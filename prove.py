@@ -77959,7 +77959,7 @@ def prove_p2p_conto_dispositivo():
     # IL TIMBRO NON AZZERA L'INDICE: un mazzo che era gia' qui tiene le
     # sue trade key bruciate, o si riuserebbe una chiave viva.
     prova("...e il timbro tiene indice, nascita e debito del vecchio",
-          True, "indice: vecchio ? (vecchio.indice | 0) : 0," in cst
+          True, "indice: vecchio ? (vecchio.indice | 0) : (s.indice | 0)," in cst
           and "creato: vecchio ? (vecchio.creato | 0)" in cst
           and "backupFatto: vecchio ? !!vecchio.backupFatto : true," in cst)
     # QUATTRO USI: tre NASCITE (il gesto, la gamba dell'app, il
@@ -78011,7 +78011,9 @@ def prove_p2p_conto_dispositivo():
     # e il contatto del supporto chiedono «e' un nativo Nostr?» con
     # `numeroConto(myTgId) < 0`, e il profilo derivato fuori da Telegram
     # si riconosce da `numeroConto(m.conto) < 0`
-    prova("...e i giudici e il testo usano numeroConto", 13,
+    # QUINDICI dal 12 ott 2026 («chiavi-stesso-profilo»): la lettura
+    # della copia sui relay e il seme chiedono anche loro «e' un nativo?»
+    prova("...e i giudici e il testo usano numeroConto", 15,
           blocco_mazzo.count("numeroConto(m.conto)")
           + blocco_mazzo.count("numeroConto(d.conto)")
           + blocco_mazzo.count("numeroConto(myTgId)"))
@@ -80833,11 +80835,12 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
     # esattamente il guasto per cui questa riga esiste. Si contano le
     # USCITE: ogni `return null` e' un modo di non avere il profilo del
     # conto, e ognuno deve dire il suo perche'.
-    # ...PIU' DUE dall'11 ott 2026 («tor-chiavi-scambio»): il seme dal
-    # server (la riga di sempre) e il seme dalla NSEC nel browser, che
-    # torna prima della fetch con la sua traccia
+    # ...PIU' TRE dall'11-12 ott 2026 («tor-chiavi-scambio», «chiavi-
+    # stesso-profilo»): il seme dal server (la riga di sempre), la COPIA
+    # sui relay e il seme dalla NSEC nel browser, che tornano prima
+    # della fetch con la loro traccia
     prova("ogni uscita della richiesta del seme lascia una traccia",
-          sp.count("return null;") + 2,
+          sp.count("return null;") + 3,
           sp.count("console.log('\U0001F511 [p2p] profilo:"))
     prova("...e dice il codice quando il conto non risponde", True,
           "il conto non risponde: ' + r.status" in sp)
@@ -147605,9 +147608,17 @@ def prove_tor_chiavi_scambio():
 
     # --- 1) IL SEME DALLA NSEC, NELLA PAGINA ---------------------------
     seme = nudo(fn("async function semeProfiloP2P(){"))
-    prova("il seme dalla nsec si prova PRIMA di chiedere al server", True,
-          0 < seme.find("await nsecDelContoP2P()") < seme.find("semeDaNsecP2P(nsec)")
+    # (12 ott 2026, «chiavi-stesso-profilo») PRIMA la copia sui relay,
+    # poi la nsec, poi il server: una npub, un profilo
+    prova("il seme guarda PRIMA la copia sui relay, poi la nsec, poi il server", True,
+          0 < seme.find("await leggiCopiaProfiloP2P()")
+          < seme.find("await nsecDelContoP2P()") < seme.find("semeDaNsecP2P(nsec)")
           < seme.find("fetch(`${API_BASE}/p2p/seme`"))
+    prova("...e il mazzo dal seme porta la copia riletta, quando il seme e' lei", True,
+          "copiaRelay: (s.copiaRelay | 0) || (vecchio ? (vecchio.copiaRelay | 0) : 0)," in fn("function mazzoDalSemeP2P(s, vecchio){"))
+    prova("la copia si pubblica anche per il profilo derivato, e mai sopra quella di un altro profilo", True,
+          "if (m.origine === 'mia' || (m.copiaRelay | 0) > 0) return 'copia';" in fn("async function assicuraCopiaProfiloP2P(opz){")
+          and "p2pCopiaEsito = 'altra';" in fn("async function assicuraCopiaProfiloP2P(opz){"))
     nsec_fn = nudo(fn("async function nsecDelContoP2P(){"))
     prova("...solo per un nativo Nostr (id negativo), e con le funzioni della nsec dietro un typeof", True,
           "if (!(numeroConto(myTgId) < 0)) return '';" in nsec_fn
@@ -147768,6 +147779,8 @@ let renderProfiloChiamate = 0; function renderProfiloP2P(){ renderProfiloChiamat
 function renderP2P(){}
 async function caricaNostrTools(){}
 let onion = false; function suOnion(){ return onion; }
+/* le righe e le lapidi, vuote: `senzaStoriaP2P` guarda l'indice */
+function ordiniP2P(){ return {}; } function lapidiP2P(){ return {}; }
 let relayCopiaP2P = ['wss://casa.test', 'wss://specchio.test'];
 let pubCasa = '';
 /* le chiavi d'accesso: una per caso */
@@ -147812,6 +147825,7 @@ function chiudiBrowser(){
   store = new Map(); nsecInBrowser = {}; nodi.p2pCopiaSheet = undefined; delete nodi.p2pCopiaSheet;
   azzeraSessioneP2P(); p2pAdozione = false; contoInCorso = null; mazzoInCorso = null;
   p2pCopiaEsito = ''; p2pCopiaGiro = null; p2pCopiaTentata = false; p2pRelayUtente = null; p2pCopiaFoglio = null;
+  p2pCopiaLetta = null; p2pCopiaLettura = null; p2pMazzoEsito = ''; p2pSemeGiro = null; p2pGiudizio = null;
   fetches = []; toasts = [];
 }
 function entra(nome, modo, conNsec){
@@ -147836,11 +147850,60 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
                     fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length,
                     log.some(l => l.indexOf('dalla chiave Nostr, nel browser') >= 0)];
   out.nsecCoperto = [profiloCopertoP2P(m1, ''), await garantisciCopiaProfiloP2P(m1), !!nodi.p2pCopiaSheet];
-  out.nsecCopiaNo = await assicuraCopiaProfiloP2P({gesto: true});   /* un derivato non va sui relay */
+  /* (12 ott 2026) anche il derivato va sui relay: e' cosi' che col bunker si ritrova */
+  out.nsecCopia = [await assicuraCopiaProfiloP2P({gesto: true}),
+                   new Set(pubblicati.filter(p => p.ev.kind === 30078).map(p => p.ev.id)).size,
+                   (mazzoMostro().copiaRelay | 0) > 0];
   /* Tor Browser si chiude: la memoria sparisce; si rientra con la stessa nsec */
   chiudiBrowser(); entra('alice', 'nsec', true);
   const m1b = await adottaProfiloContoP2P();
-  out.nsecTorna = [!!m1b, m1b && m1b.sk === s1, !!mazzoMostro()];
+  out.nsecTorna = [!!m1b, m1b && m1b.sk === s1, !!mazzoMostro(), log.some(l => l.indexOf('dalla copia cifrata sui relay') >= 0)];
+  /* NSEC → BUNKER (il caso del campo): stessa npub, il profilo e' quello */
+  chiudiBrowser(); entra('alice', 'bunker', false);
+  const m1c = await adottaProfiloContoP2P();
+  out.nsecVersoBunker = [!!m1c, m1c && m1c.sk === s1, m1c && (m1c.copiaRelay | 0) > 0];
+  /* ...e ESTENSIONE → NSEC: alice entra con l'estensione, poi con la nsec su un altro browser */
+  chiudiBrowser(); entra('alice', 'estensione', false);
+  const m1d = await adottaProfiloContoP2P();
+  chiudiBrowser(); entra('alice', 'nsec', true);
+  const m1e = await adottaProfiloContoP2P();
+  out.estensioneVersoNsec = [!!m1d && m1d.sk === s1, !!m1e && m1e.sk === s1,
+                             log.filter(l => l.indexOf('dalla chiave Nostr, nel browser') >= 0).length];
+  /* BUNKER → NSEC su una npub NUOVA: il profilo nato col bunker (a caso) vince sulla derivazione */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('bea', 'bunker', false);
+  const mbA = await assicuraMazzo();
+  await assicuraCopiaProfiloP2P({gesto: true});
+  chiudiBrowser(); entra('bea', 'nsec', true);
+  const mbB = await adottaProfiloContoP2P();
+  out.bunkerVersoNsec = [mbA.origine, !!mbB, mbB && mbB.sk === mbA.sk, mbB && mbB.sk !== semeDaNsecP2P(conto('bea').skHex),
+                         fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length];
+  /* I DUE PROFILI PER LA STESSA NPUB (il punto 4): un derivato di ieri SENZA copia
+     e la copia di un altro profilo sui relay. Con una storia si TIENE, e la
+     copia non si tocca; senza storia cede il posto, e va sulla mensola. */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('ivo', 'nsec', true);
+  const mi = await adottaProfiloContoP2P();           /* derivato, copia pubblicata dal render? no: il gesto qui sotto la farebbe */
+  const altroSk = bytesToHex(NT.generateSecretKey());
+  const altro = {sk: altroSk, pub: NT.getPublicKey(hexToBytes(altroSk)), indice: 3, creato: 5, backupFatto: false, origine: '', versione: 0, copiaRelay: 0, conto: 0};
+  const cifrato = NT.nip44.encrypt(mazzoSerializza(altro), NT.nip44.getConversationKey(contoAperto.sk, contoAperto.pub));
+  relayStore.set('wss://casa.test', [NT.finalizeEvent(eventoCopiaProfiloP2P(cifrato, 7777), contoAperto.sk)]);
+  p2pCopiaLetta = null;
+  ricordaMazzo(Object.assign({}, mi, {indice: 1}));   /* una storia: una trade key bruciata */
+  p2pMazzoEsito = ''; p2pSemeGiro = null;
+  await giudicaMazzoP2P(mazzoMostro());
+  const tenuto = [p2pMazzoEsito, mazzoMostro().sk === mi.sk, await assicuraCopiaProfiloP2P({gesto: true}),
+                  pubblicati.filter(p => p.ev.kind === 30078).length];
+  /* ...e senza storia: il derivato e' gia' in casa (adottato senza copia
+     sui relay), poi la copia di un altro profilo compare — cede, prende
+     la copia col SUO indice, e il derivato sta sulla mensola */
+  chiudiBrowser(); relayStore.clear(); entra('ivo', 'nsec', true);
+  const miPrima = await adottaProfiloContoP2P();
+  relayStore.set('wss://casa.test', [NT.finalizeEvent(eventoCopiaProfiloP2P(cifrato, 7777), contoAperto.sk)]);
+  p2pCopiaLetta = null; p2pMazzoEsito = ''; p2pSemeGiro = null;
+  await giudicaMazzoP2P(mazzoMostro());
+  const mi2 = mazzoMostro();
+  out.dueProfili = [tenuto, mi2 && mi2.sk === altroSk, mi2 && mi2.indice, mi2 && (mi2.copiaRelay | 0) > 0,
+                    p2pMazzoEsito, miPrima.sk === mi.sk,
+                    [...store.keys()].some(k => k.indexOf('@altrui:') >= 0)];
   /* con un'altra nsec e' un altro profilo */
   chiudiBrowser(); entra('bob', 'nsec', true);
   const mb = await adottaProfiloContoP2P();
@@ -147879,7 +147942,7 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
   const m2b = await adottaProfiloContoP2P();
   out.bunkerTorna = [!!m2b, m2b && m2b.sk === m2.sk, m2b && (m2b.copiaRelay | 0) > 0, p2pCopiaEsito,
                      fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length,
-                     log.some(l => l.indexOf('ripreso dalla copia cifrata sui relay') >= 0)];
+                     log.some(l => l.indexOf('dalla copia cifrata sui relay') >= 0)];
   /* una copia piu' recente vince, una d'altri non si guarda */
   out.piuRecente = [copiaPiuRecenteP2P([
       {kind: 30078, pubkey: 'a', created_at: 5, tags: [['d', P2P_COPIA_D]], id: 'uno'},
@@ -147984,8 +148047,14 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     prova("chi entra con la nsec adotta il profilo DERIVATO senza chiedere il seme al server, e registra la pubblica",
           [True, True, "conto", -555, 0, 1, True], o["nsecAdotta"])
     prova("...e' coperto: la porta passa senza foglio", [True, True, False], o["nsecCoperto"])
-    prova("...e un derivato non va sui relay", "copia", o["nsecCopiaNo"])
-    prova("Tor Browser si chiude, si rientra con la stessa nsec: lo stesso profilo", [True, True, True], o["nsecTorna"])
+    prova("...e il derivato va sui relay come gli altri (12 ott 2026)", ["copia", 1, True], o["nsecCopia"])
+    prova("Tor Browser si chiude, si rientra con la stessa nsec: lo stesso profilo, dalla copia", [True, True, True, True], o["nsecTorna"])
+    prova("NSEC → BUNKER, stessa npub: lo stesso profilo (il caso del campo)", [True, True, True], o["nsecVersoBunker"])
+    prova("ESTENSIONE → NSEC: lo stesso, e la nsec non deriva piu' niente", [True, True, 1], o["estensioneVersoNsec"])
+    prova("BUNKER → NSEC su una npub nuova: vince il profilo nato col bunker, non la derivazione",
+          ["", True, True, True, 1], o["bunkerVersoNsec"])
+    prova("due profili per la stessa npub: con una storia si TIENE e la copia altrui non si tocca ('altra'); senza, cede alla copia e va sulla mensola",
+          [["tenuto", True, "altra", 0], True, 3, True, "ceduto", True, True], o["dueProfili"])
     prova("con un'altra nsec e' un altro profilo", [True, True, True], o["nsecAltra"])
     prova("un conto Telegram non deriva dalla nsec, anche se sta nel browser", ["", None], o["telegramNo"])
     prova("col bunker, senza copia sui relay: niente si adotta e niente nasce guardando", [None, "niente", False], o["bunkerAdottaVuoto"])

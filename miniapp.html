@@ -52900,6 +52900,8 @@ function azzeraSessioneP2P(){
      volo no: il suo esito lo giudica chi lo riceve, che rilegge il
      mazzo prima di scrivere. */
   p2pMazzoEsito = ''; p2pSemeGiro = null;
+  /* ...e la copia letta dai relay e' di quel conto (12 ott 2026) */
+  if (typeof p2pCopiaLetta !== 'undefined') p2pCopiaLetta = null;
 }
 /* ⚠️ IL CONTO NON PASSA MAI DA `| 0` (10 set 2026, il secondo giro dal
    campo): i tg_id nuovi di Telegram stanno SOPRA 2^31 — 8711624959 —
@@ -52998,13 +53000,15 @@ function senzaStoriaP2P(m){
 function mazzoDalSemeP2P(s, vecchio){
   const NT = window.NostrTools;
   return {sk: s.sk, pub: NT.getPublicKey(NT.utils.hexToBytes(s.sk)),
-          indice: vecchio ? (vecchio.indice | 0) : 0,
+          indice: vecchio ? (vecchio.indice | 0) : (s.indice | 0),
           creato: vecchio ? (vecchio.creato | 0) : Math.floor(Date.now() / 1000),
           /* NESSUN DEBITO DI BACKUP: questo profilo torna da solo a ogni
              ingresso, su qualunque dispositivo — timbrarlo «da mettere
              al sicuro» chiederebbe un gesto che non serve. Un mazzo che
              era gia' qui tiene quel che aveva. */
           backupFatto: vecchio ? !!vecchio.backupFatto : true,
+          /* la copia riletta dai relay, quando il seme e' lei (12 ott 2026) */
+          copiaRelay: (s.copiaRelay | 0) || (vecchio ? (vecchio.copiaRelay | 0) : 0),
           origine: 'conto', conto: myTgId, versione: s.versione | 0};
 }
 /* IL PASSAGGIO VERO, in un posto solo perche' lo fanno in due: il
@@ -53444,13 +53448,26 @@ async function assicuraCopiaProfiloP2P(opz){
   opz = opz || {};
   const m = mazzoMostro();
   if (!m || DEMO || VETRINA || !(numeroConto(myTgId) < 0)) return '';
-  if (m.origine === 'conto' || m.origine === 'mia' || (m.copiaRelay | 0) > 0) return 'copia';
+  /* ANCHE IL PROFILO DERIVATO DALLA NSEC VA SUI RELAY (12 ott 2026,
+     «chiavi-stesso-profilo»): e' cosi' che col bunker si ritrova lo
+     stesso. Resta fuori la sola strada sovrana. */
+  if (m.origine === 'mia' || (m.copiaRelay | 0) > 0) return 'copia';
   if (!opz.gesto && p2pCopiaTentata) return p2pCopiaEsito;
   if (p2pCopiaGiro) return p2pCopiaGiro;
   p2pCopiaTentata = true;
   p2pCopiaGiro = (async () => {
     let auto = null;
     try {
+      /* MAI SOPRA LA COPIA DI UN ALTRO PROFILO (12 ott 2026): se sui
+         relay c'e' gia' la copia di un profilo diverso — la npub ha un
+         profilo altrove, e questo e' quello «tenuto» col suo passato —
+         non si scrive: la decide il giudice unico, non una sovrascrittura */
+      const gia = await leggiCopiaProfiloP2P();
+      if (gia && gia.sk !== m.sk) {
+        p2pCopiaEsito = 'altra';
+        console.log('🔑 [p2p] copia sui relay: c\'e\' gia\' quella di un altro profilo di questo account, non si scrive sopra');
+        return p2pCopiaEsito;
+      }
       auto = await firmatarioCifranteP2P();
       if (!auto) {
         p2pCopiaEsito = 'niente';
@@ -53461,6 +53478,8 @@ async function assicuraCopiaProfiloP2P(opz){
       if (esito.visto > 0) {
         const ora = mazzoMostro();
         if (ora && ora.sk === m.sk) { ora.copiaRelay = Math.floor(Date.now() / 1000); ricordaMazzo(ora); }
+        /* la lettura della sessione ora dice questa copia */
+        p2pCopiaLetta = {mazzo: Object.assign({}, ora || m, {quando: Math.floor(Date.now() / 1000)})};
         p2pCopiaEsito = 'copia';
         console.log('🔑 [p2p] copia cifrata del profilo sui relay: la rileggono ' + esito.visto + ' su ' + esito.relays);
       } else {
@@ -53484,38 +53503,62 @@ async function assicuraCopiaProfiloP2P(opz){
    col firmatario automatico — si cerca la copia piu' recente, si
    decifra, e il profilo torna. Torna il mazzo o null; non genera mai
    niente (l'invariante di `adottaProfiloContoP2P`). */
+/* LA LETTURA DELLA COPIA, UNA VOLTA PER SESSIONE (12 ott 2026, «chiavi-
+   stesso-profilo»): per un nativo Nostr, col firmatario automatico che
+   sa cifrare (nsec, bunker, estensione), si cerca sui relay la copia
+   piu' recente MIA e la si apre. Torna il mazzo letto (con `quando`) o
+   null; la risposta si tiene per la sessione, che la chiedono il seme,
+   la ripresa e la copia da pubblicare. `azzeraSessioneP2P` la butta. */
+let p2pCopiaLetta = null;      /* {mazzo|null} dopo la prima lettura */
+let p2pCopiaLettura = null;    /* la promessa in volo */
+function leggiCopiaProfiloP2P(){
+  if (DEMO || VETRINA || !(numeroConto(myTgId) < 0)) return Promise.resolve(null);
+  if (p2pCopiaLetta) return Promise.resolve(p2pCopiaLetta.mazzo);
+  if (p2pCopiaLettura) return p2pCopiaLettura;
+  p2pCopiaLettura = (async () => {
+    const auto = await firmatarioCifranteP2P();
+    if (!auto) { p2pCopiaEsito = p2pCopiaEsito || 'niente'; return null; }
+    try {
+      await caricaNostrTools();
+      const NT = window.NostrTools;
+      const pub = String(await auto.f.pubkey() || '').toLowerCase();
+      if (!FORMA_HEX64.test(pub)) return null;
+      const relays = await relayPerCopiaP2P(pub);
+      if (!relays.length) return null;
+      const letti = await leggiDaRelayP2P(relays,
+        {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [P2P_COPIA_D]}, P2P_COPIA_MS);
+      const ev = copiaPiuRecenteP2P(letti.map(x => x.ev), pub);
+      if (!ev) { console.log('🔑 [p2p] copia sui relay: nessuna copia'); p2pCopiaLetta = {mazzo: null}; return null; }
+      if (!NT.verifyEvent(ev)) return null;
+      const su = mazzoDaTesto(await auto.f.decifra44(pub, ev.content));
+      if (!su) { console.log('🔑 [p2p] copia sui relay: la copia non si apre'); return null; }
+      su.quando = Math.max(su.copiaRelay | 0, ev.created_at | 0);
+      su.copiaRelay = su.quando;
+      p2pCopiaLetta = {mazzo: su};
+      return su;
+    } catch(e) {
+      console.log('🔑 [p2p] copia sui relay: lettura fallita (' + ((e && e.message) || e) + ')');
+      return null;
+    } finally {
+      if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+    }
+  })().finally(() => { p2pCopiaLettura = null; });
+  return p2pCopiaLettura;
+}
+/* LA RIPRESA: senza mazzo, per un nativo Nostr — la copia letta diventa
+   il profilo, registrata. Torna il mazzo o null; non genera mai niente
+   (l'invariante di `adottaProfiloContoP2P`). Dal 12 ott 2026 e' la via
+   di riserva: il seme la copia la guarda gia' per primo. */
 async function riprendiCopiaProfiloP2P(){
   if (DEMO || VETRINA || !(numeroConto(myTgId) < 0) || mazzoMostro()) return null;
-  if (await nsecDelContoP2P()) return null;    /* il primo strato fa da se' */
-  const auto = await firmatarioCifranteP2P();
-  if (!auto) return null;
-  try {
-    await caricaNostrTools();
-    const NT = window.NostrTools;
-    const pub = String(await auto.f.pubkey() || '').toLowerCase();
-    if (!FORMA_HEX64.test(pub)) return null;
-    const relays = await relayPerCopiaP2P(pub);
-    if (!relays.length) return null;
-    const letti = await leggiDaRelayP2P(relays,
-      {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [P2P_COPIA_D]}, P2P_COPIA_MS);
-    const ev = copiaPiuRecenteP2P(letti.map(x => x.ev), pub);
-    if (!ev) { p2pCopiaEsito = 'niente'; console.log('🔑 [p2p] copia sui relay: nessuna copia da riprendere'); return null; }
-    if (!NT.verifyEvent(ev)) return null;
-    const su = mazzoDaTesto(await auto.f.decifra44(pub, ev.content));
-    if (!su) { console.log('🔑 [p2p] copia sui relay: la copia non si apre'); return null; }
-    if (mazzoMostro()) return mazzoMostro();     /* nato nel frattempo: non si tocca */
-    su.copiaRelay = Math.max(su.copiaRelay | 0, ev.created_at | 0);
-    ricordaMazzo(su);
-    await registraChiaviP2P([su.pub]);
-    p2pCopiaEsito = 'copia';
-    console.log('🔑 [p2p] profilo: ripreso dalla copia cifrata sui relay');
-    return mazzoMostro();
-  } catch(e) {
-    console.log('🔑 [p2p] copia sui relay: ripresa fallita (' + ((e && e.message) || e) + ')');
-    return null;
-  } finally {
-    if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
-  }
+  const su = await leggiCopiaProfiloP2P();
+  if (!su) { p2pCopiaEsito = p2pCopiaEsito || 'niente'; return null; }
+  if (mazzoMostro()) return mazzoMostro();     /* nato nel frattempo: non si tocca */
+  ricordaMazzo(su);
+  await registraChiaviP2P([su.pub]);
+  p2pCopiaEsito = 'copia';
+  console.log('🔑 [p2p] profilo: ripreso dalla copia cifrata sui relay');
+  return mazzoMostro();
 }
 /* ============ LA RETE DI SICUREZZA PRIMA DELLA PRIMA PRESA (11 ott 2026,
    cantiere «tor-chiavi-scambio», terzo strato) ============
@@ -54098,10 +54141,27 @@ async function semeProfiloP2P(){
     console.log('🔑 [p2p] profilo: nel browser (non si chiede: vetrina o demo)');
     return null;
   }
+  /* UNA NPUB, UN PROFILO (12 ott 2026, «chiavi-stesso-profilo», dal
+     campo: pubblicato con la nsec da Tor, rientrato con Amber, l'ordine
+     non era suo). Per un nativo Nostr la PRIMA fonte e' la copia
+     cifrata sui relay, qualunque sia il modo di entrare: se c'e', il
+     profilo e' quello, e la nsec non deriva niente. */
+  /* SOLO PER IL NATIVO si aspetta qualcosa qui: chi entra da Telegram
+     va dritto alla fetch di sempre, senza un'attesa in piu' (una
+     promessa in piu' sposta la fetch di un giro, e un banco lo vede) */
+  const nativo = numeroConto(myTgId) < 0;
+  const copia = nativo ? await leggiCopiaProfiloP2P() : null;
+  if (copia) {
+    console.log('🔑 [p2p] profilo: dalla copia cifrata sui relay');
+    p2pCopiaEsito = 'copia';
+    return {sk: copia.sk, versione: copia.versione | 0, copiaRelay: copia.quando | 0, indice: copia.indice | 0};
+  }
   /* LA NSEC NEL BROWSER PRIMA DEL SERVER (11 ott 2026, «tor-chiavi-
      scambio»): per un nativo Nostr il server risponde 409 apposta, e
-     la risposta sta gia' qui — dalla sua chiave, senza rete. */
-  const nsec = await nsecDelContoP2P();
+     la risposta sta gia' qui — dalla sua chiave, senza rete. La copia
+     la pubblica poi `assicuraCopiaProfiloP2P`, cosi' col bunker si
+     ritrova lo stesso profilo. */
+  const nsec = nativo ? await nsecDelContoP2P() : '';
   if (nsec) {
     const sk = semeDaNsecP2P(nsec);
     if (sk) {
@@ -54361,10 +54421,13 @@ async function apriProfiloP2P(){
 /* PURA: il testo del profilo che deriva dalla chiave d'accesso (11 ott
    2026, primo strato), per chi entra con la nsec nel browser */
 function testoProfiloDerivatoFuoriP2P(){
-  return 'Questo profilo si ricava dalla <b>tua chiave Nostr</b>, qui nel browser e mai inviata: <b>torna da solo</b> ogni volta che entri con la stessa chiave, su qualunque dispositivo. Il codice segreto serve solo se vuoi portarlo fuori da Barattolo.';
+  return 'Questo profilo è legato alla <b>tua chiave Nostr</b>, che non viene mai inviata: una copia cifrata sta sui tuoi relay, così <b>torna da solo</b> comunque tu entri — nsec, bunker o estensione. Il codice segreto serve solo se vuoi portarlo fuori da Barattolo.';
 }
 function rigaCopiaFuoriP2P(m){
-  if (!m || !(numeroConto(myTgId) < 0) || m.origine === 'conto' || m.origine === 'mia') return '';
+  if (!m || !(numeroConto(myTgId) < 0) || m.origine === 'mia') return '';
+  /* (12 ott 2026) la copia di un altro profilo di questo account: lo
+     dice gia' il riquadro dei due profili, qui niente */
+  if (p2pCopiaEsito === 'altra') return '';
   if ((m.copiaRelay | 0) > 0) {
     const dal = new Date((m.copiaRelay | 0) * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'});
     return '<div class="hint">✓ Una <b>copia cifrata</b> del profilo sta sui tuoi relay Nostr (dal ' + esc(dal) + '): la apre solo la tua chiave. Entrando con la stessa chiave, da qualunque browser, torna da sola.</div>';

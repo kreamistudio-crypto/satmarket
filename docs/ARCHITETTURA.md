@@ -29961,8 +29961,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    bunker, l'estensione o la nsec, sui relay dell'utente e su quelli di
    casa, riletta per conferma; il server non la vede e non la custodisce
    — la copia server-side, anche cifrata, resta RESPINTA come per il
-   secret NWC). La ricetta e le prove: CANTIERI, «Le chiavi dello
-   scambio dopo la memoria svuotata».
+   secret NWC). UNA NPUB, UN PROFILO (12 ott 2026, «chiavi-stesso-
+   profilo»): al login del nativo si legge PRIMA la copia sui relay,
+   con qualunque firmatario; solo senza copia la nsec deriva, e poi
+   pubblica anche lei; due profili per la stessa npub li decide il
+   giudice unico del mazzo con la mensola, e la copia sui relay non si
+   sovrascrive mai con un profilo diverso. La ricetta e le prove:
+   CANTIERI, «Le chiavi dello scambio dopo la memoria svuotata» e «Una
+   npub, un profilo di scambio».
 - LE LETTURE DAI RELAY IN COLLAUDO (23 set 2026, regola di Andrea: nei
   collaudi e nei giri dal vivo non ci si collega MAI a un relay vero, e
   non si pubblica niente). Le PUBBLICAZIONI erano a posto da sempre —

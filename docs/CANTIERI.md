@@ -50735,3 +50735,72 @@ il deploy); il 10050 nuovo, che pubblica Andrea.
 RESTA DA FARE (Andrea): i passi D0-D5 di PRODUZIONE, «IL KIND 10050 DI
 BARATTOLO», dopo aver visto nel journal «in ascolto su
 wss://relay.primal.net»; poi un DM di prova da un'altra chiave.
+
+## Una npub, un profilo di scambio: prima la copia sui relay, poi la nsec (12 ott 2026, notte, cantiere chiavi-stesso-profilo, difetto trovato da Andrea nella prova dal vivo)
+
+**Il difetto.** Stessa npub: Andrea pubblica un ordine P2P entrando con
+la nsec dal .onion con Tor Browser, esce, rientra con Amber (bunker):
+l'ordine non risulta suo. La causa era nella cura di ieri: con la nsec il
+profilo si RICAVAVA dalla chiave e la copia cifrata sui relay NON si
+pubblicava («senza relay», per decisione); col bunker si cercava la copia,
+non c'era, e nasceva un profilo a caso. Il contrario (bunker, poi nsec)
+avrebbe fatto lo stesso: la nsec derivava il suo, ignorando la copia.
+
+**La regola (decisione di Andrea).** Per la stessa npub UN profilo di
+scambio, qualunque sia il modo di entrare e qualunque sia stato il
+primo. 1) Al login si cerca SEMPRE prima la copia cifrata sui relay
+(`leggiCopiaProfiloP2P`, una lettura per sessione col firmatario
+automatico: nsec, bunker o estensione): se c'è, il profilo è quello, e
+`semeProfiloP2P` la restituisce come seme — con l'indice che porta,
+così una trade key bruciata altrove non si riusa prima ancora del
+pavimento del server. 2) Se non c'è: con la nsec si ricava e si PUBBLICA
+la copia (`assicuraCopiaProfiloP2P` non salta più il profilo 'conto' del
+nativo; resta fuori solo la strada sovrana 'mia'); col bunker o con
+l'estensione si crea e si pubblica, come ieri. 3) Chi ha già un profilo
+ricavato dalla nsec senza copia (Andrea, adesso): al prossimo login con la
+nsec il giudice lo riconosce (stessa sk del seme derivato: «mio») e il
+render pubblica la copia; da lì funziona anche col bunker. 4) Due profili
+diversi per la stessa npub — uno ricavato (o nato a caso) in un browser
+senza copia, uno già copiato sui relay da un altro browser: decide il
+GIUDICE UNICO del mazzo, quello del conto di Telegram, senza una riga
+nuova: il seme ora è la copia; se la sk locale è diversa e il profilo
+locale HA UNA STORIA (una trade key bruciata, righe, lapidi) si TIENE
+(`tenuto`): gli scambi in corso restano suoi, il foglio del profilo dice
+«Questo profilo è nato su questo dispositivo, e il tuo account ne ha un
+altro» col bottone «🔁 Usa il profilo del tuo account», che aspetta la
+fine degli scambi aperti (`passaAlContoDalFoglioP2P`) e poi PARCHEGGIA il
+locale sulla mensola (`parcheggiaMazzoAltruiP2P`: mazzo, righe, lapidi e
+recapiti sotto `@altrui:<pub>`, mai cancellati) e adotta la copia; se il
+locale NON ha storia cede subito (`ceduto`), la copia entra col suo
+indice, e il derivato va sulla mensola. E la copia sui relay NON si
+sovrascrive mai con un profilo diverso: `assicuraCopiaProfiloP2P` legge
+prima, e se trova la copia di un altro profilo dello stesso account
+risponde «altra» e non scrive — a decidere è il giudice, non chi arriva
+ultimo. Per chi entra da Telegram niente cambia: il seme non aspetta
+nessuna lettura nuova (le due attese sono solo del nativo: un banco ha
+visto la fetch spostata di un giro).
+
+**Scartato.** Rendere canonico il profilo derivato (il bunker non può
+derivarlo); far vincere l'ultimo arrivato sui relay (perderebbe gli
+scambi dell'altro); una regola di conflitto nuova (quella del conto di
+Telegram fa già tutto, mensola compresa).
+
+**Provato.** `prove_tor_chiavi_scambio` (63 verdi): il seme guarda prima
+la copia, poi la nsec, poi il server; il mazzo dal seme porta copia e
+indice; il derivato va sui relay (una copia, riletta); Tor che si chiude
+e rientra dalla copia; NSEC → BUNKER (il caso del campo), ESTENSIONE →
+NSEC (la nsec non deriva più), BUNKER → NSEC su una npub nuova (vince il
+profilo nato col bunker); i due profili: con storia «tenuto» e la copia
+altrui non si tocca («altra», zero pubblicazioni), senza storia «ceduto»
+alla copia col suo indice, e il derivato sulla mensola. Le prove del
+conto e delle chiavi rilette (quindici `numeroConto`, l'indice dal
+seme). `collaudo_chiavi_ritrovate` (41 ok, nel workflow): i tre
+passaggi sul server vero — il dispositivo 1 (nsec, bunker, estensione)
+pubblica la copia e prende; il dispositivo 2 nell'altro modo ritrova lo
+STESSO profilo dalla copia e la riga ha le chiavi e il bottone. Il giro
+dal vivo nel pane: nel verbale sotto.
+
+**Resta da guardare.** Sul telefono vero di Andrea: il prossimo login con
+la nsec pubblica la copia (il foglio del profilo deve dire «una copia
+cifrata sta sui tuoi relay»), poi Amber ritrova l'ordine; il relay di
+casa che accetta la copia dalla sua npub (è nella lista di chi scrive).

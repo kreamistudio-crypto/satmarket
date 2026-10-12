@@ -175,15 +175,24 @@ vere sullo schermo, si salta come il tour):
   fine dello scambio.», il bottone per il bot e «…o entra con Nostr».
   Dall'indirizzo .onion: «🧅 Entra con la tua chiave» e «Entra con
   Nostr».
-- **Con una chiave Nostr, il profilo di scambio** (12 ott 2026) 🧑 se sei
-  entrato con la **nsec** il profilo si ricava dalla tua chiave, qui nel
-  browser, e torna da solo a ogni ingresso con la stessa chiave; 📱 nel
-  foglio del profilo: «Questo profilo si ricava dalla **tua chiave
-  Nostr**, qui nel browser e mai inviata: **torna da solo** ogni volta
-  che entri con la stessa chiave, su qualunque dispositivo. Il codice
-  segreto serve solo se vuoi portarlo fuori da Barattolo.» Col **bunker**
-  o con l'**estensione** una copia cifrata del profilo va sui tuoi
-  relay: «✓ Una **copia cifrata** del profilo sta sui tuoi relay Nostr
+- **Con una chiave Nostr, il profilo di scambio** (12 ott 2026) 🧑 una
+  npub, un profilo, comunque entri: al login si cerca prima la copia
+  cifrata sui tuoi relay; se non c'è, con la **nsec** il profilo si
+  ricava dalla tua chiave qui nel browser e la copia parte, col
+  **bunker** o con l'**estensione** nasce e la copia parte. 📱 Nel foglio
+  del profilo, entrando con la nsec: «Questo profilo è legato alla **tua
+  chiave Nostr**, che non viene mai inviata: una copia cifrata sta sui
+  tuoi relay, così **torna da solo** comunque tu entri — nsec, bunker o
+  estensione. Il codice segreto serve solo se vuoi portarlo fuori da
+  Barattolo.» (anche quando il profilo è nato col bunker e la nsec lo ha
+  ritrovato dalla copia: il testo vale per tutt'e due) Se un browser ha un profilo suo con una
+  storia e l'account ne ha un altro sui relay: «Questo profilo è nato su
+  **questo dispositivo**, e il tuo account ne ha un altro — quello che usi
+  altrove. Gli scambi e le recensioni restano attaccati al profilo con cui
+  li hai fatti.» col bottone «🔁 Usa il profilo del tuo account» (che
+  aspetta la fine degli scambi aperti: «Hai uno scambio ancora aperto:
+  finiscilo prima di cambiare profilo»). Per tutti, la riga della copia
+  sui relay: «✓ Una **copia cifrata** del profilo sta sui tuoi relay Nostr
   (dal <data>): la apre solo la tua chiave. Entrando con la stessa
   chiave, da qualunque browser, torna da sola.» — o, se non è riuscita,
   «⚠️ Non siamo riusciti a mettere una copia cifrata del profilo sui

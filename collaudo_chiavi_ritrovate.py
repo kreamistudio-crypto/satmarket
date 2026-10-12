@@ -53,7 +53,11 @@ NATIVO = -777                    # un nativo Nostr: tg_id NEGATIVO
 ORD = {"nsec": "5a1e0000-7071-4a2b-9c3d-0000000000c1",
        "bunker": "5a1e0000-7071-4a2b-9c3d-0000000000c2",
        "estensione": "5a1e0000-7071-4a2b-9c3d-0000000000c3",
-       "spento": "5a1e0000-7071-4a2b-9c3d-0000000000c4"}
+       "spento": "5a1e0000-7071-4a2b-9c3d-0000000000c4",
+       # (12 ott 2026) i passaggi fra i modi di entrare, stessa npub
+       "nsec-bunker": "5a1e0000-7071-4a2b-9c3d-0000000000c5",
+       "bunker-nsec": "5a1e0000-7071-4a2b-9c3d-0000000000c6",
+       "estensione-nsec": "5a1e0000-7071-4a2b-9c3d-0000000000c7"}
 
 
 def js(mini, firma, fine="\n}\n"):
@@ -303,7 +307,8 @@ def main():
     t = int(time.time()) - 600
     # una chiave d'accesso usa-e-getta per caso: nata qui, mai vera
     import secrets
-    conti = {c: secrets.token_hex(32) for c in ("nsec", "bunker", "estensione", "spento")}
+    conti = {c: secrets.token_hex(32) for c in ("nsec", "bunker", "estensione", "spento",
+                                                 "nsec-bunker", "bunker-nsec", "estensione-nsec")}
     # una chiave d'accesso valida e' uno scalare: con 64 hex a caso lo e'
     # quasi sempre, e per il resto c'e' il bundle che lo dice; qui basta
 
@@ -320,7 +325,7 @@ def main():
             continue
         if caso == "nsec":
             prova("[nsec] il profilo deriva dalla chiave (origine 'conto', col conto negativo), senza chiedere il seme, senza copia sui relay",
-                  ["conto", NATIVO, 0, "copia", 0], [uno["origine"], uno["conto"], uno["semeChiesto"], uno["copia"], uno["copie"]])
+                  ["conto", NATIVO, 0, "copia", 1], [uno["origine"], uno["conto"], uno["semeChiesto"], uno["copia"], uno["copie"]])
         else:
             # il seme si chiede due volte: la gamba dell'app e poi il gesto, e
             # tutt'e due prendono il 409
@@ -351,15 +356,40 @@ def main():
         prova(f"[{caso}] il dispositivo 2 gira", None, due.get("ERRORE"))
         if due.get("ERRORE"):
             continue
-        prova(f"[{caso}] lo STESSO profilo torna a memoria vuota" + (" (dalla copia sui relay)" if caso != "nsec" else " (dalla nsec)"),
-              [uno["mazzoPub"], caso != "nsec"],
+        # (12 ott 2026) anche con la nsec torna dalla copia sui relay: una npub, un profilo
+        prova(f"[{caso}] lo STESSO profilo torna a memoria vuota, dalla copia sui relay",
+              [uno["mazzoPub"], True],
               [due["profilo"] and due["profilo"]["pub"], bool(due["profilo"] and due["profilo"]["copiaRelay"])])
         prova(f"[{caso}] la riga dell'archivio NON e' solo da guardare: la trade key e' ritrovata, i gesti ci sono",
               ["attivo", "compro", False, uno["tradePub"], uno["indice"], "euro-inviati"],
               due["riga"] and [due["riga"]["stato"], due["riga"]["lato"], due["riga"]["soloVista"],
                                due["riga"]["pubTrade"], due["riga"]["indice"], due["riga"]["azione"]])
 
-    print("\n3) il controllo negativo: senza nsec, senza copia, un'estensione che non cifra")
+    print("\n3) i passaggi fra i modi di entrare, stessa npub (12 ott 2026, «chiavi-stesso-profilo»)")
+    for da, a in (("nsec", "bunker"), ("bunker", "nsec"), ("estensione", "nsec")):
+        ordine = ORD[da + "-" + a]
+        chiave = conti[da + "-" + a]
+        uno = client({"passo": "nasce", "modo": da, "contoSk": chiave, "tgId": NATIVO, "relay": {}, "pavimento": 0})
+        prova(f"[{da}→{a}] il dispositivo 1 ({da}) gira e pubblica la copia", [None, "copia", 1],
+              [uno.get("ERRORE"), uno.get("copia"), uno.get("copie")])
+        if uno.get("ERRORE"):
+            continue
+        banco.come(NATIVO)
+        for pubkeys in uno["chiaviRegistrate"]:
+            banco.esito(SRV.registra_chiavi_p2p, {"pubkeys": pubkeys})
+        cammina_presa(ordine, uno["tradePub"], t)
+        risposta = scambi(NATIVO)
+        due = client({"passo": "rientra", "modo": a, "contoSk": chiave, "tgId": NATIVO,
+                      "relay": uno["relay"], "risposta": risposta.get("scambi", {}), "ordine": ordine,
+                      "pavimento": uno["indice"]})
+        prova(f"[{da}→{a}] il dispositivo 2 ({a}) ritrova LO STESSO profilo dalla copia, e la riga ha le chiavi e i gesti",
+              [None, uno["mazzoPub"], True, "attivo", False, uno["tradePub"], "euro-inviati"],
+              [due.get("ERRORE"), due.get("profilo") and due["profilo"]["pub"],
+               bool(due.get("profilo") and due["profilo"]["copiaRelay"]),
+               due.get("riga") and due["riga"]["stato"], due.get("riga") and due["riga"]["soloVista"],
+               due.get("riga") and due["riga"]["pubTrade"], due.get("riga") and due["riga"]["azione"]])
+
+    print("\n4) il controllo negativo: senza nsec, senza copia, un'estensione che non cifra")
     ordine = ORD["spento"]
     uno = client({"passo": "nasce", "modo": "spento", "contoSk": conti["spento"], "tgId": NATIVO,
                   "relay": {}, "pavimento": 0})
@@ -378,7 +408,7 @@ def main():
         prova("[spento] il dispositivo 2 gira", None, due.get("ERRORE"))
         if not due.get("ERRORE"):
             prova("[spento] a memoria vuota nessun profilo torna, e la riga resta SOLO DA GUARDARE coi gesti spenti: il caso del campo",
-                  [None, "", True, "", ""],
+                  [None, "niente", True, "", ""],
                   [due["profilo"], due["copiaEsito"], due["riga"] and due["riga"]["soloVista"],
                    due["riga"] and due["riga"]["azione"], due["riga"] and due["riga"]["azioneNuda"]])
 
