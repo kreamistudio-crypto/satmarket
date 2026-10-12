@@ -224,10 +224,8 @@ vere sullo schermo, si salta come il tour):
   Barattolo: qui non ha un profilo…»; sugli scambi di prima del 12 ott
   «L'altra persona è su Barattolo ma resta anonima: lo scambio è di
   prima del 12 ottobre 2026…»; finché il coordinatore non ha detto chi
-  è: «Chi è l'altra persona non lo sappiamo ancora…». Al primo ingresso
-  dopo il cambio, a chi entrava da Nostr col vecchio default: «Da ora
-  l'altra persona ti riconosce negli scambi» — «…Se vuoi restare
-  anonimo, entra con una chiave Nostr nuova.» — «Ho capito».
+  è: «Chi è l'altra persona non lo sappiamo ancora…». Nessun avviso al
+  login: la regola sta nel patto «I tuoi dati» («Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome che hai scelto e le tue recensioni. Non vede chi sei né da dove ti colleghi. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.»).
 - **Gli avvisi**, per tutti, nel cassetto «🔔 Avvisi»: «⚡ Avvisi sugli
   scambi P2P» — «Quando il tuo ordine viene preso, quando lo scambio si
   chiude e quando tocca a te. Spenti, non ti scriviamo nulla dello

@@ -46,10 +46,10 @@ SEGRETO = "collaudo-segreto"
 V, C = banco.VENDE, banco.COMPRA
 # (12 ott 2026, chi-e-l-altro) chi ha preso vede chi ha pubblicato appena
 # mostrod nomina le due parti: la frase dice il NOME di V, che il banco
-# semina come «Chi vende» (senza un nome direbbe «Chi ti vende i sats»)
-AGG = ("📮 <b>Chi vende ha aggiornato il recapito.</b> Controlla il "
+# semina come «Vera» (senza un nome direbbe «Chi ti vende i sats»)
+AGG = ("📮 <b>Vera ha aggiornato il recapito.</b> Controlla il "
        "nuovo prima di inviare gli euro.")
-GIA = ("📮 <b>Chi vende ha aggiornato il recapito dopo che hai segnato "
+GIA = ("📮 <b>Vera ha aggiornato il recapito dopo che hai segnato "
        "gli euro come inviati.</b> Se li hai già inviati al recapito precedente, "
        "scrivilo nella chat dello scambio: non inviarli una seconda volta.")
 
@@ -111,7 +111,7 @@ async def giro():
     detti, _, r = await recapito(o)
     prova("risponde ok, e a chi compra parte la frase di sempre", ({"ok": True}, C, True),
           (r, detti[0][0] if detti else 0, (detti[0][1] if detti else "").startswith(
-              "💶 <b>Chi vende ti ha indicato dove inviare 10,00 €: tocca a te.</b>")))
+              "💶 <b>Vera ti ha indicato dove inviare 10,00 €: tocca a te.</b>")))
 
     print("\n2) l'aggiornamento SUBITO DOPO")
     detti, giornale, _ = await recapito(o)

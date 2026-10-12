@@ -51827,10 +51827,13 @@ nomina come compratore. Ma volto e recensione passavano da
 `p2p_ordini.preso_da`, e per un nativo Nostr che PRENDE `preso_da` non si
 scriveva — la decisione del 16-17 set 2026 («Fatti riconoscere negli
 scambi» spento di serie per chi entra da Nostr). Sconosciuto per regola,
-non per mancanza di dati. (Resta aperta l'ipotesi di Alan che la chiave
-di quello scambio non fosse legata al suo account — un profilo perso su
-Tor prima della cura: lo dice il comando in sola lettura nel rapporto;
-in ogni caso il passato non si ricostruisce.)
+non per mancanza di dati. L'ipotesi di Alan — che la chiave di quello
+scambio non fosse legata al suo account, un profilo perso su Tor prima
+della cura — l'ha chiusa Andrea sul VPS la sera stessa, in sola lettura:
+la trade key del compratore (de2e035b) è legata al suo account (firmata
+0), quella del venditore al suo (firmata 1), `preso_da` 0. Il
+collegamento c'era: sconosciuto per regola, davvero. Il passato non si
+ricostruisce comunque.
 
 **La decisione.** Chi scambia DA Barattolo è riconosciuto dalla
 controparte con qualunque login — Telegram, nsec, bunker, estensione:
@@ -51841,18 +51844,14 @@ L'interruttore «Fatti riconoscere» ESCE del tutto (prima stesura: acceso
 di serie con lo spegnimento come scelta; poi, con Alan, via): chi vuole
 l'anonimato entra con una chiave Nostr nuova, che per l'altra persona è
 un'altra persona. Gli scambi già chiusi NON sono retroattivi: la promessa
-del 17 set vale sul passato. A chi oggi entra da Nostr col vecchio default
-un avviso una tantum: «Da ora l'altra persona ti riconosce negli scambi…
-se vuoi restare anonimo, entra con una chiave Nostr nuova» — «Ho capito».
+del 17 set vale sul passato. NESSUN AVVISO al login: la regola sta solo
+nel patto «I tuoi dati», con le parole di Andrea (la sera): «Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome che hai scelto e le tue recensioni. Non vede chi sei né da dove ti colleghi. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.»
 
 **Com'è fatto.** `_p2p_riconosciuto` resta il giudice unico e dice sì a
 chiunque sia qualcuno: la presa si annota per tutti (`preso_da`), e da
 lì volti e recensioni funzionano come per chi entra da Telegram. La
 rotta dell'interruttore è uscita; la colonna `riconosci_p2p` resta per il
-passato e per l'avviso; nasce `avviso_riconosci` (1 = detto). `/api/me`
-dà `riconosci_p2p` DERIVATO dal giudice e `avviso_riconosci`
-(`_avviso_riconosci_p2p`: nativo, mai avvisato, mai acceso, con una
-chiave di scambio registrata); «Ho capito» → `/api/me/avviso-riconosci-visto`.
+passato; `/api/me` dà `riconosci_p2p` DERIVATO dal giudice.
 I MOTIVI dello sconosciuto (`_motivo_sconosciuto_p2p`, da `p2p_scambi` +
 `chiavi_p2p`, niente di nuovo si scrive): `esterno` (la chiave non è di
 nessuno dei nostri: un'altra app Mostro), `anonimo_prima` (dei nostri, ma
@@ -51873,26 +51872,29 @@ cassetto «🔔 Avvisi» ha una riga in meno.
 set); l'interruttore acceso di serie con lo spegnimento (la prima stesura
 di oggi: Alan e Andrea hanno preferito una regola sola, senza un quarto
 caso di testo); una leva a data per distinguere «prima» e «dopo» (basta
-`preso_da`: il passato non lo ha, il presente sì).
+`preso_da`: il passato non lo ha, il presente sì); l'avviso una tantum
+«Da ora l'altra persona ti riconosce negli scambi» — «Ho capito»,
+costruito la mattina (colonna `avviso_riconosci`, rotta
+`/api/me/avviso-riconosci-visto`, foglio al login) e tolto la sera su
+decisione di Andrea: la regola sta nel patto e basta, un foglio in più al
+login non dice niente che il patto non dica già.
 
-**Provato.** `prove_chi_e_l_altro` (25 verdi): i giudici su un database
-in memoria (i tre motivi, l'avviso una tantum, il riconoscimento per
-tutti) e le sentinelle su rotte, pagina e patto. Le prove toccate
+**Provato.** `prove_chi_e_l_altro` (22 verdi): i giudici su un database
+in memoria (i tre motivi, il riconoscimento per tutti, nessun avviso) e
+le sentinelle su rotte, pagina e patto. Le prove toccate
 riscritte: `prove_recensione_p2p` (la sezione 12: l'interruttore è
 uscito), `prove_dati_reputazione_p2p`, `prove_p2p_avvisi_libro`,
 `prove_parti_si_vedono`, `prove_card_parte_ordine`, `prove_fogli_di_casa`
-(ottantadue gesti della domanda unica). `collaudo_chi_e_l_altro` (21 ok,
+(ottantuno gesti della domanda unica). `collaudo_chi_e_l_altro` (20 ok,
 nel workflow): le quattro coppie di login sul server vero (volto nei due
 versi, recensione nei due versi), lo scambio di prima («anonimo_prima»,
 il volto di chi vende a chi ha preso), l'altra app («esterno»), mostrod
-muto, l'avviso una tantum e «Ho capito», il riconoscimento derivato in
-`/api/me`. `collaudo_recensione_p2p` riscritto nella sezione 10. Il giro
+muto, il riconoscimento derivato in `/api/me` e nessun avviso. `collaudo_recensione_p2p` riscritto nella sezione 10. Il giro
 dal vivo nel pane: sotto.
 
 **Resta da guardare.** Sul telefono di Andrea e su quello di Alan: il
-prossimo scambio con un nativo (volto e recensione); l'avviso una tantum
-a chi entra da Nostr col vecchio default; l'esito del comando in sola
-lettura su ea0af71a (la chiave di Sweegmiao in `chiavi_p2p`).
+prossimo scambio con un nativo (volto e recensione). Chiuso: l'esito del
+comando in sola lettura su ea0af71a (sopra, «La causa»).
 
 **La suite intera, e quel che ha trovato.** Sulla copia pulita del
 primo commit (39ba942) la suite ha detto 4 prove rosse e 2 collaudi
@@ -51920,3 +51922,33 @@ una copia pulita: la suite intera 22505 passate, 0 fallite; i collaudi
 della CI 63 verdi, 0 rossi. Prima del rebase, sull'albero del
 cantiere: le sette prove toccate 556 verdi e i sei collaudi vicini in
 gabbia verdi.
+
+**Il giro della sera (richieste di Andrea).** 1) L'avviso una tantum
+è uscito del tutto — colonna `avviso_riconosci`, giudice, rotta
+`/api/me/avviso-riconosci-visto`, foglio «Ho capito», gancio dal
+`/api/me`, prove e collaudo: la regola sta SOLO nel patto «I tuoi
+dati», con le sue parole (il paragrafo che apre con «Negli scambi
+l'altra persona vede il tuo profilo Barattolo…»); una sentinella
+pretende quella frase una volta e nessun «lo dice una volta sola».
+`/api/me` continua a dare `riconosci_p2p` derivato dal giudice (il
+collaudo lo legge). 2) Cosa vede DAVVERO la controparte, letto in
+`_volti_persone` e `cardParte`: nome, foto (salvo «nessuna foto»),
+stelline con la media e il numero dei voti, livello e titolo, bollino
+Staff, «N giorni qui», ✅ completati / ⚠️ non completati / ⚖️ dispute
+perse, il tondo Telegram (lo @username, se c'è) e il tondo Nostr con la
+npub PROVATA — cioè il badge verificato OPPURE la chiave con cui è
+entrato (`npub_accesso`: nsec, bunker, estensione). Rispetto alla pagina
+pubblica del negozio ci sono due cose in più: i giorni di iscrizione
+(`registrato` non esce di là) e la npub di accesso (di là esce solo col
+badge). Mai: tg_id, IP, modo di accesso, recapiti, importi. Quindi la
+frase «Non vede chi sei» è vera solo per chi non ha uno @username e non
+entra con una chiave Nostr: a Andrea la parola, prima del push. 3) Il
+caso ea0af71a chiuso da Andrea sul VPS: il collegamento c'era (sopra).
+4) Il seme di `collaudo_pagamento_p2p` nomina le persone «Vera» e
+«Carlo» al posto di «Chi vende»/«Chi compra», così nelle frasi degli
+avvisi il nome e il ruolo si distinguono: cinque collaudi hanno
+cambiato le attese (annulli, recapito, dispute, promemoria del gesto,
+statistiche — le iniziali «V.»/«C.»), e tre di loro hanno rivelato
+altrettante frasi in cui il NOME passava per il ruolo. Provato: le otto
+prove toccate 646 verdi; i venti collaudi che usano quel seme, in
+gabbia, verdi; i tre blocchi `<script>` della pagina compilano.

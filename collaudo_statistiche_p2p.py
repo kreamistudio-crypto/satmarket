@@ -148,7 +148,7 @@ def main():
           (d["commissioni"]["routing"]["stato"], d["commissioni"]["nette_sats"],
            d["lnd"]["motivo"]))
     prova("gli ultimi scambi portano iniziali, mai un nome",
-          [("C.V.", "C.C."), ("C.V.", "C.C.")],
+          [("V.", "C."), ("V.", "C.")],
           [(u["pubblica"], u["prende"]) for u in d["ultimi"]])
     prova("la risposta non si tiene nel browser", "no-store",
           asyncio.run(SRV.statistiche_p2p_admin(

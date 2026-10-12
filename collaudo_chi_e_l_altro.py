@@ -27,10 +27,10 @@ che non c'e' piu', `/api/me` e l'avviso letto.
   4. un altro client Mostro: la chiave non e' di nessuno dei nostri —
      «esterno», e la recensione dice quello;
   5. mostrod che non ha ancora detto niente: nessun motivo, nessun volto;
-  6. l'avviso una tantum: /api/me lo chiede al nativo col vecchio default
-     che ha una chiave di scambio, non a Telegram ne' a un nativo nuovo;
-     «Ho capito» lo spegne; e /api/me dice
-     il riconoscimento DERIVATO (acceso con la colonna di ieri a zero).
+  6. nessun avviso una tantum (nato e tolto il 12 ott 2026, decisione di
+     Andrea: la regola sta nel patto «I tuoi dati»): /api/me dice il
+     riconoscimento DERIVATO (acceso con la colonna di ieri a zero), non
+     porta `avviso_riconosci`, e la rotta «Ho capito» non esiste.
 
 NON TOCCA NIENTE DI VERO: config di cartone, niente Telegram, niente
 relay, niente coordinatore.
@@ -184,23 +184,14 @@ def main():
     pubblica(o, TG_V)
     prova("nessun volto e nessun motivo: la pagina dira' «non lo sappiamo ancora»", (None, ""), controparte(TG_V, o))
 
-    print("\n6) l'avviso una tantum e il riconoscimento derivato in /api/me")
+    print("\n6) il riconoscimento derivato in /api/me, e nessun avviso una tantum")
     d = me(NA_PRIMA)
-    prova("al nativo col vecchio default, che ha una chiave di scambio: riconosciuto (derivato) e l'avviso da mostrare",
-          [1, True], [d.get("riconosci_p2p"), d.get("avviso_riconosci")])
+    prova("al nativo col vecchio default: riconosciuto (derivato), e nessun avviso da mostrare",
+          [1, False], [d.get("riconosci_p2p"), "avviso_riconosci" in d])
     prova("a chi entra da Telegram: riconosciuto, nessun avviso", [1, False],
-          [me(TG_V).get("riconosci_p2p"), me(TG_V).get("avviso_riconosci")])
-    banco.come(NA_PRIMA)
-    r = asyncio.run(SRV.avviso_riconosci_visto())
-    prova("«Ho capito» lo registra, e /api/me non lo chiede piu'", [True, False],
-          [bool(r.get("ok")), me(NA_PRIMA).get("avviso_riconosci")])
-    con = banco.con_db()
-    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,ln_address,npub,npub_verificata) "
-                "VALUES(-705,'Nativo nuovo','neg705',1,'','npub1x705',1)")
-    con.commit()
-    con.close()
-    prova("un nativo nuovo, senza chiavi di scambio, non riceve nessun avviso", False, me(-705).get("avviso_riconosci"))
-    # il nativo col vecchio default, DOPO l'avviso, prende: ora e' riconosciuto
+          [me(TG_V).get("riconosci_p2p"), "avviso_riconosci" in me(TG_V)])
+    prova("la rotta «Ho capito» non esiste", False, hasattr(SRV, "avviso_riconosci_visto"))
+    # il nativo col vecchio default prende: ora e' riconosciuto, senza avvisi
     n += 1
     o = ORD(n)
     pubblica(o, TG_V)

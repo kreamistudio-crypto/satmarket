@@ -205,7 +205,10 @@ def semina():
     """Tre persone, le due chiavi di scambio, e le righe del libro."""
     con = con_db()
     adesso = int(time.time())
-    for tg, nome in ((VENDE, "Chi vende"), (COMPRA, "Chi compra"),
+    # NOMI DI PERSONA, non di ruolo (12 ott 2026, richiesta di Andrea):
+    # nelle frasi degli avvisi il nome dell'altra parte e il ruolo
+    # generico («chi vende») devono distinguersi a colpo d'occhio
+    for tg, nome in ((VENDE, "Vera"), (COMPRA, "Carlo"),
                      (ESTRANEO, "Un estraneo")):
         con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,"
                     "registrato,ln_address) VALUES(?,?,?,1,'')",

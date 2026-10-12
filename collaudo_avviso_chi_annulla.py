@@ -139,10 +139,9 @@ async def giro():
     # Qui nessuno dichiara la presa dal telefono (`preso_da` resta 0),
     # quindi chi ha PUBBLICATO legge «chi compra» / «chi vende»; chi ha
     # PRESO, dal 12 ott 2026 (chi-e-l-altro), vede chi ha pubblicato
-    # appena mostrod nomina le due parti: nelle frasi di chi ha preso il
-    # nome e' MAIUSCOLO («Chi compra» / «Chi vende» sono i NOMI che il
-    # banco semina a C e a V), in quelle di chi ha pubblicato e' il ruolo
-    # minuscolo. I nomi veri li prova il banco di `prove_avviso_chi_annulla`
+    # appena mostrod nomina le due parti: nelle sue frasi c'e' il NOME
+    # che il banco semina («Carlo» per C, «Vera» per V), in quelle di
+    # chi ha pubblicato il ruolo generico («chi compra» / «chi vende»)
 
     print("\n1) IL CASO DI ANDREA: chi vende prende un acquisto, blocca i sats, si ritira")
     o = ordine(1)
@@ -153,7 +152,7 @@ async def giro():
     prova("il ritiro entra: nuovo", {"ok": True, "nuovo": True}, r)
     prova("partono DUE avvisi: a chi ha pubblicato il ritorno in vetrina, a chi "
           "si e' ritirato il suo, coi sats tornati",
-          [(V, f"❌ <b>Hai annullato lo scambio con Chi compra.</b>{TORNATI}"),
+          [(V, f"❌ <b>Hai annullato lo scambio con Carlo.</b>{TORNATI}"),
            (C, f"🔄 <b>Chi vende ha annullato lo scambio.</b> Il tuo ordine è "
                "tornato in vetrina: non devi fare niente.")], detto())
     print("   (le due frasi, come arrivano:)")
@@ -166,7 +165,7 @@ async def giro():
     semina_ordine(o, "buy")
     await fino_a(o, "preso", t0 + 100)
     await posta(busta(o, "canceled", t0 + 140, "seller", "republished"))
-    prova("a chi si ritira la frase senza sats", f"❌ <b>Hai annullato lo scambio con Chi compra.</b>",
+    prova("a chi si ritira la frase senza sats", f"❌ <b>Hai annullato lo scambio con Carlo.</b>",
           dict(banco.DETTO).get(V))
 
     print("\n3) chi ha PUBBLICATO (e vende) annulla dopo aver bloccato")
@@ -177,7 +176,7 @@ async def giro():
     await posta(busta(o, "canceled", t0 + 240, "seller", ""))
     prova("lui coi sats tornati, chi compra con la frase di sempre",
           [(V, f"❌ <b>Hai annullato lo scambio con chi compra.</b>{TORNATI}"),
-           (C, f"❌ <b>Chi vende ha annullato lo scambio.</b> I sats eventualmente "
+           (C, f"❌ <b>Vera ha annullato lo scambio.</b> I sats eventualmente "
                "in garanzia tornano a chi vende.")], detto())
 
     print("\n4) chi ha pubblicato (e compra) annulla: 3b, a chi vende «sono tornati a te»")
@@ -187,7 +186,7 @@ async def giro():
     await fino_a(o, "garanzia", t0 + 300)
     await posta(busta(o, "canceled", t0 + 340, "buyer", ""))
     prova("chi compra sente il suo annullo, chi vende i sats tornati",
-          [(V, f"❌ <b>Chi compra ha annullato lo scambio.</b>{TORNATI}"),
+          [(V, f"❌ <b>Carlo ha annullato lo scambio.</b>{TORNATI}"),
            (C, f"❌ <b>Hai annullato lo scambio con chi vende.</b>")],
           detto())
 
@@ -205,7 +204,7 @@ async def giro():
           [(V, f"❌ <b>Chi compra ha accettato di annullare: lo scambio è annullato.</b>"
                f"{TORNATI}"),
            (C, f"❌ <b>Hai accettato di annullare: lo scambio con "
-               f"Chi vende è annullato.</b>")], detto())
+               f"Vera è annullato.</b>")], detto())
     o = ordine(6)
     t0 = ora(500)
     semina_ordine(o, "sell")
@@ -216,7 +215,7 @@ async def giro():
     prova("chi vende ACCETTA: i sats tornano a lui, nella sua frase",
           [(V, f"❌ <b>Hai accettato di annullare: lo scambio con chi compra è annullato.</b>"
                f"{TORNATI}"),
-           (C, f"❌ <b>Chi vende ha accettato di annullare: lo scambio è annullato.</b> "
+           (C, f"❌ <b>Vera ha accettato di annullare: lo scambio è annullato.</b> "
                "I sats eventualmente in garanzia tornano a chi vende.")], detto())
 
     print("\n6) il moderatore e le scadenze: tutti e due, e i sats a chi li aveva")
@@ -351,10 +350,10 @@ async def giro():
         semina_ordine(o, "sell", ("Contanti",))
         await fino_a(o, "preso", t0 + 1500)
         await posta(busta(o, "canceled", t0 + 1540, "buyer", "republished"))
-        # «Chi vende» maiuscolo e' il NOME di V: C ha preso, e dal 12 ott
-        # 2026 vede chi ha pubblicato (mostrod ha nominato le due parti)
+        # «Vera» e' il NOME di V: C ha preso, e dal 12 ott 2026 vede chi
+        # ha pubblicato (mostrod ha nominato le due parti)
         prova("chi compra si ritira: il suo avviso, e sotto la cauzione che torna",
-              f"❌ <b>Hai annullato lo scambio con Chi vende."
+              f"❌ <b>Hai annullato lo scambio con Vera."
               "</b>\n\n🔐 La cauzione che avevi bloccato torna nel tuo wallet.",
               dict(banco.DETTO).get(C))
     finally:

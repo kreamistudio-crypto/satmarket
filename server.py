@@ -7330,10 +7330,9 @@ def init_db():
                     # controparte con qualunque login, e chi vuole
                     # l'anonimato entra con una chiave Nostr nuova. La
                     # colonna qui sopra resta per il passato (lo zero di
-                    # chi non si era fatto riconoscere) e per l'avviso una
-                    # tantum qui sotto: 1 = gli abbiamo detto che da ora
-                    # l'altra persona lo riconosce.
-                    "avviso_riconosci INTEGER DEFAULT 0",
+                    # chi non si era fatto riconoscere). Nessun avviso una
+                    # tantum (nato e tolto lo stesso giorno, decisione di
+                    # Andrea): la regola sta nel patto «I tuoi dati», e basta.
                     # «NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi
                     # piccoli, decisione di Andrea): 1 = il suo nome non
                     # esce dalla classifica pubblica. Il LIVELLO invece
@@ -40913,20 +40912,16 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # server sa ogni passo dalla patch 0007, e il telefono che apre
     # l'app nel mercatino non ascolta i relay — vedi `_quanti_tocca_p2p`
     p2p_tocca = _quanti_tocca_p2p(con, user["id"], int(time.time()))
-    # (12 ott 2026) il giudizio e l'avviso si leggono PRIMA di chiudere
+    # (12 ott 2026) il giudizio si legge PRIMA di chiudere
     _ric = 1 if (u and _p2p_riconosciuto(con, user["id"])) else 0
-    _avv = _avviso_riconosci_p2p(con, u) if u else False
     con.close()
     profilo = dict(u) if u else {}
     # IL RICONOSCIMENTO LO DICE IL GIUDICE (12 ott 2026, chi-e-l-altro):
-    # acceso di serie, spento solo da chi ha scelto l'anonimato — la
+    # acceso per tutti (l'anonimato e' una chiave Nostr nuova) — la
     # colonna `riconosci_p2p` da sola direbbe ancora il default di ieri.
-    # E L'AVVISO UNA TANTUM: a chi aveva il vecchio default (nativo,
-    # mai toccato l'interruttore, con un profilo di scambio gia' usato)
-    # si dice una volta che da ora viene riconosciuto e come spegnerlo.
+    # Nessun avviso una tantum: la regola sta nel patto «I tuoi dati».
     if u:
         profilo["riconosci_p2p"] = _ric
-        profilo["avviso_riconosci"] = _avv
     # LA FOTO SPENTA NON ESCE NEMMENO A LUI (ago 2026): questa era
     # l'unica rotta che mandava l'avatar GREZZO — «e' il tuo profilo,
     # devi vedere cosa hai» — ed e' precisamente cio' che faceva
@@ -43471,38 +43466,6 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
     return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(
         {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": "|" + "|".join(tipi) + "|",
          "avvisi_nuovi_soglia": soglia})}
-
-
-def _avviso_riconosci_p2p(con, u) -> bool:
-    """PURA sulla connessione: va mostrato l'avviso una tantum del 12 ott
-    2026? Solo a un nativo Nostr che aveva il vecchio default (anonimo
-    di serie: `riconosci_p2p` 0, avviso mai dato) e che il P2P l'aveva
-    gia' usato (una chiave di scambio registrata): a chi arriva dopo il
-    cambio, o si era gia' fatto riconoscere, non c'e' niente da
-    annunciare."""
-    try:
-        if int(u["tg_id"] or 0) >= 0:
-            return False
-        if int(u["avviso_riconosci"] or 0) or int(u["riconosci_p2p"] or 0):
-            return False
-    except (KeyError, IndexError, TypeError):
-        return False
-    return bool(con.execute("SELECT 1 FROM chiavi_p2p WHERE tg_id=? LIMIT 1",
-                            (u["tg_id"],)).fetchone())
-
-
-@app.post("/api/me/avviso-riconosci-visto")
-async def avviso_riconosci_visto(x_tg_init_data: str = Header(""),
-                                 barattolo_sessione: str = Cookie("")):
-    """«Ho capito» sull'avviso una tantum del riconoscimento (12 ott
-    2026: da ora l'altra persona ti riconosce; per l'anonimato una chiave
-    nuova): da qui non si ripropone. Nessun corpo."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    con = db()
-    con.execute("UPDATE utenti SET avviso_riconosci=1 WHERE tg_id=?", (user["id"],))
-    con.commit()
-    con.close()
-    return {"ok": True}
 
 
 # I MOTIVI DELLO SCONOSCIUTO (12 ott 2026, chi-e-l-altro): quando

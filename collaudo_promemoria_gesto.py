@@ -202,7 +202,7 @@ async def giro():
     a = ordine(1)
     primo = await vendita_presa(a)
     prova("il primo avviso va a chi vende, e dice quanto tempo ha",
-          [(V, "🔒 Paga la garanzia: la richiesta è nell'app. Chi compra ha indicato "
+          [(V, "🔒 Paga la garanzia: la richiesta è nell'app. Carlo ha indicato "
                "dove ricevere i sats, ora tocca a te.\n\n⏳ Hai 15 minuti, poi lo "
                "scambio si annulla.", None)], primo)
     prova("in attesa c'e' il promemoria di chi vende, e quello di chi compra se n'e' "
@@ -308,7 +308,7 @@ async def giro():
     h = ordine(8)
     primo = await vendita_presa(h)
     prova("il primo avviso resta quello di sempre: nessun tempo inventato",
-          [(V, "🔒 Paga la garanzia: la richiesta è nell'app. Chi compra ha indicato "
+          [(V, "🔒 Paga la garanzia: la richiesta è nell'app. Carlo ha indicato "
                "dove ricevere i sats, ora tocca a te.", None)], primo)
     detti, _ = await battito(h, 7 * 60 + 30)
     prova("il promemoria parte a meta' del ripiego, senza una cifra",

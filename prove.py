@@ -41371,10 +41371,11 @@ def prove_fogli_di_casa():
     # OTTANTUNO (11 ott 2026, la presa della disputa letta sul nodo
     # vero): la ripresa di una disputa gia' presa sul coordinatore
     # (`riprendiPresaDisputaP2P`) chiede conferma con la condizione scritta.
-    # OTTANTADUE (12 ott 2026, chi-e-l-altro): l'avviso una tantum del
-    # riconoscimento, «Ho capito».
-    prova("i gesti che passano dalla domanda unica sono ottantadue",
-          82, solo_codice(mini).count("chiediConferma({"))
+    # (12 ott 2026, chi-e-l-altro: l'avviso una tantum del riconoscimento
+    # e' nato e uscito lo stesso giorno, decisione di Andrea — la regola
+    # sta nel patto «I tuoi dati». Restano ottantuno.)
+    prova("i gesti che passano dalla domanda unica sono ottantuno",
+          81, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -119677,16 +119678,16 @@ console.log(JSON.stringify(out));
     ric = amb2["_p2p_riconosciuto"]
     con2 = _sq.connect(":memory:")
     con2.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
-                 "riconosci_p2p INTEGER DEFAULT 0, avviso_riconosci INTEGER DEFAULT 0)")
-    con2.execute("INSERT INTO utenti VALUES(111, 0, 0)")
-    con2.execute("INSERT INTO utenti VALUES(-77, 0, 0)")
+                 "riconosci_p2p INTEGER DEFAULT 0)")
+    con2.execute("INSERT INTO utenti VALUES(111, 0)")
+    con2.execute("INSERT INTO utenti VALUES(-77, 0)")
     prova("riconosciuti tutti: Telegram, il nativo col vecchio zero, chi in `utenti` non c'e'",
           [True, True, True, True], [ric(con2, 111), ric(con2, -77), ric(con2, 222), ric(con2, -99)])
     prova("...e lo zero dell'anonimo in vetrina resta un no", False, ric(con2, 0))
     con2.close()
-    prova("la colonna di ieri resta (il passato) e quella dell'avviso nasce a zero; nessuna scelta di anonimato", True,
+    prova("la colonna di ieri resta (il passato); nessuna scelta di anonimato e nessun avviso salvato", True,
           '"riconosci_p2p INTEGER DEFAULT 0"' in _SORGENTE
-          and '"avviso_riconosci INTEGER DEFAULT 0"' in _SORGENTE
+          and "avviso_riconosci" not in _SORGENTE
           and "anonimo_p2p" not in _SORGENTE)
     prova("...mentre gli avvisi restano accesi di serie", True,
           '"avvisi_p2p INTEGER DEFAULT 1"' in _SORGENTE)
@@ -149610,7 +149611,6 @@ def prove_chi_e_l_altro():
     exec(pezzo("_parti_scambio_p2p"), amb)
     exec(pezzo("_motivo_sconosciuto_p2p"), amb)
     exec(pezzo("_motivi_controparti_p2p"), amb)
-    exec(pezzo("_avviso_riconosci_p2p"), amb)
     exec(pezzo("_p2p_riconosciuto"), amb)
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
@@ -149619,13 +149619,12 @@ def prove_chi_e_l_altro():
                               stato TEXT, lato TEXT, tornati INTEGER DEFAULT 0);
       CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY, compratore INTEGER, venditore INTEGER, giro INTEGER);
       CREATE TABLE p2p_momenti(ordine TEXT, giro INTEGER, momento TEXT, quando INTEGER, fonte TEXT);
-      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, riconosci_p2p INTEGER DEFAULT 0,
-                          avviso_riconosci INTEGER DEFAULT 0);
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, riconosci_p2p INTEGER DEFAULT 0);
       CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INTEGER);
-      INSERT INTO utenti VALUES(111, 0, 0);
-      INSERT INTO utenti VALUES(-77, 0, 0);   -- nativo, vecchio default, mai avvisato
-      INSERT INTO utenti VALUES(-66, 0, 0);   -- un altro nativo col vecchio default (la presa mai annotata)
-      INSERT INTO utenti VALUES(-55, 1, 1);   -- nativo che si era gia' fatto riconoscere
+      INSERT INTO utenti VALUES(111, 0);
+      INSERT INTO utenti VALUES(-77, 0);   -- nativo, vecchio default
+      INSERT INTO utenti VALUES(-66, 0);   -- un altro nativo col vecchio default (la presa mai annotata)
+      INSERT INTO utenti VALUES(-55, 1);   -- nativo che si era gia' fatto riconoscere
       INSERT INTO chiavi_p2p VALUES('k77', -77);
       -- a) chi vende 111 ha pubblicato, il nativo -77 ha preso: mostrod l'ha detto, la presa NON e' annotata
       INSERT INTO p2p_ordini VALUES('o-prima', 111, 0, 'in-progress', 'sell', 0);
@@ -149662,17 +149661,16 @@ def prove_chi_e_l_altro():
                                          {"o-visto": {"nome": "y"}}))
     prova("i tre motivi stanno in una tupla sola", ("esterno", "anonimo_prima", "ignota"),
           amb["MOTIVI_SCONOSCIUTO_P2P"])
-    # --- 2) IL GIUDICE DEL RICONOSCIMENTO E L'AVVISO UNA TANTUM ---------
-    ric, avv = amb["_p2p_riconosciuto"], amb["_avviso_riconosci_p2p"]
-    u = lambda tg: con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg,)).fetchone()
+    # --- 2) IL GIUDICE DEL RICONOSCIMENTO. Nessun avviso una tantum:
+    # nato e uscito il 12 ott 2026 (decisione di Andrea, la sera): la
+    # regola sta nel patto «I tuoi dati», e basta. -----------------------
+    ric = amb["_p2p_riconosciuto"]
     prova("riconosciuti tutti: Telegram e i nativi, col vecchio zero o gia' accesi",
           [True, True, True, True], [ric(con, 111), ric(con, -77), ric(con, -55), ric(con, -66)])
-    prova("l'avviso una tantum va SOLO al nativo col vecchio default che il P2P l'ha usato",
-          [False, True, False, False], [avv(con, u(111)), avv(con, u(-77)), avv(con, u(-66)), avv(con, u(-55))])
-    con.execute("INSERT INTO utenti VALUES(-44, 0, 0)")    # nativo nuovo, mai una chiave
-    prova("...non a un nativo che non ha mai usato il P2P", False, avv(con, u(-44)))
-    con.execute("UPDATE utenti SET avviso_riconosci=1 WHERE tg_id=-77")
-    prova("...e dopo «Ho capito» non torna", False, avv(con, u(-77)))
+    prova("l'avviso una tantum non esiste: ne' il giudice, ne' la colonna, ne' la rotta",
+          [False, False, False],
+          ["_avviso_riconosci_p2p" in src, "avviso_riconosci" in src,
+           "avviso-riconosci-visto" in src])
     con.close()
 
     # --- 3) LE SENTINELLE: rotte, pagina, patto --------------------------
@@ -149688,14 +149686,11 @@ def prove_chi_e_l_altro():
     prova("la recensibilita' precisa «ignota» col giudice dei motivi", True,
           'if motivo == "ignota":' in rec and "_motivo_sconosciuto_p2p(con2, ordine, user[\"id\"])" in rec)
     me = codice(pezzo("mio_profilo"))
-    prova("/api/me dice il riconoscimento DERIVATO dal giudice, e l'avviso una tantum", True,
+    prova("/api/me dice il riconoscimento DERIVATO dal giudice, letto prima di chiudere, e nessun avviso", True,
           '_ric = 1 if (u and _p2p_riconosciuto(con, user["id"])) else 0' in me
-          and '_avv = _avviso_riconosci_p2p(con, u) if u else False' in me
-          and me.index("_avv = _avviso_riconosci_p2p") < me.index("con.close()")
-          and 'profilo["avviso_riconosci"] = _avv' in me)
-    prova("la rotta «avviso letto» esiste e scrive la colonna", True,
-          '@app.post("/api/me/avviso-riconosci-visto")' in src
-          and "UPDATE utenti SET avviso_riconosci=1 WHERE tg_id=?" in codice(pezzo("avviso_riconosci_visto")))
+          and me.index("_ric = 1 if") < me.index("con.close()")
+          and 'profilo["riconosci_p2p"] = _ric' in me
+          and "avviso_riconosci" not in me)
     gate = codice(pezzo("registra_ordini_p2p"))
     prova("il cancello della presa chiede ancora al giudice unico (che ora dice si' di serie)", True,
           "_p2p_riconosciuto(con, user[\"id\"])" in gate)
@@ -149720,13 +149715,10 @@ def prove_chi_e_l_altro():
            "ha scelto di restare anonima" in rm,
            "Scambio di prima del 12 ottobre 2026" in rm,
            "non lo sappiamo: non c\\'è un posto" in rm])
-    av = nudo(fn("function mostraAvvisoRiconosciP2P(){"))
-    prova("l'avviso una tantum: solo a un nativo, una domanda unica con «Ho capito», che lo registra al server, e la strada dell'anonimato e' una chiave nuova", True,
-          "!(myTgId < 0)) return;" in av and "etichetta: 'Ho capito'" in av
-          and "/me/avviso-riconosci-visto`" in av and "ti riconosce negli scambi" in av
-          and "entra con una chiave Nostr nuova" in av)
-    prova("...e parte dal /api/me, una volta, se il server lo chiede", True,
-          "if (me.avviso_riconosci === true && typeof mostraAvvisoRiconosciP2P === 'function')" in mini)
+    prova("nessun avviso una tantum nella pagina: ne' il foglio, ne' il gancio dal /api/me, ne' la frase",
+          [False, False, False],
+          ["mostraAvvisoRiconosciP2P" in mini, "avviso_riconosci" in mini,
+           "ti riconosce negli scambi" in mini])
     # il patto e il cassetto
     dati = mini[mini.index('<h3 id="priv-p2p">'):]
     dati = dati[:dati.index('<h3 id="priv-tor">')]
@@ -149736,6 +149728,12 @@ def prove_chi_e_l_altro():
            "lo mostra solo all'altra parte di quello scambio: mai in pubblico, mai sui relay" in dati,
            "chiave Nostr nuova" in dati and "ha scelto di restare anonima" not in dati,
            "quella promessa resta valida sul passato" in dati])
+    # (12 ott 2026, sera, parole di Andrea) la regola sta SOLO nel patto,
+    # con la sua frase, e nessun foglio al login la ripete
+    prova("...e la regola con le parole di Andrea, una volta, senza un avviso al login",
+          [1, False],
+          [dati.count("<b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome che hai scelto e le tue recensioni. Non vede chi sei né da dove ti colleghi. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b>"),
+           "lo dice una volta sola al primo ingresso" in dati])
 
 def main():
     print("=" * 58)

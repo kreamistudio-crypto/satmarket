@@ -155,7 +155,7 @@ def main():
     prova("al moderatore: l'ordine e chi l'ha aperta", True,
           "Disputa P2P aperta</b> sull'ordine <code>" + D[0][:8] + "</code>, da <b>chi compra</b>." in m)
     prova("...le due persone, coi nomi SCAPPATI e lo @username", True,
-          "• Compra: Chi &lt;b&gt;compra&lt;/b&gt;" in m and "• Vende: Chi vende (@chi_vende)" in m)
+          "• Compra: Chi &lt;b&gt;compra&lt;/b&gt;" in m and "• Vende: Vera (@chi_vende)" in m)
     prova("...importo e metodo", True,
           "• Importo: 13.603 sats per 10,00 €" in m and "• Metodo: Contanti" in m)
     prova("...e da quando la garanzia e' bloccata", True,
@@ -290,7 +290,7 @@ def main():
     e = __import__("json").loads(e.body)
     d = [x for x in e["dispute"] if x["ordine"] == R][0]
     prova("l'elenco: la disputa, l'id, i nomi NUDI, la chiave del moderatore",
-          ["aperta", DISP, "Chi <b>compra</b>", "Chi vende (@chi_vende)", KM, False, "", ""],
+          ["aperta", DISP, "Chi <b>compra</b>", "Vera (@chi_vende)", KM, False, "", ""],
           [d["stato"], d["disputa"], d["compra"], d["vende"], e["chiave"], d["sei_parte"],
            d["chiave_compratore"], d["chiave_venditore"]])
 
