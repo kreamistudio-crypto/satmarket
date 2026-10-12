@@ -10460,14 +10460,23 @@
   tornato) piu' quelli che la cronaca dei quaranta giorni racconta e il
   registro non ha ancora (`_esiti_cronaca_p2p`: in corso, o chiusi
   nell'ultima ora) — a parita' di ordine e giro vince il registro; LE
-  DISPUTE sono `p2p_dispute`, che non si pota. Uno scambio sta nel
+  DISPUTE sono `p2p_dispute`, che non si pota. IL DENOMINATORE DELLA
+  PERCENTUALE sono gli scambi CON LA GARANZIA BLOCCATA (`con_garanzia`;
+  correzione di Andrea prima del push): una disputa puo' nascere solo
+  li'. Che fosse bloccata lo dice la cronaca finche' c'e' — la garanzia
+  pagata, o un passo che viene solo dopo (`P2P_MOMENTI_CON_GARANZIA`) —;
+  oltre i quaranta giorni il registro non ha una colonna per questo e
+  si DEDUCE (`_garanzia_dal_registro_p2p`: completato si', tornato no,
+  annullato si' per moderatore, concordato, garanzia scaduta e fattura
+  mai data su un ordine di acquisto); una disputa lo prova da sola. Gli
+  scambi `presi` restano nella risposta, accanto. Uno scambio sta nel
   periodo in cui e' stato PRESO (presa, o chiusura se la presa non si
   sa) e la disputa sta col suo scambio: la percentuale non passa il
   cento; una disputa senza piu' il suo scambio in registro e cronaca lo
   porta con se', dall'ora dell'apertura. Tre periodi
   (`P2P_DISPUTE_PERIODI`: 7, 30, tutto); per 7 e 30 il periodo PRIMA,
-  lungo uguale, e la `tendenza` in punti percentuali; senza scambi la
-  percentuale e' None, mai 0. Delle chiuse si dice dove sono andati i
+  lungo uguale, e la `tendenza` in punti percentuali; senza scambi con
+  garanzia la percentuale e' None, mai 0. Delle chiuse si dice dove sono andati i
   sats (`compratore` | `venditore`) e quante le ha decise un moderatore;
   delle aperte l'id dell'ordine ACCORCIATO a 8 e da quando. Nessun
   account esce di li'. Un database senza le tabelle del P2P da' None e

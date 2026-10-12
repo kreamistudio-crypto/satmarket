@@ -28467,8 +28467,8 @@ def _leve_stato():
             # quello con cui il giro dell'ora sta confrontando
             _leva("Soglia delle dispute P2P (%)",
                   "P2P_DISPUTE_SOGLIA_PERCENTO", P2P_DISPUTE_SOGLIA_PERCENTO,
-                  acceso="sopra questa percentuale di scambi in disputa "
-                         f"negli ultimi 30 giorni (e con almeno "
+                  acceso="sopra questa percentuale di scambi con garanzia "
+                         f"finiti in disputa negli ultimi 30 giorni (e con almeno "
                          f"{P2P_DISPUTE_SOGLIA_MINIMO} dispute) i "
                          "moderatori ricevono un avviso, uno solo per "
                          "superamento",
@@ -44523,8 +44523,8 @@ except (TypeError, ValueError):
 
 
 # LA SOGLIA DELLE DISPUTE P2P (12 ott 2026, cantiere dispute-nel-cruscotto,
-# richiesta di Andrea): sopra questa percentuale di scambi finiti in
-# disputa negli ultimi 30 giorni i moderatori ricevono UN avviso su
+# richiesta di Andrea): sopra questa percentuale di scambi CON GARANZIA
+# finiti in disputa negli ultimi 30 giorni i moderatori ricevono UN avviso su
 # Telegram (`_avviso_soglia_dispute_p2p`). 0 = avviso spento; la sezione
 # «⚖️ Dispute P2P» del cruscotto resta comunque.
 # PERCHE' 5: dove i numeri si conoscono (un coordinatore RoboSats, il
@@ -50789,17 +50789,32 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
 #   (`p2p_momenti`), che porta quelli in corso e quelli non ancora
 #   consolidati. Uno scambio e' un GIRO di un ordine;
 # • le DISPUTE: `p2p_dispute`, una riga per ordine, che non si pota.
+# LA PERCENTUALE E' SUGLI SCAMBI CON LA GARANZIA BLOCCATA (correzione di
+# Andrea, 12 ott 2026): una disputa puo' nascere solo li', e le prese
+# cadute prima — la garanzia mai pagata, chi ha preso che si ritira —
+# annacquerebbero il numero. CHE LA GARANZIA FOSSE BLOCCATA lo dice la
+# cronaca finche' c'e' (`P2P_MOMENTI_CON_GARANZIA`: la garanzia pagata, o
+# un passo che viene solo dopo); oltre i quaranta giorni resta il
+# registro, che non ha una colonna per questo, e si DEDUCE da esito,
+# motivo e lato (`_garanzia_dal_registro_p2p`). Una disputa lo prova da
+# sola. Gli scambi presi restano nella risposta, accanto.
 # UNO SCAMBIO STA NEL PERIODO IN CUI E' STATO PRESO, e la disputa sta col
-# suo scambio: cosi' la percentuale e' «di cento scambi presi, quanti in
-# disputa» e non puo' passare il cento. Una disputa prova che lo scambio
-# c'era: se registro e cronaca non lo ricordano piu', conta dall'ora in
-# cui e' stata aperta.
+# suo scambio: cosi' la percentuale e' «di cento scambi con garanzia,
+# quanti in disputa» e non puo' passare il cento. Una disputa prova che
+# lo scambio c'era: se registro e cronaca non lo ricordano piu', conta
+# dall'ora in cui e' stata aperta.
 # SOLO NUMERI, e delle aperte l'id dell'ordine ACCORCIATO: gli account
 # che `p2p_dispute` porta di qui non escono.
 # QUEL CHE NON SI SA: la disputa che il coordinatore apre DA SOLO alla
 # scadenza della garanzia (vedi «LA GARANZIA LUNGA») non la racconta a
 # nessuno, e qui non si conta.
 P2P_DISPUTE_PERIODI = (("7", 7), ("30", 30), ("tutto", 0))
+# i momenti della cronaca che vogliono dire «la garanzia e' bloccata»: il
+# pagamento della hold, o un passo che viene solo dopo (di una cronaca
+# potata a meta' puo' restare solo quello)
+P2P_MOMENTI_CON_GARANZIA = ("garanzia_pagata", "fiat", "disputa",
+                            "annullo_chiesto", "rilasciato",
+                            "payout_fallito", "concluso")
 # sotto tre dispute nei 30 giorni la percentuale e' rumore: una su dieci
 # scambi fa «10%» e non dice niente
 P2P_DISPUTE_SOGLIA_MINIMO = 3
@@ -50825,24 +50840,52 @@ def _sopra_soglia_dispute_p2p(p30: dict, soglia: float) -> bool:
                 and p30["percento"] > soglia)
 
 
+def _garanzia_dal_registro_p2p(esito: str, motivo: str, lato: str) -> bool:
+    """PURA: in questo scambio CHIUSO la garanzia era stata bloccata? Dal
+    solo registro, per quando la cronaca non c'e' piu'. E' una DEDUZIONE,
+    e si dice:
+    • `completato`: si', sempre — senza garanzia non si rilascia;
+    • `tornato` in vetrina: no — chi aveva preso non ha fatto il suo
+      primo gesto, e la garanzia viene dopo;
+    • `annullato`: si' se l'ha deciso un moderatore, se e' concordato
+      (si concorda solo a garanzia bloccata) o se la garanzia e' arrivata
+      a scadenza; si' anche per la fattura mai data su un ordine di
+      ACQUISTO, dove chi vende blocca per primo. No per la garanzia mai
+      pagata. A mano e a tempo scaduto restano «no»: e' il caso piu'
+      frequente, e dove sbaglia toglie dal conto uno scambio senza
+      disputa (la percentuale esce un filo piu' alta, mai piu' bassa)."""
+    if esito == "completato":
+        return True
+    if esito != "annullato":
+        return False
+    return (motivo in ("moderatore", "concordato", "garanzia_scaduta")
+            or (motivo == "fattura_non_data" and lato == "buy"))
+
+
 def dati_dispute_p2p(con, adesso: int):
     """LA SEZIONE «⚖️ Dispute P2P» DEL CRUSCOTTO. Pura sulla connessione,
     e NON SCRIVE: il registro lo consolida chi lo fa gia'. Torna None su
     un database senza le tabelle del P2P (i banchi di ieri): la pagina
     allora non disegna la sezione, e il resto del cruscotto vive.
-    Per ogni periodo: `presi`, `con_disputa`, `percento` (None senza
-    scambi, mai 0%), dove sono andati i sats delle chiuse (`compratore`,
+    Per ogni periodo: `presi`, `con_garanzia` (il DENOMINATORE: gli
+    scambi con la garanzia bloccata), `con_disputa`, `percento` (None
+    senza scambi con garanzia, mai 0%), dove sono andati i sats delle
+    chiuse (`compratore`,
     `venditore`; `moderatore` = quante di quelle le ha decise un
     moderatore), `aperte`, e — per 7 e 30 — `prima` (lo stesso conto
     sul periodo precedente, lungo uguale) con `tendenza`, la differenza
     in PUNTI percentuali (None se uno dei due non ha scambi)."""
     adesso = int(adesso)
     try:
-        presi = {}
-        for r in con.execute("SELECT ordine, giro, preso, chiuso FROM p2p_conti "
+        presi, garanzia = {}, set()
+        for r in con.execute("SELECT ordine, giro, esito, motivo, lato, preso, "
+                             "chiuso FROM p2p_conti "
                              "WHERE esito IN ('completato','annullato','tornato')"):
-            presi[(r["ordine"], int(r["giro"] or 0))] = int(
-                r["preso"] or r["chiuso"] or adesso)
+            chiave = (r["ordine"], int(r["giro"] or 0))
+            presi[chiave] = int(r["preso"] or r["chiuso"] or adesso)
+            if _garanzia_dal_registro_p2p(r["esito"], r["motivo"] or "",
+                                          r["lato"] or ""):
+                garanzia.add(chiave)
         per_ordine = {}
         for r in con.execute("SELECT ordine, momento, quando, giro, attore, "
                              "dettaglio FROM p2p_momenti WHERE fonte='mostro'"):
@@ -50853,6 +50896,10 @@ def dati_dispute_p2p(con, adesso: int):
     except sqlite3.OperationalError:
         return None
     for ordine, momenti in per_ordine.items():
+        # la garanzia la dice la cronaca, giro per giro: e' un fatto
+        visti = {}
+        for m in momenti:
+            visti.setdefault(int(m["giro"] or 0), set()).add(str(m["momento"] or ""))
         for e in _esiti_cronaca_p2p(momenti):
             if e["esito"] in ("scaduto", "ritirato"):
                 continue              # un ordine morto senza essere preso
@@ -50860,17 +50907,22 @@ def dati_dispute_p2p(con, adesso: int):
             # la presa vera
             presi.setdefault((ordine, e["giro"]),
                              int(e["preso"] or e["chiuso"] or adesso))
+            if visti.get(e["giro"], set()) & set(P2P_MOMENTI_CON_GARANZIA):
+                garanzia.add((ordine, e["giro"]))
     for d in dispute:
         chiave = (d["ordine"], int(d["giro"] or 0))
         d["quando"] = presi.setdefault(chiave, int(d["aperta_il"] or adesso))
+        garanzia.add(chiave)          # una disputa lo prova da sola
 
     def conto(da, fino=None):
         dentro = lambda q: q >= da and (fino is None or q < fino)
         sue = [d for d in dispute if dentro(d["quando"])]
         chiuse = [d for d in sue if d["stato"] == "chiusa"]
         n = sum(1 for q in presi.values() if dentro(q))
-        return {"presi": n, "con_disputa": len(sue),
-                "percento": round(len(sue) * 100 / n, 1) if n else None,
+        g = sum(1 for chiave, q in presi.items()
+                if chiave in garanzia and dentro(q))
+        return {"presi": n, "con_garanzia": g, "con_disputa": len(sue),
+                "percento": round(len(sue) * 100 / g, 1) if g else None,
                 "compratore": sum(1 for d in chiuse if d["esito"] == "compratore"),
                 "venditore": sum(1 for d in chiuse if d["esito"] == "venditore"),
                 "moderatore": sum(1 for d in chiuse if d["chiusa_da"] == "moderatore"),
@@ -50882,7 +50934,8 @@ def dati_dispute_p2p(con, adesso: int):
             continue
         ora = conto(adesso - giorni * 86400)
         prima = conto(adesso - 2 * giorni * 86400, adesso - giorni * 86400)
-        ora["prima"] = {k: prima[k] for k in ("presi", "con_disputa", "percento")}
+        ora["prima"] = {k: prima[k] for k in ("presi", "con_garanzia",
+                                              "con_disputa", "percento")}
         ora["tendenza"] = (round(ora["percento"] - prima["percento"], 1)
                            if None not in (ora["percento"], prima["percento"])
                            else None)
@@ -50905,13 +50958,13 @@ def _testo_soglia_dispute_p2p(d: dict) -> str:
     p, s = d["periodi"]["30"], d["soglia"]
     righe = ["⚖️ <b>Dispute P2P sopra la soglia</b>", "",
              f"Negli ultimi 30 giorni sono finiti in disputa "
-             f"{p['con_disputa']} scambi su {p['presi']} presi: "
+             f"{p['con_disputa']} scambi su {p['con_garanzia']} con garanzia: "
              f"<b>{_perc_it(p['percento'])}%</b> (la soglia è "
              f"{_perc_it(s['percento'])}%)."]
     prima = p["prima"]
     if prima["percento"] is not None:
         righe.append(f"Nei 30 giorni prima: {_perc_it(prima['percento'])}% "
-                     f"({prima['con_disputa']} su {prima['presi']}).")
+                     f"({prima['con_disputa']} su {prima['con_garanzia']}).")
     if d["aperte"]:
         righe.append("Ancora aperte: " + ", ".join(
             f"<code>{html.escape(a['ordine'])}</code>" for a in d["aperte"][:10])

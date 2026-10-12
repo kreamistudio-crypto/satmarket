@@ -720,7 +720,8 @@ P2P_PROVA_IDS = []
 # tutti. Si riempie sul VPS e si riavvia.
 P2P_STATISTICHE_IDS = []
 # LA SOGLIA DELLE DISPUTE P2P (12 ott 2026): la sezione «⚖️ Dispute P2P»
-# del cruscotto /admin dice quanti scambi presi finiscono in disputa.
+# del cruscotto /admin dice quanti scambi CON LA GARANZIA BLOCCATA (gli
+# unici dove una disputa puo' nascere) finiscono in disputa.
 # Sopra questa PERCENTUALE negli ultimi 30 giorni — e con almeno 3
 # dispute, perche' una su dieci scambi non e' un segnale — i moderatori
 # ricevono UN avviso su Telegram: uno per superamento, e si riarma solo

@@ -51072,15 +51072,35 @@ tabella, nessuna colonna, nessuna rotta nuova.
 
 **LE DECISIONI.**
 - UNO SCAMBIO STA NEL PERIODO IN CUI È STATO PRESO, e la disputa sta
-  col suo scambio. È una coorte: «di cento scambi presi in questi 30
-  giorni, quanti in disputa», e non può passare il cento. L'altra
+  col suo scambio. È una coorte: «di cento scambi con garanzia presi
+  in questi 30 giorni, quanti in disputa», e non può passare il cento. L'altra
   strada — dispute APERTE nel periodo su scambi presi nel periodo —
   mescola due orologi.
-- «SCAMBI PRESI» sono le prese raccontate dal coordinatore, la stessa
-  misura della tessera «Presi» di «🔁 Scambi P2P»: completati,
-  annullati, tornati in vetrina, in corso. Dentro ci sono anche le
-  prese cadute prima della garanzia, dove una disputa non può nascere:
-  la percentuale è quindi sul numero più largo.
+- IL DENOMINATORE SONO GLI SCAMBI CON LA GARANZIA BLOCCATA — CORREZIONE
+  DI ANDREA PRIMA DEL PUSH. La prima stesura divideva per tutte le
+  prese raccontate dal coordinatore (la misura della tessera «Presi» di
+  «🔁 Scambi P2P»), e dentro c'erano le prese cadute prima della
+  garanzia, dove una disputa non può nascere: il numero usciva
+  annacquato. Ora la percentuale è «dispute su scambi con garanzia», la
+  card lo scrive con la sua parola, e gli scambi presi restano in
+  tabella per confronto. COME SI SA CHE LA GARANZIA ERA BLOCCATA: lo
+  dice la cronaca finché c'è (la garanzia pagata, o un passo che viene
+  solo dopo: pagato segnato, disputa, annullo chiesto, rilascio); una
+  disputa lo prova da sola; e oltre i quaranta giorni, dove resta il
+  solo registro, si DEDUCE da esito, motivo e lato
+  (`_garanzia_dal_registro_p2p`): completato sì, tornato in vetrina no,
+  annullato sì se deciso da un moderatore, concordato, a garanzia
+  scaduta, o per la fattura mai data su un ordine di ACQUISTO (dove chi
+  vende blocca per primo). «A mano» e «tempo scaduto» restano no: dove
+  la deduzione sbaglia toglie dal conto uno scambio senza disputa, e la
+  percentuale esce un filo più alta, mai più bassa. È detto nella nota
+  della card.
+  LA STRADA NON PRESA, e da decidere: una colonna «garanzia» in
+  `p2p_conti`, scritta al consolidamento quando la cronaca c'è ancora,
+  renderebbe esatto anche il passato oltre i quaranta giorni. È un dato
+  in più nel registro: la regola del cantiere era «niente di nuovo
+  senza dirlo prima», quindi qui c'è la deduzione e la colonna aspetta
+  un sì.
 - IL GIUDICE NON SCRIVE (`dati_dispute_p2p`): legge registro e cronaca
   insieme, a parità di ordine e giro vince il registro (di una cronaca
   potata a metà ricorda la presa vera). Chiamare il consolidamento dal
@@ -51135,9 +51155,26 @@ che il coordinatore apre DA SOLO alla scadenza della garanzia (a ~92
 ore, in `fiat-sent`: `enforce_escrow_deadline_pass`) non viene
 raccontata al server — la patch 0007 aggancia `dispute_action` — e
 quindi non si conta. Se quelle dispute diventassero frequenti, il
-numero sarebbe basso a torto: serve una riga nella patch del nodo, non
-qui. E «da sempre» parte da dove partono i registri: le dispute dal 28
-set 2026, gli scambi da quel che la cronaca ricordava il 10 ott.
+numero sarebbe basso a torto. E «da sempre» parte da dove partono i
+registri: le dispute dal 28 set 2026, gli scambi da quel che la cronaca
+ricordava il 10 ott.
+
+**DA FARE NELLA PROSSIMA PATCH DEL NODO (la -bar8 del cantiere
+tempo-di-chi-pubblica, parola di Andrea): la disputa automatica delle
+92 ore va raccontata.** In `enforce_escrow_deadline_pass`
+(`src/scheduler.rs`), nel ramo `fiat-sent` dove mostrod apre la disputa
+da solo, va chiamato lo stesso gancio che la patch 0007 ha messo in
+`dispute_action`: l'evento `dispute-opened` verso `/api/p2p/evento`,
+con `actor` = `mostro` e un `detail` che dica la ragione (per esempio
+`escrow-deadline`), `order`, `ts`, `buyer` e `seller` come gli altri.
+Dal lato del server non serve niente, ed è SONDATO (12 ott, sul banco
+di cartone, l'evento mandato dalla porta vera dopo presa, garanzia e
+pagato segnato): il server di oggi lo accetta — `mostro` è già fra gli
+attori ammessi —, la riga nasce in `p2p_dispute` aperta e con
+`aperta_da` vuoto, partono gli avvisi alle due parti e ai moderatori, e
+la card la conta (1 su 1). Era una sonda, non un collaudo: quando la
+patch c'è, diventa un passo di `collaudo_dispute_cruscotto`, e la frase
+«QUEL CHE NON SI SA» qui sopra e nel sorgente si toglie.
 
 **DOVE STA.** `server.py`: la leva accanto a `P2P_STATISTICHE_IDS`; il
 blocco «LE DISPUTE NEL CRUSCOTTO» dopo la rotta delle statistiche
@@ -51153,39 +51190,56 @@ punti era 10%») andava a capo su tre righe in una colonna da ottanta
 pixel: ora sono due righe corte che non si spezzano («▼ −1,7» e sotto
 «era 10%»), e la parola «punti» è salita nell'intestazione della riga.
 
-**PROVATO.** `prove_dispute_cruscotto_p2p` (39 prove): il giudice sul
-DDL vero con un registro e una cronaca fatti per contare — 10 scambi e
-1 disputa nei 7 giorni, 40 e 3 nei 30, 70 e 4 da sempre; scaduti e
+**PROVATO.** `prove_dispute_cruscotto_p2p` (42 prove): il giudice sul
+DDL vero con un registro e una cronaca fatti per contare — nei 7
+giorni 10 scambi presi, 8 con garanzia, 1 disputa (12,5%); nei 30, 40,
+35 e 3 (8,6%); da sempre 70, 63 e 4 (6,3%); la garanzia solo chiesta e
+quella mai pagata fuori dal denominatore, la deduzione dal registro
+caso per caso, il fatto della cronaca che vince sulla deduzione, la
+disputa che prova la garanzia, gli scambi presi senza nessuna garanzia
+(percentuale «—», nessuna divisione per zero); scaduti e
 ritirati fuori; due giri dello stesso ordine; la presa che manca; lo
 scambio in due fonti (vince il registro); la disputa orfana; nessun
 account e nessun id intero nella risposta; il giudice che non scrive —
 poi la soglia (la riga esatta, il pavimento), l'avviso che suona una
-volta, tace al 5% preciso senza riarmarsi, si riarma al 4% e risuona,
+volta (3 su 35 con garanzia), tace al 5% preciso senza riarmarsi, si
+riarma al 4% e risuona,
 la leva nei suoi versi (8, 2,5, 0; assente, parola, True, 150, −1), e
 la card DISEGNATA in node dalle funzioni vere della pagina: piena,
 senza scambi, senza sezione, con un id scritto per fare danni, a leva
 spenta. In `prove_cruscotto_admin`: su un database senza P2P la sezione
 è None e il resto vive. `collaudo_dispute_cruscotto` (25 passi, nella
 gabbia della CI): la rotta VERA — 403 all'utente normale, la sezione al
-moderatore che non vede i conti —, quattro scambi e una disputa dalla
-porta del coordinatore, la decisione di un moderatore, e l'avviso dal
+moderatore che non vede i conti —, cinque scambi presi dalla porta del
+coordinatore, di cui uno senza garanzia (chiesta, mai pagata) e uno in
+disputa: 1 su 4, 25%; la decisione di un moderatore, e l'avviso dal
 BATTITO VERO dell'ora: tace sotto le tre dispute, parte una volta alla
 terza, tace l'ora dopo e dopo un «riavvio», tace a leva spenta; la
-scopa dei quaranta giorni non cambia «da sempre». LA TORTURA, su una
+scopa dei quaranta giorni non cambia «da sempre» (sette presi, sei con
+garanzia, tre dispute, anche letti dal solo registro). LA TORTURA, su una
 copia del repo: sedici mutazioni (la cronaca che vince sul registro,
 gli scaduti contati, il periodo prima senza tetto, l'orfana senza
 scambio, la soglia col maggiore-uguale, senza pavimento, il riarmo
 subito, il timbro non scritto, l'id intero, le aperte fra le chiuse,
 la sezione tolta dal cruscotto, il giro dell'ora che non guarda, l'id
 senza `esc()`, la tendenza rovesciata, la leva storta a zero), 16 prese
-su 16 al primo giro: tutte dalla prova, sette anche dal collaudo. IL
+su 16 al primo giro: tutte dalla prova, sette anche dal collaudo. DOPO
+LA CORREZIONE, altre nove sulle regole della garanzia (la percentuale
+di nuovo sulle prese, la disputa che non prova la garanzia, la cronaca
+che non la dice, la garanzia solo chiesta che vale bloccata, ogni
+annullato e il tornato con garanzia dal registro, la fattura mai data
+anche sulle vendite, l'avviso e i riquadri con gli scambi presi): 9 prese su 9, tutte dalla prova e sei anche dal collaudo. IL
 GIRO DAL VIVO (Browser pane sul server del worktree, porta sua,
 collaudo, config di cartone coi relay morti e la nsec segnaposto,
 registro e dispute seminati a mano perché la porta degli eventi rifiuta
 le ore vecchie): `/admin?collaudo=999` a 390 px, la card sopra la soglia
 (8,3% / 7,3% in rosso / 5,6%, due aperte coi loro id corti), la scena
 calma, il tema scuro forzato, nessuno scorrimento orizzontale (tabella
-325 su 325), console pulita; 111 legge «riservata agli admin». Lo
+325 su 325), console pulita; 111 legge «riservata agli admin». RIFATTO
+DOPO LA CORREZIONE sulla scena sopra soglia: 9,1% / 7,9% in rosso /
+5,8%, «N dispute su M scambi con garanzia» nei riquadri, la riga
+«Scambi con garanzia» (11 / 38 / 69) sotto «Scambi presi» (12 / 41 /
+72), tabella 324 su 324. Lo
 scanner dei segreti sulle 940 righe aggiunte, con le forme lette dal
 workflow e la controprova: zero.
 
@@ -51196,7 +51250,9 @@ tre nei 30 giorni l'avviso può partire al primo giro dell'ora dopo il
 deploy. • La soglia a 5 è una proposta: dopo due o tre settimane di
 numeri veri si ritara (la riga nel config del VPS serve solo per
 cambiarla). • La disputa automatica del coordinatore non si conta: se
-ne capita una, il cruscotto non la mostra.
+ne capita una, il cruscotto non la mostra finché la -bar8 non la
+racconta. • La colonna «garanzia» nel registro (vedi LE DECISIONI):
+serve un sì.
 
 **UNA REGRESSIONE MIA, presa dalla suite intera e non dalle prove
 vicine.** `prove_p2p_orologio` e `prove_p2p_tutti_i_relay` eseguono
@@ -51209,14 +51265,20 @@ la lezione di «firma cambiata, ancore nei banchi» in un'altra forma:
 una chiamata nuova dentro una funzione che i banchi eseguono si cerca
 per NOME in `prove.py` prima della suite, non dopo.
 
-**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Prove vicine,
-collaudo nuovo, tortura e giro dal vivo sopra `464f839` (la punta di
-main quando il cantiere è nato). Poi main è corso di UN commit non mio
-(`2c317ab`, solo CLAUDE.md: i tetti di prezzo in «Adesso»): rebase
-senza conflitti, e SULL'ALBERO RIBASATO — quello del push — è girato
-tutto il resto: `PROVE_SEVERE=1 python prove.py` INTERA, 22.534 passate
-e 0 fallite, nessuna saltata; i 63 collaudi del workflow nella gabbia
-(`collaudi_ci.py`, in tre gruppi in parallelo), 63 verdi; `compileall`;
-lo scanner dei segreti sulle righe aggiunte. La prima corsa della suite,
-sopra `464f839`, era quella delle due esplose; la seconda è questa. La
-voce era già scritta quando la suite è girata, tranne questo paragrafo.
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Il cantiere è
+nato sopra `464f839`; main è corso di UN commit non mio (`2c317ab`,
+solo CLAUDE.md: i tetti di prezzo in «Adesso»), rebase senza conflitti.
+La prima stesura (percentuale sulle prese) aveva avuto lì sopra la sua
+suite intera — la prima corsa con le due esplose, la seconda 22.534 e 0
+— e i suoi 63 collaudi. POI LA CORREZIONE DI ANDREA (il denominatore),
+e sull'albero che si pusha, sopra `2c317ab` (la punta di main al
+momento del push, ricontrollata col fetch), è girato di nuovo tutto:
+`PROVE_SEVERE=1 python prove.py` INTERA, 22.537 passate e 0 fallite,
+nessuna saltata; i 63 collaudi del workflow nella gabbia
+(`collaudi_ci.py`, tre gruppi in parallelo), 63 verdi; `compileall`; la
+tortura corta della garanzia (9 su 9) e lo scatto dal vivo a 390 px; lo
+scanner dei segreti sulle righe aggiunte, con le forme lette dal
+workflow e la controprova. La tortura lunga (16 su 16) e il resto del
+giro dal vivo sono della prima stesura, sopra `464f839`. La voce era
+già scritta quando la suite è girata, tranne questo paragrafo e il
+conto della tortura corta.

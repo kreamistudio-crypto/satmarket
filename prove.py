@@ -113652,7 +113652,10 @@ def prove_dispute_cruscotto_p2p():
     Il giudice gira per davvero sul DDL VERO, con un registro e una
     cronaca di cartone fatti per contare: scambi presi in ogni finestra,
     dal registro, dalla sola cronaca, da tutt'e due, e una disputa di cui
-    registro e cronaca non ricordano piu' lo scambio. Poi la soglia (il
+    registro e cronaca non ricordano piu' lo scambio; e la GARANZIA
+    BLOCCATA, che fa il denominatore: detta dalla cronaca dove c'e',
+    dedotta dal registro dove non c'e' piu', provata da una disputa. Poi
+    la soglia (il
     pavimento delle tre dispute, la riga esatta), l'avviso che suona UNA
     volta e si riarma un punto sotto, la leva nei suoi versi, e la card
     disegnata dalle funzioni vere della pagina."""
@@ -113664,12 +113667,14 @@ def prove_dispute_cruscotto_p2p():
            "print": lambda *a, **k: None}
     for capo, coda in (("_PESO_MOMENTO_P2P = {", "}\n"),
                        ("P2P_MOMENTI_IN_CORSO = (", ")\n"),
-                       ("P2P_DISPUTE_PERIODI = (",
+                       ("P2P_DISPUTE_PERIODI = (", "))\n"),
+                       ("P2P_MOMENTI_CON_GARANZIA = (",
                         'TIMBRO_SOGLIA_DISPUTE_P2P = "soglia_dispute_p2p"\n')):
         i = src.index(capo)
         exec(src[i:src.index(coda, i) + len(coda)], amb)
     for f in ("_motivo_annullo_p2p", "_esiti_cronaca_p2p", "_perc_it",
-              "_sopra_soglia_dispute_p2p", "dati_dispute_p2p",
+              "_sopra_soglia_dispute_p2p", "_garanzia_dal_registro_p2p",
+              "dati_dispute_p2p",
               "_testo_soglia_dispute_p2p", "_avviso_soglia_dispute_p2p",
               "_soglia_dispute_salva_p2p"):
         exec(pezzo(f), amb)
@@ -113694,12 +113699,13 @@ def prove_dispute_cruscotto_p2p():
     ORA, G = 1760270400, 86400
     COMPRA, VENDE = 111222333, 444555666        # id che NON devono uscire
 
-    def registro(ordine, giorni_fa, esito="completato", giro=1, preso=None):
+    def registro(ordine, giorni_fa, esito="completato", giro=1, preso=None,
+                 motivo="", lato="sell"):
         quando = ORA - int(giorni_fa * G)
-        con.execute("INSERT INTO p2p_conti(ordine, giro, esito, preso, chiuso) "
-                    "VALUES(?,?,?,?,?)",
-                    (ordine, giro, esito, quando if preso is None else preso,
-                     quando + 600))
+        con.execute("INSERT INTO p2p_conti(ordine, giro, esito, motivo, lato, "
+                    "preso, chiuso) VALUES(?,?,?,?,?,?,?)",
+                    (ordine, giro, esito, motivo, lato,
+                     quando if preso is None else preso, quando + 600))
 
     def cronaca(ordine, giorni_fa, momenti, giro=1):
         for n, (momento, attore, dettaglio) in enumerate(momenti):
@@ -113717,14 +113723,18 @@ def prove_dispute_cruscotto_p2p():
             (ordine, giro, ORA - int(giorni_fa * G) + 1800, COMPRA, VENDE,
              stato, VENDE if stato != "aperta" else 0, esito, chiusa_da))
     APERTA = "d15b0001-aaaa-4bbb-8ccc-0000000000d1"
-    # --- gli ultimi 7 giorni: 10 scambi presi, 1 in disputa -------------
-    for n in range(7):
+    # --- gli ultimi 7 giorni: 10 scambi presi, 8 con la garanzia
+    # bloccata, 1 in disputa ---------------------------------------------
+    for n in range(6):
         registro(f"sette-{n}", 1 + n * 0.8)
+    # preso, e la garanzia mai pagata: uno scambio preso SENZA garanzia
+    registro("sette-senza", 3, esito="annullato", motivo="garanzia_non_pagata")
     cronaca("non-consolidato", 0.5, [("preso", "buyer", ""),
                                      ("rilasciato", "seller", ""),
                                      ("concluso", "mostro", "")])
+    # in corso, e la garanzia e' solo CHIESTA: non c'e' ancora
     cronaca("in-corso", 0.1, [("preso", "buyer", ""),
-                              ("garanzia_pagata", "seller", "active")])
+                              ("garanzia_chiesta", "mostro", "invoice")])
     cronaca(APERTA, 2, [("preso", "buyer", ""), ("garanzia_pagata", "seller", ""),
                         ("fiat", "buyer", ""), ("disputa", "buyer", "")])
     disputa(APERTA, 2, stato="presa")
@@ -113732,17 +113742,33 @@ def prove_dispute_cruscotto_p2p():
     registro("mai-preso", 1, esito="scaduto", giro=0)
     registro("tolto-a-mano", 2, esito="ritirato", giro=0)
     cronaca("scaduto-ora", 3, [("scaduto", "mostro", "book")], giro=0)
-    # --- da 7 a 14 giorni fa: 8 scambi, nessuna disputa ----------------
+    # --- da 7 a 14 giorni fa: 8 scambi, 7 con garanzia, nessuna disputa
     for n in range(6):
         registro(f"prima-{n}", 8 + n)
-    # un ordine tornato in vetrina e ripreso: due giri, due scambi
+    # un ordine tornato in vetrina (senza garanzia) e ripreso, poi
+    # annullato d'accordo (con): due giri, due scambi
     registro("due-giri", 10, esito="tornato", giro=1)
-    registro("due-giri", 9, esito="annullato", giro=2)
-    # --- da 14 a 30 giorni fa: 22 scambi, 2 in disputa -----------------
-    for n in range(18):
+    registro("due-giri", 9, esito="annullato", giro=2, motivo="concordato")
+    # --- da 14 a 30 giorni fa: 22 scambi, 20 con garanzia, 2 in disputa
+    for n in range(13):
         registro(f"mese-{n}", 14.5 + n * 0.8)
+    # la deduzione dal registro, caso per caso: a mano no; la fattura
+    # mai data si' su un ordine di acquisto e no su uno di vendita; la
+    # garanzia arrivata a scadenza si'
+    registro("a-mano", 17, esito="annullato", motivo="a_mano")
+    registro("fattura-compra", 18, esito="annullato", motivo="fattura_non_data",
+             lato="buy")
+    registro("fattura-vendi", 19, esito="annullato", motivo="fattura_non_data")
+    registro("garanzia-scaduta", 22, esito="annullato", motivo="garanzia_scaduta")
+    # ...e dove la cronaca c'e' ancora, IL FATTO VINCE sulla deduzione:
+    # annullato a mano, ma la garanzia era stata pagata
+    registro("fatto-vince", 23, esito="annullato", motivo="a_mano")
+    cronaca("fatto-vince", 23, [("preso", "seller", "take"),
+                                ("garanzia_pagata", "seller", ""),
+                                ("annullato", "seller", "")])
     registro("disputa-mod", 20)
     disputa("disputa-mod", 20, esito="compratore", chiusa_da="moderatore")
+    # annullato senza un motivo che dica la garanzia: la disputa la prova
     registro("disputa-parti", 25, esito="annullato")
     disputa("disputa-parti", 25, esito="venditore", chiusa_da="parti")
     # la presa non si sa: vale la chiusura
@@ -113751,51 +113777,89 @@ def prove_dispute_cruscotto_p2p():
     # «13 giorni fa»: vince il registro (16), e conta una volta sola
     registro("due-fonti", 16)
     cronaca("due-fonti", 13, [("concluso", "mostro", "")])
-    # --- da 30 a 60 giorni fa: 20 scambi, 1 in disputa -----------------
-    for n in range(19):
+    # --- da 30 a 60 giorni fa: 20 scambi, 19 con garanzia, 1 in disputa
+    for n in range(17):
         registro(f"due-mesi-{n}", 31 + n * 1.5)
+    registro("antico-moderatore", 40, esito="annullato", motivo="moderatore")
+    registro("antico-tornato", 50, esito="tornato")
     # una disputa di cui ne' registro ne' cronaca ricordano lo scambio:
     # lo scambio c'era, e conta dall'ora in cui e' stata aperta
     disputa("disputa-orfana", 45, esito="venditore", chiusa_da="moderatore")
-    # --- prima: 10 scambi, nessuna disputa -----------------------------
-    for n in range(10):
+    # --- prima: 10 scambi, 9 con garanzia, nessuna disputa -------------
+    for n in range(9):
         registro(f"vecchio-{n}", 61 + n * 3)
+    registro("vecchio-tornato", 70, esito="tornato")
     con.commit()
     prima_del_conto = con.total_changes
     d = dati(con, ORA)
     p7, p30, pt = (d["periodi"][k] for k in ("7", "30", "tutto"))
     prova("7 giorni: 10 scambi presi (registro, cronaca non consolidata, "
-          "in corso), 1 in disputa — scaduti e ritirati fuori",
-          (10, 1, 10.0), (p7["presi"], p7["con_disputa"], p7["percento"]))
+          "in corso) — scaduti e ritirati fuori — ma 8 CON GARANZIA: fuori "
+          "la garanzia mai pagata e quella solo chiesta; 1 in disputa, e la "
+          "percentuale e' sugli 8: 12,5%",
+          (10, 8, 1, 12.5), (p7["presi"], p7["con_garanzia"], p7["con_disputa"],
+                             p7["percento"]))
     prova("...la disputa e' ancora aperta, e nessuna chiusa",
           (1, 0, 0, 0), (p7["aperte"], p7["compratore"], p7["venditore"],
                          p7["moderatore"]))
     prova("...e sui 7 giorni prima (8 scambi, due giri dello stesso "
-          "ordine compresi, zero dispute) la tendenza e' +10 punti",
-          ({"presi": 8, "con_disputa": 0, "percento": 0.0}, 10.0),
-          (p7["prima"], p7["tendenza"]))
-    prova("30 giorni: 40 scambi, 3 in disputa, 7,5% — la presa che manca "
-          "vale la chiusura, e chi sta in due fonti conta una volta, dove "
-          "dice il registro", (40, 3, 7.5),
-          (p30["presi"], p30["con_disputa"], p30["percento"]))
+          "ordine: il tornato senza garanzia, il concordato con; zero "
+          "dispute) la tendenza e' +12,5 punti",
+          ({"presi": 8, "con_garanzia": 7, "con_disputa": 0, "percento": 0.0},
+           12.5), (p7["prima"], p7["tendenza"]))
+    prova("30 giorni: 40 scambi presi, 35 con garanzia, 3 in disputa, "
+          "8,6% — la presa che manca vale la chiusura, chi sta in due "
+          "fonti conta una volta; dal registro: a mano e fattura mai data "
+          "su una vendita no, su un acquisto e a garanzia scaduta si'; il "
+          "fatto della cronaca vince; la disputa prova la garanzia",
+          (40, 35, 3, 8.6),
+          (p30["presi"], p30["con_garanzia"], p30["con_disputa"], p30["percento"]))
     prova("...una a chi compra (decisa da un moderatore), una a chi vende "
           "(fra le parti), una aperta", (1, 1, 1, 1),
           (p30["compratore"], p30["venditore"], p30["moderatore"], p30["aperte"]))
-    prova("...e sui 30 giorni prima (20 scambi con la disputa orfana, "
-          "5%) la tendenza e' +2,5 punti",
-          ({"presi": 20, "con_disputa": 1, "percento": 5.0}, 2.5),
-          (p30["prima"], p30["tendenza"]))
-    prova("da sempre: 70 scambi, 4 dispute, 5,7%; due a chi vende, due "
-          "decise da un moderatore; senza un «prima»",
-          (70, 4, 5.7, 1, 2, 2, 1, False),
-          (pt["presi"], pt["con_disputa"], pt["percento"], pt["compratore"],
-           pt["venditore"], pt["moderatore"], pt["aperte"], "prima" in pt))
+    prova("...e sui 30 giorni prima (20 scambi, 19 con garanzia: dentro "
+          "l'annullo del moderatore e la disputa orfana, fuori il tornato; "
+          "5,3%) la tendenza e' +3,3 punti",
+          ({"presi": 20, "con_garanzia": 19, "con_disputa": 1, "percento": 5.3},
+           3.3), (p30["prima"], p30["tendenza"]))
+    prova("da sempre: 70 scambi presi, 63 con garanzia, 4 dispute, 6,3%; "
+          "due a chi vende, due decise da un moderatore; senza un «prima»",
+          (70, 63, 4, 6.3, 1, 2, 2, 1, False),
+          (pt["presi"], pt["con_garanzia"], pt["con_disputa"], pt["percento"],
+           pt["compratore"], pt["venditore"], pt["moderatore"], pt["aperte"],
+           "prima" in pt))
+    dedotta = amb["_garanzia_dal_registro_p2p"]
+    prova("la garanzia dal solo registro: completato si', tornato no; "
+          "annullato si' per moderatore, concordato, garanzia scaduta e "
+          "fattura mai data su un ACQUISTO; no per garanzia mai pagata, a "
+          "mano, tempo scaduto, fattura mai data su una vendita, e un "
+          "esito che non e' uno scambio",
+          [True, False, True, True, True, True, False, False, False, False,
+           False, False],
+          [dedotta("completato", "", ""), dedotta("tornato", "moderatore", "buy"),
+           dedotta("annullato", "moderatore", ""),
+           dedotta("annullato", "concordato", ""),
+           dedotta("annullato", "garanzia_scaduta", ""),
+           dedotta("annullato", "fattura_non_data", "buy"),
+           dedotta("annullato", "garanzia_non_pagata", "buy"),
+           dedotta("annullato", "a_mano", "buy"),
+           dedotta("annullato", "tempo_scaduto", "buy"),
+           dedotta("annullato", "fattura_non_data", "sell"),
+           dedotta("annullato", "", ""), dedotta("scaduto", "", "")])
+    solo_prese = base()
+    solo_prese.execute("INSERT INTO p2p_conti(ordine, giro, esito, preso, chiuso) "
+                       "VALUES('mai-garantito', 1, 'tornato', ?, ?)",
+                       (ORA - G, ORA - G + 60))
+    sp = dati(solo_prese, ORA)["periodi"]["30"]
+    prova("scambi presi ma nessuno con garanzia: la percentuale non c'e', "
+          "e non si divide per zero", (1, 0, 0, None),
+          (sp["presi"], sp["con_garanzia"], sp["con_disputa"], sp["percento"]))
     prova("le aperte adesso: l'id ACCORCIATO, da quando, e se un "
           "moderatore l'ha presa",
           [{"ordine": APERTA[:8], "aperta_il": ORA - 2 * G + 1800, "presa": True}],
           d["aperte"])
     prova("«da sempre» dice da quando: la presa piu' vecchia",
-          ORA - 88 * G, d["dal"])
+          ORA - 85 * G, d["dal"])
     prova("la soglia viaggia con la sezione: 5%, almeno 3 dispute, e qui "
           "si e' sopra", {"percento": 5.0, "minimo": 3, "sopra": True},
           d["soglia"])
@@ -113807,8 +113871,9 @@ def prove_dispute_cruscotto_p2p():
     vuoto = dati(base(), ORA)
     prova("senza scambi la percentuale non c'e' (None, mai 0%), niente "
           "tendenza, niente soglia passata",
-          (0, None, None, False, [], 0),
-          (vuoto["periodi"]["30"]["presi"], vuoto["periodi"]["30"]["percento"],
+          (0, 0, None, None, False, [], 0),
+          (vuoto["periodi"]["30"]["presi"], vuoto["periodi"]["30"]["con_garanzia"],
+           vuoto["periodi"]["30"]["percento"],
            vuoto["periodi"]["30"]["tendenza"], vuoto["soglia"]["sopra"],
            vuoto["aperte"], vuoto["dal"]))
     prova("un database senza le tabelle del P2P: None, senza alzare", None,
@@ -113832,9 +113897,10 @@ def prove_dispute_cruscotto_p2p():
         return r[0] if r else None
     primo = avviso(con, ORA)
     prova("la prima volta sopra la soglia l'avviso parte, coi numeri: 3 su "
-          "40, 7,5%, la soglia, i 30 giorni prima, l'aperta, il riarmo",
-          [], [x for x in ("3 scambi su 40 presi", "<b>7,5%</b>",
-                           "la soglia è 5%", "Nei 30 giorni prima: 5% (1 su 20)",
+          "35 CON GARANZIA, 8,6%, la soglia, i 30 giorni prima, l'aperta, il "
+          "riarmo",
+          [], [x for x in ("3 scambi su 35 con garanzia", "<b>8,6%</b>",
+                           "la soglia è 5%", "Nei 30 giorni prima: 5,3% (1 su 19)",
                            f"<code>{APERTA[:8]}</code>", "scende al 4% o sotto",
                            "«⚖️ Dispute P2P»") if x not in primo])
     prova("...senza un account, senza un nome, senza l'id intero",
@@ -113843,23 +113909,23 @@ def prove_dispute_cruscotto_p2p():
            "@" in primo))
     prova("...e il timbro dice «sopra»", "sopra", timbro())
     prova("un'ora dopo, ancora sopra: silenzio", "", avviso(con, ORA + 3600))
-    # venti scambi puliti: 3 su 60 = 5,0% — non piu' sopra, non ancora
-    # un punto sotto
-    for n in range(20):
+    # venticinque scambi puliti: 3 su 60 = 5,0% — non piu' sopra, non
+    # ancora un punto sotto
+    for n in range(25):
         registro(f"pulito-{n}", 0.2)
     prova("scesa al 5% preciso: tace, e NON si riarma (serve un punto "
           "sotto)", ("", "sopra", 5.0),
           (avviso(con, ORA), timbro(), dati(con, ORA)["periodi"]["30"]["percento"]))
     con.execute("DELETE FROM p2p_conti WHERE ordine LIKE 'pulito-%'")
-    prova("...risalita al 7,5% senza essersi mai riarmata: tace ancora",
+    prova("...risalita all'8,6% senza essersi mai riarmata: tace ancora",
           ("", "sopra"), (avviso(con, ORA), timbro()))
-    for n in range(35):
+    for n in range(40):
         registro(f"pulito-{n}", 0.2)
     prova("scesa al 4%: si riarma, in silenzio", ("", "sotto", 4.0),
           (avviso(con, ORA), timbro(), dati(con, ORA)["periodi"]["30"]["percento"]))
     con.execute("DELETE FROM p2p_conti WHERE ordine LIKE 'pulito-%'")
     prova("...e al superamento dopo, UN avviso nuovo", (True, "sopra", ""),
-          ("7,5%" in avviso(con, ORA), timbro(), avviso(con, ORA + 60)))
+          ("8,6%" in avviso(con, ORA), timbro(), avviso(con, ORA + 60)))
     amb["P2P_DISPUTE_SOGLIA_PERCENTO"] = 0.0
     con.execute("DELETE FROM timbri")
     prova("soglia a 0: nessun avviso, e il timbro non si tocca", ("", None),
@@ -113962,11 +114028,14 @@ def prove_dispute_cruscotto_p2p():
     o = _js.loads(r.stdout)
     prova("a schermo: le tre percentuali, i conti, la tendenza in punti "
           "col «era», l'aperta col suo id corto, la soglia",
-          [], [x for x in ("⚖️ Dispute P2P", ">10%<", ">7,5%<", ">5,7%<",
-                           "1 disputa su 10 scambi presi",
-                           "3 dispute su 40 scambi presi", "sopra la soglia",
-                           "Punti sul periodo prima", "▲ +10</span>",
-                           "era 0%", "▲ +2,5</span>", "era 5%",
+          [], [x for x in ("⚖️ Dispute P2P", ">12,5%<", ">8,6%<", ">6,3%<",
+                           "1 disputa su 8 scambi con garanzia",
+                           "3 dispute su 35 scambi con garanzia",
+                           "4 dispute su 63 scambi con garanzia",
+                           "sopra la soglia", "Scambi presi",
+                           "Scambi con garanzia",
+                           "Punti sul periodo prima", "▲ +12,5</span>",
+                           "era 0%", "▲ +3,3</span>", "era 5,3%",
                            f'<span class="mono">{APERTA[:8]}</span>',
                            "Chiuse a favore di chi compra",
                            "Chiuse a favore di chi vende",
@@ -113981,6 +114050,11 @@ def prove_dispute_cruscotto_p2p():
           o["niente"])
     prova("un id scritto per fare danni esce come testo", (False, True),
           ("<img src=x" in o["cattivo"], "&lt;img src=x" in o["cattivo"]))
+    prova("il denominatore ha la sua parola: nei riquadri non si legge "
+          "«scambi presi», e la nota dice dove la garanzia e' dedotta",
+          (False, False, True),
+          ("scambi presi<" in o["pieno"], "scambio preso<" in o["pieno"],
+           "la garanzia è dedotta dal motivo" in o["pieno"]))
     prova("a leva spenta la pagina lo dice", True,
           "L'avviso ai moderatori è spento." in o["spenta"]
           and "sopra la soglia" not in o["spenta"])

@@ -68,8 +68,9 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   una cifra. Coi perche': Architettura, «I CONTI DEL P2P».
 - LA SOGLIA DELLE DISPUTE P2P (12 ott 2026): la card «⚖️ Dispute P2P»
   del cruscotto `/admin` la vedono tutti i moderatori e non vuole
-  niente sul VPS. L'AVVISO su Telegram parte quando negli ultimi 30
-  giorni le dispute passano la leva `P2P_DISPUTE_SOGLIA_PERCENTO` (di
+  niente sul VPS. La percentuale e' sugli scambi CON LA GARANZIA
+  BLOCCATA, non su tutte le prese. L'AVVISO su Telegram parte quando
+  negli ultimi 30 giorni passa la leva `P2P_DISPUTE_SOGLIA_PERCENTO` (di
   serie 5) con almeno 3 dispute: uno per superamento, e si riarma
   quando la percentuale scende di un punto sotto. La riga nel config
   del VPS serve SOLO per cambiare il numero o spegnere (0): si guarda

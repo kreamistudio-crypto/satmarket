@@ -11,9 +11,11 @@ eventi nella forma che la patch 0007 manda davvero:
   1. la porta: il cruscotto e' dei moderatori — 403 all'utente normale —
      e la sezione delle dispute arriva a OGNI moderatore, anche a chi non
      vede i conti del P2P;
-  2. quattro scambi presi dalla porta del coordinatore, uno finisce in
-     disputa: 1 su 4, 25%, un'aperta col suo id ACCORCIATO, e nella
-     risposta nessuna chiave, nessun id intero;
+  2. cinque scambi presi dalla porta del coordinatore: uno non arriva
+     alla garanzia (chiesta, mai pagata) e NON entra nel denominatore;
+     degli altri quattro uno finisce in disputa: 1 su 4 con garanzia,
+     25%, un'aperta col suo id ACCORCIATO, e nella risposta nessuna
+     chiave, nessun id intero;
   3. un moderatore la decide a favore di chi compra: zero aperte, una a
      chi compra, una decisa da un moderatore;
   4. il battito VERO dell'ora: sotto le tre dispute tace anche al 25%;
@@ -124,17 +126,24 @@ def main():
           (cr["dispute_p2p"]["periodi"]["tutto"]["presi"],
            cr["dispute_p2p"]["periodi"]["tutto"]["percento"]))
 
-    print("\n2) quattro scambi presi, uno in disputa")
+    print("\n2) cinque scambi presi, quattro con garanzia, uno in disputa")
     for n in range(3):
         concluso(O[n], t + n * 100)
     dispute.fino_alla_disputa(O[3], t + 300)
+    # una presa che non arriva alla garanzia: chiesta, mai pagata, e il
+    # coordinatore chiude. E' uno scambio preso, non uno con garanzia
+    dispute.manda(O[6], "taken", t + 350, "buyer", "take")
+    dispute.manda(O[6], "hold-invoice-requested", t + 360, "mostro", "invoice")
+    dispute.manda(O[6], "canceled", t + 370, "mostro", "maker-timeout")
     d = cruscotto()["dispute_p2p"]
     p30 = d["periodi"]["30"]
-    prova("30 giorni: 1 disputa su 4 scambi presi, 25%", (4, 1, 25.0),
-          (p30["presi"], p30["con_disputa"], p30["percento"]))
-    prova("...lo stesso in 7 giorni e da sempre", [(4, 1, 25.0)] * 2,
-          [(d["periodi"][k]["presi"], d["periodi"][k]["con_disputa"],
-            d["periodi"][k]["percento"]) for k in ("7", "tutto")])
+    prova("30 giorni: 5 scambi presi, 4 con garanzia, 1 disputa — e la "
+          "percentuale e' sui 4: 25%", (5, 4, 1, 25.0),
+          (p30["presi"], p30["con_garanzia"], p30["con_disputa"], p30["percento"]))
+    prova("...lo stesso in 7 giorni e da sempre", [(5, 4, 1, 25.0)] * 2,
+          [(d["periodi"][k]["presi"], d["periodi"][k]["con_garanzia"],
+            d["periodi"][k]["con_disputa"], d["periodi"][k]["percento"])
+           for k in ("7", "tutto")])
     prova("...aperta, col suo id accorciato, e nessun moderatore l'ha presa",
           [(O[3][:8], False)], [(a["ordine"], a["presa"]) for a in d["aperte"]])
     prova("...e prima non c'erano scambi: nessuna tendenza inventata", None,
@@ -162,7 +171,8 @@ def main():
 
     print("\n4) l'avviso, dal battito vero dell'ora")
     AVVISATI.clear()
-    prova("una disputa su quattro scambi: il battito tace", [], battito())
+    prova("una disputa su quattro scambi con garanzia: il battito tace", [],
+          battito())
     dispute.fino_alla_disputa(O[4], t + 500, da="seller")
     prova("due su cinque (40%): tace ancora, mancano le tre dispute", [],
           battito())
@@ -172,7 +182,8 @@ def main():
     avviso = partiti[0] if partiti else ""
     prova("...coi numeri — 3 su 6, 50%, la soglia — e le due aperte per id "
           "corto", [],
-          [x for x in ("3 scambi su 6 presi", "<b>50%</b>", "la soglia è 5%",
+          [x for x in ("3 scambi su 6 con garanzia", "<b>50%</b>",
+                       "la soglia è 5%",
                        f"<code>{O[4][:8]}</code>", f"<code>{O[5][:8]}</code>")
            if x not in avviso])
     prova("...senza una chiave, senza un id intero, senza un nome",
@@ -208,9 +219,12 @@ def main():
           (tolte > 0, con.execute("SELECT COUNT(*) FROM p2p_momenti").fetchone()[0]))
     dopo = SRV.dati_dispute_p2p(con, adesso)["periodi"]["tutto"]
     con.close()
-    prova("...e i sei scambi con le loro tre dispute ci sono ancora — anche "
-          "i due ancora in disputa, che nel registro non sono entrati",
-          (prima, 6, 3), (dopo, dopo["presi"], dopo["con_disputa"]))
+    prova("...e i sette scambi presi, i sei con garanzia e le tre dispute "
+          "ci sono ancora — anche i due ancora in disputa, che nel registro "
+          "non sono entrati; la presa senza garanzia resta fuori dal "
+          "denominatore anche letta dal registro",
+          (prima, 7, 6, 3),
+          (dopo, dopo["presi"], dopo["con_garanzia"], dopo["con_disputa"]))
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0
