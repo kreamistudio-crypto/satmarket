@@ -31131,22 +31131,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ancora chi parte per le ferie: la regola non è cambiata, la frase
   sì). I TONDI DEI GIORNI della fascia (`.p2p-pausa-giorni
   .p2p-accesso-chip`) sono alti 40px come le celle.
-  I GESTI DELL'APPUNTAMENTO (12 ott 2026, notte, cantiere
-  `gesti-subito`): `segnaOrdineAperto(campi)` scrive i fatti appena
-  detti dal server sull'ordine aperto E sulla riga viva di `orders`
-  (quella che `openOrder` rilegge), e di lì passano tutti e tre —
+  I GESTI DELL'ORDINE SCRIVONO DOVE LA PAGINA RILEGGE (12-13 ott 2026,
+  cantiere `gesti-subito`). `openOrder` ridisegna dalla riga di
+  `orders`, e `loadOrders` quella riga la RIFÀ: se la lista si rilegge
+  mentre un ordine è aperto, `currentOrder` resta la copia di prima, e
+  quel che un gesto scriveva lì non si vedeva. L'ATTREZZO È UNO, accanto
+  a `loadOrders`: `segnaOrdine(o, campi)` scrive sull'ordine dato E
+  sulla sua riga viva; `segnaOrdineAperto(campi)` lo chiama con
+  `currentOrder`. Di lì passano i tre gesti dell'appuntamento —
   `proponiAppuntamento` (la data; la conferma azzerata se la proposta è
-  nuova), `confermaAppuntamento` (la data del server e la conferma:
-  l'ora è «adesso», una già data resta; al 409 rilegge gli ordini e si
-  ridisegna sulla data nuova), `depositaAccesso` (`accessoIl` = il
-  primo deposito, che una correzione non sposta). Dopo il tocco la
-  pagina dice subito «Hai proposto…», «✅ … — confermato», «✅ Lasciato
-  il…». `_impegni_aperti` dice a ogni ordine pagato la SUA via
-  d'uscita: «consegna il codice» (digitale), «porta a termine il
-  servizio», «segna la consegna a mano» (ritiro), «segna la spedizione»
-  (il resto). ⚠️ NON CURATO: `conferma_appuntamento` non riceve la data
-  che chi compra sta guardando — conferma quella che il server ha in
-  quel momento (Cantieri, «I gesti dell'appuntamento»).
+  nuova), `confermaAppuntamento`, `depositaAccesso` (`accessoIl` = il
+  primo deposito, che una correzione non sposta) — e i tredici che
+  scrivevano sulla sola copia: `inviaFeedback`, `saveLnAddress`,
+  `saveSellerInvoice`, `confirmReceived`, `inviaSpedito`,
+  `markConsegnaMano`, `depositaBusta`, `resoSpedito`, `resoRicevuto`,
+  `openDispute`, `adminResolve`, e con `segnaOrdine(o, …)` i due che
+  tengono il LORO ordine, `scegliConsegnaOrdine` e `salvaPuntoRitiro`.
+  CAMBIA SOLO DOVE SI SCRIVE: stessi campi, stessi valori, dopo lo
+  stesso «sì»; i rami della demo e le due righe della busta diretta
+  restano com'erano. LA CONFERMA DELL'APPUNTAMENTO PORTA LA DATA: il
+  bottone ha `data-quando` (la data a schermo), il gesto la manda, e
+  `conferma_appuntamento` — corpo FACOLTATIVO, mai da `leggi_json` — se
+  non è più quella dell'ordine risponde 409 PRIMA di guardare se è già
+  confermata; la pagina rilegge, tiene in `appuntamentoCambiato` la
+  data che si stava confermando, e `pannelloServizioCompratore` chiede
+  «La data è cambiata: confermi questa?» finché a schermo ce n'è
+  un'altra. Il CAS resta. `_impegni_aperti` dice a ogni ordine pagato
+  la SUA via d'uscita: «consegna il codice» (digitale), «porta a
+  termine il servizio», «segna la consegna a mano» (ritiro), «aspetta
+  che chi ha vinto l'asta scelga la consegna» (strada non scelta e
+  annuncio d'asta), «segna la spedizione» (il resto). IL COLLAUDO:
+  `collaudo_gesti_ordine.py`, la pagina vera in node contro le rotte
+  vere, gesto per gesto dalla copia di prima.
   • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
   `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
   senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo

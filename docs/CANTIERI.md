@@ -54808,7 +54808,8 @@ Non era la richiesta: proposta, non fatta.
 - CAMBIARE LA FRASE DEL 409 SUL SERVER: la frase giusta la dice la
 pagina, che adesso si ridisegna; il server resta com'è.
 
-**TROVATO NEL GIRO DAL VIVO, E NON TOCCATO** (aspetta un sì di Andrea).
+**TROVATO NEL GIRO DAL VIVO** (il 12 non toccato; CURATO il 13, nella
+seconda parte qui sotto).
 La conferma dell'appuntamento NON porta la data: il server conferma
 quella che ha in quel momento. Il suo 409 ferma solo il cambio che
 cade nei millisecondi fra la sua lettura e la sua scrittura. Nel giro:
@@ -54839,8 +54840,109 @@ in tutti e due i casi; le ferie con i due ordini aperti — «ordine #5
 si è potuto vedere, per la ragione scritta qui sopra: lo tiene il banco
 node.
 
-**NOTATI E NON FATTI.** 1) La conferma che non porta la data (qui
-sopra). 2) I gesti che scrivono sulla sola copia aperta dell'ordine.
-3) Per un'asta vinta in attesa della scelta della consegna le ferie
-dicono «segna la spedizione», e chi vende lì non può ancora fare
-niente.
+**NOTATI il 12** (tutti e tre CURATI il 13, nella seconda parte qui
+sotto). 1) La conferma che non porta la data (qui sopra). 2) I gesti
+che scrivono sulla sola copia aperta dell'ordine. 3) Per un'asta vinta
+in attesa della scelta della consegna le ferie dicono «segna la
+spedizione», e chi vende lì non può ancora fare niente.
+
+**LA SECONDA PARTE (13 ott 2026, stesso cantiere): i tre notati, uno per
+uno, su richiesta di Andrea** — «non pushare ancora».
+
+1) LA CONFERMA PORTA LA DATA. «✅ Confermo, ci sono» manda `quando`, la
+data che chi compra ha davanti: la porta il BOTTONE (`data-quando`,
+scritta quando il riquadro è stato disegnato), non quel che l'ordine ha
+in memoria in quel momento. Sul server, `conferma_appuntamento` la
+confronta con quella dell'ordine PRIMA di ogni altra cosa — anche prima
+dell'idempotenza: chi guarda una data che non c'è più non «riconferma»
+quella nuova per sbaglio — e se è cambiata risponde 409. La pagina
+rilegge gli ordini, si ridisegna sulla data nuova e il riquadro chiede
+«📅 **La data è cambiata: confermi questa?** Il venditore ora propone
+**venerdì 16 ottobre alle ore 15:30**», con un bottone che porta la data
+nuova. La domanda vale finché a schermo non c'è più la data che si stava
+confermando (`appuntamentoCambiato`), e se ne va alla conferma. Il CAS
+di prima resta, per la corsa dei millisecondi. IL CORPO È FACOLTATIVO:
+un client di ieri non lo manda e vale come ieri (la pagina è servita
+senza cache: resta fuori solo il telefono aperto a cavallo del deploy),
+e un corpo rotto vale come nessun corpo — mai un 400, quindi la rotta
+NON passa da `leggi_json`. SCARTATO il corpo obbligatorio (quel
+telefono prenderebbe un errore che non capisce); SCARTATO restituire la
+data nuova dentro il 409 (la pagina rilegge comunque: con la data può
+essere cambiato anche il resto).
+2) I TREDICI GESTI CHE SCRIVEVANO SULLA SOLA COPIA APERTA passano
+dall'attrezzo, che adesso prende l'ordine per nome —
+`segnaOrdine(o, campi)`, con `segnaOrdineAperto(campi)` per quello
+aperto — e sta accanto a `loadOrders`, la funzione che crea il problema
+(rifà la lista, e la copia aperta resta di prima). COSA CAMBIA,
+ESATTAMENTE: dopo lo stesso «sì» del server, gli stessi campi con gli
+stessi valori si scrivono sulla copia aperta E sulla riga della lista,
+invece che sulla sola copia. Nient'altro: nessuna richiesta, nessuna
+condizione, nessuna cifra, nessun testo, niente sul server. Gesto per
+gesto: il feedback (`mioVoto`, `mioCommento`, `mioFoto`); l'indirizzo
+Lightning e la fattura d'incasso (`state` a incasso o rimborso
+avvenuto; la fattura tenuta, se il nodo tace); la conferma di ricezione
+(`state`, nei tre rami); «segna come spedito» (`state`, `corriere`,
+`tracking`); la consegna a mano (`state`, `corriere`); il codice di
+ritiro (`bustaIl`, `bustaCorrezioni`, `bustaDocumento`); il reso
+spedito (`state`, `corriereReso`, `trackingReso`) e ricevuto (`state`);
+la disputa e la decisione del moderatore (`state`). La scelta della
+consegna dopo un'asta e il punto di ritiro tengono il LORO ordine (`o`,
+preso prima della richiesta), e continuano a scrivere su quello — non su
+quello aperto adesso, se nel frattempo se n'è aperto un altro. I rami
+della demo non si toccano (lì la lista non si rilegge mai), e nemmeno le
+due righe della busta diretta, che la riga viva la scrivevano già.
+SCARTATA ancora la cura in tre righe dentro `loadOrders`: tocca il
+punto da cui passano i pagamenti senza che un gesto lo chieda, e c'è un
+confronto d'identità; un gesto alla volta si prova un gesto alla volta.
+3) LE FERIE E L'ASTA VINTA IN ATTESA DELLA SCELTA. La strada non c'è
+ancora — la sceglie chi ha vinto — e chi vende lì non può segnare
+niente: `_impegni_aperti` dice «aspetta che chi ha vinto l'asta scelga
+la consegna». L'ordine è d'asta se l'annuncio ha una base d'asta; gli
+ordini storici senza strada che non sono aste restano «segna la
+spedizione». Trattiene ancora chi parte.
+
+PROVATO, la seconda parte. `prove_gesti_ordine` (79 prove): le
+sentinelle — nessun gesto vero scrive più a mano sull'ordine — e i
+tredici gesti VERI in node, ognuno tre volte: sulla riga viva, sulla
+copia di prima, e col «no» del server; ogni volta la riga, la copia, il
+ridisegno, l'altro ordine, la rotta, il corpo che parte e le parole
+devono essere quelli di ieri. `prove_servizio_senza_corriere` (30): la
+data che viaggia col bottone, il 409 e la domanda, la regola del server
+(prima dell'idempotenza, corpo facoltativo), le sette frasi delle
+ferie. IL COLLAUDO NUOVO, `collaudo_gesti_ordine.py` (63 passi, nel
+workflow): la pagina vera in node contro le rotte vere (un ponte verso
+il TestClient: in CI non c'è uvicorn) — per ogni gesto la pagina apre
+l'ordine, la lista si rilegge, parte il gesto, e quel che la pagina
+dice dev'essere quel che il server risponde a una rilettura fresca, e
+quel che c'è nel database; in fila sugli stessi ordini: spedito →
+disputa → decisione (reso) → reso spedito → reso ricevuto → rimborso
+con l'indirizzo; consegna a mano; conferma → fattura → feedback; i due
+incassi che partono da soli; punto e codice di ritiro; scelta della
+consegna dopo un'asta. E IL CASO DELL'APPUNTAMENTO: giovedì visto,
+venerdì proposto nel frattempo, il tocco rifiutato, la domanda,
+venerdì confermato, un solo avviso a chi vende (per venerdì). Al primo
+giro il collaudo ha dato una rossa SUA: leggeva il database a sessione
+finita, quando venerdì era già confermato — l'ha detto la riga
+riletta dalla pagina, non il codice. LA TORTURA: 31 mutazioni, girate
+contro le prove E contro il collaudo. Tutte prese dalle prove; 25
+anche dal collaudo, e fra queste ognuno dei tredici gesti rimesso a
+scrivere sulla copia (le sei che il collaudo non vede sono rami che lì
+non si percorrono: il nodo muto, l'ordine cambiato a richiesta in
+volo, le due varianti della frase dell'asta). IL GIRO DAL VIVO a
+390×844 con due telefoni, sette scatti: chi compra guarda giovedì 15;
+chi vende, dal suo telefono, propone venerdì 16; il tocco su «Confermo,
+ci sono» fa comparire «La data è cambiata: confermi questa?» con
+venerdì (una rilettura, il toast); il secondo tocco conferma venerdì, e
+chi vende legge «confermato da chi ha comprato». Poi tre gesti aperti
+con la copia di prima — spedito, consegna a mano (dal suo bottone, con
+la conferma), disputa — e la pagina cambia subito, zero riletture. E le
+ferie: «ordine #10 «Quadro a olio»: aspetta che chi ha vinto l'asta
+scelga la consegna».
+
+NOTATI E NON FATTI, la seconda parte (aspettano un sì): l'indirizzo
+Lightning segna «incassato» l'ordine APERTO ogni volta che sblocca
+qualche incasso, anche se l'incasso sbloccato è di un altro ordine (era
+così, e resta com'era: stesso valore di ieri); gli undici gesti che
+scrivono sull'ordine aperto lo fanno su quello aperto in quel momento —
+se ne apre un altro mentre la richiesta viaggia, il fatto finisce lì
+(era così; i due che tengono `o` no).

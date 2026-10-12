@@ -34410,7 +34410,8 @@ def _impegni_aperti(con, tg_id: int) -> list:
     # 1) Merce pagata e mai partita: e' il caso piu' grave — i sats di
     #    qualcuno sono in cassaforte e aspettano lui.
     for o in con.execute(
-            "SELECT o.id, o.annuncio_id, o.consegna_scelta, a.titolo "
+            "SELECT o.id, o.annuncio_id, o.consegna_scelta, a.titolo, "
+            "a.asta_base_sats "
             "FROM ordini o LEFT JOIN annunci a ON a.id = o.annuncio_id "
             "WHERE o.venditore_id=? AND o.stato='locked' ORDER BY o.id",
             (tg_id,)):
@@ -34430,6 +34431,14 @@ def _impegni_aperti(con, tg_id: int) -> list:
                 if o["consegna_scelta"] == "servizio"
                 else "segna la consegna a mano"
                 if o["consegna_scelta"] == "ritiro"
+                # L'ASTA VINTA IN ATTESA DELLA SCELTA (13 ott 2026): la
+                # strada non c'e' ancora, la sceglie chi ha vinto — e
+                # chi vende li' non puo' segnare niente. La via
+                # d'uscita e' aspettare, e si dice. Gli storici senza
+                # strada (annunci non d'asta) restano «spedizione».
+                else "aspetta che chi ha vinto l'asta scelga la consegna"
+                if not o["consegna_scelta"]
+                and (o["asta_base_sats"] or 0) > 0
                 else "segna la spedizione")
         voci.append(f"ordine #{o['id']} «{(titolo or '?')[:40]}»: {cosa}")
     # 2) Le aste vive sono VINCOLANTI: chi ha versato sta gareggiando.
@@ -38387,21 +38396,36 @@ async def proponi_appuntamento(ordine_id: int, req: Request,
 
 
 @app.post("/api/orders/{ordine_id}/appuntamento/conferma")
-async def conferma_appuntamento(ordine_id: int,
+async def conferma_appuntamento(ordine_id: int, req: Request,
                                 x_tg_init_data: str = Header(""),
                                 barattolo_sessione: str = Cookie("")):
     """IL COMPRATORE CONFERMA. Un tocco, e da qui in poi la data e' un
     fatto accettato da tutti e due — il primo dei due che il
     moderatore legge in disputa.
 
-    Niente body: non c'e' niente da scegliere, si conferma la data che
-    si ha davanti. Il CAS su `appuntamento_il` e' la protezione dalla
-    corsa vera di questo flusso — il venditore che sposta la data
-    mentre il compratore sta confermando quella di prima: senza,
-    resterebbe confermata una data che nessuno dei due ha piu' in
-    mente. Con lui il compratore prende il 409, rilegge e conferma
-    quella nuova."""
+    LA DATA CHE SI CONFERMA LA DICE CHI CONFERMA (13 ott 2026, cantiere
+    gesti-subito, richiesta di Andrea): il corpo porta `quando`, la
+    data che chi compra ha DAVANTI. Se non e' piu' quella dell'ordine —
+    chi vende ne ha proposta un'altra nel frattempo — 409: la pagina
+    rilegge, mostra quella nuova e chiede «confermi questa?». Prima il
+    corpo non c'era e si confermava la data che il server aveva in quel
+    momento: il CAS qui sotto fermava solo il cambio caduto nei
+    millisecondi fra la lettura e la scrittura, e a chi guardava
+    «giovedi'» restava confermato «venerdi'», una data mai vista (visto
+    nel giro dal vivo del 12 ott). Il CAS resta, per quella corsa.
+    Un client di ieri non manda il corpo: vale come ieri — la pagina e'
+    servita senza cache, resta fuori solo il telefono aperto a cavallo
+    del deploy. Un corpo rotto vale come nessun corpo, mai un 400: qui
+    non c'e' altro da leggere."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+    except Exception:
+        d = {}
+    try:
+        visto = int((d if isinstance(d, dict) else {}).get("quando") or 0)
+    except (TypeError, ValueError):
+        visto = 0
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
                     "AND stato='locked'", (ordine_id, user["id"])).fetchone()
@@ -38415,6 +38439,12 @@ async def conferma_appuntamento(ordine_id: int,
         con.close()
         raise HTTPException(400, "Il venditore non ha ancora proposto "
                                  "una data")
+    if visto and visto != o["appuntamento_il"]:
+        # PRIMA dell'idempotenza: chi guarda una data che non c'e' piu'
+        # non «riconferma» quella nuova per sbaglio
+        con.close()
+        raise HTTPException(409, "La data è cambiata mentre confermavi: "
+                                 "guarda quella nuova")
     if o["appuntamento_confermato_il"]:
         con.close()          # idempotente: confermare due volte non e'
         return {"ok": True, "quando": o["appuntamento_il"]}   # un errore
@@ -38427,7 +38457,7 @@ async def conferma_appuntamento(ordine_id: int,
     con.close()
     if not fatto:
         raise HTTPException(409, "La data è cambiata mentre confermavi: "
-                                 "riapri l'ordine e guarda quella nuova")
+                                 "guarda quella nuova")
     await notifica(o["venditore_id"],
                    f"✅ <b>Appuntamento confermato</b> per l'ordine "
                    f"#{ordine_id}: <b>{_quando_appuntamento(o['appuntamento_il'])}</b>. "

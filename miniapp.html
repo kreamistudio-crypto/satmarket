@@ -16467,6 +16467,36 @@ async function loadOrders(ordine){
     {headers:{'X-Tg-Init-Data': authHdr()}});
   orders = (await r.json()).map(mapOrder);
 }
+/* I FATTI CHE IL SERVER HA APPENA DETTO, SCRITTI DOVE LA PAGINA LI
+   RILEGGE (12-13 ott 2026, cantiere gesti-subito, richieste di Andrea).
+   Un gesto dell'ordine finisce con `openOrder`, che ridisegna dalla riga
+   di `orders`. E `loadOrders`, qui sopra, quella riga la RIFA': se la
+   lista si rilegge mentre un ordine e' aperto (basta toccarlo mentre
+   «Ordini» si sta ancora aggiornando), `currentOrder` resta la copia di
+   PRIMA — e quel che un gesto scriveva li' il ridisegno non lo vedeva:
+   il toast diceva «fatto» e la pagina restava com'era. E' «la lezione
+   dei solleciti», che il codice applicava gia' gesto per gesto (la
+   nota, l'email del corriere, il punto contestato, la busta diretta).
+   QUI E' UN ATTREZZO SOLO: scrive sull'ordine dato E sulla sua riga viva.
+   Di li' passano i tre gesti dell'appuntamento e, dal 13 ott, gli undici
+   che scrivevano sulla sola copia aperta: il feedback, l'indirizzo
+   Lightning, la fattura d'incasso, la conferma di ricezione, «segna come
+   spedito», la consegna a mano, il codice di ritiro, il reso spedito e
+   ricevuto, la disputa, la decisione del moderatore — piu' la scelta
+   della consegna dopo un'asta e il punto di ritiro, che tengono il LORO
+   ordine (`o`, preso prima della richiesta) e non quello aperto adesso.
+   ⚠️ CAMBIA SOLO DOVE SI SCRIVE: gli stessi campi, gli stessi valori,
+   dopo lo stesso «si'» del server. Nessuna richiesta, nessuna
+   condizione, nessuna cifra passa di qui. */
+function segnaOrdine(o, campi){
+  if (!o) return;
+  Object.assign(o, campi);
+  const viva = orders.find(x => x.id === o.id);
+  if (viva && viva !== o) Object.assign(viva, campi);
+}
+function segnaOrdineAperto(campi){
+  segnaOrdine(currentOrder, campi);
+}
 
 /* ---------------- dati demo ---------------- */
 const CATS = ["Tutto","Elettronica","Informatica","Telefonia","Audio e video",
@@ -34044,8 +34074,8 @@ async function inviaFeedback(btn){
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova', 7000); return; }
-  currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
-  currentOrder.mioFoto = Array.isArray(d.foto) ? d.foto : [];
+  segnaOrdineAperto({mioVoto: stellaScelta, mioCommento: commento,
+    mioFoto: Array.isArray(d.foto) ? d.foto : []});
   fbFoto = [];
   stellaScelta = 0;
   toast('⭐ Grazie per il feedback!');
@@ -34437,7 +34467,7 @@ async function saveLnAddress(btn){
   if (!r.ok) { toast(d.detail || 'Indirizzo non accettato, ricontrolla'); return; }
   myLnAddress = d.ln_address;
   if (d.incassi_sbloccati > 0) {
-    currentOrder.state = currentOrder.state==='refund' ? 'refunded' : 'released';
+    segnaOrdineAperto({state: currentOrder.state==='refund' ? 'refunded' : 'released'});
     toast(currentOrder.state==='refunded' ? '↩️ Rimborso in arrivo! ⚡' : '🔓 Sats incassati automaticamente! ⚡');
   }
   else toast('⚡ Incassi automatici attivati!');
@@ -39925,7 +39955,7 @@ async function adminResolve(esito, btn){
       const d = await r.json().catch(()=>({}));
       ripristina();
       if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-      currentOrder.state = d.stato || 'dispute';
+      segnaOrdineAperto({state: d.stato || 'dispute'});
       toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
           : d.stato==='released' ? '⚡ Sats consegnati al venditore'
           : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
@@ -39957,11 +39987,11 @@ async function saveSellerInvoice(btn){
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail || 'Invoice non accettata, riprova'); return; }
-  if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats incassati! Affare concluso ⚡'); }
-  else if (d.stato==='refunded') { currentOrder.state='refunded'; toast('↩️ Rimborso in arrivo nel tuo wallet!'); }
+  if (d.stato==='released') { segnaOrdineAperto({state:'released'}); toast('🔓 Sats incassati! Affare concluso ⚡'); }
+  else if (d.stato==='refunded') { segnaOrdineAperto({state:'refunded'}); toast('↩️ Rimborso in arrivo nel tuo wallet!'); }
   /* Prima del ramo 'refund', o chi ha appena depositato una invoice
      BUONA si sentirebbe dire di rifarla mentre a tacere e' il nodo. */
-  else if (d.non_chiesto) { currentOrder.sellerInvoice=inv;
+  else if (d.non_chiesto) { segnaOrdineAperto({sellerInvoice: inv});
     toast('✓ Fattura ricevuta. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli'); }
   else if (d.stato==='refund') { toast('Il pagamento non è riuscito: riprova con una invoice nuova'); }
   /* a pagamento CONGELATO (21 set 2026) da qui non parte niente: la
@@ -39998,7 +40028,7 @@ async function confirmReceived(btn){
       const d = await r.json().catch(()=>({}));
       ripristina();
       if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
-      if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); }
+      if (d.stato==='released') { segnaOrdineAperto({state:'released'}); toast('🔓 Sats sbloccati al venditore!'); }
       /* NON_CHIESTO: il nostro nodo non ha risposto, quindi l'ordine e'
          rimasto ESATTAMENTE dov'era. Va letto `d.stato` invece di
          scrivere 'confirmed' a mano: senza, chi compra vedrebbe
@@ -40011,14 +40041,14 @@ async function confirmReceived(btn){
          davanti a chi ha appena confermato. Il guasto, se c'e', e'
          nostro e non si racconta: chi ha comprato ha finito. */
       else if (d.non_chiesto || d.in_volo || d.incerto) {
-        currentOrder.state = d.stato || currentOrder.state;
+        segnaOrdineAperto({state: d.stato || currentOrder.state});
         toast('✅ Confermato: per te è tutto fatto. Ora tocca a Barattolo consegnare i sats al venditore');
         const id = currentOrder.id;
         try { await loadOrders(); renderOrders(); } catch(e) {}
         if (orders.find(x=>x.id===id)) openOrder(id);
         return;
       }
-      else { currentOrder.state='confirmed'; toast('✅ Confermato! Ora tocca a Barattolo: i sats partono appena il venditore ci dice dove riceverli');
+      else { segnaOrdineAperto({state:'confirmed'}); toast('✅ Confermato! Ora tocca a Barattolo: i sats partono appena il venditore ci dice dove riceverli');
         const id = currentOrder.id;
         try { await loadOrders(); renderOrders(); } catch(e) {}
         if (orders.find(x=>x.id===id)) { openOrder(id); return; } }
@@ -40544,7 +40574,7 @@ async function inviaSpedito(corriere, tracking, bustaDiretta){
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({corriere, tracking, busta_diretta: bustaDiretta})});
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking;
+  segnaOrdineAperto({state:'shipped', corriere: corriere, tracking: tracking});
   /* anche sulla riga di orders, non solo su currentOrder: la lista
      puo' essersi ricaricata e currentOrder essere un detached */
   if (bustaDiretta && currentOrder.viaPunto) {
@@ -40626,7 +40656,7 @@ async function scegliConsegnaOrdine(v){
         body: JSON.stringify({consegna:v})});
       const d = await r.json().catch(()=>({}));
       if (!r.ok) { toast(d.detail||'Scelta non riuscita', 6000); return; }
-      o.consegnaScelta = v;
+      segnaOrdine(o, {consegnaScelta: v});
       toast('✔ Scelta fatta: il venditore prepara la consegna');
       openOrder(o.id);
     }});
@@ -41100,8 +41130,7 @@ async function salvaPuntoRitiro(){
     body: JSON.stringify({punto_ritiro: punto, tipo_punto: o.tipoPunto || ''})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
-  o.puntoRitiro = d.punto_ritiro || punto;
-  o.tipoPunto = d.tipo_punto || '';
+  segnaOrdine(o, {puntoRitiro: d.punto_ritiro || punto, tipoPunto: d.tipo_punto || ''});
   toast('📦 Punto salvato: il venditore lo vede nell\'ordine');
   openOrder(o.id);
 }
@@ -41133,7 +41162,7 @@ async function markConsegnaMano(){
         headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
         body: JSON.stringify({corriere:'Ritiro in zona', tracking:''})});
       if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-      currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona';
+      segnaOrdineAperto({state:'shipped', corriere:'Ritiro in zona'});
       toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id);
     }});
 }
@@ -41606,8 +41635,15 @@ function pannelloServizioCompratore(o){
     ? `<div class="hint">Il venditore non ha ancora proposto una data. Gliel'abbiamo ricordato: i tuoi sats restano fermi nel deposito di garanzia e non si muovono da soli.</div>`
     : conf
     ? `<div class="hint">✅ <b>${esc(dataAppuntamento(quando))}</b> — confermato. Quando la prestazione c'è stata, conferma qui sotto e i sats vanno al venditore.</div>`
+    /* LA DATA E' CAMBIATA MENTRE SI CONFERMAVA (13 ott 2026): il server ha
+       rifiutato la conferma della data di prima, la pagina ha riletto, e
+       qui lo si DICE — la data nuova, e la domanda. Vale finche' la data
+       a schermo non e' quella che si stava confermando. */
+    : (appuntamentoCambiato[o.id] && appuntamentoCambiato[o.id] !== quando)
+    ? `<div class="hint">📅 <b>La data è cambiata: confermi questa?</b> Il venditore ora propone <b>${esc(dataAppuntamento(quando))}</b>.</div>
+      <button class="btn orange" data-quando="${quando}" onclick="confermaAppuntamento(this)">✅ Confermo, ci sono</button>`
     : `<div class="hint">📅 Il venditore propone <b>${esc(dataAppuntamento(quando))}</b>. Se ti va bene confermalo: finché non lo fai, per noi la data non è concordata.</div>
-      <button class="btn orange" onclick="confermaAppuntamento(this)">✅ Confermo, ci sono</button>`;
+      <button class="btn orange" data-quando="${quando}" onclick="confermaAppuntamento(this)">✅ Confermo, ci sono</button>`;
   const testoLink = o.accessoIl
     ? `<div style="margin-top:10px"></div>
       <div class="hint">🔗 Il venditore ha lasciato il collegamento.</div>
@@ -41623,23 +41659,6 @@ function pannelloServizioCompratore(o){
       ${testoData}
       ${testoLink}
     </div>`;
-}
-/* I FATTI CHE IL SERVER HA APPENA DETTO, SCRITTI DOVE LA PAGINA LI
-   RILEGGE (12 ott 2026, notte, cantiere gesti-subito, richiesta di
-   Andrea). I tre gesti dell'appuntamento — «Proponi la data», «Confermo,
-   ci sono», «Lascia il collegamento» — finiscono con `openOrder`, che
-   ridisegna dai dati che ha: senza aggiornarli la pagina restava com'era
-   finche' gli ordini non si rileggevano (il tocco sembrava andato a
-   vuoto). Si scrive sull'ordine aperto E sulla riga viva di `orders`,
-   che e' quella che `openOrder` rilegge: `currentOrder` puo' essere la
-   copia di PRIMA dell'ultima rilettura della lista (la lezione dei
-   solleciti, rivista nel giro dal vivo del 12 ott). */
-function segnaOrdineAperto(campi){
-  const o = currentOrder;
-  if (!o) return;
-  Object.assign(o, campi);
-  const viva = orders.find(x => x.id === o.id);
-  if (viva && viva !== o) Object.assign(viva, campi);
 }
 async function proponiAppuntamento(btn){
   const v = el('servQuando')?.value;
@@ -41672,28 +41691,44 @@ async function proponiAppuntamento(btn){
   } catch(e) { toast('Non è andata, riprova'); }
   finally { fine(); }
 }
+/* ordine -> la data che chi compra stava confermando quando il server ha
+   detto «e' cambiata»: il riquadro la usa per chiedere «confermi questa?» */
+let appuntamentoCambiato = {};
 async function confermaAppuntamento(btn){
+  /* SI CONFERMA LA DATA CHE SI HA DAVANTI (13 ott 2026, cantiere
+     gesti-subito, richiesta di Andrea): la porta il bottone, scritta quando
+     il riquadro e' stato disegnato, e viaggia col tocco. Prima non
+     viaggiava niente, e il server confermava la data che aveva LUI in
+     quel momento: nel giro dal vivo del 12 ott chi comprava guardava
+     giovedi', chi vendeva aveva appena proposto venerdi', e restava
+     confermato venerdi' — una data mai vista, sul fatto che il moderatore
+     legge in disputa. */
+  const visto = Math.floor(Number(btn && btn.dataset && btn.dataset.quando) || 0)
+    || currentOrder.appuntamentoIl || 0;
   const fine = bottoneInAttesa(btn, 'Confermo…');
   try {
     const r = await fetch(
       `${API_BASE}/orders/${currentOrder.id}/appuntamento/conferma`,
-      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()},
-       credentials:'include'});
+      {method:'POST', headers:{'Content-Type':'application/json',
+         'X-Tg-Init-Data':authHdr()},
+       credentials:'include', body: JSON.stringify({quando: visto})});
     const d = await r.json();
     if (!r.ok) {
       /* LA DATA E' CAMBIATA MENTRE CONFERMAVI (il 409 del server: chi
          vende ne ha proposta un'altra): la pagina rilegge l'ordine e
-         mostra quella nuova, da confermare — prima restava sulla
-         vecchia, e toccava uscire e rientrare (12 ott 2026, notte) */
+         mostra quella nuova con la domanda «confermi questa?» — prima
+         restava sulla vecchia, e toccava uscire e rientrare */
       if (r.status === 409) {
-        toast('La data è cambiata mentre confermavi: guarda quella nuova');
+        toast('📅 La data è cambiata: guarda quella nuova');
         const id = currentOrder.id;
+        appuntamentoCambiato[id] = visto;
         try { await loadOrders(); } catch(e) {}
         if (orders.find(x => x.id === id)) openOrder(id);
         return;
       }
       toast(d.detail || 'Non è andata'); return;
     }
+    delete appuntamentoCambiato[currentOrder.id];
     /* LA CONFERMA COMPARE SUBITO (12 ott 2026, notte, gesti-subito): la
        data e' quella che il server ha confermato; il QUANDO della
        conferma lo sa lui — qui e' adesso, e al prossimo giro degli
@@ -42910,9 +42945,8 @@ async function depositaBusta(btn){
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
-  currentOrder.bustaIl = d.busta_il || Math.floor(Date.now()/1000);
-  currentOrder.bustaCorrezioni = d.busta_correzioni || 0;
-  currentOrder.bustaDocumento = docResta;
+  segnaOrdineAperto({bustaIl: d.busta_il || Math.floor(Date.now()/1000),
+    bustaCorrezioni: d.busta_correzioni || 0, bustaDocumento: docResta});
   bustaLetta[currentOrder.id] = {nome, codice, documento:docResta,
     documentoNome: bustaDoc && !bustaDoc.togli ? bustaDoc.nome
       : (docResta && b ? b.documentoNome : ''),
@@ -43361,7 +43395,7 @@ async function resoSpedito(){
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({corriere, tracking})});
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.state='return_shipped'; currentOrder.corriereReso=corriere; currentOrder.trackingReso=tracking;
+  segnaOrdineAperto({state:'return_shipped', corriereReso: corriere, trackingReso: tracking});
   toast('↩️ Reso registrato: rimborso alla consegna'); openOrder(currentOrder.id);
 }
 
@@ -43379,7 +43413,7 @@ async function resoRicevuto(btn){
       const d = await r.json().catch(()=>({}));
       ripristina();
       if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-      currentOrder.state = d.stato || 'refund';
+      segnaOrdineAperto({state: d.stato || 'refund'});
       toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
       openOrder(currentOrder.id);
     }});
@@ -43394,7 +43428,7 @@ async function openDispute(){
       const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/disputa`,
         {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
       if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
-      currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id);
+      segnaOrdineAperto({state:'dispute'}); toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id);
     }});
 }
 
