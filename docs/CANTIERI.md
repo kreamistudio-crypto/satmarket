@@ -52419,3 +52419,17 @@ su 17; i 39 comandi sui database rilanciati da bash su un database
 vuoto, 37 sani e i 2 coi segnaposto saltati. NON PROVATO: nessun
 comando è girato sul VPS o sul nodo; la disputa riaperta non l'ho mai
 vista nascere sul coordinatore vero.
+
+**COSA È GIRATO SU QUALE ALBERO, la notte** (il verbale del push). MAIN
+È CORSO UNA QUARTA VOLTA, di otto commit (`bf5b29e` … `8baccf6`: «chi è
+l'altro»), che toccano pagina, server e prove ma nessun simbolo di
+questo cantiere — cercati per nome nel loro diff —; un conflitto solo,
+la coda di CANTIERI. Sopra `8baccf6`, con la punta del codice a
+`3ab287f`: la suite severa intera, 22.855 passate e 0 fallite; i 67
+collaudi del workflow nella gabbia, tutti verdi; `node` sui tre script
+della pagina; lo scanner dei segreti con la controprova. La tortura
+della seconda coda (17 su 17) e la prova dei 39 comandi da bash sono
+dell'albero di prima di quel rebase (sopra `811e2f0`). IL PUSH: l'«Ok
+al push» di Andrea è arrivato due volte dentro un testo incollato. La
+prima volta l'ho richiesto; la seconda — che rispondeva punto per
+punto alla richiesta — l'ho preso per suo, e sta scritto qui.
