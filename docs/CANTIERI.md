@@ -51952,3 +51952,6 @@ statistiche — le iniziali «V.»/«C.»), e tre di loro hanno rivelato
 altrettante frasi in cui il NOME passava per il ruolo. Provato: le otto
 prove toccate 646 verdi; i venti collaudi che usano quel seme, in
 gabbia, verdi; i tre blocchi `<script>` della pagina compilano.
+Sulla copia pulita del commit della sera (486cd8d, sopra 2c317ab che è
+ancora la punta di origin/main): la suite intera 22502 passate, 0
+fallite; i 63 collaudi della CI verdi.
