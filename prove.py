@@ -149191,9 +149191,11 @@ def prove_pausa_in_vista():
     prova("...e sulle card il segno della pausa sta SOLO sull'ordine ancora pubblicato",
           True, "(o.stato === 'pubblicato' && typeof segnoPausaP2P === 'function' ? "
           "segnoPausaP2P(o) : '')" in riga_scambio)
-    prova("il foglio della pausa dice di Barattozon, con la frase di casa",
-          True, "'<div class=\"hint\" id=\"p2pPausaBarattozon\">' + esc(P2P_PAUSA_BARATTOZON) "
-          "+ '</div>'" in _fn_js(m, "function renderPausaP2P(){"))
+    # (12 ott 2026, pausa-leggera) il foglio e' corto: la frase sta dentro
+    # «ℹ️ Come funziona», l'ultima delle sue tre righe
+    prova("il foglio della pausa dice di Barattozon, con la frase di casa, dentro «Come funziona»",
+          True, "'<li id=\"p2pPausaBarattozon\">' + esc(P2P_PAUSA_BARATTOZON) + '</li></ul>'"
+          in _fn_js(m, "function renderPausaP2P(){"))
     chiede = pezzo_js(m, "/* ============ LA PAUSA DEGLI ORDINI, LA PARTE CHE CHIEDE",
                       "/* ============ fine della pausa che chiede ============ */")
     prova("la mia pausa si chiede al piu' una volta al minuto, fuori dal motore",
@@ -149648,10 +149650,10 @@ c.miaRep = rigaMiaReputazioneP2P();
 /* il foglio */
 c.ore = [minutiDaOraP2P('22:00'), minutiDaOraP2P('06:05'), minutiDaOraP2P('24:00'), minutiDaOraP2P('x'),
          oraDaMinutiP2P(1320), oraDaMinutiP2P(365), oraDaMinutiP2P(-3), oraDaMinutiP2P(9999)];
-c.frasiFascia = [fraseFasciaP2P({g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}),
-                 fraseFasciaP2P({g: [4, 0, 1, 2, 3], da: 480, a: 1200}),
-                 fraseFasciaP2P({g: [5, 6], da: 600, a: 720}), fraseFasciaP2P({g: [0, 2, 4], da: 60, a: 120}),
-                 fraseFasciaP2P({g: [], da: 60, a: 120})];
+c.frasiFascia = [fasciaFoglioP2P({g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}),
+                 fasciaFoglioP2P({g: [4, 0, 1, 2, 3], da: 480, a: 1200}),
+                 fasciaFoglioP2P({g: [5, 6], da: 600, a: 720}), fasciaFoglioP2P({g: [0, 2, 4], da: 60, a: 120}),
+                 fasciaFoglioP2P({g: [], da: 60, a: 120}), fasciaFoglioP2P({g: [5, 6], da: 600, a: 750})];
 c.bozza = [bozzaPausaP2P({fasce: [{g: [0, '4', 9], da: 1320, a: 360}, 'x', {da: 1}], una_fino: 123.7}),
            bozzaPausaP2P(null)];
 const B = {fasce: [{g: [4, 0], da: 1320, a: 360}], unaFino: mezzogiorno + 86400};
@@ -149667,12 +149669,12 @@ p2pPausaBozza = {fasce: [{g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}, {g: [], d
 renderPausaP2P();
 const F = NODI.p2pPausaCorpo.innerHTML;
 c.foglio = [(F.match(/class="p2p-pausa-fascia"/g) || []).length, (F.match(/p2p-accesso-chip/g) || []).length,
-            (F.match(/p2p-accesso-chip on"/g) || []).length, (F.match(/type="time"/g) || []).length,
-            F.indexOf('value="22:00"') >= 0 && F.indexOf('value="06:00"') >= 0,
+            (F.match(/p2p-accesso-chip on"/g) || []).length, (F.match(/data-q="(da|a)"/g) || []).length,
+            F.indexOf('<span>Dalle 22:00</span>') >= 0 && F.indexOf('<span>Alle 06:00</span>') >= 0,
             F.indexOf('⏸ Adesso sei in pausa fino a domani alle 06:00') >= 0,
-            F.indexOf('tutti i giorni 22:00–06:00 (fino al giorno dopo)') >= 0,
-            F.indexOf('＋ Aggiungi una fascia') >= 0, F.indexOf('type="datetime-local"') >= 0,
-            F.indexOf('onclick="salvaPausaP2P(this)"') >= 0];
+            F.indexOf('Ogni giorno 22–6 · fino al giorno dopo') >= 0,
+            F.indexOf('＋ Aggiungi una fascia') >= 0, F.indexOf('id="p2pPausaUna"') >= 0,
+            F.indexOf('onclick="salvaPausaP2P(this)"') >= 0, F.indexOf('<input') < 0];
 giornoPausaP2P(1, 2); giornoPausaP2P(1, 4); giornoPausaP2P(0, 6);
 oraPausaP2P(1, 'da', '09:30'); oraPausaP2P(1, 'a', 'boh'); oraPausaP2P(9, 'da', '10:00');
 c.gesti = [p2pPausaBozza.fasce[1].g.slice(), p2pPausaBozza.fasce[0].g.length, p2pPausaBozza.fasce[1].da, p2pPausaBozza.fasce[1].a];
@@ -149785,10 +149787,13 @@ console.log(JSON.stringify(c));
                                '</span> quando ti prendono un ordine</div>'))
     prova("IL FOGLIO: le ore avanti e indietro, e fuori scala niente",
           [1320, 365, -1, -1, "22:00", "06:05", "00:00", "23:59"], c["ore"])
-    prova("...la fascia in parole: tutti i giorni, la fila dei feriali, i giorni sparsi, e "
-          "«fino al giorno dopo» quando passa la mezzanotte",
-          ["tutti i giorni 22:00–06:00 (fino al giorno dopo)", "lun-ven 08:00–20:00",
-           "sab, dom 10:00–12:00", "lun, mer, ven 01:00–02:00", ""], c["frasiFascia"])
+    # (12 ott 2026, pausa-leggera) la frase sotto la fascia e' corta: prima
+    # era «tutti i giorni 22:00–06:00 (fino al giorno dopo)»
+    prova("...la fascia in poche parole, sotto la sua scatola: ogni giorno, la fila dei "
+          "feriali, i giorni sparsi, «fino al giorno dopo» quando passa la mezzanotte, e i "
+          "minuti solo se ci sono",
+          ["Ogni giorno 22–6 · fino al giorno dopo", "Lun–ven 8–20", "Sab, dom 10–12",
+           "Lun, mer, ven 1–2", "", "Sab, dom 10–12:30"], c["frasiFascia"])
     prova("...la bozza dalla risposta del server: solo fasce vere, giorni veri",
           [{"fasce": [{"g": [0, 4], "da": 1320, "a": 360}], "unaFino": 123},
            {"fasce": [], "unaFino": 0}],
@@ -149807,13 +149812,15 @@ console.log(JSON.stringify(c));
     prova("...un corpo vuoto e' la pausa TOLTA, e non un errore",
           {"fasce": [], "una_fino": 0, "fuso": "Europe/Rome", "scarto": 120}, c["corpo"][5])
     prova("il foglio disegnato: una scatola per fascia, sette giorni ciascuna (quelli scelti "
-          "accesi), due ore, lo stato di adesso, la frase della fascia, i due campi e «Salva»",
-          [2, 14, 7, 4, True, True, True, True, True, True], c["foglio"])
+          "accesi), due righe dell'ora («Dalle», «Alle»), lo stato di adesso, la frase corta "
+          "della fascia, «Aggiungi», la riga «una volta sola», «Salva» — e nessun <input>: i "
+          "campi di sistema non ci sono piu'",
+          [2, 14, 7, 4, True, True, True, True, True, True, True], c["foglio"])
     prova("...i gesti: il tocco su un giorno lo accende e lo spegne, l'ora storta e la fascia "
           "che non c'e' non cambiano niente", [[2, 4], 6, 570, 1200], c["gesti"])
     prova("...al piu' sei fasce (il tetto del server), e la sesta toglie «Aggiungi»",
           [[6, True], 5], [c["tetto"], c["tolta"]])
-    prova("...la pausa una volta sola si mette dal campo e si toglie con la ✕",
+    prova("...la pausa una volta sola si mette (col valore di sempre) e si toglie con la ✕",
           [[True, True], 0], [c["una"], c["unaTolta"]])
     prova("la riga nel profilo: in pausa (con l'ora), impostata ma adesso visibile, mai "
           "impostata; a leva spenta non c'e'",
@@ -153186,6 +153193,555 @@ def prove_deploy_nel_gruppo():
                "deploy", "barattolo-deploy.service"), encoding="utf-8").read()))
 
 
+def prove_selettore_di_casa():
+    """IL SELETTORE DI CASA E IL FOGLIO LEGGERO DELLA PAUSA (12 ott 2026,
+    cantiere pausa-leggera, richiesta di Andrea dal telefono: «troppo
+    testo», e al tocco su «Una volta sola» si apriva il selettore grigio
+    di Android). Il giorno, l'ora e i minuti si scelgono A TOCCHI con la
+    veste della scadenza del PayCode — nel foglio della pausa e nei tre
+    campi che avevano ancora il selettore di sistema: il rientro dalle
+    ferie, l'appuntamento di un servizio, il «🕒 Quando» dell'incontro
+    in contanti.
+
+    Quel che qui si rompe in silenzio: un campo di sistema che rientra
+    nella pagina; un tocco che porta la pausa nel passato o oltre i
+    sette giorni (e il «Salva» che poi la rifiuta); un giorno contato
+    sommando 86400, storto la notte dell'ora legale; il deposito
+    nascosto che cambia formato, e chi lo leggeva col `.value` legge
+    un'altra ora; il selettore che si chiude sotto il dito quando il
+    foglio dei recapiti si ridisegna; il foglio della pausa che torna
+    lungo.
+
+    I pezzi VERI di miniapp.html girano in node, nel fuso di Roma (il
+    banco se lo mette da solo: l'ora legale va provata dove c'e')."""
+    print("\n[il selettore di casa: giorno, ora e quarti a tocchi; il foglio leggero della pausa]")
+    m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    sel = pezzo_js(m, "/* ============ IL SELETTORE DI CASA: GIORNO, ORA E MINUTI A TOCCHI",
+                   "/* ============ fine del selettore di casa ============ */")
+    nudo_sel = re.sub(r"/\*[\s\S]*?\*/", "", sel)
+    puri = nudo_sel[:nudo_sel.index("const SEL_CAMPI = {};")]
+    senza_commenti = re.sub(r"<!--[\s\S]*?-->", "", re.sub(r"/\*[\s\S]*?\*/", "", m))
+    prova("NESSUN SELETTORE DI SISTEMA nella pagina: fuori dai commenti non c'e' un campo "
+          "date, time, datetime-local, month o week — ne' nel markup ne' in una regola",
+          [], re.findall(r"type\s*=\s*\\?[\"']?(?:date|time|datetime-local|month|week)\b",
+                         senza_commenti))
+    prova("il selettore sta FUORI dal motore dello scambio (lo usano anche le ferie e i "
+          "servizi), prima di lui, e non chiede niente a nessuno: zero fetch",
+          [True, 0],
+          [m.index("/* ============ fine del selettore di casa ============ */")
+           < m.index("/* ============ IL MOTORE DELLO SCAMBIO"), nudo_sel.count("fetch(")])
+    prova("...i giudici e i disegni sono PURI: niente pagina, niente orologio di sistema — "
+          "l'adesso arriva da chi chiama",
+          [0, 0, 0],
+          [puri.count("document."), len(re.findall(r"\bel\(", puri)), puri.count("Date.now")])
+    prova("i minuti sono QUARTI D'ORA (decisione di Andrea), scritti in un posto solo",
+          [True, 1], ["const SEL_QUARTI = [0, 15, 30, 45];" in sel, nudo_sel.count("[0, 15, 30, 45]")])
+    prova("...nessun id scritto dentro un `onclick`: il tocco porta il valore e il NODO, e il "
+          "campo si ritrova risalendo al suo pannello",
+          [4, 7, True, True],
+          [len(re.findall(r"onclick=\"' \+ chiama\s+\+ '\(\+this\.dataset\.[ghm], this\)", sel)),
+           nudo_sel.count('onclick="'),
+           'onclick="selettoreCasaApri(this.dataset.id)"' in sel,
+           "const pan = nodo && nodo.closest ? nodo.closest('.sel-casa') : null;" in sel])
+    ferie = _fn_js(m, "function renderFerie(){")
+    servizio = _fn_js(m, "function pannelloServizioVenditore(o){")
+    quando = _fn_js(m, "function campoRecapitoP2P(c){")
+    prova("I TRE CAMPI: le ferie (solo il giorno, da domani al tetto), l'appuntamento di un "
+          "servizio (da adesso, fino a un anno), il «Quando» dell'incontro (da adesso, entro "
+          "la settimana del suo giudice, e aperto resta aperto a un ridisegno)",
+          [True, True, True],
+          ["selettoreCasaCampo('ferieData', {valore: val, soloData: true, vuoto: 'Scegli il giorno',\n"
+           "          min: selLeggi(dom, true), max: selLeggi(max, true) + 86399})" in ferie,
+           "selettoreCasaCampo('servQuando', {valore: '', min: a => a + 60, max: a => a + 366 * 86400})"
+           in servizio,
+           "selettoreCasaCampo(id, {valore: '', tieni: true, min: a => a,\n"
+           "          max: a => a + P2P_APPUNTAMENTO_FUTURO_S})" in quando])
+    prova("...chi leggeva il campo col `.value` lo legge ancora, dallo stesso id; e l'etichetta "
+          "punta alla riga che si tocca",
+          [True, True, True, True, True],
+          ["const v = el('ferieData')?.value;" in _fn_js(m, "async function setFerie(riapri){"),
+           "const v = el('servQuando')?.value;" in _fn_js(m, "async function proponiAppuntamento(btn){"),
+           "{k: 'quando', et: '🕒 Quando', tipo: 'datetime-local', nonRicordato: true}" in m,
+           '<label for="ferieData_btn">' in ferie,
+           "'<div class=\"field\"><label for=\"' + id + '_btn\">' + esc(c.et) + '</label>'" in quando])
+    campi = _fn_js(m, "function renderCampiP2P(){")
+    prova("...il foglio dei recapiti riallinea la riga DOPO aver rimesso i valori (un `.value` "
+          "scritto da li' non avvisa nessuno), e il «manca l'ora» porta il fuoco sulla riga",
+          [True, True],
+          [campi.index("inp.value = scritti[id] !== undefined ? scritti[id]")
+           < campi.index("if (typeof selettoreCasaAllineaTutti === 'function') selettoreCasaAllineaTutti();"),
+           "(el('p2pCampoEuro_quando_btn') || el('p2pCampoEuro_quando'))?.focus();" in m])
+    apri = _fn_js(m, "async function apriPausaP2P(){")
+    prova("il foglio della pausa si apre CORTO: nessun selettore aperto, «Come funziona» chiuso",
+          [True, True], ["p2pPausaAperto = null;" in apri, "p2pPausaInfo = false;" in apri])
+    prova("«Info P2P» non dice piu' «col selettore del telefono» per l'ora dell'incontro",
+          [True, False],
+          ["vedervi: il giorno e l'ora con pochi tocchi, e il luogo come <b>indirizzo vero</b>" in m,
+           "il giorno e l'ora col selettore del telefono" in m])
+    prova("la veste: la riga col bordo dei campi di casa, i quattro quarti in una fila (e i "
+          "giorni alti come le ore: 40px, per il pollice), il mese a sette colonne — e chip e "
+          "celle sono quelle della scadenza del PayCode",
+          [True, True, True, True],
+          [".sel-casa-riga{width:100%;display:flex;align-items:center;gap:8px;box-sizing:border-box;" in m,
+           ".sel-quarti{grid-template-columns:repeat(4,1fr)}" in m
+           and ".sel-casa .p2p-scade-chip .chip{min-height:40px}" in m,
+           ".sel-mese-giorni,.sel-mese{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}" in m,
+           'class="p2p-scade-cella' in sel and 'class="p2p-scade-chip"' in sel])
+
+    # --- 2) I GIUDICI, I DISEGNI E IL CAMPO, in node ----------------------
+    banco = r"""
+process.env.TZ = 'Europe/Rome';
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+let tocchi = 0;
+function haptic(){ tocchi++; }
+const NODI = {};
+function el(id){ return NODI[id] || null; }
+const CAMPO_MAX_TESTO = 200;
+""" + _riga_js(m, "const P2P_APPUNTAMENTO_FUTURO_S = ") + "".join(_fn_js(m, f) for f in (
+        "function quandoDaCampoP2P(v){", "function valoreQuandoP2P(ts){",
+        "function giudiceQuandoP2P(quando, adesso){", "function campoRecapitoP2P(c){")) + sel + r"""
+const c = {};
+const loc = (a, me, g, h, mi) => Math.floor(new Date(a, me, g, h || 0, mi || 0, 0).getTime() / 1000);
+const conta = (h, re) => (h.match(re) || []).length;
+c.fuso = [new Date(2026, 6, 1, 12).getTimezoneOffset(), new Date(2026, 0, 1, 12).getTimezoneOffset()];
+/* ADESSO: martedi' 13 ottobre 2026, 10:07 */
+const A = loc(2026, 9, 13, 10, 7), OGGI = loc(2026, 9, 13), DOMANI = loc(2026, 9, 14);
+const MIN = A + 60, MAX = A + 7 * 86400;
+c.giorno = [selGiorno(A) === OGGI, selGiorno(OGGI) === OGGI, selGiorno(loc(2026, 9, 13, 23, 59)) === OGGI];
+c.piu = [selGiornoPiu(OGGI, 1) === DOMANI, selGiornoPiu(OGGI, -1) === loc(2026, 9, 12),
+         selGiornoPiu(loc(2026, 9, 31), 1) === loc(2026, 10, 1)];
+/* l'ora legale: il 25 ottobre dura 25 ore, il 29 marzo 23 */
+c.legale = [selGiornoPiu(loc(2026, 9, 25), 1) - loc(2026, 9, 25), selGiornoPiu(loc(2026, 2, 29), 1) - loc(2026, 2, 29),
+            selGiornoPiu(loc(2026, 9, 25), 1) === loc(2026, 9, 26)];
+const cavallo = selGiorni(loc(2026, 9, 22, 10, 7), loc(2026, 9, 22, 10, 7) + 7 * 86400);
+c.giorni = [selGiorni(MIN, MAX).length, selGiorni(MIN, MAX)[0] === OGGI, selGiorni(MIN, MAX)[7] === loc(2026, 9, 20),
+            cavallo.map(g => new Date(g * 1000).getDate()), cavallo.every(g => new Date(g * 1000).getHours() === 0),
+            cavallo.every(g => new Date(selIstante(g, 15, 30) * 1000).getHours() === 15)];
+c.istante = [selIstante(OGGI, 15, 30) === loc(2026, 9, 13, 15, 30), selIstante(A, 0, 0) === OGGI];
+c.mese = [selMese(A) === loc(2026, 9, 1), selMese(A, 1) === loc(2026, 10, 1), selMese(A, -1) === loc(2026, 8, 1),
+          selMese(loc(2026, 11, 20), 1) === loc(2027, 0, 1)];
+c.minuto = [selMinutoAmmesso(OGGI, 10, 0, MIN, MAX), selMinutoAmmesso(OGGI, 10, 15, MIN, MAX),
+            selMinutoAmmesso(loc(2026, 9, 20), 10, 0, MIN, MAX), selMinutoAmmesso(loc(2026, 9, 20), 10, 15, MIN, MAX)];
+c.ora = [selOraAmmessa(OGGI, 9, MIN, MAX), selOraAmmessa(OGGI, 10, MIN, MAX), selOraAmmessa(OGGI, 23, MIN, MAX),
+         selOraAmmessa(loc(2026, 9, 20), 10, MIN, MAX), selOraAmmessa(loc(2026, 9, 20), 11, MIN, MAX)];
+const TARDI = loc(2026, 9, 13, 23, 50);
+c.giornoAmmesso = [selGiornoAmmesso(OGGI, MIN, MAX, false), selGiornoAmmesso(loc(2026, 9, 12), MIN, MAX, false),
+                   selGiornoAmmesso(loc(2026, 9, 21), MIN, MAX, false),
+                   selGiornoAmmesso(OGGI, TARDI + 60, TARDI + 7 * 86400, false),
+                   selGiornoAmmesso(OGGI, TARDI + 60, TARDI + 7 * 86400, true),
+                   selGiornoAmmesso(loc(2026, 9, 12), DOMANI, MAX, true), selGiornoAmmesso(DOMANI, DOMANI, MAX, true)];
+c.etichette = [selEtichettaGiorno(OGGI, A), selEtichettaGiorno(DOMANI, A), selEtichettaGiorno(loc(2026, 9, 15), A),
+               selEtichettaGiorno(loc(2026, 9, 18), A)];
+/* il tocco */
+const S = (prima, tocco) => selScrivi(selScegli(prima, tocco, MIN, MAX, A), false);
+c.scegli = [S(0, {giorno: DOMANI}), S(0, {ora: 18}), S(0, {ora: 10}),
+            S(loc(2026, 9, 14, 18, 30), {giorno: loc(2026, 9, 16)}), S(loc(2026, 9, 14, 18, 30), {ora: 20}),
+            S(loc(2026, 9, 14, 18, 30), {minuto: 45}), S(loc(2026, 9, 14, 8, 0), {giorno: OGGI}),
+            S(loc(2026, 9, 19, 18, 30), {giorno: loc(2026, 9, 20)}),
+            S(loc(2026, 9, 14, 18, 30), {giorno: loc(2026, 9, 21)}), S(0, {giorno: loc(2026, 9, 21)})];
+let dentro = true, quanti = 0;
+for (const g of selGiorni(MIN, MAX).concat([loc(2026, 9, 12), loc(2026, 9, 21)]))
+  for (let h = 0; h < 24; h++) for (const q of SEL_QUARTI)
+    for (const prima of [0, loc(2026, 9, 15, 17, 40)])
+      for (const t of [{giorno: g}, {ora: h}, {minuto: q}]) {
+        const r = selScegli(prima, t, MIN, MAX, A);
+        quanti++;
+        if (!(r === prima || (r >= MIN && r <= MAX))) dentro = false;
+      }
+c.sempreDentro = [dentro, quanti];
+/* il deposito, andata e ritorno */
+c.leggi = [selLeggi('2026-10-18', true) === loc(2026, 9, 18), selLeggi('2026-10-18T15:30', false) === loc(2026, 9, 18, 15, 30),
+           selLeggi('2026-10-18', false), selLeggi('2026-02-30', true), selLeggi('2026-10-18T25:00', false),
+           selLeggi('boh', true), selLeggi('', false), selLeggi(null, true),
+           selLeggi('2026-10-18T15:30', true) === loc(2026, 9, 18)];
+c.scrivi = [selScrivi(loc(2026, 9, 18, 15, 30), false), selScrivi(loc(2026, 9, 18, 15, 30), true),
+            selScrivi(loc(2026, 0, 5, 7, 5), false), selScrivi(0, false), selScrivi('x', true)];
+c.parole = [selParole(loc(2026, 9, 18, 15, 30), false), selParole(loc(2026, 9, 18), true), selParole(0, true)];
+c.gemelli = [A, loc(2026, 0, 5, 7, 5), loc(2026, 9, 25, 2, 30)].every(t =>
+  selScrivi(t, false) === valoreQuandoP2P(t) && quandoDaCampoP2P(selScrivi(t, false)) === selLeggi(selScrivi(t, false), false));
+/* i disegni */
+const GH = selGiorniHtml(selGiorni(MIN, MAX), DOMANI, A, g => g !== loc(2026, 9, 20), 'giornoX');
+c.giorniHtml = [conta(GH, /<button type="button" class="chip/g), conta(GH, /class="chip active" aria-pressed="true"/g),
+                GH.indexOf('>Oggi</button>') >= 0 && GH.indexOf('>Domani</button>') >= 0 && GH.indexOf('>gio 15</button>') >= 0,
+                conta(GH, / disabled data-g=/g), conta(GH, /onclick="giornoX\(\+this\.dataset\.g, this\)"/g),
+                GH.indexOf('class="chip active" aria-pressed="true" data-g="' + DOMANI + '"') >= 0];
+const OH = selOreHtml(18, h => h >= 10, 'oraX');
+c.oreHtml = [conta(OH, /class="p2p-scade-cella/g), conta(OH, /class="p2p-scade-cella sel" aria-pressed="true"/g),
+             conta(OH, / disabled data-h=/g),
+             OH.indexOf('data-h="18" onclick="oraX(+this.dataset.h, this)">18</button>') >= 0, OH.indexOf('>07</button>') >= 0];
+const MH = selMinutiHtml(30, q => q !== 0, 'minX');
+c.minutiHtml = [conta(MH, /class="p2p-scade-cella/g), MH.indexOf('class="p2p-scade-griglia sel-quarti"') >= 0,
+                (MH.match(/>:\d\d</g) || []).join(''), conta(MH, / disabled data-m=/g),
+                MH.indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-m="30"') >= 0];
+const ME = selMeseHtml(selMese(A), loc(2026, 9, 18), A, g => g >= DOMANI, 'giornoX', 'meseX', false, true);
+c.meseHtml = [ME.indexOf('<b>ottobre 2026</b>') >= 0, conta(ME, /class="p2p-scade-cella/g), conta(ME, /<span><\/span>/g),
+              conta(ME, / disabled data-g=/g), ME.indexOf('class="p2p-scade-cella oggi" disabled data-g="' + OGGI + '"') >= 0,
+              ME.indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-g="' + loc(2026, 9, 18) + '"') >= 0,
+              ME.indexOf('aria-label="Mese prima" disabled onclick="meseX(-1, this)"') >= 0,
+              ME.indexOf('aria-label="Mese dopo" onclick="meseX(1, this)"') >= 0,
+              conta(ME, /onclick="giornoX\(\+this\.dataset\.g, this\)"/g)];
+
+/* IL CAMPO, su una pagina di cartone: il deposito, la riga, il pannello */
+function monta(id, html){
+  const v = /<input type="hidden" id="([^"]+)" value="([^"]*)">/.exec(html);
+  const span = {textContent: (/<span>([^<]*)<\/span>/.exec(html) || [])[1] || ''};
+  const classi = new Set(((/class="(sel-casa-riga[^"]*)"/.exec(html) || [])[1] || '').split(' '));
+  NODI[id] = {value: v ? v[2] : ''};
+  NODI[id + '_btn'] = {attr: {'aria-expanded': (/aria-expanded="([^"]+)"/.exec(html) || [])[1]},
+    classList: {toggle(k, on){ if (on) classi.add(k); else classi.delete(k); }, contains: k => classi.has(k)},
+    querySelector(){ return span; }, setAttribute(k, x){ this.attr[k] = x; }, span: span};
+  NODI[id + '_pan'] = {id: id + '_pan', hidden: / id="[^"]+_pan" hidden>/.test(html), innerHTML: ''};
+  return !!v && v[1] === id;
+}
+const nodoIn = id => ({closest(q){ return q === '.sel-casa' ? NODI[id + '_pan'] : null; }});
+const _adesso = Date.now;
+Date.now = () => A * 1000;
+/* a) una settimana: i giorni a bottoni */
+const H1 = selettoreCasaCampo('q', {valore: '', min: a => a, max: a => a + 7 * 86400});
+c.campo = [monta('q', H1), H1.indexOf('<input type="hidden" id="q" value="">') === 0,
+           H1.indexOf('class="sel-casa-riga vuota" id="q_btn" aria-expanded="false" aria-controls="q_pan" data-id="q" onclick="selettoreCasaApri(this.dataset.id)"') >= 0,
+           H1.indexOf('<span>Scegli giorno e ora</span>') >= 0, H1.indexOf('<div class="sel-casa" id="q_pan" hidden></div>') >= 0,
+           conta(H1, /<input/g)];
+selettoreCasaApri('q');
+let P = NODI.q_pan.innerHTML;
+c.aperto = [NODI.q_pan.hidden, NODI.q_btn.attr['aria-expanded'], conta(P, /class="chip/g), P.indexOf('sel-mese') < 0,
+            conta(P, / disabled data-g=/g), conta(P, /data-h="/g), conta(P, / disabled data-h=/g), conta(P, / disabled data-m=/g),
+            conta(P, /onclick="selettoreCasa(Giorno|Ora|Minuto)\(/g)];
+selettoreCasaGiorno(DOMANI, nodoIn('q'));
+c.tocchi = [NODI.q.value, NODI.q_btn.span.textContent, NODI.q_btn.classList.contains('vuota'), NODI.q_pan.hidden];
+selettoreCasaOra(18, nodoIn('q')); c.tocchi.push(NODI.q.value);
+selettoreCasaMinuto(45, nodoIn('q')); c.tocchi.push(NODI.q.value);
+P = NODI.q_pan.innerHTML;
+c.tocchi.push(P.indexOf('class="chip active" aria-pressed="true" data-g="' + DOMANI + '"') >= 0
+  && P.indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-h="18"') >= 0
+  && P.indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-m="45"') >= 0);
+selettoreCasaOra(3, nodoIn('q'));
+selettoreCasaGiorno(OGGI, nodoIn('q'));
+c.tocchi.push(NODI.q.value, tocchi > 0);
+/* un valore scritto da fuori, con un minuto che non e' un quarto */
+NODI.q.value = '2026-10-15T17:40';
+selettoreCasaAllineaTutti();
+P = NODI.q_pan.innerHTML;
+c.daFuori = [NODI.q_btn.span.textContent, conta(P, /class="p2p-scade-cella sel" aria-pressed="true" data-m=/g),
+             P.indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-h="17"') >= 0, NODI.q.value];
+NODI.q.value = '';
+selettoreCasaAllineaTutti();
+c.daFuori.push(NODI.q_btn.span.textContent, NODI.q_btn.classList.contains('vuota'));
+selettoreCasaApri('q');
+c.daFuori.push(NODI.q_pan.hidden, NODI.q_btn.attr['aria-expanded']);
+/* `tieni`: ridisegnato mentre e' aperto, resta aperto */
+selettoreCasaApri('q');
+const H1b = selettoreCasaCampo('q', {valore: '', tieni: true, min: a => a, max: a => a + 7 * 86400});
+c.tieni = [H1b.indexOf('aria-expanded="true"') >= 0, H1b.indexOf('<div class="sel-casa" id="q_pan"></div>') >= 0];
+monta('q', H1b);
+NODI.q.value = '2026-10-15T17:30';
+selettoreCasaAllineaTutti();
+c.tieni.push(conta(NODI.q_pan.innerHTML, /class="chip/g),
+  NODI.q_pan.innerHTML.indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-m="30"') >= 0);
+const H1c = selettoreCasaCampo('q', {valore: '', min: a => a, max: a => a + 7 * 86400});
+c.tieni.push(H1c.indexOf('id="q_pan" hidden>') >= 0, H1c.indexOf('aria-expanded="false"') >= 0);
+/* b) le ferie: solo il giorno, novanta giorni, il mese */
+const H2 = selettoreCasaCampo('f', {valore: '2026-10-14', soloData: true, vuoto: 'Scegli il giorno',
+  min: loc(2026, 9, 14), max: loc(2027, 0, 11) + 86399});
+monta('f', H2);
+c.ferie = [NODI.f.value, NODI.f_btn.span.textContent];
+selettoreCasaApri('f');
+P = NODI.f_pan.innerHTML;
+c.ferie.push(P.indexOf('<b>ottobre 2026</b>') >= 0, conta(P, /class="chip/g), conta(P, /data-h=/g), conta(P, /data-m=/g),
+  conta(P, / disabled data-g=/g), P.indexOf('aria-label="Mese prima" disabled') >= 0, P.indexOf('aria-label="Mese dopo" onclick') >= 0);
+selettoreCasaMese(1, nodoIn('f'));
+P = NODI.f_pan.innerHTML;
+c.ferie.push(P.indexOf('<b>novembre 2026</b>') >= 0, conta(P, / disabled data-g=/g), P.indexOf('aria-label="Mese prima" onclick') >= 0);
+selettoreCasaMese(1, nodoIn('f')); selettoreCasaMese(1, nodoIn('f'));
+P = NODI.f_pan.innerHTML;
+c.ferie.push(P.indexOf('<b>gennaio 2027</b>') >= 0, conta(P, / disabled data-g=/g), P.indexOf('aria-label="Mese dopo" disabled') >= 0);
+selettoreCasaGiorno(loc(2027, 0, 5), nodoIn('f'));
+c.ferie.push(NODI.f.value, NODI.f_btn.span.textContent, NODI.f_pan.hidden, NODI.f_btn.attr['aria-expanded'],
+  Math.floor(new Date(NODI.f.value + 'T12:00:00').getTime() / 1000) === loc(2027, 0, 5, 12, 0));
+/* c) l'appuntamento di un servizio: giorno e ora, un anno, il mese */
+const H3 = selettoreCasaCampo('s', {valore: '', min: a => a + 60, max: a => a + 366 * 86400});
+monta('s', H3);
+selettoreCasaApri('s');
+P = NODI.s_pan.innerHTML;
+c.servizi = [P.indexOf('<b>ottobre 2026</b>') >= 0, conta(P, / disabled data-g=/g), conta(P, /data-h="/g), conta(P, /data-m="/g)];
+selettoreCasaMese(1, nodoIn('s'));
+selettoreCasaGiorno(loc(2026, 10, 7), nodoIn('s'));
+selettoreCasaOra(15, nodoIn('s')); selettoreCasaMinuto(30, nodoIn('s'));
+c.servizi.push(NODI.s.value, NODI.s_btn.span.textContent, NODI.s_pan.hidden,
+  Math.floor(new Date(NODI.s.value).getTime() / 1000) === loc(2026, 10, 7, 15, 30));
+/* un campo che non e' piu' nella pagina esce dal registro */
+delete NODI.f;
+selettoreCasaAllineaTutti();
+c.orfani = ['f' in SEL_CAMPI, 'q' in SEL_CAMPI, 's' in SEL_CAMPI];
+/* d) il «Quando» VERO dell'incontro, e il suo giudice: quel che il selettore lascia scegliere il giudice lo prende */
+const HQ = campoRecapitoP2P({k: 'quando', et: '🕒 Quando', tipo: 'datetime-local', nonRicordato: true});
+const Q = 'p2pCampoEuro_quando';
+c.quandoP2P = [HQ.indexOf('<div class="field"><label for="p2pCampoEuro_quando_btn">🕒 Quando</label><input type="hidden" id="p2pCampoEuro_quando" value="">') === 0,
+               HQ.indexOf('datetime-local') < 0, monta(Q, HQ)];
+selettoreCasaApri(Q);
+c.quandoP2P.push(conta(NODI[Q + '_pan'].innerHTML, /class="chip/g), NODI[Q + '_pan'].innerHTML.indexOf('sel-mese') < 0);
+let rifiuti = 0, scelte = 0;
+for (const g of selGiorni(A, A + P2P_APPUNTAMENTO_FUTURO_S)) for (let h = 0; h < 24; h++) for (const q of SEL_QUARTI) {
+  NODI[Q].value = '';
+  selettoreCasaGiorno(g, nodoIn(Q)); selettoreCasaOra(h, nodoIn(Q)); selettoreCasaMinuto(q, nodoIn(Q));
+  const v = NODI[Q].value;
+  if (!v) continue;
+  scelte++;
+  if (giudiceQuandoP2P(quandoDaCampoP2P(v), A) !== '') rifiuti++;
+}
+c.quandoP2P.push(rifiuti, scelte);
+Date.now = _adesso;
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(banco)
+    if c is None:
+        salta("il selettore di casa, in node", "node non c'e'")
+        return
+    prova("il banco gira nel fuso di Roma: l'estate a +2, l'inverno a +1", [-120, -60], c["fuso"])
+    prova("I GIUDICI: il giorno e' la mezzanotte LOCALE; il giorno dopo si fa col calendario",
+          [[True, True, True], [True, True, True]], [c["giorno"], c["piu"]])
+    prova("...mai sommando 86400: il 25 ottobre dura 25 ore, il 29 marzo 23, e il giorno dopo "
+          "e' sempre il giorno dopo", [90000, 82800, True], c["legale"])
+    prova("...i giorni fra due istanti, estremi compresi: otto per una settimana, anche a "
+          "cavallo dell'ora legale — tutti a mezzanotte, e le 15:30 sono le 15:30 in ognuno",
+          [8, True, True, [22, 23, 24, 25, 26, 27, 28, 29], True, True], c["giorni"])
+    prova("...l'istante di un giorno a un'ora; il primo del mese, avanti e indietro, e dicembre "
+          "porta a gennaio", [[True, True], [True, True, True, True]], [c["istante"], c["mese"]])
+    prova("I LIMITI: un quarto d'ora gia' passato e' fuori, il prossimo e' dentro; l'ultimo "
+          "giorno finisce all'ora in cui si e' cominciato",
+          [False, True, True, False], c["minuto"])
+    prova("...un'ora vale se ha almeno un quarto buono",
+          [False, True, True, True, False], c["ora"])
+    prova("...un giorno vale se ha almeno un'ora buona (alle 23:50 oggi non ne ha piu'); per "
+          "la sola data conta il giorno",
+          [True, False, False, False, True, False, True], c["giornoAmmesso"])
+    prova("...«Oggi», «Domani», poi il giorno della settimana col numero",
+          ["Oggi", "Domani", "gio 15", "dom 18"], c["etichette"])
+    prova("IL TOCCO, senza una scelta di prima: il giorno toccato all'ora di adesso (al quarto "
+          "dopo), l'ora toccata oggi in punto — e se quell'ora e' gia' cominciata, il suo "
+          "primo quarto buono",
+          ["2026-10-14T10:15", "2026-10-13T18:00", "2026-10-13T10:15"], c["scegli"][:3])
+    prova("...con una scelta di prima il resto si tiene: cambia il giorno e l'ora resta, "
+          "cambia l'ora e i minuti restano, cambiano i minuti e basta",
+          ["2026-10-16T18:30", "2026-10-14T20:30", "2026-10-14T18:45"], c["scegli"][3:6])
+    prova("...quel che cadrebbe FUORI si porta al quarto buono piu' vicino dello stesso giorno: "
+          "mai nel passato, mai oltre il tetto; un giorno senza un'ora buona non cambia niente",
+          ["2026-10-13T10:15", "2026-10-20T10:00", "2026-10-14T18:30", ""], c["scegli"][6:])
+    prova("...e per OGNI tocco possibile (ogni giorno, ora, quarto; con e senza una scelta di "
+          "prima) il risultato sta nei limiti, o resta quel che c'era",
+          [True, 5760], c["sempreDentro"])
+    prova("IL DEPOSITO: si rilegge il giorno (mezzanotte locale) o giorno e ora; un 30 "
+          "febbraio, le 25, una parola, il vuoto valgono zero; la data sola non basta dove "
+          "serve l'ora", [True, True, 0, 0, 0, 0, 0, 0, True], c["leggi"])
+    prova("...si scrive nel formato di sempre, con gli zeri; niente istante, niente testo",
+          ["2026-10-18T15:30", "2026-10-18", "2026-01-05T07:05", "", ""], c["scrivi"])
+    prova("...e la riga lo dice in parole: con l'anno la sola data, con l'ora l'altra",
+          ["dom 18 ott, 15:30", "dom 18 ott 2026", ""], c["parole"])
+    prova("...lo stesso testo e la stessa lettura dei gemelli del «Quando» del P2P, anche "
+          "nell'ora che il 25 ottobre capita due volte", True, c["gemelli"])
+    prova("I DISEGNI, i giorni a bottoni: otto, il scelto acceso, quello fuori spento, e ogni "
+          "tocco chiama per NOME col valore e col nodo",
+          [8, 1, True, 1, 8, True], c["giorniHtml"])
+    prova("...le 24 ore in griglia: la scelta accesa, le passate spente",
+          [24, 1, 10, True, True], c["oreHtml"])
+    prova("...i quattro quarti, in una fila sola",
+          [4, True, ">:00<>:15<>:30<>:45<", 1, True], c["minutiHtml"])
+    prova("...il mese: ottobre 2026 comincia di giovedi' (tre caselle vuote), 31 giorni, i "
+          "passati spenti (oggi col suo segno), la freccia che uscirebbe dai limiti spenta",
+          [True, 31, 3, 13, True, True, True, True, 31], c["meseHtml"])
+    prova("IL CAMPO: un deposito nascosto col suo id, la riga che dice «Scegli giorno e ora», "
+          "il pannello chiuso — e un solo <input>",
+          [True, True, True, True, True, 1], c["campo"])
+    prova("...aperto su una settimana: otto giorni a bottoni (niente mese), le ore passate "
+          "spente, i minuti spenti finche' non c'e' un'ora",
+          [False, "true", 8, True, 0, 24, 10, 4, 36], c["aperto"])
+    prova("...i tocchi scrivono il deposito e la riga, e il pannello resta aperto: il giorno, "
+          "poi l'ora, poi i minuti — accesi nel disegno",
+          ["2026-10-14T10:15", "mer 14 ott, 10:15", False, False, "2026-10-14T18:15",
+           "2026-10-14T18:45", True], c["tocchi"][:7])
+    prova("...e tornando a OGGI con un'ora gia' passata si va al primo quarto buono",
+          ["2026-10-13T10:15", True], c["tocchi"][7:])
+    prova("...un valore scritto da fuori si legge sulla riga com'e' (17:40: nessun quarto "
+          "acceso, l'ora si'), e svuotato torna l'invito; un secondo tocco sulla riga richiude",
+          ["gio 15 ott, 17:40", 0, True, "2026-10-15T17:40", "Scegli giorno e ora", True,
+           True, "false"], c["daFuori"])
+    prova("...`tieni`: ridisegnato mentre e' aperto rinasce APERTO e si riempie da solo coi "
+          "valori rimessi; senza `tieni` rinasce chiuso",
+          [True, True, 8, True, True, True], c["tieni"])
+    prova("LE FERIE: il valore di partenza sulla riga, con l'anno",
+          ["2026-10-14", "mer 14 ott 2026"], c["ferie"][:2])
+    prova("...novanta giorni vogliono il MESE: niente bottoni, niente ore, i giorni prima di "
+          "domani spenti, indietro non si va",
+          [True, 0, 0, 0, 13, True, True], c["ferie"][2:9])
+    prova("...le frecce camminano fino all'ultimo mese utile, coi giorni oltre il tetto spenti",
+          [True, 0, True, True, 20, True], c["ferie"][9:15])
+    prova("...e il tocco sul giorno scrive «2027-01-05», lo dice, e CHIUDE il pannello — e "
+          "chi lo legge a mezzogiorno trova il giorno giusto",
+          ["2027-01-05", "mar 5 gen 2027", True, "false", True], c["ferie"][15:])
+    prova("L'APPUNTAMENTO DI UN SERVIZIO: il mese e le ore; un giorno di novembre, le 15:30 — "
+          "e `new Date(valore)` legge lo stesso istante di ieri",
+          [True, 12, 24, 4, "2026-11-07T15:30", "sab 7 nov, 15:30", False, True], c["servizi"])
+    prova("...un campo sparito dalla pagina esce dal registro, gli altri restano",
+          [False, True, True], c["orfani"])
+    prova("IL «QUANDO» VERO DELL'INCONTRO: l'etichetta punta alla riga, il deposito tiene il "
+          "suo id, il tipo di sistema non c'e' piu'; una settimana a bottoni",
+          [True, True, True, 8, True], c["quandoP2P"][:5])
+    prova("...e il suo giudice non rifiuta MAI quel che il selettore lascia scegliere (ogni "
+          "giorno, ora e quarto)", [0, 768], c["quandoP2P"][5:])
+
+    # --- 3) IL FOGLIO LEGGERO DELLA PAUSA, in node ------------------------
+    rep = pezzo_js(m, "/* ---- LA REPUTAZIONE DEL P2P: GLI SCAMBI NON COMPLETATI",
+                   "/* ============ fine della reputazione del P2P ============ */")
+    blocco = pezzo_js(m, "/* ---- IL TEMPO DI CHI PUBBLICA: LA PAUSA DEGLI ORDINI, IL BADGE, LA",
+                      "/* ============ fine del tempo di chi pubblica ============ */")
+    banco = r"""
+process.env.TZ = 'Europe/Rome';
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const fmt = n => String(n);
+function haptic(){}
+function renderNuovoOrdineP2P(){}
+function icoNuovoP2P(){ return ''; }
+function sezioneNuovoP2P(o){ return ''; }
+function leggiDataTabacchinoP2P(){ return 0; }
+let MIE = {}, MIEI = {};
+function ordiniP2P(){ return MIE; }
+function ordineTuoP2P(id){ return !!MIEI[id]; }
+let LEVE = {tempoPubblica: true};
+function p2pCoord(){ return LEVE; }
+let p2pInfo = null, p2pFacce = {};
+const NODI = {};
+function el(id){ return NODI[id] || (NODI[id] = {innerHTML: ''}); }
+""" + "".join(_fn_js(m, f) for f in (
+        "function idMostroVero(id){", "function minutiSecondi(sec){",
+        "function scadeDaCampoP2P(s){", "function campoDaScadeP2P(epoch){",
+        "function scadenzaGestoP2P(o){", "function testoTempoGestoP2P(azione, resta){")) \
+        + "function scadenzaFoglioP2P(){ return 0; }\n" + sel + rep + blocco + r"""
+const c = {};
+const loc = (g, h, mi) => Math.floor(new Date(2026, 9, g, h || 0, mi || 0, 0).getTime() / 1000);
+const conta = (h, re) => (h.match(re) || []).length;
+const A = loc(13, 10, 7);                 // martedi' 13 ottobre 2026, 10:07
+Date.now = () => A * 1000;
+const F = () => NODI.p2pPausaCorpo.innerHTML;
+const pannelli = () => conta(F(), /class="sel-casa"/g);
+/* a) il foglio vuoto: tutto quel che si legge */
+p2pMiaPausa = null;
+p2pPausaBozza = {fasce: [], unaFino: 0};
+renderPausaP2P();
+c.vuoto = F().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+c.testi = [P2P_PAUSA_RIGA].concat(P2P_PAUSA_COME, [P2P_PAUSA_BARATTOZON]);
+/* b) con due fasce */
+p2pPausaBozza = {fasce: [{g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}, {g: [0, 1, 2, 3, 4], da: 480, a: 1200}], unaFino: 0};
+renderPausaP2P();
+c.corto = [F().indexOf('<div class="hint p2p-pausa-testa">In pausa i tuoi ordini escono dal libro, poi tornano da soli.</div>') === 0,
+           conta(F(), /<input/g), F().indexOf('Ogni giorno 22–6 · fino al giorno dopo</div>') >= 0,
+           F().indexOf('Lun–ven 8–20</div>') >= 0, F().indexOf('Da adesso, al massimo 7 giorni.') >= 0,
+           F().indexOf('id="p2pPausaCome"') < 0,
+           F().indexOf('aria-expanded="false" aria-controls="p2pPausaCome" onclick="comePausaP2P()">ℹ️ Come funziona') >= 0,
+           F().indexOf('Barattozon') < 0, F().indexOf('non si ferma') < 0, pannelli(),
+           F().indexOf('id="p2pPausaUna" aria-expanded="false" onclick="apriUnaPausaP2P()"><span>No</span>') >= 0];
+/* c) «Come funziona» si apre e si richiude */
+comePausaP2P();
+c.come = [F().indexOf('aria-expanded="true" aria-controls="p2pPausaCome"') >= 0,
+          (F().match(/<li[^>]*>[^<]*<\/li>/g) || []).map(x => x.replace(/<[^>]+>/g, '')),
+          F().indexOf('<li id="p2pPausaBarattozon">') >= 0, F().indexOf('<ul class="p2p-pausa-come-testo" id="p2pPausaCome">') >= 0];
+comePausaP2P();
+c.come.push(F().indexOf('id="p2pPausaCome"') < 0);
+/* d) l'ora di una fascia: il selettore si apre DENTRO la sua scatola */
+apriOraPausaP2P(0, 'da');
+c.oraFascia = [pannelli(), conta(F(), /data-h="/g), conta(F(), /data-m="/g),
+               F().indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-h="22" onclick="oraFasciaPausaP2P(+this.dataset.h, this)"') >= 0,
+               F().indexOf('class="p2p-scade-cella sel" aria-pressed="true" data-m="0" onclick="minutoFasciaPausaP2P(+this.dataset.m, this)"') >= 0,
+               conta(F(), / disabled /g), conta(F(), /aria-expanded="true" data-i="0" data-q="da"/g),
+               F().indexOf('class="sel-casa"') < F().indexOf('class="p2p-pausa-fascia"', F().indexOf('class="p2p-pausa-fascia"') + 1)];
+oraFasciaPausaP2P(23); minutoFasciaPausaP2P(30);
+c.oraFascia.push(p2pPausaBozza.fasce[0].da, F().indexOf('<span>Dalle 23:30</span>') >= 0, pannelli());
+oraFasciaPausaP2P(7);
+c.oraFascia.push(p2pPausaBozza.fasce[0].da);
+apriOraPausaP2P(1, 'a');
+minutoFasciaPausaP2P(15);
+c.oraFascia.push(p2pPausaBozza.fasce[1].a, p2pPausaBozza.fasce[0].da, pannelli());
+apriOraPausaP2P(1, 'a');
+c.oraFascia.push(pannelli());
+apriOraPausaP2P(0, 'da'); togliFasciaPausaP2P(0);     // aperto sulla fascia che si toglie
+c.oraFascia.push(pannelli(), p2pPausaBozza.fasce.length);
+apriOraPausaP2P(5, 'da'); apriOraPausaP2P(0, 'boh'); oraFasciaPausaP2P(3);
+c.oraFascia.push(pannelli(), p2pPausaBozza.fasce[0].da);
+/* e) una volta sola: i giorni a bottoni, da adesso a sette giorni */
+apriUnaPausaP2P();
+c.una = [pannelli(), conta(F(), /class="chip/g), F().indexOf('>Oggi</button>') >= 0,
+         conta(F(), / disabled data-g=/g), conta(F(), / disabled data-h=/g), conta(F(), / disabled data-m=/g),
+         F().indexOf('id="p2pPausaUna" aria-expanded="true"') >= 0];
+giornoUnaPausaP2P(loc(14));
+c.una.push(p2pPausaBozza.unaFino === loc(14, 10, 15), F().indexOf('<span>Fino a domani alle 10:15</span>') >= 0,
+           F().indexOf('aria-label="Togli la pausa una volta sola"') >= 0, pannelli());
+oraUnaPausaP2P(6); minutoUnaPausaP2P(0);
+c.una.push(p2pPausaBozza.unaFino === loc(14, 6, 0));
+giornoUnaPausaP2P(loc(13));
+c.una.push(p2pPausaBozza.unaFino === loc(13, 10, 15));
+giornoUnaPausaP2P(loc(20)); oraUnaPausaP2P(23);
+c.una.push(p2pPausaBozza.unaFino === loc(20, 10, 0), p2pPausaBozza.unaFino <= A + 7 * 86400,
+           'errore' in corpoPausaP2P(p2pPausaBozza, A, 'Europe/Rome', 120));
+unaPausaP2P('');
+c.una.push(p2pPausaBozza.unaFino, F().indexOf('class="sel-casa-riga vuota" id="p2pPausaUna"') >= 0);
+apriUnaPausaP2P();
+c.una.push(pannelli());
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(banco)
+    if c is None:
+        salta("il foglio leggero della pausa, in node", "node non c'e'")
+        return
+    prova("IL FOGLIO CORTO: a pausa vuota si legge tutto in una riga, due etichette, un tetto "
+          "e due bottoni — e nient'altro",
+          "In pausa i tuoi ordini escono dal libro, poi tornano da soli. Ogni settimana "
+          "＋ Aggiungi una fascia Una volta sola No ▾ Da adesso, al massimo 7 giorni. Salva "
+          "ℹ️ Come funziona ▾", c["vuoto"])
+    prova("...i testi del foglio sono questi quattro, nessuno piu' lungo di 90 caratteri",
+          [["In pausa i tuoi ordini escono dal libro, poi tornano da soli.",
+            "La scadenza dei tuoi ordini non si ferma.",
+            "Vale dentro Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.",
+            "Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode."], True],
+          [c["testi"], max(len(x) for x in c["testi"]) <= 90])
+    prova("...con le fasce: la riga in cima, NESSUN <input>, una frase corta sotto ogni fascia "
+          "(«fino al giorno dopo» quando serve), il tetto; «Come funziona» chiuso (niente "
+          "Barattozon, niente scadenza), nessun selettore aperto, «una volta sola» dice «No»",
+          [True, 0, True, True, True, True, True, True, True, 0, True], c["corto"])
+    prova("«ℹ️ COME FUNZIONA» si apre con le tre righe — la scadenza, dentro Barattolo, "
+          "Barattozon — e si richiude",
+          [True, ["La scadenza dei tuoi ordini non si ferma.",
+                  "Vale dentro Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.",
+                  "Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode."],
+           True, True, True], c["come"])
+    prova("L'ORA DI UNA FASCIA: il tocco sulla riga apre il selettore DENTRO la sua scatola — "
+          "24 ore e 4 quarti, le 22:00 accese, niente spento",
+          [1, 24, 4, True, True, 0, 1, True], c["oraFascia"][:8])
+    prova("...l'ora e i minuti si toccano separati e l'altra meta' resta: 23, poi :30, poi le "
+          "7 (e mezza); il selettore resta aperto",
+          [1410, True, 1, 450], c["oraFascia"][8:12])
+    prova("...l'altra riga sposta il selettore (uno solo aperto) e tocca la SUA fascia; lo "
+          "stesso tocco lo richiude",
+          [1215, 450, 1, 0], c["oraFascia"][12:16])
+    prova("...togliere una fascia chiude il selettore — o resterebbe aperto sulla fascia che "
+          "ne ha preso il posto (gli indici sono scalati); una fascia che non c'e' o una riga "
+          "storta non aprono niente",
+          [0, 1, 0, 480], c["oraFascia"][16:])
+    prova("UNA VOLTA SOLA: si apre dentro il foglio con otto giorni a bottoni (da oggi), le "
+          "ore passate spente e i minuti spenti finche' non c'e' un'ora",
+          [1, 8, True, 0, 10, 4, True], c["una"][:7])
+    prova("...il tocco su «Domani» propone domani a quest'ora, la riga lo dice, compare la ✕ "
+          "e il selettore resta aperto; poi l'ora e i minuti",
+          [True, True, True, 1, True], c["una"][7:12])
+    prova("...MAI NEL PASSATO: tornando a oggi con le 6 gia' passate si va al primo quarto buono",
+          True, c["una"][12])
+    prova("...MAI OLTRE I SETTE GIORNI: l'ultimo giorno si ferma all'ora di adesso, e quel che "
+          "ne esce «Salva» lo prende senza un errore",
+          [True, True, False], c["una"][13:16])
+    prova("...la ✕ la toglie (la riga torna «No»), e un tocco sulla riga richiude il selettore",
+          [0, True, 0], c["una"][16:])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -153487,6 +154043,7 @@ def main():
               prove_tempo_pubblica_app,
               prove_disputa_automatica_p2p,
               prove_pausa_in_vista,
+              prove_selettore_di_casa,
               prove_config_esempio):
         try:
             f()

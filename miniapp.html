@@ -3681,9 +3681,19 @@
   .p2p-pausa-giorni{display:flex;gap:4px;margin-bottom:8px}
   .p2p-pausa-giorni .p2p-accesso-chip{flex:1 1 0;min-width:0;padding:6px 0;text-align:center}
   .p2p-pausa-ore{display:flex;align-items:center;gap:8px}
-  .p2p-pausa-ore label{flex:1 1 0;min-width:0;font-size:12px;font-weight:700;color:var(--ink-soft)}
-  .p2p-pausa-ore input{display:block;width:100%;margin-top:2px}
-  .p2p-pausa-ore .btn.mini{flex:0 0 auto;align-self:flex-end}
+  .p2p-pausa-ore .sel-casa-riga{flex:1 1 0;min-width:0;padding:10px 12px}
+  .p2p-pausa-ore .btn.mini{flex:0 0 auto;align-self:center}
+  /* la riga in cima al foglio: un respiro prima dell'etichetta */
+  .p2p-pausa-testa{margin:0 0 12px}
+  /* «ℹ️ Come funziona» (12 ott 2026, pausa-leggera): una riga discreta in
+     fondo al foglio, che si apre sulle tre frasi lunghe di ieri */
+  .p2p-pausa-come{display:flex;align-items:center;gap:6px;width:100%;margin:12px 0 0;padding:8px 0;
+    border:0;background:none;font:inherit;font-size:13px;font-weight:700;color:var(--muted);
+    text-align:left;cursor:pointer}
+  .p2p-pausa-come i{font-style:normal;font-size:11px}
+  .p2p-pausa-come:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  .p2p-pausa-come-testo{margin:0 0 4px;padding:0 0 0 18px;font-size:13px;line-height:1.45;color:var(--ink-soft)}
+  .p2p-pausa-come-testo li{margin:0 0 4px}
   /* CHI C'E' DALL'ALTRA PARTE, nella sua scatola: il filo che la
      staccava non serve piu' — a staccarla e' il riquadro, come nel
      riferimento. Ultima e non prima: in un libro si scorre per PREZZO,
@@ -4850,6 +4860,34 @@
   .p2p-scade-riga{margin-top:14px;font-weight:800;font-size:15px;color:var(--ink);line-height:1.35}
   .p2p-scade-riga.vuota{color:var(--muted);font-weight:700}
   .p2p-scade-fra{color:var(--muted);font-weight:700;font-size:13px}
+  /* IL SELETTORE DI CASA (12 ott 2026, cantiere pausa-leggera): la veste
+     e' quella della scadenza del PayCode qui sopra — le `.chip`, la
+     griglia, le celle — e qui stanno solo i pezzi che la' non c'erano:
+     la riga che dice la scelta, il mese a sette colonne, i quattro
+     quarti d'ora. La riga ha il bordo dei campi di casa: vive anche
+     fuori dalle scatole del P2P (le ferie, l'appuntamento). */
+  .sel-casa-riga{width:100%;display:flex;align-items:center;gap:8px;box-sizing:border-box;
+    border:1.5px solid var(--field-line);background:var(--card);border-radius:12px;
+    padding:12px 14px;font:inherit;font-weight:700;font-size:15px;color:var(--ink);
+    text-align:left;cursor:pointer}
+  .sel-casa-riga > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sel-casa-riga.vuota > span{color:var(--muted)}
+  .sel-casa-riga i{flex:0 0 auto;font-style:normal;font-size:11px;color:var(--muted)}
+  .sel-casa-riga:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  .sel-casa{margin:4px 0 6px}
+  .sel-casa .p2p-scade-eti:first-child{margin-top:10px}
+  /* i giorni a bottoni alti come le celle delle ore: si toccano col pollice */
+  .sel-casa .p2p-scade-chip .chip{min-height:40px}
+  .sel-quarti{grid-template-columns:repeat(4,1fr)}
+  .sel-mese-testa{display:flex;align-items:center;gap:8px;margin:0 0 6px}
+  .sel-mese-testa b{flex:1;text-align:center;font-size:15px;color:var(--ink);text-transform:capitalize}
+  .sel-mese-freccia{flex:0 0 44px;height:40px;border:1.5px solid var(--field-line);background:var(--card);
+    border-radius:10px;font:inherit;font-weight:800;font-size:18px;color:var(--ink);cursor:pointer}
+  .sel-mese-freccia:disabled{opacity:.35;cursor:default}
+  .sel-mese-giorni,.sel-mese{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .sel-mese-giorni{margin-bottom:4px}
+  .sel-mese-giorni span{text-align:center;font-size:11px;font-weight:800;color:var(--muted)}
+  .sel-mese .p2p-scade-cella.oggi:not(.sel){border-color:var(--ink)}
   #p2pScadeSheet .p2p-tappa-err{margin-top:6px}
   #p2pScadeSheet .btn.orange{margin-top:14px}
   /* I FOGLI DEI PASSI 1 E 2 (9 ott 2026, sera): il campo grande del
@@ -11493,7 +11531,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Il rilascio sul posto.</b> A chi compra: <i>Consegna i contanti solo quando chi vende preme «Libera i sats» davanti a te, e controlla che lo scambio risulti concluso prima di andare via.</i> A chi vende: <i>Conta i contanti davanti a chi ti paga, poi premi «Libera i sats» lì, davanti a lui: chi compra deve vedere lo scambio concluso prima di andare via.</i> Mai prima di vedersi, mai dopo essersi salutati.</li>
         <li><b>L'incontro.</b> Vedetevi in un posto pubblico e di giorno — un bar, un incontro bitcoin —, contate le banconote insieme, e mai grosse cifre da soli.</li>
       </ol>
-      <p><b>🕒 L'appuntamento.</b> Chi vende indica <b>dove e quando</b> vedervi: il giorno e l'ora col selettore del telefono, e il luogo come <b>indirizzo vero</b> — mentre lo scrive gli proponiamo indirizzi esistenti, o usa la sua posizione. Chi compra lo trova in cima alla pagina dello scambio, con <b>«🧭 Apri nel navigatore»</b>. Se l'appuntamento cambia, l'altra persona riceve l'avviso.</p>
+      <p><b>🕒 L'appuntamento.</b> Chi vende indica <b>dove e quando</b> vedervi: il giorno e l'ora con pochi tocchi, e il luogo come <b>indirizzo vero</b> — mentre lo scrive gli proponiamo indirizzi esistenti, o usa la sua posizione. Chi compra lo trova in cima alla pagina dello scambio, con <b>«🧭 Apri nel navigatore»</b>. Se l'appuntamento cambia, l'altra persona riceve l'avviso.</p>
       <p><b>📍 «Sono qui», la prova d'incontro.</b> Quando arrivate, ognuno tocca «Sono qui» dal suo telefono, senza aspettare l'altro: si registrano l'<b>ora esatta</b> e, se il telefono la dà, la <b>posizione</b>, firmate con la chiave usa-e-getta dello scambio. È <b>facoltativo</b>, per la privacy, ma aiuta a risolvere le dispute. L'altra persona vede l'ora in cui l'hai segnato, <b>mai la tua posizione</b>; un moderatore, solo in caso di disputa, vede se eravate lì insieme, all'ora e vicino al luogo dell'appuntamento. <b>Il GPS si può falsificare:</b> la posizione è una conferma, non una prova assoluta.</p>
       <p><b>In disputa, sul contanti.</b> Se chi vende dice di non aver ricevuto i contanti e non c'è la prova d'incontro, in disputa si dà ragione a chi vende. Ma se chi compra ha segnato la presenza all'ora e vicino al luogo dell'appuntamento e chi vende no, la disputa non va in automatico a chi vende: decide il moderatore. Lo scriviamo adesso, prima dello scambio, e non il giorno della disputa.</p>
 
@@ -17350,6 +17388,316 @@ function fogliCoperti(fogli){
   fogli.forEach((f, i) => { if (f.aperto) ultimo = i; });
   return fogli.filter((f, i) => f.pieno && f.aperto && i < ultimo).map(f => f.id);
 }
+/* ============ IL SELETTORE DI CASA: GIORNO, ORA E MINUTI A TOCCHI (12 ott
+   2026, cantiere pausa-leggera, richiesta di Andrea) ============
+   Su Android il campo `datetime-local` apre il selettore di sistema —
+   grigio, «Imposta data e ora» —, su iPhone le rotelle, sul sito un
+   terzo vestito: tre cose diverse, e nessuna di casa. Il rimedio c'era
+   gia' dal 9 ott per la scadenza del PayCode (`#p2pScadeSheet`): i
+   giorni a bottoni, le ore in griglia, tutto a tocchi e niente
+   tastiera. Qui quella veste diventa UN PEZZO SOLO, riusato dal foglio
+   della pausa (i giorni a bottoni, le ore e i quarti d'ora) e dai tre
+   campi che avevano ancora il selettore di sistema — il rientro dalle
+   ferie, l'appuntamento di un servizio, il «🕒 Quando» dell'incontro
+   in contanti — ognuno coi suoi limiti.
+   DUE PIANI. I GIUDICI E I DISEGNI sono PURI: prendono numeri, tornano
+   numeri o HTML, e non sanno chi li chiama (il foglio della pausa li
+   usa cosi', col suo stato). IL CAMPO (`selettoreCasaCampo`) e' il
+   vestito per chi aveva un <input>: resta un <input type="hidden"> con
+   lo STESSO id e lo STESSO formato di prima («2026-10-18» o
+   «2026-10-18T15:30», ora locale) — e' il deposito del valore, e chi
+   lo leggeva col `.value` non cambia di una riga —, piu' la riga che
+   dice la scelta e il pannello che si apre SOTTO, dentro la pagina:
+   nessun foglio sopra un altro.
+   I MINUTI SONO QUARTI D'ORA (decisione di Andrea): quattro bottoni
+   grandi invece di dodici piccoli. Un valore arrivato da fuori con un
+   minuto diverso (17:40) resta com'e' finche' non lo si tocca.
+   I LIMITI SONO ISTANTI (secondi): un'ora fuori dai limiti e' spenta,
+   un giorno senza un'ora buona pure, e un tocco che cadrebbe fuori si
+   porta al quarto d'ora valido piu' vicino DELLO STESSO GIORNO. L'ora
+   legale la fa `Date`: ogni istante nasce da anno, mese, giorno, ora
+   locali, mai sommando 86400. */
+const SEL_MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio',
+                  'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const SEL_GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+const SEL_QUARTI = [0, 15, 30, 45];
+/* dopo quanti giorni di intervallo i bottoni lasciano il posto al mese */
+const SEL_BOTTONI_MAX = 8;
+/* ---- i giudici, puri ---- */
+/* la mezzanotte LOCALE del giorno di quell'istante */
+function selGiorno(ts){
+  const d = new Date(Number(ts) * 1000);
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000);
+}
+/* la mezzanotte locale di n giorni dopo (o prima) */
+function selGiornoPiu(giorno, n){
+  const d = new Date(Number(giorno) * 1000);
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n).getTime() / 1000);
+}
+/* l'istante di quel giorno a quell'ora locale */
+function selIstante(giorno, ora, minuto){
+  const d = new Date(Number(giorno) * 1000);
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate(), ora, minuto, 0, 0).getTime() / 1000);
+}
+/* il primo giorno del mese di quell'istante, e di n mesi dopo */
+function selMese(ts, n){
+  const d = new Date(Number(ts) * 1000);
+  return Math.floor(new Date(d.getFullYear(), d.getMonth() + (n || 0), 1).getTime() / 1000);
+}
+/* i giorni fra min e max, estremi compresi */
+function selGiorni(min, max){
+  const fuori = [];
+  for (let g = selGiorno(min); g <= max && fuori.length < 400; g = selGiornoPiu(g, 1)) fuori.push(g);
+  return fuori;
+}
+function selMinutoAmmesso(giorno, ora, minuto, min, max){
+  const t = selIstante(giorno, ora, minuto);
+  return t >= min && t <= max;
+}
+/* quell'ora ha almeno un quarto dentro i limiti? */
+function selOraAmmessa(giorno, ora, min, max){
+  return SEL_QUARTI.some(q => selMinutoAmmesso(giorno, ora, q, min, max));
+}
+/* quel giorno si puo' scegliere? Per la sola data conta il giorno; se no
+   deve avere almeno un'ora buona */
+function selGiornoAmmesso(giorno, min, max, soloData){
+  if (soloData) return giorno >= selGiorno(min) && giorno <= selGiorno(max);
+  for (let h = 0; h < 24; h++) if (selOraAmmessa(giorno, h, min, max)) return true;
+  return false;
+}
+/* «Oggi», «Domani», «mer 14» */
+function selEtichettaGiorno(giorno, adesso){
+  const oggi = selGiorno(adesso);
+  if (giorno === oggi) return 'Oggi';
+  if (giorno === selGiornoPiu(oggi, 1)) return 'Domani';
+  const d = new Date(giorno * 1000);
+  return SEL_GIORNI[d.getDay()] + ' ' + d.getDate();
+}
+/* L'ISTANTE DOPO UN TOCCO. `prima` e' l'istante gia' scelto (0 = niente),
+   `tocco` dice cosa si e' toccato — {giorno}, {ora} o {minuto} — e il
+   resto si tiene. Senza una scelta di prima si PROPONE: il giorno
+   toccato a quest'ora (al quarto dopo), o l'ora toccata nel primo
+   giorno buono. Se il risultato cade fuori dai limiti si prende il
+   quarto valido piu' vicino dello stesso giorno; se quel giorno non ne
+   ha, resta `prima`. */
+function selScegli(prima, tocco, min, max, adesso){
+  let g, h, m;
+  if (prima > 0) {
+    const d = new Date(prima * 1000);
+    g = selGiorno(prima); h = d.getHours(); m = d.getMinutes();
+  } else {
+    const d = new Date((Number(adesso) + 15 * 60) * 1000);
+    g = selGiorno(Math.max(min, adesso));
+    h = d.getHours(); m = Math.floor(d.getMinutes() / 15) * 15;
+    if (tocco.ora !== undefined) m = 0;
+  }
+  if (tocco.giorno !== undefined) g = tocco.giorno;
+  if (tocco.ora !== undefined) h = tocco.ora;
+  if (tocco.minuto !== undefined) m = tocco.minuto;
+  const voluto = selIstante(g, h, m);
+  if (voluto >= min && voluto <= max) return voluto;
+  let meglio = 0, scarto = Infinity;
+  for (let k = 0; k < 24; k++) for (const q of SEL_QUARTI) {
+    const t = selIstante(g, k, q);
+    if (t >= min && t <= max && Math.abs(t - voluto) < scarto) { meglio = t; scarto = Math.abs(t - voluto); }
+  }
+  return meglio || prima || 0;
+}
+/* il valore del deposito, andata e ritorno: «2026-10-18» (solo data: la
+   mezzanotte locale) o «2026-10-18T15:30». 0 e '' su tutto il resto — un
+   30 febbraio che JS «correggerebbe» si rilegge e si confronta */
+function selLeggi(v, soloData){
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(String(v || ''));
+  if (!m || (!soloData && m[4] === undefined)) return 0;
+  const a = +m[1], me = +m[2], g = +m[3], h = soloData ? 0 : +m[4], mi = soloData ? 0 : +m[5];
+  const d = new Date(a, me - 1, g, h, mi, 0, 0);
+  if (d.getFullYear() !== a || d.getMonth() !== me - 1 || d.getDate() !== g
+      || d.getHours() !== h || d.getMinutes() !== mi) return 0;
+  return Math.floor(d.getTime() / 1000);
+}
+function selScrivi(ts, soloData){
+  const n = Number(ts) || 0;
+  if (!(n > 0)) return '';
+  const d = new Date(n * 1000), due = x => (x < 10 ? '0' : '') + x;
+  const data = d.getFullYear() + '-' + due(d.getMonth() + 1) + '-' + due(d.getDate());
+  return soloData ? data : data + 'T' + due(d.getHours()) + ':' + due(d.getMinutes());
+}
+/* la scelta in parole: «sab 18 ott 2026», «sab 18 ott, 15:30» */
+function selParole(ts, soloData){
+  const n = Number(ts) || 0;
+  if (!(n > 0)) return '';
+  const d = new Date(n * 1000), due = x => (x < 10 ? '0' : '') + x;
+  const giorno = SEL_GIORNI[d.getDay()] + ' ' + d.getDate() + ' ' + SEL_MESI[d.getMonth()].slice(0, 3);
+  return soloData ? giorno + ' ' + d.getFullYear() : giorno + ', ' + due(d.getHours()) + ':' + due(d.getMinutes());
+}
+/* ---- i disegni, puri: tornano HTML, e `chiama` e' il NOME della funzione
+   che riceve il tocco (un nome di casa, mai testo di qualcuno): la si
+   chiama col valore e col NODO toccato, e chi vive in un campo ritrova il
+   suo id risalendo dal nodo — nessun id scritto dentro un `onclick` ---- */
+/* i giorni a bottoni */
+function selGiorniHtml(giorni, scelto, adesso, ammesso, chiama){
+  return '<div class="p2p-scade-chip" role="group" aria-label="Giorno">' + giorni.map(g =>
+    '<button type="button" class="chip' + (g === scelto ? ' active' : '') + '" aria-pressed="'
+    + (g === scelto ? 'true' : 'false') + '"' + (ammesso(g) ? '' : ' disabled') + ' data-g="' + g
+    + '" onclick="' + chiama + '(+this.dataset.g, this)">' + selEtichettaGiorno(g, adesso) + '</button>').join('')
+    + '</div>';
+}
+/* il mese: la testata con le due frecce e la griglia dal lunedi' */
+function selMeseHtml(mese, scelto, adesso, ammesso, chiama, chiamaMese, indietro, avanti){
+  const d = new Date(mese * 1000), oggi = selGiorno(adesso);
+  const vuote = (d.getDay() + 6) % 7;
+  const giorni = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  let celle = '';
+  for (let i = 0; i < vuote; i++) celle += '<span></span>';
+  for (let n = 1; n <= giorni; n++) {
+    const g = Math.floor(new Date(d.getFullYear(), d.getMonth(), n).getTime() / 1000);
+    celle += '<button type="button" class="p2p-scade-cella' + (g === scelto ? ' sel' : '')
+      + (g === oggi ? ' oggi' : '') + '"' + (g === scelto ? ' aria-pressed="true"' : '')
+      + (ammesso(g) ? '' : ' disabled') + ' data-g="' + g + '" onclick="' + chiama
+      + '(+this.dataset.g, this)">' + n + '</button>';
+  }
+  return '<div class="sel-mese-testa">'
+    + '<button type="button" class="sel-mese-freccia" aria-label="Mese prima"' + (indietro ? '' : ' disabled')
+    + ' onclick="' + chiamaMese + '(-1, this)">‹</button>'
+    + '<b>' + SEL_MESI[d.getMonth()] + ' ' + d.getFullYear() + '</b>'
+    + '<button type="button" class="sel-mese-freccia" aria-label="Mese dopo"' + (avanti ? '' : ' disabled')
+    + ' onclick="' + chiamaMese + '(1, this)">›</button></div>'
+    + '<div class="sel-mese-giorni" aria-hidden="true"><span>L</span><span>M</span><span>M</span><span>G</span><span>V</span><span>S</span><span>D</span></div>'
+    + '<div class="sel-mese" role="group" aria-label="Giorno">' + celle + '</div>';
+}
+/* le 24 ore in griglia */
+function selOreHtml(scelta, ammessa, chiama){
+  let celle = '';
+  for (let h = 0; h < 24; h++)
+    celle += '<button type="button" class="p2p-scade-cella' + (h === scelta ? ' sel' : '') + '"'
+      + (h === scelta ? ' aria-pressed="true"' : '') + (ammessa(h) ? '' : ' disabled')
+      + ' data-h="' + h + '" onclick="' + chiama + '(+this.dataset.h, this)">' + (h < 10 ? '0' : '') + h + '</button>';
+  return '<div class="p2p-scade-griglia" role="group" aria-label="Ora">' + celle + '</div>';
+}
+/* i quattro quarti d'ora */
+function selMinutiHtml(scelto, ammesso, chiama){
+  return '<div class="p2p-scade-griglia sel-quarti" role="group" aria-label="Minuti">' + SEL_QUARTI.map(q =>
+    '<button type="button" class="p2p-scade-cella' + (q === scelto ? ' sel' : '') + '"'
+    + (q === scelto ? ' aria-pressed="true"' : '') + (ammesso(q) ? '' : ' disabled')
+    + ' data-m="' + q + '" onclick="' + chiama + '(+this.dataset.m, this)">:' + (q < 10 ? '0' : '') + q + '</button>').join('')
+    + '</div>';
+}
+/* ---- IL CAMPO: il deposito nascosto, la riga, il pannello ---- */
+const SEL_CAMPI = {};         // id del campo -> {soloData, min, max, vuoto, aperto, mese}
+/* `cfg`: {valore, soloData, min, max, vuoto, tieni}. `min` e `max` sono
+   istanti (0 = nessun limite da quel lato), e possono essere FUNZIONI: si
+   richiedono a ogni disegno, cosi' «da adesso» resta adesso.
+   `tieni`: UN RIDISEGNO NON CHIUDE IL SELETTORE SOTTO IL DITO. Chi
+   ridisegna il suo riquadro mentre il campo e' a schermo e aperto — il
+   foglio dei recapiti, quando arriva una busta — lo ritrova aperto, sul
+   mese dov'era; a riempirlo ci pensa `selettoreCasaAllineaTutti`, che quel
+   chiamante lancia dopo aver rimesso i valori. Senza `tieni` rinasce
+   chiuso, come ogni campo appena disegnato. */
+function selettoreCasaCampo(id, cfg){
+  const prima = SEL_CAMPI[id];
+  const aperto = !!(cfg.tieni && prima && prima.aperto && el(id));
+  const c = SEL_CAMPI[id] = {soloData: !!cfg.soloData, min: cfg.min || 0, max: cfg.max || 0,
+    vuoto: cfg.vuoto || (cfg.soloData ? 'Scegli il giorno' : 'Scegli giorno e ora'),
+    aperto: aperto, mese: aperto ? prima.mese : 0};
+  const ts = selLeggi(cfg.valore, c.soloData);
+  return '<input type="hidden" id="' + id + '" value="' + esc(ts ? selScrivi(ts, c.soloData) : '') + '">'
+    + '<button type="button" class="sel-casa-riga' + (ts ? '' : ' vuota') + '" id="' + id + '_btn" aria-expanded="'
+    + (aperto ? 'true' : 'false') + '" '
+    + 'aria-controls="' + id + '_pan" data-id="' + id + '" onclick="selettoreCasaApri(this.dataset.id)">'
+    + '<span>' + esc(ts ? selParole(ts, c.soloData) : c.vuoto) + '</span><i aria-hidden="true">▾</i></button>'
+    + '<div class="sel-casa" id="' + id + '_pan"' + (aperto ? '' : ' hidden') + '></div>';
+}
+function selLimitiCampo(c, adesso){
+  const v = x => Math.floor(Number(typeof x === 'function' ? x(adesso) : x) || 0);
+  return {min: v(c.min) || 0, max: v(c.max) || adesso + 3650 * 86400};
+}
+/* la riga dice quel che c'e' nel deposito: dopo un tocco, e dopo che
+   qualcuno ha scritto il `.value` da fuori (il recapito ricordato) */
+function selettoreCasaAllinea(id){
+  const c = SEL_CAMPI[id], inp = el(id), btn = el(id + '_btn');
+  if (!c || !inp || !btn) return;
+  const ts = selLeggi(inp.value, c.soloData);
+  btn.classList.toggle('vuota', !ts);
+  const t = btn.querySelector('span');
+  if (t) t.textContent = ts ? selParole(ts, c.soloData) : c.vuoto;
+  if (c.aperto) selettoreCasaDisegna(id);
+}
+function selettoreCasaAllineaTutti(){
+  Object.keys(SEL_CAMPI).forEach(id => { if (el(id)) selettoreCasaAllinea(id); else delete SEL_CAMPI[id]; });
+}
+function selettoreCasaApri(id){
+  const c = SEL_CAMPI[id], pan = el(id + '_pan'), btn = el(id + '_btn');
+  if (!c || !pan || !btn) return;
+  haptic();
+  c.aperto = !c.aperto;
+  pan.hidden = !c.aperto;
+  btn.setAttribute('aria-expanded', c.aperto ? 'true' : 'false');
+  if (c.aperto) { c.mese = 0; selettoreCasaDisegna(id); }
+}
+function selettoreCasaDisegna(id){
+  const c = SEL_CAMPI[id], pan = el(id + '_pan'), inp = el(id);
+  if (!c || !pan || !inp) return;
+  const adesso = Math.floor(Date.now() / 1000), L = selLimitiCampo(c, adesso);
+  const ts = selLeggi(inp.value, c.soloData);
+  const giorno = ts ? selGiorno(ts) : 0;
+  const da = Math.max(L.min, adesso);
+  const buonGiorno = g => selGiornoAmmesso(g, L.min, L.max, c.soloData);
+  let h = '<div class="p2p-scade-eti">Giorno</div>';
+  /* pochi giorni: i bottoni; se no il mese, con le frecce dentro i limiti */
+  if (L.max - da <= SEL_BOTTONI_MAX * 86400)
+    h += selGiorniHtml(selGiorni(da, L.max), giorno, adesso, buonGiorno, 'selettoreCasaGiorno');
+  else {
+    if (!c.mese) c.mese = selMese(ts || da);
+    h += selMeseHtml(c.mese, giorno, adesso, buonGiorno, 'selettoreCasaGiorno', 'selettoreCasaMese',
+      selMese(c.mese, -1) >= selMese(da), selMese(c.mese, 1) <= L.max);
+  }
+  if (!c.soloData) {
+    const d = ts ? new Date(ts * 1000) : null;
+    const g = giorno || selGiorno(Math.max(L.min, adesso));
+    h += '<div class="p2p-scade-eti">Ora</div>'
+      + selOreHtml(d ? d.getHours() : -1, x => selOraAmmessa(g, x, L.min, L.max), 'selettoreCasaOra')
+      + '<div class="p2p-scade-eti">Minuti</div>'
+      + selMinutiHtml(d ? d.getMinutes() : -1,
+          x => !!d && selMinutoAmmesso(g, d.getHours(), x, L.min, L.max), 'selettoreCasaMinuto');
+  }
+  pan.innerHTML = h;
+}
+function selettoreCasaTocco(id, tocco){
+  const c = SEL_CAMPI[id], inp = el(id);
+  if (!c || !inp) return;
+  haptic();
+  const adesso = Math.floor(Date.now() / 1000), L = selLimitiCampo(c, adesso);
+  const prima = selLeggi(inp.value, c.soloData);
+  const dopo = c.soloData ? (tocco.giorno !== undefined ? tocco.giorno : prima)
+                          : selScegli(prima, tocco, L.min, L.max, adesso);
+  if (dopo > 0) inp.value = selScrivi(dopo, c.soloData);
+  /* la sola data si chiude al tocco: non c'e' altro da scegliere */
+  if (c.soloData && tocco.giorno !== undefined) {
+    c.aperto = false;
+    const pan = el(id + '_pan'), btn = el(id + '_btn');
+    if (pan) pan.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  selettoreCasaAllinea(id);
+}
+/* il campo di un nodo toccato: il pannello che lo contiene si chiama
+   «<id>_pan» */
+function selCampoDi(nodo){
+  const pan = nodo && nodo.closest ? nodo.closest('.sel-casa') : null;
+  return pan && pan.id ? pan.id.replace(/_pan$/, '') : '';
+}
+function selettoreCasaGiorno(g, nodo){ selettoreCasaTocco(selCampoDi(nodo), {giorno: g}); }
+function selettoreCasaOra(h, nodo){ selettoreCasaTocco(selCampoDi(nodo), {ora: h}); }
+function selettoreCasaMinuto(m, nodo){ selettoreCasaTocco(selCampoDi(nodo), {minuto: m}); }
+function selettoreCasaMese(n, nodo){
+  const id = selCampoDi(nodo), c = SEL_CAMPI[id];
+  if (!c) return;
+  haptic();
+  c.mese = selMese(c.mese || Date.now() / 1000, n);
+  selettoreCasaDisegna(id);
+}
+/* ============ fine del selettore di casa ============ */
+
 /* la classe `coperto` sui fogli pieni che lo sono, e via dagli altri. Si
    tocca la classe SOLO se cambia: un toggle a vuoto farebbe scattare di
    nuovo l'osservatore che chiama questa, a vuoto. */
@@ -38343,8 +38691,13 @@ function renderFerie(){
            Non si chiude con affari da spedire o aste in corso.`}</div>
     <div id="ferieErrore"></div>
     <div class="field" style="margin-top:12px">
-      <label for="ferieData">${chiuso ? 'Sposta il rientro a' : 'Torno il'}</label>
-      <input type="date" id="ferieData" value="${val}" min="${dom}" max="${max}">
+      <label for="ferieData_btn">${chiuso ? 'Sposta il rientro a' : 'Torno il'}</label>
+      ${/* IL SELETTORE DI CASA (12 ott 2026, pausa-leggera) al posto del
+           campo data di sistema: solo il giorno, da domani al tetto delle
+           ferie. Il deposito e' un nascosto con lo STESSO id e lo stesso
+           formato («2026-10-18»): `setFerie` lo legge come prima. */
+        selettoreCasaCampo('ferieData', {valore: val, soloData: true, vuoto: 'Scegli il giorno',
+          min: selLeggi(dom, true), max: selLeggi(max, true) + 86399})}
     </div>
     <button class="btn ${chiuso?'ghost':'orange'}" style="margin-top:0" onclick="setFerie()">
       ${chiuso ? '📅 Sposta la data' : '🌴 Chiudi il negozio'}</button>
@@ -41001,7 +41354,12 @@ function pannelloServizioVenditore(o){
         <div class="payout">
           <h4>📅 L'appuntamento</h4>
           ${testoData}
-          <input id="servQuando" type="datetime-local">
+          ${/* IL SELETTORE DI CASA (12 ott 2026, pausa-leggera): giorno e
+               ora a tocchi, da adesso in avanti. Il tetto dei giorni e'
+               una leva del server, che la pagina non conosce: qui si
+               arriva a un anno, e oltre il suo tetto lo dice il server.
+               Il deposito tiene id e formato di prima («2026-10-18T15:30»). */
+            selettoreCasaCampo('servQuando', {valore: '', min: a => a + 60, max: a => a + 366 * 86400})}
           <button class="btn orange" onclick="proponiAppuntamento(this)">📅 ${quando ? 'Proponi un&#39;altra data' : 'Proponi la data'}</button>
           <div style="margin-top:14px"></div>
           <h4>🔗 Il collegamento</h4>
@@ -63287,6 +63645,11 @@ let p2pPause = {};                    // ordine -> epoch a cui la pausa di chi l
 let p2pMiaPausa = null;               // la mia pausa come la dice il server ({fasce, una_fino, fino, attiva})
 let p2pPausaBozza = null;             // quel che il foglio sta componendo
 let p2pPausaErrore = '';              // l'ultimo «no» del server, per il foglio
+/* (12 ott 2026, pausa-leggera) quale selettore e' aperto DENTRO il foglio:
+   'una' (la pausa una volta sola), {i, quale} (l'ora di una fascia: 'da'
+   o 'a'), o niente. Uno alla volta. */
+let p2pPausaAperto = null;
+let p2pPausaInfo = false;             // «ℹ️ Come funziona» e' aperto?
 /* la leva del server, in busta come `tempoPubblica` (true/false) */
 function tempoPubblicaP2P(){
   const c = p2pCoord();
@@ -63488,18 +63851,23 @@ function oraDaMinutiP2P(n){
   n = Math.max(0, Math.min(1439, Math.floor(Number(n) || 0)));
   return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
 }
-/* PURA: una fascia in parole — «lun-ven 08:00–20:00», «tutti i giorni
-   22:00–06:00 (fino al mattino dopo)» */
-function fraseFasciaP2P(f){
-  const g = (f && f.g || []).slice().sort((a, b) => a - b);
+/* PURA: una fascia in poche parole, sotto la sua scatola nel foglio —
+   «Ogni giorno 22–6 · fino al giorno dopo», «Lun–ven 8–20», «Sab, dom
+   10–12:30» (12 ott 2026, pausa-leggera: prima era «tutti i giorni
+   22:00–06:00 (fino al giorno dopo)»). Vuota senza giorni. La sorella
+   della riga di stato e' `fasciaCortaP2P`. */
+function fasciaFoglioP2P(f){
+  const g = (f && Array.isArray(f.g) ? f.g : []).map(Number)
+    .filter(x => x >= 0 && x <= 6).sort((a, b) => a - b);
   if (!g.length) return '';
   const corti = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
   const fila = g.every((x, i) => i === 0 || x === g[i - 1] + 1);
-  const giorni = g.length === 7 ? 'tutti i giorni'
-    : (fila && g.length > 2) ? corti[g[0]] + '-' + corti[g[g.length - 1]]
+  const da = Number(f.da) || 0, a = Number(f.a) || 0;
+  const giorni = g.length === 7 ? 'ogni giorno'
+    : (fila && g.length > 2) ? corti[g[0]] + '–' + corti[g[g.length - 1]]
     : g.map(x => corti[x]).join(', ');
-  return giorni + ' ' + oraDaMinutiP2P(f.da) + '–' + oraDaMinutiP2P(f.a)
-    + (f.a <= f.da ? ' (fino al giorno dopo)' : '');
+  return giorni.charAt(0).toUpperCase() + giorni.slice(1) + ' ' + oraCortaP2P(da) + '–' + oraCortaP2P(a)
+    + (a <= da ? ' · fino al giorno dopo' : '');
 }
 /* PURA: la bozza del foglio dalla risposta del server */
 function bozzaPausaP2P(d){
@@ -63545,7 +63913,7 @@ function oraCortaP2P(n){
 }
 /* PURA: una fascia in poche parole, per la riga di stato — «notti 22-6»
    (tutti i giorni, a cavallo della mezzanotte), «tutti i giorni 8-20»,
-   «lun-ven 8-20», «sab, dom 10-12». La sorella lunga e' `fraseFasciaP2P`. */
+   «lun-ven 8-20», «sab, dom 10-12». La sorella del foglio e' `fasciaFoglioP2P`. */
 function fasciaCortaP2P(f){
   const g = (f && Array.isArray(f.g) ? f.g : []).map(Number)
     .filter(x => x >= 0 && x <= 6).sort((a, b) => a - b);
@@ -63626,48 +63994,146 @@ function rigaPausaProfiloP2P(){
   return '<div class="hint" id="p2pPausaStato">' + stato + '</div>'
     + '<button type="button" class="btn ghost" onclick="apriPausaP2P()">⏸ Pausa degli ordini</button>';
 }
+/* IL FOGLIO, LEGGERO (12 ott 2026, cantiere pausa-leggera, richiesta di
+   Andrea dal telefono): una riga dice cosa fa la pausa, e il resto sta in
+   «ℹ️ Come funziona», chiuso di serie. E NIENTE SELETTORI DI SISTEMA: le
+   ore delle fasce e la pausa «una volta sola» si scelgono col selettore
+   di casa (i giudici e i disegni `sel…`, fuori dal motore: da qui il
+   typeof nei banchi), che si apre DENTRO il foglio, sotto la riga
+   toccata — nessun terzo foglio sopra, e «Salva» torna dov'era. */
+const P2P_PAUSA_RIGA = 'In pausa i tuoi ordini escono dal libro, poi tornano da soli.';
+const P2P_PAUSA_COME = ['La scadenza dei tuoi ordini non si ferma.',
+  'Vale dentro Barattolo: da un\'altra app collegata i tuoi ordini si vedono ancora.'];
+/* i limiti della pausa una volta sola: da fra un minuto a fra sette giorni */
+function limitiUnaPausaP2P(adesso){
+  return {min: adesso + 60, max: adesso + P2P_PAUSA_GIORNI_MAX * 86400};
+}
+/* il selettore dell'ora di una fascia, sotto la sua riga */
+function selettoreFasciaPausaP2P(f, quale){
+  const m = Number(f[quale]) || 0, si = () => true;
+  return '<div class="sel-casa"><div class="p2p-scade-eti">Ora</div>'
+    + selOreHtml(Math.floor(m / 60), si, 'oraFasciaPausaP2P')
+    + '<div class="p2p-scade-eti">Minuti</div>' + selMinutiHtml(m % 60, si, 'minutoFasciaPausaP2P') + '</div>';
+}
+/* il selettore della pausa una volta sola: i giorni a bottoni, le ore, i quarti */
+function selettoreUnaPausaP2P(unaFino, adesso){
+  const L = limitiUnaPausaP2P(adesso);
+  const d = unaFino > 0 ? new Date(unaFino * 1000) : null;
+  const giorno = d ? selGiorno(unaFino) : 0, g = giorno || selGiorno(L.min);
+  return '<div class="sel-casa"><div class="p2p-scade-eti">Giorno</div>'
+    + selGiorniHtml(selGiorni(L.min, L.max), giorno, adesso,
+        x => selGiornoAmmesso(x, L.min, L.max, false), 'giornoUnaPausaP2P')
+    + '<div class="p2p-scade-eti">Ora</div>'
+    + selOreHtml(d ? d.getHours() : -1, x => selOraAmmessa(g, x, L.min, L.max), 'oraUnaPausaP2P')
+    + '<div class="p2p-scade-eti">Minuti</div>'
+    + selMinutiHtml(d ? d.getMinutes() : -1,
+        x => !!d && selMinutoAmmesso(g, d.getHours(), x, L.min, L.max), 'minutoUnaPausaP2P')
+    + '</div>';
+}
 function renderPausaP2P(){
   const box = el('p2pPausaCorpo');
   if (!box) return;
   const b = p2pPausaBozza || {fasce: [], unaFino: 0};
   const adesso = Math.floor(Date.now() / 1000);
   const p = p2pMiaPausa;
+  const ap = p2pPausaAperto;
   const stato = (p && p.fino > 0)
     ? '<div class="p2p-box p2p-pausa">⏸ Adesso sei in pausa fino ' + esc(quandoPausaP2P(p.fino)) + '</div>' : '';
+  const ora = (f, i, quale, parola) => {
+    const su = !!ap && ap !== 'una' && ap.i === i && ap.quale === quale;
+    return '<button type="button" class="sel-casa-riga" aria-expanded="' + (su ? 'true' : 'false')
+      + '" data-i="' + i + '" data-q="' + quale + '" onclick="apriOraPausaP2P(+this.dataset.i, this.dataset.q)">'
+      + '<span>' + parola + ' ' + oraDaMinutiP2P(f[quale]) + '</span><i aria-hidden="true">▾</i></button>';
+  };
   const fasce = b.fasce.map((f, i) =>
     '<div class="p2p-pausa-fascia"><div class="p2p-pausa-giorni" role="group" aria-label="Giorni in cui la fascia comincia">'
     + P2P_GIORNI_CORTI.map((g, n) =>
         '<button type="button" class="p2p-accesso-chip' + (f.g.indexOf(n) >= 0 ? ' on' : '')
         + '" aria-pressed="' + (f.g.indexOf(n) >= 0 ? 'true' : 'false') + '" aria-label="' + P2P_GIORNI_NOMI[n]
         + '" data-i="' + i + '" data-g="' + n + '" onclick="giornoPausaP2P(+this.dataset.i, +this.dataset.g)">' + g + '</button>').join('')
-    + '</div><div class="p2p-pausa-ore">'
-    + '<label>Dalle<input type="time" value="' + oraDaMinutiP2P(f.da) + '" data-i="' + i
-    + '" onchange="oraPausaP2P(+this.dataset.i, \'da\', this.value)"></label>'
-    + '<label>Alle<input type="time" value="' + oraDaMinutiP2P(f.a) + '" data-i="' + i
-    + '" onchange="oraPausaP2P(+this.dataset.i, \'a\', this.value)"></label>'
+    + '</div><div class="p2p-pausa-ore">' + ora(f, i, 'da', 'Dalle') + ora(f, i, 'a', 'Alle')
     + '<button type="button" class="btn mini" aria-label="Togli questa fascia" data-i="' + i
     + '" onclick="togliFasciaPausaP2P(+this.dataset.i)">✕</button></div>'
-    + (f.g.length ? '<div class="hint" style="margin:6px 0 0">' + esc(fraseFasciaP2P(f)) + '</div>' : '')
+    + ((ap && ap !== 'una' && ap.i === i && typeof selOreHtml === 'function')
+       ? selettoreFasciaPausaP2P(f, ap.quale) : '')
+    + (f.g.length ? '<div class="hint" style="margin:6px 0 0">' + esc(fasciaFoglioP2P(f)) + '</div>' : '')
     + '</div>').join('');
+  const scelta = b.unaFino > adesso;
   box.innerHTML =
-    '<div class="hint">In pausa i tuoi ordini non si vedono nel libro e da Barattolo nessuno li prende. Alla fine tornano da soli.</div>'
+    '<div class="hint p2p-pausa-testa">' + esc(P2P_PAUSA_RIGA) + '</div>'
     + stato
     + '<div class="field"><label>Ogni settimana</label>' + fasce
     + (b.fasce.length < P2P_PAUSA_FASCE_MAX
        ? '<button type="button" class="btn ghost" onclick="aggiungiFasciaPausaP2P()">＋ Aggiungi una fascia</button>' : '')
     + '</div>'
-    + '<div class="field"><label for="p2pPausaUna">Una volta sola, fino a</label>'
-    + '<div class="p2p-pausa-ore"><label style="flex:1 1 auto">'
-    + '<input type="datetime-local" id="p2pPausaUna" value="' + (b.unaFino > adesso ? campoDaScadeP2P(b.unaFino) : '')
-    + '" min="' + campoDaScadeP2P(adesso) + '" max="' + campoDaScadeP2P(adesso + P2P_PAUSA_GIORNI_MAX * 86400)
-    + '" onchange="unaPausaP2P(this.value)"></label>'
-    + (b.unaFino > adesso ? '<button type="button" class="btn mini" aria-label="Togli la pausa una volta sola" onclick="unaPausaP2P(\'\')">✕</button>' : '')
-    + '</div><div class="hint" style="margin:6px 0 0">Parte adesso e dura al massimo ' + P2P_PAUSA_GIORNI_MAX + ' giorni.</div></div>'
+    + '<div class="field"><label>Una volta sola</label>'
+    + '<div class="p2p-pausa-ore">'
+    + '<button type="button" class="sel-casa-riga' + (scelta ? '' : ' vuota') + '" id="p2pPausaUna" aria-expanded="'
+    + (ap === 'una' ? 'true' : 'false') + '" onclick="apriUnaPausaP2P()"><span>'
+    + (scelta ? 'Fino ' + esc(quandoPausaP2P(b.unaFino, adesso)) : 'No') + '</span><i aria-hidden="true">▾</i></button>'
+    + (scelta ? '<button type="button" class="btn mini" aria-label="Togli la pausa una volta sola" onclick="unaPausaP2P(\'\')">✕</button>' : '')
+    + '</div>'
+    + ((ap === 'una' && typeof selGiorniHtml === 'function') ? selettoreUnaPausaP2P(scelta ? b.unaFino : 0, adesso) : '')
+    + '<div class="hint" style="margin:6px 0 0">Da adesso, al massimo ' + P2P_PAUSA_GIORNI_MAX + ' giorni.</div></div>'
     + (p2pPausaErrore ? '<div class="p2p-box p2p-veto">🚫 ' + esc(p2pPausaErrore) + '</div>' : '')
     + '<button type="button" class="btn orange" id="p2pPausaSalva" onclick="salvaPausaP2P(this)">Salva</button>'
-    + '<div class="hint">La scadenza dei tuoi ordini non si ferma. La pausa vale dentro Barattolo: chi usa un\'altra app collegata allo stesso servizio di scambio li vede ancora.</div>'
-    + '<div class="hint" id="p2pPausaBarattozon">' + esc(P2P_PAUSA_BARATTOZON) + '</div>';
+    + '<button type="button" class="p2p-pausa-come" aria-expanded="' + (p2pPausaInfo ? 'true' : 'false')
+    + '" aria-controls="p2pPausaCome" onclick="comePausaP2P()">ℹ️ Come funziona<i aria-hidden="true">'
+    + (p2pPausaInfo ? '▴' : '▾') + '</i></button>'
+    + (p2pPausaInfo
+       ? '<ul class="p2p-pausa-come-testo" id="p2pPausaCome">' + P2P_PAUSA_COME.map(x => '<li>' + esc(x) + '</li>').join('')
+         + '<li id="p2pPausaBarattozon">' + esc(P2P_PAUSA_BARATTOZON) + '</li></ul>'
+       : '');
 }
+/* «ℹ️ Come funziona»: si apre e si richiude */
+function comePausaP2P(){
+  haptic();
+  p2pPausaInfo = !p2pPausaInfo;
+  renderPausaP2P();
+}
+/* la riga dell'ora di una fascia: apre il suo selettore, o lo richiude */
+function apriOraPausaP2P(i, quale){
+  haptic();
+  const f = p2pPausaBozza && p2pPausaBozza.fasce[i];
+  if (!f || (quale !== 'da' && quale !== 'a')) return;
+  const ap = p2pPausaAperto;
+  p2pPausaAperto = (ap && ap !== 'una' && ap.i === i && ap.quale === quale) ? null : {i: i, quale: quale};
+  renderPausaP2P();
+}
+/* un tocco sulle ore o sui quarti del selettore aperto: l'altra meta' resta */
+function oraFasciaPausaP2P(h){
+  const ap = p2pPausaAperto, f = ap && ap !== 'una' && p2pPausaBozza && p2pPausaBozza.fasce[ap.i];
+  if (!f) return;
+  haptic();
+  oraPausaP2P(ap.i, ap.quale, oraDaMinutiP2P(h * 60 + (Number(f[ap.quale]) || 0) % 60));
+}
+function minutoFasciaPausaP2P(m){
+  const ap = p2pPausaAperto, f = ap && ap !== 'una' && p2pPausaBozza && p2pPausaBozza.fasce[ap.i];
+  if (!f) return;
+  haptic();
+  oraPausaP2P(ap.i, ap.quale, oraDaMinutiP2P(Math.floor((Number(f[ap.quale]) || 0) / 60) * 60 + m));
+}
+/* la riga della pausa una volta sola: apre il selettore, o lo richiude */
+function apriUnaPausaP2P(){
+  haptic();
+  p2pPausaAperto = p2pPausaAperto === 'una' ? null : 'una';
+  renderPausaP2P();
+}
+/* un tocco sul selettore della pausa una volta sola: il giudice di casa
+   tiene quel che c'era e porta dentro i limiti quel che ne esce */
+function toccoUnaPausaP2P(tocco){
+  if (typeof selScegli !== 'function') return;
+  haptic();
+  if (!p2pPausaBozza) p2pPausaBozza = {fasce: [], unaFino: 0};
+  const adesso = Math.floor(Date.now() / 1000), L = limitiUnaPausaP2P(adesso);
+  const prima = p2pPausaBozza.unaFino > adesso ? p2pPausaBozza.unaFino : 0;
+  p2pPausaBozza.unaFino = selScegli(prima, tocco, L.min, L.max, adesso);
+  p2pPausaErrore = '';
+  renderPausaP2P();
+}
+function giornoUnaPausaP2P(g){ toccoUnaPausaP2P({giorno: g}); }
+function oraUnaPausaP2P(h){ toccoUnaPausaP2P({ora: h}); }
+function minutoUnaPausaP2P(m){ toccoUnaPausaP2P({minuto: m}); }
 function aggiungiFasciaPausaP2P(){
   haptic();
   const b = p2pPausaBozza || (p2pPausaBozza = {fasce: [], unaFino: 0});
@@ -63682,6 +64148,8 @@ function togliFasciaPausaP2P(i){
   if (!p2pPausaBozza) return;
   p2pPausaBozza.fasce.splice(i, 1);
   p2pPausaErrore = '';
+  /* gli indici sono scalati: il selettore aperto su una fascia si chiude */
+  if (p2pPausaAperto && p2pPausaAperto !== 'una') p2pPausaAperto = null;
   renderPausaP2P();
 }
 function giornoPausaP2P(i, g){
@@ -68454,7 +68922,8 @@ const P2P_FORME_RECAPITO = [
   /* IL CONTANTI DI PERSONA E' UN APPUNTAMENTO (1 ott 2026, richiesta di
      Andrea): il luogo come INDIRIZZO VALIDO — i suggerimenti mentre si
      scrive, o «📍 Usa la mia posizione», col punto nel campo nascosto —
-     e «🕒 Quando», col selettore del telefono. Il testo che viaggia lo
+     e «🕒 Quando», col selettore di casa (dal 12 ott 2026: prima quello
+     del telefono). Il testo che viaggia lo
      compone `testoAppuntamentoP2P`, gemella di chi legge; il ricordo
      tiene il luogo e il punto, MAI l'ora: al prossimo scambio sarebbe
      gia' passata. */
@@ -68510,10 +68979,18 @@ function campoRecapitoP2P(c){
   const id = 'p2pCampoEuro_' + c.k;
   if (c.tipo === 'hidden') return '<input type="hidden" id="' + id + '">';
   if (c.tipo === 'datetime-local') {
-    const adesso = Math.floor(Date.now() / 1000);
-    return '<div class="field"><label for="' + id + '">' + esc(c.et) + '</label>'
-      + '<input type="datetime-local" id="' + id + '" min="' + valoreQuandoP2P(adesso)
-      + '" max="' + valoreQuandoP2P(adesso + P2P_APPUNTAMENTO_FUTURO_S) + '"></div>';
+    /* IL SELETTORE DI CASA (12 ott 2026, pausa-leggera) al posto di quello
+       di sistema: i giorni a bottoni (e' una settimana), le ore e i
+       quarti. I limiti sono quelli di `giudiceQuandoP2P` — da adesso, entro
+       `P2P_APPUNTAMENTO_FUTURO_S` — chiesti a ogni disegno. Il deposito e'
+       un nascosto con lo STESSO id e lo stesso formato: chi lo scrive e
+       chi lo legge col `.value` non cambia. Il nome del tipo resta: dice
+       COSA e' il campo, non con che cosa si disegna. `tieni`: il foglio
+       si ridisegna quando arriva una busta, e il selettore aperto resta
+       aperto sotto il dito (lo riempie `selettoreCasaAllineaTutti`). */
+    return '<div class="field"><label for="' + id + '_btn">' + esc(c.et) + '</label>'
+      + selettoreCasaCampo(id, {valore: '', tieni: true, min: a => a,
+          max: a => a + P2P_APPUNTAMENTO_FUTURO_S}) + '</div>';
   }
   return '<div class="field"><label for="' + id + '">' + esc(c.et) + '</label>'
     + '<input type="text" id="' + id + '" maxlength="' + (c.max || CAMPO_MAX_TESTO) + '" '
@@ -69035,6 +69512,9 @@ function renderCampiP2P(){
     inp.value = scritti[id] !== undefined ? scritti[id]
               : (salvato && salvato.campi && salvato.campi[c.k]) || '';
   });
+  /* ...e la riga del «🕒 Quando» dice il valore appena rimesso nel suo
+     deposito (12 ott 2026): un `.value` scritto da qui non avvisa nessuno */
+  if (typeof selettoreCasaAllineaTutti === 'function') selettoreCasaAllineaTutti();
   /* la riga del punto sotto il luogo, coi valori appena rimessi */
   if (fr && fr.appuntamento && typeof aggiornaPuntoLuogoP2P === 'function') aggiornaPuntoLuogoP2P();
 }
@@ -69077,7 +69557,8 @@ async function inviaCampoP2P(tipo, btn){
        campo l'ha gia' detto, gentile, che il navigatore non ci sara' */
     if (appuntamento) {
       const no = giudiceQuandoP2P(quandoDaCampoP2P(campi.quando), Math.floor(Date.now() / 1000));
-      if (no) { toast(no); el('p2pCampoEuro_quando')?.focus(); return; }
+      /* il fuoco va sulla riga del selettore: il deposito e' nascosto (12 ott 2026) */
+      if (no) { toast(no); (el('p2pCampoEuro_quando_btn') || el('p2pCampoEuro_quando'))?.focus(); return; }
     }
     /* controllo LEGGERO, sulla sagoma e non sul contenuto: due lettere
        di paese, due cifre, e una lunghezza da IBAN */
@@ -73544,6 +74025,9 @@ async function apriPausaP2P(){
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
   p2pPausaErrore = '';
   p2pPausaBozza = bozzaPausaP2P(p2pMiaPausa);
+  /* il foglio si apre CORTO: nessun selettore aperto, «Come funziona» chiuso */
+  p2pPausaAperto = null;
+  p2pPausaInfo = false;
   renderPausaP2P();
   el('p2pProfiloSheet').classList.remove('open');
   el('sheetBg').classList.add('open');

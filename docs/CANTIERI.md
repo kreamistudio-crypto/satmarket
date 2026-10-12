@@ -53503,3 +53503,140 @@ passate e 0 fallite —, `collaudo_chat_scambio` nella gabbia (verde),
 segreti con la controprova. La suite INTERA su questo albero la dice
 la CI. L'«ok al push» di Andrea è arrivato con la richiesta sui
 recapiti.
+
+## La pausa leggera e il selettore di casa: il foglio corto, giorno e ora a tocchi, e via i selettori di sistema dalle ferie, dai servizi e dall'incontro in contanti (12 ott 2026, notte, cantiere pausa-leggera, richiesta di Andrea dal telefono)
+
+**IL PROBLEMA.** Il foglio «⏸ Pausa degli ordini» (pausa-in-vista,
+`236d5b8`) funzionava, ma aveva troppo testo, e toccando «Una volta
+sola, fino a» si apriva il selettore di data e ora di Android — grigio,
+«Imposta data e ora» —, che non è in stile Barattolo. Le ore delle fasce
+erano due campi `time`, stessa storia; su iPhone le rotelle, sul sito un
+terzo vestito.
+
+**LE QUATTRO RISPOSTE DI ANDREA AL PIANO.** 1) I minuti a quarti d'ora
+(00 · 15 · 30 · 45). 2) Sotto ogni fascia resta una frase corta, «Ogni
+giorno 22–6», «Lun–ven 8–20», più «fino al giorno dopo» quando serve.
+3) I selettori si aprono DENTRO il foglio della pausa. 4) Nello stesso
+cantiere lo stesso selettore va negli altri tre campi che avevano
+ancora quello di sistema — le ferie del negozio, la data dei servizi, il
+«🕒 Quando» del P2P — ognuno coi suoi limiti.
+
+**COSA SI È FATTO.**
+1) IL FOGLIO CORTO. In cima una riga: «In pausa i tuoi ordini escono dal
+libro, poi tornano da soli.» Sotto la pausa una volta sola: «Da adesso,
+al massimo 7 giorni.» Il resto sta in «ℹ️ Come funziona», chiuso di
+serie, tre righe: «La scadenza dei tuoi ordini non si ferma.» · «Vale
+dentro Barattolo: da un'altra app collegata i tuoi ordini si vedono
+ancora.» · «Gli ordini Barattozon restano visibili: hanno già la
+scadenza del PayCode.» A pausa vuota tutto il foglio si legge in una
+riga, due etichette e due bottoni (una prova lo tiene, parola per
+parola, e un tetto di 90 caratteri sui quattro testi).
+2) IL SELETTORE DI CASA, un pezzo solo fuori dal motore dello scambio,
+con la veste che la scadenza del PayCode ha dal 9 ott (le `.chip`, la
+griglia, le celle). Su due piani: i GIUDICI e i DISEGNI puri (numeri
+dentro, numeri o HTML fuori; l'adesso lo dà chi chiama), e IL CAMPO per
+chi aveva un `<input>` — un nascosto con lo STESSO id e lo STESSO
+formato di prima, più la riga che dice la scelta e il pannello che si
+apre sotto. È questo che ha tenuto il cantiere piccolo: `setFerie`,
+`proponiAppuntamento`, `inviaCampoP2P` e il «quel che si stava
+scrivendo sopravvive al ridisegno» del foglio dei recapiti leggono e
+scrivono il `.value` come ieri, e non sono cambiati di una riga.
+3) NEL FOGLIO DELLA PAUSA i selettori si aprono sotto la riga toccata,
+uno alla volta: «Dalle 22:00 ▾» e «Alle 06:00 ▾» aprono ore e quarti
+dentro la scatola della fascia (si tocca l'ora e i minuti restano, e
+viceversa); «Una volta sola» — che dice «No ▾» — apre otto giorni a
+bottoni («Oggi», «Domani», «mer 14»…), le ore e i quarti, e poi dice
+«Fino a domani alle 08:00 ▾». Le ore passate sono spente; un tocco che
+cadrebbe fuori (oggi alle 6, quando sono le 10) va al quarto buono più
+vicino dello stesso giorno. I limiti sono quelli che `corpoPausaP2P`
+già rifiutava al «Salva» — nel passato, oltre i 7 giorni —, e adesso
+non si possono nemmeno comporre.
+4) I TRE CAMPI. Le ferie: solo il giorno, da domani al tetto (novanta
+giorni: il MESE, con le frecce; il tocco sul giorno chiude). Il
+servizio: giorno e ora, da adesso a un anno (il tetto vero è una leva
+del server, che la pagina non conosce: oltre, lo dice lui). Il «🕒
+Quando» dell'incontro: da adesso a una settimana, i limiti del suo
+giudice — e una prova gira OGNI giorno, ora e quarto che il selettore
+lascia scegliere e controlla che il giudice non ne rifiuti nessuno.
+In «Info P2P» la frase «il giorno e l'ora col selettore del telefono»
+è diventata «con pochi tocchi».
+
+**LE STRADE SCARTATE.**
+- UN TERZO FOGLIO sopra quello della pausa, come `#p2pScadeSheet` sopra
+«Pubblica»: tre fogli impilati, e «Salva» deve tornare al foglio
+dell'ordine con metodo e importo ancora lì — col selettore dentro il
+foglio la pila non si tocca, e la regola di ieri (salvare chiude SOLO
+il suo foglio) resta com'è.
+- RIUSARE `#p2pScadeSheet` così com'è: è cucito sul PayCode (il suo
+stato, i suoi limiti, i suoi minuti). Se n'è presa la veste, non il
+foglio; lui non è cambiato.
+- UN `<select>` per ore e minuti: è ancora un controllo di sistema
+(rotella su iPhone, lista grigia su Android).
+- IL MESE PER TUTTI: per una settimana otto bottoni sono un tocco solo.
+Il mese entra da solo oltre gli otto giorni (`SEL_BOTTONI_MAX`).
+- L'ID DEL CAMPO DENTRO L'`onclick`: i disegni chiamano per nome col
+valore e col nodo, e il campo si ritrova risalendo al suo pannello.
+- CAMBIARE IL NOME DEL TIPO `datetime-local` nelle forme del recapito:
+dice cosa È il campo, e sei prove lo leggono così.
+
+**LE LEZIONI.**
+- I GIORNI SI FANNO COL CALENDARIO. Il 25 ottobre dura 25 ore e il 29
+marzo 23: «domani» è anno, mese, giorno + 1 passati a `Date`, mai
+`+ 86400`. Il banco si mette da solo nel fuso di Roma
+(`process.env.TZ`), perché in CI il fuso è UTC e l'ora legale lì non
+esiste: una prova dell'ora legale che gira dove non c'è passa sempre.
+- UN RIDISEGNO CHIUDE QUEL CHE ERA APERTO. Il foglio dei recapiti si
+rifà quando arriva una busta: i valori li rimetteva già, ma il
+selettore aperto si sarebbe chiuso sotto il dito. `tieni` lo fa
+rinascere aperto, e `selettoreCasaAllineaTutti` lo riempie dopo che i
+valori sono tornati. Visto ragionando sui chiamanti, e poi dal vivo.
+- IL GIRO DAL VIVO HA TROVATO DUE COSE CHE LE PROVE NON VEDONO: la riga
+in cima al foglio senza respiro sopra l'etichetta, e i bottoni dei
+giorni alti 34 px contro i 40 delle ore (adesso 40: si toccano col
+pollice). E due del banco: un ordine da evadere BLOCCA le ferie (è
+giusto: l'ordine di servizio si semina dopo), e la prima volta la
+pagina di un ordine pagato apre l'avviso sul trasporto, che copre la
+riga da toccare.
+- LA DATA NEI COMMENTI: avevo scritto «13 ott» a cantiere cominciato la
+sera del 12. Corretta prima del commit guardando `date`, non a memoria.
+
+**COSA È STATO PROVATO.** La sezione nuova `prove_selettore_di_casa`
+(59 prove: le sentinelle — nessun `type` di sistema nella pagina fuori
+dai commenti —, i giudici e i disegni in node nel fuso di Roma, il campo
+su una pagina di cartone, il foglio della pausa col selettore vero), le
+due sezioni di ieri emendate dove pinzavano il foglio lungo
+(`prove_tempo_pubblica_app`, `prove_pausa_in_vista`: la regola è
+cambiata per richiesta). IL GIRO DAL VIVO a 390×844 sul server di
+cartone (copia nello scratchpad, relay morto, LNbits su una porta
+chiusa), due volte: in Chrome e nel motore di Safari (WebKit), stessi
+esiti. Il foglio corto, «Come funziona», una fascia aggiunta con le
+23:30 scelte dal selettore, il calendario aperto, «Fino a domani alle
+08:00», e «Salva» che torna a «Pubblica» con SEPA e 120 € ancora lì (la
+pausa è arrivata al server: `una_fino` = domani alle 8). Le ferie: il 5
+novembre scelto dal mese, il negozio chiuso «fino al 5 novembre»
+(mezzogiorno di quel giorno sul server), poi riaperto. Il servizio:
+giovedì 15 alle 15:30, e l'ordine riletto dice «Hai proposto giovedì 15
+ottobre alle ore 15:30». L'incontro in contanti: «Domani», 18, :30; il
+foglio ridisegnato col selettore ancora aperto; il recapito che parte
+dice «Quando: 13/10/2026 alle 18:30». Nessun campo di sistema in nessun
+riquadro, nessuno scorrimento di lato; le celle delle ore 55×40, i
+quarti 85×40, i giorni 61×40, i giorni del mese 38×40.
+LA TORTURA, su una copia del repo: 41 mutazioni — un quarto passato o
+oltre il tetto che passa, il giorno dopo fatto sommando 86400, il
+deposito che prende il 30 febbraio, un campo di sistema che rientra,
+`tieni` che non tiene, il mese al posto dei bottoni e viceversa, i
+limiti dei tre campi allargati, il foglio che torna lungo — tutte
+prese. Alla prima passata una restava VIVA: tolta la riga che chiude il
+selettore quando si toglie una fascia, la prova passava lo stesso,
+perché toglieva la fascia 0 col selettore aperto sulla 1 — che dopo il
+taglio non esiste più, e il selettore spariva comunque. Il caso vero è
+il selettore aperto sulla fascia TOLTA, che senza quella riga resta
+aperto sulla fascia che ne ha preso il posto: la prova adesso fa
+quello, e la mutazione è presa.
+
+**COSA RESTA DA GUARDARE.** Sul telefono vero, che il banco non è:
+dentro Telegram su Android e su iPhone, e dal sito — il foglio della
+pausa (una fascia, «Una volta sola»), le ferie nel Profilo, la data di
+un servizio venduto, il «🕒 Quando» di uno scambio in contanti. Gli
+scatti del motore di Safari hanno i caratteri più sottili: è il WebKit
+per Windows del banco, non l'iPhone.

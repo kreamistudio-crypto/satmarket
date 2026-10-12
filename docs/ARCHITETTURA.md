@@ -30578,7 +30578,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   posizione — resta), la riga sotto (`rigaPuntoLuogoP2P`: riconosciuto;
   coi suggerimenti davanti l'invito a sceglierne uno; senza, l'avviso
   gentile dell'indirizzo a mano, che resta possibile), «🕒 Quando» col
-  selettore `datetime-local` (`quandoDaCampoP2P` ↔ `valoreQuandoP2P`,
+  selettore di casa (dal 12 ott 2026, `selettoreCasaCampo`: prima era un
+  `datetime-local`; il deposito tiene il formato, `quandoDaCampoP2P` ↔ `valoreQuandoP2P`,
   giudicato da `giudiceQuandoP2P`: scelto, non passato da più di dieci
   minuti, entro `P2P_APPUNTAMENTO_FUTURO_S`). Il ricordo per forma tiene
   luogo e punto, mai l'ora (`nonRicordato`); un appuntamento si cambia
@@ -30894,6 +30895,71 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   volti e per «posso prendere?»; la pagina non ne ha una sua, la dice e
   basta (`P2P_PAUSA_BARATTOZON`). `_presa_in_pausa_p2p` NON è cambiata:
   la tutela della presa arrivata in pausa resta di ogni ordine.
+  • IL SELETTORE DI CASA E IL FOGLIO LEGGERO DELLA PAUSA (12 ott 2026,
+  notte, cantiere `pausa-leggera`, richiesta di Andrea dal telefono: il
+  foglio aveva troppo testo, e «Una volta sola» apriva il selettore
+  grigio di Android). NELLA PAGINA NON C'È PIÙ NESSUN SELETTORE DI
+  SISTEMA (`date`, `time`, `datetime-local`): giorno, ora e minuti si
+  scelgono a tocchi con la veste della scadenza del PayCode (`.chip`,
+  `.p2p-scade-griglia`, `.p2p-scade-cella`), uguale su Android, iPhone,
+  Telegram e sito. IL PEZZO È UNO, fra «IL SELETTORE DI CASA» e «fine
+  del selettore di casa», FUORI dal motore dello scambio (lo usano anche
+  le ferie e i servizi), su DUE PIANI. 1) I GIUDICI E I DISEGNI, PURI
+  (l'adesso arriva da chi chiama): `selGiorno`, `selGiornoPiu`,
+  `selIstante`, `selMese`, `selGiorni` — i giorni si fanno col
+  calendario, MAI sommando 86400 (il 25 ottobre dura 25 ore) —,
+  `selMinutoAmmesso`/`selOraAmmessa`/`selGiornoAmmesso` (i limiti sono
+  ISTANTI: un'ora vale se ha almeno un quarto buono, un giorno se ha
+  almeno un'ora buona; per la sola data conta il giorno),
+  `selScegli(prima, tocco, min, max, adesso)` (il tocco cambia una cosa
+  e il resto si tiene; senza una scelta si propone il giorno toccato al
+  quarto dopo adesso; quel che cadrebbe fuori si porta al quarto buono
+  più vicino DELLO STESSO GIORNO, e se quel giorno non ne ha resta quel
+  che c'era), `selLeggi`/`selScrivi` (il valore del deposito, andata e
+  ritorno: «2026-10-18» o «2026-10-18T15:30», ora locale; un 30 febbraio
+  vale zero), `selParole`; `selGiorniHtml` (i giorni a bottoni: «Oggi»,
+  «Domani», «mer 14»), `selMeseHtml` (il mese dal lunedì, con le
+  frecce), `selOreHtml` (24 celle), `selMinutiHtml` (I MINUTI SONO
+  QUARTI D'ORA, `SEL_QUARTI`, decisione di Andrea). I disegni prendono
+  il NOME della funzione da chiamare e la chiamano col valore e col
+  NODO: nessun id dentro un `onclick`. 2) IL CAMPO,
+  `selettoreCasaCampo(id, {valore, soloData, min, max, vuoto, tieni})`:
+  un `<input type="hidden">` con lo STESSO id e lo STESSO formato del
+  campo di prima (è il deposito: chi lo leggeva col `.value` non cambia
+  di una riga), la riga-bottone `<id>_btn` che dice la scelta, il
+  pannello `<id>_pan` che si apre SOTTO, dentro la pagina. `min`/`max`
+  possono essere funzioni dell'adesso, richieste a ogni disegno. Fino a
+  `SEL_BOTTONI_MAX` (8) giorni di intervallo i giorni sono bottoni,
+  oltre c'è il mese. `selettoreCasaAllineaTutti()` rilegge i depositi
+  (dopo un `.value` scritto da fuori) e toglie dal registro `SEL_CAMPI`
+  i campi spariti; `tieni` fa rinascere APERTO un campo ridisegnato
+  mentre era aperto. I TRE CAMPI: `ferieData` (solo il giorno, da domani
+  a `ferie_leve.max_giorni`: novanta giorni, il mese; il tocco chiude),
+  `servQuando` (giorno e ora, da adesso a un anno: oltre il suo tetto lo
+  dice il server), `p2pCampoEuro_quando` (da adesso a
+  `P2P_APPUNTAMENTO_FUTURO_S`, i limiti di `giudiceQuandoP2P`; `tieni`,
+  perché `renderCampiP2P` si rifà quando arriva una busta, e dopo aver
+  rimesso i valori chiama `selettoreCasaAllineaTutti`). Il `tipo:
+  'datetime-local'` nelle forme del recapito RESTA: dice cosa è il
+  campo, non con che cosa si disegna. IL FOGLIO DELLA PAUSA
+  (`renderPausaP2P`, nel motore: i `sel…` li chiama dietro `typeof`) è
+  CORTO: `P2P_PAUSA_RIGA` in cima, e in fondo «ℹ️ Come funziona»
+  (`p2pPausaInfo`, chiuso di serie; aperto: le due righe di
+  `P2P_PAUSA_COME` e `P2P_PAUSA_BARATTOZON` nel `<li
+  id="p2pPausaBarattozon">`). I selettori si aprono DENTRO il foglio,
+  uno alla volta (`p2pPausaAperto`: `'una'` o `{i, quale}`): sotto la
+  riga «Dalle»/«Alle» della fascia le ore e i quarti
+  (`selettoreFasciaPausaP2P`, senza limiti: `oraFasciaPausaP2P` e
+  `minutoFasciaPausaP2P` toccano una metà e l'altra resta), sotto «Una
+  volta sola» i giorni, le ore e i quarti (`selettoreUnaPausaP2P`,
+  `toccoUnaPausaP2P`: `limitiUnaPausaP2P` = da fra un minuto a
+  `P2P_PAUSA_GIORNI_MAX` giorni, gli stessi «no» di `corpoPausaP2P`,
+  che così non scattano più). Nessun terzo foglio: «Salva» chiude il
+  SUO foglio e si torna a quello dell'ordine com'era. Sotto ogni fascia
+  `fasciaFoglioP2P` («Ogni giorno 22–6 · fino al giorno dopo»,
+  «Lun–ven 8–20»; ha preso il posto di `fraseFasciaP2P`). IL SELETTORE
+  DELLA SCADENZA DEL PAYCODE (`#p2pScadeSheet`) NON È CAMBIATO: resta il
+  suo foglio, coi suoi minuti.
   • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
   `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
   senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo

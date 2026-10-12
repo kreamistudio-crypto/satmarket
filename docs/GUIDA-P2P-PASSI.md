@@ -857,8 +857,12 @@ contanti» (contanti di persona), «✅ Ho pagato al tabacchino»
 1. 🧑 Chi vende, a garanzia bloccata, vede «📍 **Indica dove e quando
    vedervi**» (al posto di «Indica dove ricevere gli euro»).
 2. 📱 Foglio «🤝 I vostri recapiti» coi campi «📍 Dove proponi di vedervi»
-   (esempio «Bar Sport, piazza Garibaldi…») e «🕒 Quando» (giorno e ora
-   col selettore del telefono, entro una settimana). Mentre scrive
+   (esempio «Bar Sport, piazza Garibaldi…») e «🕒 Quando»: la riga
+   «**Scegli giorno e ora ▾**», che toccata apre sotto il **Giorno**
+   (otto bottoni: «Oggi», «Domani», «mer 14»…), l'**Ora** e i
+   **Minuti** a quarti d'ora — niente selettore del telefono, dal 12 ott
+   2026 — e poi dice la scelta («mar 13 ott, 18:30»). Entro una
+   settimana. Mentre scrive
    arrivano indirizzi veri («Indirizzi da © OpenStreetMap»), e c'è «📍 Usa
    la mia posizione». Sotto il luogo, una di queste:
    - «🧭 Indirizzo riconosciuto: chi compra avrà «Apri nel navigatore».»
@@ -1371,20 +1375,29 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
 - 📱 **Gli ordini Barattozon in pausa non ci vanno**: restano nel libro e
   si prendono anche mentre gli altri ordini della stessa persona sono
   nascosti, e sulla loro card il segno «⏸ In pausa…» non compare.
-- 📱 Il foglio «⏸ Pausa degli ordini»: «In pausa i tuoi ordini non si
-  vedono nel libro e da Barattolo nessuno li prende. Alla fine tornano
-  da soli.» Poi **Ogni settimana**: «**＋ Aggiungi una fascia**» mette
-  una scatola coi sette giorni in tondi (L M M G V S D, verdi quelli
-  scelti: si toccano per accenderli e spegnerli), **Dalle** e **Alle**
-  (la prima proposta è 22:00–06:00, tutti i giorni) e la ✕ per
-  toglierla; sotto ogni scatola la fascia in parole («tutti i giorni
-  22:00–06:00 (fino al giorno dopo)», «lun-ven 08:00–20:00»). Fino a
-  sei fasce. Poi **Una volta sola, fino a**: giorno e ora col selettore
-  del telefono, «Parte adesso e dura al massimo 7 giorni.» E «**Salva**».
-  In fondo: «La scadenza dei tuoi ordini non si ferma. La pausa vale
-  dentro Barattolo: chi usa un'altra app collegata allo stesso servizio
-  di scambio li vede ancora.» e, sotto, «Gli ordini Barattozon restano
-  visibili: hanno già la scadenza del PayCode.»
+- 📱 Il foglio «⏸ Pausa degli ordini» (CORTO, dal 12 ott 2026 notte:
+  niente selettori del telefono, è uguale su Android, iPhone, Telegram
+  e sito). In cima una riga sola: «In pausa i tuoi ordini escono dal
+  libro, poi tornano da soli.» Poi **Ogni settimana**: «**＋ Aggiungi
+  una fascia**» mette una scatola coi sette giorni in tondi (L M M G V
+  S D, verdi quelli scelti: si toccano per accenderli e spegnerli), le
+  due righe «**Dalle 22:00 ▾**» e «**Alle 06:00 ▾**» (la prima proposta
+  è la notte, tutti i giorni) e la ✕ per toglierla. Toccando «Dalle» o
+  «Alle» si apre, DENTRO la scatola, il selettore: **Ora** (le 24 ore in
+  griglia) e **Minuti** (**:00 :15 :30 :45**); un secondo tocco sulla
+  riga lo richiude. Sotto ogni scatola la fascia in poche parole («Ogni
+  giorno 22–6 · fino al giorno dopo», «Lun–ven 8–20»). Fino a sei
+  fasce. Poi **Una volta sola**: la riga dice «**No ▾**»; toccandola si
+  apre sotto il selettore — **Giorno** (otto bottoni: «Oggi», «Domani»,
+  «mer 14»…), **Ora** (quelle già passate sono spente), **Minuti** — e
+  la riga diventa «**Fino a domani alle 08:00 ▾**», con la ✕ per
+  toglierla; sotto, «Da adesso, al massimo 7 giorni.» E «**Salva**»,
+  che riporta dov'eri (nel foglio dell'ordine, metodo e importo sono
+  ancora lì). In fondo «**ℹ️ Come funziona ▾**», chiuso; aperto dice tre
+  righe: «La scadenza dei tuoi ordini non si ferma.» · «Vale dentro
+  Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.»
+  · «Gli ordini Barattozon restano visibili: hanno già la scadenza del
+  PayCode.»
 - 📱 I toast: «Pausa salvata: i tuoi ordini sono nascosti ⏸» (se la
   pausa è già attiva), «Pausa salvata ⏸» (se comincia più tardi), «Pausa
   tolta: i tuoi ordini sono visibili».
