@@ -35,7 +35,10 @@ import http.server
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from urllib.parse import urlsplit
@@ -262,6 +265,88 @@ def monta(base, canale_id, argomenti, detto, timbri, fatti):
     return S
 
 
+# ---------------- deploy.sh, la funzione vera in bash ----------------
+# (12 ott 2026, cantiere deploy-nel-gruppo) `prove.py` fa girare il
+# Python di `avvisa()` ritagliato dallo script. Qui gira LA FUNZIONE,
+# in bash, con le due chiamate vere copiate da deploy.sh: e' lo strato
+# che le prove non vedono — il testo su piu' righe fra virgolette, la
+# stanza dopo le virgolette, `${2:-errori}`, l'heredoc. Di finto c'e'
+# `python3`: una funzione di bash che chiama il Python vero con un
+# involucro davanti, e l'involucro mette il cartello stradale a
+# `urlopen` (ogni richiesta al cartone, stesso percorso e stesso corpo)
+# e poi esegue il programma che bash gli passa sullo standard input,
+# cioe' l'heredoc vero. Il config e' un file di cartone accanto.
+INVOLUCRO = '''# -*- coding: utf-8 -*-
+import os, sys, urllib.request
+from urllib.parse import urlsplit
+_vero = urllib.request.urlopen
+
+
+def _deviato(req, timeout=None):
+    return _vero(urllib.request.Request(
+        os.environ["CARTONE"] + urlsplit(req.full_url).path, data=req.data,
+        headers=dict(req.header_items())), timeout=timeout)
+
+
+urllib.request.urlopen = _deviato
+sys.argv = sys.argv[1:]
+exec(compile(sys.stdin.read(), "deploy.sh:avvisa", "exec"),
+     {"__name__": "__main__"})
+'''
+
+
+def _bash():
+    """Il bash che esegue deploy.sh. Su Windows `bash` puo' essere il
+    lanciatore di WSL (System32): li' si prende quello di Git."""
+    b = shutil.which("bash")
+    if b and os.name == "nt" and "system32" in b.lower():
+        git = shutil.which("git")
+        vicino = os.path.join(os.path.dirname(os.path.dirname(git or "")),
+                              "bin", "bash.exe")
+        b = vicino if os.path.exists(vicino) else b
+    return b
+
+
+def deploy_avvisa(base, leve):
+    """Le due chiamate vere di deploy.sh — l'aggiornamento riuscito e un
+    guasto — con `leve` scritte nel config di cartone. Torna quel che
+    bash ha stampato."""
+    sh = open(os.path.join(QUI, "deploy.sh"), encoding="utf-8").read() \
+        .replace("\r\n", "\n")
+    i = sh.index("\navvisa() {\n") + 1
+    funzione = sh[i:sh.index("\nPY\n}\n", i) + len("\nPY\n}\n")]
+    riuscito = re.search(r'^  avvisa "🚀 .*\n\$NOVITA".*\n', sh, re.M).group(0)
+    guasto = re.search(r"^  avvisa \"❌ <b>Deploy</b>: il riavvio .*\n", sh,
+                       re.M).group(0)
+    with tempfile.TemporaryDirectory(prefix="barattolo-deploy-avvisa-") as d:
+        open(os.path.join(d, "involucro.py"), "w", encoding="utf-8",
+             newline="\n").write(INVOLUCRO)
+        open(os.path.join(d, "config.py"), "w", encoding="utf-8",
+             newline="\n").write(
+            f"BOT_TOKEN = {TOKEN!r}\nADMIN_IDS = [{ANDREA}, {ALAN}]\n"
+            + "".join(f"{k} = {v!r}\n" for k, v in leve.items()))
+        open(os.path.join(d, "giro.sh"), "w", encoding="utf-8",
+             newline="\n").write(
+            'set -uo pipefail\n'
+            'python3() { "$PY_VERO" "$INVOLUCRO" "$@"; }\n'
+            + funzione +
+            "LA=abcdef1234567\nQUI=1234567abcdef\nRAMO=pronto\n"
+            "NOVITA=\"• Una novita'\n• <b>Due</b> novita'\"\n"
+            + riuscito + guasto)
+        r = subprocess.run(
+            [_bash(), "giro.sh"], cwd=d, capture_output=True,
+            encoding="utf-8", errors="replace", timeout=120,
+            stdin=subprocess.DEVNULL,
+            env=dict(os.environ, PYTHONUTF8="1", PYTHONDONTWRITEBYTECODE="1",
+                     CARTONE=base, PY_VERO=sys.executable.replace("\\", "/"),
+                     INVOLUCRO=os.path.join(d, "involucro.py").replace("\\", "/")))
+    return r.stdout + r.stderr
+
+
+AGGIORNATO = ("🚀 <b>Barattolo aggiornato</b> (<code>abcdef1</code>)\n"
+              "• Una novita'\n• <b>Due</b> novita'")
+RIAVVIO = "❌ <b>Deploy</b>: il riavvio del servizio non e' partito."
+
 AVVISI = [("dispute", "⚠️ <b>Disputa aperta</b> sull'ordine #5."),
           ("liquidita", "⚠️ <b>Liquidità del nodo: c'è un problema</b>"),
           ("errori", "⚠️ <b>Pagamento in uscita FALLITO.</b> Ordine #5"),
@@ -482,7 +567,48 @@ def main():
     prova("/dove da un estraneo, nel gruppo: silenzio", ([], []),
           scrive("/dove", chi=ESTRANEO))
 
-    # --- 9. il journal -------------------------------------------------
+    # --- 9. deploy.sh: la funzione vera, in bash ---------------------------
+    ACCESE = {"ADMIN_CANALE_ID": GRUPPO, "ADMIN_CANALE_ARGOMENTI": STANZE}
+    T.nuovo()
+    deploy_avvisa(base, {})
+    ieri = sorted(in_privato())
+    prova("deploy.sh senza la leva: «Barattolo aggiornato» e il guasto a "
+          "ogni moderatore, in privato, com'era",
+          (sorted([(ANDREA, AGGIORNATO), (ALAN, AGGIORNATO),
+                   (ANDREA, RIAVVIO), (ALAN, RIAVVIO)]), []),
+          (ieri, nel_gruppo()))
+    T.nuovo()
+    detto_bash = deploy_avvisa(base, ACCESE)
+    prova("deploy.sh con la leva: l'aggiornamento UNA volta nei riepiloghi, "
+          "il guasto UNA volta negli errori, con le stesse parole — e in "
+          "privato niente",
+          ([(STANZE["riepiloghi"], AGGIORNATO), (STANZE["errori"], RIAVVIO)],
+           [], ""), (nel_gruppo(), in_privato(), detto_bash.strip()))
+    T.nuovo()
+    T.gruppi[GRUPPO]["stanze"].discard(STANZE["errori"])
+    deploy_avvisa(base, ACCESE)
+    prova("...con la stanza degli errori cancellata su Telegram: il guasto "
+          "arriva nel Generale, e in privato niente",
+          ([(STANZE["riepiloghi"], AGGIORNATO), (None, RIAVVIO)], []),
+          (nel_gruppo(), in_privato()))
+    T.nuovo()
+    T.gruppi[GRUPPO]["bot"] = False
+    detto_bash = deploy_avvisa(base, ACCESE)
+    prova("...col bot tolto dal gruppo: i due avvisi tornano in privato a "
+          "ogni moderatore, identici a quelli senza la leva, e bash lo "
+          "scrive nel journal una volta per avviso, senza il token",
+          (ieri, 2, False),
+          (sorted(in_privato()),
+           detto_bash.count("il gruppo degli admin non ha risposto"),
+           TOKEN in detto_bash))
+    T.nuovo()
+    deploy_avvisa(base, {"ADMIN_CANALE_ID": ANDREA,
+                         "ADMIN_CANALE_ARGOMENTI": STANZE})
+    prova("...con un id che non e' un gruppo (una persona): la leva non "
+          "vale, e tutto va in privato a tutti e due", ieri,
+          sorted(in_privato()))
+
+    # --- 10. il journal ------------------------------------------------
     prova("nel journal mai il token del bot", False,
           any(TOKEN in r for r in detto))
     print("  --- le righe del journal, per chi legge ---")

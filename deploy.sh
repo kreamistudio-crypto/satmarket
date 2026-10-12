@@ -98,23 +98,81 @@ dillo() { echo "[$(date '+%F %T')] $*"; }
 # gli id li legge dal config, che su questa macchina c'e' e nella repo
 # non c'e' mai stato. Fail-open totale — un avviso che non parte non
 # deve poter far fallire un deploy riuscito, ne' salvarne uno rotto.
+#
+# NEL GRUPPO DEGLI ADMIN, SE C'E' (12 ott 2026, cantiere
+# deploy-nel-gruppo). Col gruppo acceso nel config (`ADMIN_CANALE_ID`,
+# vedi server.py, «IL GRUPPO DEGLI ADMIN») gli avvisi del server sono
+# usciti dalla chat privata, e quelli di questo script no: «🚀
+# Barattolo aggiornato» arrivava ancora in privato a ognuno. Adesso
+# l'avviso va nel gruppo, UNO: il secondo argomento dice in quale
+# stanza — `riepiloghi` per l'aggiornamento riuscito, `errori` (di
+# serie) per tutto il resto: rifiuto, attesa, rollback, guasti.
+# LE STESSE PAROLE, e nessun avviso in piu' o in meno. Una stanza
+# senza numero, o che non risponde, vale il Generale. SE IL GRUPPO NON
+# RISPONDE (bot tolto, numero sbagliato, Telegram che rifiuta) l'avviso
+# va in privato a ogni moderatore, com'era: e lo si legge in una riga
+# del journal, non in un messaggio in piu'. Senza la leva — o con una
+# leva storta — e' lo script di ieri.
+# LA LEVA SI LEGGE COME LA LEGGE IL SERVER (`_leggi_gruppo_admin`):
+# l'id di un gruppo con gli argomenti e' negativo e comincia per -100,
+# il numero di una stanza e' un intero sopra 1. Sono due copie della
+# stessa regola — qui non si puo' importare il server — e una prova le
+# tiene uguali, caso per caso.
 avvisa() {
-  python3 - "$1" <<'PY' 2>/dev/null || true
+  python3 - "$1" "${2:-errori}" <<'PY' 2>/dev/null || true
 import sys, json, urllib.request
 try:
     from config import BOT_TOKEN, ADMIN_IDS
 except Exception:
     sys.exit(0)
-for chat in ADMIN_IDS:
+
+
+def manda(chat, stanza=0):
+    """Un messaggio a una chat: True solo se Telegram dice «ok»."""
+    dati = {"chat_id": chat, "text": sys.argv[1], "parse_mode": "HTML",
+            "disable_web_page_preview": True}
+    if stanza:
+        dati["message_thread_id"] = stanza
     try:
-        urllib.request.urlopen(urllib.request.Request(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            data=json.dumps({"chat_id": chat, "text": sys.argv[1],
-                             "parse_mode": "HTML",
-                             "disable_web_page_preview": True}).encode(),
-            headers={"Content-Type": "application/json"}), timeout=10)
+        with urllib.request.urlopen(urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                data=json.dumps(dati).encode(),
+                headers={"Content-Type": "application/json"}),
+                timeout=10) as risposta:
+            return json.load(risposta).get("ok") is True
     except Exception:
-        pass
+        return False
+
+
+def gruppo_e_stanza(argomento):
+    """(id del gruppo, numero della stanza): 0 e 0 a leva spenta o
+    storta, 0 la stanza che manca (il Generale)."""
+    try:
+        import config
+        grezzo = getattr(config, "ADMIN_CANALE_ID", 0)
+        gruppo = 0 if isinstance(grezzo, bool) else int(str(grezzo).strip() or 0)
+    except Exception:
+        return 0, 0
+    if gruppo >= -1000000000000:
+        return 0, 0
+    try:
+        stanze = getattr(config, "ADMIN_CANALE_ARGOMENTI", {})
+        grezzo = stanze.get(argomento, 0) if isinstance(stanze, dict) else 0
+        stanza = 0 if isinstance(grezzo, bool) else int(str(grezzo).strip() or 0)
+    except Exception:
+        stanza = 0
+    return gruppo, (stanza if stanza > 1 else 0)
+
+
+gruppo, stanza = gruppo_e_stanza(sys.argv[2])
+if gruppo:
+    # prima nella sua stanza; se quella non risponde, nel Generale
+    if manda(gruppo, stanza) or (stanza and manda(gruppo)):
+        sys.exit(0)
+    print("   ⚠️ avviso: il gruppo degli admin non ha risposto, lo mando "
+          "in privato ai moderatori")
+for chat in ADMIN_IDS:
+    manda(chat)
 PY
 }
 
@@ -391,7 +449,7 @@ if aspetta_che_stia_bene; then
   rm -f .deploy-bocciato .deploy-rifiutato
   dillo "✅ in produzione ${LA:0:8}"
   avvisa "🚀 <b>Barattolo aggiornato</b> (<code>${LA:0:7}</code>)
-$NOVITA"
+$NOVITA" riepiloghi
   exit 0
 fi
 

@@ -4273,3 +4273,28 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (una disputa aperta, una garanzia fra le 72 e le 88 ore) può essere
   ridetto una volta nel gruppo: il «già detto» è per destinatario, e
   il gruppo è un destinatario nuovo.
+
+- GLI AVVISI DEL DEPLOY NEL GRUPPO DEGLI ADMIN (12 ott 2026; com'è
+  fatto in ARCHITETTURA, «GLI AVVISI DI `deploy.sh` NEL GRUPPO DEGLI
+  ADMIN»). NON C'È NIENTE DA ACCENDERE: `deploy.sh` legge le stesse due
+  righe del config che ha già acceso il gruppo (`ADMIN_CANALE_ID`,
+  `ADMIN_CANALE_ARGOMENTI`). Da quando è in produzione, «🚀 Barattolo
+  aggiornato» arriva in 📊 Riepiloghi, e gli altri sette avvisi del
+  deploy (rifiutato, fermo, annullato, rollback, «è GIÙ») in ⚠️ Errori;
+  in privato non arriva più niente.
+  ⚠️ IL PRIMO È ANCORA IN PRIVATO: il deploy che porta questa modifica
+  gira con lo script di prima (il servizio ne esegue una copia), quindi
+  il suo «🚀 Barattolo aggiornato» arriva in privato. Dal deploy dopo,
+  nel gruppo.
+  SE UN AVVISO DEL DEPLOY TORNA IN PRIVATO il gruppo non ha risposto a
+  `deploy.sh` (bot tolto, numero sbagliato, Telegram che rifiuta). Lo
+  dice il journal del deploy:
+  `journalctl -u barattolo-deploy --since "1 hour ago" | grep "gruppo degli admin"`
+  Non arriva un secondo messaggio a dirlo: quell'avvertimento lo dà il
+  server, al primo avviso suo che il gruppo rifiuta.
+  LA PROVA è il secondo deploy dopo questo: il suo «🚀 Barattolo
+  aggiornato» deve comparire in 📊 Riepiloghi e non in privato.
+  GLI ALTRI CANALI NON C'ENTRANO E NON SONO CAMBIATI: il backup
+  (`deploy/backup-fuori.sh`, col suo bot e il suo `CHAT_ID_BACKUP`), le
+  ronde del nodo (`TG_CHAT` in `telegram.env`, sul nodo), la ronda del
+  relay (`CHAT_ID` in `/opt/relay/telegram.conf`), i canali pubblici.

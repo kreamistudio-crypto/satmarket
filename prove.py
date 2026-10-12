@@ -151330,6 +151330,245 @@ def prove_chi_e_l_altro():
           [dati.count("<b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b>"),
            "lo dice una volta sola al primo ingresso" in dati])
 
+
+def prove_deploy_nel_gruppo():
+    """GLI AVVISI DEL DEPLOY NEL GRUPPO DEGLI ADMIN (12 ott 2026,
+    cantiere deploy-nel-gruppo, richiesta di Andrea).
+
+    Col gruppo degli admin acceso gli avvisi del SERVER sono usciti
+    dalla chat privata; quelli di `deploy.sh` no («🚀 Barattolo
+    aggiornato» arrivava ancora in privato): lo script scrive a
+    Telegram per conto suo, con un Python di poche righe dentro
+    `avvisa()`. Adesso, con `ADMIN_CANALE_ID` nel config, l'avviso va
+    nel gruppo — l'aggiornamento riuscito nei «riepiloghi», tutto il
+    resto negli «errori» — e in privato se il gruppo non risponde.
+    Stesse parole, nessun avviso in piu' o in meno; senza la leva e' lo
+    script di ieri.
+
+    Qui gira QUEL Python, ritagliato da deploy.sh, con un config e un
+    Telegram di cartone. Le cose che si rompono in silenzio: l'avviso
+    che col gruppo acceso parte due volte (gruppo E privato) o non
+    parte piu'; il gruppo muto che se lo porta via — ed e' l'avviso che
+    dice che il mercatino e' giu'; la regola della leva che qui si
+    legge in un modo e nel server in un altro (un id che il server
+    scarta e lo script accetta: gli avvisi a una persona); un `import`
+    di terzi in un heredoc che gira col python di sistema."""
+    print("\n[gli avvisi del deploy nel gruppo degli admin]")
+    import contextlib as _cl
+    import io as _io
+    import json as _json
+    import types as _types
+    import urllib.error as _ue
+    import urllib.request as _ur
+
+    grezzo = open("deploy.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    i = grezzo.find("\navvisa() {\n")
+    testa = '  python3 - "$1" "${2:-errori}" <<\'PY\' 2>/dev/null || true\n'
+    prova("avvisa() passa al suo Python il testo e la stanza; senza il "
+          "secondo argomento la stanza e' «errori»; e resta fail-open",
+          True, i > -1 and grezzo.find(testa, i) == grezzo.find("  python3 - ", i))
+    corpo = grezzo[grezzo.find(testa, i) + len(testa):grezzo.find("\nPY\n", i) + 1]
+    sh = "\n".join(r for r in grezzo.split("\n") if not r.lstrip().startswith("#"))
+
+    GRUPPO = -1001234567890
+    ADMIN = [111111, 222222]
+    STANZE = {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,
+              "dm": 12, "riepiloghi": 14}
+    ACCESO = {"ADMIN_CANALE_ID": GRUPPO, "ADMIN_CANALE_ARGOMENTI": STANZE}
+    AGGIORNATO = "🚀 <b>Barattolo aggiornato</b> (<code>abcdef1</code>)\n• Una novita'"
+    GIU = "🆘 <b>Barattolo e' GIU'</b>: nemmeno <code>12345678</code> risponde."
+
+    class _Risposta:
+        def __init__(self, corpo_r):
+            self.corpo_r = corpo_r
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, *a):
+            return _json.dumps(self.corpo_r).encode()
+
+    def gira(leve, testo=AGGIORNATO, stanza="riepiloghi", telegram=None,
+             senza_token=False):
+        """Il Python VERO di avvisa(), come lo chiama bash: `python3 -
+        testo stanza`. `telegram(dati)` dice cosa risponde il cartone:
+        True, "falso" (200 con ok:false), un codice HTTP, o un'eccezione.
+        Torna (richieste, quel che ha stampato)."""
+        richieste = []
+
+        def urlopen(req, timeout=None):
+            dati = _json.loads(req.data)
+            richieste.append((req.full_url, dati, timeout))
+            r = (telegram or (lambda d: True))(dati)
+            if r is True:
+                return _Risposta({"ok": True, "result": {"message_id": 1}})
+            if r == "falso":
+                return _Risposta({"ok": False, "description": "no"})
+            if isinstance(r, Exception):
+                raise r
+            raise _ue.HTTPError(req.full_url, r, "rifiutato", {}, None)
+
+        cfg = _types.ModuleType("config")
+        if not senza_token:
+            cfg.BOT_TOKEN = "TOKEN-DI-CARTONE"
+        cfg.ADMIN_IDS = list(ADMIN)
+        for k, v in leve.items():
+            setattr(cfg, k, v)
+        prima = (sys.modules.get("config"), sys.argv, _ur.urlopen)
+        sys.modules["config"] = cfg
+        sys.argv = ["-", testo, stanza]
+        _ur.urlopen = urlopen
+        buf = _io.StringIO()
+        try:
+            with _cl.redirect_stdout(buf):
+                try:
+                    exec(compile(corpo, "deploy.sh:avvisa", "exec"),
+                         {"__name__": "avvisa"})
+                except SystemExit:
+                    pass
+        finally:
+            sys.argv, _ur.urlopen = prima[1], prima[2]
+            if prima[0] is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = prima[0]
+        return richieste, buf.getvalue()
+
+    def solo_gruppo_muto(risposta):
+        return lambda d: risposta if d["chat_id"] == GRUPPO else True
+
+    URL = "https://api.telegram.org/botTOKEN-DI-CARTONE/sendMessage"
+
+    def in_privato(testo):
+        return [(URL, {"chat_id": a, "text": testo, "parse_mode": "HTML",
+                       "disable_web_page_preview": True}, 10) for a in ADMIN]
+
+    # --- senza la leva: lo script di ieri -------------------------------
+    r, detto = gira({})
+    prova("SENZA LA LEVA: un messaggio a ogni moderatore, in privato — "
+          "la richiesta di ieri, campo per campo, e niente nel journal",
+          (in_privato(AGGIORNATO), ""), (r, detto))
+    r, _ = gira({}, GIU, "errori")
+    prova("...e lo stesso per un errore", in_privato(GIU), r)
+
+    # --- con la leva ------------------------------------------------------
+    r, detto = gira(ACCESO)
+    prova("CON LA LEVA: «Barattolo aggiornato» va UNA volta nel gruppo, "
+          "nella stanza dei riepiloghi, con le stesse parole — e a "
+          "nessuno in privato",
+          ([(URL, {"chat_id": GRUPPO, "text": AGGIORNATO, "parse_mode": "HTML",
+                   "disable_web_page_preview": True,
+                   "message_thread_id": 14}, 10)], ""), (r, detto))
+    r, _ = gira(ACCESO, GIU, "errori")
+    prova("...e un errore nella stanza degli errori",
+          [(GRUPPO, 6, GIU)],
+          [(d["chat_id"], d.get("message_thread_id"), d["text"]) for _, d, _ in r])
+    r, _ = gira({"ADMIN_CANALE_ID": GRUPPO,
+                 "ADMIN_CANALE_ARGOMENTI": {"errori": 6}})
+    prova("una stanza senza numero: nel Generale (nessun numero di "
+          "stanza), sempre una volta sola", [(GRUPPO, None)],
+          [(d["chat_id"], d.get("message_thread_id")) for _, d, _ in r])
+    prova("mai silenzioso: nessun disable_notification, in tutto deploy.sh",
+          0, grezzo.count("disable_notification"))
+
+    # --- il gruppo non risponde -------------------------------------------
+    for come, risposta in (("bot tolto dal gruppo (403)", 403),
+                           ("id sbagliato (400)", 400),
+                           ("un 200 che dice ok:false", "falso"),
+                           ("la rete cade solo verso il gruppo",
+                            OSError("https://api.telegram.org/botSEGRETISSIMO/x"))):
+        r, detto = gira(ACCESO, GIU, "errori", solo_gruppo_muto(risposta))
+        prova(f"IL GRUPPO NON RISPONDE — {come}: prima la stanza, poi il "
+              "Generale, poi IN PRIVATO a ogni moderatore, la richiesta di "
+              "ieri: l'avviso non si perde",
+              ([(GRUPPO, 6), (GRUPPO, None)], in_privato(GIU)),
+              ([(d["chat_id"], d.get("message_thread_id")) for _, d, _ in r[:2]],
+               r[2:]))
+        prova(f"...{come}: lo dice una riga del journal, non un messaggio "
+              "in piu'; e la riga non porta ne' il token ne' il testo "
+              "dell'errore", (1, False),
+              (detto.count("il gruppo degli admin non ha risposto"),
+               "TOKEN" in detto or "SEGRETISSIMO" in detto))
+    r, detto = gira(ACCESO, GIU, "errori",
+                    lambda d: 400 if d.get("message_thread_id") else True)
+    prova("una stanza cancellata su Telegram: l'avviso arriva nel "
+          "Generale, e in privato non va niente",
+          ([(GRUPPO, 6), (GRUPPO, None)], ""),
+          ([(d["chat_id"], d.get("message_thread_id")) for _, d, _ in r], detto))
+    r, _ = gira({"ADMIN_CANALE_ID": GRUPPO}, GIU, "errori", solo_gruppo_muto(403))
+    prova("gruppo muto senza stanze: un tentativo solo, poi privato",
+          [GRUPPO] + ADMIN, [d["chat_id"] for _, d, _ in r])
+    r, detto = gira(ACCESO, senza_token=True)
+    prova("un config senza il token del bot: non parte niente e non "
+          "esplode niente (fail-open)", ([], ""), (r, detto))
+
+    # --- la leva si legge come la legge il server -------------------------
+    i_arg = _SORGENTE.index("ADMIN_ARGOMENTI = {")
+    K = {}
+    exec(_SORGENTE[i_arg:_SORGENTE.index("try:\n    from config import "
+                                         "ADMIN_CANALE_ID", i_arg)], K)
+    prova("le due stanze dello script sono argomenti VERI del server",
+          True, {"errori", "riepiloghi"} <= set(K["ADMIN_ARGOMENTI"]))
+    leggi = reale("_leggi_gruppo_admin", {"ADMIN_ARGOMENTI": K["ADMIN_ARGOMENTI"]})
+    diversi = []
+    for canale in (0, None, "", GRUPPO, f" {GRUPPO} ", 123456789, -4567, True,
+                   False, "gruppo", 1.5, -1000000000000, -1000000000001):
+        for stanze in ({}, STANZE, {"errori": "6", "riepiloghi": " 14 "},
+                       {"errori": 0, "riepiloghi": 1}, {"errori": True},
+                       {"errori": "x", "riepiloghi": -3}, [6, 14], None,
+                       "errori"):
+            g, st, _ = leggi(canale, stanze)
+            for arg in ("errori", "riepiloghi"):
+                leve = {"ADMIN_CANALE_ARGOMENTI": stanze}
+                if canale is not None:
+                    leve["ADMIN_CANALE_ID"] = canale
+                primo = gira(leve, GIU, arg)[0][0][1]
+                atteso = (g, st.get(arg)) if g else (ADMIN[0], None)
+                if (primo["chat_id"], primo.get("message_thread_id")) != atteso:
+                    diversi.append((canale, stanze, arg))
+    prova("LA LEVA SI LEGGE COME LA LEGGE IL SERVER: 13 valori di "
+          "ADMIN_CANALE_ID per 9 di ADMIN_CANALE_ARGOMENTI per le due "
+          "stanze, e lo script va dove andrebbe il server — nel gruppo e "
+          "in quella stanza, o in privato quando il server terrebbe la "
+          "leva spenta (un id positivo, un gruppo semplice, True, una "
+          "parola)", [], diversi)
+
+    # --- le otto chiamate, in bash ------------------------------------------
+    chiamate = re.findall(r'^\s*avvisa "(.{0,40})', sh, re.M)
+    OTTO = ["⛔ <b>Deploy rifiutato</b>", "⏳ <b>Deploy fermo</b> da",
+            "❌ <b>Deploy fermo</b>: git reset",
+            "❌ <b>Deploy annullato</b>: il codice",
+            "❌ <b>Deploy</b>: il riavvio",
+            "🚀 <b>Barattolo aggiornato</b>",
+            "↩️ <b>Deploy annullato</b>: <code>", "🆘 <b>Barattolo e' GIU'</b>"]
+    prova("gli avvisi del deploy sono gli otto di ieri, nello stesso "
+          "ordine e con le stesse parole in testa: nessuno tolto, nessuno "
+          "aggiunto", OTTO,
+          [a if c.startswith(a) else c for c, a in zip(chiamate, OTTO)]
+          + chiamate[len(OTTO):])
+    prova("...e UNA sola dice una stanza: l'aggiornamento riuscito, nei "
+          "riepiloghi. Le altre sette tacciono, cioe' «errori»",
+          (["riepiloghi"], True),
+          (re.findall(r'"[ \t]+(dispute|liquidita|errori|moderazione|dm|riepiloghi)'
+                      r'[ \t]*$', sh, re.M),
+           '$NOVITA" riepiloghi\n' in sh))
+    importati = sorted(set(re.findall(r"^\s*(?:import|from)\s+([\w.]+)", corpo, re.M)))
+    prova("il Python dell'avviso resta di sola libreria standard, piu' il "
+          "config: gira col python3 di sistema, senza venv",
+          ["config", "json", "sys", "urllib.request"],
+          sorted(set(importati) | {m.strip() for riga in re.findall(
+              r"^import (.+)$", corpo, re.M) for m in riga.split(",")}))
+    prova("...e il timeout di ogni richiesta e' quello di ieri, dieci "
+          "secondi: tre tentativi a vuoto stanno larghi nei 300 del "
+          "servizio", (True, True),
+          ("timeout=10) as risposta:" in corpo,
+           "TimeoutStartSec=300" in open(os.path.join(
+               "deploy", "barattolo-deploy.service"), encoding="utf-8").read()))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -151454,7 +151693,7 @@ def main():
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,
               prove_guardiano_ponte,
-              prove_guardia_liquidita, prove_canale_admin,
+              prove_guardia_liquidita, prove_canale_admin, prove_deploy_nel_gruppo,
               prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,
               prove_podio_sfondo,

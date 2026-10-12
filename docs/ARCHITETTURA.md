@@ -31390,3 +31390,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (il giro col Telegram di cartone, in CI nella gabbia). I banchi che
   eseguono chi passa dalla porta montano i pezzi veri a leva spenta:
   `gruppo_admin_spento` in prove.py.
+
+- GLI AVVISI DI `deploy.sh` NEL GRUPPO DEGLI ADMIN (12 ott 2026; perché
+  in CANTIERI, «Gli avvisi del deploy nel gruppo degli admin»; il
+  gruppo: qui sopra, «IL GRUPPO DEGLI ADMIN»). `deploy.sh` non passa
+  dal server: scrive a Telegram da sé, con un Python di sola libreria
+  standard dentro `avvisa()` (gira da root col python3 di sistema, e
+  durante un deploy il server può essere giù). Per questo ha la SUA
+  porta, piccola: `avvisa "<testo>" [stanza]`. Legge dal config
+  `ADMIN_CANALE_ID` e `ADMIN_CANALE_ARGOMENTI` con la stessa regola di
+  `_leggi_gruppo_admin` (id negativo che comincia per -100, numero di
+  stanza sopra 1) — due copie, tenute uguali da una prova che le
+  confronta caso per caso. Col gruppo: UN messaggio, nella stanza
+  `riepiloghi` per «🚀 Barattolo aggiornato» e `errori` (di serie)
+  per gli altri sette (rifiutato, fermo, git reset, non compila,
+  riavvio non partito, rollback, «è GIÙ»); una stanza senza numero o
+  che non risponde vale il Generale. Se il gruppo non risponde — per
+  qualunque ragione: qui non si distingue, a differenza del server —
+  l'avviso va in privato a ogni `ADMIN_IDS` con la richiesta di ieri,
+  e nel journal del deploy resta UNA riga («il gruppo degli admin non
+  ha risposto»), mai un messaggio in più: l'avvertimento «il gruppo non
+  riceve» è del server, e lo dà lui. Senza la leva, o con una leva
+  storta, è lo script di prima. Le parole degli otto avvisi non sono
+  cambiate. LE PROVE: `prove_deploy_nel_gruppo` (il Python ritagliato
+  da deploy.sh, con config e Telegram di cartone) e la sezione 9 di
+  `collaudo_canale_admin` (la funzione vera in bash, con le due
+  chiamate vere, davanti al Telegram di cartone).
+  ⚠️ LO SCRIPT NUOVO ENTRA IN VIGORE AL GIRO DOPO (il servizio esegue
+  una copia, vedi `deploy/barattolo-deploy.service`): il deploy che
+  porta una modifica a `avvisa()` si annuncia ancora con quella vecchia.

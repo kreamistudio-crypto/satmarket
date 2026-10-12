@@ -52480,3 +52480,122 @@ quattro rosse, col «✗» e col «‼», e nessuna verde né spiegazione.
 Sull'albero committato (eaf29f9, sopra 6cf04a6 che è la punta di main):
 la suite intera 22862 passate, 0 fallite; due collaudi col lanciatore
 (chi-e-l-altro, db_contesa) verdi.
+
+## Gli avvisi del deploy nel gruppo degli admin: «🚀 Barattolo aggiornato» nei riepiloghi, i guasti negli errori (12 ott 2026, cantiere deploy-nel-gruppo, richiesta di Andrea)
+
+**IL FATTO.** Acceso il gruppo degli admin sul VPS (la voce «Il gruppo
+degli admin», poco sopra), gli avvisi del server sono usciti dalla chat
+privata. Quelli di `deploy.sh` no: «🚀 Barattolo aggiornato» arrivava
+ancora in privato a ognuno. Nel mio inventario di quel cantiere
+`deploy.sh` non c'era: avevo guardato chi scrive agli admin DENTRO
+server.py, e lo script scrive a Telegram per conto suo — un Python di
+quindici righe dentro `avvisa()`, che gira da root col python3 di
+sistema. L'ha visto Andrea, dalla chat.
+
+**COSA FA ADESSO.** `avvisa "<testo>" [stanza]`. Con `ADMIN_CANALE_ID`
+nel config l'avviso va nel gruppo, UNO: nei `riepiloghi` l'aggiornamento
+riuscito, negli `errori` (la stanza di serie, quando non la si dice) gli
+altri sette — rifiutato, fermo, git reset, non compila, riavvio non
+partito, rollback, «è GIÙ». Una stanza senza numero vale il Generale.
+Se il gruppo non risponde l'avviso va in privato a ogni moderatore, con
+la richiesta di ieri campo per campo. Senza la leva, o con una leva
+storta, è lo script di prima. LE PAROLE SONO QUELLE: degli otto avvisi
+è cambiata una riga sola, il `riepiloghi` in coda alla chiamata del 🚀.
+
+**LE SCELTE, e i perché.**
+· UNA PORTA SUA, e non quella del server. `deploy.sh` non può importare
+  server.py (fastapi, il database, mezzo mondo), e soprattutto non
+  DEVE dipendere dal server: i suoi avvisi più importanti partono
+  quando il server è giù («è GIÙ», il rollback). Quindi la regola della
+  leva vive in due posti. Due copie divergono: una prova le confronta
+  caso per caso — 13 valori di `ADMIN_CANALE_ID` per 9 di
+  `ADMIN_CANALE_ARGOMENTI` per le due stanze — e lo script deve andare
+  dove andrebbe il server.
+· LA STANZA È IL SECONDO ARGOMENTO, DOPO IL TESTO, e di serie è
+  `errori`: sette chiamate su otto non sono cambiate di una virgola, e
+  una chiamata nuova scritta domani senza pensarci finisce fra gli
+  errori — che è il verso giusto in cui sbagliare (un guasto letto fra
+  i riepiloghi si perde; un riepilogo letto fra gli errori si nota).
+· IL RIPIEGO NON DISTINGUE. Il server giudica la risposta di Telegram
+  (stanza persa, 429, bot tolto, HTML rotto) e fa cose diverse. Qui no:
+  la stanza non risponde → il Generale; nemmeno quello → in privato.
+  Uno script che gira una volta al minuto e parla otto volte l'anno non
+  ha bisogno di una macchina a stati, e un avviso che dice «il
+  mercatino è giù» deve arrivare per la strada più corta che c'è.
+· NESSUN «IL GRUPPO NON RICEVE» DA QUI. Sarebbe un avviso in più
+  (Andrea: nessuno tolto, nessuno aggiunto), e c'è già chi lo dà: il
+  server, al primo avviso suo che il gruppo rifiuta. Qui resta una riga
+  nel journal del deploy, senza il token e senza il testo dell'errore.
+· NIENTE VARIABILE D'AMBIENTE per dire a `avvisa` dove sta Telegram
+  (sarebbe servita solo alle prove): è un punto in cui il token del bot
+  va a un indirizzo, e un indirizzo che si cambia da fuori è una porta.
+  Le prove sostituiscono `urlopen`; il collaudo sostituisce `python3`.
+
+**GLI ALTRI SCRIPT CHE SCRIVONO SU TELEGRAM** (richiesta di Andrea:
+elencarli, non toccarli). Nel repo, oltre a `deploy.sh`, nessuno scrive
+in privato agli `ADMIN_IDS`. Scrivono a una chat scritta nel LORO file:
+`deploy/backup-fuori.sh` (bot suo, `CHAT_ID_BACKUP`: il canale dei
+backup); le ronde del nodo — `ronda.sh`, e tutte le altre attraverso
+`ronda-avvisa.sh` (liquidità, nodo, superficie, tor, pagamenti) — con
+`TG_CHAT` di `telegram.env`, sul nodo; `deploy/relay/ronda-relay.sh` con
+`CHAT_ID` di `/opt/relay/telegram.conf`, sulla macchina del relay.
+`prova_notifica.py` scrive a mano alla chat che gli si dà. QUEL CHE NON
+SO: cosa c'è scritto in quei tre file (stanno sulle macchine, non qui),
+e se sul VPS gira qualcosa che nel repo non c'è — il VPS è fuori dal mio
+perimetro. Ad Andrea il comando per guardarlo, in sola lettura.
+
+**PROVATO.**
+· `prove_deploy_nel_gruppo`, 24 prove: il Python VERO di `avvisa()`,
+  ritagliato da deploy.sh, con un config e un Telegram di cartone al
+  posto di `urlopen`. Senza la leva: la richiesta di ieri, campo per
+  campo. Con la leva: una volta nel gruppo, nella stanza giusta, e in
+  privato niente. Il gruppo che non risponde in quattro modi (403, 400,
+  un 200 con ok:false, la rete che cade solo verso il gruppo): stanza,
+  Generale, poi privato a ogni moderatore. La stanza cancellata: nel
+  Generale. La regola della leva contro quella del server. Gli otto
+  avvisi di ieri nello stesso ordine, e uno solo con una stanza.
+· `collaudo_canale_admin`, sezione 9 (36 prove in tutto, in CI nella
+  gabbia): LA FUNZIONE VERA IN BASH, con le due chiamate vere copiate
+  da deploy.sh (il 🚀 su più righe con `$NOVITA`, e un guasto), davanti
+  al Telegram di cartone su 127.0.0.1 — è lo strato che le prove non
+  vedono: le virgolette, la stanza dopo il testo, `${2:-errori}`,
+  l'heredoc. Di finto c'è `python3` (una funzione di bash che chiama il
+  Python vero con un involucro che devia `urlopen` sul cartone).
+· LA TORTURA, undici guasti messi apposta in deploy.sh su una copia del
+  repo: 11 presi, 0 sfuggiti — il 🚀 che perde la sua stanza, la
+  stanza di serie che diventa «riepiloghi», il doppio invio (gruppo E
+  privato), il gruppo muto che si porta via l'avviso, la stanza che non
+  ripiega nel Generale, un id positivo che accende la leva, il Generale
+  mandato col suo numero, la richiesta in privato che non è più quella
+  di ieri, un 200 con ok:false preso per «consegnato», il token nel
+  journal, un avviso silenzioso. Le prove li prendono tutti e undici,
+  il collaudo in bash sette.
+· `bash -n deploy.sh`: la sintassi regge.
+
+**NON PROVATO, e si dice.** Il Telegram vero e il VPS vero: che
+«🚀 Barattolo aggiornato» compaia in 📊 Riepiloghi lo dice il SECONDO
+deploy dopo questo — il primo gira ancora con lo script di prima,
+perché il servizio esegue una copia fatta prima del `git reset`. Un
+comando per provare `avvisa` a mano sul VPS l'avevo scritto per
+PRODUZIONE e l'ho TOLTO: usava `eval`, qui non l'ho potuto far girare,
+e una procedura non provata in quel file non ci entra.
+
+**COSA È GIRATO SU QUALE ALBERO.** SOPRA 6cf04a6: `PROVE_SEVERE=1 python
+prove.py` INTERA, 22884 passate e 0 fallite, nessuna saltata; i 67
+collaudi del workflow nella gabbia, in quattro gruppi, 67 verdi; la
+tortura. POI MAIN È CORSO di due commit non miei (il segno «‼» nel
+giudice delle righe rosse: `collaudi_ci.py`, la sua prova, questo
+file): rebase pulito sopra 0eaea86, niente di arrivato tocca il deploy
+né gli avvisi. SULL'ALBERO DEL PUSH, sopra 0eaea86: le sezioni toccate
+e quella arrivata da main (`prove_deploy_nel_gruppo`, `prove_deploy`,
+`prove_giudice_deploy`, `prove_canale_admin`, `prove_collaudi_in_ci`),
+289 verdi e 0 rosse; `collaudo_canale_admin`, `collaudo_guardia_liquidita`
+e `collaudo_punti_barattolo` verdi nella gabbia col giudice nuovo; lo
+scanner dei segreti sulle righe aggiunte, con le forme lette dal
+workflow e la controprova. La suite intera sull'albero ribasato la fa
+la CI (la regola di «main che corre»: non la si insegue).
+
+**RESTA DA GUARDARE** (Andrea): al secondo deploy da qui, «🚀
+Barattolo aggiornato» in 📊 Riepiloghi e non in privato. E, in sola
+lettura sul VPS, se c'è qualche script fuori dal repo che scrive su
+Telegram (il comando nel rapporto).
