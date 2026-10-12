@@ -52477,4 +52477,6 @@ due sorgenti stampano i segni e il formato attesi (se cambiano, la
 prova lo dice); un'uscita costruita coi loro stessi formati — verde,
 grave e rossa per ognuno, con le spiegazioni sotto — dà esattamente le
 quattro rosse, col «✗» e col «‼», e nessuna verde né spiegazione.
-Suite intera: nel verbale del push.
+Sull'albero committato (eaf29f9, sopra 6cf04a6 che è la punta di main):
+la suite intera 22862 passate, 0 fallite; due collaudi col lanciatore
+(chi-e-l-altro, db_contesa) verdi.
