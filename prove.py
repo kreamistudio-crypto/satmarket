@@ -17818,9 +17818,13 @@ def prove_tracking_facoltativo():
       const campi = {};
       const el = id => campi[id];
       const fetch = async (url, o) => { posted.push([url, JSON.parse(o.body)]); return {ok: true, json: async () => ({})}; };
-      """ + forme + "\n" + sped_js + "\n" + pan + "\n}\n" + r"""
+      """ + _fn_js(mini, "function segnaOrdine(o, campi){") \
+        + _fn_js(mini, "function segnaOrdineAperto(campi){") \
+        + forme + "\n" + sped_js + "\n" + pan + "\n}\n" + r"""
       (async () => {
         const O = {};
+        /* (13 ott 2026, gesti-subito) `inviaSpedito` scrive il fatto con
+           l'attrezzo dei gesti: il banco ha quello VERO, qui sopra */
         const prepara = (corriere, tracking) => {
           campi.shipCorriere = {value: corriere}; campi.shipTracking = {value: tracking};
           campi.shipAvviso = {style: {}, innerHTML: ''};
