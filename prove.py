@@ -154739,24 +154739,30 @@ console.log(JSON.stringify(c));
 
 
 def prove_servizio_senza_corriere():
-    """L'ORDINE DI SERVIZIO: LA DATA PROPOSTA SI VEDE SUBITO, E NESSUNO GLI
-    PARLA DI CORRIERI (12 ott 2026, notte, cantiere pausa-leggera: tre
-    cose viste nel giro dal vivo del selettore, sistemate su richiesta
-    di Andrea prima del push).
+    """L'ORDINE DI SERVIZIO: I GESTI DELL'APPUNTAMENTO SI VEDONO SUBITO, E
+    NESSUNO GLI PARLA DI CORRIERI (12 ott 2026, notte: prima «Proponi la
+    data», l'avviso sul trasporto e la frase delle ferie — cantiere
+    pausa-leggera —, poi «✅ Confermo, ci sono», «🔗 Lascia il
+    collegamento» e il ritiro a mano — cantiere gesti-subito; richieste
+    di Andrea).
 
-    Quel che qui si rompe in silenzio: dopo «📅 Proponi la data» la
-    pagina che dice ancora «Proponi giorno e ora» (si ridisegna dai dati
-    che ha, e nessuno glieli aggiornava); una data NUOVA che lascia in
-    piedi la conferma di quella vecchia; l'avviso sul rischio del
-    trasporto che si apre sopra «📅 L'appuntamento» — e che cosi' si
-    consuma, e non arriva piu' alla prima vendita che spedisce davvero;
-    le ferie che a chi vende una lezione dicono «segna la spedizione»."""
-    print("\n[l'ordine di servizio: la data proposta subito, niente corriere, niente «segna la spedizione»]")
+    Quel che qui si rompe in silenzio: dopo un gesto andato a buon fine
+    la pagina che resta com'era (si ridisegna dai dati che ha, e nessuno
+    glieli aggiornava): «Proponi giorno e ora» a data proposta,
+    «Confermo, ci sono» a conferma data, «Lascia il collegamento» a
+    collegamento lasciato; il dato scritto sulla copia VECCHIA
+    dell'ordine, che il ridisegno non guarda; una data NUOVA che lascia
+    in piedi la conferma di quella vecchia; il compratore che conferma
+    una data cambiata sotto di lui e resta a guardare la vecchia;
+    l'avviso sul rischio del trasporto che si apre sopra «📅
+    L'appuntamento» — e cosi' si consuma; le ferie che a chi vende una
+    lezione, o consegna a mano, dicono «segna la spedizione»."""
+    print("\n[l'ordine di servizio: i gesti dell'appuntamento subito, niente corriere, le ferie con la frase giusta]")
     m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
 
-    # --- 1) LA DATA PROPOSTA COMPARE SUBITO --------------------------------
+    # --- 1) I TRE GESTI DELL'APPUNTAMENTO COMPAIONO SUBITO -----------------
     banco = r"""
-const NODI = {servQuando: {value: '2026-10-15T15:30'}};
+const NODI = {servQuando: {value: '2026-10-15T15:30'}, servAccesso: {value: '  https://meet.example.com/abc-defg  '}};
 function el(id){ return NODI[id] || null; }
 const API_BASE = '/api';
 function authHdr(){ return 'h'; }
@@ -154768,56 +154774,139 @@ const aperti = [], chieste = [];
 /* il ridisegno, come quello vero, rilegge la riga dalla LISTA: si annota
    cosa trova in quel momento */
 function openOrder(id){ const o = orders.find(x => x.id === id);
-  aperti.push({id: id, quando: o.appuntamentoIl, conf: o.appuntamentoConfermatoIl}); }
+  aperti.push({id: id, quando: o.appuntamentoIl, conf: o.appuntamentoConfermatoIl, accesso: o.accessoIl}); }
+const ultimo = () => aperti[aperti.length - 1];
 /* l'ordine aperto: la stessa riga della lista, o (`vecchia`) la copia di
    prima che la lista si rileggesse */
 function apri(o, vecchia){ orders = [{id: 1}, o]; currentOrder = vecchia ? Object.assign({}, o) : o; }
+/* la lista riletta dal server (serve al 409): quel che c'e' in NUOVI */
+let NUOVI = null, riletture = 0;
+async function loadOrders(){ riletture++; if (NUOVI) orders = NUOVI; }
 let RISPOSTA = null;
-globalThis.fetch = async (url, opz) => { chieste.push([url, JSON.parse(opz.body)]); return RISPOSTA; };
-""" + _fn_js(m, "async function proponiAppuntamento(btn){") + r"""
+globalThis.fetch = async (url, opz) => { chieste.push([url, opz && opz.body ? JSON.parse(opz.body) : null]); return RISPOSTA; };
+""" + "".join(_fn_js(m, f) for f in (
+        "function segnaOrdineAperto(campi){", "async function proponiAppuntamento(btn){",
+        "async function confermaAppuntamento(btn){", "async function depositaAccesso(btn){")) + r"""
 (async () => {
   const c = {};
   const Q = Math.floor(new Date('2026-10-15T15:30').getTime() / 1000);
-  const si = (quando, confermato) => ({ok: true, json: async () => ({ok: true, quando: quando, confermato: confermato})});
-  /* a) la prima proposta */
+  const si = corpo => ({ok: true, status: 200, json: async () => Object.assign({ok: true}, corpo)});
+  const no = (stato, perche) => ({ok: false, status: stato, json: async () => ({detail: perche})});
+  const ADESSO = Math.floor(Date.now() / 1000);
+
+  /* ---------- «📅 Proponi la data» ---------- */
   apri({id: 7, appuntamentoIl: 0, appuntamentoConfermatoIl: 0});
-  RISPOSTA = si(Q, false);
+  RISPOSTA = si({quando: Q, confermato: false});
   await proponiAppuntamento({});
-  c.prima = [chieste[0][0], chieste[0][1].quando === Q, aperti[0].quando === Q, aperti[0].conf, detti.slice()];
-  /* b) una data NUOVA dopo una conferma: la conferma si azzera */
+  c.prima = [chieste[0][0], chieste[0][1].quando === Q, ultimo().quando === Q, ultimo().conf, detti.slice()];
+  /* una data NUOVA dopo una conferma: la conferma si azzera */
   apri({id: 7, appuntamentoIl: Q - 86400, appuntamentoConfermatoIl: 12345});
   await proponiAppuntamento({});
-  c.nuova = [aperti[1].quando === Q, aperti[1].conf];
-  /* c) la STESSA data gia' confermata: il server dice «confermato», e resta */
+  c.nuova = [ultimo().quando === Q, ultimo().conf];
+  /* la STESSA data gia' confermata: il server dice «confermato», e resta */
   apri({id: 7, appuntamentoIl: Q, appuntamentoConfermatoIl: 12345});
-  RISPOSTA = si(Q, true);
+  RISPOSTA = si({quando: Q, confermato: true});
   await proponiAppuntamento({});
-  c.stessa = [aperti[2].quando === Q, aperti[2].conf];
-  /* d) la data la dice il SERVER */
+  c.stessa = [ultimo().quando === Q, ultimo().conf];
+  /* la data la dice il SERVER */
   apri({id: 7, appuntamentoIl: 0, appuntamentoConfermatoIl: 0});
-  RISPOSTA = si(Q + 60, false);
+  RISPOSTA = si({quando: Q + 60, confermato: false});
   await proponiAppuntamento({});
-  c.server = aperti[3].quando === Q + 60;
-  /* d-bis) LA LISTA SI E' RILETTA mentre l'ordine era aperto: `currentOrder`
-     e' la copia di prima, e il ridisegno guarda la riga nuova — la data deve
-     stare li' (il difetto visto nel giro dal vivo) */
+  c.server = ultimo().quando === Q + 60;
+  /* LA LISTA SI E' RILETTA mentre l'ordine era aperto: `currentOrder` e' la
+     copia di prima, e il ridisegno guarda la riga nuova — la data deve stare
+     li' (il difetto visto nel giro dal vivo), e anche sulla copia aperta */
   apri({id: 7, appuntamentoIl: 0, appuntamentoConfermatoIl: 9}, true);
-  RISPOSTA = si(Q, false);
+  RISPOSTA = si({quando: Q, confermato: false});
   await proponiAppuntamento({});
-  c.riletta = [aperti[4].quando === Q, aperti[4].conf, currentOrder !== orders[1]];
-  /* e) il server dice no: niente cambia, niente ridisegno, e si dice perche' */
+  c.riletta = [ultimo().quando === Q, ultimo().conf, currentOrder !== orders[1], currentOrder.appuntamentoIl === Q];
+  /* il server dice no: niente cambia, niente ridisegno, e si dice perche' */
   apri({id: 7, appuntamentoIl: 0, appuntamentoConfermatoIl: 0});
-  RISPOSTA = {ok: false, json: async () => ({detail: 'Scegli una data nel futuro'})};
-  const n = aperti.length;
+  RISPOSTA = no(400, 'Scegli una data nel futuro');
+  let n = aperti.length;
   detti.length = 0;
   await proponiAppuntamento({});
   c.no = [aperti.length === n, orders[1].appuntamentoIl, detti.slice()];
-  /* f) senza una scelta non si chiede niente */
+  /* senza una scelta non si chiede niente */
   NODI.servQuando.value = '';
-  const k = chieste.length;
+  let k = chieste.length;
   detti.length = 0;
   await proponiAppuntamento({});
   c.vuoto = [chieste.length === k, detti.slice()];
+
+  /* ---------- «✅ Confermo, ci sono» ---------- */
+  apri({id: 7, appuntamentoIl: Q, appuntamentoConfermatoIl: 0});
+  RISPOSTA = si({quando: Q});
+  k = chieste.length; detti.length = 0; riletture = 0;
+  await confermaAppuntamento({});
+  c.conferma = [chieste[k][0], chieste[k][1], ultimo().quando === Q,
+                ultimo().conf >= ADESSO && ultimo().conf <= ADESSO + 5, detti.slice(), riletture];
+  /* sulla copia vecchia dell'ordine: la conferma sta sulla riga che il ridisegno legge */
+  apri({id: 7, appuntamentoIl: Q, appuntamentoConfermatoIl: 0}, true);
+  await confermaAppuntamento({});
+  c.confermaRiletta = [ultimo().conf > 0, currentOrder !== orders[1], currentOrder.appuntamentoConfermatoIl > 0];
+  /* gia' confermata (il server e' idempotente): l'ora di prima resta */
+  apri({id: 7, appuntamentoIl: Q, appuntamentoConfermatoIl: 12345});
+  await confermaAppuntamento({});
+  c.confermaGiaData = ultimo().conf;
+  /* IL 409: chi vende ha cambiato la data mentre si confermava. La pagina
+     rilegge e mostra quella NUOVA, non confermata */
+  apri({id: 7, appuntamentoIl: Q, appuntamentoConfermatoIl: 0});
+  NUOVI = [{id: 1}, {id: 7, appuntamentoIl: Q + 3600, appuntamentoConfermatoIl: 0}];
+  RISPOSTA = no(409, 'La data è cambiata mentre confermavi: riapri l\'ordine e guarda quella nuova');
+  detti.length = 0; riletture = 0; n = aperti.length;
+  await confermaAppuntamento({});
+  c.cambiata = [riletture, aperti.length - n, ultimo().quando === Q + 3600, ultimo().conf, detti.slice()];
+  NUOVI = null;
+  /* un altro «no»: niente rilettura, niente ridisegno */
+  apri({id: 7, appuntamentoIl: Q, appuntamentoConfermatoIl: 0});
+  RISPOSTA = no(400, 'Operazione non permessa');
+  detti.length = 0; riletture = 0; n = aperti.length;
+  await confermaAppuntamento({});
+  c.confermaNo = [riletture, aperti.length === n, orders[1].appuntamentoConfermatoIl, detti.slice()];
+
+  /* ---------- «🔗 Lascia il collegamento» ---------- */
+  apri({id: 7, accessoIl: 0});
+  RISPOSTA = si({accesso_il: 1791000000});
+  k = chieste.length; detti.length = 0;
+  await depositaAccesso({});
+  c.accesso = [chieste[k][0], chieste[k][1], ultimo().accesso, detti.slice()];
+  /* una correzione: `accesso_il` e' il PRIMO deposito, e resta */
+  apri({id: 7, accessoIl: 1790000000});
+  RISPOSTA = si({accesso_il: 1790000000});
+  await depositaAccesso({});
+  c.accessoCorretto = ultimo().accesso;
+  /* sulla copia vecchia dell'ordine */
+  apri({id: 7, accessoIl: 0}, true);
+  RISPOSTA = si({accesso_il: 1791000000});
+  await depositaAccesso({});
+  c.accessoRiletto = [ultimo().accesso, currentOrder !== orders[1], currentOrder.accessoIl];
+  /* un server che non dice l'ora (quello di ieri): vale adesso */
+  apri({id: 7, accessoIl: 0});
+  RISPOSTA = si({});
+  await depositaAccesso({});
+  c.accessoSenzaOra = ultimo().accesso >= ADESSO && ultimo().accesso <= ADESSO + 5;
+  /* il server dice no; e il campo vuoto non parte */
+  apri({id: 7, accessoIl: 0});
+  RISPOSTA = no(400, 'Il collegamento è troppo lungo');
+  detti.length = 0; n = aperti.length;
+  await depositaAccesso({});
+  c.accessoNo = [aperti.length === n, orders[1].accessoIl, detti.slice()];
+  NODI.servAccesso.value = '   ';
+  k = chieste.length; detti.length = 0;
+  await depositaAccesso({});
+  c.accessoVuoto = [chieste.length === k, detti.slice()];
+
+  /* ---------- l'attrezzo, da solo ---------- */
+  currentOrder = null; orders = [{id: 7, a: 1}];
+  segnaOrdineAperto({a: 2});
+  c.attrezzo = [orders[0].a];
+  apri({id: 7, a: 1, b: 1});
+  segnaOrdineAperto({a: 2});
+  c.attrezzo.push(orders[1].a, orders[1].b, orders[0].a === undefined);
+  currentOrder = {id: 99, a: 1}; orders = [{id: 7, a: 1}];
+  segnaOrdineAperto({a: 2});
+  c.attrezzo.push(currentOrder.a, orders[0].a);
   console.log(JSON.stringify(c));
 })();
 """
@@ -154835,11 +154924,47 @@ globalThis.fetch = async (url, opz) => { chieste.push([url, JSON.parse(opz.body)
     prova("...la data scritta e' quella che risponde il server", True, c["server"])
     prova("...e si scrive sulla riga della LISTA, quella che il ridisegno rilegge: se la lista "
           "si e' riletta mentre l'ordine era aperto, la data compare lo stesso (e la conferma "
-          "di prima si azzera)", [True, 0, True], c["riletta"])
+          "di prima si azzera) — e anche sulla copia aperta", [True, 0, True, True], c["riletta"])
     prova("...al «no» del server niente cambia e niente si ridisegna: si legge il perche'",
           [True, 0, ["Scegli una data nel futuro"]], c["no"])
     prova("...e senza una scelta nel selettore non parte nessuna richiesta",
           [True, ["Scegli giorno e ora"]], c["vuoto"])
+    prova("«✅ CONFERMO, CI SONO» COMPARE SUBITO: al ridisegno l'appuntamento e' confermato "
+          "(adesso), sulla data che dice il server — senza rileggere gli ordini",
+          ["/api/orders/7/appuntamento/conferma", None, True, True, ["✅ Appuntamento confermato"], 0],
+          c["conferma"])
+    prova("...anche se la lista si e' riletta mentre l'ordine era aperto: sulla riga che il "
+          "ridisegno legge, e sulla copia aperta", [True, True, True], c["confermaRiletta"])
+    prova("...una conferma gia' data tiene la sua ora", 12345, c["confermaGiaData"])
+    prova("...LA DATA CAMBIATA MENTRE SI CONFERMAVA (il 409): la pagina rilegge gli ordini UNA "
+          "volta, si ridisegna UNA volta e mostra la data NUOVA, ancora da confermare — con "
+          "la frase che non manda piu' a riaprire l'ordine",
+          [1, 1, True, 0, ["La data è cambiata mentre confermavi: guarda quella nuova"]],
+          c["cambiata"])
+    prova("...a ogni altro «no» niente rilettura e niente ridisegno: si legge il perche'",
+          [0, True, 0, ["Operazione non permessa"]], c["confermaNo"])
+    prova("«🔗 LASCIA IL COLLEGAMENTO» COMPARE SUBITO: parte pulito degli spazi, e al ridisegno "
+          "l'ordine ha l'ora del deposito che dice il server",
+          ["/api/orders/7/accesso", {"accesso": "https://meet.example.com/abc-defg"}, 1791000000,
+           ["🔗 Collegamento salvato"]], c["accesso"])
+    prova("...una correzione lascia l'ora del PRIMO deposito; sulla copia vecchia dell'ordine "
+          "si scrive lo stesso sulla riga della lista (e sulla copia); senza l'ora dal server "
+          "vale adesso",
+          [1790000000, [1791000000, True, 1791000000], True],
+          [c["accessoCorretto"], c["accessoRiletto"], c["accessoSenzaOra"]])
+    prova("...al «no» del server niente cambia; il campo vuoto non parte",
+          [[True, 0, ["Il collegamento è troppo lungo"]], [True, ["Scrivi il collegamento"]]],
+          [c["accessoNo"], c["accessoVuoto"]])
+    prova("L'ATTREZZO DEI TRE GESTI: senza un ordine aperto non tocca niente; scrive SOLO i "
+          "campi dati, SOLO sull'ordine aperto e sulla sua riga; un ordine che in lista non "
+          "c'e' si scrive su se stesso e basta",
+          [1, 2, 1, True, 2, 1], c["attrezzo"])
+    tre = "".join(_fn_js(m, f) for f in (
+        "async function proponiAppuntamento(btn){", "async function confermaAppuntamento(btn){",
+        "async function depositaAccesso(btn){"))
+    prova("...e i tre gesti passano TUTTI da li': uno ciascuno, e nessuno scrive piu' a mano "
+          "sull'ordine aperto", [3, 0],
+          [tre.count("segnaOrdineAperto("), len(re.findall(r"currentOrder\.\w+\s*=[^=]", tre))])
 
     # --- 2) NIENTE AVVISO SUL CORRIERE -------------------------------------
     banco = r"""
@@ -154873,7 +154998,7 @@ console.log(JSON.stringify(c));
           [[["sheetBg.open", "trasportoSheet.open"], ["/api/me/avviso-trasporto"], 1], [[], [], 1]],
           [c["spedizione"], c["dopo"]])
 
-    # --- 3) LE FERIE NON CHIEDONO A UN SERVIZIO DI SPEDIRE -----------------
+    # --- 3) LE FERIE DICONO A OGNUNO LA SUA VIA D'USCITA -------------------
     amb = {"time": __import__("time"), "ORE_PAGAMENTO_OFFERTA": 24}
     i = _SORGENTE.index("MESI_IT = (")
     exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
@@ -154898,16 +155023,21 @@ console.log(JSON.stringify(c));
     """)
     ora = int(_t.time()) - 7200
     con.execute("INSERT INTO annunci VALUES(1,7,'Lezione di inglese','venduto',0,0,0,0)")
-    for oid, strada in ((10, "servizio"), (11, "digitale"), (12, "spedizione")):
+    for oid, strada in ((10, "servizio"), (11, "digitale"), (12, "spedizione"), (13, "ritiro")):
         con.execute("INSERT INTO ordini VALUES(?,1,7,'locked',?,?)", (oid, strada, ora))
-    prova("LE FERIE: un servizio pagato trattiene ancora chi parte, ma la sua via d'uscita e' "
-          "FARLO — «segna la spedizione» resta a chi spedisce, «consegna il codice» al "
-          "digitale",
+    prova("LE FERIE: un affare pagato trattiene ancora chi parte, e a ognuno si dice la SUA "
+          "via d'uscita — il servizio si porta a termine, il codice si consegna, il pacco si "
+          "segna spedito, e il ritiro a mano si segna consegnato A MANO (non «spedito»)",
           ["ordine #10 «Lezione di inglese»: porta a termine il servizio",
            "ordine #11 «Lezione di inglese»: consegna il codice",
-           "ordine #12 «Lezione di inglese»: segna la spedizione"],
+           "ordine #12 «Lezione di inglese»: segna la spedizione",
+           "ordine #13 «Lezione di inglese»: segna la consegna a mano"],
           amb["_impegni_aperti"](con, 7))
     con.close()
+    prova("...con le parole che la pagina e gli avvisi usano gia' per quel gesto",
+          [True, True],
+          ["🤝 Ho consegnato l'oggetto a mano</button>" in m,
+           "<b>Il venditore ha segnato la consegna a mano</b>" in _SORGENTE])
 
 
 def prove_voto_dopo_concluso():

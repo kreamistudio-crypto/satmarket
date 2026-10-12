@@ -34421,10 +34421,15 @@ def _impegni_aperti(con, tg_id: int) -> list:
                 "WHERE ordine_id=? ORDER BY id", (o["id"],))])
         # (12 ott 2026, notte, richiesta di Andrea) un SERVIZIO non si
         # spedisce: la sua via d'uscita e' farlo — a chiuderlo e' chi
-        # ha comprato, quando la prestazione c'e' stata
+        # ha comprato, quando la prestazione c'e' stata. E NEMMENO UN
+        # RITIRO A MANO: li' il gesto di chi vende e' «🤝 Ho consegnato
+        # l'oggetto a mano», e la frase lo dice con le parole
+        # dell'avviso («ha segnato la consegna a mano»).
         cosa = ("consegna il codice" if o["consegna_scelta"] == "digitale"
                 else "porta a termine il servizio"
                 if o["consegna_scelta"] == "servizio"
+                else "segna la consegna a mano"
+                if o["consegna_scelta"] == "ritiro"
                 else "segna la spedizione")
         voci.append(f"ordine #{o['id']} «{(titolo or '?')[:40]}»: {cosa}")
     # 2) Le aste vive sono VINCOLANTI: chi ha versato sta gareggiando.

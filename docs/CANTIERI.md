@@ -54740,3 +54740,107 @@ sezioni toccate (`prove_cassetta_nip46`, `prove_negozi_grandi`) e i
 collaudi vicini (`collaudo_cassetta_nip46`, `collaudo_negozi_grandi`,
 `collaudo_connettori`), rigirati prima del push — se questa voce è su
 main erano verdi. La suite intera su quest'ultimo albero la fa la CI.
+
+## I gesti dell'appuntamento si vedono subito, e le ferie dicono la frase giusta a chi consegna a mano (12 ott 2026, notte, cantiere gesti-subito, richiesta di Andrea sui due «notati» della pausa leggera)
+
+**IL PROBLEMA.** Dopo «✅ Confermo, ci sono» (chi compra un servizio) e
+dopo «🔗 Lascia il collegamento» (chi lo vende) il toast diceva che era
+andata, e la pagina restava com'era: il bottone «Confermo, ci sono»
+ancora lì, «Lascia il collegamento» ancora da lasciare. `openOrder`
+ridisegna dai dati che ha, e quei due gesti non glieli aggiornavano: lo
+stesso schema di «Proponi la data», curata la notte stessa. E le ferie,
+a chi ha un ritiro a mano pagato, dicevano «segna la spedizione».
+
+**COSA SI È FATTO.**
+1) UN ATTREZZO SOLO PER I TRE GESTI DELL'APPUNTAMENTO,
+`segnaOrdineAperto(campi)`: scrive i fatti che il server ha appena
+detto sull'ordine aperto E sulla riga viva di `orders`, che è quella
+che `openOrder` rilegge. `currentOrder` può essere la copia di PRIMA
+dell'ultima rilettura della lista: è «la lezione dei solleciti», che il
+codice applica già gesto per gesto (la nota, l'email del corriere, il
+punto contestato, la busta diretta), e che il giro dal vivo della pausa
+leggera aveva ritrovato. «Proponi la data» adesso passa di lì.
+2) «✅ CONFERMO, CI SONO»: al ridisegno l'appuntamento è confermato,
+sulla data che risponde il server. L'ora della conferma è «adesso» (il
+server non la restituisce: al prossimo giro degli ordini arriva la
+sua); una conferma già data tiene la sua.
+3) «🔗 LASCIA IL COLLEGAMENTO»: al ridisegno c'è «✅ Lasciato il…» e
+il bottone dice «Cambia il collegamento». L'ora è `accesso_il` del
+server — il PRIMO deposito, che una correzione non sposta.
+4) LA DATA CAMBIATA MENTRE SI CONFERMA (il 409 del server): la pagina
+rilegge gli ordini, si ridisegna sulla data nuova e dice «La data è
+cambiata mentre confermavi: guarda quella nuova» — prima restava sulla
+vecchia, con la frase del server che mandava a riaprire l'ordine.
+5) LE FERIE, in `_impegni_aperti`: per un ordine pagato con ritiro a
+mano la via d'uscita è «segna la consegna a mano», con le parole che
+pagina e avvisi usano già per quel gesto («🤝 Ho consegnato l'oggetto a
+mano», «ha segnato la consegna a mano»). La regola non cambia: l'ordine
+pagato trattiene ancora chi parte (confermato da Andrea anche per i
+servizi).
+
+**LA RICERCA DEGLI ALTRI GESTI** (chiesta da Andrea: «cerca anche altri
+gesti con lo stesso schema»). Guardati uno per uno tutti i gesti della
+pagina dell'ordine che parlano col server (una quarantina di chiamate a
+`/orders/…`, trenta ridisegni). CON LO STESSO SCHEMA — il server dice
+sì e nessuno aggiorna niente — c'erano SOLO questi due. Gli altri si
+dividono in tre famiglie: chi rilegge gli ordini (l'indirizzo, la
+correzione del tracciamento, la conferma di ricezione, gli annulli);
+chi scrive già sulla riga viva (la nota, l'email del corriere, il punto
+contestato, il tipo di punto, la busta diretta, il promemoria al
+venditore, il contenuto digitale); e chi scrive sulla sola copia aperta
+(il feedback, l'indirizzo Lightning e la fattura d'incasso, «segna come
+spedito», la consegna a mano, il codice di ritiro, il reso spedito e
+ricevuto, la disputa, la decisione del moderatore, la scelta della
+consegna dopo un'asta, il punto di ritiro). Quest'ultima famiglia si
+aggiorna, ma NON se la lista si è riletta mentre l'ordine era aperto:
+è un caso raro e un'altra cura — NON TOCCATA, sta fra i notati.
+
+**LE STRADE SCARTATE.**
+- RILEGGERE GLI ORDINI DOPO OGNI GESTO (`loadOrders().then(openOrder)`,
+come fa il salvataggio dell'indirizzo): un giro di rete in più a ogni
+tocco, con la pagina ferma finché torna, per sapere quel che il server
+ha appena detto nella risposta.
+- RIPUNTARE `currentOrder` DENTRO `loadOrders` (o fondere la riga nuova
+nell'oggetto aperto): curerebbe la copia vecchia per TUTTI i gesti in
+tre righe, ma tocca la funzione da cui passano i pagamenti, e almeno un
+punto confronta l'ordine aperto per identità (`currentOrder !== o`).
+Non era la richiesta: proposta, non fatta.
+- CAMBIARE LA FRASE DEL 409 SUL SERVER: la frase giusta la dice la
+pagina, che adesso si ridisegna; il server resta com'è.
+
+**TROVATO NEL GIRO DAL VIVO, E NON TOCCATO** (aspetta un sì di Andrea).
+La conferma dell'appuntamento NON porta la data: il server conferma
+quella che ha in quel momento. Il suo 409 ferma solo il cambio che
+cade nei millisecondi fra la sua lettura e la sua scrittura. Nel giro:
+chi compra guarda «Il venditore propone giovedì 15 alle 15:30», chi
+vende nel frattempo propone venerdì 16, chi compra tocca «Confermo, ci
+sono» — e resta CONFERMATO VENERDÌ 16, una data che non ha mai visto.
+È il fatto che il moderatore legge in disputa. Con questo cantiere la
+pagina almeno lo DICE subito («✅ venerdì 16… — confermato»): prima non
+diceva niente. La cura vera è mandare al server la data che si sta
+confermando e rifiutare se non è più quella (lì il 409, e la pagina che
+rilegge, servono davvero): è una regola del server, da decidere.
+
+**COSA È STATO PROVATO.** `prove_servizio_senza_corriere`, riscritta
+(22 prove): i tre gesti VERI in node con la lista e l'ordine aperto
+tenuti distinti (anche il caso della copia vecchia), i «no» del server,
+il 409, l'attrezzo da solo, e `_impegni_aperti` su un database in
+memoria con le quattro strade. La tortura: 19 mutazioni, tutte prese.
+IL GIRO DAL VIVO a 390×844 sul server di cartone, con DUE telefoni (222
+vende, 111 compra), quattro scatti: chi vende lascia il collegamento e
+legge subito «✅ Lasciato il lunedì 12 ottobre alle ore 23:43» col
+bottone «Cambia il collegamento»; chi compra apre l'ordine (con la
+copia vecchia: la lista si stava rileggendo), vede la proposta, tocca
+«Confermo, ci sono» e legge subito «✅ giovedì 15 ottobre alle ore
+15:30 — confermato», senza più il bottone; zero riletture degli ordini
+in tutti e due i casi; le ferie con i due ordini aperti — «ordine #5
+«Lezione di inglese»: porta a termine il servizio» e «ordine #6
+«Bicicletta da citta'»: segna la consegna a mano». IL 409 dal vivo NON
+si è potuto vedere, per la ragione scritta qui sopra: lo tiene il banco
+node.
+
+**NOTATI E NON FATTI.** 1) La conferma che non porta la data (qui
+sopra). 2) I gesti che scrivono sulla sola copia aperta dell'ordine.
+3) Per un'asta vinta in attesa della scelta della consegna le ferie
+dicono «segna la spedizione», e chi vende lì non può ancora fare
+niente.

@@ -41624,6 +41624,23 @@ function pannelloServizioCompratore(o){
       ${testoLink}
     </div>`;
 }
+/* I FATTI CHE IL SERVER HA APPENA DETTO, SCRITTI DOVE LA PAGINA LI
+   RILEGGE (12 ott 2026, notte, cantiere gesti-subito, richiesta di
+   Andrea). I tre gesti dell'appuntamento — «Proponi la data», «Confermo,
+   ci sono», «Lascia il collegamento» — finiscono con `openOrder`, che
+   ridisegna dai dati che ha: senza aggiornarli la pagina restava com'era
+   finche' gli ordini non si rileggevano (il tocco sembrava andato a
+   vuoto). Si scrive sull'ordine aperto E sulla riga viva di `orders`,
+   che e' quella che `openOrder` rilegge: `currentOrder` puo' essere la
+   copia di PRIMA dell'ultima rilettura della lista (la lezione dei
+   solleciti, rivista nel giro dal vivo del 12 ott). */
+function segnaOrdineAperto(campi){
+  const o = currentOrder;
+  if (!o) return;
+  Object.assign(o, campi);
+  const viva = orders.find(x => x.id === o.id);
+  if (viva && viva !== o) Object.assign(viva, campi);
+}
 async function proponiAppuntamento(btn){
   const v = el('servQuando')?.value;
   if (!v) { toast('Scegli giorno e ora'); return; }
@@ -41644,14 +41661,12 @@ async function proponiAppuntamento(btn){
        senza queste righe diceva ancora «Proponi giorno e ora» finche'
        gli ordini non si rileggevano. La parola e' quella del server: la
        SUA data, e la conferma — che una proposta nuova azzera, e che
-       resta solo se la data e' la stessa di prima.
-       SI SCRIVE SULLA RIGA DI `orders`, che e' quella che `openOrder`
-       rilegge: `currentOrder` puo' essere la copia di PRIMA dell'ultima
-       rilettura della lista (visto nel giro dal vivo: scritta li', la
-       data non compariva). */
-    const riga = orders.find(x => x.id === currentOrder.id) || currentOrder;
-    riga.appuntamentoIl = Math.floor(Number(d.quando) || quando);
-    if (!d.confermato) riga.appuntamentoConfermatoIl = 0;
+       resta solo se la data e' la stessa di prima. Dove si scrive lo sa
+       `segnaOrdineAperto` (la riga viva di `orders`, non la sola copia
+       aperta: scritta li', nel giro dal vivo la data non compariva). */
+    segnaOrdineAperto(Object.assign(
+      {appuntamentoIl: Math.floor(Number(d.quando) || quando)},
+      d.confermato ? {} : {appuntamentoConfermatoIl: 0}));
     toast('📅 Proposta inviata');
     openOrder(currentOrder.id);
   } catch(e) { toast('Non è andata, riprova'); }
@@ -41665,7 +41680,28 @@ async function confermaAppuntamento(btn){
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()},
        credentials:'include'});
     const d = await r.json();
-    if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    if (!r.ok) {
+      /* LA DATA E' CAMBIATA MENTRE CONFERMAVI (il 409 del server: chi
+         vende ne ha proposta un'altra): la pagina rilegge l'ordine e
+         mostra quella nuova, da confermare — prima restava sulla
+         vecchia, e toccava uscire e rientrare (12 ott 2026, notte) */
+      if (r.status === 409) {
+        toast('La data è cambiata mentre confermavi: guarda quella nuova');
+        const id = currentOrder.id;
+        try { await loadOrders(); } catch(e) {}
+        if (orders.find(x => x.id === id)) openOrder(id);
+        return;
+      }
+      toast(d.detail || 'Non è andata'); return;
+    }
+    /* LA CONFERMA COMPARE SUBITO (12 ott 2026, notte, gesti-subito): la
+       data e' quella che il server ha confermato; il QUANDO della
+       conferma lo sa lui — qui e' adesso, e al prossimo giro degli
+       ordini arriva il suo. Una conferma gia' data resta la sua. */
+    segnaOrdineAperto({
+      appuntamentoIl: Math.floor(Number(d.quando) || currentOrder.appuntamentoIl || 0),
+      appuntamentoConfermatoIl: currentOrder.appuntamentoConfermatoIl
+        || Math.floor(Date.now() / 1000)});
     toast('✅ Appuntamento confermato');
     openOrder(currentOrder.id);
   } catch(e) { toast('Non è andata, riprova'); }
@@ -41684,6 +41720,12 @@ async function depositaAccesso(btn){
       body: JSON.stringify({accesso: v})});
     const d = await r.json();
     if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    /* IL COLLEGAMENTO LASCIATO COMPARE SUBITO (12 ott 2026, notte,
+       gesti-subito): «✅ Lasciato il…» e «Cambia il collegamento».
+       `accesso_il` e' il PRIMO deposito e non si muove piu': lo dice il
+       server, e una correzione lo lascia dov'era. */
+    segnaOrdineAperto({accessoIl: Math.floor(Number(d.accesso_il) || 0)
+      || currentOrder.accessoIl || Math.floor(Date.now() / 1000)});
     toast('🔗 Collegamento salvato');
     openOrder(currentOrder.id);
   } catch(e) { toast('Non è andata, riprova'); }

@@ -31131,6 +31131,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ancora chi parte per le ferie: la regola non è cambiata, la frase
   sì). I TONDI DEI GIORNI della fascia (`.p2p-pausa-giorni
   .p2p-accesso-chip`) sono alti 40px come le celle.
+  I GESTI DELL'APPUNTAMENTO (12 ott 2026, notte, cantiere
+  `gesti-subito`): `segnaOrdineAperto(campi)` scrive i fatti appena
+  detti dal server sull'ordine aperto E sulla riga viva di `orders`
+  (quella che `openOrder` rilegge), e di lì passano tutti e tre —
+  `proponiAppuntamento` (la data; la conferma azzerata se la proposta è
+  nuova), `confermaAppuntamento` (la data del server e la conferma:
+  l'ora è «adesso», una già data resta; al 409 rilegge gli ordini e si
+  ridisegna sulla data nuova), `depositaAccesso` (`accessoIl` = il
+  primo deposito, che una correzione non sposta). Dopo il tocco la
+  pagina dice subito «Hai proposto…», «✅ … — confermato», «✅ Lasciato
+  il…». `_impegni_aperti` dice a ogni ordine pagato la SUA via
+  d'uscita: «consegna il codice» (digitale), «porta a termine il
+  servizio», «segna la consegna a mano» (ritiro), «segna la spedizione»
+  (il resto). ⚠️ NON CURATO: `conferma_appuntamento` non riceve la data
+  che chi compra sta guardando — conferma quella che il server ha in
+  quel momento (Cantieri, «I gesti dell'appuntamento»).
   • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
   `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
   senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo
