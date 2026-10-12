@@ -53397,7 +53397,19 @@ e in «Come funziona»; e la slide del giro guidato non giura più «lo
 dice la matematica»: dice «Barattolo non li legge, e a fine scambio
 la chat si cancella», che vale per tutti. SUL TASTO DELL'AVVISO,
 letto il rapporto: Andrea non ricorda se l'ha toccato («può darsi»),
-e la cura copre comunque tutti i casi.
+e la cura copre comunque tutti i casi. E I RECAPITI, prima del push,
+con la stessa logica e la stessa forma corta: nel patto, accanto a
+«il recapito non passa da noi», «I recapiti sono cifrati fra voi due.
+Se il tuo account è nato su Nostr, Barattolo non li può aprire. Se è
+nato con Telegram (anche se poi entri con Nostr), il tuo profilo di
+scambio lo ricava il server: per questo Barattolo potrebbe
+tecnicamente aprirli. Non lo fa.» — viaggiano sui relay chiusi fra le
+due chiavi dello scambio, e quelle di un account nato con Telegram il
+server le sa ricavare. In «Come funziona» la riga «li leggete solo
+voi due» è diventata «sono cifrati fra voi due, e Barattolo non li
+legge». I due paragrafi del patto sul PROFILO di scambio dicono
+ancora «se entri da Telegram / con una chiave Nostr»: non toccati,
+segnalati ad Andrea.
 
 **COM'È FATTA** (per intero in ARCHITETTURA, «LA CHAT SEGUE LO
 SCAMBIO: LA COPIA SIGILLATA»). La chiave resta casuale e usa-e-getta.

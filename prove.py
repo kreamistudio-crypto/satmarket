@@ -92281,6 +92281,13 @@ def prove_chat_scambio():
     prova("...niente promette piu' quel che non e' vero per tutti", [],
           [f for f in ("non la può leggere", "non li può leggere", "la chiave non passa mai di lì",
                        "non lascia il dispositivo") if f in patto + info + blocco])
+    FRASE_RECAPITI = ("I recapiti sono cifrati fra voi due. Se il tuo account è nato su Nostr, Barattolo non li può aprire. Se è nato con Telegram (anche se poi entri con Nostr), il tuo profilo di scambio lo ricava il server: per questo Barattolo potrebbe tecnicamente aprirli. Non lo fa.")
+    prova("I RECAPITI hanno la stessa frase, nella stessa forma corta (richiesta di Andrea): l'account "
+          "nato su Nostr, quello nato con Telegram anche se poi entra con Nostr, e «non lo fa»",
+          True, "<b>" + FRASE_RECAPITI + "</b>" in patto)
+    prova("...e «Come funziona» non dice piu' che recapiti e chat li leggete «solo voi due»",
+          (False, True), ("li leggete solo voi due" in mini,
+                          "sono cifrati fra voi due, e Barattolo non li legge.</li>" in mini))
     prova("...e dice cosa il server vede, che i backup non la tengono, e cosa non si puo' cancellare",
           [], [f for f in ("chi dei due l'ha spedito, a che ora, quanto pesa",
                            "<b>non entra nei backup</b>", "<b>non si ricalcola da niente</b>",
