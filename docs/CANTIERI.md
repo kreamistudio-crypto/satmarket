@@ -51964,3 +51964,17 @@ collaudo ballerino degli avvisi del mercatino, CLAUDE.md): per la regola
 del 10 ott Andrea ha scelto la strada piena — rebase su 539245a (un solo
 conflitto, in coda a CANTIERI, tutt'e due le voci tenute) e suite intera
 più collaudi SOLO sull'albero ribasato, i conti qui sotto.
+Sulla copia pulita dell'albero ribasato su 539245a (0f3f6c2): la suite
+intera 22569 passate, 0 fallite; i 64 collaudi della CI verdi (c'è
+anche `collaudo_dispute_cruscotto`, arrivato da main). E mentre girava,
+main è corso una TERZA volta (tre commit fino a 811e2f0: il gruppo
+degli admin con 754 righe in server.py, `collaudo_punti_barattolo` in
+CI, l'hackathon nei documenti). Andrea aveva già detto «rebase e push
+subito»: rebase su 811e2f0 — due conflitti in coda, CANTIERI e prove.py
+(`prove_canale_admin` e `prove_chi_e_l_altro` appese nello stesso
+punto, tenute tutt'e due) — e, per non inseguire, SOLO le sezioni
+toccate sull'albero finale: le undici prove (le dieci del cantiere più
+`prove_canale_admin`) 864 verdi, gli undici collaudi vicini in gabbia
+(i nove del cantiere più `collaudo_canale_admin` e
+`collaudo_punti_barattolo`) verdi, i tre blocchi script della pagina
+compilano. La suite intera sull'albero finale la dice la CI.
