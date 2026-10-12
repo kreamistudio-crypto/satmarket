@@ -51468,3 +51468,44 @@ ea0af71a». • Dopo il primo giro dell'ora, la query di PRODUZIONE sulla
 colonna: quante righe restano a -1 (sono gli scambi chiusi prima di
 inizio settembre). • «I tuoi dati»: se nominare la garanzia nel
 paragrafo del registro.
+
+**LA TORTURA, E IL BANCO CHE HA MENTITO.** Quattordici mutazioni su una
+copia: il consolidamento che non scrive la garanzia, le righe vecchie
+che non si riempiono, la cronaca intera che vale «non si sa» e quella a
+metà che vale «no», il giudice che non legge la colonna o che deduce
+anche dove dice no, le escluse che restano nel conto, l'esclusione per
+un pezzo qualunque dell'id, il capo di un carattere, la leva storta che
+esclude lo stesso, la migrazione tolta, la disputa che non esce dai
+dedotti, le escluse senza `esc()`, la frase della deduzione sempre.
+Al primo giro 11 su 14, e le tre sfuggite erano due cose diverse:
+• UNA ERA VERA: «il consolidamento non scrive la garanzia». La prova
+guardava il registro DOPO un secondo consolidamento, che riempie le
+righe a -1: un server che la scriveva sbagliata alla nascita passava
+per buono. Ora c'è la foto della riga appena nata («scritta ALLA
+NASCITA, non al giro dopo»).
+• DUE ERANO DEL BANCO: lo script della tortura doveva lanciare anche
+`prove_statistiche_p2p` (è lì che il consolidamento gira davvero) e la
+riga che la aggiungeva non aveva trovato la sua ancora, in silenzio —
+il controllo stampava «ok» guardando la cosa sbagliata. Rifatte le
+quattro mutazioni del consolidamento col banco giusto: 4 su 4. In
+tutto 14 su 14. È la lezione di «la tortura: il banco mente» un'altra
+volta: prima di credere a una sfuggita, o a una presa, si guarda COSA
+ha lanciato il banco.
+
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Il cantiere è
+nato sopra `88ed663`. Main è corso di TRE commit non miei (`a180fa6`
+CLAUDE.md, `e460c2f` il collaudo ballerino degli avvisi del mercatino,
+`02dec6b` il suo verbale): rebase col solo conflitto della coda di
+questo file, sciolto tenendo la voce di main e questa riappesa sotto
+(il diff contro main: solo aggiunte, zero righe tolte); cercati per
+nome, dopo, i simboli del cantiere: ci sono, una volta sola. SULL'ALBERO
+RIBASATO, quello del push (sopra `02dec6b`, ricontrollato col fetch):
+`PROVE_SEVERE=1 python prove.py` INTERA, 22.561 passate e 0 fallite,
+nessuna saltata; i 63 collaudi del workflow nella gabbia (tre gruppi in
+parallelo), 63 verdi; `compileall`; lo scanner dei segreti sulle righe
+aggiunte, con le forme lette dal workflow e la controprova. Sopra
+`88ed663`, prima del rebase: le prove vicine, i 63 collaudi una prima
+volta (63 verdi), la tortura e il giro dal vivo — da lì all'albero del
+push sono cambiati solo CLAUDE.md, `collaudo_avvisi_mercatino.py` e
+questo file. La voce era già scritta quando la suite è girata, tranne
+questi due paragrafi.
