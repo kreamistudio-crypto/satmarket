@@ -5728,9 +5728,11 @@ def init_db():
         -- gli argomenti scritti in CANTIERI («Il libro che avvisa»,
         -- l'emenda) — le card mostrano gia' chi pubblica e le due parti
         -- si conoscono comunque per il pagamento fiat. Lo dichiara il
-        -- client alla presa accettata, SOLO per chi entra da Telegram
-        -- (tg_id > 0): chi entra da Nostr non viene annotato e resta
-        -- sulla generica. Una riga nata dalla presa di un ordine altrui
+        -- client alla presa accettata, e dal 12 ott 2026 (chi-e-l-altro)
+        -- per CHIUNQUE sia qualcuno, con qualunque login: fino ad allora
+        -- chi entrava da Nostr non veniva annotato (poi con un
+        -- interruttore, poi tolto), e quelle prese di prima restano a 0.
+        -- Una riga nata dalla presa di un ordine altrui
         -- ha tg_id 0 finche' chi l'ha pubblicato non si presenta.
         stato TEXT DEFAULT '',
         lato TEXT DEFAULT '',
@@ -47148,11 +47150,13 @@ def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
     nuovo. Il livello esce col solo NOME: gli XP sono roba di chi li
     ha, e un numero altrui non aiuta nessuno a decidere se fidarsi.
 
-    ⚠️ CHI ENTRA DA NOSTR NON HA UNA RIGA DA MOSTRARE QUANDO PRENDE, e
-    non e' un caso da rattoppare: `preso_da` per lui non si scrive (la
-    decisione del 16 set 2026), quindi chi ha pubblicato non riceve
-    niente e la pagina lo dice. E' la forma in cui l'anonimato esiste
-    — l'unica che non chiede a nessuno di fidarsi di una promessa.
+    DAL 12 OTT 2026 (chi-e-l-altro) CHI PRENDE DA BARATTOLO HA SEMPRE
+    UNA RIGA: `preso_da` si scrive con qualunque login (la decisione
+    del 16 set 2026, che per chi entrava da Nostr non la scriveva, e'
+    superata), e l'anonimato e' una chiave Nostr nuova. Le prese di
+    PRIMA restano senza riga, e per quelle il giudice legge le due
+    parti dette da mostrod: chi ha preso vede chi ha pubblicato (gia'
+    pubblico sulla card), chi ha pubblicato continua a non vedere lui.
 
     DUE QUERY E NON N: prima le righe degli ordini, poi UNA sola sui
     volti delle persone che ne sono uscite. Con MAX_ORDINI_P2P a 200
@@ -47278,14 +47282,13 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
     try:
-        # LA PRESA SI ANNOTA A CHI E' RICONOSCIUTO (16 set 2026, e
-        # dal 17 con l'interruttore): chi entra da Telegram lo e' da
-        # sempre; chi entra da Nostr no, e per lui non si scrive «l'ha
-        # preso» — resta sulla frase generica del campanello — finche'
-        # non accende «Fatti riconoscere negli scambi» dal cassetto
-        # «🔔 Avvisi». Il giudice e' UNO (`_p2p_riconosciuto`), che due
-        # letture della stessa cosa un giorno dicono cose diverse.
-        # E' scritto nella pagina «I tuoi dati» e nel cassetto Avvisi.
+        # LA PRESA SI ANNOTA A CHI E' RICONOSCIUTO (16 set 2026, dal 17
+        # con l'interruttore «Fatti riconoscere», e dal 12 ott 2026 —
+        # chi-e-l-altro, decisione di Andrea con Alan — a CHIUNQUE sia
+        # qualcuno, con qualunque login: l'interruttore e' uscito e
+        # l'anonimato e' una chiave Nostr nuova). Il giudice e' UNO
+        # (`_p2p_riconosciuto`), che due letture della stessa cosa un
+        # giorno dicono cose diverse. E' scritto nella pagina «I tuoi dati».
         esito = _registra_ordini_p2p(con, user["id"],
                                      (d or {}).get("ordini"), int(time.time()),
                                      bool((d or {}).get("pubblicati")),
@@ -54556,8 +54559,9 @@ def _nome_altro_p2p(con, ordine: str, per: int, adesso: int) -> str:
     """Il nome dell'ALTRA parte come lo vede `per` nella pagina dello
     scambio, gia' scappato — o vuoto. LO STESSO GIUDICE della pagina
     (`_controparti_p2p`, «LE PARTI SI VEDONO»): la frase non dice mai un
-    nome che la pagina non mostra, e chi entra da Nostr senza farsi
-    riconoscere resta «chi vende» / «chi compra» anche qui. E' un di
+    nome che la pagina non mostra: chi scambia da un'altra app, o chi
+    ha preso senza la presa annotata (uno scambio di prima del 12 ott
+    2026), resta «chi vende» / «chi compra» anche qui. E' un di
     piu': se non si legge la frase parte senza, e il journal lo dice."""
     try:
         nome = (_controparti_p2p(con, [ordine], per, adesso)

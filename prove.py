@@ -63833,16 +63833,15 @@ let p2pLibro = null;
    e' entrato senza un nome — tg_id negativo — perche' la sua presa
    non viene annotata e vedersi non succede. Qui e' uno stub, e il
    banco lo gira da 111 a -9 per leggere tutt'e due le righe.
-   ⚠️ E DAL 17 SET 2026 QUEL VERSO HA UN INTERRUTTORE: chi entra da
-   Nostr puo' farsi riconoscere, e allora vale la riga di tutti. Lo
-   stub nasce SPENTO come nel client (le sue prove stanno in
-   `prove_recensione_p2p`), e serve anche a non far esplodere il
-   banco: senza, il foglio nomina una variabile che non c'e'. */
+   ⚠️ DAL 17 SET 2026 QUEL VERSO AVEVA UN INTERRUTTORE («Fatti
+   riconoscere»), e DAL 12 OTT 2026 (chi-e-l-altro) NON C'E' PIU' NE'
+   l'interruttore ne' il verso: chi scambia da Barattolo e' riconosciuto
+   con qualunque login, e l'anonimato e' una chiave nuova. Il banco gira
+   ancora da 111 a -9 per provare che nessuno dei due legge piu' la riga. */
 let myTgId = 111;
 /* ...e la vetrina anonima (10 ott 2026): il piede del dettaglio la
    guarda per dare «Entra» a chi non e' entrato */
 let VETRINA = false;
-let myRiconosciP2P = false;
 /* le impostazioni del coordinator e la busta delle leve: i casi del
    conto le girano come vogliono, e il p2pCoord e' quello VERO */
 let p2pInfo = null;
@@ -64119,10 +64118,11 @@ out.senzaVoltoNienteRep = out.paginaVendi.indexOf('p2p-rep-tre') < 0;
 /* ---- L'AVVISO «VI VEDETE» NON C'E' PIU' (17 set 2026, decisione
    di Andrea) ----
    Stava qui e nel foglio di chi pubblica, ed e' uscito da tutt'e due.
-   RESTA la riga di chi e' entrato senza un nome, che dice un'altra
-   cosa — che di lui non si vede niente — e porta all'interruttore: la
-   pagina e' la STESSA e cambia una variabile sola, che e' il modo di
-   provare che a decidere e' chi guarda e non l'ordine. */
+   (12 ott 2026, chi-e-l-altro) E NON C'E' PIU' NEMMENO la riga di chi
+   e' entrato senza un nome («Per chi ha pubblicato resti sconosciuto»):
+   chi scambia da Barattolo e' riconosciuto con qualunque login, e
+   l'anonimato e' una chiave nuova. La pagina si guarda nei due versi —
+   stesso ordine, cambia solo chi guarda — e in nessuno la dice. */
 out.nienteAvviso = out.paginaVendi.indexOf('vi vedete') < 0;
 out.notoNonLaVede = out.paginaVendi.indexOf('Per chi ha pubblicato resti sconosciuto') < 0;
 myTgId = -9;
@@ -65177,14 +65177,12 @@ console.log(JSON.stringify(out));
     # Andrea): stava qui e nel foglio di chi pubblica, ed e' uscito da
     # tutt'e due. Il posto dove le cose si spiegano e' «I tuoi dati»,
     # e li' resta — la sentinella larga sta in `prove_parti_si_vedono`.
-    # RESTA INVECE la riga di chi e' entrato senza un nome, ed e'
-    # un'altra cosa: non dice «vi vedete», dice il contrario, e porta
-    # all'interruttore. Un avviso che informa e basta se n'e' andato;
-    # una riga che apre una porta resta.
+    # (12 ott 2026, chi-e-l-altro) E LA RIGA DI CHI RESTA ANONIMO E'
+    # USCITA CON L'INTERRUTTORE: nessuno dei due versi la dice piu'.
     prova("l'avviso «vi vedete» non c'e' in nessuno dei due versi",
           [True, True], [o["nienteAvviso"], o["anonimoNienteAvviso"]])
-    prova("...e la riga di chi resta anonimo la legge solo lui",
-          [True, True], [o["anonimoLoDice"], o["notoNonLaVede"]])
+    prova("...e la riga di chi resta anonimo non c'e' piu', in nessuno dei due versi",
+          [False, True], [o["anonimoLoDice"], o["notoNonLaVede"]])
     # (7 ott 2026, sera, decisione di Andrea) IL DETTAGLIO BARATTOZON DAL
     # LIBRO, disegnato dal vero: la riga 🧾 se n'e' andata (la dice il
     # riquadro «Come funziona» coi suoi quattro passi), e il bottone che
@@ -65378,9 +65376,17 @@ def prove_parti_si_vedono():
         "INSERT INTO p2p_ordini VALUES('ordine-bbb',111,1,'',1,0);"
         # un ordine di due estranei
         "INSERT INTO p2p_ordini VALUES('ordine-ccc',333,1,'',1,444);"
-        # un ordine preso da chi e' entrato con una chiave: il server
-        # non lo annota, quindi `preso_da` resta zero
-        "INSERT INTO p2p_ordini VALUES('ordine-ddd',111,1,'',1,0);")
+        # un ordine preso da chi e' entrato con una chiave PRIMA del 12
+        # ott 2026: allora il server non lo annotava, `preso_da` e' zero
+        "INSERT INTO p2p_ordini VALUES('ordine-ddd',111,1,'',1,0);"
+        # ...e uno uguale, ma mostrod ha gia' nominato le due parti:
+        # Cleo (-7) ha comprato da Ada
+        "INSERT INTO p2p_ordini VALUES('ordine-eee',111,1,'',1,0);"
+        # (12 ott 2026, chi-e-l-altro) le due parti dette da mostrod: il
+        # giudice le legge nella stessa query delle prese annotate
+        "CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY,"
+        " compratore INTEGER DEFAULT 0, venditore INTEGER DEFAULT 0);"
+        "INSERT INTO p2p_scambi VALUES('ordine-eee',-7,111);")
     i_l = _SORGENTE.index('LIVELLI = [(0, 0, "nuovo"')
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
            "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400,
@@ -65410,7 +65416,7 @@ def prove_parti_si_vedono():
     chi_di = amb["_controparti_p2p"]
 
     def per(io, ordini=("ordine-aaa", "ordine-bbb", "ordine-ccc",
-                        "ordine-ddd")):
+                        "ordine-ddd", "ordine-eee")):
         return chi_di(con, list(ordini), io, 1000000)
 
     # IL PROFILO ESCE DAI DUE LATI, e ognuno vede L'ALTRO
@@ -65441,11 +65447,18 @@ def prove_parti_si_vedono():
     # PRIMA DELLA PRESA NON C'E' NIENTE DA SERVIRE
     prova("un ordine pubblicato e non preso non ha controparte", False,
           "ordine-bbb" in a)
-    # ⚠️ E CHI E' ENTRATO CON UNA CHIAVE RESTA ANONIMO QUANDO PRENDE:
-    # la sua presa non viene annotata, quindi qui non c'e' niente —
-    # ed e' voluto, non un difetto da tappare.
-    prova("...e nemmeno un ordine preso da chi resta anonimo", False,
+    # (12 ott 2026, chi-e-l-altro) UNA PRESA MAI ANNOTATA — com'era per
+    # chi entrava da Nostr fino a oggi — non da' un volto a chi ha
+    # pubblicato: il passato resta com'era, non si ricostruisce
+    prova("...e nemmeno un ordine preso senza la presa annotata", False,
           "ordine-ddd" in a)
+    # ...ma se mostrod ha nominato le due parti (`p2p_scambi`), chi ha
+    # preso vede comunque chi ha pubblicato — che e' gia' pubblico sul
+    # libro — mentre chi ha pubblicato continua a non vedere lui
+    prova("chi ha preso senza la presa annotata vede chi ha pubblicato, da mostrod",
+          ["Ada Rossi", False],
+          [(per(-7, ["ordine-eee"]).get("ordine-eee") or {}).get("nome"),
+           "ordine-eee" in a])
     # IL CONFINE: un estraneo con una sessione non riceve niente, e
     # non riceve nemmeno un errore
     prova("un estraneo non riceve la riga di due altri", {},
@@ -107417,8 +107430,10 @@ def prove_avvisi_nuovi_ordini():
           'aria-label="Avvisi dei nuovi ordini P2P">\n    <div class="grab"></div>\n'
           '    <div id="p2pAvvisiCorpo"></div>' in m
           and 'id="p2pAvvisiTit"' not in m)
-    prova("il cassetto Avvisi ha la riga, dopo le tre sorelle", True,
-          "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;" in m)
+    # (12 ott 2026, chi-e-l-altro) la terza sorella, l'interruttore
+    # «Fatti riconoscere», e' uscita: ne restano due
+    prova("il cassetto Avvisi ha la riga, dopo le due sorelle", True,
+          "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaAvvisiNuoviP2P()}`;" in m)
     prova("il carico da /api/me passa dal normalizzatore (chiave assente = spento)", True,
           "myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(me.avvisi_nuovi_p2p);" in m)
     prova("il gesto parla con la rotta giusta e prende lo stato dalla risposta del server", True,
@@ -107977,7 +107992,7 @@ def prove_avvisi_mercatino():
         prova(f"i messaggi non dicono «{spia}»", False, spia in frasi.lower())
     # il client
     prova("il cassetto Avvisi accoda il blocco DOPO le righe del P2P senza toccare la loro riga", True,
-          "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}${rigaAvvisiNuoviP2P()}`;\n" in m
+          "${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaAvvisiNuoviP2P()}`;\n" in m
           and "  box.insertAdjacentHTML('beforeend', rigaAvvisiMercatino());\n}\n" in m)
     # LA CAMPANELLA TONDA (9 ott 2026, sera, ritocco di Andrea): non piu'
     # una pillola sotto la riga delle vendite, ma il primo tondo della fila
@@ -143659,8 +143674,9 @@ def prove_dati_reputazione_p2p():
     # non viene annotata», che dal cantiere reputazione-p2p era vero solo
     # per i volti. Ora dicono a CHI resta sconosciuto — all'altra persona
     # — e che l'esito si scrive lo stesso. E il perche' sta nel codice:
-    # l'interruttore «Fatti riconoscere» lo guarda chi annota la presa
-    # fra i volti, NON chi scrive gli esiti.
+    # il giudice del riconoscimento (`_p2p_riconosciuto`, che dal 12 ott
+    # 2026 dice si' a chiunque sia qualcuno) lo guarda chi annota la
+    # presa fra i volti, NON chi scrive gli esiti.
     prova("la pagina non dice piu' che chi entra da Nostr e prende «non "
           "viene annotato»", [],
           [f for f in ("non viene annotato quando prende",
@@ -143684,7 +143700,7 @@ def prove_dati_reputazione_p2p():
     prova("...e «dimentica il profilo» toglie le prese annotate, non gli "
           "esiti: anche qui", True,
           "che toglie le prese annotate, non gli esiti" in nostr[1])
-    prova("nel codice: l'interruttore «Fatti riconoscere» decide i volti "
+    prova("nel codice: il giudice del riconoscimento decide i volti "
           "(la presa annotata), non gli esiti", (True, False),
           ("_p2p_riconosciuto(con, user[\"id\"])" in pezzo("registra_ordini_p2p"),
            "_p2p_riconosciuto" in segna))

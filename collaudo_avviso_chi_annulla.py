@@ -136,9 +136,13 @@ async def giro():
     SRV.P2P_EVENTI_SEGRETO = SEGRETO
     # I NOMI: la frase dice il nome dell'altra parte solo se la pagina
     # dello scambio lo mostra (`_nome_altro_p2p`, «LE PARTI SI VEDONO»).
-    # Qui le due parti non si sono fatte riconoscere, quindi le frasi
-    # dicono «chi compra» / «chi vende»: i nomi veri li prova il banco di
-    # `prove_avviso_chi_annulla`
+    # Qui nessuno dichiara la presa dal telefono (`preso_da` resta 0),
+    # quindi chi ha PUBBLICATO legge «chi compra» / «chi vende»; chi ha
+    # PRESO, dal 12 ott 2026 (chi-e-l-altro), vede chi ha pubblicato
+    # appena mostrod nomina le due parti: nelle frasi di chi ha preso il
+    # nome e' MAIUSCOLO («Chi compra» / «Chi vende» sono i NOMI che il
+    # banco semina a C e a V), in quelle di chi ha pubblicato e' il ruolo
+    # minuscolo. I nomi veri li prova il banco di `prove_avviso_chi_annulla`
 
     print("\n1) IL CASO DI ANDREA: chi vende prende un acquisto, blocca i sats, si ritira")
     o = ordine(1)
@@ -149,7 +153,7 @@ async def giro():
     prova("il ritiro entra: nuovo", {"ok": True, "nuovo": True}, r)
     prova("partono DUE avvisi: a chi ha pubblicato il ritorno in vetrina, a chi "
           "si e' ritirato il suo, coi sats tornati",
-          [(V, f"❌ <b>Hai annullato lo scambio con chi compra.</b>{TORNATI}"),
+          [(V, f"❌ <b>Hai annullato lo scambio con Chi compra.</b>{TORNATI}"),
            (C, f"🔄 <b>Chi vende ha annullato lo scambio.</b> Il tuo ordine è "
                "tornato in vetrina: non devi fare niente.")], detto())
     print("   (le due frasi, come arrivano:)")
@@ -162,7 +166,7 @@ async def giro():
     semina_ordine(o, "buy")
     await fino_a(o, "preso", t0 + 100)
     await posta(busta(o, "canceled", t0 + 140, "seller", "republished"))
-    prova("a chi si ritira la frase senza sats", f"❌ <b>Hai annullato lo scambio con chi compra.</b>",
+    prova("a chi si ritira la frase senza sats", f"❌ <b>Hai annullato lo scambio con Chi compra.</b>",
           dict(banco.DETTO).get(V))
 
     print("\n3) chi ha PUBBLICATO (e vende) annulla dopo aver bloccato")
@@ -201,7 +205,7 @@ async def giro():
           [(V, f"❌ <b>Chi compra ha accettato di annullare: lo scambio è annullato.</b>"
                f"{TORNATI}"),
            (C, f"❌ <b>Hai accettato di annullare: lo scambio con "
-               f"chi vende è annullato.</b>")], detto())
+               f"Chi vende è annullato.</b>")], detto())
     o = ordine(6)
     t0 = ora(500)
     semina_ordine(o, "sell")
@@ -347,8 +351,10 @@ async def giro():
         semina_ordine(o, "sell", ("Contanti",))
         await fino_a(o, "preso", t0 + 1500)
         await posta(busta(o, "canceled", t0 + 1540, "buyer", "republished"))
+        # «Chi vende» maiuscolo e' il NOME di V: C ha preso, e dal 12 ott
+        # 2026 vede chi ha pubblicato (mostrod ha nominato le due parti)
         prova("chi compra si ritira: il suo avviso, e sotto la cauzione che torna",
-              f"❌ <b>Hai annullato lo scambio con chi vende."
+              f"❌ <b>Hai annullato lo scambio con Chi vende."
               "</b>\n\n🔐 La cauzione che avevi bloccato torna nel tuo wallet.",
               dict(banco.DETTO).get(C))
     finally:
