@@ -192,6 +192,7 @@ jobs:
              collaudo_tempo_pubblica.py
              collaudo_gesti_ordine.py
              collaudo_ordine_in_pausa.py
+             collaudo_paracadute.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -322,6 +323,7 @@ jobs:
              collaudo_tempo_pubblica
              collaudo_gesti_ordine
              collaudo_ordine_in_pausa
+             collaudo_paracadute
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

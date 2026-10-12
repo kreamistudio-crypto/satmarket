@@ -6259,6 +6259,40 @@ def init_db():
         aggiornato INTEGER DEFAULT 0,
         salta_fino INTEGER DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS p2p_paracadute(
+        -- IL PARACADUTE, PER ORDINE (13 ott 2026, cantiere paracadute,
+        -- decisione di Andrea con Alan): chi pubblica dice «se il prezzo
+        -- di BTC sale o scende di X%, annullamelo». Una riga per ordine,
+        -- scritta all'intestazione come la zona e il filtro (la prima
+        -- resta), solo sugli ordini che la persona ha PUBBLICATO.
+        -- `soglia` e' il percento, una di P2P_PARACADUTE_SOGLIE.
+        -- `partenza` sono gli euro per bitcoin del NOSTRO cambio quando
+        -- la riga e' nata (0 = in quel momento non si sapeva: la riempie
+        -- la prima lettura buona dell'orologio). `oltre` conta le
+        -- letture DI FILA oltre la soglia, `lettura` e' l'ora
+        -- dell'ultima lettura contata: la stessa non si conta due volte.
+        -- `aperto` e' l'ora in cui il paracadute si e' aperto (0 =
+        -- chiuso), `arrivo` il prezzo di quel momento. `superato` e'
+        -- l'ora in cui un'apertura e' stata disfatta, perche' l'ordine
+        -- risultava preso un attimo prima.
+        -- ⚠️ A DIFFERENZA DELLA PAUSA, QUI SI SCRIVE SULL'ORDINE: la
+        -- pausa finisce da sola con l'orologio, un paracadute aperto
+        -- resta aperto. E VALE DENTRO BARATTOLO finche' il telefono di
+        -- chi ha pubblicato non firma il `cancel`: per il coordinatore
+        -- l'ordine resta `pending`, e quella firma il server non la fa
+        -- (regola ferrea 2). Niente di qui esce verso i relay.
+        ordine TEXT PRIMARY KEY,
+        tg_id INTEGER NOT NULL,
+        soglia INTEGER NOT NULL,
+        partenza REAL DEFAULT 0,
+        creato INTEGER DEFAULT 0,
+        oltre INTEGER DEFAULT 0,
+        lettura INTEGER DEFAULT 0,
+        aperto INTEGER DEFAULT 0,
+        arrivo REAL DEFAULT 0,
+        superato INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_paracadute_tg ON p2p_paracadute(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_semi(
         -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
         -- d'identita' Mostro di chi entra da Telegram si ricava con
@@ -16524,6 +16558,10 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE p2p_pause SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (id_nostr,))
+        # ...e i paracadute (13 ott 2026) seguono gli ordini: la PK e'
+        # l'ordine, quindi qui non collide niente
+        con.execute("UPDATE p2p_paracadute SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
         # perche' qui la scelta non e' neutra come per i preferiti: la'
@@ -29329,6 +29367,15 @@ def _leve_stato():
                   spento="come ieri: niente pausa né badge, un solo "
                          "promemoria a metà tempo, e chi pubblica non "
                          "viene mai contato"),
+            # IL PARACADUTE (13 ott 2026): spento di serie
+            _leva("Paracadute degli ordini P2P", "P2P_PARACADUTE", P2P_PARACADUTE,
+                  acceso="chi pubblica può scegliere una soglia (5, 10, "
+                         "20%): se BTC si muove oltre, l'ordine esce dal "
+                         "libro e il suo telefono lo annulla alla prima "
+                         "apertura; mai Barattozon",
+                  spento="come ieri: nessuna riga nel foglio che pubblica, "
+                         "l'orologio non guarda il prezzo, e i paracadute "
+                         "già aperti non nascondono più niente"),
             # LA CHAT NELLO SCAMBIO (12 ott 2026): accesa di serie
             _leva("Chat nello scambio P2P", "P2P_CHAT_SCAMBIO",
                   P2P_CHAT_SCAMBIO,
@@ -45352,6 +45399,21 @@ try:
     P2P_TEMPO_DI_CHI_PUBBLICA = P2P_TEMPO_DI_CHI_PUBBLICA is True
 except ImportError:
     P2P_TEMPO_DI_CHI_PUBBLICA = False
+# IL PARACADUTE (13 ott 2026, cantiere paracadute, decisione di Andrea con
+# Alan): chi pubblica un ordine puo' dire «se il prezzo di BTC sale o
+# scende di X%, annullamelo» — un ordine resta nel libro per giorni, e il
+# prezzo di lunedi' giovedi' puo' non stargli piu' bene. SPENTO DI SERIE:
+# a leva spenta la riga nel foglio non c'e', l'orologio non guarda il
+# prezzo e nessun ordine si nasconde. Solo True accende. Le soglie, le due
+# letture e i giudici stanno piu' sotto, nel blocco «IL PARACADUTE».
+try:
+    from config import P2P_PARACADUTE
+    if not isinstance(P2P_PARACADUTE, bool):
+        print("[p2p] P2P_PARACADUTE non e' True/False: il paracadute "
+              "resta SPENTO")
+    P2P_PARACADUTE = P2P_PARACADUTE is True
+except ImportError:
+    P2P_PARACADUTE = False
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
 # chi lo chiede riceve un messaggio quando nel libro P2P compaiono
 # ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
@@ -45691,6 +45753,9 @@ def _p2p_leve() -> dict:
             # il tempo di chi pubblica (12 ott 2026): pausa degli ordini,
             # badge e regole nuove; il client le mostra solo con questa
             "tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),
+            # il paracadute (13 ott 2026): la riga nel foglio che pubblica
+            # e il segno sulla card ci sono solo con questa
+            "paracadute": bool(P2P_PARACADUTE),
             # la chat nello scambio (12 ott 2026): accesa di serie; a
             # leva spenta il client non mostra il riquadro
             "chat": bool(P2P_CHAT_SCAMBIO),
@@ -46598,7 +46663,8 @@ P2P_TENTATIVO_MARGINE_S = 60
 P2P_GESTI_TENTATIVO = ("garanzia_aperta", "garanzia_copiata", "garanzia_wallet",
                        "cauzione_aperta", "cauzione_copiata", "cauzione_wallet",
                        "fattura_inviata", "fattura_rifiutata", "fattura_scartata")
-P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute", "pausa")
+P2P_MOTIVI_PRESA = ("filtro", "mancati", "prese", "sospesi", "dispute", "pausa",
+                    "paracadute")
 # ═══ I MALUS DOPO LA GARANZIA (10 ott 2026, cantiere malus-p2p, richiesta
 # di Andrea dopo lo studio sul feedback). Le quattro regole qui sopra
 # guardano il PRIMO gesto; a garanzia bloccata non c'era nessuna
@@ -47069,6 +47135,381 @@ def _presa_in_pausa_p2p(con, tg_id, quando: int) -> bool:
         return False
     return bool(_fine_pausa_p2p(p, int(quando))
                 or _fine_pausa_p2p(p, int(quando) + P2P_PAUSA_PRIMA_S))
+
+
+# ═══ IL PARACADUTE (13 ott 2026, cantiere paracadute, decisione di Andrea
+# con Alan) ═══════════════════════════════════════════════════════════
+# Chi pubblica un ordine lo fa perche' a QUEL prezzo gli sta bene. Ma un
+# ordine resta nel libro per giorni. A PREZZO FISSO, se BTC sale chi vende
+# regala la differenza a chi prende (e se scende la regala chi compra); A
+# MERCATO nessuno regala niente — i sats li conta il coordinatore alla
+# presa — ma si scambia a un prezzo che non e' piu' quello visto
+# pubblicando. Il paracadute e' la frase «se BTC sale o scende di X% da
+# adesso, annullamelo», detta pubblicando.
+# LE QUATTRO DECISIONI DI ANDREA (12-13 ott 2026), da non rovesciare:
+# 1) IL `cancel` LO FIRMA IL TELEFONO, MAI IL SERVER. Per chi e' nato con
+#    Telegram il server il profilo lo saprebbe ricavare, ma firmare al
+#    posto di qualcuno e' custodia (regola ferrea 2: la stessa strada
+#    scartata per la pausa). Quindi DUE TEMPI, uguali per tutti: SUBITO il
+#    server nasconde l'ordine, non lo fa prendere da qui (la porta della
+#    pausa) e avvisa; POI il telefono, alla prima apertura, manda il
+#    `cancel` vero. Nel mezzo per un'altra app Mostro l'ordine e' ancora
+#    `pending`: una presa da li' non costa niente a chi ha pubblicato
+#    (`pausa_presa`, la tutela della presa arrivata in pausa).
+# 2) BARATTOZON FUORI, come dalla pausa: ha gia' la scadenza del PayCode.
+# 3) SI APRE DOPO DUE LETTURE DI FILA oltre la soglia
+#    (P2P_PARACADUTE_LETTURE): un numero impazzito della fonte non deve
+#    cancellare gli ordini di tutti. E UNA FONTE MUTA NON APRE NIENTE: una
+#    lettura piu' vecchia di P2P_PARACADUTE_FRESCO_S non si conta — in
+#    quel buco l'ordine non e' protetto, e «Info P2P» lo dice.
+# 4) SPENTO DI SERIE nel foglio che pubblica; il telefono ricorda
+#    l'ultima scelta.
+# UN ORDINE PRESO NON SI TOCCA: l'orologio guarda solo quelli `pending` e
+# senza una presa in corso; se l'ordine torna nel libro il paracadute e'
+# di nuovo armato, col prezzo della pubblicazione.
+# LA FONTE E' IL CAMBIO DI TUTTA L'APP (`cambio_noto_ora`, riletto ogni
+# CAMBIO_RINFRESCO_S): nessuna chiamata nuova, e mai la rete da qui.
+P2P_PARACADUTE_SOGLIE = (5, 10, 20)
+P2P_PARACADUTE_LETTURE = 2        # letture di fila oltre la soglia
+P2P_PARACADUTE_FRESCO_S = 300     # una lettura piu' vecchia non si conta
+P2P_BOTTONE_PARACADUTE = "🔁 Ripubblica al prezzo nuovo"
+P2P_PARACADUTE_DOPO = ("🪂 Il paracadute di quest'ordine era già aperto: "
+                       "puoi annullare senza penalità.")
+P2P_PARACADUTE_PRIMA = ("🪂 Il paracadute non vale: l'ordine era stato preso "
+                        "un attimo prima che si aprisse. Lo scambio va avanti "
+                        "come sempre.")
+
+
+def _soglia_paracadute_p2p(v) -> int:
+    """PURA: una soglia del catalogo, o 0 (nessun paracadute). Una storta
+    vale 0 — il calco di `_soglia_filtro_p2p`."""
+    if isinstance(v, bool):
+        return 0
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return 0
+    return n if n in P2P_PARACADUTE_SOGLIE else 0
+
+
+def _scarto_paracadute_p2p(partenza, prezzo) -> float:
+    """PURA: di quanto si e' mosso il prezzo dalla partenza, in percento
+    col segno (+ salito, − sceso). 0 se uno dei due manca o e' storto: un
+    numero che non c'e' non e' un movimento."""
+    try:
+        a, b = float(partenza), float(prezzo)
+    except (TypeError, ValueError):
+        return 0.0
+    if not (a > 0 and b > 0) or a == float("inf") or b == float("inf"):
+        return 0.0
+    return (b - a) / a * 100.0
+
+
+def _passo_paracadute_p2p(riga: dict, prezzo, letto, adesso) -> dict:
+    """PURA: UNA LETTURA DEL PREZZO su un paracadute chiuso. `riga` porta
+    `soglia`, `partenza`, `oltre`, `lettura`; `prezzo` e' il cambio noto
+    (euro per bitcoin, 0 = non c'e'), `letto` l'ora in cui la fonte l'ha
+    dato. Torna `{partenza, oltre, lettura, apre, scarto, cambia}`.
+    • FONTE MUTA (prezzo che manca, o lettura piu' vecchia di
+      P2P_PARACADUTE_FRESCO_S): non cambia niente — non apre e non azzera;
+    • LA STESSA LETTURA non si conta due volte: sono DUE LETTURE di fila,
+      non due giri dell'orologio sullo stesso numero;
+    • una riga SENZA PARTENZA la prende da questa lettura, e non giudica;
+    • OLTRE la soglia, in su o in giu' — al filo esatto no: «piu' del
+      5%» dice il foglio — `oltre` sale, e a P2P_PARACADUTE_LETTURE si
+      apre; una lettura dentro la soglia lo riporta a zero."""
+    soglia = _soglia_paracadute_p2p(riga.get("soglia"))
+    try:
+        partenza = float(riga.get("partenza") or 0)
+    except (TypeError, ValueError):
+        partenza = 0.0
+    oltre, lettura = int(riga.get("oltre") or 0), int(riga.get("lettura") or 0)
+    fermo = {"partenza": partenza, "oltre": oltre, "lettura": lettura,
+             "apre": False, "scarto": 0.0, "cambia": False}
+    try:
+        prezzo, letto = float(prezzo or 0), int(float(letto or 0))
+    except (TypeError, ValueError):
+        return fermo
+    if not soglia or not prezzo > 0 or letto <= 0 \
+            or int(adesso) - letto > P2P_PARACADUTE_FRESCO_S or letto <= lettura:
+        return fermo
+    if not partenza > 0:
+        return {"partenza": prezzo, "oltre": 0, "lettura": letto,
+                "apre": False, "scarto": 0.0, "cambia": True}
+    scarto = _scarto_paracadute_p2p(partenza, prezzo)
+    oltre = oltre + 1 if round(abs(scarto), 6) > soglia else 0
+    return {"partenza": partenza, "oltre": oltre, "lettura": letto,
+            "apre": oltre >= P2P_PARACADUTE_LETTURE, "scarto": scarto,
+            "cambia": True}
+
+
+def _dichiara_paracadute_p2p(con, tg_id: int, mappa, adesso: int, cambio) -> int:
+    """Scrive i paracadute dichiarati, `{ordine: soglia}`, e torna quanti
+    ne ha scritti. La porta della zona e del filtro: SOLO sulla riga di
+    chi l'ordine l'ha PUBBLICATO (`maker` acceso), e LA PRIMA RESTA — la
+    soglia e il prezzo di partenza non si spostano dopo. LA PARTENZA E' IL
+    CAMBIO DEL SERVER di questo momento (`cambio`, 0 = non lo sa: la
+    riempie l'orologio), mai un numero detto dal telefono. Gli ordini
+    BARATTOZON non entrano. A leva spenta non scrive; una mappa storta e'
+    una mappa vuota; una soglia fuori catalogo non entra."""
+    if not P2P_PARACADUTE or not isinstance(mappa, dict):
+        return 0
+    try:
+        cambio = float(cambio or 0)
+    except (TypeError, ValueError):
+        cambio = 0.0
+    scritti = 0
+    for ordine, v in list(mappa.items())[:MAX_ORDINI_P2P]:
+        if not isinstance(ordine, str) or not FORMA_ORDINE_P2P.fullmatch(ordine):
+            continue
+        soglia = _soglia_paracadute_p2p(v)
+        if not soglia:
+            continue
+        r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=? AND tg_id=? "
+                        "AND maker=1", (ordine, int(tg_id))).fetchone()
+        if not r or _tabacchino_libro(_metodi_lista_p2p(r[0])):
+            continue
+        scritti += con.execute(
+            "INSERT OR IGNORE INTO p2p_paracadute(ordine, tg_id, soglia, partenza, "
+            "creato) VALUES(?,?,?,?,?)",
+            (ordine, int(tg_id), soglia, cambio if cambio > 0 else 0,
+             int(adesso))).rowcount
+    if scritti:
+        con.commit()
+    return scritti
+
+
+def _paracadute_p2p(con, ordini) -> list:
+    """Da una lista di id a quelli col PARACADUTE APERTO, in ordine. NON
+    E' UN VOLTO, come la pausa: dice solo «questo ordine da qui non si
+    prende piu'», e non dice di chi e'. A leva spenta e' vuota — gli
+    ordini tornano a vedersi, come ieri. Alza ValueError come le sorelle,
+    sulla lista storta; un database senza la tabella vale «nessuno»."""
+    pulite = _ordini_puliti_p2p(ordini)
+    if not P2P_PARACADUTE:
+        return []
+    segni = ",".join("?" * len(pulite))
+    try:
+        return sorted(r[0] for r in con.execute(
+            f"SELECT ordine FROM p2p_paracadute WHERE ordine IN ({segni}) "
+            f"AND aperto > 0", pulite))
+    except sqlite3.OperationalError:
+        return []
+
+
+def _miei_paracadute_p2p(con, tg_id) -> dict:
+    """I paracadute degli ordini VIVI di chi chiede, per la sua card e per
+    il `cancel` che firma il suo telefono: `{ordine: {soglia, partenza,
+    aperto, arrivo}}`. Un ordine gia' concluso, annullato o scaduto non
+    c'e' piu'. Pura sulla connessione."""
+    try:
+        righe = con.execute(
+            "SELECT p.ordine, p.soglia, p.partenza, p.aperto, p.arrivo "
+            "FROM p2p_paracadute p JOIN p2p_ordini o ON o.ordine = p.ordine "
+            "AND o.tg_id = p.tg_id WHERE p.tg_id=? AND o.stato NOT IN "
+            "('success','canceled','expired') ORDER BY p.creato DESC LIMIT ?",
+            (int(tg_id or 0), MAX_ORDINI_P2P)).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {r[0]: {"soglia": int(r[1] or 0), "partenza": float(r[2] or 0),
+                   "aperto": int(r[3] or 0), "arrivo": float(r[4] or 0)}
+            for r in righe}
+
+
+def _preso_adesso_p2p(con, ordine: str) -> bool:
+    """PURA SULLA CONNESSIONE: per la cronaca di mostrod quest'ordine ha
+    una PRESA IN CORSO? L'ultima presa raccontata, senza un fatto finale
+    dopo. Mostrod racconta entro un secondo, il libro entro un minuto: e'
+    questa la riga che tiene fermo il paracadute sull'ordine preso un
+    attimo prima della soglia. Alla pari (stesso secondo) vale «preso»."""
+    segni = ",".join("?" * len(P2P_MOMENTI_FINALI))
+    try:
+        r = con.execute(
+            "SELECT MAX(CASE WHEN momento='preso' THEN quando END), "
+            f"MAX(CASE WHEN momento IN ({segni}) THEN quando END) "
+            "FROM p2p_momenti WHERE ordine=? AND fonte='mostro'",
+            list(P2P_MOMENTI_FINALI) + [ordine]).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    presa, fine = int((r and r[0]) or 0), int((r and r[1]) or 0)
+    return bool(presa) and presa >= fine
+
+
+def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
+    """UNA PASSATA DELL'OROLOGIO sui paracadute chiusi: una lettura del
+    prezzo su ogni ordine ancora NEL LIBRO (`pending`), pubblicato da chi
+    ha il paracadute, non Barattozon e senza una presa in corso. Torna
+    quelli che si aprono ADESSO — `[{ordine, tg_id, soglia, partenza,
+    arrivo, lato, euro}]` — gia' scritti. Pura sulla connessione;
+    COMMITTA. A leva spenta, o senza le tabelle, non fa niente.
+    UN ORDINE CHE ESCE DAL LIBRO AZZERA IL CONTO: preso, o non piu'
+    `pending`, le letture oltre soglia contate fin li' non valgono piu' —
+    se torna nel libro ne servono di nuovo due DI FILA, da capo."""
+    if not P2P_PARACADUTE:
+        return []
+    try:
+        righe = con.execute(
+            "SELECT p.ordine, p.tg_id, p.soglia, p.partenza, p.oltre, p.lettura, "
+            "o.metodi, o.lato, o.euro, o.stato FROM p2p_paracadute p "
+            "JOIN p2p_ordini o ON o.ordine = p.ordine AND o.tg_id = p.tg_id "
+            "WHERE p.aperto = 0 AND o.maker = 1 AND o.stato NOT IN "
+            "('success','canceled','expired')").fetchall()
+    except sqlite3.OperationalError:
+        return []
+    aperti, toccati = [], 0
+    for r in righe:
+        if (r[9] != "pending" or _tabacchino_libro(_metodi_lista_p2p(r[6]))
+                or _preso_adesso_p2p(con, r[0])):
+            if int(r[4] or 0):
+                toccati += con.execute(
+                    "UPDATE p2p_paracadute SET oltre=0 WHERE ordine=? AND aperto=0",
+                    (r[0],)).rowcount
+            continue
+        p = _passo_paracadute_p2p({"soglia": r[2], "partenza": r[3], "oltre": r[4],
+                                   "lettura": r[5]}, prezzo, letto, adesso)
+        if not p["cambia"]:
+            continue
+        toccati += con.execute(
+            "UPDATE p2p_paracadute SET partenza=?, oltre=?, lettura=?, aperto=?, "
+            "arrivo=? WHERE ordine=? AND aperto=0",
+            (p["partenza"], p["oltre"], p["lettura"],
+             int(adesso) if p["apre"] else 0, float(prezzo) if p["apre"] else 0,
+             r[0])).rowcount
+        if p["apre"]:
+            aperti.append({"ordine": r[0], "tg_id": int(r[1]), "soglia": int(r[2]),
+                           "partenza": p["partenza"], "arrivo": float(prezzo),
+                           "lato": r[7] or "", "euro": r[8] or ""})
+    if toccati:
+        con.commit()
+    return aperti
+
+
+def _presa_a_paracadute_p2p(con, ordine: str, quando: int) -> str:
+    """LA PRESA E IL PARACADUTE, alla presa: '' se il paracadute di
+    quest'ordine non e' aperto (o non c'e', o la leva e' spenta); `dopo`
+    se la presa e' arrivata a paracadute GIA' APERTO — da un'altra app,
+    perche' da qui non si prende piu' —; `prima` se per l'orologio di
+    mostrod la presa e' di PRIMA dell'apertura: l'evento ha solo fatto
+    tardi, e allora l'apertura si DISFA (un ordine gia' preso si porta a
+    termine come sempre) e la riga torna chiusa e armata. In tutti e due
+    i casi chi ha pubblicato non paga quella presa: lo scrive chi chiama
+    (`_segna_presa_paracadute_p2p`), in `pausa_presa`. Pura sulla
+    connessione; NON committa."""
+    if not P2P_PARACADUTE:
+        return ""
+    r = con.execute("SELECT aperto FROM p2p_paracadute WHERE ordine=?",
+                    (ordine,)).fetchone()
+    aperto = int((r and r[0]) or 0)
+    if not aperto:
+        return ""
+    if int(quando) < aperto:
+        con.execute("UPDATE p2p_paracadute SET aperto=0, arrivo=0, oltre=0, "
+                    "superato=? WHERE ordine=?", (aperto, ordine))
+        return "prima"
+    return "dopo"
+
+
+def _segna_presa_paracadute_p2p(con, ev: dict, fatto: dict) -> list:
+    """LA PRESA A PARACADUTE APERTO, scritta ALLA PRESA come la presa in
+    pausa (e dalla ROTTA, dopo `_registra_evento_p2p`: la cronaca e le
+    parti sono gia' al loro posto). Mette in `fatto["paracadute"]` com'era
+    il paracadute — '' | `dopo` | `prima` (`_presa_a_paracadute_p2p`) — e
+    torna le righe di journal. In tutti e due i casi a chi ha pubblicato
+    quella presa NON COSTA: la colonna e' `pausa_presa`, la stessa tutela.
+    UNA PRESA GIA' SUPERATA NON TOCCA NIENTE: un `preso` che arriva dopo
+    un fatto finale piu' recente (il retry via Tor di un giro gia' chiuso)
+    non e' una presa in corso, e non deve disfare un paracadute aperto
+    dopo. Pura sulla connessione; COMMITTA se scrive."""
+    fatto["paracadute"] = ""
+    if fatto.get("momento") != "preso" or not P2P_PARACADUTE:
+        return []
+    ordine = ev["ordine"]
+    try:
+        if not _preso_adesso_p2p(con, ordine):
+            return []
+        come = _presa_a_paracadute_p2p(con, ordine, ev["ts"])
+        if not come:
+            return []
+        con.execute("UPDATE p2p_scambi SET pausa_presa=1 WHERE ordine=? AND giro=?",
+                    (ordine, int(fatto.get("giro") or 0)))
+    except sqlite3.OperationalError:
+        return []
+    con.commit()
+    fatto["paracadute"] = come
+    return [f"🪂 Paracadute P2P: {ordine[:8]} preso "
+            + ("a paracadute gia' aperto: a chi ha pubblicato questa presa non costa"
+               if come == "dopo" else
+               "un attimo PRIMA dell'apertura: l'apertura si disfa, e lo scambio "
+               "va avanti come sempre")]
+
+
+def _euro_btc_p2p(v) -> str:
+    """PURA: un prezzo del bitcoin come si legge, «98.450 €»."""
+    try:
+        return f"{round(float(v or 0)):,}".replace(",", ".") + " €"
+    except (TypeError, ValueError, OverflowError):
+        return "— €"
+
+
+def _testo_paracadute_p2p(a: dict) -> str:
+    """PURA: l'avviso a chi aveva pubblicato, quando il paracadute si
+    apre. La frase e' di Andrea; la seconda riga dice quel che resta da
+    fare, perche' il `cancel` vero lo firma il telefono."""
+    scarto = _scarto_paracadute_p2p(a.get("partenza"), a.get("arrivo"))
+    perc = f"{abs(scarto):.1f}".replace(".", ",")
+    cosa = {"sell": " di vendita", "buy": " di acquisto"}.get(a.get("lato") or "", "")
+    euro = f" da {a['euro']}" if a.get("euro") else ""
+    return (f"🪂 <b>Il paracadute si è aperto</b>: BTC è passato da "
+            f"{_euro_btc_p2p(a.get('partenza'))} a {_euro_btc_p2p(a.get('arrivo'))} "
+            f"({'+' if scarto > 0 else '−'}{perc}%), il tuo ordine{cosa}{euro} è stato "
+            "annullato. Nessuna penalità.\n"
+            "Apri Barattolo per toglierlo anche dalle altre app collegate.")
+
+
+def _riga_paracadute_presa_p2p(avvisi: list, fatto: dict) -> list:
+    """PURA: sotto l'avviso della PRESA, a chi ha pubblicato e a lui solo,
+    la riga che dice com'e' messo il suo paracadute — gia' aperto (puo'
+    annullare senza penalita') o disfatto (la presa era di prima)."""
+    riga = {"dopo": P2P_PARACADUTE_DOPO,
+            "prima": P2P_PARACADUTE_PRIMA}.get((fatto or {}).get("paracadute") or "")
+    if not riga or (fatto or {}).get("momento") != "preso":
+        return avvisi
+    chi = _chi_pubblica_p2p(fatto)[0]
+    if not chi:
+        return avvisi
+    return [(tg, testo + "\n\n" + riga) if tg == chi else (tg, testo)
+            for tg, testo in avvisi]
+
+
+async def _giro_paracadute_p2p():
+    """IL PARACADUTE NELL'OROLOGIO: una volta al minuto, nella passata
+    intera, DOPO il libro (lo stato e' quello appena letto) e PRIMA della
+    fotografia (un ordine col paracadute aperto esce dal libro nello
+    stesso giro). Il prezzo e' quello che il server ha gia' in mano —
+    `cambio_noto_ora`, con l'ora della sua lettura — e da qui non parte
+    nessuna chiamata. Chi si apre viene avvisato col bottone che porta al
+    suo ordine: da li' lo ripubblica al prezzo nuovo, e aprendo l'app il
+    telefono firma il `cancel`."""
+    if not P2P_PARACADUTE:
+        return
+    con = db()
+    try:
+        aperti = _passata_paracadute_p2p(con, cambio_noto_ora(),
+                                         _cambio_cache["quando"], int(time.time()))
+    finally:
+        con.close()
+    for a in aperti:
+        try:
+            esito = await _recapita_p2p(
+                a["tg_id"], _testo_paracadute_p2p(a),
+                bottone=(P2P_BOTTONE_PARACADUTE,
+                         f"{URL_PUBBLICO}/p2p?scambio={a['ordine']}"))
+        except Exception as e:
+            esito = f"SALTATO ({type(e).__name__}: {e})"
+        print(f"🪂 Paracadute P2P: {a['ordine'][:8]} di {a['tg_id']} aperto al "
+              f"{a['soglia']}% (da {a['partenza']:.0f} a {a['arrivo']:.0f} €/BTC): "
+              f"avviso {esito}", flush=True)
+        await asyncio.sleep(0.2)
 
 
 def _chi_pubblica_p2p(fatto: dict) -> tuple:
@@ -47828,8 +48269,23 @@ def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
             if pause else set()
     except Exception:
         pause, miei = {}, set()
+    # IL PARACADUTE APERTO (13 ott 2026, cantiere paracadute): l'ordine e'
+    # uscito dal libro e da qui non si prende piu' — per sempre, non «fino
+    # a». Il PROPRIO si', che si deve poter aprire. Un conto che non riesce
+    # non chiude la porta a nessuno
+    try:
+        para = set(_paracadute_p2p(con, pulite)) if pulite else set()
+        miei_para = {r[0] for r in con.execute(
+            f"SELECT ordine FROM p2p_ordini WHERE tg_id=? AND ordine IN "
+            f"({','.join('?' * len(para))})", [int(io or 0)] + sorted(para))} \
+            if para else set()
+    except Exception:
+        para, miei_para = set(), set()
     fuori = {}
     for o in pulite:
+        if o in para and o not in miei_para:
+            fuori[o] = {"ok": False, "motivo": "paracadute", "soglia": filtri.get(o, 0)}
+            continue
         if o in pause and o not in miei:
             fuori[o] = {"ok": False, "motivo": "pausa", "soglia": filtri.get(o, 0),
                         "fino": pause[o]}
@@ -48456,6 +48912,10 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         # ...e CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p):
         # stessa porta, stessa regola (solo da maker, la prima resta)
         _dichiara_filtri_p2p(con, user["id"], (d or {}).get("filtri"))
+        # ...e IL PARACADUTE (13 ott 2026): stessa porta, e la partenza e'
+        # il cambio che il server ha in mano adesso
+        _dichiara_paracadute_p2p(con, user["id"], (d or {}).get("paracadute"),
+                                 int(time.time()), cambio_noto_ora())
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -48514,11 +48974,14 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         filtri = _filtri_p2p(con, (d or {}).get("ordini"))
         # e gli ordini in pausa adesso (12 ott 2026, tempo-di-chi-pubblica)
         pause = _pause_p2p(con, (d or {}).get("ordini"), int(time.time()))
+        # e quelli col paracadute aperto (13 ott 2026, cantiere paracadute)
+        paracadute = _paracadute_p2p(con, (d or {}).get("ordini"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause}
+    return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause,
+            "paracadute": paracadute}
 
 
 @app.get("/api/p2p/zona")
@@ -48595,6 +49058,10 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # di chi sono — il client li toglie dal libro di chi non li ha scritti
     if fuori["eventi"] and F.get("pause"):
         fuori["pause"] = F["pause"]
+    # ...e quelli col paracadute aperto (13 ott 2026): una lista di id,
+    # senza dire di chi — il client li toglie dal libro degli altri
+    if fuori["eventi"] and F.get("paracadute"):
+        fuori["paracadute"] = F["paracadute"]
     chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
         if fuori["eventi"] else 0
     if chi and F.get("facce"):
@@ -48895,6 +49362,28 @@ async def scrivi_pausa_p2p(req: Request, x_tg_init_data: str = Header(""),
     # la fotografia del libro la rilegge al prossimo giro; la porta vera
     # (`_posso_prendere_p2p`) l'ora la chiede al momento
     return JSONResponse(dict(fuori, attiva=True), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/p2p/paracadute")
+def miei_paracadute_p2p(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """«Come stanno i miei paracadute?» (13 ott 2026, cantiere
+    paracadute): la chiede la pagina P2P di chi ha pubblicato, per
+    scrivere «🪂 Paracadute 5%» sulla sua card anche dal telefono che
+    l'ordine non l'ha scritto, e per sapere quali si sono APERTI — quelli
+    di cui il suo telefono deve firmare il `cancel`. NESSUN PARAMETRO, il
+    patto di /api/p2p/pausa: si chiede solo di se'. A leva spenta risponde
+    `attivo: false` e niente altro. `no-store`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not P2P_PARACADUTE:
+        return JSONResponse({"attivo": False}, headers={"Cache-Control": "no-store"})
+    con = db()
+    try:
+        ordini = _miei_paracadute_p2p(con, user["id"])
+    finally:
+        con.close()
+    return JSONResponse({"attivo": True, "ordini": ordini},
+                        headers={"Cache-Control": "no-store"})
 
 
 # ═══ LE RECENSIONI DEGLI SCAMBI P2P (set 2026) ══════════════════════
@@ -49310,6 +49799,9 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # niente da nascondere, e una pausa dimenticata li' nasconderebbe
     # quelli del profilo nuovo
     con.execute("DELETE FROM p2p_pause WHERE tg_id=?", (user["id"],))
+    # ...e i paracadute (13 ott 2026): stanno sulle righe degli ordini
+    # appena tolte, e senza quelle non hanno piu' un ordine da guardare
+    con.execute("DELETE FROM p2p_paracadute WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -54510,6 +55002,15 @@ async def orologio_p2p():
             print(f"⚠️ Libro P2P: battito saltato "
                   f"({type(e).__name__}: {e})", flush=True)
         _P2P_BATTITO["vivo"] = time.time()
+        # IL PARACADUTE (13 ott 2026): nel battito pieno, dopo il libro e
+        # prima della fotografia, col suo tetto e il suo try
+        if not lampo and not solo_attese:
+            try:
+                await asyncio.wait_for(_giro_paracadute_p2p(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Paracadute P2P: battito saltato "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
         # LA FOTOGRAFIA DEL LIBRO (26 set 2026): nella passata intera, col
         # suo tetto e il suo try — una fotografia che cade non tocca gli
         # avvisi, che sono il mestiere dell'orologio
@@ -54974,6 +55475,8 @@ async def _fotografa_libro_p2p():
     # ...e gli ordini in pausa adesso (12 ott 2026, tempo-di-chi-pubblica):
     # per ULTIMI — se il loro giudice inciampa, volti e autori ci sono gia'
     F["pause"] = _pause_foto_p2p(F["eventi"], adesso)
+    # ...e quelli col paracadute aperto (13 ott 2026)
+    F["paracadute"] = _paracadute_foto_p2p(F["eventi"])
     if intera:
         F["intera"] = adesso
 
@@ -55142,6 +55645,7 @@ def _rinfresca_volti_foto_p2p(ordini=None) -> bool:
         F["filtri"] = _filtri_foto_p2p(F["eventi"])
         F["autori"] = _autori_foto_p2p(F["eventi"])
         F["pause"] = _pause_foto_p2p(F["eventi"], int(time.time()))
+        F["paracadute"] = _paracadute_foto_p2p(F["eventi"])
     except Exception as e:
         print(f"⚠️ Fotografia del libro, volti non rifatti: {e}", flush=True)
         return False
@@ -55204,6 +55708,25 @@ def _pause_foto_p2p(eventi, adesso: int) -> dict:
         return _pause_p2p(con, ids, adesso)
     except ValueError:
         return {}
+    finally:
+        con.close()
+
+
+def _paracadute_foto_p2p(eventi) -> list:
+    """Gli ordini della fotografia col PARACADUTE APERTO (13 ott 2026,
+    cantiere paracadute), una volta per giro come le pause: il giudice e'
+    `_paracadute_p2p`, sugli stessi id che la rotta serve. La porta vera
+    resta `_posso_prendere_p2p`, che lo chiede al momento."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return []
+    con = db()
+    try:
+        return _paracadute_p2p(con, ids)
+    except ValueError:
+        return []
     finally:
         con.close()
 
@@ -57928,6 +58451,13 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
                 bottoni = {tg: _bottone_pausa_p2p(con, ev, fatto, tg) for tg, _ in avvisi}
             except Exception:
                 bottoni = {}
+            # ...e la riga del PARACADUTE (13 ott 2026), sotto l'avviso
+            # della presa a chi ha pubblicato: prima dei moderatori, che
+            # non la vedono. Un guasto toglie la riga, mai l'avviso
+            try:
+                avvisi = _riga_paracadute_presa_p2p(avvisi, fatto)
+            except Exception:
+                pass
             # ...e i MODERATORI, se l'evento apre o chiude una disputa
             # (28 set 2026). Un guasto qui non toglie l'avviso alle parti.
             try:
@@ -58005,6 +58535,17 @@ async def evento_p2p(req: Request):
         # col cambio di adesso, dalla cache: a una presa diventa il suo
         # metro (27 set 2026)
         fatto = _registra_evento_p2p(con, ev, adesso, cambio_noto_ora())
+        # LA PRESA A PARACADUTE APERTO (13 ott 2026, cantiere paracadute):
+        # si scrive adesso, alla presa, PRIMA degli esiti — e' la tutela
+        # che gli esiti leggeranno. Mai un 500 per lei: l'evento e' gia'
+        # registrato
+        if fatto is not None:
+            try:
+                for riga in _segna_presa_paracadute_p2p(con, ev, fatto):
+                    print(riga, flush=True)
+            except Exception as e:
+                print(f"⚠️ Paracadute P2P: la presa di {ev['ordine'][:8]} non si "
+                      f"e' guardata ({type(e).__name__}: {e})", flush=True)
         # GLI ESITI (10 ott 2026, reputazione-p2p): il completato alle due
         # parti, il non completato a chi ha preso e non ha fatto il suo
         # gesto. Mai un 500 per loro: l'evento e' gia' registrato

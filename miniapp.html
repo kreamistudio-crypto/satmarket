@@ -3678,6 +3678,13 @@
      tondi dei giorni sono i `.p2p-accesso-chip` del foglio «Pubblica»,
      stretti: sette devono stare in una riga a 320 px. */
   .p2p-pausa{background:var(--chip-bg);color:var(--ink);font-weight:800;font-size:12.5px}
+  /* IL PARACADUTE (13 ott 2026): lo stesso vestito della pausa sulla
+     card; nella pagina dell'ordine il riquadro va a capo e porta il suo
+     bottone */
+  .p2p-paracadute{background:var(--chip-bg);color:var(--ink);font-weight:800;font-size:12.5px}
+  .p2p-paracadute-riq{margin:0 0 12px}
+  .p2p-paracadute-riq .p2p-paracadute{margin:0 0 8px;white-space:normal;line-height:1.4;font-weight:700}
+  .p2p-paracadute-riq .btn{margin:0}
   #p2pPausaCorpo .p2p-pausa{margin:10px 0 12px}
   /* LA PAUSA IN VISTA (cantiere pausa-in-vista): la riga con lo stato e
      il bottone, nel foglio che pubblica e in cima a «I miei scambi».
@@ -12195,6 +12202,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Dal <b>10 ottobre 2026</b>, di ogni scambio <b>chiuso</b> — concluso o annullato — e di ogni ordine scaduto o ritirato senza essere preso, teniamo anche oltre i quaranta giorni <b>i conti</b>: il numero dell'ordine (che è pubblico), le date, come è finito, gli importi della chiusura, il metodo di pagamento e la cifra in euro del libro. <b>Senza le persone</b>: in quel registro non c'è il tuo account né una tua chiave, e chi ha scambiato con chi continua a cancellarsi come detto qui sopra. Il legame fra un ordine e te resta quello che il server annota già — quali ordini pubblichi e quali prendi — e «dimentica il profilo» lo cancella come sempre. Serve a sapere quanto lavora il servizio e quanto incassa di commissioni, e lo leggono solo gli amministratori di Barattolo.</p>
       <p>Dal <b>10 ottobre 2026</b> teniamo, <b>legato al tuo account</b>, <b>come sono finiti i tuoi scambi</b>: una riga per ogni scambio <b>completato</b> — a tutte e due le parti — e una per ogni scambio <b>non completato</b>, che si conta a chi ha <b>preso</b> un ordine e non ha fatto in tempo il suo primo passo (bloccare la garanzia se vende, dire dove ricevere i sats se compra), tanto che l'ordine è tornato in vetrina. Mai a chi ha aspettato, mai a chi si ritira prima che lo scambio parta. Dal <b>12 ottobre 2026</b>, dove il servizio di scambio dà a chi <b>pubblica</b> più tempo di chi prende, si conta anche a chi ha pubblicato un ordine e, quando glielo prendono, <b>non risponde in tempo</b> o <b>annulla dopo la presa</b>: una sola volta per ordine, e mai se la presa è arrivata mentre i suoi ordini erano <b>in pausa</b> o nella mezz'ora prima. Di ogni presa rimasta senza risposta teniamo comunque una riga, che serve al segno «<b>⚡ Risponde in fretta</b>»: compare accanto al nome di chi, negli ultimi 30 giorni, ha concluso almeno tre scambi pubblicati da lui con tre persone diverse rispondendo di solito entro dieci minuti, e sparisce alla prima presa lasciata senza risposta. Si conta come non completato anche lo scambio in cui la garanzia arriva a <b>scadenza</b> (circa quattro giorni) perché chi <b>compra</b> non ha mai segnato gli euro come inviati, pur avendo ricevuto il recapito a cui mandarli. Se un tuo tentativo ti ha <b>scusato</b> teniamo una riga anche per quello, perché la scusa vale <b>una volta ogni 30 giorni</b>. E se un <b>moderatore</b>, chiudendo una disputa, segna la colpa a chi l'ha persa, teniamo una riga «<b>disputa persa</b>»: compare come «<b>⚖️ N dispute perse</b>» negli stessi posti del contatore, per <b>90 giorni</b> e già dalla prima; in quei 90 giorni chi pubblica con un filtro <b>non ti accetta</b>, e quello scambio non vale come completato a chi l'ha persa. Chi la perde lo viene a sapere <b>subito</b>, nel messaggio che chiude la disputa. Ogni riga dice il numero dell'ordine, quando, se compravi o vendevi e com'è finita: <b>niente importi</b>. <b>A cosa serve:</b> al contatore «<b>⚠️ N non completati</b>», che conta solo gli <b>ultimi 90 giorni</b> e compare <b>dal secondo</b> (il primo si tollera), e al <b>filtro di chi pubblica</b> — «solo chi ha almeno 1, 3 o 5 scambi completati» —, che guarda quanti ne hai completati e se ne hai di non completati negli <b>ultimi 30 giorni</b>. <b>Chi lo vede:</b> il contatore, quando c'è, lo vede chi vede te — accanto al tuo nome sugli ordini che pubblichi, nella pagina dello scambio o dell'ordine per l'altra persona, e nella pagina del tuo negozio; <b>quanti scambi hai completato</b>, dal 10 ottobre 2026, lo vede anche chi vede te, negli stessi posti («✅ 12 scambi», accanto alle stelline): è il numero che aiuta chi sta per scambiare a decidere di chi fidarsi. Quanti ne hai di non completati sotto la soglia della scritta resta tuo, e chi pubblica col filtro <b>non riceve altri numeri</b>: se puoi prendere quell'ordine lo decide il server, e lo dice a te. Un giorno dopo la chiusura di uno scambio, se non hai lasciato la recensione, ti arriva <b>un solo promemoria</b>. <b>Per quanto:</b> circa <b>quattrocento giorni</b>, poi ogni riga si cancella da sola. Vale <b>anche se entri con una chiave Nostr</b> e prendi senza farti riconoscere: all'altra persona continuiamo a non dire chi sei, ma l'esito si scrive sul tuo account come per tutti. Perché uno scambio in cui <b>ci hai provato</b> non ti venga contato, il telefono ci dice anche i <b>tentativi</b> — hai aperto o copiato la richiesta della garanzia, toccato «Apri nel wallet», mandato una fattura che il coordinatore ha accettato o rifiutato, o incollato una che il telefono ha scartato: il gesto, mai la fattura né il pagamento —, e quelli se ne vanno con la cronaca, dopo quaranta giorni. <b>«Dimentica il profilo»</b> cancella subito i tentativi ma <b>non gli esiti</b>: sono del tuo account, come le recensioni, e non è da lì che ci si toglie un contatore.</p>
       <p>La <b>pausa degli ordini</b>, se la imposti, sta <b>legata al tuo account</b>: i giorni, le ore e il nome del tuo fuso orario (per esempio «Europe/Rome»), e niente altro. Serve a non far prendere i tuoi ordini dal libro di Barattolo nelle ore che hai scelto (restano visibili, in grigio), e a non contarti una presa arrivata mentre eri in pausa. Non esce da Barattolo, resta finché non la togli, e se ne va subito se dimentichi il profilo.</p>
+      <p>Il <b>paracadute</b>, se lo apri pubblicando un ordine, sta <b>su quell'ordine</b>: la soglia che hai scelto, il prezzo di BTC che avevamo in quel momento e, se si apre, quando e a che prezzo. Serve a togliere l'ordine dal libro di Barattolo se il prezzo si muove oltre la soglia; l'annullamento vero lo firma il tuo telefono, noi quella firma non la facciamo. Se dimentichi il profilo di scambio lo cancelliamo.</p>
       <p>Se togli uno scambio chiuso con la ✕, il server ricorda <b>il numero dell'ordine e quando l'hai tolto</b>, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo quaranta giorni, e subito se dimentichi il profilo.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b> Vale con qualunque modo di entrare: anche chi entra con una chiave Nostr è riconosciuto dall'altra persona come tutti (dal 12 ottobre 2026) — chi ha pubblicato vede il suo profilo, e le due parti possono recensirsi. Una chiave Nostr nuova, per l'altra persona, è un'altra persona: non c'è un interruttore, e non c'è un modo di scambiare da Barattolo senza farsi vedere dall'altra parte. <b>L'esito dello scambio si scrive sul suo account come per tutti</b> — è il paragrafo qui sopra sugli esiti degli scambi —, e se arriva al contatore «⚠️ N non completati» quello compare dove compare lui: nella pagina del suo negozio e sugli ordini che pubblica. Gli scambi già presi prima del 12 ottobre restano come erano, e a cancellare il pregresso c'è «dimentica il profilo» — che toglie le prese annotate, <b>non gli esiti</b>. Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
@@ -18738,6 +18746,9 @@ async function aggiornaVista(){
     await caricaLibroP2P(true).catch(()=>{});
     await cambio;
     renderP2P();
+    /* ...e gli ordini usciti col paracadute (13 ott 2026): la tirata e'
+       un gesto, e non aspetta il minuto — ridisegna lei se cambia */
+    if (v === 'p2p' && typeof rinfrescaFuoriLibroP2P === 'function') rinfrescaFuoriLibroP2P(true);
     return;
   }
   if (v === 'affari' || v === 'profilo') go(v);
@@ -23170,6 +23181,10 @@ setInterval(() => {
   battitoCambioLibroP2P();
   /* «📍 Sono qui» dell'altra parte, a pagina del contanti aperta (1 ott 2026) */
   try { battitoContantiP2P(); } catch(e) {}
+  /* il paracadute dei miei ordini (13 ott 2026): su ogni vista, una volta al minuto */
+  try { if (typeof battitoParacaduteP2P === 'function') battitoParacaduteP2P(); } catch(e) {}
+  /* ...e col libro davanti, gli ordini usciti col paracadute (una volta al minuto) */
+  try { if (typeof rinfrescaFuoriLibroP2P === 'function') rinfrescaFuoriLibroP2P(); } catch(e) {}
   document.querySelectorAll('.lampo-count').forEach(n => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
@@ -51471,6 +51486,13 @@ function passaFiltroP2P(o, f){
      usciva dal libro prima di ogni altra regola; da oggi RESTA, grigio,
      con «⏸ Puoi prenderlo tra…», e non si prende (`rigaOrdineP2P`,
      `rifiutaPerPausaP2P`). Il filtro torna a fare solo il filtro. */
+  /* IL PARACADUTE APERTO INVECE SI' (13 ott 2026, cantiere paracadute): un
+     ordine in pausa torna, e per questo resta nel libro, grigio; uno col
+     paracadute aperto NON TORNA — chi l'ha pubblicato ha chiesto di
+     annullarlo, e il suo telefono lo sta per fare. Esce dal libro prima di
+     ogni altra regola e anche senza un filtro, tranne che per chi l'ha
+     scritto. */
+  if (typeof nascostoPerParacaduteP2P === 'function' && nascostoPerParacaduteP2P(o)) return false;
   if (!o || !f) return true;
   if (f.valute.length && f.valute.indexOf(o.fiat) < 0) return false;
   if (f.metodi.length) {
@@ -52629,6 +52651,21 @@ function testoPubblicaInfoP2P(info, accesa){
     + '<p><b>⚡ Risponde in fretta.</b> Compare accanto al tuo nome se negli ultimi 30 giorni hai concluso almeno tre scambi pubblicati da te, '
     + 'con tre persone diverse, rispondendo di solito entro dieci minuti. Si perde alla prima presa lasciata senza risposta.</p>';
 }
+/* IL PARACADUTE in «Info P2P» (13 ott 2026): nella sezione «Se pubblichi
+   un ordine» quando c'e', col suo titolo quando quella e' spenta. Sta
+   QUI, fuori dal motore, accanto a chi lo usa — come le sorelle */
+function testoParacaduteInfoP2P(acceso, conTitolo){
+  if (!acceso) return '';
+  return (conTitolo ? '<h3 id="p2pinfo-pubblica">Se pubblichi un ordine</h3>' : '')
+    + '<p><b>🪂 Il paracadute.</b> Pubblicando puoi scegliere una soglia — <b>'
+    + P2P_PARACADUTE_SOGLIE.join('%, ') + '%</b> — e se il prezzo di BTC sale o scende più di così rispetto a quel momento, '
+    + 'l\'ordine <b>esce dal libro da solo</b>, <b>senza penalità</b>, e ti avvisiamo. Vale finché nessuno l\'ha preso: '
+    + 'uno scambio già cominciato va avanti come sempre. Il prezzo lo guardiamo ogni minuto e servono <b>due letture di fila</b> oltre la soglia; '
+    + 'se in quel momento non riusciamo a leggerlo, il paracadute resta chiuso. '
+    + 'L\'annullamento vero lo firma <b>il tuo telefono</b>, alla prima apertura di Barattolo: fino ad allora, da un\'altra app collegata '
+    + 'allo stesso servizio di scambio l\'ordine si vede ancora — e se lo prendono da lì puoi annullare senza penalità. '
+    + 'Non c\'è sugli ordini Barattozon.</p>';
+}
 function renderP2PInfo(){
   const num = n => esc(Number(n).toLocaleString('it-IT',
                                                {maximumFractionDigits: 2}));
@@ -52698,7 +52735,10 @@ function renderP2PInfo(){
   if (scadeTesto) scade.innerHTML = scadeTesto;
   const pubblica = el('p2pInfoPubblica');
   if (pubblica && typeof testoPubblicaInfoP2P === 'function')
-    pubblica.innerHTML = testoPubblicaInfoP2P(p2pInfo, tempoPubblicaP2P());
+    pubblica.innerHTML = testoPubblicaInfoP2P(p2pInfo, tempoPubblicaP2P())
+      /* ...e il paracadute (13 ott 2026), con la sua leva */
+      + (typeof testoParacaduteInfoP2P === 'function'
+         ? testoParacaduteInfoP2P(paracaduteAttivoP2P(), !tempoPubblicaP2P()) : '');
 }
 
 /* ---- I TRE GIUDIZI CHE I DUE ELENCHI SI DIVIDONO ----
@@ -53002,6 +53042,7 @@ function rigaOrdineP2P(o){
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${typeof segnoVeloceP2P === 'function' ? segnoVeloceP2P(o) : ''}
     ${mio && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : ''}
+    ${mio && typeof segnoParacaduteP2P === 'function' ? segnoParacaduteP2P(o) : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
 }
@@ -60709,6 +60750,8 @@ function renderDettaglioP2P(){
     (tuo || typeof rigaFiltroDettP2P !== 'function' ? '' : rigaFiltroDettP2P(o.id)) +
     /* la mia pausa, sul MIO ordine (12 ott 2026, tempo-di-chi-pubblica) */
     (tuo && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : '') +
+    /* ...e il mio paracadute (13 ott 2026) */
+    (tuo && typeof segnoParacaduteP2P === 'function' ? segnoParacaduteP2P(o) : '') +
     anelloneP2P(o) +
     (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
     /* IL CONTO SCORPORATO sotto l'anello: il calco del foglio «Paga»
@@ -62080,6 +62123,9 @@ function renderOrdineP2P(){
        ce l'ha si fermava sul cancello di chiamataOrdineP2P — l'avviso
        arancio «non risulta ancora registrato» che Alan ha letto. Chi
        pubblica ripubblica. */
+    /* IL PARACADUTE APERTO (13 ott 2026): cosa e' successo, e il tasto
+       per ripubblicare al prezzo nuovo */
+    (typeof riquadroParacaduteP2P === 'function' ? riquadroParacaduteP2P(o) : '') +
     (o.stato === 'senza_risposta'
       ? (o.mio
          ? '<button class="btn ghost" onclick="riprovaPubblicazioneP2P()">↻ Riprova a pubblicare</button>'
@@ -64134,6 +64180,10 @@ function fraseVetoP2P(v, rep){
     return 'Chi ha pubblicato quest\'ordine è in pausa'
       + (v.fino > 0 && typeof quandoPausaP2P === 'function' ? ' fino ' + quandoPausaP2P(v.fino) : '')
       + ': riprova più tardi.';
+  /* IL PARACADUTE DI CHI HA PUBBLICATO (13 ott 2026): non e' un «riprova
+     piu' tardi», l'ordine se n'e' andato */
+  if (v.motivo === 'paracadute')
+    return 'Quest\'ordine non è più disponibile: chi l\'ha pubblicato aveva scelto di ritirarlo se il prezzo di BTC si muoveva troppo.';
   return 'Quest\'ordine non si può prendere adesso.';
 }
 function vetoPresaP2P(id){
@@ -64211,6 +64261,14 @@ function fraseAccessoNuovoP2P(n){
     + ' e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.';
 }
 function scegliFiltroNuovoP2P(n){
+  /* IL CLICK CHE ARRIVA DOPO IL TOCCO SUL + (13 ott 2026, trovato dal giro
+     dal vivo del paracadute, cura chiesta da Andrea): il gesto del + apre
+     il foglio al rilascio del dito, e il click che il browser manda
+     subito dopo cade su quel che il foglio ha messo li' sotto. A 390×844
+     e' proprio la pillola «3+ scambi»: l'ordine usciva RISTRETTO senza che
+     chi pubblica l'avesse scelto. Si scarta con lo stesso orologio di
+     `toccaPiu` (e del paracadute, `scegliParacaduteNuovoP2P`). */
+  if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
   haptic();
   p2pNuovoFiltro = sogliaFiltroP2P(n);
   renderNuovoOrdineP2P();
@@ -64650,6 +64708,230 @@ function fermaPerPausaP2P(){
     }}});
   return true;
 }
+/* ═══ IL PARACADUTE (13 ott 2026, cantiere paracadute, decisione di Andrea
+   con Alan) ═══
+   Chi pubblica sceglie una soglia: «se BTC sale o scende piu' del 5% da
+   adesso, l'ordine si annulla da solo». A PREZZO FISSO protegge soldi
+   veri (chi vende regala la differenza se BTC sale, chi compra se
+   scende); A MERCATO e' un «a quel prezzo non lo faccio piu'».
+   CHI FA COSA:
+   • IL SERVER guarda il prezzo (il suo cambio, una volta al minuto), e
+     dopo DUE letture di fila oltre la soglia toglie l'ordine dal libro
+     di Barattolo e avvisa. Barattozon no: ha la scadenza del PayCode.
+   • IL TELEFONO firma il `cancel` vero, alla prima apertura: e' la sua
+     chiave, e il server quella firma non la fa (regola ferrea 2).
+   • SPENTO DI SERIE nel foglio che pubblica; l'ultima scelta si ricorda
+     su questo dispositivo (`P2P_PARACADUTE_CHIAVE`).
+   QUI DENTRO, NEL MOTORE, ZERO `fetch`: le due che parlano col server
+   (`chiediMieiParacaduteP2P`, `battitoParacaduteP2P`) stanno fuori,
+   accanto a quelle della pausa. */
+const P2P_PARACADUTE_SOGLIE = [5, 10, 20];    // come il server (P2P_PARACADUTE_SOGLIE)
+const P2P_PARACADUTE_CHIAVE = 'barattolo_p2p_paracadute';
+const P2P_PARACADUTE_SPENTO = 'Se BTC sale o scende oltre la soglia che scegli, l\'ordine si annulla da solo. Senza penalità.';
+let p2pNuovoParacadute = 0;           // la scelta nel foglio «Pubblica»: 0 = spento
+let p2pParacaduteAperti = {};         // ordine -> true: il paracadute di chi l'ha pubblicato si e' aperto
+let p2pMieiParacadute = {};           // ordine -> {soglia, partenza, aperto, arrivo}: i miei, come li dice il server
+/* la leva del server, in busta come `paracadute` (true/false) */
+function paracaduteAttivoP2P(){
+  const c = p2pCoord();
+  return !!(c && c.paracadute === true);
+}
+/* PURA: una soglia del catalogo, o 0 (spento) */
+function sogliaParacaduteP2P(n){
+  n = Number(n);
+  return P2P_PARACADUTE_SOGLIE.indexOf(n) >= 0 ? n : 0;
+}
+/* PURA: la riga sotto le scelte, corta */
+function fraseParacaduteP2P(n){
+  n = sogliaParacaduteP2P(n);
+  return n ? 'Se BTC sale o scende più del ' + n + '% da adesso, l\'ordine si annulla da solo. Senza penalità.'
+           : P2P_PARACADUTE_SPENTO;
+}
+/* l'ultima scelta, su questo dispositivo: una comodita', mai un fatto */
+function ultimoParacaduteP2P(){
+  try { return sogliaParacaduteP2P(localStorage.getItem(P2P_PARACADUTE_CHIAVE)); } catch(e) { return 0; }
+}
+function ricordaParacaduteP2P(n){
+  try { localStorage.setItem(P2P_PARACADUTE_CHIAVE, String(sogliaParacaduteP2P(n))); } catch(e) {}
+}
+/* ---- il foglio «Pubblica»: la sezione, dopo la pausa ---- */
+function sezioneParacaduteNuovoP2P(tab){
+  /* a leva spenta non c'e'; e con Barattozon nemmeno (decisione di Andrea) */
+  if (!paracaduteAttivoP2P() || tab) return '';
+  const voce = (n, testo) =>
+    '<button type="button" class="p2p-accesso-chip' + (p2pNuovoParacadute === n ? ' on' : '')
+    + '" aria-pressed="' + (p2pNuovoParacadute === n ? 'true' : 'false') + '" data-n="' + n
+    + '" onclick="scegliParacaduteNuovoP2P(Number(this.dataset.n))">' + testo + '</button>';
+  return sezioneNuovoP2P({
+    titolo: '🪂 Paracadute',
+    corpo: '<div class="p2p-accesso-scelte" id="p2pNuovoParacadute">' + voce(0, 'Spento')
+      + P2P_PARACADUTE_SOGLIE.map(n => voce(n, n + '%')).join('') + '</div>',
+    sotto: '<div class="hint">' + fraseParacaduteP2P(p2pNuovoParacadute) + '</div>'
+  });
+}
+function scegliParacaduteNuovoP2P(n){
+  /* IL CLICK CHE ARRIVA DOPO IL TOCCO SUL + (13 ott 2026, dal giro dal
+     vivo): il gesto del + apre il foglio al rilascio del dito, e il
+     click che il browser manda subito dopo cade su quel che il foglio ha
+     messo sotto il dito. Qui sceglierebbe una soglia che nessuno ha
+     toccato — e un paracadute scelto per sbaglio annulla un ordine: si
+     scarta, con lo stesso orologio di `toccaPiu`. */
+  if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
+  haptic();
+  p2pNuovoParacadute = sogliaParacaduteP2P(n);
+  renderNuovoOrdineP2P();
+}
+/* il paracadute che parte con l'ordine: dai campi. Mai con Barattozon */
+function paracaduteDaCampiP2P(campi){
+  if (!campi || !paracaduteAttivoP2P() || tabacchinoP2P(campi.metodi)) return 0;
+  return sogliaParacaduteP2P(campi.paracadute);
+}
+/* quel che si DICHIARA al server all'intestazione: i paracadute dei MIEI
+   ordini in questa lista, dalle loro righe (il calco dei filtri) */
+function paracaduteDaDichiarareP2P(ids){
+  const fuori = {}, mie = typeof ordiniP2P === 'function' ? ordiniP2P() : {};
+  for (const id of ids || []) {
+    const riga = mie[id];
+    const n = (riga && riga.mio && !riga.tabacchino) ? sogliaParacaduteP2P(riga.paracadute) : 0;
+    if (n) fuori[id] = n;
+  }
+  return fuori;
+}
+/* ---- quel che dice il server ---- */
+/* prende la lista degli ordini col paracadute aperto. Con `ids` giudica
+   SOLO quegli id; senza, la lista e' la fotografia intera e prende il
+   posto di quella di prima. Vero se e' cambiato qualcosa. */
+function prendiParacaduteP2P(lista, ids){
+  const nuova = {};
+  if (Array.isArray(lista))
+    for (const id of lista) if (idMostroVero(id)) nuova[id] = true;
+  let cambiato = false;
+  const chiavi = ids || Object.keys(Object.assign({}, p2pParacaduteAperti, nuova));
+  for (const id of chiavi) {
+    const era = !!p2pParacaduteAperti[id], e = !!nuova[id];
+    if (era === e) continue;
+    if (e) p2pParacaduteAperti[id] = true; else delete p2pParacaduteAperti[id];
+    cambiato = true;
+  }
+  return cambiato;
+}
+/* nel libro e nella fila: l'ordine di un ALTRO col paracadute aperto non
+   si mostra. Il mio si', che lo devo poter aprire */
+function nascostoPerParacaduteP2P(o){
+  if (!o || !o.id || !p2pParacaduteAperti[o.id]) return false;
+  return !(typeof ordineTuoP2P === 'function' && ordineTuoP2P(o.id, o));
+}
+/* PURA sulle due mappe: il paracadute di un MIO ordine — `{soglia,
+   aperto, partenza, arrivo}` — o null. Vince quel che dice il server
+   (`p2pMieiParacadute`); senza, la soglia scritta sulla riga alla
+   pubblicazione, e l'apertura che la riga si e' annotata. */
+function mioParacaduteP2P(o){
+  if (!o || !o.id) return null;
+  const s = p2pMieiParacadute[o.id];
+  const riga = (typeof ordiniP2P === 'function' && ordiniP2P()[o.id]) || o;
+  const ap = (riga && riga.paracaduteAperto) || null;
+  const soglia = sogliaParacaduteP2P((s && s.soglia) || (riga && riga.paracadute));
+  if (!soglia) return null;
+  return {soglia: soglia,
+          aperto: Math.floor(Number((s && s.aperto) || (ap && ap.quando)) || 0),
+          partenza: Number((s && s.partenza) || (ap && ap.partenza)) || 0,
+          arrivo: Number((s && s.arrivo) || (ap && ap.arrivo)) || 0};
+}
+/* PURA: un prezzo del bitcoin come si legge, «98.450 €» */
+function euroBtcP2P(v){
+  const n = Math.round(Number(v) || 0);
+  return n > 0 ? n.toLocaleString('it-IT') + ' €' : '—';
+}
+/* PURA: «BTC è passato da 98.450 € a 93.120 € (−5,4%)», o '' se i due
+   prezzi non ci sono */
+function passaggioParacaduteP2P(p){
+  const a = Number(p && p.partenza) || 0, b = Number(p && p.arrivo) || 0;
+  if (!(a > 0 && b > 0)) return '';
+  const sc = (b - a) / a * 100;
+  return 'BTC è passato da ' + euroBtcP2P(a) + ' a ' + euroBtcP2P(b) + ' ('
+    + (sc > 0 ? '+' : '−') + Math.abs(sc).toFixed(1).replace('.', ',') + '%)';
+}
+/* PURA: come sta il paracadute di un mio ordine — 'armato' (nel libro,
+   la soglia guarda), 'aperto' (uscito dal libro: resta il `cancel`),
+   'annullato' (annullato dal paracadute), '' (niente da dire) */
+function statoParacaduteP2P(o, p){
+  if (!o || !p) return '';
+  if (o.stato === 'annullato') return (o.paracaduteAperto || p.aperto) ? 'annullato' : '';
+  if (o.stato !== 'pubblicato') return '';
+  return p.aperto ? 'aperto' : 'armato';
+}
+/* il segno sul MIO ordine: la card del libro, il dettaglio, «I miei scambi» */
+function segnoParacaduteP2P(o){
+  if (!paracaduteAttivoP2P()) return '';
+  const p = mioParacaduteP2P(o);
+  const st = statoParacaduteP2P(o, p);
+  if (!st) return '';
+  return '<div class="p2p-box p2p-paracadute">'
+    + (st === 'armato' ? '🪂 Paracadute ' + p.soglia + '%'
+       : st === 'aperto' ? '🪂 Paracadute aperto: l\'ordine è uscito dal libro'
+       : '🪂 Annullato dal paracadute') + '</div>';
+}
+/* PURA: i campi del foglio per RIPUBBLICARE l'ordine al prezzo nuovo. A
+   mercato sono quelli di prima (il prezzo lo segue da solo); a PREZZO
+   FISSO i sats si rifanno sugli stessi euro, tenendo lo scarto dal
+   mercato che l'ordine aveva alla pubblicazione: sats × partenza ÷
+   cambio di adesso. Senza uno dei due prezzi restano quelli di prima —
+   e il foglio, aperto, li fa vedere prima di pubblicare. */
+function campiRipubblicaP2P(o, p, cambioOra){
+  const euroMax = Number(o && o.euroMax) || 0;
+  const fisso = Number(o && o.sats) > 0 && !euroMax && !Math.round(Number(o.premium) || 0);
+  let sats = '';
+  if (fisso) {
+    const partenza = Number(p && p.partenza) || 0, ora = Number(cambioOra) || 0;
+    sats = String((partenza > 0 && ora > 0) ? Math.max(1, Math.round(Number(o.sats) * partenza / ora))
+                                            : Math.round(Number(o.sats)));
+  }
+  return {metodi: ((o && o.metodi) || []).slice(), euro: String((o && o.euro) || ''),
+          euroMax: euroMax ? String(euroMax) : '', fisso: fisso, sats: sats,
+          premio: fisso ? 0 : Math.round(Number(o && o.premium) || 0),
+          zona: String((o && o.zona) || ''), filtro: Number(o && o.filtro) || 0,
+          paracadute: sogliaParacaduteP2P((p && p.soglia) || (o && o.paracadute))};
+}
+/* il riquadro nella pagina del MIO ordine, quando il paracadute si e'
+   aperto: cosa e' successo, e il tasto per ripubblicarlo */
+function riquadroParacaduteP2P(o){
+  if (!o || !o.mio || !paracaduteAttivoP2P()) return '';
+  const p = mioParacaduteP2P(o);
+  const st = statoParacaduteP2P(o, p);
+  if (st !== 'aperto' && st !== 'annullato') return '';
+  const come = passaggioParacaduteP2P(p);
+  const testo = '🪂 Il paracadute si è aperto' + (come ? ': ' + come : '') + '. '
+    + (st === 'annullato' ? 'L\'ordine è stato annullato, senza penalità.'
+       : o.soloVista ? 'L\'ordine è uscito dal libro di Barattolo. Per annullarlo anche sulle altre app apri Barattolo da dove l\'hai pubblicato.'
+       : 'L\'ordine è uscito dal libro: lo sto annullando.');
+  return '<div class="p2p-paracadute-riq" id="p2pParacaduteRiq"><div class="p2p-box p2p-paracadute">' + esc(testo) + '</div>'
+    + (tabacchinoP2P(o.metodi) ? ''
+       : '<button type="button" class="btn orange" onclick="ripubblicaParacaduteP2P()">🔁 Ripubblica al prezzo nuovo</button>')
+    + '</div>';
+}
+/* «🔁 Ripubblica al prezzo nuovo»: il foglio che pubblica, coi campi
+   dell'ordine di prima. NON pubblica da solo: il prezzo nuovo si legge, e
+   il «Pubblica» resta un gesto. Se l'ordine vecchio e' ancora da
+   annullare, il `cancel` parte prima (`annullaPerParacaduteP2P`). */
+function ripubblicaParacaduteP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!o || !o.mio) return;
+  const c = campiRipubblicaP2P(o, mioParacaduteP2P(o), (cambioVivo && eurPerSat > 0) ? eurPerSat * 1e8 : 0);
+  if (o.stato === 'pubblicato' && typeof annullaPerParacaduteP2P === 'function') annullaPerParacaduteP2P(o.id);
+  /* il lato del libro lo scrive `setLatoP2P` e nessun altro (senza la
+     scossa del logo: non e' un dito sul tab) */
+  setLatoP2P(o.lato === 'compro' ? 'compro' : 'vendo', true);
+  vaiP2P();
+  apriNuovoOrdineP2P();
+  p2pNuovoMetodi = c.metodi;
+  p2pNuovoEuro = c.euro; p2pNuovoEuroMax = c.euroMax; p2pNuovoDue = !!c.euroMax;
+  p2pNuovoFisso = c.fisso; p2pNuovoSats = c.sats; p2pNuovoPremio = c.premio;
+  p2pNuovoZona = c.zona;
+  if (typeof sogliaFiltroP2P === 'function') p2pNuovoFiltro = sogliaFiltroP2P(c.filtro);
+  p2pNuovoParacadute = c.paracadute;
+  renderNuovoOrdineP2P();
+}
+/* ============ fine del paracadute nel motore ============ */
 /* ---- la pausa: il foglio ---- */
 /* PURA: «22:00» <-> minuti dalla mezzanotte (-1 se non e' un'ora) */
 function minutiDaOraP2P(s){
@@ -66241,6 +66523,9 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoZona = '';
   /* ...e il filtro di chi puo' prendere riparte da «tutti» (10 ott 2026) */
   p2pNuovoFiltro = 0;
+  /* ...e il paracadute riparte dall'ULTIMA SCELTA di questo dispositivo
+     (13 ott 2026): spento la prima volta, poi come l'hai lasciato */
+  p2pNuovoParacadute = typeof ultimoParacaduteP2P === 'function' ? ultimoParacaduteP2P() : 0;
   /* ...e la zona riparte dall'ULTIMA USATA, chiesta al server (10 ott
      2026): vedi `preparaZonaNuovoP2P` */
   if (typeof preparaZonaNuovoP2P === 'function') preparaZonaNuovoP2P();
@@ -66795,6 +67080,8 @@ function campiNuovoP2P(){
     zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : '',
     /* chi puo' prendere l'ordine (10 ott 2026, reputazione-p2p): 0 = tutti */
     filtro: typeof p2pNuovoFiltro === 'number' ? p2pNuovoFiltro : 0,
+    /* il paracadute (13 ott 2026): 0 = spento */
+    paracadute: typeof p2pNuovoParacadute === 'number' ? p2pNuovoParacadute : 0,
     premio: p2pNuovoPremio,
     /* il premio del percorso Barattozon, come scritto (23 set 2026) */
     premioTab: p2pNuovoPremioTab,
@@ -67271,6 +67558,9 @@ function renderNuovoOrdineP2P(){
      il bottone che apre il foglio della pausa SOPRA questo, dopo «chi
      puo' prendere» e prima dei limiti — vedi `sezionePausaNuovoP2P` */
   const pausa = typeof sezionePausaNuovoP2P === 'function' ? sezionePausaNuovoP2P(tab) : '';
+  /* IL PARACADUTE (13 ott 2026): dopo la pausa, e mai con Barattozon —
+     vedi `sezioneParacaduteNuovoP2P` */
+  const paracadute = typeof sezioneParacaduteNuovoP2P === 'function' ? sezioneParacaduteNuovoP2P(tab) : '';
 
   /* I TRE DATI DEL TABACCHINO (set 2026), solo quando la voce e'
      scelta: numero, importo e scadenza dell'ordine Amazon, che chi
@@ -67397,7 +67687,7 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + accesso + pausa + riquadroLimitiP2P() +
+    + quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
@@ -68931,6 +69221,13 @@ async function inviaNuovoOrdineP2P(confermato){
      mia card mostra il segno */
   const filtroOrd = typeof filtroDaCampiP2P === 'function' ? filtroDaCampiP2P(campi) : 0;
   if (filtroOrd) ord.filtro = filtroOrd;
+  /* IL PARACADUTE STA SULLA RIGA (13 ott 2026): parte all'intestazione
+     come la zona e il filtro, e intanto la mia card mostra il segno. La
+     scelta — anche «Spento» — si ricorda per il prossimo ordine */
+  const paraOrd = typeof paracaduteDaCampiP2P === 'function' ? paracaduteDaCampiP2P(campi) : 0;
+  if (paraOrd) ord.paracadute = paraOrd;
+  if (typeof ricordaParacaduteP2P === 'function' && typeof paracaduteAttivoP2P === 'function'
+      && paracaduteAttivoP2P() && !tabacchinoP2P(campi.metodi)) ricordaParacaduteP2P(campi.paracadute);
   /* I TRE DATI DEL TABACCHINO STANNO SULLA RIGA (set 2026), e non
      nel ricordo per forma: sono di QUESTO ordine, e partono da soli
      verso chi compra appena si sa chi e' (`recapitoDaAutoInvio` li
@@ -71229,6 +71526,9 @@ function rigaScambioP2P(o){
     /* IL MIO ORDINE IN PAUSA LO DICE (cantiere pausa-in-vista): lo stesso
        segno della card del libro, sull'ordine ancora pubblicato */
     + (o.stato === 'pubblicato' && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : '')
+    /* ...E IL SUO PARACADUTE (13 ott 2026): «🪂 Paracadute 5%» sull'ordine
+       ancora pubblicato, e come e' finito su quello che ha annullato lui */
+    + (typeof segnoParacaduteP2P === 'function' ? segnoParacaduteP2P(o) : '')
     + (metodi.length ? '<div class="p2p-box p2p-paga'
              + (senzaNomi ? ' p2p-paga-marchio' : '')
              + (senzaNomi && finita ? ' p2p-paga-spenta' : '') + '" title="'
@@ -72508,6 +72808,8 @@ async function chiediFotoLibroP2P(){
   const filtri = typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri);
   /* ...e gli ordini in pausa adesso (12 ott 2026): la fotografia intera */
   const pause = typeof prendiPauseP2P === 'function' && prendiPauseP2P(d && d.pause);
+  /* ...e quelli col paracadute aperto (13 ott 2026): la fotografia intera */
+  const paracadute = typeof prendiParacaduteP2P === 'function' && prendiParacaduteP2P(d && d.paracadute);
   /* ...e i miei secondo il server (28 set 2026): la stessa lista della
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
@@ -72515,7 +72817,7 @@ async function chiediFotoLibroP2P(){
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
-      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri || pause;
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri || pause || paracadute;
   libroDaCopiaP2P(eventi, quando, 'server');
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
@@ -73052,6 +73354,8 @@ function ordiniVetrinaP2P(libro, adesso, mio){
     /* ...e gli ordini in pausa (12 ott 2026): la fila mostra solo quel
        che chi guarda puo' prendere */
     .filter(o => !(typeof nascostoPerPausaP2P === 'function' && nascostoPerPausaP2P(o)))
+    /* ...e quelli col paracadute aperto (13 ott 2026) */
+    .filter(o => !(typeof nascostoPerParacaduteP2P === 'function' && nascostoPerParacaduteP2P(o)))
     .sort((a, b) => (b.creato || 0) - (a.creato || 0))
     .slice(0, P2P_VETRINA_MAX);
 }
@@ -73207,6 +73511,7 @@ async function chiediFotoVetrinaP2P(){
   prendiZoneP2P(d && d.zone);
   if (typeof prendiFiltriP2P === 'function') prendiFiltriP2P(d && d.filtri);
   if (typeof prendiPauseP2P === 'function') prendiPauseP2P(d && d.pause);
+  if (typeof prendiParacaduteP2P === 'function') prendiParacaduteP2P(d && d.paracadute);
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
@@ -73784,6 +74089,9 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
   /* ...e CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la
      stessa porta della zona, dalla riga di chi ha pubblicato */
   const filtri = typeof filtriDaDichiarareP2P === 'function' ? filtriDaDichiarareP2P(lista) : {};
+  /* ...e IL PARACADUTE (13 ott 2026): la stessa porta, dalla riga di chi
+     ha pubblicato; il prezzo di partenza lo scrive il server, col suo */
+  const paracadute = typeof paracaduteDaDichiarareP2P === 'function' ? paracaduteDaDichiarareP2P(lista) : {};
   try {
     const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -73800,6 +74108,7 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
                             presi: !!presi,
                             zone: zone,
                             filtri: filtri,
+                            paracadute: paracadute,
                             cambi: cambi})});
     return r.ok;
   } catch(e){ return false; }
@@ -73950,6 +74259,8 @@ async function chiediFacceP2P(ids){
       if (typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri)) nuove++;
       /* ...e la pausa di chi li ha pubblicati (12 ott 2026): solo per gli id chiesti */
       if (typeof prendiPauseP2P === 'function' && prendiPauseP2P(d && d.pause, lista)) nuove++;
+      /* ...e il paracadute aperto (13 ott 2026): solo per gli id chiesti */
+      if (typeof prendiParacaduteP2P === 'function' && prendiParacaduteP2P(d && d.paracadute, lista)) nuove++;
       return nuove > 0;
     } catch(e){ return false; }
     finally { p2pFacceGiro = null; }
@@ -74996,6 +75307,127 @@ async function togliPausaAdessoP2P(){
   }
 }
 /* ============ fine della pausa che chiede ============ */
+/* ============ IL PARACADUTE, LA PARTE CHE CHIEDE (13 ott 2026, cantiere
+   paracadute): «come stanno i miei paracadute?», e il `cancel` di quelli
+   che si sono aperti. Stanno qui, fuori dal motore, come le due rotte
+   della pausa.
+   IL `cancel` LO FIRMA QUESTO TELEFONO, SENZA CHIEDERE DI NUOVO: il
+   consenso e' stato dato pubblicando, con la soglia. Parte SOLO su un
+   ordine mio ancora `pubblicato` — uno preso non si tocca, si porta a
+   termine come sempre — e passa dalla porta di tutti i gesti
+   (`chiamataOrdineP2P`), con la stessa attesa dell'annullo a mano. ---- */
+async function chiediMieiParacaduteP2P(){
+  if (DEMO || VETRINA || !myTgId || !paracaduteAttivoP2P()) return false;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/paracadute`, {headers: {'X-Tg-Init-Data': authHdr()}, cache: 'no-store'});
+    if (!r.ok) return false;
+    const d = await r.json();
+    if (!d || d.attivo !== true || !d.ordini || typeof d.ordini !== 'object') return false;
+    const nuova = {};
+    for (const id of Object.keys(d.ordini)) {
+      const v = d.ordini[id];
+      if (idMostroVero(id) && v && sogliaParacaduteP2P(v.soglia))
+        nuova[id] = {soglia: sogliaParacaduteP2P(v.soglia), partenza: Number(v.partenza) || 0,
+                     aperto: Math.floor(Number(v.aperto) || 0), arrivo: Number(v.arrivo) || 0};
+    }
+    const cambiato = JSON.stringify(nuova) !== JSON.stringify(p2pMieiParacadute);
+    p2pMieiParacadute = nuova;
+    return cambiato;
+  } catch(e) { return false; }
+}
+let p2pParacaduteInCorso = {};        // ordine -> true: il suo `cancel` e' in volo
+let p2pParacaduteTentato = {};        // ordine -> quando l'ho provato l'ultima volta
+const P2P_PARACADUTE_RIPROVA_MS = 300000;   // un `cancel` non riuscito si riprova dopo cinque minuti
+async function annullaPerParacaduteP2P(id){
+  const o = ordiniP2P()[id];
+  const p = o && mioParacaduteP2P(o);
+  /* solo un ordine MIO, ancora nel libro, con le chiavi qui, e col
+     paracadute che il server dice aperto */
+  if (!o || !o.mio || o.soloVista || o.stato !== 'pubblicato' || !p || !p.aperto) return false;
+  if (p2pParacaduteInCorso[id]) return false;
+  if (Date.now() - (p2pParacaduteTentato[id] || 0) < P2P_PARACADUTE_RIPROVA_MS) return false;
+  /* LE PRESE DALLE 10 (9 ott 2026): prima dell'ora nessuno manda un `cancel` */
+  if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) return false;
+  p2pParacaduteInCorso[id] = true;
+  p2pParacaduteTentato[id] = Date.now();
+  /* la riga si annota l'apertura PRIMA del gesto: a ordine annullato il
+     server non lo racconta piu', e la card deve saperlo dire */
+  o.paracaduteAperto = {partenza: p.partenza, arrivo: p.arrivo, quando: p.aperto};
+  scriviOrdineP2P(o);
+  let fatto = false;
+  try {
+    /* A FREDDO IL MOTORE DELLO SCAMBIO DORME (13 ott 2026, dal giro dal
+       vivo): chi riapre l'app su Esplora non ha ancora la libreria delle
+       chiavi (si carica al primo bisogno) ne' l'ascolto delle risposte
+       (parte col libro). Si svegliano tutti e due PRIMA del gesto, o il
+       `cancel` della «prima apertura» morirebbe senza partire. */
+    if (typeof caricaNostrTools === 'function') await caricaNostrTools();
+    if (typeof mostroRiascolta === 'function') await mostroRiascolta();
+    const chiamata = chiamataOrdineP2P(o, 'cancel');
+    await (typeof attendiGestoP2P === 'function' ? attendiGestoP2P(id, 'ritira', chiamata) : chiamata);
+    fatto = true;
+  } catch(e) {
+    /* «gia' annullato» o «non c'e' piu'» a un annullo: e' riuscito */
+    fatto = !!(typeof annulloGiaFattoP2P === 'function' && annulloGiaFattoP2P(e, id));
+    if (!fatto && typeof diarioP2P === 'function')
+      diarioP2P('paracadute ' + String(id).slice(0, 8) + ': il cancel non e\' riuscito ('
+        + String(e && e.message || e).slice(0, 80) + '), si riprova');
+  } finally { delete p2pParacaduteInCorso[id]; }
+  if (fatto) toast('🪂 Il paracadute si è aperto: ordine annullato', 6000);
+  if (typeof renderP2P === 'function') renderP2P();
+  if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+  return fatto;
+}
+/* IL BATTITO, nell'interval unico dell'app: una volta al minuto, a
+   pagina in vista, e SOLO a chi ha almeno un ordine suo ancora nel libro
+   — tutti gli altri non chiedono niente. Su QUALUNQUE vista: e' cosi'
+   che «alla prima apertura» vale anche per chi apre su Esplora. */
+let p2pParacaduteBattito = 0;
+const P2P_PARACADUTE_OGNI_MS = 60000;
+function battitoParacaduteP2P(forza){
+  const adesso = Date.now();
+  if (!forza && adesso - p2pParacaduteBattito < P2P_PARACADUTE_OGNI_MS) return false;
+  if (DEMO || VETRINA || !myTgId || !paracaduteAttivoP2P()) return false;
+  if (document.visibilityState === 'hidden') return false;
+  const mie = ordiniP2P();
+  if (!Object.keys(mie).some(id => mie[id] && mie[id].mio && mie[id].stato === 'pubblicato')) return false;
+  p2pParacaduteBattito = adesso;
+  chiediMieiParacaduteP2P().then(cambiato => {
+    const righe = ordiniP2P();
+    for (const id of Object.keys(p2pMieiParacadute))
+      if (p2pMieiParacadute[id].aperto && righe[id]) annullaPerParacaduteP2P(id);
+    if (!cambiato) return;
+    const v = vistaAttivaP2P();
+    if (v === 'view-p2p' || v === 'view-p2pmiei') renderP2P();
+    if (p2pOrdineAperto && v === 'view-p2pordine') renderOrdineP2P();
+  }).catch(() => {});
+  return true;
+}
+/* CHI HA IL LIBRO DAVANTI LO VEDE USCIRE (13 ott 2026, dal giro dal
+   vivo): la fotografia del server si chiede una volta per sessione, e
+   l'ordine col paracadute aperto restava sul libro di chi lo stava
+   guardando finche' non usciva e rientrava — «posso prendere?» lo
+   fermava comunque, ma l'ordine era ancora li'. Col libro davanti la si
+   richiede una volta al minuto, e alla tirata: la STESSA domanda e le
+   stesse mappe (di rimbalzo si rinfrescano anche le pause, che viaggiano
+   con lei), e si ridisegna solo se e' cambiato qualcosa. A leva spenta
+   non parte niente: e' come ieri. */
+let p2pFuoriLibroChiesto = 0;
+function rinfrescaFuoriLibroP2P(forza){
+  if (DEMO || !paracaduteAttivoP2P()) return false;
+  if (!forza && Date.now() - p2pFuoriLibroChiesto < P2P_PARACADUTE_OGNI_MS) return false;
+  if (document.visibilityState === 'hidden' || vistaAttivaP2P() !== 'view-p2p') return false;
+  p2pFuoriLibroChiesto = Date.now();
+  const firma = () => JSON.stringify([Object.keys(p2pParacaduteAperti).sort(),
+                                      typeof p2pPause !== 'undefined' ? p2pPause : null]);
+  const prima = firma();
+  chiediFotoLibroP2P().then(() => {
+    if (firma() !== prima && vistaAttivaP2P() === 'view-p2p'
+        && typeof ridisegnaLibroFermoP2P === 'function') ridisegnaLibroFermoP2P();
+  }).catch(() => {});
+  return true;
+}
+/* ============ fine del paracadute che chiede ============ */
 
 /* ============ LA ✕ SU OGNI DISPOSITIVO (7 ott 2026) =========
    La domanda che la ✕ di «I miei scambi» fa prima di togliere: «questo

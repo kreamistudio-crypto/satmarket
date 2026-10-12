@@ -31282,6 +31282,119 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   motore. Prove: `prove_tempo_di_chi_pubblica`,
   `prove_tempo_pubblica_app`, `collaudo_tempo_pubblica` (gabbia della CI).
 
+- IL PARACADUTE (13 ott 2026, cantiere `paracadute`; il perché in
+  CANTIERI, «Il paracadute», la leva in PRODUZIONE, «IL PARACADUTE, SUL
+  VPS»). Chi pubblica un ordine P2P può dire «se il prezzo di BTC sale o
+  scende più di X% da adesso, annullamelo»: se succede PRIMA che
+  qualcuno lo prenda, l'ordine esce dal libro da solo, senza penalità, e
+  lui riceve un avviso col tasto per ripubblicarlo. Un ordine già preso
+  non si tocca. DUE POSTI, e la firma sta in uno solo.
+  IL SERVER, dietro la leva `P2P_PARACADUTE` (spenta di serie, in busta
+  come `paracadute`, nel pannello delle leve), GUARDA IL PREZZO E
+  NASCONDE; non firma e non esce verso i relay (regola ferrea 2: il
+  `cancel` è una firma dell'utente).
+  • LA RIGA: tabella `p2p_paracadute`, una per ORDINE (`soglia`,
+  `partenza` = euro per bitcoin del nostro cambio alla nascita, `oltre`
+  e `lettura` = il conto delle letture di fila, `aperto`/`arrivo`,
+  `superato`). A differenza della pausa — una riga per persona, chiesta
+  all'orologio — qui si scrive sull'ordine: un paracadute aperto resta
+  aperto.
+  • L'INTESTAZIONE: `_dichiara_paracadute_p2p`, dalla porta della zona e
+  del filtro (`POST /api/p2p/ordini`, chiave `paracadute: {ordine:
+  soglia}`): solo sulla riga di chi l'ordine l'ha PUBBLICATO (`maker`),
+  LA PRIMA RESTA, mai un ordine Barattozon, soglia solo dal catalogo
+  `P2P_PARACADUTE_SOGLIE` (5, 10, 20). LA PARTENZA LA SCRIVE IL SERVER
+  col suo cambio di quel momento (`cambio_noto_ora`), mai un numero
+  detto dal telefono; se in quel momento non lo sa nasce a 0 e la
+  riempie la prima lettura buona.
+  • I GIUDICI PURI: `_soglia_paracadute_p2p`, `_scarto_paracadute_p2p`
+  (percento col segno), `_passo_paracadute_p2p` — UNA lettura su una
+  riga chiusa: la fonte muta (prezzo che manca, o lettura più vecchia di
+  `P2P_PARACADUTE_FRESCO_S`, 300 s) non apre e non azzera; la STESSA
+  lettura non si conta due volte (si confronta l'ora della lettura, non
+  il giro dell'orologio); OLTRE la soglia (al filo esatto no) `oltre`
+  sale e a `P2P_PARACADUTE_LETTURE` (2) si apre; una lettura dentro la
+  soglia lo riporta a zero.
+  • L'OROLOGIO: `_giro_paracadute_p2p` nella passata intera di
+  `orologio_p2p`, DOPO il libro e PRIMA della fotografia;
+  `_passata_paracadute_p2p` guarda i soli ordini `pending`, pubblicati
+  da chi ha la riga, non Barattozon e senza una presa in corso
+  (`_preso_adesso_p2p`: l'ultima presa raccontata da mostrod senza un
+  fatto finale dopo — mostrod racconta entro un secondo, il libro entro
+  un minuto). Un ordine che esce dal libro AZZERA il conto: se torna
+  servono di nuovo due letture. Il prezzo è quello che il server ha già
+  in mano (`cambio_noto_ora` e `_cambio_cache["quando"]`): da qui non
+  parte nessuna chiamata. ⚠️ Quindi vive del rinfresco di sfondo del
+  cambio (`CAMBIO_RINFRESCO_S`): a 0 il paracadute non riceve letture.
+  • LE PORTE: `_paracadute_p2p` (gli id col paracadute aperto, senza dire
+  di chi) esce con `/api/p2p/facce`, con la fotografia del libro
+  (`F["paracadute"]`, `_paracadute_foto_p2p`) e ferma
+  `_posso_prendere_p2p` col motivo `paracadute` (il settimo di
+  `P2P_MOTIVI_PRESA`; mai sul proprio ordine). `GET
+  /api/p2p/paracadute` (senza parametri, `no-store`) dà a chi ha
+  pubblicato i suoi: `_miei_paracadute_p2p`, i soli ordini vivi. A leva
+  spenta le liste sono vuote e gli ordini tornano a vedersi.
+  • LA PRESA: `_segna_presa_paracadute_p2p`, dalla ROTTA degli eventi
+  dopo `_registra_evento_p2p` e PRIMA degli esiti (dentro
+  `_registra_evento_p2p` no: i banchi delle prove la ritagliano per
+  nome). `_presa_a_paracadute_p2p` dice `dopo` (presa arrivata a
+  paracadute già aperto: da un'altra app) o `prima` (per l'orologio di
+  mostrod la presa è di prima dell'apertura: l'evento ha fatto tardi, e
+  l'apertura si DISFA, `superato`). In tutti e due i casi
+  `p2p_scambi.pausa_presa` va a 1: è la tutela della presa arrivata in
+  pausa, e `_esito_chi_pubblica_p2p` non conta niente. Un `preso` già
+  superato da un fatto finale non tocca niente.
+  • GLI AVVISI: `_testo_paracadute_p2p` all'apertura, col bottone
+  `P2P_BOTTONE_PARACADUTE` che porta a `/p2p?scambio=<id>` (vocabolario
+  di sempre: dentro Telegram apre la Mini App);
+  `_riga_paracadute_presa_p2p` aggiunge sotto l'avviso della PRESA, a chi
+  ha pubblicato e a lui solo, `P2P_PARACADUTE_DOPO` o
+  `P2P_PARACADUTE_PRIMA`.
+  «Dimentica il profilo» li toglie, la fusione degli account li sposta.
+  L'APP SCEGLIE, MOSTRA E FIRMA. Nel motore, il blocco «IL PARACADUTE»
+  (zero `fetch`): `paracaduteAttivoP2P`, `sogliaParacaduteP2P`,
+  `sezioneParacaduteNuovoP2P` (nel foglio che pubblica dopo la pausa;
+  «Spento» di serie, mai con Barattozon), `ultimoParacaduteP2P` /
+  `ricordaParacaduteP2P` (l'ultima scelta, in `localStorage`: una
+  comodità del dispositivo, mai un fatto), `paracaduteDaCampiP2P`,
+  `paracaduteDaDichiarareP2P`, `prendiParacaduteP2P`,
+  `nascostoPerParacaduteP2P` (in `passaFiltroP2P` e nella fila della
+  home; il proprio ordine resta — ⚠️ la PAUSA da `passaFiltroP2P` è
+  uscita lo stesso giorno, cantiere `libro-vuoto`: l'ordine in pausa
+  resta nel libro, grigio, perché torna; quello col paracadute aperto
+  NON torna, e per questo dal libro esce), `mioParacaduteP2P` (vince quel che
+  dice il server), `statoParacaduteP2P` / `segnoParacaduteP2P` («🪂
+  Paracadute 5%» sulla propria card, poi «aperto» e «annullato dal
+  paracadute»), `riquadroParacaduteP2P` e `ripubblicaParacaduteP2P` (il
+  foglio che pubblica coi campi di prima — a prezzo fisso i sats rifatti
+  sugli stessi euro, `campiRipubblicaP2P`: sats × partenza ÷ cambio di
+  adesso — e NON pubblica da solo). `scegliParacaduteNuovoP2P` scarta il
+  click che arriva entro 700 ms dal gesto del + (`p2pPiuGestoAt`, lo
+  stesso orologio di `toccaPiu`): il gesto apre il foglio al rilascio
+  del dito e il click cade su quel che il foglio ha messo lì sotto. LO
+  STESSO SCARTO sta in `scegliFiltroNuovoP2P` (il filtro di chi può
+  prendere l'ordine): a 390×844 quel click accendeva «3+ scambi» a ogni
+  apertura del foglio, e l'ordine usciva ristretto senza saperlo.
+  Fuori dal motore, «IL PARACADUTE, LA PARTE CHE CHIEDE»:
+  `chiediMieiParacaduteP2P`, `battitoParacaduteP2P` (nell'interval unico,
+  una volta al minuto, su QUALUNQUE vista e solo a chi ha un ordine suo
+  ancora nel libro) e `annullaPerParacaduteP2P` — IL `cancel`: solo su
+  un ordine mio ancora `pubblicato`, con le chiavi su questo
+  dispositivo e col paracadute che il server dice aperto; sveglia il
+  motore (`caricaNostrTools`, `mostroRiascolta`: a freddo su Esplora
+  dorme) e passa da `chiamataOrdineP2P`; uno fallito si riprova dopo
+  `P2P_PARACADUTE_RIPROVA_MS`. `rinfrescaFuoriLibroP2P` richiede la
+  fotografia del server col libro davanti (una volta al minuto, e alla
+  tirata): prima arrivava una volta per sessione, e chi stava guardando
+  il libro non vedeva uscire l'ordine — con lei si rinfrescano anche le
+  pause, che viaggiano nella stessa risposta. Il testo di «Info P2P»
+  (`testoParacaduteInfoP2P`) sta fuori dal motore, accanto alle sorelle.
+  ⚠️ VALE DENTRO BARATTOLO finché il telefono non firma: per il
+  coordinatore l'ordine resta `pending`, e un'altra app lo vede e lo
+  prende. Chiudere quel buco a telefono spento vuole una patch del nodo:
+  rimandata (CANTIERI). Prove: `prove_paracadute_p2p`,
+  `prove_paracadute_app`, `collaudo_paracadute` (gabbia della CI).
+
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo
   (`orologio_x`, `X_GIRO_S` 5 minuti, parte da `avvia_x` SOLO se

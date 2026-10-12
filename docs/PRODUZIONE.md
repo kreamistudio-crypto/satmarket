@@ -3498,6 +3498,41 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   — ogni mancata risposta lascia la sua riga, anche quando NON si conta
   (in pausa, non dei nostri, già contata su quell'ordine, senza il tempo
   lungo), col perché.
+- IL PARACADUTE, SUL VPS: LA LEVA E LE LETTURE (13 ott 2026, cantiere
+  `paracadute`; il perché in CANTIERI, «Il paracadute»). La leva è
+  `P2P_PARACADUTE`, nel codice `False`. ACCESA: nel foglio che pubblica
+  un ordine P2P compare «🪂 Paracadute» (Spento · 5% · 10% · 20%); se il
+  prezzo di BTC si muove oltre la soglia prima che l'ordine venga preso,
+  il server lo toglie dal libro di Barattolo, avvisa chi l'aveva
+  pubblicato, e il SUO telefono lo annulla alla prima apertura. Mai sugli
+  ordini Barattozon. NON DIPENDE DALLE ALTRE LEVE DEL P2P né dal nodo:
+  si può accendere prima o dopo la `-bar8`.
+  ⚠️ VIVE DEL CAMBIO DI SFONDO: il paracadute legge il cambio che il
+  server rinfresca da solo ogni `CAMBIO_RINFRESCO_S` (60 di serie). Se
+  sul VPS quella riga fosse a 0 il paracadute non riceverebbe letture e
+  resterebbe sempre chiuso: prima di accendere,
+  `grep -n "CAMBIO_RINFRESCO_S" /srv/barattolo/config.py` (nessuna riga =
+  60, va bene).
+  PER ACCENDERLA: `nano /srv/barattolo/config.py`, in coda la riga
+  `P2P_PARACADUTE = True` (da AGGIUNGERE), poi
+  `sudo systemctl restart barattolo` e il pannello «⚙️ Stato delle leve»
+  → «Paracadute degli ordini P2P: acceso». PER SPEGNERLA: la riga a
+  `False` e riavvio. Le righe restano in `p2p_paracadute` e smettono di
+  contare: gli ordini già usciti col paracadute tornano a vedersi, e i
+  telefoni non annullano più niente.
+  LE LETTURE (in `python3`, sola lettura). I paracadute, dal più nuovo:
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT ordine, tg_id, soglia, partenza, oltre, aperto, arrivo, superato FROM p2p_paracadute ORDER BY creato DESC LIMIT 20').fetchall())"`
+  (`aperto` > 0 = si è aperto a quell'ora, a quel prezzo d'`arrivo`;
+  `superato` > 0 = un'apertura disfatta perché l'ordine risultava preso
+  un attimo prima). Quelli aperti che per il libro sono ancora `pending`
+  — cioè il telefono non ha ancora firmato il `cancel`:
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute(\"SELECT p.ordine, p.tg_id, p.aperto FROM p2p_paracadute p JOIN p2p_ordini o ON o.ordine=p.ordine WHERE p.aperto>0 AND o.stato='pending'\").fetchall())"`
+  Nel journal: `journalctl -u barattolo --since today | grep "Paracadute P2P"`
+  — «🪂 Paracadute P2P: … aperto al 5% (da … a … €/BTC): avviso …» a ogni
+  apertura, «… preso a paracadute gia' aperto» e «… un attimo PRIMA
+  dell'apertura» alle prese, «⚠️ Paracadute P2P: battito saltato» se il
+  giro inciampa (il prossimo arriva lo stesso).
+
 - LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (PREPARATA il 12
   ott 2026, cantiere `tempo-di-chi-pubblica`; ⚠️ NON ANCORA FATTA: build
   e riavvio del nodo solo con l'ok esplicito di Andrea, un comando alla

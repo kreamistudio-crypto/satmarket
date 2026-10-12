@@ -891,6 +891,17 @@ P2P_CAUZIONE_SUL_METODO = False
 # funzionano e la regola di ieri («mai a chi ha pubblicato») resta.
 # Solo True accende.
 P2P_TEMPO_DI_CHI_PUBBLICA = False
+# IL PARACADUTE DEGLI ORDINI P2P (13 ott 2026): SPENTO di serie. Acceso,
+# chi pubblica un ordine puo' scegliere una soglia (5, 10 o 20%): se il
+# prezzo di BTC sale o scende piu' di cosi' rispetto alla pubblicazione,
+# PRIMA che qualcuno lo prenda, l'ordine esce dal libro di Barattolo da
+# solo, senza penalita', e lui riceve un avviso col tasto per
+# ripubblicarlo. L'annullamento vero sul circuito lo firma il SUO
+# telefono alla prima apertura: il server non firma al posto di nessuno.
+# Il prezzo e' il cambio che il server legge gia' (nessuna chiamata in
+# piu'); servono due letture di fila oltre la soglia, e una fonte muta
+# non apre niente. Mai sugli ordini Barattozon. Solo True accende.
+P2P_PARACADUTE = False
 # LA CHAT NELLO SCAMBIO (12 ott 2026): ACCESA di serie. Dentro ogni
 # scambio preso le due parti si scrivono; i messaggi passano dal server
 # gia' chiusi dal telefono, stanno in un file a parte (`chat-scambi.db`,

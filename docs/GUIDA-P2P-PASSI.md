@@ -1462,6 +1462,68 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
   pubblicati da te, con tre persone diverse, rispondendo di solito entro
   dieci minuti. Si perde alla prima presa lasciata senza risposta.»
 
+### Il paracadute (13 ott 2026)
+
+⚠️ UN INTERRUTTORE: la leva del VPS `P2P_PARACADUTE` (pannello «⚙️ Stato
+delle leve»). A leva spenta niente di questa sezione esiste.
+
+**Pubblicando.**
+- 📱 Nel foglio «Vuoi vendere Bitcoin» / «Vuoi comprare Bitcoin», dopo
+  «Pausa degli ordini»: la sezione «**🪂 Paracadute**» con quattro
+  scelte, «**Spento**» · «**5%**» · «**10%**» · «**20%**». Di serie è
+  accesa «Spento», e sotto: «Se BTC sale o scende oltre la soglia che
+  scegli, l'ordine si annulla da solo. Senza penalità.» Toccato il 5%:
+  «Se BTC sale o scende più del 5% da adesso, l'ordine si annulla da
+  solo. Senza penalità.» La volta dopo il foglio si apre con l'ultima
+  scelta. Con un ordine Barattozon la sezione non c'è.
+- 📱 In «I miei scambi», sulla card dell'ordine pubblicato, sotto
+  «Ordine pubblicato»: «**🪂 Paracadute 5%**». Lo vede solo chi l'ha
+  pubblicato.
+
+**Quando il prezzo si muove oltre la soglia** (due letture di fila, a
+un minuto l'una dall'altra, e solo se nessuno l'ha ancora preso).
+- ✈️ **A chi aveva pubblicato**: «🪂 **Il paracadute si è aperto**: BTC
+  è passato da 100.000 € a 94.000 € (−6,0%), il tuo ordine di vendita da
+  50,00 € è stato annullato. Nessuna penalità.» e a capo «Apri Barattolo
+  per toglierlo anche dalle altre app collegate.», col bottone «**🔁
+  Ripubblica al prezzo nuovo**» (apre la pagina di quell'ordine).
+- 📱 **Chi guarda il libro**: l'ordine sparisce (entro un minuto se il
+  libro è aperto, subito tirando giù). Chi lo aveva già aperto e tocca
+  il bottone per prenderlo legge «🚫 Quest'ordine non è più disponibile:
+  chi l'ha pubblicato aveva scelto di ritirarlo se il prezzo di BTC si
+  muoveva troppo.»
+- 📱 **Chi aveva pubblicato, alla prima apertura dell'app** (su
+  qualunque pagina): il telefono annulla l'ordine da solo, e passa
+  «🪂 Il paracadute si è aperto: ordine annullato». In «I miei scambi»
+  → «Filtro» → «Annullati» la card dice «**🪂 Annullato dal
+  paracadute**». Nella pagina dell'ordine: «🪂 Il paracadute si è
+  aperto: BTC è passato da 100.000 € a 94.000 € (−6,0%). L'ordine è
+  stato annullato, senza penalità.» e il bottone «**🔁 Ripubblica al
+  prezzo nuovo**».
+- 🧑 «🔁 Ripubblica al prezzo nuovo» apre il foglio che pubblica coi
+  campi di prima: a prezzo fisso gli stessi euro e i sats rifatti al
+  prezzo di adesso (50.000 sats a 100.000 € diventano 53.191 a 94.000
+  €), a mercato tutto com'era. Non pubblica da solo: si rilegge e si
+  tocca «Pubblica ordine».
+
+**Se lo prendono prima, o da un'altra app.**
+- Preso PRIMA che la soglia scatti: il paracadute non fa niente, lo
+  scambio va avanti come sempre. Se l'ordine torna nel libro, il
+  paracadute è di nuovo armato col prezzo della pubblicazione.
+- ✈️ Preso da un'altra app DOPO l'apertura (finché il telefono non ha
+  annullato, lì l'ordine si vede ancora): sotto «Il tuo ordine è stato
+  preso» la riga «🪂 Il paracadute di quest'ordine era già aperto: puoi
+  annullare senza penalità.»
+- ✈️ Se la presa era di un attimo prima dell'apertura e l'avviso
+  dell'annullamento era già partito: sotto «Il tuo ordine è stato preso»
+  la riga «🪂 Il paracadute non vale: l'ordine era stato preso un attimo
+  prima che si aprisse. Lo scambio va avanti come sempre.»
+
+**La regola, in «Info P2P» → «Se pubblichi un ordine».** «🪂 Il
+paracadute. Pubblicando puoi scegliere una soglia — 5%, 10%, 20% — e se
+il prezzo di BTC sale o scende più di così rispetto a quel momento,
+l'ordine esce dal libro da solo, senza penalità, e ti avvisiamo. …»
+
 ### I promemoria a garanzia bloccata: gli euro e il rilascio (10 ott 2026)
 
 Dopo la garanzia bloccata il coordinatore non ha più un cronometro corto

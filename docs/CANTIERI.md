@@ -55704,3 +55704,302 @@ fermati e dimmelo», parola di Andrea, che ha dato l'ok al push nello
 stesso messaggio). La CI di main guardata prima del push: una riga
 «failure» su `29c47f3` è la sola bandierina `pronto` che non si è
 spostata (prove e segreti verdi), non una prova rossa.
+
+## Il paracadute: l'ordine che si annulla da solo se BTC si muove troppo (13 ott 2026, cantiere paracadute, decisione di Andrea con Alan)
+
+**IL PROBLEMA.** Chi pubblica un ordine P2P lo fa perché a QUEL prezzo
+gli sta bene vendere o comprare. Ma un ordine resta nel libro per
+giorni, finché scade, e se intanto BTC fa un salto o un crollo forte a
+quelle condizioni non lo farebbe più. Con un esempio, BTC a 100.000 €
+quando si pubblica. A PREZZO FISSO («50.000 sats per 50 €»): se BTC
+sale del 10% quei sats valgono 55 € e chi li prende li paga 50 — chi
+vende regala la differenza; se scende nessuno prende, e l'ordine resta
+morto nel libro. Per chi compra a prezzo fisso è lo specchio: ci
+rimette se BTC scende. A MERCATO i sats li conta il coordinatore alla
+presa, quindi nessuno regala niente: ma con BTC a 90.000 chi vende dà
+circa 55.500 sats invece di 50.000 per gli stessi 50 €, cioè scambia a
+un prezzo che non è più quello visto pubblicando.
+
+**LA REGOLA.** Pubblicando si può aprire il «🪂 Paracadute» con una
+soglia: «se il prezzo di BTC sale o scende più di X% da adesso,
+annullami l'ordine». Se succede PRIMA che qualcuno lo prenda, l'ordine
+esce dal libro da solo, senza penalità, e chi l'aveva pubblicato riceve
+un avviso col tasto per ripubblicarlo al prezzo nuovo. Se è già preso,
+lo scambio si porta a termine come sempre.
+
+**LE DECISIONI DI ANDREA** (prima del codice, su sei domande):
+1. IL `cancel` LO FIRMA IL TELEFONO, MAI IL SERVER. Per cancellare un
+   ordine il coordinatore vuole la firma della chiave di chi l'ha
+   pubblicato. Per chi è nato con Telegram il server il profilo lo
+   saprebbe ricavare: è la strada scartata il 12 ott per la pausa, e
+   per la stessa ragione — firmare al posto di qualcuno è custodia
+   (regola ferrea 2), e varrebbe solo per chi usa il profilo
+   dell'account. Quindi DUE TEMPI, uguali per tutti: SUBITO il server
+   toglie l'ordine dal libro di Barattolo e non lo fa prendere da qui
+   (la porta della pausa), e avvisa; POI il telefono, alla prima
+   apertura dell'app, manda il `cancel` vero senza chiedere di nuovo —
+   il consenso è stato dato pubblicando.
+2. BARATTOZON FUORI, come dalla pausa: ha già la scadenza del PayCode.
+   Dentro tutti gli altri: prezzo fisso, mercato col premio, intervalli.
+3. SI APRE SOLO DOPO DUE LETTURE DI FILA oltre la soglia: un numero
+   impazzito della fonte non deve cancellare gli ordini di tutti. E UNA
+   FONTE MUTA NON APRE NIENTE.
+4. SPENTO DI SERIE (è un automatismo che annulla: nessuno deve
+   trovarselo acceso), e il foglio ricorda l'ultima scelta. Le soglie:
+   Spento · 5% · 10% · 20%.
+5. LA PATCH AL NODO PER LE ALTRE APP, PER ORA NO.
+6. Una leva nel config, spenta di serie: `P2P_PARACADUTE`.
+
+**COM'È FATTO** (ARCHITETTURA, «IL PARACADUTE»). IL SERVER guarda il
+prezzo e nasconde: una riga per ordine in `p2p_paracadute`, scritta
+all'intestazione dalla porta della zona e del filtro (la prima resta);
+una passata al minuto nell'orologio del P2P, dopo il libro e prima
+della fotografia; la lista degli ordini col paracadute aperto esce coi
+volti e con la fotografia, e «posso prendere?» li ferma col motivo
+`paracadute`. L'APP sceglie nel foglio che pubblica, mostra «🪂
+Paracadute 5%» sulla propria card, toglie dal libro gli ordini degli
+altri, e FIRMA il `cancel` dei propri.
+
+**LE SCELTE DI DISEGNO, coi perché.**
+- IL PREZZO DI PARTENZA LO SCRIVE IL SERVER, col suo cambio nel momento
+  in cui registra l'ordine come pubblicato; il telefono manda la sola
+  soglia. È lo stesso numero con cui poi si confronta, e un telefono
+  col cambio fermo non può spostarlo.
+- LA FONTE È IL CAMBIO DI TUTTA L'APP: quello che il server rinfresca
+  da solo ogni minuto (`cambio_noto_ora`). Nessuna chiamata in più, mai
+  la rete dal giro del paracadute. Il coordinatore i sats di un ordine
+  a mercato li conta con le sue fonti: possono differire di qualche
+  decimo di punto, niente davanti al 5%.
+- DUE LETTURE VUOL DIRE DUE LETTURE: si confronta l'ora in cui la fonte
+  ha dato il numero, non il giro dell'orologio. Due giri sullo stesso
+  numero ne contano una.
+- LA FONTE MUTA NON APRE E NON AZZERA: una lettura più vecchia di
+  cinque minuti non si conta, e il conto resta dov'era. IN QUEL BUCO
+  L'ORDINE NON È PROTETTO, e «Info P2P» lo dice. Niente riga «prezzo
+  non aggiornato» all'utente (decisione dell'11 ott).
+- «PIÙ DEL 5%» È STRETTO: al filo esatto non si apre. È la frase del
+  foglio, e la prova la tiene.
+- UN ORDINE PRESO NON SI TOCCA, e si riconosce in due modi: il libro
+  (che arriva entro un minuto) e la cronaca di mostrod (entro un
+  secondo). È la seconda che tiene fermo il paracadute sull'ordine
+  preso un attimo prima della soglia. Uscito dal libro, il conto delle
+  letture riparte da zero: se torna servono di nuovo due letture, col
+  prezzo della pubblicazione.
+- LA CORSA FRA LA PRESA E L'APERTURA ha due esiti, tutti e due senza
+  penalità (la colonna è `pausa_presa`, la tutela della presa in
+  pausa). Presa arrivata DOPO l'apertura — da un'altra app, perché da
+  qui non si prende più —: sotto l'avviso della presa la riga «puoi
+  annullare senza penalità». Presa che per l'orologio di mostrod è di
+  PRIMA dell'apertura (l'evento ha fatto tardi): l'apertura si disfa, e
+  la riga dice che lo scambio va avanti.
+- LA PRESA A PARACADUTE APERTO STA NELLA ROTTA degli eventi, non dentro
+  `_registra_evento_p2p`: quella funzione la ritagliano per nome decine
+  di banchi delle prove, e una chiamata nuova lì dentro li faceva
+  esplodere tutti.
+- IL `cancel` PARTE SU QUALUNQUE PAGINA, non solo nel P2P: chi apre
+  l'app su Esplora ha comunque dato quella consegna. Solo a chi ha un
+  ordine suo ancora nel libro: tutti gli altri non chiedono niente.
+
+**COSA VEDE CHI USA UN'ALTRA APP MOSTRO, nel frattempo.** La scheda
+dell'ordine nel libro la firma il coordinatore, quindi finché il
+telefono non manda il `cancel` lì l'ordine resta visibile e prendibile.
+Se lo prendono da lì: chi ha pubblicato riceve l'avviso della presa con
+la riga del paracadute, e annullare o lasciar scadere non gli costa
+niente; chi ha preso può uscire quando vuole, senza penalità. A prezzo
+fisso non c'è un danno nemmeno così: a chi pubblica tocca sempre un
+passo (pagare la garanzia o dare la fattura), e senza di lui non si
+muove niente.
+
+**LE STRADE SCARTATE.**
+- IL `cancel` FIRMATO DAL SERVER per chi è nato con Telegram: sopra.
+- LA PATCH AL NODO che toglie l'ordine dal libro del coordinatore
+  quando il server glielo dice (l'unico modo di nasconderlo alle altre
+  app a telefono spento): rimandata, come la «pausa vera» del 12 ott —
+  prima i numeri di quanti scambi hanno una parte fuori da Barattolo.
+- UNA SECONDA FONTE DEL PREZZO per quando la prima tace: un'altra
+  dipendenza verso fuori, per un buco che oggi si dichiara.
+- IL PREZZO DI PARTENZA DETTO DAL TELEFONO (la strada del cambio di
+  Barattozon): qui non c'è un premio da rileggere, c'è una soglia da
+  far scattare, e la fa scattare il server.
+- LA SOGLIA VISIBILE A CHI GUARDA: non gli serve, e direbbe a tutti a
+  che prezzo l'ordine se ne va.
+- L'ANNULLO AUTOMATICO DI UN ORDINE GIÀ PRESO: mai.
+
+**TRE COSE TROVATE DAL GIRO DAL VIVO, e curate.** Nessun banco le
+avrebbe viste.
+1) CHI AVEVA IL LIBRO APERTO NON VEDEVA USCIRE L'ORDINE: la fotografia
+   del server (che porta la lista) si chiedeva una volta per sessione.
+   «Posso prendere?» lo fermava comunque, ma l'ordine restava lì. Ora
+   col libro davanti si richiede una volta al minuto, e alla tirata
+   (`rinfrescaFuoriLibroP2P`). Di rimbalzo si rinfrescano anche le
+   pause, che viaggiano nella stessa risposta: solo a leva accesa.
+2) A FREDDO IL `cancel` NON PARTIVA: chi riapre l'app su Esplora non ha
+   ancora la libreria delle chiavi né l'ascolto delle risposte. Si
+   svegliano tutti e due prima del gesto.
+3) IL CLICK CHE ARRIVA DOPO IL TOCCO SUL +: il gesto del + apre il
+   foglio al rilascio del dito, e il click che il browser manda subito
+   dopo cade su quel che il foglio ha messo lì sotto. A 390×844 è la
+   pillola «3+ scambi» di «Chi può prendere l'ordine», che si accendeva
+   da sola (curata nello stesso push: vedi sotto). Una soglia del
+   paracadute scelta così annullerebbe un ordine:
+   `scegliParacaduteNuovoP2P` scarta il click con lo stesso orologio di
+   `toccaPiu`.
+
+**I TESTI.** Nel foglio: «🪂 Paracadute», «Spento · 5% · 10% · 20%», e
+una riga sola — «Se BTC sale o scende più del 5% da adesso, l'ordine si
+annulla da solo. Senza penalità.» Sulla card: «🪂 Paracadute 5%».
+L'avviso (la frase è di Andrea): «🪂 Il paracadute si è aperto: BTC è
+passato da 100.000 € a 94.000 € (−6,0%), il tuo ordine di vendita da
+50,00 € è stato annullato. Nessuna penalità.», e a capo «Apri Barattolo
+per toglierlo anche dalle altre app collegate.» — la seconda riga è
+mia, e dice quel che resta da fare: per chi guarda da Barattolo
+l'ordine è annullato, ma il `cancel` vero parte dal telefono. Il
+custode non si nomina, come nei testi della pausa. Il bottone: «🔁
+Ripubblica al prezzo nuovo». «Info P2P» e «I tuoi dati» dicono la
+regola e cosa teniamo; la guida ai passi ha la sua sezione.
+
+**IL + CHE ACCENDEVA «3+ SCAMBI», CURATO NELLO STESSO PUSH** (richiesta
+di Andrea, 13 ott: «fa uscire ordini ristretti senza che chi pubblica lo
+sappia»). Nel giro dal vivo, a 390×844, OGNI apertura del foglio dal +
+lo lasciava con «3+ scambi» scelto senza che nessuno lo toccasse: il
+click dopo il tocco (punto 3 sopra) cadeva proprio su quella pillola.
+È di prima del paracadute — il filtro è del 10 ott — e su un telefono
+vero dipende dall'altezza dello schermo e da dove cade il dito. LA
+CURA è la riga del paracadute, in `scegliFiltroNuovoP2P`: il click
+entro 700 ms dal gesto del + si scarta (`p2pPiuGestoAt`, l'orologio di
+`toccaPiu`). VISTA ROSSA PRIMA: il pezzo vero, in node, subito dopo il
+gesto sceglieva 3 e ridisegnava; DOPO: resta «Tutti», e un tocco vero
+a foglio aperto lo sceglie ancora. E dal vivo, coi tocchi veri: il
+foglio si apre su «Tutti», e «3+ scambi» toccato col dito si accende.
+
+**DA FARE** (i notati non urgenti: scritti qui e NON fatti, decisione
+di Andrea del 13 ott).
+- `_autori_foto_p2p` HA LO STESSO `tg_id > 0` della pausa (cantiere
+  pausa-nativi): a chi è nato su Nostr la fila «Scambi P2P» di Esplora
+  mostra anche i SUOI ordini, perché il server non glieli dice suoi.
+  La cura è la stessa (`<> 0`), con la sua prova per un id negativo.
+- IL CLICK DOPO IL TOCCO SUL + SUGLI ALTRI CONTROLLI DEL FOGLIO: a
+  un'altra altezza di schermo può cadere sulla leva del tipo di prezzo,
+  sulla tendina dei metodi, sul campo dell'importo o su «Imposta la
+  pausa». Quelli SI VEDONO (aprono qualcosa, o cambiano una sezione del
+  foglio): non scelgono in silenzio come il filtro e il paracadute, e
+  per questo non sono urgenti. La cura di fondo sarebbe scartare nel
+  foglio OGNI click entro i 700 ms dal gesto, in un posto solo.
+- DOPO L'ANNULLO L'ORDINE NON SI VEDE IN «I MIEI SCAMBI»: sta sotto
+  «Filtro» → «Annullati», come ogni annullato. Ci si arriva dal tasto
+  dell'avviso; da decidere se, annullato dal paracadute, vada mostrato
+  per un po' anche nella pagina di sempre col suo «Ripubblica».
+- LA PATCH DEL NODO per togliere l'ordine anche dalle altre app a
+  telefono spento (rimandata: sopra, «le strade scartate»).
+- LA PROVA DAL VIVO COL COORDINATORE VERO (telefono vero, prezzo che si
+  muove), a leva ancora spenta per tutti: i passi li ha Andrea.
+
+**PROVATO** (paracadute). `prove_paracadute_p2p`, sul banco degli
+avvisi coi giudici veri: le sentinelle (la leva, il server che non
+firma e non esce, il posto nell'orologio, la presa scritta dalla rotta
+prima degli esiti), i pezzi puri — UN DUMP e UN PUMP (alla prima
+lettura no, alla seconda sì), il filo esatto, il numero impazzito
+seguito da uno sano, la stessa lettura contata una volta, la FONTE MUTA
+che non apre e non azzera, la riga senza partenza —, l'intestazione (la
+prima resta, Barattozon no, l'ordine altrui no), la passata
+dell'orologio, «posso prendere?», chi è nato su Nostr, la leva spenta,
+L'ORDINE PRESO UN ATTIMO PRIMA DELLA SOGLIA (non si apre più; tornato
+nel libro riparte da zero letture), la presa arrivata dopo l'apertura
+(nessun esito a chi ha pubblicato, nemmeno annullando a mano), l'evento
+della presa arrivato tardi (l'apertura si disfa), il `preso` vecchio che
+non disfa niente. `prove_paracadute_app`, coi pezzi veri in node: la
+sezione del foglio, l'ultima scelta ricordata, il click fantasma, il
+segno e il riquadro, il «Ripubblica» coi sats rifatti, IL `cancel` (solo
+su un ordine mio ancora pubblicato, una volta, col motore svegliato
+prima), il battito, il libro davanti. `collaudo_paracadute` sulle ROTTE
+VERE e col giro vero dell'orologio, nella gabbia della CI: 41 passi.
+LE SEZIONI DI IERI EMENDATE dove la regola è cambiata: le chiavi della
+busta sono diciassette, i motivi della presa sette, i try dell'orologio
+sette, le consegne da `_recapita_p2p` cinque, il giudice «è mio?» ha
+otto chiamanti, le scatole del foglio e la risposta dei volti portano
+il paracadute; quattro banchi della busta e quello della fotografia
+hanno la leva nuova, spenta.
+LA TORTURA, su una copia del repo: 37 mutazioni (21 sul server, 16
+sull'app), tutte uccise. Al primo giro tre erano uccise solo da un
+banco che ESPLODEVA (`substring not found`): le sentinelle dell'ordine
+sono passate da `.index` a `.find`, e ora dicono rosso col loro nome. E
+una, la freschezza della lettura, la uccideva la prova ma non il
+collaudo: il suo passo della fonte muta è stato rifatto perché a
+fermare le letture vecchie possa essere solo lei.
+IL GIRO DAL VIVO a larghezza telefono (390×844, Chrome senza finestra
+coi TOCCHI veri, due telefoni): 37 controlli su 37 nell'ultimo giro,
+dopo la cura del filtro (35 su 35 in quello prima), quattordici scatti,
+nessuna pagina più larga del telefono. Il server è quello della copia
+(config di cartone, nsec al segnaposto), il coordinatore è di cartone,
+e il relay è VERO ma locale — un relay minimo su loopback che leggono
+sia le pagine sia il server —, quindi il server il libro lo legge
+davvero (`pending` dal 38383 firmato, non seminato a mano). Il prezzo è
+un file che il giro riscrive. Si vede: il foglio con «Spento» di serie
+e il 5% scelto con un tocco; l'ordine pubblicato coi tocchi (50 € per
+50.000 sats, prezzo fisso) e «🪂 Paracadute 5%» sulla card; chi guarda
+che lo trova nel libro; CHI HA PUBBLICATO CHE CHIUDE L'APP; il dump da
+100.000 a 94.000 €, l'apertura dopo due letture e l'avviso (simulato)
+col bottone; chi guarda che legge «non è più disponibile» e poi vede
+l'ordine uscire dal libro DA SOLO in mezzo minuto, mentre per il
+coordinatore è ancora `pending` e nessun `cancel` è arrivato; l'app
+riaperta su Esplora che manda UN `cancel`; «🪂 Annullato dal paracadute»
+sotto «Annullati»; la pagina col riquadro e «🔁 Ripubblica al prezzo
+nuovo», che apre il foglio con 53.191 sats al posto di 50.000; «Info
+P2P».
+
+**NON PROVATO, e si dice.** NESSUN TELEFONO VERO e nessun Telegram vero:
+il giro entra dal sito (dentro il finto Telegram la pubblicazione resta
+appesa al cloud, che lì non risponde). Il `cancel` verso il coordinatore
+VERO non è mai partito: il cartone risponde `canceled` come mostrod, ma
+è cartone. L'avviso su Telegram è quello simulato del collaudo (il
+testo e il bottone si leggono nel log). Un'altra app Mostro non l'ho
+aperta: che lì l'ordine resti visibile finché il telefono non firma lo
+dice il protocollo, non una prova. Un dump vero, coi suoi rimbalzi sul
+filo della soglia, nemmeno.
+
+**RESTA DA GUARDARE** (Andrea). Sul VPS, prima di accendere:
+`grep -n "P2P_PARACADUTE\|CAMBIO_RINFRESCO_S" /srv/barattolo/config.py`
+(la leva non c'è finché non si aggiunge; il rinfresco del cambio non
+dev'essere a 0). Sul telefono, a leva accesa: la sezione nel foglio
+dentro Telegram, un ordine piccolo a prezzo fisso col 5%, e — se il
+prezzo non si muove da solo — niente: per vederlo aprire serve
+aspettare il mercato. E, aprendo il foglio dal +: «Chi può prendere
+l'ordine» deve restare su «Tutti».
+
+**COSA È GIRATO SU QUALE ALBERO** (paracadute, prima dell'ok al push).
+Sopra `ea93474` (la punta di main; il cantiere era nato su `5c71c7f`
+ed è stato ribasato tre volte mentre main correva, l'ultima con un
+conflitto di code in `prove.py`: tenute tutte le sezioni). PRIMO GIRO
+della suite severa: 14 rosse, tutte attese di ieri o banchi senza la
+leva nuova, emendate; SECONDO: 2 rosse (le chiavi della busta e i
+chiamanti del giudice, che al primo giro stavano dietro due sezioni
+esplose), emendate; TERZO, sull'albero finale (il codice e i documenti
+di questo commit, prima di questo verbale): 23.491 passate e 0 fallite.
+I collaudi del workflow nella gabbia: 75 verdi, 0 rossi.
+Un giro di collaudi è stato fermato e rifatto da capo: per controprovare
+il passo della fonte muta avevo tolto la freschezza dal `server.py` DEL
+WORKTREE per una quindicina di secondi mentre giravano (rimesso
+identico subito): le mutazioni si fanno sulla copia, mai qui.
+
+**L'INCROCIO COL CANTIERE `libro-vuoto`** (arrivato su main il 13 ott, a
+push del paracadute in corso: decisione di Andrea dello stesso giorno).
+Quel cantiere ROVESCIA la pausa del 12: l'ordine di chi è in pausa NON
+esce più dal libro — resta, grigio, con «⏸ Puoi prenderlo tra 6 h 35
+min», e non si prende. Il paracadute era nato sulla pausa di prima
+(«toglierlo dal libro come fa la pausa») e i due cantieri toccavano le
+stesse righe: `passaFiltroP2P`, «I tuoi dati», lo stesso punto del
+motore, il conto dei chiamanti del giudice «è mio?» nelle prove. Fusi
+A MANO, non coi segni: nel filtro la pausa non passa più (la loro riga)
+e IL PARACADUTE SÌ, con la sua ragione scritta lì — un ordine in pausa
+TORNA, e per questo resta in vista; uno col paracadute aperto NON
+TORNA: chi l'ha pubblicato ha chiesto di annullarlo, e il suo telefono
+lo sta per fare. È la consegna di Andrea («ordine tolto dal libro») e
+non cambia. In «I tuoi dati» la frase nuova della pausa e sotto il
+paragrafo del paracadute; nel motore prima il loro blocco, poi il mio;
+i chiamanti del giudice sono NOVE (la pausa tolta, e il paracadute).
+`rinfrescaFuoriLibroP2P` — la fotografia richiesta ogni minuto col
+libro davanti — adesso serve anche alla carta grigia: una pausa che
+COMINCIA mentre si guarda il libro si vede entro il minuto (il loro
+battito riscrive i minuti e toglie il grigio a pausa finita, ma la
+mappa la prendeva solo all'ingresso). Il server si è fuso da solo, e
+«posso prendere?» giudica prima il paracadute, poi la pausa.
