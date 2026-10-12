@@ -143,8 +143,8 @@ modo in cui si rifà un errore già pagato.
 
 ⚠️ Non è il VPS di Barattolo: è il coordinator Mostro P2P su LNVPS
 (Dublino, `185.18.221.96`), tutto in container (bitcoind pruned, LND,
-tor, mostrod), due canali: 400.000 sat verso ACINQ e, dal 5 ott 2026,
-5M verso LNBiG. Gira il nostro fork di Mostro, `mostro:v0.19.0-bar7`
+tor, mostrod), tre canali (`/canali`, 12 ott 2026): LNBiG [Hub-2] 5M,
+ACINQ 1M e ACINQ 400k. Gira il nostro fork di Mostro, `mostro:v0.19.0-bar7`
 (otto patch più la 0010: PRODUZIONE, «LA SALITA ALLA -bar7»). Il verbale
 — audit, timer, sonda, dev fee, risposte del team — sta in
 `docs/NODO-MOSTRO.md`. Le regole che valgono in ogni sessione:
