@@ -149732,7 +149732,7 @@ def prove_chi_e_l_altro():
     # con la sua frase, e nessun foglio al login la ripete
     prova("...e la regola con le parole di Andrea, una volta, senza un avviso al login",
           [1, False],
-          [dati.count("<b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome che hai scelto e le tue recensioni. Non vede chi sei né da dove ti colleghi. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b>"),
+          [dati.count("<b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b>"),
            "lo dice una volta sola al primo ingresso" in dati])
 
 def main():

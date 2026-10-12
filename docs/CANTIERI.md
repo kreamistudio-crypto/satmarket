@@ -51845,7 +51845,7 @@ di serie con lo spegnimento come scelta; poi, con Alan, via): chi vuole
 l'anonimato entra con una chiave Nostr nuova, che per l'altra persona è
 un'altra persona. Gli scambi già chiusi NON sono retroattivi: la promessa
 del 17 set vale sul passato. NESSUN AVVISO al login: la regola sta solo
-nel patto «I tuoi dati», con le parole di Andrea (la sera): «Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome che hai scelto e le tue recensioni. Non vede chi sei né da dove ti colleghi. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.»
+nel patto «I tuoi dati», con le parole di Andrea (la sera): «Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.»
 
 **Com'è fatto.** `_p2p_riconosciuto` resta il giudice unico e dice sì a
 chiunque sia qualcuno: la presa si annota per tutti (`preso_da`), e da
@@ -51941,8 +51941,12 @@ entrato (`npub_accesso`: nsec, bunker, estensione). Rispetto alla pagina
 pubblica del negozio ci sono due cose in più: i giorni di iscrizione
 (`registrato` non esce di là) e la npub di accesso (di là esce solo col
 badge). Mai: tg_id, IP, modo di accesso, recapiti, importi. Quindi la
-frase «Non vede chi sei» è vera solo per chi non ha uno @username e non
-entra con una chiave Nostr: a Andrea la parola, prima del push. 3) Il
+frase «Non vede chi sei» era vera solo per chi non ha uno @username e
+non entra con una chiave Nostr: Andrea ha tenuto i due tondi e scritto la
+frase vera (quella sopra, in «La decisione»: nome e foto, recensioni,
+livello, da quanto sei iscritto, completati e non completati, @username
+e npub se ci sono; mai telefono, da dove ti colleghi, recapiti, cosa hai
+comprato). 3) Il
 caso ea0af71a chiuso da Andrea sul VPS: il collegamento c'era (sopra).
 4) Il seme di `collaudo_pagamento_p2p` nomina le persone «Vera» e
 «Carlo» al posto di «Chi vende»/«Chi compra», così nelle frasi degli

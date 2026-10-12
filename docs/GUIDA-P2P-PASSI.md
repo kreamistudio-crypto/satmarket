@@ -225,7 +225,7 @@ vere sullo schermo, si salta come il tour):
   «L'altra persona è su Barattolo ma resta anonima: lo scambio è di
   prima del 12 ottobre 2026…»; finché il coordinatore non ha detto chi
   è: «Chi è l'altra persona non lo sappiamo ancora…». Nessun avviso al
-  login: la regola sta nel patto «I tuoi dati» («Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome che hai scelto e le tue recensioni. Non vede chi sei né da dove ti colleghi. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.»).
+  login: la regola sta nel patto «I tuoi dati» («Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.»).
 - **Gli avvisi**, per tutti, nel cassetto «🔔 Avvisi»: «⚡ Avvisi sugli
   scambi P2P» — «Quando il tuo ordine viene preso, quando lo scambio si
   chiude e quando tocca a te. Spenti, non ti scriviamo nulla dello
