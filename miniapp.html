@@ -3432,6 +3432,21 @@
     .p2p-chat-nuovo{display:flex;align-items:center;gap:7px;margin-top:8px;
       font-size:13px;font-weight:700;color:var(--ink)}
     .chatsc-pallino{flex:none;width:9px;height:9px;border-radius:50%;background:var(--danger)}
+    /* IL RICHIAMO «💬 Chat» in cima alla pagina dello scambio (12 ott
+       2026, notte, richiesta di Andrea): la chat sta in fondo alla
+       pagina, e chi non scorre non sa che c'e'. Una pastiglia a
+       destra, alta quanto un dito, col conto dei messaggi nuovi */
+    .chatsc-richiamo{display:flex;align-items:center;gap:8px;width:auto;min-height:44px;
+      margin:0 0 10px auto;padding:9px 16px;border-radius:999px;
+      border:1.5px solid var(--field-line);background:var(--card);color:var(--ink);
+      font:inherit;font-size:14px;font-weight:800;cursor:pointer;
+      -webkit-tap-highlight-color:transparent}
+    .chatsc-richiamo.nuovi{border-color:var(--danger)}
+    .chatsc-conto{min-width:20px;padding:0 6px;border-radius:999px;background:var(--danger);
+      color:var(--card);font-size:12px;font-weight:800;line-height:20px;text-align:center}
+    .chatsc-giu{color:var(--ink-soft)}
+    /* ...e il riquadro a cui porta non finisce sotto la testata */
+    #p2pChatSc{scroll-margin-top:76px}
     .chatmod textarea,.mod-decidi textarea{width:100%;box-sizing:border-box;margin-top:6px;
       padding:10px 12px;border-radius:12px;border:1px solid var(--field-line);
       background:var(--bg);color:var(--ink);font:inherit;font-size:16px;resize:vertical}
@@ -61670,6 +61685,9 @@ function renderOrdineP2P(){
     /* L'APPUNTAMENTO DEL CONTANTI IN CIMA, per tutti e due (1 ott 2026,
        richiesta di Andrea): il giorno dell'incontro e' la prima cosa che
        si cerca aprendo lo scambio — l'ora, il luogo, il navigatore */
+    /* IL RICHIAMO «💬 Chat» (12 ott 2026, notte): il primo pezzo della
+       pagina, col conto dei messaggi nuovi; porta giu' al riquadro */
+    (typeof chatScRichiamoP2P === 'function' ? chatScRichiamoP2P(o) : '') +
     riquadroAppuntamentoP2P(o) +
     /* il conto veste il lato della RIGA, non del tab del libro (24
        set 2026): vedi il CSS di `.p2p-ord.lato-vendo` */
@@ -76206,6 +76224,12 @@ let p2pChatScUltimi = {};         // ordine -> il numero dell'ultimo messaggio d
 let p2pChatScNovitaInVolo = null;
 let p2pChatScBattiti = 0;
 const CHATSC_NOVITA_OGNI = 6;     // un giro del pallino ogni sei battiti del polso: 30 secondi
+/* LA CONTROPARTE CHE MANCA (12 ott 2026, notte): vedi `chatScCercaControparteP2P` */
+const CHATSC_NON_PRESO = ['prendo', 'senza_risposta', 'pubblico', 'pubblicato'];
+const CHATSC_CERCA_MAX = 12;      // tentativi ravvicinati, uno a battito: un minuto. Poi resta il battito dei due minuti
+const CHATSC_CERCA_OGNI_MS = 4000;
+let p2pChatScCerca = {};          // ordine -> {n, t, volo}: la controparte chiesta al server
+let p2pChatScScorre = 0;          // il timer che raccoglie gli scorrimenti della pagina
 /* le due chiuse delle frasi del profilo: vedi `chatScParlarviP2P` */
 const CHATSC_FRASE_RECAPITI = 'restano i recapiti qui sotto, cifrati fra voi due.';
 const CHATSC_FRASE_CHAT = 'c\'è la chat qui sotto.';
@@ -76304,6 +76328,64 @@ function chatScCeP2P(o){
    chiusa cambiasse la' una prova lo dice. */
 function chatScParlarviP2P(testo, conChat){
   return conChat ? String(testo).replace(CHATSC_FRASE_RECAPITI, CHATSC_FRASE_CHAT) : testo;
+}
+
+/* ---- LA CHAT PARTE SUBITO: LA CONTROPARTE CHE MANCA (12 ott 2026,
+   notte, dal campo di Andrea) ----
+   IL FATTO: «la chat si attiva solo se chi apre lo scambio scorre fino
+   in fondo». Lo scorrimento non c'entrava. La chat nasce quando la
+   riga sa CHI E' L'ALTRA PARTE (`o.peer`), e a dirglielo e' l'archivio
+   del server — che si chiede APRENDO la pagina, tornando in primo
+   piano, o col battito dei due minuti. Una pagina GIA' APERTA non lo
+   chiedeva: chi ha appena preso resta sulla pagina che la presa ha
+   aperto (a «prendo» il riallineo non parte), e chi ha pubblicato
+   puo' averla davanti quando l'ordine viene preso. Riprodotto: 119
+   secondi senza controparte, senza riquadro e senza chiave — e
+   intanto l'altra persona legge «Si apre appena … apre lo scambio».
+   LA CURA: a pagina dello scambio aperta su un ordine PRESO senza
+   controparte la si chiede SUBITO (al ridisegno: e' il momento in cui
+   il coordinatore ha risposto) e a ogni battito della chat, cinque
+   secondi — una domanda sola, la stessa dell'apertura senza il giro
+   sui relay. COL FRENO: dodici tentativi ravvicinati (un minuto), poi
+   resta il battito dei due minuti; dopo due minuti di silenzio il
+   conto riparte. Arrivata la controparte la pagina si ridisegna, il
+   riquadro nasce e sveglia il ritiro. */
+/* PURA: uno scambio PRESO di cui questo telefono non sa ancora la
+   controparte — e che qui si puo' governare (una riga solo da
+   guardare la chat non la apre) */
+function chatScSenzaControparteP2P(o){
+  return !!(o && !o.peer && !o.soloVista && idMostroVero(o.id)
+    && CHATSC_NON_PRESO.indexOf(o.stato) < 0
+    && P2P_FINALI.indexOf(o.stato) < 0 && CHATSC_DOPO.indexOf(o.stato) < 0);
+}
+function chatScCercaControparteP2P(id){
+  if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId)
+    return Promise.resolve(false);
+  if (!chatScAccesaP2P() || !chatScSenzaControparteP2P(ordiniP2P()[id])) return Promise.resolve(false);
+  if (typeof chiediScambiServerP2P !== 'function' || typeof adottaScambiServerP2P !== 'function')
+    return Promise.resolve(false);
+  const adesso = Date.now();
+  const v = p2pChatScCerca[id] || (p2pChatScCerca[id] = {n: 0, t: 0, volo: null});
+  if (v.volo) return v.volo;
+  if (adesso - v.t > 120000) v.n = 0;
+  if (v.n >= CHATSC_CERCA_MAX || adesso - v.t < CHATSC_CERCA_OGNI_MS) return Promise.resolve(false);
+  v.n++; v.t = adesso;
+  const tentativo = v.n;
+  v.volo = (async () => {
+    if (!(await chiediScambiServerP2P())) return false;
+    adottaScambiServerP2P(ordiniP2P());
+    const o = ordiniP2P()[id];
+    if (!o || !o.peer) return false;
+    if (typeof diarioP2P === 'function')
+      diarioP2P('chat ' + String(id).slice(0, 8) + ': controparte arrivata dal server (tentativo '
+                + tentativo + '), la chat parte');
+    delete p2pChatScCerca[id];
+    /* la pagina si ridisegna: il riquadro nasce e sveglia il ritiro.
+       Dietro un'altra pagina il ritiro lo fara' chi apre lo scambio */
+    if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+    return true;
+  })().catch(() => false).finally(() => { const x = p2pChatScCerca[id]; if (x) x.volo = null; });
+  return v.volo;
 }
 
 /* ---- IL PALLINO DEI MESSAGGI NON LETTI (12 ott 2026, sera, richiesta
@@ -76733,10 +76815,13 @@ function chatScRitiraP2P(id){
     for (const b of (d.buste || []))
       if (b && b.tipo === 'msg' && !b.mia && (b.n | 0) > (p2pChatScUltimi[id] | 0)) p2pChatScUltimi[id] = b.n | 0;
     try { await chatScPresentaP2P(id, false); } catch(e) {}
-    /* LA CHAT E' APERTA DAVANTI: quel che e' arrivato e' visto, e il
-       pallino si spegne. Dietro un'altra pagina, o ad app nascosta, no */
+    /* LA CHAT E' DAVANTI AGLI OCCHI: quel che e' arrivato e' visto, e il
+       pallino si spegne. Dietro un'altra pagina, ad app nascosta, o col
+       riquadro FUORI VISTA in fondo alla pagina (12 ott 2026, notte: e'
+       il conto del richiamo «💬 Chat» in cima), no */
     if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'
-        && (typeof document === 'undefined' || document.visibilityState === 'visible'))
+        && (typeof document === 'undefined' || document.visibilityState === 'visible')
+        && chatScInVistaP2P())
       chatScVistoP2P(id);
     else chatScSegnaP2P();
     if (esito.nuovi && !esito.rileggi) {
@@ -76983,6 +77068,11 @@ function chatScBloccoHTML(o, c, sa){
    riscrive intera, e a chi sta scrivendo sparirebbe il campo da sotto
    le dita. */
 function bloccoChatScambioP2P(o){
+  /* LO SCAMBIO E' PRESO E LA CONTROPARTE NON SI SA: si chiede adesso,
+     senza aspettare il battito dei due minuti (vedi «LA CONTROPARTE
+     CHE MANCA»). Il freno e' in chi chiede */
+  if (typeof document !== 'undefined' && chatScAccesaP2P() && chatScSenzaControparteP2P(o))
+    setTimeout(() => { chatScCercaControparteP2P(o.id); }, 0);
   if (!chatScAccesaP2P() || !chatScServeP2P(o)) return '';
   if (typeof document !== 'undefined') {
     if (Date.now() - (p2pChatScUltimoGiro[o.id] || 0) > 2000)
@@ -77001,6 +77091,79 @@ function bloccoChatScambioP2P(o){
     }, 0);
   }
   return chatScBloccoHTML(o, chatScDiP2P(o.id), p2pChatScSapere[o.id]);
+}
+/* ---- IL RICHIAMO «💬 CHAT» IN CIMA ALLA PAGINA (12 ott 2026, notte,
+   richiesta di Andrea) ----
+   La chat sta in fondo alla pagina dello scambio: chi apre per
+   bloccare i sats e non scorre non sa che c'e', ne' che gli hanno
+   scritto. In cima una pastiglia «💬 Chat» col NUMERO dei messaggi
+   dell'altra persona non ancora visti, e un tocco (o un clic) porta
+   giu' al riquadro. Lo stesso pezzo su telefono, computer, Mini App e
+   sito. C'e' dove c'e' il riquadro: dalla presa alla fine.
+   «VISTO» VUOL DIRE DAVANTI AGLI OCCHI: il conto scende quando la
+   lista dei messaggi entra nello schermo — scorrendo, o col tocco sul
+   richiamo — e non piu' per il solo fatto di avere la pagina aperta. */
+/* PURA: i messaggi dell'altra persona che qui non sono ancora stati visti */
+function chatScDaLeggereP2P(c){
+  if (!c) return 0;
+  const fino = c.vistoFino | 0;
+  return (c.msgs || []).filter(m => m && !m.mio && !m.sis && (m.n | 0) > fino).length;
+}
+/* la lista dei messaggi e' nello schermo? Senza una pagina vera (i
+   banchi) vale si', com'era prima del richiamo */
+function chatScInVistaP2P(){
+  if (typeof document === 'undefined') return true;
+  const l = el('p2pChatScLista') || el('p2pChatSc');
+  if (!l || !l.getBoundingClientRect) return false;
+  const r = l.getBoundingClientRect();
+  const alta = window.innerHeight || document.documentElement.clientHeight || 0;
+  /* almeno un pezzo vero della lista: una riga, non il solo bordo */
+  return Math.min(r.bottom, alta) - Math.max(r.top, 0) >= Math.min(40, Math.max(1, r.height));
+}
+/* PURA: il richiamo. Vuoto dove il riquadro non c'e' */
+function chatScRichiamoHTML(o, c, sa){
+  if (!chatScAccesaP2P() || !chatScServeP2P(o) || (sa && (sa.chiusa || sa.senzaAltro))) return '';
+  /* dove al posto del riquadro c'e' solo una NOTA (lo scambio qui si
+     puo' solo guardare) non c'e' una chat a cui portare: le stesse
+     condizioni di `chatScBloccoHTML`, che e' chi fa nascere `#p2pChatSc` */
+  if (o.soloVista || !chatScTradeP2P(o)) return '';
+  const n = chatScDaLeggereP2P(c);
+  return '<button type="button" class="chatsc-richiamo' + (n ? ' nuovi' : '') + '" id="p2pChatRichiamo" '
+    + 'onclick="vaiAllaChatP2P()" aria-label="'
+    + (n ? 'Chat: ' + n + (n === 1 ? ' messaggio nuovo' : ' messaggi nuovi') : 'Vai alla chat') + '">'
+    + '<span>💬 Chat</span>'
+    + (n ? '<span class="chatsc-conto">' + (n > 99 ? '99+' : n) + '</span>' : '')
+    + '<span class="chatsc-giu" aria-hidden="true">↓</span></button>';
+}
+function chatScRichiamoP2P(o){
+  return chatScRichiamoHTML(o, chatScDiP2P(o.id), p2pChatScSapere[o.id]);
+}
+/* il conto del richiamo si rimette in pari sul posto, senza
+   ridisegnare la pagina */
+function chatScRichiamoAggiornaP2P(id){
+  if (typeof document === 'undefined' || p2pOrdineAperto !== id) return;
+  const r = el('p2pChatRichiamo');
+  const o = ordiniP2P()[id];
+  const html = o ? chatScRichiamoP2P(o) : '';
+  if (r && html) { if (r.outerHTML !== html) r.outerHTML = html; }
+  else if (r && !html) r.remove();
+}
+/* la lista e' entrata nello schermo: quel che c'e' e' visto */
+function chatScGuardataP2P(){
+  const id = p2pOrdineAperto;
+  if (!id || vistaAttivaP2P() !== 'view-p2pordine' || !chatScInVistaP2P()) return;
+  chatScVistoP2P(id);
+  chatScRichiamoAggiornaP2P(id);
+}
+function vaiAllaChatP2P(){
+  const b = el('p2pChatSc');
+  if (!b) return;
+  haptic();
+  const fermo = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  b.scrollIntoView({behavior: fermo ? 'auto' : 'smooth', block: 'start'});
+  /* a corsa finita: gli scorrimenti lo direbbero gia', ma una pagina
+     corta puo' non scorrere affatto */
+  setTimeout(chatScGuardataP2P, fermo ? 60 : 700);
 }
 /* IL RIDISEGNO SUL POSTO: arrivato un messaggio si riscrive la LISTA,
    e il piede solo se ha cambiato mestiere. La pagina intera non si
@@ -77021,19 +77184,36 @@ function chatScRidisegnaP2P(id){
   if (inFondo) lista.scrollTop = lista.scrollHeight;
   const p = chatScPiedeP2P(o, c);
   if (piede.dataset.modo !== p.modo) { piede.dataset.modo = p.modo; piede.innerHTML = p.html; }
+  chatScRichiamoAggiornaP2P(id);
 }
 /* IL POLSO DELLA CHAT: finche' lo scambio e' davanti e la pagina e' in
    vista, un ritiro ogni pochi secondi. LA POTATURA NON STA PIU' QUI
    (12 ott 2026, notte): la fa la risposta del pallino, con la parola
    del server — vedi `chatScPotaP2P`. */
+/* UN BATTITO, col suo nome (12 ott 2026, notte: lo chiama l'orologio
+   qui sotto, e i collaudi). A scambio PRESO senza controparte non c'e'
+   niente da ritirare: si chiede la controparte, e il ritiro lo sveglia
+   il riquadro quando nasce. */
+function chatScBattitoP2P(){
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+  /* il pallino: una domanda ogni mezzo minuto, su qualunque pagina */
+  if (!(p2pChatScBattiti++ % CHATSC_NOVITA_OGNI)) chatScNovitaP2P();
+  if (!p2pOrdineAperto || vistaAttivaP2P() !== 'view-p2pordine') return;
+  if (chatScSenzaControparteP2P(ordiniP2P()[p2pOrdineAperto])) {
+    chatScCercaControparteP2P(p2pOrdineAperto);
+    return;
+  }
+  chatScRitiraP2P(p2pOrdineAperto);
+}
 if (typeof document !== 'undefined' && document.addEventListener) {
-  setInterval(() => {
-    if (document.visibilityState !== 'visible') return;
-    /* il pallino: una domanda ogni mezzo minuto, su qualunque pagina */
-    if (!(p2pChatScBattiti++ % CHATSC_NOVITA_OGNI)) chatScNovitaP2P();
-    if (!p2pOrdineAperto || vistaAttivaP2P() !== 'view-p2pordine') return;
-    chatScRitiraP2P(p2pOrdineAperto);
-  }, CHATSC_POLSO_MS);
+  setInterval(chatScBattitoP2P, CHATSC_POLSO_MS);
+  /* LA LISTA CHE ENTRA NELLO SCHERMO: scorrendo la pagina dello scambio
+     (in cattura: lo scorrimento non risale, e cosi' si sente anche
+     quello di un contenitore), raccolto in un colpo ogni 150 ms */
+  document.addEventListener('scroll', () => {
+    if (p2pChatScScorre || !p2pOrdineAperto) return;
+    p2pChatScScorre = setTimeout(() => { p2pChatScScorre = 0; chatScGuardataP2P(); }, 150);
+  }, {capture: true, passive: true});
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     chatScNovitaP2P();

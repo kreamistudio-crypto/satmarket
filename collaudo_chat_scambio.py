@@ -167,6 +167,169 @@ async def scambio(n, venditore, compratore, kv, kc):
     return o
 
 
+def dispositivo_chat(mini):
+    """IL TELEFONO, per la sezione 16: le funzioni VERE di miniapp.html —
+    tutto il blocco della chat, la domanda all'archivio del server e la
+    sua adozione, la chiave dello scambio — in node, col bundle vero, un
+    localStorage che vive in un file (uno per telefono) e la `fetch` vera
+    verso il ponte. Di cartone ci sono solo la pagina (uno schermo alto
+    800 con la lista della chat IN FONDO, fuori vista finche' non si
+    «scorre») e il ridisegno, che fa nascere i due pezzi della chat come
+    `renderOrdineP2P`: il richiamo e il riquadro."""
+    def js(firma, fine="\n}\n"):
+        i = mini.index(firma)
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    def cost(nome, fine=";\n"):
+        i = mini.index("const " + nome + " = ")
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    blocco = mini[mini.rindex("/* ═══ LA CHAT NELLO SCAMBIO (12 ott 2026"):
+                  mini.index("/* ═══ fine: la chat nello scambio ═══ */")]
+    pezzi = "\n".join(
+        [cost(n) for n in ("MAZZO_INFO", "P2P_FINALI", "P2P_ORIZZONTE_S", "P2P_LAPIDE_TOLTO_S",
+                           "P2P_LIBRO_FINESTRA_S", "MOSTRO_LAPIDI_CHIAVE", "P2P_FORMA_ORDINE",
+                           "P2P_DA_RESTORE", "P2P_RESTORE_FERMI", "P2P_RIPRESA_PASSO",
+                           "P2P_INDICE_CERCA_MAX", "P2P_INDICE_CERCA_MIN", "P2P_GIRO_APERTO")]
+        + [cost("STATI_P2P", "\n};\n"), cost("P2P_PROGRESSO", "\n};\n")]
+        + [js(f) for f in ("function idMostroVero(id){", "function chiaveScambio(",
+                           "function ordiniP2P(){", "function scriviOrdineP2P(o){",
+                           "function lapidiP2P(){", "function lapidataP2P(id, giro){",
+                           "function toltoAltroveP2P(id){",
+                           "async function chiediScambiServerP2P(){",
+                           "function statoDaRestoreP2P(o, statoMostro){",
+                           "function fermoDaMomentiP2P(momenti){", "function indiceDaChiaveP2P(mz, pub, max){",
+                           "function presenzeDaServerP2P(p, giro){", "function uniscePresenzeP2P(a, b){",
+                           "function rigaDaServerP2P(id, s, tk, stato, adesso){",
+                           "function chiaveScambioDaServerP2P(mz, id, s){",
+                           "function adottaScambiServerP2P(locali){",
+                           "function testoContropartePerMotivoP2P(motivo){")]
+        + [js("function p2pRitirato(o){", "\n}") + "\n", blocco])
+    return r"""
+const fs = require('fs'), vm = require('vm');
+const [BUNDLE, STATO, MODO, BASE, BISCOTTO, CONTO, NOME] = process.argv.slice(2, 9);
+const PASSI = process.argv.slice(9);
+vm.runInThisContext(fs.readFileSync(BUNDLE, 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT, innerHeight: 800};
+const _box = fs.existsSync(STATO) ? JSON.parse(fs.readFileSync(STATO, 'utf-8')) : {};
+const localStorage = {getItem: k => (k in _box ? _box[k] : null), setItem: (k, v) => { _box[k] = String(v); }};
+function chiaveP2P(k){ return k; }
+const MOSTRO_ORDINI_CHIAVE = 'barattolo_mostro_ordini';
+const DEMO = false, VETRINA = false;
+let myTgId = Number(CONTO);
+const API_BASE = BASE + '/api';
+/* la Mini App porta l'initData; il sito il cookie (e sulla POST l'Origin) */
+function authHdr(){ return MODO === 'tg' ? 'collaudo:' + CONTO + ':' + NOME : ''; }
+const fetchVera = fetch;
+let chiamate = [];
+globalThis.fetch = (url, opz) => {
+  chiamate.push(String(url).split('/api/')[1]);
+  const o = Object.assign({}, opz || {});
+  o.headers = Object.assign({}, o.headers || {});
+  if (MODO === 'web') { o.headers['Cookie'] = 'barattolo_sessione=' + BISCOTTO; o.headers['Origin'] = BASE; }
+  return fetchVera(url, o);
+};
+let p2pOrdineAperto = _box.APERTO || '', p2pMieiOrdini = null, p2pScambiServer = null, p2pScambiGiro = null,
+    p2pToltiServer = null, p2pLeve = {chat: true};
+const DIARIO = [];
+function diarioP2P(r){ DIARIO.push(String(r).replace(/[0-9a-f]{8}/, 'ID')); }
+function toast(){} function haptic(){} function renderP2P(){} function renderModerazioneP2P(){}
+function aggiornaPallinoScambiP2P(){} function prendiCambiPubP2P(){}
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function nomeControparteP2P(o, ripiego){ return ripiego; }
+function chiaveModeratoreP2P(){ return null; } function archivioModP2P(){ return {}; }
+async function caricaNostrTools(){}
+function vistaAttivaP2P(){ return 'view-p2pordine'; }
+function mazzoMostro(){ return _box.MAZZO ? JSON.parse(_box.MAZZO) : null; }
+/* LA PAGINA, di cartone: la lista della chat sta IN FONDO, sotto lo
+   schermo, finche' non si scorre */
+let RETT = {top: 1200, bottom: 1460, height: 260};
+const LISTA = {getBoundingClientRect: () => RETT};
+function el(id){ return id === 'p2pChatScLista' ? LISTA : null; }
+/* IL RIDISEGNO: i due pezzi della chat nascono qui, come in `renderOrdineP2P` */
+let ridisegni = 0, ULTIMA = {richiamo: '', riquadro: ''};
+function renderOrdineP2P(){
+  ridisegni++;
+  const o = ordiniP2P()[p2pOrdineAperto];
+  ULTIMA = o ? {richiamo: chatScRichiamoP2P(o), riquadro: bloccoChatScambioP2P(o)} : {richiamo: '', riquadro: ''};
+}
+""" + pezzi + r"""
+globalThis.document = {visibilityState: 'visible', documentElement: {clientHeight: 800}, activeElement: null};
+const scartoOra = Number(_box.AVANTI || 0); const oraVera = Date.now; let avanti = scartoOra;
+Date.now = () => oraVera() + avanti;
+const log0 = console.log; console.log = () => {};
+const dormi = ms => new Promise(r => setTimeout(r, ms));
+/* si aspetta che la pagina abbia finito quel che ha fatto partire */
+async function quieto(){
+  for (let i = 0; i < 80; i++) {
+    await dormi(25);
+    const inVolo = Object.keys(p2pChatScInVolo).length
+      + Object.values(p2pChatScCerca).filter(x => x && x.volo).length
+      + (p2pScambiGiro ? 1 : 0) + (p2pChatScNovitaInVolo ? 1 : 0);
+    if (!inVolo && i >= 4) return;
+  }
+}
+const foto = () => {
+  const o = ordiniP2P()[p2pOrdineAperto] || {};
+  const c = chatScDiP2P(p2pOrdineAperto);
+  const richiamo = o.id ? chatScRichiamoP2P(o) : '';
+  return {stato: o.stato || '', controparte: !!o.peer, riquadro: !!ULTIMA.riquadro, chiave: !!(c && c.sk),
+          laSua: !!(c && c.loro), modo: (o.id && chatScServeP2P(o)) ? chatScPiedeP2P(o, c).modo : '',
+          msgs: c ? (c.msgs || []).filter(m => !m.sis).map(m => (m.mio ? 'io: ' : 'altro: ') + m.testo) : [],
+          daLeggere: chatScDaLeggereP2P(c), richiamo: richiamo ? (richiamo.match(/aria-label="([^"]*)"/) || [])[1] : '',
+          conto: (richiamo.match(/chatsc-conto">([^<]*)</) || [])[1] || '', inVista: chatScInVistaP2P(),
+          chiamate: chiamate.slice(), diario: DIARIO.slice()};
+};
+(async () => {
+  const fuori = [];
+  for (const passo of PASSI) {
+    /* le domande al server si contano su TUTTI i passi di questa accensione */
+    const [cosa, a, b, c, d, e] = passo.split('|');
+    try {
+      if (cosa === 'mazzo') {
+        if (!_box.MAZZO) { const sk = NT.generateSecretKey();
+          _box.MAZZO = JSON.stringify({sk: NT.utils.bytesToHex(sk), pub: NT.getPublicKey(sk), indice: 3}); }
+        fuori.push({passo: passo, scambio: chiaveScambio(mazzoMostro().sk, Number(a)).pub});
+      } else if (cosa === 'riga') {
+        /* la riga com'e' quando la pagina si apre: SENZA la controparte */
+        const ora = Math.floor(oraVera() / 1000);
+        scriviOrdineP2P({id: a, lato: b, indice: Number(c), pubTrade: chiaveScambio(mazzoMostro().sk, Number(c)).pub,
+          stato: d, mio: e === 'mio', peer: '', euro: 10, euroMax: 0, sats: 15000, satsNetti: 0, metodi: ['SEPA'],
+          premium: 0, hold: null, contattato: true, cantDo: '', errore: '', creato: ora, aggiornato: ora});
+        p2pOrdineAperto = a; _box.APERTO = a;
+        renderOrdineP2P(); await quieto();
+        fuori.push(Object.assign({passo: passo}, foto()));
+      } else if (cosa === 'stato') {
+        /* il coordinatore ha risposto: la riga cambia passo e la pagina si ridisegna */
+        const r = ordiniP2P()[a]; r.stato = b; scriviOrdineP2P(r);
+        renderOrdineP2P(); await quieto();
+        fuori.push(Object.assign({passo: passo}, foto()));
+      } else if (cosa === 'avanti') {
+        avanti += Number(a); _box.AVANTI = String(avanti);
+        fuori.push({passo: passo});
+      } else if (cosa === 'battito') {
+        chatScBattitoP2P(); await quieto(); await quieto();
+        fuori.push(Object.assign({passo: passo}, foto()));
+      } else if (cosa === 'scrivi') {
+        await chatScInviaP2P(a, b); await quieto();
+        fuori.push(Object.assign({passo: passo}, foto()));
+      } else if (cosa === 'scorri') {
+        RETT = {top: 300, bottom: 560, height: 260}; chatScGuardataP2P(); await quieto();
+        fuori.push(Object.assign({passo: passo}, foto()));
+      } else if (cosa === 'foto') {
+        fuori.push(Object.assign({passo: passo}, foto()));
+      }
+    } catch(x) { fuori.push({passo: passo, ESPLOSO: String(x && x.stack || x)}); }
+  }
+  fs.writeFileSync(STATO, JSON.stringify(_box));
+  console.log = log0;
+  console.log(JSON.stringify(fuori));
+  process.exit(0);
+})();
+"""
+
+
 async def giro():
     SRV = banco.SRV
     prova = banco.prova
@@ -743,6 +906,115 @@ async def giro():
         prova("la copia sigillata torna solo a chi l'ha spedita, con tutte e quattro le coppie di accesso",
               [(n, True, True) for n, _, _ in coppie], esiti)
 
+    async def s16():
+        # «LA CHAT SI ATTIVA SOLO SE SCORRI» (12 ott 2026, notte, dal campo di
+        # Andrea). Lo scorrimento non c'entrava: una pagina dello scambio
+        # GIA' APERTA non chiedeva al server chi fosse l'altra parte — chi ha
+        # appena preso resta sulla pagina che la presa ha aperto, chi ha
+        # pubblicato puo' averla davanti quando l'ordine viene preso — e
+        # senza la controparte non c'e' riquadro, non c'e' chiave, e l'altra
+        # persona legge «Si apre appena … apre lo scambio» fino al battito
+        # dei due minuti. QUI: il client VERO in node contro il server VERO,
+        # la pagina aperta e MAI riaperta, la lista della chat in fondo e mai
+        # scorsa (finche' non lo si dice), la controparte non ancora nota.
+        import shutil
+        import subprocess
+        import tempfile
+        import collaudo_tolti_ovunque as tolti
+        node = shutil.which("node")
+        if not node:
+            prova("node c'e'", True, False)
+            return
+        t = ordine(160)
+        pubblica(t, TG_V)
+        srv, base = tolti.avvia_ponte()
+        cart = tempfile.mkdtemp(prefix="chat_subito_")
+        mini = open(os.path.join(banco.QUI, "miniapp.html"), encoding="utf-8").read()
+        prog = os.path.join(cart, "telefono.js")
+        open(prog, "w", encoding="utf-8").write(dispositivo_chat(mini))
+        # chi compra e' nella WEB APP (il cookie del Login Widget), chi vende nella Mini App
+        chi = {"T": ("web", tolti.login_web(TG_C), TG_C, "Compratore"),
+               "M": ("tg", "", TG_V, "Venditore")}
+
+        def telefono(nome, *passi):
+            modo, biscotto, conto, come_si_chiama = chi[nome]
+            r = subprocess.run([node, prog, os.path.join(banco.QUI, "vendor", "nostr.bundle.js"),
+                                os.path.join(cart, nome + ".json"), modo, base, biscotto,
+                                str(conto), come_si_chiama, *passi],
+                               capture_output=True, text=True, encoding="utf-8", timeout=120)
+            try:
+                fuori = json.loads(r.stdout.strip().splitlines()[-1])
+            except Exception:
+                fuori = [{"ERRORE": (r.stdout or "")[-300:] + (r.stderr or "")[-700:]}] * len(passi)
+            return fuori[-1]
+
+        def buste_di(conto):
+            return [r[0] for r in cassetto("SELECT tipo FROM buste WHERE ordine=? AND da=? ORDER BY n",
+                                           t, conto)]
+        kt = km = ""
+        try:
+            kt = telefono("T", "mazzo|1").get("scambio") or ""
+            km = telefono("M", "mazzo|1").get("scambio") or ""
+            prova("i due telefoni hanno ognuno il suo profilo e la sua chiave di scambio", (64, 64, True),
+                  (len(kt), len(km), kt != km))
+            registra_chiave(km, TG_V)
+            registra_chiave(kt, TG_C)
+            # CHI HA APPENA PRESO: la pagina si apre alla presa («prendo»)
+            f = telefono("T", f"riga|{t}|compro|1|prendo|", "battito")
+            prova("PRIMA che il coordinatore risponda la pagina non chiede niente a nessuno: non c'e' "
+                  "ancora uno scambio", ([], False, False),
+                  (f.get("chiamate"), f.get("controparte"), f.get("riquadro")))
+            f = telefono("T", f"stato|{t}|attesa_mia_fattura")
+            prova("IL COORDINATORE HA RISPOSTO e il server non sa ancora della presa: la pagina CHIEDE "
+                  "SUBITO la controparte (una domanda all'archivio), e non la trova",
+                  (["p2p/scambi"], False, False, ""),
+                  (f.get("chiamate"), f.get("controparte"), f.get("riquadro"), f.get("ERRORE", "") or f.get("ESPLOSO", "")))
+            await evento(t, "taken", "buyer", "invoice-next", kt, km)
+            f = telefono("T", "avanti|5000", "battito")
+            prova("AL BATTITO DOPO (cinque secondi), a pagina aperta e MAI riaperta, con la chat in fondo e "
+                  "MAI scorsa: la controparte arriva, il riquadro nasce, la chiave pure",
+                  (True, True, True, False, "p2p/scambi"),
+                  (f.get("controparte"), f.get("riquadro"), f.get("chiave"), f.get("inVista"),
+                   (f.get("chiamate") or [""])[0]))
+            prova("...sul server ci sono la sua copia sigillata e il suo saluto, e il diario lo dice",
+                  (["chiave", "saluto"], True),
+                  (buste_di(TG_C), any("controparte arrivata dal server" in r for r in f.get("diario") or [])))
+            prova("...e intanto aspetta l'altra persona, com'e' giusto", "attesa", f.get("modo"))
+            # CHI HA PUBBLICATO ha la pagina del suo ordine gia' davanti quando viene preso
+            f = telefono("M", f"riga|{t}|vendo|1|pubblicato|mio", "battito")
+            prova("CHI HA PUBBLICATO, con la pagina del suo ordine gia' aperta: finche' il passo e' «nel "
+                  "libro» non chiede niente", ([], False), (f.get("chiamate"), f.get("riquadro")))
+            f = telefono("M", f"stato|{t}|attesa_mia_hold")
+            prova("...gli arriva «blocca i sats»: la pagina chiede la controparte, la chat parte SUBITO — "
+                  "senza riaprire, senza scorrere — e trova gia' la chiave dell'altra persona",
+                  (True, True, True, True, "scrivi", False),
+                  (f.get("controparte"), f.get("riquadro"), f.get("chiave"), f.get("laSua"), f.get("modo"),
+                   f.get("inVista")))
+            prova("...anche la sua copia e il suo saluto sono sul server", ["chiave", "saluto"], buste_di(TG_V))
+            f = telefono("T", "battito")
+            prova("...e chi aveva preso smette di aspettare al suo battito: si scrive", "scrivi", f.get("modo"))
+            prova("IL RICHIAMO IN CIMA c'e' dalla presa, senza numero finche' non c'e' niente di nuovo",
+                  ("Vai alla chat", "", 0), (f.get("richiamo"), f.get("conto"), f.get("daLeggere")))
+            telefono("M", f"scrivi|{t}|Ho bloccato i sats")
+            f = telefono("T", "battito")
+            prova("ARRIVA UN MESSAGGIO a chi ha la pagina aperta e la chat in fondo, fuori dallo schermo: "
+                  "non e' «visto», e il richiamo porta il numero",
+                  (["altro: Ho bloccato i sats"], 1, "1", "Chat: 1 messaggio nuovo", False),
+                  (f.get("msgs"), f.get("daLeggere"), f.get("conto"), f.get("richiamo"), f.get("inVista")))
+            f = telefono("T", "scorri")
+            prova("...scorre fino alla chat (o tocca il richiamo): il messaggio e' visto e il numero se ne va",
+                  (0, "", "Vai alla chat", True),
+                  (f.get("daLeggere"), f.get("conto"), f.get("richiamo"), f.get("inVista")))
+        finally:
+            srv.shutdown()
+            # i compiti nati nel giro del ponte non sono di questo: non si aspettano qui
+            qui = asyncio.get_running_loop()
+            for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
+                for c in list(gruppo):
+                    if c.get_loop() is not qui:
+                        gruppo.discard(c)
+            await evento(t, "canceled", "buyer", "", kt or chiave(0x71), km or chiave(0x72))
+
     await sezione(1, "LE QUATTRO COPPIE DI ACCESSO", s1)
     await sezione(2, "PRIMA DELLA PRESA, E PER UN ESTRANEO", s2)
     await sezione(3, "LA CONSEGNA A CHI E' OFFLINE", s3)
@@ -758,6 +1030,7 @@ async def giro():
     await sezione(13, "LA LEVA SPENTA", s13)
     await sezione(14, "LA CHAT SEGUE LO SCAMBIO: LA COPIA SIGILLATA E LE TRE PORTE DELLO STESSO ACCOUNT", s14)
     await sezione(15, "LA COPIA, CON LE QUATTRO COPPIE DI ACCESSO", s15)
+    await sezione(16, "LA CHAT PARTE SUBITO: PAGINA APERTA, MAI SCORSA, CONTROPARTE NON ANCORA NOTA (il client vero contro il server vero)", s16)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)

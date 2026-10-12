@@ -31768,6 +31768,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Il ritiro (`chatScRitiraP2P`) parte all'apertura dello scambio e ogni
   `CHATSC_POLSO_MS` (5 s) a pagina in vista; a un arrivo si riscrive la
   sola lista (`chatScRidisegnaP2P`), non la pagina.
+  LA CHAT PARTE SUBITO E IL RICHIAMO IN CIMA (12 ott 2026, notte,
+  cantiere chat-subito, dal campo di Andrea; il perché in CANTIERI,
+  «La chat parte subito»). Il riquadro vuole la controparte (`o.peer`),
+  e una pagina GIÀ APERTA non la chiedeva a nessuno fino al battito
+  dei due minuti (`battitoScambiP2P`): chi ha appena preso resta sulla
+  pagina che la presa ha aperto a «prendo», chi ha pubblicato può
+  avere la sua davanti. `chatScSenzaControparteP2P(o)` (pura) dice se
+  lo scambio è PRESO, vivo, governabile da qui e senza controparte
+  (`CHATSC_NON_PRESO`: non prima della presa);
+  `chatScCercaControparteP2P(id)` chiede l'archivio del server
+  (`chiediScambiServerP2P` + `adottaScambiServerP2P`: una GET, nessun
+  relay), un volo alla volta, non più di una ogni
+  `CHATSC_CERCA_OGNI_MS` e `CHATSC_CERCA_MAX` di fila — poi resta il
+  battito dei due minuti, e dopo due minuti di silenzio il conto
+  riparte — e quando la controparte arriva ridisegna la pagina: il
+  riquadro nasce e sveglia il ritiro. La chiamano
+  `bloccoChatScambioP2P`, a ogni ridisegno della pagina (quindi appena
+  il coordinatore risponde), e `chatScBattitoP2P`, il polso della chat
+  che ora ha un nome. IL RICHIAMO: `chatScRichiamoP2P(o)` è il primo
+  pezzo di `renderOrdineP2P` (markup di `chatScRichiamoHTML`, pura: il
+  bottone `#p2pChatRichiamo`, la classe `nuovi` e `.chatsc-conto` col
+  numero; vuoto dove il riquadro non c'è). Il numero è
+  `chatScDaLeggereP2P(c)`: i messaggi dell'altra persona oltre
+  `vistoFino`, lo stesso conto del pallino. «VISTO» ORA VUOLE LA LISTA
+  NELLO SCHERMO (`chatScInVistaP2P`): `chatScRitiraP2P` non segna più
+  visto un messaggio arrivato con la chat sotto, fuori vista — prima
+  bastava avere la pagina aperta. `vaiAllaChatP2P()` scorre al riquadro
+  (`scroll-margin-top` su `#p2pChatSc`), `chatScGuardataP2P()` segna
+  visto quando la lista entra nello schermo — dal richiamo o scorrendo
+  a mano (un ascolto di `scroll` in cattura, frenato a 150 ms) — e
+  `chatScRichiamoAggiornaP2P` riscrive il solo bottone. Sul server
+  non cambia niente.
   IL SERVER (il blocco «LA CHAT NELLO SCAMBIO: IL SERVER FA IL
   POSTINO»). Le buste stanno in `DB_CHAT` (`chat-scambi.db` accanto al
   database vero, col `realpath`; non è una leva del config; `db_chat()`,

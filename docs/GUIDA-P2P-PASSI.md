@@ -1743,6 +1743,13 @@ tutti e due.
 
 - **Dov'è**: pagina dello scambio → riquadro «💬 **Chat con <nome>**»
   (senza un nome: «Chat con l'altra persona»).
+- **Il richiamo in cima** (dal 12 ott 2026, notte): in cima alla pagina
+  dello scambio, a destra, il bottone «💬 **Chat** ↓». Un tocco (o un clic)
+  porta giù alla chat. Con messaggi dell'altra persona non ancora letti
+  porta il numero in un tondo rosso («💬 **Chat** ② ↓») e il bordo rosso;
+  arrivati alla chat — dal richiamo o scorrendo — il numero se ne va. C'è
+  dalla presa alla fine, dove c'è la chat; uguale su telefono, PC, Mini
+  App e sito.
 - **In cima, sempre**: «🛡️ Barattolo non ti scrive mai qui. Non uscire
   dallo scambio per pagare. Non mandare codici o chiavi.»
 - **In fondo, sempre**: «🔒 Cifrata fra voi due: Barattolo la trasporta e
@@ -1750,7 +1757,9 @@ tutti e due.
   solo se una di voi due apre una disputa.»
 - **Appena preso l'ordine**, finché l'altra persona non ha aperto lo
   scambio: «Si apre appena <nome> apre lo scambio.» (il campo per scrivere
-  non c'è ancora).
+  non c'è ancora). Non serve riaprire la pagina né scorrere: appena
+  l'altra persona ha la pagina dello scambio davanti, il campo compare da
+  solo, in pochi secondi (dal 12 ott 2026, notte).
 - **Per scrivere**: campo «Scrivi un messaggio…», contatore «0/500»,
   bottone «**Invia**». Solo testo, 500 caratteri. Vuoto: «Scrivi qualcosa,
   prima». Due invii troppo vicini: «Un momento: un messaggio alla volta».

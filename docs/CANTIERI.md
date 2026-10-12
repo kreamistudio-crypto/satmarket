@@ -54391,3 +54391,153 @@ subito»): sopra `865c75b` sono girati `prove_tempo_di_chi_pubblica`
 con le sezioni della bussola, del tetto e dei collaudi in CI,
 `collaudo_tempo_pubblica` nella gabbia e `compileall`. La suite intera
 e i 73 collaudi sull'albero del push li dice la CI.
+## La chat parte subito, e il richiamo «💬 Chat» in cima alla pagina dello scambio (notte fra il 12 e il 13 ott 2026, cantiere chat-subito, dal campo di Andrea)
+
+**IL FATTO.** Andrea ha provato dal vivo «La chat segue lo scambio»
+(telefono con l'app installata e account Telegram, PC con Nostr): chat,
+chiudi e riapri, nuovo accesso dal PC, avviso Telegram senza testo,
+«⚡ Apri lo scambio» nella Mini App con tutti i messaggi, ritorno
+all'app installata, chat sparita dopo l'annullo — tutto bene. Un
+difetto: «la chat si attiva (e l'altra parte smette di leggere "Si apre
+appena … apre lo scambio") solo quando chi apre lo scambio SCORRE fino
+in fondo alla pagina. Chi ha pubblicato apre lo scambio per bloccare i
+sats e magari non scorre: l'altra parte resta bloccata ad aspettare».
+La richiesta: la chat parte appena la pagina dello scambio è aperta,
+senza scorrere; in cima un richiamo «💬 Chat» col numero dei messaggi
+non letti, che con un tocco (o un clic) porta giù alla chat, uguale su
+telefono, PC, Mini App e sito. Prima cinque righe di causa e cura, poi
+il suo ok.
+
+**LA CAUSA, cercata prima di scrivere codice: NON è lo scorrimento.**
+Nel blocco della chat niente guarda lo schermo: nessun osservatore, il
+ritiro parte quando il riquadro NASCE e poi a ogni polso (5 s) a pagina
+in vista. Riprodotto dal vivo sul codice di prima, a 390 px: chi ha
+pubblicato APRE lo scambio e non scorre → la chat parte dopo un
+secondo, con lo scorrimento a zero, perché l'apertura fa il riallineo
+(`riallineaScambioP2P(id, 'apertura')`). Quel che non partiva è la pagina GIÀ APERTA. Il riquadro
+vuole `o.peer`, la chiave di scambio dell'altra parte, e quella arriva
+o da un messaggio del coordinatore che porta le due chiavi, o
+dall'archivio del server (`chiediScambiServerP2P`), che si chiede
+all'apertura della pagina — tranne ai passi di `P2P_PRIMA_DELLA_PRESA`
+— e poi col battito `battitoScambiP2P`, ogni 120 secondi. Chi prende
+ha la pagina che gli si apre a «prendo» (prima della presa: niente
+riallineo) e ci resta; chi ha pubblicato può avere davanti la pagina
+del suo ordine quando viene preso. Per tutti e due la controparte
+arrivava solo col battito dei due minuti. MISURATO due volte, con lo
+stesso banco prima e dopo: 119 secondi senza controparte, senza
+riquadro, senza chiave e senza saluto (le domande al server: `ordini`
+a 0 s, poi niente fino a `scambi` a 119 s), mentre l'altra persona
+legge «Si apre appena…». In quei due minuti chi aspetta scorre, torna
+su, riapre: «scorrendo parte» è la coincidenza col battito.
+
+**LA CURA, solo nel client.** `chatScSenzaControparteP2P(o)` (pura):
+uno scambio PRESO (`CHATSC_NON_PRESO` = «prendo», «senza_risposta»,
+«pubblico», «pubblicato»: prima della presa non c'è niente da
+chiedere), ancora vivo, governabile da questo dispositivo, con un id
+vero e senza `peer`. `chatScCercaControparteP2P(id)` chiede l'archivio
+del server (`chiediScambiServerP2P` + `adottaScambiServerP2P`: una GET
+a `/api/p2p/scambi`, NESSUN relay), un volo alla volta, e se la
+controparte arriva scrive il diario («controparte arrivata dal server
+(tentativo N), la chat parte») e ridisegna la pagina: il riquadro nasce
+e sveglia il ritiro, come sempre. La chiamano due posti: (1)
+`bloccoChatScambioP2P`, cioè OGNI ridisegno della pagina dello scambio
+— quindi nell'istante in cui il coordinatore risponde alla presa, o
+manda «blocca i sats»; (2) `chatScBattitoP2P`, il polso della chat (5
+s, a pagina in vista), che finché la controparte manca la cerca invece
+di ritirare. IL FRENO: non più di una domanda ogni
+`CHATSC_CERCA_OGNI_MS` (4 s) e `CHATSC_CERCA_MAX` (12) di fila, cioè
+un minuto; poi resta il battito dei due minuti di sempre, e dopo due
+minuti di silenzio il conto riparte. Serve per lo scambio di cui il
+server non saprà mai la controparte (un coordinatore senza la patch
+degli eventi): senza tetto sarebbe una GET ogni 5 secondi per tutta la
+vita della pagina. Sul server non cambia niente.
+
+**IL RICHIAMO.** `chatScRichiamoP2P(o)` è il PRIMO pezzo di
+`renderOrdineP2P`: un bottone `#p2pChatRichiamo` a pillola, a destra,
+«💬 Chat ↓», alto 44 px (bersaglio da dito). Il numero è
+`chatScDaLeggereP2P(c)` — i messaggi dell'ALTRA persona oltre
+`vistoFino`, non i miei, non le righe di servizio: lo stesso conto del
+pallino — in un tondo rosso, col bordo rosso e l'`aria-label` «Chat: N
+messaggi nuovi» (oltre 99: «99+»). C'è dove c'è il riquadro (dalla
+presa alla fine; non per chi lo scambio lo può solo guardare, non se
+l'altra persona non è di Barattolo, non a leva spenta). Lo stesso
+markup ovunque: non c'è una variante per larghezza. `vaiAllaChatP2P()`
+scorre al riquadro (`scrollIntoView`, `scroll-margin-top` su
+`#p2pChatSc`; senza animazione con `prefers-reduced-motion`).
+
+**«VISTO» ORA VUOLE LA CHAT NELLO SCHERMO, ed è una regola che
+cambia.** Prima bastava avere la pagina dello scambio aperta: ogni
+messaggio arrivato era «visto», anche con la chat sotto, fuori vista —
+e il numero del richiamo sarebbe stato sempre zero. Ora
+`chatScRitiraP2P` segna visto solo se la lista è nello schermo
+(`chatScInVistaP2P`: almeno 40 px di lista); sennò il richiamo conta,
+il pallino di «I miei scambi» resta acceso e c'è la vibrazione.
+`chatScGuardataP2P()` segna visto quando la lista entra nello schermo:
+dopo il tocco sul richiamo, o scorrendo a mano (un ascolto di `scroll`
+in cattura, frenato a 150 ms, vivo solo a scambio aperto). L'AVVISO
+TELEGRAM NON CAMBIA: lo decide il server su quel che il telefono ha
+RITIRATO (`letture.letto_fino`), non su «visto»; chi ha la pagina
+aperta ritira ogni 5 secondi e l'avviso non gli parte, come prima.
+
+**LE STRADE SCARTATE.** (a) Accorciare `P2P_SCAMBI_OGNI_MS` per tutti:
+è il battito di OGNI dispositivo con l'app aperta, su ogni pagina; qui
+serve solo alla pagina aperta di uno scambio preso senza controparte.
+(b) Far partire il riallineo completo («apertura») a ogni risposta del
+coordinatore: fa anche il giro sui relay, e il coordinatore ha appena
+parlato. La domanda all'archivio è una GET. (c) Aprire il riquadro
+SENZA controparte, con la chiave pronta: il saluto è cifrato VERSO la
+chiave di scambio dell'altra parte, senza quella non c'è niente da
+spedire. (d) Un richiamo fisso che galleggia sulla pagina: copre il
+conto o il bottone del passo su un telefono; in cima scorre via con la
+pagina, e in fondo c'è già la chat. (e) Un collaudo nuovo in un file
+suo: vorrebbe una riga nel workflow, e un commit che tocca
+`.github/workflows/` lascia `pronto` indietro. È la sezione 16 di
+`collaudo_chat_scambio.py`.
+
+**PROVATO.** `prove_chat_scambio`: 195 controlli (erano 173). I nuovi:
+il caso «senza controparte» passo per passo, la domanda che parte
+subito, il freno, i dodici tentativi e il conto che riparte, l'arrivo
+che ridisegna e scrive il diario, il battito che cerca invece di
+ritirare; il conto del richiamo, il markup, la chat fuori vista che non
+è «vista», l'arrivo alla chat che spegne numero e pallino, e il
+richiamo che c'è SE E SOLO SE c'è il riquadro vero (`#p2pChatSc`),
+caso per caso: dove lo scambio si può solo guardare c'è una nota, non
+una chat a cui portare, e il bottone non nasce.
+`collaudo_chat_scambio.py`, sezione 16 (13 controlli, 127 in tutto):
+il CLIENT VERO in node — tutto il blocco della chat e la domanda
+all'archivio, ritagliati da `miniapp.html`, col bundle vero — contro
+il SERVER VERO (il ponte `http.server` → TestClient di
+`collaudo_tolti_ovunque`); chi compra nella web app (cookie del Login
+Widget), chi vende nella Mini App; la pagina aperta e MAI riaperta, la
+lista della chat in fondo e MAI scorsa. Prima della presa nessuna
+domanda; il coordinatore risponde e il server non sa ancora: una
+domanda, niente; arriva l'evento «preso» e al battito dopo la
+controparte c'è, il riquadro nasce, sul server ci sono la copia
+sigillata e il saluto; lo stesso per chi ha pubblicato, che trova già
+la chiave dell'altra persona; l'altra persona al suo battito può
+scrivere; un messaggio fuori vista fa «Chat: 1 messaggio nuovo», e
+scorrendo il numero se ne va. Più giri di fila verdi, anche nella
+gabbia (`collaudi_ci.py`). LA TORTURA: 15 mutazioni su una copia
+intera, 15 uccise, nessun botto; le tre che TOLGONO LA CURA le uccidono
+sia le prove sia il collaudo (5, 8 e 10 rosse). IL GIRO DAL VIVO, col
+server vero sulla copia (LNbits e relay di cartone, nessun relay vero)
+e Chrome via Playwright, due memorie: a 390×844 coi TOCCHI veri (chi
+ha pubblicato nella Mini App, chi prende nella web app) e a 1280×800
+coi clic (tutti e due nel sito), 15 controlli su 15 a ogni larghezza.
+Chi ha preso, fermo sulla pagina: controparte, riquadro, chiave e
+richiamo dopo 0,3 s (prima della cura, stesso banco: 119 s). Chi ha
+pubblicato, al «blocca i sats»: subito, con lo scorrimento a zero, e
+l'altra persona passa a «scrivi» senza che lui abbia scorso. Il
+richiamo: 1, poi 2, un tocco e la chat è nello schermo coi due
+messaggi letti; tornato in cima ne conta 1 (non 3), e scorrendo a mano
+il numero se ne va. Nessun errore in console, nessuna pagina che
+sborda. Gli scatti: `.claude/giri/chat-subito/` (telefono, pc, prima).
+Suite e collaudi: nel verbale del push.
+
+**DA GUARDARE.** Sul telefono vero: la presa da un telefono e il
+«blocca i sats» dall'altro senza toccare la pagina, e il richiamo col
+numero. Il richiamo non compare a chi sta compilando un foglio aperto
+sopra la pagina (la fattura, il QR): sta sotto il foglio, e si vede
+alla chiusura. Se l'app è aperta su UN'ALTRA pagina (l'elenco, il
+libro) la chat di quella parte parte quando apre lo scambio, come
+prima: lì l'altra persona legge ancora «Si apre appena…», ed è vero.

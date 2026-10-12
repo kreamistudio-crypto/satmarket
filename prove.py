@@ -92010,6 +92010,9 @@ let p2pOrdineAperto = '';
 let p2pLeve = null;
 let pallinoChiamato = 0; function aggiornaPallinoScambiP2P(){ pallinoChiamato++; }
 function renderP2P(){}
+/* l'archivio del server: di cartone, e le prove lo cambiano */
+let chiediScambiServerP2P = async () => false;
+let adottaScambiServerP2P = () => {};
 /* I DISPOSITIVI: ognuno ha il suo conto, il suo mazzo, le sue righe e
    il SUO magazzino — e' la' che vive la chiave usa-e-getta, e un
    magazzino solo per tutti farebbe sembrare «ritrovata» una chiave che
@@ -92429,6 +92432,118 @@ await chatScNovitaP2P();
 out.sconosciutoButta = chatScDiP2P(ORD) === null;
 /* IL DIARIO dice ogni chiave che se ne va, con la ragione: e' quel che «Copia la diagnosi» porta a chi aiuta */
 out.diario = [...new Set(DIARIO.map(r => r.replace(/[0-9a-f]{8}/, 'ID')))].sort();
+/* ===== 10) LA CHAT PARTE SUBITO: la controparte che manca =====
+   chi ha appena preso resta sulla pagina che la presa ha aperto; il
+   coordinatore ha risposto, ma chi e' l'altra parte lo sa solo il server */
+const ORD2 = '5a1e0000-c2c2-4a2b-9c3d-000000000002';
+dispositivo('p', 555, nuovoMazzo());
+dispositivo('m', 444, nuovoMazzo());
+srv.parti[ORD2] = [444, 555]; srv.vivo = true; srv.perso = false; srv.spenta = false;
+p2pLeve = {chat: true}; p2pChatScSpenta = false;
+su('m'); const tkM = chiaveScambio(disp.m.mazzo.sk, 2);
+su('p'); const tkP = chiaveScambio(disp.p.mazzo.sk, 4);
+const riga2 = (stato, peer, piu) => Object.assign({id: ORD2, indice: 4, peer: peer || '', stato: stato, lato: 'compro'}, piu || {});
+out.senzaControparte = [['prendo', ''], ['senza_risposta', ''], ['pubblicato', ''], ['pubblico', ''],
+  ['attesa_mia_fattura', ''], ['attesa_mia_hold', ''], ['attivo', ''], ['in_disputa', ''], ['attivo', tkM.pub],
+  ['concluso', ''], ['annullato', ''], ['rilasciato', '']].map(([s, p]) => chatScSenzaControparteP2P(riga2(s, p)));
+out.senzaControparteAltro = [chatScSenzaControparteP2P(riga2('attivo', '', {soloVista: true})),
+  chatScSenzaControparteP2P(riga2('attivo', '', {id: 'nuovo:3'})), chatScSenzaControparteP2P(null)];
+/* l'archivio del server, di cartone: la controparte la dice solo quando la sa */
+let archChieste = 0, archSa = false, archOk = true, ridisegni = 0;
+chiediScambiServerP2P = async () => { archChieste++; return archOk; };
+adottaScambiServerP2P = righe => { if (archSa && righe[ORD2] && !righe[ORD2].peer) righe[ORD2].peer = tkM.pub; };
+renderOrdineP2P = () => { ridisegni++; };
+const oraVera = Date.now; let avanti = 0; Date.now = () => oraVera() + avanti;
+const respiro = () => new Promise(r => setTimeout(r, 15));
+const leggi2 = () => srv.chiamate.filter(c => c.url.endsWith('/leggi') && c.corpo.indexOf(ORD2) > 0).length;
+disp.p.ordini[ORD2] = riga2('attesa_mia_fattura', '');
+su('p'); p2pOrdineAperto = ORD2;
+out.bloccoSenzaControparte = bloccoChatScambioP2P(disp.p.ordini[ORD2]);
+out.cercaSubito = [await chatScCercaControparteP2P(ORD2), archChieste];
+out.cercaColFreno = [await chatScCercaControparteP2P(ORD2), archChieste];
+/* IL BATTITO: a pagina aperta, senza controparte, non ritira (non c'e' cosa): la chiede */
+avanti += 5000; chatScBattitoP2P(); await respiro();
+out.battitoChiede = [archChieste, leggi2(), !!disp.p.ordini[ORD2].peer];
+/* il server adesso lo sa: al battito dopo la controparte arriva, e la pagina si ridisegna */
+archSa = true; avanti += 5000; chatScBattitoP2P(); await respiro();
+out.arrivata = [disp.p.ordini[ORD2].peer === tkM.pub, ridisegni, archChieste,
+  DIARIO.filter(r => /controparte arrivata dal server \(tentativo 3\), la chat parte/.test(r)).length, p2pChatScCerca[ORD2] === undefined];
+/* ...e al battito dopo la chat e' partita: chiave, copia, saluto — senza riaprire niente */
+avanti += 5000; chatScBattitoP2P(); await respiro(); await (p2pChatScInVolo[ORD2] || null);
+out.poiParte = [archChieste, !!(chatScDiP2P(ORD2) || {}).sk,
+  srv.buste.filter(b => b.ordine === ORD2 && b.da === 555).map(b => b.tipo).join(',')];
+/* IL FRENO: dodici tentativi ravvicinati, poi basta; dopo due minuti di silenzio il conto riparte */
+disp.p.ordini[ORD2] = riga2('attivo', ''); archSa = false; delete p2pChatScCerca[ORD2];
+const c0 = archChieste;
+for (let i = 0; i < 20; i++) { avanti += 5000; await chatScCercaControparteP2P(ORD2); }
+const dopoVenti = archChieste - c0;
+avanti += 121000; await chatScCercaControparteP2P(ORD2);
+out.freno = [dopoVenti, archChieste - c0];
+/* il server che non risponde non fa danni, e non si chiede quando non serve */
+archOk = false; avanti += 5000; out.serverMuto = await chatScCercaControparteP2P(ORD2); archOk = true;
+const c1 = archChieste; delete p2pChatScCerca[ORD2]; avanti += 5000;
+disp.p.ordini[ORD2] = riga2('prendo', ''); await chatScCercaControparteP2P(ORD2);
+disp.p.ordini[ORD2] = riga2('attivo', tkM.pub); await chatScCercaControparteP2P(ORD2);
+disp.p.ordini[ORD2] = riga2('attivo', ''); p2pLeve = {chat: false}; await chatScCercaControparteP2P(ORD2); p2pLeve = {chat: true};
+const idVero = myTgId; myTgId = 0; await chatScCercaControparteP2P(ORD2); myTgId = idVero;
+out.nonSiChiede = archChieste - c1;
+
+/* ===== 11) IL RICHIAMO «💬 Chat» IN CIMA ===== */
+su('p');
+disp.p.ordini[ORD2] = riga2('attivo', tkM.pub);
+const cR = {vistoFino: 5, msgs: [{n: 4, mio: false, testo: 'a'}, {n: 6, mio: false, testo: 'b'},
+  {n: 7, mio: true, testo: 'c'}, {n: 8, sis: 1}, {n: 9, mio: false, testo: 'd'}]};
+out.daLeggere = [chatScDaLeggereP2P(cR), chatScDaLeggereP2P(null), chatScDaLeggereP2P({msgs: []})];
+const rh = n => chatScRichiamoHTML(disp.p.ordini[ORD2],
+  {vistoFino: 0, msgs: Array.from({length: n}, (_, i) => ({n: i + 1, mio: false, testo: 'x'}))}, {});
+out.richiamo = [rh(0), rh(1), rh(2), rh(150).indexOf('<span class="chatsc-conto">99+</span>') > 0];
+out.richiamoAssente = [chatScRichiamoHTML(riga2('attivo', ''), cR, {}), chatScRichiamoHTML(riga2('concluso', tkM.pub), cR, {}),
+  chatScRichiamoHTML(disp.p.ordini[ORD2], cR, {chiusa: true}), chatScRichiamoHTML(disp.p.ordini[ORD2], cR, {senzaAltro: true})];
+p2pLeve = {chat: false}; out.richiamoSpenta = chatScRichiamoHTML(disp.p.ordini[ORD2], cR, {}); p2pLeve = {chat: true};
+/* «VISTO» VUOL DIRE DAVANTI AGLI OCCHI. Con una pagina vera (di cartone:
+   uno schermo alto 800 e la lista dove la mettiamo noi) */
+out.inVistaSenzaPagina = chatScInVistaP2P();
+let rett = {top: 1200, bottom: 1460, height: 260};
+const conPagina = () => { globalThis.document = {visibilityState: 'visible', documentElement: {clientHeight: 800}};
+  window.innerHeight = 800; el = id => (id === 'p2pChatScLista' ? {getBoundingClientRect: () => rett} : null); };
+const senzaPagina = () => { delete globalThis.document; el = () => null; };
+conPagina();
+out.inVista = [chatScInVistaP2P(), (rett = {top: 700, bottom: 960, height: 260}, chatScInVistaP2P()),
+               (rett = {top: 790, bottom: 1050, height: 260}, chatScInVistaP2P()),
+               (rett = {top: -300, bottom: -40, height: 260}, chatScInVistaP2P())];
+el = () => null; out.inVistaSenzaRiquadro = chatScInVistaP2P();
+senzaPagina();
+/* IL GIRO INTERO: i due si presentano; a chi ha la pagina aperta ma la chat in fondo, fuori dallo
+   schermo, arriva un messaggio → il richiamo conta 1 e il pallino resta acceso; scorre → zero */
+const giro2 = async chi => { su(chi); await chatScRitiraP2P(ORD2); await respiro(); await (p2pChatScInVolo[ORD2] || null);
+  return chatScDiP2P(ORD2); };
+disp.m.ordini[ORD2] = {id: ORD2, indice: 2, peer: tkP.pub, stato: 'attivo', lato: 'vendo', mio: true};
+p2pOrdineAperto = ''; await giro2('m'); await giro2('p'); await giro2('m');
+su('m'); await chatScInviaP2P(ORD2, 'Ci sei? Ho bloccato i sats');
+conPagina(); rett = {top: 1200, bottom: 1460, height: 260};
+su('p'); p2pOrdineAperto = ORD2; await giro2('p');
+out.fuoriVista = [chatScDaLeggereP2P(chatScDiP2P(ORD2)),
+  chatScRichiamoP2P(disp.p.ordini[ORD2]).indexOf('<span class="chatsc-conto">1</span>') > 0,
+  chatScNonLettoP2P(disp.p.ordini[ORD2])];
+rett = {top: 300, bottom: 560, height: 260}; chatScGuardataP2P();
+out.inVistaLetto = [chatScDaLeggereP2P(chatScDiP2P(ORD2)),
+  chatScRichiamoP2P(disp.p.ordini[ORD2]).indexOf('chatsc-conto') < 0, chatScNonLettoP2P(disp.p.ordini[ORD2])];
+/* ...e un messaggio che arriva con la lista gia' davanti e' visto subito */
+senzaPagina(); su('m'); p2pOrdineAperto = ''; await chatScInviaP2P(ORD2, 'Perfetto');
+conPagina(); su('p'); p2pOrdineAperto = ORD2; await giro2('p');
+out.davantiSubito = chatScDaLeggereP2P(chatScDiP2P(ORD2));
+senzaPagina(); Date.now = oraVera;
+/* IL RICHIAMO C'E' SE E SOLO SE IL RIQUADRO VERO C'E' (`#p2pChatSc`): un bottone che porta a
+   niente e' peggio di nessun bottone. Caso per caso, con la chat vera di questo telefono */
+su('p');
+const rigaR = disp.p.ordini[ORD2], chatR = chatScDiP2P(ORD2);
+out.richiamoComeRiquadro = [[rigaR, {}], [Object.assign({}, rigaR, {soloVista: true}), {}],
+  [Object.assign({}, rigaR, {peer: ''}), {}], [Object.assign({}, rigaR, {stato: 'concluso'}), {}],
+  [rigaR, {chiusa: true}], [rigaR, {senzaAltro: true}]]
+  .map(k => [chatScRichiamoHTML(k[0], chatR, k[1]) !== '', chatScBloccoHTML(k[0], chatR, k[1]).indexOf('id="p2pChatSc"') >= 0]);
+const mazzoVero = mazzoMostro; mazzoMostro = () => null;
+out.richiamoSenzaMazzo = [chatScRichiamoHTML(rigaR, chatR, {}), chatScBloccoHTML(rigaR, chatR, {}).indexOf('id="p2pChatSc"') >= 0];
+mazzoMostro = mazzoVero;
 console.log(JSON.stringify(out));
 })().catch(e => { console.log('ESPLOSO: ' + (e && e.stack || e)); process.exit(1); });
 """
@@ -93097,6 +93212,90 @@ def prove_chat_scambio():
                        "chat ID: le buste sul server non ci sono piu': si riparte",
                        "chat ID: scambio finito per il server, chiave e messaggi buttati")
            if r not in o["diario"]])
+    # --- LA CHAT PARTE SUBITO, E IL RICHIAMO IN CIMA (12 ott 2026, notte) ---
+    prova("LA CONTROPARTE CHE MANCA: e' il caso di uno scambio PRESO e ancora vivo senza la chiave "
+          "dell'altra parte — non prima della presa, non a controparte nota, non a scambio chiuso",
+          [False, False, False, False, True, True, True, True, False, False, False, False],
+          o["senzaControparte"])
+    prova("...e non una riga solo da guardare, ne' un ordine senza nome", [False, False, False],
+          o["senzaControparteAltro"])
+    prova("senza controparte il riquadro non c'e' ancora", "", o["bloccoSenzaControparte"])
+    prova("LA SI CHIEDE SUBITO al server (una domanda), e il freno tiene la seconda di fila",
+          ([False, 1], [False, 1]), (o["cercaSubito"], o["cercaColFreno"]))
+    prova("IL BATTITO DELLA CHAT, a pagina aperta senza controparte: la chiede, e non ritira",
+          [2, 0, False], o["battitoChiede"])
+    prova("...appena il server la sa, ARRIVA: la riga la prende, la pagina si ridisegna (e' il riquadro "
+          "che nasce a svegliare il ritiro), il diario lo scrive, il conto dei tentativi si azzera",
+          [True, 1, 3, 1, True], o["arrivata"])
+    prova("...e al battito dopo la chat e' partita — chiave, copia sigillata e saluto — senza riaprire "
+          "la pagina, senza scorrere, e senza un'altra domanda all'archivio",
+          [3, True, "chiave,saluto"], o["poiParte"])
+    prova("IL FRENO: dodici tentativi ravvicinati e poi basta (resta il battito dei due minuti); dopo "
+          "due minuti di silenzio il conto riparte", [12, 13], o["freno"])
+    prova("...il server che non risponde non rompe niente; e non si chiede prima della presa, a "
+          "controparte nota, a leva spenta, o senza un account", (False, 0),
+          (o["serverMuto"], o["nonSiChiede"]))
+    cerca = pezzo_js(mini, "function chatScCercaControparteP2P(", "\n}\n")
+    bloccoF = pezzo_js(mini, "function bloccoChatScambioP2P(", "\n}\n")
+    battito = pezzo_js(mini, "function chatScBattitoP2P(", "\n}\n")
+    prova("...la domanda e' quella dell'apertura senza il giro sui relay, e chi la fa partire sono il "
+          "ridisegno della pagina (prima di decidere se il riquadro c'e') e il battito, che ha un nome",
+          True,
+          "await chiediScambiServerP2P()" in cerca and "adottaScambiServerP2P(ordiniP2P());" in cerca
+          and "statoPubblicoOrdini" not in cerca and "riallineaScambioP2P" not in cerca
+          and 0 < bloccoF.find("chatScCercaControparteP2P(o.id)") < bloccoF.find("if (!chatScAccesaP2P() || !chatScServeP2P(o)) return '';")
+          and "chatScCercaControparteP2P(p2pOrdineAperto);\n    return;" in battito
+          and "setInterval(chatScBattitoP2P, CHATSC_POLSO_MS);" in mini)
+    prova("IL RICHIAMO conta i messaggi dell'altra persona non ancora visti (non i miei, non le righe "
+          "di servizio)", [2, 0, 0], o["daLeggere"])
+    prova("...senza messaggi nuovi e' «💬 Chat» con la freccia, e porta giu' al riquadro",
+          '<button type="button" class="chatsc-richiamo" id="p2pChatRichiamo" onclick="vaiAllaChatP2P()" '
+          'aria-label="Vai alla chat"><span>💬 Chat</span>'
+          '<span class="chatsc-giu" aria-hidden="true">↓</span></button>', o["richiamo"][0])
+    prova("...con uno o piu' messaggi nuovi porta il numero, lo dice a chi non vede, e oltre i "
+          "novantanove non conta piu'",
+          (True, True, True),
+          ('class="chatsc-richiamo nuovi"' in o["richiamo"][1]
+           and 'aria-label="Chat: 1 messaggio nuovo"' in o["richiamo"][1]
+           and '<span class="chatsc-conto">1</span>' in o["richiamo"][1],
+           'aria-label="Chat: 2 messaggi nuovi"' in o["richiamo"][2]
+           and '<span class="chatsc-conto">2</span>' in o["richiamo"][2], o["richiamo"][3]))
+    prova("...non c'e' dove il riquadro della chat non c'e': senza controparte, a scambio chiuso, a "
+          "chat finita, con chi scambia da un'altra app, a leva spenta",
+          (["", "", "", ""], ""), (o["richiamoAssente"], o["richiamoSpenta"]))
+    prova("...IL RICHIAMO C'E' SE E SOLO SE C'E' IL RIQUADRO VERO (`#p2pChatSc`), caso per caso: lo "
+          "scambio normale si'; quello che qui si puo' solo guardare no (li' c'e' una nota, non una chat "
+          "a cui portare), ne' senza controparte, a scambio chiuso, a chat finita, con chi scambia da "
+          "un'altra app; e nemmeno senza il profilo di scambio in questo dispositivo",
+          ([[True, True], [False, False], [False, False], [False, False], [False, False], [False, False]],
+           ["", False]),
+          (o["richiamoComeRiquadro"], o["richiamoSenzaMazzo"]))
+    prova("«VISTO» VUOL DIRE DAVANTI AGLI OCCHI: la lista sotto lo schermo no, un pezzo vero si', "
+          "dieci pixel di bordo no, sopra lo schermo no; senza riquadro no; senza una pagina (i "
+          "banchi) vale come prima", ([False, True, False, False], False, True),
+          (o["inVista"], o["inVistaSenzaRiquadro"], o["inVistaSenzaPagina"]))
+    prova("A PAGINA APERTA E CHAT IN FONDO, FUORI DALLO SCHERMO, il messaggio che arriva NON e' "
+          "visto: il richiamo dice 1 e il pallino resta acceso", [1, True, True], o["fuoriVista"])
+    prova("...scorrendo fin li' (o col tocco sul richiamo) e' visto: il numero se ne va, il pallino "
+          "si spegne", [0, True, False], o["inVistaLetto"])
+    prova("...e con la lista gia' davanti un messaggio nuovo e' visto subito", 0, o["davantiSubito"])
+    rend = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    rit2 = pezzo_js(mini, "function chatScRitiraP2P(", "\n}\n")
+    prova("il richiamo e' il PRIMO pezzo della pagina dello scambio, e il ritiro segna «visto» solo "
+          "con la lista nello schermo", True,
+          0 < rend.find("chatScRichiamoP2P(o) : '') +") < rend.find("riquadroAppuntamentoP2P(o) +")
+          and "&& chatScInVistaP2P())\n      chatScVistoP2P(id);" in rit2
+          and "chatScRichiamoAggiornaP2P(id);" in pezzo_js(mini, "function chatScRidisegnaP2P(", "\n}\n"))
+    prova("...lo scorrimento della pagina si sente (in cattura, passivo, raccolto), il tocco porta "
+          "al riquadro rispettando chi ha chiesto meno movimento, e il riquadro non finisce sotto la "
+          "testata", True,
+          "document.addEventListener('scroll', () => {" in mini
+          and "}, {capture: true, passive: true});" in mini
+          and "b.scrollIntoView({behavior: fermo ? 'auto' : 'smooth', block: 'start'});" in mini
+          and "#p2pChatSc{scroll-margin-top:76px}" in mini)
+    prova("...ed e' alto quanto un dito, coi colori di casa (nessun colore cablato)", True,
+          ".chatsc-richiamo{display:flex;align-items:center;gap:8px;width:auto;min-height:44px;" in mini
+          and "#" not in mini[mini.index("    .chatsc-richiamo{"):mini.index("    /* ...e il riquadro a cui porta")])
 
 
 def prove_recapito_aggiornato():
