@@ -18288,32 +18288,51 @@
   usa (Web Animations, View Transitions, SMIL) e chi chiama
   `requestAnimationFrame` col suo perché — un effetto nuovo che non ci
   passa esce rosso col suo nome.
-  LA VIBRAZIONE DI CASA (11 ott 2026, cantiere vibrazione; dal campo:
-  «nell'app non vibra niente»). `haptic(tipo)` è la PORTA UNICA della
-  vibrazione: senza argomento è il tocco, con `'success'`, `'warning'`
-  o `'error'` è un avviso (oggi l'unico avviso è il barattolo dei
-  preferiti). Nessun altro punto della pagina nomina `HapticFeedback` o
-  `navigator.vibrate`, e `prove_vibrazione` li conta. TRE REGOLE, in
+  LA VIBRAZIONE DI CASA (11-12 ott 2026, cantieri vibrazione e
+  vibrazione-forte; dal campo: «nell'app non vibra niente»).
+  `haptic(tipo)` è la PORTA UNICA della vibrazione: senza argomento è
+  il tocco, con `'success'`, `'warning'` o `'error'` è un avviso (oggi
+  gli avvisi sono due: `success` al barattolo dei preferiti, `warning`
+  a «Pubblica» senza foto, che è un no detto a chi ha premuto).
+  Nessun altro punto della pagina nomina `HapticFeedback` o
+  `navigator.vibrate`, e `prove_vibrazione` li conta. LE REGOLE, in
   quest'ordine: 1) chi ha chiesto meno movimento (`effettiRidotti()`,
   il giudice di qui sopra: il sistema o «🌗 Aspetto») non riceve
-  niente; 2) DENTRO TELEGRAM (`tg.initData`, il giudice di casa) solo
-  la strada di Telegram, dalla versione 6.1 — `impactOccurred` per il
-  tocco, `notificationOccurred` per l'avviso — e mai le due strade
-  insieme; 3) FUORI (sito, app installata, .onion) `navigator.vibrate`
-  dove esiste, con le durate di `VIBRA_MS`; dove non esiste (iPhone:
-  Safari non ce l'ha) niente, e nessun errore. Tutto dentro un `try`:
-  una vibrazione mancata non ferma mai il gesto che la chiedeva.
-  PERCHÉ PRIMA TACEVA: fuori da Telegram lo script di Telegram crea
-  `tg` lo stesso ma si crede alla 6.0 e la sua HapticFeedback rifiuta
-  con un avviso in console; dentro, su Android, lo stile `light` è un
-  colpo di 7 ms a un quarto della forza (`BotWebViewVibrationEffect`
-  del client). Per questo su Android si chiede `soft`
-  (`VIBRA_STILE_ANDROID`: 10 ms a 175 su 255, e 55 ms sui telefoni che
-  la forza non la dosano, contro i 60 di `light`), altrove `light`.
-  Le misure si ritoccano in quelle tre costanti e in nessun altro posto.
-  DA SAPERE: Chrome non vibra col telefono in silenzioso né prima di un
-  tocco sulla pagina, e il sistema può spegnere tutto dalle sue
-  impostazioni — da lì la pagina non lo vede.
+  niente; 2) FUORI DA TELEGRAM (sito, app installata, .onion)
+  `navigator.vibrate` dove esiste, con le durate di `VIBRA_MS` (15 ms
+  il tocco, `[20, 65, 20]` il `warning`); dove non esiste (iPhone:
+  Safari non ce l'ha) niente, e nessun errore; 3) DENTRO TELEGRAM SU
+  ANDROID (`tg.initData`, il giudice di casa, e `tg.platform`) PRIMA
+  `navigator.vibrate` con le STESSE durate, e la strada di Telegram
+  solo come RIPIEGO — `impactOccurred('heavy')` per il tocco
+  (`VIBRA_STILE_ANDROID`), `notificationOccurred` per l'avviso, dalla
+  6.1 — se `navigator.vibrate` non c'è, se lancia un errore o se
+  risponde `false` (rifiutata: non ha vibrato); 4) DENTRO TELEGRAM
+  ALTROVE (iPhone, desktop) solo la strada di Telegram, con `light`
+  (`VIBRA_STILE`): lì `navigator.vibrate` non si chiede nemmeno quando
+  c'è. MAI LE DUE STRADE INSIEME: il ripiego parte solo quando la
+  prima non ha vibrato. Tutto dentro un `try`: una vibrazione mancata
+  non ferma mai il gesto che la chiedeva.
+  PERCHÉ È FATTA COSÌ, in tre passi pagati sul telefono di Andrea.
+  All'inizio `haptic` era una riga che parlava solo a Telegram: fuori
+  da Telegram lo script di Telegram crea `tg` lo stesso ma si crede
+  alla 6.0 e la sua HapticFeedback rifiuta con un avviso in console;
+  dentro, su Android, lo stile `light` è un colpo di 7 ms a un quarto
+  della forza (`BotWebViewVibrationEffect` del client). Prima cura:
+  `navigator.vibrate` fuori, `soft` dentro — e fuori ha vibrato,
+  dentro no. Seconda: `heavy` (7 ms a forza piena). Terza, la cura
+  vera (12 ott, decisione di Andrea): dentro Telegram su Android la
+  STESSA chiamata che nell'app web si sente, perché i colpi li misura
+  Telegram e sono troppo corti, mentre la durata di `navigator.vibrate`
+  la decidiamo noi. Si può perché la WebView di Android implementa la
+  Vibration API e Telegram dichiara il permesso `VIBRATE` (su iPhone
+  no: WebKit non ce l'ha, e lì resta la strada di Telegram).
+  Le misure si ritoccano nelle tre costanti e in nessun altro posto.
+  DA SAPERE: Chrome — e la WebView con lui — non vibra col telefono in
+  silenzioso né prima di un tocco sulla pagina, e in silenzioso
+  risponde `true` lo stesso: da lì la pagina non lo vede, e il ripiego
+  non parte. Vale anche dentro Telegram su Android, da quando ci
+  passa. Il sistema può sempre spegnere tutto dalle sue impostazioni.
   Cartello «fase di test» (lug 2026): l'avviso di rodaggio
   all'apertura — modale a tutto schermo col velo SFOCATO
   (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si

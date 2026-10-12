@@ -50913,3 +50913,140 @@ regola e cauzione da subito (quattro scatti in
 gabbia: 62 su 62 verdi. Il fork NON è stato toccato né compilato (non
 serviva). LA CI DI MAIN prima del push: verde sulla punta `2fc9b3d`.
 Il sì al push è di Andrea: stava nel brief incollato («Ok al push»).
+
+## La vibrazione dentro Telegram su Android: `navigator.vibrate` prima, Telegram come ripiego, e l'avviso a «Pubblica» (12 ott 2026, cantiere vibrazione-forte, dal telefono di Andrea)
+
+DAL TELEFONO. Dopo il cantiere «vibrazione» Andrea ha provato: nell'app
+web la vibrazione FUNZIONA; dentro la Mini App di Telegram su Android
+NO, anche con la vibrazione al tocco del sistema accesa. Il cantiere è
+andato in due tempi, tutti e due in questo commit.
+
+**PRIMO TEMPO, la sua prima richiesta**: dentro Telegram
+`impactOccurred('heavy')` per i tocchi e `notificationOccurred('warning')`
+per «Pubblica» senza foto; e sapere se Telegram su Android non vibra
+comunque, e se lì dentro si può usare anche `navigator.vibrate`.
+Fatto: `VIBRA_STILE_ANDROID` da `soft` a `heavy`, e `mostraObbligoFoto`
+che chiama `haptic('warning')`. Risposto: se `heavy` si senta non lo so
+(per il client Android è 7 ms a forza piena — più forte di `soft`, ma
+più CORTO, 7 contro 10 — e la sola misura certa dal suo telefono è che
+15 ms si sentono e 10 a due terzi no); e sì, `navigator.vibrate`
+dentro Telegram su Android si può.
+
+**SECONDO TEMPO, LA CURA (decisione di Andrea)**: dentro Telegram su
+Android si usa `navigator.vibrate` con le STESSE durate dell'app web —
+15 ms ai tocchi, 20-65-20 a «Pubblica» senza foto —; se
+`navigator.vibrate` non c'è o lancia un errore si ripiega su
+HapticFeedback `heavy`/`warning`; mai tutte e due insieme; iPhone
+resta com'è (Telegram, `light`/`warning`); il doppio colpo di
+«Pubblica» nell'app web va bene.
+
+**PERCHÉ È LA CURA GIUSTA.** Stesso telefono, stesso sistema: i 15 ms
+di `navigator.vibrate` si sentono, i colpi di Telegram no. La
+richiesta a Telegram arriva — dal vivo lo script vero la spedisce, e
+nel suo codice fra la richiesta e il motore non c'è altro
+(`onEventReceived` → `BotWebViewVibrationEffect.vibrate()`, nessuna
+impostazione, nessun filtro) —: quel che non basta è la misura del
+colpo, che decide Telegram. Con `navigator.vibrate` la decidiamo noi.
+SI PUÒ, letto nei sorgenti: la WebView di sistema di Android
+implementa la Vibration API con lo stesso codice di Chrome
+(`VibrationManagerAndroid.java`), che chiede all'app ospite il
+permesso `VIBRATE`, e il manifest di Telegram lo dichiara. Su iPhone
+no: WebKit non ha `navigator.vibrate`.
+
+**COM'È FATTA.** Nella porta, e solo lì: se non si è dentro Telegram,
+o si è dentro Telegram su Android, si prova il telefono; `fatto` resta
+falso se la funzione non c'è, se esplode o se risponde `false`. Fuori
+da Telegram finisce lì comunque. Dentro Telegram su Android, se
+`fatto` è falso, si scende alla strada di Telegram — che è anche
+l'unica per iPhone e desktop.
+
+**LE SCELTE, E I PERCHÉ.**
+- ANCHE `false` FA PARTIRE IL RIPIEGO, non solo l'assenza e l'errore
+  che ha nominato Andrea. `false` è il modo in cui il browser dice
+  «rifiutata» (per esempio prima di un tocco sulla pagina): il telefono
+  NON ha vibrato, quindi il ripiego non fa mai due colpi — ed è la
+  regola «mai tutte e due» letta dal lato giusto. Detto ad Andrea.
+- UN TELEGRAM TROPPO VECCHIO (sotto la 6.1) su Android adesso vibra:
+  `navigator.vibrate` non dipende da lui.
+- `heavy` SOLO SU ANDROID, e solo nel ripiego; iPhone resta `light`,
+  come ha confermato Andrea.
+- L'AVVISO VALE ANCHE FUORI DA TELEGRAM (`[20, 65, 20]` nel sito e
+  nell'app installata): la porta ha un vocabolario solo. Andrea l'ha
+  visto e ha detto che va bene.
+- IL PREZZO, e si dice: col telefono in SILENZIOSO Chrome — e la
+  WebView con lui — non vibra, e risponde `true` lo stesso: da lì il
+  ripiego non parte. Prima, dentro Telegram, il silenzioso non contava
+  (ma non si sentiva comunque). È lo stesso comportamento dell'app
+  web.
+
+**PROVATO.** `prove_vibrazione` (36): la porta è una sola, e la
+funzione VERA girata in node in trentatré mondi di cartone — fuori da
+Telegram (anche col browser che rifiuta), dentro Telegram su Android
+(il telefono con le stesse durate di fuori, alla lettera; il ripiego
+senza `vibrate`, con `vibrate` che lancia, con `vibrate` che rifiuta,
+una vibrazione sola per chiamata; il Telegram vecchio; senza
+HapticFeedback), dentro Telegram su iPhone e desktop (solo Telegram,
+anche quando `vibrate` c'è), meno movimento, i guasti.
+`prove_foto_obbligatorie`: il banco con la `publish()` vera legge il
+TIPO della vibrazione (`warning`). Tortura su una copia: 30 mutazioni
+di `miniapp.html` — fra cui «le due strade insieme», «la cura tolta»,
+«il telefono anche su iPhone», «il `false` preso per fatto», «l'errore
+che non ripiega», «durate diverse dentro Telegram» — 30 prese.
+DAL VIVO, Chrome e WebKit pilotati con tocchi veri sulla copia col
+config di cartone (relay al relay morto, nessuna chiave), lo script
+VERO di Telegram, spiando `navigator.vibrate` e la porta
+`TelegramWebviewProxy`. Dodici mondi per gli stessi otto gesti:
+- dentro Telegram su Android: `vibrate(15)` a ogni tocco,
+  `[15,65,15]` al barattolo, `[20,65,20]` a «Pubblica» senza foto,
+  Chrome risponde `true`, e a Telegram non arriva NIENTE;
+- lo stesso con `navigator.vibrate` tolto: a Telegram `impact heavy` e
+  `notification warning`; con `vibrate` che lancia e con `vibrate` che
+  rifiuta: un tentativo e poi lo stesso ripiego, mai due vibrazioni,
+  nessun errore di pagina;
+- dentro Telegram «iPhone» su un browser che HA `vibrate`: solo
+  Telegram, `light` e `warning`, `vibrate` mai chiamata; e su WebKit
+  (che non ce l'ha): uguale;
+- un Telegram alla 6.0 su Android: vibra dal telefono;
+- sito su Android e su iPhone, meno movimento dal sistema e da
+  «🌗 Aspetto»: come ieri.
+Gli esiti: `.claude/giri/vibrazione/esiti-cura-12ott.json` (quelli del
+primo tempo: `esiti-forte-12ott.json`).
+
+**UN INCIAMPO MIO, preso prima del commit.** Lo script con cui ho
+riscritto `prove_vibrazione` tagliava fino a `def main()`: main nel
+frattempo aveva messo lì in mezzo `prove_tor_chiavi_scambio` (non
+mia), e l'innesto se l'è portata via. L'ha detto il diff (590 righe
+tolte invece di 60): `prove.py` rimesso com'era, innesto rifatto fino
+alla funzione SUCCESSIVA, con un conto delle sezioni prima e dopo.
+
+**NON PROVATO, e si dice.** Nessun telefono, e nessun Telegram vero:
+che dentro Telegram su Android `navigator.vibrate` ci sia, risponda e
+faccia muovere il motore l'ho letto nei sorgenti e provato in Chrome
+che finge un Pixel dentro un finto Telegram — non nella WebView di
+Telegram. Se lì non ci fosse o rifiutasse, parte il ripiego (`heavy`),
+cioè quel che c'era al primo tempo.
+
+**COSA È GIRATO SU QUALE ALBERO.** Il primo tempo (`heavy` e
+l'avviso) è girato intero due volte — sopra a0983ec e, dopo un rebase,
+sopra a1abb29: suite severa 22468 e poi 22471 passate, 0 fallite, 62
+collaudi su 62 — ma NON è mai stato pushato da solo. POI MAIN È CORSO
+ancora (sei commit non miei: le chiavi dello scambio, le scritte sui
+contanti, due ritocchi a CLAUDE.md) e Andrea ha chiesto la cura: il
+cantiere è stato ribasato sopra 71ebbe0 e poi sopra 37a0de5, ogni
+volta col solo conflitto della coda di questo file (tenuta la voce di
+main, questa riappesa sotto), e cercato per nome quel che arrivava:
+niente che tocchi la vibrazione. LA CURA È GIRATA TUTTA SULL'ALBERO DEL
+PUSH, sopra 37a0de5 (la punta di main, con la sua CI verde), tranne
+tortura e giro dal vivo, fatti sopra 71ebbe0 (da lì a 37a0de5 è
+cambiato solo CLAUDE.md): `PROVE_SEVERE=1 python prove.py` INTERA,
+22494 passate e 0 fallite, nessuna saltata; i 62 collaudi del workflow
+nella gabbia, 62 verdi (in tre gruppi, in parallelo); `compileall`; lo
+scanner dei segreti sulle righe aggiunte, con le forme lette dal
+workflow e la controprova: zero. La voce era già scritta quando la
+suite è girata, tranne questo paragrafo.
+
+**RESTA DA GUARDARE** (Andrea, sul telefono, dopo il deploy): dentro
+Telegram su Android, un tocco qualunque (per esempio Compra/Vendi) e
+«Pubblica» senza foto, col telefono NON in silenzioso. Se non vibra
+nemmeno così, dirlo: vuol dire che la WebView di Telegram non lascia
+passare `navigator.vibrate`, e c'è da guardare cosa risponde.

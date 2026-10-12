@@ -15158,9 +15158,9 @@ def prove_foto_obbligatorie():
       }
       const document = {querySelector(s){ return el('q:' + s); }};
       const detti = [];
-      let vibra = 0;
+      let vibra = 0, tipoVibra = null;
       function toast(m){ detti.push(m); }
-      function haptic(){ vibra++; }
+      function haptic(t){ vibra++; tipoVibra = t === undefined ? 'tocco' : t; }
       function tourRidotto(){ return true; }
       function fmt(n){ return String(n); }
       function esc(s){ return String(s); }
@@ -15187,7 +15187,7 @@ def prove_foto_obbligatorie():
         out.nuovo = metti([], null, null, [], false);
         detti.length = 0; vibra = 0;
         await publish();
-        out.tocco = {...stato(), detti: detti.slice(), vibra,
+        out.tocco = {...stato(), detti: detti.slice(), vibra, tipoVibra,
                      mosso: el('sellFotoDrop').mosso};
         detti.length = 0;
         await publish();                 // un secondo tocco: uguale
@@ -15248,9 +15248,11 @@ def prove_foto_obbligatorie():
           "il riquadro e' quello di sempre (un foglio appena aperto non "
           "rimprovera)", (True, True, True, False, FRASE),
           solo(o["nuovo"]) + (o["nuovo"]["testo"],))
-    prova("il tocco senza foto: porta alle foto, ripete la riga, una "
-          "vibrazione breve — e non chiede altro", ([FRASE], 1, 1),
-          (o["tocco"]["detti"], o["tocco"]["mosso"], o["tocco"]["vibra"]))
+    prova("il tocco senza foto: porta alle foto, ripete la riga, UNA "
+          "vibrazione — d'avviso, non un tocco (12 ott 2026) — e non "
+          "chiede altro", ([FRASE], 1, 1, "warning"),
+          (o["tocco"]["detti"], o["tocco"]["mosso"], o["tocco"]["vibra"],
+           o["tocco"]["tipoVibra"]))
     prova("...e il riquadro si accende d'arancione, col bottone che resta "
           "acceso", (True, True, True, True), solo(o["tocco"]))
     prova("...un secondo tocco fa lo stesso, e il riquadro resta acceso",
@@ -147438,9 +147440,13 @@ def prove_vibrazione():
 
     `haptic` era una riga che parlava solo a Telegram, e con lo stile
     che su Android non si sente; fuori da Telegram non chiedeva a
-    nessuno. Adesso e' la porta UNICA: dentro Telegram la strada di
-    Telegram, fuori `navigator.vibrate` dove esiste, niente a chi ha
-    chiesto meno movimento, e mai un errore che fermi il gesto.
+    nessuno. Adesso e' la porta UNICA: fuori da Telegram
+    `navigator.vibrate` dove esiste; dentro Telegram su Android PRIMA
+    `navigator.vibrate`, con le stesse durate, e la strada di Telegram
+    solo come ripiego (12 ott 2026, la cura: sul telefono di Andrea i
+    colpi di Telegram non si sentivano); dentro Telegram altrove solo
+    la strada di Telegram; niente a chi ha chiesto meno movimento, mai
+    le due strade insieme, e mai un errore che fermi il gesto.
 
     Qui la funzione VERA gira in node dentro mondi di cartone (il
     telefono, e lo script di Telegram, non ci sono): si prova CHE COSA
@@ -147467,6 +147473,11 @@ def prove_vibrazione():
     prova("il barattolo dei preferiti passa dalla porta, col suo avviso",
           True, "haptic('success');\n      toast('Messo nel barattolo! 🫙');"
           in fuori)
+    obbligo = _fn_js(fuori, "function mostraObbligoFoto(){")
+    prova("«Pubblica» senza foto chiede un AVVISO (`warning`), una volta "
+          "sola, e non piu' un tocco (12 ott 2026, dal telefono)",
+          (1, 0), (obbligo.count("haptic('warning');"),
+                   obbligo.count("haptic();")))
     prova("chi ha chiesto meno movimento si chiede al giudice di casa, "
           "per prima cosa", True,
           0 < codice.find("if (effettiRidotti()) return;")
@@ -147474,7 +147485,7 @@ def prove_vibrazione():
     prova("...e `prefers-reduced-motion` qui non si interroga a parte",
           False, "prefers-reduced-motion" in codice or "matchMedia" in codice)
     prova("dentro Telegram il giudice e' `initData`, come nel resto "
-          "della pagina", True, "if (tg?.initData) {" in codice)
+          "della pagina", True, "const dentro = !!tg?.initData;" in codice)
 
     # --- 2) LA FUNZIONE VERA, NEI SUOI MONDI ---------------------------
     banco = "const PEZZO = " + json.dumps(codice) + """;
@@ -147500,10 +147511,13 @@ function mondo(m){
   if (tg && m.senzaHaptic) delete tg.HapticFeedback;
   if (tg && m.senzaVersione) delete tg.isVersionAtLeast;
   const navigator = {};
-  // come nel browser: staccata dal suo `navigator` e' «Illegal invocation»
+  // come nel browser: staccata dal suo `navigator` e' «Illegal
+  // invocation»; `rifiuta` e' il `false` di una richiesta non accolta
+  // (li' il telefono NON vibra); `rompeVibrate` rompe lei sola
   if (!m.senzaVibrate) navigator.vibrate = function(p){
     if (this !== navigator) throw new TypeError('Illegal invocation');
-    if (m.rompe) throw new Error('rotto');
+    if (m.rompe || m.rompeVibrate) throw new Error('rotto');
+    if (m.rifiuta) { fatti.push(['vibrate-rifiutata', p]); return false; }
     fatti.push(['vibrate', p]); return true; };
   const giudice = m.nonNato
     ? () => { throw new ReferenceError('non ancora nato'); }
@@ -147522,27 +147536,46 @@ function gira(m, tipi){
           muta: reso.length === tipi.length && reso.every(r => r === undefined)};
 }
 const TUTTI = [null, 'success', 'warning', 'error'];
+const IGNOTI = ['boh', {type: 'click'}, 0, '', 'tocco'];
+const A = {dentro: true}, I = {dentro: true, platform: 'ios'};
 const c = mondo({}).casa;
 const out = {ms: c.VIBRA_MS, stili: [c.VIBRA_STILE_ANDROID, c.VIBRA_STILE]};
+// fuori da Telegram
 out.fuori = gira({}, TUTTI);
-out.fuoriIgnoto = gira({}, ['boh', {type: 'click'}, 0, '', 'tocco']);
+out.fuoriIgnoto = gira({}, IGNOTI);
+out.fuoriRifiuta = gira({rifiuta: true}, TUTTI);
 out.iphone = gira({senzaVibrate: true}, TUTTI);
 out.onion = gira({senzaTg: true}, [null]);
 out.onionIphone = gira({senzaTg: true, senzaVibrate: true}, TUTTI);
-out.android = gira({dentro: true}, TUTTI);
-out.ios = gira({dentro: true, platform: 'ios'}, TUTTI);
-out.desktop = gira({dentro: true, platform: 'tdesktop'}, [null]);
-out.dentroIgnoto = gira({dentro: true}, ['boh', {type: 'click'}]);
-out.limite = gira({dentro: true, versione: '6.1'}, [null]);
-out.vecchio = gira({dentro: true, versione: '6.0'}, TUTTI);
-out.senzaHaptic = gira({dentro: true, senzaHaptic: true}, TUTTI);
-out.senzaVersione = gira({dentro: true, senzaVersione: true}, TUTTI);
-out.ridottiDentro = gira({dentro: true, ridotti: true}, TUTTI);
+// dentro Telegram su Android: prima il telefono, poi il ripiego
+out.android = gira(A, TUTTI);
+out.androidIgnoto = gira(A, IGNOTI);
+out.androidSenza = gira({...A, senzaVibrate: true}, TUTTI);
+out.androidRotta = gira({...A, rompeVibrate: true}, TUTTI);
+out.androidRifiuta = gira({...A, rifiuta: true}, TUTTI);
+out.androidSenzaIgnoto = gira({...A, senzaVibrate: true}, IGNOTI);
+out.androidVecchio = gira({...A, versione: '6.0'}, TUTTI);
+out.androidVecchioSenza = gira({...A, versione: '6.0', senzaVibrate: true}, TUTTI);
+out.androidLimiteSenza = gira({...A, versione: '6.1', senzaVibrate: true}, [null]);
+out.androidSenzaHaptic = gira({...A, senzaHaptic: true}, TUTTI);
+out.androidSenzaTutto = gira({...A, senzaHaptic: true, senzaVibrate: true}, TUTTI);
+out.androidSenzaVersione = gira({...A, senzaVersione: true, senzaVibrate: true}, TUTTI);
+// dentro Telegram altrove: solo Telegram, anche se vibrate c'e'
+out.ios = gira(I, TUTTI);
+out.iosSenza = gira({...I, senzaVibrate: true}, TUTTI);
+out.iosIgnoto = gira(I, ['boh', {type: 'click'}]);
+out.iosVecchio = gira({...I, versione: '6.0'}, TUTTI);
+out.iosSenzaHaptic = gira({...I, senzaHaptic: true}, TUTTI);
+out.desktop = gira({dentro: true, platform: 'tdesktop'}, TUTTI);
+// meno movimento, e i guasti
+out.ridottiAndroid = gira({...A, ridotti: true}, TUTTI);
+out.ridottiIos = gira({...I, ridotti: true}, TUTTI);
 out.ridottiFuori = gira({ridotti: true}, TUTTI);
 out.ridottiOnion = gira({senzaTg: true, ridotti: true}, TUTTI);
-out.rottoDentro = gira({dentro: true, rompe: true}, TUTTI);
+out.rottoAndroid = gira({...A, rompe: true}, TUTTI);
+out.rottoIos = gira({...I, rompe: true}, TUTTI);
 out.rottoFuori = gira({rompe: true}, TUTTI);
-out.nonNatoDentro = gira({dentro: true, nonNato: true}, [null]);
+out.nonNatoAndroid = gira({...A, nonNato: true}, [null]);
 out.nonNatoFuori = gira({nonNato: true}, [null]);
 console.log(JSON.stringify(out));
 """
@@ -147556,6 +147589,10 @@ console.log(JSON.stringify(out));
     ms, (st_android, st_altri) = o["ms"], o["stili"]
     zitto = {"fatti": [], "errore": None, "muta": True}
     detto = lambda fatti: {"fatti": fatti, "errore": None, "muta": True}
+    TIPI = ("tocco", "success", "warning", "error")
+    telefono = [["vibrate", ms[k]] for k in TIPI]
+    telegram = lambda stile: [["tg-tocco", stile], ["tg-avviso", "success"],
+                              ["tg-avviso", "warning"], ["tg-avviso", "error"]]
 
     # le misure: si leggono dal file (si ritoccano li', in un posto solo)
     # ma dentro un recinto — un tocco non e' una sveglia
@@ -147570,20 +147607,23 @@ console.log(JSON.stringify(out));
     prova("gli stili chiesti a Telegram sono fra i cinque che conosce "
           "(uno storto e' un'eccezione nella sua libreria)", True,
           st_android in STILI and st_altri in STILI)
-    prova("su Android NON e' `light` — 7 ms a un quarto della forza: il "
-          "guasto del campo — e altrove resta `light`", (True, "light"),
-          (st_android != "light", st_altri))
+    prova("il ripiego su Android e' `heavy`, lo stile a forza piena — "
+          "`light` era il guasto del campo e `soft` sul telefono di "
+          "Andrea non si e' sentito (12 ott 2026) — e altrove resta "
+          "`light`", ("heavy", "light"), (st_android, st_altri))
 
     # FUORI DA TELEGRAM
     prova("fuori da Telegram (sito, app installata): navigator.vibrate, "
           "un colpo per il tocco e la sua figura per ogni avviso — e la "
-          "HapticFeedback di Telegram non si tocca",
-          detto([["vibrate", ms["tocco"]], ["vibrate", ms["success"]],
-                 ["vibrate", ms["warning"]], ["vibrate", ms["error"]]]),
+          "HapticFeedback di Telegram non si tocca", detto(telefono),
           o["fuori"])
     prova("...un tipo che non conosce (o l'evento di un click passato "
           "per sbaglio) e' un tocco", detto([["vibrate", ms["tocco"]]] * 5),
           o["fuoriIgnoto"])
+    prova("...e se il browser rifiuta, fuori da Telegram non c'e' "
+          "ripiego: Telegram non si tocca",
+          detto([["vibrate-rifiutata", ms[k]] for k in TIPI]),
+          o["fuoriRifiuta"])
     prova("iPhone fuori da Telegram (niente navigator.vibrate): niente, "
           "e nessun errore", zitto, o["iphone"])
     prova("sulla .onion (lo script di Telegram non c'e' proprio): vibra "
@@ -147591,41 +147631,69 @@ console.log(JSON.stringify(out));
     prova("...e li', senza navigator.vibrate, niente e nessun errore",
           zitto, o["onionIphone"])
 
-    # DENTRO TELEGRAM
-    prova("dentro Telegram su Android: SOLO la strada di Telegram — il "
-          "tocco con lo stile di Android, gli avvisi col loro nome — e "
-          "navigator.vibrate non si chiama (sarebbero due colpi)",
-          detto([["tg-tocco", st_android], ["tg-avviso", "success"],
-                 ["tg-avviso", "warning"], ["tg-avviso", "error"]]),
+    # DENTRO TELEGRAM SU ANDROID: LA CURA
+    prova("dentro Telegram su Android: navigator.vibrate con le STESSE "
+          "durate dell'app web — il tocco e i tre avvisi — e a Telegram "
+          "non si chiede niente (mai le due insieme)", detto(telefono),
           o["android"])
-    prova("dentro Telegram su iPhone: uguale, col tocco `light`",
-          detto([["tg-tocco", "light"], ["tg-avviso", "success"],
-                 ["tg-avviso", "warning"], ["tg-avviso", "error"]]),
-          o["ios"])
-    prova("dentro Telegram su un client che non e' Android: `light`",
-          detto([["tg-tocco", "light"]]), o["desktop"])
-    prova("...un tipo che non conosce e' un tocco anche qui (a Telegram "
-          "non arriva mai un avviso dal nome storto)",
-          detto([["tg-tocco", st_android]] * 2), o["dentroIgnoto"])
-    prova("dalla 6.1, la prima che vibra, si chiede",
-          detto([["tg-tocco", st_android]]), o["limite"])
-    prova("un Telegram piu' vecchio della 6.1: niente — nemmeno "
-          "l'avviso in console della sua libreria, e nessun ripiego",
-          zitto, o["vecchio"])
-    prova("...e cosi' un Telegram senza HapticFeedback, o che non sa "
-          "dire la sua versione", (zitto, zitto),
-          (o["senzaHaptic"], o["senzaVersione"]))
+    prova("...le stesse durate, alla lettera, di fuori da Telegram",
+          o["fuori"]["fatti"], o["android"]["fatti"])
+    prova("...un tipo che non conosce e' un tocco anche qui",
+          detto([["vibrate", ms["tocco"]]] * 5), o["androidIgnoto"])
+    prova("IL RIPIEGO, se navigator.vibrate non c'e': la strada di "
+          "Telegram, `heavy` al tocco e gli avvisi col loro nome",
+          detto(telegram("heavy")), o["androidSenza"])
+    prova("...se lancia un errore: lo stesso ripiego, e l'errore non esce",
+          detto(telegram("heavy")), o["androidRotta"])
+    prova("...se risponde `false` (rifiutata: non ha vibrato): il "
+          "ripiego, uno per chiamata — UNA vibrazione sola, mai due",
+          detto([x for k, t in zip(TIPI, telegram("heavy"))
+                 for x in (["vibrate-rifiutata", ms[k]], t)]),
+          o["androidRifiuta"])
+    prova("...nel ripiego un tipo che non conosce e' un tocco (a "
+          "Telegram non arriva mai un avviso dal nome storto)",
+          detto([["tg-tocco", "heavy"]] * 5), o["androidSenzaIgnoto"])
+    prova("un Telegram piu' vecchio della 6.1 su Android: "
+          "navigator.vibrate non dipende da lui, e vibra", detto(telefono),
+          o["androidVecchio"])
+    prova("...e senza navigator.vibrate niente: nemmeno l'avviso in "
+          "console della sua libreria", zitto, o["androidVecchioSenza"])
+    prova("...dalla 6.1, la prima che vibra, il ripiego si chiede",
+          detto([["tg-tocco", "heavy"]]), o["androidLimiteSenza"])
+    prova("un Telegram senza HapticFeedback su Android: il telefono "
+          "vibra lo stesso; senza l'uno e senza l'altro, o senza saper "
+          "dire la versione, niente e nessun errore",
+          (detto(telefono), zitto, zitto),
+          (o["androidSenzaHaptic"], o["androidSenzaTutto"],
+           o["androidSenzaVersione"]))
+
+    # DENTRO TELEGRAM ALTROVE: COM'ERA
+    prova("dentro Telegram su iPhone: SOLO la strada di Telegram, "
+          "`light` al tocco e gli avvisi — navigator.vibrate non si "
+          "chiama nemmeno quando c'e'", detto(telegram("light")), o["ios"])
+    prova("...uguale senza navigator.vibrate, che e' l'iPhone vero",
+          detto(telegram("light")), o["iosSenza"])
+    prova("...un tipo che non conosce e' un tocco",
+          detto([["tg-tocco", "light"]] * 2), o["iosIgnoto"])
+    prova("...con un Telegram vecchio o senza HapticFeedback: niente, e "
+          "nessun ripiego sul telefono", (zitto, zitto),
+          (o["iosVecchio"], o["iosSenzaHaptic"]))
+    prova("dentro Telegram su un client che non e' Android ne' iPhone: "
+          "come l'iPhone", detto(telegram("light")), o["desktop"])
 
     # MENO MOVIMENTO, E I GUASTI
     prova("chi ha chiesto meno movimento non riceve niente: dentro "
-          "Telegram, fuori, sulla .onion", (zitto, zitto, zitto),
-          (o["ridottiDentro"], o["ridottiFuori"], o["ridottiOnion"]))
-    prova("una vibrazione che esplode non ferma il gesto: dentro e fuori "
-          "nessun errore esce dalla porta", (zitto, zitto),
-          (o["rottoDentro"], o["rottoFuori"]))
+          "Telegram su Android e su iPhone, fuori, sulla .onion",
+          (zitto,) * 4,
+          (o["ridottiAndroid"], o["ridottiIos"], o["ridottiFuori"],
+           o["ridottiOnion"]))
+    prova("una vibrazione che esplode non ferma il gesto: con tutte e "
+          "due le strade rotte nessun errore esce dalla porta",
+          (zitto,) * 3,
+          (o["rottoAndroid"], o["rottoIos"], o["rottoFuori"]))
     prova("...nemmeno chiamata mentre la pagina si carica, col giudice "
           "non ancora nato: li' si tace", (zitto, zitto),
-          (o["nonNatoDentro"], o["nonNatoFuori"]))
+          (o["nonNatoAndroid"], o["nonNatoFuori"]))
 
 
 def prove_tor_chiavi_scambio():

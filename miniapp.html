@@ -16511,17 +16511,34 @@ function tempoLettura(testo){
    2) DENTRO TELEGRAM la richiesta partiva giusta, ma su Android lo
       stile `light` e' un colpo di 7 millesimi a un quarto della forza
       (65 su 255, `BotWebViewVibrationEffect` del client): sui telefoni
-      che sanno dosare la forza non si sente. Li' si chiede `soft`, 10
-      millesimi a 175 — e sui telefoni che la forza non la dosano dura
-      55 ms contro i 60 di `light`, quindi a nessuno arriva di piu' di
-      ieri. Su iPhone `light` si sente gia' e resta.
+      che sanno dosare la forza non si sente. La prima cura e' stata
+      `soft` (10 millesimi a 175): SUL TELEFONO DI ANDREA NON SI E'
+      SENTITA (12 ott 2026), mentre i 15 ms di `navigator.vibrate`
+      nell'app web si'. Da allora su Android si chiede `heavy`, lo
+      stile a forza piena (7 millesimi a 255; 80 ms sui telefoni che
+      la forza non la dosano), per sua scelta. Su iPhone resta `light`:
+      li' nessuno ha detto che non si sente, e `heavy` a ogni tocco
+      sarebbe un colpo.
+      «PUBBLICA» SENZA FOTO E' UN AVVISO, `haptic('warning')`: per
+      Telegram e' una figura piu' lunga di qualunque tocco (14 ms a
+      225, pausa, 14 a 175), quindi la piu' facile da sentire.
    UNA PORTA SOLA: `haptic()` e' il tocco, `haptic('success')` (o
    'warning', 'error') l'avviso. Nessun altro in questa pagina nomina
    HapticFeedback o navigator.vibrate — una prova li conta.
-   - Dentro Telegram (`initData`, il giudice di casa) SOLO la strada
-     di Telegram: mai le due insieme, sarebbero due colpi.
-   - Fuori, `navigator.vibrate` dove esiste. Dove non esiste (iPhone:
-     Safari non ce l'ha) niente, e nessun errore.
+   - Fuori da Telegram, `navigator.vibrate` dove esiste. Dove non
+     esiste (iPhone: Safari non ce l'ha) niente, e nessun errore.
+   - DENTRO TELEGRAM SU ANDROID, PRIMA `navigator.vibrate` (12 ott
+     2026, la cura): con le STESSE durate dell'app web, che sul
+     telefono di Andrea si sentono mentre i colpi di Telegram no. La
+     WebView di Android ce l'ha, e Telegram dichiara il permesso di
+     vibrare. La strada di Telegram (`heavy`, e gli avvisi) resta il
+     RIPIEGO: se `navigator.vibrate` non c'e', se lancia un errore, o
+     se risponde `false` — che vuol dire «rifiutata»: non ha vibrato.
+     MAI LE DUE INSIEME: il ripiego parte solo quando la prima non ha
+     vibrato, o sarebbero due colpi.
+   - Dentro Telegram altrove (iPhone, desktop) SOLO la strada di
+     Telegram, com'era: `navigator.vibrate` li' non si chiede nemmeno
+     quando c'e'.
    - Chi ha chiesto meno movimento (`effettiRidotti`: il sistema, o
      «🌗 Aspetto») non riceve vibrazioni.
    IL `try` E' LARGO APPOSTA: una vibrazione mancata non deve mai
@@ -16531,24 +16548,34 @@ function tempoLettura(testo){
    DA SAPERE: Chrome non vibra col telefono in SILENZIOSO (non in
    «vibrazione»: proprio muto) e finche' non c'e' stato un tocco sulla
    pagina; il sistema puo' sempre spegnere tutto dalle sue
-   impostazioni. Le durate qui sotto sono il posto solo da ritoccare. */
+   impostazioni. In silenzioso `navigator.vibrate` risponde `true` lo
+   stesso: da qui non si distingue, e il ripiego non parte — vale anche
+   dentro Telegram su Android, da quando ci passa.
+   Le durate qui sotto sono il posto solo da ritoccare. */
 const VIBRA_MS = {tocco: 15, success: [15, 65, 15],
                   warning: [20, 65, 20], error: [20, 50, 20, 50, 20]};
-const VIBRA_STILE_ANDROID = 'soft', VIBRA_STILE = 'light';
+const VIBRA_STILE_ANDROID = 'heavy', VIBRA_STILE = 'light';
 function haptic(tipo){
   try {
     if (effettiRidotti()) return;
     const avviso = tipo === 'success' || tipo === 'warning' || tipo === 'error';
-    if (tg?.initData) {
-      const h = tg.HapticFeedback;
-      if (!h || !tg.isVersionAtLeast?.('6.1')) return;
-      if (avviso) h.notificationOccurred(tipo);
-      else h.impactOccurred(tg.platform === 'android' ? VIBRA_STILE_ANDROID
-                                                      : VIBRA_STILE);
-      return;
+    const dentro = !!tg?.initData;
+    const android = dentro && tg.platform === 'android';
+    if (!dentro || android) {
+      /* il telefono, direttamente. `fatto` resta falso se la funzione
+         non c'e', se esplode o se rifiuta: solo allora, e solo dentro
+         Telegram, si passa al ripiego qui sotto */
+      let fatto = false;
+      try {
+        fatto = typeof navigator.vibrate === 'function'
+          && navigator.vibrate(avviso ? VIBRA_MS[tipo] : VIBRA_MS.tocco) !== false;
+      } catch(e){}
+      if (fatto || !dentro) return;
     }
-    if (typeof navigator.vibrate === 'function')
-      navigator.vibrate(avviso ? VIBRA_MS[tipo] : VIBRA_MS.tocco);
+    const h = tg.HapticFeedback;
+    if (!h || !tg.isVersionAtLeast?.('6.1')) return;
+    if (avviso) h.notificationOccurred(tipo);
+    else h.impactOccurred(android ? VIBRA_STILE_ANDROID : VIBRA_STILE);
   } catch(e){}
 }
 
@@ -47236,7 +47263,10 @@ function aggiornaObbligoFoto(){
 function mostraObbligoFoto(){
   fotoRichiamoPer = facciaFormVendi();
   aggiornaObbligoFoto();
-  haptic();
+  /* un AVVISO, non un tocco (12 ott 2026, dal telefono di Andrea): e'
+     un no detto a chi ha premuto «Pubblica» — vedi LA VIBRAZIONE DI
+     CASA */
+  haptic('warning');
   const drop = el('sellFotoDrop');
   if (drop) drop.scrollIntoView({block:'center',
     behavior: tourRidotto() ? 'auto' : 'smooth'});
