@@ -52903,3 +52903,135 @@ segreti sulle righe aggiunte con la controprova. La suite INTERA
 sull'albero che si pusha la dice la CI: è la parola di Andrea («se
 main corre ancora, basta la CI»). La tortura lunga (39 su 39) e il
 giro dal vivo lungo (34 controlli) restano quelli del primo tempo.
+
+## Il runner della CI col numero: `ubuntu-24.04` al posto di `ubuntu-latest`, e come si sale a Ubuntu 26.04 (12 ott 2026, sera, cantiere runner-fisso, richiesta di Andrea)
+
+**IL FATTO.** La CI del 12 ott sera portava un'annotazione: l'etichetta
+`ubuntu-latest` passa a Ubuntu 26.04 dal 19 ottobre 2026. L'annuncio di
+GitHub (actions/runner-images, issue 14748, letto il 12 ott) dice che
+il passaggio va a ondate per alcune settimane e si chiude entro il 19
+novembre. Vuol dire che dal 19 ott, senza un commit nostro, la macchina
+sotto la CI sarebbe cambiata — e per un mese un giro poteva cadere
+sulla 24.04 e quello dopo sulla 26.04. Una CI rossa ferma il deploy (il
+VPS tira solo col verde): un rosso che va e viene senza un commit a cui
+dare la colpa è il peggiore da leggere, e sarebbe arrivato nella
+settimana dell'hackathon.
+
+**COSA FA ADESSO.** I tre job dell'unico workflow (`prove`, `segreti`,
+`pronto` in `.github/workflows/prove.yml`) dicono `runs-on:
+ubuntu-24.04`. Oggi non cambia NIENTE: `ubuntu-latest` È la 24.04 (dal
+log del giro di 6cf04a6: Ubuntu 24.04.5, immagine `ubuntu-24.04`
+versione 20261004.327.1). Cambia solo chi decide il giorno: noi, con un
+commit. È lo stesso perché delle action inchiodate allo sha (la B8 di
+«CSP e le voci aperte degli audit», 1 ott): un tag si sposta, un numero
+no; un aggiornamento è un gesto, non un'eredità. `python-version:
+"3.12"` e gli sha delle action erano già fissi e non sono stati toccati.
+
+**LA SENTINELLA.** `prove_runner_fisso` in `prove.py`, tre prove su
+TUTTI i file di `.github/workflows` (non sul solo `prove.yml`: un
+workflow nuovo nasce di solito copiando un esempio con `ubuntu-latest`):
+ogni job dichiara il suo runner; ogni runner ha la forma `ubuntu-NN.NN`;
+tutti i job stanno sulla stessa immagine (il verde di `prove` e quello
+di `segreti` devono parlare della stessa macchina). Guarda la FORMA e
+non il numero: il giorno della salita si cambiano tre righe e resta
+verde.
+
+**QUANDO SALIRE A UBUNTU 26.04.** Non c'è fretta e non è «mai».
+- NON PRIMA del 19 novembre 2026: fino a quel giorno GitHub sta ancora
+  spostando gli altri, e i guasti dell'immagine nuova li trovano loro.
+  E comunque non nella settimana dell'hackathon (17-18 ott) né con un
+  cantiere aperto che tocca il workflow.
+- NON «MAI», per due ragioni. Il VPS gira già Ubuntu 26.04: la CI sulla
+  stessa versione somiglia di più alla produzione. E la 24.04 non dura
+  per sempre: il README di actions/runner-images dice che tengono le
+  due versioni più recenti di ogni sistema, quindi a stare alla loro
+  regola la 24.04 esce quando arriverà la 28.04 — annunciata lì, con
+  una voce come la 14748 e mesi di anticipo. Quel giorno si vuole
+  essere già saliti con calma, non di corsa.
+- PRIMA DEL TEMPO solo se serve uno strumento che ha solo la 26.04, o
+  se GitHub annuncia il ritiro della 24.04.
+
+**COSA CAMBIA SOTTO** (dai due README delle immagini, letti il 12 ott;
+si rileggono il giorno della salita, i numeri corrono): Node.js da 22 a
+24 e npm da 10 a 11 — ed è la voce che ci riguarda di più, perché node
+NON è fissato dal workflow, viene dall'immagine, e lo chiamano decine
+di prove, quelle che fanno girare il JavaScript vero (più `npm install`
+di nostr-tools 2.25.2 per `prove_annuncio_identita`); bash da 5.2 a 5.3; kernel da 6.17 a 7.0;
+git e grep nuovi (il job `segreti` è fatto di `git log -p` e `grep
+-E`: una forma che la versione nuova legge in un altro modo sarebbe uno
+scanner che tace). Il Python di sistema passa da 3.12 a 3.14, ma il
+nostro è quello di `setup-python`, fisso a 3.12: va solo guardato che
+la 3.12 per la 26.04 ci sia (lo dice il log del passo `setup-python`).
+
+**COME SALIRE, UNA PROVA SU UN RAMO PRIMA.** È l'unica eccezione alla
+regola «si pusha su main, mai su un ramo», e si fa col sì di Andrea. Si
+può perché il workflow parte a ogni push di QUALUNQUE ramo (`on: push`
+senza filtro), mentre il job `pronto` gira solo su main: un ramo di
+prova fa girare `prove` e `segreti` sulla macchina nuova e il VPS non
+vede niente (tira solo main, e solo dove arriva `pronto`).
+1. Worktree nuovo da origin/main, ramo `prova/ubuntu-26`.
+2. Le TRE righe `runs-on:` a `ubuntu-26.04`, tutte insieme (la
+   sentinella vuole la stessa immagine nei tre job). Nient'altro nel
+   commit.
+3. `git push origin HEAD:refs/heads/prova/ubuntu-26` e
+   `gh run watch --exit-status`.
+4. Nel giro si guarda, in quest'ordine: l'intestazione del log dice
+   `Image: ubuntu-26.04`; `prove` è verde con lo STESSO conto di main
+   (stesse passate, nessuna saltata: con PROVE_SEVERE una saltata è già
+   rossa); i collaudi dell'elenco sono girati tutti; `segreti` è verde
+   e nel suo log non c'è nessun `grep: warning`; i tempi somigliano a
+   quelli di main.
+5. Un verde solo non basta: `gh run rerun <id>` due volte, tre verdi di
+   fila. Un collaudo che balla su una macchina nuova si vede al secondo
+   o al terzo giro.
+6. Verde tre volte: su main lo stesso cambio di tre righe, in un commit
+   firmato, CI fino al verde. ⚠️ Il job `pronto` sul ramo NON gira:
+   la sua prima volta sulla 26.04 è il primo push su main. Fa solo un
+   checkout e un `git push`, ma si GUARDA (`git ls-remote origin
+   refs/heads/pronto refs/heads/main`), come dopo ogni commit che tocca
+   il workflow.
+7. Si cancella il ramo di prova: `git push origin --delete
+   prova/ubuntu-26`.
+8. ROSSO sul ramo: non si è perso niente, main sta ancora sulla 24.04.
+   Il rosso dice quale strumento è cambiato; si cura QUELLO su main
+   restando sulla 24.04 (per node: un `actions/setup-node` inchiodato
+   allo sha con la versione scritta, come `setup-python`), poi si
+   riprova il ramo.
+9. Se dopo la salita qualcosa balla: si torna indietro con un commit
+   nuovo che rimette le tre righe a `ubuntu-24.04`.
+
+**LE STRADE SCARTATE.** Lasciare `ubuntu-latest` e vedere cosa succede
+il 19: il passaggio è a ondate, quindi per un mese la macchina sarebbe
+stata una o l'altra a caso. Salire subito alla 26.04: senza una prova,
+a cinque giorni dall'hackathon. Fissare anche la VERSIONE dell'immagine
+(20261004…): sui runner di GitHub non si può, l'etichetta col numero è
+il grano più fine che danno; dentro la 24.04 gli strumenti continuano
+ad aggiornarsi ogni settimana, e va bene così. Una matrice con le due
+immagini insieme: raddoppia i minuti, e soprattutto cambia i NOMI dei
+job («prove (ubuntu-24.04)»), mentre il giudice del VPS chiede `prove`
+e `segreti` per nome (`LAVORI_RICHIESTI` in `giudice_deploy.py`): il
+deploy si fermerebbe. Inchiodare il numero «24.04» nella sentinella:
+diventerebbe rossa per un cambio legittimo. Fissare node già adesso con
+`setup-node`: è un cambio in più alla CI che Andrea non ha chiesto;
+resta scritto al punto 8 come cura pronta.
+
+**COSA È STATO PROVATO.** La sentinella da sola sul workflow vero (3
+verdi) e su sei mutazioni in una cartella a parte, col workflow vero
+mai toccato: tutti e tre tornati a `ubuntu-latest`, uno solo (il job
+`pronto`), un job salito da solo a 26.04, un job senza `runs-on`, un
+secondo workflow nato con `ubuntu-latest` — cinque rosse — e la salita
+vera, tutti e tre a 26.04, che resta verde. 7 su 7. Che l'etichetta
+`ubuntu-24.04` esista e sia l'immagine di oggi l'ha detto il log della
+CI; che esista `ubuntu-26.04`, il README di GitHub. La prova sul ramo
+NON è stata fatta: è il gesto della salita, non di oggi.
+
+**UNA SVISTA MIA, PER CHI VIENE DOPO.** Ho ritoccato una riga del
+workflow con `sed -i` dal Git Bash, che toglie TUTTI i CRLF del file
+(era già scritto nella memoria delle sessioni). Visto subito da `file`,
+rimessi, e il diff è tornato di sedici righe. Su `prove.yml`,
+`prove.py` e i documenti: uno script Python con `newline=""`, mai `sed
+-i`.
+
+**RESTA DA GUARDARE.** Dopo questo push: che `pronto` sia arrivato a
+main (il commit tocca il workflow). Dal 19 novembre 2026: la salita,
+coi nove passi qui sopra, quando Andrea dice sì.

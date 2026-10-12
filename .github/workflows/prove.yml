@@ -18,7 +18,17 @@ jobs:
     # del repo diventasse piu' largo.
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    # L'immagine del runner col NUMERO, non `ubuntu-latest` (12 ott
+    # 2026): un'etichetta mobile si sposta da sola — dal 19 ott 2026
+    # GitHub la porta a Ubuntu 26.04, a ondate, fino al 19 nov — e con
+    # lei cambiano node, git, grep e il resto dell'immagine, senza un
+    # commit nostro a cui dare la colpa di un rosso. E' lo stesso
+    # perche' delle action inchiodate allo sha: un aggiornamento e' un
+    # gesto, non un'eredita'. I TRE job stanno sulla stessa immagine,
+    # e una sentinella di prove.py (`prove_runner_fisso`) lo tiene.
+    # Quando e come salire a Ubuntu 26.04, con una prova su un ramo
+    # prima: docs/CANTIERI.md, "Il runner della CI col numero".
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
@@ -288,7 +298,7 @@ jobs:
   segreti:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # Le forme dei segreti, scritte UNA volta: le guardano sia i file
       # di oggi sia la cronologia, e due elenchi che divergono sarebbero
@@ -551,7 +561,7 @@ jobs:
     needs: [prove, segreti]
     permissions:
       contents: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       # La STORIA INTERA, e non e' un dettaglio: il checkout di serie e'
       # SHALLOW (un commit solo), quindi git non puo' dimostrare che

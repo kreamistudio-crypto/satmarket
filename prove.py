@@ -137192,6 +137192,38 @@ def prove_quattro_piccole():
           all(re.search(r"@[0-9a-f]{40}\s+# v\d", r) for r in wf.splitlines() if "uses:" in r))
 
 
+def prove_runner_fisso():
+    """IL RUNNER DELLA CI COL NUMERO (12 ott 2026, cantiere runner-fisso,
+    richiesta di Andrea). `runs-on: ubuntu-latest` e' un'etichetta mobile
+    come lo erano i tag delle action (B8): dal 19 ott 2026 GitHub la
+    sposta a Ubuntu 26.04, e l'immagine sotto la CI cambierebbe senza un
+    commit nostro. Qui si guarda la FORMA e non il numero: il giorno
+    della salita a 26.04 si cambiano tre righe e questa prova resta
+    verde; rossa diventa se torna un `-latest`, se un job nuovo nasce
+    senza numero, o se i job finiscono su immagini diverse (il verde di
+    `prove` e quello di `segreti` devono parlare della stessa macchina).
+    Si leggono TUTTI i workflow della cartella, non il solo prove.yml."""
+    print("\n[il runner della CI col numero]")
+    cartella = os.path.join(".github", "workflows")
+    runner, lavori = [], 0
+    for nome in sorted(os.listdir(cartella)):
+        if not nome.endswith((".yml", ".yaml")):
+            continue
+        testo = open(os.path.join(cartella, nome), encoding="utf-8").read()
+        # i job: le chiavi a due spazi sotto `jobs:` (i commenti no)
+        lavori += len(re.findall(r"(?m)^  [\w-]+:\s*$",
+                                 testo.split("\njobs:", 1)[-1]))
+        runner += [(nome, r) for r in
+                   re.findall(r"(?m)^\s*runs-on:\s*(.*?)\s*$", testo)]
+    prova("ogni job di ogni workflow dichiara il suo runner", True,
+          lavori >= 3 and len(runner) == lavori)
+    prova("nessun runner e' un'etichetta mobile: tutti `ubuntu-NN.NN`", [],
+          [r for r in runner
+           if not re.fullmatch(r"ubuntu-\d\d\.\d\d", r[1])])
+    prova("...e tutti i job girano sulla stessa immagine", 1,
+          len({r[1] for r in runner}))
+
+
 def prove_chiavi_p2p_firmate():
     """LE CHIAVI P2P FIRMATE (1 ott 2026, cantiere «CSP e le voci aperte
     degli audit», cura 6: la M5 dell'audit del 19 set). `chiavi_p2p`
@@ -152714,6 +152746,7 @@ def main():
               prove_ssrf_ln_address,
               prove_foto_anomala,
               prove_quattro_piccole,
+              prove_runner_fisso,
               prove_chiavi_p2p_firmate,
               prove_rotte_p2p_riverificate,
               prove_negozi_fuori_dal_ciclo,
