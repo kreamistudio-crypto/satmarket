@@ -51208,3 +51208,15 @@ cura è nei banchi — lo stesso stub che il 10 ott aveva avuto
 la lezione di «firma cambiata, ancore nei banchi» in un'altra forma:
 una chiamata nuova dentro una funzione che i banchi eseguono si cerca
 per NOME in `prove.py` prima della suite, non dopo.
+
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Prove vicine,
+collaudo nuovo, tortura e giro dal vivo sopra `464f839` (la punta di
+main quando il cantiere è nato). Poi main è corso di UN commit non mio
+(`2c317ab`, solo CLAUDE.md: i tetti di prezzo in «Adesso»): rebase
+senza conflitti, e SULL'ALBERO RIBASATO — quello del push — è girato
+tutto il resto: `PROVE_SEVERE=1 python prove.py` INTERA, 22.534 passate
+e 0 fallite, nessuna saltata; i 63 collaudi del workflow nella gabbia
+(`collaudi_ci.py`, in tre gruppi in parallelo), 63 verdi; `compileall`;
+lo scanner dei segreti sulle righe aggiunte. La prima corsa della suite,
+sopra `464f839`, era quella delle due esplose; la seconda è questa. La
+voce era già scritta quando la suite è girata, tranne questo paragrafo.
