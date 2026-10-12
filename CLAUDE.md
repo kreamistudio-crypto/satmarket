@@ -143,11 +143,11 @@ modo in cui si rifà un errore già pagato.
 
 ⚠️ Non è il VPS di Barattolo: è il coordinator Mostro P2P su LNVPS
 (Dublino, `185.18.221.96`), tutto in container (bitcoind pruned, LND,
-tor, mostrod), canale da 400.000 sat verso ACINQ. Gira il nostro fork
-di Mostro, immagine `mostro:v0.19.0-bar7` (otto patch più la 0010:
-PRODUZIONE, «LA SALITA ALLA -bar7»). Il verbale — audit, timer, sonda,
-dev fee, risposte del team — sta in `docs/NODO-MOSTRO.md`. Le regole che
-valgono in ogni sessione:
+tor, mostrod), due canali: 400.000 sat verso ACINQ e, dal 5 ott 2026,
+5M verso LNBiG. Gira il nostro fork di Mostro, `mostro:v0.19.0-bar7`
+(otto patch più la 0010: PRODUZIONE, «LA SALITA ALLA -bar7»). Il verbale
+— audit, timer, sonda, dev fee, risposte del team — sta in
+`docs/NODO-MOSTRO.md`. Le regole che valgono in ogni sessione:
 - L'AUDIT DI SICUREZZA È FATTO (2 set 2026): non riproporre le sue sei
   domande come «da fare». Il documento `auditnodomostro202609` sta nel
   canale Telegram del nodo, coi perché: si chiede quello. I canali
@@ -240,10 +240,9 @@ valgono in ogni sessione:
 
 ## Adesso
 
-Stato al 30 set 2026 (parola di Andrea):
-- LANCIO PUBBLICO DEL P2P IL 10 OTTOBRE 2026: quel giorno si accende la
-  leva `P2P_IN_VETRINA` nel config del VPS (nel codice è False;
-  PRODUZIONE, «LE CARD P2P IN VETRINA»).
+Stato al 12 ott 2026 (parola di Andrea):
+- P2P PUBBLICO DAL 10 OTT 2026 (lancio fatto): `P2P_IN_VETRINA` sta nel
+  config del VPS, nel codice è False (PRODUZIONE, «LE CARD P2P IN VETRINA»).
 - I PIONIERI sono congelati a 101.
 - La cassaforte del mercatino è quella «nodo» (LNbits self-hosted col
   LND del nodo: Cantieri, «Il doppio wallet»).
@@ -253,7 +252,7 @@ Stato al 30 set 2026 (parola di Andrea):
   leve sono ACCESE lo dice il pannello «⚙️ Stato delle leve» dell'admin,
   che chiede al valore VIVO e non alla costante nel codice.
 
-Backlog concordato: commissione minima fissa; post-lancio il tracking
+Backlog concordato: commissione minima fissa; a lancio fatto, il tracking
 verificato via API corrieri (con la MAPPA dei punti), l'escrow on-chain
 2-di-3, il parere legale MiCA prima di crescere. Da riprendere (ago 2026,
 segnati da Andrea, non ancora decisi): il luogo del ritiro a mano
