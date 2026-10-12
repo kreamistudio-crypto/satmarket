@@ -51758,3 +51758,57 @@ rosso il giorno stesso.
 della cura (gli stessi 5); verde dopo, da solo e nella gabbia con
 `collaudi_ci.py`; e nel giro intero dei collaudi del workflow
 sull'albero del push (la voce qui sopra).
+
+## Hackathon: le risposte degli organizzatori e l'analisi del 12 ott (solo documenti)
+
+**Cosa è.** La sera del 12 ottobre 2026 Andrea ha chiesto di mettere nel
+repo tutta l'analisi del giorno, perché non si perdesse: è la sezione
+nuova **§12 di `docs/HACKATHON-SETUP.md`**. Nessun file di codice,
+niente sul VPS, sul nodo, sulla VM. La lista «Domenica 11 ott» non è
+stata fatta l'11: la migrazione a Mutinynet si fa martedì 13.
+
+**Cosa c'è dentro, e perché conta.**
+- Le risposte degli organizzatori: RGB e QVAC obbligatori, WDK
+  facoltativo (fino a 5 punti di bonus), fork e strumenti di terzi
+  ammessi se dichiarati nella pull request, Mutinynet col kit di
+  KaleidoSwap o una rete propria, i modelli QVAC consigliati.
+- **`signet` contro `signetcustom`**: sulla stessa catena sono due reti
+  RGB. Il mondo di KaleidoSwap (maker, faucet RGB, i loro wallet) è
+  `SignetCustom`, il wallet WDK di Utexo apre solo `Signet` e solo gli
+  schemi NIA, CFA, UDA; e l'USDT del faucet ha `issued_supply` 0, la
+  firma di un IFA. Dodici fatti con la fonte, due provati offline nelle
+  distro WSL. **La scelta**: l'USDT del faucet resta fuori; USDB e MOON
+  li riemettiamo noi su Mutinynet marcato `signet`. A `signetcustom`
+  solo con un build pronto di UTEXO: la marcatura sta nel genesis e si
+  decide prima di emettere.
+- **QVAC**: `consigliami` passa da Qwen3 1.7B (fuori dalla lista dei
+  mentor) a Qwen3.5 2B, con la discesa 0.8B e poi 600M. Scaricati e
+  provati la sera stessa sul fisso col nostro `consiglio.py`: il 2B
+  rispetta la regola 8 volte su 8, sotto il secondo a caldo. Due
+  scoperte: con Qwen3.5 lo schema dà **500 senza `reasoning_budget:
+  false`** (l'interruttore è obbligatorio, e lo mandavamo già), e su
+  Windows gli scarichi dal registro falliscono per un difetto del
+  runtime Bare (la data dei file troncata a 32 bit: «Invalid device
+  file, was modified»); il rimedio è rinominare l'archivio del registro.
+- **A Torino va un portatile di Alan, non il fisso** (scelta di Andrea
+  della sera): il wallet della demo NON trasloca. Il 13 sul fisso nasce
+  il wallet di prova e si collauda la catena; il 15 sul portatile nasce
+  un wallet nuovo, riempito dalla VM in venti minuti. Strade scartate:
+  il trasloco di stash e chiavi (la variante override deriva un altro
+  wallet dallo stesso seme) e l'installazione fatta da Alan da remoto il
+  giorno della migrazione.
+- Il calendario dal 12 al 18 con l'ordine dei tagli, il piano B su
+  signet con la sua regola, i cinque rischi, le undici domande ai mentor
+  come sono state inviate, la bozza della dichiarazione per la pull
+  request (con la riga sull'assistente AI, voluta da Andrea).
+
+**Provato.** `prove_mutinynet_prep`, `prove_annuncio_identita`,
+`prove_leva_rgb` e `prove_semina_demo` (quelle che leggono questo
+documento), la suite intera e i collaudi della CI: nel rapporto del
+push. Le forme dei segreti della CI sul testo nuovo: nessuna.
+
+**Resta da guardare.** Le risposte dei mentor (la 1 e la 2 decidono la
+marcatura); la glibc dei due portatili di Alan; il cantiere della
+mattina del 13 (la lista datata 13, l'alias del modello, la
+dichiarazione in §5); la chiave SSH dedicata per la VM e dove gira la
+sessione a Torino, da decidere il 15.

@@ -11,7 +11,9 @@ roadmap), **e il 9** (cantiere «mutinynet-prep»: Mutinynet coi
 servizi degli organizzatori, deciso con Alan — `RGB_CATENA`, i due
 `.env`, il backup a due catene, la lista di domenica 11 e quella del 15
 per i due portatili di Alan in §10, i numeri della demo e le scene
-8-bis in §11, la chiavetta di riserva),
+8-bis in §11, la chiavetta di riserva), **e il 12** (le risposte degli
+organizzatori e l'analisi su Mutinynet in §12, solo documenti: la
+migrazione dell'11 spostata al 13, e a Torino va un portatile di Alan),
 (la demo sui punti fedeltà, **NWC-RGB** — l'estensione NIP-47 per gli
 asset RGB —, l'emittente legato a un'identità Nostr: il perché e il
 disegno stanno nella parte seconda dello studio; qui c'è COSA si fa e
@@ -598,6 +600,9 @@ implementa in un pomeriggio chi ha già il provider `window.rgb`.
 
 ## 8. Le cose incerte, da chiedere ai mentor (13 ott e sabato mattina)
 
+> **12 ott**: gli organizzatori hanno già risposto a una parte (§12.1), e
+> le domande ancora aperte sono le undici inviate il 12 nel topic (§12.8).
+
 La lista completa, con l'ordine e lo spazio per le risposte, è nello
 studio, parte seconda, E (undici domande). La pagina della gara NON
 nomina nessun Q&A: la data del 13 viene dalla mail di conferma, e si
@@ -917,6 +922,11 @@ guarda solo chi ne ha uno), quindi resta «creato» tutto il giorno. Il
 rovescio, da sapere: il foglio «Paga ora» di OGGI su quell'ordine
 bussa a LNbits per la fattura che non c'è, e nel log del server esce un
 500 — innocuo, l'ordine non si muove; il foglio di sabato è un altro.
+
+> ⚠️ **12 ott**: questa lista NON è stata fatta l'11. Si fa **martedì 13
+> ott**, dopo le risposte dei mentor, con le correzioni di §12.3; il wallet
+> utente che nasce quel giorno sul fisso è di PROVA, quello della demo
+> nasce il 15 sul portatile di Alan (§12.10).
 
 **Domenica 11 ott: Mutinynet coi servizi degli organizzatori — la lista
 da spuntare** (studio del 9 ott, deciso con Alan; cantiere
@@ -1575,3 +1585,499 @@ backup del NODO falliva dal 7 settembre («permission denied» su
 `/var/backups/nodo`: lo script lo richiudeva a 700 ogni notte). Curato
 da Andrea il 1 ott (riga 19 di `backup-nodo.sh`, `-g pull -m 750`): il
 verbale sta in `docs/NODO-MOSTRO.md`.
+
+## 12. 12 ott: le risposte degli organizzatori e l'analisi su Mutinynet
+
+Scritto il 12 ottobre 2026, sera, su richiesta di Andrea, perché
+l'analisi del giorno non si perda. **Solo analisi, letture e una prova
+di QVAC sul PC fisso**: niente toccato sul VPS, sul nodo, sulla VM,
+nessun wallet creato per la demo, nessun file di codice cambiato. La
+lista «Domenica 11 ott» di §10 NON è stata fatta l'11: la migrazione a
+Mutinynet si fa **martedì 13 ott**, dopo le risposte dei mentor alle
+domande di 12.8. Quel che qui è una STIMA o una DEDUZIONE è scritto come
+tale; il resto è stato letto, provato o misurato il 12, e porta la sua
+fonte. Le quattro scelte di Andrea della sera stanno in 12.7, e la più
+grossa (a Torino va un portatile di Alan, non il fisso) in 12.10.
+
+### 12.1 Le risposte degli organizzatori (12 ott, topic delle domande)
+
+Rispondono una volta al giorno, la sera. Riportate da Andrea:
+
+- **Obbligatori**: RGB Protocol su Bitcoin e QVAC. **WDK è
+  facoltativo**: fino a 5 punti di bonus, e senza non si perdono punti.
+  Noi WDK lo teniamo.
+- **WDK + RGB**: l'adattatore è quello di UTEXO, `wdk-wallet-rgb`
+  (https://github.com/UTEXO-Protocol/wdk-wallet-rgb), con la
+  documentazione su https://docs.wdk.tether.io/. Un mentor UTEXO è in
+  sala tutti e due i giorni.
+- **Fork e strumenti di terzi**: ammessi (anche
+  `UTEXO-Protocol/rgb-lightning-node` e `@utexo/wdk-rgb-lightning`),
+  basta dichiararli nella pull request. (DEDUZIONE: la consegna è una
+  pull request; dove e entro quando è la domanda 11.)
+- **Rete**: Mutinynet tramite il «KaleidoSwap builder kit»
+  (https://kaleidoswap.github.io/rgb-hackathon/), più un faucet RGB per
+  gli asset di prova. Chi vuole può usare la propria.
+- **In sala**: il Wi-Fi del posto va bene fra dispositivi; ci sono cavi
+  Ethernet.
+- **QVAC, l'hardware**: desktop con almeno 16 GB di RAM (meglio 24-32),
+  la GPU aiuta, macOS va meglio; telefono con 8 GB, Snapdragon o Apple
+  dal 2024.
+- **QVAC, i modelli consigliati a 4 bit**: QWEN3-600M, QWEN3.5-0.8B,
+  QWEN3.5-2B, QWEN3.5-4B, QWEN3.5-9B. Trascrizione: Parakeet TDT 0.6B
+  Q8. Voce: Supertonic 3 Q8.
+
+**Il progetto non cambia**: Fidelity Points resta com'è (i punti fedeltà
+come asset RGB col NIP-05, Consigliami con QVAC, il wallet WDK che parla
+NWC, la demo coi dollari di prova). Cambiano solo la rete, il modello
+QVAC e gli asset di prova.
+
+### 12.2 `signet` contro `signetcustom`, e l'USDT del faucet: i fatti
+
+Sulla stessa catena (Mutinynet) rgb-lib conosce DUE marcature, e sono
+due reti RGB separate: `Signet` e `SignetCustom`. La marcatura sta nei
+recipient id, nelle fatture e nel genesis di ogni contratto.
+
+| Fatto | Fonte (letta o provata il 12 ott) |
+|---|---|
+| Il maker di KaleidoSwap dichiara `"network":"signetcustom"` | `https://api.signet.kaleidoswap.com/api/v1/market/assets` |
+| L'USDT di prova è «Tether USD», precisione 6, `issued_supply` 0; lo XAUT «Tether Gold», precisione 9, `issued_supply` 0. Un NIA non può nascere con zero unità emesse, un IFA sì: è la firma di un IFA (DEDUZIONE, lo schema non è scritto da nessuna parte: domanda 3) | la stessa API, e `…/api/v1/lsps1/get_info` |
+| Gli id sul faucet: USDT `rgb:lX~ToKsO-Iup7dJ5-UM794sA-9WD21ge-VHYzBGb-E9PA_h0`, XAUT `rgb:qrilKFY5-VBmdIOF-cH5ziA8-9K9MIFS-OwsjmXe-yOv3Oa8`; la pagina non dice né schema né rete | `https://faucet.mutinynet.kaleidoswap.com` (riletta il 12: invariata dal 9) |
+| Il wallet browser di KaleidoSwap apre signet/mutinynet come `SignetCustom`, e il commento dice che quei recipient id «won't validate against a standard `Signet` wallet»; fuori da mainnet accetta gli schemi `Nia` e `Ifa` | `kaleidoswap/wallet-engine` 1.0.0-beta.76, `src/adapters/wdk/RgbLibWasmAdapter.ts` (`toRgbNetwork`, `supportedSchemas`) |
+| Il loro adattatore NATIVO usa `@utexo/wdk-wallet-rgb ^2.0.3` con `network: 'signet'`, indexer `https://esplora.signet.kaleidoswap.com`, proxy `rpcs://proxy.iriswallet.com/0.2/json-rpc`: è il nostro stesso stack, e nei loro test i due wallet si scambiano un NIA emesso da loro (non ricevono dal faucet) | stesso repo, `src/adapters/wdk/RgbLibWdkAdapter.ts`, `test/integration/config.ts`, `test/integration/rgb-lib.mutinynet.integration.test.ts` |
+| rgb-lib all'INVIO rifiuta un destinatario di un'altra rete (`InvalidRecipientNetwork`), e in ARRIVO valida il consignment con la rete del wallet (`chain_net: self.chain_net()`); `Signet` è `ChainNet::BitcoinSignet`, `SignetCustom` è `ChainNet::BitcoinSignetCustom` | `RGB-Tools/rgb-lib` al commit `538f2ab` (0.3.0-beta.7): `src/wallet/online.rs`, `src/utils.rs`, `src/error.rs` |
+| Le fatture e i recipient id cominciano con `sb:` su `SIGNET` e con `sbc:` su `SIGNET_CUSTOM`; la fattura riletta dice la sua rete | prova OFFLINE nella distro `noble-pulita` (rgb-lib Python 0.3.0b7, `witness_receive` su due wallet usa-e-getta, rete staccata con `unshare -n`) |
+| I binding Node di Utexo espongono le sole reti `Mainnet, Testnet, Testnet4, Signet, Regtest` e i soli schemi `Nia, Cfa, Uda`, nella beta.8 (variante originale) e nella beta.13 (variante override); `rgb-sdk` 1.0.3 e 1.0.6 mappano le stesse cinque reti | `wrapper.js` di `@utexo/rgb-lib-linux-x64` e `mapNetworkToRgbLib` di `@utexo/rgb-sdk`, letti nelle due distro di prova |
+| Il binario ORIGINALE (rgb-sdk 1.0.3, beta.8) sincronizza con l'Esplora di KaleidoSwap e con la riserva `https://mutinynet.com/api`. Il 9 era stato provato dal vivo solo l'override | `node punti.mjs saldo` sul wallet usa-e-getta di `noble-pulita`, sola lettura |
+| I servizi il 12: i due Esplora alla stessa altezza (3.500.001), i due proxy rispondono protocollo 0.2, versione 0.3.0 | `…/blocks/tip/height` e `server.info` |
+| Il kit non è cambiato dal 9: dà il proxy, NON dà un Esplora, non nomina `signetcustom`; consiglia «Qwen3.5 2B through QVAC» | `https://kaleidoswap.github.io/rgb-hackathon/` |
+| Su npm, il 12: `@utexo/wdk-wallet-rgb` 2.0.3 è ancora l'ultima; `@utexo/rgb-sdk` arriva alla 1.0.6; `@qvac/sdk` 0.21.0 e `@qvac/cli` 0.15.0 sono le ultime | `npm view` |
+
+Quindi fra l'USDT del faucet e il nostro wallet WDK gli ostacoli sono
+DUE, indipendenti: la marcatura (`sbc:` contro `sb:`) e lo schema (IFA,
+se la deduzione è giusta, contro `Nia, Cfa, Uda`).
+
+### 12.3 La scelta
+
+- **L'USDT del faucet resta fuori.** Non entra nel wallet WDK del
+  cliente, che è il centro della demo e del bonus WDK.
+- **USDB e MOON li riemettiamo noi su Mutinynet**, schema NIA, coi
+  wallet marcati **`signet`**: è lo stack provato dal 1 ott (beta.7
+  Python sulla VM, beta.8 Utexo nel wallet utente), ed è quello che il
+  cantiere «mutinynet-prep» ha preparato (`RGB_CATENA=mutinynet`, per
+  rgb-lib `SIGNET`). Fra i nostri wallet tutto funziona; con faucet RGB,
+  USDT e wallet di KaleidoSwap non c'è interoperabilità, e si dice
+  apertamente (domanda 4, e la riga «Network» della dichiarazione).
+- **La marcatura sta nel genesis: si decide PRIMA di emettere.** Si
+  passa a `signetcustom` solo se UTEXO la sera del 12 dà un build o un
+  ramo pronto di `wdk-wallet-rgb`/`rgb-sdk` (domanda 2) E una prova di
+  45 minuti la mattina del 13 passa. Sarebbe una scelta per catena in
+  `rgb.py` (`BitcoinNetwork.SIGNET_CUSTOM`) e in
+  `punti.mjs`/`nwc-wdk.mjs` (`network`): mezz'ora di codice con le sue
+  prove. Senza risposta, o senza build: `signet`.
+
+**Cosa cambia rispetto a `948ac56` e alla lista «Domenica 11 ott».**
+Confermato: l'adattatore (`wdk-wallet-rgb` 2.0.3, lo stesso che usa
+KaleidoSwap, con la stessa rete e lo stesso Esplora), i quattro
+indirizzi dei due `.env`, la variante override come fork dichiarabile,
+la rete propria ammessa. Da correggere, nel cantiere del 13:
+
+1. Le date: la lista si fa il 13; «dall'11» e «si incolla l'11» (§2,
+   §6, §10) diventano il 13, col messaggio di `identita.mjs` che cita
+   «domenica 11».
+2. Passo 1: nel WSL `punti.mjs indirizzo` NON va in rete; il primo
+   contatto con l'Esplora è `saldo`. Sulla VM `rgb.py indirizzo` sì.
+3. Passo 2, il faucet BTC: da casa si prende il milione intero (il
+   tetto delle 24 ore) e la scorta resta sul wallet `barattolo` di
+   Mutinynet, che fa da faucet al wallet della demo e ai wallet di
+   prova (`rgb.py btc barattolo <indirizzo> <sats>`): il limite del
+   faucet è per IP, e in sala l'IP è probabilmente uno per tutti
+   (domanda 6). Serve anche il 15 (12.10).
+4. Il wallet utente che nasce il 13 sul fisso è il wallet di PROVA del
+   fisso; quello della DEMO nasce il 15 sul portatile di Alan (12.10).
+5. Il modello QVAC (12.4): `qvac.config.json` nel repo e in
+   `qvac-prova`, la prova che pinza la costante in `prove_leva_rgb`,
+   i nomi dei modelli in §4, §5 e §10.
+6. La chiavetta di riserva va rinfrescata: i modelli nuovi,
+   `identita.mjs` con gli id, `qvac.config.json`.
+7. Un passo in più: il giro intero della variante OVERRIDE (12.10).
+8. Escono dal piano: l'USDT come secondo dollaro (studio del 9, punto
+   12; la riga «dom 12:30-13:00» di §11.3) e la prova da dieci minuti
+   col wallet `SIGNET_CUSTOM` e il faucet (studio del 9, punto 7), che
+   resta al più una curiosità per il Q&A.
+
+Si semplifica poco: il builder kit è fatto per chi usa il nodo RLN in
+Docker con `kaleido-cli` e `kaleido-mcp`; noi usiamo rgb-lib e WDK, e
+del kit ci servono gli indirizzi. L'Esplora non è nel kit: l'abbiamo
+preso dal codice di KaleidoSwap (domanda 5).
+
+### 12.4 QVAC: i modelli, il piano 2B → 0.8B → 600M, e la prova del 12 sera
+
+Oggi l'alias `consigliami` è Qwen3 1.7B, che NON è nella lista dei
+mentor; di riserva c'è il 600M, che c'è. Il registro è quello installato
+sul PC fisso di Andrea (`@qvac/sdk` e `@qvac/inference` 0.21.0,
+`@qvac/cli` 0.15.0), letto il 12:
+
+| Modello | Costante nel registro | Peso | Nella lista dei mentor | Sul disco del fisso |
+|---|---|---|---|---|
+| Qwen3.5 2B, Q4_K_M | `QWEN3_5_2B_MULTIMODAL_Q4_K_M` | 1.281 MB | sì | sì, dal 12 sera |
+| Qwen3.5 0.8B, Q4_K_M | `QWEN3_5_0_8B_MULTIMODAL_Q4_K_M` | 533 MB | sì | sì, dal 12 sera |
+| Qwen3 600M, Q4_0 | `QWEN3_600M_INST_Q4` | 382 MB | sì | sì |
+| Qwen3 1.7B, Q4_0 (l'alias di oggi) | `QWEN3_1_7B_INST_Q4` | 1.057 MB | no | sì |
+| Qwen3.5 4B / 9B, Q4_K_M | `QWEN3_5_4B_MULTIMODAL_Q4_K_M` / `QWEN3_5_9B_…` | 2.741 / 5.681 MB | sì | no |
+
+**Il piano**: `consigliami` passa a **Qwen3.5 2B**; se dal vivo fa
+capricci si scende allo **0.8B**; l'ultima rete è il **600M**, che è
+nella loro lista ed è già sul disco. Il 4B e il 9B non servono a una
+risposta di cento token. L'alias `consigliami` RESTA, quindi
+`consigliami-prova.html` (che chiede `consigliami`) e `consiglio.py` non
+cambiano: cambia una costante in `qvac.config.json`, nel cantiere del
+13. «MULTIMODAL» nel nome non pesa: per il solo testo il proiettore
+delle immagini (`MMPROJ_…`) non serve, e la CLI non lo scarica (provato:
+ha scaricato il solo `.gguf`).
+
+**La prova della sera del 12** (ok di Andrea), sul fisso (i9-13900KS, 64
+GB, RTX 4090 da 24 GB, Vulkan 1.4.341), con un `qvac serve` di prova su
+una porta sua e un config a parte: il `qvac.config.json` di Andrea non è
+stato toccato. Il banco è il NOSTRO `deploy/rgb/consiglio.py` (`chiedi`,
+`controlla`, `motivo` veri: schema a `json_schema` strict,
+`reasoning_budget: false`, temperatura 0), puntato sul server di prova.
+
+| Cosa | Qwen3.5 2B | Qwen3.5 0.8B |
+|---|---|---|
+| Otto casi (la demo, tetto piccolo, due asset, tetto zero…): la regola rispettata | 8 su 8 | 7 su 8 (sul tetto zero propone 60 punti: `controlla` la boccia) |
+| Usa il massimo quando conviene | 7 su 7 | 6 su 7 |
+| Dieci giri del caso della demo, a caldo | tutti giusti, mediana 0,76 s, massimo 0,94 s, circa 150 token al secondo | non misurato (i singoli casi: 0,7-1,3 s) |
+| La prima richiesta A SCHEMA dopo l'avvio | 20 s, poi sotto il secondo (la prima richiesta nuda, in un altro avvio: 0,3 s) | sotto il secondo, a server già caldo |
+| Il «perché» del modello porta cifre, e `motivo` lo scarta per la riga di riserva | 7 casi su 8 | 6 casi su 8 |
+| Token: entrata, uscita | circa 270, 85-120 | circa 270, 90-130 |
+| Domanda nuda (max 80 token) SENZA interruttore | risponde, ma prima pensa (5,6 s, `reasoning_content` pieno) | `content` vuoto, `finish_reason: length`: ha solo pensato |
+| Domanda nuda con `reasoning_budget: false` | risponde subito, senza pensare | risponde subito (male: «di bianco») |
+| **Lo schema SENZA `reasoning_budget: false`, o con `true`** | **HTTP 500, tre volte su tre** | **HTTP 500, tre volte su tre** |
+| Lo schema con `reasoning_budget: false` | 200, tre su tre | 200, tre su tre |
+| Memoria, contesto 8192 | 1,9 GB di VRAM in più; il processo 1,7 GB di RAM di lavoro (3,2 privata) | circa 1,1 GB di VRAM in più (misurato per differenza coi due caricati) |
+
+Cosa dice:
+
+- **`reasoning_budget: false` non è più solo utile: con Qwen3.5 è
+  OBBLIGATORIO insieme allo schema.** Senza, il server risponde 500
+  («An internal error occurred»). La pagina e `consiglio.py` lo mandano
+  già. È anche una cosa da dire ai mentor di QVAC (sotto).
+- **Il 2B regge**: la scelta è sempre dentro la regola e al massimo.
+  Come col 1.7B, la riga del «perché» porta quasi sempre cifre (e
+  sbagliate: «uno sconto del 100%»), e il programma la sostituisce con
+  la riga di riserva. È il disegno del 9 ott che lavora («i numeri li
+  scrive il programma, lei la frase»); una frase senza cifre è lavoro
+  sul prompt, del weekend.
+- **Lo 0.8B è una riserva vera solo perché il programma controlla**:
+  sbaglia il caso limite, e `controlla` lo ferma.
+- **I 20 secondi della prima richiesta a schema** ci sono anche sulla
+  4090 (una richiesta nuda, appena avviato, torna in 0,3 s: il tempo è
+  della prima volta con lo schema): la mattina della demo si fa una
+  chiamata di riscaldamento COL NOSTRO SCHEMA, non una domanda qualunque.
+- **Sui portatili di Alan i tempi saranno altri**: qui gira sulla 4090.
+  In CPU, o sull'Arc via Vulkan, STIMO da 5 a 10 secondi per risposta
+  col 2B; si misura il 15. La RAM (2-3 GB) sta larga nei 16 e nei 32 GB.
+
+**Un difetto di QVAC su Windows, trovato scaricando.** Il primo scarico
+è fallito con «Could not download … from the registry on this network
+(Invalid device file, was modified)». La causa NON è la rete: il runtime
+Bare del worker (1.34.1, `bare-fs` 4.8.3) legge la data di modifica dei
+file troncata a 32 bit (per il file-dispositivo `CORESTORE` dell'archivio
+del registro dà un numero negativo), e la libreria `device-file` 2.3.1
+conclude che l'archivio `~/.qvac/registry-corestore` è stato manomesso.
+I modelli GIÀ scaricati si caricano lo stesso; falliscono gli scarichi
+NUOVI, e fallirà anche il prossimo (verificato: anche l'archivio rifatto
+il 12 ha la data sbagliata agli occhi di Bare). Il rimedio, reversibile:
+a QVAC spento si rinomina `registry-corestore` e al primo scarico se ne
+rifà uno. Fatto il 12: il vecchio è
+`~/.qvac/registry-corestore.messo-da-parte-12ott` (120 MB, si può
+cancellare). Con l'archivio nuovo i due modelli sono scesi in meno di un
+minuto. Su Linux NON è provato: sui portatili di Alan i modelli arrivano
+comunque dalla chiavetta, come file. Due righe per il topic dei mentor,
+da aggiungere alle undici:
+
+```text
+QVAC, two findings from tonight (Windows 11, @qvac/sdk 0.21.0, @qvac/cli 0.15.0, bare-runtime 1.34.1):
+A. With Qwen3.5 (2B and 0.8B), `response_format: json_schema` returns HTTP 500 unless `reasoning_budget: false` is sent. With the switch it works every time. Is that expected?
+B. Registry downloads fail with "Invalid device file, was modified": in Bare, fstat on ~/.qvac/registry-corestore/<id>/CORESTORE returns mtime truncated to 32 bits, so device-file rejects the store. Renaming the store folder works once. Known issue?
+```
+
+I controlli di RAM e GPU sui portatili, uno per riga:
+
+```powershell
+# un PC Windows, PowerShell
+Get-CimInstance Win32_ComputerSystem | ForEach-Object { "{0} {1}, RAM {2:N0} GB" -f $_.Manufacturer, $_.Model, ($_.TotalPhysicalMemory/1GB) }
+Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+vulkaninfo --summary | Select-String "apiVersion|deviceName"
+wsl -l -v
+```
+
+```bash
+# portatile di Alan, terminale Linux
+free -h | head -2
+lspci | grep -i -E "vga|3d|display"
+vulkaninfo --summary | grep -E "apiVersion|deviceName|driverName"
+ldd --version | head -1
+grep PRETTY_NAME /etc/os-release
+```
+
+Deve uscire: almeno 16 GB di RAM; Vulkan 1.4 per la GPU (su Windows
+QVAC lo vuole anche in CPU, su Linux solo per la GPU); glibc 2.38 per la
+variante originale del wallet (§10, punto 0 della lista del 15).
+
+### 12.5 Il calendario dal 12 al 18 ott, e cosa si taglia
+
+Aggiornato la sera del 12, dopo la scelta della macchina (12.10).
+
+| Giorno | Cosa | Chi | Tempo |
+|---|---|---|---|
+| lun 12 | Le undici domande nel topic (12.8) | Andrea | ☑ inviate |
+| lun 12, sera | Le risposte dei mentor; la scelta fra `signet` e `signetcustom` (12.3). Alan manda le cinque righe dei due portatili (12.4: RAM, GPU, Vulkan, glibc, sistema) | Andrea le porta | |
+| mar 13, mattina | Il cantiere: la lista datata 13 con le correzioni di 12.3, l'alias del modello con la sua prova, la dichiarazione in §5 | sessione | 1,5 h |
+| mar 13 | La migrazione sul FISSO, i dieci passi di §10 (comandi uno per riga, risposta attesa, Andrea incolla gli output), più il giro dell'override (12.10) | Andrea, la sessione legge | 3-4 h |
+| mar 13, sera | Gli id nei file, il backup a due catene, la chiavetta rinfrescata, il push (aspetta il sì di Andrea) | sessione | 1 h |
+| mer 14 | Niente: Andrea è a Lugano. `rgb_http.py` fermo dalla sera del 13 (il backup delle 03:30) | | |
+| gio 15 | **Il portatile di Alan da 32 GB diventa la macchina della demo**: installazione, chiave SSH dedicata, il wallet della demo che NASCE lì e si riempie dalla VM, NWC, Barattolo in collaudo e semina, QVAC, la prova di riavvio completa e quella col Wi-Fi spento, il backup del wallet nuovo (12.10) | insieme, a casa di Andrea | 4-5 h |
+| ven 16 | Margine. Sul fisso: la dichiarazione, le slide, il video di riserva (registrato sul wallet del fisso). Il portatile da 16 GB dalla chiavetta, se non si è fatto il 15 | Andrea; Alan | 2 h |
+| sab 17, 08:30 | Gli annunci sul relay locale del portatile (il relay tiene gli eventi in memoria: si rifanno comunque quella mattina, §10) | | 10 min |
+| sab 17, dom 18 | L'hackathon (§11.3) | | |
+
+Ci stiamo, ma **il 13 e il 15 non hanno margine** e il 14 è fermo. Cosa
+si taglia, nell'ordine:
+
+1. L'USDT come secondo dollaro: di fatto è già fuori (12.3).
+2. La tool call di Consigliami.
+3. Il wallet signet del portatile, cioè il piano B con WDK (12.6).
+4. Il portatile di riserva da 16 GB: lo fa Alan il 16 dalla chiavetta.
+5. Il modello: dal 2B allo 0.8B, poi al 600M.
+
+Non si tagliano mai: la migrazione del 13, il wallet della demo nato e
+provato sul portatile il 15, i backup, la prova di riavvio. (Durante il
+weekend, per primi: il riscatto automatico dei premi, poi i livelli di
+autorizzazione dal vivo, che restano nella bozza.)
+
+### 12.6 Il piano B su signet, e la sua regola
+
+Da tenere pronto:
+
+- I tre container della VM accesi e la catena signet in pari (si guarda
+  il 15, nella prova di riavvio).
+- I wallet signet della VM INTATTI (`~/rgb/dati`): nessuno li tocca
+  dall'8.
+- **Il wallet signet del cliente sta sul fisso, che a Torino non
+  viene.** Perché il piano B abbia ancora il WDK, il 15 sul portatile
+  nasce ANCHE un wallet signet (senza `source`: `~/wdk-prova/utente`),
+  riempito dai wallet signet della VM col tunnel a tre gambe: due invii
+  e due blocchi da dieci minuti, in sottofondo. È la prima cosa che si
+  taglia il 15: senza, il piano B mostra il cliente da `rgb.py` (un
+  terzo wallet sulla VM, §6), cioè senza WDK.
+- Gli annunci, la mattina del 17, per TUTT'E DUE le catene: senza
+  `source` gli id di signet, con `source` quelli di Mutinynet (dieci
+  secondi in più).
+- Gli id di signet (prima tabella di §2) in una riga commentata del
+  config di collaudo, accanto a quelli di Mutinynet.
+- Il tunnel a tre gambe di §1, scritto.
+
+La regola:
+
+- **Prima di partire** (la sera del 16 e sabato alle 8:30): se Mutinynet
+  non fa blocchi da dieci minuti, o non rispondono TUTTI E DUE gli
+  Esplora, o TUTTI E DUE i proxy, si parte su signet.
+- **Durante**: si cambia solo dopo quindici minuti di blocco, e solo
+  entro domenica a mezzogiorno. Dopo, niente cambio: si mostrano
+  l'ordine delle 13:30 e il video.
+- **Una volta sola, mai indietro.** Come si torna è in §10 («Come si
+  torna al signet in cinque minuti») e in §11.4; su signet i blocchi
+  sono da dieci minuti, e la scaletta è quella dell'8 ott.
+
+Le quattro distro WSL di prova (`jammy-prova`, `jammy-pulita`,
+`noble-prova`, `noble-pulita`) restano sul fisso fino al 18 (decisione
+di Andrea del 12).
+
+### 12.7 I cinque rischi, la raccomandazione, le scelte di Andrea
+
+1. **La macchina della demo arriva il 15.** Un pomeriggio per
+   installare, far nascere e riempire il wallet, collegare tutto e
+   provare, su un portatile mai visto (glibc, Vulkan, l'Arc). Il 16 è
+   margine solo per quel che Alan può fare da solo.
+2. **Nessuna interoperabilità con KaleidoSwap.** I loro wallet e il
+   faucet RGB non vedono i nostri asset, e noi non vediamo i loro. Si
+   chiede (domanda 4) e si dichiara.
+3. **L'Esplora e il proxy di KaleidoSwap con settanta squadre.** Un
+   limite di richieste l'hanno già visto nella loro CI (un 429 su
+   `mutinynet.com/api`). Le riserve sono nei due `.env`; sotto c'è il
+   piano B.
+4. **Un giorno solo per migrare** (il 13), senza margine, e il 14 fermo.
+5. **Il modello cambiato a cinque giorni dalla gara.** Dal 12 sera è
+   provato sul fisso (12.4); resta da misurare sui portatili di Alan.
+   La discesa è scritta: 2B, 0.8B, 600M.
+
+**La raccomandazione**: restare su `signet` con USDB e MOON nostri; il
+modello passa al 2B (provato); a `signetcustom` solo con un build pronto
+di UTEXO e una prova di 45 minuti la mattina del 13; il wallet della
+demo nasce il 15 sul portatile di Alan, senza traslochi (12.10).
+
+**Le scelte di Andrea (12 ott, sera):**
+
+1. A Torino va un portatile di ALAN, quello da 32 GB, con quello da 16
+   GB di riserva; NON il fisso. Il portatile arriva da Andrea solo il
+   15. Dove nasce il wallet: 12.10.
+2. Ok al cantiere della mattina del 13 (lista datata 13, alias del
+   modello con la sua prova, dichiarazione in §5). Il push aspetta il
+   suo sì.
+3. Ok a scaricare i due Qwen3.5 sul fisso e a provarli la sera del 12:
+   fatto, 12.4.
+4. La riga sull'assistente AI nella dichiarazione: DENTRO (12.9).
+
+### 12.8 Le undici domande ai mentor (inviate da Andrea il 12 ott nel topic)
+
+Tolte quelle già risposte in 12.1; restano le aperte di §8 e dello
+studio (parte seconda, E), più quella sul modello. Com'erano:
+
+```text
+Questions from team Fidelity Points (Barattolo): Andrea and Alan
+
+RGB network on Mutinynet (KaleidoSwap, UTEXO)
+1. KaleidoSwap's maker API reports network "signetcustom", and rgb-lib tags those recipient IDs "sbc:". The UTEXO adapter (@utexo/wdk-wallet-rgb 2.0.3) opens "signet", tagged "sb:", and its native binding exposes no SignetCustom. Are these two separate RGB networks on the same chain, so that a WDK wallet cannot receive from the RGB faucet or from a KaleidoSwap wallet?
+2. UTEXO: is there a build or branch of wdk-wallet-rgb / rgb-sdk that opens Mutinynet as SignetCustom? If not, is running it as plain "signet" on the Mutinynet chain (KaleidoSwap Esplora over https, our own NIA assets) fine, also for the WDK bonus?
+3. Faucet USDT (rgb:lX~ToKsO-...): is it NIA or IFA? The API shows precision 6 and issued_supply 0. The UTEXO binding supports NIA, CFA and UDA only.
+4. If the answer to 1 is "separate": is it acceptable for judging that our test dollar and our loyalty points (NIA, issued by us) live on Mutinynet tagged "signet", with real transfers visible on mutinynet.com, even though KaleidoSwap wallets cannot hold them?
+
+Infrastructure (KaleidoSwap)
+5. May our own rgb-lib wallets use https://esplora.signet.kaleidoswap.com and rpcs://proxy.kaleidoswap.com/json-rpc all weekend? Any rate limits with about 70 teams? Is https://mutinynet.com/api an acceptable fallback indexer?
+6. The BTC faucet limit is per IP. Will the venue share one public IP? Should we fund our wallets before arriving?
+
+UTEXO adapter
+7. The native binary pulled by wdk-wallet-rgb 2.0.3 (rgb-lib 0.3.0-beta.8) needs glibc 2.38 and fails on Ubuntu 22.04. We run it there by overriding @utexo/rgb-sdk to 1.0.6 (native beta.13). Is that the recommended way? We noticed the same mnemonic then gives a different wallet (vanillaKeychain 0 instead of 1).
+
+QVAC
+8. Our advisor returns one short schema-constrained JSON answer (about 400 tokens in, 80 out; our code computes all numbers). Plan: QWEN3.5-2B Q4 through `qvac serve --openai`, QWEN3.5-0.8B as fallback, on a 16 GB Linux laptop (CPU, or Intel Arc through Vulkan). Is that a good choice? Is `reasoning_budget: false` the right switch for Qwen3.5 together with `response_format: json_schema`?
+9. Does inference in `qvac serve` on the laptop, called from a web page on the same machine, count as "on device"?
+
+Judging and submission
+10. Does a checkout paid in an RGB asset on-chain (direct transfer, one confirmation) count for "Payments and checkout", or do you expect RGB over Lightning?
+11. Submission by pull request: to which repository, and by what time? Our marketplace repository is private. We planned a small separate repository with the weekend's dated commits. Is that acceptable, and must it be public?
+```
+
+Le risposte si scrivono qui sotto quando arrivano (la sera del 12 o
+dopo): ☐.
+
+### 12.9 La bozza della dichiarazione per la pull request
+
+È la §5 in inglese, aggiornata a Mutinynet e al modello nuovo, con la
+riga dei fork e degli strumenti di terzi che gli organizzatori chiedono.
+BOZZA: le parti fra parentesi quadre si riempiono il 13 (gli id) e la
+domenica (cosa si è costruito). La riga sull'assistente AI è DENTRO
+(scelta di Andrea del 12).
+
+```text
+## Pre-existing work and third-party components
+
+Team: Andrea and Alan. Project: Fidelity Points, an extension of Barattolo.
+
+### What existed before the hackathon (not to be judged)
+- Barattolo: a marketplace priced in sats with Lightning escrow and a non-custodial P2P desk, live at barattolo.store. Private repository. It already had XP levels, loyalty discounts and a browser NWC client. It had no RGB, QVAC or WDK code: only a disabled feature flag and a static /.well-known/nostr.json route.
+- Infrastructure: one VM with rgb-lib (Python), a small CLI and a loopback HTTP wrapper around it. First on public signet, moved to Mutinynet on 13 Oct 2026.
+- Test assets issued by us on Mutinynet on 13 Oct 2026, schema NIA: USDB, a test dollar [asset id], and MOON, a shop's loyalty points [asset id]. Balances were distributed to our test wallets on 13 and 15 Oct.
+- A WDK wallet script using @utexo/wdk-wallet-rgb, and a base Nostr Wallet Connect service around it with get_info and get_balance only. No rgb_* method existed.
+- Two test Nostr identities with NIP-05 names, and two signed asset announcements published on a local relay before the kickoff. No Barattolo code read them.
+- QVAC running locally, with a standalone test page and script outside the app that ask a model for one JSON suggestion.
+- Design only: two draft specs, "RGB asset announcements on Nostr" and "NWC-RGB", including the authorization levels.
+
+### Built during the hackathon (17-18 Oct 2026)
+Everything in this pull request, in dated commits: [list on Sunday].
+
+### Third-party tools and forks
+- RGB: rgb-lib 0.3.0-beta.7, Python bindings (RGB-Tools). RGB proxy protocol 0.2.
+- WDK: @utexo/wdk-wallet-rgb 2.0.3 with @utexo/rgb-sdk 1.0.3 and UTEXO's native rgb-lib build 0.3.0-beta.8. [If a laptop runs glibc older than 2.38: @utexo/rgb-sdk overridden to 1.0.6, native 0.3.0-beta.13.] No source changes.
+- Network: Mutinynet, through KaleidoSwap's public Esplora and RGB proxy, and the Mutinynet BTC faucet. Our wallets open the chain as rgb-lib "signet". We did not use the RGB faucet assets.
+- QVAC: @qvac/sdk 0.21.0 and @qvac/cli 0.15.0, model Qwen3.5 2B Q4, fallback Qwen3.5 0.8B.
+- Nostr: nostr-tools 2.25.2, and nak 0.21.0 as a local relay.
+- No forks of our own.
+- The code was written with an AI coding assistant, Claude Code; commits are co-authored accordingly.
+```
+
+### 12.10 A Torino va un portatile di Alan: dove nasce il wallet della demo
+
+La scelta di Andrea del 12 sera cambia un presupposto di §1, §10 e §11:
+il fisso (che i documenti chiamano «il portatile della demo») resta a
+casa, e a Torino vanno i due portatili Linux di Alan, quello da 32 GB
+come macchina della demo e quello da 16 GB di riserva. Il primo arriva
+da Andrea solo il 15. Lo stash di rgb-lib vive in UN posto solo: dove
+nasce il wallet del cliente? Andrea ha chiesto fra due strade.
+
+- **A) Nasce il 13 sul fisso, il 15 si trasloca sul portatile** (backup
+  e ripristino di stash e chiavi). Il 13 non dipende da nessuno, ma il
+  trasloco ha tre pericoli. Uno: la variante. Se il portatile ha una
+  glibc più vecchia della 2.38 gli serve l'override (`rgb-sdk` 1.0.6,
+  binario beta.13), che dallo stesso seme deriva un ALTRO wallet
+  (`vanillaKeychain` 0 invece di 1) e aprirebbe uno stash scritto dalla
+  beta.8: mai provato. Due: `punti.mjs` ha `backup` ma non un comando di
+  ripristino, da scrivere e da collaudare. Tre: per un momento
+  esisterebbero due copie dello stash, e quella del fisso andrebbe
+  ritirata senza errori.
+- **B) Alan il 13 prepara il portatile da casa e il wallet nasce lì.** Il
+  wallet nasce dove vivrà, ma il giorno della migrazione dipenderebbe
+  da un'installazione fatta la prima volta, da solo e da remoto (glibc
+  ignota, node-gyp, niente chiavetta), con le fatture incollate in chat
+  e nessuno che legge gli output; se il suo Pop!_OS è a base 22.04 il
+  wallet della demo nascerebbe sulla variante meno provata; e il backup
+  di seme e stash resterebbe fino al 15 su una macchina che Andrea non
+  vede.
+- **C) Nessun trasloco, ed è la strada raccomandata** (è la A senza la
+  sua parte pericolosa). Il 13 sul fisso nasce il wallet utente di
+  PROVA e ci si collauda TUTTA la catena di Mutinynet; quel wallet resta
+  del fisso (le prove del 14-16, il video di riserva). **Il 15 sul
+  portatile di Alan nasce un wallet NUOVO, quello della demo, e si
+  riempie dalla VM in venti minuti**: i sats dalla scorta di `barattolo`
+  (per questo il 13 si prende il milione intero), 3 UTXO, due fatture
+  «qualunque asset», due invii (50.000 unità di USDB, 60 MOON), qualche
+  blocco da 30 secondi. Gli emittenti ne hanno d'avanzo. Nessuno stash
+  viaggia, nessun seme viaggia: due semi diversi su due macchine, e la
+  regola «un posto solo» vale per costruzione. È anche la ricetta se a
+  Torino il portatile muore: un wallet nuovo su quello di riserva,
+  riempito dalla VM, purché la VM si raggiunga (sotto).
+
+Fra A e B è più sicura la A; la C le batte tutt'e due.
+
+**La glibc dei due portatili decide la variante**, e si sa subito: Alan
+manda le cinque righe di 12.4 (bastano `ldd --version | head -1` e
+`grep PRETTY_NAME /etc/os-release`). Dalla 2.38 in su (base Ubuntu
+24.04) si usa la variante ORIGINALE, la stessa del fisso, provata dal 1
+ott. Sotto (base 22.04: Pop!_OS 22.04, Zorin OS 17) serve l'override,
+di cui finora sono provati solo `nuovo`, `indirizzo` e `saldo`. Quindi
+**il 13, dentro la migrazione, si prova il giro intero dell'override**
+nella distro `jammy-pulita` (Ubuntu 22.04): un wallet usa-e-getta riceve
+5 MOON dal negozio e ne rimanda 2, con la beta.7 Python dall'altra
+parte. Dieci minuti e due comandi in più sulla VM, e si fa comunque: il
+portatile di riserva è con ogni probabilità a base 22.04. Se quel giro
+fallisce, su un portatile a base 22.04 la variante originale gira dentro
+un contenitore Ubuntu 24.04 (`distrobox`, che condivide casa e rete):
+da preparare il 15, e si scrive solo se serve.
+
+**Cosa cambia nella lista «15 ott» di §10**, che era scritta per i
+portatili di Alan come RISERVA («NON stanno: il wallet della demo, le
+chiavi SSH della VM, …»). Sul portatile da 32 GB adesso servono:
+
+1. Il wallet della demo, nato lì (strada C), col suo backup cifrato
+   portato sul fisso la sera stessa.
+2. **L'accesso alla VM** (il tunnel di `rgb_http.py` e i comandi
+   `rgb.py aggiorna …` del weekend). NON la chiave `lnvps` del fisso,
+   che §1 chiama «chiave del nodo»: una chiave ed25519 NUOVA, nata sul
+   portatile nell'utente `hackathon`, autorizzata SOLO su
+   `debian@vm-2050.lnvps.cloud` (una riga che Andrea aggiunge dal
+   fisso) e tolta il 19. DECISIONE di Andrea, da confermare il 15.
+3. Barattolo in collaudo: il clone, il venv, il config di collaudo dal
+   solo esempio (relay morto, `NIP05_NOMI`, gli id di Mutinynet), la
+   semina. Nessun segreto.
+4. QVAC coi due Qwen3.5 copiati come file (chiavetta), le identità e
+   `consigliami-prova.html` dalla chiavetta (punto 8 della lista).
+5. Il servizio NWC: sul portatile nascono una chiave di servizio e una
+   connection string NUOVE (`connetti barattolo`), incollate nel
+   Profilo nel browser del portatile.
+6. La prova di riavvio completa e quella col Wi-Fi spento si fanno il
+   15 SUL PORTATILE: è lui che va a Torino.
+7. Da decidere il 15: se il portatile resta da Andrea fino al 17 (il 16
+   torna a essere un giorno di prove) o torna a casa con Alan; e dove
+   gira la sessione a Torino, con quali credenziali di GitHub.
