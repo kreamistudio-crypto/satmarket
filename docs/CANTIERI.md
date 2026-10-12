@@ -53486,3 +53486,20 @@ memoria, la scritta c'è ancora ed è vera.
 vive in una memoria sola va provato entrando anche dall'altra. Il giro
 dal vivo della chat aveva due telefoni e un «secondo telefono», mai lo
 STESSO telefono da due memorie — che è il caso di ogni utente Telegram.
+
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** SOPRA `236d5b8`,
+con la cura intera e la frase di Andrea sulla chat: la suite severa
+INTERA (23.110 passate e 0 fallite), i 68 collaudi del workflow nella
+gabbia, la tortura corta (16 su 16), il giro dal vivo (14 su 14) e il
+motore vero col relay di cartone. POI il patto sui recapiti (solo
+testi, due prove): le sezioni che leggono il patto e «Come funziona»,
+666 passate e 0 fallite. POI main è corso di UN commit non mio
+(`eb68d8d`, i documenti dell'hackathon: CANTIERI e HACKATHON-SETUP):
+rebase senza conflitti, la coda di CANTIERI guardata a mano. SULL'ALBERO
+DEL PUSH, sopra `eb68d8d`: `prove_chat_scambio` (173) con le sezioni
+che leggono il patto, `prove_p2p_server` e il tetto di CLAUDE.md — 975
+passate e 0 fallite —, `collaudo_chat_scambio` nella gabbia (verde),
+`node` sui tre script della pagina, `py_compile`, lo scanner dei
+segreti con la controprova. La suite INTERA su questo albero la dice
+la CI. L'«ok al push» di Andrea è arrivato con la richiesta sui
+recapiti.
