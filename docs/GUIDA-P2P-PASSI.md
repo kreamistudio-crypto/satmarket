@@ -1362,23 +1362,23 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
      Solo a chi ha pubblicato, solo alla presa, non sugli ordini
      Barattozon;
   4. **dal profilo di scambio** («👤 Il tuo profilo di scambio»), com'era:
-     sotto i propri numeri la riga «Quando non ci sei puoi nascondere i
-     tuoi ordini dal libro.» e il bottone «**⏸ Pausa degli ordini**».
+     sotto i propri numeri la riga «Quando non ci sei puoi mettere in
+     pausa i tuoi ordini.» e il bottone «**⏸ Pausa degli ordini**».
 - 📱 **Lo stato, in una riga** (nel foglio che pubblica e in «I miei
   scambi»), è una di tre frasi: «Nessuna pausa: i tuoi ordini si possono
   prendere sempre» · «⏸ Pausa: notti 22-6, lun-ven 8-20» (le fasce
-  impostate, quando adesso gli ordini si vedono) · «⏸ In pausa fino a
-  domani alle 06:00» (quando adesso sono nascosti). Con una pausa
-  impostata, e sempre quando si sta pubblicando un ordine Barattozon,
-  sotto c'è «Gli ordini Barattozon restano visibili: hanno già la
-  scadenza del PayCode.»
-- 📱 **Gli ordini Barattozon in pausa non ci vanno**: restano nel libro e
-  si prendono anche mentre gli altri ordini della stessa persona sono
-  nascosti, e sulla loro card il segno «⏸ In pausa…» non compare.
+  impostate, quando adesso gli ordini si possono prendere) · «⏸ In
+  pausa fino a domani alle 06:00» (quando adesso sono fermi). Con una
+  pausa impostata, e sempre quando si sta pubblicando un ordine
+  Barattozon, sotto c'è «Gli ordini Barattozon si prendono sempre: hanno
+  già la scadenza del PayCode.»
+- 📱 **Gli ordini Barattozon in pausa non ci vanno**: si prendono anche
+  mentre gli altri ordini della stessa persona sono fermi, e sulla loro
+  card non compare né «⏸ In pausa…» né «⏸ Puoi prenderlo tra…».
 - 📱 Il foglio «⏸ Pausa degli ordini» (CORTO, dal 12 ott 2026 notte:
   niente selettori del telefono, è uguale su Android, iPhone, Telegram
-  e sito). In cima una riga sola: «In pausa i tuoi ordini escono dal
-  libro, poi tornano da soli.» Poi **Ogni settimana**: «**＋ Aggiungi
+  e sito). In cima una riga sola: «In pausa i tuoi ordini restano nel
+  libro in grigio: nessuno può prenderli.» Poi **Ogni settimana**: «**＋ Aggiungi
   una fascia**» mette una scatola coi sette giorni in tondi (L M M G V
   S D, verdi quelli scelti: si toccano per accenderli e spegnerli), le
   due righe «**Dalle 22:00 ▾**» e «**Alle 06:00 ▾**» (la prima proposta
@@ -1393,54 +1393,64 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
   la riga diventa «**Fino a domani alle 08:00 ▾**», con la ✕ per
   toglierla; sotto, «Da adesso, al massimo 7 giorni.» Poi, se nel
   foglio c'è scritta una pausa, UNA RIGA CHE DICE SE VALE ADESSO (dal 13
-  ott 2026): «⏸ Attiva adesso: i tuoi ordini escono dal libro fino a
-  domani alle 07:00.» oppure «Adesso non è attiva: i tuoi ordini si
-  vedono.» — cambia mentre si toccano giorni e ore, PRIMA di salvare; se
-  la pausa è stata tolta per stanotte dice «Tolta fino a domani alle
-  07:00: adesso i tuoi ordini si vedono.» E «**Salva**», che riporta
+  ott 2026): «⏸ Attiva adesso: nessuno può prendere i tuoi ordini fino
+  a domani alle 07:00.» oppure «Adesso non è attiva: i tuoi ordini si
+  possono prendere.» — cambia mentre si toccano giorni e ore, PRIMA di
+  salvare; se la pausa è stata tolta per stanotte dice «Tolta fino a
+  domani alle 07:00: adesso i tuoi ordini si possono prendere.» E «**Salva**», che riporta
   dov'eri (nel foglio dell'ordine, metodo e importo sono ancora lì). In fondo «**ℹ️ Come funziona ▾**», chiuso; aperto dice tre
   righe: «La scadenza dei tuoi ordini non si ferma.» · «Vale dentro
-  Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.»
-  · «Gli ordini Barattozon restano visibili: hanno già la scadenza del
-  PayCode.»
-- 📱 I toast: «Pausa salvata: i tuoi ordini sono nascosti ⏸» (se la
+  Barattolo: da un'altra app collegata i tuoi ordini si prendono lo
+  stesso.» · «Gli ordini Barattozon si prendono sempre: hanno già la
+  scadenza del PayCode.»
+- 📱 I toast: «Pausa salvata: i tuoi ordini sono in pausa ⏸» (se la
   pausa è già attiva), «Pausa salvata ⏸» (se comincia più tardi), «Pausa
-  tolta: i tuoi ordini sono visibili».
+  tolta: i tuoi ordini si possono prendere».
 - 📱 **Sul proprio ordine**, nel libro, nel dettaglio e sulla sua card in
   «I miei scambi» (finché è «Ordine pubblicato»): «⏸ In pausa fino
   a domani alle 06:00» (oggi: «fino alle 06:00»). Nel profilo: «⏸ Adesso
   i tuoi ordini sono in pausa fino a domani alle 06:00.»
-- 📱 **Per gli altri l'ordine sparisce dal libro** (e dalla fila «Scambi
-  P2P» della home), e il conto delle offerte lo dice. Chi lo apre da un
+- 📱 **Per gli altri l'ordine RESTA nel libro, in grigio** (dal 13 ott
+  2026; il 12 spariva): la carta è spenta, col bordo tratteggiato, e in
+  cima porta la scritta arancio «**⏸ Puoi prenderlo tra 6 h 35 min**»
+  (sotto l'ora: «tra 35 min»; a ore tonde: «tra 6 h»; oltre il giorno:
+  «tra 2 g 3 h»), che scende da sola. Il conto «N offerte» la conta, e i
+  filtri la trattano come ogni altra offerta. **Toccandola non si apre
+  e non si prende**: la carta fa un breve scuotimento di lato e il
+  telefono dà la vibrazione d'avviso. Con «riduci movimento» (del
+  telefono, o «🌗 Aspetto») lo scuotimento non c'è e resta la
+  vibrazione — è l'unico punto dell'app che vibra anche coi movimenti
+  ridotti. **Allo scadere della pausa la carta torna normale da sola**,
+  senza ricaricare, e da lì si tocca e si prende. Nella fila «Scambi
+  P2P» della home l'ordine in pausa invece non c'è. Chi lo apre da un
   link trova «Compra» spento e il riquadro «🚫 Chi ha pubblicato
   quest'ordine è in pausa fino a domani alle 06:00: riprova più tardi.»
-- 📱 **Se nel libro restano solo ordini in pausa** (dal 13 ott 2026): la
-  pillola dice «0 offerte» e la schermata «**Nessun ordine da prendere
-  adesso**» — «C'è 1 offerta, ma chi l'ha pubblicata è in pausa fino a
-  domani alle 07:00.» (con più offerte: «Ci sono 3 offerte, ma chi le ha
-  pubblicate è in pausa almeno fino a domani alle 07:00.»). NESSUN
-  bottone: non c'è niente da togliere. Il vuoto da filtro resta «Nessun
-  ordine col tuo filtro» — «C'è 1 offerta, ma non passa il filtro.» /
-  «Ci sono 3 offerte, ma nessuna passa il filtro.» — col link «**Togli
-  il filtro**», che compare SOLO lì.
+- 📱 **Il libro vuoto dice quale vuoto è** (dal 13 ott 2026): senza
+  offerte «**Nessun ordine aperto**»; con offerte che il filtro ferma
+  «**Nessun ordine col tuo filtro**» — «C'è 1 offerta, ma non passa il
+  filtro.» / «Ci sono 3 offerte, ma nessuna passa il filtro.» — col link
+  «**Togli il filtro**», che compare SOLO lì (prima diceva «Ci sono 1
+  offerte», e il link c'era anche a filtro spento).
 - 🔔 **L'avviso «nuovo ordine nel libro» aspetta la fine della pausa**
   (dal 13 ott 2026): per un ordine pubblicato mentre il suo autore è in
   pausa non parte niente; quando la pausa finisce parte, se l'ordine è
-  ancora nel libro. Gli ordini Barattozon non aspettano (in pausa
-  restano visibili).
+  ancora nel libro. Gli ordini Barattozon non aspettano (si prendono
+  sempre). La cifra di un intervallo si legge «da 50,00 a 100,00 €»
+  (prima «da da»).
 - 📱 **Pubblicare mentre si è in pausa** (dal 13 ott 2026; non per gli
   ordini Barattozon): toccando «⚡ Pubblica ordine» si apre prima la
   domanda «**Pubblichi durante la pausa?**» — «Sei in pausa fino a
-  domani alle 07:00: il tuo ordine non si vedrà fino ad allora.» — con
-  DUE tasti: «**Pubblica lo stesso**» (l'ordine parte e resta nascosto
-  fino alla fine della pausa) e «**Togli la pausa per stanotte**» (di
-  giorno: «Togli la pausa per adesso»), che toglie SOLO la pausa aperta
-  adesso — le fasce restano, da domani sera è quella di sempre —, dice
-  «Pausa tolta: il tuo ordine si vede subito» e pubblica. Non c'è
-  «Annulla»: per ripensarci si chiude il foglio col gesto di sempre, e
-  il foglio dell'ordine è ancora lì. Se la pausa non si toglie (rete):
-  «La pausa non si è tolta: controlla la connessione e riprova», e
-  l'ordine NON parte.
+  domani alle 07:00: il tuo ordine si vedrà in grigio e si potrà
+  prendere solo da allora.» — con DUE tasti: «**Pubblica lo stesso**»
+  (l'ordine parte e resta fermo, in grigio, fino alla fine della pausa)
+  e «**Togli la pausa per stanotte**» (di giorno: «Togli la pausa per
+  adesso»), che toglie SOLO la pausa aperta adesso — le fasce restano,
+  da domani sera è quella di sempre —, dice «Pausa tolta: il tuo ordine
+  si può prendere subito» e pubblica. Non c'è «Annulla»: per ripensarci
+  si chiude il foglio col gesto di sempre (il tocco fuori, il gesto
+  indietro), e il foglio dell'ordine è ancora lì. Se la pausa non si
+  toglie (rete): «La pausa non si è tolta: controlla la connessione e
+  riprova», e l'ordine NON parte.
 
 **Il badge «⚡ Risponde in fretta» (con la leva accesa).**
 - 📱 Sulla card del libro, sotto le stelline: «⚡ Risponde in fretta». Nel

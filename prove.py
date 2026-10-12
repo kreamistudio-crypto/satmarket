@@ -150318,7 +150318,7 @@ console.log(JSON.stringify(c));
           "giorni non e' una pausa",
           ["nessuna", "nessuna", "impostata", "in", "impostata", "nessuna"],
           [x["stato"] for x in c["stati"]])
-    FRASE_BZ = "Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode."
+    FRASE_BZ = "Gli ordini Barattozon si prendono sempre: hanno già la scadenza del PayCode."
     prova("la riga nel foglio che pubblica: lo stato, il bottone «⏸ Imposta la pausa» che "
           "apre il foglio — e senza una pausa la frase di Barattozon non c'e'",
           [True, True, True, False, True],
@@ -150560,10 +150560,19 @@ def prove_tempo_pubblica_app():
           "Telegram e Nostr si nominano", True,
           m.index("function testoPubblicaInfoP2P(info, accesa){")
           < m.index("function renderP2PInfo(){") < m.index("const MOSTRO_ORDINI_CHIAVE"))
-    prova("la pausa entra nel libro PRIMA di ogni altra regola, e nella fila della home",
-          [True, True],
-          [fn("function passaFiltroP2P(o, f){").index("nascostoPerPausaP2P(o)) return false;")
-           < fn("function passaFiltroP2P(o, f){").index("if (!o || !f) return true;"),
+    # ⚠️ ROVESCIATA IL 13 OTT 2026 (cantiere libro-vuoto, decisione di
+    # Andrea). Diceva: «la pausa entra nel libro PRIMA di ogni altra
+    # regola» — l'ordine di chi era in pausa spariva dentro
+    # `passaFiltroP2P`. Da oggi nel libro RESTA, grigio, con «⏸ Puoi
+    # prenderlo tra…», e a fermarlo e' la card (`etichettaPausaP2P`) e la
+    # porta della presa (`rifiutaPerPausaP2P`): li prova
+    # `prove_ordine_in_pausa`. Nella fila della home invece non c'e',
+    # com'era.
+    prova("la pausa NON passa dal filtro del libro (l'ordine resta, grigio); nella fila "
+          "della home l'ordine in pausa non c'e'",
+          [False, True, True],
+          ["nascostoPerPausaP2P" in fn("function passaFiltroP2P(o, f){"),
+           "if (!o || !f) return true;" in fn("function passaFiltroP2P(o, f){"),
            "nascostoPerPausaP2P(o)" in fn("function ordiniVetrinaP2P(libro, adesso, mio){")])
     prova("...arriva con la fotografia (intera), con la fila e coi volti (per gli id chiesti)",
           [2, 1],
@@ -150705,7 +150714,7 @@ c.foglio = [(F.match(/class="p2p-pausa-fascia"/g) || []).length, (F.match(/p2p-a
                alla riga sotto le fasce, che parla di quel che c'e' SCRITTO:
                le notti 22-6 composte a mezzogiorno adesso non sono attive */
             F.indexOf('Adesso sei in pausa') < 0
-              && F.indexOf('id="p2pPausaAdesso">Adesso non è attiva: i tuoi ordini si vedono.</div>') >= 0
+              && F.indexOf('id="p2pPausaAdesso">Adesso non è attiva: i tuoi ordini si possono prendere.</div>') >= 0
               && F.indexOf('id="p2pPausaAdesso"') > F.indexOf('id="p2pPausaUna"')
               && F.indexOf('id="p2pPausaAdesso"') < F.indexOf('id="p2pPausaSalva"'),
             F.indexOf('Ogni giorno 22–6 · fino al giorno dopo') >= 0,
@@ -150863,8 +150872,10 @@ console.log(JSON.stringify(c));
           [True, True, True, ""],
           ["⏸ Adesso i tuoi ordini sono in pausa fino a domani alle 06:00." in c["profilo"][0]
            and 'onclick="apriPausaP2P()">⏸ Pausa degli ordini</button>' in c["profilo"][0],
-           "Hai una pausa impostata: adesso i tuoi ordini sono visibili." in c["profilo"][1],
-           "Quando non ci sei puoi nascondere i tuoi ordini dal libro." in c["profilo"][2],
+           # (13 ott 2026, cantiere libro-vuoto) in pausa gli ordini non
+           # spariscono piu': restano nel libro, grigi — le due frasi lo dicono
+           "Hai una pausa impostata: adesso i tuoi ordini si possono prendere." in c["profilo"][1],
+           "Quando non ci sei puoi mettere in pausa i tuoi ordini." in c["profilo"][2],
            c["profilo"][3]])
     prova("...e la leva e' un `true` vero: una stringa o niente non la accendono",
           [False, False, False], c["leva"])
@@ -152310,7 +152321,9 @@ def prove_vibrazione():
     print("\n[la vibrazione di casa]")
     mini = open("miniapp.html", encoding="utf-8").read()
     i = mini.index("/* ══ LA VIBRAZIONE DI CASA")
-    j = mini.index("\n}\n", mini.index("function haptic(tipo){", i)) + 3
+    # (13 ott 2026, cantiere libro-vuoto) il secondo argomento: l'avviso
+    # che resta anche coi movimenti ridotti, dove e' l'unica risposta
+    j = mini.index("\n}\n", mini.index("function haptic(tipo, anche){", i)) + 3
     blocco, fuori = mini[i:j], mini[:i] + mini[j:]
     codice = blocco[blocco.index("const VIBRA_MS"):]
 
@@ -152333,8 +152346,16 @@ def prove_vibrazione():
                    obbligo.count("haptic();")))
     prova("chi ha chiesto meno movimento si chiede al giudice di casa, "
           "per prima cosa", True,
-          0 < codice.find("if (effettiRidotti()) return;")
+          0 < codice.find("if (effettiRidotti() && anche !== true) return;")
           < codice.find("tg?.initData"))
+    # L'ECCEZIONE E' UNA, E SI CONTA (13 ott 2026, cantiere libro-vuoto,
+    # parola di Andrea: coi movimenti ridotti «niente scuotimento, solo
+    # la vibrazione»): il «no» della carta in pausa nel libro. Un secondo
+    # chiamante col `true` e' una decisione, non una svista.
+    prova("...e l'avviso che vibra ANCHE coi movimenti ridotti lo chiede un posto solo: "
+          "il «no» della carta in pausa", (1, ["haptic('warning', true)"]),
+          (len(re.findall(r"\bhaptic\([^()]*,", fuori)),
+           re.findall(r"\bhaptic\([^()]*,[^()]*\)", fuori)))
     prova("...e `prefers-reduced-motion` qui non si interroga a parte",
           False, "prefers-reduced-motion" in codice or "matchMedia" in codice)
     prova("dentro Telegram il giudice e' `initData`, come nel resto "
@@ -152430,6 +152451,15 @@ out.rottoIos = gira({...I, rompe: true}, TUTTI);
 out.rottoFuori = gira({rompe: true}, TUTTI);
 out.nonNatoAndroid = gira({...A, nonNato: true}, [null]);
 out.nonNatoFuori = gira({nonNato: true}, [null]);
+// l'eccezione: `anche` vero vibra pure coi movimenti ridotti; ogni altro
+// valore no (1, 'si', un evento di click: solo `true`)
+function anche(m){
+  const w = mondo({...m, ridotti: true});
+  w.casa.haptic('warning', true); w.casa.haptic('warning'); w.casa.haptic('warning', 1);
+  w.casa.haptic('warning', 'si'); w.casa.haptic({type: 'click'}, {type: 'click'});
+  return w.fatti;
+}
+out.ridottiAnche = [anche({}), anche(A), anche(I), anche({senzaVibrate: true})];
 console.log(JSON.stringify(out));
 """
     o = _node_banco(banco)
@@ -152540,6 +152570,12 @@ console.log(JSON.stringify(out));
           (zitto,) * 4,
           (o["ridottiAndroid"], o["ridottiIos"], o["ridottiFuori"],
            o["ridottiOnion"]))
+    prova("...TRANNE l'avviso chiesto con `anche` vero (13 ott 2026): una volta sola, "
+          "dalla strada di sempre — il telefono fuori e su Android, Telegram su iPhone, "
+          "niente dove non si puo'",
+          [[["vibrate", [20, 65, 20]]], [["vibrate", [20, 65, 20]]],
+           [["tg-avviso", "warning"]], []],
+          o.get("ridottiAnche"))
     prova("una vibrazione che esplode non ferma il gesto: con tutte e "
           "due le strade rotte nessun errore esce dalla porta",
           (zitto,) * 3,
@@ -154674,7 +154710,7 @@ c.testi = [P2P_PAUSA_RIGA].concat(P2P_PAUSA_COME, [P2P_PAUSA_BARATTOZON]);
 /* b) con due fasce */
 p2pPausaBozza = {fasce: [{g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360}, {g: [0, 1, 2, 3, 4], da: 480, a: 1200}], unaFino: 0};
 renderPausaP2P();
-c.corto = [F().indexOf('<div class="hint p2p-pausa-testa">In pausa i tuoi ordini escono dal libro, poi tornano da soli.</div>') === 0,
+c.corto = [F().indexOf('<div class="hint p2p-pausa-testa">In pausa i tuoi ordini restano nel libro in grigio: nessuno può prenderli.</div>') === 0,
            conta(F(), /<input/g), F().indexOf('Ogni giorno 22–6 · fino al giorno dopo</div>') >= 0,
            F().indexOf('Lun–ven 8–20</div>') >= 0, F().indexOf('Da adesso, al massimo 7 giorni.') >= 0,
            F().indexOf('id="p2pPausaCome"') < 0,
@@ -154735,14 +154771,14 @@ console.log(JSON.stringify(c));
         return
     prova("IL FOGLIO CORTO: a pausa vuota si legge tutto in una riga, due etichette, un tetto "
           "e due bottoni — e nient'altro",
-          "In pausa i tuoi ordini escono dal libro, poi tornano da soli. Ogni settimana "
+          "In pausa i tuoi ordini restano nel libro in grigio: nessuno può prenderli. Ogni settimana "
           "＋ Aggiungi una fascia Una volta sola No ▾ Da adesso, al massimo 7 giorni. Salva "
           "ℹ️ Come funziona ▾", c["vuoto"])
     prova("...i testi del foglio sono questi quattro, nessuno piu' lungo di 90 caratteri",
-          [["In pausa i tuoi ordini escono dal libro, poi tornano da soli.",
+          [["In pausa i tuoi ordini restano nel libro in grigio: nessuno può prenderli.",
             "La scadenza dei tuoi ordini non si ferma.",
-            "Vale dentro Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.",
-            "Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode."], True],
+            "Vale dentro Barattolo: da un'altra app collegata i tuoi ordini si prendono lo stesso.",
+            "Gli ordini Barattozon si prendono sempre: hanno già la scadenza del PayCode."], True],
           [c["testi"], max(len(x) for x in c["testi"]) <= 90])
     prova("...con le fasce: la riga in cima, NESSUN <input>, una frase corta sotto ogni fascia "
           "(«fino al giorno dopo» quando serve), il tetto; «Come funziona» chiuso (niente "
@@ -154751,8 +154787,8 @@ console.log(JSON.stringify(c));
     prova("«ℹ️ COME FUNZIONA» si apre con le tre righe — la scadenza, dentro Barattolo, "
           "Barattozon — e si richiude",
           [True, ["La scadenza dei tuoi ordini non si ferma.",
-                  "Vale dentro Barattolo: da un'altra app collegata i tuoi ordini si vedono ancora.",
-                  "Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode."],
+                  "Vale dentro Barattolo: da un'altra app collegata i tuoi ordini si prendono lo stesso.",
+                  "Gli ordini Barattozon si prendono sempre: hanno già la scadenza del PayCode."],
            True, True, True], c["come"])
     prova("L'ORA DI UNA FASCIA: il tocco sulla riga apre il selettore DENTRO la sua scatola — "
           "24 ore e 4 quarti, le 22:00 accese, niente spento",
@@ -155778,15 +155814,21 @@ def prove_ordine_in_pausa():
     arrivata a tutti, e nel libro si leggeva «0 offerte», «Ci sono 1
     offerte, ma nessuna passa il filtro» e un «Togli il filtro» che non
     faceva niente — un filtro non c'era.
+    LA DECISIONE DEL 13 (Andrea): l'ordine di chi e' in pausa NON
+    sparisce dal libro — resta, grigio, con «⏸ Puoi prenderlo tra 6 h 35
+    min» in arancio che scende da solo; al tocco non si apre (la carta
+    si scuote, il telefono vibra d'avviso), e alla fine torna normale.
 
     Quel che qui si rompe in silenzio: la 🔔 che parte per un ordine che
-    nessuno puo' vedere, o che NON parte piu' quando la pausa finisce; la
-    schermata vuota che da' la colpa a un filtro spento; il bottone che
-    azzera il niente; chi pubblica in pausa senza saperlo; «togli la
-    pausa per stanotte» che butta via le fasce; il secondo tasto del
+    nessuno puo' prendere, o che NON parte piu' quando la pausa finisce;
+    l'ordine in pausa che sparisce di nuovo, o che si apre al tocco; la
+    scritta che non scende, o che resta dopo la fine; lo scuotimento coi
+    movimenti ridotti, o il tocco muto li'; la schermata vuota che da' la
+    colpa a un filtro spento; chi pubblica in pausa senza saperlo; «togli
+    la pausa per stanotte» che butta via le fasce; il secondo tasto del
     foglio di conferma che resta appeso alla domanda dopo.
     Il caso intero, con le sue ore, gira in `collaudo_ordine_in_pausa`."""
-    print("\n[l'ordine pubblicato in pausa: la 🔔 che aspetta, il libro che dice il vero, l'avviso prima di pubblicare]")
+    print("\n[l'ordine pubblicato in pausa: la 🔔 che aspetta, la carta grigia nel libro, l'avviso prima di pubblicare]")
     import calendar as _cal
     import html as _html
     import json
@@ -155989,6 +156031,61 @@ def prove_ordine_in_pausa():
                     'onclick="eseguiConfermaAltra(this)"></button>')
           < m.index('id="confNo" onclick="navIndietro()"'))
 
+    # LA CARTA IN PAUSA RESTA NEL LIBRO (13 ott 2026, decisione di Andrea)
+    filtro_js = fn("function passaFiltroP2P(o, f){")
+    prova("la pausa NON passa piu' dal filtro del libro: l'ordine resta, e si conta; nella "
+          "fila della home invece non c'e', com'era",
+          [False, True],
+          ["nascostoPerPausaP2P" in filtro_js,
+           "nascostoPerPausaP2P(o)" in fn("function ordiniVetrinaP2P(libro, adesso, mio){")])
+    riga_js = fn("function rigaOrdineP2P(o){")
+    card = riga_js[riga_js.rindex("return `<div class=\"p2p-ord"):]
+    prova("la card: ferma = la scritta in cima e la classe grigia, dalla STESSA condizione "
+          "(e dal typeof); il tocco resta quello di sempre", [True] * 5,
+          ["const fermo = typeof etichettaPausaP2P === 'function' ? etichettaPausaP2P(o) : '';"
+           in riga_js,
+           "${fermo ? ' p2p-in-pausa' : ''}\" data-id=\"${esc(o.id)}\"" in card,
+           "${fermo ? ' aria-disabled=\"true\"' : ''}" in card,
+           0 < card.index('onclick="prendiOrdineP2P(this.dataset.id)">') < card.index("${fermo}\n")
+           < card.index('<div class="p2p-testa">'),
+           card.count("${fermo}\n") == 1])
+    prendi = fn("function prendiOrdineP2P(id){")
+    prova("LA PORTA DELLA PRESA dice di no PRIMA di tutto, anche del tocco: nessun foglio "
+          "si apre, e le vibrazioni non sono due", True,
+          0 < prendi.index("if (typeof rifiutaPerPausaP2P === 'function' && "
+                           "rifiutaPerPausaP2P(id)) return;")
+          < prendi.index("haptic();") < prendi.index("if (DEMO)"))
+    rifiuta_js = fn("function rifiutaPerPausaP2P(id){")
+    prova("...il «no» e' l'AVVISO, chiesto anche coi movimenti ridotti, e lo scuotimento; "
+          "dei propri ordini non lo dice (il giudice e' quello di sempre)", [True] * 3,
+          ["haptic('warning', true);" in rifiuta_js, "scuotiCartaP2P(id);" in rifiuta_js,
+           "if (!nascostoPerPausaP2P(o)) return false;" in rifiuta_js])
+    prova("il conto scende nell'UNICO interval dell'app, accanto agli altri battiti",
+          True, "  battitoGestoP2P();\n" in m
+          and "if (typeof battitoPausaLibroP2P === 'function') battitoPausaLibroP2P();"
+          in m[m.index("  battitoGestoP2P();\n"):m.index("  battitoTabacchinoP2P();\n")])
+    css = m[m.index("<style>"):m.index("</style>")]
+    prova("IL GRIGIO sta sui figli e non sulla carta: la scritta arancio resta piena",
+          [True, True, True],
+          [".p2p-ord.p2p-in-pausa>*:not(.p2p-pausa-tra){filter:grayscale(1);opacity:.42}" in css,
+           # l'arancio di casa e' `--sats` (quello dei prezzi), e deve
+           # ESISTERE: una variabile che in `:root` non c'e' lascia la
+           # scritta del colore del testo — visto dal vivo
+           bool(re.search(r"\.p2p-pausa-tra\{[^}]*color:var\(--sats\)", css))
+           and "--sats:#F7931A;" in css,
+           not re.search(r"\.p2p-ord\.p2p-in-pausa\{[^}]*(opacity|filter)", css)])
+    prova("LO SCUOTIMENTO: di lato, breve, una volta — e coi movimenti ridotti non c'e'",
+          [True, True, True, True],
+          [bool(re.search(r"@keyframes p2p-no\{[^@]*translateX\(-7px\)[^@]*translateX\(6px\)", css)),
+           ".p2p-ord.p2p-scuoti{animation:p2p-no .4s ease-in-out 1}" in css,
+           "@media (prefers-reduced-motion:reduce){.p2p-ord.p2p-scuoti{animation:none}}" in css,
+           "html.fx-ridotti *,html.fx-ridotti *::before,html.fx-ridotti *::after{\n"
+           "    animation:none!important;" in css])
+    frasi = [x for x in re.findall(r"'((?:[^'\\]|\\.)*)'", re.sub(r"/\*[\s\S]*?\*/", "", m))
+             if re.search(r"escono dal libro|ordini sono nascosti|nascondere i tuoi ordini|"
+                          r"non si vedono nel libro|non si vedrà fino", x)]
+    prova("nessuna frase della pagina dice piu' che in pausa gli ordini spariscono", [], frasi)
+
     # --- 4) LA PAGINA: i pezzi veri, in node -----------------------------------
     blocco = pezzo_js(m, "/* ---- IL TEMPO DI CHI PUBBLICA: LA PAUSA DEGLI ORDINI, IL BADGE, LA",
                       "/* ============ fine del tempo di chi pubblica ============ */")
@@ -155998,12 +156095,16 @@ def prove_ordine_in_pausa():
 process.env.TZ = 'Europe/Rome';
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const fmt = n => String(n);
-function haptic(){}
+let VIBRA = [];
+function haptic(tipo, anche){ VIBRA.push([tipo || 'tocco', anche === true]); }
 function renderNuovoOrdineP2P(){}
 function icoNuovoP2P(){ return ''; }
 function sezioneNuovoP2P(o){ return ''; }
 function leggiDataTabacchinoP2P(){ return 0; }
 function scadenzaFoglioP2P(){ return 0; }
+let RIDISEGNI = 0, LIBRO = [], CARTE = [], SCRITTE = [];
+function renderP2P(){ RIDISEGNI++; }
+function rigaLibroP2P(id){ return LIBRO.find(o => o.id === id) || null; }
 let MIE = {}, MIEI = {};
 function ordiniP2P(){ return MIE; }
 function ordineTuoP2P(id){ return !!MIEI[id]; }
@@ -156017,7 +156118,20 @@ function el(id){
     aggiunte: [], insertAdjacentHTML(dove, h){ this.aggiunte.push(h); },
     classList: {add(){}, remove(){}, contains(){ return false; }}});
 }
-const document = {querySelector(){ return null; }};
+const document = {querySelector(){ return null; },
+  querySelectorAll(sel){ return sel.indexOf('p2p-pausa-tra') >= 0 ? SCRITTE : CARTE; }};
+/* una carta ferma di cartone, dalla scritta VERA: le mosse sulla classe
+   si segnano, per vedere che lo scuotimento RIPARTE a ogni tocco */
+function carta(id, html){
+  const mosse = [];
+  const b = {textContent: (/<b>([^<]*)<\/b>/.exec(html) || [])[1] || ''};
+  const c = {dataset: {id: id}, offsetWidth: 1, mosse: mosse,
+    classList: {add: x => mosse.push('+' + x), remove: x => mosse.push('-' + x)}};
+  CARTE.push(c);
+  SCRITTE.push({dataset: {fine: (/data-fine="(\d+)"/.exec(html) || [])[1]}, b: b,
+    querySelector(){ return b; }});
+  return c;
+}
 function bottoneInAttesa(){ return () => {}; }
 let confermaAzione = null, confermaAltra = null;
 let pubblicati = 0, TOGLIE = true, tolte = 0;
@@ -156029,7 +156143,7 @@ async function togliPausaAdessoP2P(){ tolte++; return TOGLIE; }
         "function scadenzaGestoP2P(o){", "function testoTempoGestoP2P(azione, resta){",
         "function filtroVuotoP2P(){", "function filtroAccesoP2P(f){",
         "function passaFiltroP2P(o, f){", "function passaRepP2P(f, faccia){",
-        "function vuotoLibroP2P(vivi, filtro, lato, adesso){",
+        "function vuotoLibroP2P(vivi, filtro, lato){",
         "function chiediConferma(c){", "async function eseguiConfermaAltra(btn){")) \
         + rep + blocco + r"""
 (async () => {
@@ -156049,17 +156163,43 @@ c.niente = [vuotoLibroP2P([], null, 'compro', SERA), vuotoLibroP2P([], null, 've
             vuotoLibroP2P([], SATISPAY, 'compro', SERA)];
 c.filtro = [vuotoLibroP2P([O(ID)], SATISPAY, 'compro', SERA),
             vuotoLibroP2P([O(ID), O(ID2)], SATISPAY, 'compro', SERA)];
-p2pPause = {[ID]: loc(13, 7), [ID2]: loc(13, 6, 30), [ID3]: SERA - 5};
-c.pausa = [vuotoLibroP2P([O(ID)], null, 'compro', SERA),
-           vuotoLibroP2P([O(ID), O(ID2)], null, 'compro', SERA),
-           vuotoLibroP2P([O(ID)], SATISPAY, 'compro', SERA)];
-/* una in pausa e una libera che il filtro ferma: si conta solo la libera */
-c.misto = vuotoLibroP2P([O(ID), O(ID3)], SATISPAY, 'compro', SERA);
-/* chi l'ha pubblicata la vede: per lui non e' un vuoto */
+/* LA CARTA IN PAUSA: resta nel libro, e il filtro la tratta come le altre */
+p2pPause = {[ID]: loc(13, 7), [ID2]: loc(13, 0, 8), [ID3]: SERA - 5};
+c.passa = [passaFiltroP2P(O(ID), null), passaFiltroP2P(O(ID3), null), passaFiltroP2P(O(ID), SATISPAY)];
+c.filtroPausa = vuotoLibroP2P([O(ID)], SATISPAY, 'compro');
+c.tra = [20, 59, 60, 61, 2100, 3600, 23700, 23641, 86400, 183660, 0, -5].map(traQuantoP2P);
+const E = etichettaPausaP2P(O(ID), SERA);
+c.etichetta = [E.replace(String(loc(13, 7)), 'FINE'), etichettaPausaP2P(O(ID2), SERA).replace(/<[^>]+>/g, ''),
+               etichettaPausaP2P(O(ID3), SERA), etichettaPausaP2P(O('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60009'), SERA),
+               etichettaPausaP2P(null, SERA)];
 MIEI = {[ID]: true};
-c.mia = [passaFiltroP2P(O(ID), null), vuotoLibroP2P([O(ID)], SATISPAY, 'compro', SERA).togli];
+c.etichettaMia = etichettaPausaP2P(O(ID), SERA);
+/* il tocco: mio, non lo rifiuta e non vibra d'avviso */
+LIBRO = [O(ID), O(ID2), O(ID3)];
+c.toccoMio = [rifiutaPerPausaP2P(ID), VIBRA.length];
 MIEI = {};
-c.passa = [passaFiltroP2P(O(ID), null), passaFiltroP2P(O(ID3), null)];
+/* il tocco: di un altro, in pausa — rifiutato, avviso (anche coi ridotti), scossa */
+const K = carta(ID, E), K2 = carta(ID2, etichettaPausaP2P(O(ID2), SERA));
+c.tocco = [rifiutaPerPausaP2P(ID), VIBRA.slice(), K.mosse.slice(), K2.mosse.length];
+/* ...e al secondo tocco lo scuotimento RIPARTE */
+rifiutaPerPausaP2P(ID);
+c.toccoDue = [VIBRA.length, K.mosse.slice()];
+/* una pausa gia' finita, un ordine senza pausa, uno che nel libro non c'e' */
+VIBRA = [];
+c.toccoLibero = [rifiutaPerPausaP2P(ID3), rifiutaPerPausaP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60009'),
+                 rifiutaPerPausaP2P(''), VIBRA.length];
+/* il battito: i minuti scendono in place, e alla fine il libro si ridisegna UNA volta */
+const scritte = () => SCRITTE.map(x => x.b.textContent);
+c.battito = [];
+for (const t of [SERA + 20, loc(12, 23, 58), loc(13, 0, 7, 30), loc(13, 0, 8, 1)]) {
+  alle(t); battitoPausaLibroP2P();
+  c.battito.push([scritte(), RIDISEGNI]);
+}
+/* ...fuori dal libro (nessuna scritta a schermo) non fa niente */
+CARTE = []; SCRITTE = []; RIDISEGNI = 0;
+alle(loc(13, 8)); battitoPausaLibroP2P();
+c.battitoFuori = RIDISEGNI;
+alle(SERA);
 /* la fine della pausa, nell'ora del telefono */
 const NOTTI = {g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 420};
 c.fine = [finePausaLocaleP2P([NOTTI], 0, loc(12, 23, 24)) === loc(13, 7),
@@ -156087,8 +156227,8 @@ p2pMiaPausa = {fino: 0, fasce: [], una_fino: 0, attiva: true};
 p2pPausaBozza = {fasce: [NOTTI], unaFino: 0};
 renderPausaP2P();
 const F = NODI.p2pPausaCorpo.innerHTML;
-c.foglio = [F.indexOf('<div class="p2p-box p2p-pausa" id="p2pPausaAdesso">⏸ Attiva adesso: i tuoi ordini '
-                      + 'escono dal libro fino a domani alle 07:00.</div>') >= 0,
+c.foglio = [F.indexOf('<div class="p2p-box p2p-pausa" id="p2pPausaAdesso">⏸ Attiva adesso: nessuno può '
+                      + 'prendere i tuoi ordini fino a domani alle 07:00.</div>') >= 0,
             F.indexOf('id="p2pPausaUna"') < F.indexOf('id="p2pPausaAdesso"')
               && F.indexOf('id="p2pPausaAdesso"') < F.indexOf('id="p2pPausaSalva"'),
             (F.match(/id="p2pPausaAdesso"/g) || []).length];
@@ -156149,8 +156289,6 @@ console.log(JSON.stringify(c));
         return
     FILTRO1 = {"logo": True, "togli": True, "titolo": "Nessun ordine col tuo filtro",
                "frase": "C'è 1 offerta, ma non passa il filtro."}
-    PAUSA1 = {"logo": True, "togli": False, "titolo": "Nessun ordine da prendere adesso",
-              "frase": "C'è 1 offerta, ma chi l'ha pubblicata è in pausa fino a domani alle 07:00."}
     prova("IL LIBRO VUOTO DAVVERO: le monete, la frase del lato, nessun bottone — anche con "
           "un filtro acceso",
           [{"logo": False, "togli": False, "titolo": "Nessun ordine aperto",
@@ -156163,19 +156301,35 @@ console.log(JSON.stringify(c));
     prova("IL VUOTO DA FILTRO: «C'è 1 offerta» / «Ci sono 2 offerte», e il bottone che lo toglie",
           [FILTRO1, dict(FILTRO1, frase="Ci sono 2 offerte, ma nessuna passa il filtro.")],
           r.get("filtro"))
-    prova("IL TERZO VUOTO, LA PAUSA DI CHI PUBBLICA: la frase dice il vero, con l'ora, e "
-          "«Togli il filtro» NON c'e' — nemmeno con un filtro acceso, perche' toglierlo non "
-          "farebbe comparire niente",
-          [PAUSA1,
-           dict(PAUSA1, frase="Ci sono 2 offerte, ma chi le ha pubblicate è in pausa almeno "
-                              "fino a domani alle 06:30."),
-           PAUSA1],
-          r.get("pausa"))
-    prova("...e con una in pausa e una che il filtro ferma, del filtro si conta solo la libera",
-          FILTRO1, r.get("misto"))
-    prova("chi l'ha pubblicata la vede nel suo libro; agli altri no, e una pausa gia' finita "
-          "non nasconde niente", ([True, True], [False, True]), (r.get("mia"), r.get("passa")))
-    testi = [x for g in ("niente", "filtro", "pausa") for v in r.get(g, [])
+    prova("LA CARTA IN PAUSA RESTA NEL LIBRO: passa come le altre (e una pausa finita non "
+          "c'entra); un filtro la ferma come ogni offerta, e allora il vuoto e' quello del "
+          "filtro", ([True, True, False], FILTRO1), (r.get("passa"), r.get("filtroPausa")))
+    prova("FRA QUANTO, in parole corte: i minuti in su (mai «0 min»), le ore, l'ora tonda, "
+          "i giorni",
+          ["1 min", "1 min", "1 min", "2 min", "35 min", "1 h", "6 h 35 min", "6 h 35 min",
+           "1 g", "2 g 3 h", "1 min", "1 min"], r.get("tra"))
+    prova("LA SCRITTA DELLA CARTA FERMA: «⏸ Puoi prenderlo tra 7 h 27 min», con la fine per "
+          "il battito; sotto l'ora «tra 35 min»; niente a pausa finita, senza pausa, senza "
+          "ordine — e MAI sul proprio",
+          (['<div class="p2p-pausa-tra" data-fine="FINE">⏸ Puoi prenderlo tra <b>7 h 27 min</b></div>',
+            "⏸ Puoi prenderlo tra 35 min", "", "", ""], ""),
+          (r.get("etichetta"), r.get("etichettaMia")))
+    prova("IL TOCCO sul proprio ordine in pausa passa: nessun rifiuto, nessun avviso",
+          [False, 0], r.get("toccoMio"))
+    prova("IL TOCCO sulla carta ferma di un altro: rifiutato, UNA vibrazione d'avviso — "
+          "chiesta anche coi movimenti ridotti —, e si scuote QUELLA carta, non la vicina",
+          [True, [["warning", True]], ["-p2p-scuoti", "+p2p-scuoti"], 0], r.get("tocco"))
+    prova("...al secondo tocco lo scuotimento riparte: via la classe, e di nuovo",
+          [2, ["-p2p-scuoti", "+p2p-scuoti", "-p2p-scuoti", "+p2p-scuoti"]], r.get("toccoDue"))
+    prova("...una pausa gia' finita, un ordine senza pausa e un id vuoto non rifiutano niente",
+          [False, False, False, 0], r.get("toccoLibero"))
+    prova("IL CONTO SCENDE DA SOLO, in place: nessun ridisegno finche' la prima pausa non "
+          "finisce; allora il libro si ridisegna UNA volta, e la carta torna normale",
+          [[["7 h 27 min", "35 min"], 0], [["7 h 2 min", "10 min"], 0],
+           [["6 h 53 min", "1 min"], 0], [["6 h 52 min", "1 min"], 1]],
+          r.get("battito"))
+    prova("...e fuori dal libro il battito non ridisegna niente", 0, r.get("battitoFuori"))
+    testi = [x for g in ("niente", "filtro") for v in r.get(g, [])
              for x in (v["titolo"], v["frase"])]
     prova("...e ogni frase della schermata vuota sta in novanta caratteri", [],
           [x for x in testi if len(x) > 90])
@@ -156187,11 +156341,11 @@ console.log(JSON.stringify(c));
           r.get("fine"))
     prova("LA RIGA SOTTO LE FASCE: attiva adesso (con l'ora), non attiva, niente di scritto, "
           "una tantum, tolta per stanotte — e il salto vale solo sulla pausa salvata",
-          ["⏸ Attiva adesso: i tuoi ordini escono dal libro fino a domani alle 07:00.",
-           "Adesso non è attiva: i tuoi ordini si vedono.", "", "",
-           "⏸ Attiva adesso: i tuoi ordini escono dal libro fino alle 23:50.",
-           "Tolta fino a domani alle 07:00: adesso i tuoi ordini si vedono.",
-           "⏸ Attiva adesso: i tuoi ordini escono dal libro fino a domani alle 07:00.", ""],
+          ["⏸ Attiva adesso: nessuno può prendere i tuoi ordini fino a domani alle 07:00.",
+           "Adesso non è attiva: i tuoi ordini si possono prendere.", "", "",
+           "⏸ Attiva adesso: nessuno può prendere i tuoi ordini fino alle 23:50.",
+           "Tolta fino a domani alle 07:00: adesso i tuoi ordini si possono prendere.",
+           "⏸ Attiva adesso: nessuno può prendere i tuoi ordini fino a domani alle 07:00.", ""],
           r.get("riga"))
     prova("...nel foglio sta sotto «Una volta sola» e sopra «Salva», una volta; a foglio "
           "vuoto non c'e'", ([True, True, 1], True), (r.get("foglio"), r.get("foglioVuoto")))
@@ -156202,10 +156356,12 @@ console.log(JSON.stringify(c));
     prova("L'AVVISO PRIMA DI PUBBLICARE: la frase di Andrea e i due tasti; di giorno il "
           "secondo non parla di notte",
           [{"titolo": "Pubblichi durante la pausa?",
-            "corpo": "Sei in pausa fino a domani alle 07:00: il tuo ordine non si vedrà fino ad allora.",
+            "corpo": "Sei in pausa fino a domani alle 07:00: il tuo ordine si vedrà in grigio "
+                     "e si potrà prendere solo da allora.",
             "etichetta": "Pubblica lo stesso", "altra": "Togli la pausa per stanotte"},
            {"titolo": "Pubblichi durante la pausa?",
-            "corpo": "Sei in pausa fino alle 20:00: il tuo ordine non si vedrà fino ad allora.",
+            "corpo": "Sei in pausa fino alle 20:00: il tuo ordine si vedrà in grigio e si potrà "
+                     "prendere solo da allora.",
             "etichetta": "Pubblica lo stesso", "altra": "Togli la pausa per adesso"},
            "Togli la pausa per stanotte", "Togli la pausa per stanotte"],
           r.get("avviso"))
@@ -156214,7 +156370,8 @@ console.log(JSON.stringify(c));
     prova("...chi e' in pausa vede la domanda di casa: il titolo, la frase, i DUE tasti, e "
           "nessun «Annulla»",
           [True, "Pubblichi durante la pausa?",
-           "Sei in pausa fino a domani alle 07:00: il tuo ordine non si vedrà fino ad allora.",
+           "Sei in pausa fino a domani alle 07:00: il tuo ordine si vedrà in grigio e si potrà "
+           "prendere solo da allora.",
            "Pubblica lo stesso", "Togli la pausa per stanotte", "", "none", "function", "function"],
           r.get("fermo"))
     prova("«Pubblica lo stesso» pubblica e la pausa resta; «Togli la pausa per stanotte» la "

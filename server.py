@@ -6223,8 +6223,9 @@ def init_db():
     CREATE TABLE IF NOT EXISTS p2p_pause(
         -- LA PAUSA DEGLI ORDINI, PER PERSONA (12 ott 2026, cantiere
         -- tempo-di-chi-pubblica): chi pubblica dice QUANDO non c'e', e
-        -- in quelle ore i suoi ordini non si vedono nel libro di
-        -- Barattolo e non si prendono da qui. Una riga per persona, non
+        -- in quelle ore i suoi ordini non si prendono da qui (nel libro
+        -- di Barattolo restano, in grigio: 13 ott 2026; il 12
+        -- sparivano). Una riga per persona, non
         -- per ordine: «dormo dalle 22 alle 6» vale per tutto quel che
         -- ho in vetrina.
         -- `fasce` e' la pausa RICORRENTE, una lista JSON di al piu'
@@ -46585,8 +46586,10 @@ P2P_EURO_SOSPESI_FINO_S = 4 * 86400   # oltre, la garanzia non c'e' piu'
 # tutto quel che e' del SERVER, dietro la leva P2P_TEMPO_DI_CHI_PUBBLICA:
 # 1) LA PAUSA DEGLI ORDINI (`p2p_pause`): ricorrente, per giorni e
 #    fasce, e una tantum fino a sette giorni. In pausa gli ordini di
-#    quella persona non si vedono nel libro di Barattolo e non si
-#    prendono da qui (`_posso_prendere_p2p`, motivo `pausa`). ⚠️ VALE
+#    quella persona non si prendono da qui (`_posso_prendere_p2p`,
+#    motivo `pausa`); nel libro di Barattolo restano, in grigio, con
+#    fra quanto si potranno prendere (13 ott 2026: la pagina; il 12
+#    sparivano — qui non e' cambiato niente). ⚠️ VALE
 #    DENTRO BARATTOLO, come il filtro e il limite: per il coordinatore
 #    l'ordine resta `pending`, e un'altra app Mostro lo prende.
 # 2) IL «NON COMPLETATO» A CHI PUBBLICA E NON RISPONDE — la regola del

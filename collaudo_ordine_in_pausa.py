@@ -12,6 +12,13 @@ libro P2P» e' arrivata a tutti, e chi apriva il libro leggeva «0
 offerte», «Ci sono 1 offerte, ma nessuna passa il filtro» e un «Togli il
 filtro» che non faceva niente, perche' un filtro non c'era.
 
+LA DECISIONE DI ANDREA (13 ott): l'ordine di chi e' in pausa NON sparisce
+dal libro. Resta, grigio, con la scritta arancio «⏸ Puoi prenderlo tra 6
+h 35 min» che scende da sola; al tocco non si apre — la carta si scuote
+e il telefono da' la vibrazione d'avviso (anche coi movimenti ridotti,
+dove lo scuotimento non c'e'); alla fine della pausa torna normale da
+sola. Il conto «N offerte» lo conta. La 🔔 aspetta la fine della pausa.
+
 Qui girano il SERVER VERO — le rotte della pausa, dei volti e di «posso
 prendere?», e il giro degli avvisi dei nuovi ordini com'e' —, su un
 database usa-e-getta e con l'OROLOGIO FERMO alle ore del caso; e i
@@ -19,12 +26,16 @@ GIUDICI VERI DELLA PAGINA, ritagliati da miniapp.html e fatti girare in
 node sulle risposte del server:
 
   1. la pausa salvata alle 23:24 e' gia' aperta, fino alle 07:00;
-  2. l'ordine pubblicato dentro la pausa: il libro di chi guarda dice il
-     vero (niente «filtro», niente bottone), chi l'ha pubblicato lo vede,
-     «posso prendere?» dice `pausa` — e LA 🔔 NON PARTE;
+  2. l'ordine pubblicato dentro la pausa: nel libro di chi guarda C'E',
+     si conta («1 offerta»), ed e' FERMO — la scritta «⏸ Puoi prenderlo
+     tra 7 h 27 min», il tocco rifiutato con scuotimento e vibrazione
+     d'avviso, i minuti che scendono da soli; chi l'ha pubblicato lo
+     vede com'era e lo apre; «posso prendere?» dice `pausa` — e LA 🔔
+     NON PARTE;
   3. ...nemmeno un quarto d'ora dopo: aspetta in coda;
-  4. alle 07:00 la pausa finisce: la 🔔 parte, con «da 50,00 a 100,00 €»
-     (un «da» solo), e il libro mostra la card;
+  4. alle 07:00 la pausa finisce: la carta torna normale DA SOLA (il
+     battito ridisegna il libro una volta), si prende, e la 🔔 parte,
+     con «da 50,00 a 100,00 €» (un «da» solo);
   5. un ordine pubblicato in pausa e SPARITO prima della fine non si
      annuncia mai;
   6. chi pubblica in pausa vede l'avviso con le due strade, e «Togli la
@@ -168,6 +179,8 @@ async def pause_viste(chi, ordini):
 GIUDICI = ("idMostroVero", "filtroVuotoP2P", "filtroAccesoP2P", "passaFiltroP2P",
            "passaRepP2P", "vuotoLibroP2P", "prendiPauseP2P", "pausaOrdineP2P",
            "nascostoPerPausaP2P", "quandoPausaP2P", "bozzaPausaP2P",
+           "traQuantoP2P", "etichettaPausaP2P", "rifiutaPerPausaP2P",
+           "scuotiCartaP2P", "battitoPausaLibroP2P",
            "finePausaLocaleP2P", "finoMiaPausaP2P", "rigaAdessoPausaP2P",
            "avvisoPausaPubblicaP2P")
 
@@ -176,6 +189,25 @@ const P2P_PREMIO_MAX = 20;
 let p2pPause = {}, p2pFiltro = null, p2pMiaPausa = null;
 let MIEI = new Set();
 function ordineTuoP2P(id){ return MIEI.has(String(id)); }
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+/* la vibrazione di casa, di cartone: segna il tipo e se e' chiesta
+   ANCHE coi movimenti ridotti */
+let VIBRA = [];
+function haptic(tipo, anche){ VIBRA.push([tipo || 'tocco', anche === true]); }
+/* il libro a schermo, di cartone: le carte ferme e le loro scritte */
+let CARTE = [], SCRITTE = [], RIDISEGNI = 0, LIBRO = [];
+function rigaLibroP2P(id){ return LIBRO.find(o => o.id === id) || null; }
+function renderP2P(){ RIDISEGNI++; }
+const document = {querySelectorAll(sel){
+  return sel.indexOf('p2p-pausa-tra') >= 0 ? SCRITTE : CARTE; }};
+function carta(id, html){
+  const classi = new Set(['p2p-ord', 'p2p-in-pausa']);
+  const b = {textContent: (/<b>([^<]*)<\/b>/.exec(html) || [])[1] || ''};
+  CARTE.push({dataset: {id: id}, offsetWidth: 1, classi: classi,
+    classList: {add: c => classi.add(c), remove: c => classi.delete(c)}});
+  SCRITTE.push({dataset: {fine: (/data-fine="(\d+)"/.exec(html) || [])[1]}, b: b,
+    querySelector(){ return b; }});
+}
 const dati = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
 const out = [];
 for (const s of dati) {
@@ -185,13 +217,33 @@ for (const s of dati) {
   MIEI = new Set(s.miei || []);
   p2pFiltro = s.filtro || null;
   p2pMiaPausa = s.miaPausa || null;
-  const vivi = s.libro || [];
+  VIBRA = []; CARTE = []; SCRITTE = []; RIDISEGNI = 0;
+  const vivi = LIBRO = s.libro || [];
   const candidati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));
   const mostrati = candidati.filter(o => passaRepP2P(p2pFiltro, undefined));
   const r = {mostrati: mostrati.map(o => o.id),
              pillola: mostrati.length + ' offert' + (mostrati.length === 1 ? 'a' : 'e'),
              filtroAcceso: filtroAccesoP2P(p2pFiltro)};
-  if (!mostrati.length) r.vuoto = vuotoLibroP2P(vivi, p2pFiltro, 'compro', s.adesso);
+  if (!mostrati.length) r.vuoto = vuotoLibroP2P(vivi, p2pFiltro, 'compro');
+  /* le carte: ferma = porta la scritta (e la classe grigia, che nel
+     disegno vero e' la stessa condizione) */
+  r.scritte = mostrati.map(o => {
+    const h = etichettaPausaP2P(o, s.adesso);
+    if (h) carta(o.id, h);
+    return h.replace(/<[^>]+>/g, '');
+  });
+  if (s.tocca) {
+    const rifiutato = rifiutaPerPausaP2P(s.tocca);
+    const c = CARTE.find(x => x.dataset.id === s.tocca);
+    r.tocco = {rifiutato: rifiutato, vibra: VIBRA.slice(), scossa: !!c && c.classi.has('p2p-scuoti')};
+  }
+  if (s.battiti) r.battiti = s.battiti.map(t => {
+    Date.now = () => t * 1000;
+    battitoPausaLibroP2P();
+    return {scritta: SCRITTE.map(x => x.b.textContent), ridisegni: RIDISEGNI,
+            ferma: mostrati.map(o => !!etichettaPausaP2P(o, t))};
+  });
+  Date.now = () => s.adesso * 1000;
   if (s.miaPausa) {
     r.finoMia = finoMiaPausaP2P(s.adesso);
     r.avviso = r.finoMia ? avvisoPausaPubblicaP2P(r.finoMia, s.adesso) : null;
@@ -284,10 +336,10 @@ async def prove():
         print("      ", scena.get("ERRORE"))
         return
     prova("...e il foglio lo diceva gia' PRIMA di salvare, sotto le fasce: attiva adesso",
-          "⏸ Attiva adesso: i tuoi ordini escono dal libro fino a domani alle 07:00.",
+          "⏸ Attiva adesso: nessuno può prendere i tuoi ordini fino a domani alle 07:00.",
           scena[0]["rigaBozza"])
     prova("...la stessa pausa composta alle 14:00 dice che adesso non lo e'",
-          "Adesso non è attiva: i tuoi ordini si vedono.", scena[1]["rigaBozza"])
+          "Adesso non è attiva: i tuoi ordini si possono prendere.", scena[1]["rigaBozza"])
     prova("...e senza niente di scritto la riga non c'e'", "", scena[2]["rigaBozza"])
 
     print("\n2) dodici secondi dopo l'ordine e' nel libro: chi lo vede, e chi no")
@@ -299,34 +351,47 @@ async def prove():
     v = await posso(GUARDA, ORD)
     prova("«posso prendere?» lo ferma col motivo `pausa`", (False, "pausa"),
           (v["ok"], v["motivo"]))
-    OROLOGIO.ora = utc(12, 21, 33, 0)
+    OROLOGIO.ora = utc(12, 21, 33, 0)                 # le 23:33: l'ora della 🔔 di stasera
+    SATISPAY = {"valute": [], "metodi": ["Satispay"], "premioDa": -20, "premioA": 20,
+                "repDa": 0, "repA": 5}
     scena = pagina([
-        {"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": pause},
-        {"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": pause, "miei": [ORD]},
+        {"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": pause, "tocca": ORD,
+         "battiti": [utc(12, 21, 33, 20), utc(12, 21, 58, 0), utc(13, 4, 59, 30),
+                     utc(13, 5, 0, 1)]},
+        {"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": pause, "miei": [ORD],
+         "tocca": ORD},
         {"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": pause,
-         "filtro": {"valute": [], "metodi": ["Satispay"], "premioDa": -20, "premioA": 20,
-                    "repDa": 0, "repA": 5}},
+         "filtro": SATISPAY},
         {"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD), riga_libro(ORD2)],
-         "pause": {ORD: utc(13, 5, 0), ORD2: utc(13, 6, 0)}}])
+         "pause": {ORD: utc(13, 5, 0), ORD2: utc(12, 22, 8)}}])
     chi_guarda, autore, filtrato, due = scena
-    prova("IL LIBRO DI CHI GUARDA: «0 offerte», il filtro spento, e nessuna card",
-          ("0 offerte", False, []),
+    prova("IL LIBRO DI CHI GUARDA: l'ordine C'E' e si conta — «1 offerta», filtro spento",
+          ("1 offerta", False, [ORD]),
           (chi_guarda["pillola"], chi_guarda["filtroAcceso"], chi_guarda["mostrati"]))
-    prova("...e la frase dice il vero: c'e' 1 offerta, chi l'ha pubblicata e' in pausa",
-          ("Nessun ordine da prendere adesso",
-           "C'è 1 offerta, ma chi l'ha pubblicata è in pausa fino a domani alle 07:00."),
-          (chi_guarda["vuoto"]["titolo"], chi_guarda["vuoto"]["frase"]))
-    prova("...senza «Togli il filtro»: un filtro non c'e'", False, chi_guarda["vuoto"]["togli"])
-    prova("...e senza la parola «filtro» da nessuna parte", False,
-          "filtro" in (chi_guarda["vuoto"]["titolo"] + chi_guarda["vuoto"]["frase"]).lower())
-    prova("CHI L'HA PUBBLICATO lo vede nel suo libro", ([ORD], "1 offerta"),
-          (autore["mostrati"], autore["pillola"]))
-    prova("con un filtro acceso l'offerta in pausa NON si conta fra quelle del filtro: "
-          "toglierlo non la farebbe comparire", (False, True),
-          (filtrato["vuoto"]["togli"], "in pausa" in filtrato["vuoto"]["frase"]))
-    prova("con due offerte in pausa il verbo e' al plurale, e l'ora e' la prima che torna",
-          "Ci sono 2 offerte, ma chi le ha pubblicate è in pausa almeno fino a domani alle 07:00.",
-          due["vuoto"]["frase"])
+    prova("...ed e' FERMO: la scritta dice fra quanto si potra' prendere",
+          ["⏸ Puoi prenderlo tra 7 h 27 min"], chi_guarda["scritte"])
+    prova("IL TOCCO NON LO APRE: rifiutato, la carta si scuote, e la vibrazione e' l'AVVISO "
+          "— chiesto anche coi movimenti ridotti, dove lo scuotimento non c'e'",
+          {"rifiutato": True, "vibra": [["warning", True]], "scossa": True},
+          chi_guarda["tocco"])
+    b = chi_guarda["battiti"]
+    prova("IL CONTO SCENDE DA SOLO, in place e senza ridisegnare: 7 h 27 min, poi 7 h 2 min, "
+          "e a mezzo minuto dalla fine «1 min»",
+          ([["7 h 27 min"], ["7 h 2 min"], ["1 min"]], [0, 0, 0]),
+          ([x["scritta"] for x in b[:3]], [x["ridisegni"] for x in b[:3]]))
+    prova("ALLO SCADERE il battito ridisegna il libro UNA volta, e la carta non e' piu' ferma",
+          (1, [False]), (b[3]["ridisegni"], b[3]["ferma"]))
+    prova("CHI L'HA PUBBLICATO lo vede com'era: nessuna scritta «puoi prenderlo», e il suo "
+          "tocco non e' rifiutato ne' vibra d'avviso",
+          ([ORD], [""], {"rifiutato": False, "vibra": [], "scossa": False}),
+          (autore["mostrati"], autore["scritte"], autore["tocco"]))
+    prova("un filtro che non lo lascia passare lo ferma come ogni altra offerta: «C'è 1 "
+          "offerta, ma non passa il filtro.» col suo «Togli il filtro»",
+          ("Nessun ordine col tuo filtro", "C'è 1 offerta, ma non passa il filtro.", True),
+          (filtrato["vuoto"]["titolo"], filtrato["vuoto"]["frase"], filtrato["vuoto"]["togli"]))
+    prova("con due ordini in pausa ognuno dice il SUO tempo, e sotto l'ora si dice in minuti",
+          ("2 offerte", ["⏸ Puoi prenderlo tra 7 h 27 min", "⏸ Puoi prenderlo tra 35 min"]),
+          (due["pillola"], due["scritte"]))
     prova("LA 🔔 NON PARTE: l'ordine e' nuovo, ma chi l'ha pubblicato e' in pausa", [],
           await giro())
     prova("...e la riga resta in coda per chi la voleva", [0], in_coda(ORD))
@@ -353,9 +418,12 @@ async def prove():
            "da da" in testo, "Apri il libro ordini" in testo])
     prova("...la riga e' timbrata, e al giro dopo non riparte", (True, []),
           (in_coda(ORD)[0] > 1, await giro()))
-    scena = pagina([{"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": {}}])
-    prova("...e nel libro di chi guarda adesso la card c'e'", ([ORD], "1 offerta"),
-          (scena[0]["mostrati"], scena[0]["pillola"]))
+    scena = pagina([{"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": {},
+                     "tocca": ORD}])
+    prova("...nel libro di chi guarda la carta e' tornata normale: nessuna scritta, e il "
+          "tocco passa", ([ORD], "1 offerta", [""], False, []),
+          (scena[0]["mostrati"], scena[0]["pillola"], scena[0]["scritte"],
+           scena[0]["tocco"]["rifiutato"], scena[0]["tocco"]["vibra"]))
     prova("«posso prendere?» adesso dice di si'", True, (await posso(GUARDA, ORD))["ok"])
 
     print("\n5) pubblicato in pausa e sparito prima della fine: non si annuncia mai")
@@ -385,8 +453,8 @@ async def prove():
           utc(15, 5, 0), scena[1]["finoMia"])
     prova("L'AVVISO PRIMA DI PUBBLICARE: la frase, e i due tasti",
           {"titolo": "Pubblichi durante la pausa?",
-           "corpo": "Sei in pausa fino a domani alle 07:00: il tuo ordine non si vedrà "
-                    "fino ad allora.",
+           "corpo": "Sei in pausa fino a domani alle 07:00: il tuo ordine si vedrà in "
+                    "grigio e si potrà prendere solo da allora.",
            "etichetta": "Pubblica lo stesso", "altra": "Togli la pausa per stanotte"},
           scena[0]["avviso"])
     prova("...di giorno il secondo tasto non parla di notte", "Togli la pausa per adesso",
@@ -397,7 +465,7 @@ async def prove():
           (r.get("fino"), r.get("fasce"), r.get("salta_fino")))
     scena = pagina([{"adesso": OROLOGIO.ora, "miaPausa": r}])
     prova("...la pagina non ferma piu' chi pubblica, e il foglio dice che per stanotte e' tolta",
-          (0, None, "Tolta fino a domani alle 07:00: adesso i tuoi ordini si vedono."),
+          (0, None, "Tolta fino a domani alle 07:00: adesso i tuoi ordini si possono prendere."),
           (scena[0]["finoMia"], scena[0]["avviso"], scena[0]["rigaFoglio"]))
     pubblica(ORD3)
     prova("l'ordine pubblicato subito dopo NON e' in pausa, e si prende",
@@ -407,7 +475,7 @@ async def prove():
     prova("alle 07:00 il salto e' finito: nessuna pausa aperta", (0, 0),
           (leggi_pausa(PUBBLICA)["fino"], leggi_pausa(PUBBLICA)["salta_fino"]))
     OROLOGIO.ora = utc(15, 20, 30, 0)                 # le 22:30 di giovedi'
-    prova("LA SERA DOPO la pausa e' quella di sempre, e l'ordine e' di nuovo nascosto",
+    prova("LA SERA DOPO la pausa e' quella di sempre, e l'ordine e' di nuovo fermo",
           (utc(16, 5, 0), {ORD3: utc(16, 5, 0)}),
           (leggi_pausa(PUBBLICA)["fino"], await pause_viste(GUARDA, [ORD3])))
     r = await scrivi_pausa(GUARDA, {"salta": True})
