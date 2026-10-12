@@ -241,6 +241,7 @@ jobs:
              collaudo_controllo_fattura
              collaudo_guardia_liquidita
              collaudo_canale_admin
+             collaudo_punti_barattolo
              collaudo_csp
              collaudo_freni
              collaudo_db_contesa

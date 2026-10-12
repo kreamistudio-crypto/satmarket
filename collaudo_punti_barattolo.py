@@ -208,7 +208,16 @@ def avvio():
     async def ln_finta(_addr, sats):
         return f"lnbc{sats}collaudo"
 
-    async def paga_finta(_bolt11, _atteso, _diario=None, cassaforte=""):
+    # LA FIRMA E' QUELLA VERA di `paga_venditore`, parola per parola
+    # (12 ott 2026). Dal 19 set 2026 chi paga passa anche `riga=` — la
+    # riga di denaro, per i pagamenti in volo — e questa finta non lo
+    # conosceva: TypeError dentro `_sblocca_sats`, la sezione del giro
+    # chiuso esplodeva e la ronda del libro mastro, che lavora
+    # sull'ordine di quella sezione, falliva di riflesso. Cinque rosse
+    # per una firma, e per tre settimane, perche' questo collaudo non
+    # era fra quelli della CI: adesso c'e'.
+    async def paga_finta(_bolt11, _atteso, _diario=None, *,
+                         cassaforte="", riga=()):
         return server.PAGATO
 
     server.crea_invoice_escrow = invoice_finta

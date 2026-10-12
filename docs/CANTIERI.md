@@ -51726,3 +51726,35 @@ un minuto e vedere l'avvertimento arrivare una volta, e gli avvisi
 tornare nel gruppo quando lo si rimette. E guardare, in sola lettura,
 se sul VPS `GUARDIANO_PONTE_AVVISA` è compilata: col gruppo acceso
 diventa la strada di riserva.
+
+## `collaudo_punti_barattolo` curato e messo in CI: cinque rosse per una firma (12 ott 2026, cantiere canale-admin, richiesta di Andrea)
+
+**IL FATTO.** `collaudo_punti_barattolo` era rosso su main pulito, 109
+passate e 5 fallite, dal 19 set 2026. Tre cantieri l'avevano trovato
+così e scritto in questo file («segnalato, non curato»): nessuno era
+il suo, e nessuno l'ha curato.
+
+**LA CAUSA, una sola.** Dal 19 set (i pagamenti in volo)
+`paga_venditore` riceve anche `riga=`, la riga di denaro. La finta del
+collaudo, `paga_finta(_bolt11, _atteso, _diario=None, cassaforte="")`,
+non lo conosceva: TypeError dentro `_sblocca_sats`, e la sezione «il
+giro si chiude» esplodeva (una rossa). Le altre quattro erano di
+riflesso: la ronda del libro mastro lavora sull'ordine che quella
+sezione le passa, e senza quell'ordine toccava la riga 0. È lo stesso
+difetto che aveva tenuto rosso `collaudo_feedback_confermato`.
+
+**LA CURA.** La finta ha la firma VERA, parola per parola
+(`*, cassaforte="", riga=()`). 121 passate, 0 fallite: le sette in più
+erano quelle che la sezione esplosa non arrivava a dire.
+
+**PERCHÉ È DURATO TRE SETTIMANE, e la cura vera.** Il collaudo era
+nell'elenco dei file COMPILATI dal workflow ma non in quello dei
+collaudi GIRATI: nessuna ragione scritta, non ci era mai entrato. Non
+vuole la rete né una chiave (gira nella gabbia, 9 secondi), quindi
+adesso è fra i collaudi della CI: la prossima firma che cambia lo fa
+rosso il giorno stesso.
+
+**PROVATO.** Rosso identico su una copia pulita di origin/main prima
+della cura (gli stessi 5); verde dopo, da solo e nella gabbia con
+`collaudi_ci.py`; e nel giro intero dei collaudi del workflow
+sull'albero del push (la voce qui sopra).
