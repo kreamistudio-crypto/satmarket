@@ -105,11 +105,22 @@ def avvio():
     async def cambio_finto():
         return 100_000.0
 
+    # LA MANOPOLA DELLA CONTROPROVA (12 ott 2026): con
+    # `AVVISI_MERCATINO_INVIO_LENTO=0.5` ogni invio di cartone ci mette
+    # mezzo secondo, come una macchina lenta. Col sonno fisso di prima il
+    # collaudo cadeva (i messaggi morivano col loop); con l'attesa regge.
+    # Di serie e' 0: la CI non si allunga.
+    lento = float(os.environ.get("AVVISI_MERCATINO_INVIO_LENTO") or 0)
+
     async def telegram_finto(tg_id, testo):
+        if lento:
+            await asyncio.sleep(lento)
         VIA.append(("telegram", tg_id, testo))
         return "ok"
 
     async def dm_finto(npub, testo, ripiego):
+        if lento:
+            await asyncio.sleep(lento)
         VIA.append(("nostr", npub, testo))
 
     server.cambio_btc_eur = cambio_finto
@@ -129,6 +140,46 @@ def testata(tg_id):
     return f"collaudo:{tg_id}:{NOMI.get(tg_id, 'Utente')}"
 
 
+# ---- L'ATTESA A TEMPO, AL POSTO DEL SONNO FISSO (12 ott 2026) ----------
+# IL DIFETTO: dopo ogni chiamata si dormiva 1,5 secondi FISSI e poi il
+# loop si chiudeva — e `asyncio.run`, chiudendo, CANCELLA i lavori ancora
+# in volo. Ma il drenatore del server dorme 1 secondo (ATTESA_RAGGRUPPO
+# di qui) e poi manda UN messaggio per destinatario con 0,2 s di pausa
+# fra uno e l'altro (`_giro_avvisi_mercatino`): con tre destinatari il
+# terzo parte a ~1,4 s. Un decimo di margine: su una macchina lenta il
+# terzo messaggio moriva col loop, e la prova diceva «0 messaggi» (la CI
+# del 12 ott 2026, sul push 2c317ab: Terzo senza il suo avviso).
+# LA CURA: non si indovina quanto dura, si ASPETTA CHE FINISCA. Dopo la
+# chiamata si aspettano i lavori che il server ha lasciato nel loop (il
+# drenatore, i `create_task` delle notifiche, e quelli che ne nascono)
+# finche' non ce n'e' piu' nessuno. Il TETTO e' un limite, non
+# un'attesa: se va tutto bene si esce appena l'ultimo lavoro ha finito
+# (una chiamata senza drenatore non aspetta niente: il collaudo e' piu'
+# CORTO di prima), e se un lavoro non finisce mai il collaudo lo DICE
+# con una rossa, invece di restare appeso o di passare per caso. Vale
+# anche per i «nessun messaggio»: un'assenza si puo' affermare solo a
+# lavori finiti.
+TETTO_ATTESA = 30.0     # secondi: il limite, mai l'attesa di un giro sano
+SCADUTE = []            # le attese che hanno toccato il tetto
+
+
+async def lascia_finire(dove=""):
+    """Aspetta che nel loop non resti nessun lavoro oltre a questo.
+    Torna True se hanno finito tutti entro TETTO_ATTESA."""
+    io = asyncio.current_task()
+    loop = asyncio.get_running_loop()
+    fine = loop.time() + TETTO_ATTESA
+    while True:
+        altri = [x for x in asyncio.all_tasks() if x is not io and not x.done()]
+        if not altri:
+            return True
+        resta = fine - loop.time()
+        if resta <= 0:
+            SCADUTE.append(dove or "?")
+            return False
+        await asyncio.wait(altri, timeout=resta)
+
+
 async def _rotta(rotta, corpo, tg_id, args):
     """Una rotta POST del server vero, col suo giro di ganci: il corpo
     arriva da `leggi_json`, l'identita' dall'header di collaudo."""
@@ -142,12 +193,12 @@ async def _rotta(rotta, corpo, tg_id, args):
 
 
 def chiama(rotta, corpo, tg_id, *args):
-    """Una chiamata sola; dopo si lascia un attimo al drenatore (che
-    dorme un secondo) e ai create_task — nello STESSO loop, o il
+    """Una chiamata sola; dopo si aspetta che il drenatore (che dorme un
+    secondo) e i create_task abbiano FINITO — nello STESSO loop, o il
     drenatore morirebbe col loop prima di svegliarsi."""
     async def giro():
         r = await _rotta(rotta, corpo, tg_id, args)
-        await asyncio.sleep(1.5)
+        await lascia_finire(getattr(rotta, "__name__", "rotta"))
         return r
     return asyncio.run(giro())
 
@@ -172,7 +223,7 @@ def pubblica_insieme(tg_id, annunci):
         for titolo, categoria in annunci:
             r = await _rotta(SRV.pubblica, corpo_annuncio(titolo, categoria, 30000), tg_id, ())
             ids.append(r.get("id"))
-        await asyncio.sleep(1.5)
+        await lascia_finire("pubblica_insieme")
         return ids
     return asyncio.run(giro())
 
@@ -183,8 +234,11 @@ def giro_orologio(adesso=None):
     if adesso is not None:
         vero = SRV.time.time
         SRV.time.time = lambda: adesso
+    async def giro():
+        await SRV._giro_avvisi_mercatino()
+        await lascia_finire("giro_orologio")   # il DM Nostr parte «in volo»
     try:
-        asyncio.run(SRV._giro_avvisi_mercatino())
+        asyncio.run(giro())
     finally:
         if adesso is not None:
             SRV.time.time = vero
@@ -368,6 +422,10 @@ def main():
     prova("...e a leva spenta non parte niente, nemmeno a chi segue", 0, len(VIA))
     SRV.MERCATINO_AVVISI_NUOVI = True
 
+    print("\n[9) l'attesa a tempo]")
+    prova("nessuna attesa ha toccato il tetto: i lavori del server hanno "
+          "sempre finito", [], SCADUTE)
+
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
     print("=" * 58)
@@ -379,7 +437,7 @@ async def _ripassa(annuncio_id):
     """Lo stesso gesto della modifica approvata: l'annuncio torna nel
     drenatore degli avvisi."""
     SRV.accoda_match(annuncio_id)
-    await asyncio.sleep(1.5)
+    await lascia_finire("_ripassa")
 
 
 if __name__ == "__main__":

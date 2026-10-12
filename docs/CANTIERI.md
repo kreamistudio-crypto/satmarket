@@ -51282,3 +51282,66 @@ workflow e la controprova. La tortura lunga (16 su 16) e il resto del
 giro dal vivo sono della prima stesura, sopra `464f839`. La voce era
 già scritta quando la suite è girata, tranne questo paragrafo e il
 conto della tortura corta.
+
+## Il collaudo ballerino degli avvisi del mercatino: l'attesa a tempo al posto del sonno fisso (12 ott 2026, cantiere tetti-e-collaudo-ballerino, richiesta di Andrea)
+
+IL FATTO. Il 12 ott 2026 la CI del push `2c317ab` (un ritocco al solo
+CLAUDE.md) è uscita rossa su `collaudo_avvisi_mercatino`: «Terzo («tutti»
+con la categoria): UN messaggio coi DUE della categoria» aveva avuto ZERO
+messaggi. Rilanciato il job, verde; in locale verde tre volte su tre.
+LA CAUSA, letta sul codice. Dopo ogni chiamata il collaudo dormiva 1,5
+secondi FISSI e poi usciva da `asyncio.run`, che chiudendo il loop
+CANCELLA i lavori ancora in volo. Ma il drenatore del server
+(`_drena_match`) dorme `ATTESA_RAGGRUPPO` (1 secondo, nel collaudo) e
+poi `_giro_avvisi_mercatino` manda UN messaggio per destinatario con
+0,2 s di pausa fra uno e l'altro: con tre destinatari (Nativa, Compra,
+Terzo) il terzo parte a ~1,4 s. Un decimo di margine. Su una macchina
+della CI più lenta il terzo messaggio moriva col loop — e nel log di
+quel giorno i primi due «mandato» ci sono, il terzo no. Non era «un
+controllo fatto una volta sola»: era un'attesa indovinata, e un loop
+che butta via quel che non ha finito.
+LA CURA: non si indovina quanto dura, si ASPETTA CHE FINISCA.
+`lascia_finire(dove)` aspetta che nel loop non resti nessun lavoro
+oltre a sé (`asyncio.all_tasks`, rifatto finché ne nascono di nuovi),
+con un TETTO di 30 secondi che è un limite e non un'attesa: se un lavoro
+non finisce mai il nome del punto va in `SCADUTE` e l'ultima prova del
+collaudo è rossa («nessuna attesa ha toccato il tetto»), invece di
+restare appesi o di passare per caso. La usano i quattro posti dove il
+server lascia lavori nel loop: `chiama`, `pubblica_insieme`, `_ripassa`
+e — nuovo — `giro_orologio`, perché il DM Nostr parte «in volo» (un
+`create_task`) e prima lo salvava solo la pausa da 0,2 s del giro. Vale
+anche per i «nessun messaggio»: un'assenza si può affermare solo a
+lavori finiti.
+LA CI NON SI ALLUNGA, SI ACCORCIA: una chiamata senza drenatore non
+aspetta più niente, e quelle col drenatore aspettano quanto serve. In
+locale il collaudo passa da 37 a 17 secondi.
+LA CONTROPROVA, fatta cadere di proposito. Una manopola nel collaudo,
+`AVVISI_MERCATINO_INVIO_LENTO` (secondi per ogni invio di cartone, 0 di
+serie: in CI non c'è), e lo stesso collaudo girato in due vesti — col
+sonno fisso di prima rimesso al posto dell'attesa, e com'è ora:
+
+| | invio normale | lento 0,3 s | lento 0,5 s | lento 2 s |
+|---|---|---|---|---|
+| sonno fisso (prima) | 30 su 30 | 3 rosse | 4 rosse | — |
+| attesa a tempo (ora) | 30 su 30 | 30 su 30 | 30 su 30 | 30 su 30 |
+
+Fra le rosse del sonno fisso c'è proprio quella della CI («Terzo…»),
+più «Compra (segue): UN messaggio…» e, dal giro dell'orologio, «…Nativa
+il DM dell'olio l'ha ricevuto»: quest'ultima è il DM «in volo», che la
+cura copre.
+SCARTATO. Allungare il sonno a 3 secondi (raddoppia la CI e sposta la
+soglia, non la toglie). Aspettare «finché compare il messaggio» (le
+prove dei «nessun messaggio» non hanno niente da aspettare, e sarebbero
+rimaste a tempo fisso). Toccare il server: il drenatore fa quel che
+deve.
+NOTATO, NON TOCCATO. `collaudo_coda_vetrina.py` abbassa anche lui
+`ATTESA_RAGGRUPPO`: non l'ho guardato. La stessa forma (sonno fisso e
+loop chiuso) può stare in altri collaudi che aspettano un drenatore.
+NELLO STESSO CANTIERE, in un commit suo: CLAUDE.md, la voce «TETTI» di
+«Adesso» corretta sulla parola di Andrea — sul VPS `P2P_MAX_EURO = 250`
+(riga 109 del config): il tetto dei 250 € vale per TUTTI gli ordini P2P
+finché dura la beta, e a fine beta salirà (cifra da decidere); nel
+codice la leva è 0. Avevo scritto «solo nei contanti» leggendo il solo
+codice: il config del VPS vince sul default, ed è la regola di CLAUDE.md.
+PROVATO. La controprova qui sopra; il collaudo nella gabbia
+(`collaudi_ci.py`); suite e collaudi interi nel verbale del push.
