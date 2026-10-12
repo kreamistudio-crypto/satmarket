@@ -53683,3 +53683,26 @@ NOTATO E NON FATTO (aspetta un sì): «✅ Confermo, ci sono» di chi compra
 e «🔗 Lascia il collegamento» hanno la stessa radice del punto 1 (la
 pagina non si aggiorna da sola dopo il gesto); per il ritiro a mano le
 ferie dicono ancora «segna la spedizione».
+
+**COSA È GIRATO SU QUALE ALBERO** (il verbale del push, 12 ott 2026,
+notte). PRIMA STESURA, sopra `236d5b8` (il commit del cantiere, allora
+`5df823e`): la suite severa intera, 23.138 passate e 0 fallite; i 68
+collaudi del workflow nella gabbia, tutti verdi (girati prima di due
+ritocchi minimi — una prova corretta, due commenti del CSS scambiati —,
+la suite dopo); la tortura, 41 su 41; il giro dal vivo in Chrome e nel
+motore di Safari, 17 scatti per motore. I QUATTRO RITOCCHI (allora
+`07ea2a1`): le sezioni toccate, la loro tortura (11 su 11) e il giro dal
+vivo coi cinque scatti.
+MAIN È CORSO di quattro commit: `eb68d8d` (hackathon, solo documenti),
+`6492f1c`, `3011e44`, `5c71c7f` (la chat segue lo scambio e il patto sui
+recapiti: stessa pagina, e lo stesso foglio dei recapiti dove vive il
+«🕒 Quando»). Un conflitto solo, la coda di CANTIERI: tenute tutte e
+due le voci.
+ALBERO ULTIMO, sopra `5c71c7f`, coi due commit a `e1a4a10` e `2c4d678`:
+la suite severa INTERA, 23.183 passate e 0 fallite; i 68 collaudi del
+workflow nella gabbia, tutti verdi; `node` sui tre script della pagina;
+lo scanner dei segreti con la controprova. Le torture e i giri dal vivo
+sono dell'albero di prima del rebase. LA CI DI MAIN, guardata prima del
+push: l'ultima conclusa è verde (`eb68d8d`), quella sulla punta
+(`5c71c7f`) era in corso. L'«ok al push» di Andrea è arrivato
+rispondendo alla richiesta di conferma, insieme ai quattro ritocchi.
