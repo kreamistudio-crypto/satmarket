@@ -248,9 +248,9 @@ Stato al 12 ott 2026 (parola di Andrea):
 - Il nodo gira Mostro 0.19.0 (`-bar7`, patch 0010): la cauzione solo a chi
   prende scegliendo «Contanti»; `P2P_CAUZIONE_SUL_METODO` ACCESA sul VPS.
 - TETTI. Mercatino: nessun prezzo massimo (`TETTO_SATS_ANNUNCIO` spenta).
-  P2P: 250 € SOLO nei contanti di persona (`P2P_CONTANTI_MAX_EURO`); per
-  tutti gli ordini c'è `P2P_MAX_EURO`, 0 nel codice. I valori VIVI li dice
-  il pannello «⚙️ Stato delle leve» dell'admin.
+  P2P in beta: 250 € per TUTTI gli ordini (`P2P_MAX_EURO = 250` sul VPS, 0
+  nel codice), a fine beta salirà; contanti di persona 250 €, di serie
+  (`P2P_CONTANTI_MAX_EURO`). Valori VIVI: pannello «⚙️ Stato delle leve».
 
 Backlog concordato: commissione minima fissa; a lancio fatto, il tracking
 verificato via API corrieri (con la MAPPA dei punti), l'escrow on-chain
