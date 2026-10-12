@@ -53975,3 +53975,342 @@ locale com'è nel workflow, pulito. I due giri dal vivo (trenta scatti)
 sono dell'albero di prima del rebase. LA CI DI MAIN, guardata prima del
 push: verde sulla punta (`400a3ea`). L'ok al push di Andrea stava nel
 brief del secondo giro e l'ha ridetto dando il sì alle due prove.
+
+## Il voto dopo il concluso: l'invito che arrivava a porta chiusa, i relay che confermano, gli scambi P2P nel Profilo (12 ott 2026, sera, cantiere voto-dopo-concluso, dal campo: lo scambio a3f57b19)
+
+**Il caso.** Un utente, a scambio P2P concluso: «metto le 5 stelle ma
+poi esce "voto non partito (30s)"» e «nel mio profilo non compare il
+fatto che ho portato a termine uno scambio». Poi si è saputo che entra
+con Nostr tramite Amber (un bunker), è uscito, ha chiuso ed è
+rientrato. Andrea ha guardato VPS e nodo in sola lettura: su a3f57b19
+il server conosce le due parti (chi pubblica vende, chi prende compra,
+`success`) e il «completato» è scritto a tutti e due alle 17:28:04 UTC;
+sul nodo `buyer_sent_rate` e `seller_sent_rate` sono a 0, e su 36
+scambi `success` chi COMPRA non ha votato MAI (0 su 36), chi vende 9
+volte. Il log di mostrod: `rate` mandato a chi vende alle 17:28:02 e a
+chi compra alle 17:28:04, poi nessun `rate-received` e nessun `cant-do`.
+⚠️ LO SCAMBIO DI CHI HA SEGNALATO NON ERA a3f57b19, e ci sono arrivato
+in tre passi sbagliati che Andrea ha corretto uno per uno coi fatti:
+1) avevo scritto «due account Telegram» delle due parti di a3f57b19
+perché hanno il numero positivo — ma il numero dice dov'è NATO
+l'account, non come si entra (un account Telegram con la npub collegata,
+`npub_accesso`, entra con Amber e resta positivo; solo chi è nato su
+Nostr è negativo); 2) poi sembrava chi comprava in a3f57b19; 3) infine
+il fatto: è un NATIVO Nostr (numero negativo) che entra con Amber, e il
+suo scambio è 44c46ddf — creato il 10 ott, concluso il 12 alle 07:07
+UTC, lui VENDE, e non è in `p2p_ordini` né come chi ha pubblicato né
+come chi ha preso. Sul nodo: `seller_sent_rate` a 1, `buyer_sent_rate`
+a 0. CIOÈ IL SUO VOTO ERA ARRIVATO.
+
+**Il suo caso, ricostruito sui fatti.** Ha PRESO un ordine d'acquisto
+(quindi vende) entrando da Nostr prima delle 15:45 UTC del 12 ott,
+quando la presa di un nativo non si annotava ancora (la regola del 17
+set, tolta da «Chi è l'altro»): per questo `preso_da` è vuoto, e non
+c'entrano né un altro client né un altro profilo — la chiave di quello
+scambio è del suo account, tant'è che il «completato» gli è stato
+scritto. Senza la presa annotata il server non gli offre la recensione,
+e la pagina gli ha aperto il foglio del solo voto. Ha votato: il
+coordinatore ha accettato e confermato, ma la pagina, sorda dopo il
+concluso (causa 1 qui sotto), ha detto «non è partito (30 s)». Ha
+riprovato: e a un voto già dato Mostro NON RISPONDE NIENTE — letto su
+`src/app/rate_user.rs` di Mostro 0.19.0 (pubblico): col flag già alzato
+`return Ok(())`, né `rate-received` né `cant-do`; lo stesso silenzio
+tocca a una chiave che non è né chi compra né chi vende, e a chi vota
+una controparte in piena privacy. E «non compare nel profilo» è la
+causa 4: la scheda Profilo gli scambi P2P non li nominava.
+
+**Le cause, e quale è provata.** La mia prima lettura («il voto
+arriva, è la conferma che si perde») l'hanno smentita i dati del nodo:
+il voto non era arrivato. Quel che il codice dice, e che i numeri
+confermano:
+1. A CONCLUSO LA CHIAVE USCIVA DALL'ASCOLTO, e il voto si dà dopo.
+   `ordiniAscoltoP2P` tiene solo gli scambi vivi; `mostroArriva` buttava
+   quel che arrivava per una riga conclusa. A chi compra l'invito `rate`
+   arriva DOPO `purchase-completed` (stesso secondo, 17:28:04), cioè a
+   riga già conclusa: `votabile` non si accendeva mai, e senza invito le
+   stelle al circuito non partono — lo 0 su 36. A chi vende l'invito
+   arriva a riga ancora «rilasciato» (17:28:02): per questo 9 su 36. E la
+   conferma `rate-received` non la sentiva nessuno dei due: il gesto
+   aspettava trenta secondi e diceva «non è partito» anche a voto
+   arrivato (nel percorso della recensione quell'errore era ingoiato,
+   quindi non l'aveva mai visto nessuno).
+   E DOPO UN'USCITA E UN RIENTRO È LO STESSO DIFETTO, PIÙ NUDO: la riga
+   ricostruita dall'archivio del server nasce `votabile: false`
+   (`rigaDaServerP2P`), l'invito non lo riascoltava nessuno, e il voto
+   al circuito non aveva più una strada — con qualunque login.
+2. «PARTITO» LO DICEVA IL PRIMO OK DI UN RELAY QUALUNQUE, e un OK dice
+   che quel relay ha preso l'evento, non che mostrod da lì lo legga. La
+   sonda in sola lettura (col sì di Andrea, solo REQ), rifatta alle
+   19:52 UTC sulle ultime 6 ore: `relay.mostro.network` fresco (8 ordini
+   del libro, 99 risposte del coordinatore, 19 richieste dei client);
+   `relay.barattolo.store` uguale sul lato del coordinatore e con ZERO
+   richieste dei client (il plugin accetta solo le chiavi in lista);
+   `relay.damus.io` in parte (59 risposte su 99; un'ora prima da qui non
+   apriva: ha bannato Mostro per «too many rate-limit violations»);
+   `nos.lol` con le richieste dei client ma NESSUN evento firmato dal
+   coordinatore più recente del 6 ott, di nessun tipo.
+   ⚠️ QUI AVEVO SCRITTO TROPPO, e Andrea l'ha fermato: «su nos.lol il
+   coordinatore non scrive da sei giorni» e «il voto di a3f57b19 è morto
+   così» erano deduzioni. Il journal di mostrod quella sera dava nos.lol
+   collegato e accettato (17:31 UTC). La sonda dice cosa un relay
+   RESTITUISCE, non se mostrod ci è collegato né se da lì legge.
+3. IL FOGLIO DEL SOLO VOTO SI APRIVA SU UNA RISPOSTA PROVVISORIA:
+   `gestoRecensioneP2P` ripiegava sul voto del circuito per QUALUNQUE
+   risposta diversa da «sì», anche `non_conclusa` e il server muto, che
+   la pagina sta ancora richiedendo da sola.
+4. LA SCHEDA PROFILO non nominava gli scambi P2P: scriveva solo «N
+   vendite · M acquisti conclusi», il mercatino. Il conto c'era nel
+   foglio «Il tuo profilo di scambio», nel negozio e accanto al nome.
+NON PROVATO, e non lo invento: se su a3f57b19 (i due flag a 0) chi
+vende abbia mai provato a votare, e in quel caso perché non sia
+arrivato. Ormai è un altro scambio e non è lui che ha segnalato: chi
+comprava non poteva (causa 1), chi vendeva forse non ha votato affatto.
+4c1b950 resta fuori da tutte e due le storie: tocca la copia del profilo
+sui relay e il seme dalla nsec, non la firma del `rate-user` — che parte
+dalla trade key derivata nel browser, e Amber non la firma né la cifra.
+
+**Le decisioni di Andrea.** Sì al cantiere; chi ha già concluso senza
+riuscire a votare deve poter votare ora; nella scheda Profilo la riga
+degli scambi P2P accanto a vendite e acquisti; la pagina considera
+«partito» un messaggio a Mostro solo quando lo conferma un relay da cui
+mostrod legge di sicuro — per ora `MOSTRO_RELAY_CONFERMA =
+["wss://relay.mostro.network"]`; damus si toglie in due tempi (dal coro
+del VPS subito, da `settings.toml` del nodo insieme alla -bar8, a libro
+fermo); `relay.barattolo.store` NON si tocca: lo sistema un cantiere a
+parte (relay-per-mostro); nel collaudo il caso di Amber e il caso
+«voto già dato, riprovo»; e a chi ha già votato la pagina deve dire
+«Hai già votato questo scambio», senza far riprovare.
+
+**Com'è fatto.**
+- L'ASCOLTO DEL VOTO: una mappa A PARTE, `ordiniVotoP2P` (righe
+  concluse, non votate, con la chiave, entro `P2P_VOTO_FINESTRA_S` = 30
+  giorni — la vita dei messaggi del coordinatore sui relay, misurata:
+  `expiration` a +720 ore). `mostroRiascolta` e `ultimoVistoP2P`
+  ascoltano l'unione (`ordiniUdibiliP2P`); `mostroArriva` cerca fra i
+  vivi e poi lì, e a una riga conclusa fa passare SOLO `rate` e
+  `rate-received`, dopo aver dato la risposta a una chiamata in attesa.
+  `ordiniAscoltoP2P` NON cambia: chat, moderatore, risveglio e
+  riconnessioni continuano a vedere solo gli scambi vivi. Nel ramo del
+  passato di `applicaMessaggioP2P` l'invito e la conferma sono fatti e
+  non mosse.
+- CHI HA GIÀ CONCLUSO: `riprendiVotoP2P`, dal render della pagina di
+  uno scambio concluso — riascolta la chiave una volta per sessione
+  (l'invito perso arriva adesso, se ha meno di trenta giorni) e, se la
+  recensione c'è già e le stelle al circuito no, le rimanda da sole con
+  lo stesso voto, una volta. Vale anche per la riga tornata
+  dall'archivio del server dopo un'uscita e un rientro.
+- I RELAY CHE CONFERMANO: leva nuova `MOSTRO_RELAY_CONFERMA`, vuota di
+  serie; `_p2p_leve` la manda come `conferma`, ristretta alle voci del
+  coro; `pubblicaSuTuttiP2P` manda a tutti come prima e risolve solo
+  all'OK di `urlConfermaP2P`. Vale per OGNI messaggio a Mostro (la
+  porta è una). Nel pannello delle leve: «Relay che confermano».
+- IL FOGLIO DEL SOLO VOTO: «Non sappiamo se il voto è arrivato: riprova
+  più tardi» quando il messaggio è partito e la risposta manca; «Il
+  voto non è partito: riprova fra un momento» quando nessun relay che
+  conta l'ha preso; e non si offre finché la risposta del server è
+  provvisoria (`rec.provvisoria`, messa da `chiediRecensibileP2P`
+  quando si richiede da sola). A riprove finite torna la strada di
+  sempre: il muto non è un no (decisione di settembre, tenuta).
+- «HAI GIÀ VOTATO QUESTO SCAMBIO»: Mostro a un secondo voto tace,
+  quindi la pagina non può chiederglielo. Lo sa da un'altra parte: la
+  CONFERMA di allora (`rate-received`) resta sui relay trenta giorni, e
+  con l'ascolto riaperto sulla chiave torna e accende `votato`. Allora
+  il riquadro scrive la frase (`P2P_GIA_VOTATO`, anche sotto il motivo
+  per cui la recensione non c'è), il bottone «Vota» non c'è più, e
+  `votaP2P` non manda niente a una riga già votata; se la conferma
+  arriva MENTRE un voto doppio aspetta, al silenzio dice la stessa
+  frase e non «riprova». Le stelle che ripartono da sole aspettano il
+  ridisegno dopo il riascolto, così la conferma arriva prima di loro.
+- IL PROFILO: `/api/me` porta `scambi_completati` (`_completati_p2p`,
+  lo stesso giudice del negozio) e `renderProfilo` scrive «· ✅ N
+  scambi P2P», da uno in su, con gli spazi che non vanno a capo.
+
+**Scartato.** Allargare `ordiniAscoltoP2P` ai conclusi (la leggono la
+chat, il moderatore e il risveglio: uno scambio concluso vivo non è).
+«Concluso = votabile» senza l'invito (rovescia la regola «si accende
+quando il coordinatore lo chiede»; l'invito si può riascoltare per
+trenta giorni, e basta quello). Mettere `relay.barattolo.store` fra i
+relay che confermano: oggi RIFIUTA le trade key dei client
+(`chi-scrive.py`, «restricted: solo Barattolo e i suoi venditori») — è
+il cantiere relay-per-mostro. Una lista di serie nel codice per la
+conferma (la stessa ragione di `MOSTRO_RELAY`: un relay di serie non è
+quello di Andrea).
+
+**Provato.** `prove_voto_dopo_concluso` (38 verdi): le pure in un banco
+node (chi aspetta il voto e la finestra, da quando si riascolta, il
+gesto con la risposta provvisoria, la ripresa una volta sola e ferma
+quando la conferma riascoltata dice che il voto c'era), le
+sentinelle su motore, frasi, Profilo e `/api/me`, la leva eseguita con
+un config finto. Nel banco del motore (`prove_p2p_motore`, col
+coordinatore di cartone che firma e cifra): l'invito dopo
+`purchase-completed` accende il voto, il passato ripetuto non tocca la
+riga conclusa, l'invito dal passato si prende, il voto parte con la
+chiave dello scambio e la conferma si SENTE, il voto in volo non si
+rimanda, e i sei casi dei relay che contano.
+`collaudo_voto_dopo_concluso` (59 ok, nel workflow e nella gabbia):
+`/api/me` con gli scambi a 0, 1, 2 e mai due volte per lo stesso
+`success`; `non_conclusa` prima del `success` e il posto dopo; la leva
+della conferma nella busta e in `/api/me`; e IL CASO DI AMBER — il
+dispositivo 1 nasce col bunker, copia il profilo sui relay e prende
+(il client di `collaudo_chiavi_ritrovate`), lo scambio si conclude sul
+server vero, e AL RIENTRO a memoria vuota il MOTORE VERO in node (la
+fetta del mazzo e quella del motore, intere) ritrova lo stesso profilo
+dalla copia, la riga conclusa dall'archivio con la sua chiave e senza
+invito, riascolta l'invito dai relay del coordinatore di cartone, vota
+UNA volta con la trade key che il coordinatore conosce (a un'altra
+direbbe `cant-do`) e sente la conferma; nel profilo di scambio la riga
+dice lo scambio completato col numero della rotta vera. Il controllo
+negativo: il profilo MAI copiato sui relay (com'era prima dell'11 ott)
+non torna, la riga resta solo da guardare, il voto da lì non parte —
+e lo scambio nel profilo di scambio c'è lo stesso, perché è
+dell'account. E IL CASO DEL CAMPO PRECISO, il terzo: un account col
+numero POSITIVO (sopra 2^31, come i veri) e la npub collegata, che entra
+con Amber — il seme glielo dà il server (rotta vera, lo stesso a ogni
+richiesta), sui relay non va nessuna copia, e dopo l'uscita e il rientro
+a memoria vuota ritrova lo stesso profilo, la riga conclusa con la sua
+chiave, l'invito riascoltato e il voto confermato; `/api/me` gli conta
+lo scambio. E «VOTO GIÀ DATO, RIPROVO», il quarto, che è lo scambio
+44c46ddf rifatto sul server vero: un nativo con Amber prende un ordine
+d'acquisto senza che la presa si annoti (l'ordine resta di chi ha
+pubblicato, `preso_da` vuoto), il «completato» gli viene scritto lo
+stesso come «vende», `/api/me` glielo conta, la recensione non ha un
+posto; il coordinatore di cartone fa quel che fa `rate_user.rs` — al
+voto doppio e alla chiave sconosciuta TACE — e sui suoi relay sta la
+conferma di allora. Al rientro il motore vero la riascolta: «Hai già
+votato questo scambio», nessun gesto, zero messaggi al coordinatore. E
+chi tocca prima che la conferma arrivi (collaudo d'ORDINE: la conferma
+la consegna il relay dopo che il voto doppio è partito, non un
+cronometro) manda UN messaggio, legge «Hai già votato» al posto di «non
+è partito», e al secondo tocco non manda niente. Tre giri di fila
+uguali. La controprova sul caso di Amber: tolta la ricerca fra
+chi aspetta il voto, e poi l'ascolto allargato, due rosse ogni volta
+(l'invito riascoltato, il voto). La tortura: nel verbale sotto.
+
+**Il giro dal vivo, e quel che ha trovato.** Pagina a 375 px dentro il
+finto Telegram, server della copia in collaudo col relay MORTO, e il
+coordinatore di cartone DENTRO la pagina (una classe al posto di
+`NostrTools.Relay`, una chiave usa-e-getta generata nel browser: zero
+websocket vere, contate). Visto: la scheda Profilo con «✅ 1 scambio
+P2P» (a 320 e 375 px va a capo intero, senza traboccare); a chi compra,
+dopo il concluso, l'ascolto resta aperto sulla chiave e l'invito
+accende il riquadro della recensione con la riga del circuito; la
+recensione inviata, e UN voto arrivato al coordinatore con la chiave
+giusta e confermato; il foglio del solo voto con «Grazie ⭐»; il
+silenzio con «Non sappiamo se il voto è arrivato»; il relay che non
+conta con «non è partito».
+DUE DIFETTI MIEI li ha trovati il giro e non il banco: 1) con la
+recensione appena inviata il voto partiva DUE volte — una dal gesto,
+una dalla ripresa, che al ridisegno vedeva «recensione fatta, voto non
+ancora confermato»: ora `stelleCircuitoP2P` segna il voto in volo
+prima di partire, e c'è la sua prova nel banco del motore; 2) «Il voto
+non è partito: Il messaggio non è partito» lo diceva due volte. E una
+cosa del banco: il relay di cartone di `prove.py` consegna anche agli
+ascolti chiusi, quindi che l'ascolto sia APERTO si chiede al motore
+(`p2pSub`, `p2pSubChiavi`) — con la sola consegna la mutazione «si
+ascoltano solo i vivi» la prendeva una sentinella e non il giro.
+Il giro è stato fatto dentro il finto Telegram: l'entrata con Amber
+dal vivo NON l'ho fatta (un bunker vero vuole un account), e sta nel
+collaudo col bunker di cartone.
+
+**Resta da guardare.**
+- Chi ha segnalato (44c46ddf), dopo il deploy: NON deve rivotare — il
+  suo voto è arrivato. Riaprendo lo scambio da «I miei scambi» entro
+  l'11 novembre 2026 (i trenta giorni che la conferma resta sui relay)
+  la pagina dovrebbe dire «Hai già votato questo scambio»: da guardare
+  sul suo telefono. Regge se in quel browser c'è ancora il profilo di
+  scambio, o la sua copia cifrata sui relay (che nasce al primo rientro
+  dopo la cura dell'11 ott, col profilo ancora in quel browser): se la
+  riga si apre «solo da guardare» la frase non compare, e non si perde
+  niente — il voto c'è. E nella scheda Profilo: «✅ 1 scambio P2P».
+- Gli scambi presi da un nativo prima delle 15:45 UTC del 12 ott non
+  hanno la recensione su Barattolo (la presa non era annotata, e il
+  passato non si ricostruisce: decisione di «Chi è l'altro»): a chi
+  chiede si dice questo.
+- Che la -bar7 faccia quel che fa `rate_user.rs` della 0.19.0 upstream
+  sul voto doppio (silenzio): letto sul sorgente pubblico, non sul fork.
+- Sul VPS, la leva: `MOSTRO_RELAY_CONFERMA = ["wss://relay.mostro.network"]`
+  dopo il push (PRODUZIONE, «`MOSTRO_RELAY_CONFERMA`», coi passi).
+- Damus: via da `MOSTRO_RELAY` sul VPS (primo tempo), via da
+  `settings.toml` del nodo con la -bar8 (secondo tempo, libro fermo).
+- nos.lol: perché non restituisce niente del coordinatore dal 6 ott
+  pur risultando collegato nel journal di mostrod — e se da lì mostrod
+  LEGGE. Si guarda nel cantiere relay-per-mostro (decisione di Andrea):
+  qui non si tocca, e finché non si sa per il client non conta.
+- LA CONTROPARTE IN PIENA PRIVACY (notato leggendo `rate_user.rs`):
+  Mostro il voto a chi scambia senza identità non lo conta e non
+  risponde, quindi la pagina dirà «Non sappiamo se il voto è arrivato» a
+  ogni tentativo. Andrea voleva la frase «Questa persona non riceve
+  voti sul circuito (privacy)» e niente voto proposto, subito. NON SI
+  PUÒ FARE ONESTAMENTE OGGI, e l'ho detto invece di stimare: Mostro non
+  dice al client chi è in privacy — la reputazione di chi pubblica (il
+  tag `rating` del 38383) e quella di chi prende (il `Peer` mandato a
+  chi ha pubblicato) valgono «0 recensioni, 0 giorni» sia per chi è in
+  privacy sia per chi si è registrato da meno di un giorno
+  (`get_ratings_for_pending_order` e `notify_taker_reputation` della
+  0.19.0). Lo sa il NODO (`is_full_privacy_order`), che al server
+  racconta solo le due trade key. DECISIONE DI ANDREA (fra tre strade:
+  la stima da «tutto a zero», scartata perché toglierebbe il voto a un
+  nuovo arrivato dicendogli una cosa falsa; predisporre adesso server e
+  pagina, spenti fino al nodo nuovo; questa): un cantiere piccolo
+  INSIEME ALLA -bar8 — l'evento della patch 0007 porta chi è in
+  privacy, il server lo tiene, la pagina lo scrive con certezza.
+- `relay.barattolo.store` come seconda strada della conferma: il
+  cantiere relay-per-mostro.
+- Se Mostro accetta ancora il voto di a3f57b19: non provato da qui. I
+  due riaprono lo scambio con la pagina nuova e poi si guardano
+  `buyer_sent_rate` e `seller_sent_rate` sul nodo.
+- Il journal del VPS su `/api/p2p/recensibile` alle 17:28 UTC del 12
+  ott (quale risposta ha aperto il foglio del solo voto) e quello di
+  mostrod sulla chiave di chi vende dopo le 17:28:04.
+- Sul telefono vero: uno scambio intero fino al voto, dai due lati, e
+  un'uscita con rientro da Amber.
+
+**COSA È GIRATO SU QUALE ALBERO.** Main è corso QUATTRO volte durante
+il cantiere (cinque, sette, uno e quattro commit non miei: la pausa in
+vista e il Node della CI; la chat che segue lo scambio, la pausa
+leggera, l'hackathon; il patto sul profilo di scambio; i punti di
+ritiro), e ogni volta il conflitto è stato la coda di questo file — al
+secondo rebase anche il punto di `prove.py` dove nascono le sezioni
+nuove (tenute le loro e la mia, una dopo l'altra). Per nome, nessuno
+dei commit arrivati tocca le funzioni del cantiere.
+- Prima stesura, sopra efd69ec: suite severa intera 23077 passate e 0
+  fallite (alla prima corsa UNA rossa: la sentinella che conta le chiavi
+  della busta P2P, «quindici» — con `conferma` sono sedici, aggiornata);
+  69 collaudi verdi nella gabbia; la tortura su una copia intera, 17
+  mutazioni prese su 17.
+- Con dentro i casi di Amber, il «già votato» e le frasi sui relay
+  corrette, sopra 236d5b8: suite severa intera 23130 passate e 0
+  fallite; 69 collaudi su 69 verdi; `collaudo_voto_dopo_concluso` da
+  solo tre volte di fila, 59 ok ogni volta; le controprove sul collaudo
+  su una copia, 7 prese su 7.
+- Sopra 890687d (secondo rebase): suite severa INTERA `PROVE_SEVERE=1
+  python prove.py`, 23234 passate e 0 fallite; i 69 collaudi, 68 verdi
+  e UNO ROSSO — `collaudo_cassetta_nip46`, una riga («l'orecchio rimanda
+  la REQ con tutte e due le chiavi»), che questo cantiere non tocca;
+  rigirato da solo cinque volte di fila, cinque verdi. Andrea aveva
+  detto «se una sola cosa è rossa, fermati e dimmelo»: mi sono fermato,
+  e il push l'ha deciso lui, a condizione di un giro tutto verde. La
+  causa (l'orecchio guarda se il filtro è cambiato solo quando la sua
+  `recv` da 3 secondi torna, e il collaudo aspetta 3 secondi: un pari)
+  e la cura stanno nel cantiere dopo, suo.
+- Sopra 400a3ea (terzo rebase): le sezioni toccate (`prove_voto_dopo_
+  concluso`, `prove_p2p_server`, `prove_p2p_motore`, `prove_recensione_
+  p2p`, `prove_chi_e_l_altro`), 852 passate e 0 fallite; i 69 collaudi,
+  69 verdi su 69.
+- Sopra 7da34fb (quarto rebase, l'albero del push): le stesse sezioni
+  e tutti i collaudi dell'elenco del workflow, rigirati prima del push,
+  che parte SOLO a tutto verde — se questa voce è su main, lo erano. La
+  suite intera su quest'albero la fa la CI (regola di Andrea per un
+  main che corre).
+DETTO PER QUEL CHE È, della tortura: «si ascoltano solo i vivi» e «il
+voto in volo si rimanda» le prende il banco del motore; «la conferma
+del voto dal passato» e «la frase del silenzio» le prende SOLO una
+sentinella di testo (la prima anche il collaudo, dal caso «riprovo»);
+«le voci fuori dal coro» una sentinella e, sul server vero, il
+collaudo; «lista vuota = non conta nessuno» fa ESPLODERE il banco del
+motore invece di dare una riga sua. Le righe aggiunte passate alle forme
+dei segreti del workflow (FORME e i 64 esadecimali), pulite, con la
+controprova; nessun nome e nessun numero d'account degli utenti nel
+diff. Alcune istruzioni di Andrea sono arrivate come testo incollato
+che rispondeva punto per punto ai miei rapporti: prese per sue, e
+detto; l'ok finale al push l'ha scritto lui in chiaro.

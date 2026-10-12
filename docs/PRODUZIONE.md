@@ -64,6 +64,58 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   del client (`📖 [p2p] libro: ...=N`): e' li' che si vede uno
   specchio che ha smesso di aggiornarsi, perche' non fallisce — torna
   zero, e zero si legge come «oggi non c'e' nessun ordine».
+- `MOSTRO_RELAY_CONFERMA` (12 ott 2026, voto-dopo-concluso) e' la
+  QUINTA leva del P2P: i relay del coro il cui OK vale «partito». La
+  pagina manda ogni messaggio per il coordinator a tutti i relay di
+  `MOSTRO_RELAY`, e senza questa leva lo da' per partito al primo OK
+  di chiunque — e un OK dice che quel relay ha preso l'evento, non che
+  mostrod da li' lo legga. Si AGGIUNGE al config
+  del VPS e serve un riavvio di barattolo (NON del nodo: il libro
+  resta acceso); le voci devono stare anche in `MOSTRO_RELAY`, o non
+  contano e il journal lo dice all'avvio («MOSTRO_RELAY_CONFERMA
+  nomina relay che non stanno in MOSTRO_RELAY»). Il pannello «⚙️ Stato
+  delle leve» la mostra come «Relay che confermano». Vuota o non
+  dichiarata e' il mondo di ieri.
+  COME SI SCEGLIE CHI CI VA: un relay ci sta solo se mostrod ci LEGGE,
+  e si guarda in due modi — il suo journal sul nodo («Connected to
+  relay …», niente «banned» o «rate-limit»), e la sonda in sola
+  lettura da fuori: l'ultimo evento del coordinator su quel relay
+  dev'essere di pochi minuti fa (il 38385 lo ripubblica di continuo).
+  La sera del 12 ott 2026 (19:52 UTC) la sonda diceva, sulle ultime 6
+  ore: `relay.mostro.network` fresco (8 ordini del libro, 99 risposte
+  del coordinator, 19 richieste dei client); `relay.barattolo.store`
+  uguale sul lato del coordinator ma con ZERO richieste dei client (il
+  suo plugin accetta solo le chiavi in lista); `relay.damus.io` in
+  parte (6 ordini, 59 risposte su 99: un limite di frequenza piu' che
+  un muro — un'ora prima da qui non apriva nemmeno); `nos.lol` con le
+  richieste dei client (19) ma NESSUN evento firmato dal coordinator
+  piu' recente del 6 ott, di nessun tipo. ⚠️ QUEL CHE LA SONDA NON
+  DICE: se mostrod da nos.lol LEGGE. Il suo journal quella sera lo
+  dava collegato e accettato (17:31 UTC): un relay puo' prendere un
+  evento e non conservarlo, e puo' consegnare le richieste a chi
+  ascolta senza tenere le risposte. Per questo in lista va solo chi
+  regge tutte e due le prove.
+  LA SCELTA DI ANDREA (12 ott 2026): per ora un relay solo —
+  `MOSTRO_RELAY_CONFERMA = ["wss://relay.mostro.network"]`, scritto
+  identico a com'e' in `MOSTRO_RELAY`. I passi: 1) cosa c'e' gia',
+  `grep -n "MOSTRO_RELAY" /srv/barattolo/config.py`; 2) la copia,
+  `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-della-conferma`;
+  3) la riga, `printf '\nMOSTRO_RELAY_CONFERMA = ["wss://relay.mostro.network"]\n' | sudo tee -a /srv/barattolo/config.py`;
+  4) il controllo, `sudo -u barattolo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('config ok')"`;
+  5) il riavvio di barattolo, e nel pannello delle leve la riga «Relay
+  che confermano» accesa. ⚠️ Con un relay solo in lista, se quel relay
+  cade OGNI gesto dice «Il messaggio non è partito» finche' non torna,
+  anche quando un altro relay l'ha preso e a mostrod magari arriva: e'
+  il verso prudente in cui sbagliare (chi legge riprova), ma va
+  saputo. La seconda strada e' `relay.barattolo.store`, che oggi
+  rifiuta i client: lo sistema un cantiere a parte (relay-per-mostro).
+  TOGLIERE UN RELAY DAL CORO (il caso di damus, bannato per «too many
+  rate-limit violations»): DUE TEMPI, e l'ordine conta. Primo, dal
+  config del VPS: la riga `MOSTRO_RELAY` senza quel relay, riavvio di
+  barattolo — da li' le pagine non ci mandano piu' niente e il suo OK
+  non conta. Secondo, da `~/nodo/mostro/settings.toml` sul nodo, a
+  LIBRO FERMO (`docker compose restart mostro` da `~/nodo`): si fa
+  insieme a una salita d'immagine, non da solo.
 - LE STATISTICHE DEL P2P (10 ott 2026): la sezione «🔁 Scambi P2P» in
   fondo al cruscotto `/admin` la vedono solo gli AMMINISTRATORI, e la
   leva `P2P_STATISTICHE_IDS` si AGGIUNGE al config del VPS: finche'

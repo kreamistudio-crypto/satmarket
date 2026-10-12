@@ -34584,6 +34584,7 @@ let myAvvisiP2P = true;   // «⚡ Avvisi sugli scambi P2P»: accesi di serie
    e' riconosciuto dalla controparte con qualunque login, e chi vuole
    l'anonimato entra con una chiave Nostr nuova. */
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
+let myScambiP2P = 0;   // gli scambi P2P completati (da /api/me, `scambi_completati`)
 /* il francobollo della propria foto profilo e il suo selettore
    ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
    telegram | nostr | nessuna): il Profilo e il tappo mostrano sempre
@@ -34682,7 +34683,13 @@ function renderProfilo(){
      (stessa regola della vista negozio) */
   const rep = (myRating>0
     ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)} · ` : '')
-    + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`;
+    + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`
+    /* GLI SCAMBI P2P ANCHE QUI (12 ott 2026, voto-dopo-concluso, dal
+       campo: «nel mio profilo non compare lo scambio»): la stessa
+       frase del negozio, da uno in su */
+    + ((typeof completatiP2P === 'function' && completatiP2P(myScambiP2P, true))
+       /* spazi che non vanno a capo: a 375 px «P2P» restava solo sulla riga sotto */
+       ? ' · ' + (completatiP2P(myScambiP2P, true) + ' P2P').replace(/ /g, ' ') : '');
   const nome = myNome || 'Tu';
   /* Il link del proprio negozio e' un TONDO dentro il riquadro (24 set
      2026), come nel negozio: qui e' l'unico dei tre che vale — a se
@@ -56564,6 +56571,21 @@ function urlViviP2P(){
   const c = p2pCoord();
   return (c && c.mostro && Array.isArray(c.relay)) ? c.relay.filter(Boolean) : [];
 }
+/* I RELAY CHE CONTANO COME CONFERMA (12 ott 2026, voto-dopo-concluso,
+   richiesta di Andrea dopo la sonda: nos.lol non restituiva nessun
+   evento del coordinatore piu' recente del 6 ott e damus lo aveva
+   bannato — un OK dice che il relay ha preso il messaggio, non che il
+   coordinatore da li' lo legga). La lista
+   la manda il server (`conferma`, dalla leva MOSTRO_RELAY_CONFERMA) ed
+   e' un SOTTOINSIEME del coro: l'evento parte verso tutti come prima,
+   ma «partito» lo dice solo uno di questi. Vuota = il mondo di ieri,
+   contano tutti. */
+function urlConfermaP2P(){
+  const c = p2pCoord();
+  const vivi = urlViviP2P();
+  const l = (c && Array.isArray(c.conferma)) ? c.conferma.filter(u => vivi.indexOf(u) >= 0) : [];
+  return l.length ? l : vivi;
+}
 function erroreRelayMutiP2P(esiti){
   const e = new Error(P2P_NON_PARTITO + ': nessuno ha confermato in '
                       + Math.round(P2P_ACK_MS / 1000) + ' s. Riprova fra un momento');
@@ -56661,6 +56683,7 @@ function coroP2P(){
    e a parlare sono gli altri. */
 function pubblicaSuTuttiP2P(ev){
   const urls = urlViviP2P();
+  const contano = typeof urlConfermaP2P === 'function' ? urlConfermaP2P() : urls;
   return new Promise((ok, no) => {
     const esiti = [];
     let chiuso = false;
@@ -56674,6 +56697,13 @@ function pubblicaSuTuttiP2P(ev){
     if (!restano) { fine(muti); return; }
     urls.forEach(u => {
       connettiUnoP2P(u).then(r => r.publish(ev)).then(() => {
+        /* l'OK di un relay che non conta si scrive e basta: a dire
+           «partito» e' uno di quelli da cui il coordinatore legge */
+        if (contano.indexOf(u) < 0) {
+          esiti.push(u + '=ok ma non conta');
+          if (--restano === 0) fine(muti);
+          return;
+        }
         esiti.push(u + '=ok');
         fine(() => { console.log('📨 [p2p] confermato da ' + u); ok(u); });
       }, e => {
@@ -56897,6 +56927,37 @@ function ordiniAscoltoP2P(){
     if (o && o.pubTrade && P2P_FINALI.indexOf(o.stato) < 0) m[o.pubTrade] = o;
   }
   return m;
+}
+/* ...E QUELLE DI CHI ASPETTA IL VOTO (12 ott 2026, cantiere voto-dopo-
+   concluso, dal campo: lo scambio a3f57b19). Il voto si da' DOPO il
+   «concluso», e a concluso la chiave usciva dall'ascolto: l'invito
+   `rate` di chi compra arriva subito dopo `purchase-completed` e
+   veniva buttato (sul nodo: 0 voti di chi compra su 36 scambi), e la
+   conferma `rate-received` non la sentiva nessuno.
+   UNA MAPPA A PARTE, e non una riga in piu' in quella qui sopra: quella
+   dice «scambio vivo» a chi ascolta la chat, il moderatore e il
+   risveglio, e uno scambio concluso vivo non e'. Di qui passano SOLO
+   l'invito e la conferma del voto (vedi `mostroArriva`).
+   LA FINESTRA e' la vita dei messaggi del coordinatore sui relay
+   (`expiration` a 30 giorni, misurata con la sonda del 12 ott): oltre,
+   l'invito non c'e' piu' da riascoltare. */
+const P2P_VOTO_FINESTRA_S = 30 * 86400;
+function ordiniVotoP2P(){
+  const m = {};
+  const tutti = ordiniP2P();
+  const adesso = Math.floor(Date.now() / 1000);
+  for (const id in tutti) {
+    const o = tutti[id];
+    if (!o || !o.pubTrade || o.stato !== 'concluso' || o.votato) continue;
+    const da = Number(o.aggiornato) || Number(o.creato) || 0;
+    if (da > 0 && adesso - da <= P2P_VOTO_FINESTRA_S) m[o.pubTrade] = o;
+  }
+  return m;
+}
+/* tutte le chiavi a cui il coordinatore puo' ancora scrivere qualcosa
+   che ci serve: gli scambi vivi, e i conclusi in attesa del voto */
+function ordiniUdibiliP2P(){
+  return Object.assign(ordiniVotoP2P(), ordiniAscoltoP2P());
 }
 /* I MIEI ORDINI, CHIESTI AL COORDINATORE (set 2026, dal campo).
    IL LIBRO NON PORTA NESSUNA PUBKEY DEL MAKER — il 38383 ha `d, k, s,
@@ -57258,12 +57319,13 @@ async function chiediMieiOrdiniP2P(){
 /* da quando riascoltare: dal piu' vecchio scambio aperto, cosi' un
    messaggio arrivato ad app chiusa si ritrova alla riapertura */
 function ultimoVistoP2P(){
-  const v = Object.keys(ordiniAscoltoP2P())
-    .map(k => ordiniAscoltoP2P()[k].creato || 0).filter(Boolean);
+  const mappa = typeof ordiniUdibiliP2P === 'function' ? ordiniUdibiliP2P() : ordiniAscoltoP2P();
+  const v = Object.keys(mappa).map(k => mappa[k].creato || 0).filter(Boolean);
   return v.length ? Math.min.apply(null, v) : Math.floor(Date.now() / 1000);
 }
 async function mostroRiascolta(){
-  const mappa = ordiniAscoltoP2P();
+  /* ...e i conclusi che aspettano il voto (12 ott 2026): vedi `ordiniVotoP2P` */
+  const mappa = typeof ordiniUdibiliP2P === 'function' ? ordiniUdibiliP2P() : ordiniAscoltoP2P();
   const pubs = Object.keys(mappa).sort();
   /* ...e il canale col moderatore, a disputa presa (28 set 2026) */
   const conMod = typeof autoriModeratoreP2P === 'function'
@@ -57321,7 +57383,13 @@ async function mostroArriva(ev){
   if (colMod) { chatModeratoreArriva(colMod, ev); return; }
   if (ev.pubkey !== mostroHexP2P()) return;    // non e' il coordinatore
   const pub = (ev.tags || []).filter(t => t[0] === 'p').map(t => t[1])[0];
-  const ord = ordiniAscoltoP2P()[pub];
+  let ord = ordiniAscoltoP2P()[pub];
+  /* UNO SCAMBIO CONCLUSO SENTE SOLO IL VOTO (12 ott 2026, voto-dopo-
+     concluso): l'invito `rate`, la conferma `rate-received` e la
+     risposta a una chiamata in attesa. Tutto il resto del suo passato
+     — che il relay ripete a ogni riascolto — si lascia stare. */
+  const soloVoto = !ord && typeof ordiniVotoP2P === 'function' && !!ordiniVotoP2P()[pub];
+  if (soloVoto) ord = ordiniVotoP2P()[pub];
   if (!ord) return;                            // non e' roba nostra
   const mz = mazzoMostro();
   if (!mz) return;
@@ -57346,6 +57414,7 @@ async function mostroArriva(ev){
      coordinatore, e serve a non riapplicare il passato — vedi
      applicaMessaggioP2P */
   dentro.quando = Number(ev.created_at) || 0;
+  if (soloVoto && dentro.action !== 'rate' && dentro.action !== 'rate-received') return;
   /* SEMPRE, anche quando una chiamata l'aspettava: la macchina a stati
      e' una sola, e un messaggio non sollecitato la muove uguale */
   applicaMessaggioP2P(ord, dentro);
@@ -58296,6 +58365,13 @@ function gestoRecensioneP2P(o, rec){
   if (o.recensione === 'fatta' || (rec && rec.gia)) return '';
   if (!rec) return '';
   if (rec.si) return 'recensisci';
+  /* UNA RISPOSTA PROVVISORIA NON APRE IL SOLO VOTO (12 ott 2026, voto-
+     dopo-concluso): finche' la domanda si sta ancora richiedendo da
+     sola («non ancora conclusa», server muto) il posto per la
+     recensione puo' arrivare — e chi ha gia' aperto il foglio del
+     circuito non lo vedrebbe piu'. A riprove finite torna la strada
+     di sempre: il muto non e' un no. */
+  if (rec.provvisoria) return '';
   return (o.votabile && !o.votato) ? 'vota' : '';
 }
 /* i quattro passi che si vedono, e a che punto sta ognuno stato */
@@ -58846,6 +58922,11 @@ function applicaMessaggioP2P(ord, dentro){
     /* ...e il moderatore e l'id della disputa, se mancano (28 set 2026) */
     if (!ord.moderatore && eco.moderatore) { ord.moderatore = eco.moderatore; preso = true; }
     if (!ord.disputaId && eco.disputaId) { ord.disputaId = eco.disputaId; preso = true; }
+    /* ...e l'invito al voto con la sua conferma (12 ott 2026, voto-
+       dopo-concluso): sono FATTI e non mosse — riascoltati dopo il
+       concluso arrivano con un'ora piu' vecchia dell'ultima mossa */
+    if (eco.votabile && !ord.votabile) { ord.votabile = true; preso = true; }
+    if (eco.votato && !ord.votato) { ord.votato = true; preso = true; }
     if (ord.stato === 'in_disputa' && !ord.annulloDisputa && eco.annulloDisputa) {
       ord.annulloDisputa = eco.annulloDisputa; preso = true;
       diarioP2P('msg ' + String(ord.id).slice(0, 8) + ': l\'annullo '
@@ -61553,6 +61634,8 @@ function renderOrdineP2P(){
      recensione si puo' lasciare, e a dirlo e' il server */
   if (o.stato === 'concluso'
       || (o.stato === 'annullato' && (o.disputaId || o.moderatore))) chiediRecensibileP2P(o.id);
+  /* ...e il voto rimasto indietro si riprende da qui (12 ott 2026) */
+  if (o.stato === 'concluso' && typeof riprendiVotoP2P === 'function') riprendiVotoP2P(o);
   /* SATS IN PAGAMENTO, A CHI VENDE (23 set 2026): la domanda al server
      parte anche da qui — «il pagamento a chi compra e' passato?» — e
      quando la risposta muove la riga la pagina si ridisegna da se'. Il
@@ -61760,13 +61843,17 @@ function riquadroRecensioneP2P(o, rec){
          : '')
       + '</div>';
   if (gestoRecensioneP2P(o, rec) === 'recensisci') return moduloRecensioneP2P(o);
+  /* IL VOTO GIA' DATO SI DICE (12 ott 2026, voto-dopo-concluso): dove
+     non c'e' il riquadro della recensione, chi ha votato lo legge qui
+     invece di cercare un bottone che non c'e' piu' */
+  const gia = o.votato ? '<div class="hint" id="p2pGiaVotato">' + P2P_GIA_VOTATO + '</div>' : '';
   /* (12 ott 2026, chi-e-l-altro) il motivo preciso: da un'altra app,
      anonima per scelta, o uno scambio di prima della regola — mai
      «non ha un profilo» a chi ce l'ha */
   if (rec && !rec.si && ['ignota', 'esterno', 'anonimo_prima'].indexOf(rec.motivo) >= 0
       && !(o.votabile && !o.votato))
-    return '<div class="hint">' + testoRecensioneMancanteP2P(rec.motivo) + '</div>';
-  return '';
+    return '<div class="hint">' + testoRecensioneMancanteP2P(rec.motivo) + '</div>' + gia;
+  return gia;
 }
 /* PURA: perche' qui una recensione non c'e' (12 ott 2026) */
 function testoRecensioneMancanteP2P(motivo){
@@ -68588,6 +68675,14 @@ async function tornaDopoAnnulloP2P(id, gesto){
    altro client un profilo qui non ce l'ha. Si dice, e non si fa finta
    di niente: il foglio lo scrive, e le stelle vanno dove possono. */
 let p2pStellaScelta = 0;       // le stelle scelte e non ancora mandate
+const P2P_VOTO_SENZA_RISPOSTA = 'Non sappiamo se il voto è arrivato: riprova più tardi';
+/* IL COORDINATORE A UN SECONDO VOTO NON RISPONDE NIENTE (12 ott 2026,
+   letto su `rate_user.rs` di Mostro 0.19.0: flag gia' alzato, `return
+   Ok(())` — ne' conferma ne' rifiuto; dal campo, lo scambio 44c46ddf:
+   il voto era arrivato, la pagina sorda non aveva sentito la conferma, e
+   ogni riprova cadeva nel silenzio). A dirlo e' la CONFERMA di allora,
+   che sui relay resta trenta giorni: riascoltata, accende `votato`. */
+const P2P_GIA_VOTATO = '⭐ Hai già votato questo scambio';
 
 /* ⚠️ LE DUE CHE PARLANO COL NOSTRO SERVER STANNO DI LA' (set 2026):
    `chiediRecensibileP2P` e `inviaRecensioneP2P` vivono nel blocco dei
@@ -68656,12 +68751,35 @@ async function votaP2P(n){
   const o = ordiniP2P()[id];
   if (!o || !(n >= 1 && n <= 5)) return;
   chiudiFoglioP2P('p2pVotoSheet');
+  /* GIA' VOTATO: non parte niente, e si dice (vedi P2P_GIA_VOTATO) */
+  if (o.votato) {
+    toast(P2P_GIA_VOTATO);
+    if (p2pOrdineAperto === id) renderOrdineP2P();
+    return;
+  }
   const rip = attesaP2P('Mando il voto…');
   try {
     await stelleCircuitoP2P(o, n);
     toast('Grazie ⭐');
   } catch(e) {
-    toast('Il voto non è partito: ' + ragioneGestoP2P(e));
+    /* ...e se MENTRE si aspettava e' arrivata la conferma di allora,
+       il silenzio ha una ragione: il voto c'era gia' */
+    const ora = ordiniP2P()[id];
+    if (ora && ora.votato) {
+      toast(P2P_GIA_VOTATO);
+      rip();
+      if (p2pOrdineAperto === id) renderOrdineP2P();
+      return;
+    }
+    /* IL SILENZIO NON E' «NON PARTITO» (12 ott 2026, voto-dopo-
+       concluso): il messaggio e' stato preso in consegna e manca la
+       risposta — non si sa, e si dice cosi' */
+    /* ...e quando nessun relay che conta l'ha preso la ragione e' gia'
+       tutta nel titolo: «Il voto non è partito: Il messaggio non è
+       partito» lo diceva due volte (visto nel giro dal vivo) */
+    toast(e && e.silenzio ? P2P_VOTO_SENZA_RISPOSTA
+          : e && e.relayMuti ? 'Il voto non è partito: riprova fra un momento'
+          : 'Il voto non è partito: ' + ragioneGestoP2P(e));
   } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
@@ -68670,10 +68788,44 @@ async function votaP2P(n){
    porta dietro — o il giorno che cambia il messaggio ne resterebbe
    uno indietro. */
 async function stelleCircuitoP2P(o, n){
+  /* UN VOTO IN VOLO NON SI RIMANDA (12 ott 2026, dal giro dal vivo: la
+     recensione appena inviata ridisegna la pagina mentre le stelle
+     viaggiano, e `riprendiVotoP2P` le rimandava una seconda volta) */
+  if (typeof p2pVotoRipresi !== 'undefined') p2pVotoRipresi[o.id] = 2;
   await chiamataOrdineP2P(o, 'rate-user', {rating_user: n});
   const agg = ordiniP2P()[o.id] || o;
   agg.votato = true;
   scriviOrdineP2P(agg);
+}
+/* IL VOTO SI RIPRENDE (12 ott 2026, voto-dopo-concluso): per chi ha
+   concluso senza riuscire a votare. Aprendo la pagina di uno scambio
+   concluso e non ancora votato: 1) si RIASCOLTA la sua chiave, cosi'
+   l'invito `rate` perso arriva adesso (il coordinatore lo tiene sui
+   relay trenta giorni); 2) se la recensione c'e' gia' e le stelle al
+   circuito no — partivano in sottofondo e il loro errore non lo vedeva
+   nessuno — ripartono da sole con lo stesso voto. Una volta per
+   sessione e per scambio: non e' un martello. Torna cosa ha fatto. */
+let p2pVotoRipresi = {};         // id -> 1 riascoltato, 2 stelle rimandate
+function riprendiVotoP2P(o){
+  if ((typeof DEMO !== 'undefined' && DEMO) || (typeof VETRINA !== 'undefined' && VETRINA)) return '';
+  if (!o || o.stato !== 'concluso' || o.votato || !o.pubTrade) return '';
+  if (typeof ordiniVotoP2P !== 'function' || !ordiniVotoP2P()[o.pubTrade]) return '';
+  const fatto = p2pVotoRipresi[o.id] || 0;
+  if (!fatto) {
+    p2pVotoRipresi[o.id] = 1;
+    mostroRiascolta().catch(() => {});
+  }
+  const n = Math.floor(Number(o.recVoto) || 0);
+  /* LE STELLE NON RIPARTONO NELLO STESSO RESPIRO DEL RIASCOLTO: prima
+     si da' tempo alla conferma di allora di arrivare (se il voto c'era
+     gia', `votato` si accende e qui non si arriva piu'); ripartono al
+     ridisegno dopo */
+  if (fatto === 1 && o.votabile && o.recensione === 'fatta' && n >= 1 && n <= 5) {
+    p2pVotoRipresi[o.id] = 2;
+    stelleCircuitoP2P(o, n).catch(() => {});
+    return 'stelle';
+  }
+  return fatto ? '' : 'ascolto';
 }
 
 /* ---- I DUE RECAPITI CIFRATI (set 2026, fase 6 — al posto della chat)
@@ -73190,6 +73342,7 @@ async function chiediRecensibileP2P(id){
   if ((esito.motivo === 'non_conclusa' || esito.motivo === 'muto')
       && !esito.si && !esito.gia && n < P2P_REC_RIPROVE_MS.length) {
     p2pRecRiprove[id] = n + 1;
+    esito.provvisoria = true;   // vedi `gestoRecensioneP2P`
     setTimeout(() => {
       p2pRecChieste.delete(id);
       if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine')
@@ -77967,6 +78120,7 @@ async function avvia(){
     bozzaCodice = null;     // e la bozza si butta, o resterebbe fissata
     codiceInModifica = 0;   // a una regola letta prima di questo giro
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
+    myScambiP2P = Number(me.scambi_completati) || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];

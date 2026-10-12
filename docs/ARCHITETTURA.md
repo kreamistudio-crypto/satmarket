@@ -7609,6 +7609,59 @@
   non ascolta sarebbe un «inviato» falso. Lo specchio entra il giorno
   che il coordinator lo ascolta, e quel giorno entra in `MOSTRO_RELAY`
   dal config del VPS, senza toccare il client.
+  I RELAY CHE CONTANO COME CONFERMA (12 ott 2026, voto-dopo-concluso):
+  «inviato alla PRIMA conferma» valeva per un relay qualunque del coro,
+  e un OK dice che QUEL relay ha preso l'evento, non che mostrod da li'
+  lo legga. La sonda in sola lettura di quel giorno: nos.lol non
+  restituiva nessun evento del coordinator piu' recente del 6 ott (le
+  richieste dei client si'), damus — che lo aveva bannato per i troppi
+  eventi — ne teneva sei su dieci. Che mostrod legga da un relay, da
+  fuori non si vede: lo dice il suo journal.
+  La leva `MOSTRO_RELAY_CONFERMA` (config del VPS, vuota di serie) dice
+  quali relay del coro CONTANO: `_p2p_leve` la manda al client come
+  `conferma`, gia' ristretta alle voci che stanno anche in
+  `MOSTRO_RELAY` (una voce fuori dal coro non riceverebbe niente, e
+  all'avvio si dice). `pubblicaSuTuttiP2P` manda l'evento a TUTTO il
+  coro come prima, ma risolve solo all'OK di un relay di
+  `urlConfermaP2P`; l'OK di un altro si scrive negli esiti («ok ma non
+  conta») e basta, e se chi conta rifiuta o tace l'errore e' lo stesso
+  `relayMuti` di sempre — «Il messaggio non è partito». Vuota = il
+  mondo di ieri: contano tutti. ⚠️ `relay.barattolo.store` NON puo'
+  stare in questa lista finche' il suo plugin (`deploy/relay/policy/
+  chi-scrive.py`) accetta solo le chiavi in lista: le trade key dei
+  client non ci sono, e il relay le rifiuta. Lo sistema un cantiere a
+  parte (relay-per-mostro, decisione di Andrea): qui non si tocca.
+  IL VOTO DOPO IL CONCLUSO (12 ott 2026, voto-dopo-concluso): il voto
+  al coordinator (`rate-user`) si da' a scambio CONCLUSO, e a concluso
+  la trade key usciva dall'ascolto (`ordiniAscoltoP2P` tiene solo gli
+  scambi vivi): l'invito `rate` di chi compra — che mostrod manda
+  subito DOPO `purchase-completed` — veniva buttato da `mostroArriva`,
+  e la conferma `rate-received` non la sentiva nessuno. Adesso c'e'
+  una SECONDA mappa, `ordiniVotoP2P`: le righe concluse, non votate,
+  con la chiave, entro `P2P_VOTO_FINESTRA_S` (30 giorni: la vita dei
+  messaggi del coordinator sui relay, il loro `expiration`).
+  `mostroRiascolta` e `ultimoVistoP2P` ascoltano l'unione
+  (`ordiniUdibiliP2P`); `mostroArriva` cerca prima fra i vivi e poi
+  li', e a una riga conclusa applica SOLO `rate` e `rate-received`
+  (dopo aver dato la risposta a un'eventuale chiamata in attesa): il
+  resto del suo passato, che il relay ripete a ogni riascolto, non la
+  tocca. `ordiniAscoltoP2P` resta com'era — chat, moderatore, risveglio
+  e riconnessioni continuano a vedere solo gli scambi vivi. Nel ramo
+  del PASSATO di `applicaMessaggioP2P` l'invito e la conferma sono
+  fatti e non mosse: si prendono anche con un'ora piu' vecchia
+  dell'ultima mossa. `riprendiVotoP2P`, chiamata dal render della
+  pagina di uno scambio concluso, riascolta la chiave una volta per
+  sessione (l'invito perso arriva adesso) e, se la recensione c'e'
+  gia' e le stelle al circuito no, le rimanda da sole con lo stesso
+  voto, una volta; `stelleCircuitoP2P` segna il voto in volo prima di
+  partire, cosi' la ripresa non lo duplica. Il foglio del solo voto
+  dice «Non sappiamo se il voto è arrivato» quando il messaggio e'
+  partito e la risposta manca (`silenzio`), e una risposta
+  PROVVISORIA di `/api/p2p/recensibile` (`non_conclusa` o muto, finche'
+  la domanda si richiede da sola: `rec.provvisoria`) non offre piu'
+  quel foglio. E la scheda Profilo scrive gli scambi P2P completati
+  accanto a vendite e acquisti: `/api/me` porta `scambi_completati`,
+  lo stesso conto del negozio (`_completati_p2p`).
   Presenza Nostr della piattaforma: `NOSTR_NSEC_PIATTAFORMA` in config
   (segnaposto = funzione spenta, fail-open). Alla pubblicazione il
   server firma un evento NIP-99 (kind 30402, tag `d` stabile

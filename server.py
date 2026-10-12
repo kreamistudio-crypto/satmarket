@@ -29381,6 +29381,13 @@ def _leve_stato():
                          "scambio",
                   spento="il libro si legge solo dai relay del "
                          "coordinator: se cadono loro, cade il libro"),
+            _leva("Relay che confermano", "MOSTRO_RELAY_CONFERMA",
+                  _elenco([r for r in MOSTRO_RELAY_CONFERMA if r in MOSTRO_RELAY]),
+                  acceso="un messaggio per il coordinator vale «partito» "
+                         "solo quando lo conferma uno di questi",
+                  spento="vale «partito» al primo OK di un relay "
+                         "qualunque del coro, anche di uno da cui il "
+                         "coordinator non legge"),
         ]},
         {"gruppo": "🪙 Punti e dollari su RGB (hackathon)", "voci": [
             # IL CANCELLO DELL'HACKATHON (ott 2026): la riga chiede al
@@ -41155,8 +41162,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     p2p_tocca = _quanti_tocca_p2p(con, user["id"], int(time.time()))
     # (12 ott 2026) il giudizio si legge PRIMA di chiudere
     _ric = 1 if (u and _p2p_riconosciuto(con, user["id"])) else 0
+    # GLI SCAMBI P2P COMPLETATI (12 ott 2026, voto-dopo-concluso): la
+    # scheda Profilo li scrive accanto a vendite e acquisti — lo stesso
+    # conto del negozio e del volto, da uno in su
+    _scambi_p2p = _completati_p2p(con, [user["id"]]).get(int(user["id"]), 0)
     con.close()
     profilo = dict(u) if u else {}
+    profilo["scambi_completati"] = _scambi_p2p
     # IL RICONOSCIMENTO LO DICE IL GIUDICE (12 ott 2026, chi-e-l-altro):
     # acceso per tutti (l'anonimato e' una chiave Nostr nuova) — la
     # colonna `riconosci_p2p` da sola direbbe ancora il default di ieri.
@@ -45033,6 +45045,29 @@ try:
                              if str(r).strip()]
 except ImportError:
     MOSTRO_RELAY_SPECCHIO = []
+# I RELAY CHE CONTANO COME CONFERMA (12 ott 2026, voto-dopo-concluso):
+# la pagina manda ogni messaggio per il coordinator a TUTTO il coro
+# (`MOSTRO_RELAY`) e lo dava per «partito» al primo OK di uno qualunque.
+# Un OK pero' dice che QUEL relay ha preso l'evento, non che mostrod da
+# li' lo legga. La sonda in sola lettura del 12 ott (19:52 UTC): nos.lol
+# non restituiva nessun evento del coordinator piu' recente del 6 ott,
+# damus — che lo aveva bannato per i troppi eventi — ne teneva sei su
+# dieci. Che mostrod LEGGA da un relay, da fuori non si vede: lo dice
+# il suo journal.
+# Qui stanno i relay da cui mostrod legge DI SICURO: solo il loro OK
+# vale. E' un sottoinsieme di MOSTRO_RELAY (una voce che la' non c'e'
+# non riceverebbe niente, e si scarta dicendolo). Vuota = il mondo di
+# ieri: contano tutti.
+try:
+    from config import MOSTRO_RELAY_CONFERMA
+    MOSTRO_RELAY_CONFERMA = [str(r) for r in MOSTRO_RELAY_CONFERMA
+                             if str(r).strip()]
+except ImportError:
+    MOSTRO_RELAY_CONFERMA = []
+_conferma_fuori_coro = [r for r in MOSTRO_RELAY_CONFERMA if r not in MOSTRO_RELAY]
+if _conferma_fuori_coro:
+    print("[p2p] MOSTRO_RELAY_CONFERMA nomina relay che non stanno in "
+          f"MOSTRO_RELAY ({', '.join(_conferma_fuori_coro)}): non contano")
 # LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026, decisione di Andrea):
 # il 2% dello scambio. ⚠️ QUESTA LEVA NON INCASSA NIENTE: l'incasso e'
 # la `fee` del coordinatore (settings.toml del nodo), perche' i sats
@@ -45499,6 +45534,9 @@ def _p2p_leve() -> dict:
             "mostro": MOSTRO_HEX,
             "relay": list(MOSTRO_RELAY),
             "specchio": list(MOSTRO_RELAY_SPECCHIO),
+            # i relay il cui OK vale «partito» (12 ott 2026): solo
+            # quelli che stanno anche nel coro
+            "conferma": [r for r in MOSTRO_RELAY_CONFERMA if r in MOSTRO_RELAY],
             # il LISTINO della commissione (set 2026): la percentuale
             # viva il client la legge dal 38385 del coordinatore, e
             # questa serve solo a dire quand'e' che quella e' una promo

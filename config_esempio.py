@@ -795,6 +795,13 @@ MOSTRO_RELAY = [
 # VUOTA E' IL MONDO DI IERI, byte per byte: il libro si legge dai soli
 # relay del coordinator, come prima che questa riga esistesse.
 MOSTRO_RELAY_SPECCHIO = []
+# I RELAY CHE CONTANO COME CONFERMA (12 ott 2026): la pagina manda ogni
+# messaggio per il coordinator a tutti i relay di MOSTRO_RELAY, e lo
+# considera «partito» solo quando lo conferma uno di QUESTI — quelli da
+# cui mostrod legge di sicuro (si guarda nel suo journal: «Connected to
+# relay», e con la sonda in sola lettura). Devono stare anche in
+# MOSTRO_RELAY. VUOTA E' IL MONDO DI IERI: vale il primo OK di chiunque.
+MOSTRO_RELAY_CONFERMA = []
 # LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026): il LISTINO, in
 # percentuale sull'intero scambio. ⚠️ NON incassa niente: a incassare
 # e' la `fee` del coordinator (settings.toml del nodo), che i client

@@ -128,6 +128,7 @@ jobs:
              collaudo_avvisi_mercatino.py
              collaudo_paycode_riconosciuto.py collaudo_scambi_ovunque.py
              collaudo_chiavi_ritrovate.py collaudo_chi_e_l_altro.py
+             collaudo_voto_dopo_concluso.py
              collaudo_dispute_p2p.py collaudo_tolti_ovunque.py
              collaudo_reputazione_p2p.py
              collaudo_giro_nuovo.py
@@ -259,6 +260,7 @@ jobs:
              collaudo_scambi_ovunque
              collaudo_chiavi_ritrovate
              collaudo_chi_e_l_altro
+             collaudo_voto_dopo_concluso
              collaudo_dispute_p2p
              collaudo_racconti_bozza
              collaudo_sponsor

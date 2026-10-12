@@ -32031,6 +32031,7 @@ def _censimento(acceso, dopo=None):
     # qualcosa («il libro si legge solo dai relay del coordinator»), non
     # una leva non configurata.
     amb["MOSTRO_RELAY_SPECCHIO"] = [1, 2, 3] if acceso else []
+    amb["MOSTRO_RELAY_CONFERMA"] = [1, 2] if acceso else []
     # LA FASE CHIUSA e' una lista anche lei, e come i relay il VUOTO ha
     # un significato — «aperto a tutti» — quindi si esercitano tutti e
     # due i rami del pannello invece di inchiodarla a [1,2,3]: a leve
@@ -71678,6 +71679,65 @@ function reset(){
   manda(ordine('purchase-completed', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
   out.concluso = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
   out.dettoConcluso = toasts.some(t => t.indexOf('concluso') >= 0);
+  /* ---- IL VOTO DOPO IL CONCLUSO (12 ott 2026, voto-dopo-concluso, lo
+     scambio a3f57b19): a chi COMPRA l'invito `rate` arriva DOPO
+     `purchase-completed`, cioe' a riga gia' conclusa — e veniva buttato;
+     la conferma `rate-received` non la sentiva nessuno. ---- */
+  {
+    const IDV = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+    /* (il relay di cartone consegna anche agli ascolti chiusi: che
+       l'ascolto sia APERTO su quella chiave lo dice il motore) */
+    await mostroRiascolta();
+    out.conclusoInAscolto = Object.keys(ordiniVotoP2P()).indexOf(tp) >= 0
+      && Object.keys(ordiniAscoltoP2P()).indexOf(tp) < 0
+      && !!p2pSub && p2pSubChiavi.indexOf(tp) >= 0;
+    manda(ordine('rate', null, IDV), tp); await pausa();
+    out.invitoDopoConcluso = ordiniP2P()[IDV].votabile === true;
+    /* il passato che il relay ripete NON tocca lo scambio concluso */
+    manda(ordine('cant-do', null, IDV, {cant_do: 'invalid_invoice'}), tp); await pausa();
+    manda(ordine('add-invoice', null, IDV, {order: {id: IDV, amount: 1}}), tp); await pausa();
+    out.conclusoIntatto = [ordiniP2P()[IDV].stato, ordiniP2P()[IDV].cantDo || '',
+                           ordiniP2P()[IDV].satsMiei];
+    /* l'invito RIASCOLTATO arriva con un'ora piu' vecchia dell'ultima
+       mossa: e' un fatto, e si prende lo stesso */
+    {
+      const rr = ordiniP2P()[IDV];
+      rr.votabile = false; rr.ultimaMossa = Math.floor(Date.now() / 1000) + 500;
+      scriviOrdineP2P(rr);
+      manda(ordine('rate', null, IDV), tp); await pausa();
+      out.invitoDalPassato = ordiniP2P()[IDV].votabile === true;
+    }
+    /* UN VOTO IN VOLO NON SI RIMANDA (dal giro dal vivo): la recensione
+       appena lasciata ridisegna la pagina mentre le stelle viaggiano, e
+       la ripresa non deve mandarle una seconda volta */
+    const votiFin = () => ricevuti.filter(x => x.dentro && x.dentro.action === 'rate-user').length;
+    {
+      const rr = ordiniP2P()[IDV];
+      rr.recensione = 'fatta'; rr.recVoto = 5; scriviOrdineP2P(rr);
+      p2pVotoRipresi = {};
+      rispondi = null; P2P_ATTESA_MS = 300;
+      const inVolo = stelleCircuitoP2P(ordiniP2P()[IDV], 5).then(() => 'ok', e => (e && e.silenzio) ? 'silenzio' : 'altro');
+      await pausa(60);
+      const ripresa = riprendiVotoP2P(ordiniP2P()[IDV]);
+      out.votoInVoloNonSiRimanda = [ripresa, await inVolo, votiFin()];
+    }
+    const votiPrima = votiFin();
+    /* il voto: il coordinatore di cartone conferma, e la conferma si SENTE */
+    rispondi = r => r.dentro.action === 'rate-user'
+      ? [ordine('rate-received', r.dentro.request_id, r.dentro.id,
+                {rating_user: r.dentro.payload.rating_user})] : [];
+    P2P_ATTESA_MS = 1500;
+    let esitoVoto = 'ok';
+    try { await stelleCircuitoP2P(ordiniP2P()[IDV], 5); }
+    catch(e) { esitoVoto = String(e && e.message || e); }
+    const votiMandati = ricevuti.filter(x => x.dentro && x.dentro.action === 'rate-user');
+    out.votoConfermato = [esitoVoto, ordiniP2P()[IDV].votato === true, votiMandati.length - votiPrima,
+                          votiMandati.length > 0 && votiMandati[votiMandati.length - 1].tradePub === tp];
+    /* votato: la chiave esce dall'ascolto */
+    out.votatoNonSiAscolta = Object.keys(ordiniVotoP2P()).length;
+    P2P_ATTESA_MS = 30000;
+    rispondi = null;
+  }
   /* EMENDATA (fase 6): a scambio concluso il foglio del profilo NON
      si apre piu' — nella vista P2P il profilo non si nomina, e per il
      profilo del conto il debito di backup non esiste. La pausa resta
@@ -72966,6 +73026,49 @@ function reset(){
   await finoA(() => !!p2pRelayVivi['wss://lento'], 3000);
   out.lentoPoiArriva = !!p2pRelayVivi['wss://lento'];
 
+  /* ---- 16) «PARTITO» LO DICE SOLO UN RELAY CHE CONTA (12 ott 2026,
+     voto-dopo-concluso): l'evento va a tutto il coro, ma l'OK di un
+     relay da cui il coordinatore non legge non e' una conferma ---- */
+  {
+    const evProva = () => NT0.finalizeEvent({kind: 14,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['p', MOSTRO_PUB], ['expiration', String(Math.floor(Date.now() / 1000) + 3600)]],
+      content: 'x'}, NT0.generateSecretKey());
+    const esito = () => pubblicaSuTuttiP2P(evProva()).then(u => u,
+      e => (e && e.relayMuti ? 'muti:' : 'altro:') + ((e && e.esiti) || []).join(' '));
+    reset(); P2P_ACK_MS = 400;
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto', 'wss://finto-b'],
+                       conferma: ['wss://finto-b']});
+    out.confermaChiConta = await esito();
+    reset(); P2P_ACK_MS = 400;
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto', 'wss://muto'],
+                       conferma: ['wss://muto']});
+    {
+      const e1 = await esito();
+      out.confermaOkCheNonConta = e1.indexOf('muti:') === 0 && e1.indexOf('wss://finto=ok ma non conta') > 0;
+    }
+    reset(); P2P_ACK_MS = 5000;
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto', 'wss://rifiuta'],
+                       conferma: ['wss://rifiuta']});
+    {
+      const t0 = Date.now();
+      const e2 = await esito();
+      /* hanno risposto tutti e nessuno conta: non si aspetta il tempo intero */
+      out.confermaRifiutata = e2.indexOf('muti:') === 0 && Date.now() - t0 < 3000;
+    }
+    reset(); P2P_ACK_MS = 400;
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+    out.confermaVuotaIeri = await esito();
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto'], conferma: []});
+    out.confermaListaVuota = await esito();
+    /* una voce che nel coro non c'e' non riceverebbe niente: non conta,
+       e senza nessuna voce buona si torna al mondo di ieri */
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto'], conferma: ['wss://altrove']});
+    out.confermaFuoriCoro = [await esito(), JSON.stringify(urlConfermaP2P())];
+    reset();
+    p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+  }
+
   /* ---- IL PAGAMENTO FALLITO DOPO IL RILASCIO (17 set 2026, lo
      scambio 3fcdb207: 14.837 sats fermi nel nodo). La sequenza VERA
      dei messaggi verso chi compra, cifrati e con la loro ora: fattura,
@@ -73180,6 +73283,23 @@ function reset(){
         "rilasciato": ("il rilascio pure", "rilasciato"),
         "concluso": ("e lo scambio si chiude", "concluso"),
         "dettoConcluso": "...dicendolo",
+        "conclusoInAscolto": "VOTO: lo scambio concluso e non votato resta in ascolto PER IL VOTO, e non fra gli scambi vivi",
+        "invitoDopoConcluso": "VOTO: l'invito `rate` che arriva DOPO `purchase-completed` accende il voto a chi compra",
+        "conclusoIntatto": ("VOTO: il passato ripetuto dal relay (un no, una fattura) non tocca lo scambio concluso",
+                            ["concluso", "", 7543]),
+        "invitoDalPassato": "VOTO: l'invito riascoltato, piu' vecchio dell'ultima mossa, si prende lo stesso",
+        "votoInVoloNonSiRimanda": ("VOTO: mentre le stelle viaggiano la ripresa non le rimanda, e il silenzio resta un silenzio",
+                                   ["", "silenzio", 1]),
+        "votoConfermato": ("VOTO: il voto parte con la chiave dello scambio e la conferma del coordinatore si SENTE",
+                           ["ok", True, 1, True]),
+        "votatoNonSiAscolta": ("VOTO: a voto confermato la chiave esce dall'ascolto", 0),
+        "confermaChiConta": ("CONFERMA: fra due relay che dicono OK vale quello che conta", "wss://finto-b"),
+        "confermaOkCheNonConta": "CONFERMA: l'OK di un relay che non conta non basta — il messaggio NON e' partito, e l'esito lo scrive",
+        "confermaRifiutata": "CONFERMA: se chi conta rifiuta, lo si sa subito e non al tempo scaduto",
+        "confermaVuotaIeri": ("CONFERMA: senza la lista vale il primo OK, il mondo di ieri", "wss://finto"),
+        "confermaListaVuota": ("CONFERMA: ...e la lista vuota vale lo stesso", "wss://finto"),
+        "confermaFuoriCoro": ("CONFERMA: una voce che nel coro non c'e' non conta, e senza voci buone contano tutti",
+                              ["wss://finto", '["wss://finto"]']),
         "backupOfferto": "a scambio concluso il foglio del profilo NON si apre (fase 6)",
         "paroleDiCasa": "a schermo nessuna parola di protocollo",
         "contoInCard": "la card dello scambio E' il conto del libro",
@@ -79894,6 +80014,7 @@ def prove_p2p_server():
         a = {"__builtins__": __builtins__, "P2P_ATTIVO": attivo,
              "MOSTRO_HEX": hexv, "MOSTRO_RELAY": relay,
              "MOSTRO_RELAY_SPECCHIO": list(specchio),
+             "MOSTRO_RELAY_CONFERMA": [],
              "P2P_COMMISSIONE_PERCENTO": 2,
              "P2P_MAX_EURO": max_euro,
              # il minimo di Barattozon (30 set 2026), in busta con le leve
@@ -79933,9 +80054,10 @@ def prove_p2p_server():
     # (11 ott 2026) TREDICI: la cauzione sul metodo scelto, dietro la -bar7
     # (12 ott 2026) QUATTORDICI: il tempo di chi pubblica — pausa, badge, regole
     # (12 ott 2026, sera) QUINDICI: la chat nello scambio, accesa di serie
-    prova("le chiavi sono quindici e sono sempre quelle",
+    # (12 ott 2026, sera) SEDICI: i relay che contano come conferma
+    prova("le chiavi sono sedici e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
-           "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
+           "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "relay",
            "specchio", "tempoPubblica"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
@@ -94393,7 +94515,7 @@ def prove_giro_nuovo_stesso_id():
     prova("la diagnosi dice il giro", True, "+ ' giro=' + (o.giro | 0)" in mini)
     prova("i messaggi del coordinatore trovano la riga dalla chiave in ascolto (le chiavi finite non si ascoltano)",
           [True, True],
-          ["const ord = ordiniAscoltoP2P()[pub];" in fn("async function mostroArriva(ev){"),
+          ["let ord = ordiniAscoltoP2P()[pub];" in fn("async function mostroArriva(ev){"),
            "if (o && o.pubTrade && P2P_FINALI.indexOf(o.stato) < 0) m[o.pubTrade] = o;"
            in fn("function ordiniAscoltoP2P(){")])
 
@@ -108982,7 +109104,8 @@ def prove_avvisi_nuovi_ordini():
     prova("...e la coda si timbra con l'ora PRIMA di comporre il messaggio", True,
           scarica_src.index("SET mandato=? WHERE tg_id=? AND mandato=0") < scarica_src.index("_testo_avviso_nuovi_p2p(vive)"))
     amb_l = {"P2P_ATTIVO": True, "MOSTRO_HEX": "a" * 64, "MOSTRO_RELAY": ["ws://127.0.0.1:9"],
-             "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
+             "MOSTRO_RELAY_SPECCHIO": [], "MOSTRO_RELAY_CONFERMA": [],
+             "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
@@ -131333,7 +131456,8 @@ def prove_contanti_a_mano():
     prova("...un tetto negativo non e' un tetto", True,
           'if P2P_CONTANTI_MAX_EURO < 0:\n        raise ValueError' in src)
     amb_l = {"P2P_ATTIVO": True, "MOSTRO_HEX": "a" * 64, "MOSTRO_RELAY": ["ws://127.0.0.1:9"],
-             "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
+             "MOSTRO_RELAY_SPECCHIO": [], "MOSTRO_RELAY_CONFERMA": [],
+             "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250,
              # il minimo di Barattozon, entrato nella busta lo stesso giorno
              "BARATTOZON_MIN_EURO": 25,
@@ -141520,7 +141644,8 @@ def prove_indirizzo_non_verificato():
     # richiesta di Andrea): la scorciatoia non si propone gia' all'apertura
     def leve_con(elenco):
         a = {"P2P_ATTIVO": True, "MOSTRO_HEX": "ab" * 32, "MOSTRO_RELAY": ["wss://x"],
-             "MOSTRO_RELAY_SPECCHIO": [], "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
+             "MOSTRO_RELAY_SPECCHIO": [], "MOSTRO_RELAY_CONFERMA": [],
+             "P2P_COMMISSIONE_PERCENTO": 2, "P2P_MAX_EURO": 0,
              "P2P_CONTANTI_MAX_EURO": 250, "BARATTOZON_MIN_EURO": 25, "P2P_CAUZIONE": False,
              "P2P_CAUZIONE_SUL_METODO": False,
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
@@ -152153,7 +152278,8 @@ def prove_tor_chiavi_scambio():
           and "pubCasa = j.pub_casa" in mini)
     # il giudice dei relay di casa, PURO sui globali: si esegue da solo
     g = {"RELAYS_VERIFICA": ["wss://relay.damus.io", "wss://nos.lol/", "", "wss://relay.damus.io"],
-         "MOSTRO_RELAY_SPECCHIO": ["wss://relay.barattolo.store", "http://no", "wss://nos.lol"]}
+         "MOSTRO_RELAY_SPECCHIO": ["wss://relay.barattolo.store", "http://no", "wss://nos.lol"],
+         "MOSTRO_RELAY_CONFERMA": []}
     exec(pezzo("_relay_copia_p2p"), g)
     prova("i relay della copia: casa piu' specchio, senza doppioni ne' indirizzi storti",
           ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.barattolo.store"], g["_relay_copia_p2p"]())
@@ -154463,12 +154589,288 @@ console.log(JSON.stringify(c));
     con.close()
 
 
+def prove_voto_dopo_concluso():
+    """IL VOTO DOPO IL CONCLUSO (12 ott 2026, cantiere voto-dopo-concluso,
+    dal campo: lo scambio a3f57b19 — «metto le 5 stelle e mi dice che il
+    voto non e' partito», «nel profilo non compare lo scambio»).
+
+    QUATTRO DIFETTI, e uno solo era quello visto: 1) a concluso la chiave
+    dello scambio usciva dall'ascolto, e il voto si da' DOPO: l'invito
+    `rate` di chi compra veniva buttato (sul nodo: 0 voti di chi compra
+    su 36 scambi) e la conferma non la sentiva nessuno; 2) «partito» lo
+    diceva il primo OK di un relay qualunque, anche di uno da cui il
+    coordinatore non legge piu'; 3) una risposta PROVVISORIA del server
+    («non ancora conclusa») apriva il foglio del solo voto; 4) la scheda
+    Profilo non nominava gli scambi P2P. Il giro intero col coordinatore
+    di cartone sta nel banco del motore (`prove_p2p_motore`, le righe
+    «VOTO:» e «CONFERMA:»); qui le pure, le sentinelle e la leva."""
+    print("\n[il voto dopo il concluso, i relay che confermano, il profilo]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # --- 1) LE SENTINELLE SUL MOTORE ----------------------------------
+    mar = fn("async function mostroArriva(ev){")
+    prova("uno scambio concluso si cerca fra quelli che aspettano il voto, "
+          "solo se fra i vivi non c'e'", True,
+          "const soloVoto = !ord && typeof ordiniVotoP2P === 'function' "
+          "&& !!ordiniVotoP2P()[pub];" in mar)
+    filtro = ("if (soloVoto && dentro.action !== 'rate' "
+              "&& dentro.action !== 'rate-received') return;")
+    prova("...e di li' passano solo l'invito e la conferma del voto", True,
+          filtro in mar)
+    prova("...DOPO che la chiamata in attesa ha avuto la sua risposta "
+          "(un «no» al voto si deve sentire)", True,
+          0 < mar.find("p2pAttese[rid]") < mar.find(filtro))
+    prova("l'ascolto prende anche le chiavi di chi aspetta il voto", True,
+          "typeof ordiniUdibiliP2P === 'function' ? ordiniUdibiliP2P() : ordiniAscoltoP2P()"
+          in fn("async function mostroRiascolta(){"))
+    prova("...e gli scambi VIVI restano quelli di prima: la chat, il "
+          "moderatore e il risveglio non vedono un concluso", True,
+          "if (o && o.pubTrade && P2P_FINALI.indexOf(o.stato) < 0) m[o.pubTrade] = o;"
+          in fn("function ordiniAscoltoP2P(){")
+          and "ordiniVotoP2P" not in fn("function autoriChatP2P(){")
+          and "ordiniVotoP2P" not in fn("function autoriModeratoreP2P(){"))
+    app = fn("function applicaMessaggioP2P(ord, dentro){")
+    prova("l'invito e la conferma sono FATTI: valgono anche dal passato",
+          [True, True],
+          ["if (eco.votabile && !ord.votabile) { ord.votabile = true; preso = true; }" in app,
+           "if (eco.votato && !ord.votato) { ord.votato = true; preso = true; }" in app])
+    prova("la pagina di uno scambio concluso riprende il voto", True,
+          "if (o.stato === 'concluso' && typeof riprendiVotoP2P === 'function') riprendiVotoP2P(o);"
+          in mini)
+
+    # --- 2) LA FRASE ONESTA, E LA RISPOSTA PROVVISORIA ------------------
+    vota = fn("async function votaP2P(n){")
+    frase = re.search(r"const P2P_VOTO_SENZA_RISPOSTA = '([^']*)';", mini)
+    frase = frase.group(1) if frase else ""
+    prova("il silenzio dopo un voto partito non si chiama «non partito»",
+          True, "toast(e && e.silenzio ? P2P_VOTO_SENZA_RISPOSTA" in vota)
+    prova("...la frase dice che non si sa, e' corta e senza parole di rete",
+          [True, True, True],
+          ["Non sappiamo" in frase, 0 < len(frase) <= 60,
+           not any(w in frase.lower() for w in ("relay", "nostr", "non è partito"))])
+    prova("...e quando nessun relay che conta l'ha preso, «non è partito» si "
+          "dice UNA volta (dal giro dal vivo: lo diceva due volte)", True,
+          ": e && e.relayMuti ? 'Il voto non è partito: riprova fra un momento'" in vota)
+    prova("un voto in volo non si rimanda: chi lo manda lo segna prima di partire",
+          True, "if (typeof p2pVotoRipresi !== 'undefined') p2pVotoRipresi[o.id] = 2;"
+          in fn("async function stelleCircuitoP2P(o, n){"))
+    gia = re.search(r"const P2P_GIA_VOTATO = '([^']*)';", mini)
+    gia = gia.group(1) if gia else ""
+    prova("il voto gia' dato si dice: prima di mandare, e dopo un silenzio "
+          "durante il quale e' arrivata la conferma di allora", [True, True, True],
+          ["if (o.votato) {\n    toast(P2P_GIA_VOTATO);" in vota,
+           "if (ora && ora.votato) {\n      toast(P2P_GIA_VOTATO);" in vota,
+           0 < len(gia) <= 40 and "già votato" in gia])
+    prova("...e la pagina lo scrive dove il bottone non c'e' piu'", True,
+          "const gia = o.votato ? '<div class=\"hint\" id=\"p2pGiaVotato\">' + P2P_GIA_VOTATO + '</div>' : '';"
+          in fn("function riquadroRecensioneP2P(o, rec){"))
+    prova("la domanda che si richiede da sola marca la risposta come provvisoria",
+          True, "esito.provvisoria = true;" in fn("async function chiediRecensibileP2P(id){"))
+
+    # --- 3) IL BANCO NODE DELLE PURE -----------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("le pure del voto dopo il concluso", "node non c'e'")
+    else:
+        banco = "\n".join([
+            re.search(r"const P2P_FINALI = [^\n]*;", mini).group(0),
+            fn("function ordiniAscoltoP2P(){"),
+            _riga_js(mini, "const P2P_VOTO_FINESTRA_S = "),
+            fn("function ordiniVotoP2P(){"),
+            fn("function ordiniUdibiliP2P(){"),
+            fn("function ultimoVistoP2P(){"),
+            fn("function gestoRecensioneP2P(o, rec){"),
+            _riga_js(mini, "let p2pVotoRipresi = "),
+            fn("function riprendiVotoP2P(o){"),
+            fn("function completatiP2P(n, inRiga){"),
+        ]) + r"""
+let DEMO = false, VETRINA = false;
+let righe = {};
+function ordiniP2P(){ return righe; }
+let riascolti = 0, stelle = [];
+async function mostroRiascolta(){ riascolti++; }
+async function stelleCircuitoP2P(o, n){ stelle.push([o.id, n]); }
+const ORA = Math.floor(Date.now() / 1000);
+const G = 86400;
+const out = {};
+righe = {
+  vivo:      {id: 'vivo', stato: 'attivo', pubTrade: 'a1', creato: ORA - 100},
+  fatto:     {id: 'fatto', stato: 'concluso', pubTrade: 'b2', creato: ORA - 5000, aggiornato: ORA - 4000},
+  votato:    {id: 'votato', stato: 'concluso', votato: true, pubTrade: 'c3', creato: ORA - 5000, aggiornato: ORA - 4000},
+  vecchio:   {id: 'vecchio', stato: 'concluso', pubTrade: 'd4', creato: ORA - 40 * G, aggiornato: ORA - 31 * G},
+  annullato: {id: 'annullato', stato: 'annullato', pubTrade: 'e5', creato: ORA - 10, aggiornato: ORA - 5},
+  senzaChiave: {id: 'sk', stato: 'concluso', pubTrade: '', aggiornato: ORA - 5},
+  senzaOra:  {id: 'so', stato: 'concluso', pubTrade: 'f6'},
+  soloCreato:{id: 'sc', stato: 'concluso', pubTrade: 'g7', creato: ORA - G},
+  alLimite:  {id: 'al', stato: 'concluso', pubTrade: 'h8', creato: ORA - 29 * G, aggiornato: ORA - 29 * G}
+};
+out.voto = Object.keys(ordiniVotoP2P()).sort();
+out.vivi = Object.keys(ordiniAscoltoP2P()).sort();
+out.udibili = Object.keys(ordiniUdibiliP2P()).sort();
+/* da quando riascoltare: dal piu' vecchio fra vivi e in attesa del voto */
+out.da = ultimoVistoP2P() === ORA - 29 * G;
+righe = {vivo: righe.vivo};
+out.daSoloVivi = ultimoVistoP2P() === ORA - 100;
+
+const c = {stato: 'concluso', votabile: true};
+out.gesti = [
+  gestoRecensioneP2P(c, {si: true}),
+  gestoRecensioneP2P(c, {si: false, motivo: 'non_conclusa', provvisoria: true}),
+  gestoRecensioneP2P(c, {si: false, motivo: 'muto', provvisoria: true}),
+  gestoRecensioneP2P(c, {si: false, motivo: 'muto'}),
+  gestoRecensioneP2P(c, {si: false, motivo: 'non_conclusa'}),
+  gestoRecensioneP2P(c, {si: false, motivo: 'ignota'}),
+  gestoRecensioneP2P({stato: 'concluso'}, {si: false, motivo: 'ignota'}),
+  gestoRecensioneP2P(c, {si: true, provvisoria: true})
+];
+
+righe = {
+  a: {id: 'a', stato: 'concluso', pubTrade: 'p1', aggiornato: ORA - 10},
+  b: {id: 'b', stato: 'concluso', pubTrade: 'p2', aggiornato: ORA - 10, votabile: true, recensione: 'fatta', recVoto: 4},
+  c: {id: 'c', stato: 'concluso', pubTrade: 'p3', aggiornato: ORA - 10, votabile: true},
+  d: {id: 'd', stato: 'concluso', pubTrade: 'p4', aggiornato: ORA - 10, votabile: true, votato: true, recensione: 'fatta', recVoto: 5},
+  e: {id: 'e', stato: 'attivo', pubTrade: 'p5'},
+  f: {id: 'f', stato: 'concluso', pubTrade: 'p6', aggiornato: ORA - 10, votabile: true, recensione: 'fatta', recVoto: 9},
+  g: {id: 'g', stato: 'concluso', pubTrade: 'p7', aggiornato: ORA - 31 * G, votabile: true, recensione: 'fatta', recVoto: 5}
+};
+/* l'invito perso: si riascolta UNA volta, e niente parte da solo */
+out.ripA = [riprendiVotoP2P(righe.a), riprendiVotoP2P(righe.a), riascolti, stelle.length];
+/* ...poi l'invito arriva, e la recensione c'era gia': le stelle ripartono, una volta */
+righe.a.votabile = true; righe.a.recensione = 'fatta'; righe.a.recVoto = 5;
+out.ripAdopo = [riprendiVotoP2P(righe.a), riprendiVotoP2P(righe.a), JSON.stringify(stelle)];
+stelle = []; riascolti = 0;
+out.ripB = [riprendiVotoP2P(righe.b), riprendiVotoP2P(righe.b), riprendiVotoP2P(righe.b), riascolti, JSON.stringify(stelle)];
+/* ...e se nel frattempo la conferma di allora ha acceso `votato`, niente riparte */
+righe.h = {id: 'h', stato: 'concluso', pubTrade: 'p8', aggiornato: ORA - 10, votabile: true, recensione: 'fatta', recVoto: 5};
+{
+  const primo = riprendiVotoP2P(righe.h);
+  righe.h.votato = true;
+  out.ripGiaVotato = [primo, riprendiVotoP2P(righe.h), stelle.filter(s => s[0] === 'h').length];
+}
+stelle = []; riascolti = 0;
+/* senza recensione sceglie la persona; votato, vivo, voto storto, fuori finestra: niente */
+out.ripAltri = [riprendiVotoP2P(righe.c), riprendiVotoP2P(righe.d), riprendiVotoP2P(righe.e),
+                riprendiVotoP2P(righe.f), riprendiVotoP2P(righe.g), riascolti, stelle.length];
+DEMO = true; p2pVotoRipresi = {};
+out.ripDemo = [riprendiVotoP2P(righe.b), stelle.length];
+out.riga = [completatiP2P(0, true), completatiP2P(1, true), completatiP2P(12, true)];
+process.stdout.write(JSON.stringify(out));
+"""
+        d = _tf.mkdtemp()
+        try:
+            pb = os.path.join(d, "banco.js")
+            open(pb, "w", encoding="utf-8").write(banco)
+            r = _sp.run([node, pb], capture_output=True, encoding="utf-8", timeout=60)
+        finally:
+            _sh.rmtree(d, ignore_errors=True)
+        if r.returncode != 0:
+            prova("il banco node del voto dopo il concluso gira", "", r.stderr[-700:])
+        else:
+            out = _json.loads(r.stdout.strip().splitlines()[-1])
+            prova("aspetta il voto chi ha concluso da meno di trenta giorni "
+                  "e non ha votato — e ha una chiave e un'ora",
+                  ["b2", "g7", "h8"], out["voto"])
+            prova("...gli scambi vivi restano i vivi", ["a1"], out["vivi"])
+            prova("...e l'ascolto li prende tutti e due",
+                  ["a1", "b2", "g7", "h8"], out["udibili"])
+            prova("si riascolta dal piu' vecchio dei due insiemi, e senza "
+                  "conclusi in attesa da dove si riascoltava ieri",
+                  [True, True], [out["da"], out["daSoloVivi"]])
+            prova("il gesto: la recensione se c'e' posto; NIENTE finche' la "
+                  "risposta e' provvisoria; il solo voto a riprove finite o "
+                  "quando l'altra persona non si conosce; mai senza invito",
+                  ["recensisci", "", "", "vota", "vota", "vota", "", "recensisci"],
+                  out["gesti"])
+            prova("l'invito perso si riascolta una volta sola, e niente parte da se'",
+                  ["ascolto", "", 1, 0], out["ripA"])
+            prova("...arrivato l'invito, le stelle della recensione gia' "
+                  "lasciata ripartono UNA volta", ["stelle", "", '[["a",5]]'],
+                  out["ripAdopo"])
+            prova("chi ha la recensione e l'invito ma non il voto: PRIMA il "
+                  "riascolto (la conferma di allora puo' dire che il voto c'era "
+                  "gia'), le stelle al ridisegno dopo, una volta",
+                  ["ascolto", "stelle", "", 1, '[["b",4]]'], out["ripB"])
+            prova("la conferma riascoltata ferma le stelle: chi aveva gia' "
+                  "votato non rimanda niente", ["ascolto", "", 0], out["ripGiaVotato"])
+            prova("senza recensione sceglie la persona; votato, vivo, voto "
+                  "fuori da 1-5 e fuori finestra non mandano niente",
+                  ["ascolto", "", "", "ascolto", "", 2, 0], out["ripAltri"])
+            prova("nel demo non parte niente", ["", 0], out["ripDemo"])
+            prova("la riga degli scambi: da uno in su, come nel negozio",
+                  ["", "✅ 1 scambio", "✅ 12 scambi"], out["riga"])
+
+    # --- 4) LA SCHEDA PROFILO ------------------------------------------
+    rp = fn("function renderProfilo(){")
+    prova("la scheda Profilo scrive gli scambi P2P accanto a vendite e acquisti",
+          True, "completatiP2P(myScambiP2P, true) + ' P2P'" in rp
+          and rp.find("acquisti conclusi") < rp.find("completatiP2P(myScambiP2P, true)"))
+    prova("...col numero che arriva da /api/me", True,
+          "myScambiP2P = Number(me.scambi_completati) || 0;" in mini)
+    me = pezzo("mio_profilo")
+    conto = '_scambi_p2p = _completati_p2p(con, [user["id"]]).get(int(user["id"]), 0)'
+    prova("...che lo conta col giudice del negozio, prima di chiudere il database",
+          [True, True],
+          [0 < me.find(conto) < me.find("con.close()"),
+           'profilo["scambi_completati"] = _scambi_p2p' in me])
+
+    # --- 5) LA LEVA DEI RELAY CHE CONFERMANO ---------------------------
+    prova("MOSTRO_RELAY_CONFERMA nasce vuota: il mondo di ieri", True,
+          "except ImportError:\n    MOSTRO_RELAY_CONFERMA = []" in src)
+    i_l = src.index("try:\n    from config import MOSTRO_RELAY_CONFERMA")
+    blocco_l = src[i_l:src.index("# LA COMMISSIONE DI BARATTOLO SUL P2P", i_l)]
+
+    def leva_con(valore, coro):
+        detto = []
+        amb_l = {"print": lambda *x, **k: detto.append(" ".join(str(i) for i in x)),
+                 "MOSTRO_RELAY": list(coro)}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.MOSTRO_RELAY_CONFERMA = valore
+        vecchio = sys.modules.get("config")
+        sys.modules["config"] = finto
+        try:
+            exec(blocco_l, amb_l)
+        finally:
+            if vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+        return amb_l["MOSTRO_RELAY_CONFERMA"], len(detto)
+    prova("...non dichiarata vale vuota, e non dice niente", ([], 0),
+          leva_con(None, ["wss://a"]))
+    prova("...si legge dal config, scartando le voci vuote", (["wss://a"], 0),
+          leva_con(["wss://a", "", "  "], ["wss://a", "wss://b"]))
+    prova("...e una voce che nel coro non c'e' si DICE all'avvio", 1,
+          leva_con(["wss://a", "wss://fuori"], ["wss://a"])[1])
+    prova("al client arrivano solo le voci che stanno anche nel coro", True,
+          '"conferma": [r for r in MOSTRO_RELAY_CONFERMA if r in MOSTRO_RELAY],'
+          in pezzo("_p2p_leve"))
+    prova("la leva sta nel pannello dell'admin", True,
+          '_leva("Relay che confermano", "MOSTRO_RELAY_CONFERMA",' in src)
+    prova("...e nel file da cui si copia, vuota", True,
+          "\nMOSTRO_RELAY_CONFERMA = []" in open("config_esempio.py", encoding="utf-8").read())
+    pub = fn("function pubblicaSuTuttiP2P(ev){")
+    prova("l'evento parte verso TUTTO il coro come prima, e a dire "
+          "«partito» e' solo un relay che conta", [True, True, True],
+          ["const urls = urlViviP2P();" in pub, "urls.forEach(u => {" in pub,
+           "if (contano.indexOf(u) < 0) {" in pub])
+    prova("...e la lista non nomina mai gli specchi", False,
+          "specchio" in fn("function urlConfermaP2P(){").lower()
+          .split("*/")[-1])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
