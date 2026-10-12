@@ -43,7 +43,11 @@ E LA SERA DEL 12 OTT 2026 (cantiere tempo-di-chi-pubblica):
      `mostro`, dettaglio `escrow-deadline`): la riga nasce di nessuna
      delle due parti, le due parti leggono la STESSA frase — e non
      «l'altro ha aperto una disputa» —, i moderatori che l'ha aperta il
-     coordinatore e che va decisa adesso, e la card la conta.
+     coordinatore e che va decisa adesso, e la card la conta;
+  7. la disputa RIAPERTA su un ordine che ne aveva gia' una chiusa:
+     gli avvisi ripartono come per una disputa nuova — alle due parti e
+     ai moderatori, col titolo che lo dice —, la riga torna aperta e di
+     nessun moderatore, e resta UNA riga.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente nodo.
@@ -358,6 +362,39 @@ def main():
           ([x for x in (dispute.manda(O[7], "dispute-opened", t + 760, "mostro",
                                       "escrow-deadline") or [])],
            cruscotto()["dispute_p2p"]["periodi"]["tutto"]["con_disputa"]))
+
+    print("\n7) la disputa riaperta su un ordine che ne aveva gia' una chiusa")
+    chiusa = dispute.manda(O[7], "released", t + 770, "seller") or []
+    r = dispute.riga(O[7]) or {}
+    prova("chi vende libera: la disputa si chiude fra le parti, e i "
+          "moderatori lo sanno", ("chiusa", "parti", True),
+          (r.get("stato"), r.get("chiusa_da"),
+           any("chiusa dalle parti" in x for chi, x in chiusa
+               if chi in (AMMINISTRATORE, MODERATORE))))
+    detti = dispute.manda(O[7], "dispute-opened", t + 790, "mostro",
+                          "escrow-deadline") or []
+    alle_parti = {chi: testo for chi, testo in detti
+                  if chi in (banco.COMPRA, banco.VENDE)}
+    ai_mod = [testo for chi, testo in detti if chi in (AMMINISTRATORE, MODERATORE)]
+    prova("il coordinatore la RIAPRE: lo risentono tutte e due le parti — "
+          "non e' il doppione di prima — e i moderatori, col titolo che "
+          "dice «riaperta» e la presa che non vale piu'",
+          (sorted([banco.COMPRA, banco.VENDE]), True, True, True),
+          (sorted(alle_parti),
+           all("è passato ai moderatori" in x for x in alle_parti.values()),
+           len(ai_mod) >= 1 and all("<b>Disputa P2P riaperta</b>" in x for x in ai_mod),
+           all("chi l'aveva presa deve riprenderla" in x for x in ai_mod)))
+    r = dispute.riga(O[7]) or {}
+    prova("...la riga torna aperta, di nessun moderatore e senza l'esito di "
+          "prima; nel registro: aperta, chiusa, riaperta",
+          ("aperta", 0, "", "", ["aperta", "chiusa", "riaperta"]),
+          (r.get("stato"), r.get("presa_da"), r.get("esito"), r.get("chiusa_da"),
+           [g for g, _, _, _ in dispute.registro(O[7])]))
+    d7 = cruscotto()["dispute_p2p"]
+    prova("...ed e' sempre UNA disputa per la card: quattro in tutto, e la "
+          "sua fra le aperte", (4, True),
+          (d7["periodi"]["tutto"]["con_disputa"],
+           O[7][:8] in [a["ordine"] for a in d7["aperte"]]))
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0

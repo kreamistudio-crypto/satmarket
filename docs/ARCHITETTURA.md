@@ -30275,7 +30275,26 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   p2p`); la fusione degli account rinomina chi ha fatto il gesto.
   L'anti-doppione è `p2p_avvisi` coi momenti `disputa_mod` e
   `disputa_chiusa_mod`; gli avvisi ai moderatori non guardano
-  l'interruttore degli avvisi P2P. IL SERVER NON FIRMA E NON TIENE
+  l'interruttore degli avvisi P2P.
+  LA DISPUTA RIAPERTA (12 ott 2026, richiesta di Andrea). La riga è una
+  per ordine, e una `dispute-opened` su un ordine con la disputa già
+  CHIUSA la trovava e taceva; ma il coordinatore riapre davvero (il
+  guardiano della garanzia riusa la riga: «one dispute row per order,
+  reopened»). `_disputa_riaperta_p2p` (pura, non scrive) dice se è una
+  riapertura — la riga c'è, è `chiusa`, e l'evento è PIÙ RECENTE della
+  chiusura per l'orologio di mostrod — e torna il suo NUMERO (1 la
+  prima). Allora la riga torna `aperta` e di nessun moderatore (presa e
+  chiave azzerate: chi l'aveva presa la riprende, come sul
+  coordinatore; l'id della disputa resta), nel registro entra
+  `riaperta` e gli avvisi partono come per una disputa nuova, coi LORO
+  timbri: `disputa_mod_rN` ai moderatori (titolo «Disputa P2P
+  riaperta»), `disputa_rN` alle due parti — e lì il giudice si chiama
+  in `_avvisi_evento_p2p`, che gira PRIMA che la riga torni aperta. La
+  chiusura di una disputa riaperta ha il suo timbro
+  (`disputa_chiusa_mod_rN`) e cerca la `decisione` solo nel registro
+  scritto DOPO l'ultima riapertura: una decisione di prima non copre
+  l'allarme. Su una riga ancora aperta o presa un secondo
+  `dispute-opened` resta un doppione, e tace. IL SERVER NON FIRMA E NON TIENE
   CHIAVI DI MODERATORE: nel blocco non c'è un posto dove starebbero, e
   una sentinella lo tiene così.
   DA FARE: la sezione «⚖️ Moderazione P2P» (elenco, presa, chat,

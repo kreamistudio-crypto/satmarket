@@ -55764,6 +55764,14 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
               f"{fatto['venditore'] or '—'}"
               + (f", cauzione di chi {dati['cauzione_di']}" if dati["cauzione_di"] else "")
               + ")", flush=True)
+    # LA DISPUTA RIAPERTA (12 ott 2026) ha il suo timbro: alle due parti
+    # non e' il doppione della prima apertura. Si chiede QUI, prima che
+    # `_disputa_evento_p2p` rimetta la riga ad «aperta»
+    timbro = momento
+    if momento == "disputa":
+        riaperta = _disputa_riaperta_p2p(con, ordine, ev["ts"])
+        if riaperta:
+            timbro = f"disputa_r{riaperta}"
     for chi, ruolo in destinatari:
         if not _avvisi_p2p_accesi(con, chi):
             print(f"🔕 Evento P2P: {chi} ha gli avvisi P2P SPENTI (cassetto "
@@ -55793,7 +55801,7 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         if not con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
                 "tg_id, quando, fonte) VALUES(?,?,?,?,?,'mostro')",
-                (ordine, momento, giro, chi, adesso)).rowcount:
+                (ordine, timbro, giro, chi, adesso)).rowcount:
             print(f"· Evento P2P: {corto} «{momento}» a {chi} e' gia' stato "
                   "detto: non si ripete", flush=True)
             continue
@@ -55949,6 +55957,9 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     IL COORDINATORE DA SOLO, alla scadenza della garanzia: non e' di
     nessuna delle due parti, e non puo' aspettare — la riga di chiusura
     («i sats restano in garanzia finche'…») li' sarebbe falsa.
+    `riaperta` dice che su quell'ordine una disputa c'era gia' stata ed
+    era chiusa (`_disputa_riaperta_p2p`): il titolo lo dice, e una riga
+    ricorda che la presa di prima non vale piu'.
     SE IL MODERATORE E' UNA DELLE PARTI LO LEGGE SUBITO: quella disputa
     non la decide lui."""
     corto = html.escape(str(d.get("ordine") or "")[:8])
@@ -55958,7 +55969,8 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     importo = (f"{_fmt_sats(sats)} sats" if sats > 0 else "")
     if euro:
         importo += (" per " if importo else "") + euro
-    righe = [f"⚖️ <b>Disputa P2P aperta</b> sull'ordine <code>{corto}</code>"
+    come = "riaperta" if d.get("riaperta") else "aperta"
+    righe = [f"⚖️ <b>Disputa P2P {come}</b> sull'ordine <code>{corto}</code>"
              + (f", da <b>{chi}</b>" if chi else "") + ".", "",
              f"• Compra: {d.get('compra') or '—'}",
              f"• Vende: {d.get('vende') or '—'}",
@@ -55967,6 +55979,9 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     if int(d.get("garanzia_il") or 0) > 0:
         righe.append("• Garanzia bloccata dal " + time.strftime(
             "%d/%m/%Y %H:%M", time.localtime(int(d["garanzia_il"]))))
+    if d.get("riaperta"):
+        righe.append("• Era già stata chiusa una volta: chi l'aveva presa deve "
+                     "riprenderla.")
     if d.get("automatica"):
         righe += ["", "⏳ <b>L'ha aperta il coordinatore da solo:</b> chi compra "
                   "ha segnato il pagamento, i sats non sono stati liberati e la "
@@ -56026,6 +56041,38 @@ def _registro_disputa_p2p(con, ordine: str, gesto: str, tg_id: int,
                 (ordine, gesto, int(tg_id or 0), int(quando), esito, motivo, chiave))
 
 
+def _disputa_riaperta_p2p(con, ordine: str, ts: int) -> int:
+    """QUESTA `dispute-opened` E' UNA RIAPERTURA? Pura sulla connessione,
+    NON scrive. Torna 0 se no; se si', il NUMERO della riapertura (1 la
+    prima), che fa da chiave ai due anti-doppione: gli avvisi di una
+    disputa riaperta non sono i doppioni di quelli della prima.
+    (12 ott 2026, sera, richiesta di Andrea.) LE DISPUTE SONO UNA RIGA
+    PER ORDINE: fin qui una `dispute-opened` su un ordine che aveva
+    gia' la sua disputa CHIUSA trovava la riga e taceva — nessun avviso
+    ai moderatori, e alle parti «e' gia' stato detto». Ma il
+    coordinatore riapre davvero: il guardiano della garanzia riusa la
+    riga di una disputa gia' risolta («one dispute row per order,
+    reopened») e la rimette a zero, senza piu' il moderatore che
+    l'aveva presa.
+    E' UNA RIAPERTURA se la riga c'e', e' CHIUSA, e l'evento e' piu'
+    recente della chiusura PER L'OROLOGIO DI MOSTROD: lo stesso evento
+    arrivato due volte non passa di qui (lo ferma la chiave di
+    `p2p_momenti`), e uno piu' vecchio arrivato in ritardo non riapre
+    niente. Su una riga ancora aperta o presa resta la regola di
+    sempre: e' un doppione, e tace. Un database senza le tabelle delle
+    dispute (i banchi di ieri) vale 0."""
+    try:
+        r = con.execute("SELECT stato, chiusa_il FROM p2p_dispute WHERE ordine=?",
+                        (ordine,)).fetchone()
+        if not r or r["stato"] != "chiusa" or int(ts) <= int(r["chiusa_il"] or 0):
+            return 0
+        return 1 + int(con.execute(
+            "SELECT COUNT(*) FROM p2p_dispute_registro WHERE ordine=? "
+            "AND gesto='riaperta'", (ordine,)).fetchone()[0])
+    except sqlite3.OperationalError:
+        return 0
+
+
 def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     """DALL'EVENTO DI MOSTROD AGLI AVVISI PER I MODERATORI: lista di
     `(tg_id, testo)`. Pura sulla connessione; scrive la riga della
@@ -56035,6 +56082,12 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     moderatori) e la disputa che si CHIUDE — da un moderatore, dalle
     parti o per scadenza (`_chiusura_disputa_p2p`). Un evento che non e'
     nessuno dei due torna una lista vuota.
+    LA DISPUTA RIAPERTA (`_disputa_riaperta_p2p`, 12 ott 2026) e' una
+    disputa che si apre: la riga chiusa torna `aperta` e di nessun
+    moderatore (chi l'aveva presa deve riprenderla, come sul
+    coordinatore), l'id della disputa resta il suo, la chiusura di
+    prima resta nel registro, e gli avvisi partono di nuovo col LORO
+    timbro.
     GLI AVVISI AI MODERATORI NON GUARDANO L'INTERRUTTORE degli avvisi
     P2P: quello e' di chi scambia, questo e' un dovere."""
     ordine, momento, giro = ev["ordine"], fatto["momento"], fatto["giro"]
@@ -56042,15 +56095,25 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     fuori = []
     if momento == "disputa":
         aperta_da = {"buyer": "compra", "seller": "vende"}.get(ev["attore"], "")
+        # si chiede PRIMA di toccare la riga: dopo sarebbe gia' aperta
+        riaperta = _disputa_riaperta_p2p(con, ordine, ev["ts"])
         nata = con.execute(
             "INSERT OR IGNORE INTO p2p_dispute(ordine, giro, aperta_il, "
             "aperta_da, compratore, venditore, stato) VALUES(?,?,?,?,?,?,'aperta')",
             (ordine, giro, ev["ts"], aperta_da, fatto["compratore"],
              fatto["venditore"])).rowcount
-        if not nata:
+        if riaperta:
+            con.execute(
+                "UPDATE p2p_dispute SET stato='aperta', giro=?, aperta_il=?, "
+                "aperta_da=?, compratore=?, venditore=?, presa_da=0, presa_il=0, "
+                "chiave_moderatore='', esito='', chiusa_da='', chiusa_il=0 "
+                "WHERE ordine=? AND stato='chiusa'",
+                (giro, ev["ts"], aperta_da, fatto["compratore"],
+                 fatto["venditore"], ordine))
+        elif not nata:
             con.commit()
             return []
-        _registro_disputa_p2p(con, ordine, "aperta", {
+        _registro_disputa_p2p(con, ordine, "riaperta" if riaperta else "aperta", {
             "compra": fatto["compratore"], "vende": fatto["venditore"]
         }.get(aperta_da, 0), ev["ts"])
         dati = _dati_frase_p2p(con, ordine)
@@ -56064,15 +56127,19 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
              "sats": dati["sats"], "euro": dati["euro"], "metodi": dati["metodi"],
              "garanzia_il": int((g["q"] if g else 0) or 0),
              # l'ha aperta il coordinatore alla scadenza della garanzia
-             "automatica": ev["dettaglio"] == "escrow-deadline"}
+             "automatica": ev["dettaglio"] == "escrow-deadline",
+             "riaperta": bool(riaperta)}
         d["parti_mod"] = _parti_mod_p2p(d)
+        # la riapertura ha il SUO timbro: non e' il doppione della prima
+        timbro = f"disputa_mod_r{riaperta}" if riaperta else "disputa_mod"
         for mod in _avvisati_mod_p2p():
             if con.execute(
                     "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
-                    "tg_id, quando, fonte) VALUES(?,'disputa_mod',?,?,?,'mostro')",
-                    (ordine, giro, mod, adesso)).rowcount:
+                    "tg_id, quando, fonte) VALUES(?,?,?,?,?,'mostro')",
+                    (ordine, timbro, giro, mod, adesso)).rowcount:
                 fuori.append((mod, _testo_disputa_aperta_p2p(d, mod)))
-        print(f"⚖️ Disputa P2P: {corto} aperta da {aperta_da or '—'} (giro "
+        print(f"⚖️ Disputa P2P: {corto} {'RIAPERTA' if riaperta else 'aperta'} da "
+              f"{aperta_da or '—'} (giro "
               f"{giro}): moderatori da avvisare {[m for m, _ in fuori]}", flush=True)
         con.commit()
         return fuori
@@ -56087,11 +56154,20 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                 "chiusa_il=? WHERE ordine=? AND stato<>'chiusa'",
                 (esito, chiusa_da, ev["ts"], ordine))
     decisione = None
+    # DOPO UNA RIAPERTURA (12 ott 2026) si guarda solo il registro scritto
+    # DA LI' IN POI: la decisione di prima non spiega la chiusura di dopo
+    # — se no l'allarme della chiave usata fuori dall'app non suonerebbe
+    # mai su una disputa riaperta — e l'avviso di questa chiusura ha il
+    # suo timbro, come l'apertura
+    ultima = con.execute(
+        "SELECT COALESCE(MAX(id), 0), COUNT(*) FROM p2p_dispute_registro "
+        "WHERE ordine=? AND gesto='riaperta'", (ordine,)).fetchone()
+    da_riga, riaperture = int(ultima[0] or 0), int(ultima[1] or 0)
     if chiusa_da == "moderatore":
         r = con.execute(
             "SELECT tg_id, motivo FROM p2p_dispute_registro WHERE ordine=? "
-            "AND gesto='decisione' AND esito=? ORDER BY id DESC LIMIT 1",
-            (ordine, esito)).fetchone()
+            "AND gesto='decisione' AND esito=? AND id>? ORDER BY id DESC LIMIT 1",
+            (ordine, esito, da_riga)).fetchone()
         if r:
             decisione = {"nome": _persona_disputa_p2p(con, r["tg_id"]),
                          "motivo": html.escape(str(r["motivo"] or ""))}
@@ -56099,11 +56175,13 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         con, ordine, "allarme" if (chiusa_da == "moderatore" and not decisione)
         else "chiusa", 0, ev["ts"], esito, chiusa_da)
     testo = _testo_disputa_chiusa_p2p(corto, esito, chiusa_da, decisione)
+    timbro = (f"disputa_chiusa_mod_r{riaperture}" if riaperture
+              else "disputa_chiusa_mod")
     for mod in _avvisati_mod_p2p():
         if con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
-                "tg_id, quando, fonte) VALUES(?,'disputa_chiusa_mod',?,?,?,'mostro')",
-                (ordine, giro, mod, adesso)).rowcount:
+                "tg_id, quando, fonte) VALUES(?,?,?,?,?,'mostro')",
+                (ordine, timbro, giro, mod, adesso)).rowcount:
             fuori.append((mod, testo))
     print(f"⚖️ Disputa P2P: {corto} chiusa ({chiusa_da}, {esito})"
           + ("" if chiusa_da != "moderatore" or decisione

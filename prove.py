@@ -90388,6 +90388,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
               # la forma del recapito dichiarato (10 ott 2026, riquadro-contanti-sepa)
               "_recapito_contanti_p2p", "_dati_frase_p2p",
               "_avvisi_evento_p2p", "_scarica_attese_p2p",
+              # la disputa riaperta, che ha il suo timbro (12 ott 2026)
+              "_disputa_riaperta_p2p",
               # l'avviso superato e la presa detta (24 set 2026)
               "_superato_p2p", "_presa_detta_p2p",
               "_pagamento_ordine_p2p",
@@ -147582,28 +147584,228 @@ def prove_disputa_automatica_p2p():
            '"escrow-deadline") or []' in collaudo,
            "             collaudo_dispute_cruscotto\n" in flusso])
 
-    # --- i comandi del VPS -----------------------------------------------
+    # --- i comandi sui database: il VPS e il nodo ----------------------
+    # (corretto da Andrea la sera stessa: sul VPS `sqlite3` C'E', e il
+    # database vero sta in `dati/` col collegamento accanto al codice;
+    # sul NODO `sqlite3` manca davvero)
+    testa = produzione[:produzione.index("\n- ")]
+    prova("la testa di PRODUZIONE dice i DUE percorsi del database, quello vero e il "
+          "collegamento, e chi li ha verificati",
+          [True, True, True],
+          ["il file VERO è\n`/srv/barattolo/dati/satmarket.db`, e "
+           "`/srv/barattolo/satmarket.db` è\nun COLLEGAMENTO a lui" in testa,
+           "verificati da Andrea\nsul VPS il 12 ott 2026 con `readlink -f`" in testa,
+           "Aprono lo stesso\ndatabase." in testa])
+    falsa = _re.compile(r"sul VPS[^.\n]{0,40}`sqlite3`[^.\n]{0,12}non c'[èe]|"
+                        r"sqlite3[^.\n]{0,30}che sul VPS non c'[èe]|"
+                        r"sul VPS non c'[èe] `?sqlite3")
+    prova("...e NESSUNO dice piu' che sul VPS `sqlite3` non c'e': c'e', e lo usa il "
+          "backup fuori sede; manca sul NODO, e li' si dice", [[], True, True],
+          [falsa.findall(produzione.replace("\n", " ")),
+           "SUL VPS IL COMANDO `sqlite3` C'È (`/usr/bin/sqlite3`" in testa,
+           "SUL NODO INVECE\nMANCA DAVVERO (verificato da Andrea il 12 ott 2026)" in testa])
+    prova("...la frase sbagliata non resta nemmeno nella voce del cantiere e nei "
+          "commenti del server", [[], []],
+          [falsa.findall(open(os.path.join("docs", "CANTIERI.md"), encoding="utf-8")
+                         .read().split("\n## Il tempo di chi pubblica: tre ore")[-1]
+                         .replace("\n", " ")),
+           falsa.findall(_SORGENTE.replace("\n", " "))])
     letture = produzione.count(
         "sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); "
         "[print(*r, sep='|') for r in c.execute(")
-    prova("in PRODUZIONE nessun comando tocca piu' il database del VPS dal percorso di "
-          "ieri o col comando sqlite3 (sul VPS non c'e'): python3, e la testa lo dice",
-          [0, [], True, True],
-          [produzione.count("/srv/barattolo/dati/satmarket.db"),
-           _re.findall(r"sqlite3 (?:-readonly |-cmd )?[^\n`]*satmarket\.db", produzione),
-           "IL DATABASE SI LEGGE CON PYTHON3, SU `/srv/barattolo/satmarket.db`" in produzione,
-           letture >= 20])
+    prova("le letture sul database del VPS restano in python3, in sola lettura, dal "
+          "collegamento (le conversioni tenute)", True, letture >= 20)
     scritture = _re.findall(
         r"`(sudo -u barattolo python3 -c \"import sqlite3; c=sqlite3\.connect\("
-        r"'/srv/barattolo/satmarket\.db', timeout=5\); [^`\n]*)`", produzione)
-    prova("le sole SCRITTURE sono due, passano da `sudo -u barattolo`, committano e "
-          "dicono quante righe hanno cambiato — e nessuna lettura apre senza `mode=ro`",
-          [2, True, 0],
+        r"'/srv/barattolo/dati/satmarket\.db', timeout=5\); [^`\n]*)`", produzione)
+    prova("le sole SCRITTURE sul VPS sono due, sul file VERO, passano da "
+          "`sudo -u barattolo`, committano e dicono quante righe hanno cambiato — e "
+          "nessuna lettura apre senza `mode=ro`", [2, True, 0],
           [len(scritture),
            all("c.commit(); print(n)" in s for s in scritture),
            len(_re.findall(r"(?<!sudo -u barattolo )python3 -c \"import sqlite3; "
-                           r"c=sqlite3\.connect\('/srv/barattolo/satmarket\.db'",
+                           r"c=sqlite3\.connect\('/srv/barattolo/(?:dati/)?satmarket\.db'",
                            produzione))])
+    del_nodo = _re.findall(
+        r"`(sudo python3 -c \"import sqlite3; [^`\n]*/home/debian/nodo/mostro/mostro\.db"
+        r"[^`\n]*)`", produzione)
+    prova("SUL NODO nessun comando usa piu' il programma `sqlite3`: tutti `sudo python3` "
+          "col percorso per esteso, in sola lettura tranne l'unica scrittura (che lo dice)",
+          [[], True, 1, True],
+          [_re.findall(r"sqlite3 (?:-readonly |-header |-column |-cmd )*[^\n`]*mostro\.db",
+                       produzione),
+           len(del_nodo) >= 8,
+           sum(1 for c in del_nodo if "mode=ro" not in c and ".backup(" not in c),
+           "(è l'unica SCRITTURA su quel database: niente `mode=ro`" in produzione])
+    prova("...e le due letture delle dispute stampano i nomi delle colonne, come faceva "
+          "`-header`", 2,
+          sum(1 for c in del_nodo if "print(*[d[0] for d in q.description], sep='|')" in c))
+    bar8 = produzione[produzione.index("- LA SALITA ALLA `-bar8`"):
+                      produzione.index("- LA SALITA ALLA `-bar7`")]
+    prova("la frase delle 88 ore sta nei passi della -bar8, da togliere a -bar8 in "
+          "servizio — e fino ad allora nel server RESTA, perche' e' vera",
+          [True, True, True, True],
+          ["FASE 6 — A `-bar8` IN SERVIZIO" in bar8,
+           "si toglie «che non arriva a nessuno su Telegram»" in bar8,
+           bar8.index("FASE 6 — A `-bar8` IN SERVIZIO") < bar8.index("ROLLBACK: `cd ~/nodo`"),
+           "che non arriva a nessuno su Telegram" in pezzo("_testo_garanzia_mod_p2p")])
+
+    # --- la disputa RIAPERTA su un ordine che ne aveva gia' una chiusa -----
+    # (12 ott 2026, sera, richiesta di Andrea: «deve far partire gli
+    # avvisi come una disputa nuova»). Il banco e' quello degli eventi,
+    # con le due tabelle delle dispute e i giudici veri.
+    src = _SORGENTE
+    con, amb = _banco_eventi_p2p()
+    schema = ""
+    for tabella, fine in (("p2p_dispute", "\n    );"),
+                          ("p2p_dispute_registro", "ON p2p_dispute_registro(ordine);")):
+        k = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        schema += src[k:src.index(fine, k) + len(fine)] + "\n"
+    con.executescript(schema + "ALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT '';"
+                      "ALTER TABLE utenti ADD COLUMN username TEXT DEFAULT '';")
+    amb.update(ADMIN_IDS=[500, 501], MODALITA_COLLAUDO=False)
+    k = src.index("\nP2P_DISPUTA_ESITI = {")
+    exec(src[k + 1:src.index("}\n", k) + 2], amb)
+    for f in ("_moderatori_p2p", "_chiusura_disputa_p2p", "_persona_disputa_p2p",
+              "_testo_disputa_aperta_p2p", "_testo_disputa_chiusa_p2p",
+              "_registro_disputa_p2p", "_disputa_riaperta_p2p", "_disputa_evento_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    gruppo_admin_spento(amb)
+    ORA = 1_790_000_000
+    KA, KB = "a" * 64, "b" * 64
+    for tg, nome in ((111, "Bea"), (222, "Alan"), (500, "Moderatore Uno")):
+        con.execute("INSERT INTO utenti(tg_id, nome, username) VALUES(?,?,'')", (tg, nome))
+    for chiave, tg in ((KA, 111), (KB, 222)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)",
+                    (chiave, tg, ORA))
+    R1, R2 = ("0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc%02d" % n for n in (1, 2))
+    for o in (R1, R2):
+        con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,"
+                    "euro,metodi) VALUES(?,?,?,'in-progress','sell',1,13603,'10,00 €',"
+                    "'[\"SEPA\"]')", (o, 222, ORA))
+    con.commit()
+
+    def manda(ordine, azione, ts, attore="mostro", dettaglio=""):
+        """Come `_manda_evento_p2p`: PRIMA le parti, POI i moderatori."""
+        d = {"v": 1, "order": ordine, "action": azione, "ts": ts, "buyer": KA,
+             "seller": KB, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        ev = amb["_evento_p2p_pulito"](d, ts)
+        fatto = amb["_registra_evento_p2p"](con, ev, ts)
+        if fatto is None:
+            return None
+        parti = amb["_avvisi_evento_p2p"](con, ev, fatto, ts)
+        return parti, amb["_disputa_evento_p2p"](con, ev, fatto, ts)
+
+    riga = lambda o: dict(con.execute("SELECT * FROM p2p_dispute WHERE ordine=?",
+                                      (o,)).fetchone() or {})
+    gesti = lambda o: [r["gesto"] for r in con.execute(
+        "SELECT gesto FROM p2p_dispute_registro WHERE ordine=? ORDER BY id", (o,))]
+    timbri = lambda o: sorted((r["momento"], r["tg_id"]) for r in con.execute(
+        "SELECT momento, tg_id FROM p2p_avvisi WHERE ordine=? AND momento LIKE 'disputa%'",
+        (o,)))
+    riaperta = amb["_disputa_riaperta_p2p"]
+    manda(R1, "taken", ORA - 130, "buyer", "take")
+    manda(R1, "hold-invoice-paid", ORA + 10, "seller")
+    manda(R1, "fiat-sent", ORA + 20, "buyer")
+    prima_parti, prima_mod = manda(R1, "dispute-opened", ORA + 30, "buyer")
+    prova("LA PRIMA disputa: la sente l'altra parte, e ogni moderatore — e fin qui non "
+          "e' una riapertura", [[222], [500, 501], 0, 0],
+          [[c for c, _ in prima_parti], [c for c, _ in prima_mod],
+           riaperta(con, R1, ORA + 40), riaperta(con, "ordine-mai-visto", ORA)])
+    con.execute("UPDATE p2p_dispute SET stato='presa', presa_da=500, presa_il=?, "
+                "chiave_moderatore='c0ffee' WHERE ordine=?", (ORA + 50, R1))
+    manda(R1, "released", ORA + 100, "seller")
+    prova("...poi si chiude (chi vende ha liberato): la riga e' chiusa, col moderatore "
+          "che l'aveva presa", ["chiusa", "parti", 500, ORA + 100],
+          [riga(R1).get(k) for k in ("stato", "chiusa_da", "presa_da", "chiusa_il")])
+    prova("UNA RIAPERTURA e' un `dispute-opened` PIU' RECENTE della chiusura; alla "
+          "stessa ora o prima non lo e'", [1, 0, 0],
+          [riaperta(con, R1, ORA + 200), riaperta(con, R1, ORA + 100),
+           riaperta(con, R1, ORA + 60)])
+    parti, mod = manda(R1, "dispute-opened", ORA + 200, "mostro", "escrow-deadline")
+    prova("LA DISPUTA RIAPERTA dal guardiano fa partire gli avvisi come una nuova: alle "
+          "DUE parti (anche a chi la prima l'aveva gia' sentita) e a OGNI moderatore",
+          [[111, 222], [500, 501]],
+          [sorted(c for c, _ in parti), [c for c, _ in mod]])
+    prova("...alle parti con la frase del coordinatore, ai moderatori col titolo che "
+          "dice «riaperta», la presa che non vale piu' e l'urgenza",
+          [True, True, True, True, False],
+          [all("è passato ai moderatori" in t for _, t in parti),
+           mod[0][1].startswith("⚖️ <b>Disputa P2P riaperta</b> sull'ordine "
+                                "<code>0f3a5c1e</code>."),
+           "• Era già stata chiusa una volta: chi l'aveva presa deve riprenderla."
+           in mod[0][1],
+           "L'ha aperta il coordinatore da solo" in mod[0][1],
+           "Disputa P2P aperta" in mod[0][1]])
+    prova("...la riga torna APERTA e di nessun moderatore, con l'ora nuova e senza "
+          "l'esito di prima — ed e' sempre UNA riga",
+          ["aperta", "", ORA + 200, 0, 0, "", "", "", 0, 1],
+          [riga(R1).get(k) for k in ("stato", "aperta_da", "aperta_il", "presa_da",
+                                     "presa_il", "chiave_moderatore", "esito",
+                                     "chiusa_da", "chiusa_il")]
+          + [con.execute("SELECT COUNT(*) FROM p2p_dispute WHERE ordine=?",
+                         (R1,)).fetchone()[0]])
+    prova("...il registro NON perde la chiusura di prima: aperta, chiusa, riaperta",
+          ["aperta", "chiusa", "riaperta"], gesti(R1))
+    prova("...e i timbri sono i SUOI: quelli della prima apertura restano, e non la "
+          "fermano",
+          [("disputa", 222), ("disputa_chiusa_mod", 500), ("disputa_chiusa_mod", 501),
+           ("disputa_mod", 500), ("disputa_mod", 501),
+           ("disputa_mod_r1", 500), ("disputa_mod_r1", 501),
+           ("disputa_r1", 111), ("disputa_r1", 222)], timbri(R1))
+    prova("il retry dello STESSO evento non suona due volte", None,
+          manda(R1, "dispute-opened", ORA + 200, "mostro", "escrow-deadline"))
+    # un moderatore la decide dall'app: la riga della decisione nasce
+    # DOPO la riapertura, poi mostrod racconta la chiusura
+    amb["_registro_disputa_p2p"](con, R1, "decisione", 500, ORA + 290, "compratore",
+                                 "la ricevuta c'e', i sats a chi compra")
+    _, chiusa2 = manda(R1, "released", ORA + 300, "mostro", "admin")
+    prova("LA CHIUSURA della disputa riaperta suona anche lei ai moderatori: il suo "
+          "timbro non e' quello della prima chiusura — e la decisione scritta DOPO la "
+          "riapertura la spiega",
+          [[500, 501], True, True, "chiusa"],
+          [[c for c, _ in chiusa2],
+           all("<b>Disputa P2P decisa</b>" in t for _, t in chiusa2),
+           ("disputa_chiusa_mod_r1", 500) in timbri(R1), gesti(R1)[-1]])
+    tardi = manda(R1, "dispute-opened", ORA + 250, "mostro", "escrow-deadline")
+    prova("chiusa di nuovo, un `dispute-opened` PIU' VECCHIO della chiusura arrivato in "
+          "ritardo non riapre niente: nessun avviso, la riga resta chiusa",
+          [([], []), "chiusa", 1],
+          [tardi, riga(R1).get("stato"), gesti(R1).count("riaperta")])
+    parti2, mod2 = manda(R1, "dispute-opened", ORA + 400, "mostro", "escrow-deadline")
+    prova("...e una SECONDA riapertura vera suona ancora, col timbro numero due",
+          [[111, 222], [500, 501], True, "aperta"],
+          [sorted(c for c, _ in parti2), [c for c, _ in mod2],
+           ("disputa_mod_r2", 500) in timbri(R1) and ("disputa_r2", 111) in timbri(R1),
+           riga(R1).get("stato")])
+    _, chiusa3 = manda(R1, "released", ORA + 500, "mostro", "admin")
+    prova("...e se QUESTA la chiude un moderatore senza una decisione nuova, la "
+          "decisione di PRIMA della riapertura non la copre: e' un ALLARME, e suona",
+          [[500, 501], True, "allarme", True],
+          [[c for c, _ in chiusa3],
+           all("chiusa SENZA una decisione a registro" in t for _, t in chiusa3),
+           gesti(R1)[-1], ("disputa_chiusa_mod_r2", 501) in timbri(R1)])
+    manda(R2, "taken", ORA - 130, "buyer", "take")
+    manda(R2, "hold-invoice-paid", ORA + 10, "seller")
+    manda(R2, "dispute-opened", ORA + 30, "buyer")
+    _, doppia = manda(R2, "dispute-opened", ORA + 90, "mostro", "escrow-deadline")
+    prova("su una riga ANCORA APERTA resta la regola di sempre: un secondo "
+          "`dispute-opened` e' un doppione, i moderatori non lo risentono e la riga "
+          "non si tocca", [[], "aperta", "compra", ORA + 30, ["aperta"]],
+          [doppia, riga(R2).get("stato"), riga(R2).get("aperta_da"),
+           riga(R2).get("aperta_il"), gesti(R2)])
+    prova("il giudice della riapertura NON scrive, e senza le tabelle delle dispute "
+          "vale zero (i banchi di ieri)", [False, 0],
+          [any(p in _senza_prosa(pezzo("_disputa_riaperta_p2p"))
+               for p in ("INSERT", "UPDATE", "DELETE", "commit(")),
+           riaperta(_banco_eventi_p2p()[0], R1, ORA + 999)])
+    invio = pezzo("_manda_evento_p2p")
+    prova("le parti si avvisano PRIMA che la riga torni aperta: e' li' che il giudice "
+          "vede ancora la chiusura", True,
+          0 < invio.find("avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))")
+          < invio.find("avvisi = avvisi + _disputa_evento_p2p("))
 
 
 def prove_tempo_pubblica_app():

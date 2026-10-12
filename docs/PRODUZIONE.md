@@ -9,23 +9,29 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
 I PERCORSI DEL VPS SONO SCRITTI PER ESTESO (10 ott 2026, cantiere
 percorsi-vps, richiesta di Andrea): la cartella del server è
 `/srv/barattolo`, il config `/srv/barattolo/config.py`, il database
-`/srv/barattolo/satmarket.db`. `~/satmarket` porta allo stesso
+`/srv/barattolo/dati/satmarket.db`. `~/satmarket` porta allo stesso
 posto (è un collegamento, verificato con `readlink -f`), ma la tilde
 sotto `sudo -u barattolo` la espande la shell di root, e per questo qui
 non compare più: ogni comando vale da qualunque utente lo lanci.
-IL DATABASE SI LEGGE CON PYTHON3, SU `/srv/barattolo/satmarket.db` (12
-ott 2026, parola di Andrea, che corregge la riga del 10): il file è
-quello — il nome che apre il server stesso — e NON
-`/srv/barattolo/dati/`; e sul VPS il comando `sqlite3` non c'è. Ogni
-lettura di questo documento è quindi
+I DUE PERCORSI DEL DATABASE, tutti e due giusti (verificati da Andrea
+sul VPS il 12 ott 2026 con `readlink -f`): il file VERO è
+`/srv/barattolo/dati/satmarket.db`, e `/srv/barattolo/satmarket.db` è
+un COLLEGAMENTO a lui — il nome che apre il server stesso, accanto al
+codice (lo crea `deploy/utente/cambio-utente.sh`). Aprono lo stesso
+database.
+LE LETTURE DI QUESTO DOCUMENTO SONO IN PYTHON3 (12 ott 2026), dal
+collegamento:
 `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); …"`
 — `mode=ro` è la sola lettura: non scrive nemmeno per sbaglio — e
-stampa una riga per riga trovata, coi campi separati da `|`. Le poche
-SCRITTURE lo dicono in chiaro e passano da `sudo -u barattolo`.
-(`deploy/utente/cambio-utente.sh` prevede il database in `dati/` con un
-collegamento accanto al codice: dove fosse così il percorso di qui
-sopra vale lo stesso, perché è quello del collegamento. Per togliersi
-il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
+stampano una riga per riga trovata, coi campi separati da `|`. Le poche
+SCRITTURE lo dicono in chiaro, passano da `sudo -u barattolo` e vanno
+sul file vero. È una forma sola per le due macchine, non una
+necessità: SUL VPS IL COMANDO `sqlite3` C'È (`/usr/bin/sqlite3`, lo usa
+il backup fuori sede di `deploy/backup-fuori.sh`). SUL NODO INVECE
+MANCA DAVVERO (verificato da Andrea il 12 ott 2026): lì il database si
+legge solo con `sudo python3`, perché `~/nodo/mostro/mostro.db` è
+leggibile solo con sudo — e sotto sudo, dentro le virgolette di python,
+il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
 
 - La coda delle categorie si riempie da sola dopo ogni giro d'import
   (leva `RICATEGORIZZA_AUTO`, accesa di serie): nel journal la riga
@@ -134,7 +140,7 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   dedotta»). PER FARLO RISUONARE A MANO (dopo aver
   cambiato soglia, per esempio) si toglie il timbro, in sola scrittura
   di quella riga: `DELETE FROM timbri WHERE nome='soglia_dispute_p2p'`
-  sul db vero (`/srv/barattolo/satmarket.db`, con python3). COSA
+  sul db vero (`/srv/barattolo/dati/satmarket.db`, con python3). COSA
   C'E' DENTRO, in sola lettura: `SELECT substr(ordine,1,8), giro,
   datetime(aperta_il,'unixepoch'), stato, esito, chiusa_da FROM
   p2p_dispute ORDER BY aperta_il` — se li' ci sono dispute di PROVA
@@ -2143,9 +2149,9 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   -d '{"pubkeys":["<64 esadecimali qualunque>"]}'` → `{"ok":true,
   "sconti":{"...":false}}`; senza l'header → 403.
   6) I DUE SCAMBI DI PROVA, piccoli: uno con UNO solo dei due scontato
-  — hold e payout al satoshi contro `lncli`, e sul nodo `sqlite3
-  <mostro.db> "SELECT * FROM barattolo_fees ORDER BY created_at DESC
-  LIMIT 1"`; e uno col VPS irraggiungibile APPOSTA (`sudo systemctl
+  — hold e payout al satoshi contro `lncli`, e sul nodo
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT * FROM barattolo_fees ORDER BY created_at DESC LIMIT 1\")]"`;
+  e uno col VPS irraggiungibile APPOSTA (`sudo systemctl
   stop barattolo` per il minuto della presa): fee piena per tutt'e due
   e nel log del nodo `discount NOT verified`.
   ⚠️ DEI DUE, IL 18 SET 2026 NON SE N'È FATTO NESSUNO NELLA FORMA
@@ -2386,7 +2392,9 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   la riga del compose a `-bar4`, `docker compose up -d mostro` — si
   perde quel che il libro ha scritto fra il deploy e il rollback, ed è
   la ragione del «a libro fermo»; oppure (b) senza toccare i dati:
-  `sqlite3 ~/nodo/mostro/mostro.db "DELETE FROM _sqlx_migrations WHERE version IN (20260913120000, 20260914120000)"`
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('/home/debian/nodo/mostro/mostro.db', timeout=5); n=c.execute(\"DELETE FROM _sqlx_migrations WHERE version IN (20260913120000, 20260914120000)\").rowcount; c.commit(); print(n)"`
+  (è l'unica SCRITTURA su quel database: niente `mode=ro`, e stampa le
+  righe tolte)
   e poi la riga a `-bar4` e `up -d` (la colonna in più nei bond resta e
   non dà noia al vecchio binario). La (a) è quella pulita.
   LA PROVA A DUE TELEFONI, dopo il deploy del client (stesso giorno o il
@@ -2866,14 +2874,14 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   root prima che sudo parta, quindi diventa `/root/satmarket/...`, dove
   `barattolo` non entra («unable to open database file», nessuna
   modifica). Le SCRITTURE si fanno sul file vero,
-  `sudo -u barattolo python3 -c "import sqlite3; c=sqlite3.connect('/srv/barattolo/satmarket.db', timeout=5); n=c.execute(\"...\").rowcount; c.commit(); print(n)"`,
+  `sudo -u barattolo python3 -c "import sqlite3; c=sqlite3.connect('/srv/barattolo/dati/satmarket.db', timeout=5); n=c.execute(\"...\").rowcount; c.commit(); print(n)"`,
   così il journal nasce suo accanto al database; le letture da root
   restano con la tilde. Il gesto non passa dal registro della
   moderazione (va scritto nel verbale) e il pallino dei moderatori
   sale: su quelle righe nessuno preme ✅.
   RIMETTERLE IN VETRINA, a famiglie scritte: prima si guarda (sopra) che
   il giro abbia riempito `famiglia`, poi
-  `sudo -u barattolo python3 -c "import sqlite3; c=sqlite3.connect('/srv/barattolo/satmarket.db', timeout=5); n=c.execute(\"UPDATE annunci SET stato=CASE WHEN quantita>0 THEN 'attivo' ELSE 'venduto' END WHERE connettore_id=<id> AND stato='revisione' AND famiglia!=''\").rowcount; c.commit(); print(n)"`
+  `sudo -u barattolo python3 -c "import sqlite3; c=sqlite3.connect('/srv/barattolo/dati/satmarket.db', timeout=5); n=c.execute(\"UPDATE annunci SET stato=CASE WHEN quantita>0 THEN 'attivo' ELSE 'venduto' END WHERE connettore_id=<id> AND stato='revisione' AND famiglia!=''\").rowcount; c.commit(); print(n)"`
   (stampa quante righe ha cambiato)
   — il `CASE` tiene l'invariante di casa (venduto ⇔ zero pezzi) per le
   taglie finite nel frattempo, e `famiglia!=''` lascia in attesa ciò che
@@ -2976,13 +2984,15 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   COME SI LEGGE UNA DISPUTA SUL NODO (sola lettura; MAI `SELECT *` su
   `orders`: porta `preimage` e `buyer_invoice`, che in una chat non ci
   vanno):
-  `sqlite3 -readonly -header -column ~/nodo/mostro/mostro.db "SELECT d.status AS disputa, d.order_previous_status AS prima, COALESCE(d.solver_pubkey,'-') AS solver, datetime(d.created_at,'unixepoch') AS aperta, o.id AS ordine, o.kind, o.status, o.amount, o.fee, o.fiat_amount, o.fiat_code, o.payment_method, o.buyer_dispute, o.seller_dispute, datetime(o.invoice_held_at,'unixepoch') AS hold_pagata, o.hash FROM disputes d JOIN orders o ON o.id=d.order_id ORDER BY d.created_at DESC LIMIT 3;"`
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); q=c.execute(\"SELECT d.status AS disputa, d.order_previous_status AS prima, COALESCE(d.solver_pubkey,'-') AS solver, datetime(d.created_at,'unixepoch') AS aperta, o.id AS ordine, o.kind, o.status, o.amount, o.fee, o.fiat_amount, o.fiat_code, o.payment_method, o.buyer_dispute, o.seller_dispute, datetime(o.invoice_held_at,'unixepoch') AS hold_pagata, o.hash FROM disputes d JOIN orders o ON o.id=d.order_id ORDER BY d.created_at DESC LIMIT 3\"); print(*[d[0] for d in q.description], sep='|'); [print(*r, sep='|') for r in q]"`
+  (la prima riga sono i nomi delle colonne)
   poi la garanzia: `cd ~/nodo && docker compose exec lnd lncli lookupinvoice <hash>`
   (`state` `ACCEPTED` = sats bloccati; `expiry_height` dentro `htlcs`)
   e `docker compose exec lnd lncli getinfo | grep block_height`: la
   scadenza è `(expiry_height − block_height) × 10 minuti`.
   CHI HA CHIESTO L'ANNULLO, quando un «Chiedi di annullare» riceve un
-  no: `sqlite3 -readonly -header -column ~/nodo/mostro/mostro.db "SELECT status, substr(seller_pubkey,1,8) AS vende, substr(buyer_pubkey,1,8) AS compra, substr(cancel_initiator_pubkey,1,8) AS annullo_chiesto_da, seller_cooperativecancel AS v_annulla, buyer_cooperativecancel AS c_annulla, buyer_dispute, seller_dispute FROM orders WHERE id LIKE '<primi 8 dell'ordine>%';"`
+  no:
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); q=c.execute(\"SELECT status, substr(seller_pubkey,1,8) AS vende, substr(buyer_pubkey,1,8) AS compra, substr(cancel_initiator_pubkey,1,8) AS annullo_chiesto_da, seller_cooperativecancel AS v_annulla, buyer_cooperativecancel AS c_annulla, buyer_dispute, seller_dispute FROM orders WHERE id LIKE '<primi 8>%'\"); print(*[d[0] for d in q.description], sep='|'); [print(*r, sep='|') for r in q]"`
   — se `annullo_chiesto_da` è la chiave di chi sta riprovando, mostrod
   risponde `invalid_pubkey`: la conferma deve venire dall'ALTRA parte.
   I log: `cd ~/nodo && docker compose logs mostro --since 4h 2>&1 | grep -i -E "<primi 8>|cant|InvalidPubkey" | tail -40`.
@@ -3416,10 +3426,9 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   SPEGNERLA: la riga a `False` e riavvio. Le pause salvate restano in
   `p2p_pause` e smettono di contare (gli ordini tornano tutti visibili);
   gli esiti già scritti restano.
-  LE LETTURE (sul VPS `sqlite3` non c'è: `python3`, sola lettura; il
-  database è `/srv/barattolo/satmarket.db`, detto da Andrea il 12 ott
-  2026 — da quel giorno TUTTI i comandi di questo file sono scritti
-  così: la nota in testa). Chi ha una pausa impostata:
+  LE LETTURE (in `python3`, sola lettura, dal collegamento accanto al
+  codice: i due percorsi del database e il perché di questa forma
+  stanno in testa a questo documento). Chi ha una pausa impostata:
   `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT tg_id, fasce, fuso, una_fino, aggiornato FROM p2p_pause').fetchall())"`
   Le mancate risposte di chi pubblica (`senza_risposta` è il fatto nudo,
   che toglie il badge; `mancato` e `scusato` col dettaglio che comincia
@@ -3591,6 +3600,15 @@ il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
   l'avviso «⚖️ Disputa P2P aperta … L'ha aperta il coordinatore da solo
   … va decisa adesso»; alle due parti «Lo scambio … è passato ai
   moderatori». E la card ⚖️ del cruscotto la conta come le altre.
+  FASE 6 — A `-bar8` IN SERVIZIO, i due ritocchi che restano (sono righe
+  di testo: si chiedono a Claude, e passano dal push come tutto):
+  a) LA FRASE DELLE 88 ORE AI MODERATORI (`_testo_garanzia_mod_p2p` in
+  `server.py`) dice ancora che verso le 92 ore il coordinatore «apre
+  una disputa da solo che non arriva a nessuno su Telegram». Con la
+  0012 arriva: finché gira la `-bar7` la frase è vera e RESTA; a `-bar8`
+  in servizio si toglie «che non arriva a nessuno su Telegram».
+  b) LA RIGA DELL'IMMAGINE DEL NODO in `CLAUDE.md` (`mostro:v0.19.0-bar7`
+  → `-bar8`, con la 0011 e la 0012), rimandata da Andrea a quel giorno.
   ROLLBACK: `cd ~/nodo`, la riga dell'immagine a `mostro:v0.19.0-bar7`
   e le due righe nuove del `settings.toml` commentate (la `-bar7` le
   ignorerebbe comunque: `[mostro]` non rifiuta le chiavi che non

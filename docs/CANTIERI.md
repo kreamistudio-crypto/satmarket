@@ -52303,21 +52303,17 @@ frase delle 88 ore ai moderatori dice ancora «una disputa da solo che
 non arriva a nessuno su Telegram»: è vera finché gira la `-bar7`, e si
 toglie quando la `-bar8` è in servizio.
 2) I COMANDI DI PRODUZIONE SUL DATABASE DEL VPS: 22 letture, 2
-scritture, la fotografia e lo schema passano dal comando `sqlite3` (che
-sul VPS non c'è) e dal percorso `/srv/barattolo/dati/satmarket.db` a
-`python3` su `/srv/barattolo/satmarket.db` — parola di Andrea, che
-corregge la riga del cantiere percorsi-vps del 10 ott. Le letture con
-`mode=ro`, una riga stampata per riga trovata e i campi separati da `|`
-(com'era l'uscita di sqlite3: le controprove scritte accanto restano
-leggibili); le due scritture restano scritture, da `sudo -u barattolo`,
-con `commit()` e il numero di righe cambiate. In testa al documento la
-regola, una volta sola, con la riga su `cambio-utente.sh` — che il
-database lo vuole in `dati/` con un collegamento accanto al codice: il
-percorso nuovo è quello del collegamento, quindi vale in tutti e due i
-casi — e il comando per togliersi il dubbio. NON TOCCATI, e si dice: i
-tre comandi `sqlite3` sul database del NODO (non erano nella
-richiesta), le righe degli audit e dei verbali vecchi, e
-`deploy/backup-fuori.sh`, che il comando `sqlite3` lo usa davvero.
+scritture, la fotografia e lo schema passano dal comando `sqlite3` a
+`python3`. Le letture con `mode=ro`, una riga stampata per riga trovata
+e i campi separati da `|` (com'era l'uscita di sqlite3: le controprove
+scritte accanto restano leggibili); le due scritture restano scritture,
+da `sudo -u barattolo`, con `commit()` e il numero di righe cambiate.
+⚠️ I DUE FATTI SU CUI QUESTA STESURA POGGIAVA ERANO SBAGLIATI, e Andrea
+li ha corretti la sera stessa dopo aver guardato sul VPS («correzione
+mia»): la richiesta diceva che lì il comando `sqlite3` manca e che il
+database NON sta in `dati/`. Non è così, e i fatti veri stanno qui
+sotto, nella seconda coda. Le conversioni restano: vanno bene, ed è una
+forma sola per le due macchine.
 3) LA GARANZIA DEDOTTA DAL REGISTRO, nella card delle dispute: il
 `tornato` valeva sempre «senza garanzia». Col ritorno per chi aveva
 PUBBLICATO un ACQUISTO è la coppia «fattura mai data, lato `buy`», la
@@ -52366,3 +52362,60 @@ del rebase (sopra `02dec6b`); dopo, le loro sezioni sono rigirate
 dentro la suite intera. LA CI DI MAIN, guardata prima di chiedere il
 push: l'ultima CONCLUSA è verde (`539245a`, dove sta anche `pronto`),
 le due sulla punta erano ancora in corso.
+
+**LA SECONDA CODA (12 ott 2026, notte: le correzioni di Andrea dopo
+aver guardato sulle due macchine, e due richieste).**
+1) I FATTI, CORRETTI. Sul VPS il comando `sqlite3` C'È
+(`/usr/bin/sqlite3`: `deploy/backup-fuori.sh` gira), il database vero è
+`/srv/barattolo/dati/satmarket.db` e `/srv/barattolo/satmarket.db` è il
+collegamento accanto al codice (`readlink -f`): la riga del cantiere
+percorsi-vps del 10 ott era giusta, e quella di stamattina no. Le
+conversioni a python3 RESTANO (decisione di Andrea: vanno bene) e
+leggono dal collegamento; le due scritture tornano sul file vero, dove
+le voleva la frase accanto; la testa di PRODUZIONE dice i due percorsi,
+chi li ha verificati e quale macchina ha `sqlite3`. LA LEZIONE: di una
+macchina che non vedo si scrive quel che viene detto con la data e il
+nome di chi ha guardato — e una riga già scritta con la sua verifica
+accanto (`readlink -f`, 10 ott) non si rovescia su una frase detta a
+memoria: si chiede il comando che lo dimostra, che costa una riga.
+2) SUL NODO `sqlite3` MANCA DAVVERO (verificato da Andrea oggi): i tre
+comandi sul suo database, più quello scritto in mezzo a una frase,
+passano a `sudo python3` col percorso per esteso
+(`/home/debian/nodo/mostro/mostro.db`: il file è leggibile solo con
+sudo, e dentro le virgolette di python la tilde non si espande), in
+sola lettura — tranne il `DELETE` del rollback della `-bar5`, che è una
+scrittura e lo dice. Le due letture delle dispute stampano i nomi delle
+colonne in testa, come faceva `-header`.
+3) LA DISPUTA RIAPERTA. Le dispute sono una riga per ordine, e una
+`dispute-opened` su un ordine con la disputa già chiusa trovava la riga
+e taceva: nessun avviso ai moderatori, e alle parti «è già stato
+detto». Adesso è una disputa nuova a tutti gli effetti
+(`_disputa_riaperta_p2p`): la riga torna aperta e di NESSUN moderatore
+— chi l'aveva presa la riprende, come sul coordinatore, che azzera il
+solver —, nel registro entra `riaperta` (la chiusura di prima resta: è
+append-only), e gli avvisi ripartono alle due parti e ai moderatori,
+col titolo «Disputa P2P riaperta». I timbri dell'anti-doppione portano
+il numero della riapertura (`disputa_rN`, `disputa_mod_rN`). DUE COSE
+VENUTE DIETRO, che la richiesta non nominava e senza le quali la cura
+era a metà: la CHIUSURA di una disputa riaperta ha il suo timbro (se no
+il suo avviso sarebbe stato il doppione di quello della prima
+chiusura), e cerca la decisione del moderatore solo nel registro
+scritto DOPO la riapertura — una decisione di prima, con lo stesso
+esito, avrebbe coperto l'allarme della chiave usata fuori dall'app. LA
+REGOLA, stretta apposta: è una riapertura solo se la riga è CHIUSA e
+l'evento è più recente della chiusura per l'orologio di mostrod.
+SCARTATO: riaprire anche una riga ancora aperta o presa al secondo
+`dispute-opened` — lì non si distingue un doppione da un fatto nuovo, e
+un doppione che azzera la presa di un moderatore è peggio di un avviso
+in meno.
+4) LA FRASE DELLE 88 ORE sta ora nei passi della `-bar8` (FASE 6), con
+la riga dell'immagine in `CLAUDE.md`: si tolgono a `-bar8` in servizio.
+PROVATO: la coda di `prove_disputa_automatica_p2p` riscritta (40 prove:
+i due percorsi, la frase sbagliata che non c'è più in PRODUZIONE, in
+questa voce e nel server, i comandi del nodo, la FASE 6, e la disputa
+riaperta dall'apertura alla seconda chiusura); il passo 7 di
+`collaudo_dispute_cruscotto` sul server vero (49 passi); la tortura, 17
+su 17; i 39 comandi sui database rilanciati da bash su un database
+vuoto, 37 sani e i 2 coi segnaposto saltati. NON PROVATO: nessun
+comando è girato sul VPS o sul nodo; la disputa riaperta non l'ho mai
+vista nascere sul coordinatore vero.
