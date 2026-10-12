@@ -31693,6 +31693,57 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   LE PROVE: `prove_avviso_dm_nostr`, `collaudo_avviso_dm_nostr` (in CI,
   nella gabbia). La procedura: PRODUZIONE, «L'AVVISO DEI DM NOSTR».
 
+- LA BUCA DEL COORDINATORE e LA RONDA DEI RELAY DI MOSTRO (12 ott 2026,
+  cantiere relay-per-mostro; perché in CANTIERI, «Il relay per
+  Mostro»; le procedure in PRODUZIONE, sotto gli stessi due titoli).
+  I telefoni parlano col coordinatore con eventi kind 14 firmati da
+  chiavi di scambio usa-e-getta, mandati a tutto il coro
+  (`MOSTRO_RELAY`) e «partiti» quando li conferma un relay di
+  `MOSTRO_RELAY_CONFERMA`. Perché di strade vive ce ne siano due, di
+  cui una nostra, servono due pezzi su due macchine.
+  LA BUCA sta sul relay (`deploy/relay/policy/chi-scrive.py`, il
+  plugin di scrittura di strfry: una riga JSON per evento su stdin,
+  una risposta su stdout, FAIL-CLOSED). `giudica` ha due porte: chi
+  firma sta in `chiavi.txt` → passa tutto, come sempre; altrimenti
+  `per_mostro` (PURA) guarda la FORMA — kind 14, un solo tag `p`
+  uguale a `MOSTRO` (scolpito, e tenuto uguale all'autore di
+  `router.conf` da una prova), una sola `expiration` entro
+  `SCADENZA_MAX_S` (2 h: la pagina mette 1 h, `P2P_SCADENZA_MSG`),
+  `TAG_MAX` 6, `BYTE_MAX` 16.384 sull'evento scritto stretto — e poi
+  tre `Freno` in memoria su una finestra che scorre di 60 s: 30 per
+  `secchio_ip` (l'IPv4, o la /64 di un IPv6; quel che non si legge in
+  un secchio solo), 10 per chiave, 600 in tutto. Un messaggio fermato
+  da un freno non consuma gli altri due; chi sta in lista i freni non
+  li vede. Il no ha le parole del protocollo in testa (`restricted:`
+  o `rate-limited:`). La chat fra le parti e col moderatore è kind 14
+  con un altro `p`: resta fuori.
+  LA RONDA sta nel server (blocco «LA RONDA DEI RELAY DI MOSTRO»,
+  leve `RONDA_RELAY_MOSTRO` e `RONDA_RELAY_CANARINO`, spente di
+  serie). `orologio_ronda_relay` fa un `_ronda_relay_giro` ogni 600 s:
+  `_ronda_relay_leggi` (una REQ `{"kinds":[38383,38385],"authors":
+  [coordinatore],"limit":1}` a ogni relay di `_ronda_relay_guardati`)
+  e, ai soli relay del canarino che alla lettura hanno risposto,
+  `_ronda_relay_canta`: un kind 14 con la forma di quelli della
+  pagina, firmato da una chiave nata per quell'evento
+  (`_ronda_relay_chiave`), contenuto di byte a caso, scadenza a 10
+  minuti. Il canarino parte ogni 1.800 s, o a ogni giro dopo un no.
+  I giudici sono puri: `_ronda_relay_male` (una risposta → mezza
+  frase, "" se va bene; le parole del relay passano da `html.escape`),
+  `_ronda_relay_decidi` (due giri storti di fila → guasto, detto una
+  volta; il ritorno solo di un guasto detto), `_ronda_relay_testo`.
+  L'avviso parte da un punto solo, `notifica_admin(…,
+  argomento="errori")`. Lo stato vive in memoria (`_RONDA_RELAY`): un
+  riavvio riparte da zero, e un guasto ancora in corso si ridice dopo
+  due giri. Il journal scrive lo stato solo quando cambia, e mai il
+  canarino.
+  IN COLLAUDO vale `lettura_simulata`, chiesta come PRIMA riga da
+  lettura e canarino: verso un relay non di casa non parte niente.
+  `_ronda_relay_connetti` è la porta che i banchi sostituiscono.
+  LE PROVE: `prove_relay_per_mostro` (il plugin VERO dal file, e il
+  canarino del server giudicato dal plugin vero) e
+  `collaudo_ronda_relay` (in CI, nella gabbia: il server vero contro
+  due relay di cartone, di cui il nostro col plugin vero).
+
 - IL GRUPPO DEGLI ADMIN (12 ott 2026; perché in CANTIERI, «Il gruppo
   degli admin»; la procedura in PRODUZIONE, «IL GRUPPO DEGLI ADMIN»).
   Gli avvisi DA ADMIN vanno in un gruppo Telegram privato con gli

@@ -30,6 +30,16 @@ poterlo sapere in una riga invece di dedurlo:
 | Il VPS di Barattolo | il mercatino, `barattolo.store` | Hetzner Helsinki, `46.62.162.103` |
 | Il nodo Mostro | il coordinator P2P, LND, bitcoind | LNVPS Dublino, `185.18.221.96` |
 
+**Come si entra** (12 ott 2026), da PowerShell sul PC di Andrea:
+
+```
+ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1957.lnvps.cloud
+```
+
+Utente `debian`. I file di `/opt/relay` sono dell'UID 1001 e Docker
+vuole i permessi: i comandi di questo foglio, dati da `debian`,
+vogliono `sudo` davanti.
+
 Il relay non ospita nessun sat e non tiene nessun segreto degli utenti:
 è la macchina meno preziosa delle tre, ed è anche il motivo per cui il
 suo database non si salva (vedi più sotto).

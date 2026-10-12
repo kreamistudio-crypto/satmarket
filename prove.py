@@ -32553,8 +32553,16 @@ def _censimento(acceso, dopo=None):
               # volta della trappola, la riga del pannello CHIAMA
               # `_guardia_liquidita_attiva()` e `_lnd_configurato()`
               "_lnd_configurato", "_guardia_liquidita_attiva",
+              # la ronda dei relay di Mostro (12 ott 2026): la
+              # tredicesima volta, `_ronda_relay_leve()` e i suoi
+              # giudici — sei esplosioni lontane, stavolta
+              "ronda_relay_viva", "_ronda_relay_lista",
+              "_ronda_relay_canarini", "_ronda_relay_guardati",
+              "_ronda_relay_leve",
               "_leve_stato"):
         exec(pezzo(f), amb)
+    # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
+    amb["_RONDA_RELAY"] = {"stati": {}}
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
     # nomina il timbro; a leve accese il timbro c'e', a spente no
@@ -153910,10 +153918,13 @@ def prove_canale_admin():
     # aperto — e 10 cicli che scrivevano agli admin per conto loro
     # (apri_disputa, le due tastiere, ponte e liquidita', cinque nel
     # P2P). 79 punti da cui nasce un avviso da admin.
+    # (12 ott 2026, cantiere relay-per-mostro: la ronda dei relay di
+    # Mostro ne aggiunge UNO, nella stanza degli errori — 70 chiamate,
+    # 80 punti.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 28, "moderazione": 14,
+          {"dispute": 2, "dm": 1, "errori": 29, "moderazione": 14,
            "riepiloghi": 25}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -153945,7 +153956,8 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "79 adesso", 79, totale)
+          "80 adesso (in piu' c'e' la ronda dei relay di Mostro)", 80,
+          totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
     prova("SENTINELLA: ADMIN_IDS lo nominano solo queste funzioni. Una "
@@ -156697,6 +156709,835 @@ console.log(JSON.stringify(c));
           "«Annulla» torna", (["none", "", "", True], [2, 2]), (r.get("dopo"), r.get("dopoMuto")))
 
 
+def prove_relay_per_mostro():
+    """IL RELAY PER MOSTRO (12 ott 2026, cantiere relay-per-mostro,
+    richiesta di Andrea): i telefoni parlavano col coordinatore dal solo
+    relay.mostro.network. Due meta', e si provano tutte e due SENZA
+    rete e senza fastapi.
+    1) LA BUCA DELLE LETTERE sul nostro relay: il plugin VERO
+       (`deploy/relay/policy/chi-scrive.py`, caricato dal file) con la
+       lista di sempre, la forma stretta dei messaggi per il
+       coordinatore e i tre freni; il suo dialogo con strfry (righe su
+       stdin, righe su stdout) fatto girare com'e'.
+    2) LA RONDA nel server: i giudici puri, la lettura e il canarino
+       contro una websocket di cartone, il giro intero. IL CANARINO DEL
+       SERVER SI FA GIUDICARE DAL PLUGIN VERO: le due meta' stanno su
+       due macchine e si tengono in pari qui.
+    Il giro col server VERO sta in `collaudo_ronda_relay` (CI)."""
+    print("\n[il relay per Mostro: la buca delle lettere e la ronda]")
+    import asyncio as _aio
+    import base64 as _b64
+    import hashlib as _hl
+    import html as _html
+    import importlib.util as _iu
+    import ipaddress as _ipa
+    import secrets as _sec
+    import ssl as _ssl
+    import subprocess as _sub
+    import tempfile as _tmp
+    from urllib.parse import urlparse as _urlparse
+    import schnorr_puro
+    PLUGIN = os.path.join(QUI, "deploy", "relay", "policy", "chi-scrive.py")
+    testo_plugin = open(PLUGIN, encoding="utf-8").read()
+    router = open(os.path.join(QUI, "deploy", "relay", "router.conf"),
+                  encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    src = _SORGENTE
+
+    def plugin():
+        """Il plugin VERO, fresco: ogni caso riparte coi freni a zero."""
+        spec = _iu.spec_from_file_location("chi_scrive_prova", PLUGIN)
+        m = _iu.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        m.CHIAVI = os.path.join(QUI, "non-esiste", "chiavi.txt")
+        return m
+
+    P = plugin()
+    T = 1_800_000_000
+    MOSTRO = P.MOSTRO
+
+    def ev(pk="a" * 64, kind=14, tags=None, content="x" * 600, t=T):
+        return {"id": "1" * 64, "pubkey": pk, "kind": kind, "created_at": t,
+                "tags": ([["p", MOSTRO], ["expiration", str(t + 3600)]]
+                         if tags is None else tags),
+                "content": content, "sig": "0" * 128}
+
+    def dice(m, e, ip="203.0.113.7", t=T):
+        return m.giudica({"type": "new", "event": e, "receivedAt": t,
+                          "sourceType": "IP4", "sourceInfo": ip}, t)
+
+    # ================================================================
+    # 1) IL PLUGIN: la lista di sempre
+    # ================================================================
+    prova("la lista di sempre: la piattaforma scrive quel che vuole, "
+          "anche senza `chiavi.txt`", (True, ""),
+          dice(P, ev(pk=P.PIATTAFORMA, kind=30402, tags=[])))
+    prova("...e uno sconosciuto con un annuncio resta FUORI, come ieri",
+          (False, True),
+          (lambda r: (r[0], r[1].startswith("restricted: ")))(
+              dice(P, ev(kind=30402, tags=[]))))
+    with _tmp.TemporaryDirectory() as cartella:
+        lista = os.path.join(cartella, "chiavi.txt")
+        with open(lista, "w", encoding="utf-8") as f:
+            f.write("b" * 64 + "\nnon una chiave\n" + "C" * 64 + "\n")
+        m = plugin()
+        m.CHIAVI = lista
+        m.rileggi()
+        prova("chi sta in `chiavi.txt` scrive ogni kind (maiuscole "
+              "comprese), una riga storta si salta",
+              [True, True, False],
+              [dice(m, ev(pk=k, kind=1, tags=[]))[0]
+               for k in ("b" * 64, "c" * 64, "d" * 64)])
+        prova("...e i freni non lo riguardano: cento di fila, cento "
+              "passati", 100,
+              sum(dice(m, ev(pk="b" * 64))[0] for _ in range(100)))
+        m.CHIAVI = os.path.join(cartella, "sparita.txt")
+        m.rileggi()
+        prova("la lista che non si legge piu' NON svuota: resta l'ultima "
+              "buona", True, dice(m, ev(pk="b" * 64, kind=1, tags=[]))[0])
+
+    # ================================================================
+    # 2) IL PLUGIN: la forma dei messaggi per il coordinatore
+    # ================================================================
+    prova("il destinatario scolpito nel plugin e' l'autore di "
+          "`router.conf`, ed e' la MOSTRO_NPUB del config d'esempio",
+          (True, True),
+          (re.findall(r'"authors": \["([0-9a-f]{64})"\]', router) == [MOSTRO],
+           (lambda amb: (exec("CHARSET_BECH32 = "
+                              + repr("qpzry9x8gf2tvdw0s3jn54khce6mua7l"), amb),
+                         exec(pezzo("npub_to_hex"), amb),
+                         amb["npub_to_hex"](re.search(
+                             r'\nMOSTRO_NPUB = "(npub1[a-z0-9]+)"',
+                             esempio).group(1)))[2])({}) == MOSTRO))
+    prova("uno sconosciuto con un kind 14 per il coordinatore e la "
+          "scadenza a un'ora PASSA: e' la presa, il rilascio, il voto",
+          (True, ""), dice(plugin(), ev()))
+    prova("...anche col nonce della prova di lavoro (tre tag)", True,
+          dice(plugin(), ev(tags=[["p", MOSTRO],
+                                  ["expiration", str(T + 3600)],
+                                  ["nonce", "4242", "8"]]))[0])
+    no = {
+        "un altro kind verso il coordinatore (1059)":
+            ev(kind=1059),
+        "un kind 14 per un ALTRO destinatario (la chat fra le parti)":
+            ev(tags=[["p", "e" * 64]]),
+        "...anche con la scadenza":
+            ev(tags=[["p", "e" * 64], ["expiration", str(T + 3600)]]),
+        "due destinatari, di cui uno il coordinatore":
+            ev(tags=[["p", MOSTRO], ["p", "e" * 64],
+                     ["expiration", str(T + 3600)]]),
+        "il coordinatore scritto in maiuscolo (non e' lui)":
+            ev(tags=[["p", MOSTRO.upper()], ["expiration", str(T + 3600)]]),
+        "nessun destinatario":
+            ev(tags=[["expiration", str(T + 3600)]]),
+        "senza scadenza":
+            ev(tags=[["p", MOSTRO]]),
+        "due scadenze":
+            ev(tags=[["p", MOSTRO], ["expiration", str(T + 60)],
+                     ["expiration", str(T + 3600)]]),
+        "una scadenza che non e' un numero":
+            ev(tags=[["p", MOSTRO], ["expiration", "domani"]]),
+        "una scadenza gia' passata":
+            ev(tags=[["p", MOSTRO], ["expiration", str(T - 1)]]),
+        "una scadenza a un giorno":
+            ev(tags=[["p", MOSTRO], ["expiration", str(T + 86400)]]),
+        "troppi tag":
+            ev(tags=[["p", MOSTRO], ["expiration", str(T + 3600)]]
+               + [["t", "x%d" % i] for i in range(P.TAG_MAX)]),
+        "un tag che non e' una lista di stringhe":
+            ev(tags=[["p", MOSTRO], ["expiration", str(T + 3600)],
+                     ["nonce", 4242, 8]]),
+        "un tag di un solo pezzo":
+            ev(tags=[["p", MOSTRO], ["expiration", str(T + 3600)], ["p"]]),
+        "i tag che non sono una lista":
+            ev(tags="p"),
+        "un messaggio piu' grande del tetto":
+            ev(content="x" * (P.BYTE_MAX + 1)),
+    }
+    esiti = {n: dice(plugin(), e) for n, e in no.items()}
+    prova("tutto il resto resta FUORI: " + "; ".join(no), [],
+          [n for n, (ok, _) in esiti.items() if ok])
+    prova("...e ogni no ha il suo perche', con la parola che il "
+          "protocollo vuole in testa", [],
+          [n for n, (_, p) in esiti.items()
+           if not p.startswith("restricted: ")])
+    al_pelo = ev(content="")
+    al_pelo["content"] = "x" * (P.BYTE_MAX - len(json.dumps(
+        al_pelo, separators=(",", ":"), ensure_ascii=False).encode("utf-8")))
+    prova("il tetto si misura sull'evento intero scritto stretto: al "
+          "byte giusto passa, un byte dopo no", (True, False),
+          (dice(plugin(), al_pelo)[0],
+           dice(plugin(), dict(al_pelo, content=al_pelo["content"] + "x"))[0]))
+    prova("la scadenza: due ore passano, due ore e un secondo no",
+          (True, False),
+          tuple(dice(plugin(), ev(tags=[
+              ["p", MOSTRO], ["expiration", str(T + P.SCADENZA_MAX_S + d)]]))[0]
+              for d in (0, 1)))
+    prova("i numeri decisi da Andrea: 16 KB, 30 al minuto per IP, 10 per "
+          "chiave, 600 in tutto",
+          (16384, 30, 10, 600, 60),
+          (P.BYTE_MAX, P.PER_IP, P.PER_CHIAVE, P.IN_TUTTO, P.FINESTRA_S))
+
+    # LA PAGINA E IL PLUGIN PARLANO DELLA STESSA FORMA: i tre punti in
+    # cui la pagina scrive al coordinatore, guardati sul testo
+    forma = ("tags: [['p', mostro], ['expiration', String(adesso + "
+             "P2P_SCADENZA_MSG)]],")
+    vita = int(re.search(r"\nconst P2P_SCADENZA_MSG = (\d+);", mini).group(1))
+    prova("la pagina scrive al coordinatore SEMPRE in quella forma: un "
+          "`p`, la scadenza, kind 14 — tre punti, nessun altro",
+          (3, 3, True),
+          (mini.count(forma), mini.count("['p', mostro]"),
+           all("kind: 14" in mini[mini.rfind("const ev = {", 0, i):i]
+               for i in (m_.start() for m_ in re.finditer(
+                   re.escape(forma), mini)))))
+    prova("...e la sua scadenza sta dentro quella del plugin anche con "
+          "l'orologio avanti del quarto d'ora che strfry tollera",
+          True, vita + 900 <= P.SCADENZA_MAX_S)
+
+    # ================================================================
+    # 3) IL PLUGIN: i tre freni
+    # ================================================================
+    m = plugin()
+    prova("per CHIAVE: dalla stessa chiave ne passano dieci in un "
+          "minuto, da qualunque indirizzo", 10,
+          sum(dice(m, ev(pk="d" * 64), ip="198.51.100.%d" % i)[0]
+              for i in range(25)))
+    prova("...l'undicesimo ha la parola del protocollo per «troppi»",
+          (False, True),
+          (lambda r: (r[0], r[1].startswith("rate-limited: ")))(
+              dice(m, ev(pk="d" * 64), ip="198.51.100.99")))
+    prova("...e dopo un minuto la stessa chiave ripassa", True,
+          dice(m, ev(pk="d" * 64, t=T + 61), ip="198.51.100.1", t=T + 61)[0])
+    m = plugin()
+    prova("per IP: dallo stesso indirizzo ne passano trenta, con "
+          "quaranta chiavi diverse", 30,
+          sum(dice(m, ev(pk="%064x" % i))[0] for i in range(40)))
+    prova("...e un altro indirizzo non ne sa niente", True,
+          dice(m, ev(pk="%064x" % 999), ip="203.0.113.8")[0])
+    prova("la finestra SCORRE: a mezzo minuto ancora chiuso, appena "
+          "passato il minuto dai primi si riapre", (False, True),
+          (dice(m, ev(pk="%064x" % 500, t=T + 30), t=T + 30)[0],
+           dice(m, ev(pk="%064x" % 501, t=T + 61), t=T + 61)[0]))
+    m = plugin()
+    passati = sum(dice(m, ev(pk="%064x" % i),
+                       ip="10.%d.%d.1" % (i // 250, i % 250))[0]
+                  for i in range(700))
+    prova("IN TUTTO: settecento chiavi da settecento indirizzi, ne "
+          "passano seicento", 600, passati)
+    m = plugin()
+    for i in range(10):
+        dice(m, ev(pk="d" * 64), ip="192.0.2.1")
+    for _ in range(50):
+        dice(m, ev(pk="d" * 64), ip="192.0.2.1")
+    prova("un messaggio fermato da UN freno non consuma gli altri: dopo "
+          "sessanta tentativi di una chiave, il suo indirizzo ha speso "
+          "dieci posti e il conto di tutti dieci", (10, 10),
+          (len(m._freno_ip.visti["192.0.2.1"]),
+           len(m._freno_tutti.visti["tutti"])))
+    prova("...e un messaggio fermato dalla FORMA non conta per nessuno",
+          (False, {}),
+          (lambda m_: (dice(m_, ev(kind=1))[0], m_._freno_ip.visti))(plugin()))
+    prova("gli indirizzi: un IPv4 e' se stesso, un IPv6 e' la sua /64, "
+          "un IPv4 travestito da IPv6 e' l'IPv4, quel che non si legge "
+          "finisce in un secchio solo",
+          ["203.0.113.7", "2001:db8:1:2::/64", "2001:db8:1:2::/64",
+           "203.0.113.7", "203.0.113.9", "fe80::/64", "?", "?", "?"],
+          [P.secchio_ip(x) for x in (
+              "203.0.113.7", "2001:db8:1:2:aaaa:bbbb:cccc:dddd",
+              "2001:db8:1:2::1", "::ffff:203.0.113.7",
+              "198.51.100.1, 203.0.113.9", "fe80::1%eth0", "", None,
+              "unix:/socket")])
+    m = plugin()
+    m.VOCI_MAX = 50
+    for i in range(200):
+        dice(m, ev(pk="%064x" % i, t=T + i), ip="10.9.%d.1" % i, t=T + i)
+    prova("la memoria di un freno ha un tetto: dopo duecento indirizzi "
+          "in duecento secondi restano solo quelli dell'ultimo minuto",
+          True, len(m._freno_ip.visti) <= 61)
+
+    # ================================================================
+    # 4) IL PLUGIN: il dialogo con strfry, e cosa NON fa
+    # ================================================================
+    righe = [
+        json.dumps({"type": "new", "event": ev(pk=P.PIATTAFORMA, kind=1,
+                                               tags=[]),
+                    "sourceType": "IP4", "sourceInfo": "203.0.113.7"}),
+        "questa riga non e' JSON",
+        json.dumps({"type": "new", "event": {"id": "2" * 64}}),
+        json.dumps({"type": "new", "event": dict(ev(kind=30402, tags=[]),
+                                                 id="3" * 64)}),
+    ]
+    giro = _sub.run([sys.executable, PLUGIN], input="\n".join(righe) + "\n",
+                    capture_output=True, text=True, encoding="utf-8",
+                    timeout=60)
+    uscite = [json.loads(r) for r in giro.stdout.splitlines() if r.strip()]
+    prova("il file VERO, lanciato come lo lancia strfry: una risposta "
+          "per riga, nell'ordine, con l'id dell'evento",
+          [("1" * 64, "accept"), ("", "reject"), ("2" * 64, "reject"),
+           ("3" * 64, "reject")],
+          [(u.get("id"), u.get("action")) for u in uscite])
+    prova("...FAIL-CLOSED: una riga che non si legge e un evento monco "
+          "si rifiutano, e il processo resta in piedi (niente su stderr)",
+          (0, ""), (giro.returncode, giro.stderr.strip()))
+    albero_p = ast.parse(testo_plugin)
+    prova("il plugin non tocca la rete e non lancia niente: importa "
+          "solo ipaddress, json, os, sys, time",
+          ["ipaddress", "json", "os", "sys", "time"],
+          sorted({a.name for n in ast.walk(albero_p)
+                  if isinstance(n, ast.Import) for a in n.names}
+                 | {n.module for n in ast.walk(albero_p)
+                    if isinstance(n, ast.ImportFrom)}))
+    prova("...non scrive file e non stampa altro che la risposta",
+          (False, 1),
+          ('open(CHIAVI, "w"' in testo_plugin or ".write(" in testo_plugin,
+           sum(1 for n in ast.walk(albero_p) if isinstance(n, ast.Call)
+               and isinstance(n.func, ast.Name) and n.func.id == "print")))
+    try:
+        ast.parse(testo_plugin, feature_version=(3, 8))
+        vecchio = True
+    except SyntaxError:
+        vecchio = False
+    prova("...e si legge anche con un Python vecchio (l'immagine del "
+          "relay e' Alpine, non la CI)", True, vecchio)
+    prova("lo scanner dei segreti lo salta ancora per NOME (porta due "
+          "chiavi PUBBLICHE in esadecimale), nei due controlli", 2,
+          wf.count("':!deploy/relay/policy/chi-scrive.py'"))
+
+    # ================================================================
+    # 5) LA RONDA NEL SERVER: la leva, e cosa non fa
+    # ================================================================
+    i = src.index("# --- LA RONDA DEI RELAY DI MOSTRO")
+    blocco = src[i:src.index(
+        "# (Qui finisce il blocco della ronda dei relay di Mostro.)", i)]
+    cod = codice(blocco)
+    prova("le due leve nascono SPENTE nel codice: niente ronda, e "
+          "nessun relay di serie per il canarino", (True, True),
+          ("    from config import RONDA_RELAY_MOSTRO\nexcept ImportError:\n"
+           "    RONDA_RELAY_MOSTRO = False\n" in blocco,
+           "    from config import RONDA_RELAY_CANARINO\nexcept ImportError:\n"
+           "    RONDA_RELAY_CANARINO = []\n" in blocco))
+    prova("...e nel config d'esempio uguale, con l'avviso che il "
+          "canarino va al SOLO relay nostro", (True, True, True),
+          ("\nRONDA_RELAY_MOSTRO = False\n" in esempio,
+           "\nRONDA_RELAY_CANARINO = []\n" in esempio,
+           "SOLO IL NOSTRO RELAY" in esempio))
+    avvio = pezzo("avvia_ronda_relay")
+    prova("all'avvio: a leva spenta si esce PRIMA di far nascere "
+          "l'orologio, e una leva accesa senza coordinatore vale spenta",
+          (True, True, True),
+          ('@app.on_event("startup")\nasync def avvia_ronda_relay' in blocco,
+           avvio.index("if not RONDA_RELAY_MOSTRO:")
+           < avvio.index("if not ronda_relay_viva()")
+           < avvio.index("asyncio.create_task(orologio_ronda_relay())"),
+           codice(avvio).count("return") == 2))
+    prova("il pannello delle leve chiede al giudice vivo", (True, True),
+          ("\n            *_ronda_relay_leve(),\n" in src,
+           '"RONDA_RELAY_MOSTRO",\n              vivo,'
+           in pezzo("_ronda_relay_leve")))
+    prova("il blocco NON tocca il database e non firma con la chiave "
+          "della piattaforma", (False, False, False, False),
+          ("con.execute" in cod, "db()" in cod, "_NOSTR" in cod,
+           "firma_evento(" in cod))
+    prova("l'avviso va nel gruppo degli admin, argomento Errori, da UN "
+          "punto solo (il giro)", (1, True),
+          (cod.count("notifica_admin("),
+           'await notifica_admin(_ronda_relay_testo(guasti, tornati),\n'
+           '                             argomento="errori")'
+           in pezzo("_ronda_relay_giro")))
+    usati, stampe = set(), 0
+    for nodo in ast.walk(ast.parse(blocco)):
+        if isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Name) \
+                and nodo.func.id == "print":
+            stampe += 1
+            usati |= {n.id for a in nodo.args for n in ast.walk(a)
+                      if isinstance(n, ast.Name)}
+    prova("il journal dice i relay e lo stato, mai il canarino ne' la "
+          "sua chiave", (True, set()),
+          (stampe >= 5, usati & {"ev", "msg", "pubblica", "firma", "sk",
+                                 "detto", "cantati", "letti"}))
+    albero_b = ast.parse(blocco)
+    conn = [(fn.name, c) for fn in ast.walk(albero_b)
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef))
+            for c in ast.walk(fn) if isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Name)
+            and c.func.id == "_ronda_relay_connetti"]
+    prova("la rete passa da UNA porta che il banco sostituisce, e la "
+          "usano la lettura e il canarino e basta",
+          (True, ["_ronda_relay_canta", "_ronda_relay_leggi"], False),
+          ("\n_ronda_relay_connetti = create_connection\n" in blocco,
+           sorted(n for n, _ in conn), "create_connection(" in cod))
+
+    def _guardia(nome):
+        fn = next(n for n in ast.walk(albero_b)
+                  if isinstance(n, ast.FunctionDef) and n.name == nome)
+        primo = next(st for st in fn.body if not (
+            isinstance(st, ast.Expr) and isinstance(st.value, ast.Constant)))
+        return (isinstance(primo, ast.If)
+                and isinstance(primo.test, ast.Call)
+                and getattr(primo.test.func, "id", "") == "lettura_simulata"
+                and getattr(primo.test.args[0], "id", "") == "relay"
+                and len(primo.body) == 1
+                and isinstance(primo.body[0], ast.Return))
+    prova("in collaudo verso un relay che non e' di casa non si esce: la "
+          "PRIMA riga della lettura e del canarino chiede il giudice, "
+          "sullo stesso relay", (True, True),
+          (_guardia("_ronda_relay_leggi"), _guardia("_ronda_relay_canta")))
+    prova("i numeri: un giro ogni 10 minuti, il canarino ogni mezz'ora "
+          "che vive 10 minuti, un'ora di silenzio del coordinatore, due "
+          "giri storti prima di dirlo",
+          {"RONDA_RELAY_PASSO_S": "600", "RONDA_RELAY_CANARINO_S": "1800",
+           "RONDA_RELAY_VITA_S": "600", "RONDA_RELAY_FERMO_S": "3600",
+           "RONDA_RELAY_DI_FILA": "2"},
+          {k: v for k, v in re.findall(
+              r"\n(RONDA_RELAY_(?:PASSO_S|CANARINO_S|VITA_S|FERMO_S|DI_FILA))"
+              r" = (\d+)", blocco)})
+
+    # ================================================================
+    # 6) LA RONDA: i pezzi VERI, fatti girare
+    # ================================================================
+    class _Priv:
+        """Il calco di coincurve.PrivateKey per quel che usa la ronda."""
+        nate = []
+
+        def __init__(self, sk):
+            self.sk, self.public_key = sk, self
+            _Priv.nate.append(sk)
+
+        def format(self):
+            return b"\x02" + schnorr_puro.pubblica(self.sk)
+
+        def sign_schnorr(self, msg):
+            return schnorr_puro.firma(self.sk, msg)
+
+    class _App:
+        def on_event(self, _):
+            return lambda f: f
+
+    class Ws:
+        """La websocket di cartone: per ogni relay un copione, cioe' una
+        funzione che dal messaggio mandato fa le risposte. Senza
+        copione il relay non apre."""
+        aperte, mandati, chiuse, copioni = [], [], [], {}
+
+        def __init__(self, relay, timeout=None, sslopt=None):
+            Ws.aperte.append(relay)
+            if relay not in Ws.copioni:
+                raise ConnectionRefusedError("relay di cartone spento")
+            self.relay, self.coda = relay, []
+
+        def send(self, s):
+            Ws.mandati.append((self.relay, json.loads(s)))
+            self.coda += [json.dumps(x)
+                          for x in Ws.copioni[self.relay](json.loads(s))]
+
+        def recv(self):
+            if not self.coda:
+                raise TimeoutError("timed out")
+            return self.coda.pop(0)
+
+        def close(self):
+            Ws.chiuse.append(self.relay)
+
+    AVVISI = []
+
+    async def _avvisa(testo, bottone=None, argomento=""):
+        AVVISI.append((testo, argomento))
+
+    def ultimo():
+        """L'ultimo avviso, o due vuoti: a codice mutato la prova
+        dev'essere ROSSA, mai esplodere portandosi via le sorelle."""
+        return AVVISI[-1] if AVVISI else ("", "")
+
+    NOSTRO, LORO, VERO = ("ws://127.0.0.1:7811", "ws://127.0.0.1:7812",
+                          "wss://relay.vero.example")
+    amb = {"app": _App(), "create_connection": Ws, "asyncio": _aio,
+           "base64": _b64, "hashlib": _hl, "html": _html, "json": json,
+           "secrets": _sec, "ssl": _ssl, "time": time,
+           "ipaddress": _ipa, "urlparse": _urlparse,
+           "MOSTRO_HEX": MOSTRO, "MOSTRO_RELAY": [NOSTRO, LORO, VERO],
+           "MOSTRO_RELAY_CONFERMA": [NOSTRO, LORO],
+           "ChiavePrivataNostr": _Priv, "MODALITA_COLLAUDO": False,
+           "_LETTURE_SIMULATE": set(), "notifica_admin": _avvisa}
+    for f in ("relay_di_casa", "lettura_simulata", "evento_non_firmato",
+              "_leva", "_elenco"):
+        exec(pezzo(f), amb)
+    exec(blocco.replace("    from config import RONDA_RELAY_MOSTRO\n",
+                        "    raise ImportError\n")
+               .replace("    from config import RONDA_RELAY_CANARINO\n",
+                        "    raise ImportError\n"), amb)
+    R = lambda nome: amb["_ronda_relay_" + nome]
+    prova("senza config: leva spenta, nessun canarino, e la ronda non "
+          "e' viva", (False, [], False),
+          (amb["RONDA_RELAY_MOSTRO"], amb["RONDA_RELAY_CANARINO"],
+           amb["ronda_relay_viva"]()))
+    amb["RONDA_RELAY_MOSTRO"] = True
+    amb["RONDA_RELAY_CANARINO"] = [NOSTRO]
+    prova("accesa: viva solo con la chiave del coordinatore",
+          (True, False),
+          (amb["ronda_relay_viva"](),
+           (lambda: (amb.update(MOSTRO_HEX=""), amb["ronda_relay_viva"](),
+                     amb.update(MOSTRO_HEX=MOSTRO))[1])()))
+    prova("le liste del config si ripuliscono: solo ws/wss, niente "
+          "doppioni, e una STRINGA sola vale la sua voce (iterata "
+          "darebbe le lettere)",
+          ([NOSTRO, LORO], [NOSTRO], [], []),
+          (R("lista")([NOSTRO, " " + LORO + " ", NOSTRO, "http://x", 7, ""]),
+           R("lista")(NOSTRO), R("lista")(None), R("lista")({"a": 1})))
+    prova("chi si guarda: i relay che confermano (se stanno nel coro) "
+          "piu' quelli del canarino, senza doppioni", [NOSTRO, LORO],
+          R("guardati")())
+    amb["MOSTRO_RELAY_CONFERMA"] = []
+    prova("...senza `MOSTRO_RELAY_CONFERMA` conferma chiunque, e si "
+          "guarda il coro intero", [NOSTRO, LORO, VERO], R("guardati")())
+    amb["MOSTRO_RELAY_CONFERMA"] = [LORO, "wss://fuori.dal.coro.example"]
+    prova("...un relay che conferma ma non sta nel coro non conta; "
+          "quello del canarino si guarda comunque", [LORO, NOSTRO],
+          R("guardati")())
+    amb["MOSTRO_RELAY_CONFERMA"] = [NOSTRO, LORO]
+    amb["ChiavePrivataNostr"] = None
+    prova("senza la libreria delle chiavi il canarino non parte (e la "
+          "lettura resta)", ([], [NOSTRO, LORO]),
+          (R("canarini")(), R("guardati")()))
+    amb["ChiavePrivataNostr"] = _Priv
+
+    # --- il canarino, e il plugin VERO che lo giudica ---
+    adesso = int(time.time())
+    can = R("canarino")(MOSTRO, adesso)
+    seriale = json.dumps([0, can["pubkey"], can["created_at"], can["kind"],
+                          can["tags"], can["content"]],
+                         separators=(",", ":"), ensure_ascii=False)
+    prova("il canarino e' un evento VERO: l'id e' quello del NIP-01 e la "
+          "firma Schnorr regge", (True, True),
+          (can["id"] == _hl.sha256(seriale.encode("utf-8")).hexdigest(),
+           schnorr_puro.verifica(bytes.fromhex(can["pubkey"]),
+                                 bytes.fromhex(can["id"]),
+                                 bytes.fromhex(can["sig"]))))
+    prova("...ha la forma di un messaggio della pagina: kind 14, UN tag "
+          "`p` col coordinatore, la scadenza a dieci minuti",
+          (14, [["p", MOSTRO], ["expiration", str(adesso + 600)]]),
+          (can["kind"], can["tags"]))
+    grezzo = _b64.b64decode(can["content"])
+    prova("...il contenuto ha l'aspetto di una busta NIP-44 (versione 2) "
+          "ed e' fatto di byte a caso, diversi a ogni canarino",
+          (2, 131, True),
+          (grezzo[0], len(grezzo),
+           R("canarino")(MOSTRO, adesso)["content"] != can["content"]))
+    altro = R("canarino")(MOSTRO, adesso)
+    prova("...e la chiave nasce per quell'evento: due canarini, due "
+          "chiavi, nessuna tenuta nel blocco", (True, False),
+          (altro["pubkey"] != can["pubkey"],
+           any(isinstance(v, (bytes, _Priv)) for v in amb.values())))
+    Pc = plugin()
+    prova("IL PLUGIN VERO ACCETTA IL CANARINO DEL SERVER, da una chiave "
+          "che non sta in nessuna lista: le due meta' sono in pari",
+          (False, (True, "")),
+          (can["pubkey"] in Pc._ammesse,
+           Pc.giudica({"event": can, "sourceType": "IP4",
+                       "sourceInfo": "203.0.113.7"}, adesso)))
+    prova("...e al ritmo della ronda (uno ogni mezz'ora dallo stesso "
+          "indirizzo) i freni non lo vedono mai: un giorno intero passa",
+          48,
+          sum(Pc.giudica({"event": R("canarino")(MOSTRO, adesso + n * 1800),
+                          "sourceInfo": "203.0.113.7"},
+                         adesso + n * 1800)[0] for n in range(48)))
+
+    # --- la lettura ---
+    def libro(*eventi, fine="EOSE"):
+        return lambda msg: ([["EVENT", msg[1], e] for e in eventi]
+                            + [[fine, msg[1]]]) if msg[0] == "REQ" else []
+
+    def del_coord(quando, autore=None, kind=38385):
+        return {"id": "9" * 64, "pubkey": autore or MOSTRO, "kind": kind,
+                "created_at": quando, "tags": [], "content": ""}
+    Ws.copioni = {
+        NOSTRO: libro(del_coord(adesso - 500, kind=38383),
+                      del_coord(adesso - 90)),
+        LORO: libro(del_coord(adesso - 30, autore="f" * 64)),
+        "ws://127.0.0.1:7813": libro(fine="CLOSED"),
+        "ws://127.0.0.1:7814": lambda msg: [["NOTICE", "aspetta"]] * 3,
+    }
+    amb["RONDA_RELAY_TETTO_S"] = 0.3
+    prova("la lettura: il piu' fresco del coordinatore, e la domanda e' "
+          "sul libro (38383 e 38385) col suo autore",
+          (("ok", adesso - 90),
+           ["REQ", "ronda", {"kinds": [38383, 38385], "authors": [MOSTRO],
+                             "limit": 1}]),
+          (R("leggi")(NOSTRO, MOSTRO), Ws.mandati[-1][1]))
+    prova("...l'autore si ricontrolla: un evento di un altro non conta, "
+          "e il relay risulta VUOTO", ("vuoto", 0), R("leggi")(LORO, MOSTRO))
+    prova("...un relay che chiude la domanda, uno che parla e non "
+          "finisce, uno che non apre",
+          [("chiuso", 0), ("giu", 0), ("giu", 0)],
+          [R("leggi")(r, MOSTRO) for r in (
+              "ws://127.0.0.1:7813", "ws://127.0.0.1:7814",
+              "ws://127.0.0.1:7899")])
+    prova("...e ogni connessione aperta si chiude, anche quando va male",
+          sorted(r for r in Ws.aperte if r in Ws.copioni), sorted(Ws.chiuse))
+
+    # --- il canto ---
+    def accetta(msg):
+        return [["OK", msg[1]["id"], True, ""]] if msg[0] == "EVENT" else []
+
+    def rifiuta(msg):
+        return [["NOTICE", "ciao"],
+                ["OK", "0" * 64, True, ""],
+                ["OK", msg[1]["id"], False,
+                 "restricted: solo <b>Barattolo</b> " + "x" * 300]]
+    Ws.copioni = {NOSTRO: accetta, LORO: rifiuta,
+                  "ws://127.0.0.1:7814": lambda msg: []}
+    Ws.mandati.clear()
+    prova("il canto: l'OK del relay sul SUO id e' «ok», e sul filo e' "
+          "passato UN evento, per il coordinatore",
+          (("ok", ""), 1, True),
+          (R("canta")(NOSTRO, MOSTRO), len(Ws.mandati),
+           Ws.mandati[0][1][0] == "EVENT"
+           and Ws.mandati[0][1][1]["tags"][0] == ["p", MOSTRO]))
+    detto_relay = R("canta")(LORO, MOSTRO)
+    prova("...un no e' «rifiutato» con le parole del relay tagliate a "
+          "120 (l'OK di un altro evento non lo inganna)",
+          ("rifiutato", 120, True),
+          (detto_relay[0], len(detto_relay[1]),
+           detto_relay[1].startswith("restricted: solo <b>Barattolo</b>")))
+    prova("...un relay che non conferma e uno che non apre",
+          [("giu", ""), ("giu", "")],
+          [R("canta")(r, MOSTRO) for r in ("ws://127.0.0.1:7814",
+                                           "ws://127.0.0.1:7899")])
+
+    # --- in collaudo non si esce ---
+    amb["MODALITA_COLLAUDO"] = True
+    Ws.aperte.clear()
+    Ws.copioni[VERO] = accetta
+    prova("IN COLLAUDO verso un relay vero: ne' lettura ne' canarino, "
+          "nessuna connessione, e il giudice non lo conta come guasto",
+          (("simulato", 0), ("simulato", ""), [], "", ""),
+          (R("leggi")(VERO, MOSTRO), R("canta")(VERO, MOSTRO),
+           list(Ws.aperte), R("male")("lettura", "simulato", 0, "", adesso),
+           R("male")("canarino", "simulato", 0, "", adesso)))
+    prova("...verso un relay di casa (il cartone, il relay morto dei "
+          "giri dal vivo) si bussa", ("ok", ""), R("canta")(NOSTRO, MOSTRO))
+    amb["MODALITA_COLLAUDO"] = False
+
+    # --- il giudice di una risposta ---
+    prova("il giudice della lettura: fresco tace; fermo da piu' di "
+          "un'ora, vuoto, muto e giu' parlano",
+          ["", "",
+           "risponde, ma il coordinatore non ci scrive da 2 h",
+           "risponde, ma del coordinatore non ha niente",
+           "non risponde", "non risponde", "non risponde"],
+          [R("male")("lettura", s, q, "", adesso) for s, q in (
+              ("ok", adesso - 60), ("ok", adesso - 3600),
+              ("ok", adesso - 7300), ("vuoto", 0), ("chiuso", 0),
+              ("muto", 0), ("giu", 0))])
+    prova("il giudice del canarino: il no porta le parole del relay "
+          "PASSATE DA html.escape; il silenzio ha la sua frase",
+          ["",
+           "NON ACCETTA i messaggi per il coordinatore («restricted: "
+           "&lt;b&gt;x&lt;/b&gt; &amp; y»)",
+           "NON ACCETTA i messaggi per il coordinatore",
+           "non conferma i messaggi per il coordinatore",
+           "non conferma i messaggi per il coordinatore"],
+          [R("male")("canarino", s, 0, d, adesso) for s, d in (
+              ("ok", ""), ("rifiutato", "restricted: <b>x</b> & y"),
+              ("rifiutato", ""), ("muto", ""), ("giu", ""))])
+    prova("le durate si leggono", ["1 min", "40 min", "2 h", "6 giorni"],
+          [R("fa")(s) for s in (5, 2400, 7300, 6 * 86400 + 5)])
+
+    # --- il giudice degli avvisi ---
+    S = {"voci": {}}
+    giri = [
+        [(LORO, "lettura", "non risponde")],            # 1: una volta
+        [(LORO, "lettura", "")],                        # 2: era un salto
+        [(LORO, "lettura", "non risponde")],            # 3
+        [(LORO, "lettura", "non risponde")],            # 4: due di fila
+        [(LORO, "lettura", "non risponde")],            # 5: gia' detto
+        [(LORO, "lettura", "")],                        # 6: torna
+        [(LORO, "lettura", "")],                        # 7
+    ]
+    detti = [R("decidi")(S, g, 1000.0 + 600 * n) for n, g in enumerate(giri)]
+    prova("un relay che salta UN giro non e' una notizia; due di fila "
+          "si', una volta sola; il ritorno si dice, con quanto e' "
+          "durato; e poi piu' niente",
+          [([], []), ([], []), ([], []),
+           ([(LORO, "lettura", "non risponde")], []), ([], []),
+           ([], [(LORO, "lettura", 1800.0)]), ([], [])], detti)
+    prova("...un guasto mai detto (un giro solo) non ha un ritorno da "
+          "dire", ([], []),
+          (lambda S2: (R("decidi")(S2, [(LORO, "lettura", "x")], 1.0),
+                       R("decidi")(S2, [(LORO, "lettura", "")], 2.0))[1])(
+              {"voci": {}}))
+    prova("...e lettura e canarino dello stesso relay hanno ciascuno il "
+          "suo conto", 2,
+          len((lambda S2: (R("decidi")(S2, [(NOSTRO, "lettura", ""),
+                                            (NOSTRO, "canarino", "x")], 1.0),
+                           S2["voci"])[1])({"voci": {}})))
+    testo = R("testo")(
+        [(NOSTRO, "canarino", "NON ACCETTA i messaggi per il coordinatore "
+                              "(«restricted: &lt;b&gt;»)"),
+         ("wss://relay.<i>x</i>.example", "lettura", "non risponde")],
+        [(LORO, "lettura", 2400.0), (NOSTRO, "canarino", 7300.0)])
+    prova("l'avviso: UNO per giro, col relay senza `wss://`, i guasti "
+          "nuovi, cosa comporta, e i ritorni",
+          ["⚠️ <b>Relay di Mostro</b>",
+           "• <code>127.0.0.1:7811</code> NON ACCETTA i messaggi per il "
+           "coordinatore («restricted: &lt;b&gt;»)",
+           "• <code>relay.&lt;i&gt;x&lt;/i&gt;.example</code> non risponde",
+           "Finché dura, i messaggi dei telefoni al coordinatore (presa, "
+           "rilascio, voto) hanno una strada in meno.",
+           "✅ <code>127.0.0.1:7812</code> è tornato a posto (dopo 40 min)",
+           "✅ <code>127.0.0.1:7811</code> accetta di nuovo i messaggi per "
+           "il coordinatore (dopo 2 h)"],
+          testo.split("\n"))
+    prova("...e di soli ritorni non porta l'intestazione del guasto",
+          False, "⚠️" in R("testo")([], [(LORO, "lettura", 60.0)]))
+
+    # --- il giro intero, con lettura e canto di copione ---
+    copione = {"leggi": {}, "canta": {}, "letti": [], "cantati": []}
+    orologio = [time.time()]
+
+    def _leggi(relay, mostro):
+        copione["letti"].append(relay)
+        return copione["leggi"].get(relay, ("ok", int(orologio[0])))
+
+    def _canta(relay, mostro):
+        copione["cantati"].append(relay)
+        return copione["canta"].get(relay, ("ok", ""))
+    amb["_ronda_relay_leggi"], amb["_ronda_relay_canta"] = _leggi, _canta
+    stato = amb["_RONDA_RELAY"]
+    vero_time = amb["time"]
+
+    class _Tempo:
+        """`time.time()` del blocco: avanti di dieci minuti a ogni giro."""
+        @staticmethod
+        def time():
+            return orologio[0]
+    amb["time"] = _Tempo
+    stampato = []
+    amb["print"] = lambda *a, **k: stampato.append(" ".join(map(str, a)))
+
+    def giro_(minuti=10):
+        copione["letti"].clear()
+        copione["cantati"].clear()
+        _aio.run(amb["_ronda_relay_giro"]())
+        fatto = (list(copione["letti"]), list(copione["cantati"]))
+        orologio[0] += minuti * 60
+        return fatto
+    primo = giro_()
+    prova("il primo giro: si legge da tutti i guardati, il canarino va "
+          "al SOLO relay nostro, nessun avviso, una riga nel journal",
+          (([NOSTRO, LORO], [NOSTRO]), [], 1),
+          (primo, AVVISI, len(stampato)))
+    prova("...poi il canarino aspetta la sua mezz'ora: due giri senza, "
+          "al terzo riparte; e il journal a stato uguale tace",
+          ([[], [], [NOSTRO]], 1),
+          ([giro_()[1] for _ in range(3)], len(stampato)))
+    copione["canta"][NOSTRO] = ("rifiutato", "restricted: solo Barattolo")
+    orologio[0] += 1800
+    g1 = giro_()
+    prova("il plugin torna quello di ieri: al primo no ancora niente ai "
+          "moderatori (ma il journal lo dice)", ([NOSTRO], [], 2),
+          (g1[1], AVVISI, len(stampato)))
+    g2 = giro_()
+    prova("...dopo un no il canarino riparte al giro DOPO, senza "
+          "aspettare la mezz'ora; al secondo no parte l'avviso, in Errori, "
+          "con quel guasto e nessun altro",
+          ([NOSTRO], 1, "errori", 1, True),
+          (g2[1], len(AVVISI), ultimo()[1], ultimo()[0].count("\n• "),
+           "<code>127.0.0.1:7811</code> NON ACCETTA i messaggi per il "
+           "coordinatore («restricted: solo Barattolo»)" in ultimo()[0]))
+    giro_()
+    giro_()
+    prova("...finche' dura non lo ripete, e il canarino continua a "
+          "provare a ogni giro", (1, [NOSTRO]), (len(AVVISI), giro_()[1]))
+    copione["canta"].pop(NOSTRO)
+    giro_()
+    prova("...quando il relay riaccetta arriva il ritorno", (2, True),
+          (len(AVVISI),
+           "✅ <code>127.0.0.1:7811</code> accetta di nuovo i messaggi per "
+           "il coordinatore" in ultimo()[0]))
+    copione["leggi"][NOSTRO] = ("giu", 0)
+    copione["leggi"][LORO] = ("ok", int(orologio[0]) - 7300)
+    orologio[0] += 1800
+    g = giro_()
+    giro_()
+    prova("a un relay che NON RISPONDE il canarino non si manda (lo "
+          "sappiamo gia'), e i due guasti arrivano in UN avviso",
+          ([], 3, 2, True, True),
+          (g[1], len(AVVISI), ultimo()[0].count("\n• "),
+           "<code>127.0.0.1:7811</code> non risponde" in ultimo()[0],
+           "<code>127.0.0.1:7812</code> risponde, ma il coordinatore non "
+           "ci scrive da 2 h" in ultimo()[0]))
+    prova("lo stato dell'ultimo giro e' quello che legge il pannello",
+          {NOSTRO: "non risponde",
+           LORO: "risponde, ma il coordinatore non ci scrive da 2 h"},
+          {r: s for r, s in stato["stati"].items()})
+    leve = {v["chiave"]: v for v in amb["_ronda_relay_leve"]()}
+    prova("...che mostra la leva viva con lo stato dei relay, e dove va "
+          "il canarino", (True, True, "127.0.0.1:7811" in str(
+              leve["RONDA_RELAY_CANARINO"]["valore"])),
+          (leve["RONDA_RELAY_MOSTRO"]["valore"],
+           "127.0.0.1:7811: non risponde" in leve["RONDA_RELAY_MOSTRO"]["nota"],
+           True))
+    amb["time"] = vero_time
+    del amb["print"]
+    prova("in tutto quel che il giro ha stampato ci sono i relay e lo "
+          "stato, e nessun avviso e' partito senza la sua stanza",
+          (True, True),
+          (all(r.startswith("🛰️ Ronda dei relay di Mostro: ") for r in stampato),
+           all(a == "errori" for _, a in AVVISI)))
+
+    # --- l'orologio non muore ---
+    async def _una_volta():
+        colpi = []
+
+        async def _rotto():
+            colpi.append(1)
+            if len(colpi) == 1:
+                raise RuntimeError("boom")
+            raise _aio.CancelledError()
+        amb["_ronda_relay_giro"] = _rotto
+        amb["RONDA_RELAY_PASSO_S"] = 0
+        try:
+            await amb["orologio_ronda_relay"]()
+        except _aio.CancelledError:
+            pass
+        return len(colpi)
+    stampato.clear()
+    amb["print"] = lambda *a, **k: stampato.append(" ".join(map(str, a)))
+    colpi = _aio.run(_una_volta())
+    del amb["print"]
+    prova("l'orologio: un giro che esplode lascia partire il prossimo, e "
+          "nel journal va il NOME dell'errore e basta", (2, True, False),
+          (colpi, "giro saltato (RuntimeError)" in "".join(stampato),
+           "boom" in "".join(stampato)))
+
+    # ================================================================
+    # 7) I DOCUMENTI E LA CI
+    # ================================================================
+    prod = open("docs/PRODUZIONE.md", encoding="utf-8").read()
+    arch = open("docs/ARCHITETTURA.md", encoding="utf-8").read()
+    ripr = open("deploy/RIPRISTINO-RELAY.md", encoding="utf-8").read()
+    leggimi = open("deploy/relay/README.md", encoding="utf-8").read()
+    prova("PRODUZIONE ha le due procedure — la buca sul relay e la "
+          "ronda — e dice come si entra nella macchina del relay",
+          (True, True, True),
+          ("LA BUCA DEL COORDINATORE" in prod,
+           "LA RONDA DEI RELAY DI MOSTRO" in prod,
+           "debian@vm-1957.lnvps.cloud" in prod))
+    prova("...lo dice anche il foglio del panico del relay", True,
+          "debian@vm-1957.lnvps.cloud" in ripr)
+    prova("ARCHITETTURA racconta la buca e la ronda; il README del relay "
+          "dice che le porte del plugin sono due", (True, True),
+          ("LA BUCA DEL COORDINATORE" in arch
+           and "LA RONDA DEI RELAY DI MOSTRO" in arch,
+           "LA BUCA DEL COORDINATORE" in leggimi))
+    prova("il collaudo col server vero sta nei due elenchi del workflow",
+          (True, True),
+          ("collaudo_ronda_relay.py" in wf,
+           "collaudo_ronda_relay" in wf[wf.index("python collaudi_ci.py"):]))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -157004,6 +157845,7 @@ def main():
               prove_servizio_senza_corriere,
               prove_gesti_ordine,
               prove_ordine_in_pausa,
+              prove_relay_per_mostro,
               prove_config_esempio):
         try:
             f()

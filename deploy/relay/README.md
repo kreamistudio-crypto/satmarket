@@ -67,6 +67,28 @@ quell'elenco non c'è** — quindi la sua assenza passerebbe in silenzio.
 Va aggiunta al `tar` e alla guardia insieme, o la guardia dirà di sì a
 un archivio incompleto.
 
+## LA BUCA DEL COORDINATORE (12 ott 2026)
+
+`policy/chi-scrive.py` ha **due porte**, non più una. La lista di
+sempre — chi firma sta in `chiavi.txt` e scrive quel che vuole — e la
+**buca delle lettere**: da chiunque, ma solo un messaggio indirizzato al
+nostro coordinatore P2P (kind 14, un tag `p` che è la sua chiave, una
+scadenza vicina, pochi byte), con tre freni al minuto per indirizzo,
+per chiave e in tutto. Sono le richieste dei telefoni — presa,
+rilascio, voto — che prima passavano dal solo `relay.mostro.network`.
+
+Tutto il resto resta rifiutato come prima. Il perché, i numeri e la
+procedura per portare il file sulla macchina (coi fine riga giusti:
+copiato da Windows com'è, il plugin non parte e il relay rifiuta
+tutto) stanno in `docs/PRODUZIONE.md`, «LA BUCA DEL COORDINATORE»; a
+sorvegliare che la buca resti aperta è la ronda del VPS, stessa pagina,
+«LA RONDA DEI RELAY DI MOSTRO».
+
+⚠️ La chiave del coordinatore sta scolpita in DUE file di questa
+cartella, `router.conf` (l'autore dello specchio) e il plugin (il
+destinatario della buca): se un giorno cambia, si cambiano insieme —
+una prova di `prove.py` lo pretende.
+
 ## La mappa
 
 | File | Dove va | Cosa fa |
@@ -75,7 +97,7 @@ un archivio incompleto.
 | `compose.yml` | `/opt/relay/` | il servizio. Porta due righe che non sono decorative: `user: "1001:1001"` e il `127.0.0.1:` davanti alla porta |
 | `strfry.conf` | `/opt/relay/` | il relay. `restrictedReadKinds` tiene i DM leggibili solo a chi li riguarda |
 | `router.conf` | `/opt/relay/` | lo **specchio** del P2P: tre kind (libro, impostazioni e — dal 17 set 2026 — le buste cifrate del coordinator), un autore, corrente in discesa |
-| `policy/chi-scrive.py` | `/opt/relay/policy/` | chi può scrivere. **Fail-closed**: se qualcosa esplode rifiuta |
+| `policy/chi-scrive.py` | `/opt/relay/policy/` | chi può scrivere: la lista, e la buca del coordinatore coi suoi freni. **Fail-closed**: se qualcosa esplode rifiuta |
 | `aggiorna-chiavi.sh` | `/opt/relay/` | rinfresca la whitelist da `/api/relay/chiavi`. Legge il token da `token.header` |
 | `backup-relay.sh` | `/usr/local/sbin/` | l'archivio cifrato delle 03:45. **Mai il database** — e ha la guardia che lo verifica (**nove** nomi da quando c'è `router.conf`) |
 | `ronda-relay.sh` | `/usr/local/sbin/` | le 08:00: età e peso dell'ultimo archivio, sul canale Telegram |

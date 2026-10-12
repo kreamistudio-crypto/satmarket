@@ -55460,3 +55460,194 @@ sua guardia è la stessa funzione di «Paga», e lo dice una sentinella.
 le spese di spedizione»: vale anche per gli ordini verso un punto di
 ritiro; il costo è `ordini.spedizione_sats`; con costo zero il bottone
 non compare. Prima del codice dei pagamenti, le dieci righe ad Andrea.
+
+## Il relay per Mostro: la buca delle lettere sul nostro relay, e la ronda col canarino (12 ott 2026, notte, cantiere relay-per-mostro, richiesta di Andrea)
+
+**Il guasto che non era ancora successo.** Il cantiere del voto
+(«Il voto dopo il concluso») aveva sondato i relay la sera del 12: la
+sola strada viva dal telefono a mostrod era `relay.mostro.network`.
+`relay.barattolo.store` rifiutava le chiavi di scambio dei telefoni
+(«restricted: solo Barattolo e i suoi venditori»: lo avevamo chiuso
+perché facesse solo da specchio del libro), damus aveva bannato il
+coordinatore, su nos.lol mostrod non scriveva da sei giorni. Caduto
+relay.mostro.network — che non è nostro, e il 17 set era già rimasto
+muto un giorno — nessuno avrebbe più preso, rilasciato o votato.
+
+**La decisione di Andrea**: il nostro relay accetta dai telefoni SOLO
+i messaggi indirizzati al nostro Mostro, e resta chiuso a tutto il
+resto; i messaggi passano da almeno due relay affidabili, di cui uno
+nostro; e qualcuno avvisa nel gruppo degli admin (argomento Errori)
+se il relay smette di accettarli o se relay.mostro.network non
+risponde. Le sue risposte alle cinque domande di apertura: la chat fra
+le parti e quella col moderatore RESTANO FUORI dal nostro relay (sono
+kind 14 anche loro, ma con un altro destinatario: la loro conferma
+resta appesa a relay.mostro.network); sì al canarino; i freni a 30 al
+minuto per IP, 10 per chiave, 600 in tutto, e 16 KB di tetto «come
+partenza, da confermare sul messaggio vero»; damus in `router.conf` e
+nei relay degli annunci non si tocca.
+
+**Cosa si è scoperto leggendo, prima di scrivere.**
+- I messaggi dei telefoni a Mostro sono kind **14**, non 1059: un tag
+  `p` col coordinatore e una `expiration` a un'ora (`P2P_SCADENZA_MSG`),
+  in tre punti della pagina e in nessun altro. Per questo la lettura
+  non vuole AUTH: `restrictedReadKinds` del relay copre il 4 e il 1059.
+- Il plugin guardava SOLO chi firma. La voce del 16 set («Il coro dei
+  relay») aveva già scritto le tre mosse perché lo specchio entrasse
+  nel coro — la policy, il `settings.toml` di mostrod, la riga del
+  config —: questo cantiere fa la prima e scrive la procedura delle
+  altre due.
+- Dal 17 set mostrod ha `relay.barattolo.store` fra i suoi relay e ci
+  scrive il libro. Che ci LEGGA anche i messaggi a lui indirizzati è
+  quel che fa per costruzione un client Nostr (la stessa
+  sottoscrizione su tutti i relay della lista), ma NON È PROVATO: resta
+  da guardare, e finché non si è visto il nostro relay non entra in
+  `MOSTRO_RELAY_CONFERMA` (un suo OK farebbe «partito» un messaggio che
+  nessuno legge: il guasto del voto).
+- Il nostro relay deve stare in TUTTE E DUE le liste, `MOSTRO_RELAY` e
+  `MOSTRO_RELAY_SPECCHIO`: dalla seconda il server prende l'ascolto dal
+  vivo del libro (`_guardia_ascolto_p2p`) e la pagina decide se il
+  libro è completo. La voce del 16 set diceva «passa da una all'altra»:
+  spostandolo, l'ascolto dal vivo si spegneva in silenzio.
+- La macchina del relay non tira da GitHub, e come ci si entra non era
+  scritto da nessuna parte. Adesso sta in PRODUZIONE e nel foglio del
+  panico.
+
+**Cosa è stato fatto.**
+1. LA BUCA, nel plugin (`deploy/relay/policy/chi-scrive.py`). Due
+   porte: la lista di sempre, intatta; e per chi non è in lista la
+   forma stretta — kind 14, UN tag `p` uguale al coordinatore, UNA
+   scadenza entro due ore, al massimo 6 tag e 16.384 byte — più tre
+   freni in memoria su un minuto che scorre (IP, chiave, tutti). Il
+   plugin è diventato un modulo con le sue funzioni (`giudica`,
+   `per_mostro`, `secchio_ip`, `Freno`) e un `main()`: prima era un
+   ciclo nudo, e un ciclo nudo non si prova senza lanciarlo.
+2. LA RONDA, nel server (leve `RONDA_RELAY_MOSTRO` e
+   `RONDA_RELAY_CANARINO`, spente): ogni dieci minuti una lettura a
+   ogni relay che conferma, ogni mezz'ora il canarino al relay nostro;
+   un guasto visto due giri di fila va in Errori, una volta, e poi il
+   ritorno. Lo stato dell'ultimo giro sta nel pannello delle leve.
+3. IL CORO: nel config d'esempio damus esce da `MOSTRO_RELAY` ed entra
+   il nostro relay. Il config del VPS è di Andrea (PRODUZIONE).
+4. I DOCUMENTI: le due procedure in PRODUZIONE, il com'è fatto in
+   ARCHITETTURA, come si entra nel foglio del panico del relay, le due
+   porte nel README della cartella.
+
+**Le scelte, coi perché.**
+- LA CHIAVE DEL COORDINATORE È SCOLPITA NEL PLUGIN, e la voce del 17
+  set aveva scritto «niente gemello cablato». Non è la stessa cosa: là
+  si parlava di chi SCRIVE (e la lista viva, `chiavi.txt`, basta); qui
+  serve il DESTINATARIO, e in `chiavi.txt` il coordinatore è una riga
+  uguale a quella di un venditore. Un secondo file rinfrescato dal
+  timer voleva una rotta nuova sul VPS e uno script in più sulla
+  macchina, per una chiave che in `router.conf` è già scolpita da
+  settembre. Una prova tiene uguali le due copie e la `MOSTRO_NPUB`
+  del config d'esempio.
+- LA SCADENZA È OBBLIGATORIA E VICINA: è quel che fa di una buca
+  aperta a chiunque una cosa che si svuota da sé (strfry butta gli
+  eventi scaduti). Due ore: l'ora della pagina più il quarto d'ora di
+  orologio avanti che strfry tollera, e margine. Una prova lega i due
+  numeri: chi allunga `P2P_SCADENZA_MSG` oltre trova la riga rossa
+  prima che il relay cominci a rifiutare.
+- IL FRENO VERO È L'IP: le chiavi nascono nuove a ogni scambio. Un
+  IPv6 si conta per la sua /64; quel che non si legge finisce in un
+  secchio solo (nel dubbio si frena insieme). Un messaggio fermato da
+  un freno non consuma gli altri due, o una chiave rumorosa
+  chiuderebbe la porta al suo palazzo.
+- UN GUASTO SI DICE AL SECONDO GIRO, IL RITORNO AL PRIMO: nos.lol «va a
+  tratti», e un relay che salta un giro non è una notizia. Dopo un no
+  il canarino riparte al giro dopo, senza aspettare la mezz'ora, così
+  il secondo no arriva in dieci minuti.
+- IL CANARINO NON VA A CHI NON RISPONDE ALLA LETTURA: direbbe la stessa
+  cosa con un'altra frase, e l'avviso avrebbe due righe per un guasto.
+- IL CANARINO È UN EVENTO VERO MA VUOTO: firma buona, forma giusta,
+  contenuto di byte a caso. Mostrod lo riceve, non lo apre e lo butta.
+  Firmato da una chiave nata per quell'evento, MAI da quella della
+  piattaforma: quella è in lista, e proverebbe la porta sbagliata.
+- «IL COORDINATORE NON CI SCRIVE DA» A UN'ORA: il 38385 torna ogni
+  pochi minuti, ma una salita d'immagine tiene il nodo fermo anche
+  mezz'ora, e la ronda non deve suonare per un gesto nostro.
+
+**Scartato.**
+- Un filtro di kind per chi sta in lista (resta la decisione del 17
+  set: il coordinatore è nostro, e un filtro butterebbe in silenzio
+  quel che pubblicherà domani).
+- Far passare anche la chat (kind 14 con un altro `p`): decisione di
+  Andrea, e sarebbe stata la porta larga — un kind 14 verso CHIUNQUE.
+- Il controllo solo passivo (contare le richieste arrivate sul nostro
+  relay): con poco traffico non dice niente, e «zero» non distingue un
+  relay chiuso da una sera tranquilla.
+- La ronda sulla macchina del relay (un timer accanto a
+  `ronda-relay.sh`): guarderebbe il relay da dentro, cioè senza Caddy,
+  senza DNS e senza l'IP di fuori — le tre cose che cadono.
+- Togliere il nostro relay dagli specchi, o deduplicare le due liste
+  nel server: si spegne l'ascolto dal vivo. Il prezzo di tenerlo in
+  tutte e due è una lettura del libro in più dallo stesso relay.
+- Copiare il plugin sulla macchina con `scp` e basta: il file sul PC ha
+  i fine riga di Windows, la prima riga diventa `python3\r`, strfry non
+  lo lancia e il relay rifiuta tutto. La procedura toglie i `\r` e
+  confronta l'impronta col repo prima di toccare niente.
+
+**Provato.** `prove_relay_per_mostro` (87 prove): il plugin VERO
+caricato dal file — la lista, sedici forme che restano fuori, il tetto
+al byte, i tre freni, la finestra che scorre, gli indirizzi, il
+dialogo con strfry lanciato com'è, FAIL-CLOSED —, la pagina che scrive
+al coordinatore solo in quella forma, e la ronda coi pezzi veri: il
+canarino del server firmato davvero (`schnorr_puro`) e GIUDICATO DAL
+PLUGIN VERO, la lettura e il canto contro una websocket di cartone, i
+giudici, il giro intero con l'orologio finto. `collaudo_ronda_relay`
+(32 passi, in CI nella gabbia): il server vero contro due relay di
+cartone, di cui il nostro verifica la firma e chiede al plugin vero;
+il plugin di ieri rimesso al suo posto fa partire l'avviso al secondo
+giro e il ritorno quando torna il nuovo; un relay giù, uno sordo, uno
+fermo da sei giorni; mai una bussata al relay pubblico; mai un
+canarino nel journal. Girato anche senza coincurve, com'è la CI. La
+tortura, su una copia del repo: 34 mutazioni su 34 prese (15 sul
+plugin, 19 sulla ronda). Emendate due prove di ieri perché la regola è
+cambiata per richiesta: il censimento degli avvisi da admin (un punto
+in più, in Errori) e il banco del pannello delle leve (la tredicesima
+volta della trappola del `__missing__`).
+
+**Resta da guardare.**
+- SULLA MACCHINA DEL RELAY: portare il plugin (PRODUZIONE, «LA BUCA DEL
+  COORDINATORE», nove passi). Che strfry lo rilanci da solo al cambio
+  del file è quel che fa di suo, ma su QUESTA immagine non l'ha visto
+  nessuno: lo dice la ronda, e se serve c'è il riavvio (secondi).
+- SUL NODO: che mostrod LEGGA dal nostro relay i messaggi a lui
+  indirizzati — la riga nel suo log al minuto del canarino. Prima di
+  quello, niente `relay.barattolo.store` in `MOSTRO_RELAY_CONFERMA`.
+- SUL VPS: le due leve della ronda, poi il coro nuovo (`MOSTRO_RELAY`
+  col nostro relay e senza damus, `MOSTRO_RELAY_CONFERMA` coi due).
+- I 16 KB sui messaggi veri (il comando sta in PRODUZIONE): nessuno ha
+  ancora misurato una richiesta vera di un telefono.
+- Damus fuori dal `settings.toml` del nodo: con la `-bar8`, a libro
+  fermo.
+- Il `description` del NIP-11: cambiato NEL REPO (decisione di Andrea,
+  13 ott), sulla macchina si applica al primo riavvio del relay che
+  serve comunque. Fino ad allora quella riga di `strfry.conf` diverge,
+  ed è scritto in PRODUZIONE.
+
+**Le decisioni di Andrea del 13 ott, prima del push.** Il cambio del
+coro sul VPS (`MOSTRO_RELAY`, `MOSTRO_RELAY_CONFERMA`, damus fuori) lo
+guida UNA sessione sola, questa: il cantiere del voto il config non lo
+tocca. I comandi per le macchine uno alla volta con l'host in cima, e
+MAI uno che stampa le righe intorno nel config o nel `settings.toml`
+(`grep -A/-B/-C`, `cat`, `sed -n`): ci sono segreti — solo righe
+precise per nome di leva, e la copia di sicurezza prima di ogni
+modifica. Le procedure di PRODUZIONE di questo cantiere sono scritte
+così. Quel che il VPS aveva il 13 ott: `MOSTRO_RELAY` alla riga 78 con
+damus, `MOSTRO_RELAY_SPECCHIO` alla 97 col nostro relay; nell'uscita
+vista non c'era `MOSTRO_RELAY_CONFERMA` (si riguarda al punto 1).
+
+**Da fare, non fatto (notato strada facendo; decide Andrea).**
+- La regola «mai righe intorno nel config» vale per ogni sessione:
+  proposta per CLAUDE.md come commit a parte, col suo sì.
+- In PRODUZIONE la procedura dello specchio di settembre («Mostro
+  scrive sullo specchio», punto 4) dice ancora
+  `grep -n -A10 '^\[nostr\]' ~/nodo/mostro/settings.toml`: è un comando
+  che stampa righe intorno in un file con una chiave. Da riscrivere
+  come qui (`grep -n "wss://"`).
+- Il pannello «Stato delle leve» con le due righe della ronda non è
+  stato guardato dal vivo: lo prova il banco, non un occhio.
+- La voce del 16 set («Il coro dei relay») dice che lo specchio «passa
+  da `MOSTRO_RELAY_SPECCHIO` a `MOSTRO_RELAY`»: è superata da questa
+  (resta in tutte e due). La voce vecchia non è stata toccata.

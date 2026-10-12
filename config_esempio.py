@@ -779,14 +779,21 @@ MOSTRO_NPUB = "npub14l3aax4gv9khctnzavek6wsj0nua42d5fq4tr6fkr4wpwhfm3neswg6lg0"
 # I relay su cui il coordinator PUBBLICA: il client legge il libro e
 # manda le richieste da qui, e il suo relay dedicato va per primo. Non
 # c'e' una lista di serie nel codice, apposta — vuota = spento.
+# (12 ott 2026) Il NOSTRO relay sta nel coro: accetta da chiunque i
+# soli messaggi indirizzati al coordinatore, cosi' le richieste dei
+# telefoni hanno due strade di cui una nostra (docs/PRODUZIONE.md, «LA
+# BUCA DEL COORDINATORE»). relay.damus.io NON va rimesso: ha bannato
+# il coordinatore, e un suo OK non vale niente.
 MOSTRO_RELAY = [
     "wss://relay.mostro.network",
-    "wss://relay.damus.io",
+    "wss://relay.barattolo.store",
     "wss://nos.lol",
 ]
 # LO SPECCHIO (set 2026): i relay che tengono una COPIA del libro senza
 # essere il posto dove il coordinator vive — il nostro
-# "wss://relay.barattolo.store" sta qui, e non nella lista qui sopra.
+# "wss://relay.barattolo.store" sta qui (e, dal 12 ott 2026, ANCHE
+# nella lista qui sopra: da questa il server prende l'ascolto dal vivo
+# del libro, quindi qui resta).
 # LA DIVISIONE E' IL PUNTO, non un ordine diverso: di qui si LEGGE
 # soltanto. Le richieste al coordinator (la gamba viva) scorrono
 # MOSTRO_RELAY e non passano mai da questa lista — mostrod sullo
@@ -1534,6 +1541,20 @@ AVVISO_DM_NOSTR_RELAY = [
     "wss://nos.lol",
     "wss://relay.primal.net",
 ]
+
+# La ronda dei relay di Mostro (12 ott 2026): ogni dieci minuti il
+# server chiede ai relay che confermano (MOSTRO_RELAY_CONFERMA; senza,
+# a tutto MOSTRO_RELAY) se rispondono e se il coordinatore ci scrive
+# ancora. Un guasto visto due giri di seguito arriva nel gruppo degli
+# admin, argomento "errori"; quando passa, arriva anche il ritorno.
+# Nasce SPENTA: True e riavvia per accenderla.
+RONDA_RELAY_MOSTRO = False
+# Il canarino: ogni mezz'ora un messaggio di prova indirizzato al
+# coordinatore (un kind 14 vuoto, firmato da una chiave usa-e-getta,
+# che scade in dieci minuti), per sapere se il relay lo ACCETTA.
+# ⚠️ SOLO IL NOSTRO RELAY: a un relay d'altri sarebbe spam. Vuota =
+# niente canarino. Sul VPS: ["wss://relay.barattolo.store"]
+RONDA_RELAY_CANARINO = []
 
 # --- Sicurezza degli accessi ------------------------------------------
 # Quanto vale un initData di Telegram: e' la credenziale di OGNI

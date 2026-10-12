@@ -4259,6 +4259,187 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`payment_required`, `auth_required`); i tempi su tre giri. La
   riserva misurata quella notte: `wss://nostr.oxtr.dev`.
 
+- LA BUCA DEL COORDINATORE, SUL RELAY NOSTRO (12 ott 2026, cantiere
+  relay-per-mostro; perché in CANTIERI, «Il relay per Mostro»; com'è
+  fatta in ARCHITETTURA, «LA BUCA DEL COORDINATORE»). Il plugin
+  `chi-scrive.py` di `relay.barattolo.store` ha DUE porte: la lista di
+  sempre (piattaforma, coordinatore, venditori con la chiave provata) e
+  la buca delle lettere — da chiunque, ma SOLO un kind 14 con un tag
+  `p` uguale al coordinatore, una scadenza entro due ore, al massimo
+  16 KB e 6 tag; e tre freni al minuto: 30 per indirizzo IP, 10 per
+  chiave, 600 in tutto. Tutto il resto resta rifiutato come prima,
+  chat fra le parti e chat col moderatore comprese (decisione di
+  Andrea).
+  COME SI ENTRA NELLA MACCHINA DEL RELAY (VM1957, `185.18.221.118`), da
+  PowerShell sul PC: `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1957.lnvps.cloud`
+  (utente `debian`; i file di `/opt/relay` sono dell'UID 1001, quindi
+  i comandi che li toccano vogliono `sudo`).
+  ⚠️ LA MACCHINA NON TIRA DA GITHUB: il plugin ci si porta a mano, e
+  IL FILE SUL PC HA I FINE RIGA DI WINDOWS — copiato com'è, la prima
+  riga diventa `python3\r`, strfry non riesce a lanciarlo e il relay
+  rifiuta TUTTO, piattaforma compresa. Per questo dopo la copia si
+  tolgono i `\r` e si confronta l'impronta con quella del repo.
+  LA PROCEDURA, un comando alla volta.
+  1) PC (PowerShell, dalla cartella del repo, dopo `git pull`):
+     `scp -i $env:USERPROFILE\.ssh\lnvps deploy\relay\policy\chi-scrive.py debian@vm-1957.lnvps.cloud:/tmp/chi-scrive.py`
+  2) PC, l'impronta che deve tornare (quella del file com'è nel repo,
+     coi fine riga giusti): `git rev-parse origin/main:deploy/relay/policy/chi-scrive.py`
+  3) RELAY, via i `\r` e la stessa impronta rifatta lì:
+     `sed -i 's/\r$//' /tmp/chi-scrive.py && python3 -c "import hashlib;d=open('/tmp/chi-scrive.py','rb').read();print(hashlib.sha1(b'blob %d\0'%len(d)+d).hexdigest())"`
+     — deve stampare la riga del punto 2, carattere per carattere. Se
+     è diversa NON si va avanti: il file non è quello del repo.
+  4) RELAY, che il Python del CONTAINER lo legga (è un'Alpine, non la
+     Debian di fuori): `cd /opt/relay && sudo docker compose exec -T relay python3 - < /tmp/chi-scrive.py; echo "esce $?"`
+     — deve dire `esce 0` e nient'altro.
+  5) RELAY, come sta il file di oggi (proprietario e permessi da
+     ricopiare): `ls -ln /opt/relay/policy/`
+  6) RELAY, la copia di sicurezza:
+     `sudo cp -p /opt/relay/policy/chi-scrive.py /opt/relay/chi-scrive.py.prima-della-buca`
+     (fuori da `policy/`, che è la cartella montata nel container).
+  7) RELAY, il cambio — atomico, col proprietario e i permessi visti
+     al punto 5 (di serie `1001:1001` e `755`: deve restare ESEGUIBILE):
+     `sudo install -o 1001 -g 1001 -m 755 /tmp/chi-scrive.py /opt/relay/policy/chi-scrive.py.nuovo && sudo mv /opt/relay/policy/chi-scrive.py.nuovo /opt/relay/policy/chi-scrive.py`
+  8) RELAY, cosa dice strfry: `sudo docker compose logs --since 3m relay | tail -30`.
+     NIENTE RIAVVIO: strfry rilancia il plugin da solo quando il file
+     cambia (lo guarda a ogni evento in arrivo: la riga compare al
+     primo evento, e mostrod ne scrive uno ogni pochi minuti). Se
+     dopo dieci minuti il plugin vecchio risponde ancora (lo dice la
+     ronda: «NON ACCETTA»), allora — AVVISANDO PRIMA —
+     `sudo docker compose restart relay`: dura pochi secondi, le
+     connessioni cadono e si riaprono da sole, i telefoni intanto
+     passano da relay.mostro.network, e quel che mostrod scrive in
+     quei secondi lo recupera lo specchio (`router.conf`). Il libro
+     NON va fermato.
+  9) LA PROVA la fa la ronda (voce qui sotto): con la leva accesa
+     PRIMA del punto 7 il journal del VPS dice «relay.barattolo.store:
+     NON ACCETTA i messaggi per il coordinatore», e dopo il punto 7
+     «a posto». Sono i due stati visti dal vivo, nell'ordine giusto.
+  SE VA STORTO (il relay rifiuta anche la piattaforma, o il log di
+  strfry parla di plugin che non parte): si torna indietro con
+  `sudo install -o 1001 -g 1001 -m 755 /opt/relay/chi-scrive.py.prima-della-buca /opt/relay/policy/chi-scrive.py`
+  e si guarda con calma. Il libro intanto arriva lo stesso: lo
+  specchio non passa dal plugin.
+  I 16 KB SI CONFERMANO SUI MESSAGGI VERI, dopo i primi scambi passati
+  di lì (i messaggi scadono in un'ora: si guarda a caldo). RELAY:
+  `cd /opt/relay && M=$(sudo grep -oE '^MOSTRO = "[0-9a-f]+"' policy/chi-scrive.py | cut -d'"' -f2) && sudo docker compose exec -T relay /app/strfry scan "{\"kinds\":[14],\"#p\":[\"$M\"]}" | awk '{print length($0)}' | sort -n | tail -5`
+  (la chiave del coordinatore la legge dal plugin: qui non si scrive,
+  che un esadecimale lungo in un documento fa rossa la CI) — i cinque
+  più grandi, in byte. Se il più grande sta sotto i 4.000
+  il tetto è largo quattro volte; se un giorno un messaggio buono
+  venisse rifiutato per la misura, strfry lo scrive nel log con
+  «messaggio troppo grande» e il numero si alza in `BYTE_MAX`.
+  LA DESCRIZIONE PUBBLICA DEL RELAY (il `description` del NIP-11 in
+  `strfry.conf`) nel repo dice già la regola nuova — «…accetta
+  Barattolo, i venditori che hanno dimostrato la loro chiave e i
+  messaggi per il suo coordinatore P2P» — e sulla macchina NO: si
+  applica al PRIMO RIAVVIO DEL RELAY CHE SERVE COMUNQUE (decisione di
+  Andrea, 13 ott 2026), non con un riavvio apposta. Fino ad allora
+  repo e macchina divergono su quella riga, ed è scritto qui perché
+  il confronto con l'archivio non sorprenda nessuno. Quel giorno,
+  RELAY, prima del riavvio:
+  `sudo cp -p /opt/relay/strfry.conf /opt/relay/strfry.conf.prima-nip11-buca`
+  poi la riga riscritta SENZA cambiare il file sotto i piedi del
+  container (`strfry.conf` è montato come file singolo: un `sed -i`
+  ne farebbe uno nuovo e il container continuerebbe a leggere il
+  vecchio):
+  `sudo sed 's|^\( *description = \).*|\1"Il relay del mercatino in sats. Lettura aperta a tutti; in scrittura accetta Barattolo, i venditori che hanno dimostrato la loro chiave e i messaggi per il suo coordinatore P2P."|' /opt/relay/strfry.conf > /tmp/strfry.nuovo && sudo sh -c 'cat /tmp/strfry.nuovo > /opt/relay/strfry.conf' && grep -n "description = " /opt/relay/strfry.conf`
+  e dopo il riavvio:
+  `curl -s -H 'Accept: application/nostr+json' https://relay.barattolo.store/ | head -c 300`
+  DOPO QUALCHE GIORNO la copia `chi-scrive.py.prima-della-buca` si
+  cancella: il backup delle 03:45 prende tutta `/opt/relay`, e un
+  archivio che si porta dietro il plugin vecchio è la trappola già a
+  verbale in `deploy/RIPRISTINO-RELAY.md`.
+  MOSTROD CI LEGGE? Dal 17 set `wss://relay.barattolo.store` sta nei
+  suoi `[nostr] relays` e lui ci scrive il libro; che ci ASCOLTI anche
+  i messaggi a lui indirizzati va visto una volta, e il canarino è la
+  prova: va SOLO al relay nostro, quindi se nel log di mostrod compare
+  una riga di errore (un messaggio che non sa aprire) al minuto del
+  canarino, l'ha letto da lì. NODO (`ssh debian@185.18.221.96`):
+  `grep -n "wss://" ~/nodo/mostro/settings.toml` (le SOLE righe dei
+  relay: in quel file c'è la chiave del coordinatore, e un comando che
+  stampa le righe intorno la mostrerebbe) e poi, entro un paio di
+  minuti da un canarino,
+  `cd ~/nodo && docker compose logs --since 5m mostro | tail -40`.
+  FINCHÉ NON SI È VISTO, `relay.barattolo.store` NON va in
+  `MOSTRO_RELAY_CONFERMA`: un suo OK farebbe «partito» un messaggio
+  che mostrod non legge (il guasto del voto, a3f57b19).
+
+- LA RONDA DEI RELAY DI MOSTRO (12 ott 2026, cantiere relay-per-mostro;
+  perché in CANTIERI, «Il relay per Mostro»; com'è fatta in
+  ARCHITETTURA, «LA RONDA DEI RELAY DI MOSTRO»). Ogni dieci minuti il
+  server chiede ai relay che confermano (`MOSTRO_RELAY_CONFERMA`; se
+  la leva è vuota, a tutto `MOSTRO_RELAY`) se rispondono e se il
+  coordinatore ci scrive ancora; e ogni mezz'ora manda al relay
+  NOSTRO un «canarino», un messaggio di prova indirizzato al
+  coordinatore, per sapere se la buca è aperta. Un guasto visto due
+  giri di seguito arriva nel gruppo degli admin, argomento Errori
+  («⚠️ Relay di Mostro»); quando passa arriva il ritorno («✅ … è
+  tornato a posto»). Una volta per guasto, non a ogni giro.
+  NASCE SPENTA, e un deploy non la accende. PER ACCENDERLA, sul VPS.
+  ⚠️ LA REGOLA DI ANDREA (13 ott 2026), che vale per ogni comando sul
+  config: MAI uno che stampa le righe intorno (`grep -A/-B/-C`, `cat`,
+  `sed -n`) — lì dentro ci sono segreti. Solo righe precise, per NOME
+  di leva. E la copia di sicurezza PRIMA di ogni modifica.
+  1) cosa c'è già: `grep -n "^RONDA_RELAY\|^MOSTRO_RELAY" /srv/barattolo/config.py`
+     (il 13 ott 2026: `MOSTRO_RELAY` alla riga 78, su UNA riga, con
+     damus; `MOSTRO_RELAY_SPECCHIO` alla 97, col nostro relay);
+  2) la copia: `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-della-ronda`;
+  3) le due righe, appese senza aprire il file:
+     `printf '\nRONDA_RELAY_MOSTRO = True\nRONDA_RELAY_CANARINO = ["wss://relay.barattolo.store"]\n' | sudo tee -a /srv/barattolo/config.py`
+     ⚠️ nel canarino va il SOLO relay nostro: a un relay d'altri
+     sarebbe spam verso il loro coordinatore di turno;
+  4) il controllo: `sudo -u barattolo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('config ok')"`;
+  5) `sudo systemctl restart barattolo`;
+  6) `sudo journalctl -u barattolo --since "2 min ago" --no-pager | grep -E "Ronda|Traceback"`
+     — «🛰️ Ronda dei relay di Mostro ACCESA: chiedo a …; il canarino
+     va a wss://relay.barattolo.store», e subito dopo la riga del primo
+     giro: «relay.barattolo.store: a posto · relay.mostro.network: a
+     posto». Quella riga torna SOLO quando lo stato cambia.
+  Il pannello «⚙️ Stato delle leve» mostra la leva con lo stato
+  dell'ultimo giro.
+  COSA DICONO GLI AVVISI: «non risponde» (non si apre, o apre e
+  tace); «risponde, ma il coordinatore non ci scrive da N» (più di
+  un'ora senza un evento del coordinatore: è il guasto di nos.lol a
+  ottobre e di relay.mostro.network il 17 set); «NON ACCETTA i
+  messaggi per il coordinatore» con le parole del relay (il plugin è
+  tornato quello vecchio, o un freno scatta sul VPS); «non conferma i
+  messaggi per il coordinatore» (il relay risponde alle letture ma
+  l'OK al canarino non arriva).
+  ⚠️ QUANDO SI FERMA IL NODO PER PIÙ DI UN'ORA (una salita d'immagine
+  andata lunga) la ronda lo dice per OGNI relay: «il coordinatore non
+  ci scrive da…». È vero, ed è atteso: passa da sé al primo evento.
+  IL CORO CON DUE STRADE, di cui una nostra — dopo che la buca è
+  aperta E si è visto che mostrod ci legge (voce qui sopra). Lo fa
+  UNA sessione sola, questa (decisione di Andrea, 13 ott 2026: il
+  cantiere del voto il config non lo tocca). Il coro deve diventare
+  `MOSTRO_RELAY = ["wss://relay.mostro.network", "wss://relay.barattolo.store", "wss://nos.lol"]`
+  `MOSTRO_RELAY_CONFERMA = ["wss://relay.mostro.network", "wss://relay.barattolo.store"]`
+  e `MOSTRO_RELAY_SPECCHIO` RESTA COM'È, col nostro relay dentro: da
+  quella lista il server prende l'ascolto dal vivo del libro e la
+  pagina decide se il libro è completo. Il prezzo di averlo nelle due
+  liste è una lettura del libro in più dallo stesso relay. Sul VPS:
+  1) `grep -n "^MOSTRO_RELAY" /srv/barattolo/config.py` (com'è oggi, e
+     se `MOSTRO_RELAY_CONFERMA` c'è già);
+  2) la copia: `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-del-coro`;
+  3) la riga del coro, RISCRITTA al suo posto (lo spazio prima di `=`
+     tiene fuori `MOSTRO_RELAY_SPECCHIO` e `MOSTRO_RELAY_CONFERMA`):
+     `sudo sed -i 's|^MOSTRO_RELAY = .*|MOSTRO_RELAY = ["wss://relay.mostro.network", "wss://relay.barattolo.store", "wss://nos.lol"]|' /srv/barattolo/config.py`
+  4) la conferma — se al punto 1 NON c'era, appesa:
+     `printf '\nMOSTRO_RELAY_CONFERMA = ["wss://relay.mostro.network", "wss://relay.barattolo.store"]\n' | sudo tee -a /srv/barattolo/config.py`
+     se c'era, riscritta al suo posto:
+     `sudo sed -i 's|^MOSTRO_RELAY_CONFERMA = .*|MOSTRO_RELAY_CONFERMA = ["wss://relay.mostro.network", "wss://relay.barattolo.store"]|' /srv/barattolo/config.py`
+  5) di nuovo il punto 1 (tre righe, come scritte qui) e il controllo:
+     `sudo -u barattolo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('config ok')"`;
+  6) `sudo systemctl restart barattolo` (NON il nodo), e nel journal
+     la riga della ronda coi due relay «a posto».
+  Damus esce dal coro col punto 3 (il primo tempo di «TOGLIERE UN
+  RELAY DAL CORO»); dal `settings.toml` del nodo esce con la `-bar8`,
+  a libro fermo. I DM di Barattolo non c'entrano: hanno la loro lista
+  (`AVVISO_DM_NOSTR_RELAY`, nos.lol e relay.primal.net). Le copie in
+  `/root/` si cancellano quando il coro nuovo ha retto qualche giorno.
+  PER SPEGNERLA: `RONDA_RELAY_MOSTRO = False` e riavvio. Il canarino
+  smette con lei.
+
 - IL GRUPPO DEGLI ADMIN (12 ott 2026; perché in CANTIERI, «Il gruppo
   degli admin»; com'è fatto in ARCHITETTURA, «IL GRUPPO DEGLI ADMIN»).
   Gli avvisi da admin (dispute, liquidità, pagamenti da guardare,

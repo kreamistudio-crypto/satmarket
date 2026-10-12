@@ -29467,6 +29467,9 @@ def _leve_stato():
             # L'avviso dei DM Nostr (11 ott 2026): il fatto e lo stato
             # VIVO dei fili, chiesti al loro giudice (`_dm_leve`).
             *_dm_leve(),
+            # La ronda dei relay di Mostro (12 ott 2026): il fatto e lo
+            # stato dell'ultimo giro, chiesti al suo giudice.
+            *_ronda_relay_leve(),
             _leva("Termometro delle sottocategorie",
                   "TERMOMETRO_SOTTOCATEGORIE", bool(TERMOMETRO_SOTTOCATEGORIE),
                   spento="il lunedì non arriva più il report degli annunci "
@@ -79526,6 +79529,408 @@ def nip05_nostr_json(name: str = ""):
     return JSONResponse({"names": nomi},
                         headers={"Cache-Control": "public, max-age=3600",
                                  "Access-Control-Allow-Origin": "*"})
+
+
+# --- LA RONDA DEI RELAY DI MOSTRO (12 ott 2026, cantiere relay-per-mostro) ---
+# I telefoni parlano col coordinatore attraverso i relay del coro
+# (`MOSTRO_RELAY`), e un messaggio e' «partito» quando lo conferma uno
+# dei relay che contano (`MOSTRO_RELAY_CONFERMA`). La sera del 12 ott
+# 2026 di strade vive ce n'era UNA, relay.mostro.network, e non era
+# nostra: da qui la buca delle lettere sul NOSTRO relay
+# (`deploy/relay/policy/chi-scrive.py`), che accetta da chiunque i soli
+# messaggi indirizzati al coordinatore. Due strade valgono due solo
+# finche' qualcuno si accorge quando una cade: questa ronda e' quel
+# qualcuno.
+# DUE DOMANDE, ogni RONDA_RELAY_PASSO_S.
+# 1) LA LETTURA, a ogni relay che conferma e a quelli del canarino: una
+#    REQ sul libro del coordinatore (38383 e 38385, il piu' fresco).
+#    Dice tre cose: il relay risponde, ha qualcosa del coordinatore, e
+#    il coordinatore ci SCRIVE ancora — il 17 set relay.mostro.network
+#    accettava tutto e non serviva piu' niente, e a ottobre nos.lol e'
+#    rimasto fermo sei giorni senza che nessuna riga lo dicesse.
+# 2) IL CANARINO, ai soli relay di `RONDA_RELAY_CANARINO` (i NOSTRI: a
+#    un relay d'altri sarebbe spam): un kind 14 con la forma esatta di
+#    quelli della pagina — un tag `p` col coordinatore, la scadenza —
+#    firmato da una chiave nata per quell'evento e col contenuto fatto
+#    di byte a caso. Il relay lo deve ACCETTARE (e' la prova che la
+#    buca e' aperta: la chiave non sta in nessuna lista); il
+#    coordinatore lo riceve, non lo sa aprire e lo butta, con una riga
+#    nel suo log. Scade da solo dopo RONDA_RELAY_VITA_S. Parte ogni
+#    RONDA_RELAY_CANARINO_S; dopo un no, a ogni giro finche' non torna.
+# QUANDO PARLA: al gruppo degli admin, argomento Errori, e solo AL
+# CAMBIO — un guasto visto RONDA_RELAY_DI_FILA giri di seguito (un
+# relay che salta un giro non e' una notizia), e il ritorno. Lo stato
+# di ogni giro lo dice il pannello «Stato delle leve».
+# IN COLLAUDO NON ESCE NIENTE: lettura e canarino chiedono il giudice
+# (`lettura_simulata`) prima della rete, e verso un relay che non e' di
+# casa non partono.
+# LA LEVA NASCE SPENTA e si accende nel config del VPS: PRODUZIONE,
+# «LA RONDA DEI RELAY DI MOSTRO».
+try:
+    from config import RONDA_RELAY_MOSTRO
+except ImportError:
+    RONDA_RELAY_MOSTRO = False
+# Dove va il canarino. VUOTA = niente canarino, e NON c'e' una lista di
+# serie: un relay scritto qui dentro sarebbe quello di ieri, e un
+# canarino mandato a un relay d'altri e' un messaggio a vuoto al loro
+# coordinatore di turno.
+try:
+    from config import RONDA_RELAY_CANARINO
+except ImportError:
+    RONDA_RELAY_CANARINO = []
+RONDA_RELAY_PASSO_S = 600        # un giro ogni dieci minuti
+RONDA_RELAY_CANARINO_S = 1800    # il canarino ogni mezz'ora
+# Il coordinatore ripubblica le sue impostazioni (38385) ogni pochi
+# minuti: un'ora di silenzio su un relay non e' un ritardo, e' un
+# relay su cui non scrive piu'. Larga apposta: un riavvio del nodo
+# (una salita d'immagine) deve starci dentro senza far suonare niente.
+RONDA_RELAY_FERMO_S = 3600
+RONDA_RELAY_VITA_S = 600         # quanto vive un canarino (NIP-40)
+RONDA_RELAY_TETTO_S = 8          # quanto si aspetta un relay
+RONDA_RELAY_DI_FILA = 2          # giri storti di seguito prima di dirlo
+RONDA_RELAY_MAX = 6              # quanti relay al massimo (ognuno un thread)
+# la porta verso la rete: il banco delle prove e il collaudo ci mettono
+# un relay di cartone
+_ronda_relay_connetti = create_connection
+_RONDA_RELAY = {"voci": {}, "cantato": {}, "stati": {}, "giro": 0.0,
+                "detto": ""}
+_TASK_RONDA_RELAY = None
+
+
+def ronda_relay_viva() -> bool:
+    """La leva accesa DAVVERO: serve la chiave del coordinatore (senza,
+    non si sa di chi chiedere) e la libreria delle websocket. Una leva
+    True senza queste vale spenta."""
+    return bool(RONDA_RELAY_MOSTRO and MOSTRO_HEX and create_connection)
+
+
+def _ronda_relay_lista(lista) -> list:
+    """PURA: una lista di relay del config, ripulita. Solo ws:// e
+    wss://, senza doppioni. Una STRINGA sola vale la lista di quella
+    voce — iterata darebbe le lettere una per una —, e qualunque altra
+    cosa storta da' la lista vuota."""
+    if isinstance(lista, str):
+        lista = [lista]
+    fuori = []
+    for r in (lista if isinstance(lista, (list, tuple)) else []):
+        r = str(r).strip()
+        if r.startswith(("ws://", "wss://")) and r not in fuori:
+            fuori.append(r)
+    return fuori
+
+
+def _ronda_relay_canarini() -> list:
+    """I relay a cui si manda il canarino. Senza la libreria delle
+    chiavi (coincurve) non si puo' firmare: nessuno, e lo dice la riga
+    d'avvio."""
+    if ChiavePrivataNostr is None:
+        return []
+    return _ronda_relay_lista(RONDA_RELAY_CANARINO)[:RONDA_RELAY_MAX]
+
+
+def _ronda_relay_guardati() -> list:
+    """I relay a cui si CHIEDE: quelli che confermano e quelli del
+    canarino. Senza `MOSTRO_RELAY_CONFERMA` conferma chiunque del coro
+    — il mondo di ieri — e allora si guarda il coro intero: se la
+    pagina prende per buono l'OK di un relay, quel relay deve essere
+    vivo."""
+    coro = _ronda_relay_lista(MOSTRO_RELAY)
+    contano = [r for r in _ronda_relay_lista(MOSTRO_RELAY_CONFERMA)
+               if r in coro] or coro
+    fuori = []
+    for r in contano + _ronda_relay_lista(RONDA_RELAY_CANARINO):
+        if r not in fuori:
+            fuori.append(r)
+    return fuori[:RONDA_RELAY_MAX]
+
+
+def _ronda_relay_leggi(relay: str, mostro: str) -> tuple:
+    """LA LETTURA: l'evento piu' fresco del coordinatore su UN relay.
+    SINCRONA (websocket-client): va in asyncio.to_thread. Torna
+    (stato, quando): «ok» con la data dell'evento, «vuoto» se il relay
+    risponde e del coordinatore non ha niente, «chiuso» se rifiuta la
+    domanda, «muto» se non arriva alla fine, «giu» se non si apre.
+    L'autore si ricontrolla qui (un relay e' un programma); la firma
+    no, come non la guardano i lettori del libro: questa e' una ronda,
+    non una porta da cui entra qualcosa."""
+    if lettura_simulata(relay, "della ronda dei relay di Mostro"):
+        return ("simulato", 0)
+    ws = None
+    try:
+        ws = _ronda_relay_connetti(relay, timeout=RONDA_RELAY_TETTO_S,
+                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "ronda", {
+            "kinds": [38383, 38385], "authors": [mostro], "limit": 1}]))
+        inizio, ultimo = time.time(), 0
+        while time.time() - inizio < RONDA_RELAY_TETTO_S:
+            msg = json.loads(ws.recv())
+            if not isinstance(msg, list) or len(msg) < 2 or msg[1] != "ronda":
+                continue
+            if (msg[0] == "EVENT" and len(msg) > 2
+                    and isinstance(msg[2], dict)
+                    and msg[2].get("pubkey") == mostro):
+                ultimo = max(ultimo, int(msg[2].get("created_at") or 0))
+            elif msg[0] == "EOSE":
+                return ("ok", ultimo) if ultimo else ("vuoto", 0)
+            elif msg[0] == "CLOSED":
+                return ("chiuso", 0)
+        return ("muto", 0)
+    except Exception:
+        return ("giu", 0)
+    finally:
+        if ws is not None:
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+
+def _ronda_relay_chiave() -> tuple:
+    """La chiave del canarino: nasce, firma UN evento e non si tiene da
+    nessuna parte. Torna (la pubblica in esadecimale, la sua firma)."""
+    sk = ChiavePrivataNostr(secrets.token_bytes(32))
+    return sk.public_key.format()[1:].hex(), sk.sign_schnorr
+
+
+def _ronda_relay_canarino(mostro: str, adesso: int) -> dict:
+    """IL CANARINO: un kind 14 con la forma di quelli che la pagina
+    manda al coordinatore (`mostroChiama`): UN tag `p`, la scadenza.
+    Il contenuto ha l'aspetto di una busta NIP-44 (la versione e byte a
+    caso) e dentro non c'e' NIENTE: il coordinatore non lo apre."""
+    pubblica, firma = _ronda_relay_chiave()
+    ev = evento_non_firmato(
+        pubblica, 14,
+        [["p", mostro], ["expiration", str(adesso + RONDA_RELAY_VITA_S)]],
+        base64.b64encode(b"\x02" + secrets.token_bytes(130)).decode(),
+        adesso)
+    ev["sig"] = firma(bytes.fromhex(ev["id"])).hex()
+    return ev
+
+
+def _ronda_relay_canta(relay: str, mostro: str) -> tuple:
+    """Manda il canarino a UN relay e aspetta il suo OK. SINCRONA: va
+    in asyncio.to_thread. Torna (stato, detto): «ok», «rifiutato» con
+    le parole del relay, «muto» se l'OK non arriva, «giu» se non si
+    apre. In collaudo verso un relay che non e' di casa non parte."""
+    if lettura_simulata(relay, "del canarino della ronda"):
+        return ("simulato", "")
+    ws = None
+    try:
+        ev = _ronda_relay_canarino(mostro, int(time.time()))
+        ws = _ronda_relay_connetti(relay, timeout=RONDA_RELAY_TETTO_S,
+                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["EVENT", ev]))
+        inizio = time.time()
+        while time.time() - inizio < RONDA_RELAY_TETTO_S:
+            msg = json.loads(ws.recv())
+            if (isinstance(msg, list) and len(msg) >= 3 and msg[0] == "OK"
+                    and msg[1] == ev["id"]):
+                if msg[2]:
+                    return ("ok", "")
+                return ("rifiutato", str(msg[3] if len(msg) > 3 else "")[:120])
+        return ("muto", "")
+    except Exception:
+        return ("giu", "")
+    finally:
+        if ws is not None:
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+
+def _ronda_relay_fa(secondi: float) -> str:
+    """PURA: una durata da leggere («40 min», «3 h», «6 giorni»)."""
+    s = max(0, int(secondi))
+    if s < 5400:
+        return f"{max(1, s // 60)} min"
+    if s < 172800:
+        return f"{s // 3600} h"
+    return f"{s // 86400} giorni"
+
+
+def _ronda_relay_male(cosa: str, stato: str, quando: int, detto: str,
+                      adesso: float) -> str:
+    """PURA, IL GIUDICE DI UNA RISPOSTA: cosa non va, in mezza frase
+    per i moderatori; "" = tutto bene. Le parole del relay passano da
+    `html.escape`: le ha scritte un programma d'altri."""
+    if stato == "simulato":
+        return ""
+    if cosa == "canarino":
+        if stato == "ok":
+            return ""
+        if stato == "rifiutato":
+            return ("NON ACCETTA i messaggi per il coordinatore"
+                    + (f" («{html.escape(detto)}»)" if detto else ""))
+        return "non conferma i messaggi per il coordinatore"
+    if stato == "ok":
+        fermo = adesso - quando
+        if fermo <= RONDA_RELAY_FERMO_S:
+            return ""
+        return ("risponde, ma il coordinatore non ci scrive da "
+                + _ronda_relay_fa(fermo))
+    if stato == "vuoto":
+        return "risponde, ma del coordinatore non ha niente"
+    return "non risponde"
+
+
+def _ronda_relay_decidi(S: dict, esiti: list, adesso: float) -> tuple:
+    """PURA sullo stato che le si passa, IL GIUDICE DEGLI AVVISI: dagli
+    esiti di un giro — (relay, cosa, male) — a (guasti, tornati). Un
+    guasto si dice quando e' il RONDA_RELAY_DI_FILA-esimo giro storto
+    di seguito, e una volta sola finche' dura; il ritorno si dice solo
+    di un guasto che era stato detto."""
+    guasti, tornati = [], []
+    for relay, cosa, male in esiti:
+        V = S["voci"].setdefault((relay, cosa), {
+            "di_fila": 0, "detto": False, "da": 0.0, "male": ""})
+        if male:
+            if not V["di_fila"]:
+                V["da"] = adesso
+            V["di_fila"] += 1
+            V["male"] = male
+            if V["di_fila"] >= RONDA_RELAY_DI_FILA and not V["detto"]:
+                V["detto"] = True
+                guasti.append((relay, cosa, male))
+        else:
+            if V["detto"]:
+                tornati.append((relay, cosa, adesso - V["da"]))
+            V.update(di_fila=0, detto=False, male="")
+    return guasti, tornati
+
+
+def _ronda_relay_nome(relay: str) -> str:
+    """PURA: il relay come si legge in un avviso, senza `wss://`."""
+    return html.escape(str(relay).split("://", 1)[-1])
+
+
+def _ronda_relay_testo(guasti: list, tornati: list) -> str:
+    """PURA: l'avviso ai moderatori, uno per giro, coi guasti nuovi e i
+    ritorni insieme."""
+    righe = []
+    if guasti:
+        righe.append("⚠️ <b>Relay di Mostro</b>")
+        righe += [f"• <code>{_ronda_relay_nome(r)}</code> {male}"
+                  for r, _, male in guasti]
+        righe.append("Finché dura, i messaggi dei telefoni al coordinatore "
+                     "(presa, rilascio, voto) hanno una strada in meno.")
+    for r, cosa, durata in tornati:
+        righe.append(
+            f"✅ <code>{_ronda_relay_nome(r)}</code> "
+            + ("accetta di nuovo i messaggi per il coordinatore"
+               if cosa == "canarino" else "è tornato a posto")
+            + f" (dopo {_ronda_relay_fa(durata)})")
+    return "\n".join(righe)
+
+
+async def _ronda_relay_giro():
+    """UN GIRO: le letture tutte insieme, poi il canarino dove tocca,
+    poi il giudice. Il canarino va solo a un relay che alla lettura ha
+    risposto — di uno che non risponde lo sappiamo gia', e una seconda
+    riga direbbe la stessa cosa — e parte quando e' passata la sua
+    mezz'ora o quando l'ultimo e' andato storto."""
+    S, mostro, adesso = _RONDA_RELAY, MOSTRO_HEX, time.time()
+    guardati = _ronda_relay_guardati()
+    letti = await asyncio.gather(*[
+        asyncio.to_thread(_ronda_relay_leggi, r, mostro) for r in guardati])
+    esiti, stati = [], {}
+    for r, (stato, quando) in zip(guardati, letti):
+        male = _ronda_relay_male("lettura", stato, quando, "", adesso)
+        stati[r] = male or ("in collaudo non si chiede"
+                            if stato == "simulato" else "a posto")
+        esiti.append((r, "lettura", male))
+    tocca = [r for r, (stato, _) in zip(guardati, letti)
+             if r in _ronda_relay_canarini()
+             and stato in ("ok", "vuoto", "chiuso")
+             and (adesso - S["cantato"].get(r, 0.0) >= RONDA_RELAY_CANARINO_S
+                  or S["voci"].get((r, "canarino"), {}).get("di_fila"))]
+    cantati = await asyncio.gather(*[
+        asyncio.to_thread(_ronda_relay_canta, r, mostro) for r in tocca])
+    for r, (stato, detto) in zip(tocca, cantati):
+        S["cantato"][r] = adesso
+        male = _ronda_relay_male("canarino", stato, 0, detto, adesso)
+        esiti.append((r, "canarino", male))
+        if male:
+            stati[r] = male if stati[r] == "a posto" else stati[r] + "; " + male
+    S.update(stati=stati, giro=adesso)
+    guasti, tornati = _ronda_relay_decidi(S, esiti, adesso)
+    # il journal dice lo stato quando CAMBIA: centoquaranta righe uguali
+    # al giorno affogherebbero quella che conta
+    riga = " · ".join(f"{r.split('://', 1)[-1]}: {html.unescape(stati[r])}"
+                      for r in guardati)
+    if riga != S["detto"]:
+        S["detto"] = riga
+        print(f"🛰️ Ronda dei relay di Mostro: {riga}", flush=True)
+    if guasti or tornati:
+        await notifica_admin(_ronda_relay_testo(guasti, tornati),
+                             argomento="errori")
+
+
+async def orologio_ronda_relay():
+    """L'orologio della ronda: un giro ogni RONDA_RELAY_PASSO_S. Ogni
+    giro che cade lascia partire il prossimo, e di un giro caduto si
+    dice il NOME dell'errore e basta."""
+    while True:
+        try:
+            await _ronda_relay_giro()
+        except Exception as e:
+            print(f"⚠️ Ronda dei relay di Mostro: giro saltato "
+                  f"({type(e).__name__}): il prossimo riparte da solo",
+                  flush=True)
+        await asyncio.sleep(RONDA_RELAY_PASSO_S)
+
+
+@app.on_event("startup")
+async def avvia_ronda_relay():
+    """La riga all'avvio dice lo stato VIVO: una leva accesa senza la
+    chiave del coordinatore o senza relay da guardare vale spenta, e
+    qui lo si legge."""
+    global _TASK_RONDA_RELAY
+    if not RONDA_RELAY_MOSTRO:
+        print("🛰️ Ronda dei relay di Mostro: spenta (RONDA_RELAY_MOSTRO)",
+              flush=True)
+        return
+    if not ronda_relay_viva() or not _ronda_relay_guardati():
+        print("⚠️ RONDA_RELAY_MOSTRO accesa ma manca MOSTRO_NPUB, "
+              "websocket-client, o un relay valido in MOSTRO_RELAY: la "
+              "ronda dei relay vale SPENTA", flush=True)
+        return
+    canarini = _ronda_relay_canarini()
+    print(f"🛰️ Ronda dei relay di Mostro ACCESA: chiedo a "
+          f"{_elenco(_ronda_relay_guardati())}; il canarino "
+          + (f"va a {_elenco(canarini)}" if canarini else
+             "NON parte (RONDA_RELAY_CANARINO vuota, o manca coincurve)"),
+          flush=True)
+    _TASK_RONDA_RELAY = asyncio.create_task(orologio_ronda_relay())
+
+
+def _ronda_relay_leve() -> list:
+    """Le voci del pannello «Stato delle leve»: il fatto e lo stato
+    VIVO di ogni relay all'ultimo giro, cosi' un relay giu' si vede
+    senza il journal. Le parole di un relay restano come le ha rese
+    il giudice (gia' passate da `html.escape`)."""
+    vivo = ronda_relay_viva() and bool(_ronda_relay_guardati())
+    stati = _elenco(
+        r.split("://", 1)[-1] + ": "
+        + _RONDA_RELAY["stati"].get(r, "non ancora chiesto")
+        for r in _ronda_relay_guardati())
+    return [
+        _leva("Ronda dei relay di Mostro", "RONDA_RELAY_MOSTRO",
+              vivo, allarme=bool(RONDA_RELAY_MOSTRO) and not vivo,
+              acceso="un guasto arriva nel gruppo degli admin, argomento "
+                     "Errori. All'ultimo giro — " + stati,
+              spento="nessuno avvisa se un relay del coordinatore cade; se "
+                     "la leva è True nel config, manca MOSTRO_NPUB o un "
+                     "relay valido in MOSTRO_RELAY"),
+        _leva("Relay del canarino", "RONDA_RELAY_CANARINO",
+              _elenco(_ronda_relay_canarini()),
+              spento="nessun messaggio di prova: la ronda non sa dire se "
+                     "il nostro relay ACCETTA i messaggi per il "
+                     "coordinatore"),
+    ]
+
+
+# (Qui finisce il blocco della ronda dei relay di Mostro.)
 
 
 # ---------- L'INDIRIZZO LIGHTNING DI CASA: zap@barattolo.store ----------
