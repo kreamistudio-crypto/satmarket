@@ -544,6 +544,49 @@ quattro incroci stato/lato; la finestra senza la chiave; il limite
 vigore; la mancata risposta contata UNA volta per `taken_at`; il dovere di
 chi ha preso che non scrive niente.
 
+## LA 0012: LA DISPUTA CHE IL COORDINATORE APRE DA SOLO (12 ott 2026)
+
+Preparata il 12 ott 2026, sera (cantiere `tempo-di-chi-pubblica`,
+richiesta di Andrea dalla nota del cantiere `dispute-nel-cruscotto`);
+entra con la STESSA immagine `-bar8`, sopra la 0011. ⚠️ MAI COMPILATA SUL
+PC, come la 0011.
+
+IL PROBLEMA. Il guardiano della garanzia (`enforce_escrow_deadline_pass`,
+upstream 0.19.0, un giro ogni cinque minuti) si muove quando l'HTLC è a
+`escrow_deadline_margin_blocks` dalla scadenza: uno scambio `active` lo
+annulla — e la 0007 lo dice già, `expired` / `escrow-deadline` —, uno
+scambio `fiat-sent` lo manda IN DISPUTA da solo, perché chi compra ha
+detto di aver pagato e solo una persona può decidere finché la garanzia
+esiste. Quella disputa non la raccontava a nessuno: il server di
+Barattolo non ne sapeva niente, i moderatori non ricevevano l'avviso nel
+caso che ha MENO tempo di tutti (a ~94 ore LND scioglie la garanzia e i
+sats tornano a chi vende), e la card ⚖️ del cruscotto non la contava.
+
+COSA FA. Una chiamata, nel ramo `Status::FiatSent` di `scheduler.rs`:
+`dispute-opened` con attore `mostro` (non l'ha aperta nessuna delle due
+parti) e dettaglio `escrow-deadline` (la parola dell'annullo gemello).
+Sta DOPO la scrittura dello stato `dispute`, e non prima: ogni uscita
+precedente del ramo è un «riprova al prossimo giro», e l'evento
+partirebbe più volte; dopo, l'ordine non è più `fiat-sent` e il
+guardiano non lo ripesca. Come tutta la 0007 non blocca e non fallisce:
+col server giù la disputa nasce lo stesso. In `barattolo_eventi.rs` la
+riga del vocabolario dei dettagli e una prova pura del corpo che parte.
+
+SUL SERVER (lo stesso commit): `dispute-opened` di `mostro` era già
+accettato — riga in `p2p_dispute` con `aperta_da` vuoto e avviso ai
+moderatori —, ma alle due parti diceva «<l'altro> ha aperto una
+disputa», che qui è falso. Col dettaglio `escrow-deadline` le due parti
+leggono «Lo scambio … è passato ai moderatori», e i moderatori «L'ha
+aperta il coordinatore da solo … va decisa adesso». PRIMA IL SERVER, POI
+IL NODO, come per la 0011.
+
+QUEL CHE NON COPRE. La disputa RIAPERTA dal guardiano su un ordine che
+ne aveva già una chiusa (upstream lo prevede: «one dispute row per
+order, reopened»): sul server la riga di quell'ordine c'è già e non
+rinasce, quindi lì l'evento arriva e non avvisa. E NON SI PROVA IN
+FRETTA: servono ~92 ore da una garanzia pagata, col pagamento segnato e
+mai liberato.
+
 ## GLI OTTO PATCHER (più il decimo)
 
 Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
@@ -566,6 +609,7 @@ fermano («porta gia' questa modifica»).
 | 0008 | `patch-0008-cauzione-solo-contanti.py` | 20 agganci in 10 file (il ventesimo, 1 ott 2026, emenda il test della 0007 sugli importi), più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
 | 0010 | `patch-0010-cauzione-metodo-dichiarato.py` | 8 agganci in 5 file (`util.rs`, `bond/flow.rs`, `bond/mod.rs`, `take_buy.rs`, `take_sell.rs`), più i test in coda a `flow.rs` (10 ott 2026); pretende la 0008 |
 | 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` | 13 agganci in 7 file (`main.rs`, `config/types.rs`, `settings.tpl.toml`, `db.rs`, `scheduler.rs`, `barattolo_eventi.rs`, `nip33.rs`), coi test dentro il modulo (12 ott 2026); pretende la 0007 |
+| 0012 | `patch-0012-disputa-automatica.py` | 3 agganci in 2 file (`scheduler.rs`: l'evento nel ramo `fiat-sent` del guardiano; `barattolo_eventi.rs`: la riga del vocabolario e una prova pura) (12 ott 2026); pretende la 0011 |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha

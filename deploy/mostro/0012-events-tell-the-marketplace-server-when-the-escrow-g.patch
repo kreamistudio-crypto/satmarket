@@ -1,0 +1,94 @@
+From 8c0e3d819685d3103554ce2980acc373cdf5cdce Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@example.invalid>
+Date: Mon, 12 Oct 2026 17:27:44 +0200
+Subject: [PATCH] events: tell the marketplace server when the escrow guardian
+ opens a dispute by itself
+
+Patch 0007 reports every dispute a USER opens (`dispute-opened`, actor
+buyer or seller). The escrow guardian (`enforce_escrow_deadline_pass`)
+opens one too: when a `fiat-sent` trade's hold invoice is within
+`escrow_deadline_margin_blocks` of its CLTV expiry it moves the order to
+`dispute` on its own, so that a solver can still settle or cancel while
+the escrow exists. That transition told nobody: the marketplace server
+never learned about it, its moderators got no notice in the one case
+that has the least time left, and its dispute statistics did not count
+it.
+
+Emit `dispute-opened` there as well, with actor `mostro` (neither party
+filed it) and detail `escrow-deadline` (the same word the guardian's
+cancel of an `active` trade already uses with `expired`). The call sits
+after the status flip is persisted: every earlier exit of the branch is
+a "retry next tick", so emitting before it would repeat the event, and
+once the order reads `dispute` the guardian no longer selects it.
+
+As everywhere in patch 0007, the event is fire-and-forget and inert
+without `BARATTOLO_EVENTI_URL`: nothing in the guardian waits for it.
+
+Plus the vocabulary line for the new detail and a pure test of the body
+that goes on the wire.
+---
+ src/barattolo_eventi.rs | 17 +++++++++++++++++
+ src/scheduler.rs        | 12 ++++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
+index 6d6b87f..986ba20 100644
+--- a/src/barattolo_eventi.rs
++++ b/src/barattolo_eventi.rs
+@@ -83,6 +83,9 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
+ //                           | maker-republished (patch 0011: the order is back in
+ //                           the book although the lapse was its maker's)
+ //   released                admin (a moderator settled a dispute)
++//   dispute-opened          escrow-deadline (patch 0012: the escrow guardian of
++//                           this daemon opened it, actor `mostro`; a dispute a
++//                           user opens carries no detail)
+ //   bond-slashed            buyer | seller (whose bond was slashed; `sats` = the
+ //                           bond, `sats_buyer` / `sats_seller` = what each receives)
+ //   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …) when the
+@@ -709,6 +712,20 @@ mod tests {
+         assert_eq!(event_of("expired", &o, "mostro", None).unwrap().detail, None);
+     }
+ 
++    #[test]
++    fn a_dispute_the_daemon_opens_is_mostros_and_says_why() {
++        // patch 0012: the escrow guardian files it, no user did
++        let event =
++            event_of("dispute-opened", &order(), "mostro", Some("escrow-deadline")).unwrap();
++        assert_eq!(event.actor, "mostro");
++        assert_eq!(event.detail.as_deref(), Some("escrow-deadline"));
++        let body = payload(&event);
++        assert_eq!(body["action"], "dispute-opened");
++        assert_eq!(body["detail"], "escrow-deadline");
++        // a dispute never carries amounts
++        assert!(body.get("sats").is_none());
++    }
++
+     #[test]
+     fn lnd_failure_reasons_by_code() {
+         assert_eq!(failure_reason_name(2), "NO_ROUTE");
+diff --git a/src/scheduler.rs b/src/scheduler.rs
+index beb5e71..b55e304 100644
+--- a/src/scheduler.rs
++++ b/src/scheduler.rs
+@@ -1138,6 +1138,18 @@ async fn enforce_escrow_deadline_pass(
+                     "escrow_deadline: order {} moved to dispute — fiat claimed sent and the escrow is near its CLTV horizon",
+                     order.id
+                 );
++                // Barattolo fork (patch 0012): tell the marketplace server.
++                // Patch 0007 reports the disputes the USERS open; this one is
++                // opened by the daemon itself, so the actor is "mostro" and
++                // the detail names the guardian. Sent only here, once the
++                // status flip is persisted: the order is no longer
++                // `fiat-sent`, so no later tick comes back to this branch.
++                crate::barattolo_eventi::emit_detail(
++                    "dispute-opened",
++                    &order,
++                    "mostro",
++                    "escrow-deadline",
++                );
+                 // A missing party key must not mute the other party's
+                 // notification, mirroring `flow::hold_invoice_canceled`.
+                 for (party, action) in [
+-- 
+2.55.0.windows.3
+

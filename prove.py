@@ -114077,6 +114077,28 @@ def prove_dispute_cruscotto_p2p():
            pt["compratore"], pt["venditore"], pt["moderatore"], pt["aperte"],
            "prima" in pt))
     dedotta = amb["_garanzia_dal_registro_p2p"]
+    prova("il TORNATO per chi aveva pubblicato un ACQUISTO (patch 0011 del "
+          "nodo) aveva la garanzia bloccata: fattura mai data, lato buy — e "
+          "solo quello: il tornato di chi aveva preso (garanzia mai pagata "
+          "su un acquisto, fattura mai data su una vendita), quello a mano "
+          "e quello senza motivo restano fuori",
+          [True, False, False, False, False, False],
+          [dedotta("tornato", "fattura_non_data", "buy"),
+           dedotta("tornato", "garanzia_non_pagata", "buy"),
+           dedotta("tornato", "fattura_non_data", "sell"),
+           dedotta("tornato", "a_mano", "buy"),
+           dedotta("tornato", "tempo_scaduto", "buy"),
+           dedotta("tornato", "", "")])
+    prova("...e il motivo e' quello che la cronaca scrive DAVVERO per quel "
+          "ritorno: garanzia pagata, fattura chiesta e mai data, poi "
+          "«tornato» detto dal coordinatore — mentre chi PRENDE un acquisto "
+          "e sparisce lascia «garanzia mai pagata»",
+          ["fattura_non_data", "garanzia_non_pagata"],
+          [amb["_motivo_annullo_p2p"](
+              "mostro", "maker-republished",
+              {"preso", "garanzia_chiesta", "garanzia_pagata", "fattura_chiesta"}),
+           amb["_motivo_annullo_p2p"](
+               "mostro", "taker-timeout", {"preso", "garanzia_chiesta"})])
     prova("la garanzia dal solo registro: completato si', tornato no; "
           "annullato si' per moderatore, concordato, garanzia scaduta e "
           "fattura mai data su un ACQUISTO; no per garanzia mai pagata, a "
@@ -147417,6 +147439,159 @@ def prove_tempo_di_chi_pubblica():
            in open(os.path.join("docs", "GUIDA-P2P-PASSI.md"), encoding="utf-8").read()])
 
 
+def prove_disputa_automatica_p2p():
+    """LA DISPUTA CHE IL COORDINATORE APRE DA SOLO (12 ott 2026, sera,
+    cantiere tempo-di-chi-pubblica, richiesta di Andrea): la patch 0012
+    del nodo fa raccontare al guardiano della garanzia la disputa che
+    apre lui a ~92 ore — `dispute-opened` di `mostro`, dettaglio
+    `escrow-deadline` — e il server le da' le sue due frasi. Piu' i
+    comandi di PRODUZIONE sul database del VPS, riscritti lo stesso
+    giorno (python3, sola lettura, il percorso che c'e').
+
+    Quel che qui si rompe in silenzio: le due parti che leggono
+    «l'altro ha aperto una disputa», falso; i moderatori rassicurati
+    («i sats restano in garanzia finche'…») proprio nel caso che ha meno
+    tempo; il patcher che manda una parola che il server non conosce;
+    un comando col percorso di ieri che torna in PRODUZIONE."""
+    print("\n[la disputa che il coordinatore apre da solo: le due frasi, il patcher, i comandi del VPS]")
+    import html as _html
+    import re as _re
+    import time as _time
+    con, amb = _banco_eventi_p2p()
+    testo = amb["_testo_evento_p2p"]
+    dati = {"sats": 13603, "euro": "10,00 €", "metodi": "SEPA"}
+    a_compra = testo("disputa", "escrow-deadline", "compra", dati, nome="Bruno")
+    a_vende = testo("disputa", "escrow-deadline", "vende", dati, nome="Anna")
+    prova("la disputa del coordinatore: alle due parti LA STESSA frase, senza un nome e "
+          "senza «ha aperto»", [True, False, False, False],
+          [a_compra == a_vende, "Bruno" in a_compra, "Anna" in a_vende,
+           "ha aperto una disputa" in a_compra])
+    prova("...che dice cosa e' successo, con la cifra del libro",
+          "⚖️ <b>Lo scambio da 10,00 € è passato ai moderatori:</b> il pagamento risulta "
+          "inviato, i sats non sono stati liberati e la garanzia sta per scadere. "
+          "Vi contatteranno.", a_compra)
+    prova("...e senza la cifra non ne inventa una",
+          "⚖️ <b>Lo scambio è passato ai moderatori:</b> il pagamento risulta inviato, i "
+          "sats non sono stati liberati e la garanzia sta per scadere. Vi contatteranno.",
+          testo("disputa", "escrow-deadline", "vende", {}))
+    prova("la disputa aperta da una PERSONA resta com'era: la sente l'altro, col nome",
+          "⚖️ <b>Bruno ha aperto una disputa sullo scambio da 10,00 €:</b> i moderatori "
+          "vi contatteranno.", testo("disputa", "", "compra", dati, nome="Bruno"))
+    a_chi = amb["_destinatari_evento_p2p"]
+    prova("del gesto del coordinatore lo sanno TUTTI E DUE; di quello di una parte solo "
+          "l'altra", [[(1, "compra"), (2, "vende")], [(2, "vende")], [(1, "compra")]],
+          [a_chi("disputa", "mostro", "escrow-deadline", 1, 2),
+           a_chi("disputa", "buyer", "", 1, 2), a_chi("disputa", "seller", "", 1, 2)])
+    prova("la parola del nodo e' un'azione che il server conosce, e diventa «disputa»",
+          True, '"dispute-opened": "disputa"' in pezzo("_momento_evento_p2p"))
+
+    # --- ai moderatori ---------------------------------------------------
+    amb2 = dict(amb)
+    amb2.update({"html": _html, "time": _time})
+    exec(pezzo("_testo_disputa_aperta_p2p"), amb2)
+    aperta = amb2["_testo_disputa_aperta_p2p"]
+    d = {"ordine": "d1c00008-5a1e-4a2b-9c3d-0000000000aa", "aperta_da": "",
+         "compra": "Anna", "vende": "Bruno", "sats": 13603, "euro": "10,00 €",
+         "metodi": "SEPA", "garanzia_il": 0, "compratore": 1, "venditore": 2}
+    auto = aperta(dict(d, automatica=True), 999)
+    mano = aperta(dict(d, aperta_da="compra"), 999)
+    prova("ai moderatori: quella del coordinatore dice chi l'ha aperta e che non puo' "
+          "aspettare — e NON «i sats restano in garanzia finché…», che li' e' falso",
+          [True, True, True, False, False],
+          ["⏳ <b>L'ha aperta il coordinatore da solo:</b>" in auto,
+           "Fra poco i sats tornano da soli a chi vende" in auto,
+           auto.rstrip().endswith("va decisa adesso."),
+           "I sats restano in garanzia finché" in auto, ", da <b>" in auto])
+    prova("...quella di una persona resta com'era, riga per riga",
+          [True, True, False],
+          ["sull'ordine <code>d1c00008</code>, da <b>chi compra</b>." in mano,
+           mano.endswith("I sats restano in garanzia finché un moderatore non decide "
+                         "o le due parti non si accordano."),
+           "coordinatore" in mano])
+    prova("...e il moderatore che e' una delle due parti lo legge anche li'", True,
+          "Sei una delle due parti" in aperta(dict(d, automatica=True), 1))
+    prova("che sia «automatica» lo dice il DETTAGLIO dell'evento, dove nasce la riga",
+          True, '"automatica": ev["dettaglio"] == "escrow-deadline"'
+          in pezzo("_disputa_evento_p2p"))
+    prova("la card delle dispute non dice piu' che quella disputa «non si conta»",
+          [False, True],
+          ["non la racconta a\n# nessuno, e qui non si conta." in _SORGENTE,
+           "# arriva come `dispute-opened` di `mostro` col dettaglio" in _SORGENTE])
+
+    # --- il patcher, la patch esportata, la liturgia ----------------------
+    cartella = os.path.join("deploy", "mostro")
+    patcher = open(os.path.join(cartella, "patch-0012-disputa-automatica.py"),
+                   encoding="utf-8").read()
+    esportata = open(os.path.join(
+        cartella, "0012-events-tell-the-marketplace-server-when-the-escrow-g.patch"),
+        encoding="utf-8").read()
+    agganci = len(_re.findall(r'"(?:dopo|prima)"\),\n', patcher))
+    prova("il patcher della 0012: tre agganci, le tre parole che il server aspetta, e si "
+          "ferma se manca la 0011 o se l'evento finisce nei test",
+          [3, True, True, True],
+          [agganci,
+           'AZIONE, ATTORE, DETTAGLIO = "dispute-opened", "mostro", "escrow-deadline"'
+           in patcher,
+           "la 0012 sta SOPRA la 0011" in patcher,
+           "l'evento non e' nel codice vero" in patcher])
+    dopo = esportata.find("moved to dispute")
+    prova("la patch esportata mette l'evento DOPO la riga che scrive lo stato, una volta "
+          "sola, con la sua prova pura — e non tocca altro che due file",
+          [True, 1, True, 2],
+          [0 <= dopo < esportata.find('+                    "dispute-opened",'),
+           esportata.count("+                crate::barattolo_eventi::emit_detail("),
+           "+    fn a_dispute_the_daemon_opens_is_mostros_and_says_why() {" in esportata,
+           esportata.count("\ndiff --git ")])
+    prova("...e la riga dello stato viene PRIMA nel sorgente toccato: l'ancora del "
+          "patcher e' quella", True,
+          "moved to dispute — fiat claimed sent and the escrow is near its CLTV horizon"
+          in patcher)
+    readme = open(os.path.join(cartella, "README.md"), encoding="utf-8").read()
+    produzione = open(os.path.join("docs", "PRODUZIONE.md"), encoding="utf-8").read()
+    prova("README del fork e liturgia della -bar8 la portano: la riga in tabella, la "
+          "sezione, la frase a secco, il commit, UNDICI righe, il ritorno alla 0010",
+          [True, True, True, True, True, True],
+          ["| 0012 | `patch-0012-disputa-automatica.py` | 3 agganci in 2 file" in readme,
+           "## LA 0012: LA DISPUTA CHE IL COORDINATORE APRE DA SOLO (12 ott 2026)" in readme,
+           f"«A SECCO: {agganci} agganci in 2 file, tutte le ancore uniche.\n  Niente scritto.»"
+           in produzione,
+           'git commit -m "events: tell the marketplace server when the escrow guardian '
+           'opens a dispute by itself"' in produzione,
+           "`git log --oneline v0.19.0..HEAD` → UNDICI righe." in produzione,
+           "`git reset --hard HEAD~2` (torna alla 0010" in produzione])
+    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
+                  encoding="utf-8").read()
+    collaudo = open("collaudo_dispute_cruscotto.py", encoding="utf-8").read()
+    prova("il passo sul server vero c'e', nel collaudo che la CI gira",
+          [True, True, True],
+          ['"dispute-opened", t + 730, "mostro",' in collaudo,
+           '"escrow-deadline") or []' in collaudo,
+           "             collaudo_dispute_cruscotto\n" in flusso])
+
+    # --- i comandi del VPS -----------------------------------------------
+    letture = produzione.count(
+        "sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); "
+        "[print(*r, sep='|') for r in c.execute(")
+    prova("in PRODUZIONE nessun comando tocca piu' il database del VPS dal percorso di "
+          "ieri o col comando sqlite3 (sul VPS non c'e'): python3, e la testa lo dice",
+          [0, [], True, True],
+          [produzione.count("/srv/barattolo/dati/satmarket.db"),
+           _re.findall(r"sqlite3 (?:-readonly |-cmd )?[^\n`]*satmarket\.db", produzione),
+           "IL DATABASE SI LEGGE CON PYTHON3, SU `/srv/barattolo/satmarket.db`" in produzione,
+           letture >= 20])
+    scritture = _re.findall(
+        r"`(sudo -u barattolo python3 -c \"import sqlite3; c=sqlite3\.connect\("
+        r"'/srv/barattolo/satmarket\.db', timeout=5\); [^`\n]*)`", produzione)
+    prova("le sole SCRITTURE sono due, passano da `sudo -u barattolo`, committano e "
+          "dicono quante righe hanno cambiato — e nessuna lettura apre senza `mode=ro`",
+          [2, True, 0],
+          [len(scritture),
+           all("c.commit(); print(n)" in s for s in scritture),
+           len(_re.findall(r"(?<!sudo -u barattolo )python3 -c \"import sqlite3; "
+                           r"c=sqlite3\.connect\('/srv/barattolo/satmarket\.db'",
+                           produzione))])
+
+
 def prove_tempo_pubblica_app():
     """IL TEMPO DI CHI PUBBLICA, NELL'APP (12 ott 2026, cantiere tempo-di-
     chi-pubblica): la finestra per ruolo, l'attesa di chi ha preso, la
@@ -151203,6 +151378,7 @@ def main():
               prove_vibrazione,
               prove_tempo_di_chi_pubblica,
               prove_tempo_pubblica_app,
+              prove_disputa_automatica_p2p,
               prove_config_esempio):
         try:
             f()

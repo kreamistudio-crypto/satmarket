@@ -10476,7 +10476,10 @@
   quaranta giorni il fatto resta. Solo dove la colonna dice -1 e la
   cronaca non c'e' piu' si DEDUCE ancora (`_garanzia_dal_registro_p2p`:
   completato si', tornato no, annullato si' per moderatore, concordato,
-  garanzia scaduta e fattura mai data su un ordine di acquisto), e la
+  garanzia scaduta e fattura mai data su un ordine di acquisto; dal
+  12 ott 2026 anche il TORNATO con la fattura mai data su un acquisto,
+  che e' il ritorno nel libro per chi l'aveva pubblicato — patch 0011
+  del nodo — dove chi vende aveva gia' bloccato), e la
   risposta dice quanti sono (`dedotti`); una disputa lo prova da sola.
   LE DISPUTE ESCLUSE A MANO: la leva `P2P_DISPUTE_ESCLUSE` (id d'ordine
   interi o il loro capo, almeno 8 caratteri; vuota, assente o storta =
@@ -10498,9 +10501,17 @@
   sats (`compratore` | `venditore`) e quante le ha decise un moderatore;
   delle aperte l'id dell'ordine ACCORCIATO a 8 e da quando. Nessun
   account esce di li'. Un database senza le tabelle del P2P da' None e
-  la pagina non disegna la card. NON SI CONTA la disputa che il
-  coordinatore apre da solo alla scadenza della garanzia: non la
-  racconta (vedi «LA GARANZIA LUNGA»).
+  la pagina non disegna la card. LA DISPUTA CHE IL COORDINATORE APRE DA
+  SOLO alla scadenza della garanzia (vedi «LA GARANZIA LUNGA») fino alla
+  `-bar7` non si conta: non la racconta. Dalla patch 0012 del nodo
+  (`-bar8`, 12 ott 2026) arriva come `dispute-opened` di `mostro` col
+  dettaglio `escrow-deadline`: prende la sua riga in `p2p_dispute`
+  (`aperta_da` vuoto), si conta come le altre, e ha le sue due frasi —
+  alle parti «Lo scambio … è passato ai moderatori» (mai «<l'altro> ha
+  aperto una disputa», che lì è falso: `_testo_evento_p2p`), ai
+  moderatori «L'ha aperta il coordinatore da solo … va decisa adesso»
+  al posto di «i sats restano in garanzia finché…»
+  (`_testo_disputa_aperta_p2p`, chiave `automatica`).
   L'AVVISO: `_avviso_soglia_dispute_p2p`, dal giro dell'ora del P2P
   (`_giro_attese_p2p`, dopo i conti e la scopa, dentro
   `_soglia_dispute_salva_p2p` che non alza mai). SOPRA vuol dire: leva

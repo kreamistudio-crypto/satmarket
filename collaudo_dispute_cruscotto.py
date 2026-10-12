@@ -36,6 +36,15 @@ E DAL 12 OTT 2026 (cantiere dispute-garanzia-escluse):
      dispute e aperte, la sezione la nomina, il suo scambio resta — e il
      battito dell'ora TACE (due dispute); tolta la leva, parte.
 
+E LA SERA DEL 12 OTT 2026 (cantiere tempo-di-chi-pubblica):
+
+  6. la disputa che il coordinatore apre DA SOLO alla scadenza della
+     garanzia (12 ott 2026, patch 0012 del nodo: `dispute-opened` di
+     `mostro`, dettaglio `escrow-deadline`): la riga nasce di nessuna
+     delle due parti, le due parti leggono la STESSA frase — e non
+     «l'altro ha aperto una disputa» —, i moderatori che l'ha aperta il
+     coordinatore e che va decisa adesso, e la card la conta.
+
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente nodo.
 
@@ -298,6 +307,57 @@ def main():
           "denominatore anche letta dal registro",
           (prima, 7, 6, 3),
           (dopo, dopo["presi"], dopo["con_garanzia"], dopo["con_disputa"]))
+
+    print("\n6) la disputa che il coordinatore apre da solo (patch 0012 del nodo)")
+    con = banco.con_db()
+    # la scopa del passo 5 ha portato via anche il libro: l'ordine torna
+    con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,"
+                "lato,maker,sats,euro,metodi) VALUES(?,?,?,'in-progress','sell',1,"
+                "13603,'10,00 €','[\"SEPA\"]')", (O[7], banco.VENDE, t - 600))
+    con.commit()
+    con.close()
+    dispute.manda(O[7], "taken", t + 700, "buyer", "take")
+    dispute.manda(O[7], "hold-invoice-paid", t + 710, "seller")
+    dispute.manda(O[7], "fiat-sent", t + 720, "buyer")
+    detti = dispute.manda(O[7], "dispute-opened", t + 730, "mostro",
+                          "escrow-deadline") or []
+    alle_parti = {chi: testo for chi, testo in detti
+                  if chi in (banco.COMPRA, banco.VENDE)}
+    prova("lo sentono TUTTE E DUE le parti, con la stessa frase",
+          (sorted([banco.COMPRA, banco.VENDE]), 1),
+          (sorted(alle_parti), len(set(alle_parti.values()))))
+    frase = next(iter(alle_parti.values()), "")
+    prova("...che dice cosa e' successo — passato ai moderatori, la "
+          "garanzia sta per scadere — e NON che l'ha aperta l'altro",
+          (True, True, False, False),
+          ("è passato ai moderatori" in frase, "la garanzia sta per scadere" in frase,
+           "ha aperto una disputa" in frase,
+           "Chi compra" in frase or "Chi vende" in frase))
+    ai_mod = [testo for chi, testo in detti if chi in (AMMINISTRATORE, MODERATORE)]
+    prova("ai moderatori arriva che l'ha aperta il coordinatore e che va "
+          "decisa adesso, senza la riga «i sats restano in garanzia finché…»",
+          (True, True, True, False),
+          (len(ai_mod) >= 1,
+           all("L'ha aperta il coordinatore da solo" in x for x in ai_mod),
+           all("va decisa adesso" in x for x in ai_mod),
+           any("I sats restano in garanzia finché" in x for x in ai_mod)))
+    r = dispute.riga(O[7]) or {}
+    prova("la riga della disputa nasce aperta, e di nessuna delle due parti",
+          ("aperta", ""), (r.get("stato"), r.get("aperta_da")))
+    prova("...e nel registro l'apertura non e' di nessuno", [("aperta", 0)],
+          [(g, chi) for g, chi, _, _ in dispute.registro(O[7])])
+    d6 = cruscotto()["dispute_p2p"]
+    p6 = d6["periodi"]["tutto"]
+    prova("la card la conta come le altre: otto scambi presi, sette con "
+          "garanzia, quattro dispute — e fra le aperte c'e' la sua",
+          (8, 7, 4, True),
+          (p6["presi"], p6["con_garanzia"], p6["con_disputa"],
+           O[7][:8] in [a["ordine"] for a in d6["aperte"]]))
+    prova("un secondo `dispute-opened` sullo stesso ordine non raddoppia "
+          "niente: nessun avviso, una riga sola", ([], 4),
+          ([x for x in (dispute.manda(O[7], "dispute-opened", t + 760, "mostro",
+                                      "escrow-deadline") or [])],
+           cruscotto()["dispute_p2p"]["periodi"]["tutto"]["con_disputa"]))
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0

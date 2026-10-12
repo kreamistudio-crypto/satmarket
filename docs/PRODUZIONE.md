@@ -9,10 +9,23 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
 I PERCORSI DEL VPS SONO SCRITTI PER ESTESO (10 ott 2026, cantiere
 percorsi-vps, richiesta di Andrea): la cartella del server è
 `/srv/barattolo`, il config `/srv/barattolo/config.py`, il database
-`/srv/barattolo/dati/satmarket.db`. `~/satmarket` porta allo stesso
+`/srv/barattolo/satmarket.db`. `~/satmarket` porta allo stesso
 posto (è un collegamento, verificato con `readlink -f`), ma la tilde
 sotto `sudo -u barattolo` la espande la shell di root, e per questo qui
 non compare più: ogni comando vale da qualunque utente lo lanci.
+IL DATABASE SI LEGGE CON PYTHON3, SU `/srv/barattolo/satmarket.db` (12
+ott 2026, parola di Andrea, che corregge la riga del 10): il file è
+quello — il nome che apre il server stesso — e NON
+`/srv/barattolo/dati/`; e sul VPS il comando `sqlite3` non c'è. Ogni
+lettura di questo documento è quindi
+`python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); …"`
+— `mode=ro` è la sola lettura: non scrive nemmeno per sbaglio — e
+stampa una riga per riga trovata, coi campi separati da `|`. Le poche
+SCRITTURE lo dicono in chiaro e passano da `sudo -u barattolo`.
+(`deploy/utente/cambio-utente.sh` prevede il database in `dati/` con un
+collegamento accanto al codice: dove fosse così il percorso di qui
+sopra vale lo stesso, perché è quello del collegamento. Per togliersi
+il dubbio: `readlink -f /srv/barattolo/satmarket.db`.)
 
 - La coda delle categorie si riempie da sola dopo ogni giro d'import
   (leva `RICATEGORIZZA_AUTO`, accesa di serie): nel journal la riga
@@ -121,7 +134,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   dedotta»). PER FARLO RISUONARE A MANO (dopo aver
   cambiato soglia, per esempio) si toglie il timbro, in sola scrittura
   di quella riga: `DELETE FROM timbri WHERE nome='soglia_dispute_p2p'`
-  sul db vero (`/srv/barattolo/dati/satmarket.db`, con python3). COSA
+  sul db vero (`/srv/barattolo/satmarket.db`, con python3). COSA
   C'E' DENTRO, in sola lettura: `SELECT substr(ordine,1,8), giro,
   datetime(aperta_il,'unixepoch'), stato, esito, chiusa_da FROM
   p2p_dispute ORDER BY aperta_il` — se li' ci sono dispute di PROVA
@@ -337,7 +350,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   Telegram (canale scelto: «nostr»)`, `NESSUN CANALE (…)`.
   DAL CHAT ID ALL'ACCOUNT: in una chat privata il chat id E' il
   `tg_id`, quindi sul VPS, in sola lettura:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT tg_id, nome, username, canale_notifiche, avvisi_p2p FROM utenti WHERE tg_id IN (<id1>, <id2>);"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT tg_id, nome, username, canale_notifiche, avvisi_p2p FROM utenti WHERE tg_id IN (<id1>, <id2>)\")]"`
   — la colonna `canale_notifiche` e' quella da guardare per prima:
   `nostr` vuol dire che sul bot non arriva niente PER SCELTA.
   IL BOT E' UNO SOLO: mercatino e P2P passano dalla stessa `notifica`
@@ -1592,9 +1605,9 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   «muto», cioe' si aspetta. Non c'e' niente da seminare a mano: basta
   che nel database ci sia UN payout riuscito dalla cassaforte `nodo`.
   I CONTROLLI A MANO, tutti di sola lettura. Sul VPS, la coda:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT 'ordini',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM ordini WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'rimborsi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM rimborsi_asta WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'sblocchi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM pagamenti WHERE payout_stato NOT IN ('','uscito');"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT 'ordini',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM ordini WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'rimborsi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM rimborsi_asta WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'sblocchi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM pagamenti WHERE payout_stato NOT IN ('','uscito')\")]"`
   Tutti gli hash tentati per una riga (qui l'ordine 163):
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito FROM payout_tentati WHERE tabella='ordini' AND riga_id=163;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT hash,datetime(quando,'unixepoch'),esito FROM payout_tentati WHERE tabella='ordini' AND riga_id=163\")]"`
   La voce di LND per un hash, dal VPS attraverso il ponte (il
   macaroon sta in un file 600, NON sulla riga di comando):
   `H=<payment_hash>; B=$(python3 -c "import base64,sys;print(base64.urlsafe_b64encode(bytes.fromhex(sys.argv[1])).decode())" $H); curl -s --max-time 30 --cacert /opt/lnbits/data/tls.cert -H "Grpc-Metadata-macaroon: $(cat /root/lettura.macaroon.hex)" https://127.0.0.1:18080/v2/router/track/$B | head -c 600`
@@ -1647,7 +1660,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   e dopo questo deploy è un numero che può solo scendere.
   DOVE SI LEGGE: `journalctl -u barattolo | grep "⌛"`. Il motivo di
   ogni payout mancato sta nella riga dell'ordine:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_tentativi,payout_errore FROM ordini WHERE COALESCE(payout_errore,'')<>'' ORDER BY id DESC LIMIT 20;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato,payout_tentativi,payout_errore FROM ordini WHERE COALESCE(payout_errore,'')<>'' ORDER BY id DESC LIMIT 20\")]"`
   «Pagamento in uscita FALLITO» adesso dice il PERCHÉ in parole
   (fattura scaduta, nessuna strada, saldo NOSTRO insufficiente, ponte
   giù, tempo scaduto per strada, rifiutata da chi riceve, fattura già
@@ -1674,9 +1687,9 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   dopo 30 minuti IN VOLO parte il 🧊 di sempre, e in quell'istante le
   due parti leggono «ci stiamo lavorando noi».
   DOVE SI LEGGE. Gli ordini in pagamento adesso:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_verso,payout_tentativi,payout_errore FROM ordini WHERE stato='confirmed' OR (payout_verso='venditore' AND payout_stato IN ('in_volo','incerto','da_riprovare')) ORDER BY id DESC;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato,payout_verso,payout_tentativi,payout_errore FROM ordini WHERE stato='confirmed' OR (payout_verso='venditore' AND payout_stato IN ('in_volo','incerto','da_riprovare')) ORDER BY id DESC\")]"`
   La linea del tempo di UN ordine (sostituisci 152):
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT datetime(quando,'unixepoch','localtime'),passo,motivo,volte,datetime(ultimo,'unixepoch','localtime') FROM payout_passi WHERE tabella='ordini' AND riga_id=152 ORDER BY id;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT datetime(quando,'unixepoch','localtime'),passo,motivo,volte,datetime(ultimo,'unixepoch','localtime') FROM payout_passi WHERE tabella='ordini' AND riga_id=152 ORDER BY id\")]"`
   Nel journal: `journalctl -u barattolo | grep -E "🔁|🛬|🧊|⌛"`.
   IL DRILL (col venditore di prova, fattura INCOLLATA e lunga):
   `systemctl stop lnd-ponte`, si aspetta che il guardiano dica «giù»
@@ -1760,11 +1773,11 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   chiude a mano allo stesso modo.
   IL #152, PASSO PER PASSO (dopo il deploy; il VPS lo guarda Andrea).
   1) Lo stato di partenza, in sola lettura:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,payout_hash,length(invoice_venditore) FROM ordini WHERE id=152;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,payout_hash,length(invoice_venditore) FROM ordini WHERE id=152\")]"`
   — atteso `confirmed | incerto | venditore | saas | (vuoto) | <hash> |
   <lunghezza>`. Se `payout_stato` è `in_volo` si aspetta la ronda (30
   minuti dal tentativo). Gli hash tentati, con cassaforte e scadenza:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito,cassaforte,datetime(scade,'unixepoch') FROM payout_tentati WHERE tabella='ordini' AND riga_id=152;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT hash,datetime(quando,'unixepoch'),esito,cassaforte,datetime(scade,'unixepoch') FROM payout_tentati WHERE tabella='ordini' AND riga_id=152\")]"`
   (`scade` a 1970 = ancora ignota: la trascrive il primo tocco del
   bottone, dalla fattura in colonna o chiedendola a LNbits).
   2) Il capitale sul nodo: vedi l'avviso qui sopra. 247.707 + ~2.500.
@@ -1779,7 +1792,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   «Arrivati ✓», ai moderatori «🔀 …pagato da un'altra cassaforte», e in
   «🔀 Crediti da recuperare» la riga del #152 sul SaaS.
   DOVE SI LEGGE: `journalctl -u barattolo | grep -E "⚖️ Altra cassaforte|🔎"`.
-  I crediti: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,riga_id,cassaforte,pagato_da,sats,stato,datetime(deciso_il,'unixepoch','localtime'),motivo,nota FROM crediti_cassaforte;"`
+  I crediti: `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,riga_id,cassaforte,pagato_da,sats,stato,datetime(deciso_il,'unixepoch','localtime'),motivo,nota FROM crediti_cassaforte\")]"`
   SE VA STORTO. Il pagamento dal nodo fallisce (nessuna strada, saldo):
   l'ordine torna a «serve una fattura nuova», la cassaforte d'uscita
   RESTA il nodo, e la prossima fattura che Pedro incolla si paga da lì
@@ -1789,7 +1802,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   colonne e la tabella nuove restano e non danno fastidio, ma un ordine
   GIÀ deviato e non ancora pagato tornerebbe a pagare dalla cassaforte
   d'origine — si guarda prima che non ce ne siano:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato FROM ordini WHERE COALESCE(cassaforte_payout,'')<>'' AND stato NOT IN ('released','refunded');"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato FROM ordini WHERE COALESCE(cassaforte_payout,'')<>'' AND stato NOT IN ('released','refunded')\")]"`
   NON PROVATO DAL VIVO: LNbits vero sulle due cassaforti, la forma di
   `details.bolt11` (è un ripiego, e si crede solo se l'hash combacia),
   il bottone sul telefono. Provato: tutto il resto, su cartone.
@@ -1804,7 +1817,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   0) Dopo il deploy: Profilo → 👑 → cassetto «🏦 Cassaforte SaaS». Leggi
   «Escono ancora dal SaaS» (dovrebbero essere 6 ordini) e «Spostati sul
   nodo» (0). Sola lettura sul VPS, per confronto:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,prezzo_sats FROM ordini WHERE cassaforte='saas' AND stato NOT IN ('creato','annullato','released','refunded');"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,prezzo_sats FROM ordini WHERE cassaforte='saas' AND stato NOT IN ('creato','annullato','released','refunded')\")]"`
   1) IL #152 (P3dr0, 247.707 sats, «pending» dal 20 set). Prima: sul
   nodo devono esserci 247.707 sats nostri piu' la riserva fee di LNbits
   (max(1%, 10 sats) = 2.477): spostali a mano. Poi 🧊 Pagamenti da
@@ -1846,7 +1859,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   hash mai saldato»): cosi' il 🏁 puo' suonare. Poi sweep del saldo e
   disdetta, come dice «Il doppio wallet» in CANTIERI.
   DOVE SI LEGGE: `journalctl -u barattolo | grep "⚖️ Cassaforte SaaS"`;
-  il registro: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT riga_id,gesto,da,a,sats,deciso_da,datetime(deciso_il,'unixepoch','localtime'),motivo FROM gesti_cassaforte;"`
+  il registro: `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT riga_id,gesto,da,a,sats,deciso_da,datetime(deciso_il,'unixepoch','localtime'),motivo FROM gesti_cassaforte\")]"`
   IL ROLLBACK e' il commit precedente: la tabella resta e non da'
   fastidio; un ordine SPOSTATO e non ancora chiuso paga ancora dal nodo
   (il codice del 21 set legge `cassaforte_payout` per l'incasso) ma un
@@ -2269,9 +2282,9 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   GUARDARE SUBITO: un relay che serve eventi non di mostrod; `⚠️ Libro
   P2P: coincurve non c'e'` vuol dire che il libro è fermo (pip).
   LA CRONACA DI UN ORDINE, quando qualcosa non torna (in sola lettura):
-  `sqlite3 /srv/barattolo/dati/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, dettaglio, attore, fonte, giro FROM p2p_momenti WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT datetime(quando,'unixepoch'), momento, dettaglio, attore, fonte, giro FROM p2p_momenti WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando\")]"`
   e chi è stato avvisato di cosa:
-  `sqlite3 /srv/barattolo/dati/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, giro, tg_id, fonte FROM p2p_avvisi WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`.
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT datetime(quando,'unixepoch'), momento, giro, tg_id, fonte FROM p2p_avvisi WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando\")]"`.
   LA PROVA A DUE TELEFONI (A compra e pubblica, B vende e prende; poi
   SUBITO un secondo scambio a parti rovesciate — è il caso che il 18 set
   ha rotto tutto): la checklist sta nel verbale in CANTIERI, e ogni riga
@@ -2541,7 +2554,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   ⚠️ DA QUEL GIORNO GLI SCRIPT CHE SCRIVONO si lanciano DA LUI:
   `cd /srv/barattolo && sudo -u barattolo python3 <script>.py`. Da root
   funzionano lo stesso, ma un file NATO da root in `dati/` o `foto/` il
-  servizio non lo sa più riscrivere. Le letture (`sqlite3 -readonly`,
+  servizio non lo sa più riscrivere. Le letture (in sola lettura,
   i censimenti) restano come sono.
   TORNARE A ROOT, se qualcosa non gira:
   `bash /srv/barattolo/deploy/utente/cambio-utente.sh --torna`
@@ -2793,9 +2806,9 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   (`saltati`, `entrati`, `consegna_corretta`), che è quello che il
   cassetto del venditore mostra. In sola lettura:
   `journalctl -u barattolo --since "48h ago" | grep -E "🏪|Connettore|↔|🗑"`
-  e `sqlite3 -readonly satmarket.db "SELECT id, fonte, url_negozio,
-  datetime(ultimo_giro,'unixepoch','localtime'), ultimo_errore,
-  ultimo_esito FROM connettori"`. Un `variable` Woo che nel report dice
+  e
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT id, fonte, url_negozio, datetime(ultimo_giro,'unixepoch','localtime'), ultimo_errore, ultimo_esito FROM connettori\")]"`.
+  Un `variable` Woo che nel report dice
   «ha piu' varianti e non le ho potute leggere» è un lettore che non ha
   agganciato le variazioni (chiamata fuori dal lettore); «nessuna delle
   sue varianti e' in vendita» è il negozio.
@@ -2840,7 +2853,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
 - LE FAMIGLIE DI UN NEGOZIO COLLEGATO (30 set 2026): le scrive il giro
   dell'ora, quindi dopo il deploy compaiono al PRIMO giro e non prima.
   Si guardano, in sola lettura, per collegamento:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT famiglia, famiglia_titolo, stato, COUNT(*) FROM annunci WHERE connettore_id=<id> GROUP BY famiglia, stato"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT famiglia, famiglia_titolo, stato, COUNT(*) FROM annunci WHERE connettore_id=<id> GROUP BY famiglia, stato\")]"`
   — righe con `famiglia` vuota = prodotti senza famiglia (o giro non
   ancora passato).
   NASCONDERE UN NEGOZIO DALLA VETRINA SENZA CANCELLARE NIENTE (il gesto
@@ -2848,19 +2861,20 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   riaccende mai (lo aggiorna, lo spegne se il prodotto sparisce). È il
   ↩︎ del moderatore fatto in blocco, e lascia fuori le righe con un
   ordine vivo (anche dentro un carrello) e le aste. Prima la fotografia:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db ".backup /root/prima-<nome>.db"`.
+  `python3 -c "import sqlite3; s=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); d=sqlite3.connect('/root/prima-<nome>.db'); s.backup(d); d.close(); s.close()"`.
   ⚠️ LA TILDE SOTTO `sudo -u barattolo` NON È SUA: la espande la shell di
   root prima che sudo parta, quindi diventa `/root/satmarket/...`, dove
   `barattolo` non entra («unable to open database file», nessuna
   modifica). Le SCRITTURE si fanno sul file vero,
-  `sudo -u barattolo sqlite3 -cmd ".timeout 5000" /srv/barattolo/dati/satmarket.db "..."`,
+  `sudo -u barattolo python3 -c "import sqlite3; c=sqlite3.connect('/srv/barattolo/satmarket.db', timeout=5); n=c.execute(\"...\").rowcount; c.commit(); print(n)"`,
   così il journal nasce suo accanto al database; le letture da root
   restano con la tilde. Il gesto non passa dal registro della
   moderazione (va scritto nel verbale) e il pallino dei moderatori
   sale: su quelle righe nessuno preme ✅.
   RIMETTERLE IN VETRINA, a famiglie scritte: prima si guarda (sopra) che
   il giro abbia riempito `famiglia`, poi
-  `sudo -u barattolo sqlite3 -cmd ".timeout 5000" /srv/barattolo/dati/satmarket.db "UPDATE annunci SET stato=CASE WHEN quantita>0 THEN 'attivo' ELSE 'venduto' END WHERE connettore_id=<id> AND stato='revisione' AND famiglia!=''; SELECT changes();"`
+  `sudo -u barattolo python3 -c "import sqlite3; c=sqlite3.connect('/srv/barattolo/satmarket.db', timeout=5); n=c.execute(\"UPDATE annunci SET stato=CASE WHEN quantita>0 THEN 'attivo' ELSE 'venduto' END WHERE connettore_id=<id> AND stato='revisione' AND famiglia!=''\").rowcount; c.commit(); print(n)"`
+  (stampa quante righe ha cambiato)
   — il `CASE` tiene l'invariante di casa (venduto ⇔ zero pezzi) per le
   taglie finite nel frattempo, e `famiglia!=''` lascia in attesa ciò che
   il giro non ha ancora legato.
@@ -2871,7 +2885,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   server di adesso quella busta NON la sa più incassare
   (`_incasso_del_motivo` conosce 'banner' e 'negozio_slug'), quindi
   PRIMA del deploy si guarda, in sola lettura, che non ce ne siano:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT 'busta', id, stato, importo_sats, datetime(creato,'unixepoch','localtime') FROM pagamenti WHERE motivo='carrello' UNION ALL SELECT 'ordine', id, stato, pagamento_id, datetime(creato,'unixepoch','localtime') FROM ordini WHERE pagamento_id > 0;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT 'busta', id, stato, importo_sats, datetime(creato,'unixepoch','localtime') FROM pagamenti WHERE motivo='carrello' UNION ALL SELECT 'ordine', id, stato, pagamento_id, datetime(creato,'unixepoch','localtime') FROM ordini WHERE pagamento_id > 0\")]"`
   Nessuna riga (o «no such column: pagamento_id», su un database che
   quella colonna non l'ha mai avuta) = si va: il 24 set 2026, prima
   del push, non ha stampato niente. Una `busta` in `creato` = una
@@ -2895,7 +2909,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   nuovo (`init_db`, `CREATE TABLE IF NOT EXISTS`), e la scopa dei sette
   giorni gira nell'orologio. Per guardare, in sola lettura — quanti
   carrelli ci sono e il più vecchio:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT COUNT(*), datetime(MIN(aggiornato),'unixepoch','localtime') FROM carrello_salvato;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT COUNT(*), datetime(MIN(aggiornato),'unixepoch','localtime') FROM carrello_salvato\")]"`
   Il più vecchio non deve superare i sette giorni (più il giro
   dell'orologio). TORNARE INDIETRO col codice di prima non chiede
   niente: quel codice la tabella non la legge né la scrive, e resta lì
@@ -3012,8 +3026,8 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   con un `cp` a caldo — `UPDATE users SET is_solver=0 WHERE pubkey='<chiave esadecimale>' AND is_solver=1;`
   (mostrod cerca il solver nel database a ogni richiesta). Si prova su
   una chiave usa-e-getta PRIMA di averne bisogno.
-  IL REGISTRO, sul VPS: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT ordine, gesto, tg_id, datetime(quando,'unixepoch','localtime'), esito, motivo FROM p2p_dispute_registro ORDER BY id DESC LIMIT 20;"`
-  e le dispute: `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT ordine, stato, aperta_da, compratore, venditore, presa_da, esito, chiusa_da, datetime(aperta_il,'unixepoch','localtime') FROM p2p_dispute ORDER BY aperta_il DESC LIMIT 20;"`.
+  IL REGISTRO, sul VPS: `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT ordine, gesto, tg_id, datetime(quando,'unixepoch','localtime'), esito, motivo FROM p2p_dispute_registro ORDER BY id DESC LIMIT 20\")]"`
+  e le dispute: `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT ordine, stato, aperta_da, compratore, venditore, presa_da, esito, chiusa_da, datetime(aperta_il,'unixepoch','localtime') FROM p2p_dispute ORDER BY aperta_il DESC LIMIT 20\")]"`.
   ⚠️ UNA DISPUTA APERTA PRIMA DI QUESTO DEPLOY NON HA LA SUA RIGA (la
   riga nasce all'evento `dispute-opened`): la sua chiusura non arriva
   ai moderatori, e non è un guasto.
@@ -3118,7 +3132,7 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   `aperta`, `id_dichiarato`, `id_diverso`, `chiave`, `presa_chiesta`,
   `presa`, `presa_fallita`, `decisione`, `non_riuscita`, `chiusa`,
   `allarme`. Le chiavi registrate:
-  `sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT tg_id, chiave, datetime(creata,'unixepoch','localtime') FROM p2p_moderatori;"`
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT tg_id, chiave, datetime(creata,'unixepoch','localtime') FROM p2p_moderatori\")]"`
   COSA NON È PROVATO: tutto quel che parla col coordinatore VERO. I
   messaggi del moderatore sono costruiti sulle pagine del protocollo e
   provati contro un coordinatore finto; che mostrod 0.18.8-bar5 li
@@ -3135,17 +3149,16 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   di persona (€)»). Sta SOTTO `P2P_MAX_EURO` quando quello è acceso.
   LA TABELLA `p2p_presenze` nasce da sola al primo riavvio (`CREATE
   TABLE IF NOT EXISTS`): niente migrazione a mano. Verifica in sola
-  lettura: `sqlite3 /srv/barattolo/dati/satmarket.db ".schema p2p_presenze"`.
+  lettura: `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute(\"SELECT sql FROM sqlite_master WHERE name='p2p_presenze'\").fetchone()[0])"`.
   IN UNA DISPUTA SUL CONTANTI il moderatore legge la riga «🤝 Incontro
   confermato…» o «Nessuna prova d'incontro» nella card della disputa;
   la regola scritta in «Info P2P» è quella di Hodl Hodl: senza prova
   d'incontro i sats tornano a chi li ha bloccati, con la prova e nessun
   rilascio vanno a chi compra. Le due firme le ha già verificate il
   server; la posizione viene dal GPS dei telefoni e si può falsificare.
-  Per guardare la riga dal VPS (sola lettura): `sqlite3
-  /srv/barattolo/dati/satmarket.db "SELECT ordine, ora_mostra, ora_legge,
-  distanza_m, posizioni, posizioni_via, caricata_da FROM p2p_presenze
-  ORDER BY quando DESC LIMIT 20"` — le colonne `lat_*`/`lon_*`/`acc_*` e
+  Per guardare la riga dal VPS (sola lettura):
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); [print(*r, sep='|') for r in c.execute(\"SELECT ordine, ora_mostra, ora_legge, distanza_m, posizioni, posizioni_via, caricata_da FROM p2p_presenze ORDER BY quando DESC LIMIT 20\")]"`
+  — le colonne `lat_*`/`lon_*`/`acc_*` e
   `prova` sono a NULL/vuote dopo la chiusura (o dopo quindici giorni,
   dalla scopa dell'orologio: riga «🧹 P2P: N prove d'incontro
   alleggerite o tolte» nel journal). Se una disputa si apre e la riga
@@ -3405,8 +3418,8 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   gli esiti già scritti restano.
   LE LETTURE (sul VPS `sqlite3` non c'è: `python3`, sola lettura; il
   database è `/srv/barattolo/satmarket.db`, detto da Andrea il 12 ott
-  2026 — i comandi più vecchi di questo file che puntano altrove vanno
-  letti con questo percorso). Chi ha una pausa impostata:
+  2026 — da quel giorno TUTTI i comandi di questo file sono scritti
+  così: la nota in testa). Chi ha una pausa impostata:
   `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT tg_id, fasce, fuso, una_fino, aggiornato FROM p2p_pause').fetchall())"`
   Le mancate risposte di chi pubblica (`senza_risposta` è il fatto nudo,
   che toglie il badge; `mancato` e `scusato` col dettaglio che comincia
@@ -3434,17 +3447,27 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   numeri; l'evento al server per quel ritorno è `maker-republished`; e
   una vendita presa da un'altra app con la fattura nel take esce
   in-progress invece di restare `pending` (README del fork, «LA 0011»).
+  E LA PATCH 0012, nella stessa immagine (richiesta di Andrea, 12 ott
+  sera): la disputa che il coordinatore apre DA SOLO a ~92 ore dalla
+  garanzia pagata (chi compra ha segnato il pagamento, nessuno ha
+  liberato) adesso la racconta al server — `dispute-opened` di `mostro`,
+  dettaglio `escrow-deadline` — e quindi arriva ai moderatori, alle due
+  parti e alla card ⚖️ del cruscotto (README del fork, «LA 0012»).
   DUE RIGHE NUOVE nel `settings.toml` (punto 6-bis); NESSUNA migrazione:
   le mancate risposte stanno in una tabella a parte, fuori da sqlx.
   ⚠️ PRIMA IL SERVER, POI IL NODO: il VPS deve avere online il commit di
   questo cantiere PRIMA che il nodo cominci a dire `maker-republished` —
   il server di ieri la leggerebbe come un annullo, e a chi ha pubblicato
-  direbbe «il tuo ordine è stato annullato» con l'ordine nel libro. Si
-  guarda sul VPS: `git -C ~/satmarket log -1 --oneline`. La LEVA del VPS
+  direbbe «il tuo ordine è stato annullato» con l'ordine nel libro; e
+  della disputa automatica (0012) direbbe alle due parti che l'ha aperta
+  l'altro. Si
+  guarda sul VPS: `git -C /srv/barattolo log -1 --oneline`. La LEVA del VPS
   invece non ha un ordine obbligato (voce qui sopra).
   ⚠️ MAI COMPILATA SUL PC (non c'è cargo): il patcher è girato a secco e
   per davvero su un clone del tag `v0.19.0` con le nove patch applicate
-  (`git am`), il diff è stato riletto riga per riga, e niente altro. Il
+  (`git am`), il diff è stato riletto riga per riga, e niente altro —
+  lo stesso per la 0012, sopra la 0011, e la sua `.patch` esportata si
+  riapplica identica con `git am`. Il
   punto 3 qui sotto è la PRIMA compilazione: va guardato, e un errore si
   incolla a Claude senza ritocchi a mano.
   Host, in cima a tutto: `ssh debian@185.18.221.96`
@@ -3466,10 +3489,10 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   `cp ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-bar8`
   `cp ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-bar8`
   FASE 3 — LA BUILD:
-  1) SUL PC, i tre file al nodo, in una cartella NUOVA e FUORI da
+  1) SUL PC, i cinque file al nodo, in una cartella NUOVA e FUORI da
   `mostro-src` (il `.rs` deve stare ACCANTO al patcher):
   `ssh debian@185.18.221.96 mkdir -p nodo/patch-bar8`
-  `scp deploy/mostro/patch-0011-tempo-di-chi-pubblica.py deploy/mostro/barattolo_tempo.rs deploy/mostro/0011-timeout-give-the-maker-a-waiting-window-of-his-own-a.patch debian@185.18.221.96:nodo/patch-bar8/`
+  `scp deploy/mostro/patch-0011-tempo-di-chi-pubblica.py deploy/mostro/barattolo_tempo.rs deploy/mostro/0011-timeout-give-the-maker-a-waiting-window-of-his-own-a.patch deploy/mostro/patch-0012-disputa-automatica.py deploy/mostro/0012-events-tell-the-marketplace-server-when-the-escrow-g.patch debian@185.18.221.96:nodo/patch-bar8/`
   2) SUL NODO, a secco e poi per davvero, un commit:
   `cd ~/nodo/mostro-src`
   `python3 ~/nodo/patch-bar8/patch-0011-tempo-di-chi-pubblica.py --secco`
@@ -3479,12 +3502,19 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   `python3 ~/nodo/patch-bar8/patch-0011-tempo-di-chi-pubblica.py && git add -A && git commit -m "timeout: give the maker a waiting window of his own, and put the order back in the book when he lets a take lapse"`
   `git log --oneline v0.19.0..HEAD` → DIECI righe. (Strada equivalente:
   `git am ~/nodo/patch-bar8/0011-*.patch`: stesso albero.)
+  POI LA 0012, sopra, allo stesso modo — a secco, per davvero, un commit:
+  `python3 ~/nodo/patch-bar8/patch-0012-disputa-automatica.py --secco`
+  → deve dire «A SECCO: 3 agganci in 2 file, tutte le ancore uniche.
+  Niente scritto.»
+  `python3 ~/nodo/patch-bar8/patch-0012-disputa-automatica.py && git add -A && git commit -m "events: tell the marketplace server when the escrow guardian opens a dispute by itself"`
+  `git log --oneline v0.19.0..HEAD` → UNDICI righe. (Strada equivalente:
+  `git am ~/nodo/patch-bar8/0012-*.patch`.)
   3) I TEST PRIMA DELLA BUILD VERA, in DUE lanci come per la `-bar7` (il
   perché dei due sta lì sotto: una prova di upstream che legge una
   globale): il primo coi filtri di ieri più quelli della 0011, il secondo
   `util::tests::` da solo.
   `docker build -f docker/Dockerfile --target builder -t mostro-test:bar8 .`
-  `docker run --rm mostro-test:bar8 cargo test --release -- app::take_buy app::take_sell flow barattolo_bond toml_only_payment_methods barattolo_tempo scheduler nip33 find_order_by_seconds`
+  `docker run --rm mostro-test:bar8 cargo test --release -- app::take_buy app::take_sell flow barattolo_bond toml_only_payment_methods barattolo_tempo scheduler nip33 find_order_by_seconds a_dispute_the_daemon_opens`
   `docker run --rm mostro-test:bar8 cargo test --release -- util::tests::`
   Fra i verdi devono comparire gli otto di `barattolo_tempo::tests::` —
   `the_duty_is_the_makers_in_the_two_states_upstream_cancels`,
@@ -3497,16 +3527,22 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   `the_takers_duty_never_touches_the_count` —, i quattro
   `reconfirm_timeout_eligibility_…` dello scheduler, i due
   `find_order_by_seconds…` e `status_tags_map_lifecycle_statuses_to_nip69_buckets`
-  (quella emendata). ⚠️ I filtri `scheduler` e `nip33` sono NUOVI in
+  (quella emendata). PER LA 0012: la sua prova
+  `barattolo_eventi::tests::a_dispute_the_daemon_opens_is_mostros_and_says_why`
+  e, già dentro il filtro `scheduler`, le tre di upstream che passano
+  dal ramo toccato — `escrow_deadline_opens_dispute_on_fiat_sent_without_touching_escrow`,
+  `escrow_deadline_resumes_a_half_completed_dispute_transition`,
+  `escrow_deadline_reopens_a_dispute_the_users_resolved_themselves`.
+  ⚠️ I filtri `scheduler` e `nip33` sono NUOVI in
   questa liturgia: se cade una prova che NON è fra queste, la si rilancia
   da sola (`cargo test --release -- <nome intero>`); se da sola passa è
   la globale dei test, come per la `-bar7`, e lo si scrive qui. Se la
   build o i test si fermano su una delle nostre: l'errore si incolla a
-  Claude, sul nodo `git reset --hard HEAD~1` (torna alla 0010) e niente
-  ritocchi a mano.
-  4) VERDI: `git format-patch -1 --start-number 11 -o ~/nodo/patch-bar8/export`
-  e la `.patch` torna sul PC con `scp`: `diff` contro quella nel repo
-  deve dire solo `index`, `From` e `Date`, MAI una riga di codice.
+  Claude, sul nodo `git reset --hard HEAD~2` (torna alla 0010: via la
+  0011 e la 0012) e niente ritocchi a mano.
+  4) VERDI: `git format-patch -2 --start-number 11 -o ~/nodo/patch-bar8/export`
+  e le due `.patch` tornano sul PC con `scp`: `diff` contro quelle nel
+  repo deve dire solo `index`, `From` e `Date`, MAI una riga di codice.
   5) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.19.0-bar8 .`
   — tag nuovo; la `-bar7` resta sulla macchina.
   6) IL COMPOSE: `cd ~/nodo` e con `nano docker-compose.yml` la SOLA
@@ -3547,6 +3583,14 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   Nel log del nodo: `docker compose logs mostro --since 4h | grep barattolo_tempo`
   → «maker lapse 1 of 2, back to the book» e poi «maker lapse 2 of 2,
   the order is removed».
+  LA 0012 NON SI PROVA IN FRETTA: la disputa automatica nasce a ~92 ore
+  da una garanzia pagata, col pagamento segnato e mai liberato. Il
+  giorno che succede si riconosce da tre cose: nel log del nodo
+  `docker compose logs mostro --since 1h | grep "dispute-opened"` →
+  «barattolo_eventi: order … dispute-opened: delivered»; ai moderatori
+  l'avviso «⚖️ Disputa P2P aperta … L'ha aperta il coordinatore da solo
+  … va decisa adesso»; alle due parti «Lo scambio … è passato ai
+  moderatori». E la card ⚖️ del cruscotto la conta come le altre.
   ROLLBACK: `cd ~/nodo`, la riga dell'immagine a `mostro:v0.19.0-bar7`
   e le due righe nuove del `settings.toml` commentate (la `-bar7` le
   ignorerebbe comunque: `[mostro]` non rifiuta le chiavi che non

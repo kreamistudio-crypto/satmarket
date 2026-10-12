@@ -52273,9 +52273,12 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
 # dall'ora in cui e' stata aperta.
 # SOLO NUMERI, e delle aperte l'id dell'ordine ACCORCIATO: gli account
 # che `p2p_dispute` porta di qui non escono.
-# QUEL CHE NON SI SA: la disputa che il coordinatore apre DA SOLO alla
-# scadenza della garanzia (vedi «LA GARANZIA LUNGA») non la racconta a
-# nessuno, e qui non si conta.
+# LA DISPUTA CHE IL COORDINATORE APRE DA SOLO alla scadenza della
+# garanzia (vedi «LA GARANZIA LUNGA»): fino alla `-bar7` non la racconta
+# a nessuno, e qui non si conta. Dalla patch 0012 (`-bar8`, 12 ott 2026)
+# arriva come `dispute-opened` di `mostro` col dettaglio
+# `escrow-deadline`: prende la sua riga in `p2p_dispute` (`aperta_da`
+# vuoto: non e' di nessuna delle due parti) e si conta come le altre.
 P2P_DISPUTE_PERIODI = (("7", 7), ("30", 30), ("tutto", 0))
 # sotto tre dispute nei 30 giorni la percentuale e' rumore: una su dieci
 # scambi fa «10%» e non dice niente
@@ -52316,8 +52319,15 @@ def _garanzia_dal_registro_p2p(esito: str, motivo: str, lato: str) -> bool:
     gia' fuori dalla cronaca (dal 12 ott 2026 il fatto lo scrive il
     consolidamento). E' una DEDUZIONE, e si dice:
     • `completato`: si', sempre — senza garanzia non si rilascia;
-    • `tornato` in vetrina: no — chi aveva preso non ha fatto il suo
-      primo gesto, e la garanzia viene dopo;
+    • `tornato` in vetrina: no quando chi aveva PRESO non ha fatto il
+      suo primo gesto — la garanzia viene dopo. SI' QUANDO E' TORNATO
+      PER CHI AVEVA PUBBLICATO UN ACQUISTO (12 ott 2026, patch 0011
+      del nodo: l'ordine torna nel libro anche se la mancata risposta
+      e' di chi l'ha pubblicato): su un acquisto chi vende blocca per
+      primo, e la fattura si chiede a chi compra solo dopo. Nel
+      registro e' la stessa coppia dell'annullato qui sotto — fattura
+      mai data, lato `buy` — e chi ha PRESO un acquisto non la produce
+      mai: lui e' quello che vende, e gli manca la garanzia;
     • `annullato`: si' se l'ha deciso un moderatore, se e' concordato
       (si concorda solo a garanzia bloccata) o se la garanzia e' arrivata
       a scadenza; si' anche per la fattura mai data su un ordine di
@@ -52327,10 +52337,12 @@ def _garanzia_dal_registro_p2p(esito: str, motivo: str, lato: str) -> bool:
       disputa (la percentuale esce un filo piu' alta, mai piu' bassa)."""
     if esito == "completato":
         return True
-    if esito != "annullato":
+    if esito not in ("annullato", "tornato"):
         return False
-    return (motivo in ("moderatore", "concordato", "garanzia_scaduta")
-            or (motivo == "fattura_non_data" and lato == "buy"))
+    if motivo == "fattura_non_data" and lato == "buy":
+        return True
+    return (esito == "annullato"
+            and motivo in ("moderatore", "concordato", "garanzia_scaduta"))
 
 
 def dati_dispute_p2p(con, adesso: int):
@@ -52609,7 +52621,8 @@ async def _giro_attese_p2p():
 # ore dal pagamento della hold (`enforce_escrow_deadline_pass`: in
 # `active` annulla e i sats tornano a chi vende, in `fiat-sent` apre una
 # disputa DA SOLO — e quella disputa la patch 0007 non la racconta a
-# nessuno), e una disputa gia' aperta e non decisa la chiude LND a ~94
+# nessuno: la racconta la 0012, dalla `-bar8`, vedi
+# `_disputa_evento_p2p`), e una disputa gia' aperta e non decisa la chiude LND a ~94
 # ore (`invoices.holdexpirydelta`, non impostato sul nodo: il default,
 # 12 blocchi), coi sats a chi vende anche se chi compra aveva ragione.
 # Il server non tocca il nodo: GUARDA. Dall'ora in cui il coordinatore
@@ -55375,6 +55388,17 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                 f"completata: {'vendevi' if vende else 'compravi'} {quanto}. "
                 "Puoi ripubblicarlo quando vuoi.")
     if momento == "disputa":
+        if dettaglio == "escrow-deadline":
+            # LA DISPUTA CHE IL COORDINATORE APRE DA SOLO (12 ott 2026,
+            # patch 0012 del nodo: `dispute-opened` di `mostro`). Non
+            # l'ha aperta l'altra parte, e dirlo sarebbe falso: chi
+            # compra ha segnato il pagamento, i sats non sono stati
+            # liberati e la garanzia sta per finire. Lo sentono tutti e
+            # due, con la stessa frase e senza un nome
+            return ("⚖️ <b>Lo scambio" + (f" da {cifra}" if cifra else "")
+                    + " è passato ai moderatori:</b> il pagamento risulta "
+                    "inviato, i sats non sono stati liberati e la garanzia "
+                    "sta per scadere. Vi contatteranno.")
         return (f"⚖️ <b>{altro} ha aperto una disputa sullo scambio"
                 + (f" da {cifra}" if cifra else "")
                 + ":</b> i moderatori vi contatteranno.")
@@ -55918,6 +55942,10 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     persone gia' dette (`compra`, `vende`, scappate), i numeri del libro
     (`sats`, `euro`, `metodi`, scappati) e i due id; `garanzia_il` e'
     l'ora in cui mostrod ha visto la garanzia pagata, o 0.
+    `automatica` (12 ott 2026, patch 0012 del nodo) dice che l'ha aperta
+    IL COORDINATORE DA SOLO, alla scadenza della garanzia: non e' di
+    nessuna delle due parti, e non puo' aspettare — la riga di chiusura
+    («i sats restano in garanzia finche'…») li' sarebbe falsa.
     SE IL MODERATORE E' UNA DELLE PARTI LO LEGGE SUBITO: quella disputa
     non la decide lui."""
     corto = html.escape(str(d.get("ordine") or "")[:8])
@@ -55936,8 +55964,14 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     if int(d.get("garanzia_il") or 0) > 0:
         righe.append("• Garanzia bloccata dal " + time.strftime(
             "%d/%m/%Y %H:%M", time.localtime(int(d["garanzia_il"]))))
-    righe += ["", "I sats restano in garanzia finché un moderatore non decide "
-              "o le due parti non si accordano."]
+    if d.get("automatica"):
+        righe += ["", "⏳ <b>L'ha aperta il coordinatore da solo:</b> chi compra "
+                  "ha segnato il pagamento, i sats non sono stati liberati e la "
+                  "garanzia è quasi scaduta. Fra poco i sats tornano da soli a "
+                  "chi vende, anche se chi compra avesse ragione: va decisa adesso."]
+    else:
+        righe += ["", "I sats restano in garanzia finché un moderatore non decide "
+                  "o le due parti non si accordano."]
     if per and per in (int(d.get("compratore") or 0), int(d.get("venditore") or 0)):
         righe.append("⚠️ <b>Sei una delle due parti:</b> questa disputa la "
                      "decide un altro moderatore.")
@@ -56025,7 +56059,9 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
              "compra": _persona_disputa_p2p(con, fatto["compratore"]),
              "vende": _persona_disputa_p2p(con, fatto["venditore"]),
              "sats": dati["sats"], "euro": dati["euro"], "metodi": dati["metodi"],
-             "garanzia_il": int((g["q"] if g else 0) or 0)}
+             "garanzia_il": int((g["q"] if g else 0) or 0),
+             # l'ha aperta il coordinatore alla scadenza della garanzia
+             "automatica": ev["dettaglio"] == "escrow-deadline"}
         d["parti_mod"] = _parti_mod_p2p(d)
         for mod in _avvisati_mod_p2p():
             if con.execute(

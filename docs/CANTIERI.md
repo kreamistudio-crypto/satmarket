@@ -52270,11 +52270,69 @@ segreti sulle 5.043 righe aggiunte, pulito, con la controprova. NON
 RIFATTI su quest'albero: la tortura e il giro dal vivo — i sei commit
 arrivati non toccano `miniapp.html`, e in `server.py` aggiungono la
 sezione delle dispute, che legge e non scrive.
-UN INCROCIO DA SAPERE, non toccato perché è dell'altro cantiere: la
-sezione delle dispute, quando la cronaca non c'è più (oltre i quaranta
-giorni), deduce dal registro che uno scambio `tornato` NON aveva la
-garanzia bloccata. Col ritorno nel libro per colpa di chi pubblica
-(`maker-republished`) su un ordine di ACQUISTO la garanzia c'era: chi
-vende l'aveva già bloccata. Sbaglia nel verso che quella voce dichiara
-già (uno scambio senza disputa in meno nel conto), e solo con la
-`-bar8` in servizio.
+UN INCROCIO, visto al rebase e CURATO LA SERA STESSA (qui sotto, punto
+3): la sezione delle dispute, quando la cronaca non c'è più (oltre i
+quaranta giorni), deduceva dal registro che uno scambio `tornato` NON
+aveva la garanzia bloccata. Col ritorno nel libro per colpa di chi
+pubblica (`maker-republished`) su un ordine di ACQUISTO la garanzia
+c'era: chi vende l'aveva già bloccata.
+
+**LA CODA DELLA SERA (12 ott 2026, tre richieste di Andrea prima del
+push).**
+1) LA DISPUTA AUTOMATICA NELLA `-bar8`, PATCH 0012 — la nota lasciata
+dal cantiere dispute-nel-cruscotto. Il guardiano della garanzia
+(`enforce_escrow_deadline_pass`) a ~92 ore manda in disputa DA SOLO lo
+scambio col pagamento segnato e mai liberato, e non lo diceva a
+nessuno. Patch SEPARATA dalla 0011 (un argomento, un commit: si legge e
+si toglie da sola), tre agganci in due file: l'evento `dispute-opened`
+di `mostro` col dettaglio `escrow-deadline`, messo DOPO la scrittura
+dello stato (prima, ogni uscita del ramo è un «riprova al prossimo
+giro», e l'evento partirebbe più volte), la riga del vocabolario e una
+prova pura. SUL SERVER l'evento era già accettato, ma alle due parti
+diceva «<l'altro> ha aperto una disputa»: falso. Adesso, col dettaglio,
+le due parti leggono la stessa frase senza un nome («Lo scambio … è
+passato ai moderatori») e i moderatori «L'ha aperta il coordinatore da
+solo … va decisa adesso» al posto di «i sats restano in garanzia
+finché…», che lì è falso: a ~94 ore la garanzia si scioglie. `aperta_da`
+resta vuoto. SCARTATO un terzo valore («coordinatore») in quella
+colonna: la pagina dei moderatori e il confronto con gli eventi
+pubblici la leggono come «compra | vende». NON COPERTO: la disputa
+RIAPERTA dal guardiano su un ordine che ne aveva già una chiusa
+(upstream lo prevede) — sul server la riga c'è già e non rinasce. E la
+frase delle 88 ore ai moderatori dice ancora «una disputa da solo che
+non arriva a nessuno su Telegram»: è vera finché gira la `-bar7`, e si
+toglie quando la `-bar8` è in servizio.
+2) I COMANDI DI PRODUZIONE SUL DATABASE DEL VPS: 22 letture, 2
+scritture, la fotografia e lo schema passano dal comando `sqlite3` (che
+sul VPS non c'è) e dal percorso `/srv/barattolo/dati/satmarket.db` a
+`python3` su `/srv/barattolo/satmarket.db` — parola di Andrea, che
+corregge la riga del cantiere percorsi-vps del 10 ott. Le letture con
+`mode=ro`, una riga stampata per riga trovata e i campi separati da `|`
+(com'era l'uscita di sqlite3: le controprove scritte accanto restano
+leggibili); le due scritture restano scritture, da `sudo -u barattolo`,
+con `commit()` e il numero di righe cambiate. In testa al documento la
+regola, una volta sola, con la riga su `cambio-utente.sh` — che il
+database lo vuole in `dati/` con un collegamento accanto al codice: il
+percorso nuovo è quello del collegamento, quindi vale in tutti e due i
+casi — e il comando per togliersi il dubbio. NON TOCCATI, e si dice: i
+tre comandi `sqlite3` sul database del NODO (non erano nella
+richiesta), le righe degli audit e dei verbali vecchi, e
+`deploy/backup-fuori.sh`, che il comando `sqlite3` lo usa davvero.
+3) LA GARANZIA DEDOTTA DAL REGISTRO, nella card delle dispute: il
+`tornato` valeva sempre «senza garanzia». Col ritorno per chi aveva
+PUBBLICATO un ACQUISTO è la coppia «fattura mai data, lato `buy`», la
+stessa che già valeva per l'annullato — e chi PRENDE un acquisto non la
+produce mai: è quello che vende, e gli manca la garanzia. Una riga di
+codice e la sua prova, col motivo che la cronaca scrive davvero.
+PROVATO: `prove_disputa_automatica_p2p` (18) e le due prove nuove in
+`prove_dispute_cruscotto_p2p`; il passo 6 di
+`collaudo_dispute_cruscotto` sul server vero (l'evento alle quattro
+persone, le due frasi, la riga di nessuno, la card che la conta, il
+doppione che non raddoppia: 32 passi); la tortura, 14 su 14; il patcher
+della 0012 a secco e per davvero sul fork ricostruito, e la `.patch`
+esportata riapplicata con `git am`, identica al commit; ogni comando
+generato di PRODUZIONE lanciato da bash su un database vuoto (28
+arrivano a sqlite e si fermano su «no such table»: virgolette e query
+intere; il ventinovesimo è la forma coi puntini). NON PROVATO: la 0012
+non è compilata, come la 0011; la disputa automatica vera vuole ~92
+ore; nessun comando è stato lanciato sul VPS.
