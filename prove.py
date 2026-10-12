@@ -100409,8 +100409,17 @@ def prove_consegna_firmata():
           "consegnaFirmata = false;" in pezzo_js(
               mini, "function annullaModifica()"))
     cons = pezzo_js(mini, "function aggiornaConsegnaForm()")
+    # (12 ott 2026, cantiere punti-ritiro) LE DUE RIGHE NON SONO PIU'
+    # IDENTICHE: il costo verso un punto guarda ANCHE se chi vende il
+    # punto lo offre (`offroPunti`). La regola che questa prova difende
+    # non e' cambiata — nella strada firmata restano nascosti tutti e
+    # due, il `!editandoNostr` c'e' in entrambe — e si chiede a ognuna
+    # la sua riga, invece di contarne due uguali.
     prova("client: le due tariffe in piu' restano fuori dalla firmata",
-          2, cons.count("(sped && !asta && !editandoNostr) ? '' : 'none'"))
+          (1, 1),
+          (cons.count("(sped && !asta && !editandoNostr "
+                      "&& (DEMO || offroPunti()))"),
+           cons.count("(sped && !asta && !editandoNostr) ? '' : 'none'")))
     prova("client: e la taglia del pacco pure", True,
           "(sped && !editandoNostr) ? '' : 'none'" in cons)
     prova("client: la quantita' invece si dichiara", False,
@@ -114073,8 +114082,29 @@ def prove_punti_barattolo():
     # gate degli altri quattro non farebbe rossa nessuna prova — e il
     # danno si vedrebbe solo il giorno che l'ultimo punto si spegne, in
     # un cassetto che perde una spunta che il venditore aveva messo.
-    prova("...e /api/me NON lo chiede, ed e' la riga da non uniformare",
-          0, codice(pezzo("mio_profilo")).count("rete_barattolo_viva()"))
+    # ⚠️ (12 ott 2026, cantiere punti-ritiro, col si' di Andrea) LA
+    # PROVA SI E' FATTA PIU' PRECISA, non piu' larga. Chiedeva che in
+    # /api/me il gate non comparisse AFFATTO; adesso il profilo dice
+    # alla pagina se ci sono punti accesi (serve a non disegnare la
+    # pillola «Barattolo» a chi non l'ha mai dichiarata), quindi il
+    # gate li' compare — ma in UNA riga sola, per una chiave SUA. Il
+    # danno che questa prova esiste per impedire e' rimasto lo stesso,
+    # e adesso lo nomina: le spunte del venditore si leggono SEMPRE
+    # senza il gate, o spegnendo l'ultimo punto dal suo cassetto
+    # sparirebbe una spunta che aveva messo.
+    _mp = codice(pezzo("mio_profilo"))
+    prova("...e /api/me le SUE spunte le legge SEMPRE senza il gate, "
+          "ed e' la riga da non uniformare", 1,
+          _mp.count('profilo["spedizionieri_miei"] = reti_venditore(\n'
+                    '        u["spedizionieri"], u["spedizioniere"], '
+                    'True)'))
+    prova("...mentre dei punti accesi chiede UNA volta sola, e solo "
+          "per la chiave nuova", (1, 1),
+          (_mp.count("rete_barattolo_viva()"),
+           _mp.count('profilo["rete_barattolo_viva"] = '
+                     'rete_barattolo_viva()')))
+    prova("...e il catalogo che manda resta intero", 1,
+          _mp.count('profilo["spedizionieri"] = list(SPEDIZIONIERI)'))
 
     # NESSUNA SCOPA: il gate e' in lettura, e un orologio che spegnesse
     # sarebbe un secondo stato da tenere in pari con la lettura.
