@@ -51849,6 +51849,11 @@ i sats (un milione il 13 dal fisso, un milione il 15 per il portatile di
 Alan), la regola del polling e il giudizio sul regtest: un banco di
 sviluppo sulla VM, da fare semmai il 16, mai al posto della migrazione.
 La migrazione del 13 aspetta l'ok di Andrea sul piano. Solo documenti.
+Più tardi, la stessa notte: Andrea ha dato l'ok al piano, e Arshia ha
+confermato che per la giuria va bene che i nostri asset stiano su
+`signet`, non compatibili coi wallet di KaleidoSwap (in §12.11 e nella
+riga «Network» della dichiarazione, §12.9). Di aperto resta una domanda
+sola: se `signet` vale per il bonus WDK.
 
 ## Chi è l'altro: riconosciuti tutti, l'anonimato è una chiave nuova (12 ott 2026, cantiere chi-e-l-altro, decisione di Andrea con Alan, dal caso ea0af71a)
 

@@ -1683,7 +1683,8 @@ qui sopra era sbagliata.
   cantiere «mutinynet-prep» ha preparato (`RGB_CATENA=mutinynet`, per
   rgb-lib `SIGNET`). Fra i nostri wallet tutto funziona; con faucet RGB,
   USDT e wallet di KaleidoSwap non c'è interoperabilità, e si dice
-  apertamente (domanda 4, e la riga «Network» della dichiarazione).
+  apertamente (la riga «Network» della dichiarazione). **Per la giuria
+  va bene**: conferma di Arshia della sera del 12 (12.11).
 - **La marcatura sta nel genesis, e si decide PRIMA di emettere: è
   `signet`, DECISO la sera del 12** (12.11). I mentor hanno confermato
   che il WDK di UTEXO e `rgb-sdk` stanno solo su `signet`: un build per
@@ -1974,8 +1975,9 @@ di Andrea del 12).
    margine solo per quel che Alan può fare da solo.
 2. **Nessuna interoperabilità con KaleidoSwap** (confermata dai mentor
    la sera del 12: 12.11). I loro wallet e il
-   faucet RGB non vedono i nostri asset, e noi non vediamo i loro. Si
-   chiede (domanda 4) e si dichiara.
+   faucet RGB non vedono i nostri asset, e noi non vediamo i loro. Per
+   la giuria va bene (conferma di Arshia, 12.11): si dichiara, e non è
+   più un rischio per il giudizio.
 3. **L'Esplora e il proxy di KaleidoSwap con settanta squadre.** Un
    limite di richieste l'hanno già visto nella loro CI (un 429 su
    `mutinynet.com/api`). Le riserve sono nei due `.env`; sotto c'è il
@@ -2047,10 +2049,13 @@ Judging and submission
   wallet si caricano prima di arrivare; il pagamento on-chain con una
   conferma vale per «Payments and checkout»; la consegna, istruzioni
   nei prossimi giorni.
-- **2 (seconda metà), 4 e 7**: ☐. Che il WDK su `signet` valga per il
-  bonus la risposta 1 lo dà per buono; restano da sentire dalla loro
-  voce il giudizio sugli asset che i wallet di KaleidoSwap non tengono,
-  e la glibc con l'override.
+- **4 (Arshia, 12 ott sera)**: ☑ per la giuria va bene che i nostri
+  asset stiano su `signet` e non siano compatibili coi wallet di
+  KaleidoSwap (12.11).
+- **2, seconda metà**: ☐ è l'UNICA ancora aperta: il WDK su `signet`
+  vale per il bonus? Andrea l'ha chiesto nel topic del WDK.
+- **7** (la glibc e l'override): senza risposta, e non più urgente:
+  il portatile della demo ha la glibc 2.39 (12.10).
 
 ### 12.9 La bozza della dichiarazione per la pull request
 
@@ -2058,7 +2063,8 @@ Judging and submission
 riga dei fork e degli strumenti di terzi che gli organizzatori chiedono.
 BOZZA: le parti fra parentesi quadre si riempiono il 13 (gli id) e la
 domenica (cosa si è costruito). La riga sull'assistente AI è DENTRO
-(scelta di Andrea del 12).
+(scelta di Andrea del 12), e la riga «Network» dice della marcatura e
+della conferma di Arshia (12.11).
 
 ```text
 ## Pre-existing work and third-party components
@@ -2080,7 +2086,7 @@ Everything in this pull request, in dated commits: [list on Sunday].
 ### Third-party tools and forks
 - RGB: rgb-lib 0.3.0-beta.7, Python bindings (RGB-Tools). RGB proxy protocol 0.2.
 - WDK: @utexo/wdk-wallet-rgb 2.0.3 with @utexo/rgb-sdk 1.0.3 and UTEXO's native rgb-lib build 0.3.0-beta.8. [If a laptop runs glibc older than 2.38: @utexo/rgb-sdk overridden to 1.0.6, native 0.3.0-beta.13.] No source changes.
-- Network: Mutinynet, through KaleidoSwap's public Esplora and RGB proxy, and the Mutinynet BTC faucet. Our wallets open the chain as rgb-lib "signet". We did not use the RGB faucet assets.
+- Network: Mutinynet, through KaleidoSwap's public Esplora and RGB proxy, and the Mutinynet BTC faucet. Our wallets open the chain as rgb-lib "signet", the only network the UTEXO WDK adapter supports, so our assets are not compatible with KaleidoSwap wallets and the RGB faucet, which use "signetcustom". The organizers confirmed on 12 Oct 2026 that this is fine for judging. We did not use the RGB faucet assets.
 - QVAC: @qvac/sdk 0.21.0 and @qvac/cli 0.15.0, model Qwen3.5 2B Q4, fallback Qwen3.5 0.8B.
 - Nostr: nostr-tools 2.25.2, and nak 0.21.0 as a local relay.
 - No forks of our own.
@@ -2200,6 +2206,13 @@ Riportate da Andrea, coi LORO numeri; fra parentesi la nostra domanda di
    giorni.
 
 E un consiglio loro: provare tutto in locale con un regtest.
+
+**La conferma di Arshia (12 ott, sera; la nostra 4)**: per la giuria va
+bene che i nostri asset stiano su `signet` e non siano compatibili coi
+wallet di KaleidoSwap. Sta anche nella riga «Network» della
+dichiarazione (12.9). Con questa, di aperto resta UNA domanda sola: se
+il WDK su `signet` vale per il bonus (la seconda metà della nostra 2),
+che Andrea ha posto nel topic del WDK.
 
 **La decisione di Andrea (12 ott, sera)**: teniamo il WDK (bonus +5) ed
 emettiamo noi il dollaro di prova e i punti fedeltà come NIA su `signet`
