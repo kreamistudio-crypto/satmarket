@@ -52906,6 +52906,12 @@ giro dal vivo lungo (34 controlli) restano quelli del primo tempo.
 
 ## Il runner della CI col numero: `ubuntu-24.04` al posto di `ubuntu-latest`, e come si sale a Ubuntu 26.04 (12 ott 2026, sera, cantiere runner-fisso, richiesta di Andrea)
 
+⚠️ SUPERATO IN UN PUNTO, lo stesso 12 ott: node adesso è FISSATO dal
+workflow (la voce dopo, «Node della CI col numero»). Dove qui sotto si
+legge che node «non è fissato» e cambia con l'immagine, e dove il passo
+8 e le strade scartate lo danno come cura da fare, vale la voce dopo.
+Il resto resta com'è.
+
 **IL FATTO.** La CI del 12 ott sera portava un'annotazione: l'etichetta
 `ubuntu-latest` passa a Ubuntu 26.04 dal 19 ottobre 2026. L'annuncio di
 GitHub (actions/runner-images, issue 14748, letto il 12 ott) dice che
@@ -53057,3 +53063,110 @@ la catena»: lo script e il `rebase --continue` in due chiamate.
 **RESTA DA GUARDARE.** Dopo questo push: che `pronto` sia arrivato a
 main (il commit tocca il workflow). Dal 19 novembre 2026: la salita,
 coi nove passi qui sopra, quando Andrea dice sì.
+
+## Node della CI col numero: `setup-node` alla 22, la maggiore che l'immagine dà oggi (12 ott 2026, sera, cantiere node-fisso, il sì di Andrea al ritocco e la sua scelta di «22»)
+
+**IL FATTO.** Fissato il runner a `ubuntu-24.04` (la voce qui sopra),
+restava una cosa che alla salita a 26.04 sarebbe cambiata da sola: node.
+Il workflow non lo nominava, lo prendeva dall'immagine — 22.23.3 sulla
+24.04 di oggi, 24 di serie sulla 26.04 — e lo chiamano decine di prove
+(il JavaScript vero della pagina) più il passo che installa nostr-tools.
+Il giorno della salita sarebbero cambiate due cose insieme, la macchina
+e node, e un rosso non avrebbe detto quale. L'avevo messo fra le cose
+notate; Andrea ha detto sì.
+
+**COSA FA ADESSO.** Nel job `prove`, subito dopo `setup-python`, un
+passo nuovo: `actions/setup-node` con `node-version: "22"` e
+`package-manager-cache: false`. Gli altri due job (`segreti`, `pronto`)
+node non lo usano e non l'hanno. Oggi non cambia niente: la 22 che
+l'action trova è la 22.23.3, il node di serie dell'immagine
+`ubuntu-24.04` (README dell'immagine, versione 20261004.327.1, letto il
+12 ott), che sta anche nella dispensa degli strumenti del runner.
+
+**«22» E NON «22.23.3»: LA SCELTA DI ANDREA.** La prima stesura aveva i
+tre numeri, perché la richiesta diceva «la versione che usa oggi
+l'immagine». Il prezzo l'ho scritto nel rapporto prima del push: finché
+l'immagine tiene 22.23.3 in dispensa non si scarica niente; il giorno
+che GitHub la porta avanti di un passo, l'action non la trova più e la
+SCARICA a ogni giro (dal repo `actions/node-versions`; di riserva
+nodejs.org) — qualche secondo in più e un server in più da cui dipende
+il verde, il contrario di quel che dice la testa del workflow («una CI
+che dipende da un server altrui…»). Andrea ha scelto «22»: si fissa la
+maggiore, come Python è «3.12» e non «3.12.3». Finché GitHub tiene la
+22 in dispensa (oggi c'è, sulla 24.04 e sulla 26.04) non si scarica mai
+niente; dentro la 22 ci si muove con l'immagine, da soli, ed è voluto:
+è il salto 22 → 24 quello che deve essere un gesto. ⚠️ Il giorno che
+GitHub toglierà la 22 dalla dispensa (succede quando una versione esce
+dal supporto), l'action tornerà a scaricarla a ogni giro: lo dice il
+log del passo, ed è il segnale per salire.
+
+**L'ACTION.** `actions/setup-node` alla v6 (rilascio v6.5.0, del 14 lug
+2026), inchiodata allo sha con `# v6` accanto come le altre due (B8).
+Non la v7: è uscita l'8 ott, quattro giorni fa, e nemmeno le altre due
+action del workflow stanno all'ultima. La riga
+`package-manager-cache: false`: l'action accende da sola una cache se
+trova un `packageManager` in un `package.json`; nel repo un file così non
+c'è (scelta scritta nel workflow, al passo di nostr-tools), e non deve
+nascere una cache che nessuno ha chiesto il giorno che ne compare uno.
+
+**LA SENTINELLA.** `prove_node_fisso` in `prove.py`, cinque prove sul
+job `prove`, lette sulle righe VIVE (i commenti tolti prima, sennò un
+passo commentato passerebbe): c'è `setup-node`; la versione è un
+NUMERO — N, N.N o N.N.N, la forma e non il valore, così salire alla 24
+resta verde e restano fuori `latest`, `lts/*` e gli intervalli, che si
+spostano da soli; niente cache, niente `check-latest`, niente
+`node-version-file`; il passo sta PRIMA di quello di npm e di quello
+delle prove (dopo non fisserebbe niente, e in silenzio); una volta
+sola. Lo sha lo guarda già la B8, che legge ogni `uses:`. Nella prima
+stesura la seconda prova voleva i tre numeri; allargata con la scelta
+di «22».
+
+**COSA CAMBIA NELLA SALITA A UBUNTU 26.04** (i nove passi della voce
+sopra). Node esce dall'elenco di quel che cambia: sul ramo
+`prova/ubuntu-26` resta la 22 (oggi in dispensa anche sulla 26.04). Al
+passo 4 si guarda in più la riga del passo `setup-node` nel log: quale
+22 ha messo, e se dice trovata in dispensa o scaricata. E salire a Node
+24 diventa un gesto SUO, separato e dopo: una riga, provata su un ramo,
+mai insieme al cambio di macchina.
+
+**LE STRADE SCARTATE.** I tre numeri, «22.23.3»: detta sopra, scartata
+da Andrea. `lts/*` o `latest`: un'etichetta mobile, proprio quello che
+si sta togliendo. Un file `.nvmrc` o `.node-version` nel repo: un file
+in più per un numero solo, e farebbe credere che Barattolo sia un
+progetto node. Mettere node anche in `segreti` e `pronto`: non lo
+usano. Passare alla v7 dell'action insieme alle altre due: è un altro
+cantiere (tre sha da cambiare e da provare), non questo.
+
+**COSA È STATO PROVATO.** La sentinella sul workflow vero e su dodici
+mutazioni in una cartella a parte: il passo tolto, la versione a
+`latest`, a `lts/*`, a `>=22`, la riga della versione tolta, la riga
+della cache tolta, `check-latest` aggiunto, il passo spostato dopo le
+prove, il passo ridotto a commento, l'action tornata al tag `@v6`
+(questa la prende la B8) — dieci rosse — e due che restano verdi: i tre
+numeri per esteso e la maggiore dopo, «24». 13 su 13. Il workflow
+riletto come YAML: tre job, il passo nuovo terzo del job `prove` coi
+suoi due valori.
+⚠️ QUEL CHE QUI NON SI PUÒ PROVARE: il passo vero gira solo su GitHub.
+Che l'action a quello sha parta, trovi la 22 e la metta davanti al node
+dell'immagine lo dice solo il primo giro della CI dopo il push. In
+locale le prove girano col node di questo PC, che è il 24 (v24.18.0):
+la suite verde qui dice che le prove non dipendono dalla 22, non che il
+passo funziona.
+
+**COSA È GIRATO SU QUALE ALBERO.** Tutto sopra efd69ec, che è rimasto
+la punta di main dall'inizio alla fine (nessun rebase). PRIMA STESURA,
+coi tre numeri: `PROVE_SEVERE=1 python prove.py` intera, 23034 passate
+e 0 fallite; i 68 collaudi dell'elenco del workflow nella gabbia, 68
+verdi; la tortura di allora, 10 su 10. SULL'ALBERO DEL PUSH, con «22» e
+la sentinella allargata: la suite severa INTERA di nuovo, 23034 passate
+e 0 fallite (Andrea aveva chiesto le sole prove toccate: leggono il
+workflow venticinque sezioni, si faceva prima a rigirarle tutte);
+la tortura, 13 su 13; le righe aggiunte passate alle forme dei segreti,
+con la controprova. I 68 collaudi NON sono stati rigirati dopo il
+cambio da «22.23.3» a «22»: non leggono né il workflow né `prove.py`, e
+li rifà la CI.
+
+**RESTA DA GUARDARE.** Dal 19 novembre 2026, con la salita a Ubuntu
+26.04: la riga del passo `setup-node` nel log del ramo di prova. E ogni
+tanto la stessa riga su main: il giorno che dice «scaricata» invece di
+«trovata», GitHub ha tolto la 22 dalla dispensa ed è ora di salire.

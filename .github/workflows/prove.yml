@@ -21,7 +21,7 @@ jobs:
     # L'immagine del runner col NUMERO, non `ubuntu-latest` (12 ott
     # 2026): un'etichetta mobile si sposta da sola — dal 19 ott 2026
     # GitHub la porta a Ubuntu 26.04, a ondate, fino al 19 nov — e con
-    # lei cambiano node, git, grep e il resto dell'immagine, senza un
+    # lei cambiano git, grep, bash e il resto dell'immagine, senza un
     # commit nostro a cui dare la colpa di un rosso. E' lo stesso
     # perche' delle action inchiodate allo sha: un aggiornamento e' un
     # gesto, non un'eredita'. I TRE job stanno sulla stessa immagine,
@@ -35,6 +35,29 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: "3.12"
+
+      # Node col NUMERO, come Python (12 ott 2026). Fin qui veniva
+      # dall'immagine del runner, cioe' cambiava con lei: sulla 26.04
+      # il node di serie e' il 24. Lo chiamano decine di prove (il
+      # JavaScript VERO della pagina, girato da `node`) e il passo di
+      # nostr-tools qui sotto, quindi il giorno della salita a Ubuntu
+      # 26.04 sarebbero cambiate due cose insieme, e un rosso non
+      # avrebbe detto quale. Si fissa la MAGGIORE, "22", quella che
+      # l'immagine ubuntu-24.04 da' oggi di serie (22.23.3) — come
+      # Python e' "3.12" e non "3.12.3" (scelta di Andrea). Finche'
+      # GitHub tiene la 22 nella dispensa del runner (oggi c'e', sulla
+      # 24.04 e sulla 26.04) non si scarica niente, e dentro la 22 ci
+      # si muove con l'immagine. I tre numeri per esteso avrebbero
+      # voluto uno scarico da GitHub a OGNI giro dal giorno che
+      # l'immagine va avanti di un passo. Salire alla 24 e' un gesto:
+      # si cambia questo numero.
+      # `package-manager-cache: false`: nel repo non c'e' un
+      # package.json e non deve nascere una cache che nessuno ha
+      # chiesto. Vedi docs/CANTIERI.md, "Node della CI col numero".
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
 
       # Solo quelle che servono ALLE PROVE: websocket-client perche'
       # importa_nostr la importa in cima, Pillow per il controllo del

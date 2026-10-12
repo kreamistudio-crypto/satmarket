@@ -137224,6 +137224,45 @@ def prove_runner_fisso():
           len({r[1] for r in runner}))
 
 
+def prove_node_fisso():
+    """NODE DELLA CI COL NUMERO (12 ott 2026, cantiere node-fisso, il si'
+    di Andrea al ritocco). `node` veniva dall'immagine del runner: fissata
+    quella a `ubuntu-24.04` restava l'ultima cosa che alla salita a 26.04
+    sarebbe cambiata da sola (22 -> 24), e lo chiamano decine di prove.
+    Adesso lo mette `actions/setup-node`, alla maggiore «22» (scelta di
+    Andrea: i tre numeri vorrebbero uno scarico a ogni giro quando
+    l'immagine va avanti; la 22 sta nella dispensa del runner, come il
+    «3.12» di Python). Si guarda la FORMA e non il numero: va bene N,
+    N.N o N.N.N — salire di versione e' cambiare una riga, e resta
+    verde — e non va bene quel che si sposta da solo (`lts/*`,
+    `latest`, un intervallo). E che il passo stia PRIMA di chi usa node —
+    dopo non fisserebbe niente, e senza dire niente — e che non si
+    porti dietro ne' una cache ne' un «prendi l'ultima». Lo sha
+    dell'action lo guarda gia' la B8, che legge ogni `uses:`."""
+    print("\n[node della CI col numero]")
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read()
+    job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    righe = [r for r in job.splitlines() if not r.lstrip().startswith("#")]
+    vivo = "\n".join(righe)
+    passo = re.search(r"- uses: actions/setup-node@\S+.*\n"
+                      r"((?:[ ]{8,}\S.*\n)+)", vivo)
+    corpo = passo.group(1) if passo else ""
+    prova("il job `prove` mette node con setup-node", True, bool(passo))
+    prova("...a una versione col numero: N, N.N o N.N.N", True,
+          bool(re.search(r'(?m)^\s+node-version: "\d+(\.\d+){0,2}"\s*$',
+                         corpo)))
+    prova("...senza cache e senza «prendi l'ultima»", True,
+          bool(re.search(r"(?m)^\s+package-manager-cache: false\s*$", corpo))
+          and "check-latest" not in corpo and "node-version-file" not in corpo
+          and not re.search(r"(?m)^\s+cache:", corpo))
+    # chi usa node: il passo di npm e quello delle prove
+    usi = [vivo.find("run: npm install"), vivo.find("run: python prove.py")]
+    prova("...PRIMA del passo di npm e di quello delle prove", True,
+          bool(passo) and all(0 < passo.start() < u for u in usi))
+    prova("...e una volta sola", 1, vivo.count("actions/setup-node@"))
+
+
 def prove_chiavi_p2p_firmate():
     """LE CHIAVI P2P FIRMATE (1 ott 2026, cantiere «CSP e le voci aperte
     degli audit», cura 6: la M5 dell'audit del 19 set). `chiavi_p2p`
@@ -152747,6 +152786,7 @@ def main():
               prove_foto_anomala,
               prove_quattro_piccole,
               prove_runner_fisso,
+              prove_node_fisso,
               prove_chiavi_p2p_firmate,
               prove_rotte_p2p_riverificate,
               prove_negozi_fuori_dal_ciclo,
