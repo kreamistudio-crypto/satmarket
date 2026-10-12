@@ -52345,3 +52345,24 @@ arrivano a sqlite e si fermano su «no such table»: virgolette e query
 intere; il ventinovesimo è la forma coi puntini). NON PROVATO: la 0012
 non è compilata, come la 0011; la disputa automatica vera vuole ~92
 ore; nessun comando è stato lanciato sul VPS.
+
+**COSA È GIRATO SU QUALE ALBERO, la sera** (il verbale prima del push,
+secondo tempo). MAIN È CORSO UNA TERZA VOLTA, di cinque commit —
+`2ec940a` e `539245a` (la garanzia scritta nel registro e le dispute
+escluse), `2a7aff2` e `5906089` (il gruppo degli admin,
+`collaudo_punti_barattolo` in CI), `811e2f0` (l'hackathon) — e stavolta
+i conflitti erano VERI: tre file della coda della sera toccati anche da
+loro (`server.py`: la chiave `automatica` accanto a `parti_mod`;
+ARCHITETTURA; il docstring di `collaudo_dispute_cruscotto`), sciolti a
+mano tenendo il loro lavoro e innestando il mio; più la coda di
+CANTIERI, come sempre. Sopra `811e2f0`, con la punta del codice a
+`bd6ecf9`: la suite severa intera, 22.825 passate e 0 fallite; i 66
+collaudi del workflow nella gabbia, tutti verdi (dentro,
+`collaudo_dispute_cruscotto` a 45 passi — i loro 38 più i miei 7 — e
+`collaudo_tempo_pubblica`); lo scanner dei segreti con la controprova e
+`node` sui tre script della pagina. La tortura della coda (14 su 14) e
+la prova dei comandi di PRODUZIONE da bash sono dell'albero di prima
+del rebase (sopra `02dec6b`); dopo, le loro sezioni sono rigirate
+dentro la suite intera. LA CI DI MAIN, guardata prima di chiedere il
+push: l'ultima CONCLUSA è verde (`539245a`, dove sta anche `pronto`),
+le due sulla punta erano ancora in corso.
