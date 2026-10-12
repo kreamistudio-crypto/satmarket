@@ -164,9 +164,9 @@ tor, mostrod), due canali: 400.000 sat verso ACINQ e, dal 5 ott 2026,
   solo l'SCB); cifra con la sola chiave pubblica age e il PC tira in pull.
 - `pow_first_contact` resta SPENTO finché il termometro degli eventi non
   salta di un ordine di grandezza senza utenti nuovi. `expiration_seconds`
-  è 1800 dal 10 ott 2026 (era 900; decisione di Andrea, NODO-MOSTRO «DAL
-  10 OTT 2026 SONO 1800»): 30 minuti PER GESTO, e non si allunga ancora
-  senza la cauzione che brucia al timeout (opzione gratuita sul cambio).
+  è 1800 dal 10 ott 2026: è il tempo di chi PRENDE, e non si allunga. Chi
+  PUBBLICA ha 3 ore dalla `-bar8` (`maker_expiration_seconds`, decisione del
+  12 ott): il contrappeso è la penalità (NODO-MOSTRO, «LA REGOLA, RISCRITTA»).
   `hold_invoice_expiration_window` resta 900: scade solo la richiesta di
   CAUZIONE, la garanzia no (letto sul nodo). La dev fee sta a `dev_fee_percentage =
   0` per il circuito Tor freddo (difetto upstream): NON esentare i due
