@@ -30847,6 +30847,40 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   proprio ordine). «Dimentica il profilo» la toglie, la fusione degli
   account la sposta. ⚠️ VALE DENTRO BARATTOLO, come filtro e limite: per
   il coordinatore l'ordine resta `pending`.
+  • LA PAUSA IN VISTA (12 ott 2026, sera, cantiere `pausa-in-vista`,
+  richiesta di Andrea: stava solo nel profilo di scambio, dietro la
+  pagina dei dati personali). NIENTE REGOLE NUOVE, cambia dove si vede,
+  sempre dietro la stessa leva e aprendo lo stesso foglio. NELL'APP:
+  `statoPausaP2P` (pura: `in` | `impostata` | `nessuna`, e la frase di
+  una riga; le fasce corte le dice `fasciaCortaP2P`, «notti 22-6»),
+  `rigaPausaVistaP2P(dove, piena, conBarattozon)` — la riga con lo
+  stato e il bottone, nel foglio che pubblica (`sezionePausaNuovoP2P`,
+  dopo «chi può prendere») e in testa a `#p2pMieiCorpo` (aggiunta con
+  `insertAdjacentHTML` DOPO il corpo di sempre; a pagina vuota e senza
+  pausa non c'è) —, `rivestiRighePausaP2P` (le righe a schermo si
+  rifanno IN PLACE: il foglio che pubblica non si ridisegna e non perde
+  niente), `rinfrescaMiaPausaP2P` (fuori dal motore: la propria pausa si
+  chiede al più una volta al minuto). IL FOGLIO `#p2pPausaSheet` STA
+  DOPO `#p2pNuovoSheet` NEL DOM: è l'ordine che decide chi copre chi, e
+  messo prima si apriva sotto la pagina che lo chiama (come
+  `#p2pScadeSheet`). Il segno «⏸ In pausa fino a…» anche sulla card di
+  «I miei scambi», solo sullo stato `pubblicato`. IL LINK:
+  `/p2p?pausa=1` (`P2P_PAUSA_URL`, `apriP2PDaUrl`: il foglio sopra il
+  libro, a velo sceso, solo a leve accese; scambio e ordine
+  nell'indirizzo vincono) e la parola `pausa` nel vocabolario chiuso
+  dei link che aprono la Mini App (`_startapp_da_link`,
+  `startappDaLink`, `percorsoDaStartapp`: i tre in pari). SUL SERVER:
+  `_bottone_pausa_p2p` — il `bottone` di `notifica()` sotto l'avviso
+  della PRESA, solo a chi ha pubblicato (`_chi_pubblica_p2p`), solo a
+  leva accesa, non sugli ordini Barattozon —, deciso in
+  `_manda_evento_p2p` sulle sole parti e passato da `_recapita_p2p`
+  (mai al gruppo degli admin): su Telegram un bottone, nel DM una riga
+  col link. ⚠️ GLI ORDINI BARATTOZON IN PAUSA NON CI VANNO (decisione
+  di Andrea: hanno già la scadenza del PayCode): la regola sta in
+  `_pause_p2p`, il giudice unico, e quindi vale per la fotografia, per i
+  volti e per «posso prendere?»; la pagina non ne ha una sua, la dice e
+  basta (`P2P_PAUSA_BARATTOZON`). `_presa_in_pausa_p2p` NON è cambiata:
+  la tutela della presa arrivata in pausa resta di ogni ordine.
   • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
   `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
   senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo

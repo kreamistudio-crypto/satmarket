@@ -1339,9 +1339,36 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
   è stato tolto dal libro. Puoi ripubblicarlo quando vuoi.»
 
 **La pausa degli ordini (con la leva accesa).**
-- 📱 Si apre dal **profilo di scambio** («👤 Il tuo profilo di scambio»):
-  sotto i propri numeri la riga «Quando non ci sei puoi nascondere i
-  tuoi ordini dal libro.» e il bottone «**⏸ Pausa degli ordini**».
+- 📱 **Dove si apre** (dal 12 ott 2026, sera: prima stava solo nel profilo
+  di scambio, e nessuno la trovava). Sono quattro posti, e tutti aprono
+  lo stesso foglio:
+  1. **nel foglio che pubblica un ordine** (il «+»), la scatola «Pausa
+     degli ordini» dopo «Chi può prendere l'ordine»: lo stato e il
+     bottone «**⏸ Imposta la pausa**». Il foglio della pausa si apre
+     SOPRA, e chiudendolo quel che si stava scrivendo nell'ordine è
+     ancora lì;
+  2. **in cima a «I miei scambi»**: lo stato e il bottone «**⏸ Pausa
+     degli ordini**» (a pagina vuota e senza una pausa impostata la riga
+     non c'è);
+  3. **dal bottone sotto l'avviso «⚡ Il tuo ordine è stato preso»**: su
+     Telegram «**⏸ Imposta la pausa**», che apre l'app sul foglio; nel
+     messaggio Nostr la riga «⏸ Imposta la pausa: https://barattolo.store/p2p?pausa=1».
+     Solo a chi ha pubblicato, solo alla presa, non sugli ordini
+     Barattozon;
+  4. **dal profilo di scambio** («👤 Il tuo profilo di scambio»), com'era:
+     sotto i propri numeri la riga «Quando non ci sei puoi nascondere i
+     tuoi ordini dal libro.» e il bottone «**⏸ Pausa degli ordini**».
+- 📱 **Lo stato, in una riga** (nel foglio che pubblica e in «I miei
+  scambi»), è una di tre frasi: «Nessuna pausa: i tuoi ordini si possono
+  prendere sempre» · «⏸ Pausa: notti 22-6, lun-ven 8-20» (le fasce
+  impostate, quando adesso gli ordini si vedono) · «⏸ In pausa fino a
+  domani alle 06:00» (quando adesso sono nascosti). Con una pausa
+  impostata, e sempre quando si sta pubblicando un ordine Barattozon,
+  sotto c'è «Gli ordini Barattozon restano visibili: hanno già la
+  scadenza del PayCode.»
+- 📱 **Gli ordini Barattozon in pausa non ci vanno**: restano nel libro e
+  si prendono anche mentre gli altri ordini della stessa persona sono
+  nascosti, e sulla loro card il segno «⏸ In pausa…» non compare.
 - 📱 Il foglio «⏸ Pausa degli ordini»: «In pausa i tuoi ordini non si
   vedono nel libro e da Barattolo nessuno li prende. Alla fine tornano
   da soli.» Poi **Ogni settimana**: «**＋ Aggiungi una fascia**» mette
@@ -1354,11 +1381,13 @@ le frasi qui sotto restano quelle di §«Il tempo di ogni passo».
   del telefono, «Parte adesso e dura al massimo 7 giorni.» E «**Salva**».
   In fondo: «La scadenza dei tuoi ordini non si ferma. La pausa vale
   dentro Barattolo: chi usa un'altra app collegata allo stesso servizio
-  di scambio li vede ancora.»
+  di scambio li vede ancora.» e, sotto, «Gli ordini Barattozon restano
+  visibili: hanno già la scadenza del PayCode.»
 - 📱 I toast: «Pausa salvata: i tuoi ordini sono nascosti ⏸» (se la
   pausa è già attiva), «Pausa salvata ⏸» (se comincia più tardi), «Pausa
   tolta: i tuoi ordini sono visibili».
-- 📱 **Sul proprio ordine**, nel libro e nel dettaglio: «⏸ In pausa fino
+- 📱 **Sul proprio ordine**, nel libro, nel dettaglio e sulla sua card in
+  «I miei scambi» (finché è «Ordine pubblicato»): «⏸ In pausa fino
   a domani alle 06:00» (oggi: «fino alle 06:00»). Nel profilo: «⏸ Adesso
   i tuoi ordini sono in pausa fino a domani alle 06:00.»
 - 📱 **Per gli altri l'ordine sparisce dal libro** (e dalla fila «Scambi

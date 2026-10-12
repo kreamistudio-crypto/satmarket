@@ -3664,6 +3664,17 @@
      stretti: sette devono stare in una riga a 320 px. */
   .p2p-pausa{background:var(--chip-bg);color:var(--ink);font-weight:800;font-size:12.5px}
   #p2pPausaCorpo .p2p-pausa{margin:10px 0 12px}
+  /* LA PAUSA IN VISTA (cantiere pausa-in-vista): la riga con lo stato e
+     il bottone, nel foglio che pubblica e in cima a «I miei scambi».
+     Lo stato e' un riquadro come «⏸ In pausa fino a…» sulla card; il
+     bottone e' di casa, a piena larghezza come gli altri del foglio. */
+  .p2p-pausa-riga{margin:0 0 12px}
+  .p2p-pausa-riga .p2p-pausa{margin:0 0 8px;white-space:normal;line-height:1.35}
+  .p2p-pausa-riga .p2p-pausa.libera{font-weight:700;color:var(--muted)}
+  .p2p-pausa-riga .hint{margin:0 0 8px}
+  .p2p-pausa-riga .btn{margin:0}
+  .p2p-sez-riga > .p2p-pausa-riga{flex:1 1 auto;min-width:0;margin:0}
+  #p2pMieiCorpo > .p2p-pausa-riga{margin:0 0 14px}
   .p2p-veloce{color:var(--trust-text);font-weight:800;white-space:nowrap}
   .p2p-veloce-segno{color:var(--trust-text);font-weight:800;font-size:11.5px;padding:5px 8px}
   .p2p-pausa-fascia{border:1.5px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px}
@@ -13390,16 +13401,6 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="p2pProfiloTit">👤 Il tuo profilo di scambio</h3>
     <div id="p2pProfiloCorpo"></div>
   </div>
-  <!-- LA PAUSA DEGLI ORDINI (12 ott 2026, cantiere tempo-di-chi-pubblica):
-       chi pubblica dice quando non c'e' — fasce che si ripetono ogni
-       settimana, e una pausa «una volta sola» fino a sette giorni — e in
-       quelle ore i suoi ordini non si vedono nel libro di Barattolo. Si
-       apre dal profilo di scambio; lo riempie `renderPausaP2P`. -->
-  <div class="sheet" id="p2pPausaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pPausaTit">
-    <div class="grab"></div>
-    <h3 id="p2pPausaTit">⏸ Pausa degli ordini</h3>
-    <div id="p2pPausaCorpo"></div>
-  </div>
   <!-- LA RETE DI SICUREZZA DEL PROFILO DI SCAMBIO (11 ott 2026, cantiere
        «tor-chiavi-scambio»): si apre PRIMA della prima presa a chi ha un
        profilo che vale in un browser solo — ne' derivato dal conto o
@@ -13469,6 +13470,23 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pScadeTit">⏳ Quando scade il PayCode</h3>
     <div id="p2pScadeCorpo"></div>
+  </div>
+
+  <!-- LA PAUSA DEGLI ORDINI (12 ott 2026, cantiere tempo-di-chi-pubblica):
+       chi pubblica dice quando non c'e' — fasce che si ripetono ogni
+       settimana, e una pausa «una volta sola» fino a sette giorni — e in
+       quelle ore i suoi ordini non si vedono nel libro di Barattolo. Lo
+       riempie `renderPausaP2P`.
+       STA QUI, DOPO IL FOGLIO «PUBBLICA» (cantiere pausa-in-vista): si
+       apre anche da li', e l'ordine nel DOM decide chi copre chi — messo
+       prima, si aprirebbe SOTTO la pagina che lo chiama. Come la
+       scadenza del PayCode qui sopra: il foglio sotto resta aperto, con
+       quel che c'era scritto. Si apre anche da «I miei scambi», dal
+       profilo di scambio e dal link dell'avviso (`/p2p?pausa=1`). -->
+  <div class="sheet" id="p2pPausaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pPausaTit">
+    <div class="grab"></div>
+    <h3 id="p2pPausaTit">⏸ Pausa degli ordini</h3>
+    <div id="p2pPausaCorpo"></div>
   </div>
 
   <!-- IL FANTASMA DELLA MORFOSI (set 2026): il bottone che, al tocco
@@ -14276,6 +14294,9 @@ const tg = window.Telegram?.WebApp;
 function percorsoDaStartapp(p){
   p = String(p || '');
   if (p === 'p2p') return '/p2p';
+  /* `pausa`: il bottone «⏸ Imposta la pausa» sotto l'avviso della presa
+     (cantiere pausa-in-vista) — il libro, col foglio della pausa aperto */
+  if (p === 'pausa') return '/p2p?pausa=1';
   /* `casa`: la porta di casa — la riga «🫙 Apri Barattolo» delle
      tastiere del bot e il link del post P2P nel canale. La scrive solo
      il server (`_link_casa_telegram`); qui vuol dire «resta sulla home»,
@@ -14513,6 +14534,7 @@ let tgMiniappLink = '';
 function startappDaLink(link, base){
   const u = String(link || ''), radice = base + '/p2p';
   if (u === radice) return 'p2p';
+  if (u === radice + '?pausa=1') return 'pausa';
   for (const nome of ['scambio', 'ordine']) {
     const testa = radice + '?' + nome + '=';
     if (u.indexOf(testa) === 0) {
@@ -52527,6 +52549,15 @@ function renderP2P(){
      + '<span class="empty-title">Nessuno scambio in corso</span>'
      + '<button type="button" class="btn orange" onclick="go(\'p2p\')">Vai al libro ordini</button>'
      + '</div>';
+  /* ...E IN CIMA LA PAUSA (cantiere pausa-in-vista): lo stato e il
+     bottone, per cambiarla al volo dopo aver pubblicato. Si AGGIUNGE in
+     testa al corpo appena scritto, che resta la riga di sempre; la
+     decide `rigaPausaVistaP2P`, che a pagina vuota e senza una pausa
+     impostata non scrive niente — lo stato vuoto resta la frase e il
+     bottone del 30 set. Vive col tempo di chi pubblica, da qui il typeof. */
+  if (mieiBox && typeof rigaPausaVistaP2P === 'function')
+    mieiBox.insertAdjacentHTML('afterbegin',
+      rigaPausaVistaP2P('miei', !mieiBox.querySelector('.scambi-vuoto')));
   /* l'intestazione DOPO il corpo, e non con la riga di strumenti: il
      conto deve contare le righe che scambiP2P ha appena adottato o
      pulito, cioe' le stesse card che si vedono */
@@ -63446,6 +63477,94 @@ function corpoPausaP2P(bozza, adesso, fuso, scartoMin){
 function fusoTelefonoP2P(){
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e){ return ''; }
 }
+/* ---- LA PAUSA IN VISTA (12 ott 2026, sera, cantiere pausa-in-vista,
+   richiesta di Andrea) ----
+   La pausa si apriva SOLO dal profilo di scambio, che sta dietro la
+   pagina dei dati personali: nessuno la trovava. Adesso lo stato e il
+   bottone stanno dove servono — nel foglio che pubblica un ordine e in
+   cima a «I miei scambi» —, sempre dietro la stessa leva e aprendo lo
+   stesso foglio. NIENTE REGOLE NUOVE: cambia solo dove si vede, piu'
+   una cosa che il server gia' fa e qui si DICE — gli ordini Barattozon
+   in pausa non ci vanno (hanno gia' la scadenza del PayCode). */
+const P2P_PAUSA_BARATTOZON = 'Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode.';
+/* PURA: un'ora corta — «22», «8», «8:30» — dai minuti dalla mezzanotte */
+function oraCortaP2P(n){
+  n = Math.max(0, Math.min(1439, Math.floor(Number(n) || 0)));
+  const m = n % 60;
+  return Math.floor(n / 60) + (m ? ':' + String(m).padStart(2, '0') : '');
+}
+/* PURA: una fascia in poche parole, per la riga di stato — «notti 22-6»
+   (tutti i giorni, a cavallo della mezzanotte), «tutti i giorni 8-20»,
+   «lun-ven 8-20», «sab, dom 10-12». La sorella lunga e' `fraseFasciaP2P`. */
+function fasciaCortaP2P(f){
+  const g = (f && Array.isArray(f.g) ? f.g : []).map(Number)
+    .filter(x => x >= 0 && x <= 6).sort((a, b) => a - b);
+  if (!g.length) return '';
+  const corti = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
+  const fila = g.every((x, i) => i === 0 || x === g[i - 1] + 1);
+  const da = Number(f.da) || 0, a = Number(f.a) || 0;
+  const giorni = g.length === 7 ? (a <= da ? 'notti' : 'tutti i giorni')
+    : (fila && g.length > 2) ? corti[g[0]] + '-' + corti[g[g.length - 1]]
+    : g.map(x => corti[x]).join(', ');
+  return giorni + ' ' + oraCortaP2P(da) + '-' + oraCortaP2P(a);
+}
+/* PURA: lo stato della mia pausa — `in` (adesso i miei ordini sono
+   nascosti: `fino` dice fino a quando), `impostata` (ci sono fasce, ma
+   adesso si vedono) o `nessuna` — e la frase di una riga:
+   «⏸ In pausa fino a domani alle 06:00», «⏸ Pausa: notti 22-6, lun-ven
+   8-20», «Nessuna pausa: i tuoi ordini si possono prendere sempre».
+   `p` e' la risposta del server (`p2pMiaPausa`), o niente. */
+function statoPausaP2P(p, adesso){
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const fino = Math.floor(Number(p && p.fino) || 0);
+  if (fino > adesso)
+    return {stato: 'in', fino: fino, frase: '⏸ In pausa fino ' + quandoPausaP2P(fino, adesso)};
+  const pezzi = (p && Array.isArray(p.fasce) ? p.fasce : []).map(fasciaCortaP2P).filter(Boolean);
+  if (pezzi.length)
+    return {stato: 'impostata', fino: 0, frase: '⏸ Pausa: ' + pezzi.join(', ')};
+  return {stato: 'nessuna', fino: 0, frase: 'Nessuna pausa: i tuoi ordini si possono prendere sempre'};
+}
+/* LA RIGA, nei due posti: `dove` = 'nuovo' (il foglio che pubblica) o
+   'miei' (in cima a «I miei scambi»). `conBarattozon` chiede la frase
+   di Barattozon anche senza una pausa impostata: e' il foglio che sta
+   pubblicando proprio un ordine Barattozon. Con una pausa impostata la
+   frase c'e' sempre — e' li' che fa la differenza.
+   In «I miei scambi» a pagina vuota (`piena` falso) e senza pausa non
+   scrive niente. Vuota a leva spenta. */
+function rigaPausaVistaP2P(dove, piena, conBarattozon){
+  if (!tempoPubblicaP2P()) return '';
+  /* la mia pausa si chiede una volta al minuto, e arrivando riveste le
+     righe: PRIMA del ramo che non scrive niente, o a pagina vuota una
+     pausa impostata altrove non si imparerebbe mai */
+  if (typeof rinfrescaMiaPausaP2P === 'function') rinfrescaMiaPausaP2P();
+  const s = statoPausaP2P(p2pMiaPausa);
+  if (dove === 'miei' && !piena && s.stato === 'nessuna') return '';
+  return '<div class="p2p-pausa-riga" data-dove="' + (dove === 'miei' ? 'miei' : 'nuovo') + '"'
+    + (piena ? ' data-piena="1"' : '') + (conBarattozon ? ' data-bz="1"' : '') + '>'
+    + '<div class="p2p-box p2p-pausa' + (s.stato === 'nessuna' ? ' libera' : '') + '">' + esc(s.frase) + '</div>'
+    + ((s.stato !== 'nessuna' || conBarattozon)
+       ? '<div class="hint">' + esc(P2P_PAUSA_BARATTOZON) + '</div>' : '')
+    + '<button type="button" class="btn ghost" onclick="apriPausaP2P()">'
+    + (dove === 'miei' ? '⏸ Pausa degli ordini' : '⏸ Imposta la pausa') + '</button></div>';
+}
+/* la sezione del foglio che pubblica: stesso vestito delle sorelle */
+function sezionePausaNuovoP2P(tab){
+  const riga = rigaPausaVistaP2P('nuovo', true, !!tab);
+  return riga ? sezioneNuovoP2P({titolo: 'Pausa degli ordini', corpo: riga}) : '';
+}
+/* le righe gia' a schermo si rivestono IN PLACE: la pausa appena salvata
+   (o appena arrivata dal server) si legge subito, e il foglio che
+   pubblica non si ridisegna — quel che c'e' scritto dentro resta */
+function rivestiRighePausaP2P(){
+  document.querySelectorAll('.p2p-pausa-riga').forEach(n => {
+    const nuova = rigaPausaVistaP2P(n.dataset.dove, n.dataset.piena === '1', n.dataset.bz === '1');
+    if (!nuova) { n.remove(); return; }
+    const t = document.createElement('template');
+    t.innerHTML = nuova;
+    if (t.content.firstChild && t.content.firstChild.outerHTML !== n.outerHTML)
+      n.replaceWith(t.content.firstChild);
+  });
+}
 /* la riga nel profilo di scambio: lo stato di adesso e il bottone */
 function rigaPausaProfiloP2P(){
   if (!tempoPubblicaP2P()) return '';
@@ -63496,7 +63615,8 @@ function renderPausaP2P(){
     + '</div><div class="hint" style="margin:6px 0 0">Parte adesso e dura al massimo ' + P2P_PAUSA_GIORNI_MAX + ' giorni.</div></div>'
     + (p2pPausaErrore ? '<div class="p2p-box p2p-veto">🚫 ' + esc(p2pPausaErrore) + '</div>' : '')
     + '<button type="button" class="btn orange" id="p2pPausaSalva" onclick="salvaPausaP2P(this)">Salva</button>'
-    + '<div class="hint">La scadenza dei tuoi ordini non si ferma. La pausa vale dentro Barattolo: chi usa un\'altra app collegata allo stesso servizio di scambio li vede ancora.</div>';
+    + '<div class="hint">La scadenza dei tuoi ordini non si ferma. La pausa vale dentro Barattolo: chi usa un\'altra app collegata allo stesso servizio di scambio li vede ancora.</div>'
+    + '<div class="hint" id="p2pPausaBarattozon">' + esc(P2P_PAUSA_BARATTOZON) + '</div>';
 }
 function aggiungiFasciaPausaP2P(){
   haptic();
@@ -65808,6 +65928,10 @@ function renderNuovoOrdineP2P(){
   /* CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la sua
      sezione, dopo il premio e prima dei limiti — vedi `sezioneAccessoNuovoP2P` */
   const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';
+  /* LA PAUSA IN VISTA (cantiere pausa-in-vista): lo stato di adesso e
+     il bottone che apre il foglio della pausa SOPRA questo, dopo «chi
+     puo' prendere» e prima dei limiti — vedi `sezionePausaNuovoP2P` */
+  const pausa = typeof sezionePausaNuovoP2P === 'function' ? sezionePausaNuovoP2P(tab) : '';
 
   /* I TRE DATI DEL TABACCHINO (set 2026), solo quando la voce e'
      scelta: numero, importo e scadenza dell'ordine Amazon, che chi
@@ -65934,7 +66058,7 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + accesso + riquadroLimitiP2P() +
+    + quanti + premio + accesso + pausa + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
@@ -69673,6 +69797,9 @@ function rigaScambioP2P(o){
     /* IL MESSAGGIO NON LETTO DELLA CHAT (12 ott 2026): sotto lo stato,
        col suo pallino; si spegne aprendo lo scambio */
     + (typeof chatScSegnoCardP2P === 'function' ? chatScSegnoCardP2P(o) : '')
+    /* IL MIO ORDINE IN PAUSA LO DICE (cantiere pausa-in-vista): lo stesso
+       segno della card del libro, sull'ordine ancora pubblicato */
+    + (o.stato === 'pubblicato' && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : '')
     + (metodi.length ? '<div class="p2p-box p2p-paga'
              + (senzaNomi ? ' p2p-paga-marchio' : '')
              + (senzaNomi && finita ? ' p2p-paga-spenta' : '') + '" title="'
@@ -73341,6 +73468,19 @@ async function chiediMiaPausaP2P(){
     return true;
   } catch(e) { return false; }
 }
+/* LA MIA PAUSA SI CHIEDE UNA VOLTA AL MINUTO, non a ogni ridisegno
+   (cantiere pausa-in-vista): le righe di stato nascono con quel che si
+   sa e, se la risposta cambia qualcosa, si rivestono in place */
+let p2pMiaPausaChiesta = 0;
+function rinfrescaMiaPausaP2P(){
+  if (Date.now() - p2pMiaPausaChiesta < 60000) return;
+  p2pMiaPausaChiesta = Date.now();
+  const prima = JSON.stringify(p2pMiaPausa);
+  chiediMiaPausaP2P().then(si => {
+    if (si && JSON.stringify(p2pMiaPausa) !== prima
+        && typeof rivestiRighePausaP2P === 'function') rivestiRighePausaP2P();
+  });
+}
 async function apriPausaP2P(){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: la pausa si imposta nell\'app vera ⏸'); return; }
@@ -73385,6 +73525,10 @@ async function salvaPausaP2P(bottone){
     /* il libro la impara al prossimo giro della fotografia: intanto si
        ridisegna quel che c'e' */
     if (typeof renderP2P === 'function') renderP2P();
+    /* ...e le righe di stato si rivestono dove sono: il foglio che
+       pubblica resta com'era, con quel che c'e' scritto dentro */
+    p2pMiaPausaChiesta = Date.now();
+    if (typeof rivestiRighePausaP2P === 'function') rivestiRighePausaP2P();
   } catch(e) {
     p2pPausaErrore = 'La pausa non si è salvata: controlla la connessione e riprova';
     renderPausaP2P();
@@ -76366,6 +76510,13 @@ const P2P_SCAMBIO_URL = (P2P_URL
    spenta si resta sul coming soon, come la sorella. */
 const P2P_ORDINE_URL = (P2P_URL
   && (location.search.match(/[?&]ordine=([0-9a-zA-Z-]{8,64})(?:&|$)/) || [])[1]) || '';
+/* LA PAUSA NELL'INDIRIZZO (cantiere pausa-in-vista): `/p2p?pausa=1` e'
+   il bottone «⏸ Imposta la pausa» sotto l'avviso «hanno preso il tuo
+   ordine», e apre il foglio della pausa sopra il libro. Solo a leva
+   accesa (quella del P2P e quella del tempo di chi pubblica): se no si
+   resta sul libro, o sul coming soon, senza dire niente. Lo scambio e
+   l'ordine nell'indirizzo vincono: sono una domanda piu' precisa. */
+const P2P_PAUSA_URL = !!P2P_URL && /[?&]pausa=1(?:&|$)/.test(location.search);
 let p2pApertoDaUrl = false;
 function apriP2PDaUrl(){
   if (!P2P_URL || p2pApertoDaUrl) return;
@@ -76388,9 +76539,14 @@ function apriP2PDaUrl(){
       .then(arrivoP2PFatto, arrivoP2PFatto);
     return;
   }
+  /* ...e la pausa: il foglio sopra il libro, a velo sceso */
+  const pausa = P2P_PAUSA_URL && !P2P_SCAMBIO_URL && !P2P_ORDINE_URL && p2pAcceso()
+    && typeof apriPausaP2P === 'function' && typeof tempoPubblicaP2P === 'function'
+    && tempoPubblicaP2P();
   /* la porta e' aperta — il libro, lo scambio, o il coming soon: il velo
      d'apertura puo' scendere */
   arrivoP2PFatto();
+  if (pausa) apriPausaP2P();
 }
 
 /* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo

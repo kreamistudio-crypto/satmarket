@@ -15331,12 +15331,16 @@ def _startapp_da_link(url) -> str:
     """PURA: il parametro `startapp` di un indirizzo di casa, o '' se
     quell'indirizzo non si traduce. Vocabolario chiuso: `/p2p` → `p2p`,
     `/p2p?scambio=<id>` → `scambio_<id>`, `/p2p?ordine=<id>` →
-    `ordine_<id>`. Il gemello nel client e' `startappDaLink`, e chi lo
-    rilegge e' `percorsoDaStartapp`: una prova tiene in pari i tre."""
+    `ordine_<id>`, e `/p2p?pausa=1` → `pausa` (12 ott 2026, il bottone
+    «⏸ Imposta la pausa» sotto l'avviso della presa). Il gemello nel
+    client e' `startappDaLink`, e chi lo rilegge e' `percorsoDaStartapp`:
+    una prova tiene in pari i tre."""
     u = str(url or "")
     base = URL_PUBBLICO + "/p2p"
     if u == base:
         return "p2p"
+    if u == base + "?pausa=1":
+        return "pausa"
     for nome in ("scambio", "ordine"):
         testa = f"{base}?{nome}="
         if u.startswith(testa):
@@ -46626,20 +46630,29 @@ def _pause_p2p(con, ordini, adesso: int) -> dict:
     la zona e il filtro: dice solo «questo ordine adesso non si prende
     da qui», e a chi non ha la sessione non dice di chi e'. A leva spenta
     e' vuoto. Alza ValueError come le sorelle, sulla lista storta; un
-    database senza le tabelle vale «nessuna pausa»."""
+    database senza le tabelle vale «nessuna pausa».
+    GLI ORDINI BARATTOZON IN PAUSA NON CI VANNO (12 ott 2026, cantiere
+    pausa-in-vista, decisione di Andrea): hanno gia' la scadenza del
+    PayCode, che non aspetta nessuno — nascosti per una notte, un
+    PayCode da tre giorni ne perde un terzo. Restano nel libro e si
+    prendono. E' QUI, nel giudice unico, che la regola vale per tutti:
+    la fotografia del libro, i volti e «posso prendere?» passano di
+    qui, e la pagina non ha una regola sua."""
     pulite = _ordini_puliti_p2p(ordini)
     if not P2P_TEMPO_DI_CHI_PUBBLICA:
         return {}
     segni = ",".join("?" * len(pulite))
     try:
         righe = con.execute(
-            f"SELECT ordine, tg_id FROM p2p_ordini WHERE ordine IN ({segni}) "
+            f"SELECT ordine, tg_id, metodi FROM p2p_ordini WHERE ordine IN ({segni}) "
             f"AND tg_id > 0 AND tg_id IN (SELECT tg_id FROM p2p_pause)",
             pulite).fetchall()
     except sqlite3.OperationalError:
         return {}
     fini, fuori = {}, {}
     for r in righe:
+        if _tabacchino_libro(_metodi_lista_p2p(r[2])):
+            continue
         tg = int(r[1])
         if tg not in fini:
             fini[tg] = _fine_pausa_p2p(_pausa_p2p(con, tg), adesso)
@@ -46671,6 +46684,38 @@ def _chi_pubblica_p2p(fatto: dict) -> tuple:
     lato = (fatto or {}).get("preso_dal") or ""
     return {"buyer": (int(fatto.get("venditore") or 0), "vende"),
             "seller": (int(fatto.get("compratore") or 0), "compra")}.get(lato, (0, ""))
+
+
+# IL BOTTONE «⏸ Imposta la pausa» SOTTO L'AVVISO DELLA PRESA (12 ott 2026,
+# cantiere pausa-in-vista, richiesta di Andrea): la pausa stava solo nel
+# profilo di scambio, e chi viene preso mentre non c'e' e' proprio quello
+# a cui serve. Su Telegram e' un bottone che apre l'app sul foglio della
+# pausa, nel DM una riga col link: e' il `bottone` di `notifica()`.
+P2P_BOTTONE_PAUSA = "⏸ Imposta la pausa"
+P2P_PAUSA_INDIRIZZO = "/p2p?pausa=1"
+
+
+def _bottone_pausa_p2p(con, ev: dict, fatto: dict, tg_id):
+    """`(etichetta, indirizzo)` del bottone della pausa per QUESTO
+    destinatario di QUESTO avviso, o None. Pura sulla connessione.
+    SOLO alla presa, SOLO a chi ha PUBBLICATO l'ordine (chi ha preso non
+    ha niente da mettere in pausa per questo), e solo a leva accesa.
+    NON sugli ordini Barattozon: la pausa li' non si applica
+    (`_pause_p2p`), e un bottone che non fa niente per l'ordine di cui
+    si sta parlando e' una promessa falsa."""
+    if not P2P_TEMPO_DI_CHI_PUBBLICA or (fatto or {}).get("momento") != "preso":
+        return None
+    chi, _ = _chi_pubblica_p2p(fatto)
+    if not chi or int(tg_id or 0) != chi:
+        return None
+    try:
+        r = con.execute("SELECT metodi FROM p2p_ordini WHERE ordine=?",
+                        (ev["ordine"],)).fetchone()
+    except sqlite3.OperationalError:
+        r = None
+    if r and _tabacchino_libro(_metodi_lista_p2p(r[0])):
+        return None
+    return (P2P_BOTTONE_PAUSA, URL_PUBBLICO + P2P_PAUSA_INDIRIZZO)
 
 
 def _tocca_a_chi_pubblica_p2p(con, ordine: str, tg_id) -> bool:
@@ -56538,13 +56583,16 @@ def _parti_mod_p2p(d: dict) -> list:
             if e_admin(int(d.get(chiave) or 0))]
 
 
-async def _recapita_p2p(tg_id: int, testo: str, tranne: int = 0):
+async def _recapita_p2p(tg_id: int, testo: str, tranne: int = 0,
+                        bottone: tuple = None):
     """`notifica()`, tranne quando il destinatario e' il gruppo degli
     admin: li' si passa dalla sua porta (argomento «dispute»), e se il
     gruppo non riceve l'avviso torna ai moderatori in privato — a
-    tutti meno `tranne`, che e' chi ha fatto il gesto e lo sa gia'."""
+    tutti meno `tranne`, che e' chi ha fatto il gesto e lo sa gia'.
+    `bottone` (12 ott 2026, la pausa in vista) e' quello di `notifica()`,
+    e vale solo per la persona: al gruppo degli admin non si passa."""
     if not tg_id or tg_id != gruppo_admin_id():
-        return await notifica(tg_id, testo)
+        return await notifica(tg_id, testo, *([bottone] if bottone else []))
     if await _al_gruppo_admin(testo, "dispute"):
         return "gruppo degli admin"
     esiti = [str(await notifica(mod, testo))
@@ -57390,6 +57438,14 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
         con = db()
         try:
             avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))
+            # ...e a chi ha PUBBLICATO, sotto l'avviso della presa, il
+            # bottone della pausa (12 ott 2026). Si decide QUI, sulle
+            # sole parti: i moderatori qui sotto non lo vedono. Un
+            # guasto li' toglie il bottone, mai l'avviso.
+            try:
+                bottoni = {tg: _bottone_pausa_p2p(con, ev, fatto, tg) for tg, _ in avvisi}
+            except Exception:
+                bottoni = {}
             # ...e i MODERATORI, se l'evento apre o chiude una disputa
             # (28 set 2026). Un guasto qui non toglie l'avviso alle parti.
             try:
@@ -57416,6 +57472,12 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
         esiti = []
         for tg_id, testo in avvisi:
             try:
+                if bottoni.get(tg_id):
+                    # col bottone SOLO dove c'e': chi non l'ha parte
+                    # com'e' sempre partito
+                    esiti.append((tg_id, await _recapita_p2p(
+                        tg_id, testo, bottone=bottoni[tg_id])))
+                    continue
                 esiti.append((tg_id, await _recapita_p2p(tg_id, testo)))
             except Exception as e:
                 esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))

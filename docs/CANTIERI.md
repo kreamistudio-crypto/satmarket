@@ -53170,3 +53170,89 @@ li rifà la CI.
 26.04: la riga del passo `setup-node` nel log del ramo di prova. E ogni
 tanto la stessa riga su main: il giorno che dice «scaricata» invece di
 «trovata», GitHub ha tolto la 22 dalla dispensa ed è ora di salire.
+
+## La pausa in vista: nel foglio che pubblica, in «I miei scambi», sotto l'avviso della presa (12 ott 2026, sera, cantiere pausa-in-vista, richiesta di Andrea)
+
+**IL PROBLEMA.** La pausa degli ordini (cantiere tempo-di-chi-pubblica,
+leva `P2P_TEMPO_DI_CHI_PUBBLICA` accesa sul VPS la sera del 12) si
+apriva SOLO da «👤 Il tuo profilo di scambio», che sta dietro la pagina
+dei dati personali: nessuno la trovava.
+
+**COSA SI È FATTO, senza regole nuove** — cambia dove si vede, sempre
+dietro la stessa leva e aprendo lo stesso foglio (`apriPausaP2P`).
+1) NEL FOGLIO CHE PUBBLICA UN ORDINE, la scatola «Pausa degli ordini»
+dopo «Chi può prendere l'ordine»: lo stato in una riga e il bottone
+«⏸ Imposta la pausa». Il foglio della pausa si apre SOPRA quello che
+pubblica e non gli tocca niente. Per riuscirci il suo markup è stato
+SPOSTATO dopo `#p2pNuovoSheet` nel DOM: tutti i fogli hanno lo stesso
+z-index, e a decidere chi copre chi è l'ordine nel documento — dov'era,
+si apriva sotto la pagina che lo chiamava. Salvando, le righe di stato
+si rivestono in place (`rivestiRighePausaP2P`): il foglio che pubblica
+NON si ridisegna.
+2) IN CIMA A «I MIEI SCAMBI», la stessa riga col bottone «⏸ Pausa degli
+ordini», e sulla card del proprio ordine ancora pubblicato il segno
+«⏸ In pausa fino a…» (quello del libro). La riga si AGGIUNGE in testa
+al corpo dopo che è stato scritto: la riga di codice di sempre resta
+com'era (quattro prove di ieri la pinzano, e avevano ragione). A pagina
+vuota e senza una pausa impostata non c'è: lo stato vuoto resta la
+frase e il bottone decisi il 30 set.
+3) SOTTO L'AVVISO «⚡ Il tuo ordine è stato preso», il bottone
+«⏸ Imposta la pausa»: su Telegram apre l'app sul foglio, nel messaggio
+Nostr è una riga col link. È il `bottone` che `notifica()` ha già (il
+promemoria del 10 ott), non una riga scritta nel testo. SCARTATA la riga
+col link dentro il testo: il testo è lo stesso per i due canali, e un
+`<a href>` nel messaggio Nostr perde l'indirizzo (lì l'HTML si toglie),
+mentre un link a barattolo.store dentro Telegram apre il browser dove
+chi è entrato dal bot è un anonimo. Solo a chi ha PUBBLICATO, solo alla
+presa. L'indirizzo è `/p2p?pausa=1`, e `pausa` entra nel vocabolario
+chiuso dei link che aprono la Mini App, nei tre posti che lo tengono.
+4) NEL PROFILO DI SCAMBIO resta com'era.
+5) GLI ORDINI BARATTOZON IN PAUSA NON CI VANNO (decisione di Andrea:
+hanno già la scadenza del PayCode, al massimo 72 ore). La regola è UNA
+riga in `_pause_p2p`, il giudice unico: di lì passano la fotografia del
+libro, i volti e «posso prendere?», e la pagina non ha una regola sua —
+la DICE, nel foglio della pausa e nella riga di stato («Gli ordini
+Barattozon restano visibili: hanno già la scadenza del PayCode»). Nella
+riga la frase c'è quando serve: con una pausa impostata, e sempre
+mentre si pubblica un ordine Barattozon; con «Nessuna pausa» e un
+ordine normale non c'è (una frase per gesto). Il bottone sotto la presa
+di un ordine Barattozon non c'è.
+
+**NON TOCCATO, e si dice.** La tutela della presa arrivata in pausa
+(`_presa_in_pausa_p2p`: non si conta il «non completato») vale ancora
+per ogni ordine, Barattozon compresi — che adesso in pausa si prendono.
+Cambiarla è una regola, e la richiesta diceva «niente regole nuove»:
+è una domanda per Andrea.
+
+**IL PUNTO 6, IN ATTESA DEL NUMERO.** Un ordine Barattozon esce dal
+libro due ore prima che il PayCode scada (`P2P_TABACCHINO_MARGINE_S`,
+messo nell'`expires_at` alla pubblicazione). Con le tre ore a chi
+pubblica (la `-bar8`) non bastano. LA PROPOSTA, non ancora applicata: il
+margine è la somma dei tre tempi che ci stanno dentro — il tempo di chi
+prende, il tempo di chi pubblica, un'ora per andare al tabacchino
+(`P2P_PAYCODE_MIN_S`, che la casa usa già per questo) — e mai meno delle
+due ore di oggi. Coi 30 minuti di oggi fa 30 + 30 + 60 = 2 ore, cioè
+non cambia niente; con le tre ore fa 4 ore e mezza.
+
+**PROVATO.** `prove_pausa_in_vista` (30 prove: il link nei tre posti, il
+bottone e a chi va, le sentinelle del foglio nel DOM e delle righe, i
+giudici della pagina in node — le tre frasi dello stato, la riga nei
+due posti, la leva spenta —, la porta dell'indirizzo) e tre prove nuove
+nel banco della pausa di `prove_tempo_di_chi_pubblica` (Barattozon fuori
+dalla mappa e prendibile, la regola nel giudice unico).
+`collaudo_tempo_pubblica`, passo 8-bis, sul server vero: 38 passi, anche
+nella gabbia. IL GIRO DAL VIVO a 390×844 (Chrome senza finestra coi
+tocchi veri, due identità di collaudo, server di una copia col config di
+cartone, relay morto): il foglio che pubblica con metodo e importo
+scritti → «⏸ Imposta la pausa» → il foglio della pausa È SOPRA (chiesto
+a `elementFromPoint`), due fasce, Salva → il foglio che pubblica è
+ancora aperto con «120 €» e SEPA, e la riga dice «⏸ In pausa fino alle
+20:00»; «I miei scambi» con la riga in cima, la pausa una volta sola da
+lì, il segno sulla card SEPA e NON su quella Barattozon; il libro di chi
+guarda con l'ordine Barattozon e senza quello SEPA, «Compra» acceso;
+`/p2p?pausa=1` che apre il foglio sopra il libro. Nove scatti, nessuna
+pagina più larga del telefono.
+
+**NON PROVATO.** Nessun telefono vero; il bottone dentro Telegram vero
+(l'avviso nel collaudo è simulato: si è guardato cosa riceve
+`notifica()`); il messaggio Nostr col link.

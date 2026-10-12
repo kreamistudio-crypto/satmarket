@@ -53870,6 +53870,9 @@ async function giro(pathname, copione){
     porta = (
         "let visto = [], acceso = true, p2pApertoDaUrl = false, p2pCondivisoInVolo = false;\n"
         "let P2P_URL = ['/p2p'], P2P_SCAMBIO_URL = '', P2P_ORDINE_URL = '';\n"
+        # (12 ott 2026, pausa-in-vista) la porta guarda anche `?pausa=1`:
+        # qui e' spenta, e la sua prova sta in `prove_pausa_in_vista`
+        "let P2P_PAUSA_URL = false;\n"
         "let esitoOrdine = 'ok';\n"
         "const p2pAcceso = () => acceso;\n"
         "function vaiP2P(){ visto.push('vai'); }\n"
@@ -74470,8 +74473,10 @@ def prove_p2p_pubblica():
           # (10 ott 2026) la zona di scambio del contanti, subito sotto i metodi
           # (10 ott 2026, reputazione-p2p) e «Chi puo' prendere l'ordine»
           # dopo il premio, prima dei limiti
+          # (12 ott 2026, pausa-in-vista) e la pausa degli ordini, dopo
+          # «chi puo' prendere» e prima dei limiti
           "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio"
-          " + accesso + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
+          " + accesso + pausa + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
     prova("la scatola e' quella delle altre, senza icona", True,
@@ -148294,6 +148299,24 @@ def prove_tempo_di_chi_pubblica():
           [r[o_p], r[o_altro]["ok"]])
     prova("...ma a chi l'ha pubblicato il SUO ordine non dice «pausa»", True,
           posso(con, P, [o_p], T4)["ordini"][o_p]["motivo"] != "pausa")
+    # (12 ott 2026, sera, pausa-in-vista) GLI ORDINI BARATTOZON in pausa
+    # non ci vanno: hanno gia' la scadenza del PayCode
+    o_bz, o_bz2 = ordine(), ordine()
+    con.execute("UPDATE p2p_ordini SET metodi=? WHERE ordine=?",
+                ('["Contanti al tabacchino 23.47"]', o_bz))
+    con.execute("UPDATE p2p_ordini SET metodi=? WHERE ordine=?",
+                ("Contanti al tabacchino", o_bz2))
+    prova("GLI ORDINI BARATTOZON IN PAUSA NON CI VANNO: nella mappa del libro resta solo "
+          "l'altro ordine della stessa persona — con l'importo nel metodo o senza",
+          {o_p: utc(2026, 7, 23, 4)}, pause(con, [o_p, o_bz, o_bz2, o_altro], T4))
+    r = posso(con, T, [o_p, o_bz, o_bz2], T4)["ordini"]
+    prova("...e «posso prendere?» li lascia prendere, mentre il vicino resta fermo",
+          ["pausa", True, True], [r[o_p]["motivo"], r[o_bz]["ok"], r[o_bz2]["ok"]])
+    prova("...la regola sta nel giudice UNICO: la fotografia e i volti non ne hanno una "
+          "loro", [True, False, False],
+          ["if _tabacchino_libro(_metodi_lista_p2p(r[2])):\n            continue"
+           in pezzo("_pause_p2p"),
+           "tabacchino" in pezzo("_pause_foto_p2p"), "abacchino" in pezzo("_presa_in_pausa_p2p")])
     mia = amb["_mia_pausa_p2p"]
     prova("la mia pausa, per il foglio: le fasce, e `fino` solo se adesso sono in pausa",
           [[NOTTI], utc(2026, 7, 23, 4), 0, 6, 7],
@@ -148803,6 +148826,298 @@ def prove_disputa_automatica_p2p():
           "vede ancora la chiusura", True,
           0 < invio.find("avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))")
           < invio.find("avvisi = avvisi + _disputa_evento_p2p("))
+
+
+def prove_pausa_in_vista():
+    """LA PAUSA IN VISTA (12 ott 2026, sera, cantiere pausa-in-vista,
+    richiesta di Andrea): la pausa degli ordini si apriva solo dal
+    profilo di scambio, dietro la pagina dei dati personali, e nessuno
+    la trovava. Adesso lo stato e il bottone stanno nel foglio che
+    pubblica un ordine e in cima a «I miei scambi», l'avviso della presa
+    porta un bottone che apre l'app sul foglio della pausa, e gli ordini
+    Barattozon in pausa non ci vanno (il giudice sta in
+    `prove_tempo_di_chi_pubblica`, col banco della pausa).
+
+    Quel che qui si rompe in silenzio: il foglio della pausa che si apre
+    SOTTO la pagina che lo chiama; il foglio «Pubblica» che si chiude, o
+    si ridisegna, e perde quel che c'era scritto; il bottone della pausa
+    a chi ha PRESO, o sotto un avviso che non e' la presa, o su un ordine
+    Barattozon; il link `pausa` che una delle tre traduzioni non conosce;
+    la riga che resta a leva spenta."""
+    print("\n[la pausa in vista: il foglio che pubblica, i miei scambi, il link dell'avviso]")
+    import json
+    import sqlite3
+    src = _SORGENTE
+    m = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) IL SERVER: il link e il bottone --------------------------------
+    BASE = "https://barattolo.store"
+    i = src.index("STARTAPP_MAX = 64")
+    amb = {"re": re, "URL_PUBBLICO": BASE, "TELEGRAM_MINIAPP_LINK": "https://t.me/ilbarattolobot",
+           "sqlite3": sqlite3, "P2P_TEMPO_DI_CHI_PUBBLICA": True, "json": json}
+    exec(src[i:src.index("\n\n\ndef _startapp_da_link(", i)], amb)
+    for f in ("_startapp_da_link", "_link_dentro_telegram", "_chi_pubblica_p2p",
+              "_euro_tabacchino", "_metodi_libro", "_tabacchino_libro", "_metodi_lista_p2p"):
+        exec(pezzo(f), amb)
+    k = src.index('\nP2P_BOTTONE_PAUSA = "') + 1
+    exec(src[k:src.index("\n\n\ndef _bottone_pausa_p2p(", k)], amb)
+    exec(pezzo("_bottone_pausa_p2p"), amb)
+    sp, ld = amb["_startapp_da_link"], amb["_link_dentro_telegram"]
+    prova("il link d'ingresso: `/p2p?pausa=1` si traduce in `pausa`, e solo quello",
+          ["pausa", "", "", "p2p"],
+          [sp(BASE + "/p2p?pausa=1"), sp(BASE + "/p2p?pausa=2"), sp(BASE + "/p2p?pausa=1&x=1"),
+           sp(BASE + "/p2p")])
+    prova("...dentro Telegram apre la Mini App sul foglio, e a leva del link spenta resta "
+          "l'indirizzo del sito",
+          ["https://t.me/ilbarattolobot?startapp=pausa", BASE + "/p2p?pausa=1"],
+          [ld(BASE + "/p2p?pausa=1"),
+           (amb.__setitem__("TELEGRAM_MINIAPP_LINK", ""), ld(BASE + "/p2p?pausa=1"),
+            amb.__setitem__("TELEGRAM_MINIAPP_LINK", "https://t.me/ilbarattolobot"))[1]])
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, metodi TEXT)")
+    con.execute("INSERT INTO p2p_ordini VALUES('ord-sepa', '[\"SEPA\"]')")
+    con.execute("INSERT INTO p2p_ordini VALUES('ord-bz', '[\"Contanti al tabacchino 23.47\"]')")
+    bottone = amb["_bottone_pausa_p2p"]
+    # una vendita di 222 presa da chi compra (111): ha pubblicato chi vende
+    presa = {"momento": "preso", "compratore": 111, "venditore": 222, "preso_dal": "buyer"}
+    ev = {"ordine": "ord-sepa"}
+    prova("IL BOTTONE DELLA PAUSA sotto l'avviso della presa: a chi ha PUBBLICATO, col "
+          "link del foglio — e a chi ha preso no",
+          [("⏸ Imposta la pausa", BASE + "/p2p?pausa=1"), None],
+          [bottone(con, ev, presa, 222), bottone(con, ev, presa, 111)])
+    prova("...segue chi ha pubblicato: su un acquisto preso da chi vende e' chi compra",
+          [("⏸ Imposta la pausa", BASE + "/p2p?pausa=1"), None],
+          [bottone(con, ev, dict(presa, preso_dal="seller"), 111),
+           bottone(con, ev, dict(presa, preso_dal="seller"), 222)])
+    prova("...SOLO alla presa: non sotto la garanzia pagata, il pagamento segnato, "
+          "l'annullo, e nemmeno se non si sa chi ha preso",
+          [None, None, None, None],
+          [bottone(con, ev, dict(presa, momento=x), 222)
+           for x in ("garanzia_pagata", "fiat", "annullato")]
+          + [bottone(con, ev, dict(presa, preso_dal=""), 222)])
+    prova("...NON su un ordine Barattozon (li' la pausa non si applica), e non a leva "
+          "spenta", [None, None],
+          [bottone(con, {"ordine": "ord-bz"}, presa, 222),
+           (amb.__setitem__("P2P_TEMPO_DI_CHI_PUBBLICA", False), bottone(con, ev, presa, 222),
+            amb.__setitem__("P2P_TEMPO_DI_CHI_PUBBLICA", True))[1]])
+    prova("...e un database senza il libro non lo fa cadere: il bottone c'e'",
+          ("⏸ Imposta la pausa", BASE + "/p2p?pausa=1"),
+          bottone(sqlite3.connect(":memory:"), ev, presa, 222))
+    invio = pezzo("_manda_evento_p2p")
+    prova("l'invio decide il bottone SULLE PARTI, prima dei moderatori, e un guasto li' "
+          "non toglie l'avviso", [True, True],
+          [0 < invio.find("avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))")
+           < invio.find("bottoni = {tg: _bottone_pausa_p2p(con, ev, fatto, tg) for tg, _ in avvisi}")
+           < invio.find("avvisi = avvisi + _disputa_evento_p2p("),
+           bool(re.search(r"try:\s+bottoni = \{tg: _bottone_pausa_p2p\(con, ev, fatto, tg\) "
+                          r"for tg, _ in avvisi\}\s+except Exception:\s+bottoni = \{\}", invio))])
+    prova("...lo passa SOLO dove c'e' (chi non l'ha parte com'e' sempre partito), e al "
+          "gruppo degli admin non arriva mai",
+          [True, True, True],
+          ["await _recapita_p2p(\n                        tg_id, testo, bottone=bottoni[tg_id])"
+           in invio,
+           "esiti.append((tg_id, await _recapita_p2p(tg_id, testo)))" in invio,
+           "return await notifica(tg_id, testo, *([bottone] if bottone else []))"
+           in pezzo("_recapita_p2p")
+           and "bottone" not in pezzo("_recapita_p2p").split("_al_gruppo_admin(", 1)[1]])
+
+    # --- 2) LA PAGINA: le sentinelle ---------------------------------------
+    prova("il foglio della pausa sta DOPO il foglio «Pubblica» (e dopo la scadenza del "
+          "PayCode): e' l'ordine nel DOM che decide chi copre chi",
+          True,
+          m.index('id="p2pProfiloSheet"') < m.index('id="p2pNuovoSheet"')
+          < m.index('id="p2pScadeSheet"') < m.index('id="p2pPausaSheet"'))
+    prova("...ed e' UNO solo", 1, m.count('id="p2pPausaSheet"'))
+    apri = _fn_js(m, "async function apriPausaP2P(){")
+    salva = _fn_js(m, "async function salvaPausaP2P(bottone){")
+    prova("aprire la pausa non chiude il foglio «Pubblica», e salvarla chiude SOLO il suo "
+          "foglio e riveste le righe dove sono — niente ridisegno del foglio che pubblica",
+          [False, True, True, False, False],
+          ["p2pNuovoSheet" in apri, "chiudiFoglioP2P('p2pPausaSheet');" in salva,
+           "rivestiRighePausaP2P()" in salva, "renderNuovoOrdineP2P" in salva,
+           "closeSheet()" in salva])
+    foglio = _fn_js(m, "function renderNuovoOrdineP2P(){")
+    prova("il foglio che pubblica ha la sua sezione, dal typeof, e le dice se e' Barattozon",
+          True, "const pausa = typeof sezionePausaNuovoP2P === 'function' ? "
+          "sezionePausaNuovoP2P(tab) : '';" in foglio)
+    rp = _fn_js(m, "function renderP2P(){") if "function renderP2P(){" in m else m
+    prova("«I miei scambi»: la riga si AGGIUNGE in testa al corpo di sempre, dal typeof",
+          True, "mieiBox.insertAdjacentHTML('afterbegin',\n      rigaPausaVistaP2P('miei', "
+          "!mieiBox.querySelector('.scambi-vuoto')));" in rp)
+    riga_scambio = _fn_js(m, "function rigaScambioP2P(o){")
+    prova("...e sulle card il segno della pausa sta SOLO sull'ordine ancora pubblicato",
+          True, "(o.stato === 'pubblicato' && typeof segnoPausaP2P === 'function' ? "
+          "segnoPausaP2P(o) : '')" in riga_scambio)
+    prova("il foglio della pausa dice di Barattozon, con la frase di casa",
+          True, "'<div class=\"hint\" id=\"p2pPausaBarattozon\">' + esc(P2P_PAUSA_BARATTOZON) "
+          "+ '</div>'" in _fn_js(m, "function renderPausaP2P(){"))
+    chiede = pezzo_js(m, "/* ============ LA PAUSA DEGLI ORDINI, LA PARTE CHE CHIEDE",
+                      "/* ============ fine della pausa che chiede ============ */")
+    prova("la mia pausa si chiede al piu' una volta al minuto, fuori dal motore",
+          [True, True],
+          ["if (Date.now() - p2pMiaPausaChiesta < 60000) return;" in chiede,
+           "function rinfrescaMiaPausaP2P(){" in chiede])
+
+    # --- 3) LA PAGINA: i giudici, in node ----------------------------------
+    costante = re.search(r"const P2P_PAUSA_BARATTOZON = '[^'\n]*';\n", m)
+    banco = r"""
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+let LEVE = {tempoPubblica: true};
+function p2pCoord(){ return LEVE; }
+let p2pMiaPausa = null, p2pPause = {}, chieste = 0;
+function rinfrescaMiaPausaP2P(){ chieste++; }
+function sezioneNuovoP2P(o){ return '[' + o.titolo + ']' + o.corpo; }
+""" + (costante.group(0) if costante else "") + "".join(_fn_js(m, f) for f in (
+        "function tempoPubblicaP2P(){", "function quandoPausaP2P(fino, adesso){",
+        "function pausaOrdineP2P(id, adesso){", "function segnoPausaP2P(o){",
+        "function oraCortaP2P(n){", "function fasciaCortaP2P(f){",
+        "function statoPausaP2P(p, adesso){",
+        "function rigaPausaVistaP2P(dove, piena, conBarattozon){",
+        "function sezionePausaNuovoP2P(tab){",
+        "function percorsoDaStartapp(p){", "function startappDaLink(link, base){")) + r"""
+const c = {};
+c.ore = [0, 360, 480, 1200, 1320, 510, 1439].map(oraCortaP2P);
+const NOTTI = {g: [0, 1, 2, 3, 4, 5, 6], da: 1320, a: 360};
+const FERIALI = {g: [4, 0, 1, 2, 3], da: 480, a: 1200};
+c.fasce = [fasciaCortaP2P(NOTTI), fasciaCortaP2P(FERIALI),
+           fasciaCortaP2P({g: [0, 1, 2, 3, 4, 5, 6], da: 480, a: 1200}),
+           fasciaCortaP2P({g: [5, 6], da: 600, a: 750}), fasciaCortaP2P({g: [0, 2, 4], da: 60, a: 120}),
+           fasciaCortaP2P({g: [], da: 60, a: 120}), fasciaCortaP2P(null)];
+/* le ore nell'ora LOCALE del banco */
+const loc = (g, h, mi) => Math.floor(new Date(2026, 6, g, h, mi, 0).getTime() / 1000);
+const mezzogiorno = loc(15, 12, 0);
+c.stati = [statoPausaP2P(null, mezzogiorno), statoPausaP2P({fasce: [], fino: 0}, mezzogiorno),
+           statoPausaP2P({fasce: [NOTTI, FERIALI], fino: 0}, mezzogiorno),
+           statoPausaP2P({fasce: [NOTTI], fino: loc(16, 6, 0)}, mezzogiorno),
+           statoPausaP2P({fasce: [NOTTI], fino: mezzogiorno - 5}, mezzogiorno),
+           statoPausaP2P({fasce: [{g: []}], fino: 0}, mezzogiorno)];
+const _adesso = Date.now;
+Date.now = () => mezzogiorno * 1000;
+/* la riga, nei due posti */
+p2pMiaPausa = null;
+c.nuovoLibera = rigaPausaVistaP2P('nuovo', true, false);
+c.nuovoBarattozon = rigaPausaVistaP2P('nuovo', true, true);
+c.mieiVuota = rigaPausaVistaP2P('miei', false, false);
+c.mieiPiena = rigaPausaVistaP2P('miei', true, false);
+p2pMiaPausa = {fasce: [NOTTI, FERIALI], fino: 0};
+c.nuovoImpostata = rigaPausaVistaP2P('nuovo', true, false);
+c.mieiVuotaImpostata = rigaPausaVistaP2P('miei', false, false);
+p2pMiaPausa = {fasce: [NOTTI], fino: loc(16, 6, 0)};
+c.mieiInPausa = rigaPausaVistaP2P('miei', true, false);
+c.sezione = sezionePausaNuovoP2P(false).slice(0, 60);
+c.chieste = chieste;
+p2pMiaPausa = {fasce: [{g: [0], da: 1, a: 2}], fino: 0, nome: '<b>x</b>'};
+c.scappa = rigaPausaVistaP2P('nuovo', true, false).indexOf('<b>x') < 0;
+LEVE = {tempoPubblica: false};
+c.spenta = [rigaPausaVistaP2P('nuovo', true, true), rigaPausaVistaP2P('miei', true, false),
+            sezionePausaNuovoP2P(true)];
+LEVE = {tempoPubblica: true};
+/* il segno sulla card: dalla mappa del server, e una pausa finita non segna */
+const ID = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001';
+p2pPause = {[ID]: loc(16, 6, 0)};
+c.segno = [segnoPausaP2P({id: ID}), segnoPausaP2P({id: 'altro'})];
+p2pPause = {[ID]: mezzogiorno - 60};
+c.segno.push(segnoPausaP2P({id: ID}));
+Date.now = _adesso;
+/* le due traduzioni del link */
+const B = 'https://barattolo.store';
+c.link = [percorsoDaStartapp('pausa'), percorsoDaStartapp('pausa_1'), percorsoDaStartapp('Pausa'),
+          startappDaLink(B + '/p2p?pausa=1', B), startappDaLink(B + '/p2p?pausa=2', B),
+          startappDaLink(B + '/p2p?pausa=1&x=1', B), startappDaLink(B + '/p2p', B),
+          percorsoDaStartapp(startappDaLink(B + '/p2p?pausa=1', B))];
+console.log(JSON.stringify(c));
+"""
+    c = _node_banco(banco)
+    if c is None:
+        prova("i giudici della pausa in vista girano in node", True, False)
+        return
+    prova("l'ora corta: senza i minuti quando sono zero",
+          ["0", "6", "8", "20", "22", "8:30", "23:59"], c["ore"])
+    prova("la fascia in poche parole: le NOTTI (tutti i giorni a cavallo della mezzanotte), "
+          "i feriali, tutti i giorni, due giorni, giorni sparsi — e niente senza giorni",
+          ["notti 22-6", "lun-ven 8-20", "tutti i giorni 8-20", "sab, dom 10-12:30",
+           "lun, mer, ven 1-2", "", ""], c["fasce"])
+    prova("LE TRE FRASI DELLO STATO, quelle chieste da Andrea",
+          ["Nessuna pausa: i tuoi ordini si possono prendere sempre",
+           "Nessuna pausa: i tuoi ordini si possono prendere sempre",
+           "⏸ Pausa: notti 22-6, lun-ven 8-20",
+           "⏸ In pausa fino a domani alle 06:00"],
+          [x["frase"] for x in c["stati"][:4]])
+    prova("...e i tre stati: una fine gia' passata non e' «in pausa», una fascia senza "
+          "giorni non e' una pausa",
+          ["nessuna", "nessuna", "impostata", "in", "impostata", "nessuna"],
+          [x["stato"] for x in c["stati"]])
+    FRASE_BZ = "Gli ordini Barattozon restano visibili: hanno già la scadenza del PayCode."
+    prova("la riga nel foglio che pubblica: lo stato, il bottone «⏸ Imposta la pausa» che "
+          "apre il foglio — e senza una pausa la frase di Barattozon non c'e'",
+          [True, True, True, False, True],
+          ['<div class="p2p-pausa-riga" data-dove="nuovo" data-piena="1">' in c["nuovoLibera"],
+           '<div class="p2p-box p2p-pausa libera">Nessuna pausa: i tuoi ordini si possono '
+           'prendere sempre</div>' in c["nuovoLibera"],
+           '<button type="button" class="btn ghost" onclick="apriPausaP2P()">⏸ Imposta la '
+           'pausa</button>' in c["nuovoLibera"],
+           FRASE_BZ in c["nuovoLibera"], c["nuovoLibera"].count("<button") == 1])
+    prova("...pubblicando un ordine BARATTOZON la frase c'e' anche senza pausa, e la riga "
+          "se lo ricorda (per rivestirsi)",
+          [True, True], [FRASE_BZ in c["nuovoBarattozon"], ' data-bz="1"' in c["nuovoBarattozon"]])
+    prova("...con una pausa impostata la frase c'e' sempre, e lo stato non e' piu' grigio",
+          [True, True, False],
+          [FRASE_BZ in c["nuovoImpostata"],
+           '<div class="p2p-box p2p-pausa">⏸ Pausa: notti 22-6, lun-ven 8-20</div>'
+           in c["nuovoImpostata"], "libera" in c["nuovoImpostata"]])
+    prova("in «I miei scambi»: il bottone «⏸ Pausa degli ordini»; a pagina VUOTA e senza "
+          "pausa non scrive niente, ma con una pausa impostata si' (va potuta togliere)",
+          [True, "", True, True],
+          ['onclick="apriPausaP2P()">⏸ Pausa degli ordini</button>' in c["mieiPiena"],
+           c["mieiVuota"], 'data-dove="miei"' in c["mieiVuotaImpostata"],
+           "⏸ In pausa fino a domani alle 06:00" in c["mieiInPausa"]])
+    prova("...la sezione del foglio ha il vestito delle sorelle, e la mia pausa si chiede "
+          "a OGNI riga (anche a quella che poi non scrive niente): il freno sta in chi chiede",
+          [True, 8], [c["sezione"].startswith('[Pausa degli ordini]<div class="p2p-pausa-riga"'),
+                      c["chieste"]])
+    prova("...niente di quel che arriva dal server finisce nella riga senza passare da esc",
+          True, c["scappa"])
+    prova("A LEVA SPENTA non c'e' niente, in nessuno dei tre posti", ["", "", ""], c["spenta"])
+    prova("il segno sulla card: dalla mappa del server, e una pausa finita non segna",
+          ['<div class="p2p-box p2p-pausa">⏸ In pausa fino a domani alle 06:00</div>', "", ""],
+          c["segno"])
+    prova("LE TRE TRADUZIONI DEL LINK SONO IN PARI: la pagina rilegge `pausa`, lo scrive "
+          "solo per l'indirizzo esatto, e quel che scrive lo sa rileggere",
+          ["/p2p?pausa=1", "", "", "pausa", "", "", "p2p", "/p2p?pausa=1"], c["link"])
+
+    # --- 4) LA PORTA DELL'INDIRIZZO ----------------------------------------
+    porta = (
+        "let visto = [], acceso = true, leva = true, p2pApertoDaUrl = false, p2pCondivisoInVolo = false;\n"
+        "let P2P_URL = ['/p2p'], P2P_SCAMBIO_URL = '', P2P_ORDINE_URL = '', P2P_PAUSA_URL = true;\n"
+        "const p2pAcceso = () => acceso;\n"
+        "function tempoPubblicaP2P(){ return leva; }\n"
+        "function vaiP2P(){ visto.push('vai'); }\n"
+        "function apriOrdineP2P(id){ visto.push('scambio'); }\n"
+        "function arrivoP2PFatto(){ visto.push('velo'); }\n"
+        "function apriPausaP2P(){ visto.push('pausa'); }\n"
+        "async function apriOrdineCondivisoP2P(id){ visto.push('ordine'); }\n"
+        + _fn_js(m, "function apriP2PDaUrl(){") + r"""
+const R = {};
+const giro = (prima) => { visto = []; p2pApertoDaUrl = false; P2P_URL = ['/p2p'];
+  P2P_SCAMBIO_URL = ''; P2P_ORDINE_URL = ''; P2P_PAUSA_URL = true; acceso = true; leva = true;
+  prima(); apriP2PDaUrl(); return visto.slice(); };
+R.pausa = giro(() => {});
+R.levaSpenta = giro(() => { leva = false; });
+R.p2pSpento = giro(() => { acceso = false; });
+R.senza = giro(() => { P2P_PAUSA_URL = false; });
+R.scambio = giro(() => { P2P_SCAMBIO_URL = 'abcdefgh'; });
+R.altrove = giro(() => { P2P_URL = null; });
+console.log(JSON.stringify(R));
+""")
+    Q = _node_banco(porta) or {}
+    prova("LA PORTA: `/p2p?pausa=1` apre il foglio della pausa sopra il libro, a velo sceso",
+          ["vai", "velo", "pausa"], Q.get("pausa"))
+    prova("...solo a leve accese (quella della pausa e quella del P2P), solo se "
+          "l'indirizzo lo chiede, e lo scambio nell'indirizzo vince",
+          [["vai", "velo"], ["vai", "velo"], ["vai", "velo"], ["vai", "scambio", "velo"], []],
+          [Q.get(k) for k in ("levaSpenta", "p2pSpento", "senza", "scambio", "altrove")])
+    prova("...e la costante la legge una volta, dall'indirizzo esatto", True,
+          "const P2P_PAUSA_URL = !!P2P_URL && /[?&]pausa=1(?:&|$)/.test(location.search);" in m)
 
 
 def prove_tempo_pubblica_app():
@@ -152834,6 +153149,7 @@ def main():
               prove_tempo_di_chi_pubblica,
               prove_tempo_pubblica_app,
               prove_disputa_automatica_p2p,
+              prove_pausa_in_vista,
               prove_config_esempio):
         try:
             f()

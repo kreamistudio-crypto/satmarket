@@ -312,6 +312,65 @@ async def giro():
     prova("...e chi ce l'ha lo legge fra i suoi numeri", (True, False),
           ((await posso(VELOCE, []))["veloce"], (await posso(PUBBLICA, []))["veloce"]))
 
+    print("\n8-bis) la pausa in vista: Barattozon resta nel libro, e il bottone sotto la presa")
+    # (12 ott 2026, sera, cantiere pausa-in-vista) tre ordini nuovi di chi
+    # pubblica: una vendita Barattozon e due vendite SEPA
+    BZ = "7e3a0000-0e0e-4a2b-9c3d-00000000000e"
+    N1 = "7e3a0000-0f0f-4a2b-9c3d-00000000000f"
+    N2 = "7e3a0000-1010-4a2b-9c3d-000000000010"
+    con = banco.con_db()
+    for ordine, metodi in ((BZ, ["Contanti al tabacchino 23.47"]), (N1, ["SEPA"]), (N2, ["SEPA"])):
+        con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,"
+                    "sats,euro,metodi) VALUES(?,?,?,'pending','sell',1,15000,'10,00 €',?)",
+                    (ordine, PUBBLICA, int(time.time()), json.dumps(metodi)))
+    con.commit()
+    con.close()
+    SRV.P2P_TEMPO_DI_CHI_PUBBLICA = True
+    await scrivi_pausa(PUBBLICA, {"una_fino": int(time.time()) + 3600})
+    f = await facce(PRENDE, [BZ, N1])
+    prova("in pausa la vendita SEPA esce fra le pause del libro, la Barattozon NO",
+          ([N1], False), (sorted(f["pause"]), BZ in f["pause"]))
+    p = (await posso(PRENDE, [BZ, N1]))["ordini"]
+    prova("...e «posso prendere?» ferma la prima e lascia prendere la Barattozon",
+          ("pausa", True, ""), (p[N1]["motivo"], p[BZ]["ok"], p[BZ]["motivo"]))
+    await scrivi_pausa(PUBBLICA, {})
+    # il bottone che `notifica()` riceve davvero, destinatario per destinatario
+    BOTTONI, vera = [], SRV.notifica
+
+    async def spia(chi, testo, *a, **k):
+        BOTTONI.append((chi, a[0] if a else k.get("bottone")))
+        return await vera(chi, testo, *a, **k)
+    SRV.notifica = spia
+    try:
+        atteso = ("⏸ Imposta la pausa", SRV.URL_PUBBLICO + "/p2p?pausa=1")
+        t = int(time.time())
+        await posta(busta(N1, "taken", t, "buyer", "invoice-next"))
+        prova("l'avviso «Il tuo ordine è stato preso» porta a chi ha PUBBLICATO il "
+              "bottone che apre il foglio della pausa — e a nessun altro",
+              ([(PUBBLICA, atteso)], True),
+              (BOTTONI, bool(detto(PUBBLICA, "Il tuo ordine è stato preso"))))
+        del BOTTONI[:]
+        await posta(busta(N1, "buyer-invoice-added", t + 1, "buyer", "hold-next"))
+        await posta(busta(N1, "hold-invoice-requested", t + 1, "mostro", "invoice"))
+        prova("...gli avvisi DOPO la presa non lo portano", [],
+              [b for _, b in BOTTONI if b])
+        del BOTTONI[:]
+        await posta(busta(BZ, "taken", t + 2, "buyer", "invoice-next"))
+        prova("...e sotto la presa di un ordine BARATTOZON non c'e': li' la pausa non "
+              "si applica", ([PUBBLICA], []),
+              ([chi for chi, _ in BOTTONI], [b for _, b in BOTTONI if b]))
+        del BOTTONI[:]
+        SRV.P2P_TEMPO_DI_CHI_PUBBLICA = False
+        await posta(busta(N2, "taken", t + 3, "buyer", "invoice-next"))
+        prova("...e a leva spenta l'avviso della presa parte com'e' sempre partito",
+              ([PUBBLICA], []),
+              ([chi for chi, _ in BOTTONI], [b for _, b in BOTTONI if b]))
+    finally:
+        SRV.notifica = vera
+        SRV.P2P_TEMPO_DI_CHI_PUBBLICA = True
+    prova("il link del bottone e' uno di quelli che dentro Telegram aprono la Mini App",
+          "pausa", SRV._startapp_da_link(SRV.URL_PUBBLICO + "/p2p?pausa=1"))
+
     print("\n9) dimentica il profilo")
     await scrivi_pausa(PUBBLICA, {"una_fino": int(time.time()) + 3600})
     prova("la pausa una volta sola c'e'", True, leggi_pausa(PUBBLICA)["fino"] > 0)
