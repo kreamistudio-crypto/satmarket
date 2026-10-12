@@ -34283,7 +34283,12 @@ def _impegni_aperti(con, tg_id: int) -> list:
             titolo = _titolo_ordine([dict(x) for x in con.execute(
                 "SELECT titolo, quantita FROM ordine_righe "
                 "WHERE ordine_id=? ORDER BY id", (o["id"],))])
+        # (12 ott 2026, notte, richiesta di Andrea) un SERVIZIO non si
+        # spedisce: la sua via d'uscita e' farlo — a chiuderlo e' chi
+        # ha comprato, quando la prestazione c'e' stata
         cosa = ("consegna il codice" if o["consegna_scelta"] == "digitale"
+                else "porta a termine il servizio"
+                if o["consegna_scelta"] == "servizio"
                 else "segna la spedizione")
         voci.append(f"ordine #{o['id']} «{(titolo or '?')[:40]}»: {cosa}")
     # 2) Le aste vive sono VINCOLANTI: chi ha versato sta gareggiando.

@@ -53640,3 +53640,46 @@ pausa (una fascia, «Una volta sola»), le ferie nel Profilo, la data di
 un servizio venduto, il «🕒 Quando» di uno scambio in contanti. Gli
 scatti del motore di Safari hanno i caratteri più sottili: è il WebKit
 per Windows del banco, non l'iPhone.
+
+**I QUATTRO RITOCCHI PRIMA DEL PUSH** (12 ott 2026, notte, richiesta di
+Andrea sui «notati» del rapporto; il PayCode resta com'è).
+1) LA DATA PROPOSTA COMPARE SUBITO. Dopo «📅 Proponi la data» la pagina
+dell'ordine diceva ancora «Proponi giorno e ora» finché gli ordini non
+si rileggevano: `openOrder` ridisegna dai dati che ha, e nessuno glieli
+aggiornava. Adesso `proponiAppuntamento` scrive la data che risponde il
+server e azzera la conferma se la proposta è nuova (la regola del
+server, detta subito). LA PRIMA STESURA SCRIVEVA SU `currentOrder`, E
+IL GIRO DAL VIVO L'HA BOCCIATA: il toast diceva «Proposta inviata» e la
+pagina restava com'era. `currentOrder` può essere la copia di PRIMA
+dell'ultima rilettura della lista (basta toccare l'ordine mentre
+«Ordini» si sta ancora rileggendo), e `openOrder` ridisegna dalla riga
+di `orders`: si scrive lì. Il banco node di prima passava, perché
+teneva un oggetto solo; adesso ha la lista e il caso della copia
+vecchia.
+2) NIENTE AVVISO SUL CORRIERE SU UN SERVIZIO. `forseAvvisoTrasporto`
+(«📦 La tua prima spedizione») si apriva anche sopra «📅 L'appuntamento»
+di un servizio pagato — e così si consumava: alla prima vendita con
+spedizione non sarebbe più arrivato. Adesso tace sulla via `servizio`
+come su ritiro e digitale, e il timbro resta.
+3) LE FERIE NON CHIEDONO A UN SERVIZIO DI SPEDIRE. `_impegni_aperti`
+diceva «segna la spedizione» per ogni ordine pagato che non fosse
+digitale; per un servizio dice «porta a termine il servizio». LA REGOLA
+NON È CAMBIATA: un servizio pagato trattiene ancora chi parte (i sats di
+qualcuno aspettano lui) — è cambiata solo la frase. SCARTATO togliere
+il servizio dagli impegni: non era la richiesta, e sarebbe una regola.
+4) I TONDI DEI GIORNI della fascia (L M M G V S D) alti 40 px, come le
+celle delle ore.
+PROVATO: `prove_servizio_senza_corriere` (11: `proponiAppuntamento` e
+`forseAvvisoTrasporto` veri in node, `_impegni_aperti` su un database in
+memoria) e una sentinella sui tondi; la tortura dei ritocchi, 11 su 11;
+IL GIRO DAL VIVO a 390×844 sul server di cartone, cinque scatti: i tondi
+45×40; l'ordine di servizio aperto da un venditore che l'avviso non l'ha
+mai visto — nessun foglio, timbro intatto; «Proponi la data» e subito
+«Hai proposto giovedì 15 ottobre alle ore 15:30» (zero riletture degli
+ordini); le ferie con quell'ordine aperto — «ordine #4 «Lezione di
+inglese»: porta a termine il servizio»; e la controprova, un ordine con
+spedizione: l'avviso arriva.
+NOTATO E NON FATTO (aspetta un sì): «✅ Confermo, ci sono» di chi compra
+e «🔗 Lascia il collegamento» hanno la stessa radice del punto 1 (la
+pagina non si aggiorna da sola dopo il gesto); per il ritiro a mano le
+ferie dicono ancora «segna la spedizione».

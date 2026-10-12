@@ -3679,7 +3679,9 @@
   .p2p-veloce-segno{color:var(--trust-text);font-weight:800;font-size:11.5px;padding:5px 8px}
   .p2p-pausa-fascia{border:1.5px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px}
   .p2p-pausa-giorni{display:flex;gap:4px;margin-bottom:8px}
-  .p2p-pausa-giorni .p2p-accesso-chip{flex:1 1 0;min-width:0;padding:6px 0;text-align:center}
+  /* alti come le celle delle ore del selettore (12 ott 2026, notte,
+     richiesta di Andrea): 40px, si toccano col pollice */
+  .p2p-pausa-giorni .p2p-accesso-chip{flex:1 1 0;min-width:0;min-height:40px;padding:6px 0;text-align:center}
   .p2p-pausa-ore{display:flex;align-items:center;gap:8px}
   .p2p-pausa-ore .sel-casa-riga{flex:1 1 0;min-width:0;padding:10px 12px}
   .p2p-pausa-ore .btn.mini{flex:0 0 auto;align-self:center}
@@ -33984,9 +33986,13 @@ function forseAvvisoTrasporto(o){
   if (DEMO || VETRINA || myAvvisatoTrasporto) return;
   /* le stesse condizioni del pannello «📦 Spedisci»: il venditore, i
      sats gia' in cassaforte, e una strada che spedisce davvero — sul
-     ritiro e sul codice online non c'e' nessun corriere di mezzo */
+     ritiro e sul codice online non c'e' nessun corriere di mezzo, e
+     su un SERVIZIO nemmeno (12 ott 2026, notte, richiesta di Andrea:
+     l'avviso si apriva sopra «📅 L'appuntamento»). Il timbro NON si
+     consuma: alla prima vendita che spedisce l'avviso arriva ancora. */
   if (o.role!=='seller' || o.state!=='locked') return;
-  if (o.consegnaScelta==='ritiro' || o.consegnaScelta==='digitale') return;
+  if (o.consegnaScelta==='ritiro' || o.consegnaScelta==='digitale'
+      || o.consegnaScelta==='servizio') return;
   if (o.asta && !o.consegnaScelta) return;   // aspetta la scelta del vincitore
   myAvvisatoTrasporto = 1;                   // il timbro PRIMA di aprire
   el('sheetBg').classList.add('open');
@@ -41413,6 +41419,19 @@ async function proponiAppuntamento(btn){
       body: JSON.stringify({quando})});
     const d = await r.json();
     if (!r.ok) { toast(d.detail || 'Non è andata'); return; }
+    /* LA DATA COMPARE SUBITO (12 ott 2026, notte, cantiere pausa-leggera,
+       richiesta di Andrea): la pagina si ridisegna dai dati che ha, e
+       senza queste righe diceva ancora «Proponi giorno e ora» finche'
+       gli ordini non si rileggevano. La parola e' quella del server: la
+       SUA data, e la conferma — che una proposta nuova azzera, e che
+       resta solo se la data e' la stessa di prima.
+       SI SCRIVE SULLA RIGA DI `orders`, che e' quella che `openOrder`
+       rilegge: `currentOrder` puo' essere la copia di PRIMA dell'ultima
+       rilettura della lista (visto nel giro dal vivo: scritta li', la
+       data non compariva). */
+    const riga = orders.find(x => x.id === currentOrder.id) || currentOrder;
+    riga.appuntamentoIl = Math.floor(Number(d.quando) || quando);
+    if (!d.confermato) riga.appuntamentoConfermatoIl = 0;
     toast('📅 Proposta inviata');
     openOrder(currentOrder.id);
   } catch(e) { toast('Non è andata, riprova'); }

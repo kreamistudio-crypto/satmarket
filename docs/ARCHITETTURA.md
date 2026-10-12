@@ -30960,6 +30960,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «Lun–ven 8–20»; ha preso il posto di `fraseFasciaP2P`). IL SELETTORE
   DELLA SCADENZA DEL PAYCODE (`#p2pScadeSheet`) NON È CAMBIATO: resta il
   suo foglio, coi suoi minuti.
+  I RITOCCHI DELLA STESSA NOTTE (richiesta di Andrea, da tre cose viste
+  nel giro dal vivo). L'ORDINE DI SERVIZIO: `proponiAppuntamento` scrive
+  la data che risponde il server sulla riga di `orders` — quella che
+  `openOrder` rilegge; `currentOrder` può essere la copia di prima
+  dell'ultima rilettura della lista — e azzera la conferma se la
+  proposta è nuova: «Hai proposto…» compare subito, senza rileggere
+  gli ordini. `forseAvvisoTrasporto` tace anche sulla via `servizio`
+  (come su ritiro e digitale) e NON consuma il timbro
+  `avvisato_trasporto`: alla prima vendita che spedisce l'avviso
+  arriva ancora. `_impegni_aperti` dice «porta a termine il servizio»
+  al posto di «segna la spedizione» (il servizio pagato trattiene
+  ancora chi parte per le ferie: la regola non è cambiata, la frase
+  sì). I TONDI DEI GIORNI della fascia (`.p2p-pausa-giorni
+  .p2p-accesso-chip`) sono alti 40px come le celle.
   • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
   `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
   senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo
