@@ -116,8 +116,11 @@ _so.socket.sendto = sendto
 # I SEGNI DI UNA RIGA ROSSA, come li stampano i banchi dei collaudi: la
 # «✗» dei piu', il «NO» di collaudo_pagamento_p2p e di chi lo importa,
 # «[NO]» e «[KO]» di qualche banco piu' vecchio, FAIL e ⛔ del lanciatore
-# stesso. Un Traceback e' rosso a parte: si prende il blocco intero.
-SEGNI_ROSSI = ("✗", "NO ", "[NO]", "[KO]", "FAIL", "⛔")
+# stesso, e il «‼» dei due collaudi dell'AI (collaudo_impersonazione e
+# collaudo_ricategorizza: la loro riga e' «✗ [atteso | detto] titolo», e
+# «‼» e' lo sbaglio GRAVE — un annuncio legittimo bloccato, un annuncio
+# spostato male). Un Traceback e' rosso a parte: si prende il blocco intero.
+SEGNI_ROSSI = ("✗", "‼", "NO ", "[NO]", "[KO]", "FAIL", "⛔")
 # ...e la riga di un'eccezione («KeyError: 'x'», «SyntaxError: …»)
 FORMA_ECCEZIONE = re.compile(r"^[A-Za-z_][\w.]*(Error|Exception)(:|$)")
 

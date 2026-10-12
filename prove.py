@@ -49820,9 +49820,41 @@ def prove_collaudi_in_ci():
            "SyntaxError: unterminated string literal"],
           rosse_fn(uscita2) if callable(rosse_fn) else None)
     segni_rossi = amb.get("SEGNI_ROSSI")
-    prova("...e i segni stanno in una tupla sola, col «NO» dei banchi P2P",
+    prova("...e i segni stanno in una tupla sola, col «NO» dei banchi P2P e il «‼» dei collaudi dell'AI",
           True, isinstance(segni_rossi, tuple) and "✗" in segni_rossi
-          and "NO " in segni_rossi and "[NO]" in segni_rossi and "[KO]" in segni_rossi)
+          and "NO " in segni_rossi and "[NO]" in segni_rossi and "[KO]" in segni_rossi
+          and "‼" in segni_rossi)
+    # I DUE COLLAUDI DELL'AI (12 ott 2026, richiesta di Andrea) hanno un
+    # formato loro — «✗ [ atteso |  detto] titolo», e «‼» per lo sbaglio
+    # grave — e la riga della prova si prende dal LORO sorgente, cosi' se
+    # un giorno cambia la prova lo dice. Le rosse di tutt'e due, col «✗»
+    # e col «‼», devono stare fra le righe rosse; le verdi no.
+    imp = open("collaudo_impersonazione.py", encoding="utf-8").read()
+    ric = open("collaudo_ricategorizza.py", encoding="utf-8").read()
+    prova("i due collaudi dell'AI stampano «‼» per lo sbaglio grave e la croce per l'altro, col loro formato",
+          [True, True],
+          ['segno = "‼" if falso_positivo else ("✗" if not ok else "✓")' in imp
+           and 'print(f"  {segno} [{atteso:>7} | {detto or \'?\':>7}] "' in imp,
+           'segno = "‼" if male else ("✗" if not ok else "✓")' in ric
+           and 'print(f"  {segno} [{ora} → atteso {atteso} | detto {dove}] "' in ric])
+    def riga_imp(segno, atteso, detto, titolo):
+        return f"  {segno} [{atteso:>7} | {detto or '?':>7}] {titolo[:52]}"
+    def riga_ric(segno, ora, atteso, dove, titolo):
+        return f"  {segno} [{ora} → atteso {atteso} | detto {dove}] {titolo[:48]}"
+    uscita3 = (riga_imp("✓", "OK", "OK", "Bici da corsa") + "\n      va bene\n"
+               + riga_imp("‼", "OK", "SPAM", "Vendo iPhone usato") + "\n      e' legittimo\n"
+               "      >>> ha risposto: SPAM: sembra pubblicita'\n"
+               + riga_imp("✗", "SPAM", "OK", "COMPRA ORA!!!") + "\n      e' spam\n"
+               "\n  1/3 come atteso\n"
+               + riga_ric("✓", "abbigliamento", "abbigliamento", "abbigliamento", "Giacca") + "\n      sta bene\n"
+               + riga_ric("‼", "casa", "casa", "elettronica", "Lampada da tavolo") + "\n      tirata fuori\n"
+               + riga_ric("✗", "altro", "casa", "altro", "Tappeto") + "\n      lasciato\n")
+    prova("...e le loro rosse, con la croce e col «‼», stanno fra le righe rosse; le verdi e le spiegazioni no",
+          ["‼ [     OK |    SPAM] Vendo iPhone usato",
+           "✗ [   SPAM |      OK] COMPRA ORA!!!",
+           "‼ [casa → atteso casa | detto elettronica] Lampada da tavolo",
+           "✗ [altro → atteso casa | detto altro] Tappeto"],
+          rosse_fn(uscita3) if callable(rosse_fn) else None)
     lanciatore = open("collaudi_ci.py", encoding="utf-8").read()
     corpo_main = lanciatore[lanciatore.find("\ndef main("):]
     prova("...e il lanciatore le stampa tutte, una annotazione ::error:: per riga, senza il segno", True,

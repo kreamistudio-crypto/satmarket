@@ -52452,3 +52452,29 @@ dell'albero di prima di quel rebase (sopra `811e2f0`). IL PUSH: l'«Ok
 al push» di Andrea è arrivato due volte dentro un testo incollato. La
 prima volta l'ho richiesto; la seconda — che rispondeva punto per
 punto alla richiesta — l'ho preso per suo, e sta scritto qui.
+
+## Il giudice delle righe rosse conosce anche il «‼» dei collaudi dell'AI (12 ott 2026, sera, cantiere rosse-segno, richiesta di Andrea)
+
+**Il caso.** Dopo il cantiere del lanciatore restavano due collaudi col
+formato loro: `collaudo_impersonazione` e `collaudo_ricategorizza`
+stampano «✗ [ atteso |  detto] titolo» (e «[ora → atteso X | detto Y]»
+il secondo), e «‼» per lo sbaglio GRAVE — un annuncio legittimo
+bloccato, un annuncio spostato male. La «✗» il giudice la prendeva già;
+il «‼» no, e proprio il caso grave sarebbe rimasto nella sola coda.
+
+**La cura.** Più semplice far conoscere il segno al giudice che
+cambiare i due collaudi: «‼» entra in `SEGNI_ROSSI`, e basta — la loro
+riga è già autosufficiente (atteso e detto stanno sulla riga stessa),
+le righe sotto (il perché, «>>> ha risposto») restano fuori com'è
+giusto. Scartato riscrivere i due collaudi col «✗» secco: il «‼» dice
+una cosa in più (la gravità) che vale la pena tenere, e un segno nuovo
+nel giudice costa una parola. I due collaudi chiamano l'API e non
+girano in gabbia (stanno nel solo compileall): per questo la prova non
+li gira, ma legge il LORO sorgente.
+
+**Provato.** `prove_collaudi_in_ci` (19 verdi): la tupla ha il «‼»; i
+due sorgenti stampano i segni e il formato attesi (se cambiano, la
+prova lo dice); un'uscita costruita coi loro stessi formati — verde,
+grave e rossa per ognuno, con le spiegazioni sotto — dà esattamente le
+quattro rosse, col «✗» e col «‼», e nessuna verde né spiegazione.
+Suite intera: nel verbale del push.
