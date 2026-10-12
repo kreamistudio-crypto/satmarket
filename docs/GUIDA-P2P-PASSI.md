@@ -1011,7 +1011,9 @@ disputa.»
      scadenza dalla mail. Deve stare fra un'ora e 72 ore da adesso. Nel
      libro l'ordine resta fino a **due ore prima** di quella scadenza,
      per lasciare a chi paga il tempo di andare al tabacchino; poi esce
-     da solo.»
+     da solo.» (Dal 12 ott 2026 quel «due ore» è il margine VERO: dove
+     chi pubblica ha tre ore per rispondere si legge «**4 ore e 30
+     minuti prima**».)
    - **4 Il premio** — cursore da −20 a +20 (si può anche scrivere a
      mano, toccando la cifra con la matita), e la riga che fa il conto:
      «Chi paga al tabacchino riceve circa <N> sats al cambio di adesso,
@@ -1082,7 +1084,7 @@ disputa.»
    («Stai comprando sats») c'è «📖 Come funziona, passo per passo» (porta
    a «Info P2P») e, se mancano meno di sei ore: «⏳ Occhio al tempo:
    questo ordine esce dal libro fra meno di sei ore (o «…di un'ora»), e il
-   PayCode scade circa due ore dopo. Devi fare in tempo ad andare al
+   PayCode scade almeno due ore dopo. Devi fare in tempo ad andare al
    tabacchino e pagare: se il PayCode scade prima, lo scambio va annullato
    e non ricevi i sats.» Passi: «Indichi dove
    ricevere i sats» → «Chi vende li mette in garanzia» → «Paghi il PayCode
@@ -1155,7 +1157,7 @@ disputa.»
   un'ora…».
 - Nessuno prende entro la scadenza del libro: ✈️ «⏰ **Nessuno ha pagato
   il tuo PayCode entro la scadenza del libro:** l'ordine è uscito dalla
-  vetrina (…). La scadenza del libro cade due ore prima di quella Amazon…
+  vetrina (…). La scadenza del libro cade almeno due ore prima di quella Amazon…
   Quando scade anche lui, l'ordine Amazon va rifatto e ripubblicato con un
   PayCode nuovo.»
 - Errori nel foglio del recapito (se il PayCode si manda a mano): «Il

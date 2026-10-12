@@ -53218,26 +53218,54 @@ mentre si pubblica un ordine Barattozon; con «Nessuna pausa» e un
 ordine normale non c'è (una frase per gesto). Il bottone sotto la presa
 di un ordine Barattozon non c'è.
 
-**NON TOCCATO, e si dice.** La tutela della presa arrivata in pausa
-(`_presa_in_pausa_p2p`: non si conta il «non completato») vale ancora
-per ogni ordine, Barattozon compresi — che adesso in pausa si prendono.
-Cambiarla è una regola, e la richiesta diceva «niente regole nuove»:
-è una domanda per Andrea.
+**LA TUTELA DELLA PRESA IN PAUSA RESTA, anche per Barattozon**
+(decisione di Andrea, chiesta apposta): una presa arrivata in pausa non
+conta come «non completato» (`_presa_in_pausa_p2p`, non toccata), e
+vale per ogni ordine — Barattozon compresi, che adesso in pausa si
+prendono. Tenerli visibili è una scelta della piattaforma, non di chi
+ha pubblicato.
 
-**IL PUNTO 6, IN ATTESA DEL NUMERO.** Un ordine Barattozon esce dal
-libro due ore prima che il PayCode scada (`P2P_TABACCHINO_MARGINE_S`,
-messo nell'`expires_at` alla pubblicazione). Con le tre ore a chi
-pubblica (la `-bar8`) non bastano. LA PROPOSTA, non ancora applicata: il
-margine è la somma dei tre tempi che ci stanno dentro — il tempo di chi
-prende, il tempo di chi pubblica, un'ora per andare al tabacchino
-(`P2P_PAYCODE_MIN_S`, che la casa usa già per questo) — e mai meno delle
-due ore di oggi. Coi 30 minuti di oggi fa 30 + 30 + 60 = 2 ore, cioè
-non cambia niente; con le tre ore fa 4 ore e mezza.
+**IL PUNTO 6: IL MARGINE DI BARATTOZON SEGUE IL TEMPO DI CHI PUBBLICA**
+(proposto, e applicato col sì di Andrea sul numero). Un ordine
+Barattozon esce dal libro due ore prima che il PayCode scada
+(`P2P_TABACCHINO_MARGINE_S`, messo nell'`expires_at` alla
+pubblicazione). Con le tre ore a chi pubblica (la `-bar8`) non bastano.
+Adesso il margine è la somma dei tre tempi che ci stanno dentro — il
+tempo di chi prende, il tempo di chi pubblica, un'ora per andare al
+tabacchino (`P2P_PAYCODE_MIN_S`, che la casa usa già per questo) — e
+mai meno delle due ore di oggi (`margineTabacchinoP2P`). Coi 30 minuti
+di oggi fa 30 + 30 + 60 = 2 ORE, cioè non cambia niente; con le tre ore
+fa 4 ORE E 30. I due tempi si leggono dal servizio di scambio: senza
+quella lettura vale il minimo.
+COSA VIENE DIETRO. Il margine si decide ALLA PUBBLICAZIONE, quindi un
+ordine già nel libro tiene quello con cui è nato: nelle 72 ore dopo la
+`-bar8` ci saranno ordini a due ore (sta scritto nella liturgia, in
+PRODUZIONE). Per questo le frasi che non sanno con quale margine è nato
+l'ordine dicono «ALMENO due ore» (il dettaglio di chi prende, «Info
+P2P», l'avviso del server a chi vende), mentre il passo 3 di chi
+pubblica dice il margine vero. L'avviso sotto le sei ore resta com'è.
+LA FUNZIONE ROVESCIATA (`scadenzaPayCodeDaLibroP2P`: dalla scadenza del
+libro a quella del PayCode, per la riga che il codice cifrato non ce
+l'ha) resta sulle due ore, e si è contato: per un ordine nato col
+margine lungo sbaglia solo in ANTICIPO, di due ore e mezza al più, mai
+di un minuto dopo. SCARTATO farle leggere il margine di adesso: per un
+ordine nato prima della `-bar8` direbbe una scadenza più lontana di
+quella vera, che è il verso in cui non si può sbagliare.
+`vitaLibroTabacchinoP2P` NON È TOCCATA: cinque banchi la ritagliano per
+firma, e resta la sorella con le due ore; chi pubblica e il riepilogo
+passano da `vitaLibroVivaP2P`.
+NON RISOLTO, e si dice: su un PayCode a cui restano poche ore il
+margine si stringe già oggi a metà del tempo — lì l'ora per il
+tabacchino non è garantita, e con le tre ore lo sarà meno —; e l'ora
+per il tabacchino non sa che di notte è chiuso.
 
-**PROVATO.** `prove_pausa_in_vista` (30 prove: il link nei tre posti, il
+**PROVATO.** `prove_pausa_in_vista` (42 prove: il link nei tre posti, il
 bottone e a chi va, le sentinelle del foglio nel DOM e delle righe, i
 giudici della pagina in node — le tre frasi dello stato, la riga nei
-due posti, la leva spenta —, la porta dell'indirizzo) e tre prove nuove
+due posti, la leva spenta —, la porta dell'indirizzo, e il margine: i
+due numeri, la vita nel libro uguale a ieri con le due ore su tutta la
+griglia, la funzione rovesciata che non sbaglia mai in ritardo, le
+frasi) e tre prove nuove
 nel banco della pausa di `prove_tempo_di_chi_pubblica` (Barattozon fuori
 dalla mappa e prendibile, la regola nel giudice unico).
 `collaudo_tempo_pubblica`, passo 8-bis, sul server vero: 38 passi, anche

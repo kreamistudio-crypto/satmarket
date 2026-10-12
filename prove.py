@@ -87396,7 +87396,10 @@ DOM = null;
           and "settantadue ore dal checkout" in _inf)
     prova("le frasi del tempo dicono PayCode e l'avviso alla presa spiega le due ore", True,
           "Il PayCode scade fra meno di sei ore" in mini
-          and "e il PayCode scade circa due ore dopo" in mini)
+          # (12 ott 2026, pausa-in-vista) «almeno»: il margine segue il
+          # tempo di chi pubblica, e un ordine tiene quello con cui e' nato
+          and "e il PayCode scade almeno due ore dopo" in mini
+          and "circa due ore dopo" not in mini)
 
     # --- 10) NESSUN DATO AMAZON IN CHIARO -----------------------------------
     _od = pezzo_js(mini, "function ordineDaCampiP2P(v, lato){", "\n}\n")
@@ -149123,6 +149126,100 @@ console.log(JSON.stringify(R));
           [Q.get(k) for k in ("levaSpenta", "p2pSpento", "senza", "scambio", "altrove")])
     prova("...e la costante la legge una volta, dall'indirizzo esatto", True,
           "const P2P_PAUSA_URL = !!P2P_URL && /[?&]pausa=1(?:&|$)/.test(location.search);" in m)
+
+    # --- 5) IL MARGINE DI BARATTOZON SEGUE IL TEMPO DI CHI PUBBLICA --------
+    # (il punto 6: numero approvato da Andrea — 4 ore e 30 con le tre ore,
+    # 2 ore oggi; «almeno due ore» nelle frasi, l'avviso a sei ore com'e')
+    costanti = "".join(re.search(r"const %s = [^;\n]*;[^\n]*\n" % nome, m).group(0)
+                       for nome in ("P2P_TABACCHINO_VITA_S", "P2P_PAYCODE_MIN_S",
+                                    "P2P_TABACCHINO_MARGINE_S"))
+    banco6 = costanti + "let p2pInfo = null;\n" + "".join(_fn_js(m, f) for f in (
+        "function tempoParoleP2P(sec){", "function finestraDiP2P(info, pubblica){",
+        "function margineTabacchinoP2P(info){",
+        "function vitaLibroMargineP2P(scade, adesso, margine){",
+        "function vitaLibroVivaP2P(scade, adesso){", "function margineParoleP2P(){",
+        "function vitaLibroTabacchinoP2P(scade, adesso){",
+        "function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){")) + r"""
+const c = {};
+const OGGI = {scadenzaSec: 1800}, BAR8 = {scadenzaSec: 1800, scadenzaPubblicaSec: 10800};
+c.margini = [margineTabacchinoP2P(OGGI), margineTabacchinoP2P(BAR8), margineTabacchinoP2P(null),
+             margineTabacchinoP2P({scadenzaSec: 900}),
+             margineTabacchinoP2P({scadenzaSec: 1800, scadenzaPubblicaSec: 1800}),
+             margineTabacchinoP2P({scadenzaSec: 1800, scadenzaPubblicaSec: 7200})];
+const ORA = 1790000000, H = 3600;
+/* con le due ore (o con meno: il minimo) e' la sorella di ieri, su tutta la griglia */
+let uguali = true;
+for (let h = 0; h <= 160; h++) for (const mar of [0, 100, 7200])
+  if (vitaLibroMargineP2P(ORA + h * 1800, ORA, mar) !== vitaLibroTabacchinoP2P(ORA + h * 1800, ORA)) uguali = false;
+c.uguali = uguali;
+c.vita = [vitaLibroMargineP2P(ORA + 48 * H, ORA, 16200) - ORA, vitaLibroMargineP2P(ORA + 6 * H, ORA, 16200) - ORA,
+          vitaLibroMargineP2P(ORA + 9 * H, ORA, 16200) - ORA, vitaLibroMargineP2P(ORA + 100 * H, ORA, 16200) - ORA,
+          vitaLibroMargineP2P(ORA - 5, ORA, 16200)];
+p2pInfo = OGGI; c.vivaOggi = [vitaLibroVivaP2P(ORA + 48 * H, ORA) - ORA, margineParoleP2P()];
+p2pInfo = BAR8; c.vivaBar8 = [vitaLibroVivaP2P(ORA + 48 * H, ORA) - ORA, margineParoleP2P()];
+p2pInfo = null; c.vivaSenza = [vitaLibroVivaP2P(ORA + 48 * H, ORA) - ORA, margineParoleP2P()];
+/* la funzione rovesciata resta sulle due ore: mai una scadenza piu' lontana di quella vera */
+let maiDopo = true, esatta = true;
+for (let h = 2; h < 144; h++) {
+  const s = ORA + h * 1800;
+  if (scadenzaPayCodeDaLibroP2P(vitaLibroMargineP2P(s, ORA, 16200), ORA) > s + 1) maiDopo = false;
+  if (Math.abs(scadenzaPayCodeDaLibroP2P(vitaLibroTabacchinoP2P(s, ORA), ORA) - s) > 1) esatta = false;
+}
+c.rovescia = [maiDopo, esatta,
+              ORA + 48 * H - scadenzaPayCodeDaLibroP2P(vitaLibroMargineP2P(ORA + 48 * H, ORA, 16200), ORA)];
+console.log(JSON.stringify(c));
+"""
+    c6 = _node_banco(banco6)
+    if c6 is None:
+        prova("il margine di Barattozon gira in node", True, False)
+        return
+    prova("IL MARGINE: coi 30 minuti di oggi DUE ORE (30 + 30 + 60: non cambia niente), con "
+          "le tre ore a chi pubblica QUATTRO ORE E MEZZA — il numero approvato",
+          [7200, 16200], c6["margini"][:2])
+    prova("...mai meno delle due ore: senza la lettura del servizio (ripiego a 15 minuti), "
+          "o col tempo uguale per tutti, resta il margine di sempre; e segue il tempo "
+          "vero (due ore a chi pubblica = 3 ore e 30)",
+          [7200, 7200, 7200, 12600], c6["margini"][2:])
+    prova("con le due ore la vita nel libro e' ESATTAMENTE quella di ieri, su tutta la "
+          "griglia (da PayCode scaduti a oltre le 72 ore)", True, c6["uguali"])
+    prova("col margine lungo: 48 ore di PayCode → 43 ore e mezza nel libro; un PayCode "
+          "corto lo tosa a meta' del tempo che resta (6 ore → 3, 9 ore → 4 e mezza); "
+          "mai oltre le 72 ore; scaduto = zero",
+          [156600, 10800, 16200, 259200, 0], c6["vita"])
+    prova("LA VITA VIVA legge il servizio di scambio: oggi due ore prima, con le tre ore "
+          "quattro e mezza, senza lettura il minimo — e il passo 3 del foglio lo dice con "
+          "le stesse parole di sempre finche' sono due ore",
+          [[165600, "due ore"], [156600, "4 ore e 30 minuti"], [165600, "due ore"]],
+          [c6["vivaOggi"], c6["vivaBar8"], c6["vivaSenza"]])
+    prova("la funzione ROVESCIATA (la scadenza del PayCode dalla scadenza del libro) resta "
+          "sulle due ore: esatta per gli ordini nati con due ore, e per quelli nati col "
+          "margine lungo sbaglia solo in ANTICIPO (due ore e mezza, mai un minuto dopo)",
+          [True, True, 9000], c6["rovescia"])
+    pubblica = m[m.index("    o.expires_at = typeof vitaLibroVivaP2P === 'function'"):][:200]
+    riepilogo = _fn_js(m, "function riepilogoTabacchinoP2P(v){")
+    prova("i due posti che decidono e mostrano la vita nel libro passano dal margine vivo, "
+          "dal typeof (i banchi di ieri senza il giudice restano alle due ore)",
+          [True, True],
+          ["? vitaLibroVivaP2P(v.scade, adesso) : vitaLibroTabacchinoP2P(v.scade, adesso);"
+           in pubblica,
+           "const libro = typeof vitaLibroVivaP2P === 'function'\n    ? vitaLibroVivaP2P(scade, "
+           "adesso) : vitaLibroTabacchinoP2P(scade, adesso);" in riepilogo])
+    prova("...la sorella di ieri NON e' toccata (i banchi che la ritagliano non cambiano), e "
+          "nemmeno le due soglie dell'avviso: sei ore e un'ora",
+          [True, True, True],
+          ["const margine = Math.min(P2P_TABACCHINO_MARGINE_S, Math.floor((s - ora) / 2));"
+           in _fn_js(m, "function vitaLibroTabacchinoP2P(scade, adesso){"),
+           "const P2P_TAB_AVVISO_S = 6 * 3600;" in m, "const P2P_TAB_ULTIMA_S = 3600;" in m])
+    prova("LE FRASI dicono «almeno due ore» dove non si sa con quale margine e' nato "
+          "l'ordine (il dettaglio di chi prende, «Info P2P», l'avviso del server a chi "
+          "vende), e il passo 3 di chi pubblica dice il margine VERO",
+          [True, True, True, True, False],
+          ["e il PayCode scade almeno due ore dopo. Devi fare in tempo" in m,
+           "Quella <b>del libro</b> cade almeno due ore prima di quella del PayCode" in m,
+           "La scadenza del libro cade almeno due ore prima di quella Amazon" in src,
+           "+ (typeof margineParoleP2P === 'function' ? margineParoleP2P() : 'due ore')\n"
+           "        + ' prima</b> di quella scadenza" in m,
+           "circa due ore" in m + src])
 
 
 def prove_tempo_pubblica_app():

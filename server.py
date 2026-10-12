@@ -56069,11 +56069,14 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
     if momento == "scaduto" and paycode and vende:
         # LE DUE SCADENZE, dette (23 set 2026): il libro chiude due ore
         # prima del PayCode — e' il margine per chi deve andare al
-        # tabacchino — quindi «scaduto» qui e' il libro, non Amazon
+        # tabacchino — quindi «scaduto» qui e' il libro, non Amazon.
+        # «ALMENO due ore» dal 12 ott 2026: il margine lo decide la pagina
+        # alla pubblicazione e segue il tempo di chi pubblica (4 ore e 30
+        # con le tre ore); il server non sa con quale e' nato l'ordine
         return ("⏰ <b>Nessuno ha pagato il tuo PayCode entro la scadenza del "
                 "libro:</b> l'ordine è uscito dalla vetrina"
                 + (f" ({quanto})" if sats > 0 or euro else "") + ".\n\n"
-                "La scadenza del libro cade due ore prima di quella Amazon, per "
+                "La scadenza del libro cade almeno due ore prima di quella Amazon, per "
                 "lasciare a chi paga il tempo di andare al tabacchino: il "
                 "PayCode vale ancora per poco, ma nessuno può più prenderlo. "
                 "Quando scade anche lui, l'ordine Amazon va rifatto e "

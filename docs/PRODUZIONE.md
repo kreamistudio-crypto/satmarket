@@ -3609,6 +3609,17 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   in servizio si toglie «che non arriva a nessuno su Telegram».
   b) LA RIGA DELL'IMMAGINE DEL NODO in `CLAUDE.md` (`mostro:v0.19.0-bar7`
   → `-bar8`, con la 0011 e la 0012), rimandata da Andrea a quel giorno.
+  DA SAPERE PER BARATTOZON (12 ott 2026, cantiere pausa-in-vista): con
+  le tre ore a chi pubblica un ordine Barattozon esce dal libro 4 ORE E
+  30 prima che il PayCode scada, invece di due — lo decide la pagina di
+  chi PUBBLICA, leggendo il tempo dal 38385, e lo scrive nella scadenza
+  dell'ordine. Quindi gli ordini Barattozon GIÀ nel libro al momento
+  del riavvio tengono le due ore finché vivono (al più 72 ore): uno
+  preso a ridosso della chiusura, con chi pubblica che usa tutte le sue
+  tre ore, può arrivare al PayCode scaduto. Non è un guasto e non
+  ferma niente: prima del riavvio si guarda se nel libro ce ne sono
+  (dall'app, la pillola Barattozon del libro), e se sì lo si dice a chi
+  li ha pubblicati, o si aspetta che escano.
   ROLLBACK: `cd ~/nodo`, la riga dell'immagine a `mostro:v0.19.0-bar7`
   e le due righe nuove del `settings.toml` commentate (la `-bar7` le
   ignorerebbe comunque: `[mostro]` non rifiuta le chiavi che non

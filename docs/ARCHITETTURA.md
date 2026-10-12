@@ -27387,7 +27387,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   timbro `confermato`). LA VITA NEL LIBRO SEGUE IL PAYCODE e rovescia
   le 24 ore del 22 set: `expires_at` = scadenza meno DUE ORE, margine
   che si stringe a meta' del tempo che resta sui PayCode corti, mai
-  oltre 72 ore (`vitaLibroTabacchinoP2P`); il costo — l'opzione sul
+  oltre 72 ore (`vitaLibroTabacchinoP2P`). ⚠️ DAL 12 OTT 2026 IL
+  MARGINE SEGUE IL TEMPO DI CHI PUBBLICA (cantiere pausa-in-vista,
+  numero approvato da Andrea): `margineTabacchinoP2P(info)` = tempo di
+  chi prende + tempo di chi pubblica (`finestraDiP2P`, dal 38385) +
+  un'ora per il tabacchino (`P2P_PAYCODE_MIN_S`), MAI MENO DELLE DUE
+  ORE. Coi 30 minuti a testa fa due ore — non cambia niente —, con le
+  tre ore della `-bar8` fa 4 ore e 30. Chi pubblica e il riepilogo
+  passano da `vitaLibroVivaP2P` (dal typeof); `vitaLibroTabacchinoP2P`
+  resta la sorella con le due ore, e i banchi che la ritagliano non
+  cambiano. Il margine si decide ALLA PUBBLICAZIONE: un ordine nel
+  libro tiene quello con cui e' nato, quindi le frasi a chi prende e
+  quella del server dicono «almeno due ore», e la funzione rovesciata
+  `scadenzaPayCodeDaLibroP2P` resta sulle due ore — sbaglia solo in
+  anticipo. L'avviso «manca poco» resta a sei ore. Il costo — l'opzione sul
   cambio per chi prende — e' dichiarato. LA SCADENZA NON VA NEL `pm`:
   l'`expires_at` pubblico dice gia' la stessa cosa meno due ore, e nel
   libro resta il solo importo; PayCode e scadenza viaggiano SOLO nel
