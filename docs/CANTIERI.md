@@ -50804,3 +50804,5 @@ dal vivo nel pane: nel verbale sotto.
 la nsec pubblica la copia (il foglio del profilo deve dire «una copia
 cifrata sta sui tuoi relay»), poi Amber ritrova l'ordine; il relay di
 casa che accetta la copia dalla sua npub (è nella lista di chi scrive).
+
+**COSA È GIRATO SU QUALE ALBERO.** Sopra a0983ec (la punta di main dopo il push della cura, CI verde): la suite intera `PROVE_SEVERE=1 python prove.py` sulla copia pulita di 340bf2b (il commit del cantiere) — 22473 passate, 0 fallite, nessuna saltata; i 62 collaudi del workflow nella gabbia, 62 su 62 verdi (`collaudo_chiavi_ritrovate` coi tre passaggi compreso).
