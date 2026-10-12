@@ -54365,3 +54365,29 @@ Andrea.
 **RESTA DA GUARDARE** (Andrea, dopo il deploy, se ha sotto mano un
 account nato su Nostr): una pausa «una volta sola» di prova, e dal
 secondo account l'ordine che esce dal libro.
+
+**COSA È GIRATO SU QUALE ALBERO** (pausa-nativi, il verbale prima del
+push, 13 ott 2026). Sopra `400a3ea`, la punta di main quando il cantiere
+è stato aperto: la suite severa intera, 23.192 passate e 0 fallite; i
+68 collaudi del workflow nella gabbia, tutti verdi, col passo 8-ter
+dentro. Quella suite è partita PRIMA dei due documenti (questa voce e
+la riga di ARCHITETTURA): scritti quelli, le 33 sezioni che leggono i
+documenti più quella toccata, 2.514 e 0.
+MAIN È CORSO di quattro commit non miei (`dba8b76`, `b6a7709`,
+`1e95da2`, `7da34fb`: il cantiere punti-ritiro, con cinque collaudi in
+più nel workflow). Un rebase solo; conflitto nella sola coda di questo
+file — tenute tutte le righe, le loro prima e le mie per ultime: contro
+main i cinque file danno solo aggiunte, più la riga del giudice.
+SULL'ALBERO DEL PUSH, sopra `7da34fb`: le 89 sezioni che toccano la
+pausa, i documenti e il workflow (6.688 passate e 0 fallite), i 73
+collaudi del workflow nella gabbia (73 verdi, 0 rossi), `compileall`
+sui file toccati, e le forme dei segreti cercate sulle righe aggiunte
+(nessuna).
+E MAIN È CORSO UNA SECONDA VOLTA, a collaudi appena finiti: un commit
+non mio (`865c75b`, voto-dopo-concluso). Secondo rebase, stesso
+conflitto nella coda e stessa cura. I collaudi NON sono stati rilanciati
+tutti (la consegna di Andrea per questa correzione: «rebase, push
+subito»): sopra `865c75b` sono girati `prove_tempo_di_chi_pubblica`
+con le sezioni della bussola, del tetto e dei collaudi in CI,
+`collaudo_tempo_pubblica` nella gabbia e `compileall`. La suite intera
+e i 73 collaudi sull'albero del push li dice la CI.
