@@ -96,6 +96,28 @@ def reale(nome, extra=None):
     return amb[nome]
 
 
+def gruppo_admin_spento(amb=None):
+    """I pezzi VERI del gruppo degli admin (12 ott 2026, cantiere
+    canale-admin), a LEVA SPENTA, montati in `amb` per i banchi che
+    eseguono chi ci passa davanti: `notifica_admin`, le due tastiere,
+    il ponte, i giudici delle dispute P2P, il pannello delle leve.
+    Pezzi veri, mai stub (vedi `reale`): a leva spenta la porta risponde
+    False alla prima riga, e il banco fa girare il codice di ieri —
+    che e' esattamente quel che la leva spenta promette. Il gruppo
+    ACCESO ha la sua prova, `prove_canale_admin`."""
+    amb = {} if amb is None else amb
+    src = _SORGENTE
+    i = src.index("ADMIN_ARGOMENTI = {")
+    exec(src[i:src.index("try:\n    from config import ADMIN_CANALE_ID", i)], amb)
+    amb.setdefault("_GRUPPO_ADMIN", {"id": 0, "stanze": {}, "giu": None,
+                                     "piano_fino": 0.0})
+    for nome in ("gruppo_admin_id", "_avvisati_mod_p2p", "_parti_mod_p2p"):
+        exec(pezzo(nome), amb)
+    for nome in ("_al_gruppo_admin", "_recapita_p2p"):
+        exec("async " + pezzo(nome), amb)
+    return amb
+
+
 def gemelli_trackbot(amb=None):
     """I gemelli VERI della regola del client per il link a @trackbot
     (25 set 2026: il codice di tracciamento cliccabile nei messaggi del
@@ -2392,7 +2414,7 @@ def prove_pagamenti_non_arrivati():
             v.execute("DROP TABLE fatture_scadute")
         detti, journal = [], []
 
-        async def _admin(t):
+        async def _admin(t, **k):
             detti.append(t)
         a.update({"db": lambda: Con(v), "time": __import__("time"),
                   "notifica_admin": _admin,
@@ -3090,7 +3112,7 @@ def prove_importo_uscita():
         async def _mai_visto(_h, _cf=""):
             return ""        # nessuna eco: per quell'hash non c'e' niente
 
-        async def _admin(t):
+        async def _admin(t, **k):
             avvisi.append(t)
             detti.append(t)
 
@@ -4327,7 +4349,7 @@ def prove_saas_senza_doveri():
     """)
     timbri, avvisi, nuova = {}, [], ["nodo"]
 
-    async def _avvisa(t):
+    async def _avvisa(t, **k):
         avvisi.append(t)
 
     amb = {"db": lambda: _Aperta(con), "time": __import__("time"),
@@ -4557,7 +4579,7 @@ def prove_esito_pagamento():
                 raise LnbitsMuto("stato del pagamento: LNbits a 520")
             return v
 
-        async def _avvisa(t):
+        async def _avvisa(t, **k):
             avvisi.append(t)
 
         amb = {**ambiente_scadenza(),
@@ -4739,7 +4761,7 @@ def prove_esito_pagamento():
                 raise LnbitsMuto("stato del pagamento: LNbits a 520")
             return v
 
-        async def _avvisa(testo):
+        async def _avvisa(testo, **k):
             avvisi.append(testo)
 
         amb = {"db": Con, "time": __import__("time"),
@@ -4873,7 +4895,7 @@ def prove_esito_pagamento():
             ripresi.append((tab, rid, verso))
             return {"ok": True}
 
-        async def _avvisa(t):
+        async def _avvisa(t, **k):
             avvisi.append(t)
 
         async def _lnd_spento(_h, _cf=""):
@@ -5403,7 +5425,7 @@ def prove_pagamenti_in_volo(attrezzi=False):
             nodo.coniate.append(addr)
             return f"lnbc-fattura-{len(nodo.coniate)}"
 
-        async def _avvisa(t):
+        async def _avvisa(t, **k):
             m.avvisi.append(t)
 
         async def _corpo(req):
@@ -8327,7 +8349,7 @@ def prove_pagamento_incerto():
         async def _mai_visto(_h, _cf=""):
             return ""
 
-        async def _avvisa(t):
+        async def _avvisa(t, **k):
             avvisi.append(t)
 
         amb = {**ambiente_scadenza(),
@@ -13643,7 +13665,7 @@ console.log(JSON.stringify(out));
 
 
 def _notifica_admin_spia(avvisi):
-    async def _n(testo):
+    async def _n(testo, **k):
         avvisi.append(("admin", testo))
     return _n
 
@@ -17969,6 +17991,7 @@ def prove_notifica_fail_open():
               "annuncio_su_nostr": _niente, "promo_venduto": _niente,
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
+    gruppo_admin_spento(catena)
     exec(pezzo_async("notifica_admin"), catena)
     exec(pezzo_async("polso_ordini_admin"), catena)
     exec(pezzo_async("_incassa_ordine"), catena)
@@ -31747,6 +31770,10 @@ def _censimento(acceso, dopo=None):
     # nomina il timbro; a leve accese il timbro c'e', a spente no
     amb["timbro_letto"] = (lambda n: "fatto") if acceso else (lambda n: "")
     amb["TIMBRO_CAMPAGNA_P2P_TUTTI"] = "campagna_p2p_tutti"
+    # il gruppo degli admin (12 ott 2026): la dodicesima volta della
+    # trappola, la riga del pannello CHIAMA `gruppo_admin_id()` e conta
+    # le stanze — i pezzi veri, a leva spenta
+    gruppo_admin_spento(amb)
     amb.update(dopo or {})
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
@@ -35087,7 +35114,7 @@ def prove_titoli_scappati():
     # --- 3) IL POLSO riceve un titolo GIA' scappato ----------------
     detto = []
 
-    async def notifica_admin_finta(t):
+    async def notifica_admin_finta(t, **k):
         detto.append(t)
 
     class ContaFinta:
@@ -35273,7 +35300,7 @@ def prove_timbri_periodici():
     # Tre deploy nello stesso lunedi', vetrina con la coda piena.
     detti = []
 
-    async def notifica_admin_finta(t):
+    async def notifica_admin_finta(t, **k):
         detti.append(t)
 
     def deploy(lunedi=True):
@@ -50044,6 +50071,10 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
               "_giro_guardiano_ponte", "guardiano_ponte",
               "_guardiano_ponte_avviato", "avvia_guardiano_ponte"):
         exec("async " + pezzo(f), amb)
+    # `_avvisa_ponte` e `_chi_avvisa_ponte` chiedono prima al gruppo
+    # degli admin (12 ott 2026): qui e' spento, e si prova la strada
+    # di sempre; il gruppo acceso sta in `prove_canale_admin`
+    gruppo_admin_spento(amb)
     amb["_TASK_PONTE"] = None
     m.amb = amb
     m.inizio = m.ora
@@ -53150,9 +53181,11 @@ def prove_link_dentro_telegram():
           [True, False],
           ['(f"\\n\\n{bottone[0]}: {bottone[1]}" if bottone else "")' in dm,
            "_link_dentro_telegram" in dm])
-    prova("la traduzione ha DUE chiamanti: il bottone del ramo Telegram e il link "
-          "di testo dell'avviso dei nuovi ordini", [2, True, True],
+    prova("la traduzione ha TRE chiamanti: il bottone del ramo Telegram, lo stesso "
+          "bottone nel gruppo degli admin (12 ott 2026) e il link di testo "
+          "dell'avviso dei nuovi ordini", [3, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
+           '"url": str(_link_dentro_telegram(bottone[1]))' in pezzo("_al_gruppo_admin"),
            "_link_dentro_telegram(bottone[1])" in pezzo("_manda_telegram"),
            "_link_dentro_telegram(URL_PUBBLICO + '/p2p')" in pezzo("_testo_avviso_nuovi_p2p")])
 
@@ -95899,9 +95932,11 @@ def prove_telegram_simulato_collaudo():
     # (11 ott 2026) `_chiedi` e' diventata `_getme_telegram`, una funzione
     # in cima al modulo con la SUA guardia: il controllo ora riprova da
     # solo, e chi bussa sta in un posto solo.
-    prova("il censimento trova i cinque indirizzi di oggi",
-          ["_foto_profilo_telegram", "_getme_telegram", "_manda_telegram", "_registra",
-           "bot_api"], sorted(trovati))
+    # ...E SEI dal 12 ott 2026: `_posta_gruppo_admin`, il trasporto verso
+    # il gruppo degli admin. Ha la sua guardia in cima, come gli altri.
+    prova("il censimento trova i sei indirizzi di oggi",
+          ["_foto_profilo_telegram", "_getme_telegram", "_manda_telegram",
+           "_posta_gruppo_admin", "_registra", "bot_api"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
 
@@ -96534,10 +96569,13 @@ def prove_p2p_esito_notifiche():
           "↳ 5: esito non detto" in detto[2])
     # (patch 0007) a mandare sono in tre: gli eventi del coordinatore, le
     # attese, e la rotta del recapito — il giro del libro non manda piu'
-    for nome, segno in (("_manda_evento_p2p", "🛰️"), ("_giro_attese_p2p", "📬")):
+    # (12 ott 2026) gli eventi mandano con `_recapita_p2p`: e' `notifica`
+    # per le parti, e la porta del gruppo degli admin per i moderatori
+    for nome, segno, manda in (("_manda_evento_p2p", "🛰️", "_recapita_p2p"),
+                               ("_giro_attese_p2p", "📬", "notifica")):
         corpo = codice(pezzo(nome))
         prova(f"`{nome}` raccoglie l'esito di ogni notifica e lo scrive sotto «avvisati»",
-              True, "await notifica(tg_id, testo)" in corpo and "esiti.append((tg_id, " in corpo
+              True, f"await {manda}(tg_id, testo)" in corpo and "esiti.append((tg_id, " in corpo
               and f'_esiti_p2p_dice("{segno}", esiti)' in corpo)
     prova("...e la rotta del recapito pure", True,
           '_esiti_p2p_dice("💶", [(a_chi, esito)])' in src)
@@ -98942,6 +98980,11 @@ def prove_servizi():
         # `pezzo` taglia dal `def`, quindi l'`async` va rimesso: e' la
         # forma che usano gia' le prove delle altre rotte
         exec("async " + pezzo("apri_disputa"), amb)
+        # la disputa passa da `notifica_admin` (12 ott 2026): il pezzo
+        # vero, a gruppo degli admin spento — cioe' un messaggio a testa
+        amb.setdefault("MODALITA_COLLAUDO", False)
+        gruppo_admin_spento(amb)
+        exec("async " + pezzo("notifica_admin"), amb)
         __import__("asyncio").run(amb["apri_disputa"](1, "", ""))
         return next(t for chi, t in detti if chi == 1)
 
@@ -100682,7 +100725,7 @@ def prove_banner_negozio():
     detti2 = []
 
     async def _notif2(tg, testo): detti2.append((tg, testo))
-    async def _notif_admin2(testo): detti2.append(("admin", testo))
+    async def _notif_admin2(testo, **k): detti2.append(("admin", testo))
 
     # ⚠️ `Request` SERVE ANCHE SE NON SI USA: sta nell'annotazione di
     # `sblocca_banner`, e in Python 3.14 le annotazioni si valutano
@@ -105114,7 +105157,7 @@ def prove_paracadute_motivo():
         async def _notifica(tg, testo):
             detti.append((tg, testo))
 
-        async def _notifica_admin(testo):
+        async def _notifica_admin(testo, **k):
             detti.append(("admin", testo))
 
         async def _mai(*a):
@@ -105327,7 +105370,7 @@ def prove_rimborso_motivo():
         async def _notifica(tg, testo):
             detti.append((tg, testo))
 
-        async def _notifica_admin(testo):
+        async def _notifica_admin(testo, **k):
             detti.append(("admin", testo))
 
         async def _mai(*a, **k):
@@ -105573,7 +105616,7 @@ def prove_slug_negozio():
     journal = []
 
     async def _notif(tg, testo): detti.append((tg, testo))
-    async def _notif_admin(testo): detti.append(("admin", testo))
+    async def _notif_admin(testo, **k): detti.append(("admin", testo))
 
     amb3 = {"db": _G3, "time": __import__("time"), "Request": object,
             "HTTPException": _H3, "Header": lambda d="": d,
@@ -109367,6 +109410,7 @@ def prove_avviso_dm_nostr():
         andate.append(a)
     amb0 = {"ADMIN_IDS": [5], "MODALITA_COLLAUDO": False,
             "notifica": _notifica}
+    gruppo_admin_spento(amb0)
     exec("async " + pezzo("notifica_admin"), amb0)
     _aio.run(amb0["notifica_admin"]("ciao"))
     _aio.run(amb0["notifica_admin"]("ciao", ("Apri", "https://x")))
@@ -114099,7 +114143,7 @@ def prove_dispute_cruscotto_p2p():
           giro.index("_conti_salvi_p2p(con, adesso)")
           < giro.index("soglia_dispute = _soglia_dispute_salva_p2p(con, adesso)")
           < giro.index("con.close()")
-          < giro.index("await notifica_admin(soglia_dispute)"))
+          < giro.index("await notifica_admin(soglia_dispute,"))
 
     # --- LA LEVA -------------------------------------------------------
     i_l = src.index("try:\n    from config import P2P_DISPUTE_SOGLIA_PERCENTO")
@@ -128781,6 +128825,9 @@ def prove_dispute_p2p_moderatori():
               "_testo_disputa_aperta_p2p", "_testo_disputa_chiusa_p2p",
               "_registro_disputa_p2p", "_disputa_evento_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    # i giudici girano su `_avvisati_mod_p2p` (12 ott 2026): a gruppo
+    # spento sono i moderatori di sempre, uno per uno
+    gruppo_admin_spento(amb)
     chiude = amb["_chiusura_disputa_p2p"]
     prova("cosa chiude una disputa, e chi: la tabella intera",
           [("compratore", "moderatore"), ("compratore", "sconosciuto"), ("compratore", "parti"),
@@ -131184,6 +131231,7 @@ def prove_moderazione_p2p():
               "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
               "_esito_gesto_disputa_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    gruppo_admin_spento(amb)
     ORA = 1_790_000_000
     KA, KB, KM, KN = "a" * 64, "b" * 64, "c" * 64, "d" * 64
     ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc01"
@@ -134372,7 +134420,7 @@ def prove_annullo_venditore():
         async def _polso(riga):
             m.polso.append(riga)
 
-        async def _admin(testo):
+        async def _admin(testo, **k):
             m.avvisi.append(testo)
 
         async def _paga(bolt11, importo, taccuino, cassaforte="", riga=None):
@@ -139780,12 +139828,12 @@ def prove_garanzia_lunga():
     giro = pezzo("_giro_garanzie_p2p")
     prova("ogni avviso mandato lascia una riga nel journal", True,
           'print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",' in giro
-          and "esito = await notifica(tg_id, testo)" in giro)
+          and "esito = await _recapita_p2p(tg_id, testo)" in giro)
     gl = pezzo("_garanzie_lunghe_p2p")
     prova("il timbro si scrive PRIMA dell'invio: il giudice lo scrive e fa commit, "
           "e il giro manda dopo", [True, True],
           ["INSERT OR IGNORE INTO p2p_avvisi" in pezzo("_timbra_garanzia_p2p"),
-           giro.index("_garanzie_lunghe_p2p(con, adesso)") < giro.index("await notifica(")])
+           giro.index("_garanzie_lunghe_p2p(con, adesso)") < giro.index("await _recapita_p2p(")])
     prova("i moderatori NON guardano l'interruttore: solo le parti lo guardano", 1,
           codice(gl).count("_avvisi_p2p_accesi("))
 
@@ -139807,6 +139855,7 @@ def prove_garanzia_lunga():
               "_modo_garanzia_p2p", "_testo_garanzia_parte_p2p", "_quando_garanzia_p2p",
               "_testo_garanzia_mod_p2p", "_timbra_garanzia_p2p", "_garanzie_lunghe_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    gruppo_admin_spento(amb)
     righe_journal = []
     amb["print"] = lambda *a, **k: righe_journal.append(" ".join(str(x) for x in a))
     H = 3600
@@ -148796,6 +148845,771 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     prova("l'avviso di Tor c'e' solo su Tor", [True, ""], o["avvisoTor"])
 
 
+def prove_canale_admin():
+    """IL GRUPPO DEGLI ADMIN (12 ott 2026, cantiere canale-admin,
+    richiesta di Andrea).
+
+    Nella chat privata col bot arrivavano insieme gli avvisi da utente
+    e quelli da admin. Con `ADMIN_CANALE_ID` gli avvisi da admin vanno
+    in un gruppo Telegram con sei argomenti, e in privato restano
+    quelli da utente. LA REGOLA che queste prove contano: nessun avviso
+    tolto e nessuno aggiunto, cambia solo DOVE arriva.
+
+    Le cose che si rompono in silenzio: un avviso che col gruppo acceso
+    non parte piu' da nessuna parte, o parte due volte (gruppo E
+    privato); un avviso da admin scritto domani con un ciclo suo su
+    ADMIN_IDS, che il gruppo non lo vedrebbe mai; il gruppo muto che si
+    porta via gli avvisi, o che lo ripete a ogni avviso; un id scritto
+    storto che manda tutto a una persona; un comando di servizio
+    accettato nel gruppo da chi non e' admin, o in un gruppo che non e'
+    il nostro; la risposta a un comando del gruppo che finisce in
+    privato; un errore di rete che stampa l'indirizzo col token."""
+    print("\n[il gruppo degli admin]")
+    import ast as _ast
+    import asyncio as _as
+    import contextlib as _cl
+    import contextvars as _cv
+    import html as _html
+    import io as _io
+    import json as _json
+    import types as _types
+
+    # --- le leve --------------------------------------------------------
+    i = _SORGENTE.index("ADMIN_ARGOMENTI = {")
+    K = {}
+    exec(_SORGENTE[i:_SORGENTE.index("try:\n    from config import ADMIN_CANALE_ID", i)], K)
+    NOMI = ("dispute", "liquidita", "errori", "moderazione", "dm",
+            "riepiloghi")
+    prova("sei argomenti, coi nomi decisi da Andrea",
+          (NOMI, "📩 DM Nostr", "⚖️ Dispute"),
+          (tuple(K["ADMIN_ARGOMENTI"]), K["ADMIN_ARGOMENTI"]["dm"],
+           K["ADMIN_ARGOMENTI"]["dispute"]))
+    prova("di serie la leva e' SPENTA, nel codice e nel config d'esempio",
+          (True, True, 0, {}),
+          ("except ImportError:\n    ADMIN_CANALE_ID = 0\n" in _SORGENTE,
+           "except ImportError:\n    ADMIN_CANALE_ARGOMENTI = {}\n" in _SORGENTE)
+          + tuple(_ast.literal_eval(n.value) for nome in
+                  ("ADMIN_CANALE_ID", "ADMIN_CANALE_ARGOMENTI")
+                  for n in _ast.parse(open("config_esempio.py",
+                                           encoding="utf-8").read()).body
+                  if isinstance(n, _ast.Assign)
+                  and getattr(n.targets[0], "id", "") == nome))
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("il config d'esempio nomina tutti e sei gli argomenti, e la "
+          "riga d'esempio li porta tutti e sei", ([], True),
+          ([n for n in NOMI if f'#   "{n}"' not in esempio],
+           '# Es.: {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,\n'
+           '#       "dm": 10, "riepiloghi": 12}\n' in esempio))
+
+    leggi = reale("_leggi_gruppo_admin", {"ADMIN_ARGOMENTI": K["ADMIN_ARGOMENTI"]})
+    GRUPPO = -1001234567890
+    STANZE = {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,
+              "dm": 12, "riepiloghi": 14}
+    prova("leva vuota (0, None, ''): spenta, e senza lamentele",
+          [(0, {}, [])] * 3, [leggi(v, {}) for v in (0, None, "")])
+    prova("l'id di un gruppo con gli argomenti accende, anche scritto fra "
+          "virgolette", [GRUPPO, GRUPPO],
+          [leggi(GRUPPO, {})[0], leggi(f" {GRUPPO} ", None)[0]])
+    storti = [leggi(v, STANZE) for v in (123456789, -4567, True, "gruppo", 1.5)]
+    prova("un id POSITIVO (una persona), un gruppo semplice, True, una "
+          "parola, un decimale: leva SPENTA, e una lamentela a testa",
+          [(0, 1)] * 5, [(g, len(l)) for g, _, l in storti])
+    prova("...la lamentela dice che gli avvisi restano in privato", True,
+          all("restano in privato" in l[0] for _, _, l in storti))
+    prova("i sei argomenti coi loro numeri", (STANZE, []),
+          leggi(GRUPPO, STANZE)[1:])
+    con_la_campanella = leggi(GRUPPO, dict(STANZE, ordini_p2p=10))
+    prova("«ordini_p2p» NON e' un argomento (decisione di Andrea, 12 ott "
+          "2026: la 🔔 del libro e' una notifica da utente): chi lo scrive "
+          "nel config se lo sente dire, e gli altri sei valgono lo stesso",
+          (STANZE, True),
+          (con_la_campanella[1], len(con_la_campanella[2]) == 1
+           and "ordini_p2p" in con_la_campanella[2][0]))
+    g, st, lam = leggi(GRUPPO, {"errori": "6", "pagamenti": 7, "dm": "x",
+                               "dispute": 0, "liquidita": 1,
+                               "moderazione": True, "riepiloghi": -3})
+    prova("un numero fra virgolette vale; un nome che non esiste, una "
+          "parola, True e un negativo si scartano e si dicono; 0 e 1 "
+          "sono il Generale, in silenzio", ({"errori": 6}, 4, True),
+          (st, len(lam), "pagamenti" in " ".join(lam)))
+    prova("gli argomenti scritti come lista: nessuna stanza, una "
+          "lamentela, e il gruppo resta acceso", (GRUPPO, {}, 1),
+          (lambda r: (r[0], r[1], len(r[2])))(leggi(GRUPPO, [2, 4])))
+
+    # --- il giudizio sulla risposta di Telegram -------------------------
+    giudica = reale("_giudizio_gruppo_admin")
+    BENE = (200, {"ok": True, "result": {"message_id": 7}})
+    CACCIATO = (403, {"ok": False, "error_code": 403, "description":
+                      "Forbidden: bot was kicked from the supergroup chat"})
+    IGNOTO = (400, {"ok": False, "error_code": 400,
+                    "description": "Bad Request: chat not found"})
+    STANZA_PERSA = (400, {"ok": False, "error_code": 400, "description":
+                          "Bad Request: message thread not found"})
+    HTML_ROTTO = (400, {"ok": False, "error_code": 400, "description":
+                        "Bad Request: can't parse entities: Unsupported "
+                        "start tag"})
+    PIANO = (429, {"ok": False, "error_code": 429, "description":
+                   "Too Many Requests: retry after 30",
+                   "parameters": {"retry_after": 30}})
+    LUNGO = (400, {"ok": False, "error_code": 400,
+                   "description": "Bad Request: message is too long"})
+    prova("giudizio: consegnato, cacciato, id sbagliato, stanza persa, "
+          "HTML rotto, 429, messaggio troppo lungo, 502, risposta vuota",
+          ["ok", "gruppo", "gruppo", "argomento", "spoglio", "piano",
+           "messaggio", "rete", "rete"],
+          [giudica(*r)[0] for r in (BENE, CACCIATO, IGNOTO, STANZA_PERSA,
+                                    HTML_ROTTO, PIANO, LUNGO, (502, {}),
+                                    (200, None))])
+    prova("...un argomento chiuso e uno cancellato sono «argomento»; un "
+          "200 con ok:false non e' un consegnato",
+          ["argomento", "argomento", "rete"],
+          [giudica(400, {"description": "Bad Request: TOPIC_CLOSED"})[0],
+           giudica(400, {"description": "Bad Request: TOPIC_DELETED"})[0],
+           giudica(200, {"ok": False})[0]])
+    prova("...il 429 dice quanto aspettare; senza numero, o con un numero "
+          "assurdo, un minuto", [30, 60, 60],
+          [giudica(*PIANO)[2], giudica(429, {})[2],
+           giudica(429, {"parameters": {"retry_after": 999999}})[2]])
+
+    # --- il banco: Telegram del gruppo di cartone, il privato in lista --
+    ADMIN = (111111, 222222)
+
+    def banco(stanze=None, copione=None, gruppo=GRUPPO, admin=ADMIN):
+        B = {"gruppo": [], "privato": [], "telegram": [], "bot": [],
+             "timbri": {}, "copione": list(copione or [BENE])}
+
+        async def posta(metodo, dati):
+            B["gruppo"].append((metodo, _json.loads(_json.dumps(dati))))
+            r = B["copione"][0]
+            if len(B["copione"]) > 1:
+                B["copione"].pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        async def notifica(tg_id, testo, bottone=None):
+            B["privato"].append((tg_id, testo, bottone))
+            return "telegram ok"
+
+        async def manda_telegram(tg_id, testo, bottone=None):
+            B["telegram"].append((tg_id, testo))
+            return "telegram ok"
+
+        async def bot_api(metodo, dati):
+            B["bot"].append((metodo, dati))
+            return {"ok": True}
+
+        S = {"ADMIN_ARGOMENTI": K["ADMIN_ARGOMENTI"],
+             "TIMBRO_GRUPPO_ADMIN": K["TIMBRO_GRUPPO_ADMIN"],
+             "_GRUPPO_ADMIN": {"id": gruppo, "stanze": dict(stanze or {}),
+                               "giu": None, "piano_fino": 0.0},
+             "ADMIN_IDS": list(admin), "MODALITA_COLLAUDO": False,
+             "html": _html, "time": time, "json": _json,
+             "_posta_gruppo_admin": posta, "notifica": notifica,
+             "_manda_telegram": manda_telegram, "bot_api": bot_api,
+             "timbro_letto": lambda n: B["timbri"].get(n, ""),
+             "timbro_scrivi": lambda n, v: B["timbri"].__setitem__(n, v),
+             "_link_dentro_telegram": lambda u: u,
+             "spoglia_html": lambda t: re.sub(r"<[^>]+>", "", t),
+             "LINK_LIBRO_P2P": "https://barattolo.store/p2p",
+             "URL_PUBBLICO": "https://barattolo.store",
+             "GUARDIANO_PONTE_AVVISA": []}
+        for nome in ("_giudizio_gruppo_admin", "gruppo_admin_id",
+                     "_gruppo_admin_riprende", "_destinatari_ponte",
+                     "e_admin", "_moderatori_p2p", "_avvisati_mod_p2p",
+                     "_parti_mod_p2p"):
+            exec(pezzo(nome), S)
+        for nome in ("_admin_in_privato", "_gruppo_admin_giu",
+                     "_al_gruppo_admin", "notifica_admin", "_avvisa_ponte",
+                     "_avvisa_liquidita", "_recapita_p2p"):
+            exec("async " + pezzo(nome), S)
+        B["S"] = S
+        return B
+
+    def muto(coro):
+        """Gira e tiene quel che e' stato stampato."""
+        buf = _io.StringIO()
+        with _cl.redirect_stdout(buf):
+            r = _as.run(coro)
+        return r, buf.getvalue()
+
+    AVVISI = [("errori", "⚠️ <b>Pagamento in uscita FALLITO.</b>", None),
+              ("moderazione", "🆕 <b>Nuovo annuncio #7</b>", None),
+              ("riepiloghi", "🛒 <b>Nuovo ordine:</b> «Bici»", None),
+              ("dm", "📩 Nuovo DM su Nostr da Ada",
+               ("🟣 Apri in un client", "https://njump.me/npub1ada")),
+              ("dispute", "⚠️ <b>Disputa aperta</b> sull'ordine #5.", None),
+              ("", "🔗 un avviso senza stanza", None)]
+
+    async def tutti(B):
+        for arg, testo, bottone in AVVISI:
+            await B["S"]["notifica_admin"](testo, *([bottone] if bottone else []),
+                                           argomento=arg)
+
+    spento = banco(gruppo=0)
+    muto(tutti(spento))
+    acceso = banco(stanze=STANZE)
+    muto(tutti(acceso))
+    prova("leva spenta: ogni avviso a ogni admin in privato, e il gruppo "
+          "non viene nemmeno chiamato", (len(AVVISI) * 2, 0),
+          (len(spento["privato"]), len(spento["gruppo"])))
+    prova("leva accesa: ogni avviso UNA volta nel gruppo, e in privato "
+          "ZERO", (len(AVVISI), 0),
+          (len(acceso["gruppo"]), len(acceso["privato"])))
+    prova("LA PROVA CHE CONTA: gli stessi avvisi, con le stesse parole e "
+          "nello stesso ordine — cambia solo dove arrivano",
+          [t for tg, t, _ in spento["privato"] if tg == ADMIN[0]],
+          [d["text"] for _, d in acceso["gruppo"]])
+    prova("...ognuno nella sua stanza; senza argomento va nel Generale, "
+          "cioe' senza numero di stanza", [6, 8, 14, 12, 2, None],
+          [d.get("message_thread_id") for _, d in acceso["gruppo"]])
+    prova("...al gruppo giusto, in HTML, e il bottone dei DM resta un "
+          "bottone", (True, [{"text": "🟣 Apri in un client",
+                             "url": "https://njump.me/npub1ada"}]),
+          (all(d["chat_id"] == GRUPPO and d["parse_mode"] == "HTML"
+               and m == "sendMessage" for m, d in acceso["gruppo"]),
+           acceso["gruppo"][3][1]["reply_markup"]["inline_keyboard"][0]))
+    prova("...mai silenzioso: nessun invio porta disable_notification, e "
+          "in tutto server.py nessuno la scrive in un messaggio (la nomina "
+          "solo la riga che la vieta)", (True, 0, 1),
+          (all("disable_notification" not in d for _, d in acceso["gruppo"]),
+           _SORGENTE.count('"disable_notification"'),
+           _SORGENTE.count("disable_notification")))
+    senza = banco(stanze={})
+    muto(tutti(senza))
+    prova("gruppo acceso senza nessun numero di stanza: tutto nel "
+          "Generale, niente in privato", (len(AVVISI), 0, True),
+          (len(senza["gruppo"]), len(senza["privato"]),
+           all("message_thread_id" not in d for _, d in senza["gruppo"])))
+
+    # --- il gruppo non riceve: ripiego, e lo si dice UNA volta ----------
+    def e_avvertimento(p):
+        return "gruppo degli admin non riceve" in p[1]
+
+    for nome_caso, risposta in (("bot tolto (403)", CACCIATO),
+                                ("id sbagliato (400 chat not found)", IGNOTO)):
+        giu = banco(stanze=STANZE, copione=[risposta])
+        muto(tutti(giu))
+        avv = [p for p in giu["privato"] if e_avvertimento(p)]
+        prova(f"{nome_caso}: ogni avviso torna in privato a ogni admin, "
+              "identico a leva spenta — non se ne perde nessuno",
+              sorted(spento["privato"], key=repr),
+              sorted((p for p in giu["privato"] if not e_avvertimento(p)),
+                     key=repr))
+        prova(f"{nome_caso}: lo si dice UNA volta a ogni admin, non a "
+              "ogni avviso", sorted(ADMIN), sorted(p[0] for p in avv))
+        prova(f"{nome_caso}: l'avvertimento porta la frase di Telegram e "
+              "MAI l'id del gruppo", (True, False),
+              (_html.escape(risposta[1]["description"]) in avv[0][1],
+               str(GRUPPO) in avv[0][1] or str(GRUPPO)[4:] in avv[0][1]))
+    prova("il «gia' detto» sta nei timbri, non in memoria", True,
+          bool(giu["timbri"].get(K["TIMBRO_GRUPPO_ADMIN"])))
+    giu["S"]["_GRUPPO_ADMIN"]["giu"] = None        # un riavvio
+    prima = len(giu["privato"])
+    muto(giu["S"]["notifica_admin"]("dopo il deploy", argomento="errori"))
+    prova("dopo un riavvio, col gruppo ancora muto: l'avviso arriva in "
+          "privato e l'avvertimento NON si ripete", (2, 0),
+          (len(giu["privato"]) - prima,
+           sum(1 for p in giu["privato"][prima:] if e_avvertimento(p))))
+    giu["copione"][:] = [BENE]
+    prima = len(giu["privato"])
+    muto(giu["S"]["notifica_admin"]("il bot e' tornato", argomento="errori"))
+    prova("il gruppo riprende: l'avviso torna nel gruppo, niente in "
+          "privato, e il timbro si toglie", (0, "il bot e' tornato", ""),
+          (len(giu["privato"]) - prima, giu["gruppo"][-1][1]["text"],
+           giu["timbri"][K["TIMBRO_GRUPPO_ADMIN"]]))
+    giu["copione"][:] = [CACCIATO]
+    prima = len(giu["privato"])
+    muto(giu["S"]["notifica_admin"]("di nuovo fuori", argomento="errori"))
+    muto(giu["S"]["notifica_admin"]("ancora fuori", argomento="errori"))
+    prova("...e se ricade lo si ridice, di nuovo una volta sola", 2,
+          sum(1 for p in giu["privato"][prima:] if e_avvertimento(p)))
+
+    b = banco(stanze=STANZE, copione=[STANZA_PERSA, BENE])
+    r, _ = muto(b["S"]["_al_gruppo_admin"]("x", "errori"))
+    prova("una stanza cancellata: si riprova SENZA numero, cioe' nel "
+          "Generale; niente in privato, nessun avvertimento",
+          (True, [6, None], 0),
+          (r, [d.get("message_thread_id") for _, d in b["gruppo"]],
+           len(b["privato"])))
+    b = banco(stanze=STANZE, copione=[STANZA_PERSA])
+    r, _ = muto(b["S"]["notifica_admin"]("x", argomento="errori"))
+    prova("...se anche il Generale risponde «argomento» e' il gruppo a "
+          "non ricevere: due tentativi, poi privato e avvertimento",
+          (2, 2, 2), (len(b["gruppo"]),
+                      sum(1 for p in b["privato"] if not e_avvertimento(p)),
+                      sum(1 for p in b["privato"] if e_avvertimento(p))))
+    b = banco(stanze=STANZE, copione=[HTML_ROTTO, BENE])
+    r, _ = muto(b["S"]["_al_gruppo_admin"](
+        "<b>Tizio</b> <3", "dm", ("Apri", "https://njump.me/x")))
+    prova("HTML rifiutato: si rimanda spoglio, una volta, e il bottone "
+          "resta", (True, "Tizio <3", False, True),
+          (r, b["gruppo"][1][1]["text"], "parse_mode" in b["gruppo"][1][1],
+           "reply_markup" in b["gruppo"][1][1]))
+    b = banco(stanze=STANZE, copione=[PIANO])
+    muto(b["S"]["notifica_admin"]("uno", argomento="errori"))
+    muto(b["S"]["notifica_admin"]("due", argomento="errori"))
+    prova("un 429: l'avviso va in privato, il successivo non bussa "
+          "nemmeno al gruppo finche' Telegram non lo permette, e nessuno "
+          "dice che il gruppo e' rotto", (1, 4, 0),
+          (len(b["gruppo"]), len(b["privato"]),
+           sum(1 for p in b["privato"] if e_avvertimento(p))))
+    b["S"]["_GRUPPO_ADMIN"]["piano_fino"] = 0.0
+    b["copione"][:] = [BENE]
+    muto(b["S"]["notifica_admin"]("tre", argomento="errori"))
+    prova("...passata l'attesa si torna nel gruppo", ("tre", 4),
+          (b["gruppo"][-1][1]["text"], len(b["privato"])))
+    b = banco(stanze=STANZE, copione=[LUNGO])
+    muto(b["S"]["notifica_admin"]("x" * 5000, argomento="errori"))
+    prova("un rifiuto che riguarda il MESSAGGIO (troppo lungo): privato, "
+          "ma il gruppo non viene accusato", (2, 0, {}),
+          (len(b["privato"]), sum(1 for p in b["privato"] if e_avvertimento(p)),
+           b["timbri"]))
+    b = banco(stanze=STANZE, copione=[OSError(
+        "https://api.telegram.org/botSEGRETISSIMO/sendMessage")])
+    r, detto = muto(b["S"]["notifica_admin"]("x", argomento="errori"))
+    prova("la rete cade: privato, nessun avvertimento, e nel journal va "
+          "il TIPO dell'errore — mai il suo testo, che porta il token",
+          (2, 0, True, False),
+          (len(b["privato"]), sum(1 for p in b["privato"] if e_avvertimento(p)),
+           "OSError" in detto, "SEGRETISSIMO" in detto))
+
+    # --- le altre porte: stesso conto, prima e dopo ---------------------
+    conto = {"prima": len(spento["privato"]) // len(ADMIN),
+             "dopo": len(acceso["gruppo"])}
+
+    # il ponte e la liquidita'
+    for nome in ("_avvisa_ponte", "_avvisa_liquidita"):
+        a, c = banco(gruppo=0), banco(stanze=STANZE)
+        muto(a["S"][nome]("🌉 guasto"))
+        muto(c["S"][nome]("🌉 guasto"))
+        prova(f"{nome}: spento a ogni moderatore su Telegram; acceso UNA "
+              "volta nel gruppo, stanza «liquidita», e a nessuno in privato",
+              (sorted(ADMIN), [(4, "🌉 guasto")], 0),
+              (sorted(t[0] for t in a["telegram"]),
+               [(d.get("message_thread_id"), d["text"]) for _, d in c["gruppo"]],
+               len(c["telegram"]) + len(c["privato"])))
+        conto["prima"] += len(a["telegram"]) // len(ADMIN)
+        conto["dopo"] += len(c["gruppo"])
+        g = banco(stanze=STANZE, copione=[CACCIATO])
+        g["S"]["GUARDIANO_PONTE_AVVISA"] = [333333]
+        muto(g["S"][nome]("🌉 guasto"))
+        prova(f"{nome}: gruppo muto → la strada di riserva e' quella di "
+              "ieri, GUARDIANO_PONTE_AVVISA compresa", [(333333, "🌉 guasto")],
+              g["telegram"])
+
+    # la revisione e il banner: le tastiere ✅/❌
+    class _Riga(dict):
+        def __missing__(self, k):
+            return ""
+
+    class _Con:
+        def execute(self, *a):
+            return self
+
+        def fetchone(self):
+            return _Riga(titolo="Bici", valuta="sats", prezzo_sats=1000,
+                         venditore="Ada", venditore_id=222, descrizione="bella",
+                         banner_foto_att="b.jpg", banner_link_att="https://x.it",
+                         nome="Ada", negozio="ada", banner_sbloccato_il=0, id=5)
+
+        def close(self):
+            pass
+
+    def con_tastiere(B):
+        B["S"].update(db=lambda: _Con(), testo_prezzo=lambda *a: "1.000 sats",
+                      riga_link_moderazione=lambda d: "",
+                      dominio_link=lambda u: "x.it")
+        exec("async " + pezzo("avvisa_revisione"), B["S"])
+        exec("async " + pezzo("avvisa_banner"), B["S"])
+        return B
+
+    a, c = con_tastiere(banco(gruppo=0)), con_tastiere(banco(stanze=STANZE))
+    muto(a["S"]["avvisa_revisione"](7, "ambiguo"))
+    muto(c["S"]["avvisa_revisione"](7, "ambiguo"))
+    prova("revisione: spento una tastiera a ogni admin; acceso UNA nel "
+          "gruppo (stanza «moderazione»), stesso testo e stessi ✅/❌",
+          (2, 1, 0, 8, True),
+          (len(a["bot"]), len(c["gruppo"]), len(c["bot"]),
+           c["gruppo"][0][1].get("message_thread_id"),
+           a["bot"][0][1]["text"] == c["gruppo"][0][1]["text"]
+           and a["bot"][0][1]["reply_markup"] == c["gruppo"][0][1]["reply_markup"]
+           and c["gruppo"][0][1]["reply_markup"]["inline_keyboard"][0][0]
+           ["callback_data"] == "rev:ok:7"))
+    conto["prima"] += len(a["bot"]) // len(ADMIN)
+    conto["dopo"] += len(c["gruppo"])
+    a, c = con_tastiere(banco(gruppo=0)), con_tastiere(banco(stanze=STANZE))
+    muto(a["S"]["avvisa_banner"](222))
+    muto(c["S"]["avvisa_banner"](222))
+    prova("banner: spento una foto a ogni admin; acceso UNA nel gruppo, "
+          "con la stessa foto, la stessa didascalia e gli stessi bottoni",
+          (2, ("sendPhoto", 8), 0, True),
+          (len(a["bot"]), (c["gruppo"][0][0],
+                           c["gruppo"][0][1].get("message_thread_id")),
+           len(c["bot"]),
+           all(a["bot"][0][1][k] == c["gruppo"][0][1][k]
+               for k in ("photo", "caption", "reply_markup", "parse_mode"))))
+    conto["prima"] += len(a["bot"]) // len(ADMIN)
+    conto["dopo"] += len(c["gruppo"])
+    g = con_tastiere(banco(stanze=STANZE, copione=[CACCIATO]))
+    muto(g["S"]["avvisa_revisione"](7, "ambiguo"))
+    prova("revisione col gruppo muto: la tastiera torna a ogni admin in "
+          "privato, e una decisione non resta senza bottoni", 2, len(g["bot"]))
+
+    # il P2P: i moderatori sono un destinatario solo
+    a, c = banco(gruppo=0), banco(stanze=STANZE)
+    prova("P2P, a chi vanno gli avvisi per i moderatori: spento ai "
+          "moderatori uno per uno, acceso al solo gruppo",
+          (sorted(ADMIN), [GRUPPO]),
+          (a["S"]["_avvisati_mod_p2p"](), c["S"]["_avvisati_mod_p2p"]()))
+    for mod in a["S"]["_avvisati_mod_p2p"]():
+        muto(a["S"]["_recapita_p2p"](mod, "⚖️ Disputa P2P aperta"))
+    for mod in c["S"]["_avvisati_mod_p2p"]():
+        muto(c["S"]["_recapita_p2p"](mod, "⚖️ Disputa P2P aperta"))
+    prova("...la consegna: spento un messaggio a testa in privato, acceso "
+          "UNO nel gruppo, stanza «dispute»",
+          (2, [(2, "⚖️ Disputa P2P aperta")], 0),
+          (len(a["privato"]),
+           [(d.get("message_thread_id"), d["text"]) for _, d in c["gruppo"]],
+           len(c["privato"])))
+    conto["prima"] += len(a["privato"]) // len(ADMIN)
+    conto["dopo"] += len(c["gruppo"])
+    muto(c["S"]["_recapita_p2p"](4242, "il tuo scambio"))
+    prova("...un avviso a una PARTE dello scambio resta suo, in privato, "
+          "anche col gruppo acceso", [(4242, "il tuo scambio", None)],
+          c["privato"])
+    g = banco(stanze=STANZE, copione=[CACCIATO])
+    muto(g["S"]["_recapita_p2p"](GRUPPO, "⚖️ Ada ha preso la disputa", ADMIN[0]))
+    prova("...gruppo muto: l'avviso torna ai moderatori in privato, meno "
+          "chi ha fatto il gesto", [ADMIN[1]],
+          [p[0] for p in g["privato"] if not e_avvertimento(p)])
+    testo_aperta = reale("_testo_disputa_aperta_p2p",
+                         {"html": _html, "time": time,
+                          "_fmt_sats": reale("_fmt_sats")})
+    d = {"ordine": "abcdef1234", "aperta_da": "compra", "compratore": ADMIN[0],
+         "venditore": 4242, "compra": "Ada", "vende": "Bruno", "sats": 50000,
+         "euro": "50 €", "metodi": "SEPA", "garanzia_il": 0}
+    prova("P2P, le parti che sono moderatori: spento nessun nome (ognuno "
+          "ha il suo «Sei»), acceso il nome di chi lo e'", ([], ["Ada"]),
+          (a["S"]["_parti_mod_p2p"](d), c["S"]["_parti_mod_p2p"](d)))
+    uno = testo_aperta(d, ADMIN[0])
+    nel_gruppo = testo_aperta(dict(d, parti_mod=["Ada"]), GRUPPO)
+    prova("...in privato il moderatore legge «Sei una delle due parti»; "
+          "nel gruppo, dove un «tu» non c'e', «Ada è una delle due parti» "
+          "— e il resto del messaggio e' lo stesso, riga per riga",
+          (True, True, False, True),
+          ("<b>Sei una delle due parti:</b>" in uno,
+           "<b>Ada è una delle due parti:</b>" in nel_gruppo,
+           "Sei una" in nel_gruppo,
+           uno.split("\n")[:-1] == nel_gruppo.split("\n")[:-1]))
+    prova("...la stessa riga nell'avviso delle garanzie lunghe, e le due "
+          "liste di parti nascono dove nasce il messaggio", (True, 2),
+          ('for nome in d.get("parti_mod") or ():'
+           in pezzo("_testo_garanzia_mod_p2p"),
+           _SORGENTE.count('d["parti_mod"] = _parti_mod_p2p(d)')))
+
+    prova("IL CONTO, su tutte le porte provate: ogni avviso da admin che "
+          "prima arrivava in privato adesso arriva nel gruppo — ne' uno "
+          "in piu' ne' uno in meno", (conto["prima"], True),
+          (conto["dopo"], conto["prima"] == len(AVVISI) + 5))
+
+    # --- il censimento: OGNI avviso da admin passa dalla porta ----------
+    albero = _ast.parse(_SORGENTE)
+    funzioni = [n for n in albero.body
+                if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]
+
+    def chiamate(nome):
+        """[(funzione che la contiene, la Call)] per ogni chiamata a `nome`."""
+        return [(f.name, c) for f in funzioni for c in _ast.walk(f)
+                if isinstance(c, _ast.Call)
+                and getattr(c.func, "id", "") == nome]
+
+    stanze_scritte = []
+    for dove, c in chiamate("notifica_admin"):
+        arg = [kw.value for kw in c.keywords if kw.arg == "argomento"]
+        stanze_scritte.append(
+            arg[0].value if arg and isinstance(arg[0], _ast.Constant) else
+            ("(variabile)" if arg else f"(MANCA in {dove}, riga {c.lineno})"))
+    per_stanza = {s: stanze_scritte.count(s) for s in sorted(set(stanze_scritte))}
+    # I NUMERI DI PRIMA, misurati su 88ed663 (la punta di main sotto
+    # questo cantiere): 69 chiamate a notifica_admin — le 68 di 2c317ab
+    # piu' la soglia delle dispute P2P, arrivata da main a cantiere
+    # aperto — e 10 cicli che scrivevano agli admin per conto loro
+    # (apri_disputa, le due tastiere, ponte e liquidita', cinque nel
+    # P2P). 79 punti da cui nasce un avviso da admin.
+    prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
+          "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
+          "OGNUNA dice la sua stanza",
+          {"dispute": 2, "dm": 1, "errori": 28, "moderazione": 14,
+           "riepiloghi": 25}, per_stanza)
+    prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
+          "con una stanza che non esiste, trova questa prova rossa", [],
+          [s for s in stanze_scritte if s not in NOMI])
+    porta = sorted(d for d, _ in chiamate("_al_gruppo_admin"))
+    prova("la porta del gruppo ha sei ingressi e non uno di piu': "
+          "notifica_admin, le due tastiere, ponte, liquidita' e il P2P dei "
+          "moderatori",
+          sorted(["notifica_admin", "avvisa_revisione", "avvisa_banner",
+                  "_avvisa_ponte", "_avvisa_liquidita", "_recapita_p2p"]),
+          porta)
+    cicli_p2p = sorted(f.name for f in funzioni for n in _ast.walk(f)
+                       if isinstance(n, _ast.For)
+                       and isinstance(n.iter, _ast.Call)
+                       and getattr(n.iter.func, "id", "") == "_avvisati_mod_p2p")
+    prova("i cinque cicli del P2P sui moderatori girano tutti sul "
+          "destinatario unico; `_moderatori_p2p` lo chiamano solo quello "
+          "e il ripiego",
+          (["_disputa_evento_p2p", "_disputa_evento_p2p",
+            "_garanzie_lunghe_p2p", "_prendi_disputa_p2p",
+            "moderazione_chiave_p2p"], ["_avvisati_mod_p2p", "_recapita_p2p"]),
+          (cicli_p2p, sorted(d for d, _ in chiamate("_moderatori_p2p"))))
+    prova("...e le quattro consegne del P2P passano da `_recapita_p2p`, "
+          "che riconosce il gruppo",
+          ["_giro_garanzie_p2p", "_manda_evento_p2p", "moderazione_chiave_p2p",
+           "moderazione_prendi_p2p"],
+          sorted(d for d, _ in chiamate("_recapita_p2p")))
+    totale = (len(stanze_scritte) + len(cicli_p2p)
+              + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
+                                              "_avvisa_ponte", "_avvisa_liquidita")))
+    prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
+          "79 adesso", 79, totale)
+    con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
+                            if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
+    prova("SENTINELLA: ADMIN_IDS lo nominano solo queste funzioni. Una "
+          "funzione nuova che ci gira sopra per mandare un avviso salta "
+          "il gruppo: passi da notifica_admin, e poi si aggiorna l'elenco",
+          ["_admin_in_privato", "_avvisa_liquidita", "_avvisa_ponte",
+           "_chi_avvisa_ponte", "_ids_staff", "_leve_stato", "_moderatori_p2p",
+           "assegna_admin_live", "avvisa_banner", "avvisa_revisione",
+           "e_admin", "notifica_admin"], con_admin_ids)
+    disputa = codice(pezzo("apri_disputa"))
+    prova("la disputa del mercatino passa da notifica_admin (stanza "
+          "«dispute») e non ha piu' un ciclo suo: in collaudo arriva "
+          "anche all'identita' 999, come tutti gli altri",
+          (True, False, True),
+          ("await notifica_admin(" in disputa,
+           "ADMIN_IDS" in disputa,
+           "decisione.\" + nota_digitale + nota_punto" in disputa))
+    prova("il polso degli ordini resta UNA funzione sola (sei chiamanti), "
+          "e va nei riepiloghi", (6, True),
+          (len(chiamate("polso_ordini_admin")),
+           'argomento="riepiloghi")' in pezzo("polso_ordini_admin")))
+    nuovi = codice(pezzo("_giro_avvisi_nuovi_p2p"))
+    prova("LA 🔔 DEL LIBRO P2P RESTA IN PRIVATO, anche a un admin: e' una "
+          "notifica da utente (decisione di Andrea). Il suo giro manda con "
+          "`notifica` e non sa niente del gruppo ne' di chi e' admin",
+          (True, []),
+          ("            esito = await notifica(tg_id, testo)\n" in nuovi,
+           [p for p in ("_al_gruppo_admin", "notifica_admin", "gruppo_admin",
+                        "e_admin(", "_recapita_p2p") if p in nuovi]))
+    dm = codice(pezzo("_dm_avvisa"))
+    porte_src = "\n".join(codice(pezzo(n)) for n in (
+        "_al_gruppo_admin", "_posta_gruppo_admin", "_gruppo_admin_giu",
+        "_admin_in_privato", "_recapita_p2p")).lower()
+    prova("privacy: l'avviso dei DM porta solo `_dm_testo` (che il "
+          "messaggio non lo riceve nemmeno), e nelle porte del gruppo non "
+          "si nominano chiavi, macaroon o nsec", (True, []),
+          ("await notifica_admin(_dm_testo(voce, nome), bottone,"
+           in dm and 'argomento="dm")' in dm,
+           [p for p in ("nsec", "macaroon", "admin_key", "lnbits", "segreto")
+            if p in porte_src]))
+    leve = pezzo("_leve_stato")
+    prova("il pannello delle leve dice se il gruppo e' acceso con un si' "
+          "o un no: l'id non esce mai", (True, False),
+          ('_leva("Gruppo degli admin", "ADMIN_CANALE_ID",\n'
+           "                  bool(gruppo_admin_id())," in leve,
+           "_GRUPPO_ADMIN['id']" in leve or '_GRUPPO_ADMIN["id"]' in leve))
+    prova("chi avvisa il ponte, detto dal pannello: col gruppo acceso e' "
+          "il gruppo", True,
+          'if gruppo_admin_id():\n        return "il gruppo degli admin'
+          in pezzo("_chi_avvisa_ponte"))
+
+    # --- il trasporto vero, con un httpx di cartone ---------------------
+    class _Risposta:
+        status_code = 200
+
+        def json(self):
+            return {"ok": True, "result": {"message_id": 5}}
+
+    class _Cliente:
+        visti = []
+
+        def __init__(self, timeout=None):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, json=None):
+            _Cliente.visti.append((url, json, self.timeout))
+            return _Risposta()
+
+    T = {"MODALITA_COLLAUDO": False, "BOT_TOKEN": "TOKEN", "json": _json,
+         "httpx": _types.SimpleNamespace(AsyncClient=_Cliente),
+         "_finto_msg_id": 0,
+         "_RISPOSTA_NEL_GRUPPO": _cv.ContextVar("prova", default=None)}
+    exec("async " + pezzo("_posta_gruppo_admin"), T)
+    exec("async " + pezzo("bot_api"), T)
+    r, _ = muto(T["_posta_gruppo_admin"]("sendMessage", {"chat_id": GRUPPO}))
+    prova("il trasporto del gruppo: l'API del bot, venti secondi di "
+          "timeout, e torna stato e corpo",
+          ((200, {"ok": True, "result": {"message_id": 5}}),
+           ("https://api.telegram.org/botTOKEN/sendMessage",
+            {"chat_id": GRUPPO}, 20)), (r, _Cliente.visti[-1]))
+    T["MODALITA_COLLAUDO"] = True
+    quanti = len(_Cliente.visti)
+    r, detto = muto(T["_posta_gruppo_admin"]("sendMessage", {"chat_id": GRUPPO}))
+    prova("...in collaudo NON esce niente: una riga in console e «ok»",
+          (200, quanti, True),
+          (r[0], len(_Cliente.visti), "[gruppo admin simulato]" in detto))
+    T["MODALITA_COLLAUDO"] = False
+
+    # --- i comandi nel gruppo, e /dove ----------------------------------
+    C = dict(T, ADMIN_IDS=list(ADMIN), ADMIN_ARGOMENTI=K["ADMIN_ARGOMENTI"],
+             _GRUPPO_ADMIN={"id": GRUPPO, "stanze": dict(STANZE), "giu": None,
+                            "piano_fino": 0.0})
+    chiamati = []
+
+    def finto(nome):
+        async def comando(mittente, testo):
+            chiamati.append((nome, testo))
+            await C["bot_api"]("sendMessage", {"chat_id": mittente["id"],
+                                               "text": "risposta"})
+            await C["bot_api"]("editMessageText", {"chat_id": mittente["id"],
+                                                   "text": "ritocco"})
+            await C["bot_api"]("sendMessage", {"chat_id": 555, "text": "a un altro"})
+        return comando
+
+    async def sconosciuto(chat):
+        chiamati.append(("sconosciuto", chat))
+
+    for nome in ("comando_anteprima", "comando_canale", "comando_sponsor",
+                 "comando_vetrina", "comando_punti", "comando_canali"):
+        C[nome] = finto(nome)
+    C["_comando_sconosciuto"] = sconosciuto
+    for nome in ("e_admin", "e_admin_bot", "gruppo_admin_id"):
+        exec(pezzo(nome), C)
+    for nome in ("comando_dove", "_comando_nel_gruppo"):
+        exec("async " + pezzo(nome), C)
+
+    def dal_gruppo(testo, chi=ADMIN[0], chat=GRUPPO, stanza=14, tipo="supergroup",
+                   forum=True):
+        msg = {"text": testo, "from": {"id": chi},
+               "chat": {"id": chat, "type": tipo, "is_forum": forum}}
+        if stanza:
+            msg.update(message_thread_id=stanza, is_topic_message=True)
+        prima_v, prima_c = len(_Cliente.visti), len(chiamati)
+        muto(C["_comando_nel_gruppo"](msg, msg["from"], testo))
+        return ([j for _, j, _ in _Cliente.visti[prima_v:]],
+                chiamati[prima_c:])
+
+    usciti, fatti = dal_gruppo("/canali")
+    prova("un admin scrive /canali nel gruppo, nella stanza 14: il comando "
+          "gira, e la risposta esce NEL GRUPPO e in quella stanza",
+          ([("comando_canali", "/canali")],
+           {"chat_id": GRUPPO, "text": "risposta", "message_thread_id": 14}),
+          (fatti, usciti[0]))
+    prova("...un ritocco (editMessageText) va al gruppo senza numero di "
+          "stanza, e un messaggio per UN'ALTRA persona resta suo",
+          ({"chat_id": GRUPPO, "text": "ritocco"},
+           {"chat_id": 555, "text": "a un altro"}), (usciti[1], usciti[2]))
+    muto(C["bot_api"]("sendMessage", {"chat_id": ADMIN[0], "text": "dopo"}))
+    prova("...finito il comando, un messaggio a quella persona torna in "
+          "privato: il «rispondi nel gruppo» vale solo mentre gira",
+          {"chat_id": ADMIN[0], "text": "dopo"}, _Cliente.visti[-1][1])
+    usciti, fatti = dal_gruppo("/sponsor@ilbarattolobot negozio 7", stanza=0)
+    prova("col nome del bot attaccato (/sponsor@...) e dal Generale: gira, "
+          "con tutto il testo, e risponde senza numero di stanza",
+          ([("comando_sponsor", "/sponsor@ilbarattolobot negozio 7")],
+           {"chat_id": GRUPPO, "text": "risposta"}), (fatti, usciti[0]))
+    prova("chi NON e' admin, nel gruppo: niente, nemmeno una risposta",
+          ([], []), dal_gruppo("/canali", chi=4242))
+    prova("un admin in UN ALTRO gruppo: i comandi di servizio non girano",
+          ([], []), dal_gruppo("/canali", chat=-1009999999999))
+    prova("un messaggio che non e' un comando, /start e /sfoglia: nel "
+          "gruppo il bot tace", [([], [])] * 3,
+          [dal_gruppo("ciao a tutti"), dal_gruppo("/start"),
+           dal_gruppo("/sfoglia")])
+    C["_GRUPPO_ADMIN"]["id"] = 0
+    prova("a leva spenta nessun gruppo e' «il gruppo»: i comandi non "
+          "girano da nessuna parte", ([], []), dal_gruppo("/canali"))
+    usciti, _ = dal_gruppo("/dove", stanza=12)
+    prova("...ma /dove risponde lo stesso, li' dove e' scritto: e' il "
+          "comando che serve PRIMA di avere il numero",
+          (GRUPPO, 12, True, True),
+          (usciti[0]["chat_id"], usciti[0].get("message_thread_id"),
+           f"Gruppo: <code>{GRUPPO}</code>" in usciti[0]["text"],
+           "Argomento: <code>12</code>" in usciti[0]["text"]))
+    C["_GRUPPO_ADMIN"]["id"] = GRUPPO
+    usciti, _ = dal_gruppo("/dove", stanza=12)
+    prova("/dove nel gruppo del config dice che e' quello, e cosa arriva "
+          "in quella stanza", True,
+          "✅ È il gruppo scritto in <code>ADMIN_CANALE_ID</code>. Qui "
+          "arrivano: 📩 DM Nostr." in usciti[0]["text"])
+    usciti, _ = dal_gruppo("/dove", stanza=0)
+    prova("/dove nel Generale: nessun numero da scrivere", (True, False),
+          ("Argomento: Generale" in usciti[0]["text"],
+           "message_thread_id" in usciti[0]))
+    usciti, _ = dal_gruppo("/dove", stanza=0, tipo="group", forum=False,
+                           chat=-4567)
+    prova("/dove in un gruppo semplice: dice che gli argomenti non sono "
+          "accesi, e che il numero puo' cambiare", True,
+          "gli argomenti non sono accesi" in usciti[0]["text"]
+          and "può cambiare" in usciti[0]["text"])
+    prova("/dove da chi non e' admin, in un gruppo: silenzio", ([], []),
+          dal_gruppo("/dove", chi=4242))
+    quanti = len(_Cliente.visti)
+    privato = {"text": "/dove", "from": {"id": ADMIN[0]},
+               "chat": {"id": ADMIN[0], "type": "private"}}
+    muto(C["comando_dove"](privato, privato["from"]))
+    estraneo = {"text": "/dove", "from": {"id": 4242},
+                "chat": {"id": 4242, "type": "private"}}
+    muto(C["comando_dove"](estraneo, estraneo["from"]))
+    prova("/dove in privato: all'admin dice di scriverlo nel gruppo; a chi "
+          "non e' admin la risposta di ogni comando che non esiste",
+          (1, True, ("sconosciuto", 4242)),
+          (len(_Cliente.visti) - quanti,
+           "nel gruppo degli admin" in _Cliente.visti[-1][1]["text"],
+           chiamati[-1]))
+
+    smista = codice(pezzo("gestisci_update"))
+    prova("il campanello: UNA guardia per tutti (testo, mittente vero, "
+          "non un bot — un admin anonimo non passa; ne' canali ne' altro), "
+          "poi i gruppi vanno a `_comando_nel_gruppo` e le chat private "
+          "proseguono come ieri", True,
+          0 < smista.find('or tipo not in ("private", "group", "supergroup")):\n'
+                          "        return\n")
+          < smista.find('    if tipo != "private":\n        return await '
+                        "_comando_nel_gruppo(msg, mittente, testo)\n")
+          < smista.find("upsert_utente("))
+    in_privato = set(re.findall(r"await (comando_\w+)\(", smista))
+    nel_gruppo = set(re.findall(r"(?<!\w)comando_\w+",
+                                codice(pezzo("_comando_nel_gruppo"))))
+    prova("i comandi di servizio sono gli stessi in privato e nel gruppo: "
+          "chi ne aggiunge uno al campanello lo aggiunge anche li'",
+          (in_privato, True),
+          (nel_gruppo, {"comando_dove", "comando_canali",
+                        "comando_anteprima"} <= in_privato))
+    prova("il webhook chiede a Telegram gli stessi aggiornamenti di ieri: "
+          "i messaggi di un gruppo sono «message», i tocchi «callback_query»",
+          True, '"allowed_updates": ["message", "callback_query"]' in _SORGENTE)
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read()
+    prova("il collaudo col Telegram di cartone sta nella CI, compilato e "
+          "girato", (True, True),
+          ("collaudo_canale_admin.py" in wf[:wf.index("python collaudi_ci.py")],
+           "collaudo_canale_admin\n" in wf[wf.index("python collaudi_ci.py"):]))
+    prova("i tocchi su ✅/❌ valgono per CHI tocca, non per DOVE: nel "
+          "gruppo decide solo un admin", (True, True),
+          ('if not e_admin((cb.get("from") or {}).get("id") or 0):'
+           in pezzo("callback_revisione"),
+           'e_admin((cb.get("from") or {}).get("id") or 0)'
+           in pezzo("callback_banner")))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -148920,7 +149734,7 @@ def main():
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,
               prove_guardiano_ponte,
-              prove_guardia_liquidita,
+              prove_guardia_liquidita, prove_canale_admin,
               prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,
               prove_podio_sfondo,

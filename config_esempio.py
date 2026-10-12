@@ -1450,6 +1450,35 @@ AVVISI_ISCRITTI_MAX_ORA = 6
 # conto di quelli ancora aperti. Solo titolo e importi, mai nomi.
 AVVISI_ORDINI_ADMIN = True
 
+# IL GRUPPO DEGLI ADMIN (12 ott 2026): gli avvisi DA ADMIN — dispute,
+# liquidita', pagamenti da guardare, moderazione, riepiloghi, i DM su
+# Nostr — vanno in un gruppo Telegram privato invece che nella chat
+# privata di ogni moderatore, dove restano i soli avvisi da utente (i
+# tuoi ordini, i tuoi scambi). Nessun avviso si aggiunge e nessuno si
+# toglie: cambia solo DOVE arriva.
+# ADMIN_CANALE_ID e' il numero del gruppo, quello che dice il comando
+# /dove scritto nel gruppo: e' negativo e comincia per -100 (un gruppo
+# CON GLI ARGOMENTI accesi; il bot dev'esserci, come amministratore).
+# 0 = spento: tutto come sempre, in privato. Un numero storto spegne la
+# leva e lo dice nel journal ([admin] ...). Se il gruppo non riceve (bot
+# tolto, numero sbagliato) gli avvisi ripiegano in privato da soli, e
+# lo si viene a sapere una volta.
+ADMIN_CANALE_ID = 0
+# ...e i suoi argomenti: per ogni nome il numero che dice /dove scritto
+# DENTRO quell'argomento. I nomi sono questi sei e non altri:
+#   "dispute"      ⚖️ dispute del mercatino e del P2P, garanzie ferme
+#   "liquidita"    💧 liquidita' del nodo e guardiano del ponte
+#   "errori"       ⚠️ pagamenti falliti o da verificare, ordini fermi
+#   "moderazione"  🛡️ revisioni e banner coi ✅/❌, filtri, annunci nuovi
+#   "dm"           📩 «e' arrivato un DM su Nostr» (mai il testo)
+#   "riepiloghi"   📊 polso degli ordini, nuovi iscritti, registro comandi
+# Un nome che manca va nell'argomento Generale. (La 🔔 dei nuovi ordini
+# del libro P2P non e' fra questi: e' una notifica da utente, e resta
+# in privato a chi l'ha accesa.)
+# Es.: {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,
+#       "dm": 10, "riepiloghi": 12}
+ADMIN_CANALE_ARGOMENTI = {}
+
 # L'avviso dei DM su Nostr (ott 2026): quando qualcuno scrive un DM al
 # profilo Nostr di Barattolo (la chiave di NOSTR_NSEC_PIATTAFORMA) i
 # moderatori ricevono «📩 Nuovo DM su Nostr da <nome o npub>» con un

@@ -2853,12 +2853,12 @@ async def decidi_racconto_admin(slug: str, req: Request,
         scrivi_impostazione(f"racconto_pubblicato:{slug}",
                             str(int(time.time())))
         await notifica_admin(f"📖 Pagina «{titolo}» pubblicata "
-                             f"(da tg {user['id']})")
+                             f"(da tg {user['id']})", argomento="riepiloghi")
         return {"ok": True, "stato": "pubblicato",
                 "detto": "✅ Pubblicata: ora la vede chi apre il negozio"}
     scrivi_impostazione(f"racconto_pubblicato:{slug}", "")
     await notifica_admin(f"📝 Pagina «{titolo}» rimessa in bozza "
-                         f"(da tg {user['id']})")
+                         f"(da tg {user['id']})", argomento="riepiloghi")
     return {"ok": True, "stato": "bozza",
             "detto": "📝 Rimessa in bozza: la vedono solo i moderatori "
                      "e il venditore"}
@@ -11316,7 +11316,7 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
                 f"si è mosso, su LNbits non c'è nessuna riga e non c'è "
                 f"niente da verificare. A chi aspetta i sats ne abbiamo "
                 f"chiesta una <b>nuova</b> (se ha un Lightning address, "
-                f"si riprova da lì da soli).")
+                f"si riprova da lì da soli).", argomento="errori")
             return
         await notifica_admin(
             f"⚠️ <b>Pagamento in uscita FALLITO.</b> "
@@ -11332,7 +11332,7 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
             + (f"\n<code>{taccuino.get('hash')}</code>"
                if taccuino.get("hash") else "")
             + (f"\n{html.escape(str(taccuino.get('errore')))}"
-               if taccuino.get("errore") else ""))
+               if taccuino.get("errore") else ""), argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
@@ -11504,7 +11504,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
                 f"<b>{_fmt_sats(atteso_sats)}</b>. Il pagamento NON è partito e i "
                 f"sats sono al sicuro nel deposito di garanzia. Se non è "
                 f"un wallet rotto, qualcuno ha provato a prelevare più "
-                f"del dovuto: vale un'occhiata.")
+                f"del dovuto: vale un'occhiata.", argomento="errori")
         except Exception as e:   # un avviso non deve mai rompere il rifiuto
             print(f"⚠️ Avviso ai moderatori non partito: {e}")
         return NON_PAGATO
@@ -12004,7 +12004,8 @@ async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
             f"questo pagamento su LNbits{dove} e poi rispondi dal Profilo, "
             f"nella sezione «🧊 Pagamenti da verificare».\n"
             + (f"<code>{phash}</code>" if phash else
-               "(il payment_hash non si è potuto leggere)"))
+               "(il payment_hash non si è potuto leggere)"),
+            argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
@@ -13641,6 +13642,8 @@ def _destinatari_ponte(lista, moderatori) -> list:
 def _chi_avvisa_ponte() -> str:
     """Chi riceve gli avvisi, detto per il journal e per il pannello:
     un CONTEGGIO, mai gli id (il patto di ADMIN_IDS nel pannello)."""
+    if gruppo_admin_id():
+        return "il gruppo degli admin (in privato, se non riceve)"
     propri = _destinatari_ponte(GUARDIANO_PONTE_AVVISA, [])
     if propri:
         return (f"{len(propri)} destinatar{'io' if len(propri) == 1 else 'i'}"
@@ -13885,6 +13888,11 @@ async def _avvisa_ponte(testo: str):
     e' stato chiesto li' (e Telegram non passa dal ponte). Fail-open, e
     una riga nel journal per destinatario: un avviso che non arriva si
     deve poter leggere."""
+    # nel gruppo degli admin, se c'e' e riceve (12 ott 2026): la leva
+    # GUARDIANO_PONTE_AVVISA resta la strada di riserva
+    if await _al_gruppo_admin(testo, "liquidita"):
+        print("   🌉 ↳ gruppo degli admin: mandato", flush=True)
+        return
     for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
         try:
             esito = await _manda_telegram(chat, testo)
@@ -15642,12 +15650,338 @@ def timbro_scrivi(nome: str, valore: str):
         print(f"⚠️ Timbro «{nome}» non scritto ({e}): l'avviso puo' ripetersi")
 
 
-async def notifica_admin(testo: str, bottone: tuple = None):
+# ---------- IL GRUPPO DEGLI ADMIN (12 ott 2026, cantiere canale-admin) ------
+# Nella chat privata col bot arrivavano INSIEME gli avvisi da utente (i
+# miei ordini, i miei scambi, i miei messaggi) e quelli da admin, ed era
+# un gran casino (parola di Andrea). Con `ADMIN_CANALE_ID` nel config gli
+# avvisi DA ADMIN vanno in un gruppo Telegram privato — Andrea, Alan, i
+# moderatori — e in privato restano i soli avvisi da utente.
+# LA REGOLA, ed e' quella che la prova conta: NESSUN AVVISO TOLTO E
+# NESSUNO AGGIUNTO, cambia solo DOVE arriva. Dove prima partiva un
+# messaggio per ogni moderatore, adesso ne parte UNO, nel gruppo.
+# PERCHE' UN GRUPPO E NON UN CANALE: in un canale i messaggi non hanno
+# mittente, e i comandi di servizio valgono «solo per chi e' admin» —
+# senza mittente non c'e' modo di saperlo. E PERCHE' CON GLI ARGOMENTI:
+# settanta tipi di avviso in una fila sola sono lo stesso casino in
+# un'altra stanza; con gli argomenti ognuno silenzia quello che vuole
+# DA TELEGRAM (il bot manda tutto col suono normale, sempre: il
+# silenzio e' una scelta di chi legge, mai del bot).
+# SEI ARGOMENTI, decisi da Andrea: i nomi qui sotto sono le chiavi di
+# `ADMIN_CANALE_ARGOMENTI`. Un argomento senza il suo numero va nel
+# Generale.
+# LA 🔔 DEL LIBRO P2P NON C'E', ed e' una decisione (Andrea, 12 ott
+# 2026): l'avviso dei nuovi ordini e' una notifica DA UTENTE — ognuno
+# la accende per se', coi suoi filtri — e resta in privato a chi l'ha
+# accesa anche quando e' un admin. `_giro_avvisi_nuovi_p2p` non passa
+# di qui, e una prova lo tiene fermo.
+# SE IL GRUPPO NON RISPONDE (bot tolto, id sbagliato) l'avviso ripiega
+# in privato com'era ieri, e lo si dice UNA volta (`_gruppo_admin_giu`).
+# Senza `ADMIN_CANALE_ID` non cambia niente: e' il codice di ieri.
+ADMIN_ARGOMENTI = {
+    "dispute": "⚖️ Dispute",
+    "liquidita": "💧 Liquidità",
+    "errori": "⚠️ Errori",
+    "moderazione": "🛡️ Moderazione",
+    "dm": "📩 DM Nostr",
+    "riepiloghi": "📊 Riepiloghi",
+}
+TIMBRO_GRUPPO_ADMIN = "gruppo_admin_giu"
+try:
+    from config import ADMIN_CANALE_ID
+except ImportError:
+    ADMIN_CANALE_ID = 0
+try:
+    from config import ADMIN_CANALE_ARGOMENTI
+except ImportError:
+    ADMIN_CANALE_ARGOMENTI = {}
+
+
+def _leggi_gruppo_admin(canale, argomenti) -> tuple:
+    """PURA: le due leve come le ha scritte una persona →
+    `(id del gruppo, {argomento: numero}, [lamentele])`.
+    L'ID E' QUELLO DI UN GRUPPO CON GLI ARGOMENTI, cioe' un supergruppo:
+    negativo e con `-100` davanti. Tutto il resto SPEGNE la leva, e lo
+    dice: un numero positivo e' una PERSONA (riceverebbe da sola tutti
+    gli avvisi da admin), un negativo corto e' un gruppo semplice, dove
+    gli argomenti non esistono. Spegnere e' il verso giusto in cui
+    sbagliare: a leva spenta gli avvisi arrivano in privato, come ieri.
+    GLI ARGOMENTI: solo i sei nomi di `ADMIN_ARGOMENTI`, ognuno col
+    numero che dice `/dove`. Un nome che non esiste o un numero storto
+    si scartano e si dicono: quell'argomento va nel Generale, che e'
+    sempre meglio di un avviso perso. 0 e 1 valgono «Generale»."""
+    lamentele = []
+    gruppo = 0
+    if isinstance(canale, bool):
+        lamentele.append("ADMIN_CANALE_ID e' True/False e non un numero: "
+                         "leva spenta, gli avvisi restano in privato")
+    elif canale not in (None, "", 0):
+        try:
+            n = int(str(canale).strip())
+        except ValueError:
+            n = 0
+        if n < -1000000000000:
+            gruppo = n
+        else:
+            lamentele.append("ADMIN_CANALE_ID non e' l'id di un gruppo con gli "
+                             "argomenti (negativo, comincia per -100): leva "
+                             "spenta, gli avvisi restano in privato")
+    stanze = {}
+    if argomenti in (None, "", 0) or argomenti == {}:
+        return gruppo, stanze, lamentele
+    if not isinstance(argomenti, dict):
+        lamentele.append("ADMIN_CANALE_ARGOMENTI non e' un dizionario "
+                         "{nome: numero}: tutti gli avvisi vanno nel Generale")
+        return gruppo, stanze, lamentele
+    for nome, valore in argomenti.items():
+        if nome not in ADMIN_ARGOMENTI:
+            lamentele.append(f"ADMIN_CANALE_ARGOMENTI: «{str(nome)[:30]}» non e' "
+                             "uno dei sei argomenti: voce scartata")
+            continue
+        try:
+            n = 0 if isinstance(valore, bool) else int(str(valore).strip() or 0)
+        except ValueError:
+            n = -1
+        if isinstance(valore, bool) or n < 0:
+            lamentele.append(f"ADMIN_CANALE_ARGOMENTI: il numero di «{nome}» non "
+                             "e' un intero: quell'argomento va nel Generale")
+        elif n > 1:
+            stanze[nome] = n
+    return gruppo, stanze, lamentele
+
+
+# `giu`: None = non ancora guardato (il timbro si legge al primo invio),
+# poi True/False. `piano_fino`: l'ora fino a cui Telegram ha chiesto di
+# aspettare (un 429): fino ad allora si va dritti in privato.
+_GRUPPO_ADMIN = {"id": 0, "stanze": {}, "giu": None, "piano_fino": 0.0}
+_GRUPPO_ADMIN["id"], _GRUPPO_ADMIN["stanze"], _lamentele_gruppo = \
+    _leggi_gruppo_admin(ADMIN_CANALE_ID, ADMIN_CANALE_ARGOMENTI)
+for _lamentela in _lamentele_gruppo:
+    print(f"[admin] {_lamentela}", flush=True)
+if _GRUPPO_ADMIN["id"]:
+    print(f"[admin] Gruppo degli admin ACCESO: {len(_GRUPPO_ADMIN['stanze'])} "
+          f"argomenti su {len(ADMIN_ARGOMENTI)} hanno la loro stanza, gli "
+          "altri vanno nel Generale", flush=True)
+
+
+def gruppo_admin_id() -> int:
+    """L'id del gruppo degli admin, o 0 a leva spenta."""
+    return int(_GRUPPO_ADMIN["id"] or 0)
+
+
+async def _posta_gruppo_admin(metodo: str, dati: dict) -> tuple:
+    """Il trasporto verso il gruppo: torna `(stato HTTP, corpo JSON)`.
+    Sta in un posto solo perche' e' l'unico punto che parla con Telegram
+    PER il gruppo: il giudizio (`_giudizio_gruppo_admin`) ha bisogno
+    della risposta intera, e `_manda_telegram` ne restituisce una frase.
+    IN COLLAUDO NON ESCE NIENTE, la regola di `_manda_telegram`: una
+    riga in console, e si risponde «consegnato». Venti secondi di
+    timeout, la convenzione di tutti gli invii."""
+    if MODALITA_COLLAUDO:
+        print(f"👥 [gruppo admin simulato] {metodo} "
+              f"{json.dumps(dati, ensure_ascii=False)}")
+        return 200, {"ok": True, "result": {"message_id": 0}}
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/{metodo}", json=dati)
+    try:
+        corpo = r.json()
+    except Exception:
+        corpo = {}
+    return r.status_code, (corpo if isinstance(corpo, dict) else {})
+
+
+def _giudizio_gruppo_admin(stato, corpo) -> tuple:
+    """PURA: cosa ha detto Telegram di un invio al gruppo. Torna
+    `(esito, dettaglio, attesa)`:
+     · 'ok'        consegnato;
+     · 'spoglio'   l'HTML non si legge: si riprova senza tag (la rete
+                   di `_manda_telegram`, una volta sola);
+     · 'argomento' quella stanza non c'e' piu' (cancellata, chiusa, o
+                   il numero e' sbagliato): si riprova nel Generale;
+     · 'piano'     un 429: `attesa` sono i secondi da aspettare;
+     · 'gruppo'    e' il GRUPPO a non ricevere — bot tolto, id
+                   sbagliato, niente permesso di scrivere: e' il caso
+                   che si segnala, una volta;
+     · 'messaggio' un rifiuto che riguarda QUESTO messaggio (troppo
+                   lungo, una foto che Telegram non scarica): il gruppo
+                   sta bene, e non lo si accusa;
+     · 'rete'      un 5xx, o una risposta che non e' una risposta.
+    In ogni caso diverso da 'ok' l'avviso ripiega in privato: la
+    differenza e' solo COSA si dice e a chi.
+    ⚠️ LE FRASI DI TELEGRAM le ho scritte a memoria della Bot API
+    («message thread not found», «TOPIC_CLOSED», «chat not found», «bot
+    was kicked»): per questo si cercano le PAROLE e non la frase, e un
+    403 vale «gruppo» qualunque cosa dica. Il giro col bot vero, dopo
+    il push, e' la conferma."""
+    if not isinstance(corpo, dict):
+        corpo = {}
+    if stato == 200 and corpo.get("ok") is True:
+        return "ok", "", 0
+    detto = " ".join(str(corpo.get("description") or "").split())[:120]
+    basso = detto.lower()
+    dettaglio = f"{stato} {detto}".strip()
+    if stato == 429:
+        par = corpo.get("parameters")
+        attesa = par.get("retry_after") if isinstance(par, dict) else 0
+        if type(attesa) is not int or not 0 < attesa <= 3600:
+            attesa = 60
+        return "piano", dettaglio, attesa
+    if stato in (401, 403, 404):
+        return "gruppo", dettaglio, 0
+    if stato == 400:
+        if "parse" in basso:
+            return "spoglio", dettaglio, 0
+        if "thread" in basso or "topic" in basso:
+            return "argomento", dettaglio, 0
+        if any(p in basso for p in ("chat not found", "upgraded", "kicked",
+                                    "not a member", "rights", "forbidden",
+                                    "deactivated", "peer_id_invalid")):
+            return "gruppo", dettaglio, 0
+        return "messaggio", dettaglio, 0
+    return "rete", dettaglio, 0
+
+
+async def _admin_in_privato(testo: str):
+    """Un messaggio a ogni moderatore, in privato, dal canale che
+    preferisce: la strada di ieri, per la sola riga che dice che il
+    gruppo non risponde. NON passa dal gruppo, per costruzione."""
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for tg_id in destinatari:
+        await notifica(tg_id, testo)
+
+
+async def _gruppo_admin_giu(perche: str):
+    """Il gruppo non riceve: lo si dice UNA volta, in privato, e da li'
+    in poi si tace finche' non riprende. Il «gia' detto» sta in `timbri`
+    e non in un globale: un globale muore a ogni deploy, e l'avviso
+    tornerebbe a ogni riavvio (la lezione del termometro arrivato tre
+    volte). Nel testo c'e' solo la frase di Telegram: mai l'id del
+    gruppo, mai niente del bot."""
+    G = _GRUPPO_ADMIN
+    print(f"⚠️ Gruppo degli admin: non riceve ({perche}) — l'avviso "
+          "ripiega in privato", flush=True)
+    if G["giu"] is None:
+        G["giu"] = bool(timbro_letto(TIMBRO_GRUPPO_ADMIN))
+    if G["giu"]:
+        return
+    G["giu"] = True
+    timbro_scrivi(TIMBRO_GRUPPO_ADMIN, str(int(time.time())))
+    await _admin_in_privato(
+        "⚠️ <b>Il gruppo degli admin non riceve.</b>\n"
+        f"Telegram dice: <code>{html.escape(perche)}</code>\n\n"
+        "Da adesso gli avvisi da admin tornano qui in privato, finché il "
+        "gruppo non riprende: non se ne perde nessuno. Controlla che il "
+        "bot sia ancora nel gruppo, che possa scrivere, e il numero in "
+        "<code>ADMIN_CANALE_ID</code>. Non lo ripeto.")
+
+
+def _gruppo_admin_riprende():
+    """Un invio e' arrivato: se il gruppo era segnato «giu'», il segno
+    si toglie — e il prossimo guasto si potra' dire di nuovo. Nessun
+    messaggio: che il gruppo ha ripreso lo dicono gli avvisi stessi."""
+    G = _GRUPPO_ADMIN
+    if G["giu"] is None:
+        G["giu"] = bool(timbro_letto(TIMBRO_GRUPPO_ADMIN))
+    if G["giu"]:
+        G["giu"] = False
+        timbro_scrivi(TIMBRO_GRUPPO_ADMIN, "")
+        print("✅ Gruppo degli admin: ha ripreso a ricevere", flush=True)
+
+
+async def _al_gruppo_admin(testo: str, argomento: str = "", bottone: tuple = None,
+                           tastiera: dict = None, foto: str = "") -> bool:
+    """LA PORTA DEL GRUPPO: True = l'avviso e' arrivato nel gruppo degli
+    admin, False = non c'e' andato, e chi chiama fa quel che faceva
+    ieri (un messaggio in privato a ogni moderatore). False anche a
+    leva spenta: per questo ogni chiamante e' due righe davanti al suo
+    codice di sempre, e senza la leva quel codice gira identico.
+    `argomento` e' una chiave di `ADMIN_ARGOMENTI`; `bottone` e' la
+    coppia di `notifica`, `tastiera` una `reply_markup` gia' fatta (i
+    ✅/❌ della revisione), `foto` l'indirizzo di un'immagine (il
+    banner). Un argomento senza il suo numero va nel Generale.
+    MAI SILENZIOSO: nessun `disable_notification`, da nessuna parte.
+    NON ALZA MAI: e' sulla strada di avvisi che partono da dentro i
+    flussi dei soldi."""
+    G = _GRUPPO_ADMIN
+    if not G["id"]:
+        return False
+    try:
+        stanza = int(G["stanze"].get(argomento) or 0)
+        if time.time() < G["piano_fino"]:
+            print("⚠️ Gruppo degli admin: Telegram ha chiesto di aspettare, "
+                  "l'avviso ripiega in privato", flush=True)
+            return False
+        if bottone:
+            tastiera = {"inline_keyboard": [[
+                {"text": str(bottone[0]),
+                 "url": str(_link_dentro_telegram(bottone[1]))}]]}
+        campo = "caption" if foto else "text"
+        dati = {"chat_id": G["id"], campo: testo, "parse_mode": "HTML"}
+        if foto:
+            dati["photo"] = foto
+        if tastiera:
+            dati["reply_markup"] = tastiera
+        if stanza:
+            dati["message_thread_id"] = stanza
+        metodo = "sendPhoto" if foto else "sendMessage"
+        esito, dettaglio, attesa = "rete", "", 0
+        # al piu' due ritocchi, uno per specie: senza la stanza, e spoglio
+        for _ in range(3):
+            stato, corpo = await _posta_gruppo_admin(metodo, dati)
+            esito, dettaglio, attesa = _giudizio_gruppo_admin(stato, corpo)
+            if esito == "argomento" and "message_thread_id" in dati:
+                print(f"⚠️ Gruppo degli admin: l'argomento «{argomento}» non "
+                      f"riceve ({dettaglio}) — l'avviso va nel Generale. "
+                      "Controlla ADMIN_CANALE_ARGOMENTI", flush=True)
+                del dati["message_thread_id"]
+                continue
+            if esito == "spoglio" and "parse_mode" in dati:
+                print("⚠️ HTML rifiutato da Telegram nel gruppo degli admin: "
+                      f"rimando spoglio. Da scappare alla fonte — {dettaglio}",
+                      flush=True)
+                del dati["parse_mode"]
+                dati[campo] = spoglia_html(testo)
+                continue
+            break
+        if esito == "ok":
+            _gruppo_admin_riprende()
+            return True
+        if esito == "piano":
+            G["piano_fino"] = time.time() + attesa
+            print(f"⚠️ Gruppo degli admin: Telegram a briglia corta (429), per "
+                  f"{attesa}s gli avvisi da admin ripiegano in privato",
+                  flush=True)
+        elif esito in ("gruppo", "argomento"):
+            # 'argomento' senza piu' una stanza da togliere: e' il
+            # Generale stesso a non ricevere, cioe' il gruppo
+            await _gruppo_admin_giu(dettaglio)
+        else:
+            print(f"⚠️ Gruppo degli admin: avviso non consegnato ({esito}"
+                  f"{': ' + dettaglio if dettaglio else ''}) — ripiega in "
+                  "privato", flush=True)
+    except Exception as e:
+        # solo il TIPO: il testo di un errore di rete puo' portarsi
+        # dietro l'indirizzo chiamato, e li' dentro c'e' il token del bot
+        print(f"⚠️ Gruppo degli admin: invio caduto ({type(e).__name__}) — "
+              "l'avviso ripiega in privato", flush=True)
+    return False
+
+
+async def notifica_admin(testo: str, bottone: tuple = None,
+                         argomento: str = ""):
     """Avvisa tutti i moderatori (nel collaudo anche l'identita' 999,
     che stampa in console come le altre notifiche simulate).
     `bottone` (11 ott 2026, l'avviso dei DM Nostr) e' quello di
     `notifica`, e le arriva SOLO quando c'e': chi non lo passa la
-    chiama come l'ha sempre chiamata."""
+    chiama come l'ha sempre chiamata.
+    `argomento` (12 ott 2026) e' la stanza del gruppo degli admin
+    (`ADMIN_ARGOMENTI`): se il gruppo c'e' e riceve, l'avviso va li' —
+    UNO, non uno a testa — e qui sotto non si arriva. Senza il gruppo,
+    o se non risponde, e' la strada di sempre."""
+    if await _al_gruppo_admin(testo, argomento, *([bottone] if bottone else [])):
+        return
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
         destinatari.add(999)
@@ -15681,7 +16015,8 @@ async def polso_ordini_admin(riga: str):
             "SELECT COUNT(*) FROM ordini WHERE stato NOT IN "
             "('creato','annullato','released','refunded')").fetchone()[0]
         con.close()
-        await notifica_admin(riga.replace("{aperti}", str(aperti)))
+        await notifica_admin(riga.replace("{aperti}", str(aperti)),
+                             argomento="riepiloghi")
     except Exception as e:
         print(f"⚠️ Polso ordini admin saltato: {e}")
 
@@ -15744,6 +16079,17 @@ def relay_chiavi_attivo() -> bool:
 
 _finto_msg_id = 0   # contatore dei message_id simulati in collaudo
 
+# UN COMANDO DATO NEL GRUPPO SI RISPONDE NEL GRUPPO (12 ott 2026). I
+# comandi di servizio rispondono a `mittente["id"]`, cioe' in privato, e
+# quella riga sta in una quarantina di posti: invece di toccarli tutti,
+# mentre gira un comando arrivato dal gruppo degli admin qui c'e' scritto
+# DA CHI e DOVE, e `bot_api` gira al gruppo (e al suo argomento) i soli
+# messaggi diretti a quella persona. Fuori da un comando del gruppo e'
+# None, e `bot_api` e' quello di sempre. E' una variabile di contesto e
+# non un globale: due comandi insieme non si pestano i piedi.
+_RISPOSTA_NEL_GRUPPO = contextvars.ContextVar("risposta_nel_gruppo",
+                                              default=None)
+
 
 async def bot_api(metodo: str, dati: dict):
     """Chiama l'API del bot (sendMessage con tastiere,
@@ -15754,6 +16100,11 @@ async def bot_api(metodo: str, dati: dict):
     un message_id finto (negativo), cosi' anche il ciclo di vita dei
     post sul canale si collauda in console."""
     global _finto_msg_id
+    dove = _RISPOSTA_NEL_GRUPPO.get()
+    if dove and dati.get("chat_id") == dove["da"]:
+        dati = dict(dati, chat_id=dove["chat"])
+        if dove["stanza"] and metodo.startswith("send"):
+            dati["message_thread_id"] = dove["stanza"]
     if MODALITA_COLLAUDO:
         print(f"🤖 [telegram simulato] {metodo} "
               f"{json.dumps(dati, ensure_ascii=False)}")
@@ -16757,7 +17108,7 @@ async def _canale_vetrina_comando(chat: int, arg: str):
     if not arg:
         imposta_canale_vetrina("")
         await notifica_admin(f"📣 Canale della comunità: spento "
-                             f"(da tg {chat})")
+                             f"(da tg {chat})", argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "✅ Fatto: non pubblico più nel canale della "
                     "comunità.",
@@ -16777,7 +17128,8 @@ async def _canale_vetrina_comando(chat: int, arg: str):
                     "propri messaggi, per il ✅ Venduto).",
             "parse_mode": "HTML"})
     imposta_canale_vetrina(arg)
-    await notifica_admin(f"📣 Canale della comunità: {arg} (da tg {chat})")
+    await notifica_admin(f"📣 Canale della comunità: {arg} (da tg {chat})",
+                         argomento="riepiloghi")
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ Fatto: gli annunci nuovi escono anche in <code>"
                 f"{html.escape(arg)}</code>.\n\n"
@@ -16798,7 +17150,8 @@ async def _canale_riepilogo_comando(chat: int, arg: str):
         imposta_canale_riepilogo("")
         dove = canale_riepilogo()
         await notifica_admin(f"📊 Canale del riepilogo: torna al canale "
-                             f"degli annunci (da tg {chat})")
+                             f"degli annunci (da tg {chat})",
+                             argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "✅ Fatto: il riepilogo del lunedì torna dove vanno "
                     "gli annunci"
@@ -16820,7 +17173,7 @@ async def _canale_riepilogo_comando(chat: int, arg: str):
             "parse_mode": "HTML"})
     imposta_canale_riepilogo(arg)
     await notifica_admin(f"📊 Canale del riepilogo cambiato in {arg} "
-                         f"(da tg {chat})")
+                         f"(da tg {chat})", argomento="riepiloghi")
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ Fatto: il riepilogo del lunedì va in <code>"
                 f"{html.escape(arg)}</code>.",
@@ -16870,7 +17223,8 @@ async def comando_canale(mittente: dict, testo: str):
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     if arg.lower() in ("spento", "off", "-", "nessuno"):
         imposta_canale("")
-        await notifica_admin(f"📣 Canale spento da tg {chat}")
+        await notifica_admin(f"📣 Canale spento da tg {chat}",
+                             argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "🔕 Fatto: da adesso non pubblico più in nessun "
                     "canale. I post già fatti restano dove sono."})
@@ -16893,7 +17247,7 @@ async def comando_canale(mittente: dict, testo: str):
             "parse_mode": "HTML"})
     imposta_canale(arg)
     await notifica_admin(f"📣 Canale del mercatino cambiato in {arg} "
-                         f"(da tg {chat})")
+                         f"(da tg {chat})", argomento="riepiloghi")
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ Fatto: da adesso pubblico in <code>"
                 f"{html.escape(arg)}</code>.",
@@ -17023,7 +17377,8 @@ async def comando_sponsor(mittente: dict, testo: str):
     if arg in ("spento", "no", "off"):
         for s in voc:
             imposta_sponsor(s, 0)
-        await notifica_admin(f"📣 Spazi in vetrina tolti tutti (da tg {chat})")
+        await notifica_admin(f"📣 Spazi in vetrina tolti tutti (da tg {chat})",
+                             argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "✅ Tolti tutti. In «Da scoprire» non c'e' piu' nessuna "
                     "card sponsorizzata; la storia dei negozi e il loro "
@@ -17041,7 +17396,8 @@ async def comando_sponsor(mittente: dict, testo: str):
                 "parse_mode": "HTML", "reply_markup": tastiera_bot()})
         ordine = imposta_ordine_sponsor(nomi)
         await notifica_admin(f"📣 Ordine degli spazi in vetrina: "
-                             f"{', '.join(ordine)} (da tg {chat})")
+                             f"{', '.join(ordine)} (da tg {chat})",
+                             argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "✅ L'ordine delle card in «Da scoprire» adesso e':\n"
                     + "\n".join(f"{k}. <b>{s}</b>"
@@ -17057,7 +17413,7 @@ async def comando_sponsor(mittente: dict, testo: str):
     if len(pezzi) > 2 and pezzi[2].strip().lower() in ("spento", "no", "off"):
         imposta_sponsor(arg, 0)
         await notifica_admin(f"📣 Spazio in vetrina tolto: {arg} "
-                             f"(da tg {chat})")
+                             f"(da tg {chat})", argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": f"✅ <b>{arg}</b> tolto. La sua card in «Da scoprire» "
                     "non c'e' piu', gli altri spazi restano come sono; la "
@@ -17076,7 +17432,7 @@ async def comando_sponsor(mittente: dict, testo: str):
     fino = int(time.time()) + giorni * 86400
     imposta_sponsor(arg, fino)
     await notifica_admin(f"📣 Spazio in vetrina: {arg} per {giorni} "
-                         f"giorni (da tg {chat})")
+                         f"giorni (da tg {chat})", argomento="riepiloghi")
     posto = sponsor_accesi().index(arg) + 1
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ <b>{arg}</b> e' in vetrina per <b>{giorni}</b> "
@@ -17172,7 +17528,7 @@ async def comando_punti(mittente: dict, testo: str):
             tenuti = imposta_punti([])
             detto = "tutti i punti tolti"
         await notifica_admin("🏠 Punti di ritiro: {} (da tg {})"
-                             .format(detto, chat))
+                             .format(detto, chat), argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "✅ {}. Accesi adesso: <b>{}</b>."
                     .format(detto.capitalize(), len(tenuti)),
@@ -17201,7 +17557,7 @@ async def comando_punti(mittente: dict, testo: str):
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     tenuti = imposta_punti(accesi + [arg])
     await notifica_admin("🏠 Punto di ritiro acceso: {} (da tg {})"
-                         .format(arg, chat))
+                         .format(arg, chat), argomento="riepiloghi")
     await bot_api("sendMessage", {"chat_id": chat,
         "text": "✅ <b>{}</b> e' acceso — {}.\nTitolare: tg <code>{}</code>."
                 "\n\nAccesi adesso: <b>{}</b>. Da ora chi compra da un "
@@ -17253,7 +17609,7 @@ async def comando_vetrina(mittente: dict, testo: str):
     else:
         detto = "valgono i valori del <b>config</b> del server"
     await notifica_admin(f"🪟 Ritmo della vetrina: {nome or 'config'} "
-                         f"(da tg {chat})")
+                         f"(da tg {chat})", argomento="riepiloghi")
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ Fatto: da adesso {detto}.\n"
                 f"{giorni} giorni fra due post dello stesso venditore, "
@@ -17328,21 +17684,119 @@ async def gestisci_callback(cb: dict):
         "Telegram arrivano anche per gli affari nati su Nostr.\n"
         + coda)
     await notifica_admin(f"🔗 Doppia cittadinanza: "
-                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}")
+                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}",
+                         argomento="riepiloghi")
+
+
+async def comando_dove(msg: dict, mittente: dict):
+    """`/dove` — «in che gruppo e in che argomento siamo?». Solo admin.
+
+    Serve a trovare i numeri da scrivere in `ADMIN_CANALE_ID` e in
+    `ADMIN_CANALE_ARGOMENTI` senza far entrare nel gruppo il bot di un
+    estraneo: si scrive `/dove` dentro ogni argomento e la risposta
+    porta i due numeri. PER QUESTO RISPONDE IN QUALUNQUE GRUPPO, e non
+    solo in quello gia' scritto nel config: il giorno che serve, il
+    config quel numero non ce l'ha ancora. A chi non e' admin, in un
+    gruppo, non risponde niente (e in privato quel che risponde a ogni
+    comando che non esiste). Dice dove siamo e nient'altro."""
+    chat = msg.get("chat") or {}
+    privata = chat.get("type") == "private"
+    if not e_admin_bot(mittente):
+        if privata:
+            return await _comando_sconosciuto(mittente["id"])
+        return
+    if privata:
+        return await bot_api("sendMessage", {
+            "chat_id": mittente["id"], "parse_mode": "HTML",
+            "text": "📍 Qui siamo in privato, io e te.\n\nScrivi "
+                    "<code>/dove</code> nel gruppo degli admin, dentro ogni "
+                    "argomento: ti rispondo lì coi numeri da mettere nel "
+                    "config."})
+    stanza = (int(msg.get("message_thread_id") or 0)
+              if msg.get("is_topic_message") else 0)
+    righe = ["📍 <b>Dove siamo</b>", "",
+             f"Gruppo: <code>{int(chat.get('id') or 0)}</code>"]
+    if chat.get("type") != "supergroup" or not chat.get("is_forum"):
+        righe.append("⚠️ Qui gli argomenti non sono accesi: accendili dalle "
+                     "impostazioni del gruppo e riscrivi <code>/dove</code> "
+                     "— accendendoli il numero del gruppo può cambiare.")
+    elif stanza:
+        righe.append(f"Argomento: <code>{stanza}</code>")
+    else:
+        righe.append("Argomento: Generale — non ha un numero, nel config "
+                     "non si scrive.")
+    if gruppo_admin_id() and chat.get("id") == gruppo_admin_id():
+        qui = [ADMIN_ARGOMENTI[n] for n, s in _GRUPPO_ADMIN["stanze"].items()
+               if stanza and s == stanza]
+        righe += ["", "✅ È il gruppo scritto in <code>ADMIN_CANALE_ID</code>."
+                  + (f" Qui arrivano: {', '.join(qui)}." if qui else "")]
+    dati = {"chat_id": chat.get("id"), "parse_mode": "HTML",
+            "text": "\n".join(righe)}
+    if stanza:
+        dati["message_thread_id"] = stanza
+    return await bot_api("sendMessage", dati)
+
+
+async def _comando_nel_gruppo(msg: dict, mittente: dict, testo: str):
+    """Un messaggio arrivato da un GRUPPO (12 ott 2026). Fino a ieri il
+    bot ascoltava le sole chat private; adesso i comandi di servizio
+    valgono anche nel gruppo degli admin. TRE PORTE, in fila:
+     · e' un comando (comincia per `/`)? Il resto, in un gruppo, il bot
+       non lo legge e non gli risponde: li' la gente parla fra se';
+     · chi scrive e' in `ADMIN_IDS`? Lo dice Telegram col MITTENTE del
+       messaggio, come in privato. Essere nel gruppo non basta: nel
+       gruppo si puo' invitare chiunque, in ADMIN_IDS no. Un admin che
+       scrive da «anonimo» non ha mittente, e non passa;
+     · il gruppo e' QUELLO di `ADMIN_CANALE_ID`? Solo `/dove` risponde
+       altrove (vedi li' il perche').
+    A chi non passa non si risponde NIENTE: il silenzio di
+    `_comando_sconosciuto`, senza nemmeno i bottoni. La risposta esce
+    nel gruppo e nell'argomento dove e' stato scritto il comando
+    (`_RISPOSTA_NEL_GRUPPO`). `/start`, `/sfoglia` e la fusione restano
+    cose da chat privata."""
+    if not testo.startswith("/") or not e_admin_bot(mittente):
+        return
+    comando = testo.split()[0].split("@")[0].lower()
+    if comando == "/dove":
+        return await comando_dove(msg, mittente)
+    chat = (msg.get("chat") or {}).get("id")
+    if not gruppo_admin_id() or chat != gruppo_admin_id():
+        return
+    fa = {"/anteprima": comando_anteprima, "/canale": comando_canale,
+          "/sponsor": comando_sponsor, "/vetrina": comando_vetrina,
+          "/punti": comando_punti, "/canali": comando_canali}.get(comando)
+    if not fa:
+        return
+    stanza = (int(msg.get("message_thread_id") or 0)
+              if msg.get("is_topic_message") else 0)
+    gettone = _RISPOSTA_NEL_GRUPPO.set(
+        {"da": mittente["id"], "chat": chat, "stanza": stanza})
+    try:
+        return await fa(mittente, testo)
+    finally:
+        _RISPOSTA_NEL_GRUPPO.reset(gettone)
 
 
 async def gestisci_update(update: dict):
-    """Smista quel che arriva dal campanello: solo chat private, solo
-    testo. Chi scrive al bot potrebbe non aver MAI aperto la Mini App:
-    prima di tutto il benvenuto standard in anagrafe."""
+    """Smista quel che arriva dal campanello: le chat private, e i
+    comandi di servizio nel gruppo degli admin (`_comando_nel_gruppo`);
+    solo testo. Chi scrive al bot potrebbe non aver MAI aperto la Mini
+    App: prima di tutto il benvenuto standard in anagrafe."""
     if "callback_query" in update:
         return await gestisci_callback(update["callback_query"])
     msg = update.get("message") or {}
     testo = (msg.get("text") or "").strip()
     mittente = msg.get("from") or {}
+    tipo = (msg.get("chat") or {}).get("type")
+    # UNA GUARDIA SOLA, per le chat private e per i gruppi: niente testo,
+    # niente mittente, un bot (e un admin che scrive da «anonimo» in un
+    # gruppo arriva col mittente di un bot: non passa), o un posto che
+    # non e' ne' una chat privata ne' un gruppo (un canale) → si esce
     if (not testo or not mittente.get("id") or mittente.get("is_bot")
-            or (msg.get("chat") or {}).get("type") != "private"):
+            or tipo not in ("private", "group", "supergroup")):
         return
+    if tipo != "private":
+        return await _comando_nel_gruppo(msg, mittente, testo)
     upsert_utente({"id": mittente["id"],
                    "first_name": mittente.get("first_name", ""),
                    "username": mittente.get("username", "")})
@@ -17386,6 +17840,8 @@ async def gestisci_update(update: dict):
         return await comando_punti(mittente, testo)
     if testo.startswith("/canali"):
         return await comando_canali(mittente, testo)
+    if testo.startswith("/dove"):
+        return await comando_dove(msg, mittente)
     if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": TESTO_SFOGLIA, "parse_mode": "HTML",
@@ -22627,7 +23083,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                              d["titolo"], venditore_id=user["id"])
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
-            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
+            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})",
+            argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
 
     # --- Strato 2: parere dell'AI. Il vietato netto blocca come
@@ -22639,7 +23096,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                              d["titolo"], venditore_id=user["id"])
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dall'AI</b> ({verdetto[1]})\n"
-            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
+            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})",
+            argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
     in_revisione = bool(verdetto and verdetto[0] == "dubbio")
     motivo_dubbio = verdetto[1] if in_revisione else ""
@@ -22818,7 +23276,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         f"«{d['titolo'][:80]}» — "
         f"{testo_prezzo(valuta, prezzo_sats, prezzo_eur)}{marca_asta}\n"
         f"Venditore: {user['first_name']} (id {user['id']})"
-        + riga_link_moderazione(d.get("descrizione", "")))
+        + riga_link_moderazione(d.get("descrizione", "")),
+        argomento="moderazione")
     if not asta_secondi:
         # E parte anche verso la piazza Nostr, in sottofondo: se i
         # relay tacciono, chi pubblica non se ne accorge nemmeno.
@@ -24661,7 +25120,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         await notifica_admin(
             f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})")
+            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
     if verdetto and verdetto[0] == "vietato":
@@ -24670,7 +25129,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         await notifica_admin(
             f"🚫 <b>Modifica bloccata dall'AI</b> ({verdetto[1]})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})")
+            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
     # Il DUBBIO sulla modifica: le modifiche si applicano ma l'annuncio
     # esce dalla vetrina finche' un moderatore non decide. Le offerte
@@ -24879,7 +25338,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                 f"«{html.escape(d['titolo'][:80])}» — "
                 f"{html.escape(domini)}\n"
                 f"Venditore: {html.escape(user['first_name'] or '')} "
-                f"(id {user['id']})")
+                f"(id {user['id']})", argomento="moderazione")
     # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
     # stabile fa si' che sostituisca il precedente da solo
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
@@ -24986,7 +25445,7 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         await notifica_admin(
             f"🚫 <b>Modifica firmata bloccata dal filtro</b> ({cat_vietata})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})")
+            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=cat_vietata))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
     if verdetto:
@@ -24996,7 +25455,7 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         await notifica_admin(
             f"🚫 <b>Modifica firmata bloccata dall'AI</b> ({motivo})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
-            f"{user['first_name']} (id {user['id']})")
+            f"{user['first_name']} (id {user['id']})", argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(motivo))
 
     categoria = categoria_valida(d.get("categoria"))
@@ -25205,7 +25664,8 @@ async def modifica_firmata(annuncio_id: int, req: Request,
         f"(firmato dal venditore su Nostr)\n"
         f"«{b['titolo'][:80]}» — "
         f"{testo_prezzo(b['valuta'], b['prezzo_sats'], b['prezzo_eur'])}\n"
-        f"Venditore: {user['first_name']} (id {user['id']})")
+        f"Venditore: {user['first_name']} (id {user['id']})",
+        argomento="moderazione")
     return {"ok": True, "id": annuncio_id}
 
 
@@ -25298,16 +25758,22 @@ async def avvisa_revisione(annuncio_id: int, motivo: str):
              # i 300 caratteri qui sopra possono aver gia' mangiato un
              # link: questa riga la scrive il giudice, e non tronca
              + riga_link_moderazione(a["descrizione"] or ""))
+    tastiera = {"inline_keyboard": [[
+        {"text": "✅ Pubblica", "callback_data": f"rev:ok:{annuncio_id}"},
+        {"text": "❌ Rifiuta", "callback_data": f"rev:no:{annuncio_id}"},
+    ]]}
+    # NEL GRUPPO DEGLI ADMIN NE PARTE UNA SOLA (12 ott 2026): chi tocca
+    # per primo decide, e il messaggio cambia sotto gli occhi di tutti —
+    # `callback_revisione` guarda chi ha toccato, non dove
+    if await _al_gruppo_admin(testo, "moderazione", tastiera=tastiera):
+        return
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
         destinatari.add(999)
     for admin in destinatari:
         await bot_api("sendMessage", {
             "chat_id": admin, "parse_mode": "HTML", "text": testo,
-            "reply_markup": {"inline_keyboard": [[
-                {"text": "✅ Pubblica", "callback_data": f"rev:ok:{annuncio_id}"},
-                {"text": "❌ Rifiuta", "callback_data": f"rev:no:{annuncio_id}"},
-            ]]}})
+            "reply_markup": tastiera})
 
 
 async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
@@ -26171,7 +26637,8 @@ async def paga_da_altra_cassaforte(req: Request,
                f"{_fmt_sats(esame['sats'])} sats: lo sorveglia la ronda, e "
                f"se quel pagamento un giorno si saldasse lo stesso lo "
                f"sentirete subito." if crediti else
-               f"Su «{origine}» non resta niente di appeso."))
+               f"Su «{origine}» non resta niente di appeso."),
+            argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
     try:
@@ -26590,7 +27057,7 @@ async def dichiara_morto(req: Request, x_tg_init_data: str = Header(""),
             f"sul SaaS, sorvegliato dalla ronda.\n\n⚠️ Se su LNbits quel "
             f"pagamento risultasse <b>failed</b>, i sats rientrano nel saldo "
             f"del SaaS: se l'avevi già riallineato a mano, fai un "
-            f"<b>Debit</b> della stessa cifra.")
+            f"<b>Debit</b> della stessa cifra.", argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
     try:
@@ -26717,7 +27184,8 @@ async def sposta_nodo(req: Request, x_tg_init_data: str = Header(""),
             f"l'incasso ({_fmt_sats(esame['netto'])} sats) o il rimborso "
             f"({_fmt_sats(esame['sats'])} sats) usciranno dal <b>nodo</b>, "
             f"che deve averne abbastanza. Deciso da <code>{user['id']}</code>"
-            f", motivo: «{html.escape(motivo)}». Nessun sat si è mosso.")
+            f", motivo: «{html.escape(motivo)}». Nessun sat si è mosso.",
+            argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
     return {"ok": True, "esito": "spostato", "id": riga_id, "messaggio": (
@@ -26923,7 +27391,7 @@ async def sorveglia_crediti():
                     f"<b>due volte {_fmt_sats(c['sats'])} sats</b>. Vanno "
                     f"chiesti indietro da una persona; quando sono tornati, "
                     f"il credito si chiude dal pannello con una nota.\n"
-                    f"<code>{c['hash']}</code>")
+                    f"<code>{c['hash']}</code>", argomento="errori")
             else:
                 await notifica_admin(
                     f"✅ <b>Credito rientrato (ordine #{c['riga_id']}).</b> Il "
@@ -26938,7 +27406,8 @@ async def sorveglia_crediti():
                     + (" ⚠️ Se il saldo di quella cassaforte l'avevi già "
                        "riallineato a mano (un Credit), adesso è alto due "
                        "volte: fai un <b>Debit</b> della stessa cifra."
-                       if c["cassaforte"] == CASSAFORTE_SAAS else ""))
+                       if c["cassaforte"] == CASSAFORTE_SAAS else ""),
+                    argomento="errori")
         except Exception as e:
             print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
@@ -27839,6 +28308,18 @@ def _leve_stato():
                   allarme=not ADMIN_IDS,
                   spento="nessuno riceve gli avvisi e nessuno può "
                          "decidere una disputa"),
+            # IL GRUPPO DEGLI ADMIN (12 ott 2026): un sì o un no, mai
+            # l'id — il patto di ADMIN_IDS qui sopra
+            _leva("Gruppo degli admin", "ADMIN_CANALE_ID",
+                  bool(gruppo_admin_id()),
+                  acceso="gli avvisi da admin vanno nel gruppo ("
+                         f"{len(_GRUPPO_ADMIN['stanze'])} argomenti su "
+                         f"{len(ADMIN_ARGOMENTI)} hanno la loro stanza, gli "
+                         "altri nel Generale) e in privato restano quelli "
+                         "da utente; se il gruppo non riceve ripiegano in "
+                         "privato, e lo si dice una volta",
+                  spento="gli avvisi da admin arrivano in privato a ogni "
+                         "moderatore, insieme a quelli da utente"),
         ]},
         {"gruppo": "🔒 Escrow e denaro", "voci": [
             _leva("Cassaforte del denaro nuovo: LNbits sul nodo",
@@ -42185,7 +42666,7 @@ async def _incassa_sblocco(pagamento_id: int) -> dict:
         await notifica_admin(
             f"💰 <b>Sblocco banner pagato.</b> "
             f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
-            f"(pagamento #{pagamento_id}).")
+            f"(pagamento #{pagamento_id}).", argomento="riepiloghi")
     except Exception as e:
         print(f"⚠️ Polso dello sblocco non partito: {e}")
     return {"stato": "pagato"}
@@ -42396,7 +42877,7 @@ async def _rimborsa_sblocco(pagamento_id: int,
                    if ritenta else
                    "Serve una invoice di esattamente quell'importo, "
                    "oppure il venditore deve mettere un Lightning "
-                   "address nel Profilo."))
+                   "address nel Profilo."), argomento="errori")
         except Exception as e:
             print(f"⚠️ Avviso del rimborso non partito: {e}")
         return {"ok": False, "stato": "pagato", "ritenta": ritenta}
@@ -42460,6 +42941,11 @@ async def avvisa_banner(tg_id: int):
         {"text": "✅ Pubblica", "callback_data": f"ban:ok:{tg_id}"},
         {"text": "❌ Rifiuta", "callback_data": f"ban:no:{tg_id}"},
     ]]}
+    # nel gruppo degli admin, se c'e': la regola di `avvisa_revisione`
+    if await _al_gruppo_admin(
+            testo, "moderazione", tastiera=tastiera,
+            foto=f"{URL_PUBBLICO}/foto/{u['banner_foto_att']}"):
+        return
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
         destinatari.add(999)
@@ -42842,7 +43328,7 @@ async def _incassa_slug_negozio(pagamento_id: int) -> dict:
                 f"⚠️ <b>Link negozio conteso.</b> #{p['tg_id']} ha pagato "
                 f"per «{slug}» (pagamento #{pagamento_id}) ma il nome "
                 "risulta già preso: da sistemare a mano (rimborso o nome "
-                "diverso).")
+                "diverso).", argomento="errori")
         except Exception as e:
             print(f"⚠️ Polso del link conteso non partito: {e}")
         return {"stato": "pagato", "slug_negato": True}
@@ -42859,7 +43345,7 @@ async def _incassa_slug_negozio(pagamento_id: int) -> dict:
         await notifica_admin(
             f"🔗 <b>Link negozio pagato:</b> {slug}, "
             f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
-            f"(pagamento #{pagamento_id}).")
+            f"(pagamento #{pagamento_id}).", argomento="riepiloghi")
     except Exception as e:
         print(f"⚠️ Polso del link non partito: {e}")
     return {"stato": "pagato", "slug": slug}
@@ -47347,7 +47833,8 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
             await notifica_admin(
                 f"🚫 <b>Commento di recensione bloccato dal filtro</b> "
                 f"({categoria})\nScambio P2P — "
-                f"{user['first_name']} (id {user['id']})")
+                f"{user['first_name']} (id {user['id']})",
+                argomento="moderazione")
             raise HTTPException(400, "Il commento contiene termini non "
                                      "ammessi sul mercatino")
     con = db()
@@ -51209,7 +51696,7 @@ async def _giro_attese_p2p():
         con.close()
     if soglia_dispute:
         try:
-            await notifica_admin(soglia_dispute)
+            await notifica_admin(soglia_dispute, argomento="dispute")
             print("⚖️ P2P: dispute sopra la soglia, moderatori avvisati", flush=True)
         except Exception as e:
             print(f"⚠️ P2P: l'avviso della soglia delle dispute è saltato "
@@ -51408,6 +51895,10 @@ def _testo_garanzia_mod_p2p(livello: int, ore: int, d: dict, per: int = 0) -> st
     if per and per in (int(d.get("compratore") or 0), int(d.get("venditore") or 0)):
         righe.append("⚠️ <b>Sei una delle due parti:</b> questa la decide un altro "
                      "moderatore.")
+    # nel gruppo degli admin non c'e' un «tu»: `_parti_mod_p2p`
+    for nome in d.get("parti_mod") or ():
+        righe.append(f"⚠️ <b>{nome} è una delle due parti:</b> questa la decide "
+                     "un altro moderatore.")
     return "\n".join(righe)
 
 
@@ -51498,7 +51989,7 @@ def _garanzie_lunghe_p2p(con, adesso: int) -> list:
             con.commit()
             continue
         d = None
-        for mod in _moderatori_p2p():
+        for mod in _avvisati_mod_p2p():
             if livello == "tardi":
                 for m in ("garanzia72", "garanzia88"):
                     if _timbra_garanzia_p2p(con, ordine, m, giro, mod, adesso, "tardi"):
@@ -51521,6 +52012,7 @@ def _garanzie_lunghe_p2p(con, adesso: int) -> list:
                      "sats": dati["sats"], "euro": dati["euro"],
                      "metodi": dati["metodi"], "modo": modo,
                      "fiat_il": fiat_il, "disputa_il": disputa_il}
+                d["parti_mod"] = _parti_mod_p2p(d)
             fuori.append((mod, _testo_garanzia_mod_p2p(livello, ore, d, mod),
                           f"⏰ Garanzia lunga P2P: {corto} {livello}h → {mod} "
                           f"(moderatore; {stato})"))
@@ -51543,7 +52035,7 @@ async def _giro_garanzie_p2p():
         con.close()
     for tg_id, testo, riga in avvisi:
         try:
-            esito = await notifica(tg_id, testo)
+            esito = await _recapita_p2p(tg_id, testo)
             print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",
                   flush=True)
         except Exception as e:
@@ -54345,6 +54837,50 @@ def _moderatori_p2p() -> list:
     return sorted(chi)
 
 
+# COL GRUPPO DEGLI ADMIN I MODERATORI SONO UN DESTINATARIO SOLO (12 ott
+# 2026): l'id del gruppo. Gli avvisi ai moderatori del P2P nascono in
+# giudici puri che scrivono PRIMA una riga in `p2p_avvisi` per ogni
+# destinatario (e' il «mai due volte») e POI tornano l'elenco da
+# mandare: mettendo il gruppo al posto dei moderatori la riga e' una,
+# il messaggio e' uno, e i giudici restano com'erano. Chi consegna
+# (`_recapita_p2p`) riconosce quell'id e passa dalla porta del gruppo.
+# Il giorno che la leva si accende, uno scambio GIA' annunciato in
+# privato puo' essere ridetto una volta nel gruppo: la riga del gruppo
+# non c'era ancora. E' un doppione solo, e nel verso giusto.
+def _avvisati_mod_p2p() -> list:
+    """A chi vanno gli avvisi PER I MODERATORI del P2P: il gruppo degli
+    admin, se c'e'; sennò i moderatori, uno per uno."""
+    gruppo = gruppo_admin_id()
+    return [gruppo] if gruppo else _moderatori_p2p()
+
+
+def _parti_mod_p2p(d: dict) -> list:
+    """Nel gruppo non c'e' un «tu»: la riga «Sei una delle due parti»
+    non ha a chi parlare. Qui i NOMI (gia' scappati, quelli di `d`)
+    delle parti che sono moderatori, e il testo li dice per nome. Fuori
+    dal gruppo e' vuota: li' ogni moderatore ha il suo messaggio, col
+    suo «Sei»."""
+    if not gruppo_admin_id():
+        return []
+    return [d.get(nome) or "Un moderatore"
+            for chiave, nome in (("compratore", "compra"), ("venditore", "vende"))
+            if e_admin(int(d.get(chiave) or 0))]
+
+
+async def _recapita_p2p(tg_id: int, testo: str, tranne: int = 0):
+    """`notifica()`, tranne quando il destinatario e' il gruppo degli
+    admin: li' si passa dalla sua porta (argomento «dispute»), e se il
+    gruppo non riceve l'avviso torna ai moderatori in privato — a
+    tutti meno `tranne`, che e' chi ha fatto il gesto e lo sa gia'."""
+    if not tg_id or tg_id != gruppo_admin_id():
+        return await notifica(tg_id, testo)
+    if await _al_gruppo_admin(testo, "dispute"):
+        return "gruppo degli admin"
+    esiti = [str(await notifica(mod, testo))
+             for mod in _moderatori_p2p() if mod != int(tranne or 0)]
+    return "gruppo muto, in privato: " + (" | ".join(esiti) or "nessuno")
+
+
 def _chiusura_disputa_p2p(momento: str, attore: str, dettaglio: str) -> tuple:
     """PURA: questo momento CHIUDE una disputa aperta? Torna `(esito,
     chiusa_da)` o `("", "")`. `esito` dice dove sono andati i sats
@@ -54416,6 +54952,10 @@ def _testo_disputa_aperta_p2p(d: dict, per: int) -> str:
     if per and per in (int(d.get("compratore") or 0), int(d.get("venditore") or 0)):
         righe.append("⚠️ <b>Sei una delle due parti:</b> questa disputa la "
                      "decide un altro moderatore.")
+    # nel gruppo degli admin non c'e' un «tu»: `_parti_mod_p2p`
+    for nome in d.get("parti_mod") or ():
+        righe.append(f"⚠️ <b>{nome} è una delle due parti:</b> questa disputa "
+                     "la decide un altro moderatore.")
     return "\n".join(righe)
 
 
@@ -54497,7 +55037,8 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
              "vende": _persona_disputa_p2p(con, fatto["venditore"]),
              "sats": dati["sats"], "euro": dati["euro"], "metodi": dati["metodi"],
              "garanzia_il": int((g["q"] if g else 0) or 0)}
-        for mod in _moderatori_p2p():
+        d["parti_mod"] = _parti_mod_p2p(d)
+        for mod in _avvisati_mod_p2p():
             if con.execute(
                     "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
                     "tg_id, quando, fonte) VALUES(?,'disputa_mod',?,?,?,'mostro')",
@@ -54530,7 +55071,7 @@ def _disputa_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         con, ordine, "allarme" if (chiusa_da == "moderatore" and not decisione)
         else "chiusa", 0, ev["ts"], esito, chiusa_da)
     testo = _testo_disputa_chiusa_p2p(corto, esito, chiusa_da, decisione)
-    for mod in _moderatori_p2p():
+    for mod in _avvisati_mod_p2p():
         if con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
                 "tg_id, quando, fonte) VALUES(?,'disputa_chiusa_mod',?,?,?,'mostro')",
@@ -54777,7 +55318,7 @@ def _prendi_disputa_p2p(con, io: int, ordine, chiave, fatto: bool, adesso: int) 
                            "mandargli quello che hai (ricevute, orari, messaggi).\n\n"
                            "<i>I sats restano in garanzia finché non decide.</i>"))
     chi = _persona_disputa_p2p(con, io)
-    for mod in _moderatori_p2p():
+    for mod in _avvisati_mod_p2p():
         if mod != int(io):
             avvisi.append((mod, f"⚖️ {chi} ha preso la disputa P2P sull'ordine "
                            f"<code>{corto}</code>."))
@@ -54955,14 +55496,15 @@ async def moderazione_chiave_p2p(req: Request, x_tg_init_data: str = Header(""),
             chi = _persona_disputa_p2p(con, user["id"])
         finally:
             con.close()
-        for mod in _moderatori_p2p():
+        for mod in _avvisati_mod_p2p():
             if mod != int(user["id"]):
                 try:
-                    await notifica(mod, f"⚖️ {chi} ha "
-                                   f"{'cambiato' if corpo.get('cambiata') else 'registrato'} "
-                                   "la sua chiave di moderatore P2P. Finché non è "
-                                   "aggiunta al nodo non può prendere dispute "
-                                   "(PRODUZIONE, «LE DISPUTE P2P»).")
+                    await _recapita_p2p(
+                        mod, f"⚖️ {chi} ha "
+                        f"{'cambiato' if corpo.get('cambiata') else 'registrato'} "
+                        "la sua chiave di moderatore P2P. Finché non è "
+                        "aggiunta al nodo non può prendere dispute "
+                        "(PRODUZIONE, «LE DISPUTE P2P»).", user["id"])
                 except Exception:
                     pass
     return _risposta_moderazione(codice, corpo)
@@ -54984,7 +55526,7 @@ async def moderazione_prendi_p2p(req: Request, x_tg_init_data: str = Header(""),
         con.close()
     for chi, testo in avvisi:
         try:
-            await notifica(chi, testo)
+            await _recapita_p2p(chi, testo, user["id"])
         except Exception as e:
             print(f"⚠️ Moderazione P2P: avviso a {chi} saltato "
                   f"({type(e).__name__}: {e})", flush=True)
@@ -55121,7 +55663,7 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
         esiti = []
         for tg_id, testo in avvisi:
             try:
-                esiti.append((tg_id, await notifica(tg_id, testo)))
+                esiti.append((tg_id, await _recapita_p2p(tg_id, testo)))
             except Exception as e:
                 esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
             await asyncio.sleep(0.2)
@@ -57952,7 +58494,7 @@ async def _dm_avvisa(voce: tuple):
         except Exception:
             nome = ""
         bottone = ("🟣 Apri in un client", f"https://njump.me/{npub}")
-    await notifica_admin(_dm_testo(voce, nome), bottone)
+    await notifica_admin(_dm_testo(voce, nome), bottone, argomento="dm")
     print("📩 Avviso DM: un avviso ai moderatori", flush=True)
 
 
@@ -61360,7 +61902,8 @@ async def avvisa_nuovi_iscritti():
     for soglia in TRAGUARDI_PIONIERI:
         if prima < soglia <= totale:
             await notifica_admin(f"🎉 <b>Traguardo: {soglia} pionieri!</b>\n"
-                                 f"Il barattolo si riempie. 🫙")
+                                 f"Il barattolo si riempie. 🫙",
+                                 argomento="riepiloghi")
     # Il tetto orario vale sui messaggi SINGOLI; oltre resta
     # l'aggregato, che passa sempre (al massimo uno per giro, e solo se
     # qualcuno e' davvero arrivato).
@@ -61370,13 +61913,13 @@ async def avvisa_nuovi_iscritti():
             and len(_iscritti_annunciati) + len(nuovi) <= AVVISI_ISCRITTI_MAX_ORA):
         for u in nuovi:
             await notifica_admin(f"👥 <b>Nuovo pioniere:</b> {_riga_pioniere(u)}\n"
-                                 f"Siamo in {totale}.")
+                                 f"Siamo in {totale}.", argomento="riepiloghi")
             _iscritti_annunciati.append(time.time())
     else:
         conto = ("1 nuovo pioniere" if len(nuovi) == 1
                  else f"{len(nuovi)} nuovi pionieri")
         await notifica_admin(f"👥 <b>{conto}</b> negli ultimi minuti.\n"
-                             f"Siamo in {totale}.")
+                             f"Siamo in {totale}.", argomento="riepiloghi")
 
 
 # --- Il motore degli avvisi di ricerca -------------------------------
@@ -62386,7 +62929,8 @@ async def deposita_invoice(ordine_id: int, req: Request,
                     f"📥 <b>Ordine #{ordine_id}: chi vende ha incollato la "
                     f"fattura nuova.</b> Dal Profilo, in «🧊 Pagamenti da "
                     f"verificare», adesso «Paga da un'altra cassaforte» "
-                    f"può partire. Una fattura scade: meglio non aspettare.")
+                    f"può partire. Una fattura scade: meglio non aspettare.",
+                    argomento="errori")
             except Exception as e:
                 print(f"⚠️ Avviso ai moderatori non partito: {e}")
         return {"ok": False, "stato": o["stato"], "incerto": True,
@@ -63667,12 +64211,15 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                        "sull'ordine: la LEGGI nel dettaglio — a "
                        "differenza dell'indirizzo e della busta.")
     con.close()
-    for admin in ADMIN_IDS:
-        await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
-                              "I sats restano bloccati in attesa della tua "
-                              "decisione." + nota_digitale + nota_punto
-                              + nota_indirizzo + nota_email + nota_servizio
-                              + avviso_nota)
+    # DALLA PORTA DI TUTTI GLI AVVISI DA ADMIN (12 ott 2026): era un
+    # ciclo suo su ADMIN_IDS, l'unico che in collaudo non scriveva
+    # all'identita' 999. Il testo e' quello di sempre.
+    await notifica_admin(
+        f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
+        "I sats restano bloccati in attesa della tua "
+        "decisione." + nota_digitale + nota_punto
+        + nota_indirizzo + nota_email + nota_servizio
+        + avviso_nota, argomento="dispute")
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
                    "vi contattera' entrambi. I sats restano nel deposito "
@@ -64157,6 +64704,11 @@ async def _avvisa_liquidita(testo: str):
     `GUARDIANO_PONTE_AVVISA`, o i moderatori): e' un avviso di macchina,
     e va dove gli avvisi di macchina sono stati chiesti. Fail-open, una
     riga nel journal per destinatario."""
+    # nel gruppo degli admin, se c'e' e riceve (12 ott 2026): la regola
+    # di `_avvisa_ponte`
+    if await _al_gruppo_admin(testo, "liquidita"):
+        print("   💧 ↳ gruppo degli admin: mandato", flush=True)
+        return
     for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
         try:
             esito = await _manda_telegram(chat, testo)
@@ -64395,7 +64947,7 @@ async def segnala_fatture_scadute(fonte: str, rifs: list):
         if testo:
             print(f"⚠️ Pagamenti non arrivati: avvisati i moderatori "
                   f"(ultima: {fonte} {rifs})", flush=True)
-            await notifica_admin(testo)
+            await notifica_admin(testo, argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso delle fatture scadute saltato "
               f"({type(e).__name__}: {e})", flush=True)
@@ -64449,7 +65001,7 @@ async def controlla_annullati():
                 f"⚠️ Un pagamento è atterrato su un <b>ordine annullato</b> "
                 f"(#{o['id']}): riacciuffato e portato avanti come un "
                 f"ordine normale. Se l'annuncio nel frattempo era stato "
-                f"rimosso, serve un occhio umano.")
+                f"rimosso, serve un occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Riacciuffo ordine #{o['id']} saltato: {e}")
     for ril in rilanci:
@@ -64996,7 +65548,8 @@ async def annulla_vendita(ordine_id: int, req: Request,
                 f"⚠️ <b>Un venditore ha annullato {n_annulli} ordini pagati "
                 f"in {ANNULLI_VENDITORE_GIORNI} giorni</b> (l'ultimo: "
                 f"«{titolo}», ordine #{ordine_id}). Nessun automatismo sulla "
-                f"reputazione: dagli un'occhiata dal suo profilo.")
+                f"reputazione: dagli un'occhiata dal suo profilo.",
+                argomento="moderazione")
         except Exception as e:
             print(f"⚠️ Allarme annulli del venditore non partito: {e}")
     esito = await _rimborsa_compratore(ordine_id)
@@ -66210,7 +66763,7 @@ async def _lavoro_import(biglietto: str):
         if lavoro["scarti"]:
             riassunto += (f"\n⚠️ {len(lavoro['scarti'])} righe scartate "
                           f"in anteprima")
-        await notifica_admin(riassunto)
+        await notifica_admin(riassunto, argomento="riepiloghi")
     except Exception as e:
         print(f"⚠️ Notifiche di fine import saltate: {e}")
 
@@ -66524,7 +67077,8 @@ async def lascia_feedback(ordine_id: int, req: Request,
             await notifica_admin(
                 f"🚫 <b>Commento di feedback bloccato dal filtro</b> "
                 f"({categoria})\nOrdine #{ordine_id} — "
-                f"{user['first_name']} (id {user['id']})")
+                f"{user['first_name']} (id {user['id']})",
+                argomento="moderazione")
             raise HTTPException(400, "Il commento contiene termini non "
                                      "ammessi sul mercatino")
     foto = d.get("foto") or []
@@ -66914,7 +67468,7 @@ async def sollecita_ritiri_fermi():
                     f"🧊 <b>Ritiro in zona fermo:</b> ordine #{r['id']} "
                     f"(«{titolo}»), <b>{_fmt_sats(r['prezzo_sats'])} sats</b> in "
                     f"cassaforte da settimane e nessuna delle due parti "
-                    f"si muove. Serve un occhio umano.")
+                    f"si muove. Serve un occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Sollecito ritiro saltato (#{r['id']}): {e}")
 
@@ -66983,7 +67537,7 @@ async def sollecita_servizi_fermi():
                     f"🧊 <b>Servizio fermo:</b> ordine #{r['id']} "
                     f"(«{titolo}»), <b>{_fmt_sats(r['prezzo_sats'])} sats</b> in "
                     f"cassaforte e nessuna delle due parti si muove. "
-                    f"Serve un occhio umano.")
+                    f"Serve un occhio umano.", argomento="errori")
             elif not r["appuntamento_il"]:
                 # nessuno ha ancora proposto: la palla e' del venditore
                 await notifica(r["venditore_id"],
@@ -67113,7 +67667,7 @@ async def sollecita_conferme_ferme():
                     f"(«{titolo}»), <b>{_fmt_sats(netto)} sats</b> in cassaforte. "
                     f"Il compratore ha ignorato {PROMEMORIA_CONFERMA_MAX} "
                     f"promemoria in ~{PROMEMORIA_CONFERMA_MAX * PROMEMORIA_CONFERMA_GIORNI} "
-                    f"giorni: serve un occhio umano.")
+                    f"giorni: serve un occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Promemoria conferma saltato (#{r['id']}): {e}")
 
@@ -67244,7 +67798,7 @@ async def sollecita_venditori_fermi():
                     f"cassaforte. Il venditore ha ignorato "
                     f"{PROMEMORIA_CONFERMA_MAX} promemoria in "
                     f"~{PROMEMORIA_CONFERMA_MAX * PROMEMORIA_CONFERMA_GIORNI} "
-                    f"giorni: serve un occhio umano.")
+                    f"giorni: serve un occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Promemoria venditore saltato (#{r['id']}): {e}")
 
@@ -67353,7 +67907,7 @@ async def sollecita_buste_ferme():
                     f"cassaforte. Il venditore ha ignorato "
                     f"{PROMEMORIA_CONFERMA_MAX} promemoria: il pacco "
                     f"è probabilmente in giacenza scaduta — serve un "
-                    f"occhio umano.")
+                    f"occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Promemoria busta saltato (#{r['id']}): {e}")
 
@@ -67776,7 +68330,7 @@ async def sollecita_punti_obiettati():
                     f"{_fmt_sats(r['prezzo_sats'])} sats in cassaforte. "
                     f"Il venditore ha segnalato «{etichetta}» "
                     f"{quanti} fa e l'acquirente non ha corretto il "
-                    f"punto. Serve un occhio umano.")
+                    f"punto. Serve un occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Promemoria punto contestato saltato (#{r['id']}): {e}")
 
@@ -67827,7 +68381,7 @@ async def sollecita_rimborsi_puntate():
                     f"<b>{_fmt_sats(r['importo_sats'])} sats</b> in "
                     f"cassaforte. L'utente ha ignorato "
                     f"{SOLLECITO_INCASSO_MAX} solleciti: serve un "
-                    f"occhio umano.")
+                    f"occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Sollecito rimborso saltato (#{r['id']}): {e}")
 
@@ -68001,7 +68555,7 @@ async def risolvi_pagamenti_in_volo(solo_in_volo: bool = False):
                     + ("era <b>uscito</b>, l'affare si chiude come pagato."
                        if v["verdetto"] == USCITO else
                        "<b>non era uscito</b>, il pagamento riparte.")
-                    + " Non devi fare niente.")
+                    + " Non devi fare niente.", argomento="errori")
             except Exception as e:
                 print(f"⚠️ Avviso ai moderatori non partito: {e}")
         try:
@@ -68047,7 +68601,7 @@ async def _arrenditi_in_volo(tabella: str, riga_id: int, phash: str,
             f"sat.\n"
             + (f"<code>{phash}</code>" if phash else
                "(questa riga non ha un payment_hash: è un difetto "
-               "nostro, e va guardata con calma)"))
+               "nostro, e va guardata con calma)"), argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
@@ -68163,7 +68717,8 @@ async def riprova_pagamenti_sospesi():
                 f"quindi <b>non e' partito niente</b> e nessun dato si e' "
                 f"perso: le invoice sono al loro posto e si riprova da "
                 f"soli a ogni giro. Se dura, guarda il nodo — e controlla "
-                f"che le chiavi LNbits siano ancora buone.")
+                f"che le chiavi LNbits siano ancora buone.",
+                argomento="errori")
         except Exception as e:
             print(f"⚠️ Avviso pagamenti fermi non partito: {e}")
 
@@ -68282,7 +68837,7 @@ async def sollecita_incassi():
                     f"(«{titolo}»), <b>{_fmt_sats(netto)} sats</b> in cassaforte. "
                     f"Il venditore ha ignorato {SOLLECITO_INCASSO_MAX} "
                     f"solleciti in ~{(SOLLECITO_INCASSO_MAX + 1) * SOLLECITO_INCASSO_GIORNI} "
-                    f"giorni: serve un occhio umano.")
+                    f"giorni: serve un occhio umano.", argomento="errori")
         except Exception as e:
             print(f"⚠️ Sollecito incasso saltato (#{r['id']}): {e}")
 
@@ -69460,7 +70015,7 @@ async def ricategorizza_automatico():
             f"🗂 <b>{len(proposte)} nuove proposte di categoria</b>\n"
             f"{righe_msg}\n\n"
             f"Le trovi nel Profilo, in «🗂 Categorie da sistemare»: "
-            f"si approvano a gruppi.")
+            f"si approvano a gruppi.", argomento="moderazione")
     except Exception as e:
         print(f"⚠️ Ricategorizzazione automatica saltata: {e}")
 
@@ -71422,7 +71977,8 @@ async def avvisa_scadenza_sponsor():
             f"Alla scadenza sparisce da sola la sua card in «Da "
             f"scoprire» — gli altri spazi non si toccano — e la storia "
             f"in cima al negozio e il posto fra i Consigliati "
-            f"restano. Per rinnovare: <code>/sponsor {slug} 30</code>")
+            f"restano. Per rinnovare: <code>/sponsor {slug} 30</code>",
+            argomento="riepiloghi")
 
 
 async def avvisa_rientro_ferie():
@@ -71933,7 +72489,7 @@ async def sollecita_revisioni():
         f"⏳ <b>{fermi} {plurale} una decisione</b> da almeno "
         f"{REVISIONE_SOLLECITO_GIORNI} giorni (Profilo → Statistiche → "
         f"In revisione). L'attesa non li pubblica né li rifiuta: "
-        f"serve un tocco umano.")
+        f"serve un tocco umano.", argomento="moderazione")
 
 
 def _termometro_conta(con):
@@ -72008,7 +72564,8 @@ async def termometro_sottocategorie():
         f"🗂 <b>{totale} {plurale} senza sottocategoria</b> — le "
         f"categorie più scoperte: {scoperte}.{riga_colmabili}\n"
         f"Sul VPS: <code>python assegna_sottocategorie.py --conta</code> "
-        f"per i titoli, parole nuove nel dizionario per il resto.")
+        f"per i titoli, parole nuove nel dizionario per il resto.",
+        argomento="riepiloghi")
 
 
 # ============ IL RIEPILOGO SETTIMANALE (ago 2026) ===================
@@ -73187,7 +73744,7 @@ async def riconcilia_payout():
               "basta. Per pagare serve una fattura <b>nuova</b> — quella "
               "vecchia, se è bruciata, LNbits non la ripaga.")
     try:
-        await notifica_admin(testo)
+        await notifica_admin(testo, argomento="errori")
     except Exception as e:
         print(f"⚠️ Avviso della riconciliazione non partito: {e}")
 
@@ -73261,7 +73818,7 @@ async def controlla_libro_mastro():
         + "\n".join(righe)
         + "\n\nNessuna correzione automatica: questi numeri li guarda una "
         "persona. Sul VPS: <code>sqlite3 satmarket.db &lt; "
-        "query_libro_mastro.sql</code>")
+        "query_libro_mastro.sql</code>", argomento="errori")
 
 
 # ----------------- IL SAAS NON HA PIU' DOVERI? -----------------------
@@ -73365,7 +73922,8 @@ async def avvisa_saas_senza_doveri():
         "un mese di SaaS come rete, la disdetta (vedi Cantieri, «Il "
         "doppio wallet»). Il conto a mano è il polso 24 di "
         "<code>query_libro_mastro.sql</code>. Questo avviso non si "
-        "ripete: se un dovere ricompare e poi torna a zero, suona di nuovo.")
+        "ripete: se un dovere ricompare e poi torna a zero, suona di nuovo.",
+        argomento="errori")
 
 
 _TASK_AVVISI_MERCATINO = None

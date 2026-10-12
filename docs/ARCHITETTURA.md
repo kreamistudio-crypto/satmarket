@@ -31181,3 +31181,95 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `schnorr_puro.PuntoCompleto`.
   LE PROVE: `prove_avviso_dm_nostr`, `collaudo_avviso_dm_nostr` (in CI,
   nella gabbia). La procedura: PRODUZIONE, «L'AVVISO DEI DM NOSTR».
+
+- IL GRUPPO DEGLI ADMIN (12 ott 2026; perché in CANTIERI, «Il gruppo
+  degli admin»; la procedura in PRODUZIONE, «IL GRUPPO DEGLI ADMIN»).
+  Gli avvisi DA ADMIN vanno in un gruppo Telegram privato con gli
+  argomenti, e nella chat privata col bot restano gli avvisi da utente.
+  Due leve: `ADMIN_CANALE_ID` (l'id del supergruppo, negativo e con
+  `-100` davanti; 0 = spento, cioè il codice di ieri) e
+  `ADMIN_CANALE_ARGOMENTI` (`{nome: numero dell'argomento}`). Le legge
+  `_leggi_gruppo_admin` (PURA), una volta, all'avvio: un id storto — un
+  positivo è una PERSONA, un negativo corto un gruppo senza argomenti —
+  SPEGNE la leva e lo dice nel journal (`[admin] …`); lo stato vive in
+  `_GRUPPO_ADMIN`, e `gruppo_admin_id()` è la domanda «c'è?».
+  I SEI ARGOMENTI (`ADMIN_ARGOMENTI`) e chi ci scrive:
+  · `dispute` — `apri_disputa` (mercatino) e gli avvisi ai moderatori
+    del P2P: disputa aperta / chiusa (`_disputa_evento_p2p`), presa
+    (`_prendi_disputa_p2p`), chiave di moderatore registrata
+    (`moderazione_chiave_p2p`), garanzia ferma a 72 e 88 ore
+    (`_garanzie_lunghe_p2p`), e la soglia delle dispute sugli scambi
+    (`_giro_attese_p2p`);
+  · `liquidita` — `_avvisa_liquidita` e `_avvisa_ponte`;
+  · `errori` — i pagamenti in uscita falliti, scaduti, rifiutati,
+    congelati, doppi, riconciliazione e libro mastro, e gli ordini
+    fermi (le `sollecita_*`);
+  · `moderazione` — `avvisa_revisione` e `avvisa_banner` (le tastiere
+    ✅/❌), i blocchi di filtro e AI, annuncio nuovo, link nuovo,
+    revisioni ferme, proposte di categoria, il venditore che annulla
+    troppo;
+  · `dm` — `_dm_avvisa` («è arrivato un DM», mai il testo);
+  · `riepiloghi` — `polso_ordini_admin`, nuovi iscritti, incassi di
+    banner e link negozio, sponsor in scadenza, import finito,
+    termometro delle sottocategorie, il registro dei comandi.
+  Un argomento senza numero va nel Generale (nessun
+  `message_thread_id`).
+  LA PORTA È UNA: `_al_gruppo_admin(testo, argomento, bottone, tastiera,
+  foto)`. Torna True se l'avviso è arrivato nel gruppo,
+  False se non c'è andato (leva spenta compresa) — e chi chiama, su
+  False, fa quel che faceva ieri. Per questo ogni chiamante è due righe
+  DAVANTI al suo codice di sempre, e a leva spenta quel codice gira
+  identico. I chiamanti sono sei e li conta una prova:
+  `notifica_admin` (che porta l'`argomento=` di ognuna delle sue 70
+  chiamate), `avvisa_revisione`, `avvisa_banner`, `_avvisa_ponte`,
+  `_avvisa_liquidita`, `_recapita_p2p`.
+  NESSUN AVVISO SI AGGIUNGE E NESSUNO SI TOGLIE: dove partiva un
+  messaggio per moderatore ne parte uno nel gruppo, con le stesse
+  parole. L'unica frase che cambia è nelle dispute e nelle garanzie del
+  P2P: «Sei una delle due parti» (in privato, a quel moderatore)
+  diventa «<nome> è una delle due parti» (`_parti_mod_p2p`), perché nel
+  gruppo un «tu» non c'è.
+  IL P2P: i giudici scrivono una riga in `p2p_avvisi` per destinatario
+  PRIMA di tornare l'elenco da mandare. `_avvisati_mod_p2p()` dà come
+  destinatario il GRUPPO (il suo id) al posto dei moderatori: una riga,
+  un messaggio, giudici intatti. `_recapita_p2p` consegna: riconosce
+  l'id del gruppo e passa dalla porta; ogni altro id è `notifica`.
+  LA 🔔 DEL LIBRO P2P NON PASSA DI QUI, ed è una decisione di Andrea
+  (12 ott 2026): l'avviso dei nuovi ordini è una notifica DA UTENTE —
+  a iscrizione, ognuno la accende per sé coi suoi filtri — e resta in
+  privato a chi l'ha accesa, anche se è un admin. `_giro_avvisi_nuovi_p2p`
+  manda con `notifica` e non sa niente del gruppo; `ordini_p2p` non è
+  un argomento, e chi lo scrive nel config se lo sente dire all'avvio.
+  IL TRASPORTO è `_posta_gruppo_admin` (in collaudo non esce niente:
+  una riga `👥 [gruppo admin simulato]`), e `_giudizio_gruppo_admin`
+  (PURA) legge la risposta: `ok`; `spoglio` (HTML rifiutato: si rimanda
+  senza tag, una volta); `argomento` (stanza cancellata o chiusa: si
+  riprova nel Generale); `piano` (429: fino a `retry_after` si va
+  dritti in privato, senza accusare il gruppo); `gruppo` (401/403/404,
+  «chat not found», niente permessi); `messaggio` (un rifiuto che
+  riguarda quel testo); `rete`. Su tutto tranne `ok` l'avviso RIPIEGA
+  in privato. Solo `gruppo` lo si dice, UNA volta e in privato
+  (`_gruppo_admin_giu`): il «già detto» sta nel timbro
+  `gruppo_admin_giu` e non in memoria, così un deploy non lo ripete; al
+  primo invio riuscito il timbro si toglie (`_gruppo_admin_riprende`).
+  Mai silenzioso: nessun `disable_notification`; il suono lo sceglie
+  chi legge, silenziando l'argomento su Telegram. Nel journal di un
+  errore di rete va il TIPO, mai il testo (porta l'indirizzo col token).
+  I COMANDI NEL GRUPPO: `gestisci_update` ha una guardia sola (testo,
+  mittente vero, non un bot — un admin «anonimo» arriva come bot e non
+  passa — chat privata o gruppo) e manda i gruppi a
+  `_comando_nel_gruppo`. Lì: è un comando? Chi scrive è in `ADMIN_IDS`
+  (essere nel gruppo non basta)? Il gruppo è quello della leva? A chi
+  non passa non si risponde niente. La risposta esce nel gruppo e
+  nell'argomento del comando: `_RISPOSTA_NEL_GRUPPO` (una ContextVar)
+  dice a `bot_api` di girare al gruppo i messaggi diretti a chi ha dato
+  il comando, finché il comando gira. `/dove` (`comando_dove`) dice id
+  del gruppo e numero dell'argomento, e risponde in QUALUNQUE gruppo a
+  un admin: serve prima di avere il numero. I tocchi su ✅/❌ valevano
+  già per chi tocca (`e_admin` sul mittente), non per dove.
+  LE PROVE: `prove_canale_admin` (il conto prima/dopo, il ripiego, il
+  censimento con l'AST: 79 punti da cui nasce un avviso da admin, e
+  l'elenco chiuso di chi nomina `ADMIN_IDS`), `collaudo_canale_admin`
+  (il giro col Telegram di cartone, in CI nella gabbia). I banchi che
+  eseguono chi passa dalla porta montano i pezzi veri a leva spenta:
+  `gruppo_admin_spento` in prove.py.

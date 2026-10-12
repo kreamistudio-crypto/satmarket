@@ -219,6 +219,11 @@ def main():
                "LIQUIDITA_PHOENIX_MIN": 300000, "LIQUIDITA_USCITA_MIN": 0,
                "LIQUIDITA_PROMEMORIA_S": 86400,
                "GUARDIANO_PONTE_AVVISA": [], "ADMIN_IDS": [999],
+               # il gruppo degli admin (12 ott 2026) qui e' SPENTO: la
+               # porta vera risponde False e l'avviso prende la strada
+               # di sempre; il gruppo acceso sta in collaudo_canale_admin
+               "_GRUPPO_ADMIN": {"id": 0, "stanze": {}, "giu": None,
+                                 "piano_fino": 0.0},
                "_manda_telegram": manda, "bot_api": bot_api,
                "_comando_sconosciuto": sconosciuto,
                "tastiera_bot": lambda *a: {"tastiera": True},
@@ -232,7 +237,8 @@ def main():
                      "_tetto_phoenix", "_strada_phoenix",
                      "_giudizio_liquidita", "_liquidita_passo",
                      "_liquidita_stato_letto", "_da_quanto",
-                     "_testo_liquidita", "_avvisa_liquidita",
+                     "_testo_liquidita", "_al_gruppo_admin",
+                     "_avvisa_liquidita",
                      "_quadro_liquidita", "_giro_guardia_liquidita",
                      "_guardia_liquidita_attiva", "comando_canali"):
             exec(pezzo(nome), amb)

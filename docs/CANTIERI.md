@@ -51509,3 +51509,220 @@ volta (63 verdi), la tortura e il giro dal vivo — da lì all'albero del
 push sono cambiati solo CLAUDE.md, `collaudo_avvisi_mercatino.py` e
 questo file. La voce era già scritta quando la suite è girata, tranne
 questi due paragrafi.
+
+## Il gruppo degli admin: gli avvisi da admin fuori dalla chat privata, in un gruppo con sei argomenti (12 ott 2026, cantiere canale-admin, richiesta di Andrea)
+
+**IL PROBLEMA, con le parole di Andrea.** «Nella mia chat privata col
+bot arrivano insieme le notifiche da utente normale e quelle da admin,
+ed è un gran casino.» Voleva: in privato SOLO quel che riceve un
+utente (i suoi ordini, i suoi scambi), e tutto il resto in un posto
+dove ci sono lui, Alan e i moderatori.
+
+**LA REGOLA che ha messo lui, e che la prova conta:** nessuna notifica
+tolta e nessuna aggiunta, cambia solo DOVE arriva. E il suono non lo
+decide il bot: manda tutto in modo normale, mai silenzioso, e ognuno
+silenzia su Telegram l'argomento che vuole.
+
+**L'INVENTARIO, prima del codice.** Gli avvisi da admin uscivano da
+tre porte, e il casino nasceva dalla prima: `notifica_admin` (68
+chiamate) scriveva a ogni `ADMIN_IDS` passando da `notifica()`, cioè
+nella STESSA chat degli avvisi da utente. Poi c'erano dieci cicli che
+scrivevano agli admin per conto loro: `apri_disputa`, le due tastiere
+✅/❌ (`avvisa_revisione`, `avvisa_banner`), ponte e liquidità, e
+cinque nel P2P (`_moderatori_p2p`). 78 punti in tutto. Quattro cose
+non erano come Andrea le ricordava, e gliele ho scritte: sulla
+cauzione agli admin non arriva niente; un avviso «errore del server»
+non esiste (gli errori stanno nel journal, arrivano solo quelli dei
+pagamenti); il riepilogo del lunedì va sul canale pubblico; e i
+comandi di servizio in un gruppo erano IGNORATI — il bot ascoltava le
+sole chat private, quindi «continuano a funzionare nel gruppo» era una
+funzione nuova.
+
+**UN GRUPPO CON GLI ARGOMENTI, non un canale.** Il canale è escluso
+dal punto 4 della richiesta: lì i messaggi non hanno mittente, e
+«solo per chi è admin» non si può far valere. Un gruppo semplice
+sposta il casino in un'altra stanza. Con gli argomenti ognuno tiene
+sonoro quel che gli serve e muto il polso degli ordini. Il costo è la
+preparazione (sei numeri da trovare, una volta), e per quello c'è
+`/dove`. Un limite vale per ogni gruppo: Telegram lascia a un bot
+circa 20 messaggi al minuto per gruppo — quelli in più ripiegano in
+privato per i secondi che Telegram chiede.
+
+**SEI ARGOMENTI, decisi da Andrea:** ⚖️ Dispute, 💧 Liquidità,
+⚠️ Errori, 🛡️ Moderazione, 📩 DM Nostr, 📊 Riepiloghi. Chi scrive
+dove: ARCHITETTURA, «IL GRUPPO DEGLI ADMIN».
+
+**IL SETTIMO CHE NON C'È, «🔁 ORDINI P2P»: UNA COSA CHE NON ERA COME
+SEMBRAVA.** A metà cantiere Andrea ne aveva chiesto un settimo, per
+«l'avviso che oggi arriva agli admin ogni volta che qualcuno pubblica
+un ordine P2P nel libro», che nel mio inventario non c'era. L'ho
+cercato per ogni strada (ogni uso di `ADMIN_IDS`, ogni
+`_manda_telegram`, ogni `bot_api("send…`, ogni primo argomento di
+`notifica(`): un avviso DA ADMIN sul libro non esiste. Quello che
+arriva è la 🔔 del libro — gli avvisi dei nuovi ordini del 9 ott, a
+iscrizione, spenti di serie, che ognuno accende PER SÉ coi suoi filtri
+(`utenti.avvisi_nuovi_p2p`). Ad Andrea arriva perché l'ha accesa lui,
+da utente. La prima stesura faceva decidere al config (la 🔔 di un
+admin nella stanza «ordini_p2p» solo se la stanza aveva un numero), e
+gliel'ho scritto com'era: la sua regola e la sua richiesta dicevano
+due cose diverse. HA DECISO LUI, ed è la regola: la 🔔 del libro è
+una notifica da utente e RESTA IN PRIVATO a chi l'ha accesa, anche se
+è un admin. Niente settimo argomento. Dal codice è uscito tutto quel
+che serviva solo a lei (`solo_stanza`, la miniatura del libro nella
+porta del gruppo): `_giro_avvisi_nuovi_p2p` è tornato byte per byte
+quello di prima, e una prova lo tiene lì — non nomina il gruppo né
+chi è admin. Chi scrive `"ordini_p2p"` nel config se lo sente dire
+all'avvio, e gli altri sei valgono lo stesso.
+
+**COME È FATTO, in tre righe** (il resto in ARCHITETTURA). Una porta
+sola, `_al_gruppo_admin`, che dice True («è arrivato nel gruppo») o
+False; ogni chiamante le chiede prima, e su False fa quel che faceva
+ieri. Così a leva spenta il codice di ieri gira identico, e il ripiego
+quando il gruppo non risponde è lo stesso codice — non un secondo
+sentiero da tenere in pari. Le 68 chiamate a `notifica_admin` portano
+`argomento="…"` (scritto con uno script sull'AST, non a mano).
+
+**STRADE SCARTATE.**
+· La stanza dedotta dal testo (la prima emoji): ⚠️ è errori, dispute e
+  moderazione insieme; 🔗 ha tre significati. Una stanza scritta è una
+  stanza che si cerca con grep.
+· La stanza dedotta da CHI chiama, guardando lo stack: non avrebbe
+  toccato nessuna chiamata, ed è il genere di furbizia che il giorno
+  di un `create_task` manda tutto nel Generale senza dirlo.
+· Cambiare i giudici del P2P perché sappiano del gruppo: scrivono una
+  riga in `p2p_avvisi` per destinatario prima di mandare. Ho messo il
+  GRUPPO al posto dei moderatori come destinatario
+  (`_avvisati_mod_p2p`): una riga, un messaggio, giudici intatti.
+· Toccare le quaranta righe `"chat_id": chat` dei comandi perché
+  rispondano nel gruppo: `chat` lì è anche l'identità («da tg {chat}»).
+  Una variabile di contesto dice a `bot_api` dove girare la risposta,
+  finché il comando gira.
+· Un avviso «il gruppo ha ripreso»: sarebbe una notifica in più. Che ha
+  ripreso lo dicono gli avvisi stessi; nel journal c'è la riga.
+· Una leva per argomento (sei righe nel config): un dizionario è una
+  riga sola, e i nomi sbagliati si dicono all'avvio.
+
+**L'UNICA FRASE CHE CAMBIA.** Nelle dispute e nelle garanzie del P2P il
+moderatore che è anche una delle parti leggeva «Sei una delle due
+parti». Nel gruppo un «tu» non c'è: diventa «<nome> è una delle due
+parti». Il nome era già nel messaggio (riga «Compra:» o «Vende:»).
+
+**`apri_disputa` ALLINEATA** (notato nell'inventario, sì di Andrea):
+era l'unico ciclo che in collaudo non scriveva all'identità 999. Ora
+passa da `notifica_admin`.
+
+**LA FIRMA CAMBIATA, E I BANCHI.** `argomento=` in più a
+`notifica_admin` ha fatto rosse 33 sezioni di prove.py (96 prove) al
+primo giro: sedici finte `async def _avvisa(t)` che alzavano TypeError
+dentro il `try` del chiamante — l'avviso «non partiva» — e i banchi
+che eseguono chi passa dalla porta senza averla nell'ambiente. Le
+finte ora accettano `**k`; i banchi montano i pezzi VERI a leva spenta
+con `gruppo_admin_spento` (un attrezzo solo, accanto a
+`gemelli_trackbot`). Tre prove dicevano una cosa che non è più vera e
+sono state riscritte dicendo perché: i chiamanti della traduzione dei
+link (due → tre), il censimento degli indirizzi di Telegram (cinque →
+sei: `_posta_gruppo_admin`, con la sua guardia), e chi manda gli
+eventi P2P (`_recapita_p2p`). La guardia `is_bot` del campanello è
+rimasta UNA: la prima stesura ne aveva due, la sentinella l'ha detto,
+e la condizione è stata riscritta invece della sentinella.
+
+**PROVATO.**
+· `prove_canale_admin`, 87 prove: le leve (un id positivo, un gruppo
+  semplice, True, una parola: leva spenta e una lamentela); il
+  giudizio sulle risposte di Telegram; IL CONTO — gli stessi avvisi,
+  con le stesse parole e nello stesso ordine, a leva spenta in privato
+  a ogni admin e a leva accesa una volta nel gruppo, su tutte le porte
+  (notifica_admin, ponte, liquidità, revisione, banner, P2P); il
+  ripiego (bot tolto, id sbagliato, stanza persa, HTML rotto, 429,
+  messaggio troppo lungo, rete caduta) con l'avvertimento UNA volta,
+  anche dopo un riavvio; i comandi nel gruppo e `/dove`; e il
+  CENSIMENTO sull'AST di server.py — 70 chiamate a `notifica_admin`
+  ognuna con la sua stanza, sei ingressi alla porta, cinque cicli del
+  P2P, 79 punti prima e 79 adesso (78 il giorno dell'inventario: il
+  settantanovesimo è arrivato da main, vedi sotto), e l'elenco chiuso
+  delle funzioni che nominano `ADMIN_IDS` (chi domani scrive un ciclo
+  suo la trova rossa).
+· `collaudo_canale_admin`, 31 prove, in CI nella gabbia: lo stesso giro
+  con `_posta_gruppo_admin`, `bot_api`, `gestisci_update` e
+  `callback_revisione` VERI e httpx vero, davanti a un Telegram di
+  cartone su 127.0.0.1 che risponde 200, 403, 400 e 429 come la Bot
+  API.
+· LA TORTURA, venti guasti messi apposta su una copia del repo, uno
+  alla volta: 20 presi, 0 sfuggiti — il doppio
+  invio (gruppo E privato) su `notifica_admin`, sulla revisione e sulla
+  liquidità; il gruppo ignorato; l'avvertimento che si ripete; il
+  timbro che non si toglie; un 429 che accusa il gruppo; la stanza
+  persa che non ripiega; un id positivo che accende la leva; l'errore
+  di rete che stampa il suo testo; un invio silenzioso; un avviso
+  senza stanza; un ciclo su ADMIN_IDS che ritorna; i comandi per
+  chiunque, o in qualunque gruppo; la risposta che finisce in privato;
+  il tocco su ✅ che non guarda chi tocca. Il collaudo da solo ne
+  lasciava passare quattro che le prove prendevano; uno era un difetto
+  del collaudo (i suoi comandi finti rifacevano il controllo di chi è
+  admin, e coprivano la porta tolta): ritoccato, e riprovato rosso.
+  E SUL RITOCCO DEI SEI ARGOMENTI altri tre, tre presi: la 🔔 di un
+  admin che torna nel gruppo, il settimo argomento che ricompare,
+  la disputa del mercatino nella stanza sbagliata.
+· IL GIRO DAL VIVO: il server VERO importato intero, in
+  collaudo (config di cartone, database usa-e-getta, relay morto), una
+  volta col gruppo acceso e una spento. In collaudo Telegram è
+  simulato, quindi si guardano le righe che escono. ACCESO: il
+  Venditore pubblica un annuncio → «🆕 Nuovo annuncio #1» esce UNA
+  volta verso il gruppo, stanza 8, e NESSUNA notifica all'utente 999;
+  la tastiera della revisione → gruppo, stanza 8, coi ✅/❌; la
+  liquidità → stanza 4; `/dove` dell'Admin nella stanza 12 → i due
+  numeri e «Qui arrivano: 📩 DM Nostr»; `/canali` (il comando vero)
+  dell'Admin nella stanza 14 → la risposta nel gruppo, stanza 14; lo
+  stesso `/canali` del Compratore → niente; in privato → in privato; il
+  tocco su ✅ dell'Admin → il messaggio del gruppo cambia; quello del
+  Compratore → niente. SPENTO: gli stessi gesti danno «notifica
+  simulata per utente 999» e la tastiera a 999, come ieri; `/dove` nel
+  gruppo risponde lo stesso, `/canali` nel gruppo no. Rifatto sull'albero
+  del push, coi sei argomenti.
+
+**NON PROVATO, e si dice.** Il Telegram vero. Le frasi degli errori
+(«message thread not found», «TOPIC_CLOSED», «chat not found», «bot was
+kicked») le ho scritte a memoria della Bot API: il giudizio per questo
+cerca le parole e non la frase, e un 403 vale «gruppo» qualunque cosa
+dica — ma che Telegram risponda proprio così lo dice solo il giro col
+bot vero, che Andrea fa dopo il push (niente bot di prova: scelta
+sua). Lo stesso per: `is_forum` e `is_topic_message` nei messaggi di
+un argomento (da lì `/dove` legge il numero), un bot amministratore
+con tutti i permessi spenti, e `/dove` senza il nome del bot.
+
+**COSA È GIRATO SU QUALE ALBERO.** MAIN È CORSO TRE VOLTE a
+cantiere aperto, sempre con commit non miei, e ogni volta: rebase, e
+poi cercato per nome quel che arrivava. 1) Da 2c317ab a 88ed663 («Le
+dispute P2P nel cruscotto»), con un avviso da admin NUOVO,
+`notifica_admin(soglia_dispute)` — il caso del cantiere gemello: ha
+preso la stanza «dispute» (la sua prova cercava la chiamata per testo,
+riallineata), il censimento è passato da 78 a 79 punti, e a dirlo è
+stata la prova nuova, rossa finché la chiamata non ha avuto la sua
+stanza. 2) Fino a 02dec6b (il collaudo ballerino, i tetti in
+CLAUDE.md): un conflitto solo, la coda di questo file, tenuta quella
+di main e questa voce riappesa sotto. 3) Fino a 539245a (la garanzia
+nel registro, le dispute escluse): pulito, nessun avviso nuovo.
+SULL'ALBERO DEL PUSH, sopra 539245a, coi sei argomenti e col collaudo
+dei punti curato: `PROVE_SEVERE=1 python prove.py` INTERA, 22649
+passate e 0 fallite, nessuna saltata; i 65 collaudi del workflow
+nella gabbia, in quattro gruppi, 65 verdi; il giro dal vivo
+rifatto (acceso, «6 argomenti su 6», e spento); la tortura del
+ritocco; lo scanner dei segreti sulle righe aggiunte con le forme
+lette dal workflow, zero prese, controprova tre su tre. PRIMA, sopra
+88ed663 e con sette argomenti: la suite intera (22625 passate, 0
+fallite) e i 64 collaudi, 63 verdi e uno rosso —
+`collaudo_guardia_liquidita` eseguiva `_avvisa_liquidita` senza la
+porta nell'ambiente: montata a leva spenta, verde. SOPRA 2c317ab: la
+tortura dei venti guasti (da lì il server del cantiere è cambiato
+nella stanza dell'avviso arrivato da main e nel settimo argomento
+tolto).
+
+**RESTA DA GUARDARE** (Andrea, dopo il deploy; i passi uno alla volta
+in PRODUZIONE, «IL GRUPPO DEGLI ADMIN»): creare il gruppo, i sei
+argomenti, `/dove` in ognuno, le due righe nel config del VPS, il
+riavvio. Poi: un annuncio nuovo compare in 🛡️ Moderazione e non in
+privato; `/canali` risponde nel gruppo; togliere il bot dal gruppo per
+un minuto e vedere l'avvertimento arrivare una volta, e gli avvisi
+tornare nel gruppo quando lo si rimette. E guardare, in sola lettura,
+se sul VPS `GUARDIANO_PONTE_AVVISA` è compilata: col gruppo acceso
+diventa la strada di riserva.

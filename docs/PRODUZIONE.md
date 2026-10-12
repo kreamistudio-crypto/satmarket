@@ -3960,3 +3960,81 @@ non compare più: ogni comando vale da qualunque utente lo lanci.
   la prova che le accetta da chiunque e non le butta; il NIP-11
   (`payment_required`, `auth_required`); i tempi su tre giri. La
   riserva misurata quella notte: `wss://nostr.oxtr.dev`.
+
+- IL GRUPPO DEGLI ADMIN (12 ott 2026; perché in CANTIERI, «Il gruppo
+  degli admin»; com'è fatto in ARCHITETTURA, «IL GRUPPO DEGLI ADMIN»).
+  Gli avvisi da admin (dispute, liquidità, pagamenti da guardare,
+  moderazione, DM su Nostr, riepiloghi) in un gruppo Telegram privato
+  con sei argomenti; in privato col bot restano gli avvisi da utente.
+  NASCE SPENTO, e un deploy non lo accende. PER ACCENDERLO:
+  A) SU TELEGRAM
+  1) si crea un gruppo privato (nome a piacere) e si aggiunge
+     @ilbarattolobot;
+  2) nelle impostazioni del gruppo si accendono gli «Argomenti»
+     (Topics): il gruppo diventa un supergruppo, e il suo numero cambia;
+  3) si creano sei argomenti: ⚖️ Dispute, 💧 Liquidità, ⚠️ Errori,
+     🛡️ Moderazione, 📩 DM Nostr, 📊 Riepiloghi (i nomi su Telegram
+     sono liberi: contano i numeri);
+  4) si fa il bot AMMINISTRATORE coi permessi al minimo: a un
+     amministratore Telegram consegna i messaggi del gruppo (a un bot
+     semplice membro solo i comandi scritti col suo nome,
+     `/dove@ilbarattolobot`), e al bot non serve altro — non deve
+     cancellare, bannare né invitare. Se Telegram vuole almeno un
+     permesso acceso, «Gestisci argomenti» è il più innocuo.
+     Chi dà i comandi NON deve avere «Resta anonimo» acceso: un
+     anonimo arriva al bot senza nome, e il bot non gli risponde;
+  5) si aggiungono Alan e i moderatori. Essere nel gruppo non dà i
+     comandi: quelli restano di chi sta in `ADMIN_IDS`;
+  6) dentro OGNI argomento si scrive `/dove`: il bot risponde con
+     «Gruppo: -100…» (uguale in tutti) e «Argomento: N». Nel Generale
+     dice che non ha un numero. Si annotano i sei numeri.
+  B) SUL VPS
+  1) la copia di riserva:
+     `sudo cp -p /srv/barattolo/config.py /srv/barattolo/config.py.prima-gruppo-admin`
+  2) si guarda che le righe non ci siano già:
+     `grep -n "ADMIN_CANALE" /srv/barattolo/config.py`
+  3) `sudo nano /srv/barattolo/config.py`, e in fondo DUE righe, coi
+     numeri di `/dove`:
+     `ADMIN_CANALE_ID = -100…`
+     `ADMIN_CANALE_ARGOMENTI = {"dispute": N, "liquidita": N, "errori": N, "moderazione": N, "dm": N, "riepiloghi": N}`
+  4) si guarda che il file si legga ancora:
+     `sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"`
+  5) `sudo systemctl restart barattolo`
+  6) il journal:
+     `journalctl -u barattolo --since "2 min ago" | grep "\[admin\]"`
+     Deve esserci «[admin] Gruppo degli admin ACCESO: 6 argomenti su 6
+     hanno la loro stanza…». Una riga «[admin] ADMIN_CANALE_ID non e'
+     l'id di un gruppo con gli argomenti…» vuol dire numero sbagliato:
+     la leva è rimasta SPENTA e gli avvisi arrivano in privato, come
+     prima. Il pannello «⚙️ Stato delle leve» dice «Gruppo degli
+     admin» acceso o spento (mai il numero).
+  7) LA PROVA: nel gruppo, `/dove` dentro un argomento risponde «✅ È
+     il gruppo scritto in ADMIN_CANALE_ID. Qui arrivano: …»; `/canali`
+     risponde lì dentro. Un annuncio nuovo dal mercatino fa comparire
+     «🆕 Nuovo annuncio» in 🛡️ Moderazione, e NON in privato.
+  PER SPEGNERLO: `ADMIN_CANALE_ID = 0` (o via la riga) e riavvio. Per
+  tornare indietro del tutto: la copia di riserva del punto 1.
+  COSA SUCCEDE SE: il bot viene tolto dal gruppo, o il numero è
+  sbagliato → gli avvisi tornano in privato da soli e a ogni moderatore
+  arriva UNA volta «⚠️ Il gruppo degli admin non riceve», con la frase
+  di Telegram; rimesso il bot, tornano nel gruppo senza toccare niente.
+  Un argomento cancellato o col numero sbagliato → i suoi avvisi vanno
+  nel Generale, e nel journal c'è «l'argomento «…» non riceve». Tanti
+  avvisi in un minuto (Telegram ne lascia circa 20 al minuto per
+  gruppo) → quelli in più arrivano in privato per i secondi che
+  Telegram chiede. Nel journal:
+  `journalctl -u barattolo --since "1 hour ago" | grep "Gruppo degli admin"`
+  IL SUONO non si decide qui: il bot manda tutto col suono normale. Su
+  Telegram ognuno silenzia l'argomento che vuole (si apre l'argomento,
+  si tocca il suo nome in alto, poi «Silenzia» / «Notifiche»).
+  LA 🔔 DEI NUOVI ORDINI DEL LIBRO P2P NON VA NEL GRUPPO (decisione
+  di Andrea): è una notifica da utente, e resta in privato a chi l'ha
+  accesa. Chi non la vuole in privato la spegne dal bottone 🔔 del
+  libro o dal cassetto Avvisi del Profilo.
+  ⚠️ `GUARDIANO_PONTE_AVVISA`, se sul VPS è compilata, col gruppo
+  acceso diventa la strada di riserva: liquidità e ponte vanno nel
+  gruppo, e a quegli id solo se il gruppo non riceve.
+  IL GIORNO DELL'ACCENSIONE uno scambio P2P già annunciato in privato
+  (una disputa aperta, una garanzia fra le 72 e le 88 ore) può essere
+  ridetto una volta nel gruppo: il «già detto» è per destinatario, e
+  il gruppo è un destinatario nuovo.

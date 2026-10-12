@@ -182,7 +182,7 @@ def main():
     S._DM_AVVIO = adesso - 30
     AVVISI = []
 
-    async def avvisa(testo, bottone=None):
+    async def avvisa(testo, bottone=None, **k):   # k: la stanza del gruppo degli admin
         AVVISI.append((testo, bottone))
     S.notifica_admin = avvisa
 

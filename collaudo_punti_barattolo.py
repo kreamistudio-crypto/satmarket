@@ -185,13 +185,20 @@ def avvio():
     # tempo il loro contenuto e' una delle cose da provare — che il
     # codice di ritiro non ci entri MAI, che il secondo tocco non ne
     # mandi una seconda, e che la nota al moderatore dica il fatto
-    # senza il contenuto. La nota della disputa arriva ai moderatori
-    # da `notifica(admin, ...)` e non da `notifica_admin`, che invece
-    # la ronda del libro mastro usa: due registri, due mestieri.
+    # senza il contenuto. DUE REGISTRI, DUE MESTIERI: la nota della
+    # disputa sta fra i DETTI, quel che dice la ronda del libro mastro
+    # fra gli ADMIN. Dal 12 ott 2026 (il gruppo degli admin) passano
+    # tutte e due da `notifica_admin` — la disputa non ha piu' un ciclo
+    # suo su ADMIN_IDS — e a separarle e' la STANZA: «dispute» e' la
+    # nota al moderatore (999, l'unico di questo config), il resto e'
+    # della ronda.
     async def detta(chi, testo, *a, **k):
         DETTI.append((chi, testo))
 
     async def alla_ronda(testo, *a, **k):
+        if k.get("argomento") == "dispute":
+            DETTI.append((999, testo))
+            return
         ADMIN.append(testo)
 
     # L'USCITA DEI SATS: il giro si chiude con la conferma di chi ha
