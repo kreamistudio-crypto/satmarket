@@ -93287,11 +93287,13 @@ def prove_chat_scambio():
           and "&& chatScInVistaP2P())\n      chatScVistoP2P(id);" in rit2
           and "chatScRichiamoAggiornaP2P(id);" in pezzo_js(mini, "function chatScRidisegnaP2P(", "\n}\n"))
     prova("...lo scorrimento della pagina si sente (in cattura, passivo, raccolto), il tocco porta "
-          "al riquadro rispettando chi ha chiesto meno movimento, e il riquadro non finisce sotto la "
+          "al riquadro chiedendo al giudice degli effetti (mai da se' al sistema), e il riquadro non finisce sotto la "
           "testata", True,
           "document.addEventListener('scroll', () => {" in mini
           and "}, {capture: true, passive: true});" in mini
-          and "b.scrollIntoView({behavior: fermo ? 'auto' : 'smooth', block: 'start'});" in mini
+          and "b.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'});"
+          in pezzo_js(mini, "function vaiAllaChatP2P(){", "\n}\n")
+          and "matchMedia" not in pezzo_js(mini, "function vaiAllaChatP2P(){", "\n}\n")
           and "#p2pChatSc{scroll-margin-top:76px}" in mini)
     prova("...ed e' alto quanto un dito, coi colori di casa (nessun colore cablato)", True,
           ".chatsc-richiamo{display:flex;align-items:center;gap:8px;width:auto;min-height:44px;" in mini

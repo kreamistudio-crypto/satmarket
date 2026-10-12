@@ -54391,6 +54391,7 @@ subito»): sopra `865c75b` sono girati `prove_tempo_di_chi_pubblica`
 con le sezioni della bussola, del tetto e dei collaudi in CI,
 `collaudo_tempo_pubblica` nella gabbia e `compileall`. La suite intera
 e i 73 collaudi sull'albero del push li dice la CI.
+
 ## La chat parte subito, e il richiamo «💬 Chat» in cima alla pagina dello scambio (notte fra il 12 e il 13 ott 2026, cantiere chat-subito, dal campo di Andrea)
 
 **IL FATTO.** Andrea ha provato dal vivo «La chat segue lo scambio»
@@ -54463,7 +54464,8 @@ presa alla fine; non per chi lo scambio lo può solo guardare, non se
 l'altra persona non è di Barattolo, non a leva spenta). Lo stesso
 markup ovunque: non c'è una variante per larghezza. `vaiAllaChatP2P()`
 scorre al riquadro (`scrollIntoView`, `scroll-margin-top` su
-`#p2pChatSc`; senza animazione con `prefers-reduced-motion`).
+`#p2pChatSc`); la scorsa è morbida solo se lo dice il giudice degli
+effetti (`tourRidotto`), come ogni scorsa di casa.
 
 **«VISTO» ORA VUOLE LA CHAT NELLO SCHERMO, ed è una regola che
 cambia.** Prima bastava avere la pagina dello scambio aperta: ogni

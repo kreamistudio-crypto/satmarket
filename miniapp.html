@@ -77159,11 +77159,12 @@ function vaiAllaChatP2P(){
   const b = el('p2pChatSc');
   if (!b) return;
   haptic();
-  const fermo = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  b.scrollIntoView({behavior: fermo ? 'auto' : 'smooth', block: 'start'});
+  /* la scorsa chiede al GIUDICE degli effetti (`tourRidotto`), come
+     ogni scorsa di casa: mai una domanda nuova al sistema */
+  b.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'});
   /* a corsa finita: gli scorrimenti lo direbbero gia', ma una pagina
      corta puo' non scorrere affatto */
-  setTimeout(chatScGuardataP2P, fermo ? 60 : 700);
+  setTimeout(chatScGuardataP2P, tourRidotto() ? 60 : 700);
 }
 /* IL RIDISEGNO SUL POSTO: arrivato un messaggio si riscrive la LISTA,
    e il piede solo se ha cambiato mestiere. La pagina intera non si
