@@ -52327,7 +52327,10 @@ def _garanzia_dal_registro_p2p(esito: str, motivo: str, lato: str) -> bool:
       primo, e la fattura si chiede a chi compra solo dopo. Nel
       registro e' la stessa coppia dell'annullato qui sotto — fattura
       mai data, lato `buy` — e chi ha PRESO un acquisto non la produce
-      mai: lui e' quello che vende, e gli manca la garanzia;
+      mai: lui e' quello che vende, e gli manca la garanzia. (Quel
+      ritorno nasce DOPO la colonna: di regola la garanzia gliela
+      scrive la cronaca, `_garanzia_dalla_cronaca_p2p`, ed e' un fatto;
+      qui si arriva solo se la sua cronaca e' cominciata a meta');
     • `annullato`: si' se l'ha deciso un moderatore, se e' concordato
       (si concorda solo a garanzia bloccata) o se la garanzia e' arrivata
       a scadenza; si' anche per la fattura mai data su un ordine di

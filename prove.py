@@ -114099,6 +114099,20 @@ def prove_dispute_cruscotto_p2p():
               {"preso", "garanzia_chiesta", "garanzia_pagata", "fattura_chiesta"}),
            amb["_motivo_annullo_p2p"](
                "mostro", "taker-timeout", {"preso", "garanzia_chiesta"})])
+    prova("...e dove la cronaca c'e' non serve dedurre: quel ritorno ha la "
+          "garanzia SCRITTA nel registro (1), quello di chi aveva preso no "
+          "(0), e una cronaca cominciata a meta' resta «non si sa» (-1) — "
+          "ed e' li' che la deduzione fa da riserva",
+          [{1: 1}, {1: 0}, {1: -1}],
+          [amb["_garanzia_dalla_cronaca_p2p"](
+              [{"giro": 1, "momento": m} for m in (
+                  "preso", "garanzia_chiesta", "garanzia_pagata",
+                  "fattura_chiesta", "tornato")]),
+           amb["_garanzia_dalla_cronaca_p2p"](
+               [{"giro": 1, "momento": m} for m in (
+                   "preso", "garanzia_chiesta", "tornato")]),
+           amb["_garanzia_dalla_cronaca_p2p"](
+               [{"giro": 1, "momento": m} for m in ("fattura_chiesta", "tornato")])])
     prova("la garanzia dal solo registro: completato si', tornato no; "
           "annullato si' per moderatore, concordato, garanzia scaduta e "
           "fattura mai data su un ACQUISTO; no per garanzia mai pagata, a "

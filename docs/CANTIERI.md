@@ -52324,6 +52324,15 @@ PUBBLICATO un ACQUISTO è la coppia «fattura mai data, lato `buy`», la
 stessa che già valeva per l'annullato — e chi PRENDE un acquisto non la
 produce mai: è quello che vende, e gli manca la garanzia. Una riga di
 codice e la sua prova, col motivo che la cronaca scrive davvero.
+⚠️ NEL FRATTEMPO, SU MAIN, UN'ALTRA SESSIONE HA CURATO LA RADICE (cantiere
+dispute-garanzia-escluse, arrivato al terzo rebase): la garanzia adesso
+si SCRIVE nel registro dai fatti della cronaca (`p2p_conti.garanzia`), e
+si deduce solo dove quella colonna dice «non si sa». Il ritorno per chi
+pubblica nasce dopo la colonna, quindi di regola è già esatto da solo
+(provato: garanzia pagata nella cronaca → 1). La correzione di qui
+resta, come riserva per la riga la cui cronaca è cominciata a metà, e
+il suo commento lo dice. Le due cose non si pestano: stessa funzione,
+rami diversi.
 PROVATO: `prove_disputa_automatica_p2p` (18) e le due prove nuove in
 `prove_dispute_cruscotto_p2p`; il passo 6 di
 `collaudo_dispute_cruscotto` sul server vero (l'evento alle quattro
