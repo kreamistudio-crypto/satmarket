@@ -53944,3 +53944,34 @@ dichiarata SDA dal Profilo il campo compare, passati a DHL sparisce,
 coi due avvisi giusti. La pillola «a punti accesi» dal vivo non si è
 vista: nel catalogo non c'è nessun punto, lo dicono il banco node e il
 collaudo.
+
+**COSA È GIRATO SU QUALE ALBERO** (il verbale del push, notte fra il
+12 e il 13 ott 2026). PRIMO GIRO, sopra `236d5b8`: suite severa intera
+23.160 passate e 0 fallite; i 69 collaudi del workflow nella gabbia,
+verdi; la tortura 22 su 22; il giro dal vivo coi ventidue scatti.
+SECONDO GIRO (i quattro notati), sullo stesso albero: i 73 collaudi
+verdi e la tortura 33 su 33, ma la suite 23.174 passate e 2 FALLITE —
+due prove scritte sulla forma di prima: quella che contava due righe
+identiche nel form di Vendi (il costo verso il punto adesso guarda
+anche `offroPunti`) e quella che vietava a `/api/me` di nominare il
+gate dei punti accesi. Il push si è fermato lì, come Andrea aveva
+chiesto, e le due prove si sono aggiornate col suo sì: la prima alla
+forma nuova, la seconda più precisa e non più larga (le spunte del
+venditore lette sempre senza il gate; i punti accesi chiesti una volta
+sola, per la chiave nuova; il catalogo intero).
+MAIN È CORSO di otto commit (`eb68d8d` … `400a3ea`: l'hackathon, la
+chat che segue lo scambio, la pausa leggera, il patto sul profilo). Due
+conflitti, tutti e due di code aggiunte in fondo allo stesso file
+(questa voce in CANTIERI, la leva in PRODUZIONE): tenuta prima la coda
+di main e poi la mia. Nessun conflitto nel codice.
+ALBERO ULTIMO, sopra `400a3ea`, prima di questo paragrafo: la suite
+severa INTERA, 23.284 passate e 0 fallite; i 73 collaudi del workflow
+nella gabbia, tutti verdi, coi cinque entrati in questo cantiere
+(`collaudo_punti_corrieri`, `collaudo_reti`, `collaudo_nota`,
+`collaudo_busta_diretta`, `collaudo_email_corriere`); i due fuori CI
+che toccano il punto (`collaudo_punto_concordato` 46, `collaudo_conto`
+232), verdi; la tortura, 33 su 33; lo scanner dei segreti rifatto in
+locale com'è nel workflow, pulito. I due giri dal vivo (trenta scatti)
+sono dell'albero di prima del rebase. LA CI DI MAIN, guardata prima del
+push: verde sulla punta (`400a3ea`). L'ok al push di Andrea stava nel
+brief del secondo giro e l'ha ridetto dando il sì alle due prove.
