@@ -51978,3 +51978,47 @@ toccate sull'albero finale: le undici prove (le dieci del cantiere più
 (i nove del cantiere più `collaudo_canale_admin` e
 `collaudo_punti_barattolo`) verdi, i tre blocchi script della pagina
 compilano. La suite intera sull'albero finale la dice la CI.
+
+## Il lanciatore dei collaudi mostra TUTTE le rosse, con qualunque segno (12 ott 2026, sera, cantiere collaudi-rosse, richiesta di Andrea)
+
+**Il caso.** Nel cantiere «Chi è l'altro» un collaudo con quattro rosse
+ne mostrava UNA. `collaudi_ci.py` stampa le ultime quaranta righe di un
+collaudo rosso e poi l'elenco delle «righe rosse» (dal 1 ott 2026), ma
+l'elenco cercava solo la «✗» — e i banchi del P2P (`collaudo_pagamento_p2p`
+e i diciotto che lo importano) scrivono «NO», altri «[NO]» o «[KO]». Le
+rosse in testa sparivano, e «una rossa» poteva essere quattro.
+
+**La cura.** `SEGNI_ROSSI = ("✗", "NO ", "[NO]", "[KO]", "FAIL", "⛔")`:
+`righe_rosse` prende ogni riga che inizia con uno di questi, con
+l'atteso e l'avuto che la seguono anche senza i due punti («atteso 400
+con…», «atteso un rifiuto…»), i Traceback INTERI (i frame rientrati e
+la riga dell'eccezione) e la riga di un'eccezione NUDA
+(`FORMA_ECCEZIONE`: un SyntaxError stampa File, riga, cursore e
+«SyntaxError: …» senza nessun «Traceback» davanti — l'ha mostrato il
+primo cartone del cantiere, scritto male apposta per caso). Il
+lanciatore li stampa tutti sotto «--- le righe rosse di X, tutte ---» e
+manda un'annotazione `::error::` per ognuno, senza il segno
+(`senza_segno`); per un Traceback l'annotazione dice l'ECCEZIONE
+(l'ultima riga del blocco), non «Traceback (most recent call last):».
+Così GitHub le mostra in cima alla corsa. La coda delle quaranta righe
+resta, come contesto.
+
+**Scartato.** Stampare l'uscita intera di un collaudo rosso (le centinaia
+di righe di rumore di `collaudo_db_contesa` seppellirebbero di nuovo le
+rosse); cambiare i banchi perché scrivano tutti «✗» (sono venti file, e
+un banco nuovo domani ricomincerebbe da capo: meglio un giudice che
+conosce i segni).
+
+**Provato.** `prove_collaudi_in_ci` (17 verdi): oltre al caso del 1 ott,
+un'uscita con due «NO» a cento righe di distanza, un «[KO]» con l'atteso
+senza i due punti, un Traceback intero e un SyntaxError nudo — tutto
+esce; la tupla dei segni; le sentinelle sul corpo di `main`; e DAL VERO
+un collaudo di cartone con due rosse «NO» separate da duecento righe di
+rumore e un KeyError in fondo, girato dal lanciatore vero: tutt'e due
+nel registro (la prima solo nell'elenco, perché la coda non la
+raggiunge; la seconda nella coda e nell'elenco), tutt'e due con la loro
+annotazione, e l'annotazione del Traceback che dice «KeyError: 'fine'». Suite intera e tre
+collaudi col lanciatore nuovo: nel verbale del push.
+
+**Resta da guardare.** La prossima rossa vera in CI: le annotazioni in
+cima alla corsa devono essere tante quante le rosse.

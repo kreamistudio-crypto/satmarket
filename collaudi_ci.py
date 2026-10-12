@@ -30,6 +30,7 @@ viaggia nel PYTHONPATH.
 Uso:  python collaudi_ci.py collaudo_porta_timer collaudo_... [...]
 """
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -112,25 +113,69 @@ _so.socket.sendto = sendto
 '''
 
 
+# I SEGNI DI UNA RIGA ROSSA, come li stampano i banchi dei collaudi: la
+# «✗» dei piu', il «NO» di collaudo_pagamento_p2p e di chi lo importa,
+# «[NO]» e «[KO]» di qualche banco piu' vecchio, FAIL e ⛔ del lanciatore
+# stesso. Un Traceback e' rosso a parte: si prende il blocco intero.
+SEGNI_ROSSI = ("✗", "NO ", "[NO]", "[KO]", "FAIL", "⛔")
+# ...e la riga di un'eccezione («KeyError: 'x'», «SyntaxError: …»)
+FORMA_ECCEZIONE = re.compile(r"^[A-Za-z_][\w.]*(Error|Exception)(:|$)")
+
+
 def righe_rosse(uscita):
-    """Le righe «✗» di un collaudo, ognuna con l'atteso e l'avuto che la
-    seguono, ovunque stiano nell'uscita.
+    """TUTTE le righe rosse di un collaudo, con qualunque segno, ognuna
+    con l'atteso e l'avuto che la seguono, e i Traceback interi, ovunque
+    stiano nell'uscita.
 
     LA CODA NON BASTAVA (1 ott 2026, decisione di Andrea): la CI stampava
     le ultime quaranta righe, e `collaudo_db_contesa` dopo la riga caduta
     stampa le centinaia di «🏪» del giro — il registro diceva «23 passate,
     1 fallite» e nessuno poteva sapere QUALE. Una prova a tempo caduta a
     caso in CI e mai in locale e' esattamente il caso in cui serve il
-    nome, perche' rifarla non la fa ricadere."""
+    nome, perche' rifarla non la fa ricadere.
+    E LA SOLA «✗» NON BASTAVA (12 ott 2026, richiesta di Andrea): i banchi
+    del P2P scrivono «NO», e un collaudo con quattro rosse ne mostrava una
+    — quella rimasta nella coda. Ora ogni segno vale, e l'atteso senza i
+    due punti («atteso 400 con…», «atteso un rifiuto…») si prende pure."""
     righe = uscita.splitlines()
     rosse = []
-    for i, r in enumerate(righe):
-        if r.lstrip().startswith("✗"):
-            rosse.append(r.strip())
-            for dopo in righe[i + 1:i + 3]:
-                if dopo.strip().startswith(("atteso:", "avuto:")):
+    i = 0
+    while i < len(righe):
+        r = righe[i].strip()
+        if r.startswith("Traceback (most recent call last):"):
+            # il blocco intero: i frame (rientrati) e la riga dell'eccezione
+            blocco = [r]
+            j = i + 1
+            while j < len(righe) and (not righe[j].strip()
+                                      or righe[j].startswith((" ", "\t"))):
+                if righe[j].strip():
+                    blocco.append("    " + righe[j].strip())
+                j += 1
+            if j < len(righe):
+                blocco.append("    " + righe[j].strip())
+                j += 1
+            rosse.extend(blocco)
+            i = j
+            continue
+        if r.startswith(SEGNI_ROSSI):
+            rosse.append(r)
+            for dopo in righe[i + 1:i + 4]:
+                if dopo.strip().startswith(("atteso", "avuto")):
                     rosse.append("    " + dopo.strip())
+        elif FORMA_ECCEZIONE.match(r):
+            # un'eccezione SENZA il «Traceback» davanti: un SyntaxError
+            # stampa File, la riga, il cursore e «SyntaxError: …» e basta
+            rosse.append(r)
+        i += 1
     return rosse
+
+
+def senza_segno(r):
+    """La riga rossa senza il suo segno, per l'annotazione della CI."""
+    for s in SEGNI_ROSSI:
+        if r.startswith(s):
+            return r[len(s):].strip()
+    return r.strip()
 
 
 def gira(nome, gabbia, segni):
@@ -180,16 +225,23 @@ def main(nomi):
         if not ok:
             rossi.append(nome)
             print("\n".join("    " + r for r in uscita.splitlines()[-40:]))
-            # E QUALI RIGHE SONO CADUTE, sempre, anche se stanno ben prima
+            # E QUALI RIGHE SONO CADUTE, TUTTE, anche se stanno ben prima
             # della coda — una annotazione per riga, che GitHub mostra in
             # cima alla corsa senza aprire il registro
             rosse = righe_rosse(uscita)
             if rosse:
-                print(f"    --- le righe rosse di {nome} ---")
+                print(f"    --- le righe rosse di {nome}, tutte ---")
                 print("\n".join("    " + r for r in rosse))
-                for r in rosse:
-                    if r.startswith("✗"):
-                        print(f"::error::{nome}: {r.lstrip('✗ ').strip()}")
+                for k, r in enumerate(rosse):
+                    if r.startswith("Traceback"):
+                        # l'annotazione dice l'ECCEZIONE, cioe' l'ultima
+                        # riga del blocco (le righe del blocco sono rientrate)
+                        fine = k + 1
+                        while fine < len(rosse) and rosse[fine].startswith("    "):
+                            fine += 1
+                        print(f"::error::{nome}: {rosse[fine - 1].strip()}")
+                    elif r.startswith(SEGNI_ROSSI) or FORMA_ECCEZIONE.match(r):
+                        print(f"::error::{nome}: {senza_segno(r)}")
             for b in bussate:
                 print(f"    ⛔ rete: {b}")
                 print(f"::error::{nome}: ha provato a uscire in rete ({b})")

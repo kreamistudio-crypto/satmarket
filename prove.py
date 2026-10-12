@@ -49790,11 +49790,76 @@ def prove_collaudi_in_ci():
           ["✗ la rotta impaziente non e' mai morta", "    atteso: (0, [])",
            "    avuto:  (1, [])", "✗ il giro dura secondi"],
           rosse_fn(uscita) if callable(rosse_fn) else None)
+    # E OGNI SEGNO VALE (12 ott 2026, richiesta di Andrea): i banchi del
+    # P2P scrivono «NO», altri «[NO]» o «[KO]», e un collaudo con quattro
+    # rosse ne mostrava UNA — quella rimasta nella coda di quaranta righe.
+    # Qui due «NO» a cento righe di distanza, un «[KO]» con l'atteso senza
+    # i due punti, e un Traceback intero: tutto deve uscire.
+    uscita2 = ("  ok prima\n  NO il primo avviso va a chi vende\n"
+               "      atteso: [(111, 'a')]\n      avuto:  [(111, 'b')]\n"
+               + "".join(f"    🛰️ Evento P2P: {k}\n" for k in range(100))
+               + "  [KO] la nota troppo lunga\n      atteso 400 con 'lunga'\n"
+               "Traceback (most recent call last):\n"
+               '  File "collaudo_x.py", line 9, in <module>\n'
+               "    main()\n"
+               "KeyError: 'ordine'\n"
+               "  NO il secondo avviso resta quello di sempre\n"
+               "      atteso: [(222, 'c')]\n      avuto:  [(222, 'd')]\n"
+               "  ok dopo\n"
+               '  File "collaudo_y.py", line 11\n    print("  [KO\n          ^\n'
+               "SyntaxError: unterminated string literal\n")
+    prova("...con qualunque segno: due «NO» a cento righe di distanza, un «[KO]», un Traceback intero e un SyntaxError nudo",
+          ["NO il primo avviso va a chi vende", "    atteso: [(111, 'a')]",
+           "    avuto:  [(111, 'b')]",
+           "[KO] la nota troppo lunga", "    atteso 400 con 'lunga'",
+           "Traceback (most recent call last):",
+           '    File "collaudo_x.py", line 9, in <module>', "    main()",
+           "    KeyError: 'ordine'",
+           "NO il secondo avviso resta quello di sempre",
+           "    atteso: [(222, 'c')]", "    avuto:  [(222, 'd')]",
+           "SyntaxError: unterminated string literal"],
+          rosse_fn(uscita2) if callable(rosse_fn) else None)
+    segni_rossi = amb.get("SEGNI_ROSSI")
+    prova("...e i segni stanno in una tupla sola, col «NO» dei banchi P2P",
+          True, isinstance(segni_rossi, tuple) and "✗" in segni_rossi
+          and "NO " in segni_rossi and "[NO]" in segni_rossi and "[KO]" in segni_rossi)
     lanciatore = open("collaudi_ci.py", encoding="utf-8").read()
     corpo_main = lanciatore[lanciatore.find("\ndef main("):]
-    prova("...e il lanciatore le stampa, una annotazione ::error:: per riga", True,
+    prova("...e il lanciatore le stampa tutte, una annotazione ::error:: per riga, senza il segno", True,
           "rosse = righe_rosse(uscita)" in corpo_main
-          and 'print(f"::error::{nome}: {r.lstrip(' in corpo_main)
+          and 'print(f"::error::{nome}: {senza_segno(r)}")' in corpo_main
+          and "r.startswith(SEGNI_ROSSI)" in corpo_main
+          and 'print(f"::error::{nome}: {rosse[fine - 1].strip()}")' in corpo_main)
+    # DAL VERO: un collaudo di cartone con DUE rosse «NO» separate da
+    # duecento righe di rumore, girato dal lanciatore vero — tutt'e due
+    # devono stare nel registro E nelle annotazioni
+    cartone = os.path.join(os.getcwd(), "collaudo_cartone_due_rosse.py")
+    with open(cartone, "w", encoding="utf-8") as f:
+        f.write("import sys\n"
+                "print('  NO la prima rossa, in cima')\n"
+                "print('      atteso: 1')\nprint('      avuto:  2')\n"
+                "for k in range(200):\n    print(f'    rumore {k}')\n"
+                "print('  NO la seconda rossa, in fondo')\n"
+                "print('      atteso: 3')\nprint('      avuto:  4')\n"
+                "sys.stdout.flush()\nraise KeyError('fine')\n")
+    try:
+        r = subprocess.run([sys.executable, "collaudi_ci.py",
+                            "collaudo_cartone_due_rosse"], capture_output=True,
+                           encoding="utf-8", errors="replace", timeout=120)
+    finally:
+        os.remove(cartone)
+    # la prima sta SOLO nell'elenco delle rosse (la coda di quaranta righe
+    # non la raggiunge), la seconda nella coda E nell'elenco
+    prova("dal vero: due rosse nello stesso collaudo si vedono tutte e due, nel registro e nelle annotazioni",
+          [1, 1, 2, True],
+          [r.returncode,
+           r.stdout.count("NO la prima rossa, in cima"),
+           r.stdout.count("NO la seconda rossa, in fondo"),
+           "::error::collaudo_cartone_due_rosse: la seconda rossa, in fondo" in r.stdout])
+    prova("...e la prima, che la coda di quaranta righe non mostrava, ha la sua annotazione", True,
+          "::error::collaudo_cartone_due_rosse: la prima rossa, in cima" in r.stdout)
+    prova("...e il Traceback con cui finisce ha la sua, che dice l'ECCEZIONE", True,
+          "::error::collaudo_cartone_due_rosse: KeyError: 'fine'" in r.stdout)
 
 
 def prove_servizio_non_root():
