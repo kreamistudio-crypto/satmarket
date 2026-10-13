@@ -31311,19 +31311,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   mentre un ordine è aperto, `currentOrder` resta la copia di prima, e
   quel che un gesto scriveva lì non si vedeva. L'ATTREZZO È UNO, accanto
   a `loadOrders`: `segnaOrdine(o, campi)` scrive sull'ordine dato E
-  sulla sua riga viva; `segnaOrdineAperto(campi)` lo chiama con
-  `currentOrder`. Di lì passano i tre gesti dell'appuntamento —
+  sulla sua riga viva. Di lì passano i tre gesti dell'appuntamento —
   `proponiAppuntamento` (la data; la conferma azzerata se la proposta è
   nuova), `confermaAppuntamento`, `depositaAccesso` (`accessoIl` = il
   primo deposito, che una correzione non sposta) — e i tredici che
   scrivevano sulla sola copia: `inviaFeedback`, `saveLnAddress`,
   `saveSellerInvoice`, `confirmReceived`, `inviaSpedito`,
   `markConsegnaMano`, `depositaBusta`, `resoSpedito`, `resoRicevuto`,
-  `openDispute`, `adminResolve`, e con `segnaOrdine(o, …)` i due che
-  tengono il LORO ordine, `scegliConsegnaOrdine` e `salvaPuntoRitiro`.
+  `openDispute`, `adminResolve`, `scegliConsegnaOrdine` e
+  `salvaPuntoRitiro`.
   CAMBIA SOLO DOVE SI SCRIVE: stessi campi, stessi valori, dopo lo
   stesso «sì»; i rami della demo e le due righe della busta diretta
-  restano com'erano. LA CONFERMA DELL'APPUNTAMENTO PORTA LA DATA: il
+  restano com'erano. L'ORDINE DEL GESTO, NON QUELLO APERTO ADESSO (13
+  ott 2026, secondo push): ognuno dei sedici prende il suo ordine AL
+  TOCCO (`const o = currentOrder`, prima della domanda di conferma e
+  della richiesta) e DOPO l'attesa non guarda più `currentOrder` — fra
+  il tocco e la risposta chi usa l'app può aver aperto un altro ordine,
+  e il fatto finiva scritto su quello. `segnaOrdineAperto` non c'è più.
+  Il ridisegno è `ridisegnaOrdine(o)`: `openOrder(o.id)` solo se
+  quell'ordine è ancora quello aperto e `#view-ordine` è la vista
+  attiva; altrimenti si resta dove si è e si chiama `renderOrders()`
+  (la riga della lista il fatto ce l'ha già): nessun gesto riporta
+  indietro. L'INDIRIZZO LIGHTNING NON SCRIVE STATI:
+  `/api/me/ln-address` risponde `incassi_sbloccati`, che è un NUMERO
+  (incassi, rimborsi, rimborsi d'asta partiti), non dice di QUALI
+  ordini; `saveLnAddress`, se è maggiore di zero, rilegge gli ordini e
+  dice «Sats incassati automaticamente» / «Rimborso in arrivo» solo se
+  l'ordine del gesto ha cambiato stato rispetto alla sua riga viva di
+  prima, sennò «Incassi automatici attivati: i pagamenti in attesa
+  sono partiti»; se la rilettura non riesce non segna niente.
+  LA CONFERMA DELL'APPUNTAMENTO PORTA LA DATA: il
   bottone ha `data-quando` (la data a schermo), il gesto la manda, e
   `conferma_appuntamento` — corpo FACOLTATIVO, mai da `leggi_json` — se
   non è più quella dell'ordine risponde 409 PRIMA di guardare se è già
@@ -31336,7 +31353,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che chi ha vinto l'asta scelga la consegna» (strada non scelta e
   annuncio d'asta), «segna la spedizione» (il resto). IL COLLAUDO:
   `collaudo_gesti_ordine.py`, la pagina vera in node contro le rotte
-  vere, gesto per gesto dalla copia di prima.
+  vere, gesto per gesto dalla copia di prima; più l'incasso di un
+  ALTRO ordine e un altro ordine aperto mentre la richiesta viaggia.
   • LA MANCATA RISPOSTA DI CHI PUBBLICA: `_mancata_risposta_p2p` (pura:
   `maker-timeout`, `maker-republished`, e `maker-annullo` = `canceled`
   senza dettaglio dal lato che ha pubblicato, cioè l'annullo a mano dopo

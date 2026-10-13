@@ -41,6 +41,20 @@ chiede «La data è cambiata: confermi questa?».
 In coda le FERIE: la frase giusta per l'asta vinta in attesa della
 scelta della consegna, e per le altre strade.
 
+E I DUE CASI DEL SECONDO PUSH (13 ott 2026), quelli che toccano i soldi
+come li vede chi usa l'app:
+  - L'INCASSO E' DI UN ALTRO ORDINE. Chi vende ha due ordini: uno appena
+    pagato da chi compra (da spedire) e uno confermato che aspetta
+    l'incasso. Apre il PRIMO e li' scrive il suo indirizzo Lightning: il
+    server paga il secondo. Prima la pagina segnava «incassato» l'ordine
+    APERTO — quello ancora da spedire. Adesso rilegge: incassato e' solo
+    quello che il server ha pagato davvero.
+  - UN ALTRO ORDINE APERTO MENTRE LA RICHIESTA VIAGGIA. «Segna come
+    spedito» su un ordine, e prima che il server risponda se ne apre un
+    altro: il fatto va sull'ordine del gesto (quello che il server ha
+    spedito davvero), l'altro non si tocca, e nessuno viene riportato
+    indietro.
+
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server (database usa-e-getta), i pagamenti sono
 controfigure con la firma del vero, niente rete, niente chiavi.
@@ -65,7 +79,7 @@ PASSATE = FALLITE = 0
 SRV = None
 CLIENT = None
 DETTO = []
-COMPRA, VENDE, VENDE2, ADMIN = 111, 222, 333, 999
+COMPRA, VENDE, VENDE2, VENDE3, ADMIN = 111, 222, 333, 444, 999
 
 
 def prova(nome, atteso, avuto):
@@ -223,7 +237,7 @@ def scrivi(tabella, chiave, valore, **campi):
 def semina():
     con = SRV.db()
     for tg, nome in ((COMPRA, "Compra"), (VENDE, "Vende"), (VENDE2, "Vende2"),
-                     (ADMIN, "Admin")):
+                     (VENDE3, "Vende3"), (ADMIN, "Admin")):
         con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,"
                     "ln_address) VALUES(?,?,?,1,'')", (tg, nome, f"neg{tg}"))
     con.commit()
@@ -309,11 +323,13 @@ const aperti = [];
 /* il ridisegno, come quello vero: riparte dalla riga della lista */
 function openOrder(id){ currentOrder = orders.find(o=>o.id===id);
   aperti.push(currentOrder ? JSON.parse(JSON.stringify(currentOrder)) : null); }
-function renderOrders(){}
+/* la lista ridisegnata: si conta */
+let liste = 0;
+function renderOrders(){ liste++; }
 function trackingDaControllare(){ return true; }
 let stellaScelta = 0, fbFoto = [], myLnAddress = '', bustaDoc = null, bustaLetta = {}, bustaDocVisto = {};
 """ + js("function mapOrder(o){") + js("async function loadOrders(ordine){") \
-        + js("function segnaOrdine(o, campi){") + js("function segnaOrdineAperto(campi){") \
+        + js("function segnaOrdine(o, campi){") + js("function ridisegnaOrdine(o){") \
         + riga_js("let appuntamentoCambiato = ") + js("function dataAppuntamento(ts){") \
         + js("function pannelloServizioCompratore(o){") + "".join(js(f) for f in GESTI) \
         + "const GESTI = {" + ", ".join(nomi) + "};\n" + r"""
@@ -337,6 +353,18 @@ const copia = x => (x === undefined ? null : JSON.parse(JSON.stringify(x)));
       for (const k of Object.keys(p.nodi || {})) NODI[k] = {value: p.nodi[k]};
       stellaScelta = p.stelle || 0;
       ATTESE = [];
+      /* ALTROVE: appena il server ha risposto alla richiesta del gesto — e
+         prima che il gesto riprenda — chi usa l'app ha gia' aperto un ALTRO
+         ordine. La `fetch` resta quella vera. */
+      if (p.altrove) {
+        const vera = globalThis.fetch;
+        globalThis.fetch = async (...a) => {
+          const r = await vera(...a);
+          globalThis.fetch = vera;
+          currentOrder = orders.find(o => o.id === p.altrove);
+          return r;
+        };
+      }
       const arg = p.bottone !== undefined ? [{dataset: {quando: String(p.bottone)}}] : (p.arg || [{}]);
       await GESTI[p.nome](...arg);
       await Promise.all(ATTESE);
@@ -347,8 +375,10 @@ const copia = x => (x === undefined ? null : JSON.parse(JSON.stringify(x)));
                   visto: aperti.length ? aperti[aperti.length - 1] : null, ridisegni: aperti.length,
                   detti: detti.splice(0), cambiata: copia(appuntamentoCambiato[p.ordine]),
                   riquadro: p.riquadro && riga ? pannelloServizioCompratore(riga) : null,
-                  data: p.data ? dataAppuntamento(p.data) : null});
-      aperti.length = 0;
+                  data: p.data ? dataAppuntamento(p.data) : null,
+                  altra: p.altra ? copia(orders.find(o => o.id === p.altra)) : null,
+                  aSchermo: currentOrder ? currentOrder.id : null, liste: liste});
+      aperti.length = 0; liste = 0;
     }
   }
   console.log(JSON.stringify(fuori));
@@ -390,7 +420,7 @@ def main():
                              + (r.stdout or "")[-400:] + (r.stderr or "")[-1200:])
 
     def gesto(chi, oid, nome, campi, parole, stato_db=None, *, arg=None, nodi=None,
-              stelle=0, titolo=""):
+              stelle=0, titolo="", rilegge=False):
         """UN GESTO, dal caso che era rotto: la pagina di `chi` apre
         l'ordine, la lista si RILEGGE (la copia aperta diventa quella di
         prima), parte il gesto. Poi una rilettura fresca dice la verita'
@@ -399,11 +429,14 @@ def main():
             {"fa": "carica", "io": chi}, {"fa": "apri", "ordine": oid}, {"fa": "carica"},
             {"fa": "gesto", "nome": nome, "arg": arg, "nodi": nodi, "stelle": stelle},
             {"fa": "leggi", "ordine": oid}, {"fa": "carica"}, {"fa": "leggi", "ordine": oid})
+        # `rilegge` (l'indirizzo Lightning, dal secondo push): il gesto non
+        # scrive niente a mano, rilegge gli ordini — la copia di prima non la
+        # tocca nessuno, e non serve: il ridisegno riparte dalla lista nuova
         prova(f"{titolo or nome}: la pagina aveva la copia di PRIMA; dopo il gesto la riga "
               f"della lista, la copia e il ridisegno (uno) dicono il fatto, con le parole di sempre",
               [True, campi, campi, campi, 1, parole],
               [dopo["staccata"], {k: (dopo["riga"] or {}).get(k) for k in campi},
-               {k: (dopo["aperta"] or {}).get(k) for k in campi},
+               campi if rilegge else {k: (dopo["aperta"] or {}).get(k) for k in campi},
                {k: (dopo["visto"] or {}).get(k) for k in campi}, dopo["ridisegni"],
                dopo["detti"]])
         prova("...ed e' quel che il server dice a una rilettura fresca",
@@ -441,7 +474,7 @@ def main():
               {"stato": "refund"}, titolo="IL RESO RICEVUTO (chi compra non ha un metodo)")
         gesto(COMPRA, o1, "saveLnAddress", {"state": "refunded"},
               ["↩️ Rimborso in arrivo! ⚡"], {"stato": "refunded"},
-              nodi={"lnAddrInput": "compra@wallet.example"},
+              nodi={"lnAddrInput": "compra@wallet.example"}, rilegge=True,
               titolo="L'INDIRIZZO LIGHTNING che fa partire il rimborso")
 
         # =========== 2) LA CONSEGNA A MANO ===========
@@ -489,7 +522,7 @@ def main():
                     consegnato=int(time.time()) - 3600)
         gesto(VENDE, o5, "saveLnAddress", {"state": "released"},
               ["🔓 Sats incassati automaticamente! ⚡"], {"stato": "released"},
-              nodi={"lnAddrInput": "vende@wallet.example"},
+              nodi={"lnAddrInput": "vende@wallet.example"}, rilegge=True,
               titolo="L'INDIRIZZO LIGHTNING che sblocca un incasso")
         scrivi("utenti", "tg_id", VENDE, ln_address="")
 
@@ -624,8 +657,68 @@ def main():
         c, _ = chiedi(VENDE, f"/api/orders/{o9}/appuntamento/conferma", {"quando": GIO})
         prova("...e la conferma resta di chi COMPRA: chi vende prende 400", 400, c)
 
-        # =========== 8) LE FERIE: A OGNUNO LA SUA FRASE ===========
-        print("\n[8. le ferie: a ogni ordine pagato la sua via d'uscita]")
+        # =========== 8) L'INCASSO E' DI UN ALTRO ORDINE ===========
+        print("\n[8. l'indirizzo Lightning: l'incasso e' di un ALTRO ordine]")
+        # chi vende (444) non ha un indirizzo. Due ordini: la tenda, appena
+        # pagata da chi compra e ancora da spedire; il fornello, confermato,
+        # che aspetta l'incasso
+        tenda = ordine("Tenda da campeggio", "spedizione", "locked", vende=VENDE3)
+        fornello = ordine("Fornello", "spedizione", "confirmed", vende=VENDE3,
+                          corriere="Poste Italiane", tracking="AB123456789IT",
+                          spedito_il=int(time.time()) - 86400,
+                          consegnato=int(time.time()) - 3600)
+        dopo, vera = pagina(
+            {"fa": "carica", "io": VENDE3}, {"fa": "apri", "ordine": tenda}, {"fa": "carica"},
+            {"fa": "gesto", "nome": "saveLnAddress",
+             "nodi": {"lnAddrInput": "vende3@wallet.example"}},
+            {"fa": "leggi", "ordine": tenda, "altra": fornello}, {"fa": "carica"},
+            {"fa": "leggi", "ordine": tenda, "altra": fornello})
+        prova("chi vende apre la TENDA (da spedire) e li' scrive il suo indirizzo: il server "
+              "paga il FORNELLO, e solo quello",
+              ["locked", "released", "vende3@wallet.example"],
+              [riga(tenda)["stato"], riga(fornello)["stato"],
+               SRV.db().execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                                (VENDE3,)).fetchone()[0]])
+        prova("LA PAGINA: la tenda — l'ordine aperto — NON diventa «incassato»: resta da "
+              "spedire, nella lista e nel ridisegno (uno); incassato e' il fornello",
+              ["locked", "locked", 1, "released"],
+              [dopo["riga"]["state"], (dopo["visto"] or {}).get("state"), dopo["ridisegni"],
+               dopo["altra"]["state"]])
+        prova("...e le parole non dicono che i sats di QUESTO ordine sono arrivati: dicono "
+              "che i pagamenti in attesa sono partiti",
+              ["⚡ Incassi automatici attivati: i pagamenti in attesa sono partiti"], dopo["detti"])
+        prova("...ed e' quel che il server dice a una rilettura fresca",
+              ["locked", "released"], [vera["riga"]["state"], vera["altra"]["state"]])
+
+        # =========== 9) UN ALTRO ORDINE APERTO MENTRE LA RICHIESTA VIAGGIA ===========
+        print("\n[9. un altro ordine aperto mentre la richiesta viaggia]")
+        sedia = ordine("Sedia a dondolo", "spedizione", "locked", vende=VENDE3)
+        dopo, vera = pagina(
+            {"fa": "carica", "io": VENDE3}, {"fa": "apri", "ordine": sedia},
+            {"fa": "gesto", "nome": "inviaSpedito", "altrove": tenda,
+             "arg": ["Poste Italiane", "CD123456789IT", False]},
+            {"fa": "leggi", "ordine": sedia, "altra": tenda}, {"fa": "carica"},
+            {"fa": "leggi", "ordine": sedia, "altra": tenda})
+        prova("«SEGNA COME SPEDITO» sulla SEDIA, e prima della risposta si apre la TENDA: il "
+              "server ha spedito la sedia, e solo quella",
+              [["shipped", "Poste Italiane", "CD123456789IT"], ["locked", None]],
+              [[riga(sedia)["stato"], riga(sedia)["corriere"], riga(sedia)["tracking"]],
+               [riga(tenda)["stato"], riga(tenda)["corriere"] or None]])
+        prova("LA PAGINA: il fatto sta sulla SEDIA (l'ordine del gesto); la tenda — quella a "
+              "schermo — non e' «spedita» e non ha preso il corriere",
+              [{"state": "shipped", "corriere": "Poste Italiane", "tracking": "CD123456789IT"},
+               "locked", True],
+              [{k: dopo["riga"].get(k) for k in ("state", "corriere", "tracking")},
+               dopo["altra"]["state"], not dopo["altra"].get("corriere")])
+        prova("...nessuno viene riportato indietro: a schermo resta la tenda, zero ridisegni "
+              "dell'ordine; il messaggio compare e si ridisegna la lista",
+              [tenda, 0, True, ["📦 Segnato come spedito"]],
+              [dopo["aSchermo"], dopo["ridisegni"], dopo["liste"] >= 1, dopo["detti"]])
+        prova("...ed e' quel che il server dice a una rilettura fresca",
+              ["shipped", "locked"], [vera["riga"]["state"], vera["altra"]["state"]])
+
+        # =========== 10) LE FERIE: A OGNUNO LA SUA FRASE ===========
+        print("\n[10. le ferie: a ogni ordine pagato la sua via d'uscita]")
         o12 = ordine("Vaso antico", "", "locked",
                      annuncio={"consegna": "entrambe", "asta_base_sats": 1000,
                                "asta_scadenza": int(time.time()) - 3600})

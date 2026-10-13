@@ -55006,18 +55006,89 @@ da uno script che si ferma al primo rosso: se questa riga è su main,
 erano verdi. Torture e giri dal vivo sono dell'albero di prima dei
 rebase.
 
-**DA FARE, NON FATTO** (deciso da Andrea il 13 ott). IN UN SECONDO PUSH
-DELLO STESSO CANTIERE, perché toccano i soldi come li vede chi usa
-l'app: l'indirizzo Lightning deve segnare «incassato» solo l'ordine a
-cui l'incasso appartiene, non quello aperto; e gli undici gesti devono
-annotare il fatto sull'ordine che li ha lanciati, anche se nel
-frattempo se ne apre un altro. NON URGENTI, da fare quando si passa di
-lì: il selettore della data di un servizio arriva a un anno mentre il
-server ha il suo tetto (`SERVIZIO_MAX_GIORNI`), e oltre lo dice solo il
-server; nel riquadro dell'appuntamento la frase e il bottone «Confermo,
-ci sono» stanno attaccati, senza respiro; un banco node che esplode fa
-UNA rossa e nasconde il resto della sua sezione (qui trenta prove
-dietro una).
+**TERZA PARTE — IL SECONDO PUSH (13 ott 2026): l'incasso si segna dove
+è arrivato, e ogni gesto annota sull'ordine che l'ha lanciato.** Erano
+i due «notati» della seconda parte; Andrea li ha voluti in un push a
+sé «perché toccano i soldi come li vede l'utente», con la cura detta
+prima in cinque righe e il suo ok prima di scrivere codice.
+
+**L'INDIRIZZO LIGHTNING SEGNAVA «INCASSATO» L'ORDINE APERTO.** Chi
+vende scrive il suo indirizzo Lightning dentro la pagina di un ordine;
+il server lo salva e fa partire gli incassi e i rimborsi che
+aspettavano, e risponde `incassi_sbloccati`: un NUMERO — quanti ne
+sono partiti (rimborsi d'asta compresi), non di quali ordini. La
+pagina, se era maggiore di zero, segnava «incassato» l'ordine APERTO.
+Nel giro dal vivo sul codice di prima: aperta la tenda (appena pagata
+da chi compra, ancora da spedire), scritto l'indirizzo, il server paga
+il fornello — e la pagina della tenda dice «Deposito sbloccato — Hai
+incassato 50 000 sats», le quattro spunte e la pioggia di monete,
+mentre in lista il fornello resta «confermato». Il database dice il
+contrario: tenda da spedire, fornello pagato. LA CURA: dopo il «sì»
+la pagina non scrive più nessuno stato a mano; se è partito qualcosa
+RILEGGE gli ordini, e «incassato» è solo chi lo è davvero. Le parole
+dicono di quest'ordine («Sats incassati automaticamente» / «Rimborso
+in arrivo») solo se è LUI ad aver cambiato stato, rispetto alla sua
+riga viva di prima del gesto; se sono partiti pagamenti di altri dice
+«⚡ Incassi automatici attivati: i pagamenti in attesa sono partiti»
+(frase approvata da Andrea); se non è partito niente, quella di
+sempre. Se la rilettura non riesce non si segna niente: lo stato vero
+arriva al prossimo aggiornamento. IL SERVER NON SI TOCCA. Scartate:
+farsi dire dal server QUALI ordini ha pagato (una rotta dei pagamenti
+cambiata per una cosa che la rilettura dice già, e meglio: dice anche
+gli stati che la risposta non conosce); segnare a mano solo quando
+l'ordine aperto era «confermato» o «da rimborsare» (resta una
+supposizione: il suo incasso può non essere riuscito mentre riusciva
+quello di un altro).
+
+**I GESTI ANNOTAVANO SULL'ORDINE APERTO DOPO L'ATTESA.** Fra il tocco
+e la risposta del server passa un'attesa, e in quell'attesa si può
+aprire un altro ordine: i gesti, dopo la risposta, scrivevano su
+`currentOrder` — cioè su QUELLO — e ce lo riportavano sopra. Nel giro
+dal vivo sul codice di prima, con la risposta rallentata di un secondo
+e mezzo: «segna come spedito» sulla sedia, si apre la lampada, e la
+pagina della lampada dice «Oggetto spedito — Poste Italiane» col
+codice della sedia; il server ha spedito la sedia. LA CURA: ogni gesto
+prende il suo ordine AL TOCCO (`const o = currentOrder`, prima della
+domanda di conferma e della richiesta) e dopo l'attesa non guarda più
+`currentOrder`: la richiesta, il fatto, le parole e il ridisegno sono
+di `o`. Il ridisegno è `ridisegnaOrdine(o)`: l'ordine si ridisegna
+solo se è ancora quello a schermo; altrove si resta dove si è, il
+messaggio compare, e si ridisegna la LISTA, che il fatto ce l'ha già
+sulla sua riga. `segnaOrdineAperto` — che chiedeva «qual è l'ordine
+aperto?» DOPO l'attesa — non c'è più. La regola vale per sedici gesti:
+gli undici di Andrea; i due che già tenevano il loro ordine ma
+riportavano indietro (`scegliConsegnaOrdine`, `salvaPuntoRitiro`: suo
+sì esplicito); e — scelta mia, dichiarata nel rapporto — i tre
+dell'appuntamento, che avevano lo stesso difetto e lo stesso attrezzo:
+lasciarli fuori voleva dire tenere in vita `segnaOrdineAperto` per
+loro soli. LA LISTA CHE SI RIDISEGNA non era nelle cinque righe: è la
+riparazione di una regressione che la regola avrebbe portato. Prima il
+gesto riportava sull'ordine e il fatto si vedeva; con «non riporta
+indietro» e basta, chi torna alla lista mentre un pagamento viaggia
+leggerebbe lo stato di prima sotto un toast che dice «fatto». COSA NON
+CAMBIA: nessuna richiesta, nessuna condizione, nessuna cifra, nessuna
+parola tranne la frase nuova; i rami della demo; il server. La riga
+`const o = currentOrder` nei quattordici gesti nuovi è nuda, senza
+`if (!o) return`: nemmeno una condizione in più.
+
+**DA GUARDARE.** Dopo l'indirizzo Lightning, se nel frattempo si è
+aperto un ALTRO ordine ed è lui a essere stato pagato, la sua pagina
+resta com'era fino al prossimo aggiornamento (non dice mai «incassato»
+a torto: lo dice in ritardo). Il feedback azzera stelle e foto del
+modulo anche se nel frattempo si è aperto un altro ordine.
+
+**DA FARE, NON FATTO** (deciso da Andrea il 13 ott: i notati non
+urgenti si scrivono qui e non si fanno). Il selettore della data di un
+servizio arriva a un anno mentre il server ha il suo tetto
+(`SERVIZIO_MAX_GIORNI`), e oltre lo dice solo il server; nel riquadro
+dell'appuntamento la frase e il bottone «Confermo, ci sono» stanno
+attaccati, senza respiro; un banco node che esplode fa UNA rossa e
+nasconde il resto della sua sezione (qui trenta prove dietro una);
+dopo «Attiva incassi automatici» il bottone torna vivo mentre la lista
+si rilegge (un secondo tocco risalva lo stesso indirizzo: innocuo, ma
+si può tenere il velo fino alla fine); quando l'indirizzo Lightning fa
+partire SOLO rimborsi la frase dice «pagamenti in attesa», che è vero
+ma generico.
 
 ## L'ordine pubblicato dentro la pausa: la 🔔 che aspetta, la carta grigia nel libro, l'avviso prima di pubblicare (notte fra il 12 e il 13 ott 2026, cantiere libro-vuoto, dal campo di Andrea)
 
