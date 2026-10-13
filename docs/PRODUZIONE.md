@@ -3531,11 +3531,18 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   resterebbe sempre chiuso: prima di accendere,
   `grep -n "CAMBIO_RINFRESCO_S" /srv/barattolo/config.py` (nessuna riga =
   60, va bene).
-  PER ACCENDERLA: `nano /srv/barattolo/config.py`, in coda la riga
-  `P2P_PARACADUTE = True` (da AGGIUNGERE), poi
+  ✅ ACCESA PER TUTTI dalla sera del 13 ott 2026 (decisione di Andrea,
+  dopo la prova dal vivo col coordinatore vero: CANTIERI, «la prova dal
+  vivo col coordinatore vero»). La riga nel config del VPS C'È GIÀ
+  (`grep -n "^P2P_PARACADUTE" /srv/barattolo/config.py`): si cambia
+  quella, non se ne aggiunge una seconda.
+  PER ACCENDERLA: la copia (`sudo cp -p /srv/barattolo/config.py
+  /root/config.py.prima-di-…`), poi
+  `sudo sed -i 's/^P2P_PARACADUTE = False$/P2P_PARACADUTE = True/' /srv/barattolo/config.py`,
+  la rilettura col `grep` qui sopra, il controllo `ast` di sempre,
   `sudo systemctl restart barattolo` e il pannello «⚙️ Stato delle leve»
-  → «Paracadute degli ordini P2P: acceso». PER SPEGNERLA: la riga a
-  `False` e riavvio. Le righe restano in `p2p_paracadute` e smettono di
+  → «Paracadute degli ordini P2P: acceso». PER SPEGNERLA: lo stesso
+  `sed` coi due valori scambiati, e riavvio. Le righe restano in `p2p_paracadute` e smettono di
   contare: gli ordini già usciti col paracadute tornano a vedersi, e i
   telefoni non annullano più niente.
   LE LETTURE (in `python3`, sola lettura). I paracadute, dal più nuovo:
@@ -3554,7 +3561,23 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Quelli aperti che per il libro sono ancora `pending`
   — cioè il telefono non ha ancora firmato il `cancel`:
   `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute(\"SELECT p.ordine, p.tg_id, p.aperto FROM p2p_paracadute p JOIN p2p_ordini o ON o.ordine=p.ordine WHERE p.aperto>0 AND o.stato='pending'\").fetchall())"`
-  Nel journal: `journalctl -u barattolo --since today | grep "Paracadute P2P"`
+  PER PROVARLO DAL VIVO SENZA ASPETTARE IL MERCATO (fatto il 13 ott
+  2026): un ordine proprio col paracadute, lasciato nel libro; si
+  RILEGGE che sia `pending` con la lettura qui sopra (su uno `canceled`
+  non succede niente, ed è giusto); a Barattolo chiuso si alza la sua
+  `partenza` del 7% — UNA riga sola, quella dell'ordine, e solo se
+  `aperto` è ancora 0. È una SCRITTURA sul database di produzione, e
+  per questo qui NON c'è il comando: non è una procedura di sempre,
+  si fa con Andrea, avvisando prima, nella forma delle altre scritture
+  (dal file vero in `dati/`, da `barattolo`, col conto delle righe
+  cambiate, che
+  deve dire 1). Entro due o tre minuti arriva l'avviso su Telegram;
+  alla riapertura dell'app il telefono annulla, e il registro di mostrod
+  sul nodo lo dice: `docker logs --since 3h nodo-mostro-1 2>&1 | grep <prime otto cifre>`
+  → «updated Nostr new Status: canceled» e «barattolo_eventi: … canceled:
+  delivered (HTTP 200)».
+  Nel journal (⚠️ il VPS segna l'ora UTC: `--since today`, non «40 min
+  ago»): `journalctl -u barattolo --since today | grep "Paracadute P2P"`
   — «🪂 Paracadute P2P: … aperto al 5% (da … a … €/BTC): avviso …» a ogni
   apertura, «… preso a paracadute gia' aperto» e «… un attimo PRIMA
   dell'apertura» alle prese, «⚠️ Paracadute P2P: battito saltato» se il

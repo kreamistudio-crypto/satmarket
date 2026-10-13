@@ -57706,3 +57706,68 @@ DA FARE (notati, non fatti: aspettano un sì):
   e commenti, restano.
 
 Cosa è girato su quale albero al push: nel messaggio del commit.
+
+## Il paracadute, la prova dal vivo col coordinatore vero: riuscita, e la leva accesa per tutti (13 ott 2026, sera, cantiere paracadute-esito, richiesta di Andrea: solo documenti)
+
+La voce «la prova sul telefono» qui sopra finiva con «NON PROVATO: il
+coordinatore vero». Lo stesso pomeriggio, a cura online (`12cbc23`
+dentro `fdf0e28`, il commit che girava sul VPS), Andrea l'ha rifatta da
+capo: un comando alla volta, la copia del config prima, l'avviso prima
+del riavvio e prima della scrittura sul database.
+
+**COM'È ANDATA.** Leva a `True` e riavvio; dal telefono, nella Mini App
+dentro Telegram: il foglio dal + su «Spento» (il telefono che la
+mattina ripartiva dal 5%), «3+ scambi» spento, una vendita da 5,00 €
+con premio 20 e paracadute al 5%, e il segno nei tre posti — «I miei
+scambi», la pagina dell'ordine con la frase intera, la sua card nel
+libro (tab «Compra BTC»). Un primo ordine Andrea l'ha annullato a mano
+dopo i controlli: la lettura del VPS lo dava `canceled`, e lì ci si è
+FERMATI prima di scrivere — su un ordine annullato il giro non guarda,
+ed è la guardia. Sul secondo, `9f2e033d`, lasciato nel libro (partenza
+74.366 €, `pending`): a Barattolo chiuso, una riga sola di
+`p2p_paracadute` con la `partenza` alzata del 7% (il prezzo vero non si
+muove del 5% a comando: il server crede che l'ordine sia nato più in
+alto, tutto il resto è vero). DOPO CIRCA UN MINUTO l'avviso su
+Telegram: «🪂 Il paracadute si è aperto: BTC è passato da 79.572 € a
+74.528 € (−6,3%), il tuo ordine di vendita da 5,00 € è stato annullato.
+Nessuna penalità.» e la seconda riga. Nel journal: «🪂 Paracadute P2P:
+9f2e033d … aperto al 5% (da 79572 a 74528 €/BTC): avviso telegram ok»,
+alle 14:06:25 UTC. Dal secondo account la vendita non era più nel
+libro. ALLA RIAPERTURA dell'app, un'ora dopo, il telefono ha firmato il
+`cancel` da solo e l'ordine è finito fra gli Annullati; sul VPS la riga
+dice `oltre` 2, `aperto` all'ora dell'apertura, `arrivo` 74.528, e lo
+stato `canceled` — che il server non scrive da sé: lo legge dal 38383
+ripubblicato dal coordinatore. SUL NODO, nel registro di mostrod: «New
+order saved» alle 14:03:38 UTC, «updated Nostr new Status: canceled»
+alle 15:05:36, il messaggio `canceled` a chi aveva pubblicato, e
+«barattolo_eventi: order 9f2e033d… canceled: delivered (HTTP 200)».
+Nessun errore da nessuna parte.
+
+**QUEL CHE LA PROVA HA FATTO VEDERE, e si sapeva.** Fra l'avviso
+(16:06) e la riapertura dell'app (17:05) l'ordine è rimasto pubblicato
+sul coordinatore per un'ora: nascosto nel libro di Barattolo, prendibile
+da un'altra app Mostro. È il limite scritto la mattina («Apri Barattolo
+per toglierlo anche dalle altre app collegate»), e lo chiude solo la
+patch al nodo, che resta fra i «da fare».
+
+**NON PROVATO SUL TELEFONO VERO.** Il tasto «🔁 Ripubblica al prezzo
+nuovo» (Andrea ha riaperto l'app senza passare dall'avviso: lo prova al
+primo caso vero); il giro «due memorie» (ordine pubblicato dal sito,
+avviso aperto nella Mini App che lì non ha le chiavi); un movimento
+VERO del prezzo oltre la soglia.
+
+**LA LEVA È ACCESA PER TUTTI** dalla sera del 13 ott 2026, decisione di
+Andrea a prova riuscita: `P2P_PARACADUTE = True` nel config del VPS (la
+copia di prima in `/root/config.py.prima-del-paracadute-acceso`). Sul
+VPS restano quattro righe di prova in `p2p_paracadute`, tutte di ordini
+annullati: ferme.
+
+**DUE LEZIONI DI PROCEDURA.** Il journal del VPS è in UTC: «40 minuti
+fa» ha dato vuoto su un'apertura di un'ora prima, e per un momento è
+sembrato un difetto — si chiede `--since today`. E prima di una
+scrittura sul database si RILEGGE lo stato: la riga «giusta» era di un
+ordine già annullato.
+
+**COSA È GIRATO.** Solo documenti (questa voce e PRODUZIONE): sull'albero
+del push le sezioni di `prove.py` che leggono i due file; i numeri nel
+messaggio del commit. Il resto lo dice la CI.
