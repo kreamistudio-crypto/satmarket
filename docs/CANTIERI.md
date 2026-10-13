@@ -55265,3 +55265,19 @@ segreti cercate nelle righe nuove (nessuna). La tortura e il giro dal
 vivo sono dell'albero di prima degli ultimi due rebase. IL PUSH aspetta
 l'ok di Andrea: quello del brief era scritto prima del lavoro, e si
 richiede a lavoro fatto.
+
+**LE RISPOSTE DI ANDREA AL RAPPORTO (cantiere libro-vuoto, 13 ott 2026),
+e l'ok al push.** 1) LA VIBRAZIONE COI MOVIMENTI RIDOTTI: sì, vibra
+anche con «riduci movimento», SOLO per questo gesto — l'eccezione alla
+regola dell'11 ott è decisa, e resta una (la prova la conta). 2) Le
+frasi cambiate, la fila della home senza l'ordine in pausa, «per
+adesso» di giorno e i due tasti senza «Annulla»: vanno bene così.
+DA FARE, deciso di NON farli in questo cantiere:
+- `var(--orange)` NON ESISTE in `:root`: `.p2p-mio` (il bordo), `.p2p-tuo`
+(«È il tuo ordine»), `.p2p-mancati` e `.p2p-fee-banner` (il contorno al
+fuoco) restano del colore del testo. L'arancio di casa è `--sats`.
+- GLI ORDINI IN PAUSA IN FONDO AL LIBRO: oggi stanno in mezzo agli altri,
+dove li mette l'ordinamento scelto (`ordinaLibroP2P`).
+L'ok al push è arrivato in risposta al rapporto, punto per punto: «git
+fetch e rebase su origin/main, sezioni toccate e collaudi sull'albero
+esatto del push, push subito solo se è tutto verde».
