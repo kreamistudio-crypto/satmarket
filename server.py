@@ -3070,7 +3070,11 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
         # compratore se i sats andarono comunque al venditore
         dispute_perse=q("SELECT COUNT(*) FROM ordini WHERE disputata=1 "
                         "AND prova=0 "
-                        "AND ((venditore_id=? AND stato='refunded') OR "
+                        # (13 ott 2026) col «rimborso meno le spese» la
+                        # colpa era dell'indirizzo: chi vende non ha
+                        # perso, e chi compra nemmeno — non si conta
+                        "AND ((venditore_id=? AND stato='refunded' "
+                        "      AND COALESCE(spese_rese_sats,0)=0) OR "
                         "(compratore_id=? AND stato='released'))",
                         tg_id, tg_id),
         # niente 'revisione': un annuncio mai approvato non apre bottega
@@ -8936,6 +8940,36 @@ def init_db():
     # in eterno la stessa cosa: un pagamento saldato e' TERMINALE, non
     # torna indietro, quindi una volta confermato non si ricontrolla piu'.
     # Zero = mai verificato, ed e' lo stato di tutte le righe di ieri.
+    # IL RIMBORSO MENO LE SPESE DI SPEDIZIONE (13 ott 2026, cantiere
+    # indirizzo-giusto, secondo push): il quarto esito del moderatore.
+    # Due colonne e una cintura, e nessuno STATO nuovo (la regola 4):
+    # · `ordini.spese_rese_sats` — la cifra TRATTENUTA, fotografata
+    #   alla decisione (0 = mai deciso cosi'). E' lei a dire quanto
+    #   torna a chi compra (prezzo meno questa) e che la decisione e'
+    #   definitiva;
+    # · `rimborsi_asta.ordine_id` — la quota di chi vende vive nel
+    #   registro «da riscuotere», che e' gia' IL binario delle uscite
+    #   verso una persona (fattura depositata → Lightning address →
+    #   sollecito, in volo, congelato, riconciliato): una riga col
+    #   motivo 'spese_spedizione' e l'ordine a cui appartiene. Il nome
+    #   della tabella dice «asta» e questa riga un'asta non e': le
+    #   righe d'asta hanno una puntata, questa ha un ordine;
+    # · l'indice UNIQUE parziale: UNA riga di spese per ordine, anche
+    #   se un domani una rotta se ne dimenticasse (il patto delle
+    #   quattro cinture qui sopra).
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN "
+                    "spese_rese_sats INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        con.execute("ALTER TABLE rimborsi_asta ADD COLUMN "
+                    "ordine_id INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_spese "
+                "ON rimborsi_asta(ordine_id) "
+                "WHERE motivo = 'spese_spedizione'")
     for tabella in ("ordini", "rimborsi_asta", "pagamenti"):
         for colonna in ("payout_tentativi INTEGER DEFAULT 0",
                         "payout_ultimo INTEGER DEFAULT 0",
@@ -26282,7 +26316,12 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
         "UNION ALL "
         "SELECT 'rimborso' AS tipo, r.id, r.payout_hash, r.aggiornato, "
         "  r.stato, r.importo_sats AS importo, "
-        "  COALESCE(a.titolo, '') AS titolo "
+        # le spese rese a chi vende (13 ott 2026) non hanno un
+        # annuncio: il titolo dice cos'e' e di quale ordine, come fa
+        # lo sblocco qui sotto
+        "  CASE WHEN r.motivo='spese_spedizione' THEN "
+        "    'spese di spedizione, ordine #' || r.ordine_id "
+        "  ELSE COALESCE(a.titolo, '') END AS titolo "
         "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
         "WHERE r.payout_stato='incerto' "
         "UNION ALL "
@@ -28146,7 +28185,11 @@ def dati_annulli(con) -> dict:
     motivi = {}
     spediti = sped_entro = conclusi = concl_entro = 0
     for o in con.execute(
-            "SELECT o.id, o.stato, o.creato, o.prezzo_sats, "
+            # (13 ott 2026) meno le spese rese a chi vende, quando il
+            # moderatore ha deciso cosi': i sats «rimborsati» sono
+            # quelli tornati a chi compra, non il totale
+            "SELECT o.id, o.stato, o.creato, "
+            "o.prezzo_sats - COALESCE(o.spese_rese_sats,0) AS prezzo_sats, "
             "COALESCE(o.spedito_il,0) AS sped, "
             "COALESCE(o.annullato_venditore_il,0) AS ann, "
             "COALESCE(o.motivo_annullo,'') AS mot, "
@@ -28187,8 +28230,11 @@ def hash_rimborsi(con) -> set:
               "o.stato IN ('refund','refunded')",
               "SELECT payout_hash FROM ordini WHERE COALESCE(payout_hash,'')"
               "!='' AND stato IN ('refund','refunded')",
-              "SELECT hash FROM payout_tentati WHERE tabella='rimborsi_asta' "
-              "AND hash!=''"):
+              # (le spese rese a chi vende, 13 ott 2026, escono dallo
+              # stesso registro ma NON sono un rimborso: sono un incasso)
+              "SELECT t.hash FROM payout_tentati t JOIN rimborsi_asta x "
+              "ON x.id=t.riga_id WHERE t.tabella='rimborsi_asta' "
+              "AND t.hash!='' AND x.motivo<>'spese_spedizione'"):
         try:
             out |= {str(r[0]).lower() for r in con.execute(q)}
         except sqlite3.OperationalError:
@@ -32480,6 +32526,11 @@ def mie_puntate(x_tg_init_data: str = Header(""),
         "a.titolo FROM rimborsi_asta r "
         "LEFT JOIN annunci a ON a.id=r.annuncio_id "
         "WHERE r.tg_id=? AND r.stato='da_riscuotere' "
+        # le spese di spedizione rese a chi vende (13 ott 2026) stanno
+        # nello stesso registro ma NON sono un rimborso d'asta: qui, in
+        # «Le mie aste», non si elencano — chi vende le trova
+        # nell'ordine
+        "AND r.motivo<>'spese_spedizione' "
         "ORDER BY r.creato DESC", (user["id"],))]
     con.close()
     return {"puntate": righe, "da_riscuotere": rimborsi,
@@ -32525,9 +32576,18 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
                         (r["tg_id"],)).fetchone()
         importo = r["importo_sats"]      # integrale, al sat
         titolo = html.escape((r["titolo"] or "un'asta")[:60])
+        # LE SPESE DI SPEDIZIONE RESE A CHI VENDE (13 ott 2026): stesso
+        # binario, ALTRE PAROLE. Questa riga non viene da un'asta — non
+        # ha un annuncio ne' una puntata — e ogni frase qui sotto che
+        # dice «rimborso» o «asta» per lei sarebbe falsa: chi la riceve
+        # e' un venditore a cui tornano le spese di un pacco.
+        spese = _campo(r, "motivo") == MOTIVO_SPESE_RESE
+        oid_spese = int(_campo(r, "ordine_id", 0) or 0)
         bolt11 = ""
-        taccuino = {"etichetta": f"Riscossione del rimborso d'asta "
-                                 f"#{rimborso_id}"}
+        taccuino = {"etichetta": (
+            f"Spese di spedizione rese a chi vende, ordine #{oid_spese}"
+            if spese else
+            f"Riscossione del rimborso d'asta #{rimborso_id}")}
         cf = _cassaforte_riga(con, "rimborsi_asta", rimborso_id)
         try:
             if r["payout_stato"] != "uscito":
@@ -32555,6 +32615,9 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
                 return {"ok": False, "stato": r["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
+                f"Spese di spedizione rese a chi vende sull'ordine "
+                f"#{oid_spese}: <b>{_fmt_sats(importo)} sats</b>."
+                if spese else
                 f"Riscossione del rimborso d'asta #{rimborso_id} "
                 f"(«{titolo}»): <b>{_fmt_sats(importo)} sats</b>.",
                 cassaforte=cf)
@@ -32576,6 +32639,10 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             con.commit()
             con.close()
             await notifica(r["tg_id"],
+                           f"📦 <b>Spese di spedizione incassate:</b> "
+                           f"{_fmt_sats(importo)} sats dell'ordine "
+                           f"#{oid_spese} sono in arrivo sul tuo wallet. ⚡"
+                           if spese else
                            f"↩️ <b>Rimborso in arrivo:</b> "
                            f"{_fmt_sats(importo)} sats da «{titolo}» "
                            f"stanno tornando sul tuo wallet. ⚡")
@@ -32590,6 +32657,11 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         con.close()
         await notifica(
             r["tg_id"], _msg_ritentiamo(importo) if ritenta else
+            f"📦 <b>Hai {_fmt_sats(importo)} sats di spese di spedizione "
+            f"da incassare</b> sull'ordine #{oid_spese}. Imposta il tuo "
+            f"Lightning address nel Profilo, oppure apri l'ordine nella "
+            f"Mini App e incolla una invoice di esattamente quell'importo."
+            if spese else
             f"💰 <b>Hai {_fmt_sats(importo)} sats da "
             f"riscuotere</b> da «{titolo}»: il pagamento "
             f"automatico non è riuscito. Controlla il tuo "
@@ -32767,7 +32839,9 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
         raise HTTPException(400,
             f"Importo sbagliato: la invoice è di {_fmt_sats(importo_sats)} sats, "
             f"deve essere esattamente {_fmt_sats(r['importo_sats'])} sats "
-            f"(rimborso integrale)")
+            + ("(le spese di spedizione)"
+               if _campo(r, "motivo") == MOTIVO_SPESE_RESE
+               else "(rimborso integrale)"))
     no = rifiuto_scadenza(bolt11)   # qui si paga all'istante
     if no:
         con.close()
@@ -41386,9 +41460,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         testa = _leader_asta(con2, pz["annuncio_id"])
         if testa and testa["id"] != pz["id"]:
             superato += 1
+    # (le spese di spedizione rese a chi vende, 13 ott 2026, stanno
+    # nello stesso registro ma non sono «aste su cui agire»: fuori)
     da_riscuotere = con2.execute(
         "SELECT COUNT(*) AS n FROM rimborsi_asta WHERE tg_id=? AND "
-        "stato='da_riscuotere'", (user["id"],)).fetchone()["n"]
+        "stato='da_riscuotere' AND motivo<>'spese_spedizione'",
+        (user["id"],)).fetchone()["n"]
     con2.close()
     profilo["aste_da_agire"] = superato + da_riscuotere
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
@@ -65713,8 +65790,15 @@ async def deposita_invoice(ordine_id: int, req: Request,
             "invoice_venditore"
         spiegazione = f"{_fmt_sats(atteso)} sats (il tuo incasso)"
     elif o and o["compratore_id"] == user["id"] and o["stato"] == "refund":
-        ruolo, atteso, colonna = "compratore", o["prezzo_sats"], "invoice_rimborso"
-        spiegazione = f"{_fmt_sats(atteso)} sats (rimborso integrale)"
+        # la cifra del giudice unico: col quarto esito (13 ott 2026)
+        # non e' piu' il totale, e una fattura del totale va rifiutata
+        # col numero giusto invece che pagata
+        ruolo, atteso, colonna = ("compratore", importo_rimborso(o),
+                                  "invoice_rimborso")
+        spiegazione = (f"{_fmt_sats(atteso)} sats (rimborso meno le spese "
+                       f"di spedizione)"
+                       if int(_campo(o, "spese_rese_sats", 0) or 0)
+                       else f"{_fmt_sats(atteso)} sats (rimborso integrale)")
     else:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
@@ -65812,6 +65896,16 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         if o["stato"] in ("released", "refunded", "refund", "creato", "annullato"):
             con.close()          # gia' risolto (o mai pagato): niente doppioni
             return {"ok": o["stato"] == "released", "stato": o["stato"]}
+        # LA CINTURA DEL QUARTO ESITO (13 ott 2026): un ordine deciso
+        # «rimborso meno le spese» ha gia' le sue DUE uscite — il
+        # rimborso ridotto a chi compra e la riga di spese a chi vende —
+        # e il netto intero al venditore sarebbe una terza. Ci si
+        # arriverebbe solo da una corsa (un altro moderatore che decide
+        # «al venditore» nello stesso istante, con la riga letta prima):
+        # qui la riga e' quella fresca, sotto il lucchetto.
+        if int(_campo(o, "spese_rese_sats", 0) or 0) > 0:
+            con.close()
+            return {"ok": False, "stato": o["stato"], "meno_spese": True}
         if o["payout_stato"] in ("incerto", "in_volo"):
             con.close()   # un pagamento in volo di cui non sappiamo l'esito:
             #               finche' non si sa com'e' finito, qui non si paga
@@ -66171,6 +66265,193 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 "scaduta": taccuino.get("scaduta") or ""}
 
 
+# ------------- IL RIMBORSO MENO LE SPESE DI SPEDIZIONE ----------------
+# (13 ott 2026, cantiere indirizzo-giusto, secondo push.) Il caso: chi
+# compra sbaglia l'indirizzo — o il punto — e il pacco torna indietro.
+# Fin qui il moderatore poteva solo rimborsare tutto, rimborsare dopo
+# il reso o dare tutto a chi vende: le spese di spedizione restavano
+# sempre a chi aveva spedito. Il quarto esito le rende a lui e rimborsa
+# il resto. Sono DUE uscite dallo stesso deposito, e fino a ieri un
+# ordine ne aveva una sola: per questo le due righe di denaro sono
+# SEPARATE — il rimborso resta sull'ordine, la quota di chi vende va
+# nel registro «da riscuotere» — e ognuna ha il suo lucchetto, i suoi
+# tentativi e il suo stato. Una che fallisce non ferma l'altra.
+MOTIVO_SPESE_RESE = "spese_spedizione"
+
+MSG_MENO_SPESE_DECISO = ("Questa disputa è già decisa: rimborso meno le "
+                         "spese di spedizione. La decisione è definitiva.")
+MSG_MENO_SPESE_DOVE = ("Il rimborso meno le spese di spedizione si decide "
+                       "su una disputa aperta o su un reso in corso")
+MSG_NIENTE_SPESE = ("Su questo ordine non c'è una spesa di spedizione da "
+                    "trattenere: usa una delle altre decisioni")
+
+
+def spese_trattenibili(o) -> int:
+    """QUANTO si puo' trattenere per le spese di spedizione, o 0.
+
+    La cifra e' `spedizione_sats`: quel che chi compra ha pagato
+    DAVVERO per la spedizione, scritto nell'ordine alla fattura (dopo
+    la promessa «gratis sopra soglia», quindi 0 se gliel'avevamo
+    regalata). Zero — e il bottone non compare — in tre casi:
+    · non e' una spedizione (ritiro, codice online, servizio: `casa`
+      e `punto` invece si', tutte e due);
+    · la spedizione era inclusa nel prezzo o gratuita: non c'e' una
+      cifra, e NON se ne inventa una (niente importi scritti a mano dal
+      moderatore: sarebbe il rimborso parziale, che e' un'altra cosa);
+    · la spedizione e' UGUALE O PIU' GRANDE del totale: a chi compra
+      tornerebbe zero, o meno di zero. Non succede con un ordine sano
+      (il totale contiene la spedizione piu' l'articolo), ed e' la
+      cintura per il giorno che un dato e' storto — Andrea l'ha voluta
+      scritta, e c'e' la prova."""
+    if (_campo(o, "consegna_scelta") or "") != "spedizione":
+        return 0
+    sped = int(_campo(o, "spedizione_sats", 0) or 0)
+    totale = int(_campo(o, "prezzo_sats", 0) or 0)
+    return sped if 0 < sped < totale else 0
+
+
+def importo_rimborso(o) -> int:
+    """QUANTO TORNA A CHI COMPRA: il totale, meno le spese trattenute
+    se il moderatore ha deciso cosi'. UN GIUDICE per i tre posti che
+    devono dire la stessa cifra — chi paga (`_rimborsa_compratore`),
+    chi controlla la fattura incollata (`deposita_invoice`) e la
+    pagina — o uno dei tre un giorno direbbe il totale."""
+    return (int(_campo(o, "prezzo_sats", 0) or 0)
+            - int(_campo(o, "spese_rese_sats", 0) or 0))
+
+
+def _msg_meno_spese_compratore(importo: int, spese: int, pagato: bool) -> str:
+    testa = ("⚖️ <b>Disputa decisa: rimborso meno le spese di "
+             "spedizione.</b> ")
+    coda = (f" Le spese di spedizione ({_fmt_sats(spese)} sats) restano "
+            f"a chi ha spedito.")
+    if pagato:
+        return (testa + f"<b>{_fmt_sats(importo)} sats</b> sono in arrivo "
+                f"nel tuo wallet." + coda + " ⭐ Com'è andata? Apri "
+                "l'ordine nella Mini App e lascia un feedback.")
+    return (testa + f"Per ricevere <b>{_fmt_sats(importo)} sats</b>: apri "
+            f"l'ordine nella Mini App e imposta il tuo Lightning "
+            f"address, oppure incolla una invoice di esattamente "
+            f"quell'importo." + coda)
+
+
+def _msg_meno_spese_venditore(spese: int, pagato: bool) -> str:
+    return ("⚖️ <b>Disputa decisa: rimborso meno le spese di "
+            "spedizione.</b> All'acquirente "
+            + ("è tornato" if pagato else "torna")
+            + f" il resto; le spese di spedizione, <b>{_fmt_sats(spese)} "
+            f"sats</b>, sono tue: le trovi da incassare nell'ordine, "
+            f"nella Mini App."
+            + (" L'annuncio è tornato in vetrina." if pagato else ""))
+
+
+async def _rimborsa_meno_spese(ordine_id: int) -> dict:
+    """IL QUARTO ESITO: rimborso meno le spese di spedizione.
+
+    LA DECISIONE SI SCRIVE IN UNA TRANSAZIONE, i pagamenti partono
+    DOPO. Nella transazione: la cifra sull'ordine (col CAS su
+    `spese_rese_sats=0` e sullo stato, cosi' due tocchi non decidono
+    due volte), la riga «da riscuotere» di chi vende, e il timbro
+    'da_riprovare' su TUTT'E DUE le uscite — che vuol dire «nessun sat
+    si e' mosso, si puo' bussare». E' quel timbro a reggere il caso del
+    server che cade a meta': al riavvio le due righe ci sono gia', e il
+    giro dei pagamenti (`riprova_pagamenti_sospesi`) riprende quella
+    che non era ancora partita. Senza, un ordine resterebbe in disputa
+    con la decisione presa e nessuno a pagarla.
+
+    POI I DUE PAGAMENTI, INDIPENDENTI: ognuno dalla sua strada di
+    sempre, col suo lucchetto. Uno che fallisce — o che esplode — non
+    ferma l'altro, e ognuno lascia la sua riga nello stato che la sua
+    strada prevede: l'ordine in 'refund' se chi compra non ha un
+    metodo, la riga «da riscuotere» se non ce l'ha chi vende.
+
+    MAI PIU' DEL DEPOSITO: le due cifre sommate fanno il totale
+    pagato, per costruzione (la riga porta `spese`, il rimborso
+    `importo_rimborso` = totale − spese), e la ronda del libro mastro
+    lo ricontrolla.
+
+    IL LUCCHETTO DELL'ORDINE, attorno alla sola scrittura: chi paga
+    quell'ordine (`_rimborsa_compratore`, `_sblocca_sats`) lo tiene per
+    tutto il suo giro, e la cifra la legge all'INIZIO — un rimborso
+    pieno gia' partito (un «reso ricevuto» premuto nello stesso
+    istante, un altro moderatore) pagherebbe il TOTALE mentre qui si
+    scrive che una parte va a chi vende. Aspettando il lucchetto, quel
+    giro finisce prima: e a quel punto o l'ordine non e' piu' in uno
+    dei tre stati, o il suo pagamento e' in volo, e il cancello della
+    transazione risponde 409."""
+    async with _lucchetti_ordine[ordine_id]:
+        o, spese, rid = _scrivi_meno_spese(ordine_id)
+    esiti = {}
+    for chi, strada, arg in (("compratore", _rimborsa_compratore, ordine_id),
+                             ("venditore", _paga_rimborso, rid)):
+        try:
+            esiti[chi] = await strada(arg)
+        except Exception as e:
+            # una meta' che esplode NON ferma l'altra: la sua riga
+            # resta 'da_riprovare' e ci torna il giro dei pagamenti
+            print(f"⚠️ Ordine #{ordine_id}, rimborso meno le spese: la "
+                  f"meta' di chi {'compra' if chi == 'compratore' else 'vende'} "
+                  f"non e' partita ({type(e).__name__}: {e}) — la "
+                  f"riprende il giro dei pagamenti", flush=True)
+            esiti[chi] = {"ok": False, "sospeso": True}
+    con = db()
+    stato = con.execute("SELECT stato FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()["stato"]
+    con.close()
+    return {"ok": True, "stato": stato, "meno_spese": True,
+            "spese_sats": spese,
+            "compratore_pagato": bool(esiti["compratore"].get("ok")),
+            "venditore_pagato": bool(esiti["venditore"].get("ok")),
+            "non_chiesto": bool(esiti["compratore"].get("non_chiesto"))}
+
+
+def _scrivi_meno_spese(ordine_id: int):
+    """LA SCRITTURA del quarto esito: la cifra sull'ordine e la riga di
+    chi vende, in UNA transazione. E' una `def` e non una `async def`
+    APPOSTA: qui dentro non puo' entrarci un await, cioe' niente puo'
+    infilarsi fra il timbro sull'ordine e la riga. Restituisce
+    (ordine, spese, id della riga); alza se non si puo' decidere."""
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Questa disputa non esiste o è già chiusa")
+    spese = spese_trattenibili(o)
+    if not spese:
+        con.close()
+        raise HTTPException(400, MSG_NIENTE_SPESE)
+    adesso = int(time.time())
+    cur = con.execute(
+        "UPDATE ordini SET spese_rese_sats=?, payout_stato='da_riprovare', "
+        "payout_verso='compratore' WHERE id=? "
+        "AND COALESCE(spese_rese_sats,0)=0 "
+        "AND stato IN ('dispute','return_pending','return_shipped') "
+        "AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo')",
+        (spese, ordine_id))
+    if cur.rowcount != 1:
+        con.rollback()
+        con.close()
+        raise HTTPException(409, "Questa disputa è cambiata nel frattempo: "
+                                 "riapri l'ordine e ricontrolla")
+    con.execute(
+        "INSERT INTO rimborsi_asta(annuncio_id, tg_id, puntata_id, "
+        "importo_sats, motivo, stato, ordine_id, cassaforte, "
+        "payout_stato, payout_verso, creato, aggiornato) "
+        "VALUES(0, ?, 0, ?, ?, 'da_riscuotere', ?, ?, 'da_riprovare', "
+        "'puntatore', ?, ?)",
+        (o["venditore_id"], spese, MOTIVO_SPESE_RESE, ordine_id,
+         _cassaforte_uscita(o), adesso, adesso))
+    rid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    print(f"⚖️ Ordine #{ordine_id}: deciso il rimborso meno le spese di "
+          f"spedizione — {_fmt_sats(spese)} sats a chi vende (riga "
+          f"#{rid}), {_fmt_sats(int(o['prezzo_sats']) - spese)} a chi "
+          f"compra", flush=True)
+    return o, spese, rid
+
+
 async def _rimborsa_compratore(ordine_id: int) -> dict:
     """Rimborsa integralmente l'acquirente (disputa decisa a suo
     favore), provando: 1. la sua invoice di rimborso, 2. il suo
@@ -66202,7 +66483,13 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         # Rimborso integrale: articolo, spedizione e protezione tornano
         # tutti al compratore (l'affare e' saltato, la protezione non
         # si e' consumata) — e' il totale, zero commissioni.
-        importo = o["prezzo_sats"]
+        # ...TRANNE col quarto esito (13 ott 2026): `spese_rese_sats`
+        # dice quanto il moderatore ha trattenuto per le spese di
+        # spedizione, e quelle vanno a chi vende da un'altra riga. La
+        # cifra la da' il giudice unico, lo stesso della fattura
+        # incollata e della pagina.
+        spese_rese = int(_campo(o, "spese_rese_sats", 0) or 0)
+        importo = importo_rimborso(o)
 
         bolt11 = ""
         taccuino = {"etichetta": f"Rimborso al compratore sull'ordine "
@@ -66309,6 +66596,18 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 await notifica(o["venditore_id"],
                                "↩️ Ordine annullato: i sats sono tornati per "
                                "intero all'acquirente.")
+            elif spese_rese:
+                # IL QUARTO ESITO: non e' «a tuo favore» per nessuno dei
+                # due, e le parole lo dicono — a chi compra la cifra
+                # che arriva e quella che resta a chi ha spedito, a chi
+                # vende dove trova la sua
+                await notifica(o["compratore_id"],
+                               _msg_meno_spese_compratore(importo, spese_rese,
+                                                          True))
+                await notifica(o["venditore_id"],
+                               _msg_meno_spese_venditore(spese_rese, True)
+                               + ("\n\n" + _coda_magazzino(magazzino)
+                                  if magazzino else ""))
             else:
                 await notifica(o["compratore_id"],
                                f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
@@ -66355,6 +66654,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         else:
             await notifica(
                 o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
+                _msg_meno_spese_compratore(importo, spese_rese, False)
+                if spese_rese else
                 f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
                 f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
                 f"Mini App e imposta il tuo Lightning address, oppure "
@@ -66364,6 +66665,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if o["disputata"] and primo_giro:
             await notifica(
                 o["venditore_id"],
+                _msg_meno_spese_venditore(spese_rese, False) if spese_rese
+                else
                 "⚖️ <b>La disputa è stata decisa a favore dell'acquirente.</b> "
                 "I sats gli verranno rimborsati appena ci dà un modo per "
                 "riceverli. Se pensi che ci sia stato un errore, scrivi ai "
@@ -66399,7 +66702,7 @@ async def risolvi_disputa(ordine_id: int, req: Request,
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
     esito = d.get("esito", "")
-    if esito not in ("venditore", "rimborso", "reso"):
+    if esito not in ("venditore", "rimborso", "reso", "meno_spese"):
         raise HTTPException(400, "Esito non valido")
     con = db()
     # LA PORTA DEL TIMER (ago 2026): un ordine digitale chiuso da uno
@@ -66426,6 +66729,23 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     if not o:
         raise HTTPException(400, "Questa disputa non esiste o è già chiusa")
     stato = o["stato"]
+    # IL QUARTO ESITO E' DEFINITIVO APPENA PRESO (13 ott 2026), ed e' la
+    # riga da non ammorbidire: dopo «meno le spese» l'ordine sta in
+    # 'refund' con `disputata=1` — cioe' ESATTAMENTE la forma che il
+    # ramo qui sotto riapre per far ridecidere — ma una delle due meta'
+    # puo' essere gia' partita. Ridecidere «rimborso integrale» a spese
+    # gia' incassate da chi vende farebbe uscire piu' sats di quanti ne
+    # sono entrati. Questa guardia sta PRIMA della riapertura, e vale
+    # per ogni esito.
+    if int(_campo(o, "spese_rese_sats", 0) or 0) > 0:
+        raise HTTPException(400, MSG_MENO_SPESE_DECISO)
+    # ...e si prende solo dalla disputa aperta o dal reso in corso
+    # (decisione di Andrea): non da un caso gia' deciso e incagliato,
+    # che il ramo qui sotto riaprirebbe.
+    if esito == "meno_spese":
+        if stato not in ("dispute", "return_pending", "return_shipped"):
+            raise HTTPException(400, MSG_MENO_SPESE_DOVE)
+        return await _rimborsa_meno_spese(ordine_id)
     if stato in ("confirmed", "refund"):
         # Il caso era gia' stato deciso e il pagamento non era riuscito:
         # per cambiare strada lo si RIAPRE, invece di allentare le
@@ -67051,7 +67371,8 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             (o["venditore_id"],)).fetchone()["n"]
         perse = con.execute(
             "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? "
-            "AND disputata=1 AND stato='refunded'",
+            "AND disputata=1 AND stato='refunded' "
+            "AND COALESCE(spese_rese_sats,0)=0",
             (o["venditore_id"],)).fetchone()["n"]
         nota_servizio = (
             f"\n📅 SERVIZIO: {stato_app}; {stato_link} (il collegamento "
@@ -68490,6 +68811,16 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     pulisci_ordini_fantasma(con)
     con.commit()
     q = ("SELECT o.*, a.titolo, a.zona, "
+         # LA QUOTA DI CHI VENDE nel «rimborso meno le spese» (13 ott
+         # 2026): la riga da riscuotere e il suo stato, per il pannello
+         # nell'ordine di chi vende (dove incolla la fattura, col suo
+         # id) e per il moderatore (che vede le due meta'). NULL su
+         # ogni ordine che non e' stato deciso cosi'. A chi COMPRA non
+         # escono: lo strip in fondo le toglie.
+         "(SELECT x.id FROM rimborsi_asta x WHERE x.ordine_id=o.id "
+         " AND x.motivo='spese_spedizione') AS spese_riga_id, "
+         "(SELECT x.stato FROM rimborsi_asta x WHERE x.ordine_id=o.id "
+         " AND x.motivo='spese_spedizione') AS spese_riga_stato, "
          # la lista JSON dei nomi foto dell'annuncio: serve alla riga
          # della pagina Ordini, che ne mostra la PRIMA come miniatura
          # (lo strip in fondo la riduce a foto0 e butta il resto)
@@ -68714,6 +69045,14 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # Il flag del nascondere e' PER-PARTE ed esce solo il PROPRIO:
         # che l'altra parte abbia nascosto il suo e' un fatto privato
         # suo (all'admin sugli ordini altrui arriva 0, innocuo).
+        # la riga delle spese rese e' di chi VENDE (e del moderatore):
+        # a chi compra resta la sola cifra trattenuta, che gli spiega
+        # il suo rimborso
+        if (user["id"] == r["compratore_id"]
+                and user["id"] != r["venditore_id"]
+                and not e_admin(user["id"])):
+            r.pop("spese_riga_id", None)
+            r.pop("spese_riga_stato", None)
         mio_c = r.pop("nascosto_compratore", 0)
         mio_v = r.pop("nascosto_venditore", 0)
         r["nascosto"] = (mio_c if user["id"] == r["compratore_id"]
@@ -71216,7 +71555,8 @@ async def sollecita_rimborsi_puntate():
     passo = SOLLECITO_INCASSO_GIORNI * 86400
     con = db()
     righe = [dict(r) for r in con.execute(
-        "SELECT r.id, r.tg_id, r.importo_sats, r.solleciti, a.titolo "
+        "SELECT r.id, r.tg_id, r.importo_sats, r.solleciti, a.titolo, "
+        "r.motivo, r.ordine_id "
         "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
         "WHERE r.stato='da_riscuotere' AND r.solleciti <= ? "
         "AND MAX(r.aggiornato, r.sollecito_il) < ?",
@@ -71231,6 +71571,31 @@ async def sollecita_rimborsi_puntate():
     con.close()
     for r in righe:
         titolo = html.escape((r["titolo"] or "un'asta")[:60])
+        # LE SPESE DI SPEDIZIONE RESE A CHI VENDE (13 ott 2026): il
+        # promemoria e' lo stesso — stesse leve, stesso binario — ma
+        # non parla di un'asta, ne' al venditore ne' ai moderatori
+        if r["motivo"] == MOTIVO_SPESE_RESE:
+            try:
+                if r["solleciti"] < SOLLECITO_INCASSO_MAX:
+                    await notifica(r["tg_id"],
+                        f"📦 <b>Hai {_fmt_sats(r['importo_sats'])} sats di "
+                        f"spese di spedizione da incassare</b> "
+                        f"sull'ordine #{r['ordine_id']}: ti aspettano nel "
+                        f"deposito di garanzia. Imposta il tuo Lightning "
+                        f"address nel Profilo, oppure apri l'ordine nella "
+                        f"Mini App e incolla una invoice di esattamente "
+                        f"quell'importo. ⚡")
+                else:
+                    await notifica_admin(
+                        f"🧊 <b>Spese di spedizione ferme:</b> ordine "
+                        f"#{r['ordine_id']}, "
+                        f"<b>{_fmt_sats(r['importo_sats'])} sats</b> da "
+                        f"rendere a chi vende, in cassaforte. Ha ignorato "
+                        f"{SOLLECITO_INCASSO_MAX} solleciti: serve un "
+                        f"occhio umano.", argomento="errori")
+            except Exception as e:
+                print(f"⚠️ Sollecito spese saltato (#{r['id']}): {e}")
+            continue
         try:
             if r["solleciti"] < SOLLECITO_INCASSO_MAX:
                 await notifica(r["tg_id"],
@@ -76138,12 +76503,39 @@ CONTROLLI_LIBRO_MASTRO = (
      "il CAS sullo stato",
      "SELECT puntata_id FROM rimborsi_asta WHERE motivo='ritiro' "
      "GROUP BY puntata_id HAVING COUNT(*)>1"),
+    # --- il rimborso meno le spese di spedizione (13 ott 2026) -------
+    # Due uscite dallo stesso deposito: la cifra trattenuta sull'ordine
+    # e la riga «da riscuotere» di chi vende devono dire LO STESSO
+    # numero, sempre — sommate al rimborso fanno il totale pagato.
+    ("spese rese senza la loro riga",
+     "un ordine deciso «meno le spese» senza la riga da riscuotere di "
+     "chi vende, o con una cifra diversa: quei sats sono fermi e "
+     "invisibili, oppure ne esce un numero che non e' quello deciso",
+     "SELECT o.id FROM ordini o WHERE COALESCE(o.spese_rese_sats,0)>0 "
+     "AND NOT EXISTS (SELECT 1 FROM rimborsi_asta x "
+     "WHERE x.ordine_id=o.id AND x.motivo='spese_spedizione' "
+     "AND x.importo_sats=o.spese_rese_sats AND x.tg_id=o.venditore_id)"),
+    ("riga di spese senza il suo ordine",
+     "una riga da riscuotere di spese di spedizione senza un ordine "
+     "che l'abbia decisa: pagherebbe sats che nessuno ha trattenuto",
+     "SELECT x.id FROM rimborsi_asta x WHERE x.motivo='spese_spedizione' "
+     "AND NOT EXISTS (SELECT 1 FROM ordini o WHERE o.id=x.ordine_id "
+     "AND o.spese_rese_sats=x.importo_sats AND o.venditore_id=x.tg_id)"),
+    ("spese rese fuori scala",
+     "spese trattenute negative, uguali o piu' grandi del totale (a "
+     "chi compra tornerebbe zero o meno), o su un ordine che non e' "
+     "una disputa decisa: uscirebbe piu' del deposito",
+     "SELECT id FROM ordini WHERE COALESCE(spese_rese_sats,0)<>0 AND ("
+     "spese_rese_sats<0 OR spese_rese_sats>=prezzo_sats OR disputata=0 "
+     "OR stato NOT IN ('dispute','return_pending','return_shipped',"
+     "'refund','refunded'))"),
     ("cinture d'idempotenza cadute",
      "mancano indici UNIQUE parziali di rimborsi_asta: il prossimo "
      "crash a meta' chiusura pagherebbe due volte",
      "SELECT nome FROM (SELECT 'idx_rimborso_chiusura' AS nome "
      "UNION ALL SELECT 'idx_rimborso_tardivo' "
      "UNION ALL SELECT 'idx_rimborso_ecc_ritiro' "
+     "UNION ALL SELECT 'idx_rimborso_spese' "
      "UNION ALL SELECT 'idx_rimborso_eccedenza') "
      "WHERE nome NOT IN (SELECT name FROM sqlite_master WHERE type='index')"),
     # --- le due colonne che non devono mai stare insieme ------------

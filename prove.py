@@ -3605,7 +3605,8 @@ def prove_chiusura_saas():
         # le due sorelle della coda del pannello, vuote
         m.vero.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
                        "payout_hash TEXT, aggiornato INT, stato TEXT, "
-                       "importo_sats INT, annuncio_id INT, payout_stato TEXT)")
+                       "importo_sats INT, annuncio_id INT, payout_stato TEXT, "
+                       "motivo TEXT DEFAULT '', ordine_id INT DEFAULT 0)")
         m.vero.execute("CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, "
                        "payout_hash TEXT, aggiornato INT, stato TEXT, "
                        "importo_sats INT, payout_stato TEXT)")
@@ -3649,7 +3650,7 @@ def prove_chiusura_saas():
                 ("_altra_cassaforte_forse", 0),
                 ("lista_crediti", 0), ("sorveglia_crediti", 1),
                 ("deposita_invoice", 1), ("coda_pagamenti", 0),
-                ("_rimborsa_compratore", 1),
+                ("_rimborsa_compratore", 1), ("importo_rimborso", 0),
                 ("_gesto_fatto", 0), ("_appesi_sul_saas", 0),
                 ("_morto_forse", 0), ("_esamina_morto", 1),
                 ("_esamina_sposta", 0), ("_registra_gesto", 0),
@@ -8902,8 +8903,11 @@ def prove_pagamento_incerto():
     # ha premuto niente non merita un allarme — per questo dal ramo mite
     # non parte NESSUNA notifica e ci sono invece questi quattro toast.
     cl = open("miniapp.html", encoding="utf-8").read()
-    prova("client: i quattro gesti sanno leggere il quarto esito",
-          4, cl.count("d.non_chiesto"))
+    # (13 ott 2026: sono CINQUE — chi vende incassa le spese di
+    # spedizione rese dal moderatore, `incassaSpese`, e a nodo muto
+    # merita la stessa risposta degli altri)
+    prova("client: i cinque gesti sanno leggere il quarto esito",
+          5, cl.count("d.non_chiesto"))
     # IL PEGGIORE ERA IL PRIMO: `confirmReceived` scriveva 'confirmed'
     # in locale su tutto cio' che non era 'released', quindi chi compra
     # vedeva «confermato» su un ordine rimasto dov'era, non riprovava, e
@@ -12510,6 +12514,9 @@ def prove_nascondi_ordine():
         busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
         nascosto_compratore INT DEFAULT 0,
         nascosto_venditore INT DEFAULT 0);
+      CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY,
+        ordine_id INT DEFAULT 0, motivo TEXT DEFAULT '',
+        stato TEXT DEFAULT '');
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         zona TEXT DEFAULT '', foto TEXT DEFAULT '',
         taglia_pacco TEXT DEFAULT '', asta_base_sats INT DEFAULT 0);
@@ -25369,11 +25376,641 @@ console.log(JSON.stringify(fuori));
     prova("...e ai moderatori risulta anche la conferma, e si dice", True,
           "<i>se</i> l'hai indicato, quando, e che l'hai confermato."
           in mini)
-    # LA QUARTA DECISIONE NON SI PROMETTE PRIMA CHE ESISTA: il bottone
-    # «Rimborso meno le spese di spedizione» arriva col secondo push
-    # del cantiere, e fino ad allora la pagina non lo nomina
-    prova("la pagina non promette un bottone che ancora non c'e'", False,
-          "meno le spese di spedizione" in nudo)
+    # LA QUARTA DECISIONE (secondo push del cantiere, stesso giorno):
+    # finche' il bottone non esisteva questa riga pretendeva che la
+    # pagina non lo nominasse. Adesso c'e', e la riga pretende il
+    # contrario: chi lo toglie viene a rileggere qui. Il resto sta in
+    # prove_rimborso_meno_spese.
+    prova("la pagina nomina la quarta decisione, ora che il bottone c'e'",
+          True, "meno le spese di spedizione" in nudo)
+
+
+def prove_rimborso_meno_spese():
+    """IL RIMBORSO MENO LE SPESE DI SPEDIZIONE (13 ott 2026, cantiere
+    «indirizzo-giusto», secondo push).
+
+    La quarta decisione del moderatore: le spese di spedizione vanno a
+    chi vende, il resto torna a chi compra, nessuna commissione. Nessuno
+    stato nuovo: l'ordine fa la strada del rimborso con una cifra piu'
+    bassa (`spese_rese_sats`), e la meta' di chi vende e' una riga del
+    registro «da riscuotere» col motivo `spese_spedizione`.
+
+    Cosa difende questa famiglia:
+    · la cifra: solo sulla spedizione, piu' di zero e MENO del totale —
+      a spedizione uguale o piu' grande del totale il bottone non
+      compare (richiesta di Andrea), e il giudice del server e quello
+      della pagina rispondono uguale sugli stessi casi;
+    · la decisione e' definitiva: la guardia sta PRIMA della riapertura;
+    · le due meta' nascono nella stessa transazione, gia' timbrate per
+      il giro dei pagamenti;
+    · nessuna logica delle aste scatta su quella riga (lista, pallino,
+      solleciti, foglio «Riscuoti»);
+    · la reputazione non la conta come disputa persa;
+    · il libro mastro la vede, e grida se le due cifre non combaciano.
+    Il giro VERO dei due pagamenti (uno che fallisce, il server che
+    cade a meta') sta in collaudo_rimborso_meno_spese.py."""
+    print("\n[il rimborso meno le spese di spedizione]")
+    import sqlite3 as _sq
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) I DUE GIUDICI DEL SERVER, fatti girare --------------------
+    campo = reale("_campo")
+    tratt = reale("spese_trattenibili", {"_campo": campo})
+    imp = reale("importo_rimborso", {"_campo": campo})
+    # (nome, strada, spedizione, totale, quanto si trattiene)
+    CASI = (
+        ("spedizione da 3.000 su 50.000", "spedizione", 3000, 50000, 3000),
+        ("un sat sotto il totale", "spedizione", 49999, 50000, 49999),
+        ("spedizione inclusa nel prezzo", "spedizione", 0, 50000, 0),
+        ("spedizione UGUALE al totale", "spedizione", 50000, 50000, 0),
+        ("spedizione PIU' GRANDE del totale", "spedizione", 50001, 50000, 0),
+        ("cifra negativa", "spedizione", -5, 50000, 0),
+        ("ritiro a mano", "ritiro", 3000, 50000, 0),
+        ("codice online", "digitale", 3000, 50000, 0),
+        ("strada non ancora scelta", "", 3000, 50000, 0),
+    )
+    del_server = []
+    for nome, strada, sped, tot, atteso in CASI:
+        avuto = tratt({"consegna_scelta": strada, "spedizione_sats": sped,
+                       "prezzo_sats": tot})
+        del_server.append(avuto)
+        prova(f"server, {nome}: si trattengono {atteso}", atteso, avuto)
+    prova("server: una riga di ieri, senza le colonne, non trattiene niente",
+          [0, 0],
+          [tratt({"consegna_scelta": "spedizione"}),
+           tratt({"consegna_scelta": "spedizione", "spedizione_sats": None,
+                  "prezzo_sats": 50000})])
+    prova("a chi compra torna il totale meno le spese", 47000,
+          imp({"prezzo_sats": 50000, "spese_rese_sats": 3000}))
+    prova("...e il totale intero su ogni altro ordine", [50000] * 3,
+          [imp({"prezzo_sats": 50000}),
+           imp({"prezzo_sats": 50000, "spese_rese_sats": 0}),
+           imp({"prezzo_sats": 50000, "spese_rese_sats": None})])
+    # i tre posti che dicono la cifra la chiedono allo stesso giudice
+    prova("chi PAGA il rimborso chiede la cifra al giudice", True,
+          "importo = importo_rimborso(o)"
+          in codice(pezzo("_rimborsa_compratore")))
+    prova("chi CONTROLLA la fattura incollata pure", True,
+          'ruolo, atteso, colonna = ("compratore", importo_rimborso(o),'
+          in codice(pezzo("deposita_invoice")))
+
+    # --- 2) LA ROTTA: definitiva, e solo da dove si puo' ----------------
+    rd = codice(pezzo("risolvi_disputa"))
+    prova("la rotta conosce il quarto esito", True,
+          'if esito not in ("venditore", "rimborso", "reso", "meno_spese"):'
+          in rd)
+    i_g = rd.find("raise HTTPException(400, MSG_MENO_SPESE_DECISO)")
+    i_q = rd.find('if esito == "meno_spese":')
+    i_r = rd.find("\"UPDATE ordini SET stato='dispute', disputata=1, \"")
+    prova("LA DECISIONE E' DEFINITIVA: la guardia sta PRIMA della "
+          "riapertura del caso incagliato", True, 0 < i_g < i_r)
+    prova("...e vale per OGNI esito: sta prima anche del ramo del quarto",
+          True, 0 < i_g < i_q < i_r)
+    prova("...e guarda la cifra trattenuta, non lo stato", True,
+          'if int(_campo(o, "spese_rese_sats", 0) or 0) > 0:\n'
+          '        raise HTTPException(400, MSG_MENO_SPESE_DECISO)' in rd)
+    prova("si decide solo da disputa aperta o reso in corso", True,
+          'if stato not in ("dispute", "return_pending", "return_shipped"):\n'
+          '            raise HTTPException(400, MSG_MENO_SPESE_DOVE)\n'
+          '        return await _rimborsa_meno_spese(ordine_id)' in rd)
+
+    # --- 3) LA TRANSAZIONE DELLE DUE META' ----------------------------
+    # La scrittura sta in una funzione SINCRONA sua (`_scrivi_meno_spese`)
+    # e la decisione (`_rimborsa_meno_spese`) la chiama dentro il
+    # lucchetto dell'ordine, poi fa partire i due pagamenti.
+    dec = codice(pezzo("_rimborsa_meno_spese"))
+    ms = codice(pezzo("_scrivi_meno_spese"))
+    i_u = ms.find('"UPDATE ordini SET spese_rese_sats=?, '
+                  'payout_stato=\'da_riprovare\', "')
+    i_i = ms.find('"INSERT INTO rimborsi_asta(annuncio_id, tg_id, '
+                  'puntata_id, "')
+    i_c = ms.find("con.commit()", i_u)
+    prova("il timbro sull'ordine e la riga di chi vende stanno in UNA "
+          "transazione", True, 0 < i_u < i_i < i_c)
+    prova("...con una sola commit", 1, ms.count("con.commit()"))
+    prova("...in una funzione che NON e' async: un await li' dentro non "
+          "puo' entrarci", (True, False, False),
+          ("\ndef _scrivi_meno_spese(ordine_id: int):" in src,
+           "async def _scrivi_meno_spese(" in src, "await " in ms))
+    # IL LUCCHETTO: chi paga l'ordine legge la cifra all'inizio del suo
+    # giro e lo tiene fino in fondo; la decisione lo aspetta, cosi' un
+    # rimborso pieno gia' partito finisce PRIMA che la cifra cambi
+    prova("la decisione scrive sotto il lucchetto dell'ordine, e i due "
+          "pagamenti partono dopo averlo lasciato", True,
+          "    async with _lucchetti_ordine[ordine_id]:\n"
+          "        o, spese, rid = _scrivi_meno_spese(ordine_id)\n"
+          "    esiti = {}\n" in dec)
+    sb = codice(pezzo("_sblocca_sats"))
+    i_l = sb.find("async with _lucchetti_ordine[ordine_id]:")
+    i_k = sb.find('if int(_campo(o, "spese_rese_sats", 0) or 0) > 0:\n'
+                  '            con.close()\n'
+                  '            return {"ok": False, "stato": o["stato"], '
+                  '"meno_spese": True}')
+    i_n = sb.find("netto = netto_venditore(")
+    prova("LA CINTURA: chi paga il venditore non da' MAI il netto intero "
+          "a un ordine deciso «meno le spese» — riga fresca, sotto il "
+          "lucchetto, prima di ogni cifra", True, 0 < i_l < i_k < i_n)
+    prova("il cancello: una decisione sola, solo dai tre stati, mai su un "
+          "pagamento in volo", [True] * 3,
+          ['"AND COALESCE(spese_rese_sats,0)=0 "' in ms[i_u:i_i],
+           "\"AND stato IN ('dispute','return_pending',"
+           "'return_shipped') \"" in ms[i_u:i_i],
+           "\"AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo')\""
+           in ms[i_u:i_i]])
+    prova("chi perde la corsa non scrive niente", True,
+          "if cur.rowcount != 1:\n        con.rollback()" in ms[i_u:i_i])
+    prova("tutte e due le meta' nascono 'da_riprovare': un crash dopo la "
+          "commit lo recupera il giro dei pagamenti", [True] * 2,
+          ["payout_stato='da_riprovare', \"\n        "
+           "\"payout_verso='compratore' WHERE id=? \"" in ms,
+           "\"VALUES(0, ?, 0, ?, ?, 'da_riscuotere', ?, ?, "
+           "'da_riprovare', \"\n        \"'puntatore', ?, ?)\"" in ms])
+    prova("senza una cifra da trattenere la rotta non decide (il bottone "
+          "non compare, e chi la chiama a mano se lo sente dire)", True,
+          "spese = spese_trattenibili(o)\n    if not spese:\n"
+          "        con.close()\n"
+          "        raise HTTPException(400, MSG_NIENTE_SPESE)" in ms)
+    prova("i due pagamenti sono indipendenti: uno che esplode non ferma "
+          "l'altro", True,
+          "        try:\n            esiti[chi] = await strada(arg)\n"
+          "        except Exception as e:" in dec)
+    prova("la migrazione: la colonna, il legame con l'ordine, la cintura",
+          [True] * 3,
+          ['"spese_rese_sats INTEGER DEFAULT 0")' in src,
+           '"ordine_id INTEGER DEFAULT 0")' in src,
+           'con.execute("CREATE UNIQUE INDEX IF NOT EXISTS '
+           'idx_rimborso_spese "\n                '
+           '"ON rimborsi_asta(ordine_id) "\n                '
+           '"WHERE motivo = \'spese_spedizione\'")' in src])
+
+    # --- 4) NESSUNA LOGICA DELLE ASTE SU QUESTE RIGHE -----------------
+    # La riga vive nel registro dei rimborsi d'asta (stesso binario dei
+    # pagamenti, stessa rotta d'incasso), ma non e' il rimborso di una
+    # puntata: dove il registro PARLA o CONTA, lei ha il suo ramo o
+    # resta fuori. Il giro vero sta nel collaudo; qui le righe che un
+    # ritocco toglierebbe senza far rompere niente di visibile.
+    prova("«Le mie aste» non la elenca fra i rimborsi da riscuotere", True,
+          "\"AND r.motivo<>'spese_spedizione' \""
+          in codice(pezzo("mie_puntate")))
+    prova("il pallino delle aste nel profilo non la conta", True,
+          "\"stato='da_riscuotere' AND motivo<>'spese_spedizione'\","
+          in codice(pezzo("mio_profilo")))
+    prova("non e' un rimborso nemmeno per chi riconcilia le uscite", True,
+          "\"AND t.hash!='' AND x.motivo<>'spese_spedizione'\""
+          in codice(pezzo("hash_rimborsi")))
+    sol = codice(pezzo("sollecita_rimborsi_puntate"))
+    i_s = sol.find('if r["motivo"] == MOTIVO_SPESE_RESE:')
+    i_f = sol.find("            continue\n", i_s)
+    ramo = sol[i_s:i_f] if 0 < i_s < i_f else ""
+    prova("il sollecito ha un ramo suo, che non cade in quello delle aste",
+          True, bool(ramo))
+    for parola in ("asta", "puntat", "rilanci", "titolo"):
+        prova(f"...e in quel ramo «{parola}» non si dice", False,
+              parola in ramo)
+    prova("...dice cosa sono e dove si incassano", [True] * 3,
+          ["spese di spedizione da incassare</b>" in ramo,
+           "sull'ordine #{r['ordine_id']}" in ramo,
+           "apri l'ordine nella" in ramo])
+    prova("...e ai moderatori, a solleciti finiti, dice «spese» e l'ordine",
+          True, "<b>Spese di spedizione ferme:</b> ordine" in ramo)
+    pr = codice(pezzo("_paga_rimborso"))
+    prova("chi paga la riga sa che e' una spesa resa", True,
+          'spese = _campo(r, "motivo") == MOTIVO_SPESE_RESE' in pr)
+    prova("...e a incasso riuscito lo chiama col suo nome", True,
+          "<b>Spese di spedizione incassate:</b>" in pr)
+    prova("la coda dei pagamenti fermi la intitola con l'ordine, non con "
+          "un'asta", True,
+          "\"  CASE WHEN r.motivo='spese_spedizione' THEN \""
+          in codice(pezzo("coda_pagamenti")))
+
+    # --- 5) LA REPUTAZIONE --------------------------------------------
+    prova("non e' una disputa PERSA per chi vende (i distintivi)", True,
+          "\"AND ((venditore_id=? AND stato='refunded' \"\n"
+          "                        \"      AND COALESCE(spese_rese_sats,0)"
+          "=0) OR \"" in codice(pezzo("_dati_distintivi")))
+    prova("...ne' nel conto che il moderatore legge aprendo una disputa",
+          True,
+          "\"AND disputata=1 AND stato='refunded' \"\n"
+          "            \"AND COALESCE(spese_rese_sats,0)=0\","
+          in codice(pezzo("apri_disputa")))
+    # e si GIRA, sulla query vera dei distintivi: lo stesso venditore con
+    # un rimborso pieno (perso) e uno meno le spese (non perso)
+    dd = pezzo("_dati_distintivi")
+    i_d = dd.index('dispute_perse=q("')
+    sql_perse = eval("(" + dd[i_d + len("dispute_perse=q("):
+                              dd.index("tg_id, tg_id)", i_d)].rstrip()
+                     .rstrip(",") + ")")
+    con = _sq.connect(":memory:")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "disputata INTEGER, prova INTEGER DEFAULT 0, "
+                "venditore_id INTEGER, compratore_id INTEGER, "
+                "spese_rese_sats INTEGER DEFAULT 0)")
+    con.executemany(
+        "INSERT INTO ordini(stato, disputata, venditore_id, compratore_id,"
+        " spese_rese_sats) VALUES(?,?,?,?,?)",
+        [("refunded", 1, 222, 111, 0),      # persa da chi vende
+         ("refunded", 1, 222, 111, 3000),   # meno le spese: di nessuno
+         ("released", 1, 222, 111, 0)])     # persa da chi compra
+    prova("girata: chi vende ne ha persa UNA, quella col rimborso pieno",
+          1, con.execute(sql_perse, (222, 222)).fetchone()[0])
+    prova("girata: chi compra ne ha persa una, e il «meno le spese» non "
+          "gliene aggiunge", 1,
+          con.execute(sql_perse, (111, 111)).fetchone()[0])
+    con.close()
+
+    # --- 6) IL LIBRO MASTRO, fatto girare -----------------------------
+    amb = {}
+    i = src.index("CONTROLLI_LIBRO_MASTRO = (")
+    exec(src[i:src.index("\nTIMBRO_LIBRO_MASTRO", i)], amb)
+    ctrl = {c[0]: c[2] for c in amb["CONTROLLI_LIBRO_MASTRO"]}
+    NOMI = ("spese rese senza la loro riga",
+            "riga di spese senza il suo ordine", "spese rese fuori scala")
+    prova("i tre controlli nuovi stanno nel catalogo", [True] * 3,
+          [n in ctrl for n in NOMI])
+
+    def mondo(ordine, righe):
+        """Un ordine e le sue righe di spese: (stato, totale, spese,
+        disputata) e [(ordine_id, importo, tg_id)]. Chi vende e' 222."""
+        c = _sq.connect(":memory:")
+        c.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT,"
+                  " prezzo_sats INTEGER, spese_rese_sats INTEGER DEFAULT 0,"
+                  " disputata INTEGER DEFAULT 0, venditore_id INTEGER)")
+        c.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
+                  "ordine_id INTEGER DEFAULT 0, motivo TEXT, "
+                  "importo_sats INTEGER, tg_id INTEGER)")
+        c.execute("INSERT INTO ordini(id, stato, prezzo_sats, "
+                  "spese_rese_sats, disputata, venditore_id) "
+                  "VALUES(7,?,?,?,?,222)", ordine)
+        c.executemany("INSERT INTO rimborsi_asta(ordine_id, motivo, "
+                      "importo_sats, tg_id) VALUES(?,'spese_spedizione',?,?)",
+                      righe)
+        return [n for n in NOMI if c.execute(ctrl[n]).fetchall()]
+
+    prova("un ordine deciso bene non fa parlare nessuno dei tre, in "
+          "nessuno dei suoi stati", [[]] * 2,
+          [mondo(("refund", 50000, 3000, 1), [(7, 3000, 222)]),
+           mondo(("refunded", 50000, 3000, 1), [(7, 3000, 222)])])
+    prova("...e nemmeno un ordine che non c'entra", [],
+          mondo(("refunded", 50000, 0, 1), []))
+    prova("la cifra trattenuta senza la riga di chi vende: grida", True,
+          NOMI[0] in mondo(("refund", 50000, 3000, 1), []))
+    prova("le due cifre diverse: gridano tutti e due i lati", list(NOMI[:2]),
+          mondo(("refund", 50000, 3000, 1), [(7, 2999, 222)])[:2])
+    prova("la riga intestata a un altro: gridano tutti e due i lati",
+          list(NOMI[:2]),
+          mondo(("refund", 50000, 3000, 1), [(7, 3000, 333)])[:2])
+    prova("una riga di spese senza una decisione: grida", [NOMI[1]],
+          mondo(("refunded", 50000, 0, 1), [(7, 3000, 222)]))
+    prova("spese uguali al totale: fuori scala", True,
+          NOMI[2] in mondo(("refund", 50000, 50000, 1), [(7, 50000, 222)]))
+    prova("spese negative: fuori scala", True,
+          NOMI[2] in mondo(("refund", 50000, -1, 1), [(7, -1, 222)]))
+    prova("spese su un ordine mai disputato: fuori scala", [NOMI[2]],
+          mondo(("refund", 50000, 3000, 0), [(7, 3000, 222)]))
+    prova("spese su un ordine consegnato al venditore: fuori scala",
+          [NOMI[2]],
+          mondo(("released", 50000, 3000, 1), [(7, 3000, 222)]))
+    prova("la cintura contro la doppia riga e' fra quelle che la ronda "
+          "sorveglia", True,
+          "\"UNION ALL SELECT 'idx_rimborso_spese' \""
+          in src[i:src.index("\nTIMBRO_LIBRO_MASTRO", i)])
+    # ...e la cintura VERA, presa dalla migrazione, ferma la seconda riga
+    c = _sq.connect(":memory:")
+    c.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
+              "ordine_id INTEGER DEFAULT 0, motivo TEXT)")
+    i_x = src.index('"CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_spese "')
+    c.execute(eval("(" + src[i_x:src.index(")\n", i_x)] + ")"))
+    c.execute("INSERT INTO rimborsi_asta(ordine_id, motivo) "
+              "VALUES(7,'spese_spedizione')")
+    try:
+        c.execute("INSERT INTO rimborsi_asta(ordine_id, motivo) "
+                  "VALUES(7,'spese_spedizione')")
+        doppia = "entrata"
+    except _sq.IntegrityError:
+        doppia = "fermata"
+    prova("la cintura vera: la seconda riga di spese sullo stesso ordine "
+          "non entra", "fermata", doppia)
+    c.executemany("INSERT INTO rimborsi_asta(ordine_id, motivo) "
+                  "VALUES(0,?)", [("perdente",), ("perdente",), ("ritiro",)])
+    prova("...e le righe delle aste (ordine 0) non le tocca", 4,
+          c.execute("SELECT COUNT(*) FROM rimborsi_asta").fetchone()[0])
+    c.close()
+
+    # --- 7) LA LISTA ORDINI -------------------------------------------
+    mo = codice(pezzo("miei_ordini"))
+    prova("la riga di chi vende esce con l'ordine, col suo stato",
+          [True] * 2,
+          ["\" AND x.motivo='spese_spedizione') AS spese_riga_id, \"" in mo,
+           "\" AND x.motivo='spese_spedizione') AS spese_riga_stato, \""
+           in mo])
+    prova("...ma a chi compra non arriva", True,
+          'r.pop("spese_riga_id", None)\n'
+          '            r.pop("spese_riga_stato", None)' in mo)
+
+    # --- 8) LA PAGINA: le righe che tengono insieme il disegno --------
+    prova("la pagina legge la cifra trattenuta e la riga di chi vende",
+          True,
+          "    speseReseSats:o.spese_rese_sats||0,\n"
+          "    speseRigaId:o.spese_riga_id||0, "
+          "speseRigaStato:o.spese_riga_stato||''," in mini)
+    prova("a decisione presa i bottoni del moderatore spariscono", 1,
+          mini.count("${isAdmin && !o.speseReseSats && (s==='dispute' ||\n"
+                     "          decidibileDalModeratore(s, o.disputata, "
+                     "o.sbloccatoAuto)) ? `"))
+    i_v = mini.find("onclick=\"adminResolve('venditore', this)\"")
+    i_b = mini.find("          ${bottoneMenoSpese(o, s)}\n        </div>`:''}",
+                    i_v)
+    prova("il quarto bottone sta nel pannello della decisione, sotto gli "
+          "altri tre", True, 0 < i_v < i_b < i_v + 400)
+    prova("sotto: il reso in corso e le due meta' per chi modera, la sua "
+          "meta' per chi vende", [1, 1],
+          [mini.count("      ${isAdmin ? pannelloResoAdmin(o, s) + "
+                      "pannelloSpeseReseAdmin(o, s) : ''}\n"),
+           mini.count("      ${pannelloSpeseVenditore(o)}\n")])
+    prova("la nota di chi compra, a rimborso uscito, ha le due storie",
+          [1, 1],
+          [mini.count("${o.role==='buyer' && s==='refunded' && "
+                      "o.speseReseSats ? `<div class=\"trust-note\">↩️ "
+                      "<span>Disputa decisa: il <b>rimborso meno le spese "
+                      "di spedizione</b> è stato inviato al tuo wallet."),
+           mini.count("${o.role==='buyer' && s==='refunded' && "
+                      "!o.speseReseSats ? `<div class=\"trust-note\">")])
+    prova("la testa dell'ordine non dice «integrale» ne' «vinta» su un "
+          "rimborso meno le spese", [True] * 2,
+          ["? (o.role==='buyer' ? `Ti abbiamo rimborsato "
+           "${cifraOrdine(o, importoRimborso(o))} (meno le spese di "
+           "spedizione)`" in mini,
+           "? (o.role==='buyer' ? 'Disputa decisa: rimborso meno le spese "
+           "di spedizione. Scegli qui sotto come riceverlo'" in mini])
+    prova("i passi: la decisione col suo nome, e il rimborso che non si "
+          "dice integrale", [True] * 2,
+          ["            : o.speseReseSats ? 'Rimborso meno le spese di "
+           "spedizione'\n" in mini,
+           "      passoRimborso(o, s, o.speseReseSats ? 'Meno le spese di "
+           "spedizione, nessuna commissione'\n" in mini])
+    prova("«Come funziona»: le strade sono tre, e la terza si spiega",
+          [0, 1],
+          [mini.count("Le strade sono due"),
+           mini.count("Le strade sono tre — i sats <b>tornano a te</b>, "
+                      "spedizione compresa; vanno al venditore; oppure "
+                      "tornano a te <b>meno le spese di spedizione</b>, "
+                      "che restano al venditore: è il caso del pacco "
+                      "tornato indietro per un indirizzo sbagliato.")])
+
+    # --- 9) LA PAGINA, fatta girare -----------------------------------
+    try:
+        prog = (
+            r"""
+const fmt = n => String(n);
+const esc = s => String(s);
+let myLnAddress = '';
+const annulloVenditore = o => false;
+const motivoAnnulloTesto = o => '';
+const DEMO = false, API_BASE = '/api';
+const authHdr = () => 'x', haptic = () => {}, openOrder = () => {};
+const toasts = [], attese = [], segnati = [], chiamate = [], nodi = {};
+const toast = t => toasts.push(t);
+const el = id => nodi[id];
+let currentOrder = null, conferma = null, risposta = {ok:true, corpo:{}};
+const segnaOrdine = (o, c) => { segnati.push(c); Object.assign(o, c); };
+const ridisegnaOrdine = () => {};
+const bottoneInAttesa = (b, t) => { attese.push(t === undefined ? '(default)' : t); return () => {}; };
+const chiediConferma = c => { conferma = c; };
+const fetch = async (u, o) => { chiamate.push([u, o.method, o.body]);
+  return {ok: risposta.ok, json: async () => risposta.corpo}; };
+"""
+            + _riga_js(mini, "const STATI_MENO_SPESE = ")
+            + "".join(_fn_js(mini, f) for f in (
+                "function speseTrattenibili(o){",
+                "function importoRimborso(o){",
+                "function bottoneMenoSpese(o, s){",
+                "function corpoMenoSpese(o){",
+                "function pannelloResoAdmin(o, s){",
+                "function pannelloSpeseReseAdmin(o, s){",
+                "function pannelloSpeseVenditore(o){",
+                "async function incassaSpese(btn){",
+                "function refundPanel(o){",
+                "async function adminResolve(esito, btn){"))
+            + "const CASI = " + json.dumps([c[1:4] for c in CASI]) + ";\n"
+            + r"""
+const ord = x => Object.assign({id:7, role:'admin', state:'dispute',
+  consegnaScelta:'spedizione', spedSats:3000, listing:{price:50000},
+  speseReseSats:0, speseRigaId:0, speseRigaStato:''}, x);
+(async () => {
+const fuori = {};
+fuori.tratt = CASI.map(c => speseTrattenibili(
+  ord({consegnaScelta:c[0], spedSats:c[1], listing:{price:c[2]}})));
+fuori.importo = [importoRimborso(ord({})), importoRimborso(ord({speseReseSats:3000}))];
+const b = (x, s) => bottoneMenoSpese(ord(x), s);
+fuori.bottone = {
+  disputa: b({}, 'dispute'), resoP: b({}, 'return_pending'),
+  resoS: b({}, 'return_shipped'),
+  altrove: ['refund','confirmed','locked','shipped','refunded','released']
+    .map(s => b({}, s)),
+  ritiro: b({consegnaScelta:'ritiro'}, 'dispute'),
+  digitale: b({consegnaScelta:'digitale'}, 'dispute'),
+  inclusa: b({spedSats:0}, 'dispute'),
+  uguale: b({spedSats:50000}, 'dispute'),
+  maggiore: b({spedSats:60000}, 'dispute')};
+fuori.corpo = corpoMenoSpese(ord({}));
+fuori.reso = [pannelloResoAdmin(ord({}), 'return_pending'),
+  pannelloResoAdmin(ord({}), 'return_shipped'),
+  pannelloResoAdmin(ord({}), 'dispute'),
+  pannelloResoAdmin(ord({spedSats:0}), 'return_pending'),
+  pannelloResoAdmin(ord({spedSats:50000}), 'return_pending'),
+  pannelloResoAdmin(ord({speseReseSats:3000}), 'return_pending')];
+fuori.deciso = [pannelloSpeseReseAdmin(ord({}), 'dispute'),
+  pannelloSpeseReseAdmin(ord({speseReseSats:3000, speseRigaStato:'da_riscuotere'}), 'refund'),
+  pannelloSpeseReseAdmin(ord({speseReseSats:3000, speseRigaStato:'riscosso'}), 'refund'),
+  pannelloSpeseReseAdmin(ord({speseReseSats:3000, speseRigaStato:'da_riscuotere'}), 'refunded'),
+  pannelloSpeseReseAdmin(ord({speseReseSats:3000, speseRigaStato:'riscosso'}), 'refunded')];
+const v = x => pannelloSpeseVenditore(ord(Object.assign(
+  {role:'seller', state:'refund', speseReseSats:3000, speseRigaId:9,
+   speseRigaStato:'da_riscuotere'}, x)));
+fuori.vende = [v({speseReseSats:0}), v({}), v({speseRigaStato:'riscosso'}),
+               v({role:'buyer'}), v({role:'admin'})];
+fuori.rimborso = [refundPanel(ord({role:'buyer', speseReseSats:3000})),
+                  refundPanel(ord({role:'buyer'}))];
+myLnAddress = 'a@b.it';
+fuori.rimborsoAddr = [refundPanel(ord({role:'buyer', speseReseSats:3000})),
+                      refundPanel(ord({role:'buyer'}))];
+myLnAddress = '';
+// il foglio di conferma: prima del «Decidi così» non parte niente
+currentOrder = ord({});
+await adminResolve('meno_spese', {});
+fuori.foglio = [conferma.titolo, conferma.corpo, conferma.etichetta, chiamate.length];
+risposta = {ok:true, corpo:{ok:true, stato:'refund', meno_spese:true,
+  spese_sats:3000, compratore_pagato:false, venditore_pagato:true}};
+await conferma.poi();
+fuori.deciso1 = {chiamata: chiamate[0], toast: toasts[toasts.length-1],
+  riga: [currentOrder.state, currentOrder.speseReseSats, currentOrder.speseRigaStato],
+  dopo: bottoneMenoSpese(currentOrder, currentOrder.state)
+        + pannelloResoAdmin(currentOrder, currentOrder.state),
+  attesa: attese[attese.length-1]};
+currentOrder = ord({state:'return_shipped'});
+risposta = {ok:true, corpo:{ok:true, stato:'refunded', meno_spese:true,
+  spese_sats:3000, compratore_pagato:true, venditore_pagato:true}};
+await adminResolve('meno_spese', {}); await conferma.poi();
+fuori.deciso2 = [toasts[toasts.length-1], currentOrder.state,
+                 currentOrder.speseReseSats, currentOrder.speseRigaStato];
+currentOrder = ord({}); segnati.length = 0;
+risposta = {ok:false, corpo:{detail:'no, grazie'}};
+await adminResolve('meno_spese', {}); await conferma.poi();
+fuori.rifiuto = [toasts[toasts.length-1], segnati.length,
+                 currentOrder.state, currentOrder.speseReseSats];
+fuori.altri = [];
+for (const e of ['rimborso', 'reso', 'venditore']) {
+  await adminResolve(e, {}); fuori.altri.push(conferma.titolo); }
+// chi vende incassa la sua meta' dall'ordine
+currentOrder = ord({role:'seller', state:'refund', speseReseSats:3000,
+  speseRigaId:9, speseRigaStato:'da_riscuotere'});
+chiamate.length = 0;
+nodi.speseInvoice = {value:'  ciao '};
+await incassaSpese({});
+fuori.incassoNo = [chiamate.length, toasts[toasts.length-1]];
+nodi.speseInvoice = {value:' lnbc30u1finta '};
+risposta = {ok:true, corpo:{ok:true, stato:'riscosso'}};
+await incassaSpese({});
+fuori.incasso = [chiamate[0], currentOrder.speseRigaStato,
+                 toasts[toasts.length-1], attese[attese.length-1]];
+currentOrder.speseRigaStato = 'da_riscuotere';
+risposta = {ok:false, corpo:{detail:'importo sbagliato'}};
+await incassaSpese({});
+fuori.incassoRifiuto = [toasts[toasts.length-1], currentOrder.speseRigaStato];
+risposta = {ok:true, corpo:{ok:false, stato:'da_riscuotere', non_chiesto:true}};
+await incassaSpese({});
+fuori.incassoMuto = [toasts[toasts.length-1], currentOrder.speseRigaStato];
+console.log(JSON.stringify(fuori));
+})();
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("i giudici della pagina sul rimborso meno le spese",
+              "node non installato")
+        return
+    BOTTONE = ("<button class=\"btn ghost\" style=\"margin-top:10px\" "
+               "onclick=\"adminResolve('meno_spese', this)\">📦 Rimborso "
+               "meno le spese di spedizione</button>")
+    prova("PARITA': la pagina trattiene quanto il server, caso per caso",
+          del_server, out.get("tratt"))
+    prova("pagina: a chi compra torna il totale, o il totale meno le spese",
+          [50000, 47000], out.get("importo"))
+    bt = out.get("bottone") or {}
+    prova("il quarto bottone c'e' sulla disputa aperta e sul reso, nei "
+          "suoi due stati", [BOTTONE] * 3,
+          [bt.get("disputa"), bt.get("resoP"), bt.get("resoS")])
+    prova("...e in nessun altro stato (nemmeno sul caso gia' deciso e "
+          "incagliato)", [""] * 6, bt.get("altrove"))
+    prova("...ne' dove non c'e' una spedizione", ["", ""],
+          [bt.get("ritiro"), bt.get("digitale")])
+    for chiave, perche in (("inclusa", "la spedizione è inclusa nel prezzo"),
+                           ("uguale", "la spedizione vale quanto il totale"),
+                           ("maggiore", "la spedizione vale quanto il totale")):
+        t = bt.get(chiave) or ""
+        prova(f"spedizione {chiave}: il bottone NON compare, e una riga "
+              f"dice perche'", (False, True),
+              ("adminResolve" in t or "<button" in t, perche in t))
+    corpo = out.get("corpo") or ""
+    prova("il foglio dice le due cifre, la commissione e che e' definitiva",
+          "Al venditore vanno le spese di spedizione: 3000 sats.\n"
+          "All'acquirente torna il resto: 47000 sats.\n"
+          "Nessuna commissione.\n\nLa decisione è definitiva.", corpo)
+    reso = out.get("reso") or [""] * 6
+    prova("sul reso in corso il moderatore trova il pannello col suo "
+          "bottone", [True, True],
+          [BOTTONE in reso[0] and "Decisione del moderatore" in reso[0],
+           BOTTONE in reso[1]])
+    prova("...solo li', solo con una cifra da trattenere, e non a "
+          "decisione presa", [""] * 4, reso[2:])
+    dec = out.get("deciso") or [""] * 5
+    FERMI = "in attesa, non sono ancora usciti"
+    prova("senza decisione il pannello delle due meta' non c'e'", "", dec[0])
+    prova("le due meta' dicono ognuna il suo stato, in tutte e quattro "
+          "le combinazioni", [(FERMI, FERMI), (FERMI, "inviati"),
+                              ("inviati", FERMI), ("inviati", "inviati")],
+          [(x.split("All'acquirente <b>47000 sats</b>: ")[-1].split(".<br>")[0],
+            x.split("Al venditore <b>3000 sats</b> di spese di spedizione: ")
+            [-1].split(".<br>")[0]) for x in dec[1:]])
+    prova("...e nessuna offre un bottone: la decisione è definitiva",
+          [True] * 4,
+          ["<button" not in x and "La decisione è definitiva." in x
+           for x in dec[1:]])
+    ve = out.get("vende") or [""] * 5
+    prova("chi vende: senza decisione niente; a chi compra e a chi modera "
+          "il suo pannello non compare", ["", "", ""],
+          [ve[0], ve[3], ve[4]])
+    prova("chi vende, da incassare: il campo, il bottone, la cifra esatta",
+          [True] * 3,
+          ['<textarea id="speseInvoice"' in ve[1],
+           'onclick="incassaSpese(this)"' in ve[1],
+           "esattamente 3000 sats" in ve[1]])
+    prova("chi vende, incassate: una nota, nessun campo", (True, False),
+          ("sono state inviate al tuo wallet" in ve[2], "<textarea" in ve[2]))
+    for parola in ("asta", "puntat", "iscuot"):
+        prova(f"...e nel suo pannello «{parola}» non compare: non e' il "
+              f"rimborso di una puntata", False,
+              parola in ve[1] or parola in ve[2])
+    prova("...ne' passa dal foglio «Riscuoti» delle aste", False,
+          "riscuotiRimborso" in _fn_js(mini, "function pannelloSpeseVenditore(o){")
+          or "riscuotiSheet" in _fn_js(mini, "async function incassaSpese(btn){"))
+    for nome, coppia in (("senza indirizzo Lightning", out.get("rimborso")),
+                         ("con l'indirizzo Lightning", out.get("rimborsoAddr"))):
+        meno, pieno = coppia or ["", ""]
+        prova(f"chi compra, {nome}: la cifra e' quella ridotta, mai il "
+              f"totale", (True, False), ("47000" in meno, "50000" in meno))
+        prova(f"chi compra, {nome}: non «vinta», non «a tuo favore», non "
+              f"«integrale»", [False] * 3,
+              ["Hai vinto" in meno, "a tuo favore" in meno,
+               "integrale" in meno])
+        prova(f"chi compra, {nome}: la decisione si chiama col suo nome",
+              True, "rimborso meno le spese di spedizione" in meno)
+        prova(f"chi compra, {nome}: il rimborso pieno e' quello di ieri",
+              (True, False), ("50000" in pieno, "meno le spese" in pieno))
+    prova("...e senza indirizzo gli si dice quanto resta al venditore",
+          True, "il totale meno 3000 sats di spedizione, che restano al "
+          "venditore" in (out.get("rimborso") or [""])[0])
+    prova("IL FOGLIO DI CONFERMA, come gli altri tre: titolo, corpo, "
+          "«Decidi così», e prima del tocco non parte niente",
+          ["Rimborso meno le spese di spedizione?", corpo, "Decidi così", 0],
+          out.get("foglio"))
+    d1 = out.get("deciso1") or {}
+    prova("al «Decidi così» parte la rotta col quarto esito",
+          ["/api/admin/orders/7/risolvi", "POST", '{"esito":"meno_spese"}'],
+          d1.get("chiamata"))
+    prova("...e la riga viva prende subito stato, cifra e meta' di chi "
+          "vende", ["refund", 3000, "riscosso"], d1.get("riga"))
+    prova("...cosi' nel ridisegno i bottoni non ci sono piu'", "",
+          d1.get("dopo"))
+    prova("...col velo dei sats (e' un gesto che li muove)", "(default)",
+          d1.get("attesa"))
+    prova("una meta' ancora ferma: il moderatore lo legge", True,
+          "Qui sotto vedi a che punto sono i due pagamenti"
+          in (d1.get("toast") or ""))
+    prova("tutte e due uscite: lo dice, e l'ordine e' rimborsato",
+          ["⚖️ Deciso: acquirente rimborsato, spese rese al venditore",
+           "refunded", 3000, "riscosso"], out.get("deciso2"))
+    prova("un rifiuto del server si legge, e la riga non cambia",
+          ["no, grazie", 0, "dispute", 0], out.get("rifiuto"))
+    prova("i tre fogli di ieri sono rimasti i loro",
+          ["Rimborsi subito l'acquirente?", "Rimborso previa restituzione?",
+           "Consegni i sats al venditore?"], out.get("altri"))
+    prova("chi vende: una fattura che non lo sembra non parte",
+          [0, 'Incolla una invoice Lightning valida (inizia con "ln…")'],
+          out.get("incassoNo"))
+    prova("chi vende: la fattura va alla riga SUA, pulita dagli spazi, e "
+          "a incasso fatto la pagina lo segna",
+          [["/api/rimborsi/9/invoice", "POST", '{"invoice":"lnbc30u1finta"}'],
+           "riscosso", "⚡ Spese di spedizione incassate",
+           "Invio sats in corso…"], out.get("incasso"))
+    prova("chi vende: un rifiuto (l'importo) si legge, e niente si segna",
+          ["importo sbagliato", "da_riscuotere"], out.get("incassoRifiuto"))
+    prova("chi vende: a nodo muto si dice che riparte da solo", (True,
+          "da_riscuotere"),
+          ("ci riproviamo da soli" in (out.get("incassoMuto") or [""])[0],
+           (out.get("incassoMuto") or ["", ""])[1]))
 
 
 def prove_punti_corrieri():
@@ -27857,7 +28494,8 @@ def prove_libro_mastro():
           punto_obiezioni INT DEFAULT 0,
           venditore_id INT DEFAULT 0,
           cassaforte TEXT DEFAULT 'saas',
-          cassaforte_payout TEXT DEFAULT '', payout_nota TEXT DEFAULT '');
+          cassaforte_payout TEXT DEFAULT '', payout_nota TEXT DEFAULT '',
+          disputata INT DEFAULT 0, spese_rese_sats INT DEFAULT 0);
         CREATE TABLE crediti_cassaforte(id INTEGER PRIMARY KEY,
           riga_id INT, cassaforte TEXT, stato TEXT DEFAULT 'aperto');
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
@@ -27875,7 +28513,8 @@ def prove_libro_mastro():
           delta_sats INT, stato TEXT);
         CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY,
           annuncio_id INT, puntata_id INT, rilancio_id INT DEFAULT 0,
-          importo_sats INT, motivo TEXT, payout_stato TEXT DEFAULT '');
+          importo_sats INT, motivo TEXT, payout_stato TEXT DEFAULT '',
+          ordine_id INT DEFAULT 0, tg_id INT DEFAULT 0);
         CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT
           DEFAULT 1, importo_sats INT
           DEFAULT 0, importo_eur REAL DEFAULT 0, contro_sats INT
@@ -27914,6 +28553,18 @@ def prove_libro_mastro():
           WHERE motivo = 'eccedenza_ritiro';
         CREATE UNIQUE INDEX idx_rimborso_eccedenza ON rimborsi_asta(puntata_id)
           WHERE motivo = 'eccedenza';
+        CREATE UNIQUE INDEX idx_rimborso_spese ON rimborsi_asta(ordine_id)
+          WHERE motivo = 'spese_spedizione';
+        -- UN RIMBORSO MENO LE SPESE SANO (13 ott 2026): 500 trattenuti
+        -- su 50.500, e la riga di chi vende con la stessa cifra. Vive
+        -- nel registro delle aste con annuncio 0 e puntata 0, e NESSUN
+        -- controllo delle aste deve fiatare per questo.
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,spedizione_sats,
+          quantita,stato,disputata,spese_rese_sats,venditore_id)
+          VALUES(77, 9, 50500, 500, 1, 'refund', 1, 500, 222);
+        INSERT INTO rimborsi_asta(id,annuncio_id,puntata_id,importo_sats,
+          motivo,ordine_id,tg_id)
+          VALUES(77, 0, 0, 500, 'spese_spedizione', 77, 222);
         -- UN CARRELLO SANO: 3 pezzi, lordo 32.000, sconto 3.200,
         -- spedizione 500 -> 29.300
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,sconto_sats,
@@ -28209,6 +28860,25 @@ def prove_libro_mastro():
          "doppio rimborso da ritiro", "2"),
         ("DROP INDEX idx_rimborso_eccedenza",
          "cinture d'idempotenza cadute", "idx_rimborso_eccedenza"),
+        # il rimborso meno le spese di spedizione (13 ott 2026): le due
+        # cifre devono dire lo stesso numero, da tutti e due i lati
+        ("DROP INDEX idx_rimborso_spese",
+         "cinture d'idempotenza cadute", "idx_rimborso_spese"),
+        ("DELETE FROM rimborsi_asta WHERE ordine_id=77",
+         "spese rese senza la loro riga", "77"),
+        ("UPDATE rimborsi_asta SET importo_sats=499 WHERE ordine_id=77",
+         "spese rese senza la loro riga", "77"),
+        ("UPDATE ordini SET spese_rese_sats=0 WHERE id=77",
+         "riga di spese senza il suo ordine", "77"),
+        ("UPDATE rimborsi_asta SET tg_id=333 WHERE ordine_id=77",
+         "riga di spese senza il suo ordine", "77"),
+        ("UPDATE ordini SET disputata=0 WHERE id=77",
+         "spese rese fuori scala", "77"),
+        ("UPDATE ordini SET spese_rese_sats=50500 WHERE id=77; "
+         "UPDATE rimborsi_asta SET importo_sats=50500 WHERE ordine_id=77",
+         "spese rese fuori scala", "77"),
+        ("UPDATE ordini SET stato='released' WHERE id=77",
+         "spese rese fuori scala", "77"),
         ("UPDATE annunci SET nostr_event_id='ev999' WHERE id=7",
          "annuncio a due teste", "7"),
         ("UPDATE ordini SET payout_stato='boh' WHERE id=1",
@@ -43699,8 +44369,11 @@ def prove_ordini_fermi():
     # allentarsi — il pannello deve passare di li', e il giudice deve
     # tenersi la meta' di ieri, o il caso incagliato tornerebbe
     # scoperto senza che nessuna prova diventi rossa.
+    # (13 ott 2026: i bottoni spariscono a «rimborso meno le spese»
+    # gia' deciso — `!o.speseReseSats` — perche' li' il server non
+    # riapre piu' niente: prove_rimborso_meno_spese)
     prova("...e ora il client offre i bottoni", True,
-          "isAdmin && (s==='dispute' ||" in mini
+          "isAdmin && !o.speseReseSats && (s==='dispute' ||" in mini
           and "decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto))"
           in mini
           and "['confirmed','refund'].includes(stato)" in pezzo_js(
@@ -57259,6 +57932,9 @@ def prove_card_parte_ordine():
         "CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INTEGER,"
         " venditore_id INTEGER, annuncio_id INTEGER, stato TEXT,"
         " creato INTEGER, consegna_scelta TEXT DEFAULT '');"
+        "CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY,"
+        " ordine_id INTEGER DEFAULT 0, motivo TEXT DEFAULT '',"
+        " stato TEXT DEFAULT '');"
         "CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,"
         " zona TEXT DEFAULT '', foto TEXT DEFAULT '[]',"
         " asta_base_sats INTEGER DEFAULT 0);"
@@ -101658,6 +102334,7 @@ def prove_servizi():
             email_corriere_correzioni INT DEFAULT 0,
             email_corriere_purgata_il INT DEFAULT 0,
             nota_compratore TEXT DEFAULT '',
+            spese_rese_sats INT DEFAULT 0,
             appuntamento_il INT DEFAULT 0,
             appuntamento_confermato_il INT DEFAULT 0,
             appuntamento_proposte INT DEFAULT 0,
@@ -115717,7 +116394,7 @@ def prove_cruscotto_admin():
       protezione_sats INTEGER DEFAULT 0, stato TEXT, prova INTEGER DEFAULT 0,
       payout_hash TEXT DEFAULT '', spedito_il INTEGER DEFAULT 0,
       annullato_venditore_il INTEGER DEFAULT 0,
-      motivo_annullo TEXT DEFAULT '');
+      motivo_annullo TEXT DEFAULT '', spese_rese_sats INTEGER DEFAULT 0);
     CREATE TABLE payout_tentati(tabella TEXT, riga_id INTEGER, hash TEXT,
       quando INTEGER DEFAULT 0);
     """)
@@ -115802,7 +116479,14 @@ def prove_cruscotto_admin():
       (7, 11, 1000, 9000, 'refunded', 0, 3000, 'esaurito', 1);
     INSERT INTO payout_tentati VALUES
       ('ordini', 1, 'h1', 1000 + 30*3600), ('ordini', 2, 'h2', 1000 + 70*3600),
-      ('ordini', 3, 'R3', 3000), ('rimborsi_asta', 9, 'ra', 4000);
+      ('ordini', 3, 'R3', 3000), ('rimborsi_asta', 9, 'ra', 4000),
+      ('rimborsi_asta', 10, 'sp', 4000);
+    -- (13 ott 2026) il registro dei rimborsi d'asta porta anche le
+    -- spese di spedizione rese a chi vende: la riga 10 e' una di
+    -- quelle, e la sua uscita NON e' un rimborso
+    CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, motivo TEXT);
+    INSERT INTO rimborsi_asta VALUES (9, 'perdente'),
+      (10, 'spese_spedizione');
     """)
     an = amb["dati_annulli"](con)
     prova("annulli: i soli PAGATI e mai i collaudi (mai pagati e prova "
@@ -115817,7 +116501,8 @@ def prove_cruscotto_admin():
     prova("...conclusi entro 48 ore dal PRIMO payout (30 h si', 70 h no)",
           (1, 2), (an["conclusi_entro"], an["conclusi"]))
     prova("gli hash dei rimborsi: le uscite degli ordini rimborsati e i "
-          "rimborsi d'asta, mai i payout a chi vende",
+          "rimborsi d'asta, mai i payout a chi vende (ne' le spese di "
+          "spedizione che un moderatore gli ha reso: «sp» resta fuori)",
           {"r3", "ra"}, amb["hash_rimborsi"](con))
     prova("...e il cruscotto li porta, e chiede al nodo anche la loro fetta",
           (True, True),
@@ -137233,7 +137918,8 @@ def prove_annullo_venditore():
                          "ANNULLI_VENDITORE_GIORNI = "):
             k = _SORGENTE.index(costante)
             exec(_SORGENTE[k:_SORGENTE.index("\n", k)], amb)
-        for nome in ("_campo", "_in_pagamento", "_rifiuto_in_pagamento",
+        for nome in ("_campo", "importo_rimborso", "_in_pagamento",
+                     "_rifiuto_in_pagamento",
                      "_righe_ordine", "_titolo_ordine", "_fmt_sats",
                      "_coda_magazzino", "_conta_annulli_venditore",
                      "_motivo_annullo", "_decadi_offerte_esaurito",
@@ -154488,10 +155174,13 @@ def prove_canale_admin():
     # (12 ott 2026, cantiere relay-per-mostro: la ronda dei relay di
     # Mostro ne aggiunge UNO, nella stanza degli errori — 70 chiamate,
     # 80 punti.)
+    # (13 ott 2026, cantiere indirizzo-giusto: le spese di spedizione
+    # rese a chi vende e mai incassate, dopo i solleciti — ancora UNO,
+    # ancora negli errori: 71 chiamate, 81 punti.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 29, "moderazione": 14,
+          {"dispute": 2, "dm": 1, "errori": 30, "moderazione": 14,
            "riepiloghi": 25}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -154526,7 +155215,8 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "80 adesso (in piu' c'e' la ronda dei relay di Mostro)", 80,
+          "81 adesso (in piu' ci sono la ronda dei relay di Mostro e le "
+          "spese di spedizione ferme)", 81,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -159764,6 +160454,7 @@ def main():
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,
               prove_indirizzo_giusto,
+              prove_rimborso_meno_spese,
               prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_pubblici,
               prove_punti_salvati,

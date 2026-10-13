@@ -11865,7 +11865,7 @@ document.getElementById('cartello')?.remove();</script>
       </ul>
 
       <h3>Se qualcosa va storto</h3>
-      <p>Finché i sats sono nel deposito puoi <b>aprire una disputa</b> dalla pagina del tuo ordine. Il deposito si congela e interviene un <b>moderatore</b>: legge le due versioni, guarda quello che avete (foto, tracking, messaggi) e decide. Le strade sono due — i sats <b>tornano a te</b>, spedizione compresa, oppure vanno al venditore. Quando l'oggetto va restituito, il rimborso parte dopo che è tornato indietro.</p>
+      <p>Finché i sats sono nel deposito puoi <b>aprire una disputa</b> dalla pagina del tuo ordine. Il deposito si congela e interviene un <b>moderatore</b>: legge le due versioni, guarda quello che avete (foto, tracking, messaggi) e decide. Le strade sono tre — i sats <b>tornano a te</b>, spedizione compresa; vanno al venditore; oppure tornano a te <b>meno le spese di spedizione</b>, che restano al venditore: è il caso del pacco tornato indietro per un indirizzo sbagliato. Quando l'oggetto va restituito, il rimborso parte dopo che è tornato indietro.</p>
       <p class="sicu-nota">Aprire una disputa non è un'accusa: nella gran parte dei casi è un malinteso che si chiarisce in mezza giornata.</p>
 
       <h3 id="sicu-limiti">Dove il deposito non può proteggerti</h3>
@@ -15834,6 +15834,13 @@ function mapOrder(o){
     /* il conto scomposto (lug 2026): listing.price resta il TOTALE
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
+    /* IL RIMBORSO MENO LE SPESE DI SPEDIZIONE (13 ott 2026): la cifra
+       che il moderatore ha lasciato a chi vende (0 = l'ordine non e'
+       stato deciso cosi') e, per chi vende e per chi modera, la riga
+       da cui quella cifra si incassa col suo stato. A chi compra la
+       riga non arriva: il server la toglie. */
+    speseReseSats:o.spese_rese_sats||0,
+    speseRigaId:o.spese_riga_id||0, speseRigaStato:o.spese_riga_stato||'',
     /* LA ZONA APPLICATA (set 2026): e' la ricevuta di QUALE tariffa
        e' stata pagata, e la leggono l'inciso del conto e — in
        disputa — il moderatore. '' non e' un buco ma il mondo di
@@ -33659,10 +33666,15 @@ function openOrder(id){
             : (o.role==='seller' ? 'Il reso è in viaggio verso di te'
                                  : 'Il reso è in viaggio verso il venditore')}
         : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso'
+            /* la quarta decisione non e' «a favore» di nessuno dei
+               due: si dice col suo nome, uguale per chi legge */
+            : o.speseReseSats ? 'Rimborso meno le spese di spedizione'
             : (o.role==='buyer' ? 'Disputa risolta a tuo favore'
                                 : 'Disputa risolta a favore dell\'acquirente')},
-      passoRimborso(o, s, 'Rimborso integrale, nessuna commissione',
-                          'Rimborso integrale, l\'annuncio torna in vetrina'),
+      passoRimborso(o, s, o.speseReseSats ? 'Meno le spese di spedizione, nessuna commissione'
+                                          : 'Rimborso integrale, nessuna commissione',
+                          o.speseReseSats ? 'Meno le spese di spedizione, rese al venditore'
+                                          : 'Rimborso integrale, l\'annuncio torna in vetrina'),
     ];
     /* `progress` e' un INDICE dentro `steps` (vedi il render piu'
        sotto), quindi il passo della spedizione, quando c'e', sposta
@@ -33792,7 +33804,10 @@ function openOrder(id){
       d:o.role==='seller' ? `Hai incassato ${cifraOrdine(o, nettoVenditore(o))}`
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
-      d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
+      d:o.speseReseSats
+        ? (o.role==='buyer' ? `Ti abbiamo rimborsato ${cifraOrdine(o, importoRimborso(o))} (meno le spese di spedizione)`
+                            : 'I sats sono tornati all\'acquirente, meno le spese di spedizione')
+       :o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
        :annulloVenditore(o) ? 'Hai annullato l\'ordine: i sats sono tornati all\'acquirente'
                           : 'I sats sono tornati all\'acquirente'}
     /* L'ANNULLO DEL VENDITORE (1 ott 2026): gli stessi due stati del
@@ -33801,6 +33816,9 @@ function openOrder(id){
       d:annulloVenditore(o)
         ? (o.role==='buyer' ? 'Il venditore ha annullato: scegli qui sotto come ricevere i tuoi sats'
                             : 'Hai annullato l\'ordine: i sats tornano all\'acquirente')
+        : o.speseReseSats
+        ? (o.role==='buyer' ? 'Disputa decisa: rimborso meno le spese di spedizione. Scegli qui sotto come riceverlo'
+                            : 'Disputa decisa: i sats tornano all\'acquirente, meno le spese di spedizione')
         : (o.role==='buyer' ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
                             : 'Disputa decisa: i sats tornano all\'acquirente')}
     : ['return_pending','return_shipped'].includes(s)
@@ -33971,7 +33989,13 @@ function openOrder(id){
            decidibile dal server e non offerto dal client. La
            coda degli ordini fermi ce lo porta davanti, e senza
            questa riga sarebbe un vicolo cieco visibile. */''}
-      ${isAdmin && (s==='dispute' ||
+      ${/* A «MENO LE SPESE» GIA' DECISO I BOTTONI SPARISCONO (13 ott
+            2026): l'ordine sta in 'refund' con la disputa segnata, cioe'
+            la forma che `decidibileDalModeratore` riapre — ma una delle
+            due meta' puo' essere gia' uscita, e il server rifiuta ogni
+            altra decisione. Un bottone che risponde sempre di no non si
+            mostra: al suo posto il pannello delle due meta', sotto. */''}
+      ${isAdmin && !o.speseReseSats && (s==='dispute' ||
           decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto)) ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
@@ -33983,9 +34007,13 @@ function openOrder(id){
           <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
+          ${bottoneMenoSpese(o, s)}
         </div>`:''}
+      ${isAdmin ? pannelloResoAdmin(o, s) + pannelloSpeseReseAdmin(o, s) : ''}
+      ${pannelloSpeseVenditore(o)}
       ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
-      ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>${annulloVenditore(o) ? 'Il venditore ha annullato l\'ordine' : 'Disputa risolta a tuo favore'}: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
+      ${o.role==='buyer' && s==='refunded' && o.speseReseSats ? `<div class="trust-note">↩️ <span>Disputa decisa: il <b>rimborso meno le spese di spedizione</b> è stato inviato al tuo wallet.</span></div>`:''}
+      ${o.role==='buyer' && s==='refunded' && !o.speseReseSats ? `<div class="trust-note">↩️ <span>${annulloVenditore(o) ? 'Il venditore ha annullato l\'ordine' : 'Disputa risolta a tuo favore'}: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='return_pending' ? `
         <div class="payout">
           <h4>↩️ Rispedisci l'oggetto per il rimborso</h4>
@@ -40067,6 +40095,111 @@ async function rimuoviNpub(){
     }});
 }
 
+/* ---- IL RIMBORSO MENO LE SPESE DI SPEDIZIONE (13 ott 2026) ----
+   La quarta decisione del moderatore, nata dal pacco tornato indietro
+   per un indirizzo sbagliato: le spese di spedizione vanno a chi vende
+   (le ha gia' pagate al corriere), il resto torna a chi compra,
+   nessuna commissione come in ogni rimborso. NESSUNO STATO NUOVO:
+   l'ordine fa la strada del rimborso ('refund' → 'refunded') con una
+   cifra piu' bassa, e a dire che e' andata cosi' e' `speseReseSats`.
+   `speseTrattenibili` E' IL GEMELLO di `spese_trattenibili` del server,
+   e le prove li girano sugli stessi casi: solo sulla spedizione (non
+   sul ritiro a mano, non sul digitale), e solo se la spedizione e' piu'
+   di zero e MENO del totale — a spedizione inclusa non c'e' una cifra
+   da trattenere, e a spedizione che copre tutto il rimborso sarebbe
+   zero. Il bottone compare solo dove il giudice dice una cifra. */
+function speseTrattenibili(o){
+  if (o.consegnaScelta !== 'spedizione') return 0;
+  const sped = Number(o.spedSats) || 0;
+  const totale = Number(o.listing.price) || 0;
+  return (sped > 0 && sped < totale) ? sped : 0;
+}
+/* PURA: quanto torna a chi compra. Il totale su ogni ordine che non e'
+   stato deciso «meno le spese». */
+function importoRimborso(o){
+  return (Number(o.listing.price) || 0) - (Number(o.speseReseSats) || 0);
+}
+/* dalla disputa aperta e dal reso in corso: gli stessi tre stati del
+   server (un caso gia' deciso e incagliato non si chiude cosi') */
+const STATI_MENO_SPESE = ['dispute', 'return_pending', 'return_shipped'];
+/* PURA: il quarto bottone, o la riga che dice perche' non c'e'. Vuota
+   dove la domanda non si pone (ritiro a mano, digitale, altri stati). */
+function bottoneMenoSpese(o, s){
+  if (!STATI_MENO_SPESE.includes(s) || o.consegnaScelta !== 'spedizione') return '';
+  if (!speseTrattenibili(o)) return `<div class="hint" style="margin-top:10px">${
+    (Number(o.spedSats) || 0) > 0
+      ? 'Rimborso meno le spese: non si può, la spedizione vale quanto il totale.'
+      : 'Rimborso meno le spese: non si può, la spedizione è inclusa nel prezzo e non c\'è una cifra da trattenere.'}</div>`;
+  return `<button class="btn ghost" style="margin-top:10px" onclick="adminResolve('meno_spese', this)">📦 Rimborso meno le spese di spedizione</button>`;
+}
+/* PURA: il corpo del foglio di conferma, con le due cifre. */
+function corpoMenoSpese(o){
+  const spese = speseTrattenibili(o);
+  return `Al venditore vanno le spese di spedizione: ${fmt(spese)} sats.\n`
+       + `All'acquirente torna il resto: ${fmt((Number(o.listing.price) || 0) - spese)} sats.\n`
+       + 'Nessuna commissione.\n\nLa decisione è definitiva.';
+}
+/* PURA: sul reso in corso il moderatore non aveva nessun bottone. Qui
+   ne trova UNO, quello di oggi, e solo dove c'e' una cifra da
+   trattenere: un pannello senza bottoni sarebbe un vicolo cieco. */
+function pannelloResoAdmin(o, s){
+  if (o.speseReseSats || !['return_pending', 'return_shipped'].includes(s)
+      || !speseTrattenibili(o)) return '';
+  return `
+        <div class="payout" style="border-color:var(--danger)">
+          <h4>⚖️ Decisione del moderatore</h4>
+          <div class="hint">Il reso è in corso. Se si è incagliato puoi chiuderlo così: la scelta è definitiva.</div>
+          ${bottoneMenoSpese(o, s)}
+        </div>`;
+}
+/* PURA: a decisione presa, le due meta' e a che punto sono. */
+function pannelloSpeseReseAdmin(o, s){
+  if (!o.speseReseSats) return '';
+  const fermi = 'in attesa, non sono ancora usciti';
+  return `
+        <div class="payout">
+          <h4>⚖️ Deciso: rimborso meno le spese di spedizione</h4>
+          <div class="hint">All'acquirente <b>${fmt(importoRimborso(o))} sats</b>: ${s==='refunded' ? 'inviati' : fermi}.<br>Al venditore <b>${fmt(o.speseReseSats)} sats</b> di spese di spedizione: ${o.speseRigaStato==='riscosso' ? 'inviati' : fermi}.<br>La decisione è definitiva.</div>
+        </div>`;
+}
+/* PURA: la meta' di chi vende, nel SUO ordine. Ha un campo suo e non
+   passa dal foglio «Riscuoti» delle aste: quella riga vive nello
+   stesso registro, ma non e' il rimborso di una puntata e non si
+   racconta con le sue parole. */
+function pannelloSpeseVenditore(o){
+  if (o.role !== 'seller' || !o.speseReseSats) return '';
+  const sats = fmt(o.speseReseSats);
+  if (o.speseRigaStato === 'riscosso')
+    return `<div class="trust-note">📦 <span>Disputa decisa: <b>rimborso meno le spese di spedizione</b>. Le spese, <b>${sats} sats</b>, sono state inviate al tuo wallet.</span></div>`;
+  return `
+        <div class="payout">
+          <h4>📦 Incassa le spese di spedizione</h4>
+          <div class="hint">Disputa decisa: <b>rimborso meno le spese di spedizione</b>. A te restano <b class="net">${sats}<span class="unit">sats</span></b>: incolla qui una invoice di <b>esattamente ${sats} sats</b>.</div>
+          <textarea id="speseInvoice" placeholder="lnbc… (invoice di ${sats} sats)"></textarea>
+          <button class="btn orange" onclick="incassaSpese(this)">⚡ Incassa le spese</button>
+        </div>`;
+}
+async function incassaSpese(btn){
+  haptic();
+  const o = currentOrder;
+  const inv = (el('speseInvoice').value || '').trim();
+  if (!inv.toLowerCase().startsWith('ln')) { toast('Incolla una invoice Lightning valida (inizia con "ln…")'); return; }
+  if (DEMO) { toast('Le spese si incassano col backend attivo'); return; }
+  const ripristina = bottoneInAttesa(btn, 'Invio sats in corso…');
+  const r = await fetch(`${API_BASE}/rimborsi/${o.speseRigaId}/invoice`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({invoice: inv})});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail || 'Invoice non accettata, riprova'); return; }
+  if (d.stato==='riscosso') { segnaOrdine(o, {speseRigaStato:'riscosso'}); toast('⚡ Spese di spedizione incassate'); }
+  else if (d.non_chiesto) { toast('✓ Fattura ricevuta. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli', 7000); }
+  else if (d.in_volo || d.incerto) { toast('⏳ Pagamento partito: lo stiamo verificando, non devi fare altro'); }
+  else { toast('Il pagamento non è riuscito: riprova con una invoice nuova', 7000); }
+  ridisegnaOrdine(o);
+}
+
 /* ---- pannello rimborso dell'acquirente (disputa vinta) ---- */
 function refundPanel(o){
   /* L'ANNULLO DEL VENDITORE (1 ott 2026): stesso pannello, altra
@@ -40074,22 +40207,27 @@ function refundPanel(o){
      vende */
   const perche = annulloVenditore(o)
     ? `Il venditore ha annullato l'ordine (${esc(motivoAnnulloTesto(o))})`
+    /* LA QUARTA DECISIONE (13 ott 2026): non e' una disputa vinta, e la
+       cifra non e' il totale. `importoRimborso` e' il totale su ogni
+       altro ordine, quindi qui sotto vale per tutte le storie. */
+    : o.speseReseSats ? 'Disputa decisa: rimborso meno le spese di spedizione'
     : 'Hai vinto la disputa';
+  const sats = fmt(importoRimborso(o));
   if (myLnAddress) return `
     <div class="payout">
       <h4>↩️ Rimborso in elaborazione</h4>
-      <div class="hint">${perche}: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
-      <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
+      <div class="hint">${perche}: <b class="net">${sats}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${sats} sats)"></textarea>
       <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
   return `
     <div class="payout">
       <h4>↩️ Ricevi il tuo rimborso</h4>
-      <div class="hint">${annulloVenditore(o) ? `${perche}` : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale${annulloVenditore(o) ? ', spedizione compresa' : ''}).
+      <div class="hint">${annulloVenditore(o) ? `${perche}` : o.speseReseSats ? 'Il moderatore ha deciso il <b>rimborso meno le spese di spedizione</b>' : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${sats}<span class="unit">sats</span></b> (${o.speseReseSats ? `il totale meno ${fmt(o.speseReseSats)} sats di spedizione, che restano al venditore` : `rimborso integrale${annulloVenditore(o) ? ', spedizione compresa' : ''}`}).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
-      <div class="hint" style="margin-top:14px"><b>Oppure</b> genera nel tuo wallet una invoice di <b>esattamente ${fmt(o.listing.price)} sats</b> e incollala qui.</div>
+      <div class="hint" style="margin-top:14px"><b>Oppure</b> genera nel tuo wallet una invoice di <b>esattamente ${sats} sats</b> e incollala qui.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua invoice Lightning)"></textarea>
       <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice(this)">Ricevi con questa invoice</button>
     </div>`;
@@ -40226,6 +40364,8 @@ async function adminResolve(esito, btn){
     : esito==='reso'
     ? ['Rimborso previa restituzione?',
        'L\'acquirente dovrà rispedire l\'oggetto (con tracciamento); il rimborso partirà solo quando il venditore conferma di averlo ricevuto.']
+    : esito==='meno_spese'
+    ? ['Rimborso meno le spese di spedizione?', corpoMenoSpese(o)]
     : ['Consegni i sats al venditore?', 'La decisione è definitiva.'];
   chiediConferma({titolo, corpo, etichetta: 'Decidi così',
     poi: async () => {
@@ -40238,8 +40378,17 @@ async function adminResolve(esito, btn){
       const d = await r.json().catch(()=>({}));
       ripristina();
       if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-      segnaOrdine(o, {state: d.stato || 'dispute'});
-      toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
+      /* col quarto esito la cifra trattenuta va scritta SUBITO sulla
+         riga viva, insieme allo stato: e' lei che spegne i bottoni
+         della decisione nel ridisegno qui sotto */
+      segnaOrdine(o, Object.assign({state: d.stato || 'dispute'},
+        d.meno_spese ? {speseReseSats: d.spese_sats || 0,
+          speseRigaStato: d.venditore_pagato ? 'riscosso' : 'da_riscuotere'} : {}));
+      toast(d.meno_spese
+            ? (d.compratore_pagato && d.venditore_pagato
+                ? '⚖️ Deciso: acquirente rimborsato, spese rese al venditore'
+                : '⚖️ Deciso: rimborso meno le spese. Qui sotto vedi a che punto sono i due pagamenti')
+          : d.stato==='refunded' ? '↩️ Acquirente rimborsato'
           : d.stato==='released' ? '⚡ Sats consegnati al venditore'
           : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
           /* Al moderatore si dice quale dei due e' successo: «in attesa

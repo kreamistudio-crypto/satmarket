@@ -21502,8 +21502,66 @@
   disputa e nella riga `rigaIndirizzoAdmin` della pagina dell'ordine,
   gemella di quella del punto; l'indirizzo no, da nessuna strada. È la
   premessa del quarto esito del moderatore («rimborso meno le spese di
-  spedizione»), che arriva col secondo push. Collaudo:
+  spedizione»), qui sotto. Collaudo:
   `collaudo_indirizzo_confermato.py`, nella gabbia della CI.
+  IL RIMBORSO MENO LE SPESE DI SPEDIZIONE (13 ott 2026, cantiere
+  «indirizzo-giusto», secondo push): la QUARTA decisione del
+  moderatore, `esito='meno_spese'` di `risolvi_disputa`. Le spese di
+  spedizione vanno a chi vende, il resto torna a chi compra, nessuna
+  commissione. NESSUNO STATO NUOVO: l'ordine fa la strada del rimborso
+  (`refund` → `refunded`) con una cifra più bassa, e il solo segno è
+  `ordini.spese_rese_sats` (0 = non deciso così). I GIUDICI:
+  `spese_trattenibili(o)` — `spedizione_sats`, solo se la consegna è
+  una spedizione (indirizzo o punto), più di zero e MENO del totale:
+  a spedizione inclusa, o uguale/più grande del totale, è 0 e il
+  bottone non compare — e `importo_rimborso(o)`, il totale meno le
+  spese rese, che è la cifra per chi paga (`_rimborsa_compratore`), per
+  chi controlla la fattura incollata (`deposita_invoice`) e, col
+  gemello `importoRimborso`, per la pagina. LE DUE META': la decisione
+  (`_rimborsa_meno_spese`) scrive in UNA transazione, dentro una
+  funzione sincrona (`_scrivi_meno_spese`) chiamata sotto il lucchetto
+  dell'ordine — chi paga quell'ordine legge la cifra all'inizio del suo
+  giro e tiene il lucchetto fino in fondo, quindi un rimborso pieno già
+  partito finisce PRIMA che la cifra cambi, e il cancello poi rifiuta —:
+  la cifra sull'ordine, dietro il cancello (`spese_rese_sats=0`, stato fra
+  `dispute`/`return_pending`/`return_shipped`, nessun pagamento in
+  volo o incerto), e la riga di chi vende nel registro «da riscuotere»
+  (`rimborsi_asta`, motivo `spese_spedizione`, colonna `ordine_id`,
+  `annuncio_id` e `puntata_id` a 0, cintura UNIQUE
+  `idx_rimborso_spese`); tutte e due nascono `da_riprovare`, così un
+  crash dopo la commit lo recupera il giro dei pagamenti. Poi i due
+  pagamenti, ognuno dalla sua strada (`_rimborsa_compratore`,
+  `_paga_rimborso`), indipendenti: uno che fallisce o esplode non
+  ferma l'altro. Sommate, le due cifre fanno il totale pagato. È
+  DEFINITIVA APPENA PRESA: la guardia su `spese_rese_sats` sta PRIMA
+  del ramo che riapre il caso incagliato (dopo la decisione l'ordine è
+  in `refund` con `disputata=1`, cioè la forma che quel ramo riapre, e
+  ridecidere a spese già incassate farebbe uscire più del deposito).
+  LA CINTURA: `_sblocca_sats` non paga MAI il netto al venditore su un
+  ordine con `spese_rese_sats` (ha già le sue due uscite: da qui in
+  poi «una uscita per riga» non basta a tenere il conto, e chi
+  aggiunge una terza strada che paga un ordine viene a rileggere qui).
+  LA RIGA DI SPESE NON È UN RIMBORSO D'ASTA: dove il registro parla o
+  conta ha il suo ramo o resta fuori — `mie_puntate`, il pallino
+  `aste_da_agire`, `sollecita_rimborsi_puntate`, i testi di
+  `_paga_rimborso`, il titolo in `coda_pagamenti`, `hash_rimborsi`; in
+  comune restano il binario dei pagamenti, la rotta
+  `/api/rimborsi/{id}/invoice` e il recupero di `salva_ln_address`.
+  REPUTAZIONE: non è una disputa persa per nessuno (`_dati_distintivi`
+  e il conto nella nota di `apri_disputa` la escludono). LIBRO MASTRO:
+  tre controlli — «spese rese senza la loro riga», «riga di spese
+  senza il suo ordine», «spese rese fuori scala» — più la cintura fra
+  quelle sorvegliate. NELLA PAGINA: `speseTrattenibili` (gemello del
+  server, parità provata), `bottoneMenoSpese` nel pannello della
+  decisione e, da solo, sul reso in corso (`pannelloResoAdmin`); a
+  decisione presa i bottoni spariscono (`!o.speseReseSats`) e il
+  moderatore legge le due metà (`pannelloSpeseReseAdmin`); chi vende
+  incassa dal SUO pannello dentro l'ordine (`pannelloSpeseVenditore`,
+  `incassaSpese`), non dal foglio «Riscuoti» delle aste; `miei_ordini`
+  porta `spese_riga_id`/`spese_riga_stato` a chi vende e a chi modera,
+  non a chi compra. Collaudo: `collaudo_rimborso_meno_spese.py` (i due
+  pagamenti col nodo di cartone: uno che fallisce, il nodo muto, il
+  server che cade a metà), nella gabbia della CI.
   L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — lì è il
   venditore a depositare per il compratore, qui il compratore per il
   venditore. Chi sceglie «🏠 Spedizione a casa» scrive l'indirizzo al
