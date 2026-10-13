@@ -55281,3 +55281,23 @@ dove li mette l'ordinamento scelto (`ordinaLibroP2P`).
 L'ok al push è arrivato in risposta al rapporto, punto per punto: «git
 fetch e rebase su origin/main, sezioni toccate e collaudi sull'albero
 esatto del push, push subito solo se è tutto verde».
+L'ALBERO DEL PUSH (cantiere libro-vuoto, 13 ott 2026). Dopo l'ok main è
+corso ancora TRE volte, e ogni volta i controlli si sono rifatti da
+capo. 1) Fermo su `ea93474`: coi cinque commit, le 26 sezioni toccate
+(1.325 prove) e i 75 collaudi del workflow nella gabbia, 75 verdi. 2)
+`8caf7eb` (patto-copia-relay e la cassetta NIP-46): 27 sezioni (1.535
+prove), e i collaudi fermi a 48 verdi su 75 — il processo è stato
+chiuso da fuori, senza una rossa. 3) `29c47f3` (gesti-subito): qui il
+conflitto non era solo la coda di questo file ma anche il workflow e
+`prove.py`, nello stesso punto — il loro collaudo e la loro sezione
+accanto ai miei: tenuti tutti e due.
+UN GIRO DI COLLAUDI DURA PIÙ DI QUANTO MAIN STIA FERMO (25 minuti in
+fila, con più sessioni che pushano): dal terzo giro i collaudi girano
+in CINQUE FILE PARALLELE della stessa gabbia (nessuna porta in comune
+fra collaudi diversi: contate), e la suite intera accanto.
+Sull'albero che contiene QUESTA riga, sopra `29c47f3` — scritta prima
+dei controlli, perché l'albero provato fosse quello pushato byte per
+byte —: `node` sui tre script della pagina, la suite severa INTERA
+(i conti delle sentinelle di due sessioni si sommano solo qui) e tutti
+i collaudi del workflow nella gabbia. Verdi: con una rossa questo
+commit non sarebbe su main.
