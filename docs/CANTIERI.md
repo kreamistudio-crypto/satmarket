@@ -57211,3 +57211,103 @@ file toccati — `prove_garanzia_lunga`, `prove_disputa_automatica_p2p`,
 garanzie lunghe, e le righe aggiunte contro le forme dello scanner dei
 segreti. I numeri stanno nel messaggio del commit. La suite intera e
 gli altri collaudi li dice la CI.
+
+## Il paracadute, la prova sul telefono: il segno che non si vedeva, il foglio che ricordava, e l'ordine che non è più nel libro (13 ott 2026, sera, cantiere paracadute-card, dalla prova di Andrea col coordinatore vero)
+
+**COM'È ANDATA LA PROVA.** Andrea ha acceso `P2P_PARACADUTE` sul VPS
+(un comando alla volta: la copia del config, la riga, il controllo, il
+riavvio, il pannello delle leve), ha pubblicato dalla Mini App dentro
+Telegram due vendite col 5%, e ha trovato DUE DIFETTI prima ancora di
+muovere il prezzo. La leva è tornata a `False` subito, e la lettura di
+`p2p_paracadute` ha detto da che parte cercare: le due righe c'erano,
+soglia 5, partenza al cambio del server — il server aveva ricevuto
+tutto. Il primo difetto era di DISEGNO, non di salvataggio.
+
+**1) «🪂 PARACADUTE 5%» NON SI VEDEVA.** «Nel libro» ha due parole: la
+riga del proprio ordine nel telefono dice `pubblicato`, l'ordine come
+lo porta il libro (il 38383) dice `pending`. `statoParacaduteP2P`
+conosceva solo la prima, e la card del libro e il dettaglio gli passano
+l'ordine DEL LIBRO: lì il segno non usciva mai. E la PAGINA del proprio
+ordine parlava solo a paracadute APERTO. Restava un posto solo, la riga
+di «I miei scambi» — l'unico che le prove e il giro dal vivo del mattino
+guardavano. LA CURA: il segno legge lo stato dalla PROPRIA RIGA quando
+c'è (sa anche se l'ho già annullato), `pending` vale «nel libro», e la
+pagina dell'ordine lo dice anche a paracadute chiuso, con la frase
+intera: «🪂 Paracadute 5%: se BTC sale o scende più del 5% da 100.000 €,
+l'ordine si annulla da solo. Senza penalità.» Intera per la seconda
+osservazione di Andrea — «quel 5 è la soglia del paracadute, non uno
+sconto»: sulla card resta corto com'era chiesto, nella pagina c'è
+posto per dire che è una soglia sul prezzo di BTC, col prezzo da cui
+si misura. Nel codice i due numeri non si toccano: la soglia vive in
+`paracadute` (sulla riga, e verso il nostro server), il premio in
+`premium`, e `ordineDaCampiP2P` — l'ordine che parte per il
+coordinatore — il paracadute non lo conosce. C'è una prova che lo tiene.
+
+**2) IL FOGLIO RIPARTIVA DAL 5%.** Era la decisione del mattino («spento
+di serie con l'ultima scelta ricordata»), e sul telefono si è vista per
+quel che è: un paracadute che nessuno ha scelto ANNULLA un ordine.
+ROVESCIATA da Andrea: il foglio parte SEMPRE da «Spento». Via
+`ultimoParacaduteP2P`, `ricordaParacaduteP2P` e la chiave in
+`localStorage`; `apriNuovoOrdineP2P` scrive 0. «🔁 RIPUBBLICA AL PREZZO
+NUOVO» INVECE LA RITROVA: io l'avevo spenta anche lì «per coerenza», e
+Andrea l'ha rimessa — è una scelta che chi pubblica aveva già fatto su
+quell'ordine, e nel foglio la vede accesa prima di pubblicare. «Sempre
+da Spento» vale per gli ordini NUOVI dal +. (Sul telefono di chi aveva
+già scelto resta in memoria la chiave vecchia: nessuno la legge più.)
+
+**3) L'ORDINE CHE NON È PIÙ NEL LIBRO** (domanda di Andrea, guardando
+la riga del suo ordine annullato a mano con `aperto = 0`: «risulta
+ancora armata?»). No: `aperto = 0` vuol dire «mai aperto». La riga
+resta in tabella, e il giro guarda solo gli ordini che `p2p_ordini` dà
+`pending` e senza una presa in corso. MA LA DOMANDA HA TROVATO UN BUCO
+VERO: quello stato lo scrive il libro, che arriva entro un minuto e può
+restare indietro o muto. Con un ordine annullato a mano e il libro
+ancora a `pending`, a −30% il paracadute SI APRIVA e l'avviso partiva —
+visto ROSSO nella prova scritta prima della cura. DUE GUARDIE IN PIÙ:
+`_fuori_per_cronaca_p2p` (mostrod racconta entro un secondo: un
+`annullato`, `scaduto`, `rilasciato` o `concluso` senza un `tornato`
+dopo ferma la riga e azzera il conto) e `_libro_letto_p2p` (se la
+passata del libro di quel battito è stata abbandonata, saltata, o
+nessun relay ha risposto, il giro del paracadute di quel minuto non
+gira). Il telefono resta l'ultima guardia: firma il `cancel` solo su
+una riga sua ancora `pubblicato`.
+
+**STRADE SCARTATE.** Cancellare la riga di `p2p_paracadute` quando
+l'ordine esce dal libro: `superato` e `aperto` servono al racconto
+dopo (la card «annullato dal paracadute», la presa arrivata tardi), e
+un ordine che TORNA nel libro deve ritrovare la sua soglia. Tenere il
+ricordo ma solo «per questa sessione»: è lo stesso rischio, più corto.
+Togliere la chiave vecchia dai telefoni con una riga di pulizia: codice
+in più per un dato che nessuno legge.
+
+**LA LEZIONE, CHE È MIA.** Il giro dal vivo del mattino diceva «sulla
+sua card: 🪂 Paracadute 5%» e guardava la riga di «I miei scambi». La
+consegna diceva «la card», e le card sono tre. Una prova che cerca il
+segno «dove so che c'è» risponde per il vicino: il giro adesso apre la
+pagina dell'ordine, cambia tab e legge la propria card nel libro.
+
+**PROVATO.** Otto prove ROSSE sul codice del mattino e verdi dopo la
+cura: il segno sull'ordine `pending` (mio, mio aperto, mio noto solo al
+server, di un altro, preso, già annullato); la frase della pagina, con
+e senza il prezzo di partenza; il foglio da «Spento» e la memoria
+vuota; l'ordine annullato a mano, scaduto e rilasciato col libro
+indietro; il libro non letto; l'ordine delle guardie nel giro. In più,
+già verdi: annullato, scaduto, concluso e preso in ogni stato del libro
+a −30% per tre giri; la soglia che non entra nell'ordine per il
+coordinatore. Il collaudo `collaudo_paracadute` ha il passo 8-bis sulle
+rotte vere (l'evento di mostrod dalla sua porta, il giro vero
+dell'orologio). IL GIRO DAL VIVO a 390×844, coi tocchi veri, relay
+locale e coordinatore di cartone: la pagina del mio ordine, la mia card
+nel libro (una vendita sta nel tab «Compra BTC»), il foglio che riparte
+da «Spento» dopo un ordine pubblicato col 5%, e il resto del giro del
+mattino.
+
+**NON PROVATO, E VA DETTO.** Il coordinatore vero: la prova di Andrea
+si è fermata ai due difetti, il prezzo non è stato mosso. Che il libro
+in ritardo capiti davvero in produzione non l'ho misurato: la guardia
+c'è perché costa poco e l'errore costerebbe un avviso falso.
+
+**DA FARE, non fatto.** La prova dal vivo da capo, coi passi del
+mattino (PRODUZIONE, «IL PARACADUTE, SUL VPS»), a leva riaccesa da
+Andrea. Le due righe di prova rimaste in `p2p_paracadute` sul VPS
+(ordini `b48935ec…` e `bb8d4f23…`, annullati): innocue, restano.

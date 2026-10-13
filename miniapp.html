@@ -65265,13 +65265,16 @@ function fermaPerPausaP2P(){
      di Barattolo e avvisa. Barattozon no: ha la scadenza del PayCode.
    • IL TELEFONO firma il `cancel` vero, alla prima apertura: e' la sua
      chiave, e il server quella firma non la fa (regola ferrea 2).
-   • SPENTO DI SERIE nel foglio che pubblica; l'ultima scelta si ricorda
-     su questo dispositivo (`P2P_PARACADUTE_CHIAVE`).
+   • SPENTO DI SERIE nel foglio che pubblica, e SEMPRE: la scelta di prima
+     non si ricorda (13 ott 2026, sera, dalla prova di Andrea sul telefono
+     — un paracadute che nessuno ha scelto annulla un ordine).
+   • IL NUMERO E' UNA SOGLIA sul prezzo di BTC, non un premio ne' uno
+     sconto: vive in `paracadute`, sulla riga e verso il NOSTRO server, e
+     l'ordine che parte per il coordinatore (`ordineDaCampiP2P`) non lo sa.
    QUI DENTRO, NEL MOTORE, ZERO `fetch`: le due che parlano col server
    (`chiediMieiParacaduteP2P`, `battitoParacaduteP2P`) stanno fuori,
    accanto a quelle della pausa. */
 const P2P_PARACADUTE_SOGLIE = [5, 10, 20];    // come il server (P2P_PARACADUTE_SOGLIE)
-const P2P_PARACADUTE_CHIAVE = 'barattolo_p2p_paracadute';
 const P2P_PARACADUTE_SPENTO = 'Se BTC sale o scende oltre la soglia che scegli, l\'ordine si annulla da solo. Senza penalità.';
 let p2pNuovoParacadute = 0;           // la scelta nel foglio «Pubblica»: 0 = spento
 let p2pParacaduteAperti = {};         // ordine -> true: il paracadute di chi l'ha pubblicato si e' aperto
@@ -65291,13 +65294,6 @@ function fraseParacaduteP2P(n){
   n = sogliaParacaduteP2P(n);
   return n ? 'Se BTC sale o scende più del ' + n + '% da adesso, l\'ordine si annulla da solo. Senza penalità.'
            : P2P_PARACADUTE_SPENTO;
-}
-/* l'ultima scelta, su questo dispositivo: una comodita', mai un fatto */
-function ultimoParacaduteP2P(){
-  try { return sogliaParacaduteP2P(localStorage.getItem(P2P_PARACADUTE_CHIAVE)); } catch(e) { return 0; }
-}
-function ricordaParacaduteP2P(n){
-  try { localStorage.setItem(P2P_PARACADUTE_CHIAVE, String(sogliaParacaduteP2P(n))); } catch(e) {}
 }
 /* ---- il foglio «Pubblica»: la sezione, dopo la pausa ---- */
 function sezioneParacaduteNuovoP2P(tab){
@@ -65402,14 +65398,21 @@ function passaggioParacaduteP2P(p){
 function statoParacaduteP2P(o, p){
   if (!o || !p) return '';
   if (o.stato === 'annullato') return (o.paracaduteAperto || p.aperto) ? 'annullato' : '';
-  if (o.stato !== 'pubblicato') return '';
+  /* «NEL LIBRO» HA DUE PAROLE (13 ott 2026, sera): 'pubblicato' sulla mia
+     riga, 'pending' sull'ordine come lo porta il libro (il 38383). Con la
+     sola prima la card del libro non diceva mai «🪂 Paracadute 5%» */
+  if (o.stato !== 'pubblicato' && o.stato !== 'pending') return '';
   return p.aperto ? 'aperto' : 'armato';
 }
-/* il segno sul MIO ordine: la card del libro, il dettaglio, «I miei scambi» */
+/* il segno sul MIO ordine: la card del libro, il dettaglio, «I miei scambi».
+   LO STATO E' QUELLO DELLA MIA RIGA, quando c'e' (13 ott 2026, sera, il
+   difetto trovato da Andrea sul telefono): la card e il dettaglio passano
+   l'ordine DEL LIBRO, che dice 'pending' e non sa se l'ho gia' annullato */
 function segnoParacaduteP2P(o){
   if (!paracaduteAttivoP2P()) return '';
-  const p = mioParacaduteP2P(o);
-  const st = statoParacaduteP2P(o, p);
+  const riga = (o && o.id && typeof ordiniP2P === 'function' && ordiniP2P()[o.id]) || o;
+  const p = mioParacaduteP2P(riga);
+  const st = statoParacaduteP2P(riga, p);
   if (!st) return '';
   return '<div class="p2p-box p2p-paracadute">'
     + (st === 'armato' ? '🪂 Paracadute ' + p.soglia + '%'
@@ -65437,12 +65440,30 @@ function campiRipubblicaP2P(o, p, cambioOra){
           zona: String((o && o.zona) || ''), filtro: Number(o && o.filtro) || 0,
           paracadute: sogliaParacaduteP2P((p && p.soglia) || (o && o.paracadute))};
 }
-/* il riquadro nella pagina del MIO ordine, quando il paracadute si e'
-   aperto: cosa e' successo, e il tasto per ripubblicarlo */
+/* PURA: la frase della pagina a paracadute ANCORA CHIUSO. Intera, perche'
+   «5%» da solo si legge come uno sconto (13 ott 2026, sera, Andrea): e'
+   una soglia sul prezzo di BTC, e la partenza — quando il server l'ha
+   detta — e' il prezzo da cui si misura */
+function fraseArmatoParacaduteP2P(p){
+  const n = sogliaParacaduteP2P(p && p.soglia);
+  if (!n) return '';
+  const da = Number(p.partenza) > 0 ? 'da ' + euroBtcP2P(p.partenza)
+                                    : 'dal prezzo di quando l\'hai pubblicato';
+  return '🪂 Paracadute ' + n + '%: se BTC sale o scende più del ' + n + '% ' + da
+    + ', l\'ordine si annulla da solo. Senza penalità.';
+}
+/* il riquadro nella pagina del MIO ordine: a paracadute chiuso la frase
+   qui sopra; quando si e' aperto, cosa e' successo e il tasto per
+   ripubblicarlo */
 function riquadroParacaduteP2P(o){
   if (!o || !o.mio || !paracaduteAttivoP2P()) return '';
   const p = mioParacaduteP2P(o);
   const st = statoParacaduteP2P(o, p);
+  /* A PARACADUTE CHIUSO LA PAGINA LO DICE (13 ott 2026, sera: «aprendo la
+     card del mio ordine non c'e' nessuna dicitura») */
+  if (st === 'armato')
+    return '<div class="p2p-paracadute-riq" id="p2pParacaduteRiq"><div class="p2p-box p2p-paracadute">'
+      + esc(fraseArmatoParacaduteP2P(p)) + '</div></div>';
   if (st !== 'aperto' && st !== 'annullato') return '';
   const come = passaggioParacaduteP2P(p);
   const testo = '🪂 Il paracadute si è aperto' + (come ? ': ' + come : '') + '. '
@@ -65473,6 +65494,10 @@ function ripubblicaParacaduteP2P(){
   p2pNuovoFisso = c.fisso; p2pNuovoSats = c.sats; p2pNuovoPremio = c.premio;
   p2pNuovoZona = c.zona;
   if (typeof sogliaFiltroP2P === 'function') p2pNuovoFiltro = sogliaFiltroP2P(c.filtro);
+  /* QUI LA SOGLIA DELL'ORDINE VECCHIO TORNA (13 ott 2026, sera, parola di
+     Andrea): e' una scelta gia' fatta su quest'ordine, e nel foglio si
+     vede accesa prima di pubblicare. «Sempre da Spento» vale per gli
+     ordini NUOVI dal +, ed e' `apriNuovoOrdineP2P` che lo scrive */
   p2pNuovoParacadute = c.paracadute;
   renderNuovoOrdineP2P();
 }
@@ -67068,9 +67093,10 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoZona = '';
   /* ...e il filtro di chi puo' prendere riparte da «tutti» (10 ott 2026) */
   p2pNuovoFiltro = 0;
-  /* ...e il paracadute riparte dall'ULTIMA SCELTA di questo dispositivo
-     (13 ott 2026): spento la prima volta, poi come l'hai lasciato */
-  p2pNuovoParacadute = typeof ultimoParacaduteP2P === 'function' ? ultimoParacaduteP2P() : 0;
+  /* ...e il paracadute riparte SEMPRE DA «SPENTO» (13 ott 2026, sera,
+     dalla prova di Andrea sul telefono): la scelta di prima non si
+     ricorda — un paracadute che nessuno ha scelto annulla un ordine */
+  p2pNuovoParacadute = 0;
   /* ...e la zona riparte dall'ULTIMA USATA, chiesta al server (10 ott
      2026): vedi `preparaZonaNuovoP2P` */
   if (typeof preparaZonaNuovoP2P === 'function') preparaZonaNuovoP2P();
@@ -69768,11 +69794,9 @@ async function inviaNuovoOrdineP2P(confermato){
   if (filtroOrd) ord.filtro = filtroOrd;
   /* IL PARACADUTE STA SULLA RIGA (13 ott 2026): parte all'intestazione
      come la zona e il filtro, e intanto la mia card mostra il segno. La
-     scelta — anche «Spento» — si ricorda per il prossimo ordine */
+     scelta vale per QUESTO ordine e non si ricorda per il prossimo */
   const paraOrd = typeof paracaduteDaCampiP2P === 'function' ? paracaduteDaCampiP2P(campi) : 0;
   if (paraOrd) ord.paracadute = paraOrd;
-  if (typeof ricordaParacaduteP2P === 'function' && typeof paracaduteAttivoP2P === 'function'
-      && paracaduteAttivoP2P() && !tabacchinoP2P(campi.metodi)) ricordaParacaduteP2P(campi.paracadute);
   /* I TRE DATI DEL TABACCHINO STANNO SULLA RIGA (set 2026), e non
      nel ricordo per forma: sono di QUESTO ordine, e partono da soli
      verso chi compra appena si sa chi e' (`recapitoDaAutoInvio` li

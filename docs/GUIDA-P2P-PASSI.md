@@ -1486,11 +1486,17 @@ delle leve»). A leva spenta niente di questa sezione esiste.
   accesa «Spento», e sotto: «Se BTC sale o scende oltre la soglia che
   scegli, l'ordine si annulla da solo. Senza penalità.» Toccato il 5%:
   «Se BTC sale o scende più del 5% da adesso, l'ordine si annulla da
-  solo. Senza penalità.» La volta dopo il foglio si apre con l'ultima
-  scelta. Con un ordine Barattozon la sezione non c'è.
+  solo. Senza penalità.» La volta dopo il foglio riparte da «Spento»:
+  la scelta vale per un ordine solo (dal 13 ott sera). Con un ordine
+  Barattozon la sezione non c'è.
 - 📱 In «I miei scambi», sulla card dell'ordine pubblicato, sotto
   «Ordine pubblicato»: «**🪂 Paracadute 5%**». Lo vede solo chi l'ha
-  pubblicato.
+  pubblicato. La stessa riga sta sulla SUA card nel libro (una vendita
+  si trova nel tab «Compra BTC»), sopra «È il tuo ordine — tocca per
+  aprirlo».
+- 📱 Nella pagina del suo ordine: «🪂 Paracadute 5%: se BTC sale o
+  scende più del 5% da 100.000 €, l'ordine si annulla da solo. Senza
+  penalità.» (il prezzo è quello del momento della pubblicazione).
 
 **Quando il prezzo si muove oltre la soglia** (due letture di fila, a
 un minuto l'una dall'altra, e solo se nessuno l'ha ancora preso).
@@ -1516,7 +1522,8 @@ un minuto l'una dall'altra, e solo se nessuno l'ha ancora preso).
   campi di prima: a prezzo fisso gli stessi euro e i sats rifatti al
   prezzo di adesso (50.000 sats a 100.000 € diventano 53.191 a 94.000
   €), a mercato tutto com'era. Non pubblica da solo: si rilegge e si
-  tocca «Pubblica ordine».
+  tocca «Pubblica ordine». Il paracadute nel foglio è acceso sulla
+  soglia dell'ordine di prima (qui sì: è una scelta già fatta).
 
 **Se lo prendono prima, o da un'altra app.**
 - Preso PRIMA che la soglia scatti: il paracadute non fa niente, lo

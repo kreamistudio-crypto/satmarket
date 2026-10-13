@@ -47239,8 +47239,9 @@ def _presa_in_pausa_p2p(con, tg_id, quando: int) -> bool:
 #    cancellare gli ordini di tutti. E UNA FONTE MUTA NON APRE NIENTE: una
 #    lettura piu' vecchia di P2P_PARACADUTE_FRESCO_S non si conta — in
 #    quel buco l'ordine non e' protetto, e «Info P2P» lo dice.
-# 4) SPENTO DI SERIE nel foglio che pubblica; il telefono ricorda
-#    l'ultima scelta.
+# 4) SPENTO DI SERIE nel foglio che pubblica, e SEMPRE: il telefono non
+#    ricorda la scelta di prima (13 ott 2026, sera, dalla prova di Andrea:
+#    un paracadute che nessuno ha scelto annulla un ordine).
 # UN ORDINE PRESO NON SI TOCCA: l'orologio guarda solo quelli `pending` e
 # senza una presa in corso; se l'ordine torna nel libro il paracadute e'
 # di nuovo armato, col prezzo della pubblicazione.
@@ -47412,6 +47413,51 @@ def _preso_adesso_p2p(con, ordine: str) -> bool:
     return bool(presa) and presa >= fine
 
 
+# I MOMENTI CHE TOLGONO UN ORDINE DAL LIBRO PER SEMPRE, nel vocabolario
+# della cronaca (`_momento_evento_p2p`): annullato (anche a mano, da chi
+# l'aveva pubblicato), scaduto senza che nessuno lo prendesse, rilasciato,
+# concluso. `tornato` NO: quello l'ordine nel libro ce lo riporta.
+P2P_MOMENTI_FUORI_LIBRO = ("annullato", "scaduto", "rilasciato", "concluso")
+
+
+def _fuori_per_cronaca_p2p(con, ordine: str) -> bool:
+    """PURA SULLA CONNESSIONE: per la cronaca di mostrod quest'ordine e'
+    USCITO DAL LIBRO? Un fatto che lo toglie per sempre, senza un ritorno
+    in vetrina dopo. E' LA SECONDA GUARDIA del paracadute (13 ott 2026,
+    sera, richiesta di Andrea: «non deve mai scattare su un ordine che non
+    e' piu' nel libro»): `p2p_ordini.stato` lo scrive il libro, che arriva
+    entro un minuto e puo' restare indietro o muto; mostrod racconta entro
+    un secondo. Senza questa riga un ordine annullato a mano, col libro
+    indietro, si apriva e mandava l'avviso — visto rosso nelle prove."""
+    segni = ",".join("?" * len(P2P_MOMENTI_FUORI_LIBRO))
+    try:
+        r = con.execute(
+            f"SELECT MAX(CASE WHEN momento IN ({segni}) THEN quando END), "
+            "MAX(CASE WHEN momento='tornato' THEN quando END) "
+            "FROM p2p_momenti WHERE ordine=? AND fonte='mostro'",
+            list(P2P_MOMENTI_FUORI_LIBRO) + [ordine]).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    fuori, tornato = int((r and r[0]) or 0), int((r and r[1]) or 0)
+    return bool(fuori) and fuori >= tornato
+
+
+def _libro_letto_p2p(riga) -> bool:
+    """PURA: la passata del libro di QUESTO battito ha letto davvero? Da
+    quel che ha scritto in `_P2P_CONTO["libro"]`: no se e' stata
+    abbandonata o saltata, e no se NESSUN relay ha risposto (tutti `✗` nel
+    conto di `_conto_relay_p2p`). E' LA TERZA GUARDIA del paracadute: su
+    uno stato del libro che non e' di adesso non si giudica nessuno — il
+    giro di quel minuto si salta, e le letture contate restano dov'erano."""
+    riga = str(riga or "")
+    if riga in ("ABBANDONATA", "SALTATA"):
+        return False
+    if "[" in riga and riga.endswith("]"):
+        voci = [v for v in riga[riga.rindex("[") + 1:-1].split(" · ") if v]
+        return any(not v.endswith("✗") for v in voci)
+    return True
+
+
 def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
     """UNA PASSATA DELL'OROLOGIO sui paracadute chiusi: una lettura del
     prezzo su ogni ordine ancora NEL LIBRO (`pending`), pubblicato da chi
@@ -47421,7 +47467,11 @@ def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
     COMMITTA. A leva spenta, o senza le tabelle, non fa niente.
     UN ORDINE CHE ESCE DAL LIBRO AZZERA IL CONTO: preso, o non piu'
     `pending`, le letture oltre soglia contate fin li' non valgono piu' —
-    se torna nel libro ne servono di nuovo due DI FILA, da capo."""
+    se torna nel libro ne servono di nuovo due DI FILA, da capo.
+    LA RIGA RESTA in tabella anche dopo, con `aperto = 0`: vuol dire «mai
+    aperto», non «armato». A tenerla ferma sono lo stato del libro
+    (`pending` o niente), la presa in corso e l'uscita raccontata da
+    mostrod (`_fuori_per_cronaca_p2p`)."""
     if not P2P_PARACADUTE:
         return []
     try:
@@ -47436,7 +47486,8 @@ def _passata_paracadute_p2p(con, prezzo, letto, adesso: int) -> list:
     aperti, toccati = [], 0
     for r in righe:
         if (r[9] != "pending" or _tabacchino_libro(_metodi_lista_p2p(r[6]))
-                or _preso_adesso_p2p(con, r[0])):
+                or _preso_adesso_p2p(con, r[0])
+                or _fuori_per_cronaca_p2p(con, r[0])):
             if int(r[4] or 0):
                 toccati += con.execute(
                     "UPDATE p2p_paracadute SET oltre=0 WHERE ordine=? AND aperto=0",
@@ -47568,6 +47619,10 @@ async def _giro_paracadute_p2p():
     suo ordine: da li' lo ripubblica al prezzo nuovo, e aprendo l'app il
     telefono firma il `cancel`."""
     if not P2P_PARACADUTE:
+        return
+    # IL LIBRO NON LETTO IN QUESTO BATTITO (13 ott 2026, sera): su uno
+    # stato che non e' di adesso non si apre e non si avvisa nessuno
+    if not _libro_letto_p2p(_P2P_CONTO.get("libro")):
         return
     con = db()
     try:

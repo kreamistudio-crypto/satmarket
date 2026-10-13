@@ -33,6 +33,10 @@ cache del cambio, scritta dal collaudo: nessuna chiamata a nessuno.
   7. LA PRESA ARRIVATA DOPO L'APERTURA (da un'altra app): la riga sotto
      l'avviso della presa, e lasciarla scadere non costa niente;
   8. L'EVENTO DELLA PRESA ARRIVATO TARDI: l'apertura si disfa;
+  8-bis. L'ORDINE CHE NON E' PIU' NEL LIBRO (13 ott 2026, sera, richiesta
+     di Andrea): annullato a mano o scaduto, col libro ancora indietro,
+     non si apre e non avvisa — vale la cronaca di mostrod; e col libro
+     NON LETTO in quel battito non si giudica nessuno;
   9. «dimentica il profilo» porta via i paracadute.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
@@ -63,6 +67,9 @@ M = "9a7a0000-0f0f-4a2b-9c3d-00000000000f"      # vendita di 111, soglia 5: la f
 C = "9a7a0000-1010-4a2b-9c3d-000000000010"      # vendita di 111, soglia 5: presa un attimo prima
 D = "9a7a0000-1111-4a2b-9c3d-000000000011"      # vendita di 111, soglia 5: presa dopo l'apertura
 E = "9a7a0000-1212-4a2b-9c3d-000000000012"      # vendita di 111, soglia 5: la presa arrivata tardi
+F = "9a7a0000-1313-4a2b-9c3d-000000000013"      # vendita di 111, soglia 5: annullata a mano
+G = "9a7a0000-1414-4a2b-9c3d-000000000014"      # vendita di 111, soglia 5: scaduta nel libro
+H = "9a7a0000-1515-4a2b-9c3d-000000000015"      # vendita di 111, soglia 5: il libro non letto
 _TAG = re.compile(r"</?[bi]>")
 BOTTONI = []                                    # (destinatario, bottone) di ogni notifica
 
@@ -199,7 +206,9 @@ def semina_ordini():
             (BZ, PUBBLICA, "sell", ["Contanti al tabacchino 23.47"]),
             (ALTRUI, PASSA, "sell", ["SEPA"]), (N1, NATIVA, "buy", ["SEPA"]),
             (M, PUBBLICA, "sell", ["SEPA"]), (C, PUBBLICA, "sell", ["SEPA"]),
-            (D, PUBBLICA, "sell", ["SEPA"]), (E, PUBBLICA, "sell", ["SEPA"])):
+            (D, PUBBLICA, "sell", ["SEPA"]), (E, PUBBLICA, "sell", ["SEPA"]),
+            (F, PUBBLICA, "sell", ["SEPA"]), (G, PUBBLICA, "sell", ["SEPA"]),
+            (H, PUBBLICA, "sell", ["SEPA"])):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
                     "metodi) VALUES(?,?,?,'pending',?,1,50000,'50,00 €',?)",
                     (ordine, chi, adesso, lato, json.dumps(metodi)))
@@ -405,6 +414,45 @@ async def giro_intero():
     prova("...e lui non lo trova piu' fra gli aperti: il suo telefono non annulla niente",
           (0, False), (miei(PUBBLICA)["ordini"][E]["aperto"],
                        E in (await facce(PRENDE, [E]))["paracadute"]))
+
+    print("\n8-bis) l'ordine che non e' piu' nel libro")
+    prezzo(100000)
+    await intesta(PUBBLICA, {F: 5, G: 5, H: 5})
+    prova("i tre nascono col paracadute chiuso, al prezzo di adesso",
+          [(5, 100000.0, 0, 0)] * 3, [riga(o)[:4] for o in (F, G, H)])
+    adesso = int(time.time())
+    await posta(busta(F, "canceled", adesso, "seller", ""))        # annullato a mano
+    await posta(busta(G, "expired", adesso, "mostro", "book"))     # scaduto nel libro
+    con = banco.con_db()
+    stati = [con.execute("SELECT stato FROM p2p_ordini WHERE ordine=?", (o,)).fetchone()[0]
+             for o in (F, G, H)]
+    con.close()
+    prova("(il libro e' INDIETRO: per `p2p_ordini` sono ancora tutti e tre `pending`)",
+          ["pending"] * 3, stati)
+    prima = len(BOTTONI)
+    SRV._P2P_CONTO["libro"] = "ABBANDONATA"
+    await giro(70000)
+    await giro(69000)
+    await giro(68000)
+    prova("COL LIBRO NON LETTO in quel battito, a −30% per tre giri, non si giudica "
+          "nessuno: nemmeno H, che nel libro c'e'", [(0, 0)] * 3,
+          [riga(o)[2:4] for o in (F, G, H)])
+    SRV._P2P_CONTO["libro"] = "3 ordini guardati (0 mai visti), 0 eventi [relay.di.cartone 0]"
+    await giro(67000)
+    await giro(66000)
+    await giro(65000)
+    SRV._P2P_CONTO["libro"] = ""
+    prova("A LIBRO LETTO: H si apre alla seconda lettura; l'ordine ANNULLATO A MANO e "
+          "quello SCADUTO no, nemmeno alla terza — li ha gia' raccontati mostrod",
+          (True, 0, 0, 0, 0),
+          (riga(H)[3] > 0, riga(F)[3], riga(G)[3], riga(F)[2], riga(G)[2]))
+    bottoni = [str(b) for _, b in BOTTONI[prima:]]
+    prova("...e l'avviso col bottone parte per H e per lui solo: nessun «🪂 Il paracadute "
+          "si è aperto» su un ordine che non e' piu' nel libro", (1, 0, 0),
+          (sum(H in b for b in bottoni), sum(F in b for b in bottoni),
+           sum(G in b for b in bottoni)))
+    f = await facce(PRENDE, [F, G, H])
+    prova("...e fra gli ordini «col paracadute aperto» c'e' solo H", [H], f["paracadute"])
 
     print("\n9) dimentica il profilo")
     prova("prima ci sono", True, len(miei(PUBBLICA)["ordini"]) > 0)

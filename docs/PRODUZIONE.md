@@ -3542,7 +3542,16 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT ordine, tg_id, soglia, partenza, oltre, aperto, arrivo, superato FROM p2p_paracadute ORDER BY creato DESC LIMIT 20').fetchall())"`
   (`aperto` > 0 = si è aperto a quell'ora, a quel prezzo d'`arrivo`;
   `superato` > 0 = un'apertura disfatta perché l'ordine risultava preso
-  un attimo prima). Quelli aperti che per il libro sono ancora `pending`
+  un attimo prima). ⚠️ `aperto = 0` VUOL DIRE «MAI APERTO», NON «ARMATO»
+  (13 ott 2026, sera, dalla prova di Andrea): la riga resta in tabella
+  anche quando l'ordine è stato annullato, preso, concluso o è scaduto,
+  e da lì non si apre più e non avvisa nessuno — il giro guarda solo gli
+  ordini che il libro dà `pending`, senza una presa in corso e senza
+  un'uscita già raccontata da mostrod, e salta il minuto in cui il libro
+  non è stato letto. Per sapere se una riga è ancora viva si guarda lo
+  stato dell'ordine, non `aperto`:
+  `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute('SELECT p.ordine, p.soglia, p.aperto, o.stato FROM p2p_paracadute p JOIN p2p_ordini o ON o.ordine=p.ordine ORDER BY p.creato DESC LIMIT 20').fetchall())"`
+  Quelli aperti che per il libro sono ancora `pending`
   — cioè il telefono non ha ancora firmato il `cancel`:
   `python3 -c "import sqlite3; c=sqlite3.connect('file:/srv/barattolo/satmarket.db?mode=ro', uri=True); print(c.execute(\"SELECT p.ordine, p.tg_id, p.aperto FROM p2p_paracadute p JOIN p2p_ordini o ON o.ordine=p.ordine WHERE p.aperto>0 AND o.stato='pending'\").fetchall())"`
   Nel journal: `journalctl -u barattolo --since today | grep "Paracadute P2P"`

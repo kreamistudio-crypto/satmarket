@@ -31517,6 +31517,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `p2p_scambi.pausa_presa` va a 1: è la tutela della presa arrivata in
   pausa, e `_esito_chi_pubblica_p2p` non conta niente. Un `preso` già
   superato da un fatto finale non tocca niente.
+  • L'ORDINE CHE NON È PIÙ NEL LIBRO (13 ott 2026, sera): la riga di
+  `p2p_paracadute` RESTA anche dopo, con `aperto = 0` — vuol dire «mai
+  aperto», non «armato». A tenerla ferma sono TRE GUARDIE in
+  `_passata_paracadute_p2p` e nel giro: lo stato del libro (solo
+  `pending`), la presa in corso (`_preso_adesso_p2p`), e l'uscita
+  raccontata da mostrod — `_fuori_per_cronaca_p2p`: un `annullato`,
+  `scaduto`, `rilasciato` o `concluso` in `p2p_momenti` senza un
+  `tornato` dopo (`P2P_MOMENTI_FUORI_LIBRO`). Il libro arriva entro un
+  minuto e può restare indietro; la cronaca arriva entro un secondo. E
+  `_libro_letto_p2p` ferma il giro intero quando la passata del libro di
+  quel battito è stata abbandonata, saltata, o nessun relay ha risposto
+  (lo legge da `_P2P_CONTO["libro"]`): su uno stato che non è di adesso
+  non si apre e non si avvisa nessuno.
   • GLI AVVISI: `_testo_paracadute_p2p` all'apertura, col bottone
   `P2P_BOTTONE_PARACADUTE` che porta a `/p2p?scambio=<id>` (vocabolario
   di sempre: dentro Telegram apre la Mini App);
@@ -31527,9 +31540,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   L'APP SCEGLIE, MOSTRA E FIRMA. Nel motore, il blocco «IL PARACADUTE»
   (zero `fetch`): `paracaduteAttivoP2P`, `sogliaParacaduteP2P`,
   `sezioneParacaduteNuovoP2P` (nel foglio che pubblica dopo la pausa;
-  «Spento» di serie, mai con Barattozon), `ultimoParacaduteP2P` /
-  `ricordaParacaduteP2P` (l'ultima scelta, in `localStorage`: una
-  comodità del dispositivo, mai un fatto), `paracaduteDaCampiP2P`,
+  «Spento» di serie e SEMPRE, mai con Barattozon — la scelta di prima
+  NON si ricorda: dal 13 ott sera `apriNuovoOrdineP2P` riparte da 0 e in
+  `localStorage` non si scrive niente, perché un paracadute che nessuno
+  ha scelto annulla un ordine), `paracaduteDaCampiP2P`,
   `paracaduteDaDichiarareP2P`, `prendiParacaduteP2P`,
   `nascostoPerParacaduteP2P` (in `passaFiltroP2P` e nella fila della
   home; il proprio ordine resta — ⚠️ la PAUSA da `passaFiltroP2P` è
@@ -31538,10 +31552,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   NON torna, e per questo dal libro esce), `mioParacaduteP2P` (vince quel che
   dice il server), `statoParacaduteP2P` / `segnoParacaduteP2P` («🪂
   Paracadute 5%» sulla propria card, poi «aperto» e «annullato dal
-  paracadute»), `riquadroParacaduteP2P` e `ripubblicaParacaduteP2P` (il
-  foglio che pubblica coi campi di prima — a prezzo fisso i sats rifatti
-  sugli stessi euro, `campiRipubblicaP2P`: sats × partenza ÷ cambio di
-  adesso — e NON pubblica da solo). `scegliParacaduteNuovoP2P` scarta il
+  paracadute» — ⚠️ «NEL LIBRO» HA DUE PAROLE: `pubblicato` sulla propria
+  riga e `pending` sull'ordine come lo porta il libro, e il segno legge
+  lo stato dalla PROPRIA RIGA quando c'è: con la sola prima parola la
+  card del libro e il dettaglio non lo dicevano mai, difetto trovato da
+  Andrea sul telefono la sera del 13 ott), `fraseArmatoParacaduteP2P` e
+  `riquadroParacaduteP2P` (nella pagina del proprio ordine: a paracadute
+  chiuso la frase intera, «🪂 Paracadute 5%: se BTC sale o scende più
+  del 5% da 100.000 €, l'ordine si annulla da solo. Senza penalità.» —
+  intera perché «5%» da solo si legge come uno sconto, ed è una SOGLIA
+  sul prezzo di BTC; quando si è aperto, cosa è successo e il tasto) e
+  `ripubblicaParacaduteP2P` (il foglio che pubblica coi campi di prima —
+  a prezzo fisso i sats rifatti sugli stessi euro, `campiRipubblicaP2P`:
+  sats × partenza ÷ cambio di adesso — NON pubblica da solo, e RITROVA
+  la soglia dell'ordine vecchio, accesa nel foglio: è una scelta già
+  fatta su quell'ordine; «sempre da Spento» vale per gli ordini nuovi
+  dal +). LA
+  SOGLIA NON È UN PREMIO: vive in `paracadute`, sulla riga e verso il
+  nostro server, e `ordineDaCampiP2P` — l'ordine che parte per il
+  coordinatore — non la conosce. `scegliParacaduteNuovoP2P` scarta il
   click che arriva entro 700 ms dal gesto del + (`p2pPiuGestoAt`, lo
   stesso orologio di `toccaPiu`): il gesto apre il foglio al rilascio
   del dito e il click cade su quel che il foglio ha messo lì sotto. LO

@@ -159074,6 +159074,7 @@ def prove_paracadute_p2p():
     con.executescript(src[i:src.index("ON p2p_paracadute(tg_id);", i)]
                       + "ON p2p_paracadute(tg_id);")
     for riga in ("P2P_PARACADUTE_LETTURE = ", "P2P_PARACADUTE_FRESCO_S = ",
+                 "P2P_MOMENTI_FUORI_LIBRO = ",
                  "P2P_BOTTONE_PARACADUTE = ", "P2P_MANCATI_FINESTRA_S = ",
                  "P2P_MANCATI_FILTRO_S = ", "P2P_MANCATI_TOLLERATI = ",
                  "P2P_PRESE_APERTE_MAX = ", "P2P_PRESA_APERTA_S = ",
@@ -159100,7 +159101,8 @@ def prove_paracadute_p2p():
               "_metodi_lista_p2p", "_blocco_dispute_fino_p2p", "_riga_disputa_persa_p2p",
               "_soglia_paracadute_p2p", "_scarto_paracadute_p2p", "_passo_paracadute_p2p",
               "_dichiara_paracadute_p2p", "_paracadute_p2p", "_miei_paracadute_p2p",
-              "_preso_adesso_p2p", "_passata_paracadute_p2p", "_presa_a_paracadute_p2p",
+              "_preso_adesso_p2p", "_fuori_per_cronaca_p2p", "_libro_letto_p2p",
+              "_passata_paracadute_p2p", "_presa_a_paracadute_p2p",
               "_segna_presa_paracadute_p2p", "_euro_btc_p2p", "_testo_paracadute_p2p",
               "_riga_paracadute_presa_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
@@ -159333,8 +159335,35 @@ def prove_paracadute_p2p():
            passata(sqlite3.connect(":memory:"), 1, t[0], t[0]),
            miei(sqlite3.connect(":memory:"), P)])
 
-    # --- 5) L'ORDINE PRESO UN ATTIMO PRIMA DELLA SOGLIA -------------------
+    # --- 4-bis) L'ORDINE CHE NON E' PIU' NEL LIBRO (13 ott 2026, sera,
+    # richiesta di Andrea dalla prova sul telefono: «non deve mai scattare
+    # ne' mandare avvisi su un ordine che non e' piu' nel libro»). La riga
+    # del paracadute RESTA in tabella con `aperto = 0` anche dopo — vuol
+    # dire «mai aperto», non «armato» — e a tenerla ferma sono tre guardie:
+    # lo stato del libro, la cronaca di mostrod (che arriva entro un
+    # secondo, quando il libro puo' essere indietro di un minuto o muto), e
+    # il libro NON LETTO in quel battito.
     _tag = _re.compile(r"</?[bi]>")
+    fuori = {s: ordine() for s in ("canceled", "expired", "success", "in-progress",
+                                   "waiting-payment", "waiting-buyer-invoice", "active",
+                                   "fiat-sent", "dispute")}
+    dich(con, P, {o: 5 for o in fuori.values()}, t[0], 100000)
+    for s, o in fuori.items():
+        con.execute("UPDATE p2p_ordini SET stato=? WHERE ordine=?", (s, o))
+        con.execute("UPDATE p2p_paracadute SET oltre=1 WHERE ordine=?", (o,))
+    prova("ANNULLATO, SCADUTO, CONCLUSO, PRESO (in ogni suo stato): a −30%, tre giri di "
+          "fila, non si apre NESSUNO — e nessuno finisce fra gli ordini col paracadute aperto",
+          [[], [], [], [0] * 9, []],
+          [giro(70000, solo=list(fuori.values())), giro(70000, solo=list(fuori.values())),
+           giro(70000, solo=list(fuori.values())), [para(o)[3] for o in fuori.values()],
+           aperti_lista(con, list(fuori.values()))])
+    prova("...e a chi l'aveva pubblicato quelli annullati, scaduti e conclusi non tornano "
+          "piu' fra i suoi: il telefono non ha niente da annullare",
+          [False, False, False],
+          [fuori[s] in miei(con, P) for s in ("canceled", "expired", "success")])
+    prova("...il conto delle letture oltre soglia di un ordine PRESO torna a zero: se "
+          "rientra nel libro ne servono di nuovo due di fila", 0, para(fuori["in-progress"])[2])
+    # --- 5) L'ORDINE PRESO UN ATTIMO PRIMA DELLA SOGLIA -------------------
     amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = True
     amb["_P2P_FOTO"]["info"] = {"kind": 38385, "tags": [
         ["d", "x"], ["expiration_seconds", "1800"],
@@ -159461,6 +159490,45 @@ def prove_paracadute_p2p():
     prova("un ordine concluso, annullato o scaduto esce dai «miei»", False,
           (con.execute("UPDATE p2p_ordini SET stato='canceled' WHERE ordine=?", (o1,)),
            o1 in miei(con, P))[1])
+
+    # IL LIBRO E' INDIETRO: per `p2p_ordini` l'ordine e' ancora `pending`,
+    # ma mostrod ha gia' raccontato che e' stato annullato (a mano, da chi
+    # l'aveva pubblicato) o che e' scaduto senza che nessuno lo prendesse
+    o_ann, o_sca, o_ril, o_rit = ordine(), ordine(), ordine(), ordine()
+    dich(con, P, {o_ann: 5, o_sca: 5, o_ril: 5, o_rit: 5}, t[0], 100000)
+    ev(o_ann, "canceled", "seller", "", t[0] + 1)
+    ev(o_sca, "expired", "mostro", "book", t[0] + 1)
+    ev(o_ril, "taken", "buyer", "invoice-next", t[0] + 1)
+    ev(o_ril, "released", "seller", "", t[0] + 2)
+    ev(o_rit, "taken", "buyer", "invoice-next", t[0] + 1)
+    ev(o_rit, "canceled", "buyer", "republished", t[0] + 2)
+    prova("(il banco e' quello giusto: per il libro i quattro sono ancora `pending`)",
+          ["pending"] * 4,
+          [con.execute("SELECT stato FROM p2p_ordini WHERE ordine=?", (o,)).fetchone()[0]
+           for o in (o_ann, o_sca, o_ril, o_rit)])
+    morti = [o_ann, o_sca, o_ril]
+    prova("IL LIBRO E' INDIETRO MA MOSTROD L'HA GIA' DETTO: l'ordine annullato a mano, "
+          "quello scaduto e quello rilasciato NON si aprono, a −30% per tre giri — vale la "
+          "cronaca del coordinatore, che arriva entro un secondo",
+          [[], [], [], [0, 0, 0], [0, 0, 0]],
+          [giro(70000, solo=morti), giro(70000, solo=morti), giro(70000, solo=morti),
+           [para(o)[3] for o in morti], [para(o)[2] for o in morti]])
+    prova("...mentre quello TORNATO nel libro (chi l'aveva preso si e' ritirato) e' di "
+          "nuovo armato, e si e' aperto alla seconda lettura", True, para(o_rit)[3] > 0)
+    letto = amb.get("_libro_letto_p2p") or (lambda riga: None)
+    prova("IL LIBRO NON LETTO IN QUESTO BATTITO non fa giudicare nessuno: passata "
+          "abbandonata, saltata, o nessun relay che risponde — con un relay solo che "
+          "risponde, o senza niente da guardare, si'",
+          [False, False, False, True, True, True, True],
+          [letto("ABBANDONATA"), letto("SALTATA"),
+           letto("3 ordini guardati (0 mai visti), 0 eventi [relay.mostro.network ✗ · nos.lol ✗]"),
+           letto("3 ordini guardati (0 mai visti), 0 eventi [relay.mostro.network ✗ · nos.lol 0]"),
+           letto("3 ordini guardati (1 mai visti), 2 eventi [relay.mostro.network 2]"),
+           letto("niente da guardare"), letto("")])
+    giro_src = codice(pezzo("_giro_paracadute_p2p"))
+    prova("...e il giro dell'orologio lo chiede PRIMA di leggere il prezzo e di avvisare",
+          True, 0 < giro_src.find('_libro_letto_p2p(_P2P_CONTO.get("libro"))')
+          < giro_src.find("_passata_paracadute_p2p("))
     con.close()
 
 
@@ -159527,14 +159595,30 @@ def prove_paracadute_app():
           [True, True],
           ["sezioneParacaduteNuovoP2P(tab) : '';" in foglio,
            "+ quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +" in foglio])
-    prova("...il foglio si apre con l'ULTIMA scelta, i campi la portano, la riga la tiene e "
-          "la ricorda", [True, True, True, True],
-          ["p2pNuovoParacadute = typeof ultimoParacaduteP2P === 'function' ? "
-           "ultimoParacaduteP2P() : 0;" in fn("function apriNuovoOrdineP2P(metodo){"),
+    # (13 ott 2026, sera, EMENDA dalla prova di Andrea sul telefono: il foglio
+    # ripartiva dal 5% dell'ordine di prima, e un paracadute che nessuno ha
+    # scelto ANNULLA un ordine. La scelta ricordata — decisa la mattina — e'
+    # tolta: si riparte sempre da «Spento», e in memoria non si scrive niente)
+    prova("IL FOGLIO SI APRE SEMPRE DA «SPENTO»: nessuna scelta di prima, i campi portano "
+          "quella di adesso e la riga la tiene", [True, True, True],
+          ["p2pNuovoParacadute = 0;" in fn("function apriNuovoOrdineP2P(metodo){"),
            "paracadute: typeof p2pNuovoParacadute === 'number' ? p2pNuovoParacadute : 0,"
            in fn("function campiNuovoP2P(){"),
-           "if (paraOrd) ord.paracadute = paraOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){"),
-           "ricordaParacaduteP2P(campi.paracadute);" in fn("async function inviaNuovoOrdineP2P(confermato){")])
+           "if (paraOrd) ord.paracadute = paraOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){")])
+    prova("...e la scelta NON SI RICORDA da nessuna parte: via le due funzioni, via la "
+          "chiave, e nel motore del paracadute nessuno tocca la memoria del telefono",
+          [0, 0, 0, False],
+          [m.count("ultimoParacaduteP2P"), m.count("ricordaParacaduteP2P"),
+           m.count("barattolo_p2p_paracadute"),
+           "localStorage" in m[m.index("/* ═══ IL PARACADUTE (13 ott 2026"):
+                               m.index("/* ============ fine del paracadute nel motore ============ */")]])
+    # (13 ott 2026, sera, richiesta di Andrea: «quel 5 e' la soglia del
+    # paracadute, non uno sconto: che nel codice non si confondano»)
+    prova("LA SOGLIA NON E' UN PREMIO NE' UNO SCONTO: l'ordine che parte per il "
+          "coordinatore non sa niente del paracadute, e scegliere la soglia non tocca il "
+          "premio", [False, False],
+          ["aracadute" in fn("function ordineDaCampiP2P(v, lato){"),
+           "remio" in fn("function scegliParacaduteNuovoP2P(n){")])
     reg = fn("async function registraOrdiniP2P(ids, pubblicati, presi){")
     prova("l'intestazione lo dichiara dalla stessa porta della zona e del filtro, e NON "
           "manda nessun prezzo: la partenza la scrive il server",
@@ -159721,13 +159805,8 @@ scegliFiltroNuovoP2P(3); const filtroDopo = [p2pNuovoFiltro, RIDISEGNI - ridiseg
 scegliFiltroNuovoP2P(0);
 c.fantasmaFiltro = [filtroSubito, filtroDopo, p2pNuovoFiltro];
 p2pPiuGestoAt = -1e9;
-/* l'ultima scelta, su questo dispositivo */
-c.ricordo = [ultimoParacaduteP2P(), (ricordaParacaduteP2P(10), ultimoParacaduteP2P()),
-             MEMORIA['barattolo_p2p_paracadute'], (ricordaParacaduteP2P(0), ultimoParacaduteP2P()),
-             (ricordaParacaduteP2P(7), MEMORIA['barattolo_p2p_paracadute']),
-             (MEMORIA = {barattolo_p2p_paracadute: '99'}, ultimoParacaduteP2P()),
-             (MEMORIA_ROTTA = true, ricordaParacaduteP2P(5), ultimoParacaduteP2P())];
-MEMORIA_ROTTA = false;
+/* la scelta NON si ricorda: dopo tutti i tocchi la memoria e' vuota */
+c.memoria = Object.keys(MEMORIA);
 /* dai campi, e all'intestazione */
 c.daCampi = [paracaduteDaCampiP2P({paracadute: 5, metodi: ['SEPA']}),
              paracaduteDaCampiP2P({paracadute: 5, metodi: ['Contanti al tabacchino 23.47']}),
@@ -159768,6 +159847,14 @@ c.segno = [segnoParacaduteP2P(MIE[ID2]), segnoParacaduteP2P(MIE[ID]), segnoParac
            segnoParacaduteP2P({id: 'x', stato: 'pubblicato'}),
            (LEVE = {paracadute: false}, segnoParacaduteP2P(MIE[ID2]))];
 LEVE = {paracadute: true};
+/* LA CARD DEL LIBRO (13 ott 2026, sera: il difetto trovato da Andrea sul
+   telefono): l'ordine del libro arriva con lo stato del 38383 — 'pending' —
+   e non con quello della mia riga ('pubblicato') */
+p2pMieiParacadute.solo = {soglia: 20, partenza: 99000, aperto: 0, arrivo: 0};
+c.segnoLibro = [segnoParacaduteP2P({id: ID2, stato: 'pending'}), segnoParacaduteP2P({id: ID, stato: 'pending'}),
+                segnoParacaduteP2P({id: 'solo', stato: 'pending'}), segnoParacaduteP2P({id: 'altrui', stato: 'pending'}),
+                segnoParacaduteP2P({id: 'solo', stato: 'in-progress'}), segnoParacaduteP2P({id: ID3, stato: 'pending'})];
+delete p2pMieiParacadute.solo;
 c.euro = [euroBtcP2P(98450.4), euroBtcP2P(100000), euroBtcP2P(0), euroBtcP2P('x')];
 c.passaggio = [passaggioParacaduteP2P({partenza: 100000, arrivo: 94000}),
                passaggioParacaduteP2P({partenza: 90000, arrivo: 100800}),
@@ -159787,12 +159874,15 @@ const rq = riquadroParacaduteP2P(MIE[ID]);
 c.riquadro = [rq.replace(/<[^>]+>/g, '|'), /onclick="ripubblicaParacaduteP2P\(\)"/.test(rq),
               riquadroParacaduteP2P(MIE[ID3]).replace(/<[^>]+>/g, '|'),
               riquadroParacaduteP2P(Object.assign({}, MIE[ID], {soloVista: true})).replace(/<[^>]+>/g, '|'),
-              riquadroParacaduteP2P(MIE[ID2]), riquadroParacaduteP2P(Object.assign({}, MIE[ID], {mio: false})),
+              riquadroParacaduteP2P(MIE[ID2]).replace(/<[^>]+>/g, '|'), riquadroParacaduteP2P(Object.assign({}, MIE[ID], {mio: false})),
               (LEVE = {paracadute: false}, riquadroParacaduteP2P(MIE[ID]))];
 LEVE = {paracadute: true};
+c.fraseArmato = typeof fraseArmatoParacaduteP2P === 'function'
+  ? [fraseArmatoParacaduteP2P({soglia: 5, partenza: 0}), fraseArmatoParacaduteP2P(null)] : null;
 /* il tasto: il foglio coi campi di prima, al prezzo nuovo */
 p2pOrdineAperto = ID3;
 MIE[ID3] = Object.assign(MIE[ID3], {lato: 'vendo', sats: 50000, euro: 50, premium: 0});
+p2pNuovoParacadute = 0;               /* come lo lascia `apriNuovoOrdineP2P`, che qui e' di cartone */
 ripubblicaParacaduteP2P();
 c.tasto = [p2pLato, ANDATO, APERTO_FOGLIO, p2pNuovoMetodi, p2pNuovoEuro, p2pNuovoFisso, p2pNuovoSats,
            p2pNuovoParacadute, CANCEL.length, SENZA_SCOSSA];
@@ -159902,9 +159992,8 @@ console.log(JSON.stringify(c));
     prova("IL CLICK FANTASMA SUL FILTRO: entro 700 ms dal gesto del + «3+ scambi» NON si "
           "accende (e il foglio non si ridisegna); dopo, un tocco vero lo sceglie, e «Tutti» "
           "lo toglie", [[0, 0], [3, 1], 0], c.get("fantasmaFiltro"))
-    prova("L'ULTIMA SCELTA si ricorda su questo dispositivo: spento la prima volta, poi come "
-          "l'hai lasciato — anche «Spento»; una memoria storta o rotta vale spento",
-          [0, 10, "10", 0, "0", 0, 0], c.get("ricordo"))
+    prova("LA SCELTA NON SI RICORDA: dopo tutti i tocchi sul foglio, in memoria non c'e' "
+          "niente", [], c.get("memoria"))
     prova("dai campi: la soglia parte con l'ordine; mai con Barattozon, mai fuori catalogo, "
           "mai a leva spenta", [5, 0, 0, 0, 0], c.get("daCampi"))
     prova("all'intestazione si dichiarano i soli MIEI ordini con una soglia buona, e non "
@@ -159934,6 +160023,16 @@ console.log(JSON.stringify(c));
            'libro</div>',
            '<div class="p2p-box p2p-paracadute">🪂 Annullato dal paracadute</div>', "", ""],
           c.get("segno"))
+    arm = '<div class="p2p-box p2p-paracadute">🪂 Paracadute %d%%</div>'
+    prova("IL SEGNO SULLA CARD DEL LIBRO, dove l'ordine arriva `pending` e non "
+          "«pubblicato»: «🪂 Paracadute 10%» sul mio; come sta, se si e' aperto; anche sul "
+          "telefono che l'ordine non l'ha scritto; MAI su quello di un altro, MAI su uno "
+          "preso — e sul mio gia' annullato vale la mia riga",
+          [arm % 10,
+           '<div class="p2p-box p2p-paracadute">🪂 Paracadute aperto: l\'ordine è uscito dal '
+           'libro</div>', arm % 20, "", "",
+           '<div class="p2p-box p2p-paracadute">🪂 Annullato dal paracadute</div>'],
+          c.get("segnoLibro"))
     prova("i prezzi come si leggono", ["98.450 €", "100.000 €", "—", "—"], c.get("euro"))
     prova("il passaggio: da quanto a quanto, e di quanto — in discesa e in salita",
           ["BTC è passato da 100.000 € a 94.000 € (−6,0%)",
@@ -159964,10 +160063,26 @@ console.log(JSON.stringify(c));
            "L'ordine è uscito dal libro di Barattolo. Per annullarlo anche sulle altre app "
            "apri Barattolo da dove l'hai pubblicato.||🔁 Ripubblica al prezzo nuovo||"],
           q[2:4])
-    prova("...su un ordine col paracadute ancora chiuso, non mio, o a leva spenta non c'e'",
-          ["", "", ""], q[4:7])
+    # (13 ott 2026, sera, EMENDA: «aprendo la card del mio ordine non c'e'
+    # nessuna dicitura» — la pagina parlava solo a paracadute APERTO)
+    prova("...E A PARACADUTE ANCORA CHIUSO LA PAGINA LO DICE, con la frase intera: e' una "
+          "soglia sul prezzo di BTC, col prezzo di partenza — non uno sconto",
+          "||🪂 Paracadute 10%: se BTC sale o scende più del 10% da 99.000 €, l'ordine si "
+          "annulla da solo. Senza penalità.||", q[4])
+    prova("...su un ordine non mio, o a leva spenta, non c'e'", ["", ""], q[5:7])
+    prova("...e senza il prezzo di partenza (il server non l'ha ancora detto) la frase "
+          "resta vera", ["🪂 Paracadute 5%: se BTC sale o scende più del 5% dal prezzo di "
+                         "quando l'hai pubblicato, l'ordine si annulla da solo. Senza penalità.",
+                         ""],
+          c.get("fraseArmato"))
+    # (13 ott 2026, sera, parola di Andrea: «lì il foglio deve ritrovare la
+    # soglia dell'ordine vecchio: è una scelta già fatta, e la vede prima di
+    # pubblicare. Sempre da Spento vale solo per gli ordini nuovi dal +». Il
+    # banco parte da 0 — come lascia il foglio `apriNuovoOrdineP2P` — e il 10
+    # che si legge dopo lo ha scritto il tasto)
     prova("IL TASTO «🔁 Ripubblica al prezzo nuovo» apre il foglio dal libro, sul lato "
-          "dell'ordine, coi campi di prima e i sats nuovi — e NON pubblica da solo",
+          "dell'ordine, coi campi di prima e i sats nuovi — NON pubblica da solo, e "
+          "RITROVA LA SOGLIA DELL'ORDINE VECCHIO (10%), accesa nel foglio",
           ["vendo", 1, 1, ["SEPA"], "50", True, "53191", 10, 0, True], c.get("tasto"))
     prova("IL CANCEL NON PARTE su un ordine PRESO, su uno senza le chiavi qui, su uno che "
           "non c'e'", [False, False, False, 0], c.get("cancelPreso"))
