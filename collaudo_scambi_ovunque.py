@@ -384,10 +384,10 @@ def esiti_del_client():
 
 
 def evento_coi_moderatori(ordine, azione, ts, attore, dettaglio=None, **extra):
-    """Come `banco.evento`, e in piu' gli avvisi PER I MODERATORI che la
-    rotta degli eventi fa partire subito dopo (`_disputa_evento_p2p`, la
-    stessa chiamata della rotta): lista `(chi, testo)`, o None se
-    l'evento era gia' registrato."""
+    """Come `banco.evento`, e in piu' gli avvisi che la rotta degli
+    eventi fa partire subito dopo, nello stesso ordine: alle PARTI
+    (`_avvisi_evento_p2p`) e poi AI MODERATORI (`_disputa_evento_p2p`).
+    Lista `(chi, testo)`, o None se l'evento era gia' registrato."""
     d = {"v": 1, "order": ordine, "action": azione, "ts": ts,
          "buyer": banco.CHIAVE_COMPRA, "seller": banco.CHIAVE_VENDE,
          "actor": attore, "detail": dettaglio}
@@ -397,7 +397,10 @@ def evento_coi_moderatori(ordine, azione, ts, attore, dettaglio=None, **extra):
     try:
         ev = banco.SRV._evento_p2p_pulito(d, adesso)
         fatto = banco.SRV._registra_evento_p2p(con, ev, adesso)
-        return None if fatto is None else banco.SRV._disputa_evento_p2p(con, ev, fatto, adesso)
+        if fatto is None:
+            return None
+        return (list(banco.SRV._avvisi_evento_p2p(con, ev, fatto, adesso))
+                + list(banco.SRV._disputa_evento_p2p(con, ev, fatto, adesso)))
     finally:
         con.close()
 
@@ -729,6 +732,16 @@ def main():
           ["in_disputa", "in_disputa", True, ["aperta", "compra", "", ""]],
           [voce(V, SBAGLIO, "stato")[0], voce(C, SBAGLIO, "stato")[0],
            any("Disputa P2P" in testo for _, testo in (aperta or [])), riga_disputa(SBAGLIO)[0]])
+    # L'AVVISO A CHI VENDE (13 ott 2026): l'ha aperta chi compra, quindi
+    # la sente chi vende — e gli si dice che puo' rilasciare
+    RIGA = "Se il pagamento ti è arrivato, puoi rilasciare i sats da Barattolo e la disputa si chiude."
+    a_vende = [testo for chi, testo in (aperta or []) if chi == V]
+    a_compra = [testo for chi, testo in (aperta or []) if chi == C]
+    prova("a chi VENDE l'avviso della disputa dice anche che puo' rilasciare; chi l'ha aperta "
+          "non riceve niente",
+          [1, True, True, []],
+          [len(a_vende), "ha aperto una disputa" in "".join(a_vende),
+           "".join(a_vende).endswith("i moderatori vi contatteranno.\n\n" + RIGA), a_compra])
     chiusa = evento_coi_moderatori(SBAGLIO, "released", t + 840, "seller", None,
                                    sats=7300, sats_buyer=7228, sats_seller=7372)
     prova("chi vende rilascia: «rilasciato» per tutt'e due, ed e' un esito del suo gesto",

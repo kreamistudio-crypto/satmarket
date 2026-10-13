@@ -30530,10 +30530,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `vestito: 'allarme'` (il gesto in rosso), `noPrima` (il ripensamento
   sale sopra e veste il pieno) e `poiNo` (quel che il ripensamento fa a
   foglio chiuso: `ripensaConferma`, che è l'`onclick` di `#confNo`,
-  chiude con `navIndietro()` e poi lo lancia). Il server non è stato
-  toccato: `_chiusura_disputa_p2p` leggeva già il `released` di chi
+  chiude con `navIndietro()` e poi lo lancia). Sul server i giudici
+  c'erano già: `_chiusura_disputa_p2p` leggeva il `released` di chi
   vende come chiusura «dalle parti», senza colpe, e l'avviso va a
   `_avvisati_mod_p2p()` (il gruppo degli admin, argomento «dispute»).
+  L'unica riga nuova è in `_testo_evento_p2p`: l'avviso della disputa
+  aperta dall'altra persona, quando chi lo riceve è chi VENDE, finisce
+  con «Se il pagamento ti è arrivato, puoi rilasciare i sats da
+  Barattolo e la disputa si chiude.» (non a chi compra, e non sulla
+  disputa che apre il coordinatore, che resta una frase per tutti e due).
   I MODERATORI LO SANNO (server). `_manda_evento_p2p`, dopo gli avvisi
   alle parti e nella stessa connessione, chiama `_disputa_evento_p2p`
   dentro un `try` suo. Al momento `disputa` nasce la riga in

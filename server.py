@@ -57099,9 +57099,20 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                     + " è passato ai moderatori:</b> il pagamento risulta "
                     "inviato, i sats non sono stati liberati e la garanzia "
                     "sta per scadere. Vi contatteranno.")
+        # A CHI VENDE SI DICE ANCHE LA STRADA CORTA (13 ott 2026, cantiere
+        # disputa-per-sbaglio, parole di Andrea): nello scambio fa17a63d
+        # chi comprava aveva pagato e aperto la disputa per sbaglio, e chi
+        # vendeva — con gli euro gia' in mano — ha letto «vi
+        # contatteranno» e ha aspettato un moderatore. Il coordinatore il
+        # rilascio a disputa aperta lo accetta, e dalla pagina dello
+        # scambio adesso si fa. A chi compra no: non ha niente da
+        # rilasciare. E nemmeno sulla disputa che apre il coordinatore,
+        # qui sopra: e' UNA frase per tutti e due.
         return (f"⚖️ <b>{altro} ha aperto una disputa sullo scambio"
                 + (f" da {cifra}" if cifra else "")
-                + ":</b> i moderatori vi contatteranno.")
+                + ":</b> i moderatori vi contatteranno."
+                + ("\n\nSe il pagamento ti è arrivato, puoi rilasciare i sats da "
+                   "Barattolo e la disputa si chiude." if vende else ""))
     if momento == "payout_fallito":
         motivo = MOTIVI_PAYOUT_P2P.get(dettaglio, "")
         return ("⚠️ <b>Il pagamento dei sats non è passato"

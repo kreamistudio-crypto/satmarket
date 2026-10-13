@@ -1653,7 +1653,10 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   all'altra persona: chi vende può rilasciare i sats e la disputa si
   chiude.»).
 - ✈️ All'altra persona: «⚖️ **<nome> ha aperto una disputa sullo scambio
-  da 50,00 €:** i moderatori vi contatteranno.»
+  da 50,00 €:** i moderatori vi contatteranno.» Se l'altra persona è chi
+  **vende**, dal 13 ott 2026 l'avviso continua, in una riga sua: «Se il
+  pagamento ti è arrivato, puoi rilasciare i sats da Barattolo e la
+  disputa si chiude.»
 - **Chi la gestisce**: i moderatori del coordinatore, cioè lo **staff di
   Barattolo** (quelli col bollino «Staff»). ✈️ Ai moderatori: «⚖️
   **Disputa P2P aperta** sull'ordine <codice>, da **chi compra**.» con

@@ -56436,6 +56436,29 @@ DISPUTA SUL NODO» — `disputa` = `released` e `status` = `success`. Se
 mostrod rispondesse di no (un cant-do), la pagina lo scrive in arancio
 sotto lo stato: quella riga è la cosa da riportare.
 
+**L'AVVISO TELEGRAM A CHI VENDE** (era un notato; Andrea, letto il
+rapporto: «fallo adesso, nello stesso push»). Quando l'altra persona apre
+la disputa e chi riceve l'avviso è chi VENDE, dopo «i moderatori vi
+contatteranno.» c'è una riga sua, con le parole di Andrea: «Se il
+pagamento ti è arrivato, puoi rilasciare i sats da Barattolo e la disputa
+si chiude.» Nel caso `fa17a63d` era la riga giusta al momento giusto: chi
+vendeva aveva gli euro e ha aspettato un moderatore. Sta in
+`_testo_evento_p2p` (`server.py`, la sola riga del server toccata dal
+cantiere), solo sul ramo della disputa aperta da una PERSONA: a chi
+compra no (non ha niente da rilasciare), e non sulla disputa che apre il
+coordinatore (`escrow-deadline`), che è una frase per tutti e due e lo
+resta. PROVA ROSSA PRIMA: le cinque prove nuove in
+`prove_disputa_per_sbaglio` (che così sono 44) scritte e lanciate sul
+server di prima — tre rosse, l'avviso senza la riga — poi la riga, e
+verdi; nel collaudo il passo 15 guarda ora anche gli avvisi alle PARTI,
+dalla stessa strada della rotta (`_avvisi_evento_p2p` e poi
+`_disputa_evento_p2p`): a chi vende l'avviso con la riga, a chi l'ha
+aperta niente (76 controlli). Una prova vecchia teneva la frase intera
+(`prove_p2p_eventi`, «la disputa la sente l'altra parte»): emendata, lì
+la sente chi vende. GUIDA §10 e ARCHITETTURA dicono la riga. Dove più
+sopra questa voce dice che `server.py` non è stato toccato, vale fino a
+qui.
+
 **DA FARE** (notati strada facendo, non fatti):
 - `P2P_DISPUTABILI` contiene `pagamento_ritentato`, che è uno stato del
   DOPO-rilascio: lì mostrod una disputa non la accetta (`dispute.rs`:
@@ -56444,10 +56467,6 @@ sotto lo stato: quella riga è la cosa da riportare.
 - Due verbi per lo stesso gesto: il resto dell'app dice «Libera i sats»
   («Liberi i sats?», «Sats liberati ✅»), qui «Rilascia i sats» per parola
   di Andrea. Da decidere se uniformare, e in che verso.
-- L'avviso Telegram a chi vende quando l'altra persona apre la disputa
-  dice «i moderatori vi contatteranno» e non dice che, se ha ricevuto il
-  pagamento, può rilasciare dalla pagina dello scambio: nel caso
-  `fa17a63d` sarebbe stata la riga giusta al momento giusto.
 - «Aperta per sbaglio?» compare solo sul telefono da cui la disputa è
   partita (`disputaMia` vive in quella memoria): il server sa chi l'ha
   aperta (`p2p_dispute.aperta_da`) e potrebbe dirlo all'archivio.

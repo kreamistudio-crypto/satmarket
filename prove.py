@@ -92013,9 +92013,12 @@ def prove_p2p_eventi():
     arriva("buyer-invoice-added", "buyer", "new-invoice", ORA + 2200, ORD4)
     prova("una fattura NUOVA riapre il campanello: se fallisse anche lei, risuona",
           1, len(arriva("payout-failed", "mostro", "TIMEOUT", ORA + 2300, ORD4)))
-    prova("la disputa la sente l'altra parte, con la cifra",
+    # (13 ott 2026, disputa-per-sbaglio) qui l'ha aperta chi compra: la
+    # sente chi VENDE, e a lui si dice anche che puo' rilasciare
+    prova("la disputa la sente l'altra parte, con la cifra — e chi vende sa che puo' rilasciare",
           [(B, "⚖️ Bruno ha aperto una disputa sullo scambio da 10,00 €: i "
-               "moderatori vi contatteranno.")],
+               "moderatori vi contatteranno.\n\nSe il pagamento ti è arrivato, puoi "
+               "rilasciare i sats da Barattolo e la disputa si chiude.")],
           arriva("dispute-opened", "buyer", "", ORA + 2400, ORD4))
     prova("chi chiede di annullare lo dice all'altro, che puo' anche non fare niente",
           True, "non fare niente, e lo scambio continua"
@@ -159085,6 +159088,40 @@ def prove_disputa_per_sbaglio():
     prova("...e una disputa chiusa dalle parti non segna la colpa a nessuno: serve una decisione a registro",
           True, "AND gesto='decisione' AND esito=? ORDER BY id DESC LIMIT 1" in pezzo("_colpa_disputa_p2p")
           and "if not r:\n            return False" in pezzo("_colpa_disputa_p2p"))
+
+    # --- 1-bis) L'AVVISO TELEGRAM A CHI VENDE (13 ott 2026, stesso push) --
+    # Nel caso fa17a63d chi vendeva ha letto «i moderatori vi
+    # contatteranno» e ha aspettato: aveva gia' gli euro, e bastava un
+    # tocco. L'avviso glielo dice (parole di Andrea). A chi COMPRA no —
+    # non ha niente da rilasciare — e la disputa che apre il coordinatore
+    # resta la stessa frase per tutti e due.
+    _con, amb = _banco_eventi_p2p()
+    try:
+        testo_ev = amb["_testo_evento_p2p"]
+        dati = {"sats": 13603, "euro": "10,00 €", "metodi": "SEPA"}
+        RIGA = ("Se il pagamento ti è arrivato, puoi rilasciare i sats da Barattolo e "
+                "la disputa si chiude.")
+        prova("L'AVVISO della disputa, a chi VENDE: dice anche che puo' rilasciare",
+              "⚖️ <b>Bruno ha aperto una disputa sullo scambio da 10,00 €:</b> i moderatori "
+              "vi contatteranno.\n\n" + RIGA,
+              testo_ev("disputa", "", "vende", dati, nome="Bruno"))
+        prova("...anche senza la cifra e senza il nome",
+              "⚖️ <b>Chi compra ha aperto una disputa sullo scambio:</b> i moderatori vi "
+              "contatteranno.\n\n" + RIGA, testo_ev("disputa", "", "vende", {}))
+        prova("...a chi COMPRA resta com'era: non ha niente da rilasciare",
+              "⚖️ <b>Anna ha aperto una disputa sullo scambio da 10,00 €:</b> i moderatori "
+              "vi contatteranno.", testo_ev("disputa", "", "compra", dati, nome="Anna"))
+        prova("...e la disputa che apre il coordinatore resta UNA frase per tutti e due, senza la riga",
+              [True, False],
+              [testo_ev("disputa", "escrow-deadline", "vende", dati)
+               == testo_ev("disputa", "escrow-deadline", "compra", dati),
+               RIGA in testo_ev("disputa", "escrow-deadline", "vende", dati)])
+        prova("...la riga sta nel server una volta sola, e non dice ne' «escrow» ne' il coordinatore",
+              [1, []],
+              [_SORGENTE.count("Se il pagamento ti è arrivato, puoi rilasciare i sats da "),
+               [w for w in ("escrow", "Mostro", "coordinator", "assicurat") if w in RIGA]])
+    finally:
+        _con.close()
 
     # --- 2) IL BANCO: le funzioni vere, in node ---------------------------
     liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, re.M))
