@@ -45,6 +45,7 @@ class WsCartone:
     mandate = []
     coda = queue.Queue()
     aperte = 0
+    passi = []          # i timeout che l'orecchio chiede alla websocket
 
     def __init__(self, relay, timeout=10, sslopt=None):
         WsCartone.aperte += 1
@@ -53,6 +54,7 @@ class WsCartone:
 
     def settimeout(self, t):
         self.t = t
+        WsCartone.passi.append(t)
 
     def send(self, s):
         WsCartone.mandate.append(json.loads(s))
@@ -73,7 +75,15 @@ def evento(pub, ev_id, contenuto="cifrato"):
             "sig": "d" * 128}
 
 
-def aspetta(cond, ms=3000):
+# IL TETTO DELL'ATTESA NON E' IL TEMPO DELL'ORECCHIO (13 ott 2026, cantiere
+# cassetta-orecchio-sveglio): erano 3000 ms, e 3 secondi era anche la
+# `recv` a vuoto dell'orecchio — un PARI. Una seconda cassetta depositata
+# un attimo dopo l'inizio di una `recv` aspettava tutti e tre i secondi, e
+# la riga «l'orecchio rimanda la REQ» cadeva per qualche millisecondo
+# (una rossa su nove giri sotto carico, cinque verdi su cinque da solo).
+# L'attesa torna appena la condizione e' vera, quindi un tetto largo non
+# costa niente a un giro verde: dieci secondi, venti volte il passo.
+def aspetta(cond, ms=10000):
     fine = time.time() + ms / 1000
     while time.time() < fine:
         if cond():
@@ -161,6 +171,15 @@ def main():
                    and sorted([m for m in WsCartone.mandate if m[0] == "REQ"][-1][2]["#p"])
                    == [PUB_A, PUB_B]),
            WsCartone.aperte))
+    # IL PASSO DELL'ORECCHIO: finche' una `recv` a vuoto non torna
+    # l'orecchio non guarda se le chiavi sono cambiate, quindi quel tempo
+    # e' la finestra in cui la chiave nuova resta FUORI dal filtro — e un
+    # 24133 e' effimero. Non si cronometra (su un runner lento ballerebbe):
+    # si guarda il numero che l'orecchio ha chiesto alla websocket.
+    prova("...e l'orecchio si sveglia almeno una volta al secondo: e' il tempo "
+          "massimo in cui la chiave di una seconda cassetta resta senza ascolto",
+          (True, S.CASSETTA_ORECCHIO_PASSO_S),
+          (0 < S.CASSETTA_ORECCHIO_PASSO_S <= 1, WsCartone.passi[-1] if WsCartone.passi else None))
     WsCartone.coda.put(json.dumps(["EVENT", "cassetta", evento(PUB_B, "4" * 64)]))
     prova("...e adesso la posta di B entra", True,
           aspetta(lambda: c.get(VIA, params={"pub": PUB_B}).json()["n"] == 1))
@@ -257,7 +276,7 @@ def main():
     g = c.get(VIA, params={"pub": PUB_A}).json()
     prova("scaduta: non viva", False, g.get("viva"))
     prova("...e l'orecchio senza cassette si chiude da solo", True,
-          aspetta(lambda: RELAY_CASA not in S._ORECCHI, 4000))
+          aspetta(lambda: RELAY_CASA not in S._ORECCHI))
     S._cassette_chiudi_tutto()
 
     print("\n" + "=" * 58)

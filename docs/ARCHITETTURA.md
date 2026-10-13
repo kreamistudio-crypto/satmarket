@@ -9145,7 +9145,11 @@
   deposita la chiave EFFIMERA del client NIP-46 e i relay
   dell'appuntamento; il server ascolta quei relay per `CASSETTA_VITA_S`
   (600 s) con un thread per relay (`_orecchio_filo`, filtro `#p` di tutte
-  le chiavi in ascolto) e tiene in memoria i kind 24133 per quella
+  le chiavi in ascolto; il filtro si rifa' quando le chiavi cambiano, e
+  l'orecchio se ne accorge solo quando la sua `recv` a vuoto torna:
+  `CASSETTA_ORECCHIO_PASSO_S`, mezzo secondo dal 13 ott 2026 — erano 3
+  cablati, cioe' fino a tre secondi di una seconda cassetta fuori dal
+  filtro) e tiene in memoria i kind 24133 per quella
   chiave; `GET /api/login/nostr/cassetta?pub=&dopo=` li consegna alla
   pagina, che li apre con la chiave privata mai uscita dal browser. È la
   cura per iOS che sospende la pagina e chiude le websocket mentre si

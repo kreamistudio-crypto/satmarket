@@ -9988,6 +9988,16 @@ CASSETTA_EVENTI_MAX = 40       # eventi tenuti per cassetta
 CASSETTA_RELAY_MAX = 6         # relay per cassetta: quelli di una URI
 CASSETTA_ORECCHI_MAX = 20      # relay distinti in ascolto, in tutto
 CASSETTA_ORECCHIO_RIPOSO_S = 60   # senza cassette, l'orecchio si chiude
+# IL PASSO DELL'ORECCHIO (13 ott 2026, cantiere cassetta-orecchio-sveglio,
+# dal collaudo che ballava): quanto dura al massimo una `recv` a vuoto.
+# L'orecchio guarda se le chiavi in ascolto sono cambiate SOLO quando la
+# `recv` torna, quindi questo numero e' il tempo in cui la chiave di una
+# SECONDA cassetta sullo stesso relay resta fuori dal filtro. Erano 3
+# secondi (misurati: da 0,02 a 2,83, mediana 2,26): un firmatario che
+# approva da solo risponde prima, e un 24133 e' effimero — su un relay
+# che non lo conserva, perso. Mezzo secondo costa due risvegli al
+# secondo per relay in ascolto (venti relay al massimo).
+CASSETTA_ORECCHIO_PASSO_S = 0.5
 _CASSETTE: dict[str, dict] = {}   # pub effimera -> la cassetta
 _ORECCHI: dict[str, dict] = {}    # relay -> {"stato", "da", "perche", "ferma"}
 _CASSETTE_LOCK = threading.Lock()
@@ -10127,7 +10137,7 @@ def _orecchio_filo(relay: str):
         try:
             ws = _cassetta_connetti(relay, timeout=10,
                                     sslopt={"cert_reqs": ssl.CERT_NONE})
-            ws.settimeout(3)
+            ws.settimeout(CASSETTA_ORECCHIO_PASSO_S)
             since = int(time.time()) - CASSETTA_VITA_S
             filtro = list(pubs)
             ws.send(json.dumps(["REQ", "cassetta", {

@@ -114080,6 +114080,18 @@ def prove_cassetta_nip46():
     prova("in collaudo verso un relay che non e' di casa non si esce "
           "(la regola di sempre, `lettura_simulata`)", True,
           'lettura_simulata(relay, "della cassetta NIP-46 (24133)")' in blocco)
+    # IL PASSO DELL'ORECCHIO (13 ott 2026, cassetta-orecchio-sveglio): la
+    # `recv` a vuoto durava 3 secondi cablati, e per tutto quel tempo la
+    # chiave di una seconda cassetta sullo stesso relay restava fuori dal
+    # filtro. Ora e' una costante col suo nome, e non piu' di un secondo.
+    passo = re.search(r"\nCASSETTA_ORECCHIO_PASSO_S = ([0-9.]+)\n", blocco)
+    prova("l'orecchio si sveglia col suo passo, che e' una costante e non un "
+          "numero cablato nella `recv`", (True, False),
+          ("ws.settimeout(CASSETTA_ORECCHIO_PASSO_S)" in blocco,
+           bool(re.search(r"ws\.settimeout\(\s*[0-9]", blocco))))
+    prova("...e il passo non supera il secondo: e' la finestra in cui una "
+          "chiave nuova resta senza ascolto", True,
+          bool(passo) and 0 < float(passo.group(1)) <= 1)
     prova("il nome del relay si RISOLVE e un indirizzo non pubblico si "
           "rifiuta: la cassetta non e' una porta per bussare dentro casa",
           (True, True), ("socket.getaddrinfo(host, None)" in blocco,
@@ -139830,8 +139842,34 @@ def prove_negozi_grandi():
             return ne.riconcilia_connettore(con_, CONN, ne.traduci(prodotti, "woo", CAMBIO),
                                             salva, {}, **kw)
 
-    vero_respira, vera_famiglia = ne._respira, ne._scrivi_famiglia
+    # L'OROLOGIO DEL GIRO E' DI CARTONE (13 ott 2026, cantiere cassetta-
+    # orecchio-sveglio, richiesta di Andrea: «misura invece di cronometrare»).
+    # Le tre prove sul QUANTO respira dormivano davvero (0,15 s una foto, 0,05
+    # e 0,3 una scrittura) e poi guardavano l'orologio vero con delle soglie —
+    # «meno di 50 millesimi», «fra 45 millesimi e il tetto». Su una macchina
+    # carica una scrittura vera ne dura di piu', e una riga rossa fermava il
+    # push di chiunque (una su sei suite intere, la notte del 12 ott; cinque
+    # verdi su cinque da sola). Il giro legge `time.monotonic` dal SUO
+    # modulo: qui gli si da' un orologio che avanza solo quando lo dice il
+    # banco — tanto per una foto, tanto per una scrittura — e il respiro
+    # diventa un NUMERO ESATTO, uguale su ogni macchina. `time()` e `sleep`
+    # restano quelli veri.
+    class _OrologioDelGiro:
+        def __init__(self):
+            self.t = 1000.0
+
+        def monotonic(self):
+            return self.t
+
+        def avanti(self, secondi):
+            self.t += secondi
+
+        def __getattr__(self, nome):
+            return getattr(time, nome)
+    orologio = _OrologioDelGiro()
+    vero_respira, vera_famiglia, vero_tempo = ne._respira, ne._scrivi_famiglia, ne.time
     ne._respira = respiro_finto
+    ne.time = orologio
     try:
         db_j = banco_db()
         con_j = db_j()
@@ -139845,27 +139883,35 @@ def prove_negozi_grandi():
         pause.clear()
 
         def foto_lenta(annuncio_id, i, u):
-            time.sleep(0.15)
+            orologio.avanti(0.15)            # una foto: 150 millesimi fuori dal database
             return f"a{annuncio_id}_{i}.jpg"
+
+        def famiglia_che_costa(*a):
+            orologio.avanti(0.02)            # la scrittura: 20 millesimi dentro
+            return vera_famiglia(*a)
+        ne._scrivi_famiglia = famiglia_che_costa
         riconcilia_j(con_j, [con_foto(50)], foto_lenta)
-        prova("...il respiro misura il tempo DENTRO il database, non gli scaricamenti", True,
-              len(pause) == 1 and pause[0][0] < 0.05)
+        ne._scrivi_famiglia = vera_famiglia
+        # due foto da 150 e una scrittura da 20: se gli scaricamenti
+        # contassero il respiro sarebbe il tetto (0,1), non 0,02
+        prova("...il respiro misura il tempo DENTRO il database, non gli scaricamenti",
+              [0.02], [s for s, _ in pause])
         # proporzionale: tanto quanto la riga ha tenuto il lucchetto...
         pause.clear()
 
         def famiglia_lenta(*a):
-            time.sleep(0.05)
+            orologio.avanti(0.05)
             return vera_famiglia(*a)
         ne._scrivi_famiglia = famiglia_lenta
         riconcilia_j(con_j, [semplice(60)])
         ne._scrivi_famiglia = vera_famiglia
-        prova("...tanto quanto la riga ha tenuto il database (qui cinquanta millesimi)", True,
-              len(pause) == 1 and 0.045 <= pause[0][0] < ne.RESPIRO_MAX_S)
+        prova("...tanto quanto la riga ha tenuto il database (qui cinquanta millesimi)",
+              [0.05], [s for s, _ in pause])
         # ...ma al piu' RESPIRO_MAX_S, anche su un disco lentissimo
         pause.clear()
 
         def famiglia_lentissima(*a):
-            time.sleep(0.3)
+            orologio.avanti(0.3)
             return vera_famiglia(*a)
         ne._scrivi_famiglia = famiglia_lentissima
         riconcilia_j(con_j, [semplice(61)])
@@ -139896,7 +139942,9 @@ def prove_negozi_grandi():
               (60, [False, False]), (esito_s.get("spenti"), [t for _, t in pause]))
         con_s.close()
     finally:
-        ne._respira, ne._scrivi_famiglia = vero_respira, vera_famiglia
+        ne._respira, ne._scrivi_famiglia, ne.time = vero_respira, vera_famiglia, vero_tempo
+    prova("...e l'orologio di cartone e' tornato al suo posto: il modulo del "
+          "giro ha di nuovo quello vero", True, ne.time is time)
 
     # --- K) il rodaggio all'ora: il secchio (1 ott 2026 sera, Andrea) ------
     # «al massimo 100 righe all'ora nelle prime 24 ore, comunque si avvii il

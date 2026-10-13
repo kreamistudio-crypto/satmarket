@@ -54642,3 +54642,101 @@ un paragrafo di testo fra due paragrafi uguali, e la prova ne pinza
 parole e posto. LA CI DI MAIN, guardata prima del push: verde sulla
 punta (`ea93474`), e `pronto` era lì. L'ok al push di Andrea stava
 nella richiesta («push subito solo se è tutto verde»).
+
+## L'orecchio della cassetta si sveglia ogni mezzo secondo, e il respiro del giro si misura con un orologio di cartone: i due collaudi che ballavano (13 ott 2026, notte, cantiere cassetta-orecchio-sveglio, richiesta di Andrea)
+
+**Il caso.** Nel giro dei 69 collaudi prima del push di «Il voto dopo
+il concluso», `collaudo_cassetta_nip46` è uscito rosso UNA volta su una
+riga — «l'orecchio rimanda la REQ con tutte e due le chiavi» — e verde
+cinque volte su cinque rigirato da solo. Andrea: capire se è solo
+l'attesa del collaudo o un vero problema di tempi nel login col bunker.
+
+**Cosa ho trovato: tutte e due le cose, e la seconda è la causa.**
+L'orecchio (`_orecchio_filo`, un thread per relay) guarda se le chiavi
+in ascolto sono cambiate SOLO quando la sua `recv` torna, e a vuoto la
+`recv` durava 3 secondi cablati (`ws.settimeout(3)`). Quindi una
+SECONDA cassetta depositata sullo stesso relay restava fuori dal filtro
+finché quella `recv` non scadeva: MISURATO sul server vero col
+websocket di cartone, quattordici depositi a momenti casuali — da 0,02
+a 2,83 secondi, mediana 2,26. Il collaudo aspettava al massimo 3000 ms:
+un PARI coi 3 secondi dell'orecchio, e cadeva quando il deposito
+capitava un attimo dopo l'inizio di una `recv` (o il runner era lento).
+E NEL LOGIN VERO quei secondi sono una finestra di sordità: se in quel
+momento arriva la risposta del firmatario — un 24133, effimero — il
+relay non la consegna (la chiave non è ancora nel filtro) e, se non la
+conserva, è persa; il `since` della REQ rifatta la ritrova solo sui
+relay che i 24133 li tengono. Serve che ci siano due login col bunker
+sullo stesso relay nello stesso momento, la pagina sospesa, e un
+firmatario che risponde entro tre secondi (uno che approva da solo lo
+fa): stretto, ma vero. NON l'ho visto succedere dal campo.
+
+**La cura.** `CASSETTA_ORECCHIO_PASSO_S = 0.5`, una costante col suo
+nome al posto del 3 cablato: la finestra scende a mezzo secondo
+(misurato dopo: da 0,03 a 0,45, mediana 0,20). Costa due risvegli al
+secondo per relay in ascolto, venti relay al massimo. Nel collaudo: il
+tetto di `aspetta` da 3 a 10 secondi (torna appena la condizione è
+vera: a un giro verde non costa niente; anche la chiusura dell'orecchio,
+che aveva 4 secondi) e una riga nuova che NON cronometra — guarda il
+numero che l'orecchio ha chiesto alla websocket: non più di un secondo.
+In `prove_cassetta_nip46`: la `recv` usa la costante e non un numero, e
+la costante non supera il secondo.
+
+**Scartato.** Allargare solo l'attesa del collaudo (avrebbe zittito una
+cosa vera). Mandare la REQ nuova dal thread della richiesta, sulla
+websocket dell'orecchio (finestra zero, ma due thread sulla stessa
+connessione: più codice e più modi di sbagliare per mezzo secondo).
+Cronometrare il ritardo nel collaudo (su un runner lento ballerebbe:
+è la lezione che ha aperto questo cantiere).
+
+**Provato.** `collaudo_cassetta_nip46` venti volte di fila nella
+gabbia, venti verdi; da solo 38 passate; `prove_cassetta_nip46` 42
+passate; la controprova nel worktree, con ripristino: il passo rimesso
+a 3 e poi il numero cablato nella `recv`, una rossa ciascuno sia nel
+collaudo sia nella sezione. La misura prima e dopo, sopra.
+
+**Resta da guardare.** Su un login vero col bunker niente da fare a
+mano: la finestra era stretta prima ed è più stretta adesso. Se un
+giorno i login insieme sullo stesso relay diventano tanti, la strada
+scartata (la REQ mandata subito) è lì.
+
+**Il secondo ballerino, nello stesso cantiere (richiesta di Andrea:
+«blocca i push di tutti; misura invece di cronometrare»).** Nella suite
+intera di questo cantiere UNA rossa su 23337: `prove_negozi_grandi`,
+«il respiro misura il tempo DENTRO il database, non gli scaricamenti».
+Da sola, cinque verdi su cinque. La prova (del 1 ott, «I negozi
+grandi») dormiva davvero — 0,15 s per foto, 0,05 e 0,3 per una
+scrittura — e poi guardava l'orologio VERO con delle soglie: «meno di
+50 millesimi», «fra 45 millesimi e il tetto». Su una macchina carica
+(quella notte più sessioni giravano e pushavano insieme) una scrittura
+vera su sqlite dura di più, e la soglia cadeva: non un difetto del
+giro, una misura fatta col cronometro. LA CURA, solo in `prove.py`: il
+giro legge `time.monotonic` dal suo modulo (`importa_negozio`), e la
+prova gli mette un OROLOGIO DI CARTONE che avanza solo quando lo dice
+il banco — 150 millesimi una foto, 20 una scrittura, poi 50, poi 300.
+Il respiro diventa un numero ESATTO, uguale su ogni macchina: `[0.02]`
+(due foto da 150 non entrano: se entrassero sarebbe il tetto, 0,1),
+`[0.05]`, `[RESPIRO_MAX_S]`. `time()` e `sleep` restano i veri, e
+l'orologio vero torna al modulo nel `finally`, con la sua prova.
+`importa_negozio.py` non cambia di una riga. PROVATO: la sezione 113
+passate; la controprova sul modulo, con ripristino — il respiro che
+conta anche gli scaricamenti, senza tetto, sempre al tetto — tre prese
+su tre, ognuna dalla riga che parla di lei; dieci giri di fila della
+sezione, dieci verdi.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sopra 865c75b (la punta di main
+all'apertura): con la sola cura della cassetta, la suite severa intera
+23336 passate e UNA rossa (il secondo ballerino qui sopra, che ha
+aperto la seconda metà del cantiere) e i 74 collaudi del workflow nella
+gabbia, 74 verdi; `collaudo_cassetta_nip46` venti volte di fila, venti
+verdi. Poi la cura del respiro, e le due controprove coi ripristini.
+DOPO IL REBASE su ea93474 (cinque commit non miei: la pausa per chi
+è nato su Nostr, la chat che parte subito), col cantiere intero: la
+suite severa INTERA `PROVE_SEVERE=1 python prove.py`, 23367 passate e 0
+fallite; i 74 collaudi dell'elenco del workflow nella gabbia, 74 verdi
+— la condizione di Andrea per il push. Poi main è corso di altri due
+commit (il patto sulla copia cifrata sui relay: tre file, nessuno di
+questo cantiere): rebase su 55a678f, e SULL'ALBERO DEL PUSH le due
+sezioni toccate (`prove_cassetta_nip46`, `prove_negozi_grandi`) e i
+collaudi vicini (`collaudo_cassetta_nip46`, `collaudo_negozi_grandi`,
+`collaudo_connettori`), rigirati prima del push — se questa voce è su
+main erano verdi. La suite intera su quest'ultimo albero la fa la CI.
