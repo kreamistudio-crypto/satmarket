@@ -54628,3 +54628,17 @@ PARTE SOLO ALL'APERTURA DELLO SCAMBIO: se l'app è aperta su un'altra
 pagina (l'elenco, il libro) la chat di quella parte nasce quando apre
 lo scambio, e fino ad allora l'altra persona legge «Si apre appena …
 apre lo scambio».
+
+**IL VERBALE DEL PUSH (13 ott 2026): cosa è girato su quale albero.**
+Main non è corso: al fetch prima del push la punta era ancora
+`ea93474`, la base del cantiere, e nessun rebase è servito. Sull'albero
+del commit (`1a56736`, sopra `ea93474`): la suite intera severa —
+23.366 passate, 0 fallite — e nella gabbia i due collaudi che leggono
+la pagina dei dati (`collaudo_inviti`, `collaudo_tolti_ovunque`),
+verdi; `node` sui tre script della pagina; lo scanner dei segreti a
+zero con la controprova (3 su 3). Gli altri collaudi non leggono il
+patto e li dice la CI. La riga NON è stata guardata in un browser: è
+un paragrafo di testo fra due paragrafi uguali, e la prova ne pinza
+parole e posto. LA CI DI MAIN, guardata prima del push: verde sulla
+punta (`ea93474`), e `pronto` era lì. L'ok al push di Andrea stava
+nella richiesta («push subito solo se è tutto verde»).
