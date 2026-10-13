@@ -9983,6 +9983,11 @@
      sopra il Copia, sul fondo dell'allarme */
   .hint.wos-hold{background:var(--warn-bg);color:var(--ink);border-radius:12px;
     padding:10px 12px;margin:-4px 0 10px;font-weight:600}
+  /* LA RIGA PER CHI PAGA CON PHOENIX nel foglio della garanzia (13 ott
+     2026, phoenix-blocca-sats): in fondo, sotto il Copia e la sua nota,
+     sullo stesso fondo della riga WoS */
+  .hint.phoenix-hold{background:var(--warn-bg);color:var(--ink);border-radius:12px;
+    padding:10px 12px;margin:10px 0 0;font-weight:600}
   .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
@@ -63023,6 +63028,23 @@ function rigaWosHoldP2P(cosa){
   return '<div class="hint wos-hold">💡 Usi Wallet of Satoshi? Con la ' + cosa +
     ' il tasto si blocca su «Elaborazione in corso»: tocca <b>📋 Copia</b> e incolla la richiesta in WoS.</div>';
 }
+/* LA RIGA PER CHI PAGA CON PHOENIX (13 ott 2026, cantiere
+   phoenix-blocca-sats, richiesta di Andrea; il testo e' suo). IL FATTO:
+   chi blocca i sats da Phoenix riceve spesso «commissione insufficiente»
+   — un venditore c'e' riuscito al quarto tentativo, sulla STESSA
+   richiesta. Letto sul nodo: i tentativi falliti non arrivano nemmeno
+   alla fattura, muoiono prima; e letto sul sorgente di Phoenix: quella
+   frase e' la risposta di chi instrada per lui quando non trova la
+   strada in quel momento, e Phoenix non riprova da solo. Non e' una
+   commissione che l'utente possa alzare: l'unica mossa e' riprovare, e
+   la richiesta e' la stessa finche' il cronometro del foglio non finisce
+   (per questo NESSUN NUMERO qui: chi ha preso e chi ha pubblicato hanno
+   tempi diversi, e li dice gia' la riga «⏱ Scade tra»). Solo nel foglio
+   della garanzia. PURA. Lo studio: Cantieri, «Phoenix e i sats da
+   bloccare». */
+function rigaPhoenixHoldP2P(){
+  return '<div class="hint phoenix-hold">💡 Phoenix dice «commissione insufficiente»? Non è colpa tua e non devi cambiare niente: riprova fra un minuto, la richiesta resta valida finché il conto alla rovescia non finisce. Se dopo 3 tentativi non passa ancora, prova con un altro wallet Lightning.</div>';
+}
 function renderCauzioneP2P(o){
   const box = el('p2pHoldCorpo');
   const c = o.cauzione;
@@ -63086,7 +63108,8 @@ function renderHoldP2P(){
     '<div class="hint">Quando i sats sono in garanzia questo foglio si chiude da solo: non c\'è niente da confermare.' +
       /* cosa fare se il wallet non paga (10 ott 2026, reputazione-p2p):
          il server vede che hai provato, non il pagamento fallito */
-      ' Se il pagamento dal wallet non va a buon fine, riprova da qui: il tentativo è registrato e non conta come scambio non completato.</div>';
+      ' Se il pagamento dal wallet non va a buon fine, riprova da qui: il tentativo è registrato e non conta come scambio non completato.</div>' +
+    rigaPhoenixHoldP2P();
   el('p2pHoldInvoice').textContent = o.hold.bolt11;
   orologioHoldP2P(o);
 }

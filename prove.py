@@ -136911,6 +136911,27 @@ def prove_apri_wallet_p2p():
            'class="hint wos-hold"' in wos, any(s in wos for s in ("el(", "document", "fetch(", "localStorage"))])
     prova("...e il suo css sta sul fondo dell'allarme", True,
           ".hint.wos-hold{background:var(--warn-bg)" in mini)
+    # la riga per chi paga con Phoenix (13 ott 2026, phoenix-blocca-sats):
+    # il testo di Andrea, SENZA un numero di minuti (chi prende e chi
+    # pubblica hanno tempi diversi: li dice il cronometro del foglio)
+    pho = nudo(fn("function rigaPhoenixHoldP2P(){"))
+    TESTO_PHOENIX = ("💡 Phoenix dice «commissione insufficiente»? Non è colpa tua e non devi cambiare niente: "
+                     "riprova fra un minuto, la richiesta resta valida finché il conto alla rovescia non finisce. "
+                     "Se dopo 3 tentativi non passa ancora, prova con un altro wallet Lightning.")
+    prova("la riga Phoenix: pura, il testo di Andrea per intero, la sua classe",
+          [True, True, False],
+          ['<div class="hint phoenix-hold">' + TESTO_PHOENIX + "</div>'" in pho, pho.count("return ") == 1,
+           any(s in pho for s in ("el(", "document", "fetch(", "localStorage", "Date.now"))])
+    prova("...corta (sotto i 260 caratteri), senza minuti scritti e senza nominare chi custodisce o chi instrada",
+          [True, False, False],
+          [len(TESTO_PHOENIX) <= 260, bool(re.search(r"\d+ minut", TESTO_PHOENIX)),
+           any(s in TESTO_PHOENIX.lower() for s in ("mostro", "coordinator", "acinq", "nodo"))])
+    prova("...solo nel foglio della garanzia, in fondo, dopo il Copia e la sua nota; la cauzione non ce l'ha",
+          [1, True, False],
+          [mini.count("rigaPhoenixHoldP2P(") - mini.count("function rigaPhoenixHoldP2P(){"),
+           "non conta come scambio non completato.</div>' +\n    rigaPhoenixHoldP2P();\n" in rh, "rigaPhoenixHoldP2P" in rc])
+    prova("...e il suo css sta sullo stesso fondo della riga WoS", True,
+          ".hint.phoenix-hold{background:var(--warn-bg)" in mini)
     prova("...e tutt'e due accendono l'orologio dopo aver scritto la stringa",
           [True, True],
           [rh.rstrip().endswith("el('p2pHoldInvoice').textContent = o.hold.bolt11;\n  orologioHoldP2P(o);\n}"),
@@ -136958,7 +136979,7 @@ def prove_apri_wallet_p2p():
         fn("function scadenzaFoglioP2P(o, modo){"),
         "let p2pHoldScadeIl = 0, p2pHoldOrologio = null;",
         fn("function orologioHoldP2P(o){"), fn("function battitoHoldP2P(){"),
-        fn("function rigaWosHoldP2P(cosa){"),
+        fn("function rigaWosHoldP2P(cosa){"), fn("function rigaPhoenixHoldP2P(){"),
         fn("function renderCauzioneP2P(o){"), fn("function renderHoldP2P(){"),
         "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => "
         "({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));",
@@ -137012,6 +137033,11 @@ out.renderHold = [html.indexOf('id="p2pHoldInvoice"') < html.indexOf('id="p2pHol
 /* la riga WoS (riga-wos): fra «Apri nel wallet» e il Copia, con la parola del foglio */
 out.wosHold = [html.indexOf('id="p2pHoldScadeRiga"') < html.indexOf('wos-hold'), html.indexOf('wos-hold') < html.indexOf('copiaHoldP2P()'),
   html.indexOf('Con la garanzia il tasto si blocca') > 0, html.indexOf('class="btn primary" onclick="copiaHoldP2P()"') > 0];
+/* la riga Phoenix (phoenix-blocca-sats): in fondo al foglio della garanzia */
+out.phoenixHold = [html.indexOf('copiaHoldP2P()') < html.indexOf('phoenix-hold'),
+  html.indexOf('non conta come scambio non completato.') < html.indexOf('phoenix-hold'),
+  html.indexOf('Phoenix dice «commissione insufficiente»?') > 0,
+  html.indexOf('finché il conto alla rovescia non finisce') > 0, html.split('phoenix-hold').length - 1];
 out.holdViva = foto();
 p2pHoldModo = 'cauzione';
 renderHoldP2P();
@@ -137021,6 +137047,7 @@ out.renderCauz = [html2.indexOf('id="p2pHoldInvoice"') < html2.indexOf('id="p2pH
   nodi.p2pHoldInvoice.textContent === V.cauz, nodi.p2pHoldTit.textContent];
 out.wosCauz = [html2.indexOf('id="p2pHoldScadeRiga"') < html2.indexOf('wos-hold'), html2.indexOf('wos-hold') < html2.indexOf('copiaHoldP2P()'),
   html2.indexOf('Con la cauzione il tasto si blocca') > 0, html2.indexOf('class="btn primary" onclick="copiaHoldP2P()"') > 0];
+out.phoenixCauz = html2.indexOf('phoenix-hold') < 0 && html2.indexOf('Phoenix') < 0;
 out.cauzViva = foto();
 /* 3) il battito: viva → morta, il bottone sparisce e l'orologio si ferma */
 const primaFermati = fermati;
@@ -137070,6 +137097,8 @@ console.log(JSON.stringify(out));
           [True, True, True, "🔐 Blocca la cauzione"], o["renderCauz"])
     prova("la riga WoS, nei due render veri: fra «Apri nel wallet» e il Copia in evidenza, con la parola del foglio",
           [[True, True, True, True], [True, True, True, True]], [o["wosHold"], o["wosCauz"]])
+    prova("la riga Phoenix, nel render vero della garanzia: una, in fondo dopo il Copia e la nota, col testo intero; nella cauzione no",
+          [[True, True, True, True, 1], True], [o["phoenixHold"], o["phoenixCauz"]])
     v = o["cauzViva"]
     prova("...cauzione viva: la porta porta la cauzione, e il conto e' il suo",
           ["", "⏱ Scade tra 4:30", "", "lightning:" + CAUZ, False],
