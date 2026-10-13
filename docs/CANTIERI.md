@@ -55090,6 +55090,41 @@ si può tenere il velo fino alla fine); quando l'indirizzo Lightning fa
 partire SOLO rimborsi la frase dice «pagamenti in attesa», che è vero
 ma generico.
 
+**COSA È GIRATO SU QUALE ALBERO** (il verbale del secondo push, 13 ott
+2026). ROSSE PRIMA, VERDI DOPO: le prove nuove fatte girare sul codice
+di prima (`673b918`) danno 37 rosse — 33 in `prove_gesti_ordine` (il
+caso «altrove» di ogni gesto, i casi dell'indirizzo Lightning, le
+sentinelle), le due sezioni il cui banco chiede l'attrezzo nuovo, due
+sentinelle di testo — e sulla cura 0. SUITE SEVERA INTERA, tre corse.
+La prima, con la cura ancora da committare: 23.827 passate e 2 fallite
+— due sentinelle di altre sezioni (`prove_pagamento_incerto`,
+`prove_busta_ritiro`) che cercavano `currentOrder` dentro
+`confirmReceived` e `depositaBusta`: allineate al testo nuovo. La
+seconda, in parallelo alla tortura: 23.830 e 1 fallita, «LA SOCKET
+CADE» in `prove_bunker_muto` (una prova a tempo del NIP-46, non toccata
+da questo cantiere): rigirata da sola tre volte, tre volte verde. La
+terza, da sola, sul commit del cantiere sopra `673b918`: 23.831 passate
+e 0 fallite, e il collaudo toccato verde nella gabbia (71 passi).
+TORTURA sullo stesso albero: 39 mutazioni, 0 sopravvissute (28 prese
+dalle sole prove, 11 anche dal collaudo). GIRO DAL VIVO su due copie di
+cartone — la cura e il codice di prima — con relay morto, pagamenti
+controfigura e la risposta di «segna come spedito» rallentata di un
+secondo e mezzo: sul codice di prima la tenda «incassata» e la lampada
+«spedita» a torto; sulla cura la tenda resta da spedire, il fornello è
+concluso, la sedia è spedita con la lampada a schermo intatta, e chi
+torna alla lista ci resta e legge «Spedito» sullo zaino; ogni volta il
+database dice lo stesso. MAIN È CORSO di otto commit (la copia tolta
+dai relay, la disputa aperta per sbaglio, l'elenco dei collaudi in
+`ci/`, CLAUDE.md, PRODUZIONE): rebase pulito, e nessun commit arrivato
+tocca i gesti dell'ordine (cercato per nome). ALBERO ESATTO DEL PUSH,
+sopra `080f22d` (questo commit compreso), come ha chiesto Andrea — «dopo
+l'ultimo rebase solo sezioni e collaudi toccati, il resto lo fa la
+CI»: le sei sezioni toccate, `prove_collaudi_in_ci` e
+`prove_elenco_dei_collaudi`, il collaudo nella gabbia, `node` sui tre
+script della pagina, lo scanner dei segreti. Il push parte da uno
+script che si ferma al primo rosso: se questa riga è su main, erano
+verdi.
+
 ## L'ordine pubblicato dentro la pausa: la 🔔 che aspetta, la carta grigia nel libro, l'avviso prima di pubblicare (notte fra il 12 e il 13 ott 2026, cantiere libro-vuoto, dal campo di Andrea)
 
 **IL CASO.** Alle 23:33 del 12 ott arriva la 🔔 «1 nuovo ordine nel libro
