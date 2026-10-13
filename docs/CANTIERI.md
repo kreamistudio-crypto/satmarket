@@ -54946,3 +54946,56 @@ così, e resta com'era: stesso valore di ieri); gli undici gesti che
 scrivono sull'ordine aperto lo fanno su quello aperto in quel momento —
 se ne apre un altro mentre la richiesta viaggia, il fatto finisce lì
 (era così; i due che tengono `o` no).
+
+**COSA È GIRATO SU QUALE ALBERO** (il verbale del push, 13 ott 2026).
+PRIMA PARTE, sopra `400a3ea`: la suite severa intera, 23.196 passate e
+0 fallite; 68 collaudi su 68; la tortura, 19 su 19; il giro dal vivo
+coi quattro scatti. L'ok al push stava nel brief, scritto prima del
+lavoro: richiesto a fine lavoro, e Andrea ha risposto «non pushare
+ancora», con la seconda parte.
+SECONDA PARTE, sopra `400a3ea`: le sezioni toccate, il collaudo nuovo
+(anche nella gabbia e col fuso UTC), la tortura (31 su 31, contro prove
+e collaudo), il giro dal vivo con due telefoni.
+MAIN È CORSO QUATTRO VOLTE, tredici commit di altri cantieri: i punti di
+ritiro (`dba8b76`, `b6a7709`, `1e95da2`, `7da34fb`), il voto dopo il
+concluso (`865c75b`), la pausa per chi è nato su Nostr (`827c26b`,
+`f2717b0`), la chat che parte subito (`899f4b8`, `6c03f14`, `ea93474`),
+il patto sulla copia cifrata (`1a56736`, `55a678f`), i due collaudi
+che ballavano (`8caf7eb`, arrivato mentre girava la catena del push:
+fermata, ribasato, rigirata). Conflitti: la coda
+di CANTIERI ogni volta (tenute tutte le voci), e una volta `prove.py`,
+dove due cantieri avevano aggiunto una sezione nello stesso punto
+(tenute tutte e due).
+LA ROSSA. Sul primo albero ribasato (sopra `7da34fb`) la suite severa
+INTERA ha dato 23.376 passate e 1 fallita: il banco node di
+`prove_tracking_facoltativo` esegue `inviaSpedito` vero, che da questo
+cantiere scrive con l'attrezzo, e il banco l'attrezzo non ce l'aveva.
+Difetto del banco, curato (gli si dà quello vero). Le sole sezioni
+toccate NON l'avevano visto: un gesto che cambia vuole la suite intera,
+perché a eseguirlo può essere il banco di un'altra sezione. I 74
+collaudi erano verdi. Andrea aveva scritto «se una sola cosa è rossa,
+fermati e dimmelo»: mi sono fermato, con tutto verde sull'albero dopo
+(sopra `f2717b0`: suite severa intera 23.440 passate e 0 fallite, 75
+collaudi su 75), e l'ok al push è arrivato in risposta.
+ALBERO ESATTO DEL PUSH, sopra `8caf7eb` (questo commit compreso): le
+sezioni del cantiere, quelle toccate dai commit arrivati
+(`prove_chat_scambio`, `prove_p2p_chiavi`, `prove_cassetta_nip46`,
+`prove_negozi_grandi`) e i 75 collaudi del workflow
+nella gabbia; `node` sui tre script della pagina; lo scanner dei
+segreti. La suite intera su quest'albero la dice la CI. Il push parte
+da uno script che si ferma al primo rosso: se questa riga è su main,
+erano verdi. Torture e giri dal vivo sono dell'albero di prima dei
+rebase.
+
+**DA FARE, NON FATTO** (deciso da Andrea il 13 ott). IN UN SECONDO PUSH
+DELLO STESSO CANTIERE, perché toccano i soldi come li vede chi usa
+l'app: l'indirizzo Lightning deve segnare «incassato» solo l'ordine a
+cui l'incasso appartiene, non quello aperto; e gli undici gesti devono
+annotare il fatto sull'ordine che li ha lanciati, anche se nel
+frattempo se ne apre un altro. NON URGENTI, da fare quando si passa di
+lì: il selettore della data di un servizio arriva a un anno mentre il
+server ha il suo tetto (`SERVIZIO_MAX_GIORNI`), e oltre lo dice solo il
+server; nel riquadro dell'appuntamento la frase e il bottone «Confermo,
+ci sono» stanno attaccati, senza respiro; un banco node che esplode fa
+UNA rossa e nasconde il resto della sua sezione (qui trenta prove
+dietro una).
