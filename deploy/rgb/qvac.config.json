@@ -9,7 +9,14 @@
         }
       },
       "consigliami": {
-        "model": "QWEN3_1_7B_INST_Q4",
+        "model": "QWEN3_5_2B_MULTIMODAL_Q4_K_M",
+        "preload": false,
+        "config": {
+          "ctx_size": 8192
+        }
+      },
+      "consigliami-riserva": {
+        "model": "QWEN3_5_0_8B_MULTIMODAL_Q4_K_M",
         "preload": false,
         "config": {
           "ctx_size": 8192

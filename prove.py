@@ -145023,7 +145023,7 @@ def prove_leva_rgb():
     # «chiusura della preparazione»: il cancello RGB qui sopra, la rotta
     # NIP-05 e il pannello non lo nominano, il config d'esempio nemmeno,
     # gli attrezzi di deploy/rgb/ neppure, l'alias di QVAC si chiama
-    # `consigliami` (Qwen3 1.7B, contesto 8192: le due scelte di §4 di
+    # `consigliami` (Qwen3.5 2B dal 13 ott, contesto 8192: §4 e §12.4 di
     # HACKATHON-SETUP) e nessuna rotta disegnata nei due documenti porta
     # `/api/cassiere`. La metafora «LNbits e' il cassiere» del wallet sta
     # in un'altra sezione con un altro senso: non c'entra e non si guarda.
@@ -145045,10 +145045,20 @@ def prove_leva_rgb():
     with open(os.path.join(QUI, "deploy", "rgb", "qvac.config.json"),
               encoding="utf-8") as f:
         modelli = json.load(f)["serve"]["models"]
-    prova("l'alias di QVAC e' `consigliami`: Qwen3 1.7B con 8192 di contesto",
-          ("QWEN3_1_7B_INST_Q4", 8192),
+    prova("l'alias di QVAC e' `consigliami`: Qwen3.5 2B con 8192 di contesto",
+          ("QWEN3_5_2B_MULTIMODAL_Q4_K_M", 8192),
           (modelli.get("consigliami", {}).get("model"),
            modelli.get("consigliami", {}).get("config", {}).get("ctx_size")))
+    # La discesa di §12.4, scritta negli alias: 2B, poi 0.8B, poi 600M.
+    # Il 1.7B del 7 ott non e' nella lista dei mentor e nessun alias lo
+    # nomina piu' (il file resta sul disco del fisso, non serve).
+    prova("...la riserva e' `consigliami-riserva` (Qwen3.5 0.8B, stesso contesto), e l'ultima rete il 600M",
+          ("QWEN3_5_0_8B_MULTIMODAL_Q4_K_M", 8192, "QWEN3_600M_INST_Q4"),
+          (modelli.get("consigliami-riserva", {}).get("model"),
+           modelli.get("consigliami-riserva", {}).get("config", {}).get("ctx_size"),
+           modelli.get("qwen3-600m-inst-q4", {}).get("model")))
+    prova("...e nessun alias porta piu' il 1.7B", [],
+          [a for a, m in modelli.items() if m.get("model") == "QWEN3_1_7B_INST_Q4"])
     prova("...e l'alias `cassiere` non c'e' piu'", False, "cassiere" in modelli)
     for doc in ("HACKATHON-SETUP.md", "STUDIO-HACKATHON-RGB-2026-10.md"):
         with open(os.path.join(QUI, "docs", doc), encoding="utf-8") as f:

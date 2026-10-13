@@ -316,20 +316,57 @@ risposta: cinque varianti provate la sera stessa), che la pagina manda
 già e `consiglio.py` manda dall'8 sera. I dettagli e i comandi in §10,
 punti 2 e 3.
 
+**Cambiato il 13 ott (cantiere piccolo di §13.1): il modello è Qwen3.5
+2B.** In `qvac.config.json` (repo e `C:\Users\Andrea\qvac-prova`) gli
+alias sono tre, e sono la discesa di §12.4:
+
+| Alias | Costante | Contesto | Ruolo |
+|---|---|---|---|
+| `consigliami` | `QWEN3_5_2B_MULTIMODAL_Q4_K_M` (1.281 MB) | 8192 | quello della demo |
+| `consigliami-riserva` | `QWEN3_5_0_8B_MULTIMODAL_Q4_K_M` (533 MB) | 8192 | se il 2B fa capricci: `consigliami-prova.html?model=consigliami-riserva` |
+| `qwen3-600m-inst-q4` | `QWEN3_600M_INST_Q4` (382 MB) | 4096 | l'ultima rete; è il `MODELLO` di `consiglio.py` |
+
+Il 1.7B qui sopra (`QWEN3_1_7B_INST_Q4`) non è nella lista dei mentor e
+nessun alias lo nomina più: il file resta sul disco del fisso e non
+serve. Tutto quel che in questa sezione dice «1.7B» è il verbale del 7 e
+dell'8; i numeri del 2B e dello 0.8B stanno in §12.4. Il primo avvio che
+scarica tutto porta i tre alias: `npx qvac serve --openai --port 11434
+--host 127.0.0.1 --model consigliami --model consigliami-riserva --model
+qwen3-600m-inst-q4`. E **`"reasoning_budget": false` con Qwen3.5 non è
+più solo utile: insieme allo schema è obbligatorio** (senza, HTTP 500);
+`/no_think` NON si usa, dà 500 (§12.4). La pagina e `consiglio.py` lo
+mandano già e non cambiano.
+
 ## 5. Cosa dichiariamo all'arrivo (pre-esistente, NON da giudicare)
 
-Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
+Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento.
+**Riallineata il 13 ott alla bozza di §12.9**, che è questa stessa
+dichiarazione in inglese, per la pull request: le due si tengono pari, e
+quando una cambia cambia l'altra. ⚠️ Le righe che dicono «su Mutinynet»
+raccontano lo stato a migrazione FATTA (§13.4): la mattina del 13 sono
+ancora un impegno, e si confermano la sera, con gli id veri. Le righe
+sul signet sono fatti dall'8 ott, e restano veri: è il piano B (§12.6).
+
+**Cosa c'era prima (NON da giudicare):**
 
 - Barattolo: il mercatino in sats con deposito di garanzia Lightning
   (custodial, LNbits), il P2P non custodial su Mostro, in produzione dal
   10 ottobre, con XP, livelli, due sconti fedeltà, un client NWC nel
   browser (`clientNwc`), le foto su Blossom (lo studio, §0 e parte
   seconda).
-- Una VM su signet con bitcoind, electrs, proxy RGB, rgb-lib Python, il
-  banco `rgb.py` e la sua faccia HTTP `rgb_http.py` sul loopback.
-- Tre asset NIA emessi prima: JAR e MOON (1 ott), USDB (8 ott,
+- Una VM con rgb-lib Python, il banco `rgb.py` e la sua faccia HTTP
+  `rgb_http.py` sul loopback. Prima sul signet pubblico, con bitcoind,
+  electrs e proxy RGB suoi (restano accesi: il piano B); **dal 13 ott su
+  Mutinynet**, coi servizi pubblici di KaleidoSwap (Esplora e proxy).
+- Gli asset di prova, schema NIA, emessi da noi. **Su Mutinynet, il 13
+  ott: USDB e MOON** (gli id nella seconda tabella di §2, dal passo 5 di
+  §13.4); i saldi distribuiti ai nostri wallet di prova il 13 e il 15.
+  Sul signet restano i tre di prima: JAR e MOON (1 ott), USDB (8 ott,
   asset_id in §2).
-- Un wallet utente WDK+RGB (`punti.mjs`) con 60 MOON e 500,00 USDB
+- Un wallet utente WDK+RGB (`punti.mjs`, su `@utexo/wdk-wallet-rgb`).
+  Su Mutinynet: quello di PROVA sul fisso (13 ott) e quello della DEMO
+  sul portatile di Alan (15 ott), ognuno con 500,00 USDB e 60 MOON
+  arrivati dalla VM. Sul signet, dall'8 ott: 60 MOON e 500,00 USDB
   (50.000 unità, tx `ba3523ca5b410c3e71b2a3f04b9662cd
   c97da6c0a71acf4e791aaf70978c6b47` nel blocco 325472 dell'8 ott, id
   spezzato a metà per la guardia dei segreti), che ha già ricevuto e
@@ -345,7 +382,8 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
   relay locale il **16 ott**, dichiarati: esistono come eventi, nessun
   codice di Barattolo li legge prima del 17 (la cura di D.3 punto 0,
   decisa l'8 ott: la riga «Emesso da ✓» si costruisce il sabato).
-- QVAC in locale (Qwen3 1.7B, alias `consigliami`) con `consiglio.py` e
+- QVAC in locale (Qwen3.5 2B, alias `consigliami`; di riserva Qwen3.5
+  0.8B, alias `consigliami-riserva`: §4 e §12.4) con `consiglio.py` e
   la pagina locale `consigliami-prova.html` FUORI dal repo che lo chiama
   con lo schema: propone, non paga.
 - Il disegno: la parte seconda dello studio (campi, nomi dei metodi,
@@ -364,6 +402,31 @@ Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento:
   `/.well-known/nostr.json`, su main dall'8 ott — un cancello chiuso e
   una rotta che risponde vuota finché `NIP05_NOMI` non entra nel
   config del VPS). Quelle si scrivono a Torino, in commit datati.
+
+**Costruito durante l'hackathon (17-18 ott):** tutto quel che sta nella
+pull request, in commit datati. L'elenco si scrive la domenica.
+
+**Strumenti di terzi e fork** (li chiedono gli organizzatori, §12.1):
+
+- RGB: `rgb-lib` 0.3.0-beta.7, i binding Python di RGB-Tools; il
+  protocollo del proxy RGB 0.2.
+- WDK: `@utexo/wdk-wallet-rgb` 2.0.3 con `@utexo/rgb-sdk` 1.0.3 e il
+  binario nativo di UTEXO 0.3.0-beta.8. Dove la glibc è più vecchia
+  della 2.38, `@utexo/rgb-sdk` forzato alla 1.0.6 (binario beta.13) con
+  un `overrides` di npm. Nessuna modifica ai sorgenti.
+- Rete: Mutinynet, dall'Esplora e dal proxy RGB pubblici di KaleidoSwap,
+  e il faucet BTC di Mutinynet. I nostri wallet aprono la catena come
+  `signet` di rgb-lib, l'unica rete che l'adattatore WDK di UTEXO
+  conosce: i nostri asset quindi NON sono compatibili coi wallet di
+  KaleidoSwap e col faucet RGB, che usano `signetcustom`. Un mentor di
+  KaleidoSwap (Arshia) ha confermato il 12 ott che per la giuria
+  dovrebbe andare bene (§12.11). Gli asset del faucet RGB non li usiamo.
+- QVAC: `@qvac/sdk` 0.21.0 e `@qvac/cli` 0.15.0, modello Qwen3.5 2B Q4,
+  riserva Qwen3.5 0.8B.
+- Nostr: `nostr-tools` 2.25.2, e `nak` 0.21.0 come relay locale.
+- Nessun fork nostro.
+- Il codice è scritto con un assistente AI, Claude Code; i commit lo
+  dicono nella riga del coautore.
 
 ## 6. Come si riavvia tutto (il giorno prima e il giorno stesso)
 
@@ -693,7 +756,7 @@ niente al nodo mai. Le stime e i perché nello studio, parte seconda, D.1.
 | 8 ott | La connection string incollata nel Profilo di Barattolo in collaudo (la CSP ammette `ws:`): Andrea, dal suo browser, sul server di collaudo del worktree (porta 8098, config dal solo esempio, identità 111 dall'hash) | ☑ 8 ott: «Incassi e pagamenti → 👛 Wallet NWC → ⚡ Collega»; il log del servizio dice `barattolo: get_info → ok (nip44_v2)` e l'app «wallet collegato», con la nota che manca `pay_invoice` (giusto: la base non ce l'ha). Al primo tentativo il servizio era morto col `nohup` (§6) |
 | 11-12 ott | `rgb_http.py` sulla VM, `127.0.0.1:8787` (salute/saldo/fattura/aggiorna/trasferimenti del wallet `barattolo`), gamba `-L 8787:127.0.0.1:8787` nel tunnel | ☑ 8 ott: copiato e avviato da Andrea (`nohup`), dal tunnel `/salute`, `/saldo` (JAR, 4 UTXO liberi), `/fattura` «qualunque asset» ok e per USDB «AssetNotFound» (lezione 5), corpo storto 400, rotta ignota 404; banco di cartone sul PC in più. **Da fermare la sera** (backup delle 03:30) |
 | 8 ott (era 11-12) | Il commit su main: `RGB_ATTIVO`/`RGB_PROVA_IDS`/`NIP05_NOMI`, il gruppo nel pannello delle leve, `rgb_ammesso`, la rotta `/.well-known/nostr.json`, `prove_leva_rgb` | ☑ 8 ott, su main PRIMA del lancio (decisione di Andrea: è un cancello chiuso e una rotta che risponde `{"names": {}}` finché `NIP05_NOMI` non entra nel config del VPS — le due hex le dà `node identita.mjs pubblica <nome>`); il nome «Cassiere» tolto anche dagli identificatori, con la prova; suite severa e collaudi della CI nel verbale del push (CANTIERI) |
-| 11-12 ott | QVAC: `npm i -g @qvac/cli@latest`, alias `consigliami` → `QWEN3_1_7B_INST_Q4` con `ctx_size 8192`, scaricato; `consigliami-prova.html` FUORI dal repo con `response_format` json_schema e `reasoning_budget: false`; `qvac serve --openai --cors-origin <origine esatta>` | ☑ 8 ott (§4): CLI 0.15.0, 1,06 GB scaricati, pagina provata nel Browser pane col 0.6B e col 1.7B |
+| 11-12 ott | QVAC: `npm i -g @qvac/cli@latest`, alias `consigliami` → `QWEN3_1_7B_INST_Q4` con `ctx_size 8192`, scaricato; `consigliami-prova.html` FUORI dal repo con `response_format` json_schema e `reasoning_budget: false`; `qvac serve --openai --cors-origin <origine esatta>` | ☑ 8 ott (§4): CLI 0.15.0, 1,06 GB scaricati, pagina provata nel Browser pane col 0.6B e col 1.7B. **13 ott**: l'alias `consigliami` passa a `QWEN3_5_2B_MULTIMODAL_Q4_K_M` (stesso contesto), con la riserva `consigliami-riserva` → `QWEN3_5_0_8B_MULTIMODAL_Q4_K_M`; i due modelli scaricati e provati il 12 sera (§4 in fondo, §12.4) |
 | 13 ott | Q&A con le undici domande | ☐ |
 | 14-16 ott | §5 riscritta e stampata; gli schermi su carta; il giro provato tre volte; video di riserva della demo | ☐ |
 | 14-16 ott | **Backup della VM**, **portatile con tutto scaricato** (modelli QVAC, `nak`, pacchetti del wallet), **prova di riavvio completa** di tutta la catena, nell'ordine di §6 e col tunnel a tre gambe: i comandi qui sotto, uno alla volta | ☐ backup e portatile. ☑ **8 ott sera, la prova di riavvio completa** (punto 3) tutta verde dal vivo sul PC fisso (Andrea): NIP-05 dalla rotta, «wallet collegato», `get_info → ok (nip44_v2)`; le quattro correzioni ai comandi sono scritte nei punti 2 e 3. Il riavvio del VPS è fatto |
@@ -1220,8 +1283,9 @@ mkdir -p ~/bin && curl -L -o ~/bin/nak https://github.com/fiatjaf/nak/releases/d
 
 5) **QVAC**, dipendenza LOCALE di `~/qvac-prova` con Node 24 (comando
 `npx qvac …`, mai `qvac` nudo), il `qvac.config.json` di `deploy/rgb/`
-(gli alias `consigliami` → Qwen3 1.7B e `qwen3-600m-inst-q4` → Qwen3
-0.6B), e `consiglio.py` accanto:
+(dal 13 ott tre alias: `consigliami` → Qwen3.5 2B, `consigliami-riserva`
+→ Qwen3.5 0.8B, `qwen3-600m-inst-q4` → Qwen3 0.6B), e `consiglio.py`
+accanto:
 
 ```bash
 source ~/.nvm/nvm.sh && nvm use 24 && mkdir -p ~/qvac-prova && cd ~/qvac-prova && npm init -y > /dev/null && npm install @qvac/sdk@0.21.0 @qvac/cli@0.15.0 && npx qvac --version   # → 0.15.0
@@ -1249,19 +1313,23 @@ nostra richiesta (circa 400 token dentro, 80 fuori) sta in 3-5 s col
 1.7B e 1-2 s col 0.6B, più 10-20 s la prima volta per caricare il
 modello. Con l'Arc su Vulkan si guadagna forse un fattore 2: comodo, non
 necessario. Si misura il 15 dal campo `usage` della risposta e da un
-cronometro.
+cronometro. (Erano le stime dell'8 ott per il 1.7B. Per il Qwen3.5 2B,
+il modello dal 13 ott, la stima è 5-10 secondi a risposta in CPU o
+sull'Arc: §12.4.)
 
-6) **I due modelli, già scaricati.** La strada corta (1,4 GB da
-chiavetta, nessun download): copiare dal PC di Andrea
-`C:\Users\Andrea\.qvac\models` (i due `.gguf`: Qwen3 0.6B Q4_0 da 382 MB
-e Qwen3 1.7B Q4_0 da 1,06 GB, coi loro prefissi) in `~/.qvac/models`
-(stesso percorso e stessi nomi su Linux). L'alternativa con la rete (la
-CLI non ha un comando «scarica»): il primo avvio con i due alias, che li
-scarica subito — provato l'8 ott sera sul PC di Andrea:
+6) **I tre modelli, già scaricati** (dal 13 ott: erano due). La strada
+corta (2,2 GB da chiavetta, nessun download): copiare dal PC di Andrea
+`C:\Users\Andrea\.qvac\models` i tre `.gguf` degli alias — Qwen3.5 2B
+Q4_K_M da 1,28 GB, Qwen3.5 0.8B Q4_K_M da 533 MB, Qwen3 0.6B Q4_0 da
+382 MB, coi loro prefissi — in `~/.qvac/models` (stesso percorso e
+stessi nomi su Linux; il quarto file lì dentro, il 1.7B, non serve più).
+L'alternativa con la rete (la CLI non ha un comando «scarica»): il primo
+avvio coi tre alias, che li scarica subito — provato l'8 ott sera sul PC
+di Andrea coi due alias di allora:
 
 ```bash
-cd ~/qvac-prova && source ~/.nvm/nvm.sh && nvm use 24 && npx qvac serve --openai --port 11434 --host 127.0.0.1 --model consigliami --model qwen3-600m-inst-q4   # scarica, poi resta in ascolto: Ctrl-C quando dice che serve
-ls -la ~/.qvac/models   # → *_Qwen3-0.6B-Q4_0.gguf e *_Qwen3-1.7B-Q4_0.gguf
+cd ~/qvac-prova && source ~/.nvm/nvm.sh && nvm use 24 && npx qvac serve --openai --port 11434 --host 127.0.0.1 --model consigliami --model consigliami-riserva --model qwen3-600m-inst-q4   # scarica, poi resta in ascolto: Ctrl-C quando dice che serve
+ls -la ~/.qvac/models   # → *_Qwen3.5-2B-Q4_K_M.gguf, *_Qwen3.5-0.8B-Q4_K_M.gguf e *_Qwen3-0.6B-Q4_0.gguf
 ```
 
 Il primo `serve` dice nel log quale device ha scelto (`gpu` o `cpu`):
@@ -1320,7 +1388,7 @@ cd ~/qvac-prova && source ~/.nvm/nvm.sh && nvm use 24 && npx qvac serve --openai
 
 e in un secondo terminale `python3 -m http.server 8081` in
 `~/qvac-prova`, poi `http://127.0.0.1:8081/consigliami-prova.html` nel
-browser: «Consigliami» risponde col 1.7B senza scaricare niente (la
+browser: «Consigliami» risponde col 2B senza scaricare niente (la
 prima chiamata carica il modello: ~20 s in CPU; la seconda pochi
 secondi). Sul portatile di Alan NON stanno: il wallet della demo (seme e
 stash), le chiavi SSH della VM, la segreta age, il `.env` della VM, il
@@ -1348,7 +1416,7 @@ Cosa c'è dentro `<chiavetta>/torino/` (2,5 GB), col `MANIFEST.txt`
 | `node/` | `node-v22.23.3-linux-x64.tar.xz` e `node-v24.<ultima>-linux-x64.tar.xz` (sha256 verificate) | nodejs.org |
 | `wdk-prova/` | `node_modules.tar.gz` (`@utexo/wdk-wallet-rgb@2.0.3`, `nostr-tools@2.25.2`, `bip39@3.1.0`, il binario `@utexo/rgb-lib-linux-x64` beta.8 o beta.13 GIÀ COMPILATO, `package.json` e lock) e `versioni.txt` con la variante | `npm install` sulla macchina che prepara |
 | `qvac-prova/` | `node_modules.tar.gz` (`@qvac/sdk@0.21.0`, `@qvac/cli@0.15.0`) e `versione.txt` | `npm install` con Node 24 |
-| `modelli/` | i due `.gguf` di Qwen3 (0.6B e 1.7B Q4_0) | `~/.qvac/models` (o `--modelli-da DIR`) |
+| `modelli/` | i `.gguf` di `~/.qvac/models` (lo script li copia TUTTI). Dal 13 ott servono Qwen3.5 2B, Qwen3.5 0.8B e Qwen3 0.6B; le due chiavette preparate prima portano ancora i due vecchi (0.6B e 1.7B) finché non si rinfrescano (§13.1, punto 4) | `~/.qvac/models` (o `--modelli-da DIR`) |
 | `wheels/` | `rgb_lib-0.3.0b7-py3-none-manylinux_2_34_x86_64.whl` e la ruota di `pip` (per installare SENZA `python3-venv`: `venv --without-pip` + `pip` dalla ruota) | PyPI (senza pip: curl + il JSON di PyPI) |
 | `nak/` | `nak` v0.21.0 linux-amd64 | le release di fiatjaf |
 | `script/` | `punti.mjs`, `nwc-wdk.mjs`, `identita.mjs`, `consiglio.py`, `qvac.config.json`, `mutinynet-wsl.env`, `install-offline.sh` | `deploy/rgb/` |
@@ -2330,7 +2398,8 @@ il loro contenuto mai.
 - Lo studio e le decisioni: §12 intera (12 ott), con le risposte dei
   mentor (12.1, 12.4, 12.8, 12.11).
 - QVAC: Qwen3.5 2B e 0.8B scaricati sul fisso e provati col nostro
-  schema (12.4). Il `qvac.config.json` NON è ancora cambiato.
+  schema (12.4). Il `qvac.config.json` è cambiato il 13 mattina
+  (punto 1 qui sotto, fatto).
 - La chiavetta di riserva: pronta nelle due varianti nelle distro WSL di
   prova (§10), ma coi modelli VECCHI (Qwen3 0.6B e 1.7B).
 - Provato dal vivo, in sola lettura, coi due Esplora (KaleidoSwap e la
@@ -2354,7 +2423,10 @@ eseguita: la sostituisce 13.4.
    pinza la costante del 1.7B; i nomi dei modelli in §4, §5 e §10; il
    messaggio di `identita.mjs` che cita «domenica 11»; la dichiarazione
    di §5 riallineata alla bozza di 12.9. `reasoning_budget: false` NON
-   si tocca (12.4).
+   si tocca (12.4). **☑ Fatto il 13 mattina** (cantiere
+   «migrazione-mutinynet», primo push): l'alias di riserva si chiama
+   `consigliami-riserva`, la prova pinza i tre alias, la tabella in
+   fondo a §4; in §5 le righe su Mutinynet aspettano la sera per gli id.
 2. **La migrazione sul fisso**: 13.4, un passo alla volta.
 3. **Gli id nuovi nei file** (passo 5 di 13.4), poi la lista «15 ott» di
    §10 riscritta per il portatile di Alan come MACCHINA DELLA DEMO, coi

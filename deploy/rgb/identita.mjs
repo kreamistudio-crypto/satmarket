@@ -45,7 +45,7 @@ const RETE = 'signet'
 
 // LA CATENA (9 ott 2026, studio Mutinynet): RGB_CATENA = signet (default) |
 // mutinynet, come in punti.mjs. Gli asset esistono UNA volta per catena
-// (riemessi su Mutinynet domenica 11 ott: id nuovi), e la tabella sotto
+// (riemessi su Mutinynet il 13 ott: id nuovi), e la tabella sotto
 // e' una per catena. Le stesse identita' (stesse chiavi, stesso NIP-05)
 // firmano gli annunci su tutt'e due.
 const CATENA = process.env.RGB_CATENA || 'signet'
@@ -75,8 +75,8 @@ const SCHEDE = {
   }
 }
 // ContractId (senza `rgb:`) → scheda, per catena. Quelli di Mutinynet si
-// incollano domenica 11 ott dopo `rgb.py emetti` (HACKATHON-SETUP §10,
-// la lista di domenica): finche' dicono INCOLLA_QUI nessun id li trova,
+// incollano il 13 ott dopo `rgb.py emetti` (HACKATHON-SETUP §13.4,
+// passo 5): finche' dicono INCOLLA_QUI nessun id li trova,
 // e `annuncio` lo dice chiaro.
 const ASSET_PER_CATENA = {
   signet: {
@@ -175,7 +175,7 @@ const COMANDI = {
     const a = ASSET[id]
     if (!a) {
       const vuoti = Object.keys(ASSET).filter(k => k.startsWith('INCOLLA_QUI'))
-      if (vuoti.length) muori(`asset ${id} sconosciuto: la tabella di ${CATENA} ha ancora ${vuoti.length} segnaposto (${vuoti.join(', ')}): dopo \`rgb.py emetti\` su ${CATENA} si incollano gli id al loro posto (HACKATHON-SETUP §10, domenica 11)`)
+      if (vuoti.length) muori(`asset ${id} sconosciuto: la tabella di ${CATENA} ha ancora ${vuoti.length} segnaposto (${vuoti.join(', ')}): dopo \`rgb.py emetti\` su ${CATENA} si incollano gli id al loro posto (HACKATHON-SETUP §13.4, passo 5)`)
       muori(`asset ${id} sconosciuto: la tabella ASSET di questo file per ${CATENA} conosce ${Object.values(ASSET).map(x => x.ticker).join(', ')} (§2); un asset nuovo si aggiunge li' copiando ticker, nome, precisione e supply dal genesis`)
     }
     if (a.emittente !== nome) muori(`${a.ticker} lo annuncia «${a.emittente}», non «${nome}»: due annunci dello stesso contratto da chiavi diverse nella demo si evitano (studio, D.3 punto 4)`)

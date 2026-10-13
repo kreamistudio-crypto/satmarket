@@ -57771,3 +57771,76 @@ ordine già annullato.
 **COSA È GIRATO.** Solo documenti (questa voce e PRODUZIONE): sull'albero
 del push le sezioni di `prove.py` che leggono i due file; i numeri nel
 messaggio del commit. Il resto lo dice la CI.
+
+## Hackathon, il cantiere piccolo prima della migrazione: `consigliami` passa a Qwen3.5 2B (13 ott 2026, cantiere migrazione-mutinynet, primo push, richiesta di Andrea)
+
+È il punto 1 di HACKATHON-SETUP §13.1, quello che la sessione dello
+studio aveva lasciato scritto e non fatto. Va PRIMA della migrazione a
+Mutinynet e col suo push, perché non tocca nessuna macchina: un file di
+configurazione, una prova, dei testi.
+
+**COSA CAMBIA.** In `deploy/rgb/qvac.config.json`, e nella copia di
+`C:\Users\Andrea\qvac-prova\` (fuori dal repo, riscritta uguale),
+l'alias `consigliami` passa da `QWEN3_1_7B_INST_Q4` a
+`QWEN3_5_2B_MULTIMODAL_Q4_K_M`, contesto 8192 come prima; nasce l'alias
+`consigliami-riserva` → `QWEN3_5_0_8B_MULTIMODAL_Q4_K_M`, stesso
+contesto; `qwen3-600m-inst-q4` resta com'era. Sono la discesa di §12.4
+scritta negli alias: 2B, poi 0.8B, poi 600M. `prove_leva_rgb` pinza i
+tre, e che nessun alias porti più il 1.7B. In `identita.mjs` i due
+commenti e il messaggio d'errore che dicevano «domenica 11» dicono il 13
+ott e rimandano a §13.4, passo 5. In HACKATHON-SETUP: una tabella in
+fondo a §4, la riga del 13 nella lista di §10, i punti 5 e 6 della lista
+«15 ott» (tre modelli, 2,2 GB, il comando coi tre alias), la riga
+`modelli/` della chiavetta, §13.1 col punto 1 spuntato; e §5, la
+dichiarazione, riallineata alla bozza inglese di §12.9.
+
+**I PERCHÉ.**
+- *Perché l'alias resta `consigliami`*: `consigliami-prova.html` chiede
+  `consigliami` e `consiglio.py` chiede il 600M per nome: nessuno dei
+  due cambia. Cambia una costante.
+- *Perché la riserva ha un alias suo e non una riga da ritoccare*: a
+  Torino, se il 2B fa capricci, si scende senza aprire un file: la
+  pagina prende `?model=consigliami-riserva`. Un nome che dice il RUOLO
+  e non il modello: se la riserva un giorno cambia, la pagina non si
+  tocca.
+- *Perché il 1.7B esce dagli alias*: non è nella lista dei mentor di
+  QVAC (§12.4). Il file resta sul disco del fisso; nessuno lo carica.
+- *Perché §4 non è stata riscritta*: è un verbale del 7 e dell'8 ott, e
+  i suoi «1.7B» raccontano quei giorni. In fondo c'è un paragrafo
+  datato 13 che dice cosa vale oggi, e il resto rimanda lì.
+- *Perché in §5 le righe su Mutinynet portano un avviso*: la
+  dichiarazione descrive lo stato a migrazione FATTA, e il primo push
+  parte prima della migrazione. L'avviso in testa lo dice; gli id e la
+  conferma entrano la sera, col secondo push.
+- `reasoning_budget: false` non si è toccato: con Qwen3.5 e lo schema è
+  obbligatorio, e `/no_think` dà 500 (§12.4).
+
+**PROVATO.** Dal vivo sul fisso, con un `qvac serve` di prova su una
+porta sua (11435, la 11434 di Andrea libera e non toccata), lanciato da
+`qvac-prova` col config nuovo: `/v1/models` elenca i tre alias; il
+`chiedi` e il `controlla` VERI di `deploy/rgb/consiglio.py`, puntati lì
+e girati due volte per alias sul caso della demo (2.000 sats, 60 MOON):
+
+| Alias | Primo giro | Secondo | Scelta | Controllo |
+|---|---|---|---|---|
+| `consigliami` (2B) | 10,2 s | 0,9 s | 60 | ok |
+| `consigliami-riserva` (0.8B) | 6,6 s | 0,9 s | 60 | ok |
+| `qwen3-600m-inst-q4` | 4,0 s | 0,6 s | 60 | ok |
+
+Nessuno scarico: i tre file erano già sul disco. Il server di prova è
+stato fermato per PID. Le prove e i collaudi: nel messaggio del commit.
+
+**DA FARE** (notati, non fatti):
+- `deploy/rgb/backup-rgb.sh`, riga 37: il commento dice ancora «c'è
+  solo da domenica 11». Tre commenti di `prove.py`
+  (`prove_annuncio_identita`, `prove_mutinynet_prep`) dicono lo stesso.
+- `chiavetta-prepara.sh`, il messaggio «nessun .gguf»: suggerisce il
+  primo avvio con due alias, ora sono tre. E la chiavetta finta di
+  `prove_mutinynet_prep` porta ancora i nomi dei due modelli vecchi (è
+  un elenco di file finti: non rompe niente). Si sistemano quando si
+  rinfresca la chiavetta (§13.1, punto 4).
+- §2 di HACKATHON-SETUP dice ancora «dall'11 ott» e «si incolla l'11»
+  per gli id di Mutinynet: si riscrive al passo 5 della migrazione, con
+  gli id veri.
+- `docs/STUDIO-HACKATHON-RGB-2026-10.md` nomina ancora il 1.7B: è lo
+  studio del 7 ott, e §13.1 non lo chiedeva.
