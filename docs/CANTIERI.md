@@ -56003,3 +56003,38 @@ COMINCIA mentre si guarda il libro si vede entro il minuto (il loro
 battito riscrive i minuti e toglie il grigio a pausa finita, ma la
 mappa la prendeva solo all'ingresso). Il server si è fuso da solo, e
 «posso prendere?» giudica prima il paracadute, poi la pausa.
+
+**IL VERBALE DEL PUSH** (paracadute, 13 ott 2026). L'ok di Andrea è
+arrivato con tre consegne: la seconda riga dell'avviso resta; il + che
+accendeva «3+ scambi» si cura nello stesso push (sopra); i notati non
+urgenti si scrivono come «da fare» e non si fanno (sopra). E la leva
+NON si accende dopo il push: prima la prova dal vivo col coordinatore
+vero.
+MAIN ALLA PARTENZA: `ea93474`. Sopra quella punta, sull'albero del
+cantiere chiuso con la cura del filtro: le 192 sezioni toccate (12.742
+passate e 0 fallite) e i 75 collaudi del workflow nella gabbia (75
+verdi).
+MAIN È CORSO CINQUE VOLTE in quattro ore (sei sessioni aperte), ogni
+volta di commit non miei. LA PRIMA: `1a56736`, `55a678f` (patto-copia-relay),
+`8caf7eb` (l'orecchio della cassetta) — rebase, conflitto nella sola
+coda di questo file; sopra `8caf7eb` le 192 sezioni (12.745 e 0) e i 75
+collaudi (75 verdi). LA SECONDA: `b977c1a`, `4d24d32`, `07bda81`,
+`29c47f3` (gesti-subito) — conflitti di coda in tre file, tenute tutte
+le righe; sopra `29c47f3` le 192 sezioni (12.745 e 0) e i 76 collaudi
+(76 verdi). LA TERZA: `96b0611`, `5d50eae`, `8826b6f`, `93fbfe2`,
+`16c4682`, `541a379` (libro-vuoto) — e qui non erano più code: vedi
+«l'incrocio» qui sopra; sopra `541a379` le 193 sezioni toccate (12.802
+e 0). LA QUARTA, a verbale appena scritto: `7f77a2d`, `ba8e3a4`
+(indirizzo-giusto) — di nuovo la sola coda di questo file; sopra
+`ba8e3a4` le 194 sezioni toccate (12.863 e 0), i 26 collaudi del P2P
+(26 verdi), il giro dal vivo sul codice fuso con la pausa nuova (37
+controlli su 37), e 59 collaudi su 77 quando main è corso ancora. LA
+QUINTA: `7fc39ed`, `f8e7684`, `bc4cd10` (documenti dell'hackathon),
+`f433cf8`, `d9c74ed` (il relay per Mostro) — code in questo file e in
+`prove.py`. Contro main il cantiere dà solo aggiunte, più le venti
+righe delle emende. Il push non porta con sé commit di altri:
+sotto i miei due c'è solo main.
+SULL'ALBERO ESATTO DEL PUSH, che è quello di questo commit (il suo
+messaggio si scrive a giri finiti, e il messaggio l'albero non lo
+cambia): quel che è girato lo dice il messaggio di questo commit, coi
+numeri. La suite intera sull'albero del push la dice la CI.
