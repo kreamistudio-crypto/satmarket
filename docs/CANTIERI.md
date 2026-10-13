@@ -56777,3 +56777,271 @@ workflow» restano com'erano: raccontano quel giorno.
   guarda `ci/compila.txt`.
 
 Cosa è girato su quale albero: nel messaggio del commit, coi numeri.
+
+## L'indirizzo giusto, secondo push: «Rimborso meno le spese di spedizione», la quarta decisione del moderatore (13 ott 2026, cantiere indirizzo-giusto, richiesta di Andrea)
+
+**IL CASO.** Il pacco torna indietro perché l'indirizzo era sbagliato
+(o il punto di ritiro lo rifiuta): chi vende ha già pagato il corriere,
+e in disputa il moderatore poteva solo rimborsare tutto, rimborsare
+dopo il reso o dare tutto al venditore. Col primo push chi compra
+conferma l'indirizzo prima di pagare, e il moderatore lo legge; questo
+push gli dà la decisione che ne segue.
+
+**COSA SI È DECISO (Andrea, sulle dieci righe mandate prima del
+codice).**
+1. Un quarto bottone, «📦 Rimborso meno le spese di spedizione», col
+   suo foglio di conferma come gli altri tre: le spese di spedizione
+   vanno a chi vende, il resto torna a chi compra, NESSUNA commissione
+   (come in ogni rimborso). Vale anche per gli ordini verso un punto di
+   ritiro.
+2. LA CIFRA è `ordini.spedizione_sats`, quel che chi compra ha pagato
+   davvero per la spedizione. Niente importi scritti a mano dal
+   moderatore: sarebbe il rimborso parziale, che è un'altra cosa.
+3. IL BOTTONE NON COMPARE se la spedizione è zero (inclusa nel prezzo,
+   o gratis sopra soglia) e — aggiunta di Andrea — se è UGUALE O PIÙ
+   GRANDE del totale: niente rimborso a zero o negativo. Al suo posto
+   una riga dice perché.
+4. DOVE SI USA: dalla disputa aperta e dal reso in corso
+   (`return_pending`, `return_shipped`). Non dal caso già deciso e
+   incagliato (`confirmed`/`refund` con la disputa segnata).
+5. LA META' DI CHI VENDE riusa il registro «da riscuotere» dei rimborsi
+   d'asta, con un motivo nuovo — e nessuna logica pensata per le aste
+   deve scattare su quelle righe (avvisi, testi, conteggi).
+6. REPUTAZIONE: non conta come disputa persa per nessuno dei due.
+
+**COM'È FATTO.** NESSUNO STATO NUOVO (regola ferrea 4): l'ordine fa la
+strada del rimborso, `refund` → `refunded`, con una cifra più bassa.
+- `ordini.spese_rese_sats`: la cifra trattenuta, fotografata alla
+  decisione (0 = l'ordine non è stato deciso così). È il solo segno
+  della quarta decisione, e tutto il resto lo legge da lì.
+- `rimborsi_asta` prende una colonna `ordine_id` e il motivo
+  `spese_spedizione`: la riga di chi vende, con `annuncio_id` 0 e
+  `puntata_id` 0 (nessun vincolo delle aste la riconosce), e la cintura
+  `idx_rimborso_spese` (UNIQUE su `ordine_id` per quel motivo: una riga
+  sola per ordine, anche se una rotta si dimenticasse il cancello).
+- DUE GIUDICI: `spese_trattenibili(o)` (quanto si può trattenere, o 0:
+  solo sulla spedizione, più di zero e MENO del totale) e
+  `importo_rimborso(o)` (il totale meno le spese rese). Il secondo lo
+  chiedono i tre posti che devono dire la stessa cifra — chi paga
+  (`_rimborsa_compratore`), chi controlla la fattura incollata
+  (`deposita_invoice`) e, col gemello `importoRimborso`, la pagina.
+- LA DECISIONE (`_rimborsa_meno_spese`) scrive in UNA transazione, in
+  una funzione sincrona sua (`_scrivi_meno_spese`: una `def`, quindi
+  un await lì dentro non può entrarci): la cifra sull'ordine dietro un
+  cancello (`spese_rese_sats=0`, i tre stati, nessun pagamento in volo
+  o incerto — chi perde la corsa prende un 409 e non scrive niente) e
+  la riga di chi vende. TUTTE E DUE NASCONO `da_riprovare`. Poi i due
+  pagamenti, ognuno dalla sua strada di sempre (`_rimborsa_compratore`,
+  `_paga_rimborso`), indipendenti: uno che fallisce, o che esplode,
+  non ferma l'altro.
+- IL LUCCHETTO E LA CINTURA (vedi «trovato provando»): la scrittura
+  avviene sotto il lucchetto dell'ordine, e `_sblocca_sats` non dà mai
+  il netto intero al venditore su un ordine con `spese_rese_sats`.
+- MAI PIÙ DEL DEPOSITO: le due cifre sommate fanno il totale pagato,
+  per costruzione.
+- LA DECISIONE È DEFINITIVA APPENA PRESA: in `risolvi_disputa` la
+  guardia su `spese_rese_sats` sta PRIMA del ramo che riapre un caso
+  incagliato. È la riga da non ammorbidire: dopo «meno le spese»
+  l'ordine sta in `refund` con `disputata=1`, cioè proprio la forma che
+  quel ramo riapre — e un «rimborso integrale» a spese già incassate
+  farebbe uscire più sats di quanti ne sono entrati.
+
+**GLI STATI, E COSA SUCCEDE SE UN PAGAMENTO FALLISCE** (le dieci
+righe). Decisione presa → cifra e riga scritte insieme.
+- Tutti e due pagati: ordine `refunded`, riga `riscosso`.
+- Chi compra non ha un metodo, o il nodo rifiuta: ordine `refund` —
+  il pannello di sempre gli chiede l'indirizzo Lightning o una fattura,
+  della cifra RIDOTTA (una fattura del totale è rifiutata col numero
+  giusto); se il metodo c'era, ci riprova il giro dei pagamenti. La
+  metà di chi vende è partita lo stesso.
+- Chi vende non ha un metodo, o il nodo rifiuta: la riga resta «da
+  riscuotere» — glielo dice un messaggio, la incassa dall'ordine con
+  una fattura, o da sola appena salva l'indirizzo Lightning nel
+  Profilo. Chi compra è stato rimborsato lo stesso.
+- Il nodo è muto: non parte niente, tutte e due restano
+  `da_riprovare` e le riprende il giro dei pagamenti.
+- Il server cade a metà: la transazione ha già scritto tutto, e al
+  riavvio il giro dei pagamenti fa partire quel che mancava — una
+  volta sola ciascuno.
+In nessuno di questi stati la decisione si può cambiare.
+
+**NESSUNA LOGICA DELLE ASTE SU QUELLE RIGHE.** Dove il registro PARLA
+o CONTA, la riga di spese ha il suo ramo o resta fuori: «Le mie aste»
+non la elenca; il pallino delle aste nel Profilo non la conta; il
+sollecito (stesse leve, stesso binario) dice «spese di spedizione da
+incassare sull'ordine #…», e ai moderatori «Spese di spedizione ferme»
+(un avviso in più nella stanza degli errori: il censimento passa da 80
+a 81 punti); chi la paga la chiama «Spese di spedizione incassate»;
+la coda dei pagamenti fermi la intitola con l'ordine; nella
+riconciliazione non è un rimborso (`hash_rimborsi`). Nella pagina chi
+vende la incassa da un pannello SUO dentro l'ordine
+(`pannelloSpeseVenditore`, `incassaSpese`), non dal foglio «Riscuoti»
+delle aste. Quel che resta in comune, voluto: il binario dei pagamenti
+(`payout_stato`, tentativi, lucchetti), la rotta
+`/api/rimborsi/{id}/invoice`, il recupero quando si salva l'indirizzo
+Lightning, la fusione degli account.
+
+**LA PAGINA.** Il quarto bottone sta nel pannello «Decisione del
+moderatore», sotto gli altri tre; sul reso in corso (dove il moderatore
+non aveva nessun bottone) compare un pannello col solo quarto, e solo
+se c'è una cifra da trattenere. A decisione presa i bottoni
+spariscono — il server non riaprirebbe niente — e al loro posto il
+moderatore legge le due metà, ognuna col suo stato. Chi compra legge
+la cifra ridotta ovunque (testa, passi, pannello del rimborso, nota a
+rimborso uscito) e mai «vinta», «a tuo favore» o «integrale». «Come
+funziona» → «Se qualcosa va storto»: le strade sono tre.
+
+**LE STRADE SCARTATE.** (a) Uno stato nuovo (`refund_parziale`): ogni
+stato in più va portato in STATES, nello stepper e nelle notifiche, e
+qui la strada è già quella del rimborso. (b) Un registro nuovo per la
+metà di chi vende: avrebbe voluto di nuovo binario dei pagamenti,
+lucchetti, solleciti, riconciliazione — Andrea ha scelto di riusare
+quello che c'è, con le prove che le aste non ci mettano bocca. (c) Due
+uscite sulla stessa riga dell'ordine: la riga ha UNA uscita
+(`payout_stato`, `payout_verso`), ed è il contratto su cui poggiano il
+giro dei pagamenti e la riconciliazione. (d) La cifra scritta a mano
+dal moderatore. (e) Riaprire la decisione dopo un pagamento fallito:
+vedi «definitiva». (f) Il foglio «Riscuoti» delle aste per chi vende:
+parla di rimborsi e di puntate. (g) La casella «decidibile» nella coda
+degli ordini fermi: vedi i «da fare».
+
+**TROVATO PROVANDO.** (0) LA CORSA, ed è la più importante: l'ho
+trovata rileggendo il codice a prove già verdi, non l'ha trovata
+nessuna prova. Finora ogni ordine aveva UNA uscita, e a tenerla unica
+bastava la sua riga: chi paga (`_rimborsa_compratore`, `_sblocca_sats`)
+prende il lucchetto dell'ordine, rilegge, e se è già risolto si ferma.
+Con due uscite su due righe non basta più. (a) Un rimborso PIENO già
+partito — un «reso ricevuto» premuto nello stesso istante, un altro
+moderatore — legge la cifra (il totale) e poi aspetta la fattura dal
+wallet di chi compra: la decisione «meno le spese» scritta in quel
+momento avrebbe fatto uscire il totale E le spese. Curato: la
+decisione scrive sotto il lucchetto dell'ordine, cioè aspetta che quel
+giro finisca, e a quel punto il cancello la rifiuta (409). (b) Un
+altro moderatore che decide «al venditore» con la riga letta un
+istante prima: `_sblocca_sats` avrebbe pagato il netto intero sopra le
+due metà. Curato con una cintura: su un ordine con `spese_rese_sats`
+quella funzione non paga, mai. Tutte e due hanno la loro scena nel
+collaudo (la prima con un wallet che risponde lento, nello stesso
+giro di eventi) e la loro mutazione nella tortura. (1) Il collaudo forzava a mano lo stato
+dell'ordine dopo il rifiuto del nodo: una sonda ha detto qual è quello
+vero (`refund`, `da_riprovare`), e la scena adesso passa dal giro dei
+pagamenti. (2) Dal giro dal vivo: il toast del moderatore diceva «vedi
+cosa è già uscito» anche quando non era uscito niente; ora «a che
+punto sono i due pagamenti». (3) La prima suite ha dato 15 rosse, tutte
+banchi e sentinelle da portare alla forma nuova (colonne e tabelle
+mancanti nei database di cartone, il censimento degli avvisi, il conto
+dei gesti): curate una per una col perché scritto accanto; due le ho
+evitate cambiando il MIO codice (il passo del rimborso resta una
+chiamata sola, il gesto del moderatore scrive sulla riga viva una
+volta sola).
+
+**COSA È STATO PROVATO.** `prove_rimborso_meno_spese` (114 prove): i
+due giudici del server fatti girare sui nove casi (fra cui la
+spedizione uguale e più grande del totale: zero, e il bottone non
+compare) e la PARITÀ col giudice della pagina, caso per caso, in node;
+la guardia «definitiva» prima della riapertura; la transazione (una
+funzione non async, una commit, il cancello, i due `da_riprovare`); il
+lucchetto e la cintura; le righe che tengono le aste fuori; la
+reputazione GIRATA sulla query vera; i tre controlli del libro mastro
+girati su un database di cartone (zitti sul sano, ognuno grida sul
+suo guasto) e la cintura vera presa dalla migrazione; la pagina fatta
+girare (il bottone nei tre stati e in nessun altro, le due righe del
+«non si può», il foglio con le due cifre, le due metà nelle quattro
+combinazioni, il pannello di chi vende, il rimborso di chi compra
+senza «vinta» né «integrale», il gesto del moderatore e quello di chi
+incassa). La sentinella del primo push («la pagina non promette un
+bottone che ancora non c'è») è rovesciata. Portati alla forma nuova,
+col perché accanto: sette banchi che fanno girare i pezzi toccati, il
+censimento degli avvisi da admin (80 → 81), il conto dei gesti che
+leggono «non chiesto» (4 → 5), la ronda del libro mastro (un caso sano
+e otto rotti in più).
+`collaudo_rimborso_meno_spese.py`, 111 passi sul server vero col nodo
+di cartone, fra i collaudi della CI (una riga in `ci/collaudi.txt` e
+una in `ci/compila.txt`): tutto bene (due uscite che fanno il
+deposito); chi vende senza metodo, con «Le mie aste», il pallino e i
+solleciti; chi compra senza metodo, con la fattura del totale
+rifiutata e la decisione che non si cambia; il nodo che rifiuta chi
+compra, poi chi vende; l'indirizzo Lightning salvato dopo; LE CORSE
+(il rimborso pieno già partito, il netto al venditore a decisione
+presa); il nodo muto; IL SERVER CHE CADE A METÀ in tre punti (prima
+dei pagamenti, fra i due, una metà che esplode) e riparte; dove il
+bottone vale e dove no; la lista ordini; la reputazione; il libro
+mastro.
+LA TORTURA: quarantacinque mutazioni su copie del repo, in quattro
+corsie, TUTTE PRESE (45 su 45). Il lucchetto tolto lo prende il
+collaudo («chi compra ha il TOTALE» non torna più), la cintura tolta
+pure: le due scene delle corse provano davvero quel che dicono. Una
+lezione sul banco: al primo giro il lettore dell'esito cercava la
+parola «esplosa», che sta anche nel NOME di un passo verde del collaudo
+(«…e quella esplosa la riprende il giro») — ogni mutazione risultava
+presa. Ora cerca solo ✗ e Traceback.
+IL GIRO DAL VIVO a 375×812 (Chrome senza finestra coi tocchi veri,
+server di una copia col config dell'esempio più la coda del giro,
+relay morti, LNbits irraggiungibile, database seminato dalle rotte
+vere): i quattro bottoni; il foglio con le due cifre, e prima del
+tocco nessuna richiesta partita; «Decidi così» → la rotta col quarto
+esito, i bottoni spariti, le due metà «in attesa»; riletto dal server
+uguale; una seconda decisione a mano rifiutata («già decisa…
+definitiva»); un ordine con tutto uscito; la spedizione inclusa (tre
+bottoni e la riga del perché); il reso in corso col solo quarto; chi
+compra con la cifra ridotta e senza la riga di chi vende; chi vende
+col suo pannello (un testo qualunque non parte, una fattura va alla
+rotta della SUA riga), «Le mie aste» vuote e il pallino a zero; «Come
+funziona». Undici scatti.
+
+**NON PROVATO.** Nessun telefono vero, e Telegram vero nemmeno. Dal
+vivo NESSUN SAT SI È MOSSO (LNbits irraggiungibile apposta): i due
+pagamenti li prova il collaudo col nodo di cartone, mai un nodo vero.
+Il pagamento «in volo» (LNbits che risponde `pending`) sulle due metà
+non ha una scena sua: passa dal binario comune, che ha i suoi
+collaudi. Un ordine spostato su un'altra cassaforte dopo la decisione
+(la riga di spese tiene la cassaforte di quando è nata).
+
+**DA FARE (notati, non urgenti: non toccati).**
+- La coda degli ordini fermi (`/api/admin/fermi`) scrive «⚖️
+  decidibile» anche su un ordine deciso «meno le spese» rimasto in
+  `refund` oltre i giorni di soglia: aprendolo i bottoni non ci sono
+  (ed è giusto), ma l'etichetta nella riga mente. Serve
+  `spese_rese_sats` nella query della coda.
+- Sul reso in corso il server accetta da sempre anche «rimborsa
+  subito» e «al venditore» come intervento d'ufficio, ma la pagina non
+  li ha mai offerti lì: adesso offre il solo quarto bottone.
+- `query_libro_mastro.sql` (le query a mano) non ha il gemello dei tre
+  controlli nuovi; `censimento_payout.py` chiama «rimborso d'asta» la
+  riga di spese e mette accanto al rimborso ridotto il totale
+  dell'ordine.
+- A nodo muto, dopo la decisione, l'ordine resta `dispute` finché il
+  pagamento non riparte: chi compra e chi vende leggono ancora «Il
+  moderatore sta esaminando il caso» (succede uguale con le altre
+  decisioni).
+- I quattro del primo push, ancora lì: la riga del canale sul punto di
+  ritiro, il campo «verso un punto di ritiro» nel Profilo, il campo
+  «Paese» vuoto, le mappe DHL/BRT/GLS.
+
+**PER IL VPS.** Niente da aggiungere al config: nessuna leva nuova. Le
+due colonne e l'indice nascono da sole al riavvio (`init_db`).
+
+**IL PUSH: COSA È GIRATO SU QUALE ALBERO.** SULL'ALBERO `202006c` (il
+cantiere sopra `66688bf`): la suite severa intera, 24.048 passate e 0
+fallite; gli 80 collaudi della CI nella gabbia, 80 verdi; la tortura,
+45 su 45; il giro dal vivo, undici scatti. MAIN È CORSO DUE VOLTE a
+cantiere aperto. LA PRIMA: `cee86d1`, `3d4550a` (dimentica-copia-relay),
+`20e7e70`, `626cb74`, `53c872f` (la disputa aperta per sbaglio, P2P),
+`2f8b9e3`, `66688bf` (pronto-libero) — rebase senza conflitti; il
+collaudo nuovo è una riga in `ci/collaudi.txt` e una in
+`ci/compila.txt`, e il workflow non l'ho toccato. È sopra questa punta
+che sono girate suite, collaudi e tortura. LA SECONDA: `080f22d`,
+`aa4b7b5`, `f0292c4` (gesti-subito, secondo push) — un conflitto solo,
+in `adminResolve`: tenuta la forma di main (l'ordine preso AL TOCCO,
+`segnaOrdine(o, …)`, `ridisegnaOrdine(o)`) col mio ramo del quarto
+esito dentro, e `incassaSpese` portato alla stessa forma
+(`segnaOrdineAperto` non esiste più). Sopra `f0292c4`: le 18 sezioni
+toccate (1.944 prove, 0 rosse — fra cui `prove_gesti_ordine`), 12
+collaudi mirati nella gabbia (12 verdi, fra cui
+`collaudo_gesti_ordine`), e il giro dal vivo dei due gesti — la
+decisione del moderatore e l'incasso di chi vende — rifatto sulla
+pagina fusa, con gli stessi esiti. La suite intera sull'albero del
+push la dice la CI (regola di Andrea per questo push: dopo l'ultimo
+rebase solo sezioni e collaudi toccati). Il push non porta con sé
+commit di altri: sotto i miei c'è solo main. `pronto` lo sposta
+Andrea.
