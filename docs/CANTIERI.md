@@ -56478,3 +56478,54 @@ qui.
   seminato oggi: quasi certamente la semina del banco (le chiavi scritte
   in `chiavi_p2p` senza il riconoscimento). Da guardare su uno scambio
   vero.
+
+**IL VERBALE DEL PUSH: cosa è girato su quale albero.** Main è corso
+QUATTRO volte mentre il cantiere era aperto (sette commit, poi sei, poi
+nove, poi due, di altre sessioni), e il cantiere è stato ribasato quattro
+volte.
+- *Sopra `ea93474`* (l'albero di partenza): la tortura (25 su 25, su una
+  copia intera), il primo giro dal vivo, e una prima suite severa intera —
+  23.402 passate e UNA rossa vera, la sentinella del 23 set «il recapito
+  di chi compra sta SUBITO sotto il bottone del passo»: il mio pezzo
+  stava fra i due. Spostato dopo il recapito (a chi vende quel recapito
+  non c'è: a schermo è lo stesso posto). I 74 collaudi di allora, verdi.
+- *Sopra `541a379`* (secondo rebase, col foglio a tre bottoni di
+  libro-vuoto), albero `4f0085d`: la suite severa PER INTERO, 23.566
+  passate e 0 fallite; i 76 collaudi del workflow nella gabbia, 76 verdi;
+  il giro dal vivo rifatto lì (42 su 42: gli scatti sono di quell'albero);
+  lo scanner dei segreti sulle righe aggiunte, a zero, con la controprova.
+  ⚠️ Una corsa della suite su quell'albero aveva dato UNA rossa che non
+  era del codice: un `python -m compileall .` lanciato da me nel worktree
+  aveva lasciato `deploy/rgb/__pycache__`, e `prove_leva_rgb` apre ogni
+  voce di quella cartella come un file. Tolto il residuo, la corsa intera
+  rifatta è quella verde qui sopra. Nel worktree il `compileall` non si
+  lancia sulla cartella intera.
+- *Dopo quelle corse* è nato l'avviso a chi vende (una riga in
+  `server.py`, il secondo commit): NON è passato da una suite intera in
+  locale. Rossa prima e verde dopo sulle sue cinque prove, poi le sezioni
+  che nominano la frase e il collaudo.
+- *Sull'albero del push* (terzo rebase, sopra `673b918`: due conflitti
+  soli, le code di `prove.py` e di questo file; e un QUARTO, sopra
+  `3d4550a`, arrivato a verbale scritto: in conflitto la sola coda di
+  questo file, e lì le stesse sezioni — 59, 0 rosse — e gli stessi otto
+  collaudi sono stati rifatti, verdi), secondo la consegna di
+  Andrea — «push stretto: dopo l'ultimo rebase solo sezioni e collaudi
+  toccati, push subito solo se sono verdi, il resto lo fa la CI»: 57
+  sezioni con `PROVE_SEVERE=1` (la mia, le sei emendate, quelle di
+  libro-vuoto, e ogni sezione che nomina `chiediConferma(c)`, `confAltra`,
+  `P2P_RIPRESA_PASSO`, `renderOrdineP2P`, `_testo_evento_p2p`, la guida o
+  il collaudo, con la bussola e il tetto), 0 rosse; otto collaudi nella
+  gabbia (`collaudo_scambi_ovunque`, `collaudo_dispute_p2p`,
+  `collaudo_dispute_cruscotto`, `collaudo_chat_scambio`,
+  `collaudo_tolti_ovunque`, `collaudo_pagamento_p2p`,
+  `collaudo_avvisi_in_ordine_p2p`, `collaudo_voto_dopo_concluso`), verdi.
+  La suite intera e tutti i collaudi su quell'albero li dice la CI.
+- L'ok al push è di Andrea, sul rapporto («Ok al push, push stretto»), e
+  `pronto` lo sposta lui. I tre commit sono firmati. Nessuna leva nuova
+  nel config: il deploy è il push.
+- LA LEZIONE DEL RISOLUTORE: al terzo rebase lo script che fonde le due
+  code («prima il loro, poi il mio») ha cercato «=======» come stringa e
+  ha preso la coda di una riga di soli uguali dentro il blocco altrui —
+  `prove.py` non si leggeva più. Rimesso il conflitto
+  (`git checkout --merge`), i tre segni adesso si cercano a riga intera e
+  per posizione, e dopo ogni fusione `prove.py` passa da `ast.parse`.
