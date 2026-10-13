@@ -56748,10 +56748,41 @@ il nome nel workflow (`"             collaudo_x\n" in flusso`), diventa
 rientrasse nel workflow per un conflitto risolto male,
 `prove_elenco_dei_collaudi` la prende.
 
-**QUESTO PUSH TOCCA IL WORKFLOW UN'ULTIMA VOLTA**, quindi `pronto` si
-ferma ancora: lo sposta Andrea a mano, senza forzare, quando `prove` e
-`segreti` sono verdi. L'avviso di PRODUZIONE resta vero per ogni altra
-modifica al workflow.
+**QUESTO PUSH TOCCAVA IL WORKFLOW UN'ULTIMA VOLTA, E `pronto` SI È MOSSO
+DA SOLO** (corretto dopo il push, su richiesta di Andrea: qui c'era
+scritto «quindi `pronto` si ferma ancora: lo sposta Andrea a mano», ed
+era sbagliato). Il job `pronto` della corsa di `66688bf` ha spinto
+`53c872f..66688bf` senza nessun rifiuto, ventun minuti dopo il push.
+L'avviso di PRODUZIONE resta vero per ogni altra modifica al workflow.
+
+**IL PERCHÉ, GUARDATO SULLE CORSE** (13 ott 2026, dopo il push). Non è
+vero che GitHub rifiuta OGNI spinta a `pronto` che porta un workflow
+cambiato — PRODUZIONE lo diceva già («non succede a ogni modifica»)
+senza sapere quando. Messe in fila le 45 corse su main dal 12 ott
+mattina al 13 ott mattina, con accanto a ognuna il workflow del suo
+commit e il workflow che stava IN PUNTA A MAIN nel momento in cui il
+job `pronto` ha spinto: 16 spinte portavano a `pronto` un workflow
+cambiato, 10 sono passate e 6 sono state rifiutate. Le 10 passate
+avevano TUTTE il workflow uguale a quello in punta a main in quel
+momento; le 6 rifiutate (`aabdd05` il 12 ott; `29c47f3`, `541a379`,
+`ba8e3a4`, `bc4cd10`, `d9c74ed` il 13) lo avevano TUTTE diverso. Nessuna
+eccezione, nei due versi. Cioè: il robot può portare a `pronto` un
+workflow che su main c'è già tale e quale, e viene rifiutato quando
+quello che porta su main NON È PIÙ in punta — perché nel frattempo un
+altro push lo ha cambiato di nuovo. La CI ci mette una ventina di
+minuti: IL RIFIUTO VUOLE DUE PUSH CHE TOCCANO IL WORKFLOW DENTRO LA
+STESSA FINESTRA, e una volta partito continua finché i workflow smettono
+di rincorrersi (`673b918`, il primo dopo cui nessuno l'ha più toccato,
+è passato da solo). La mattina del 13 erano cinque push che toccavano
+il workflow in tre quarti d'ora. Il push di questo cantiere lo toccava
+ma dopo di lui non l'ha più toccato nessuno — che è esattamente quel
+che il cantiere ottiene per i collaudi — e il robot ha fatto da sé.
+È UNA REGOLARITÀ MISURATA (16 su 16), non una riga della documentazione
+di GitHub, e il confronto è con la punta di main: se valga anche per un
+altro ramo non lo dicono questi dati. La regola pratica non cambia —
+dopo ogni tocco al workflow `pronto` si GUARDA — ma ora si sa cosa
+guardare: se un altro push ha toccato il workflow prima che finisse la
+CI del primo.
 
 **I DOCUMENTI.** `CLAUDE.md`: la riga della gabbia dice dove si scrive
 un collaudo nuovo, dentro le stesse righe (261, tetto 262 non toccato),
@@ -56777,6 +56808,15 @@ workflow» restano com'erano: raccontano quel giorno.
   guarda `ci/compila.txt`.
 
 Cosa è girato su quale albero: nel messaggio del commit, coi numeri.
+
+**IL VERBALE DEL PUSH** (13 ott 2026). `53c872f..66688bf` su main, due
+commit firmati (`2f8b9e3` il cantiere, `66688bf` la riga di CLAUDE.md),
+nessun commit altrui portato con sé. La CI su `66688bf`: «Tutto
+compila» verde, letto da `ci/compila.txt`; le prove 23889 passate, 0
+fallite; i collaudi «79 verdi, 0 rossi», letti da `ci/collaudi.txt`;
+`segreti` verde; `pronto` verde, spinto dal robot. I tre push arrivati
+subito dopo (`080f22d`, `f0292c4`, `3db1ef4`) hanno tenuto il workflow
+nuovo, e nessun nome è rientrato. Tolti il worktree e il ramo.
 
 ## L'indirizzo giusto, secondo push: «Rimborso meno le spese di spedizione», la quarta decisione del moderatore (13 ott 2026, cantiere indirizzo-giusto, richiesta di Andrea)
 
