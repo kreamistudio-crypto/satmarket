@@ -27208,6 +27208,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   giusto e fa MORDERE la gabbia (un DNS e un connect, fermati e
   segnati): un sitecustomize che non si carica lascerebbe passare
   tutto in silenzio.
+  I DUE ELENCHI STANNO IN `ci/`, FUORI DAL WORKFLOW (13 ott 2026,
+  cantiere «pronto-libero»): `ci/collaudi.txt` — una riga per collaudo,
+  `#` per i commenti, in fondo i `fuori:` che la CI non gira — e
+  `ci/compila.txt`, una riga per file e nient'altro (lo legge
+  `compileall -i`, che prende ogni riga per un percorso). Il workflow
+  dice solo DOVE: `python -m compileall -q -i ci/compila.txt` e
+  `python collaudi_ci.py --elenco ci/collaudi.txt`. IL PERCHÉ: dopo un
+  commit che tocca `.github/workflows/` GitHub non lascia al token
+  delle Actions spostare `pronto`, e ogni collaudo nuovo toccava il
+  workflow — il deploy restava fermo finché Andrea non spostava il ref
+  a mano. Resta un elenco SCRITTO A MANO (entra solo un collaudo
+  guardato), ma un collaudo nuovo è una riga in quei due file. Lo
+  tiene `prove_elenco_dei_collaudi`: ogni `collaudo_*.py` della radice
+  sta nell'elenco una volta sola (fra chi gira o fra i `fuori:`), nel
+  workflow non torna nessuna riga di nomi, e il lanciatore — fatto
+  girare — dà rosso su un elenco vuoto, storto o che non c'è.
   IL PARSE DEL CLIENT È UNA PROVA (13 ago 2026, nata da un guasto
   VERO arrivato fino a main con la CI verde: un `*/` doppio in un
   commento JS — chiuso il commento a metà, la coda di prosa è

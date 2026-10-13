@@ -10,10 +10,17 @@ ROSSO tre giorni (il `riga=` di `paga_venditore`, 19 set) senza che
 nessuno lo vedesse. Adesso li gira la CI, e un collaudo rosso ferma il
 deploy come una prova rossa.
 
-L'ELENCO NON STA QUI: sta nel workflow, scritto a mano, uno per nome.
-Entra solo un collaudo che e' stato GUARDATO — niente rete, nessun
+L'ELENCO NON STA QUI: sta in `ci/collaudi.txt`, scritto a mano, uno per
+riga. Entra solo un collaudo che e' stato GUARDATO — niente rete, nessun
 config vero, stesso esito a ogni giro — e un collaudo nuovo non ci
 finisce da solo per il fatto di chiamarsi `collaudo_*`.
+FINO AL 13 OTT 2026 STAVA NEL WORKFLOW, e non ci deve tornare: ogni
+collaudo nuovo cambiava `.github/workflows/prove.yml`, e dopo un commit
+che tocca il workflow GitHub non lascia al robot spostare `pronto`
+(«refusing to allow a GitHub App to create or update workflow»): il
+deploy restava fermo finche' Andrea non lo spostava a mano. Adesso il
+workflow dice solo `--elenco ci/collaudi.txt`, e un collaudo nuovo e'
+una riga la'.
 
 LA GABBIA E' IL PEZZO DA NON TOGLIERE. «Senza rete» detto a parole non
 regge: basta un `notifica` non sostituito, un cambio BTC/EUR chiesto
@@ -27,7 +34,8 @@ collaudo anche se il collaudo, fail-open com'e' giusto, e' passato lo
 stesso. Il `sitecustomize` vale anche per i processi figli, perche'
 viaggia nel PYTHONPATH.
 
-Uso:  python collaudi_ci.py collaudo_porta_timer collaudo_... [...]
+Uso:  python collaudi_ci.py --elenco ci/collaudi.txt     (quel che fa la CI)
+      python collaudi_ci.py collaudo_porta_timer collaudo_... [...]
 """
 import os
 import re
@@ -181,6 +189,32 @@ def senza_segno(r):
     return r.strip()
 
 
+# LA FORMA DI UN NOME NELL'ELENCO: un collaudo, senza `.py`
+FORMA_NOME = re.compile(r"collaudo_\w+")
+
+
+def leggi_elenco(percorso):
+    """L'ELENCO DEI COLLAUDI, dal suo file (13 ott 2026): `ci/collaudi.txt`.
+
+    Una riga, un nome. Il `#` apre un commento (anche in coda a una
+    riga), le righe vuote non contano. `fuori: collaudo_x` dichiara un
+    collaudo che la CI NON gira. Torna (dentro, fuori, storte): le
+    storte sono le righe che non hanno la forma di un nome, e chi chiama
+    si deve FERMARE — una riga storta saltata in silenzio e' un collaudo
+    che smette di girare senza che nessuno lo sappia."""
+    dentro, fuori, storte = [], [], []
+    with open(percorso, encoding="utf-8") as f:
+        for riga in f:
+            r = riga.split("#")[0].strip()
+            if not r:
+                continue
+            lista = dentro
+            if r.startswith("fuori:"):
+                lista, r = fuori, r[len("fuori:"):].strip()
+            (lista if FORMA_NOME.fullmatch(r) else storte).append(r)
+    return dentro, fuori, storte
+
+
 def gira(nome, gabbia, segni):
     """Un collaudo, nella gabbia. Torna (ok, secondi, uscita)."""
     percorso = os.path.join(QUI, nome + ".py")
@@ -207,8 +241,28 @@ def gira(nome, gabbia, segni):
 def main(nomi):
     # la console di Windows parla cp1252, e una ✓ la farebbe esplodere
     sys.stdout.reconfigure(encoding="utf-8")
+    if nomi[:1] == ["--elenco"]:
+        # DAL FILE, che e' quel che fa la CI. Un elenco che non si
+        # legge, vuoto o con una riga storta e' ROSSO, mai «0 verdi, 0
+        # rossi»: un giro che non gira niente non deve sembrare verde.
+        if len(nomi) != 2:
+            print("Uso: python collaudi_ci.py --elenco ci/collaudi.txt")
+            return 2
+        try:
+            nomi, _fuori, storte = leggi_elenco(nomi[1])
+        except OSError as e:
+            print(f"::error::l'elenco dei collaudi non si legge: {e}")
+            return 2
+        for r in storte:
+            print(f"::error::riga storta nell'elenco dei collaudi: «{r}»")
+        if storte:
+            return 2
+        if not nomi:
+            print("::error::l'elenco dei collaudi e' vuoto: non gira niente")
+            return 2
     if not nomi:
-        print("Uso: python collaudi_ci.py collaudo_uno collaudo_due ...")
+        print("Uso: python collaudi_ci.py --elenco ci/collaudi.txt\n"
+              "     python collaudi_ci.py collaudo_uno collaudo_due ...")
         return 2
     gabbia = tempfile.mkdtemp(prefix="gabbia-collaudi-")
     with open(os.path.join(gabbia, "sitecustomize.py"), "w",

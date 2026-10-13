@@ -100,99 +100,18 @@ jobs:
       # Primo scalino: tutto compila. Banale e imbattibile — becca il
       # refuso prima che arrivi sul VPS, che e' esattamente il modo
       # in cui il mercatino potrebbe restare giu' per una virgola.
+      #
+      # L'ELENCO DEI FILE STA IN `ci/compila.txt`, uno per riga, e non
+      # qui (13 ott 2026): uno script nuovo e' una riga LA', e questo
+      # file non si tocca. Il perche' sta sul passo dei collaudi, piu'
+      # sotto. `-i` e' un'opzione di serie di compileall, che prende
+      # OGNI riga per un percorso: in quel file niente commenti e
+      # niente righe vuote (una riga che non e' un file passerebbe
+      # con un «Can't list» e basta: lo guarda `prove.py`, che chiede
+      # che ogni riga sia un file che c'e' e che ogni .py della radice
+      # ci sia).
       - name: Tutto compila
-        run: python -m compileall -q server.py importa_nostr.py prove.py
-             genera_icone.py genera_icone_apk.py censimento_nostr.py
-             censimento_spedizione.py censimento_payout.py capitale_cassa.py orfani.py
-             censimento_scadenze.py collaudo_fatture_scadute.py
-             collaudo_rotte_metodi.py
-             collaudo_cassetta_nip46.py
-             collaudo_avviso_dm_nostr.py
-             collaudo_ronda_relay.py
-             collaudo_in_pagamento.py collaudo_altra_cassaforte.py
-             collaudo_chiusura_saas.py collaudo_csp.py collaudo_freni.py
-             ripulisci_anello_nostr.py
-             ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
-             presenta_release.py config_esempio.py prova_notifica.py
-             importa_negozio.py collaudo_connettori.py
-             og_categorie.py og_racconti.py
-             assegna_sottocategorie.py ripulisci_avatar_min.py
-             anteprime.py collaudo_impersonazione.py
-             stima_coda_moderazione.py recupera_cambi_ordini.py
-             converti_soglie_euro.py collaudo_conto.py
-             converti_soglie_euro.py recupera_cambi_ordini.py
-             stima_coda_moderazione.py collaudo_altri_oggetti.py
-             collaudo_reti.py collaudo_nota.py collaudo_porta_timer.py
-             collaudo_feedback_confermato.py ripubblica_tag_client.py
-             collaudo_recensione_p2p.py collaudo_pagamento_p2p.py
-             collaudo_avvisi_in_ordine_p2p.py
-             collaudo_avvisi_mercatino.py
-             collaudo_paycode_riconosciuto.py collaudo_scambi_ovunque.py
-             collaudo_chiavi_ritrovate.py collaudo_chi_e_l_altro.py
-             collaudo_voto_dopo_concluso.py
-             collaudo_dispute_p2p.py collaudo_tolti_ovunque.py
-             collaudo_reputazione_p2p.py
-             collaudo_giro_nuovo.py
-             collaudo_pausa.py collaudo_due_teste.py
-             collaudo_consegna_firmata.py collaudo_ricategorizza.py
-             collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py
-             anteprima_riepilogo.py
-             collaudo_finestra.py collaudo_rilancio.py
-             confronta_vetrina.py
-             collaudo_busta_diretta.py
-             collaudo_email_corriere.py collaudo_account.py
-             collaudo_duplicato.py
-             collaudo_punto_concordato.py collaudo_lnbits_muto.py
-             classifica_prova.py collaudo_classifica.py
-             marca_prove.py recupera_xp_ordini.py livelli_prova.py
-             collaudo_inviti.py
-             collaudo_offerta_carrello.py collaudo_punti_barattolo.py
-             collaudo_punti_corrieri.py
-             collaudo_indirizzo_confermato.py
-             spoglia_foto_esistenti.py collaudo_verita_lnd.py
-             collaudo_prova_hold.py
-             giudice_deploy.py collaudi_ci.py
-             racconti.py collaudo_racconti_bozza.py collaudo_sponsor.py
-             collaudo_numeri_negozio.py
-             collaudo_letture_relay.py
-             collaudo_foto_scartate.py collaudo_foto_obbligatorie.py
-             prepara_logo_consigliato.py
-             prepara_banner_fee.py ritaglia_banner_fee.py
-             collaudo_spedizione_standard.py
-             collaudo_catalogo_esterno.py
-             collaudo_nuova_fattura.py
-             collaudo_quantita_servizi.py
-             collaudo_pionieri.py
-             collaudo_contanti_p2p.py schnorr_puro.py
-             collaudo_controllo_fattura.py
-             collaudo_guardia_liquidita.py deploy/nodo/sonda-rotte.py
-             collaudo_canale_admin.py
-             collaudo_avviso_chi_annulla.py
-             collaudo_recapito_aggiornato.py
-             collaudo_chat_scambio.py
-             collaudo_garanzia_lunga.py
-             collaudo_promemoria_gesto.py
-             collaudo_x_risonanza.py
-             collaudo_annullo_venditore.py
-             collaudo_db_contesa.py collaudo_negozi_grandi.py
-             collaudo_foto_recensioni.py
-             collaudo_coda_vetrina.py
-             collaudo_pagamenti_non_arrivati.py
-             collaudo_carrello_salvato.py
-             collaudo_bollino_staff.py
-             semina_demo.py collaudo_semina_demo.py
-             collaudo_campagna_p2p_tutti.py
-             collaudo_statistiche_p2p.py
-             collaudo_solleciti_p2p.py
-             collaudo_malus_p2p.py
-             collaudo_feedback_p2p.py
-             collaudo_cambio_libro_p2p.py
-             collaudo_indirizzo_lightning.py
-             collaudo_dispute_cruscotto.py
-             collaudo_tempo_pubblica.py
-             collaudo_gesti_ordine.py
-             collaudo_ordine_in_pausa.py
-             collaudo_paracadute.py
+        run: python -m compileall -q -i ci/compila.txt
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -234,6 +153,20 @@ jobs:
       # gira ognuno in una gabbia che ferma ogni connessione fuori da
       # 127.0.0.1 e fa rosso chi ci prova (il perche' sta li').
       #
+      # ⚠️ E L'ELENCO NON STA PIU' IN QUESTO FILE (13 ott 2026): sta in
+      # `ci/collaudi.txt`, una riga per collaudo, e NON CI DEVE
+      # TORNARE. Finche' stava qui ogni collaudo nuovo cambiava il
+      # workflow, e dopo un commit che tocca il workflow GitHub non
+      # lascia al token di questo stesso file spostare `pronto`
+      # («refusing to allow a GitHub App to create or update workflow
+      # … without `workflows` permission»): `prove` e `segreti` verdi,
+      # il job `pronto` rosso, il VPS fermo al commit di prima finche'
+      # Andrea non spostava il ref a mano — tre volte nella sola
+      # mattina del 13 ott. Un collaudo nuovo e' una riga in
+      # `ci/collaudi.txt` e una in `ci/compila.txt`; chi rimette un
+      # nome qui dentro arrossisce in prove.py
+      # (`prove_elenco_dei_collaudi`).
+      #
       # `!cancelled()` e non il default: i collaudi parlano anche se le
       # prove sono rosse — la lezione del job dei segreti, un rosso
       # prima non deve zittire le domande dopo. Il job resta rosso lo
@@ -244,86 +177,7 @@ jobs:
 
       - name: I collaudi, senza rete
         if: ${{ !cancelled() }}
-        run: python collaudi_ci.py
-             collaudo_porta_timer
-             collaudo_sblocco_banner
-             collaudo_feedback_confermato
-             collaudo_verita_lnd
-             collaudo_prova_hold
-             collaudo_altra_cassaforte
-             collaudo_chiusura_saas
-             collaudo_in_pagamento
-             collaudo_lnbits_muto
-             collaudo_fatture_scadute
-             collaudo_rotte_metodi
-             collaudo_cassetta_nip46
-             collaudo_avviso_dm_nostr
-             collaudo_ronda_relay
-             collaudo_pagamento_p2p
-             collaudo_avvisi_in_ordine_p2p
-             collaudo_avvisi_mercatino
-             collaudo_paycode_riconosciuto
-             collaudo_scambi_ovunque
-             collaudo_chiavi_ritrovate
-             collaudo_chi_e_l_altro
-             collaudo_voto_dopo_concluso
-             collaudo_dispute_p2p
-             collaudo_racconti_bozza
-             collaudo_sponsor
-             collaudo_numeri_negozio
-             collaudo_inviti
-             collaudo_letture_relay
-             collaudo_foto_scartate
-             collaudo_foto_obbligatorie
-             collaudo_spedizione_standard
-             collaudo_catalogo_esterno
-             collaudo_nuova_fattura
-             collaudo_classifica
-             collaudo_quantita_servizi
-             collaudo_annullo_venditore
-             collaudo_pionieri
-             collaudo_contanti_p2p
-             collaudo_controllo_fattura
-             collaudo_guardia_liquidita
-             collaudo_canale_admin
-             collaudo_punti_barattolo
-             collaudo_punti_corrieri
-             collaudo_reti
-             collaudo_nota
-             collaudo_busta_diretta
-             collaudo_email_corriere
-             collaudo_indirizzo_confermato
-             collaudo_csp
-             collaudo_freni
-             collaudo_db_contesa
-             collaudo_negozi_grandi
-             collaudo_foto_recensioni
-             collaudo_coda_vetrina
-             collaudo_pagamenti_non_arrivati
-             collaudo_carrello_salvato
-             collaudo_bollino_staff
-             collaudo_tolti_ovunque
-             collaudo_reputazione_p2p
-             collaudo_giro_nuovo
-             collaudo_avviso_chi_annulla
-             collaudo_recapito_aggiornato
-             collaudo_chat_scambio
-             collaudo_garanzia_lunga
-             collaudo_promemoria_gesto
-             collaudo_x_risonanza
-             collaudo_semina_demo
-             collaudo_campagna_p2p_tutti
-             collaudo_statistiche_p2p
-             collaudo_solleciti_p2p
-             collaudo_malus_p2p
-             collaudo_feedback_p2p
-             collaudo_cambio_libro_p2p
-             collaudo_indirizzo_lightning
-             collaudo_dispute_cruscotto
-             collaudo_tempo_pubblica
-             collaudo_gesti_ordine
-             collaudo_ordine_in_pausa
-             collaudo_paracadute
+        run: python collaudi_ci.py --elenco ci/collaudi.txt
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

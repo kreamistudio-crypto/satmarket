@@ -56529,3 +56529,145 @@ volte.
   `prove.py` non si leggeva più. Rimesso il conflitto
   (`git checkout --merge`), i tre segni adesso si cercano a riga intera e
   per posizione, e dopo ogni fusione `prove.py` passa da `ast.parse`.
+
+## Pronto libero: l'elenco dei collaudi esce dal workflow, e un collaudo nuovo è una riga in `ci/` (13 ott 2026, cantiere pronto-libero, richiesta di Andrea)
+
+**IL PROBLEMA.** Il VPS tira quando si muove il ref `pronto`, e a
+muoverlo è l'ultimo job della CI. Ma dopo un commit che tocca
+`.github/workflows/prove.yml` GitHub può rifiutare quel push al robot:
+«refusing to allow a GitHub App to create or update workflow … without
+`workflows` permission». `prove` e `segreti` verdi, `pronto` rosso, il
+VPS fermo al commit di prima finché Andrea non sposta il ref a mano
+(PRODUZIONE, «LA CATENA DEL DEPLOY», scritto il 24 set). Era raro
+finché il workflow cambiava di rado. Non lo è più: OGNI cantiere che
+aggiunge un collaudo scriveva il suo nome in DUE elenchi dentro il
+workflow — i file del passo «Tutto compila» e i collaudi del passo «I
+collaudi, senza rete» — quindi ogni cantiere col suo collaudo toccava
+il workflow. La mattina del 13 ott è successo tre volte: `pronto` fermo
+a `8caf7eb`, e le corse di `29c47f3`, `541a379` e `ba8e3a4` rosse nel
+solo job `pronto` con quella riga nel registro.
+
+**COSA SI È DECISO.** I due elenchi escono dal workflow e vanno in una
+cartella nuova, `ci/`:
+- `ci/collaudi.txt` — i collaudi che la CI gira, una riga per nome,
+  senza `.py`, nell'ordine in cui girano; `#` apre un commento. In
+  fondo, con `fuori:` davanti, i collaudi che la CI NON gira.
+- `ci/compila.txt` — i file del «Tutto compila», una riga per file e
+  NIENT'ALTRO: niente commenti, niente righe vuote.
+Il workflow dice solo DOVE: `python -m compileall -q -i ci/compila.txt`
+e `python collaudi_ci.py --elenco ci/collaudi.txt`. Da oggi UN COLLAUDO
+NUOVO È UNA RIGA IN `ci/collaudi.txt` E UNA IN `ci/compila.txt`, E IL
+WORKFLOW NON SI TOCCA. `python collaudi_ci.py collaudo_x`, il gesto
+della gabbia, resta com'era.
+
+**I PERCHÉ.**
+- *Due file e non uno.* `compileall -i` è un'opzione di serie di
+  Python: legge un file e prende OGNI riga per un percorso. Usarla vuol
+  dire non scrivere codice nostro per il primo scalino della CI, quello
+  che deve reggere anche quando tutto il resto è rotto. Il prezzo è che
+  quel file non può avere commenti: la spiegazione sta in testa a
+  `ci/collaudi.txt` e nel commento del workflow.
+- *Resta un elenco scritto a mano, non un glob.* È la decisione del 22
+  set («I COLLAUDI IN CI»): entra solo un collaudo GUARDATO — config di
+  cartone prima dell'import del server, niente rete, stesso esito a
+  ogni giro. Dei 96 `collaudo_*.py` del repo la CI ne gira 79; 17 sono
+  fuori da sempre. Un glob li avrebbe accesi tutti in un colpo.
+- *I 17 stanno scritti, con `fuori:`.* La prova che Andrea ha chiesto —
+  rossa se un collaudo esiste nel repo ma manca dall'elenco — con 17
+  collaudi fuori sarebbe nata rossa. Dichiararli la rende vera: ogni
+  collaudo del repo sta in una delle due parti, una volta sola. Chi ne
+  scrive uno nuovo e lo dimentica lo sente dalla CI il giorno stesso;
+  chi lo vuole tenere fuori lo deve SCRIVERE, e si vede nel diff.
+- *Un elenco che non gira niente è rosso.* Con `--elenco` il lanciatore
+  si ferma con uscita 2 se il file non c'è, se è vuoto o se una riga
+  non ha la forma di un nome: mai «0 verdi, 0 rossi». Una riga storta
+  saltata in silenzio sarebbe un collaudo che smette di girare senza
+  che nessuno lo sappia.
+- *Un lettore solo.* `prove.py` legge `ci/collaudi.txt` con
+  `leggi_elenco` del lanciatore VERO (lo stesso ritaglio che
+  `prove_collaudi_in_ci` già faceva per la gabbia), non con una copia.
+
+**LE STRADE SCARTATE.**
+- *Dare al robot il permesso `workflows`.* Il token delle Actions non
+  lo può avere dal file del workflow: servirebbe un token personale di
+  Andrea, con scrittura, messo fra i secret del repo. È il contrario di
+  «nessuna chiave nei secret di questo repo» (il deploy è PULL apposta).
+- *L'elenco dentro `collaudi_ci.py`*, come lista Python: toglieva il
+  problema per i collaudi ma non per il compileall, e avrebbe fatto di
+  un lanciatore un file che cambia a ogni cantiere.
+- *Togliere il job `pronto` e far guardare al VPS direttamente main.*
+  È un cambio alla catena del deploy, non un trasloco di un elenco.
+
+**NIENTE PERSO, E COME LO SI SA.** I due file sono stati GENERATI dal
+workflow, non ricopiati a mano, e uno script li ha confrontati col
+workflow di `origin/main` prima del cantiere (`673b918`): compila 143
+righe = 143, stesso ordine (140 file: tre sono scritti due volte, e
+sono rimasti com'erano); collaudi 79 = 79, stesso ordine, nessun
+doppione; 79 + 17 = i 96 del repo. Dal vero lo dice la riga finale del
+passo dei collaudi nella CI: «79 verdi, 0 rossi».
+
+**LE SENTINELLE.** Nuova, `prove_elenco_dei_collaudi` (14 prove): ogni
+`collaudo_*.py` della radice sta nell'elenco, fra chi gira o fra i
+`fuori:`; ogni nome ha il suo file; nessuno due volte né dentro e fuori
+insieme; nessuna riga storta; ogni riga di `ci/compila.txt` è un file
+che c'è, e chi gira è anche compilato; i due passi del workflow hanno
+la riga ESATTA, e nel workflow non c'è più una riga fatta di soli nomi;
+il lanciatore, fatto girare su un collaudo e un elenco di cartone, gira
+quel che sta scritto e solo quello, e dà 2 su un elenco vuoto, storto o
+che non c'è; `CLAUDE.md` dice dove si scrive. RIPORTATE sui file nuovi
+le 21 prove di 18 funzioni che cercavano il nome del loro collaudo nel
+TESTO del workflow (erano diventate rosse, com'era giusto), più una che
+rossa non era diventata e andava riportata lo stesso: «il giudice si
+compila in CI» chiedeva `"giudice_deploy.py" in wf`, e passava per
+merito di un COMMENTO del workflow che lo nomina — una prova che
+risponde per il vicino. Ora tutte chiedono a due lettori,
+`_collaudi_della_ci()` e `_compilati_dalla_ci()`, e chiedono il nome
+INTERO: `prove_script_nel_workflow` cercava ogni script come pezzo di
+testo dentro la riga del comando, adesso come voce di una lista.
+LA TORTURA, su una copia: 22 mutazioni, 22 uccise — un collaudo tolto
+dall'elenco, uno nuovo non scritto, uno dentro e fuori, uno doppio, un
+nome senza file, una riga storta, uno script tolto dal compila, un
+commento, una riga vuota e un refuso nel compila, il workflow che torna
+coi nomi (nei due passi, sulla riga del comando e sotto), il passo
+fuori dal job `prove`, e sei sul lanciatore (non si ferma sulle storte,
+gira i `fuori:`, non toglie i commenti in coda, il vuoto verde, il
+mancante verde, ignora `--elenco`).
+
+**CHI HA UN CANTIERE APERTO CON UN COLLAUDO NUOVO.** Al rebase il
+conflitto su `prove.yml` si risolve tenendo il workflow di main e
+scrivendo le due righe in `ci/`; la sentinella del cantiere, se cercava
+il nome nel workflow (`"             collaudo_x\n" in flusso`), diventa
+`"collaudo_x" in _collaudi_della_ci()` e
+`"collaudo_x.py" in _compilati_dalla_ci()`. Se una riga di nomi
+rientrasse nel workflow per un conflitto risolto male,
+`prove_elenco_dei_collaudi` la prende.
+
+**QUESTO PUSH TOCCA IL WORKFLOW UN'ULTIMA VOLTA**, quindi `pronto` si
+ferma ancora: lo sposta Andrea a mano, senza forzare, quando `prove` e
+`segreti` sono verdi. L'avviso di PRODUZIONE resta vero per ogni altra
+modifica al workflow.
+
+**I DOCUMENTI.** `CLAUDE.md`: la riga della gabbia dice dove si scrive
+un collaudo nuovo, dentro le stesse righe (261, tetto 262 non toccato),
+in un commit suo. PRODUZIONE, «LA CATENA DEL DEPLOY»: la nota dopo
+l'avviso del 24 set. ARCHITETTURA, «I COLLAUDI IN CI, IN GABBIA»: i due
+elenchi in `ci/`. Le voci più vecchie che dicono «nei due elenchi del
+workflow» restano com'erano: raccontano quel giorno.
+
+**DA FARE** (notati, non fatti):
+- I 17 `fuori:` non hanno un perché scritto: provarli uno a uno nella
+  gabbia (`python collaudi_ci.py collaudo_x`), e scrivere il perché
+  accanto al nome o farli entrare.
+- In `ci/compila.txt` tre file sono scritti due volte
+  (`converti_soglie_euro.py`, `recupera_cambi_ordini.py`,
+  `stima_coda_moderazione.py`): portati com'erano, la seconda riga si
+  può togliere.
+- PRODUZIONE dice ancora che i collaudi in gabbia durano «una ventina
+  di secondi»: erano otto, oggi sono 79.
+- Le `FORME` dei segreti stanno ancora DENTRO il workflow: una leva
+  nuova con un segreto nel nome lo tocca, e `pronto` si ferma come
+  prima. Da decidere se farle uscire allo stesso modo.
+- `prove_script_nel_workflow` ha tenuto il suo nome, anche se ora
+  guarda `ci/compila.txt`.
+
+Cosa è girato su quale albero: nel messaggio del commit, coi numeri.

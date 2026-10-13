@@ -1,0 +1,134 @@
+# I COLLAUDI CHE LA CI GIRA (13 ott 2026, cantiere «pronto-libero»).
+#
+# UN COLLAUDO NUOVO E' UNA RIGA QUI, e una in ci/compila.txt (li' col
+# `.py`). IL WORKFLOW NON SI TOCCA.
+# (In ci/compila.txt niente commenti e niente righe vuote: lo legge
+# `python -m compileall -i`, che prende OGNI riga per un file.)
+#
+# Fino al 13 ott 2026 questi nomi stavano DENTRO
+# .github/workflows/prove.yml, e ogni collaudo nuovo cambiava il
+# workflow: GitHub allora non lasciava al robot della CI spostare
+# `pronto` («refusing to allow a GitHub App to create or update
+# workflow»), e il deploy restava fermo finche' Andrea non lo spostava a
+# mano. Il 13 ott e' successo tre volte in una mattina. Adesso il
+# workflow dice soltanto DOVE sta l'elenco, e l'elenco sta qui.
+#
+# COME SI LEGGE: una riga, un nome, senza `.py`. Il `#` apre un
+# commento, le righe vuote non contano. L'ordine e' quello in cui
+# girano. Lo legge `python collaudi_ci.py --elenco ci/collaudi.txt`
+# (il passo «I collaudi, senza rete»), e una riga storta lo ferma col
+# rosso invece di saltarla.
+#
+# RESTA UN ELENCO SCRITTO A MANO, e non un glob: entra solo un collaudo
+# GUARDATO — config di cartone installato prima dell'import del server,
+# niente rete, stesso esito a ogni giro. Prima di scriverlo qui si
+# prova nella gabbia: `python collaudi_ci.py collaudo_x`.
+#
+# In fondo, con `fuori:` davanti, i collaudi che la CI NON gira.
+# Stanno scritti perche' `prove_elenco_dei_collaudi` (prove.py) chiede
+# che OGNI collaudo_*.py del repo stia in una delle due parti, una
+# volta sola: un collaudo dimenticato non resta fuori in silenzio, si
+# dichiara.
+
+collaudo_porta_timer
+collaudo_sblocco_banner
+collaudo_feedback_confermato
+collaudo_verita_lnd
+collaudo_prova_hold
+collaudo_altra_cassaforte
+collaudo_chiusura_saas
+collaudo_in_pagamento
+collaudo_lnbits_muto
+collaudo_fatture_scadute
+collaudo_rotte_metodi
+collaudo_cassetta_nip46
+collaudo_avviso_dm_nostr
+collaudo_ronda_relay
+collaudo_pagamento_p2p
+collaudo_avvisi_in_ordine_p2p
+collaudo_avvisi_mercatino
+collaudo_paycode_riconosciuto
+collaudo_scambi_ovunque
+collaudo_chiavi_ritrovate
+collaudo_chi_e_l_altro
+collaudo_voto_dopo_concluso
+collaudo_dispute_p2p
+collaudo_racconti_bozza
+collaudo_sponsor
+collaudo_numeri_negozio
+collaudo_inviti
+collaudo_letture_relay
+collaudo_foto_scartate
+collaudo_foto_obbligatorie
+collaudo_spedizione_standard
+collaudo_catalogo_esterno
+collaudo_nuova_fattura
+collaudo_classifica
+collaudo_quantita_servizi
+collaudo_annullo_venditore
+collaudo_pionieri
+collaudo_contanti_p2p
+collaudo_controllo_fattura
+collaudo_guardia_liquidita
+collaudo_canale_admin
+collaudo_punti_barattolo
+collaudo_punti_corrieri
+collaudo_reti
+collaudo_nota
+collaudo_busta_diretta
+collaudo_email_corriere
+collaudo_indirizzo_confermato
+collaudo_csp
+collaudo_freni
+collaudo_db_contesa
+collaudo_negozi_grandi
+collaudo_foto_recensioni
+collaudo_coda_vetrina
+collaudo_pagamenti_non_arrivati
+collaudo_carrello_salvato
+collaudo_bollino_staff
+collaudo_tolti_ovunque
+collaudo_reputazione_p2p
+collaudo_giro_nuovo
+collaudo_avviso_chi_annulla
+collaudo_recapito_aggiornato
+collaudo_chat_scambio
+collaudo_garanzia_lunga
+collaudo_promemoria_gesto
+collaudo_x_risonanza
+collaudo_semina_demo
+collaudo_campagna_p2p_tutti
+collaudo_statistiche_p2p
+collaudo_solleciti_p2p
+collaudo_malus_p2p
+collaudo_feedback_p2p
+collaudo_cambio_libro_p2p
+collaudo_indirizzo_lightning
+collaudo_dispute_cruscotto
+collaudo_tempo_pubblica
+collaudo_gesti_ordine
+collaudo_ordine_in_pausa
+collaudo_paracadute
+
+# ---- FUORI DALLA CI ---------------------------------------------------
+# Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:
+# il cantiere del 13 ott 2026 ha solo SPOSTATO l'elenco. Il perche' di
+# ognuno non e' scritto da nessuna parte (da fare: provarli uno a uno
+# nella gabbia, e scriverlo accanto al nome dopo un `#`).
+fuori: collaudo_account
+fuori: collaudo_altri_oggetti
+fuori: collaudo_connettori
+fuori: collaudo_consegna_firmata
+fuori: collaudo_conto
+fuori: collaudo_due_teste
+fuori: collaudo_duplicato
+fuori: collaudo_finestra
+fuori: collaudo_impersonazione
+fuori: collaudo_offerta_carrello
+fuori: collaudo_pausa
+fuori: collaudo_punto_concordato
+fuori: collaudo_recensione_p2p
+fuori: collaudo_ricategorizza
+fuori: collaudo_ricerca
+fuori: collaudo_rilancio
+fuori: collaudo_servizio_dove

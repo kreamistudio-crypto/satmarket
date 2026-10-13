@@ -15368,14 +15368,11 @@ def prove_foto_obbligatorie():
            in o["giro2"]))
 
     # ---- 6) IL COLLAUDO DELLE ROTTE VERE E' IN CI ---------------------
-    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
-                  encoding="utf-8").read()
     prova("collaudo_foto_obbligatorie.py c'e', compila e gira nella "
           "gabbia", (True, True, True),
           (os.path.exists("collaudo_foto_obbligatorie.py"),
-           "collaudo_foto_obbligatorie.py" in flusso,
-           re.search(r"^\s+collaudo_foto_obbligatorie\s*$", flusso, re.M)
-           is not None))
+           "collaudo_foto_obbligatorie.py" in _compilati_dalla_ci(),
+           "collaudo_foto_obbligatorie" in _collaudi_della_ci()))
 
 
 def prove_foto_vuota():
@@ -50520,8 +50517,141 @@ def prove_giudice_deploy():
           sorted({r.split()[1].split(".")[0] for r in sorgente.split("\n")
                   if r.startswith(("import ", "from "))}
                  - {"json", "os", "re", "subprocess", "sys", "urllib"}))
-    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
-    prova("il giudice si compila in CI", True, "giudice_deploy.py" in wf)
+    prova("il giudice si compila in CI", True,
+          "giudice_deploy.py" in _compilati_dalla_ci())
+
+
+def _lettore_dei_collaudi():
+    """`leggi_elenco` del lanciatore VERO, e non una copia: due lettori
+    dello stesso file prima o poi leggono due cose diverse."""
+    amb = {"__file__": "collaudi_ci.py"}
+    exec(open(os.path.join(QUI, "collaudi_ci.py"), encoding="utf-8").read()
+         .split("\ndef gira(")[0], amb)
+    return amb["leggi_elenco"]
+
+
+def _collaudi_della_ci():
+    """I collaudi che la CI GIRA: i nomi di `ci/collaudi.txt`, senza
+    `.py`, nell'ordine in cui girano (13 ott 2026)."""
+    return _lettore_dei_collaudi()(os.path.join(QUI, "ci", "collaudi.txt"))[0]
+
+
+def _compilati_dalla_ci():
+    """I file che la CI COMPILA: le righe di `ci/compila.txt`, una per
+    file, come le legge `python -m compileall -i` (13 ott 2026)."""
+    return [r.strip() for r in open(os.path.join(QUI, "ci", "compila.txt"),
+                                    encoding="utf-8").read().splitlines()]
+
+
+def prove_elenco_dei_collaudi():
+    """L'ELENCO DEI COLLAUDI STA IN `ci/`, FUORI DAL WORKFLOW (13 ott
+    2026, cantiere «pronto-libero»).
+
+    Finche' i nomi stavano in `.github/workflows/prove.yml` ogni collaudo
+    nuovo cambiava il workflow, e dopo un commit che tocca il workflow
+    GitHub non lascia al robot spostare `pronto` («refusing to allow a
+    GitHub App to create or update workflow»): `prove` e `segreti`
+    verdi, il deploy fermo finche' Andrea non spostava il ref a mano —
+    tre volte nella sola mattina del 13 ott. Adesso un collaudo nuovo e'
+    una riga in `ci/collaudi.txt` (e una in `ci/compila.txt`), e qui si
+    tengono le tre cose che il trasloco poteva perdere:
+
+    1) NESSUN COLLAUDO DIMENTICATO: ogni `collaudo_*.py` della radice
+       sta nell'elenco — fra quelli che girano o fra i `fuori:`
+       dichiarati — una volta sola. Si GUARDA la cartella, non si tiene
+       un secondo elenco: chi aggiunge un collaudo e non lo scrive lo
+       sente dal rosso il giorno stesso.
+    2) I NOMI NON TORNANO NEL WORKFLOW: i due passi dicono solo DOVE sta
+       l'elenco, con la riga esatta.
+    3) IL LANCIATORE LEGGE DAVVERO IL FILE, e un elenco vuoto, storto o
+       che non c'e' e' ROSSO: provato facendolo girare."""
+    print("\n[l'elenco dei collaudi, fuori dal workflow]")
+    import subprocess
+    import tempfile
+    dentro, fuori, storte = _lettore_dei_collaudi()(
+        os.path.join("ci", "collaudi.txt"))
+    nel_repo = sorted(f[:-3] for f in os.listdir(".")
+                      if re.fullmatch(r"collaudo_\w+\.py", f))
+    prova("il repo ha dei collaudi, e l'elenco ne fa girare", True,
+          len(nel_repo) > 10 and len(dentro) > 10)
+    prova("nessuna riga storta nell'elenco", [], storte)
+    prova("ogni collaudo del repo sta nell'elenco: fra quelli che girano "
+          "o fra i «fuori:» dichiarati", [],
+          sorted(set(nel_repo) - set(dentro) - set(fuori)))
+    prova("...e ogni nome dell'elenco ha il suo file", [],
+          sorted(n for n in dentro + fuori if n not in nel_repo))
+    tutti = dentro + fuori
+    prova("...una volta sola: ne' due volte, ne' dentro e fuori insieme",
+          [], sorted({n for n in tutti if tutti.count(n) > 1}))
+
+    # --- il file del compileall: ogni riga e' un file che c'e' -----------
+    # `compileall -i` prende OGNI riga per un percorso, e una riga che
+    # non e' un file (un refuso, un commento, una riga vuota) passa con
+    # un «Can't list» e l'uscita 0: la guardia sta qui
+    compilati = _compilati_dalla_ci()
+    prova("ogni riga di ci/compila.txt e' un file che c'e' (niente "
+          "commenti, niente righe vuote)", [],
+          [r for r in compilati if not os.path.isfile(r)])
+    prova("...e chi gira e' anche compilato", [],
+          [n for n in dentro if n + ".py" not in compilati])
+
+    # --- il workflow dice solo DOVE --------------------------------------
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read()
+    i = wf.index("python -m compileall")
+    prova("il passo «Tutto compila» legge l'elenco dal suo file",
+          "python -m compileall -q -i ci/compila.txt",
+          wf[i:wf.index("\n", i)].strip())
+    # una riga fatta SOLO di nomi e' un elenco che e' tornato a casa:
+    # i commenti (che cominciano con `#`) restano liberi di nominarli
+    prova("...e nel workflow non c'e' piu' una riga di soli nomi, di "
+          "collaudi o di script", [],
+          re.findall(r"^[ \t]+(?:collaudo_\w+|[\w/.-]+\.py)"
+                     r"(?:[ \t]+[\w/.-]+\.py)*[ \t]*$", wf, re.M))
+
+    # --- DAL VERO: il lanciatore legge il file ---------------------------
+    # un collaudo di cartone e un elenco di cartone: gira chi sta
+    # scritto, non gira chi e' `fuori:`, e i commenti non contano
+    cartone = os.path.join(os.getcwd(), "collaudo_cartone_elenco.py")
+    cartella = tempfile.mkdtemp(prefix="elenco-prova-")
+
+    def lancia(testo):
+        elenco = os.path.join(cartella, "elenco.txt")
+        with open(elenco, "w", encoding="utf-8", newline="") as f:
+            f.write(testo)
+        r = subprocess.run([sys.executable, "collaudi_ci.py", "--elenco",
+                            elenco], capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=120)
+        return r.returncode, r.stdout
+    with open(cartone, "w", encoding="utf-8") as f:
+        f.write("print('cartone: girato')\n")
+    try:
+        buono = lancia("# un commento\r\n\r\ncollaudo_cartone_elenco  # in coda\r\n"
+                       "fuori: collaudo_che_non_gira\r\n")
+    finally:
+        os.remove(cartone)
+    prova("dal vero: il lanciatore gira quel che sta scritto nel file, "
+          "e solo quello", [0, True, True, False],
+          [buono[0], "✓ collaudo_cartone_elenco" in buono[1],
+           "1 verdi, 0 rossi" in buono[1],
+           "collaudo_che_non_gira" in buono[1]])
+    vuoto = lancia("# solo commenti\nfuori: collaudo_che_non_gira\n")
+    prova("...un elenco VUOTO e' rosso, non «0 verdi, 0 rossi»",
+          [2, True, False],
+          [vuoto[0], "::error::l'elenco dei collaudi e' vuoto" in vuoto[1],
+           "verdi" in vuoto[1]])
+    storto = lancia("collaudo_cartone_elenco\ncollaudo_due nomi_in_una_riga\n")
+    prova("...una riga STORTA lo ferma prima di girare qualunque cosa",
+          [2, True, False],
+          [storto[0], "::error::riga storta nell'elenco dei collaudi: "
+           "«collaudo_due nomi_in_una_riga»" in storto[1],
+           "verdi" in storto[1]])
+    r = subprocess.run([sys.executable, "collaudi_ci.py", "--elenco",
+                        os.path.join(cartella, "non-c-e.txt")],
+                       capture_output=True, encoding="utf-8",
+                       errors="replace", timeout=120)
+    prova("...e un elenco che NON C'E' pure", [2, True],
+          [r.returncode, "::error::l'elenco dei collaudi non si legge" in r.stdout])
 
 
 def prove_collaudi_in_ci():
@@ -50538,7 +50668,12 @@ def prove_collaudi_in_ci():
     job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
     i = job.find("python collaudi_ci.py")
     prova("lo step dei collaudi sta nel job `prove`", True, i > 0)
-    elenco = job[i:job.find("\n\n", i)].split()[2:] if i > 0 else []
+    # L'ELENCO STA IN ci/collaudi.txt (13 ott 2026): il passo dice solo
+    # DOVE, con la riga esatta — vedi `prove_elenco_dei_collaudi`
+    prova("...e legge l'elenco dal suo file, fuori dal workflow",
+          "python collaudi_ci.py --elenco ci/collaudi.txt",
+          job[i:job.find("\n", i)].strip() if i > 0 else None)
+    elenco = _collaudi_della_ci()
     prova("...con un elenco scritto a mano, non un glob", True,
           len(elenco) >= 8 and not any("*" in n for n in elenco))
     prova("...di collaudi che esistono tutti", [],
@@ -52045,7 +52180,7 @@ def prove_podio_sfondo():
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
 
-    L'elenco del workflow e' scritto A MANO, e i documenti lo dichiarano
+    L'elenco e' scritto A MANO, e i documenti lo dichiarano
     da mesi come il punto in cui uno script nuovo si fa dimenticare —
     «ai tre nati il 3 ago 2026 e' successo». Un file fuori da
     quell'elenco non e' meno rotto: e' solo un file che nessuno
@@ -52057,16 +52192,21 @@ def prove_script_nel_workflow():
     sente dalla CI il giorno stesso, non fra sei mesi.
 
     `config.py` resta fuori per costruzione: non e' tracciato, e in
-    CI non esiste (la regola ferrea 1)."""
+    CI non esiste (la regola ferrea 1).
+
+    DAL 13 OTT 2026 L'ELENCO STA IN `ci/compila.txt`, fuori dal workflow
+    (il perche': `prove_elenco_dei_collaudi`). La domanda e' la stessa,
+    e' cambiato l'indirizzo."""
     print("\n[gli script del repo, e il compileall]")
-    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
-    riga = wf[wf.index("python -m compileall"):]
-    riga = riga[:riga.index("\n      -")]
+    # NOMI INTERI, non un pezzo di testo (13 ott 2026): quando l'elenco
+    # era una riga del workflow si chiedeva `f in riga`, e `orfani.py`
+    # sarebbe passato anche per merito di un `conta_orfani.py`
+    riga = _compilati_dalla_ci()
     nostri = sorted(f for f in os.listdir(".")
                     if f.endswith(".py") and f != "config.py")
     prova("il repo ha degli script da compilare", True, len(nostri) > 10)
     fuori = [f for f in nostri if f not in riga]
-    prova("...e sono TUTTI nel compileall del workflow", [], fuori)
+    prova("...e sono TUTTI nell'elenco del compileall (ci/compila.txt)", [], fuori)
 
     # --- E OGNI FUNZIONE DI PROVE GIRA DAVVERO (ago 2026) ----------
     # La gemella del compileall, e nasce dalla tortura del cantiere
@@ -61264,7 +61404,7 @@ def prove_banner_fee_primo_ingresso():
           and 'media_type="image/webp"' in rotta
           and '"Cache-Control": "public, max-age=86400"' in rotta)
     prova("...e ritaglia_banner_fee.py e' nella lista del «Tutto compila»", True,
-          "ritaglia_banner_fee.py" in open(".github/workflows/prove.yml", encoding="utf-8").read())
+          "ritaglia_banner_fee.py" in _compilati_dalla_ci())
 
     # --- 3) IL CSS: i passi, tutti sotto .fee-primo -------------------------
     prova("il pezzo della prima mostra il ritaglio, largo il 34% (340 su 1000), fino al passo 3",
@@ -110458,7 +110598,6 @@ def prove_avvisi_mercatino():
     mini = open("miniapp.html", encoding="utf-8").read()
     m = mini.replace("\r\n", "\n")
     cfg = open("config_esempio.py", encoding="utf-8").read()
-    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
 
     # --- 1) LE SENTINELLE -------------------------------------------------------
     prova("la leva globale: accesa di serie, solo un booleano conta, storta resta accesa", True,
@@ -110539,7 +110678,8 @@ def prove_avvisi_mercatino():
           "\nMERCATINO_AVVISI_NUOVI = True\n" in cfg and "\nMERCATINO_AVVISI_NUOVI_MINUTI = 60\n" in cfg
           and "\nMERCATINO_AVVISI_SEGUI_MINUTI = 15\n" in cfg)
     prova("il collaudo sul server vero sta nella CI, compilato e in gabbia", True,
-          "collaudo_avvisi_mercatino.py" in wf and "\n             collaudo_avvisi_mercatino\n" in wf)
+          "collaudo_avvisi_mercatino.py" in _compilati_dalla_ci()
+          and "collaudo_avvisi_mercatino" in _collaudi_della_ci())
     frasi = _senza_prosa(pezzo("_testo_avviso_mercatino_tutti")) + _senza_prosa(pezzo("_testo_avviso_mercatino_segui"))
     for spia in ("nostr", "relay", "npub", "tg_id"):
         prova(f"i messaggi non dicono «{spia}»", False, spia in frasi.lower())
@@ -111394,7 +111534,7 @@ def prove_x_risonanza():
     prova("...e ogni giro che cade lascia partire il prossimo", True,
           "except Exception" in codice(pezzo("orologio_x")))
     prova("il collaudo del server vero sta nella CI", True,
-          "collaudo_x_risonanza" in wf[wf.index("python collaudi_ci.py"):])
+          "collaudo_x_risonanza" in _collaudi_della_ci())
 
 
 def _banco_zap(extra=None):
@@ -111811,10 +111951,8 @@ def prove_indirizzo_lightning():
           and '\nZAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI' in esempio)
     prova("...e nel codice pure: senza la riga nel config vale False", True,
           "except ImportError:\n    ZAP_ATTIVO = False\n" in blocco)
-    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
-                  encoding="utf-8").read()
     prova("il collaudo gira in CI, nella gabbia", True,
-          "             collaudo_indirizzo_lightning\n" in flusso)
+          "collaudo_indirizzo_lightning" in _collaudi_della_ci())
     arch = open(os.path.join("docs", "ARCHITETTURA.md"), encoding="utf-8").read()
     prova("ARCHITETTURA elenca le due rotte fra le pubbliche", True,
           "`/.well-known/lnurlp/zap`" in arch and "`/api/lnurl/zap`" in arch
@@ -111847,7 +111985,6 @@ def prove_avviso_dm_nostr():
     i = src.index("# --- L'AVVISO DEI DM A BARATTOLO")
     blocco = src[i:src.index("\ndef chiave_nostr_provata(", i)]
     cod = codice(blocco)
-    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
     esempio = open("config_esempio.py", encoding="utf-8").read()
 
     # --- la leva, e dove nasce ---
@@ -111982,7 +112119,7 @@ def prove_avviso_dm_nostr():
            for k in ("AVVISO_DM_PAUSA_MITTENTE_S", "AVVISO_DM_TETTO",
                      "AVVISO_DM_FINESTRA_S", "AVVISO_DM_BUSTE_S")})
     prova("il collaudo del server vero sta nella CI", True,
-          "collaudo_avviso_dm_nostr" in wf[wf.index("python collaudi_ci.py"):])
+          "collaudo_avviso_dm_nostr" in _collaudi_della_ci())
 
     # --- notifica_admin porta il bottone solo quando c'e' ---
     andate = []
@@ -138407,9 +138544,9 @@ def prove_csp_prova():
           mini.count("s.src = 'https://telegram.org/js/telegram-widget.js?22';"))
 
     # --- la CI: il collaudo entra per nome --------------------------------
-    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
     prova("il collaudo delle cinture e' nella CI, compilato e lanciato", True,
-          "collaudo_csp.py" in wf and "\n             collaudo_csp\n" in wf)
+          "collaudo_csp.py" in _compilati_dalla_ci()
+          and "collaudo_csp" in _collaudi_della_ci())
 
 
 def prove_ssrf_ln_address():
@@ -144733,8 +144870,7 @@ def prove_semina_demo():
           True, setup.count("py -3 semina_demo.py") >= 2
           and "py -3 semina_demo.py ordine" in setup)
     prova("...e il collaudo e' nella lista della CI", True,
-          "collaudo_semina_demo" in open(os.path.join(QUI, ".github", "workflows",
-                                                      "prove.yml"), encoding="utf-8").read())
+          "collaudo_semina_demo" in _collaudi_della_ci())
     prova("§11.1 porta la riga del profilo con la picture, §11.3 il wallet a ogni apertura, "
           "§10 l'insegna", True,
           "node identita.mjs profilo tothemooon https://barattolo.store/assets/consigliati/to-the-moon.webp" in setup
@@ -146955,10 +147091,8 @@ def prove_prova_wallet():
           ['"already" in perche.lower()' in codice(pezzo("_annulla_hold_prova")),
            'if await _annulla_hold_prova(r["hash"]):' in codice(pezzo("ripulisci_hold_prova"))])
     prova("il collaudo delle hold e' nella CI (elenco e compileall)",
-          [1, 1], [open(os.path.join(QUI, ".github", "workflows", "prove.yml"), encoding="utf-8").read()
-                   .count("\n             collaudo_prova_hold\n"),
-                   open(os.path.join(QUI, ".github", "workflows", "prove.yml"), encoding="utf-8").read()
-                   .count("collaudo_prova_hold.py")])
+          [1, 1], [_collaudi_della_ci().count("collaudo_prova_hold"),
+                   _compilati_dalla_ci().count("collaudo_prova_hold.py")])
     prova("il config d'esempio e PRODUZIONE portano la leva e il macaroon root key 4 coi soli tre metodi",
           [True, True, True],
           ['LND_PONTE_MACAROON_HOLD = ""' in open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read(),
@@ -147136,11 +147270,10 @@ def prove_cambio_libro_p2p():
           "alza in un posto solo", [True, 1],
           [bool(m_ril) and "&& !(typeof cambioRidisegna !== 'undefined' && cambioRidisegna)"
            in m_ril.group(1), mini.count("cambioRidisegna = true")])
-    wf = open(os.path.join(".github", "workflows", "prove.yml"), encoding="utf-8").read()
     prova("il collaudo del server vero sta nella CI: fra i file guardati e fra quelli che girano",
           [True, True],
-          ["collaudo_cambio_libro_p2p.py" in wf,
-           bool(re.search(r"\n\s+collaudo_cambio_libro_p2p\n", wf))])
+          ["collaudo_cambio_libro_p2p.py" in _compilati_dalla_ci(),
+           "collaudo_cambio_libro_p2p" in _collaudi_della_ci()])
 
     # --- 2) IL BANCO NODE --------------------------------------------------
     js = r"""
@@ -149491,11 +149624,9 @@ def prove_tempo_di_chi_pubblica():
            '"tempoPubblica": bool(P2P_TEMPO_DI_CHI_PUBBLICA),' in src])
     prova("...e sta nel pannello delle leve, col suo nome", True,
           '"P2P_TEMPO_DI_CHI_PUBBLICA", P2P_TEMPO_DI_CHI_PUBBLICA,' in pezzo("_leve_stato"))
-    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
-                  encoding="utf-8").read()
     prova("il collaudo delle rotte vere gira in CI, nella gabbia", [True, True],
-          ["             collaudo_tempo_pubblica\n" in flusso,
-           "             collaudo_tempo_pubblica.py\n" in flusso])
+          ["collaudo_tempo_pubblica" in _collaudi_della_ci(),
+           "collaudo_tempo_pubblica.py" in _compilati_dalla_ci()])
     prova("la parola nuova del coordinatore e' un RITORNO, e non quello di chi ha preso",
           [True, True],
           ['"maker-republished": "tornato"' in pezzo("_momento_evento_p2p"),
@@ -150239,14 +150370,12 @@ def prove_disputa_automatica_p2p():
            'opens a dispute by itself"' in produzione,
            "`git log --oneline v0.19.0..HEAD` → UNDICI righe." in produzione,
            "`git reset --hard HEAD~2` (torna alla 0010" in produzione])
-    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
-                  encoding="utf-8").read()
     collaudo = open("collaudo_dispute_cruscotto.py", encoding="utf-8").read()
     prova("il passo sul server vero c'e', nel collaudo che la CI gira",
           [True, True, True],
           ['"dispute-opened", t + 730, "mostro",' in collaudo,
            '"escrow-deadline") or []' in collaudo,
-           "             collaudo_dispute_cruscotto\n" in flusso])
+           "collaudo_dispute_cruscotto" in _collaudi_della_ci()])
 
     # --- i comandi sui database: il VPS e il nodo ----------------------
     # (corretto da Andrea la sera stessa: sul VPS `sqlite3` C'E', e il
@@ -154604,12 +154733,10 @@ def prove_canale_admin():
     prova("il webhook chiede a Telegram gli stessi aggiornamenti di ieri: "
           "i messaggi di un gruppo sono «message», i tocchi «callback_query»",
           True, '"allowed_updates": ["message", "callback_query"]' in _SORGENTE)
-    wf = open(os.path.join(".github", "workflows", "prove.yml"),
-              encoding="utf-8").read()
     prova("il collaudo col Telegram di cartone sta nella CI, compilato e "
           "girato", (True, True),
-          ("collaudo_canale_admin.py" in wf[:wf.index("python collaudi_ci.py")],
-           "collaudo_canale_admin\n" in wf[wf.index("python collaudi_ci.py"):]))
+          ("collaudo_canale_admin.py" in _compilati_dalla_ci(),
+           "collaudo_canale_admin" in _collaudi_della_ci()))
     prova("i tocchi su ✅/❌ valgono per CHI tocca, non per DOVE: nel "
           "gruppo decide solo un admin", (True, True),
           ('if not e_admin((cb.get("from") or {}).get("id") or 0):'
@@ -156731,11 +156858,9 @@ def prove_ordine_in_pausa():
           '        else:\n'
           '            fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)'
           in rotta)
-    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
-                  encoding="utf-8").read()
     prova("il collaudo del caso gira in CI, nella gabbia", [True, True],
-          ["             collaudo_ordine_in_pausa\n" in flusso,
-           "             collaudo_ordine_in_pausa.py\n" in flusso])
+          ["collaudo_ordine_in_pausa" in _collaudi_della_ci(),
+           "collaudo_ordine_in_pausa.py" in _compilati_dalla_ci()])
 
     # --- 3) LA PAGINA: le sentinelle ------------------------------------------
     def fn(firma):
@@ -157958,10 +158083,10 @@ def prove_relay_per_mostro():
           ("LA BUCA DEL COORDINATORE" in arch
            and "LA RONDA DEI RELAY DI MOSTRO" in arch,
            "LA BUCA DEL COORDINATORE" in leggimi))
-    prova("il collaudo col server vero sta nei due elenchi del workflow",
+    prova("il collaudo col server vero sta nei due elenchi della CI",
           (True, True),
-          ("collaudo_ronda_relay.py" in wf,
-           "collaudo_ronda_relay" in wf[wf.index("python collaudi_ci.py"):]))
+          ("collaudo_ronda_relay.py" in _compilati_dalla_ci(),
+           "collaudo_ronda_relay" in _collaudi_della_ci()))
 
 
 def prove_paracadute_p2p():
@@ -158046,11 +158171,9 @@ def prove_paracadute_p2p():
           [True, True],
           ['con.execute("DELETE FROM p2p_paracadute WHERE tg_id=?", (user["id"],))' in src,
            'con.execute("UPDATE p2p_paracadute SET tg_id=? WHERE tg_id=?",' in src])
-    flusso = open(os.path.join(".github", "workflows", "prove.yml"),
-                  encoding="utf-8").read()
     prova("il collaudo delle rotte vere gira in CI, nella gabbia", [True, True],
-          ["             collaudo_paracadute\n" in flusso,
-           "             collaudo_paracadute.py\n" in flusso])
+          ["collaudo_paracadute" in _collaudi_della_ci(),
+           "collaudo_paracadute.py" in _compilati_dalla_ci()])
 
     # --- 2) I PEZZI PURI -------------------------------------------------
     con, amb = _banco_eventi_p2p()
@@ -159490,6 +159613,7 @@ def main():
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci,
+              prove_elenco_dei_collaudi,
               prove_servizio_non_root,
               prove_guardiano_ponte,
               prove_guardia_liquidita, prove_canale_admin, prove_deploy_nel_gruppo,

@@ -1220,6 +1220,16 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   mai `--force`. Il giudice di `deploy.sh` resta quello di sempre (su
   main, in avanti, `prove` e `segreti` in `success`, punta firmata): il
   ref spostato a mano è solo il campanello.
+  DAL 13 OTT 2026 UN COLLAUDO NUOVO NON TOCCA PIÙ IL WORKFLOW (cantiere
+  «pronto-libero»): era la ragione di quasi tutti questi rifiuti — ogni
+  cantiere col suo collaudo aggiungeva un nome ai due elenchi dentro
+  `prove.yml`, e il 13 ott `pronto` si è fermato tre volte in una
+  mattina. I due elenchi ora stanno in `ci/collaudi.txt` e
+  `ci/compila.txt`: un collaudo o uno script nuovo è una riga là, e il
+  workflow dice solo dove leggerli. L'AVVISO DI SOPRA RESTA VERO per
+  ogni altra modifica a `.github/workflows/` (una action aggiornata, un
+  passo nuovo, una forma in più fra le `FORME` dei segreti): lì si
+  guarda come sempre, e `pronto` si sposta a mano col via di Andrea.
 - IL RIAVVIO DOLCE (1 ott 2026): un deploy non deve far vedere un 502.
   DUE PEZZI SUL VPS, tutt'e due fuori dalla repo come il resto della
   macchina (il drop-in ha la sua copia in `deploy/utente/`):
