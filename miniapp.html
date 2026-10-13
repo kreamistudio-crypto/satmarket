@@ -12193,7 +12193,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Per scambiare sats in euro con altre persone lo scambio passa da un <b>coordinatore</b> (il programma si chiama Mostro, e a farlo girare è <b>Barattolo</b>, sul nostro nodo), e per riconoscerti lì serve un <b>profilo di scambio</b>. <b>Nasce e funziona da solo</b>: dentro l'app non c'è niente da creare né da gestire. Qui sotto diciamo per intero da dove viene e <b>chi lo può ricavare</b>, perché dipende da dove è nato il tuo account, non da come entri.</p>
       <p><b>Se il tuo account è nato con Telegram</b> (anche se poi entri con Nostr), il profilo lo <b>ricaviamo noi dal tuo account</b>: così è lo stesso dal bot, dal sito e dall'app, e torna da solo su un telefono nuovo senza che tu debba salvare niente. Il prezzo lo diciamo per intero: <b>quel profilo il server di Barattolo lo sa ricavare</b>, quindi in linea di principio potrebbe firmare uno scambio al posto tuo. Non lo facciamo, e non c'è niente nel programma che lo faccia — ma <b>potremmo</b>, e questo è l'unico posto di Barattolo in cui possiamo dirlo di un tuo segreto. Per ricavarlo servono <b>due cose insieme</b>, una nella configurazione del server e una nel database: chi si portasse via una sola delle due non ricaverebbe nulla.</p>
       <p><b>Se il tuo account è nato su Nostr</b>, il profilo <b>non lo può ricavare nessuno tranne te</b>, noi compresi, ed è lo stesso ovunque perché ce l'hai tu. Vale anche se in passato hai reso il tuo profilo di scambio una chiave Nostr che è tua, dovunque sia nato l'account: resta così, e questa strada resta nel patto anche se oggi non ha più un gesto dentro l'app.</p>
-      <p>Per fartelo ritrovare su ogni dispositivo, il tuo browser ne mette una <b>copia cifrata sui relay Nostr</b> — i tuoi, quelli pubblici che usa Barattolo e il nostro: la apre <b>solo la tua chiave</b>, noi no, e sul nostro server non ce n'è nessuna. Il prezzo lo diciamo per intero: chi legge quei relay <b>vede che la copia esiste ed è tua</b>, non cosa contiene, e «Dimentica il profilo» <b>non la toglie</b> da lì.</p>
+      <p>Per fartelo ritrovare su ogni dispositivo, il tuo browser ne mette una <b>copia cifrata sui relay Nostr</b> — i tuoi, quelli pubblici che usa Barattolo e il nostro: la apre <b>solo la tua chiave</b>, noi no, e sul nostro server non ce n'è nessuna. Il prezzo lo diciamo per intero: chi legge quei relay <b>vede che la copia esiste ed è tua</b>, non cosa contiene. «Dimentica il profilo» <b>la toglie anche da lì</b>: la sostituisce con una vuota e chiede ai relay di cancellarla. Non possiamo garantire che tutti obbediscano: su un relay che non lo fa può restare la copia vecchia, sempre cifrata, e resta visibile che una copia c'è stata.</p>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
       <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Dal <b>12 ottobre 2026</b> chi scambia da Barattolo è <b>riconosciuto dall'altra persona</b> con qualunque modo di entrare — Telegram, nsec, bunker o estensione: la presa si annota, chi ha pubblicato vede il suo profilo e le due parti possono <b>recensirsi</b>. Il collegamento fra la chiave dello scambio e l'account lo sa solo il server, e lo mostra solo all'altra parte di quello scambio: mai in pubblico, mai sui relay. Non c'è un interruttore: chi vuole <b>restare anonimo</b> entra con una <b>chiave Nostr nuova</b>, che per l'altra persona è un'altra persona. Gli scambi di <b>prima del 12 ottobre 2026</b> restano come erano (dal 17 settembre al 12 ottobre chi entrava da Nostr era anonimo di serie, e quella promessa resta valida sul passato). <b>Riconosciuto dall'altra persona, e dal server</b>: come per tutti, il coordinatore ci dice fra quali due account è lo scambio (è la cronaca dei quaranta giorni, più sotto), e dal <b>10 ottobre 2026</b> <b>l'esito dello scambio si scrive sul suo account</b> — completato, o non completato se ha preso e non ha fatto il primo passo — col numero dell'ordine, per circa quattrocento giorni. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
@@ -49610,7 +49610,7 @@ const NIP46_GRAZIA_MS = 2500;
    scambio»): la firma del kind 30078 e la cifratura NIP-44 verso se
    stessi. Chi ha una sessione di prima li concede al momento, o rifiuta
    — e il rifiuto e' un esito detto nel foglio del profilo. */
-const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402,sign_event:30078,nip44_encrypt,nip44_decrypt';
+const NIP46_PERMESSI = 'sign_event:22242,sign_event:30402,sign_event:30078,sign_event:5,nip44_encrypt,nip44_decrypt';
 
 /* I TEMPI DELL'UMANO (10 ott 2026, dal campo: due utenti in due giorni
    fuori dalla porta, uno col bunker e uno con Clave su iPhone). Dall'altra
@@ -54472,6 +54472,9 @@ async function leggiDaRelayP2P(relays, filtro, ms){
   await caricaNostrTools();
   const NT = window.NostrTools;
   const trovati = [];
+  /* chi e' arrivato in fondo (EOSE): serve a chi deve distinguere «non
+     c'e' niente» da «non ha risposto» */
+  trovati.risposti = [];
   await Promise.allSettled((relays || []).map(url => new Promise(fine => {
     let relay = null, chiuso = false;
     const basta = () => {
@@ -54484,9 +54487,9 @@ async function leggiDaRelayP2P(relays, filtro, ms){
     NT.Relay.connect(url).then(r => {
       relay = r;
       if (chiuso) { try { r.close(); } catch(e){} return; }
-      r.subscribe([filtro], {
+      r.subscribe(Array.isArray(filtro) ? filtro : [filtro], {
         onevent(ev){ trovati.push({ev, relay: url}); },
-        oneose(){ clearTimeout(t); basta(); },
+        oneose(){ trovati.risposti.push(url); clearTimeout(t); basta(); },
         onclose(){ clearTimeout(t); basta(); }
       });
     }).catch(() => { clearTimeout(t); basta(); });
@@ -54541,7 +54544,10 @@ async function pubblicaCopiaProfiloP2P(m, auto){
   const pub = String(await auto.f.pubkey() || '').toLowerCase();
   if (!FORMA_HEX64.test(pub)) throw new Error('chiave dell\'account sconosciuta');
   const cifrato = await auto.f.cifra44(pub, mazzoSerializza(m));
-  const ev = await auto.f.firma(eventoCopiaProfiloP2P(cifrato));
+  /* (13 ott 2026) DOPO l'ultima rimozione vista: una copia con l'ora
+     di una richiesta di cancellazione nascerebbe gia' cancellata */
+  const dopoTolta = ((p2pCopiaLetta && p2pCopiaLetta.tolta) | 0) + 1;
+  const ev = await auto.f.firma(eventoCopiaProfiloP2P(cifrato, Math.max(Math.floor(Date.now() / 1000), dopoTolta)));
   if (!ev || ev.pubkey !== pub || !NT.verifyEvent(ev)) throw new Error('firma della copia storta');
   const relays = await relayPerCopiaP2P(pub);
   if (!relays.length) throw new Error('nessun relay su cui scrivere');
@@ -54592,6 +54598,7 @@ async function assicuraCopiaProfiloP2P(opz){
         /* la lettura della sessione ora dice questa copia */
         p2pCopiaLetta = {mazzo: Object.assign({}, ora || m, {quando: Math.floor(Date.now() / 1000)})};
         p2pCopiaEsito = 'copia';
+        if (typeof copiaToltaScriviP2P === 'function') copiaToltaScriviP2P(null);
         console.log('🔑 [p2p] copia cifrata del profilo sui relay: la rileggono ' + esito.visto + ' su ' + esito.relays);
       } else {
         p2pCopiaEsito = 'muto';
@@ -54636,10 +54643,17 @@ function leggiCopiaProfiloP2P(){
       if (!FORMA_HEX64.test(pub)) return null;
       const relays = await relayPerCopiaP2P(pub);
       if (!relays.length) return null;
-      const letti = await leggiDaRelayP2P(relays,
-        {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [P2P_COPIA_D]}, P2P_COPIA_MS);
-      const ev = copiaPiuRecenteP2P(letti.map(x => x.ev), pub);
-      if (!ev) { console.log('🔑 [p2p] copia sui relay: nessuna copia'); p2pCopiaLetta = {mazzo: null}; return null; }
+      /* (13 ott 2026) LA COPIA VIVA: una copia vuota o una richiesta di
+         cancellazione piu' recenti la spengono — il «Dimentica» l'ha
+         tolta, e un relay rimasto indietro non la fa risorgere */
+      const letti = await leggiDaRelayP2P(relays, filtriCopiaP2P(pub), P2P_COPIA_MS);
+      const viva = copiaVivaP2P(letti.map(x => x.ev).filter(e => e && (e.kind !== 5 || NT.verifyEvent(e))), pub);
+      const ev = viva.ev;
+      if (!ev) {
+        console.log('🔑 [p2p] copia sui relay: ' + (viva.tolta ? 'e\' stata tolta' : 'nessuna copia'));
+        p2pCopiaLetta = {mazzo: null, tolta: viva.tolta};
+        return null;
+      }
       if (!NT.verifyEvent(ev)) return null;
       const su = mazzoDaTesto(await auto.f.decifra44(pub, ev.content));
       if (!su) { console.log('🔑 [p2p] copia sui relay: la copia non si apre'); return null; }
@@ -54810,6 +54824,235 @@ function avvisoMemoriaBrowserP2P(onion){
   return '<div class="hint p2p-tor">🧅 Su Tor Browser la memoria si svuota a ogni chiusura, e con lei le chiavi dei tuoi scambi: entra sempre con la stessa chiave Nostr, o salva il codice segreto del profilo da «I tuoi dati».</div>';
 }
 /* ============ fine della rete di sicurezza ============ */
+/* ============ «DIMENTICA IL PROFILO» TOGLIE ANCHE LA COPIA DAI RELAY
+   (13 ott 2026, cantiere «dimentica-copia-relay», richiesta di Andrea:
+   tocca la privacy) ============
+   Fino a ieri il «Dimentica» cancellava il dispositivo, il cloud di
+   Telegram e la parte pubblica sul server, e la copia cifrata restava
+   sui relay — anzi, nella stessa sessione la lettura in tasca
+   (`p2pCopiaLetta`) l'avrebbe fatta tornare. ORA SI TOGLIE IN DUE
+   TEMPI, e l'ordine conta:
+   1) LA COPIA VUOTA: lo stesso evento (kind 30078, lo stesso `d`) col
+      contenuto vuoto e un'ora piu' recente. E' il passo SICURO: ogni
+      relay che la accetta butta quella di prima (e' un evento
+      sostituibile), e col bunker non serve un permesso nuovo.
+   2) LA RICHIESTA NIP-09 (kind 5): con la coordinata `a` e gli `e` di
+      ogni copia vista (strfry guarda gli `e`). E' il passo IN PIU': un
+      relay che obbedisce toglie anche la vuota, uno che la ignora si
+      tiene la vuota — senza segreti. Un rifiuto del firmatario qui non
+      disfa il primo passo.
+   POI SI RILEGGE, e il foglio dice il CONTO VERO: quanti relay non
+   danno piu' una copia piena, su quanti ce n'e' ancora una (spento
+   mentre si toglieva, o chiuso alla scrittura), quanti non rispondono.
+   Con «Riprova», che resta anche dopo una ricarica.
+   CHI RILEGGE NON FA RISORGERE NIENTE (`copiaVivaP2P`): una copia piu'
+   vecchia di una vuota o di una richiesta di cancellazione non e' una
+   copia — sennò il relay che era spento riporterebbe il profilo
+   dimenticato al prossimo ingresso.
+   SI TOGLIE SOLO QUANDO QUI IL PROFILO NON C'E' PIU': con un mazzo in
+   casa la copia e' la sua, e toglierla sarebbe il guasto opposto.
+   I NOMI NON DICONO «RELAY» dove li chiama il foglio: la sentinella del
+   lessico guarda `renderProfiloP2P`, `scordaMazzo`, `dimenticaMazzoOra`. */
+const P2P_COPIA_TOLTA_CHIAVE = 'barattolo_p2p_copia_tolta';
+let p2pCopiaTolta = null;         /* l'ultimo esito: {esito, relays, puliti, restano, muti, chiesta, nulla} */
+let p2pCopiaToglie = null;        /* la promessa in volo */
+/* PURA: la coordinata della copia (NIP-33), quella che una richiesta
+   di cancellazione nomina */
+function coordinataCopiaP2P(pub){
+  return P2P_COPIA_KIND + ':' + String(pub || '') + ':' + P2P_COPIA_D;
+}
+/* PURA: e' una copia MIA (il kind, l'autore, il `d`)? Piena o vuota */
+function copiaMiaP2P(ev, pub){
+  return !!(ev && ev.kind === P2P_COPIA_KIND && ev.pubkey === pub
+    && (ev.tags || []).some(t => t && t[0] === 'd' && t[1] === P2P_COPIA_D));
+}
+/* PURA: i due filtri di chi legge — le copie, e le richieste di
+   cancellazione che le nominano */
+function filtriCopiaP2P(pub){
+  return [{kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [P2P_COPIA_D]},
+          {kinds: [5], authors: [pub], '#a': [coordinataCopiaP2P(pub)]}];
+}
+/* PURA: la richiesta di cancellazione NIP-09, da firmare */
+function eventoCancellaCopiaP2P(pub, ids, adesso){
+  const visti = [...new Set((ids || []).map(i => String(i || '')).filter(i => /^[0-9a-f]{64}$/.test(i)))].slice(0, 40);
+  return {kind: 5,
+          created_at: Math.floor(Number(adesso) || 0) || Math.floor(Date.now() / 1000),
+          tags: [['a', coordinataCopiaP2P(pub)]].concat(visti.map(i => ['e', i]), [['k', String(P2P_COPIA_KIND)]]),
+          content: ''};
+}
+/* PURA: LA COPIA VIVA fra quel che i relay hanno dato. Torna {ev, tolta}:
+   `ev` e' la copia piu' recente mia SE e' piena e SE nessuna copia vuota
+   e nessuna richiesta di cancellazione mia e' recente quanto lei;
+   `tolta` e' l'ora dell'ultima rimozione vista (0 se nessuna) */
+function copiaVivaP2P(eventi, pub){
+  const ev = copiaPiuRecenteP2P(eventi, pub);
+  const coord = coordinataCopiaP2P(pub);
+  let tolta = 0;
+  for (const c of (eventi || []))
+    if (c && c.kind === 5 && c.pubkey === pub
+        && (c.tags || []).some(t => t && t[0] === 'a' && t[1] === coord))
+      tolta = Math.max(tolta, c.created_at | 0);
+  const vuota = !!(ev && !String(ev.content || ''));
+  if (vuota) tolta = Math.max(tolta, ev.created_at | 0);
+  if (!ev || vuota || (ev.created_at | 0) <= tolta) return {ev: null, tolta};
+  return {ev, tolta};
+}
+/* l'esito in sospeso sopravvive alla ricarica: senza, il «Riprova»
+   sparirebbe con la scheda e la copia resterebbe li' in silenzio */
+function copiaToltaLettaP2P(){
+  if (p2pCopiaTolta) return p2pCopiaTolta;
+  try {
+    const t = JSON.parse(localStorage.getItem(chiaveP2P(P2P_COPIA_TOLTA_CHIAVE)) || 'null');
+    return (t && typeof t === 'object' && typeof t.esito === 'string') ? t : null;
+  } catch(e){ return null; }
+}
+function copiaToltaScriviP2P(t){
+  p2pCopiaTolta = t;
+  try {
+    if (t && t.esito !== 'tolta') localStorage.setItem(chiaveP2P(P2P_COPIA_TOLTA_CHIAVE), JSON.stringify(t));
+    else localStorage.removeItem(chiaveP2P(P2P_COPIA_TOLTA_CHIAVE));
+  } catch(e){}
+}
+/* IL GESTO. Torna l'esito (o null dove non c'e' niente da fare: chi non
+   e' nato su Nostr non ha copie li', e con un profilo in casa non si
+   toglie). Fail-open: qualunque guasto e' un esito detto, mai un botto */
+function togliCopiaFuoriP2P(){
+  if (DEMO || VETRINA || !(numeroConto(myTgId) < 0) || mazzoMostro()) return Promise.resolve(null);
+  if (p2pCopiaToglie) return p2pCopiaToglie;
+  /* SUBITO, prima di ogni attesa: la lettura in tasca e' di un profilo
+     che non c'e' piu', e il seme la guarderebbe per prima */
+  p2pCopiaLetta = {mazzo: null, tolta: Math.floor(Date.now() / 1000)};
+  p2pCopiaEsito = '';
+  const ridisegna = () => {
+    if (typeof renderProfiloP2P === 'function' && typeof el === 'function'
+        && el('p2pProfiloSheet')?.classList.contains('open')) renderProfiloP2P();
+  };
+  p2pCopiaToglie = (async () => {
+    const fuori = {esito: 'niente', relays: 0, puliti: 0, restano: 0, muti: 0, chiesta: false, nulla: false};
+    let auto = null;
+    try {
+      try { auto = (typeof firmatarioAutomatico === 'function') ? await firmatarioAutomatico() : null; } catch(e){ auto = null; }
+      if (!auto || !auto.f) {
+        console.log('🔑 [p2p] copia sui relay: per toglierla serve un firmatario, e qui non c\'e\'');
+        return fuori;
+      }
+      await caricaNostrTools();
+      const NT = window.NostrTools;
+      const pub = String(await auto.f.pubkey() || '').toLowerCase();
+      if (!FORMA_HEX64.test(pub)) throw new Error('chiave dell\'account sconosciuta');
+      const relays = await relayPerCopiaP2P(pub);
+      if (!relays.length) throw new Error('nessun relay da cui toglierla');
+      fuori.relays = relays.length;
+      const prima = await leggiDaRelayP2P(relays, filtriCopiaP2P(pub), P2P_COPIA_MS);
+      const mie = prima.filter(x => copiaMiaP2P(x.ev, pub));
+      const piene = mie.filter(x => String(x.ev.content || ''));
+      let dopo = prima;
+      if (piene.length) {
+        if (mazzoMostro()) throw new Error('il profilo e\' rinato: la copia e\' la sua, non si tocca');
+        const adesso = Math.max(Math.floor(Date.now() / 1000), ...mie.map(x => (x.ev.created_at | 0) + 1));
+        const vuota = await auto.f.firma(eventoCopiaProfiloP2P('', adesso));
+        if (!vuota || vuota.pubkey !== pub || vuota.content !== '' || !NT.verifyEvent(vuota))
+          throw new Error('firma della copia vuota storta');
+        await pubblicaEventoSuRelay(relays, vuota);
+        p2pCopiaLetta = {mazzo: null, tolta: adesso};
+        try {
+          const canc = await auto.f.firma(eventoCancellaCopiaP2P(pub, mie.map(x => x.ev.id).concat([vuota.id]), adesso));
+          if (canc && canc.kind === 5 && canc.pubkey === pub && NT.verifyEvent(canc)) {
+            await pubblicaEventoSuRelay(relays, canc);
+            fuori.chiesta = true;
+          }
+        } catch(e) {
+          console.log('🔑 [p2p] copia sui relay: la richiesta di cancellazione non e\' partita (' + ((e && e.message) || e) + '), resta la copia vuota');
+        }
+        dopo = await leggiDaRelayP2P(relays, filtriCopiaP2P(pub), P2P_COPIA_MS);
+      } else fuori.nulla = true;
+      /* IL CONTO VERO, relay per relay: una copia PIENA che torna
+         ancora = resta; chi non risponde = non si sa */
+      const risposti = new Set(dopo.risposti || []);
+      const conPiena = new Set(dopo.filter(x => copiaMiaP2P(x.ev, pub) && String(x.ev.content || '')).map(x => x.relay));
+      fuori.restano = relays.filter(r => conPiena.has(r)).length;
+      fuori.muti = relays.filter(r => !conPiena.has(r) && !risposti.has(r)).length;
+      fuori.puliti = relays.length - fuori.restano - fuori.muti;
+      fuori.esito = (!fuori.restano && !fuori.muti) ? 'tolta' : 'parte';
+      console.log('🔑 [p2p] copia sui relay: tolta da ' + fuori.puliti + ' su ' + relays.length
+                  + (fuori.restano ? ', resta su ' + fuori.restano : '') + (fuori.muti ? ', ' + fuori.muti + ' non rispondono' : '')
+                  + (fuori.nulla ? ' (non ce n\'era)' : '') + (fuori.chiesta ? ', cancellazione chiesta' : ''));
+    } catch(e) {
+      const perche = String((e && e.message) || e || '');
+      fuori.esito = /rifiut|denied|reject|permission|unauthori|not allowed/i.test(perche) ? 'rifiutata' : 'guasto';
+      console.log('🔑 [p2p] copia sui relay: non tolta (' + perche + ')');
+    } finally {
+      if (auto && auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+    }
+    return fuori;
+  })().then(f => { copiaToltaScriviP2P(f); return f; })
+    .finally(() => { p2pCopiaToglie = null; ridisegna(); });
+  ridisegna();
+  return p2pCopiaToglie;
+}
+/* PURA (sull'esito): la riga del foglio, dove il profilo non c'e' piu' */
+function rigaCopiaToltaFuoriP2P(){
+  if (DEMO || VETRINA || !(numeroConto(myTgId) < 0) || mazzoMostro()) return '';
+  if (p2pCopiaToglie) return '<div class="hint">Tolgo la copia cifrata dai relay…</div>';
+  const t = copiaToltaLettaP2P();
+  if (!t) return '';
+  const riprova = '<button class="btn ghost" onclick="riprovaTogliCopiaP2P()">🔁 Riprova a toglierla dai relay</button>';
+  if (t.esito === 'tolta')
+    return '<div class="hint">' + (t.nulla ? '✓ Sui relay non c\'è nessuna copia del profilo.'
+      : '✓ Copia cifrata tolta dai relay (' + (t.puliti | 0) + ' su ' + (t.relays | 0) + ').') + '</div>';
+  if (t.esito === 'parte') {
+    const pezzi = [];
+    if (t.restano | 0) pezzi.push('su ' + (t.restano | 0) + ' c\'è ancora, sempre cifrata');
+    if (t.muti | 0) pezzi.push((t.muti | 0) + ((t.muti | 0) === 1 ? ' non risponde' : ' non rispondono'));
+    return '<div class="hint">⚠️ Copia cifrata tolta da ' + (t.puliti | 0) + ' relay su ' + (t.relays | 0) + ': '
+      + pezzi.join(', ') + '.</div>' + riprova;
+  }
+  const testo = {
+    niente: 'Per togliere la copia cifrata dai relay serve la tua chiave: entra con l\'estensione, il bunker o la nsec e riprova.',
+    rifiutata: '⚠️ Il tuo firmatario non ha concesso la firma: la copia cifrata sui relay è ancora lì.',
+    guasto: '⚠️ Non siamo riusciti a togliere la copia cifrata dai relay.'
+  }[t.esito] || '';
+  return testo ? '<div class="hint">' + testo + '</div>' + riprova : '';
+}
+async function riprovaTogliCopiaP2P(){
+  haptic();
+  try { await togliCopiaFuoriP2P(); } catch(e){}
+  renderProfiloP2P();
+}
+/* IL PROFILO RINASCEREBBE UGUALE? Solo se qui c'e' la nsec E lui deriva
+   da lei. ⚠️ `origine 'conto'` con un conto negativo NON lo dice: lo
+   porta anche il profilo nato a caso (bunker, estensione) da quando il
+   suo seme e' la copia sui relay — e a lui «rinasce uguale» sarebbe
+   una bugia proprio sul gesto che lo cancella (visto nel giro dal
+   vivo, 13 ott 2026) */
+function rinasceUgualeFuoriP2P(m){
+  if (!m || !(numeroConto(myTgId) < 0) || typeof nsecSalvate !== 'function') return false;
+  /* SENZA ATTESE: la domanda del «Dimentica» nasce nel gesto. Si
+     guardano le nsec di QUESTO browser: se una deriva proprio questo
+     profilo, rientrando con lei rinasce uguale */
+  try {
+    return Object.values(nsecSalvate() || {}).some(sk => {
+      const s = String(sk || '').toLowerCase();
+      return FORMA_HEX64.test(s) && semeDaNsecP2P(s) === m.sk;
+    });
+  } catch(e){ return false; }
+}
+/* PURA: cosa chiede il «Dimentica», detto per intero a chi ha una copia
+   fuori. Chi e' nato con Telegram legge la frase di sempre */
+function testoDimenticaFuoriP2P(rinasce){
+  const coda = '\n\nSe non hai salvato il codice segreto, la reputazione riparte da zero.';
+  if (!(numeroConto(myTgId) < 0))
+    return 'Il profilo di scambio sparisce da questo dispositivo e dal tuo Telegram.' + coda;
+  if (rinasce)
+    return 'Il profilo di scambio sparisce da questo dispositivo, e la sua copia cifrata viene tolta dai relay.'
+      + '\n\nÈ legato alla tua chiave Nostr: se rientri con quella, rinasce uguale e la copia torna sui relay.';
+  return 'Il profilo di scambio sparisce da questo dispositivo, e la sua copia cifrata viene tolta dai relay: '
+    + 'su un altro dispositivo non tornerà più da solo.' + coda;
+}
+/* PURA: il nome del bottone — «su questo dispositivo» solo dove e' vero */
+function etichettaDimenticaFuoriP2P(){
+  return numeroConto(myTgId) < 0 ? '🗑 Dimentica il profilo' : '🗑 Dimentica il profilo su questo dispositivo';
+}
 /* ============ fine della copia cifrata sui relay ============ */
 function mazzoMostro(){
   try {
@@ -55621,7 +55864,9 @@ function renderProfiloP2P(){
          si leggono anche sul dispositivo dove il mazzo non c'e' */
       + (typeof rigaMiaReputazioneP2P === 'function' ? rigaMiaReputazioneP2P() : '')
       /* ...e la pausa degli ordini (12 ott 2026): e' dell'ACCOUNT anche lei */
-      + (typeof rigaPausaProfiloP2P === 'function' ? rigaPausaProfiloP2P() : '');
+      + (typeof rigaPausaProfiloP2P === 'function' ? rigaPausaProfiloP2P() : '')
+      /* ...e l'esito del togliere la copia fuori (13 ott 2026), col suo «Riprova» */
+      + (typeof rigaCopiaToltaFuoriP2P === 'function' ? rigaCopiaToltaFuoriP2P() : '');
     return;
   }
   /* IL GIUDIZIO SI FA ANCHE DA QUI: al foglio ci si arriva da «I tuoi
@@ -55679,7 +55924,7 @@ function renderProfiloP2P(){
       <button type="submit" class="btn orange" style="margin-top:10px">✓ L'ho salvato</button>
     </form>
     <button class="btn ghost" onclick="mostraCodiceP2P()" style="display:${p2pCodiceVisibile ? 'none' : ''}">🔑 Mostra il codice segreto</button>
-    <button class="btn allarme" onclick="scordaMazzo()">🗑 Dimentica il profilo su questo dispositivo</button>`;
+    <button class="btn allarme" onclick="scordaMazzo()">${etichettaDimenticaFuoriP2P()}</button>`;
   /* il codice entra col .value: mai dentro un template */
   if (p2pCodiceVisibile) el('p2pCodice').value = p2pCodiceMostrato;
 }
@@ -55729,8 +55974,9 @@ function scordaMazzo(){
     toast('Hai uno scambio ancora aperto: finiscilo prima di dimenticare il profilo');
     return;
   }
+  const rinasce = typeof rinasceUgualeFuoriP2P === 'function' && rinasceUgualeFuoriP2P(mazzoMostro());
   chiediConferma({titolo: 'Dimenticare il profilo?',
-    corpo: 'Il profilo di scambio sparisce da questo dispositivo e dal tuo Telegram.\n\nSe non hai salvato il codice segreto, la reputazione riparte da zero.',
+    corpo: testoDimenticaFuoriP2P(rinasce),
     etichetta: 'Dimentica', poi: dimenticaMazzoOra});
 }
 async function dimenticaMazzoOra(){
@@ -55750,6 +55996,9 @@ async function dimenticaMazzoOra(){
   p2pChiaviGiro = null;
   renderProfiloP2P();
   toast('Profilo di scambio dimenticato');
+  /* ...E LA COPIA FUORI (13 ott 2026): parte adesso che qui il profilo
+     non c'e' piu', non si aspetta, e il foglio ne dice l'esito */
+  if (typeof togliCopiaFuoriP2P === 'function') togliCopiaFuoriP2P().catch(() => {});
 }
 
 /* ---- export CSV degli affari conclusi (contabilità) ---- */

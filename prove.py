@@ -69830,38 +69830,48 @@ def prove_p2p_chiavi():
            "scambio una chiave Nostr tua, quel profilo <b>non lo può ricavare nessuno</b>" in mini,
            [f for f in ("<b>Se entri da Telegram</b>", "<b>Se entri con una chiave Nostr",
                         "dipende da come entri") if f in mini]))
-    # LA COPIA CIFRATA SUI RELAY STA NEL PATTO (13 ott 2026, cantiere
-    # patto-copia-relay, richiesta di Andrea): il profilo di un account
-    # nato su Nostr ha una copia cifrata sui relay (dall'11 ott, cantiere
-    # tor-chiavi-scambio) e lo diceva solo il foglio del profilo. Una riga
-    # sola, subito sotto «nato su Nostr», col suo prezzo. E OGNI PEZZO
-    # DELLA RIGA SI CONTROLLA SUL CODICE: se un giorno la copia finisse sul
-    # server, o «Dimentica il profilo» imparasse a toglierla dai relay, la
-    # riga direbbe il falso e questa prova lo dice prima.
+    # LA COPIA CIFRATA SUI RELAY STA NEL PATTO (13 ott 2026, cantieri
+    # patto-copia-relay e dimentica-copia-relay, richieste di Andrea): il
+    # profilo di un account nato su Nostr ha una copia cifrata sui relay
+    # (dall'11 ott, cantiere tor-chiavi-scambio) e lo diceva solo il
+    # foglio del profilo. Un paragrafo solo, subito sotto «nato su
+    # Nostr», col suo prezzo. E DAL POMERIGGIO DELLO STESSO GIORNO
+    # «Dimentica il profilo» LA TOGLIE ANCHE DAI RELAY: il patto lo dice
+    # coi suoi limiti. OGNI PEZZO DEL PARAGRAFO SI CONTROLLA SUL CODICE:
+    # se un giorno la copia finisse sul server, o il «Dimentica»
+    # smettesse di toglierla, il paragrafo direbbe il falso e questa
+    # prova lo dice prima.
     _copia = ("<p>Per fartelo ritrovare su ogni dispositivo, il tuo browser ne mette una "
               "<b>copia cifrata sui relay Nostr</b> — i tuoi, quelli pubblici che usa Barattolo e "
               "il nostro: la apre <b>solo la tua chiave</b>, noi no, e sul nostro server non ce n'è "
               "nessuna. Il prezzo lo diciamo per intero: chi legge quei relay <b>vede che la copia "
-              "esiste ed è tua</b>, non cosa contiene, e «Dimentica il profilo» <b>non la toglie</b> "
-              "da lì.</p>")
+              "esiste ed è tua</b>, non cosa contiene. «Dimentica il profilo» <b>la toglie anche da "
+              "lì</b>: la sostituisce con una vuota e chiede ai relay di cancellarla. Non possiamo "
+              "garantire che tutti obbediscano: su un relay che non lo fa può restare la copia "
+              "vecchia, sempre cifrata, e resta visibile che una copia c'è stata.</p>")
     _nato = priv.find("<p><b>Se il tuo account è nato su Nostr</b>, il profilo")
     _altri = priv.find("<p><b>Negli altri casi</b>")
-    prova("IL PATTO DICE LA COPIA CIFRATA SUI RELAY: una riga, una volta sola, subito sotto «nato "
-          "su Nostr» e prima degli altri casi", (1, True),
-          (priv.count(_copia), 0 <= _nato < priv.find(_copia) < _altri))
+    prova("IL PATTO DICE LA COPIA CIFRATA SUI RELAY, e che «Dimentica il profilo» la toglie anche da li' coi "
+          "suoi limiti: un paragrafo, una volta sola, subito sotto «nato su Nostr» e prima degli altri casi",
+          (1, True, 0),
+          (priv.count(_copia), 0 <= _nato < priv.find(_copia) < _altri, priv.count("non la toglie")))
     _relay = pezzo("_relay_copia_p2p")
     _pubblica = pezzo_js(mini, "async function pubblicaCopiaProfiloP2P(", "\n}\n")
-    _dimentica = (pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
-                  + pezzo_js(mini, "async function dimenticaChiaviP2P(", "\n}\n"))
-    prova("...ed e' VERA pezzo per pezzo: cifrata verso la propria chiave (NIP-44) nel browser; sui "
+    _dimentica = pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
+    _toglie = pezzo_js(mini, "function togliCopiaFuoriP2P(){", "\n}\n")
+    prova("...ed e' VERO pezzo per pezzo: cifrata verso la propria chiave (NIP-44) nel browser; sui "
           "relay dell'utente, su quelli pubblici di casa e sul nostro; sul server nessuna copia "
-          "(il kind non ci compare); e «Dimentica il profilo» non tocca i relay",
-          (True, True, True, 0, []),
+          "(il kind non ci compare); e «Dimentica il profilo» la toglie — la vuota, poi la richiesta "
+          "di cancellazione, sugli stessi relay della copia",
+          (True, True, True, 0, True, True),
           ("const cifrato = await auto.f.cifra44(pub, mazzoSerializza(m));" in _pubblica,
            "RELAYS_VERIFICA" in _relay and "MOSTRO_RELAY_SPECCHIO" in _relay,
            "relayScritturaDaEventoP2P(" in mini and "const P2P_COPIA_KIND = 30078;" in mini,
            src.count("30078"),
-           [s for s in ("p2p_copia", "relay", "copia", "kind: 5", "pubblica") if s in _dimentica.lower()]))
+           "togliCopiaFuoriP2P().catch(() => {});" in _dimentica,
+           0 < _toglie.find("const relays = await relayPerCopiaP2P(pub);")
+           < _toglie.find("await auto.f.firma(eventoCopiaProfiloP2P('', adesso));")
+           < _toglie.find("await auto.f.firma(eventoCancellaCopiaP2P(")))
     # ...E DALLA FASE 6 E' ANCHE LA PORTA DEL FOGLIETTO: il codice
     # segreto e il «dimentica» si raggiungono SOLO da qui.
     prova("...e porta il bottone del foglietto ridotto", True,
@@ -79225,7 +79235,10 @@ def prove_p2p_conto_dispositivo():
     # si riconosce da `numeroConto(m.conto) < 0`
     # QUINDICI dal 12 ott 2026 («chiavi-stesso-profilo»): la lettura
     # della copia sui relay e il seme chiedono anche loro «e' un nativo?»
-    prova("...e i giudici e il testo usano numeroConto", 15,
+    # VENTI dal 13 ott 2026 («dimentica-copia-relay»): il togliere la
+    # copia dai relay, la sua riga, il testo e il nome del «Dimentica»
+    # chiedono anche loro «e' un nativo?» (e il testo: «deriva dalla nsec?»)
+    prova("...e i giudici e il testo usano numeroConto", 20,
           blocco_mazzo.count("numeroConto(m.conto)")
           + blocco_mazzo.count("numeroConto(d.conto)")
           + blocco_mazzo.count("numeroConto(myTgId)"))
@@ -153007,8 +153020,8 @@ def prove_tor_chiavi_scambio():
     prova("...l'estensione solo se la offre", True,
           "n.nip44 && typeof n.nip44.encrypt === 'function'" in fn("function firmatarioEstensione(){"))
     prova("i permessi del bunker chiedono la firma del 30078 e la cifratura NIP-44", True,
-          "sign_event:30078,nip44_encrypt,nip44_decrypt" in
-          re.search(r"const NIP46_PERMESSI = '([^']+)';", mini).group(1))
+          all(p in re.search(r"const NIP46_PERMESSI = '([^']+)';", mini).group(1).split(",")
+              for p in ("sign_event:30078", "nip44_encrypt", "nip44_decrypt")))
     prova("il campo `copiaRelay` viaggia col mazzo, andata e ritorno", True,
           "copiaRelay: m.copiaRelay|0," in fn("function mazzoSerializza(m){")
           and "copiaRelay: d ? (d.copiaRelay|0) : 0," in fn("function mazzoDaTesto(testo){"))
@@ -153085,10 +153098,12 @@ vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
 /* IL RELAY DI CARTONE: uno per url, con la memoria degli eventi e una
    leva «giu'»; NT.Relay e' quello, il resto e' il bundle vero */
 const relayStore = new Map(), relayGiu = new Set(), pubblicati = [];
+const relayModo = new Map(), relayNoScrive = new Set();
 function combacia(f, ev){
   if (f.kinds && f.kinds.indexOf(ev.kind) < 0) return false;
   if (f.authors && f.authors.indexOf(ev.pubkey) < 0) return false;
   if (f['#d'] && !ev.tags.some(t => t[0] === 'd' && f['#d'].indexOf(t[1]) >= 0)) return false;
+  if (f['#a'] && !ev.tags.some(t => t[0] === 'a' && f['#a'].indexOf(t[1]) >= 0)) return false;
   return true;
 }
 class RelayCartone {
@@ -153098,7 +153113,39 @@ class RelayCartone {
     if (!relayStore.has(url)) relayStore.set(url, []);
     return new RelayCartone(url);
   }
-  async publish(ev){ pubblicati.push({url: this.url, ev}); relayStore.get(this.url).push(ev); return 'ok'; }
+  /* TRE CARATTERI DI RELAY (13 ott 2026, «dimentica-copia-relay»), piu' lo
+     spento (`relayGiu`) e il chiuso alla scrittura (`relayNoScrive`):
+     ''      accoda e basta: non sostituisce niente e non cancella niente
+             (il peggiore: la copia di prima resta leggibile)
+     'nip01' sostituisce l'evento indirizzabile con uno piu' recente, e
+             una richiesta di cancellazione la conserva senza obbedire
+     'nip09' sostituisce E obbedisce: toglie gli `e` e la coordinata `a`
+             fino all'ora della richiesta, e rifiuta quel che lei copre */
+  async publish(ev){
+    if (relayNoScrive.has(this.url)) throw new Error('restricted: solo Barattolo e i suoi venditori');
+    const modo = relayModo.get(this.url) || '';
+    let st = relayStore.get(this.url);
+    const dDi = e => ((e.tags || []).find(t => t[0] === 'd') || [])[1];
+    const coordDi = e => e.kind + ':' + e.pubkey + ':' + dDi(e);
+    const indirizzabile = ev.kind >= 30000 && ev.kind < 40000;
+    if (modo && indirizzabile) {
+      if (modo === 'nip09' && st.some(c => c.kind === 5 && c.pubkey === ev.pubkey && c.created_at >= ev.created_at
+          && c.tags.some(t => t[0] === 'a' && t[1] === coordDi(ev)))) throw new Error('deleted: una cancellazione la copre');
+      if (st.some(c => c.kind === ev.kind && c.pubkey === ev.pubkey && dDi(c) === dDi(ev) && c.created_at >= ev.created_at))
+        throw new Error('replaced: ne ho una piu\' recente');
+      st = st.filter(c => !(c.kind === ev.kind && c.pubkey === ev.pubkey && dDi(c) === dDi(ev)));
+    }
+    if (modo === 'nip09' && ev.kind === 5) {
+      const ids = ev.tags.filter(t => t[0] === 'e').map(t => t[1]);
+      const coord = ev.tags.filter(t => t[0] === 'a').map(t => t[1]);
+      st = st.filter(c => !(c.pubkey === ev.pubkey && c.kind !== 5
+        && (ids.indexOf(c.id) >= 0 || (coord.indexOf(coordDi(c)) >= 0 && c.created_at <= ev.created_at))));
+    }
+    pubblicati.push({url: this.url, ev});
+    st.push(ev);
+    relayStore.set(this.url, st);
+    return 'ok';
+  }
   subscribe(filtri, opz){
     const miei = relayStore.get(this.url) || [];
     setTimeout(() => { for (const ev of miei) if (filtri.some(f => combacia(f, ev))) opz.onevent(ev); if (opz.oneose) opz.oneose(); }, 1);
@@ -153154,10 +153201,11 @@ async function pubAccount(){ return contoAperto ? contoAperto.pub : ''; }
    'bunker' (un oggetto che risponde come chiama()), 'estensione' (window.nostr
    di cartone, col vero firmatarioEstensione), o nessuno */
 let modoFirma = ''; let bunkerRifiuta = false; let estensioneSenza44 = false;
+let bunkerNoCanc = false, bunkerNoFirma = false;   /* (13 ott 2026) il bunker che non firma la cancellazione, o niente */
 function bunkerCartone(c){
   return {
     pubkey: async () => c.pub,
-    firma: async ev => NT.finalizeEvent(ev, c.sk),
+    firma: async ev => { if (bunkerNoFirma || (bunkerNoCanc && ev.kind === 5)) throw new Error('permission denied'); return NT.finalizeEvent(ev, c.sk); },
     cifra44: async (pub, t) => { if (bunkerRifiuta) throw new Error('permission denied'); return NT.nip44.encrypt(t, NT.nip44.getConversationKey(c.sk, pub)); },
     decifra44: async (pub, t) => { if (bunkerRifiuta) throw new Error('permission denied'); return NT.nip44.decrypt(t, NT.nip44.getConversationKey(c.sk, pub)); },
     chiudi(){},
@@ -153183,6 +153231,7 @@ function chiudiBrowser(){
   azzeraSessioneP2P(); p2pAdozione = false; contoInCorso = null; mazzoInCorso = null;
   p2pCopiaEsito = ''; p2pCopiaGiro = null; p2pCopiaTentata = false; p2pRelayUtente = null; p2pCopiaFoglio = null;
   p2pCopiaLetta = null; p2pCopiaLettura = null; p2pMazzoEsito = ''; p2pSemeGiro = null; p2pGiudizio = null;
+  p2pCopiaTolta = null; p2pCopiaToglie = null;
   fetches = []; toasts = [];
 }
 function entra(nome, modo, conNsec){
@@ -153363,6 +153412,144 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
   /* un conto Telegram (id positivo) non va sui relay */
   myTgId = 111; out.telegramCopia = await assicuraCopiaProfiloP2P({gesto: true}); myTgId = -555;
 
+  /* ===== F) «DIMENTICA IL PROFILO» TOGLIE LA COPIA DAI RELAY (13 ott 2026) ===== */
+  const QUATTRO = ['wss://mio.test', 'wss://scrivo.test', 'wss://casa.test', 'wss://specchio.test'];
+  /* cosa tiene un relay di questa persona: piena | vuota | canc, senza doppioni */
+  const vede = (url, pub) => [...new Set((relayStore.get(url) || []).filter(e => e.pubkey === pub && (e.kind === 30078 || e.kind === 5))
+    .map(e => e.kind === 5 ? 'canc' : (e.content ? 'piena' : 'vuota')))].sort().join('+');
+  const sospeso = () => [...store.keys()].some(k => k.indexOf('barattolo_p2p_copia_tolta') === 0);
+  /* senza la cura un evento o un esito possono MANCARE: il banco lo deve dire con una rossa, non con un botto */
+  const oraDi = e => e ? e.created_at : 0, idDi = e => e ? e.id : '', es = e => e || {esito: 'NESSUN ESITO'};
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; relayGiu.clear(); entra('lia', 'bunker', false);
+  relayStore.set('wss://casa.test', [NT.finalizeEvent({kind: 10002, created_at: 100, content: '',
+    tags: [['r', 'wss://mio.test'], ['r', 'wss://scrivo.test', 'write']]}, contoAperto.sk)]);
+  /* i quattro caratteri: obbediente, sostituisce-e-basta, accoda-e-basta; il quarto si spegne */
+  relayModo.set('wss://mio.test', 'nip09'); relayModo.set('wss://scrivo.test', 'nip01'); relayModo.set('wss://specchio.test', 'nip01');
+  const mL = await assicuraMazzo();
+  await assicuraCopiaProfiloP2P({gesto: true});
+  const copiaL = pubblicati.filter(p => p.ev.kind === 30078)[0].ev;
+  /* (il giro dal vivo: dopo la copia il profilo nato a caso e' timbrato 'conto' anche lui — e NON rinasce uguale) */
+  await giudicaMazzoP2P(mazzoMostro());
+  out.togliPrima = [QUATTRO.map(u => vede(u, contoAperto.pub)), testoDimenticaFuoriP2P(rinasceUgualeFuoriP2P(mazzoMostro())),
+                    etichettaDimenticaFuoriP2P(), mazzoMostro().sk === mL.sk, mazzoMostro().origine];
+  relayGiu.add('wss://specchio.test');
+  pubblicati.length = 0; fetches = [];
+  await dimenticaMazzoOra();
+  out.togliSubito = [!!mazzoMostro(), !!p2pCopiaToglie, rigaCopiaToltaFuoriP2P(), p2pCopiaLetta && p2pCopiaLetta.mazzo,
+                     fetches.filter(f => f.opt && f.opt.method === 'DELETE').length];
+  const eL = await p2pCopiaToglie;
+  const vuotaL = (pubblicati.filter(p => p.ev.kind === 30078)[0] || {}).ev, cancL = (pubblicati.filter(p => p.ev.kind === 5)[0] || {}).ev;
+  out.togliEsito = eL;
+  out.togliEventi = [!!vuotaL && vuotaL.content === '', !!vuotaL && vuotaL.pubkey === contoAperto.pub && NT.verifyEvent(vuotaL),
+    vuotaL && vuotaL.tags.map(t => t.join('=')), !!vuotaL && vuotaL.created_at > copiaL.created_at,
+    !!cancL && cancL.pubkey === contoAperto.pub && NT.verifyEvent(cancL),
+    !!cancL && cancL.tags[0].join('=') === 'a=30078:' + contoAperto.pub + ':barattolo/p2p/profilo/v1',
+    !!cancL && cancL.tags.filter(t => t[0] === 'e').map(t => t[1]).sort().join() === [copiaL.id, idDi(vuotaL)].sort().join(),
+    cancL && cancL.tags[cancL.tags.length - 1].join('='), !!cancL && !!vuotaL && cancL.created_at >= vuotaL.created_at,
+    pubblicati.findIndex(p => p.ev.kind === 30078) < pubblicati.findIndex(p => p.ev.kind === 5),
+    [...new Set(pubblicati.map(p => p.url))].sort()];
+  out.togliRelay = QUATTRO.map(u => vede(u, contoAperto.pub));
+  out.togliRiga = [rigaCopiaToltaFuoriP2P(), sospeso(), toasts[toasts.length - 1], renderProfiloChiamate > 0];
+  /* UN'ALTRA SESSIONE, il relay spento e' tornato con la copia PIENA di prima: il profilo non risorge */
+  chiudiBrowser(); relayGiu.clear(); entra('lia', 'bunker', false);
+  const mL2 = await adottaProfiloContoP2P();
+  out.togliNonRisorge = [mL2, !!mazzoMostro(), vede('wss://specchio.test', contoAperto.pub),
+    log.some(l => l.indexOf("copia sui relay: e' stata tolta") >= 0), !!(p2pCopiaLetta && !!vuotaL && p2pCopiaLetta.tolta >= oraDi(vuotaL))];
+  /* «RIPROVA»: lo spento ora c'e' e si pulisce; quello che accoda e basta si tiene la sua */
+  pubblicati.length = 0;
+  await riprovaTogliCopiaP2P();
+  out.togliRiprova = [p2pCopiaTolta, QUATTRO.map(u => vede(u, contoAperto.pub)), rigaCopiaToltaFuoriP2P(), sospeso()];
+  /* ...e quando anche lui impara a sostituire: tolta ovunque, e il sospeso se ne va */
+  relayModo.set('wss://casa.test', 'nip01');
+  await riprovaTogliCopiaP2P();
+  out.togliTutta = [p2pCopiaTolta, QUATTRO.map(u => vede(u, contoAperto.pub)), rigaCopiaToltaFuoriP2P(), sospeso()];
+  const ultimaCanc = Math.max(...(relayStore.get('wss://mio.test') || []).filter(e => e.kind === 5).map(e => e.created_at));
+  /* UN PROFILO NUOVO DOPO: la copia nuova nasce DOPO l'ultima rimozione, passa anche dal relay obbediente, e torna */
+  const mN = await assicuraMazzo();
+  const esitoN = await assicuraCopiaProfiloP2P({gesto: true});
+  const copiaN = (relayStore.get('wss://mio.test') || []).filter(e => e.kind === 30078)[0];
+  chiudiBrowser(); entra('lia', 'bunker', false);
+  const mN2 = await adottaProfiloContoP2P();
+  out.togliPoiRinasce = [esitoN, mN.sk !== mL.sk, !!copiaN && copiaN.created_at > ultimaCanc, !!mN2 && mN2.sk === mN.sk,
+                         vede('wss://mio.test', contoAperto.pub)];
+  /* CON UN PROFILO IN CASA NON SI TOGLIE NIENTE: la copia e' la sua */
+  pubblicati.length = 0;
+  out.togliConProfilo = [await togliCopiaFuoriP2P(), pubblicati.length, rigaCopiaToltaFuoriP2P(), vede('wss://scrivo.test', contoAperto.pub)];
+  /* CHI ENTRA CON LA NSEC: tolta; alla sessione dopo il profilo RINASCE UGUALE dalla chiave, e la copia torna */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('noa', 'nsec', true);
+  relayModo.set('wss://casa.test', 'nip09');
+  const mS = await adottaProfiloContoP2P();
+  await assicuraCopiaProfiloP2P({gesto: true});
+  const testoS = testoDimenticaFuoriP2P(rinasceUgualeFuoriP2P(mazzoMostro()));
+  await dimenticaMazzoOra();
+  const eS = await p2pCopiaToglie;
+  const dopoS = [vede('wss://casa.test', contoAperto.pub), vede('wss://specchio.test', contoAperto.pub)];
+  chiudiBrowser(); entra('noa', 'nsec', true);
+  const mS2 = await adottaProfiloContoP2P();
+  const esitoS2 = await assicuraCopiaProfiloP2P({gesto: true});
+  out.togliNsec = [eS, dopoS, testoS.indexOf('rinasce uguale') > 0, !!mS2 && mS2.sk === mS.sk && mS.sk === semeDaNsecP2P(contoAperto.skHex),
+                   esitoS2, [vede('wss://casa.test', contoAperto.pub), vede('wss://specchio.test', contoAperto.pub)]];
+  /* SENZA FIRMATARIO: niente parte, si dice, e il «Riprova» resta anche dopo una ricarica della pagina */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('olga', 'bunker', false);
+  await assicuraMazzo(); await assicuraCopiaProfiloP2P({gesto: true});
+  pubblicati.length = 0; modoFirma = '';
+  await dimenticaMazzoOra();
+  const eO = await p2pCopiaToglie;
+  p2pCopiaTolta = null;                         /* la pagina si ricarica: resta quel che sta nella memoria del browser */
+  const rigaO = rigaCopiaToltaFuoriP2P(), partitiO = pubblicati.length;
+  modoFirma = 'bunker';
+  await riprovaTogliCopiaP2P();
+  out.togliSenzaFirma = [es(eO).esito, partitiO, rigaO, p2pCopiaTolta && p2pCopiaTolta.esito, sospeso(),
+                         vede('wss://casa.test', contoAperto.pub)];
+  /* IL BUNKER CHE NON FIRMA LA CANCELLAZIONE: la copia vuota parte lo stesso, e basta lei */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('pia', 'bunker', false);
+  await assicuraMazzo(); await assicuraCopiaProfiloP2P({gesto: true});
+  pubblicati.length = 0; bunkerNoCanc = true;
+  await dimenticaMazzoOra();
+  const eP = await p2pCopiaToglie;
+  bunkerNoCanc = false;
+  out.togliSenzaCanc = [eP, [...new Set(pubblicati.map(p => p.ev.kind))], vede('wss://casa.test', contoAperto.pub), vede('wss://specchio.test', contoAperto.pub)];
+  /* IL BUNKER CHE NON FIRMA NIENTE: «rifiutata», la copia e' ancora li', e si dice */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('quinn', 'bunker', false);
+  await assicuraMazzo(); await assicuraCopiaProfiloP2P({gesto: true});
+  pubblicati.length = 0; bunkerNoFirma = true;
+  await dimenticaMazzoOra();
+  const eQ = await p2pCopiaToglie;
+  bunkerNoFirma = false;
+  out.togliRifiutata = [es(eQ).esito, pubblicati.length, vede('wss://casa.test', contoAperto.pub), rigaCopiaToltaFuoriP2P()];
+  /* UN RELAY CHIUSO ALLA SCRITTURA (il nostro, per una chiave fuori lista): li' resta, e il conto lo dice */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('rita', 'bunker', false);
+  await assicuraMazzo(); await assicuraCopiaProfiloP2P({gesto: true});
+  relayNoScrive.add('wss://specchio.test');
+  await dimenticaMazzoOra();
+  const eR = await p2pCopiaToglie;
+  relayNoScrive.clear();
+  out.togliChiuso = [eR, vede('wss://casa.test', contoAperto.pub), vede('wss://specchio.test', contoAperto.pub)];
+  /* CHI NON HA MAI AVUTO UNA COPIA: non parte NIENTE (nessuna traccia nuova), e si dice che non c'e' */
+  chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('sara', 'bunker', false);
+  await assicuraMazzo();
+  await dimenticaMazzoOra();
+  const eT = await p2pCopiaToglie;
+  out.togliNulla = [eT, pubblicati.length, rigaCopiaToltaFuoriP2P(), sospeso()];
+  /* UN CONTO TELEGRAM: non ha copie li', non si tocca niente, e legge la frase di sempre */
+  chiudiBrowser(); entra('alice', 'nsec', true); myTgId = 111; pubblicati.length = 0;
+  out.togliTelegram = [await togliCopiaFuoriP2P(), pubblicati.length, rigaCopiaToltaFuoriP2P(),
+                       testoDimenticaFuoriP2P(rinasceUgualeFuoriP2P(mazzoMostro())), etichettaDimenticaFuoriP2P()];
+  myTgId = -555;
+  relayModo.clear();
+  /* I GIUDICI PURI */
+  const P = 'ab'.repeat(32), Q = 'cd'.repeat(32), CO = '30078:' + P + ':' + P2P_COPIA_D;
+  const cp = (quando, contenuto, chi) => ({kind: 30078, pubkey: chi || P, created_at: quando, content: contenuto, tags: [['d', P2P_COPIA_D]], id: 'c' + quando});
+  const cn = (quando, coord, chi) => ({kind: 5, pubkey: chi || P, created_at: quando, content: '', tags: [['a', coord || CO]], id: 'k' + quando});
+  const viva = evs => { const v = copiaVivaP2P(evs, P); return [v.ev ? v.ev.id : null, v.tolta]; };
+  out.viva = [viva([cp(5, 'x')]), viva([cp(5, 'x'), cp(9, '')]), viva([cp(5, 'x'), cn(7)]), viva([cp(9, 'x'), cn(7)]),
+              viva([cp(7, 'x'), cn(7)]), viva([cp(5, 'x'), cn(9, null, Q)]), viva([cp(5, 'x'), cn(9, '30078:' + P + ':altro')]),
+              viva([cp(5, ''), cp(9, 'y')]), viva([]), viva([cn(4)])];
+  const ec = eventoCancellaCopiaP2P(P, ['storto', Q, Q, P], 123);
+  out.cancella = [ec.kind, ec.created_at, ec.content, ec.tags.map(t => t.join('='))];
+  out.filtri = [JSON.stringify(filtriCopiaP2P(P)), coordinataCopiaP2P(P) === CO,
+                copiaMiaP2P(cp(1, ''), P), copiaMiaP2P(cp(1, 'x', Q), P), copiaMiaP2P(cn(1), P)];
+
   /* ===== E) I TESTI E IL TEMPO ======================================= */
   out.rigaCorta = rigaChiaviAltroveP2P({}, false);
   pubCasa = conto('alice').pub;
@@ -153449,6 +153636,192 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     prova("la rovesciata del tempo nel libro torna alla scadenza del PayCode (al secondo) su 216 casi, e zero sui dati che mancano",
           [216, 216, 0, 0, 0], o["rovesciata"])
     prova("l'avviso di Tor c'e' solo su Tor", [True, ""], o["avvisoTor"])
+
+    # --- 6) «DIMENTICA IL PROFILO» TOGLIE LA COPIA DAI RELAY (13 ott 2026,
+    # cantiere dimentica-copia-relay, richiesta di Andrea: tocca la
+    # privacy). Quattro relay di cartone, quattro caratteri: uno che
+    # obbedisce alla cancellazione (NIP-09), uno che sostituisce e basta,
+    # uno che accoda e basta, uno spento. Si rompe in silenzio in tutti i
+    # modi: la copia che resta e si dice «tolta»; il relay spento che fa
+    # risorgere il profilo al login dopo; la copia nuova che nasce gia'
+    # cancellata; il «Riprova» che sparisce con la pagina; una traccia
+    # lasciata dove non c'era niente; la copia di un profilo VIVO tolta
+    # per sbaglio.
+    CO = "barattolo/p2p/profilo/v1"
+    prova("PRIMA: la copia sta su tutti e quattro; a chi ha una copia fuori il «Dimentica» lo dice per intero "
+          "— e a un profilo nato a caso NON dice «rinasce uguale», anche se dopo la copia e' timbrato 'conto' "
+          "come quello che deriva dalla nsec — e il bottone non dice piu' «su questo dispositivo»",
+          [["piena"] * 4,
+           "Il profilo di scambio sparisce da questo dispositivo, e la sua copia cifrata viene tolta dai relay: "
+           "su un altro dispositivo non tornerà più da solo.\n\nSe non hai salvato il codice segreto, la "
+           "reputazione riparte da zero.", "🗑 Dimentica il profilo", True, "conto"], o["togliPrima"])
+    prova("«Dimentica»: il profilo sparisce SUBITO da qui e dal server, la lettura in tasca si svuota, e il "
+          "togliere dai relay parte senza farsi aspettare",
+          [False, True, '<div class="hint">Tolgo la copia cifrata dai relay…</div>', None, 1], o["togliSubito"])
+    prova("PRIMA la copia VUOTA (stesso kind, stesso `d`, firmata dall'account, piu' recente), POI la richiesta "
+          "NIP-09 con la coordinata `a`, gli `e` della copia e della vuota, e il `k` — sui tre relay accesi",
+          [True, True, ["d=" + CO], True, True, True, True, "k=30078", True, True,
+           ["wss://casa.test", "wss://mio.test", "wss://scrivo.test"]], o["togliEventi"])
+    prova("...e ogni relay fa il suo: l'obbediente tiene solo la richiesta; chi sostituisce tiene la vuota; chi "
+          "accoda e basta ha ANCORA la piena; lo spento pure",
+          ["canc", "canc+vuota", "canc+piena+vuota", "piena"], o["togliRelay"])
+    prova("IL CONTO VERO: tolta da 2 su 4, su 1 c'e' ancora, 1 non risponde — non «tolta»",
+          {"esito": "parte", "relays": 4, "puliti": 2, "restano": 1, "muti": 1, "chiesta": True, "nulla": False},
+          o["togliEsito"])
+    prova("...il foglio lo dice con le sue cifre e offre «Riprova», l'esito resta in sospeso nella memoria del "
+          "browser, e il toast e' quello di sempre",
+          ['<div class="hint">⚠️ Copia cifrata tolta da 2 relay su 4: su 1 c\'è ancora, sempre cifrata, 1 non '
+           'risponde.</div><button class="btn ghost" onclick="riprovaTogliCopiaP2P()">🔁 Riprova a toglierla dai '
+           'relay</button>', True, "Profilo di scambio dimenticato", True], o["togliRiga"])
+    prova("IL RELAY CHE ERA SPENTO TORNA CON LA COPIA PIENA, in un'altra sessione: il profilo dimenticato NON "
+          "risorge, e il diario dice perche'", [None, False, "piena", True, True], o["togliNonRisorge"])
+    prova("«RIPROVA»: lo spento ora si pulisce (3 su 4), chi accoda e basta no — e resta in sospeso",
+          [{"esito": "parte", "relays": 4, "puliti": 3, "restano": 1, "muti": 0, "chiesta": True, "nulla": False},
+           ["canc", "canc+vuota", "canc+piena+vuota", "canc+vuota"],
+           '<div class="hint">⚠️ Copia cifrata tolta da 3 relay su 4: su 1 c\'è ancora, sempre cifrata.</div>'
+           '<button class="btn ghost" onclick="riprovaTogliCopiaP2P()">🔁 Riprova a toglierla dai relay</button>',
+           True], o["togliRiprova"])
+    prova("...e quando anche lui sostituisce: tolta da tutti e quattro, il foglio lo dice e il sospeso se ne va",
+          [{"esito": "tolta", "relays": 4, "puliti": 4, "restano": 0, "muti": 0, "chiesta": True, "nulla": False},
+           ["canc", "canc+vuota", "canc+vuota", "canc+vuota"],
+           '<div class="hint">✓ Copia cifrata tolta dai relay (4 su 4).</div>', False], o["togliTutta"])
+    prova("UN PROFILO NUOVO DOPO: e' un altro, la sua copia nasce DOPO l'ultima cancellazione, il relay "
+          "obbediente la accetta, e al login dopo torna lui", ["copia", True, True, True, "canc+piena"],
+          o["togliPoiRinasce"])
+    prova("CON UN PROFILO IN CASA NON SI TOGLIE NIENTE: la copia e' la sua (nessun evento, nessuna riga)",
+          [None, 0, "", "canc+piena"], o["togliConProfilo"])
+    prova("CHI ENTRA CON LA NSEC: tolta (2 su 2), detto prima che rinasce; alla sessione dopo il profilo e' lo "
+          "STESSO, dalla chiave, e la copia torna sui relay",
+          [{"esito": "tolta", "relays": 2, "puliti": 2, "restano": 0, "muti": 0, "chiesta": True, "nulla": False},
+           ["canc", "canc+vuota"], True, True, "copia", ["canc+piena", "canc+piena"]], o["togliNsec"])
+    prova("SENZA FIRMATARIO: niente parte e si dice come fare; il «Riprova» c'e' ANCHE DOPO UNA RICARICA, e col "
+          "firmatario la toglie",
+          ["niente", 0,
+           '<div class="hint">Per togliere la copia cifrata dai relay serve la tua chiave: entra con l\'estensione, '
+           'il bunker o la nsec e riprova.</div><button class="btn ghost" onclick="riprovaTogliCopiaP2P()">🔁 '
+           'Riprova a toglierla dai relay</button>', "tolta", False, "canc"], o["togliSenzaFirma"])
+    prova("IL BUNKER CHE NON FIRMA LA CANCELLAZIONE (una sessione di prima del permesso nuovo): la copia vuota "
+          "parte lo stesso e basta lei — tolta, senza richiesta",
+          [{"esito": "tolta", "relays": 2, "puliti": 2, "restano": 0, "muti": 0, "chiesta": False, "nulla": False},
+           [30078], "vuota", "vuota"], o["togliSenzaCanc"])
+    prova("IL BUNKER CHE NON FIRMA NIENTE: «rifiutata», niente e' partito, la copia e' ancora li' e si dice",
+          ["rifiutata", 0, "piena",
+           '<div class="hint">⚠️ Il tuo firmatario non ha concesso la firma: la copia cifrata sui relay è ancora '
+           'lì.</div><button class="btn ghost" onclick="riprovaTogliCopiaP2P()">🔁 Riprova a toglierla dai '
+           'relay</button>'], o["togliRifiutata"])
+    prova("UN RELAY CHIUSO ALLA SCRITTURA: li' la copia resta, e il conto lo dice (1 su 2; l'altro, "
+          "obbediente, tiene solo la richiesta)",
+          [{"esito": "parte", "relays": 2, "puliti": 1, "restano": 1, "muti": 0, "chiesta": True, "nulla": False},
+           "canc", "piena"], o["togliChiuso"])
+    prova("CHI NON HA MAI AVUTO UNA COPIA: non parte NESSUN evento (nessuna traccia nuova), e il foglio dice che "
+          "non c'e'",
+          [{"esito": "tolta", "relays": 2, "puliti": 2, "restano": 0, "muti": 0, "chiesta": False, "nulla": True},
+           0, '<div class="hint">✓ Sui relay non c\'è nessuna copia del profilo.</div>', False], o["togliNulla"])
+    prova("UN CONTO TELEGRAM non ha copie li': niente si tocca, e legge la frase e il bottone di sempre",
+          [None, 0, "", "Il profilo di scambio sparisce da questo dispositivo e dal tuo Telegram.\n\nSe non hai "
+           "salvato il codice segreto, la reputazione riparte da zero.",
+           "🗑 Dimentica il profilo su questo dispositivo"], o["togliTelegram"])
+    prova("LA COPIA VIVA (pura): la piena da sola vive; una vuota o una cancellazione piu' recenti (o dello "
+          "stesso secondo) la spengono; una cancellazione piu' vecchia, d'altri o di un'altra coordinata no",
+          [["c5", 0], [None, 9], [None, 7], ["c9", 7], [None, 7], ["c5", 0], ["c5", 0], ["c9", 0], [None, 0],
+           [None, 4]], o["viva"])
+    prova("la richiesta di cancellazione: kind 5, l'ora data, `a` in testa, gli `e` validi senza doppioni, `k` in coda",
+          [5, 123, "", ["a=30078:" + "ab" * 32 + ":" + CO, "e=" + "cd" * 32, "e=" + "ab" * 32, "k=30078"]],
+          o["cancella"])
+    prova("chi legge chiede DUE cose in una domanda: le copie e le cancellazioni che le nominano",
+          ['[{"kinds":[30078],"authors":["' + "ab" * 32 + '"],"#d":["' + CO + '"]},{"kinds":[5],"authors":["'
+           + "ab" * 32 + '"],"#a":["30078:' + "ab" * 32 + ":" + CO + '"]}]', True, True, False, False], o["filtri"])
+    # LE SENTINELLE SUL TESTO: l'ordine dei due tempi, e i tre posti dove
+    # il gesto si aggancia
+    tg = nudo(fn("function togliCopiaFuoriP2P(){"))
+    prova("il togliere: solo per chi e' nato su Nostr e SOLO senza un profilo in casa; la lettura in tasca si "
+          "svuota prima di ogni attesa; la vuota PRIMA della cancellazione; e alla fine si RILEGGE", True,
+          "if (DEMO || VETRINA || !(numeroConto(myTgId) < 0) || mazzoMostro()) return Promise.resolve(null);" in tg
+          and 0 < tg.find("p2pCopiaLetta = {mazzo: null, tolta: Math.floor(Date.now() / 1000)};") < tg.find("await ")
+          and 0 < tg.find("eventoCopiaProfiloP2P('', adesso)") < tg.find("eventoCancellaCopiaP2P(")
+          < tg.find("dopo = await leggiDaRelayP2P(relays, filtriCopiaP2P(pub), P2P_COPIA_MS);"))
+    dm = nudo(fn("async function dimenticaMazzoOra(){"))
+    prova("«Dimentica» lo fa partire DOPO aver tolto il profilo da qui, dal cloud e dal server, e non lo aspetta",
+          True,
+          0 < dm.find("scordaMazzoLocale();") < dm.find("await dimenticaChiaviP2P();")
+          < dm.find("togliCopiaFuoriP2P().catch(() => {});") and "await togliCopiaFuoriP2P" not in dm)
+    lc = nudo(fn("function leggiCopiaProfiloP2P(){"))
+    prova("chi legge la copia passa dal giudice della copia VIVA, con le cancellazioni verificate", True,
+          "await leggiDaRelayP2P(relays, filtriCopiaP2P(pub), P2P_COPIA_MS);" in lc
+          and "copiaVivaP2P(letti.map(x => x.ev).filter(e => e && (e.kind !== 5 || NT.verifyEvent(e))), pub);" in lc
+          and "p2pCopiaLetta = {mazzo: null, tolta: viva.tolta};" in lc)
+    prova("...la copia nuova nasce DOPO l'ultima rimozione vista, e una copia riuscita chiude il sospeso", True,
+          "eventoCopiaProfiloP2P(cifrato, Math.max(Math.floor(Date.now() / 1000), dopoTolta))"
+          in fn("async function pubblicaCopiaProfiloP2P(m, auto){")
+          and "copiaToltaScriviP2P(null);" in fn("async function assicuraCopiaProfiloP2P(opz){"))
+    ld = fn("async function leggiDaRelayP2P(relays, filtro, ms){")
+    prova("la lettura sui relay accetta piu' filtri e dice CHI HA RISPOSTO (chi non risponde non e' «pulito»)",
+          True,
+          "r.subscribe(Array.isArray(filtro) ? filtro : [filtro], {" in ld
+          and "oneose(){ trovati.risposti.push(url); clearTimeout(t); basta(); }," in ld)
+    rpf = fn("function renderProfiloP2P(){")
+    prova("il foglio: la riga dell'esito dove il profilo non c'e' piu', il bottone e la domanda dai loro testi",
+          True,
+          "rigaCopiaToltaFuoriP2P()" in rpf and "${etichettaDimenticaFuoriP2P()}" in rpf
+          and "corpo: testoDimenticaFuoriP2P(rinasce)," in fn("function scordaMazzo(){")
+          and "rinasceUgualeFuoriP2P(mazzoMostro());" in fn("function scordaMazzo(){")
+          and "async function scordaMazzo(" not in mini
+          and "semeDaNsecP2P(s) === m.sk" in fn("function rinasceUgualeFuoriP2P(m){"))
+    prova("i permessi del bunker chiedono anche la firma della cancellazione (kind 5)", True,
+          "sign_event:5," in re.search(r"const NIP46_PERMESSI = '([^']+)';", mini).group(1))
+
+    # --- 7) IL NOSTRO RELAY LE LASCIA PASSARE (13 ott 2026, la domanda di
+    # Andrea: «la copia di un nativo Nostr puo' davvero arrivare sul
+    # nostro relay?»). SI': la lista di chi scrive e' SQL_CHIAVE_PROVATA,
+    # cioe' anche ogni `npub_accesso` — la chiave con cui un nativo entra
+    # — e il plugin guarda CHI FIRMA, non il kind. Qui gira il plugin
+    # VERO (una copia col solo percorso della lista cambiato) e gli si
+    # danno la copia piena, la vuota e la richiesta NIP-09: passano da
+    # una chiave in lista, restano fuori da una che non c'e'.
+    # ⚠️ SE QUESTA DIVENTA ROSSA DOPO UN RITOCCO AL PLUGIN: «Dimentica il
+    # profilo» non toglie piu' la copia dal nostro relay, e il patto lo
+    # promette. Non si cura qui.
+    rc = pezzo("relay_chiavi")
+    prova("la lista del relay e' la regola di sempre, e la regola prende la chiave d'accesso di chi entra con "
+          "Nostr", True,
+          "WHERE {SQL_CHIAVE_PROVATA}" in rc and 'SQL_CHIAVE_PROVATA = ("npub_accesso != \'\' "' in src)
+    import sys as _sys
+    _pl = open(_os.path.join("deploy", "relay", "policy", "chi-scrive.py"), encoding="utf-8").read()
+    _riga = re.search(r'^CHIAVI = "[^"\n]*"$', _pl, re.M)
+    prova("il plugin del relay legge la lista da un file con un nome solo (`CHIAVI = \"...\"`)", True, bool(_riga))
+    if _riga:
+        _cart = _tf.mkdtemp(prefix="plugin_relay_")
+        _lista = _os.path.join(_cart, "chiavi.txt").replace("\\", "/")
+        _nativo, _fuori = "ab" * 32, "cd" * 32
+        open(_lista, "w", encoding="utf-8").write(_nativo + "\n")
+        _pp = _os.path.join(_cart, "chi-scrive.py")
+        open(_pp, "w", encoding="utf-8").write(_pl.replace(_riga.group(0), "CHIAVI = " + _json.dumps(_lista)))
+        _coord = "30078:%s:" + CO
+
+        def _ev(n, chi, kind, contenuto, tags):
+            return _json.dumps({"type": "new", "receivedAt": 1790000000, "sourceType": "IP4",
+                                "sourceInfo": "203.0.113.7",
+                                "event": {"id": ("%064x" % n), "pubkey": chi, "kind": kind,
+                                          "created_at": 1790000000, "content": contenuto, "tags": tags,
+                                          "sig": "00" * 64}})
+        _righe = []
+        for _i, _chi in enumerate((_nativo, _fuori)):
+            _righe += [_ev(10 * _i + 1, _chi, 30078, "testo-cifrato", [["d", CO]]),
+                       _ev(10 * _i + 2, _chi, 30078, "", [["d", CO]]),
+                       _ev(10 * _i + 3, _chi, 5, "", [["a", _coord % _chi], ["e", "%064x" % (10 * _i + 1)],
+                                                    ["k", "30078"]])]
+        _r = _sp.run([_sys.executable, _pp], input="\n".join(_righe) + "\n", capture_output=True, text=True,
+                     timeout=60, encoding="utf-8")
+        _sh.rmtree(_cart, ignore_errors=True)
+        _esiti = []
+        for _l in (_r.stdout or "").strip().splitlines():
+            try:
+                _esiti.append(_json.loads(_l).get("action"))
+            except Exception:
+                _esiti.append("?")
+        prova("IL PLUGIN VERO: da una chiave in lista passano la copia cifrata, la copia VUOTA e la richiesta "
+              "NIP-09; da una chiave fuori lista nessuna delle tre",
+              (["accept"] * 3 + ["reject"] * 3, ""), (_esiti, (_r.stderr or "")[-300:]))
 
 
 def prove_canale_admin():

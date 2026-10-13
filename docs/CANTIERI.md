@@ -56038,3 +56038,163 @@ SULL'ALBERO ESATTO DEL PUSH, che è quello di questo commit (il suo
 messaggio si scrive a giri finiti, e il messaggio l'albero non lo
 cambia): quel che è girato lo dice il messaggio di questo commit, coi
 numeri. La suite intera sull'albero del push la dice la CI.
+
+## «Dimentica il profilo» toglie anche la copia cifrata dai relay (13 ott 2026, cantiere dimentica-copia-relay, richiesta di Andrea: tocca la privacy)
+
+**IL FATTO.** Scrivendo nel patto che il profilo di un account nato su
+Nostr ha una copia cifrata sui relay (la voce qui sopra) avevo notato,
+e scritto nel patto stesso, che «Dimentica il profilo» non la toglieva
+da lì. Andrea: «tocca la privacy, lo facciamo adesso: deve togliere
+anche la copia cifrata dai relay (i suoi, quelli pubblici e il nostro),
+per quanto un relay lo permette». Prima cinque righe e il suo ok; poi
+un'aggiunta: verificare nel repo se la copia di un nativo Nostr può
+davvero arrivare sul NOSTRO relay, che accetta in scrittura solo le
+chiavi in lista — e non toccare il plugin, che un'altra sessione
+(relay-per-mostro) sta cambiando.
+
+**IL NOSTRO RELAY: SÌ, CI ARRIVA.** La lista di chi scrive è
+`/api/relay/chiavi`, cioè `SQL_CHIAVE_PROVATA`: `npub_accesso` (la
+chiave con cui un nativo entra) o il badge npub verificato. Il plugin
+`deploy/relay/policy/chi-scrive.py` guarda CHI FIRMA e non il kind:
+da una chiave in lista passano la copia piena, la copia vuota e la
+richiesta NIP-09. NESSUN CAMBIO AL PLUGIN, né nella versione di main
+né in quella che la sessione relay-per-mostro tiene sul suo ramo (letta
+in sola lettura: la sua porta nuova è per chi NON sta in lista, e «la
+lista, quella di sempre» resta). «E il nostro» nel patto resta vero.
+UN LIMITE SCOPERTO GUARDANDO: il relay rinfresca la lista ogni dieci
+minuti, quindi la PRIMA copia di un account appena nato può arrivare
+sul nostro relay rifiutata; la copia si considera riuscita se la
+rilegge almeno un relay, e sul nostro non si riprova. Vale da prima di
+oggi, non l'ho toccato: è nei «da fare».
+
+**COSA NON FUNZIONAVA, oltre al notato.** Sul codice di prima, col
+giro dal vivo: dimenticato il profilo, la copia PIENA restava su tutti
+i relay, e alla sessione dopo il profilo «dimenticato» RISORGEVA dalla
+copia (lo stesso, con la sua chiave). Per un nativo Nostr il «Dimentica»
+era un gesto che non dimenticava.
+
+**LA CURA, solo nel client (`miniapp.html`, dentro il blocco «LA COPIA
+CIFRATA SUI RELAY»).** `dimenticaMazzoOra` toglie il profilo da qui,
+dal cloud e dal server come sempre, e POI fa partire
+`togliCopiaFuoriP2P()` senza aspettarlo. DUE TEMPI, sugli stessi relay
+della copia: (1) LA COPIA VUOTA — lo stesso evento (kind 30078, lo
+stesso `d`) col contenuto vuoto e un'ora più recente di ogni copia
+vista; è il passo SICURO: ogni relay che la accetta butta quella di
+prima, perché è un evento sostituibile, e col bunker non serve un
+permesso nuovo; (2) LA RICHIESTA NIP-09 — kind 5 con la coordinata
+`a`, gli `e` di ogni copia vista (vuota compresa) e il `k`; è il passo
+IN PIÙ: un relay che obbedisce toglie anche la vuota, e se il
+firmatario la rifiuta resta valido il primo (`sign_event:5` entra in
+`NIP46_PERMESSI`: le sessioni bunker nuove lo chiedono all'ingresso,
+quelle di prima al momento). POI SI RILEGGE, e l'esito è un CONTO:
+`puliti` (rispondono e non danno una copia piena), `restano` (danno
+ancora una copia piena), `muti` (non arrivano all'EOSE). Il foglio lo
+dice — «✓ Copia cifrata tolta dai relay (3 su 3).», oppure «⚠️ Copia
+cifrata tolta da 2 relay su 3: 1 non risponde.» col bottone «🔁 Riprova
+a toglierla dai relay» — e l'esito non riuscito resta nella memoria del
+browser, così il «Riprova» c'è anche dopo una ricarica.
+
+**CHI RILEGGE NON FA RISORGERE NIENTE.** `leggiCopiaProfiloP2P` chiede
+in UNA domanda le copie e le richieste di cancellazione che le
+nominano, e passa da `copiaVivaP2P` (pura): una copia più vecchia di
+una vuota o di una cancellazione mia (o dello stesso secondo) non è una
+copia. Così il relay che era spento, e ha ancora la copia piena, non
+riporta in vita il profilo. E LA COPIA NUOVA NASCE DOPO l'ultima
+rimozione vista: con la stessa ora di una cancellazione nascerebbe già
+cancellata (nel banco tutto succede nello stesso secondo, e senza
+questa riga il relay obbediente la rifiuta).
+
+**TRE GUARDIE.** Solo per chi è nato su Nostr (un conto Telegram non ha
+copie lì). Solo quando qui il profilo non c'è più: con un mazzo in casa
+la copia è la sua, e toglierla sarebbe il guasto opposto. E chi non ha
+mai avuto una copia non pubblica NIENTE: una copia vuota dove non c'era
+nulla sarebbe una traccia nuova, cioè il contrario di quel che si
+chiede.
+
+**COSA LEGGE L'UTENTE.** Il bottone, per chi è nato su Nostr, è «🗑
+Dimentica il profilo» (per gli altri resta «…su questo dispositivo»,
+dov'è vero). La domanda dice: «…sparisce da questo dispositivo, e la
+sua copia cifrata viene tolta dai relay: su un altro dispositivo non
+tornerà più da solo.» A chi ha la nsec in questo browser e il profilo
+deriva da lei: «…È legato alla tua chiave Nostr: se rientri con quella,
+rinasce uguale e la copia torna sui relay.» — perché è così, e tacerlo
+sarebbe una promessa falsa. LA LEZIONE DEL GIRO DAL VIVO: la prima
+stesura decideva «rinasce uguale» da `origine 'conto'` con un conto
+negativo, e il banco le dava ragione; nel browser vero quella frase è
+uscita a un profilo nato a caso con l'estensione, perché dopo la copia
+il giudice del mazzo lo timbra 'conto' anche lui. Ora si chiede alle
+nsec di QUESTO browser se una deriva proprio quel profilo
+(`rinasceUgualeFuoriP2P`, senza attese: `scordaMazzo` resta sincrona),
+e il banco fa il timbro prima di leggere il testo.
+
+**IL PATTO.** L'ultima parte del paragrafo sulla copia: «…«Dimentica il
+profilo» la toglie anche da lì: la sostituisce con una vuota e chiede
+ai relay di cancellarla. Non possiamo garantire che tutti obbediscano:
+su un relay che non lo fa può restare la copia vecchia, sempre cifrata,
+e resta visibile che una copia c'è stata.» I DUE LIMITI SONO VERI: la
+copia vuota e la richiesta di cancellazione portano la stessa etichetta
+della copia, quindi la traccia «questa npub ha avuto un profilo su
+Barattolo» non sparisce; sparisce il contenuto.
+
+**LE STRADE SCARTATE.** (a) La sola richiesta NIP-09: i relay che la
+ignorano terrebbero la copia piena, e col bunker di prima non partirebbe
+nemmeno. (b) La sola copia vuota: basta a togliere il segreto, ma
+lascia un evento in più dove un relay sarebbe disposto a toglierlo.
+(c) Mandare la cancellazione PRIMA e la vuota DOPO, per tenere la vuota
+come lapide ovunque: è l'ordine opposto a quello detto ad Andrea, e la
+lapide la fa già la richiesta di cancellazione, che chi rilegge guarda.
+(d) Decidere il conto dal «più recente» di ogni relay: un relay che
+accoda e basta dà la vuota E la piena, e la piena è ancora leggibile —
+conta «resta». (e) Toccare il plugin del relay: non serve, e non è mio.
+(f) Aspettare il togliere prima di dire «Profilo di scambio
+dimenticato»: sei relay lenti terrebbero il foglio fermo, e il profilo
+da qui è già sparito; l'esito arriva nel foglio.
+
+**PROVATO.** `prove_tor_chiavi_scambio`, sezione 6, nel banco node col
+bundle vero e QUATTRO relay di cartone di quattro caratteri (obbedisce
+alla cancellazione; sostituisce e basta; accoda e basta; spento) più
+quello chiuso alla scrittura: gli eventi e il loro ordine, cosa tiene
+ogni relay, il conto, la riga del foglio e il sospeso; il relay spento
+che torna con la copia piena e il profilo che NON risorge; il «Riprova»
+due volte fino a «tolta»; il profilo nuovo la cui copia passa anche dal
+relay obbediente e torna al login dopo; col profilo in casa niente; la
+nsec (tolta, rinasce uguale, la copia torna); senza firmatario, col
+«Riprova» dopo la ricarica; il bunker che non firma la cancellazione
+(basta la vuota) e quello che non firma niente («rifiutata»); il relay
+chiuso alla scrittura; chi non ha mai avuto una copia (zero eventi); il
+conto Telegram; i giudici puri. Sezione 7: il PLUGIN VERO del relay,
+fatto girare con una lista di cartone — accetta le tre cose da una
+chiave in lista, le rifiuta da una fuori. `prove_p2p_chiavi`: il
+paragrafo del patto, e che è vero sul codice.
+IL GIRO DAL VIVO, perché il banco ha un relay di cartone al posto di
+nostr-tools: Chrome via Playwright sul server vero della copia, un
+nativo Nostr con un'estensione di cartone, e TRE RELAY FINTI nel
+processo del banco (websocket intercettati, nessun relay vero):
+obbediente, che ignora la cancellazione, e «il nostro» spento e poi
+riacceso. A 390×844 coi tocchi veri e a 1280×800 coi clic, 11
+controlli su 11 a ogni larghezza: la domanda, il conto «2 su 3, 1 non
+risponde», sul filo la vuota prima della cancellazione e UNA domanda
+con due filtri, un'altra sessione col relay tornato e il profilo che
+non risorge, «Riprova» fino a «3 su 3», il profilo nuovo. LA
+CONTROPROVA sullo stesso banco col codice di prima: la copia piena
+resta su tutti e tre e il profilo risorge. Gli scatti:
+`.claude/giri/dimentica-copia-relay/`. Tortura, suite e collaudi: nel
+verbale del push.
+
+**DA GUARDARE (Andrea, sul vero).** Con una npub di prova, dall'app:
+profilo di scambio, poi «Dimentica il profilo» e il conto nel foglio.
+Da fuori, per vedere cosa resta sul nostro relay (sola lettura, la
+chiave pubblica in esadecimale al posto di `<hex>`):
+`nak req -k 30078 -k 5 -a <hex> wss://relay.barattolo.store`
+— ci si aspetta una copia col contenuto vuoto, o la sola richiesta di
+cancellazione: strfry obbedisce agli `e`, non so se anche alla `a`.
+
+**DA FARE (scritti, NON fatti).** (1) La prima copia di un account
+appena nato può non arrivare sul nostro relay (lista rinfrescata ogni
+dieci minuti) e non si riprova lì: una seconda passata dopo il primo
+quarto d'ora. (2) Chi ha lo stesso profilo su un altro dispositivo non
+viene avvisato che la copia è stata tolta: là continua a funzionare, ma
+se quella memoria si svuota non torna. (3) I due del cantiere
+chat-subito restano scritti nella voce del patto: il richiamo «💬 Chat»
+sotto un foglio aperto, e la chat che parte solo all'apertura dello
+scambio.

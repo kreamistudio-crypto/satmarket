@@ -30267,6 +30267,40 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    sovrascrive mai con un profilo diverso. La ricetta e le prove:
    CANTIERI, «Le chiavi dello scambio dopo la memoria svuotata» e «Una
    npub, un profilo di scambio».
+   «DIMENTICA IL PROFILO» LA TOGLIE ANCHE DAI RELAY (13 ott 2026,
+   «dimentica-copia-relay», richiesta di Andrea: tocca la privacy).
+   `dimenticaMazzoOra` fa partire `togliCopiaFuoriP2P()` DOPO aver
+   tolto il profilo dal dispositivo, dal cloud e dal server, e non lo
+   aspetta. Due tempi, sugli stessi relay della copia
+   (`relayPerCopiaP2P`): 1) LA COPIA VUOTA — lo stesso evento (kind
+   30078, lo stesso `d`) col contenuto vuoto e un'ora più recente: il
+   passo sicuro, perché ogni relay che la accetta butta quella di prima
+   e col bunker non serve un permesso nuovo; 2) LA RICHIESTA NIP-09
+   (`eventoCancellaCopiaP2P`: kind 5 con la coordinata `a`, gli `e` di
+   ogni copia vista e il `k`): il passo in più, e un rifiuto del
+   firmatario non disfa il primo (`sign_event:5` sta in
+   `NIP46_PERMESSI` da oggi). POI SI RILEGGE e l'esito è un CONTO —
+   `{esito, relays, puliti, restano, muti, chiesta, nulla}`: «resta»
+   è un relay che dà ancora una copia piena, «muto» uno che non è
+   arrivato all'EOSE (`leggiDaRelayP2P` ora porta `risposti` e accetta
+   più filtri) — che `rigaCopiaToltaFuoriP2P` scrive nel foglio col suo
+   «🔁 Riprova» e che resta nella memoria del browser finché non è
+   «tolta» (`P2P_COPIA_TOLTA_CHIAVE`). CHI RILEGGE NON FA RISORGERE
+   NIENTE: `leggiCopiaProfiloP2P` chiede in una domanda le copie e le
+   cancellazioni (`filtriCopiaP2P`) e passa da `copiaVivaP2P` (pura):
+   una copia più vecchia di una vuota o di una richiesta di
+   cancellazione mia non è una copia; e la copia NUOVA nasce dopo
+   l'ultima rimozione vista (`p2pCopiaLetta.tolta`). TRE GUARDIE: solo
+   per chi è nato su Nostr; solo quando qui il profilo non c'è più (con
+   un mazzo in casa la copia è la sua); e chi non ha mai avuto una
+   copia non pubblica niente (nessuna traccia nuova). IL NOSTRO RELAY
+   le lascia passare tutte e tre: la lista di chi scrive è
+   `SQL_CHIAVE_PROVATA`, cioè anche la chiave con cui un nativo entra,
+   e `chi-scrive.py` guarda chi firma e non il kind (una prova fa
+   girare il plugin vero). I LIMITI, scritti nel patto: un relay che
+   non obbedisce o era spento può tenere la copia vecchia, sempre
+   cifrata, e la traccia «una copia c'è stata» non sparisce. Il
+   perché: CANTIERI, «Dimentica il profilo toglie anche la copia».
 - LE LETTURE DAI RELAY IN COLLAUDO (23 set 2026, regola di Andrea: nei
   collaudi e nei giri dal vivo non ci si collega MAI a un relay vero, e
   non si pubblica niente). Le PUBBLICAZIONI erano a posto da sempre —

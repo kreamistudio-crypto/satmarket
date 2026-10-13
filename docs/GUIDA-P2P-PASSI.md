@@ -164,7 +164,19 @@ vere sullo schermo, si salta come il tour):
   dispositivo: non c'è niente da salvare. Il codice segreto serve solo
   se vuoi portarlo fuori da Barattolo.», i bottoni «🔑 Mostra il codice
   segreto» (poi «📋 Copia il codice segreto», «✓ L'ho salvato») e «🗑
-  Dimentica il profilo su questo dispositivo». Prima del primo scambio:
+  Dimentica il profilo su questo dispositivo» (per un account nato su
+  Nostr, dal 13 ott 2026: «🗑 Dimentica il profilo», e la domanda dice
+  «Il profilo di scambio sparisce da questo dispositivo, e la sua copia
+  cifrata viene tolta dai relay: su un altro dispositivo non tornerà più
+  da solo.»; a chi è entrato con la nsec: «…viene tolta dai relay. È
+  legato alla tua chiave Nostr: se rientri con quella, rinasce uguale e
+  la copia torna sui relay.»). Dopo, nel foglio: «Tolgo la copia cifrata
+  dai relay…», poi «✓ Copia cifrata tolta dai relay (3 su 3).» oppure
+  «⚠️ Copia cifrata tolta da 2 relay su 3: 1 non risponde.» (o «su 1 c'è
+  ancora, sempre cifrata») col bottone «🔁 Riprova a toglierla dai
+  relay»; senza firmatario: «Per togliere la copia cifrata dai relay
+  serve la tua chiave: entra con l'estensione, il bunker o la nsec e
+  riprova.» Prima del primo scambio:
   «Non hai ancora un profilo di scambio: nasce da solo al primo scambio,
   legato al tuo account, e le recensioni che guadagni restano attaccate
   a lui.»
