@@ -143483,8 +143483,8 @@ def prove_garanzia_lunga():
            "• Importo: 72.000 sats per 50,00 € via SEPA\n"
            "• «Ho inviato gli euro»: <b>no</b>\n"
            "• Disputa: <b>no</b>\n\n"
-           "Verso le 92 ore il coordinatore annulla, o apre una disputa da solo che non arriva "
-           "a nessuno su Telegram; verso le 94 i sats tornano da soli a chi vende, anche se chi "
+           "Verso le 92 ore il coordinatore annulla, o apre una disputa da solo; "
+           "verso le 94 i sats tornano da soli a chi vende, anche se chi "
            "compra aveva ragione. Se c'è una disputa, decidila adesso.")
     m72, m88 = tm(72, 72, D, 500), tm(88, 88, D, 500)
     prova("i due avvisi ai moderatori, come approvati (a meno del separatore delle migliaia)",
@@ -151139,13 +151139,14 @@ def prove_disputa_automatica_p2p():
           sum(1 for c in del_nodo if "print(*[d[0] for d in q.description], sep='|')" in c))
     bar8 = produzione[produzione.index("- LA SALITA ALLA `-bar8`"):
                       produzione.index("- LA SALITA ALLA `-bar7`")]
-    prova("la frase delle 88 ore sta nei passi della -bar8, da togliere a -bar8 in "
-          "servizio — e fino ad allora nel server RESTA, perche' e' vera",
-          [True, True, True, True],
+    prova("la frase delle 88 ore stava nei passi della -bar8, da togliere a -bar8 in "
+          "servizio — e dal 13 ott 2026 la -bar8 gira: nel server NON c'e' piu'",
+          [True, True, True, False, True],
           ["FASE 6 — A `-bar8` IN SERVIZIO" in bar8,
            "si toglie «che non arriva a nessuno su Telegram»" in bar8,
            bar8.index("FASE 6 — A `-bar8` IN SERVIZIO") < bar8.index("ROLLBACK: `cd ~/nodo`"),
-           "che non arriva a nessuno su Telegram" in pezzo("_testo_garanzia_mod_p2p")])
+           "che non arriva a nessuno su Telegram" in pezzo("_testo_garanzia_mod_p2p"),
+           "✅ FATTI TUTTI E DUE il 13 ott 2026 (cantiere `mostro-bar8`)" in bar8])
 
     # --- la disputa RIAPERTA su un ordine che ne aveva gia' una chiusa -----
     # (12 ott 2026, sera, richiesta di Andrea: «deve far partire gli

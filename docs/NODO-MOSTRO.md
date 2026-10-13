@@ -407,10 +407,11 @@ PER CAMBIARE LE ORE: la sola riga del `settings.toml` e un `docker
 compose restart mostro` a libro fermo, senza ricompilare. Sopra le venti
 ore non si va senza toccare anche la scadenza della fattura di garanzia
 (86400 secondi, il default di LND: vedi sopra).
-⚠️ NON ANCORA IN SERVIZIO finché la `-bar8` non è sul nodo (PRODUZIONE,
-«LA SALITA ALLA -bar8»): fino ad allora chi pubblica ha i 1800 di tutti,
-l'ordine muore al primo tempo scaduto, e su Barattolo vale la regola del
-10 ott («mai a chi ha pubblicato»). BARATTOLO SEGUE DA SOLO: il numero lo leggono dal 38385
+✅ IN SERVIZIO DAL 13 OTT 2026, 11:36 UTC (PRODUZIONE, «LA SALITA ALLA
+-bar8», «COM'È ANDATA»; in fondo a questo documento, «LA `-bar8` IN
+SERVIZIO»): fino ad allora chi pubblicava aveva i 1800 di tutti, l'ordine
+moriva al primo tempo scaduto, e su Barattolo valeva la regola del 10 ott
+(«mai a chi ha pubblicato»). BARATTOLO SEGUE DA SOLO: il numero lo leggono dal 38385
 l'app (`scadenzaSec`: «Hai circa 30 minuti», il conto alla rovescia) e il
 server (`_finestra_gesto_p2p`: «⏳ Hai 30 minuti», il promemoria a metà
 tempo), e non c'è niente da girare sul VPS (CANTIERI, «Il promemoria
@@ -571,3 +572,36 @@ relay vuoti); da sola passa. La liturgia la lancia in un giro suo, e il
 perché sta al suo punto 3. IL ROLLBACK resta quello scritto là: la leva
 a `False` sul VPS e riavvio, e se serve la riga dell'immagine a
 `mostro:v0.19.0-bar6` con `docker compose up -d mostro` a libro fermo.
+
+LA `-bar8` IN SERVIZIO (13 ott 2026, cantiere `mostro-bar8`; i comandi li
+ha lanciati Andrea; la liturgia e il verbale in PRODUZIONE, «LA SALITA
+ALLA -bar8», il perché in CANTIERI, «Il tempo di chi pubblica» e «La
+-bar8 in servizio»). Il nodo gira `mostro:v0.19.0-bar8`: le otto patch,
+la 0010, e sopra la 0011 (il tempo di chi pubblica) e la 0012 (la
+disputa che il coordinatore apre da solo). Nel `settings.toml`, sezione
+`[mostro]`: `expiration_seconds = 1800` (chi prende, non toccato),
+`maker_expiration_seconds = 10800`, `maker_timeout_limit = 2`. Nessuna
+migrazione. Libro fermo undici secondi (11:36:00-11:36:11 UTC), a zero
+scambi aperti. Provato da Andrea con due account: a chi ha pubblicato
+«Hai ancora 2:59:29 per bloccare i sats, poi l'ordine torna nel libro».
+DA QUEL MINUTO LA PENALITÀ A CHI PUBBLICA È ACCESA DA SOLA sul VPS (la
+leva `P2P_TEMPO_DI_CHI_PUBBLICA` lo era dal 12 sera): il server la conta
+perché il 38385 annuncia il tempo lungo.
+I RELAY DEL NODO SONO TRE dallo stesso giorno (secondo riavvio,
+11:47:43-11:47:53 UTC): `relay.barattolo.store`, `relay.mostro.network`,
+`nos.lol`. `relay.damus.io` è uscito dal `settings.toml`.
+⚠️ IL SORGENTE SUL NODO (`~/nodo/mostro-src`, undici commit sopra
+`v0.19.0`) NON È QUELLO CHE IL REPO RICOSTRUISCE: le 0005 e 0007 del nodo
+sono quelle del 30 set-1 ott, senza i tre ritocchi dell'audit scritti nel
+repo il 1 ott (M6: il segreto degli eventi senza il ripiego su quello
+dello sconto; M4: l'interruttore della domanda dello sconto; B6: il tetto
+di 64 KB alla risposta). Il codice della 0011 e della 0012 è identico a
+quello del repo; cambiano solo le posizioni dentro `barattolo_eventi.rs`.
+Si porta con la build della 0.19.3; per la M6 va guardato prima che sul
+nodo ci sia `BARATTOLO_EVENTI_SEGRETO`: se oggi vale il ripiego, senza
+quella gli eventi si spengono.
+RESTA NON PROVATO: l'ordine che TORNA nel libro alla prima mancata
+risposta di chi ha pubblicato e si toglie alla seconda (FASE 5 della
+liturgia: la prova del 13 si è fermata al conto alla rovescia, e si è
+chiusa con l'annullo di chi aveva preso); la disputa automatica a ~92
+ore; il ritorno alla `-bar7` (i due file `.prima-bar8` e `up -d`).

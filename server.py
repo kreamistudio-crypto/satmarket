@@ -54463,7 +54463,7 @@ def _testo_garanzia_mod_p2p(livello: int, ore: int, d: dict, per: int = 0) -> st
              ""]
     if livello >= 88:
         righe.append(f"Verso le {P2P_GARANZIA_COORD_H} ore il coordinatore annulla, o "
-                     "apre una disputa da solo che non arriva a nessuno su Telegram; "
+                     "apre una disputa da solo; "
                      f"verso le {P2P_GARANZIA_LND_H} i sats tornano da soli a chi "
                      "vende, anche se chi compra aveva ragione. Se c'è una disputa, "
                      "decidila adesso.")

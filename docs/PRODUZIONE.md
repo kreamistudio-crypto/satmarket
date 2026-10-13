@@ -3551,10 +3551,12 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   dell'apertura» alle prese, «⚠️ Paracadute P2P: battito saltato» se il
   giro inciampa (il prossimo arriva lo stesso).
 
-- LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (PREPARATA il 12
-  ott 2026, cantiere `tempo-di-chi-pubblica`; ⚠️ NON ANCORA FATTA: build
-  e riavvio del nodo solo con l'ok esplicito di Andrea, un comando alla
-  volta, a libro fermo). Cosa cambia: la patch 0011 del fork — chi ha
+- LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (preparata il 12
+  ott 2026, cantiere `tempo-di-chi-pubblica`; ✅ FATTA SUL NODO il 13 ott
+  2026, cantiere `mostro-bar8`: in servizio dalle 11:36 UTC, e com'è
+  andata sta in fondo a questa voce, «COM'È ANDATA». Era scritta così:
+  build e riavvio del nodo solo con l'ok esplicito di Andrea, un comando
+  alla volta, a libro fermo). Cosa cambia: la patch 0011 del fork — chi ha
   PUBBLICATO ha la sua finestra (`maker_expiration_seconds`), e se la
   lascia scadere l'ordine TORNA NEL LIBRO invece di morire, fino a
   `maker_timeout_limit` mancate risposte di fila; il 38385 annuncia i due
@@ -3639,8 +3641,8 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `the_info_event_carries_only_what_is_in_force`,
   `a_lapse_is_counted_once_per_waiting_episode`,
   `the_takers_duty_never_touches_the_count` —, i quattro
-  `reconfirm_timeout_eligibility_…` dello scheduler, i due
-  `find_order_by_seconds…` e `status_tags_map_lifecycle_statuses_to_nip69_buckets`
+  `reconfirm_timeout_eligibility_…` dello scheduler, l'unica
+  `find_order_by_seconds…` (è una sola, non due: contata il 13 ott) e `status_tags_map_lifecycle_statuses_to_nip69_buckets`
   (quella emendata). PER LA 0012: la sua prova
   `barattolo_eventi::tests::a_dispute_the_daemon_opens_is_mostros_and_says_why`
   e, già dentro il filtro `scheduler`, le tre di upstream che passano
@@ -3714,6 +3716,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   in servizio si toglie «che non arriva a nessuno su Telegram».
   b) LA RIGA DELL'IMMAGINE DEL NODO in `CLAUDE.md` (`mostro:v0.19.0-bar7`
   → `-bar8`, con la 0011 e la 0012), rimandata da Andrea a quel giorno.
+  ✅ FATTI TUTTI E DUE il 13 ott 2026 (cantiere `mostro-bar8`).
   DA SAPERE PER BARATTOZON (12 ott 2026, cantiere pausa-in-vista): con
   le tre ore a chi pubblica un ordine Barattozon esce dal libro 4 ORE E
   30 prima che il PayCode scada, invece di due — lo decide la pagina di
@@ -3733,6 +3736,82 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   nessuno: non è una migrazione. Sul VPS non c'è niente da toccare: senza
   il tag del tempo lungo nel 38385 il «non completato» a chi pubblica si
   spegne da solo, e pausa e badge restano.
+  COM'È ANDATA (13 ott 2026, cantiere `mostro-bar8`; i comandi li ha
+  lanciati Andrea, uno alla volta). PRIMA: il VPS sulla punta di main
+  (`3db1ef4`), il nodo sulla `-bar7`, `mostro-src` pulito con le nove
+  righe, il libro fermo (14 `pending`, nessuno scambio aperto); 4
+  processori, 5 GB di memoria disponibile, 18 GB di disco liberi.
+  I cinque file sono partiti dal PC coi fine riga di Linux (presi da git
+  con `git show`, non dalla cartella di lavoro di Windows, dove i due
+  patcher escono CRLF), e sul nodo le impronte `sha256sum` erano le
+  stesse. I due patcher a secco hanno detto le frasi attese; i due
+  commit hanno gli stessi conti delle `.patch` del repo (8 file, 468 e
+  7; 2 file, 29). LA PRIMA COMPILAZIONE è passata al primo colpo:
+  `Finished release` in 6 minuti e 53, nessun avviso del compilatore.
+  I TEST: primo lancio 246 passate e 0 fallite, secondo (`util::tests::`)
+  79 e 0; le tredici prove nominate al punto 3 cercate una per una nel
+  registro, tutte `ok`. La cucina di prova ha preso 3 GB di disco.
+  IL CONFRONTO DEL PUNTO 4 HA DETTO «DIVERSA», e non era un guasto: le
+  righe di codice delle due patch sono le stesse, cambiano solo le
+  posizioni dei riquadri dentro `src/barattolo_eventi.rs` (`@@ -77` sul
+  nodo, `@@ -80` nel repo). ⚠️ IL SORGENTE DEL NODO È PIÙ VECCHIO DEL
+  REPO in due file: le 0005 e 0007 ritoccate il 1 ott 2026 per l'audit
+  (`998a5d2`: M6 il segreto degli eventi senza ripiego, M4
+  l'interruttore dello sconto, B6 il tetto alla risposta) non sono mai
+  arrivate sul nodo — la `-bar7` e la `-bar8` hanno solo aggiunto patch
+  sopra il sorgente che c'era. Visto sul nodo: `ENV_SECRET_FALLBACK`
+  c'è ancora in `barattolo_eventi.rs`, `BREAKER_FAILS` in
+  `barattolo_fee.rs` no. DA FARE nella build della 0.19.3, dove il fork
+  si rifà da capo (decisione di Andrea: oggi solo la `-bar8`); per la M6
+  va guardato PRIMA che sul nodo ci sia `BARATTOLO_EVENTI_SEGRETO`: se
+  oggi vale il ripiego, senza quella gli eventi si spengono. E finché il nodo è indietro il confronto del
+  punto 4 guarda le righe che cominciano per `+` e `-`, non le
+  intestazioni `@@`.
+  L'IMMAGINE VERA in pochi secondi (ha riusato la compilazione provata).
+  Dentro `/usr/local/bin/mostrod` la parola `maker_timeout_limit`
+  compare 5 volte nella `-bar8` e 0 nella `-bar7`.
+  IL CAMBIO SENZA EDITOR: quattro file preparati prima e mostrati ad
+  Andrea — `docker-compose.yml.prima-bar8` e
+  `mostro/settings.toml.prima-bar8` (il ritorno: identici ai vivi con
+  `cmp`), `docker-compose.yml.bar8` e `mostro/settings.toml.bar8`
+  (l'andata: `diff` dice la riga 57 del compose e le due righe nuove
+  sotto la 60, nella sezione `[mostro]`; `tomllib` legge 1800, 10800 e
+  2; `docker compose -f … config -q` lo accetta). Il backup del
+  database con l'API di sqlite da `python3` (`backup()`: 260 ordini
+  nella copia e nel vivo) e non col `cp` della FASE 2 su un file vivo;
+  la copia nasce di root e leggibile da tutti: `chown debian:debian` e
+  `chmod 600` subito. Il cambio è UN comando che per prima cosa conta
+  gli scambi aperti e, se non sono zero, non tocca niente; poi i due
+  `cp -p` e `docker compose up -d mostro`. LIBRO FERMO dalle 11:36:00
+  alle 11:36:11 UTC; Tor, LND e bitcoind `Running`. Dopo: `-bar8`,
+  `running`, zero riavvii; «Settings correctly loaded!», le due righe
+  `barattolo_fee` e `barattolo_eventi`, `Transport: nip44 (protocol v2,
+  event kind 14)`, nessuna migrazione, nessun errore (i soli `WARN`
+  sono del prezzo di valute con una fonte sola, c'erano anche prima).
+  LA PROVA DAL VIVO, di Andrea con due account suoi: pubblicato, preso,
+  e a chi ha pubblicato «Hai ancora 2:59:29 per bloccare i sats, poi
+  l'ordine torna nel libro». Annullato dal lato di chi ha preso: nel
+  registro degli esiti del VPS nessun `mancato`, nel journal nessuna
+  riga «Reputazione P2P». L'annuncio agli utenti era già uscito il 12.
+  DAMUS FUORI DAL `settings.toml`, con un secondo riavvio (deciso nel
+  cantiere relay-per-mostro: «con la -bar8, a libro fermo»): la riga 35
+  da quattro relay a tre — `relay.barattolo.store`,
+  `relay.mostro.network`, `nos.lol` —, altri due file pronti
+  (`settings.toml.prima-senza-damus`, `settings.toml.senza-damus`), lo
+  stesso comando col conto degli scambi aperti, `docker compose restart
+  mostro`. Libro fermo dalle 11:47:43 alle 11:47:53 UTC; dopo, «Sending
+  Mostro relay list» e la parola `damus` zero volte nel registro.
+  NON PROVATO, e resta della FASE 5: la scadenza vera (l'ordine che
+  TORNA nel libro alla prima mancata risposta e SPARISCE alla seconda,
+  con le righe `barattolo_tempo` nel registro) — la prova del 13 si è
+  fermata al conto alla rovescia; la disputa automatica della 0012 (~92
+  ore); cosa vede chi prende da un'altra app. IL RITORNO ALLA `-bar7`
+  non è stato provato dal vivo (scelta di Andrea): sono i due `cp -p`
+  dai file `.prima-bar8` e `docker compose up -d mostro`. ⚠️ Il
+  `settings.toml.prima-bar8` ha ancora damus: tornare alla `-bar7` con
+  quel file rimette anche damus (per toglierlo di nuovo, la riga 35).
+  DA FARE, non urgente: le immagini `mostro-test:bar2`…`bar7` occupano
+  disco per niente (15 GB liberi dopo la build, 85% usato).
 - LA SALITA ALLA `-bar7`, immagine `mostro:v0.19.0-bar7` (preparata il
   10 ott 2026 sera, cantiere `cauzione-metodo-scelto`; ✅ FATTA SUL NODO
   da Andrea, riferito il 12 ott 2026: `mostro:v0.19.0-bar7` in servizio

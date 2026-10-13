@@ -473,6 +473,13 @@ Preparata il 12 ott 2026 (cantiere `tempo-di-chi-pubblica`, decisioni di
 Andrea dopo lo studio); entra con l'immagine `-bar8` (PRODUZIONE, «LA
 SALITA ALLA -bar8»). ⚠️ MAI COMPILATA SUL PC: il primo `cargo build` e il
 primo `cargo test` sono quelli sul nodo.
+✅ COMPILATA E IN SERVIZIO SUL NODO dal 13 ott 2026 (cantiere
+`mostro-bar8`), insieme alla 0012: build al primo colpo, 246 + 79 prove
+verdi. ⚠️ SUL NODO sta sopra le 0005 e 0007 di PRIMA del 1 ott 2026: i
+tre ritocchi dell'audit di quel giorno (M4, B6, M6) nel sorgente del
+nodo non ci sono, e il `format-patch` di là ha le stesse righe di codice
+ma altre posizioni in `barattolo_eventi.rs` (PRODUZIONE, «COM'È
+ANDATA»). Si riallinea con la build della 0.19.3.
 
 IL PROBLEMA. Upstream dà UNA finestra (`expiration_seconds`) a chi deve
 fare il gesto, e se a lasciarla scadere è chi ha PUBBLICATO l'ordine,

@@ -57085,3 +57085,129 @@ push la dice la CI (regola di Andrea per questo push: dopo l'ultimo
 rebase solo sezioni e collaudi toccati). Il push non porta con sé
 commit di altri: sotto i miei c'è solo main. `pronto` lo sposta
 Andrea.
+
+## La -bar8 in servizio: le tre ore a chi pubblica sul nodo, damus fuori, e il sorgente del nodo più vecchio del repo (13 ott 2026, cantiere mostro-bar8, decisione di Andrea)
+
+**PERCHÉ OGGI.** Sul nodo girava la `-bar7`, che dà trenta minuti anche
+a chi pubblica: la mattina del 13 un utente si aspettava le tre ore
+annunciate il 12. L'app diceva trenta minuti ovunque (i tempi li legge
+dal 38385): le tre ore erano nell'annuncio, non ancora nel nodo. Le
+patch 0011 e 0012 erano pronte dal 12 (qui sopra, «Il tempo di chi
+pubblica») e mai compilate.
+
+**LE DECISIONI DI ANDREA**, sul rapporto in dieci righe chiesto prima di
+toccare qualcosa.
+1. SOLO LA `-bar8` OGGI. Mostro 0.19.3 e i voti in privacy vanno DOPO
+   Torino, nella stessa build. Provato a secco il 13 sul tag vero
+   `v0.19.3` (28 commit dalla 0.19.0, 2 migrazioni: `payer_history` e
+   `order_success_at`): i patcher 0001-0006 entrano, la 0007 si ferma
+   su un'ancora di `src/flow.rs` che non c'è più («// Update the
+   invoice_held_at field») e con lei non si possono nemmeno provare
+   0008, 0010, 0011 e 0012; upstream ha cambiato molto proprio dove
+   agganciamo (`cancel.rs`, `nip33.rs`, `scheduler.rs`,
+   `config/types.rs`). È un lavoro come la `-bar6`, e con le migrazioni
+   il ritorno non è più una riga: serve il database di prima.
+2. DAMUS FUORI DAL `settings.toml` del nodo lo stesso giorno, ma DOPO la
+   prova e con un riavvio suo: una causa per volta.
+3. IL RITORNO ALLA `-bar7` NON SI PROVA DAL VIVO: i file pronti, mostrati
+   prima del cambio.
+4. LA PROVA COL TEMPO VERO (tre ore), senza un riavvio in più per
+   accorciarlo.
+
+**COM'È ANDATA** sta per esteso in PRODUZIONE, «LA SALITA ALLA `-bar8`»,
+in fondo («COM'È ANDATA»), e lo stato in NODO-MOSTRO, «LA `-bar8` IN
+SERVIZIO». In breve: prima il VPS (punta di main), poi il nodo; i cinque
+file con le impronte; i due patcher a secco e per davvero; la prima
+compilazione al primo colpo (6 minuti e 53); 246 + 79 prove verdi, le
+tredici nostre cercate per nome; l'immagine; quattro file pronti per
+andata e ritorno; il backup; il cambio a zero scambi aperti, libro fermo
+undici secondi (11:36 UTC); la prova di Andrea con due account («Hai
+ancora 2:59:29 per bloccare i sats, poi l'ordine torna nel libro»);
+damus fuori col secondo riavvio (11:47 UTC, dieci secondi). Da quel
+minuto la penalità a chi pubblica è accesa da sola (la leva del VPS lo
+era dal 12 sera), e l'annuncio agli utenti era già uscito il 12.
+
+**QUEL CHE SI È TROVATO STRADA FACENDO.**
+- IL SORGENTE DEL NODO È PIÙ VECCHIO DEL REPO. Il confronto fra le
+  `.patch` esportate dal nodo e quelle del repo ha detto «diversa» su
+  tutt'e due: stesse righe di codice, altre posizioni dentro
+  `src/barattolo_eventi.rs`. La causa, letta nella storia e poi vista
+  sul nodo: il 1 ott (`998a5d2`) le 0005 e 0007 sono state ritoccate
+  NEL REPO per tre voci dell'audit, «in attesa del prossimo giro del
+  nodo» — e i giri dopo (`-bar7`, `-bar8`) hanno solo aggiunto patch
+  sopra il sorgente che c'era. Sul nodo `ENV_SECRET_FALLBACK` c'è
+  ancora, `BREAKER_FAILS` no. Ricostruito il fork sul PC in due modi
+  (i patcher in fila, e `git am` delle `.patch`): stesso albero, con le
+  posizioni del repo. Le liturgie della `-bar7` e della `-bar8`
+  guardavano solo QUANTE righe ha il registro del fork (nove, undici),
+  non COSA c'è dentro: per questo non l'ha visto nessuno.
+- LA LITURGIA CONTAVA «i due `find_order_by_seconds…`»: in Mostro
+  0.19.0 la prova con quel nome è una, e la 0011 non ne aggiunge.
+  Corretto in PRODUZIONE.
+- I DUE PATCHER, NELLA CARTELLA DI LAVORO DI WINDOWS, ESCONO CRLF (le
+  `.patch` e i `.rs` no: hanno la loro riga in `.gitattributes`). I
+  file per il nodo sono stati presi da git (`git show HEAD:…`), LF, e
+  mandati da una cartella a parte.
+- LA COPIA DEL DATABASE fatta con `sudo python3` nasce di root e
+  leggibile da tutti (`-rw-r--r--`), mentre l'originale è `-rw-------`:
+  errore mio, corretto subito con `chown` e `chmod 600`. Chi rifà un
+  backup così mette i due comandi nella stessa riga.
+- `docker build` NON SI PUÒ RALLENTARE con `nice`: la build la fa il
+  motore di Docker, non il comando. Con 4 processori e 5 GB liberi è
+  passata senza toccare il nodo che girava.
+- IL COMANDO DEL CAMBIO COL CONTROLLO DENTRO: conta gli scambi aperti
+  e, se non sono zero, non tocca niente. Così «il controllo subito
+  prima dell'`up -d`» non è un secondo comando lanciato qualche minuto
+  prima, ma la prima riga dello stesso.
+
+**I TESTI.** Quelli dell'app sui tempi leggono il 38385 e sono cambiati
+da soli. A mano, in questo push: la frase delle 88 ore ai moderatori
+(`_testo_garanzia_mod_p2p`: via «che non arriva a nessuno su Telegram»,
+perché con la 0012 la disputa del coordinatore arriva) con le sue due
+prove; PRODUZIONE (la voce è «fatta», «COM'È ANDATA», l'unica
+`find_order_by_seconds`, la FASE 6 chiusa); NODO-MOSTRO («in servizio»,
+i tre relay, il sorgente più vecchio); il README del fork; e
+`CLAUDE.md` in un commit suo (l'immagine che gira, due righe, lo stesso
+numero di righe del file).
+
+**NON PROVATO, e si dice.** La scadenza vera: l'ordine che TORNA nel
+libro alla prima mancata risposta di chi ha pubblicato e SPARISCE alla
+seconda (FASE 5 della liturgia) — la prova di oggi si è fermata al conto
+alla rovescia ed è finita con l'annullo di chi aveva preso. La disputa
+automatica (~92 ore). Il ritorno alla `-bar7`. Cosa vede, durante le tre
+ore, chi prende da un'altra app. Che mostrod LEGGA dai tre relay rimasti
+i messaggi a lui indirizzati: nel registro c'è «Sending Mostro relay
+list» e nessun errore, non una presa arrivata dopo il secondo riavvio.
+
+**DA FARE, non fatto (parola di Andrea: i notati non urgenti si
+scrivono).**
+- NELLA BUILD DELLA 0.19.3, dopo Torino: rifare il fork da capo coi
+  patcher del repo, e quindi portare sul nodo le tre voci dell'audit
+  del 1 ott — M6 (il segreto degli eventi senza ripiego: PRIMA va guardato che
+  sul nodo ci sia `BARATTOLO_EVENTI_SEGRETO`, uguale al
+  `P2P_EVENTI_SEGRETO` del VPS — se oggi vale il ripiego, senza quella
+  gli eventi si spengono), M4 (l'interruttore della
+  domanda dello sconto), B6 (il tetto di 64 KB alla risposta); la 0007
+  da riagganciare sulla 0.19.3; le 2 migrazioni, quindi il ritorno col
+  database di prima; i voti in privacy (l'evento della 0007 che dice
+  chi è in privacy, il server che lo tiene, la pagina che lo scrive).
+- NELLA PROSSIMA LITURGIA: il backup del database con l'API di sqlite
+  e non col `cp` (la FASE 2 dice ancora `cp`, e una prova tiene quella
+  riga); il confronto delle `.patch` sulle righe `+` e `-`; un passo
+  che guardi COSA c'è nel sorgente del nodo, non solo quante righe.
+- SUL NODO: le immagini `mostro-test:bar2`…`bar7` occupano disco per
+  niente (15 GB liberi, 85% usato); i file `.bar8`, `.prima-bar8`,
+  `.senza-damus`, `.prima-senza-damus` restano lì come ritorno.
+- LA FASE 5, quando Andrea vuole: un ordine lasciato scadere apposta.
+- Il sito barattolo.online (altro repo): non guardato se dice i tempi.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sul nodo e sul VPS: quel che sta
+scritto sopra, lanciato da Andrea. Nel repo, col push stretto chiesto
+da lui: sull'albero del push le sezioni di `prove.py` che leggono i
+file toccati — `prove_garanzia_lunga`, `prove_disputa_automatica_p2p`,
+`prove_tempo_di_chi_pubblica`, `prove_canale_admin`,
+`prove_relay_per_mostro`, `prove_cauzione_p2p`, `prove_bussola`,
+`prove_tetto_claude_md` —, i collaudi che fanno nascere l'avviso delle
+garanzie lunghe, e le righe aggiunte contro le forme dello scanner dei
+segreti. I numeri stanno nel messaggio del commit. La suite intera e
+gli altri collaudi li dice la CI.
