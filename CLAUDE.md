@@ -89,11 +89,11 @@ modo in cui si rifà un errore già pagato.
   relay.
 - MAI RELAY VERI IN COLLAUDO E NEI GIRI DAL VIVO, mai eventi pubblicati:
   il server si ferma da solo (`lettura_simulata`, solo loopback), il
-  BROWSER no — nel config del giro `MOSTRO_RELAY` e
-  `MOSTRO_RELAY_SPECCHIO` vanno al relay morto (`ws://127.0.0.1:9`) e la
-  nsec a `INCOLLA_QUI`. Mai copiare il `config.py` locale (ha una nsec
-  di prova). Un collaudo nuovo si prova prima nella gabbia
-  (`python collaudi_ci.py collaudo_x`).
+  BROWSER no — nel config del giro `MOSTRO_RELAY` e `MOSTRO_RELAY_SPECCHIO`
+  vanno al relay morto (`ws://127.0.0.1:9`) e la nsec a `INCOLLA_QUI`.
+  Mai copiare il `config.py` locale (ha una nsec di prova). Un collaudo
+  nuovo: prima nella gabbia (`python collaudi_ci.py collaudo_x`), poi una
+  riga in `ci/collaudi.txt` e in `ci/compila.txt`, MAI nel workflow.
 - PULIZIA A FINE GIRO, dopo il push verde: si esce dal worktree,
   `git worktree remove --force <il mio>`, `git worktree prune`, e via i
   rami dei cantieri già su origin/main (`git branch --merged origin/main

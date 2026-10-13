@@ -50653,6 +50653,12 @@ def prove_elenco_dei_collaudi():
     prova("...e un elenco che NON C'E' pure", [2, True],
           [r.returncode, "::error::l'elenco dei collaudi non si legge" in r.stdout])
 
+    # --- le istruzioni dicono dove si scrive ------------------------------
+    regole = open("CLAUDE.md", encoding="utf-8").read()
+    prova("CLAUDE.md dice dove si aggiunge un collaudo, e che il "
+          "workflow non si tocca", True,
+          "`ci/collaudi.txt`" in regole and "`ci/compila.txt`" in regole)
+
 
 def prove_collaudi_in_ci():
     """I COLLAUDI IN CI (22 set 2026). Lo step che li gira sta nel job
