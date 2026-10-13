@@ -57577,3 +57577,132 @@ la nav del P2P, il rimborso meno le spese) e 5 collaudi nella gabbia
 (5 verdi). La suite intera sull'albero del push la dice la CI (regola
 di Andrea: dopo l'ultimo rebase solo sezioni e collaudi toccati). Il
 push non porta con sé commit di altri: sotto i miei c'è solo main.
+
+## Scambi chiari: «✅ N scambi P2P completati» e «🛡️ Solo per chi ha almeno N scambi P2P completati», le stesse parole ovunque (13 ott 2026, cantiere scambi-chiari, richiesta di Andrea)
+
+IL DIFETTO, dallo screenshot di Andrea: sulla card del libro P2P due
+righe si confondevano. La reputazione di chi pubblica diceva «✅ 1
+scambio» e il filtro di chi può prendere diceva «🛡️ Da 1 scambi
+completati» — parole quasi uguali per due cose diverse (quanti ne ha
+fatti LUI, quanti ne devi aver fatti TU), e il filtro sbagliava il
+singolare. In più lo stesso numero aveva tre vestiti: «✅ 12 scambi»
+in riga, «✅ **12** scambi completati» nel riquadro, «✅ 12 scambi P2P»
+nel negozio e nel Profilo.
+
+COSA SI È DECISO (le frasi le ha dettate Andrea; prima del codice gli
+sono andati i posti e come diventavano, e ha detto sì):
+- REPUTAZIONE, con la spunta verde: «✅ 1 scambio P2P completato» /
+  «✅ N scambi P2P completati». Ovunque: card del libro (in coda alle
+  stelline), riquadro di chi ha pubblicato nel foglio dell'ordine (col
+  numero in grassetto), card dell'altra persona nello scambio, negozio,
+  scheda Profilo, «Il tuo profilo di scambio».
+- FILTRO: «🛡️ Solo per chi ha almeno 1 scambio P2P completato» / «…N
+  scambi P2P completati». Card del libro; foglio dell'ordine («…,
+  nessuno scambio non completato negli ultimi 30 giorni e nessuna
+  disputa persa negli ultimi 90»); il «no» a chi non può prendere
+  («Quest'ordine è solo per chi ha almeno N scambi P2P completati (tu
+  ne hai 1).»); la frase sotto le pillole del foglio «Pubblica» («Solo
+  per chi ha almeno N scambi P2P completati e non ha nessun «non
+  completato»…»).
+- LE PILLOLE «1+ scambi / 3+ scambi / 5+ scambi» RESTANO COSÌ
+  (decisione di Andrea): sono bottoni stretti, e la frase sotto dice
+  tutto.
+- IL PATTO «I tuoi dati» cita le due frasi fra virgolette e le segue:
+  «solo chi ha almeno 1, 3 o 5 scambi P2P completati» e «✅ 12 scambi
+  P2P completati». La seconda non era nel piano (è saltata fuori
+  leggendo la riga): detta ad Andrea, approvata.
+- NEL PROFILO GLI SCAMBI P2P STANNO SU UNA RIGA LORO, SENZA IL PUNTINO
+  DAVANTI (scelta B di Andrea, sullo scatto a 375 px): vedi sotto.
+
+COM'È FATTO: le parole hanno UN giudice. `paroleCompletatiP2P(n)`
+scrive «scambio P2P completato» (solo a uno) o «scambi P2P completati»;
+`completatiP2P` e `rigaMiaReputazioneP2P` lo chiamano; `fraseFiltroP2P(n,
+inFrase)` ci costruisce sopra «Solo per chi ha almeno N…» (`inFrase` =
+minuscola, dentro una frase già cominciata) e lo chiamano
+`segnoFiltroP2P`, `rigaFiltroDettP2P`, `fraseVetoP2P`,
+`fraseAccessoNuovoP2P`. I due giudici stanno nel blocco della
+reputazione (dentro il motore: zero `fetch`). Negozio e Profilo non
+aggiungono più «P2P» in coda: lo porta la frase. Dal segno della card è
+uscito il `title`: ripeteva la riga parola per parola (detto ad Andrea,
+approvato). Il server non cambia: manda codici, le frasi le scrive chi
+le mostra, e nessun avviso Telegram porta queste parole.
+
+LA MISURA A 375 px (giro dal vivo: server di collaudo nel worktree sulla
+8137, config dall'ESEMPIO, relay morto `ws://127.0.0.1:9`, nsec al
+segnaposto, database usa-e-getta; tutto spento e cancellato dopo):
+- CARD DEL LIBRO: filtro e reputazione su UNA riga ciascuno. Il filtro
+  276 px su 298 disponibili; «★ 4,9 · 👤 1240 · ✅ 1280 scambi P2P
+  completati» 277 su 294. Col relay morto il libro è vuoto: i due
+  ordini sono nati in pagina da `ordineDaEvento` su eventi scritti a
+  mano e mai pubblicati, facce e filtri messi a mano; CSS e funzioni
+  quelli veri.
+- PROFILO: il «12» arriva da `/api/me` vera (dodici righe seminate in
+  `p2p_esiti` per il 111); stelline, vendite e acquisti forzati in
+  pagina per il caso peggiore. Con le parole intere e il puntino in
+  riga: senza stelline 2 righe come prima, CON le stelline 3 (prima 2),
+  quella di mezzo «34 acquisti conclusi ·» corta e col puntino appeso.
+  Fermato lì e mandato lo scatto. Tre strade: A lasciare, B gli scambi
+  P2P su una riga loro senza puntino, C accorciare solo nel Profilo
+  (ma non sarebbero più le stesse parole). Andrea: B. Rimisurato: «3
+  vendite · 5 acquisti conclusi» / «✅ 12 scambi P2P completati»; con
+  le stelline tre righe pulite, l'ultima sempre gli scambi; a zero
+  scambi la riga è quella di sempre; niente sborda. Con l'a capo voluto
+  gli spazi che non vanno a capo (12 ott, «P2P» da solo sulla riga
+  sotto) non servono più e sono usciti.
+
+STRADE SCARTATE: riscrivere le parole in ogni posto (cinque ternari:
+alla prima correzione divergono — era già successo, tre vestiti per un
+numero); accorciare nel Profilo (C); toccare le pillole.
+
+PROVATO:
+- `prove_reputazione_p2p`: i casi nuovi — le parole (singolare solo a
+  uno, anche da stringa), il filtro con maiuscola e in frase, la card a
+  1 e a 5 parola per parola, la riga del foglio dell'ordine, il «no»
+  con e senza i numeri di chi chiede, la reputazione in riga e nel
+  riquadro, lo zero del profilo di scambio; e le sentinelle: le parole
+  scritte UNA volta nella pagina, le forme vecchie a zero, ogni frase
+  che passa dal giudice, il patto, le pillole che restano. Allineate
+  `prove_feedback_p2p`, `prove_malus_p2p`, `prove_voto_dopo_concluso`,
+  `prove_dati_reputazione_p2p` e `collaudo_voto_dopo_concluso` (la riga
+  del profilo). I banchi che ritagliano per nome `completatiP2P`,
+  `fraseVetoP2P`, `rigaFiltroDettP2P` o `fraseAccessoNuovoP2P` portano
+  ora con sé i due giudici (tre banchi).
+- Sul codice di prima i banchi nuovi non passano (esplodono su
+  `paroleCompletatiP2P`, che non c'era); la controprova vera è la
+  tortura, 8 mutazioni su 8 rosse: parole sempre al plurale, parole
+  senza «P2P», la card che torna «Da N», il «no» riscritto a mano, il
+  Profilo col puntino in riga, il negozio con «P2P» in coda, la riga
+  del profilo di scambio riscritta a mano, il patto con la frase
+  vecchia.
+- Suite severa intera nel worktree, senza `config.py` come in CI:
+  23.934 passate, 0 fallite — PRIMA della scelta B (una riga di
+  `renderProfilo`, due sentinelle, la guida). Dopo la B: le sette
+  sezioni toccate, 474 su 474. I tre collaudi che toccano queste frasi
+  verdi nella gabbia (`collaudo_voto_dopo_concluso`,
+  `collaudo_reputazione_p2p`, `collaudo_feedback_p2p`), anche loro
+  prima della B: nessuno dei tre guarda `renderProfilo`.
+- `docs/GUIDA-P2P-PASSI.md` allineata nei cinque passi che riportano le
+  frasi; ARCHITETTURA dice dei due giudici.
+
+DA FARE (notati, non fatti: aspettano un sì):
+- IL NEGOZIO (il profilo di un altro) tiene gli scambi in riga col
+  puntino: «N vendite concluse · ✅ 12 scambi P2P completati». Con le
+  stelline a 375 px può andare a capo come andava il Profilo. Non
+  misurato dal vivo (serve un negozio seminato). Se Andrea vuole, la
+  stessa scelta B.
+- Nel Profilo con le stelline la PRIMA riga finisce ancora con «· 12
+  vendite ·» (un puntino appeso, c'era anche prima): è della riga di
+  vendite e acquisti, non degli scambi.
+- Misurato a 375 px nel Browser pane; non su un telefono vero, e non a
+  320-360 px. Il segno del filtro sulla card ha 22 px di margine a 375:
+  a 360 dovrebbe starci ancora, a 320 andrebbe su due righe (stima dai
+  numeri, non misurata).
+- Le altre frasi del «no» dicono ancora «Quest'ordine accetta solo chi
+  non ha…» (scambi non completati, dispute perse): altro concetto, non
+  toccate; ora il «no» del filtro comincia in un altro modo
+  («Quest'ordine è solo per chi…»).
+- Le voci vecchie di questo file e i commenti di schema del server
+  citano le frasi di prima («almeno N scambi completati»): sono storia
+  e commenti, restano.
+
+Cosa è girato su quale albero al push: nel messaggio del commit.

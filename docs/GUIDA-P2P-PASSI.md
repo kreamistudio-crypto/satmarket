@@ -157,7 +157,8 @@ vere sullo schermo, si salta come il tour):
   dal sito e dall'app. 📱 Lo si guarda da «🔐 Il patto sui tuoi dati, per
   intero» (fondo di «Info P2P») → «👤 Il tuo profilo di scambio»: foglio
   «👤 Il tuo profilo di scambio» con «Profilo attivo dal <data>.», la
-  riga dei tuoi numeri (dal 10 ott 2026) «✅ **3** scambi completati» e,
+  riga dei tuoi numeri (dal 10 ott 2026) «✅ **3** scambi P2P completati»
+  (le parole intere dal 13 ott 2026: «✅ **1** scambio P2P completato») e,
   solo da due in su negli ultimi 90 giorni, «· ⚠️ **2 non completati**
   negli ultimi 90 giorni» (il primo si tollera e non si scrive),
   «Questo profilo **torna da solo** ogni volta che entri, su qualunque
@@ -331,9 +332,9 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      «Compra» fa il suo. Prima delle 10:00 del 10 ott (chi non è
      moderatore) il bottone resta spento e dice «Dalle 10:00 di domani».
      Dal 10 ott 2026 il bottone resta **spento** anche quando il server
-     dice di no, e sopra i bottoni compare il riquadro arancio: «🚫 Chi
-     ha pubblicato quest'ordine accetta solo chi ha almeno 3 scambi
-     completati (tu ne hai 1).», oppure «🚫 Quest'ordine accetta solo chi
+     dice di no, e sopra i bottoni compare il riquadro arancio: «🚫
+     Quest'ordine è solo per chi ha almeno 3 scambi P2P completati (tu
+     ne hai 1).», oppure «🚫 Quest'ordine accetta solo chi
      non ha scambi non completati negli ultimi 30 giorni: tu ne hai 2.
      Potrai riprenderli dal 12 novembre.», oppure — dal 10 ott 2026 —
      «🚫 Quest'ordine accetta solo chi non ha dispute perse negli ultimi
@@ -356,8 +357,8 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      se vende, la fattura se compra —, mai a chi ci ha provato; a chi ha
      PUBBLICATO si conta solo dal 12 ott 2026, con la leva e col nodo che
      gli dà le sue tre ore: vedi §9, «Il tempo di chi pubblica»);
-   - (solo se chi ha pubblicato ha messo il filtro) «🛡️ Chi ha
-     pubblicato accetta solo chi ha almeno 3 scambi completati, nessuno
+   - (solo se chi ha pubblicato ha messo il filtro) «🛡️ Solo per chi
+     ha almeno 3 scambi P2P completati, nessuno
      scambio non completato negli ultimi 30 giorni e nessuna disputa
      persa negli ultimi 90»;
    - «Tempo rimasto: <6g 23:47:17>»;
@@ -721,11 +722,13 @@ le sezioni in quest'ordine:
    mercato del momento in cui l'offerta viene presa.»
 7. «Chi può prendere l'ordine» (dal 10 ott 2026): le quattro pillole
    «Tutti» (accesa di serie, e sotto niente), «1+ scambi», «3+ scambi»,
-   «5+ scambi»; scelta una soglia, sotto una riga sola: «Solo chi ha
-   completato almeno 3 scambi e non ha nessun «non completato» segnalato
-   negli ultimi 30 giorni né dispute perse negli ultimi 90.» (con 1:
-   «…almeno 1 scambio e…»). Sulla card
-   del libro compare il segno piccolo «🛡️ Da 3 scambi completati».
+   «5+ scambi»; scelta una soglia, sotto una riga sola: «Solo per chi ha
+   almeno 3 scambi P2P completati e non ha nessun «non completato»
+   segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.»
+   (con 1: «…almeno 1 scambio P2P completato e…»). Sulla card
+   del libro compare il segno piccolo «🛡️ Solo per chi ha almeno 3
+   scambi P2P completati» (con 1: «…almeno 1 scambio P2P completato»;
+   fino al 13 ott 2026 diceva «🛡️ Da 3 scambi completati»).
 8. «Quanto si può, e quanto costa»: per esempio «Al momento si accettano
    ordini fino a 500 000 sats — la fee P2P è dell'1,5% per parte» (a un
    Pioniere: «…la fee P2P è dell'1,5% per parte, e tu hai uno sconto
@@ -1765,12 +1768,16 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
   all'angolo del volto (per il lettore di schermo: «Valutazione 4,9 su
   5»). Senza recensioni, niente stella.
 - **Gli scambi completati** (dal 10 ott 2026) stanno accanto alle
-  stelline, da uno in su: sulla card del libro «★ 4,9 · 👤 24 · ✅ 12
-  scambi» (chi non ha ancora recensioni ma ha già scambiato mostra solo
-  «✅ 3 scambi»), nel dettaglio sotto le tre colonne «✅ **12** scambi
-  completati», nella card dell'altra persona «✅ 12 scambi», nel negozio
-  «✅ 12 scambi P2P» accanto alle vendite concluse. Prima quel numero lo
-  vedeva solo l'interessato, nel suo profilo di scambio.
+  stelline, da uno in su, e dal 13 ott 2026 con le stesse parole in
+  ogni posto («✅ 1 scambio P2P completato» al singolare): sulla card
+  del libro «★ 4,9 · 👤 24 · ✅ 12 scambi P2P completati» (chi non ha
+  ancora recensioni ma ha già scambiato mostra solo «✅ 3 scambi P2P
+  completati»), nel dettaglio sotto le tre colonne «✅ **12** scambi
+  P2P completati», nella card dell'altra persona e nel negozio «✅ 12
+  scambi P2P completati» (lì accanto alle vendite concluse), nella
+  scheda Profilo la stessa frase su una riga sua, sotto vendite e
+  acquisti. Prima del 10 ott quel numero lo vedeva solo l'interessato,
+  nel suo profilo di scambio.
 - **Lo scudo Staff**: il bollino «Staff» (sui volti nelle card, nella card
   dell'altra persona nella pagina dello scambio). **Ha la precedenza**: chi
   è staff porta lo scudo e non la stellina. Toccandolo: «**Staff di

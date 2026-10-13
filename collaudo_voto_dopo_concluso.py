@@ -510,7 +510,8 @@ def caso_amber(prova, t):
                   "conferma si sente", {"esito": "ok", "votato": True, "arrivati": 1, "daChiaveGiusta": True, "stelle": 5},
                   due["voto"])
             prova("[torna] nel profilo di scambio lo scambio completato c'e'", True,
-                  "scambio completato" in due["rigaProfilo"] or "scambi completati" in due["rigaProfilo"])
+                  # (13 ott 2026, scambi-chiari) le parole intere, col nome della piazza
+                  "scambio P2P completato" in due["rigaProfilo"] or "scambi P2P completati" in due["rigaProfilo"])
             prova("[torna] ...col numero della rotta vera", True,
                   "<b>%d</b>" % rep["completati"] in due["rigaProfilo"])
         else:

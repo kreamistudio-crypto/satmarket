@@ -31174,6 +31174,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `completatiP2P` li scrive in coda a `stellineP2P` (la card), in
   `repRiquadroP2P`, `cardParte` e `renderNegozio`. Il verbale: CANTIERI,
   «Il feedback rifinito».
+  LE PAROLE HANNO UN GIUDICE SOLO (13 ott 2026, scambi-chiari):
+  `paroleCompletatiP2P(n)` scrive «scambio P2P completato» / «scambi P2P
+  completati» per la reputazione (`completatiP2P`,
+  `rigaMiaReputazioneP2P`) e `fraseFiltroP2P(n, inFrase)` ci costruisce
+  sopra «Solo per chi ha almeno N…» per il filtro (`segnoFiltroP2P`,
+  `rigaFiltroDettP2P`, `fraseVetoP2P`, `fraseAccessoNuovoP2P`). Chi
+  ritaglia per nome una di queste in un banco porta con sé i due
+  giudici. Il verbale: CANTIERI, «Scambi chiari».
   Il messaggio Telegram «Non hai proseguito in tempo» a chi ha preso
   porta la riga del conto: la scrive `_riga_conto_p2p` (pura, una frase
   per Telegram e app: al primo la tolleranza e il blocco dei 30 giorni

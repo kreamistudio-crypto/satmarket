@@ -147697,7 +147697,7 @@ def prove_dati_reputazione_p2p():
           (30, (1, 3, 5), True, True),
           (amb["P2P_MANCATI_FILTRO_S"] // 86400, amb["P2P_FILTRO_SOGLIE"],
            "non completati negli ultimi 30 giorni" in testo,
-           "almeno 1, 3 o 5 scambi completati" in testo))
+           "almeno 1, 3 o 5 scambi P2P completati" in testo))
     prova("...e la memoria: circa quattrocento giorni gli esiti, quaranta "
           "i tentativi (con la cronaca)",
           (400, 40, True, True),
@@ -150126,7 +150126,8 @@ function icoPersonaP2P(){ return '[omino]'; }
 function stelleSceltaP2P(){ return '[stelle]'; }
 function nomeControparteP2P(o, altrimenti){ return altrimenti; }
 """ + "".join(_fn_js(m, f) for f in (
-        "function completatiP2P(n, inRiga){", "function stellineP2P(f){",
+        "function paroleCompletatiP2P(n){", "function completatiP2P(n, inRiga){",
+        "function stellineP2P(f){",
         "function gestoRecensioneP2P(o, rec){",
         "function riquadroRecensioneP2P(o, rec){", "function moduloRecensioneP2P(o){",
         "function testoRecensioneMancanteP2P(motivo){")) + r"""
@@ -150156,14 +150157,15 @@ console.log(JSON.stringify(c));
         salta("il client del feedback P2P", "node non c'e'")
     else:
         prova("client: i completati in riga — niente a zero, singolare a uno, plurale dopo",
-              ["", "✅ 1 scambio", "✅ 2 scambi", "✅ 12 scambi", "", ""], c["riga"])
+              ["", "✅ 1 scambio P2P completato", "✅ 2 scambi P2P completati",
+               "✅ 12 scambi P2P completati", "", ""], c["riga"])
         prova("...e nel riquadro la forma intera", [True, True, ""],
-              ["✅ <b>1</b> scambio completato" in c["box"][0],
-               "✅ <b>12</b> scambi completati" in c["box"][1], c["box"][2]])
+              ["✅ <b>1</b> scambio P2P completato" in c["box"][0],
+               "✅ <b>12</b> scambi P2P completati" in c["box"][1], c["box"][2]])
         prova("client: la riga delle stelline SENZA il numero e' quella di sempre; col numero "
               "lo porta in coda; senza voti ma con scambi fatti mostra quelli; senza niente tace",
-              ["[stella 4.9] 4,9 · [omino] 24", "[stella 4.9] 4,9 · [omino] 24 · ✅ 12 scambi",
-               "✅ 3 scambi", "", ""], c["stelline"])
+              ["[stella 4.9] 4,9 · [omino] 24", "[stella 4.9] 4,9 · [omino] 24 · ✅ 12 scambi P2P completati",
+               "✅ 3 scambi P2P completati", "", ""], c["stelline"])
         prova("client: a scambio aperto, senza scambio, o con un si' che non e' un true "
               "vero, niente — mai per lo stato da solo", [""] * 6, c["aperto"])
         prova("client: sullo scambio annullato il gesto e' la recensione solo col si' del "
@@ -150709,6 +150711,7 @@ function filtroOrdineP2P(o){ return 3; }
 """ + "".join(_fn_js(m, f) for f in (
         "function marchioDisputeP2P(n, inRiga){", "function fraseVetoP2P(v, rep){",
         "function rigaFiltroDettP2P(id){", "function fraseAccessoNuovoP2P(n){",
+        "function paroleCompletatiP2P(n){", "function fraseFiltroP2P(n, inFrase){",
         "function sogliaFiltroP2P(v){",
         "function colpaModSceltaP2P(ordine){", "function colpaModP2P(d, bozze){",
         "function conColpaModP2P(ordine, corpo){",
@@ -150760,7 +150763,7 @@ console.log(JSON.stringify(c));
               "dispute perse", [True, True],
               ["nessuno scambio non completato negli ultimi 30 giorni e nessuna disputa "
                "persa negli ultimi 90" in c["regola"][0],
-               c["regola"][1] == "Solo chi ha completato almeno 3 scambi e non ha nessun "
+               c["regola"][1] == "Solo per chi ha almeno 3 scambi P2P completati e non ha nessun "
                "«non completato» segnalato negli ultimi 30 giorni né dispute perse negli "
                "ultimi 90."])
         prova("client: la spunta della colpa nasce SPENTA, e si accende solo con un true vero",
@@ -153151,7 +153154,7 @@ scegliFiltroNuovoP2P(3);
 const sez3 = sezioneAccessoNuovoP2P();
 c.sezione3 = [p2pNuovoFiltro, RIDISEGNI, (sez3.match(/ on"/g) || []).length,
               sez3.indexOf('aria-pressed="true" data-n="3"') >= 0,
-              sez3.indexOf('Solo chi ha completato almeno 3 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.') >= 0,
+              sez3.indexOf('Solo per chi ha almeno 3 scambi P2P completati e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.') >= 0,
               (sez3.match(/class="hint"/g) || []).length === 1];
 c.frasiAccesso = [fraseAccessoNuovoP2P(1), fraseAccessoNuovoP2P(5), fraseAccessoNuovoP2P(0), fraseAccessoNuovoP2P(2)];
 scegliFiltroNuovoP2P(2); c.sezioneFuori = p2pNuovoFiltro;
@@ -153167,6 +153170,15 @@ c.rifiuto = [fraseFatturaRifiutataP2P(O), fraseFatturaRifiutataP2P({id: ID}),
   fraseRifiutoIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'lnbc1', null)];
 c.pura = [ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'lnbc1xyz'),
           ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'a@b.it') === P2P_INDIRIZZO_RIFIUTATO];
+/* LE STESSE PAROLE OVUNQUE (13 ott 2026, scambi-chiari): il singolare a 1 */
+MIE = {}; p2pFiltri = {[ID]: 1, [ID2]: 5};
+c.parole = [0, 1, 2, 12, '1'].map(n => paroleCompletatiP2P(n));
+c.filtroFrase = [fraseFiltroP2P(1), fraseFiltroP2P(3), fraseFiltroP2P(1, true), fraseFiltroP2P(5, true)];
+c.uno = [segnoFiltroP2P({id: ID}), segnoFiltroP2P({id: ID2}), rigaFiltroDettP2P(ID),
+         fraseVetoP2P({ok: false, motivo: 'filtro', soglia: 1}, {completati: 0}),
+         fraseVetoP2P({ok: false, motivo: 'filtro'}),
+         completatiP2P(1, true), completatiP2P(1), completatiP2P(5, true)];
+p2pMiaRep = {completati: 0, mancati: 0}; c.zero = rigaMiaReputazioneP2P(); p2pMiaRep = null;
 console.log(JSON.stringify(c));
 """
     c = _node_banco(banco)
@@ -153182,7 +153194,7 @@ console.log(JSON.stringify(c));
         prova("client: le frasi del veto, dal codice del server, coi numeri di chi chiede",
               ["", "", True, True, True, True, True],
               [c["veto"][0], c["veto"][1],
-               "almeno 3 scambi completati" in c["veto"][2] and "(tu ne hai 1)" in c["veto"][2],
+               c["veto"][2] == "Quest'ordine è solo per chi ha almeno 3 scambi P2P completati (tu ne hai 1)." and "(tu ne hai 1)" in c["veto"][2],
                "30 giorni" in c["veto"][3] and "tu ne hai 2" in c["veto"][3] and "Potrai" not in c["veto"][3],
                # (10 ott 2026, l'avviso del blocco) con `fino` la data di quando riprendere
                c["veto"][4].endswith("tu ne hai 2. Potrai riprenderli dal 12 novembre."),
@@ -153190,22 +153202,22 @@ console.log(JSON.stringify(c));
         prova("client: i filtri del server entrano solo con id veri e soglie del catalogo",
               [True, {ID: 3}, False, False], c["filtri"])
         prova("...il segno sulla card c'e' solo col filtro, piccolo e con la soglia",
-              [True, ""], ['p2p-accesso' in c["segno"][0] and 'Da 3 scambi completati' in c["segno"][0], c["segno"][1]])
+              [True, ""], [c["segno"][0] == '<div class="p2p-box p2p-accesso">🛡️ Solo per chi ha almeno 3 scambi P2P completati</div>', c["segno"][1]])
         prova("...la mia riga vince sul server, il server vale per gli altri, niente e' 0",
               [5, 3, 0], c["mio"])
         prova("client: i verdetti del server entrano (uno storto no), `fino` con loro, e il veto si legge per id",
               [1, 1800000000, True, "", 0, 0],
-              [c["prendibili"][0], c["prendibili"][1], "almeno 3 scambi completati" in c["prendibili"][2],
+              [c["prendibili"][0], c["prendibili"][1], "almeno 3 scambi P2P completati" in c["prendibili"][2],
                c["prendibili"][3], c["prendibili"][4], c["prendibili"][5]])
         prova("...la riga del filtro nel dettaglio e il riquadro del veto", [True, True, ""],
               # (emendata il 10 ott 2026, malus-p2p: la regola nomina le dispute perse)
-              ["almeno 3 scambi completati, nessuno scambio non completato negli ultimi 30 "
+              ["🛡️ Solo per chi ha almeno 3 scambi P2P completati, nessuno scambio non completato negli ultimi 30 "
                "giorni e nessuna disputa persa negli ultimi 90" in c["riquadro"][0],
                'id="p2pDettVeto"' in c["riquadro"][1] and "🚫" in c["riquadro"][1], c["riquadro"][2]])
         prova("client: la riga del profilo di scambio: niente senza numeri, i completati, il marchio da 2",
               ["", True, True, ""],
-              [c["mia"][0], "<b>3</b> scambi completati" in c["mia"][1] and "non completati" not in c["mia"][1],
-               "<b>1</b> scambio completato" in c["mia"][2] and "⚠️ 2 non completati" in c["mia"][2]
+              [c["mia"][0], "<b>3</b> scambi P2P completati" in c["mia"][1] and "non completati" not in c["mia"][1],
+               "<b>1</b> scambio P2P completato" in c["mia"][2] and "⚠️ 2 non completati" in c["mia"][2]
                and "90 giorni" in c["mia"][2], c["mia"][3]])
         # EMENDATA (10 ott 2026, ritocco di Andrea): con «Tutti» nessun testo
         # sotto; con una soglia la frase corta e sola
@@ -153217,9 +153229,65 @@ console.log(JSON.stringify(c));
               # (emendata il 10 ott 2026, malus-p2p, decisione di Andrea: una
               # disputa persa negli ultimi 90 giorni blocca dal filtro, e la
               # frase lo dice)
-              ["Solo chi ha completato almeno 1 scambio e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.",
-               "Solo chi ha completato almeno 5 scambi e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.",
+              ["Solo per chi ha almeno 1 scambio P2P completato e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.",
+               "Solo per chi ha almeno 5 scambi P2P completati e non ha nessun «non completato» segnalato negli ultimi 30 giorni né dispute perse negli ultimi 90.",
                "", ""], c["frasiAccesso"])
+        # LE STESSE PAROLE OVUNQUE (13 ott 2026, cantiere scambi-chiari, richiesta
+        # di Andrea): sulla card del libro «✅ 1 scambio» (la reputazione) e
+        # «🛡️ Da 1 scambi completati» (il filtro) si confondevano, e il secondo
+        # sbagliava il singolare. Le parole le scrive UN giudice solo.
+        prova("scambi-chiari: le parole dei completati — singolare SOLO a uno",
+              ["scambi P2P completati", "scambio P2P completato", "scambi P2P completati",
+               "scambi P2P completati", "scambio P2P completato"], c["parole"])
+        prova("...il filtro in parole, con la maiuscola e dentro una frase",
+              ["Solo per chi ha almeno 1 scambio P2P completato",
+               "Solo per chi ha almeno 3 scambi P2P completati",
+               "solo per chi ha almeno 1 scambio P2P completato",
+               "solo per chi ha almeno 5 scambi P2P completati"], c["filtroFrase"])
+        prova("...sulla card del libro il segno a UNO non dice piu' «1 scambi», e a 5 il plurale",
+              ['<div class="p2p-box p2p-accesso">🛡️ Solo per chi ha almeno 1 scambio P2P completato</div>',
+               '<div class="p2p-box p2p-accesso">🛡️ Solo per chi ha almeno 5 scambi P2P completati</div>'],
+              c["uno"][:2])
+        prova("...nel foglio dell'ordine la riga del filtro a UNO", True,
+              c["uno"][2] == '<div class="p2p-box p2p-accesso">🛡️ Solo per chi ha almeno 1 scambio P2P '
+              'completato, nessuno scambio non completato negli ultimi 30 giorni e nessuna disputa '
+              'persa negli ultimi 90</div>')
+        prova("...il «no» a UNO, coi numeri di chi chiede e senza",
+              ["Quest'ordine è solo per chi ha almeno 1 scambio P2P completato (tu ne hai 0).",
+               "Quest'ordine è solo per chi ha almeno 1 scambio P2P completato."], c["uno"][3:5])
+        prova("...la reputazione con la spunta: le stesse parole in riga e nel riquadro",
+              ["✅ 1 scambio P2P completato",
+               '<div class="hint p2p-completati">✅ <b>1</b> scambio P2P completato</div>',
+               "✅ 5 scambi P2P completati"], c["uno"][5:])
+        prova("...e nel profilo di scambio a zero resta il plurale", True,
+              "✅ <b>0</b> scambi P2P completati" in c["zero"])
+        # le parole stanno in UN posto: chi le riscrive a mano altrove le fa divergere
+        prova("...le parole sono scritte una volta sola nella pagina, e le forme vecchie non ci sono piu'",
+              [1, 1, 0, 0, 0, 0, 0, 0],
+              [m.count("'scambi P2P completati'"), m.count("'scambio P2P completato'"),
+               m.count("scambi completati'"), m.count("scambio completato'"),
+               m.count("+ ' P2P'"), m.count("Da ' + s"),
+               m.count("accetta solo chi ha almeno"), m.count("Solo chi ha completato")])
+        prova("...ogni frase del filtro passa dal giudice: card, foglio dell'ordine, «no», foglio «Pubblica»",
+              [True, True, True, True],
+              ["fraseFiltroP2P(s)" in _fn_js(m, "function segnoFiltroP2P(o){"),
+               "fraseFiltroP2P(s)" in _fn_js(m, "function rigaFiltroDettP2P(id){"),
+               "fraseFiltroP2P(v.soglia || 1, true)" in _fn_js(m, "function fraseVetoP2P(v, rep){"),
+               "return fraseFiltroP2P(n)" in _fn_js(m, "function fraseAccessoNuovoP2P(n){")])
+        prova("...e ogni riga della reputazione: card e riquadro, profilo di scambio, Profilo, negozio",
+              [2, True, True, True],
+              [_fn_js(m, "function completatiP2P(n, inRiga){").count("paroleCompletatiP2P(n)"),
+               "paroleCompletatiP2P(c)" in _fn_js(m, "function rigaMiaReputazioneP2P(){"),
+               # nel Profilo su una riga loro, senza puntino (scelta B di Andrea a 375 px)
+               "? '<br>' + completatiP2P(myScambiP2P, true) : '');" in m,
+               "? ' · ' + completatiP2P(v.scambi_completati, true) : '')" in m])
+        prova("...«I tuoi dati» cita le due frasi con le parole nuove", [True, True, 0],
+              ["«solo chi ha almeno 1, 3 o 5 scambi P2P completati»" in m,
+               "(«✅ 12 scambi P2P completati», accanto alle stelline)" in m,
+               m.count("«✅ 12 scambi»")])
+        # le pillole del foglio «Pubblica» restano corte (decisione di Andrea, 13 ott 2026)
+        prova("...le pillole del foglio «Pubblica» restano «1+ / 3+ / 5+ scambi»", True,
+              "P2P_FILTRO_SOGLIE.map(n => voce(n, n + '+ scambi'))" in m)
         prova("...una soglia fuori catalogo torna a «tutti»", 0, c["sezioneFuori"])
         prova("...il filtro parte dai campi solo dal catalogo", [5, 0, 0], c["campi"])
         prova("...e all'intestazione si dichiarano i filtri dei SOLI miei ordini", {ID: 3}, c["dichiara"])
@@ -157451,6 +157519,7 @@ def prove_voto_dopo_concluso():
             fn("function gestoRecensioneP2P(o, rec){"),
             _riga_js(mini, "let p2pVotoRipresi = "),
             fn("function riprendiVotoP2P(o){"),
+            fn("function paroleCompletatiP2P(n){"),
             fn("function completatiP2P(n, inRiga){"),
         ]) + r"""
 let DEMO = false, VETRINA = false;
@@ -157566,12 +157635,12 @@ process.stdout.write(JSON.stringify(out));
                   ["ascolto", "", "", "ascolto", "", 2, 0], out["ripAltri"])
             prova("nel demo non parte niente", ["", 0], out["ripDemo"])
             prova("la riga degli scambi: da uno in su, come nel negozio",
-                  ["", "✅ 1 scambio", "✅ 12 scambi"], out["riga"])
+                  ["", "✅ 1 scambio P2P completato", "✅ 12 scambi P2P completati"], out["riga"])
 
     # --- 4) LA SCHEDA PROFILO ------------------------------------------
     rp = fn("function renderProfilo(){")
     prova("la scheda Profilo scrive gli scambi P2P accanto a vendite e acquisti",
-          True, "completatiP2P(myScambiP2P, true) + ' P2P'" in rp
+          True, "? '<br>' + completatiP2P(myScambiP2P, true) : '');" in rp
           and rp.find("acquisti conclusi") < rp.find("completatiP2P(myScambiP2P, true)"))
     prova("...col numero che arriva da /api/me", True,
           "myScambiP2P = Number(me.scambi_completati) || 0;" in mini)
