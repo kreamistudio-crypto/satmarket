@@ -55651,3 +55651,56 @@ vista non c'era `MOSTRO_RELAY_CONFERMA` (si riguarda al punto 1).
 - La voce del 16 set («Il coro dei relay») dice che lo specchio «passa
   da `MOSTRO_RELAY_SPECCHIO` a `MOSTRO_RELAY`»: è superata da questa
   (resta in tutte e due). La voce vecchia non è stata toccata.
+
+**Il verbale del push (13 ott 2026), relay-per-mostro.** Cosa è girato
+su quale albero. PRIMA STESURA, la notte del 12, sopra `236d5b8`: la
+suite severa intera, 22.707 passate e 8 fallite — sei sezioni esplose
+nel banco del pannello delle leve (la trappola del `__missing__`, la
+tredicesima volta) e i due conti del censimento degli avvisi da admin
+—, curate. SOPRA IL COMMIT LOCALE DEL VOTO (`1b4143f`, non ancora su
+main): suite severa intera 23.214 passate e 0 fallite; i 70 collaudi
+del workflow nella gabbia tutti verdi; `collaudo_ronda_relay` anche
+senza coincurve; tortura 34 su 34, rifatta dopo il ritocco al secchio
+degli IPv6. MAIN È CORSO di diciotto commit non miei (hackathon, la
+chat che segue lo scambio, il patto sui recapiti e sul profilo, la
+pausa leggera, punti-ritiro, il voto `865c75b`, la pausa dei nativi,
+la chat che parte subito): il commit è stato trapiantato sopra
+`ea93474` con due
+conflitti, tutti e due «aggiungiamo nello stesso punto» — il registro
+delle sezioni in `prove.py` (tenute le tre) e la coda di CANTIERI
+(tenuta la voce del voto com'è su main, e questa sotto). Poi le
+decisioni di Andrea del 13: la descrizione NIP-11 nel repo, i comandi
+senza righe intorno, i «da fare». SOPRA `ea93474`, ad albero chiuso:
+suite severa INTERA 23.451 passate e 0 fallite; i 75 collaudi del
+workflow nella gabbia, 75 verdi. MENTRE GIRAVANO I COLLAUDI MAIN È
+CORSO ANCORA, di tre commit non miei (il patto che dice la copia
+cifrata sui relay, col suo verbale, e l'orecchio della cassetta
+NIP-46): rebase sopra `8caf7eb`, un conflitto solo, la coda di
+CANTIERI (tenuta la voce nuova di main, e questa sotto). SOPRA
+`8caf7eb`, ad albero chiuso: le 24 sezioni toccate, 1.616 passate e 0
+fallite, e di nuovo tutti i 75 collaudi nella gabbia, 75 verdi. E
+MAIN È CORSO UNA TERZA VOLTA mentre finivano, di dieci commit non miei
+(i gesti dell'ordine, l'ordine in pausa nel libro): terzo rebase,
+sopra `541a379`, coi due conflitti di sempre (il registro e la coda
+delle sezioni in `prove.py`, la coda di CANTIERI). A quel punto, come
+vuole la sua regola del 10 ott, l'ho chiesto ad Andrea invece di
+inseguire main: ha scelto «collaudi mirati e push». SOPRA `541a379`,
+ad albero chiuso: le 26 sezioni toccate, 1.771 passate e 0 fallite, e
+24 collaudi nella gabbia (la ronda, tutto il P2P, i relay, gli
+avvisi, i due arrivati da main), 24 verdi — in più di dieci minuti,
+e MAIN È CORSO UNA QUARTA VOLTA, di cinque commit non miei
+(l'indirizzo giusto e tre note dell'hackathon): quarto rebase, sopra
+`bc4cd10`, un conflitto solo, la coda di CANTIERI. SULL'ALBERO DEL
+PUSH, sopra `bc4cd10`, ad albero chiuso e in pochi minuti, per non
+dare a main il tempo di correre ancora: le sezioni toccate — da me e
+dai commit arrivati — e i collaudi che passano dal codice di questo
+cantiere e da quello appena arrivato (la ronda, gli avvisi agli
+admin, le letture dai relay, l'avviso dei DM, l'indirizzo
+confermato); i conti stanno nel messaggio del commit di questo
+verbale, perché dopo il giro non si tocca più un file. LA SUITE INTERA
+E TUTTI I COLLAUDI SU QUESTO ALBERO LI DICE LA CI: se è rossa il VPS
+non tira. Il push parte solo col verde («se c'è anche un solo rosso
+fermati e dimmelo», parola di Andrea, che ha dato l'ok al push nello
+stesso messaggio). La CI di main guardata prima del push: una riga
+«failure» su `29c47f3` è la sola bandierina `pronto` che non si è
+spostata (prove e segreti verdi), non una prova rossa.
