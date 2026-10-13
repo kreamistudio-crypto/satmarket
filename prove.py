@@ -26013,6 +26013,489 @@ console.log(JSON.stringify(fuori));
            (out.get("incassoMuto") or ["", ""])[1]))
 
 
+def banco_annulla_chiude_js(mini):
+    """Il banco di `prove_annulla_chiude`, come programma node: il MOTORE
+    VERO della cronologia (navPila, navRiflette, navApplica, navIndietro,
+    navChiudiStrato), il foglio di conferma vero e il gesto vero
+    (`annullaPagamento`), su una cronologia di cartone che consegna i
+    popstate DOPO, in un giro loro, come il browser. Di finto ci sono il
+    DOM, la rete e gli orologi.
+    Prende il TESTO della pagina, e i pezzi nati col cantiere li monta
+    solo se ci sono: cosi' lo stesso banco gira sulla pagina di PRIMA
+    (dove il foglio resta aperto, e le prove vengono rosse) — e' la
+    controprova, e si fa su un file vero, non su un sorgente imitato."""
+    import json as _js
+
+    def intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    def se_c_e(firma):
+        return intera(firma) if firma in mini else ""
+
+    def riga(inizio):
+        return _riga_js(mini, inizio) if inizio in mini else ""
+
+    def blocco(inizio, fine):
+        i = mini.index(inizio)
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    return (
+        r"""
+/* ---- il DOM di cartone: nodi che restano, e i fogli nell'ordine del
+   markup (la conferma sta DOPO il foglio della fattura) ---- */
+let CUR = 'ordine';
+const NODI = {}, FOGLI = ['paySheet', 'confermaSheet'];
+function osserva(){ queueMicrotask(() => navRiflette()); }
+function el(id){
+  if (!NODI[id]) {
+    const n = NODI[id] = {id, style: {}, innerHTML: '', textContent: '', className: '',
+      nextElementSibling: null, insertAdjacentHTML(){}, _c: new Set()};
+    n.classList = {
+      contains: c => c === 'active' ? id === 'view-' + CUR : n._c.has(c),
+      add(c){ if (!n._c.has(c)) { n._c.add(c); if (c === 'open' && id !== 'sheetBg') osserva(); } },
+      remove(c){ if (n._c.has(c)) { n._c.delete(c); if (c === 'open' && id !== 'sheetBg') osserva(); } }};
+  }
+  return NODI[id];
+}
+const aperti = () => FOGLI.filter(id => el(id).classList.contains('open'));
+const document = {
+  querySelector(s){ if (s === '.view.active') return el('view-' + CUR);
+    if (s === '.sheet.open') { const a = aperti(); return a.length ? el(a[0]) : null; } return null; },
+  querySelectorAll(s){ return s === '.sheet.open' ? aperti().map(el) : []; }
+};
+/* ---- lo stato della pagina che il gesto legge ---- */
+let STORIA = true;
+const DEMO = false, VETRINA = false, API_BASE = '/api', tg = null;
+const location = {href: 'https://barattolo.store/'};
+let navApplicando = false, navRicordata = null, navGiuInVolo = 0, navUltimo = 0;
+let navSpingi = false, navSostituisci = false, navLasciaFoglio = null;
+let uscitaDopoAnnullo = false, uscitaDopoSalva = false;
+let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
+let p2pDettOrdine = '', currentOrder = null, orders = [];
+let pollTimer = null, currentOrderId = null, rilancioCorrente = null, pagamentoCorrente = null;
+let confermaAzione = null, confermaAltra = null, confermaNo = null;
+let nwcRipristina = null, acqDati = null, paccoDati = null, listings = [];
+/* ---- quel che si conta ---- */
+let TOAST = [], URLS = [], LETTI = 0, APERTO = [], VAI = [], LOG = [], FERMATI = [], WALLET = [];
+let TIMER = [], PERDI = 0, RISPOSTA = () => ({ok: true, status: 200, corpo: {ok: true}});
+function haptic(){} function authHdr(){ return 'x'; }
+function toast(t){ TOAST.push(t); }
+function bottoneInAttesa(){ return () => {}; }
+function navFreccia(){} function vaiEsplora(){ VAI.push('esplora'); }
+function navRendiVista(b){ CUR = b.v; }
+function closeSheet(){ FOGLI.forEach(id => el(id).classList.remove('open')); el('sheetBg').classList.remove('open'); }
+function portaWallet(a, inv){ WALLET.push(inv); }
+function renderOrders(){} function carrelloDopoPagamento(){}
+async function loadOrders(){ LETTI++; }
+function openOrder(id){ APERTO.push(id); }
+function go(v){ VAI.push(v); CUR = v; osserva(); }
+function clearInterval(t){ FERMATI.push(t); }
+function setTimeout(f, ms){ TIMER.push([f, ms]); }
+async function fetch(url, opz){
+  URLS.push(url.replace(API_BASE, ''));
+  const r = RISPOSTA(url);
+  return {ok: r.ok, status: r.status, json: async () => r.corpo};
+}
+/* la vista: quel che serve a dire «e' ancora lei» */
+function navVista(){ return {t: 'v', v: CUR, k: CUR === 'ordine' ? ((currentOrder && currentOrder.id) || 0) : 0}; }
+/* ---- LA CRONOLOGIA DI CARTONE ---- */
+let CODA = [];
+const history = {
+  voci: [], i: -1,
+  get state(){ return this.i >= 0 ? this.voci[this.i] : null; },
+  pushState(s){ LOG.push('push'); this.voci = this.voci.slice(0, this.i + 1);
+    this.voci.push(JSON.parse(JSON.stringify(s))); this.i++; },
+  replaceState(s){ LOG.push('replace'); const c = JSON.parse(JSON.stringify(s));
+    if (this.i < 0) { this.voci = [c]; this.i = 0; } else this.voci[this.i] = c; },
+  back(){ LOG.push('back'); if (PERDI) { PERDI--; return; }
+    CODA.push(() => { if (this.i > 0) { this.i--; navApplica(this.state); } }); }
+};
+const pausa = () => new Promise(r => setImmediate(r));
+async function scorri(){ await pausa(); let g = 0;
+  while (CODA.length && g++ < 40) { CODA.shift()(); await pausa(); }
+  await pausa(); }
+"""
+        + blocco("const RADICI = new Set([", "]);") + "\n"
+        + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0)
+                    for n in ("RADICE_MADRE", "VISTE_NAV_P2P", "MADRE_P2P",
+                              "FIGLIE_P2P", "navStesso")) + "\n"
+        + blocco("const navUguali = ", "));") + "\n"
+        + riga("let chiudiPayDopoAnnullo = ")
+        + riga("let ordineAnnullatoQui = ")
+        + riga("const PAY_CINTURA_MS = ")
+        + "".join(intera(f) for f in (
+            "function navPila(){", "function navChiudiStrato(s){",
+            "function navRiapriStrato(s){", "function navRiflette(){",
+            "function navApplica(s){", "function navIndietro(){",
+            "function navGiu(){", "function passoPilaP2P(ora, st, sotto){",
+            "function chiediConferma(c){", "async function eseguiConferma(btn){",
+            "async function annullaPagamento(){",
+            "async function verificaOrdine(oid){"))
+        + "".join(se_c_e(f) for f in (
+            "function chiudiFoglioFattura(){",
+            "async function rileggiOrdineAnnullato(oid){",
+            "async function fatturaAnnullataAltrove(oid){"))
+        + r"""
+/* ---- I CASI: ognuno e' solo, col suo stato di partenza ---- */
+function azzera(vista){
+  Object.keys(NODI).forEach(k => delete NODI[k]);
+  CUR = vista || 'ordine'; STORIA = true;
+  currentOrder = {id: 7}; orders = [{id: 7}, {id: 8}];
+  pollTimer = null; currentOrderId = null; rilancioCorrente = null; pagamentoCorrente = null;
+  confermaAzione = null; confermaAltra = null; confermaNo = null;
+  navApplicando = false; navGiuInVolo = 0; navUltimo = 0;
+  uscitaDopoAnnullo = false; uscitaDopoSalva = false;
+  if (typeof chiudiPayDopoAnnullo !== 'undefined') chiudiPayDopoAnnullo = false;
+  if (typeof ordineAnnullatoQui !== 'undefined') ordineAnnullatoQui = 0;
+  TOAST = []; URLS = []; LETTI = 0; APERTO = []; VAI = []; LOG = []; FERMATI = []; WALLET = [];
+  TIMER = []; PERDI = 0; CODA = [];
+  RISPOSTA = () => ({ok: true, status: 200, corpo: {ok: true}});
+  history.voci = []; history.i = -1;
+  history.replaceState({app: 'brt', pila: navPila(), d: 0, sotto: []});
+  LOG = [];
+}
+/* il foglio della fattura aperto, nei suoi tre usi */
+async function apriFattura(uso, id){
+  rilancioCorrente = null; pagamentoCorrente = null; currentOrderId = null;
+  if (uso === 'ordine') currentOrderId = id;
+  if (uso === 'puntata') rilancioCorrente = id;
+  if (uso === 'sblocco') pagamentoCorrente = id;
+  el('payInvoice').textContent = 'lnbc1fattura' + id;
+  el('payQr').innerHTML = '<canvas></canvas>';
+  el('payQr').classList.add('pronto');
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  pollTimer = 'poll-' + uso + '-' + id;
+  await pausa();
+}
+/* «Annulla» nel foglio, poi «Sì, annulla» nella conferma */
+async function annullaEConferma(){
+  await annullaPagamento();
+  await pausa();
+  const conferma = aperti().join('+');
+  await eseguiConferma({});
+  await scorri();
+  return conferma;
+}
+const scatta = () => ({
+  fogli: aperti().join('+'), velo: el('sheetBg').classList.contains('open'),
+  i: history.i, voci: history.voci.length,
+  cima: (history.state.pila || []).map(x => x.t === 'v' ? x.v : x.k).join('+'),
+  toast: TOAST.slice(), url: URLS.slice(), letti: LETTI, aperto: APERTO.slice(), vai: VAI.slice(),
+  poll: pollTimer, fermati: FERMATI.slice(),
+  qr: el('payQr').innerHTML, pronto: el('payQr').classList.contains('pronto'),
+  fattura: el('payInvoice').textContent, wallet: WALLET.slice(),
+  indietro: LOG.filter(x => x === 'back').length, timer: TIMER.length,
+  modi: [currentOrderId, rilancioCorrente, pagamentoCorrente]});
+const CASI = {
+  /* IL CASO DEL TELEFONO: «Paga ora» dalla pagina dell'ordine, «Annulla», «Sì, annulla» */
+  async dallOrdine(){ azzera('ordine'); await apriFattura('ordine', 7);
+    const prima = scatta(); const conferma = await annullaEConferma();
+    return {prima, conferma, dopo: scatta()}; },
+  /* ...e dalla cassa: sotto non c'e' la pagina dell'ordine */
+  async dallaCassa(){ azzera('acquisto'); await apriFattura('ordine', 7);
+    await annullaEConferma(); return scatta(); },
+  async puntata(){ azzera('dettaglio'); await apriFattura('puntata', 5);
+    await annullaEConferma(); return scatta(); },
+  async sblocco(){ azzera('profilo'); await apriFattura('sblocco', 9);
+    await annullaEConferma(); return scatta(); },
+  /* il server dice di no (il pagamento e' arrivato nella corsa): il
+     foglio RESTA, con la sua fattura e il suo controllo */
+  async rifiuto(){ azzera('ordine'); await apriFattura('ordine', 7);
+    RISPOSTA = () => ({ok: false, status: 409, corpo: {detail: 'gia arrivato'}});
+    await annullaEConferma(); return scatta(); },
+  /* l'ordine non c'e' piu' nemmeno come riga: dalla sua pagina si torna agli Ordini */
+  async sparito(){ azzera('ordine'); await apriFattura('ordine', 7);
+    orders = [{id: 8}]; await annullaEConferma(); return scatta(); },
+  /* ANNULLATO DA UN'ALTRA PARTE: lo viene a sapere il controllo periodico */
+  async altrove(){ azzera('ordine'); await apriFattura('ordine', 7);
+    RISPOSTA = () => ({ok: true, status: 200, corpo: {stato: 'annullato'}});
+    const torna = await verificaOrdine(7); await scorri();
+    return Object.assign(scatta(), {torna}); },
+  /* ...mentre sopra c'e' la conferma aperta: se ne vanno tutti e due */
+  async altroveConConferma(){ azzera('ordine'); await apriFattura('ordine', 7);
+    await annullaPagamento(); await pausa();
+    RISPOSTA = () => ({ok: true, status: 200, corpo: {stato: 'annullato'}});
+    await verificaOrdine(7); await scorri(); return scatta(); },
+  /* «Ho pagato — verifica» dal dettaglio, a foglio chiuso: niente da
+     chiudere. Il foglio di QUELL'ordine e' stato aperto e poi chiuso
+     con la ✕, quindi la modalita' punta ancora a lui: a fermare il
+     gesto dev'essere il foglio chiuso, non un numero che non combacia */
+  async altroveSenzaFoglio(){ azzera('ordine'); await apriFattura('ordine', 7);
+    navUltimo = 0; navIndietro(); await scorri();
+    const n = LOG.filter(x => x === 'back').length;
+    RISPOSTA = () => ({ok: true, status: 200, corpo: {stato: 'annullato'}});
+    const torna = await verificaOrdine(7); await scorri();
+    return Object.assign(scatta(), {torna, passi: LOG.filter(x => x === 'back').length - n,
+                                    puntato: currentOrderId}); },
+  /* il foglio e' aperto su UN ALTRO ordine: non si tocca */
+  async altroveAltroOrdine(){ azzera('ordine'); await apriFattura('ordine', 8);
+    RISPOSTA = () => ({ok: true, status: 200, corpo: {stato: 'annullato'}});
+    await verificaOrdine(7); await scorri(); return scatta(); },
+  /* ...o e' il foglio di una puntata */
+  async altroveSuPuntata(){ azzera('dettaglio'); await apriFattura('puntata', 5);
+    currentOrderId = 7;
+    RISPOSTA = () => ({ok: true, status: 200, corpo: {stato: 'annullato'}});
+    await verificaOrdine(7); await scorri(); return scatta(); },
+  /* dopo il MIO annullo, un controllo ancora in viaggio torna con
+     «annullato» MENTRE IL FOGLIO E' ANCORA APERTO (i passi indietro
+     non sono ancora atterrati: qui sono persi, che e' la finestra piu'
+     larga). Non deve ridire niente, e soprattutto non deve fare un
+     ALTRO passo indietro: porterebbe via dalla pagina dell'ordine */
+  async pollInRitardo(){ azzera('ordine'); await apriFattura('ordine', 7);
+    PERDI = 9; await annullaEConferma();
+    const n = TOAST.length, passi = LOG.filter(x => x === 'back').length, letti = LETTI;
+    RISPOSTA = () => ({ok: true, status: 200, corpo: {stato: 'annullato'}});
+    await verificaOrdine(7); await scorri();
+    return {apertoAncora: aperti().join('+'), toastDopo: TOAST.length - n,
+            passiDopo: LOG.filter(x => x === 'back').length - passi,
+            lettiDopo: LETTI - letti}; },
+  /* LA CINTURA: i popstate non arrivano. Il QR e' gia' vuoto, e a tempo scaduto il foglio si chiude a mano */
+  async passiPersi(){ azzera('ordine'); await apriFattura('ordine', 7);
+    PERDI = 9; await annullaEConferma(); const fermo = scatta();
+    TIMER.forEach(t => t[0]()); await scorri();
+    return {fermo, dopo: scatta(), ms: (TIMER[0] || [])[1]}; },
+  /* ...ma un foglio RIAPERTO nel frattempo (un'altra fattura) la cintura non lo tocca */
+  async cinturaNonToccaIlNuovo(){ azzera('ordine'); await apriFattura('ordine', 7);
+    await annullaEConferma(); await apriFattura('ordine', 8);
+    TIMER.forEach(t => t[0]()); await scorri(); return scatta(); },
+  /* senza cronologia (la demo da file) lo strato si smonta a mano */
+  async senzaStoria(){ azzera('ordine'); STORIA = false; await apriFattura('ordine', 7);
+    await annullaPagamento(); await pausa(); await eseguiConferma({}); await scorri();
+    return scatta(); },
+  /* LA CHIUSURA DI SEMPRE non e' cambiata: la ✕ fa un passo, e basta */
+  async chiusuraDiSempre(){ azzera('ordine'); await apriFattura('ordine', 7);
+    navUltimo = 0; navIndietro(); await scorri(); return scatta(); },
+  /* ...e il ripensamento nella conferma chiude lei sola: il foglio e la fattura restano */
+  async ripensamento(){ azzera('ordine'); await apriFattura('ordine', 7);
+    await annullaPagamento(); await pausa();
+    navUltimo = 0; navIndietro(); await scorri(); return scatta(); }
+};
+(async () => {
+  const fuori = {};
+  for (const nome of Object.keys(CASI)) {
+    try { fuori[nome] = await CASI[nome](); }
+    catch (e) { fuori[nome] = {ESPLOSO: String(e && e.stack || e).slice(0, 300)}; }
+  }
+  console.log(JSON.stringify(fuori));
+})();
+""")
+
+
+def prove_annulla_chiude():
+    """IL FOGLIO DELLA FATTURA SI CHIUDE DOPO L'ANNULLO (13 ott 2026,
+    cantiere «annulla-chiude», dal telefono di Andrea).
+
+    Il guasto: «Paga ora» sotto un ordine, «Annulla», «Sì, annulla» —
+    usciva «Ordine annullato» e il foglio restava aperto col QR di una
+    fattura ancora viva. Il foglio di conferma costa un gradino nella
+    cronologia, e il solo passo indietro del gesto se lo mangiava.
+
+    Cosa difende questa famiglia, facendo girare il motore VERO della
+    cronologia su una cronologia di cartone:
+    · dopo l'annullo il foglio e' CHIUSO, il velo pure, e la cronologia
+      e' tornata alla pagina di sotto — nei tre usi (ordine, puntata,
+      sblocco);
+    · il QR, la fattura e la porta del wallet si svuotano SUBITO, e il
+      controllo periodico si ferma;
+    · sotto, la pagina dell'ordine si ridisegna e la lista si rilegge;
+    · se il server dice di no, il foglio RESTA com'era;
+    · il controllo periodico chiude il foglio quando l'ordine e' stato
+      annullato da un'altra parte — e solo il foglio di quell'ordine;
+    · la cintura: popstate persi, il foglio si chiude lo stesso.
+    La controprova (lo stesso banco sulla pagina di prima: rosso) sta nel
+    verbale del cantiere."""
+    print("\n[il foglio della fattura si chiude dopo l'annullo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) SUL TESTO: le righe che tengono insieme il disegno --------
+    i = mini.find("async function annullaPagamento(){")
+    f = mini.find("\n}\n", i)
+    gesto = codice_js_senza_commenti(mini[i:f]) if 0 <= i < f else ""
+    prova("il gesto non chiude piu' con un passo indietro suo", False,
+          "navIndietro();\n      toast(" in gesto)
+    i_ok = gesto.find("if (!r.ok) {")
+    i_ch = gesto.find("chiudiFoglioFattura();")
+    i_to = gesto.find("toast(pag ? ")
+    prova("...chiude col suo attrezzo, DOPO il si' del server e prima "
+          "di dirlo", True, 0 < i_ok < i_ch < i_to)
+    prova("...e rimette in pari quel che c'e' sotto, per l'ordine", True,
+          "if (!ril && !pag) await rileggiOrdineAnnullato(oid);" in gesto)
+    i = mini.find("function navApplica(s){")
+    f = mini.find("\n}\n", i)
+    approdo = mini[i:f] if 0 <= i < f else ""
+    prova("l'intenzione si consuma sull'approdo, e fa un altro passo solo "
+          "se il foglio e' ancora aperto", True,
+          "  if (chiudiPayDopoAnnullo) {\n"
+          "    chiudiPayDopoAnnullo = false;\n"
+          "    if (el('paySheet').classList.contains('open')) {\n"
+          "      navUltimo = 0;\n"
+          "      navIndietro();\n" in approdo)
+    prova("la bandierina sta con le sue sorelle, sopra il motore", True,
+          0 < mini.find("let uscitaDopoSalva = false;")
+          < mini.find("let chiudiPayDopoAnnullo = false;")
+          < mini.find("function navRiflette(){"))
+    i = mini.find("async function verificaOrdine(oid){")
+    f = mini.find("\n}\n", i)
+    prova("il controllo periodico non ignora piu' «annullato»", True,
+          "if (d.stato === 'annullato') await fatturaAnnullataAltrove(oid);"
+          in (mini[i:f] if 0 <= i < f else ""))
+    prova("il bottone «Annulla» del foglio chiama sempre quel gesto", 1,
+          mini.count('<button class="btn ghost" '
+                     'onclick="annullaPagamento()">Annulla</button>'))
+
+    # --- 2) FATTO GIRARE ----------------------------------------------
+    try:
+        out = _node_banco(banco_annulla_chiude_js(mini))
+    except (ValueError, AttributeError) as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("il foglio della fattura dopo l'annullo", "node non installato")
+        return
+    esplosi = {k: v["ESPLOSO"] for k, v in out.items()
+               if isinstance(v, dict) and "ESPLOSO" in v}
+    prova("il banco gira: nessun caso esploso, e ci sono tutti e diciassette",
+          ({}, 17), (esplosi or ({"ancora": out["ancora"]}
+                                 if "ancora" in out else {}), len(out)))
+
+    def caso(nome):
+        v = out.get(nome)
+        return v if isinstance(v, dict) and "ESPLOSO" not in v else {}
+
+    # IL CASO DEL TELEFONO
+    o = caso("dallOrdine")
+    prima, dopo = o.get("prima") or {}, o.get("dopo") or {}
+    prova("la premessa: il foglio aperto sopra la pagina dell'ordine, un "
+          "gradino piu' su", ("paySheet", 1, "ordine+paySheet"),
+          (prima.get("fogli"), prima.get("i"), prima.get("cima")))
+    prova("...e la conferma si apre SOPRA il foglio", "paySheet+confermaSheet",
+          o.get("conferma"))
+    prova("DOPO «SÌ, ANNULLA» IL FOGLIO E' CHIUSO, e il velo con lui",
+          ("", False), (dopo.get("fogli"), dopo.get("velo")))
+    prova("...e la cronologia e' tornata alla pagina dell'ordine: nessun "
+          "gradino lasciato sotto i piedi, e si resta li'", (0, "ordine", []),
+          (dopo.get("i"), dopo.get("cima"), dopo.get("vai")))
+    prova("...in due passi: il primo si mangia il gradino della conferma",
+          2, dopo.get("indietro"))
+    prova("l'annullo e' partito per QUELL'ordine, una volta",
+          ["/orders/7/annulla"], dopo.get("url"))
+    prova("il QR, la fattura e la porta del wallet sono vuoti", ("", False, "", [""]),
+          (dopo.get("qr"), dopo.get("pronto"), dopo.get("fattura"),
+           dopo.get("wallet")))
+    prova("il controllo periodico e' fermo", (None, ["poll-ordine-7"]),
+          (dopo.get("poll"), dopo.get("fermati")))
+    prova("lo si dice una volta sola", ["✖️ Ordine annullato"], dopo.get("toast"))
+    prova("la lista si rilegge e la pagina dell'ordine si ridisegna",
+          (1, [7]), (dopo.get("letti"), dopo.get("aperto")))
+
+    c = caso("dallaCassa")
+    prova("dalla cassa: foglio chiuso, cronologia alla cassa, lista "
+          "riletta, nessuna pagina d'ordine da ridisegnare",
+          ("", False, 0, "acquisto", 1, []),
+          (c.get("fogli"), c.get("velo"), c.get("i"), c.get("cima"),
+           c.get("letti"), c.get("aperto")))
+    for nome, url, parole, modo in (
+            ("puntata", "/rilanci/5/annulla", "✖️ Fattura di puntata annullata", 1),
+            ("sblocco", "/pagamenti/9/annulla",
+             "✖️ Sblocco annullato: non è stato pagato niente", 2)):
+        c = caso(nome)
+        prova(f"{nome}: stessa chiusura — foglio, velo, cronologia",
+              ("", False, 0), (c.get("fogli"), c.get("velo"), c.get("i")))
+        prova(f"{nome}: la SUA rotta, le SUE parole, e la sua modalita' si "
+              f"spegne", ([url], [parole], None),
+              (c.get("url"), c.get("toast"), (c.get("modi") or [0, 0, 0])[modo]))
+        prova(f"{nome}: non e' un ordine — la lista non si rilegge", 0,
+              c.get("letti"))
+
+    c = caso("rifiuto")
+    prova("IL SERVER DICE DI NO: il foglio RESTA aperto, con la sua "
+          "fattura, il suo QR e il suo controllo",
+          ("paySheet", True, "lnbc1fattura7", True, "poll-ordine-7"),
+          (c.get("fogli"), c.get("velo"), c.get("fattura"), c.get("pronto"),
+           c.get("poll")))
+    prova("...si legge il perche', e nient'altro si muove",
+          (["gia arrivato"], 0, 0, []),
+          (c.get("toast"), c.get("indietro"), c.get("letti"), c.get("aperto")))
+
+    c = caso("sparito")
+    prova("l'ordine non c'e' piu' nemmeno come riga: dalla sua pagina si "
+          "torna agli Ordini", ("", ["affari"], []),
+          (c.get("fogli"), c.get("vai"), c.get("aperto")))
+
+    c = caso("altrove")
+    prova("ANNULLATO DA UN'ALTRA PARTE: il controllo periodico chiude il "
+          "foglio e svuota il QR", ("", False, 0, "", ""),
+          (c.get("fogli"), c.get("velo"), c.get("i"), c.get("qr"),
+           c.get("fattura")))
+    # il secondo passo, a foglio gia' chiuso, partirebbe dalla RADICE:
+    # non un passo nella cronologia ma «vai a Esplora» (o, dentro
+    # Telegram, la chiusura dell'app). Si guarda che nessuno venga
+    # portato via, non solo quanti passi si contano
+    prova("...basta UN passo (nessuna conferma di mezzo), il secondo "
+          "non parte, e nessuno viene portato via dalla pagina",
+          (1, [], "ordine"), (c.get("indietro"), c.get("vai"), c.get("cima")))
+    prova("...lo dice con parole sue, rilegge e ridisegna",
+          (["✖️ Questo ordine è stato annullato: la fattura non va più "
+            "pagata"], 1, [7]),
+          (c.get("toast"), c.get("letti"), c.get("aperto")))
+    prova("...e chi ha chiesto la verifica riceve lo stato, come prima",
+          "annullato", c.get("torna"))
+    c = caso("altroveConConferma")
+    prova("...con la conferma aperta sopra se ne vanno tutti e due",
+          ("", False, 0, 2),
+          (c.get("fogli"), c.get("velo"), c.get("i"), c.get("indietro")))
+    c = caso("altroveSenzaFoglio")
+    prova("a foglio chiuso («Ho pagato — verifica» dal dettaglio, dopo "
+          "aver chiuso il foglio con la ✕) non si dice e non si muove "
+          "niente", (7, "", [], 0, 0, "annullato"),
+          (c.get("puntato"), c.get("fogli"), c.get("toast"), c.get("passi"),
+           c.get("letti"), c.get("torna")))
+    c = caso("altroveAltroOrdine")
+    prova("il foglio di UN ALTRO ordine non si tocca",
+          ("paySheet", "lnbc1fattura8", [], "poll-ordine-8"),
+          (c.get("fogli"), c.get("fattura"), c.get("toast"), c.get("poll")))
+    c = caso("altroveSuPuntata")
+    prova("...e nemmeno il foglio di una puntata",
+          ("paySheet", "lnbc1fattura5", []),
+          (c.get("fogli"), c.get("fattura"), c.get("toast")))
+    c = caso("pollInRitardo")
+    prova("dopo il MIO annullo, un controllo in ritardo che trova il "
+          "foglio ancora aperto non ridice niente e NON fa un altro passo "
+          "indietro", ("paySheet", 0, 0, 0),
+          (c.get("apertoAncora"), c.get("toastDopo"), c.get("passiDopo"),
+           c.get("lettiDopo")))
+
+    p = caso("passiPersi")
+    fermo, dopo = p.get("fermo") or {}, p.get("dopo") or {}
+    prova("LA CINTURA: coi popstate persi il foglio e' ancora li', ma il "
+          "QR e la fattura sono gia' vuoti e il controllo e' fermo",
+          ("paySheet", "", "", None),
+          (fermo.get("fogli"), fermo.get("qr"), fermo.get("fattura"),
+           fermo.get("poll")))
+    prova("...e a tempo scaduto si chiude a mano, velo compreso",
+          ("", False), (dopo.get("fogli"), dopo.get("velo")))
+    prova("...dopo poco piu' di un secondo", 1200, p.get("ms"))
+    c = caso("cinturaNonToccaIlNuovo")
+    prova("...ma un foglio riaperto nel frattempo, con la sua fattura, la "
+          "cintura non lo chiude", ("paySheet", "lnbc1fattura8"),
+          (c.get("fogli"), c.get("fattura")))
+    c = caso("senzaStoria")
+    prova("senza cronologia (la demo da file) lo strato si smonta a mano",
+          ("", False, 0), (c.get("fogli"), c.get("velo"), c.get("indietro")))
+    c = caso("chiusuraDiSempre")
+    prova("LA ✕ DI SEMPRE non e' cambiata: un passo, e la fattura resta "
+          "nell'ordine (l'annullo e' un altro gesto)",
+          ("", 0, 1, [], "lnbc1fattura7"),
+          (c.get("fogli"), c.get("i"), c.get("indietro"), c.get("url"),
+           c.get("fattura")))
+    c = caso("ripensamento")
+    prova("il ripensamento nella conferma chiude lei sola: foglio, "
+          "fattura e controllo restano", ("paySheet", 1, [], "lnbc1fattura7",
+                                          "poll-ordine-7"),
+          (c.get("fogli"), c.get("i"), c.get("url"), c.get("fattura"),
+           c.get("poll")))
+
+
 def prove_punti_corrieri():
     """IL PUNTO DI RITIRO SOLO DOVE IL CORRIERE CI ARRIVA (12 ott 2026,
     cantiere «punti-ritiro»).
@@ -90382,6 +90865,9 @@ let navRicordata = null, navRicordataPresa = false, p2pMieiFiltro = [], p2pMieiV
 let sciogliPaginaRicordata = () => {};
 /* (6 ott 2026) la gemella dell'annullo: «Salva per dopo» del carrello */
 let uscitaDopoSalva = false;
+/* (13 ott 2026) ...e la terza, dell'annullo dal foglio della fattura:
+   navApplica la legge in coda, e qui resta spenta */
+let chiudiPayDopoAnnullo = false;
 /* (6 ott 2026) il dettaglio del libro: l'ordine, il metodo e la cifra
    scelti, il libro di cartone (un intervallo con due metodi, un ordine
    fisso con uno), i disegni e i toast contati */
@@ -91158,6 +91644,9 @@ let pollTimer = null, tourInCorso = false, tourP2PInCorso = false, testModaleInC
 let p2pMieiFiltro = [], p2pMieiFiltroBozza = null, p2pMieiVerso = 'tutti', p2pMieiVersoBozza = null;
 let navSpingi = false, navSostituisci = false, navLasciaFoglio = null, navGradinoReparto = 0;
 let navApplicando = false, uscitaDopoAnnullo = false, uscitaDopoSalva = false;
+/* (13 ott 2026) la terza bandierina, dell'annullo dal foglio della
+   fattura: navApplica la legge in coda, e qui resta spenta */
+let chiudiPayDopoAnnullo = false;
 let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
 let navRicordata = null, navRicordataPresa = false;
 let classificaDati = null, offertaDaSvelare = 0, barattoloOspite = null, p2pDettOrdine = '';
@@ -160571,6 +161060,7 @@ def main():
               prove_punti_corrieri,
               prove_indirizzo_giusto,
               prove_rimborso_meno_spese,
+              prove_annulla_chiude,
               prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_pubblici,
               prove_punti_salvati,

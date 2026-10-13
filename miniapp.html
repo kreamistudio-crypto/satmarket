@@ -17382,6 +17382,10 @@ let uscitaDopoAnnullo = false;
    del carrello (6 ott 2026): il foglio costa una entry, e uscire dalla
    pagina del carrello ne vuole due — vedi la coda di navApplica. */
 let uscitaDopoSalva = false;
+/* ...e la terza (13 ott 2026, «annulla-chiude»): l'annullo dal foglio
+   della fattura. La conferma costa una entry, e chiudere il foglio ne
+   vuole due — vedi `chiudiFoglioFattura` e la coda di navApplica. */
+let chiudiPayDopoAnnullo = false;
 /* Su file:// (la DEMO aperta a mano) la storia non si puo' toccare: il
    motore resta spento e tutto si comporta come ieri. Stessa guardia di
    protocollo del service worker. */
@@ -18187,6 +18191,19 @@ function navApplica(s){
   if (uscitaDopoSalva) {
     uscitaDopoSalva = false;
     if (bersaglio[0]?.t === 'v' && bersaglio[0].v === 'pacco') {
+      navUltimo = 0;
+      navIndietro();
+    }
+  }
+  /* L'ANNULLO DAL FOGLIO DELLA FATTURA (13 ott 2026), lo stesso patto:
+     il primo passo si e' mangiato il gradino della conferma, e il
+     foglio e' ancora aperto — un altro passo lo smonta. Se il primo
+     l'ha gia' chiuso (nessuna conferma di mezzo: l'annullo arrivato da
+     fuori) non si fa niente. Mai dalla radice: col foglio aperto
+     navIndietro fa sempre e solo un passo nella cronologia. */
+  if (chiudiPayDopoAnnullo) {
+    chiudiPayDopoAnnullo = false;
+    if (el('paySheet').classList.contains('open')) {
       navUltimo = 0;
       navIndietro();
     }
@@ -30441,6 +30458,8 @@ async function verificaOrdine(oid){
       carrelloDopoPagamento(oid, venditoreCassa);
       setTimeout(()=>openOrder(oid), 400);
     }
+    /* annullato da un'altra parte col foglio aperto: il QR non resta */
+    if (d.stato === 'annullato') await fatturaAnnullataAltrove(oid);
     /* lo stato torna a chi chiama (24 set 2026): il poll lo ignora, il
        bottone del dettaglio ci dice «non e' ancora arrivato» */
     return d.stato || '';
@@ -31144,11 +31163,88 @@ async function annullaPagamento(){
       }
       if (ril) rilancioCorrente = null;
       if (pag) pagamentoCorrente = null;
-      navIndietro();
+      /* l'ho annullato IO, da qui: il controllo periodico che tornasse
+         adesso con «annullato» non ha niente da aggiungere */
+      if (!ril && !pag) ordineAnnullatoQui = oid;
+      chiudiFoglioFattura();
       toast(pag ? '✖️ Sblocco annullato: non è stato pagato niente'
           : ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
-      if (!ril && !pag) { await loadOrders(); renderOrders(); }
+      if (!ril && !pag) await rileggiOrdineAnnullato(oid);
     }});
+}
+
+/* ═══ IL FOGLIO DELLA FATTURA SI CHIUDE DOPO L'ANNULLO (13 ott 2026,
+   cantiere «annulla-chiude», dal telefono di Andrea) ══════════════════
+   IL GUASTO: dopo «Sì, annulla» usciva «Ordine annullato» e il foglio
+   restava aperto col QR — di una fattura ancora VIVA nel wallet, che
+   pagata avrebbe riportato in vita l'ordine (il riacciuffo del server:
+   «chi paga ha comprato»). `annullaPagamento` chiudeva con UN passo
+   indietro, ma il foglio di conferma e' uno strato con un gradino suo:
+   chiudendosi a mano (`eseguiConferma`) quel gradino non se ne va, si
+   RISCRIVE come «pagina + foglio della fattura». Il passo indietro
+   atterrava quindi su un gradino identico a quel che c'era a schermo,
+   e non smontava niente. E' il gradino doppio che `uscitaDopoAnnullo`
+   cura per il form di Vendi, e la cura e' la stessa: non si CONTANO i
+   gradini — si dichiara l'intenzione e la si consuma sull'approdo
+   (`navApplica`), che fa un altro passo solo se il foglio e' ancora li'.
+   TRE COSE, in quest'ordine:
+   1. il controllo periodico si ferma e il QR, la fattura e la porta del
+      wallet si SVUOTANO subito: qualunque cosa faccia la cronologia,
+      una fattura annullata non resta a schermo da pagare;
+   2. il passo indietro, con la bandierina;
+   3. LA CINTURA: se i popstate non arrivano (un passo perso), dopo poco
+      il foglio si chiude a mano — al prezzo di un indietro a vuoto, mai
+      di un QR rimasto.
+   Serve i tre usi del foglio (ordine, puntata, sblocco) e il controllo
+   periodico quando l'annullo arriva da un'altra parte. */
+let ordineAnnullatoQui = 0;         // l'ordine annullato da questo foglio
+const PAY_CINTURA_MS = 1200;
+function chiudiFoglioFattura(){
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  const aperto = () => el('paySheet').classList.contains('open');
+  if (!aperto()) return;
+  el('payQr').innerHTML = '';
+  el('payQr').classList.remove('pronto');
+  el('payInvoice').textContent = '';
+  portaWallet(el('payWallet'), '');
+  /* senza cronologia (la demo da file://) lo strato si smonta a mano */
+  if (!STORIA) { navChiudiStrato({t:'f', k:'paySheet'}); return; }
+  chiudiPayDopoAnnullo = true;
+  navUltimo = 0;      /* e' il seguito del gesto, non un secondo canale */
+  navIndietro();
+  setTimeout(() => {
+    chiudiPayDopoAnnullo = false;
+    /* solo il foglio SVUOTATO qui sopra: uno riaperto nel frattempo ha
+       gia' la sua fattura (ogni apertura scrive in quel campo), e non
+       si tocca */
+    if (aperto() && !el('payInvoice').textContent)
+      navChiudiStrato({t:'f', k:'paySheet'});
+  }, PAY_CINTURA_MS);
+}
+/* Quel che c'e' SOTTO il foglio si rimette in pari: la lista si rilegge,
+   e se a schermo c'e' la pagina di quell'ordine si ridisegna — o
+   resterebbe «⚡ Paga ora» con la fattura di un ordine annullato. Se
+   l'ordine non c'e' piu' nemmeno come riga, si torna agli Ordini. */
+async function rileggiOrdineAnnullato(oid){
+  await loadOrders(); renderOrders();
+  const aSchermo = currentOrder && currentOrder.id === oid
+    && el('view-ordine').classList.contains('active');
+  if (!aSchermo) return;
+  if (orders.find(x => x.id === oid)) openOrder(oid);
+  else go('affari');
+}
+/* L'ORDINE E' STATO ANNULLATO DA UN'ALTRA PARTE (un altro telefono, la
+   scadenza) mentre il foglio della sua fattura e' aperto: il controllo
+   periodico lo viene a sapere, e fin qui lo ignorava. Solo se il foglio
+   e' aperto proprio su quell'ordine — «Ho pagato — verifica» dal
+   dettaglio passa dalla stessa lettura e ha le sue parole. */
+async function fatturaAnnullataAltrove(oid){
+  if (oid === ordineAnnullatoQui) return;
+  if (!el('paySheet').classList.contains('open') || currentOrderId !== oid
+      || rilancioCorrente || pagamentoCorrente) return;
+  chiudiFoglioFattura();
+  toast('✖️ Questo ordine è stato annullato: la fattura non va più pagata', 6000);
+  await rileggiOrdineAnnullato(oid);
 }
 
 /* SU ONION LA PORTA E' UN'ALTRA, e questo catalogo e' la ragione

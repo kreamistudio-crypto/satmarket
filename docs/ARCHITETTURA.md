@@ -12669,6 +12669,30 @@
   velo resta se sotto c'è un altro foglio) e il `pollTimer` non si
   tocca. Provato dal vivo con una invoice vera: il ripensamento
   chiude solo il foglio, l'annullo annulla.
+  ...MA L'ANNULLO RIUSCITO NON CHIUDEVA IL FOGLIO DI SOTTO (13 ott
+  2026, cantiere «annulla-chiude», dal telefono di Andrea): «regge per
+  costruzione» vale per il ripensamento, non per il seguito. Il foglio
+  di conferma ha un gradino suo nella cronologia, e chiuso a mano da
+  `eseguiConferma` quel gradino non se ne va: `navRiflette` lo riscrive
+  come «pagina + paySheet». Il solo `navIndietro` di `annullaPagamento`
+  atterrava quindi su un gradino identico allo schermo, e il QR di una
+  fattura ancora viva restava aperto sotto «Ordine annullato». Ora
+  chiude `chiudiFoglioFattura()`: ferma il `pollTimer` e SVUOTA subito
+  QR, fattura e porta del wallet; dichiara l'intenzione
+  (`chiudiPayDopoAnnullo`, terza sorella di `uscitaDopoAnnullo` e
+  `uscitaDopoSalva`) e fa un passo — e in coda a `navApplica`, se il
+  foglio è ancora aperto, un altro (non si contano i gradini: si guarda
+  il foglio all'approdo); la cintura a 1,2 s smonta a mano il foglio
+  svuotato se i popstate si sono persi. Serve i tre usi del paySheet
+  (ordine, puntata, sblocco). Sotto, `rileggiOrdineAnnullato` rilegge
+  la lista e ridisegna la pagina dell'ordine se è lei a schermo. E
+  `verificaOrdine` non ignora più la risposta «annullato»:
+  `fatturaAnnullataAltrove` chiude il foglio dell'ordine annullato da
+  un'altra parte (puntata e sblocco lo facevano già). CHI APRE UN
+  FOGLIO DI CONFERMA SOPRA UN ALTRO FOGLIO E NEL `poi` VUOLE CHIUDERE
+  QUELLO DI SOTTO viene a rileggere qui: un `navIndietro` solo non
+  basta. Prova: `prove_annulla_chiude`, col motore vero della
+  cronologia su una cronologia di cartone.
   TRE RIGHE DA NON AMMORBIDIRE: 1) le FIRME delle funzioni convertite
   non si toccano — l'`async` resta anche dove il corpo non attende
   più, perché parecchie sono ancore di fette in prove.py
