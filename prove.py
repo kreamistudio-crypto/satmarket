@@ -69502,6 +69502,38 @@ def prove_p2p_chiavi():
            "scambio una chiave Nostr tua, quel profilo <b>non lo può ricavare nessuno</b>" in mini,
            [f for f in ("<b>Se entri da Telegram</b>", "<b>Se entri con una chiave Nostr",
                         "dipende da come entri") if f in mini]))
+    # LA COPIA CIFRATA SUI RELAY STA NEL PATTO (13 ott 2026, cantiere
+    # patto-copia-relay, richiesta di Andrea): il profilo di un account
+    # nato su Nostr ha una copia cifrata sui relay (dall'11 ott, cantiere
+    # tor-chiavi-scambio) e lo diceva solo il foglio del profilo. Una riga
+    # sola, subito sotto «nato su Nostr», col suo prezzo. E OGNI PEZZO
+    # DELLA RIGA SI CONTROLLA SUL CODICE: se un giorno la copia finisse sul
+    # server, o «Dimentica il profilo» imparasse a toglierla dai relay, la
+    # riga direbbe il falso e questa prova lo dice prima.
+    _copia = ("<p>Per fartelo ritrovare su ogni dispositivo, il tuo browser ne mette una "
+              "<b>copia cifrata sui relay Nostr</b> — i tuoi, quelli pubblici che usa Barattolo e "
+              "il nostro: la apre <b>solo la tua chiave</b>, noi no, e sul nostro server non ce n'è "
+              "nessuna. Il prezzo lo diciamo per intero: chi legge quei relay <b>vede che la copia "
+              "esiste ed è tua</b>, non cosa contiene, e «Dimentica il profilo» <b>non la toglie</b> "
+              "da lì.</p>")
+    _nato = priv.find("<p><b>Se il tuo account è nato su Nostr</b>, il profilo")
+    _altri = priv.find("<p><b>Negli altri casi</b>")
+    prova("IL PATTO DICE LA COPIA CIFRATA SUI RELAY: una riga, una volta sola, subito sotto «nato "
+          "su Nostr» e prima degli altri casi", (1, True),
+          (priv.count(_copia), 0 <= _nato < priv.find(_copia) < _altri))
+    _relay = pezzo("_relay_copia_p2p")
+    _pubblica = pezzo_js(mini, "async function pubblicaCopiaProfiloP2P(", "\n}\n")
+    _dimentica = (pezzo_js(mini, "async function dimenticaMazzoOra(", "\n}\n")
+                  + pezzo_js(mini, "async function dimenticaChiaviP2P(", "\n}\n"))
+    prova("...ed e' VERA pezzo per pezzo: cifrata verso la propria chiave (NIP-44) nel browser; sui "
+          "relay dell'utente, su quelli pubblici di casa e sul nostro; sul server nessuna copia "
+          "(il kind non ci compare); e «Dimentica il profilo» non tocca i relay",
+          (True, True, True, 0, []),
+          ("const cifrato = await auto.f.cifra44(pub, mazzoSerializza(m));" in _pubblica,
+           "RELAYS_VERIFICA" in _relay and "MOSTRO_RELAY_SPECCHIO" in _relay,
+           "relayScritturaDaEventoP2P(" in mini and "const P2P_COPIA_KIND = 30078;" in mini,
+           src.count("30078"),
+           [s for s in ("p2p_copia", "relay", "copia", "kind: 5", "pubblica") if s in _dimentica.lower()]))
     # ...E DALLA FASE 6 E' ANCHE LA PORTA DEL FOGLIETTO: il codice
     # segreto e il «dimentica» si raggiungono SOLO da qui.
     prova("...e porta il bottone del foglietto ridotto", True,

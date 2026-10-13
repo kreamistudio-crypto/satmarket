@@ -54582,3 +54582,49 @@ sull'albero del push li dice la CI. LA CI DI MAIN, guardata prima del
 push: verde sulla punta (`f2717b0`), e `pronto` era lì. L'ok al push
 di Andrea stava nel brief («pusha solo se suite e collaudi sono verdi:
 fetch e rebase, push subito»).
+
+## Il patto dice la copia cifrata sui relay del profilo nato su Nostr (13 ott 2026, cantiere patto-copia-relay, richiesta di Andrea; coda di «La chat parte subito»)
+
+**IL FATTO.** Dall'11 ott (cantiere tor-chiavi-scambio) il profilo di
+scambio di un account nato su Nostr ha una COPIA CIFRATA sui relay:
+lo diceva il foglio del profilo, non il patto «I tuoi dati». L'avevo
+segnalato due volte senza toccarlo; Andrea: «se non lo dice, aggiungilo
+in una riga semplice nello stesso stile delle altre». Guardato su
+origin/main (`ea93474`): non lo diceva.
+
+**LA RIGA, solo testo.** Un paragrafo nuovo in «Il profilo di scambio
+P2P», subito sotto «Se il tuo account è nato su Nostr» e prima di
+«Negli altri casi»: «Per fartelo ritrovare su ogni dispositivo, il tuo
+browser ne mette una copia cifrata sui relay Nostr — i tuoi, quelli
+pubblici che usa Barattolo e il nostro: la apre solo la tua chiave, noi
+no, e sul nostro server non ce n'è nessuna. Il prezzo lo diciamo per
+intero: chi legge quei relay vede che la copia esiste ed è tua, non
+cosa contiene, e «Dimentica il profilo» non la toglie da lì.» IL
+PREZZO NON ERA CHIESTO ED È SCRITTO LO STESSO, perché è la forma di
+ogni altro paragrafo di quel patto: la copia è un evento firmato dalla
+chiave dell'account (NIP-78, `d` fisso), quindi chi legge i relay vede
+che quella npub ha un profilo di scambio su Barattolo; e
+`dimenticaMazzoOra` cancella il dispositivo, il cloud di Telegram e la
+parte pubblica sul server, non i relay. Sono due fatti del codice, non
+due novità. Le due righe gemelle di «Come funziona» non sono toccate:
+dicono chi può ricavare il profilo, e resta vero.
+
+**PROVATO.** Due controlli nuovi in `prove_p2p_chiavi` (210, erano
+208): la riga c'è una volta sola e sta fra «nato su Nostr» e «Negli
+altri casi»; ed è VERA pezzo per pezzo sul codice — cifrata verso la
+propria chiave nel browser, i tre gruppi di relay (`_relay_copia_p2p`
+più i relay di scrittura dell'utente), nessun 30078 nel server, e
+«Dimentica il profilo» che non nomina né relay né copia. Controprova
+su una copia intera: tolta la parola «cifrata», fatto toccare i relay
+al «Dimentica», messo il kind nel server → 3 rosse su 3, ognuna col
+suo nome. Suite e collaudi: nel verbale del push.
+
+**DA FARE (dal cantiere chat-subito; decisione di Andrea: scritti qui,
+NON fatti).** (1) IL RICHIAMO SOTTO IL FOGLIO: con un foglio aperto
+sopra la pagina dello scambio (la fattura, il QR) il richiamo
+«💬 Chat» resta sotto e si vede solo alla chiusura; chi riceve un
+messaggio mentre compila non ha il numero davanti. (2) LA CHAT CHE
+PARTE SOLO ALL'APERTURA DELLO SCAMBIO: se l'app è aperta su un'altra
+pagina (l'elenco, il libro) la chat di quella parte nasce quando apre
+lo scambio, e fino ad allora l'altra persona legge «Si apre appena …
+apre lo scambio».
