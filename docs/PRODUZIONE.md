@@ -6,6 +6,11 @@ push su main = online entro un minuto, il config del VPS che vince sul
 default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
 — restano in `CLAUDE.md`. Qui c'è tutto il resto.
 
+Il sito barattolo.online sta nel repo privato
+kreamistudio-crypto/barattolo-online (clonato in
+Documents\GitHub\barattolo-online); Vercel pubblica da solo a ogni push
+su main.
+
 I PERCORSI DEL VPS SONO SCRITTI PER ESTESO (10 ott 2026, cantiere
 percorsi-vps, richiesta di Andrea): la cartella del server è
 `/srv/barattolo`, il config `/srv/barattolo/config.py`, il database
