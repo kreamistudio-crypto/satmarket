@@ -13850,7 +13850,7 @@ document.getElementById('cartello')?.remove();</script>
          stanotte». Con lei «Annulla» non c'e': i tasti restano due, e
          si esce col gesto di sempre. -->
     <button class="btn ghost" id="confAltra" style="display:none" onclick="eseguiConfermaAltra(this)"></button>
-    <button class="btn ghost" id="confNo" onclick="navIndietro()">Annulla</button>
+    <button class="btn ghost" id="confNo" onclick="ripensaConferma()">Annulla</button>
   </div>
 
   <!-- ============ SHEET: LA PRIMA SPEDIZIONE ============ -->
@@ -33014,6 +33014,10 @@ function chiediConferma(c){
   /* il logo e' una costante nostra, e l'etichetta resta col textContent
      di sempre, che e' la guardia (vedi prove_onion) */
   if (c.vestito === 'bz') ok.insertAdjacentHTML('afterbegin', LOGO_BZ_HTML);
+  /* ...e `vestito: 'allarme'` e' il rosso dell'uscita (13 ott 2026,
+     disputa-per-sbaglio): un gesto che ferma lo scambio non veste
+     l'arancio del «vai avanti» */
+  if (c.vestito === 'allarme') ok.className = 'btn allarme';
   el('confNo').style.display = c.avviso ? 'none' : '';
   /* LA SECONDA STRADA (12 ott 2026, notte, cantiere libro-vuoto): chi
      passa `altra: {etichetta, poi}` ha DUE azioni vere e nessun
@@ -33030,8 +33034,36 @@ function chiediConferma(c){
      chiede di ANNULLARE qualcosa lo chiama «Indietro» — sotto «Sì,
      annulla» due «annulla» erano due strade con lo stesso nome */
   el('confNo').textContent = c.indietro || 'Annulla';
+  /* IL RIPENSAMENTO PER PRIMO (13 ott 2026, disputa-per-sbaglio): con
+     `noPrima` sale sopra e veste il pieno, e il gesto scende sotto —
+     dove il pollice arriva per primo sta la strada che non rompe
+     niente. `poiNo` e' quel che il ripensamento fa DOPO aver chiuso il
+     foglio (portare alla chat). Il foglio e' uno per tutti: posto,
+     vestito e seguito si rimettono a ogni apertura. */
+  const no = el('confNo');
+  no.className = 'btn ' + (c.noPrima ? 'orange' : 'ghost');
+  /* IL POSTO DI SERIE DEL RIPENSAMENTO E' L'ULTIMO, dopo la seconda
+     strada (`#confAltra`, cantiere libro-vuoto, arrivato lo stesso
+     giorno): gesto, seconda strada, ripensamento. I due modi non si
+     usano insieme. `before`/`after` si chiedono solo se ci sono: i
+     banchi che girano questo foglio su nodi di cartone non li hanno. */
+  const ultimo = el('confAltra') || ok;
+  if (c.noPrima) { if (no.nextElementSibling !== ok && ok.before) ok.before(no); }
+  else if (ultimo.nextElementSibling !== no && ultimo.after) ultimo.after(no);
+  confermaNo = c.poiNo || null;
   el('sheetBg').classList.add('open');
   el('confermaSheet').classList.add('open');
+}
+/* il tocco sul ripensamento: chiude come sempre (un passo indietro), e
+   se chi ha aperto il foglio ha lasciato un seguito lo fa a foglio
+   chiuso. Chiudere in un altro modo — il fondo, il tasto indietro —
+   non lo fa partire: e' il seguito di QUEL bottone. */
+let confermaNo = null;
+function ripensaConferma(){
+  const poi = confermaNo;
+  confermaNo = null;
+  navIndietro();
+  if (poi) setTimeout(poi, 350);
 }
 /* La testata standard di un annuncio: la miniatura se c'e', il 💰 se
    manca. Sta qui perche' la vogliono tutti i chiamanti che parlano di
@@ -61628,8 +61660,12 @@ const SECONDARI_P2P = {
   vota: '<button class="btn ghost" onclick="apriVotoP2P()">⭐ Vota chi ha scambiato con te</button>',
   /* l'uscita, e sta in fondo come nell'ordine di Barattolo: prima
      il passo da fare, poi il modo di parlarsi, e per ultima la
-     strada per quando parlarsi non e' bastato */
-  disputa: '<button class="btn allarme" onclick="apriDisputaP2P()">⚠️ C’è un problema</button>'
+     strada per quando parlarsi non e' bastato.
+     IL BOTTONE DICE QUEL CHE FA (13 ott 2026, disputa-per-sbaglio,
+     decisione di Andrea): si chiamava «C'è un problema», e chi aveva
+     solo una domanda lo toccava per chiedere aiuto — lo scambio
+     fa17a63d, euro arrivati e disputa aperta «per errore». */
+  disputa: '<button class="btn allarme" onclick="apriDisputaP2P()">⚠️ Apri una disputa</button>'
 };
 /* L'ANNULLO IN EVIDENZA (set 2026, col tabacchino): a ordine Amazon
    scaduto coi sats in garanzia il gesto che risolve e' annullare
@@ -62336,6 +62372,8 @@ function renderOrdineP2P(){
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     /* A DISPUTA APERTA: il moderatore, e il canale per scrivergli (28 set 2026) */
     (typeof bloccoModeratoreP2P === 'function' ? bloccoModeratoreP2P(o) : '') +
+    /* ...e a chi l'ha aperta per sbaglio, come si torna indietro (13 ott 2026) */
+    rigaDisputaPerSbaglioP2P(o, typeof chatScCeP2P === 'function' && chatScCeP2P(o) && !o.soloVista) +
     /* IL CONTANTI DI PERSONA (30 set 2026): la regola dal proprio lato e
        «📍 Sono qui» (1 ott 2026, al posto del QR di «Siamo insieme»),
        SOPRA il bottone del passo — si legge prima di liberare o di
@@ -62349,6 +62387,12 @@ function renderOrdineP2P(){
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
        inviato gli euro», che e' dove l'IBAN si legge e si copia */
     recapitoCompratoreP2P(o) +
+    /* A DISPUTA APERTA chi vende puo' ancora rilasciare (13 ott 2026):
+       nel posto del bottone del passo, senza «tocca a te». Sta DOPO il
+       recapito di chi compra e non fra i due — fra il bottone e il suo
+       recapito non entra niente — e a chi vende quel recapito non c'e',
+       quindi il posto e' lo stesso */
+    rilascioInDisputaP2P(o) +
     /* IL PAYCODE CHE NON E' PARTITO DA SOLO (24 set 2026): a chi vende,
        sotto il suo gesto, con la strada a mano */
     avvisoRecapitoFermoP2P(o) +
@@ -63663,9 +63707,52 @@ function euroInviatiP2P(){
                               'Sto avvisando che hai pagato…')
   });
 }
+/* ═══ CHI VENDE RILASCIA ANCHE A DISPUTA APERTA (13 ott 2026, lo
+   scambio fa17a63d: euro arrivati, disputa aperta per sbaglio da chi
+   comprava, e chi vendeva non trovava piu' il tasto) ═══════════════════
+   IL COORDINATORE LO ACCETTA, letto sul sorgente della v0.19.0 che il
+   nodo gira (`release_action` in `src/app/release.rs`): il rilascio
+   passa da `fiat-sent` E da `dispute`, solo da chi vende, chiunque
+   abbia aperto la disputa e anche se un moderatore l'ha gia' presa; la
+   disputa la chiude lui (`DisputeStatus::Released`). Le nostre patch
+   quel cancello non lo toccano. Il 28 set era rimasto fuori per
+   perimetro («chiesto solo l'annullo»).
+   NON E' «TOCCA A TE»: a disputa aperta la mossa resta del moderatore,
+   e chi vende rilascia solo SE gli euro sono arrivati. Per questo il
+   bottone non esce da `azioniDisponibili` (niente 👉 sulla card, niente
+   gruppo «tocca a te») ma da un pezzo suo, nel posto dove stava «Libera
+   i sats». Le parole sono di Andrea. */
+const RILASCIO_DISPUTA_AVVISO = 'Rilascia solo se hai ricevuto il pagamento: la disputa si chiude.';
+/* PURA: il pezzo della pagina, o '' */
+function rilascioInDisputaP2P(o){
+  if (!o || o.stato !== 'in_disputa' || o.lato !== 'vendo' || o.soloVista) return '';
+  return '<div class="hint">Hai ricevuto il pagamento? Puoi rilasciare i sats anche adesso: la disputa si chiude.</div>'
+    + '<button class="btn orange" onclick="rilasciaP2P()">✅ Rilascia i sats</button>';
+}
+/* PURA: a chi COMPRA e la disputa l'ha aperta lui, la strada per
+   tornare indietro. Ritirarla non si puo' (il coordinatore non ha un
+   gesto per farlo): la chiude chi vende, rilasciando. `disputaMia` la
+   sa solo il telefono da cui e' partita. */
+const DISPUTA_SBAGLIO_CHAT = 'Aperta per sbaglio? Scrivilo nella chat: chi vende può rilasciare i sats e la disputa si chiude.';
+const DISPUTA_SBAGLIO_SENZA = 'Aperta per sbaglio? Dillo all\'altra persona: chi vende può rilasciare i sats e la disputa si chiude.';
+function rigaDisputaPerSbaglioP2P(o, conChat){
+  if (!o || o.stato !== 'in_disputa' || o.lato !== 'compro' || !o.disputaMia) return '';
+  return '<div class="trust-note"><span>💡</span><span>'
+    + (conChat ? DISPUTA_SBAGLIO_CHAT : DISPUTA_SBAGLIO_SENZA) + '</span></div>';
+}
 function rilasciaP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
+  if (o.stato === 'in_disputa') {
+    chiediConferma({
+      titolo: 'Rilasci i sats?',
+      corpo: RILASCIO_DISPUTA_AVVISO + '\n\nI sats partono verso chi compra e non tornano indietro.',
+      etichetta: 'Sì, rilascio i sats',
+      poi: () => mossaOrdineP2P(o.id, 'release', 'Sats rilasciati ✅ La disputa è chiusa',
+                                'Sto rilasciando i sats…')
+    });
+    return;
+  }
   /* COL CONTANTI LA DOMANDA E' QUELLA DEL CONTEGGIO (30 set 2026): la
      regola del rilascio sul posto, chiesta nel momento in cui conta */
   const contanti = scambioInContantiP2P(o);
@@ -71091,27 +71178,37 @@ async function inviaCampoP2P(tipo, btn){
    ⚠️ IL NOME DEL COORDINATORE QUI NON SI PRONUNCIA (regola della fase
    6: nelle viste dello SCAMBIO niente nomi di terzi). Il testo dice
    «Barattolo», che e' la stessa cosa detta nella lingua di chi legge. */
+/* ═══ LA DISPUTA APERTA PER SBAGLIO (13 ott 2026, lo scambio fa17a63d) ═
+   Chi comprava aveva pagato col bonifico e poi ha aperto la disputa
+   «per errore»: aveva una domanda. Il foglio c'era gia', ma erano
+   quattro capoversi col consiglio in fondo e un «Sì» arancione in cima.
+   Adesso (parole di Andrea): tre righe, la strada che non rompe niente
+   PER PRIMA e piena — «Torna alla chat», che alla chat ci porta davvero
+   — e sotto, in rosso, il gesto. Dove la chat non c'e' (l'altra persona
+   non e' di qui, o lo scambio qui si guarda soltanto) il consiglio e'
+   «sentitevi» e il ripensamento e' «Indietro».
+   RESTA la riga del 12 ott 2026: PRIMA del tocco si dice che da quel
+   momento i moderatori possono leggere la chat. E' il patto della chat,
+   non un consiglio: non si accorcia via.
+   Quel che il foglio di prima spiegava — chi decide, dove vanno i sats —
+   lo dice la pagina a disputa aperta (lo stato, il riquadro del
+   moderatore). */
 function apriDisputaP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
   haptic();
-  /* CON LA CHAT NELLO SCAMBIO (12 ott 2026) il consiglio ha un posto:
-     «scrivile nella chat». E si dice PRIMA del tocco quel che il tocco
-     fa: da quel momento i moderatori la possono leggere. Detto cosi',
-     senza le parole dell'impianto, che in questo foglio non entrano.
-     Dove la chat non c'e' (l'altra parte non e' di qui) resta la frase
-     di prima. */
   const conChat = typeof chatScCeP2P === 'function' && chatScCeP2P(o) && !o.soloVista;
   chiediConferma({
-    titolo: 'Aprire una disputa?',
-    corpo: 'Un moderatore guarderà il caso e deciderà chi riceve i sats.\n\n'
-      + 'Da quel momento lo scambio si ferma: né tu né l\'altra persona potete più muovere i sats. '
-      + 'A decidere è Barattolo, e le strade restano due: i sats vanno a chi compra o tornano a chi vende.\n\n'
+    titolo: 'Sei sicuro?',
+    corpo: 'La disputa ferma lo scambio e chiama un moderatore.\n\n'
       + (conChat
-        ? 'Prima di aprirla, dai tempo all\'altra persona e scrivile nella chat dello scambio: quasi sempre è un ritardo.\n\n'
+        ? 'Se è solo una domanda, scrivi all\'altra persona nella chat.\n\n'
           + 'Se la apri, i moderatori potranno leggere la chat di questo scambio.'
-        : 'Prima di aprirla, dai tempo all\'altra persona: quasi sempre è un ritardo. Se qui sopra c\'è il suo profilo coi bottoni per scrivergli, provate prima a sentirvi.'),
-    etichetta: 'Sì, apri la disputa',
+        : 'Se è solo una domanda o un ritardo, prova prima a sentire l\'altra persona.'),
+    etichetta: 'Apri la disputa', vestito: 'allarme',
+    noPrima: true,
+    indietro: conChat ? 'Torna alla chat' : 'Indietro',
+    poiNo: conChat ? (() => vaiAllaChatP2P()) : null,
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => inviaDisputaP2P()
   });
@@ -71900,9 +71997,22 @@ async function statoPubblicoOrdini(ids){
    SOLO IN AVANTI, ed e' la riga che tiene tutto: la restore e' una
    fotografia d'inizio sessione, i messaggi arrivano dopo — un gesto
    appena fatto qui (euro inviati) non deve tornare indietro perche' la
-   fotografia diceva `active`. I passi stanno in P2P_RIPRESA_PASSO; la
-   disputa e i finali stanno in cima, cosi' vincono su tutto tranne che
-   su un finale gia' scritto. PURA: torna la riga nuova, o null. */
+   fotografia diceva `active`. I passi stanno in P2P_RIPRESA_PASSO; i
+   finali stanno in cima, cosi' vincono su tutto tranne che su un
+   finale gia' scritto. PURA: torna la riga nuova, o null.
+   ⚠️ IL RILASCIO STA SOPRA LA DISPUTA (13 ott 2026, disputa-per-
+   sbaglio). Fino a ieri la disputa stava sopra i tre del dopo-rilascio
+   («in cima, vince su tutto»), ed era vero finche' da una disputa si
+   usciva solo con un finale. Ma il coordinatore accetta il rilascio di
+   chi vende ANCHE a disputa aperta, e il verso e' uno solo: dopo il
+   rilascio una disputa non si apre piu' (`dispute.rs` la accetta solo
+   da `active` e `fiat-sent`). Con la disputa sopra, la fotografia che
+   diceva `settled-hold-invoice` non muoveva la riga — chi comprava
+   restava a «Disputa aperta» senza il campo della fattura nuova se il
+   pagamento falliva — e, peggio, una fotografia VECCHIA che diceva
+   `dispute` riportava indietro la riga che il messaggio del rilascio
+   aveva appena mosso. Lo stesso gradino lo legge l'archivio del
+   server (`adottaScambiServerP2P`). */
 const P2P_DA_RESTORE = {
   /* I DUE STATI DELLA CAUZIONE (1 ott 2026, mostrod 0.19.0): la restore
      li dice a chi ha PUBBLICATO — un ordine con qualcuno che sta
@@ -71941,7 +72051,7 @@ const P2P_RIPRESA_PASSO = {
      passo 2 e 1 la fotografia li scavalcava con «rilasciato», cioe'
      toglieva il campo della fattura a chi doveva usarlo. Alla pari
      non si muovono, e a dire quale dei tre e' restano i messaggi. */
-  euro_inviati: 3, rilasciato: 4, pagamento_ritentato: 4, fattura_nuova: 4, in_disputa: 5,
+  euro_inviati: 3, in_disputa: 4, rilasciato: 5, pagamento_ritentato: 5, fattura_nuova: 5,
   concluso: 6, annullato: 6, rifiutato: 6
 };
 function statoDaRestoreP2P(o, statoMostro){

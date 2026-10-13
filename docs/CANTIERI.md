@@ -56237,3 +56237,225 @@ controprova. I due commit del paracadute portano globali nuovi in
 `server.py` e nel blocco della copia non toccano niente. LA CI DI
 MAIN, guardata prima del push: verde sui tre job sulla punta (`673b918`), e `pronto` era lì. L'ok al push di Andrea stava nella
 richiesta («push subito solo se è tutto verde»).
+
+## La disputa aperta per sbaglio: il bottone che dice quel che fa, il foglio corto, e chi vende che rilascia anche a disputa aperta (13 ott 2026, cantiere disputa-per-sbaglio, dal campo di Andrea: lo scambio fa17a63d)
+
+**IL FATTO.** Scambio P2P `fa17a63d`, 13 ott 2026: chi comprava ha pagato
+col bonifico alle 8:14 e poi ha aperto la disputa «per errore» («sono un
+neofita»). Chi vendeva aveva gli euro e non trovava più il tasto per
+liberare i sats: a disputa aperta la pagina non lo offriva. Ha chiuso
+Andrea da moderatore.
+
+**COSA C'ERA GIÀ, letto prima di scrivere.** Il foglio di conferma
+esisteva («Aprire una disputa?», quattro capoversi, il consiglio «scrivile
+nella chat» in fondo, «Sì, apri la disputa» in cima e arancio, «Annulla»
+sotto), e il bottone d'ingresso si chiamava «⚠️ C'è un problema»: non
+diceva «disputa», e chi aveva solo una domanda lo toccava per chiedere
+aiuto. Il bottone del rilascio a disputa aperta era rimasto fuori il 28
+set per perimetro (voce «Le dispute P2P per i moderatori, primo pezzo»:
+«NON FATTO… mostrod lo accetta: chiesto solo l'annullo»), e PRODUZIONE lo
+dava già per fatto («Oppure chi vende libera i sats dalla pagina dello
+scambio»). Il server era pronto dal 28 set: `_chiusura_disputa_p2p` legge
+il `released` di chi vende come chiusura «dalle parti».
+
+**LETTO SUL SORGENTE** (upstream `v0.19.0`, il tag sopra cui stanno le
+nostre patch; i tre file scaricati dal repo pubblico e letti qui — i byte
+della `-bar7` sul nodo non sono stati guardati, e niente è stato provato
+sul coordinatore vero): `release_action` (`src/app/release.rs`) vuole che
+a firmare sia chi vende («Only the seller can release funds») e accetta
+l'ordine in `fiat-sent` O in `dispute`; incassa la garanzia, porta
+l'ordine a `settled-hold-invoice` e chiude la disputa con
+`close_dispute_after_user_resolution(…, DisputeStatus::Released, …)`,
+anche se un solver l'aveva presa. Non guarda chi l'ha aperta.
+`dispute_action` (`src/app/dispute.rs`) accetta una disputa solo da
+`active` e `fiat-sent`: dopo un rilascio non se ne aprono. `cancel.rs`
+manda `Active | FiatSent | Dispute` all'annullo insieme (com'era). Un
+gesto per RITIRARE una disputa non esiste: fra le azioni di chi scambia
+ci sono `dispute`, `release`, `cancel`, e basta. Nessuna delle nostre
+patch tocca quei controlli (cercato `check_status`, `Status::Dispute`,
+`Status::FiatSent` nelle 0006, 0007, 0011, 0012: niente).
+
+**LE DECISIONI DI ANDREA**, prese sul rapporto di dieci righe e prima del
+codice: 1) il bottone d'ingresso si chiama «⚠️ Apri una disputa»; 2) il
+foglio dice le sue parole — «Sei sicuro? La disputa ferma lo scambio e
+chiama un moderatore. Se è solo una domanda, scrivi all'altra persona
+nella chat» — con «Apri la disputa» e «Torna alla chat»; 3) chi vende
+rilascia anche a disputa aperta, anche se un moderatore l'ha presa, con
+l'avviso «Rilascia solo se hai ricevuto il pagamento: la disputa si
+chiude», e il moderatore lo viene a sapere nel gruppo degli admin,
+argomento Dispute; 4) a chi compra e l'ha aperta per sbaglio la riga
+«Aperta per sbaglio? Scrivilo nella chat: chi vende può rilasciare i sats
+e la disputa si chiude»; 5) il passaggio disputa → rilasciato insegnato
+anche alla ripresa e all'archivio.
+
+**COSA È CAMBIATO** (solo `miniapp.html`; `server.py` non è stato
+toccato).
+- *Il bottone*: `SECONDARI_P2P.disputa` dice «⚠️ Apri una disputa».
+- *Il foglio* (`apriDisputaP2P`): titolo «Sei sicuro?», tre righe — la
+  terza è quella del 12 ott, «Se la apri, i moderatori potranno leggere la
+  chat di questo scambio», che è il patto della chat e non si accorcia
+  via. «Torna alla chat» sta SOPRA e veste il pieno, chiude il foglio e
+  porta al riquadro della chat (`vaiAllaChatP2P`); «Apri la disputa» sta
+  SOTTO, in rosso. Dove la chat non c'è (l'altra persona non è di qui, o
+  lo scambio qui si guarda soltanto): «…prova prima a sentire l'altra
+  persona» e «Indietro». Quel che il foglio di prima spiegava (chi
+  decide, dove vanno i sats) lo dice la pagina a disputa aperta.
+- *Il foglio comune* (`chiediConferma`) ha tre modi in più, spenti di
+  serie e rimessi a ogni apertura: `vestito: 'allarme'`, `noPrima` (il
+  ripensamento sale sopra e veste il pieno) e `poiNo` (il seguito del
+  ripensamento, a foglio chiuso). Il tasto `#confNo` passa da
+  `ripensaConferma`, che fa il `navIndietro()` di sempre e poi il seguito.
+  Chiudere in un altro modo (il fondo, il tasto indietro) il seguito non
+  lo fa partire.
+- *«✅ Rilascia i sats» a disputa aperta*: un pezzo suo
+  (`rilascioInDisputaP2P`), nel posto del bottone del passo, con sopra
+  «Hai ricevuto il pagamento? Puoi rilasciare i sats anche adesso: la
+  disputa si chiude.» A chi vende, chiunque abbia aperto la disputa,
+  presa o no, con l'annullo chiesto o proposto; mai dove lo scambio si
+  guarda soltanto. `rilasciaP2P` a `in_disputa` apre «Rilasci i sats?»
+  con l'avviso di Andrea e manda lo stesso `release` di sempre.
+- *La riga di chi l'ha aperta per sbaglio* (`rigaDisputaPerSbaglioP2P`):
+  sotto il riquadro del moderatore, a chi compra e l'ha aperta lui.
+- *La ripresa*: in `P2P_RIPRESA_PASSO` i tre del dopo-rilascio stanno
+  SOPRA la disputa (era il contrario: «la disputa e i finali in cima»).
+  Lo leggono la restore (`riprendiDaRestoreP2P`) e l'archivio del server
+  (`adottaScambiServerP2P`). Coi gradini di prima la fotografia che
+  diceva `settled-hold-invoice` non muoveva la riga in disputa — a chi
+  compra, se il pagamento falliva, non sarebbe mai comparso il campo
+  della fattura nuova — e una fotografia VECCHIA che diceva `dispute`
+  riportava in disputa la riga che il messaggio del rilascio aveva appena
+  mosso. I messaggi (`released`, `hold-invoice-payment-settled`)
+  muovevano già la riga fuori dalla disputa.
+
+**SCARTATE.** *Il bottone del rilascio dentro `azioniDisponibili`*: da lì
+escono il 👉 della card e il gruppo «tocca a te», e a disputa aperta la
+mossa non è di chi vende — rilascia SOLO SE gli euro sono arrivati; il
+server (`_tocca_a_me_p2p`) dice la stessa cosa. *Un tasto «Chiedi al
+moderatore di chiudere» verso il gruppo admin*: era l'alternativa se
+mostrod non avesse accettato il rilascio; lo accetta. *Un gesto per
+ritirare la disputa*: nel coordinatore non esiste, e l'annullo d'accordo
+riporta i sats a chi vende, cioè la cosa sbagliata se gli euro sono
+partiti. *Un quarto foglio per la disputa*: il patto della sezione è «un
+modo del foglio che c'è». *Il caso speciale «da disputa a rilasciato è
+avanti» lasciando la disputa in cima*: avrebbe lasciato un ciclo (la
+fotografia vecchia che riporta indietro); scambiare i due gradini lo
+toglie. *Toccare `server.py`* per l'avviso al gruppo: c'era già, e una
+prova nuova lo tiene.
+
+**LE PROVE VECCHIE EMENDATE** (cinque, tutte per il foglio): in
+`prove_p2p_chat` «si dice cosa succede DOPO» guarda la riga nuova e non
+più «A decidere è Barattolo», e «si consiglia di dare tempo» è diventata
+«di parlarsi»; in `prove_chat_scambio` `disputaMia` ha un lettore in più
+(tre nomi, e UNA sola scrittura: prova nuova accanto) e la frase della
+chat è «scrivi», non «scrivile»; in `prove_testi_p2p_confondono` la
+chiusa senza chat; in `prove_fogli_di_casa` le domande sono ottantatre
+(l'ottantaduesima l'ha contata lo stesso giorno il cantiere libro-vuoto).
+Nessuna prova difendeva la disputa SOPRA il rilascio: lo scambio dei due
+gradini non ne ha fatta cadere nessuna.
+
+**IL CANTIERE GEMELLO NELLO STESSO FOGLIO.** Mentre questo girava le
+prove, su main è arrivato «L'ordine in pausa nel libro» (cantiere
+libro-vuoto), che a `chiediConferma` ha dato una SECONDA STRADA: un terzo
+bottone, `#confAltra`, fra il sì e il ripensamento. Il mio riordino dava
+per scontati due bottoni (di serie avrebbe spostato il sì DOPO il
+terzo): riscritto perché il posto di serie del ripensamento sia l'ultimo,
+dopo la seconda strada — gesto, seconda strada, ripensamento — e
+`before`/`after` si chiedono solo se il nodo li ha (il banco di
+libro-vuoto gira questo foglio su nodi di cartone senza). La sua
+sentinella sull'ordine dei tre tasti cercava
+`id="confNo" onclick="navIndietro()"`: adesso cerca `ripensaConferma()`,
+che chiude con lo stesso `navIndietro()`. Una prova nuova tiene i due
+insieme: dopo il foglio della disputa, una domanda con la seconda strada
+ha i tre in fila e lei in vista. Al rebase i conflitti erano quattro (il
+tasto nel markup, il conto delle domande, e le due code di `prove.py` e
+di questo file); il resto si è fuso da solo, e i simboli arrivati li ho
+cercati per nome.
+
+**PROVATO.** `prove_disputa_per_sbaglio` (39): sentinelle (il bottone, il
+foglio, l'ordine dei pezzi in `renderOrdineP2P`, le parole di Andrea una
+volta sola, `disputaMia` scritta da uno solo) e, sul server, i giudici
+puri ESEGUITI (`_chiusura_disputa_p2p`, `_testo_disputa_chiusa_p2p`) più
+la strada dell'avviso (gruppo degli admin, argomento «dispute»; nessuna
+colpa senza una decisione a registro). Il banco in node con le funzioni
+vere: `chiediConferma` su un DOM di cartone (titolo, corpo, ordine e
+vestito dei due bottoni, con e senza chat, e il foglio DOPO che torna
+com'era), `ripensaConferma` (chiude, poi il seguito; il secondo tocco
+chiude e basta), `rilasciaP2P` a disputa aperta, il bottone e la riga
+caso per caso, `azioniDisponibili` che resta vuota, la macchina a stati
+(`avanzaOrdineP2P`) e la ripresa (`riprendiDaRestoreP2P`) nei due versi,
+la scala, l'attesa del gesto. `collaudo_scambi_ovunque`, passo 15 (11
+controlli, 75 in tutto): sul server vero euro inviati, disputa di chi
+compra, `released` di chi vende — «rilasciato» ai due lati, la riga di
+`p2p_dispute` chiusa «parti / compratore», nessuna colpa a registro,
+l'avviso ai moderatori una volta sola (il retry di mostrod non lo
+ridice) — e il client vero sull'archivio vero: dalla disputa a
+«rilasciato» (anche con la nota dell'annullo, che cade), mai indietro su
+una risposta rimasta alla disputa, poi a «concluso».
+IL GIRO DAL VIVO: server del worktree col config di cartone (dall'esempio:
+relay MORTO `ws://127.0.0.1:9`, nsec `INCOLLA_QUI`, gruppo degli admin
+finto con la stanza 7 per «dispute»), due telefoni di Playwright a
+375×812 coi tocchi veri (Chrome), il coordinatore di cartone dentro la
+pagina, gli eventi di mostrod dalla porta vera (`/api/p2p/evento`), il
+mazzo nato nella pagina. 42 controlli su 42 e dodici scatti in
+`.claude/giri/disputa-per-sbaglio/`: il bottone, il foglio senza e con la
+chat, «Torna alla chat» (anche da in cima alla pagina: scende fino al
+riquadro), la disputa aperta con la riga «Aperta per sbaglio?», chi vende
+col bottone (anche a disputa presa), la conferma, il rilascio, chi compra
+che lo viene a sapere dal solo archivio del server, e nel giornale la
+riga al gruppo: `"message_thread_id": 7` e «✅ Disputa P2P chiusa dalle
+parti … chi vende ha liberato i sats». Nessuno scorrimento laterale,
+nessun errore JavaScript. ⚠️ Due «NO» del primo giro erano del BANCO, non
+del codice: chiamavo `chiediScambiServerP2P()` senza il ridisegno che
+adotta l'archivio (la strada vera è quella del battito:
+`chiediScambiServerP2P` → `renderP2P` → `renderOrdineP2P`), e contavo le
+righe di giornale dei lanci precedenti.
+LA TORTURA: venticinque mutazioni su una copia intera del repo (la scala
+rimessa com'era, il bottone a chi compra / dove si guarda soltanto /
+fuori dalla disputa, la riga a chi non l'ha aperta, il foglio col gesto
+per primo o arancione, «Torna alla chat» che non porta alla chat, la riga
+dei moderatori tolta, i tre modi del foglio che non si rimettono, il
+rilascio con la domanda di sempre o con un altro gesto, i due pezzi tolti
+dalla pagina, il nome di prima, e due sul server): venticinque prese, la
+scala e le due del server anche dal collaudo. La suite e i collaudi: nel
+verbale del push.
+
+**NON PROVATO.** Il coordinatore vero: che la `-bar7` accetti il
+`release` a disputa aperta lo dice il sorgente, non un giro. I due
+telefoni veri. La restore-session vera che dice `settled-hold-invoice`
+su una riga in disputa (provata col giudice vero e la parola del
+protocollo, non col nodo).
+
+**DA AVERE** (la prova dal vivo, da fare con Alan su uno scambio piccolo
+dopo il deploy): chi compra prende, chi vende blocca, chi compra tocca
+«Ho inviato gli euro» e poi «⚠️ Apri una disputa» → «Apri la disputa»;
+chi vende tocca «✅ Rilascia i sats» → «Sì, rilascio i sats». Atteso: a
+chi vende «Sats in pagamento» e poi «Scambio concluso», i sats a chi
+compra, nel gruppo degli admin (argomento Dispute) «✅ Disputa P2P chiusa
+dalle parti», e sul nodo — con la query di PRODUZIONE «COME SI LEGGE UNA
+DISPUTA SUL NODO» — `disputa` = `released` e `status` = `success`. Se
+mostrod rispondesse di no (un cant-do), la pagina lo scrive in arancio
+sotto lo stato: quella riga è la cosa da riportare.
+
+**DA FARE** (notati strada facendo, non fatti):
+- `P2P_DISPUTABILI` contiene `pagamento_ritentato`, che è uno stato del
+  DOPO-rilascio: lì mostrod una disputa non la accetta (`dispute.rs`:
+  solo `active` e `fiat-sent`), quindi «Apri una disputa» in quello stato
+  riceve un no. Da verificare e, se è così, da togliere.
+- Due verbi per lo stesso gesto: il resto dell'app dice «Libera i sats»
+  («Liberi i sats?», «Sats liberati ✅»), qui «Rilascia i sats» per parola
+  di Andrea. Da decidere se uniformare, e in che verso.
+- L'avviso Telegram a chi vende quando l'altra persona apre la disputa
+  dice «i moderatori vi contatteranno» e non dice che, se ha ricevuto il
+  pagamento, può rilasciare dalla pagina dello scambio: nel caso
+  `fa17a63d` sarebbe stata la riga giusta al momento giusto.
+- «Aperta per sbaglio?» compare solo sul telefono da cui la disputa è
+  partita (`disputaMia` vive in quella memoria): il server sa chi l'ha
+  aperta (`p2p_dispute.aperta_da`) e potrebbe dirlo all'archivio.
+- Chi apre la disputa per sbaglio PRIMA di pagare non ha una strada per
+  riprendere lo scambio (da `dispute` non si torna ad `active`): resta
+  l'annullo d'accordo e rifarlo. La pagina non lo dice.
+- Nel giro, a chi vendeva il profilo dell'altra persona diceva «resta
+  anonima: lo scambio è di prima del 12 ottobre 2026» su uno scambio
+  seminato oggi: quasi certamente la semina del banco (le chiavi scritte
+  in `chiavi_p2p` senza il riconoscimento). Da guardare su uno scambio
+  vero.

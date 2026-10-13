@@ -28543,8 +28543,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di mostro-core per intero (due voci dipendono dal lato: chi deve la
   fattura, chi la garanzia), `riprendiDaRestoreP2P` è il giudice puro
   e va SOLO IN AVANTI (`P2P_RIPRESA_PASSO`: la fotografia è d'inizio
-  sessione, un gesto fatto dopo non torna indietro; disputa e finali
-  in cima), e `adottaOrdiniAltroveP2P` lo applica UNA volta per
+  sessione, un gesto fatto dopo non torna indietro; i finali in cima,
+  e dal 13 ott 2026 i tre del dopo-rilascio SOPRA la disputa — vedi
+  «LE DISPUTE P2P», il rilascio a disputa aperta), e
+  `adottaOrdiniAltroveP2P` lo applica UNA volta per
   fotografia (`ripresa` sulla voce in memoria). `pending` e
   `in-progress` non muovono, uno stato fuori tabella nemmeno — lascia
   una riga in console e la parola GREZZA sulla riga (`statoGrezzo`,
@@ -30492,6 +30494,46 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `attesaAltraParteP2P`, `esitoGestoRaggiuntoP2P` e i due fogli
   (`corpoAnnulloDisputaP2P`). `P2P_ANNULLA_INSIEME` non contiene
   `in_disputa`.
+  IL RILASCIO A DISPUTA APERTA, E IL FOGLIO DELLA DISPUTA (client, 13
+  ott 2026, perché in CANTIERI, «La disputa aperta per sbaglio»).
+  mostrod accetta il `release` di chi vende anche da `dispute`
+  (`release_action`, v0.19.0: `fiat-sent` o `dispute`, solo chi vende,
+  chiunque l'abbia aperta, presa o no da un moderatore) e chiude la
+  disputa da sé (`DisputeStatus::Released`); una disputa non si apre
+  DOPO un rilascio (`dispute.rs`: solo `active` e `fiat-sent`). Quindi:
+  • il bottone è un PEZZO SUO, `rilascioInDisputaP2P(o)` (pura: chi
+    vende, `in_disputa`, non `soloVista`), messo in `renderOrdineP2P`
+    nel posto del bottone del passo (dopo `bottoni[azione]` e il
+    recapito di chi compra, che fra loro non vogliono niente e che a
+    chi vende non c'è). NON passa da `azioniDisponibili`: a
+    disputa aperta la mossa non è di nessuno dei due, e da lì escono il
+    👉 della card e il gruppo «tocca a te». Il gesto è `rilasciaP2P`,
+    che a `in_disputa` apre la sua conferma (`RILASCIO_DISPUTA_AVVISO`)
+    e manda lo stesso `release` di sempre (`mossaOrdineP2P`);
+  • `P2P_RIPRESA_PASSO` mette i tre del dopo-rilascio (`rilasciato`,
+    `pagamento_ritentato`, `fattura_nuova`, alla pari) SOPRA
+    `in_disputa`: la restore che dice `settled-hold-invoice` e
+    l'archivio del server che dice «rilasciato» portano la riga fuori
+    dalla disputa, e una fotografia vecchia che dice `dispute` non ce la
+    riporta. I messaggi lo facevano già (`released` a chi compra,
+    `hold-invoice-payment-settled` a chi vende);
+  • a chi COMPRA e l'ha aperta lui (`disputaMia`, che vive sul telefono
+    da cui è partita) `rigaDisputaPerSbaglioP2P(o, conChat)` dice come
+    si torna indietro — ritirarla non si può, la chiude chi vende;
+  • l'ingresso: il bottone di `SECONDARI_P2P` si chiama «⚠️ Apri una
+    disputa», e `apriDisputaP2P` apre il foglio corto col ripensamento
+    PER PRIMO.
+  Il foglio di conferma comune (`chiediConferma`) ha per questo tre
+  modi in più, tutti spenti di serie e rimessi a ogni apertura (e che
+  convivono con la seconda strada `altra` / `#confAltra`, nata lo
+  stesso giorno: di serie il ripensamento torna ULTIMO, dopo di lei):
+  `vestito: 'allarme'` (il gesto in rosso), `noPrima` (il ripensamento
+  sale sopra e veste il pieno) e `poiNo` (quel che il ripensamento fa a
+  foglio chiuso: `ripensaConferma`, che è l'`onclick` di `#confNo`,
+  chiude con `navIndietro()` e poi lo lancia). Il server non è stato
+  toccato: `_chiusura_disputa_p2p` leggeva già il `released` di chi
+  vende come chiusura «dalle parti», senza colpe, e l'avviso va a
+  `_avvisati_mod_p2p()` (il gruppo degli admin, argomento «dispute»).
   I MODERATORI LO SANNO (server). `_manda_evento_p2p`, dopo gli avvisi
   alle parti e nella stessa connessione, chiama `_disputa_evento_p2p`
   dentro un `try` suo. Al momento `disputa` nasce la riga in

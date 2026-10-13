@@ -3053,7 +3053,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   «Accetta di annullare» (o «Chiedi di annullare»: per mostrod il
   secondo `cancel` è la conferma): la hold si cancella, i sats tornano
   a chi vende, la disputa si chiude come `SellerRefunded`. Oppure chi
-  vende libera i sats dalla pagina dello scambio, e vanno a chi compra.
+  vende libera i sats dalla pagina dello scambio, e vanno a chi compra
+  (il bottone nell'app c'è DAL 13 OTT 2026: «✅ Rilascia i sats», a
+  disputa aperta, anche già presa da un moderatore — CANTIERI, «La
+  disputa aperta per sbaglio»; sul nodo la disputa risulta `released`).
   Nessuna chiave di moderatore. I moderatori leggono «Disputa P2P
   chiusa dalle parti».
   2) NESSUNO FA NIENTE. Il guardiano delle scadenze di mostrod guarda

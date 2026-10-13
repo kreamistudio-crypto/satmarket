@@ -1241,8 +1241,8 @@ aveva bloccati, e la riga della cauzione se l'aveva messa.
    c'era).
 
 Se B non fa niente, lo scambio continua. **Dopo «Ho inviato gli euro» il
-bottone «✕ Annulla» non c'è più**: resta solo «⚠️ C'è un problema» (la
-disputa). In disputa si può ancora annullare d'accordo: «La disputa è
+bottone «✕ Annulla» non c'è più**: resta solo «⚠️ Apri una disputa» (dal
+13 ott 2026; prima «⚠️ C'è un problema»). In disputa si può ancora annullare d'accordo: «La disputa è
 aperta, ma potete ancora chiuderla fra voi: se anche l'altra persona è
 d'accordo lo scambio si annulla, la disputa si chiude e i sats tornano a
 chi li ha bloccati.» (a chi compra in più: «Se hai già inviato gli euro
@@ -1617,22 +1617,41 @@ ancora fermo a quel punto; chi ha spento gli avvisi P2P non li riceve.
 - **Quando**: solo a sats **già in garanzia** — negli stati «Sats in
   garanzia», «Pagamento non riuscito», «Euro inviati» / «Contanti
   consegnati» / «PayCode pagato». Prima non c'è niente da contendere.
-- **Il bottone**: «⚠️ **C'è un problema**» (rosso, in fondo alla pagina
-  dello scambio); per chi vende in Barattozon è «🚨 Non risulta pagato:
-  apri una disputa».
-- 🧑 Lo tocca. 📱 «**Aprire una disputa?**» — «Un moderatore guarderà il
-  caso e deciderà chi riceve i sats. Da quel momento lo scambio si ferma:
-  né tu né l'altra persona potete più muovere i sats. A decidere è
-  Barattolo, e le strade restano due: i sats vanno a chi compra o tornano
-  a chi vende. Prima di aprirla, dai tempo all'altra persona e scrivile
-  nella chat dello scambio: quasi sempre è un ritardo. Se la apri, i
-  moderatori potranno leggere la chat di questo scambio.» (dal 12 ott
-  2026, §13; dove la chat non c'è resta la chiusa di prima: «…Se qui
-  sopra c'è il suo profilo coi bottoni per scrivergli, provate prima a
-  sentirvi.») —
-  «Sì, apri la disputa» → «Apro la disputa…» → «Disputa aperta».
+- **Il bottone**: «⚠️ **Apri una disputa**» (rosso, in fondo alla pagina
+  dello scambio; dal 13 ott 2026 — prima si chiamava «⚠️ C'è un problema»,
+  e chi aveva solo una domanda lo toccava per chiedere aiuto); per chi
+  vende in Barattozon è «🚨 Non risulta pagato: apri una disputa».
+- 🧑 Lo tocca. 📱 «**Sei sicuro?**» — «La disputa ferma lo scambio e chiama
+  un moderatore. Se è solo una domanda, scrivi all'altra persona nella
+  chat. Se la apri, i moderatori potranno leggere la chat di questo
+  scambio.» (dal 13 ott 2026). I bottoni sono due, in quest'ordine:
+  «**Torna alla chat**» (sopra, arancio: chiude il foglio e porta al
+  riquadro della chat) e «**Apri la disputa**» (sotto, rosso). Dove la
+  chat non c'è (§13) il testo è «La disputa ferma lo scambio e chiama un
+  moderatore. Se è solo una domanda o un ritardo, prova prima a sentire
+  l'altra persona.» e il primo bottone è «Indietro».
+  «Apri la disputa» → «Apro la disputa…» → «Disputa aperta».
 - 📱 Stato per tutti e due: «**Disputa aperta**» «Un moderatore esaminerà
   lo scambio. I sats restano bloccati fino alla decisione.»
+- **Chi vende può rilasciare anche a disputa aperta** (dal 13 ott 2026),
+  chiunque l'abbia aperta e anche se un moderatore l'ha già presa. 📱 Nella
+  sua pagina, dove stava «Libera i sats»: «Hai ricevuto il pagamento? Puoi
+  rilasciare i sats anche adesso: la disputa si chiude.» e il bottone
+  «✅ **Rilascia i sats**». 🧑 Lo tocca. 📱 «**Rilasci i sats?**» —
+  «Rilascia solo se hai ricevuto il pagamento: la disputa si chiude. I
+  sats partono verso chi compra e non tornano indietro.» — «Sì, rilascio i
+  sats» → «Sto rilasciando i sats…» → «Sats rilasciati ✅ La disputa è
+  chiusa». Lo scambio prosegue come dopo ogni rilascio («Sats in
+  pagamento», poi «Scambio concluso»), a nessuno viene segnata una disputa
+  persa, e ai moderatori arriva «✅ **Disputa P2P chiusa dalle parti**
+  (ordine <codice>): chi vende ha liberato i sats, i sats vanno a chi
+  compra. Non c'è più niente da decidere.»
+- **Chi compra e l'ha aperta per sbaglio** non la può ritirare (il
+  coordinatore non ha un gesto per farlo). 📱 Sul telefono da cui l'ha
+  aperta: «💡 Aperta per sbaglio? Scrivilo nella chat: chi vende può
+  rilasciare i sats e la disputa si chiude.» (senza chat: «…Dillo
+  all'altra persona: chi vende può rilasciare i sats e la disputa si
+  chiude.»).
 - ✈️ All'altra persona: «⚖️ **<nome> ha aperto una disputa sullo scambio
   da 50,00 €:** i moderatori vi contatteranno.»
 - **Chi la gestisce**: i moderatori del coordinatore, cioè lo **staff di
@@ -1912,7 +1931,7 @@ tutti e due.
 - **Da un dispositivo che lo scambio lo può solo guardare**: «💬 Per
   scrivere all'altra persona apri lo scambio dal dispositivo da cui l'hai
   fatto.»
-- **In disputa**: chi tocca «C'è un problema» legge, prima di confermare,
+- **In disputa**: chi tocca «Apri una disputa» legge, prima di confermare,
   «Se la apri, i moderatori potranno leggere la chat di questo scambio.»
   (§10). Il moderatore che prende la disputa trova, nella sua card, «💬 **La
   chat fra le due parti**» — «La leggi perché chi ha aperto la disputa ti ha
@@ -1957,6 +1976,8 @@ già nelle sezioni qui sopra.
    più «all'inizio».
 4. ✅ **Il «contatto» della disputa.** Ora: «Se qui sopra c'è il suo
    profilo coi bottoni per scrivergli, provate prima a sentirvi.» (§10).
+   Dal 13 ott 2026 il foglio è più corto e quella frase non c'è più:
+   senza chat dice «…prova prima a sentire l'altra persona.» (§10).
 5. ✅ **Il PayCode alla presa.** Ora: «…appena l'ordine è tuo, e paghi
    solo quando la pagina dice «Sats in garanzia».» (§7), anche nel passo
    4 della lista di Barattozon in «Info P2P».

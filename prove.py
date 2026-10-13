@@ -42181,8 +42181,11 @@ def prove_fogli_di_casa():
     # un ordine mentre e' in pausa vede prima la domanda, con le due
     # strade — «Pubblica lo stesso» e «Togli la pausa per stanotte»
     # (`fermaPerPausaP2P`).
-    prova("i gesti che passano dalla domanda unica sono ottantadue",
-          82, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTATRE (13 ott 2026, disputa-per-sbaglio): il rilascio a disputa
+    # aperta (`rilasciaP2P`) ha la sua domanda, con l'avviso che la
+    # disputa si chiude.
+    prova("i gesti che passano dalla domanda unica sono ottantatre",
+          83, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -75029,9 +75032,15 @@ def prove_p2p_chat():
     prova("...e non muove lo stato a mano: lo fa la risposta", False,
           "stato" in dis)
     ap = pezzo_js(mini, "function apriDisputaP2P(", "\n}\n")
+    # EMENDATA (13 ott 2026, disputa-per-sbaglio, parole di Andrea): il
+    # foglio era di quattro capoversi e chi aveva solo una domanda
+    # premeva il «Sì» senza leggerli (lo scambio fa17a63d). Adesso dice
+    # in UNA riga cosa succede dopo — lo scambio si ferma, arriva un
+    # moderatore; chi decide e dove vanno i sats lo dice la pagina a
+    # disputa aperta.
     prova("si chiede prima, e si dice cosa succede DOPO", True,
-          "chiediConferma({" in ap and "A decidere è Barattolo" in ap
-          and "tornano a chi vende" in ap)
+          "chiediConferma({" in ap
+          and "La disputa ferma lo scambio e chiama un moderatore." in ap)
     # ⚠️ E IL COORDINATORE QUI NON SI PRONUNCIA: e' una vista dello
     # SCAMBIO, e la regola della fase 6 vieta i nomi di terzi dove uno
     # sta facendo un gesto. Il testo dice «Barattolo», che dal 14 set
@@ -75040,8 +75049,11 @@ def prove_p2p_chat():
           [s for s in ("coordinator", "Mostro") if s in ap])
     # EMENDATA (fase 6): la chat non c'e' piu', quindi il consiglio non
     # e' «scrivi» ma «dai tempo» — e il contatto, se c'e', e' la strada.
-    prova("...e si consiglia di dare tempo prima di aprirla", True,
-          "dai tempo all" in ap)
+    # RI-EMENDATA (13 ott 2026): con la chat nello scambio il consiglio
+    # torna «scrivi», e dove la chat non c'e' «sentitevi»
+    prova("...e si consiglia di parlarsi prima di aprirla", True,
+          "scrivi all\\'altra persona nella chat." in ap
+          and "prova prima a sentire l\\'altra persona." in ap)
     prova("il bottone della disputa e' l'uscita rossa di casa", True,
           'disputa: \'<button class="btn allarme"' in mini)
     sec = pezzo_js(mini, "function azioniSecondarieP2P(", "\n}\n")
@@ -93380,12 +93392,17 @@ def prove_chat_scambio():
           "if (!o || o.stato !== 'in_disputa' || !o.disputaMia || !tk) return;" in mod)
     prova("...e `disputaMia` la scrive il motore quando lo conferma il coordinatore", 1,
           mini.count("if (azione === 'dispute-initiated-by-you') o.disputaMia = 1;"))
-    prova("...e la nomina solo lui e la chat: nessun altro la accende", 2,
+    # (13 ott 2026, disputa-per-sbaglio) un LETTORE in piu': la riga
+    # «Aperta per sbaglio?» di chi compra. A scriverla resta il motore.
+    prova("...e la nomina solo lui, la chat e la riga di chi l'ha aperta per sbaglio", 3,
           len(re.findall(r"disputaMia", re.sub(r"/\*[\s\S]*?\*/", "", mini))))
+    prova("...nessun altro la accende", 1,
+          len(re.findall(r"disputaMia\s*=[^=]", re.sub(r"/\*[\s\S]*?\*/", "", mini))))
     ap = pezzo_js(mini, "function apriDisputaP2P(", "\n}\n")
     prova("PRIMA del tocco si dice cosa fa: i moderatori potranno leggere la chat", True,
           "Se la apri, i moderatori potranno leggere la chat di questo scambio." in ap
-          and "scrivile nella chat dello scambio" in ap)
+          # (13 ott 2026, disputa-per-sbaglio) il foglio corto: «scrivi», non «scrivile»
+          and "scrivi all\\'altra persona nella chat." in ap)
     card = pezzo_js(mini, "function cardDisputaModP2P(", "\n}\n")
     prova("il moderatore la trova nella card della disputa presa, PRIMA della decisione", True,
           0 <= card.find("chatPartiModP2P(d)") < card.find('<div class="mod-decidi">'))
@@ -141884,9 +141901,11 @@ console.log(JSON.stringify(out));
                               # (10 ott 2026, guida-paycode) ...e col PayCode una riga
                               # in piu', sua: il buono regalo non si conferma
                               + "\n\n⚠️ Se ti hanno dato un buono regalo, non confermare."])
-    prova("la disputa non parla piu' del contatto, ma del profilo coi bottoni", [True, False],
-          ["Se qui sopra c'è il suo profilo coi bottoni per scrivergli, provate prima a "
-           "sentirvi." in (out["disputa"] or ""),
+    # (13 ott 2026, disputa-per-sbaglio) il foglio e' di poche righe: del
+    # profilo coi bottoni non parla piu', dice di sentire l'altra persona
+    prova("la disputa non parla del contatto: dice di sentire l'altra persona", [True, False],
+          ["Se è solo una domanda o un ritardo, prova prima a sentire l'altra persona."
+           in (out["disputa"] or ""),
            "un contatto" in (out["disputa"] or "")])
     prova("il recapito SEPA: Instant col suo nome, il bonifico normale com'era",
           ["Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT00X",
@@ -156752,7 +156771,10 @@ def prove_ordine_in_pausa():
           m.index('id="confOk" onclick="eseguiConferma(this)"')
           < m.index('<button class="btn ghost" id="confAltra" style="display:none" '
                     'onclick="eseguiConfermaAltra(this)"></button>')
-          < m.index('id="confNo" onclick="navIndietro()"'))
+          # (13 ott 2026, disputa-per-sbaglio, arrivato lo stesso giorno) il
+          # ripensamento passa da `ripensaConferma`, che chiude con lo
+          # stesso `navIndietro()` e poi fa il suo seguito, se c'e'
+          < m.index('id="confNo" onclick="ripensaConferma()"'))
 
     # LA CARTA IN PAUSA RESTA NEL LIBRO (13 ott 2026, decisione di Andrea)
     filtro_js = fn("function passaFiltroP2P(o, f){")
@@ -158968,12 +158990,351 @@ console.log(JSON.stringify(c));
           ["", True, True, True], c.get("info"))
 
 
+def prove_disputa_per_sbaglio():
+    """LA DISPUTA APERTA PER SBAGLIO (13 ott 2026, lo scambio fa17a63d).
+    Chi comprava ha pagato col bonifico e poi ha aperto la disputa «per
+    errore»: aveva una domanda, e il bottone si chiamava «C'è un
+    problema». Chi vendeva aveva gli euro e non trovava piu' il tasto
+    per liberare i sats: a disputa aperta il client non lo offriva, e ha
+    chiuso Andrea da moderatore.
+    LE QUATTRO COSE: 1) il bottone d'ingresso dice quel che fa; 2) il
+    foglio e' di tre righe, col ripensamento PER PRIMO e pieno («Torna
+    alla chat», che alla chat ci porta) e il gesto sotto, in rosso;
+    3) chi vende rilascia anche a disputa aperta — il coordinatore lo
+    accetta (`release_action` della v0.19.0: `fiat-sent` e `dispute`) e
+    la disputa la chiude lui; 4) nella ripresa il rilascio sta SOPRA la
+    disputa, perche' il verso e' uno solo, e a chi l'ha aperta per
+    sbaglio la pagina dice come si torna indietro.
+    Il server c'era gia': la disputa «chiusa dalle parti» va ai
+    moderatori, nel gruppo degli admin all'argomento delle dispute."""
+    import html as _html
+    print("\n[la disputa aperta per sbaglio]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    blocco_const = lambda nome: (lambda i: mini[i:mini.index("\n};", i) + 3])(
+        mini.index("const " + nome + " = {"))
+    riga = lambda firma: mini[mini.index(firma):mini.index("\n", mini.index(firma))]
+
+    # --- 1) LE SENTINELLE -------------------------------------------------
+    sec = blocco_const("SECONDARI_P2P")
+    prova("il bottone d'ingresso dice quel che fa: «⚠️ Apri una disputa», rosso", True,
+          'disputa: \'<button class="btn allarme" onclick="apriDisputaP2P()">⚠️ Apri una disputa</button>\''
+          in sec)
+    prova("...e «C'è un problema» nei gesti dello scambio P2P non c'e' piu'", [],
+          [s for s in ("C’è un problema", "C'è un problema", "C\\'è un problema") if s in nudo(sec)])
+    ap = nudo(fn("function apriDisputaP2P(){"))
+    prova("il foglio: il gesto in rosso, il ripensamento per primo, e la chat come seguito",
+          [True, True, True, True],
+          ["etichetta: 'Apri la disputa', vestito: 'allarme'," in ap,
+           "noPrima: true," in ap,
+           "indietro: conChat ? 'Torna alla chat' : 'Indietro'," in ap,
+           "poiNo: conChat ? (() => vaiAllaChatP2P()) : null," in ap])
+    prova("...e non nomina ne' il coordinatore ne' l'impianto", [],
+          [s for s in ("coordinator", "Mostro", "escrow", "relay", "assicurat") if s in ap])
+    prova("il tasto del ripensamento passa dal suo gesto, che chiude e poi fa il seguito", [1, True],
+          [mini.count('<button class="btn ghost" id="confNo" onclick="ripensaConferma()">Annulla</button>'),
+           0 <= nudo(fn("function ripensaConferma(){")).find("navIndietro();")
+           < nudo(fn("function ripensaConferma(){")).find("if (poi) setTimeout(poi, 350);")])
+    ren = pezzo_js(mini, "function renderOrdineP2P(", "\n}\n")
+    prova("«Rilascia i sats» sta dove stava il bottone del passo: dopo il bottone e il recapito "
+          "di chi compra (che fra loro non vogliono niente), prima del resto", True,
+          0 <= ren.find("(bottoni[azione] || '') +") < ren.find("recapitoCompratoreP2P(o) +")
+          < ren.find("rilascioInDisputaP2P(o) +") < ren.find("avvisoRecapitoFermoP2P(o) +"))
+    prova("...e la riga di chi l'ha aperta per sbaglio sta sotto il riquadro del moderatore", True,
+          0 <= ren.find("bloccoModeratoreP2P(o) : '') +") < ren.find("rigaDisputaPerSbaglioP2P(o, "))
+    ril = nudo(fn("function rilasciaP2P(){"))
+    prova("il rilascio a disputa aperta e' lo STESSO gesto `release`, con le sue parole", True,
+          0 <= ril.find("if (o.stato === 'in_disputa') {")
+          < ril.find("corpo: RILASCIO_DISPUTA_AVVISO + ")
+          < ril.find("mossaOrdineP2P(o.id, 'release', 'Sats rilasciati ✅ La disputa è chiusa',")
+          < ril.find("    return;\n  }\n") < ril.find("const contanti = scambioInContantiP2P(o);"))
+    prova("le parole di Andrea, una volta sola", [1, 1, 1],
+          [mini.count("const RILASCIO_DISPUTA_AVVISO = 'Rilascia solo se hai ricevuto il pagamento: la disputa si chiude.';"),
+           mini.count("const DISPUTA_SBAGLIO_CHAT = 'Aperta per sbaglio? Scrivilo nella chat: chi vende può rilasciare i sats e la disputa si chiude.';"),
+           mini.count("'La disputa ferma lo scambio e chiama un moderatore.\\n\\n'")])
+    prova("`disputaMia` la scrive ANCORA solo il motore: chi la legge qui non la accende", 1,
+          len(re.findall(r"disputaMia\s*=[^=]", nudo(mini))))
+
+    # il server c'era gia': la chiusura «dalle parti» e a chi va l'avviso
+    ns = {"html": _html}
+    i = _SORGENTE.index("P2P_DISPUTA_ESITI = {")
+    exec(_SORGENTE[i:_SORGENTE.index("}\n", i) + 2], ns)
+    exec(pezzo("_chiusura_disputa_p2p"), ns)
+    exec(pezzo("_testo_disputa_chiusa_p2p"), ns)
+    prova("il server: il rilascio di chi vende a disputa aperta la chiude «dalle parti», sats a chi compra",
+          [("compratore", "parti"), ("compratore", "parti")],
+          [ns["_chiusura_disputa_p2p"]("rilasciato", "seller", ""),
+           ns["_chiusura_disputa_p2p"]("rilasciato", "seller", "admin")])
+    testo = ns["_testo_disputa_chiusa_p2p"]("fa17a63d", "compratore", "parti", None)
+    prova("...e ai moderatori lo dice con le sue parole: nessuno deve piu' decidere",
+          [True, True, True, True],
+          ["Disputa P2P chiusa dalle parti" in testo, "fa17a63d" in testo,
+           "chi vende ha liberato i sats" in testo, "Non c'è più niente da decidere." in testo])
+    reg = _SORGENTE[_SORGENTE.index("    esito, chiusa_da = _chiusura_disputa_p2p(momento, ev[\"attore\"], ev[\"dettaglio\"])"):]
+    reg = reg[:reg.index("\n\n\n")]
+    prova("...a chi riceve gli avvisi dei moderatori, una volta sola per chiusura", True,
+          0 <= reg.find("testo = _testo_disputa_chiusa_p2p(corto, esito, chiusa_da, decisione)")
+          < reg.find("for mod in _avvisati_mod_p2p():")
+          < reg.find("INSERT OR IGNORE INTO p2p_avvisi(")
+          < reg.find("fuori.append((mod, testo))"))
+    prova("...cioe' al gruppo degli admin, nell'argomento delle dispute (o ai moderatori, se il gruppo tace)",
+          [True, True],
+          ["return [gruppo] if gruppo else _moderatori_p2p()" in pezzo("_avvisati_mod_p2p"),
+           'if await _al_gruppo_admin(testo, "dispute"):' in pezzo("_recapita_p2p")])
+    prova("...e una disputa chiusa dalle parti non segna la colpa a nessuno: serve una decisione a registro",
+          True, "AND gesto='decisione' AND esito=? ORDER BY id DESC LIMIT 1" in pezzo("_colpa_disputa_p2p")
+          and "if not r:\n            return False" in pezzo("_colpa_disputa_p2p"))
+
+    # --- 2) IL BANCO: le funzioni vere, in node ---------------------------
+    liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, re.M))
+    i = mini.index("let confermaAzione = null;")
+    foglio = mini[i:mini.index("\n}\n", mini.index("function ripensaConferma(){")) + 3]
+    js = "\n".join([
+        # il DOM di cartone del foglio di conferma: due bottoni in fila
+        r"""
+const FIGLI = [];
+function nodo(id, classe){
+  const n = {id, className: classe, textContent: '', innerHTML: '', style: {},
+    classList: {add(){}, remove(){}}, insertAdjacentHTML(){},
+    before(altro){ FIGLI.splice(FIGLI.indexOf(altro), 1); FIGLI.splice(FIGLI.indexOf(n), 0, altro); },
+    after(altro){ FIGLI.splice(FIGLI.indexOf(altro), 1); FIGLI.splice(FIGLI.indexOf(n) + 1, 0, altro); }};
+  Object.defineProperty(n, 'nextElementSibling', {get(){ return FIGLI[FIGLI.indexOf(n) + 1] || null; }});
+  return n;
+}
+const DOM = {confTit: nodo('confTit', ''), confTestata: nodo('confTestata', ''),
+  confCorpo: nodo('confCorpo', ''), confOk: nodo('confOk', 'btn orange'),
+  confAltra: nodo('confAltra', 'btn ghost'),
+  confNo: nodo('confNo', 'btn ghost'), sheetBg: nodo('sheetBg', ''),
+  confermaSheet: nodo('confermaSheet', '')};
+FIGLI.push(DOM.confOk, DOM.confAltra, DOM.confNo);
+const el = id => DOM[id];
+const haptic = () => {};
+const LOGO_BZ_HTML = '';
+const FATTI = [], TIMER = [];
+const navIndietro = () => { FATTI.push('indietro'); };
+const setTimeout = (f, ms) => { TIMER.push([f, ms]); };
+const vaiAllaChatP2P = () => { FATTI.push('chat'); };
+const inviaDisputaP2P = () => { FATTI.push('disputa'); };
+const mossaOrdineP2P = (...a) => { FATTI.push(a); };
+let CHAT = true;
+const chatScCeP2P = () => CHAT;
+let p2pOrdineAperto = 'x';
+const fmtEur = n => String(n).replace('.', ',');
+const scambioInContantiP2P = o => (o.metodi || [])[0] === 'Contanti';
+const tabacchinoP2P = metodi => (metodi || []).some(x => /tabacch/i.test(x));
+""",
+        foglio,
+        blocco_const("AVANZA_P2P"), blocco_const("STATI_P2P"), blocco_const("P2P_PROGRESSO"),
+        blocco_const("MOTIVI_CANTDO"), blocco_const("P2P_DA_RESTORE"),
+        blocco_const("P2P_RIPRESA_PASSO"), blocco_const("ESITI_GESTO_P2P"), liste,
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02}; let p2pControparti = {};",
+        fn("function commissioneVivaP2P(){"), fn("function feeMiaP2P(o){"),
+        fn("function nettoLatoP2P(o, sats){"), fn("function scontoMancatoP2P(o, miei){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function recapitoEuroArrivatoP2P(o){"), fn("function aspettaRecapitoP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function azioniDisponibili(o){"),
+        fn("function statoDaRestoreP2P(o, statoMostro){"),
+        fn("function riprendiDaRestoreP2P(o, statoMostro){"),
+        fn("function cauzioneAFineP2P(o){"),
+        "let archivio = {}; function ordiniP2P(){ return archivio; }",
+        fn("function esitoGestoRaggiuntoP2P(id, gesto){"),
+        fn("function apriDisputaP2P(){"),
+        riga("const RILASCIO_DISPUTA_AVVISO = "),
+        fn("function rilascioInDisputaP2P(o){"),
+        riga("const DISPUTA_SBAGLIO_CHAT = "), riga("const DISPUTA_SBAGLIO_SENZA = "),
+        fn("function rigaDisputaPerSbaglioP2P(o, conChat){"),
+        fn("function rilasciaP2P(){"),
+    ]) + r"""
+const out = {};
+const foglio = () => ({tit: DOM.confTit.textContent, corpo: DOM.confCorpo.textContent,
+  ordine: FIGLI.map(n => n.id), ok: [DOM.confOk.textContent, DOM.confOk.className],
+  no: [DOM.confNo.textContent, DOM.confNo.className]});
+const pulisci = () => { FATTI.length = 0; TIMER.length = 0; };
+// 1) IL FOGLIO DELLA DISPUTA, con la chat
+archivio.x = {id: 'x', stato: 'euro_inviati', lato: 'compro', peer: 'p', euro: 50};
+CHAT = true; apriDisputaP2P(); out.conChat = foglio();
+pulisci(); ripensaConferma();
+out.tornaChat = [FATTI.slice(), TIMER.map(t => t[1])];
+TIMER[0][0](); out.tornaChatPoi = FATTI.slice();
+//    il seguito e' di QUEL tocco: un secondo tocco chiude e basta
+pulisci(); ripensaConferma(); out.secondoTocco = [FATTI.slice(), TIMER.length];
+//    il gesto
+pulisci(); apriDisputaP2P(); confermaAzione(); out.gesto = FATTI.slice();
+// 2) ...senza la chat, e dove lo scambio si guarda soltanto
+CHAT = false; apriDisputaP2P(); out.senzaChat = foglio();
+pulisci(); ripensaConferma(); out.indietro = [FATTI.slice(), TIMER.length];
+CHAT = true; archivio.x.soloVista = true; apriDisputaP2P(); out.soloVista = foglio();
+pulisci(); ripensaConferma(); out.soloVistaIndietro = [FATTI.slice(), TIMER.length];
+// 3) IL FOGLIO E' UNO PER TUTTI: quello dopo torna com'era
+archivio.x = {id: 'x', stato: 'euro_inviati', lato: 'vendo', euro: 50, metodi: ['SEPA']};
+rilasciaP2P(); out.dopo = foglio();
+pulisci(); ripensaConferma(); out.dopoRipensa = [FATTI.slice(), TIMER.length];
+// 4) IL RILASCIO A DISPUTA APERTA
+archivio.x = {id: 'x', stato: 'in_disputa', lato: 'vendo', euro: 50, metodi: ['SEPA'], moderatore: 'm'};
+rilasciaP2P(); out.rilascio = foglio();
+pulisci(); confermaAzione(); out.rilascioGesto = FATTI.slice();
+archivio.x = {id: 'x', stato: 'in_disputa', lato: 'vendo', euro: 50, metodi: ['Contanti']};
+rilasciaP2P(); out.rilascioContanti = foglio().corpo;
+// 4-bis) LA SECONDA STRADA (`altra`, cantiere libro-vuoto) DOPO un foglio col
+//        ripensamento per primo: i tre bottoni tornano in fila, lei in mezzo
+archivio.x = {id: 'x', stato: 'euro_inviati', lato: 'compro', peer: 'p', euro: 50};
+CHAT = true; apriDisputaP2P(); out.treConDisputa = FIGLI.map(n => n.id);
+chiediConferma({titolo: 'Due strade', corpo: 'x', etichetta: 'Prima', poi: () => {},
+                altra: {etichetta: 'Seconda', poi: () => {}}});
+out.treConAltra = [FIGLI.map(n => n.id), DOM.confAltra.textContent, DOM.confAltra.style.display,
+                   DOM.confNo.style.display, DOM.confNo.className, DOM.confOk.className];
+pulisci();
+// 5) IL BOTTONE NELLA PAGINA, e chi non lo vede
+const D = (lato, piu) => Object.assign({id: 'd', stato: 'in_disputa', lato, peer: 'p'}, piu || {});
+out.bottone = [D('vendo'), D('vendo', {moderatore: 'm'}), D('vendo', {annulloDisputa: 'chiesto'}),
+               D('vendo', {annulloDisputa: 'proposto'}), D('vendo', {disputaMia: 1})]
+  .map(o => rilascioInDisputaP2P(o));
+out.senzaBottone = [D('compro'), D('vendo', {soloVista: true}), {stato: 'euro_inviati', lato: 'vendo'},
+                    {stato: 'attivo', lato: 'vendo'}, {stato: 'rilasciato', lato: 'vendo'},
+                    {stato: 'annullato', lato: 'vendo'}, null].map(o => rilascioInDisputaP2P(o));
+out.toccaATe = [azioniDisponibili(D('vendo')), azioniDisponibili(D('compro'))];
+// 6) LA RIGA DI CHI L'HA APERTA PER SBAGLIO
+out.riga = [rigaDisputaPerSbaglioP2P(D('compro', {disputaMia: 1}), true),
+            rigaDisputaPerSbaglioP2P(D('compro', {disputaMia: 1}), false)];
+out.senzaRiga = [D('compro'), D('vendo', {disputaMia: 1}),
+                 {stato: 'euro_inviati', lato: 'compro', disputaMia: 1},
+                 {stato: 'rilasciato', lato: 'compro', disputaMia: 1}, null]
+  .map(o => rigaDisputaPerSbaglioP2P(o, true));
+// 7) LA MACCHINA A STATI: dalla disputa al rilascio, coi messaggi
+const pochi = o => o ? [o.stato, o.annulloDisputa || ''] : null;
+out.messaggi = [
+  pochi(avanzaOrdineP2P(D('vendo'), 'hold-invoice-payment-settled', null)),
+  pochi(avanzaOrdineP2P(D('compro'), 'released', null)),
+  pochi(avanzaOrdineP2P(D('compro', {annulloDisputa: 'proposto'}), 'released', null)),
+  pochi(avanzaOrdineP2P(D('compro', {moderatore: 'm'}), 'purchase-completed', null))];
+// 8) LA RIPRESA: il rilascio sta sopra la disputa, e il verso e' uno solo
+const R = (stato, lato) => ({id: 'r', lato: lato || 'compro', stato});
+out.avanti = [
+  pochi(riprendiDaRestoreP2P(D('compro'), 'settled-hold-invoice')),
+  pochi(riprendiDaRestoreP2P(D('vendo', {annulloDisputa: 'chiesto'}), 'settled-hold-invoice')),
+  pochi(riprendiDaRestoreP2P(D('compro'), 'success')),
+  pochi(riprendiDaRestoreP2P(D('vendo'), 'canceled')),
+  pochi(riprendiDaRestoreP2P(R('euro_inviati'), 'dispute')),
+  pochi(riprendiDaRestoreP2P(R('attivo', 'vendo'), 'dispute')),
+  pochi(riprendiDaRestoreP2P(R('annullo_proposto', 'vendo'), 'dispute'))];
+out.fermi = [
+  riprendiDaRestoreP2P(R('rilasciato'), 'dispute'),
+  riprendiDaRestoreP2P(R('fattura_nuova'), 'dispute'),
+  riprendiDaRestoreP2P(R('pagamento_ritentato'), 'dispute'),
+  riprendiDaRestoreP2P(R('rilasciato', 'vendo'), 'dispute'),
+  riprendiDaRestoreP2P(R('concluso'), 'dispute'),
+  riprendiDaRestoreP2P(D('compro'), 'fiat-sent'),
+  riprendiDaRestoreP2P(D('compro'), 'active'),
+  riprendiDaRestoreP2P(D('compro'), 'dispute')];
+const P = P2P_RIPRESA_PASSO;
+out.scala = [P.attivo < P.euro_inviati, P.euro_inviati < P.in_disputa, P.annullo_chiesto < P.in_disputa,
+             P.in_disputa < P.rilasciato, P.rilasciato === P.pagamento_ritentato,
+             P.rilasciato === P.fattura_nuova, P.rilasciato < P.concluso, P.concluso === P.annullato];
+// 9) l'attesa del gesto: il rilascio riletto dalla fotografia e' fatto
+archivio = {dis: D('vendo'), ril: riprendiDaRestoreP2P(D('vendo'), 'settled-hold-invoice'),
+            fin: riprendiDaRestoreP2P(D('vendo'), 'success')};
+out.esiti = ['dis', 'ril', 'fin'].map(k => esitoGestoRaggiuntoP2P(k, 'release'));
+console.log(JSON.stringify(out));
+"""
+    out = _node_banco(js)
+    if out is None:
+        salta("il banco della disputa aperta per sbaglio", "node non c'e'")
+        return
+    CORPO = "La disputa ferma lo scambio e chiama un moderatore.\n\n"
+    prova("IL FOGLIO, con la chat: «Sei sicuro?» e le tre righe",
+          ["Sei sicuro?",
+           CORPO + "Se è solo una domanda, scrivi all'altra persona nella chat.\n\n"
+           "Se la apri, i moderatori potranno leggere la chat di questo scambio."],
+          [out.get("conChat", {}).get("tit"), out.get("conChat", {}).get("corpo")])
+    prova("...«Torna alla chat» PER PRIMO e pieno, «Apri la disputa» sotto e rosso",
+          [["confNo", "confOk", "confAltra"], ["Torna alla chat", "btn orange"], ["Apri la disputa", "btn allarme"]],
+          [out.get("conChat", {}).get("ordine"), out.get("conChat", {}).get("no"),
+           out.get("conChat", {}).get("ok")])
+    prova("...il testo resta corto: sotto i duecento caratteri", True,
+          0 < len(out.get("conChat", {}).get("corpo") or "") <= 200)
+    prova("«Torna alla chat» chiude il foglio e POI porta alla chat",
+          [[["indietro"], [350]], ["indietro", "chat"]],
+          [out.get("tornaChat"), out.get("tornaChatPoi")])
+    prova("...e il seguito e' di quel tocco: il secondo chiude e basta", [["indietro"], 0],
+          out.get("secondoTocco"))
+    prova("«Apri la disputa» apre la disputa, e non porta da nessuna parte", ["disputa"], out.get("gesto"))
+    prova("SENZA LA CHAT: «sentitevi», «Indietro» per primo, e nessuna promessa sulla chat",
+          [CORPO + "Se è solo una domanda o un ritardo, prova prima a sentire l'altra persona.",
+           ["confNo", "confOk", "confAltra"], ["Indietro", "btn orange"], ["Apri la disputa", "btn allarme"],
+           [["indietro"], 0]],
+          [out.get("senzaChat", {}).get("corpo"), out.get("senzaChat", {}).get("ordine"),
+           out.get("senzaChat", {}).get("no"), out.get("senzaChat", {}).get("ok"), out.get("indietro")])
+    prova("...e lo scambio che qui si guarda soltanto vale «senza chat»",
+          [out.get("senzaChat", {}).get("corpo"), ["Indietro", "btn orange"], [["indietro"], 0]],
+          [out.get("soloVista", {}).get("corpo"), out.get("soloVista", {}).get("no"),
+           out.get("soloVistaIndietro")])
+    prova("IL FOGLIO E' UNO PER TUTTI: quello dopo ha il gesto sopra, arancio, e «Annulla» sotto",
+          [["confOk", "confAltra", "confNo"], ["Sì, libero i sats", "btn orange"], ["Annulla", "btn ghost"],
+           [["indietro"], 0]],
+          [out.get("dopo", {}).get("ordine"), out.get("dopo", {}).get("ok"),
+           out.get("dopo", {}).get("no"), out.get("dopoRipensa")])
+    prova("...e il rilascio di sempre dice le parole di sempre", "Liberi i sats?",
+          out.get("dopo", {}).get("tit"))
+    AVVISO = "Rilascia solo se hai ricevuto il pagamento: la disputa si chiude."
+    prova("IL RILASCIO A DISPUTA APERTA: l'avviso di Andrea, e che non si torna indietro",
+          ["Rilasci i sats?", AVVISO + "\n\nI sats partono verso chi compra e non tornano indietro.",
+           ["confOk", "confAltra", "confNo"], ["Sì, rilascio i sats", "btn orange"], ["Annulla", "btn ghost"]],
+          [out.get("rilascio", {}).get("tit"), out.get("rilascio", {}).get("corpo"),
+           out.get("rilascio", {}).get("ordine"), out.get("rilascio", {}).get("ok"),
+           out.get("rilascio", {}).get("no")])
+    prova("...il sì manda `release` per quell'ordine, coi suoi due verbi",
+          [["x", "release", "Sats rilasciati ✅ La disputa è chiusa", "Sto rilasciando i sats…"]],
+          out.get("rilascioGesto"))
+    prova("...ed e' lo stesso avviso con qualunque metodo (a disputa aperta la domanda e' una)",
+          out.get("rilascio", {}).get("corpo"), out.get("rilascioContanti"))
+    prova("I DUE CANTIERI NELLO STESSO FOGLIO: dopo la disputa (ripensamento per primo) la domanda "
+          "con la seconda strada rimette i tre in fila — gesto, seconda strada, ripensamento — "
+          "e la mostra", [["confNo", "confOk", "confAltra"],
+                          [["confOk", "confAltra", "confNo"], "Seconda", "", "none", "btn ghost", "btn orange"]],
+          [out.get("treConDisputa"), out.get("treConAltra")])
+    BOTTONE = ('<div class="hint">Hai ricevuto il pagamento? Puoi rilasciare i sats anche adesso: '
+               'la disputa si chiude.</div>'
+               '<button class="btn orange" onclick="rilasciaP2P()">✅ Rilascia i sats</button>')
+    prova("IL BOTTONE: a chi vende, a disputa aperta — presa o no, con l'annullo chiesto o proposto, "
+          "chiunque l'abbia aperta", [BOTTONE] * 5, out.get("bottone"))
+    prova("...mai a chi compra, mai dove si guarda soltanto, mai fuori dalla disputa", [""] * 7,
+          out.get("senzaBottone"))
+    prova("...e NON e' «tocca a te»: a disputa aperta il passo non e' di nessuno dei due", ["", ""],
+          out.get("toccaATe"))
+    nota = lambda t: '<div class="trust-note"><span>💡</span><span>' + t + '</span></div>'
+    prova("LA RIGA di chi l'ha aperta per sbaglio: le parole di Andrea, e la gemella senza chat",
+          [nota("Aperta per sbaglio? Scrivilo nella chat: chi vende può rilasciare i sats e la disputa si chiude."),
+           nota("Aperta per sbaglio? Dillo all'altra persona: chi vende può rilasciare i sats e la disputa si chiude.")],
+          out.get("riga"))
+    prova("...solo a chi compra E l'ha aperta lui, e solo finche' e' aperta", [""] * 5,
+          out.get("senzaRiga"))
+    prova("I MESSAGGI: dalla disputa il rilascio porta a «Sats in pagamento» (chi vende e chi compra), "
+          "la nota dell'annullo cade, e il pagamento riuscito chiude",
+          [["rilasciato", ""], ["rilasciato", ""], ["rilasciato", ""], ["concluso", ""]],
+          out.get("messaggi"))
+    prova("LA RIPRESA, in avanti: dalla disputa al rilascio e ai finali; dentro la disputa da prima",
+          [["rilasciato", ""], ["rilasciato", ""], ["concluso", ""], ["annullato", ""],
+           ["in_disputa", ""], ["in_disputa", ""], ["in_disputa", "proposto"]],
+          out.get("avanti"))
+    prova("...e mai indietro: una fotografia vecchia che dice `dispute` non riporta in disputa "
+          "chi e' gia' al rilascio, ne' la disputa torna a prima", [None] * 8, out.get("fermi"))
+    prova("la scala: attivo < euro inviati < disputa < i tre del dopo-rilascio (alla pari) < finali",
+          [True] * 8, out.get("scala"))
+    prova("l'attesa del gesto: in disputa il rilascio non e' fatto, riletto dalla fotografia si'",
+          [False, True, True], out.get("esiti"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

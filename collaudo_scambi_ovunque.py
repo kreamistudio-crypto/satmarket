@@ -89,6 +89,17 @@ import time
 
 import collaudo_pagamento_p2p as banco
 
+# E DAL 13 OTT 2026 (disputa-per-sbaglio, lo scambio fa17a63d: euro
+# arrivati, disputa aperta per errore da chi comprava, e chi vendeva
+# senza piu' il tasto):
+#
+#  15. CHI VENDE RILASCIA A DISPUTA APERTA: mostrod lo accetta e lo
+#      racconta come un `released` di chi vende; il server chiude la
+#      disputa «dalle parti» coi sats a chi compra, lo dice ai moderatori
+#      una volta sola e non segna colpe; l'archivio dice «rilasciato» ai
+#      due lati, e il client vero porta la riga dalla disputa al rilascio
+#      (nella ripresa il rilascio sta SOPRA la disputa) e poi a concluso.
+
 ATTIVO = "5a1e0000-aaaa-4a2b-9c3d-0000000000a1"
 TORNATO = "5a1e0000-bbbb-4a2b-9c3d-0000000000b1"
 MORTO = "5a1e0000-cccc-4a2b-9c3d-0000000000c1"
@@ -108,6 +119,8 @@ DISPUTA = "5a1e0000-ffff-4a2b-9c3d-0000000000f7"
 # e le seconde trade key delle stesse due persone (quelle della presa)
 MIO_COMPRA = "5a1e0000-ffff-4a2b-9c3d-0000000000f9"
 MIO_VENDI = "5a1e0000-ffff-4a2b-9c3d-0000000000fa"
+# 13 ott 2026: la disputa aperta per sbaglio, chiusa dal rilascio di chi vende
+SBAGLIO = "5a1e0000-ffff-4a2b-9c3d-0000000000fb"
 CHIAVE_COMPRA_2 = "c3" * 32
 CHIAVE_VENDE_2 = "d4" * 32
 
@@ -150,7 +163,8 @@ def semina_ordini():
     for ordine, stato in ((RITIRO, "pending"), (SCADUTO, "pending"),
                           (MORTO_NEL_LIBRO, "canceled"), (GESTI, "in-progress"),
                           (LIBERATO, "in-progress"), (LASCIATO, "in-progress"),
-                          (DISPUTA, "in-progress"), (FORBICE, "in-progress")):
+                          (DISPUTA, "in-progress"), (FORBICE, "in-progress"),
+                          (SBAGLIO, "in-progress")):
         con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,"
                     "lato,maker,sats,euro,metodi) VALUES(?,?,?,?,'sell',1,"
                     "0,'20,00 €','[\"Revolut\"]')",
@@ -367,6 +381,38 @@ def esiti_del_client():
     t = js(mini, "const ESITI_GESTO_P2P = {", "\n};\n")
     return {k: re.findall(r"'(\w+)'", v)
             for k, v in re.findall(r"^  '?([\w-]+)'?: \{stati: \[([^\]]*)\]", t, re.M)}
+
+
+def evento_coi_moderatori(ordine, azione, ts, attore, dettaglio=None, **extra):
+    """Come `banco.evento`, e in piu' gli avvisi PER I MODERATORI che la
+    rotta degli eventi fa partire subito dopo (`_disputa_evento_p2p`, la
+    stessa chiamata della rotta): lista `(chi, testo)`, o None se
+    l'evento era gia' registrato."""
+    d = {"v": 1, "order": ordine, "action": azione, "ts": ts,
+         "buyer": banco.CHIAVE_COMPRA, "seller": banco.CHIAVE_VENDE,
+         "actor": attore, "detail": dettaglio}
+    d.update(extra)
+    adesso = int(time.time())
+    con = banco.con_db()
+    try:
+        ev = banco.SRV._evento_p2p_pulito(d, adesso)
+        fatto = banco.SRV._registra_evento_p2p(con, ev, adesso)
+        return None if fatto is None else banco.SRV._disputa_evento_p2p(con, ev, fatto, adesso)
+    finally:
+        con.close()
+
+
+def riga_disputa(ordine):
+    """La riga di `p2p_dispute` e i gesti del suo registro."""
+    con = banco.con_db()
+    try:
+        r = con.execute("SELECT stato, aperta_da, esito, chiusa_da FROM p2p_dispute "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+        gesti = [g[0] for g in con.execute(
+            "SELECT gesto FROM p2p_dispute_registro WHERE ordine=? ORDER BY id", (ordine,))]
+        return (list(r) if r else None), gesti
+    finally:
+        con.close()
 
 
 def scambi(chi):
@@ -673,6 +719,59 @@ def main():
     r = client_sulla_risposta(risposta, con_nota, [])
     prova("...e il client vero porta la riga dalla disputa ad annullata", "annullato",
           (r.get("note", {}).get(DISPUTA) or [r])[0])
+
+    print("\n15) chi vende rilascia a disputa aperta (13 ott 2026, lo scambio fa17a63d)")
+    banco.evento(SBAGLIO, "taken", t + 800, "buyer", "take")
+    banco.evento(SBAGLIO, "hold-invoice-paid", t + 810, "seller")
+    banco.evento(SBAGLIO, "fiat-sent", t + 820, "buyer")
+    aperta = evento_coi_moderatori(SBAGLIO, "dispute-opened", t + 830, "buyer")
+    prova("euro inviati, poi chi compra apre la disputa: in disputa per tutt'e due, e i moderatori lo sanno",
+          ["in_disputa", "in_disputa", True, ["aperta", "compra", "", ""]],
+          [voce(V, SBAGLIO, "stato")[0], voce(C, SBAGLIO, "stato")[0],
+           any("Disputa P2P" in testo for _, testo in (aperta or [])), riga_disputa(SBAGLIO)[0]])
+    chiusa = evento_coi_moderatori(SBAGLIO, "released", t + 840, "seller", None,
+                                   sats=7300, sats_buyer=7228, sats_seller=7372)
+    prova("chi vende rilascia: «rilasciato» per tutt'e due, ed e' un esito del suo gesto",
+          ["rilasciato", "rilasciato", True],
+          [voce(V, SBAGLIO, "stato")[0], voce(C, SBAGLIO, "stato")[0], fatto("release", V, SBAGLIO)])
+    riga, gesti = riga_disputa(SBAGLIO)
+    prova("la disputa e' chiusa DALLE PARTI, coi sats a chi compra — e nessuna colpa a registro",
+          [["chiusa", "compra", "compratore", "parti"], True, False],
+          [riga, "chiusa" in gesti, "colpa" in gesti or "decisione" in gesti or "allarme" in gesti])
+    ai_mod = [testo for chi, testo in (chiusa or []) if chi in banco.SRV._avvisati_mod_p2p()]
+    prova("i moderatori lo sanno, una volta: «chiusa dalle parti: chi vende ha liberato i sats»",
+          [1, True, True, True],
+          [len(ai_mod), "Disputa P2P chiusa dalle parti" in "".join(ai_mod),
+           "chi vende ha liberato i sats" in "".join(ai_mod),
+           "Non c'è più niente da decidere." in "".join(ai_mod)])
+    prova("...e l'evento ripetuto da mostrod non lo ridice", None,
+          evento_coi_moderatori(SBAGLIO, "released", t + 840, "seller", None,
+                                sats=7300, sats_buyer=7228, sats_seller=7372))
+    in_disputa = lambda lato, **piu: {SBAGLIO: dict({
+        "id": SBAGLIO, "lato": lato, "indice": 0, "pubTrade": "", "stato": "in_disputa",
+        "euro": 20, "metodi": ["Revolut"], "preso": True, "creato": t, "ultimaMossa": t + 830}, **piu)}
+    for chi, lato, piu in ((V, "vendo", {}), (C, "compro", {"disputaMia": 1}),
+                           (C, "compro", {"annulloDisputa": "proposto"})):
+        risposta = {o: v for o, v in scambi(chi)["scambi"].items() if o == SBAGLIO}
+        r = client_sulla_risposta(risposta, in_disputa(lato, **piu), [])
+        prova(f"il client vero ({lato}{', con la nota' if piu.get('annulloDisputa') else ''}): "
+              "dalla disputa la riga va a «rilasciato», e la nota dell'annullo cade",
+              {SBAGLIO: ["rilasciato", ""]}, r.get("note", r))
+    # il verso e' uno solo: la riga gia' al rilascio non torna in disputa
+    # nemmeno se l'archivio fosse rimasto alla disputa (una risposta vecchia)
+    vecchia = {SBAGLIO: dict(risposta[SBAGLIO], stato="in_disputa", quando=t + 830)}
+    gia = {SBAGLIO: dict(in_disputa("compro")[SBAGLIO], stato="rilasciato", ultimaMossa=t + 840)}
+    r = client_sulla_risposta(vecchia, gia, [])
+    prova("...e una risposta rimasta alla disputa non riporta indietro chi e' gia' al rilascio",
+          {SBAGLIO: ["rilasciato", ""]}, r.get("note", r))
+    banco.evento(SBAGLIO, "success", t + 850, "mostro", None,
+                 sats=7300, sats_buyer=7228, sats_seller=7372)
+    prova("il pagamento riesce: concluso per tutt'e due", ["concluso", "concluso"],
+          [voce(V, SBAGLIO, "stato")[0], voce(C, SBAGLIO, "stato")[0]])
+    risposta = {o: v for o, v in scambi(C)["scambi"].items() if o == SBAGLIO}
+    r = client_sulla_risposta(risposta, in_disputa("compro"), [])
+    prova("...e il telefono rimasto alla disputa arriva a concluso", "concluso",
+          (r.get("note", {}).get(SBAGLIO) or [r])[0])
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0
