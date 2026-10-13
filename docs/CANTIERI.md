@@ -57400,3 +57400,180 @@ WireGuard, il test della porta: il ponte funziona, parola di Andrea).
 - Un vero scambio dal telefono con relay.mostro.network giù non l'ha
   provato nessuno: le due strade sono provate una per una (la ronda
   le guarda ogni dieci minuti), non la caduta di una durante un gesto.
+
+## Annulla chiude: dopo «Sì, annulla» il foglio della fattura si chiude davvero (13 ott 2026, cantiere annulla-chiude, dal telefono di Andrea)
+
+**IL CASO.** Mercatino, sul telefono: «⚡ Paga ora» sotto un ordine, si
+apre il foglio della fattura; «Annulla», poi «Sì, annulla». Compare
+«Ordine annullato», ma il foglio col QR resta aperto — e sotto, la
+pagina dell'ordine dice ancora «Paga ora».
+
+**PERCHÉ.** `annullaPagamento` chiudeva con UN passo indietro
+(`navIndietro`). Ma il foglio di conferma è uno strato con un gradino
+suo nella cronologia, e quando si chiude a mano (`eseguiConferma` gli
+toglie la classe) quel gradino non se ne va: `navRiflette` lo RISCRIVE
+come «pagina + foglio della fattura». Il passo indietro atterrava
+quindi su un gradino identico a quel che c'era a schermo, e
+`navApplica` non aveva niente da smontare. È il gradino doppio che
+`uscitaDopoAnnullo` cura dal form di Vendi; qui nessuno se n'era
+accorto, e ARCHITETTURA diceva anzi «il foglio sopra un foglio regge
+per costruzione» — vero per il ripensamento, falso per l'annullo
+riuscito. In più la pagina dell'ordine sotto non si ridisegnava, e il
+controllo periodico del foglio ignorava la risposta «annullato».
+
+**PERCHÉ CONTA.** Quella fattura è ancora VIVA nel wallet: pagata dopo
+l'annullo, l'orologio la riacciuffa (`controlla_annullati`) e l'ordine
+torna vivo — «chi paga ha comprato». Un QR rimasto a schermo sotto la
+scritta «annullato» è un invito a comprare per sbaglio.
+
+**COSA SI È DECISO (Andrea).** La cura vale per i TRE usi del foglio
+(ordine, fattura di puntata, sblocco), e il controllo periodico chiude
+il foglio quando il server dice «annullato». Server non toccato.
+
+**COM'È FATTO.** Tutto in `miniapp.html`.
+- `chiudiFoglioFattura()`: (1) ferma il controllo periodico e SVUOTA
+  subito QR, fattura e porta del wallet — qualunque cosa faccia la
+  cronologia, una fattura annullata non resta a schermo; (2) dichiara
+  l'intenzione (`chiudiPayDopoAnnullo`, sorella di `uscitaDopoAnnullo`
+  e `uscitaDopoSalva`) e fa un passo indietro; (3) la CINTURA: se dopo
+  1,2 secondi il foglio svuotato è ancora lì (un popstate perso), lo
+  smonta a mano — al prezzo di un indietro a vuoto, mai di un QR
+  rimasto. Un foglio riaperto nel frattempo con un'altra fattura la
+  cintura non lo tocca.
+- `navApplica`, in coda: se l'intenzione è accesa e il foglio è ancora
+  aperto, un altro passo. Non si CONTANO i gradini (il motore lo
+  rifiuta apposta): si guarda il foglio all'approdo. Senza conferma di
+  mezzo (l'annullo arrivato da fuori) il primo passo basta e il secondo
+  non parte.
+- `rileggiOrdineAnnullato(oid)`: la lista si rilegge, e se a schermo
+  c'è la pagina di quell'ordine si ridisegna («Ordine annullato», senza
+  «Paga ora»); se l'ordine non c'è più nemmeno come riga, si torna agli
+  Ordini.
+- `fatturaAnnullataAltrove(oid)`, chiamata da `verificaOrdine`: il
+  controllo periodico chiude il foglio quando l'ordine è stato
+  annullato da un'altra parte (un altro telefono, la scadenza), con le
+  sue parole. Solo se il foglio è aperto proprio su quell'ordine: «Ho
+  pagato — verifica» dal dettaglio passa dalla stessa lettura e non
+  cambia. Puntata e sblocco chiudevano già su «annullato».
+
+**LE STRADE SCARTATE.** (a) Chiudere il foglio a mano e basta
+(`navChiudiStrato`): sicuro per il QR, ma lascia due gradini morti
+nella cronologia — due «indietro» a vuoto. È rimasta come cintura.
+(b) `history.go(-2)`: il debito dei gradini contati, che questo motore
+rifiuta (asincrono, e coalescente). (c) Far chiudere a
+`eseguiConferma` il suo gradino con un passo indietro vero: cambia il
+patto di tutti gli ottanta fogli di conferma per curarne uno. (d)
+Toccare il server (per esempio spegnere la fattura sul nodo
+all'annullo): fuori da questo cantiere — vedi «da decidere».
+
+**COSA È STATO PROVATO.** `prove_annulla_chiude` (44 prove) fa girare
+il MOTORE VERO della cronologia (navPila, navRiflette, navApplica,
+navIndietro, navChiudiStrato), il foglio di conferma vero e il gesto
+vero su una cronologia di cartone che consegna i popstate dopo, come
+il browser; diciassette casi, ognuno solo: il caso del telefono (dalla
+pagina dell'ordine), dalla cassa, la puntata, lo sblocco, il server
+che dice di no (il foglio RESTA com'era), l'ordine sparito, l'annullo
+da fuori (anche con la conferma aperta, a foglio chiuso, sul foglio di
+un altro ordine, su quello di una puntata), il controllo in ritardo
+dopo il mio annullo, i popstate persi e la cintura, il foglio riaperto
+che la cintura non tocca, la pagina senza cronologia, la ✕ di sempre e
+il ripensamento (che non sono cambiati).
+ROSSA PRIMA: lo stesso banco, in una copia del repo con la pagina di
+`origin/main`, dà 24 rosse su 44 — e sono quelle del telefono: «dopo
+Sì, annulla il foglio è chiuso» atteso `('', False)`, avuto
+`('paySheet', True)`; la cronologia ferma su `ordine+paySheet`; un
+passo solo. Il banco prende il TESTO della pagina e monta i pezzi
+nuovi solo se ci sono, così gira anche sulla pagina di prima senza
+esplodere.
+IL GIRO DAL VIVO a 375×812 (Chrome senza finestra coi tocchi veri;
+server di una copia col config dell'esempio più la coda del giro,
+relay morti, e un LNbits di CARTONE su loopback che conia fatture
+sintatticamente vere e non paga niente). Sulla pagina di PRIMA: il
+guasto, uguale al telefono — toast «Ordine annullato», foglio aperto
+col QR, sotto ancora «Paga ora». Sulla pagina curata: mezzo secondo
+dopo «Sì, annulla» foglio chiuso, velo spento, QR e fattura vuoti, la
+cronologia tornata alla pagina dell'ordine, che dice «Ordine
+annullato» senza «Paga ora»; l'annullo fatto da fuori chiude il foglio
+al primo controllo (2,5 s) con «Questo ordine è stato annullato: la
+fattura non va più pagata»; riaprendo la pagina l'ordine è annullato e
+non offre nessuna fattura. Sette scatti.
+
+LA TORTURA: ventisette mutazioni su una copia del repo. Al primo giro
+24 prese e TRE SFUGGITE, tutte e tre colpa delle prove: «a foglio
+chiuso» era provato con la modalità spenta (a fermare il gesto era un
+numero che non combaciava, non il foglio chiuso), e il «controllo in
+ritardo dopo il mio annullo» era provato a foglio già chiuso, dove il
+segno `ordineAnnullatoQui` non serve — serve nella finestra in cui il
+foglio è ancora aperto, e lì senza di lui partirebbe un ALTRO passo
+indietro. Sostituiti i due casi: 27 su 27. Una quarta era presa solo
+da una sentinella sul testo («il secondo passo parte anche a foglio
+già chiuso»): dalla radice quel passo non è un passo nella cronologia
+ma «vai a Esplora» — o, dentro Telegram, la chiusura dell'app — e la
+prova contava i passi senza guardare dove si finiva. Ora lo guarda.
+I BANCHI: i due che fanno girare `navApplica` (`prove_indietro_dal_libro`,
+`prove_ricarica_resta`) dichiarano la bandierina nuova, spenta — senza,
+159 rosse per un nome che non conoscevano.
+
+**NON PROVATO.** Nessun telefono vero, e Telegram vero nemmeno: il
+gesto indietro dentro Telegram passa dal tasto del client, e qui è
+provato col motore su una cronologia di cartone e in Chrome. Dal vivo
+la puntata e lo sblocco non li ho aperti (stesso gesto, stesso foglio:
+li prova il banco). Dal vivo il caso «il server dice di no» non si è
+visto come tale: il controllo periodico ha trovato il pagamento prima
+(ordine in deposito, com'è giusto) — che il foglio resti com'era lo
+prova il banco. La cintura (popstate persi) non si può provocare in un
+browser sano: solo nel banco.
+
+**LA DOPPIA VENDITA: VERIFICATA, DECISA, E IN UN CANTIERE SUO (non
+toccato qui: è server).** Chiesto da Andrea prima del push:
+cosa succede se la fattura di un ordine annullato viene pagata DOPO
+che un altro ha comprato l'ultimo pezzo. Provato con una sonda sul
+server vero (nodo finto): l'annullo libera subito la prenotazione, il
+secondo compra e paga, poi il primo paga la fattura annullata —
+`controlla_annullati` lo riacciuffa e `_incassa_ordine` lo porta a
+`locked` senza guardare lo stock. Risultato: DUE ordini in deposito per
+un pezzo solo, il venditore riceve «Hai venduto!» due volte, ai
+moderatori arriva l'avviso generico del riacciuffo. I sats non si
+perdono (sono tutti e due nel deposito di garanzia) e l'uscita c'è, a
+mano: il venditore annulla il secondo per «oggetto esaurito»
+(rimborso integrale), o decide un moderatore. È il «conflitto
+dichiarato» di ARCHITETTURA dall'agosto 2026 («il doppio escrow è il
+caso da moderatore di sempre»), non una regressione. Questo cantiere
+lo rende più RARO (il QR non resta a schermo) ma non lo chiude: una
+fattura già copiata o già aperta nel wallet resta pagabile. LE STRADE
+messe davanti ad Andrea: (1) lasciare com'è; (2) rimborso automatico
+se la fattura annullata viene pagata e il pezzo non c'è più; (3)
+tenere il pezzo prenotato finché quella fattura è pagabile (chiude
+alla radice con poco codice, ma blocca l'oggetto fino a 15 minuti dopo
+ogni annullo: su un mercatino di pezzi unici pesa); (4) spegnere la
+fattura sul nodo all'annullo (da studiare: non so se il nostro LNbits
+lo permette). DECISIONE DI ANDREA (13 ott 2026): LA 2 — il venditore
+non riceve niente, chi ha pagato viene avvisato e rimborsato, avviso
+chiaro ai moderatori — in un cantiere suo, col suo collaudo. Nessuna
+riga di quella cura è in questo push.
+
+**DA FARE (notati, non urgenti: non toccati).**
+- `sheetPaid()` chiama `verificaSblocco` anche quando il foglio è
+  quello del link del negozio (che ha la sua `verificaSlugNegozio`): da
+  guardare se «Ho pagato» lì chiude con le parole giuste.
+- Il foglio del link del negozio, annullato da fuori, chiude con
+  «Questo pagamento non è più in attesa»; la puntata chiude senza dire
+  niente. Parole da allineare a quelle dell'ordine.
+- Il commento sopra `annullaPagamento` dice ancora «regge per
+  costruzione»: è vero per la conferma, e il resto lo dice il blocco
+  nuovo sotto.
+
+**IL PUSH: COSA È GIRATO SU QUALE ALBERO.** SULL'ALBERO `a2522f8` (il
+cantiere sopra `3db1ef4`): la suite severa intera, 24.120 passate e 0
+fallite; gli 80 collaudi della CI nella gabbia, 80 verdi; la tortura,
+27 su 27; il giro dal vivo, sette scatti. MAIN È CORSO UNA VOLTA:
+`a06e047` (pronto-libero, il verbale), `c66e74b`, `5eafc33` (la -bar8),
+`12cbc23` (il paracadute, dalla prova sul telefono), `fdf0e28` (il
+relay per Mostro) — rebase con un conflitto solo, nella coda di questo
+file (tenute prima le voci di main, poi questa). Sopra `fdf0e28`: 9
+sezioni toccate (693 prove, 0 rosse: questa, i tre banchi della
+cronologia, i gesti dell'ordine, i collaudi in CI, la storia dal link,
+la nav del P2P, il rimborso meno le spese) e 5 collaudi nella gabbia
+(5 verdi). La suite intera sull'albero del push la dice la CI (regola
+di Andrea: dopo l'ultimo rebase solo sezioni e collaudi toccati). Il
+push non porta con sé commit di altri: sotto i miei c'è solo main.
