@@ -25259,6 +25259,14 @@ console.log(JSON.stringify(fuori));
     prova("...con la riga piccola che dice dove",
           "casa, ufficio, un amico o un negozio che accetta il pacco "
           "per te", out.get("sotto"))
+    # ...e non basta che la frase ESISTA: va disegnata, sotto il nome
+    # della via a indirizzo (la mutazione che la toglieva dalla cassa
+    # lasciando la costante passava tutte le prove: trovata dalla
+    # tortura)
+    prova("...e la cassa la DISEGNA, sotto il nome di quella via", True,
+          "        : s.via==='casa'\n"
+          "          ? `<span class=\"via-sped\">${SOTTO_INDIRIZZO}</span>`"
+          " : '';" in mini)
     prova("la frase della casella e' quella chiesta, parola per parola",
           FRASE, out.get("frase"))
     _impegno = "le spese di spedizione restano a mio carico"

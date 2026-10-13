@@ -55387,7 +55387,7 @@ DAL GIRO DAL VIVO: la casella ereditava lo stile delle etichette del
 form — frase in maiuscoletto grigio, casella centrata sopra. Curato con
 la specificità alta di `.cons-riga`.
 
-**COSA È STATO PROVATO.** `prove_indirizzo_giusto` (60 prove: il
+**COSA È STATO PROVATO.** `prove_indirizzo_giusto` (61 prove: il
 giudice del server fatto girare, i giudici della pagina fatti girare in
 node — la guardia, la spunta che se ne va, la riga del moderatore sui
 dieci casi —, i nomi vecchi assenti da pagina e server, le frasi).
@@ -55400,7 +55400,10 @@ database usa-e-getta, fra i collaudi della CI: la conferma salvata
 `True`, la via punto e il ritiro dove non entra, la ripresa, la
 correzione dall'ordine, la nota e la lista del moderatore (mai
 l'indirizzo), la scopa che non la cancella, gli avvisi col nome nuovo.
-LA TORTURA: ventinove mutazioni su una copia del repo. IL GIRO DAL VIVO
+LA TORTURA: ventinove mutazioni su una copia del repo, tutte prese — al
+primo giro una era SFUGGITA (la riga piccola tolta dalla cassa lasciando
+la costante: nessuna prova chiedeva che fosse DISEGNATA), e la prova
+che mancava adesso c'è. IL GIRO DAL VIVO
 a 375×812 (Chrome senza finestra coi tocchi veri, server di una copia
 col config dell'esempio più la coda del giro, relay morti, LNbits
 irraggiungibile): la cassa col nome e il sottotitolo, i campi con la
