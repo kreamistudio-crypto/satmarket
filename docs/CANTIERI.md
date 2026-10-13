@@ -57311,3 +57311,92 @@ c'è perché costa poco e l'errore costerebbe un avviso falso.
 mattino (PRODUZIONE, «IL PARACADUTE, SUL VPS»), a leva riaccesa da
 Andrea. Le due righe di prova rimaste in `p2p_paracadute` sul VPS
 (ordini `b48935ec…` e `bb8d4f23…`, annullati): innocue, restano.
+
+## Il relay per Mostro, il giro sulle macchine: a che punto siamo (13 ott 2026, pomeriggio, cantiere relay-per-mostro — chiuso lo stesso giorno, in due riprese)
+
+Il seguito di «Il relay per Mostro: la buca delle lettere…», più su.
+I comandi li ha dati Andrea uno alla volta; le ore sono UTC, quelle
+delle macchine. **Fatto e visto:**
+- NODO: la `-bar8` gira, e nel `settings.toml` (riga 35) i relay sono
+  il nostro, relay.mostro.network e nos.lol — damus è già fuori (lo ha
+  fatto la sessione mostro-bar8). Il nodo si raggiunge con
+  `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`.
+- VPS, config: copia in `/root/config.py.prima-della-ronda`; la riga 78
+  riscritta (`MOSTRO_RELAY` = relay.mostro.network, relay.barattolo.store,
+  nos.lol: damus fuori dal coro); appese `MOSTRO_RELAY_CONFERMA` col
+  SOLO relay.mostro.network, `RONDA_RELAY_MOSTRO = True`,
+  `RONDA_RELAY_CANARINO` col nostro relay. Riavvio di barattolo alle
+  12:59:41. La ronda è ACCESA.
+- RELAY, il plugin: portato da `origin/main` (impronta `cf562a1f…`,
+  rifatta uguale sulla macchina; il Python del container lo legge),
+  copia del vecchio in `/opt/relay/chi-scrive.py.prima-della-buca`,
+  cambio alle 13:03. STRFRY LO HA RILANCIATO DA SOLO, senza riavvio
+  («Setting up write policy plugin», 13:03:42, al primo evento).
+- LA PROVA DAL VIVO NEI DUE VERSI: il canarino delle 12:59:42 bloccato
+  dal plugin vecchio («restricted: solo Barattolo e i suoi venditori»),
+  quello delle 13:09:42 accettato — la ronda dice «a posto» dalle
+  13:09:43. Un solo no di fila: nessun avviso in Errori, com'è giusto.
+- NODO, il log al minuto del canarino: NIENTE. Mostrod a livello INFO
+  non scrive i messaggi che butta: la prova non decide. Scrive invece
+  i cambi ogni cinque minuti, e l'esito dell'invio dà `success` su
+  tutti e tre i relay, il nostro compreso.
+- RELAY, `strfry.conf` (scelta di Andrea: la prova vera): copia in
+  `/opt/relay/strfry.conf.prima-della-prova`; la descrizione NIP-11
+  nuova è SULLA MACCHINA (riga 74), scritta dentro lo stesso file
+  (identità 33708); STRFRY RILEGGE LA SUA CONFIGURAZIONE DA SOLO (il
+  registro delle letture si è acceso senza riavvio). Riavvio del relay
+  alle 13:18:55, pochi secondi. Alle 13:19:36 la connessione `[36]`,
+  da un'uscita di Tor, ha chiesto `{"kinds":[14],"limit":0,"#p":[il
+  coordinatore]}` — la domanda di chi aspetta i messaggi per Mostro —,
+  ed era ancora aperta.
+
+**La seconda ripresa, lo stesso pomeriggio** (il giro si era fermato
+coi due registri di strfry accesi, per i crediti di Andrea finiti: la
+prima cosa è stata spegnerli).
+- I REGISTRI SPENTI: `dumpInAll`, `dumpInEvents`, `dumpInReqs` tutti a
+  `false` (righe 162, 165, 168), zero righe di registro nel minuto
+  dopo.
+- LA CONTROPROVA: col registro delle scritture, `5 [36] dumpInEvent`
+  — cinque eventi firmati dal coordinatore, tutti entrati dalla
+  connessione 36, quella che aveva chiesto i kind 14 per il
+  coordinatore. MOSTROD LEGGE DAL NOSTRO RELAY: non più «per
+  costruzione», visto.
+- VPS, il coro con due strade: copia in `/root/config.py.prima-del-coro`,
+  la riga 150 riscritta — `MOSTRO_RELAY_CONFERMA` = relay.mostro.network
+  e relay.barattolo.store —, riavvio di barattolo alle 13:29:32. La
+  ronda, ripartita: «relay.mostro.network: a posto ·
+  relay.barattolo.store: a posto». Da quell'ora un messaggio per
+  Mostro è «partito» quando lo conferma l'uno O l'altro.
+
+**Quel che il giro ha insegnato** (sta anche in PRODUZIONE, dove
+serve): strfry rilancia il plugin da solo e rilegge da solo la sua
+configurazione, quindi per il plugin e per `strfry.conf` non serve
+riavviare — serve solo per far ricollegare qualcuno; `strfry.conf` va
+riscritto DENTRO il file (è montato come file singolo); il log di
+mostrod non dice cosa butta, e chi legge da un relay lo si vede dal
+relay. E una svista mia, corretta: nella prima stesura avevo scritto
+`ssh debian@185.18.221.96` per il nodo copiandolo dalle procedure
+della `-bar7` e della `-bar8`; Andrea ci entra con
+`ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`. Corretti
+gli otto comandi `ssh`/`scp` di PRODUZIONE che lo portavano (anche il
+`scp` del ponte); l'IP resta dove è un fatto di rete (l'endpoint
+WireGuard, il test della porta: il ponte funziona, parola di Andrea).
+
+**Da fare, non fatto.**
+- Le copie da cancellare quando il coro nuovo ha retto qualche giorno:
+  `/root/config.py.prima-della-ronda` e `/root/config.py.prima-del-coro`
+  (VPS); `chi-scrive.py.prima-della-buca` e
+  `strfry.conf.prima-della-prova` in `/opt/relay/` (relay: il backup
+  delle 03:45 se le porta dietro); `/tmp/chi-scrive.py` e
+  `/tmp/strfry.nuovo`.
+- La descrizione NIP-11 vista DA FUORI (`curl` con
+  `Accept: application/nostr+json`): sulla macchina la riga è quella
+  nuova, da fuori non l'ha guardata nessuno.
+- I 16 KB sui messaggi veri (il comando è in PRODUZIONE).
+- Sul relay, una volta al minuto, strfry rifiuta delle REQ con «bad
+  req: error parsing authors: filter item too small»: una lettura con
+  un autore troppo corto. Non è il plugin né la ronda; non si sa chi
+  è né da quando. Col registro delle letture si vede in un minuto.
+- Un vero scambio dal telefono con relay.mostro.network giù non l'ha
+  provato nessuno: le due strade sono provate una per una (la ronda
+  le guarda ogni dieci minuti), non la caduta di una durante un gesto.

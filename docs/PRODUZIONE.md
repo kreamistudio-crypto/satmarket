@@ -2063,7 +2063,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   esce coi fine-riga di Windows e `wg-quick` non lo legge.
   `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
   `git -c core.autocrlf=false -C C:\Users\Andrea\Documents\GitHub\satmarket archive --format=tar -o "$env:TEMP\ponte.tar" origin/main deploy/ponte`
-  `scp "$env:TEMP\ponte.tar" UTENTE@185.18.221.96:/tmp/`
+  `scp -i $env:USERPROFILE\.ssh\lnvps "$env:TEMP\ponte.tar" debian@vm-1937.lnvps.cloud:/tmp/`
   Poi SUL NODO: `tar -xf /tmp/ponte.tar -C /tmp && sha256sum /tmp/deploy/ponte/*`
   e SUL VPS: `sha256sum /srv/barattolo/deploy/ponte/*`
   — le quattro impronte devono essere IDENTICHE sulle due macchine. Se
@@ -3595,7 +3595,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   riapplica identica con `git am`. Il
   punto 3 qui sotto è la PRIMA compilazione: va guardato, e un errore si
   incolla a Claude senza ritocchi a mano.
-  Host, in cima a tutto: `ssh debian@185.18.221.96`
+  Host, in cima a tutto: `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`
   FASE 1 — IN SOLA LETTURA, tutt'e tre:
   a) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
   → `mostro:v0.19.0-bar7`.
@@ -3616,8 +3616,8 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   FASE 3 — LA BUILD:
   1) SUL PC, i cinque file al nodo, in una cartella NUOVA e FUORI da
   `mostro-src` (il `.rs` deve stare ACCANTO al patcher):
-  `ssh debian@185.18.221.96 mkdir -p nodo/patch-bar8`
-  `scp deploy/mostro/patch-0011-tempo-di-chi-pubblica.py deploy/mostro/barattolo_tempo.rs deploy/mostro/0011-timeout-give-the-maker-a-waiting-window-of-his-own-a.patch deploy/mostro/patch-0012-disputa-automatica.py deploy/mostro/0012-events-tell-the-marketplace-server-when-the-escrow-g.patch debian@185.18.221.96:nodo/patch-bar8/`
+  `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud mkdir -p nodo/patch-bar8`
+  `scp -i $env:USERPROFILE\.ssh\lnvps deploy/mostro/patch-0011-tempo-di-chi-pubblica.py deploy/mostro/barattolo_tempo.rs deploy/mostro/0011-timeout-give-the-maker-a-waiting-window-of-his-own-a.patch deploy/mostro/patch-0012-disputa-automatica.py deploy/mostro/0012-events-tell-the-marketplace-server-when-the-escrow-g.patch debian@vm-1937.lnvps.cloud:nodo/patch-bar8/`
   2) SUL NODO, a secco e poi per davvero, un commit:
   `cd ~/nodo/mostro-src`
   `python3 ~/nodo/patch-bar8/patch-0011-tempo-di-chi-pubblica.py --secco`
@@ -3846,7 +3846,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   a `-bar6`, e la leva di nuovo a False.
   Host, in cima a tutto (l'alias ssh può essere un altro: è quello di
   sempre del nodo di Dublino):
-  `ssh debian@185.18.221.96`
+  `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`
   FASE 1 — IN SOLA LETTURA, tutt'e tre:
   a) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
   → `mostro:v0.19.0-bar6`.
@@ -3866,8 +3866,8 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   FASE 3 — LA BUILD:
   1) SUL PC, il patcher al nodo, in una cartella NUOVA e FUORI da
   `mostro-src`:
-  `ssh debian@185.18.221.96 mkdir -p nodo/patch-bar7`
-  `scp deploy/mostro/patch-0010-cauzione-metodo-dichiarato.py deploy/mostro/0010-bond-decide-the-taker-bond-on-the-payment-method-the.patch debian@185.18.221.96:nodo/patch-bar7/`
+  `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud mkdir -p nodo/patch-bar7`
+  `scp -i $env:USERPROFILE\.ssh\lnvps deploy/mostro/patch-0010-cauzione-metodo-dichiarato.py deploy/mostro/0010-bond-decide-the-taker-bond-on-the-payment-method-the.patch debian@vm-1937.lnvps.cloud:nodo/patch-bar7/`
   2) SUL NODO, a secco e poi per davvero, un commit:
   `cd ~/nodo/mostro-src`
   `python3 ~/nodo/patch-bar7/patch-0010-cauzione-metodo-dichiarato.py --secco`
@@ -4443,7 +4443,9 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   8) RELAY, cosa dice strfry: `sudo docker compose logs --since 3m relay | tail -30`.
      NIENTE RIAVVIO: strfry rilancia il plugin da solo quando il file
      cambia (lo guarda a ogni evento in arrivo: la riga compare al
-     primo evento, e mostrod ne scrive uno ogni pochi minuti). Se
+     primo evento, e mostrod ne scrive uno ogni pochi minuti). VISTO
+     il 13 ott 2026: cambio alle 13:03, «Setting up write policy
+     plugin: /etc/strfry-policy/chi-scrive.py» alle 13:03:42. Se
      dopo dieci minuti il plugin vecchio risponde ancora (lo dice la
      ronda: «NON ACCETTA»), allora — AVVISANDO PRIMA —
      `sudo docker compose restart relay`: dura pochi secondi, le
@@ -4470,40 +4472,56 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   venisse rifiutato per la misura, strfry lo scrive nel log con
   «messaggio troppo grande» e il numero si alza in `BYTE_MAX`.
   LA DESCRIZIONE PUBBLICA DEL RELAY (il `description` del NIP-11 in
-  `strfry.conf`) nel repo dice già la regola nuova — «…accetta
-  Barattolo, i venditori che hanno dimostrato la loro chiave e i
-  messaggi per il suo coordinatore P2P» — e sulla macchina NO: si
-  applica al PRIMO RIAVVIO DEL RELAY CHE SERVE COMUNQUE (decisione di
-  Andrea, 13 ott 2026), non con un riavvio apposta. Fino ad allora
-  repo e macchina divergono su quella riga, ed è scritto qui perché
-  il confronto con l'archivio non sorprenda nessuno. Quel giorno,
-  RELAY, prima del riavvio:
+  `strfry.conf`) dice la regola nuova — «…accetta Barattolo, i
+  venditori che hanno dimostrato la loro chiave e i messaggi per il
+  suo coordinatore P2P» — nel repo E SULLA MACCHINA: applicata il 13
+  ott 2026 (riga 74), repo e macchina sono in pari.
+  ⚠️ DUE COSE IMPARATE QUEL GIORNO SU `strfry.conf`, che valgono per
+  ogni sua modifica. 1) STRFRY RILEGGE LA SUA CONFIGURAZIONE DA SOLO:
+  una riga cambiata vale subito, senza riavvio (visto col registro
+  delle letture, acceso e spento così). 2) IL FILE È MONTATO NEL
+  CONTAINER COME FILE SINGOLO, agganciato per identità: va riscritto
+  DENTRO (`cat nuovo > strfry.conf`), mai sostituito (`sed -i`, `mv`),
+  o il container continua a leggere il vecchio; `ls -li` prima e dopo
+  deve dare lo stesso primo numero. La forma usata, RELAY:
   `sudo cp -p /opt/relay/strfry.conf /opt/relay/strfry.conf.prima-nip11-buca`
   poi la riga riscritta SENZA cambiare il file sotto i piedi del
   container (`strfry.conf` è montato come file singolo: un `sed -i`
   ne farebbe uno nuovo e il container continuerebbe a leggere il
   vecchio):
   `sudo sed 's|^\( *description = \).*|\1"Il relay del mercatino in sats. Lettura aperta a tutti; in scrittura accetta Barattolo, i venditori che hanno dimostrato la loro chiave e i messaggi per il suo coordinatore P2P."|' /opt/relay/strfry.conf > /tmp/strfry.nuovo && sudo sh -c 'cat /tmp/strfry.nuovo > /opt/relay/strfry.conf' && grep -n "description = " /opt/relay/strfry.conf`
-  e dopo il riavvio:
+  e per vederla da fuori (senza riavvio: strfry rilegge da solo):
   `curl -s -H 'Accept: application/nostr+json' https://relay.barattolo.store/ | head -c 300`
   DOPO QUALCHE GIORNO la copia `chi-scrive.py.prima-della-buca` si
   cancella: il backup delle 03:45 prende tutta `/opt/relay`, e un
   archivio che si porta dietro il plugin vecchio è la trappola già a
   verbale in `deploy/RIPRISTINO-RELAY.md`.
-  MOSTROD CI LEGGE? Dal 17 set `wss://relay.barattolo.store` sta nei
-  suoi `[nostr] relays` e lui ci scrive il libro; che ci ASCOLTI anche
-  i messaggi a lui indirizzati va visto una volta, e il canarino è la
-  prova: va SOLO al relay nostro, quindi se nel log di mostrod compare
-  una riga di errore (un messaggio che non sa aprire) al minuto del
-  canarino, l'ha letto da lì. NODO (`ssh debian@185.18.221.96`):
-  `grep -n "wss://" ~/nodo/mostro/settings.toml` (le SOLE righe dei
-  relay: in quel file c'è la chiave del coordinatore, e un comando che
-  stampa le righe intorno la mostrerebbe) e poi, entro un paio di
-  minuti da un canarino,
-  `cd ~/nodo && docker compose logs --since 5m mostro | tail -40`.
-  FINCHÉ NON SI È VISTO, `relay.barattolo.store` NON va in
-  `MOSTRO_RELAY_CONFERMA`: un suo OK farebbe «partito» un messaggio
-  che mostrod non legge (il guasto del voto, a3f57b19).
+  MOSTROD CI LEGGE? SÌ, PROVATO il 13 ott 2026, e il modo conta
+  perché la prima strada non ha funzionato. IL LOG DI MOSTROD NON LO
+  DICE: a livello INFO non scrive i messaggi che butta, e al minuto
+  del canarino non c'era niente (ci sono invece i cambi pubblicati
+  ogni cinque minuti, con `success` sui tre relay). LO DICE IL RELAY,
+  coi due registri di strfry accesi per pochi minuti (`dumpInReqs` e
+  `dumpInEvents`, righe 168 e 165 di `strfry.conf`, da `false` a
+  `true` e ritorno: vedi sopra come si scrive quel file). 1) Registro
+  delle letture acceso, poi `sudo docker compose restart relay`
+  (AVVISANDO: pochi secondi), perché mostrod la sua sottoscrizione la
+  manda solo quando si collega. Quaranta secondi dopo, da un'uscita
+  di Tor, una connessione ha chiesto
+  `{"kinds":[14],"limit":0,"#p":[il coordinatore]}` — si cerca con
+  `M=$(sudo grep -oE '^MOSTRO = "[0-9a-f]+"' policy/chi-scrive.py | cut -d'"' -f2); sudo docker compose logs --since 5m relay | grep "dumpInReq" | grep -E "#p\": ?\[\"$M"`.
+  2) Che quella connessione sia mostrod e non un curioso lo dice il
+  registro delle scritture: gli eventi FIRMATI dal coordinatore
+  entravano tutti da lei —
+  `… | grep "dumpIn" | grep -v "dumpInReq" | grep -E "\"pubkey\": ?\"$M\"" | grep -oE "\[[0-9]+\] dumpIn[A-Za-z]+" | sort | uniq -c`
+  ha dato `5 [36] dumpInEvent`, e la 36 era quella della domanda.
+  3) I DUE REGISTRI SI RISPENGONO SUBITO (accesi riempiono il log di
+  Docker), e si guarda che lo siano:
+  `sudo grep -n "dumpIn" /opt/relay/strfry.conf` — tre righe, tre
+  `false`. Solo dopo questa prova `relay.barattolo.store` è entrato in
+  `MOSTRO_RELAY_CONFERMA`: un suo OK avrebbe fatto «partito» un
+  messaggio che mostrod non legge (il guasto del voto, a3f57b19). Va
+  rifatta se mostrod cambia versione di trasporto o lista dei relay.
 
 - LA RONDA DEI RELAY DI MOSTRO (12 ott 2026, cantiere relay-per-mostro;
   perché in CANTIERI, «Il relay per Mostro»; com'è fatta in
