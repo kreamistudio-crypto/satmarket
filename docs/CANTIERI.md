@@ -51857,6 +51857,18 @@ di KaleidoSwap (la parola di un mentor, non degli organizzatori: in
 riga «Network» della dichiarazione, §12.9). Di aperto resta una domanda
 sola: se `signet` vale per il bonus WDK.
 
+**Le consegne (13 ott, notte).** La sessione dello studio si chiude qui e
+la migrazione la fa una sessione nuova: per lei c'è la sezione §13 di
+`docs/HACKATHON-SETUP.md`, col punto dove siamo (codice e studio fatti,
+VM e wallet mai toccati), le macchine e come si entra, le decisioni in
+una riga ciascuna, la migrazione riscritta in dieci passi (§13.4, che
+sostituisce la lista dell'11) e i dubbi aperti. Due cose trovate
+scrivendola: in un checkout Windows i file di `deploy/rgb/` hanno i fine
+riga CRLF, e un `.env` o un `.sh` copiato così sulla VM si rompe (nelle
+copie di §13.4 c'è `tr -d '\r'`); e la ruota Python `rgb-lib` 0.3.0b7 va
+in rete coi due Esplora di Mutinynet, provato da un wallet usa-e-getta.
+Solo documenti.
+
 ## Chi è l'altro: riconosciuti tutti, l'anonimato è una chiave nuova (12 ott 2026, cantiere chi-e-l-altro, decisione di Andrea con Alan, dal caso ea0af71a)
 
 **Il caso.** Nello scambio ea0af71a (Alan vende, Sweegmiao compra entrando
