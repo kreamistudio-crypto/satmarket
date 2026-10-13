@@ -57844,3 +57844,28 @@ stato fermato per PID. Le prove e i collaudi: nel messaggio del commit.
   gli id veri.
 - `docs/STUDIO-HACKATHON-RGB-2026-10.md` nomina ancora il 1.7B: è lo
   studio del 7 ott, e §13.1 non lo chiedeva.
+
+**IL VERBALE DEL PRIMO PUSH: cosa è girato su quale albero.** Sul
+commit del cantiere com'era nato, sopra `66688bf` (la punta di main
+delle 10:40): la suite severa intera (`PROVE_SEVERE=1`, `PYTHONUTF8=1`),
+23.896 passate e 0 fallite, e i collaudi della CI in gabbia
+(`collaudi_ci.py --elenco ci/collaudi.txt`), 79 verdi e 0 rossi. Nel
+frattempo main è corso di cinque commit, fino a `3db1ef4` (i secondi
+push di «gesti dell'ordine» e di «indirizzo giusto», e la frase di
+PRODUZIONE su barattolo.online): rebase, con un solo conflitto, in coda
+a questo file (due voci appese nello stesso punto: la nostra va per
+ultima). Sull'albero ribasato sono rigirate, severe, le quattro sezioni
+che leggono i file toccati: `prove_leva_rgb` 38, `prove_mutinynet_prep`
+67, `prove_annuncio_identita` 53, `prove_semina_demo` 72, tutte verdi
+(230 in tutto). Nessun collaudo tocca questi file: i collaudi sul
+ribasato li fa la CI.
+
+Il push è partito il 15 ott, col sì di Andrea (che prima ha chiesto se
+toccava produzione: no, solo `deploy/rgb/`, le prove e i documenti; la
+leva `RGB_ATTIVO` nel codice è `False`, e senza riga nel config il server
+la tiene spenta). Main era corso di altri nove commit, fino a `15fad26`
+(il paracadute dal vivo, gli scambi chiari, annulla-chiude, il relay per
+Mostro, la -bar8, il verbale di pronto-libero): secondo rebase, di nuovo
+un solo conflitto in coda a questo file, e le stesse quattro sezioni
+rigirate severe sull'albero nuovo, 230 verdi. I collaudi sul ribasato li
+fa la CI.
