@@ -147,6 +147,7 @@ jobs:
              collaudo_inviti.py
              collaudo_offerta_carrello.py collaudo_punti_barattolo.py
              collaudo_punti_corrieri.py
+             collaudo_indirizzo_confermato.py
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
              collaudo_prova_hold.py
              giudice_deploy.py collaudi_ci.py
@@ -288,6 +289,7 @@ jobs:
              collaudo_nota
              collaudo_busta_diretta
              collaudo_email_corriere
+             collaudo_indirizzo_confermato
              collaudo_csp
              collaudo_freni
              collaudo_db_contesa

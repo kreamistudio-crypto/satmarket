@@ -11087,8 +11087,11 @@ def prove_indirizzo_casa():
         indirizzo_corretto_il INT DEFAULT 0,
         indirizzo_correzioni INT DEFAULT 0,
         indirizzo_purgato_il INT DEFAULT 0,
+        -- la conferma di chi compra (13 ott 2026): indica_indirizzo
+        -- la scrive nello stesso UPDATE dell'indirizzo
+        indirizzo_confermato_il INT DEFAULT 0,
         indirizzo_atteso INT DEFAULT 0, disputata INT DEFAULT 0);
-      -- 1: spedizione a casa, in attesa dell'indirizzo
+      -- 1: spedizione a un indirizzo, in attesa dell'indirizzo
       INSERT INTO ordini(id, compratore_id, venditore_id, stato,
         indirizzo_atteso) VALUES(1, 111, 222, 'locked', 1);
       -- 2: la via del locker, che di indirizzi non ne vuole
@@ -11157,6 +11160,10 @@ def prove_indirizzo_casa():
         exec(pezzo("_decifra_contenuto"), amb)
         exec(_campi_ind(), amb)
         exec(pezzo("_indirizzo_da_payload"), amb)
+        # il giudice della conferma (13 ott 2026, cantiere
+        # indirizzo-giusto): indica_indirizzo lo chiama — pezzo vero,
+        # mai stub
+        exec(pezzo("_indirizzo_confermato"), amb)
         exec(pezzo("_indirizzo_letto"), amb)
         return amb
 
@@ -12232,8 +12239,10 @@ def prove_nota_compratore():
     _pan = pezzo_js(mini, "function pannelloNota(o){")
     prova("client: il MODERATORE la legge (nessun early return admin)",
           False, "o.role==='admin') return ''" in _pan)
+    # (13 ott 2026, cantiere indirizzo-giusto) «di spedizione», non
+    # «di casa»: il nome della via e' uno solo, ovunque
     prova("client: ...e al moderatore si dichiara l'asimmetria", True,
-          "l'indirizzo di casa e la busta di ritiro no" in _pan)
+          "l'indirizzo di spedizione e la busta di ritiro no" in _pan)
     prova("client: il pannello Spedisci fa da cartello, non ripete",
           True, "la leggi nel riquadro qui sotto" in mini)
     prova("client: il segnaposto ha un giudice unico, due chiamanti",
@@ -25070,6 +25079,286 @@ globalThis.document = { querySelectorAll: () => BOXES };
         prova(nome, atteso, {k: avuto.get(k) for k in atteso})
 
 # ====================================================================
+def prove_indirizzo_giusto():
+    """LA SPEDIZIONE A UN INDIRIZZO, E LA CONFERMA DI CHI COMPRA (13 ott
+    2026, cantiere «indirizzo-giusto», primo push).
+
+    Due cose dal giro dal vivo di Andrea. IL NOME: «Spedizione a casa»
+    faceva credere che si potesse spedire solo a casa propria — adesso
+    e' «Spedizione a un indirizzo», uguale ovunque. LA CONFERMA: chi
+    compra sbaglia l'indirizzo, il pacco torna indietro, e le spese
+    restavano sempre a chi vende; prima di pagare ora si spunta «Ho
+    controllato l'indirizzo: se è sbagliato, le spese di spedizione
+    restano a mio carico», la data finisce nell'ordine e il moderatore
+    la legge in disputa (l'indirizzo no, mai).
+
+    Cosa difende questa famiglia:
+    · il nome vecchio non torna, ne' nella pagina ne' nel server;
+    · la conferma e' un GESTO (solo `True`, solo con un indirizzo) e
+      non blocca mai una vendita — la regola vive nel client;
+    · segue l'indirizzo: ritoccato, va rispuntata;
+    · la scopa degli indirizzi non la cancella; il moderatore la legge."""
+    print("\n[la spedizione a un indirizzo e la sua conferma]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = codice_js_senza_commenti(mini)
+
+    # --- IL NOME UNICO ------------------------------------------------
+    for vecchio in ("Spedizione a casa", "spedizione a casa",
+                    "Indirizzo di casa", "indirizzo di casa",
+                    "Consegna a casa"):
+        prova(f"pagina: «{vecchio}» non c'e' piu' in nessun testo", 0,
+              nudo.count(vecchio))
+    # la casetta resta UNA, ed e' quella dei punti di casa nostri (la
+    # rete Barattolo): sull'indirizzo adesso c'e' il pacco
+    prova("pagina: la casetta resta solo sui punti Barattolo", 1,
+          nudo.count("🏠"))
+    for vecchio in ('f"Per la spedizione a casa serve "',
+                    '"La spedizione a casa non è "',
+                    '"spedizione a casa")',
+                    "casa</b>: trovi l'indirizzo nell'ordine.",
+                    '"🚚 Spedizione a casa o a un punto di ritiro"',
+                    "🏠 Spedizione a CASA"):
+        prova(f"server: {vecchio[:38]!r}… non c'e' piu'", False,
+              vecchio in src)
+    prova("server: i due rifiuti dell'estero dicono «a un indirizzo»", 2,
+          src.count('"spedizione a un indirizzo")'))
+    prova("server: i due avvisi al venditore pure", 2,
+          src.count('msg += ("\\n\\n📦 Il compratore ha scelto la '
+                    '<b>spedizione a "\n                "un indirizzo</b>:'))
+    prova("server: e la riga del canale", 1,
+          src.count('"🚚 Spedizione a un indirizzo o a un punto di '
+                    'ritiro"'))
+
+    # --- IL GIUDICE DELLA CONFERMA, fatto girare ----------------------
+    import time as _t
+    conf = reale("_indirizzo_confermato", {"time": _t})
+    adesso = int(_t.time())
+    prova("True con un indirizzo: la data di adesso", True,
+          abs(conf({"indirizzo_confermato": True}, "blob") - adesso) < 5)
+    prova("True SENZA indirizzo non conferma niente", 0,
+          conf({"indirizzo_confermato": True}, ""))
+    prova("solo il gesto: ne' «true», ne' 1, ne' un oggetto",
+          [0, 0, 0, 0],
+          [conf({"indirizzo_confermato": v}, "blob")
+           for v in ("true", 1, "si", {"ok": True})])
+    prova("chiave assente (la pagina di prima): zero, senza rifiuti", 0,
+          conf({}, "blob"))
+    prova("...e il giudice non alza MAI: la regola vive nel client",
+          False, "HTTPException" in codice(pezzo("_indirizzo_confermato")
+                                           .split('"""')[-1]))
+
+    # --- dove si scrive ------------------------------------------------
+    prova("la colonna nasce con la migrazione, 0 = mai", 1,
+          src.count('"indirizzo_confermato_il INTEGER DEFAULT 0",'))
+    prova("i DUE acquisti la scrivono accanto all'ordine appena nato", 2,
+          src.count("    if _indirizzo_confermato(d, ind):\n"
+                    '        con.execute("UPDATE ordini SET '
+                    'indirizzo_confermato_il=? "'))
+    _c = codice(pezzo("compra"))
+    prova("la ripresa la riscrive anche a indirizzo uguale (la sola "
+          "spunta cambiata)", True,
+          "or bool(conf) != bool(conf_prima)):" in _c)
+    _ii = codice(pezzo("indica_indirizzo").split('"""')[-1])
+    prova("dal campo dell'ordine la conferma si rinnova nello stesso "
+          "UPDATE dell'indirizzo", True,
+          "confermato = _indirizzo_confermato(d, ind)" in _ii
+          and '"indirizzo_correzioni=?, indirizzo_confermato_il=? "' in _ii)
+    prova("...e torna alla pagina", True,
+          '"indirizzo_confermato_il": confermato,' in _ii)
+    prova("la scopa degli indirizzi NON la tocca (e' un fatto, non un "
+          "dato personale)", False,
+          "indirizzo_confermato_il" in pezzo("pulisci_indirizzi"))
+    prova("la lista ordini la manda a tutti e tre (l'indirizzo no)",
+          (False, True),
+          ('r.pop("indirizzo_confermato_il"' in src,
+           'r.pop("indirizzo", "")' in src))
+    _ad = pezzo("apri_disputa")
+    prova("la nota della disputa dice il FATTO della conferma", True,
+          "L'acquirente lo ha CONFERMATO il " in _ad
+          and "NESSUNA conferma dell'acquirente" in _ad)
+    prova("...e col nome nuovo della via", True,
+          "📦 Spedizione a un INDIRIZZO: {stato_ind}." in _ad)
+
+    # --- la pagina: i giudici FATTI GIRARE ----------------------------
+    try:
+        prog = (
+            "const toasts = []; const toast = t => toasts.push(t);\n"
+            "const nodi = {};\n"
+            "const el = id => nodi[id] || null;\n"
+            "let acqDati = null;\n"
+            + mini[mini.index("const esc = s =>"):
+                   mini.index("const el = id =>")]
+            + "const ICO_LOCKER = '';\n"
+            + pezzo_js(mini, "const SOTTO_INDIRIZZO = ", "\n\n") + "\n"
+            + pezzo_js(mini, "const CONFERMA_INDIRIZZO = ",
+                       "\nfunction casellaIndirizzo") + "\n"
+            + pezzo_js(mini, "function casellaIndirizzo(id, spuntata, "
+                             "gesto){", "\n}") + "}\n"
+            + pezzo_js(mini, "function setIndirizzoConfermato(si){",
+                       "\n}") + "}\n"
+            + pezzo_js(mini, "function togliConfermaIndirizzo(){",
+                       "\n}") + "}\n"
+            + pezzo_js(mini, "function mancaConfermaIndirizzo(d){",
+                       "\n}") + "}\n"
+            + pezzo_js(mini, "function rigaIndirizzoAdmin(o){", "\n}")
+            + "}\n"
+            + r"""
+const casella = () => ({checked: true, visto: 0, fuoco: 0,
+  scrollIntoView(){ this.visto++ }, focus(){ this.fuoco++ }});
+const ord = x => Object.assign({role:'admin', viaPunto:false,
+  consegnaScelta:'spedizione', indirizzoAtteso:1, indirizzoIl:1760000000,
+  indirizzoConfermatoIl:1760000100, indirizzoCorrezioni:0}, x);
+const fuori = {};
+fuori.nome = nomeVia('casa');
+fuori.sotto = SOTTO_INDIRIZZO;
+fuori.frase = CONFERMA_INDIRIZZO;
+fuori.casella = [casellaIndirizzo('acqIndOk', false, 'x()'),
+                 casellaIndirizzo('acqIndOk', true, 'x()')];
+// la guardia
+nodi.acqIndOk = casella();
+fuori.guardia = [
+  mancaConfermaIndirizzo({via:'casa', indirizzoConfermato:false}),
+  mancaConfermaIndirizzo({via:'casa', indirizzoConfermato:true}),
+  mancaConfermaIndirizzo({via:'punto', indirizzoConfermato:false}),
+  mancaConfermaIndirizzo({via:'ritiro'}),
+  mancaConfermaIndirizzo(null)];
+fuori.occhi = [nodi.acqIndOk.visto, nodi.acqIndOk.fuoco, toasts.length,
+               toasts[0] || ''];
+// la spunta che se ne va quando l'indirizzo si ritocca
+acqDati = {indirizzoConfermato: true};
+nodi.acqIndOk = casella();
+togliConfermaIndirizzo();
+fuori.tolta = [acqDati.indirizzoConfermato, nodi.acqIndOk.checked];
+setIndirizzoConfermato(true);
+fuori.rimessa = acqDati.indirizzoConfermato;
+// la riga del moderatore
+fuori.admin = [
+  rigaIndirizzoAdmin(ord({})),
+  rigaIndirizzoAdmin(ord({indirizzoConfermatoIl:0})),
+  rigaIndirizzoAdmin(ord({indirizzoIl:0, indirizzoConfermatoIl:0})),
+  rigaIndirizzoAdmin(ord({indirizzoCorrezioni:2})),
+  rigaIndirizzoAdmin(ord({indirizzoCorrezioni:1})),
+  rigaIndirizzoAdmin(ord({role:'buyer'})),
+  rigaIndirizzoAdmin(ord({role:'seller'})),
+  rigaIndirizzoAdmin(ord({viaPunto:true})),
+  rigaIndirizzoAdmin(ord({consegnaScelta:'ritiro'})),
+  rigaIndirizzoAdmin(ord({indirizzoAtteso:0, indirizzoIl:0}))];
+console.log(JSON.stringify(fuori));
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("i giudici della pagina sull'indirizzo", "node non installato")
+        return
+    FRASE = ("Ho controllato l'indirizzo: se è sbagliato, le spese di "
+             "spedizione restano a mio carico")
+    prova("alla cassa la via si chiama «📦 Spedizione a un indirizzo»",
+          "📦 Spedizione a un indirizzo", out.get("nome"))
+    prova("...con la riga piccola che dice dove",
+          "casa, ufficio, un amico o un negozio che accetta il pacco "
+          "per te", out.get("sotto"))
+    prova("la frase della casella e' quella chiesta, parola per parola",
+          FRASE, out.get("frase"))
+    _impegno = "le spese di spedizione restano a mio carico"
+    # nel sorgente la frase e' spezzata su due righe di f-string: si
+    # ricuce prima di cercarla (che arrivi intera lo prova il collaudo)
+    _ad_cucito = re.sub(r'"\s*\n\s*f?"', "", _ad)
+    prova("...e la nota al moderatore cita le stesse parole", True,
+          _impegno in FRASE and _impegno in _ad_cucito)
+    cas = out.get("casella") or ["", ""]
+    prova("la casella e' una casella vera, con la frase accanto", True,
+          '<input type="checkbox"' in cas[0] and FRASE in cas[0]
+          and 'id="acqIndOk"' in cas[0])
+    prova("...nasce vuota, e spuntata solo se lo era", (False, True),
+          (" checked" in cas[0], " checked" in cas[1]))
+    prova("la guardia ferma SOLO la via a indirizzo non confermata",
+          [True, False, False, False, False], out.get("guardia"))
+    prova("...porta gli occhi sulla casella e lo dice",
+          [1, 1, 1, "Spunta la casella: conferma di aver controllato "
+                    "l'indirizzo"], out.get("occhi"))
+    prova("ritoccato l'indirizzo, la spunta se ne va (stato E casella)",
+          [False, False], out.get("tolta"))
+    prova("...e si rimette col gesto", True, out.get("rimessa"))
+    adm = out.get("admin") or [""] * 10
+    prova("il moderatore legge che l'acquirente ha confermato", True,
+          "<b>confermato</b> dall'acquirente il " in adm[0])
+    prova("...o che la conferma non c'e', e perche' puo' mancare", True,
+          "<b>nessuna conferma</b>" in adm[1]
+          and "non la chiedevano" in adm[1])
+    prova("...o che l'indirizzo non e' mai stato indicato", True,
+          "non l'ha mai indicato" in adm[2])
+    prova("...e quante volte e' stato corretto", (True, True),
+          ("corretto 2 volte" in adm[3], "corretto 1 volta" in adm[4]))
+    prova("...e gli si ricorda che l'indirizzo non lo vede", True,
+          "L'indirizzo non è mostrato ai moderatori." in adm[0])
+    prova("le due parti quella riga non la vedono; sul punto e sul "
+          "ritiro non nasce; senza una spedizione a indirizzo nemmeno",
+          ["", "", "", "", ""], adm[5:10])
+
+    # --- dove stanno i pezzi nella pagina ------------------------------
+    cta = pezzo_js(mini, "function ctaAcquisto(){", "\n}")
+    prova("«Paga» chiede la casella DOPO l'indirizzo e PRIMA di comprare",
+          True, cta.index("!indirizzoCompleto(d.indirizzo)")
+          < cta.index("if (mancaConfermaIndirizzo(d)) return;")
+          < cta.index("startBuySet()"))
+    prova("...e il wallet ⚡ la chiede come tutti", 1,
+          mini.count("if (mancaConfermaIndirizzo(acqDati)) return;"))
+    cc = pezzo_js(mini, "function corpoConsegna(){", "\n}")
+    prova("la conferma viaggia con l'indirizzo, e solo `true`", True,
+          cc.index("if (v==='casa'){")
+          < cc.index("if (acqDati.indirizzoConfermato) "
+                     "out.indirizzo_confermato = true;"))
+    prova("la casella sta sotto l'indirizzo, aperto o riassunto", True,
+          "${(d.indirizzoAperto || indScritto)\n"
+          "      ? casellaIndirizzo('acqIndOk', d.indirizzoConfermato,"
+          in mini)
+    prova("ogni tasto nei campi toglie la spunta", True,
+          "togliConfermaIndirizzo();" in pezzo_js(
+              mini, "function setCampoIndirizzo(k, v){", "\n}"))
+    prova("...e il cambio di paese pure", True,
+          "acqDati.indirizzoConfermato = false;" in pezzo_js(
+              mini, "function setPaeseAcquisto(c){", "\n}"))
+    si = pezzo_js(mini, "async function salvaIndirizzo(btn){", "\n}")
+    prova("dal campo dell'ordine: senza casella non si salva", True,
+          "if (ok && !ok.checked){" in si
+          and si.index("if (ok && !ok.checked){") < si.index("fetch("))
+    prova("...e il Salva manda la conferma con l'indirizzo", True,
+          "JSON.stringify({indirizzo: corpo, indirizzo_confermato: "
+          "true})" in si)
+    prova("...con la STESSA casella della cassa", 1,
+          mini.count("${casellaIndirizzo('ordIndOk', false, '')}"))
+    prova("la pagina legge la data dall'ordine", True,
+          "indirizzoConfermatoIl:o.indirizzo_confermato_il||0," in mini)
+    prova("la riga del moderatore sta nella pagina dell'ordine", 1,
+          mini.count("${rigaIndirizzoAdmin(o)}"))
+
+    # --- le frasi ------------------------------------------------------
+    i = mini.index('<h3 id="sicu-limiti">')
+    limiti = mini[i:mini.index("</ul>", i)]
+    prova("«Come funziona»: la regola sta fra le cose che il deposito "
+          "non copre", True,
+          "<b>Un indirizzo sbagliato lo paga chi l'ha scritto.</b>"
+          in limiti
+          and "le spese di spedizione restano a tuo carico" in limiti)
+    prova("«I tuoi dati»: accanto all'indirizzo, la riga che lo ricorda",
+          1, mini.count(
+              "<li><b>L'indirizzo di spedizione</b>, se scegli la "
+              "spedizione a un indirizzo. Lo vede <b>solo chi ti "
+              "vende</b>, per stampare l'etichetta. Ricontrollalo prima "
+              "di pagare: se è sbagliato e il pacco torna indietro, le "
+              "spese di spedizione restano a tuo carico.</li>"))
+    prova("...e ai moderatori risulta anche la conferma, e si dice", True,
+          "<i>se</i> l'hai indicato, quando, e che l'hai confermato."
+          in mini)
+    # LA QUARTA DECISIONE NON SI PROMETTE PRIMA CHE ESISTA: il bottone
+    # «Rimborso meno le spese di spedizione» arriva col secondo push
+    # del cantiere, e fino ad allora la pagina non lo nomina
+    prova("la pagina non promette un bottone che ancora non c'e'", False,
+          "meno le spese di spedizione" in nudo)
+
+
 def prove_punti_corrieri():
     """IL PUNTO DI RITIRO SOLO DOVE IL CORRIERE CI ARRIVA (12 ott 2026,
     cantiere «punti-ritiro»).
@@ -32387,8 +32676,10 @@ def prove_canale_bot():
     # --- 2b) COME ARRIVA LA ROBA, e la vetrina del venditore -------
     # Il post dice la strada di consegna: e' la domanda che si fa chi
     # legge PRIMA di aprire, e finora nel canale non c'era.
+    # (13 ott 2026, cantiere indirizzo-giusto) «a un indirizzo», non
+    # «a casa»: il nome della via e' uno solo, anche nel canale
     prova("la spedizione nomina tutte e due le destinazioni", True,
-          "🚚 Spedizione a casa o a un punto di ritiro" in t)
+          "🚚 Spedizione a un indirizzo o a un punto di ritiro" in t)
     prova("col suo costo", True, "5.000 sats" in t)
     prova("e il ritiro in zona ha la riga sua", True,
           "🤝 Ritiro in zona" in t)
@@ -32415,7 +32706,8 @@ def prove_canale_bot():
     ancorata = dict(a, spedizione_sats=0, spedizione_eur=4.50)
     senza_cambio = cap["_caption_canale"](ancorata, 0)
     prova("euro ancorato e cambio muto: la strada c'e'", True,
-          "🚚 Spedizione a casa o a un punto di ritiro" in senza_cambio)
+          "🚚 Spedizione a un indirizzo o a un punto di ritiro"
+          in senza_cambio)
     prova("...ma senza cifra e senza «gratuita»", True,
           "gratuita" not in senza_cambio and "4,50" not in senza_cambio)
     prova("col cambio la cifra parla euro", True,
@@ -120659,7 +120951,11 @@ def prove_dati_spedizione_copia():
              "function riquadroSpedisciA(o){", "function testoSpedisciA(o){",
              "function copiaSpedisciA(){", "function ridisegnaSpedisciA(){",
              "async function caricaDatiSpedisci(o, forza){",
-             "function nomePunto(tipo, rete){", "function copiaTracking(o){"]
+             "function nomePunto(tipo, rete){", "function copiaTracking(o){",
+             # la casella della conferma (13 ott 2026, cantiere
+             # indirizzo-giusto): il modulo dell'indirizzo dentro
+             # l'ordine la disegna — pezzo vero, mai stub
+             "function casellaIndirizzo(id, spuntata, gesto){"]
     prova("le funzioni del cantiere ci sono, una volta sola", [1] * len(FIRME),
           [mini.count(f) for f in FIRME])
     prova("...e la riga del primo giro, col «Copia» dentro, non c'e' piu'", 0,
@@ -120869,7 +121165,10 @@ def prove_dati_spedizione_copia():
     costanti = [mini[_it:mini.index("];", _it) + 2]] + [
         re.search(r, mini).group(0) for r in (
             r"const COPIA_PICCOLA = \{[^}]*\};", r"const spedInCorso = new Set\(\);",
-            r"const spedProvato = new Set\(\);")]
+            r"const spedProvato = new Set\(\);")] + [
+        # la frase della casella, che `casellaIndirizzo` scrive
+        pezzo_js(mini, "const CONFERMA_INDIRIZZO = ",
+                 "\nfunction casellaIndirizzo")]
     # la VERA `caricaIndirizzo`, col nome cambiato: il banco ha la sua
     # di cartone, e questa serve al caso del cambio d'ordine a meta'
     vera_ci = fn("async function caricaIndirizzo(){").replace(
@@ -121393,8 +121692,11 @@ const CASI = {
     prova("...un punto al banco di Poste si chiama col suo nome",
           ["🏪 Punto Poste Italiane", ["Punto di ritiro"]], rl.get("banco"))
     rc = g("riquadroCasa")
+    # (13 ott 2026, cantiere indirizzo-giusto) «📦 Indirizzo di
+    # spedizione», non «🏠 Indirizzo di casa»: il nome della via e' uno
+    # solo, e a un indirizzo non si spedisce solo a casa propria
     prova("la casa: «⏳ Apro l'indirizzo…», poi le sette righe col 📋 e «Copia tutto "
-          "l'indirizzo»", [True, "🏠 Indirizzo di casa", 7, True],
+          "l'indirizzo»", [True, "📦 Indirizzo di spedizione", 7, True],
           [rc.get("attesa"), rc.get("tipo"), rc.get("piccole"), rc.get("tutto")])
     prova("...e su un pacco per Lisbona anche il paese",
           ["Nome e cognome", "Via e civico", "CAP", "Città", "Paese"], rc.get("paese"))
@@ -156459,6 +156761,7 @@ def main():
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,
+              prove_indirizzo_giusto,
               prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_pubblici,
               prove_punti_salvati,

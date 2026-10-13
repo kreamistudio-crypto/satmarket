@@ -21477,6 +21477,33 @@
   CLAMPA lo scorrimento e la vista sale di altrettanto. Non è il salto
   di ieri (`scrollTo` non viene chiamata affatto): è quel che fa
   qualunque contenuto che si accorcia in fondo a un documento.
+  «SPEDIZIONE A UN INDIRIZZO», E LA CONFERMA DI CHI COMPRA (13 ott
+  2026, cantiere «indirizzo-giusto», primo push). IL NOME: la via che
+  qui sotto si chiama «a casa» per gli utenti è «📦 Spedizione a un
+  indirizzo», ovunque — «a casa» faceva credere che si potesse spedire
+  solo a casa propria; alla cassa ha la riga piccola «casa, ufficio,
+  un amico o un negozio che accetta il pacco per te». I nomi INTERNI
+  non sono cambiati (`casa`, `indirizzo_*`, `pannelloIndirizzoCasa`),
+  e i paragrafi che seguono li usano. LA CONFERMA: prima di «Paga» chi
+  compra spunta «Ho controllato l'indirizzo: se è sbagliato, le spese
+  di spedizione restano a mio carico» (`CONFERMA_INDIRIZZO`, una frase
+  per la cassa e per il campo dentro l'ordine), e la data finisce in
+  `ordini.indirizzo_confermato_il` (0 = mai: gli ordini di prima, la
+  pagina rimasta aperta, un indirizzo riscritto senza rispuntare). Il
+  giudice è `_indirizzo_confermato(d, ind)`: solo `True`, solo con un
+  indirizzo, e NON alza mai — la casella obbligatoria è una regola del
+  CLIENT (`mancaConfermaIndirizzo`, la stessa guardia per «Paga» e per
+  il wallet ⚡), così nessuna vendita si blocca. LA CONFERMA SEGUE
+  L'INDIRIZZO: la riscrivono, insieme a lui, la ripresa del mono
+  (anche a indirizzo uguale, quando cambia la sola spunta) e
+  `indica_indirizzo`; nella pagina se ne va a ogni tasto nei campi e
+  al cambio di paese. La scopa degli indirizzi non la cancella: è un
+  fatto, non un dato personale. IL MODERATORE la legge nella nota della
+  disputa e nella riga `rigaIndirizzoAdmin` della pagina dell'ordine,
+  gemella di quella del punto; l'indirizzo no, da nessuna strada. È la
+  premessa del quarto esito del moderatore («rimborso meno le spese di
+  spedizione»), che arriva col secondo push. Collaudo:
+  `collaudo_indirizzo_confermato.py`, nella gabbia della CI.
   L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — lì è il
   venditore a depositare per il compratore, qui il compratore per il
   venditore. Chi sceglie «🏠 Spedizione a casa» scrive l'indirizzo al

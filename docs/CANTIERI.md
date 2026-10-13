@@ -55301,3 +55301,140 @@ byte —: `node` sui tre script della pagina, la suite severa INTERA
 (i conti delle sentinelle di due sessioni si sommano solo qui) e tutti
 i collaudi del workflow nella gabbia. Verdi: con una rossa questo
 commit non sarebbe su main.
+
+## L'indirizzo giusto, primo push: «Spedizione a un indirizzo», la casella della conferma, quel che legge il moderatore (13 ott 2026, cantiere indirizzo-giusto, richiesta di Andrea dopo il giro dal vivo di punti-ritiro)
+
+**IL CASO.** Due cose viste da Andrea provando dal vivo. (1) Con un
+venditore senza corrieri la sola via di spedizione si chiamava
+«🏠 Spedizione a casa»: fuorviante, sembra che si possa spedire solo a
+casa propria. (2) Se chi compra sbaglia l'indirizzo e il pacco torna
+indietro, le spese di spedizione restano sempre a chi vende: in
+disputa il moderatore può solo rimborsare tutto, rimborsare dopo il
+reso o dare tutto al venditore.
+
+**COSA SI È DECISO (Andrea), e come si divide il cantiere.** DUE PUSH.
+Questo è il PRIMO: il nome, la casella, quel che vede il moderatore,
+le frasi. Il SECONDO porterà il quarto bottone di decisione,
+«Rimborso meno le spese di spedizione» — due pagamenti dallo stesso
+deposito, che oggi non esistono (ogni ordine ha UNA uscita): prima di
+scriverne il codice, gli stati dell'ordine e cosa succede se uno dei
+due pagamenti fallisce vanno ad Andrea in dieci righe.
+1. UN NOME SOLO: «📦 Spedizione a un indirizzo», ovunque. Alla cassa,
+   e solo lì, la riga piccola «casa, ufficio, un amico o un negozio
+   che accetta il pacco per te».
+2. LA CASELLA è OBBLIGATORIA prima di «Paga»: «Ho controllato
+   l'indirizzo: se è sbagliato, le spese di spedizione restano a mio
+   carico». Solo sull'indirizzo, non sul punto di ritiro.
+3. IL MODERATORE la vede in disputa — il fatto e la data; l'indirizzo
+   no, come sempre.
+4. LE FRASI: la regola in «Come funziona» («Dove il deposito non può
+   proteggerti») e una riga che la ricorda in «I tuoi dati», accanto
+   all'indirizzo (il «patto» è quella pagina).
+
+**COM'È FATTO.** Una colonna, `ordini.indirizzo_confermato_il` (il
+pattern di `busta_il`: il flag e il quando, 0 = mai), e un giudice,
+`_indirizzo_confermato(d, ind)`: vale solo `True` scritto dal client
+INSIEME a un indirizzo che c'è. I due acquisti la scrivono con un
+UPDATE sulla riga appena nata (non una colonna in più nei due INSERT:
+trentaquattro segnaposto contati a mano sono il posto dove un valore
+finisce nella colonna accanto); la ripresa del mono e il campo dentro
+l'ordine (`indica_indirizzo`) la riscrivono insieme all'indirizzo. LA
+CONFERMA SEGUE L'INDIRIZZO: ritoccato senza rispuntare, torna a zero —
+alla cassa la spunta se ne va a ogni tasto nei campi e al cambio di
+paese, dall'ordine senza la casella non si salva. La scopa degli
+indirizzi NON la cancella (è un fatto e una data, non un dato
+personale). Il moderatore la legge in due posti: nella nota della
+disputa («L'acquirente lo ha CONFERMATO il …» oppure «NESSUNA
+conferma… gli ordini nati prima del 13 ott 2026 non la chiedevano») e
+nella pagina dell'ordine, in una riga sua (`rigaIndirizzoAdmin`),
+gemella di quella del punto. Nella pagina: `CONFERMA_INDIRIZZO` (una
+frase per i due posti), `casellaIndirizzo`, `mancaConfermaIndirizzo`
+(la stessa guardia per «Paga» e per il wallet ⚡), `SOTTO_INDIRIZZO`.
+
+**NESSUNA VENDITA SI BLOCCA.** Il server NON rifiuta un acquisto senza
+conferma: la regola — la casella obbligatoria — vive nel client, ed è
+la tolleranza di sempre verso la pagina rimasta aperta da prima, che il
+campo non ce l'ha. Per quell'ordine il moderatore legge «nessuna
+conferma», che è la verità. GLI ORDINI GIÀ APERTI non cambiano: la
+colonna vale 0 e niente migra.
+
+**IL NOME, dove è cambiato.** Cassa (l'opzione, col sottotitolo);
+ordine di chi vende (la frase, la riga d'attesa, il titolo del riquadro
+«Spedisci a»: «📦 Indirizzo di spedizione»); i titoli e i toast del
+pannello dell'indirizzo (la casetta 🏠 è diventata il pacco 📦: resta
+solo sui punti di casa nostri); due avvisi al venditore e quello della
+correzione; quattro rifiuti del server; la nota della disputa; la riga
+dei post del canale; «Come funziona» e «I tuoi dati». I nomi interni
+(`casa`, `indirizzo_*`, `pannelloIndirizzoCasa`) restano com'erano.
+
+**LE STRADE SCARTATE.** (a) Una riga di testo al posto della casella:
+solo un gesto si può salvare e mostrare al moderatore. (b) Il 400 del
+server su un acquisto senza conferma: romperebbe la pagina di prima, e
+la vendita non si blocca. (c) La colonna dentro i due INSERT: vedi
+sopra. (d) La casella anche sul punto di ritiro: Andrea l'ha voluta
+solo sull'indirizzo. (e) Nominare già adesso la quarta decisione in
+«Se qualcosa va storto»: il bottone arriva col secondo push, e fino ad
+allora la pagina non promette quel che non c'è (c'è la sentinella, che
+il secondo push rovescerà).
+
+**TROVATO PROVANDO.** Due difetti miei, nessuno visibile leggendo. (1)
+DAL COLLAUDO: alla ripresa, chi spuntava la casella al SECONDO tocco su
+«Paga» restava «non confermato» — il ramo scattava solo a indirizzo
+diverso, e senza chiave due blob dello stesso indirizzo combaciano; in
+produzione (Fernet, sempre diversi) avrebbe funzionato, cioè si rompeva
+solo dove si prova. Curato: la ripresa guarda anche la sola spunta. (2)
+DAL GIRO DAL VIVO: la casella ereditava lo stile delle etichette del
+form — frase in maiuscoletto grigio, casella centrata sopra. Curato con
+la specificità alta di `.cons-riga`.
+
+**COSA È STATO PROVATO.** `prove_indirizzo_giusto` (60 prove: il
+giudice del server fatto girare, i giudici della pagina fatti girare in
+node — la guardia, la spunta che se ne va, la riga del moderatore sui
+dieci casi —, i nomi vecchi assenti da pagina e server, le frasi).
+Aggiornate col perché le prove che nominavano «a casa» (l'asimmetria
+detta al moderatore, la riga del canale, il titolo del riquadro) e i
+due banchi che eseguono il pannello dell'indirizzo e
+`indica_indirizzo`. `collaudo_indirizzo_confermato.py`, 39 passi su
+database usa-e-getta, fra i collaudi della CI: la conferma salvata
+(mono e carrello), l'acquisto senza casella che nasce lo stesso, solo
+`True`, la via punto e il ritiro dove non entra, la ripresa, la
+correzione dall'ordine, la nota e la lista del moderatore (mai
+l'indirizzo), la scopa che non la cancella, gli avvisi col nome nuovo.
+LA TORTURA: ventinove mutazioni su una copia del repo. IL GIRO DAL VIVO
+a 375×812 (Chrome senza finestra coi tocchi veri, server di una copia
+col config dell'esempio più la coda del giro, relay morti, LNbits
+irraggiungibile): la cassa col nome e il sottotitolo, i campi con la
+casella, «Paga» fermato senza spunta (nessuna richiesta partita), la
+spunta che se ne va ritoccando la via, la richiesta che parte con
+`indirizzo_confermato: true`; le due vie col venditore che ha Poste e
+InPost; dentro l'ordine, il Salva fermato senza casella e riuscito con;
+il venditore col riquadro «📦 Indirizzo di spedizione»; il moderatore
+sulle due dispute (confermato il…, nessuna conferma) senza l'indirizzo
+in pagina; le due frasi. Dieci scatti.
+
+**NON PROVATO.** Nessun telefono vero, e Telegram vero nemmeno. Dal
+vivo la fattura non è nata (LNbits irraggiungibile apposta): che la
+conferma finisca nell'ordine lo prova il collaudo, dal vivo si è visto
+cosa PARTE dalla pagina. Il wallet ⚡ collegato (in locale non c'è): la
+sua guardia è la stessa funzione di «Paga», e lo dice una sentinella.
+
+**DA FARE (notati, non urgenti: non toccati).**
+- La riga dei post del canale dice «🚚 Spedizione a un indirizzo o a un
+  punto di ritiro» per OGNI annuncio a spedizione: dal cantiere
+  punti-ritiro il punto c'è solo coi corrieri giusti, e per gli altri
+  venditori la seconda metà non è vera. La funzione che la scrive è
+  pura e ha in mano solo l'annuncio: per dirlo giusto le servono i
+  corrieri del venditore. Lo stesso vale per il «da X» del costo, che
+  guarda anche la tariffa del punto.
+- Nel cassetto «Come spedisci» del Profilo il campo «verso un punto di
+  ritiro» resta visibile anche a chi non ha corrieri coi punti (nel
+  form di Vendi è già nascosto).
+- Nel modulo dell'indirizzo dentro l'ordine il campo «Paese» esce vuoto
+  per un ordine italiano (alla cassa quel campo non si disegna).
+- Le mappe DHL ServicePoint, BRT Fermopoint e GLS (cantiere a parte,
+  già deciso).
+
+**IL SECONDO PUSH.** Il quarto bottone del moderatore, «Rimborso meno
+le spese di spedizione»: vale anche per gli ordini verso un punto di
+ritiro; il costo è `ordini.spedizione_sats`; con costo zero il bottone
+non compare. Prima del codice dei pagamenti, le dieci righe ad Andrea.

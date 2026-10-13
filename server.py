@@ -8731,6 +8731,18 @@ def init_db():
                     # segna_spedito di bloccare di colpo ogni ordine
                     # 'locked' gia' in produzione.
                     "indirizzo_atteso INTEGER DEFAULT 0",
+                    # LA CONFERMA DI CHI COMPRA (13 ott 2026, cantiere
+                    # indirizzo-giusto): prima di pagare spunta «Ho
+                    # controllato l'indirizzo: se è sbagliato, le spese
+                    # di spedizione restano a mio carico». Il pattern
+                    # di `busta_il`: il flag E il quando in una colonna
+                    # sola, 0 = mai — gli ordini nati prima, quelli di
+                    # una pagina rimasta aperta, e un indirizzo
+                    # corretto senza rispuntare la casella. NON e' un
+                    # dato personale (e' un fatto e una data): la scopa
+                    # degli indirizzi non lo tocca, e il moderatore lo
+                    # legge in disputa — l'indirizzo no, mai.
+                    "indirizzo_confermato_il INTEGER DEFAULT 0",
                     # L'EMAIL PER IL CORRIERE (ago 2026, tappa B): la
                     # scorciatoia perche' il codice del locker arrivi
                     # a chi compra DIRETTAMENTE dal corriere, invece
@@ -30176,6 +30188,21 @@ CAMPI_INDIRIZZO = (
 )
 
 
+def _indirizzo_confermato(d, ind: str) -> int:
+    """QUANDO chi compra ha confermato l'indirizzo, o 0.
+
+    Vale solo `True` scritto dal client insieme a un indirizzo che c'e'
+    (`ind`, il blob gia' cifrato): una conferma senza indirizzo non
+    conferma niente, e una stringa «true» non e' un gesto. NIENTE 400
+    quando manca, ed e' la tolleranza di `tipo_punto_da_payload`: la
+    regola — la casella obbligatoria prima di «Paga» — vive nel
+    CLIENT, e una pagina rimasta aperta da prima il campo non ce l'ha.
+    Per quegli ordini il moderatore legge «nessuna conferma», che e'
+    la verita'."""
+    return int(time.time()) if (ind and d.get("indirizzo_confermato")
+                                is True) else 0
+
+
 def _indirizzo_da_payload(d, paese: str = "") -> tuple:
     """(blob CIFRATO, atteso) dall'indirizzo scritto dal compratore.
 
@@ -30235,8 +30262,8 @@ def _indirizzo_da_payload(d, paese: str = "") -> tuple:
                                  "l'indirizzo sul pacco")
     for campo, etichetta, _tetto, serve in CAMPI_INDIRIZZO:
         if serve and not dati[campo]:
-            raise HTTPException(400, f"Per la spedizione a casa serve "
-                                     f"anche {etichetta}")
+            raise HTTPException(400, f"Per la spedizione a un "
+                                     f"indirizzo serve anche {etichetta}")
     if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
         # IL FAIL-OPEN SI FERMA QUI, ed e' l'unica differenza vera con
         # la busta: un PIN di ritiro in chiaro e' una degradazione
@@ -30246,7 +30273,7 @@ def _indirizzo_da_payload(d, paese: str = "") -> tuple:
         # 'plain:' come tutto il resto, o il mercatino di prova non
         # potrebbe piu' vendere niente a casa.
         if not MODALITA_COLLAUDO:
-            raise HTTPException(503, "La spedizione a casa non è "
+            raise HTTPException(503, "La spedizione a un indirizzo non è "
                                      "disponibile in questo momento: "
                                      "scegli un'altra strada o riprova "
                                      "più tardi")
@@ -34923,7 +34950,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             raise HTTPException(400, "I punti di ritiro che conosciamo "
                                      "sono in Italia: per una "
                                      "destinazione all'estero c'è la "
-                                     "spedizione a casa")
+                                     "spedizione a un indirizzo")
         # QUARTO giro (decisione di Andrea, rovescia il terzo): il
         # punto si sceglie SEMPRE in pagina, prima di «Paga» — la
         # regola vive nel CLIENT. Qui il 400 resta SOLO con la rete
@@ -35398,6 +35425,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
          # sconto_sats — l'unico numero che comanda resta prezzo_sats
          accordo_sats_v))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    # LA CONFERMA DELL'INDIRIZZO (13 ott 2026): un UPDATE sulla riga
+    # appena nata e non una colonna in piu' nell'INSERT qui sopra —
+    # trentaquattro segnaposto contati a mano sono il posto dove un
+    # valore finisce nella colonna accanto. Stessa transazione, nessun
+    # await in mezzo: il patto del ricontrollo non si tocca.
+    if _indirizzo_confermato(d, ind):
+        con.execute("UPDATE ordini SET indirizzo_confermato_il=? "
+                    "WHERE id=?", (int(time.time()), ordine_id))
     for r in righe:
         con.execute(
             "INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita,"
@@ -36771,7 +36806,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(400, "I punti di ritiro che conosciamo "
                                      "sono in Italia: per una "
                                      "destinazione all'estero c'è la "
-                                     "spedizione a casa")
+                                     "spedizione a un indirizzo")
         # QUARTO giro, il patto del set (rovescia il terzo): il punto
         # si sceglie SEMPRE in pagina — la regola vive nel CLIENT, e
         # il 400 resta SOLO con la rete dichiarata: tolleranza per il
@@ -36979,12 +37014,29 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             # la fattura resta quella: e' un DML su un ordine 'creato'
             # in un ramo che esce subito, e nessun ricontrollo lo
             # aspetta.
-            if ind and ind != mio["indirizzo"]:
+            # LA CONFERMA SEGUE L'INDIRIZZO CHE SI RISCRIVE (13 ott
+            # 2026): vale quella di QUESTA richiesta — spuntata, la
+            # data di adesso; non spuntata, zero. Tenere la data di
+            # prima sotto un indirizzo nuovo direbbe al moderatore
+            # «confermato» di un indirizzo che nessuno ha ricontrollato.
+            # ⚠️ E SI RISCRIVE ANCHE A INDIRIZZO UGUALE, quando a
+            # cambiare e' la sola spunta (trovato dal collaudo, non
+            # leggendo): in produzione due blob dello stesso indirizzo
+            # sono sempre diversi e il ramo scatta comunque, ma senza
+            # chiave sono 'plain:' e combaciano — e chi spuntava la
+            # casella al secondo tocco su «Paga» restava «non
+            # confermato» solo li', cioe' solo dove si prova.
+            conf = _indirizzo_confermato(d, ind)
+            conf_prima = (mio["indirizzo_confermato_il"]
+                          if "indirizzo_confermato_il" in mio.keys() else 0)
+            if ind and (ind != mio["indirizzo"]
+                        or bool(conf) != bool(conf_prima)):
                 con.execute(
                     "UPDATE ordini SET indirizzo=?, indirizzo_il=?, "
-                    "indirizzo_atteso=1 WHERE id=? AND stato='creato'",
+                    "indirizzo_atteso=1, indirizzo_confermato_il=? "
+                    "WHERE id=? AND stato='creato'",
                     (ind, mio["indirizzo_il"] or int(time.time()),
-                     mio["id"]))
+                     conf, mio["id"]))
                 con.commit()
             # LA NOTA segue la stessa strada dell'indirizzo — fuori dal
             # confronto e riscritta qui — ma per una ragione DIVERSA, e
@@ -37471,6 +37523,14 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
          # ripresa), l'ID solo se ha VINTO (lo conta il tetto)
          cod_nome, cod_id if chi_sc else 0))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    # LA CONFERMA DELL'INDIRIZZO (13 ott 2026): un UPDATE sulla riga
+    # appena nata e non una colonna in piu' nell'INSERT qui sopra —
+    # trentaquattro segnaposto contati a mano sono il posto dove un
+    # valore finisce nella colonna accanto. Stessa transazione, nessun
+    # await in mezzo: il patto del ricontrollo non si tocca.
+    if _indirizzo_confermato(d, ind):
+        con.execute("UPDATE ordini SET indirizzo_confermato_il=? "
+                    "WHERE id=?", (int(time.time()), ordine_id))
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
         # finestra in cui l'uno esiste senza l'altro.
@@ -38049,11 +38109,11 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         # Coda STATICA anche qui: l'indirizzo e' testo del compratore e
         # nell'HTML di una notifica non ci entra mai — si legge
         # nell'ordine, dove il client lo passa da esc().
-        msg += ("\n\n🏠 Il compratore ha scelto la <b>spedizione a "
-                "casa</b>: trovi l'indirizzo nell'ordine.")
+        msg += ("\n\n📦 Il compratore ha scelto la <b>spedizione a "
+                "un indirizzo</b>: lo trovi nell'ordine.")
     elif o["indirizzo_atteso"]:
-        msg += ("\n\n🏠 Il compratore ha scelto la <b>spedizione a "
-                "casa</b>: indicherà l'indirizzo nell'ordine, e ti "
+        msg += ("\n\n📦 Il compratore ha scelto la <b>spedizione a "
+                "un indirizzo</b>: lo indicherà nell'ordine, e ti "
                 "avviseremo appena lo scrive.")
     # LA ZONA, e SOLO quando non e' l'Italia (set 2026). Qui la regola
     # e' l'opposto di quella della ricevuta, ed e' deliberato: al
@@ -38667,7 +38727,7 @@ async def indica_indirizzo(ordine_id: int, req: Request,
     if o["via_punto"] or o["consegna_scelta"] != "spedizione":
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
-                                 "casa")
+                                 "un indirizzo")
     try:
         ind, _atteso = _indirizzo_da_payload(d, o["paese_sped"] or "")
     except HTTPException:
@@ -38678,13 +38738,20 @@ async def indica_indirizzo(ordine_id: int, req: Request,
         raise HTTPException(400, "Scrivi l'indirizzo per la spedizione")
     adesso = int(time.time())
     correzione = bool(o["indirizzo_il"])
+    # LA CONFERMA SI RINNOVA CON QUESTO GESTO (13 ott 2026): chi
+    # scrive o corregge l'indirizzo dall'ordine spunta la stessa
+    # casella della cassa, e la data e' quella di adesso. Senza la
+    # spunta (una pagina di prima) torna a zero: la conferma di ieri
+    # parlava di un altro indirizzo.
+    confermato = _indirizzo_confermato(d, ind)
     con.execute("UPDATE ordini SET indirizzo=?, indirizzo_il=?, "
                 "indirizzo_atteso=1, indirizzo_corretto_il=?, "
-                "indirizzo_correzioni=? WHERE id=?",
+                "indirizzo_correzioni=?, indirizzo_confermato_il=? "
+                "WHERE id=?",
                 (ind, o["indirizzo_il"] or adesso,
                  adesso if correzione else 0,
                  (o["indirizzo_correzioni"] or 0) + (1 if correzione else 0),
-                 ordine_id))
+                 confermato, ordine_id))
     con.commit()
     con.close()
     # Il journal dice CHE e' successo e QUANDO, mai cosa: un indirizzo
@@ -38695,11 +38762,12 @@ async def indica_indirizzo(ordine_id: int, req: Request,
           + (f" (correzione n. {(o['indirizzo_correzioni'] or 0) + 1})"
              if correzione else ""))
     await notifica(o["venditore_id"],
-                   "🏠 <b>L'acquirente ha "
+                   "📦 <b>L'acquirente ha "
                    + ("aggiornato" if correzione else "indicato")
                    + " l'indirizzo di spedizione</b>: lo trovi "
                      "nell'ordine, nella Mini App.")
     return {"ok": True, "indirizzo_il": o["indirizzo_il"] or adesso,
+            "indirizzo_confermato_il": confermato,
             "indirizzo_correzioni":
                 (o["indirizzo_correzioni"] or 0) + (1 if correzione else 0)}
 
@@ -62534,7 +62602,7 @@ def _righe_consegna_promo(a: dict, cambio: float) -> str:
     c = a.get("consegna") or ""
     righe = []
     if c in ("spedizione", "entrambe"):
-        riga = "🚚 Spedizione a casa o a un punto di ritiro"
+        riga = "🚚 Spedizione a un indirizzo o a un punto di ritiro"
         costo = _costo_sped_promo(a, cambio)
         if costo:
             riga += f" — {costo}"
@@ -66337,10 +66405,28 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                 stato_ind += (f", poi corrett{'o' if ni == 1 else 'o'} "
                               f"{ni} volt{'a' if ni == 1 else 'e'} "
                               f"(ultima il {ultima_i})")
+            # LA CONFERMA DI CHI COMPRA (13 ott 2026, cantiere
+            # indirizzo-giusto): il FATTO e la data, come il resto —
+            # e quando manca si dice perche' puo' mancare, o un ordine
+            # nato prima della casella sembrerebbe una conferma
+            # rifiutata. Si legge con `keys()`: i banchi che eseguono
+            # questo pezzo montano tabelle piu' strette della vera.
+            conf_il = (o["indirizzo_confermato_il"]
+                       if "indirizzo_confermato_il" in o.keys() else 0)
+            if conf_il:
+                quando_c = time.strftime("%d/%m/%Y %H:%M",
+                                         time.localtime(conf_il))
+                stato_ind += (f". L'acquirente lo ha CONFERMATO il "
+                              f"{quando_c} («se è sbagliato, le spese "
+                              f"di spedizione restano a mio carico»)")
+            else:
+                stato_ind += (". NESSUNA conferma dell'acquirente su "
+                              "questo indirizzo (gli ordini nati prima "
+                              "del 13 ott 2026 non la chiedevano)")
         else:
             stato_ind = "indirizzo MAI indicato dall'acquirente"
         nota_indirizzo = (
-            f"\n🏠 Spedizione a CASA: {stato_ind}. L'indirizzo lo "
+            f"\n📦 Spedizione a un INDIRIZZO: {stato_ind}. L'indirizzo lo "
             f"leggono solo le parti: non è mostrato ai moderatori.")
     # L'EMAIL PER IL CORRIERE: il FATTO e la data, MAI il valore
     # (decisione di Andrea). Al moderatore serve sapere se il codice

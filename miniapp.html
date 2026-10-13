@@ -6811,6 +6811,22 @@
     min-width:0}
   .via-opzione .via-sped{font-size:11.5px;color:var(--muted);
     font-weight:600}
+  /* la casella «Ho controllato l'indirizzo» (13 ott 2026): alla cassa
+     e nel campo dentro l'ordine, la stessa. SPECIFICITA' ALTA DI
+     PROPOSITO, il patto di .cons-riga: le regole generiche dei form
+     (.field label e .ind-campi label la fanno maiuscola e grigia,
+     .field input la allarga come un campo) vincerebbero sulla classe
+     nuda — visto dal giro dal vivo, non leggendo: la frase usciva in
+     maiuscoletto con la casella centrata sopra. */
+  label.ind-conferma,.field label.ind-conferma,
+  .ind-campi label.ind-conferma{display:flex;align-items:flex-start;
+    gap:9px;margin:12px 0 0;font-size:13px;font-weight:700;
+    color:var(--ink);text-transform:none;letter-spacing:normal;
+    line-height:1.4;cursor:pointer}
+  .ind-conferma input,.field .ind-conferma input,
+  .ind-campi .ind-conferma input{width:17px;height:17px;padding:0;
+    margin:1px 0 0;border-radius:5px;flex:0 0 auto;
+    accent-color:var(--sats)}
   /* Le righe delle zone nel form Vendi (set 2026): il nome della
      zona a sinistra e il campo a destra, cosi' le caselle si leggono
      come una tabellina invece che come campi indipendenti — sono la
@@ -11872,6 +11888,12 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Il pacco perso o rovinato è una cosa fra chi spedisce e il corriere.</b> Barattolo garantisce la <b>transazione</b>: che il venditore non incassi senza aver consegnato e che tu non paghi senza ricevere. L'oggetto in viaggio no — se il corriere lo perde o lo rompe, il reclamo si apre con lui.</li>
         <li><b>Spedite sempre col tracciamento</b>, e per le cose di valore con la <b>copertura del corriere</b>. Il tracciamento è la prova che l'oggetto è partito ed è arrivato, ed è la prima cosa che guarda un moderatore; la copertura di base, verso i punti di ritiro, è quasi sempre molto bassa.</li>
         <li><b>Il deposito garantisce l'oggetto promesso, non i gusti.</b> «Non mi piace più» non è un difetto; un oggetto diverso da com'era descritto sì.</li>
+        <!-- L'INDIRIZZO SBAGLIATO (13 ott 2026, cantiere
+             indirizzo-giusto): la regola sta QUI, fra le cose che il
+             deposito non copre, perche' e' una regola che decide una
+             disputa — e chi compra la incontra un'altra volta alla
+             cassa, nella casella che spunta prima di pagare. -->
+        <li><b>Un indirizzo sbagliato lo paga chi l'ha scritto.</b> Se l'indirizzo che hai indicato è sbagliato e il pacco torna indietro, le spese di spedizione restano a tuo carico. Per questo prima di pagare ti chiediamo di ricontrollarlo, e di confermarlo con una spunta.</li>
       </ul>
 
       <!-- COSA NON SI PUO' VENDERE (25 set 2026): la lista che stava in
@@ -11912,7 +11934,7 @@ document.getElementById('cartello')?.remove();</script>
            della busta non si cancellano, e una frase che le
            includesse sarebbe falsa. -->
       <h3>L'indirizzo per la spedizione</h3>
-      <p>Se scegli la <b>spedizione a casa</b>, l'indirizzo lo scrivi al momento dell'acquisto e resta <b>dentro l'ordine</b>: lo vede <b>solo il venditore</b>, per stampare l'etichetta. Non lo pubblichiamo da nessuna parte, non lo usiamo per altro, e <b>i moderatori non lo leggono</b> — nemmeno per decidere una disputa: a loro risulta soltanto <i>se</i> l'hai indicato e quando.</p>
+      <p>Se scegli la <b>spedizione a un indirizzo</b> — casa, ufficio, un amico o un negozio che accetta il pacco per te — lo scrivi al momento dell'acquisto e resta <b>dentro l'ordine</b>: lo vede <b>solo il venditore</b>, per stampare l'etichetta. Non lo pubblichiamo da nessuna parte, non lo usiamo per altro, e <b>i moderatori non lo leggono</b> — nemmeno per decidere una disputa: a loro risulta soltanto <i>se</i> l'hai indicato, quando, e che l'hai confermato.</p>
       <p>E non lo conserviamo: <b>lo trasportiamo</b>. Nel database è cifrato, e <b>appena confermi di aver ricevuto l'oggetto viene cancellato</b> — da quel momento l'affare è chiuso e quello che succede fra te e il venditore non ci riguarda più. Se invece l'ordine si chiude <i>senza</i> la tua conferma — un rimborso, una disputa decisa da un moderatore — sparisce entro <b><span data-giorni-ind></span> giorni</b>. Finché l'ordine è aperto resta, perché è lì che serve: se un affare non si chiude mai, l'indirizzo lo aspetta.</p>
       <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore. Puoi lasciare <b>la tua email</b>, se vuoi che il codice di ritiro te lo mandi il corriere invece del venditore: è facoltativa, non è mai una condizione per comprare, e sparisce con l'ordine.</p>
 
@@ -12039,7 +12061,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
       <p>Cinque cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
       <ul class="sicu-lista">
-        <li><b>L'indirizzo di casa</b>, se scegli la spedizione a casa. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta.</li>
+        <li><b>L'indirizzo di spedizione</b>, se scegli la spedizione a un indirizzo. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta. Ricontrollalo prima di pagare: se è sbagliato e il pacco torna indietro, le spese di spedizione restano a tuo carico.</li>
         <!-- ⚠️ EMENDATA E NON SMENTITA (ago 2026, la rete di casa): la
              ragione per cui il punto si puo' salvare REGGE — e' un
              luogo pubblico anche adesso, e casa tua no. A cambiare e'
@@ -12083,13 +12105,13 @@ document.getElementById('cartello')?.remove();</script>
            VPS c'e' — verificata con Andrea — altrimenti busta e
            contenuto digitale finirebbero in chiaro col prefisso
            `plain:` e questa voce sarebbe falsa. -->
-      <p><b>Vuol dire al riparo da un database rubato, non da noi.</b> L'indirizzo di casa, il codice di ritiro della busta e il contenuto di un buono digitale non stanno in chiaro: sono cifrati, e la chiave non è dentro il database. Se qualcuno ne rubasse una copia — un backup, il file del database — quelle tre cose resterebbero illeggibili.</p>
+      <p><b>Vuol dire al riparo da un database rubato, non da noi.</b> L'indirizzo di spedizione, il codice di ritiro della busta e il contenuto di un buono digitale non stanno in chiaro: sono cifrati, e la chiave non è dentro il database. Se qualcuno ne rubasse una copia — un backup, il file del database — quelle tre cose resterebbero illeggibili.</p>
       <p><b>La chiave però sta sullo stesso server che ti risponde</b>, perché è lì che serve per mostrare l'indirizzo a chi vende quando apre l'ordine. Quindi finché quel dato è lì, il server lo può leggere — e chi amministra il server anche. Non lo facciamo e non abbiamo nessuno strumento che lo faccia; nei log restano le impronte e mai i contenuti, e i messaggi d'errore sono scritti apposta per non contenere un CAP. Ma è una promessa nostra, non una garanzia della matematica.</p>
       <p><b>L'unica garanzia vera è che il dato duri poco.</b> È per questo che l'indirizzo si cancella da solo, invece di restare lì «tanto è cifrato».</p>
 
       <h3 id="priv-durate">Per quanto teniamo le cose</h3>
       <ul class="sicu-lista">
-        <li><b>L'indirizzo di casa</b>: fino alla tua conferma, o <span data-giorni-ind></span> giorni dalla chiusura senza conferma. Qui sopra c'è la storia per intero.</li>
+        <li><b>L'indirizzo di spedizione</b>: fino alla tua conferma, o <span data-giorni-ind></span> giorni dalla chiusura senza conferma. Qui sopra c'è la storia per intero.</li>
         <!-- L'email viaggia con la stessa scopa e con le stesse due
              velocita': e' letteralmente lo stesso giro (pulisci_indirizzi),
              e per questo la riga sta ACCANTO invece che in fondo. -->
@@ -12515,7 +12537,7 @@ document.getElementById('cartello')?.remove();</script>
            0 scritto = gratis al punto. -->
       <div class="field" id="sellSpedPuntoField" style="display:none"><label>Costo verso un punto di ritiro (facoltativo)</label>
         <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come sopra"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a un indirizzo. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div></div>
         <!-- la riga discreta del secondo giro, e dal 12 ott 2026
              dice la regola nuova: senza un corriere che consegna a
              una rete di punti la via punto NON si offre — il
@@ -15904,6 +15926,8 @@ function mapOrder(o){
        corretto, e se la scopa l'ha gia' cancellato. */
     indirizzoAtteso:!!o.indirizzo_atteso, indirizzoIl:o.indirizzo_il||0,
     indirizzoCorrezioni:o.indirizzo_correzioni||0,
+    /* la conferma di chi compra (13 ott 2026): il quando, 0 = mai */
+    indirizzoConfermatoIl:o.indirizzo_confermato_il||0,
     indirizzoPurgatoIl:o.indirizzo_purgato_il||0,
     /* il feedback che ho lasciato io e quello che ho ricevuto */
     mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
@@ -22469,6 +22493,30 @@ function puntoInVista(o, s){
   return STATI_PUNTO_IN_VISTA.includes(s)
       || (!!o.disputata && ['confirmed', 'refund'].includes(s));
 }
+/* L'INDIRIZZO, PER CHI DECIDE (13 ott 2026, cantiere indirizzo-giusto):
+   il gemello della riga del punto sulla spedizione a un indirizzo. Il
+   moderatore l'indirizzo non lo legge da nessuna strada — qui trova i
+   FATTI: se e' stato indicato, se chi compra l'ha confermato prima di
+   pagare (e quando), quante volte l'ha corretto. E' la riga che serve
+   a decidere a chi restano le spese di spedizione quando il pacco
+   torna indietro. Solo all'admin: le due parti hanno gia' il loro
+   pannello dell'indirizzo. */
+function rigaIndirizzoAdmin(o){
+  if (o.role !== 'admin' || o.viaPunto
+      || o.consegnaScelta !== 'spedizione'
+      || !(o.indirizzoAtteso || o.indirizzoIl)) return '';
+  const data = ts => new Date(ts*1000).toLocaleString('it-IT',
+    {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  const n = o.indirizzoCorrezioni || 0;
+  const fatto = !o.indirizzoIl
+    ? 'l\'acquirente <b>non l\'ha mai indicato</b>'
+    : o.indirizzoConfermatoIl
+      ? `<b>confermato</b> dall'acquirente il ${data(o.indirizzoConfermatoIl)}`
+      : '<b>nessuna conferma</b> dell\'acquirente (gli ordini di prima non la chiedevano)';
+  return `<div class="trust-note nota-punto">📦 <span>Spedizione a un indirizzo: ${fatto}`
+       + `${n ? ` · corretto ${n} ${n === 1 ? 'volta' : 'volte'}` : ''}`
+       + `<br><span class="eur-hint">L'indirizzo non è mostrato ai moderatori.</span></span></div>`;
+}
 /* QUEL CHE SERVE A CHI DECIDE, e solo a lui: di che rete e tipo era
    il punto (o che la rete non c'era: gli ordini di prima) e quante
    volte chi vende l'aveva contestato prima di spedire — il contatore
@@ -25301,8 +25349,11 @@ const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="tru
   + '<circle cx="9.8" cy="5.8" r="1" fill="currentColor"/>'
   + '<circle cx="14.2" cy="11.4" r="1" fill="currentColor"/>'
   + '<circle cx="9.8" cy="17.1" r="1" fill="currentColor"/></svg>';
+/* la riga piccola sotto «Spedizione a un indirizzo», alla cassa */
+const SOTTO_INDIRIZZO = 'casa, ufficio, un amico o un negozio che '
+  + 'accetta il pacco per te';
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
-  : v==='casa' ? '🏠 Spedizione a casa'
+  : v==='casa' ? '📦 Spedizione a un indirizzo'
   : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a un locker / punto</span>`
   : v==='digitale' ? '💾 Codice online'
   : v==='servizio' ? '📅 Di persona o in videoconferenza' : '';
@@ -26620,10 +26671,19 @@ function renderAcquisto(){
     <label for="acqPaese">Dove lo spediamo</label>
     <select id="acqPaese" onchange="setPaeseAcquisto(this.value)">${opzioni}</select>
   </div>`;
+  /* LA CASELLA DELLA CONFERMA (13 ott 2026, cantiere indirizzo-giusto):
+     sta sotto l'indirizzo in TUTTI E DUE gli stati in cui c'e' un
+     indirizzo da guardare — i campi aperti e la riga compatta col
+     «Cambia» — perche' e' proprio rileggendolo riassunto che ci si
+     accorge del civico sbagliato. Sul bottone nudo (nessun indirizzo
+     ancora) non compare: non c'e' niente da aver controllato. */
   const cassettoIndirizzo = `<div class="${d.indirizzoAperto?'field':''}" id="acqIndCampo"
       onclick="event.stopPropagation()">
     ${cassettoPaese}
     ${d.indirizzoAperto ? campiIndirizzo : indChiuso}
+    ${(d.indirizzoAperto || indScritto)
+      ? casellaIndirizzo('acqIndOk', d.indirizzoConfermato,
+                         'setIndirizzoConfermato(this.checked)') : ''}
   </div>`;
   /* --- LA NOTA PER IL VENDITORE (ago 2026) --- il terzo cassetto
      della cassa, e l'unico che NON vive dentro una via: la taglia e la
@@ -26796,8 +26856,15 @@ function renderAcquisto(){
          verita' e' gia' la cifra mostrata (che con la tariffa unica
          E' quella di casa). Il flag fallback_casa resta nel payload
          del preventivo: e' un fatto del server, non piu' un testo. */
+      /* «a un INDIRIZZO», non «a casa» (13 ott 2026, cantiere
+         indirizzo-giusto, dal giro dal vivo di Andrea): «a casa»
+         faceva credere che si potesse spedire solo a casa propria. La
+         riga piccola dice quel che il nome da solo non dice — e sta
+         SOLO qui alla cassa, dove si sceglie: altrove basta il nome. */
       const nota = s.via==='punto'
-        ? `<span class="via-sped">Consigliato</span>` : '';
+        ? `<span class="via-sped">Consigliato</span>`
+        : s.via==='casa'
+          ? `<span class="via-sped">${SOTTO_INDIRIZZO}</span>` : '';
       const cifra = (s.via==='casa' || s.via==='punto') && !cifreMute
         ? (s.spedizione_sats>0
             ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'', s.spedizione_eur)}</span>`
@@ -27146,6 +27213,8 @@ function setPaeseAcquisto(c){
   if (!acqDati || !c) return;
   haptic();
   acqDati.paese = c;
+  /* cambiato il paese, l'indirizzo va ricontrollato */
+  acqDati.indirizzoConfermato = false;
   const domV = (acqDati.preventivo && acqDati.preventivo.domestico)
                || DOM_DEFAULT;
   if (zonaPaese(c, domV) !== 'dom' && acqDati.via === 'punto')
@@ -27645,6 +27714,46 @@ function indirizzoRiassunto(i){
 }
 function setCampoIndirizzo(k, v){
   if (acqDati && acqDati.indirizzo) acqDati.indirizzo[k] = v;
+  /* un indirizzo ritoccato va ricontrollato: la spunta di prima
+     parlava di un altro testo */
+  togliConfermaIndirizzo();
+}
+/* LA CONFERMA DELL'INDIRIZZO (13 ott 2026, cantiere indirizzo-giusto).
+   Il caso: chi compra sbaglia l'indirizzo, il pacco torna indietro, e
+   le spese di spedizione restavano sempre a chi vende. Adesso prima
+   di pagare si spunta una casella, la data finisce nell'ordine
+   (`indirizzo_confermato_il`) e il moderatore la legge in disputa —
+   l'indirizzo no, mai.
+   UNA FRASE PER I DUE POSTI (la cassa e il campo dentro l'ordine): il
+   patto di `invitoEmail` — due copie divergono al primo ritocco, e
+   questa frase e' un impegno, non una didascalia. */
+const CONFERMA_INDIRIZZO = 'Ho controllato l\'indirizzo: se è sbagliato, '
+  + 'le spese di spedizione restano a mio carico';
+function casellaIndirizzo(id, spuntata, gesto){
+  return `<label class="ind-conferma" for="${id}"><input type="checkbox"
+      id="${id}"${spuntata ? ' checked' : ''} onchange="${gesto}">
+    <span>${CONFERMA_INDIRIZZO}</span></label>`;
+}
+function setIndirizzoConfermato(si){
+  if (acqDati) acqDati.indirizzoConfermato = !!si;
+}
+/* la spunta se ne va IN PLACE, senza ridisegnare: il render rifarebbe
+   i campi e porterebbe via cursore e fuoco a chi sta scrivendo */
+function togliConfermaIndirizzo(){
+  if (!acqDati || !acqDati.indirizzoConfermato) return;
+  acqDati.indirizzoConfermato = false;
+  const c = el('acqIndOk');
+  if (c) c.checked = false;
+}
+/* la guardia di «Paga» e di ⚡: la stessa nei due varchi. Torna vero
+   se manca la spunta, dopo aver portato gli occhi sulla casella. */
+function mancaConfermaIndirizzo(d){
+  if (!d || d.via !== 'casa' || d.indirizzoConfermato) return false;
+  const c = el('acqIndOk');
+  if (c) { c.scrollIntoView({block:'center'});
+           c.focus({preventScroll:true}); }
+  toast('Spunta la casella: conferma di aver controllato l\'indirizzo');
+  return true;
 }
 /* Il cassetto si apre da UN posto solo, come quello del punto: mai il
    fuoco su un campo che non e' in pagina. */
@@ -27721,6 +27830,10 @@ function corpoConsegna(){
     out.indirizzo = {};
     CAMPI_IND.forEach(c =>
       out.indirizzo[c.k] = (i[c.k]||'').trim().slice(0, c.max));
+    /* LA CONFERMA viaggia con l'indirizzo, e solo `true`: chiave
+       assente quando non c'e' (il patto della nota) — per il server
+       l'assenza e' «nessuna conferma», che e' la verita' */
+    if (acqDati.indirizzoConfermato) out.indirizzo_confermato = true;
   }
   return out;
 }
@@ -27824,6 +27937,10 @@ function ctaAcquisto(){
     toast('Scrivi l\'indirizzo: al venditore serve per spedire');
     return;
   }
+  /* ...e la casella: l'indirizzo lo ricontrolla chi l'ha scritto
+     (13 ott 2026). DOPO la guardia dell'indirizzo: quando scatta
+     questa la casella e' in pagina per costruzione. */
+  if (mancaConfermaIndirizzo(d)) return;
   if (d.tipo==='set') startBuySet(); else startBuy();
 }
 /* ---------------- la pagina del pacco (ago 2026) ----------------
@@ -30725,6 +30842,9 @@ function compraSubito(){
     toast('Scrivi l\'indirizzo: al venditore serve per spedire');
     return;
   }
+  /* la gemella della guardia di ctaAcquisto: chi paga col wallet
+     collegato la casella la spunta come tutti */
+  if (mancaConfermaIndirizzo(acqDati)) return;
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
   el('nwcScomposto').innerHTML = contoScomposto({
@@ -33767,6 +33887,7 @@ function openOrder(id){
             un bottone per ogni dato faceva confusione — e la frase del
             banner si seleziona con la pressione lunga, come un testo. */''}
       ${puntoInVista(o, s) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}${puntoBannerAdmin(o)}</span></div>`:''}
+      ${rigaIndirizzoAdmin(o)}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${/* IL CASO INCAGLIATO (ago 2026): quando lo sblocco o il
@@ -33876,7 +33997,7 @@ function openOrder(id){
                 busta, che il sollecito stesso nomina. */''}
           ${o.viaPunto ? `<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:700;margin-top:6px;cursor:pointer">
             <input type="checkbox" id="shipBustaDiretta" style="margin-top:2px"> <span>Ho messo i recapiti dell'acquirente come destinatario: il codice di ritiro arriva direttamente a lui</span></label>` : ''}
-          ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo in cima, in <b>«📦 Spedisci a»</b>.</div>` : ''}
+          ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">📦 L'acquirente ha scelto la <b>spedizione a un indirizzo</b>: lo trovi in cima, in <b>«📦 Spedisci a»</b>.</div>` : ''}
           ${/* IL CARTELLO, MAI IL DATO: la nota si legge nel suo
                 riquadro qui sotto, e ripeterla qui sarebbe il dato
                 accanto al posto in cui si tocca — il peccato che il
@@ -42398,7 +42519,7 @@ function pannelloNota(o){
   return `<div class="payout"><h4>📝 Nota dell'acquirente</h4>
     <div class="hint">${esc(scritta)}</div>
     ${o.role==='admin'
-      ? `<div class="hint" style="margin-top:6px">Questa la leggi: l'indirizzo di casa e la busta di ritiro no.</div>`
+      ? `<div class="hint" style="margin-top:6px">Questa la leggi: l'indirizzo di spedizione e la busta di ritiro no.</div>`
       : `<div class="hint" style="margin-top:6px">Leggila prima di preparare la consegna: se ti chiede qualcosa che non puoi fare, dillo in chat prima di spedire.</div>`}</div>`;
 }
 /* ---- I RIQUADRI DI QUEL CHE VI SIETE DETTI (22 set 2026, richiesta
@@ -42490,7 +42611,7 @@ function pannelloIndirizzoCasa(o){
     {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
   if (o.indirizzoPurgatoIl) return `
     <div class="payout">
-      <h4>🏠 Indirizzo di spedizione</h4>
+      <h4>📦 Indirizzo di spedizione</h4>
       <div class="hint">Cancellato il ${data(o.indirizzoPurgatoIl)}, dopo la chiusura dell'ordine: l'indirizzo vive quanto l'affare, poi sparisce da Barattolo.</div>
     </div>`;
   const i = indirizzoLetto[o.id];
@@ -42503,14 +42624,14 @@ function pannelloIndirizzoCasa(o){
          da capo (la lezione del «Cambia» in pagina d'acquisto) */
       if (o.indirizzoIl && !i) return `
         <div class="payout">
-          <h4>🏠 Il tuo indirizzo di spedizione</h4>
+          <h4>📦 Il tuo indirizzo di spedizione</h4>
           <div class="hint">Indicato il ${data(o.indirizzoIl)}${corr}. Puoi correggerlo finché il venditore non spedisce.</div>
           <button class="btn ghost" style="margin-top:10px" onclick="mostraIndirizzo(this)">✏️ Mostra e correggi</button>
         </div>`;
       const v = i || {};
       return `
         <div class="payout">
-          <h4>🏠 ${o.indirizzoIl?'Il tuo indirizzo di spedizione':'Indica l\'indirizzo di spedizione'}</h4>
+          <h4>📦 ${o.indirizzoIl?'Il tuo indirizzo di spedizione':'Indica l\'indirizzo di spedizione'}</h4>
           <div class="hint">${o.indirizzoIl
             ? `Indicato il ${data(o.indirizzoIl)}${corr}. Se correggi, il venditore riceve un avviso.`
             : 'Al venditore serve per spedire il pacco: lo vede solo lui, e lo cancelliamo appena confermi di aver ricevuto l\'oggetto.'}</div>
@@ -42522,13 +42643,17 @@ function pannelloIndirizzoCasa(o){
               ${c.k==='telefono' ? 'type="tel"' : ''}
               placeholder="${esc(SEGNAPOSTO_IND[c.k]||'')}">`).join('')}
           </form>
-          <button class="btn orange" style="margin-top:10px" onclick="salvaIndirizzo(this)">🏠 ${o.indirizzoIl?'Aggiorna l\'indirizzo':'Salva l\'indirizzo'}</button>
+          ${/* la stessa casella della cassa: chi scrive o corregge
+                l'indirizzo da qui lo riconferma con questo gesto, e
+                la data nell'ordine e' quella di adesso */''}
+          ${casellaIndirizzo('ordIndOk', false, '')}
+          <button class="btn orange" style="margin-top:10px" onclick="salvaIndirizzo(this)">📦 ${o.indirizzoIl?'Aggiorna l\'indirizzo':'Salva l\'indirizzo'}</button>
         </div>`;
     }
     if (!o.indirizzoIl) return '';
     return `
       <div class="payout">
-        <h4>🏠 Il tuo indirizzo di spedizione</h4>
+        <h4>📦 Il tuo indirizzo di spedizione</h4>
         <div class="hint">Indicato il ${data(o.indirizzoIl)}${corr}. Il pacco è partito: da qui non si cambia più.</div>
       </div>`;
   }
@@ -42544,17 +42669,17 @@ function pannelloIndirizzoCasa(o){
      copia qui sotto sarebbe il dato in due posti */
   if (serveSpedisciA(o)) return '';
   if (!o.indirizzoIl) return `
-    <div class="trust-note">🏠 <span><b>In attesa dell'indirizzo.</b> L'acquirente ha scelto la spedizione a casa e lo scriverà qui nell'ordine: ti avviseremo appena lo fa.</span></div>`;
+    <div class="trust-note">📦 <span><b>In attesa dell'indirizzo.</b> L'acquirente ha scelto la spedizione a un indirizzo e lo scriverà qui nell'ordine: ti avviseremo appena lo fa.</span></div>`;
   if (i) return `
     <div class="payout">
-      <h4>🏠 Indirizzo di spedizione</h4>
+      <h4>📦 Indirizzo di spedizione</h4>
       <div class="hint">Indicato dall'acquirente il ${data(o.indirizzoIl)}${corr}:</div>
       ${righeIndirizzo(i, spedEstero(o))}
       <button class="btn ghost" style="margin-top:10px" onclick="copiaIndirizzo()">📋 Copia tutto l'indirizzo</button>
     </div>`;
   return `
     <div class="payout">
-      <h4>🏠 Indirizzo di spedizione</h4>
+      <h4>📦 Indirizzo di spedizione</h4>
       <div class="hint">L'acquirente l'ha indicato il ${data(o.indirizzoIl)}${corr}. Lo leggi solo tu, e sparisce appena lui conferma di aver ricevuto l'oggetto: se ti serve per un reclamo al corriere, tienilo da parte prima.</div>
       <button class="btn orange" style="margin-top:10px" onclick="mostraIndirizzo(this)">👁 Mostra l'indirizzo</button>
     </div>`;
@@ -42643,18 +42768,25 @@ async function salvaIndirizzo(btn){
     toast('Servono almeno nome, via, CAP e città');
     return;
   }
-  const ripristina = bottoneInAttesa(btn, '🏠 Salvo l\'indirizzo…');
+  /* la casella, come alla cassa (13 ott 2026): senza, non si salva */
+  const ok = el('ordIndOk');
+  if (ok && !ok.checked){
+    ok.scrollIntoView({block:'center'});
+    toast('Spunta la casella: conferma di aver controllato l\'indirizzo');
+    return;
+  }
+  const ripristina = bottoneInAttesa(btn, '📦 Salvo l\'indirizzo…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/indirizzo`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({indirizzo: corpo})});
+    body: JSON.stringify({indirizzo: corpo, indirizzo_confermato: true})});
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail||'Indirizzo non salvato, ricontrolla'); return; }
   /* quel che si e' appena scritto e' anche quel che si rilegge: cosi'
      il pannello si riapre pieno senza un secondo giro di rete */
   indirizzoLetto[currentOrder.id] = corpo;
-  toast('🏠 Indirizzo salvato');
+  toast('📦 Indirizzo salvato');
   loadOrders().then(()=> openOrder(currentOrder.id));
 }
 
@@ -42733,7 +42865,7 @@ function riquadroSpedisciA(o){
     corpo = '<div class="dati-copia">' + righe.join('') + '</div>';
     tutto = righe.length > 1;
   } else {
-    tipo = '🏠 Indirizzo di casa';
+    tipo = '📦 Indirizzo di spedizione';
     const i = indirizzoLetto[o.id];
     if (i) { corpo = righeIndirizzo(i, spedEstero(o)); tutto = !!corpo; }
   }
