@@ -56042,7 +56042,8 @@ numeri. La suite intera sull'albero del push la dice la CI.
 ## «Dimentica il profilo» toglie anche la copia cifrata dai relay (13 ott 2026, cantiere dimentica-copia-relay, richiesta di Andrea: tocca la privacy)
 
 **IL FATTO.** Scrivendo nel patto che il profilo di un account nato su
-Nostr ha una copia cifrata sui relay (la voce qui sopra) avevo notato,
+Nostr ha una copia cifrata sui relay (la voce «Il patto dice la copia
+cifrata sui relay», di stamattina) avevo notato,
 e scritto nel patto stesso, che «Dimentica il profilo» non la toglieva
 da lì. Andrea: «tocca la privacy, lo facciamo adesso: deve togliere
 anche la copia cifrata dai relay (i suoi, quelli pubblici e il nostro),
@@ -56195,6 +56196,44 @@ dieci minuti) e non si riprova lì: una seconda passata dopo il primo
 quarto d'ora. (2) Chi ha lo stesso profilo su un altro dispositivo non
 viene avvisato che la copia è stata tolta: là continua a funzionare, ma
 se quella memoria si svuota non torna. (3) I due del cantiere
-chat-subito restano scritti nella voce del patto: il richiamo «💬 Chat»
+chat-subito restano scritti nella voce «Il patto dice la copia
+cifrata sui relay»: il richiamo «💬 Chat»
 sotto un foglio aperto, e la chat che parte solo all'apertura dello
 scambio.
+
+**IL VERBALE DEL PUSH (13 ott 2026): cosa è girato su quale albero.**
+Main è corso DUE volte, per commit non miei: tredici (l'ordine in
+pausa nel libro, l'indirizzo giusto, l'hackathon, e il relay per
+Mostro di `f433cf8` + `d9c74ed`, che porta su main il plugin nuovo) e
+poi i due del paracadute (`5dc7c0a`, `673b918`). Due rebase, il solo
+conflitto in coda a CANTIERI (voci accodate: tenute tutte, la mia per
+ultima); `miniapp.html` e `prove.py` si sono fusi da soli, e i miei
+simboli li ho ricontati per nome. SULL'ALBERO DI PRIMA (sopra
+`29c47f3`): la tortura — 27 mutazioni, 27 uccise, ognuna con una rossa
+che ha un nome (le prime due all'inizio facevano ESPLODERE il banco:
+irrobustito e rifatte) — e i primi giri dal vivo, compresa la
+controprova sul codice di prima. SUL PRIMO ALBERO RIBASATO (`7fc3095`,
+sopra `d9c74ed`, col plugin nuovo del relay): PER INTERO la suite
+severa — 23.705 passate, 0 fallite — e i 78 collaudi della CI nella
+gabbia, 78 verdi; i due giri dal vivo rifatti col codice ribasato (11
+su 11 a 390×844 e a 1280×800: gli scatti sono di lì), `node` sui tre
+script. SULL'ALBERO DEL PUSH (sopra `673b918`), secondo la consegna di
+Andrea («dopo l'ultimo rebase rifai solo sezioni e collaudi toccati,
+il resto lo conferma la CI»): le sezioni mie
+(`prove_tor_chiavi_scambio`, `prove_p2p_chiavi`,
+`prove_p2p_conto_dispositivo`, `prove_effetti_ridotti`) e quelle
+toccate dai due commit arrivati (`prove_paracadute_p2p`,
+`prove_paracadute_app`, `prove_relay_per_mostro`, `prove_p2p_server`,
+`prove_p2p_pubblica`, `prove_p2p_avvisi_libro`,
+`prove_reputazione_p2p`, `prove_avvisi_nuovi_ordini`,
+`prove_canale_admin`, `prove_contanti_a_mano`, `prove_contanti_zona`,
+`prove_indirizzo_non_verificato`, `prove_premio_barattozon`,
+`prove_ritocchi_prova_alan`), con la bussola, il tetto e i collaudi in
+CI: 2.125 passate, 0 fallite; e sei collaudi nella gabbia
+(`collaudo_tolti_ovunque`, `collaudo_inviti`, `collaudo_paracadute`,
+`collaudo_scambi_ovunque`, `collaudo_chiavi_ritrovate`,
+`collaudo_ronda_relay`), verdi; lo scanner dei segreti a zero con la
+controprova. I due commit del paracadute portano globali nuovi in
+`server.py` e nel blocco della copia non toccano niente. LA CI DI
+MAIN, guardata prima del push: verde sui tre job sulla punta (`673b918`), e `pronto` era lì. L'ok al push di Andrea stava nella
+richiesta («push subito solo se è tutto verde»).
