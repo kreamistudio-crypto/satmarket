@@ -60033,3 +60033,343 @@ decide `tabRiga`, che c'è solo sul foglio del PayCode. Provato nel banco
 che esegue il VERO `inviaCampoP2P` (`prove_contanti_a_mano`, ora anche
 col foglio del tabacchino: recapito partito, niente ricordo, il toast
 nuovo); la mutazione che lo spegne è presa.
+
+## Gli incassi grossi on-chain quando la rete è calma: i conti, cosa servirebbe, e perché oggi no (16 ott 2026, cantiere incasso-onchain-studio, studio chiesto da Andrea: solo documenti, niente codice né modifiche al nodo)
+
+Il compito (Andrea): pagare on-chain gli incassi grossi dei venditori
+del mercatino quando la rete è calma (oggi 1-3 sat/vB), perché in
+Lightning verso WoS/Spark ci costano ~0,4 %. Dentro: i conti dei 30
+giorni a 1, 3, 10 e 20 sat/vB con le soglie 50k, 100k e 200k; i lotti;
+cosa servirebbe nel codice; la regola 10; i rischi e la proposta. In
+corsa Andrea ha aggiunto: l'on-chain come SCELTA FACOLTATIVA del
+venditore (mai obbligatoria), solo sopra una soglia e con la rete
+calma, col testo che la mostra; e, in breve, il compratore che paga
+on-chain. Prosegue lo studio del 15 ott («Quanto ci costano le
+commissioni di instradamento»), da cui vengono il tetto di LNbits e il
+dove si paga lo 0,4 % verso Spark. Il comando l'ho scritto io, provato
+su un `listpayments` e un `pagamenti_noti` di cartone, e l'ha lanciato
+Andrea sul nodo la sera del 15 (sola lettura; in appendice).
+
+**I DATI.** Dalla fonte che la ronda scrive per ogni hash, la fonte
+`barattolo` (payout del mercatino, il VPS ha detto sì) c'è dal 28 set:
+**26 payout dal 30 set al 15 ott (16 giorni), 1.698.092 sats, 3.613
+sats di commissioni (0,21 %)**; verso Spark/WoS (`030936e7`) 10 payout,
+900.737 sats, 3.015 sats, cioè l'83 % della spesa. Quel che è uscito
+prima del 28 set sta in `imparato` insieme al P2P e agli spostamenti
+nostri: tolti Blixt (`03072348`) e gli swap di SatsRouting2 del 5 ott
+(`02b06bf3`), restano 24 pagamenti, 761.425 sats, 909 sats. Servono
+solo da tetto alto (terza tabella): non si sa quali siano del
+mercatino.
+
+**IL COSTO ON-CHAIN DI UN PAYOUT.** Dal wallet del nodo una
+transazione con un ingresso taproot, l'uscita del venditore e il resto:
+~150 vB (142 se l'indirizzo è `bc1q`, 154 se è `bc1p`). Quindi 150
+sats a 1 sat/vB, 450 a 3, 1.500 a 10, 3.000 a 20.
+
+Tabella 1 — i payout `barattolo` (16 giorni), tutte le destinazioni,
+payout sopra soglia (in sats):
+
+| Soglia | Payout | Sats | Pagato in Lightning | a 1 sat/vB | a 3 | a 10 | a 20 |
+|---|---|---|---|---|---|---|---|
+| ≥ 50.000 | 14 | 1.358.898 | 3.226 | 2.100 | 6.300 | 21.000 | 42.000 |
+| ≥ 100.000 | 4 | 734.450 | 2.382 | 600 | 1.800 | 6.000 | 12.000 |
+| ≥ 200.000 | 1 | 269.368 | 782 | 150 | 450 | 1.500 | 3.000 |
+
+Tabella 2 — gli stessi, solo verso Spark/WoS:
+
+| Soglia | Payout | Sats | Pagato in Lightning | a 1 sat/vB | a 3 | a 10 | a 20 |
+|---|---|---|---|---|---|---|---|
+| ≥ 50.000 | 6 | 782.179 | 2.730 | 900 | 2.700 | 9.000 | 18.000 |
+| ≥ 100.000 | 3 | 603.433 | 2.120 | 450 | 1.350 | 4.500 | 9.000 |
+| ≥ 200.000 | 1 | 269.368 | 782 | 150 | 450 | 1.500 | 3.000 |
+
+Tabella 3 — tetto alto dei 30 giorni (`barattolo` più gli `imparato`
+che non sono spostamenti nostri):
+
+| Soglia | Payout | Sats | Pagato in Lightning | a 1 sat/vB | a 3 | a 10 | a 20 |
+|---|---|---|---|---|---|---|---|
+| ≥ 50.000 | 17 | 1.799.121 | 3.417 | 2.550 | 7.650 | 25.500 | 51.000 |
+| ≥ 100.000 | 6 | 1.096.913 | 2.518 | 900 | 2.700 | 9.000 | 18.000 |
+| ≥ 200.000 | 2 | 517.075 | 906 | 300 | 900 | 3.000 | 6.000 |
+
+Come si leggono:
+- Si guadagna solo a 1 sat/vB, e a 3 sat/vB solo sopra i 100.000 sats.
+  A 10 e a 20 si perde sempre, anche verso Spark. Il caso migliore,
+  ≥ 100k a 1 sat/vB, risparmia 1.782 sats in 16 giorni: **~3.300 sats
+  al mese (~2,4 € a 72.171 €/BTC)**.
+- Sotto i 100k l'on-chain non conviene quasi mai: molti payout grossi
+  vanno verso ACINQ, Blink o altri a 6-55 sats (0,01-0,08 %), e lì 150
+  sats on-chain sono una perdita anche a 1 sat/vB.
+- Il punto di pareggio di un payout da 200.000 verso Spark: 800 sats
+  di rotta (0,4 %) contro 150 vB × tariffa, cioè ~5 sat/vB. Ma prima
+  della voce che segue.
+
+**IL COSTO CHE LE TABELLE NON VEDONO: LA LIQUIDITÀ.** Il deposito di
+chi compra entra in Lightning, nei canali, e oggi esce in Lightning col
+payout: «un deposito che entra diventa uscita per il suo payout» (studio
+della liquidità del 1 ott, §5). Pagato on-chain, il payout esce dal
+wallet on-chain del nodo e i sats del deposito restano nei canali:
+l'entrata che il compratore ha consumato non torna, e il wallet
+on-chain si svuota. Si va avanti finché bastano la riserva on-chain e
+l'entrata di LNBiG, poi bisogna riportare sats dai canali all'on-chain
+con uno swap: SATS Routing 0,6 % + ~1.114 sats (Boltz spento dal 3
+ago), Loop Out 0,05-0,5 % ma con loopd sul nodo e un macaroon largo,
+già scartato per superficie (studio del 1 ott, §6). Con ≥ 100k si
+spostano ~1,38M sats al mese: con SATS Routing ~9.400 sats al mese,
+cioè **una perdita netta di ~6.000 sats al mese** contro i 3.300
+risparmiati; con Loop Out al prezzo migliore (0,05 %, più la sua
+transazione) restano ~2.500 sats al mese, ma con loopd sul nodo. In parole semplici: l'on-chain non cancella lo 0,4 %, lo sposta
+sul giorno in cui si riempie la riserva.
+
+**IL VENDITORE CHE RICEVE.** Il wallet che ci costa lo 0,4 % è quasi
+sempre WoS, e WoS trattiene **l'1 %** sui bitcoin ricevuti on-chain
+(la pagina di supporto «What are the fees for receiving BTC on-chain?»:
+è vecchia, il valore del 2026 va guardato nell'app). Blink trattiene
+2.500 sats per ricezione; Phoenix paga la commissione di rete per
+mettere i sats nel canale (lo splice). Sul payout da 269.368 verso
+Spark: 782 sats nostri in Lightning, ~2.694 sats SUOI on-chain su WoS.
+L'on-chain conviene a tutti e due solo verso un wallet on-chain vero
+(Sparrow, Electrum, una hardware wallet, la parte on-chain di
+BlueWallet o Bitkit). Fra i payout ≥ 100k dei 16 giorni nessuno
+andava sicuramente lì; il candidato è quello da 131.017 verso
+`02b06bf3` (dietro SatsRouting2, quindi forse un indirizzo Lightning
+che già converte in on-chain), che in Lightning ci è costato 262 sats.
+
+**I LOTTI** (più incassi in una transazione: ~40 vB per uscita in più,
+un ingresso e un resto in comune):
+
+| Payout nel lotto | vB in tutto | vB a payout | a 1 sat/vB | a 3 | a 10 | a 20 |
+|---|---|---|---|---|---|---|
+| 1 | 151 | 151 | 151 | 453 | 1.510 | 3.020 |
+| 2 | 191 | 96 | 96 | 286 | 955 | 1.910 |
+| 3 | 231 | 77 | 77 | 231 | 770 | 1.540 |
+| 5 | 311 | 62 | 62 | 187 | 622 | 1.244 |
+| 10 | 511 | 51 | 51 | 153 | 511 | 1.022 |
+
+Quanto aspetterebbe il venditore, al ritmo dei 16 giorni:
+- ≥ 100k: 4 payout, uno ogni ~4 giorni. Un lotto da due fa aspettare
+  il primo ~4 giorni in media per risparmiare ~55 sats a 1 sat/vB
+  (~165 a 3). Non vale.
+- ≥ 50k: 14 payout, ~0,9 al giorno. Un lotto al giorno (l'attesa è da
+  0 a 24 ore, ~12 in media) ha quasi sempre un payout solo; un lotto da
+  tre vuol dire ~3 giorni d'attesa per ~74 sats a payout a 1 sat/vB.
+- I lotti dimezzano la commissione on-chain, ma alla rete calma quella
+  è già la parte piccola: la grande è la liquidità. A 10-20 sat/vB, dove
+  i lotti peserebbero, non si manda comunque. In più un lotto mostra a
+  ogni venditore le uscite degli altri (sotto, i rischi).
+
+**COSA SERVIREBBE NEL CODICE** (nessuna riga scritta):
+1. L'indirizzo del venditore e il suo controllo. Chiesto AL MOMENTO
+   dello sblocco e per quell'ordine, non salvato nel profilo: un
+   indirizzo nuovo ogni volta (sotto, il riuso). Si accettano solo
+   indirizzi mainnet con checksum valido: `bc1q`/`bc1p` (bech32 e
+   bech32m) e i vecchi `1…`/`3…` (base58check); via `tb1`, `bcrt1`,
+   gli indirizzi del nodo stesso e quelli già usati da un altro
+   venditore. Il checksum prende gli errori di battitura, non un
+   indirizzo valido ma sbagliato (gli appunti cambiati da un malware,
+   l'indirizzo vecchio): per quello la conferma con le ultime 6 cifre
+   da confrontare nel wallet.
+2. L'invio dal nodo. LND ha `SendCoins` (uno) e `SendMany` (il lotto),
+   con `sat_per_vbyte`, `min_confs`, `label`; `EstimateFee` per la
+   tariffa; `GetTransactions` per le conferme; `BumpFee` di WalletKit
+   per spingere col resto (CPFP; il comportamento sulla versione del
+   nodo va provato prima). Ci vuole un macaroon con `onchain:write`, o
+   cotto solo su quelle uri. Ed è qui il nodo vero: PRODUZIONE dice che
+   sul VPS «una chiave che sa PAGARE qui non entra» e la regola resta.
+   La forma che la rispetta è un pezzo SUL NODO, sul calco della ronda:
+   prende dal VPS la coda dei payout on-chain (ordine, indirizzo,
+   importo), applica i suoi tetti (per transazione, per giorno, mai
+   sopra la riserva) e paga lui; il VPS non tiene la chiave. La
+   perdita massima se il VPS cade in mani altrui è la riserva on-chain,
+   ed è il motivo per tenerla piccola.
+3. La regola «solo se tariffa ≤ X». X = 3 sat/vB, e solo dalla soglia
+   in su (dai conti: 100.000). Due giudici, tutti e due sotto X: la
+   stima di LND a 6 blocchi e `mempool.space/api/v1/fees/recommended`.
+   Se in 72 ore la rete non si calma, il payout va in Lightning come
+   oggi, all'indirizzo Lightning del venditore: il venditore non
+   aspetta mai più di così, e lo sa da prima.
+4. La transazione bloccata. Una transazione a 1-3 sat/vB può restare in
+   mempool se la tariffa sale, e dopo ~2 settimane i nodi la buttano:
+   i sats tornano nel nostro wallet. LA REGOLA, sul calco dell'«incerto»
+   dei payout Lightning: MAI una seconda transazione al venditore
+   finché la prima può ancora confermarsi; si spinge LA STESSA (CPFP
+   sul resto, o la sostituzione verso lo stesso indirizzo), a spese
+   nostre. Gli stati: in volo col txid finché non c'è una conferma,
+   uscito con due (un riordino della catena è raro ma esiste). Il
+   venditore vede «in arrivo on-chain» col txid. Il libro mastro scrive
+   la commissione on-chain di ogni payout (il «da fare» del 15 ott vale
+   anche qui). La ronda conosce i pagamenti per payment hash: l'on-chain
+   ha bisogno del suo registro per txid.
+5. La riserva on-chain del nodo. LND tiene da parte 10.000 sats per
+   canale anchor (fino a 100.000; con i tre canali di oggi 30.000) e non
+   li spende: la riserva usabile è sopra quelli. Dimensione: una
+   settimana di payout ≥ 100k, ~330.000 sats. Si riempie solo con uno
+   swap (la voce della liquidità) o con sats freschi. Il saldo vero si
+   legge col comando in appendice; per questo studio non serviva.
+
+**LA REGOLA 10** (CLAUDE.md, 15 ott 2026: una tariffa per le
+commissioni del mercatino non va MAI al venditore, al più al
+compratore, visibile prima di pagare). L'on-chain la rispetta così: il
+venditore riceve il prezzo intero sull'indirizzo, e la commissione di
+rete della transazione la paga Barattolo; se un giorno la paga il
+compratore, è dentro la riga «Rete» del riepilogo prima di pagare,
+come nello studio del 15. Resta fuori dalle nostre mani quel che
+trattiene il wallet del venditore per ricevere (WoS, Blink, Phoenix):
+non è una tariffa nostra, ma se Barattolo lo proponesse senza dirlo
+il venditore ci rimetterebbe per una scelta suggerita da noi. Per
+questo l'on-chain può esistere solo come scelta sua, col costo detto
+PRIMA, e Lightning resta la strada di partenza.
+
+**L'AGGIUNTA DI ANDREA: L'ON-CHAIN COME SCELTA DEL VENDITORE.** Mai
+obbligatoria, solo dalla soglia in su, solo con la rete calma (la
+regola del punto 3, con la ricaduta in Lightning dopo 72 ore). Dove: al
+momento in cui l'ordine è sbloccato e l'incasso supera la soglia, una
+scelta in due tasti, Lightning come primo e già scelto. Il testo segue
+«una frase per gesto», e la spiegazione lunga sta in «Info».
+
+Il riquadro:
+> ⛓️ **Incasso on-chain** — per gli incassi da 100.000 sats in su.
+> Arriva entro 3 giorni, quando la rete costa poco: la paghiamo noi.
+> Il tuo wallet potrebbe trattenere qualcosa per riceverlo.
+> [⚡ Resto su Lightning] [⛓️ Voglio on-chain]
+
+Se il dominio dell'indirizzo Lightning del venditore è conosciuto, la
+terza riga diventa quella del suo wallet, con la cifra del suo incasso
+(i valori del 2026 vanno verificati nell'app prima di scriverli):
+> Usi Wallet of Satoshi: per i bitcoin ricevuti on-chain trattiene
+> l'1 %, circa 2.694 sats su 269.368. In Lightning li ricevi tutti.
+
+> Usi Blink: per ogni ricezione on-chain trattiene 2.500 sats. In
+> Lightning li ricevi tutti.
+
+Se non lo è:
+> Alcuni wallet trattengono una parte dei bitcoin ricevuti on-chain
+> (Wallet of Satoshi l'1 %, Blink 2.500 sats): con un wallet Lightning
+> conviene restare su Lightning.
+
+Dopo «Voglio on-chain», il campo e la conferma:
+> Incolla un indirizzo bitcoin **nuovo** del tuo wallet: chi conosce un
+> indirizzo vede tutto quello che ci arriva.
+
+> Arriveranno **269.368 sats**, interi, a `bc1q…x7k2`. Controlla nel
+> tuo wallet che finisca con **x7k2**: un indirizzo sbagliato non si
+> può correggere.
+> [Confermo] [Torno a Lightning]
+
+In «Info», le tre righe lunghe: quando parte (tariffa sotto 3 sat/vB,
+al più 72 ore, poi Lightning), quanto costa a chi (la rete noi, il
+wallet suo), cosa vede dopo (il txid e le conferme). La parola del
+deposito resta «deposito di garanzia» (regola 9).
+
+**IL COMPRATORE CHE PAGA ON-CHAIN, IN BREVE.** C'è già senza una riga di
+codice: uno swap da on-chain a Lightning (SATS Routing, o i wallet che
+lo fanno da sé) paga la nostra fattura, e la commissione dello swap la
+vede e la paga lui prima di confermare: rispetta la regola 10. Fatto da
+noi vorrebbe dire: un indirizzo nuovo per ogni ordine (`NewAddress`,
+un permesso che non sa pagare), il deposito che vale solo dopo 1-2
+conferme (10-60 minuti, con l'ordine fermo nel frattempo e un doppio
+pagamento possibile prima della conferma), i pagamenti di troppo e di
+meno, e i rimborsi che vogliono un indirizzo di ritorno. Ha un senso
+solo insieme al venditore on-chain: i sats on-chain del compratore
+pagherebbero il venditore on-chain senza passare dai canali, e la voce
+della liquidità sparirebbe per quegli ordini. È esattamente la forma
+dell'escrow on-chain 2-di-3 del backlog post-lancio, dove in più la
+chiave che paga non sta a noi. Oggi: una riga in «Info» che dice dello
+swap, se Andrea la vuole; niente checkout on-chain.
+
+**I RISCHI.**
+- Privacy. Una transazione del nodo è pubblica per sempre: indirizzo
+  del venditore, importo (cioè il prezzo della vendita) e data. I
+  canali del nodo sono pubblici, quindi il wallet on-chain del nodo è
+  riconoscibile, e il resto di ogni payout lega tutti i payout fra
+  loro: chi ha venduto una volta può seguire il resto e vedere gli
+  incassi degli altri. In un lotto i venditori si vedono l'un l'altro
+  nella stessa transazione.
+- Indirizzi riusati. Un indirizzo salvato e usato per ogni vendita fa
+  di tutte le vendite di quella persona una lista pubblica: da qui
+  l'indirizzo chiesto ogni volta, e il rifiuto di uno già usato da un
+  altro venditore (un indizio di appunti cambiati).
+- Errori di indirizzo. In Lightning una fattura sbagliata fallisce e i
+  sats restano a noi; on-chain un indirizzo valido ma sbagliato è una
+  perdita definitiva. Il checksum, le ultime 6 cifre, mai un indirizzo
+  che il venditore non ha incollato lui.
+- La chiave che paga. Oggi i payout passano da LNbits e dalla cintura
+  dell'importo in `paga_venditore`; l'on-chain è una porta nuova, e
+  ogni sentinella dei payout (i tre esiti, la mano presa, il doppio
+  pagamento) andrebbe rifatta per lei.
+
+**LA PROPOSTA: OGGI NO.** In ordine:
+1. Non si costruisce adesso. Al meglio (≥ 100k, 1 sat/vB) si
+   risparmiano ~3.300 sats al mese (~2,4 €), e contando lo swap che
+   riempie la riserva si perde; il venditore che ci costa lo 0,4 % (WoS)
+   pagherebbe l'1 % per ricevere on-chain; e il lavoro tocca la parte
+   più delicata, i payout, con una chiave che paga in più.
+2. Lo 0,3 % verso Spark si toglie meglio dall'altra parte, come dice lo
+   studio del 15 ott: la rotta da LNBiG, e il canale verso il nodo di
+   instradamento di Spark dopo una prova di peering da Tor.
+3. Si riapre se succede una di queste: venditori con un wallet on-chain
+   vero che lo chiedono; la spesa verso Spark del mercatino sopra
+   ~10.000 sats al mese; uno swap Lightning → on-chain sotto lo 0,1 %
+   che non voglia software nuovo sul nodo; l'escrow on-chain 2-di-3 del
+   backlog, dove compratore e venditore on-chain si incontrano senza
+   canali in mezzo. In quel caso la forma è quella sopra: scelta del
+   venditore, soglia 100.000, X = 3 sat/vB, 72 ore e poi Lightning, il
+   pezzo che paga sul nodo e non sul VPS.
+4. Si rimisura a metà novembre col comando dell'appendice, insieme a
+   quelli dello studio del 15 ott.
+
+**NOTATO STRADA FACENDO.** I due pagamenti verso SatsRouting2 del 7 e
+del 13 ott (71.832 e 131.017), che lo studio del 15 lasciava «da
+attribuire», nella fonte della ronda sono `barattolo`: payout del
+mercatino a un venditore il cui wallet riceve dietro SatsRouting2.
+Resta da attribuire solo Blixt del 7 ott (12.832). Il conto dei 26
+payout torna con lo studio del 15 a 11 sats (3.613 contro 3.624): la
+finestra dei 30 giorni è scivolata di un giorno.
+
+**STRADE SCARTATE.** L'on-chain obbligatorio sopra soglia (il venditore
+su WoS ci rimetterebbe l'1 %); la chiave `onchain:write` sul VPS (la
+regola di PRODUZIONE); i lotti (pochi sats per giorni d'attesa); il
+checkout on-chain del compratore senza il venditore on-chain (tutta la
+fatica della conferma, nessun risparmio); un indirizzo salvato nel
+profilo (il riuso).
+
+**FONTI** (lette il 15-16 ott 2026): [WoS, le commissioni per ricevere
+on-chain](https://support.walletofsatoshi.com/support/solutions/articles/36000484922-what-are-the-fees-for-receiving-btc-on-chain-);
+[WoS, ricevere nel wallet self-custody](https://support.walletofsatoshi.com/support/solutions/articles/36000579025-how-to-send-and-receive-bitcoin-in-the-self-custody-wos-wallet);
+[Blink, le commissioni per ricevere](https://faq.blink.sv/transaction-fees/what-are-the-fees-for-receiving-bitcoin-in-my-blink-wallet);
+[Phoenix e lo splicing](https://www.theblock.co/post/239098/phoenix-wallet-lightning),
+[Phoenix 2.2.0](https://nobsbitcoin.com/phoenix-wallet-v2-2-0);
+[Spark, i depositi on-chain](https://www.spark.money/solutions/instant-bitcoin-deposits);
+gli swap da `STUDIO-LIQUIDITA-NODO-2026-10-01.md`, §6; tariffa e cambio
+da `mempool.space` come nello studio del 15 ott.
+
+**APPENDICE: I COMANDI** (sola lettura, sul nodo, da `~/nodo`).
+
+I payout dei 30 giorni uno per uno, senza il P2P né i falliti (fonte,
+giorno, sats, commissione, destinazione); `sudo` perché il file della
+ronda è di root:
+```bash
+cd ~/nodo && docker compose exec -T lnd lncli listpayments --max_payments 100000 | sudo python3 -c '
+import json,sys,time
+noti={}
+for l in open("/var/lib/ronda/pagamenti_noti"):
+    x=l.split()
+    if x: noti[x[0]]=x[1] if len(x)>1 else "imparato"
+lim=time.time()-30*86400
+for p in json.load(sys.stdin)["payments"]:
+    t=int(p["creation_time_ns"])/1e9
+    f=noti.get(p["payment_hash"],"nessuna")
+    if p["status"]!="SUCCEEDED" or t<lim or f.startswith("mostro"): continue
+    ok=[h for h in p["htlcs"] if h["status"]=="SUCCEEDED"]
+    d=ok[0]["route"]["hops"][-1]["pub_key"][:8] if ok else "-"
+    print(f, time.strftime("%m-%d",time.gmtime(t)), p["value_sat"], int(p["fee_msat"])//1000, d, sep="|")
+'
+```
+
+Il saldo on-chain del nodo e la parte tenuta per i canali anchor (non
+lanciato: per lo studio non serviva):
+```bash
+cd ~/nodo && docker compose exec -T lnd lncli walletbalance
+```
+
+Nel commit c'è solo questa voce.
