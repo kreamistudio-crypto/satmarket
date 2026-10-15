@@ -137398,6 +137398,8 @@ out.phoenixHold = [html.indexOf('copiaHoldP2P()') < html.indexOf('phoenix-hold')
 /* ...e la riga «non riesco a controllare»: c'e', nascosta, sotto la frase e sopra il QR */
 out.mutoHold = [html.indexOf('id="p2pHoldMuto" style="display:none"') > 0,
   html.indexOf('id="p2pHoldMuto"') < html.indexOf('id="p2pHoldQr"')];
+/* «Hai circa» c'e' con la scadenza conosciuta (phoenix-blocca-sats-2) */
+out.haiCirca = html.indexOf('Hai circa 15 minuti.') > 0;
 out.holdViva = foto();
 p2pHoldModo = 'cauzione';
 renderHoldP2P();
@@ -137435,6 +137437,13 @@ const f = nodo('paySheet'), r = nodo('payScadeRiga'), t = nodo('payScade'), w = 
 out.mercatino = [vestiScadenzaFattura(f, r, t, w, V.T + 61), t.textContent, w.style.display, f.classList.contains('fattura-scaduta'),
   vestiScadenzaFattura(f, r, t, w, V.T - 1), t.textContent, w.style.display, f.classList.contains('fattura-scaduta'),
   vestiScadenzaFattura(f, r, t, w, 0), r.style.display, f.classList.contains('fattura-scaduta')];
+/* 6) senza scadenza (phoenix-blocca-sats-2): niente «Hai circa», niente riga */
+Date.now = () => V.T * 1000;
+righe.o1 = {id: 'o1', hold: {bolt11: 'robaccia', sats: 25000}};
+p2pHoldModo = 'hold';
+renderHoldP2P();
+out.senzaScadenza = [nodi.p2pHoldCorpo.innerHTML.indexOf('Hai circa') < 0,
+  nodi.p2pHoldCorpo.innerHTML.indexOf('Paga <b>25.000 sats</b>') >= 0, nodi.p2pHoldScadeRiga.style.display];
 console.log(JSON.stringify(out));
 """
     cart = _tf.mkdtemp(prefix="apri_wallet_")
@@ -137481,6 +137490,11 @@ console.log(JSON.stringify(out));
     v = o["holdMorta"]
     prova("una hold vecchia aperta adesso nasce gia' morta: lapide, porta sparita, nessun orologio",
           ["⌛ Fattura scaduta", "none", True, None], [v["testo"], v["wallet"], v["velo"], v["orologio"]])
+    prova("«Hai circa» c'e' quando la scadenza si conosce; senza scadenza ne' «Hai circa» "
+          "ne' riga del tempo, il resto del foglio si'",
+          [True, [True, True, "none"]], [o["haiCirca"], o["senzaScadenza"]])
+    prova("...e la condizione sta nel conto dei minuti, sulla scadenza del foglio", True,
+          "!(scadenzaFoglioP2P(o, 'hold') > 0) ? ''" in rh)
     prova("il pezzo comune sul foglio del mercatino: viva, morta, senza scadenza",
           [True, "⏱ Scade tra 1:01", "", False, False, "⌛ Fattura scaduta", "none", True, False, "none", False],
           o["mercatino"])
@@ -154871,6 +154885,65 @@ def prove_guardia_liquidita():
           [t for v in (v_ok, v_ko, v_nn) for k, _, t in v if k == "canale_uscita"])
     prova("...e a leva spenta non c'e', anche con un tetto scritto", ["entrata", "phoenix", "uscita"],
           sorted(esiti(voci(dict(n, tetto_p2p_sats=999999999, tetto_p2p_euro=250)))))
+    # --- la quinta domanda (15 ott 2026, phoenix-blocca-sats-2) ----------
+    prova("la quinta domanda nasce SPENTA", False, K["LIQUIDITA_ACINQ_TETTO"])
+
+    def con_tetti(c, loc, rem, sospesi=None):
+        c = dict(c, local_constraints=dict(c["local_constraints"], max_pending_amt_msat=str(loc)),
+                 remote_constraints=dict(c["remote_constraints"], max_pending_amt_msat=str(rem)))
+        if sospesi is not None:
+            c["pending_htlcs"] = sospesi
+        return c
+    # i numeri del 13 ott: ACINQ 1M con 337.845 di entrata e due garanzie
+    # appese (193.135 + 189.784), un HTLC in USCITA che non conta, uno storto
+    tredici = [con_tetti(canale(ACINQ, "ACINQ", 101, 400000, 391000, 9000, 4000),
+                         180000000, 396000000),
+               con_tetti(canale(ACINQ, "ACINQ", 102, 1000000, 269236, 347845, 10000),
+                         450000000, 990000000,
+                         [{"incoming": True, "amount": "193135"},
+                          {"incoming": True, "amount": "189784"},
+                          {"incoming": False, "amount": "5000"}, "storto"]),
+               sei[2]]
+    m = S["_numeri_liquidita"](tredici)
+    prova("i numeri del 13 ott: posto 67.081 sul canale grande (tetto 450.000, il piu' "
+          "piccolo dei due lati; appesi in arrivo 382.919), nessun tetto ignoto",
+          (67081, 450000, 382919, False),
+          (m["acinq_posto"], m["acinq_tetto"], m["acinq_appesi"], m["acinq_tetto_ignoto"]))
+    m2 = S["_numeri_liquidita"]([tredici[0], con_tetti(tredici[1], 450000000, 990000000, [])])
+    prova("...senza appesi il posto e' l'entrata spendibile, se e' lei la piu' piccola",
+          (337845, 450000, 0), (m2["acinq_posto"], m2["acinq_tetto"], m2["acinq_appesi"]))
+    prova("...i canali del 6 ott non hanno tetti: tutto ignoto, posto zero", (0, True),
+          (n["acinq_posto"], n["acinq_tetto_ignoto"]))
+    m3 = S["_numeri_liquidita"]([tredici[0], dict(tredici[1], active=False), sei[2]])
+    prova("...un canale ACINQ fuori linea non conta: resta il piccolo, coi suoi 5.000",
+          (5000, 180000), (m3["acinq_posto"], m3["acinq_tetto"]))
+
+    def quinta(nn, strada=None, **leve):
+        return [(e, t) for k, e, t in voci(nn, strada, LIQUIDITA_ACINQ_TETTO=True, **leve)
+                if k == "acinq_tetto"]
+    buona = {"esito": "ok", "costo": 734, "tetto": 1204, "da": "LNBiG [Hub-2]", "entra": 4830000}
+    prova("quinta accesa, i casi: posto sopra, strada buona, cara, stretta, nessuna, "
+          "non misurata, tetto ignoto",
+          [True, True, False, False, False, None, None],
+          [quinta(dict(m, acinq_posto=300000))[0][0], quinta(m, buona)[0][0],
+           quinta(m, dict(buona, esito="cara", costo=5000))[0][0],
+           quinta(m, dict(buona, esito="stretta", entra=120000))[0][0],
+           quinta(m, {"esito": "nessuna"})[0][0], quinta(m, None)[0][0],
+           quinta(dict(m, acinq_tetto_ignoto=True))[0][0]])
+    prova("...i testi: il posto coi suoi numeri, la strada da LNBiG, il «non lo so»",
+          ["✅ Tetto di ACINQ: dal canale diretto entrano solo 67.081 sats (tetto 450.000, appesi "
+           "382.919), ma 300.000 entrano da LNBiG [Hub-2] (costo 734 sats, Phoenix ne lascia 1.204).",
+           "⚠️ Tetto di ACINQ: dal canale diretto entrano solo 67.081 sats (tetto 450.000, appesi "
+           "382.919), e LND non trova un'altra strada da ACINQ per 300.000 sats.",
+           "❔ Tetto di ACINQ: non lo so (LND non dice il tetto dei pagamenti appesi di un canale ACINQ).",
+           "✅ Tetto di ACINQ: entrano ancora 337.845 sats dal canale diretto (tetto 450.000, appesi 0)."],
+          [quinta(m, buona)[0][1], quinta(m, {"esito": "nessuna"})[0][1],
+           quinta(dict(m, acinq_tetto_ignoto=True))[0][1], quinta(m2)[0][1]])
+    prova("...un posto sopra la soglia vince anche su un canale ignoto", True,
+          quinta(dict(m2, acinq_tetto_ignoto=True))[0][0])
+    prova("...a leva spenta, o senza la soglia di Phoenix, la quinta non c'e'", ([], []),
+          ([k for k, _, _ in voci(m, {"esito": "nessuna"}) if k == "acinq_tetto"],
+           quinta(m, {"esito": "nessuna"}, LIQUIDITA_PHOENIX_MIN=0)))
     exec("async " + pezzo("_tetto_p2p_in_sats"), S)
 
     def tetto_in_sats(euro, cambio):
@@ -155041,10 +155114,14 @@ def prove_guardia_liquidita():
     prova("i canali si chiedono coi nomi (la REST di serie non li da')",
           "/v1/channels?peer_alias_lookup=true", K["CANALI_LND"])
     quadro = codice(pezzo("_quadro_liquidita"))
-    prova("la strada si chiede a LND solo quando il canale diretto non basta",
-          True, 'if LIQUIDITA_PHOENIX_MIN and n["entra_acinq"] < '
-                "LIQUIDITA_PHOENIX_MIN:\n        strada = await _strada_phoenix("
-          in quadro)
+    prova("la strada si chiede a LND solo quando serve: il saldo di ACINQ sotto la "
+          "soglia, o (quinta accesa) il posto sotto i tetti, mai a tetto ignoto",
+          True, 'serve_strada = n["entra_acinq"] < LIQUIDITA_PHOENIX_MIN or (\n'
+                '        LIQUIDITA_ACINQ_TETTO and not n["acinq_tetto_ignoto"]\n'
+                '        and n["acinq_posto"] < LIQUIDITA_PHOENIX_MIN)\n'
+                "    if LIQUIDITA_PHOENIX_MIN and serve_strada:\n"
+                "        strada = await _strada_phoenix("
+          in quadro and quadro.count("_strada_phoenix(") == 1)
     prova("il cambio si chiede solo a quarta domanda accesa, prima del giudizio",
           True, "if LIQUIDITA_USCITA_CANALE:\n        n.update(await _tetto_p2p_in_sats())"
           in quadro and quadro.index("_tetto_p2p_in_sats()") < quadro.index("_giudizio_liquidita("))
@@ -155081,6 +155158,8 @@ def prove_guardia_liquidita():
            for m in [re.search(rf"^{k} = \w+", es, re.M)] if m])
     prova("config_esempio: anche la quarta domanda, spenta", True,
           re.search(r"^LIQUIDITA_USCITA_CANALE = False\b", es, re.M) is not None)
+    prova("config_esempio: anche la quinta, spenta", True,
+          re.search(r"^LIQUIDITA_ACINQ_TETTO = False\b", es, re.M) is not None)
 
     # --- la sonda del nodo (deploy/nodo/sonda-rotte.py) -------------------
     sonda = open(os.path.join(QUI, "deploy", "nodo", "sonda-rotte.py"),

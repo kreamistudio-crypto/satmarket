@@ -922,6 +922,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   canale con più uscita regge da solo un ordine al tetto
   `P2P_MAX_EURO`, al cambio del momento; con `P2P_MAX_EURO` a 0 è un
   «non so»),
+  `LIQUIDITA_ACINQ_TETTO = False` (True = la quinta domanda: il
+  tetto dei pagamenti appesi di ACINQ, 450k sul canale da 1M, lascia
+  entrare `LIQUIDITA_PHOENIX_MIN`? Se no, vale la strada via LNBiG;
+  si accende con la riga nel config e il riavvio, come le altre),
   `LIQUIDITA_PROMEMORIA_S = 86400`, `LIQUIDITA_OGNI_S = 3600`.
   Gli avvisi vanno agli stessi del guardiano del ponte
   (`GUARDIANO_PONTE_AVVISA`, o i moderatori).

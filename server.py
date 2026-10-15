@@ -68343,6 +68343,17 @@ def _incasso_del_motivo(motivo: str):
 #     intero da un canale. SPENTA di serie come l'uscita, e per lo
 #     stesso motivo. Senza tetto in euro o senza cambio e' un «non so»,
 #     mai un allarme.
+#  5) IL TETTO DEGLI APPESI DI ACINQ (15 ott 2026, cantiere
+#     phoenix-blocca-sats-2, `LIQUIDITA_ACINQ_TETTO`): Eclair non tiene
+#     appesi verso di noi piu' del PIU' PICCOLO dei due tetti del canale,
+#     il suo e il nostro (`max_pending_amt_msat` dei due lati: 450k sul
+#     canale da 1M), e una garanzia resta appesa per tutto lo scambio. Il
+#     posto e' il tetto meno gli HTLC in ARRIVO; quel che puo' entrare e'
+#     il piu' piccolo fra il posto e l'entrata spendibile; si prende il
+#     canale ACINQ migliore, contro `LIQUIDITA_PHOENIX_MIN`. Sotto, la
+#     stessa strada da ACINQ della domanda 2 (chiesta UNA volta per giro):
+#     se c'e', e' buona. Un canale ACINQ senza i due tetti e' un «non so».
+#     SPENTA di serie.
 # NIENTE RIPETIZIONI: un avviso quando una domanda passa da buona a
 # cattiva, uno quando tornano tutte buone, e in mezzo al massimo un
 # promemoria ogni `LIQUIDITA_PROMEMORIA_S`. Lo stato sta nei timbri
@@ -68379,6 +68390,10 @@ try:
     from config import LIQUIDITA_USCITA_CANALE
 except ImportError:
     LIQUIDITA_USCITA_CANALE = False   # la quarta domanda: spenta
+try:
+    from config import LIQUIDITA_ACINQ_TETTO
+except ImportError:
+    LIQUIDITA_ACINQ_TETTO = False     # la quinta domanda: spenta
 try:
     from config import LIQUIDITA_PROMEMORIA_S
 except ImportError:
@@ -68445,13 +68460,39 @@ def _numeri_liquidita(canali: list) -> dict:
                    .startswith(LIQUIDITA_PREFISSO_ACINQ)), "")
     # la quarta domanda: il canale in linea con piu' uscita spendibile
     piu = max(vivi, key=lambda c: _sats_canale(c, "local"), default=None)
+    # la quinta: per ogni canale ACINQ in linea il tetto degli appesi (il
+    # piu' piccolo dei due lati), quel che vi e' gia' appeso in ARRIVO, e
+    # quanto puo' ancora entrare; un canale senza tetti e' un «non so»
+    posti, tetto_ignoto = [], False
+    for c in acinq:
+        try:
+            tetto = min(int((c.get(lato + "_constraints") or {})
+                            .get("max_pending_amt_msat") or 0)
+                        for lato in ("local", "remote")) // 1000
+        except (TypeError, ValueError, AttributeError):
+            tetto = 0
+        if tetto <= 0:
+            tetto_ignoto = True
+            continue
+        appesi = 0
+        for h in c.get("pending_htlcs") or []:
+            try:
+                if h.get("incoming"):
+                    appesi += int(h.get("amount") or 0)
+            except (TypeError, ValueError, AttributeError):
+                pass
+        posti.append((min(max(0, tetto - appesi), _sats_canale(c, "remote")),
+                      tetto, appesi))
+    posto = max(posti) if posti else (0, 0, 0)
     return {"canali": len(canali), "vivi": len(vivi),
             "entra": sum(_sats_canale(c, "remote") for c in vivi),
             "esce": sum(_sats_canale(c, "local") for c in vivi),
             "entra_acinq": sum(_sats_canale(c, "remote") for c in acinq),
             "pk_acinq": chiave,
             "esce_max": _sats_canale(piu, "local") if piu else 0,
-            "esce_max_nome": _nome_canale(piu) if piu else ""}
+            "esce_max_nome": _nome_canale(piu) if piu else "",
+            "acinq_posto": posto[0], "acinq_tetto": posto[1],
+            "acinq_appesi": posto[2], "acinq_tetto_ignoto": tetto_ignoto}
 
 
 def _grafica_canali(canali: list) -> str:
@@ -68631,6 +68672,50 @@ def _giudizio_liquidita(n: dict, strada: dict | None) -> list:
                          f"❔ Da Phoenix: {diretto}. L'altra strada non "
                          "l'ho potuta misurare"
                          + (f" ({s['perche']})." if s.get("perche") else ".")))
+    # la quinta (15 ott 2026): il tetto degli appesi di ACINQ, con la
+    # stessa strada della seconda
+    if LIQUIDITA_ACINQ_TETTO and LIQUIDITA_PHOENIX_MIN:
+        serve = _fmt_sats(LIQUIDITA_PHOENIX_MIN)
+        posto = n.get("acinq_posto") or 0
+        diretto = (f"dal canale diretto entrano solo {_fmt_sats(posto)} sats "
+                   f"(tetto {_fmt_sats(n.get('acinq_tetto') or 0)}, appesi "
+                   f"{_fmt_sats(n.get('acinq_appesi') or 0)})")
+        s = strada or {}
+        if posto >= LIQUIDITA_PHOENIX_MIN:
+            voci.append(("acinq_tetto", True,
+                         f"✅ Tetto di ACINQ: entrano ancora {_fmt_sats(posto)} "
+                         f"sats dal canale diretto (tetto "
+                         f"{_fmt_sats(n.get('acinq_tetto') or 0)}, appesi "
+                         f"{_fmt_sats(n.get('acinq_appesi') or 0)})."))
+        elif n.get("acinq_tetto_ignoto"):
+            voci.append(("acinq_tetto", None,
+                         "❔ Tetto di ACINQ: non lo so (LND non dice il tetto "
+                         "dei pagamenti appesi di un canale ACINQ)."))
+        elif s.get("esito") == "ok":
+            voci.append(("acinq_tetto", True,
+                         f"✅ Tetto di ACINQ: {diretto}, ma {serve} entrano da "
+                         f"{s['da']} (costo {_fmt_sats(s['costo'])} sats, "
+                         f"Phoenix ne lascia {_fmt_sats(s['tetto'])})."))
+        elif s.get("esito") == "cara":
+            voci.append(("acinq_tetto", False,
+                         f"⚠️ Tetto di ACINQ: {diretto}, e l'altra strada, da "
+                         f"{s['da']}, costa {_fmt_sats(s['costo'])} sats: più "
+                         f"dei {_fmt_sats(s['tetto'])} che Phoenix lascia "
+                         f"spendere per {serve}."))
+        elif s.get("esito") == "stretta":
+            voci.append(("acinq_tetto", False,
+                         f"⚠️ Tetto di ACINQ: {diretto}, e l'altra strada arriva "
+                         f"da {s['da']}, che ha solo {_fmt_sats(s['entra'])} "
+                         f"sats di entrata: {serve} non passano."))
+        elif s.get("esito") == "nessuna":
+            voci.append(("acinq_tetto", False,
+                         f"⚠️ Tetto di ACINQ: {diretto}, e LND non trova "
+                         f"un'altra strada da ACINQ per {serve} sats."))
+        else:
+            voci.append(("acinq_tetto", None,
+                         f"❔ Tetto di ACINQ: {diretto}; l'altra strada non "
+                         "l'ho potuta misurare"
+                         + (f" ({s['perche']})." if s.get("perche") else ".")))
     if LIQUIDITA_USCITA_MIN:
         if n["esce"] >= LIQUIDITA_USCITA_MIN:
             voci.append(("uscita", True,
@@ -68798,7 +68883,12 @@ async def _quadro_liquidita() -> tuple:
     if LIQUIDITA_USCITA_CANALE:
         n.update(await _tetto_p2p_in_sats())
     strada = None
-    if LIQUIDITA_PHOENIX_MIN and n["entra_acinq"] < LIQUIDITA_PHOENIX_MIN:
+    # la strada si chiede UNA volta e serve a due domande: la seconda
+    # (il saldo di ACINQ) e la quinta (il tetto degli appesi, 15 ott 2026)
+    serve_strada = n["entra_acinq"] < LIQUIDITA_PHOENIX_MIN or (
+        LIQUIDITA_ACINQ_TETTO and not n["acinq_tetto_ignoto"]
+        and n["acinq_posto"] < LIQUIDITA_PHOENIX_MIN)
+    if LIQUIDITA_PHOENIX_MIN and serve_strada:
         strada = await _strada_phoenix(canali, LIQUIDITA_PHOENIX_MIN)
     return "ok", canali, _giudizio_liquidita(n, strada)
 

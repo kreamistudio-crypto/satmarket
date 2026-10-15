@@ -133,6 +133,9 @@ LIQUIDITA_USCITA_MIN = 0           # 0 = nessun minimo d'uscita
 LIQUIDITA_USCITA_CANALE = False    # True = il canale con piu' uscita
                                    # regge da solo un ordine al tetto
                                    # P2P_MAX_EURO (al cambio di adesso)
+LIQUIDITA_ACINQ_TETTO = False      # True = il tetto degli appesi di
+                                   # ACINQ (450k sul canale da 1M) lascia
+                                   # entrare LIQUIDITA_PHOENIX_MIN?
 LIQUIDITA_PROMEMORIA_S = 86400     # fra un promemoria e l'altro
 LIQUIDITA_OGNI_S = 3600            # ogni quanto guarda
 

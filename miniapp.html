@@ -63161,7 +63161,13 @@ function renderHoldP2P(){
      lettore del 38385, in infoDaEvento. */
   /* ...E A CHI HA PUBBLICATO IL SUO (12 ott 2026): `finestraMiaP2P`, e in
      parole dall'ora in su («circa 3 ore») */
-  const min = !(p2pInfo && p2pInfo.scadenzaSec > 0) ? ''
+  /* ...E SOLO SE LA SCADENZA SI CONOSCE (15 ott 2026, cantiere
+     phoenix-blocca-sats-2, richiesta di Andrea): senza la nascita della
+     bolt11 e senza l'arrivo della richiesta non si sa da quando conta il
+     tempo, e «Hai circa 30 minuti» sarebbe un numero inventato. La riga
+     «⏱ Scade tra», in quel caso, gia' non c'e' (`vestiScadenzaFattura`
+     con scadenza 0). */
+  const min = !(p2pInfo && p2pInfo.scadenzaSec > 0) || !(scadenzaFoglioP2P(o, 'hold') > 0) ? ''
     : typeof finestraMiaP2P === 'function' ? tempoParoleP2P(finestraMiaP2P(o))
     : Math.max(1, Math.round(p2pInfo.scadenzaSec / 60)) + ' minuti';
   box.innerHTML =

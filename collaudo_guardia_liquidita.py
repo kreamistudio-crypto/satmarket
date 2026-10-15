@@ -473,6 +473,50 @@ def main():
         prova("...il cambio torna a 100.000: rientrato", "rientrato", azione)
         amb["LIQUIDITA_USCITA_CANALE"] = False
 
+        # --- 8-ter. la quinta domanda (15 ott 2026) ------------------------
+        def con_tetti(cc, appesi_in=()):
+            fuori = []
+            for c in cc:
+                c = json.loads(json.dumps(c))
+                if c["remote_pubkey"] == ACINQ:
+                    cap = int(c["capacity"])
+                    c["local_constraints"]["max_pending_amt_msat"] = str(cap * 450)
+                    c["remote_constraints"]["max_pending_amt_msat"] = str(cap * 990)
+                    if c["chan_id"] == "333":
+                        c["pending_htlcs"] += [{"incoming": True, "amount": str(a)}
+                                               for a in appesi_in]
+                fuori.append(c)
+            return fuori
+        amb["LIQUIDITA_ACINQ_TETTO"] = True
+        SCENA.update(canali=con_tetti(canali()), strada="ok")
+        prima_strade = len(strade_chieste())
+        azione, nuovi = giro()
+        prova("quinta accesa, posto 429.000 sul canale grande: silenzio, e nessuna "
+              "strada chiesta", ("", [], 0),
+              (azione, nuovi, len(strade_chieste()) - prima_strade))
+        SCENA["canali"] = con_tetti(canali(), (200000,))
+        azione, nuovi = giro()
+        prova("...una garanzia da 200.000 appesa: posto 229.000, la strada da LNBiG "
+              "c'e' (chiesta UNA volta): silenzio", ("", [], 1),
+              (azione, nuovi, len(strade_chieste()) - prima_strade))
+        SCENA["strada"] = "nessuna"
+        azione, nuovi = giro()
+        prova("...e senza strada: ALLARME, col posto, il tetto e gli appesi",
+              ("allarme", True),
+              (azione, bool(nuovi) and "⚠️ Tetto di ACINQ: dal canale diretto entrano "
+               "solo 229.000 sats (tetto 450.000, appesi 221.000), e LND non trova "
+               "un'altra strada da ACINQ per 300.000 sats." in nuovi[0]))
+        SCENA["canali"] = canali()
+        azione, nuovi = giro()
+        prova("...LND smette di dire i tetti: un «non so», niente rientro e niente "
+              "allarme nuovo", ("", ["acinq_tetto"]),
+              (azione, json.loads(timbri["liquidita_stato"])["chiavi"]))
+        SCENA["canali"] = con_tetti(canali())
+        azione, nuovi = giro()
+        prova("...la garanzia si chiude: rientrato", "rientrato", azione)
+        SCENA.update(canali=canali(), strada="ok")
+        amb["LIQUIDITA_ACINQ_TETTO"] = False
+
         # --- 9. il journal -------------------------------------------------
         prova("nel journal una riga per ogni cambio, e mai il macaroon",
               (True, False),

@@ -30153,6 +30153,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   16 pezzi quando la fattura di chi riceve dichiara MPP (Mostro non
   passa `max_parts`); senza MPP esce intero da un canale. Il perché:
   CANTIERI, «Phoenix e i sats da bloccare».
+  5) IL TETTO DEGLI APPESI DI ACINQ (15 ott 2026,
+  `LIQUIDITA_ACINQ_TETTO`, SPENTA di serie) — Eclair non tiene appesi
+  verso di noi più del più piccolo dei due `max_pending_amt_msat` del
+  canale (450k sul canale da 1M), e una garanzia resta appesa per tutto
+  lo scambio. `_numeri_liquidita` dà per il canale ACINQ migliore il
+  posto (tetto meno HTLC in arrivo, non oltre l'entrata spendibile), il
+  tetto, gli appesi, e se un canale ACINQ non dice i tetti
+  (`acinq_tetto_ignoto`). Contro `LIQUIDITA_PHOENIX_MIN`: sopra è buona;
+  sotto vale la strada da ACINQ della domanda 2, chiesta UNA volta per
+  giro (`serve_strada` in `_quadro_liquidita`); senza tetti è un «non
+  so». Il perché: CANTIERI, «Il tetto degli appesi di ACINQ».
   Ogni voce è buona, cattiva, o NON MISURATA (`None`): la terza non
   allarma e non rassicura. GLI STATI stanno in `_liquidita_passo`
   (PURA) e nel timbro `liquidita_stato` (JSON: le chiavi cattive,
