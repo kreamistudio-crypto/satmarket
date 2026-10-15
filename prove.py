@@ -96294,12 +96294,84 @@ def prove_paycode_ripresa():
     prova("...e non mentre l'invio automatico lo sta mandando", "", o["rigaInCorso"])
     prova("la frase di stato: «sta partendo» in corso, la riga se non e' partito, «chi compra ha il PayCode» se lo e'",
           ["I tuoi sats sono bloccati. Il PayCode sta partendo da solo verso chi compra.", RIGA,
-           "I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato»."],
+           "I tuoi sats sono bloccati. Chi compra paga al tabacchino col tuo PayCode e segna «pagato»: poi controlli su Amazon e liberi i sats."],
           [o["statoInCorso"], o["statoNonPartito"], o["statoPartito"]])
     prova("l'avviso a garanzia bloccata: col PayCode «manda il PayCode», poi come ieri",
           ["Garanzia bloccata ✓: ora manda il PayCode a chi compra",
            "Garanzia bloccata ✓: aspetta gli euro",
            "Garanzia bloccata ✓: ora indica dove ricevere gli euro"], o["passo"])
+
+
+def prove_paycode_testi():
+    """I TESTI DEL PAYCODE (15 ott 2026, cantiere paycode-testi, testi
+    approvati da Andrea parola per parola). Negli ordini Barattozon:
+    chi vende, a PayCode partito, non legge piu' «Chi compra deve
+    inviarti gli euro» ma il gesto vero (il tabacchino, poi Amazon, poi
+    il rilascio); su Telegram chi compra legge «appena ti manda il
+    PayCode», non «dove inviare 39,99 €»; e il foglio di chi vende e la
+    sua porta si chiamano PayCode. Gli ordini degli altri metodi restano
+    com'erano. Il foglio sta in prove_recapito_corto (girato vero)."""
+    print("\n[i testi del PayCode]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LA RIGA D'ATTESA e LA PORTA, girate vere in node
+    js = (
+        "const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];\n"
+        "const azioniDisponibili = () => '';\n"
+        "const nomeControparteP2P = (o, r) => r;\n"
+        "const pagaInContantiP2P = o => (o.metodi || []).indexOf('Contanti') >= 0;\n"
+        + re.search(r"const P2P_TABACCHINO = [^\n]+", mini).group(0) + "\n"
+        + re.search(r"const P2P_TABACCHINO_PM = [^\n]+", mini).group(0) + "\n"
+        + pezzo_js(mini, "function metodoBaseP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function tabacchinoP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function attesaAltraParteP2P(o){", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function campiOrdineP2P(o){", "\n}\n") + "\n}\n"
+        + r"""
+const T = 'Contanti al tabacchino 39.99';
+const riga = (lato, metodo) => attesaAltraParteP2P({lato, stato: 'attivo', metodi: [metodo]});
+const porta = (lato, metodo) => campiOrdineP2P({lato, metodi: [metodo]}).replace(/<[^>]+>/g, '');
+console.log(JSON.stringify({
+  righe: [riga('vendo', T), riga('vendo', 'Bonifico SEPA'), riga('vendo', 'Contanti'), riga('compro', T)],
+  porte: [porta('vendo', T), porta('vendo', 'Bonifico SEPA'), porta('compro', T)]
+}));
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("la riga d'attesa e la porta girate in node", "node non c'e'")
+    else:
+        prova("la riga d'attesa di chi vende col PayCode partito dice il tabacchino; gli altri come ieri",
+              [{"chi": "chi compra", "cosa": "deve pagare il tuo PayCode al tabacchino"},
+               {"chi": "chi compra", "cosa": "deve inviarti gli euro"},
+               {"chi": "chi compra", "cosa": "deve consegnarti i contanti"},
+               {"chi": "chi vende", "cosa": "deve mandarti il PayCode"}], out["righe"])
+        prova("la porta del foglio: «🧾 Il PayCode» solo a chi vende un Barattozon",
+              ["🧾 Il PayCode", "🤝 I vostri recapiti", "🤝 I vostri recapiti"], out["porte"])
+    prova("il riquadro dello stato a PayCode partito: il tabacchino, Amazon, il rilascio",
+          [2, 0],
+          [mini.count("'I tuoi sats sono bloccati. Chi compra paga al tabacchino col tuo PayCode e segna "
+                      "«pagato»: poi controlli su Amazon e liberi i sats.'"),
+           mini.count("Chi compra ha il PayCode: aspetta che vada al tabacchino")])
+
+    # --- 2) TELEGRAM A CHI COMPRA, a garanzia bloccata
+    con, amb = _banco_eventi_p2p()
+    con.close()
+    testo = amb["_testo_evento_p2p"]
+    dati = {"sats": 55000, "euro": "39,99 €", "metodi": "Contanti al tabacchino",
+            "tabacchino": True}
+    prova("Telegram a chi compra, PayCode non ancora arrivato: «appena ti manda il PayCode»",
+          "🔒 <b>Bruno ha bloccato i sats in garanzia.</b> Appena ti manda il PayCode, tocca a te.",
+          testo("garanzia_pagata", "active", "compra", dati, nome="Bruno"))
+    prova("...PayCode gia' arrivato: «ti ha gia' mandato il PayCode»",
+          "🔒 <b>Bruno ha bloccato i sats in garanzia e ti ha già mandato il PayCode:</b> tocca a te.",
+          testo("garanzia_pagata", "active", "compra", dict(dati, recapito_detto=True), nome="Bruno"))
+    prova("...e senza nome «Chi vende»", True,
+          testo("garanzia_pagata", "active", "compra", dati)
+          .startswith("🔒 <b>Chi vende ha bloccato i sats in garanzia.</b>"))
+    prova("...e senza il timbro Barattozon le frasi degli euro, come ieri",
+          ["🔒 <b>Bruno ha bloccato i sats in garanzia.</b> Appena ti indica dove inviare 39,99 €, tocca a te.",
+           "🔒 <b>Bruno ha bloccato i sats in garanzia e ti ha già indicato dove inviare 39,99 €:</b> tocca a te."],
+          [testo("garanzia_pagata", "active", "compra", dict(dati, tabacchino=False), nome="Bruno"),
+           testo("garanzia_pagata", "active", "compra", dict(dati, tabacchino=False, recapito_detto=True), nome="Bruno")])
 
 
 def prove_scambi_ovunque():
@@ -122216,10 +122288,12 @@ def prove_ritocchi_scambio():
           in fn("function statoTestoP2P(o){")
           and "recapito: '<button class=\"btn orange\" onclick=\"apriCampiP2P()\">"
               "💶 Indica dove ricevere gli euro</button>'" in mini)
+    # (15 ott 2026, paycode-testi) a chi vende un Barattozon la porta
+    # si chiama «🧾 Il PayCode»: resta il suo bottone e basta
     prova("...e la porta dei recapiti e' il suo bottone e basta", True,
-          co.split("{", 1)[1].strip().startswith(
-              "return '<button class=\"btn ghost\" onclick=\"apriCampiP2P()\">"
-              "🤝 I vostri recapiti'"))
+          re.sub(r"/\*[\s\S]*?\*/", "", co.split("{", 1)[1]).strip().startswith(
+              "return '<button class=\"btn ghost\" onclick=\"apriCampiP2P()\">'")
+          and "? '🧾 Il PayCode' : '🤝 I vostri recapiti')" in co)
 
     # --- 2) IL RECAPITO SOTTO IL SUO BOTTONE, COL SUO «COPIA» ----------
     ren = fn("function renderOrdineP2P(){")
@@ -135011,6 +135085,10 @@ def prove_contanti_a_mano():
               f["contanti"])
         prova("...con un metodo senza appuntamento al server non va niente",
               ["recapito", "ricordo", "toast:Recapito inviato a chi compra ✓"], f["sepa"])
+        # (16 ott 2026, paycode-testi) col PayCode l'avviso dice PayCode,
+        # e niente resta ricordato
+        prova("...e col Barattozon l'avviso dice «PayCode inviato a chi compra ✓»",
+              ["recapito", "toast:PayCode inviato a chi compra ✓"], f["tabacchino"])
         prova("...se il recapito non parte non parte nemmeno l'appuntamento, e il foglio lo dice",
               ["recapito", "toast:Non è partito: relay giù"], f["fallito"])
         prova("...e un server che non risponde non ferma il foglio (il tetto dei sei secondi)", ok_contanti, f["muto"])
@@ -135061,6 +135139,14 @@ function registraAppuntamentoP2P(id){
 function ricordaRecapito(){ registro.push('ricordo'); }
 function scriviOrdineP2P(){}
 function renderCampiP2P(){}
+/* il foglio del Barattozon (16 ott 2026): i giudici del PayCode, della
+   data e dell'importo hanno le loro prove; qui dicono si' */
+function payCodeP2P(v){ return '479-868-518'; }
+function leggiDataTabacchinoP2P(v){ return 1790000000; }
+function dataTabacchinoP2P(t){ return '17/09/2026 alle 14:30'; }
+function centesimiP2P(v){ return {n: 39.99}; }
+function giudiceImportoPayCodeP2P(n){ return ''; }
+function centesimiTestoP2P(n){ return '39,99'; }
 /* il tetto dei sei secondi senza aspettarli: il timer scatta subito */
 const setTimeout = f => f();
 __PEZZI__
@@ -135068,8 +135154,12 @@ const CONTANTI = {forma: 'contanti', appuntamento: true, componi: c => c.luogo +
   campi: [{k: 'luogo', et: 'Dove'}, {k: 'punto', et: 'Punto', facoltativo: true},
           {k: 'quando', et: 'Quando', tipo: 'datetime-local', nonRicordato: true}]};
 const SEPA = {forma: 'sepa', componi: c => 'IBAN: ' + c.iban, campi: [{k: 'iban', et: 'IBAN'}]};
+const TAB = {forma: 'tabacchino', ricorda: false,
+  componi: c => 'Contanti al tabacchino\nPayCode: ' + c.ordine + '\nImporto: ' + c.importo + ' €\nScade: ' + c.scade,
+  campi: [{k: 'ordine', et: 'PayCode'}, {k: 'importo', et: 'Importo'}, {k: 'scade', et: 'Scade'}]};
 Object.assign(CAMPI, {luogo: 'Piazza Castello, Torino', punto: 'i:45.07095,7.68591',
-                      quando: '2026-10-04T18:30', iban: 'IT60 X054 2811 1010 0000 0123 456'});
+                      quando: '2026-10-04T18:30', iban: 'IT60 X054 2811 1010 0000 0123 456',
+                      ordine: '479868518', importo: '39,99', scade: '17/09/2026 alle 14:30'});
 async function giro(forma, opz){
   FORMA = forma; inviaFallisce = !!opz.fallisce; serverMuto = !!opz.muto; registro.length = 0;
   await inviaCampoP2P('euro', null);
@@ -135079,6 +135169,7 @@ async function giro(forma, opz){
   const out = {};
   out.contanti = await giro(CONTANTI, {});
   out.sepa = await giro(SEPA, {});
+  out.tabacchino = await giro(TAB, {});
   out.fallito = await giro(CONTANTI, {fallisce: true});
   out.muto = await giro(CONTANTI, {muto: true});
   const P = (g, mia, altra) => ({giro: g, mia: mia, altra: altra});
@@ -143533,8 +143624,8 @@ def prove_recapito_corto():
         "const CAMPO_MAX_TESTO = 600;\n"
         "let ORD = {};\n"
         "const ordiniP2P = () => ({x: ORD});\n"
-        "const box = {innerHTML: ''};\n"
-        "const el = id => id === 'p2pCampiCorpo' ? box : null;\n"
+        "const box = {innerHTML: ''}, tit = {textContent: '🤝 I vostri recapiti'};\n"
+        "const el = id => id === 'p2pCampiCorpo' ? box : id === 'p2pCampiTit' ? tit : null;\n"
         "const document = {querySelectorAll: () => []};\n"
         "const esc = s => String(s);\n"
         "const recapitiMiei = () => ({});\n"
@@ -143551,9 +143642,16 @@ def prove_recapito_corto():
         + pezzo_js(mini, "const P2P_FORME_RECAPITO = [", "\n];\n") + "\n];\n"
         + pezzo_js(mini, "function formaRecapito(metodo){", "\n}\n") + "\n}\n"
         + pezzo_js(mini, "function metodoRecapitoScelto(o){", "\n}\n") + "\n}\n"
+        # (15 ott 2026) il giudice VERO del Barattozon: senza, il banco
+        # proverebbe il foglio dei recapiti anche sul tabacchino
+        + re.search(r"const P2P_TABACCHINO = [^\n]+", mini).group(0) + "\n"
+        + re.search(r"const P2P_TABACCHINO_PM = [^\n]+", mini).group(0) + "\n"
+        + pezzo_js(mini, "function metodoBaseP2P(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function tabacchinoP2P(", "\n}\n") + "\n}\n"
         + rc + "\n}\n" + r"""
 const righe = () => (box.innerHTML.match(/<div class="hint">[^]*?<\/div>/g) || [])
   .map(r => r.replace(/<[^>]+>/g, ''));
+const testa = () => [tit.textContent, ((box.innerHTML.match(/<button class="btn orange"[^>]*>([^<]*)<\/button>/) || [])[1] || '')];
 const giro = (lato, metodo, inviato, loro) => {
   ORD = {lato, metodi: [metodo], campiMiei: inviato ? {euro: {testo: 'x'}} : {},
          campiLoro: loro ? {euro: {testo: 'IBAN: IT00'}} : {}, peer: 'p'};
@@ -143565,6 +143663,13 @@ for (const m of ['Bonifico SEPA', 'Revolut', 'Satispay', 'PayPal', 'Lightning in
                  'Contanti di persona', 'Contanti al tabacchino'])
   out[m] = [giro('vendo', m, false), giro('vendo', m, true)];
 out.compro = [giro('compro', 'Bonifico SEPA', false, false), giro('compro', 'Bonifico SEPA', false, true)];
+out.teste = {};
+for (const [lato, m, inv] of [['vendo', 'Contanti al tabacchino', false], ['vendo', 'Contanti al tabacchino', true],
+                              ['vendo', 'Bonifico SEPA', false], ['vendo', 'Bonifico SEPA', true],
+                              ['compro', 'Contanti al tabacchino', false]]) {
+  giro(lato, m, inv);
+  out.teste[lato + '|' + m + '|' + inv] = testa();
+}
 console.log(JSON.stringify(out));
 """)
     out = _node_banco(js)
@@ -143591,9 +143696,20 @@ console.log(JSON.stringify(out));
           out.get(m))
     m = "Contanti al tabacchino"
     lucc = LUCC + " Non resta salvato: ogni PayCode vale una volta sola."
-    prova("il tabacchino: non resta salvato niente; dopo l'invio «✓ Recapito inviato»",
+    # (15 ott 2026, paycode-testi, testi approvati da Andrea) col PayCode
+    # la riga dopo l'invio dice «PayCode», non «Recapito»
+    OK_PC = ("✓ PayCode inviato. Se lo cambi, vale l'ultimo: cambialo solo se chi "
+             "compra non ha ancora pagato.")
+    prova("il tabacchino: non resta salvato niente; dopo l'invio «✓ PayCode inviato»",
           [[f"💶 Il metodo dello scambio è {m}.", lucc, AVV],
-           [f"💶 Il metodo dello scambio è {m}.", OK, lucc, AVV]], out.get(m))
+           [f"💶 Il metodo dello scambio è {m}.", OK_PC, lucc, AVV]], out.get(m))
+    prova("il foglio del PayCode, a chi vende: titolo e bottone da PayCode; gli altri come ieri",
+          {"vendo|Contanti al tabacchino|false": ["🧾 Il PayCode per chi compra", "🧾 Manda il PayCode a chi compra"],
+           "vendo|Contanti al tabacchino|true": ["🧾 Il PayCode per chi compra", "🧾 Aggiorna il PayCode"],
+           "vendo|Bonifico SEPA|false": ["🤝 I vostri recapiti", "💶 Invia a chi compra"],
+           "vendo|Bonifico SEPA|true": ["🤝 I vostri recapiti", "💶 Aggiorna il recapito"],
+           "compro|Contanti al tabacchino|false": ["🤝 I vostri recapiti", ""]},
+          out.get("teste"))
     prova("chi compra: la prima riga com'era, poi il 🔒 senza coda e il ⚠️ senza «password»",
           [["💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.",
             LUCC, "⚠️ Quello che vi dite fuori da Barattolo non conta in caso di disputa."],
@@ -143602,12 +143718,12 @@ console.log(JSON.stringify(out));
     vecchie = ("I recapiti viaggiano cifrati", "🔓 Fuori da Barattolo", "📌 Resta ricordato",
                "🧾 Non resta ricordato", "✓ Inviato: l'ultimo")
     prova("...e delle righe di prima non ne resta nessuna, in nessun ramo", [],
-          [r for x in out.values() for y in x for r in y if r.startswith(vecchie)])
+          [r for k, x in out.items() if k != "teste" for y in x for r in y if r.startswith(vecchie)])
     prova("LA RIGA ONESTA resta gemella in ogni ramo: il 🔒 e subito dopo il ⚠️, in coda", True,
           all(len(y) >= 2 and y[-2].startswith("🔒") and "nemmeno Barattolo" in y[-2]
               and y[-1].startswith("⚠️") and y[-1].endswith(
                   "fuori da Barattolo non conta in caso di disputa.")
-              for x in out.values() for y in x))
+              for k, x in out.items() if k != "teste" for y in x))
 
 
 def prove_causale_sepa():
@@ -164171,6 +164287,7 @@ def main():
     prove_chat_scambio,
     prove_paycode_riconosciuto,
     prove_paycode_ripresa,
+    prove_paycode_testi,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_avvisi_precisi,
     prove_p2p_recapito_passo,

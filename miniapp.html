@@ -59645,7 +59645,11 @@ function attesaAltraParteP2P(o){
     ? (contanti ? 'deve indicarti dove e quando vedervi'
        : (typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi)) ? 'deve mandarti il PayCode'
        : 'deve indicarti dove inviare gli euro')
-    : contanti ? 'deve consegnarti i contanti' : 'deve inviarti gli euro';
+    : contanti ? 'deve consegnarti i contanti'
+    /* ...e a chi vende col PayCode partito (15 ott 2026, paycode-testi):
+       gli euro non arrivano, si pagano al tabacchino */
+    : (typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi)) ? 'deve pagare il tuo PayCode al tabacchino'
+    : 'deve inviarti gli euro';
   else if (s === 'euro_inviati') cosa = contanti
     ? 'deve contare i contanti e liberare i sats' : 'deve controllare gli euro e liberare i sats';
   else if (s === 'fattura_nuova') cosa = 'deve dare una fattura nuova';
@@ -62147,7 +62151,10 @@ function serveRecapitiP2P(o){
      dove ricevere gli euro»), e la terza copia della stessa frase, in
      fondo alla pagina, era rumore. */
 function campiOrdineP2P(o){
-  return '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
+  /* a chi vende un Barattozon il foglio e' quello del PayCode (15 ott 2026) */
+  return '<button class="btn ghost" onclick="apriCampiP2P()">'
+    + ((o.lato === 'vendo' && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
+       ? '🧾 Il PayCode' : '🤝 I vostri recapiti')
     + (o.campiNuovi ? ' <b>(novità)</b>' : '') + '</button>';
 }
 /* ---- IL RECAPITO A CHI COMPRA, SOTTO IL SUO BOTTONE (23 set 2026,
@@ -62469,11 +62476,11 @@ function statoPayCodeP2P(o){
        scambio 101e20d6): prima la frase lo dava per fatto, sotto un
        «tocca a te» che chiedeva proprio quello */
     : {t: 'Sats in garanzia', d: (o.campiMiei || {}).euro
-        ? 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'
+        ? 'I tuoi sats sono bloccati. Chi compra paga al tabacchino col tuo PayCode e segna «pagato»: poi controlli su Amazon e liberi i sats.'
         : (typeof p2pAutoInCorso !== 'undefined' && p2pAutoInCorso[o.id])
           ? 'I tuoi sats sono bloccati. Il PayCode sta partendo da solo verso chi compra.'
         : (typeof payCodeDaMandareP2P === 'function' && payCodeDaMandareP2P(o))
-          || 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'};
+          || 'I tuoi sats sono bloccati. Chi compra paga al tabacchino col tuo PayCode e segna «pagato»: poi controlli su Amazon e liberi i sats.'};
   if (o.stato === 'euro_inviati') return compro
     ? {t: 'PayCode pagato', d: 'Hai detto di aver pagato al tabacchino. Chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats: tieni lo scontrino, è la tua prova.'}
     : {t: 'PayCode pagato: controlla su Amazon', d: 'Chi compra dice di aver pagato alla cassa. Apri Amazon e guarda se l\'ordine risulta saldato: nessuno lo controlla al posto tuo, e i sats non si liberano da soli.'};
@@ -71511,6 +71518,12 @@ function renderCampiP2P(){
   if (!box || !o) return;
   const miei = o.campiMiei || {}, loro = o.campiLoro || {};
   const vende = o.lato === 'vendo';
+  /* IL FOGLIO DEL PAYCODE HA IL SUO NOME (15 ott 2026, paycode-testi,
+     testi approvati da Andrea): a chi vende un Barattozon il foglio non
+     e' «i vostri recapiti», e' il PayCode da mandare */
+  const payCodeVendo = vende && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi);
+  const tit = el('p2pCampiTit');
+  if (tit) tit.textContent = payCodeVendo ? '🧾 Il PayCode per chi compra' : '🤝 I vostri recapiti';
   /* quel che si stava scrivendo sopravvive al ridisegno, e i valori
      entrano col .value: mai interpolati — il patto del codice segreto */
   const scritti = {};
@@ -71575,6 +71588,10 @@ function renderCampiP2P(){
         ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">📍 ' +
           (miei.euro ? 'Aggiorna l\'appuntamento' : 'Invia a chi compra') + '</button>' +
           (miei.euro ? '<div class="hint">✓ Appuntamento inviato. Se lo cambi, vale l\'ultimo e chi compra viene avvisato.</div>' : '')
+        : payCodeVendo
+        ? '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">🧾 ' +
+          (miei.euro ? 'Aggiorna il PayCode' : 'Manda il PayCode a chi compra') + '</button>' +
+          (miei.euro ? '<div class="hint">✓ PayCode inviato. Se lo cambi, vale l\'ultimo: cambialo solo se chi compra non ha ancora pagato.</div>' : '')
         : '<button class="btn orange" onclick="inviaCampoP2P(\'euro\', this)">💶 ' +
           (miei.euro ? 'Aggiorna il recapito' : 'Invia a chi compra') + '</button>' +
           (miei.euro ? '<div class="hint">✓ Recapito inviato. Se lo cambi, vale l\'ultimo: cambialo solo se chi compra non ha ancora pagato.</div>' : ''));
@@ -71747,8 +71764,11 @@ async function inviaCampoP2P(tipo, btn){
   /* e' partito davvero, preso in consegna: si torna a «I miei scambi» se il
      passo dopo non e' mio (1 ott 2026). Fuori dal `try`: il recapito e'
      partito, e niente di quel che succede dopo puo' dire «non e' partito» */
+  /* ...e col PayCode l'avviso dice PayCode (16 ott 2026, paycode-testi,
+     testo di Andrea): `tabRiga` c'e' solo sul foglio del Barattozon */
   if (!(typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id)))
-    toast(appuntamento ? 'Appuntamento inviato a chi compra ✓' : 'Recapito inviato a chi compra ✓');
+    toast(appuntamento ? 'Appuntamento inviato a chi compra ✓'
+          : tabRiga ? 'PayCode inviato a chi compra ✓' : 'Recapito inviato a chi compra ✓');
 }
 
 /* ---- la disputa ----

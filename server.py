@@ -57306,6 +57306,14 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         return (f"🔒 <b>Garanzia bloccata ✓:</b> appena {l_altro} indica dove "
                 "ricevere i sats, tocca a te indicare dove ricevere gli euro.")
     if momento == "garanzia_pagata":
+        # COL PAYCODE a chi compra non arriva un recapito ma il PayCode
+        # (15 ott 2026, paycode-testi, testi approvati da Andrea)
+        if dettaglio == "active" and paycode and detto:
+            return (f"🔒 <b>{altro} ha bloccato i sats in garanzia e ti ha già "
+                    "mandato il PayCode:</b> tocca a te.")
+        if dettaglio == "active" and paycode:
+            return (f"🔒 <b>{altro} ha bloccato i sats in garanzia.</b> Appena "
+                    "ti manda il PayCode, tocca a te.")
         if dettaglio == "active" and detto:
             return (f"🔒 <b>{altro} ha bloccato i sats in garanzia e ti ha già "
                     f"indicato dove inviare {cifra or 'gli euro'}:</b> tocca a te.")

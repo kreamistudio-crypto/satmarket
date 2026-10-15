@@ -1082,8 +1082,11 @@ disputa.»
    Barattolo») e il bottone «🧾 Mandalo da qui lo stesso» → «Mandare il
    PayCode a mano?».
 6. Si blocca la garanzia come in §3. Stato «**Sats in garanzia**» «I tuoi
-   sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al
-   tabacchino e segni «pagato».»
+   sats sono bloccati. Chi compra paga al tabacchino col tuo PayCode e
+   segna «pagato»: poi controlli su Amazon e liberi i sats.», con la riga
+   «✋ Aspetta · Chi compra deve pagare il tuo PayCode al tabacchino» (dal
+   15 ott 2026; prima «…deve inviarti gli euro»). Il bottone grigio che
+   riapre il foglio è «🧾 **Il PayCode**».
    ⚠️ Se il PayCode NON è partito (dal 15 ott 2026: l'app era chiusa
    quando l'ordine è stato preso, per esempio la garanzia pagata da
    Phoenix): riaprendo l'app parte da solo, dopo qualche secondo («Il
@@ -1091,8 +1094,12 @@ disputa.»
    Se non può partire da solo (un altro dispositivo, o il server non sa
    ancora chi ha preso): «👉 tocca a te» con «Il PayCode non è ancora
    arrivato a chi compra: toccalo qui sotto per mandarlo.» e il bottone
-   «🧾 **Manda il PayCode a chi compra**», che apre il foglio coi tre
-   campi (PayCode, importo, scadenza) e «Invia a chi compra». ✈️ A
+   «🧾 **Manda il PayCode a chi compra**», che apre il foglio «🧾 **Il
+   PayCode per chi compra**» coi tre campi (PayCode, importo, scadenza) e
+   lo stesso bottone «🧾 Manda il PayCode a chi compra»; dopo l'invio il
+   bottone è «🧾 Aggiorna il PayCode» e sotto «✓ PayCode inviato. Se lo
+   cambi, vale l'ultimo: cambialo solo se chi compra non ha ancora
+   pagato.» ✈️ A
    garanzia bloccata: «🔒 **Garanzia bloccata ✓:** ora manda il PayCode
    a chi compra: tocca «🧾 Manda il PayCode a chi compra» nella pagina
    dello scambio.»
@@ -1130,7 +1137,11 @@ disputa.»
    e non ricevi i sats.» Passi: «Indichi dove
    ricevere i sats» → «Chi vende li mette in garanzia» → «Paghi il PayCode
    al tabacchino» → «I sats arrivano a te».
-2. 🧑 Compra, dà l'indirizzo sats (come §2b). 📱 Il riquadro «🧾 Il PayCode
+2. 🧑 Compra, dà l'indirizzo sats (come §2b). ✈️ A garanzia bloccata: «🔒
+   **<nome> ha bloccato i sats in garanzia.** Appena ti manda il PayCode,
+   tocca a te.» (o, se è già arrivato, «🔒 **<nome> ha bloccato i sats in
+   garanzia e ti ha già mandato il PayCode:** tocca a te.»; dal 15 ott
+   2026, prima «…dove inviare 25,47 €»). 📱 Il riquadro «🧾 Il PayCode
    da pagare al tabacchino» compare con codice (e «📋»: «PayCode copiato
    📋»), «Importo 25,47 € in contanti», «Scade il …», «Tempo che resta:
    <conto>», e i quattro passi, NUMERATI da 1 a 4 (dal 10 ott 2026: dove

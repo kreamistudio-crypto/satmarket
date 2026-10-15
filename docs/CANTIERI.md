@@ -59976,3 +59976,60 @@ qualcuno». Toccarne uno solo sarebbe diventato rosso, ed è il modo in cui
 questa coppia di sentinelle fa il suo lavoro. La voce delle tre
 destinazioni — i comandi, chi filtra l'@username e chi no, e perché il
 vuoto RIPIEGA sul riepilogo ma non sugli altri due — sta in PRODUZIONE.
+
+## I testi del PayCode (15 ott 2026, cantiere paycode-testi, testi approvati da Andrea)
+
+I tre «da fare» dei testi lasciati dal cantiere «Il PayCode che non è
+partito riparte», negli ordini Barattozon e SOLO lì (gli altri metodi
+restano com'erano, e le prove lo dicono). I testi sono di Andrea,
+approvati riga per riga prima del codice.
+- Chi vende, a PayCode partito: il riquadro dello stato «I tuoi sats
+  sono bloccati. Chi compra paga al tabacchino col tuo PayCode e segna
+  «pagato»: poi controlli su Amazon e liberi i sats.» (prima «Chi compra
+  ha il PayCode: aspetta che vada al tabacchino…»); la riga d'attesa
+  «Chi compra deve pagare il tuo PayCode al tabacchino» (prima «…deve
+  inviarti gli euro», `attesaAltraParteP2P`).
+- Telegram a chi compra a garanzia bloccata (`_testo_evento_p2p`):
+  «🔒 <nome> ha bloccato i sats in garanzia. Appena ti manda il PayCode,
+  tocca a te.» e, col PayCode già arrivato, «…e ti ha già mandato il
+  PayCode: tocca a te.» (prima «…dove inviare 39,99 €»).
+- Il foglio di chi vende (`renderCampiP2P`): titolo «🧾 Il PayCode per
+  chi compra» (il titolo del foglio si scrive a ogni render, e torna «🤝
+  I vostri recapiti» per tutti gli altri), bottone «🧾 Manda il PayCode
+  a chi compra», dopo l'invio «🧾 Aggiorna il PayCode» con «✓ PayCode
+  inviato. Se lo cambi, vale l'ultimo: cambialo solo se chi compra non
+  ha ancora pagato.»; e la sua porta grigia nella pagina
+  (`campiOrdineP2P`) «🧾 Il PayCode». A chi COMPRA un Barattozon il
+  foglio e la porta restano «🤝 I vostri recapiti»: il foglio, per lui,
+  non è quello del PayCode.
+
+**PROVATO.** `prove_paycode_testi` (nuova): la riga d'attesa e la porta
+girate vere in node coi giudici veri del Barattozon, le quattro frasi
+di Telegram (col nome, senza nome, senza il timbro come ieri).
+`prove_recapito_corto` ora porta nel suo banco il VERO `tabacchinoP2P`:
+prima il ramo del tabacchino girava senza, e avrebbe provato il foglio
+dei recapiti anche lì; in più titolo e bottone per metodo e per lato.
+Le sentinelle che citavano i testi di prima sono aggiornate
+(`prove_paycode_ripresa`, la porta in `prove_ritocchi_scambio`). Tortura:
+quattro mutazioni (la riga d'attesa, il foglio, la porta, Telegram),
+quattro prese. Sul cantiere sopra 3b85a11: la suite intera
+(`PROVE_SEVERE=1`) 24.403 passate e 0 fallite, i collaudi della CI in
+gabbia 81 su 81. Poi ribasato sopra 090e1b9, dove main aveva di nuovo
+gli otto commit di Alan (334e92c rovescia il revert 96270e4) e la CI
+rossa per conto suo (10 rosse: `link_telegram`, il censimento di
+`notifica_admin`, i tre invii al canale): lì sono rigirate le 52
+sezioni che citano i testi, il foglio, la riga d'attesa, lo stato e
+`scriviOrdineP2P` (4.300 passate, 0 fallite) e sette collaudi del P2P
+(avvisi in ordine, PayCode riconosciuto, solleciti, pagamento,
+recapito aggiornato, contanti, foglio pagato): verdi. Il 16 ott, col
+toast, ribasato sopra fa4ec13 (main di nuovo verde: il cantiere
+«fix-test-rossi» di Alan): lì le 40 sezioni toccate (3.581 passate, 0
+fallite) e gli stessi sette collaudi, verdi. Il resto lo fa la CI.
+
+**IL TOAST (16 ott 2026, chiesto da Andrea nello stesso cantiere).** Dopo
+l'invio dal foglio del Barattozon l'avviso è «PayCode inviato a chi
+compra ✓» (prima «Recapito inviato…»; gli altri metodi come sono). Lo
+decide `tabRiga`, che c'è solo sul foglio del PayCode. Provato nel banco
+che esegue il VERO `inviaCampoP2P` (`prove_contanti_a_mano`, ora anche
+col foglio del tabacchino: recapito partito, niente ricordo, il toast
+nuovo); la mutazione che lo spegne è presa.
