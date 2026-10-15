@@ -58077,7 +58077,28 @@ e Andrea lo controlla prima di lanciarlo: qui non si scrive.
 - Lo 🛡️ Specchiato dei due venditori del 203 e del 211: se avevano già
   dieci affari, la disputa finta può averglielo negato. Si guarda in
   sola lettura dopo la scrittura; i distintivi si danno agli eventi,
-  quindi tornerebbe al loro prossimo affare, non da solo.
+  quindi tornerebbe al loro prossimo affare, non da solo. GUARDATO (vedi
+  l'esito qui sotto): chiuso.
+
+**L'ESITO SUL VPS (15 ott 2026, dopo il deploy di `61892a6`; i comandi
+li ha lanciati Andrea, controllati prima).** La correzione era online
+(`server.py` del VPS con l'esclusione: 1). LO SPECCHIATO, in sola
+lettura prima della scrittura: il venditore del 203 (1879103467) lo
+aveva già, 13 affari conclusi, una disputa persa contata (la finta) e
+zero senza 203 e 211 — niente da rendere, perché un distintivo dato non
+si toglie; il venditore del 211 (1707802768) ha un affare solo, quindi
+non ne aveva diritto comunque. IL BACKUP del database in `/root`, poi LA
+SCRITTURA: `disputata` di nuovo a 0 sul 203 e sul 211, con la forma
+«annullo per errore» nella WHERE, 2 righe. LA CONTROPROVA (l'elenco del
+mattino rilanciato) ne ha trovato UN TERZO: il 233, `refunded`, annullo
+del 14 ott, `per-errore` — marcato da un riavvio col codice vecchio fra
+la lettura del mattino e il deploy, cioè esattamente il difetto. Andrea
+lo ha pulito con la stessa scrittura sul solo 233: 1 riga. LA LEZIONE:
+la lettura del mattino era una fotografia, e il difetto continuava a
+scrivere a ogni riavvio fino al deploy; per questo la scrittura andava
+fatta DOPO, e la controprova rilancia l'elenco intero, non i soli id
+noti. RESTA (non fatto): lo Specchiato del venditore del 233 non è
+stato guardato.
 
 
 ## La notifica porta allo scambio (13-15 ott 2026, cantiere notifica-porta-allo-scambio, richiesta di Andrea)
