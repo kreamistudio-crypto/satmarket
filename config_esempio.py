@@ -1426,6 +1426,19 @@ TELEGRAM_CANALE_RIEPILOGO = ""
 # e' la maniglia che quel pubblico si aspetta, e un post senza
 # menzione in casa d'altri e' un volantino.
 TELEGRAM_CANALE_VETRINA = ""
+# Il canale @BitcoinPodcastTelegram (15 ott 2026): la TERZA
+# destinazione degli annunci e degli scambi P2P nuovi. Vuoto = non ci
+# si posta, e nessun ripiego sul nostro — come il canale della
+# comunita' qui sopra, e per lo stesso motivo.
+# A DIFFERENZA di quello, qui NON c'e' il filtro dell'@username: entra
+# tutto, perche' quel pubblico e' di bitcoiner e la menzione Telegram
+# non e' la maniglia che si aspetta.
+# Anche questa riga e' solo il valore di PARTENZA: si cambia dal bot
+# con «/canale bitcoinpodcast @nome», e da quel momento comanda la
+# scelta salvata nel database. Il bot dev'essere amministratore di quel
+# canale, col permesso di pubblicare e di modificare i propri messaggi
+# (serve al ✅ Venduto).
+TELEGRAM_CANALE_BITCOIN_PODCAST = ""
 # ATTENZIONE (ago 2026): come per il canale, i tre numeri qui sotto
 # sono il valore di PARTENZA. Il ritmo si sceglie dal bot con
 # «/vetrina tutto | giorno | settimana» e da quel momento comanda la

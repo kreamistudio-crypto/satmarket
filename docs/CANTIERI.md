@@ -59957,6 +59957,22 @@ dal banner con Pillow e senza resta vuota), e un
   per due strade: la seconda sempre accesa, la prima spenta e con le sue
   prove. Un cantiere che le unisca (la terza strada di sopra) toglierebbe
   un doppione prima che le due divergano.
-- Il canale @BitcoinPodcastTelegram non ha una voce in PRODUZIONE né una
-  riga nel config d'esempio: la destinazione si imposta da
-  `/canale bitcoinpodcast` e vive nelle impostazioni del database.
+**LA CORREZIONE DELLA TERZA DESTINAZIONE** («correggi» di Andrea, stesso
+giorno). Avevo scritto che il canale @BitcoinPodcastTelegram «non ha una
+voce in PRODUZIONE né una riga nel config d'esempio», e la frase era
+sbagliata a metà: i tre canali FRATELLI hanno tutti la loro riga
+(`TELEGRAM_CANALE_ID`, `TELEGRAM_CANALE_RIEPILOGO`,
+`TELEGRAM_CANALE_VETRINA`) come valore di PARTENZA che il comando del bot
+poi scavalca salvando nel database. Il BitcoinPodcast era **l'unico dei
+quattro senza**, e in più aveva lo `""` CABLATO al posto del valore di
+partenza (`impostazione("canale_bitcoin_podcast", "")`): si poteva
+accendere solo dal bot, e un VPS appena rifatto lo dimenticava in
+silenzio. Corretto nei TRE pezzi che vanno insieme — l'import dal config
+in `server.py`, il valore di partenza dentro `canale_bitcoin_podcast()`,
+e la riga documentata nel config d'esempio — perché due sentinelle di
+`prove.py` chiedono l'andata e il ritorno: «ogni leva letta dal codice
+sta nel config d'esempio» e «ogni riga del config d'esempio la legge
+qualcuno». Toccarne uno solo sarebbe diventato rosso, ed è il modo in cui
+questa coppia di sentinelle fa il suo lavoro. La voce delle tre
+destinazioni — i comandi, chi filtra l'@username e chi no, e perché il
+vuoto RIPIEGA sul riepilogo ma non sugli altri due — sta in PRODUZIONE.

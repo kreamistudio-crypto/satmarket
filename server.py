@@ -745,6 +745,16 @@ try:
     from config import TELEGRAM_CANALE_RIEPILOGO
 except ImportError:
     TELEGRAM_CANALE_RIEPILOGO = ""
+# Il canale @BitcoinPodcastTelegram (15 ott 2026): la TERZA
+# destinazione dei post, e come i due di sopra questa riga e' solo il
+# valore di PARTENZA — si cambia dal bot con «/canale bitcoinpodcast
+# @nome» e da quel momento comanda la scelta salvata nel database.
+# Nasceva senza la sua riga qui (l'unico dei quattro): si poteva
+# accendere solo dal bot, e un VPS appena rifatto lo dimenticava.
+try:
+    from config import TELEGRAM_CANALE_BITCOIN_PODCAST
+except ImportError:
+    TELEGRAM_CANALE_BITCOIN_PODCAST = ""
 try:
     from config import POST_MAX_ORA
 except ImportError:
@@ -2243,7 +2253,8 @@ def canale_bitcoin_podcast() -> str:
     """Canale secondario BitcoinPodcastTelegram (ott 2026)."""
     global _CANALE_BITCOIN_PODCAST
     if _CANALE_BITCOIN_PODCAST is None:
-        _CANALE_BITCOIN_PODCAST = impostazione("canale_bitcoin_podcast", "")
+        _CANALE_BITCOIN_PODCAST = impostazione(
+            "canale_bitcoin_podcast", TELEGRAM_CANALE_BITCOIN_PODCAST)
     return _CANALE_BITCOIN_PODCAST
 
 

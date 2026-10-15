@@ -4977,3 +4977,36 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   riparte (timbro `campagna_corrieri_punti` nella tabella `timbri`), e
   rispegnerla non serve. Lo stato vero lo dice il pannello «⚙️ Stato
   delle leve», voce «Avviso «indica i tuoi corrieri»».
+
+LE TRE DESTINAZIONI DEI POST, E LA TERZA (15 ott 2026, cantiere
+fix-test-rossi). Un annuncio nuovo esce da UNA fabbrica
+(`_manda_post_canale`) verso tre posti, e ognuno ha la sua leva di
+PARTENZA nel config e il suo comando dal bot che la scavalca salvando
+nel database:
+- il canale di CASA — `TELEGRAM_CANALE_ID`, comando `/canale @nome`;
+- il canale OSPITE della comunità — `TELEGRAM_CANALE_VETRINA`, comando
+  `/canale vetrina @nome`; lì entrano SOLO gli annunci di chi ha un
+  @username Telegram;
+- **@BitcoinPodcastTelegram** — `TELEGRAM_CANALE_BITCOIN_PODCAST`,
+  comando `/canale bitcoinpodcast @nome`; qui NON c'è il filtro
+  dell'@username (quel pubblico è di bitcoiner, e la menzione Telegram
+  non è la maniglia che si aspetta).
+Il riepilogo del lunedì ha un canale suo a parte
+(`TELEGRAM_CANALE_RIEPILOGO`, `/canale riepilogo @nome`), e il vuoto lì
+RIPIEGA sul canale di casa — a differenza degli altri due, dove il
+vuoto vuol dire «non ci andiamo» e non esiste nessun ripiego: sono
+canali di qualcun ALTRO.
+IL BOT DEV'ESSERE AMMINISTRATORE di ogni canale a cui parla, col
+permesso di pubblicare E di modificare i propri messaggi (serve al
+✅ Venduto, che rieèdita il post già fatto). Il comando si prova prima
+di crederci: manda un messaggio di saluto e salva solo se Telegram
+risponde ok, sennò dice il motivo che Telegram ha dato.
+PERCHÉ QUESTA VOCE ESISTE: la terza destinazione è nata (15 ott 2026)
+senza la sua riga nel config d'esempio — l'unica dei quattro — e con lo
+`""` cablato al posto del valore di partenza. Si poteva accendere solo
+dal bot, e un VPS appena rifatto la dimenticava in silenzio.
+DOVE SONO IN USO ADESSO lo dice `/canale` senza argomenti, che le elenca
+tutte e tre (e dice «BitcoinPodcast è spento» quando è vuoto). Il
+pannello «⚙️ Stato delle leve» NON basta: nomina il solo canale di casa
+(`TELEGRAM_CANALE_ID`) — né l'ospite né il BitcoinPodcast ci compaiono,
+e cercarli là non dà risposta.
