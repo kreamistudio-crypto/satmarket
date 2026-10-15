@@ -2236,6 +2236,26 @@ def imposta_canale_vetrina(valore: str) -> str:
     return valore
 
 
+_CANALE_BITCOIN_PODCAST = None
+
+
+def canale_bitcoin_podcast() -> str:
+    """Canale secondario BitcoinPodcastTelegram (ott 2026)."""
+    global _CANALE_BITCOIN_PODCAST
+    if _CANALE_BITCOIN_PODCAST is None:
+        _CANALE_BITCOIN_PODCAST = impostazione("canale_bitcoin_podcast", "")
+    return _CANALE_BITCOIN_PODCAST
+
+
+def imposta_canale_bitcoin_podcast(valore: str) -> str:
+    """Cambia il canale BitcoinPodcast e riallinea la cache."""
+    global _CANALE_BITCOIN_PODCAST
+    valore = (valore or "").strip()
+    scrivi_impostazione("canale_bitcoin_podcast", valore)
+    _CANALE_BITCOIN_PODCAST = valore
+    return valore
+
+
 def imposta_canale(valore: str) -> str:
     """Cambia il canale e riallinea la cache. Stringa vuota = spento
     (e NON «torna al config»: chi spegne dal bot vuole il silenzio,
