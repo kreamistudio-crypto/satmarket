@@ -58940,7 +58940,8 @@ ANDREA (15 ott 2026, prima del push di questo verbale): un'eventuale
 tariffa per le commissioni del mercatino NON va MAI al venditore; al
 massimo al compratore, AGGIUNTA al prezzo che paga e ben visibile PRIMA
 di pagare. Il venditore incassa sempre il prezzo intero. È la regola
-del «chi»; il «se» e il «quanto» si decidono dopo Torino.
+del «chi», ed è anche in CLAUDE.md (regola 10); il «se» e il «quanto»
+si decidono dopo Torino.
 - In gioco ~6.400 sats al mese (~4,6 €), l'83 % per i payout verso WoS.
   La commissione vera dipende dal wallet di chi VENDE (verso WoS fino
   allo 0,4 %, verso Phoenix ~13 sats) e si sa solo dopo il payout,
@@ -58964,9 +58965,9 @@ del «chi»; il «se» e il «quanto» si decidono dopo Torino.
   commissione vera del payout è il nostro margine (positivo o
   negativo). Per far tornare quel conto va scritta la commissione vera
   di ogni payout, che oggi non scrive nessuno (vedi i da fare).
-- Nei rimborsi, una proposta da decidere: si restituisce il totale
-  pagato, tariffa compresa, come vuole la regola dei rimborsi integrali
-  (la decisione delle aste: «le fee di routing le paga la piattaforma»).
+- Nei rimborsi: DA DECIDERE se la tariffa torna a chi compra. La
+  proposta di restituirla insieme al prezzo NON è approvata (Andrea, 15
+  ott 2026): resta aperta.
 - Toglie «fee zero» a chi compra: è una decisione di prodotto e di
   parole, non di conti. Se arriva anche la commissione minima fissa del
   backlog, le due si guardano insieme: chi compra deve vedere UNA riga
