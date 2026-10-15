@@ -68710,7 +68710,8 @@ def _giudizio_liquidita(n: dict, strada: dict | None) -> list:
         elif s.get("esito") == "nessuna":
             voci.append(("acinq_tetto", False,
                          f"⚠️ Tetto di ACINQ: {diretto}, e LND non trova "
-                         f"un'altra strada da ACINQ per {serve} sats."))
+                         f"un'altra strada da ACINQ per "
+                         f"{_fmt_sats(LIQUIDITA_PHOENIX_MIN)} sats."))
         else:
             voci.append(("acinq_tetto", None,
                          f"❔ Tetto di ACINQ: {diretto}; l'altra strada non "
