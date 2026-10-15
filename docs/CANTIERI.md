@@ -60318,6 +60318,11 @@ swap, se Andrea la vuole; niente checkout on-chain.
 4. Si rimisura a metà novembre col comando dell'appendice, insieme a
    quelli dello studio del 15 ott.
 
+**LA DECISIONE DI ANDREA** (16 ott 2026, dopo aver letto questa voce):
+l'incasso on-chain PER ORA NO. Si riguarda a metà novembre INSIEME al
+canale verso `039174f8` (il nodo di instradamento di Spark, studio del
+15 ott), coi comandi delle due appendici.
+
 **NOTATO STRADA FACENDO.** I due pagamenti verso SatsRouting2 del 7 e
 del 13 ott (71.832 e 131.017), che lo studio del 15 lasciava «da
 attribuire», nella fonte della ronda sono `barattolo`: payout del
