@@ -58248,3 +58248,106 @@ nome). Sull'albero del push: le sezioni toccate più `prove_p2p_sconto`,
 verdi e 0 rosse; i quattro collaudi toccati (avvisi in ordine, garanzia
 lunga, promemoria del gesto, tempo di chi pubblica) verdi nella gabbia.
 Il resto lo dice la CI.
+
+## Il DM fantasma: l'avviso delle 05:59 era quasi certamente una mail Nostr (15 ott 2026, cantiere dm-fantasma, richiesta di Andrea: solo verbale)
+
+Il 15 ott alle 05:59:29 UTC il bot ha mandato ai moderatori «📩 Nuovo
+DM su Nostr da Ivory Tower (npub1lmhct…fvdasx)» (journal: «📩 Avviso
+DM: un avviso ai moderatori»). Su Amethyst, account di Barattolo, il
+messaggio non c'era: né fra i conosciuti né nelle nuove richieste. La
+domanda: cosa ha fatto scattare l'avviso, e perché il client non lo
+mostra. Un'indagine in SOLA LETTURA, sui relay pubblici e sul codice:
+nessuna chiave, niente VPS, nessuna riga di codice cambiata.
+
+**COME FUNZIONA L'AVVISO (com'è oggi, server.py, «L'AVVISO DEI DM A
+BARATTOLO»).** Ascolta la npub DI BARATTOLO (la stessa dell'Amethyst
+di Andrea) sui relay del suo kind 10050, nos.lol e relay.primal.net
+(`AVVISO_DM_NOSTR_RELAY`); chiede i kind 4 e 1059 con la nostra `p`.
+Di un 1059 apre SOLO la busta di fuori: il sigillo che c'è dentro,
+firmato e verificato, dice chi scrive; il messaggio (il `content` del
+sigillo) non si decifra. Il prezzo era già dichiarato nel commento:
+non si sa il TIPO di quel che c'è dentro.
+
+**L'EVENTO.** Sui due relay, dal 12 ott: cinque buste 1059 e un kind
+4 per Barattolo. La candidata è la busta `45ae4128…` (su tutti e
+due): data finta del 13 ott 09:19 UTC, cioè 44 ore prima delle 05:59
+— NIP-59 arretra fino a due giorni — e 4188 byte di contenuto contro
+i 1456 delle altre. Nessun kind 5 la cita; la chiave usa-e-getta che
+l'ha firmata non ha pubblicato nient'altro. La certezza sull'id
+l'avrebbe data il journal (gli avvisi e le riconnessioni dal 12 ott):
+Andrea ha scelto di non chiederla, la spiegazione basta.
+
+**PERCHÉ AMETHYST NON LA MOSTRA.** Ivory Tower (profilo su
+relay.ditto.pub, nip05 su zaps.lol) è un account che prova molti
+client: Ditto, White Noise (KeyPackage MLS, kind 443), roadstr, e il
+9 ott ha salvato le impostazioni di un client di mail Nostr (kind
+30078, `d` = `nostr-mail/settings/private`). La mail su Nostr viaggia
+nella STESSA busta 1059 dei DM, ma dentro c'è una mail (kind 1301 —
+Nmail — o 2024 — Hoot) e non una chat kind 14: Amethyst mostra solo
+le chat e la scarta in silenzio. La mail spiega anche il peso triplo
+(oggetto, intestazioni RFC 2822). Meno probabili: un invito MLS (kind
+444, che vorrebbe un nostro KeyPackage, e non ne pubblichiamo) o una
+reazione.
+
+**COSA PUÒ FAR SCATTARE L'AVVISO, e cosa no.** NO: zap, menzioni,
+buste per altri (servono il kind 4 o 1059, la nostra `p`, un sigillo
+che si apre con la nostra chiave e una firma valida). SÌ: chat NIP-17,
+mail Nostr, inviti MLS, reazioni, spam cifrato (per quello c'è il
+tetto). Stringerlo vuol dire leggere il tipo del messaggio interno,
+cioè aprire la seconda busta.
+
+**LA DECISIONE DI ANDREA (15 ott).** Strada A, ma NON adesso: decifrare
+in memoria la seconda busta per tenerne SOLO il tipo (mai il testo, mai
+una riga nel journal), e dire «📩 DM» o «✉️ Mail Nostr». La strada
+scartata, B: non decifrare e cambiare solo il testo dell'avviso
+(«busta cifrata: se il tuo client non la mostra è un altro tipo»).
+
+**COME LEGGERLA SENZA NSEC (istruzioni date ad Andrea, non eseguite).**
+Il client che legge le mail kind 1301 ed entra con un firmatario è
+Nmail (nogringo/nostr-mail-client: web app.nostrmail.org, Android da
+Zapstore): sotto «More options» ci sono Amber (NIP-55), il bunker
+NIP-46 e il QR nostrconnect. ATTENZIONE: chiede di poter firmare anche
+i kind 0, 10002, 10050, 30078; e Barattolo non ha un 10002, quindi
+dopo il login Nmail apre la configurazione dei relay. Un 10050 nuovo
+pubblicato da lì sostituirebbe il nostro e sposterebbe la posta dove
+il bot non ascolta: si approvano solo le decifrature, si nega ogni
+firma, e la pagina dei relay si salta senza salvare. I passi, come
+dati ad Andrea:
+1. In Amber l'account Barattolo con le approvazioni MANUALI.
+2. Nmail, «More options»: sul telefono l'app firmatario (Amber); dal
+   PC il QR nostrconnect, inquadrato con Amber come bunker.
+3. In Amber si approvano solo la chiave pubblica e le decifrature
+   (nip44_decrypt); ogni «firma evento» si rifiuta.
+4. La pagina dei relay (Relay setup) NON si salva: indietro o chiudi.
+   Se non lascia passare senza salvare, ci si ferma lì.
+5. Nella posta in arrivo la mail di Ivory Tower: ogni busta costa due
+   decifrature, Amber chiede più volte.
+6. Alla fine si scollega Nmail da Amber.
+Andrea per ora non lo fa (15 ott): scrive a Ivory Tower in chat.
+
+**DAMUS.** Il P2P non lo usa più (13 ott). Resta in `RELAY_DI_SERIE`
+(server.py) e in `RELAY_NOSTR` di config_esempio, quindi è vivo in
+tutto ciò che legge `RELAYS_VERIFICA`: pubblicazione e ritiro degli
+annunci, reputazione, badge live, zap, verifica della npub, lettura
+dei profili (compreso il nome nell'avviso DM), la copia del profilo
+di scambio P2P (`_relay_copia_p2p`), i DM agli utenti senza 10050; e
+negli script `importa_nostr.py`, `censimento_nostr.py`,
+`presenta_release.py`. Nel journal dà 503 più volte all'ora. Il config
+del VPS (`/srv/barattolo/config.py`) può avere una sua `RELAY_NOSTR`
+che vince sul default: si guarda prima di decidere.
+
+**DA FARE DOPO TORINO** (decisi da Andrea il 15 ott, non fatti):
+- La strada A dell'avviso DM: il tipo del messaggio interno, decifrato
+  in memoria e buttato, e i due avvisi «📩 DM» / «✉️ Mail Nostr».
+  Da decidere lì cosa dire di un invito MLS e di una reazione.
+- Damus in `RELAY_DI_SERIE` / `RELAY_NOSTR`: 503 frequenti, decidere
+  se toglierlo (e dal config del VPS, se ce l'ha).
+- Il kind 10002 di Barattolo manca su nos.lol e su relay.primal.net:
+  chi cerca dove scriverci trova solo il 10050.
+
+**PROVATO.** Le letture sui relay con uno script di sola lettura
+(REQ e basta): i kind 4/1059 per Barattolo dal 12 ott, i kind 5 sui
+sei eventi, gli eventi delle chiavi usa-e-getta, il 10050 di Barattolo,
+il profilo e gli eventi di Ivory Tower (ricerca NIP-50 su
+relay.ditto.pub); il codice di login di Nmail letto sul suo repo.
+Commit di soli documenti.
