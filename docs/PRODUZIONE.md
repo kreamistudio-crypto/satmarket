@@ -4509,6 +4509,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
       la 10002 nuova su ogni relay che l'ha presa (sostituisce la
       vecchia: è «replaceable»). Poi in Amber si toglie l'app
       «Barattolo — lista relay».
+  ⚠️ NMAIL (e ogni client che al login apre «Relay setup») PUBBLICA
+  UNA 10002 SUA se la si salva: il 15 ott 2026 alle 14:43 ha messo
+  relay.nmail.li, nostr-01.yakihonne.com e primal, e nsyte ha seguito
+  quella. Se succede: K4 di nuovo, e la stessa 10002 copiata sui relay
+  di quella sbagliata (`nak req -k 10002 -a $HEX wss://nos.lol <
+  /dev/null > nostra10002.json`, controllo, poi `nak event <relay> <
+  nostra10002.json`: non rifirma).
   QUANDO LA LISTA CAMBIA si cambiano insieme `RELAY_DI_SERIE` (server
   e import), `config_esempio.py` e `LISTA` dello script (una prova le
   tiene uguali), poi R1-R5 e K1-K5.

@@ -59501,3 +59501,57 @@ la CI.
   metodo solo non conta, su quelli a più metodi va guardata.
 - Sul caso vero: se il promemoria a un'ora (`sollecito_recapito1`) è
   partito per 101E20D6 lo dice il journal del VPS (comando da Andrea).
+
+## I relay di Barattolo, il giro sulle macchine: la lista sul VPS, la 10002 con Amber, la ronda accesa, la misura dei 429 (15 ott 2026, cantiere relay-di-barattolo, verbale; comandi lanciati da Andrea)
+
+**LA LISTA SUL VPS.** `RELAY_NOSTR` del config era su più righe (84-90)
+coi cinque di ieri: damus, nos.lol, primal, nostr.mom e il nostro.
+Copia in `/root/config.py.prima-dei-relay` (7248 byte, `root:barattolo`,
+`rw-r-----`), poi la riscrittura delle sole righe dell'assegnamento con
+ast (PRODUZIONE, «I RELAY DI BARATTOLO», R1-R5): il valore riletto è la
+lista nuova, il config si legge intero, il riavvio è pulito («🟣
+Barattolo pubblica su Nostr», ronda spenta, nessun Traceback) e nel
+journal da lì in poi compaiono solo i sei relay nuovi. La posta dei
+relay (3792e3a) era già nel deploy di quel pomeriggio.
+
+**LA 10002 DI NMAIL (14:43 ora italiana).** Prima della firma, la
+lettura ha trovato una 10002 di Barattolo NUOVA, delle 12:43 UTC, con
+relay.nmail.li, nostr-01.yakihonne.com e relay.primal.net, già su sei
+relay e su purplepag.es: l'ha firmata Andrea in Amber durante l'accesso
+a Nmail con l'account Barattolo (confermato da lui, e dalla cronologia
+di Amber). È la pagina di configurazione dei relay che Nmail apre a un
+account senza 10002, prevista nella voce del DM fantasma. Il server una
+10002 non la pubblica mai. È per lei che il deploy dell'nsite (nsyte,
+kind 15128) è uscito anche su quei due relay. Nessun allarme sulla
+chiave.
+
+**LA NOSTRA 10002.** Dal WSL di Andrea: `prova` giusta (non firmata,
+la chiave di Barattolo, sei tag `r`); `firma` col QR in Amber, il solo
+kind 10002 approvato, controllo dello script «OK: firmato da
+Barattolo», presa da 7 relay su 7 (i sei della lista e purplepag.es).
+L'evento delle 16:31 UTC (id `9dec51e5…`) ha sostituito quello di Nmail
+ovunque; su relay.nmail.li e nostr-01.yakihonne.com, dove lo script non
+pubblica, Andrea ha ripubblicato con `nak event` lo STESSO evento letto
+da nos.lol (stesso id: copiato, non rifirmato). Riletta in sola lettura
+dopo: la 10002 nuova su tutti e nove i relay cercati, il 10050 del 12
+ott intatto. Amber vero: PROVATO, ed è la prima volta per questo script.
+
+**LA RONDA.** `RONDA_RELAY_NOSTR = True` appesa al config alle 18:40,
+controllo e riavvio: primo giro tutti a posto.
+
+**LA MISURA DEI 429** (righe d'errore per relay nel journal, orari
+fissi; comando di Andrea, quello della voce «I relay di Barattolo» con
+`--since`/`--until`). Prima, 13:11-14:11 UTC (15:11-16:11 italiane):
+nostr.mom 185, nos.lol 56, relay.damus.io 26, totale 267. Dopo,
+14:12-15:12 UTC: relay.mostro.network 1, relay.barattolo.store 1,
+nos.lol 1, totale 3. L'ora «dopo» ha insieme la posta dei relay e la
+lista nuova (damus e nostr.mom fuori), quindi la misura non separa le
+due cure; su nos.lol, che c'è in tutt'e due le ore, si passa da 56 a 1.
+Quel che resta su nos.lol è in buona parte delle letture del libro
+P2P, che non passano dalla posta (il «da fare dopo Torino» della voce
+«La posta dei relay»).
+
+**DA FARE.** Rifare la misura su tre giorni fra qualche giorno, col
+comando della voce «I relay di Barattolo». Le copie
+`/root/config.py.prima-dei-relay` sul VPS si cancellano quando la lista
+nuova ha retto qualche giorno (decide Andrea).
