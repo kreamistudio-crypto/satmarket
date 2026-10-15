@@ -127,11 +127,26 @@ const COMANDI = {
   async riscatta (assetId, quantita, fatturaStr) {
     if (!fatturaStr) muori('riscatta <asset_id> <quantita> <fattura>')
     const { account, chiudi } = await apri()
-    const esito = await account.transfer({
-      recipient: fatturaStr, token: assetId, amount: Number(quantita),
-      minConfirmations: 1, feeRate: FEE
+    // I TRE TEMPI A MANO, non `account.transfer` (15 ott 2026, il 6-bis):
+    // dentro wdk-wallet-rgb 2.0.3 `transfer` (e il suo `quoteTransfer`)
+    // chiama `sendBegin` SENZA await, e con la variante override
+    // (rgb-sdk 1.0.6) sendBegin torna una Promise: la firma riceve una
+    // Promise al posto della PSBT e muore con «psbtBase64 must be a
+    // non-empty string». I metodi pubblici dell'account che `transfer`
+    // usa — sendBegin, signPsbt, sendEnd — qui si chiamano uno per uno e
+    // si aspettano tutti: con la 1.0.3 sono sincroni e l'await li rende
+    // com'erano. Nessuna libreria toccata. Si perde il controllo del tetto
+    // di commissione di `transfer` (transferMaxFee), che non configuriamo.
+    if (!String(fatturaStr).trim().startsWith('rgb:')) muori('la fattura comincia con rgb:')
+    const psbt = await account.sendBegin({
+      invoice: fatturaStr, assetId, amount: Number(quantita),
+      feeRate: FEE, minConfirmations: 1
     })
-    console.log(`✓ consignment depositato, txid ${esito.hash}\n  ${ESPLORA}${esito.hash}`)
+    const firmata = await account.signPsbt(psbt)
+    const esito = await account.sendEnd({ signedPsbt: firmata })
+    const txid = esito && esito.txid
+    if (!txid) muori(`l'invio non ha dato un txid: ${mostra(esito)}`)
+    console.log(`✓ consignment depositato, txid ${txid}\n  ${ESPLORA}${txid}`)
     chiudi()
   },
 
@@ -155,7 +170,7 @@ const COMANDI = {
       fs.writeFileSync(pwFile, Buffer.from(os.hostname() + Date.now() + Math.random()).toString('base64url') + '\n', { mode: 0o600 })
     }
     const password = fs.readFileSync(pwFile, 'utf8').trim()
-    const r = account.createBackup({ password, backupPath: BACKUP })
+    const r = await account.createBackup({ password, backupPath: BACKUP })
     console.log('✓', mostra(r), '\n  password in', pwFile)
     chiudi()
   }
