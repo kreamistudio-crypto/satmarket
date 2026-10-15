@@ -154219,6 +154219,50 @@ def prove_guardia_liquidita():
           sorted(esiti(voci(dict(n, entra=0, entra_acinq=0),
                             LIQUIDITA_SCAMBIO_MAX=0, LIQUIDITA_PHOENIX_MIN=0))))
 
+    # --- la quarta domanda (15 ott 2026, phoenix-blocca-sats) -----------
+    prova("la quarta domanda nasce SPENTA", False, K["LIQUIDITA_USCITA_CANALE"])
+    prova("i numeri del 6 ott: il canale con piu' uscita spendibile e' ACINQ 1M",
+          (774179, "ACINQ"), (n["esce_max"], n["esce_max_nome"]))
+    prova("...un canale fuori linea non conta, e senza canali e' zero",
+          (391056, 0, ""),
+          (S["_numeri_liquidita"]([dict(c, active=False) if c["chan_id"] == "102" else c
+                                   for c in sei])["esce_max"],
+           S["_numeri_liquidita"]([])["esce_max"], S["_numeri_liquidita"]([])["esce_max_nome"]))
+
+    def quarta(**k):
+        return voci(dict(n, **k), LIQUIDITA_USCITA_CANALE=True)
+    v_ok = quarta(tetto_p2p_sats=774179, tetto_p2p_euro=250)
+    v_ko = quarta(tetto_p2p_sats=774180, tetto_p2p_euro=250)
+    v_nn = quarta(tetto_p2p_euro=250, tetto_p2p_perche="il cambio euro/bitcoin non risponde")
+    prova("quarta accesa: ALLA soglia buona, un sat sopra cattiva, senza tetto in sats un «non so»",
+          (True, False, None),
+          (esiti(v_ok)["canale_uscita"], esiti(v_ko)["canale_uscita"], esiti(v_nn)["canale_uscita"]))
+    prova("...i testi dicono euro, sats e il canale piu' carico",
+          ["✅ Un ordine da 250 € (774.179 sats) esce intero dal canale più carico: ACINQ, con 774.179 sats.",
+           "⚠️ Nessun canale regge da solo un ordine da 250 € (774.180 sats): il più carico in uscita è ACINQ, con 774.179 sats.",
+           "❔ Un ordine al tetto: non l'ho potuto misurare (il cambio euro/bitcoin non risponde)."],
+          [t for v in (v_ok, v_ko, v_nn) for k, _, t in v if k == "canale_uscita"])
+    prova("...e a leva spenta non c'e', anche con un tetto scritto", ["entrata", "phoenix", "uscita"],
+          sorted(esiti(voci(dict(n, tetto_p2p_sats=999999999, tetto_p2p_euro=250)))))
+    exec("async " + pezzo("_tetto_p2p_in_sats"), S)
+
+    def tetto_in_sats(euro, cambio):
+        async def cb():
+            if isinstance(cambio, Exception):
+                raise cambio
+            return cambio
+        S.update(P2P_MAX_EURO=euro, cambio_btc_eur=cb)
+        return _as.run(S["_tetto_p2p_in_sats"]())
+    prova("il tetto in sats: 250 € a 100.000 €/BTC fanno 250.000, a 60.000 fanno 416.667; "
+          "tetto spento, cambio a zero o che esplode: il perche', mai un numero",
+          [{"tetto_p2p_euro": 250, "tetto_p2p_sats": 250000},
+           {"tetto_p2p_euro": 250, "tetto_p2p_sats": 416667},
+           {"tetto_p2p_perche": "il tetto P2P in euro è spento"},
+           {"tetto_p2p_euro": 250, "tetto_p2p_perche": "il cambio euro/bitcoin non risponde"},
+           {"tetto_p2p_euro": 250, "tetto_p2p_perche": "il cambio euro/bitcoin non risponde"}],
+          [tetto_in_sats(250, 100000.0), tetto_in_sats(250, 60000.0), tetto_in_sats(0, 100000.0),
+           tetto_in_sats(250, 0), tetto_in_sats(250, RuntimeError("giu'"))])
+
     # --- la strada da ACINQ, con LND di cartone ---------------------------
     chieste = []
 
@@ -154374,6 +154418,9 @@ def prove_guardia_liquidita():
           True, 'if LIQUIDITA_PHOENIX_MIN and n["entra_acinq"] < '
                 "LIQUIDITA_PHOENIX_MIN:\n        strada = await _strada_phoenix("
           in quadro)
+    prova("il cambio si chiede solo a quarta domanda accesa, prima del giudizio",
+          True, "if LIQUIDITA_USCITA_CANALE:\n        n.update(await _tetto_p2p_in_sats())"
+          in quadro and quadro.index("_tetto_p2p_in_sats()") < quadro.index("_giudizio_liquidita("))
     smista = codice(pezzo("gestisci_update"))
     prova("il bot smista /canali (e /canale resta suo: nessuno dei due e' "
           "prefisso dell'altro)", (True, False, False),
@@ -154405,6 +154452,8 @@ def prove_guardia_liquidita():
                                 "LIQUIDITA_PHOENIX_MIN", "LIQUIDITA_USCITA_MIN",
                                 "LIQUIDITA_PROMEMORIA_S", "LIQUIDITA_OGNI_S")
            for m in [re.search(rf"^{k} = \w+", es, re.M)] if m])
+    prova("config_esempio: anche la quarta domanda, spenta", True,
+          re.search(r"^LIQUIDITA_USCITA_CANALE = False\b", es, re.M) is not None)
 
     # --- la sonda del nodo (deploy/nodo/sonda-rotte.py) -------------------
     sonda = open(os.path.join(QUI, "deploy", "nodo", "sonda-rotte.py"),

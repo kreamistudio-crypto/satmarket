@@ -122,12 +122,17 @@ GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
 # anche a guardia spenta. Tre domande: l'entrata totale regge la
 # garanzia piu' grossa? chi paga da Phoenix ha una strada (il canale
 # ACINQ diretto, o un'altra che LND trova)? l'uscita totale sta sopra il
-# minimo? Vedi docs/PRODUZIONE.md, «LA GUARDIA DELLA LIQUIDITA'».
+# minimo? E, a leva accesa, il canale con piu' uscita regge da solo un
+# ordine P2P al tetto? Vedi docs/PRODUZIONE.md, «LA GUARDIA DELLA
+# LIQUIDITA'».
 GUARDIA_LIQUIDITA = False          # True = accesa
 LIQUIDITA_SCAMBIO_MAX = 500000     # la garanzia piu' grossa (sats): lo
                                    # specchio di max_order_amount del nodo
 LIQUIDITA_PHOENIX_MIN = 300000     # quanto deve poter entrare da Phoenix
 LIQUIDITA_USCITA_MIN = 0           # 0 = nessun minimo d'uscita
+LIQUIDITA_USCITA_CANALE = False    # True = il canale con piu' uscita
+                                   # regge da solo un ordine al tetto
+                                   # P2P_MAX_EURO (al cambio di adesso)
 LIQUIDITA_PROMEMORIA_S = 86400     # fra un promemoria e l'altro
 LIQUIDITA_OGNI_S = 3600            # ogni quanto guarda
 

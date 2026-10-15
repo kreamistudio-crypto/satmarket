@@ -444,6 +444,35 @@ def main():
         azione, nuovi = giro()
         prova("...leva di nuovo a zero: rientrato", "rientrato", azione)
 
+        # --- 8-bis. la quarta domanda (15 ott 2026) ------------------------
+        # il canale piu' carico in uscita e' ACINQ 400k: 386.777 spendibili
+        exec(pezzo("_tetto_p2p_in_sats"), amb)
+        CAMBIO = [100000.0]
+
+        async def cambio_finto():
+            return CAMBIO[0]
+        amb.update(P2P_MAX_EURO=250, cambio_btc_eur=cambio_finto,
+                   LIQUIDITA_USCITA_CANALE=True)
+        azione, nuovi = giro()
+        prova("quarta accesa, 250 € a 100.000 €/BTC = 250.000 sats, il canale "
+              "piu' carico ne ha 386.777: silenzio", ("", []), (azione, nuovi))
+        CAMBIO[0] = 60000.0
+        azione, nuovi = giro()
+        prova("...a 60.000 €/BTC fanno 416.667: ALLARME, col canale e le cifre",
+              ("allarme", True),
+              (azione, bool(nuovi) and "⚠️ Nessun canale regge da solo un ordine da "
+               "250 € (416.667 sats): il più carico in uscita è ACINQ, con "
+               "386.777 sats." in nuovi[0]))
+        CAMBIO[0] = 0.0
+        azione, nuovi = giro()
+        prova("...il cambio non risponde: un «non so», niente rientro e niente "
+              "allarme nuovo", ("", ["canale_uscita"]),
+              (azione, json.loads(timbri["liquidita_stato"])["chiavi"]))
+        CAMBIO[0] = 100000.0
+        azione, nuovi = giro()
+        prova("...il cambio torna a 100.000: rientrato", "rientrato", azione)
+        amb["LIQUIDITA_USCITA_CANALE"] = False
+
         # --- 9. il journal -------------------------------------------------
         prova("nel journal una riga per ogni cambio, e mai il macaroon",
               (True, False),

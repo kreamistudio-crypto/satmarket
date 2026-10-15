@@ -30119,6 +30119,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   verso i venditori del mercatino sale e scende insieme al saldo dei
   canali — un pavimento fisso suonerebbe proprio il giorno in cui tutti
   i venditori sono stati pagati.
+  4) UN ORDINE AL TETTO DA UN CANALE SOLO (15 ott 2026,
+  `LIQUIDITA_USCITA_CANALE`, SPENTA di serie) — il canale in linea con
+  più uscita spendibile (`esce_max` in `_numeri_liquidita`) regge da
+  solo un ordine P2P al tetto `P2P_MAX_EURO`? Il tetto in sats lo fa
+  `_tetto_p2p_in_sats` col cambio di adesso e lo mette in `n`, così il
+  giudizio resta PURO; senza tetto in euro o senza cambio la voce è un
+  «non so». È una prudenza e non un muro: LND divide un payout fino a
+  16 pezzi quando la fattura di chi riceve dichiara MPP (Mostro non
+  passa `max_parts`); senza MPP esce intero da un canale. Il perché:
+  CANTIERI, «Phoenix e i sats da bloccare».
   Ogni voce è buona, cattiva, o NON MISURATA (`None`): la terza non
   allarma e non rassicura. GLI STATI stanno in `_liquidita_passo`
   (PURA) e nel timbro `liquidita_stato` (JSON: le chiavi cattive,

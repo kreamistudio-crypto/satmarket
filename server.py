@@ -67906,7 +67906,7 @@ def _incasso_del_motivo(motivo: str):
 # arriva di continuo e' tappezzeria. La frase che lo reggeva — «Phoenix
 # paga solo dal canale ACINQ» — veniva da UN acquisto fallito, il 5
 # ott, il giorno stesso in cui il canale LNBiG nasceva.
-# LA DOMANDA VERA e' se il nodo puo' fare gli scambi, e sono tre:
+# LA DOMANDA VERA e' se il nodo puo' fare gli scambi, e sono tre (piu' una):
 #  1) ENTRATA: sommando i canali in linea, ci sta la garanzia piu'
 #     grossa? (`LIQUIDITA_SCAMBIO_MAX`, lo specchio di `max_order_amount`
 #     del coordinatore.)
@@ -67922,6 +67922,16 @@ def _incasso_del_motivo(motivo: str):
 #     appena incassata, quindi l'uscita di uno scambio se la porta lo
 #     scambio. Un pavimento fisso suonerebbe proprio il giorno in cui
 #     tutti i venditori sono stati pagati.
+#  4) UN ORDINE AL TETTO ESCE DA UN CANALE SOLO? (15 ott 2026, richiesta
+#     di Andrea, `LIQUIDITA_USCITA_CANALE`): il canale in linea con piu'
+#     uscita spendibile regge DA SOLO un ordine P2P al tetto in euro
+#     (`P2P_MAX_EURO`, al cambio di adesso)? E' una PRUDENZA e non un
+#     muro: Mostro non passa `max_parts`, e LND legge lo zero come 16
+#     pezzi (`DefaultMaxParts`, routerrpc della 0.19.3) quando la
+#     fattura di chi riceve dichiara MPP; senza MPP il payout esce
+#     intero da un canale. SPENTA di serie come l'uscita, e per lo
+#     stesso motivo. Senza tetto in euro o senza cambio e' un «non so»,
+#     mai un allarme.
 # NIENTE RIPETIZIONI: un avviso quando una domanda passa da buona a
 # cattiva, uno quando tornano tutte buone, e in mezzo al massimo un
 # promemoria ogni `LIQUIDITA_PROMEMORIA_S`. Lo stato sta nei timbri
@@ -67954,6 +67964,10 @@ try:
     from config import LIQUIDITA_USCITA_MIN
 except ImportError:
     LIQUIDITA_USCITA_MIN = 0          # 0 = nessun pavimento d'uscita
+try:
+    from config import LIQUIDITA_USCITA_CANALE
+except ImportError:
+    LIQUIDITA_USCITA_CANALE = False   # la quarta domanda: spenta
 try:
     from config import LIQUIDITA_PROMEMORIA_S
 except ImportError:
@@ -68018,11 +68032,15 @@ def _numeri_liquidita(canali: list) -> dict:
     chiave = next((str(c.get("remote_pubkey")) for c in canali
                    if str(c.get("remote_pubkey") or "")
                    .startswith(LIQUIDITA_PREFISSO_ACINQ)), "")
+    # la quarta domanda: il canale in linea con piu' uscita spendibile
+    piu = max(vivi, key=lambda c: _sats_canale(c, "local"), default=None)
     return {"canali": len(canali), "vivi": len(vivi),
             "entra": sum(_sats_canale(c, "remote") for c in vivi),
             "esce": sum(_sats_canale(c, "local") for c in vivi),
             "entra_acinq": sum(_sats_canale(c, "remote") for c in acinq),
-            "pk_acinq": chiave}
+            "pk_acinq": chiave,
+            "esce_max": _sats_canale(piu, "local") if piu else 0,
+            "esce_max_nome": _nome_canale(piu) if piu else ""}
 
 
 def _grafica_canali(canali: list) -> str:
@@ -68216,6 +68234,27 @@ def _giudizio_liquidita(n: dict, strada: dict | None) -> list:
         voci.append(("uscita", True,
                      f"• Uscita: {_fmt_sats(n['esce'])} sats in tutto "
                      "(nessun minimo impostato)."))
+    # la quarta (15 ott 2026): il tetto in sats lo mette in `n` chi
+    # legge il cambio (`_tetto_p2p_in_sats`), cosi' qui resta PURA
+    if LIQUIDITA_USCITA_CANALE:
+        tetto = n.get("tetto_p2p_sats") or 0
+        euro = n.get("tetto_p2p_euro") or 0
+        piu = (f"{n.get('esce_max_nome') or 'nessun canale'}, con "
+               f"{_fmt_sats(n.get('esce_max') or 0)} sats")
+        if tetto <= 0:
+            voci.append(("canale_uscita", None,
+                         "❔ Un ordine al tetto: non l'ho potuto misurare ("
+                         + (n.get("tetto_p2p_perche") or "tetto sconosciuto")
+                         + ")."))
+        elif (n.get("esce_max") or 0) >= tetto:
+            voci.append(("canale_uscita", True,
+                         f"✅ Un ordine da {euro} € ({_fmt_sats(tetto)} sats) "
+                         f"esce intero dal canale più carico: {piu}."))
+        else:
+            voci.append(("canale_uscita", False,
+                         f"⚠️ Nessun canale regge da solo un ordine da "
+                         f"{euro} € ({_fmt_sats(tetto)} sats): il più "
+                         f"carico in uscita è {piu}."))
     return voci
 
 
@@ -68316,6 +68355,24 @@ async def _avvisa_liquidita(testo: str):
                   flush=True)
 
 
+async def _tetto_p2p_in_sats() -> dict:
+    """Il tetto degli ordini P2P (`P2P_MAX_EURO`) in sats, al cambio di
+    adesso: le chiavi che la quarta domanda legge in `n`. Senza tetto o
+    senza cambio torna il perche', e la voce sara' un «non so»: un
+    numero inventato farebbe suonare (o tacere) a caso."""
+    if not P2P_MAX_EURO:
+        return {"tetto_p2p_perche": "il tetto P2P in euro è spento"}
+    try:
+        cambio = float(await cambio_btc_eur() or 0)
+    except Exception:
+        cambio = 0.0
+    if cambio <= 0:
+        return {"tetto_p2p_euro": P2P_MAX_EURO,
+                "tetto_p2p_perche": "il cambio euro/bitcoin non risponde"}
+    return {"tetto_p2p_euro": P2P_MAX_EURO,
+            "tetto_p2p_sats": round(P2P_MAX_EURO * 100_000_000 / cambio)}
+
+
 async def _quadro_liquidita() -> tuple:
     """Canali, numeri e giudizio, letti ADESSO dal nodo. Torna (stato,
     canali, voci): con uno stato diverso da 'ok' i canali non si sono
@@ -68327,6 +68384,8 @@ async def _quadro_liquidita() -> tuple:
         return stato, [], []
     canali = [c for c in (r.get("channels") or []) if isinstance(c, dict)]
     n = _numeri_liquidita(canali)
+    if LIQUIDITA_USCITA_CANALE:
+        n.update(await _tetto_p2p_in_sats())
     strada = None
     if LIQUIDITA_PHOENIX_MIN and n["entra_acinq"] < LIQUIDITA_PHOENIX_MIN:
         strada = await _strada_phoenix(canali, LIQUIDITA_PHOENIX_MIN)

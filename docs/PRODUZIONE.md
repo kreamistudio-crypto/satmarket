@@ -877,9 +877,26 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `LIQUIDITA_PHOENIX_MIN = 300000` (quanto deve poter entrare da
   Phoenix; 0 = quella domanda non si fa),
   `LIQUIDITA_USCITA_MIN = 0` (0 = nessun minimo d'uscita),
+  `LIQUIDITA_USCITA_CANALE = False` (True = la quarta domanda: il
+  canale con più uscita regge da solo un ordine al tetto
+  `P2P_MAX_EURO`, al cambio del momento; con `P2P_MAX_EURO` a 0 è un
+  «non so»),
   `LIQUIDITA_PROMEMORIA_S = 86400`, `LIQUIDITA_OGNI_S = 3600`.
   Gli avvisi vanno agli stessi del guardiano del ponte
   (`GUARDIANO_PONTE_AVVISA`, o i moderatori).
+  L'AVVISO D'USCITA (15 ott 2026, richiesta di Andrea): uscita totale
+  sotto 400.000, o nessun canale che regga da solo un ordine al
+  tetto. Sul VPS, prima si guarda che le righe non ci siano già (nel
+  config vale l'ULTIMA riga con quel nome):
+  `grep -n "^LIQUIDITA_USCITA\|^P2P_MAX_EURO\|^GUARDIA_LIQUIDITA" /srv/barattolo/config.py`
+  poi, a mano, le due righe
+  `LIQUIDITA_USCITA_MIN = 400000`
+  `LIQUIDITA_USCITA_CANALE = True`
+  e `sudo systemctl restart barattolo`. La quarta domanda vuole
+  `P2P_MAX_EURO` scritto (250); gli avvisi partono solo a guardia
+  accesa (`GUARDIA_LIQUIDITA = True`), e `/canali` nel bot mostra le
+  due voci anche a guardia spenta. RITORNO: via le due righe e
+  riavvio.
   DOVE SI LEGGE: `journalctl -u barattolo | grep "💧"` — una riga a
   ogni CAMBIO («allarme (phoenix)», «promemoria», «rientrato») e a ogni
   giro saltato («canali non letti (muto)»), più una per destinatario.
