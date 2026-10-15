@@ -58817,3 +58817,267 @@ del push.
 - Gli altri due «da fare» del «DM fantasma» (damus in
   `RELAY_DI_SERIE` / `RELAY_NOSTR`, il kind 10002 di Barattolo) li ha
   chiusi lo stesso giorno il cantiere relay-di-barattolo, voce sopra.
+
+## Quanto ci costano le commissioni di instradamento, e se Ark le abbassa (15 ott 2026, cantiere costo-commissioni, studio chiesto da Andrea: solo documenti, nessuna decisione né modifica prima del 18 ott)
+
+Il compito (Andrea): gli scambi crescono e le commissioni di
+instradamento dei pagamenti in uscita cominciano a pesare; il mercatino
+è «fee zero», quindi le paga Barattolo. Prima di pensare ad Ark, i
+numeri: quanto abbiamo speso in 30 giorni, verso chi, quanto
+risparmierebbe un canale diretto, come funzionerebbe una tariffa al
+venditore, se c'è un tetto, cosa sono Ark (Arkade, Second/bark) oggi.
+Niente codice, niente scritture su nodo, canali, VPS o config: i
+comandi di sola lettura li ho scritti io e li ha lanciati Andrea, uno
+alla volta. Prosegue lo studio del 5 ott
+(`STUDIO-INSTRADAMENTO-NODO-2026-10-05.md`).
+
+**I NUMERI DEI 30 GIORNI** (16 set → 15 ott, `lncli listpayments
+--include_incomplete --max_payments 100000` sul nodo, filtrati per
+`creation_time_ns`; i conti rifatti qui combaciano con quelli di Andrea):
+113 pagamenti riusciti, 11.093.648 sats, **13.881 sats di commissioni
+(0,125 %)**; 24 falliti, non contati.
+
+Chi ha pagato, dalla fonte che la ronda del nodo scrive per ogni
+pagamento (`/var/lib/ronda/pagamenti_noti`, «hash fonte»; lettura di
+Andrea dell'incrocio):
+
+| Fonte | Cos'è | n | commissioni |
+|---|---|---|---|
+| `barattolo` | payout del mercatino (il VPS ha detto sì) | 26 | 3.624 (3.019 verso Spark) |
+| `mostro` + `mostro-log` | payout del P2P | 32 | 5.851 |
+| `imparato` | spostamenti nostri e tutto quel che c'era prima del 28 set | 55 | 4.404 |
+
+`barattolo` e `mostro` esistono da quando la ronda scrive la fonte (28
+set): sono circa 17 giorni, non 30. In `imparato` stanno gli spostamenti
+nostri — SatsRouting2 (`02b06bf3`, gli swap del 5 ott: 10 pagamenti,
+5.237.545 sats, 2.120 di commissioni) e la spinta verso Blixt
+(`03072348`, 21 pagamenti, 902.491 sats, 1.374) — e i payout di mercatino
+e P2P anteriori al 28 set. Tre righe restano da attribuire: SatsRouting2
+del 7 e del 13 ott (71.832 e 131.017) e Blixt del 7 ott (12.832).
+
+Al ritmo di adesso: il **mercatino** spende ~6.400 sats al mese (3.624
+in ~17 giorni; ~139 sats a payout), cioè **~4,6 €** a 72.171 €/BTC; il
+**P2P** ~10.300 sats al mese, in salita dal lancio del 10 ott. Mercatino
+e P2P insieme, dal 6 ott: 45 pagamenti, 3.748.374 sats, 8.566 sats
+(0,23 %), cioè ~25.000 sats al mese (~18 €).
+
+**VERSO CHI.** Spark/WoS (`030936e7`, il punto di ricezione comune dei
+wallet su Spark) prende il 62 % di tutte le commissioni: 39 pagamenti,
+2.488.677 sats, 8.654 sats (0,35 %). Dal 6 ott: 17 pagamenti, 2.041.721
+sats, 7.117 (~6,4M sats e ~21.000 sats al mese). Dietro ACINQ (Phoenix e
+gli altri privati con porta `03864ef0`) costa quasi niente: 34
+pagamenti, 1.688.236 sats, 452 sats (0,03 %, ~13 sats a pagamento).
+Swiss Bitcoin Pay 0,07 %. Blink non si distingue sul nodo.
+Un segno da leggere: dal 10 ott ogni pagamento verso Spark sopra i
+136.000 sats costa esattamente 1 sat + 4.000 ppm, da tutte e due le
+porte e con 3 o 4 salti; i piccoli costano 0,18-0,23 %.
+
+**DOVE SI PAGA LO 0,4 % VERSO SPARK** (comando 3 dell'appendice, la
+commissione presa da ogni nodo della rotta; lettura di Andrea): circa
+0,3 % lo prende ACINQ come PRIMO salto, cioè per inoltrare verso Spark;
+circa 0,1 % il nodo di instradamento di Spark (`039174f8` o
+`02a98e8c`), che è la tariffa scritta nella fattura per l'ultimo tratto
+privato; `030936e7`, il destinatario, segna 0 per costruzione (in LND
+l'ultimo salto non incassa mai). Conseguenza: un canale nostro verso
+`039174f8` (o `02a98e8c`) toglie la parte di ACINQ, ~0,3 %, e NON lo
+0,1 % di Spark. Verso `030936e7` un canale non si apre: è un nodo
+privato, compare solo nei suggerimenti di rotta delle fatture.
+
+**IL TETTO.** Sui payout del mercatino è la riserva commissioni di
+LNbits, `max(1 %, 10 sats)` per pagamento, che LNbits passa a LND come
+`fee_limit` (Barattolo non ne passa uno suo; il valore vero sta nel
+pannello admin di LNbits, non nel `.env`: PRODUZIONE). Sul P2P è
+`max_routing_fee = 0.01` del settings di Mostro (riletto da Andrea il
+15 ott). Abbassarli non fa risparmiare: con un tetto stretto LND
+risponde NO_ROUTE (la trappola del payout verso WoS, 5 ott).
+
+**CHI PAGA LE COMMISSIONI DEL P2P: NOI**, cioè mostrod dal nodo, dentro
+la commissione che Mostro trattiene. Il settings dice `fee = 0.03` (letto
+il 15 ott): 1,5 % a testa, 1 % per i pionieri con lo sconto da 0,005.
+La rotta sta sotto il tetto dell'1 % e nei fatti arriva al più allo
+0,4 % (Spark): il P2P la copre da sé, e un risparmio lì alza il margine,
+non chiude una perdita. Lo scambio di prova del 18 set lo mostrava al
+sats: 148 trattenuti, 37 di rotta, 111 al nodo.
+
+**IL CANALE DIRETTO VERSO SPARK** (`039174f8`), coi numeri di oggi:
+- Risparmio: ~0,3 % del volume verso Spark. A ~6,4M sats al mese sono
+  ~19.000 sats al mese (~14 €), di cui ~4.000 (~3 €) del mercatino; il
+  resto è P2P, già coperto dalla commissione di Mostro.
+- Capitale bloccato: verso Spark escono ~215.000 sats al giorno. Un
+  canale da 1M (~720 €) si svuota in ~5 giorni, uno da 2M in ~9, se non
+  rientra niente.
+- Chi lo riempirebbe: (1) i compratori e i venditori P2P che pagano da
+  un wallet su Spark (WoS è il dominio più comune negli indirizzi dei
+  profili, 28 su 63 al 5 ott): i loro pagamenti entrerebbero da lì e
+  riempirebbero la nostra parte, come succede con ACINQ per Phoenix —
+  ma quanto non si sa, perché chi riceve non vede il wallet di chi
+  paga, e si misura solo a canale aperto (comando 4 dello studio del 5
+  ott); (2) un giro su noi stessi da ACINQ o LNBiG, che costa più o meno
+  quanto si voleva risparmiare; (3) un canale nuovo, cioè on-chain di
+  nuovo (LND 0.19 non ha lo splicing).
+- On-chain: oggi 1 sat/vB, apertura e chiusura ~150-300 sats l'una;
+  a 20 sat/vB qualche migliaio. Non è la voce che conta: contano il
+  capitale e il riempimento.
+- Prima condizione, mai provata: che il nodo di Spark accetti un peer
+  che arriva da Tor (Spark annuncia solo indirizzi in chiaro; WoS
+  rifiuta gli exit, ACINQ li accetta: studio del 5 ott, §7). Le soglie
+  del 5 ott (3M al mese o 10.000 sats al mese verso Spark) sono
+  superate tutte e due, ma contando il P2P.
+- La strada gratis resta quella del 5 ott: LNBiG [Hub-3] ha un canale
+  da ~4 BTC con `039174f8` e noi siamo su Hub-2. Quando LNBiG ha uscita
+  nostra (cresce da sola coi pagamenti che entrano da lì), LND sceglie
+  da sé la rotta più economica: la prima colonna del comando 3 dice se
+  un payout verso Spark è uscito da LNBiG, e a che prezzo.
+
+**LA TARIFFA DEL NODO** (quella che chiediamo a chi passa da noi): non
+c'entra coi nostri costi. Gli inoltri dei 30 giorni sono 22, 831.345
+sats, 196 sats di guadagno: l'1,4 % di quel che spendiamo. Anche
+quintuplicata resterebbe sotto i 1.000 sats al mese.
+
+**LA TARIFFA AL VENDITORE, SOLO PER IL MERCATINO.** In gioco ~6.400 sats
+al mese (~4,6 €), l'83 % per i payout verso WoS.
+- La commissione vera si sa solo DOPO il pagamento: si può trattenere
+  una stima (una `queryroutes` prima del payout, con un tetto), una
+  percentuale (0,4 % copre il caso peggiore, WoS; su Phoenix sarebbe
+  dieci volte il costo) o una cifra fissa (21 sats coprono Phoenix, ~13
+  sats, e non WoS: sui 26 payout dei 17 giorni avrebbe reso 546 sats su
+  3.624).
+- Cosa legge lui: «Incassi X sats (rete Y)» prima di pubblicare, nella
+  card di Ordini e nell'avviso dell'incasso. La fattura dal suo
+  indirizzo Lightning si chiede per prezzo meno tariffa; chi deposita
+  una fattura a mano la deve fare per quella cifra, e la pagina gliela
+  dice.
+- Nel libro mastro: una trattenuta per ordine; il debito verso il
+  venditore è prezzo meno trattenuta; la trattenuta è nostra e la
+  differenza con la commissione vera è il nostro margine (positivo o
+  negativo). I rimborsi restano integrali (la decisione delle aste:
+  «le fee di routing le paga la piattaforma»).
+- Rovescia la promessa «fee zero», ed è una decisione di prodotto, non
+  di conti. Se si fa, si fa insieme alla commissione minima fissa del
+  backlog: UNA trattenuta, non due.
+
+**ARK, LO STUDIO** (fonti lette il 15 ott 2026):
+- Second, `bark`: su mainnet dal 9 giu 2026, server pubblico
+  `ark.second.tech`. Ark↔Ark gratis, ricevere da Lightning gratis,
+  pagare verso Lightning 0,2-0,5 % con minimo 20 sats (secondo la vita
+  restante della moneta), rinnovo gratis negli ultimi due giorni; le
+  monete vivono 28 giorni (quelle ricevute da Lightning 1-3 giorni),
+  ingresso minimo 50.000 sats, moneta massima 0,1 BTC, un giro ogni ora.
+- Arkade (Ark Labs): mainnet in «developer preview»; il servizio Boltz
+  è ritirato; pagare verso Lightning passa da un «solver» che quota a
+  ogni pagamento, e ricevere da Lightning oggi non lo serve nessun
+  solver.
+- Se compratore e venditore usano WoS o Phoenix, Ark aggiunge un salto
+  che costa 0,2-0,5 %, contro lo 0,03-0,4 % di oggi: costa DI PIÙ. Fare
+  da server vuol dire il capitale di tutte le monete, un'operazione
+  on-chain a ogni giro e un ponte verso Lightning: un secondo nodo. Il
+  deposito di garanzia resterebbe custodial (monete nostre), e in più
+  con la scadenza a 28 giorni da rinnovare sugli ordini lunghi e sulle
+  dispute.
+- Fonti: [Second, prezzi](https://second.tech/pricing);
+  [bark su mainnet](https://second.tech/blog/bark-now-on-bitcoin-mainnet/);
+  i parametri del server in [ghostly #305](https://github.com/MiguelMedeiros/ghostly/pull/305)
+  (26 set 2026); [Arkade, Lightning](https://docs.arkadeos.com/intents/integrate/lightning.md)
+  e [gli swap](https://docs.arkadeos.com/contracts/lightning-swaps.md);
+  [Ark Labs](https://arklabs.xyz/insights/press-start-arkade-goes-live);
+  tariffe on-chain e cambio da `mempool.space/api/v1/fees/recommended`
+  e `/api/v1/prices` (1 sat/vB, 72.171 €/BTC, mattina del 15 ott).
+
+**LA RACCOMANDAZIONE**, in ordine di costo e fatica (nessuna decisione
+prima del 18 ott):
+1. Niente da cambiare adesso: il mercatino costa ~4,6 € al mese, il P2P
+   paga la rotta dentro la sua commissione. Si rimisura a metà
+   novembre coi comandi dell'appendice: il P2P è partito il 10 ott e i
+   numeri si muovono.
+2. Gratis: la prima colonna del comando 3, ogni tanto, per vedere se i
+   payout verso Spark che escono da LNBiG costano meno di quelli da
+   ACINQ.
+3. La tariffa al venditore: una decisione di prodotto dopo Torino; se
+   sì, insieme alla commissione minima fissa.
+4. Il canale verso `039174f8`: solo dopo una prova di peering da Tor
+   riuscita e con sats freschi da bloccare (1-2M); risparmia ~19.000
+   sats al mese, quasi tutti sul P2P.
+5. Ark: no, oggi costa di più nel nostro caso. Si riguarda quando ci
+   saranno venditori con un wallet Ark e Arkade riceverà da Lightning.
+
+**L'ERRORE DEL COMANDO 2, E LA LEZIONE.** Il primo comando del VPS
+filtrava `payout_tentati` su `esito='uscito'` ed è tornato vuoto: quel
+campo si scrive solo quando `_verita_riga` richiede l'esito di un hash
+(una ripresa, un dubbio); un payout riuscito al primo colpo resta con
+l'esito vuoto, e il fatto «pagato» sta nella riga (`payout_stato`).
+Filtrare sull'esito buttava via il caso normale. La strada giusta per
+separare i pagamenti era già sul nodo: la fonte che la ronda scrive per
+ogni hash.
+
+**STRADE SCARTATE.** Abbassare il tetto di LNbits (fa fallire, non
+risparmia); un canale verso `030936e7` (privato, non si apre); alzare la
+tariffa del nodo per pagare i payout (196 sats al mese di base); Ark
+come server o come cliente (sopra).
+
+**DA FARE** (notati, non fatti):
+- `payout_tentati.esito` vuoto sui payout riusciti al primo colpo: chi
+  legge la tabella sbaglia come ho sbagliato io. O si scrive in
+  ARCHITETTURA, o si scrive l'esito anche al successo.
+- L'1 sat + 4.000 ppm fisso verso Spark sui pagamenti grandi: leggere
+  con una `decodepayreq` quanto chiede il suggerimento di rotta della
+  fattura, e quanto è di ACINQ.
+- I 24 falliti dei 30 giorni: quanti sono ritentati riusciti e quanti
+  payout veri.
+- Le tre righe da attribuire (SatsRouting2 del 7 e del 13 ott, Blixt
+  del 7): spostamenti nostri o pagamenti a qualcuno?
+- Il cruscotto `/admin` dà le commissioni di tutta la storia, senza una
+  finestra di 30 giorni; il libro mastro non scrive la commissione di
+  ogni payout, e quelle uscite dal SaaS non le vede nessun conto.
+- `keep-failed-payment-attempts` al prossimo riavvio già previsto di
+  LND (studio del 5 ott, §7).
+
+**APPENDICE: I COMANDI PER RIMISURARE** (sola lettura, da `~/nodo` sul
+nodo; il primo con `sudo` perché il file della ronda è di root).
+
+La fonte di ogni pagamento dei 30 giorni:
+```bash
+cd ~/nodo && docker compose exec -T lnd lncli listpayments --max_payments 100000 | sudo python3 -c '
+import json,sys,time,collections
+noti={}
+for l in open("/var/lib/ronda/pagamenti_noti"):
+    x=l.split()
+    if x: noti[x[0]]=x[1] if len(x)>1 else "imparato"
+lim=time.time()-30*86400
+T=collections.defaultdict(lambda:[0,0,0])
+for p in json.load(sys.stdin)["payments"]:
+    t=int(p["creation_time_ns"])/1e9
+    if p["status"]!="SUCCEEDED" or t<lim: continue
+    ok=[h for h in p["htlcs"] if h["status"]=="SUCCEEDED"]
+    d=ok[0]["route"]["hops"][-1]["pub_key"][:8] if ok else "-"
+    f=noti.get(p["payment_hash"],"nessuna")
+    if f in ("imparato","nessuna"): print(f, p["payment_hash"][:16], time.strftime("%m-%d",time.gmtime(t)), p["value_sat"], d, sep="|")
+    for k in (f, f+" "+d):
+        a=T[k]; a[0]+=1; a[1]+=int(p["value_sat"]); a[2]+=int(p["fee_msat"])
+for k,(n,s,m) in sorted(T.items()): print(k, "| n", n, "| sats", s, "| fee sats", m//1000)
+'
+```
+
+Il comando 3, chi prende cosa sulla strada verso Spark (primo canale
+nostro, poi `nodo:sats` per ogni salto):
+```bash
+cd ~/nodo && docker compose exec -T lnd lncli listpayments --max_payments 100000 | python3 -c '
+import json,sys,time
+lim=time.time()-30*86400
+N={"1066579055655714817":"LNBiG","1063354188044304385":"ACINQ1M","1061107885743538177":"ACINQ400k"}
+for p in json.load(sys.stdin)["payments"]:
+    if p["status"]!="SUCCEEDED" or int(p["creation_time_ns"])/1e9<lim: continue
+    ok=[h for h in p["htlcs"] if h["status"]=="SUCCEEDED"]
+    s=ok[0]["route"]["hops"] if ok else []
+    if not s or not s[-1]["pub_key"].startswith("030936e7"): continue
+    print(p["payment_hash"][:16], p["value_sat"], N.get(s[0]["chan_id"],s[0]["chan_id"]), " ".join(h["pub_key"][:8]+":"+str(int(h["fee_msat"])//1000) for h in s), sep="|")
+'
+```
+
+Gli inoltri dei 30 giorni:
+```bash
+cd ~/nodo && docker compose exec -T lnd lncli fwdinghistory --start_time $(date -d '30 days ago' +%s) --max_events 50000 | python3 -c 'import json,sys; e=json.load(sys.stdin)["forwarding_events"]; print("inoltri:",len(e),"| sats inoltrati:",sum(int(x["amt_out"]) for x in e),"| guadagno sats:",sum(int(x["fee_msat"]) for x in e)/1000)'
+```
+
+Provati prima su risposte di cartone (un `listpayments` finto con tre
+rotte e un fallito, un `pagamenti_noti` finto), poi lanciati da Andrea
+sul nodo vero il 15 ott. Nel commit c'è solo questa voce.
