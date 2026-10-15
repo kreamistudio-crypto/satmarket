@@ -1194,6 +1194,18 @@ rispondere. I punti 1-9 con la rete, il 10 col Wi-Fi spento. La
 chiavetta (`chiavetta-prepara.sh` / `install-offline.sh`, in fondo) è la
 RISERVA: se il 15 la rete fa i capricci, o per rifare lo Zorin.
 
+> ⚠️ **15 ott, dal punto 0 lanciato sul portatile principale**: l'utente
+> esiste già e si chiama **`hackaton`** (senza la seconda h), host
+> `pop-os`; Andrea ha deciso di NON rinominarlo. **Non ha sudo** (nel
+> gruppo `sudo` c'è solo `alanbimbati`, l'account di Alan): le righe con
+> `sudo` le lancia Alan dal suo account, tutto il resto si fa da
+> `hackaton`. Dove questa lista dice `hackathon` come nome d'utente, sul
+> Pop!_OS si legge `hackaton`; sullo Zorin si guarda il 16 col punto 0.
+> I percorsi della chiavetta sono scritti `/media/$USER/…`, che vale per
+> tutti e due. Il punto 0 ha detto anche: glibc 2.39, Pop!_OS 24.04
+> `noble`, 30 GB di RAM (16 già usati dalla sessione di Alan), 469 GB
+> liberi, 16 processori.
+
 0) **Prima di tutto, la glibc** (dall'utente di Alan, prima di creare
 `hackathon`): il binario Utexo del wallet (`librgblibcffi.so` dentro
 `@utexo/rgb-lib-linux-x64@0.3.0-beta.8`, quello che `wdk-wallet-rgb
@@ -1226,6 +1238,14 @@ alla ruota rgb-lib.
 ```bash
 sudo apt update && sudo apt install -y build-essential python3 python3-venv python3-pip git curl tar xz-utils libatomic1 libvulkan1 mesa-vulkan-drivers vulkan-tools
 sudo adduser --gecos "Hackathon Torino" hackathon && sudo usermod -aG render,video hackathon && id hackathon   # → … groups=…,render,video
+```
+
+Sul Pop!_OS di Alan (15 ott) l'utente c'è già, `hackaton`, e non si
+crea: dall'account `alanbimbati` le due righe diventano
+
+```bash
+sudo apt update && sudo apt install -y build-essential python3 python3-venv python3-pip git curl tar xz-utils libatomic1 libvulkan1 mesa-vulkan-drivers vulkan-tools
+sudo usermod -aG render,video hackaton && id hackaton   # → … groups=…,render,video
 ```
 
 Poi **logout e login grafico come `hackathon`** (QVAC e il browser
@@ -1364,9 +1384,9 @@ della piattaforma) e `consigliami-prova.html` da
 chiavetta. Da `hackathon`:
 
 ```bash
-mkdir -p ~/wdk-prova/identita && cp /media/hackathon/<chiavetta>/identita/*.json ~/wdk-prova/identita/ && chmod 700 ~/wdk-prova/identita && chmod 600 ~/wdk-prova/identita/*.json
+mkdir -p ~/wdk-prova/identita && cp /media/$USER/<chiavetta>/identita/*.json ~/wdk-prova/identita/ && chmod 700 ~/wdk-prova/identita && chmod 600 ~/wdk-prova/identita/*.json
 cd ~/wdk-prova && node identita.mjs pubblica usdb && node identita.mjs pubblica tothemooon   # → le due npub di §11
-cp /media/hackathon/<chiavetta>/consigliami-prova.html ~/qvac-prova/
+cp /media/$USER/<chiavetta>/consigliami-prova.html ~/qvac-prova/
 ```
 
 9) **Il wallet di PROVA vuoto** (NON quello della demo), su Mutinynet
@@ -1410,7 +1430,7 @@ variante giusta per la sua glibc: una chiavetta preparata su 22.04 va
 anche su 24.04, non il contrario) e copia il resto.
 
 ```bash
-bash ~/satmarket/deploy/rgb/chiavetta-prepara.sh /media/hackathon/<chiavetta>   # → le ✓ di node, wallet, qvac, modelli, ruote, nak, script, deb, e «📦 …/torino: 2,5G»
+bash ~/satmarket/deploy/rgb/chiavetta-prepara.sh /media/$USER/<chiavetta>   # → le ✓ di node, wallet, qvac, modelli, ruote, nak, script, deb, e «📦 …/torino: 2,5G»
 ```
 
 Cosa c'è dentro `<chiavetta>/torino/` (2,5 GB), col `MANIFEST.txt`
@@ -1430,8 +1450,8 @@ Cosa c'è dentro `<chiavetta>/torino/` (2,5 GB), col `MANIFEST.txt`
 E sull'altro portatile, senza rete, da `hackathon`:
 
 ```bash
-bash /media/hackathon/<chiavetta>/torino/script/install-offline.sh --prova /media/hackathon/<chiavetta>/torino   # → le ✓ «chiavetta: …» e «✓ la chiavetta e' completa»
-bash /media/hackathon/<chiavetta>/torino/script/install-offline.sh /media/hackathon/<chiavetta>/torino   # → le ✓ di glibc, node 22 e 24, ~/wdk-prova, nak, ~/qvac-prova, modelli, ~/rgb-venv, e «✓ tutto installato»
+bash /media/$USER/<chiavetta>/torino/script/install-offline.sh --prova /media/$USER/<chiavetta>/torino   # → le ✓ «chiavetta: …» e «✓ la chiavetta e' completa»
+bash /media/$USER/<chiavetta>/torino/script/install-offline.sh /media/$USER/<chiavetta>/torino   # → le ✓ di glibc, node 22 e 24, ~/wdk-prova, nak, ~/qvac-prova, modelli, ~/rgb-venv, e «✓ tutto installato»
 ```
 
 Installa SOLO sotto `$HOME` (Node in `~/.local/node/22` e `/24` con le
