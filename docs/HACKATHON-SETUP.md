@@ -502,7 +502,7 @@ secondo… niente conferma»). Per fermarli: `pkill -f "[n]wc-wdk.mjs
 serve"` — con le parentesi, o `pkill` uccide la shell che lo lancia.
 
 ```bash
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && source mutinynet.env && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 &'   # VM: la faccia HTTP del mercante, sul wallet di Mutinynet
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && source mutinynet.env || exit 1; nohup ./venv/bin/python -u rgb_http.py > rgb_http.log 2>&1 < /dev/null &'   # VM: la faccia HTTP del mercante, sul wallet di Mutinynet
 curl -s 127.0.0.1:8787/salute   # → {"ok": true, "wallet": "barattolo", "rete": "mutinynet"}; se dice "signet", è partito senza il source
 ```
 
@@ -844,7 +844,7 @@ Barattolo in collaudo — con un controllo dopo ogni passo:
 # VM: i tre container, la catena in pari, il wallet mercante, la faccia HTTP
 ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && docker compose up -d && docker compose ps'
 ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && ./venv/bin/python rgb.py saldo barattolo'
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 &'
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && nohup ./venv/bin/python -u rgb_http.py > rgb_http.log 2>&1 < /dev/null &'
 # WSL, finestra 1 (resta aperta): il tunnel a tre gambe
 ssh -i ~/.ssh/lnvps -N -L 50001:127.0.0.1:50001 -L 3000:127.0.0.1:3000 -L 8787:127.0.0.1:8787 debian@vm-2050.lnvps.cloud
 # WSL, finestra 2: la faccia HTTP dal tunnel, il relay, il wallet, le identità, il servizio NWC
@@ -1114,7 +1114,7 @@ settled; `rgb.py saldo barattolo` → 100 unità di USDB.
 UNA gamba:
 
 ```bash
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; source mutinynet.env && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; source mutinynet.env || exit 1; nohup ./venv/bin/python -u rgb_http.py > rgb_http.log 2>&1 & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
 ssh -i ~/.ssh/lnvps -N -L 8787:127.0.0.1:8787 debian@vm-2050.lnvps.cloud   # finestra 1 del WSL, resta aperta
 curl -s 127.0.0.1:8787/salute   # → {"ok": true, "wallet": "barattolo", "rete": "mutinynet"}
 ```
@@ -2702,7 +2702,7 @@ sono due strade, e si prova sempre la prima:
    nuovi senza l'ambiente aprono `~/rgb/dati`, cioè i wallet signet:
 
    ```bash
-   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su signet»
+   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; nohup ./venv/bin/python -u rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su signet»
    ```
 
 2. *Coi file VECCHI* (solo se il dubbio è proprio sui file nuovi: sono
@@ -2711,7 +2711,7 @@ sono due strade, e si prova sempre la prima:
    `.mutinynet`, così si torna anche da qui:
 
    ```bash
-   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; for f in rgb.py rgb_http.py; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done; grep -c RGB_CATENA rgb.py; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → 0 (è il file dell'8 ott), poi «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» — Ctrl-C per fermare» (il vecchio non nomina la catena)
+   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; for f in rgb.py rgb_http.py; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done; grep -c RGB_CATENA rgb.py; nohup ./venv/bin/python -u rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → 0 (è il file dell'8 ott), poi «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» — Ctrl-C per fermare» (il vecchio non nomina la catena)
    cd ~/wdk-prova && for f in punti.mjs nwc-wdk.mjs identita.mjs; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done   # nel WSL: i tre file del wallet dell'8 ott
    ```
 
@@ -2735,7 +2735,7 @@ signet non sono stati toccati da nessun passo di questa migrazione.
 I comandi del passo:
 
 ```bash
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; source mutinynet.env && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; source mutinynet.env || exit 1; nohup ./venv/bin/python -u rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
 ssh -i ~/.ssh/lnvps -N -L 8787:127.0.0.1:8787 debian@vm-2050.lnvps.cloud   # in una finestra del WSL che resta aperta
 curl -s 127.0.0.1:8787/salute   # → {"ok": true, "wallet": "barattolo", "rete": "mutinynet"}
 curl -s -X POST 127.0.0.1:8787/fattura -d '{"quantita": 100}'   # → {"invoice": "rgb:…", …}
@@ -2745,7 +2745,16 @@ ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'source ~/rgb/mutinynet.env && cd
 ```
 
 Se `/salute` dice `"rete": "signet"`, `rgb_http.py` è partito senza il
-`source`. Finché gira, niente `rgb.py … barattolo` a mano: lo stesso
+`source`. **Corretto il 15 ott, dal 7a di Andrea** (in tutto il
+documento): con `source mutinynet.env && nohup … &` la `&` manda in
+sottofondo TUTTA la coppia, la sottoshell tiene aperta l'uscita di `ssh`
+e il comando resta appeso finché `rgb_http.py` vive; e Python su un file
+tiene le righe nel buffer, così il log restava vuoto. Ora: `source
+mutinynet.env || exit 1;` (se il file manca non parte niente, come
+prima), `nohup` da solo in sottofondo con lo stdin chiuso, e `python
+-u`. Provato in jammy-pulita: la forma vecchia tornava dopo 17 s su 20,
+la nuova dopo 1 s; senza `-u` il log era vuoto, con `-u` la prima riga
+c'è subito. Finché gira, niente `rgb.py … barattolo` a mano: lo stesso
 wallet non si apre in due posti.
 
 **Passo 8, il servizio NWC sul wallet di Mutinynet** (stessa chiave e
