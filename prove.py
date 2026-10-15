@@ -119262,7 +119262,14 @@ def prove_p2p_sconto():
     con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)", [
         (111, "pioniere", 10, 0, 0), (222, "", 900, 10, 10),
         (333, "", 4000, 30, 15)])
-    con.executemany("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", [
+    # TUTTE FIRMATE, come le registra il nostro client (15 ott 2026):
+    # dal giorno di P2P_FIRMA_CHIAVI_DAL lo sconto pretende `firmata=1`,
+    # e con le righe nude queste prove dipendevano dall'orologio — la CI
+    # e' diventata rossa da sola a mezzanotte. Cosi' un «no» qui sotto
+    # viene dai fatti (livello, account sparito), mai dalla firma; la
+    # riga nuda ha il suo caso, a orologio fermo, in fondo al blocco.
+    con.executemany("INSERT INTO chiavi_p2p(pubkey, tg_id, creato, firmata) "
+                    "VALUES(?,?,0,1)", [
         (PION, 111), (NORM, 222), (MAES, 333), (ORFA, 9999)])
     per = a["_sconti_per_chiavi_p2p"]
     prova("pioniere e non: un si' e un no", {PION: True, NORM: False},
@@ -119280,6 +119287,23 @@ def prove_p2p_sconto():
                                       "livello", "0.5")))
     prova("a leva spenta la stessa chiave risponde no", {PION: False},
           amb_con(0.0)["_sconti_per_chiavi_p2p"](con, [PION]))
+    # la riga NUDA del pioniere (un client che non e' il nostro), con
+    # l'orologio fermo ai due lati della data: la transizione intera ha
+    # le sue prove in `prove_chiavi_p2p_firmate`, qui basta che il banco
+    # di questa sezione non menta piu' a seconda del giorno in cui gira
+    NUDA = "f" * 64
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,111,0)",
+                (NUDA,))
+    fermo = amb_con(0.5)
+    fermo["time"] = type("T", (), {"time": staticmethod(
+        lambda: fermo["P2P_FIRMA_CHIAVI_DAL"])})
+    prova("dalla data la chiave NON firmata del pioniere non ha lo sconto, "
+          "la sua firmata si'", {NUDA: False, PION: True},
+          fermo["_sconti_per_chiavi_p2p"](con, [NUDA, PION]))
+    fermo["time"] = type("T", (), {"time": staticmethod(
+        lambda: fermo["P2P_FIRMA_CHIAVI_DAL"] - 1)})
+    prova("...e un secondo prima della data la stessa riga nuda lo aveva",
+          {NUDA: True}, fermo["_sconti_per_chiavi_p2p"](con, [NUDA]))
 
     def alza(chiavi):
         try:

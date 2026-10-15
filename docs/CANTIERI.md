@@ -57869,3 +57869,97 @@ Mostro, la -bar8, il verbale di pronto-libero): secondo rebase, di nuovo
 un solo conflitto in coda a questo file, e le stesse quattro sezioni
 rigirate severe sull'albero nuovo, 230 verdi. I collaudi sul ribasato li
 fa la CI.
+
+
+## La CI rossa a mezzanotte: lo sconto P2P e la data delle chiavi firmate (15 ott 2026, cantiere sconto-firma-orologio, richiesta di Andrea)
+
+La CI di main è diventata rossa da sola il 15 ott 2026 (run
+38694699911, job `prove`: 24.139 passate, 3 fallite), e il ref
+`pronto` è rimasto fermo su `15fad26`: nessun deploy partiva. L'ha
+trovata la sessione «migrazione-mutinynet» col suo push `f688cf3`,
+che toccava solo `deploy/rgb/`, `prove_leva_rgb` e documenti: la
+causa non era un commit, era una DATA. `P2P_FIRMA_CHIAVI_DAL =
+1792022400` (15 ott 2026, 00:00 UTC) è la transizione voluta della M5
+(«CSP e le voci aperte degli audit — 6) le chiavi P2P firmate»): da
+quel momento `_sconti_per_chiavi_p2p` dà lo sconto solo alle chiavi
+con `firmata=1`. Il banco della parte «3) la risposta al coordinatore»
+di `prove_p2p_sconto` seminava le chiavi in `chiavi_p2p` SENZA
+`firmata` (cioè 0): fino al 14 ottobre la riga nuda valeva, dal 15 no,
+e tre prove («pioniere e non: un si' e un no», «ENTRAMBI con lo
+sconto: due si'», «le maiuscole si normalizzano») aspettavano True e
+ricevevano False. Quel cantiere aveva emendato il banco con le cinque
+colonne, ma non con la firma: le prove passavano perché l'orologio
+stava ancora dalla parte giusta.
+
+**LA CURA, SOLO NELLE PROVE.** Il comportamento di produzione non si
+tocca: la data è voluta, e da oggi lo sconto pretende la firma. Nel
+banco le quattro chiavi si seminano con `firmata=1`, come le registra
+il nostro client: così un «no» di quelle prove viene dai fatti
+(livello, account sparito), mai dalla firma, e il risultato non
+dipende più dal giorno in cui la suite gira. Poi un caso nuovo a
+orologio FERMO (un `time` di cartone nell'ambiente, la stessa tecnica
+di `prove_chiavi_p2p_firmate`): una chiave NUDA del pioniere accanto
+alla sua firmata — alla data esatta la nuda dice False e la firmata
+True; un secondo prima la stessa riga nuda diceva True.
+
+**CHI PERDE LO SCONTO DAL 15: NESSUNO.** Contato da Andrea sul VPS, in
+sola lettura, il 15 ott: la leva è accesa (`P2P_SCONTO_FEDELTA_PERCENTO
+= 0.5`), e 5 utenti con lo sconto (pionieri o livello 5) hanno ANCHE
+chiavi non firmate, ma tutti e 5 ne hanno almeno una firmata: la
+transizione ha funzionato come previsto, i telefoni si sono rifirmati
+da soli. Le righe nude sono chiavi vecchie, e lo sconto si chiede solo
+per le trade key dello scambio in corso, che il client registra
+firmate. Se una nuda capitasse comunque in uno scambio, nessun avviso:
+il coordinatore fa prezzo pieno, e a prezzo fisso il cartello della
+commissione dice «sconto non verificato» al posto di «🌱 Pioniere» o
+«Lv. 5» (a prezzo di mercato non si vede: limite dichiarato in
+`scontoMancatoP2P`). Il conteggio:
+`SELECT COUNT(DISTINCT k.tg_id), COUNT(DISTINCT CASE WHEN NOT EXISTS
+(SELECT 1 FROM chiavi_p2p f WHERE f.tg_id=k.tg_id AND f.firmata=1)
+THEN k.tg_id END) FROM chiavi_p2p k JOIN utenti u ON u.tg_id=k.tg_id
+WHERE k.firmata=0 AND (u.coorte='pioniere' OR (u.xp>=3000 AND
+vendite_ok+acquisti_ok>=40))` → `5|0`.
+
+**LE STRADE SCARTATE.** Spostare la data in avanti, o leggerla dal
+config per le prove: avrebbe curato la CI rimandando la M5, cioè
+riaperto il buco dello sconto prestato. Fermare l'orologio su tutto il
+blocco 3 senza toccare i semi: le prove sarebbero tornate verdi, ma
+avrebbero continuato a provare un mondo (la riga nuda che vale) che in
+produzione da oggi non esiste più.
+
+**LA LEZIONE.** Una costante che è una DATA futura dentro un giudice è
+una bomba a tempo per ogni banco che la attraversa senza fermare
+l'orologio: il giorno del cantiere tutto è verde, e il rosso arriva
+settimane dopo addosso a chi pusha altro. In `prove.py` non ci sono
+altre prove che confrontano `time.time()` con `P2P_FIRMA_CHIAVI_DAL`:
+l'unica altra che la nomina (`prove_chiavi_p2p_firmate`) l'orologio lo
+ferma già ai due lati. Cercate anche le altre date scritte dentro, come
+epoch e come testo, dal 15 al 21 ottobre, in `prove.py`, `server.py` e
+`miniapp.html`: oltre a questa solo date già passate o a orologio fermo
+(`_stato("2026-10-20")`, il mezzogiorno fisso del 20 ott nei numeri del
+negozio, il `Date.now` di cartone del selettore): nessuna salta fra il
+17 e il 20. Il limite della ricerca: una data costruita in altro modo
+le sfuggirebbe. Gli altri banchi che seminano `chiavi_p2p` nudi
+(gli avvisi del P2P) non chiedono lo sconto, e la firma per loro non
+conta.
+
+**PROVATO.** Sull'albero `f688cf3` (punta di main, nessun commit
+nuovo nel frattempo): la sola sezione `prove_p2p_sconto` prima della
+cura 49 passate e 3 fallite, dopo 54 passate e 0 fallite (le due in
+più sono il caso nuovo); `prove_chiavi_p2p_firmate` 26 verdi. LA
+CONTROPROVA: col giudice guastato apposta (`>=` diventato `>` sulla
+data) la prova nuova cade, «dalla data la chiave NON firmata del
+pioniere non ha lo sconto», 53 e 1; `server.py` rimesso com'era.
+La suite severa intera (`PROVE_SEVERE=1`, `PYTHONUTF8=1`) 24.149
+passate e 0 fallite; i collaudi della CI in gabbia
+(`collaudi_ci.py --elenco ci/collaudi.txt`) 80 verdi e 0 rossi.
+Nessun rebase: main non si è mosso fino al push.
+
+**DA FARE (notati strada facendo, non fatti).** 1) Il «DA GUARDARE»
+della voce della M5 dà ancora la lettura col comando `sqlite3` e un
+percorso relativo, mentre le letture sul VPS si scrivono in python3
+sul collegamento `/srv/barattolo/satmarket.db` in sola lettura: da
+riscrivere come il conteggio qui sopra, ora che la data è passata. 2)
+Una sentinella che faccia arrossire `prove.py` quando una costante del
+server che è una data futura (`*_DAL = 17…`) viene letta da un banco
+che non ferma l'orologio: oggi la regola sta solo in questa voce.
