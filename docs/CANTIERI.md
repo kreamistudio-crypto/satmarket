@@ -59100,3 +59100,199 @@ cd ~/nodo && docker compose exec -T lnd lncli fwdinghistory --start_time $(date 
 Provati prima su risposte di cartone (un `listpayments` finto con tre
 rotte e un fallito, un `pagamenti_noti` finto), poi lanciati da Andrea
 sul nodo vero il 15 ott. Nel commit c'è solo questa voce.
+
+## Phoenix e i sats da bloccare: «commissione insufficiente», il tetto ACINQ dei 450k, la riga nell'app e l'avviso d'uscita (13-15 ott 2026, cantiere phoenix-blocca-sats, richiesta di Andrea)
+
+**IL CASO.** Chi blocca i sats della garanzia P2P da Phoenix riceve
+spesso «commissione insufficiente». Il 13 ott il venditore dell'ordine
+2709FB37 (189.784 sats) c'è riuscito al quarto tentativo, fra le 17:08
+e le 17:28 italiane, e dice che succede spesso. La nostra entrata era a
+posto: ~517.000 utili sul canale ACINQ grande, 4,7 milioni su LNBiG.
+Studio prima, poi una riga d'aiuto nell'app; nessuna modifica al nodo,
+a Mostro o al VPS.
+
+**COSA SI È LETTO SUL NODO** (comandi scritti da me uno alla volta,
+sola lettura, lanciati da Andrea; ore UTC):
+1) Il log di LND fra 15:00 e 15:35, filtrato su ACINQ, disconnessioni,
+   HSWC e INVC: UNA riga, l'iscrizione alla fattura della garanzia alle
+   15:08:13 (hash che comincia per `8a786957`). Nessuna caduta del
+   collegamento con ACINQ. A livello INF LND non scrive gli HTLC (manca
+   anche quello riuscito): indizio, non prova.
+2) `listchannels`: ACINQ grande (`1063354188044304385`) loro 337.845 +
+   382.919 appesi (193.135 + 189.784), acceso il 99,8 % di 28 giorni;
+   ACINQ piccolo ~5-9k di entrata, inutile per ricevere; tutti pubblici.
+   I `local_constraints` (30 HTLC, 450k) sono i tetti che ACINQ mette a
+   quel che offriamo NOI; i `remote_constraints` (483, 990k) quelli che
+   mettiamo noi a lui.
+3) `getchaninfo` del canale ACINQ grande: ACINQ verso di noi 1 sat +
+   499 ppm, `time_lock_delta` 144, `max_htlc_msat` 450.000.000, nessuna
+   inbound fee, politica ferma dal 5 ott; la nostra 1 sat + 500 ppm, 80.
+4) `lookupinvoice` della garanzia (solo i campi utili, mai la bolt11 né
+   i codici): ACCEPTED, 189.784, creata 15:08:12, `expiry` 86.400 s,
+   `cltv_expiry` 576, non privata, nessun route hint, MPP dichiarato. UN
+   pezzo solo, intero, dal canale ACINQ grande, alle 15:25:21 al blocco
+   971262, scadenza al blocco 971949: 687 = 576 + 111, il ritardo a
+   caso che Phoenix aggiunge. I tre tentativi falliti non sono MAI
+   arrivati alla fattura.
+5) `listinvoices`, cosa era appeso sul canale grande fra 15:00 e 15:30:
+   due righe sole, fc721859 (193.135, dalle 13:31:50) e 2709fb37.
+6) `getchaninfo` di LNBiG (`1066579055655714817`): LNBiG verso di noi 1
+   sat + 733 ppm, `time_lock_delta` 80, `max_htlc_msat` 4,29M, inbound
+   fee 0; la nostra 1 sat + 2.500 ppm.
+7) `deploy/nodo/sonda-rotte.py` (Andrea, 15 ott): il giro ACINQ → LNBiG
+   Hub-3 → LNBiG Hub-2 → noi sta nel budget di Phoenix a 100k, 300k,
+   500k e 1M (costo 75-734 sats contro 404-4.004), con 4,83M di entrata
+   utile su LNBiG.
+
+**COSA SI È LETTO NEL SORGENTE** (Phoenix, lightning-kmp ed Eclair su
+`master`, 13 ott; citazioni lette, non a memoria):
+- PHOENIX ha UN solo gradino di commissione verso il trampolino: 4 sat
+  + 4.000 ppm (0,4 %) e 576 blocchi. Con un gradino solo, ogni errore
+  del trampolino finisce in `RetryExhausted`: Phoenix NON riprova da
+  solo, l'utente sì. Sul finale aggiunge un ritardo a caso di 72-144
+  blocchi; il suo tetto locale è 2.016 blocchi, e 576 + 144 + 576 =
+  1.296 passa sempre: il nostro `hold_invoice_cltv_delta` 576 non c'entra.
+- LIGHTNING-KMP traduce `TrampolineFeeInsufficient`,
+  `TrampolineExpiryTooSoon` e `FeeInsufficient` nello stesso
+  `NotEnoughFees`: è la «commissione insufficiente» dello schermo.
+- ECLAIR (`NodeRelay`) risponde `TrampolineFeeInsufficient` anche quando
+  NON TROVA LA STRADA (`RouteNotFound`) o quando l'unico errore è
+  `BalanceTooLow` con una commissione non «alta» (sotto cinque volte la
+  sua minima): la frase è un ripiego, non un giudizio sulla commissione.
+  Il budget della rotta è tutto quel che Phoenix lascia (contando anche
+  il canale di ACINQ verso di noi), i blocchi sono i 576.
+- ECLAIR (`Commitments.canSendAdd`) applica a quel che MANDA il più
+  piccolo dei due tetti, il suo e il nostro: verso di noi ACINQ non tiene
+  appesi più di 450k sul canale grande (il 45 % di 1M, default di
+  Eclair), anche se noi ne permettiamo 990k. E il saldo che guarda il
+  suo cercatore di strade (`availableBalanceForSend`) quel tetto non lo
+  conta: la strada sembra buona, poi il canale rifiuta. Il
+  `max_htlc_msat` di 450.000.000 lo conferma. Gli scalini con cui Eclair
+  abbassa il `max_htlc` a saldo basso, invece, sul nodo ACINQ NON ci
+  sono (previsti da me, smentiti dal `getchaninfo`).
+
+**COSA SE NE CONCLUDE.**
+- I tre fallimenti del 13 sera NON si spiegano dal nostro lato:
+  entrata (189k stavano interi nel canale grande), tetto (383k appesi,
+  sotto i 450k), collegamento (nessuna caduta), blocchi (576 passa),
+  tariffe (ACINQ ~96 sats contro i 763 del budget; nessuna inbound fee;
+  le nostre si pagano solo sugli inoltri in uscita, non da chi ci paga).
+  Sono morti DENTRO ACINQ prima di arrivare a noi: il perché sta nei
+  loro log.
+- IL TETTO DEI 450k È UN LIMITE VIVO: con due garanzie da ~190k appese,
+  sul canale grande restano ~67k di posto finché uno scambio non si
+  chiude. Ma la sonda dice che il giro via LNBiG sta nel budget di
+  Phoenix fino a 1M: il tetto ha la sua riserva. DECISIONE DI ANDREA (15
+  ott): NESSUN CANALE NUOVO. Restano in fila, se un giorno servissero:
+  un canale ACINQ più grande (il tetto cresce col 45 % della capienza)
+  o un secondo canale ACINQ (un tetto per canale) — tutti e due con
+  apertura on-chain, capitale fermo e LND 0.19 senza splicing.
+- TRE SBAGLI MIEI corretti da Andrea, scritti perché non si rifacciano:
+  a) «la richiesta vale 900 secondi»: la bolt11 della garanzia scade
+  dopo 86.400 s (Mostro non le passa un `expiry`, vale il default di
+  LND); il tempo vero lo tiene il cronometro di Mostro, che annulla:
+  `expiration_seconds = 1800` per chi prende e
+  `maker_expiration_seconds = 10800` per chi pubblica — dai documenti
+  (NODO-MOSTRO), il `settings.toml` in questo cantiere non è stato
+  riletto. Avevo letto una copia locale di main vecchia di cinque
+  giorni, e CLAUDE.md dice ancora «900». b) i 517k «divisi su due
+  canali»: stanno quasi tutti sul grande. c) gli scalini del `max_htlc`
+  di ACINQ: non ci sono.
+
+**LA RIGA NELL'APP.** `rigaPhoenixHoldP2P()`, pura, sul calco della
+riga per Wallet of Satoshi (`rigaWosHoldP2P`), in fondo al foglio «🔒
+Blocca i sats», sotto «Copia la richiesta» e la sua nota, sullo stesso
+fondo giallo. Il testo è di Andrea, con le virgolette «» della casa:
+«💡 Phoenix dice «commissione insufficiente»? Non è colpa tua e non devi
+cambiare niente: riprova fra un minuto, la richiesta resta valida
+finché il conto alla rovescia non finisce. Se dopo 3 tentativi non
+passa ancora, prova con un altro wallet Lightning.» SENZA un numero di
+minuti, apposta: chi prende e chi pubblica hanno tempi diversi, e li
+dice la riga «⏱ Scade tra». Solo nella garanzia, non nella cauzione.
+
+**L'AVVISO D'USCITA** (15 ott, chiesto da Andrea a cantiere aperto:
+nel gruppo degli admin, argomento liquidità, quando l'uscita spendibile
+totale scende sotto 400.000 o quando il canale più carico in uscita non
+regge un ordine al tetto P2P, 250 €; leva spenta di serie; quel giorno
+l'uscita utile era ~552k: ACINQ piccolo 298k, grande 187k, LNBiG 68k).
+È la guardia della liquidità del server (11 ott), che manda già al
+gruppo degli admin con l'argomento «liquidita»:
+- LA PRIMA METÀ C'ERA GIÀ: `LIQUIDITA_USCITA_MIN`, la terza domanda,
+  spenta a 0. Si accende scrivendo 400000 nel config del VPS. La
+  ragione per cui nacque spenta resta vera e va saputa prima di
+  accenderla: i sats del payout sono quelli della garanzia appena
+  incassata, quindi l'avviso può suonare il giorno in cui tutti i
+  venditori sono stati pagati.
+- LA SECONDA È LA QUARTA DOMANDA, `LIQUIDITA_USCITA_CANALE` (False di
+  serie): il canale in linea con più uscita spendibile regge da solo un
+  ordine al tetto `P2P_MAX_EURO`, al cambio di adesso? Il tetto in sats
+  lo fa `_tetto_p2p_in_sats` e lo mette in `n` (il giudizio resta
+  PURO); senza tetto in euro o senza cambio è un «non so», che non
+  allarma e non fa dire «rientrato». È UNA PRUDENZA E NON UN MURO:
+  Mostro non passa `max_parts`, e LND legge lo zero come 16 pezzi
+  (`DefaultMaxParts`, routerrpc della 0.19.3, letto) quando la fattura
+  di chi riceve dichiara MPP; senza MPP il payout esce intero da un
+  canale. Io ricordavo il contrario («zero = un pezzo»): il sorgente
+  dice 16.
+- Scartato: una leva nuova anche per il totale (doppione di
+  `LIQUIDITA_USCITA_MIN`); un aiutante a parte per la voce nel giudizio
+  (avrebbe chiesto un pezzo in più nei due banchi che ritagliano per
+  nome).
+- La procedura sul VPS sta in PRODUZIONE, «LA GUARDIA DELLA
+  LIQUIDITÀ», «L'AVVISO D'USCITA»: prima il grep delle sole righe, poi
+  `LIQUIDITA_USCITA_MIN = 400000` e `LIQUIDITA_USCITA_CANALE = True`,
+  riavvio. Gli avvisi partono solo a guardia accesa; `/canali` mostra
+  le voci anche a guardia spenta.
+
+**PROVATO.** In `prove_apri_wallet_p2p` le sentinelle (testo intero,
+pura, sotto i 260 caratteri, nessun «N minuti», nessun nome di chi
+custodisce o instrada, una chiamata sola, solo nella garanzia, in fondo
+dopo il Copia e la nota, il css) e il banco coi due render veri.
+Controprova a sei mutazioni (chiamata tolta, riga anche nella cauzione,
+un numero di minuti, riga sopra il Copia, css tolto, consiglio
+dell'altro wallet tolto): prese tutte. Vista a 375 nel browser su una
+copia statica della pagina, con un ordine finto. Le cinque sezioni che
+leggono il foglio (`prove_apri_wallet_p2p`, `prove_prova_wallet`,
+`prove_tempo_pubblica_app`, `prove_reputazione_p2p`,
+`prove_cauzione_p2p`): 406 passate, 0 fallite sull'albero del 13
+(`15fad26`). Nessun collaudo della CI tocca quel foglio.
+L'avviso d'uscita: in `prove_guardia_liquidita` la leva spenta,
+`esce_max` coi numeri del 6 ott (un canale fuori linea non conta), le
+tre risposte coi loro testi, la voce assente a leva spenta, il tetto in
+sats su cinque casi (250 € a 100.000 e a 60.000 €/BTC, tetto spento,
+cambio a zero, cambio che esplode), la sentinella sul quadro e il
+config d'esempio: 73 passate, 0 fallite. In
+`collaudo_guardia_liquidita` il caso 8-bis contro l'LND di cartone
+(silenzio, allarme con le cifre, un «non so» che tiene lo stato,
+rientrato): 46 passate, 0 fallite. Controprova a otto mutazioni di
+server.py: prese tutte. Cosa è girato sull'albero finale: nel verbale
+del push, qui sotto.
+
+**DA FARE** (notati, non fatti; decide Andrea):
+- Vedere DAL VIVO se Eclair prende davvero il giro via LNBiG quando il
+  canale ACINQ grande è pieno: un pagamento da Phoenix più grosso del
+  posto appeso rimasto, poi `lookupinvoice` per leggere il canale
+  d'ingresso (la lista `htlcs`). Letto nel codice, mai visto succedere.
+- La causa dei tre fallimenti del 13: la schermata dei dettagli del
+  pagamento fallito nel Phoenix del venditore, o una domanda al
+  supporto ACINQ con l'hash (`8a786957…`) e gli orari 15:08-15:25 UTC;
+  e gli inoltri in transito sul canale in quei minuti, che occupano il
+  tetto senza comparire fra le fatture (`fwdinghistory` scrive solo i
+  riusciti).
+- LA GUARDIA DELLA LIQUIDITÀ NON VEDE IL TETTO: giudica Phoenix sul
+  saldo di ACINQ (`remote_balance`), che non conta gli HTLC appesi né
+  il tetto dei 450k; `/canali` li mostra (quanti e quanto) ma non li
+  giudica. Un avviso si fa lì: «posto appeso su ACINQ» = il più piccolo
+  dei due `max_pending_amt_msat` meno gli HTLC in entrata del canale;
+  sotto una soglia, la domanda della strada da LNBiG che la guardia ha
+  già (`_strada_phoenix`). Proposta, non fatta.
+- CLAUDE.md dice «I 900 secondi di `expiration_seconds` restano 900»:
+  sono 1800. Commit a parte (ok di Andrea).
+- Il foglio della cauzione non ha la riga Phoenix, anche se pure la
+  cauzione si paga con una fattura trattenuta.
+- Se il foglio non conosce la scadenza, la riga «⏱ Scade tra» non
+  compare e la riga Phoenix nomina un conto alla rovescia che non c'è.
+- ACINQ verso di noi chiede 499 ppm, quasi la copia dei nostri 500, e la
+  sua ultima modifica è del 5 ott, il giorno del nostro rialzo: da
+  capire se segue la nostra tariffa (se sì, alzarla toglie budget a
+  Phoenix).
