@@ -58783,9 +58783,10 @@ SEGRETO né nel journal né negli avvisi. Suite e collaudi: nel verbale
 del push.
 
 **DA FARE** (notati, non fatti):
-- PRODUZIONE ha ancora due comandi con `~/satmarket/config.py` (le
-  leve `P2P_CHAT_SCAMBIO` e `AVVISO_CORRIERI_PUNTI`): il percorso vero
-  è `/srv/barattolo/config.py`, già corretto in CLAUDE.md dal 10 ott.
+- ~~PRODUZIONE con `~/satmarket/config.py` in due comandi~~: FATTO
+  nello stesso push (ok di Andrea), le leve `P2P_CHAT_SCAMBIO` e
+  `AVVISO_CORRIERI_PUNTI` ora dicono `/srv/barattolo/config.py`, come
+  CLAUDE.md dal 10 ott.
 - Una reazione (kind 7) o un invito MLS dentro una busta arrivano come
   «Messaggio cifrato di tipo N»: se servono frasi loro, si decide.
 - Un kind 4 dentro una busta NIP-17 (non lo fa nessun client noto)

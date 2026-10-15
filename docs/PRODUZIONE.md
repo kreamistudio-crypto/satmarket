@@ -4866,7 +4866,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `P2P_CHAT_SCAMBIO`, accesa di serie anche senza la sua riga. Per
   spegnerla: nel config del VPS la riga `P2P_CHAT_SCAMBIO = False`, e
   riavvio del servizio (`systemctl restart barattolo`). Si guarda prima
-  se la riga c'è già: `grep -n "P2P_CHAT_SCAMBIO" ~/satmarket/config.py`.
+  se la riga c'è già: `grep -n "P2P_CHAT_SCAMBIO" /srv/barattolo/config.py`.
   Da spenta la chat sparisce dalla pagina dello scambio, il pallino
   tace, e il server non accetta buste nuove né ne consegna; le buste
   che ci sono restano nel file e se ne vanno come sempre, a scambio
@@ -4901,7 +4901,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Per accenderla: nel `config.py` del VPS la riga
   `AVVISO_CORRIERI_PUNTI = True`, poi `sudo systemctl restart
   barattolo`. Si guarda prima se la riga c'è già: `grep -n
-  "AVVISO_CORRIERI_PUNTI" ~/satmarket/config.py`. Parte al primo giro
+  "AVVISO_CORRIERI_PUNTI" /srv/barattolo/config.py`. Parte al primo giro
   dell'orologio dopo il riavvio, e nel journal lascia la riga
   «📦 Campagna «corrieri per i punti»: avvisati N venditori [...]» con
   gli id: è il modo di sapere a chi è arrivata. Partita una volta non
