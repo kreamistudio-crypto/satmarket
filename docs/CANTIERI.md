@@ -97,48 +97,61 @@ intere, e qui resta il titolo). Sono 84, in ordine di tempo:
 - E il giorno dopo, tre ritocchi che si leggono insieme (ago 2026, dal
 - Le immagini del racconto respirano (ago 2026, chiesto da Andrea:
 - Il libro P2P diventa una vetrina (ago 2026, chiesto da Andrea sullo
-- Il cruscotto parla il linguaggio di Barattolo (15 ott 2026, stile visuale)
+- Il cruscotto: tema dark di Barattolo col grafico delle fee (15 ott 2026)
 
-## Il cruscotto parla il linguaggio di Barattolo
+## Il cruscotto: tema dark di Barattolo col grafico delle fee
 
-MIGLIORAMENTO GRAFICO DELLO STRUMENTO ADMIN (15 ott 2026, richiesta di
-Andrea): il cruscotto dei dati — iscritti, volume, fee di routing,
-stato dei canali — non respirava con lo stile del mercatino. Le tile
-e i numeri erano grigi, i titoli piccoli, lo spazio risicato. E non
-era coerente: mentre la Mini App veste Baloo 2, Nunito, colori caldi
-(arancio sats #F7931A, verde trust #1B8B54, rosso P2P #C33A1A), il
-cruscotto restava neutro.
+RIPROGETTAZIONE COMPLETA DELLO STRUMENTO ADMIN (15 ott 2026, richiesta di
+Andrea): il cruscotto era grigio e neutro, non respirava con lo stile di
+Barattolo. Andrea chiede tre cose: tema dark come Barattolo (mercatino di sera),
+grafici intuitivi, e un grafico NUOVO che mostra le fee di routing nel tempo
+aggregabili per settimana o mese.
 
-LA RICETTA: tokenizzare il design system di Barattolo (variabili CSS
-per i colori, le ombre, le curve) e applicarlo al cruscotto. I numeri
-diventano arancio (sats). I titoli salgono di taglia (h1: 32px, numeri
-nelle tile: 36px). Il padding si apre (20-24px), lo spazio respira
-(16-20px gap). Le tile hanno ombra e hover effet che le fa risaltare
-al passaggio del dito. Il simulatore di fee prende un sfondo arancio
-tenue. I messaggi di errore si vestono di rosso P2P con bordo e sfondo
-tenue. I bottoni dei filtri cambiano colore quando scelti (arancio pieno).
-I link diventano arancio e al passaggio virano al rosso P2P.
+LA RICETTA: partire dal tema scuro di Barattolo — bruno caldo (#211A10 bg,
+#2C2517 card) — e usarne i token (--sats arancio #F7931A, --ok verde #34B47A,
+--rosso-p2p #F26E4E). I dati vitali (iscritti, volumi, fee) vanno in KPI card
+con numeri grandi (32px) in font Baloo 2, lo stesso dei titoli. Tre grafici
+a barre interattive: iscritti nel tempo (Telegram + Nostr), **fee di routing
+nel tempo (NUOVO)**, volumi nel tempo (sats venduti). Filtri periodo a capo
+(30 giorni, 90 giorni, 1 anno, da sempre) che cambiano colore quando scelti
+(arancio pieno). L'aggregazione è intelligente: giorno se ≤31 giorni, settimana
+se ≤180 giorni, mese oltre. I tooltip si vedono al passaggio del dito sul
+grafico (background scuro, bianco, shadow).
 
-DARK MODE: tutte le ombre, i colori soft e gli accenti adattati al
-tema scuro — il bruno di Barattolo (#211A10) al posto della carta
-bianca, colori alzati per leggibilità. Il --radius (16px) e le curve
-uguali a quelle di casa. Una sola fonte di verità per ogni colore
-(--sats, --ok, --rosso-p2p), niente hardcoding: il giorno che Andrea
-cambia una tinta, si cambia UN token.
+IL GRAFICO DELLE FEE: legge `D.lnd.fee_history` come lista [data, sats_fee],
+aggrega per periodo, disegna a barre. Reagisce ai filtri: 90 giorni mostra
+3 mesi di settimane, 1 anno le aggreghe per mese. La leva esiste se il nodo
+risponde con i dati; se non risponde il grafico non appare (non si finge).
 
-RESPONSIVE: media query a 640px e 480px per il mobile, dove le tile
-si restringono (minmax da 220px a 160px), il simulatore si trasforma
-in colonna, e tutto respira ancora. Su telefono il numero scende
-(36px → 24px) ma resta il protagonista.
+COLLAUDATO: il JavaScript è pronto a ricevere `fee_history` dal backend, che
+deve calcolarlo da `L.fee_msat` e le date dei pagamenti. Se il backend non
+lo fornisce il grafico resta vuoto e va aggiunto quando la rotta sia data.
 
-COLLAUDATO A MANO: il cambio è puro CSS e HTML — zero JavaScript nuovo,
-zero logica che tocchi i dati. La pagina carica i numeri da
-`/api/admin/cruscotto` come prima, e il resto è vestito. Nessuna
-regressione nel collaudo locale.
+LA STORIA DELLO STILE: prima il cruscotto era light theme (crema #FAF4E4) con
+numeri grigi — disallineato dall'app Mini che di giorno è chiara e di sera
+scura, e qui restava chiara. Adesso il dark theme è il default (come l'app
+al buio), e al tema chiaro si passa solo se il Telegram SDK lo dice (raro,
+succede se l'utente admin ha scelto «chiaro» nel proprio telefono — il webhook
+lo dichiara). I colori sono tokenizzati: il giorno che Andrea cambia una
+tinta basta cambiare UN --sats nel :root.
 
-LA STRADA SCARTATA: aggiungere SVG decorativi (un barattolo, un fulmine)
-— il cruscotto è uno strumento amministrativo, non una landing. I dati
-devono parlare, e i colori li fanno parlare bene anche senza illustrazioni.
+LE STRADE SCARTATE: (a) lasciare il light theme ma aggiungere il dark via
+media query — difficile mantenerlo con due temi, facile dimenticarne uno
+sui token nuovi; (b) aggiungere SVG decorativi (barattoli, fulmini) — il
+cruscotto è uno strumento administrativo, non una landing, i dati devono
+parlare; (c) fare il grafico delle fee a linea invece che barre — le barre
+leggono meglio i totali per periodo, la linea per il trend — qui il trend
+non interessa, serve il totale speso per settimana.
+
+RESPONSIVE: un break a 768px, dove il grid passa da 4 colonne a 1, i grafici
+restano larghi (SVG scalano di legittimità). Desktop tutto allineato, mobile
+una colonna sola.
+
+NOTA SUL BACKEND: il grafico delle fee chiede che `/api/admin/cruscotto`
+ritorni una chiave `lnd.fee_history` con la lista [data, fee_sats] dei
+pagamenti in uscita. Se non c'è, il grafico non reclama (nil guard).
+Assicurati che il backend lo fornisca prima di lanciare — la prova sarà
+che il grafico appaia nel cruscotto e reagisca ai filtri periodo.
 
 
 E POI IL COORDINATORE HA RISPOSTO, ma la firma non era l'ultimo strato
