@@ -2801,3 +2801,57 @@ si riemetta.
   ruota Python e il binario Utexo su MUTINYNET. Su signet regge dal 1
   ott, e i due pezzi da soli vanno in rete con l'Esplora; il giro intero
   è il passo 6 di 13.4.
+
+### 13.6 Le istruzioni ufficiali dei giudici (arrivate il 15 ott) e cosa si prepara il 16
+
+Riportate da Andrea il 15 ott, durante la migrazione; il piano del 15 non
+cambia. Sono l'agenda del 16.
+
+**Entro venerdì 16 ott, ore 23:00 CEST (OBBLIGATORIO):**
+
+- Un repo GitHub **PUBBLICO** `fidelity-points` col README: il team, i
+  membri con lo username GitHub, l'idea, lo stack, cosa funziona già, e
+  **TUTTO il lavoro precedente dichiarato**; il codice già scritto, nei
+  suoi file originali; push.
+- Poi nome del progetto e del team, col link, a `info.rgb@proton.me` o su
+  Telegram a @birk1907 / @Maryive.
+- Mai segreti (seed, chiavi, `.env`): il `.gitignore` si controlla due
+  volte. Mai force push, mai rebase di commit già pushati. Niente zip,
+  niente binari.
+
+**Domenica 18, entro le 13:00:** il commit finale su main; il README con
+l'installazione, cosa è stato fatto all'hackathon, cosa è mock o
+simulato, le funzioni RGB, QVAC e WDK usate. Mini-demo dal vivo di circa
+3 minuti fra le 13:00 e le 14:30; i finalisti mandano il PDF entro le
+15:50, e il pitch è di 5 minuti più 2 di domande.
+
+**I criteri:** RGB 25% (uso reale); QVAC 20% (AI locale, con un motivo);
+Execution 20% (cosa funziona dal vivo); UX 15% (un utente non tecnico,
+errori comprensibili); Innovation 10%; Marketability 10% (la vita dopo
+domenica); WDK bonus +1.
+
+**Il repo, com'è il 15 (letto con `gh`, sola lettura):**
+`kreamistudio-crypto/fidelity-points` esiste, creato l'8 ott alle 14:05
+UTC, **PRIVATO**, collaboratori `kreamistudio-crypto` e `alanbimbati`;
+dentro solo `README.md`, `LICENSE` e `.gitignore`, ultimo commit `af445f7`
+dell'8 («minimal repository, for transparency only»). Le istruzioni
+rovesciano due scelte dell'8 ott (§10, prima riga; studio, G.1): il repo
+va reso PUBBLICO, e deve contenere il lavoro precedente e il codice già
+scritto, non solo dichiararlo. Chi lo rende pubblico e cosa ci entra
+(quali file di `deploy/rgb/`, le due bozze di `docs/spec/`, la
+dichiarazione di §5 e §12.9 in inglese, mai `config.py` né le chiavi) è
+una decisione di Andrea con Alan, da prendere il 16 mattina: rendere
+pubblico un repo è un gesto che non si disfa (una copia può restare in
+giro). Barattolo (`satmarket`) resta privato.
+
+**Da preparare il 16 (richiesta di Andrea del 15):**
+
+1. L'elenco degli errori che un utente può vedere nella demo, ognuno con
+   la sua frase comprensibile (criterio UX).
+2. Come si mostra che QVAC è locale (Wi-Fi spento, §10 punto 10) e
+   perché: le abitudini di spesa restano sul dispositivo (criterio
+   QVAC, «con un motivo»).
+3. Il flusso vero della demo, schermata per schermata (§11.2 è il punto
+   di partenza), da confrontare col copione di 3 minuti di Andrea.
+4. Il repo `fidelity-points`: lo stato è qui sopra; le decisioni del 16
+   sono la visibilità, il contenuto e chi fa il push.
