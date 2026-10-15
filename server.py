@@ -17411,6 +17411,41 @@ async def _canale_vetrina_comando(chat: int, arg: str):
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
+async def _canale_bitcoin_podcast_comando(chat: int, arg: str):
+    """Il ramo «/canale bitcoinpodcast …» (ott 2026): dove vanno gli
+    annunci e gli scambi P2P per BitcoinPodcastTelegram, senza filtro
+    @username."""
+    if not arg:
+        imposta_canale_bitcoin_podcast("")
+        await notifica_admin(f"📻 BitcoinPodcast: spento (da tg {chat})",
+                             argomento="riepiloghi")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "✅ Fatto: non pubblico più in BitcoinPodcastTelegram.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    r = await bot_api("sendMessage", {
+        "chat_id": arg, "parse_mode": "HTML",
+        "text": "🫙 <b>Barattolo pubblicherà qui i nuovi annunci e gli "
+                "scambi P2P.</b>\nMercatino e comunità in satoshi, con "
+                "deposito di garanzia."})
+    if not (r and r.get("ok")):
+        motivo = (r or {}).get("description") or "nessuna risposta"
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"❌ Non riesco a scrivere in <code>"
+                    f"{html.escape(arg)}</code>.\nTelegram dice: "
+                    f"<i>{html.escape(str(motivo))}</i>\n\n"
+                    "Il bot dev'essere amministratore di quel canale, "
+                    "col permesso di pubblicare (e di modificare i "
+                    "propri messaggi, per il ✅ Venduto).",
+            "parse_mode": "HTML"})
+    imposta_canale_bitcoin_podcast(arg)
+    await notifica_admin(f"📻 BitcoinPodcast: {arg} (da tg {chat})",
+                         argomento="riepiloghi")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: gli annunci e gli scambi P2P nuovi escono "
+                f"anche in <code>{html.escape(arg)}</code>.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def _canale_riepilogo_comando(chat: int, arg: str):
     """Il ramo «/canale riepilogo …»: dove va il post del lunedi'.
 
@@ -17474,6 +17509,8 @@ async def comando_canale(mittente: dict, testo: str):
         return await _canale_riepilogo_comando(chat, resto)
     if prima == ["vetrina"]:
         return await _canale_vetrina_comando(chat, resto)
+    if prima == ["bitcoinpodcast"]:
+        return await _canale_bitcoin_podcast_comando(chat, resto)
     if not arg:
         ora = canale_id()
         stato = (f"Adesso scrivo in <code>{html.escape(ora)}</code>."
@@ -17482,6 +17519,10 @@ async def comando_canale(mittente: dict, testo: str):
         stato += ("\nIl riepilogo del lunedì va in <code>"
                   f"{html.escape(riep)}</code>." if riep else
                   "\nIl riepilogo del lunedì non ha dove andare.")
+        btc = canale_bitcoin_podcast()
+        stato += ("\nBitcoinPodcast va in <code>"
+                  f"{html.escape(btc)}</code>." if btc else
+                  "\nBitcoinPodcast è spento.")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": f"📣 <b>Canale del mercatino</b>\n{stato}\n\n"
                     "Per cambiarlo: <code>/canale @nomecanale</code> "
@@ -17490,7 +17531,9 @@ async def comando_canale(mittente: dict, testo: str):
                     "Per spegnerlo: <code>/canale spento</code>.\n"
                     "Per il riepilogo del lunedì: <code>/canale "
                     "riepilogo @nomecanale</code> (senza nome, torna "
-                    "dove vanno gli annunci).\n\n"
+                    "dove vanno gli annunci).\n"
+                    "Per BitcoinPodcast: <code>/canale bitcoinpodcast "
+                    "@nomecanale</code> (senza nome, si spegne).\n\n"
                     "⚠️ Il bot dev'essere <b>amministratore</b> del "
                     "canale, o non riuscirà a pubblicare.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
@@ -64319,6 +64362,7 @@ async def _posta_promo_singolo(a: dict, giorni: int):
         except Exception as e:
             print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
     post_vetrina_id = 0
+    post_bitcoin_podcast_id = 0
     caption = _caption_canale(a, cambio, altri=altri)
     foto = _foto_url_nostr(a.get("foto", ""))
     if canale_id():
@@ -64337,12 +64381,17 @@ async def _posta_promo_singolo(a: dict, giorni: int):
     if canale_vetrina() and (a.get("venditore_username") or ""):
         post_vetrina_id = await _manda_post_canale(
             canale_vetrina(), caption, foto)
-    if post_nostr_id or post_canale_id or post_vetrina_id:
+    # BitcoinPodcastTelegram (ott 2026): nuovo canale, NO filtro @username
+    if canale_bitcoin_podcast():
+        post_bitcoin_podcast_id = await _manda_post_canale(
+            canale_bitcoin_podcast(), caption, foto)
+    if post_nostr_id or post_canale_id or post_vetrina_id or post_bitcoin_podcast_id:
         con = db()
         con.execute(
             "UPDATE annunci SET post_nostr_id=?, post_canale_id=?, "
-            "post_vetrina_id=? WHERE id=?",
-            (post_nostr_id, post_canale_id, post_vetrina_id, a["id"]))
+            "post_vetrina_id=?, post_bitcoin_podcast_id=? WHERE id=?",
+            (post_nostr_id, post_canale_id, post_vetrina_id,
+             post_bitcoin_podcast_id, a["id"]))
         con.commit()
         con.close()
 
@@ -66373,7 +66422,8 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         # Ognuna fallisce per conto suo: se il canale della comunita'
         # ci ha tolto i permessi, il nostro si aggiorna lo stesso.
         dove = [(canale_id(), a["post_canale_id"]),
-                (canale_vetrina(), _post_vetrina(a))]
+                (canale_vetrina(), _post_vetrina(a)),
+                (canale_bitcoin_podcast(), a.get("post_bitcoin_podcast_id"))]
         if not any(c and m for c, m in dove):
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
@@ -66405,16 +66455,17 @@ async def promo_rimuovi(annuncio_id: int):
     try:
         con = db()
         a = con.execute(
-            "SELECT post_canale_id, post_vetrina_id, post_nostr_id, "
-            "foto FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
+            "SELECT post_canale_id, post_vetrina_id, post_bitcoin_podcast_id, "
+            "post_nostr_id, foto FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
         con.close()
         vetrina = _post_vetrina(a) if a else 0
         if not a or not (a["post_canale_id"] or vetrina
-                         or a["post_nostr_id"]):
+                         or a.get("post_bitcoin_podcast_id") or a["post_nostr_id"]):
             return
         # ogni canale col SUO id, e ognuno fallisce per conto suo
         for canale, msg in ((canale_id(), a["post_canale_id"]),
-                            (canale_vetrina(), vetrina)):
+                            (canale_vetrina(), vetrina),
+                            (canale_bitcoin_podcast(), a.get("post_bitcoin_podcast_id"))):
             if canale and msg:
                 await bot_api("deleteMessage",
                               {"chat_id": canale, "message_id": msg})
@@ -66424,7 +66475,7 @@ async def promo_rimuovi(annuncio_id: int):
                              "Annuncio rimosso da Barattolo"))
         con = db()
         con.execute("UPDATE annunci SET post_canale_id=0, "
-                    "post_vetrina_id=0, post_nostr_id='' WHERE id=?",
+                    "post_vetrina_id=0, post_bitcoin_podcast_id=0, post_nostr_id='' WHERE id=?",
                     (annuncio_id,))
         con.commit()
         con.close()
