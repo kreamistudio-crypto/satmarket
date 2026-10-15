@@ -59296,3 +59296,11 @@ del push, qui sotto.
   sua ultima modifica è del 5 ott, il giorno del nostro rialzo: da
   capire se segue la nostra tariffa (se sì, alzarla toglie budget a
   Phoenix).
+
+**IL PUSH** (15 ott 2026). Ribasato sopra `641cac7` (diciotto commit
+arrivati dal 13, nessuno sul foglio della garanzia né sulla guardia
+della liquidità). Sull'albero di `2502b8b` (i tre commit del
+cantiere): suite intera con `PROVE_SEVERE=1`, 24.338 passate, 0
+fallite; in gabbia `collaudo_guardia_liquidita` e
+`collaudo_canale_admin` verdi; le forme dei segreti della CI sulle
+righe aggiunte: nessuna. Il push non porta commit altrui.
