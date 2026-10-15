@@ -97,6 +97,48 @@ intere, e qui resta il titolo). Sono 84, in ordine di tempo:
 - E il giorno dopo, tre ritocchi che si leggono insieme (ago 2026, dal
 - Le immagini del racconto respirano (ago 2026, chiesto da Andrea:
 - Il libro P2P diventa una vetrina (ago 2026, chiesto da Andrea sullo
+- Il cruscotto parla il linguaggio di Barattolo (15 ott 2026, stile visuale)
+
+## Il cruscotto parla il linguaggio di Barattolo
+
+MIGLIORAMENTO GRAFICO DELLO STRUMENTO ADMIN (15 ott 2026, richiesta di
+Andrea): il cruscotto dei dati — iscritti, volume, fee di routing,
+stato dei canali — non respirava con lo stile del mercatino. Le tile
+e i numeri erano grigi, i titoli piccoli, lo spazio risicato. E non
+era coerente: mentre la Mini App veste Baloo 2, Nunito, colori caldi
+(arancio sats #F7931A, verde trust #1B8B54, rosso P2P #C33A1A), il
+cruscotto restava neutro.
+
+LA RICETTA: tokenizzare il design system di Barattolo (variabili CSS
+per i colori, le ombre, le curve) e applicarlo al cruscotto. I numeri
+diventano arancio (sats). I titoli salgono di taglia (h1: 32px, numeri
+nelle tile: 36px). Il padding si apre (20-24px), lo spazio respira
+(16-20px gap). Le tile hanno ombra e hover effet che le fa risaltare
+al passaggio del dito. Il simulatore di fee prende un sfondo arancio
+tenue. I messaggi di errore si vestono di rosso P2P con bordo e sfondo
+tenue. I bottoni dei filtri cambiano colore quando scelti (arancio pieno).
+I link diventano arancio e al passaggio virano al rosso P2P.
+
+DARK MODE: tutte le ombre, i colori soft e gli accenti adattati al
+tema scuro — il bruno di Barattolo (#211A10) al posto della carta
+bianca, colori alzati per leggibilità. Il --radius (16px) e le curve
+uguali a quelle di casa. Una sola fonte di verità per ogni colore
+(--sats, --ok, --rosso-p2p), niente hardcoding: il giorno che Andrea
+cambia una tinta, si cambia UN token.
+
+RESPONSIVE: media query a 640px e 480px per il mobile, dove le tile
+si restringono (minmax da 220px a 160px), il simulatore si trasforma
+in colonna, e tutto respira ancora. Su telefono il numero scende
+(36px → 24px) ma resta il protagonista.
+
+COLLAUDATO A MANO: il cambio è puro CSS e HTML — zero JavaScript nuovo,
+zero logica che tocchi i dati. La pagina carica i numeri da
+`/api/admin/cruscotto` come prima, e il resto è vestito. Nessuna
+regressione nel collaudo locale.
+
+LA STRADA SCARTATA: aggiungere SVG decorativi (un barattolo, un fulmine)
+— il cruscotto è uno strumento amministrativo, non una landing. I dati
+devono parlare, e i colori li fanno parlare bene anche senza illustrazioni.
 
 
 E POI IL COORDINATORE HA RISPOSTO, ma la firma non era l'ultimo strato
