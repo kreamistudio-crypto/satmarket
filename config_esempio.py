@@ -1546,12 +1546,15 @@ ADMIN_CANALE_ARGOMENTI = {}
 
 # L'avviso dei DM su Nostr (ott 2026): quando qualcuno scrive un DM al
 # profilo Nostr di Barattolo (la chiave di NOSTR_NSEC_PIATTAFORMA) i
-# moderatori ricevono «📩 Nuovo DM su Nostr da <nome o npub>» con un
-# bottone per aprirlo in un client. MAI il testo del messaggio: il
-# server non lo decifra (di una busta NIP-17 apre solo quella di
-# fuori, per sapere chi scrive). Al massimo un avviso ogni 10 minuti
-# per mittente e 6 in mezz'ora in tutto: oltre, un riassunto senza
-# nomi. Nasce SPENTO: True e riavvia per accenderlo.
+# moderatori ricevono un avviso che dice da chi e CHE COSA e' arrivato
+# — «📩 Nuovo DM da …, lo trovi in Amethyst», «✉️ Nuova mail Nostr da
+# …», un altro tipo col suo numero — con un bottone per aprirlo in un
+# client. MAI il testo del messaggio: di una busta NIP-17 il server
+# apre il sigillo per sapere chi scrive e il messaggio di dentro per
+# leggerne il solo tipo (dal 15 ott 2026), in memoria, e il resto lo
+# butta: niente nei log, nel database o negli avvisi. Al massimo un
+# avviso ogni 10 minuti per mittente e 6 in mezz'ora in tutto: oltre,
+# un riassunto senza nomi. Nasce SPENTO: True e riavvia per accenderlo.
 AVVISO_DM_NOSTR = False
 # I relay su cui ascoltare: quelli della lista DM di Barattolo (il suo
 # kind 10050). Se un giorno quella lista cambia, si cambia anche qui.

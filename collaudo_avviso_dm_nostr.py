@@ -6,6 +6,9 @@ Richiesta di Andrea: quando qualcuno scrive un DM al profilo Nostr di
 Barattolo, ai moderatori arriva «📩 Nuovo DM su Nostr da <chi>» — mai il
 testo, niente doppioni, un tetto contro lo spam, niente avvisi per la
 posta vecchia, e un relay che cade non porta giu' il server.
+Dal 15 ott 2026 (cantiere dm-o-mail) l'avviso dice anche CHE COSA e'
+arrivato: una chat (lo trovi in Amethyst), una mail Nostr (un client di
+posta), un altro tipo col suo numero, o un tipo illeggibile.
 
 QUI GIRA IL SERVER VERO col banco di `collaudo_lnbits_muto` (config
 finto, database usa-e-getta, MODALITA_COLLAUDO): l'orologio dell'avviso
@@ -214,13 +217,15 @@ def main():
         ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"])).hex()
         return ev
 
-    def busta(sk_mitt, n="", dest=None, dentro=None, creato=None):
+    def busta(sk_mitt, n="", dest=None, dentro=None, creato=None,
+              kind_rumor=14):
         """Un DM NIP-17 intero: rumor (col SEGRETO) → sigillo → pacco,
-        con la data del pacco arretrata come fa un client vero."""
+        con la data del pacco arretrata come fa un client vero.
+        `kind_rumor`: 14 la chat, 1301/2024 una mail Nostr..."""
         dest = dest or NOI
         pub = schnorr_puro.pubblica(sk_mitt).hex()
-        rumor = S.evento_non_firmato(pub, 14, [["p", dest]], SEGRETO + n,
-                                     int(time.time()))
+        rumor = S.evento_non_firmato(pub, kind_rumor, [["p", dest]],
+                                     SEGRETO + n, int(time.time()))
         if dentro is None:
             dentro = S.nip44_cifra(sk_mitt, dest, json.dumps(rumor))
         sigillo = firmato(sk_mitt, 13, [], dentro, int(time.time()) - 7000)
@@ -287,8 +292,8 @@ def main():
     corta_m = f"{npub_m[:10]}…{npub_m[-6:]}"
     prova("...uno e non due (lo stesso DM dai due relay), col nome del "
           "profilo accorciato e scappato, e la npub abbreviata",
-          [(f"📩 Nuovo DM su Nostr da Mario &lt;b&gt;Rossi&lt;/b&gt; &amp;co "
-            f"({corta_m})", ("🟣 Apri in un client",
+          [(f"📩 Nuovo DM da Mario &lt;b&gt;Rossi&lt;/b&gt; &amp;co "
+            f"({corta_m}), lo trovi in Amethyst", ("🟣 Apri in un client",
                              f"https://njump.me/{npub_m}"))], AVVISI)
 
     print("\n[il tetto per mittente]")
@@ -300,8 +305,8 @@ def main():
                    .get("attesa") == 2), len(AVVISI)))
     S._DM_AVVISI["mittenti"][MARIO]["ultimo"] -= S.AVVISO_DM_PAUSA_MITTENTE_S
     prova("...a pausa finita escono in una riga sola, col conto",
-          (True, f"📩 2 nuovi DM su Nostr da Mario &lt;b&gt;Rossi&lt;/b&gt; "
-                 f"&amp;co ({corta_m})"),
+          (True, f"📩 2 nuovi DM da Mario &lt;b&gt;Rossi&lt;/b&gt; "
+                 f"&amp;co ({corta_m}), li trovi in Amethyst"),
           (aspetta(lambda: len(AVVISI) == 2), AVVISI[-1][0]))
 
     print("\n[il vecchio NIP-04]")
@@ -339,9 +344,10 @@ def main():
     metti(RELAY_A, ["EVENT", "dm", busta(
         sk_gino, dentro="questo non si puo' decifrare, e nessuno ci prova")])
     prova("una busta col sigillo firmato e DENTRO un contenuto che non si "
-          "puo' aprire: l'avviso arriva lo stesso, col mittente — il "
-          "server la seconda busta non la tocca",
-          (True, f"📩 Nuovo DM su Nostr da {npub_g[:10]}…{npub_g[-6:]}"),
+          "puo' aprire: l'avviso arriva lo stesso, col mittente, e dice "
+          "che il tipo non si legge",
+          (True, f"📨 Nuovo messaggio cifrato da {npub_g[:10]}…{npub_g[-6:]} "
+                 "(tipo illeggibile)"),
           (aspetta(lambda: len(AVVISI) == 4), AVVISI[-1][0]))
 
     print("\n[la raffica: il tetto e il riassunto]")
@@ -412,6 +418,21 @@ def main():
            S._DM_ASCOLTO[RELAY_A]["stato"]))
     S.AVVISO_DM_POLSO_S = polsi
 
+    print("\n[la mail Nostr e il tipo sconosciuto (15 ott 2026, dm-o-mail)]")
+    S._DM_AVVISI["mandati"] = []
+    S._DM_AVVISI["mittenti"].pop(GINO, None)
+    S._DM_AVVISI["mittenti"].pop(LUCIA, None)
+    metti(RELAY_A, ["EVENT", "dm", busta(sk_gino, "mail", kind_rumor=1301)])
+    metti(RELAY_B, ["EVENT", "dm", busta(sk_lucia, "ignoto", kind_rumor=7777)])
+    prova("una busta con dentro una mail (1301) e una con un kind che non "
+          "conosciamo (7777): due avvisi, ognuno col suo genere",
+          (True, {(f"✉️ Nuova mail Nostr da {npub_g[:10]}…{npub_g[-6:]}: si "
+                   "legge con un client di posta, es. Nmail",
+                   ("🟣 Apri in un client", f"https://njump.me/{npub_g}")),
+                  (f"📨 Messaggio cifrato di tipo 7777 da {corta_l}",
+                   ("🟣 Apri in un client", f"https://njump.me/{npub_l}"))}),
+          (aspetta(lambda: len(AVVISI) == 11), set(AVVISI[-2:])))
+
     print("\n[il nome dal profilo vero: in collaudo non si esce]")
     S._profilo_nostr = profilo_vero
     S._DM_AVVISI["mandati"] = []
@@ -419,8 +440,8 @@ def main():
     metti(RELAY_A, ["EVENT", "dm", busta(sk_mario, "senza-nome")])
     prova("col lettore vero del kind 0 (relay pubblici: in collaudo non "
           "risponde nessuno) l'avviso parte lo stesso, con la sola npub",
-          (True, f"📩 Nuovo DM su Nostr da {corta_m}"),
-          (aspetta(lambda: len(AVVISI) == 10, 15000), AVVISI[-1][0]))
+          (True, f"📩 Nuovo DM da {corta_m}, lo trovi in Amethyst"),
+          (aspetta(lambda: len(AVVISI) == 12, 15000), AVVISI[-1][0]))
 
     print("\n[il pannello delle leve]")
     voci = {v["chiave"]: v for v in S._dm_leve()}

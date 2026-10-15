@@ -58683,3 +58683,115 @@ e niente sul relay. Amber vero non è provato da qui.
 e numeri):
 `journalctl -u barattolo --since "3 days ago" --no-pager | grep -iE "503|timed out|timeout|handshake|ssl|non risponde|rifiut" | grep -oE "(relay\.damus\.io|nos\.lol|relay\.primal\.net|nostr\.mom|relay\.mostro\.network|relay\.barattolo\.store|relay\.nostr\.net|nostr\.oxtr\.dev)" | sort | uniq -c | sort -rn`
 (coi due relay nuovi in coda: il 15 ott non c'erano ancora).
+
+## L'avviso dice se è un DM o una mail (15 ott 2026, cantiere dm-o-mail, decisione di Andrea)
+
+La strada A del «DM fantasma», anticipata da Andrea: non più dopo
+Torino ma subito. L'avviso «📩 Nuovo DM su Nostr da Ivory Tower» del
+15 mattina era una mail Nostr (confermato da Andrea), che Amethyst
+scarta: chi riceve l'avviso deve sapere CHE COSA è arrivato e dove si
+legge. Il piano in dieci righe è stato approvato prima del codice.
+
+**COSA FA.** Di una busta NIP-17 il server apriva solo quella di
+fuori: dal sigillo (kind 13) la firma, cioè chi scrive. Ora, SOLO DOPO
+quella firma verificata, `_dm_tipo_rumor` apre anche il sigillo con la
+stessa chiave della piattaforma (la nostra: il DM è per noi) e ne
+restituisce un numero, il kind del messaggio interno — un intero da 0 a
+65535, o None. Il setaccio dà `(mittente, tipo)` invece del solo
+mittente; il NIP-04 dà `(autore, 4)`. `_dm_genere` fa del kind il
+genere dell'avviso, e `_dm_testo` sceglie la frase:
+- 14 chat: «📩 Nuovo DM da …, lo trovi in Amethyst» (plurale «3 nuovi
+  DM da …, li trovi in Amethyst»);
+- 15 file in chat (risposta di Andrea al piano: Amethyst lo mostra):
+  «📩 Nuovo DM (con file) da …, lo trovi in Amethyst»; chat e file
+  insieme fanno «N nuovi DM» senza «con file»;
+- 1301 e 2024 mail: «✉️ Nuova mail Nostr da …: si legge con un client
+  di posta, es. Nmail» (plurale «si leggono»);
+- un altro kind: «📨 Messaggio cifrato di tipo N da …»;
+- busta interna che non si apre, JSON rotto, kind mancante o non
+  intero (anche `true` e `14.0`), fuori scala, o rumor con una
+  `pubkey` diversa da chi ha firmato il sigillo (contraffatto, NIP-17):
+  «📨 Nuovo messaggio cifrato da … (tipo illeggibile)», a nome di chi
+  ha FIRMATO il sigillo (testo approvato da Andrea);
+- tipi diversi dallo stesso mittente nello stesso avviso: «📨 N nuovi
+  messaggi cifrati da …»;
+- il kind 4, la busta rimasta chiusa (senza `cryptography`) e il
+  riassunto: le frasi di sempre.
+Il bottone njump, l'argomento `dm` del gruppo admin e il nome dal
+kind 0 sono quelli di prima.
+
+**IL TESTO: DA COSTRUZIONE A REGOLA.** Prima nessuna riga apriva il
+messaggio; ora il testo passa in memoria, nella variabile `rumor` di
+`_dm_tipo_rumor`, il tempo di due `.get`. Le regole che lo tengono lì,
+tutte sorvegliate da sentinelle sull'albero in `prove_avviso_dm_nostr`:
+la funzione restituisce solo `None` o `tipo`; il `rumor` si legge solo
+con `.get` e `isinstance`; i tre except del percorso (`_dm_tipo_rumor`,
+`_dm_mittente_busta`, `_dm_setaccia`) non nominano l'errore — niente
+`as e`, né il messaggio né il tipo nel journal (richiesta di Andrea:
+un JSONDecodeError si porta dietro il testo intero in `.doc`) — e
+fanno solo `return None`; nessun `print`, `logging` o `log(`; il
+contenuto del sigillo lo nomina UNA riga sola. Le due sentinelle che
+dicevano «una decifratura sola» e «il contenuto del sigillo non lo
+nomina nessuno» sono state rovesciate apposta, rosse prima.
+
+**IL TETTO NON CAMBIA.** Pausa di 10 minuti per mittente, 6 avvisi in
+mezz'ora, la folla e la coda da 2000: le chiavi restano il mittente, e
+una chat più una mail dello stesso mittente sono un avviso solo
+(«misti»). Dei generi di un mittente se ne tengono al massimo tre
+(`AVVISO_DM_GENERI_MAX`): tre diversi sono già «misti», e chi manda
+mille kind diversi non fa crescere la memoria; il conto dei messaggi
+resta intero.
+
+**IL COSTO.** Una decifratura in più (un ECDH, ChaCha20, un HMAC) e un
+`json.loads` su al massimo 64 KB, solo per le buste che hanno già
+passato forma, `p` nostra, firma esterna, doppione, età e la firma del
+sigillo: meno delle due verifiche Schnorr che si facevano già. Lo spam
+cifrato costa a chi lo manda almeno quanto a noi (due firme per
+busta). La posta vecchia (base, prima del primo EOSE) resta chiusa.
+
+**COSA NON CAMBIA.** La chiave è la stessa `_NOSTR[0]`, dove e come
+era. Stessi relay, stesso 10050, stessi filtri, stessa autenticazione
+NIP-42; nessuna firma nuova, nessuna pubblicazione. Niente database.
+Nessun passo sul VPS: il deploy porta le frasi nuove a leva accesa.
+
+**DOCUMENTI.** ARCHITETTURA: il paragrafo «IL TESTO NON SI DECIFRA»
+diventa «DEL MESSAGGIO SI LEGGE IL TIPO, E BASTA» e dice che rovescia
+la regola di prima. PRODUZIONE e `config_esempio.py`: la frase «il
+server non lo decifra» corretta. Il commento in testa al blocco di
+server.py riscritto.
+
+**PROVATO.** `prove_avviso_dm_nostr` rossa prima (la funzione nuova
+non c'era: esplodeva sulla prima sentinella rovesciata) e verde dopo,
+107 passate. Gli eventi finti, chiavi di cartone e il SEGRETO dentro
+ogni rumor: 14, 15, 1301, 2024, 7777, contraffatto, e nove buste
+interne rotte (non JSON, lista, senza kind, kind testo, `true`,
+negativo, oltre 65535, `14.0`, senza pubkey) — mittente sempre giusto,
+tipo None per le rotte, niente su stdout né stderr, il SEGRETO in
+nessuna risposta; il conto delle decifrature (due per un DM, una se il
+sigillo non è un sigillo); il giudice coi generi e i suoi tetti; le
+frasi al singolare e al plurale; dal pacco al testo coi pezzi veri in
+fila. LA TORTURA su una copia intera del worktree: 15 mutazioni (il
+rumor che esce, niente contraffatto, il booleano per kind, niente
+scala, l'except che stampa il tipo, la seconda busta mai aperta o
+aperta prima della firma, 15 come chat, 2024 non mail, generi senza
+tetto, «con file» nella mescolanza, la folla che tiene i generi, la
+pausa che non li somma, il NIP-04 come chat, la mescolanza muta): 15
+prese, base verde. `collaudo_avviso_dm_nostr` (server vero, relay di
+cartone, in gabbia): frasi nuove per la chat e la busta illeggibile, e
+un giro nuovo con una mail (1301) e un kind 7777 dal filo vero; il
+SEGRETO né nel journal né negli avvisi. Suite e collaudi: nel verbale
+del push.
+
+**DA FARE** (notati, non fatti):
+- PRODUZIONE ha ancora due comandi con `~/satmarket/config.py` (le
+  leve `P2P_CHAT_SCAMBIO` e `AVVISO_CORRIERI_PUNTI`): il percorso vero
+  è `/srv/barattolo/config.py`, già corretto in CLAUDE.md dal 10 ott.
+- Una reazione (kind 7) o un invito MLS dentro una busta arrivano come
+  «Messaggio cifrato di tipo N»: se servono frasi loro, si decide.
+- Un kind 4 dentro una busta NIP-17 (non lo fa nessun client noto)
+  prende la frase del vecchio NIP-04.
+- La data vera del rumor ora si avrebbe: potrebbe affinare la posta
+  vecchia, oggi decisa sulla finestra dei tre giorni.
+- Gli altri due «da fare» del «DM fantasma» (damus in
+  `RELAY_DI_SERIE` / `RELAY_NOSTR`, il kind 10002 di Barattolo) li ha
+  chiusi lo stesso giorno il cantiere relay-di-barattolo, voce sopra.

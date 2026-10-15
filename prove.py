@@ -113295,25 +113295,78 @@ def prove_avviso_dm_nostr():
     # --- cosa NON fa ---
     prova("il blocco NON tocca il database: lo stato vive in memoria",
           (False, False), ("con.execute" in cod, "db()" in cod))
-    prova("la decifratura si chiama UNA volta, e sulla busta di FUORI: "
-          "chiave nostra, autore e contenuto del 1059", (1, True),
+    # (15 ott 2026, cantiere dm-o-mail) LA SECONDA BUSTA SI APRE, per il
+    # solo tipo: prima qui si provava che il sigillo non lo apriva
+    # nessuno. Le due sentinelle sono state rovesciate apposta: le
+    # decifrature sono DUE, e la seconda vive in una funzione sola che
+    # del messaggio restituisce un numero e basta.
+    prova("la decifratura si chiama DUE volte: la busta di FUORI (chiave "
+          "nostra, autore e contenuto del 1059) e il sigillo (chiave nostra, "
+          "chi firma e contenuto del sigillo)", (2, True, True),
           (cod.count("nip44_decifra(") - 1,
            'nip44_decifra(\n            _NOSTR[0].secret, pacco["pubkey"], '
-           'pacco["content"])' in cod))
-    prova("...del sigillo si leggono solo il tipo, la firma e chi firma: "
-          "il suo contenuto (il messaggio) non lo nomina nessuno",
-          (False, False, True),
-          ('sigillo["content"]' in cod, 'sigillo.get("content")' in cod,
-           'return sigillo["pubkey"]' in cod))
-    prova("il setaccio, la busta, il giudice e i testi non stampano niente",
-          [False] * 6, ["print(" in codice(pezzo(f)) for f in (
-              "_dm_setaccia", "_dm_mittente_busta", "nip44_decifra",
+           'pacco["content"])' in cod,
+           'nip44_decifra(\n            _NOSTR[0].secret, sigillo["pubkey"], '
+           'sigillo["content"])' in pezzo("_dm_tipo_rumor")))
+    prova("...il contenuto del sigillo lo nomina UNA riga sola, in "
+          "`_dm_tipo_rumor`; `_dm_mittente_busta` non lo tocca",
+          (1, 1, False, False),
+          (cod.count('sigillo["content"]'),
+           pezzo("_dm_tipo_rumor").count('sigillo["content"]'),
+           'sigillo["content"]' in pezzo("_dm_mittente_busta"),
+           'sigillo.get("content")' in cod))
+    # IL MESSAGGIO APERTO NON ESCE DA `_dm_tipo_rumor`: guardato
+    # sull'albero. Ogni return dice None o `tipo` (un intero, controllato
+    # prima); il `rumor` si legge solo con `.get(` e `isinstance`; gli
+    # except non danno un nome all'errore (niente `as e`: ne' il suo
+    # messaggio ne' il suo tipo vanno da nessuna parte — un
+    # JSONDecodeError si porta dietro il testo intero in `.doc`)
+    _albero_r = ast.parse(textwrap.dedent(pezzo("_dm_tipo_rumor")))
+    _ritorni = sorted({ast.unparse(n.value) if n.value else "None"
+                       for n in ast.walk(_albero_r)
+                       if isinstance(n, ast.Return)})
+    _usi_rumor = set()
+    for _n in ast.walk(_albero_r):
+        for _f in ast.iter_child_nodes(_n):
+            if isinstance(_f, ast.Name) and _f.id == "rumor" \
+                    and isinstance(_f.ctx, ast.Load):
+                if isinstance(_n, ast.Attribute):
+                    _usi_rumor.add("." + _n.attr)
+                elif isinstance(_n, ast.Call):
+                    _usi_rumor.add(ast.unparse(_n.func) + "()")
+                else:
+                    _usi_rumor.add(type(_n).__name__)
+    prova("`_dm_tipo_rumor` restituisce None o il tipo, e nient'altro",
+          ["None", "tipo"], _ritorni)
+    prova("...del messaggio aperto si legge solo con `.get(` e "
+          "`isinstance`: nessuno lo passa, lo copia o lo guarda per intero",
+          {".get", "isinstance()"}, _usi_rumor)
+    _eccezioni = [h for f in ("_dm_tipo_rumor", "_dm_mittente_busta",
+                              "_dm_setaccia")
+                  for h in ast.walk(ast.parse(textwrap.dedent(pezzo(f))))
+                  if isinstance(h, ast.ExceptHandler)]
+    prova("...e i loro except non danno un nome all'errore (niente "
+          "`as e`) e si limitano a `return None`",
+          [(None, "return None")] * len(_eccezioni),
+          [(h.name, ast.unparse(h.body[0]) if len(h.body) == 1 else "")
+           for h in _eccezioni])
+    prova("...e sono tre: uno per funzione", 3, len(_eccezioni))
+    prova("il setaccio, le buste, il giudice e i testi non stampano niente",
+          [False] * 9, ["print(" in codice(pezzo(f)) for f in (
+              "_dm_setaccia", "_dm_mittente_busta", "_dm_tipo_rumor",
+              "nip44_decifra", "_dm_genere", "_dm_somma_generi",
               "_dm_decidi", "_dm_testo", "_dm_chi")])
+    prova("...e nemmeno loggano (`logging`, `logger`, `log(`)",
+          [False] * 3, [w in codice(pezzo("_dm_tipo_rumor")
+                                    + pezzo("_dm_mittente_busta")
+                                    + pezzo("_dm_setaccia"))
+                        for w in ("logging", "logger", "log(")])
     # IL JOURNAL NON NOMINA MAI L'EVENTO NE' CHI SCRIVE: ogni print del
     # blocco, coi nomi che usa, guardato sull'albero e non a occhio
     vietati = {"ev", "msg", "grezzo", "sigillo", "pacco", "voce", "nome",
                "mittente", "chi", "testo", "carico", "chiaro", "npub",
-               "bottone", "risposta", "sfida", "richiesta", "auth_id"}
+               "bottone", "risposta", "sfida", "richiesta", "auth_id",
+               "rumor", "tipo", "generi", "arrivo"}
     usati = set()
     stampe = 0
     for nodo in ast.walk(ast.parse(blocco)):
@@ -113419,8 +113472,9 @@ def prove_avviso_dm_nostr():
               "evento_non_firmato", "_x_firma_valida", "_hkdf_estrai",
               "_hkdf_espandi", "_imbottisci", "nip44_cifra",
               "nip44_decifra", "_dm_relays", "_dm_visto",
-              "_dm_mittente_busta", "_dm_setaccia", "_dm_filtri",
-              "_dm_in_coda", "_dm_decidi", "_dm_chi", "_dm_testo",
+              "_dm_tipo_rumor", "_dm_mittente_busta", "_dm_setaccia",
+              "_dm_filtri", "_dm_in_coda", "_dm_genere", "_dm_somma_generi",
+              "_dm_decidi", "_dm_chi", "_dm_testo",
               "firma_evento", "_dm_vuole_auth", "_dm_auth", "_dm_riposa"):
         exec(pezzo(f), amb)
     amb["_DM_AVVIO"] = adesso - 100
@@ -113452,13 +113506,16 @@ def prove_avviso_dm_nostr():
     SEGRETO = "il testo che nessuno deve leggere"
 
     def busta(sk_mitt, dest=noi, dentro=None, kind_sigillo=13, creato=None,
-              eff=sk_eff, etichetta=""):
-        """Un DM NIP-17 intero: rumor → sigillo → pacco."""
+              eff=sk_eff, etichetta="", kind_rumor=14, rumor=None):
+        """Un DM NIP-17 intero: rumor → sigillo → pacco. `kind_rumor` e'
+        il tipo del messaggio di dentro (14 chat, 15 file, 1301/2024
+        mail...); `rumor` lo sostituisce per intero (gia' in testo)."""
         pub = schnorr_puro.pubblica(sk_mitt).hex()
-        rumor = amb["evento_non_firmato"](pub, 14, [["p", dest]],
-                                          SEGRETO + etichetta, adesso)
+        if rumor is None:
+            rumor = json.dumps(amb["evento_non_firmato"](
+                pub, kind_rumor, [["p", dest]], SEGRETO + etichetta, adesso))
         if dentro is None:
-            dentro = amb["nip44_cifra"](sk_mitt, dest, json.dumps(rumor))
+            dentro = amb["nip44_cifra"](sk_mitt, dest, rumor)
         sigillo = firmato(sk_mitt, kind_sigillo, [], dentro, adesso - 4000)
         return firmato(eff, 1059, [["p", noi]], amb["nip44_cifra"](
             eff, dest, json.dumps(sigillo)), creato or adesso - 90000)
@@ -113498,14 +113555,94 @@ def prove_avviso_dm_nostr():
     S = amb["_dm_setaccia"]
     b1 = busta(sk_mario, etichetta="1")
     prova("una busta NIP-17 nuova, con la data finta di ieri: esce chi "
-          "l'ha scritta", mario, S(b1, noi, False, adesso))
+          "l'ha scritta e il TIPO del messaggio di dentro (14, la chat)",
+          (mario, 14), S(b1, noi, False, adesso))
     prova("...la stessa da un secondo relay (stesso id): niente", None,
           S(dict(b1), noi, False, adesso))
     b_rotto = busta(sk_mario, dentro="questo non e' nemmeno cifrato",
                     etichetta="2")
-    prova("IL MESSAGGIO NON SI DECIFRA: una busta col sigillo firmato e "
-          "dentro un contenuto che non si puo' aprire dice lo stesso chi "
-          "scrive", mario, S(b_rotto, noi, False, adesso))
+    prova("una busta col sigillo firmato e dentro un contenuto che non si "
+          "puo' aprire dice lo stesso chi scrive, e il tipo no (None)",
+          (mario, None), S(b_rotto, noi, False, adesso))
+
+    # (15 ott 2026, cantiere dm-o-mail) LA SECONDA BUSTA: il tipo del
+    # messaggio, e nient'altro. Eventi finti con chiavi di cartone; il
+    # SEGRETO sta dentro ogni rumor, e non deve uscire da nessuna parte.
+    import contextlib as _ctx
+    import io as _io
+    _tipi = {}
+    _detto = _io.StringIO()
+    with _ctx.redirect_stdout(_detto), _ctx.redirect_stderr(_detto):
+        for _n, (_et, _k) in enumerate([("chat", 14), ("file", 15),
+                                         ("mail 1301", 1301),
+                                         ("mail 2024", 2024),
+                                         ("sconosciuto", 7777)]):
+            _tipi[_et] = S(busta(sk_mario, kind_rumor=_k,
+                                 etichetta=f"t{_n}"), noi, False, adesso)
+        _rumor_lucia = json.dumps(amb["evento_non_firmato"](
+            lucia, 14, [["p", noi]], SEGRETO, adesso))
+        _tipi["contraffatto"] = S(busta(sk_mario, rumor=_rumor_lucia),
+                                  noi, False, adesso)
+        _r = json.loads(json.dumps(amb["evento_non_firmato"](
+            mario, 14, [["p", noi]], SEGRETO, adesso)))
+        _strani = {
+            "non JSON": SEGRETO,
+            "JSON ma lista": json.dumps([SEGRETO, 14]),
+            "senza kind": json.dumps({k: v for k, v in _r.items()
+                                      if k != "kind"}),
+            "kind testo": json.dumps(dict(_r, kind="14")),
+            "kind vero/falso": json.dumps(dict(_r, kind=True)),
+            "kind negativo": json.dumps(dict(_r, kind=-1)),
+            "kind oltre 65535": json.dumps(dict(_r, kind=70000)),
+            "kind con la virgola": json.dumps(dict(_r, kind=14.0)),
+            "senza pubkey": json.dumps({k: v for k, v in _r.items()
+                                        if k != "pubkey"}),
+        }
+        for _n, (_et, _grezzo) in enumerate(_strani.items()):
+            _tipi[_et] = S(busta(sk_mario, rumor=_grezzo, etichetta=f"s{_n}"),
+                           noi, False, adesso)
+    prova("il tipo del messaggio interno: 14 chat, 15 file, 1301 e 2024 "
+          "mail, e un kind sconosciuto col suo numero",
+          {"chat": (mario, 14), "file": (mario, 15),
+           "mail 1301": (mario, 1301), "mail 2024": (mario, 2024),
+           "sconosciuto": (mario, 7777)},
+          {k: _tipi[k] for k in ("chat", "file", "mail 1301", "mail 2024",
+                                 "sconosciuto")})
+    prova("un rumor che dice di essere di un altro (pubkey diversa da chi "
+          "firma il sigillo: contraffatto, NIP-17) non ha tipo: avviso "
+          "generico, a nome di chi ha FIRMATO", (mario, None),
+          _tipi["contraffatto"])
+    prova("busta interna rotta in ogni modo: il mittente resta, il tipo e' "
+          "None, e niente esplode",
+          {k: (mario, None) for k in _strani},
+          {k: _tipi[k] for k in _strani})
+    prova("...e mentre si aprivano, nessuna riga e' uscita, ne' su stdout "
+          "ne' su stderr", "", _detto.getvalue())
+    prova("...e il SEGRETO non c'e' in nessuna risposta del setaccio: "
+          "escono solo una chiave in hex e un intero (o None)",
+          (False, True),
+          (SEGRETO in repr(_tipi),
+           all(isinstance(v, tuple) and len(v) == 2
+               and re.fullmatch(r"[0-9a-f]{64}", v[0]) is not None
+               and (v[1] is None or type(v[1]) is int)
+               for v in _tipi.values())))
+    _contati = {}
+    _vera = amb["nip44_decifra"]
+
+    def _contadec(*a):
+        _contati[len(_contati)] = a[1]
+        return _vera(*a)
+    amb["nip44_decifra"] = _contadec
+    S(busta(sk_mario, etichetta="conta"), noi, False, adesso)
+    _base_n = len(_contati)
+    S(busta(sk_mario, kind_sigillo=1, etichetta="conta-1"), noi, False,
+      adesso)
+    amb["nip44_decifra"] = _vera
+    prova("il conto delle decifrature: DUE per un DM vero (fuori, poi il "
+          "sigillo di chi firma), UNA se il sigillo non e' un sigillo: la "
+          "seconda busta si apre solo dopo la firma verificata",
+          (2, [_eff, mario], 3), (_base_n, [_contati[0], _contati[1]],
+                                  len(_contati)))
     b_base = busta(sk_lucia, etichetta="3")
     prova("la posta che c'era gia' (prima del primo EOSE): niente, e "
           "resta vista — rimandata dopo, tace", (None, None, True),
@@ -113541,14 +113678,15 @@ def prove_avviso_dm_nostr():
     falso = dict(storto, content=storto["content"][:-4] + "AAAA")
     prova("un evento con l'id di un DM vero ma il contenuto ritoccato si "
           "butta SENZA occupare il posto fra i visti: quello vero, dopo, "
-          "parla", (None, False, mario),
+          "parla", (None, False, (mario, 14)),
           (S(falso, noi, False, adesso), id_buono in amb["_DM_VISTI"],
            S(storto, noi, False, adesso)))
     k4 = firmato(sk_lucia, 4, [["p", noi]], "cifrato?iv=nip04", adesso - 5)
     prova("un NIP-04 di dopo l'avvio: esce l'autore, senza toccare il "
-          "contenuto", lucia, S(k4, noi, False, adesso))
+          "contenuto, e il tipo e' il suo (4)", (lucia, 4),
+          S(k4, noi, False, adesso))
     prova("...anche se arriva prima del primo EOSE di quel relay (la sua "
-          "data e' vera: basta lei)", lucia,
+          "data e' vera: basta lei)", (lucia, 4),
           S(firmato(sk_lucia, 4, [["p", noi]], "x?iv=y", adesso - 6), noi,
             True, adesso))
     prova("...uno di PRIMA dell'avvio no; uno per un altro no; un kind "
@@ -113564,7 +113702,7 @@ def prove_avviso_dm_nostr():
     b_chiusa = busta(sk_mario, etichetta="9")
     amb["ChaCha20DM"] = None
     prova("senza `cryptography` la busta resta chiusa: l'avviso parte "
-          "senza nome ('' e non None)", "",
+          "senza nome e senza tipo ('' e None, e non None)", ("", None),
           S(b_chiusa, noi, False, adesso))
     amb["ChaCha20DM"] = _Cha
     amb["AVVISO_DM_VISTI_MAX"] = 3
@@ -113597,57 +113735,64 @@ def prove_avviso_dm_nostr():
     amb["AVVISO_DM_NOSTR_RELAY"] = [f"wss://r{n}.example" for n in range(9)]
     prova("...e al massimo sei: ognuno e' un thread", 6, len(rel()))
 
-    # il giudice degli avvisi
+    # il giudice degli avvisi. Ogni arrivo e' (mittente, tipo), e la
+    # voce «uno» porta anche i GENERI di quel che conta (15 ott 2026,
+    # cantiere dm-o-mail): il tetto e la pausa restano per mittente
     D = amb["_dm_decidi"]
+    CHAT, MAIL = frozenset({"chat"}), frozenset({"mail"})
 
     def stato():
         return {"arrivi": [], "mittenti": {}, "mandati": [],
-                "folla": {"n": 0, "chi": set(), "oltre": False}}
+                "folla": {"n": 0, "chi": set(), "oltre": False,
+                          "generi": set()}}
     St = stato()
-    St["arrivi"] = ["m1"]
-    prova("un DM: un avviso", [("uno", "m1", 1)], D(St, 1000))
-    St["arrivi"] = ["m1", "m1"]
+    St["arrivi"] = [("m1", 14)]
+    prova("un DM: un avviso", [("uno", "m1", 1, CHAT)], D(St, 1000))
+    St["arrivi"] = [("m1", 14), ("m1", 1301)]
     prova("altri due dallo stesso mittente entro la pausa: silenzio",
           [], D(St, 1100))
-    prova("...a pausa finita escono in UNA riga col conto",
-          [("uno", "m1", 2)], D(St, 1000 + 600))
+    prova("...a pausa finita escono in UNA riga col conto, coi generi di "
+          "quel che ha contato (una chat e una mail: misti)",
+          [("uno", "m1", 2, frozenset({"chat", "mail"}))],
+          D(St, 1000 + 600))
     prova("...e dopo un'altra pausa senza posta il mittente si dimentica",
           ([], {}), (D(St, 1600 + 600), St["mittenti"]))
     St = stato()
-    St["arrivi"] = [f"s{n}" for n in range(9)] + ["s0"]
+    St["arrivi"] = [(f"s{n}", 14) for n in range(9)] + [("s0", 14)]
     fuori = D(St, 5000)
     prova("nove mittenti insieme: sei avvisi (il tetto), il resto nella "
-          "folla", ([("uno", f"s{n}", 2 if n == 0 else 1) for n in range(6)],
-                    3, {"s6", "s7", "s8"}),
+          "folla", ([("uno", f"s{n}", 2 if n == 0 else 1, CHAT)
+                     for n in range(6)], 3, {"s6", "s7", "s8"}),
           (fuori, St["folla"]["n"], St["folla"]["chi"]))
-    St["arrivi"] = ["s9"]
+    St["arrivi"] = [("s9", 1301)]
     prova("...finche' la finestra e' piena non esce niente, e chi arriva "
           "si somma", ([], 4), (D(St, 5100), St["folla"]["n"]))
     prova("...al primo posto libero esce il RIASSUNTO, senza nomi, e la "
-          "folla si svuota", ([("folla", 4, 4, False)], 0),
-          (D(St, 5000 + 1800), St["folla"]["n"]))
+          "folla si svuota", ([("folla", 4, 4, False)], 0, set()),
+          (D(St, 5000 + 1800), St["folla"]["n"], St["folla"]["generi"]))
     St = stato()
     St["mandati"] = [100.0] * 6
-    St["arrivi"] = ["solo", "solo"]
+    St["arrivi"] = [("solo", 1301), ("solo", 2024)]
     D(St, 200)
     prova("una folla di UN mittente solo esce come avviso normale, col suo "
-          "nome", [("uno", "solo", 2)], D(St, 100 + 1800))
+          "nome e i suoi generi (due mail)", [("uno", "solo", 2, MAIL)],
+          D(St, 100 + 1800))
     St = stato()
     St["mandati"] = [100.0] * 6
-    St["arrivi"] = ["solo", "solo"]
+    St["arrivi"] = [("solo", 14), ("solo", 14)]
     D(St, 200)
-    St["arrivi"] = ["solo"]
+    St["arrivi"] = [("solo", 14)]
     prova("...e se nello stesso giro ne arriva un altro suo, NON esce un "
           "secondo avviso: aspetta la sua pausa",
-          ([("uno", "solo", 2)], 1),
+          ([("uno", "solo", 2, CHAT)], 1),
           (D(St, 100 + 1800), St["mittenti"]["solo"]["attesa"]))
     St = stato()
     amb["_DM_AVVISI"] = St
     amb["AVVISO_DM_CODA_MAX"] = 2
     for m in ("a", "b", "c", "d"):
-        amb["_dm_in_coda"](m)
+        amb["_dm_in_coda"]((m, 14))
     prova("la coda ha un tetto: oltre, il DM si conta e il mittente non si "
-          "tiene", (["a", "b"], 2, True),
+          "tiene", ([("a", 14), ("b", 14)], 2, True),
           (St["arrivi"], St["folla"]["n"], St["folla"]["oltre"]))
     St["mandati"] = [0.0] * 5
     prova("...e il riassunto dice «almeno» quando ha perso il conto dei "
@@ -113655,30 +113800,96 @@ def prove_avviso_dm_nostr():
           [v for v in D(St, 10) if v[0] == "folla"])
     amb["AVVISO_DM_CODA_MAX"] = 2000
 
+    # IL TETTO NON CAMBIA COI TIPI (dm-o-mail): i tipi diversi dello
+    # stesso mittente sono UN avviso, e i generi tenuti hanno un tetto
+    St = stato()
+    St["arrivi"] = [("m", 14), ("m", 1301), ("m", 7777), ("m", None)]
+    prova("quattro messaggi di quattro tipi dallo stesso mittente: UN "
+          "avviso, e dei generi se ne tengono al massimo tre (gia' cosi' "
+          "e' «misti»)",
+          [("uno", "m", 4, frozenset({"chat", "mail", 7777}))], D(St, 1000))
+    St["arrivi"] = [("m", k) for k in range(100, 400)]
+    D(St, 1100)
+    prova("...cento e piu' kind diversi in pausa: si contano tutti, la "
+          "memoria del mittente resta di tre generi",
+          (300, 3), (St["mittenti"]["m"]["attesa"],
+                     len(St["mittenti"]["m"]["generi"])))
+    St = stato()
+    St["mandati"] = [100.0] * 6
+    St["arrivi"] = [("solo", k) for k in range(100, 400)]
+    D(St, 200)
+    prova("...e lo stesso nella folla", 3, len(St["folla"]["generi"]))
+    G = amb["_dm_genere"]
+    prova("i generi: 4 il NIP-04, 14 la chat, 15 il file, 1301 e 2024 la "
+          "mail, None illeggibile, un numero sconosciuto se stesso, e "
+          "quel che non e' un intero illeggibile",
+          ["nip04", "chat", "file", "mail", "mail", "?", 7777, "?", "?"],
+          [G(4), G(14), G(15), G(1301), G(2024), G(None), G(7777), G("14"),
+           G(True)])
+
     # i testi
     T = amb["_dm_testo"]
     npub = amb["hex_to_npub"](mario)
     corta = f"{npub[:10]}…{npub[-6:]}"
-    prova("il testo: «📩 Nuovo DM su Nostr da <npub abbreviata>»",
-          f"📩 Nuovo DM su Nostr da {corta}", T(("uno", mario, 1)))
+    NIP04 = frozenset({"nip04"})
+    prova("un NIP-04 (kind 4) col testo di sempre: «📩 Nuovo DM su Nostr "
+          "da <npub abbreviata>»",
+          f"📩 Nuovo DM su Nostr da {corta}", T(("uno", mario, 1, NIP04)))
     prova("...col nome del profilo davanti, e la npub che resta (il nome "
           "se lo sceglie chi scrive)",
           f"📩 Nuovo DM su Nostr da Mario ({corta})",
-          T(("uno", mario, 1), "Mario"))
+          T(("uno", mario, 1, NIP04), "Mario"))
     prova("...piu' d'uno, il conto", f"📩 3 nuovi DM su Nostr da {corta}",
-          T(("uno", mario, 3)))
+          T(("uno", mario, 3, NIP04)))
     prova("...senza mittente (busta rimasta chiusa): solo «Nuovo DM»",
           ["📩 Nuovo DM su Nostr", "📩 2 nuovi DM su Nostr"],
-          [T(("uno", "", 1)), T(("uno", "", 2))])
+          [T(("uno", "", 1, frozenset({"?"}))),
+           T(("uno", "", 2, frozenset({"?"})))])
     prova("...il riassunto: quanti e da quanti, senza nomi",
           ["📩 12 nuovi DM su Nostr da 7 mittenti",
            "📩 12 nuovi DM su Nostr da almeno 7 mittenti",
            "📩 5 nuovi DM su Nostr"],
           [T(("folla", 12, 7, False)), T(("folla", 12, 7, True)),
            T(("folla", 5, 0, True))])
-    prova("la npub abbreviata torna quella del mittente (inizio e coda)",
-          (True, mario), (npub.startswith(corta[:10]) and npub.endswith(corta[-6:]),
-                          amb["npub_to_hex"](npub)))
+    chi_m = f"Mario ({corta})"
+    prova("le forme di dm-o-mail, una per genere, al singolare e al "
+          "plurale: chat, file, mail, tipo sconosciuto, illeggibile",
+          [f"📩 Nuovo DM da {chi_m}, lo trovi in Amethyst",
+           f"📩 3 nuovi DM da {chi_m}, li trovi in Amethyst",
+           f"📩 Nuovo DM (con file) da {chi_m}, lo trovi in Amethyst",
+           f"📩 3 nuovi DM (con file) da {chi_m}, li trovi in Amethyst",
+           f"✉️ Nuova mail Nostr da {chi_m}: si legge con un client di "
+           "posta, es. Nmail",
+           f"✉️ 3 nuove mail Nostr da {chi_m}: si leggono con un client di "
+           "posta, es. Nmail",
+           f"📨 Messaggio cifrato di tipo 7777 da {chi_m}",
+           f"📨 3 messaggi cifrati di tipo 7777 da {chi_m}",
+           f"📨 Nuovo messaggio cifrato da {chi_m} (tipo illeggibile)",
+           f"📨 3 nuovi messaggi cifrati da {chi_m} (tipo illeggibile)"],
+          [T(("uno", mario, n, frozenset({g})), "Mario")
+           for g in ("chat", "file", "mail", 7777, "?") for n in (1, 3)])
+    prova("tipi diversi dallo stesso mittente: chat e file sono DM (senza "
+          "«con file»); ogni altra mescolanza e' «messaggi cifrati»",
+          [f"📩 2 nuovi DM da {chi_m}, li trovi in Amethyst",
+           f"📨 2 nuovi messaggi cifrati da {chi_m}",
+           f"📨 3 nuovi messaggi cifrati da {chi_m}",
+           f"📨 2 nuovi messaggi cifrati da {chi_m}",
+           f"📨 2 nuovi messaggi cifrati da {chi_m}"],
+          [T(("uno", mario, len(g), frozenset(g)), "Mario")
+           for g in ({"chat", "file"}, {"chat", "mail"},
+                     {"chat", "file", "mail"}, {"nip04", "chat"},
+                     {7777, 8888})])
+    # dal pacco al testo, coi pezzi veri in fila: una mail di Lucia
+    St = stato()
+    amb["_DM_AVVISI"] = St
+    amb["_dm_in_coda"](S(busta(sk_lucia, kind_rumor=2024, etichetta="fila"),
+                         noi, False, adesso))
+    npub_l = amb["hex_to_npub"](lucia)
+    prova("dal pacco al testo, coi pezzi veri: una busta con dentro una "
+          "mail (2024) diventa l'avviso della mail, senza il SEGRETO",
+          [f"✉️ Nuova mail Nostr da {npub_l[:10]}…{npub_l[-6:]}: si legge "
+           "con un client di posta, es. Nmail"],
+          [T(v) for v in D(St, adesso)])
     avvisa = pezzo("_dm_avvisa")
     prova("il nome del profilo arriva da un estraneo: si accorcia e si "
           "SCAPPA all'assegnazione, prima di entrare nel testo", True,

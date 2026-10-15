@@ -4281,8 +4281,11 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   DM A BARATTOLO»). Quando qualcuno scrive un DM al profilo Nostr di
   Barattolo, ai moderatori (`ADMIN_IDS`, la chat degli altri avvisi)
   arriva «📩 Nuovo DM su Nostr da <nome> (<npub abbreviata>)» col
-  bottone «🟣 Apri in un client». Il testo del messaggio non c'è mai:
-  il server non lo decifra.
+  bottone «🟣 Apri in un client»; dal 15 ott 2026 l'avviso dice anche
+  il genere (chat «lo trovi in Amethyst», mail Nostr «es. Nmail», un
+  altro tipo col suo numero). Il testo del messaggio non c'è mai: il
+  server ne legge il solo tipo, in memoria (ARCHITETTURA, «DEL
+  MESSAGGIO SI LEGGE IL TIPO»). Nessun passo nuovo sul VPS.
   NASCE SPENTO, e un deploy non lo accende. PER ACCENDERLO, sul VPS:
   1) si guarda che la riga non ci sia già:
      `grep -n "AVVISO_DM" /srv/barattolo/config.py`

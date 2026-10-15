@@ -32023,7 +32023,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
 - L'AVVISO DEI DM A BARATTOLO (11 ott 2026, perché in CANTIERI,
   «L'avviso dei DM a Barattolo su Nostr»). Un DM al profilo Nostr di
   Barattolo diventa un avviso Telegram ai moderatori: «📩 Nuovo DM su
-  Nostr da <nome> (<npub abbreviata>)», col bottone che apre il profilo
+  Nostr da <nome> (<npub abbreviata>)» — dal 15 ott 2026 col genere
+  del messaggio, vedi sotto —, col bottone che apre il profilo
   di chi scrive su njump.me. In server.py, un blocco solo, subito dopo
   i DM in uscita (`manda_dm_nostr`); leva `AVVISO_DM_NOSTR`, spenta nel
   codice, e `AVVISO_DM_NOSTR_RELAY` (la nostra lista DM, il kind 10050:
@@ -32046,19 +32047,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   chiede il nome al kind 0 (`_profilo_nostr`, `nome_da_profilo`,
   scappato) e passa da `notifica_admin`, che dal cantiere porta un
   `bottone` facoltativo.
-  IL TESTO NON SI DECIFRA. Di un NIP-04 si legge l'autore dell'evento.
-  Di una busta NIP-17 si apre la SOLA busta di fuori
-  (`_dm_mittente_busta`, con `nip44_decifra` e la chiave della
-  piattaforma — la nostra: il DM è per noi, la regola ferrea 2 parla
-  delle chiavi altrui): ne esce il sigillo (kind 13), la cui firma
-  verificata dice chi scrive; il suo `content`, il messaggio cifrato
-  una seconda volta, non lo apre nessuna riga. Lo provano una busta
-  col sigillo firmato e dentro un contenuto indecifrabile, che dà lo
-  stesso il mittente, e la sentinella che conta le chiamate a
-  `nip44_decifra`. Il prezzo: senza il rumor non si sa la data vera né
-  il tipo (una reazione in chat conta come DM). Nel journal non
-  entrano né testo né mittente: lo guarda una sentinella sull'albero
-  dei `print` del blocco.
+  DEL MESSAGGIO SI LEGGE IL TIPO, E BASTA (dal 15 ott 2026, cantiere
+  dm-o-mail: ROVESCIA «il server non decifra mai la busta interna»;
+  il perché in CANTIERI, «Il DM fantasma» e «L'avviso dice se è un DM
+  o una mail»). Di un NIP-04 si legge l'autore dell'evento. Di una
+  busta NIP-17 si aprono le due buste, con `nip44_decifra` e la chiave
+  della piattaforma — la nostra: il DM è per noi, la regola ferrea 2
+  parla delle chiavi altrui. Da quella di fuori (`_dm_mittente_busta`)
+  esce il sigillo (kind 13), la cui firma verificata dice chi scrive;
+  SOLO DOPO quella firma `_dm_tipo_rumor` apre il sigillo e restituisce
+  il kind del messaggio (un intero 0–65535, o None se non si apre, è
+  storto o il rumor dice un'altra `pubkey`). Il testo passa in
+  memoria e muore lì: non è più una costruzione, è una regola, e la
+  tengono le sentinelle sull'albero (`_dm_tipo_rumor` restituisce solo
+  None o `tipo`, il `rumor` si legge solo con `.get`/`isinstance`, gli
+  except non nominano l'errore, nessun `print`/log) più le buste finte
+  col SEGRETO dentro. `_dm_genere` fa del kind il genere dell'avviso —
+  14 chat e 15 file «📩 … lo trovi in Amethyst», 1301 e 2024 «✉️ Nuova
+  mail Nostr … es. Nmail», un altro kind «📨 Messaggio cifrato di tipo
+  N», None «(tipo illeggibile)», il 4 il testo di sempre; tipi diversi
+  dello stesso mittente «📨 N nuovi messaggi cifrati». Il tetto non
+  cambia: pausa e conti restano per mittente, i generi tenuti sono al
+  massimo tre (`AVVISO_DM_GENERI_MAX`). Il prezzo rimasto: la data vera
+  del rumor non si usa. Nel journal non entrano né testo né mittente:
+  lo guarda una sentinella sull'albero dei `print` del blocco.
   LA POSTA VECCHIA. Un 1059 ha la data arretrata fino a due giorni,
   quindi «dopo l'avvio» non si può chiedere al relay: si chiedono tre
   giorni, e ciò che arriva prima del PRIMO EOSE di quel relay (`base`)

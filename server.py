@@ -61313,22 +61313,29 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
 # cade, in un thread suo perche' websocket-client e' sincrona — con i
 # due tipi di DM indirizzati a noi (`#p`): le buste NIP-17 (kind 1059)
 # e i vecchi NIP-04 (kind 4).
-# IL TESTO NON SI LEGGE MAI, E NON PER PROMESSA: IL SERVER NON LO
-# DECIFRA. Un NIP-04 dice il mittente in chiaro (e' il suo difetto):
-# basta l'autore dell'evento, il contenuto non si tocca. Una busta
-# NIP-17 sono due buste una nell'altra: quella di FUORI (1059) e'
-# firmata da una chiave usa-e-getta e nasconde chi scrive; quella di
-# DENTRO (il sigillo, kind 13) e' firmata dal mittente e porta il
-# messaggio cifrato una seconda volta. Qui si apre SOLO quella di
-# fuori, con la chiave della piattaforma — che e' la NOSTRA, il DM e'
-# per noi: la regola ferrea 2 parla delle chiavi degli altri. Ne esce
-# il sigillo: la sua firma (verificata) dice chi scrive, e il suo
-# contenuto — il messaggio — resta cifrato com'e' arrivato. Nessuna
-# riga di questo blocco lo decifra, lo stampa o lo scrive: del
-# sigillo si tiene la chiave di chi firma e si butta il resto.
-# Il prezzo dichiarato: senza aprire la seconda busta non si sa la
-# data vera del messaggio ne' il suo tipo (una reazione dentro una
-# chat arriva come «nuovo DM»).
+# DEL MESSAGGIO SI LEGGE IL TIPO, E BASTA. Un NIP-04 dice il mittente
+# in chiaro (e' il suo difetto): basta l'autore dell'evento, il
+# contenuto non si tocca. Una busta NIP-17 sono due buste una
+# nell'altra: quella di FUORI (1059) e' firmata da una chiave
+# usa-e-getta e nasconde chi scrive; quella di DENTRO (il sigillo,
+# kind 13) e' firmata dal mittente e porta il messaggio (il «rumor»)
+# cifrato una seconda volta. Tutte e due si aprono con la chiave della
+# piattaforma — che e' la NOSTRA, il DM e' per noi: la regola ferrea 2
+# parla delle chiavi degli altri. Dalla prima esce il sigillo, la cui
+# firma (verificata) dice chi scrive. La seconda (15 ott 2026,
+# cantiere dm-o-mail, decisione di Andrea) si apre SOLO dopo quella
+# firma, in memoria, e ne esce un numero: il kind del messaggio, che
+# dice se e' una chat (14, 15 col file), una mail Nostr (1301, 2024) o
+# altro. Fino a quel giorno non si apriva, e una mail arrivava come
+# «nuovo DM» che Amethyst non mostrava (Cantieri, «Il DM fantasma»).
+# ADESSO E' UNA REGOLA, NON PIU' UNA COSTRUZIONE: il testo passa in
+# memoria. La tiene `_dm_tipo_rumor`, l'unica riga che apre il sigillo:
+# restituisce None o un intero, il messaggio aperto lo guarda solo con
+# `.get`, e il suo except non nomina l'errore (un JSONDecodeError si
+# porta dietro il testo intero). Niente esce nei log, nel database o
+# negli avvisi: lo provano le sentinelle sull'albero in prove.py.
+# Il prezzo rimasto: la data vera del messaggio non si usa (la posta
+# vecchia resta quella dei tre giorni, vedi sotto).
 # NIENTE AVVISI PER LA POSTA VECCHIA. Un 1059 porta una data FINTA,
 # arretrata fino a due giorni (e' la specifica: nessuno deve correlare
 # i tempi), quindi «dopo l'avvio» non si puo' chiedere al relay. Si
@@ -61399,12 +61406,14 @@ AVVISO_DM_SFIDA_MAX = 256           # NIP-42: una sfida piu' lunga non si firma
 AVVISO_DM_AUTH_OK_S = 10            # quanto si aspetta l'OK all'AUTH
 AVVISO_DM_RIFIUTO_S = 3600          # dopo un NO del relay: fra un'ora
 AVVISO_DM_RIPOSO_PASSO_S = 30       # l'attesa lunga, a fette (la guardia)
+AVVISO_DM_GENERI_MAX = 3            # generi tenuti per mittente: e' gia' «misti»
 _DM_AVVIO = int(time.time())        # la posta di prima non parla
 _DM_ASCOLTO: dict[str, dict] = {}   # relay -> lo stato del suo filo
 _DM_VISTI: dict[str, None] = {}     # id evento -> visto (in ordine d'arrivo)
 _DM_LOCK = threading.Lock()
 _DM_AVVISI = {"arrivi": [], "mittenti": {}, "mandati": [],
-              "folla": {"n": 0, "chi": set(), "oltre": False}}
+              "folla": {"n": 0, "chi": set(), "oltre": False,
+                        "generi": set()}}
 _TASK_AVVISO_DM = None
 # LA PORTA DEL BANCO: la connessione la fa questa, e i collaudi la
 # sostituiscono con una di cartone — il resto gira vero.
@@ -61473,33 +61482,66 @@ def _dm_visto(ev_id: str) -> bool:
         return False
 
 
+def _dm_tipo_rumor(sigillo: dict):
+    """LA SECONDA BUSTA (15 ott 2026, cantiere dm-o-mail): apre il
+    sigillo — gia' verificato: la firma e' di chi scrive — e dice il
+    TIPO del messaggio di dentro, il suo kind: un intero da 0 a 65535.
+    None = il tipo non si sa: il sigillo non si apre, il messaggio non
+    e' un oggetto, non ha un kind intero, o dice di essere di un altro
+    (`pubkey` diversa da chi ha firmato il sigillo: per NIP-17 e'
+    contraffatto). L'avviso parte lo stesso, generico.
+    IL MESSAGGIO APERTO NON ESCE DI QUI. Vive nella variabile `rumor`
+    il tempo di due `.get` e muore con lei: non si restituisce, non si
+    stampa, non si passa a nessuno. L'except non da' un nome all'errore
+    — ne' il suo messaggio ne' il suo tipo vanno nel journal — perche'
+    un errore di json si porta dietro il testo intero. Lo guardano le
+    sentinelle sull'albero in prove.py: una riga nuova che lo tocca in
+    un altro modo le fa diventare rosse."""
+    try:
+        rumor = json.loads(nip44_decifra(
+            _NOSTR[0].secret, sigillo["pubkey"], sigillo["content"]))
+        if not isinstance(rumor, dict) \
+                or rumor.get("pubkey") != sigillo["pubkey"]:
+            return None
+        tipo = rumor.get("kind")
+    except Exception:
+        return None
+    if type(tipo) is not int or not 0 <= tipo <= 65535:
+        return None
+    return tipo
+
+
 def _dm_mittente_busta(pacco: dict):
-    """Apre la SOLA busta di fuori di un 1059 e dice chi ha firmato il
-    sigillo che c'e' dentro: la chiave del mittente, in hex.
+    """Apre la busta di fuori di un 1059, verifica il sigillo che c'e'
+    dentro e dice (chi l'ha firmato, il tipo del messaggio): la chiave
+    del mittente in hex, e il kind che trova `_dm_tipo_rumor` (None se
+    non si sa).
     None = non e' un DM per noi (non si apre con la nostra chiave, non
     contiene un sigillo, o la firma del sigillo non torna): niente
-    avviso. '' = la busta resta chiusa perche' manca la cifratura
-    (`cryptography`): l'avviso parte senza nome.
-    IL MESSAGGIO NON SI DECIFRA: sta nel `content` del sigillo, cifrato
-    una seconda volta, e qui nessuno lo apre. Del sigillo esce la sola
-    `pubkey`; il resto muore con la variabile."""
+    avviso. ('', None) = la busta resta chiusa perche' manca la
+    cifratura (`cryptography`): l'avviso parte senza nome.
+    Il contenuto del sigillo qui non si tocca: va a `_dm_tipo_rumor`, e
+    solo DOPO la firma verificata — la seconda decifratura tocca solo
+    a un sigillo buono."""
     if ChaCha20DM is None or not _NOSTR:
-        return ""
+        return ("", None)
     try:
         sigillo = json.loads(nip44_decifra(
             _NOSTR[0].secret, pacco["pubkey"], pacco["content"]))
         if not isinstance(sigillo, dict) or sigillo.get("kind") != 13 \
                 or not _x_firma_valida(sigillo):
             return None
-        return sigillo["pubkey"]
     except Exception:
         return None
+    return (sigillo["pubkey"], _dm_tipo_rumor(sigillo))
 
 
 def _dm_setaccia(ev, nostra: str, base: bool, adesso: float):
     """IL SETACCIO, nel filo: da un evento letto dal relay a «chi
-    avvisare di chi». Torna la chiave del mittente (hex), '' se il
-    mittente non si puo' sapere, None se non c'e' niente da dire.
+    avvisare di chi». Torna (mittente, tipo): la chiave del mittente
+    (hex, '' se non si puo' sapere) e il kind del messaggio (4 per un
+    NIP-04, quello di dentro per una busta, None se non si sa); None se
+    non c'e' niente da dire.
     In ordine: la forma (un 4 o un 1059 con la `p` nostra — il filtro
     lo chiede al relay, ma un relay e' un programma); `base` — la posta
     che c'era gia' al primo collegamento: un 1059 si segna visto e
@@ -61529,14 +61571,14 @@ def _dm_setaccia(ev, nostra: str, base: bool, adesso: float):
         if ev["kind"] == 4:
             if creato < _DM_AVVIO:
                 return None
-            mittente = autore
+            arrivo = (autore, 4)
         else:
             if creato < adesso - AVVISO_DM_BUSTE_S:
                 return None
-            mittente = _dm_mittente_busta(ev)
-        if mittente is None or mittente == nostra:
+            arrivo = _dm_mittente_busta(ev)
+        if arrivo is None or arrivo[0] == nostra:
             return None
-        return mittente
+        return arrivo
     except Exception:
         return None
 
@@ -61552,23 +61594,50 @@ def _dm_filtri(nostra: str, adesso: float, vivo_fino: float) -> list:
              "since": int(max(_DM_AVVIO, vivo_fino - AVVISO_DM_RITORNO_S))}]
 
 
-def _dm_in_coda(mittente: str):
+def _dm_in_coda(arrivo: tuple):
     """La porta fra il filo e il loop (`call_soon_threadsafe`): un DM
-    da avvisare entra in coda, e l'orologio decide. Oltre il tetto
-    della coda non si tiene nemmeno il mittente: va nel riassunto."""
+    da avvisare — (mittente, tipo), come esce dal setaccio — entra in
+    coda, e l'orologio decide. Oltre il tetto della coda non si tiene
+    nemmeno il mittente: va nel riassunto."""
     S = _DM_AVVISI
     if len(S["arrivi"]) >= AVVISO_DM_CODA_MAX:
         S["folla"]["n"] += 1
         S["folla"]["oltre"] = True
         return
-    S["arrivi"].append(mittente)
+    S["arrivi"].append(arrivo)
+
+
+def _dm_genere(tipo):
+    """PURA: dal kind del messaggio al GENERE dell'avviso (15 ott 2026,
+    cantiere dm-o-mail). "chat" il 14 e "file" il 15 (NIP-17: tutti e
+    due li mostra Amethyst), "mail" il 1301 e il 2024 (la posta Nostr:
+    Amethyst la scarta, si legge con un client di posta), "nip04" il
+    vecchio DM, "?" il tipo che non si sa; ogni altro kind resta il suo
+    numero, e l'avviso lo dice."""
+    if type(tipo) is not int:
+        return "?"
+    return {4: "nip04", 14: "chat", 15: "file", 1301: "mail",
+            2024: "mail"}.get(tipo, tipo)
+
+
+def _dm_somma_generi(dove: set, da) -> None:
+    """Aggiunge a `dove` i generi di `da`, fino a AVVISO_DM_GENERI_MAX:
+    tre generi diversi sono gia' «misti» (chat e file insieme fanno
+    ancora un DM), e chi manda mille kind diversi non fa crescere la
+    memoria. Il conto dei messaggi non c'entra: quello resta intero."""
+    for g in da:
+        if len(dove) >= AVVISO_DM_GENERI_MAX:
+            return
+        dove.add(g)
 
 
 def _dm_decidi(S: dict, adesso: float) -> list:
     """IL GIUDICE DEGLI AVVISI: dalla coda a cosa si dice ADESSO.
     PURA sullo stato che riceve (lo cambia, non tocca altro).
-    Torna una lista di voci: ("uno", mittente, quanti) — un avviso per
-    quel mittente — e ("folla", quanti, mittenti, oltre) — il riassunto.
+    Torna una lista di voci: ("uno", mittente, quanti, generi) — un
+    avviso per quel mittente, coi generi di quel che conta (vedi
+    `_dm_genere`) — e ("folla", quanti, mittenti, oltre) — il
+    riassunto, che di generi non ne ha.
     Le regole, in ordine:
     • chi e' stato avvisato da meno di AVVISO_DM_PAUSA_MITTENTE_S non
       si riavvisa: i suoi DM si contano, e a pausa finita escono in
@@ -61576,44 +61645,54 @@ def _dm_decidi(S: dict, adesso: float) -> list:
     • in AVVISO_DM_FINESTRA_S partono al massimo AVVISO_DM_TETTO
       avvisi, riassunti compresi: chi non trova posto finisce nella
       folla, che esce per PRIMA al primo posto libero;
-    • una folla di un mittente solo e' un avviso normale, col suo nome."""
+    • una folla di un mittente solo e' un avviso normale, col suo nome.
+    IL TIPO NON TOCCA IL TETTO (15 ott 2026, cantiere dm-o-mail): pausa
+    e conti restano per MITTENTE, e una chat e una mail dello stesso
+    mittente sono un avviso solo, «misti»."""
     M, F = S["mittenti"], S["folla"]
     pausa = AVVISO_DM_PAUSA_MITTENTE_S
     nuovi = {}
-    for m in S["arrivi"]:
+    for m, tipo in S["arrivi"]:
+        g = (_dm_genere(tipo),)
         if m in M:
             M[m]["attesa"] += 1
+            _dm_somma_generi(M[m]["generi"], g)
         else:
-            nuovi[m] = nuovi.get(m, 0) + 1
+            v = nuovi.setdefault(m, [0, set()])
+            v[0] += 1
+            _dm_somma_generi(v[1], g)
     S["arrivi"] = []
     S["mandati"] = [t for t in S["mandati"]
                     if adesso - t < AVVISO_DM_FINESTRA_S]
-    in_fila = [(m, v["attesa"]) for m, v in M.items()
+    in_fila = [(m, v["attesa"], v["generi"]) for m, v in M.items()
                if v["attesa"] and adesso - v["ultimo"] >= pausa]
-    in_fila += list(nuovi.items())
+    in_fila += [(m, n, g) for m, (n, g) in nuovi.items()]
     fuori = []
     if F["n"] and len(S["mandati"]) < AVVISO_DM_TETTO:
         if len(F["chi"]) == 1 and not F["oltre"]:
             solo = next(iter(F["chi"]))
-            fuori.append(("uno", solo, F["n"]))
-            M[solo] = {"ultimo": adesso, "attesa": 0}
+            fuori.append(("uno", solo, F["n"], frozenset(F["generi"])))
+            M[solo] = {"ultimo": adesso, "attesa": 0, "generi": set()}
         else:
             fuori.append(("folla", F["n"], len(F["chi"]), F["oltre"]))
         S["mandati"].append(adesso)
-        S["folla"] = F = {"n": 0, "chi": set(), "oltre": False}
-    for m, n in in_fila:
+        S["folla"] = F = {"n": 0, "chi": set(), "oltre": False,
+                          "generi": set()}
+    for m, n, g in in_fila:
         if m in M and adesso - M[m]["ultimo"] < pausa:
             M[m]["attesa"] += n
+            _dm_somma_generi(M[m]["generi"], g)
         elif len(S["mandati"]) < AVVISO_DM_TETTO:
-            fuori.append(("uno", m, n))
+            fuori.append(("uno", m, n, frozenset(g)))
             S["mandati"].append(adesso)
-            M[m] = {"ultimo": adesso, "attesa": 0}
+            M[m] = {"ultimo": adesso, "attesa": 0, "generi": set()}
         else:
             F["n"] += n
             if len(F["chi"]) < AVVISO_DM_CODA_MAX:
                 F["chi"].add(m)
             else:
                 F["oltre"] = True
+            _dm_somma_generi(F["generi"], g)
             M.pop(m, None)
     for m in [m for m, v in M.items()
               if not v["attesa"] and adesso - v["ultimo"] >= pausa]:
@@ -61633,14 +61712,44 @@ def _dm_chi(mittente: str, nome: str = "") -> str:
 
 
 def _dm_testo(voce: tuple, nome: str = "") -> str:
-    """Il testo dell'avviso. PURA. Dice che e' arrivato un DM e da chi:
-    il messaggio no, mai — qui non esiste nemmeno."""
+    """Il testo dell'avviso. PURA. Dice CHE COSA e' arrivato e da chi
+    (15 ott 2026, cantiere dm-o-mail): una chat, che si trova in
+    Amethyst; una mail Nostr, che vuole un client di posta; un
+    messaggio di un altro tipo, col suo numero; uno il cui tipo non si
+    legge. Il messaggio no, mai — qui non esiste nemmeno. Il NIP-04, la
+    busta rimasta chiusa e il riassunto dicono quel che dicevano prima;
+    tipi diversi dallo stesso mittente sono «messaggi cifrati»."""
     if voce[0] == "uno":
-        _, mittente, n = voce
-        quanti = "Nuovo DM" if n == 1 else f"{n} nuovi DM"
+        _, mittente, n, generi = voce
+        uno = n == 1
         if not mittente:
+            quanti = "Nuovo DM" if uno else f"{n} nuovi DM"
             return f"📩 {quanti} su Nostr"
-        return f"📩 {quanti} su Nostr da {_dm_chi(mittente, nome)}"
+        chi = _dm_chi(mittente, nome)
+        if generi and generi <= {"chat", "file"}:
+            con = " (con file)" if generi == {"file"} else ""
+            if uno:
+                return f"📩 Nuovo DM{con} da {chi}, lo trovi in Amethyst"
+            return f"📩 {n} nuovi DM{con} da {chi}, li trovi in Amethyst"
+        if generi == {"mail"}:
+            if uno:
+                return (f"✉️ Nuova mail Nostr da {chi}: si legge con un "
+                        "client di posta, es. Nmail")
+            return (f"✉️ {n} nuove mail Nostr da {chi}: si leggono con un "
+                    "client di posta, es. Nmail")
+        if generi == {"?"}:
+            if uno:
+                return f"📨 Nuovo messaggio cifrato da {chi} (tipo illeggibile)"
+            return f"📨 {n} nuovi messaggi cifrati da {chi} (tipo illeggibile)"
+        if len(generi) > 1:
+            return f"📨 {n} nuovi messaggi cifrati da {chi}"
+        tipo = next(iter(generi), "nip04")
+        if type(tipo) is int:
+            if uno:
+                return f"📨 Messaggio cifrato di tipo {tipo} da {chi}"
+            return f"📨 {n} messaggi cifrati di tipo {tipo} da {chi}"
+        quanti = "Nuovo DM" if uno else f"{n} nuovi DM"
+        return f"📩 {quanti} su Nostr da {chi}"
     _, n, mittenti, oltre = voce
     quanti = "1 nuovo DM" if n == 1 else f"{n} nuovi DM"
     if not mittenti:
