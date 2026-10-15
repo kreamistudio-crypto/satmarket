@@ -58384,12 +58384,10 @@ poi quattro risposte).
   spegnere la fattura sul nodo (non sappiamo se LNbits lo permette).
 
 **«IL PEZZO NON C'È PIÙ»** (`_perche_niente_vendita`, riga per riga):
-c'è quando l'annuncio è `attivo` e la quantità meno i pezzi prenotati da
-ALTRI compratori (le loro fatture vive, finestra di `_riservati`) basta
-per la riga. Venduto, rimosso, in revisione, sparito: non c'è. Le
-prenotazioni di Anna stessa non contano (`_riservati_da_altri`, gemello
-di `_riservati` con la firma di quest'ultimo intatta): se ha già una
-fattura nuova sua, pagare la vecchia è comprare. NEI SET NE BASTA UNO:
+c'è quando l'annuncio è `attivo` e la quantità meno i pezzi prenotati
+dalle fatture vive (`_riservati`, ANCHE quelle di chi ha pagato: vedi
+«I TRE NOTATI») basta per la riga. Venduto, rimosso, in revisione,
+sparito: non c'è. NEI SET NE BASTA UNO:
 la fattura era una e il rimborso è sempre intero, quindi un pezzo che
 manca rimborsa tutto l'ordine. Il no di chi vende si guarda PRIMA dello
 stock.
@@ -58465,7 +58463,8 @@ vendita in chiaro (lo stato `locked` di Anna, il secondo «Hai
 venduto!»). Sull'albero del cantiere: 80 su 80. Le scene: Anna e Bruno;
 due passaggi dell'orologio (un'uscita sola); il pezzo ancora
 disponibile (vendita come prima); il pezzo prenotato da un altro (poi
-Bruno compra davvero, una vendita); la sua fattura nuova (compra);
+Bruno compra davvero, una vendita); la sua fattura nuova (dal 15 ott: si
+rimborsa la vecchia, vedi «I TRE NOTATI»);
 senza address (`refund`, poi la fattura incollata); il nodo muto
 (riparte da solo, una volta); il server che cade dopo la decisione e
 dopo il rimborso (avvisi finiti una volta sola, il backfill al riavvio
@@ -58507,9 +58506,11 @@ moderatori (72 chiamate, 82 punti, polso con sette chiamanti).
   dei distintivi lo conta («dispute perse di chi vende: 1»); in più
   quell'ordine, se resta in `refund`, diventa «decidibile» da un
   moderatore. Esiste dal 1 ott (l'annullo del venditore); qui è curato
-  solo per la fattura annullata e pagata. La cura probabile: escludere
-  anche `annullato_venditore_il` dal backfill (e decidere cosa fare
-  degli ordini già marcati sul VPS).
+  solo per la fattura annullata e pagata. FATTO lo stesso giorno da un
+  cantiere suo («L'annullo del venditore non è una disputa», 61892a6):
+  al rebase le due esclusioni sono finite nella STESSA riga del
+  backfill, `AND COALESCE(annullato_venditore_il,0)=0 AND " +
+  SQL_NON_ANNULLATA_PAGATA`, coi due commenti.
 - IL LINK DEL NEGOZIO (decisione 3 di Andrea: solo verbale). Caso
   preciso: un venditore chiede il link «x», annulla il foglio della
   fattura e un altro venditore paga e prende «x»; poi il primo paga la
@@ -58519,19 +58520,65 @@ moderatori (72 chiamate, 82 punti, polso con sette chiamanti).
   «Hai pagato per il link «x», ma nel frattempo lo ha preso qualcun
   altro», ai moderatori «Link negozio conteso»: rimborso o nome diverso
   A MANO (`_rimborsa_sblocco`, mai automatico per patto).
-- LA SUA FATTURA NUOVA E LA VECCHIA. Anna annulla, ricompra (fattura
-  nuova, sua) e paga la VECCHIA: è una vendita, giusto; ma la nuova
-  resta viva, e se paga anche quella `verifica_pagamento` la porta a
-  `locked` senza guardare lo stock (il MAX del corner): un secondo
-  ordine pagato per lo stesso pezzo, a se stessa.
-- LA CARD DI CHI VENDE in fondo all'ordine, quando non ha contatti
-  pubblici, dice «Per i problemi c'è la disputa, e interviene un
-  moderatore» anche su questi ordini, dove una disputa non si apre.
-- LE ROTTE PER NUMERO (`/indirizzo`, `/email-corriere`, `/busta-ritiro`,
-  `/accesso`) guardano solo che chi chiede sia una delle parti: chi
-  vende può ancora leggere l'indirizzo lasciato su un ordine che non
-  vede, se ne indovina il numero.
 - Gli scatti del giro sono del Browser pane (densità 2): per quelli a
   densità 3 c'è la ricetta CDP.
+
+**I TRE NOTATI, FATTI NELLO STESSO CANTIERE** (15 ott 2026, decisione
+di Andrea: «toccano soldi e privacy»; il push aspetta che la prova
+dello sconto P2P scaduta il 15 ott torni verde su main, la sistema
+un'altra sessione).
+1. LA FATTURA NUOVA E LA VECCHIA. Prima: Anna annulla, ricompra
+   (fattura nuova, sua) e paga la VECCHIA — il giudice ignorava le sue
+   prenotazioni (`_riservati_da_altri`), quindi era una vendita; poi
+   paga anche la nuova, e `verifica_pagamento` la portava a `locked`
+   senza guardare lo stock. Prova rossa nel collaudo: DUE ordini
+   pagati per il «Tappeto», due «Hai venduto!». Ora nel conto entrano
+   anche i suoi (`_riservati`, e `_riservati_da_altri` non c'è più):
+   la fattura nuova tiene il pezzo, la vecchia si rimborsa come le
+   altre; se paga prima la nuova, la vecchia trova l'annuncio venduto.
+   Un ordine pagato solo, nei due ordini di pagamento. LE PAROLE
+   CAMBIANO, ed è la ragione di un giudice in più
+   (`_perche_annullata_pagata`, ricavato dalle righe e mai scritto):
+   «non è più disponibile» detto a chi ha la fattura nuova in mano la
+   convincerebbe a non pagarla. Quindi ««Tappeto» è già nella tua
+   fattura più recente: i tuoi N sats tornano per intero»; ai
+   moderatori «chi ha pagato aveva già una fattura più recente per lo
+   stesso oggetto»; nella pagina il secondo passo «L'oggetto è nella
+   tua fattura più recente» (`annullata_perche` esce da /api/orders
+   solo sulle righe col timbro).
+2. LE ROTTE PER NUMERO. Prima: chi vende, col numero dell'ordine che
+   non vede, leggeva indirizzo ed email di chi ha pagato e ci SCRIVEVA
+   un tracciamento (prova rossa nel collaudo: «Via Roma 1»,
+   «anna@posta.it», `{'ok': True, ...}`). Ora `_nascosto_a(o, tg_id)`
+   — col timbro, e non sei chi ha pagato — fa rispondere come a un
+   estraneo (400 «Operazione non permessa») a indirizzo, email, busta,
+   documento della busta, collegamento e correzione del tracciamento
+   del venditore. Chi ha pagato legge i suoi dati come sempre; sugli
+   ordini veri chi vende arriva ai dati come prima (la controprova). Le
+   altre rotte del venditore per numero chiedono stati che questi
+   ordini non hanno mai (locked, shipped...).
+3. LA SCHEDA DI CHI VENDE: una riga sola, sistemata — su questi ordini
+   «Per i problemi c'è la disputa, e interviene un moderatore» non
+   esce; il resto della nota resta.
+Banchi allineati: `giudice_nascosto(amb)` in prove.py dà il trio
+`_campo`/`_annullata_pagata`/`_nascosto_a` ai cinque banchi che
+eseguono quelle rotte; la sentinella dell'email guarda la riga nuova;
+la scheda del venditore ha il suo caso nel banco della card. IL
+SECONDO GIRO DAL VIVO (15 ott, chiesto da Andrea prima del push,
+sull'albero ribasato su 61892a6): server della copia su 8177, relay
+morti, P2P spento, a 375 px come Anna. Gli avvisi dal log: «Hai pagato
+una fattura annullata. «Radio a valvole Geloso» nel frattempo non è più
+disponibile…» e «…«Tappeto berbero» è già nella tua fattura più
+recente…», coi due avvisi ai moderatori e il perché giusto. Le pagine:
+la Radio col secondo passo «L'oggetto non era più disponibile», il
+Tappeto con «L'oggetto è nella tua fattura più recente» (e la sua
+fattura nuova in lista, «Da pagare»); in nessuna delle due «disputa»,
+nemmeno nella scheda di chi vende. LA
+TORTURA RIFATTA sull'albero coi tre notati: 23 mutazioni (le 19 di
+prima, con «le sue prenotazioni contate» che ora e' il comportamento
+giusto e diventa «le prenotazioni non contano», piu' il perche'
+«rifatta» dimenticato, le rotte di lettura senza guardia, il
+tracciamento senza guardia, il giudice del nascosto sempre falso, la
+scheda che promette ancora la disputa): 23 prese.
 
 **COSA È GIRATO SU QUALE ALBERO.** Nel messaggio del commit.

@@ -27,7 +27,8 @@ quello vero), la fattura coniata dal Lightning address e le due piazze
    3. il pezzo c'e' ancora: chi paga ha comprato, come ieri;
    4. il pezzo e' PRENOTATO da un altro (fattura viva): rimborso, e
       l'altro poi compra davvero;
-   5. la SUA stessa fattura nuova non le nega il pezzo;
+   5. la fattura nuova e la vecchia, pagate tutte e due: mai due
+      ordini pagati per un pezzo (15 ott 2026);
    6. senza Lightning address: 'refund', poi incolla la fattura;
    7. il nodo muto: 'da_riprovare', e riparte da solo;
    8. il server che cade a meta': al riavvio finisce il lavoro, una
@@ -36,7 +37,9 @@ quello vero), la fattura coniata dal Lightning address e le due piazze
   10. il set con UN pezzo che manca: torna tutto;
   11. l'annuncio rimosso nel frattempo;
   12. chi vende non vede niente e i conti non si muovono;
-  13. il libro mastro e la riconciliazione tacciono (e sanno parlare).
+  13. il libro mastro e la riconciliazione tacciono (e sanno parlare);
+  14. le rotte per numero: chi vende non legge i dati dell'ordine che
+      non vede, nemmeno indovinandone il numero (15 ott 2026).
 
 NON TOCCA NIENTE DI VERO: il `config` finto si installa PRIMA
 dell'import di server (lo fa `avvio()` del banco). Nessuna rete.
@@ -335,19 +338,60 @@ def scena_prenotato_da_un_altro():
 
 
 def scena_la_sua_fattura_nuova():
+    """LA FATTURA NUOVA E LA VECCHIA (15 ott 2026, decisione di Andrea):
+    Anna annulla, ricompra (fattura nuova, SUA) e le paga TUTTE E DUE.
+    Mai due ordini pagati per lo stesso pezzo: nel conto dei pezzi
+    prenotati entrano anche i suoi, e la vecchia si rimborsa come le
+    altre — in tutti e due gli ordini in cui puo' pagarle."""
     aid = nuovo_annuncio("Tappeto")
     vecchio = compra(ANNA, aid)
     annulla(ANNA, vecchio)
     nuovo = compra(ANNA, aid)             # ci ripensa: fattura nuova, SUA
     paga(vecchio)
     orologio()
-    prova("la prenotazione che le si oppone e' la SUA: paga la vecchia "
-          "e ha comprato ('locked', nessun timbro, nessun rimborso)",
-          ("locked", False, 0),
-          (banco.riga(vecchio)["stato"], timbro(vecchio),
-           len(banco.USCITE)))
-    prova("...la nuova resta la fattura viva di prima", "creato",
-          banco.riga(nuovo)["stato"])
+    prova("paga PRIMA la vecchia: la sua fattura nuova tiene il pezzo, "
+          "quindi la vecchia si rimborsa (timbro, un'uscita, niente vendita)",
+          (("refunded", "uscito"), True, 1, "creato", ("attivo", 1), []),
+          (stato(vecchio), timbro(vecchio), len(banco.USCITE),
+           banco.riga(nuovo)["stato"], annuncio(aid), detti_a(VENDE)))
+    prova("...e le si dice dov'e' il pezzo: nella sua fattura piu' recente",
+          True,
+          any("Hai pagato una fattura annullata" in t
+              and "«Tappeto» è già nella tua fattura più recente" in t
+              for t in detti_a(ANNA)))
+    prova("...ai moderatori il perche' giusto", True,
+          any("nessuna vendita" in a and "aveva già una fattura più "
+              "recente per lo stesso oggetto" in a for a in banco.AVVISI))
+    paga(nuovo)
+    verifica(ANNA, nuovo)
+    con = SRV.db()
+    pagati = con.execute(
+        "SELECT COUNT(*) FROM ordini WHERE annuncio_id=? AND stato NOT IN "
+        "('creato','annullato','refund','refunded')", (aid,)).fetchone()[0]
+    con.close()
+    prova("...poi paga la nuova: UNA vendita, UN ordine pagato per il pezzo",
+          ("locked", ("venduto", 0), 1, 1),
+          (banco.riga(nuovo)["stato"], annuncio(aid), pagati,
+           sum("Hai venduto" in t for t in detti_a(VENDE))))
+    # ...e nell'ordine inverso
+    pulisci()
+    aid = nuovo_annuncio("Tappetino")
+    vecchio = compra(ANNA, aid)
+    annulla(ANNA, vecchio)
+    nuovo = compra(ANNA, aid)
+    paga(nuovo)
+    verifica(ANNA, nuovo)
+    paga(vecchio)
+    orologio()
+    con = SRV.db()
+    pagati = con.execute(
+        "SELECT COUNT(*) FROM ordini WHERE annuncio_id=? AND stato NOT IN "
+        "('creato','annullato','refund','refunded')", (aid,)).fetchone()[0]
+    con.close()
+    prova("paga PRIMA la nuova e poi la vecchia: la vecchia si rimborsa, "
+          "un ordine pagato solo", ("locked", ("refunded", "uscito"), 1, 1),
+          (banco.riga(nuovo)["stato"], stato(vecchio), pagati,
+           sum("Hai venduto" in t for t in detti_a(VENDE))))
 
 
 def scena_senza_metodo():
@@ -643,6 +687,70 @@ def scena_chi_vende_non_vede(aid, o_anna, o_bruno):
           "concluso in questo collaudo", 0, conclusi)
 
 
+def scena_rotte_per_numero():
+    """LE ROTTE PER NUMERO (15 ott 2026, decisione di Andrea): l'ordine
+    nascosto a chi vende e' nascosto anche li' — indirizzo, email,
+    busta, documento, collegamento, correzione del tracciamento — e
+    nemmeno indovinando il numero se ne leggono i dati. Chi ha pagato
+    li legge come sempre."""
+    import json
+    aid, o_anna, o_bruno = _anna_e_bruno_fino_al_saldo("Giradischi")
+    ora = int(time.time())
+    cifra = SRV._cifra_contenuto
+    db_esegui("UPDATE ordini SET indirizzo=?, indirizzo_il=?, "
+              "email_corriere=?, email_corriere_il=?, busta_il=?, "
+              "busta_nome=?, busta_codice=?, accesso_il=?, accesso_testo=? "
+              "WHERE id=?",
+              cifra(json.dumps({"nome": "Anna Bianchi", "via": "Via Roma 1",
+                                "cap": "27100", "citta": "Pavia"})), ora,
+              cifra("anna@posta.it"), ora, ora, cifra("Mario"),
+              cifra("4321"), ora, cifra("https://esempio.invalid/x"), o_anna)
+    orologio()
+    prova("l'ordine e' quello nascosto a chi vende", (True, False),
+          (timbro(o_anna), o_anna in miei(VENDE)))
+
+    def bussa(chi, fn, *args, corpo=None):
+        banco.come(chi)
+        try:
+            r = banco.chiama(fn, *args, corpo=corpo)
+            return ("risponde", str(r)[:120])
+        except SRV.HTTPException as e:
+            return (e.status_code, str(e.detail))
+
+    no = (400, "Operazione non permessa")
+    prova("chi vende, col numero giusto: indirizzo, email, busta, "
+          "documento e collegamento rispondono come a un estraneo",
+          [no] * 5,
+          [bussa(VENDE, SRV.leggi_indirizzo, o_anna),
+           bussa(VENDE, SRV.leggi_email_corriere, o_anna),
+           bussa(VENDE, SRV.leggi_busta_ritiro, o_anna),
+           bussa(VENDE, SRV.leggi_documento_busta, o_anna),
+           bussa(VENDE, SRV.leggi_accesso, o_anna)])
+    # il tracciamento si corregge solo su una SPEDIZIONE: l'ordine lo
+    # diventa per questa prova, o il no arriverebbe per un altro motivo
+    db_esegui("UPDATE ordini SET consegna_scelta='spedizione' WHERE id=?",
+              o_anna)
+    prova("...e non ci scrive un tracciamento", (no, ""),
+          (bussa(VENDE, SRV.correggi_tracking_venditore, o_anna, None,
+                 corpo={"corriere": "Poste", "tracking": "RR123456789IT"}),
+           banco.riga(o_anna)["tracking"] or ""))
+    ind = bussa(ANNA, SRV.leggi_indirizzo, o_anna)
+    mail = bussa(ANNA, SRV.leggi_email_corriere, o_anna)
+    prova("chi ha pagato legge i suoi dati come sempre", (True, True),
+          (ind[0] == "risponde" and "Via Roma 1" in ind[1],
+           mail[0] == "risponde" and "anna@posta.it" in mail[1]))
+    prova("controprova: sull'ordine VERO di Bruno chi vende arriva fino "
+          "ai dati (qui non ce ne sono: 404, non il 400 dell'estraneo)",
+          (404, "Nessun indirizzo su questo ordine"),
+          bussa(VENDE, SRV.leggi_indirizzo, o_bruno))
+    # la semina torna com'era: busta e collegamento su un ritiro sono
+    # «fuori contratto», e il libro mastro della scena 13 lo direbbe
+    db_esegui("UPDATE ordini SET consegna_scelta='ritiro', indirizzo='', "
+              "indirizzo_il=0, email_corriere='', email_corriere_il=0, "
+              "busta_il=0, busta_nome='', busta_codice='', accesso_il=0, "
+              "accesso_testo='' WHERE id=?", o_anna)
+
+
 def scena_libro_mastro(o_anna):
     SRV.CONTROLLO_LIBRO_MASTRO = True
     SRV.RICONCILIA_PAYOUT = True
@@ -775,6 +883,7 @@ def main():
     scena("11. l'annuncio rimosso", scena_annuncio_rimosso)
     scena("12. chi vende non vede, i conti non si muovono",
           lambda: scena_chi_vende_non_vede(aid, o_anna, o_bruno))
+    scena("14. le rotte per numero", scena_rotte_per_numero)
     scena("13. il libro mastro e la riconciliazione",
           lambda: scena_libro_mastro(o_anna))
 

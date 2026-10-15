@@ -12484,6 +12484,17 @@ def _campo(o, chiave: str, vuoto=""):
         return vuoto
 
 
+def _nascosto_a(o, tg_id: int) -> bool:
+    """L'ORDINE CHE CHI VENDE NON VEDE, NEMMENO PER NUMERO (15 ott 2026,
+    decisione di Andrea): la fattura annullata e pagata e' di chi ha
+    pagato soltanto. La lista non la manda a chi vende, e le rotte che
+    leggono o scrivono un ordine per numero — indirizzo, email, busta,
+    documento, collegamento, correzione del tracciamento — gli
+    rispondono come a un estraneo: chi indovina il numero non impara
+    niente, nemmeno che l'ordine esiste."""
+    return _annullata_pagata(o) and tg_id != o["compratore_id"]
+
+
 def _annullata_pagata(o) -> bool:
     """La riga porta il timbro della FATTURA ANNULLATA E PAGATA (13 ott
     2026)? Passa da `_campo`: i banchi montano tabelle piu' strette di
@@ -34750,28 +34761,6 @@ def _riservati(con, annuncio_id: int) -> int:
     return mono + nei_set
 
 
-def _riservati_da_altri(con, annuncio_id: int, compratore_id: int) -> int:
-    """I pezzi prenotati da ALTRI compratori: il gemello di `_riservati`
-    per il riacciuffo (13 ott 2026), con la stessa finestra e le stesse
-    due somme. Chi ha pagato una fattura annullata non deve trovarsi il
-    pezzo negato dalla SUA stessa fattura nuova — ma quella viva in mano
-    a un altro e' una prenotazione buona, e lui alla sua ha rinunciato.
-    Una funzione a parte e non un argomento in piu' su `_riservati`: la
-    cassa la chiama in dieci posti, e la sua firma resta quella."""
-    soglia = int(time.time()) - 1800
-    mono = con.execute(
-        "SELECT COALESCE(SUM(quantita),0) AS n FROM ordini "
-        "WHERE annuncio_id=? AND stato='creato' AND creato>=? "
-        "AND compratore_id<>?",
-        (annuncio_id, soglia, compratore_id)).fetchone()["n"]
-    nei_set = con.execute(
-        "SELECT COALESCE(SUM(r.quantita),0) AS n FROM ordine_righe r "
-        "JOIN ordini o ON o.id=r.ordine_id "
-        "WHERE r.annuncio_id=? AND o.stato='creato' AND o.creato>=? "
-        "AND o.compratore_id<>?",
-        (annuncio_id, soglia, compratore_id)).fetchone()["n"]
-    return mono + nei_set
-
 
 # UN USO E' UN ORDINE CHE PORTA QUEL CODICE E NON E' ANNULLATO: i
 # pagati per sempre, i 'creato' finche' la loro fattura e' viva.
@@ -38844,7 +38833,7 @@ async def leggi_accesso(ordine_id: int,
                     "(compratore_id=? OR venditore_id=?)",
                     (ordine_id, user["id"], user["id"])).fetchone()
     con.close()
-    if not o:
+    if not o or _nascosto_a(o, user["id"]):
         raise HTTPException(400, "Operazione non permessa")
     if not o["accesso_il"]:
         raise HTTPException(404, "Il venditore non ha ancora lasciato "
@@ -39006,7 +38995,7 @@ async def leggi_indirizzo(ordine_id: int,
                     "(compratore_id=? OR venditore_id=?)",
                     (ordine_id, user["id"], user["id"])).fetchone()
     con.close()
-    if not o:
+    if not o or _nascosto_a(o, user["id"]):
         raise HTTPException(400, "Operazione non permessa")
     if o["indirizzo_purgato_il"]:
         # la promessa mantenuta, detta a chi la incontra
@@ -39175,7 +39164,7 @@ async def leggi_email_corriere(ordine_id: int,
                     "(compratore_id=? OR venditore_id=?)",
                     (ordine_id, user["id"], user["id"])).fetchone()
     con.close()
-    if not o:
+    if not o or _nascosto_a(o, user["id"]):
         raise HTTPException(400, "Operazione non permessa")
     if o["email_corriere_purgata_il"]:
         # la promessa mantenuta, detta a chi la incontra
@@ -39755,7 +39744,7 @@ async def leggi_busta_ritiro(ordine_id: int,
                     "(compratore_id=? OR venditore_id=?)",
                     (ordine_id, user["id"], user["id"])).fetchone()
     con.close()
-    if not o:
+    if not o or _nascosto_a(o, user["id"]):
         raise HTTPException(400, "Operazione non permessa")
     if not o["busta_il"]:
         raise HTTPException(404, "Nessuna istruzione di ritiro su "
@@ -39814,7 +39803,7 @@ async def leggi_documento_busta(ordine_id: int,
                     "(compratore_id=? OR venditore_id=?)",
                     (ordine_id, user["id"], user["id"])).fetchone()
     con.close()
-    if not o:
+    if not o or _nascosto_a(o, user["id"]):
         raise HTTPException(400, "Operazione non permessa")
     if not o["busta_file"]:
         raise HTTPException(404, "Nessun documento di ritiro su questo "
@@ -67135,6 +67124,11 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
             "SELECT * FROM ordini WHERE id=? AND venditore_id=? AND stato IN "
             f"({','.join('?' * len(STATI_CON_SPEDIZIONE))})",
             (ordine_id, user["id"], *STATI_CON_SPEDIZIONE)).fetchone()
+        # (15 ott 2026) la fattura annullata e pagata e' in 'refund'/
+        # 'refunded', due stati di questa lista: chi vende non la vede,
+        # e qui ci scriverebbe un tracciamento (avvisando chi ha pagato)
+        if o and _nascosto_a(o, user["id"]):
+            raise HTTPException(400, "Operazione non permessa")
         if not o:
             raise HTTPException(400, "Questo ordine non ha un tracciamento "
                                      "che puoi correggere")
@@ -68428,8 +68422,15 @@ def _perche_niente_vendita(con, o) -> str:
     diventare una vendita — 'venditore' (aveva annullato lui), 'esaurito'
     (il pezzo non c'e' piu') — o '' se si puo' vendere come sempre.
     IL PEZZO C'E' quando l'annuncio e' 'attivo' e i pezzi liberi — la
-    quantita' meno quelli prenotati da ALTRI — bastano per la riga.
-    Venduto, rimosso, in revisione, sparito: non c'e'.
+    quantita' meno quelli prenotati dalle fatture vive (`_riservati`) —
+    bastano per la riga. Venduto, rimosso, in revisione, sparito: non
+    c'e'.
+    LE PRENOTAZIONI SUE CONTANO COME LE ALTRE (15 ott 2026, decisione
+    di Andrea): Anna annulla, ricompra (fattura nuova) e le paga TUTTE E
+    DUE — prima, la vecchia diventava una vendita e la nuova, pagata
+    dopo, una seconda: due ordini pagati per un pezzo. Ora la fattura
+    nuova tiene il pezzo e la vecchia si rimborsa come le altre; e se
+    paga prima la nuova, la vecchia trova l'annuncio venduto.
     NEI SET SI GUARDA RIGA PER RIGA E NE BASTA UNA: la fattura era una
     e il rimborso e' sempre intero, quindi un pezzo che manca rimborsa
     tutto l'ordine — mai una vendita a meta' che nessuno ha chiesto."""
@@ -68440,11 +68441,34 @@ def _perche_niente_vendita(con, o) -> str:
                         (r["annuncio_id"],)).fetchone()
         if not a or a["stato"] != "attivo":
             return "esaurito"
-        liberi = int(a["quantita"] or 0) - _riservati_da_altri(
-            con, r["annuncio_id"], o["compratore_id"])
+        liberi = int(a["quantita"] or 0) - _riservati(con, r["annuncio_id"])
         if liberi < int(r["quantita"] or 1):
             return "esaurito"
     return ""
+
+
+def _perche_annullata_pagata(con, o) -> str:
+    """PERCHE' questa fattura annullata e pagata non e' diventata una
+    vendita, per le PAROLE (15 ott 2026): 'venditore' (aveva annullato
+    lui), 'rifatta' (chi ha pagato ha un ordine piu' recente sullo
+    stesso pezzo: e' li' che lo trova), 'esaurito' (tutto il resto).
+    Si ricava dalle righe e non si scrive: gli avvisi possono partire
+    piu' tardi (dopo una caduta), e la pagina lo chiede a ogni lista.
+    La differenza conta: «non e' piu' disponibile» detto a chi ha la
+    fattura nuova in mano la convincerebbe a non pagarla."""
+    if _campo(o, "annullato_venditore_il", 0):
+        return "venditore"
+    for r in _righe_ordine(con, o):
+        if con.execute(
+                "SELECT 1 FROM ordini x WHERE x.compratore_id=? AND x.id>? "
+                "AND x.stato<>'annullato' "
+                "AND COALESCE(x.pagata_da_annullata_il,0)=0 "
+                "AND (x.annuncio_id=? OR x.id IN (SELECT ordine_id FROM "
+                "ordine_righe WHERE annuncio_id=?)) LIMIT 1",
+                (o["compratore_id"], o["id"], r["annuncio_id"],
+                 r["annuncio_id"])).fetchone():
+            return "rifatta"
+    return "esaurito"
 
 
 def _decidi_annullata_pagata(ordine_id: int) -> str:
@@ -68488,7 +68512,7 @@ def _decidi_annullata_pagata(ordine_id: int) -> str:
         con.close()
 
 
-def _msg_annullata_pagata(titolo: str, importo: int, dal_venditore: bool,
+def _msg_annullata_pagata(titolo: str, importo: int, perche: str,
                           ha_address: bool, partiti: bool = False) -> str:
     """LE PAROLE DI CHI HA PAGATO UNA FATTURA ANNULLATA. `titolo` arriva
     GIA' scappato. Mai «disputa», mai «annullato dal venditore» come
@@ -68497,7 +68521,9 @@ def _msg_annullata_pagata(titolo: str, importo: int, dal_venditore: bool,
     `partiti`: il rimborso e' gia' uscito (l'avviso arriva tardi, dopo
     una caduta del server) — allora non si chiede niente a nessuno."""
     perche = (f"Il venditore aveva annullato l'ordine «{titolo}»"
-              if dal_venditore else
+              if perche == "venditore" else
+              f"«{titolo}» è già nella tua fattura più recente"
+              if perche == "rifatta" else
               f"«{titolo}» nel frattempo non è più disponibile")
     come = ("Sono già partiti verso il tuo wallet." if partiti
             else "Arrivano da soli sul tuo Lightning address." if ha_address
@@ -68506,13 +68532,16 @@ def _msg_annullata_pagata(titolo: str, importo: int, dal_venditore: bool,
             f"<b>{_fmt_sats(importo)} sats</b> tornano per intero. {come}")
 
 
-def _msg_annullata_pagata_admin(o, titolo: str, importo: int) -> str:
+def _msg_annullata_pagata_admin(o, titolo: str, importo: int,
+                                perche: str) -> str:
     """L'AVVISO AI MODERATORI: ordine, cifra, perche', e a che punto e'
     il rimborso — letto dalla RIGA di adesso, cosi' dice il vero anche
     quando parte in ritardo (dopo una caduta)."""
     perche = ("il venditore aveva annullato l'ordine"
-              if _campo(o, "annullato_venditore_il", 0)
-              else "l'oggetto non era più disponibile")
+              if perche == "venditore" else
+              "chi ha pagato aveva già una fattura più recente per lo "
+              "stesso oggetto" if perche == "rifatta" else
+              "l'oggetto non era più disponibile")
     ps = _campo(o, "payout_stato")
     if o["stato"] == "refunded":
         rimborso = "✅ uscito"
@@ -68560,6 +68589,7 @@ async def _avvisi_annullata_pagata(ordine_id: int, fino_a: str):
         con.close()
         return
     titolo = html.escape(_titolo_ordine(_righe_ordine(con, o))[:60])
+    perche = _perche_annullata_pagata(con, o)
     u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
                     (o["compratore_id"],)).fetchone()
     con.close()
@@ -68568,12 +68598,13 @@ async def _avvisi_annullata_pagata(ordine_id: int, fino_a: str):
         await notifica(
             o["compratore_id"],
             _msg_annullata_pagata(
-                titolo, importo, bool(_campo(o, "annullato_venditore_il", 0)),
+                titolo, importo, perche,
                 bool(u and u["ln_address"]), o["stato"] == "refunded"))
         timbro_scrivi(nome, "compratore")
     if fino_a != "moderatori":
         return
-    await notifica_admin(_msg_annullata_pagata_admin(o, titolo, importo),
+    await notifica_admin(_msg_annullata_pagata_admin(o, titolo, importo,
+                                                     perche),
                          argomento="errori")
     timbro_scrivi(nome, "moderatori")
 
@@ -69441,6 +69472,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     # compra, chi vende e chi modera. La chiave c'e' SOLO dove c'e' uno
     # stadio: un client che non la trova disegna la pagina di ieri.
     stadi = _stadi_ordini(con, righe)
+    # IL PERCHE' DELLA FATTURA ANNULLATA E PAGATA (15 ott 2026), per la
+    # storia della cassaforte: solo sulle righe col timbro, che sono
+    # tutte di chi ha pagato (a chi vende non escono)
+    for r in righe:
+        if r.get("pagata_da_annullata_il"):
+            r["annullata_perche"] = _perche_annullata_pagata(con, r)
     # IL VOLTO DELL'ALTRA PARTE (24 set 2026, «La card del venditore
     # anche nel dettaglio dell'ordine»): in fondo alla pagina di un
     # ordine chi compra vede la card di chi vende, e chi vende quella di

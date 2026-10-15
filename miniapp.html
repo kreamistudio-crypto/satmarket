@@ -15841,6 +15841,9 @@ function mapOrder(o){
        deciso che quel saldo NON era una vendita (0 = mai). Si legge
        SOLO insieme allo stato (annullataPagata). */
     pagataDaAnnullata:o.pagata_da_annullata_il||0,
+    /* ...e PERCHE' non e' diventato un acquisto (15 ott 2026): 'venditore',
+       'rifatta' (il pezzo e' nella sua fattura piu' recente), 'esaurito' */
+    annullataPerche:o.annullata_perche||'',
     /* QUANDO IL RIMBORSO E' USCITO (1 ott 2026): su 'refunded' e'
        `aggiornato`, scritto nello STESSO update che chiude l'ordine
        (_rimborsa_compratore) e mai piu' toccato dopo — e' la stessa
@@ -22651,7 +22654,7 @@ function cardParteOrdine(o, lato){
     + cardParte(c, primo ? 'a ' + esc(primo)
                          : (vende ? 'al venditore' : "all'acquirente"), {
       link: true, volto: faccia,
-      nota: `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`});
+      nota: `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare.${annullataPagata(o) ? '' : ' Per i problemi c\'è la disputa, e interviene un moderatore.'}</span></div>`});
 }
 
 /* Cambio BTC/EUR (per il "≈ X €" sotto i prezzi): UNA SOLA FONTE, il
@@ -33838,6 +33841,9 @@ function openOrder(id){
                             : 'Pagata una fattura annullata',
          d:'I sats sono arrivati dopo l\'annullo dell\'ordine'},
         {t:o.annullatoDalVenditore ? 'Il venditore aveva annullato l\'ordine'
+         /* (15 ott 2026) mai «non disponibile» a chi ha il pezzo nella
+            sua fattura nuova: la convincerebbe a non pagarla */
+         : o.annullataPerche==='rifatta' ? 'L\'oggetto è nella tua fattura più recente'
                                    : 'L\'oggetto non era più disponibile',
          d:'Nessun acquisto: i sats tornano per intero'},
         passoRimborso(o, s, 'Rimborso integrale', 'Rimborso integrale'),

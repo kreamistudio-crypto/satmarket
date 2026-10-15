@@ -1100,7 +1100,9 @@
   è `controlla_annullati` nell'orologio: lapide-ordine pagata → la
   decide `_decidi_annullata_pagata`, una `def` sola in UNA
   transazione. SE IL PEZZO C'È ANCORA (annuncio 'attivo' e pezzi
-  liberi, tolti quelli prenotati da ALTRI) torna 'creato' (timbro
+  liberi, tolti quelli prenotati dalle fatture vive — ANCHE quelle di
+  chi ha pagato, 15 ott: la sua fattura nuova tiene il pezzo e la
+  vecchia si rimborsa, mai due ordini pagati) torna 'creato' (timbro
   fresco, il reaper non se la mangia) e passa da `_incassa_ordine` —
   chi paga ha comprato, la regola di verifica_pagamento (e un avviso
   ai moderatori); lapide-rilancio pagata → binario del fuori-tempo
@@ -1111,8 +1113,8 @@
   escrow era «il caso da moderatore di sempre» — verificato con una
   sonda il 13 ott: due ordini pagati per un pezzo, «Hai venduto!» due
   volte. ORA quel saldo NON È UNA VENDITA: se il pezzo non c'è più
-  (venduto, rimosso, in revisione, prenotato da un altro; nei set ne
-  basta uno) o se ad annullare era stato CHI VENDE (sempre, anche col
+  (venduto, rimosso, in revisione, prenotato da una fattura viva; nei
+  set ne basta uno) o se ad annullare era stato CHI VENDE (sempre, anche col
   pezzo in vetrina: il suo no resta un no), l'ordine va 'annullato' →
   'refund' col timbro `pagata_da_annullata_il` e il rimborso già
   timbrato 'da_riprovare' verso il compratore, nella stessa scrittura;
@@ -1124,7 +1126,12 @@
   passaggio da 'locked': stock, annuncio, offerte, carrello, negozi
   collegati, Nostr, canale, XP restano dove sono; a chi vende non
   arriva niente e l'ordine non compare nei suoi Ordini (lo filtra
-  `miei_ordini` dopo la query, la WHERE resta quella). Gli avvisi
+  `miei_ordini` dopo la query, la WHERE resta quella) né nelle rotte
+  per numero: `_nascosto_a` fa rispondere come a un estraneo
+  indirizzo, email, busta, documento, collegamento e correzione del
+  tracciamento (15 ott). Il perché, per le parole, è
+  `_perche_annullata_pagata` ('venditore', 'rifatta' — il pezzo è nella
+  sua fattura più recente —, 'esaurito'), ricavato dalle righe. Gli avvisi
   hanno un timbro in `timbri` (`annullata_pagata:<id>`, '' →
   'compratore' → 'moderatori'), scritto DOPO aver parlato: se il
   server cade a metà li finisce il giro dopo, una volta sola; il
