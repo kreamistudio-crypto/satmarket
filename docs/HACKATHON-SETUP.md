@@ -2864,3 +2864,116 @@ giro). Barattolo (`satmarket`) resta privato.
    di partenza), da confrontare col copione di 3 minuti di Andrea.
 4. Il repo `fidelity-points`: lo stato è qui sopra; le decisioni del 16
    sono la visibilità, il contenuto e chi fa il push.
+
+### 13.7 Preparato per il 16 (bozze del 15 pomeriggio, da rileggere con Andrea e Alan)
+
+Le quattro richieste di Andrea in §13.6, scritte mentre il portatile di
+Alan si installa. Sono BOZZE: niente di questo è deciso, e niente tocca
+il repo `fidelity-points`.
+
+**1. Gli errori che un utente può vedere, in parole sue** (criterio UX,
+15%). La regola: la pagina non mostra MAI un nome di rgb-lib, di nostr o
+di QVAC; ogni guasto diventa una frase che dice cosa succede e cosa
+fare. Il terminale del wallet resta tecnico (è «il wallet», ed è
+dichiarato), ma le righe che i giudici leggono lì sono in parole
+semplici. Elenco preso dai guasti VERI di questi giorni:
+
+| Cosa succede sotto | Cosa vede l'utente | In inglese (per i giudici) |
+|---|---|---|
+| Il servizio del wallet non risponde (spento, relay locale senza ascolto: «no one was listening», timeout) | «Il tuo wallet non risponde. È acceso? Riprova fra un attimo.» | "Your wallet isn't answering. Is it open? Try again in a moment." |
+| Il pagamento supera la soglia del wallet (livello 2) | «Supera la soglia che hai scelto (3 USDB): confermalo nel tuo wallet.» | "Above the limit you set (3 USDB): please confirm in your wallet." |
+| `InsufficientAllocationSlots` (nessun posto libero per ricevere) | «Il wallet sta preparando lo spazio per ricevere: riprova fra un minuto.» | "Your wallet is getting ready to receive: try again in a minute." |
+| `InsufficientBitcoins` (niente sats per la commissione) | «Servono pochi sats per la commissione di rete: aggiungine un po' al wallet.» | "A few sats are needed for the network fee: top up your wallet." |
+| USDB non bastano | «Hai 3,10 USDB, ne servono 4,80. Puoi pagare in sats.» | "You have 3.10 USDB, 4.80 are needed. You can pay in sats." |
+| `AssetNotFound` (il wallet non conosce ancora il token) | «Il wallet non conosce ancora questo token: si attiva col primo arrivo.» | "Your wallet doesn't know this token yet: it activates on first receipt." |
+| Fattura scaduta | nessun errore: la pagina ne fa una nuova da sola e lo dice («ho preparato una nuova richiesta») | "We prepared a fresh payment request." |
+| Proxy RGB o Esplora lenti o giù (429, timeout) | «La rete è lenta: riprovo da solo…» (e si riprova; dopo tre volte «riprova più tardi o paga in sats») | "The network is slow: retrying…" |
+| In attesa del blocco (NON è un errore) | «Pagamento partito: la conferma arriva in circa 30 secondi.» | "Payment sent: confirmation in about 30 seconds." |
+| QVAC non risponde, 500, risposta non JSON | il fumetto con la proposta della regola: «Consiglio della regola del negozio (l'aiutante non è disponibile)» | "Shop rule suggestion (assistant unavailable)" |
+| Il modello propone fuori regola (`controlla` boccia) | la proposta della regola, senza dirlo come errore: il fumetto la mostra e basta | — |
+| Annuncio non firmato o dominio che non conferma | la card grigia «⚠️ Emittente sconosciuto: nessuno firma questo token» | "⚠️ Unknown issuer: nobody signs this token" |
+
+Da togliere dallo schermo (notato il 15): `riscatta` stampa «sendBegin
+params {…}» con la fattura dentro. Lo stampa la libreria `rgb-sdk`, non
+il nostro codice: in demo sembra un errore tecnico. Strade: filtrare
+quella riga nel servizio, o non mostrare quel terminale in quel momento.
+
+**2. QVAC è locale, e perché** (criterio QVAC, 20%: «AI locale con un
+motivo»). Il motivo, in una frase: *l'aiutante legge cosa compri e
+quanti punti e dollari hai: sono le tue abitudini di spesa, e restano
+sul tuo dispositivo; nessun server, nemmeno il nostro, le vede.* In
+seconda battuta: funziona anche senza rete (il banco del mercatino
+all'aperto). Come si mostra, in 20 secondi:
+
+- il terminale di `npx qvac serve` accanto al browser: quando si tocca
+  «Consigliami» compare la richiesta su `127.0.0.1:11434`, cioè su
+  questo portatile;
+- **il Wi-Fi spento** (la prova di §10 punto 10): Wi-Fi giù, «Consigliami»,
+  la risposta arriva lo stesso, Wi-Fi su. ATTENZIONE: col Wi-Fi spento il
+  pagamento RGB NON va (proxy ed Esplora sono in rete); il relay NWC è
+  locale e va. Quindi il momento del Wi-Fi spento si fa PRIMA di
+  «Approva», e il Wi-Fi si riaccende prima di pagare;
+- la mattina, una chiamata di riscaldamento COL NOSTRO SCHEMA: la prima
+  dopo l'avvio costa ~20 s anche sulla 4090 (§12.4);
+- i tempi sul portatile di Alan (CPU o Arc via Vulkan) si misurano
+  oggi o il 16: se il 2B sta sopra i 5 secondi, `consigliami-riserva`
+  (0.8B) per la demo, e lo si dice.
+
+**3. Il flusso vero della demo in 3 minuti** (la mini-demo dal vivo; la
+versione da sei minuti di §11.2 resta per il pitch dei finalisti). Cosa
+cambia rispetto a §11.2: il portatile della demo è quello di Alan (non
+il fisso), il modello è Qwen3.5 2B (non il 1.7B della scena 6), gli
+esploratori sono `mutinynet.com` (non mempool), e il tempo è la metà.
+Proposta da confrontare col copione di Andrea:
+
+| Tempo | Sullo schermo | Il gesto | La frase |
+|---|---|---|---|
+| 0:00-0:20 | Barattolo, vetrina di To The Mooon | — | il problema: i punti fedeltà oggi non sono tuoi |
+| 0:20-0:45 | l'annuncio; la card MOON con «✓ Emesso da To The Mooon» | tocco sulla riga dell'emittente | il negozio emette i punti come token RGB e li firma con la sua identità Nostr |
+| 0:45-1:15 | «Compra» → «oppure 4,80 USDB»; «Consigliami» → il fumetto; il terminale QVAC si muove | due tocchi | l'AI è su questo portatile: legge le tue spese e non le manda a nessuno |
+| 1:15-2:00 | «Approva» → il terminale del wallet chiede (sopra la soglia di 3) → «in arrivo» col link a mutinynet.com | «Approva», poi `s` nel terminale | il wallet è tuo: Barattolo chiede, tu firmi; la soglia l'hai scelta tu |
+| 2:00-2:35 | intanto: l'ordine delle 13:30, pagato da solo (2,50 sotto soglia), +2 MOON; si arma «☕ Caffè gratis · 25 MOON» | due tocchi | sotto soglia paga da solo, e il caffè lo prende da solo appena i punti bastano |
+| 2:35-3:00 | il blocco arriva: «Pagato in USDB ✓», «+5 MOON», «☕ Caffè gratis riscattato» | — | tre eventi in sala, blocchi da trenta secondi; Bitcoin, RGB, WDK e QVAC locale |
+
+Cosa è VERO oggi (15 ott) e cosa si costruisce a Torino, da dire bene
+nel README (sezione «mock/simulato»): oggi esistono i wallet, gli asset
+su Mutinynet, gli invii, il servizio NWC con `get_info`/`get_balance`,
+QVAC con la pagina di prova FUORI da Barattolo; a Torino si scrivono il
+checkout in USDB, i metodi `rgb_*`, la ✓ dell'emittente, «Consigliami»
+dentro Barattolo, i livelli e il riscatto del premio. Se a domenica
+qualcosa resta simulato, si dice in quella sezione, e sul palco si
+cambia strada senza spiegare il guasto (§11.4).
+
+**4. Il repo `fidelity-points`: la proposta per la decisione del 16
+mattina.** Le istruzioni chiedono il codice già scritto nei suoi file
+originali, e TUTTO il lavoro precedente dichiarato.
+
+- *Cosa ci entrerebbe*: i file di `deploy/rgb/` (`rgb.py`, `rgb_http.py`,
+  `punti.mjs`, `nwc-wdk.mjs`, `identita.mjs`, `consiglio.py`,
+  `qvac.config.json`, i due `mutinynet-*.env` — solo indirizzi pubblici
+  —, `backup-rgb.sh` e il timer, `compose.yaml`, `chiavetta-prepara.sh`,
+  `install-offline.sh`), le due bozze di `docs/spec/`, la pagina
+  `consigliami-prova.html` (oggi in `C:\Users\Andrea\qvac-prova`, fuori
+  dai repo), e il README in inglese con la dichiarazione di §12.9.
+- *Cosa NON ci entra mai*: niente di Barattolo (`satmarket` resta
+  privato: il README lo nomina e basta), `config.py`, le cartelle dei
+  wallet (`dati/`, `mutinynet/`, `utente/`, `seme.txt`, `chiavi.json`,
+  i `.rgb-backup`), `nwc/` e `identita/` (chiavi del servizio e delle
+  identità), `node_modules/`, la chiave age, le chiavi SSH.
+- *Il `.gitignore`* le elenca tutte; il controllo «due volte»: una con
+  lo scanner dei segreti del nostro workflow (le `FORME`) sull'albero
+  prima del primo commit, una a mano su `git ls-files` prima del push.
+- *Il README* (sezioni chieste): team (Andrea `kreamistudio-crypto`,
+  Alan `alanbimbati`), l'idea, lo stack (RGB con rgb-lib, WDK di Tether
+  col modulo RGB di UTEXO, QVAC con Qwen3.5, Nostr/NWC, Mutinynet), cosa
+  funziona già, il lavoro precedente (§12.9). Domenica: installazione,
+  cosa è fatto all'hackathon, cosa è mock, le funzioni RGB/QVAC/WDK.
+- *Chi fa cosa*: le decisioni (cosa entra, la visibilità) le prendono
+  Andrea e Alan; il repo pubblico lo rende pubblico Andrea, dal suo
+  account (rendere pubblico non si disfa); la sessione prepara l'albero
+  in una cartella locale e lo controlla; il push (mai forzato) col sì di
+  Andrea; il link agli organizzatori lo manda Andrea.
+- *Una domanda per gli organizzatori, se c'è tempo*: il repo può essere
+  quello esistente (privato dall'8 ott, tre commit di sola dichiarazione)
+  reso pubblico, o ne vogliono uno nuovo? La storia dell'8 ott conta come
+  «lavoro precedente dichiarato», ed è un punto a favore.
