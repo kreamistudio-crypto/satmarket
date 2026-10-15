@@ -58235,3 +58235,16 @@ normalizzano». Rossa la CI del push dell'hackathon (15 ott, 06:49 UTC),
 e lo sarà quella di ogni push finché il banco non firma le sue chiavi o
 non fissa l'orologio. Segnalata ad Andrea, non curata qui (la regola
 della CI rossa altrui).
+**IL PUSH (15 ott 2026, ok di Andrea).** Il banco l'ha curato 3e69a84
+(«La CI rossa a mezzanotte»); main era corso ancora con 61892a6
+(l'annullo del venditore non è una disputa). Rebase sopra 61892a6: due
+conflitti di sole code, risolti tenendo tutti e due — la funzione
+`prove_backfill_annullo_venditore` e la mia, e la sua riga
+nell'elenco; in CANTIERI le loro due voci e questa in fondo. Nessun
+simbolo di questo cantiere toccato dai commit arrivati (cercati per
+nome). Sull'albero del push: le sezioni toccate più `prove_p2p_sconto`,
+`prove_backfill_annullo_venditore`, `prove_tetto_claude_md`,
+`prove_tempo_di_chi_pubblica` e `prove_disputa_automatica_p2p`, 889
+verdi e 0 rosse; i quattro collaudi toccati (avvisi in ordine, garanzia
+lunga, promemoria del gesto, tempo di chi pubblica) verdi nella gabbia.
+Il resto lo dice la CI.
