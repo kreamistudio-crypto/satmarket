@@ -45,7 +45,7 @@ const RETE = 'signet'
 
 // LA CATENA (9 ott 2026, studio Mutinynet): RGB_CATENA = signet (default) |
 // mutinynet, come in punti.mjs. Gli asset esistono UNA volta per catena
-// (riemessi su Mutinynet il 13 ott: id nuovi), e la tabella sotto
+// (riemessi su Mutinynet il 15 ott: id nuovi), e la tabella sotto
 // e' una per catena. Le stesse identita' (stesse chiavi, stesso NIP-05)
 // firmano gli annunci su tutt'e due.
 const CATENA = process.env.RGB_CATENA || 'signet'
@@ -74,18 +74,18 @@ const SCHEDE = {
     descrizione: (rete) => `USDB sono i «Dollari di prova Barattolo», un asset NIA di PROVA su RGB (${rete}) emesso per l'hackathon di Torino (17-18 ott 2026): 1,00 USDB vale 1 $ dichiarato, accettato al checkout di Barattolo in collaudo. Nessun valore reale.`
   }
 }
-// ContractId (senza `rgb:`) → scheda, per catena. Quelli di Mutinynet si
-// incollano il 13 ott dopo `rgb.py emetti` (HACKATHON-SETUP §13.4,
-// passo 5): finche' dicono INCOLLA_QUI nessun id li trova,
-// e `annuncio` lo dice chiaro.
+// ContractId (senza `rgb:`) → scheda, per catena. Quelli di Mutinynet
+// sono nati il 15 ott con `rgb.py emetti` (HACKATHON-SETUP §13.4, passi
+// 4 e 5), letti dai due wallet emittenti. Un segnaposto INCOLLA_QUI qui
+// dentro non lo trova nessun id, e `annuncio` lo dice chiaro.
 const ASSET_PER_CATENA = {
   signet: {
     '9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM': SCHEDE.MOON,
     'H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A': SCHEDE.USDB
   },
   mutinynet: {
-    'INCOLLA_QUI_ID_MOON_MUTINYNET': SCHEDE.MOON,
-    'INCOLLA_QUI_ID_USDB_MUTINYNET': SCHEDE.USDB
+    'p201iE~i-S7TykFU-a8i2QvO-frJrgai-vkQG4cA-CkNJqPs': SCHEDE.MOON,
+    'lF6gcSFS-UWfWMDF-ok~RsPB-jVoHbYc-sEwPAB~-iCtjQ9w': SCHEDE.USDB
   }
 }
 const ASSET = ASSET_PER_CATENA[CATENA]

@@ -91,20 +91,21 @@ utente. Chi li vede in chat, li ruota.
 | **MOON** | Punti To The Mooon | to-the-mooon | 1.000.000, precisione 0 | `rgb:9N5NpOdN-Qdy418I-xs_gEFy-Wzk1p6X-S33L673-X~lm9iM` |
 | **USDB** | `Dollari_di_prova_Barattolo` | `usdb` (impronta 8276ad20, wallet NUOVO dell'8 ott: l'emittente dei dollari non è il mercante né il negozio) | 1.000.000,00 cioè 100.000.000 unità, **precisione 2** («2 for USD», docs.rgb.info) | `rgb:H1951SnR-7Jq3pjE-bXen9Qd-0AkXlmm-s~NLk5g-qGVUh9A` (emesso l'8 ott 2026, backup `usdb-20261008-0846`) |
 
-**Su Mutinynet (dall'11 ott 2026) gli asset sono RIEMESSI**: un NIA
+**Su Mutinynet (dal 15 ott 2026) gli asset sono RIEMESSI**: un NIA
 vive sulla catena dove è nato, e il wallet utente di Mutinynet è nuovo.
 Stessi ticker, nomi, precisioni e quantità (le `SCHEDE` di
 `identita.mjs`), id NUOVI, che si incollano qui e in
 `ASSET_PER_CATENA.mutinynet` di `deploy/rgb/identita.mjs` (al posto dei
-due `INCOLLA_QUI_…`, senza `rgb:`) la domenica, dopo `rgb.py emetti`
-(§10, la lista «Domenica 11 ott», punti 4 e 5). JAR non si riemette
+due `INCOLLA_QUI_…`, senza `rgb:`) dopo `rgb.py emetti`: fatto il 15
+ott, passi 4 e 5 di §13.4 (la lista «Domenica 11 ott» di §10 non è mai
+stata eseguita). JAR non si riemette
 (fuori dalla demo). Gli id di signet qui sopra restano veri: sono gli
 asset del piano B.
 
 | Ticker | Emittente (wallet, in `~/rgb/mutinynet/`) | Quantità | asset_id su Mutinynet |
 |---|---|---|---|
-| **MOON** | to-the-mooon | 1.000.000, precisione 0 | ☐ `rgb:…` (si incolla l'11) |
-| **USDB** | usdb | 1.000.000,00 cioè 100.000.000 unità, precisione 2 | ☐ `rgb:…` (si incolla l'11) |
+| **MOON** | to-the-mooon (impronta 48a9ee1d) | 1.000.000, precisione 0 | `rgb:p201iE~i-S7TykFU-a8i2QvO-frJrgai-vkQG4cA-CkNJqPs` (emesso il 15 ott 2026) |
+| **USDB** | `usdb` (impronta 74a1ef9b), nome `Dollari_di_prova_Barattolo` come sul signet | 1.000.000,00 cioè 100.000.000 unità, precisione 2 | `rgb:lF6gcSFS-UWfWMDF-ok~RsPB-jVoHbYc-sEwPAB~-iCtjQ9w` (emesso il 15 ott 2026) |
 
 Perché questi nomi: «BRT» ricordava Bartolini e «CAFFE-LUCA» non passa
 (il ticker NIA ammette SOLO maiuscole e cifre, da 1 a 8 caratteri:
@@ -342,10 +343,13 @@ mandano già e non cambiano.
 Da consegnare scritto il 17 mattina, com'è chiesto dal regolamento.
 **Riallineata il 13 ott alla bozza di §12.9**, che è questa stessa
 dichiarazione in inglese, per la pull request: le due si tengono pari, e
-quando una cambia cambia l'altra. ⚠️ Le righe che dicono «su Mutinynet»
-raccontano lo stato a migrazione FATTA (§13.4): la mattina del 13 sono
-ancora un impegno, e si confermano la sera, con gli id veri. Le righe
-sul signet sono fatti dall'8 ott, e restano veri: è il piano B (§12.6).
+quando una cambia cambia l'altra. La migrazione a Mutinynet è del 15
+ott (§13.4, non del 13 com'era in programma): VM, wallet e asset sono
+fatti di quel giorno, gli id sono in §2. ⚠️ I saldi dei due wallet
+utente (quello di prova sul fisso, quello della demo sul portatile)
+sono un impegno finché i passi 6 e la lista del 15 non li chiudono: si
+confermano la sera del 15. Le righe sul signet sono fatti dall'8 ott, e
+restano veri: è il piano B (§12.6).
 
 **Cosa c'era prima (NON da giudicare):**
 
@@ -356,15 +360,15 @@ sul signet sono fatti dall'8 ott, e restano veri: è il piano B (§12.6).
   seconda).
 - Una VM con rgb-lib Python, il banco `rgb.py` e la sua faccia HTTP
   `rgb_http.py` sul loopback. Prima sul signet pubblico, con bitcoind,
-  electrs e proxy RGB suoi (restano accesi: il piano B); **dal 13 ott su
+  electrs e proxy RGB suoi (restano accesi: il piano B); **dal 15 ott su
   Mutinynet**, coi servizi pubblici di KaleidoSwap (Esplora e proxy).
-- Gli asset di prova, schema NIA, emessi da noi. **Su Mutinynet, il 13
-  ott: USDB e MOON** (gli id nella seconda tabella di §2, dal passo 5 di
-  §13.4); i saldi distribuiti ai nostri wallet di prova il 13 e il 15.
+- Gli asset di prova, schema NIA, emessi da noi. **Su Mutinynet, il 15
+  ott: USDB e MOON** (gli id nella seconda tabella di §2); i saldi
+  distribuiti ai nostri wallet di prova lo stesso giorno.
   Sul signet restano i tre di prima: JAR e MOON (1 ott), USDB (8 ott,
   asset_id in §2).
 - Un wallet utente WDK+RGB (`punti.mjs`, su `@utexo/wdk-wallet-rgb`).
-  Su Mutinynet: quello di PROVA sul fisso (13 ott) e quello della DEMO
+  Su Mutinynet: quello di PROVA sul fisso e quello della DEMO
   sul portatile di Alan (15 ott), ognuno con 500,00 USDB e 60 MOON
   arrivati dalla VM. Sul signet, dall'8 ott: 60 MOON e 500,00 USDB
   (50.000 unità, tx `ba3523ca5b410c3e71b2a3f04b9662cd
@@ -2138,8 +2142,9 @@ Judging and submission
 
 È la §5 in inglese, aggiornata a Mutinynet e al modello nuovo, con la
 riga dei fork e degli strumenti di terzi che gli organizzatori chiedono.
-BOZZA: le parti fra parentesi quadre si riempiono il 13 (gli id) e la
-domenica (cosa si è costruito). La riga sull'assistente AI è DENTRO
+BOZZA: gli id e le date di Mutinynet sono dentro dal 15 ott (la
+migrazione è di quel giorno); la parte fra parentesi quadre si riempie
+la domenica (cosa si è costruito). La riga sull'assistente AI è DENTRO
 (scelta di Andrea del 12), e la riga «Network» dice della marcatura e
 della conferma di Arshia (12.11).
 
@@ -2150,8 +2155,8 @@ Team: Andrea and Alan. Project: Fidelity Points, an extension of Barattolo.
 
 ### What existed before the hackathon (not to be judged)
 - Barattolo: a marketplace priced in sats with Lightning escrow and a non-custodial P2P desk, live at barattolo.store. Private repository. It already had XP levels, loyalty discounts and a browser NWC client. It had no RGB, QVAC or WDK code: only a disabled feature flag and a static /.well-known/nostr.json route.
-- Infrastructure: one VM with rgb-lib (Python), a small CLI and a loopback HTTP wrapper around it. First on public signet, moved to Mutinynet on 13 Oct 2026.
-- Test assets issued by us on Mutinynet on 13 Oct 2026, schema NIA: USDB, a test dollar [asset id], and MOON, a shop's loyalty points [asset id]. Balances were distributed to our test wallets on 13 and 15 Oct.
+- Infrastructure: one VM with rgb-lib (Python), a small CLI and a loopback HTTP wrapper around it. First on public signet, moved to Mutinynet on 15 Oct 2026.
+- Test assets issued by us on Mutinynet on 15 Oct 2026, schema NIA: USDB, a test dollar (rgb:lF6gcSFS-UWfWMDF-ok~RsPB-jVoHbYc-sEwPAB~-iCtjQ9w), and MOON, a shop's loyalty points (rgb:p201iE~i-S7TykFU-a8i2QvO-frJrgai-vkQG4cA-CkNJqPs). Balances were distributed to our test wallets on 15 Oct.
 - A WDK wallet script using @utexo/wdk-wallet-rgb, and a base Nostr Wallet Connect service around it with get_info and get_balance only. No rgb_* method existed.
 - Two test Nostr identities with NIP-05 names, and two signed asset announcements published on a local relay before the kickoff. No Barattolo code read them.
 - QVAC running locally, with a standalone test page and script outside the app that ask a model for one JSON suggestion.
