@@ -237,6 +237,8 @@ ACINQ 1M e ACINQ 400k. Gira il nostro fork di Mostro, `mostro:v0.19.0-bar8`
    NIP-99, presenta_release). Il barattolo 🫙 è dei preferiti, mai
    metafora dell'escrow. La scheda «Affari» si chiama «Ordini» (testi
    utente sempre «Ordini», id interni invariati).
+10. Una tariffa per le commissioni del mercatino non va MAI al venditore:
+    al più al compratore, visibile prima di pagare (15 ott 2026).
 
 ## Adesso
 
