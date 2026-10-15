@@ -79,9 +79,17 @@ async function apri () {
 const COMANDI = {
   nuovo,
 
+  // OGNI chiamata al wallet si aspetta (15 ott 2026, il 6-bis della
+  // migrazione): con la variante override (@utexo/rgb-sdk 1.0.6, il
+  // portatile di riserva a glibc 2.35) getAddress, listUnspents,
+  // listAssets, receiveAsset, refreshWallet e listTransfers tornano una
+  // Promise, e senza `await` la fattura usciva `undefined` e il refresh
+  // veniva chiuso da `chiudi()` prima di finire. Con la variante
+  // originale (1.0.3) sono sincroni, e `await` su un valore lo rende
+  // com'e': lo stesso file vale per tutt'e due.
   async indirizzo () {
     const { account, chiudi } = await apri()
-    console.log(account.getAddress()); chiudi()
+    console.log(await account.getAddress()); chiudi()
   },
 
   async saldo () {
@@ -89,8 +97,8 @@ const COMANDI = {
     const reg = await account.registerWallet()        // sync col chain
     console.log('indirizzo:', reg.address)
     console.log('sats:', mostra(reg.btcBalance))
-    console.log('UTXO:', mostra(account.listUnspents()))
-    console.log('asset:', mostra(account.listAssets()))
+    console.log('UTXO:', mostra(await account.listUnspents()))
+    console.log('asset:', mostra(await account.listAssets()))
     chiudi()
   },
 
@@ -104,7 +112,7 @@ const COMANDI = {
   async fattura (assetId = '-', quantita, modo = 'blind') {
     if (!quantita) muori('serve la quantita\': fattura <asset_id|-> <quantita> [witness]')
     const { account, chiudi } = await apri()
-    const r = account.receiveAsset({
+    const r = await account.receiveAsset({
       assetId: assetId === '-' ? undefined : assetId,
       amount: Number(quantita),
       witness: modo === 'witness',
@@ -129,13 +137,13 @@ const COMANDI = {
 
   async aggiorna () {
     const { account, chiudi } = await apri()
-    console.log(mostra(account.refreshWallet()))
+    console.log(mostra(await account.refreshWallet()))
     chiudi()
   },
 
   async trasferimenti (assetId) {
     const { account, chiudi } = await apri()
-    console.log(mostra(account.listTransfers(assetId)))
+    console.log(mostra(await account.listTransfers(assetId)))
     chiudi()
   },
 
