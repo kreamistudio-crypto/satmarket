@@ -16945,7 +16945,10 @@ def prove_foto_nostr_relay_muti():
 
     amb = {"lettura_simulata": lambda r, cosa: False,
            "create_connection": _connetti, "json": json, "time": time,
-           "ssl": _ssl}
+           "ssl": _ssl,
+           # LA POSTA DEI RELAY (15 ott 2026) ha la sua sezione: qui si
+           # prova la connessione singola, quindi nessun postino
+           "_posta_per": lambda r: None}
     exec(pezzo("_kind0_profilo"), amb)
     k0 = amb["_kind0_profilo"]
     CH = "ab" * 32
@@ -100133,6 +100136,7 @@ def prove_letture_relay_collaudo():
                "urlparse": _urlparse, "ipaddress": _ipaddress,
                "create_connection": _connetti, "ssl": _ssl, "json": json,
                "time": time, "asyncio": _aio, "RELAYS_VERIFICA": list(SERIE),
+               "_posta_per": lambda r: None,     # la posta ha la sua sezione
                "print": lambda *a, **k: detto.append(
                    " ".join(str(x) for x in a))}
         amb.update(piu)
@@ -162842,7 +162846,8 @@ def prove_relay_di_barattolo():
 
     # --- invia_evento_relay VERO segna l'esito, e il suo ritorno non cambia
     amb_inv = {"create_connection": Ws, "json": json, "ssl": _ssl,
-               "time": time, "_segna_scrittura_relay": segna}
+               "time": time, "_segna_scrittura_relay": segna,
+               "_posta_per": lambda r: None}   # la connessione singola
     exec(pezzo("invia_evento_relay"), amb_inv)
     Ws.copioni = {A: lambda m: [["OK", m[1]["id"], False, "rate-limited: piano"]]
                   if m[0] == "EVENT" else [],
@@ -162969,6 +162974,289 @@ def prove_relay_di_barattolo():
            "boom" in "".join(stampato)))
 
 
+def prove_posta_relay():
+    """LA POSTA DEI RELAY (15 ott 2026, cantiere «relay-di-barattolo»,
+    secondo commit, richiesta di Andrea): una connessione per relay,
+    tenuta aperta e riusata, invece di una nuova per ogni lettura e
+    pubblicazione. Da qui nos.lol rispondeva 429 dall'undicesima
+    apertura ravvicinata (misurato), e una ripubblicazione in blocco ne
+    apre cinque ogni secondo e mezzo.
+    Si prova coi pezzi VERI contro relay di cartone che parlano da un
+    thread loro, come i veri: uno col freno di nos.lol (429 dopo dieci
+    aperture), uno lento, uno che chiude a meta', uno giu'. Rosse sul
+    codice di prima (una connessione a richiesta), verdi dopo."""
+    print("\n[la posta dei relay]")
+    import asyncio as _aio
+    import ipaddress as _ipa
+    import queue as _queue
+    import ssl as _ssl
+    import threading as _th
+    from concurrent.futures import ThreadPoolExecutor
+    from urllib.parse import urlparse as _urlparse
+
+    src = _SORGENTE
+    PIATTA = "2e" * 32
+
+    class Relay:
+        """Un relay di cartone: `freno` aperture concesse (poi 429),
+        `ritardo` secondi prima di ogni risposta, `chiudi_al` = chiude la
+        connessione quando riceve quel messaggio (contato su tutte le
+        connessioni), `giu` = non apre."""
+        def __init__(self, freno=None, ritardo=0.0, chiudi_al=None, giu=False):
+            self.freno, self.ritardo, self.chiudi_al, self.giu = (
+                freno, ritardo, chiudi_al, giu)
+            self.aperture, self.rifiutate, self.ricevuti = 0, 0, 0
+            self.lucchetto = _th.Lock()
+            self.conns = []
+
+    class Conn:
+        def __init__(self, relay, R, timeout):
+            self.relay, self.R, self.timeout = relay, R, timeout
+            self.coda, self.chiusa = _queue.Queue(), False
+            self.zitta = False        # aperta, ma non risponde piu' a niente
+
+        def settimeout(self, t):
+            self.timeout = t
+
+        def _rispondi(self, risposte):
+            def via():
+                for r in risposte:
+                    if not self.chiusa:
+                        self.coda.put(json.dumps(r))
+            if self.R.ritardo:
+                t = _th.Timer(self.R.ritardo, via)
+                t.daemon = True
+                t.start()
+            else:
+                via()
+
+        def send(self, s):
+            if self.chiusa:
+                raise ConnectionError("socket chiuso")
+            m = json.loads(s)
+            with self.R.lucchetto:
+                self.R.ricevuti += 1
+                n = self.R.ricevuti
+            if self.R.chiudi_al == n:
+                self.shutdown()
+                return
+            if self.zitta:
+                return
+            if m[0] == "EVENT":
+                self._rispondi([["OK", m[1]["id"], True, ""]])
+            elif m[0] == "REQ":
+                f = m[2]
+                eventi = []
+                if 0 in f.get("kinds", []):
+                    eventi = [{"kind": 0, "content": json.dumps({"name": "Ada"})}]
+                elif 10050 in f.get("kinds", []):
+                    eventi = [{"kind": 10050, "tags": [["relay", "wss://dm.example"]]}]
+                elif 1 in f.get("kinds", []):
+                    eventi = [{"kind": 1, "id": "n1", "content": "ciao"}]
+                self._rispondi([["EVENT", m[1], e] for e in eventi]
+                               + [["EOSE", m[1]]])
+
+        def recv(self):
+            try:
+                x = self.coda.get(timeout=self.timeout)
+            except _queue.Empty:
+                raise TimeoutError("timed out")
+            if x is None:
+                raise ConnectionError("connessione chiusa")
+            return x
+
+        def shutdown(self):
+            if not self.chiusa:
+                self.chiusa = True
+                self.coda.put(None)
+
+        def close(self):
+            self.shutdown()
+
+    RELAY = {}
+
+    def connetti(relay, timeout=None, sslopt=None):
+        R = RELAY[relay]
+        with R.lucchetto:
+            if R.giu:
+                R.rifiutate += 1
+                raise ConnectionRefusedError("relay giu'")
+            if R.freno is not None and R.aperture >= R.freno:
+                R.rifiutate += 1
+                raise Exception("Handshake status 429 Too Many Requests")
+            R.aperture += 1
+            c = Conn(relay, R, timeout)
+            R.conns.append(c)
+        return c
+
+    FRENATO, LENTO, SVELTO, CADE, GIU, FUORI = (
+        "wss://frenato.example", "wss://lento.example", "wss://svelto.example",
+        "wss://cade.example", "wss://giu.example", "wss://fuori.example")
+
+    def mondo():
+        RELAY.clear()
+        RELAY.update({FRENATO: Relay(freno=10), LENTO: Relay(ritardo=3.0),
+                      SVELTO: Relay(), CADE: Relay(chiudi_al=1),
+                      GIU: Relay(giu=True), FUORI: Relay()})
+        amb = {"create_connection": connetti, "json": json, "ssl": _ssl,
+               "time": time, "threading": _th, "asyncio": _aio,
+               "ipaddress": _ipa, "urlparse": _urlparse,
+               "MODALITA_COLLAUDO": False, "_LETTURE_SIMULATE": set(),
+               "_NOSTR": (object(), PIATTA), "_SCRITTURE_RELAY": {},
+               "_x_segna_di_casa": lambda i: None,
+               "RELAYS_VERIFICA": [FRENATO, LENTO, SVELTO, CADE, GIU]}
+        for f in ("relay_di_casa", "lettura_simulata", "_segna_scrittura_relay",
+                  "invia_evento_relay", "_kind0_profilo", "chiedi_relay_dm",
+                  "_x_note_da_relay"):
+            exec(pezzo(f), amb)
+        i = src.find("# ---------- LA POSTA DEI RELAY")
+        if i >= 0:
+            exec(src[i:src.index("# (Qui finisce la posta dei relay.)", i)], amb)
+            amb["POSTA_TETTO_S"] = 1.0
+        else:
+            amb["_posta_per"] = lambda r: None
+        return amb
+
+    def evento(n):
+        return {"id": f"{n:064x}", "pubkey": PIATTA, "kind": 30402,
+                "created_at": 1, "tags": [], "content": ""}
+
+    # --- 1) LA RAFFICA: come una ripubblicazione in blocco ---
+    amb = mondo()
+    presi = []
+    with ThreadPoolExecutor(5) as ex:
+        for lotto in range(6):
+            presi += list(ex.map(lambda n: amb["invia_evento_relay"](FRENATO, evento(n)),
+                                 range(lotto * 5, lotto * 5 + 5)))
+    R = RELAY[FRENATO]
+    prova("LA RAFFICA (30 annunci, cinque alla volta) verso un relay che "
+          "frena come nos.lol: presi tutti, con UNA apertura e nessun 429",
+          (30, 1, 0), (sum(presi), R.aperture, R.rifiutate))
+    with ThreadPoolExecutor(8) as ex:
+        letture = list(ex.map(
+            lambda n: (amb["_kind0_profilo"](FRENATO, "ab" * 32) if n % 3 == 0
+                       else amb["chiedi_relay_dm"](FRENATO, "ab" * 32) if n % 3 == 1
+                       else amb["_x_note_da_relay"](FRENATO, "ab" * 32, 0)),
+            range(24)))
+    prova("...e le letture (profili, relay dei DM, note per X) passano "
+          "dalla STESSA connessione, con le loro risposte giuste",
+          ([{"name": "Ada"}] * 8, [["wss://dm.example"]] * 8, 8, 1, 0),
+          (letture[0::3], letture[1::3],
+           sum(1 for x in letture[2::3] if x and x[0]["id"] == "n1"),
+           R.aperture, R.rifiutate))
+    prova("...e l'esito dei nostri eventi finisce ancora nel registro della "
+          "ronda", True,
+          amb["_SCRITTURE_RELAY"].get(FRENATO, {}).get("ok", 0) > 0)
+
+    # --- 2) IL RELAY LENTO non ferma gli altri ---
+    amb = mondo()
+    t0 = time.time()
+    with ThreadPoolExecutor(2) as ex:
+        lento = ex.submit(amb["invia_evento_relay"], LENTO, evento(1))
+        svelto = ex.submit(amb["invia_evento_relay"], SVELTO, evento(2))
+        esito_svelto, t_svelto = svelto.result(), time.time() - t0
+        esito_lento, t_lento = lento.result(), time.time() - t0
+    prova("UN RELAY LENTO (risponde dopo 3 s, tetto 1 s): lui non conta, "
+          "entro il suo tetto; l'altro risponde subito",
+          (True, True, False, True),
+          (esito_svelto, t_svelto < 0.8, esito_lento, t_lento < 2.5))
+
+    # --- 3) IL RELAY CHE CHIUDE A META' ---
+    amb = mondo()
+    prova("UN RELAY CHE CHIUDE A META' (cade alla prima richiesta): un "
+          "tentativo in piu' su una connessione nuova, e l'evento passa",
+          (True, 2), (amb["invia_evento_relay"](CADE, evento(3)),
+                      RELAY[CADE].aperture))
+
+    # --- 3b) LA CONNESSIONE MEZZA MORTA: aperta, ma muta ---
+    amb = mondo()
+    primo = amb["invia_evento_relay"](SVELTO, evento(6))
+    RELAY[SVELTO].conns[-1].zitta = True
+    muto = amb["invia_evento_relay"](SVELTO, evento(7))
+    dopo = amb["invia_evento_relay"](SVELTO, evento(8))
+    prova("UNA CONNESSIONE CHE RESTA APERTA MA TACE: la richiesta senza "
+          "risposta dice no nel suo tetto e la spezza, e la prossima apre "
+          "una connessione nuova e passa", (True, False, True, 2),
+          (primo, muto, dopo, RELAY[SVELTO].aperture))
+
+    # --- 4) IL RELAY GIU' ---
+    amb = mondo()
+    t0 = time.time()
+    primo = amb["invia_evento_relay"](GIU, evento(4))
+    secondo = amb["invia_evento_relay"](GIU, evento(5))
+    prova("UN RELAY GIU': no subito, e la seconda richiesta non bussa di "
+          "nuovo (una pausa che cresce, fino a un minuto)",
+          (False, False, 1, True),
+          (primo, secondo, RELAY[GIU].rifiutate, time.time() - t0 < 1.0))
+
+    # --- 5) CHI NON PASSA DALLA POSTA ---
+    amb = mondo()
+    for n in range(3):
+        amb["invia_evento_relay"](FUORI, evento(10 + n))
+    prova("un relay FUORI da RELAY_NOSTR (il 10050 di un utente) resta a "
+          "una connessione per richiesta, come prima", 3,
+          RELAY[FUORI].aperture)
+    amb["MODALITA_COLLAUDO"] = True
+    prova("in collaudo la posta non apre verso un relay vero", None,
+          amb["_posta_per"](SVELTO))
+    prova("...e una lettura in collaudo non bussa", (None, 0),
+          (amb["_kind0_profilo"](SVELTO, "ab" * 32), RELAY[SVELTO].aperture))
+    if "_Postino" not in amb:
+        return                    # il codice di prima: il resto non ha senso
+
+    # --- 6) IL CUSTODE, IL TETTO, NIENTE APPESO ---
+    amb = mondo()
+    amb["invia_evento_relay"](SVELTO, evento(20))
+    p = amb["_POSTINI"][SVELTO]
+    amb["POSTA_RIPOSO_S"] = 0
+    amb["_posta_riposa"]()
+    prova("il custode chiude la connessione che non lavora, e la prossima "
+          "richiesta ne apre una nuova", (None, True, 2),
+          (p.ws, amb["invia_evento_relay"](SVELTO, evento(21)),
+           RELAY[SVELTO].aperture))
+    amb["POSTA_RIPOSO_S"] = 120
+    amb["_posta_riposa"]()
+    prova("...ma non quella che ha lavorato da poco", True, p.ws is not None)
+    amb = mondo()
+    amb["POSTA_IN_VOLO"] = 2
+    amb["_POSTINI"].clear()
+    with ThreadPoolExecutor(4) as ex:
+        t0 = time.time()
+        esiti = list(ex.map(lambda n: amb["invia_evento_relay"](LENTO, evento(30 + n)),
+                            range(4)))
+        durata = time.time() - t0
+    q = amb["_POSTINI"][LENTO]
+    prova("IL TETTO: due richieste in volo, le altre aspettano dentro il "
+          "loro tetto e poi dicono no — nessuna resta appesa, nessuna "
+          "attesa rimasta nel postino", (False, True, {}),
+          (any(esiti), durata < 2.5, q.attese))
+    vivi = [t for t in _th.enumerate() if t.name == "posta dei relay"]
+    prova("...e i thread lettori sono al massimo uno per relay della lista",
+          True, len(vivi) <= len(amb["RELAYS_VERIFICA"]) * 3)
+
+    # --- 7) CHI NON PASSA DALLA POSTA, e il patto delle firme ---
+    for nome in ("_dm_filo", "_orecchio_filo", "_ascolto_p2p_filo",
+                 "eventi_libro_da_relay", "info_libro_da_relay",
+                 "libro_intero_da_relay", "_ronda_nostr_leggi",
+                 "_ronda_relay_leggi", "_ronda_relay_canta"):
+        prova(f"{nome} NON passa dalla posta (ha un filo suo, o vuole "
+              "vedere l'apertura)", False, "_posta_per(" in codice(pezzo(nome)))
+    prova("le quattro porte che ci passano chiedono il postino, e solo "
+          "DOPO il giudice del collaudo nelle letture", [True] * 4,
+          [("_posta_per(relay)" in codice(pezzo(n)))
+           and (n == "invia_evento_relay"
+                or codice(pezzo(n)).index("lettura_simulata(")
+                < codice(pezzo(n)).index("_posta_per(relay)"))
+           for n in ("invia_evento_relay", "_kind0_profilo",
+                     "chiedi_relay_dm", "_x_note_da_relay")])
+    blocco = src[src.index("# ---------- LA POSTA DEI RELAY"):
+                 src.index("# (Qui finisce la posta dei relay.)")]
+    prova("il postino si apre solo dalla sua porta (`_posta_connetti`), mai "
+          "con create_connection diretta", (1, 1),
+          (codice(blocco).count("_posta_connetti("),
+           codice(blocco).count("create_connection")))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -163037,7 +163325,7 @@ def main():
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
               prove_podio_riepilogo, prove_vetrina_negozio,
-              prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo,
+              prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo, prove_posta_relay,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,

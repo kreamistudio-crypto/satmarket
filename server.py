@@ -41147,6 +41147,20 @@ def _kind0_profilo(relay: str, hexkey: str):
     (vedi `lettura_simulata`): None, come un relay che tace."""
     if lettura_simulata(relay, f"del profilo (kind 0) di {hexkey[:16]}…"):
         return None
+    posta = _posta_per(relay)
+    if posta is not None:
+        try:
+            letto = posta.leggi({"kinds": [0], "authors": [hexkey], "limit": 1})
+            if letto is None:
+                return None
+            profilo = None
+            for ev in letto[0]:
+                trovato = json.loads(ev.get("content") or "{}")
+                if isinstance(trovato, dict) and trovato:
+                    profilo = trovato
+            return {} if profilo is None and letto[1] else profilo
+        except Exception:
+            return None
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
@@ -61068,7 +61082,20 @@ def evento_annuncio_importato(a: dict, titolo: str, descrizione: str,
 
 def invia_evento_relay(relay: str, evento: dict) -> bool:
     """Consegna un evento firmato a UN relay e aspetta il suo "OK".
-    E' SINCRONA (websocket-client): va chiamata in asyncio.to_thread."""
+    E' SINCRONA (websocket-client): va chiamata in asyncio.to_thread.
+    Per i relay di casa passa dal loro postino (LA POSTA DEI RELAY): una
+    connessione riusata invece di una nuova a ogni evento."""
+    posta = _posta_per(relay)
+    if posta is not None:
+        a = posta.pubblica(evento)
+        if a["stato"] != "doppio":
+            if a["stato"] != "ok":
+                return False      # relay muto, giu' o in pausa: pazienza
+            try:                  # la ronda guarda, la consegna no
+                _segna_scrittura_relay(relay, evento, a["preso"], a["detto"])
+            except Exception:
+                pass
+            return a["preso"]
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
@@ -61116,6 +61143,285 @@ def _segna_scrittura_relay(relay: str, evento: dict, preso: bool,
         if not V["no_da"]:
             V["no_da"] = time.time()
         V["detto"] = str(detto or "")[:120]
+
+
+# ---------- LA POSTA DEI RELAY ----------
+# (15 ott 2026, cantiere «relay-di-barattolo», secondo commit, richiesta
+# di Andrea.) Prima ogni lettura e ogni pubblicazione apriva una
+# connessione NUOVA: una ripubblicazione in blocco (l'import, le spese
+# standard, le categorie) va a lotti di cinque annunci ogni secondo e
+# mezzo, cioe' cinque aperture al secondo verso ogni relay — e nos.lol,
+# misurato da qui, risponde 429 dall'undicesima apertura ravvicinata
+# (2576 righe d'errore in tre giorni nel journal). Trenta richieste
+# sulla STESSA connessione, invece, passano tutte.
+# UN POSTINO PER RELAY, e solo per quelli di `RELAYS_VERIFICA`: una
+# websocket tenuta aperta, un thread che legge e smista le risposte
+# (gli OK per id dell'evento, EVENT/EOSE/CLOSED per id della richiesta),
+# l'invio sotto un lucchetto, al massimo POSTA_IN_VOLO richieste
+# insieme (le altre aspettano, dentro il loro tetto). Le funzioni che
+# lo usano non cambiano firma ne' risposta.
+# SE IL RELAY CHIUDE A META' le richieste in volo si svegliano
+# «caduto» e riprovano UNA volta su una connessione nuova (ripubblicare
+# lo stesso evento e' innocuo: il relay risponde «duplicate» con un OK).
+# Una richiesta senza risposta nel suo tetto spezza la connessione: un
+# socket mezzo morto non deve far aspettare la successiva. Un relay che
+# non si apre resta in pausa (1, 2, 4… fino a POSTA_PAUSA_MAX_S): le
+# richieste verso di lui falliscono subito invece di bussare di nuovo.
+# Dopo POSTA_RIPOSO_S senza lavoro la connessione si chiude da sola.
+# CHI NON PASSA DI QUI, apposta: l'ascolto dei DM di Barattolo, il
+# login bunker, tutto Mostro e il P2P (hanno fili loro), la ronda dei
+# relay Nostr (apre una connessione nuova per vedere anche il 429),
+# l'import, e i relay fuori dalla lista (il 10050 di un utente).
+# IN COLLAUDO la posta non apre verso un relay che non e' di casa.
+POSTA_IN_VOLO = 10                 # richieste insieme per relay
+POSTA_TETTO_S = 6.0                # quanto aspetta una richiesta
+POSTA_APRI_S = 5                   # quanto aspetta un'apertura
+POSTA_RIPOSO_S = 120               # senza lavoro, la connessione si chiude
+POSTA_PAUSA_MAX_S = 60             # la pausa piu' lunga di un relay giu'
+POSTA_EVENTI_MAX = 500             # eventi tenuti per una lettura
+POSTA_MAX_RELAY = 12               # postini in tutto, al massimo
+# la porta verso la rete: il banco delle prove ci mette i relay di cartone
+_posta_connetti = create_connection
+_POSTINI: dict = {}
+_POSTA_LUCCHETTO = threading.Lock()
+_POSTA_CUSTODE = []
+
+
+def _posta_spezza(ws):
+    """Chiude il socket SUBITO, senza il saluto di chiusura: il lettore
+    sta dentro recv() in un altro thread, e il saluto vorrebbe leggere
+    la risposta proprio da li'."""
+    try:
+        (getattr(ws, "shutdown", None) or ws.close)()
+    except Exception:
+        pass
+
+
+class _Postino:
+    """La connessione di UN relay, riusata. Vedi il commento sopra."""
+
+    def __init__(self, relay: str):
+        self.relay = relay
+        self.ws = None
+        self.giro = 0                 # quale connessione (cresce a ogni apertura)
+        self.lucchetto = threading.Lock()
+        self.attese = {}              # chiave -> la richiesta che aspetta
+        self.posti = threading.BoundedSemaphore(POSTA_IN_VOLO)
+        self.cadute = 0
+        self.fermo_fino = 0.0
+        self.usato = time.time()
+        self.numero = 0               # per gli id delle letture
+
+    def _apri(self):
+        """Con il lucchetto preso. La connessione viva, o una nuova."""
+        if self.ws is not None:
+            return self.ws, self.giro
+        adesso = time.time()
+        if adesso < self.fermo_fino:
+            raise ConnectionError("relay in pausa dopo un'apertura fallita")
+        try:
+            ws = _posta_connetti(self.relay, timeout=POSTA_APRI_S,
+                                 sslopt={"cert_reqs": ssl.CERT_NONE})
+        except Exception:
+            self.cadute += 1
+            self.fermo_fino = adesso + min(2 ** (self.cadute - 1),
+                                           POSTA_PAUSA_MAX_S)
+            raise
+        try:
+            ws.settimeout(None)       # il lettore aspetta; i tetti sono delle richieste
+        except Exception:
+            pass
+        self.cadute, self.fermo_fino = 0, 0.0
+        self.ws, self.giro = ws, self.giro + 1
+        threading.Thread(target=self._leggi, args=(ws, self.giro),
+                         daemon=True, name="posta dei relay").start()
+        return ws, self.giro
+
+    def _leggi(self, ws, giro):
+        """Il thread lettore: smista ogni risposta alla sua richiesta.
+        Quando la connessione cade, sveglia chi aspettava su di lei."""
+        try:
+            while True:
+                grezzo = ws.recv()
+                if not grezzo:
+                    raise ConnectionError("chiusa dal relay")
+                try:
+                    msg = json.loads(grezzo)
+                except ValueError:
+                    continue
+                if isinstance(msg, list) and len(msg) >= 2:
+                    self._smista(msg, giro)
+        except Exception:
+            pass
+        finally:
+            with self.lucchetto:
+                if self.ws is ws:
+                    self.ws = None
+                rimaste = [a for a in self.attese.values() if a["giro"] == giro]
+            for a in rimaste:
+                if not a["pronto"].is_set():
+                    a["stato"] = "caduto"
+                    a["pronto"].set()
+            _posta_spezza(ws)
+
+    def _smista(self, msg, giro):
+        tipo = msg[0]
+        if tipo == "OK" and len(msg) >= 3:
+            chiave = ("ok", str(msg[1]))
+        elif tipo in ("EVENT", "EOSE", "CLOSED"):
+            chiave = ("req", str(msg[1]))
+        else:
+            return                    # NOTICE, AUTH: non rispondono a nessuno
+        with self.lucchetto:
+            a = self.attese.get(chiave)
+        if a is None or a["giro"] != giro or a["pronto"].is_set():
+            return
+        if tipo == "EVENT":
+            if len(msg) > 2 and isinstance(msg[2], dict) \
+                    and len(a["eventi"]) < POSTA_EVENTI_MAX:
+                a["eventi"].append(msg[2])
+            return
+        if tipo == "OK":
+            a.update(stato="ok", preso=bool(msg[2]),
+                     detto=str(msg[3]) if len(msg) > 3 else "")
+        elif tipo == "EOSE":
+            a["stato"] = "eose"
+        else:
+            a.update(stato="chiuso",
+                     detto=str(msg[2]) if len(msg) > 2 else "")
+        a["pronto"].set()
+
+    def chiedi(self, messaggio_di, chiave_di, tetto: float) -> dict:
+        """UNA richiesta: manda, aspetta la risposta entro `tetto`, e se
+        la connessione cade a meta' riprova una volta su una nuova.
+        `messaggio_di(numero)` e `chiave_di(numero)` fanno il messaggio e
+        la chiave con cui la risposta torna (per le letture l'id cambia
+        a ogni tentativo). Lo stato: ok | eose | chiuso | tempo | caduto
+        | giu | coda | doppio."""
+        scade = time.time() + tetto
+        if not self.posti.acquire(timeout=max(0.0, tetto)):
+            return {"stato": "coda"}
+        try:
+            for tentativo in (1, 2):
+                a = {"pronto": threading.Event(), "stato": "tempo",
+                     "eventi": [], "preso": None, "detto": "", "giro": 0}
+                with self.lucchetto:
+                    self.numero += 1
+                    chiave = chiave_di(self.numero)
+                    if chiave in self.attese:
+                        return {"stato": "doppio"}
+                    try:
+                        ws, a["giro"] = self._apri()
+                    except Exception:
+                        return {"stato": "giu"}
+                    a["chiave"] = chiave
+                    self.attese[chiave] = a
+                    self.usato = time.time()
+                    try:
+                        ws.send(json.dumps(messaggio_di(self.numero)))
+                        mandato = True
+                    except Exception:
+                        mandato = False
+                        if self.ws is ws:
+                            self.ws = None
+                if not mandato:
+                    _posta_spezza(ws)
+                    a["stato"] = "caduto"
+                else:
+                    a["pronto"].wait(max(0.0, scade - time.time()))
+                with self.lucchetto:
+                    self.attese.pop(chiave, None)
+                    self.usato = time.time()
+                if a["stato"] == "caduto" and tentativo == 1 \
+                        and scade - time.time() > 0.2:
+                    continue
+                if a["stato"] == "tempo":
+                    with self.lucchetto:
+                        if self.ws is ws:
+                            self.ws = None
+                    _posta_spezza(ws)
+                return a
+            return a
+        finally:
+            self.posti.release()
+
+    def pubblica(self, evento: dict, tetto: float = None) -> dict:
+        return self.chiedi(lambda n: ["EVENT", evento],
+                           lambda n: ("ok", str(evento.get("id"))),
+                           POSTA_TETTO_S if tetto is None else tetto)
+
+    def leggi(self, filtro: dict, tetto: float = None):
+        """(eventi, finito) — finito = e' arrivato l'EOSE — o None se il
+        relay non ha risposto. La sottoscrizione si chiude dopo."""
+        a = self.chiedi(lambda n: ["REQ", f"p{n}", filtro],
+                        lambda n: ("req", f"p{n}"),
+                        POSTA_TETTO_S if tetto is None else tetto)
+        if a["stato"] == "eose":
+            try:              # la sottoscrizione si chiude: il relay ne tiene poche
+                with self.lucchetto:
+                    if self.ws is not None and a.get("giro") == self.giro:
+                        self.ws.send(json.dumps(["CLOSE", a["chiave"][1]]))
+            except Exception:
+                pass
+        if a["stato"] not in ("eose", "chiuso"):
+            return None
+        return a["eventi"], a["stato"] == "eose"
+
+    def riposa(self, adesso: float):
+        """Chiude la connessione se non lavora da POSTA_RIPOSO_S."""
+        with self.lucchetto:
+            ws = self.ws
+            if ws is None or self.attese \
+                    or adesso - self.usato < POSTA_RIPOSO_S:
+                return
+            self.ws = None
+        _posta_spezza(ws)
+
+
+def _posta_riposa():
+    """Un giro del custode: chiude le connessioni che non lavorano."""
+    adesso = time.time()
+    with _POSTA_LUCCHETTO:
+        postini = list(_POSTINI.values())
+    for p in postini:
+        p.riposa(adesso)
+
+
+def _posta_custode():
+    while True:
+        time.sleep(30)
+        try:
+            _posta_riposa()
+        except Exception:
+            pass
+
+
+def _posta_per(relay: str):
+    """Il postino del relay, o None = connessione singola come prima:
+    relay fuori da `RELAYS_VERIFICA`, libreria assente, o collaudo
+    verso un relay che non e' di casa."""
+    if _posta_connetti is None:
+        return None
+    r = str(relay or "").strip()
+    if r not in [str(x).strip() for x in RELAYS_VERIFICA]:
+        return None
+    if MODALITA_COLLAUDO and not relay_di_casa(r):
+        return None
+    with _POSTA_LUCCHETTO:
+        p = _POSTINI.get(r)
+        if p is None:
+            if len(_POSTINI) >= POSTA_MAX_RELAY:
+                return None
+            p = _POSTINI[r] = _Postino(r)
+        if not _POSTA_CUSTODE:
+            t = threading.Thread(target=_posta_custode, daemon=True,
+                                 name="custode della posta")
+            _POSTA_CUSTODE.append(t)
+            t.start()
+    return p
+
+
+# (Qui finisce la posta dei relay.)
 
 
 async def _spedisci_ai_relay(evento: dict, relays: list = None) -> int:
@@ -61234,6 +61540,20 @@ def chiedi_relay_dm(relay: str, hexkey: str):
     un relay che non e' di casa torna None, «nessun relay DM»."""
     if lettura_simulata(relay, f"dei relay DM (kind 10050) di {hexkey[:16]}…"):
         return None
+    posta = _posta_per(relay)
+    if posta is not None:
+        try:
+            letto = posta.leggi({"kinds": [10050], "authors": [hexkey],
+                                 "limit": 1})
+            trovati = None
+            for ev in (letto or ([], False))[0]:
+                lista = [t[1] for t in ev.get("tags", [])
+                         if len(t) > 1 and t[0] == "relay"
+                         and str(t[1]).startswith("ws")]
+                trovati = lista or trovati
+            return trovati
+        except Exception:
+            return None
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
@@ -64784,6 +65104,11 @@ def _x_note_da_relay(relay: str, hexkey: str, dal: int) -> list:
         return None
     if lettura_simulata(relay, f"delle note di {hexkey[:12]}… per X"):
         return None
+    posta = _posta_per(relay)
+    if posta is not None:
+        letto = posta.leggi({"kinds": [1], "authors": [hexkey],
+                             "since": int(dal), "limit": 100}, 8)
+        return None if letto is None else letto[0]
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})

@@ -32211,6 +32211,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_ronda_relay_lista`, `_ronda_relay_nome` e `_ronda_relay_fa`;
   `_ronda_nostr_connetti` è la porta dei banchi.
 
+- LA POSTA DEI RELAY (15 ott 2026, cantiere relay-di-barattolo,
+  secondo commit; perché in CANTIERI, «La posta dei relay»). Un
+  `_Postino` per relay di `RELAYS_VERIFICA` (al massimo
+  `POSTA_MAX_RELAY`), chiesto con `_posta_per(relay)`: None vuol dire
+  connessione singola come prima (relay fuori lista, libreria assente,
+  collaudo verso un relay che non è di casa). Il postino tiene UNA
+  websocket aperta (`_posta_connetti`, la porta dei banchi), un thread
+  lettore (`posta dei relay`) che smista gli OK per id dell'evento e
+  EVENT/EOSE/CLOSED per id della lettura (`p<numero>`), l'invio sotto
+  un lucchetto, `POSTA_IN_VOLO` richieste insieme (un semaforo: chi non
+  trova posto nel suo tetto dice «coda»). `chiedi()` dà lo stato: ok,
+  eose, chiuso, tempo, caduto, giu, coda, doppio. Caduta a metà: il
+  lettore sveglia chi aspettava («caduto») e la richiesta riprova una
+  volta su una connessione nuova. Tempo scaduto: la connessione si
+  spezza (`_posta_spezza`, shutdown senza saluto, perché il lettore sta
+  dentro recv). Apertura fallita: pausa 1, 2, 4… fino a
+  `POSTA_PAUSA_MAX_S`, e intanto «giu» senza bussare. Il custode
+  (thread `custode della posta`, ogni 30 s) chiude le connessioni ferme
+  da `POSTA_RIPOSO_S`. Le porte che ci passano: `invia_evento_relay`
+  (dopo, il registro della ronda come prima; «doppio» = lo stesso
+  evento già in volo: connessione singola), `_kind0_profilo`,
+  `chiedi_relay_dm`, `_x_note_da_relay` — le letture chiedono il
+  postino DOPO `lettura_simulata`. NON ci passano: `_dm_filo`,
+  `_orecchio_filo`, tutto il P2P e Mostro, le due ronde, l'import.
+  LE PROVE: `prove_posta_relay`.
+
 - IL GRUPPO DEGLI ADMIN (12 ott 2026; perché in CANTIERI, «Il gruppo
   degli admin»; la procedura in PRODUZIONE, «IL GRUPPO DEGLI ADMIN»).
   Gli avvisi DA ADMIN vanno in un gruppo Telegram privato con gli

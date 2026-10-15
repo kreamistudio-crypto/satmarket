@@ -58690,7 +58690,8 @@ e niente sul relay. Amber vero non è provato da qui.
 
 **DA FARE (notati, non fatti).**
 - Una connessione per relay riusata, invece di una per lettura: è la
-  cura vera del 429 di nos.lol.
+  cura vera del 429 di nos.lol. FATTO lo stesso giorno: la voce «La
+  posta dei relay», più in fondo.
 - `presenta_release.py` e `censimento_nostr.py` hanno liste loro, con
   damus e nostr.mom: mestieri diversi (Zapstore, il censimento), da
   decidere a parte.
@@ -59305,3 +59306,66 @@ cantiere): suite intera con `PROVE_SEVERE=1`, 24.338 passate, 0
 fallite; in gabbia `collaudo_guardia_liquidita` e
 `collaudo_canale_admin` verdi; le forme dei segreti della CI sulle
 righe aggiunte: nessuna. Il push non porta commit altrui.
+
+## La posta dei relay: una connessione per relay invece di una a richiesta (15 ott 2026, cantiere relay-di-barattolo, secondo commit, richiesta di Andrea)
+
+**PERCHÉ.** Il primo commit del cantiere aveva messo nei «da fare» la
+cura vera dei 429 di nos.lol; Andrea l'ha voluta subito. Il server
+apriva una connessione NUOVA per ogni lettura e ogni pubblicazione, e le
+ripubblicazioni in blocco (l'import, le spese standard, le categorie)
+vanno a lotti di cinque annunci ogni secondo e mezzo: cinque aperture
+al secondo verso ogni relay. nos.lol, misurato da qui, risponde 429
+dall'undicesima apertura ravvicinata; trenta richieste sulla stessa
+connessione passano tutte, in 1,1 secondi.
+
+**COM'È FATTA** (ARCHITETTURA, «LA POSTA DEI RELAY»). Un postino per
+relay, solo per quelli di `RELAY_NOSTR`: una websocket tenuta aperta, un
+thread che legge e smista le risposte, al massimo dieci richieste in
+volo (le altre aspettano dentro il loro tetto di 6 s). Se la
+connessione cade a metà, un tentativo in più su una nuova; una
+richiesta senza risposta nel tetto spezza la connessione (un socket
+mezzo morto non fa aspettare la successiva); un relay che non si apre
+resta in pausa 1, 2, 4… fino a 60 s e le richieste falliscono subito;
+due minuti senza lavoro e la connessione si chiude da sola. Ci passano
+le pubblicazioni (`invia_evento_relay`: annunci, ritiri, reputazione,
+badge, zap, i DM agli utenti quando vanno ai nostri relay) e tre
+letture: profili (`_kind0_profilo`), relay dei DM (`chiedi_relay_dm`),
+note per X (`_x_note_da_relay`). Le funzioni non cambiano firma.
+NON ci passano, apposta: l'ascolto dei DM di Barattolo, il login
+bunker, tutto Mostro e il P2P, la ronda dei relay Nostr (apre una
+connessione nuova per vedere anche il 429), `importa_nostr.py`, e i
+relay fuori lista (il 10050 di un utente).
+Scartato: un pool generico per qualunque relay (le connessioni verso
+relay sconosciuti crescerebbero senza tetto); ritentare a connessione
+singola quando il postino fallisce (riaprirebbe proprio la raffica
+che il postino toglie).
+
+**PROVATO.** `prove_posta_relay` (nuova, 25 prove) coi pezzi VERI
+contro relay di cartone che rispondono da un thread loro: SCRITTA
+PRIMA del codice e rossa sul codice di prima (5 su 9: la raffica 10
+presi su 30 con 20 rifiuti 429; le letture tutte None con 44 rifiuti;
+il relay lento che teneva 6 s invece del tetto; la chiusura a metà
+senza secondo tentativo; il relay giù che veniva ribussato), verde
+dopo. In più: il custode, il tetto delle richieste in volo, nessuna
+attesa rimasta appesa, i thread, una connessione aperta ma muta, le
+sentinelle su chi non deve passarci. La tortura: nove mutazioni, nove
+prese (la prima versione ne lasciava passare una, «il tempo non spezza
+la connessione»: da lì la prova della connessione muta). I banchi che
+fanno girare le letture vere (`prove_foto_nostr_relay_muti`,
+`prove_letture_relay_collaudo`, `prove_relay_di_barattolo`) e
+`collaudo_x_risonanza` vanno a connessione singola con
+`_posta_per = None` (la posta ha la sua sezione). DAL VIVO, SOLA
+LETTURA, i pezzi veri del server contro nos.lol, una raffica di 30
+letture del 10050 di Barattolo cinque alla volta: PRIMA 11 risposte su
+30, 11 aperture, 19 rifiuti 429; DOPO 30 su 30, UNA apertura, nessun
+429. Nessun evento pubblicato.
+
+**DA FARE DOPO TORINO (deciso da Andrea, 15 ott).**
+- Le letture del libro P2P (`info_libro_da_relay`,
+  `eventi_libro_da_relay`, `libro_intero_da_relay`) aprono anche loro
+  una connessione a richiesta, e vanno anche a nos.lol (che sta nel
+  coro di Mostro): contano sullo stesso freno. Non toccate adesso.
+  Prima di deciderle, la misura dei 429 del journal PRIMA e DOPO il
+  deploy della posta, col comando della voce «I relay di Barattolo»
+  («IL CONTEGGIO DEL JOURNAL»), su tre giorni: quel che resta su nos.lol dopo la posta
+  è in buona parte loro.

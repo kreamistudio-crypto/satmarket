@@ -293,6 +293,10 @@ def main():
     SRV.URL_PUBBLICO = BASE                 # le foto degli annunci stanno qui
     SRV.RELAYS_VERIFICA = ["ws://127.0.0.1:9", "ws://localhost:9"]   # di casa: si leggono
     SRV.create_connection = relay_finto
+    # LA POSTA DEI RELAY (15 ott 2026) si e' presa la create_connection
+    # vera all'import: qui si prova X, non la posta (che ha la sua
+    # sezione in prove.py), quindi la lettura va a connessione singola
+    SRV._posta_per = lambda relay: None
     # IL BANCO SOSTITUISCE httpx col nodo LNbits di cartone (solo `post`):
     # qui X e' un server vero sul loopback e le chiamate sono quelle vere
     # (request, stream): torna l'httpx di libreria. LNbits non si chiama.
