@@ -411,9 +411,10 @@ pull request, in commit datati. L'elenco si scrive la domenica.
 - RGB: `rgb-lib` 0.3.0-beta.7, i binding Python di RGB-Tools; il
   protocollo del proxy RGB 0.2.
 - WDK: `@utexo/wdk-wallet-rgb` 2.0.3 con `@utexo/rgb-sdk` 1.0.3 e il
-  binario nativo di UTEXO 0.3.0-beta.8. Dove la glibc è più vecchia
-  della 2.38, `@utexo/rgb-sdk` forzato alla 1.0.6 (binario beta.13) con
-  un `overrides` di npm. Nessuna modifica ai sorgenti.
+  binario nativo di UTEXO 0.3.0-beta.8. Sul portatile di riserva
+  (Zorin OS 17, glibc 2.35: più vecchia della 2.38 che quel binario
+  vuole), `@utexo/rgb-sdk` forzato alla 1.0.6 (binario beta.13) con un
+  `overrides` di npm. Nessuna modifica ai sorgenti.
 - Rete: Mutinynet, dall'Esplora e dal proxy RGB pubblici di KaleidoSwap,
   e il faucet BTC di Mutinynet. I nostri wallet aprono la catena come
   `signet` di rgb-lib, l'unica rete che l'adattatore WDK di UTEXO
@@ -2161,7 +2162,7 @@ Everything in this pull request, in dated commits: [list on Sunday].
 
 ### Third-party tools and forks
 - RGB: rgb-lib 0.3.0-beta.7, Python bindings (RGB-Tools). RGB proxy protocol 0.2.
-- WDK: @utexo/wdk-wallet-rgb 2.0.3 with @utexo/rgb-sdk 1.0.3 and UTEXO's native rgb-lib build 0.3.0-beta.8. [If a laptop runs glibc older than 2.38: @utexo/rgb-sdk overridden to 1.0.6, native 0.3.0-beta.13.] No source changes.
+- WDK: @utexo/wdk-wallet-rgb 2.0.3 with @utexo/rgb-sdk 1.0.3 and UTEXO's native rgb-lib build 0.3.0-beta.8. On our backup laptop (Zorin OS 17, glibc 2.35, older than the 2.38 that build needs): @utexo/rgb-sdk overridden to 1.0.6, native 0.3.0-beta.13. No source changes.
 - Network: Mutinynet, through KaleidoSwap's public Esplora and RGB proxy, and the Mutinynet BTC faucet. Our wallets open the chain as rgb-lib "signet", the only network the UTEXO WDK adapter supports, so our assets are not compatible with KaleidoSwap wallets and the RGB faucet, which use "signetcustom". A KaleidoSwap mentor (Arshia) confirmed on 12 Oct 2026 that this should be fine for judging. We did not use the RGB faucet assets.
 - QVAC: @qvac/sdk 0.21.0 and @qvac/cli 0.15.0, model Qwen3.5 2B Q4, fallback Qwen3.5 0.8B.
 - Nostr: nostr-tools 2.25.2, and nak 0.21.0 as a local relay.
@@ -2445,7 +2446,7 @@ eseguita: la sostituisce 13.4.
 | **VM «rgb-prova»** | LNVPS Dublino, `vm-2050.lnvps.cloud` (185.18.221.42), Debian 13, utente `debian`; aperta la sola porta 22 | Dal WSL del fisso: `ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud` (la chiave sta DENTRO il WSL, a 600). In `~/rgb`: `compose.yaml` (bitcoind, electrs e proxy del SIGNET, il piano B), `venv/` con `rgb-lib==0.3.0b7`, `rgb.py`, `rgb_http.py`, `dati/` (i wallet signet), `backup/`; dopo il passo 0 `mutinynet.env`, dopo il passo 1 `mutinynet/` e `backup-mutinynet/`. Backup notturno alle 03:30 (`rgb-backup.timer`), cifrato age, tirato dal PC. **I comandi sulla VM li lancia ANDREA e incolla l'output**: la sessione li scrive |
 | **Il fisso di Andrea** | Windows 11 con WSL2 Ubuntu 26.04; i9-13900KS, 64 GB, RTX 4090. È dove girano le sessioni, e NON va a Torino | Nel WSL: `~/wdk-prova` (`punti.mjs`, `nwc-wdk.mjs`, `identita.mjs`, `node_modules`, `utente/` = il wallet SIGNET, `nwc/`, `identita/`), `~/bin/nak`, Node 22.23.3 via nvm. In Windows: `C:\Users\Andrea\qvac-prova` (QVAC come dipendenza locale: `npx qvac …`; `consigliami-prova.html` e una copia di `consiglio.py`, fuori dal repo), i modelli in `C:\Users\Andrea\.qvac\models` (quattro `.gguf`). Barattolo in collaudo gira da PowerShell (`py -3 -m uvicorn server:app --port 8080`) |
 | **Le quattro distro WSL di prova** | `jammy-prova`, `jammy-pulita` (Ubuntu 22.04), `noble-prova`, `noble-pulita` (24.04), in `%LOCALAPPDATA%\wsl-torino` | Restano fino al 18. In `noble-prova:/chiavetta/torino` la chiavetta nella variante originale; in `noble-pulita` e `jammy-pulita` un'installazione completa in `/home/prova` (Node, wallet, `rgb-venv`, QVAC), buona per le prove usa-e-getta |
-| **I portatili di Alan** | Due Linux. Uno è Pop!_OS 24.04 LTS con glibc 2.39 (variante ORIGINALE del wallet); da confermare che sia quello da 32 GB. Dell'altro mancano le righe | Arrivano il 15. Si lavora nell'utente Linux `hackathon` (§10, lista «15 ott», e 12.10). Il 32 GB è la macchina della demo |
+| **I portatili di Alan** | Due Linux, **confermati da Alan il 13 ott**. **Il principale: Pop!_OS 24.04 LTS, 32 GB, glibc 2.39** → wallet nella variante ORIGINALE (la «normale», la stessa del fisso): è la macchina della demo. **La riserva: Dell Inspiron 5491 2-in-1, Zorin OS 17.3 (base Ubuntu 22.04), 16 GB, glibc 2.35** → wallet nella variante OVERRIDE (`@utexo/rgb-sdk` 1.0.6, binario beta.13: §10, punto 3b), il cui giro intero si prova al passo 6-bis di 13.4 | Arrivano il 15. Si lavora nell'utente Linux `hackathon` (§10, lista «15 ott», e 12.10). Il 32 GB è la macchina della demo |
 | **I servizi pubblici di Mutinynet** | Esplora `https://esplora.signet.kaleidoswap.com` (riserva `https://mutinynet.com/api`), proxy `rpcs://proxy.kaleidoswap.com/json-rpc` (riserva `rpcs://proxy.iriswallet.com/0.2/json-rpc`), faucet BTC `https://faucet.mutinynet.com` (login GitHub: lo fa ANDREA, mai la sessione), esploratore `https://mutinynet.com` | Usabili tutto il weekend senza polling stretto (12.11). Il faucet RGB di KaleidoSwap NON ci serve |
 | **VPS di Barattolo, nodo Mostro, relay** | Fuori da questo cantiere | Non si toccano, nemmeno in lettura (CLAUDE.md) |
 
@@ -2456,7 +2457,10 @@ eseguita: la sostituisce 13.4.
 - Asset: **USDB e MOON riemessi da noi, NIA**; l'USDT del faucet resta
   fuori (è su `signetcustom`: 12.2, 12.11).
 - **WDK tenuto** (bonus fino a 5 punti), con `@utexo/wdk-wallet-rgb`
-  2.0.3 nella variante originale dove la glibc è almeno 2.38.
+  2.0.3 nella variante originale dove la glibc è almeno 2.38 (il fisso e
+  il portatile principale di Alan) e nella variante override sul
+  portatile di riserva (glibc 2.35). Le due varianti dallo stesso seme
+  derivano wallet DIVERSI: un wallet nasce e resta su una sola.
 - QVAC: **Qwen3.5 2B**, poi 0.8B, poi 600M; **`reasoning_budget: false`
   da solo**, mai `/no_think` (dà 500: 12.4).
 - **A Torino va il portatile di Alan da 32 GB**, non il fisso. **Nessun
@@ -2500,18 +2504,38 @@ dal WSL, per esempio
 Gli id degli asset nascono al passo 4: fino ad allora sono `<ID_USDB>` e
 `<ID_MOON>`.
 
-**Passo 0, i file al loro posto** (WSL del fisso):
+**Passo 0, i file al loro posto** (WSL del fisso). In tre tempi
+(aggiunta di Andrea del 13: **prima di sovrascrivere, una copia
+accanto**, col nome `.prima-mutinynet`; sono i file dell'8 ott, quelli
+del piano B «coi file vecchi» scritto al passo 7).
+
+0a, le copie sulla VM (non cambia niente: si può rilanciare, una copia
+che c'è già non viene riscritta):
+
+```bash
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'pgrep -fa "[r]gb_http.py"; cd ~/rgb && for f in rgb.py rgb_http.py; do [ -e $f.prima-mutinynet ] || cp -p $f $f.prima-mutinynet; done; sudo sh -c "[ -e /usr/local/sbin/backup-rgb.sh.prima-mutinynet ] || cp -p /usr/local/sbin/backup-rgb.sh /usr/local/sbin/backup-rgb.sh.prima-mutinynet"; cmp rgb.py rgb.py.prima-mutinynet && cmp rgb_http.py rgb_http.py.prima-mutinynet && sudo cmp /usr/local/sbin/backup-rgb.sh /usr/local/sbin/backup-rgb.sh.prima-mutinynet && echo copie-uguali; grep -c RGB_CATENA rgb.py.prima-mutinynet; ls -la ~/rgb/*.prima-mutinynet /usr/local/sbin/backup-rgb.sh.prima-mutinynet'   # → NESSUNA riga di pgrep (rgb_http.py è fermo), «copie-uguali», 0 (il file dell'8 ott non conosce RGB_CATENA) e i tre file con la data dell'8
+```
+
+Se `pgrep` stampa una riga, `rgb_http.py` sta girando: ci si ferma qui e
+si decide (va spento prima di sovrascrivergli `rgb.py` sotto i piedi).
+
+0b, i file nuovi sulla VM (**è il gesto che sovrascrive**: da qui i tre
+file della VM sono quelli di main; indietro si torna dalle copie di 0a):
 
 ```bash
 mkdir -p /tmp/rgb-13 && for f in rgb.py rgb_http.py backup-rgb.sh mutinynet-vm.env; do tr -d '\r' < "$R/deploy/rgb/$f" > /tmp/rgb-13/$f; done && grep -c RGB_CATENA /tmp/rgb-13/rgb.py   # → un numero maggiore di 0
 scp -i ~/.ssh/lnvps /tmp/rgb-13/rgb.py /tmp/rgb-13/rgb_http.py /tmp/rgb-13/backup-rgb.sh /tmp/rgb-13/mutinynet-vm.env debian@vm-2050.lnvps.cloud:~/rgb/
 ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && mv mutinynet-vm.env mutinynet.env && sudo install -m 755 backup-rgb.sh /usr/local/sbin/backup-rgb.sh && rm backup-rgb.sh && grep -c "fotografa mutinynet" /usr/local/sbin/backup-rgb.sh && grep -c $(printf "\r") mutinynet.env'   # → 1, poi 0 (nessun fine riga di Windows)
-for f in punti.mjs nwc-wdk.mjs identita.mjs; do tr -d '\r' < "$R/deploy/rgb/$f" > ~/wdk-prova/$f; done; tr -d '\r' < "$R/deploy/rgb/mutinynet-wsl.env" > ~/wdk-prova/mutinynet.env; grep -c mutinynet ~/wdk-prova/mutinynet.env   # → un numero maggiore di 0
 ```
 
-Prima di sovrascrivere `rgb.py` sulla VM, `rgb_http.py` deve essere
-fermo (lo è dalla sera dell'8: si guarda con `pgrep -fa "[r]gb_http.py"`).
-Il signet non cambia: senza `source` i programmi fanno quel che facevano.
+0c, i file del wallet nel WSL, con la stessa copia accanto:
+
+```bash
+cd ~/wdk-prova && for f in punti.mjs nwc-wdk.mjs identita.mjs; do [ -e $f.prima-mutinynet ] || cp -p $f $f.prima-mutinynet; tr -d '\r' < "$R/deploy/rgb/$f" > $f; done; tr -d '\r' < "$R/deploy/rgb/mutinynet-wsl.env" > mutinynet.env; ls *.prima-mutinynet; grep -c mutinynet mutinynet.env   # → i tre .prima-mutinynet e un numero maggiore di 0
+```
+
+Il signet non cambia: senza `source` i programmi nuovi fanno quel che
+facevano i vecchi.
 
 **Passo 1, i wallet nuovi** (tre sulla VM, quello di PROVA sul fisso):
 
@@ -2582,9 +2606,96 @@ Poi lo stesso giro per i punti: `node punti.mjs fattura - 60`,
 `aggiorna`. Controllo: `node punti.mjs saldo` → USDB 50.000 e MOON 60,
 settled.
 
+**Passo 6-bis, la variante «override» del wallet WDK: il giro intero**
+(aggiunta di Andrea del 13). **Serve davvero**: il portatile di riserva
+di Alan (Dell Inspiron 5491 2-in-1, Zorin OS 17.3, base Ubuntu 22.04,
+glibc 2.35) non può caricare il binario originale e userà l'override
+(`@utexo/rgb-sdk` 1.0.6, binario beta.13), di cui finora erano provati
+solo `nuovo`, `indirizzo` e `saldo`. Si prova sul fisso, nella distro
+WSL `jammy-pulita` (Ubuntu 22.04, glibc 2.35: la stessa base), che ha
+già l'override installato e un wallet usa-e-getta nato su Mutinynet il
+9 ott in `/home/prova/wdk-prova/mutinynet/utente`. Il giro è quello di
+12.10: il wallet riceve 5 MOON dal negozio e ne rimanda 2, con la ruota
+Python beta.7 dall'altra parte. Non tocca il wallet di prova del fisso
+né quello della demo.
+
+Nella distro si entra da PowerShell con `wsl -d jammy-pulita` (si è
+root, la casa è `/home/prova`), e OGNI riga lì dentro comincia con lo
+stesso preambolo, che qui sotto è scritto intero:
+
+```bash
+# [jammy-pulita] l'indirizzo del wallet usa-e-getta (l'override stampa un oggetto: l'indirizzo è il tb1p… dentro)
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && npm ls --all 2>/dev/null | grep -E "rgb-sdk|rgb-lib-linux" && node punti.mjs indirizzo   # → @utexo/rgb-sdk@1.0.6 overridden, @utexo/rgb-lib-linux-x64@0.3.0-beta.13, e l'indirizzo
+# [WSL del fisso] 20.000 sats dalla scorta di casa (rgb_http.py è ancora fermo: il wallet barattolo è libero)
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'source ~/rgb/mutinynet.env && cd ~/rgb && ./venv/bin/python rgb.py btc barattolo <l indirizzo tb1p…> 20000'   # → il txid e il link https://mutinynet.com/tx/…
+# [jammy-pulita] un blocco dopo: due UTXO colorabili; un altro blocco, e la fattura «qualunque asset» per 5
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && node punti.mjs utxo 2   # → «✓ creati … UTXO colorabili (una transazione mutinynet)»
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && node punti.mjs fattura - 5   # → la riga che comincia con rgb:
+# [WSL del fisso] il negozio manda 5 MOON
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'source ~/rgb/mutinynet.env && cd ~/rgb && ./venv/bin/python rgb.py invia to-the-mooon <ID_MOON> 5 "<la fattura>"'   # → «✓ consignment depositato sul proxy (…), txid …»
+# [jammy-pulita] l'ACK dell'override; poi [WSL] la trasmissione; un blocco, e di nuovo i due
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && node punti.mjs aggiorna
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'source ~/rgb/mutinynet.env && cd ~/rgb && ./venv/bin/python rgb.py aggiorna to-the-mooon'
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && node punti.mjs saldo   # → MOON 5, settled
+# IL RITORNO. [WSL del fisso] la fattura del negozio per MOON
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'source ~/rgb/mutinynet.env && cd ~/rgb && ./venv/bin/python rgb.py fattura to-the-mooon <ID_MOON>'   # → la riga che comincia con rgb:
+# [jammy-pulita] l'override ne rimanda 2
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && node punti.mjs riscatta <ID_MOON> 2 "<la fattura del negozio>"   # → «✓ consignment depositato, txid …»
+# [WSL] l'ACK del negozio; [jammy-pulita] la trasmissione; un blocco, e di nuovo i due
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'source ~/rgb/mutinynet.env && cd ~/rgb && ./venv/bin/python rgb.py aggiorna to-the-mooon'
+export HOME=/home/prova && source ~/.bashrc && cd ~/wdk-prova && source mutinynet.env && node punti.mjs aggiorna && node punti.mjs saldo   # → MOON 3, settled: l'override riceve E manda
+```
+
+Passa se: 5 arrivati e settled, 2 ripartiti e settled, il negozio li
+rivede. Se si inceppa NON blocca la migrazione (il portatile principale
+usa la variante originale, provata al passo 6): si scrive cosa ha detto,
+si va al passo 7, e per la riserva resta la strada di 12.10 (la
+variante originale dentro un contenitore Ubuntu 24.04, `distrobox`).
+
 **Passo 7, la faccia HTTP del mercante, il tunnel a UNA gamba, e 1,00
 USDB al mercante** (perché conosca l'asset prima delle fatture per
-asset: lezione 5 di §9):
+asset: lezione 5 di §9).
+
+**Prima del `pkill`: come si riaccende il signet (il piano B).** Da
+questo passo `rgb_http.py` gira su Mutinynet. Per tornare al signet ci
+sono due strade, e si prova sempre la prima:
+
+1. *Coi file nuovi, senza `source`* (la strada normale: §10, «Come si
+   torna al signet in cinque minuti», e la regola di 12.6). I file
+   nuovi senza l'ambiente aprono `~/rgb/dati`, cioè i wallet signet:
+
+   ```bash
+   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su signet»
+   ```
+
+2. *Coi file VECCHI* (solo se il dubbio è proprio sui file nuovi: sono
+   le copie `.prima-mutinynet` del passo 0, i file dell'8 ott che hanno
+   retto la prova di riavvio). I nuovi si mettono da parte col nome
+   `.mutinynet`, così si torna anche da qui:
+
+   ```bash
+   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; for f in rgb.py rgb_http.py; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done; grep -c RGB_CATENA rgb.py; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → 0 (è il file dell'8 ott), poi «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» — Ctrl-C per fermare» (il vecchio non nomina la catena)
+   cd ~/wdk-prova && for f in punti.mjs nwc-wdk.mjs identita.mjs; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done   # nel WSL: i tre file del wallet dell'8 ott
+   ```
+
+   ⚠️ Coi file vecchi **MAI `source mutinynet.env`**: il `rgb.py` dell'8
+   ott non conosce `RGB_CATENA` ma ubbidisce a `RGB_BASE`, e aprirebbe i
+   wallet di Mutinynet senza la guardia della catena. Si lavora in una
+   shell nuova. Per rimettere i nuovi: `for f in rgb.py rgb_http.py; do
+   cp -p $f.mutinynet $f; done` sulla VM, e lo stesso coi tre del WSL.
+   Il backup vecchio (`sudo install -m 755
+   /usr/local/sbin/backup-rgb.sh.prima-mutinynet
+   /usr/local/sbin/backup-rgb.sh`) fotografa il solo signet: si rimette
+   solo se quello nuovo fallisce, e si sa che Mutinynet resta scoperta.
+
+In tutt'e due le strade, dal WSL: il tunnel a TRE gambe di §1 (`-L
+50001:127.0.0.1:50001 -L 3000:127.0.0.1:3000 -L 8787:127.0.0.1:8787`),
+`curl -s 127.0.0.1:8787/salute` che dice `"rete": "signet"`, e in una
+shell SENZA `source` `node punti.mjs saldo`, che apre il wallet signet
+di `~/wdk-prova/utente` (60 MOON e 500,00 USDB dall'8 ott). I wallet
+signet non sono stati toccati da nessun passo di questa migrazione.
+
+I comandi del passo:
 
 ```bash
 ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; source mutinynet.env && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
@@ -2620,7 +2731,10 @@ utente con `node punti.mjs backup` (con `source`). `rgb_http.py` resta
 FERMO la sera (il backup delle 03:30) e si riaccende con la prima riga
 del passo 7. Il 14 non si lavora.
 
-**Se qualcosa va storto**: non si improvvisa sulla VM. Il signet è
+**Se qualcosa va storto**: non si improvvisa sulla VM. **Un passo
+inceppato da più di trenta minuti ferma la migrazione** (regola di
+Andrea del 13): ci si ferma, lo si dice, e si decide insieme se restare
+su signet. Il signet è
 intatto e ci si torna non facendo `source` (§10, «Come si torna al
 signet in cinque minuti»; 12.6). I wallet di Mutinynet si possono
 rifare da capo: finché non c'è una demo, non contengono niente che non
@@ -2635,10 +2749,13 @@ si riemetta.
 - **QVAC**: la risposta al mentor sul `/no_think` che dà 500, e la riga
   sul difetto degli scarichi su Windows, sono scritte in inglese in 12.4:
   da mandare, se Andrea non l'ha già fatto.
-- **I portatili di Alan**: la conferma che il Pop!_OS è quello da 32 GB;
-  le due righe (`ldd --version | head -1`, `grep PRETTY_NAME
-  /etc/os-release`) dell'altro. L'override del wallet serve solo se
-  quello è a base 22.04 (12.10).
+- **I portatili di Alan**: ☑ confermati il 13 ott. Il principale è il
+  Pop!_OS da 32 GB, glibc 2.39 (wallet normale); la riserva è il Dell
+  Inspiron 5491 2-in-1 con Zorin OS 17.3 (base Ubuntu 22.04), 16 GB,
+  glibc 2.35: **l'override del wallet serve**, e il suo giro intero è
+  il passo 6-bis di 13.4. Da misurare il 15 sulla riserva: Vulkan
+  (`vulkaninfo --summary`; su una base 22.04 §10 si aspetta la 1.3,
+  cioè QVAC in CPU) e i tempi del 2B con 16 GB.
 - **Per il 15**: la chiave SSH nuova e dedicata per la VM dal portatile
   di Alan (mai quella del fisso); se il portatile resta da Andrea fino
   al 17; dove gira la sessione a Torino e con quali credenziali.
