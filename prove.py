@@ -33841,7 +33841,8 @@ def prove_canale_bot():
     prova("chiamarla senza il freno e' un errore", "TypeError", senza)
 
     # --- 2) LA CAPTION DEL CANALE --------------------------------
-    cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store"}
+    cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot"}
     # la firma passa dal giudice della npub, che a sua volta vuole il
     # bech32: chi estrae una funzione ne eredita le dipendenze
     exec(next(r for r in _SORGENTE.split("\n")
@@ -33852,7 +33853,7 @@ def prove_canale_bot():
               "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
               "_hashtag_promo", "_firma_venditore", "_tariffa_dichiarata",
               "_sped_in_sats", "_costo_sped_promo", "_righe_consegna_promo",
-              "_vetrina_venditore", "_caption_canale"):
+              "_vetrina_venditore", "link_telegram", "_caption_canale"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
          "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
@@ -34361,8 +34362,9 @@ def prove_vetrina_negozio():
 
     # --- 2) LA RIGA DELLA DIDASCALIA -------------------------------
     rig = {"html": _html, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
            "EMOJI_CATEGORIA": {"Libri e media": "📚"}}
-    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_riga_negozio"):
+    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "link_telegram", "_riga_negozio"):
         exec(pezzo(f), rig)
     riga = rig["_riga_negozio"](
         {"id": 7, "titolo": "L'individuo <Sovrano>",
@@ -42280,6 +42282,7 @@ def prove_rilancio_offerta():
                "Header": lambda d="": d, "Cookie": lambda d="": d,
                "verifica_utente": lambda h, s: {"id": chi},
                "URL_PUBBLICO": "https://barattolo.store",
+               "LINK_BOT": "https://t.me/ilbarattolobot",
                "ORE_RISPOSTA_OFFERTA": 48, "ORE_PAGAMENTO_OFFERTA": 24,
                "MAX_RILANCI_OFFERTA": 2,
                "STATI_OFFERTA_VIVI": ("proposta", "controproposta",
@@ -42287,6 +42290,7 @@ def prove_rilancio_offerta():
         amb.update({k: puro[k] for k in
                     ("_cifra_accordo", "_cifra_offerta", "_importo_accordo",
                      "_spazio_rilancio", "_cifra_da_payload")})
+        exec(pezzo("link_telegram"), amb)
         exec("async " + pezzo("rispondi_offerta"), amb)
         try:
             e = asyncio.new_event_loop().run_until_complete(
@@ -42786,10 +42790,12 @@ def prove_ritiro_offerta():
                "Header": lambda d="": d, "Cookie": lambda d="": d,
                "verifica_utente": lambda h, s: {"id": chi},
                "URL_PUBBLICO": "https://barattolo.store",
+               "LINK_BOT": "https://t.me/ilbarattolobot",
                "STATI_OFFERTA_VIVI": ("proposta", "controproposta",
                                       "accettata"),
                "_cifra_accordo": puro["_cifra_accordo"],
                "_importo_accordo": puro["_importo_accordo"]}
+        exec(pezzo("link_telegram"), amb)
         exec("async " + pezzo("ritira_offerta"), amb)
         try:
             esito = asyncio.new_event_loop().run_until_complete(

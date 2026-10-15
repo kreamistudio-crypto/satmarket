@@ -17417,8 +17417,6 @@ async def _canale_bitcoin_podcast_comando(chat: int, arg: str):
     @username."""
     if not arg:
         imposta_canale_bitcoin_podcast("")
-        await notifica_admin(f"📻 BitcoinPodcast: spento (da tg {chat})",
-                             argomento="riepiloghi")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": "✅ Fatto: non pubblico più in BitcoinPodcastTelegram.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
@@ -17438,8 +17436,6 @@ async def _canale_bitcoin_podcast_comando(chat: int, arg: str):
                     "propri messaggi, per il ✅ Venduto).",
             "parse_mode": "HTML"})
     imposta_canale_bitcoin_podcast(arg)
-    await notifica_admin(f"📻 BitcoinPodcast: {arg} (da tg {chat})",
-                         argomento="riepiloghi")
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ Fatto: gli annunci e gli scambi P2P nuovi escono "
                 f"anche in <code>{html.escape(arg)}</code>.",
