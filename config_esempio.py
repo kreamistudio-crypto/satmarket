@@ -1065,11 +1065,20 @@ NIP05_NOMI = {}
 # non toglie niente agli altri. Lasciarne almeno un paio di quelli
 # grossi e' cio' che tiene gli annunci raggiungibili da chi ha i SUOI
 # relay e non i nostri.
+#
+# L'ORDINE CONTA (15 ott 2026): il primo e' il relay suggerito ai client,
+# e i primi quattro ricevono i DM di chi non ha un kind 10050 — il
+# relay di Barattolo in fondo (rifiuta le buste dei DM), nos.lol non in
+# testa (frena con un 429 chi gli apre troppe connessioni). Questa lista
+# e' anche il kind 10002 di Barattolo: se cambia qui, si ripubblica quello
+# (PRODUZIONE, «IL KIND 10002 DI BARATTOLO»).
 RELAY_NOSTR = [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
     "wss://relay.primal.net",
-    "wss://nostr.mom",
+    "wss://relay.nostr.net",
+    "wss://nostr.oxtr.dev",
+    "wss://nos.lol",
+    "wss://relay.mostro.network",
+    "wss://relay.barattolo.store",
 ]
 # I relay che l'IMPORT interroga in piu' — quelli personali dei
 # venditori, dove i loro annunci vivono e i grossi non arrivano. Sono
@@ -1566,6 +1575,13 @@ RONDA_RELAY_MOSTRO = False
 # ⚠️ SOLO IL NOSTRO RELAY: a un relay d'altri sarebbe spam. Vuota =
 # niente canarino. Sul VPS: ["wss://relay.barattolo.store"]
 RONDA_RELAY_CANARINO = []
+# La ronda dei relay Nostr di casa (15 ott 2026): ogni dieci minuti il
+# server chiede a ognuno dei relay di RELAY_NOSTR se risponde (una
+# lettura, niente eventi), e guarda se accettano i nostri eventi veri.
+# Un relay giù, o che ci rifiuta, da più di un'ora arriva nel gruppo
+# degli admin, argomento "errori"; quando passa, anche il ritorno.
+# Nasce SPENTA: True e riavvia per accenderla.
+RONDA_RELAY_NOSTR = False
 
 # --- Sicurezza degli accessi ------------------------------------------
 # Quanto vale un initData di Telegram: e' la credenziale di OGNI

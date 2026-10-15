@@ -29637,6 +29637,9 @@ def _leve_stato():
             # La ronda dei relay di Mostro (12 ott 2026): il fatto e lo
             # stato dell'ultimo giro, chiesti al suo giudice.
             *_ronda_relay_leve(),
+            # La ronda dei relay Nostr di casa (15 ott 2026), sul calco
+            # di quella di Mostro.
+            *_ronda_nostr_leve(),
             _leva("Termometro delle sottocategorie",
                   "TERMOMETRO_SOTTOCATEGORIE", bool(TERMOMETRO_SOTTOCATEGORIE),
                   spento="il lunedì non arriva più il report degli annunci "
@@ -45089,16 +45092,30 @@ async def elimina_codice_sconto(codice_id: int,
 # riga nel config del VPS. E' la regola di casa per tutto cio' che il
 # VPS decide: `canale_id()`, `ONION_HOST`, le sei dei connettori.
 # Il config e' il VALORE DI PARTENZA e non la verita': senza quella
-# riga valgono i quattro di sempre, cioe' il mondo di ieri byte per
-# byte.
+# riga valgono questi di serie.
+# LA LISTA DI SERIE NUOVA (15 ott 2026, cantiere «relay-di-barattolo»,
+# decisione di Andrea): sei relay di sei gestori diversi, misurati in
+# sola lettura (CANTIERI, «I relay di Barattolo»). Fuori damus (503 a
+# ogni ora) e nostr.mom (8690 errori in tre giorni nel journal, e da
+# qui la connessione sicura si chiude subito). L'ORDINE CONTA in due
+# punti: il PRIMO e' il relay suggerito nel 31990 (`tag_client`), e i
+# primi QUATTRO sono dove vanno i DM a chi non ha un 10050
+# (`relay_dm_di`) — quindi il nostro relay sta in fondo (le buste 1059
+# le firma una chiave usa-e-getta, e lui le rifiuta) e nos.lol al
+# quarto posto: frena con un 429 chi gli apre piu' di una decina di
+# connessioni di fila, e da qui ne apriamo una per lettura.
+# LA STESSA LISTA E' IL KIND 10002 DI BARATTOLO
+# (`deploy/nostr/relay-di-barattolo.mjs`): una prova le tiene uguali.
 # ⚠️ IL NOME NON SI RINOMINA: `RELAYS_VERIFICA` e' letto in una dozzina di
 # punti e importato da `ripubblica_tag_client.py`, che cosi' eredita
 # la leva senza una riga — il patto dei nomi interni.
 RELAY_DI_SERIE = [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
     "wss://relay.primal.net",
-    "wss://nostr.mom",
+    "wss://relay.nostr.net",
+    "wss://nostr.oxtr.dev",
+    "wss://nos.lol",
+    "wss://relay.mostro.network",
+    "wss://relay.barattolo.store",
 ]
 try:
     from config import RELAY_NOSTR
@@ -61061,11 +61078,44 @@ def invia_evento_relay(relay: str, evento: dict) -> bool:
             msg = json.loads(ws.recv())
             if msg[0] == "OK" and msg[1] == evento["id"]:
                 ws.close()
-                return bool(msg[2])
+                preso = bool(msg[2])
+                try:                  # la ronda guarda, la consegna no
+                    _segna_scrittura_relay(
+                        relay, evento, preso,
+                        msg[3] if len(msg) > 3 else "")
+                except Exception:
+                    pass
+                return preso
         ws.close()
     except Exception:
         pass                  # relay muto o irraggiungibile: pazienza
     return False
+
+
+# LE NOSTRE SCRITTURE, relay per relay (15 ott 2026, cantiere
+# «relay-di-barattolo»): l'esito degli eventi FIRMATI DA BARATTOLO, che
+# la ronda dei relay Nostr legge per dire «questo relay ci rifiuta».
+# Solo i nostri e non tutti: le buste 1059 le firma una chiave
+# usa-e-getta e gli annunci dei venditori la loro, e il nostro relay li
+# rifiuta di mestiere (whitelist) — contarli farebbe suonare un relay
+# sano. Il «no» si ricorda dal PRIMO no dopo l'ultimo sì, con le parole
+# del relay (tagliate: le ha scritte un programma d'altri).
+_SCRITTURE_RELAY: dict[str, dict] = {}
+
+
+def _segna_scrittura_relay(relay: str, evento: dict, preso: bool,
+                           detto: str = ""):
+    if not _NOSTR or not isinstance(evento, dict) \
+            or evento.get("pubkey") != _NOSTR[1]:
+        return
+    V = _SCRITTURE_RELAY.setdefault(
+        str(relay), {"ok": 0.0, "no_da": 0.0, "detto": ""})
+    if preso:
+        V.update(ok=time.time(), no_da=0.0, detto="")
+    else:
+        if not V["no_da"]:
+            V["no_da"] = time.time()
+        V["detto"] = str(detto or "")[:120]
 
 
 async def _spedisci_ai_relay(evento: dict, relays: list = None) -> int:
@@ -81413,6 +81463,230 @@ def _ronda_relay_leve() -> list:
 
 
 # (Qui finisce il blocco della ronda dei relay di Mostro.)
+
+
+# ---------- LA RONDA DEI RELAY NOSTR DI CASA ----------
+# (15 ott 2026, cantiere «relay-di-barattolo», richiesta di Andrea.)
+# La ronda qui sopra guarda le strade del coordinatore; questa guarda
+# quelle di tutto il resto, `RELAYS_VERIFICA`: annunci, ritiri, zap,
+# reputazione, profili, la copia del profilo P2P. Tre giorni di journal
+# del VPS (13-15 ott 2026) dicevano nostr.mom 8690 errori, nos.lol
+# 2576, damus 1540 — e nessuno l'aveva detto a nessuno.
+# DUE DOMANDE, e nessuna scrive niente sui relay d'altri:
+# 1) LA LETTURA, ogni RONDA_NOSTR_PASSO_S: una REQ minima (il 10050 di
+#    Barattolo, limit 1). Basta l'EOSE: un relay che non l'ha risponde
+#    lo stesso, ed e' quel che si chiede.
+# 2) LE SCRITTURE si guardano da quelle VERE: `invia_evento_relay`
+#    segna l'esito degli eventi firmati da Barattolo
+#    (`_segna_scrittura_relay`). Niente canarino: su un relay d'altri
+#    sarebbe un evento finto in piu' per ogni giro.
+# QUANDO PARLA: un guasto che dura da RONDA_NOSTR_GIU_S (un'ora: e'
+# la soglia di Andrea, «giu' piu' di un'ora») arriva nel gruppo degli
+# admin, argomento Errori, una volta per guasto; quando passa, il
+# ritorno. Il journal dice lo stato solo quando CAMBIA.
+# IN COLLAUDO NON ESCE NIENTE: la lettura chiede il giudice
+# (`lettura_simulata`) prima della rete.
+# LA LEVA NASCE SPENTA e si accende nel config del VPS: PRODUZIONE,
+# «LA RONDA DEI RELAY NOSTR».
+try:
+    from config import RONDA_RELAY_NOSTR
+except ImportError:
+    RONDA_RELAY_NOSTR = False
+RONDA_NOSTR_PASSO_S = 600        # un giro ogni dieci minuti
+RONDA_NOSTR_GIU_S = 3600         # quanto deve durare un guasto per dirlo
+RONDA_NOSTR_TETTO_S = 8          # quanto si aspetta un relay
+RONDA_NOSTR_MAX = 10             # quanti relay al massimo (ognuno un thread)
+# la porta verso la rete: il banco delle prove ci mette un relay di cartone
+_ronda_nostr_connetti = create_connection
+_RONDA_NOSTR = {"voci": {}, "stati": {}, "giro": 0.0, "detto": ""}
+_TASK_RONDA_NOSTR = None
+
+
+def ronda_nostr_viva() -> bool:
+    """La leva accesa DAVVERO: senza la libreria delle websocket non si
+    sa chiedere, e una leva True vale spenta."""
+    return bool(RONDA_RELAY_NOSTR and create_connection)
+
+
+def _ronda_nostr_guardati() -> list:
+    """I relay a cui si chiede: quelli di casa, ripuliti come quelli
+    della ronda di Mostro."""
+    return _ronda_relay_lista(RELAYS_VERIFICA)[:RONDA_NOSTR_MAX]
+
+
+def _ronda_nostr_leggi(relay: str) -> str:
+    """LA LETTURA: «ok» se il relay risponde alla REQ (EOSE), «chiuso»
+    se la rifiuta, «muto» se non arriva alla fine, «giu» se non si
+    apre, «simulato» in collaudo. SINCRONA: va in asyncio.to_thread."""
+    if lettura_simulata(relay, "della ronda dei relay Nostr"):
+        return "simulato"
+    ws = None
+    try:
+        ws = _ronda_nostr_connetti(relay, timeout=RONDA_NOSTR_TETTO_S,
+                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+        filtro = {"kinds": [10050], "limit": 1}
+        if _NOSTR:
+            filtro["authors"] = [_NOSTR[1]]
+        ws.send(json.dumps(["REQ", "ronda", filtro]))
+        inizio = time.time()
+        while time.time() - inizio < RONDA_NOSTR_TETTO_S:
+            msg = json.loads(ws.recv())
+            if not isinstance(msg, list) or len(msg) < 2 or msg[1] != "ronda":
+                continue
+            if msg[0] == "EOSE":
+                return "ok"
+            if msg[0] == "CLOSED":
+                return "chiuso"
+        return "muto"
+    except Exception:
+        return "giu"
+    finally:
+        if ws is not None:
+            try:
+                ws.close()
+            except Exception:
+                pass
+
+
+def _ronda_nostr_male(cosa: str, stato: str, scritture: dict = None) -> str:
+    """PURA, IL GIUDICE DI UNA RISPOSTA: cosa non va, in mezza frase per
+    i moderatori; "" = tutto bene. Le parole del relay passano da
+    `html.escape`."""
+    if cosa == "scrittura":
+        V = scritture or {}
+        if not V.get("no_da"):
+            return ""
+        detto = V.get("detto") or ""
+        return ("rifiuta i nostri eventi"
+                + (f" («{html.escape(detto)}»)" if detto else ""))
+    if stato in ("ok", "simulato"):
+        return ""
+    if stato == "chiuso":
+        return "rifiuta le letture"
+    return "non risponde"
+
+
+def _ronda_nostr_decidi(S: dict, esiti: list, adesso: float) -> tuple:
+    """PURA sullo stato che le si passa, IL GIUDICE DEGLI AVVISI: dagli
+    esiti di un giro — (relay, cosa, male) — a (guasti, tornati). Un
+    guasto si dice quando dura da RONDA_NOSTR_GIU_S, una volta sola
+    finche' dura; il ritorno si dice solo di un guasto che era stato
+    detto. A tempo e non a giri: «giu' da piu' di un'ora» resta vero
+    anche se un giro salta."""
+    guasti, tornati = [], []
+    for relay, cosa, male in esiti:
+        V = S["voci"].setdefault((relay, cosa), {
+            "da": 0.0, "detto": False, "male": ""})
+        if male:
+            if not V["da"]:
+                V["da"] = adesso
+            V["male"] = male
+            if adesso - V["da"] >= RONDA_NOSTR_GIU_S and not V["detto"]:
+                V["detto"] = True
+                guasti.append((relay, cosa, male, adesso - V["da"]))
+        else:
+            if V["detto"]:
+                tornati.append((relay, cosa, adesso - V["da"]))
+            V.update(da=0.0, detto=False, male="")
+    return guasti, tornati
+
+
+def _ronda_nostr_testo(guasti: list, tornati: list) -> str:
+    """PURA: l'avviso ai moderatori, uno per giro, coi guasti nuovi e i
+    ritorni insieme."""
+    righe = []
+    if guasti:
+        righe.append("⚠️ <b>Relay Nostr di Barattolo</b>")
+        righe += [f"• <code>{_ronda_relay_nome(r)}</code> {male} "
+                  f"(da {_ronda_relay_fa(durata)})"
+                  for r, _, male, durata in guasti]
+        righe.append("Finché dura, annunci, zap e profili hanno una strada "
+                     "in meno: gli altri relay della lista restano.")
+    for r, cosa, durata in tornati:
+        righe.append(
+            f"✅ <code>{_ronda_relay_nome(r)}</code> "
+            + ("accetta di nuovo i nostri eventi" if cosa == "scrittura"
+               else "è tornato a posto")
+            + f" (dopo {_ronda_relay_fa(durata)})")
+    return "\n".join(righe)
+
+
+async def _ronda_nostr_giro():
+    """UN GIRO: le letture tutte insieme, le scritture dal registro, poi
+    il giudice."""
+    S, adesso = _RONDA_NOSTR, time.time()
+    guardati = _ronda_nostr_guardati()
+    letti = await asyncio.gather(*[
+        asyncio.to_thread(_ronda_nostr_leggi, r) for r in guardati])
+    esiti, stati = [], {}
+    for r, stato in zip(guardati, letti):
+        letto = _ronda_nostr_male("lettura", stato)
+        scritto = _ronda_nostr_male("scrittura", stato,
+                                    _SCRITTURE_RELAY.get(r))
+        esiti += [(r, "lettura", letto), (r, "scrittura", scritto)]
+        stati[r] = "; ".join(x for x in (letto, scritto) if x) or (
+            "in collaudo non si chiede" if stato == "simulato" else "a posto")
+    S.update(stati=stati, giro=adesso)
+    guasti, tornati = _ronda_nostr_decidi(S, esiti, adesso)
+    riga = " · ".join(f"{r.split('://', 1)[-1]}: {html.unescape(stati[r])}"
+                      for r in guardati)
+    if riga != S["detto"]:
+        S["detto"] = riga
+        print(f"🛰️ Ronda dei relay Nostr: {riga}", flush=True)
+    if guasti or tornati:
+        await notifica_admin(_ronda_nostr_testo(guasti, tornati),
+                             argomento="errori")
+
+
+async def orologio_ronda_nostr():
+    """L'orologio: un giro ogni RONDA_NOSTR_PASSO_S; un giro che cade
+    lascia partire il prossimo."""
+    while True:
+        try:
+            await _ronda_nostr_giro()
+        except Exception as e:
+            print(f"⚠️ Ronda dei relay Nostr: giro saltato "
+                  f"({type(e).__name__}): il prossimo riparte da solo",
+                  flush=True)
+        await asyncio.sleep(RONDA_NOSTR_PASSO_S)
+
+
+@app.on_event("startup")
+async def avvia_ronda_nostr():
+    """La riga all'avvio dice lo stato VIVO."""
+    global _TASK_RONDA_NOSTR
+    if not RONDA_RELAY_NOSTR:
+        print("🛰️ Ronda dei relay Nostr: spenta (RONDA_RELAY_NOSTR)",
+              flush=True)
+        return
+    if not ronda_nostr_viva() or not _ronda_nostr_guardati():
+        print("⚠️ RONDA_RELAY_NOSTR accesa ma manca websocket-client o un "
+              "relay valido in RELAY_NOSTR: la ronda vale SPENTA", flush=True)
+        return
+    print(f"🛰️ Ronda dei relay Nostr ACCESA: chiedo a "
+          f"{_elenco(_ronda_nostr_guardati())}", flush=True)
+    _TASK_RONDA_NOSTR = asyncio.create_task(orologio_ronda_nostr())
+
+
+def _ronda_nostr_leve() -> list:
+    """La voce del pannello «Stato delle leve»: il fatto e lo stato VIVO
+    di ogni relay all'ultimo giro."""
+    vivo = ronda_nostr_viva() and bool(_ronda_nostr_guardati())
+    stati = _elenco(
+        r.split("://", 1)[-1] + ": "
+        + _RONDA_NOSTR["stati"].get(r, "non ancora chiesto")
+        for r in _ronda_nostr_guardati())
+    return [
+        _leva("Ronda dei relay Nostr", "RONDA_RELAY_NOSTR",
+              vivo, allarme=bool(RONDA_RELAY_NOSTR) and not vivo,
+              acceso="un relay giù da più di un'ora arriva nel gruppo degli "
+                     "admin, argomento Errori. All'ultimo giro — " + stati,
+              spento="nessuno avvisa se un relay di RELAY_NOSTR cade o "
+                     "rifiuta i nostri eventi"),
+    ]
+
+
+# (Qui finisce il blocco della ronda dei relay Nostr.)
 
 
 # ---------- L'INDIRIZZO LIGHTNING DI CASA: zap@barattolo.store ----------

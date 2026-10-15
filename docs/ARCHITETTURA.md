@@ -32154,6 +32154,41 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `collaudo_ronda_relay` (in CI, nella gabbia: il server vero contro
   due relay di cartone, di cui il nostro col plugin vero).
 
+- I RELAY DI BARATTOLO, IL KIND 10002 e LA RONDA DEI RELAY NOSTR (15
+  ott 2026, cantiere relay-di-barattolo; perché in CANTIERI, «I relay
+  di Barattolo»; le procedure in PRODUZIONE, «I RELAY DI BARATTOLO» e
+  «LA RONDA DEI RELAY NOSTR»).
+  LA LISTA È UNA, in quattro posti tenuti in pari da
+  `prove_relay_di_barattolo`: `RELAY_DI_SERIE` in server.py e in
+  importa_nostr.py, `RELAY_NOSTR` in config_esempio.py, `LISTA` in
+  `deploy/nostr/relay-di-barattolo.mjs`. Sei relay di sei gestori:
+  primal, relay.nostr.net, nostr.oxtr.dev, nos.lol, relay.mostro.network
+  e il nostro. L'ORDINE CONTA: il primo è il relay suggerito nel 31990
+  (`tag_client`), i primi quattro ricevono i DM di chi non ha un 10050
+  (`relay_dm_di`); per questo il nostro relay sta in fondo (rifiuta le
+  buste 1059, firmate da chiavi usa-e-getta) e nos.lol non sta in testa
+  (risponde 429 a chi gli apre più di una decina di connessioni di
+  fila, e il server ne apre una per lettura o pubblicazione).
+  IL KIND 10002 dice la stessa lista ai client: senza etichetta i relay
+  del 10050 (`AVVISO_DM_NOSTR_RELAY`), «write» gli altri. Lo firma Amber
+  via NIP-46 (nostrconnect, il solo permesso `sign_event:10002`, la
+  stanza = `RELAYS_NIP46`); lo script non sa firmare da sé e controlla
+  chiave, kind, tag e firma prima di chiedere «pubblico?». Le tre
+  variabili `RELAY10002_PROVA_*` (stanza, destinazioni, chiave attesa)
+  esistono per il banco e accettano SOLO `ws://127.0.0.1:<porta>`.
+  LA RONDA DEI RELAY NOSTR (leva `RONDA_RELAY_NOSTR`, nasce spenta):
+  ogni `RONDA_NOSTR_PASSO_S` una REQ minima a ogni relay di
+  `RELAYS_VERIFICA` (il 10050 di Barattolo, limit 1: basta l'EOSE), e il
+  registro `_SCRITTURE_RELAY` che `invia_evento_relay` riempie con
+  l'esito degli eventi FIRMATI DA BARATTOLO (le buste e gli annunci dei
+  venditori no: il nostro relay li rifiuta di mestiere). Nessun evento
+  scritto per la ronda. Il giudice degli avvisi è A TEMPO
+  (`RONDA_NOSTR_GIU_S`, un'ora) e non a giri; avvisi al gruppo admin,
+  argomento Errori, una volta per guasto, e il ritorno. In collaudo la
+  lettura passa da `lettura_simulata`. Riusa dal blocco di Mostro
+  `_ronda_relay_lista`, `_ronda_relay_nome` e `_ronda_relay_fa`;
+  `_ronda_nostr_connetti` è la porta dei banchi.
+
 - IL GRUPPO DEGLI ADMIN (12 ott 2026; perché in CANTIERI, «Il gruppo
   degli admin»; la procedura in PRODUZIONE, «IL GRUPPO DEGLI ADMIN»).
   Gli avvisi DA ADMIN vanno in un gruppo Telegram privato con gli

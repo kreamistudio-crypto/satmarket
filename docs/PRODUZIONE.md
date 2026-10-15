@@ -4423,6 +4423,102 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`payment_required`, `auth_required`); i tempi su tre giri. La
   riserva misurata quella notte: `wss://nostr.oxtr.dev`.
 
+- I RELAY DI BARATTOLO: LA LISTA (`RELAY_NOSTR`) E IL KIND 10002 (15
+  ott 2026, cantiere relay-di-barattolo; perché in CANTIERI, «I relay
+  di Barattolo»). La lista dei relay dove Barattolo pubblica e legge
+  (annunci, ritiri, zap, reputazione, profili, la copia del profilo
+  P2P) è nel codice (`RELAY_DI_SERIE`) MA SUL VPS VINCE LA RIGA
+  `RELAY_NOSTR` del config (riga 84 il 15 ott, su più righe): il
+  deploy da solo non cambia niente. La lista nuova, in quest'ordine
+  (l'ordine conta: il primo è il relay suggerito ai client, i primi
+  quattro ricevono i DM di chi non ha un 10050):
+  `["wss://relay.primal.net", "wss://relay.nostr.net", "wss://nostr.oxtr.dev", "wss://nos.lol", "wss://relay.mostro.network", "wss://relay.barattolo.store"]`
+  NON si toccano qui: `AVVISO_DM_NOSTR_RELAY` (il 10050, nos.lol e
+  primal), `MOSTRO_RELAY*`, `RELAY_NOSTR_IMPORT`.
+  ⚠️ LA REGOLA DI ANDREA (13 ott 2026): sul config solo comandi che
+  stampano la riga per NOME, mai le righe intorno.
+  SUL VPS, `root@satmarket`, DOPO il deploy del codice:
+  R1) cosa c'è adesso, il solo valore (ast su quel solo assegnamento):
+      `python3 -c "import ast;t=ast.parse(open('/srv/barattolo/config.py').read());print([ast.literal_eval(n.value) for n in t.body if isinstance(n,ast.Assign) and any(getattr(x,'id',None)=='RELAY_NOSTR' for x in n.targets)])"`
+  R2) la copia: `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-dei-relay`
+  R3) la riscrittura delle SOLE righe dell'assegnamento (le trova ast,
+      anche su più righe; il resto del file non si legge a schermo):
+      ```
+      sudo python3 - <<'EOF'
+      import ast
+      p = "/srv/barattolo/config.py"
+      righe = open(p).read().split("\n")
+      a = [n for n in ast.parse("\n".join(righe)).body if isinstance(n, ast.Assign) and any(getattr(x, "id", None) == "RELAY_NOSTR" for x in n.targets)]
+      assert len(a) == 1, "RELAY_NOSTR non c'e' o c'e' due volte: mi fermo"
+      righe[a[0].lineno - 1:a[0].end_lineno] = ['RELAY_NOSTR = ["wss://relay.primal.net", "wss://relay.nostr.net", "wss://nostr.oxtr.dev", "wss://nos.lol", "wss://relay.mostro.network", "wss://relay.barattolo.store"]']
+      open(p, "w").write("\n".join(righe))
+      print("riscritte le righe", a[0].lineno, "-", a[0].end_lineno)
+      EOF
+      ```
+  R4) di nuovo R1 (deve dire la lista nuova) e il controllo:
+      `sudo -u barattolo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('config ok')"`
+  R5) `sudo systemctl restart barattolo`; il pannello «⚙️ Stato delle
+      leve» mostra la lista nuova alla voce «Relay Nostr».
+  IL KIND 10002 (NIP-65) è il biglietto con cui Barattolo dice ai
+  client DOVE scrive: la stessa lista, coi relay del 10050 senza
+  etichetta e gli altri «write». Lo firma AMBER sul telefono, account
+  Barattolo: la nsec non passa da nessuna parte. Si pubblica DOPO R5,
+  così biglietto e server dicono la stessa cosa. Dal WSL del PC (dove
+  c'è nostr-tools, in `~/wdk-prova`), un comando alla volta:
+  K1) i due file in una cartella sotto `~/wdk-prova`:
+      `mkdir -p ~/wdk-prova/relay10002 && cd ~/wdk-prova/relay10002`
+      `cp /mnt/c/Users/Andrea/Documents/GitHub/satmarket/deploy/nostr/relay-di-barattolo.mjs /mnt/c/Users/Andrea/Documents/GitHub/satmarket/vendor/qrcode.js .`
+      (dopo un `git pull` del checkout: lo script è quello di main).
+  K2) LA PROVA A SECCO, nessun relay toccato: `node relay-di-barattolo.mjs prova`
+      — una 10002 NON firmata, coi sei relay e le etichette.
+  K3) COSA C'È OGGI, in sola lettura: `node relay-di-barattolo.mjs guarda`
+      — il 15 ott: nessuna 10002 sui relay nuovi, una VECCHIA del 17
+      lug 2026 su relay.nostr.net (nostr.mom, nos.lol,
+      nostr.bitcoiner.social), il 10050 del 12 ott ovunque.
+  K4) LA FIRMA: `node relay-di-barattolo.mjs firma`
+      — stampa un QR (e sotto il link `nostrconnect://`). In Amber:
+      account BARATTOLO, approvazione MANUALE; si inquadra il QR; si
+      approva il collegamento e poi la firma del SOLO kind 10002 (è
+      l'unico permesso che lo script chiede). Lo script controlla che
+      a firmare sia stata la chiave di Barattolo, che sia una 10002
+      con la lista giusta e che la firma regga; altrimenti «NON
+      PUBBLICO» e si ferma. Poi chiede «Pubblico su 7 relay? (si/no)»:
+      `si` e Invio. Pubblica sui sei della lista e su purplepag.es
+      (dove i client cercano le 10002 altrui); ogni relay ✓ o ✗.
+  K5) il controllo: di nuovo `node relay-di-barattolo.mjs guarda` —
+      la 10002 nuova su ogni relay che l'ha presa (sostituisce la
+      vecchia: è «replaceable»). Poi in Amber si toglie l'app
+      «Barattolo — lista relay».
+  QUANDO LA LISTA CAMBIA si cambiano insieme `RELAY_DI_SERIE` (server
+  e import), `config_esempio.py` e `LISTA` dello script (una prova le
+  tiene uguali), poi R1-R5 e K1-K5.
+  Provato il 15 ott 2026: K2 e K3 dal vivo (K3 è una lettura); K4 con
+  un firmatario di cartone (`nak bunker`, chiave usa-e-getta) su un
+  relay locale, con la variabile del banco: la firma passa, la 10002
+  arriva sul relay; con una chiave diversa «NON PUBBLICO» e niente
+  sul relay. Amber vero non è provato da qui.
+
+- LA RONDA DEI RELAY NOSTR (15 ott 2026, cantiere relay-di-barattolo;
+  com'è fatta in ARCHITETTURA, «LA RONDA DEI RELAY NOSTR»). Ogni dieci
+  minuti il server chiede a ognuno dei relay di `RELAY_NOSTR` se
+  risponde (una lettura minima, nessun evento scritto sui relay
+  d'altri), e dal registro delle pubblicazioni VERE vede se un relay
+  rifiuta gli eventi di Barattolo. Un guasto che dura da un'ora arriva
+  nel gruppo degli admin, argomento Errori («⚠️ Relay Nostr di
+  Barattolo»), una volta; quando passa, il ritorno («✅ … è tornato a
+  posto»). Il journal lo dice al cambio: «🛰️ Ronda dei relay Nostr: …».
+  NASCE SPENTA, e un deploy non la accende. PER ACCENDERLA, sul VPS:
+  1) `grep -n "^RONDA_RELAY_NOSTR" /srv/barattolo/config.py` (non deve
+     esserci);
+  2) `printf '\nRONDA_RELAY_NOSTR = True\n' | sudo tee -a /srv/barattolo/config.py`
+  3) il controllo ast come in R4, e `sudo systemctl restart barattolo`;
+  4) `sudo journalctl -u barattolo --since "2 min ago" --no-pager | grep -E "Ronda dei relay Nostr|Traceback"`
+     — «🛰️ Ronda dei relay Nostr ACCESA: chiedo a …», e dopo il primo
+     giro la riga con lo stato di ogni relay.
+  PER SPEGNERLA: `RONDA_RELAY_NOSTR = False` (riscritta al suo posto
+  con `sudo sed -i 's|^RONDA_RELAY_NOSTR = .*|RONDA_RELAY_NOSTR = False|' /srv/barattolo/config.py`)
+  e riavvio.
+
 - LA BUCA DEL COORDINATORE, SUL RELAY NOSTRO (12 ott 2026, cantiere
   relay-per-mostro; perché in CANTIERI, «Il relay per Mostro»; com'è
   fatta in ARCHITETTURA, «LA BUCA DEL COORDINATORE»). Il plugin

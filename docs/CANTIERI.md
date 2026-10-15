@@ -58582,3 +58582,98 @@ tracciamento senza guardia, il giudice del nascosto sempre falso, la
 scheda che promette ancora la disputa): 23 prese.
 
 **COSA È GIRATO SU QUALE ALBERO.** Nel messaggio del commit.
+
+## I relay di Barattolo: la lista nuova, il kind 10002 con Amber e la ronda dei relay Nostr (15 ott 2026, cantiere relay-di-barattolo, richiesta di Andrea)
+
+**LA DECISIONE (Andrea, 15 ott).** Una lista di relay di Barattolo più
+robusta, 5-6 relay affidabili di gestori diversi, usata dal server
+(`RELAY_DI_SERIE` / `RELAY_NOSTR`) e pubblicata come kind 10002;
+damus fuori. Il 10050 (i DM) e i relay di Mostro e del P2P
+(`MOSTRO_RELAY*`) NON si toccano. Era il secondo e il terzo «da fare
+dopo Torino» della voce del DM fantasma, anticipati da Andrea.
+
+**COSA DICEVA IL JOURNAL (3 giorni, 13-15 ott, sul VPS, letto da
+Andrea).** Righe d'errore per relay: nostr.mom 8690, nos.lol 2576,
+relay.damus.io 1540, relay.barattolo.store 9, relay.mostro.network 4,
+relay.primal.net 1. Il config del VPS HA una sua `RELAY_NOSTR` (riga
+84, su più righe), che vince sul codice: il deploy da solo non cambia
+la lista, la cambia la riscrittura di quella riga (PRODUZIONE, «I
+RELAY DI BARATTOLO», R1-R5).
+
+**LE MISURE (da qui, sola lettura: NIP-11 e REQ, nessun evento).**
+Apertura e EOSE, mediana su tre giri: relay.barattolo.store 0,16/0,22
+s; nos.lol 0,11/0,11; relay.primal.net 0,15/0,11; relay.mostro.network
+0,33/0,10 (tiene anche kind 0, 1, 30402 di altri: non è un relay solo
+per Mostro); relay.nostr.net 0,17/0,09 (al massimo 100 eventi per
+richiesta, aveva già cento eventi nostri); nostr.oxtr.dev 0,11/0,06;
+nostr.bitcoiner.social lento (NIP-11 in 1,7 s, una REQ in timeout) e
+dello stesso gestore di offchain.pub; nostr.mom GIÙ (la connessione
+sicura si chiude subito, tre giri su tre); damus da qui rispondeva.
+Nessuno dei candidati dichiara AUTH o pagamento per scrivere.
+
+**NOS.LOL: IL 429 È NOSTRO.** Una raffica di 15 aperture di fila da
+qui: undici risposte, poi «Handshake status 429» (troppe richieste);
+primal 15 su 15. Il server apre una connessione NUOVA per ogni lettura
+e ogni pubblicazione, e a nos.lol arrivano anche l'ascolto dei DM e il
+coro di Mostro: il freno ce lo tiriamo addosso noi. Decisione: nos.lol
+RESTA (è nel 10050, è dove arrivano i DM, ed è uno dei relay più letti)
+ma non in testa — al quarto posto. Un filo lungo tenuto da qui come
+quello dei DM (polso ogni due minuti) ha retto quattro minuti.
+
+**LA LISTA (in quest'ordine).** relay.primal.net, relay.nostr.net,
+nostr.oxtr.dev, nos.lol, relay.mostro.network, relay.barattolo.store.
+Sei gestori. L'ordine conta in due punti: il primo è il relay
+suggerito nel 31990, i primi quattro ricevono i DM di chi non ha un
+10050 — il nostro relay quelle buste le rifiuta (whitelist), quindi in
+fondo. Scartati: nostr.bitcoiner.social (lento; Andrea ha scelto
+nostr.oxtr.dev al suo posto), offchain.pub (stesso gestore),
+relay.snort.social (memlay, tiene solo in memoria), purplepag.es come
+relay di lista (accetta solo i kind di profilo: resta come indice
+dove si pubblica la 10002).
+
+**IL 10002.** La stessa lista, coi due relay del 10050 senza etichetta
+(lettura e scrittura) e gli altri «write». Firma Amber via NIP-46
+(nostrconnect), il solo permesso `sign_event:10002`; lo script
+`deploy/nostr/relay-di-barattolo.mjs` non sa firmare da sé e controlla
+chiave, kind, tag e firma prima di chiedere «pubblico?». Comandi
+`prova` (a secco), `guarda` (sola lettura), `firma`. Scartato: nak
+con la nsec nel WSL (la strada del 10050, che Andrea non vuole più) e
+la firma dal server con la chiave della piattaforma (Andrea ha detto
+Amber). Trovata con `guarda`: una 10002 VECCHIA di Barattolo del 17
+lug 2026 su relay.nostr.net (nostr.mom, nos.lol,
+nostr.bitcoiner.social): la nuova la sostituisce.
+
+**LA RONDA DEI RELAY NOSTR** (leva `RONDA_RELAY_NOSTR`, spenta). Sul
+calco di quella di Mostro, senza canarino: una REQ minima ogni dieci
+minuti, e le scritture guardate da quelle vere (il registro che
+`invia_evento_relay` riempie coi soli eventi firmati da Barattolo).
+Avviso dopo un'ora di guasto, a tempo e non a giri. Scartato: un
+evento di prova sui relay d'altri (sarebbe spam a ogni giro).
+
+**PROVATO.** `prove_relay_di_barattolo` (nuova) e `prove_relay_leva`
+(emendata: i sei di serie, la sentinella della copia passa da
+nostr.mom a relay.nostr.net): verdi. La tortura: cinque mutazioni (il
+filtro delle scritture tolto, la soglia a giri, la guardia del
+collaudo tolta, il registro che rompe la consegna, nos.lol in testa),
+cinque prese. Lo script vero nel WSL: `prova` e `guarda` (lettura sui
+relay veri); `firma` con `nak bunker` come firmatario di cartone su un
+relay locale (le variabili del banco accettano solo loopback): la
+10002 firmata arriva sul relay; con una chiave diversa «NON PUBBLICO»
+e niente sul relay. Amber vero non è provato da qui.
+
+**DA FARE (notati, non fatti).**
+- Una connessione per relay riusata, invece di una per lettura: è la
+  cura vera del 429 di nos.lol.
+- `presenta_release.py` e `censimento_nostr.py` hanno liste loro, con
+  damus e nostr.mom: mestieri diversi (Zapstore, il censimento), da
+  decidere a parte.
+- Un collaudo in gabbia della ronda dei relay Nostr col server vero
+  (oggi la provano i pezzi veri nel banco di prove.py).
+- Dopo qualche giorno con la lista nuova, rifare il conteggio del
+  journal (lo stesso comando del 15 ott, in questa voce sotto) per
+  vedere se nos.lol è sceso.
+
+**IL CONTEGGIO DEL JOURNAL**, sul VPS, sola lettura (stampa solo nomi
+e numeri):
+`journalctl -u barattolo --since "3 days ago" --no-pager | grep -iE "503|timed out|timeout|handshake|ssl|non risponde|rifiut" | grep -oE "(relay\.damus\.io|nos\.lol|relay\.primal\.net|nostr\.mom|relay\.mostro\.network|relay\.barattolo\.store|relay\.nostr\.net|nostr\.oxtr\.dev)" | sort | uniq -c | sort -rn`
+(coi due relay nuovi in coda: il 15 ott non c'erano ancora).

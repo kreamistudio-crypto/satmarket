@@ -33746,10 +33746,16 @@ def _censimento(acceso, dopo=None):
               "ronda_relay_viva", "_ronda_relay_lista",
               "_ronda_relay_canarini", "_ronda_relay_guardati",
               "_ronda_relay_leve",
+              # la ronda dei relay Nostr (15 ott 2026): la quattordicesima
+              # volta, `_ronda_nostr_leve()` e i suoi due giudici — le
+              # stesse sei esplosioni lontane
+              "ronda_nostr_viva", "_ronda_nostr_guardati",
+              "_ronda_nostr_leve",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
     amb["_RONDA_RELAY"] = {"stati": {}}
+    amb["_RONDA_NOSTR"] = {"stati": {}}
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
     # nomina il timbro; a leve accese il timbro c'e', a spente no
@@ -35127,8 +35133,12 @@ def prove_relay_leva():
                 sys.modules["config"] = vecchio
         return amb, detto
 
-    QUATTRO = ["wss://relay.damus.io", "wss://nos.lol",
-               "wss://relay.primal.net", "wss://nostr.mom"]
+    # EMENDATA (15 ott 2026, cantiere «relay-di-barattolo»): erano i
+    # QUATTRO di ieri (damus, nos.lol, primal, nostr.mom); la lista di
+    # serie nuova e' di sei relay, e l'ordine conta (vedi server.py).
+    SERIE = ["wss://relay.primal.net", "wss://relay.nostr.net",
+             "wss://nostr.oxtr.dev", "wss://nos.lol",
+             "wss://relay.mostro.network", "wss://relay.barattolo.store"]
     VENDITORE = "wss://21milionidinostr.duckdns.org"
 
     # --- 1) LA REGRESSIONE, che viene prima di tutto -------------
@@ -35136,11 +35146,11 @@ def prove_relay_leva():
     # ordine: e' la sola cosa che permette di deployare la leva senza
     # toccare il config del VPS.
     amb, _ = deriva(SERVER)
-    prova("senza config il server ha i quattro di ieri",
-          QUATTRO, amb["RELAYS_VERIFICA"])
+    prova("senza config il server ha i sei di serie, in ordine",
+          SERIE, amb["RELAYS_VERIFICA"])
     amb, _ = deriva(IMPORT)
-    prova("senza config l'import ha i cinque di ieri",
-          QUATTRO + [VENDITORE], amb["RELAYS"])
+    prova("senza config l'import ha i sei di serie piu' il venditore",
+          SERIE + [VENDITORE], amb["RELAYS"])
 
     # --- 2) LA LEVA COMANDA --------------------------------------
     amb, _ = deriva(SERVER, RELAY_NOSTR=["wss://relay.barattolo.store"])
@@ -35158,12 +35168,12 @@ def prove_relay_leva():
     # smetterebbe di funzionare senza che niente lo dica.
     amb, detto = deriva(SERVER, RELAY_NOSTR=[])
     prova("lista vuota: il server torna ai relay di serie",
-          QUATTRO, amb["RELAYS_VERIFICA"])
+          SERIE, amb["RELAYS_VERIFICA"])
     prova("...e lo dice invece di tacere", True,
           any("RELAY_NOSTR" in r for r in detto))
     amb, _ = deriva(IMPORT, RELAY_NOSTR=[], RELAY_NOSTR_IMPORT=[])
     prova("lista vuota: l'import torna ai relay di serie",
-          QUATTRO, amb["RELAYS"])
+          SERIE, amb["RELAYS"])
 
     # --- 4) LE STRINGHE VUOTE NON DIVENTANO RELAY ----------------
     # Una riga rimasta a meta' nel config del VPS non deve diventare
@@ -35207,14 +35217,16 @@ def prove_relay_leva():
     # e' una copia tornata: si conta DUE, e si guarda che il secondo
     # sia proprio quello. A fare da sentinella della copia resta
     # nostr.mom, che vive solo nella lista di serie.
-    prova("wss://nostr.mom sta in un posto solo", 1,
-          _SORGENTE.count("wss://nostr.mom"))
+    # EMENDATA (15 ott 2026): nostr.mom e' uscito dalla lista di serie;
+    # la sentinella passa a relay.nostr.net, che vive solo li'.
+    prova("wss://relay.nostr.net sta in un posto solo", 1,
+          _SORGENTE.count("wss://relay.nostr.net"))
     prova("wss://relay.primal.net sta in DUE posti, e il secondo e' la "
           "lista dei relay dei DM", (2, True),
           (_SORGENTE.count("wss://relay.primal.net"),
            'AVVISO_DM_NOSTR_RELAY = ["wss://nos.lol", '
            '"wss://relay.primal.net"]' in _SORGENTE))
-    prova("in importa_nostr.py sono la lista piu' il venditore", 5,
+    prova("in importa_nostr.py sono la lista piu' il venditore", 7,
           _IMP.count("wss://"))
 
     # --- 7) IL NOME NON SI RINOMINA ------------------------------
@@ -155852,10 +155864,12 @@ def prove_canale_admin():
     # pagata che non diventa una vendita — UNO, negli errori: 72
     # chiamate, 82 punti. E il polso ha un chiamante in piu', il suo
     # rimborso uscito.)
+    # (15 ott 2026, cantiere relay-di-barattolo: la ronda dei relay Nostr
+    # di casa — UNO, negli errori: 73 chiamate, 83 punti.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 31, "moderazione": 14,
+          {"dispute": 2, "dm": 1, "errori": 32, "moderazione": 14,
            "riepiloghi": 25}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -155890,8 +155904,9 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "82 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
-          "spese di spedizione ferme e la fattura annullata pagata)", 82,
+          "83 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "spese di spedizione ferme, la fattura annullata pagata e la "
+          "ronda dei relay Nostr)", 83,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -162238,6 +162253,430 @@ def prove_notifica_porta_allo_scambio():
 
 
 
+def prove_relay_di_barattolo():
+    """I RELAY DI BARATTOLO (15 ott 2026, cantiere «relay-di-barattolo»,
+    richiesta di Andrea): la lista di serie nuova, il kind 10002 che la
+    dice ai client, e la ronda che avvisa quando uno dei relay resta giu'
+    piu' di un'ora. Tre meta', SENZA rete:
+    1) LA LISTA E' UNA in quattro posti (server, import, config
+       d'esempio, script della 10002), nell'ordine che conta;
+    2) LO SCRIPT DELLA 10002: le sue liste in pari con quelle del server,
+       e — dove c'e' nostr-tools — fatto girare a secco;
+    3) LA RONDA: i giudici puri, la lettura contro una websocket di
+       cartone, il registro delle scritture VERE, il giro intero."""
+    print("\n[i relay di Barattolo]")
+    import asyncio as _aio
+    import html as _html
+    import ipaddress as _ipa
+    import shlex
+    import shutil
+    import ssl as _ssl
+    import subprocess
+    import tempfile
+    from urllib.parse import urlparse as _urlparse
+
+    src = _SORGENTE
+    imp = open("importa_nostr.py", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    percorso = os.path.join("deploy", "nostr", "relay-di-barattolo.mjs")
+    js = open(percorso, encoding="utf-8").read()
+
+    def lista_py(testo, testa):
+        i = testo.index(testa)
+        return ast.literal_eval(testo[i + len(testa) - 1:testo.index("]", i) + 1])
+
+    def lista_js(nome):
+        i = js.index(f"const {nome} = [")
+        return re.findall(r"'(wss://[^']+)'", js[i:js.index("]", i)])
+
+    # ================================================================
+    # 1) LA LISTA
+    # ================================================================
+    SERIE = lista_py(src, "RELAY_DI_SERIE = [")
+    prova("la lista e' UNA: server, import, config d'esempio e kind 10002 "
+          "dicono gli stessi relay nello stesso ordine", [SERIE] * 3,
+          [lista_py(imp, "RELAY_DI_SERIE = ["),
+           lista_py(esempio, "RELAY_NOSTR = ["), lista_js("LISTA")])
+    prova("sei relay, nessuno due volte, e sei gestori diversi (un "
+          "dominio a testa)", (6, 6),
+          (len(SERIE), len({".".join(_urlparse(r).hostname.split(".")[-2:])
+                            for r in SERIE})))
+    prova("damus (503 a ogni ora) e nostr.mom (giu') sono fuori", [],
+          [r for r in SERIE if "damus" in r or "nostr.mom" in r])
+    prova("L'ORDINE: il primo (il relay suggerito nel 31990) non e' "
+          "nos.lol, che frena con un 429; il nostro relay sta fuori dai "
+          "primi quattro (dove vanno i DM di chi non ha un 10050: lui le "
+          "buste le rifiuta)", (True, False),
+          (SERIE[0] != "wss://nos.lol",
+           "wss://relay.barattolo.store" in SERIE[:4]))
+    prova("...ed e' cosi' che il server li usa: il 31990 prende il primo, "
+          "il ripiego dei DM i primi quattro", (True, True),
+          ("RELAYS_VERIFICA[0]]" in codice(pezzo("tag_client")),
+           "relays[:4]" in codice(pezzo("relay_dm_di"))))
+
+    # ================================================================
+    # 2) LO SCRIPT DELLA 10002
+    # ================================================================
+    dm = ast.literal_eval(re.search(
+        r'\n    AVVISO_DM_NOSTR_RELAY = (\[[^\]]*\])', src).group(1))
+    prova("le etichette: senza (lettura e scrittura) i relay dei DM, gli "
+          "stessi del 10050; e stanno nella lista", (dm, True),
+          (lista_js("LEGGE"), all(r in SERIE for r in dm)))
+    prova("la stanza del NIP-46 e' quella del login QR (RELAYS_NIP46)",
+          lista_py(src, "RELAYS_NIP46 = ["), lista_js("STANZA"))
+    prova("la chiave e' la npub di Barattolo, quella del 10050 "
+          "(PRODUZIONE, «IL KIND 10050»)", True,
+          "const NPUB = 'npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy'"
+          in js)
+    cjs = "\n".join(r for r in js.split("\n") if not r.strip().startswith("//"))
+    prova("NESSUNA NSEC: lo script non firma da se' (niente finalizeEvent), "
+          "non legge chiavi dall'ambiente, e la sola chiave che nasce e' "
+          "quella usa-e-getta della stanza", (False, False, 2),
+          ("finalizeEvent" in cjs, bool(re.search(r"process\.env\.\w*(SEC|NSEC|KEY)", cjs)),
+           cjs.count("generateSecretKey(")))
+    prova("prima di pubblicare: firmato da Barattolo, kind 10002, i tag "
+          "chiesti, la firma che regge; poi la domanda «si'»", True,
+          all(x in cjs for x in ("ev.pubkey !== HEX", "ev.kind !== KIND",
+                                 "JSON.stringify(ev.tags) !== JSON.stringify(attesa.tags)",
+                                 "!verifyEvent(ev)", "if (si !== 'si')"))
+          and cjs.index("controlla(ev, attesa)") < cjs.index("relay.publish(ev)")
+          and cjs.index("if (si !== 'si')") < cjs.index("relay.publish(ev)"))
+    prova("Amber firma il SOLO kind 10002: e' l'unico permesso chiesto",
+          True, "perms: [`sign_event:${KIND}`]" in cjs and "const KIND = 10002" in cjs)
+    prova("le tre variabili del banco si spostano SOLO su un relay di "
+          "loopback", 2, cjs.count("soloLoopback('RELAY10002_PROVA_"))
+
+    # --- lo script VERO, a secco, dove c'e' nostr-tools (il calco di
+    # prove_annuncio_identita: la copia sta SOTTO una cartella con
+    # node_modules, o nel WSL)
+    def ha_nostr_tools(cartella):
+        return cartella and os.path.isdir(
+            os.path.join(cartella, "node_modules", "nostr-tools"))
+    node = shutil.which("node")
+    QUI = os.path.dirname(os.path.abspath(__file__))
+    base = next((c for c in (os.environ.get("IDENTITA_NODE_MODULES"), QUI,
+                             os.path.expanduser("~/wdk-prova"))
+                 if node and ha_nostr_tools(c)), None)
+    wsl = shutil.which("wsl.exe") if sys.platform == "win32" else None
+    esegui, pulizia = None, []
+    if base:
+        cartella = tempfile.mkdtemp(prefix=".prove-10002-", dir=base)
+        shutil.copy(percorso, os.path.join(cartella, "relay-di-barattolo.mjs"))
+        pulizia.append(lambda: shutil.rmtree(cartella, ignore_errors=True))
+
+        def esegui(args, env_piu=None):
+            env = dict(os.environ, **(env_piu or {}))
+            r = subprocess.run([node, "relay-di-barattolo.mjs", *args],
+                               cwd=cartella, capture_output=True, text=True,
+                               encoding="utf-8", env=env, timeout=60)
+            return r.returncode, r.stdout, r.stderr
+    elif wsl:
+        def wslpath(p):
+            p = os.path.abspath(p).replace("\\", "/")
+            return re.sub(r"^([A-Za-z]):", lambda m: "/mnt/" + m.group(1).lower(), p)
+
+        def nel_wsl(script):
+            return subprocess.run([wsl, "-e", "bash", "-c", script],
+                                  capture_output=True, text=True,
+                                  encoding="utf-8", timeout=90)
+        cartella = f"~/wdk-prova/.prove-10002-{os.getpid()}"
+        pronto = nel_wsl(
+            f"test -d ~/wdk-prova/node_modules/nostr-tools && mkdir -p {cartella}"
+            f" && cp {shlex.quote(wslpath(percorso))} {cartella}/ && echo si")
+        if "si" in pronto.stdout:
+            pulizia.append(lambda: nel_wsl(f"rm -rf {cartella}"))
+
+            def esegui(args, env_piu=None):
+                piu = " ".join(f"{k}={shlex.quote(v)}"
+                               for k, v in (env_piu or {}).items())
+                r = nel_wsl(f"source ~/.nvm/nvm.sh >/dev/null 2>&1; cd {cartella} && "
+                            f"{piu} node relay-di-barattolo.mjs "
+                            + " ".join(shlex.quote(a) for a in args))
+                return r.returncode, r.stdout, r.stderr
+    if esegui is None:
+        salta("lo script vero della 10002, a secco",
+              "nostr-tools non c'e' (ne' IDENTITA_NODE_MODULES, ne' ~/wdk-prova, ne' il WSL)")
+    else:
+        try:
+            rc, out, err = esegui(["prova"])
+            ev = json.loads(out) if rc == 0 else {}
+            prova("lo script VERO, a secco: una 10002 NON firmata (niente id, "
+                  "niente sig), della chiave di Barattolo, con la lista e le "
+                  "etichette", (0, 10002, False, True, "",
+                                [["r", r] if r in dm else ["r", r, "write"]
+                                 for r in SERIE]),
+                  (rc, ev.get("kind"), "sig" in ev or "id" in ev,
+                   str(ev.get("pubkey", "")).startswith("2e7afe3f"),
+                   ev.get("content"), ev.get("tags")))
+            rifiuti = [esegui(["prova"], {v: "wss://nos.lol"})[0]
+                       for v in ("RELAY10002_PROVA_DOVE", "RELAY10002_PROVA_STANZA")]
+            prova("...una variabile del banco verso un relay vero si rifiuta, "
+                  "e senza comando lo script non fa niente", ([1, 1], 1),
+                  (rifiuti, esegui([])[0]))
+        finally:
+            for p in pulizia:
+                p()
+
+    # ================================================================
+    # 3) LA RONDA
+    # ================================================================
+    i = src.index("# ---------- LA RONDA DEI RELAY NOSTR DI CASA")
+    blocco = src[i:src.index(
+        "# (Qui finisce il blocco della ronda dei relay Nostr.)", i)]
+    prova("la leva nasce SPENTA nel codice, e la ronda NON scrive sui "
+          "relay d'altri (nessun EVENT nel blocco)", (True, False),
+          ("    from config import RONDA_RELAY_NOSTR\nexcept ImportError:\n"
+           "    RONDA_RELAY_NOSTR = False\n" in blocco,
+           '"EVENT"' in codice(blocco)))
+    prova("...e nel config d'esempio sta spenta", True,
+          "\nRONDA_RELAY_NOSTR = False\n" in esempio)
+    prova("la soglia e' l'ora di Andrea, a tempo e non a giri",
+          ("600", "3600"),
+          (re.search(r"\nRONDA_NOSTR_PASSO_S = (\d+)", blocco).group(1),
+           re.search(r"\nRONDA_NOSTR_GIU_S = (\d+)", blocco).group(1)))
+    prova("il pannello delle leve la mostra", True,
+          "*_ronda_nostr_leve()," in codice(pezzo("_leve_stato")))
+
+    class _App:
+        def on_event(self, _):
+            return lambda f: f
+
+    class Ws:
+        """La websocket di cartone, il calco di quella della ronda di
+        Mostro: un copione per relay; senza copione il relay non apre."""
+        aperte, mandati, chiuse, copioni = [], [], [], {}
+
+        def __init__(self, relay, timeout=None, sslopt=None):
+            Ws.aperte.append(relay)
+            if relay not in Ws.copioni:
+                raise ConnectionRefusedError("relay di cartone spento")
+            self.relay, self.coda = relay, []
+
+        def send(self, s):
+            Ws.mandati.append((self.relay, json.loads(s)))
+            self.coda += [json.dumps(x)
+                          for x in Ws.copioni[self.relay](json.loads(s))]
+
+        def recv(self):
+            if not self.coda:
+                raise TimeoutError("timed out")
+            return self.coda.pop(0)
+
+        def close(self):
+            Ws.chiuse.append(self.relay)
+
+    AVVISI = []
+
+    async def _avvisa(testo, bottone=None, argomento=""):
+        AVVISI.append((testo, argomento))
+
+    def ultimo():
+        return AVVISI[-1] if AVVISI else ("", "")
+
+    PIATTA = "2e" * 32
+    A, B, VERO = ("ws://127.0.0.1:7821", "ws://127.0.0.1:7822",
+                  "wss://relay.vero.example")
+    amb = {"app": _App(), "create_connection": Ws, "asyncio": _aio,
+           "html": _html, "json": json, "ssl": _ssl, "time": time,
+           "ipaddress": _ipa, "urlparse": _urlparse,
+           "_NOSTR": (object(), PIATTA), "RELAYS_VERIFICA": [A, " " + B, A, ""],
+           "MODALITA_COLLAUDO": False, "_LETTURE_SIMULATE": set(),
+           "notifica_admin": _avvisa}
+    for f in ("relay_di_casa", "lettura_simulata", "_leva", "_elenco",
+              "_ronda_relay_lista", "_ronda_relay_nome", "_ronda_relay_fa",
+              "_segna_scrittura_relay"):
+        exec(pezzo(f), amb)
+    amb["_SCRITTURE_RELAY"] = {}
+    exec(blocco.replace("    from config import RONDA_RELAY_NOSTR\n",
+                        "    raise ImportError\n"), amb)
+    R = lambda nome: amb["_ronda_nostr_" + nome]
+    prova("senza config: leva spenta e ronda non viva", (False, False),
+          (amb["RONDA_RELAY_NOSTR"], amb["ronda_nostr_viva"]()))
+    amb["RONDA_RELAY_NOSTR"] = True
+    prova("accesa: viva; guarda i relay di RELAY_NOSTR, ripuliti", (True, [A, B]),
+          (amb["ronda_nostr_viva"](), R("guardati")()))
+
+    # --- la lettura ---
+    def risponde(fine="EOSE"):
+        return lambda msg: ([[fine, msg[1]]] if msg[0] == "REQ" else [])
+    Ws.copioni = {A: risponde(), B: risponde("CLOSED"),
+                  "ws://127.0.0.1:7823": lambda msg: [["NOTICE", "aspetta"]] * 3}
+    amb["RONDA_NOSTR_TETTO_S"] = 0.3
+    prova("la lettura: l'EOSE basta (anche vuoto), e la domanda e' il "
+          "10050 di Barattolo, limit 1",
+          ("ok", ["REQ", "ronda", {"kinds": [10050], "limit": 1,
+                                   "authors": [PIATTA]}]),
+          (R("leggi")(A), Ws.mandati[-1][1]))
+    prova("...un relay che chiude la domanda, uno che parla e non "
+          "finisce, uno che non apre", ["chiuso", "giu", "giu"],
+          [R("leggi")(r) for r in (B, "ws://127.0.0.1:7823", "ws://127.0.0.1:7899")])
+    prova("...e ogni connessione aperta si chiude, anche quando va male",
+          sorted(r for r in Ws.aperte if r in Ws.copioni), sorted(Ws.chiuse))
+    amb["MODALITA_COLLAUDO"] = True
+    Ws.aperte.clear()
+    Ws.copioni[VERO] = risponde()
+    prova("IN COLLAUDO verso un relay vero: nessuna connessione, e il "
+          "giudice non lo conta come guasto", ("simulato", [], ""),
+          (R("leggi")(VERO), list(Ws.aperte), R("male")("lettura", "simulato")))
+    prova("...verso un relay di casa si bussa", "ok", R("leggi")(A))
+    amb["MODALITA_COLLAUDO"] = False
+
+    # --- il registro delle scritture vere ---
+    segna = amb["_segna_scrittura_relay"]
+    nostro = {"id": "1" * 64, "pubkey": PIATTA, "kind": 30402}
+    segna(A, {"pubkey": "f" * 64}, False, "blocked: not in whitelist")
+    segna(A, "non un evento", False, "x")
+    prova("il registro conta SOLO gli eventi firmati da Barattolo: la "
+          "busta usa-e-getta o l'annuncio di un venditore rifiutati non "
+          "fanno suonare niente", {}, dict(amb["_SCRITTURE_RELAY"]))
+    segna(A, nostro, False, "blocked: <b>kind</b> " + "x" * 300)
+    V = amb["_SCRITTURE_RELAY"][A]
+    primo_no = V["no_da"]
+    segna(A, nostro, False, "ancora no")
+    prova("...un no si ricorda dal PRIMO no dopo l'ultimo si', con le "
+          "parole del relay tagliate a 120", (True, primo_no, "ancora no"),
+          (primo_no > 0, V["no_da"], V["detto"]))
+    prova("...e il giudice lo dice passando da html.escape",
+          ["rifiuta i nostri eventi («blocked: &lt;b&gt;x»)",
+           "rifiuta i nostri eventi", ""],
+          [R("male")("scrittura", "ok", {"no_da": 1, "detto": "blocked: <b>x"}),
+           R("male")("scrittura", "ok", {"no_da": 1, "detto": ""}),
+           R("male")("scrittura", "ok", None)])
+    segna(A, nostro, True)
+    prova("...un si' azzera il no", (0.0, ""), (V["no_da"], V["detto"]))
+    prova("il giudice della lettura", ["", "", "rifiuta le letture",
+                                       "non risponde", "non risponde"],
+          [R("male")("lettura", s) for s in ("ok", "simulato", "chiuso", "muto", "giu")])
+
+    # --- invia_evento_relay VERO segna l'esito, e il suo ritorno non cambia
+    amb_inv = {"create_connection": Ws, "json": json, "ssl": _ssl,
+               "time": time, "_segna_scrittura_relay": segna}
+    exec(pezzo("invia_evento_relay"), amb_inv)
+    Ws.copioni = {A: lambda m: [["OK", m[1]["id"], False, "rate-limited: piano"]]
+                  if m[0] == "EVENT" else [],
+                  B: lambda m: [["OK", m[1]["id"], True, ""]] if m[0] == "EVENT" else []}
+    amb["_SCRITTURE_RELAY"].clear()
+    prova("invia_evento_relay VERO: l'OK del relay resta il ritorno, e "
+          "l'esito finisce nel registro (il no con le sue parole)",
+          (False, True, "rate-limited: piano", 0.0),
+          (amb_inv["invia_evento_relay"](A, nostro),
+           amb_inv["invia_evento_relay"](B, nostro),
+           amb["_SCRITTURE_RELAY"][A]["detto"], amb["_SCRITTURE_RELAY"][B]["no_da"]))
+    amb_inv["_segna_scrittura_relay"] = None      # il registro che esplode
+    prova("...e un registro che esplode non tocca la consegna", True,
+          amb_inv["invia_evento_relay"](B, nostro))
+    amb["_SCRITTURE_RELAY"].clear()
+
+    # --- il giudice degli avvisi: a tempo ---
+    S = {"voci": {}}
+    t0 = 1000.0
+    giri = [R("decidi")(S, [(A, "lettura", "non risponde")], t0 + 600 * n)
+            for n in range(8)]
+    prova("giu' per meno di un'ora non e' una notizia; a un'ora si', una "
+          "volta sola", ([([], [])] * 6, [(A, "lettura", "non risponde", 3600.0)],
+                         ([], [])),
+          (giri[:6], giri[6][0], giri[7]))
+    prova("...il ritorno si dice, con quanto e' durato", ([], [(A, "lettura", 4800.0)]),
+          R("decidi")(S, [(A, "lettura", "")], t0 + 4800))
+    prova("...un guasto mai detto non ha un ritorno da dire", ([], []),
+          (lambda S2: (R("decidi")(S2, [(A, "lettura", "x")], 1.0),
+                       R("decidi")(S2, [(A, "lettura", "")], 2.0))[1])({"voci": {}}))
+    testo = R("testo")([(A, "lettura", "non risponde", 3700.0),
+                        ("wss://relay.<i>x</i>.example", "scrittura",
+                         "rifiuta i nostri eventi", 7300.0)],
+                       [(B, "scrittura", 2400.0)])
+    prova("l'avviso: uno per giro, col relay senza `wss://`, da quanto, "
+          "cosa comporta, e i ritorni",
+          ["⚠️ <b>Relay Nostr di Barattolo</b>",
+           "• <code>127.0.0.1:7821</code> non risponde (da 61 min)",
+           "• <code>relay.&lt;i&gt;x&lt;/i&gt;.example</code> rifiuta i nostri "
+           "eventi (da 2 h)",
+           "Finché dura, annunci, zap e profili hanno una strada in meno: "
+           "gli altri relay della lista restano.",
+           "✅ <code>127.0.0.1:7822</code> accetta di nuovo i nostri eventi "
+           "(dopo 40 min)"],
+          testo.split("\n"))
+
+    # --- il giro intero, con la lettura di copione ---
+    copione = {}
+    orologio = [time.time()]
+    amb["_ronda_nostr_leggi"] = lambda r: copione.get(r, "ok")
+
+    class _Tempo:
+        @staticmethod
+        def time():
+            return orologio[0]
+    vero_time = amb["time"]
+    amb["time"] = _Tempo
+    stampato = []
+    amb["print"] = lambda *a, **k: stampato.append(" ".join(map(str, a)))
+
+    def giro_():
+        _aio.run(amb["_ronda_nostr_giro"]())
+        orologio[0] += 600
+    giro_()
+    prova("il primo giro: tutto a posto, nessun avviso, una riga nel journal",
+          ([], 1, "🛰️ Ronda dei relay Nostr: 127.0.0.1:7821: a posto · "
+                  "127.0.0.1:7822: a posto"),
+          (AVVISI, len(stampato), stampato[-1]))
+    copione[A] = "giu"
+    for _ in range(6):
+        giro_()
+    prova("A giu': il journal lo dice subito, i moderatori dopo un'ora, "
+          "in Errori", (2, 0), (len(stampato), len(AVVISI)))
+    giro_()
+    prova("...al settimo giro (un'ora intera) parte l'avviso", (1, "errori", True),
+          (len(AVVISI), ultimo()[1],
+           "<code>127.0.0.1:7821</code> non risponde (da 60 min)" in ultimo()[0]))
+    segna(B, nostro, False, "pow: difficulty 20")
+    giro_()
+    giro_()
+    prova("...finche' dura non lo ripete; B che rifiuta i nostri eventi "
+          "si vede nel pannello subito", (1, "rifiuta i nostri eventi "
+                                             "(«pow: difficulty 20»)"),
+          (len(AVVISI), _html.unescape(amb["_RONDA_NOSTR"]["stati"][B])))
+    copione.pop(A)
+    segna(B, nostro, True)
+    giro_()
+    prova("...quando tornano, arriva il ritorno di A (B non era mai stato "
+          "detto: niente)", (2, True, False),
+          (len(AVVISI), "✅ <code>127.0.0.1:7821</code> è tornato a posto"
+           in ultimo()[0], "7822" in ultimo()[0]))
+    leve = {v["chiave"]: v for v in amb["_ronda_nostr_leve"]()}
+    prova("il pannello mostra la leva viva con lo stato dell'ultimo giro",
+          (True, True), (leve["RONDA_RELAY_NOSTR"]["valore"],
+                         "127.0.0.1:7821: a posto" in leve["RONDA_RELAY_NOSTR"]["nota"]))
+    amb["time"] = vero_time
+    del amb["print"]
+    prova("in tutto quel che il giro ha stampato ci sono i relay e lo stato",
+          True, all(r.startswith("🛰️ Ronda dei relay Nostr: ") for r in stampato))
+
+    # --- l'orologio non muore ---
+    async def _una_volta():
+        colpi = []
+
+        async def _rotto():
+            colpi.append(1)
+            if len(colpi) == 1:
+                raise RuntimeError("boom")
+            raise _aio.CancelledError()
+        amb["_ronda_nostr_giro"] = _rotto
+        amb["RONDA_NOSTR_PASSO_S"] = 0
+        try:
+            await amb["orologio_ronda_nostr"]()
+        except _aio.CancelledError:
+            pass
+        return len(colpi)
+    stampato.clear()
+    amb["print"] = lambda *a, **k: stampato.append(" ".join(map(str, a)))
+    colpi = _aio.run(_una_volta())
+    del amb["print"]
+    prova("l'orologio: un giro che esplode lascia partire il prossimo, e "
+          "nel journal va il NOME dell'errore e basta", (2, True, False),
+          (colpi, "giro saltato (RuntimeError)" in "".join(stampato),
+           "boom" in "".join(stampato)))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -162306,7 +162745,7 @@ def main():
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
               prove_podio_riepilogo, prove_vetrina_negozio,
-              prove_vetrina_canale, prove_relay_leva,
+              prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,

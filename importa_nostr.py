@@ -74,7 +74,8 @@ MAX_FOTO_BYTES = 3_000_000           # oltre ~3 MB la foto resta un URL
 # basta: tenerli separati e' quel che permette di aggiungere il relay
 # di un venditore senza mandargli anche i nostri eventi.
 # Il config e' il VALORE DI PARTENZA: senza quelle righe valgono i
-# cinque di sempre, cioe' il mondo di ieri.
+# relay di serie, gli stessi del server (la lista del 15 ott 2026: il
+# perche' sta accanto a quella di server.py).
 # ⚠️ IL CONFIG SI LEGGE DENTRO UN try, come NPUB_VENDITORE qui sopra:
 # questo modulo dev'essere lanciabile a mano su un Barattolo piu'
 # VECCHIO, dove quelle righe non ci sono (la lezione di
@@ -85,10 +86,12 @@ MAX_FOTO_BYTES = 3_000_000           # oltre ~3 MB la foto resta un URL
 # — nel default e nel fail-safe — perche' due copie divergono al
 # primo ritocco, che e' il difetto che questo cantiere toglie.
 RELAY_DI_SERIE = [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
     "wss://relay.primal.net",
-    "wss://nostr.mom",
+    "wss://relay.nostr.net",
+    "wss://nostr.oxtr.dev",
+    "wss://nos.lol",
+    "wss://relay.mostro.network",
+    "wss://relay.barattolo.store",
 ]
 try:
     from config import RELAY_NOSTR
