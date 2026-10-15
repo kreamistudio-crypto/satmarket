@@ -11476,6 +11476,21 @@ document.getElementById('cartello')?.remove();</script>
           <div id="p2pMieiTesta"></div>
         </div>
       </div>
+      <!-- LO SCAMBIO DELL'AVVISO CHE QUI NON C'E' (13 ott 2026, cantiere
+           notifica-porta-allo-scambio): chi tocca «⚡ Apri lo scambio»
+           sotto un avviso del bot e quello scambio fra i suoi non c'e'
+           piu' — tolto, chiuso da tempo, o di un altro account — resta
+           su «I miei scambi», e questa riga gli dice perche' non si e'
+           aperto niente. Una frase sola per tutti i casi: non dice
+           niente degli scambi di un altro. Markup fisso, la sorella di
+           `#p2pOrdineSparito` del libro; la accende e la spegne
+           `scambioSparitoP2P`, e sta FUORI da quel che `renderP2P`
+           riscrive. -->
+      <div class="p2p-box p2p-sparito" id="p2pScambioSparito" role="status" hidden>
+        <div><b>Questo scambio non è fra i tuoi</b>
+          È stato tolto o chiuso da tempo, oppure è di un altro account. Qui sotto trovi i tuoi scambi.</div>
+        <button type="button" class="order-x" aria-label="Chiudi l'avviso" onclick="scambioSparitoP2P(false)">✕</button>
+      </div>
       <!-- LA STRISCIA DEI MODERATORI (28 set 2026): vuota per tutti gli
            altri; la riempie renderStrisciaModP2P -->
       <div id="p2pModStriscia"></div>
@@ -74700,6 +74715,51 @@ function entraDaDettaglioP2P(){
 }
 /* ============ fine del «Condividi» di un ordine ============ */
 
+/* ============ LA NOTIFICA PORTA ALLO SCAMBIO (13 ott 2026) =========
+   «⚡ Apri lo scambio» sotto un avviso del bot arriva qui come
+   `/p2p?scambio=<id>` (dentro Telegram passando da `startapp`, vedi
+   `arrivoDaStartapp`), e `apriP2PDaUrl` lo da' alla porta di sempre,
+   `apriOrdineP2P`: se la riga su QUESTA memoria c'e', la pagina dello
+   scambio e' gia' aperta e qui non resta niente da fare.
+   MA LA MEMORIA DELLA MINI APP NON E' QUELLA DEL BROWSER: lo scambio
+   preso dall'app installata, nella Mini App che il bottone apre puo'
+   non esserci ancora — e fino a ieri si restava su «I miei scambi» in
+   silenzio, a cercarselo. Adesso si chiede all'ARCHIVIO DEL SERVER
+   (`chiediScambiServerP2P`: i MIEI scambi, con la sessione e senza
+   niente nella domanda — non esiste la sintassi per chiedere quelli di
+   un altro), la riga nasce con l'adozione di sempre, e si apre.
+   SE NON NASCE — tolto con la ✕, chiuso da tempo, o di un altro
+   account — si resta su «I miei scambi» con la riga gentile. UNA frase
+   per tutti i casi: distinguere «non c'e' piu'» da «non e' tuo»
+   direbbe a chiunque abbia un id se quello scambio esiste.
+   ⚠️ IL NO SI DICE SOLO SU UNA PAROLA FRESCA (la regola dell'ordine
+   condiviso): se il server non risponde non si dice niente, e si resta
+   sulla pagina com'e' — dire «non e' fra i tuoi» a rete giu' sarebbe
+   una bugia a chi lo sta facendo.
+   UN BLOCCO SUO, fuori dal motore (che non ha dentro nessuna fetch).
+   Torna una parola per chi la prova: `aperto` | `fuori` | `muto` |
+   `altrove` | `nato` | `sparito`. */
+function scambioSparitoP2P(mostra){
+  const s = el('p2pScambioSparito');
+  if (s) s.hidden = !mostra;
+}
+async function cercaScambioDaAvvisoP2P(id){
+  if (ordiniP2P()[id]) return 'aperto';
+  if (DEMO || VETRINA || !myTgId) return 'fuori';
+  let fresca = false;
+  try { fresca = await chiediScambiServerP2P(); } catch(e) {}
+  if (!fresca) return 'muto';
+  try { adottaScambiServerP2P(ordiniP2P()); applicaToltiP2P(); } catch(e) {}
+  /* nel frattempo si e' andati altrove: non si apre niente sopra
+     un'altra pagina, e non si lascia un avviso per dopo */
+  if (vistaAttivaP2P() !== 'view-p2pmiei') return 'altrove';
+  if (ordiniP2P()[id]) { apriOrdineP2P(id); return 'nato'; }
+  scambioSparitoP2P(true);
+  renderP2P();
+  return 'sparito';
+}
+/* ============ fine della notifica che porta allo scambio ============ */
+
 /* ============ I VOLTI SUL LIBRO (set 2026, decisione di Andrea) ====
    Le card mostrano chi ha pubblicato, con la faccia che quella persona
    gia' mostra nel mercatino. Due mezze rotte: una scrive «questi
@@ -79483,6 +79543,11 @@ function apriP2PDaUrl(){
      d'apertura puo' scendere */
   arrivoP2PFatto();
   if (pausa) apriPausaP2P();
+  /* ...e lo scambio dell'avviso che su questa memoria non c'e' ancora
+     (13 ott 2026): `apriOrdineP2P` ha gia' portato a «I miei scambi», e
+     qui lo si chiede all'archivio — si apre, o lo dice la riga gentile */
+  if (P2P_SCAMBIO_URL && p2pAcceso() && typeof cercaScambioDaAvvisoP2P === 'function')
+    cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL).catch(() => {});
 }
 
 /* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo

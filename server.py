@@ -15553,6 +15553,21 @@ def _link_esplora_telegram(url) -> str:
     return f"{TELEGRAM_MINIAPP_LINK}?startapp={p}" if p else str(url or "")
 
 
+def _bottoni_avviso(bottone) -> list:
+    """PURA: i bottoni di un avviso come LISTA di coppie `(etichetta,
+    indirizzo)`, uno per riga, dall'alto in basso. Chi passa una coppia
+    sola — tutti, fino al 13 ott 2026 — ne ha uno; chi passa una LISTA
+    di coppie li ha tutti, nell'ordine in cui li ha scritti (i due sotto
+    «hanno preso il tuo ordine»: lo scambio sopra, la pausa sotto).
+    Niente, o una forma storta, vale nessun bottone: un bottone in meno
+    non ferma mai un avviso."""
+    if not bottone:
+        return []
+    righe = bottone if isinstance(bottone, list) else [bottone]
+    return [(str(b[0]), str(b[1])) for b in righe
+            if isinstance(b, (tuple, list)) and len(b) == 2 and b[0] and b[1]]
+
+
 async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     """Il ramo Telegram di notifica(): il messaggio via bot (l'utente
     deve averlo avviato almeno una volta), simulato nel collaudo.
@@ -15561,7 +15576,8 @@ async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     coppia `(etichetta, indirizzo)` o niente: un bottone SOTTO il
     messaggio. E' un LINK e non un `web_app`, la regola di
     `_riga_webapp`: il link funziona ovunque. Senza, il messaggio parte
-    com'e' sempre partito.
+    com'e' sempre partito. (13 ott 2026) Puo' essere anche una LISTA di
+    coppie, un bottone per riga: il giudice e' `_bottoni_avviso`.
 
     LA RETE DI SICUREZZA DELL'HTML (ago 2026): le notifiche nascono coi
     tag di Telegram e dentro ci finisce testo di chi vende e di chi
@@ -15613,17 +15629,18 @@ async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
     # solo qui — questo e' il ramo Telegram, il DM Nostr tiene l'indirizzo
     # del sito. A leva spenta, o con un indirizzo che non si traduce,
     # `_link_dentro_telegram` lo rende com'e' arrivato.
-    if bottone:
-        bottone = (bottone[0], _link_dentro_telegram(bottone[1]))
+    # (13 ott 2026) uno o piu' bottoni, uno per riga: `_bottoni_avviso`
+    bottoni = ([(b[0], _link_dentro_telegram(b[1])) for b in _bottoni_avviso(bottone)]
+               if bottone else [])
     if MODALITA_COLLAUDO:
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}"
-              + (f" [bottone «{bottone[0]}» → {bottone[1]}]" if bottone else ""))
+              + "".join(f" [bottone «{b[0]}» → {b[1]}]" for b in bottoni))
         return "simulata (collaudo)"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     dati = {"chat_id": tg_id, "text": testo, "parse_mode": "HTML"}
-    if bottone:
-        dati["reply_markup"] = {"inline_keyboard": [[
-            {"text": str(bottone[0]), "url": str(bottone[1])}]]}
+    if bottoni:
+        dati["reply_markup"] = {"inline_keyboard": [
+            [{"text": b[0], "url": b[1]}] for b in bottoni]}
     # IL CODICE DI TRACCIAMENTO CLICCABILE (25 set 2026): un link a
     # @trackbot si porterebbe dietro la scheda d'anteprima del bot
     # sotto l'avviso. Il link e' il codice stesso, e basta lui: la
@@ -15698,7 +15715,7 @@ async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int,
     try:
         ok = await manda_dm_nostr(
             npub_to_hex(npub), spoglia_html(testo)
-            + (f"\n\n{bottone[0]}: {bottone[1]}" if bottone else ""))
+            + "".join(f"\n\n{b[0]}: {b[1]}" for b in _bottoni_avviso(bottone)))
     except Exception as e:
         print(f"⚠️ DM Nostr saltato: {e}")
         ok = False
@@ -47697,6 +47714,37 @@ def _bottone_pausa_p2p(con, ev: dict, fatto: dict, tg_id):
     return (P2P_BOTTONE_PAUSA, URL_PUBBLICO + P2P_PAUSA_INDIRIZZO)
 
 
+# --- LA NOTIFICA PORTA ALLO SCAMBIO (13 ott 2026, richiesta di Andrea) ---
+# Fino a ieri «⚡ Apri lo scambio» stava sotto i soli avvisi che lo
+# nominano (il promemoria, i solleciti, il messaggio in chat): quelli dei
+# PASSAGGI — preso, sats bloccati, euro inviati, liberati, disputa… —
+# partivano nudi, e chi li riceveva apriva Barattolo dal menu del bot,
+# cioe' sulla home. Adesso ogni avviso che parla di UNO scambio a una
+# delle sue due parti porta il bottone di quello scambio.
+# NEL LINK VIAGGIA SOLO L'ID DELL'ORDINE, che e' pubblico (il `d` del
+# 38383): niente di chi lo apre. Che sia SUO lo guarda la pagina, con la
+# sessione, chiedendo al server i propri scambi (`/api/p2p/scambi`: non
+# esiste la sintassi per chiedere quelli di un altro).
+# AI MODERATORI NO: i loro avvisi hanno la loro pagina, e al gruppo degli
+# admin `_recapita_p2p` un bottone non lo passa mai.
+def _bottone_scambio_p2p(ordine) -> tuple:
+    """PURA: `(etichetta, indirizzo)` di «⚡ Apri lo scambio» per QUELLO
+    scambio. L'indirizzo e' quello del sito: a tradurlo nel link che apre
+    la Mini App e' il trasporto (`_link_dentro_telegram`), e nel DM Nostr
+    resta com'e'."""
+    return (P2P_BOTTONE_SCAMBIO, f"{LINK_LIBRO_P2P}?scambio={ordine}")
+
+
+def _bottoni_evento_p2p(ordine, avvisi: list, pausa: dict = None) -> dict:
+    """PURA: i bottoni sotto l'avviso di un passaggio, per ogni PARTE
+    avvisata: `{tg_id: bottone}`. A tutti «⚡ Apri lo scambio»; a chi ha
+    gia' il bottone della pausa (chi ha pubblicato, alla presa) una LISTA
+    di due — lo scambio sopra, la pausa sotto (decisione di Andrea)."""
+    scambio = _bottone_scambio_p2p(ordine)
+    return {tg: ([scambio, pausa[tg]] if (pausa or {}).get(tg) else scambio)
+            for tg, _ in avvisi}
+
+
 def _tocca_a_chi_pubblica_p2p(con, ordine: str, tg_id) -> bool:
     """Questa persona, su quest'ordine, e' CHI L'HA PUBBLICATO? Dal posto
     che mostrod ha dato alle parti (`p2p_scambi`). Pura sulla
@@ -50329,7 +50377,14 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
                   flush=True)
         return {"ok": True}
     try:
-        esito = await notifica(a_chi, testo)
+        # (13 ott 2026, notifica-porta-allo-scambio) a chi compra «tocca
+        # a te»: sotto, il bottone che lo porta a QUELLO scambio. Solo
+        # con un id nella forma di sempre; sennò l'avviso parte nudo
+        o_avviso = (d or {}).get("ordine")
+        if isinstance(o_avviso, str) and FORMA_ORDINE_P2P.fullmatch(o_avviso):
+            esito = await notifica(a_chi, testo, _bottone_scambio_p2p(o_avviso))
+        else:
+            esito = await notifica(a_chi, testo)
     except Exception as e:
         esito = f"SALTATO ({type(e).__name__}: {e})"
     print(f"💶 Recapito P2P: {user['id']} ha indicato dove ricevere gli "
@@ -53395,12 +53450,15 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                       f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
                       "parla il libro (nel log del nodo: barattolo_eventi)",
                       flush=True)
-        if (r["fonte"] in ("promemoria", "sollecito", "sollecito_euro", "recensione",
-                           "sollecito_recapito")
-                and bottoni is not None):
+        if bottoni is not None:
             # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
             # compra — portano il bottone: dicono «dalla pagina dello
             # scambio», e il bottone ce li porta)
+            # (13 ott 2026, notifica-porta-allo-scambio) ...E ADESSO OGNI
+            # ATTESA, anche «Sats in pagamento» a chi vende e il passaggio
+            # che racconta il libro quando il coordinatore tace: parlano
+            # tutte di UNO scambio a una delle sue due parti, e la
+            # condizione sulla fonte se n'e' andata
             # l'ordine e' un id pubblico del libro (il `d` del 38383):
             # nell'indirizzo non viaggia niente di chi lo apre
             bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO,
@@ -54559,13 +54617,18 @@ def _timbra_garanzia_p2p(con, ordine: str, momento: str, giro: int, tg_id: int,
         (ordine, momento, giro, int(tg_id), adesso, fonte)).rowcount)
 
 
-def _garanzie_lunghe_p2p(con, adesso: int) -> list:
+def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:
     """Le garanzie lunghe di adesso: chi avvisare e con che frase. Pura
     sulla connessione; SCRIVE i timbri (e fa commit) prima di tornare,
     cosi' quel che torna e' gia' «detto». Torna una lista di
     `(tg_id, testo, riga_del_journal)`. Le righe dei salti (avvisi
     spenti, fuori tempo, livello superato) le stampa qui, una volta
-    sola: il timbro le spegne ai giri dopo."""
+    sola: il timbro le spegne ai giri dopo.
+    `bottoni` (13 ott 2026, notifica-porta-allo-scambio) e' un dizionario
+    che chi chiama PRESTA, il patto di `_scarica_attese_p2p`: qui si
+    riempie, per il posto in lista di ogni avviso A UNA PARTE, col
+    bottone di quello scambio. Quelli ai moderatori no. La lista resta
+    di terne: chi non presta niente non vede cambiare niente."""
     fuori = []
     righe = con.execute(
         "SELECT s.ordine, s.giro, s.compratore, s.venditore, MIN(m.quando) AS garanzia "
@@ -54623,6 +54686,8 @@ def _garanzie_lunghe_p2p(con, adesso: int) -> list:
                     continue
                 if _timbra_garanzia_p2p(con, ordine, "garanzia48", giro, chi,
                                         adesso, "garanzia"):
+                    if bottoni is not None:
+                        bottoni[len(fuori)] = _bottone_scambio_p2p(ordine)
                     fuori.append((chi, _testo_garanzia_parte_p2p(
                         ruolo, bool(fiat_il), bool(disputa_il), cifra, modo),
                         f"⏰ Garanzia lunga P2P: {corto} 48h → {chi} ({ruolo}; {stato})"))
@@ -54676,13 +54741,16 @@ async def _giro_garanzie_p2p():
         return
     adesso = int(time.time())
     con = db()
+    # (13 ott 2026) il bottone dello scambio sotto l'avviso alle PARTI:
+    # il giudice riempie il dizionario per posto, ai moderatori niente
+    bottoni = {}
     try:
-        avvisi = _garanzie_lunghe_p2p(con, adesso)
+        avvisi = _garanzie_lunghe_p2p(con, adesso, bottoni)
     finally:
         con.close()
-    for tg_id, testo, riga in avvisi:
+    for posto, (tg_id, testo, riga) in enumerate(avvisi):
         try:
-            esito = await _recapita_p2p(tg_id, testo)
+            esito = await _recapita_p2p(tg_id, testo, bottone=bottoni.get(posto))
             print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",
                   flush=True)
         except Exception as e:
@@ -58605,6 +58673,15 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
                 bottoni = {tg: _bottone_pausa_p2p(con, ev, fatto, tg) for tg, _ in avvisi}
             except Exception:
                 bottoni = {}
+            # ...E SOTTO OGNI AVVISO ALLE PARTI «⚡ APRI LO SCAMBIO» (13 ott
+            # 2026, cantiere notifica-porta-allo-scambio): il tocco porta
+            # alla pagina di QUESTO scambio, dove c'e' il gesto da fare.
+            # Sopra la pausa, dove c'e'. Anche questo sulle sole parti, e
+            # un guasto lascia i bottoni com'erano: mai l'avviso in meno
+            try:
+                bottoni = _bottoni_evento_p2p(ev["ordine"], avvisi, bottoni)
+            except Exception:
+                pass
             # ...e la riga del PARACADUTE (13 ott 2026), sotto l'avviso
             # della presa a chi ha pubblicato: prima dei moderatori, che
             # non la vedono. Un guasto toglie la riga, mai l'avviso

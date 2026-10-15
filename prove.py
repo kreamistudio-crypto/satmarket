@@ -55320,6 +55320,8 @@ def prove_link_dentro_telegram():
         exec(blocco_leva, amb)
         exec(pezzo("_startapp_da_link"), amb)
         exec(pezzo("_link_dentro_telegram"), amb)
+        # (13 ott 2026) il trasporto legge i bottoni dal loro giudice
+        exec(pezzo("_bottoni_avviso"), amb)
         return amb
     S = server(BOT)
     sp, ld = S["_startapp_da_link"], S["_link_dentro_telegram"]
@@ -55403,14 +55405,17 @@ def prove_link_dentro_telegram():
     dm = pezzo("_dm_nostr_con_ripiego")
     prova("IL DM NOSTR TIENE L'INDIRIZZO DEL SITO: la riga in coda non passa dalla traduzione",
           [True, False],
-          ['(f"\\n\\n{bottone[0]}: {bottone[1]}" if bottone else "")' in dm,
+          # (13 ott 2026, notifica-porta-allo-scambio) una riga per OGNI bottone
+          ['"".join(f"\\n\\n{b[0]}: {b[1]}" for b in _bottoni_avviso(bottone))' in dm,
            "_link_dentro_telegram" in dm])
     prova("la traduzione ha TRE chiamanti: il bottone del ramo Telegram, lo stesso "
           "bottone nel gruppo degli admin (12 ott 2026) e il link di testo "
           "dell'avviso dei nuovi ordini", [3, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
            '"url": str(_link_dentro_telegram(bottone[1]))' in pezzo("_al_gruppo_admin"),
-           "_link_dentro_telegram(bottone[1])" in pezzo("_manda_telegram"),
+           # (13 ott 2026) uno o piu' bottoni: ognuno passa dalla traduzione
+           "(b[0], _link_dentro_telegram(b[1])) for b in _bottoni_avviso(bottone)"
+           in pezzo("_manda_telegram"),
            "_link_dentro_telegram(URL_PUBBLICO + '/p2p')" in pezzo("_testo_avviso_nuovi_p2p")])
 
     # ---------------- 3bis) I LINK DI TESTO E LA RIGA DELLE TASTIERE ------
@@ -98218,7 +98223,8 @@ def prove_p2p_orologio():
         """Un PROCESSO NUOVO: memoria vergine, stesso disco."""
         detto, mandati = [], []
 
-        async def _notifica(tg_id, testo):
+        # (13 ott 2026, notifica-porta-allo-scambio) ogni attesa porta il bottone dello scambio: la notifica di cartone lo accetta
+        async def _notifica(tg_id, testo, bottone=None):
             mandati.append((tg_id, testo))
 
         amb = {"asyncio": _aio, "time": time, "html": _html, "json": json,
@@ -98263,6 +98269,7 @@ def prove_p2p_orologio():
                "_fee_di_p2p": lambda c, chi, fee: fee}
         _m = src.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
         exec(src[_m:src.index("}\n", _m) + 2], amb)
+        amb.update({"P2P_BOTTONE_SCAMBIO": "⚡ Apri lo scambio", "LINK_LIBRO_P2P": "https://barattolo.store/p2p"})
         for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
             _i = src.index("\n" + _riga) + 1
             exec(src[_i:src.index("\n", _i)], amb)
@@ -98513,7 +98520,8 @@ def prove_p2p_tutti_i_relay():
 
     detto, mandati = [], []
 
-    async def _notifica(tg_id, testo):
+    # (13 ott 2026, notifica-porta-allo-scambio) ogni attesa porta il bottone dello scambio: la notifica di cartone lo accetta
+    async def _notifica(tg_id, testo, bottone=None):
         mandati.append((tg_id, testo))
         return "cartone"
 
@@ -98548,6 +98556,7 @@ def prove_p2p_tutti_i_relay():
            "_fee_di_p2p": lambda c, chi, fee: fee}
     _m = src.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(src[_m:src.index("}\n", _m) + 2], amb)
+    amb.update({"P2P_BOTTONE_SCAMBIO": "⚡ Apri lo scambio", "LINK_LIBRO_P2P": "https://barattolo.store/p2p"})
     for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
         _i = src.index("\n" + _riga) + 1
         exec(src[_i:src.index("\n", _i)], amb)
@@ -99142,7 +99151,8 @@ def prove_p2p_ascolto():
         chiesto.append(("libro", time.time()))
         return [dict(e) for e in sui_relay["libro"] if e["id"] in ids and e["quando"] >= since]
 
-    async def _notifica(tg_id, testo):
+    # (13 ott 2026, notifica-porta-allo-scambio) ogni attesa porta il bottone dello scambio: la notifica di cartone lo accetta
+    async def _notifica(tg_id, testo, bottone=None):
         mandati.append((tg_id, testo))
         return "cartone"
 
@@ -99186,6 +99196,7 @@ def prove_p2p_ascolto():
                     "\nP2P_IN_PAGAMENTO_TESTI = {"):
         _m = src.index(_blocco) + 1
         exec(src[_m:src.index("}\n", _m) + 2], amb6)
+        amb6.update({"P2P_BOTTONE_SCAMBIO": "⚡ Apri lo scambio", "LINK_LIBRO_P2P": "https://barattolo.store/p2p"})
         for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
             _i = src.index("\n" + _riga) + 1
             exec(src[_i:src.index("\n", _i)], amb6)
@@ -143900,12 +143911,15 @@ def prove_garanzia_lunga():
     giro = pezzo("_giro_garanzie_p2p")
     prova("ogni avviso mandato lascia una riga nel journal", True,
           'print(f"{riga}: mandato ({esito})" if esito else f"{riga}: mandato",' in giro
-          and "esito = await _recapita_p2p(tg_id, testo)" in giro)
+          # (13 ott 2026, notifica-porta-allo-scambio) col bottone dello scambio
+          # sotto l'avviso alle parti, per posto in lista
+          and "esito = await _recapita_p2p(tg_id, testo, bottone=bottoni.get(posto))" in giro)
     gl = pezzo("_garanzie_lunghe_p2p")
     prova("il timbro si scrive PRIMA dell'invio: il giudice lo scrive e fa commit, "
           "e il giro manda dopo", [True, True],
           ["INSERT OR IGNORE INTO p2p_avvisi" in pezzo("_timbra_garanzia_p2p"),
-           giro.index("_garanzie_lunghe_p2p(con, adesso)") < giro.index("await _recapita_p2p(")])
+           giro.index("_garanzie_lunghe_p2p(con, adesso, bottoni)")
+           < giro.index("await _recapita_p2p(")])
     prova("i moderatori NON guardano l'interruttore: solo le parti lo guardano", 1,
           codice(gl).count("_avvisi_p2p_accesi("))
 
@@ -147537,6 +147551,8 @@ def prove_promemoria_gesto():
     exec(_SORGENTE[_i:_SORGENTE.index("\n\n\ndef _startapp_da_link(", _i)], amb_t)
     exec(pezzo("_startapp_da_link"), amb_t)
     exec(pezzo("_link_dentro_telegram"), amb_t)
+    # (13 ott 2026) il trasporto legge i bottoni dal loro giudice
+    exec(pezzo("_bottoni_avviso"), amb_t)
     exec("async " + pezzo("_manda_telegram"), amb_t)
     bott = ("⚡ Apri lo scambio", "https://barattolo.store/p2p?scambio=abc")
     _aio.run(amb_t["_manda_telegram"](111, "⏳ <b>Restano</b>", bott))
@@ -147585,7 +147601,8 @@ def prove_promemoria_gesto():
           sorted(visti))
     dm_src = pezzo("_dm_nostr_con_ripiego")
     prova("nel DM, che e' testo puro, il bottone diventa una riga in coda", True,
-          'f"\\n\\n{bottone[0]}: {bottone[1]}" if bottone else ""' in dm_src)
+          # (13 ott 2026, notifica-porta-allo-scambio) una riga per OGNI bottone
+          '"".join(f"\\n\\n{b[0]}: {b[1]}" for b in _bottoni_avviso(bottone))' in dm_src)
 
     # --- 7) LA PAGINA: il conto alla rovescia sopra il bottone ----------
     rend = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
@@ -149356,9 +149373,11 @@ def prove_solleciti_p2p():
     # (emendata il 10 ott 2026, feedback-p2p: il bottone lo porta anche il
     # promemoria della recensione; e la sera, recapito-e-riga: anche il
     # sollecito del recapito a chi vende)
+    # (emendata il 13 ott 2026, notifica-porta-allo-scambio: lo porta OGNI
+    # attesa, la condizione sulla fonte se n'e' andata)
     prova("i solleciti portano il bottone dello scambio, come il promemoria", True,
-          'r["fonte"] in ("promemoria", "sollecito", "sollecito_euro", "recensione",\n'
-          '                           "sollecito_recapito")' in att)
+          "        if bottoni is not None:\n"
+          "            bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO," in att)
     ev_p = pezzo("_avvisi_evento_p2p")
     prova("i solleciti del PayCode nascono ancora dov'erano, e li' non e' entrato "
           "nient'altro", [1, False],
@@ -149893,7 +149912,9 @@ def prove_feedback_p2p():
            < att.index("INSERT OR IGNORE INTO p2p_avvisi"),
            "try:\n                perche = _promemoria_recensione_p2p_fermo(con, r)" in att,
            # (emendata la sera del 10 ott 2026: in coda c'e' il sollecito del recapito)
-           'r["fonte"] in ("promemoria", "sollecito", "sollecito_euro", "recensione",' in att])
+           # (e il 13 ott 2026, notifica-porta-allo-scambio: lo porta OGNI attesa)
+           "        if bottoni is not None:\n"
+           "            bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO," in att])
     fermo = codice(_senza_prosa(pezzo("_promemoria_recensione_p2p_fermo")))
     prova("i giudici del promemoria sono quelli della rotta che la recensione la scrive",
           [True, True, True],
@@ -161188,6 +161209,396 @@ def prove_backfill_annullo_venditore():
           ["annullato il venditore" in testo, "rimborso" in testo])
 
 
+def prove_notifica_porta_allo_scambio():
+    """LA NOTIFICA PORTA ALLO SCAMBIO (13 ott 2026, cantiere
+    notifica-porta-allo-scambio, richiesta di Andrea): gli avvisi dei
+    PASSAGGI di uno scambio P2P — preso, sats bloccati, euro inviati,
+    liberati, disputa… — partivano senza bottone, e chi li riceveva
+    apriva Barattolo dal menu del bot, cioe' sulla home. Adesso ogni
+    avviso che parla di UNO scambio a una delle sue due parti porta
+    «⚡ Apri lo scambio», e la pagina apre QUELLO scambio anche sulla
+    memoria che non l'ha mai visto.
+
+    Quel che qui si rompe in silenzio: un avviso alle parti che resta
+    nudo; il bottone che finisce sotto l'avviso dei moderatori nel
+    gruppo; i due bottoni della presa nell'ordine sbagliato, o la pausa
+    che sparisce; un guasto del bottone che si porta via l'avviso; nel
+    link qualcosa di piu' dell'id; la pagina che apre un altro scambio,
+    o che dice «non e' fra i tuoi» a rete giu', o che lo dice a chi lo
+    sta facendo perche' la riga doveva ancora nascere."""
+    print("\n[la notifica porta allo scambio: il bottone sotto ogni avviso, la pagina che lo apre]")
+    import asyncio as _aio
+    import json as _j
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    BASE = "https://barattolo.store"
+    BOT = "https://t.me/ilbarattolobot"
+    ID = "7b1f0c9e-3a52-4d7e-9c1a-5e2f8a4b6c3d"
+    SCAMBIO = ("⚡ Apri lo scambio", BASE + "/p2p?scambio=" + ID)
+    PAUSA = ("⏸ Imposta la pausa", BASE + "/p2p?pausa=1")
+
+    # --- 1) I GIUDICI PURI ---------------------------------------------------
+    i = src.index("STARTAPP_MAX = 64")
+    amb = {"re": re, "URL_PUBBLICO": BASE, "TELEGRAM_MINIAPP_LINK": BOT,
+           "LINK_LIBRO_P2P": BASE + "/p2p", "P2P_BOTTONE_SCAMBIO": "⚡ Apri lo scambio"}
+    exec(src[i:src.index("\n\n\ndef _startapp_da_link(", i)], amb)
+    for f in ("_startapp_da_link", "_link_dentro_telegram", "_bottoni_avviso",
+              "_bottone_scambio_p2p", "_bottoni_evento_p2p"):
+        exec(pezzo(f), amb)
+    ba, bs, be = amb["_bottoni_avviso"], amb["_bottone_scambio_p2p"], amb["_bottoni_evento_p2p"]
+    prova("l'etichetta e' quella di sempre: una sola in tutto il P2P",
+          ['P2P_BOTTONE_SCAMBIO = "⚡ Apri lo scambio"'],
+          re.findall(r'^P2P_BOTTONE_SCAMBIO = .*$', src, re.M))
+    prova("IL BOTTONE DELLO SCAMBIO: l'etichetta di sempre e l'indirizzo di QUELLO scambio",
+          SCAMBIO, bs(ID))
+    prova("...NEL LINK SOLO L'ID: dentro Telegram `scambio_<id>` e nient'altro, fuori "
+          "l'indirizzo del sito con la sola domanda `scambio`",
+          [BOT + "?startapp=scambio_" + ID, True],
+          [amb["_link_dentro_telegram"](bs(ID)[1]),
+           bool(re.fullmatch(re.escape(BASE) + r"/p2p\?scambio=[0-9a-zA-Z-]{8,64}", bs(ID)[1]))])
+    prova("UNO O PIU' BOTTONI: niente = nessuno, una coppia = uno (com'era), una lista = "
+          "tutti, nell'ordine scritto",
+          [[], [], [SCAMBIO], [SCAMBIO, PAUSA]],
+          [ba(None), ba(()), ba(SCAMBIO), ba([SCAMBIO, PAUSA])])
+    prova("...una forma storta vale un bottone in meno, mai un errore",
+          [[], [SCAMBIO], [], []],
+          [ba("ciao"), ba([SCAMBIO, None, ("solo",), ("", "x")]), ba(7), ba([("a", "")])])
+    prova("SOTTO UN PASSAGGIO: a ogni parte avvisata il bottone dello scambio",
+          {111: SCAMBIO, 222: SCAMBIO}, be(ID, [(111, "a"), (222, "b")], {}))
+    prova("...a chi ha gia' la pausa (chi ha pubblicato, alla presa) DUE, lo scambio sopra "
+          "e la pausa sotto; all'altro uno",
+          {111: SCAMBIO, 222: [SCAMBIO, PAUSA]},
+          be(ID, [(111, "a"), (222, "b")], {111: None, 222: PAUSA}))
+    prova("...nessuno avvisato, nessun bottone (e senza il dizionario della pausa non cade)",
+          [{}, {111: SCAMBIO}], [be(ID, [], {222: PAUSA}), be(ID, [(111, "a")], None)])
+
+    # --- 2) IL TRASPORTO: due bottoni, due righe -----------------------------
+    def manda(collaudo, bottone, leva=BOT):
+        mandati, righe = [], []
+
+        class Cliente:
+            def __init__(self, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None):
+                mandati.append(json)
+                return type("R", (), {"status_code": 200,
+                                      "text": '{"result": {"message_id": 1}}'})()
+        a = dict(amb)
+        a.update({"httpx": type("H", (), {"AsyncClient": Cliente}), "json": _j,
+                  "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": collaudo,
+                  "TELEGRAM_MINIAPP_LINK": leva,
+                  "TRACKBOT_START": "https://t.me/trackbot?start=",
+                  "spoglia_html": lambda t: t,
+                  "print": lambda *x, **k: righe.append(" ".join(str(y) for y in x))})
+        for f in ("_startapp_da_link", "_link_dentro_telegram", "_bottoni_avviso"):
+            exec(pezzo(f), a)
+        exec("async " + pezzo("_manda_telegram"), a)
+        _aio.run(a["_manda_telegram"](222, "⚡ <b>Hanno preso il tuo ordine</b>",
+                                      *([bottone] if bottone else [])))
+        return mandati, righe
+    due, _r = manda(False, [SCAMBIO, PAUSA])
+    prova("IL TRASPORTO: due bottoni = due RIGHE, lo scambio sopra e la pausa sotto, "
+          "tutti e due tradotti nel link che apre la Mini App",
+          {"inline_keyboard": [
+              [{"text": "⚡ Apri lo scambio", "url": BOT + "?startapp=scambio_" + ID}],
+              [{"text": "⏸ Imposta la pausa", "url": BOT + "?startapp=pausa"}]]},
+          due[0].get("reply_markup"))
+    prova("...restano bottoni `url`, mai `web_app` (la regola di _riga_webapp)", False,
+          "web_app" in _j.dumps(due[0]))
+    uno, _r = manda(False, SCAMBIO)
+    prova("...una coppia sola parte com'e' sempre partita: una riga, un bottone",
+          {"inline_keyboard": [[{"text": "⚡ Apri lo scambio",
+                                 "url": BOT + "?startapp=scambio_" + ID}]]},
+          uno[0].get("reply_markup"))
+    nudo_, _r = manda(False, None)
+    prova("...e senza bottone nessuna tastiera", False, "reply_markup" in nudo_[0])
+    spenta, _r = manda(False, [SCAMBIO, PAUSA], leva="")
+    prova("...a leva del link spenta i due indirizzi sono quelli del sito",
+          [SCAMBIO[1], PAUSA[1]],
+          [r[0]["url"] for r in spenta[0]["reply_markup"]["inline_keyboard"]])
+    _m, righe = manda(True, [SCAMBIO, PAUSA])
+    prova("...in collaudo non esce niente, e la riga simulata dice TUTTI E DUE i bottoni, "
+          "nell'ordine",
+          [[], True],
+          [_m, f"[bottone «⚡ Apri lo scambio» → {BOT}?startapp=scambio_{ID}] "
+               f"[bottone «⏸ Imposta la pausa» → {BOT}?startapp=pausa]" in righe[0]])
+    dm_detti = []
+
+    async def _dm_finto(dest, testo):
+        dm_detti.append(testo)
+        return True
+    a = dict(amb)
+    a.update({"manda_dm_nostr": _dm_finto, "npub_to_hex": lambda n: "ab" * 32,
+              "spoglia_html": lambda t: t})
+    exec(pezzo("_bottoni_avviso"), a)
+    exec("async " + pezzo("_dm_nostr_con_ripiego"), a)
+    _aio.run(a["_dm_nostr_con_ripiego"]("npub1x", "Preso", 0, [SCAMBIO, PAUSA]))
+    _aio.run(a["_dm_nostr_con_ripiego"]("npub1x", "Preso", 0, SCAMBIO))
+    _aio.run(a["_dm_nostr_con_ripiego"]("npub1x", "Preso", 0))
+    prova("NEL DM NOSTR i bottoni sono righe in coda, con l'indirizzo del SITO (non si "
+          "traducono): due, una, nessuna",
+          ["Preso\n\n⚡ Apri lo scambio: " + SCAMBIO[1] + "\n\n⏸ Imposta la pausa: " + PAUSA[1],
+           "Preso\n\n⚡ Apri lo scambio: " + SCAMBIO[1], "Preso"], dm_detti)
+
+    # --- 3) L'INVIO DEI PASSAGGI, ESEGUITO -----------------------------------
+    def invia(momento, parti, mod, pausa=None, rompi=False):
+        consegnati = []
+
+        class Con:
+            def close(self):
+                pass
+
+        async def recapita(tg, testo, tranne=0, bottone=None):
+            consegnati.append((tg, bottone))
+            return "ok"
+
+        async def respiro(o):
+            return None
+
+        async def dormi(s):
+            return None
+
+        def rotto(*x, **k):
+            raise RuntimeError("giudice inciampato")
+        a = dict(amb)
+        exec(pezzo("_bottone_scambio_p2p"), a)
+        exec(pezzo("_bottoni_evento_p2p"), a)
+        if rompi:
+            a["_bottoni_evento_p2p"] = rotto
+        a.update({
+            "_respiro_presa_p2p": respiro, "db": lambda: Con(), "time": time,
+            "_avvisi_evento_p2p": lambda con, ev, fatto, adesso: list(parti),
+            "_bottone_pausa_p2p": lambda con, ev, fatto, tg: (pausa or {}).get(tg),
+            "_riga_paracadute_presa_p2p": lambda avvisi, fatto: avvisi,
+            "_disputa_evento_p2p": lambda con, ev, fatto, adesso: list(mod),
+            "P2P_PRESENZA_MOMENTI_CHIUSI": (), "_P2P_SVEGLIA": {"ev": None},
+            "P2P_RISERVA_S": 60, "_recapita_p2p": recapita,
+            "_esiti_p2p_dice": lambda *x: None, "print": lambda *x, **k: None,
+            "asyncio": type("A", (), {"sleep": staticmethod(dormi)})})
+        exec("async " + pezzo("_manda_evento_p2p"), a)
+        _aio.run(a["_manda_evento_p2p"](
+            {"ordine": ID, "dettaglio": "", "attore": "buyer", "azione": "x"},
+            {"momento": momento, "giro": 1}))
+        return consegnati
+    prova("UN PASSAGGIO (sats bloccati): alle due parti l'avviso COL bottone di quello scambio",
+          [(111, SCAMBIO), (222, SCAMBIO)],
+          invia("garanzia_pagata", [(111, "a"), (222, "b")], []))
+    prova("...LA PRESA: a chi ha pubblicato DUE bottoni (scambio sopra, pausa sotto), a "
+          "chi ha preso il solo scambio",
+          [(111, SCAMBIO), (222, [SCAMBIO, PAUSA])],
+          invia("preso", [(111, "a"), (222, "b")], [], pausa={222: PAUSA}))
+    prova("...LA DISPUTA: alle parti si', al gruppo dei moderatori NO",
+          [(111, SCAMBIO), (222, SCAMBIO), (-100777, None)],
+          invia("disputa", [(111, "a"), (222, "b")], [(-100777, "⚖️ per i moderatori")]))
+    prova("...un avviso ai soli moderatori non porta niente",
+          [(999, None)], invia("disputa", [], [(999, "⚖️")]))
+    prova("...e UN GUASTO DEL BOTTONE NON TOGLIE L'AVVISO: parte lo stesso, coi bottoni "
+          "che c'erano (la pausa a chi l'aveva)",
+          [(111, None), (222, PAUSA)],
+          invia("preso", [(111, "a"), (222, "b")], [], pausa={222: PAUSA}, rompi=True))
+    invio = codice(pezzo("_manda_evento_p2p"))
+    prova("i bottoni si decidono SULLE PARTI, prima dei moderatori, e dentro un `try`",
+          [True, True],
+          [0 < invio.find("bottoni = {tg: _bottone_pausa_p2p(")
+           < invio.find('bottoni = _bottoni_evento_p2p(ev["ordine"], avvisi, bottoni)')
+           < invio.find("avvisi = avvisi + _disputa_evento_p2p("),
+           bool(re.search(r'try:\s+bottoni = _bottoni_evento_p2p\(ev\["ordine"\], avvisi, '
+                          r'bottoni\)\s+except Exception:\s+pass', invio))])
+    prova("...e al gruppo degli admin `_recapita_p2p` un bottone non lo passa mai",
+          [True, False],
+          ["return await notifica(tg_id, testo, *([bottone] if bottone else []))"
+           in pezzo("_recapita_p2p"),
+           "bottone" in codice(pezzo("_recapita_p2p")).split("_al_gruppo_admin(", 1)[1]])
+
+    # --- 4) GLI ALTRI AVVISI ALLE PARTI --------------------------------------
+    att = codice(pezzo("_scarica_attese_p2p"))
+    prova("LE ATTESE: oltre a promemoria e solleciti, anche «Sats in pagamento» e il "
+          "passaggio raccontato dal libro portano il bottone — cioe' tutte: la condizione "
+          "sulla fonte non c'e' piu'",
+          [True, False],
+          [bool(re.search(r'\n        if bottoni is not None:\s+bottoni\[len\(fuori\)\] = '
+                          r'\(P2P_BOTTONE_SCAMBIO,\s+f"\{LINK_LIBRO_P2P\}\?scambio='
+                          r"\{r\['ordine'\]\}\"\)\s+fuori\.append\(", att)),
+           "and bottoni is not None" in att])
+    rec = codice(pezzo("recapito_p2p"))
+    prova("IL RECAPITO DEGLI EURO, a chi compra: col bottone, e solo con un id nella forma "
+          "di sempre (sennò parte nudo, mai un errore)",
+          [True, True],
+          [bool(re.search(r"if isinstance\(o_avviso, str\) and FORMA_ORDINE_P2P\.fullmatch"
+                          r"\(o_avviso\):\s+esito = await notifica\(a_chi, testo, "
+                          r"_bottone_scambio_p2p\(o_avviso\)\)\s+else:\s+esito = await "
+                          r"notifica\(a_chi, testo\)", rec)),
+           rec.index("o_avviso = (d or {}).get(\"ordine\")") > rec.index("if not a_chi:")])
+    gl = codice(pezzo("_garanzie_lunghe_p2p"))
+    giro = codice(pezzo("_giro_garanzie_p2p"))
+    prova("LA GARANZIA LUNGA: il bottone sotto l'avviso alle PARTI (48 ore), per posto in "
+          "lista; sotto quello dei moderatori no",
+          [1, True, True, True],
+          [gl.count("_bottone_scambio_p2p("),
+           gl.index("bottoni[len(fuori)] = _bottone_scambio_p2p(ordine)")
+           < gl.index("for mod in _avvisati_mod_p2p():"),
+           "avvisi = _garanzie_lunghe_p2p(con, adesso, bottoni)" in giro,
+           "esito = await _recapita_p2p(tg_id, testo, bottone=bottoni.get(posto))" in giro])
+    prova("...e chi non presta il dizionario non vede cambiare niente (la firma ha un "
+          "default)", True,
+          "def _garanzie_lunghe_p2p(con, adesso: int, bottoni: dict = None) -> list:" in src)
+    sc = pezzo("scambi_p2p")
+    prova("CHE SIA TUO LO GUARDA LA PAGINA COL SERVER: la rotta degli scambi vuole la "
+          "sessione, non ha corpo ne' id nell'indirizzo, e risponde solo di chi chiede",
+          [True, False, True],
+          ["user = verifica_utente(x_tg_init_data, barattolo_sessione)" in sc,
+           "req" in sc.split('"""', 1)[0],
+           '_scambi_p2p(con, user["id"], int(time.time()))' in sc])
+
+    # --- 5) LA PAGINA --------------------------------------------------------
+    riga = mini[mini.index('id="p2pScambioSparito"') - 60:]
+    riga = riga[:riga.index("</button>")]
+    testo = re.sub(r"<[^>]+>", " ", riga.split(">", 1)[1])
+    testo = " ".join(testo.split())
+    vista = mini[mini.index('<div class="view" id="view-p2pmiei">'):]
+    vista = vista[:vista.index('<div class="view" id="view-p2pinfo">')]
+    prova("LA RIGA GENTILE sta in «I miei scambi», nasce nascosta, e' uno `status` e ha "
+          "la sua ✕",
+          [True, True, True, True],
+          ['id="p2pScambioSparito"' in vista,
+           '<div class="p2p-box p2p-sparito" id="p2pScambioSparito" role="status" hidden>' in mini,
+           'onclick="scambioSparitoP2P(false)"' in riga,
+           mini.count('id="p2pScambioSparito"') == 1])
+    prova("...FUORI da quel che il render riscrive (prima della lista), o il primo "
+          "ridisegno se la porterebbe via",
+          True, 0 < vista.index('id="p2pScambioSparito"') < vista.index('id="p2pMieiCorpo"')
+          and vista.index('id="p2pScambioSparito"') > vista.index('id="p2pMieiTesta"'))
+    prova("...UNA frase per tutti i casi, corta, senza «errore» e senza dire se lo "
+          "scambio esiste",
+          [True, True, False, False],
+          [testo.startswith("Questo scambio non è fra i tuoi"), len(testo) <= 150,
+           "errore" in testo.lower(), "non esiste" in testo.lower()])
+    porta_js = _fn_js(mini, "function apriP2PDaUrl(){")
+    prova("LA PORTA: lo scambio dell'indirizzo passa prima dalla porta di sempre, poi — a "
+          "velo sceso — dalla ricerca nell'archivio, e solo a leva accesa",
+          [True, True],
+          [0 < porta_js.index("apriOrdineP2P(P2P_SCAMBIO_URL);")
+           < porta_js.index("arrivoP2PFatto();\n  if (pausa) apriPausaP2P();")
+           < porta_js.index("cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL)"),
+           "if (P2P_SCAMBIO_URL && p2pAcceso() && typeof cercaScambioDaAvvisoP2P === "
+           "'function')\n    cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL).catch(() => {});"
+           in porta_js])
+    cerca = _senza_commenti_js(_fn_js(mini, "async function cercaScambioDaAvvisoP2P(id){"))
+    prova("LA RICERCA non manda l'id a nessuno: chiede i PROPRI scambi, senza argomenti, "
+          "e dentro non c'e' nessuna fetch",
+          [True, False, False],
+          ["await chiediScambiServerP2P()" in cerca, "fetch(" in cerca, "location" in cerca])
+    banco = (
+        "let visto = [], ordini = {}, server = {}, tolti = [], rete = true, chieste = 0;\n"
+        "let vista = '', DEMO = false, VETRINA = false, myTgId = 111, acceso = true, vaVia = false;\n"
+        "let P2P_URL = ['/p2p'], P2P_SCAMBIO_URL = '', P2P_ORDINE_URL = '', P2P_PAUSA_URL = false;\n"
+        "let p2pApertoDaUrl = false, p2pCondivisoInVolo = false;\n"
+        "const nodi = {p2pScambioSparito: {hidden: true}};\n"
+        "const el = id => nodi[id] || null;\n"
+        "const p2pAcceso = () => acceso;\n"
+        "const ordiniP2P = () => ordini;\n"
+        "const vistaAttivaP2P = () => vista;\n"
+        "function vaiP2P(){ vista = 'view-p2p'; }\n"
+        "function arrivoP2PFatto(){ visto.push('velo'); }\n"
+        "function renderP2P(){ visto.push('render'); }\n"
+        # la porta di sempre, com'e' in pagina: senza riga porta ai miei scambi
+        "function apriOrdineP2P(id){ if (!ordini[id]) { vista = 'view-p2pmiei'; visto.push('miei'); return; }\n"
+        "  vista = 'view-p2pordine'; visto.push('apre:' + id); }\n"
+        "async function chiediScambiServerP2P(){ chieste++; await new Promise(r => setTimeout(r, 5));\n"
+        "  if (vaVia) vista = 'view-esplora'; return rete; }\n"
+        "function adottaScambiServerP2P(loc){ for (const k in server) if (!loc[k]) loc[k] = server[k]; }\n"
+        "function applicaToltiP2P(){ tolti.forEach(k => { delete ordini[k]; }); }\n"
+        + _fn_js(mini, "function scambioSparitoP2P(mostra){")
+        + _fn_js(mini, "async function cercaScambioDaAvvisoP2P(id){")
+        + porta_js + r"""
+(async () => {
+  const R = {};
+  const A = 'aaaaaaaa-1', B = 'bbbbbbbb-2', C = 'cccccccc-3';
+  const giro = async (prima) => {
+    visto = []; ordini = {}; server = {}; tolti = []; rete = true; chieste = 0; vista = '';
+    myTgId = 111; acceso = true; vaVia = false; DEMO = false; VETRINA = false;
+    P2P_URL = ['/p2p']; P2P_SCAMBIO_URL = B; p2pApertoDaUrl = false;
+    nodi.p2pScambioSparito.hidden = true;
+    prima(); apriP2PDaUrl();
+    await new Promise(r => setTimeout(r, 40));
+    return {visto: visto.slice(), vista, chieste, riga: !nodi.p2pScambioSparito.hidden};
+  };
+  R.qui = await giro(() => { ordini = {[A]: {id: A}, [B]: {id: B}}; });
+  R.nasce = await giro(() => { server = {[A]: {id: A}, [B]: {id: B}, [C]: {id: C}}; });
+  R.altrui = await giro(() => { ordini = {[A]: {id: A}}; server = {[A]: {id: A}, [C]: {id: C}}; });
+  R.nessuno = await giro(() => {});
+  R.tolto = await giro(() => { server = {[B]: {id: B}}; tolti = [B]; });
+  R.reteGiu = await giro(() => { server = {[B]: {id: B}}; rete = false; });
+  R.anonimo = await giro(() => { myTgId = 0; server = {[B]: {id: B}}; });
+  R.vetrina = await giro(() => { VETRINA = true; server = {[B]: {id: B}}; });
+  R.altrove = await giro(() => { vaVia = true; });
+  R.altroveNato = await giro(() => { vaVia = true; server = {[B]: {id: B}}; });
+  R.spenta = await giro(() => { acceso = false; server = {[B]: {id: B}}; });
+  R.senza = await giro(() => { P2P_SCAMBIO_URL = ''; server = {[B]: {id: B}}; });
+  nodi.p2pScambioSparito.hidden = false; scambioSparitoP2P(false);
+  R.chiusa = nodi.p2pScambioSparito.hidden;
+  delete nodi.p2pScambioSparito; let cade = false;
+  try { scambioSparitoP2P(true); } catch(e) { cade = true; }
+  R.senzaNodo = cade;
+  R.parole = [];
+  nodi.p2pScambioSparito = {hidden: true};
+  for (const [nome, prima] of [
+      ['aperto', () => { ordini = {[B]: {id: B}}; }], ['fuori', () => { ordini = {}; myTgId = 0; }],
+      ['muto', () => { myTgId = 111; rete = false; }],
+      ['nato', () => { rete = true; server = {[B]: {id: B}}; vista = 'view-p2pmiei'; }],
+      ['sparito', () => { ordini = {}; server = {}; vista = 'view-p2pmiei'; }],
+      ['altrove', () => { vista = 'view-p2p'; }]]) {
+    prima(); R.parole.push(await cercaScambioDaAvvisoP2P(B) === nome);
+  }
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    Q = _node_banco(banco)
+    if Q is None:
+        salta("la pagina che apre lo scambio dell'avviso (banco node)", "node non c'e'")
+        return
+    A_, B_ = "aaaaaaaa-1", "bbbbbbbb-2"
+    prova("LO SCAMBIO E' GIA' QUI: si apre QUELLO dell'avviso (non il primo della lista), "
+          "subito, e al server non si chiede niente",
+          {"visto": ["apre:" + B_, "velo"], "vista": "view-p2pordine", "chieste": 0,
+           "riga": False}, Q.get("qui"))
+    prova("SU UNA MEMORIA CHE NON L'HA MAI VISTO (la Mini App): prima «I miei scambi», "
+          "poi l'archivio lo fa nascere e si apre lui — fra tre, quello dell'avviso",
+          {"visto": ["miei", "velo", "apre:" + B_], "vista": "view-p2pordine", "chieste": 1,
+           "riga": False}, Q.get("nasce"))
+    prova("NON E' FRA I TUOI (di un altro account, o chiuso da tempo): si resta su «I miei "
+          "scambi» con la riga gentile, e non si apre NIENTE — nemmeno un altro scambio",
+          {"visto": ["miei", "velo", "render"], "vista": "view-p2pmiei", "chieste": 1,
+           "riga": True}, Q.get("altrui"))
+    prova("...lo stesso senza nessuno scambio, e per quello tolto con la ✕",
+          [{"visto": ["miei", "velo", "render"], "vista": "view-p2pmiei", "chieste": 1,
+            "riga": True}] * 2, [Q.get("nessuno"), Q.get("tolto")])
+    prova("A RETE GIU' NON SI DICE «NON E' FRA I TUOI»: si resta su «I miei scambi», "
+          "senza riga e senza errori",
+          {"visto": ["miei", "velo"], "vista": "view-p2pmiei", "chieste": 1, "riga": False},
+          Q.get("reteGiu"))
+    prova("CHI NON E' ENTRATO non chiede e non legge niente (ne' in vetrina)",
+          [{"visto": ["miei", "velo"], "vista": "view-p2pmiei", "chieste": 0, "riga": False}] * 2,
+          [Q.get("anonimo"), Q.get("vetrina")])
+    prova("SE NEL FRATTEMPO SI E' ANDATI ALTROVE non si apre niente sopra l'altra pagina, "
+          "e non resta un avviso per dopo",
+          [{"visto": ["miei", "velo"], "vista": "view-esplora", "chieste": 1, "riga": False}] * 2,
+          [Q.get("altrove"), Q.get("altroveNato")])
+    prova("A LEVA SPENTA, o senza scambio nell'indirizzo, la ricerca non parte",
+          [0, 0], [(Q.get("spenta") or {}).get("chieste"), (Q.get("senza") or {}).get("chieste")])
+    prova("la ✕ chiude la riga; e una pagina senza quel nodo non cade", [True, False],
+          [Q.get("chiusa"), Q.get("senzaNodo")])
+    prova("le sei parole che la ricerca torna a chi la prova", [True] * 6, Q.get("parole"))
+
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -161502,6 +161913,7 @@ def main():
               prove_ordine_in_pausa,
               prove_relay_per_mostro,
               prove_backfill_annullo_venditore,
+              prove_notifica_porta_allo_scambio,
               prove_config_esempio):
         try:
             f()

@@ -64,6 +64,9 @@ class Orologio:
 
 
 OROLOGIO = Orologio(time)
+# (13 ott 2026, notifica-porta-allo-scambio) i bottoni degli avvisi
+# dell'ultimo battito, nell'ordine: `(chi, bottone)`
+BOTTONI = []
 
 
 def ordine(n):
@@ -104,6 +107,7 @@ async def battito(ore, o=None):
     quelli di quello scambio."""
     OROLOGIO.avanti = int(ore * H)
     del banco.DETTO[:]
+    del BOTTONI[:]
     giornale = io.StringIO()
     # la leva accesa SOLO per il battito: il resto del server (la
     # fotografia del libro dopo un evento) resta col P2P spento del
@@ -158,6 +162,12 @@ async def giro():
            f"⏰ Garanzia lunga P2P: {a[:8]} 48h → {C} (compra; pagato: no, disputa: no): mandato"
            in giornale])
 
+    # (13 ott 2026, notifica-porta-allo-scambio)
+    prova("...e sotto, a tutti e due, «⚡ Apri lo scambio» con l'id di QUESTO scambio",
+          sorted([(V, ("⚡ Apri lo scambio", f"https://barattolo.store/p2p?scambio={a}")),
+                  (C, ("⚡ Apri lo scambio", f"https://barattolo.store/p2p?scambio={a}"))]),
+          sorted(BOTTONI))
+
     print("\n3) niente doppioni: ripassando, e dopo un «riavvio»")
     prova("un minuto dopo, niente", [], (await battito(48 + 1 / 60))[0])
     prova("un battito nuovo sul database (quel che fa un server ripartito): niente",
@@ -166,6 +176,8 @@ async def giro():
     print("\n4) i moderatori: 72 e 88 ore, poi basta")
     detti, giornale = await battito(72)
     prova("a 72 ore il moderatore, e solo lui", [MOD], [chi for chi, _ in detti])
+    prova("...SENZA il bottone dello scambio: quello e' delle due parti",
+          [(MOD, None)], list(BOTTONI))
     prova("...col testo delle 72", True, bool(detti) and detti[0][1].startswith(
         f"⏰ <b>Scambio P2P in garanzia da 72 ore</b> (ordine <code>{a[:8]}</code>)"))
     prova("...e la riga nel journal", True,
@@ -220,6 +232,13 @@ def main():
     banco.semina()
     banco.SRV.P2P_RESPIRO_S = 1
     banco.SRV.P2P_RESPIRO_NOME_S = 1
+
+    # (13 ott 2026) la notifica di cartone tiene anche il BOTTONE: il
+    # testo va dove andava (`banco.DETTO`), il bottone in `BOTTONI`
+    async def notifica_col_bottone(chi, testo, bottone=None, *a, **k):
+        banco.DETTO.append((chi, testo))
+        BOTTONI.append((chi, bottone))
+    banco.SRV.notifica = notifica_col_bottone
     asyncio.run(giro())
     print(f"\n{banco.PASSATE} passate, {banco.FALLITE} fallite")
     return 1 if banco.FALLITE else 0

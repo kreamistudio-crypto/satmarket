@@ -31,7 +31,12 @@ che ordine:
      mostrod manda la fattura chiesta PRIMA della presa (due POST, due
      task). A chi compra parte subito «Cauzione bloccata ✓: ora indica
      dove ricevere i sats», poi la presa a chi vende; a leva spenta la
-     stessa strada resta muta com'era.
+     stessa strada resta muta com'era;
+  7. LA NOTIFICA PORTA ALLO SCAMBIO (13 ott 2026): ogni avviso partito
+     qui sopra porta sotto «⚡ Apri lo scambio» con l'id del SUO scambio
+     — e alla presa, a chi ha pubblicato e a leva della pausa accesa, i
+     bottoni sono due: lo scambio sopra, la pausa sotto (sul PayCode,
+     dove la pausa non si applica, resta il solo scambio).
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram (le notifiche finiscono in
@@ -58,6 +63,9 @@ INFO_38385 = {"kind": 38385, "tags": [["bond_enabled", "true"], ["bond_apply_to"
                                       ["bond_only_payment_methods", "Contanti"],
                                       ["bond_slash_on_waiting_timeout", "false"]]}
 SEGRETO = "collaudo-segreto"
+# (13 ott 2026) i bottoni di ogni avviso partito, nell'ordine: `(chi,
+# bottone)` — una coppia, una lista di coppie, o None
+BOTTONI = []
 RESPIRO_S = 2            # il respiro vero e' 6: qui si accorcia, non si salta
 
 
@@ -161,6 +169,7 @@ async def giro():
 
     print("\n3) L'ORDINE CALMO: presa, poi il ritiro dopo il respiro")
     del banco.DETTO[:]
+    del BOTTONI[:]
     await posta(busta(CALMO, "taken", t0 + 100, "buyer", "invoice-next"))
     await asyncio.sleep(RESPIRO_S + 1.5)
     prova("la presa, a chi vende, col PayCode", [banco.VENDE],
@@ -179,6 +188,7 @@ async def giro():
               "tornato in vetrina"))
     prova("...e i timbri nell'ordine dei fatti",
           [("preso", banco.VENDE), ("tornato", banco.VENDE)], timbri(CALMO))
+    bottoni_calmo = list(BOTTONI)
 
     print("\n4) TOR: il POST del ritiro arriva prima di quello della presa")
     del banco.DETTO[:]
@@ -201,6 +211,9 @@ async def giro():
 
     print("\n6) LA CAUZIONE: la fattura chiesta arriva PRIMA della presa")
     del banco.DETTO[:]
+    del BOTTONI[:]
+    pausa_prima = SRV.P2P_TEMPO_DI_CHI_PUBBLICA
+    SRV.P2P_TEMPO_DI_CHI_PUBBLICA = True
     SRV.P2P_CAUZIONE = True
     SRV._P2P_FOTO["info"] = INFO_38385
     r = await posta(busta(CAUZ, "buyer-invoice-requested", t0 + 400, "mostro", ""))
@@ -217,15 +230,36 @@ async def giro():
                "⚡ <b>Il tuo ordine è stato preso!</b> Vendi 8.000 sats per 5,00 € via Contanti.")))
     prova("...due timbri, due persone, nessun doppione",
           [("fattura_chiesta", banco.COMPRA), ("preso", banco.VENDE)], timbri(CAUZ))
+    bottoni_cauz = list(BOTTONI)
+    SRV.P2P_TEMPO_DI_CHI_PUBBLICA = False
     SRV.P2P_CAUZIONE = False
     del banco.DETTO[:]
+    del BOTTONI[:]
     await posta(busta(SENZA, "buyer-invoice-requested", t0 + 500, "mostro", ""))
     await asyncio.sleep(0.6)
     prova("a leva spenta la stessa strada resta muta com'era", [], list(banco.DETTO))
     await posta(busta(SENZA, "taken", t0 + 501, "buyer", "invoice-next"))
     await asyncio.sleep(RESPIRO_S + 1.5)
     prova("...e la presa parla a chi vende e basta", [banco.VENDE], [chi for chi, _ in banco.DETTO])
+    bottoni_senza = list(BOTTONI)
+    SRV.P2P_TEMPO_DI_CHI_PUBBLICA = pausa_prima
     SRV._P2P_FOTO["info"] = None
+
+    print("\n7) LA NOTIFICA PORTA ALLO SCAMBIO: il bottone sotto ogni avviso")
+
+    def scambio(ordine):
+        return ("⚡ Apri lo scambio", f"https://barattolo.store/p2p?scambio={ordine}")
+    prova("la presa e il ritorno dell'ordine calmo: a chi vende, tutti e due col bottone "
+          "di QUELLO scambio (sul PayCode la pausa non c'e')",
+          [(banco.VENDE, scambio(CALMO)), (banco.VENDE, scambio(CALMO))], bottoni_calmo)
+    prova("la cauzione: a chi compra il bottone dello scambio; a chi ha PUBBLICATO, alla "
+          "presa e a leva della pausa accesa, DUE — lo scambio sopra, la pausa sotto",
+          [(banco.COMPRA, scambio(CAUZ)),
+           (banco.VENDE, [scambio(CAUZ), ("⏸ Imposta la pausa",
+                                          "https://barattolo.store/p2p?pausa=1")])],
+          bottoni_cauz)
+    prova("...e a leva della pausa spenta resta il solo scambio",
+          [(banco.VENDE, scambio(SENZA))], bottoni_senza)
     # i task in volo, se ne restano, finiscono prima di chiudere il loop
     if banco.SRV._TASK_EVENTI_P2P:
         await asyncio.gather(*list(banco.SRV._TASK_EVENTI_P2P), return_exceptions=True)
@@ -237,6 +271,13 @@ def main():
     semina_ordini()
     banco.SRV.P2P_RESPIRO_S = RESPIRO_S
     banco.SRV.P2P_RESPIRO_NOME_S = 1
+
+    # (13 ott 2026) la notifica di cartone tiene anche il BOTTONE: il
+    # testo va dove andava (`banco.DETTO`), il bottone in `BOTTONI`
+    async def notifica_col_bottone(chi, testo, bottone=None, *a, **k):
+        banco.DETTO.append((chi, testo))
+        BOTTONI.append((chi, bottone))
+    banco.SRV.notifica = notifica_col_bottone
     asyncio.run(giro())
     print(f"\n{banco.PASSATE} passate, {banco.FALLITE} fallite")
     return 1 if banco.FALLITE else 0
