@@ -74736,6 +74736,17 @@ function entraDaDettaglioP2P(){
    condiviso): se il server non risponde non si dice niente, e si resta
    sulla pagina com'e' — dire «non e' fra i tuoi» a rete giu' sarebbe
    una bugia a chi lo sta facendo.
+   L'AZIONE IN VISTA (dal giro dal vivo a 375 px): la pagina si apriva
+   giusta ma in cima, e il riquadro «tocca a te» col suo bottone restava
+   sotto la barra in basso. Arrivati dall'avviso, la RIGA DELLO STATO (la
+   prima `.nota-scambio`: «Euro inviati 👉 tocca a te», «✋ Aspetta») va
+   in cima, e sotto c'e' il suo gesto. Il bottone si cerca SOLO se la
+   riga dice «tocca a te», ed e' il primo arancione acceso che la SEGUE:
+   il primo della pagina, a chi aspetta, e' «Invia» della chat (il giro
+   dal vivo ci era saltato sopra), e quelli della chat non contano mai. Se resta sotto la barra in basso si
+   porta al centro, e batte coi tre colpi di `evidenziaPassoP2P`; il
+   bottone SPENTO di chi aspetta il recapito non batte mai: direbbe
+   «tocca a te» a chi deve aspettare.
    UN BLOCCO SUO, fuori dal motore (che non ha dentro nessuna fetch).
    Torna una parola per chi la prova: `aperto` | `fuori` | `muto` |
    `altrove` | `nato` | `sparito`. */
@@ -74743,8 +74754,31 @@ function scambioSparitoP2P(mostra){
   const s = el('p2pScambioSparito');
   if (s) s.hidden = !mostra;
 }
+/* il riquadro dell'azione di QUESTO scambio a vista, se lo si sta ancora
+   guardando: un attimo dopo, che il velo d'apertura scenda e la pagina
+   abbia preso le sue misure */
+function azioneInVistaP2P(id){
+  setTimeout(() => {
+    if (p2pOrdineAperto !== id || vistaAttivaP2P() !== 'view-p2pordine') return;
+    const v = el('view-p2pordine');
+    const nota = v && v.querySelector('.nota-scambio');
+    if (!nota) return;
+    const b = nota.querySelector('.p2p-tocca')
+      ? Array.from(v.querySelectorAll('.btn.orange:not([disabled])')).find(x => !x.closest('.chatmod')
+          && (nota.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING)) : null;
+    try {
+      nota.scrollIntoView({block: 'start'});
+      window.scrollBy(0, -12);
+      if (b && b.getBoundingClientRect().bottom > innerHeight - 96)
+        b.scrollIntoView({block: 'center'});
+    } catch(e) {}
+    /* il battito e' di `evidenziaPassoP2P`, che prende il PRIMO bottone
+       pieno della pagina: solo se e' questo */
+    if (b && v.querySelector('.btn.orange') === b) evidenziaPassoP2P();
+  }, 350);
+}
 async function cercaScambioDaAvvisoP2P(id){
-  if (ordiniP2P()[id]) return 'aperto';
+  if (ordiniP2P()[id]) { azioneInVistaP2P(id); return 'aperto'; }
   if (DEMO || VETRINA || !myTgId) return 'fuori';
   let fresca = false;
   try { fresca = await chiediScambiServerP2P(); } catch(e) {}
@@ -74753,7 +74787,7 @@ async function cercaScambioDaAvvisoP2P(id){
   /* nel frattempo si e' andati altrove: non si apre niente sopra
      un'altra pagina, e non si lascia un avviso per dopo */
   if (vistaAttivaP2P() !== 'view-p2pmiei') return 'altrove';
-  if (ordiniP2P()[id]) { apriOrdineP2P(id); return 'nato'; }
+  if (ordiniP2P()[id]) { apriOrdineP2P(id); azioneInVistaP2P(id); return 'nato'; }
   scambioSparitoP2P(true);
   renderP2P();
   return 'sparito';

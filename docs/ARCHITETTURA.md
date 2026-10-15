@@ -31882,6 +31882,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `condividiLink`, col link della Mini App il messaggio viaggia intero
   nel campo `url` del selettore (`testo`, a capo il link); col link del
   sito resta `url` + `text`.
+  LA NOTIFICA PORTA ALLO SCAMBIO (13 ott 2026, perché in CANTIERI, «La
+  notifica porta allo scambio»): ogni avviso che parla di UNO scambio a
+  una delle sue due parti porta «⚡ Apri lo scambio»
+  (`_bottone_scambio_p2p`: `/p2p?scambio=<id>`, il solo id pubblico).
+  Sotto i passaggi lo decide `_bottoni_evento_p2p` dentro
+  `_manda_evento_p2p`, sulle sole parti e prima dei moderatori; le
+  attese lo portano tutte (`_scarica_attese_p2p`), il recapito e la
+  garanzia lunga alle parti pure. UN AVVISO, PIÙ BOTTONI:
+  `_bottoni_avviso` accetta una coppia o una LISTA di coppie, un bottone
+  per riga — alla presa, a chi ha pubblicato, lo scambio sopra e la
+  pausa sotto. AL GRUPPO DEGLI ADMIN un bottone non passa mai
+  (`_recapita_p2p`); a un moderatore in privato solo se è anche una
+  parte di quello scambio. NELLA PAGINA: `apriP2PDaUrl` passa lo
+  scambio alla porta di sempre e poi a `cercaScambioDaAvvisoP2P` — se
+  la riga su questa memoria non c'è la chiede all'archivio del server
+  (i PROPRI scambi, con la sessione) e la apre; se non nasce resta su
+  «I miei scambi» con `#p2pScambioSparito`, una frase per tutti i casi;
+  a rete giù non dice niente. `azioneInVistaP2P` porta in cima la riga
+  dello stato (la prima `.nota-scambio`) e, se dice «tocca a te», il
+  primo bottone acceso che la SEGUE fuori dalla chat. LE PROVE:
+  `prove_notifica_porta_allo_scambio`, la sezione 7 di
+  `collaudo_avvisi_in_ordine_p2p` e `collaudo_garanzia_lunga`.
 - L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026, perché in CANTIERI,
   «L'indirizzo Lightning di casa: zap@barattolo.store»). Un Lightning
   address di Barattolo, da scrivere nel profilo Nostr ufficiale

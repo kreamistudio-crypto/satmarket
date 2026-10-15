@@ -161515,6 +161515,8 @@ def prove_notifica_porta_allo_scambio():
         "  if (vaVia) vista = 'view-esplora'; return rete; }\n"
         "function adottaScambiServerP2P(loc){ for (const k in server) if (!loc[k]) loc[k] = server[k]; }\n"
         "function applicaToltiP2P(){ tolti.forEach(k => { delete ordini[k]; }); }\n"
+        # l'azione in vista ha il suo banco, qui sotto: qui lascia un segno
+        "function azioneInVistaP2P(id){ visto.push('vista:' + id); }\n"
         + _fn_js(mini, "function scambioSparitoP2P(mostra){")
         + _fn_js(mini, "async function cercaScambioDaAvvisoP2P(id){")
         + porta_js + r"""
@@ -161566,13 +161568,14 @@ def prove_notifica_porta_allo_scambio():
         return
     A_, B_ = "aaaaaaaa-1", "bbbbbbbb-2"
     prova("LO SCAMBIO E' GIA' QUI: si apre QUELLO dell'avviso (non il primo della lista), "
-          "subito, e al server non si chiede niente",
-          {"visto": ["apre:" + B_, "velo"], "vista": "view-p2pordine", "chieste": 0,
-           "riga": False}, Q.get("qui"))
+          "subito, con l'azione portata in vista, e al server non si chiede niente",
+          {"visto": ["apre:" + B_, "velo", "vista:" + B_], "vista": "view-p2pordine",
+           "chieste": 0, "riga": False}, Q.get("qui"))
     prova("SU UNA MEMORIA CHE NON L'HA MAI VISTO (la Mini App): prima «I miei scambi», "
-          "poi l'archivio lo fa nascere e si apre lui — fra tre, quello dell'avviso",
-          {"visto": ["miei", "velo", "apre:" + B_], "vista": "view-p2pordine", "chieste": 1,
-           "riga": False}, Q.get("nasce"))
+          "poi l'archivio lo fa nascere e si apre lui — fra tre, quello dell'avviso — con "
+          "l'azione in vista",
+          {"visto": ["miei", "velo", "apre:" + B_, "vista:" + B_], "vista": "view-p2pordine",
+           "chieste": 1, "riga": False}, Q.get("nasce"))
     prova("NON E' FRA I TUOI (di un altro account, o chiuso da tempo): si resta su «I miei "
           "scambi» con la riga gentile, e non si apre NIENTE — nemmeno un altro scambio",
           {"visto": ["miei", "velo", "render"], "vista": "view-p2pmiei", "chieste": 1,
@@ -161596,6 +161599,63 @@ def prove_notifica_porta_allo_scambio():
     prova("la ✕ chiude la riga; e una pagina senza quel nodo non cade", [True, False],
           [Q.get("chiusa"), Q.get("senzaNodo")])
     prova("le sei parole che la ricerca torna a chi la prova", [True] * 6, Q.get("parole"))
+    # --- L'AZIONE IN VISTA, ESEGUITA (dal giro dal vivo a 375 px: il
+    # riquadro «tocca a te» restava sotto la barra in basso; e poi la
+    # pagina saltava su «Invia» della chat, il primo arancione acceso) ---
+    vista_js = (
+        "let fatti = [], aperto = 'B', vista = 'view-p2pordine', tocca = true, nota = true;\n"
+        "let azione = true, chat = true, spento = false, basso = 300;\n"
+        "const innerHeight = 812, Node = {DOCUMENT_POSITION_FOLLOWING: 4};\n"
+        "const window = {scrollBy: (x, y) => fatti.push('su:' + y)};\n"
+        "const tourRidotto = () => true;\n"
+        "const nodo = (nome, pos) => ({nome, pos, scrollIntoView: o => fatti.push(nome + ':' + o.block),\n"
+        "  getBoundingClientRect: () => ({bottom: basso}),\n"
+        "  closest: s => (s === '.chatmod' && nome === 'chat') ? {} : null});\n"
+        "const PRIMA = nodo('prima', 1), NOTA = nodo('nota', 2), AZ = nodo('azione', 3),\n"
+        "  SPENTO = nodo('spento', 3), CHAT = nodo('chat', 9);\n"
+        "NOTA.querySelector = s => (s === '.p2p-tocca' && tocca) ? {} : null;\n"
+        "NOTA.compareDocumentPosition = x => x.pos > NOTA.pos ? 4 : 2;\n"
+        "const accesi = () => [azione && AZ, chat && CHAT].filter(Boolean);\n"
+        "const el = id => id === 'view-p2pordine' ? {\n"
+        "  querySelector: s => s === '.nota-scambio' ? (nota ? NOTA : null)\n"
+        "    : s === '.btn.orange' ? (spento ? SPENTO : accesi()[0] || null) : null,\n"
+        "  querySelectorAll: s => s === '.btn.orange:not([disabled])' ? accesi() : []} : null;\n"
+        "const vistaAttivaP2P = () => vista;\n"
+        "function evidenziaPassoP2P(){ fatti.push('batte'); }\n"
+        "Object.defineProperty(globalThis, 'p2pOrdineAperto', {get: () => aperto});\n"
+        + _fn_js(mini, "function azioneInVistaP2P(id){") + r"""
+(async () => {
+  const R = {};
+  const giro = async (prima, dopo) => { fatti = []; aperto = 'B'; vista = 'view-p2pordine';
+    tocca = true; nota = true; azione = true; chat = true; spento = false; basso = 300;
+    prima(); azioneInVistaP2P('B');
+    const subito = fatti.slice(); if (dopo) dopo();
+    await new Promise(r => setTimeout(r, 450)); return [subito, fatti.slice()]; };
+  R.tocca = await giro(() => {});
+  R.sotto = await giro(() => { basso = 780; });
+  R.aspetta = await giro(() => { tocca = false; azione = false; spento = true; });
+  R.soloChat = await giro(() => { azione = false; });
+  R.niente = await giro(() => { nota = false; });
+  R.altro = await giro(() => {}, () => { aperto = 'A'; });
+  R.via = await giro(() => {}, () => { vista = 'view-p2pmiei'; });
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    V = _node_banco(vista_js) or {}
+    prova("L'AZIONE IN VISTA: un attimo dopo (non subito: il velo e le misure), la riga "
+          "dello stato in cima e il SUO bottone che batte",
+          [[], ["nota:start", "su:-12", "batte"]], V.get("tocca"))
+    prova("...se il bottone resta sotto la barra in basso, si porta al centro",
+          [[], ["nota:start", "su:-12", "azione:center", "batte"]], V.get("sotto"))
+    prova("...A CHI ASPETTA (il bottone spento del recapito, e «Invia» della chat accesa "
+          "piu' sotto): la riga dello stato e basta — niente salto alla chat, niente battito",
+          [[], ["nota:start", "su:-12"]], V.get("aspetta"))
+    prova("...e anche con «tocca a te» un bottone della CHAT non e' mai il gesto: senza il "
+          "suo bottone, resta la riga dello stato",
+          [[], ["nota:start", "su:-12"]], V.get("soloChat"))
+    prova("...senza la riga dello stato non si muove niente; e nemmeno se intanto si e' "
+          "aperto un altro scambio, o si e' andati altrove",
+          [[[], []]] * 3, [V.get("niente"), V.get("altro"), V.get("via")])
 
 
 

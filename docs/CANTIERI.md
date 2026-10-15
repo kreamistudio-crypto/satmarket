@@ -58078,3 +58078,136 @@ e Andrea lo controlla prima di lanciarlo: qui non si scrive.
   dieci affari, la disputa finta può averglielo negato. Si guarda in
   sola lettura dopo la scrittura; i distintivi si danno agli eventi,
   quindi tornerebbe al loro prossimo affare, non da solo.
+
+
+## La notifica porta allo scambio (13-15 ott 2026, cantiere notifica-porta-allo-scambio, richiesta di Andrea)
+
+La richiesta: quando il bot manda un avviso durante uno scambio P2P
+(ordine preso, sats bloccati, euro inviati, messaggio in chat, disputa,
+paracadute…) il tasto deve aprire «I miei scambi» già sullo scambio
+giusto, con l'azione da fare in vista; se lo scambio non c'è più o non
+è tuo, «I miei scambi» con un messaggio, mai errori; nel link solo
+l'id. Prima del codice il sopralluogo in cinque righe, e l'ok di Andrea
+con tre risposte: la prova sul telefono (la Mini App ridotta, aperta
+sul Profilo: il link `startapp=p2p` SALTA al libro — Telegram ricarica
+la pagina e il parametro arriva anche ad app già aperta), due tasti
+sotto «ordine preso», il mercatino fuori.
+
+**COSA C'ERA GIÀ.** Metà della strada: il link `t.me/…?startapp=
+scambio_<id>` (cantiere «I link dentro Telegram aprono la Mini App», 10
+ott, leva accesa sul VPS), la pagina che lo rilegge in
+`/p2p?scambio=<id>`, e «⚡ Apri lo scambio» sotto il messaggio in chat,
+il promemoria del gesto a tempo, i solleciti e l'invito alla
+recensione. MANCAVA sotto tutti gli avvisi dei PASSAGGI
+(`_manda_evento_p2p`: preso, garanzia chiesta, sats bloccati, fattura,
+euro inviati, liberati, concluso, annullato e tornato, disputa,
+pagamento fallito, cauzione persa), sotto «Sats in pagamento» e il
+passaggio raccontato dal libro, sotto il recapito degli euro e la
+garanzia lunga: lì Barattolo si apriva dal menu del bot, cioè sulla
+home. E nella pagina, su una memoria che lo scambio non l'ha (la Mini
+App non è il browser: «Due memorie, stesso telefono»), si finiva su «I
+miei scambi» in silenzio.
+
+**COSA SI È FATTO.** SERVER: `_bottoni_avviso` — un avviso può avere una
+coppia (com'era) o una LISTA di coppie, un bottone per riga; il
+trasporto Telegram le traduce tutte, il DM Nostr le scrive in coda con
+l'indirizzo del sito. `_bottone_scambio_p2p` e `_bottoni_evento_p2p`:
+alle parti di ogni passaggio il bottone dello scambio, deciso sulle
+sole parti e prima dei moderatori, dentro un `try` (un guasto lascia i
+bottoni di prima, mai l'avviso in meno); alla presa, a chi ha
+pubblicato, DUE — lo scambio sopra, la pausa sotto. Le attese lo
+portano TUTTE (la condizione sulla fonte se n'è andata), il recapito
+degli euro a chi compra (solo con un id nella forma di sempre), la
+garanzia lunga alle parti (il dizionario prestato, il patto di
+`_scarica_attese_p2p`). PAGINA: dopo la porta di sempre,
+`cercaScambioDaAvvisoP2P` chiede all'archivio del server i PROPRI
+scambi (`/api/p2p/scambi`: sessione, nessun corpo, non esiste la
+sintassi per chiedere quelli di un altro), la riga nasce con l'adozione
+di sempre e si apre; se non nasce, la riga gentile `#p2pScambioSparito`
+in «I miei scambi»: «Questo scambio non è fra i tuoi» — UNA frase per
+tolto, chiuso da tempo e altrui, perché distinguere direbbe a chi ha un
+id se quello scambio esiste. `azioneInVistaP2P`, all'arrivo: la riga
+dello stato in cima e il suo bottone sotto.
+
+**L'AZIONE IN VISTA, DAL GIRO DAL VIVO.** Il primo giro ha trovato due
+difetti che il banco non vedeva. 1) La pagina si apriva giusta ma in
+cima, col riquadro «👉 tocca a te» e il suo bottone sotto la barra in
+basso. 2) Curato il primo puntando al «primo bottone arancione acceso»,
+a chi compra e aspetta il recapito la pagina saltava su «Invia» della
+CHAT (il bottone dell'azione è spento, e quello della chat è il primo
+acceso). Adesso il riferimento è la RIGA DELLO STATO (la prima
+`.nota-scambio`): va in cima; il bottone si cerca solo se la riga dice
+«tocca a te», ed è il primo acceso che la SEGUE fuori da `.chatmod`; se
+resta sotto la barra si porta al centro, e batte coi tre colpi di
+`evidenziaPassoP2P`. Un bottone spento non batte mai.
+
+**STRADE SCARTATE.** Un parametro nuovo nel link (`avviso_<id>`, o
+l'azione da fare): il vocabolario di `startapp` è chiuso e `scambio_`
+dice già tutto; l'azione la sa la pagina, non il messaggio di ieri.
+Bottoni `web_app`: la regola di `_riga_webapp`. Un messaggio diverso
+per «non c'è più» e «non è tuo»: vedi sopra. Toccare
+`apriOrdineP2P`, la porta di tutti i tocchi sulle card: la ricerca
+nell'archivio vive solo all'arrivo dall'indirizzo. Indicizzare i
+bottoni per posizione in `_manda_evento_p2p` (così un moderatore che è
+anche parte non avrebbe il bottone sotto l'avviso PER i moderatori):
+avrebbe rotto la «consegna in UNA chiamata» che due sentinelle
+difendono, per un caso che col gruppo degli admin non esiste e senza
+gruppo apre il SUO scambio. È scritto in ARCHITETTURA.
+
+**PROVATO.** `prove_notifica_porta_allo_scambio` (47): i giudici puri, il
+trasporto ESEGUITO (due righe, l'ordine, la traduzione, la leva spenta,
+la riga simulata del collaudo), il DM Nostr, `_manda_evento_p2p`
+ESEGUITO (passaggio, presa coi due bottoni, disputa col gruppo, il
+guasto che non toglie l'avviso), attese, recapito e garanzia lunga, la
+rotta degli scambi che risponde solo di chi chiede; nella pagina il
+markup, la porta, la ricerca in dodici scenari e l'azione in vista in
+sette. ROSSA SULL'ALBERO DI IERI (esplode: i giudici non esistono), e
+la controprova dell'esclusione della chat rossa su una copia mutata.
+`collaudo_avvisi_in_ordine_p2p` ha una sezione 7 e
+`collaudo_garanzia_lunga` due righe: col server vero gli avvisi
+partono col bottone del LORO scambio (e alla presa coi due), ai
+moderatori senza — ROSSI sull'albero di ieri (gli avvisi partivano con
+`None`), verdi qui. Sentinelle e banchi che ancoravano le righe
+cambiate, aggiornati: il DM e il trasporto (`prove_link_dentro_telegram`,
+`prove_promemoria_gesto`), la garanzia lunga, le due sentinelle sulla
+fonte delle attese (`prove_solleciti_p2p`), e tre banchi dell'orologio
+(`prove_p2p_orologio`, `prove_p2p_tutti_i_relay`, `prove_p2p_ascolto`)
+la cui notifica di cartone accettava due argomenti: adesso anche il
+passaggio raccontato dal libro porta il bottone.
+DAL VIVO (Chrome a 375×812 con Playwright, tocchi veri; copia in
+collaudo su 8137, relay morto, Telegram finto dall'hash, la leva del
+link accesa; due memorie col profilo di scambio e NESSUNA riga, tre
+scambi seminati dalla porta vera degli eventi): il server ha mandato
+dieci avvisi, tutti col bottone `t.me/ilbarattolobot?startapp=
+scambio_<id>` del loro scambio. Chi vende tocca l'avviso di A (euro
+inviati): la Mini App apre A, «Euro inviati 👉 tocca a te» in cima e
+«🔓 Libera i sats» sotto, toccabile; poi B, con due scambi aperti: apre
+B, con «💶 Indica dove ricevere gli euro»; A di nuovo, riga in memoria:
+uguale. Un id di altri, uno che non esiste, e un terzo (999) con l'id
+di A: «I miei scambi» con la riga gentile; la ✕ col dito la chiude.
+L'archivio che non risponde: «I miei scambi» senza riga, senza errori.
+Un parametro storto: la home. Chi compra, avviso di B: «Sats in
+garanzia ✋ Aspetta» in cima, il bottone spento sotto, la chat non si
+prende il posto. App già aperta sul Profilo, poi l'avviso: apre A.
+Nessuna riga più larga di 375. Gli scatti in
+`.claude/giri/notifica-porta-allo-scambio/` (gitignored).
+
+**NON PROVATO, DA GUARDARE (serve Andrea).** • Telegram VERO: i due
+bottoni uno sopra l'altro sotto «hanno preso il tuo ordine» (la pausa
+nel giro non si è vista: `P2P_TEMPO_DI_CHI_PUBBLICA` spenta nel config
+d'esempio; la coppia la prova il collaudo), e un avviso qualunque
+toccato sul telefono che apre lo scambio. • La Mini App aperta da un
+avviso su un account nato su Nostr (il profilo di scambio lì non si
+ricava dal server: la riga nasce «solo da guardare»).
+
+**DA FARE (notati, non fatti).** • IL MERCATINO, decisione di Andrea:
+la stessa strada per gli avvisi di ordine, spedizione e disputa —
+oggi senza tasti, e la pagina non ha un indirizzo «questo ordine»
+(c'è solo `/offerta/<id>`): una parola nuova nel vocabolario, una porta
+che apre la cassaforte di quell'ordine, il tasto su decine di avvisi.
+• «⭐ Hai ricevuto una recensione» (`recensione_p2p`) è rimasto senza
+bottone: non c'è un gesto da fare, e quel sito ha scelto di non
+riportare l'id. Si decide. • `evidenziaPassoP2P`, quando un passo arriva
+a pagina aperta, prende il PRIMO `.btn.orange` della pagina: dove il
+bottone dell'azione è spento e la chat c'è, porta a vista e fa battere
+«Invia» della chat — la stessa trappola del giro, sull'altra strada.
