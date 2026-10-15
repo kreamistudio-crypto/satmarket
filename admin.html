@@ -1,354 +1,618 @@
 <!doctype html>
-<html lang="it" data-theme="dark">
+<html lang="it">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Cruscotto Barattolo</title>
+<!-- IL CRUSCOTTO DEGLI ADMIN (ott 2026). Questa pagina NON porta dati:
+     li chiede a /api/admin/cruscotto, che controlla chi e' admin.
+     Dentro Telegram si apre nella stessa webview della Mini App, e lo
+     SDK ritrova l'initData; dal browser vale il cookie di sessione. -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   @font-face{font-family:'Baloo 2';font-weight:800;font-display:swap;src:url(/vendor/font/baloo2-latin.woff2) format('woff2')}
-  @font-face{font-family:'Nunito';font-weight:400 600 700 800;font-display:swap;src:url(/vendor/font/nunito-latin.woff2) format('woff2')}
+  @font-face{font-family:'Nunito';font-weight:400 800;font-display:swap;src:url(/vendor/font/nunito-latin.woff2) format('woff2')}
   :root{
-    --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87; --soft:#B5AA90;
-    --line:#3E3623; --grid:#3a3121;
-    --sats:#F7931A; --sats-soft:#3E2B12; --sats-text:#FFB25C;
-    --ok:#34B47A; --ok-soft:#1B2C20; --ok-text:#63CB96;
-    --rosso-p2p:#F26E4E; --rosso-p2p-soft:#3D2017; --rosso-p2p-text:#F37456;
-    --radius:16px; --shadow:0 1px 4px rgba(0,0,0,.35);
-    --shadow-hover:0 8px 24px rgba(0,0,0,.5);
+    --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271; --soft:#5d574b;
+    --line:#ECE3CC; --grid:#EFE8D6; --sats:#F7931A;
+    --s-tg:#2a78d6; --s-nostr:#eb6834; --s-vol:#2a78d6;
+    --ok:#1B8B54; --err:#C2410C;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,sans-serif;font-size:15px;line-height:1.5}
-  html{height:100%;overscroll-behavior:none}
-  body{height:100%;overscroll-behavior:none}
-  main{max-width:1200px;margin:0 auto;padding:24px 16px 48px}
-  h1{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:36px;margin-bottom:4px;color:var(--ink)}
-  h2{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:20px;margin:20px 0 12px;color:var(--ink)}
-  h3{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:16px;margin:0;color:var(--ink)}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87; --soft:#cfc5ad;
+      --line:#3d3424; --grid:#3a3121; --s-tg:#3987e5; --s-nostr:#d95926; --s-vol:#3987e5;
+      --ok:#34B47A; --err:#F28B5B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87; --soft:#cfc5ad;
+    --line:#3d3424; --grid:#3a3121; --s-tg:#3987e5; --s-nostr:#d95926; --s-vol:#3987e5;
+    --ok:#34B47A; --err:#F28B5B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,sans-serif;font-size:15px;line-height:1.45}
+  main{max-width:1080px;margin:0 auto;padding:16px 16px 48px}
+  h1{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:26px;margin:4px 0 2px}
+  h2{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:19px;margin:0 0 4px}
   .sub{color:var(--muted);font-weight:600;font-size:13px}
-
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px}
-  .header-left h1{margin:0}
-  .header-right{text-align:right}
-
-  .periodo{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
-  .periodo button{font:inherit;font-weight:700;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:8px;padding:6px 12px;cursor:pointer;transition:all .15s}
-  .periodo button:hover{border-color:var(--sats);color:var(--sats)}
-  .periodo button[aria-pressed="true"]{background:var(--sats);color:#000;border-color:var(--sats)}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:16px 0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);transition:all .15s}
-  .card:hover{border-color:var(--sats);box-shadow:var(--shadow-hover)}
-
-  .kpi{padding:4px 0}
-  .kpi-label{color:var(--muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-  .kpi-value{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:32px;margin:8px 0;color:var(--sats);line-height:1.1}
-  .kpi-subtext{color:var(--soft);font-weight:600;font-size:13px}
-
-  .chart-container{position:relative;width:100%;margin:16px 0;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px}
-  .chart-title{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:16px;margin-bottom:16px;color:var(--ink)}
-  .chart-svg{display:block;width:100%;height:auto;overflow:visible}
-  .chart-svg text{fill:var(--muted);font:600 11px 'Nunito',system-ui,sans-serif}
-
-  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:12px}
-  .legend-item{display:flex;align-items:center;gap:6px;color:var(--soft);font-weight:700}
-  .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px}
-
-  .tooltip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;opacity:0;transition:opacity .15s;z-index:10;box-shadow:0 4px 16px rgba(0,0,0,.5)}
-  .tooltip.on{opacity:1}
-
-  .details{margin-top:20px}
-  .details-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 0;user-select:none;font-weight:700;color:var(--soft);font-size:14px;transition:color .15s}
-  .details-header:hover{color:var(--sats)}
-  .details-header::after{content:'▼';transition:transform .15s;margin-left:8px}
-  .details.closed .details-header::after{transform:rotate(-90deg)}
-  .details.closed .details-content{display:none}
-  .details-content{margin-top:12px}
-
-  table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
-  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
-  th{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
-  td.num,th.num{text-align:right}
-
-  .note{color:var(--soft);font-weight:600;font-size:13px;margin-top:12px;line-height:1.5}
-  .error{background:var(--rosso-p2p-soft);border:1px solid var(--rosso-p2p);color:var(--rosso-p2p-text);padding:12px;border-radius:var(--radius);margin:12px 0}
-
-  @media (max-width:768px){
-    main{padding:16px 12px 40px}
-    h1{font-size:28px}
-    .grid{grid-template-columns:1fr}
-    .kpi-value{font-size:24px}
-  }
+  .filtri{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px}
+  .filtri button{font:inherit;font-weight:800;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 14px;cursor:pointer}
+  .filtri button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+  .tile .k{color:var(--muted);font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  .tile .v{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:28px;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+  .tile .d{color:var(--soft);font-weight:600;font-size:13px;margin-top:2px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+  .legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--soft);margin:6px 0 4px}
+  .legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .grafico{position:relative;width:100%}
+  .grafico svg{display:block;width:100%;height:auto;overflow:visible}
+  .grafico text{fill:var(--muted);font:600 11px 'Nunito',system-ui,sans-serif}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:10px;padding:7px 10px;font-size:12.5px;font-weight:700;white-space:nowrap;transform:translate(-50%,-100%);opacity:0;transition:opacity .1s;z-index:2}
+  .tip.on{opacity:1}
+  details{margin-top:8px} summary{cursor:pointer;color:var(--soft);font-weight:700;font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  td.n,th.n{text-align:right}
+  .tab{overflow-x:auto}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+  .nota{color:var(--soft);font-weight:600;font-size:13px;margin-top:6px}
+  .simu{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+  .simu input[type=range]{flex:1;min-width:180px;accent-color:var(--sats)}
+  .simu output{font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:22px;min-width:64px}
+  .simu select{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 8px}
+  .stato{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:20px;font-weight:700}
+  .barra{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--grid);min-width:90px;gap:2px}
+  .barra b{display:block;background:var(--s-tg)} .barra s{display:block;background:var(--s-nostr);text-decoration:none}
+  a{color:var(--s-tg)}
+  @media (max-width:520px){ h1{font-size:22px} .tile .v{font-size:24px} }
 </style>
 </head>
 <body>
 <main>
-  <div class="header">
-    <div class="header-left">
-      <h1>📊 Cruscotto</h1>
-      <div class="sub" id="sub">Carico i dati…</div>
-    </div>
-  </div>
-
-  <div class="periodo" role="group" aria-label="Seleziona periodo">
-    <button aria-pressed="true" onclick="setPeriodo(30)">30 giorni</button>
-    <button onclick="setPeriodo(90)">90 giorni</button>
-    <button onclick="setPeriodo(365)">Un anno</button>
-    <button onclick="setPeriodo(0)">Da sempre</button>
-  </div>
-
+  <h1>📊 Cruscotto di Barattolo</h1>
+  <div class="sub" id="sub">Carico i numeri…</div>
   <div id="corpo"></div>
+  <!-- SCAMBI P2P (10 ott 2026): resta VUOTO per chi non e' amministratore.
+       Il cruscotto dice un si' o un no, e i numeri li da' un'altra rotta
+       che rifa' la stessa domanda (`vede_statistiche_p2p`). -->
+  <div id="p2p"></div>
 </main>
-
 <script>
-const tg = window.Telegram?.WebApp;
-try { if (tg?.colorScheme) document.documentElement.dataset.theme = tg.colorScheme; } catch(e){}
-
+const tg = window.Telegram && window.Telegram.WebApp;
+try { if (tg && tg.colorScheme) document.documentElement.dataset.theme = tg.colorScheme; } catch(e){}
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => Number(n || 0).toLocaleString('it-IT');
 const fmtd = (n, d) => Number(n || 0).toLocaleString('it-IT', {maximumFractionDigits: d});
+const el = id => document.getElementById(id);
+let D = null, giorni = 90;
 
-let D = null, giorni = 30;
-
-function setPeriodo(g) {
-  giorni = g;
-  document.querySelectorAll('.periodo button').forEach((b, i) => {
-    const val = [30, 90, 365, 0][i];
-    b.setAttribute('aria-pressed', g === val);
-  });
-  carica();
-}
-
-async function carica() {
-  try {
-    const r = await fetch('/api/admin/cruscotto', {
-      credentials: 'same-origin',
-      headers: {'X-Tg-Init-Data': intestazione()}
-    });
-    if (r.status === 401) return errore('Entra prima su Barattolo, poi torna qui.');
-    if (r.status === 403) return errore('Questa pagina è solo per admin.');
-    if (!r.ok) return errore(`Errore ${r.status}`);
-
-    D = await r.json();
-    document.getElementById('sub').textContent = 'Aggiornato alle ' +
-      new Date(D.generato * 1000).toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
-    disegna();
-  } catch(e) {
-    errore('Non riesco a contattare il server.');
-  }
-}
-
-function intestazione() {
-  if (tg?.initData) return tg.initData;
+/* L'identita': dentro Telegram l'initData, fuori il cookie. In collaudo
+   (`?collaudo=999`) l'identita' finta che il server accetta SOLO in
+   modalita' collaudo. */
+function intestazione(){
+  if (tg && tg.initData) return tg.initData;
   const c = new URLSearchParams(location.search).get('collaudo');
   return /^\d{1,6}$/.test(c || '') ? `collaudo:${c}:Admin` : '';
 }
 
-function errore(t) {
-  document.getElementById('corpo').innerHTML = `<div class="error">${esc(t)}</div>`;
+async function carica(){
+  let r;
+  try {
+    r = await fetch('/api/admin/cruscotto', {credentials:'same-origin',
+      headers:{'X-Tg-Init-Data': intestazione()}});
+  } catch(e) { return stato('Non riesco a raggiungere Barattolo: riprova fra poco.'); }
+  if (r.status === 401) return stato('Entra prima su Barattolo (da questo browser o dall\'app), poi riapri questa pagina.');
+  if (r.status === 403) return stato('Questa pagina è riservata agli admin.');
+  if (!r.ok) return stato(`Il server ha risposto ${r.status}.`);
+  D = await r.json();
+  el('sub').textContent = 'Aggiornato alle ' + new Date(D.generato * 1000)
+    .toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  disegna();
+  if (D.p2p_statistiche) caricaP2P();
 }
+function stato(t){ el('sub').textContent = ''; el('corpo').innerHTML = `<div class="stato">${esc(t)}</div>`; }
 
-function disegna() {
-  const it = D.iscritti_totali, vt = D.volume_totale;
-  const periodo = giorni ? `negli ultimi ${giorni} giorni` : 'da sempre';
-  const nuoviPer = D.iscritti.filter(r => r[0] >= dataInizio()).reduce((a, v) => [a[0] + v[1], a[1] + v[2]], [0, 0]);
-  const vendPer = D.volume.filter(r => r[0] >= dataInizio()).reduce((a, v) => [a[0] + v[0], a[1] + v[1], a[2] + v[2]], [0, 0, 0]);
-
-  document.getElementById('corpo').innerHTML = `
-    <div class="grid">
-      <div class="card">
-        <div class="kpi">
-          <div class="kpi-label">Iscritti totali</div>
-          <div class="kpi-value">${fmt(it.totale)}</div>
-          <div class="kpi-subtext">${fmt(it.telegram)} TG · ${fmt(it.nostr)} Nostr</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="kpi">
-          <div class="kpi-label">Nuovi ${esc(periodo)}</div>
-          <div class="kpi-value">${fmt(nuoviPer[0] + nuoviPer[1])}</div>
-          <div class="kpi-subtext">${fmt(nuoviPer[0])} TG · ${fmt(nuoviPer[1])} Nostr</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="kpi">
-          <div class="kpi-label">Sats venduti (totale)</div>
-          <div class="kpi-value">${fmt(vt.sats)}</div>
-          <div class="kpi-subtext">${fmt(vt.ordini)} ordini</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="kpi">
-          <div class="kpi-label">Sats venduti ${esc(periodo)}</div>
-          <div class="kpi-value">${fmt(vendPer[1])}</div>
-          <div class="kpi-subtext">${fmt(vendPer[0])} ordini</div>
-        </div>
-      </div>
-    </div>
-
-    <h2>Iscritti nel tempo</h2>
-    <div class="chart-container">
-      <div class="legend">
-        <div class="legend-item"><span class="legend-dot" style="background:var(--sats)"></span> Telegram</div>
-        <div class="legend-item"><span class="legend-dot" style="background:var(--ok-text)"></span> Nostr</div>
-      </div>
-      <div id="chartIscritti" class="chart-container" style="background:transparent;border:none;padding:0;margin:0;box-shadow:none"></div>
-    </div>
-
-    <h2>Fee di routing nel tempo</h2>
-    <div class="chart-container">
-      <div class="legend">
-        <div class="legend-item"><span class="legend-dot" style="background:var(--sats)"></span> Fee (sats)</div>
-      </div>
-      <div id="chartFee" class="chart-container" style="background:transparent;border:none;padding:0;margin:0;box-shadow:none"></div>
-    </div>
-
-    <h2>Volumi nel tempo</h2>
-    <div class="chart-container">
-      <div class="legend">
-        <div class="legend-item"><span class="legend-dot" style="background:var(--sats)"></span> Sats venduti</div>
-      </div>
-      <div id="chartVolume" class="chart-container" style="background:transparent;border:none;padding:0;margin:0;box-shadow:none"></div>
-    </div>
-  `;
-
-  disegnaGrafici();
+/* ---- il tempo: i giorni del server diventano secchi ---- */
+const GIORNO = 86400000;
+const gran = () => giorni && giorni <= 31 ? 'giorno' : (giorni && giorni <= 180 ? 'settimana' : 'mese');
+function chiave(g, modo){
+  if (modo === 'giorno') return g;
+  if (modo === 'mese') return g.slice(0, 7);
+  const d = new Date(g + 'T00:00:00Z');
+  const lun = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * GIORNO);
+  return lun.toISOString().slice(0, 10);
 }
-
-function dataInizio() {
-  if (!giorni) return '2000-01-01';
-  return new Date(Date.now() - (giorni - 1) * 86400000).toISOString().slice(0, 10);
+function etichetta(k, modo){
+  if (modo === 'mese') { const [a, m] = k.split('-'); return new Date(Date.UTC(+a, +m - 1, 1)).toLocaleDateString('it-IT', {month:'short', year:'2-digit'}); }
+  return new Date(k + 'T00:00:00Z').toLocaleDateString('it-IT', {day:'numeric', month:'short'});
 }
-
-function disegnaGrafici() {
-  const modo = giorni <= 31 ? 'giorno' : (giorni <= 180 ? 'settimana' : 'mese');
-  const ks = secchi(modo);
-
-  const nuovi = aggregaIscritti(modo, ks);
-  const fee = aggregaFee(modo, ks);
-  const vend = aggregaVolume(modo, ks);
-
-  grafico(document.getElementById('chartIscritti'), ks, modo, nuovi, [
-    {nome: 'Telegram', colore: 'var(--sats)'},
-    {nome: 'Nostr', colore: 'var(--ok-text)'}
-  ]);
-
-  grafico(document.getElementById('chartFee'), ks, modo, fee, [
-    {nome: 'Fee', colore: 'var(--sats)'}
-  ]);
-
-  grafico(document.getElementById('chartVolume'), ks, modo, vend, [
-    {nome: 'Sats', colore: 'var(--sats)'}
-  ]);
+function inizio(){
+  if (!giorni) {
+    const prime = [D.iscritti[0]?.[0], D.volume[0]?.[0]].filter(Boolean).sort();
+    return prime[0] || new Date().toISOString().slice(0, 10);
+  }
+  return new Date(Date.now() - (giorni - 1) * GIORNO).toISOString().slice(0, 10);
 }
-
-function secchi(modo) {
-  const out = [], visti = new Set(), da = dataInizio();
-  const GIORNO = 86400000;
-  for (let t = new Date(da + 'T00:00:00Z').getTime(); t <= Date.now(); t += GIORNO) {
+/* tutti i secchi del periodo, anche quelli vuoti: un buco nel tempo e'
+   uno zero, non un salto */
+function secchi(){
+  const modo = gran(), out = [], visti = new Set();
+  for (let t = new Date(inizio() + 'T00:00:00Z').getTime(); t <= Date.now(); t += GIORNO) {
     const k = chiave(new Date(t).toISOString().slice(0, 10), modo);
     if (!visti.has(k)) { visti.add(k); out.push(k); }
   }
   return out;
 }
-
-function chiave(g, modo) {
-  if (modo === 'giorno') return g;
-  if (modo === 'mese') return g.slice(0, 7);
-  const d = new Date(g + 'T00:00:00Z');
-  const lun = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000);
-  return lun.toISOString().slice(0, 10);
-}
-
-function aggregaIscritti(modo, ks) {
-  const m = {}, da = dataInizio();
-  for (const [data, tg, nostr] of D.iscritti) {
-    if (data < da) continue;
-    const k = chiave(data, modo);
-    if (!m[k]) m[k] = [0, 0];
-    m[k][0] += tg; m[k][1] += nostr;
+function somma(righe, colonne){
+  const modo = gran(), da = inizio(), m = {};
+  for (const r of righe) {
+    if (r[0] < da) continue;
+    const k = chiave(r[0], modo);
+    const v = m[k] || (m[k] = colonne.map(() => 0));
+    colonne.forEach((c, i) => v[i] += r[c]);
   }
   return m;
 }
 
-function aggregaFee(modo, ks) {
-  const m = {}, da = dataInizio(), L = D.lnd || {};
-  if (!L.fee_history) return m;
-  for (const [data, fee] of L.fee_history) {
-    if (data < da) continue;
-    const k = chiave(data, modo);
-    if (!m[k]) m[k] = [0];
-    m[k][0] += fee;
-  }
-  return m;
+/* ---- i grafici: SVG a mano, una scala sola, marchi sottili ---- */
+/* LA LARGHEZZA E' QUELLA VERA del riquadro, non una fissa scalata: su
+   un telefono un viewBox da 720 rimpicciolirebbe le scritte a 6px */
+let W = 720;
+const H = 240, SX = 44, DX = 8, ALTO = 12, BASSO = 26;
+const misura = box => { W = Math.max(280, Math.round(box.clientWidth || 720)); };
+function tacche(max){
+  if (max <= 0) return [0];
+  const passo = Math.pow(10, Math.floor(Math.log10(max)));
+  const p = [1, 2, 5, 10].map(x => x * passo).find(x => max / x <= 5) || passo * 10;
+  const out = []; for (let v = 0; v <= max + 1e-9; v += p) out.push(v);
+  if (out[out.length - 1] < max) out.push(out[out.length - 1] + p);
+  return out;
 }
-
-function aggregaVolume(modo, ks) {
-  const m = {}, da = dataInizio();
-  for (const [data, ordini, sats] of D.volume) {
-    if (data < da) continue;
-    const k = chiave(data, modo);
-    if (!m[k]) m[k] = [0];
-    m[k][0] += sats;
-  }
-  return m;
+const breve = n => n >= 1e6 ? fmtd(n / 1e6, 1) + ' M' : n >= 1e4 ? fmtd(n / 1e3, 0) + 'k' : fmt(n);
+function asse(t, y){
+  return t.map(v => `<line x1="${SX}" x2="${W - DX}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`
+    + `<text x="${SX - 6}" y="${y(v) + 4}" text-anchor="end">${breve(v)}</text>`).join('');
 }
-
-function grafico(box, ks, modo, valori, serie) {
-  if (!box) return;
-  const W = Math.max(280, Math.round(box.parentElement.clientWidth || 400));
-  const H = 200, SX = 40, DX = 8, ALTO = 12, BASSO = 20;
-
-  const max = Math.max(1, ...ks.map(k => (valori[k] || [0])[0]));
+function assex(ks, x, larg){
+  const ogni = Math.max(1, Math.ceil(ks.length / Math.max(2, Math.floor(W / 90))));
+  return ks.map((k, i) => i % ogni ? '' :
+    `<text x="${x(i) + larg / 2}" y="${H - 8}" text-anchor="middle">${esc(etichetta(k, gran()))}</text>`).join('');
+}
+/* barre impilate (o una serie sola): 2px di aria fra i pezzi, la cima
+   arrotondata, il tooltip su tutta la colonna */
+function barre(box, ks, serie, valori, testoTip){
+  misura(box);
+  const n = ks.length, larg = (W - SX - DX) / Math.max(1, n);
+  const tot = ks.map(k => (valori[k] || []).reduce((a, b) => a + b, 0));
+  const t = tacche(Math.max(1, ...tot)), max = t[t.length - 1];
   const y = v => ALTO + (H - ALTO - BASSO) * (1 - v / max);
-  const x = (i, n) => SX + (i / Math.max(1, n - 1)) * (W - SX - DX);
-
-  let svg = '';
-
-  svg += `<line x1="${SX}" x2="${W - DX}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-width="1"/>`;
-
-  for (let i = 0; i < ks.length; i++) {
-    const xx = x(i, ks.length);
-    svg += `<rect class="hit" data-i="${i}" x="${xx - 20}" y="${ALTO}" width="40" height="${H - ALTO - BASSO}" fill="transparent" cursor="pointer"/>`;
-  }
-
-  const n = ks.length;
-  for (let i = 0; i < n; i++) {
-    const v = (valori[ks[i]] || [0])[0];
-    const xx = x(i, n);
-    const yy = y(v);
-    const h = Math.max(2, y(0) - yy);
-    svg += `<rect x="${xx - 3}" y="${yy}" width="6" height="${h}" fill="var(--sats)" rx="2"/>`;
-  }
-
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="chart-svg">${svg}</svg><div class="tooltip"></div>`;
-
-  const s = box.querySelector('svg');
-  const tip = box.querySelector('.tooltip');
-  s.addEventListener('pointermove', e => {
-    const r = e.target.closest('.hit');
-    if (!r) return;
-    const i = +r.dataset.i;
-    const v = valori[ks[i]] || [0];
-    tip.innerHTML = `${etichetta(ks[i], modo)}<br>${fmt(v[0])} ${v[1] ? ` · ${fmt(v[1])}` : ''}`;
-    const k = s.getBoundingClientRect();
-    tip.style.left = (x(i, n) / W * k.width) + 'px';
-    tip.style.top = (y(v[0]) / H * k.height - 10) + 'px';
-    tip.classList.add('on');
+  const x = i => SX + i * larg;
+  const b = Math.max(2, Math.min(28, larg - 4));
+  let svg = asse(t, y);
+  ks.forEach((k, i) => {
+    let base = 0;
+    const v = valori[k] || serie.map(() => 0);
+    serie.forEach((s, j) => {
+      if (!v[j]) return;
+      const y0 = y(base), y1 = y(base + v[j]); base += v[j];
+      const cima = j === serie.length - 1 || !v.slice(j + 1).some(Boolean);
+      const h = Math.max(1, y0 - y1 - (base > v[j] ? 2 : 0));
+      const r = cima ? Math.min(4, b / 2, h) : 0;
+      const xx = x(i) + (larg - b) / 2, yy = y1;
+      svg += r
+        ? `<path d="M${xx},${yy + h} V${yy + r} Q${xx},${yy} ${xx + r},${yy} H${xx + b - r} Q${xx + b},${yy} ${xx + b},${yy + r} V${yy + h} Z" fill="${s.colore}"/>`
+        : `<rect x="${xx}" y="${yy}" width="${b}" height="${h}" fill="${s.colore}"/>`;
+    });
+    svg += `<rect class="hit" data-i="${i}" x="${x(i)}" y="${ALTO}" width="${larg}" height="${H - ALTO - BASSO}" fill="transparent"/>`;
   });
-  s.addEventListener('pointerleave', () => tip.classList.remove('on'));
+  svg += assex(ks, x, larg);
+  monta(box, svg, i => ({x: x(i) + larg / 2, y: y(tot[i]), testo: testoTip(ks[i], valori[ks[i]] || serie.map(() => 0))}));
+}
+/* linee cumulate: 2px, l'etichetta diretta in coda, crosshair */
+function linee(box, ks, serie, punti, testoTip){
+  misura(box);
+  const n = ks.length, passo = (W - SX - DX) / Math.max(1, n - 1);
+  const t = tacche(Math.max(1, ...serie.flatMap((s, j) => ks.map(k => punti[k][j])))), max = t[t.length - 1];
+  const y = v => ALTO + (H - ALTO - BASSO) * (1 - v / max);
+  const x = i => SX + (n === 1 ? (W - SX - DX) / 2 : i * passo);
+  let svg = asse(t, y);
+  serie.forEach((s, j) => {
+    svg += `<polyline fill="none" stroke="${s.colore}" stroke-width="2" stroke-linejoin="round" points="${ks.map((k, i) => `${x(i)},${y(punti[k][j])}`).join(' ')}"/>`;
+    const ult = punti[ks[n - 1]][j];
+    svg += `<text x="${x(n - 1) - 4}" y="${y(ult) - 6}" text-anchor="end" style="fill:var(--soft);font-weight:800">${esc(s.nome)} ${fmt(ult)}</text>`;
+  });
+  svg += `<line class="croce" x1="0" x2="0" y1="${ALTO}" y2="${H - BASSO}" stroke="var(--muted)" stroke-width="1" style="display:none"/>`;
+  ks.forEach((k, i) => svg += `<rect class="hit" data-i="${i}" x="${x(i) - passo / 2}" y="${ALTO}" width="${Math.max(passo, 6)}" height="${H - ALTO - BASSO}" fill="transparent"/>`);
+  svg += assex(ks, i => x(i) - 0, 0);
+  monta(box, svg, i => ({x: x(i), y: y(Math.max(...punti[ks[i]])), testo: testoTip(ks[i], punti[ks[i]]), croce: x(i)}));
+}
+function monta(box, svg, info){
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img">${svg}</svg><div class="tip"></div>`;
+  const s = box.querySelector('svg'), tip = box.querySelector('.tip'), croce = s.querySelector('.croce');
+  const mostra = e => {
+    const r = e.target.closest('.hit'); if (!r) return;
+    const d = info(+r.dataset.i), k = s.getBoundingClientRect().width / W;
+    tip.innerHTML = d.testo; tip.style.left = (d.x * k) + 'px'; tip.style.top = (d.y * k - 8) + 'px';
+    tip.classList.add('on');
+    if (croce) { croce.style.display = ''; croce.setAttribute('x1', d.croce); croce.setAttribute('x2', d.croce); }
+  };
+  s.addEventListener('pointermove', mostra); s.addEventListener('pointerdown', mostra);
+  s.addEventListener('pointerleave', () => { tip.classList.remove('on'); if (croce) croce.style.display = 'none'; });
+}
+const legenda = serie => `<div class="legenda">${serie.map(s => `<span><i style="background:${s.colore}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
+const colore = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function disegna(){
+  const it = D.iscritti_totali, vt = D.volume_totale, ks = secchi(), modo = gran();
+  const nuovi = somma(D.iscritti, [1, 2]), vend = somma(D.volume, [1, 2, 3]);
+  const nuoviPer = Object.values(nuovi).reduce((a, v) => [a[0] + v[0], a[1] + v[1]], [0, 0]);
+  const vendPer = Object.values(vend).reduce((a, v) => [a[0] + v[0], a[1] + v[1], a[2] + v[2]], [0, 0, 0]);
+  const eur = D.eur_per_btc > 0 ? s => ` ≈ € ${fmtd(s / 1e8 * D.eur_per_btc, 0)}` : () => '';
+  const L = D.lnd || {}, rt = L.totale || {};
+  const periodo = giorni ? `negli ultimi ${giorni} giorni` : 'da sempre';
+  el('corpo').innerHTML = `
+  <div class="filtri" role="group" aria-label="Periodo">
+    ${[[30,'30 giorni'],[90,'90 giorni'],[365,'Un anno'],[0,'Da sempre']].map(([g, t]) =>
+      `<button aria-pressed="${g === giorni}" onclick="giorni=${g};disegna()">${t}</button>`).join('')}
+  </div>
+  <div class="tiles">
+    <div class="tile"><div class="k">Iscritti totali</div><div class="v">${fmt(it.totale)}</div>
+      <div class="d">${fmt(it.telegram)} Telegram · ${fmt(it.nostr)} Nostr${it.entrambi ? ` · ${fmt(it.entrambi)} con tutte e due` : ''}</div></div>
+    <div class="tile"><div class="k">Nuovi ${esc(periodo)}</div><div class="v">${fmt(nuoviPer[0] + nuoviPer[1])}</div>
+      <div class="d">${fmt(nuoviPer[0])} Telegram · ${fmt(nuoviPer[1])} Nostr</div></div>
+    <div class="tile"><div class="k">Sats venduti in totale</div><div class="v">${fmt(vt.sats)}</div>
+      <div class="d">${fmt(vt.ordini)} ordini conclusi${eur(vt.sats)}</div></div>
+    <div class="tile"><div class="k">Sats venduti ${esc(periodo)}</div><div class="v">${fmt(vendPer[1])}</div>
+      <div class="d">${fmt(vendPer[0])} ordini${eur(vendPer[1])}</div></div>
+  </div>
+
+  <div class="card"><h2>Nuovi iscritti per ${modo}</h2>
+    ${legenda([{nome:'Telegram', colore:colore('--s-tg')}, {nome:'Nostr', colore:colore('--s-nostr')}])}
+    <div class="grafico" id="gNuovi"></div>
+    <details><summary>Vedi i numeri</summary><div class="tab">${tabella(['Periodo','Telegram','Nostr'], ks.filter(k => nuovi[k]).map(k => [etichetta(k, modo), fmt(nuovi[k][0]), fmt(nuovi[k][1])]))}</div></details>
+  </div>
+
+  <div class="card"><h2>Iscritti totali nel tempo</h2>
+    ${legenda([{nome:'Telegram', colore:colore('--s-tg')}, {nome:'Nostr', colore:colore('--s-nostr')}])}
+    <div class="grafico" id="gTotali"></div>
+    ${it.senza_data ? `<div class="nota">${fmt(it.senza_data)} iscritti sono arrivati prima che la data d'iscrizione si scrivesse: sono nel totale, ma non nella linea.</div>` : ''}
+  </div>
+
+  <div class="card"><h2>Sats venduti per ${modo}</h2>
+    <div class="nota" style="margin:0 0 6px">Ordini conclusi (sats arrivati a chi vende), per data dell'ordine. Collaudi esclusi.</div>
+    <div class="grafico" id="gVolume"></div>
+    <details><summary>Vedi i numeri</summary><div class="tab">${tabella(['Periodo','Ordini','Sats','Merce'], ks.filter(k => vend[k]).map(k => [etichetta(k, modo), fmt(vend[k][0]), fmt(vend[k][1]), fmt(vend[k][2])]))}</div></details>
+  </div>
+
+  ${cardAnnulli(D.annulli, L)}
+
+  <div class="card"><h2>Quanto avremmo guadagnato con una fee</h2>
+    <div class="simu">
+      <label for="fee" style="font-weight:700">Fee</label>
+      <input type="range" id="fee" min="0" max="10" step="0.25" value="2" oninput="simula()">
+      <output id="feeV">2%</output>
+      <select id="base" onchange="simula()"><option value="merce">sulla merce</option><option value="sats">sul totale pagato</option></select>
+    </div>
+    <div class="tiles" id="simuOut"></div>
+    <div class="nota">«Merce» è il prezzo senza spedizione e protezione: è la base su cui una commissione del mercatino si calcola davvero.</div>
+  </div>
+
+  <div class="card"><h2>Fee di routing</h2>
+    ${L.stato === 'ok' ? `
+    <div class="tiles">
+      <div class="tile"><div class="k">Spesa in routing</div><div class="v">${fmtd((rt.fee_msat || 0) / 1000, 0)} sats</div><div class="d">${eur((rt.fee_msat || 0) / 1000)}</div></div>
+      <div class="tile"><div class="k">Sul volume pagato</div><div class="v">${fmtd(rt.percento, 2)}%</div><div class="d">${fmt(Math.round((rt.percento || 0) * 1e4))} ppm in media</div></div>
+      <div class="tile"><div class="k">Pagamenti in uscita</div><div class="v">${fmt(rt.pagamenti)}</div><div class="d">${fmt(rt.sats)} sats pagati</div></div>
+    </div>
+    <div class="nota">Solo i pagamenti del mercatino (incassi a chi vende, rimborsi): dallo stesso nodo pagano anche il P2P e le manovre a mano, che qui non entrano.</div>
+    <h2 style="margin-top:14px">I nodi che abbiamo pagato</h2>
+    <div class="tab">${tabella(['Nodo','Pagamenti','Sats','Fee','ppm'], (L.nodi || []).map(n => [nodo(n.nodo, ''), fmt(n.pagamenti), fmt(n.sats), fmtd(n.fee_msat / 1000, 0), n.sats ? fmt(Math.round(n.fee_msat / 1000 / n.sats * 1e6)) : '—']), [1,2,3,4])}</div>
+    <div class="nota">Il nodo è l'ultimo salto della rotta, cioè chi ha incassato: dietro un wallet custodial è il nodo del wallet.</div>`
+    : `<div class="nota">Non disponibile: ${esc(L.motivo || 'nessuna risposta dal nodo')}.</div>`}
+  </div>
+
+  <div class="card"><h2>I wallet dei venditori</h2>
+    <div class="tab">${tabella(['Wallet','Venditori','Incassi conclusi'], (D.wallet || []).map(w => [esc(w.nome) + (w.nome !== w.dominio ? ` <span class="sub">${esc(w.dominio)}</span>` : ''), fmt(w.venditori), fmt(w.incassi)]), [1,2])}</div>
+    <div class="nota">Dal dominio dell'indirizzo Lightning di oggi: chi l'ha cambiato conta tutto sul wallet nuovo.</div>
+  </div>
+
+  <div class="card"><h2>I canali del nodo</h2>
+    ${(L.canali || []).length ? `<div class="tab">${tabella(['Con chi','Capacità','Nostri / loro',''], L.canali.map(c => [nodo(c.nodo, c.alias), fmt(c.capacita), `<div class="barra" title="${fmt(c.nostri)} nostri · ${fmt(c.loro)} loro"><b style="width:${c.capacita ? c.nostri / c.capacita * 100 : 0}%"></b><s style="width:${c.capacita ? c.loro / c.capacita * 100 : 0}%"></s></div><div class="sub">${fmt(c.nostri)} · ${fmt(c.loro)}</div>`, c.attivo ? '🟢' : '⚪️ spento']), [1])}</div>`
+      : `<div class="nota">Non disponibili${L.canali_motivo ? ': ' + esc(L.canali_motivo) : ''}.</div>`}
+  </div>
+
+  ${cardZap(D.zap)}
+
+  ${cardDisputeP2P(D.dispute_p2p)}`;
+
+  barre(el('gNuovi'), ks, [{colore:colore('--s-tg')}, {colore:colore('--s-nostr')}], nuovi,
+    (k, v) => `${esc(etichetta(k, modo))} · Telegram ${fmt(v[0])} · Nostr ${fmt(v[1])}`);
+  /* il cumulato parte da chi c'era PRIMA del periodo */
+  const da = inizio(); let base = [0, 0];
+  for (const r of D.iscritti) if (r[0] < da) { base[0] += r[1]; base[1] += r[2]; }
+  const cum = {}; ks.forEach(k => { const v = nuovi[k] || [0, 0]; base = [base[0] + v[0], base[1] + v[1]]; cum[k] = base.slice(); });
+  linee(el('gTotali'), ks, [{nome:'Telegram', colore:colore('--s-tg')}, {nome:'Nostr', colore:colore('--s-nostr')}], cum,
+    (k, v) => `${esc(etichetta(k, modo))} · Telegram ${fmt(v[0])} · Nostr ${fmt(v[1])} · totale ${fmt(v[0] + v[1])}`);
+  const vSats = {}; Object.keys(vend).forEach(k => vSats[k] = [vend[k][1]]);
+  barre(el('gVolume'), ks, [{colore:colore('--s-vol')}], vSats,
+    k => `${esc(etichetta(k, modo))} · ${fmt((vend[k] || [0, 0])[1])} sats · ${fmt((vend[k] || [0])[0])} ordini`);
+  simula();
 }
 
-function etichetta(k, modo) {
-  if (modo === 'mese') {
-    const [a, m] = k.split('-');
-    return new Date(Date.UTC(+a, +m - 1, 1)).toLocaleDateString('it-IT', {month:'short', year:'2-digit'});
+function simula(){
+  const f = Number(el('fee').value) / 100, base = el('base').value === 'sats' ? 1 : 2;
+  el('feeV').textContent = fmtd(f * 100, 2) + '%';
+  const vend = somma(D.volume, [1, 2, 3]);
+  const per = Object.values(vend).reduce((a, v) => a + v[base], 0);
+  const sempre = base === 1 ? D.volume_totale.sats : D.volume_totale.merce;
+  const tre = D.volume.filter(r => r[0] >= new Date(Date.now() - 89 * GIORNO).toISOString().slice(0, 10)).reduce((a, r) => a + r[base + 1], 0);
+  const eur = s => D.eur_per_btc > 0 ? `≈ € ${fmtd(s / 1e8 * D.eur_per_btc, 0)}` : '';
+  const t = (k, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${fmt(Math.floor(s * f))} sats</div><div class="d">${eur(s * f)}</div></div>`;
+  el('simuOut').innerHTML = t('Da sempre', sempre)
+    + t(giorni ? `Negli ultimi ${giorni} giorni` : 'Nel periodo', per)
+    + t('Al mese (media ultimi 90 giorni)', tre / 3);
+}
+
+/* ANNULLAMENTI, RIMBORSI E TEMPI (7 ott 2026): la misura per decidere
+   il pagamento in sospeso nelle prime 48 ore. Numeri da sempre, con la
+   loro percentuale; le fee dei rimborsi solo se il nodo risponde. */
+const MOTIVI = {esaurito: 'oggetto esaurito', spedizione: 'non può spedire', altro: 'altro'};
+const perc = (a, b) => b ? ` (${fmtd(a / b * 100, 0)}%)` : '';
+function cardAnnulli(A, L){
+  if (!A) return '';
+  const h = A.ore_finestra || 48;
+  const motivi = Object.entries(A.motivi_venditore || {})
+    .map(([k, n]) => `${fmt(n)} ${esc(MOTIVI[k] || k)}`).join(' · ');
+  const r = (L && L.stato === 'ok' && L.rimborsi) || null;
+  const t = (k, v, d) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  return `<div class="card"><h2>Annullamenti, rimborsi e tempi</h2>
+    <div class="nota" style="margin:0 0 6px">Da sempre, sugli ordini pagati (collaudi esclusi). Serve a decidere il pagamento in sospeso nelle prime ${h} ore.</div>
+    <div class="tiles">
+      ${t('Ordini pagati', fmt(A.pagati), 'quelli che hanno bloccato dei sats')}
+      ${t('Rimborsati', fmt(A.rimborsati) + perc(A.rimborsati, A.pagati), fmt(A.rimborsati_sats) + ' sats tornati a chi compra')}
+      ${t('Annullati da chi vende', fmt(A.annullati_venditore), motivi || 'nessun motivo registrato')}
+      ${t('Rimborsati prima della spedizione', fmt(A.rimborsati_prima_spedizione) + perc(A.rimborsati_prima_spedizione, A.rimborsati), 'con il pagamento in sospeso sarebbero costati zero fee')}
+      ${t(`Spediti entro ${h} ore`, fmt(A.spediti_entro) + ' su ' + fmt(A.spediti) + perc(A.spediti_entro, A.spediti), 'dal pagamento alla spedizione')}
+      ${t(`Conclusi entro ${h} ore`, fmt(A.conclusi_entro) + ' su ' + fmt(A.conclusi) + perc(A.conclusi_entro, A.conclusi), 'dal pagamento ai sats partiti verso chi vende')}
+      ${r ? t('Fee spese nei rimborsi', fmtd((r.fee_msat || 0) / 1000, 0) + ' sats', fmt(r.pagamenti) + ' rimborsi in uscita · ' + fmtd(r.percento, 2) + '% del rimborsato') : ''}
+    </div>
+    ${r ? '' : '<div class="nota">Le fee dei rimborsi le sa il nodo: compaiono quando risponde.</div>'}
+  </div>`;
+}
+
+/* ---- GLI ZAP (10 ott 2026): l'indirizzo Lightning di casa ----
+   Il salvadanaio e' un wallet a parte dello stesso LNbits del nodo: il
+   server ne ha la sola invoice key, quindi qui si GUARDA e basta — i
+   sats li sposta Andrea dal pannello di LNbits. `Z` nullo = indirizzo
+   spento e mai uno zap: niente card. Il commento lo scrive uno
+   sconosciuto: passa SEMPRE da `esc`, come la npub. */
+function cardZap(Z){
+  if (!Z) return '';
+  const data = ts => ts ? new Date(ts * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—';
+  const chi = u => u.tipo !== 'zap' ? '<span class="sub">pagamento semplice</span>'
+    : `<span class="mono" title="${esc(u.mittente)}">${esc(u.mittente.slice(0, 12))}…${esc(u.mittente.slice(-4))}</span>`
+      + (u.ricevuta_relay ? '' : ' <span class="sub">ricevuta non ancora presa</span>');
+  return `<div class="card"><h2>⚡ Zap</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">Nel salvadanaio</div><div class="v">${Z.saldo_sats == null ? '—' : fmt(Z.saldo_sats) + ' sats'}</div><div class="d">${Z.saldo_sats == null ? 'LNbits non risponde' : 'saldo vivo del wallet «zap»'}</div></div>
+      <div class="tile"><div class="k">Arrivati in tutto</div><div class="v">${fmt(Z.totale_sats)} sats</div><div class="d">${fmt(Z.quanti)} ${Z.quanti === 1 ? 'pagamento' : 'pagamenti'}</div></div>
+      <div class="tile"><div class="k">Indirizzo</div><div class="v" style="font-size:15px">${esc(Z.indirizzo)}</div><div class="d">${Z.vivo ? (Z.nostr ? 'acceso, con ricevute di zap' : 'acceso, senza ricevute di zap') : 'spento'}${Z.in_attesa ? ` · ${fmt(Z.in_attesa)} in attesa` : ''}</div></div>
+    </div>
+    <div class="tab">${tabella(['Quando', 'Sats', 'Da chi', 'Messaggio'], (Z.ultimi || []).map(u => [data(u.pagato_il), fmt(u.sats), chi(u), esc(u.commento || '')]), [1])}</div>
+    <div class="nota">Gli ultimi venti. I sats si spostano a mano dal pannello di LNbits (wallet «zap»): il server ha la sola chiave che incassa.</div>
+  </div>`;
+}
+
+/* ---- DISPUTE P2P (12 ott 2026): quanti scambi con la garanzia
+   bloccata finiscono in disputa ----
+   La vedono tutti i moderatori: solo numeri, e delle aperte l'id
+   dell'ordine accorciato. `X` nullo = un server senza P2P: niente card.
+   IL DENOMINATORE sono gli scambi CON GARANZIA (`con_garanzia`): una
+   disputa puo' nascere solo li'. Gli scambi presi restano in tabella,
+   per confronto. Uno scambio sta nel periodo in cui e' stato PRESO e la
+   disputa sta col suo scambio; la tendenza e' in PUNTI percentuali sul
+   periodo prima, lungo uguale. Senza scambi con garanzia la percentuale
+   e' «—», mai 0%. `X.dedotti` = gli scambi vecchi la cui garanzia e'
+   ancora una deduzione; `X.escluse` = le dispute tolte a mano dal conto
+   (leva P2P_DISPUTE_ESCLUSE), che la card NOMINA: un numero corretto a
+   mano si deve vedere. */
+const percD = p => p == null ? '—' : fmtd(p, 1) + '%';
+function tendenzaD(p){
+  if (!p.prima) return '—';
+  if (p.tendenza == null) return '—';
+  const segno = p.tendenza > 0 ? '▲ +' : p.tendenza < 0 ? '▼ −' : '= ';
+  /* due righe corte: su un telefono la colonna e' larga ottanta pixel */
+  return `<span style="white-space:nowrap">${segno}${fmtd(Math.abs(p.tendenza), 1)}</span><br><span class="sub" style="white-space:nowrap">era ${percD(p.prima.percento)}</span>`;
+}
+function cardDisputeP2P(X){
+  if (!X) return '';
+  const P7 = X.periodi['7'], P30 = X.periodi['30'], PT = X.periodi.tutto, S = X.soglia;
+  const su = p => `${fmt(p.con_disputa)} ${p.con_disputa === 1 ? 'disputa' : 'dispute'} su ${fmt(p.con_garanzia)} ${p.con_garanzia === 1 ? 'scambio con garanzia' : 'scambi con garanzia'}`;
+  const t = (k, v, d, rosso) => `<div class="tile"><div class="k">${k}</div><div class="v"${rosso ? ' style="color:var(--err)"' : ''}>${v}</div><div class="d">${d}</div></div>`;
+  const giorni = ts => Math.max(0, Math.floor((Date.now() / 1000 - ts) / 86400));
+  const aperte = X.aperte.map(a => `<span class="mono">${esc(a.ordine)}</span> <span class="sub">${giorni(a.aperta_il) ? 'da ' + fmt(giorni(a.aperta_il)) + ' g' : 'da oggi'}${a.presa ? '' : ', nessuno l\'ha presa'}</span>`).join(' · ');
+  const riga = (nome, f) => [nome, f(P7, 7), f(P30, 30), f(PT, 0)];
+  const dal = X.dal ? new Date(X.dal * 1000).toLocaleDateString('it-IT', {day: 'numeric', month: 'short', year: 'numeric'}) : '';
+  return `<div class="card" id="disputeP2P"><h2>⚖️ Dispute P2P</h2>
+    ${PT.presi ? `
+    <div class="tiles">
+      ${t('Ultimi 7 giorni', percD(P7.percento), su(P7))}
+      ${t('Ultimi 30 giorni', percD(P30.percento), su(P30) + (S.sopra ? ' · sopra la soglia' : ''), S.sopra)}
+      ${t('Da sempre', percD(PT.percento), su(PT))}
+      ${t('Ancora aperte', fmt(X.aperte.length), aperte || 'nessuna')}
+    </div>
+    <div class="tab">${tabella(['', '7 giorni', '30 giorni', 'Da sempre'], [
+      riga('Scambi presi', p => fmt(p.presi)),
+      riga('Scambi con garanzia', p => fmt(p.con_garanzia)),
+      riga('Con disputa', p => fmt(p.con_disputa)),
+      riga('Percentuale', p => `<b>${percD(p.percento)}</b>`),
+      riga('Punti sul periodo prima', tendenzaD),
+      riga('Chiuse a favore di chi compra', p => fmt(p.compratore)),
+      riga('Chiuse a favore di chi vende', p => fmt(p.venditore)),
+      riga('Ancora aperte', p => fmt(p.aperte))])}</div>
+    <div class="nota">La percentuale è sugli scambi con la garanzia bloccata, dove una disputa può nascere${X.dedotti ? `; per ${fmt(X.dedotti)} ${X.dedotti === 1 ? 'scambio più vecchio' : 'scambi più vecchi'} la garanzia è dedotta dal motivo` : ''}. Uno scambio conta nel periodo in cui è stato preso${dal ? ` («da sempre» parte dal ${esc(dal)})` : ''}. «A favore di» dice dove sono andati i sats: ${fmt(PT.moderatore)} su ${fmt(PT.compratore + PT.venditore)} le ha decise un moderatore, le altre si sono chiuse fra le parti o per scadenza.</div>
+    ${(X.escluse || []).length ? `<div class="nota">${X.escluse.length === 1 ? 'Una disputa non contata' : fmt(X.escluse.length) + ' dispute non contate'} per scelta (leva P2P_DISPUTE_ESCLUSE): ${X.escluse.map(e => `<span class="mono">${esc(e)}</span>`).join(', ')}.</div>` : ''}
+    <div class="nota">${S.percento > 0 ? `I moderatori ricevono un avviso se negli ultimi 30 giorni si passa il ${fmtd(S.percento, 1)}%, con almeno ${fmt(S.minimo)} dispute.` : 'L\'avviso ai moderatori è spento.'}</div>`
+    : '<div class="nota">Ancora nessuno scambio preso.</div>'}
+  </div>`;
+}
+
+function tabella(testa, righe, numeriche){
+  /* una tabella VUOTA esce prima di tutto (10 ott 2026): `righe.length &&`
+     dava 0, e `new Set(0)` alzava — su un giorno senza scambi P2P, o su
+     un database appena nato, portandosi via la pagina intera */
+  if (!righe.length) return '<div class="nota">Ancora niente.</div>';
+  const num = new Set(numeriche || testa.map((_, i) => i).filter(i => i > 0));
+  return `<table><thead><tr>${testa.map((h, i) => `<th class="${num.has(i) ? 'n' : ''}">${esc(h)}</th>`).join('')}</tr></thead><tbody>`
+    + righe.map(r => `<tr>${r.map((c, i) => `<td class="${num.has(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+}
+/* un nodo: l'alias se c'e', la chiave accorciata, e il link per guardarlo */
+function nodo(pub, alias){
+  const p = String(pub || '');
+  if (!/^[0-9a-f]{66}$/i.test(p)) return esc(alias || p || '—');
+  const corto = p.slice(0, 8) + '…' + p.slice(-4);
+  return (alias ? `<b>${esc(alias)}</b><br>` : '')
+    + `<a class="mono" href="https://amboss.space/node/${p}" target="_blank" rel="noopener">${corto}</a>`;
+}
+
+/* ---- SCAMBI P2P (10 ott 2026): la sezione degli amministratori ----
+   Ha il SUO periodo e la SUA richiesta: i numeri li fa il server per
+   il periodo chiesto (`/api/admin/p2p-statistiche`), non questa pagina.
+   Chi non e' amministratore qui non arriva — `D.p2p_statistiche` e'
+   falso e la richiesta non parte — e se arrivasse lo stesso il server
+   risponde 403 e il riquadro resta vuoto. */
+let P = null, periodoP2P = 'oggi';
+const PERIODI_P2P = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
+const MOTIVI_P2P = {garanzia_non_pagata: 'garanzia non pagata', fattura_non_data: 'fattura non data',
+  tempo_scaduto: 'tempo scaduto', garanzia_scaduta: 'garanzia arrivata a scadenza',
+  a_mano: 'annullato a mano', concordato: 'annullo concordato', moderatore: 'deciso da un moderatore'};
+const LATI_P2P = {sell: 'Vendi', buy: 'Compra'};
+const ESITI_P2P = {completato: '✅ concluso', annullato: '❌ annullato', tornato: '🔄 tornato in vetrina'};
+/* i sats col punto delle migliaia SEMPRE: l'italiano di serie non lo
+   mette sotto le cinque cifre, e «4046 sats» accanto a «185.908» stona */
+const fmtP = n => Number(n || 0).toLocaleString('it-IT', {useGrouping: 'always'});
+const euro2 = n => '€ ' + Number(n || 0).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+async function caricaP2P(){
+  const box = el('p2p');
+  box.querySelectorAll('.filtri button').forEach(b => b.setAttribute('aria-pressed', b.dataset.p === periodoP2P));
+  let r;
+  try {
+    r = await fetch('/api/admin/p2p-statistiche?periodo=' + encodeURIComponent(periodoP2P),
+      {credentials: 'same-origin', headers: {'X-Tg-Init-Data': intestazione()}});
+  } catch(e) { r = null; }
+  if (r && (r.status === 403 || r.status === 401)) { P = null; box.innerHTML = ''; return; }
+  if (!r || !r.ok) {
+    box.innerHTML = `<h1 style="margin-top:28px">🔁 Scambi P2P</h1><div class="stato">Non riesco a leggere i conti del P2P${r ? ` (il server ha risposto ${r.status})` : ''}: riprova fra poco.</div>`;
+    return;
   }
-  return new Date(k + 'T00:00:00Z').toLocaleDateString('it-IT', {day:'numeric', month:'short'});
+  P = await r.json();
+  disegnaP2P();
 }
 
-addEventListener('resize', () => D && disegnaGrafici());
+function disegnaP2P(){
+  if (!P) return;
+  const s = P.scambi, v = P.volume, c = P.commissioni, o = P.ordini, pe = P.persone, rt = c.routing;
+  /* uno scambio, due scambi */
+  const sc = n => n === 1 ? 'scambio' : 'scambi';
+  const t = (k, val, d) => `<div class="tile"><div class="k">${k}</div><div class="v">${val}</div><div class="d">${d || ''}</div></div>`;
+  const eurOra = sats => P.eur_per_btc > 0 ? `≈ ${euro2(sats / 1e8 * P.eur_per_btc)} al cambio di adesso` : '';
+  const motivi = Object.entries(s.motivi || {}).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${fmtP(n)} ${esc(MOTIVI_P2P[k] || k)}`).join(' · ');
+  const gruppi = (righe, nome) => righe.map(g => [nome(g.nome), fmtP(g.scambi), g.euro ? euro2(g.euro) : '—', fmtP(g.sats)]);
+  const fetta = (nome, f) => [nome, fmtP(f.meta), fmtP(f.sats), f.percento == null ? '—' : fmtd(f.percento, 2) + '%'];
+  const fette = [fetta('A fee piena', c.fette.piena), fetta('Con sconto pionieri', c.fette.pioniere), fetta('Con sconto Lv5', c.fette.livello)];
+  if (c.non_divise) fette.push(['Non divisibili (manca l\'importo dello scambio)', '—', fmtP(c.non_divise), '—']);
+  const routing = rt.stato === 'ok' ? fmtP(rt.sats) + ' sats'
+    : rt.stato === 'parziale' ? fmtP(rt.sats) + ' sats <span class="sub">parziale</span>' : 'non disponibile';
+  const routingD = !s.completati ? 'nessuno scambio concluso nel periodo'
+    : rt.stato === 'ok' ? rt.abbinati === 1 ? 'letto dal nodo' : `letto dal nodo per tutti e ${fmtP(rt.abbinati)} gli scambi`
+    : rt.stato === 'parziale' ? `noto per ${fmtP(rt.abbinati)} ${sc(rt.abbinati)} su ${fmtP(s.completati)}: per gli altri non disponibile`
+    : (P.lnd.stato === 'ok' ? 'il nodo risponde, ma non ha un pagamento che combaci' : esc(P.lnd.motivo || 'il nodo non risponde'));
+  const quando = ts => ts ? new Date(ts * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : '—';
+  const esito = u => esc(ESITI_P2P[u.esito] || u.esito)
+    + (u.esito === 'completato' ? (u.pagato ? '' : ' <span class="sub">pagamento in viaggio</span>')
+       /* accanto a «annullato» il motivo perde la parola che lo ripete */
+       : ` <span class="sub">${esc((MOTIVI_P2P[u.motivo] || u.motivo || '').replace(/^(annullato|annullo) /, ''))}</span>`);
+  const chi = u => [u.pubblica, u.prende].map(x => esc(x || '—')).join(' → ');
+  el('p2p').innerHTML = `
+  <h1 style="margin-top:28px">🔁 Scambi P2P</h1>
+  <div class="sub">Riservato agli amministratori · conti aggiornati alle ${new Date(P.generato * 1000).toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}</div>
+  <div class="filtri" role="group" aria-label="Periodo degli scambi P2P">
+    ${PERIODI_P2P.map(([p, nome]) => `<button data-p="${p}" aria-pressed="${p === P.periodo}" onclick="periodoP2P='${p}';caricaP2P()">${nome}</button>`).join('')}
+  </div>
+
+  <div class="card"><h2>Scambi</h2>
+    <div class="tiles">
+      ${t('Completati', fmtP(s.completati), s.in_viaggio ? `${fmtP(s.in_viaggio)} col pagamento a chi compra ancora in viaggio` : 'sats arrivati a chi compra')}
+      ${t('Annullati', fmtP(s.annullati), (motivi || 'nessuno') + (s.tornati ? ` — ${fmtP(s.tornati)} con l'ordine tornato in vetrina` : ''))}
+      ${t('In corso adesso', fmtP(s.in_corso), (s.in_disputa ? `${fmtP(s.in_disputa)} in disputa · ` : '') + 'non dipende dal periodo')}
+      ${t('Tasso di completamento', s.tasso == null ? '—' : fmtd(s.tasso, 1) + '%', 'completati su chiusi (completati + annullati)')}
+    </div>
+  </div>
+
+  <div class="card"><h2>Volume</h2>
+    <div class="tiles">
+      ${t('Euro scambiati', euro2(v.euro), v.senza_euro ? `${fmtP(v.senza_euro)} ${sc(v.senza_euro)} senza cifra in euro (ordini di altri client)` : 'la cifra del libro, scambi conclusi')}
+      ${t('Sats passati', fmtP(v.sats), eurOra(v.sats))}
+      ${t('Scambio medio', s.completati - v.senza_euro > 0 ? euro2(v.euro / (s.completati - v.senza_euro)) : '—', s.completati ? fmtP(Math.round(v.sats / s.completati)) + ' sats in media' : '')}
+    </div>
+    <h2 style="margin-top:14px">Per tipo di ordine</h2>
+    <div class="tab">${tabella(['Tipo', 'Scambi', 'Euro', 'Sats'], gruppi(v.lati, n => esc(LATI_P2P[n] || 'Non noto')))}</div>
+    <h2 style="margin-top:14px">Per metodo di pagamento</h2>
+    <div class="tab">${tabella(['Metodo', 'Scambi', 'Euro', 'Sats'], gruppi(v.metodi, n => esc(n || 'Non noto')))}</div>
+    <div class="nota">«Vendi» e «Compra» sono dal lato di chi ha pubblicato l'ordine. Un ordine con più metodi sta in una riga sua: quale dei due sia stato usato lo sanno solo le due parti.</div>
+  </div>
+
+  <div class="card"><h2>Commissioni</h2>
+    <div class="tiles">
+      ${t('Incassate', fmtP(c.lorde_sats) + ' sats', c.lorde_sats ? `≈ ${euro2(c.euro)} al cambio del momento${c.senza_cambio ? ` (${fmtP(c.senza_cambio)} ${sc(c.senza_cambio)} senza cambio)` : ''}` : '')}
+      ${t('Routing dei payout', routing, routingD)}
+      ${t('Nette', c.nette_sats == null ? '—' : fmtP(c.nette_sats) + ' sats', c.nette_sats == null ? 'servono le fee di routing di tutti gli scambi' : 'incassate meno il routing')}
+    </div>
+    <div class="tab">${tabella(['Come è stata pagata', 'Metà', 'Sats', '% sullo scambio'], fette)}</div>
+    <div class="nota">Ogni scambio ha due metà di commissione: una di chi vende, una di chi compra.${c.senza_importi ? ` ${fmtP(c.senza_importi)} ${c.senza_importi === 1 ? 'scambio concluso non porta' : 'scambi conclusi non portano'} gli importi di chiusura e qui non ${c.senza_importi === 1 ? 'entra' : 'entrano'}.` : ''}</div>
+  </div>
+
+  <div class="card"><h2>Ordini</h2>
+    <div class="tiles">
+      ${t('Pubblicati', fmtP(o.pubblicati), 'da Barattolo' + (o.a_intervallo ? ` · ${fmtP(o.a_intervallo)} a intervallo` : ''))}
+      ${t('Presi', fmtP(o.presi), 'le prese raccontate dal coordinatore')}
+      ${t('Scaduti senza essere presi', fmtP(o.scaduti), o.ritirati ? `${fmtP(o.ritirati)} ${o.ritirati === 1 ? 'ritirato' : 'ritirati'} da chi li aveva pubblicati` : 'nessuno ritirato a mano')}
+      ${t('Importo medio', o.importo_medio == null ? '—' : euro2(o.importo_medio), 'degli ordini pubblicati a cifra fissa')}
+    </div>
+  </div>
+
+  <div class="card"><h2>Persone</h2>
+    <div class="tiles">
+      ${t('Utenti diversi', fmtP(pe.diverse), 'con almeno uno scambio concluso nel periodo')}
+      ${t('Nuovi', fmtP(pe.nuove), 'al primo scambio concluso nel periodo')}
+      ${pe.parti_ignote ? t('Parti non riconosciute', fmtP(pe.parti_ignote), 'altri client, o chiavi che il server non conosce') : ''}
+    </div>
+  </div>
+
+  <div class="card"><h2>Ultimi scambi${P.ultimi.length ? ` (${fmtP(P.ultimi.length)})` : ''}</h2>
+    <div class="tab">${tabella(['Data', 'Ordine', 'Tipo', 'Importo', 'Sats', 'Metodo', 'Esito', 'Commissione', 'Routing', 'Pubblica → prende'],
+      P.ultimi.map(u => [quando(u.quando), `<span class="mono">${esc(u.ordine)}</span>`, esc(LATI_P2P[u.lato] || '—'),
+        u.euro ? euro2(u.euro) : '—', u.sats ? fmtP(u.sats) : '—', esc(u.metodi || '—'), esito(u),
+        u.commissione == null ? '—' : fmtP(u.commissione), u.routing == null ? '—' : fmtP(u.routing), chi(u)]), [3, 4, 7, 8])}</div>
+    <div class="nota">Al posto dei nomi le iniziali, o le ultime tre cifre dell'id per chi un nome non ce l'ha. «—» è chi il server non conosce, o non ricorda più.</div>
+    <details><summary>Cosa è certo e cosa è una stima</summary>
+      <div class="nota"><b>Certo</b> (lo dice il coordinatore): quanti scambi, i loro passi e le ore; i tre importi di chiusura — lo scambio, il netto a chi compra, il totale bloccato da chi vende — e quindi le commissioni incassate.</div>
+      <div class="nota"><b>Certo ma parziale</b>: euro, metodo e tipo vengono dal libro, che il server segue per gli ordini con almeno un account di Barattolo; gli ordini «pubblicati» sono quelli pubblicati da qui; le persone sono quelle che il libro ha intestato (chi prende da Nostr senza farsi riconoscere non si conta).</div>
+      <div class="nota"><b>Dedotto</b>: il motivo di un annullo per scadenza (quale gesto mancava nella cronaca); la divisione fra fee piena e scontata (chi aveva diritto allo sconto secondo Barattolo, mentre la cifra l'ha applicata il coordinatore); il routing, che è la fee vera letta dal nodo ma abbinata allo scambio per importo e ora.</div>
+      <div class="nota"><b>Stima</b>: gli euro delle commissioni (sats per il cambio della presa) e ogni «≈ al cambio di adesso».</div>
+    </details>
+  </div>`;
+}
+
+let ridisegno = 0;
+addEventListener('resize', () => { if (!D) return; clearTimeout(ridisegno); ridisegno = setTimeout(disegna, 150); });
 carica();
 </script>
 </body>

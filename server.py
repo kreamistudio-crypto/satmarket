@@ -2236,26 +2236,6 @@ def imposta_canale_vetrina(valore: str) -> str:
     return valore
 
 
-_CANALE_BITCOIN_PODCAST = None
-
-
-def canale_bitcoin_podcast() -> str:
-    """Canale secondario BitcoinPodcastTelegram (ott 2026)."""
-    global _CANALE_BITCOIN_PODCAST
-    if _CANALE_BITCOIN_PODCAST is None:
-        _CANALE_BITCOIN_PODCAST = impostazione("canale_bitcoin_podcast", "")
-    return _CANALE_BITCOIN_PODCAST
-
-
-def imposta_canale_bitcoin_podcast(valore: str) -> str:
-    """Cambia il canale BitcoinPodcast e riallinea la cache."""
-    global _CANALE_BITCOIN_PODCAST
-    valore = (valore or "").strip()
-    scrivi_impostazione("canale_bitcoin_podcast", valore)
-    _CANALE_BITCOIN_PODCAST = valore
-    return valore
-
-
 def imposta_canale(valore: str) -> str:
     """Cambia il canale e riallinea la cache. Stringa vuota = spento
     (e NON «torna al config»: chi spegne dal bot vuole il silenzio,
@@ -7718,8 +7698,6 @@ def init_db():
                     # e non un secondo uso del primo, o il ✅ Venduto
                     # finirebbe in un canale e il post nell'altro
                     "post_vetrina_id INTEGER DEFAULT 0",
-                    # BitcoinPodcastTelegram (ott 2026)
-                    "post_bitcoin_podcast_id INTEGER DEFAULT 0",
                     "post_nostr_id TEXT DEFAULT ''",
                     # lat/lon: coordinate del comune riconosciuto nella
                     # zona (0,0 = non riconosciuta). Scritte una volta
@@ -17124,7 +17102,8 @@ def _riga_sfoglia(a: dict, cambio: float) -> str:
             f"💰 {_prezzo_promo(dict(a), cambio)}")
     if a["zona_comune"]:
         riga += f" · 📍 {html.escape(a['zona_comune'])}"
-    riga += f"\n{link_telegram('annuncio', a['id'])}"
+    riga += (f"\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+             "Apri su Barattolo</a>")
     return riga
 
 
@@ -17411,41 +17390,6 @@ async def _canale_vetrina_comando(chat: int, arg: str):
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
-async def _canale_bitcoin_podcast_comando(chat: int, arg: str):
-    """Il ramo «/canale bitcoinpodcast …» (ott 2026): dove vanno gli
-    annunci e gli scambi P2P per BitcoinPodcastTelegram, senza filtro
-    @username."""
-    if not arg:
-        imposta_canale_bitcoin_podcast("")
-        await notifica_admin(f"📻 BitcoinPodcast: spento (da tg {chat})",
-                             argomento="riepiloghi")
-        return await bot_api("sendMessage", {"chat_id": chat,
-            "text": "✅ Fatto: non pubblico più in BitcoinPodcastTelegram.",
-            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
-    r = await bot_api("sendMessage", {
-        "chat_id": arg, "parse_mode": "HTML",
-        "text": "🫙 <b>Barattolo pubblicherà qui i nuovi annunci e gli "
-                "scambi P2P.</b>\nMercatino e comunità in satoshi, con "
-                "deposito di garanzia."})
-    if not (r and r.get("ok")):
-        motivo = (r or {}).get("description") or "nessuna risposta"
-        return await bot_api("sendMessage", {"chat_id": chat,
-            "text": f"❌ Non riesco a scrivere in <code>"
-                    f"{html.escape(arg)}</code>.\nTelegram dice: "
-                    f"<i>{html.escape(str(motivo))}</i>\n\n"
-                    "Il bot dev'essere amministratore di quel canale, "
-                    "col permesso di pubblicare (e di modificare i "
-                    "propri messaggi, per il ✅ Venduto).",
-            "parse_mode": "HTML"})
-    imposta_canale_bitcoin_podcast(arg)
-    await notifica_admin(f"📻 BitcoinPodcast: {arg} (da tg {chat})",
-                         argomento="riepiloghi")
-    await bot_api("sendMessage", {"chat_id": chat,
-        "text": f"✅ Fatto: gli annunci e gli scambi P2P nuovi escono "
-                f"anche in <code>{html.escape(arg)}</code>.",
-        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
-
-
 async def _canale_riepilogo_comando(chat: int, arg: str):
     """Il ramo «/canale riepilogo …»: dove va il post del lunedi'.
 
@@ -17509,8 +17453,6 @@ async def comando_canale(mittente: dict, testo: str):
         return await _canale_riepilogo_comando(chat, resto)
     if prima == ["vetrina"]:
         return await _canale_vetrina_comando(chat, resto)
-    if prima == ["bitcoinpodcast"]:
-        return await _canale_bitcoin_podcast_comando(chat, resto)
     if not arg:
         ora = canale_id()
         stato = (f"Adesso scrivo in <code>{html.escape(ora)}</code>."
@@ -17519,10 +17461,6 @@ async def comando_canale(mittente: dict, testo: str):
         stato += ("\nIl riepilogo del lunedì va in <code>"
                   f"{html.escape(riep)}</code>." if riep else
                   "\nIl riepilogo del lunedì non ha dove andare.")
-        btc = canale_bitcoin_podcast()
-        stato += ("\nBitcoinPodcast va in <code>"
-                  f"{html.escape(btc)}</code>." if btc else
-                  "\nBitcoinPodcast è spento.")
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": f"📣 <b>Canale del mercatino</b>\n{stato}\n\n"
                     "Per cambiarlo: <code>/canale @nomecanale</code> "
@@ -17531,9 +17469,7 @@ async def comando_canale(mittente: dict, testo: str):
                     "Per spegnerlo: <code>/canale spento</code>.\n"
                     "Per il riepilogo del lunedì: <code>/canale "
                     "riepilogo @nomecanale</code> (senza nome, torna "
-                    "dove vanno gli annunci).\n"
-                    "Per BitcoinPodcast: <code>/canale bitcoinpodcast "
-                    "@nomecanale</code> (senza nome, si spegne).\n\n"
+                    "dove vanno gli annunci).\n\n"
                     "⚠️ Il bot dev'essere <b>amministratore</b> del "
                     "canale, o non riuscirà a pubblicare.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
@@ -25679,14 +25615,14 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"✏️ Il venditore ha ritoccato il prezzo di "
             f"«{d['titolo'][:60]}»: la tua offerta decade. Se ti "
             f"interessa ancora, riproponi sul prezzo nuovo."
-            f"\n{link_telegram('annuncio', annuncio_id)}")
+            f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
     for riga in decadute_carrello:
         await notifica(riga["compratore_id"],
             f"✏️ Il venditore ha ritoccato il prezzo di "
             f"«{d['titolo'][:60]}», che è dentro la tua offerta sul "
             f"carrello: l'offerta decade. Se ti interessa ancora, "
             f"riproponi sul listino nuovo."
-            f"\n{link_telegram('annuncio', annuncio_id)}")
+            f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
     conto_foto = {}
     if nomi_nuovi:
         nomi = nomi_nuovi
@@ -26309,7 +26245,7 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
         await notifica(a["venditore_id"],
                        f"✅ <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
                        f"approvato</b> ed è in vetrina!\n"
-                       f"{link_telegram('annuncio', annuncio_id)}")
+                       f"{URL_PUBBLICO}/annuncio/{annuncio_id}")
         return True, f"✅ Pubblicato: «{html.escape(a['titolo'][:60])}»"
     # Il rifiuto ritira anche dai canali. Prima si poteva dare per
     # scontato che un annuncio in revisione non fosse MAI stato
@@ -32541,7 +32477,7 @@ async def verifica_rilancio(rilancio_id: int,
     except Exception:
         pass
     titolo = html.escape(a["titolo"][:60])
-    link = f"\n{link_telegram('annuncio', ril['annuncio_id'])}"
+    link = f"\n{URL_PUBBLICO}/annuncio/{ril['annuncio_id']}"
     if in_testa and testa_prima and testa_prima["tg_id"] != user["id"]:
         # il «budget esaurito»: un proxy spodestato e' stato esposto
         # al suo massimo per costruzione — e' l'unico squillo che il
@@ -33211,7 +33147,7 @@ async def _avvisa_aste_in_scadenza():
                 f"⏳ <b>L'asta «{a['titolo'][:60]}» si chiude tra circa "
                 f"un'ora.</b> Controlla la tua posizione: un rilancio "
                 f"all'ultimo prolunga la gara di {ASTA_PROROGA_MINUTI} "
-                f"minuti.\n{link_telegram('annuncio', a['id'])}")
+                f"minuti.\n{URL_PUBBLICO}/annuncio/{a['id']}")
         except Exception as e:
             print(f"⚠️ Avviso scadenza asta saltato: {e}")
 
@@ -33592,7 +33528,7 @@ async def fai_offerta(annuncio_id: int, req: Request,
         + f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
         f"una controproposta. Senza risposta entro "
         f"{ORE_RISPOSTA_OFFERTA} ore l'offerta scade da sola."
-        f"\n{link_telegram('offerta', offerta_id)}")
+        f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 
 
@@ -33863,7 +33799,7 @@ async def fai_offerta_carrello(req: Request,
         f"accettare, rifiutare o fare una controproposta sul totale. "
         f"Senza risposta entro {ORE_RISPOSTA_OFFERTA} ore l'offerta "
         f"scade da sola."
-        f"\n{link_telegram('offerta', offerta_id)}")
+        f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 
 
@@ -33995,8 +33931,8 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         link = (f"\n{URL_PUBBLICO}/negozio/{_neg['negozio']}"
                 if _neg and _neg["negozio"] else "")
     else:
-        link = f"\n{link_telegram('annuncio', off['annuncio_id'])}"
-    link_off = f"\n{link_telegram('offerta', offerta_id)}"
+        link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
+    link_off = f"\n{URL_PUBBLICO}/offerta/{offerta_id}"
     # I pezzi dell'accordo: 0 (le offerte di ieri) e 1 dicono la sola
     # cifra, com'e' sempre stato — vedi _cifra_accordo. Niente «or 0»:
     # la colonna e' un INTEGER DEFAULT 0 e l'ALTER ha riempito le righe
@@ -34420,7 +34356,7 @@ async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
     resta = ("i tuoi annunci restano in vetrina" if carrello
              else "l'annuncio resta in vetrina")
     link_ann = ("" if carrello
-                else f"\n{link_telegram('annuncio', off['annuncio_id'])}")
+                else f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}")
     if off["stato"] == "accettata":
         # Qui aveva detto si' e aspettava dei sats: «nessun sat si era
         # mosso» e' la riga che conta, poteva credere di averli in
@@ -34501,7 +34437,7 @@ async def _avvisa_savers_lampo(a: dict, percento: int, scadenza: int,
                 f"«{html.escape(a['titolo'][:60])}»: <s>{vecchio}</s> → "
                 f"<b>{nuovo}</b> (−{percento}%)\n"
                 f"Hai tempo fino {_quando_scade(scadenza)}.\n"
-                f"{link_telegram('annuncio', a['id'])}"))
+                f"{URL_PUBBLICO}/annuncio/{a['id']}"))
             await asyncio.sleep(0.2)
     except Exception as e:
         print(f"⚠️ Avvisi lampo saltati: {e}")
@@ -60715,11 +60651,6 @@ URL_PUBBLICO = "https://barattolo.store"
 LINK_BOT = "https://t.me/ilbarattolobot"
 
 
-def link_telegram(tipo: str, id_: str) -> str:
-    """Deep link Telegram per aprire annuncio o offerta nella miniapp."""
-    return f"{LINK_BOT}?startapp={tipo}_{id_}"
-
-
 def nsec_to_bytes(nsec: str) -> bytes:
     """Converte la nsec (bech32) nei 32 byte della chiave privata.
     Gemella di npub_to_hex qui sopra, ma per la chiave segreta."""
@@ -63835,7 +63766,7 @@ def _nota_promo(a: dict, cambio: float) -> str:
     foto = _foto_url_nostr(a.get("foto", ""))
     if foto:
         testo += f"\n\n{foto[0]}"
-    testo += f"\n{link_telegram('annuncio', a['id'])}"
+    testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
     testo += f"\n\n{_hashtag_promo(a)}"
     return testo
 
@@ -64006,7 +63937,8 @@ def _vetrina_venditore(a: dict, altri: list) -> str:
         t = (x.get("titolo") or "").strip()
         if len(t) > 46:
             t = t[:45].rstrip() + "…"
-        voci.append(f"\n• {html.escape(t)} — {link_telegram('annuncio', x['id'])}")
+        voci.append(f"\n• <a href=\"{URL_PUBBLICO}/annuncio/{x['id']}\">"
+                    f"{html.escape(t)}</a>")
     return "\n\n🛍 Anche in vendita da lui:" + "".join(voci)
 
 
@@ -64027,7 +63959,7 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False,
     del venditore (venditore, venditore_username, venditore_negozio),
     cioe' letta col JOIN su `utenti` — senza, la firma esce anonima e
     il post NUOVO e quello RIEDITATO col ✅ direbbero cose diverse."""
-    link = f"{link_telegram('annuncio', a['id'])}"
+    link = f"{URL_PUBBLICO}/annuncio/{a['id']}"
     testo = f"🫙 <b>{html.escape(a['titolo'])}</b>"
     testo += f"\n💰 {_prezzo_promo(a, cambio)}"
     if a.get("zona"):
@@ -64362,7 +64294,6 @@ async def _posta_promo_singolo(a: dict, giorni: int):
         except Exception as e:
             print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
     post_vetrina_id = 0
-    post_bitcoin_podcast_id = 0
     caption = _caption_canale(a, cambio, altri=altri)
     foto = _foto_url_nostr(a.get("foto", ""))
     if canale_id():
@@ -64381,17 +64312,12 @@ async def _posta_promo_singolo(a: dict, giorni: int):
     if canale_vetrina() and (a.get("venditore_username") or ""):
         post_vetrina_id = await _manda_post_canale(
             canale_vetrina(), caption, foto)
-    # BitcoinPodcastTelegram (ott 2026): nuovo canale, NO filtro @username
-    if canale_bitcoin_podcast():
-        post_bitcoin_podcast_id = await _manda_post_canale(
-            canale_bitcoin_podcast(), caption, foto)
-    if post_nostr_id or post_canale_id or post_vetrina_id or post_bitcoin_podcast_id:
+    if post_nostr_id or post_canale_id or post_vetrina_id:
         con = db()
         con.execute(
             "UPDATE annunci SET post_nostr_id=?, post_canale_id=?, "
-            "post_vetrina_id=?, post_bitcoin_podcast_id=? WHERE id=?",
-            (post_nostr_id, post_canale_id, post_vetrina_id,
-             post_bitcoin_podcast_id, a["id"]))
+            "post_vetrina_id=? WHERE id=?",
+            (post_nostr_id, post_canale_id, post_vetrina_id, a["id"]))
         con.commit()
         con.close()
 
@@ -64477,7 +64403,8 @@ async def promo_lampo(annuncio_id: int, percento: int, scadenza: int):
                  f"<b>{html.escape(a['titolo'])}</b>"
                  f"\n💰 {_riga_prezzo_lampo(a, percento, cambio)}"
                  f"\n⏳ solo fino {_quando_scade(scadenza)}"
-                 f"\n\n{link_telegram('annuncio', a['id'])}"
+                 f"\n\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+                 "🫙 Apri su Barattolo</a>"
                  f"\n\n{_hashtag_promo(a)}")
         r = await bot_api("sendMessage", {
             "chat_id": canale_id(), "text": testo,
@@ -64509,8 +64436,8 @@ def _riga_negozio(a: dict, cambio: float) -> str:
     didascalia e' HTML e un «<» spegne il messaggio in silenzio, ed e'
     la lezione dell'avviso di spedizione."""
     return (f"{EMOJI_CATEGORIA.get(a.get('categoria'), '📦')} "
-            f"{html.escape(a['titolo'])} ({link_telegram('annuncio', a['id'])})"
-            f" — {_prezzo_promo(a, cambio)}")
+            f"<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+            f"{html.escape(a['titolo'])}</a> — {_prezzo_promo(a, cambio)}")
 
 
 async def _posta_negozio(gruppo: list, giorni: int):
@@ -65757,7 +65684,7 @@ async def _notifica_match(tg_id: int, annunci: list, cambio: float):
                  f"{_prezzo_promo(a, cambio)}")
         if a.get("zona"):
             testo += f"\n📍 {html.escape(a['zona'])}"
-        testo += f"\n{link_telegram('annuncio', a['id'])}"
+        testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
     else:
         testo = (f"📬 {len(annunci)} nuovi annunci corrispondono ai "
                  f"tuoi avvisi di ricerca → {URL_PUBBLICO}")
@@ -66373,7 +66300,7 @@ async def _drena_colpo():
                         f"l'ha appena messo nel suo barattolo.\n"
                         f"💰 Se vuoi dargli una spinta, lancia "
                         f"un'offerta lampo dalla scheda dell'annuncio:\n"
-                        f"{link_telegram('annuncio', a['id'])}"))
+                        f"{URL_PUBBLICO}/annuncio/{a['id']}"))
             else:
                 # La valvola: un solo messaggio, non nomina nessuno.
                 await notifica(venditore, (
@@ -66422,8 +66349,7 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         # Ognuna fallisce per conto suo: se il canale della comunita'
         # ci ha tolto i permessi, il nostro si aggiorna lo stesso.
         dove = [(canale_id(), a["post_canale_id"]),
-                (canale_vetrina(), _post_vetrina(a)),
-                (canale_bitcoin_podcast(), a.get("post_bitcoin_podcast_id"))]
+                (canale_vetrina(), _post_vetrina(a))]
         if not any(c and m for c, m in dove):
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
@@ -66455,17 +66381,16 @@ async def promo_rimuovi(annuncio_id: int):
     try:
         con = db()
         a = con.execute(
-            "SELECT post_canale_id, post_vetrina_id, post_bitcoin_podcast_id, "
-            "post_nostr_id, foto FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
+            "SELECT post_canale_id, post_vetrina_id, post_nostr_id, "
+            "foto FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
         con.close()
         vetrina = _post_vetrina(a) if a else 0
         if not a or not (a["post_canale_id"] or vetrina
-                         or a.get("post_bitcoin_podcast_id") or a["post_nostr_id"]):
+                         or a["post_nostr_id"]):
             return
         # ogni canale col SUO id, e ognuno fallisce per conto suo
         for canale, msg in ((canale_id(), a["post_canale_id"]),
-                            (canale_vetrina(), vetrina),
-                            (canale_bitcoin_podcast(), a.get("post_bitcoin_podcast_id"))):
+                            (canale_vetrina(), vetrina)):
             if canale and msg:
                 await bot_api("deleteMessage",
                               {"chat_id": canale, "message_id": msg})
@@ -66475,7 +66400,7 @@ async def promo_rimuovi(annuncio_id: int):
                              "Annuncio rimosso da Barattolo"))
         con = db()
         con.execute("UPDATE annunci SET post_canale_id=0, "
-                    "post_vetrina_id=0, post_bitcoin_podcast_id=0, post_nostr_id='' WHERE id=?",
+                    "post_vetrina_id=0, post_nostr_id='' WHERE id=?",
                     (annuncio_id,))
         con.commit()
         con.close()
