@@ -59369,3 +59369,135 @@ letture del 10050 di Barattolo cinque alla volta: PRIMA 11 risposte su
   deploy della posta, col comando della voce «I relay di Barattolo»
   («IL CONTEGGIO DEL JOURNAL»), su tre giorni: quel che resta su nos.lol dopo la posta
   è in buona parte loro.
+
+## Il PayCode che non è partito riparte (15 ott 2026, cantiere paycode-barattozon, richiesta di Andrea)
+
+**IL CASO.** Lo scambio 101E20D6, un Barattozon da 39,99 € in contanti
+al tabacchino. Chi vendeva ha pagato la garanzia con Phoenix: la Mini
+App non era aperta quando l'ordine è stato preso, e il PayCode non è
+partito. A scambio attivo vedeva «👉 tocca a te» col bottone «💶 Indica
+dove ricevere gli euro», la frase dei bonifici, e non ha capito che
+doveva mandare il PayCode; sotto, la frase di stato diceva perfino «Chi
+compra ha il PayCode». Chi comprava leggeva «Chi vende deve mandarti il
+PayCode» e aspettava.
+
+**IL PERCHÉ.** L'invio automatico del PayCode (`pianificaAutoRecapito`)
+nasceva SOLO quando la controparte arrivava da un messaggio del
+coordinatore (`applicaMessaggioP2P`, i due punti «peer nuovo»). Alla
+riapertura la controparte arriva PRIMA dall'archivio del server
+(`adottaScambiServerP2P`: una fetch batte la riconnessione dei relay,
+lo stesso fatto del cantiere «garanzia-non-si-chiude»), e l'eco del
+relay, dopo, la trova già scritta: nessuno chiamava più l'invio. Lo
+stesso succedeva a chi chiudeva l'app negli otto secondi dell'attesa.
+
+**DECISO (Andrea, 15 ott).**
+- Col PayCode il bottone di chi vende è «🧾 Manda il PayCode a chi
+  compra», mai «dove ricevere gli euro» (`renderOrdineP2P`, accanto
+  alla variante del contanti di persona). Lo stesso foglio di prima
+  (`apriCampiP2P`), che col PayCode ha già i tre campi.
+- Se il PayCode non è partito, riparte da solo, dopo il controllo «è
+  dei nostri?» (`parteRiconosciutaP2P`, invariato), e MAI due volte.
+  Le strade della ripresa (`riprendiAutoRecapitoP2P` per uno scambio,
+  `riprendiAutoRecapitiP2P` per tutti): 1) la scrittura della riga che
+  porta la controparte per la prima volta (`scriviOrdineP2P`, dove
+  passano messaggio, archivio e restore); 2) la riapertura (`avvia`,
+  accanto al pallino) e il ritorno in primo piano (`risvegliaP2P` con
+  `sonda`, non il polso dei 20 s); 3) l'apertura della pagina dello
+  scambio (`apriOrdineP2P`). Il «mai due volte» è quello di sempre: un
+  giro alla volta (`p2pAutoTentati`), la domanda prima dello sparo, e
+  al momento dello sparo «è già partito?», che vede anche l'eco di un
+  altro dispositivo arrivata nell'attesa.
+- I FERMI RESTANO FERMI, con le frasi decise con Alan il 24 set:
+  «esterno», «diversa», «estraneo» non si riprovano mai da soli;
+  l'«ignoto» (mostrod non aveva ancora parlato) si riprova SOLO dalle
+  strade 2 e 3, che sono gesti — dalla scrittura no, perché il fermo
+  stesso è una scrittura e il ridisegno che la segue diventerebbe un
+  giro che si richiama da solo.
+- Senza chiavi (il bundle non ancora caricato, il mazzo che manca) non
+  è un tentativo: l'invio carica prima il bundle (`caricaNostrTools`),
+  e se le chiavi mancano lo stesso il tentativo non conta e la prossima
+  ripresa riprova.
+- Se non può partire da solo (un altro dispositivo, dove il testo del
+  PayCode non c'è; o fermo), chi vende legge nel riquadro dello stato,
+  sotto «👉 tocca a te»: «Il PayCode non è ancora arrivato a chi
+  compra: toccalo qui sotto per mandarlo.» (`payCodeDaMandareP2P`).
+  Mentre l'invio automatico sta aspettando (`p2pAutoInCorso`) la frase
+  è «Il PayCode sta partendo da solo verso chi compra.»; «Chi compra ha
+  il PayCode» solo quando è partito davvero.
+- Le frasi del passo a garanzia bloccata, col PayCode non ancora
+  partito: nell'app «Garanzia bloccata ✓: ora manda il PayCode a chi
+  compra» (`passoDopoGaranziaP2P`); su Telegram «🔒 Garanzia bloccata ✓:
+  ora manda il PayCode a chi compra: tocca «🧾 Manda il PayCode a chi
+  compra» nella pagina dello scambio.» (`_testo_evento_p2p`, ramo
+  `active`), e a chi vende avendo preso (`invoice-next`) «…tocca a te
+  mandargli il PayCode». I promemoria a 1 e 6 ore col PayCode
+  (`SOLLECITO_RECAPITO_PAYCODE_TESTI`) c'erano già: il server non aveva
+  bisogno d'altro.
+
+**SCARTATO.** Ripartire da ogni ridisegno della pagina (un «ignoto»
+diventerebbe un giro infinito: c'è una sentinella che lo vieta). Un
+avviso nuovo dal bot «manda il PayCode»: i due promemoria esistono, e
+la frase della garanzia ora dice il gesto giusto. Toccare i fermi decisi
+con Alan.
+
+**COORDINATO** col cantiere «garanzia-non-si-chiude» (stesso caso, il
+foglio della garanzia), che a quest'ora non è su main: lui aggiunge
+`chiudiFoglioPagatoP2P` in `scriviOrdineP2P` e toglie la chiusura da
+`applicaMessaggioP2P`; qui l'aggancio in `scriviOrdineP2P` è una riga
+accanto, e `applicaMessaggioP2P` non si tocca. Al rebase di chi arriva
+secondo: le due righe in `scriviOrdineP2P` stanno insieme.
+
+**PROVATO.** `prove_paycode_ripresa` (nuova, 32 prove): sentinelle sul
+bottone, sulle tre strade, sul ridisegno che NON riprende, sulla frase
+di Telegram; e un banco node col bundle vero e la `scriviOrdineP2P`
+VERA — la controparte dall'archivio (una domanda, un invio, e chi
+compra apre la busta), l'eco più la riapertura più l'apertura (sempre
+uno), l'app chiusa negli otto secondi (tre riprese, un invio), l'altro
+dispositivo nell'attesa (niente), i fermi «esterno» e «diversa» (mai),
+l'«ignoto» (dalla scrittura no, dalla riapertura sì), senza chiavi
+(nessuna domanda, poi riparte), DEMO, la riga e la frase di stato nei
+loro casi. Tortura: tre mutazioni (via l'aggancio della scrittura, via
+il «senza chiavi non conta», fermi ignorati), tre prese.
+DAL VIVO, nel Browser pane, su una copia nello scratchpad (config di
+cartone, relay NIP-01 di loopback su 7798, eventi di mostrod dalla porta
+vera col segreto di cartone; nessun relay vero, niente Telegram): il
+compratore 111 a scambio attivo legge «Chi vende deve mandarti il
+PayCode»; il venditore 222 ha la riga di prima della presa, SENZA
+controparte, e riapre l'app: l'archivio del server porta controparte e
+«attivo», l'invio parte da solo, UNA domanda a
+`/api/p2p/parte-riconosciuta` (200) e UNA busta kind 14 verso la chiave
+di chi compra, col toast. Ricaricata la pagina, il ritorno in primo
+piano simulato e la pagina riaperta: nessuna seconda domanda, nessuna
+seconda busta. Il compratore riapre: il riquadro «🧾 Il PayCode da
+pagare al tabacchino» con 479-868-518 e «👉 tocca a te». Poi la riga di
+un altro dispositivo, senza il testo: «Il PayCode non è ancora arrivato
+a chi compra: toccalo qui sotto per mandarlo.» e il bottone «🧾 Manda il
+PayCode a chi compra», che col tocco vero apre il foglio coi tre campi.
+SUITE E COLLAUDI, E SU QUALE ALBERO. La suite intera (`PROVE_SEVERE=1`) e
+i collaudi della CI (81 su 81) sono girati sul cantiere sopra 4a2048d: 24.164
+passate, 7 rosse, tutte di `link_telegram` (4a2048d, non di qui). Poi main
+e' tornato com'era dopo 3792e3a (decisione di Andrea, il revert dei suoi
+otto commit del pomeriggio, nel commit prima di questo: l'albero e'
+identico a 3792e3a, che aveva la CI verde), e il cantiere ci e' stato
+rimesso sopra: lì sono rigirate le sezioni che erano rosse, le mie e
+quelle dei documenti (996 su 996) e otto collaudi (indirizzo Lightning,
+PayCode riconosciuto, avvisi in ordine, solleciti, pagamento P2P,
+cruscotto dispute, statistiche P2P, canale admin): verdi. Il resto lo fa
+la CI.
+
+**DA FARE (notati, non fatti).**
+- A PayCode partito, la riga d'attesa di chi vende dice ancora «Chi
+  compra deve inviarti gli euro» (`rigaAttesaP2P`): col PayCode sarebbe
+  «…pagare il PayCode».
+- Telegram a chi COMPRA a garanzia bloccata, col PayCode: «Appena ti
+  indica dove inviare 39,99 €, tocca a te» — sarebbe «appena ti manda il
+  PayCode».
+- Telegram e app a chi vende col PayCode già partito: «aspetta gli
+  euro» (giusto, ma non dice il tabacchino).
+- Il foglio del PayCode si intitola «🤝 I vostri recapiti» e il bottone è
+  «💶 Invia a chi compra»: col PayCode potrebbe dire 🧾.
+- `pianificaMetodoP2P` (la scelta del metodo prima del recapito) nasce
+  anch'essa solo dal messaggio del coordinatore: sugli ordini a un
+  metodo solo non conta, su quelli a più metodi va guardata.
+- Sul caso vero: se il promemoria a un'ora (`sollecito_recapito1`) è
+  partito per 101E20D6 lo dice il journal del VPS (comando da Andrea).

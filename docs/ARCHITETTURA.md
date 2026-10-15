@@ -28497,7 +28497,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ATTESE_MS`), `fermaRecapitoP2P` scrive `recapitoFermo` sulla riga,
   `avvisoRecapitoFermoP2P` lo dice nella pagina e `mandaRecapitoFermoP2P`
   manda a mano dopo `chiediConferma`. Verbale: CANTIERI, «Il PayCode
-  non parte verso chi non riconosciamo». La pubblicazione alza il velo dei gesti («Sto
+  non parte verso chi non riconosciamo». DAL 15 OTT 2026 L'INVIO SI
+  RIPRENDE (`riprendiAutoRecapitoP2P`, `riprendiAutoRecapitiP2P`): dalla
+  scrittura della riga che porta la controparte per la prima volta
+  (`scriviOrdineP2P`, qualunque strada: messaggio, archivio del server,
+  restore), dalla riapertura (`avvia`) e dal ritorno in primo piano
+  (`risvegliaP2P` con `sonda`, mai il polso), dall'apertura della pagina
+  (`apriOrdineP2P`); i fermi restano fermi, l'«ignoto» si riprova solo
+  dalle ultime due. `p2pAutoInCorso` segna il giro in volo, e
+  `payCodeDaMandareP2P` dice a chi vende che non è partito; col PayCode
+  il bottone del recapito è «🧾 Manda il PayCode a chi compra». Verbale:
+  CANTIERI, «Il PayCode che non è partito riparte». La pubblicazione alza il velo dei gesti («Sto
   pubblicando…»), mostra la spunta arancione ferma «Ordine pubblicato»
   per `P2P_SPUNTA_MS` (2,5 s, `spuntaAttesaP2P`, classe `fatto`
   sull'overlay) e lo chiude nel `finally`.

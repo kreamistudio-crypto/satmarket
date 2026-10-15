@@ -1074,6 +1074,18 @@ disputa.»
 6. Si blocca la garanzia come in §3. Stato «**Sats in garanzia**» «I tuoi
    sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al
    tabacchino e segni «pagato».»
+   ⚠️ Se il PayCode NON è partito (dal 15 ott 2026: l'app era chiusa
+   quando l'ordine è stato preso, per esempio la garanzia pagata da
+   Phoenix): riaprendo l'app parte da solo, dopo qualche secondo («Il
+   PayCode sta partendo da solo verso chi compra.»), col toast di sopra.
+   Se non può partire da solo (un altro dispositivo, o il server non sa
+   ancora chi ha preso): «👉 tocca a te» con «Il PayCode non è ancora
+   arrivato a chi compra: toccalo qui sotto per mandarlo.» e il bottone
+   «🧾 **Manda il PayCode a chi compra**», che apre il foglio coi tre
+   campi (PayCode, importo, scadenza) e «Invia a chi compra». ✈️ A
+   garanzia bloccata: «🔒 **Garanzia bloccata ✓:** ora manda il PayCode
+   a chi compra: tocca «🧾 Manda il PayCode a chi compra» nella pagina
+   dello scambio.»
 7. Quando chi compra segna «pagato»: ✈️ «🧾 **PayCode pagato: controlla su
    Amazon.** <nome> dice di aver pagato 25,47 € in contanti al
    tabacchino. Apri il tuo ordine su Amazon: se risulta saldato libera i

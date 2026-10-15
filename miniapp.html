@@ -57064,6 +57064,10 @@ function scriviOrdineP2P(o){
      scritture lo ricalcola (vedi «IL PALLINO SU I MIEI SCAMBI»). Vive
      fuori dal motore, e nel banco del motore non c'e': da qui il typeof */
   if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
+  /* ...e la controparte appena arrivata, da qualunque strada (15 ott
+     2026): il PayCode che deve partire da solo (vedi «LA RIPRESA») */
+  if (o.peer && !(prima && prima.peer) && typeof riprendiAutoRecapitoP2P === 'function')
+    riprendiAutoRecapitoP2P(o.id);
   /* ...e la garanzia o la cauzione pagate da un wallet esterno: e' qui
      che si vede la riga uscirne, da qualunque strada arrivi (1 ott 2026,
      vedi «DOPO OGNI GESTO SI TORNA A "I MIEI SCAMBI"») */
@@ -59253,6 +59257,10 @@ function nomeControparteP2P(o, ripiego){
    la dice a scambio attivo). */
 function passoDopoGaranziaP2P(o){
   if (!o || o.lato !== 'vendo') return '';
+  /* col PayCode il passo ha il suo verbo (15 ott 2026, lo scambio 101e20d6) */
+  if (o.stato === 'attivo' && !(o.campiMiei || {}).euro
+      && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
+    return 'Garanzia bloccata ✓: ora manda il PayCode a chi compra';
   if (o.stato === 'attivo')
     return (o.campiMiei || {}).euro ? 'Garanzia bloccata ✓: aspetta gli euro'
                                     : 'Garanzia bloccata ✓: ora indica dove ricevere gli euro';
@@ -62418,7 +62426,15 @@ function statoPayCodeP2P(o){
         : o.soloVista
         ? 'I sats sono al sicuro in garanzia. Il PayCode sta nel browser dove hai preso lo scambio: da là vai al tabacchino, paga in contanti, tieni lo scontrino e segna «pagato».'
         : 'I sats sono al sicuro in garanzia. Il PayCode da pagare arriva cifrato da chi vende: appena è qui sotto, vai al tabacchino, paga in contanti alla cassa, tieni lo scontrino e torna qui a segnare «pagato».'}
-    : {t: 'Sats in garanzia', d: 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'};
+    /* «CHI COMPRA HA IL PAYCODE» SOLO SE E' PARTITO (15 ott 2026, lo
+       scambio 101e20d6): prima la frase lo dava per fatto, sotto un
+       «tocca a te» che chiedeva proprio quello */
+    : {t: 'Sats in garanzia', d: (o.campiMiei || {}).euro
+        ? 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'
+        : (typeof p2pAutoInCorso !== 'undefined' && p2pAutoInCorso[o.id])
+          ? 'I tuoi sats sono bloccati. Il PayCode sta partendo da solo verso chi compra.'
+        : (typeof payCodeDaMandareP2P === 'function' && payCodeDaMandareP2P(o))
+          || 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'};
   if (o.stato === 'euro_inviati') return compro
     ? {t: 'PayCode pagato', d: 'Hai detto di aver pagato al tabacchino. Chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats: tieni lo scontrino, è la tua prova.'}
     : {t: 'PayCode pagato: controlla su Amazon', d: 'Chi compra dice di aver pagato alla cassa. Apri Amazon e guarda se l\'ordine risulta saldato: nessuno lo controlla al posto tuo, e i sats non si liberano da soli.'};
@@ -62433,6 +62449,8 @@ function apriOrdineP2P(id){
      altro ripartono da zero (la bozza del commento guarda il suo id) */
   if (p2pOrdineAperto !== id) p2pStellaScelta = 0;
   p2pOrdineAperto = id;
+  /* il PayCode che non e' partito riparte da qui (vedi «LA RIPRESA») */
+  if (typeof riprendiAutoRecapitoP2P === 'function') riprendiAutoRecapitoP2P(id, true);
   renderOrdineP2P();
   go('p2pordine');
   /* APRENDO UNO SCAMBIO VIVO SI CHIEDE A CHI SA (25 set 2026): la
@@ -62663,6 +62681,10 @@ function renderOrdineP2P(){
   /* col contanti di persona il recapito E' l'appuntamento (1 ott 2026):
      lo stesso foglio, col suo verbo */
   if (contantiQui) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">📍 Indica dove e quando vedervi</button>';
+  /* ...e col PayCode il recapito E' il PayCode (15 ott 2026, lo scambio
+     101e20d6): «dove ricevere gli euro» e' la frase dei bonifici, e chi
+     vende non capiva che il gesto era mandarlo a chi compra */
+  if (tabOrd) bottoni.recapito = '<button class="btn orange" onclick="apriCampiP2P()">🧾 Manda il PayCode a chi compra</button>';
   /* LA DOMANDA PARTE DA QUI, una sola volta per scambio: «c'e' un
      posto per la recensione, e l'ho gia' lasciata?». Non blocca il
      render — la pagina si disegna e il gesto compare quando la
@@ -71246,6 +71268,7 @@ function scegliMetodoRecapito(m){
       (nessun rinvio automatico, vedi la voce in CANTIERI). */
 let P2P_AUTOINVIO_MS = 8000;     // `let`: il banco lo accorcia
 let p2pAutoTentati = {};         // per sessione: un tentativo per scambio
+let p2pAutoInCorso = {};         // per sessione: l'invio sta aspettando (vedi «LA RIPRESA»)
 function recapitoDaAutoInvio(o){
   if (!o || o.lato !== 'vendo' || !o.peer) return null;
   if (P2P_FINALI.indexOf(o.stato) >= 0) return null;
@@ -71280,11 +71303,25 @@ function pianificaAutoRecapito(id){
   if (p2pAutoTentati[id]) return;
   if (!recapitoDaAutoInvio(ordiniP2P()[id])) return;
   p2pAutoTentati[id] = 1;
+  p2pAutoInCorso[id] = 1;
   const attese = P2P_RICONOSCI_ATTESE_MS.slice();
+  /* il giro e' finito, comunque sia andato: la pagina lo dice (la riga
+     «non e' ancora arrivato» compare solo da qui in poi) */
+  const finito = () => {
+    delete p2pAutoInCorso[id];
+    if (p2pOrdineAperto === id && typeof renderOrdineP2P === 'function') renderOrdineP2P();
+  };
   const tenta = async () => {
     const o = ordiniP2P()[id];
     const r = recapitoDaAutoInvio(o);
-    if (!r || !chiaviChatOrdine(o)) return;
+    /* le chiavi dello scambio vogliono il bundle: alla riapertura
+       (15 ott 2026) puo' non esserci ancora */
+    if (r && typeof caricaNostrTools === 'function') { try { await caricaNostrTools(); } catch(e) { } }
+    if (!r || !chiaviChatOrdine(o)) {
+      /* senza chiavi non e' un tentativo: la prossima ripresa riprova */
+      if (r) delete p2pAutoTentati[id];
+      finito(); return;
+    }
     /* fail-closed: senza il blocco che chiede (o senza una risposta
        pulita) e' un «non lo so», mai un si' */
     const verdetto = typeof parteRiconosciutaP2P === 'function'
@@ -71295,14 +71332,65 @@ function pianificaAutoRecapito(id){
       await campoInvia(o, 'euro', r.testo);
       toast('🧾 PayCode, importo e scadenza sono partiti verso chi compra ✓');
     } catch(e) { }
+    finito();
   };
   setTimeout(tenta, P2P_AUTOINVIO_MS);
+}
+/* ⚠️ LA RIPRESA (15 ott 2026, lo scambio 101e20d6, richiesta di
+   Andrea). Chi vendeva ha pagato la garanzia con Phoenix: la Mini App
+   non era aperta quando l'ordine e' stato preso, e il PayCode non e'
+   partito — l'invio automatico nasceva SOLO quando la controparte
+   arrivava da un messaggio del coordinatore (`applicaMessaggioP2P`).
+   Alla riapertura la controparte arriva prima dall'archivio del server
+   (una fetch batte la riconnessione dei relay) e l'eco del relay,
+   dopo, la trova gia' scritta: nessuno chiamava piu' l'invio, e chi
+   vendeva leggeva «tocca a te» senza capire cosa.
+   ADESSO l'invio si riprende da TRE strade:
+   1) la SCRITTURA DELLA RIGA che porta la controparte per la prima
+      volta, da qualunque strada arrivi (`scriviOrdineP2P`);
+   2) la RIAPERTURA dell'app e il RITORNO IN PRIMO PIANO, per ogni mio
+      PayCode che non e' partito (`riprendiAutoRecapitiP2P`): copre
+      anche l'app chiusa negli otto secondi dell'attesa;
+   3) l'APERTURA della pagina dello scambio (`apriOrdineP2P`).
+   MAI DUE VOLTE: le prudenze sono quelle di `pianificaAutoRecapito` —
+   un giro alla volta per scambio, la domanda «e' dei nostri?» prima
+   dello sparo, e al momento dello sparo «e' gia' partito?» (anche da un
+   altro dispositivo: l'eco arriva nell'attesa). Un PayCode FERMATO
+   resta fermo, con la sua frase decisa con Alan: si riprova SOLO
+   quello fermo su «ignoto» (mostrod nel frattempo puo' aver parlato),
+   e solo dalle strade 2 e 3 — che sono gesti, mai un ridisegno, cosi'
+   una risposta «ignoto» non diventa un giro che si richiama da solo. */
+function riprendiAutoRecapitoP2P(id, ancheFermi){
+  const o = ordiniP2P()[id];
+  if (!recapitoDaAutoInvio(o)) return;
+  if (o.recapitoFermo) {
+    if (!ancheFermi || o.recapitoFermo !== 'ignoto' || p2pAutoInCorso[id]) return;
+    delete p2pAutoTentati[id];
+  }
+  pianificaAutoRecapito(id);
+}
+function riprendiAutoRecapitiP2P(){
+  if (typeof DEMO !== 'undefined' && DEMO) return;
+  if (typeof VETRINA !== 'undefined' && VETRINA) return;
+  const tutti = ordiniP2P();
+  Object.keys(tutti).forEach(id => riprendiAutoRecapitoP2P(id, true));
+}
+/* PURA: il PayCode di chi vende, a scambio attivo, NON e' partito e
+   l'invio automatico non lo sta mandando: la frase che lo dice, sopra
+   il bottone. Fuori da li', ''. */
+function payCodeDaMandareP2P(o){
+  if (!o || o.lato !== 'vendo' || o.stato !== 'attivo' || !o.peer || o.soloVista) return '';
+  if (typeof tabacchinoP2P !== 'function' || !tabacchinoP2P(o.metodi)) return '';
+  if ((o.campiMiei || {}).euro) return '';
+  if (typeof p2pAutoInCorso !== 'undefined' && p2pAutoInCorso[o.id]) return '';
+  return 'Il PayCode non è ancora arrivato a chi compra: toccalo qui sotto per mandarlo.';
 }
 /* il PayCode che NON e' partito: la riga lo ricorda (sopravvive alla
    riapertura, come il resto della riga) e la pagina lo dice. Se nel
    frattempo e' partito per un'altra strada — un altro dispositivo —
    non c'e' niente da fermare. */
 function fermaRecapitoP2P(id, motivo){
+  if (typeof p2pAutoInCorso !== 'undefined') delete p2pAutoInCorso[id];
   const o = ordiniP2P()[id];
   if (!o || (o.campiMiei || {}).euro) return;
   o.recapitoFermo = String(motivo || 'ignoto');
@@ -79197,6 +79285,9 @@ function sondaRelayP2P(){
 }
 async function risvegliaP2P(sonda){
   if (typeof VETRINA !== 'undefined' && VETRINA) return;
+  /* il PayCode che non e' partito, al ritorno in primo piano (15 ott
+     2026, vedi «LA RIPRESA»): solo col ritorno, mai dal polso */
+  if (sonda && typeof riprendiAutoRecapitiP2P === 'function') riprendiAutoRecapitiP2P();
   /* LO SCAMBIO CHE SI HA DAVANTI SI RIALLINEA COL SERVER al ritorno in
      primo piano (25 set 2026): un messaggio perso mentre l'app era
      dietro non deve lasciare lo schermo su un passo gia' fatto. Sta
@@ -80201,6 +80292,9 @@ async function avvia(){
     /* ...e il pallino degli scambi, qui dove conto e leva del P2P sono
        arrivati tutt'e due: l'archivio si legge con la chiave del conto */
     aggiornaPallinoScambiP2P();
+    /* ...e i PayCode che non sono partiti mentre l'app era chiusa (15
+       ott 2026): vedi «LA RIPRESA» */
+    if (typeof riprendiAutoRecapitiP2P === 'function') riprendiAutoRecapitiP2P();
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {

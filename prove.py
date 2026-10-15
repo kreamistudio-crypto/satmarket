@@ -95918,6 +95918,347 @@ def prove_paycode_riconosciuto():
           [0, 0, 1], o["manualeSenzaPeer"])
 
 
+BANCO_PAYCODE_RIPRESA = r"""
+/* ===== il server di cartone: risponde in fila; senza risposte in
+   fila la rete e' giu' ===== */
+const API_BASE = '/api';
+function authHdr(){ return 'sessione'; }
+let risposteParte = [], domandeParte = [];
+async function fetch(url, opz){
+  domandeParte.push({url, metodo: opz.method, corpo: JSON.parse(opz.body)});
+  if (!risposteParte.length) throw new Error('rete giu');
+  const r = risposteParte.shift();
+  return {ok: true, json: async () => r};
+}
+const MOSTRO_ORDINI_CHIAVE = 'mostro_ordini';
+__PEZZI__
+(async () => {
+const attesa = ms => new Promise(r => setTimeout(r, ms));
+const TAB = {ordine: '479-868-518', importo: '39,99', scade: 1790000000,
+             testo: 'Contanti al tabacchino\nPayCode: 479-868-518\nImporto: 39,99 €\nScade: 17/09/2026 alle 14:30'};
+let ridisegni = 0;
+renderOrdineP2P = function(){ ridisegni++; };
+chiediConferma = function(){};
+myTgId = 111;
+P2P_AUTOINVIO_MS = 0;
+P2P_RICONOSCI_ATTESE_MS = [5, 5, 5];
+p2pOrdineAperto = 'X';
+let tb = null;
+/* la riga di chi vende com'e' DOPO la presa ad app chiusa: la
+   controparte c'e' (o arriva), il PayCode non e' partito */
+function apparecchia(conPeer){
+  mondo.a = {mazzo: {sk: 'a1'.repeat(32), pub: ''}, ordini: {}};
+  mondo.b = {mazzo: {sk: 'b2'.repeat(32), pub: ''}, ordini: {}};
+  const ta = chiaveScambio(mondo.a.mazzo.sk, 1);
+  tb = chiaveScambio(mondo.b.mazzo.sk, 1);
+  mondo.a.mazzo.pub = ta.pub; mondo.b.mazzo.pub = tb.pub;
+  mondo.a.ordini['X'] = {id: 'X', indice: 1, pubTrade: ta.pub, stato: 'attivo',
+                         creato: 1000, lato: 'vendo', metodi: ['Contanti al tabacchino 39.99'],
+                         tabacchino: Object.assign({}, TAB)};
+  if (conPeer) mondo.a.ordini['X'].peer = tb.pub;
+  mondo.b.ordini['X'] = {id: 'X', indice: 1, pubTrade: tb.pub, peer: ta.pub, stato: 'attivo',
+                         creato: 1000, lato: 'compro', metodi: ['Contanti al tabacchino 39.99']};
+  p2pChiaviChat = {}; p2pChatSecchio = {}; pubblicati = [];
+  /* una sessione nuova: la riapertura dell'app */
+  p2pAutoTentati = {}; p2pAutoInCorso = {};
+  risposteParte = []; domandeParte = []; toasts = []; ridisegni = 0; LATO = 'a';
+  P2P_AUTOINVIO_MS = 0;
+}
+const mio = () => mondo.a.ordini['X'];
+const euroMio = () => ((mio().campiMiei || {}).euro || {}).testo;
+const si = () => ({riconosciuta: true, motivo: 'riconosciuta'});
+
+/* 1) LA CONTROPARTE ARRIVA DALL'ARCHIVIO DEL SERVER: la scrittura della
+   riga (una copia, come fa la restore che rilegge il magazzino) */
+apparecchia(false);
+risposteParte = [si()];
+scriviOrdineP2P(Object.assign({}, mio(), {peer: tb.pub}));
+await attesa(60);
+out.dalServer = [domandeParte.length, pubblicati.length, euroMio() === TAB.testo];
+/* ...poi l'eco del relay con la stessa controparte, la riapertura e
+   l'apertura della pagina: niente parte due volte */
+risposteParte = [si(), si(), si()];
+scriviOrdineP2P(Object.assign({}, mio()));
+riprendiAutoRecapitiP2P();
+riprendiAutoRecapitoP2P('X', true);
+await attesa(60);
+out.dalServerMaiDue = [domandeParte.length, pubblicati.length];
+/* ...e chi compra lo apre: e' la stessa busta di sempre */
+LATO = 'b';
+campoArriva(mondo.b.ordini['X'], JSON.parse(JSON.stringify(pubblicati[0])));
+out.dalServerArriva = ((mondo.b.ordini['X'].campiLoro || {}).euro || {}).testo === TAB.testo;
+LATO = 'a';
+
+/* 2) L'APP CHIUSA NEGLI OTTO SECONDI: la controparte c'era gia', la
+   riapertura riprende — e tre riprese di fila sono UN invio */
+apparecchia(true);
+risposteParte = [si(), si(), si()];
+riprendiAutoRecapitiP2P();
+riprendiAutoRecapitiP2P();
+riprendiAutoRecapitoP2P('X', true);
+await attesa(60);
+out.riapertura = [domandeParte.length, pubblicati.length, euroMio() === TAB.testo];
+out.riaperturaToast = toasts.some(t => t.indexOf('partiti verso chi compra') >= 0);
+out.riaperturaFinito = [!!p2pAutoInCorso['X'], ridisegni >= 1];
+
+/* 3) UN ALTRO DISPOSITIVO L'HA MANDATO NELL'ATTESA: al momento dello
+   sparo c'e' gia', e non si chiede e non si manda */
+apparecchia(true);
+P2P_AUTOINVIO_MS = 30;
+risposteParte = [si()];
+riprendiAutoRecapitiP2P();
+out.inCorsoSubito = !!p2pAutoInCorso['X'];
+mio().campiMiei = {euro: {id: 'altro', testo: TAB.testo, t: 1}};
+await attesa(80);
+out.altroDispositivo = [domandeParte.length, pubblicati.length, !!p2pAutoInCorso['X']];
+
+/* 4) IL FERMO «ESTERNO» RESTA FERMO, da tutte e tre le strade */
+apparecchia(true);
+mio().recapitoFermo = 'esterno';
+risposteParte = [si()];
+riprendiAutoRecapitiP2P();
+riprendiAutoRecapitoP2P('X', true);
+scriviOrdineP2P(Object.assign({}, mio()));
+await attesa(40);
+out.esternoFermo = [domandeParte.length, pubblicati.length];
+mio().recapitoFermo = 'diversa';
+riprendiAutoRecapitiP2P();
+await attesa(40);
+out.diversaFermo = [domandeParte.length, pubblicati.length];
+
+/* 5) IL FERMO «IGNOTO»: la scrittura della riga non lo riprende (non e'
+   un gesto), la riapertura si' — anche nella stessa sessione */
+apparecchia(true);
+mio().recapitoFermo = 'ignoto';
+p2pAutoTentati['X'] = 1;
+risposteParte = [si()];
+riprendiAutoRecapitoP2P('X');
+await attesa(40);
+out.ignotoDallaScrittura = [domandeParte.length, pubblicati.length];
+riprendiAutoRecapitiP2P();
+await attesa(60);
+out.ignotoDallaRiapertura = [domandeParte.length, pubblicati.length, euroMio() === TAB.testo];
+
+/* 6) SENZA CHIAVI non e' un tentativo: nessuna domanda, e la prossima
+   ripresa ci riprova */
+apparecchia(true);
+const mazzo = mondo.a.mazzo;
+mondo.a.mazzo = null;
+risposteParte = [si()];
+riprendiAutoRecapitiP2P();
+await attesa(40);
+out.senzaChiavi = [domandeParte.length, pubblicati.length, !!p2pAutoTentati['X'], !!p2pAutoInCorso['X']];
+mondo.a.mazzo = mazzo;
+riprendiAutoRecapitiP2P();
+await attesa(60);
+out.senzaChiaviPoi = [domandeParte.length, pubblicati.length];
+
+/* 7) IN DEMO (e in vetrina) la ripresa non fa niente */
+apparecchia(true);
+DEMO = true;
+risposteParte = [si()];
+riprendiAutoRecapitiP2P();
+await attesa(40);
+DEMO = false;
+out.demo = [domandeParte.length, pubblicati.length];
+
+/* 8) LA RIGA E LA FRASE DI STATO di chi vende */
+apparecchia(true);
+const v = mio();
+out.riga = [
+  payCodeDaMandareP2P(v),
+  payCodeDaMandareP2P(Object.assign({}, v, {campiMiei: {euro: {testo: TAB.testo}}})),
+  payCodeDaMandareP2P(Object.assign({}, v, {lato: 'compro'})),
+  payCodeDaMandareP2P(Object.assign({}, v, {metodi: ['SEPA']})),
+  payCodeDaMandareP2P(Object.assign({}, v, {soloVista: true})),
+  payCodeDaMandareP2P(Object.assign({}, v, {stato: 'attesa_mia_hold'})),
+  payCodeDaMandareP2P(Object.assign({}, v, {peer: ''})),
+  payCodeDaMandareP2P(null)];
+/* ...la riga di un altro dispositivo, senza il testo: non puo' partire
+   da sola, e la riga lo dice */
+const senzaTesto = Object.assign({}, v, {tabacchino: null});
+out.senzaTesto = [recapitoDaAutoInvio(senzaTesto), payCodeDaMandareP2P(senzaTesto)];
+p2pAutoInCorso['X'] = 1;
+out.rigaInCorso = payCodeDaMandareP2P(v);
+out.statoInCorso = statoPayCodeP2P(v).d;
+delete p2pAutoInCorso['X'];
+out.statoNonPartito = statoPayCodeP2P(v).d;
+out.statoPartito = statoPayCodeP2P(Object.assign({}, v, {campiMiei: {euro: {testo: TAB.testo}}})).d;
+out.passo = [passoDopoGaranziaP2P(v),
+             passoDopoGaranziaP2P(Object.assign({}, v, {campiMiei: {euro: {testo: TAB.testo}}})),
+             passoDopoGaranziaP2P(Object.assign({}, v, {metodi: ['SEPA']}))];
+
+console.log(JSON.stringify(out));
+})().catch(e => { console.log('BANCO ROTTO: ' + (e && e.stack || e)); process.exit(1); });
+"""
+
+
+def prove_paycode_ripresa():
+    """IL PAYCODE CHE NON E' PARTITO RIPARTE (15 ott 2026, lo scambio
+    101e20d6, richiesta di Andrea).
+
+    Chi vendeva un Barattozon ha pagato la garanzia con Phoenix: la Mini
+    App non era aperta alla presa, e il PayCode non e' partito — l'invio
+    automatico nasceva solo dal messaggio del coordinatore, e alla
+    riapertura la controparte arriva prima dall'archivio del server. A
+    scambio attivo leggeva «tocca a te» col bottone dei bonifici («Indica
+    dove ricevere gli euro»), e chi comprava aspettava.
+    Qui si prova: il bottone e le frasi col PayCode (pagina, avviso,
+    Telegram); la ripresa dalle tre strade — la scrittura della riga che
+    porta la controparte, la riapertura e il ritorno in primo piano,
+    l'apertura della pagina — col bundle vero; che non parte MAI due
+    volte, che i fermi restano fermi (l'«ignoto» si riprova solo da un
+    gesto), e la riga «non e' ancora arrivato» quando non puo' partire."""
+    print("\n[il PayCode che non e' partito riparte]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL BOTTONE E LE FRASI ------------------------------------
+    ren = pezzo_js(mini, "function renderOrdineP2P(", "\n}\n")
+    prova("col PayCode il bottone di chi vende e' «🧾 Manda il PayCode a chi compra»",
+          True, "if (tabOrd) bottoni.recapito = '<button class=\"btn orange\" "
+          "onclick=\"apriCampiP2P()\">🧾 Manda il PayCode a chi compra</button>';" in ren)
+    prova("...e vince sulla frase dei bonifici: sta DOPO le altre due", True,
+          0 < ren.find("recapito: '<button class=\"btn orange\" onclick=\"apriCampiP2P()\">💶 Indica dove ricevere gli euro")
+          < ren.find("if (contantiQui) bottoni.recapito =")
+          < ren.find("if (tabOrd) bottoni.recapito =")
+          < ren.find("(bottoni[azione] || '')"))
+    prova("...e il PayCode non dice mai «dove ricevere gli euro» a chi vende", True,
+          "Manda il PayCode" in ren and "Indica dove ricevere gli euro</button>' : " not in ren)
+
+    # --- 2) LE STRADE DELLA RIPRESA ----------------------------------
+    sc = pezzo_js(mini, "function scriviOrdineP2P(o){", "\n}\n")
+    prova("la scrittura della riga riprende quando la controparte arriva per la prima volta",
+          True, "if (o.peer && !(prima && prima.peer) && typeof riprendiAutoRecapitoP2P === 'function')\n"
+          "    riprendiAutoRecapitoP2P(o.id);" in sc)
+    prova("...SENZA i fermi: la scrittura non e' un gesto (niente giro che si richiama)",
+          True, "riprendiAutoRecapitoP2P(o.id, true)" not in sc)
+    ap = pezzo_js(mini, "function apriOrdineP2P(id){", "\n}\n")
+    prova("l'apertura della pagina dello scambio riprende, col fermo «ignoto»", True,
+          "riprendiAutoRecapitoP2P(id, true);" in ap)
+    ri = pezzo_js(mini, "async function risvegliaP2P(sonda){", "\n}\n")
+    prova("il ritorno in primo piano riprende, e il polso dei 20 secondi no", True,
+          "if (sonda && typeof riprendiAutoRecapitiP2P === 'function') riprendiAutoRecapitiP2P();" in ri)
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    prova("la riapertura dell'app riprende, dove conto e leva del P2P sono arrivati", True,
+          0 < av.find("aggiornaPallinoScambiP2P();\n")
+          < av.find("if (typeof riprendiAutoRecapitiP2P === 'function') riprendiAutoRecapitiP2P();"))
+    ren2 = re.sub(r"/\*[\s\S]*?\*/", "", ren)
+    prova("il ridisegno della pagina NON riprende: un «ignoto» non diventa un giro", False,
+          "riprendiAutoRecapit" in ren2)
+    pia = pezzo_js(mini, "function pianificaAutoRecapito(", "\n}\n")
+    prova("l'invio carica il bundle prima delle chiavi, e senza chiavi non conta il tentativo",
+          True, 0 < pia.find("await caricaNostrTools();")
+          < pia.find("if (!r || !chiaviChatOrdine(o)) {")
+          < pia.find("if (r) delete p2pAutoTentati[id];"))
+    prova("...il segno «in corso» nasce col tentativo e cade col fermo", True,
+          "p2pAutoTentati[id] = 1;\n  p2pAutoInCorso[id] = 1;" in pia
+          and "delete p2pAutoInCorso[id];" in pezzo_js(mini, "function fermaRecapitoP2P(id, motivo){", "\n}\n"))
+    prova("p2pAutoInCorso sta accanto a p2pAutoTentati (prima di ogni uso)", True,
+          "let p2pAutoTentati = {};" in mini and mini.index("let p2pAutoInCorso = {};")
+          < mini.index("function pianificaAutoRecapito("))
+
+    # --- 3) IL SERVER: la frase a garanzia bloccata --------------------
+    con, amb = _banco_eventi_p2p()
+    con.close()
+    testo = amb["_testo_evento_p2p"]
+    dati = {"sats": 53000, "euro": "39,99 €", "metodi": "Contanti al tabacchino",
+            "tabacchino": True}
+    prova("Telegram, a chi vende col PayCode a garanzia bloccata: «manda il PayCode»",
+          "🔒 <b>Garanzia bloccata ✓:</b> ora manda il PayCode a chi compra: tocca "
+          "«🧾 Manda il PayCode a chi compra» nella pagina dello scambio.",
+          testo("garanzia_pagata", "active", "vende", dati))
+    prova("...e col PayCode gia' partito resta «aspetta gli euro»",
+          "🔒 <b>Garanzia bloccata ✓:</b> aspetta gli euro.",
+          testo("garanzia_pagata", "active", "vende", dict(dati, recapito_detto=True)))
+    prova("...chi vende che ha preso: tocca a lui mandarlo dopo la fattura", True,
+          testo("garanzia_pagata", "invoice-next", "vende", dati, nome="Anna")
+          .endswith("appena Anna indica dove ricevere i sats, tocca a te mandargli il PayCode."))
+    prova("...e senza il timbro le frasi sono quelle degli euro, come ieri",
+          ["🔒 <b>Garanzia bloccata ✓:</b> ora indica dove ricevere gli euro.", True],
+          [testo("garanzia_pagata", "active", "vende", dict(dati, tabacchino=False)),
+           testo("garanzia_pagata", "invoice-next", "vende", dict(dati, tabacchino=False))
+           .endswith("tocca a te indicare dove ricevere gli euro.")])
+
+    # --- 4) IL BANCO NODE: la ripresa col bundle vero ------------------
+    node = _sh.which("node")
+    if not node:
+        salta("la ripresa del PayCode gira col bundle vero", "node non c'e'")
+        return
+    blocco = mini[mini.index("/* ---- I DUE RECAPITI CIFRATI"):
+                  mini.index("/* ---- LA RIGA LOCALE NEL VOCABOLARIO DEL LIBRO ----")]
+    pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + re.search(r"const P2P_TABACCHINO = [^\n]+", mini).group(0) + "\n"
+             + re.search(r"const P2P_TABACCHINO_PM = [^\n]+", mini).group(0) + "\n"
+             + pezzo_js(mini, "function metodoBaseP2P(", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function tabacchinoP2P(", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function scriviOrdineP2P(o){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function passoDopoGaranziaP2P(o){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function statoPayCodeP2P(o){", "\n}\n") + "\n}\n"
+             + blocco + "\n"
+             + pezzo_js(mini, "async function parteRiconosciutaP2P(", "\n}\n") + "\n}\n")
+    # la scrittura vera, sul magazzino di cartone: `ordiniP2P` e' il
+    # mondo, quindi la riga si mette anche li'
+    pezzi = pezzi.replace(
+        "function scriviOrdineP2P(o){\n  const tutti = ordiniP2P();",
+        "function scriviOrdineP2P(o){\n  const tutti = Object.assign({}, ordiniP2P());\n"
+        "  mondo[LATO].ordini[o.id] = o;", 1)
+    prelude = BANCO_CHAT[:BANCO_CHAT.index("__PEZZI__")].replace(
+        "async function parteRiconosciutaP2P(o){ return 'riconosciuta'; }\n", "").replace(
+        "function scriviOrdineP2P(o){ mondo[LATO].ordini[o.id] = o; return o; }\n", "")
+    prova("il banco usa la scrittura VERA (quella dello stub e' tolta)", [False, True],
+          ["function scriviOrdineP2P(o){ mondo" in prelude,
+           "mondo[LATO].ordini[o.id] = o;" in pezzi])
+    banco = prelude + BANCO_PAYCODE_RIPRESA.replace("__PEZZI__", pezzi)
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "ripresa.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f, "vendor/nostr.bundle.js"], capture_output=True,
+                    text=True, encoding="utf-8", timeout=120)
+    if r.returncode:
+        prova("la ripresa del PayCode gira col bundle vero", "",
+              (r.stdout or "") + (r.stderr or ""))
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    prova("la controparte arriva dall'archivio del server: una domanda, un invio, il PayCode",
+          [1, 1, True], o["dalServer"])
+    prova("...l'eco del relay, la riapertura e l'apertura della pagina non lo rimandano",
+          [1, 1], o["dalServerMaiDue"])
+    prova("...e chi compra lo apre: la busta di sempre", True, o["dalServerArriva"])
+    prova("app chiusa negli otto secondi: alla riapertura parte, e tre riprese sono UN invio",
+          [1, 1, True], o["riapertura"])
+    prova("...col toast di sempre, e a giro finito la pagina si ridisegna", [True, [False, True]],
+          [o["riaperturaToast"], o["riaperturaFinito"]])
+    prova("un altro dispositivo l'ha mandato nell'attesa: niente domanda, niente invio",
+          [True, [0, 0, False]], [o["inCorsoSubito"], o["altroDispositivo"]])
+    prova("il fermo «esterno» resta fermo da tutte e tre le strade, e «diversa» pure",
+          [[0, 0], [0, 0]], [o["esternoFermo"], o["diversaFermo"]])
+    prova("il fermo «ignoto»: la scrittura non lo riprende, la riapertura si', e parte",
+          [[0, 0], [1, 1, True]], [o["ignotoDallaScrittura"], o["ignotoDallaRiapertura"]])
+    prova("senza chiavi: nessuna domanda, il tentativo non conta, e poi riparte",
+          [[0, 0, False, False], [1, 1]], [o["senzaChiavi"], o["senzaChiaviPoi"]])
+    prova("in DEMO la ripresa non fa niente", [0, 0], o["demo"])
+    RIGA = "Il PayCode non è ancora arrivato a chi compra: toccalo qui sotto per mandarlo."
+    prova("la riga di chi vende: solo a scambio attivo, col PayCode non partito",
+          [RIGA, "", "", "", "", "", "", ""], o["riga"])
+    prova("...anche quando non puo' partire da solo (un altro dispositivo, senza il testo)",
+          [None, RIGA], o["senzaTesto"])
+    prova("...e non mentre l'invio automatico lo sta mandando", "", o["rigaInCorso"])
+    prova("la frase di stato: «sta partendo» in corso, la riga se non e' partito, «chi compra ha il PayCode» se lo e'",
+          ["I tuoi sats sono bloccati. Il PayCode sta partendo da solo verso chi compra.", RIGA,
+           "I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato»."],
+          [o["statoInCorso"], o["statoNonPartito"], o["statoPartito"]])
+    prova("l'avviso a garanzia bloccata: col PayCode «manda il PayCode», poi come ieri",
+          ["Garanzia bloccata ✓: ora manda il PayCode a chi compra",
+           "Garanzia bloccata ✓: aspetta gli euro",
+           "Garanzia bloccata ✓: ora indica dove ricevere gli euro"], o["passo"])
+
+
 def prove_scambi_ovunque():
     """I MIEI SCAMBI SU OGNI DISPOSITIVO (24 set 2026, dal campo: lo
     scambio preso da Alan sul tablet non c'era nella mini app Telegram
@@ -163428,6 +163769,7 @@ def main():
     prove_recapito_aggiornato,
     prove_chat_scambio,
     prove_paycode_riconosciuto,
+    prove_paycode_ripresa,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_avvisi_precisi,
     prove_p2p_recapito_passo,

@@ -57213,6 +57213,14 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         # tornando nell'app deve sapere che e' andata e cosa tocca a lui
         if detto:
             return "🔒 <b>Garanzia bloccata ✓:</b> aspetta gli euro."
+        # COL PAYCODE IL GESTO E' MANDARLO (15 ott 2026, lo scambio
+        # 101e20d6): «dove ricevere gli euro» e' la frase dei bonifici, e
+        # chi vendeva non capiva. La stessa del client
+        # (`passoDopoGaranziaP2P`) e del bottone della pagina.
+        if dettaglio == "active" and paycode:
+            return ("🔒 <b>Garanzia bloccata ✓:</b> ora manda il PayCode a "
+                    "chi compra: tocca «🧾 Manda il PayCode a chi compra» "
+                    "nella pagina dello scambio.")
         if dettaglio == "active":
             return ("🔒 <b>Garanzia bloccata ✓:</b> ora indica dove ricevere "
                     "gli euro.")
@@ -57221,6 +57229,9 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         # attivo — quindi le coordinate cifrate non puo' ancora mandarle:
         # «ora indica» sarebbe un bottone che non c'e'. Glielo dira' la
         # fattura data, che e' il momento in cui il bottone compare.
+        if paycode:
+            return (f"🔒 <b>Garanzia bloccata ✓:</b> appena {l_altro} indica "
+                    "dove ricevere i sats, tocca a te mandargli il PayCode.")
         return (f"🔒 <b>Garanzia bloccata ✓:</b> appena {l_altro} indica dove "
                 "ricevere i sats, tocca a te indicare dove ricevere gli euro.")
     if momento == "garanzia_pagata":
