@@ -121,6 +121,7 @@ collaudo_garanzia_lunga.py
 collaudo_promemoria_gesto.py
 collaudo_x_risonanza.py
 collaudo_annullo_venditore.py
+collaudo_annullata_pagata.py
 collaudo_db_contesa.py
 collaudo_negozi_grandi.py
 collaudo_foto_recensioni.py

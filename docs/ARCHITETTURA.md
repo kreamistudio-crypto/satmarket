@@ -1097,17 +1097,44 @@
   agisce a fattura morta), CAS sullo stato, e la riga diventa LAPIDE
   'annullato' — MAI DELETE: un saldo atterrato nella corsa
   annulla-vs-saldo deve avere una riga su cui posarsi. Il RIACCIUFFO
-  è `controlla_annullati` nell'orologio: lapide-ordine pagata →
-  torna 'creato' (timbro fresco, il reaper non se la mangia) e passa
-  da `_incassa_ordine` — chi paga ha comprato, la regola di
-  verifica_pagamento (e un avviso ai moderatori); lapide-rilancio
-  pagata → binario del fuori-tempo («Da riscuotere»). CONFLITTO
-  DICHIARATO (provato in CI e su DB usa-e-getta): se nel frattempo
-  l'oggetto e' andato a un altro, il riacciuffo porta COMUNQUE
-  l'ordine a locked — lo stock non va mai negativo (il MAX del corner
-  del reaper, da cui passa per costruzione), l'annuncio resta
-  'venduto', e il doppio escrow e' il caso da moderatore di sempre:
-  l'avviso ⚠️ ai moderatori parte proprio per questo. La purga vive
+  è `controlla_annullati` nell'orologio: lapide-ordine pagata → la
+  decide `_decidi_annullata_pagata`, una `def` sola in UNA
+  transazione. SE IL PEZZO C'È ANCORA (annuncio 'attivo' e pezzi
+  liberi, tolti quelli prenotati da ALTRI) torna 'creato' (timbro
+  fresco, il reaper non se la mangia) e passa da `_incassa_ordine` —
+  chi paga ha comprato, la regola di verifica_pagamento (e un avviso
+  ai moderatori); lapide-rilancio pagata → binario del fuori-tempo
+  («Da riscuotere»). IL CONFLITTO DICHIARATO DELL'AGO 2026 È ROVESCIATO
+  (13 ott 2026, decisione di Andrea, cantiere «annullata-pagata»):
+  fino a quel giorno, se nel frattempo l'oggetto era andato a un
+  altro, il riacciuffo portava COMUNQUE l'ordine a locked e il doppio
+  escrow era «il caso da moderatore di sempre» — verificato con una
+  sonda il 13 ott: due ordini pagati per un pezzo, «Hai venduto!» due
+  volte. ORA quel saldo NON È UNA VENDITA: se il pezzo non c'è più
+  (venduto, rimosso, in revisione, prenotato da un altro; nei set ne
+  basta uno) o se ad annullare era stato CHI VENDE (sempre, anche col
+  pezzo in vetrina: il suo no resta un no), l'ordine va 'annullato' →
+  'refund' col timbro `pagata_da_annullata_il` e il rimborso già
+  timbrato 'da_riprovare' verso il compratore, nella stessa scrittura;
+  poi `_rimborsa_annullata_pagata`: l'avviso a chi ha pagato (parole
+  sue, mai «disputa»), il rimborso intero per la strada di sempre
+  (`_rimborsa_compratore`, che per questo timbro esce PRIMA di ogni
+  riga che tocca la merce), l'avviso ⚠️ ai moderatori con ordine,
+  cifra, perché e stato del rimborso. Nessuno stato nuovo, nessun
+  passaggio da 'locked': stock, annuncio, offerte, carrello, negozi
+  collegati, Nostr, canale, XP restano dove sono; a chi vende non
+  arriva niente e l'ordine non compare nei suoi Ordini (lo filtra
+  `miei_ordini` dopo la query, la WHERE resta quella). Gli avvisi
+  hanno un timbro in `timbri` (`annullata_pagata:<id>`, '' →
+  'compratore' → 'moderatori'), scritto DOPO aver parlato: se il
+  server cade a metà li finisce il giro dopo, una volta sola; il
+  rimborso lo riprende `riprova_pagamenti_sospesi`. Chi conta gli
+  affari salta il timbro con UN frammento, `SQL_NON_ANNULLATA_PAGATA`
+  (sopra init_db, che lo usa all'import): il backfill di
+  `disputata`, `_ordini_vivi_annuncio`, `_conta_annulli_venditore`,
+  gli «affari conclusi», l'export CSV; il feedback è chiuso. Nella
+  pagina il giudice è `annullataPagata(o)` (vince su
+  `annulloVenditore`), con la sua storia di tre passi. La purga vive
   nel reaper: lapidi-ordine a 1h dall'annullo, lapidi-rilancio con la
   soglia dei rilanci — sempre DOPO che la fattura non può più essere
   pagata. `_incassa_ordine` è il ramo pagato di verifica_pagamento

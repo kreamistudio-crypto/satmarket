@@ -58351,3 +58351,187 @@ sei eventi, gli eventi delle chiavi usa-e-getta, il 10050 di Barattolo,
 il profilo e gli eventi di Ivory Tower (ricerca NIP-50 su
 relay.ditto.pub); il codice di login di Nmail letto sul suo repo.
 Commit di soli documenti.
+
+## La fattura annullata e pagata non è più una vendita: rimborso automatico (13-15 ott 2026, cantiere annullata-pagata, decisione di Andrea)
+
+**IL CASO** (la sonda del 13 ott, voce «Annulla chiude», paragrafo «LA
+DOPPIA VENDITA»): Anna compra l'ultimo pezzo e annulla; il pezzo torna
+libero ma la sua fattura è ancora viva nel wallet. Bruno compra e paga.
+Poi Anna paga la fattura annullata, e `controlla_annullati` la
+riacciuffava portando anche il suo ordine a `locked` senza guardare lo
+stock: due ordini pagati per un oggetto solo, «Hai venduto!» due volte,
+«Ordine pagato!» ad Anna, l'avviso generico ai moderatori. Era il
+«CONFLITTO DICHIARATO» di ARCHITETTURA dall'agosto 2026 («il doppio
+escrow è il caso da moderatore di sempre»): questo cantiere lo rovescia,
+e ARCHITETTURA lo dice al suo posto.
+
+**COSA SI È DECISO** (Andrea, 13 ott: le dieci righe prima del codice,
+poi quattro risposte).
+- Fattura annullata pagata e pezzo finito: NESSUNA VENDITA. Chi vende
+  non riceve niente e l'ordine non compare nei suoi Ordini; chi ha
+  pagato riceve il rimborso intero (l'importo della fattura, mai più del
+  deposito) con parole sue; ai moderatori arriva un avviso chiaro.
+- Pezzo ancora disponibile: come prima, «chi paga ha comprato».
+- SE AD ANNULLARE ERA STATO CHI VENDE (la lapide porta
+  `annullato_venditore_il`, per esempio «non posso spedire») si rimborsa
+  SEMPRE, anche col pezzo in vetrina: il suo no resta un no. Chi ha
+  pagato legge «Il venditore aveva annullato l'ordine «…»: i tuoi N sats
+  tornano per intero». (Decisione 2 di Andrea: prima riapriva la
+  vendita, e l'avviso dell'annullo prometteva «l'ordine riparte da
+  solo»; ora dice «i sats ti tornano per intero e ti avviso».)
+- Strade scartate (già prima del cantiere): tenere il pezzo prenotato
+  dopo l'annullo (blocca l'oggetto fino a 15 minuti a ogni annullo) e
+  spegnere la fattura sul nodo (non sappiamo se LNbits lo permette).
+
+**«IL PEZZO NON C'È PIÙ»** (`_perche_niente_vendita`, riga per riga):
+c'è quando l'annuncio è `attivo` e la quantità meno i pezzi prenotati da
+ALTRI compratori (le loro fatture vive, finestra di `_riservati`) basta
+per la riga. Venduto, rimosso, in revisione, sparito: non c'è. Le
+prenotazioni di Anna stessa non contano (`_riservati_da_altri`, gemello
+di `_riservati` con la firma di quest'ultimo intatta): se ha già una
+fattura nuova sua, pagare la vecchia è comprare. NEI SET NE BASTA UNO:
+la fattura era una e il rimborso è sempre intero, quindi un pezzo che
+manca rimborsa tutto l'ordine. Il no di chi vende si guarda PRIMA dello
+stock.
+
+**LA STRADA, SENZA STATI NUOVI** (regola ferrea 4): `annullato` →
+`refund` → `refunded`, mai da `creato` né da `locked`, quindi
+`_incassa_ordine` non gira e con lui non girano stock, «venduto»,
+offerte, carrello salvato, registro dei negozi collegati, Nostr e
+canale. La decide `_decidi_annullata_pagata`, una `def` (mai async: fra
+lo sguardo allo stock e la scrittura non si infila niente) in UNA
+transazione col CAS sulla lapide: o torna `creato` per l'incasso di
+sempre, o va in `refund` col timbro nuovo `pagata_da_annullata_il` e il
+rimborso GIÀ timbrato `da_riprovare` verso il compratore. Poi
+`_rimborsa_annullata_pagata`: avviso a chi ha pagato, rimborso per
+`_rimborsa_compratore` (che per questo timbro esce PRIMA di ogni riga
+che tocca la merce, e non scrive a chi vende), avviso ai moderatori.
+LO DISTINGUE il timbro: `disputata` resta 0 (quindi un moderatore non
+lo «ridecide»), e vince su `annullato_venditore_il` quando ci sono
+tutti e due.
+
+**CHI NON HA L'ADDRESS, IL NODO MUTO, IL SERVER CHE CADE.** Senza
+Lightning address l'ordine resta `refund` col riquadro di sempre
+(address o fattura dell'importo esatto), con le parole sue. Nodo muto:
+`NON_CHIESTO`, il timbro `da_riprovare` resta e lo riprende
+`riprova_pagamenti_sospesi` col suo passo. Server che cade: la decisione
+è già scritta tutta; gli avvisi hanno un timbro in `timbri`
+(`annullata_pagata:<id>`, '' → 'compratore' → 'moderatori') scritto
+DOPO aver parlato (su dei sats fra «due volte» e «mai» si sceglie due
+volte), e `controlla_annullati` finisce a ogni giro quelli rimasti a
+metà nelle ultime 24 ore. Se l'avviso arriva a rimborso già uscito dice
+«Sono già partiti verso il tuo wallet» (visto nel giro dal vivo: prima
+diceva «scegli come riceverli» anche lì).
+
+**LE PAROLE.** A chi ha pagato: «↩️ Hai pagato una fattura annullata.
+«Radio» nel frattempo non è più disponibile: i tuoi 50.000 sats tornano
+per intero. Arrivano da soli sul tuo Lightning address.» (o «Apri
+l'ordine nella Mini App e scegli come riceverli»), poi «↩️ Rimborso
+della fattura annullata: 50.000 sats in arrivo nel tuo wallet, per
+intero.» Mai «disputa», mai «Ordine pagato!», niente invito al feedback.
+Ai moderatori (stanza errori): «⚠️ Fattura annullata pagata: nessuna
+vendita. Ordine #N, «titolo», X sats. Perché: … Rimborso a chi ha
+pagato: ✅ uscito / ⏳ in attesa… Al venditore non è arrivato nessun
+avviso.»; al rimborso uscito il polso nei riepiloghi. Il vecchio avviso
+del riacciuffo resta per il pezzo ancora disponibile, senza più «serve
+un occhio umano». Nella pagina (`annullataPagata(o)`): la card dice
+«Acquisto non concluso» anche mentre il rimborso aspetta; la cassaforte
+racconta tre passi suoi («Hai pagato una fattura annullata» → «L'oggetto
+non era più disponibile» / «Il venditore aveva annullato l'ordine» →
+«Rimborso dei tuoi sats»); testa, riquadro del rimborso e nota del
+rimborsato con le sue parole; nessun riquadro del feedback.
+
+**COSA NON SI MUOVE** (chi conta gli affari salta il timbro con UN
+frammento, `SQL_NON_ANNULLATA_PAGATA`, sopra init_db che lo usa
+all'import): il backfill di `disputata` che gira a ogni avvio (l'avrebbe
+marcata disputa persa di chi vende), `_ordini_vivi_annuncio` (non blocca
+la modifica dell'annuncio a chi vende), `_conta_annulli_venditore`
+(l'annullo di un ordine NON pagato resta il gesto innocuo), gli «affari
+conclusi» del pannello, l'export CSV; il feedback è chiuso in tutte e
+due le porte; XP e reputazione non si toccano. `miei_ordini` toglie
+l'ordine a chi vende DOPO la query (la WHERE è quella di sempre, e la
+sentinella del 10 ago che la protegge resta vera); i moderatori lo
+vedono.
+
+**PUNTATE E SBLOCCHI, OGGI (non toccati).** La puntata annullata e
+pagata non entra mai in gara: `tardivo`, sats in «Da riscuotere» e
+pagamento subito — nessun buco. Il banner: la porta è sempre la stessa
+cosa, si apre — nessun buco.
+
+**PROVATO.** La prova rossa prima: `collaudo_annullata_pagata.py` (13
+scene sul server vero, nodo finto) sul server di `origin/main` 15fad26,
+in una copia intera del repo: 24 passate, 46 fallite — con la doppia
+vendita in chiaro (lo stato `locked` di Anna, il secondo «Hai
+venduto!»). Sull'albero del cantiere: 80 su 80. Le scene: Anna e Bruno;
+due passaggi dell'orologio (un'uscita sola); il pezzo ancora
+disponibile (vendita come prima); il pezzo prenotato da un altro (poi
+Bruno compra davvero, una vendita); la sua fattura nuova (compra);
+senza address (`refund`, poi la fattura incollata); il nodo muto
+(riparte da solo, una volta); il server che cade dopo la decisione e
+dopo il rimborso (avvisi finiti una volta sola, il backfill al riavvio
+non la marca); l'annullo del venditore «non posso spedire» ed
+«esaurito» pagati dopo; il set con un pezzo che manca; l'annuncio
+rimosso; chi vende non vede (lista, feedback, affare in corso, XP,
+affari conclusi); libro mastro e riconciliazione che TACCIONO, con due
+controprove che li fanno parlare su quella riga. `prove_annullata_pagata`
+(54): la forma, i giudici eseguiti su un database in memoria, le
+parole, il lato client in node. Nella gabbia della CI: verde. LA
+TORTURA, 19 mutazioni su una copia (il pezzo sempre presente, il no di
+chi vende dimenticato, le prenotazioni altrui ignorate o le sue
+contate, il set guardato solo alla prima riga, il rimosso come attivo,
+il rimborso che rimette la merce, chi vende che vede l'ordine, il
+feedback riaperto nel server e nella pagina, il backfill, l'affare in
+corso, il conto degli annulli, gli avvisi non finiti dopo una caduta o
+ripetuti, la decisione senza timbro di ritentativo, «disputa» nelle
+parole, la vecchia promessa dell'annullo, la pagina senza timbro): 19
+prese. IL GIRO DAL VIVO a 375 px (server del worktree su 8177, relay
+morti, P2P spento, tre ordini seminati): la lista di Anna («Acquisto non
+concluso», «Da rimborsare», «Rimborsato»), l'ordine in attesa senza
+address, quello col «Il venditore aveva annullato l'ordine» e la data
+del rimborso; chi vende (222) vede «Ancora nessun ordine» e la sua
+/api/orders torna vuota; gli avvisi letti dal log.
+
+Allineati i banchi che ritagliano le funzioni toccate: il riacciuffo in
+`prove_annullo` (la sentinella guarda ora la decisione), il paracadute
+(colonna nuova), l'annullo del venditore (colonna, costante, giudice in
+node), la spunta del rimborso (tre storie), il rimborso meno le spese e
+la parità del feedback (il giudice nel banco), la lista ordini (la
+colonna dopo gli INSERT per posizione), il censimento degli avvisi ai
+moderatori (72 chiamate, 82 punti, polso con sette chiamanti).
+
+**DA FARE (notati, non toccati).**
+- IL BACKFILL DI `disputata` MARCA ANCHE GLI ANNULLI DEL VENDITORE.
+  Verificato con una sonda il 15 ott: un ordine pagato e annullato da
+  chi vende (`refunded`, `disputata` 0) dopo un riavvio qualunque — cioè
+  dopo ogni deploy — ha `disputata` 1, e la query delle dispute perse
+  dei distintivi lo conta («dispute perse di chi vende: 1»); in più
+  quell'ordine, se resta in `refund`, diventa «decidibile» da un
+  moderatore. Esiste dal 1 ott (l'annullo del venditore); qui è curato
+  solo per la fattura annullata e pagata. La cura probabile: escludere
+  anche `annullato_venditore_il` dal backfill (e decidere cosa fare
+  degli ordini già marcati sul VPS).
+- IL LINK DEL NEGOZIO (decisione 3 di Andrea: solo verbale). Caso
+  preciso: un venditore chiede il link «x», annulla il foglio della
+  fattura e un altro venditore paga e prende «x»; poi il primo paga la
+  fattura annullata. `controlla_annullati` resuscita il pagamento e
+  `_incassa_slug_negozio` lo incassa: i 5.000 sats restano incassati, il
+  link non si scrive (`_slug_negozio_libero` dice no), al venditore
+  «Hai pagato per il link «x», ma nel frattempo lo ha preso qualcun
+  altro», ai moderatori «Link negozio conteso»: rimborso o nome diverso
+  A MANO (`_rimborsa_sblocco`, mai automatico per patto).
+- LA SUA FATTURA NUOVA E LA VECCHIA. Anna annulla, ricompra (fattura
+  nuova, sua) e paga la VECCHIA: è una vendita, giusto; ma la nuova
+  resta viva, e se paga anche quella `verifica_pagamento` la porta a
+  `locked` senza guardare lo stock (il MAX del corner): un secondo
+  ordine pagato per lo stesso pezzo, a se stessa.
+- LA CARD DI CHI VENDE in fondo all'ordine, quando non ha contatti
+  pubblici, dice «Per i problemi c'è la disputa, e interviene un
+  moderatore» anche su questi ordini, dove una disputa non si apre.
+- LE ROTTE PER NUMERO (`/indirizzo`, `/email-corriere`, `/busta-ritiro`,
+  `/accesso`) guardano solo che chi chiede sia una delle parti: chi
+  vende può ancora leggere l'indirizzo lasciato su un ordine che non
+  vede, se ne indovina il numero.
+- Gli scatti del giro sono del Browser pane (densità 2): per quelli a
+  densità 3 c'è la ricetta CDP.
+
+**COSA È GIRATO SU QUALE ALBERO.** Nel messaggio del commit.

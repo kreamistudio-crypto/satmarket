@@ -5158,6 +5158,16 @@ def etichetta_zona(zona: str, domestico: str = "") -> str:
     return ZONA_ETICHETTA.get(zona, "")
 
 
+# LA FATTURA ANNULLATA E PAGATA NON E' UN AFFARE (13 ott 2026): l'ordine
+# che porta il timbro `pagata_da_annullata_il` ha fatto entrare dei sats
+# e li ha fatti tornare, senza che niente sia mai stato venduto. Chi
+# conta gli affari — le guardie «affare in corso» dell'annuncio, il
+# conto degli annulli di chi vende, gli «affari conclusi», il backfill
+# di `disputata` — lo salta con QUESTO frammento, scritto una volta
+# sola. Sta sopra init_db() perche' il backfill gira all'import.
+SQL_NON_ANNULLATA_PAGATA = "COALESCE(pagata_da_annullata_il,0)=0"
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -8910,7 +8920,17 @@ def init_db():
                     "annullato_venditore_il INTEGER DEFAULT 0",
                     "motivo_annullo TEXT DEFAULT ''",
                     "nota_annullo TEXT DEFAULT ''",
-                    "esauriti_annullo TEXT DEFAULT ''"):
+                    "esauriti_annullo TEXT DEFAULT ''",
+                    # LA FATTURA ANNULLATA E PAGATA (13 ott 2026): QUANDO
+                    # il riacciuffo ha deciso che quel saldo NON diventa
+                    # una vendita (0 = mai) — il pezzo non c'era piu', o
+                    # chi vende aveva annullato. L'ordine fa la strada
+                    # del rimborso ('refund' → 'refunded') senza passare
+                    # da 'locked', ed e' questo timbro a distinguerlo da
+                    # una disputa (`disputata` resta 0) e dall'annullo
+                    # del venditore a ordine pagato. Vedi
+                    # `_decidi_annullata_pagata`.
+                    "pagata_da_annullata_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -9124,10 +9144,15 @@ def init_db():
     # per cui questo giro e' nato non si sposta; e un annullo
     # riacciuffato e poi disputato davvero ha gia' il suo 1, scritto da
     # apri_disputa: questo giro non smarca mai niente.
+    # ...E NEMMENO la fattura annullata e pagata (13 ott 2026): fa la strada
+    # del rimborso senza che nessuno abbia disputato niente, e questo
+    # giro — che passa a OGNI avvio — la marcherebbe disputa persa di
+    # chi vende, che di quell'ordine non ha mai saputo nulla.
     con.execute("UPDATE ordini SET disputata=1 WHERE disputata=0 AND stato "
                 "IN ('dispute','return_pending','return_shipped',"
                 "'refund','refunded') "
-                "AND COALESCE(annullato_venditore_il,0)=0")
+                "AND COALESCE(annullato_venditore_il,0)=0 "
+                "AND " + SQL_NON_ANNULLATA_PAGATA)
     # L'ORDINE DI PROVA (ago 2026): i collaudi fatti in produzione
     # mentre l'app si costruiva. NON si cancellano — la riconciliazione
     # con LNbits incrocia i suoi incassi coi payment_hash di QUESTE
@@ -12457,6 +12482,13 @@ def _campo(o, chiave: str, vuoto=""):
         return (o[chiave] if chiave in o.keys() else vuoto) or vuoto
     except Exception:
         return vuoto
+
+
+def _annullata_pagata(o) -> bool:
+    """La riga porta il timbro della FATTURA ANNULLATA E PAGATA (13 ott
+    2026)? Passa da `_campo`: i banchi montano tabelle piu' strette di
+    quella vera, e li' la colonna non c'e' — che vuol dire «no»."""
+    return bool(_campo(o, "pagata_da_annullata_il", 0))
 
 
 def _in_pagamento(o) -> bool:
@@ -28446,13 +28478,16 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
                           "WHERE stato='attivo'").fetchone()["n"]
     conclusi = con.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) AS volume "
-        "FROM ordini WHERE stato IN ('released','refunded')").fetchone()
+        # (13 ott 2026) una fattura annullata e pagata non e' un affare
+        "FROM ordini WHERE stato IN ('released','refunded') "
+        "AND " + SQL_NON_ANNULLATA_PAGATA).fetchone()
     lista = [dict(r) for r in con.execute(
         "SELECT u.tg_id, u.nome, u.username, u.negozio, u.registrato, "
         "  (SELECT COUNT(*) FROM annunci a WHERE a.venditore_id=u.tg_id "
         "     AND a.stato='attivo') AS annunci_attivi, "
         "  (SELECT COUNT(*) FROM ordini o WHERE o.stato IN "
-        "     ('released','refunded') AND (o.venditore_id=u.tg_id "
+        "     ('released','refunded') AND COALESCE("
+        "     o.pagata_da_annullata_il,0)=0 AND (o.venditore_id=u.tg_id "
         "     OR o.compratore_id=u.tg_id)) AS affari_conclusi "
         "FROM utenti u ORDER BY u.registrato DESC")]
     # Il polso della moderazione: quanti aspettano, e gli ultimi 30
@@ -34576,12 +34611,17 @@ def _ordini_vivi_annuncio(con, annuncio_id: int, stati: tuple,
     ordini che toccano l'annuncio come testata mono O come riga di
     un set — cosi' nessuna guardia puo' dimenticarsi delle righe.
     Con esclusi=True la tupla elenca gli stati TERMINALI da ignorare
-    (la forma della guardia di modifica), altrimenti quelli vivi."""
+    (la forma della guardia di modifica), altrimenti quelli vivi.
+    LA FATTURA ANNULLATA E PAGATA NON CONTA (13 ott 2026): aspetta in
+    'refund' anche per giorni, ma chi vende non la vede e non ci puo'
+    fare niente — fermargli la modifica dell'annuncio per un ordine
+    che non e' mai stato suo sarebbe un muro senza porta."""
     segnaposto = ",".join("?" * len(stati))
     verso = "NOT IN" if esclusi else "IN"
     return con.execute(
         f"SELECT COUNT(*) AS n FROM ordini WHERE stato {verso} "
-        f"({segnaposto}) AND (annuncio_id=? OR id IN "
+        f"({segnaposto}) AND {SQL_NON_ANNULLATA_PAGATA} "
+        f"AND (annuncio_id=? OR id IN "
         f"(SELECT ordine_id FROM ordine_righe WHERE annuncio_id=?))",
         (*stati, annuncio_id, annuncio_id)).fetchone()["n"]
 
@@ -34707,6 +34747,29 @@ def _riservati(con, annuncio_id: int) -> int:
         "JOIN ordini o ON o.id=r.ordine_id "
         "WHERE r.annuncio_id=? AND o.stato='creato' AND o.creato>=?",
         (annuncio_id, soglia)).fetchone()["n"]
+    return mono + nei_set
+
+
+def _riservati_da_altri(con, annuncio_id: int, compratore_id: int) -> int:
+    """I pezzi prenotati da ALTRI compratori: il gemello di `_riservati`
+    per il riacciuffo (13 ott 2026), con la stessa finestra e le stesse
+    due somme. Chi ha pagato una fattura annullata non deve trovarsi il
+    pezzo negato dalla SUA stessa fattura nuova — ma quella viva in mano
+    a un altro e' una prenotazione buona, e lui alla sua ha rinunciato.
+    Una funzione a parte e non un argomento in piu' su `_riservati`: la
+    cassa la chiama in dieci posti, e la sua firma resta quella."""
+    soglia = int(time.time()) - 1800
+    mono = con.execute(
+        "SELECT COALESCE(SUM(quantita),0) AS n FROM ordini "
+        "WHERE annuncio_id=? AND stato='creato' AND creato>=? "
+        "AND compratore_id<>?",
+        (annuncio_id, soglia, compratore_id)).fetchone()["n"]
+    nei_set = con.execute(
+        "SELECT COALESCE(SUM(r.quantita),0) AS n FROM ordine_righe r "
+        "JOIN ordini o ON o.id=r.ordine_id "
+        "WHERE r.annuncio_id=? AND o.stato='creato' AND o.creato>=? "
+        "AND o.compratore_id<>?",
+        (annuncio_id, soglia, compratore_id)).fetchone()["n"]
     return mono + nei_set
 
 
@@ -66627,6 +66690,16 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         # quella vera, e li' la colonna non c'e'.
         annullo = bool("annullato_venditore_il" in o.keys()
                        and o["annullato_venditore_il"])
+        # LA FATTURA ANNULLATA E PAGATA (13 ott 2026): l'ordine non e'
+        # mai stato 'locked' — niente stock scalato, nessun «venduto» —
+        # quindi qui non c'e' merce da rimettere a posto e a chi vende
+        # non si dice niente: tornano i sats a chi ha pagato, e basta.
+        # VINCE sull'annullo del venditore quando ci sono tutt'e due i
+        # timbri (la lapide di un suo annullo, pagata dopo): il suo
+        # ramo, piu' sotto, esce prima di quello dell'annullo. Si legge
+        # con `_campo`, per la ragione dell'annullo qui sopra: i banchi
+        # montano tabelle piu' strette, e li' la colonna non c'e'.
+        tardiva = bool(_campo(o, "pagata_da_annullata_il", 0))
         # Rimborso integrale: articolo, spedizione e protezione tornano
         # tutti al compratore (l'affare e' saltato, la protezione non
         # si e' consumata) — e' il totale, zero commissioni.
@@ -66683,6 +66756,29 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                         "payout_stato='uscito', "
                         "aggiornato=? WHERE id=?",
                         (cambio, int(time.time()), ordine_id))
+            if tardiva:
+                # LA FATTURA ANNULLATA E PAGATA ESCE QUI, prima di ogni
+                # riga che tocca la merce: l'ordine non e' mai stato
+                # 'locked', quindi non c'e' stock da rimettere, ne' un
+                # registro di negozio da pareggiare, ne' una piazza da
+                # avvisare. Il perche' gliel'ha gia' detto l'avviso del
+                # riacciuffo (`_avvisi_annullata_pagata`): qui si dice
+                # che i sats sono partiti. Niente invito al feedback —
+                # non c'e' stato un affare — e a chi vende NIENTE.
+                titolo = html.escape(
+                    _titolo_ordine(_righe_ordine(con, o))[:60])
+                con.commit()
+                con.close()
+                await notifica(o["compratore_id"],
+                               f"↩️ <b>Rimborso della fattura annullata:</b> "
+                               f"<b>{_fmt_sats(importo)} sats</b> in arrivo nel "
+                               f"tuo wallet, per intero.")
+                await polso_ordini_admin(
+                    f"↩️ <b>Fattura annullata pagata, rimborsata a chi ha "
+                    f"pagato:</b> «{titolo}» — {_fmt_sats(importo)} sats "
+                    f"(ordine #{ordine_id}). Nessuna vendita. Restano "
+                    f"{{aperti}} ordini aperti.")
+                return {"ok": True, "stato": "refunded"}
             # I pezzi rimborsati tornano nello stock e l'oggetto in
             # vetrina (incremento RELATIVO: se il venditore li aveva
             # gia' ricontati con la ricarica — che e' una scrittura
@@ -66787,10 +66883,12 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                      int(time.time()), ordine_id))
         con.commit()
         con.close()
-        if annullo and not ritenta:
+        if (annullo or tardiva) and not ritenta:
             # L'ANNULLO DEL VENDITORE: l'avviso di annulla_vendita ha
             # gia' detto al compratore come ricevere i sats; qui si
-            # parla solo se la strada automatica C'ERA e non ha pagato
+            # parla solo se la strada automatica C'ERA e non ha pagato.
+            # LA FATTURA ANNULLATA E PAGATA fa lo stesso: il suo avviso
+            # (`_avvisi_annullata_pagata`) e' gia' partito.
             if c_utente and c_utente["ln_address"]:
                 await notifica(
                     o["compratore_id"],
@@ -68300,6 +68398,203 @@ async def segnala_fatture_scadute(fonte: str, rifs: list):
               f"({type(e).__name__}: {e})", flush=True)
 
 
+# ------------- LA FATTURA ANNULLATA E PAGATA (13 ott 2026) -------------
+# IL CASO, verificato con una sonda sul server vero: Anna compra
+# l'ultimo pezzo e annulla; il pezzo torna libero, ma la sua fattura e'
+# ancora viva nel wallet. Bruno compra e paga. Poi Anna paga la fattura
+# annullata — e fino al 13 ott il riacciuffo portava anche il suo ordine
+# a 'locked' senza guardare se il pezzo c'era ancora: DUE ordini pagati
+# per un oggetto solo, «Hai venduto!» due volte, e un moderatore a
+# sistemare a mano. Era il «conflitto dichiarato» dell'ago 2026.
+# LA DECISIONE DI ANDREA: rimborso automatico. Se il pezzo non c'e'
+# piu' quel saldo NON e' una vendita — chi vende non riceve niente, chi
+# ha pagato viene avvisato e rimborsato, i moderatori lo sanno.
+# E SE AD ANNULLARE ERA STATO CHI VENDE si rimborsa SEMPRE, anche col
+# pezzo ancora in vetrina: il suo no resta un no.
+# NESSUNO STATO NUOVO (regola ferrea 4): 'annullato' → 'refund' →
+# 'refunded', la strada dei rimborsi di sempre, senza passare da
+# 'creato' ne' da 'locked' — quindi `_incassa_ordine` non gira, e con
+# lui non girano lo stock, il «venduto», le offerte, il carrello, il
+# registro dei negozi collegati, Nostr e il canale. A distinguerlo da
+# una disputa vinta e dall'annullo del venditore e' il timbro
+# `pagata_da_annullata_il`.
+# LE STRADE SCARTATE: tenere il pezzo prenotato dopo l'annullo (blocca
+# l'oggetto fino a 15 minuti a ogni annullo: su un mercatino di pezzi
+# unici pesa) e spegnere la fattura sul nodo (non sappiamo se LNbits lo
+# permette).
+
+def _perche_niente_vendita(con, o) -> str:
+    """PURA SULLA CONNESSIONE: perche' il saldo su questa lapide NON puo'
+    diventare una vendita — 'venditore' (aveva annullato lui), 'esaurito'
+    (il pezzo non c'e' piu') — o '' se si puo' vendere come sempre.
+    IL PEZZO C'E' quando l'annuncio e' 'attivo' e i pezzi liberi — la
+    quantita' meno quelli prenotati da ALTRI — bastano per la riga.
+    Venduto, rimosso, in revisione, sparito: non c'e'.
+    NEI SET SI GUARDA RIGA PER RIGA E NE BASTA UNA: la fattura era una
+    e il rimborso e' sempre intero, quindi un pezzo che manca rimborsa
+    tutto l'ordine — mai una vendita a meta' che nessuno ha chiesto."""
+    if _campo(o, "annullato_venditore_il", 0):
+        return "venditore"
+    for r in _righe_ordine(con, o):
+        a = con.execute("SELECT stato, quantita FROM annunci WHERE id=?",
+                        (r["annuncio_id"],)).fetchone()
+        if not a or a["stato"] != "attivo":
+            return "esaurito"
+        liberi = int(a["quantita"] or 0) - _riservati_da_altri(
+            con, r["annuncio_id"], o["compratore_id"])
+        if liberi < int(r["quantita"] or 1):
+            return "esaurito"
+    return ""
+
+
+def _decidi_annullata_pagata(ordine_id: int) -> str:
+    """LA DECISIONE, in UNA transazione: la lapide pagata torna 'creato'
+    ('vendita': la incassa `_incassa_ordine`, come sempre) oppure va in
+    'refund' col timbro ('esaurito' o 'venditore': nessuna vendita).
+    '' = non era piu' una lapide, qualcun altro e' passato prima.
+    E' una `def` e non una `async def` APPOSTA (il patto di
+    `_scrivi_meno_spese`): qui dentro non puo' entrarci un await, cioe'
+    niente si infila fra lo sguardo allo stock e la scrittura — un
+    altro compratore non puo' prenotare il pezzo a meta'.
+    IL CAS SULLA LAPIDE regge i due passaggi dell'orologio: il secondo
+    non trova piu' 'annullato' e torna a mani vuote — un rimborso solo.
+    E IL RIMBORSO NASCE GIA' TIMBRATO 'da_riprovare' verso il
+    compratore, nella stessa scrittura: se il server cade un istante
+    dopo, la riga dice da sola «nessun sat si e' mosso, si puo'
+    bussare» e la riprende `riprova_pagamenti_sospesi`."""
+    con = db()
+    try:
+        o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                        "stato='annullato'", (ordine_id,)).fetchone()
+        if not o:
+            return ""
+        adesso = int(time.time())
+        perche = _perche_niente_vendita(con, o)
+        if not perche:
+            cur = con.execute(
+                "UPDATE ordini SET stato='creato', creato=?, aggiornato=? "
+                "WHERE id=? AND stato='annullato'",
+                (adesso, adesso, ordine_id))
+            con.commit()
+            return "vendita" if cur.rowcount else ""
+        cur = con.execute(
+            "UPDATE ordini SET stato='refund', pagata_da_annullata_il=?, "
+            "payout_stato='da_riprovare', payout_verso='compratore', "
+            "aggiornato=? WHERE id=? AND stato='annullato'",
+            (adesso, adesso, ordine_id))
+        con.commit()
+        return perche if cur.rowcount else ""
+    finally:
+        con.close()
+
+
+def _msg_annullata_pagata(titolo: str, importo: int, dal_venditore: bool,
+                          ha_address: bool, partiti: bool = False) -> str:
+    """LE PAROLE DI CHI HA PAGATO UNA FATTURA ANNULLATA. `titolo` arriva
+    GIA' scappato. Mai «disputa», mai «annullato dal venditore» come
+    titolo: il fatto e' suo — ha pagato una fattura annullata — e la
+    seconda frase dice perche' non e' diventata un acquisto.
+    `partiti`: il rimborso e' gia' uscito (l'avviso arriva tardi, dopo
+    una caduta del server) — allora non si chiede niente a nessuno."""
+    perche = (f"Il venditore aveva annullato l'ordine «{titolo}»"
+              if dal_venditore else
+              f"«{titolo}» nel frattempo non è più disponibile")
+    come = ("Sono già partiti verso il tuo wallet." if partiti
+            else "Arrivano da soli sul tuo Lightning address." if ha_address
+            else "Apri l'ordine nella Mini App e scegli come riceverli.")
+    return (f"↩️ <b>Hai pagato una fattura annullata.</b> {perche}: i tuoi "
+            f"<b>{_fmt_sats(importo)} sats</b> tornano per intero. {come}")
+
+
+def _msg_annullata_pagata_admin(o, titolo: str, importo: int) -> str:
+    """L'AVVISO AI MODERATORI: ordine, cifra, perche', e a che punto e'
+    il rimborso — letto dalla RIGA di adesso, cosi' dice il vero anche
+    quando parte in ritardo (dopo una caduta)."""
+    perche = ("il venditore aveva annullato l'ordine"
+              if _campo(o, "annullato_venditore_il", 0)
+              else "l'oggetto non era più disponibile")
+    ps = _campo(o, "payout_stato")
+    if o["stato"] == "refunded":
+        rimborso = "✅ uscito"
+    elif ps == "incerto":
+        rimborso = "🧊 da decidere: vedi l'avviso del pagamento incerto"
+    elif ps == "in_volo":
+        rimborso = "⏳ in volo: lo chiude il giro dei pagamenti"
+    elif ps == "da_riprovare":
+        rimborso = "⏳ in attesa: non è partito, ci riproviamo da soli"
+    else:
+        rimborso = ("⏳ in attesa: chi ha pagato deve indicare come "
+                    "riceverlo, dall'ordine")
+    return (f"⚠️ <b>Fattura annullata pagata: nessuna vendita.</b>\n"
+            f"Ordine #{o['id']}, «{titolo}», "
+            f"<b>{_fmt_sats(importo)} sats</b>.\n"
+            f"Perché: {perche}.\n"
+            f"Rimborso a chi ha pagato: {rimborso}.\n"
+            f"Al venditore non è arrivato nessun avviso.")
+
+
+def _timbro_annullata_pagata(ordine_id: int) -> str:
+    return f"annullata_pagata:{ordine_id}"
+
+
+async def _avvisi_annullata_pagata(ordine_id: int, fino_a: str):
+    """I DUE AVVISI, una volta sola ciascuno: a chi ha pagato (subito,
+    prima di provare a pagare: deve sapere comunque che non ha comprato
+    niente e che i sats tornano) e ai moderatori (dopo il tentativo,
+    cosi' dicono se il rimborso e' uscito o aspetta).
+    IL TIMBRO SI SCRIVE DOPO AVER PARLATO, al contrario delle campagne:
+    quelle sono cortesie, e un errore puo' perderne una; questo e' un
+    avviso su dei sats, e fra «due volte» e «mai» qui si sceglie due
+    volte. Avanza di un passo alla volta — '' → 'compratore' →
+    'moderatori' — ed e' quel che fa finire il lavoro dopo una caduta
+    (lo richiama `controlla_annullati` a ogni giro).
+    `fino_a`: 'compratore' si ferma al primo, 'moderatori' li fa tutti."""
+    nome = _timbro_annullata_pagata(ordine_id)
+    fatto = timbro_letto(nome)
+    if fatto == "moderatori":
+        return
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    if not o or not _annullata_pagata(o):
+        con.close()
+        return
+    titolo = html.escape(_titolo_ordine(_righe_ordine(con, o))[:60])
+    u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                    (o["compratore_id"],)).fetchone()
+    con.close()
+    importo = importo_rimborso(o)
+    if not fatto:
+        await notifica(
+            o["compratore_id"],
+            _msg_annullata_pagata(
+                titolo, importo, bool(_campo(o, "annullato_venditore_il", 0)),
+                bool(u and u["ln_address"]), o["stato"] == "refunded"))
+        timbro_scrivi(nome, "compratore")
+    if fino_a != "moderatori":
+        return
+    await notifica_admin(_msg_annullata_pagata_admin(o, titolo, importo),
+                         argomento="errori")
+    timbro_scrivi(nome, "moderatori")
+
+
+async def _rimborsa_annullata_pagata(ordine_id: int):
+    """DOPO LA DECISIONE: l'avviso a chi ha pagato, il rimborso per la
+    strada di sempre, l'avviso ai moderatori col suo esito. Ogni passo
+    e' sotto try: uno che esplode non ferma gli altri — il rimborso ha
+    gia' il suo timbro 'da_riprovare' e lo riprende il giro dei
+    pagamenti, gli avvisi li finisce il giro dopo."""
+    for passo in (lambda: _avvisi_annullata_pagata(ordine_id, "compratore"),
+                  lambda: _rimborsa_compratore(ordine_id),
+                  lambda: _avvisi_annullata_pagata(ordine_id, "moderatori")):
+        try:
+            await passo()
+        except Exception as e:
+            print(f"⚠️ Fattura annullata pagata, ordine #{ordine_id}: un "
+                  f"passo non e' riuscito ({type(e).__name__}: {e}) — lo "
+                  f"riprende il giro", flush=True)
+
+
 async def controlla_annullati():
     """Il riacciuffo (ago 2026): un pagamento arrivato su una fattura
     ANNULLATA. Succede nella corsa annulla-vs-saldo (finestra di
@@ -68311,6 +68606,11 @@ async def controlla_annullati():
     ORDINI: la lapide torna 'creato' (timbro fresco, che il reaper
     non se la mangi a meta' strada) e _incassa_ordine fa il flusso di
     sempre — chi paga ha comprato, la regola di verifica_pagamento.
+    ...MA SOLO SE C'E' ANCORA COSA COMPRARE (13 ott 2026): se il pezzo
+    nel frattempo e' andato a un altro, o se ad annullare era stato chi
+    vende, quel saldo NON diventa una vendita — l'ordine prende la
+    strada del rimborso e chi vende non ne sa niente. Decide, in una
+    transazione sola, `_decidi_annullata_pagata`.
     RILANCI: binario del fuori-tempo, i sats in «Da riscuotere» come
     ogni saldo su puntata fuori gara. Gira nell'orologio, fail-open:
     un errore = si riprova al giro dopo, la lapide aspetta."""
@@ -68329,26 +68629,41 @@ async def controlla_annullati():
         "SELECT id, motivo, payment_hash, cassaforte FROM pagamenti WHERE stato='annullato' "
         "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
     con.close()
+    # GLI AVVISI RIMASTI A META' (13 ott 2026): una fattura annullata e
+    # pagata si DECIDE in una transazione e si racconta dopo — a chi ha
+    # pagato, poi ai moderatori. Se il server e' caduto fra le due
+    # cose, il timbro dice dove si era arrivati e qui si finisce, una
+    # volta sola. Il rimborso NON si ritenta da qui: ha il suo timbro
+    # 'da_riprovare' e lo riprende il giro dei pagamenti, col suo passo.
+    try:
+        con = db()
+        a_meta = [r["id"] for r in con.execute(
+            "SELECT id FROM ordini WHERE pagata_da_annullata_il >= ?",
+            (adesso - 86400,))]
+        con.close()
+        for oid in a_meta:
+            await _avvisi_annullata_pagata(oid, "moderatori")
+    except Exception as e:
+        print(f"⚠️ Avvisi delle fatture annullate e pagate saltati: {e}")
     for o in ordini:
         try:
             if not await invoice_pagata(o["payment_hash"], o["cassaforte"]):
                 continue
-            con = db()
-            cur = con.execute(
-                "UPDATE ordini SET stato='creato', creato=?, aggiornato=? "
-                "WHERE id=? AND stato='annullato'",
-                (int(time.time()), int(time.time()), o["id"]))
-            con.commit()
-            con.close()
-            if cur.rowcount == 0:
+            esito = _decidi_annullata_pagata(o["id"])
+            if not esito:
+                continue
+            if esito != "vendita":
+                print(f"↩️ Pagamento su ordine annullato #{o['id']}: "
+                      f"nessuna vendita ({esito}), si rimborsa")
+                await _rimborsa_annullata_pagata(o["id"])
                 continue
             print(f"⚠️ Pagamento su ordine annullato #{o['id']}: riacciuffato")
             await _incassa_ordine(o["id"])
             await notifica_admin(
                 f"⚠️ Un pagamento è atterrato su un <b>ordine annullato</b> "
-                f"(#{o['id']}): riacciuffato e portato avanti come un "
-                f"ordine normale. Se l'annuncio nel frattempo era stato "
-                f"rimosso, serve un occhio umano.", argomento="errori")
+                f"(#{o['id']}): l'oggetto c'era ancora, quindi è stato "
+                f"riacciuffato e portato avanti come un ordine normale.",
+                argomento="errori")
         except Exception as e:
             print(f"⚠️ Riacciuffo ordine #{o['id']} saltato: {e}")
     for ril in rilanci:
@@ -68620,12 +68935,17 @@ def _conta_annulli_venditore(con, venditore_id: int, adesso: int = 0) -> int:
     ANNULLI_VENDITORE_GIORNI giorni: le righe che l'annullo ha portato
     a 'refund'/'refunded' — quelle che hanno fatto tornare dei sats — e
     non le lapidi degli ordini mai pagati, che il reaper spazza entro
-    un'ora e che non hanno fatto male a nessuno."""
+    un'ora e che non hanno fatto male a nessuno.
+    E NON la lapide pagata DOPO (13 ott 2026, `pagata_da_annullata_il`):
+    chi vende aveva annullato un ordine non pagato, che e' il gesto
+    innocuo di sempre — se poi l'altro paga la fattura annullata i sats
+    gli tornano, ma quello non e' un «annullo di un ordine pagato»."""
     adesso = adesso or int(time.time())
     return con.execute(
         "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? "
         "AND annullato_venditore_il >= ? "
-        "AND stato IN ('refund','refunded')",
+        "AND stato IN ('refund','refunded') "
+        "AND " + SQL_NON_ANNULLATA_PAGATA,
         (venditore_id,
          adesso - ANNULLI_VENDITORE_GIORNI * 86400)).fetchone()["n"]
 
@@ -68806,7 +69126,9 @@ async def annulla_vendita(ordine_id: int, req: Request,
         # l'offerta dietro l'ordine DECADE — non resta ripagabile come
         # nell'annullo del compratore, perche' qui a dire di no e' chi
         # vende. Le righe dei set restano: la lapide puo' essere
-        # riacciuffata da un saldo tardivo, come sempre.
+        # riacciuffata da un saldo tardivo — che dal 13 ott 2026 su
+        # QUESTA lapide non riapre la vendita: si rimborsa sempre
+        # (`_perche_niente_vendita`, il no di chi vende resta un no).
         con.execute("UPDATE offerte SET ordine_id=0, stato='decaduta', "
                     "aggiornato=? WHERE ordine_id=?", (adesso, ordine_id))
         passaggi = _pausa_esauriti(con, esauriti)
@@ -68818,7 +69140,7 @@ async def annulla_vendita(ordine_id: int, req: Request,
             f"✖️ <b>Il venditore ha annullato il tuo ordine «{titolo}»</b> "
             f"prima del pagamento — motivo: {motivo_testo}. Non pagare la "
             f"fattura: nessun sat è stato trattenuto. (Se l'avevi appena "
-            f"pagata, l'ordine riparte da solo e ti avviso.)")
+            f"pagata, i sats ti tornano per intero e ti avviso.)")
         return {"ok": True, "stato": "annullato"}
 
     # 'locked': i sats sono in cassaforte e tornano per intero. IL CAS
@@ -69044,6 +69366,16 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     # prove) altrimenti si scambierebbero di posto a ogni richiesta.
     righe = [dict(r) for r in con.execute(
         q + " ORDER BY o.creato DESC, o.id DESC", par)]
+    # LA FATTURA ANNULLATA E PAGATA NON E' DI CHI VENDE (13 ott 2026,
+    # decisione di Andrea): non ha venduto niente e non riceve avvisi,
+    # quindi quell'ordine nei suoi Ordini non compare — lo vede chi ha
+    # pagato, e i moderatori. Si toglie QUI e non nella WHERE: e'
+    # l'unica riga che il server nega a una delle due parti, e la
+    # query resta quella di sempre.
+    if not e_admin(user["id"]):
+        righe = [r for r in righe
+                 if not (r.get("pagata_da_annullata_il")
+                         and r["compratore_id"] != user["id"])]
     for r in righe:
         r["mio_foto"] = foto_recensione(r["mio_foto"])
         r["suo_foto"] = foto_recensione(r["suo_foto"])
@@ -69282,6 +69614,10 @@ def scarica_export(biglietto: str):
         # riga non deve far sparire l'ordine dall'export di chi vende
         "LEFT JOIN utenti uc ON uc.tg_id=o.compratore_id "
         "WHERE (o.venditore_id=? OR o.compratore_id=?) "
+        # (13 ott 2026) la fattura annullata e pagata non e' un affare:
+        # fuori dalla contabilita' di tutti e due — e chi vende di
+        # quell'ordine non deve sapere niente, nemmeno da qui
+        "AND COALESCE(o.pagata_da_annullata_il,0)=0 "
         f"{dove}"
         "ORDER BY o.aggiornato DESC", (tg_id, tg_id)).fetchall()
     # Un set = UNA riga di CSV (un incasso = una riga di contabilita'),
@@ -70473,8 +70809,12 @@ async def lascia_feedback(ordine_id: int, req: Request,
             raise HTTPException(404, "Ordine non trovato")
         if user["id"] not in (o["compratore_id"], o["venditore_id"]):
             raise HTTPException(403, "Operazione non permessa")
-        if not _ammette_feedback(o["stato"], o["disputata"],
-                                 o["sbloccato_auto_il"]):
+        # (13 ott 2026) e mai su una fattura annullata e pagata: i sats
+        # sono tornati, ma fra i due non c'e' stato nessun affare da
+        # giudicare — e chi vende di quell'ordine non sa niente
+        if (not _ammette_feedback(o["stato"], o["disputata"],
+                                  o["sbloccato_auto_il"])
+                or _annullata_pagata(o)):
             raise HTTPException(400, "Il feedback si lascia a affare concluso")
         if gia:
             raise HTTPException(400, "Hai già lasciato il feedback "
@@ -70510,8 +70850,9 @@ async def lascia_feedback(ordine_id: int, req: Request,
         if user["id"] not in (o["compratore_id"], o["venditore_id"]):
             con.rollback()
             raise HTTPException(403, "Operazione non permessa")
-        if not _ammette_feedback(o["stato"], o["disputata"],
-                                 o["sbloccato_auto_il"]):
+        if (not _ammette_feedback(o["stato"], o["disputata"],
+                                  o["sbloccato_auto_il"])
+                or _annullata_pagata(o)):
             con.rollback()
             raise HTTPException(400, "Il feedback si lascia a affare concluso")
         per = (o["venditore_id"] if user["id"] == o["compratore_id"]

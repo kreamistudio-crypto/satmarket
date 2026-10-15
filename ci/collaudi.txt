@@ -66,6 +66,7 @@ collaudo_nuova_fattura
 collaudo_classifica
 collaudo_quantita_servizi
 collaudo_annullo_venditore
+collaudo_annullata_pagata
 collaudo_pionieri
 collaudo_contanti_p2p
 collaudo_controllo_fattura

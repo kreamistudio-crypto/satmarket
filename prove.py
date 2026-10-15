@@ -2033,10 +2033,16 @@ def prove_annullo():
 
     # --- la corsa: il saldo su una lapide viene riacciuffato
     sw = corpo("controlla_annullati")
+    # EMENDATA (13 ott 2026, «annullata-pagata»): la lapide non torna
+    # piu' 'creato' DENTRO il giro — che cosa farne lo decide
+    # `_decidi_annullata_pagata`, in una transazione sola (se il pezzo
+    # non c'e' piu' si rimborsa: vedi prove_annullata_pagata)
+    dec = corpo("_decidi_annullata_pagata")
     prova("riacciuffo: l'ordine annullato-ma-pagato torna 'creato' e "
           "passa da _incassa_ordine", True,
-          "stato='creato'" in sw and "_incassa_ordine" in sw
-          and "WHERE id=? AND stato='annullato'" in sw)
+          "UPDATE ordini SET stato='creato', creato=?, aggiornato=? " in dec
+          and "WHERE id=? AND stato='annullato'" in dec
+          and "_decidi_annullata_pagata(" in sw and "_incassa_ordine" in sw)
     prova("riacciuffo: il rilancio annullato-ma-pagato va nel binario "
           "del fuori-tempo", True,
           "'tardivo'" in sw and "rimborsi_asta" in sw
@@ -12861,6 +12867,9 @@ def prove_lista_ordini():
           (3,1,222,111,3000,'dispute',60000,3000,'spedizione','{"nome":"Ada Bianchi","via":"Via Roma 1","cap":"10100","citta":"Torino"}',0,'eu','FR','IT'),
           -- annullato, digitale: nessun indirizzo possibile
           (4,1,222,111,4000,'annullato',60000,4000,'digitale','',0,'','','');
+        -- (13 ott 2026) la colonna della fattura annullata e pagata, che
+        -- l'export salta: DOPO gli INSERT, che vanno per posizione
+        ALTER TABLE ordini ADD COLUMN pagata_da_annullata_il INT DEFAULT 0;
         """)
         return c
 
@@ -25766,6 +25775,7 @@ const fmt = n => String(n);
 const esc = s => String(s);
 let myLnAddress = '';
 const annulloVenditore = o => false;
+const annullataPagata = o => false;
 const motivoAnnulloTesto = o => '';
 const DEMO = false, API_BASE = '/api';
 const authHdr = () => 'x', haptic = () => {}, openOrder = () => {};
@@ -103605,7 +103615,12 @@ def prove_feedback_confermato():
     else:
         js_giudici = (pezzo_js(mini, "function chiusoDalTimer(")
                       + "\n" + pezzo_js(mini, "function decidibileDalModeratore(")
-                      + "\n" + pezzo_js(mini, "function puoiLasciareFeedback("))
+                      + "\n" + pezzo_js(mini, "function puoiLasciareFeedback(")
+                      # (13 ott 2026) il giudice che il feedback
+                      # interroga per primo: senza timbro risponde no,
+                      # e i 48 casi restano quelli
+                      + "\n" + pezzo_js(mini, "function annullataPagata(o){",
+                                        "\n}\n") + "\n}\n")
         casi = [(s, d, a) for s in STATI for d in (0, 1)
                 for a in (0, 1_755_000_000)]
         js = (js_giudici + "\nconst casi=" + _js.dumps(casi) + ";"
@@ -105882,10 +105897,16 @@ def prove_connettori_registro():
           0 <= inc.find("_coda_magazzino(magazzino)")
           < inc.find('notifica(o["venditore_id"], msg)'))
     rim = codice(pezzo("_rimborsa_compratore"))
+    # EMENDATA (13 ott 2026, cantiere annullata-pagata): il ramo della
+    # fattura annullata e pagata ha un commit suo PRIMA — esce senza
+    # toccare la merce — quindi, come per l'incasso qui sopra, si guarda
+    # il commit che SEGUE la registrazione, e che lo stock la preceda
+    i_reg_r = rim.find("registra_uscita_negozio")
     prova("il rimborso rimette in pari il registro", True,
-          '"rimborso")' in rim
-          and 0 <= rim.find("registra_uscita_negozio")
-          < rim.find("con.commit()"))
+          '"rimborso")' in rim and i_reg_r >= 0
+          and 0 <= rim.find("UPDATE annunci SET quantita=quantita+?")
+          < i_reg_r
+          and "con.commit()" in rim[i_reg_r:])
     # ...e i chiamanti sono ESATTAMENTE questi due: il terzo di domani
     # (un annullo, uno storno) deve venire a leggere questa voce. Si
     # conta il CHIAMANTE e non il nome, o la definizione entrerebbe
@@ -108995,7 +109016,8 @@ def prove_paracadute_motivo():
         vero.executescript("""
           CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT,
             payment_hash TEXT, creato INT, aggiornato INT,
-            cassaforte TEXT DEFAULT 'saas');
+            cassaforte TEXT DEFAULT 'saas',
+            pagata_da_annullata_il INT DEFAULT 0);
           CREATE TABLE rilanci(id INTEGER PRIMARY KEY, stato TEXT,
             payment_hash TEXT, creato INT, aggiornato INT,
             cassaforte TEXT DEFAULT 'saas');
@@ -138324,7 +138346,8 @@ def prove_annullo_venditore():
               cambio_eur REAL DEFAULT 0,
               annullato_venditore_il INT DEFAULT 0,
               motivo_annullo TEXT DEFAULT '', nota_annullo TEXT DEFAULT '',
-              esauriti_annullo TEXT DEFAULT '', creato INT, aggiornato INT);
+              esauriti_annullo TEXT DEFAULT '',
+              pagata_da_annullata_il INT DEFAULT 0, creato INT, aggiornato INT);
             CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
               annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
             CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
@@ -138439,7 +138462,10 @@ def prove_annullo_venditore():
         # i pezzi VERI: niente stub di quel che si sta provando
         exec(_SORGENTE[i:_SORGENTE.index("\n}\n", i) + 3], amb)
         for costante in ("ANNULLI_VENDITORE_ALLARME = ",
-                         "ANNULLI_VENDITORE_GIORNI = "):
+                         "ANNULLI_VENDITORE_GIORNI = ",
+                         # (13 ott 2026) il conto degli annulli salta la
+                         # lapide pagata dopo: vedi prove_annullata_pagata
+                         "SQL_NON_ANNULLATA_PAGATA = "):
             k = _SORGENTE.index(costante)
             exec(_SORGENTE[k:_SORGENTE.index("\n", k)], amb)
         for nome in ("_campo", "importo_rimborso", "_in_pagamento",
@@ -138741,6 +138767,9 @@ def prove_annullo_venditore():
         pezzo_js(mini, "const CONCLUSI = [", "\n"),
         pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n") + "};",
         pezzo_js(mini, "function annulloVenditore(o){", "\n}\n") + "\n}",
+        # (13 ott 2026) `annulloVenditore` cede il passo alla fattura
+        # annullata e pagata: il suo giudice viaggia con lui
+        pezzo_js(mini, "function annullataPagata(o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function motivoAnnulloTesto(o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function markupAnnullaVendita(o, motivo){", "\n}\n") + "\n}",
         pezzo_js(mini, "function corpoAnnullaVendita(o, motivo, nota, esauriti){", "\n}\n") + "\n}",
@@ -138862,7 +138891,8 @@ def prove_spunta_rimborso():
           < oo.index("if (annulloVenditore(o)) {"))
     prova("...e nessuna riga che comincia col «+» dopo una graffa", False,
           "}\n             + (o.tracking" in oo.replace("\r\n", "\n"))
-    prova("l'ultimo passo e' UNO per le due storie", 2,
+    # (13 ott 2026: le storie sono TRE — la fattura annullata e pagata)
+    prova("l'ultimo passo e' UNO per le tre storie", 3,
           oo.count("passoRimborso(o, s, "))
     prova("la resa dei passi e' quella che il banco imita", True,
           "${i<progress?'done':i===progress?'now':'todo'}" in oo)
@@ -138891,6 +138921,7 @@ def prove_spunta_rimborso():
           "const TEMPI = {confermaDig: 72};\n"
           + pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n") + "};\n"
           + pezzo_js(mini, "function annulloVenditore(o){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function annullataPagata(o){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function passoRimborso(o, s, perChiCompra, perGliAltri){",
                      "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function motivoAnnulloTesto(o){", "\n}\n") + "\n}\n"
@@ -155790,10 +155821,14 @@ def prove_canale_admin():
     # (13 ott 2026, cantiere indirizzo-giusto: le spese di spedizione
     # rese a chi vende e mai incassate, dopo i solleciti — ancora UNO,
     # ancora negli errori: 71 chiamate, 81 punti.)
+    # (13 ott 2026, cantiere annullata-pagata: la fattura annullata e
+    # pagata che non diventa una vendita — UNO, negli errori: 72
+    # chiamate, 82 punti. E il polso ha un chiamante in piu', il suo
+    # rimborso uscito.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 30, "moderazione": 14,
+          {"dispute": 2, "dm": 1, "errori": 31, "moderazione": 14,
            "riepiloghi": 25}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -155828,8 +155863,8 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "81 adesso (in piu' ci sono la ronda dei relay di Mostro e le "
-          "spese di spedizione ferme)", 81,
+          "82 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "spese di spedizione ferme e la fattura annullata pagata)", 82,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -155848,8 +155883,8 @@ def prove_canale_admin():
           ("await notifica_admin(" in disputa,
            "ADMIN_IDS" in disputa,
            "decisione.\" + nota_digitale + nota_punto" in disputa))
-    prova("il polso degli ordini resta UNA funzione sola (sei chiamanti), "
-          "e va nei riepiloghi", (6, True),
+    prova("il polso degli ordini resta UNA funzione sola (sette chiamanti), "
+          "e va nei riepiloghi", (7, True),
           (len(chiamate("polso_ordini_admin")),
            'argomento="riepiloghi")' in pezzo("polso_ordini_admin")))
     nuovi = codice(pezzo("_giro_avvisi_nuovi_p2p"))
@@ -161207,6 +161242,459 @@ def prove_backfill_annullo_venditore():
     prova("...e al moderatore dice perche': l'ha annullato chi vende, e "
           "i sats tornano col rimborso dell'annullo", [True, True],
           ["annullato il venditore" in testo, "rimborso" in testo])
+def prove_annullata_pagata():
+    """LA FATTURA ANNULLATA E PAGATA (13 ott 2026, decisione di Andrea).
+    Il caso: Anna compra l'ultimo pezzo e annulla, Bruno compra e paga,
+    poi Anna paga la fattura annullata — e il riacciuffo portava anche
+    il suo ordine a 'locked' senza guardare lo stock: due ordini pagati
+    per un oggetto solo, il «conflitto dichiarato» dell'ago 2026. Da
+    oggi quel saldo NON e' una vendita: rimborso automatico, chi vende
+    non ne sa niente. E se ad annullare era stato chi vende si rimborsa
+    sempre, anche col pezzo in vetrina.
+    Qui: la FORMA (dove sta la decisione, che non abbia un await, che
+    nasca gia' timbrata, che l'ordine non passi mai da 'locked'), i
+    giudici ESEGUITI su un database in memoria (il pezzo c'e' / non
+    c'e', riga per riga), le parole eseguite, e il lato client in node.
+    La STORIA intera — Anna e Bruno, il nodo muto, il server che cade —
+    sta in collaudo_annullata_pagata.py, sul server vero."""
+    print("\n[la fattura annullata e pagata]")
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    import time as _t
+
+    # ============ 1. LA FORMA ==========================================
+    giro = codice(pezzo("controlla_annullati"))
+    prova("il riacciuffo non decide piu' da solo: chiede a "
+          "_decidi_annullata_pagata, e la lapide non torna 'creato' li'",
+          (True, False),
+          ('esito = _decidi_annullata_pagata(o["id"])' in giro,
+           "UPDATE ordini SET stato='creato'" in giro))
+    prova("...e _incassa_ordine parte SOLO dopo il ramo del rimborso",
+          True,
+          'if esito != "vendita":' in giro
+          and giro.index('if esito != "vendita":')
+          < giro.index("await _rimborsa_annullata_pagata(o[\"id\"])")
+          < giro.index("await _incassa_ordine(o[\"id\"])"))
+    prova("...il giro cerca ancora i pagamenti sulle lapidi, e finisce "
+          "gli avvisi rimasti a meta'", [True, True],
+          ["FROM ordini WHERE stato='annullato' " in giro,
+           '_avvisi_annullata_pagata(oid, "moderatori")' in giro])
+    prova("la decisione e' una `def`, mai una `async def`: niente si "
+          "infila fra lo sguardo allo stock e la scrittura",
+          (True, False, False),
+          ("\ndef _decidi_annullata_pagata(ordine_id: int) -> str:"
+           in _SORGENTE,
+           "async def _decidi_annullata_pagata(" in _SORGENTE,
+           "await " in codice(pezzo("_decidi_annullata_pagata"))))
+    dec = codice(pezzo("_decidi_annullata_pagata"))
+    prova("il rimborso NASCE timbrato nella stessa scrittura: stato, "
+          "timbro, da_riprovare verso il compratore, col CAS sulla lapide",
+          True,
+          "UPDATE ordini SET stato='refund', pagata_da_annullata_il=?, "
+          in dec
+          and "payout_stato='da_riprovare', payout_verso='compratore', "
+          in dec
+          and dec.count("WHERE id=? AND stato='annullato'") == 2)
+    prova("nessuno stato nuovo, e mai 'locked' da qui: la decisione "
+          "scrive solo 'creato' o 'refund'", ["creato", "refund"],
+          sorted(set(re.findall(r"SET stato='([a-z_]+)'", dec))))
+    perche = codice(pezzo("_perche_niente_vendita"))
+    prova("il no di chi vende viene PRIMA dello stock, e lo stock conta "
+          "i pezzi prenotati da ALTRI", True,
+          perche.index('_campo(o, "annullato_venditore_il", 0)')
+          < perche.index("_riservati_da_altri(")
+          and 'a["stato"] != "attivo"' in perche)
+    rimb = codice(pezzo("_rimborsa_compratore"))
+    ramo = rimb[rimb.index("            if tardiva:"):]
+    ramo = ramo[:ramo.index("return {\"ok\": True, \"stato\": \"refunded\"}")]
+    prova("nel rimborso la fattura annullata esce PRIMA di ogni riga "
+          "che tocca la merce", True,
+          rimb.index("            if tardiva:")
+          < rimb.index("UPDATE annunci SET quantita=quantita+?")
+          and rimb.index("            if tardiva:")
+          < rimb.index("registra_uscita_negozio("))
+    prova("...e in quel ramo a chi vende non si dice niente, ne' alle "
+          "piazze, ne' si invita al feedback", [],
+          [x for x in ('o["venditore_id"]', "annuncio_su_nostr",
+                       "promo_venduto", "feedback") if x in ramo])
+    prova("la colonna nasce nella migrazione di sempre", True,
+          '"pagata_da_annullata_il INTEGER DEFAULT 0"' in _SORGENTE)
+    prova("il frammento che la esclude sta SOPRA init_db(), che gira "
+          "all'import", True,
+          _SORGENTE.index('SQL_NON_ANNULLATA_PAGATA = "COALESCE('
+                          'pagata_da_annullata_il,0)=0"')
+          < _SORGENTE.index("\ninit_db()\n"))
+    prova("chi conta gli affari la salta: il backfill di disputata, "
+          "l'affare in corso, gli annulli di chi vende, gli affari "
+          "conclusi", [True] * 4,
+          # (15 ott 2026: accanto all'esclusione dell'annullo del
+          # venditore, arrivata da main col suo cantiere — tutte e due)
+          ["\"AND COALESCE(annullato_venditore_il,0)=0 \"\n"
+           "                \"AND \" + SQL_NON_ANNULLATA_PAGATA)" in _SORGENTE,
+           "{SQL_NON_ANNULLATA_PAGATA}" in pezzo("_ordini_vivi_annuncio"),
+           "SQL_NON_ANNULLATA_PAGATA" in pezzo("_conta_annulli_venditore"),
+           "FROM ordini WHERE stato IN ('released','refunded') \"\n"
+           "        \"AND \" + SQL_NON_ANNULLATA_PAGATA" in _SORGENTE])
+    mo = codice(pezzo("miei_ordini"))
+    prova("a chi vende quell'ordine non esce, e la WHERE resta quella "
+          "di sempre", [True, True, True],
+          ['r.get("pagata_da_annullata_il")' in mo,
+           'r["compratore_id"] != user["id"]' in mo,
+           "WHERE o.compratore_id=? OR o.venditore_id=?" in mo])
+    prova("il feedback e' chiuso nelle DUE porte della rotta", 2,
+          codice(pezzo("lascia_feedback")).count(
+              "or _annullata_pagata(o)):"))
+    prova("l'annullo a ordine non pagato non promette piu' che «riparte "
+          "da solo»", (False, True),
+          ("riparte da solo" in pezzo("annulla_vendita"),
+           "i sats ti tornano per intero e ti avviso" in
+           pezzo("annulla_vendita")))
+
+    # ============ 2. IL GIUDICE DELLO STOCK, eseguito ===================
+    def mondo():
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.executescript("""
+          CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
+            quantita INT, titolo TEXT DEFAULT 'Cosa');
+          CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+            compratore_id INT, venditore_id INT DEFAULT 222, stato TEXT,
+            quantita INT DEFAULT 1, creato INT, aggiornato INT DEFAULT 0,
+            prezzo_sats INT DEFAULT 50000, spedizione_sats INT DEFAULT 0,
+            protezione_sats INT DEFAULT 0, sconto_sats INT DEFAULT 0,
+            annullato_venditore_il INT DEFAULT 0,
+            pagata_da_annullata_il INT DEFAULT 0,
+            payout_stato TEXT DEFAULT '', payout_verso TEXT DEFAULT '');
+          CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+            annuncio_id INT, quantita INT, unitario_sats INT DEFAULT 0,
+            titolo TEXT DEFAULT 'Cosa');
+        """)
+        return vero
+
+    amb = {"time": _t}
+    for nome in ("_campo", "_righe_ordine", "_riservati_da_altri",
+                 "_perche_niente_vendita"):
+        exec(pezzo(nome), amb)
+    ora = int(_t.time())
+
+    def giudica(prepara):
+        vero = mondo()
+        prepara(vero)
+        o = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+        return amb["_perche_niente_vendita"](vero, o)
+
+    def base(vero, stato="attivo", quantita=1, pezzi=1, venditore=0):
+        vero.execute("INSERT INTO annunci(id,stato,quantita) VALUES(7,?,?)",
+                     (stato, quantita))
+        vero.execute(
+            "INSERT INTO ordini(id,annuncio_id,compratore_id,stato,"
+            "quantita,creato,annullato_venditore_il) "
+            "VALUES(1,7,111,'annullato',?,?,?)", (pezzi, ora, venditore))
+
+    def altro(vero, chi, stato="creato", eta=60, pezzi=1):
+        vero.execute(
+            "INSERT INTO ordini(annuncio_id,compratore_id,stato,quantita,"
+            "creato) VALUES(7,?,?,?,?)", (chi, stato, pezzi, ora - eta))
+
+    prova("il pezzo c'e' (attivo, libero): si puo' vendere", "",
+          giudica(base))
+    prova("annuncio venduto: non c'e'", "esaurito",
+          giudica(lambda v: base(v, "venduto", 0)))
+    prova("annuncio rimosso, in revisione o sparito: non c'e'",
+          ["esaurito"] * 3,
+          [giudica(lambda v: base(v, "rimosso", 3)),
+           giudica(lambda v: base(v, "revisione", 3)),
+           giudica(lambda v: v.execute(
+               "INSERT INTO ordini(id,annuncio_id,compratore_id,stato,"
+               "quantita,creato) VALUES(1,99,111,'annullato',1,?)",
+               (ora,)))])
+    prova("l'ultimo pezzo e' prenotato da un ALTRO (fattura viva): non "
+          "c'e'", "esaurito",
+          giudica(lambda v: (base(v), altro(v, 333))))
+    prova("...prenotato da LEI (la sua fattura nuova): c'e'", "",
+          giudica(lambda v: (base(v), altro(v, 111))))
+    prova("...la prenotazione altrui STANTIA (oltre mezz'ora) non conta",
+          "", giudica(lambda v: (base(v), altro(v, 333, eta=1900))))
+    prova("...e nemmeno la lapide di un altro", "",
+          giudica(lambda v: (base(v), altro(v, 333, stato="annullato"))))
+    prova("due pezzi chiesti, due in vetrina, uno prenotato da un altro: "
+          "non bastano", "esaurito",
+          giudica(lambda v: (base(v, quantita=2, pezzi=2), altro(v, 333))))
+    prova("...tre in vetrina: bastano", "",
+          giudica(lambda v: (base(v, quantita=3, pezzi=2), altro(v, 333))))
+    prova("la prenotazione di un altro dentro un SET conta lo stesso",
+          "esaurito",
+          giudica(lambda v: (base(v), v.execute(
+              "INSERT INTO ordini(id,annuncio_id,compratore_id,stato,"
+              "creato) VALUES(5,0,333,'creato',?)", (ora,)), v.execute(
+              "INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita) "
+              "VALUES(5,7,1)"))))
+
+    def un_set(vero, secondo="attivo"):
+        vero.execute("INSERT INTO annunci(id,stato,quantita) "
+                     "VALUES(7,'attivo',1)")
+        vero.execute("INSERT INTO annunci(id,stato,quantita) VALUES(8,?,?)",
+                     (secondo, 1 if secondo == "attivo" else 0))
+        vero.execute("INSERT INTO ordini(id,annuncio_id,compratore_id,"
+                     "stato,quantita,creato) VALUES(1,0,111,'annullato',2,?)",
+                     (ora,))
+        vero.executemany("INSERT INTO ordine_righe(ordine_id,annuncio_id,"
+                         "quantita) VALUES(1,?,1)", [(7,), (8,)])
+
+    prova("il set tutto in vetrina: si puo' vendere", "", giudica(un_set))
+    prova("il set con UN pezzo che manca: niente vendita a meta'",
+          "esaurito", giudica(lambda v: un_set(v, "venduto")))
+    prova("ad annullare era stato CHI VENDE: si rimborsa sempre, anche "
+          "col pezzo in vetrina", "venditore",
+          giudica(lambda v: base(v, quantita=5, venditore=ora)))
+
+    # ============ 3. LA DECISIONE, eseguita =============================
+    vero = mondo()
+    base(vero, "venduto", 0)
+
+    class Con:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    amb2 = dict(amb, db=Con)
+    exec(pezzo("_decidi_annullata_pagata"), amb2)
+    decidi = amb2["_decidi_annullata_pagata"]
+    primo, secondo = decidi(1), decidi(1)
+    o = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("la lapide pagata col pezzo finito: 'refund', col timbro e il "
+          "rimborso da riprovare verso il compratore",
+          ("esaurito", "refund", True, "da_riprovare", "compratore"),
+          (primo, o["stato"], o["pagata_da_annullata_il"] > 0,
+           o["payout_stato"], o["payout_verso"]))
+    prova("...il secondo passaggio torna a mani vuote: un rimborso solo",
+          "", secondo)
+    vero = mondo()
+    base(vero)
+    o = (decidi(1), vero.execute("SELECT stato, pagata_da_annullata_il, "
+                                 "payout_stato FROM ordini").fetchone())
+    prova("la lapide pagata col pezzo in vetrina: torna 'creato' per "
+          "l'incasso di sempre, senza timbri",
+          ("vendita", ("creato", 0, "")), (o[0], tuple(o[1])))
+    prova("un ordine che non e' una lapide non si tocca",
+          ["", "", ""],
+          [decidi(1), decidi(99),
+           (vero.execute("UPDATE ordini SET stato='locked'"), decidi(1))[1]])
+
+    # ============ 4. LE PAROLE, eseguite ================================
+    amb3 = {"_fmt_sats": lambda n: f"{n:,}".replace(",", ".")}
+    exec(pezzo("_campo"), amb3)
+    exec(pezzo("_msg_annullata_pagata"), amb3)
+    exec(pezzo("_msg_annullata_pagata_admin"), amb3)
+    dette = [amb3["_msg_annullata_pagata"]("Radio", 50000, v, a)
+             for v in (False, True) for a in (False, True)]
+    prova("a chi ha pagato: il fatto suo, il perche', la cifra intera",
+          [True] * 4,
+          ["Hai pagato una fattura annullata" in t
+           and "<b>50.000 sats</b> tornano per intero" in t for t in dette])
+    prova("...il perche' e' quello giusto nei due casi", [True] * 4,
+          ["«Radio» nel frattempo non è più disponibile" in dette[0],
+           "«Radio» nel frattempo non è più disponibile" in dette[1],
+           "Il venditore aveva annullato l'ordine «Radio»" in dette[2],
+           "Il venditore aveva annullato l'ordine «Radio»" in dette[3]])
+    prova("...e il come: da soli con l'address, dall'ordine senza",
+          [False, True, False, True],
+          ["Arrivano da soli" in t for t in dette])
+    tardi = amb3["_msg_annullata_pagata"]("Radio", 50000, False, False, True)
+    prova("...e se il rimborso e' gia' uscito (l'avviso arriva dopo una "
+          "caduta) non chiede niente", (True, False),
+          ("Sono già partiti verso il tuo wallet" in tardi,
+           "Apri l'ordine" in tardi))
+    prova("...mai «disputa», mai «assicurato», mai «escrow», e corte "
+          "(sotto i 260 caratteri)", [],
+          [t for t in dette
+           if any(p in t.lower() for p in ("disputa", "assicurat", "escrow"))
+           or len(t) > 260])
+    riga = {"id": 12, "stato": "refund", "payout_stato": "",
+            "annullato_venditore_il": 0}
+    moderatori = [amb3["_msg_annullata_pagata_admin"](
+        dict(riga, **x), "Radio", 50000)
+        for x in ({"stato": "refunded", "payout_stato": "uscito"},
+                  {"payout_stato": "da_riprovare"},
+                  {"payout_stato": "in_volo"}, {"payout_stato": "incerto"},
+                  {}, {"annullato_venditore_il": 5})]
+    prova("ai moderatori: ordine, cifra, e che non e' una vendita",
+          [True] * 6,
+          ["Ordine #12, «Radio», <b>50.000 sats</b>" in t
+           and "nessuna vendita" in t
+           and "Al venditore non è arrivato nessun avviso" in t
+           for t in moderatori])
+    prova("...a che punto e' il rimborso, letto dalla riga",
+          ["✅ uscito", "ci riproviamo da soli", "in volo", "da decidere",
+           "chi ha pagato deve indicare", "chi ha pagato deve indicare"],
+          [next((p for p in ("✅ uscito", "ci riproviamo da soli",
+                             "in volo", "da decidere",
+                             "chi ha pagato deve indicare") if p in t), "")
+           for t in moderatori])
+    prova("...e il perche' giusto", [True, True],
+          ["l'oggetto non era più disponibile" in moderatori[0],
+           "il venditore aveva annullato l'ordine" in moderatori[5]])
+
+    # ============ 5. IL LATO CLIENT =====================================
+    mini = open("miniapp.html", encoding="utf-8").read()
+    oo = mini[mini.index("function openOrder(id){"):]
+    oo = oo[:oo.index("\n}\n")]
+    prova("mapOrder porta il timbro", True,
+          "pagataDaAnnullata:o.pagata_da_annullata_il||0," in mini)
+    prova("la terza storia della cassaforte si scrive DOPO l'annullo del "
+          "venditore: quando ci sono i due timbri vince lei", True,
+          oo.index("if (annullataPagata(o)) {")
+          > oo.index("if (annulloVenditore(o)) {"))
+    prova("la testa di 'refund' e la nota del rimborsato hanno le parole "
+          "di chi ha pagato", [True, True],
+          ["Hai pagato una fattura annullata: scegli qui sotto come "
+           "riavere i tuoi sats" in oo,
+           "annullataPagata(o) ? 'Hai pagato una fattura annullata' : "
+           "annulloVenditore(o)" in oo])
+    node = _sh.which("node")
+    if not node:
+        salta("il lato client della fattura annullata in node",
+              "node non c'e'")
+        return
+    blocco = oo[oo.index("  const passoDeposito = s==='creato'"):
+                oo.index("  /* Le frasi di chiusura parlano a CHI legge")]
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    js = ("const esc = x => String(x);\n"
+          "const fmt = n => String(n);\n"
+          "let myLnAddress = '';\n"
+          "const importoRimborso = o => o.listing.price;\n"
+          "const codiceTracking = (o, s) => o.tracking;\n"
+          "const rigaCorretto = () => '';\n"
+          "const filaTracking = () => '';\n"
+          "const copiaTracking = () => '';\n"
+          "const inPagamento = () => false;\n"
+          "const dataAppuntamento = () => '';\n"
+          "const TEMPI = {confermaDig: 72};\n"
+          + pezzo_js(mini, "const CONCLUSI = [", "\n") + "\n"
+          + pezzo_js(mini, "const MOTIVI_ANNULLO_VENDITORE = {", "};\n")
+          + "};\n"
+          + fn("function annulloVenditore(o){")
+          + fn("function annullataPagata(o){")
+          + fn("function passoRimborso(o, s, perChiCompra, perGliAltri){")
+          + fn("function motivoAnnulloTesto(o){")
+          + fn("function verboOrdine(o){")
+          + fn("function chiusoDalTimer(")
+          + fn("function decidibileDalModeratore(")
+          + fn("function puoiLasciareFeedback(o){")
+          + fn("function refundPanel(o){")
+          + "function stepper(o){ const s = o.state;\n" + blocco
+          + "\n  return steps.map((st,i) => [i<progress?'done':"
+            "i===progress?'now':'todo', st.t, st.d]); }\n"
+          + """
+const O = (state, role, x) => Object.assign({id: 1, state, role, tracking: '',
+  listing: {title: 'Radio', price: 50000}, righe: [], disputata: 0,
+  sbloccatoAuto: 0}, x || {});
+const T = {pagataDaAnnullata: 1790850000};
+const TV = {pagataDaAnnullata: 1790850000, annullatoDalVenditore: 1790840000,
+            motivoAnnullo: 'spedizione'};
+const V = {annullatoDalVenditore: 1790840000, motivoAnnullo: 'spedizione'};
+const senza = refundPanel(O('refund', 'buyer', T));
+myLnAddress = 'anna@wallet.tld';
+const con = refundPanel(O('refund', 'buyer', T));
+console.log(JSON.stringify({
+  giudice: [annullataPagata(O('refund', 'buyer', T)),
+            annullataPagata(O('refunded', 'buyer', T)),
+            annullataPagata(O('locked', 'buyer', T)),
+            annullataPagata(O('annullato', 'buyer', T)),
+            annullataPagata(O('refund', 'buyer')), annullataPagata(null)],
+  cede: [annulloVenditore(O('refund', 'buyer', TV)),
+         annulloVenditore(O('refunded', 'buyer', TV)),
+         annulloVenditore(O('refund', 'buyer', V)),
+         annulloVenditore(O('annullato', 'buyer', V))],
+  verbi: [verboOrdine(O('refund', 'buyer', T)),
+          verboOrdine(O('refunded', 'buyer', T)),
+          verboOrdine(O('refund', 'buyer', TV)),
+          verboOrdine(O('refund', 'admin', T)),
+          verboOrdine(O('refund', 'buyer', V)),
+          verboOrdine(O('locked', 'buyer'))],
+  feedback: [puoiLasciareFeedback(O('refunded', 'buyer', T)),
+             puoiLasciareFeedback(O('refunded', 'buyer', TV)),
+             puoiLasciareFeedback(O('refunded', 'buyer')),
+             puoiLasciareFeedback(O('refunded', 'buyer', V))],
+  passi: [stepper(O('refund', 'buyer', T)), stepper(O('refunded', 'buyer', T)),
+          stepper(O('refund', 'buyer', TV)), stepper(O('refunded', 'admin', T)),
+          stepper(O('refund', 'buyer', V))],
+  senza, con,
+}));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+    try:
+        out = _sp.run([node, f.name], capture_output=True,
+                      encoding="utf-8", errors="replace", timeout=60)
+        e = _json.loads(out.stdout or "null")
+    except Exception as ex:
+        e = None
+        print(f"      node e' esploso: {ex}")
+    finally:
+        os.unlink(f.name)
+    if e is None:
+        prova("il banco node gira", "", (out.stderr or "")[:400])
+        return
+    prova("annullataPagata: col timbro e SOLO su refund/refunded",
+          [True, True, False, False, False, False], e["giudice"])
+    prova("annulloVenditore le cede il passo quando ci sono i due timbri, "
+          "e da solo risponde come prima", [False, False, True, True],
+          e["cede"])
+    prova("la card nella lista: «Acquisto non concluso» anche mentre il "
+          "rimborso aspetta; gli altri verbi come prima",
+          ["Acquisto non concluso", "Acquisto non concluso",
+           "Acquisto non concluso", "⚖️ Da moderare",
+           "Annullato dal venditore", "Stai comprando"], e["verbi"])
+    prova("nessun riquadro del feedback su quell'ordine; sugli altri "
+          "rimborsati resta", [False, False, True, True], e["feedback"])
+    p = e["passi"]
+    prova("la cassaforte racconta TRE passi suoi, in attesa: il fatto, il "
+          "perche', il rimborso che aspetta",
+          [["done", "Hai pagato una fattura annullata",
+            "I sats sono arrivati dopo l'annullo dell'ordine"],
+           ["done", "L'oggetto non era più disponibile",
+            "Nessun acquisto: i sats tornano per intero"],
+           ["now", "Rimborso dei tuoi sats",
+            "In attesa: i sats non sono ancora usciti"]], p[0])
+    prova("...a rimborso uscito tutti con la spunta",
+          (["done", "done", "done"], "Ti abbiamo rimborsato i sats",
+           "Rimborso integrale"),
+          ([x[0] for x in p[1]], p[1][2][1], p[1][2][2]))
+    prova("...se ad annullare era stato chi vende lo dice il secondo "
+          "passo, e la storia resta questa (non «Il venditore ha "
+          "annullato» a ordine pagato)",
+          ("Hai pagato una fattura annullata",
+           "Il venditore aveva annullato l'ordine"),
+          (p[2][0][1], p[2][1][1]))
+    prova("...ai moderatori le stesse tappe, in terza persona",
+          ["Pagata una fattura annullata",
+           "L'oggetto non era più disponibile",
+           "Sats rimborsati all'acquirente"], [x[1] for x in p[3]])
+    prova("...e l'annullo del venditore a ordine pagato resta la SUA "
+          "storia", "Il venditore ha annullato l'ordine", p[4][1][1])
+    tutte = " ".join(x[1] + " " + (x[2] or "") for s in p[:4] for x in s)
+    prova("in quei passi mai «disputa» ne' «moderatore»", [],
+          [w for w in ("isputa", "oderatore") if w in tutte])
+    prova("il riquadro del rimborso: parole sue, senza e con l'address",
+          [True, True, False],
+          ["Hai pagato una fattura annullata" in e["senza"]
+           and "ti aspettano" in e["senza"],
+           "Hai pagato una fattura annullata" in e["con"]
+           and "anna@wallet.tld" in e["con"],
+           "isputa" in e["senza"] + e["con"]])
 
 
 def prove_notifica_porta_allo_scambio():
@@ -161974,6 +162462,7 @@ def main():
               prove_relay_per_mostro,
               prove_backfill_annullo_venditore,
               prove_notifica_porta_allo_scambio,
+              prove_annullata_pagata,
               prove_config_esempio):
         try:
             f()
