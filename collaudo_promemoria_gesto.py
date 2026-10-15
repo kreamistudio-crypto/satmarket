@@ -201,10 +201,13 @@ async def giro():
     annuncia(900)
     a = ordine(1)
     primo = await vendita_presa(a)
+    # (13 ott 2026, notifica-porta-allo-scambio) e sotto, come ogni avviso
+    # dei passaggi alle parti, il bottone di QUESTO scambio
     prova("il primo avviso va a chi vende, e dice quanto tempo ha",
           [(V, "🔒 Paga la garanzia: la richiesta è nell'app. Carlo ha indicato "
                "dove ricevere i sats, ora tocca a te.\n\n⏳ Hai 15 minuti, poi lo "
-               "scambio si annulla.", None)], primo)
+               "scambio si annulla.", ("⚡ Apri lo scambio", f"{SRV.LINK_LIBRO_P2P}?scambio={a}"))],
+          primo)
     prova("in attesa c'e' il promemoria di chi vende, e quello di chi compra se n'e' "
           "andato con la sua fattura", [("garanzia_promemoria", V)], in_attesa(a))
     detti, _ = await battito(a, 7 * 60 + 29)
@@ -309,7 +312,8 @@ async def giro():
     primo = await vendita_presa(h)
     prova("il primo avviso resta quello di sempre: nessun tempo inventato",
           [(V, "🔒 Paga la garanzia: la richiesta è nell'app. Carlo ha indicato "
-               "dove ricevere i sats, ora tocca a te.", None)], primo)
+               "dove ricevere i sats, ora tocca a te.",
+            ("⚡ Apri lo scambio", f"{SRV.LINK_LIBRO_P2P}?scambio={h}"))], primo)
     detti, _ = await battito(h, 7 * 60 + 30)
     prova("il promemoria parte a meta' del ripiego, senza una cifra",
           [(V, "⏳ Il tempo per bloccare la garanzia sta finendo: fallo adesso, "

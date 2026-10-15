@@ -58211,3 +58211,27 @@ riportare l'id. Si decide. • `evidenziaPassoP2P`, quando un passo arriva
 a pagina aperta, prende il PRIMO `.btn.orange` della pagina: dove il
 bottone dell'azione è spento e la chat c'è, porta a vista e fa battere
 «Invia» della chat — la stessa trappola del giro, sull'altra strada.
+
+**COSA È GIRATO, SU QUALE ALBERO (15 ott 2026).** Main è corso due volte
+a cantiere aperto (13 ott: sette commit — il paracadute, «Scambi
+chiari», «Annulla chiude», il relay per Mostro —; 15 ott: i due
+dell'hackathon, `consigliami` a Qwen3.5 2B e il suo verbale); rebase
+pulito tranne la coda di questo file. Sull'albero ribasato sopra
+f688cf3: la suite intera severa, 24.191 verdi e 3 ROSSE, tutte di
+`prove_p2p_sconto` e tutte anche su f688cf3 SENZA questo cantiere (vedi
+sotto); i collaudi della CI, 78 verdi e 2 rossi —
+`collaudo_promemoria_gesto` e `collaudo_tempo_pubblica`, che
+aspettavano gli avvisi senza il bottone dello scambio: aggiornati
+(il senso di ogni riga resta: dov'è la pausa e dove no), 2 su 2 verdi
+nella gabbia. I due passi «segreti» del workflow rifatti in locale sulle
+righe aggiunte (`grep -E -f` con le forme lette dal workflow, la
+controprova prima): puliti. `compileall` verde.
+**LA CI DI MAIN È ROSSA DAL 15 OTT, E NON PER QUESTO CANTIERE.**
+`P2P_FIRMA_CHIAVI_DAL = 15 ott 2026, 00:00 UTC`: da quell'istante il
+server pretende le chiavi di scambio FIRMATE per lo sconto, e il banco
+di `prove_p2p_sconto` semina chiavi non firmate sull'orologio vero —
+«pioniere e non», «ENTRAMBI con lo sconto», «le maiuscole si
+normalizzano». Rossa la CI del push dell'hackathon (15 ott, 06:49 UTC),
+e lo sarà quella di ogni push finché il banco non firma le sue chiavi o
+non fissa l'orologio. Segnalata ad Andrea, non curata qui (la regola
+della CI rossa altrui).

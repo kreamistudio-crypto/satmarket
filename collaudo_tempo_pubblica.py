@@ -345,28 +345,39 @@ async def giro():
     SRV.notifica = spia
     try:
         atteso = ("⏸ Imposta la pausa", SRV.URL_PUBBLICO + "/p2p?pausa=1")
+
+        # (13 ott 2026, notifica-porta-allo-scambio) sotto ogni avviso alle
+        # parti c'e' anche «⚡ Apri lo scambio»: alla presa, a chi ha
+        # pubblicato, sopra la pausa. Qui si guarda la PAUSA, dovunque stia
+        def scambio(o):
+            return ("⚡ Apri lo scambio", f"{SRV.LINK_LIBRO_P2P}?scambio={o}")
+
+        def pause():
+            return [b for _, bb in BOTTONI
+                    for b in (bb if isinstance(bb, list) else [bb] if bb else [])
+                    if b == atteso]
         t = int(time.time())
         await posta(busta(N1, "taken", t, "buyer", "invoice-next"))
         prova("l'avviso «Il tuo ordine è stato preso» porta a chi ha PUBBLICATO il "
-              "bottone che apre il foglio della pausa — e a nessun altro",
-              ([(PUBBLICA, atteso)], True),
+              "bottone che apre il foglio della pausa — e a nessun altro (sopra, lo scambio)",
+              ([(PUBBLICA, [scambio(N1), atteso])], True),
               (BOTTONI, bool(detto(PUBBLICA, "Il tuo ordine è stato preso"))))
         del BOTTONI[:]
         await posta(busta(N1, "buyer-invoice-added", t + 1, "buyer", "hold-next"))
         await posta(busta(N1, "hold-invoice-requested", t + 1, "mostro", "invoice"))
-        prova("...gli avvisi DOPO la presa non lo portano", [],
-              [b for _, b in BOTTONI if b])
+        prova("...gli avvisi DOPO la presa non lo portano (portano solo lo scambio)",
+              ([], True), (pause(), all(b == scambio(N1) for _, b in BOTTONI if b)))
         del BOTTONI[:]
         await posta(busta(BZ, "taken", t + 2, "buyer", "invoice-next"))
         prova("...e sotto la presa di un ordine BARATTOZON non c'e': li' la pausa non "
-              "si applica", ([PUBBLICA], []),
-              ([chi for chi, _ in BOTTONI], [b for _, b in BOTTONI if b]))
+              "si applica", ([PUBBLICA], [], [scambio(BZ)]),
+              ([chi for chi, _ in BOTTONI], pause(), [b for _, b in BOTTONI if b]))
         del BOTTONI[:]
         SRV.P2P_TEMPO_DI_CHI_PUBBLICA = False
         await posta(busta(N2, "taken", t + 3, "buyer", "invoice-next"))
-        prova("...e a leva spenta l'avviso della presa parte com'e' sempre partito",
-              ([PUBBLICA], []),
-              ([chi for chi, _ in BOTTONI], [b for _, b in BOTTONI if b]))
+        prova("...e a leva spenta l'avviso della presa porta il solo scambio",
+              ([PUBBLICA], [], [scambio(N2)]),
+              ([chi for chi, _ in BOTTONI], pause(), [b for _, b in BOTTONI if b]))
     finally:
         SRV.notifica = vera
         SRV.P2P_TEMPO_DI_CHI_PUBBLICA = True
