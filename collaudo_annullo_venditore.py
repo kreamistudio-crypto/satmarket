@@ -30,7 +30,13 @@ hanno niente da dire.
   4. i RIFIUTI: spedito, il compratore, «altro» senza nota — e niente
      si muove;
   5. il TERZO annullo pagato in trenta giorni: l'allarme ai moderatori;
-  6. /api/orders porta i campi nuovi a tutt'e due le parti.
+  6. /api/orders porta i campi nuovi a tutt'e due le parti;
+  7. IL RIAVVIO (15 ott 2026): init_db — che gira a ogni avvio — non
+     marca disputa gli annulli pagati, mentre la disputa vera si'; i
+     distintivi di chi vende contano solo quella, e l'annullo rimasto
+     in 'refund' un moderatore non lo «decide» — nemmeno se e' stato
+     marcato prima della cura (la guardia di risolvi_disputa), mentre
+     una disputa vera su una lapide riacciuffata si decide.
 
 NON TOCCA NIENTE DI VERO: il `config` finto si installa PRIMA
 dell'import di server (lo fa `avvio()` del banco). Nessuna rete.
@@ -262,6 +268,114 @@ def main():
           (suoi[oid]["motivo_annullo"], suoi[oid]["stato"]))
     prova("gli annulli pagati del venditore, contati dal giudice", 3,
           SRV._conta_annulli_venditore(SRV.db(), 222))
+
+    # ============ 7. IL RIAVVIO =======================================
+    # (15 ott 2026) init_db gira all'import — a ogni avvio, a ogni
+    # deploy — col backfill di `disputata`, che marcava disputa anche
+    # l'annullo del venditore: una «disputa persa» per chi vende, e un
+    # ordine rimasto in 'refund' che un moderatore poteva «decidere».
+    print("\n[7. il riavvio]")
+    pulisci()
+    ln_address(111, "")
+    in_attesa = pagato(ids[1])
+    r = annulla(in_attesa, {"motivo": "spedizione"})
+    prova("un quarto annullo pagato, il compratore senza metodo: 'refund'",
+          "refund", banco.riga(in_attesa)["stato"])
+    # il controllo: una disputa VERA, aperta da chi compra e decisa a
+    # rimborso — e poi riportata a `disputata` 0, come un ordine nato
+    # prima della colonna: e' il caso per cui il backfill esiste
+    ln_address(111, "compra@wallet.tld")
+    vera = pagato(ids[1])
+    banco.come(111)
+    banco.chiama(SRV.apri_disputa, vera)
+    banco.come(999, admin=True)
+    banco.chiama(SRV.risolvi_disputa, vera, None, corpo={"esito": "rimborso"})
+    con = SRV.db()
+    con.execute("UPDATE ordini SET disputata=0 WHERE id=?", (vera,))
+    con.commit()
+    annullati = [r["id"] for r in con.execute(
+        "SELECT id FROM ordini WHERE annullato_venditore_il>0 "
+        "AND stato IN ('refund','refunded') ORDER BY id")]
+    con.close()
+
+    def disputate():
+        con = SRV.db()
+        d = {r["id"]: r["disputata"] for r in con.execute(
+            "SELECT id, disputata FROM ordini")}
+        con.close()
+        return d
+
+    prova("prima del riavvio: quattro annulli pagati, nessuno disputato; "
+          "la disputa vera in 'refunded'",
+          (4, [0, 0, 0, 0], "refunded"),
+          (len(annullati), [disputate()[x] for x in annullati],
+           banco.riga(vera)["stato"]))
+    SRV.init_db()
+    SRV.init_db()
+    prova("DOPO IL RIAVVIO (due): gli annulli restano non disputati, la "
+          "disputa vera torna marcata", ([0, 0, 0, 0], 1),
+          ([disputate()[x] for x in annullati], disputate()[vera]))
+    con = SRV.db()
+    prova("...e nei distintivi di chi vende c'e' una disputa persa sola: "
+          "quella vera", 1, SRV._dati_distintivi(con, 222)["dispute_perse"])
+    con.close()
+    banco.come(999, admin=True)
+    try:
+        esito = banco.chiama(SRV.risolvi_disputa, in_attesa, None,
+                             corpo={"esito": "venditore"})
+    except SRV.HTTPException as e:
+        esito = e
+    prova("...e l'annullo in attesa del rimborso un moderatore non lo "
+          "«decide»: 400, e resta 'refund'",
+          (400, "refund"),
+          (getattr(esito, "status_code", esito),
+           banco.riga(in_attesa)["stato"]))
+
+    # LA GUARDIA DI risolvi_disputa: gli ordini marcati PRIMA della cura
+    # (sul VPS ce ne sono, finche' non si scrive a mano) restano con
+    # `disputata` 1 — la porta del moderatore li troverebbe. Si semina
+    # quella forma sull'annullo in attesa, e si provano i quattro esiti.
+    print("\n[7b. la guardia del moderatore]")
+    pulisci()
+    con = SRV.db()
+    con.execute("UPDATE ordini SET disputata=1 WHERE id=?", (in_attesa,))
+    con.commit()
+    con.close()
+    rifiuti = []
+    for e in ("venditore", "rimborso", "reso", "meno_spese"):
+        try:
+            rifiuti.append(banco.chiama(SRV.risolvi_disputa, in_attesa, None,
+                                        corpo={"esito": e}))
+        except SRV.HTTPException as x:
+            rifiuti.append((x.status_code, "annullato il venditore" in x.detail))
+    prova("marcato per errore PRIMA della cura: i quattro esiti dicono 400 "
+          "col perche' (l'ha annullato chi vende)", [(400, True)] * 4, rifiuti)
+    prova("...e niente si e' mosso: 'refund', nessuna uscita, nessun avviso",
+          ("refund", 0, 0, 0),
+          (banco.riga(in_attesa)["stato"], len(banco.USCITE),
+           len(banco.DETTO), len(banco.AVVISI)))
+    # il controllo: la lapide di un annullo da chi vende PAGATA DOPO e
+    # riacciuffata (il timbro resta, `creato` riparte), poi disputata
+    # DAVVERO da chi compra — quella e' una disputa, e si decide
+    riacciuffo = pagato(ids[2])
+    con = SRV.db()
+    con.execute("UPDATE ordini SET annullato_venditore_il=creato-60, "
+                "motivo_annullo='esaurito' WHERE id=?", (riacciuffo,))
+    con.commit()
+    con.close()
+    banco.come(111)
+    banco.chiama(SRV.apri_disputa, riacciuffo)
+    banco.come(999, admin=True)
+    try:
+        esito = banco.chiama(SRV.risolvi_disputa, riacciuffo, None,
+                             corpo={"esito": "rimborso"})
+    except SRV.HTTPException as x:
+        esito = (x.status_code, x.detail)
+    prova("...ma una disputa VERA su una lapide riacciuffata si decide: "
+          "rimborsata", ("refunded", "refunded", 1),
+          (esito.get("stato") if isinstance(esito, dict) else esito,
+           banco.riga(riacciuffo)["stato"],
+           banco.riga(riacciuffo)["disputata"]))
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")

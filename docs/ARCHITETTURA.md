@@ -1173,7 +1173,14 @@
   moderatori dice il conto (`_conta_annulli_venditore`: gli annulli
   PAGATI in 30 giorni, refund/refunded, non le lapidi) e dal terzo
   (`ANNULLI_VENDITORE_ALLARME`) parte un avviso a parte; la reputazione
-  non si tocca, il feedback del compratore resta il suo. Nel client:
+  non si tocca, il feedback del compratore resta il suo. NON È UNA
+  DISPUTA (15 ott 2026): il backfill di `disputata` in `init_db`, che
+  gira a ogni avvio, salta gli ordini col timbro (fino ad allora li
+  marcava: una «disputa persa» per chi vende a ogni deploy), e
+  `risolvi_disputa` rifiuta di decidere un ordine il cui timbro è venuto
+  DOPO `creato` (`MSG_ANNULLO_NON_DISPUTA`, prima di ogni altra guardia e
+  di ogni esito); la lapide riacciuffata e poi disputata davvero
+  riparte con un `creato` nuovo, e passa. Nel client:
   `annulloVenditore(o)` (timbro E stato fra refund/refunded/annullato: un
   ordine riacciuffato da un saldo tardivo porta ancora il timbro ma è un
   ordine normale), `motivoAnnulloTesto`, il bottone «✖️ Annulla l'ordine»

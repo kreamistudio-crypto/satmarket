@@ -161089,6 +161089,105 @@ console.log(JSON.stringify(out));
           [False, True, True], out.get("esiti"))
 
 
+def prove_backfill_annullo_venditore():
+    """L'ANNULLO DEL VENDITORE NON E' UNA DISPUTA (15 ott 2026). Il
+    backfill di `disputata` in init_db gira a OGNI avvio, cioe' a ogni
+    deploy, e marcava disputato ogni ordine in 'refund'/'refunded' —
+    compreso quello pagato e annullato da chi vende (1 ott 2026), che
+    di disputa non ha visto niente. Effetti: una «disputa persa» nei
+    distintivi di chi vende, e l'ordine rimasto in 'refund' decidibile
+    da un moderatore. Trovato con una sonda sul server vero il 15 ott.
+    Qui il backfill VERO, ritagliato da init_db, gira su un database in
+    memoria con le forme di ogni strada che porta a 'refund'; il giro
+    col riavvio sul server vero sta in collaudo_annullo_venditore.py
+    (scena 7)."""
+    print("\n[il backfill di disputata e l'annullo del venditore]")
+    import sqlite3
+
+    init = pezzo("init_db")
+    i = init.index('con.execute("UPDATE ordini SET disputata=1 '
+                   'WHERE disputata=0')
+    i += len("con.execute(")
+    # la chiusa della chiamata: la prima parentesi che pareggia
+    profondita, j = 1, i
+    while profondita:
+        profondita += {"(": 1, ")": -1}.get(init[j], 0)
+        j += 1
+    # i frammenti SQL scritti una volta sola sopra init_db: la riga li
+    # incolla per nome, e qui si eseguono col loro valore
+    frammenti = dict(re.findall(r'\n(SQL_[A-Z_]+) = "([^"]+)"', _SORGENTE))
+    sql = eval("(" + init[i:j - 1] + ")", frammenti)
+
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "disputata INTEGER DEFAULT 0, "
+                "annullato_venditore_il INTEGER DEFAULT 0, "
+                "pagata_da_annullata_il INTEGER DEFAULT 0)")
+    righe = {
+        # (stato, disputata prima, annullato_venditore_il) -> disputata
+        # atteso dopo
+        "annullo pagato, rimborsato": (("refunded", 0, 1760000000), 0),
+        "annullo pagato, rimborso in attesa": (("refund", 0, 1760000000), 0),
+        "disputa storica rimborsata": (("refunded", 0, 0), 1),
+        "disputa storica in attesa del rimborso": (("refund", 0, 0), 1),
+        "disputa aperta": (("dispute", 0, 0), 1),
+        "reso in corso": (("return_pending", 0, 0), 1),
+        "reso spedito": (("return_shipped", 0, 0), 1),
+        # il riacciuffo riporta a 'creato' anche la lapide di un annullo
+        # da chi vende pagata dopo: un ordine cosi' puo' poi essere
+        # disputato DAVVERO, e apri_disputa ha gia' scritto il suo 1 —
+        # il backfill non smarca mai niente
+        "annullo riacciuffato e poi disputato": (
+            ("refunded", 1, 1760000000), 1),
+        "venduto e basta": (("released", 0, 0), 0),
+        "annullo prima del pagamento": (("annullato", 0, 1760000000), 0),
+    }
+    nomi = list(righe)
+    for n, ((stato, disp, ann), _) in enumerate(righe.values(), 1):
+        con.execute("INSERT INTO ordini(id, stato, disputata, "
+                    "annullato_venditore_il) VALUES(?,?,?,?)",
+                    (n, stato, disp, ann))
+    con.execute(sql)
+    # e una seconda volta: il riavvio dopo il riavvio non cambia niente
+    con.execute(sql)
+    avuto = {nomi[r[0] - 1]: r[1] for r in con.execute(
+        "SELECT id, disputata FROM ordini ORDER BY id")}
+    prova("il backfill VERO, eseguito: marca solo chi e' passato da una "
+          "disputa, mai l'annullo del venditore",
+          {n: atteso for n, (_, atteso) in righe.items()}, avuto)
+    con.close()
+    prova("la colonna del timbro nasce nella migrazione PRIMA del "
+          "backfill, che su un database vecchio la trova gia'", True,
+          init.index('"annullato_venditore_il INTEGER DEFAULT 0"')
+          < init.index('UPDATE ordini SET disputata=1 WHERE disputata=0'))
+
+    # LA GUARDIA DEL MODERATORE (decisione di Andrea): gli ordini marcati
+    # prima della cura restano con `disputata` 1 finche' non si scrive a
+    # mano, e la porta di risolvi_disputa li troverebbe. L'esecuzione
+    # coi quattro esiti sta nella scena 7b del collaudo; qui la forma.
+    rd = codice(pezzo("risolvi_disputa"))
+    guardia = ('ann = int(_campo(o, "annullato_venditore_il", 0) or 0)\n'
+               '    if ann and ann >= int(_campo(o, "creato", 0) or 0):\n'
+               '        raise HTTPException(400, MSG_ANNULLO_NON_DISPUTA)')
+    i_n = rd.find('raise HTTPException(400, "Questa disputa non esiste')
+    i_a = rd.find(guardia)
+    prova("risolvi_disputa rifiuta l'annullo del venditore: timbro venuto "
+          "DOPO la nascita dell'ordine (la lapide riacciuffata e poi "
+          "disputata davvero ha `creato` piu' nuovo, e passa)", True,
+          i_a > 0)
+    prova("...subito dopo la porta, PRIMA di ogni altra guardia e di ogni "
+          "esito: vale per tutti e quattro, e niente si riapre", True,
+          0 < i_n < i_a
+          < rd.find("raise HTTPException(400, MSG_MENO_SPESE_DECISO)")
+          < rd.find('if esito == "meno_spese":')
+          < rd.find("\"UPDATE ordini SET stato='dispute', disputata=1, \""))
+    msg = re.search(r'\nMSG_ANNULLO_NON_DISPUTA = \(([^)]*)\)', _SORGENTE)
+    testo = "".join(re.findall(r'"([^"]*)"', msg.group(1))) if msg else ""
+    prova("...e al moderatore dice perche': l'ha annullato chi vende, e "
+          "i sats tornano col rimborso dell'annullo", [True, True],
+          ["annullato il venditore" in testo, "rimborso" in testo])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -161402,6 +161501,7 @@ def main():
               prove_gesti_ordine,
               prove_ordine_in_pausa,
               prove_relay_per_mostro,
+              prove_backfill_annullo_venditore,
               prove_config_esempio):
         try:
             f()

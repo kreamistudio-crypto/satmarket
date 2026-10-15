@@ -9114,9 +9114,20 @@ def init_db():
     # disputa, quindi gli ordini storici che ci si trovano sono marcabili
     # a colpo sicuro. I released passati da una disputa prima della
     # colonna sono irrecuperabili: si perdona, a favore dell'utente.
+    # ...TRANNE L'ANNULLO DEL VENDITORE (15 ott 2026, trovato con una
+    # sonda sul server vero): dal 1 ott chi vende annulla un ordine
+    # pagato e i sats tornano per la stessa strada, 'refund'/'refunded',
+    # senza nessuna disputa. Marcato qui, a ogni avvio — cioe' a ogni
+    # deploy — diventava una «disputa persa» nei distintivi di chi vende
+    # e, se restava in 'refund', un ordine che un moderatore poteva
+    # «decidere». Il timbro esiste solo dal 1 ott, quindi il pregresso
+    # per cui questo giro e' nato non si sposta; e un annullo
+    # riacciuffato e poi disputato davvero ha gia' il suo 1, scritto da
+    # apri_disputa: questo giro non smarca mai niente.
     con.execute("UPDATE ordini SET disputata=1 WHERE disputata=0 AND stato "
                 "IN ('dispute','return_pending','return_shipped',"
-                "'refund','refunded')")
+                "'refund','refunded') "
+                "AND COALESCE(annullato_venditore_il,0)=0")
     # L'ORDINE DI PROVA (ago 2026): i collaudi fatti in produzione
     # mentre l'app si costruiva. NON si cancellano — la riconciliazione
     # con LNbits incrocia i suoi incassi coi payment_hash di QUESTE
@@ -66339,6 +66350,10 @@ MSG_MENO_SPESE_DOVE = ("Il rimborso meno le spese di spedizione si decide "
                        "su una disputa aperta o su un reso in corso")
 MSG_NIENTE_SPESE = ("Su questo ordine non c'è una spesa di spedizione da "
                     "trattenere: usa una delle altre decisioni")
+# (15 ott 2026) la guardia di risolvi_disputa sull'annullo del venditore
+MSG_ANNULLO_NON_DISPUTA = ("Questo ordine l'ha annullato il venditore: non "
+                           "è una disputa e non si decide. I sats tornano "
+                           "all'acquirente con il rimborso dell'annullo.")
 
 
 def spese_trattenibili(o) -> int:
@@ -66783,6 +66798,19 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     con.close()
     if not o:
         raise HTTPException(400, "Questa disputa non esiste o è già chiusa")
+    # L'ANNULLO DEL VENDITORE NON SI DECIDE (15 ott 2026, decisione di
+    # Andrea). Il backfill di init_db lo marcava `disputata` a ogni avvio
+    # (curato), e gli ordini marcati prima della cura restano marcati
+    # finche' non si scrivono a mano: questa porta li troverebbe, e
+    # «venditore» darebbe i sats proprio a chi aveva annullato. Un
+    # annullo da 'locked' viene sempre DOPO la nascita dell'ordine, e da
+    # li' una disputa non si apre piu'. La lapide di un annullo pagata
+    # dopo e riacciuffata invece riparte con un `creato` nuovo e puo'
+    # essere disputata DAVVERO: il confronto la lascia passare. Sta
+    # prima di ogni altra guardia e di ogni esito: vale per tutti.
+    ann = int(_campo(o, "annullato_venditore_il", 0) or 0)
+    if ann and ann >= int(_campo(o, "creato", 0) or 0):
+        raise HTTPException(400, MSG_ANNULLO_NON_DISPUTA)
     stato = o["stato"]
     # IL QUARTO ESITO E' DEFINITIVO APPENA PRESO (13 ott 2026), ed e' la
     # riga da non ammorbidire: dopo «meno le spese» l'ordine sta in

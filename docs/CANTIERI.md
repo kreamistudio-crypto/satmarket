@@ -57963,3 +57963,118 @@ riscrivere come il conteggio qui sopra, ora che la data è passata. 2)
 Una sentinella che faccia arrossire `prove.py` quando una costante del
 server che è una data futura (`*_DAL = 17…`) viene letta da un banco
 che non ferma l'orologio: oggi la regola sta solo in questa voce.
+
+## L'annullo del venditore non è una disputa: il backfill di `disputata` lo salta, e il moderatore non lo decide (15 ott 2026, cantiere backfill-annullo-venditore, richiesta di Andrea)
+
+**IL DIFETTO.** In `init_db` — che gira all'import, quindi a ogni avvio
+e a ogni deploy — il backfill di `disputata` marcava 1 ogni ordine in
+`dispute`, `return_pending`, `return_shipped`, `refund` e `refunded`:
+stati che, quando il giro è nato, esistevano solo a valle di una
+disputa. Dal 1 ott 2026 («Il venditore può annullare un ordine») non è
+più vero: chi vende annulla un ordine pagato da `locked` e i sats
+tornano per la stessa strada, `refund`/`refunded`, senza nessuna
+disputa. Al primo riavvio quell'ordine diventava disputato. Trovato con
+una sonda sul server vero (il banco di `collaudo_lnbits_muto.py`:
+compra, `_incassa_ordine`, `annulla_vendita` «esaurito», poi
+`init_db`): prima `disputata` 0, dopo 1. Due effetti: una «disputa
+persa» nei distintivi di chi vende (`_dati_distintivi`, quindi anche lo
+🛡️ Specchiato), e un ordine rimasto in `refund` che diventava
+«decidibile» da un moderatore (`risolvi_disputa` apre
+`disputata=1 AND stato IN ('confirmed','refund')`). Il collaudo l'ha
+mostrato peggio di come sembrava: sul codice di prima l'esito
+«venditore» su quell'ordine lo portava a `confirmed`, cioè i sats verso
+chi aveva annullato.
+
+**LA CURA, due righe (decisione di Andrea).**
+1. Il backfill aggiunge `AND COALESCE(annullato_venditore_il,0)=0`. Il
+   timbro esiste solo dal 1 ott, quindi il pregresso per cui il giro è
+   nato non si sposta. Una disputa vera non si tocca: `apri_disputa`
+   scrive già lei `disputata=1`, e il backfill porta solo da 0 a 1, non
+   smarca mai niente.
+2. La guardia in `risolvi_disputa`, subito dopo la porta e prima di
+   ogni altra guardia e di ogni esito: se `annullato_venditore_il` è
+   diverso da zero e non viene prima di `creato`, 400 con
+   `MSG_ANNULLO_NON_DISPUTA` («Questo ordine l'ha annullato il
+   venditore: non è una disputa e non si decide. I sats tornano
+   all'acquirente con il rimborso dell'annullo.»). Serve agli ordini
+   marcati PRIMA della cura, che restano marcati finché non si scrive a
+   mano: con la guardia non sono pericolosi nemmeno nel frattempo.
+   PERCHÉ IL CONFRONTO CON `creato`: l'annullo da `locked` viene sempre
+   dopo la nascita dell'ordine, e da lì una disputa non si apre più
+   (`apri_disputa` vuole locked/shipped/delivered, e da `dispute` non si
+   torna a `locked`). L'unico ordine col timbro che può avere una
+   disputa VERA è la lapide di un annullo fatto su `creato`, pagata dopo
+   e riacciuffata da `controlla_annullati`: riparte con un `creato`
+   nuovo, quindi più recente del timbro, e la guardia la lascia passare.
+
+In `refund`/`refunded` si arriva da tre strade sole (la disputa decisa,
+l'annullo del venditore, e — col cantiere «annullata-pagata», non
+ancora su main — la fattura annullata e pagata): l'esclusione copre
+esattamente quella che mancava.
+
+**COL CANTIERE «ANNULLATA-PAGATA»** (committato in locale, non su main
+il 15 ott): esclude il proprio timbro dallo stesso backfill con
+`SQL_NON_ANNULLATA_PAGATA`. Le due esclusioni sono due `AND`
+indipendenti: nessun conflitto di logica. Al suo rebase la riga diventa
+`... 'refund','refunded') AND " + SQL_NON_ANNULLATA_PAGATA + " AND
+COALESCE(annullato_venditore_il,0)=0"`, e va allineata la sua ancora in
+`prove_annullata_pagata` che cerca la riga chiusa dalla parentesi.
+`prove_backfill_annullo_venditore` esegue il backfill coi frammenti
+`SQL_*` che trova nel sorgente, quindi vale su tutti e due gli alberi.
+
+**STRADE SCARTATE.**
+- Smarcare da sé, all'avvio, gli ordini già marcati: `disputata` è la
+  memoria «per sempre» dei distintivi, e un giro che la smarca da solo
+  a ogni avvio è una regola in più da tenere giusta per sempre, per due
+  righe di un difetto chiuso. Si scrive a mano, una volta.
+- Mettere il confronto con `creato` anche nel backfill: inutile, il
+  backfill non smarca, e la lapide riacciuffata e disputata ha già il
+  suo 1.
+- Lavorare sopra il ramo «annullata-pagata»: il difetto è su main e in
+  produzione dal 1 ott; è quella sessione che ribasa sopra questo
+  commit (indicazione di Andrea).
+
+**I RECORD SUL VPS** (lettura di Andrea, sola lettura, 15 ott 2026): due
+ordini segnati per errore, il 203 (refunded, annullato il 1 ott) e il
+211 (refunded, annullato il 5 ott); nessuno in `refund`, quindi oggi
+nessun rischio di soldi, solo due «dispute perse» finte; nessuna lapide
+riacciuffata da guardare. LA SCRITTURA, decisa da Andrea: una volta
+sola, solo DOPO il deploy della cura (prima, ogni riavvio li
+rimarcherebbe), solo sul 203 e sul 211, `disputata` di nuovo a 0, col
+backup del database prima. Il comando lo scrivo io quando è il momento
+e Andrea lo controlla prima di lanciarlo: qui non si scrive.
+
+**PROVATO.** Prima la prova rossa, poi la cura.
+- `prove_backfill_annullo_venditore` (5): il backfill VERO, ritagliato
+  da `init_db` ed eseguito due volte su un database in memoria con le
+  forme di ogni strada (annullo pagato rimborsato e in attesa, disputa
+  storica rimborsata e in attesa, disputa aperta, i due resi, la lapide
+  riacciuffata e disputata, il venduto, l'annullo non pagato); la
+  colonna del timbro nella migrazione prima del backfill; la guardia
+  dopo la porta e prima di ogni altra; il messaggio. Su origin/main
+  `f688cf3` senza cura: rosse 1 su 2, poi 4 su 5 con la guardia; con
+  la cura: 5 su 5.
+- `collaudo_annullo_venditore.py`, scene 7 e 7b sul server vero: un
+  quarto annullo lasciato in `refund`, una disputa vera rimborsata e
+  riportata a 0 come un ordine nato prima della colonna, DUE riavvii
+  (`init_db`); poi l'annullo in attesa marcato a mano come quelli del
+  VPS e i quattro esiti del moderatore; e il controllo della lapide
+  riacciuffata e disputata. Senza cura: 28 su 31, poi 29 su 34 (gli
+  annulli 4 su 4 marcati, 4 dispute perse invece di 1, il moderatore che
+  porta l'annullo a `confirmed`, gli esiti «venditore» e «rimborso» che
+  passano). Con la cura: 34 su 34.
+- Le sezioni che ritagliano `risolvi_disputa` (disputa incagliata,
+  feedback alla conferma, ordini fermi, porta del timer, meno le spese)
+  e `prove_annullo_venditore`, severe: 358 verdi.
+- Suite intera e collaudi della CI: nel messaggio del commit.
+
+**DA FARE** (notati, non fatti):
+- Il gemello nel client, `decidibileDalModeratore`, non sa della
+  guardia: su un ordine annullato e marcato per errore in `refund` il
+  moderatore vedrebbe i bottoni della decisione, e al tocco il 400 con
+  la frase. Oggi sul VPS non ce n'è nessuno, e dopo la scrittura a mano
+  nemmeno quelli in `refunded`.
+- Lo 🛡️ Specchiato dei due venditori del 203 e del 211: se avevano già
+  dieci affari, la disputa finta può averglielo negato. Si guarda in
+  sola lettura dopo la scrittura; i distintivi si danno agli eventi,
+  quindi tornerebbe al loro prossimo affare, non da solo.
