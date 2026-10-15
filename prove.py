@@ -33868,9 +33868,14 @@ def prove_canale_bot():
           "<b>Chitarra classica</b>" in t)
     prova("il prezzo c'e'", True, "80.000 sats" in t)
     prova("«Pagabile in Satoshi» c'e'", True, "Pagabile in Satoshi" in t)
+    # L'HREF E' IL DEEP LINK DELLA MINI APP (15 ott 2026, «Link
+    # Telegram deep link»): toccato DENTRO Telegram, un link a
+    # barattolo.store aprirebbe il browser, dove chi e' entrato solo
+    # dal bot e' un anonimo. L'ancora resta un'ancora: l'URL non si
+    # vede, ed e' il punto del cantiere di agosto.
     prova("il link e' un'ancora «Apri su Barattolo»", True,
-          '<a href="https://barattolo.store/annuncio/42">🫙 Apri su '
-          'Barattolo</a>' in t)
+          '<a href="https://t.me/ilbarattolobot?startapp=annuncio_42">'
+          '🫙 Apri su Barattolo</a>' in t)
     # IL PUNTO DEL CANTIERE: l'URL non si vede in chiaro da nessuna
     # parte. Si contano le occorrenze fuori dagli href — un URL nudo
     # rimasto in coda sarebbe passato dalla prova qui sopra.
@@ -33936,21 +33941,34 @@ def prove_canale_bot():
     altri = [{"id": 7, "titolo": "Amplificatore"},
              {"id": 8, "titolo": "Leggio"}]
     v = cap["_caption_canale"](a, 0, altri=altri)
+    # LA VETRINA PORTA IL DEEP LINK IN CHIARO (15 ott 2026, «Link
+    # Telegram deep link»): qui le voci non sono piu' ancore — il link
+    # sta scritto dopo il titolo, ed e' quello che apre la Mini App.
     prova("gli altri articoli sono linkati", True,
-          '<a href="https://barattolo.store/annuncio/7">Amplificatore</a>'
-          in v and "/annuncio/8" in v)
+          "• Amplificatore — https://t.me/ilbarattolobot"
+          "?startapp=annuncio_7" in v and "startapp=annuncio_8" in v)
     prova("e il negozio resta in coda come sempre", True,
           "vedi il suo negozio" in v)
     prova("senza altri articoli non compare la sezione", False,
           "Anche in vendita" in t)
     lungo = cap["_caption_canale"](a, 0, altri=[
         {"id": 9, "titolo": "T" * 80}])
-    prova("il titolo lungo si tronca", True, "…</a>" in lungo)
+    prova("il titolo lungo si tronca", True,
+          "… — https://t.me/ilbarattolobot?startapp=annuncio_9" in lungo)
     prova("e passa da escape", True, "&lt;i&gt;" in cap["_caption_canale"](
         a, 0, altri=[{"id": 9, "titolo": "<i>x</i>"}]))
-    # Nemmeno qui restano URL nudi: la sezione e' fatta di ancore.
-    prova("nessun URL nudo con la vetrina accesa", False,
-          "https://" in re.sub(r'href="[^"]*"', "", v))
+    # LA GUARDIA, RISCRITTA (15 ott 2026): la sezione non e' piu' fatta
+    # di ancore, quindi «nessun URL nudo» qui sarebbe per forza falso e
+    # cancellarla lascerebbe la vetrina senza sorveglianza. Quel che
+    # RESTA vero — ed e' la paura del cantiere di agosto — e' che
+    # l'indirizzo del SITO non si vede mai in chiaro: i soli URL nudi
+    # ammessi sono i deep link del bot. Un `barattolo.store` sfuggito
+    # dentro una voce della vetrina fa ancora rossa questa riga.
+    nudi_v = re.sub(r'href="[^"]*"', "", v)
+    prova("con la vetrina accesa gli URL nudi sono SOLO deep link del "
+          "bot: il sito in chiaro non si vede", (False, 2),
+          ("barattolo.store" in nudi_v,
+           nudi_v.count("https://t.me/ilbarattolobot?startapp=annuncio_")))
 
     # Il venditore SENZA username (i nativi Nostr): niente «@», o
     # nascerebbe una menzione che Telegram non sa risolvere.
@@ -34220,7 +34238,12 @@ def prove_canale_bot():
                # la cassa di risonanza su X (9 ott 2026): la lancetta
                # delle note gia' guardate e il giorno dell'ultimo
                # riepilogo — timbri, non segreti e non denaro
-               "x_dal", "x_riepilogo_il"}
+               "x_dal", "x_riepilogo_il",
+               # il canale @BitcoinPodcastTelegram (15 ott 2026): la
+               # terza destinazione dei post, senza filtro @username
+               # (`/canale bitcoinpodcast`). Un id di canale, non un
+               # segreto e non una leva del denaro
+               "canale_bitcoin_podcast"}
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
                              _SORGENTE))
@@ -34300,14 +34323,18 @@ def prove_canale_comunita():
     prova("una riga senza la colonna non fa esplodere niente", 0,
           v(RigaVecchia(post_canale_id=3)))
 
-    # --- 5) LA FABBRICA e' UNA per le due destinazioni
+    # --- 5) LA FABBRICA e' UNA per le TRE destinazioni
+    # TRE dal 15 ott 2026: il canale di casa, il canale OSPITE e
+    # @BitcoinPodcastTelegram. La fabbrica resta una — e' lei la
+    # ragione per cui aggiungere una destinazione costa una riga e non
+    # un terzo invio copiato.
     fab = pezzo("_manda_post_canale")
     prova("la fabbrica riceve il canale, non lo sceglie", True,
           "dove" in fab.split("\n")[0])
     prova("...e ha il ripiego senza foto", True,
           "sendPhoto" in fab and "sendMessage" in fab)
-    prova("i due invii passano tutti e due da lei",
-          2, sing.count("_manda_post_canale("))
+    prova("i tre invii passano tutti da lei",
+          3, sing.count("_manda_post_canale("))
 
     # --- 6) IL COMANDO, gemello dei due fratelli
     cmd = pezzo("_canale_vetrina_comando")
@@ -34370,8 +34397,13 @@ def prove_vetrina_negozio():
         {"id": 7, "titolo": "L'individuo <Sovrano>",
          "categoria": "Libri e media", "prezzo_sats": 120000,
          "valuta": "sats", "prezzo_eur": 0}, 0)
-    prova("il titolo E' il link", True,
-          '<a href="https://barattolo.store/annuncio/7">' in riga)
+    # IL LINK HA CAMBIATO POSTO (15 ott 2026, «Link Telegram deep
+    # link»): non e' piu' il titolo a essere l'ancora — il deep link
+    # della Mini App sta scritto fra parentesi subito dopo. Il titolo
+    # resta la prima cosa che si legge, e il link apre dentro Telegram
+    # invece di buttare nel browser.
+    prova("il link del bot sta accanto al titolo", True,
+          "(https://t.me/ilbarattolobot?startapp=annuncio_7)" in riga)
     # IL TITOLO SCAPPATO: la didascalia e' HTML e un «<» spegne il
     # messaggio in silenzio (la lezione dell'avviso di spedizione).
     prova("il titolo cattivo esce scappato", True,
@@ -42058,8 +42090,13 @@ def prove_link_offerte():
     riti = pezzo("ritira_offerta")
 
     # --- 1) chi ha una mossa da fare va nelle Offerte ---------------
+    # LA FORMA DEL LINK E' CAMBIATA (15 ott 2026, «Link Telegram deep
+    # link»): non piu' `{URL_PUBBLICO}/offerta/{id}` ma il deep link
+    # della Mini App, che `link_telegram` fabbrica da sola. La domanda
+    # di questa prova resta la stessa — il link porta DOVE C'E' IL
+    # GESTO — e si fa al giudice unico invece che all'URL a mano.
     prova("l'offerta ricevuta porta il venditore a rispondere", True,
-          "{URL_PUBBLICO}/offerta/{offerta_id}" in offe)
+          "link_telegram('offerta', offerta_id)" in offe)
     # TRE e non due da quando c'e' il rilancio: accettata,
     # controproposta e rilancio sono i tre gesti che lasciano
     # all'altra parte una pedina da muovere nella scheda Ordini.
@@ -42073,9 +42110,9 @@ def prove_link_offerte():
     prova("il rifiuto resta sull'annuncio: li' ci si rioffre", 1,
           risp.count("{link}"))
     prova("...e il link dell'annuncio non e' sparito", True,
-          "{URL_PUBBLICO}/annuncio/{off['annuncio_id']}" in risp)
+          "link_telegram('annuncio', off['annuncio_id'])" in risp)
     prova("il ritiro dell'accordo resta sull'annuncio", True,
-          "{URL_PUBBLICO}/annuncio/{off['annuncio_id']}" in riti)
+          "link_telegram('annuncio', off['annuncio_id'])" in riti)
 
     # --- 3) le due che non hanno un link non lo guadagnano ----------
     # Chi non deve fare niente non riceve una porta: e' il patto di

@@ -59852,3 +59852,111 @@ e il config d'esempio) 1.269 passate, 0 fallite; in gabbia
 `collaudo_guardia_liquidita`, `collaudo_canale_admin` e
 `collaudo_foglio_pagato` verdi. Il resto lo fa la CI. Il push non
 porta commit altrui.
+
+## Le prove dei link t.me e del canale BitcoinPodcast (15 ott 2026, cantiere «fix-test-rossi», richiesta di Andrea)
+
+**IL FATTO.** La CI di `090e1b9` era rossa: 21 rossi. Andrea li ha letti
+su tre fronti — le sezioni di `/admin`, un `NameError: link_telegram is
+not defined` che faceva esplodere quattro prove, e il conto delle
+chiamate a `notifica_admin` passato fuori misura — e ha chiesto di
+chiuderli tutti prima di qualunque deploy.
+
+**LA RADICE, che non era quella che sembrava.** I rossi non venivano dal
+fix di `admin.html`: vengono dagli **otto commit del 15 ott pomeriggio**
+(`4a2048d..1a96715`), quelli revertiti con `96270e4` e poi ripristinati
+con `334e92c`. **Nessuno di quegli otto ha toccato `prove.py`**: hanno
+spedito tre feature (i deep link Telegram, il canale
+@BitcoinPodcastTelegram, il cruscotto dark) senza le loro prove. Da qui
+la lezione di questo giro: un commit che cambia una FORMA che le prove
+guardano — un URL, il conto di una porta, una chiave delle impostazioni
+— non è finito finché la prova non dice la forma nuova. Il revert e il
+revert del revert non c'entrano: il debito era già dentro i commit.
+
+**IL NameError, e cosa teneva nascosto.** `link_telegram` è definita in
+`server.py`, ma quattro prove ritagliano il server con `pezzo()` ed
+eseguono le funzioni in un ambiente POVERO: là il nome non c'era.
+Aggiunti `link_telegram` e `LINK_BOT` ai quattro namespace
+(`prove_canale_bot`, `prove_vetrina_negozio`, `prove_ritiro_offerta`,
+`prove_rilancio_offerta`). **Ma l'esplosione mascherava altri rossi**: una
+prova che ESPLODE si porta dietro tutte le righe che vengono dopo, e in
+CI quelle righe non si vedevano nemmeno. Appena il nome è stato definito
+sono comparse otto asserzioni cadute sulla forma del link. È la ragione
+per cui qui si conta male a occhio: 10 ✗ stampati in CI, 21 rossi veri.
+
+**LA DECISIONE (di Andrea, a bivio posto).** Le otto asserzioni
+chiedevano `{URL_PUBBLICO}/annuncio/{id}` dentro un'ancora HTML; il
+codice adesso scrive `https://t.me/ilbarattolobot?startapp=annuncio_42`.
+Le strade erano tre, e si sono messe sul tavolo:
+- tornare a `barattolo.store` (le prove tornavano verdi da sole, e i
+  deep link restavano alla leva `TELEGRAM_MINIAPP_LINK` già decisa il
+  10 ott);
+- **tenere il deep link e riscrivere le prove** ← scelta;
+- far passare `link_telegram` DALLA leva, un meccanismo solo invece di
+  due.
+Andrea ha scelto di tenere il deep link. Resta scritto qui quel che la
+scelta si porta dietro, perché non si riscopra domani: la leva
+`TELEGRAM_MINIAPP_LINK` (10 ott, vocabolario chiuso di tre parametri,
+tetto di 64 caratteri, spenta nel codice) è **scavalcata** da un secondo
+meccanismo sempre acceso, e i link della vetrina del venditore e della
+riga del negozio **non sono più ancore HTML** ma URL in chiaro.
+
+**LE OTTO ASSERZIONI, una per una.** Tre in `prove_link_offerte`: la
+domanda resta «il link porta DOVE C'È IL GESTO» e si fa al giudice unico
+(`link_telegram('offerta', offerta_id)`) invece che all'URL scritto a
+mano. Quattro in `prove_canale_bot`: l'href dell'ancora «Apri su
+Barattolo» è il deep link; le voci della vetrina portano il link in
+chiaro dopo il titolo; il troncamento si riconosce dal `…` davanti al
+link invece che dal `…</a>`. Una in `prove_vetrina_negozio`: il titolo
+non È più il link — il link sta fra parentesi accanto, e la prova si
+chiama come la cosa che misura.
+
+**LA GUARDIA RISCRITTA invece che cancellata.** «Nessun URL nudo con la
+vetrina accesa» con la forma nuova è per forza falsa, e togliere la riga
+lasciava la vetrina senza sorveglianza. Quel che resta vero — ed era la
+paura del cantiere di agosto — è che **l'indirizzo del sito non si vede
+mai in chiaro**: la prova adesso chiede che gli URL nudi siano SOLO deep
+link del bot (`barattolo.store` assente, due link contati). Un
+`barattolo.store` sfuggito dentro una voce fa ancora rossa la riga. È la
+regola di casa: una sentinella che diventa tautologia va riscritta sulla
+cosa che ancora difende, non spenta.
+
+**IL CONTO DI `notifica_admin`.** Il censimento chiedeva 83 punti e ne
+trovava 85, con `riepiloghi` a 27 invece di 25: due chiamate nuove nel
+ramo `/canale bitcoinpodcast`, che annunciavano agli admin
+l'accensione e lo spegnimento del canale. Tolte — gli altri due rami
+gemelli (`/canale vetrina`, `/canale riepilogo`) non annunciano niente,
+e un terzo che parla sarebbe un'eccezione senza perché. Torna 83.
+
+**IL CANALE @BitcoinPodcastTelegram.** Due rossi suoi, e la feature è
+viva su main con tre commit dedicati: `canale_bitcoin_podcast` entra fra
+le chiavi note del recinto delle impostazioni (un id di canale, non un
+segreto e non una leva del denaro), e «i due invii passano tutti e due
+da lei» diventa «i tre invii passano tutti da lei» — la fabbrica
+`_manda_post_canale` resta UNA per tre destinazioni, ed è lei la ragione
+per cui la terza è costata una riga e non un invio copiato.
+
+**COSA È STATO PROVATO.** Le cinque sezioni toccate
+(`prove_canale_bot`, `prove_vetrina_negozio`, `prove_link_offerte`,
+`prove_ritiro_offerta`, `prove_rilancio_offerta`): verdi, zero rossi.
+Poi la suite intera con `PROVE_SEVERE=1`.
+
+**I ROSSI CHE RESTANO SONO DEL PC, NON DEL CODICE** (verdi in CI, che
+quelle dipendenze le installa): `websocket` manca (sei prove esplodono),
+Pillow manca (quattro rossi più i cinque dell'insegna, che si costruisce
+dal banner con Pillow e senza resta vuota), e un
+`deploy/rgb/__pycache__` rimasto per terra fa un `IsADirectoryError`.
+
+**DA FARE** (notati, non fatti):
+- In `prove.py` ci sono **16 chiamate a `salta()` con un argomento
+  solo**, mentre la firma vuole `(nome, perche)`. Stanno tutte in rami
+  `except` che scattano solo quando manca una dipendenza opzionale
+  (node, Pillow): in CI non scattano mai, in locale fanno ESPLODERE la
+  prova invece di saltarla — è come `prove_scoprire` e
+  `prove_strisce_web` sono morte in questo giro. Una riga a testa.
+- La leva `TELEGRAM_MINIAPP_LINK` e `link_telegram` fanno la stessa cosa
+  per due strade: la seconda sempre accesa, la prima spenta e con le sue
+  prove. Un cantiere che le unisca (la terza strada di sopra) toglierebbe
+  un doppione prima che le due divergano.
+- Il canale @BitcoinPodcastTelegram non ha una voce in PRODUZIONE né una
+  riga nel config d'esempio: la destinazione si imposta da
+  `/canale bitcoinpodcast` e vive nelle impostazioni del database.
