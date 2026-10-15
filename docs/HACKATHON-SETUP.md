@@ -2513,11 +2513,23 @@ del piano B «coi file vecchi» scritto al passo 7).
 che c'è già non viene riscritta):
 
 ```bash
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'pgrep -fa "[r]gb_http.py"; cd ~/rgb && for f in rgb.py rgb_http.py; do [ -e $f.prima-mutinynet ] || cp -p $f $f.prima-mutinynet; done; sudo sh -c "[ -e /usr/local/sbin/backup-rgb.sh.prima-mutinynet ] || cp -p /usr/local/sbin/backup-rgb.sh /usr/local/sbin/backup-rgb.sh.prima-mutinynet"; cmp rgb.py rgb.py.prima-mutinynet && cmp rgb_http.py rgb_http.py.prima-mutinynet && sudo cmp /usr/local/sbin/backup-rgb.sh /usr/local/sbin/backup-rgb.sh.prima-mutinynet && echo copie-uguali; grep -c RGB_CATENA rgb.py.prima-mutinynet; ls -la ~/rgb/*.prima-mutinynet /usr/local/sbin/backup-rgb.sh.prima-mutinynet'   # → NESSUNA riga di pgrep (rgb_http.py è fermo), «copie-uguali», 0 (il file dell'8 ott non conosce RGB_CATENA) e i tre file con la data dell'8
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'pgrep -a python | grep rgb_http || echo rgb_http-fermo; cd ~/rgb && for f in rgb.py rgb_http.py; do [ -e $f.prima-mutinynet ] || cp -p $f $f.prima-mutinynet; done; sudo sh -c "[ -e /usr/local/sbin/backup-rgb.sh.prima-mutinynet ] || cp -p /usr/local/sbin/backup-rgb.sh /usr/local/sbin/backup-rgb.sh.prima-mutinynet"; cmp rgb.py rgb.py.prima-mutinynet && cmp rgb_http.py rgb_http.py.prima-mutinynet && sudo cmp /usr/local/sbin/backup-rgb.sh /usr/local/sbin/backup-rgb.sh.prima-mutinynet && echo copie-uguali; grep -c RGB_CATENA rgb.py.prima-mutinynet; ls -la ~/rgb/*.prima-mutinynet /usr/local/sbin/backup-rgb.sh.prima-mutinynet'   # → «rgb_http-fermo», «copie-uguali», 0 (il file dell'8 ott non conosce RGB_CATENA) e i tre file con la data dell'8
 ```
 
-Se `pgrep` stampa una riga, `rgb_http.py` sta girando: ci si ferma qui e
-si decide (va spento prima di sovrascrivergli `rgb.py` sotto i piedi).
+Se al posto di «rgb_http-fermo» esce una riga `… python rgb_http.py`,
+`rgb_http.py` sta girando: ci si ferma qui e si decide (va spento prima
+di sovrascrivergli `rgb.py` sotto i piedi).
+
+**Perché non `pgrep -f` né `pkill -f` dentro `ssh`** (corretto il 15 ott,
+dal passo 0a di Andrea): sulla VM il comando gira come `bash -c '<tutto
+il comando>'`, e se il comando nomina `rgb_http.py` (il ciclo delle
+copie, il `nohup` del passo 7) la shell STESSA combacia col modello. Il
+trucco `[r]` salva solo dalla riga del `pgrep`: al passo 0a il `pgrep`
+ha stampato la shell, e al passo 7 un `pkill -f` avrebbe ucciso il
+comando prima del `nohup`. Per questo in tutto 13.4, dentro `ssh`, si
+cerca fra i SOLI processi python (`pgrep -a python | grep rgb_http`) e si
+ferma per PID (`pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs
+-r kill`). Nella shell del WSL, scritta a mano, `pkill -f` resta buono.
 
 0b, i file nuovi sulla VM (**è il gesto che sovrascrive**: da qui i tre
 file della VM sono quelli di main; indietro si torna dalle copie di 0a):
@@ -2665,7 +2677,7 @@ sono due strade, e si prova sempre la prima:
    nuovi senza l'ambiente aprono `~/rgb/dati`, cioè i wallet signet:
 
    ```bash
-   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su signet»
+   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su signet»
    ```
 
 2. *Coi file VECCHI* (solo se il dubbio è proprio sui file nuovi: sono
@@ -2674,7 +2686,7 @@ sono due strade, e si prova sempre la prima:
    `.mutinynet`, così si torna anche da qui:
 
    ```bash
-   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; for f in rgb.py rgb_http.py; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done; grep -c RGB_CATENA rgb.py; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → 0 (è il file dell'8 ott), poi «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» — Ctrl-C per fermare» (il vecchio non nomina la catena)
+   ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; for f in rgb.py rgb_http.py; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done; grep -c RGB_CATENA rgb.py; nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → 0 (è il file dell'8 ott), poi «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» — Ctrl-C per fermare» (il vecchio non nomina la catena)
    cd ~/wdk-prova && for f in punti.mjs nwc-wdk.mjs identita.mjs; do cp -p $f $f.mutinynet && cp -p $f.prima-mutinynet $f; done   # nel WSL: i tre file del wallet dell'8 ott
    ```
 
@@ -2698,7 +2710,7 @@ signet non sono stati toccati da nessun passo di questa migrazione.
 I comandi del passo:
 
 ```bash
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pkill -f "[r]gb_http.py"; source mutinynet.env && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'cd ~/rgb && pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; source mutinynet.env && nohup ./venv/bin/python rgb_http.py > rgb_http.log 2>&1 < /dev/null & sleep 2; head -1 ~/rgb/rgb_http.log'   # → «🟪 rgb_http su 127.0.0.1:8787, wallet «barattolo» su mutinynet»
 ssh -i ~/.ssh/lnvps -N -L 8787:127.0.0.1:8787 debian@vm-2050.lnvps.cloud   # in una finestra del WSL che resta aperta
 curl -s 127.0.0.1:8787/salute   # → {"ok": true, "wallet": "barattolo", "rete": "mutinynet"}
 curl -s -X POST 127.0.0.1:8787/fattura -d '{"quantita": 100}'   # → {"invoice": "rgb:…", …}
@@ -2722,7 +2734,7 @@ sleep 2 && head -2 ~/wdk-prova/nwc/serve.log && node nwc-wdk.mjs prova barattolo
 **Passo 9, il backup a due catene, e la sera**:
 
 ```bash
-ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'pkill -f "[r]gb_http.py"; sudo systemctl start rgb-backup.service; sudo journalctl -u rgb-backup.service -n 12 --no-pager | grep -E "wallet:|rgb/mutinynet|backup-mutinynet"'   # → «wallet: signet/barattolo signet/to-the-mooon signet/usdb mutinynet/barattolo mutinynet/to-the-mooon mutinynet/usdb» e le righe di rgb/mutinynet e rgb/backup-mutinynet
+ssh -i ~/.ssh/lnvps debian@vm-2050.lnvps.cloud 'pgrep -a python | awk "/rgb_http/ {print \$1}" | xargs -r kill; sudo systemctl start rgb-backup.service; sudo journalctl -u rgb-backup.service -n 12 --no-pager | grep -E "wallet:|rgb/mutinynet|backup-mutinynet"'   # → «wallet: signet/barattolo signet/to-the-mooon signet/usdb mutinynet/barattolo mutinynet/to-the-mooon mutinynet/usdb» e le righe di rgb/mutinynet e rgb/backup-mutinynet
 ```
 
 Poi `pull.ps1` dal PC e il drill (`age -d -i rgb-prova.key <archivio> |
