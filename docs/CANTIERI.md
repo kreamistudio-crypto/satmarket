@@ -59755,3 +59755,85 @@ la guida) 1.231 passate, 0 fallite; in gabbia otto collaudi verdi
 dei segreti della CI sulle righe aggiunte: nessuna. Sopra `c463c61`:
 la sezione nuova, la bussola, il tetto e l'elenco dei collaudi 48
 passate, `collaudo_foglio_pagato` verde. Il resto lo fa la CI. Il push non porta commit altrui.
+
+## Il tetto degli appesi di ACINQ nella guardia della liquidità, e «Hai circa» solo con la scadenza conosciuta (15 ott 2026, cantiere phoenix-blocca-sats-2, richiesta di Andrea)
+
+**PERCHÉ ADESSO.** Il cantiere phoenix-blocca-sats (voce sopra) aveva
+lasciato fra i «da fare» due cose che Andrea aveva chiesto: le vuole
+subito. Erano tre; la terza era già fatta. Quel che resta fuori, e
+perché:
+- CLAUDE.md, «900 secondi» → 1800: su origin/main lo dice già («
+  `expiration_seconds` è 1800 dal 10 ott 2026», scritto da un'altra
+  sessione). L'unico 900 rimasto è `hold_invoice_expiration_window`, che
+  è giusto. Il file non si tocca (263 righe su 263).
+- La riga Phoenix (anche nel foglio della cauzione): la sostituisce il
+  cantiere «garanzia-non-si-chiude» con una riga unica nei due fogli,
+  testo di Andrea, che non nomina il conto alla rovescia. Qui non si
+  tocca. Lui lavora sullo stesso foglio: chi pusha per secondo si ribasa
+  sull'altro (decisione di Andrea).
+
+**«HAI CIRCA» SOLO CON LA SCADENZA.** Nel foglio «🔒 Blocca i sats» la
+prima riga diceva «Hai circa 30 minuti» anche quando la scadenza del
+foglio non si conosce (`scadenzaFoglioP2P(o, 'hold')` a 0: niente
+nascita leggibile della bolt11, niente arrivo della richiesta). Senza
+sapere da quando conta il tempo è un numero inventato. Ora la frase c'è
+solo con la scadenza conosciuta; la riga «⏱ Scade tra», senza scadenza,
+già non c'era (`vestiScadenzaFattura` con 0).
+
+**LA QUINTA DOMANDA DELLA GUARDIA, `LIQUIDITA_ACINQ_TETTO`** (spenta di
+serie). Il fatto viene dal sorgente di Eclair, letto il 13 ott: ACINQ
+non tiene appesi verso di noi più del PIÙ PICCOLO dei due
+`max_pending_amt_msat` del canale (450k sul canale da 1M), e una
+garanzia P2P resta appesa per tutto lo scambio. Cosa misura, per ogni
+canale ACINQ in linea:
+- il tetto, il più piccolo dei due lati;
+- gli HTLC in ARRIVO già appesi; quelli in uscita no, sono l'altro verso;
+- quanto può ancora entrare: il posto (tetto meno appesi), non oltre
+  l'entrata spendibile.
+
+Si tiene il canale migliore e si confronta con `LIQUIDITA_PHOENIX_MIN`
+(300.000), la soglia che la guardia ha già per Phoenix. Alla soglia o
+sopra è buona. Sotto vale la strada da ACINQ della domanda 2, chiesta
+UNA volta per giro per le due domande (`serve_strada`): se c'è è buona
+(«entrano da LNBiG», col costo); se è cara, stretta o non c'è, è
+l'allarme; se non si è potuta misurare, «non lo so». Un canale ACINQ che
+non dice i due tetti fa dire «❔ Tetto di ACINQ: non lo so», che non
+allarma e non fa dire «tornata a posto»; un posto sopra la soglia vince
+anche su un canale ignoto. Gli avvisi vanno dove vanno quelli della
+guardia (il gruppo degli admin, argomento liquidità); a leva accesa la
+voce compare anche in `/canali`, a guardia spenta.
+
+Scartato: una soglia nuova (la domanda è la stessa della seconda,
+«quanto deve poter entrare da Phoenix»); una seconda richiesta della
+strada nello stesso giro; ignorare il canale senza tetti (sarebbe
+rassicurare senza sapere).
+
+**PROVATO.** `prove_guardia_liquidita`: la leva spenta; i numeri del 13
+ott (posto 67.081, tetto 450.000, appesi 382.919, un HTLC in uscita e
+uno storto che non contano); senza appesi il posto è l'entrata
+(337.845); un canale ACINQ fuori linea non conta; i canali del 6 ott
+senza tetti fanno «ignoto»; i sette casi del giudizio coi loro testi; la
+voce assente a leva spenta e a soglia zero; la sentinella su
+`serve_strada` (una sola chiamata della strada); il config d'esempio.
+Nel banco di `prove_apri_wallet_p2p`: con la scadenza «Hai circa 15
+minuti.», senza né la frase né la riga del tempo, il resto del foglio
+sì. `collaudo_guardia_liquidita`, caso 8-ter contro l'LND di cartone:
+posto 429.000 e nessuna strada chiesta; garanzia da 200.000 appesa,
+posto 229.000, strada chiesta una volta e buona; senza strada l'allarme
+coi numeri; LND che non dice i tetti, un «non so» che tiene lo stato;
+rientrato. Sei sezioni toccate: 705 passate, 0 fallite; collaudo 51
+passate, 0 fallite. Controprova a dodici mutazioni (il tetto come il
+più grande dei due lati, gli HTLC in uscita contati, il posto oltre
+l'entrata, il «non so» come allarme, la strada a tetto ignoto, i canali
+fuori linea, la soglia stretta, la scadenza della cauzione al posto
+della garanzia…): prese tutte.
+
+**DA FARE** (notati, non fatti):
+- La mail al supporto ACINQ sui tre fallimenti del 13 ott: il testo in
+  inglese sta nel report del cantiere; la manda Andrea.
+- La prova dal vivo del giro via LNBiG a canale ACINQ pieno (dalla voce
+  sopra, ancora aperta).
+- `/canali` mostra gli HTLC in sospeso di ogni canale ma non il posto
+  sotto il tetto: si potrebbe aggiungere alla riga dello stato.
+- La ronda del nodo (`ronda-liquidita.sh`) il tetto non lo conosce: lo
+  guarda solo il server.
