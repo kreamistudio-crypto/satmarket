@@ -9983,11 +9983,17 @@
      sopra il Copia, sul fondo dell'allarme */
   .hint.wos-hold{background:var(--warn-bg);color:var(--ink);border-radius:12px;
     padding:10px 12px;margin:-4px 0 10px;font-weight:600}
-  /* LA RIGA PER CHI PAGA CON PHOENIX nel foglio della garanzia (13 ott
-     2026, phoenix-blocca-sats): in fondo, sotto il Copia e la sua nota,
-     sullo stesso fondo della riga WoS */
+  /* LA RIGA PER CHI PAGA CON PHOENIX nei fogli della garanzia e della
+     cauzione (13 ott 2026, phoenix-blocca-sats; nella cauzione dal 15
+     ott): in fondo, sotto il Copia e la sua nota, sullo stesso fondo
+     della riga WoS */
   .hint.phoenix-hold{background:var(--warn-bg);color:var(--ink);border-radius:12px;
     padding:10px 12px;margin:10px 0 0;font-weight:600}
+  /* LA RIGA «NON RIESCO A CONTROLLARE» nei due fogli (15 ott 2026,
+     garanzia-non-si-chiude): in alto, sotto la frase, sullo stesso fondo;
+     nascosta finche' il server risponde */
+  .hint.foglio-muto{background:var(--warn-bg);color:var(--ink);border-radius:12px;
+    padding:10px 12px;margin:0 0 10px;font-weight:600}
   .sheet.fattura-scaduta .qr,.sheet.fattura-scaduta .invoice{opacity:.3}
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
@@ -57068,11 +57074,51 @@ function scriviOrdineP2P(o){
      2026): il PayCode che deve partire da solo (vedi «LA RIPRESA») */
   if (o.peer && !(prima && prima.peer) && typeof riprendiAutoRecapitoP2P === 'function')
     riprendiAutoRecapitoP2P(o.id);
+  /* ...il foglio da pagare si chiude, da qualunque strada arrivi la
+     notizia (15 ott 2026): vedi qui sotto. Col typeof: i banchi di casa
+     estraggono la scrittura da sola */
+  if (typeof chiudiFoglioPagatoP2P === 'function') chiudiFoglioPagatoP2P(prima, o);
   /* ...e la garanzia o la cauzione pagate da un wallet esterno: e' qui
      che si vede la riga uscirne, da qualunque strada arrivi (1 ott 2026,
      vedi «DOPO OGNI GESTO SI TORNA A "I MIEI SCAMBI"») */
   if (typeof mossaScrittaP2P === 'function') mossaScrittaP2P(prima, o);
   return o;
+}
+/* ═══ IL FOGLIO DA PAGARE SI CHIUDE DA QUALUNQUE STRADA (15 ott 2026,
+   cantiere «garanzia-non-si-chiude», richiesta di Andrea) ═══════════
+   Il caso: lo scambio 101e20d6. Chi vendeva ha pagato la garanzia con
+   Phoenix e il coordinatore l'aveva, ma il foglio «🔒 Blocca i sats» e'
+   rimasto aperto con la richiesta sopra — e Phoenix la mostrava «in
+   sospeso», com'e' normale per una hold: si e' spaventato. Chiusa e
+   riaperta l'app, il passo risultava fatto.
+   IL PERCHE': il foglio si chiudeva SOLO dal messaggio del coordinatore
+   via relay (in `applicaMessaggioP2P`). Se la notizia arrivava prima dal
+   server — al ritorno dal wallet l'app glielo chiede subito, e una fetch
+   batte la riconnessione dei relay — o dalla restore, la riga passava
+   ad «attivo» sotto il foglio; il ritorno di `tornaAdessoP2P` si
+   fermava, perche' a chi vende tocca subito il recapito degli euro; e
+   il messaggio arrivato dopo non lo chiudeva piu': la riga non era piu'
+   «da pagare». Lo stesso con la cauzione (dopo, a chi ha preso tocca la
+   fattura).
+   ADESSO si chiude QUI, dalla scrittura della riga, dove passano tutte
+   le strade: il messaggio, l'archivio del server, la restore. La regola
+   e' quella di prima: il foglio di QUESTO scambio, la riga che ESCE
+   dallo stato in cui si pagava, in qualunque verso (anche un annullo lo
+   chiude: la richiesta non vale piu'), e «Cauzione bloccata ✅» solo
+   se lo e'. Sotto resta la pagina dello scambio; il passo dopo la
+   garanzia lo dice gia' `applicaMessaggioP2P` a chi vende, ovunque sia. */
+const P2P_STATI_DA_PAGARE = ['attesa_mia_hold', 'attesa_mia_cauzione'];
+function chiudiFoglioPagatoP2P(prima, o){
+  if (!prima || !o || !p2pHoldOrdine || p2pHoldOrdine !== o.id) return false;
+  if (P2P_STATI_DA_PAGARE.indexOf(prima.stato) < 0 || o.stato === prima.stato) return false;
+  chiudiFoglioP2P('p2pHoldSheet');
+  p2pHoldOrdine = '';
+  diarioP2P('foglio ' + String(o.id).slice(0, 8) + ': chiuso (' + prima.stato + ' → ' + o.stato + ')');
+  if (prima.stato === 'attesa_mia_cauzione' && o.cauzione && o.cauzione.stato === 'bloccata') {
+    haptic();
+    toast('🔐 Cauzione bloccata ✅', 5000);
+  }
+  return true;
 }
 /* ---- QUANDO UNO SCAMBIO SI PUO' TOGLIERE ----
    UN GIUDICE SOLO, e lo chiedono in due: la ✕ della riga e la scopa.
@@ -60003,6 +60049,10 @@ function applicaMessaggioP2P(ord, dentro){
      col quale il coordinatore lo chiamera' per sempre. */
   if (provvisorioP2P(nuovo.id) && dentro.id) {
     rinominaOrdineP2P(nuovo, dentro.id);
+    /* il rinome non passa dalla scrittura: il foglio da pagare (se mai
+       fosse aperto su un nome provvisorio) lo si guarda qui, con la
+       stessa regola (15 ott 2026) */
+    if (typeof chiudiFoglioPagatoP2P === 'function') chiudiFoglioPagatoP2P({stato: prima}, nuovo);
     /* e col nome vero l'ordine si intesta SUBITO, volto compreso: la
        restore della sessione dopo era una faccia in ritardo di tre
        aperture (vedi `intestaOrdiniP2P`) */
@@ -60042,23 +60092,12 @@ function applicaMessaggioP2P(ord, dentro){
     pianificaAutoRecapito(nuovo.id);
   }
   if (p2pOrdineAperto === nuovo.id) renderOrdineP2P();
-  /* il foglio del pagamento si chiude DA SOLO quando i sats sono
-     bloccati: e' il coordinatore a dirlo, non un bottone «ho pagato» */
-  if (p2pHoldOrdine === nuovo.id && prima === 'attesa_mia_hold'
-      && nuovo.stato !== 'attesa_mia_hold') {
-    chiudiFoglioP2P('p2pHoldSheet');
-    p2pHoldOrdine = '';
-  }
-  /* ...e lo stesso foglio, con la cauzione (1 ott 2026) */
-  if (p2pHoldOrdine === nuovo.id && prima === 'attesa_mia_cauzione'
-      && nuovo.stato !== 'attesa_mia_cauzione') {
-    chiudiFoglioP2P('p2pHoldSheet');
-    p2pHoldOrdine = '';
-    if (nuovo.cauzione && nuovo.cauzione.stato === 'bloccata') {
-      haptic();
-      toast('🔐 Cauzione bloccata ✅', 5000);
-    }
-  }
+  /* il foglio del pagamento (garanzia o cauzione) si chiude DA SOLO
+     quando i sats sono bloccati: e' il coordinatore a dirlo, non un
+     bottone «ho pagato». Ma non piu' qui (15 ott 2026, lo scambio
+     101e20d6): lo chiude la scrittura della riga, gia' fatta sopra,
+     perche' la notizia arriva anche dal server e dalla restore — vedi
+     `chiudiFoglioPagatoP2P` */
   /* TOCCA A TE: LA CAUZIONE (1 ott 2026), come la garanzia — ovunque
      si sia, e il foglio si apre da solo se si sta guardando lo scambio */
   if (nuovo.stato === 'attesa_mia_cauzione' && prima !== 'attesa_mia_cauzione'
@@ -63008,6 +63047,8 @@ async function apriHoldP2P(){
   renderHoldP2P();
   el('sheetBg').classList.add('open');
   el('p2pHoldSheet').classList.add('open');
+  /* ...e da aperto chiede da se' a che punto e' (15 ott 2026) */
+  if (typeof sentinellaFoglioP2P === 'function') sentinellaFoglioP2P();
   await disegnaQr(el('p2pHoldQr'),
                   ('lightning:' + o.hold.bolt11.trim()).toUpperCase(), 'Alphanumeric');
 }
@@ -63030,6 +63071,8 @@ async function apriCauzioneP2P(){
   renderHoldP2P();
   el('sheetBg').classList.add('open');
   el('p2pHoldSheet').classList.add('open');
+  /* ...e da aperto chiede da se' a che punto e' (15 ott 2026) */
+  if (typeof sentinellaFoglioP2P === 'function') sentinellaFoglioP2P();
   await disegnaQr(el('p2pHoldQr'),
                   ('lightning:' + o.cauzione.bolt11.trim()).toUpperCase(), 'Alphanumeric');
 }
@@ -63051,7 +63094,7 @@ function rigaWosHoldP2P(cosa){
     ' il tasto si blocca su «Elaborazione in corso»: tocca <b>📋 Copia</b> e incolla la richiesta in WoS.</div>';
 }
 /* LA RIGA PER CHI PAGA CON PHOENIX (13 ott 2026, cantiere
-   phoenix-blocca-sats, richiesta di Andrea; il testo e' suo). IL FATTO:
+   phoenix-blocca-sats, richiesta di Andrea). IL FATTO:
    chi blocca i sats da Phoenix riceve spesso «commissione insufficiente»
    — un venditore c'e' riuscito al quarto tentativo, sulla STESSA
    richiesta. Letto sul nodo: i tentativi falliti non arrivano nemmeno
@@ -63061,11 +63104,18 @@ function rigaWosHoldP2P(cosa){
    commissione che l'utente possa alzare: l'unica mossa e' riprovare, e
    la richiesta e' la stessa finche' il cronometro del foglio non finisce
    (per questo NESSUN NUMERO qui: chi ha preso e chi ha pubblicato hanno
-   tempi diversi, e li dice gia' la riga «⏱ Scade tra»). Solo nel foglio
-   della garanzia. PURA. Lo studio: Cantieri, «Phoenix e i sats da
-   bloccare». */
+   tempi diversi, e li dice gia' la riga «⏱ Scade tra»). PURA. Lo
+   studio: Cantieri, «Phoenix e i sats da bloccare».
+   UNA RIGA SOLA, IN TUTT'E DUE I FOGLI (15 ott 2026, cantiere
+   «garanzia-non-si-chiude», il testo e' di Andrea): l'«in sospeso» che
+   stava nel primo riquadro e la riga Phoenix erano due avvisi sulla
+   stessa cosa — il wallet che mostra la hold come un pagamento a meta'.
+   Adesso e' uno, in fondo, uguale nella garanzia e nella cauzione (tutte
+   e due hold), e dice anche di NON PAGARE DUE VOLTE: chi vedeva il
+   foglio restare aperto col wallet «in sospeso» pensava al pagamento
+   inceppato. */
 function rigaPhoenixHoldP2P(){
-  return '<div class="hint phoenix-hold">💡 Phoenix dice «commissione insufficiente»? Non è colpa tua e non devi cambiare niente: riprova fra un minuto, la richiesta resta valida finché il conto alla rovescia non finisce. Se dopo 3 tentativi non passa ancora, prova con un altro wallet Lightning.</div>';
+  return '<div class="hint phoenix-hold">💡 Su Phoenix e altri wallet il pagamento resta "in sospeso": è normale, i sats sono bloccati finché lo scambio non si chiude. Non pagare due volte. Se dice «commissione insufficiente», riprova fra un minuto; dopo 3 tentativi prova un altro wallet.</div>';
 }
 function renderCauzioneP2P(o){
   const box = el('p2pHoldCorpo');
@@ -63079,8 +63129,8 @@ function renderCauzioneP2P(o){
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
       'è la <b>cauzione</b> dello scambio in contanti. Resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>; la perdi solo se un moderatore decide che non ti sei presentato.' +
-      (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') +
-      ' Nel tuo wallet resterà <b>in sospeso</b> finché lo scambio non finisce: è normale.' + '</div>' +
+      (min ? ' Hai circa ' + min + (min === 1 ? ' minuto' : ' minuti') + ': scaduta, l\'ordine resta nel libro e va ripreso.' : '') + '</div>' +
+    '<div class="hint foglio-muto" id="p2pHoldMuto" style="display:none"></div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
     '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
@@ -63088,7 +63138,8 @@ function renderCauzioneP2P(o){
       '<a class="btn mini" id="p2pHoldWallet" href="#">⚡ Apri nel wallet</a></div>' +
     rigaWosHoldP2P('cauzione') +
     '<button class="btn primary" onclick="copiaHoldP2P()">📋 Copia la richiesta</button>' +
-    '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e lo scambio va avanti: non c\'è niente da confermare.</div>';
+    '<div class="hint">Quando la cauzione è bloccata questo foglio si chiude da solo e lo scambio va avanti: non c\'è niente da confermare.</div>' +
+    rigaPhoenixHoldP2P();
   el('p2pHoldInvoice').textContent = c.bolt11;
   orologioHoldP2P(o);
 }
@@ -63116,10 +63167,8 @@ function renderHoldP2P(){
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
       'i sats restano <b>bloccati in garanzia</b> e non escono finché non li liberi tu.' +
-      (min ? ' Hai circa ' + min + '.' : '') +
-      /* il wallet lo mostra «in sospeso» per tutto lo scambio (10 ott
-         2026, prova-wallet): e' la hold, non un pagamento inceppato */
-      ' Nel tuo wallet il pagamento resterà <b>in sospeso</b> (o «in corso») finché lo scambio non finisce: è normale, è la garanzia che tiene.' + '</div>' +
+      (min ? ' Hai circa ' + min + '.' : '') + '</div>' +
+    '<div class="hint foglio-muto" id="p2pHoldMuto" style="display:none"></div>' +
     '<div class="qr" id="p2pHoldQr"></div>' +
     '<div class="invoice" id="p2pHoldInvoice"></div>' +
     '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none">' +
@@ -75771,6 +75820,67 @@ async function riallineaScambioP2P(id, motivo, leggero){
     return dopo !== prima;
   })().finally(() => { delete p2pRiallineoInVolo[id]; });
   return p2pRiallineoInVolo[id];
+}
+/* ═══ IL FOGLIO DA PAGARE CHIEDE DA SE' (15 ott 2026, cantiere
+   «garanzia-non-si-chiude», richiesta di Andrea) ════════════════════
+   Finche' il foglio della garanzia o della cauzione e' aperto e l'app
+   si vede, ogni `P2P_FOGLIO_OGNI_MS` si chiede al server a che punto e'
+   lo scambio: il server lo sa da mostrod (la porta degli eventi), senza
+   relay, e l'adozione porta la riga avanti — e la scrittura chiude il
+   foglio (`chiudiFoglioPagatoP2P`). Cosi' il foglio si chiude in pochi
+   secondi anche con un relay che non risponde; prima il server si
+   chiedeva ogni due minuti, e il foglio non lo ascoltava.
+   IL RIPIEGO: ogni `P2P_FOGLIO_RESTORE_MS` la rilettura piena
+   (`riallineaScambioP2P` non leggero: server, libro e restore dal
+   coordinatore), che copre il server che non sa — la porta degli eventi
+   chiusa, un POST perso — e parte senza fermare le domande al server.
+   E se il server non risponde da `P2P_FOGLIO_MUTO_MS` il foglio lo dice
+   (`#p2pHoldMuto`), e lo ritira alla prima risposta: non resta mai
+   zitto ad aspettare. Una domanda alla volta; a foglio chiuso il giro
+   si ferma da se'. Fuori dal motore, come l'archivio: qui il server si
+   chiama. */
+let P2P_FOGLIO_OGNI_MS = 5000;        // `let` per il banco
+let P2P_FOGLIO_RESTORE_MS = 60000;
+let P2P_FOGLIO_MUTO_MS = 30000;
+const P2P_FOGLIO_MUTO_TESTO = '⚠️ Non riesco a controllare se il pagamento è arrivato: riprovo da solo. Non pagare due volte.';
+let p2pFoglioGiro = null, p2pFoglioInVolo = false;
+let p2pFoglioRisposta = 0, p2pFoglioRestore = 0;
+function sentinellaFoglioP2P(){
+  fermaSentinellaFoglioP2P();
+  const adesso = Date.now();
+  p2pFoglioRisposta = adesso;
+  p2pFoglioRestore = adesso;
+  p2pFoglioGiro = setInterval(() => { chiediFoglioP2P().catch(() => {}); }, P2P_FOGLIO_OGNI_MS);
+}
+function fermaSentinellaFoglioP2P(){
+  if (p2pFoglioGiro) { clearInterval(p2pFoglioGiro); p2pFoglioGiro = null; }
+}
+async function chiediFoglioP2P(){
+  const foglio = el('p2pHoldSheet');
+  const id = p2pHoldOrdine;
+  if (!id || !foglio || !foglio.classList.contains('open')) { fermaSentinellaFoglioP2P(); return false; }
+  if (document.visibilityState === 'hidden' || p2pFoglioInVolo) return false;
+  if (Date.now() - p2pFoglioRestore >= P2P_FOGLIO_RESTORE_MS) {
+    p2pFoglioRestore = Date.now();
+    riallineaScambioP2P(id, 'foglio', false).catch(() => {});
+  }
+  p2pFoglioInVolo = true;
+  try {
+    const foto = p2pScambiServer;
+    const prima = (ordiniP2P()[id] || {}).stato || '';
+    if (await chiediScambiServerP2P()) adottaScambiServerP2P(ordiniP2P());
+    if (p2pScambiServer !== foto) p2pFoglioRisposta = Date.now();
+    const mosso = ((ordiniP2P()[id] || {}).stato || '') !== prima;
+    if (mosso && p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+    mutoFoglioP2P(Date.now() - p2pFoglioRisposta >= P2P_FOGLIO_MUTO_MS);
+    return mosso;
+  } finally { p2pFoglioInVolo = false; }
+}
+function mutoFoglioP2P(muto){
+  const r = el('p2pHoldMuto');
+  if (!r) return;
+  r.textContent = muto ? P2P_FOGLIO_MUTO_TESTO : '';
+  r.style.display = muto ? '' : 'none';
 }
 /* ---- «NON E' TUO» DOPO UN GESTO (28 set 2026, l'ordine d66347c2) ----
    Il coordinatore risponde `is_not_your_order` quando la chiave che ha

@@ -12123,6 +12123,20 @@
   pagata scrive `active` in `p2p_ordini.stato` (per il libro e' una
   presa, `STATI_LIBRO_PRESO`). Il verbale: CANTIERI, «Lo schermo segue
   lo stato di mostro».
+  IL FOGLIO DA PAGARE SI CHIUDE DA QUALUNQUE STRADA (15 ott 2026): il
+  foglio della garanzia e della cauzione (`p2pHoldSheet`) lo chiude
+  `chiudiFoglioPagatoP2P`, chiamata da `scriviOrdineP2P` (e dal rinome),
+  cioe' da ogni strada che muove la riga — il messaggio, l'archivio del
+  server, la restore — quando la riga di `p2pHoldOrdine` esce da
+  `P2P_STATI_DA_PAGARE` in qualunque verso. Prima lo chiudeva solo il
+  gestore del messaggio, e una notizia arrivata dal server lasciava il
+  foglio aperto per sempre (lo scambio 101e20d6). E DA APERTO IL FOGLIO
+  CHIEDE: `sentinellaFoglioP2P` (fuori dal motore) ogni
+  `P2P_FOGLIO_OGNI_MS` (5 s) domanda l'archivio del server e lo adotta,
+  ad app visibile; ogni `P2P_FOGLIO_RESTORE_MS` (60 s) il riallineo
+  pieno con la restore; col server muto da `P2P_FOGLIO_MUTO_MS` (30 s)
+  la riga `#p2pHoldMuto` lo dice. Il verbale: CANTIERI, «Il foglio della
+  garanzia che non si chiudeva».
   LA RISPOSTA CHE TARDA NON E' UN NO (26 set 2026): i gesti con una
   risposta del coordinatore — l'annullo nei suoi tre modi, gli euro
   inviati, il rilascio, la disputa — aspettano da `attendiGestoP2P`

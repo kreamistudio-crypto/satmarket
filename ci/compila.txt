@@ -53,6 +53,7 @@ collaudo_avvisi_in_ordine_p2p.py
 collaudo_avvisi_mercatino.py
 collaudo_paycode_riconosciuto.py
 collaudo_scambi_ovunque.py
+collaudo_foglio_pagato.py
 collaudo_chiavi_ritrovate.py
 collaudo_chi_e_l_altro.py
 collaudo_voto_dopo_concluso.py

@@ -137261,12 +137261,15 @@ def prove_apri_wallet_p2p():
           ".hint.wos-hold{background:var(--warn-bg)" in mini)
     # la riga per chi paga con Phoenix (13 ott 2026, phoenix-blocca-sats):
     # il testo di Andrea, SENZA un numero di minuti (chi prende e chi
-    # pubblica hanno tempi diversi: li dice il cronometro del foglio)
+    # pubblica hanno tempi diversi: li dice il cronometro del foglio).
+    # DAL 15 OTT 2026 (garanzia-non-si-chiude) e' la RIGA UNICA: l'«in
+    # sospeso» del primo riquadro e la riga Phoenix fuse in una, col «non
+    # pagare due volte», uguale nella garanzia e nella cauzione
     pho = nudo(fn("function rigaPhoenixHoldP2P(){"))
-    TESTO_PHOENIX = ("💡 Phoenix dice «commissione insufficiente»? Non è colpa tua e non devi cambiare niente: "
-                     "riprova fra un minuto, la richiesta resta valida finché il conto alla rovescia non finisce. "
-                     "Se dopo 3 tentativi non passa ancora, prova con un altro wallet Lightning.")
-    prova("la riga Phoenix: pura, il testo di Andrea per intero, la sua classe",
+    TESTO_PHOENIX = ("💡 Su Phoenix e altri wallet il pagamento resta \"in sospeso\": è normale, i sats sono "
+                     "bloccati finché lo scambio non si chiude. Non pagare due volte. Se dice «commissione "
+                     "insufficiente», riprova fra un minuto; dopo 3 tentativi prova un altro wallet.")
+    prova("la riga unica: pura, il testo di Andrea per intero, la sua classe",
           [True, True, False],
           ['<div class="hint phoenix-hold">' + TESTO_PHOENIX + "</div>'" in pho, pho.count("return ") == 1,
            any(s in pho for s in ("el(", "document", "fetch(", "localStorage", "Date.now"))])
@@ -137274,10 +137277,15 @@ def prove_apri_wallet_p2p():
           [True, False, False],
           [len(TESTO_PHOENIX) <= 260, bool(re.search(r"\d+ minut", TESTO_PHOENIX)),
            any(s in TESTO_PHOENIX.lower() for s in ("mostro", "coordinator", "acinq", "nodo"))])
-    prova("...solo nel foglio della garanzia, in fondo, dopo il Copia e la sua nota; la cauzione non ce l'ha",
-          [1, True, False],
+    prova("...nei due fogli, in fondo, dopo il Copia e la sua nota",
+          [2, True, True],
           [mini.count("rigaPhoenixHoldP2P(") - mini.count("function rigaPhoenixHoldP2P(){"),
-           "non conta come scambio non completato.</div>' +\n    rigaPhoenixHoldP2P();\n" in rh, "rigaPhoenixHoldP2P" in rc])
+           "non conta come scambio non completato.</div>' +\n    rigaPhoenixHoldP2P();\n" in rh,
+           "non c\\'è niente da confermare.</div>' +\n    rigaPhoenixHoldP2P();\n" in rc])
+    prova("...e l'«in sospeso» non e' piu' un secondo avviso nel primo riquadro, in nessuno dei due",
+          [False, False, False, False],
+          ["in sospeso</b>" in rh, "è la garanzia che tiene" in rh, "in sospeso</b>" in rc,
+           "Nel tuo wallet resterà" in rc])
     prova("...e il suo css sta sullo stesso fondo della riga WoS", True,
           ".hint.phoenix-hold{background:var(--warn-bg)" in mini)
     prova("...e tutt'e due accendono l'orologio dopo aver scritto la stringa",
@@ -137381,11 +137389,15 @@ out.renderHold = [html.indexOf('id="p2pHoldInvoice"') < html.indexOf('id="p2pHol
 /* la riga WoS (riga-wos): fra «Apri nel wallet» e il Copia, con la parola del foglio */
 out.wosHold = [html.indexOf('id="p2pHoldScadeRiga"') < html.indexOf('wos-hold'), html.indexOf('wos-hold') < html.indexOf('copiaHoldP2P()'),
   html.indexOf('Con la garanzia il tasto si blocca') > 0, html.indexOf('class="btn primary" onclick="copiaHoldP2P()"') > 0];
-/* la riga Phoenix (phoenix-blocca-sats): in fondo al foglio della garanzia */
+/* la riga unica (phoenix-blocca-sats, garanzia-non-si-chiude): in fondo ai due fogli */
 out.phoenixHold = [html.indexOf('copiaHoldP2P()') < html.indexOf('phoenix-hold'),
   html.indexOf('non conta come scambio non completato.') < html.indexOf('phoenix-hold'),
-  html.indexOf('Phoenix dice «commissione insufficiente»?') > 0,
-  html.indexOf('finché il conto alla rovescia non finisce') > 0, html.split('phoenix-hold').length - 1];
+  html.indexOf('Su Phoenix e altri wallet il pagamento resta "in sospeso"') > 0,
+  html.indexOf('Non pagare due volte.') > 0, html.split('phoenix-hold').length - 1,
+  html.split('in sospeso').length - 1];
+/* ...e la riga «non riesco a controllare»: c'e', nascosta, sotto la frase e sopra il QR */
+out.mutoHold = [html.indexOf('id="p2pHoldMuto" style="display:none"') > 0,
+  html.indexOf('id="p2pHoldMuto"') < html.indexOf('id="p2pHoldQr"')];
 out.holdViva = foto();
 p2pHoldModo = 'cauzione';
 renderHoldP2P();
@@ -137395,7 +137407,12 @@ out.renderCauz = [html2.indexOf('id="p2pHoldInvoice"') < html2.indexOf('id="p2pH
   nodi.p2pHoldInvoice.textContent === V.cauz, nodi.p2pHoldTit.textContent];
 out.wosCauz = [html2.indexOf('id="p2pHoldScadeRiga"') < html2.indexOf('wos-hold'), html2.indexOf('wos-hold') < html2.indexOf('copiaHoldP2P()'),
   html2.indexOf('Con la cauzione il tasto si blocca') > 0, html2.indexOf('class="btn primary" onclick="copiaHoldP2P()"') > 0];
-out.phoenixCauz = html2.indexOf('phoenix-hold') < 0 && html2.indexOf('Phoenix') < 0;
+out.phoenixCauz = [html2.indexOf('copiaHoldP2P()') < html2.indexOf('phoenix-hold'),
+  html2.indexOf('niente da confermare.') < html2.indexOf('phoenix-hold'),
+  html2.indexOf('Su Phoenix e altri wallet il pagamento resta "in sospeso"') > 0,
+  html2.split('phoenix-hold').length - 1];
+out.mutoCauz = [html2.indexOf('id="p2pHoldMuto" style="display:none"') > 0,
+  html2.indexOf('id="p2pHoldMuto"') < html2.indexOf('id="p2pHoldQr"')];
 out.cauzViva = foto();
 /* 3) il battito: viva → morta, il bottone sparisce e l'orologio si ferma */
 const primaFermati = fermati;
@@ -137445,8 +137462,11 @@ console.log(JSON.stringify(out));
           [True, True, True, "🔐 Blocca la cauzione"], o["renderCauz"])
     prova("la riga WoS, nei due render veri: fra «Apri nel wallet» e il Copia in evidenza, con la parola del foglio",
           [[True, True, True, True], [True, True, True, True]], [o["wosHold"], o["wosCauz"]])
-    prova("la riga Phoenix, nel render vero della garanzia: una, in fondo dopo il Copia e la nota, col testo intero; nella cauzione no",
-          [[True, True, True, True, 1], True], [o["phoenixHold"], o["phoenixCauz"]])
+    prova("la riga unica, nel render vero della garanzia: una, in fondo dopo il Copia e la nota, col testo intero, e «in sospeso» detto UNA volta",
+          [True, True, True, True, 1, 1], o["phoenixHold"])
+    prova("...e nel render vero della cauzione, uguale, in fondo", [True, True, True, 1], o["phoenixCauz"])
+    prova("la riga «non riesco a controllare» nei due fogli: nascosta, sopra il QR",
+          [[True, True], [True, True]], [o["mutoHold"], o["mutoCauz"]])
     v = o["cauzViva"]
     prova("...cauzione viva: la porta porta la cauzione, e il conto e' il suo",
           ["", "⏱ Scade tra 4:30", "", "lightning:" + CAUZ, False],
@@ -137553,10 +137573,11 @@ def prove_cauzione_p2p():
           and "if (p2pHoldModo === 'cauzione') {" in fn("function renderHoldP2P(){")
           and "const r = richiestaFoglioP2P(ordiniP2P()[p2pHoldOrdine]);" in fn("function copiaHoldP2P(){"))
     app = nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
-    prova("all'ingresso in «cauzione da bloccare» il toast e il foglio da solo; all'uscita il foglio si chiude", True,
+    prova("all'ingresso in «cauzione da bloccare» il toast e il foglio da solo; all'uscita il foglio lo chiude la scrittura", True,
           "if (nuovo.stato === 'attesa_mia_cauzione' && prima !== 'attesa_mia_cauzione'" in app
           and "if (seguibileP2P(nuovo.id)) apriCauzioneP2P();" in app
-          and "if (p2pHoldOrdine === nuovo.id && prima === 'attesa_mia_cauzione'" in app)
+          and "'attesa_mia_cauzione'];" in mini
+          and "chiudiFoglioPagatoP2P(prima, o);" in fn("function scriviOrdineP2P(o){"))
     prova("il «concluso» detto dal server a chi vende, e la fotografia della restore, restituiscono la cauzione bloccata", True,
           "return cauzioneAFineP2P(r);" in fn("function applicaPagamentoP2P(o, esito){")
           and "return cauzioneAFineP2P(r);" in fn("function riprendiDaRestoreP2P(o, statoMostro){")
@@ -144128,7 +144149,11 @@ console.log(JSON.stringify({
            "«⚠️ Il tuo indirizzo Wallet of Satoshi qui non funziona: incolla una fattura "
            "dal tuo wallet.»" in guida,
            "quindi va bene anche se lo scambio dura ore" in guida,
-           "altro wallet" in guida])
+           # la riga vecchia di WoS salvato («...una fattura di un altro
+           # wallet»): dal 15 ott 2026 la guida cita la riga unica del
+           # foglio della garanzia, che dice «prova un altro wallet» per
+           # Phoenix, e la sentinella guarda la frase intera
+           "fattura di un altro wallet" in guida])
 
 
 def prove_indirizzo_non_verificato():
@@ -148558,6 +148583,256 @@ def prove_dati_reputazione_p2p():
                for c in ("bolt11", "fattura TEXT", "invoice"))))
 
 
+def prove_foglio_pagato_p2p():
+    """IL FOGLIO DA PAGARE SI CHIUDE DA QUALUNQUE STRADA (15 ott 2026,
+    cantiere «garanzia-non-si-chiude», richiesta di Andrea). Lo scambio
+    101e20d6: chi vendeva ha pagato la garanzia con Phoenix, il
+    coordinatore l'aveva, e il foglio «🔒 Blocca i sats» e' rimasto aperto
+    con la richiesta sopra. Si chiudeva SOLO dal messaggio via relay: se
+    la notizia arrivava prima dal server o dalla restore, la riga andava
+    ad «attivo» sotto il foglio e il messaggio dopo non lo chiudeva piu'.
+
+    Quel che qui si rompe in silenzio: la chiusura rimessa nel solo
+    gestore del messaggio (il difetto di partenza); una regola piu' larga
+    che chiude il foglio a ogni scrittura di un altro scambio, o all'eco
+    dello stesso stato; il «Cauzione bloccata ✅» detto a una cauzione
+    che bloccata non e'; la sentinella che chiede al server a foglio
+    chiuso, ad app nascosta, o che resta zitta col server muto; il
+    ripiego della restore a ogni battito invece che al minuto."""
+    print("\n[il foglio da pagare si chiude da qualunque strada]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    def fino(da, a):
+        return mini[mini.index(da):mini.index("\n}\n", mini.index(a)) + 3]
+
+    # --- 1) LE SENTINELLE --------------------------------------------
+    i_cod = mini.index("const MOSTRO_ORDINI_CHIAVE")
+    i_fine = mini.index("/* ============ fine del motore dello scambio")
+    chiudi = fn("function chiudiFoglioPagatoP2P(prima, o){")
+    app = nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
+    sc = nudo(fn("function scriviOrdineP2P(o){"))
+    prova("il foglio della garanzia si chiude per lo stato in UN posto solo, e non nel gestore del messaggio",
+          [1, True, False, False],
+          [nudo(mini).count("chiudiFoglioP2P('p2pHoldSheet')"), "chiudiFoglioP2P('p2pHoldSheet');" in chiudi,
+           "chiudiFoglioP2P('p2pHoldSheet')" in app, "Cauzione bloccata ✅" in app])
+    prova("...lo chiama la scrittura della riga, PRIMA del ritorno dopo il gesto",
+          True, -1 < sc.find("chiudiFoglioPagatoP2P(prima, o);")
+          < sc.find("if (typeof mossaScrittaP2P === 'function') mossaScrittaP2P(prima, o);"))
+    prova("...e il rinome, che dalla scrittura non passa", True,
+          "if (typeof chiudiFoglioPagatoP2P === 'function') chiudiFoglioPagatoP2P({stato: prima}, nuovo);" in app)
+    prova("...e sta DENTRO il motore (i suoi banchi lo girano), senza rete", [True, False],
+          [i_cod < mini.index("function chiudiFoglioPagatoP2P(prima, o){") < i_fine,
+           any(s in nudo(chiudi) for s in ("fetch(", "localStorage"))])
+    prova("la sentinella sta FUORI dal motore (chiama il server)", True,
+          mini.index("async function chiediFoglioP2P(){") > i_fine
+          and mini.index("function sentinellaFoglioP2P(){") > i_fine)
+    ACCENDE = ("  el('p2pHoldSheet').classList.add('open');\n"
+               "  /* ...e da aperto chiede da se' a che punto e' (15 ott 2026) */\n"
+               "  if (typeof sentinellaFoglioP2P === 'function') sentinellaFoglioP2P();\n")
+    prova("i due fogli (garanzia e cauzione) accendono la sentinella appena aperti",
+          [True, True], [ACCENDE in fn("async function apriHoldP2P(){"),
+                         ACCENDE in fn("async function apriCauzioneP2P(){")])
+    valore = lambda nome: int(re.search(r"\blet " + nome + r" = (\d+);", mini).group(1))
+    prova("i tempi: 5 s al server (prima i 120 s dell'archivio), la riga del muto a 30 s, la restore al minuto",
+          [5000, True, 30000, 60000],
+          [valore("P2P_FOGLIO_OGNI_MS"),
+           valore("P2P_FOGLIO_OGNI_MS") < int(re.search(r"const P2P_SCAMBI_OGNI_MS = (\d+);", mini).group(1)),
+           valore("P2P_FOGLIO_MUTO_MS"), valore("P2P_FOGLIO_RESTORE_MS")])
+    muto = re.search(r"const P2P_FOGLIO_MUTO_TESTO = '([^']*)';", mini).group(1)
+    prova("la riga del muto: dice che riprova da sola e di non pagare due volte, corta, senza nominare chi custodisce",
+          [True, True, True, False],
+          ["riprovo da solo" in muto, "Non pagare due volte." in muto, len(muto) <= 120,
+           any(s in muto.lower() for s in ("mostro", "coordinat", "nodo", "server"))])
+    prova("...e il suo css sta sul fondo dell'allarme", True,
+          ".hint.foglio-muto{background:var(--warn-bg)" in mini)
+    prova("la sentinella non paga niente: nessun `pay_invoice`", False,
+          "pay_invoice" in fino("let P2P_FOGLIO_OGNI_MS = ", "function mutoFoglioP2P(muto){"))
+
+    # --- 2) IL BANCO -------------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del foglio da pagare", "node non c'e'")
+        return
+    pezzi = "\n".join([
+        "const _box = {}; const localStorage = {getItem: k => (k in _box ? _box[k] : null),"
+        " setItem: (k, v) => { _box[k] = String(v); }};",
+        "const chiaveP2P = k => k; const MOSTRO_ORDINI_CHIAVE = 'o';",
+        "const nodi = {};",
+        "const nodo = id => nodi[id] || (nodi[id] = {id, textContent: '', style: {display: 'none'}, "
+        "_cl: new Set(), get classList(){ const s = this._cl; return {"
+        "add: c => s.add(c), remove: c => s.delete(c), contains: c => s.has(c)}; }});",
+        "const el = id => nodo(id);",
+        "function altroFoglioAperto(){ return false; }",
+        "let toasts = [], scosse = 0, diario = [];",
+        "function toast(t){ toasts.push(t); } function haptic(){ scosse++; }",
+        "function diarioP2P(r){ diario.push(r); }",
+        "let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pHoldModo = 'hold', p2pScambiServer = null;",
+        "const document = {visibilityState: 'visible'};",
+        "let ORA = 1790000000000; Date.now = () => ORA;",
+        "let intervalli = [], fermati = 0;",
+        "globalThis.setInterval = (f, ms) => { intervalli.push(ms); return intervalli.length; };",
+        "globalThis.clearInterval = () => { fermati++; };",
+        fn("function ordiniP2P(){"), fn("function scriviOrdineP2P(o){"),
+        fino("const P2P_STATI_DA_PAGARE = ", "function chiudiFoglioPagatoP2P(prima, o){"),
+        fn("function chiudiFoglioP2P(idFoglio){"),
+        fino("let P2P_FOGLIO_OGNI_MS = ", "function mutoFoglioP2P(muto){"),
+    ]) + r"""
+/* il server di cartone: `risposta` e' lo stato che dice, null = muto */
+let risposta = null, chieste = 0, restore = 0, render = 0;
+async function chiediScambiServerP2P(){
+  chieste++;
+  if (risposta === null) return false;
+  p2pScambiServer = {[p2pHoldOrdine || 'v']: {stato: risposta}};
+  return true;
+}
+/* l'adozione: in avanti, su una riga letta da capo e poi scritta — come la vera */
+function adottaScambiServerP2P(locali){
+  for (const id in p2pScambiServer) {
+    const o = locali[id];
+    if (o && o.stato !== p2pScambiServer[id].stato) { o.stato = p2pScambiServer[id].stato; scriviOrdineP2P(o); }
+  }
+}
+function riallineaScambioP2P(){ restore++; return Promise.resolve(false); }
+function renderOrdineP2P(){ render++; }
+function vistaAttivaP2P(){ return 'view-p2pordine'; }
+const righe = o => { localStorage.setItem('o', JSON.stringify(o)); };
+const riga = id => ordiniP2P()[id];
+const apri = (id, modo) => { p2pHoldOrdine = id; p2pHoldModo = modo || 'hold'; p2pOrdineAperto = id; nodo('p2pHoldSheet').classList.add('open'); };
+const aperto = () => nodo('p2pHoldSheet').classList.contains('open');
+const scrivi = (id, stato, piu) => scriviOrdineP2P(Object.assign(riga(id), {stato}, piu || {}));
+const out = {};
+(async () => {
+/* A) LA SCRITTURA CHIUDE, da qualunque strada */
+righe({v: {id: 'v', lato: 'vendo', stato: 'attesa_mia_hold'}, w: {id: 'w', lato: 'vendo', stato: 'attesa_mia_hold'}});
+apri('v');
+scrivi('w', 'attivo');
+out.altro = [aperto(), p2pHoldOrdine];
+scrivi('v', 'attesa_mia_hold');
+out.eco = [aperto(), p2pHoldOrdine];
+scrivi('v', 'attivo');
+out.chiuso = [aperto(), p2pHoldOrdine, toasts.length, diario.filter(r => r.indexOf('foglio v: chiuso (attesa_mia_hold → attivo)') === 0).length];
+/* ...il messaggio del relay che arriva DOPO l'archivio: niente di nuovo */
+apri('v');
+scrivi('v', 'attivo');
+out.tardivo = [aperto(), toasts.length];
+nodo('p2pHoldSheet').classList.remove('open'); p2pHoldOrdine = '';
+/* ...un annullo chiude anche lui: la richiesta non vale piu' */
+righe({v: {id: 'v', lato: 'vendo', stato: 'attesa_mia_hold'}});
+apri('v');
+scrivi('v', 'annullato');
+out.annullo = [aperto(), toasts.length];
+/* ...e un foglio chiuso a mano (p2pHoldOrdine vuoto) non fa niente */
+righe({v: {id: 'v', lato: 'vendo', stato: 'attesa_mia_hold'}});
+nodo('p2pHoldSheet').classList.add('open'); p2pHoldOrdine = '';
+scrivi('v', 'attivo');
+out.aMano = aperto();
+nodo('p2pHoldSheet').classList.remove('open');
+/* ...uno stato che da pagare non era: niente */
+righe({v: {id: 'v', lato: 'vendo', stato: 'attivo'}});
+apri('v');
+scrivi('v', 'euro_inviati');
+out.nonDaPagare = [aperto(), p2pHoldOrdine];
+nodo('p2pHoldSheet').classList.remove('open'); p2pHoldOrdine = '';
+/* LA CAUZIONE: bloccata = il toast; il giro morto = solo la chiusura */
+righe({c: {id: 'c', lato: 'compro', stato: 'attesa_mia_cauzione', cauzione: {stato: 'chiesta'}}});
+apri('c', 'cauzione');
+scrivi('c', 'attesa_mia_fattura', {cauzione: {stato: 'bloccata'}});
+out.cauzione = [aperto(), toasts.slice(), scosse];
+toasts = []; scosse = 0;
+righe({c: {id: 'c', lato: 'compro', stato: 'attesa_mia_cauzione', cauzione: {stato: 'chiesta'}}});
+apri('c', 'cauzione');
+scrivi('c', 'annullato', {giroMorto: 'cauzione'});
+out.cauzioneMorta = [aperto(), toasts.length, scosse];
+
+/* B) LA SENTINELLA */
+righe({v: {id: 'v', lato: 'vendo', stato: 'attesa_mia_hold'}});
+apri('v');
+intervalli = []; fermati = 0; chieste = 0; restore = 0; render = 0;
+sentinellaFoglioP2P();
+out.acceso = intervalli.slice();
+risposta = 'attesa_mia_hold';
+ORA += 5000; await chiediFoglioP2P();
+out.prima = [aperto(), chieste, restore, render, nodo('p2pHoldMuto').style.display];
+risposta = 'attivo';
+ORA += 5000;
+out.mosso = await chiediFoglioP2P();
+out.dopo = [aperto(), riga('v').stato, chieste, render];
+const f0 = fermati;
+ORA += 5000; await chiediFoglioP2P();
+out.spento = [chieste, fermati > f0];
+/* il server muto: zitto fino ai 30 s, poi la riga; la restore al minuto, una volta */
+righe({v: {id: 'v', lato: 'vendo', stato: 'attesa_mia_hold'}});
+apri('v');
+sentinellaFoglioP2P();
+risposta = null; restore = 0;
+const muti = [];
+for (let s = 5; s <= 65; s += 5) {
+  ORA += 5000; await chiediFoglioP2P();
+  muti.push([s, nodo('p2pHoldMuto').style.display === '' ? 1 : 0, restore]);
+}
+out.muto = muti;
+out.mutoTesto = nodo('p2pHoldMuto').textContent;
+risposta = 'attesa_mia_hold';
+ORA += 5000; await chiediFoglioP2P();
+out.tornato = [nodo('p2pHoldMuto').style.display, nodo('p2pHoldMuto').textContent];
+/* ad app nascosta (si sta pagando dal wallet) non si chiede */
+document.visibilityState = 'hidden';
+const c0 = chieste;
+ORA += 5000; await chiediFoglioP2P();
+out.nascosta = [chieste - c0, aperto()];
+document.visibilityState = 'visible';
+/* ...e al ritorno, col server che dice attivo, il foglio si chiude */
+risposta = 'attivo';
+ORA += 5000; await chiediFoglioP2P();
+out.ritorno = [aperto(), riga('v').stato];
+console.log(JSON.stringify(out));
+})().catch(e => { console.error(e && e.stack || e); process.exit(1); });
+"""
+    cart = _tf.mkdtemp(prefix="foglio_pagato_")
+    try:
+        pb = os.path.join(cart, "banco.js")
+        open(pb, "w", encoding="utf-8").write(pezzi)
+        rr = _sp.run([node, pb], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    finally:
+        _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode != 0:
+        return
+    o = _json.loads(rr.stdout)
+    prova("la scrittura di un ALTRO scambio non chiude il foglio", [True, "v"], o["altro"])
+    prova("...nemmeno l'eco dello stesso stato", [True, "v"], o["eco"])
+    prova("la riga che esce da «da pagare» chiude il foglio, da qualunque strada: chiuso, dimenticato, zitto (il passo lo dice il messaggio), nel diario",
+          [False, "", 0, 1], o["chiuso"])
+    prova("...e il messaggio del relay arrivato DOPO non riapre ne' ripete niente", [True, 0], o["tardivo"])
+    prova("un annullo chiude anche lui", [False, 0], o["annullo"])
+    prova("un foglio chiuso a mano resta com'e'", True, o["aMano"])
+    prova("uno stato che da pagare non era non chiude niente", [True, "v"], o["nonDaPagare"])
+    prova("la cauzione bloccata: chiuso, «Cauzione bloccata ✅» e la scossa",
+          [False, ["🔐 Cauzione bloccata ✅"], 1], o["cauzione"])
+    prova("...la cauzione caduta: chiuso, e niente festa", [False, 0, 0], o["cauzioneMorta"])
+    prova("la sentinella batte ogni 5 s", [5000], o["acceso"])
+    prova("col server che dice ancora «da pagare»: foglio aperto, una domanda, niente restore ne' ridisegno, riga del muto spenta",
+          [True, 1, 0, 0, "none"], o["prima"])
+    prova("col server che dice «attivo»: il foglio si chiude al battito, la riga avanza, la pagina si ridisegna",
+          [True, False, "attivo", 2, 1], [o["mosso"]] + o["dopo"])
+    prova("...e a foglio chiuso la sentinella si spegne senza chiedere", [2, True], o["spento"])
+    prova("col server muto: zitta fino ai 30 s, poi la riga; la restore al minuto, UNA volta",
+          [[5, 0, 0], [10, 0, 0], [15, 0, 0], [20, 0, 0], [25, 0, 0], [30, 1, 0], [35, 1, 0],
+           [40, 1, 0], [45, 1, 0], [50, 1, 0], [55, 1, 0], [60, 1, 1], [65, 1, 1]], o["muto"])
+    prova("...col testo giusto", True, "Non riesco a controllare se il pagamento è arrivato" in o["mutoTesto"])
+    prova("...e alla prima risposta la riga se ne va", ["none", ""], o["tornato"])
+    prova("ad app nascosta non si chiede niente", [0, True], o["nascosta"])
+    prova("al ritorno, col server che dice «attivo», il foglio si chiude", [False, "attivo"], o["ritorno"])
+
+
 def prove_apri_nel_wallet():
     """COME SI APRE IL WALLET (10 ott 2026, cantiere «apri-nel-wallet»,
     richiesta di Andrea). Il caso: Android, Barattolo installato sulla
@@ -149073,15 +149348,19 @@ def prove_prova_wallet():
           and "<x>" not in amb["pagina_prova_wallet"]("lnbc1<x>", "", None))
 
     # --- 4) la riga «in sospeso» nei due fogli P2P -----------------------
+    # dal 15 ott 2026 (garanzia-non-si-chiude) e' la RIGA UNICA in fondo
+    # ai due fogli, fusa con quella per Phoenix: la si guarda per intero
+    # in prove_apri_wallet_p2p; qui che dica ancora la cosa provata col
+    # wallet (la hold resta «in sospeso», ed e' normale)
     def fn(firma):
         return pezzo_js(mini, firma, "\n}\n") + "\n}"
     rh, rc = fn("function renderHoldP2P(){"), fn("function renderCauzioneP2P(o){")
-    prova("la garanzia lo dice: nel wallet il pagamento resta «in sospeso» finche' lo scambio non finisce, ed e' normale",
-          True, "Nel tuo wallet il pagamento resterà <b>in sospeso</b> (o «in corso») finché lo scambio non finisce: è normale, è la garanzia che tiene." in rh)
-    prova("...e la cauzione pure, con le sue parole", True,
-          "Nel tuo wallet resterà <b>in sospeso</b> finché lo scambio non finisce: è normale." in rc)
-    prova("...tutt'e due nel primo riquadro, prima del QR", [True, True],
-          [rh.index("in sospeso") < rh.index('id="p2pHoldQr"'), rc.index("in sospeso") < rc.index('id="p2pHoldQr"')])
+    riga = fn("function rigaPhoenixHoldP2P(){")
+    prova("la riga unica lo dice: nel wallet il pagamento resta «in sospeso», ed e' normale",
+          True, 'il pagamento resta "in sospeso": è normale' in riga)
+    prova("...e sta in tutt'e due i fogli, dopo il QR", [True, True],
+          [rh.index('id="p2pHoldQr"') < rh.index("rigaPhoenixHoldP2P()"),
+           rc.index('id="p2pHoldQr"') < rc.index("rigaPhoenixHoldP2P()")])
 
 
 def prove_cambio_libro_p2p():
@@ -163717,7 +163996,7 @@ def main():
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
               prove_cambio_converte,
-              prove_paga_ora, prove_apri_wallet_p2p, prove_apri_nel_wallet,
+              prove_paga_ora, prove_apri_wallet_p2p, prove_foglio_pagato_p2p, prove_apri_nel_wallet,
               prove_prova_wallet,
               prove_conto_intervallo,
               prove_catalogo_esterno,

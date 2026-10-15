@@ -574,8 +574,18 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
    wallet: i sats restano **bloccati in garanzia** e non escono finché non
    li liberi tu. Hai circa <n> minuti.», QR, «⚡ Apri nel wallet», «📋
    Copia la richiesta», «Quando i sats sono in garanzia questo foglio si
-   chiude da solo: non c'è niente da confermare.» Il numero da pagare è
-   i sats PIÙ la tua metà di commissione.
+   chiude da solo: non c'è niente da confermare.» e in fondo «💡 Su
+   Phoenix e altri wallet il pagamento resta "in sospeso": è normale, i
+   sats sono bloccati finché lo scambio non si chiude. Non pagare due
+   volte. Se dice «commissione insufficiente», riprova fra un minuto;
+   dopo 3 tentativi prova un altro wallet.» (la stessa riga sta nel
+   foglio della cauzione). Il numero da pagare è i sats PIÙ la tua metà
+   di commissione.
+   📱 Pagato dal wallet, il foglio si chiude da solo entro pochi secondi
+   (l'app chiede a che punto è ogni 5 secondi) e resta la pagina dello
+   scambio col passo dopo. Se per mezzo minuto l'app non riesce a
+   chiederlo, nel foglio compare «⚠️ Non riesco a controllare se il
+   pagamento è arrivato: riprovo da solo. Non pagare due volte.»
    ✈️ A te, che hai pagato da fuori: «🔒 **Garanzia bloccata ✓:** appena
    chi compra indica dove ricevere i sats, tocca a te indicare dove
    ricevere gli euro.» (se l'ordine era tuo e chi compra ha già dato

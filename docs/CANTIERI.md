@@ -59610,3 +59610,121 @@ P2P, che non passano dalla posta (il «da fare dopo Torino» della voce
 comando della voce «I relay di Barattolo». Le copie
 `/root/config.py.prima-dei-relay` sul VPS si cancellano quando la lista
 nuova ha retto qualche giorno (decide Andrea).
+
+## Il foglio della garanzia che non si chiudeva: la chiusura da qualunque strada, il foglio che chiede da sé e la riga unica sull'«in sospeso» (15 ott 2026, cantiere garanzia-non-si-chiude, richiesta di Andrea)
+
+IL CASO (15 ott 2026, lo scambio 101e20d6: un «vendi» da 40 €, 56.163
+sats, preso alle 15:04). Chi vendeva ha pagato la garanzia con Phoenix;
+sul nodo lo scambio era `active` (fattura trattenuta accettata, la
+fattura di chi compra già data). Nella Mini App il foglio «🔒 Blocca i
+sats» è rimasto aperto con la richiesta sopra, Phoenix la mostrava «in
+sospeso» — com'è normale per una hold — e l'utente si è spaventato.
+Chiusa e riaperta l'app, il foglio non c'era più e il passo «Sats
+bloccati» risultava fatto: lo stato c'era, era il foglio aperto che non
+lo ascoltava.
+
+IL PERCHÉ (letto nel codice). Il foglio si chiudeva in UN posto solo,
+il gestore del messaggio del coordinatore (`applicaMessaggioP2P`), e
+solo se la riga passava da «da pagare» ad altro IN QUEL MESSAGGIO. Ma la
+notizia arriva da tre strade: il messaggio via relay, l'archivio del
+server (che lo sa da mostrod, dalla porta degli eventi, senza relay) e
+la restore. Al ritorno dal wallet l'app chiede subito al server
+(`risvegliaP2P` → `riallineaScambioP2P` leggero) e intanto riapre i
+relay: la fetch vince, la riga va ad «attivo» sotto il foglio, e il
+foglio resta. Il ritorno automatico (`tornaAdessoP2P`) non lo chiude
+perché a chi vende, in «attivo», tocca subito un gesto («dove ricevere
+gli euro»: `tornaAiMieiP2P` dice di restare); e il messaggio del relay
+arrivato dopo non lo chiude più, perché la riga non è più «da pagare».
+Con Phoenix sullo stesso telefono è quasi la regola, e i relay non
+c'entrano: i 429 di nos.lol sono le connessioni del SERVER, il telefono
+parla coi relay da sé. Lo stesso buco c'era nella cauzione (dopo, chi
+ha preso deve dare la fattura). Il foglio di chi compra (la fattura)
+no: si chiude alla risposta del suo stesso gesto. Chi vende prendendo
+un ordine d'acquisto se lo vedeva chiudere dal ritorno dopo il gesto,
+ma fino a due minuti dopo (il battito dell'archivio).
+
+DECISO E FATTO (miniapp.html):
+- LA CHIUSURA STA NELLA SCRITTURA DELLA RIGA: `chiudiFoglioPagatoP2P`,
+  dentro il motore, chiamata da `scriviOrdineP2P` (e dal rinome, che
+  dalla scrittura non passa). Ogni strada che muove la riga passa di lì.
+  La regola è quella di prima: il foglio di questo scambio
+  (`p2pHoldOrdine`), la riga che esce da `P2P_STATI_DA_PAGARE` in
+  qualunque verso (anche un annullo lo chiude), «Cauzione bloccata ✅»
+  solo se lo è. I due blocchi del gestore sono tolti.
+- IL FOGLIO APERTO CHIEDE DA SÉ: `sentinellaFoglioP2P`, fuori dal
+  motore, accesa da `apriHoldP2P` e `apriCauzioneP2P`. Ogni 5 s
+  (`P2P_FOGLIO_OGNI_MS`), ad app visibile e una domanda alla volta,
+  l'archivio del server e la sua adozione; se la riga si muove, la
+  pagina si ridisegna. Si spegne da sola a foglio chiuso.
+- IL RIPIEGO: ogni 60 s (`P2P_FOGLIO_RESTORE_MS`) il riallineo pieno con
+  la restore al coordinatore, per il server che non sa (porta degli
+  eventi chiusa, un POST perso); e col server muto da 30 s
+  (`P2P_FOGLIO_MUTO_MS`) in alto nel foglio la riga «⚠️ Non riesco a
+  controllare se il pagamento è arrivato: riprovo da solo. Non pagare
+  due volte.», che se ne va alla prima risposta.
+- LA RIGA UNICA (testo di Andrea): l'«in sospeso» del primo riquadro e
+  la riga Phoenix del 13 ott diventano una, in fondo, uguale nei fogli
+  della garanzia e della cauzione: «💡 Su Phoenix e altri wallet il
+  pagamento resta "in sospeso": è normale, i sats sono bloccati finché
+  lo scambio non si chiude. Non pagare due volte. Se dice «commissione
+  insufficiente», riprova fra un minuto; dopo 3 tentativi prova un
+  altro wallet.» Non nomina più il conto alla rovescia (una delle voci
+  «da fare» di «Phoenix e i sats da bloccare»), e la cauzione ora ce
+  l'ha (un'altra di quelle voci). Nella cauzione resta la frase che la
+  spiega («Resta in sospeso nel tuo wallet e torna a fine scambio»): è
+  cos'è la cauzione, non un avviso.
+
+SCARTATO:
+- Il toast «Garanzia bloccata ✓» anche dalla chiusura: col messaggio
+  sarebbe un doppione, e il passo lo dice già il gestore a chi vende
+  ovunque sia (decisione del 19 set: quel ramo non guarda il foglio).
+- Il passo in evidenza dalla chiusura: in quel momento la pagina non è
+  ancora ridisegnata, e si accenderebbe il vecchio «🔒 Blocca i sats».
+- La restore a ogni battito: un messaggio al coordinatore ogni 5 s per
+  chi aspetta; al minuto basta, il server copre il resto.
+- Chiedere anche ad app nascosta: mentre si paga dal wallet l'app è
+  sotto, e al ritorno chiede già da sé.
+- Chiedere a LND lo stato della hold dal server: lo dice già la porta
+  degli eventi, e sarebbe un accesso in più al nodo per lo stesso fatto.
+
+PROVATO:
+- `prove_foglio_pagato_p2p` (nuova, 29): le sentinelle (la chiusura in
+  un posto solo e fuori dal gestore, chiamata dalla scrittura prima del
+  ritorno e dal rinome, dentro il motore; la sentinella fuori; i due
+  fogli che la accendono; i tempi; il testo del muto) e un banco node
+  coi pezzi veri: un altro scambio, l'eco, l'annullo, il foglio chiuso a
+  mano, la cauzione bloccata e caduta; la sentinella a 5 s, che chiude
+  col server che dice «attivo», si spegne, tace fino ai 30 s, fa la
+  restore al minuto una volta, non chiede ad app nascosta. Controprova a
+  quattro mutazioni: prese tutte.
+- Aggiornate `prove_apri_wallet_p2p` (la riga unica nei due render veri,
+  l'«in sospeso» detto una volta, la riga del muto nascosta sopra il
+  QR), `prove_prova_wallet` (sezione 4) e `prove_cauzione_p2p`.
+- `collaudo_foglio_pagato` (nuovo, in `ci/collaudi.txt`): lo scambio di
+  101e20d6 rifatto sulla ROTTA VERA con gli eventi di mostrod, e sulle
+  sue risposte il client vero in node — sentinella, adozione, scrittura,
+  chiusura: aperto a «da pagare», chiuso al battito dopo «garanzia
+  pagata», il messaggio del relay in ritardo che non ripete niente,
+  l'altro verso, il server muto mezzo minuto. Rosso con la chiusura
+  tolta.
+- DAL VIVO nel Browser pane, server dalla copia nello scratchpad con
+  config di cartone (relay morto, porta degli eventi con un segreto di
+  prova), come Venditore 222: foglio aperto, la domanda ogni 5 s
+  (`/api/p2p/scambi` 200), l'evento `hold-invoice-paid` mandato alla
+  porta alle 15:56:45, il foglio chiuso alle 15:56:50 al battito dopo,
+  sulla pagina dello scambio con «Sats bloccati» spuntato e «💶 Indica
+  dove ricevere gli euro»; col server finto muto la riga d'allarme in
+  alto, sparita alla prima risposta; la riga unica in fondo al foglio.
+  In console solo il relay morto.
+- Suite e collaudi: nel verbale del push.
+
+DA FARE (notati, non fatti; decide Andrea):
+- Il journal del VPS su 101e20d6 (il comando l'ha avuto Andrea): l'ora
+  di «🛰️ Evento P2P: 101e20d6 «garanzia_pagata»» conferma la strada.
+  Se serve la prova di quale strada ha vinto, la diagnosi dal telefono
+  dell'utente («🩺 Copia la diagnosi dei tuoi scambi»).
+- La cauzione col server vero non è provata: l'archivio la porta avanti
+  con la presa (`taken` dopo la cauzione pagata), letto e non visto.
+- Il cantiere «phoenix-blocca-sats 2» tocca lo stesso foglio (la
+  cauzione, il conto alla rovescia senza scadenza): al suo arrivo su
+  main la riga unica e la sua si fondono a mano.

@@ -49,6 +49,7 @@ collaudo_avvisi_in_ordine_p2p
 collaudo_avvisi_mercatino
 collaudo_paycode_riconosciuto
 collaudo_scambi_ovunque
+collaudo_foglio_pagato
 collaudo_chiavi_ritrovate
 collaudo_chi_e_l_altro
 collaudo_voto_dopo_concluso
