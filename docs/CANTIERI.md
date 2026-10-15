@@ -58351,6 +58351,12 @@ sei eventi, gli eventi delle chiavi usa-e-getta, il 10050 di Barattolo,
 il profilo e gli eventi di Ivory Tower (ricerca NIP-50 su
 relay.ditto.pub); il codice di login di Nmail letto sul suo repo.
 Commit di soli documenti.
+**CONFERMATO (15 ott 2026, parola di Andrea).** Il messaggio di Ivory
+Tower era davvero una mail Nostr: la «quasi certezza» di sopra è
+diventata un fatto, e la causa dell'avviso senza messaggio è quella
+scritta (una busta 1059 con dentro una mail, che Amethyst scarta). Lo
+stesso giorno Andrea ha anticipato la strada A: non più dopo Torino ma
+subito, cantiere «dm-o-mail».
 
 ## La fattura annullata e pagata non è più una vendita: rimborso automatico (13-15 ott 2026, cantiere annullata-pagata, decisione di Andrea)
 
