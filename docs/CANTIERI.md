@@ -59728,3 +59728,30 @@ DA FARE (notati, non fatti; decide Andrea):
 - Il cantiere «phoenix-blocca-sats 2» tocca lo stesso foglio (la
   cauzione, il conto alla rovescia senza scadenza): al suo arrivo su
   main la riga unica e la sua si fondono a mano.
+
+**IL PUSH** (15 ott 2026, sera). Sull'albero del cantiere sopra
+`76200fc`: suite intera con `PROVE_SEVERE=1`, 24.368 passate e 1
+fallita — la sentinella della guida in `prove_testo_ricevere_sats`
+vietava «altro wallet» ovunque, e la guida ora cita la riga unica:
+ristretta alla frase vecchia intera («fattura di un altro wallet»),
+sezione rigirata 17/17 — e i collaudi della CI in gabbia, 82 verdi.
+Ribasato quattro volte. Prima sopra `616b928`: le sezioni toccate e tre
+collaudi verdi. Poi, col «ok al push» di Andrea, sopra `42a8919` (il
+revert degli otto commit del pomeriggio e il cantiere
+paycode-barattozon): in `scriviOrdineP2P` la riga del PayCode
+(`riprendiAutoRecapitoP2P`) e la chiusura del foglio unite a mano,
+tutte e due, prima quella del PayCode; in CANTIERI le due voci in
+coda, unite a mano. Poi ancora sopra `334e92c` (il revert del revert,
+di Alan: gli otto commit del pomeriggio tornano) e sopra `c463c61`
+(admin.html e PRODUZIONE, niente di questo cantiere), con le stesse
+due unioni a mano in CANTIERI. Sull'albero sopra `334e92c`: diciotto sezioni (le
+toccate, il motore P2P, il ritorno dopo il gesto, le due del PayCode,
+la bussola, il tetto, gli elenchi dei collaudi, le pagine che leggono
+la guida) 1.231 passate, 0 fallite; in gabbia otto collaudi verdi
+(`collaudo_foglio_pagato`, `collaudo_scambi_ovunque`,
+`collaudo_promemoria_gesto`, `collaudo_chiavi_ritrovate`,
+`collaudo_giro_nuovo`, `collaudo_tolti_ovunque`,
+`collaudo_chat_scambio`, `collaudo_paycode_riconosciuto`); le forme
+dei segreti della CI sulle righe aggiunte: nessuna. Sopra `c463c61`:
+la sezione nuova, la bussola, il tetto e l'elenco dei collaudi 48
+passate, `collaudo_foglio_pagato` verde. Il resto lo fa la CI. Il push non porta commit altrui.
