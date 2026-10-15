@@ -58825,7 +58825,8 @@ instradamento dei pagamenti in uscita cominciano a pesare; il mercatino
 è «fee zero», quindi le paga Barattolo. Prima di pensare ad Ark, i
 numeri: quanto abbiamo speso in 30 giorni, verso chi, quanto
 risparmierebbe un canale diretto, come funzionerebbe una tariffa al
-venditore, se c'è un tetto, cosa sono Ark (Arkade, Second/bark) oggi.
+venditore (diventata «al compratore» per decisione di Andrea, sotto),
+se c'è un tetto, cosa sono Ark (Arkade, Second/bark) oggi.
 Niente codice, niente scritture su nodo, canali, VPS o config: i
 comandi di sola lettura li ho scritti io e li ha lanciati Andrea, uno
 alla volta. Prosegue lo studio del 5 ott
@@ -58934,27 +58935,42 @@ c'entra coi nostri costi. Gli inoltri dei 30 giorni sono 22, 831.345
 sats, 196 sats di guadagno: l'1,4 % di quel che spendiamo. Anche
 quintuplicata resterebbe sotto i 1.000 sats al mese.
 
-**LA TARIFFA AL VENDITORE, SOLO PER IL MERCATINO.** In gioco ~6.400 sats
-al mese (~4,6 €), l'83 % per i payout verso WoS.
-- La commissione vera si sa solo DOPO il pagamento: si può trattenere
-  una stima (una `queryroutes` prima del payout, con un tetto), una
-  percentuale (0,4 % copre il caso peggiore, WoS; su Phoenix sarebbe
-  dieci volte il costo) o una cifra fissa (21 sats coprono Phoenix, ~13
-  sats, e non WoS: sui 26 payout dei 17 giorni avrebbe reso 546 sats su
-  3.624).
-- Cosa legge lui: «Incassi X sats (rete Y)» prima di pubblicare, nella
-  card di Ordini e nell'avviso dell'incasso. La fattura dal suo
-  indirizzo Lightning si chiede per prezzo meno tariffa; chi deposita
-  una fattura a mano la deve fare per quella cifra, e la pagina gliela
-  dice.
-- Nel libro mastro: una trattenuta per ordine; il debito verso il
-  venditore è prezzo meno trattenuta; la trattenuta è nostra e la
-  differenza con la commissione vera è il nostro margine (positivo o
-  negativo). I rimborsi restano integrali (la decisione delle aste:
-  «le fee di routing le paga la piattaforma»).
-- Rovescia la promessa «fee zero», ed è una decisione di prodotto, non
-  di conti. Se si fa, si fa insieme alla commissione minima fissa del
-  backlog: UNA trattenuta, non due.
+**LA TARIFFA AL COMPRATORE, SOLO PER IL MERCATINO.** DECISIONE DI
+ANDREA (15 ott 2026, prima del push di questo verbale): un'eventuale
+tariffa per le commissioni del mercatino NON va MAI al venditore; al
+massimo al compratore, AGGIUNTA al prezzo che paga e ben visibile PRIMA
+di pagare. Il venditore incassa sempre il prezzo intero. È la regola
+del «chi»; il «se» e il «quanto» si decidono dopo Torino.
+- In gioco ~6.400 sats al mese (~4,6 €), l'83 % per i payout verso WoS.
+  La commissione vera dipende dal wallet di chi VENDE (verso WoS fino
+  allo 0,4 %, verso Phoenix ~13 sats) e si sa solo dopo il payout,
+  mentre chi compra paga prima: la tariffa è per forza una cifra decisa
+  in anticipo. Le tre forme: fissa (21 sats coprono Phoenix e non WoS:
+  sui 26 payout dei 17 giorni avrebbe reso 546 sats su 3.624);
+  percentuale (0,4 % copre il caso peggiore, su Phoenix è dieci volte
+  il costo); stimata sulla rotta verso l'indirizzo di chi vende quando
+  nasce la fattura, con un tetto — col limite che chi vende può
+  cambiare il modo di incassare dopo l'acquisto, e la differenza resta
+  nostra.
+- Cosa legge chi compra: nel riepilogo prima di pagare, una riga sua,
+  «Prezzo X sats · Rete Lightning Y sats · Totale», e la fattura è del
+  totale; la stessa scomposizione nella card di Ordini e nella ricevuta.
+  Mai una cifra che compare solo dopo aver pagato.
+- Cosa legge chi vende: niente di nuovo. «Incassi X sats» resta il
+  prezzo intero, e il payout è del prezzo intero.
+- Nel libro mastro: per ordine, la tariffa accanto al prezzo; il
+  deposito incassato è prezzo + tariffa; il debito verso chi vende
+  resta il prezzo; la tariffa è nostra, e la differenza con la
+  commissione vera del payout è il nostro margine (positivo o
+  negativo). Per far tornare quel conto va scritta la commissione vera
+  di ogni payout, che oggi non scrive nessuno (vedi i da fare).
+- Nei rimborsi, una proposta da decidere: si restituisce il totale
+  pagato, tariffa compresa, come vuole la regola dei rimborsi integrali
+  (la decisione delle aste: «le fee di routing le paga la piattaforma»).
+- Toglie «fee zero» a chi compra: è una decisione di prodotto e di
+  parole, non di conti. Se arriva anche la commissione minima fissa del
+  backlog, le due si guardano insieme: chi compra deve vedere UNA riga
+  di costi in più, non due.
 
 **ARK, LO STUDIO** (fonti lette il 15 ott 2026):
 - Second, `bark`: su mainnet dal 9 giu 2026, server pubblico
@@ -58992,8 +59008,10 @@ prima del 18 ott):
 2. Gratis: la prima colonna del comando 3, ogni tanto, per vedere se i
    payout verso Spark che escono da LNBiG costano meno di quelli da
    ACINQ.
-3. La tariffa al venditore: una decisione di prodotto dopo Torino; se
-   sì, insieme alla commissione minima fissa.
+3. La tariffa al compratore (mai al venditore, decisione di Andrea):
+   una decisione di prodotto dopo Torino; se sì, una riga sola di costi
+   in più per chi compra, insieme alla commissione minima fissa se
+   arriva.
 4. Il canale verso `039174f8`: solo dopo una prova di peering da Tor
    riuscita e con sats freschi da bloccare (1-2M); risparmia ~19.000
    sats al mese, quasi tutti sul P2P.
@@ -59009,8 +59027,9 @@ Filtrare sull'esito buttava via il caso normale. La strada giusta per
 separare i pagamenti era già sul nodo: la fonte che la ronda scrive per
 ogni hash.
 
-**STRADE SCARTATE.** Abbassare il tetto di LNbits (fa fallire, non
-risparmia); un canale verso `030936e7` (privato, non si apre); alzare la
+**STRADE SCARTATE.** Una tariffa a carico del venditore (decisione di
+Andrea: mai, al più al compratore); abbassare il tetto di LNbits (fa
+fallire, non risparmia); un canale verso `030936e7` (privato, non si apre); alzare la
 tariffa del nodo per pagare i payout (196 sats al mese di base); Ark
 come server o come cliente (sopra).
 
