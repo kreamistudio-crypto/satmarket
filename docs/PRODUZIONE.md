@@ -10,6 +10,47 @@ Il sito barattolo.online sta nel repo privato
 kreamistudio-crypto/barattolo-online (clonato in
 Documents\GitHub\barattolo-online); Vercel pubblica da solo a ogni push
 su main.
+LA COPIA NOSTR DEL SITO (nsite, 15 ott 2026, cantiere nsite-allineato,
+richiesta di Andrea): è il sito radice (manifesto kind 15128) della
+chiave di Barattolo,
+npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy, e si
+vede su
+https://npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy.nsite.lol/
+I file stanno in Documents\GitHub\barattolo-nsite, che NON è un repo
+git e NON si aggiorna da sola: dopo ogni ritocco al sito va rifatta e
+ripubblicata a mano. La ricetta (la stessa dell'8 ott): le pagine e
+`robots.txt` presi da git (`git cat-file blob HEAD:<file>`, non dalla
+cartella di lavoro, che con autocrlf ha i CRLF), con `poster="video/` e
+`src="video/` riscritti a `https://www.barattolo.online/video/` (i video
+su Blossom non ci vanno); niente `video/`, `vercel.json`, `sitemap.xml`;
+solo le immagini che le pagine citano (37). Si pubblica con nsyte
+(0.28.1, nel WSL Ubuntu), dalla cartella:
+`nsyte deploy . --no-config -s https://blossom.primal.net,https://cdn.hzrd149.com -r wss://relay.barattolo.store,wss://nos.lol,wss://relay.primal.net,wss://relay.damus.io,wss://relay.nsite.lol --fallback index.html --prompt-sec`
+— nsyte aggiunge da sé i relay della lista 10002 di Barattolo: il 15
+ott al deploy erano anche relay.nmail.li e nostr-01.yakihonne.com (la
+10002 sbagliata messa da nmail), poi la 10002 è stata rifatta (id
+9dec51e5, i sei relay di Barattolo) e nsyte userà quelli; la voce «I
+RELAY DI BARATTOLO: LA LISTA (`RELAY_NOSTR`) E IL KIND 10002».
+COME SI AGGIORNA CON AMBER, senza nsec sul PC né in chat: 1) `nsyte ci`
+nel WSL → «Scan QR Code (Nostr Connect)» → relay `wss://nos.lol` (il
+default, relay.nsec.app, il 13 ott non rispondeva) → QR inquadrato con
+Amber, chiave di Barattolo: stampa un `nbunksec`, lasciapassare della
+sessione che non salva su disco e che in chat non va mai; 2) il deploy
+qui sopra con `--dry-run` in fondo (non firma niente; l'anteprima del
+manifesto finisce in `/tmp/nsyte-dry-run-*`); 3) il deploy vero,
+incollando l'`nbunksec` al prompt: DUE firme su Amber, il permesso
+Blossom (24242, fino a 20 file in una firma) e il manifesto (15128);
+4) controllo su nsite.lol di `/`, `en.html`, `es.html`; 5) la sessione
+si revoca da Amber, e l'`nbunksec` non vale più. `nsyte bunker connect`
+NON serve: salva il collegamento su disco, e con `--no-config` nsyte
+non lo usa («--no-config requires --sec»). Il gesto che non si disfa è
+il deploy vero: il manifesto nuovo sostituisce il vecchio (si torna
+indietro solo ripubblicando la cartella di prima) e i file caricati su
+Blossom restano pubblici. cdn.nostrcheck.me è TOLTO dal comando (15
+ott, decisione di Andrea): non prendeva i file (8 ott: 2 su 41; 15
+ott: 401 «Auth event already used» e 400 «file type not detected»);
+il sito vive da blossom.primal.net e cdn.hzrd149.com. Il manifesto
+del 15 ott lo nomina ancora fra i server: sparisce al deploy dopo.
 
 I PERCORSI DEL VPS SONO SCRITTI PER ESTESO (10 ott 2026, cantiere
 percorsi-vps, richiesta di Andrea): la cartella del server è
