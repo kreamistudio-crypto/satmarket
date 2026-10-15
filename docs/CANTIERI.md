@@ -62326,3 +62326,313 @@ riapertura della pagina rifà il ritiro prima di disegnare.
   sessione, stessa base) cerca la stessa «seconda memoria» per l'avviso
   doppio del recapito; qui non s'è trovato un difetto da condividere,
   solo la mappa delle memorie qui sopra.
+
+## Gli swap di SATS Routing dentro Barattolo: lo studio (16 ott 2026, cantiere swap-studio, studio chiesto da Andrea: solo documenti)
+
+**LA DOMANDA.** Offrire dentro Barattolo uno swap fra bitcoin on-chain,
+Lightning e Liquid come quello di SATS Routing (satsrouting.exchange),
+la copia di Boltz curata da Massimo Musumeci che Zeus usa di serie.
+Due strade: A) integrare SATS Routing (lo swap lo fanno loro, noi non
+tocchiamo mai i fondi); B) un nostro boltz-backend. Solo studio: niente
+codice, niente nodo, niente VPS, nessuno swap creato e nessun sats
+mosso. Le sole chiamate fatte sono GET di sola lettura (tariffe, nodi,
+mempool), dal Browser pane e non da `curl.exe` (Bitdefender aveva
+segnalato il dominio letto così: studio della liquidità, §9). Molto
+c'era già: gli swap VERI del 5 ott col loro sito, nello studio
+`STUDIO-LIQUIDITA-NODO-2026-10-01.md` (§6 e §9).
+
+**1. COM'È FATTO SATS ROUTING** (fonti in fondo).
+- Chi: Massimo Musumeci e «Luke», volontari, nessun legame con Boltz
+  (articolo di Massimo del 20 ago). Online dal 19 ago circa (primo
+  avvistamento del loro nodo). Boltz è spento dal 3 ago (attacchi
+  automatici assistiti da AI), i fondatori se ne sono andati, nessuna
+  ripartenza trovata; il 16 ott `boltz.exchange` non si apre nemmeno.
+- Codice: fork di boltz-backend (AGPL-3.0), nove commit avanti
+  all'originale, fra cui le correzioni di un audit di terzi (1 set): il
+  pagamento ambiguo che non deve diventare un rimborso, il nonce MuSig2
+  che finiva in Redis, gli id degli swap da un generatore sicuro. Chi
+  ha fatto l'audit NON è scritto da nessuna parte. Zeus l'ha messo di
+  serie il 17 set (PR #4620, che ha provato il recupero dalla chiave);
+  Alby Hub lo rende configurabile (PR #2603, 14 ott), Angor anche (23
+  set). Il sito dichiara web app 2.2.1, commit `004f4077`.
+- Le coppie e i numeri, letti dall'API il 16 ott mattina (cambiano;
+  mempool a 1 sat/vB, 73.541 €/BTC):
+
+| Direzione | Tipo | Commissione | Minimo | Massimo |
+|---|---|---|---|---|
+| Lightning → on-chain | reverse | 0,6 % + 324 (lockup) + ~234 (claim, lo paga chi riceve) | 2.142 | 5.000.000 |
+| Lightning → Liquid | reverse | 0,4 % + 27 + ~20 | 100 | 5.000.000 |
+| on-chain → Lightning | submarine | 0,5 % + 318 | 50.000 | 5.000.000 |
+| Liquid → Lightning | submarine | **5 %** + 19 | 1.000 | 2.000.000 |
+| on-chain → Liquid | chain | 0,4 % + 345 + i propri lockup e claim | 25.000 | 2.000.000 |
+| Liquid → on-chain | chain | **5 %** + 343 + i propri | 25.000 | 2.000.000 |
+
+  Il 5 % sulle due direzioni che partono da Liquid è un freno, non una
+  tariffa: vuol dire che lì non vogliono altro L-BTC (da chiedere). Lo
+  zero-conf è a 0 ovunque: chi manda on-chain aspetta UNA conferma. Il
+  1 ott la Lightning → on-chain era 0,6 % + 1.114, minimo 4.284.
+- Tempi: Lightning → on-chain in minuti (il claim lo trasmette il
+  browser di chi riceve); on-chain → Lightning dopo la prima conferma
+  (~10 minuti in media, a volte un'ora). La scadenza di ogni swap
+  (`timeoutBlockHeight`) si legge solo creandone uno: non l'ho fatto, e
+  la configurazione del server non è pubblica.
+- L'API: è quella di Boltz v2 (`api.satsrouting.exchange/v2/...`, anche
+  via Tor), documentata in `SatsRouting/satsrouting-api-docs`, che è la
+  documentazione di Boltz copiata e ribattezzata, con dei resti (i nodi
+  Lightning elencati sono quelli di Boltz, la mail di supporto è di
+  Boltz). Limiti di chiamate NON documentati. Ci sono webhook sullo
+  stato degli swap e un'API «referral» con chiave e firma HMAC (risponde
+  401 senza chiave). La documentazione dice, in rosso: NON integrare
+  l'API a mano («multi-month effort», perdita di fondi), usare le
+  librerie (boltz-core in TypeScript, Breez SDK Nodeless, boltz-client
+  in Go). Il sito si può aprire con l'indirizzo già compilato:
+  `?sendAsset=BTC&receiveAsset=LN&destination=<fattura>`, e ha un modo
+  `embedded=true` per stare in un iframe che avvisa la pagina madre.
+- Se lo swap si blocca: lo swap è un HTLC, o va tutto o i sats tornano.
+  On-chain → Lightning fallito (fattura non pagata, scaduta, importo
+  sbagliato): rimborso SUBITO se il server collabora (firma MuSig2),
+  altrimenti da soli dopo la scadenza in blocchi. Lightning →
+  on-chain: se chi riceve non reclama in tempo, il server si riprende
+  l'on-chain e il pagamento Lightning torna indietro. Per tutto serve la
+  **chiave di recupero** (Rescue Key): 12 parole generate NEL BROWSER
+  di chi fa lo swap, tenute nella memoria del sito (localforage, a
+  scelta cifrate con una frase), da scaricare come file o da trascrivere;
+  il server riceve solo la xpub (vede la storia degli swap, non può
+  spendere). La pagina `/rescue` ritrova gli swap dalla chiave anche su
+  un altro dispositivo. La custodisce SOLO l'utente.
+- Il sito NON ha termini di servizio né privacy (`/terms` dà 404; nel
+  codice la pagina c'è ancora, e dice «Boltz S.A. de C.V., El
+  Salvador»). Chi gestisce il servizio, come persona giuridica, non è
+  scritto.
+- Il nodo: SatsRouting2 (`02b06bf3…`, quello degli swap del 5 ott) ha
+  60M sats in tre canali, 50M verso il loro secondo nodo «SatsRouting»
+  (`03172359…`, ~5,9 BTC, 35 canali: Strike, Kraken, ACINQ, Bitfinex,
+  LNBiG Hub-1…). Ben collegato, ACINQ diretto.
+
+**2. LE DUE STRADE.**
+A) INTEGRARE SATS ROUTING. Noi non tocchiamo mai i fondi né le chiavi;
+ci mettiamo la porta. Tre gradini, dal più leggero:
+- A0, una riga d'aiuto (Info): «Hai solo bitcoin on-chain? Ecco come
+  entrare in Lightning», col nome del servizio. Nessun codice.
+- A1, il link già compilato: dal foglio di pagamento un tocco apre il
+  sito di SATS Routing nel browser di sistema con la NOSTRA fattura come
+  destinazione; lo swap si fa là. Poco codice, ma vedi il nodo della
+  scadenza (§3).
+- A2, lo swap dentro la Mini App con boltz-core o l'SDK: è quello che la
+  loro documentazione chiama un lavoro di mesi, e la chiave di recupero
+  starebbe nella memoria della WebView di Telegram, che cambia a seconda
+  da dove si apre la Mini App (lezione «Due memorie, stesso telefono»).
+  No.
+B) UN NOSTRO BOLTZ. Servono, oltre a bitcoind (il nostro nodo è pruned:
+da verificare se basta), Elements per Liquid, LND, PostgreSQL, Redis e
+il sidecar in Rust, sempre accesi; e capitale caldo da tutt'e due le
+parti: per gli swap verso on-chain sats on-chain da bloccare, per quelli
+verso Lightning uscita sui canali, per Liquid L-BTC. Per stare ai
+massimi di oggi (5M a swap, qualche swap insieme) parliamo di 0,3-1 BTC
+per lato; SATS Routing ci tiene ~6 BTC solo in Lightning. Il rischio è
+quello che ha spento Boltz: un codice grosso preso di mira da attacchi
+automatici, e qui i fondi a rischio sarebbero i NOSTRI (lo swap è non
+custodial per l'utente, non per chi lo serve). È anche la macchina che
+l'audit del nodo ha voluto piccola. E in più la parte legale (§6). No.
+
+**3. COME SI INSERIREBBE LA STRADA A IN BARATTOLO.**
+- Dove ha senso: SOLO in entrata, nel pagamento di un ordine del
+  mercatino («paga da bitcoin on-chain»). In uscita (il venditore che
+  vuole l'incasso on-chain) lo swap andrebbe creato nel SUO browser e
+  il nostro payout resterebbe appeso finché lui non reclama: un payout
+  in volo per ore sui nostri canali, che la ripresa dei payout oggi non
+  conosce. Quando lo fa il WALLET del venditore succede già, ed è
+  andato bene: i payout del 7 e del 13 ott (71.832 e 131.017) sono
+  arrivati a un venditore che riceve dietro SatsRouting2 (voce qui
+  sopra, «NOTATO STRADA FACENDO»). Nel P2P no: la garanzia è una hold invoice di Mostro che
+  resta appesa per tutto lo scambio, e la fattura del compratore si
+  paga solo al rilascio; uno swap con la sua scadenza in mezzo è un
+  modo nuovo di far fallire uno scambio.
+- IL NODO DELLA SCADENZA (letto nel codice del loro server,
+  `SwapManager.ts`): senza zero-conf, una fattura con meno di DUE
+  blocchi di tempo (20 minuti) viene rifiutata, «invoice expiry too
+  short». La nostra fattura di checkout dura 15 minuti
+  (`INVOICE_EXPIRY = 900`): oggi SATS Routing la rifiuterebbe. A1 vuole
+  una fattura apposta di almeno un'ora, con l'ordine tenuto fermo per
+  quel tempo: è lì il lavoro vero, non nel link. QUESTO CORREGGE la
+  voce qui sopra («Gli incassi grossi on-chain», «IL COMPRATORE CHE
+  PAGA ON-CHAIN»), che dice che lo swap da on-chain paga già la nostra
+  fattura senza una riga di codice: con SATS Routing e la fattura da 15
+  minuti no, secondo il codice pubblicato (una prova vera vorrebbe
+  creare uno swap, e non l'ho fatto). Funziona invece chi entra in
+  Lightning PRIMA (lo swap verso il proprio wallet, poi il pagamento).
+- Cosa vede l'utente (A1): nel foglio di pagamento una riga «Hai solo
+  bitcoin on-chain?»; il tocco apre satsrouting.exchange nel browser
+  del telefono (`tg.openLink`, che gli http li apre), con importo e
+  fattura già scritti; là vede l'indirizzo e la cifra da mandare
+  (prezzo + 0,5 % + 318 + la commissione del suo invio), scarica la
+  chiave di recupero, manda; dopo una conferma SATS Routing paga la
+  nostra fattura e l'ordine diventa pagato come sempre. Sotto i 50.000
+  sats non si può.
+- La chiave di recupero: nel browser di sistema dell'utente e nel file
+  che scarica. MAI sul nostro server, mai nella WebView di Telegram
+  (regola ferrea 2 nello spirito; e la documentazione stessa dice che
+  un integratore non deve tenere chiavi di rimborso sui suoi server).
+- Se chiude l'app a metà: lo swap non vive in Barattolo, vive sul loro
+  sito; chiudere Barattolo non cambia niente. Se la conferma arriva
+  dopo la scadenza della fattura, lo swap fallisce e l'utente si
+  rimborsa da solo dalla pagina «Rescue» con la chiave: è il caso da
+  spiegare bene, perché per lui sono sats «spariti» per un po'.
+- Quali wallet: per mandare, qualunque wallet on-chain che sappia fare
+  UN invio dell'importo esatto (la documentazione: un solo lockup, un
+  secondo invio è ignorato). Da verificare con uno swap vero se
+  l'indirizzo è taproot (bc1p…), che qualche exchange non accetta come
+  destinazione. Chi ha Zeus o Alby Hub ha già SATS Routing in casa;
+  Phoenix ha una sua entrata on-chain (a memoria, non riverificato
+  oggi): per loro la riga non serve.
+
+**4. USO PER NOI: LO SWAP LIGHTNING → ON-CHAIN DAL NODO.** Lo facciamo
+già, a mano, dal sito sul PC (5 ott: 5.034.696 mandati, 33.505 di
+commissione = 0,67 %, più 1.801 di instradamento). Non c'è niente da
+integrare: il nodo paga una fattura e basta. I conti di oggi:
+- uno swap da 300.000 (il pezzo che da ACINQ passa): 1.800 + 324 +
+  ~234 = ~2.360 sats (0,79 %), più l'instradamento;
+- un giro su noi stessi ACINQ → LNBiG, quello che la guardia della
+  liquidità propone per primo: tetto 3 per mille, ≤ 900 sats per
+  300.000, e i sats restano in Lightning;
+- Loop Out: 0,05-0,5 %, ma vuole loopd e un macaroon largo (scartato
+  il 1 ott).
+Quindi per l'entrata ACINQ resta prima il giro, poi lo swap solo
+«senza spazio per il giro» o quando i sats servono on-chain (un canale
+nuovo). E NESSUNO swap cura il tetto di 450.000 appesi di ACINQ
+(cantiere phoenix-blocca-sats-2): quello non è una questione di
+entrata.
+
+**5. GUADAGNO.** La loro documentazione ha un «Partner Program», ma è il
+testo di Boltz copiato (pagamento mensile in Lightning, minimo 1.000
+sats, ammissione a discrezione). Due righe ci tagliano fuori: NON vale
+per chi usa gli swap «per farsi pagare beni e servizi» (il nostro caso
+A1) né per il semplice link o iframe al sito (A0 e A1). C'è anche
+`extraFees`: chi integra può aggiungere fino al 10 % sopra la loro
+commissione, con un suo `id`; chi incassa quel ricarico e come lo gira
+a noi la documentazione non lo dice. Un ricarico nostro, comunque,
+peggiora la parte legale (§6). Da chiedere a Massimo:
+1. Il Partner Program vale per SATS Routing? Con che regole, e la
+   clausola «beni e servizi» vale anche per noi?
+2. `extraFees`: chi lo incassa, quando e come ci arriva; con che
+   ricevuta.
+3. Chi è il gestore (persona o società, quale paese)? I termini di
+   servizio e la privacy, oggi assenti: cosa tengono (IP, xpub, log) e
+   per quanto.
+4. Le scadenze per coppia, e se accetterebbero lo zero-conf sotto una
+   soglia (toglierebbe l'attesa della conferma).
+5. Limiti di chiamate, chiave API per chi integra, webhook.
+6. Chi ha fatto l'audit, se il rapporto è pubblicabile; quanto pensano
+   di restare accesi e cosa succede agli swap aperti se chiudono.
+7. Il 5 % sulle direzioni da Liquid: voluto, per liquidità?
+8. I resti di Boltz nella documentazione (nodi, mail): da correggere.
+
+**6. LA PARTE LEGALE** (NON sono sicuro di niente qui: sono letture del
+testo, non un parere).
+- Quel che dice il regolamento MiCA (UE 2023/1114, letto in italiano su
+  EUR-Lex): i servizi per le cripto-attività sono un elenco chiuso (art.
+  3, punto 16), fra cui custodia per conto di clienti, scambio di
+  cripto-attività con altre cripto-attività «utilizzando capitale
+  proprio» (punto 20), ricezione e trasmissione di ordini a una terza
+  parte (punto 23), trasferimento per conto dei clienti (punto 26).
+  Senza autorizzazione da CASP non si prestano (art. 59). Fuori: i
+  servizi «completamente decentrati senza alcun intermediario»
+  (considerando 22) e i fornitori di hardware o software di portafogli
+  non custoditi (considerando 83). In Italia le autorità sono Consob e
+  Banca d'Italia (D.Lgs. 129/2024); il regime transitorio dei VASP
+  iscritti all'OAM è finito (domande entro il 30 dic 2025, attività al
+  più fino al 30 giu 2026: fonte di uno studio legale, non ufficiale).
+- Strada A0 (informazione e un nome): mi sembra la più lontana da ogni
+  servizio: non riceviamo ordini, non li trasmettiamo, non tocchiamo
+  niente. A1 (il link con la nostra fattura dentro): l'utente crea lo
+  swap da sé sul sito altrui per pagare NOI; il dubbio è se
+  «preparare» lo swap sia ricezione e trasmissione di ordini. A2 e un
+  ricarico nostro avvicinano a quella lettura, e a quella di
+  «esecuzione di ordini». Non so dire dove passa la linea.
+- Strada B: saremmo la controparte con capitale nostro, cioè quasi alla
+  lettera il punto 20, almeno per Liquid (L-BTC è un'altra
+  cripto-attività, emessa da una federazione); per on-chain ↔ Lightning
+  c'è chi direbbe che è lo stesso bitcoin in due forme. Plausibilmente
+  serve l'autorizzazione da CASP: da non fare senza un parere.
+- Fuori dal MiCA: mandare utenti italiani da un gestore senza nome e
+  senza termini è una questione di fiducia e di tutela del
+  consumatore, e c'è l'antiriciclaggio (D.Lgs. 231/2007), di cui non ho
+  letto niente.
+- Da chiedere al professionista (insieme al parere MiCA già nel
+  backlog, che riguarda soprattutto il nostro deposito di garanzia,
+  cioè la custodia — molto più pesante di qualunque swap):
+  1. A0 e A1 sono «ricezione e trasmissione di ordini»? Cambia qualcosa
+     se la fattura nel link è nostra?
+  2. Un ricarico (`extraFees`) o una quota del Partner Program cambia la
+     risposta?
+  3. On-chain ↔ Lightning è «scambio di cripto-attività con altre
+     cripto-attività»? E con Liquid?
+  4. Che obblighi d'informazione verso l'utente se lo mandiamo da un
+     servizio terzo (avvertenze, responsabilità se lo swap fallisce)?
+  5. Antiriciclaggio: obblighi nostri con A1?
+
+**7. LA RACCOMANDAZIONE.**
+1. Per il nodo niente da costruire: si continua come il 5 ott quando
+   servono sats on-chain; per l'entrata ACINQ prima il giro.
+2. Per gli utenti, non adesso: il P2P è partito il 10 ott, Torino è il
+   17-18, e SATS Routing ha due mesi, nessun gestore dichiarato e
+   nessun termine di servizio. Prima la lettera a Massimo coi punti del
+   §5 (la scrive Andrea; posso prepararla).
+3. Se le risposte reggono e il parere dice sì: A0 subito (mezza
+   giornata con le prove), A1 dopo, se qualcuno chiede davvero di
+   pagare da on-chain (3-5 giorni: la fattura lunga e l'ordine tenuto
+   fermo, i testi, i collaudi).
+4. A2 e B: no.
+
+**STRADE SCARTATE.** A2 (mesi di lavoro per loro stessa ammissione,
+chiave nella WebView); B (capitale caldo, attacchi, CASP); lo swap nel
+P2P e nei payout (hold invoice e payout appesi); un ricarico nostro
+sugli swap (soldi pochi, legale peggiore).
+
+**PROVATO.** Solo letture: le pagine e i repo citati, le GET
+`/v2/swap/submarine`, `/v2/swap/reverse`, `/v2/swap/chain`,
+`/v2/nodes`, `/v2/chain/fees` e `/v2/referral` (401) di
+api.satsrouting.exchange, e mempool.space (nodi, canali, tariffe,
+cambio), tutte il 16 ott 2026 dal Browser pane. Nessuno swap creato,
+nessun sats mosso, nessun account. Le prove di `prove.py` che leggono
+CANTIERI: nel verbale del commit.
+
+**DA FARE** (notati, non fatti):
+- La lettera a Massimo coi punti del §5, se Andrea la vuole.
+- Il parere: le cinque domande del §6 accanto a quelle già nel backlog.
+- Con un primo swap vero piccolo (nostro, dal PC): la scadenza in
+  blocchi e la forma dell'indirizzo, da scrivere qui.
+
+**AGGIUNTE DELLA SERA (16 ott 2026, parola di Andrea).**
+- L'OFFERTA DI MASSIMO, che SUPERA il §5 sul Partner Program:
+  Barattolo ha una quota del 10 % sulle commissioni che SATS Routing
+  incassa sugli swap portati da noi, confermata da lui ad Andrea. È la
+  strada principale per il guadagno: chi fa lo swap non paga niente in
+  più. Nel loro codice la quota si conta sulla sola commissione
+  percentuale degli swap riusciti (non sulla rete), sommata per mese:
+  60 sats su uno swap da 100.000, 600 su 1M, 3.000 su 5M alle tariffe
+  di oggi. Si attiva con un «referral» nostro nel loro database e il
+  suo nome in ogni swap; il pagamento a noi è a mano, da mettere per
+  iscritto. Una nostra fee (0,5 %) resta solo un'alternativa, spenta.
+  Il lavoro parte col cantiere «swap-venditore».
+- L'ON-CHAIN NATIVO: lo studio del 16 ott «Il pagamento on-chain come
+  opzione» (cantiere pagamento-onchain, 2-di-3 non custodial) paga in
+  on-chain gli ordini pagati on-chain, senza swap. Lo swap resta la
+  strada per gli ordini pagati in Lightning: il venditore vedrà una
+  scelta sola, «₿ On-chain», e la strada la decide il tipo d'ordine.
+
+Fonti: [massmux, «A new Boltz's fork is running: SATS Routing»](https://massmux.org/p/a-new-boltzs-fork-is-running-sats) (20 ago 2026);
+[il video in italiano](https://www.massmux.com/satsrouting-exchange-swap-non-custodial-atomico/);
+[satsrouting.exchange](https://satsrouting.exchange) (`/rescue`, `/terms` 404);
+[SatsRouting/boltz-backend](https://github.com/SatsRouting/boltz-backend) (README con la nota dell'audit, `lib/swap/SwapManager.ts`);
+[SatsRouting/boltz-web-app](https://github.com/SatsRouting/boltz-web-app) (`docs/urlParams.md`, `src/utils/rescueFile.ts`, `src/pages/Terms.tsx`);
+[SatsRouting/satsrouting-api-docs](https://github.com/SatsRouting/satsrouting-api-docs) (`swap-limits-and-fees.md`, `swap-restore.md`, `libraries.md`, `common-mistakes.md`, `partner-program.md`, `pro.md`, `api-v2.md`);
+[Zeus PR #4620](https://github.com/ZeusLN/zeus/pull/4620);
+[Alby Hub PR #2603](https://github.com/getAlby/hub/pull/2603);
+[Angor PR #970](https://github.com/block-core/angor/pull/970);
+[Cointelegraph su Boltz](https://cointelegraph.com/news/boltz-pauses-service-after-wave-of-ai-assisted-hacking-attempts);
+[i fondatori di Boltz se ne vanno](https://cryptonews.net/news/security/33288731/);
+[MiCA su EUR-Lex](https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:32023R1114) (art. 3, 59; considerando 22 e 83);
+[CMS sul regime transitorio](https://cms.law/it/ita/publication/il-regime-transitorio-per-i-fornitori-di-servizi-di-cripto-assets-in-italia-alla-luce-delle-recenti-modifiche-normative);
+[Banca d'Italia, FAQ CASP](https://www.bancaditalia.it/compiti/vigilanza/accesso-mercato/soggetti-mercato-cripto-attivita/casp/faq-casp/);
+`mempool.space/api/v1/lightning/nodes/…`, `/channels`, `/fees/recommended`, `/prices` (16 ott).
