@@ -17102,8 +17102,7 @@ def _riga_sfoglia(a: dict, cambio: float) -> str:
             f"💰 {_prezzo_promo(dict(a), cambio)}")
     if a["zona_comune"]:
         riga += f" · 📍 {html.escape(a['zona_comune'])}"
-    riga += (f"\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
-             "Apri su Barattolo</a>")
+    riga += f"\n{link_telegram('annuncio', a['id'])}"
     return riga
 
 
@@ -25615,14 +25614,14 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"✏️ Il venditore ha ritoccato il prezzo di "
             f"«{d['titolo'][:60]}»: la tua offerta decade. Se ti "
             f"interessa ancora, riproponi sul prezzo nuovo."
-            f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
+            f"\n{link_telegram('annuncio', annuncio_id)}")
     for riga in decadute_carrello:
         await notifica(riga["compratore_id"],
             f"✏️ Il venditore ha ritoccato il prezzo di "
             f"«{d['titolo'][:60]}», che è dentro la tua offerta sul "
             f"carrello: l'offerta decade. Se ti interessa ancora, "
             f"riproponi sul listino nuovo."
-            f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
+            f"\n{link_telegram('annuncio', annuncio_id)}")
     conto_foto = {}
     if nomi_nuovi:
         nomi = nomi_nuovi
@@ -26245,7 +26244,7 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
         await notifica(a["venditore_id"],
                        f"✅ <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
                        f"approvato</b> ed è in vetrina!\n"
-                       f"{URL_PUBBLICO}/annuncio/{annuncio_id}")
+                       f"{link_telegram('annuncio', annuncio_id)}")
         return True, f"✅ Pubblicato: «{html.escape(a['titolo'][:60])}»"
     # Il rifiuto ritira anche dai canali. Prima si poteva dare per
     # scontato che un annuncio in revisione non fosse MAI stato
@@ -32477,7 +32476,7 @@ async def verifica_rilancio(rilancio_id: int,
     except Exception:
         pass
     titolo = html.escape(a["titolo"][:60])
-    link = f"\n{URL_PUBBLICO}/annuncio/{ril['annuncio_id']}"
+    link = f"\n{link_telegram('annuncio', ril['annuncio_id'])}"
     if in_testa and testa_prima and testa_prima["tg_id"] != user["id"]:
         # il «budget esaurito»: un proxy spodestato e' stato esposto
         # al suo massimo per costruzione — e' l'unico squillo che il
@@ -33147,7 +33146,7 @@ async def _avvisa_aste_in_scadenza():
                 f"⏳ <b>L'asta «{a['titolo'][:60]}» si chiude tra circa "
                 f"un'ora.</b> Controlla la tua posizione: un rilancio "
                 f"all'ultimo prolunga la gara di {ASTA_PROROGA_MINUTI} "
-                f"minuti.\n{URL_PUBBLICO}/annuncio/{a['id']}")
+                f"minuti.\n{link_telegram('annuncio', a['id'])}")
         except Exception as e:
             print(f"⚠️ Avviso scadenza asta saltato: {e}")
 
@@ -33528,7 +33527,7 @@ async def fai_offerta(annuncio_id: int, req: Request,
         + f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
         f"una controproposta. Senza risposta entro "
         f"{ORE_RISPOSTA_OFFERTA} ore l'offerta scade da sola."
-        f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
+        f"\n{link_telegram('offerta', offerta_id)}")
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 
 
@@ -33799,7 +33798,7 @@ async def fai_offerta_carrello(req: Request,
         f"accettare, rifiutare o fare una controproposta sul totale. "
         f"Senza risposta entro {ORE_RISPOSTA_OFFERTA} ore l'offerta "
         f"scade da sola."
-        f"\n{URL_PUBBLICO}/offerta/{offerta_id}")
+        f"\n{link_telegram('offerta', offerta_id)}")
     return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
 
 
@@ -33931,8 +33930,8 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         link = (f"\n{URL_PUBBLICO}/negozio/{_neg['negozio']}"
                 if _neg and _neg["negozio"] else "")
     else:
-        link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
-    link_off = f"\n{URL_PUBBLICO}/offerta/{offerta_id}"
+        link = f"\n{link_telegram('annuncio', off['annuncio_id'])}"
+    link_off = f"\n{link_telegram('offerta', offerta_id)}"
     # I pezzi dell'accordo: 0 (le offerte di ieri) e 1 dicono la sola
     # cifra, com'e' sempre stato — vedi _cifra_accordo. Niente «or 0»:
     # la colonna e' un INTEGER DEFAULT 0 e l'ALTER ha riempito le righe
@@ -34356,7 +34355,7 @@ async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
     resta = ("i tuoi annunci restano in vetrina" if carrello
              else "l'annuncio resta in vetrina")
     link_ann = ("" if carrello
-                else f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}")
+                else f"\n{link_telegram('annuncio', off['annuncio_id'])}")
     if off["stato"] == "accettata":
         # Qui aveva detto si' e aspettava dei sats: «nessun sat si era
         # mosso» e' la riga che conta, poteva credere di averli in
@@ -34437,7 +34436,7 @@ async def _avvisa_savers_lampo(a: dict, percento: int, scadenza: int,
                 f"«{html.escape(a['titolo'][:60])}»: <s>{vecchio}</s> → "
                 f"<b>{nuovo}</b> (−{percento}%)\n"
                 f"Hai tempo fino {_quando_scade(scadenza)}.\n"
-                f"{URL_PUBBLICO}/annuncio/{a['id']}"))
+                f"{link_telegram('annuncio', a['id'])}"))
             await asyncio.sleep(0.2)
     except Exception as e:
         print(f"⚠️ Avvisi lampo saltati: {e}")
@@ -60651,6 +60650,11 @@ URL_PUBBLICO = "https://barattolo.store"
 LINK_BOT = "https://t.me/ilbarattolobot"
 
 
+def link_telegram(tipo: str, id_: str) -> str:
+    """Deep link Telegram per aprire annuncio o offerta nella miniapp."""
+    return f"{LINK_BOT}?startapp={tipo}_{id_}"
+
+
 def nsec_to_bytes(nsec: str) -> bytes:
     """Converte la nsec (bech32) nei 32 byte della chiave privata.
     Gemella di npub_to_hex qui sopra, ma per la chiave segreta."""
@@ -63766,7 +63770,7 @@ def _nota_promo(a: dict, cambio: float) -> str:
     foto = _foto_url_nostr(a.get("foto", ""))
     if foto:
         testo += f"\n\n{foto[0]}"
-    testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo += f"\n{link_telegram('annuncio', a['id'])}"
     testo += f"\n\n{_hashtag_promo(a)}"
     return testo
 
@@ -63937,8 +63941,7 @@ def _vetrina_venditore(a: dict, altri: list) -> str:
         t = (x.get("titolo") or "").strip()
         if len(t) > 46:
             t = t[:45].rstrip() + "…"
-        voci.append(f"\n• <a href=\"{URL_PUBBLICO}/annuncio/{x['id']}\">"
-                    f"{html.escape(t)}</a>")
+        voci.append(f"\n• {html.escape(t)} — {link_telegram('annuncio', x['id'])}")
     return "\n\n🛍 Anche in vendita da lui:" + "".join(voci)
 
 
@@ -63959,7 +63962,7 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False,
     del venditore (venditore, venditore_username, venditore_negozio),
     cioe' letta col JOIN su `utenti` — senza, la firma esce anonima e
     il post NUOVO e quello RIEDITATO col ✅ direbbero cose diverse."""
-    link = f"{URL_PUBBLICO}/annuncio/{a['id']}"
+    link = f"{link_telegram('annuncio', a['id'])}"
     testo = f"🫙 <b>{html.escape(a['titolo'])}</b>"
     testo += f"\n💰 {_prezzo_promo(a, cambio)}"
     if a.get("zona"):
@@ -64403,8 +64406,7 @@ async def promo_lampo(annuncio_id: int, percento: int, scadenza: int):
                  f"<b>{html.escape(a['titolo'])}</b>"
                  f"\n💰 {_riga_prezzo_lampo(a, percento, cambio)}"
                  f"\n⏳ solo fino {_quando_scade(scadenza)}"
-                 f"\n\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
-                 "🫙 Apri su Barattolo</a>"
+                 f"\n\n{link_telegram('annuncio', a['id'])}"
                  f"\n\n{_hashtag_promo(a)}")
         r = await bot_api("sendMessage", {
             "chat_id": canale_id(), "text": testo,
@@ -64436,8 +64438,8 @@ def _riga_negozio(a: dict, cambio: float) -> str:
     didascalia e' HTML e un «<» spegne il messaggio in silenzio, ed e'
     la lezione dell'avviso di spedizione."""
     return (f"{EMOJI_CATEGORIA.get(a.get('categoria'), '📦')} "
-            f"<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
-            f"{html.escape(a['titolo'])}</a> — {_prezzo_promo(a, cambio)}")
+            f"{html.escape(a['titolo'])} ({link_telegram('annuncio', a['id'])})"
+            f" — {_prezzo_promo(a, cambio)}")
 
 
 async def _posta_negozio(gruppo: list, giorni: int):
@@ -65684,7 +65686,7 @@ async def _notifica_match(tg_id: int, annunci: list, cambio: float):
                  f"{_prezzo_promo(a, cambio)}")
         if a.get("zona"):
             testo += f"\n📍 {html.escape(a['zona'])}"
-        testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+        testo += f"\n{link_telegram('annuncio', a['id'])}"
     else:
         testo = (f"📬 {len(annunci)} nuovi annunci corrispondono ai "
                  f"tuoi avvisi di ricerca → {URL_PUBBLICO}")
@@ -66300,7 +66302,7 @@ async def _drena_colpo():
                         f"l'ha appena messo nel suo barattolo.\n"
                         f"💰 Se vuoi dargli una spinta, lancia "
                         f"un'offerta lampo dalla scheda dell'annuncio:\n"
-                        f"{URL_PUBBLICO}/annuncio/{a['id']}"))
+                        f"{link_telegram('annuncio', a['id'])}"))
             else:
                 # La valvola: un solo messaggio, non nomina nessuno.
                 await notifica(venditore, (
