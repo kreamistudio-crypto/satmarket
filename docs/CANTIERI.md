@@ -59837,3 +59837,18 @@ della garanzia…): prese tutte.
   sotto il tetto: si potrebbe aggiungere alla riga dello stato.
 - La ronda del nodo (`ronda-liquidita.sh`) il tetto non lo conosce: lo
   guarda solo il server.
+
+**IL PUSH** (15 ott 2026, sera). Suite intera sull'albero di prima
+(sopra `3792e3a`): 24.374 passate, 1 fallita, la sentinella di
+`prove_anteprime` sulle cifre in sats («{serve} sats»), curata nel
+commit dopo. Poi, su richiesta di Andrea, si è aspettato che
+«garanzia-non-si-chiude» arrivasse su main (`c9d04a8`, `08e0235`) e
+ci si è ribasati sopra `08e0235`: due conflitti, tutti e due di
+aggiunte vicine (il banco di `prove_apri_wallet_p2p`, dove la riga
+unica di quel cantiere ha preso il posto della riga Phoenix, e la
+voce qui in fondo), risolti tenendo le due parti. Sull'albero
+ribasato: diciotto sezioni (le toccate e quelle che leggono CANTIERI
+e il config d'esempio) 1.269 passate, 0 fallite; in gabbia
+`collaudo_guardia_liquidita`, `collaudo_canale_admin` e
+`collaudo_foglio_pagato` verdi. Il resto lo fa la CI. Il push non
+porta commit altrui.
