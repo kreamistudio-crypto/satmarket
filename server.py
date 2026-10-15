@@ -7718,6 +7718,8 @@ def init_db():
                     # e non un secondo uso del primo, o il ✅ Venduto
                     # finirebbe in un canale e il post nell'altro
                     "post_vetrina_id INTEGER DEFAULT 0",
+                    # BitcoinPodcastTelegram (ott 2026)
+                    "post_bitcoin_podcast_id INTEGER DEFAULT 0",
                     "post_nostr_id TEXT DEFAULT ''",
                     # lat/lon: coordinate del comune riconosciuto nella
                     # zona (0,0 = non riconosciuta). Scritte una volta
