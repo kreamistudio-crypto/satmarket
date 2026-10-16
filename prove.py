@@ -33963,8 +33963,7 @@ def prove_canale_bot():
     # Telegram deep link»): qui le voci non sono piu' ancore — il link
     # sta scritto dopo il titolo, ed e' quello che apre la Mini App.
     prova("gli altri articoli sono linkati", True,
-          "• Amplificatore — https://t.me/ilbarattolobot"
-          "?startapp=annuncio_7" in v and "startapp=annuncio_8" in v)
+          "startapp=annuncio_7" in v and "startapp=annuncio_8" in v)
     prova("e il negozio resta in coda come sempre", True,
           "vedi il suo negozio" in v)
     prova("senza altri articoli non compare la sezione", False,
@@ -33972,21 +33971,16 @@ def prove_canale_bot():
     lungo = cap["_caption_canale"](a, 0, altri=[
         {"id": 9, "titolo": "T" * 80}])
     prova("il titolo lungo si tronca", True,
-          "… — https://t.me/ilbarattolobot?startapp=annuncio_9" in lungo)
+          "…</a>" in lungo and "startapp=annuncio_9" in lungo)
     prova("e passa da escape", True, "&lt;i&gt;" in cap["_caption_canale"](
         a, 0, altri=[{"id": 9, "titolo": "<i>x</i>"}]))
-    # LA GUARDIA, RISCRITTA (15 ott 2026): la sezione non e' piu' fatta
-    # di ancore, quindi «nessun URL nudo» qui sarebbe per forza falso e
-    # cancellarla lascerebbe la vetrina senza sorveglianza. Quel che
-    # RESTA vero — ed e' la paura del cantiere di agosto — e' che
-    # l'indirizzo del SITO non si vede mai in chiaro: i soli URL nudi
-    # ammessi sono i deep link del bot. Un `barattolo.store` sfuggito
-    # dentro una voce della vetrina fa ancora rossa questa riga.
-    nudi_v = re.sub(r'href="[^"]*"', "", v)
+    # LA GUARDIA: ora i link della sezione "Anche in vendita" sono dentro
+    # tag `<a>` per nasconderli nel testo (ott 2026). L'importante resta
+    # che l'indirizzo del SITO non si veda mai in chiaro. Un `barattolo.store`
+    # sfuggito dentro una voce della vetrina fa ancora rossa questa riga.
     prova("con la vetrina accesa gli URL nudi sono SOLO deep link del "
-          "bot: il sito in chiaro non si vede", (False, 2),
-          ("barattolo.store" in nudi_v,
-           nudi_v.count("https://t.me/ilbarattolobot?startapp=annuncio_")))
+          "bot: il sito in chiaro non si vede", True,
+          "barattolo.store" not in v and "startapp=annuncio_7" in v)
 
     # Il venditore SENZA username (i nativi Nostr): niente «@», o
     # nascerebbe una menzione che Telegram non sa risolvere.
