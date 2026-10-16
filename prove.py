@@ -14110,6 +14110,10 @@ def prove_initdata():
         # dal 26 set 2026 firma e freschezza stanno in _utente_da_initdata,
         # che verifica_utente chiama prima di scrivere: si montano insieme
         exec(pezzo("_utente_da_initdata"), amb)
+        # PIU' ACCOUNT OVUNQUE (16 ott 2026): l'ultimo passo e' VERO, a
+        # leva spenta — qui si prova la firma, e lui deve dire «ieri»
+        amb["PIU_ACCOUNT_OVUNQUE"] = False
+        exec(pezzo("conto_scelto"), amb)
         exec(pezzo("verifica_utente"), amb)
         return amb["verifica_utente"]
 
@@ -37912,7 +37916,7 @@ def prove_onion():
         if "location.origin" in _pulita.split("//")[0]:
             _vive.append(_r.strip())
     prova("...il sesto e' il portinaio, che confronta e non condivide",
-          True, "origine: location.origin, avviso: avvisoRiprovo});" in mini)
+          True, "origine: location.origin, avviso: avvisoRiprovo}));" in mini)
     prova("...e nel codice non ne restano altri in giro", 6, len(_vive))
 
     # --- 4) il login Telegram non si offre su onion ----------------
@@ -43484,8 +43488,12 @@ def prove_fogli_di_casa():
     # che il backup nel cloud RESTA — sennò sembrerebbe la cancellazione
     # di tutto, mentre e' proprio la prova da fare. Nato con un
     # `confirm()` di sistema, che questa sentinella ha preso.
-    prova("i gesti che passano dalla domanda unica sono ottantasei",
-          86, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTOTTO (16 ott 2026, piu' account): «Esci da tutti»
+    # (`esciDaTutti`) chiede prima, e l'avviso del bot arrivato mentre e'
+    # scelto un altro account chiede di passare al Telegram
+    # (`avvisoPerAltroConto`).
+    prova("i gesti che passano dalla domanda unica sono ottantotto",
+          88, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -56693,7 +56701,9 @@ def prove_server_che_si_riavvia(mini, node):
     print("\n🔁 Il server che si riavvia")
     # --- la forma: montato PRIMA di qualunque fetch, e con la pastiglia ---
     i_app = mini.index("const API_BASE = location.protocol")
-    i_monta = mini.index("window.fetch = fetchCheRiprova(")
+    # (16 ott 2026, piu' account) il montaggio e' UNO e porta sopra il
+    # filo dell'account scelto: `fetchColConto(fetchCheRiprova(...))`
+    i_monta = mini.index("window.fetch = fetchColConto(fetchCheRiprova(")
     prova("il portinaio si monta nello script dell'app...", True,
           i_app < i_monta)
     prova("...PRIMA di ogni fetch del file", 0, mini[:i_monta].count("fetch("))
@@ -60246,7 +60256,9 @@ def prove_libro_subito():
              "Request": object, "Response": _Risp,
              "Cookie": lambda d="": d, "db": lambda: _Con(), "time": __import__("time"),
              "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-             "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400, "_tag_evento_p2p": amb["_tag_evento_p2p"]}
+             "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400, "_tag_evento_p2p": amb["_tag_evento_p2p"],
+             # piu' account (16 ott 2026): spenta, il libro di ieri
+             "PIU_ACCOUNT_OVUNQUE": False}
     chieste = []
     mondo["_facce_ordini_p2p"] = lambda con, ids, adesso: (
         chieste.append(list(ids)) or {i: {"nome": "Ada"} for i in ids})
@@ -61691,7 +61703,9 @@ def prove_card_p2p_vetrina():
     # (10 s dal 27 set 2026: la fila rilegge ogni 15, la cache e' piu' corta)
     prova("...con una cache privata di 10 secondi, e Vary sulle due porte", True,
           '"Cache-Control": "private, max-age=10"' in rot
-          and '"Vary": "X-Tg-Init-Data, Cookie"' in rot)
+          # (16 ott 2026, piu' account) e anche sull'account scelto: la
+          # stessa firma, con un altro account accanto, e' un altro libro
+          and '"Vary": "X-Tg-Init-Data, X-Barattolo-Conto, Cookie"' in rot)
     prova("...e i volti li fotografa l'orologio, con il libro", True,
           'F["facce"] = _facce_foto_p2p(F["eventi"], adesso)' in pezzo("_fotografa_libro_p2p"))
     DB = []
@@ -61714,6 +61728,9 @@ def prove_card_p2p_vetrina():
            "JSONResponse": lambda c, headers=None: {"corpo": c, "testa": headers},
            "db": db_vietato, "_p2p_leve": lambda: {"attivo": ATTIVO[0]},
            "_utente_da_initdata": initdata_finto,
+           # piu' account (16 ott 2026): a leva spenta l'account scelto
+           # non conta, e chi guarda e' quello della firma
+           "conto_scelto": lambda u: u, "PIU_ACCOUNT_OVUNQUE": False,
            "utente_da_sessione": lambda s: SESS.append(s) or ({"id": 5} if s == "COOKIE-BUONO" else None),
            "_P2P_FOTO": {"eventi": [{"kind": 38383, "tags": [["d", "ordine-uno-1"]]}],
                          "quando": 1000, "facce": {"ordine-uno-1": {"nome": "Luca"}},
@@ -93250,7 +93267,10 @@ def prove_ricarica_resta():
         _dove.append((mini[f + 16:mini.index("(", f)], riga.strip()))
     prova("i cinque location.reload() sono i nostri, e ripartono tutti da capo",
           [("esciWeb", "navDaCapo(); location.reload();"),
-           ("cambiaAccount", "navDaCapo(); location.reload();"),
+           # (16 ott 2026, piu' account) i ricarichi del cambio d'account
+           # passano da una porta sola, e l'avviso del bot tiene l'indirizzo
+           ("ricaricaPerConto", "if (restaQui) { location.reload(); return; }"),
+           ("ricaricaPerConto", "navDaCapo(); location.reload();"),
            ("provaLoginWeb", "navDaCapo(); location.reload();"),
            ("entraConNostr", "navDaCapo(); location.reload();"),
            ("accettaCollega", "navDaCapo(); location.reload();")], _dove)
@@ -109404,6 +109424,7 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
             self.cookie = {}
             self.scudi = {}      # gli attributi (secure, httponly...) per nome
             self.tolti = []
+            self.headers = {}    # X-Barattolo-Aperto (piu' account, 16 ott 2026)
 
         def set_cookie(self, nome, valore, **kw):
             self.cookie[nome] = valore
@@ -109428,10 +109449,24 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
                               creato INTEGER, scade INTEGER);
         CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,
                             username TEXT, negozio TEXT, avatar TEXT,
-                            avatar_scelta TEXT DEFAULT '');
+                            avatar_scelta TEXT DEFAULT '',
+                            npub_accesso TEXT DEFAULT '');
     """)
+
+    class FintoErrore(Exception):
+        def __init__(self, codice, detail=""):
+            super().__init__(detail)
+            self.status_code, self.detail = codice, detail
+
     amb = {"hashlib": _h, "time": _t, "db": lambda: con,
            "MODALITA_COLLAUDO": collaudo,
+           # PIU' ACCOUNT OVUNQUE (16 ott 2026): spenta di serie, come
+           # nel server; chi la vuole accesa la riscrive nell'ambiente
+           "PIU_ACCOUNT_OVUNQUE": False, "HTTPException": FintoErrore,
+           "MSG_CONTO_CHIUSO": "L'account che avevi scelto non è più aperto qui",
+           # l'initData di collaudo «collaudo:<id>:<nome>», giudicato e basta
+           "_utente_da_initdata": lambda s: {"id": int(s.split(":")[1]),
+                                             "first_name": s.split(":")[2]},
            "GIORNI_SESSIONE_WEB": 30, "MAX_ACCOUNT_BROWSER": 3,
            "COOKIE_PORTACHIAVI": "barattolo_portachiavi",
            "SEP_PORTACHIAVI": ".", "Response": Resp, "secrets": __import__("secrets"),
@@ -109440,12 +109475,16 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
            "contextvars": __import__("contextvars"), "hmac": __import__("hmac"),
            "ONION_HOST": onion_host, "ONION_SEGNALE": onion_segnale}
     exec('_HOST_RICHIESTA = contextvars.ContextVar("host_richiesta", default="")\n'
-         '_SEGNALE_RICHIESTA = contextvars.ContextVar("segnale_richiesta", default="")',
+         '_SEGNALE_RICHIESTA = contextvars.ContextVar("segnale_richiesta", default="")\n'
+         '_CONTO_RICHIESTA = contextvars.ContextVar("conto_richiesta", default=None)',
          amb)
     for n in ("su_onion", "dal_tunnel", "cookie_sicuro",
               "crea_sessione", "imposta_cookie_sessione",
               "imposta_cookie_portachiavi", "_portachiavi_token",
-              "portachiavi_conti", "portachiavi_adottato", "apri_sessione"):
+              "portachiavi_conti", "portachiavi_adottato",
+              "cookie_mini", "imposta_cookie_mini", "telegram_della_richiesta",
+              "conti_mini", "utente_da_sessione", "conto_scelto",
+              "conti_del_dispositivo", "apri_sessione"):
         exec(pezzo(n), amb)
     return amb, con, Resp
 
@@ -109624,10 +109663,15 @@ def prove_portachiavi():
     sel = _fetta(mini, "async function caricaAccount", 2600)
     prova("nel selettore non arriva mai un token di sessione", False,
           "token" in sel)
-    prova("il selettore non esiste dentro Telegram", True,
-          "function accountVivi(){ return WEB && !DEMO && !VETRINA; }" in mini)
+    # dal 16 ott 2026 (PIU' ACCOUNT OVUNQUE) il selettore vive anche
+    # dentro Telegram, ma SOLO a leva accesa: `miniAccount` la chiede
+    prova("il selettore dentro Telegram solo a leva accesa", (True, True),
+          ("function accountVivi(){ return !DEMO && !VETRINA && (WEB || miniAccount()); }" in mini,
+           "function miniAccount(){ return !!tg?.initData && piuAccount && !DEMO && !VETRINA; }" in mini))
     prova("...e lo switch ricarica invece di ridisegnare a mano", True,
-          "location.reload();" in _fetta(mini, "async function cambiaAccount"))
+          # (16 ott 2026) per la porta unica dei ricarichi d'account
+          "ricaricaPerConto(restaQui);" in _fn_js(mini, "async function cambiaAccount(")
+          and "location.reload();" in _fn_js(mini, "async function ricaricaPerConto("))
 
     # --- IL GESTO DEL TAPPO (ago 2026): primo tocco il Profilo,
     #     secondo il menu degli account. ---
@@ -109665,6 +109709,229 @@ def prove_portachiavi():
           "prima di aprire il login", (True, False),
           ("closeSheet(); apriNostrSheet();" in porte,
            "navIndietro(); apriNostrSheet();" in porte))
+
+
+def prove_piu_account_ovunque():
+    """PIU' ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea): il
+    selettore anche DENTRO la Mini App (il Telegram + account Nostr, un
+    portachiavi per ogni Telegram del telefono), l'id come testo, la
+    pastiglia nel Profilo, il volto prima dei gesti coi soldi, «Esci da
+    tutti», il no all'ordine P2P di un proprio account, le annotazioni
+    per il moderatore. Leva PIU_ACCOUNT_OVUNQUE, spenta di serie.
+    Il giro con le richieste vere sta in `collaudo_piu_account.py`."""
+    print("\n[piu' account ovunque]")
+    amb, con, Resp = _amb_portachiavi()
+    for tg, nome in ((710, "Andrea"), (711, "Negozio"), (712, "Terzo"),
+                     (713, "Quarto"), (720, "Sorella")):
+        con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                    "avatar_scelta) VALUES(?,?,?,?,?,'')",
+                    (tg, nome, nome.lower(), f"n{tg}", ""))
+    con.commit()
+    CV = amb["_CONTO_RICHIESTA"]
+
+    def bussa(init="", conto="", cookie=None):
+        CV.set({"init": init, "conto": conto, "cookie": cookie or {}})
+
+    # --- a leva spenta: la porta di ieri, anche con la firma accanto ---
+    bussa("collaudo:710:Andrea")
+    r0 = Resp()
+    amb["apri_sessione"](r0, 711, "")
+    prova("a leva spenta il login dentro Telegram e' quello di ieri",
+          (True, False, {}), ("barattolo_sessione" in r0.cookie,
+                              "barattolo_mini_710" in r0.cookie, r0.headers))
+    bussa("collaudo:710:Andrea", "711")
+    prova("...e l'account scelto non conta", 710,
+          amb["conto_scelto"]({"id": 710})["id"])
+
+    # --- a leva accesa: il portachiavi di QUEL Telegram ---
+    amb["PIU_ACCOUNT_OVUNQUE"] = True
+    bussa("collaudo:710:Andrea")
+    r1 = Resp()
+    amb["apri_sessione"](r1, 711, "")
+    prova("dentro la Mini App la sessione va nel portachiavi del Telegram",
+          (True, False), ("barattolo_mini_710" in r1.cookie,
+                          "barattolo_sessione" in r1.cookie))
+    prova("...e l'intestazione dice chi e' entrato", "711",
+          r1.headers.get("X-Barattolo-Aperto"))
+    sc = r1.scudi["barattolo_mini_710"]
+    prova("il portachiavi della Mini App e' HttpOnly", True, sc.get("httponly"))
+    mini_cookie = {"barattolo_mini_710": r1.cookie["barattolo_mini_710"]}
+    bussa("collaudo:710:Andrea", "", mini_cookie)
+    r2 = Resp()
+    amb["apri_sessione"](r2, 710, "")
+    prova("entrare col PROPRIO Telegram non apre niente", ({}, "710"),
+          (r2.cookie, r2.headers.get("X-Barattolo-Aperto")))
+    # il tetto: 3 posti, uno e' del Telegram
+    for nuovo in (712, 713):
+        bussa("collaudo:710:Andrea", "", mini_cookie)
+        rr = Resp()
+        amb["apri_sessione"](rr, nuovo, "")
+        mini_cookie = {"barattolo_mini_710": rr.cookie["barattolo_mini_710"]}
+    bussa("collaudo:710:Andrea", "", mini_cookie)
+    prova("al tetto il Telegram tiene il suo posto: restano i DUE piu' nuovi",
+          [712, 713], [x["tg_id"] for x in amb["conti_mini"](710)])
+
+    # --- l'account scelto ---
+    bussa("collaudo:710:Andrea", "713", mini_cookie)
+    prova("l'account scelto e nel portachiavi: la richiesta e' sua", 713,
+          amb["conto_scelto"]({"id": 710})["id"])
+    bussa("collaudo:710:Andrea", "711", mini_cookie)
+    try:
+        amb["conto_scelto"]({"id": 710})
+        esito = "ricaduto"
+    except Exception as e:
+        esito = getattr(e, "status_code", "?")
+    prova("uno uscito dal mazzo: 401, MAI la ricaduta sul Telegram", 401, esito)
+    bussa("collaudo:720:Sorella", "713", mini_cookie)
+    try:
+        amb["conto_scelto"]({"id": 720})
+        esito = "usato"
+    except Exception as e:
+        esito = getattr(e, "status_code", "?")
+    prova("un ALTRO Telegram sullo stesso telefono non lo usa", 401, esito)
+    bussa("collaudo:720:Sorella", "", mini_cookie)
+    prova("...e non lo vede nemmeno", [], amb["conti_mini"](720))
+    bussa("collaudo:710:Andrea", "", mini_cookie)
+    prova("il dispositivo: il Telegram e i suoi aggiunti", {710, 712, 713},
+          amb["conti_del_dispositivo"]())
+    CV.set(None)
+    prova("fuori da una richiesta il dispositivo e' vuoto", set(),
+          amb["conti_del_dispositivo"]())
+    amb["PIU_ACCOUNT_OVUNQUE"] = False
+
+    # --- le righe che una svista toglierebbe, nel server ---
+    vu = codice(pezzo("verifica_utente"))
+    prova("verifica_utente finisce DUE volte in conto_scelto", 2,
+          vu.count("return conto_scelto(user)"))
+    prova("...e la seconda FUORI dal try (il suo 401 non si riscrive)", True,
+          vu.rindex("except Exception:") < vu.rindex("return conto_scelto(user)"))
+    cs = codice(pezzo("conto_scelto"))
+    prova("conto_scelto chiude col 401, mai con la ricaduta", True,
+          cs.rstrip().endswith("raise HTTPException(401, MSG_CONTO_CHIUSO)"))
+    prova("...e chiede la leva per prima cosa", True,
+          cs.index("PIU_ACCOUNT_OVUNQUE") < cs.index("_CONTO_RICHIESTA"))
+    prova("la firma resta obbligatoria: telegram_della_richiesta la giudica",
+          True, "_utente_da_initdata(" in codice(pezzo("telegram_della_richiesta")))
+    cm = codice(pezzo("imposta_cookie_mini"))
+    prova("il portachiavi della Mini App: HttpOnly, None+Partitioned sul sicuro",
+          (True, True, True), ("httponly=True" in cm,
+                               'samesite="none" if sicuro else "lax"' in cm,
+                               "partitioned=sicuro" in cm))
+    prova("la leva nasce SPENTA nel server", True,
+          "    PIU_ACCOUNT_OVUNQUE = False" in _SORGENTE)
+    prova("...e nel config d'esempio", True, "\nPIU_ACCOUNT_OVUNQUE = False\n"
+          in open("config_esempio.py", encoding="utf-8").read())
+    prova("«Esci da tutti» a leva spenta non esiste", True,
+          'raise HTTPException(404, "Not Found")'
+          in codice(pezzo("logout_tutti")).split("PIU_ACCOUNT_OVUNQUE", 2)[1][:80])
+    prova("le annotazioni stanno nei cinque gesti", 5,
+          codice(_SORGENTE).count("annota_insieme(") - 1)
+    prova("il libro varia anche con l'account scelto", True,
+          '"Vary": "X-Tg-Init-Data, X-Barattolo-Conto, Cookie"' in _SORGENTE)
+    prova("le righe del selettore portano l'id come TESTO", True,
+          '"id": str(r["tg_id"])' in codice(pezzo("portachiavi_conti")))
+    msg = re.search(r'MSG_CONTO_CHIUSO = \("([^"]+)"', _SORGENTE).group(1)
+
+    # --- il client ---
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la frase che il client riconosce e' quella del server", True,
+          msg.startswith("L'account che avevi scelto")
+          and "d.detail.startsWith(\"L'account che avevi scelto\")" in mini)
+    prova("il cloud di Telegram tace con un account scelto", True,
+          "function cloudTelegram(){\n  if (typeof CONTO_MINI !== 'undefined' && CONTO_MINI) return null;" in mini)
+    prova("la scelta e' per Telegram (la sua chiave porta l'id)", True,
+          "return t ? CONTO_MINI_CHIAVE + '@' + t : '';" in mini)
+    prova("il filo dell'account scelto e' montato su fetch", True,
+          "window.fetch = fetchColConto(fetchCheRiprova(" in mini)
+    prova("i gesti coi soldi chiedono il volto (soldi: true)", 6,
+          mini.count("soldi: true,"))
+    prova("...e i due fogli di pagamento hanno il loro posto", 2,
+          mini.count('<div class="conto-in-vista" data-conto-in-vista'))
+    prova("il no all'ordine di un mio altro account nelle due porte della presa",
+          (True, True),
+          ("ordineDiUnAltroMioContoP2P(id)" in _fn_js(mini, "async function eseguiPresaP2P("),
+           "ordineDiUnAltroMioContoP2P(id)" in _fn_js(mini, "function confermaDettaglioP2P(")))
+    rp = _fn_js(mini, "function renderProfilo(")
+    prova("nel Profilo la foto apre «I tuoi account» e c'e' la pastiglia",
+          (True, True), ("fotoMia.onclick = apriAccountSheet;" in rp,
+                         "renderPastigliaAccount();" in rp))
+    prova("la pastiglia c'e' anche con UN account solo", False,
+          "accountAperti.length < 2" in _fn_js(mini, "function renderPastigliaAccount("))
+    ca = _fn_js(mini, "async function cambiaAccount(")
+    prova("lo switch chiede col TESTO dell'id", True,
+          "id = String(id);" in ca and "JSON.stringify({tg_id: id})" in ca)
+    ed = _fn_js(mini, "function esciDaTutti(")
+    prova("«Esci da tutti» chiude il foglio PRIMA di chiedere (o la domanda resta sotto)",
+          True, 0 <= ed.find("closeSheet();") < ed.find("chiediConferma({"))
+    prova("l'accenno non parla sopra un foglio aperto", 2,
+          _fn_js(mini, "function accennaAccount(").count("document.querySelector('.sheet.open')"))
+    prova("negli onclick del foglio solo cifre e segno", True,
+          "if (!/^-?\\d{1,20}$/.test(id)) return '';"
+          in _fn_js(mini, "function renderAccountSheet("))
+
+    # --- il filo, ESEGUITO: chiave per Telegram, intestazione, 401 ---
+    def _f(firma):
+        return _fn_js(mini, firma) + "\n"
+    banco = (
+        "const store = {};\n"
+        "const localStorage = {getItem: k => (k in store ? store[k] : null),\n"
+        "  setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }};\n"
+        "const location = {href: 'https://barattolo.store/', origin: 'https://barattolo.store',\n"
+        "  reload(){ globalThis.ricaricato = true; }};\n"
+        "let tg = {initData: 'collaudo:710:Andrea', initDataUnsafe: {}};\n"
+        "let toast = () => {}; let setTimeout = f => f();\n"
+        + _f("function idTelegramMini(")
+        + re.search(r"const CONTO_MINI_CHIAVE = [^\n]*;", mini).group(0) + "\n"
+        + _f("function chiaveContoMini(") + _f("function leggiContoMini(")
+        + _f("function scriviContoMini(")
+        + "let CONTO_MINI = leggiContoMini();\n"
+        + _f("function eUnaRichiesta(") + _f("function diCasaApi(")
+        + _f("function fetchColConto(")
+        + _f("async function ricaricaPerConto(") + "function navDaCapo(){}\n"
+        + "const G = '-4611686018427387905';\n"
+        "const visti = [];\n"
+        "let risposta = {status: 200, clone(){ return {json: async () => ({})}; }};\n"
+        "const vero = async (input, init) => { visti.push([String(input),\n"
+        "  new Headers((init && init.headers) || undefined)]); return risposta; };\n"
+        "const f = fetchColConto(vero);\n"
+        "(async () => {\n"
+        "  const esito = {};\n"
+        "  await f('/api/me', {headers: {'X-Tg-Init-Data': 'x'}});\n"
+        "  esito.senza = visti[0][1].get('X-Barattolo-Conto');\n"
+        "  scriviContoMini(G); CONTO_MINI = leggiContoMini();\n"
+        "  esito.chiave = Object.keys(store);\n"
+        "  esito.esatto = CONTO_MINI;\n"
+        "  await f('/api/me', {headers: {'X-Tg-Init-Data': 'x'}});\n"
+        "  esito.con = [visti[1][1].get('X-Barattolo-Conto'), visti[1][1].get('X-Tg-Init-Data')];\n"
+        "  await f('https://altro.example/api/x');\n"
+        "  esito.fuori = visti[2][1].get('X-Barattolo-Conto');\n"
+        "  tg = {initData: 'collaudo:720:Sorella', initDataUnsafe: {}};\n"
+        "  esito.sorella = leggiContoMini();\n"
+        "  tg = {initData: 'collaudo:710:Andrea', initDataUnsafe: {}};\n"
+        "  risposta = {status: 401, clone(){ return {json: async () =>\n"
+        "    ({detail: \"L'account che avevi scelto non è più aperto qui\"})}; }};\n"
+        "  await f('/api/ordini');\n"
+        "  esito.dopo401 = [CONTO_MINI, leggiContoMini(), !!globalThis.ricaricato];\n"
+        "  scriviContoMini('710');\n"
+        "  esito.proprio = Object.keys(store).length;\n"
+        "  console.log(JSON.stringify(esito));\n"
+        "})();\n")
+    r = _node_banco(banco)
+    if r is None:
+        print("  · node non c'e': il banco del filo si SALTA")
+        return
+    prova("senza scelta nessuna intestazione in piu'", None, r.get("senza"))
+    prova("la scelta si scrive sotto la chiave del Telegram",
+          ["barattolo_conto_mini@710"], r.get("chiave"))
+    prova("...ESATTA come testo, anche oltre 2^53", "-4611686018427387905",
+          r.get("esatto"))
+    prova("con la scelta l'intestazione parte, accanto alla firma",
+          ["-4611686018427387905", "x"], r.get("con"))
+    prova("...mai verso un sito che non e' il nostro", None, r.get("fuori"))
+    prova("un altro Telegram trova la sua chiave vuota", "", r.get("sorella"))
+    prova("il 401 dell'account chiuso fa tornare al Telegram e ricarica",
+          ["", "", True], r.get("dopo401"))
+    prova("scegliere il proprio Telegram svuota la scelta", 0, r.get("proprio"))
 
 
 def _fetta(testo, ancora, quanti=1400):
@@ -132938,7 +133205,9 @@ def prove_volto_unico():
                        "function feedbackNegozioHTML(feedback, nFeedback){"),
         "riquadro venditore": ("voltoHTML({nome: l.seller", None),
         "profilo": ("voltoHTML({nome: myNome || myUsername", "function renderProfilo(){"),
-        "account": ("voltoHTML({nome: c.nome || c.username", "function renderAccountSheet(){"),
+        # (16 ott 2026) le righe del foglio, la pastiglia e «Stai usando»
+        # lo chiedono tutti a voltoConto, che e' il posto della chiamata
+        "account": ("voltoHTML({nome: c.nome || c.username", "function voltoConto(c, cls){"),
         "card del libro": ("voltoHTML(f, 'p2p-faccia'", "function anelloScadenzaP2P(o, adesso){"),
         "chi ha pubblicato": ("voltoHTML(f, 'p2p-rep-volto'", "function repRiquadroP2P(f, id){"),
         "fila in vetrina": ("voltoHTML(f, 'p2p-vt-volto'", "function cardVetrinaP2P(o){"),
@@ -133100,7 +133369,7 @@ out.posti = {
                P('recensioni', {chi: '', f: {da_avatar: ''}, cod: ''})],
   'riquadro venditore': [P('riquadro venditore', {l: {seller: 'Dario', avatar: '', negozio: 'dd11'}}),
                          P('riquadro venditore', {l: {seller: '—', avatar: '', negozio: ''}})],
-  account: [P('account', {c: {nome: '', username: 'franco', avatar: '', negozio: 'ff11'}})],
+  account: [P('account', {c: {nome: '', username: 'franco', avatar: '', negozio: 'ff11'}, cls: undefined})],
   'card dell\'altra parte': [
     P('card dell\'altra parte', {op: {}, c: {nome: 'Ivo', negozio: 'ii11'}}),
     P('card dell\'altra parte', {op: {}, c: {nome: '', negozio: 'ii22'}})],
@@ -168730,7 +168999,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,

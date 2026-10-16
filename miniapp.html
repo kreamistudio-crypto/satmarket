@@ -7626,6 +7626,29 @@
   .avatar{width:42px;height:42px;border-radius:50%;background:var(--ink);color:var(--on-ink);
     display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;
     position:relative;overflow:hidden;flex:0 0 auto}
+  /* LA PASTIGLIA DELL'ACCOUNT (16 ott 2026, dal campo: «il doppio tocco
+     non fa niente»): sul telefono nel Profilo il tappo non c'e', quindi
+     il secondo tocco non aveva dove cadere. Foto + nome + ▾ sotto il
+     titolo, un tocco e si apre «I tuoi account». A 360 px il nome si
+     tronca, la foto e la freccia no. */
+  .conto-pill{display:flex;align-items:center;gap:8px;max-width:100%;
+    margin:10px auto 0;padding:4px 12px 4px 4px;min-height:36px;
+    border:1px solid var(--line);border-radius:999px;background:var(--card);
+    color:var(--ink);font:inherit;font-weight:700;font-size:13.5px;cursor:pointer}
+  .conto-pill .avatar{width:28px;height:28px;font-size:12px}
+  .conto-pill .nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .conto-pill .quanti{flex:0 0 auto;min-width:20px;height:20px;padding:0 6px;
+    border-radius:10px;background:var(--sats-soft);color:var(--ink);
+    font-size:11.5px;line-height:20px;text-align:center}
+  .conto-pill .fr{flex:0 0 auto;color:var(--muted)}
+  .conto-pill:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  /* «Stai usando …»: il volto dell'account attivo in testa a ogni gesto
+     coi soldi, solo quando gli account aperti sono piu' d'uno */
+  .conto-in-vista{display:flex;align-items:center;gap:8px;margin:0 0 10px;
+    padding:6px 10px 6px 6px;border-radius:12px;background:var(--sats-soft);
+    color:var(--ink);font-size:13px;font-weight:600}
+  .conto-in-vista .avatar{width:24px;height:24px;font-size:11px}
+  .conto-in-vista span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* La foto profilo sopra l'iniziale (avatar lug 2026): copre il
      cerchio, e se non arriva l'onerror la toglie e resta l'iniziale
      — mai un'immagine rotta, il patto della mascotte */
@@ -13154,6 +13177,9 @@ document.getElementById('cartello')?.remove();</script>
            della pagina, nello stesso carattere di quelli delle pagine
            di racconto (.sicu-hero h2), un filo piu' piccolo. -->
       <h2 class="profilo-tit">Il tuo profilo</h2>
+      <!-- La pastiglia dell'account attivo (16 ott 2026): la porta di
+           «I tuoi account», la scrive renderPastigliaAccount() -->
+      <div id="contoPastiglia" style="display:flex;justify-content:center"></div>
       <div id="profiloTestata"></div>
       <!-- (Gli account aperti NON stanno qui: vivono nel foglio che si
            apre col SECONDO tocco sul tappo — vedi toccaTappo(). Un
@@ -13925,6 +13951,7 @@ document.getElementById('cartello')?.remove();</script>
          Il markup NASCE col testo dell'escrow: un flusso che
          dimenticasse `vestiPaySheet` mostra la frase di ieri, mai
          una vuota. -->
+    <div class="conto-in-vista" data-conto-in-vista style="display:none"></div>
     <h3 id="payTitolo">Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
     <!-- Il conto scomposto (articolo/spedizione/protezione): compare
          solo quando c'e' qualcosa oltre all'articolo -->
@@ -13958,6 +13985,7 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet" id="nwcConfermaSheet">
     <div class="grab"></div>
     <h3>⚡ Compra subito</h3>
+    <div class="conto-in-vista" data-conto-in-vista style="display:none"></div>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Stai per pagare <b class="mono" style="color:var(--sats)"><span id="nwcConfermaSats"></span><span class="unit">sats</span></b>
       dal tuo wallet collegato. I sats finiscono <b style="color:var(--trust)">bloccati
@@ -14342,6 +14370,9 @@ document.getElementById('cartello')?.remove();</script>
        aria-labelledby="confTit">
     <div class="grab"></div>
     <h3 id="confTit"></h3>
+    <!-- «Stai usando …» (16 ott 2026): solo per i gesti coi soldi
+         (`soldi: true` in chiediConferma) e con piu' account aperti -->
+    <div class="conto-in-vista" id="confConto" style="display:none"></div>
     <!-- La testata (miniatura + titolo dell'annuncio) e il corpo li
          scrive chi apre: il titolo e' testo dell'utente e passa da
          esc(), come ovunque. -->
@@ -14719,6 +14750,11 @@ document.getElementById('cartello')?.remove();</script>
          renderAccountSheet(), che e' l'unico posto che le disegna. -->
     <div id="accountLista"></div>
     <div id="accountPorte" style="margin-top:14px"></div>
+    <!-- «Esci da tutti» (16 ott 2026, leva PIU_ACCOUNT_OVUNQUE): solo
+         con piu' d'un account aperto, e chiede conferma — un bottone
+         che chiude anche gli account su cui non si sta. -->
+    <button class="btn ghost" id="accountEsciTutti" style="display:none"
+      onclick="esciDaTutti()">🚪 Esci da tutti</button>
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
 
@@ -14972,7 +15008,10 @@ function arrivoDaStartapp(){
     return dove;
   } catch(e) { return ''; }
 }
+/* PERSONALE = lo scambio o l'ordine P2P di un avviso del bot, che e'
+   sempre del Telegram (vedi avvisoPerAltroConto) */
 arrivoDaStartapp();
+const ARRIVO_PERSONALE = /^\/p2p\?(scambio|ordine)=/.test(location.pathname + location.search);
 
 /* ══ IL SERVER CHE SI RIAVVIA (30 set 2026) ══════════════════════
    Ogni deploy riavvia il servizio, e per quei pochi secondi Caddy
@@ -15082,10 +15121,100 @@ function avvisoRiprovo(acceso){
   if (p) p.classList.toggle('show', acceso);
 }
 
+/* ══ PIU' ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea) ══════
+   Dentro la Mini App si passa dal proprio Telegram a un account Nostr
+   aggiunto, senza uscire. La firma di Telegram viaggia SEMPRE (e' lei
+   che dice al server quale portachiavi guardare); l'account scelto le
+   viaggia ACCANTO in `X-Barattolo-Conto`, aggiunto qui a ogni richiesta
+   di casa — un filo solo invece di 237 intestazioni da ritoccare.
+   LA SCELTA E' PER TELEGRAM: la chiave porta il suo id, perche'
+   Telegram ha UNA WebView per tutti gli account del telefono (la
+   lezione del conto sul dispositivo). Un altro Telegram trova la sua
+   chiave vuota e parte da se stesso; il tasto di un avviso del bot,
+   che apre un'altra memoria, parte dal Telegram — ed e' giusto: gli
+   avvisi del bot sono suoi.
+   L'ID VIAGGIA COME TESTO: gli account nati con Nostr hanno id fino a
+   -2^63, e un Number li arrotonda. */
+function idTelegramMini(){
+  if (!tg?.initData) return '';
+  const u = tg.initDataUnsafe?.user?.id;
+  if (u) return String(u);
+  /* nel collaudo l'initData e' «collaudo:<id>:<Nome>» */
+  const m = /^collaudo:(-?\d{1,20}):/.exec(tg.initData);
+  return m ? m[1] : '';
+}
+const CONTO_MINI_CHIAVE = 'barattolo_conto_mini';
+function chiaveContoMini(){
+  const t = idTelegramMini();
+  return t ? CONTO_MINI_CHIAVE + '@' + t : '';
+}
+function leggiContoMini(){
+  const k = chiaveContoMini();
+  if (!k) return '';
+  try {
+    const v = localStorage.getItem(k) || '';
+    return /^-?\d{1,20}$/.test(v) && v !== idTelegramMini() ? v : '';
+  } catch(e){ return ''; }
+}
+function scriviContoMini(id){
+  const k = chiaveContoMini();
+  if (!k) return;
+  id = String(id || '');
+  try {
+    if (/^-?\d{1,20}$/.test(id) && id !== idTelegramMini()) localStorage.setItem(k, id);
+    else localStorage.removeItem(k);
+  } catch(e){}
+}
+/* '' = si e' il Telegram (il mondo di ieri) */
+let CONTO_MINI = leggiContoMini();
+function eUnaRichiesta(input){
+  return typeof Request !== 'undefined' && input instanceof Request;
+}
+function diCasaApi(input){
+  try {
+    const casa = new URL('/', location.href);
+    const u = new URL(eUnaRichiesta(input) ? input.url : String(input || ''),
+                      casa.href);
+    return u.origin === casa.origin && u.pathname.startsWith('/api/');
+  } catch(e){ return false; }
+}
+function fetchColConto(fetchVero){
+  return async function(input, init){
+    if (!CONTO_MINI || !diCasaApi(input)) return fetchVero(input, init);
+    let r;
+    if (eUnaRichiesta(input) && !(init && init.headers)) {
+      const h = new Headers(input.headers);
+      h.set('X-Barattolo-Conto', CONTO_MINI);
+      r = await fetchVero(new Request(input, {headers: h}), init);
+    } else {
+      const h = new Headers((init && init.headers) || undefined);
+      h.set('X-Barattolo-Conto', CONTO_MINI);
+      r = await fetchVero(input, Object.assign({}, init || {}, {headers: h}));
+    }
+    /* L'ACCOUNT SCELTO NON E' PIU' APERTO (sessione scaduta o chiusa
+       altrove): il server non ricade in silenzio sul Telegram — un
+       gesto pensato per l'uno finirebbe sull'altro — e lo dice con la
+       sua frase. Qui si torna al Telegram, ricaricando. */
+    if (r.status === 401) {
+      try {
+        const d = await r.clone().json();
+        if (d && typeof d.detail === 'string' && d.detail.startsWith("L'account che avevi scelto")) {
+          scriviContoMini('');
+          CONTO_MINI = '';
+          try { toast(d.detail, 5000); } catch(e){}
+          setTimeout(() => ricaricaPerConto(), 1600);
+        }
+      } catch(e){}
+    }
+    return r;
+  };
+}
+/* UN MONTAGGIO SOLO: il portinaio che riprova, e sopra di lui il filo
+   dell'account scelto (piu' account, 16 ott 2026) */
 if (typeof window.fetch === 'function' && location.protocol.startsWith('http')) {
-  window.fetch = fetchCheRiprova(window.fetch.bind(window), {
+  window.fetch = fetchColConto(fetchCheRiprova(window.fetch.bind(window), {
     attendi: attendiRiprovo, ora: () => Date.now(),
-    origine: location.origin, avviso: avvisoRiprovo});
+    origine: location.origin, avviso: avvisoRiprovo}));
 }
 
 let DEMO = !API_BASE;
@@ -30787,6 +30916,7 @@ async function ritiraEccedenza(){
   if (!ecc) { toast('Non c\'è eccedenza da ritirare'); return; }
   chiediConferma({
     titolo: `Ritiri l'eccedenza (${fmt(ecc)} sats)?`,
+    soldi: true,
     corpo: `È DEFINITIVO: la puntata torna secca a `
          + `${fmt(mia.offerto_sats)} sats e su quest'asta il rilancio `
          + `automatico si chiude (le puntate normali restano).`,
@@ -33672,6 +33802,11 @@ function chiediConferma(c){
      avviso non farebbe nulla e il foglio non si chiuderebbe piu'. */
   confermaAzione = c.poi || (c.avviso ? (()=>{}) : null);
   el('confTit').textContent = c.titolo || 'Confermi?';
+  /* IL VOLTO DELL'ACCOUNT ATTIVO prima di un gesto coi soldi (16 ott
+     2026): con piu' account aperti si vede chi sta pagando o liberando */
+  const chi = c.soldi && typeof contoInVistaHTML === 'function' ? contoInVistaHTML() : '';
+  const posto = el('confConto');
+  if (posto) { posto.innerHTML = chi; posto.style.display = chi ? '' : 'none'; }
   const testata = el('confTestata');
   testata.innerHTML = c.testata || '';
   testata.style.display = c.testata ? '' : 'none';
@@ -35730,6 +35865,20 @@ function renderProfilo(){
       </div>
       ${tondi}
     </div>`;
+  /* LA FOTO DELLA TESTATA APRE «I TUOI ACCOUNT» (16 ott 2026, dal campo:
+     «il doppio tocco sulla foto non fa niente»): sul telefono il tappo
+     nel Profilo non c'e', e il secondo tocco cadeva qui, sulla foto, che
+     non rispondeva. Ora risponde, dove gli account esistono. */
+  const fotoMia = box.querySelector('.seller > .avatar');
+  if (fotoMia && accountVivi()) {
+    fotoMia.setAttribute('role', 'button');
+    fotoMia.setAttribute('tabindex', '0');
+    fotoMia.setAttribute('aria-label', 'I tuoi account');
+    fotoMia.style.cursor = 'pointer';
+    fotoMia.onclick = apriAccountSheet;
+    fotoMia.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apriAccountSheet(); } };
+  }
+  renderPastigliaAccount();
   /* Le due porte del negozio non sono piu' bottoni sotto il biglietto
      da visita (set 2026): sono voci di «Negozio e spedizioni», con le
      STESSE condizioni di prima. Si decidono qui, prima di
@@ -35743,7 +35892,9 @@ function renderProfilo(){
      perderli tutti in un colpo. Senza icona dal set 2026: e' uno dei
      due bottoni del piede, gemello di «Tutorial». */
   if (el('profiloEsci')) {
-    el('profiloEsci').style.display = WEB ? '' : 'none';
+    /* dentro Telegram si esce dal solo account AGGIUNTO: il Telegram
+       non si chiude da qui (e' lui la firma) */
+    el('profiloEsci').style.display = (WEB || (miniAccount() && CONTO_MINI)) ? '' : 'none';
     el('profiloEsci').textContent = accountAperti.length > 1
       ? 'Esci da questo account' : 'Esci';
   }
@@ -41182,6 +41333,7 @@ async function confirmReceived(btn){
      irreversibile, ed e' la regola: il corpo non si ammorbidisce. */
   chiediConferma({
     titolo: 'Confermi di aver ricevuto l\'oggetto?',
+    soldi: true,
     corpo: 'E che è tutto ok: i sats verranno sbloccati '
          + 'DEFINITIVAMENTE al venditore.',
     etichetta: 'Libera i sats',
@@ -44601,6 +44753,7 @@ async function resoRicevuto(btn){
   const o = currentOrder;
   chiediConferma({
     titolo: 'Hai ricevuto il reso?',
+    soldi: true,
     corpo: 'L\'acquirente verrà rimborsato integralmente.',
     etichetta: 'Sì, rimborsa',
     poi: async () => {
@@ -46146,6 +46299,13 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       admSponsor = rs.ok ? await rs.json() : null;
     } catch(e) { admSponsor = null; }
+    /* gli account aperti insieme che si sono comprati o votati (16 ott
+       2026): a leva spenta la rotta risponde 404 e il cassetto non nasce */
+    try {
+      const ri = await fetch(`${API_BASE}/admin/account-insieme`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      admInsieme = ri.ok ? await ri.json() : null;
+    } catch(e) { admInsieme = null; }
     let rev = [];
     if (s.in_revisione) {
       try {
@@ -46270,6 +46430,7 @@ async function loadAdminStats(){
       })()}
       ${boxRacconti(admRacconti)}
       ${boxSponsor(admSponsor)}
+      ${boxInsieme(admInsieme)}
       ${decisi.length ? cassettoAdm('accAdmDecisi', '↩︎',
         'Decisi di recente', decisi.length, `
         <div class="sub">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
@@ -46661,6 +46822,7 @@ async function altraCassaforte(id){
   const scelte = (j.destinazioni||[]).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   chiediConferma({
     titolo: `Pago ${fmt(j.sats)} sats da un'altra cassaforte?`,
+    soldi: true,
     testata: `<span style="font-size:28px">🔀</span><span style="font-size:13px;font-weight:700">da «${esc(j.origine)}» a <select id="altraCfSel" style="font:inherit;padding:4px 8px;border-radius:8px">${scelte}</select></span>`,
     corpo: `Il pagamento d'origine risulta MORTO.${voci}\n\nChi vende ci ha dato ${j.fattura==='address' ? 'un Lightning address' : 'una fattura nuova'}: parte adesso, dalla strada di sempre, con tutte le sue verifiche.\n\nI sats escono dal saldo dell'altra cassaforte, dove ci sono i depositi di altri ordini: lì deve esserci capitale NOSTRO per coprirli.${(j.crediti||[]).length ? `\n\nSu «${j.origine}» quei sats restano impegnati finché quel pagamento non si decide: nasce un CREDITO DA RECUPERARE, e lo sorveglia la ronda.` : ''}\n\n⚠️ Una fattura scaduta non prova che un pagamento tenuto appeso da chi riceve non possa più saldarsi: se un giorno succedesse, chi vende avrebbe ricevuto due volte ${fmt(j.sats)} sats. Te lo diremmo subito, ma a chiederli indietro saresti tu.`,
     etichetta: '🔀 Sì, paga da lì',
@@ -47188,6 +47350,27 @@ function boxRacconti(lista){
    giu' per l'ultimo) non c'e', e lascia il suo posto vuoto perche' le
    altre restino in colonna. Gli slug finiscono negli onclick:
    filtro-alfabeto sulla loro forma, come nel cassetto delle pagine. */
+/* «ACCOUNT APERTI INSIEME» (16 ott 2026, decisione di Andrea): due
+   account aperti sullo stesso dispositivo che si comprano, si puntano
+   o si recensiscono NON si bloccano — si annota, e qui il moderatore
+   legge chi, l'altro, cosa e quando. Niente IP ne' impronte: e' tutto
+   quel che il server sa. Il cassetto c'e' solo con qualcosa dentro. */
+let admInsieme = null;
+function boxInsieme(lista){
+  if (!Array.isArray(lista) || !lista.length) return '';
+  const righe = lista.map(x => {
+    const quando = new Date((Number(x.quando) || 0) * 1000).toLocaleString('it-IT',
+      {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    return `<div class="order">
+        <b>${esc(x.nome_chi || 'senza nome')} → ${esc(x.nome_altro || 'senza nome')}</b>
+        <div class="sub">${esc(x.cosa || '')}${x.rif ? ' · ' + esc(x.rif) : ''} · ${esc(quando)}</div>
+      </div>`;
+  }).join('');
+  return cassettoAdm('accAdmInsieme', '👥', 'Account aperti insieme',
+    `${lista.length}`, `
+    <div class="sub">Due account aperti sullo stesso dispositivo che si sono comprati, puntati o votati. Non è bloccato niente: è un'annotazione, da guardare.</div>
+    <div style="margin-top:10px">${righe}</div>`);
+}
 let admSponsor = null;
 const nomeSpazio = x => x.titolo
   || (RACCONTI[x.slug] && RACCONTI[x.slug].titolo) || x.slug;
@@ -50605,7 +50788,11 @@ function chiudiBarraWeb(){
 async function esciWeb(){
   /* chi esce lascia il dispositivo: la sua nsec non resta qui */
   try { await scordaNsecAccount(); } catch(e){}
-  try { await fetch(`${API_BASE}/logout`, {method:'POST'}); } catch(e){}
+  /* dentro Telegram (leva PIU_ACCOUNT_OVUNQUE) esce l'account scelto:
+     la firma dice quale portachiavi, e si torna al Telegram */
+  try { await fetch(`${API_BASE}/logout`, {method:'POST',
+    headers: tg?.initData ? {'X-Tg-Init-Data': authHdr()} : {}}); } catch(e){}
+  if (typeof miniAccount === 'function' && miniAccount()) { scriviContoMini(''); CONTO_MINI = ''; }
   navDaCapo(); location.reload();
 }
 
@@ -50613,36 +50800,70 @@ async function esciWeb(){
    Due identita' (la mia e quella del negozio) aperte INSIEME, e si
    passa dall'una all'altra dal Profilo senza rifare il login.
 
-   SOLO SU WEB E PWA, ed e' una decisione (Andrea, ago 2026) e non una
-   dimenticanza: dentro Telegram l'identita' la impone il client —
-   authHdr() manda l'initData firmato — quindi li' non c'e' niente da
-   scegliere, e farlo vorrebbe dire far vincere una sessione scelta su
-   una firma di Telegram. In DEMO e in vetrina anonima non esiste
-   affatto: la' non c'e' nessuna sessione, e un selettore vuoto
-   sarebbe un cassetto su un muro.
+   SUL WEB E NELLA PWA da agosto; DENTRO TELEGRAM dal 16 ott 2026, con
+   la leva PIU_ACCOUNT_OVUNQUE (decisione di Andrea, che rovescia quella
+   d'agosto): li' l'identita' la impone il client — authHdr() manda
+   l'initData firmato — e resta cosi'. Gli account Nostr aggiunti le
+   viaggiano ACCANTO (`X-Barattolo-Conto`, vedi fetchColConto), mai al
+   suo posto: e' il server a guardare che siano nel portachiavi di
+   QUEL Telegram. In DEMO e in vetrina anonima non esiste affatto: la'
+   non c'e' nessuna sessione, e un selettore vuoto sarebbe un cassetto
+   su un muro.
 
    IL TOKEN NON ARRIVA MAI QUI: il server manda i soli tg_id, e lo
    switch si chiede con quello. I token restano nel cookie HttpOnly,
    dove il JavaScript non li vede — che e' l'unica difesa che quel
-   cookie ha. */
+   cookie ha. E L'ID VIAGGIA COME TESTO (`c.id`): un account nato con
+   Nostr ha un id fino a -2^63, e come Number tornava arrotondato — lo
+   switch verso di lui rispondeva «non e' aperto» (16 ott 2026). */
 let accountAperti = [], accountAttivo = null, accountMax = 0;
+let accountAttivoId = '', accountTelegramId = '';
+/* la leva viva, da /api/me (un server di ieri non la manda: spenta) */
+let piuAccount = false;
 
-function accountVivi(){ return WEB && !DEMO && !VETRINA; }
+/* Dentro Telegram il selettore c'e' solo a leva accesa */
+function accountVivi(){ return !DEMO && !VETRINA && (WEB || miniAccount()); }
+function miniAccount(){ return !!tg?.initData && piuAccount && !DEMO && !VETRINA; }
+/* l'id di una riga, sempre come testo */
+function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }
 
 async function caricaAccount(){
   if (!accountVivi()) { accountAperti = []; return; }
   try {
-    const r = await fetch(`${API_BASE}/sessioni`);
+    /* dentro Telegram la firma va mandata: e' lei che dice al server
+       quale portachiavi guardare */
+    const r = await fetch(`${API_BASE}/sessioni`, tg?.initData
+      ? {headers:{'X-Tg-Init-Data': authHdr()}} : undefined);
     if (!r.ok) throw new Error('niente sessioni');
     const d = await r.json();
     accountAperti = d.conti || [];
     accountAttivo = d.attivo != null ? d.attivo : null;
+    accountAttivoId = d.attivo_id != null ? String(d.attivo_id)
+      : (d.attivo != null ? String(d.attivo) : '');
+    accountTelegramId = d.telegram_id ? String(d.telegram_id) : '';
     accountMax = d.massimo || 0;
   } catch (e) {
     /* Un server di ieri non ha questa rotta: si resta col solo account
        di adesso, che e' un'ASSENZA e mai una bugia. */
     accountAperti = [];
+    return;
   }
+  /* La scelta che il server non riconosce piu' (sessione chiusa
+     altrove) non resta appesa: si torna al Telegram, e si dice. */
+  if (miniAccount() && CONTO_MINI && accountAttivoId !== CONTO_MINI) {
+    scriviContoMini(''); CONTO_MINI = '';
+    toast("L'account che avevi scelto non è più aperto qui: torni al tuo account Telegram", 5000);
+    setTimeout(() => ricaricaPerConto(), 1600);
+  }
+}
+
+/* Il volto e il nome di una riga, nella forma del volto unico */
+function voltoConto(c, cls){
+  return voltoHTML({nome: c.nome || c.username, avatar: c.avatar,
+                    negozio: c.negozio, ignoto: true}, cls || 'avatar', {tag: 'div'});
+}
+function contoAttivoRiga(){
+  return accountAperti.find(c => idConto(c) === accountAttivoId) || null;
 }
 
 /* IL MENU DEGLI ACCOUNT (ago 2026, decisione di Andrea): il primo
@@ -50650,35 +50871,44 @@ async function caricaAccount(){
    le identita' aperte, e la porta per aggiungerne una. E' il gesto di
    Gmail, quello che chi ha due account ha gia' nelle dita.
    VIVE NEL FOGLIO E NON IN PAGINA: un elenco qui e uno nel Profilo
-   sarebbero due posti per la stessa cosa, e il secondo tocco non
-   avrebbe piu' niente da dire. */
+   sarebbero due posti per la stessa cosa. Nel Profilo c'e' la sola
+   PASTIGLIA dell'account attivo (16 ott 2026), che apre questo foglio:
+   e' una porta, non un secondo elenco. */
 function renderAccountSheet(){
   const box = el('accountLista');
   if (!box) return;
+  const mini = miniAccount();
   const pieno = accountAperti.length >= accountMax;
   el('accountSub').textContent = accountAperti.length > 1
     ? 'Tocca un account per passare a quello. Restano aperti tutti: '
       + 'nessun affare in corso viene toccato.'
+    : mini
+    ? 'Accanto al tuo account Telegram puoi aprire uno o più account '
+      + 'Nostr e passare dall\'uno all\'altro senza uscire da Telegram.'
     : 'Puoi tenere aperte più identità insieme — la tua e quella del '
       + 'negozio — e passare dall\'una all\'altra senza rifare l\'accesso.';
   box.innerHTML =
     accountAperti.map(c => {
-        const attivo = c.tg_id === accountAttivo;
-        const nome = c.nome || c.username || 'Account';
-        /* Negli onclick viaggia SOLO il tg_id numerico: il patto del
+        const id = idConto(c);
+        /* Negli onclick viaggia SOLO l'id, cifre e segno: il patto del
            filtro-alfabeto, come «Scrivi a un utente». Nome e username
            sono testo altrui e passano da esc(). */
+        if (!/^-?\d{1,20}$/.test(id)) return '';
+        const attivo = id === accountAttivoId;
+        const nome = c.nome || c.username || 'Account';
+        const aspetta = piuAccount && !attivo && Number(c.aspetta) > 0
+          ? ` · ⚡ ${Number(c.aspetta)} ${Number(c.aspetta) === 1 ? 'ti aspetta' : 'ti aspettano'}` : '';
         return `<div class="seller${attivo?' attivo':''}"`
           + (attivo ? '' : ` role="button" tabindex="0"`
-              + ` onclick="cambiaAccount(${c.tg_id})"`
+              + ` onclick="cambiaAccount('${id}')"`
               + ` onkeydown="if(event.key==='Enter'||event.key===' ')`
-              + `{event.preventDefault();cambiaAccount(${c.tg_id})}"`)
+              + `{event.preventDefault();cambiaAccount('${id}')}"`)
           + ` style="margin-top:8px${attivo?'':';cursor:pointer'}">`
-          + voltoHTML({nome: c.nome || c.username, avatar: c.avatar,
-                       negozio: c.negozio, ignoto: true}, 'avatar', {tag: 'div'})
+          + voltoConto(c)
           + `<div class="who"><b>${esc(nome)}</b>`
-          + `<div class="rep">${c.username?'@'+esc(c.username)+' · ':''}`
-          + `${attivo?'sei qui':'tocca per passare a questo account'}</div></div>`
+          + `<div class="rep">${c.telegram?'Telegram · ':''}`
+          + `${c.username?'@'+esc(c.username)+' · ':''}`
+          + `${attivo?'sei qui':'tocca per passare a questo account'}${aspetta}</div></div>`
           + `</div>`;
       }).join('')
     + (pieno
@@ -50687,6 +50917,8 @@ function renderAccountSheet(){
   /* Le porte del login si montano solo se c'e' posto: un bottone che
      porta a un muro e' peggio di un bottone che non c'e'. */
   montaPorteAccount(!pieno);
+  const tutti = el('accountEsciTutti');
+  if (tutti) tutti.style.display = piuAccount && accountAperti.length > 1 ? '' : 'none';
 }
 
 /* Lo switch. E' una LETTURA sul mondo: non muove un sat, non tocca un
@@ -50697,18 +50929,37 @@ function renderAccountSheet(){
    ordini, preferiti, offerte, barattolo e permessi insieme, e
    rimettere in pari a mano una dozzina di viste sarebbe l'elenco che
    fra sei mesi ne dimentica una. Il reload e' la strada che il login
-   web fa gia'. */
+   web fa gia' — e svuota la memoria della pagina, cosi' niente di un
+   account resta in mano all'altro.
+   DENTRO TELEGRAM non c'e' un cookie da riscrivere: la scelta si
+   scrive nella memoria del Telegram che ospita (scriviContoMini), e la
+   prossima richiesta la porta. `restaQui` tiene l'indirizzo (l'avviso
+   del bot che chiede di passare al Telegram per aprirsi). */
+/* IL RICARICO DEL CAMBIO D'ACCOUNT (16 ott 2026): da capo, come ogni
+   ricarica nostra (vedi navDaCapo) — tranne quando l'indirizzo e' il
+   motivo del cambio: l'avviso del bot che si apre sul Telegram. */
+async function ricaricaPerConto(restaQui){
+  if (restaQui) { location.reload(); return; }
+  navDaCapo(); location.reload();
+}
 let accountInCorso = false;
-async function cambiaAccount(tgId){
-  if (accountInCorso || tgId === accountAttivo) return;
+async function cambiaAccount(id, restaQui){
+  id = String(id);
+  if (accountInCorso || id === accountAttivoId) return;
   accountInCorso = true;
+  if (miniAccount()) {
+    scriviContoMini(id);
+    CONTO_MINI = leggiContoMini();
+    ricaricaPerConto(restaQui);
+    return;
+  }
   try {
     const r = await fetch(`${API_BASE}/sessioni/attiva`, {method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({tg_id: tgId})});
+      body: JSON.stringify({tg_id: id})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'switch rifiutato');
-    navDaCapo(); location.reload();
+    ricaricaPerConto(restaQui);
   } catch (e) {
     accountInCorso = false;
     toast(e.message || 'Non è riuscito, riprova', 5000);
@@ -50717,11 +50968,15 @@ async function cambiaAccount(tgId){
 
 /* IL GESTO DEL TAPPO: il primo tocco porta al Profilo, il secondo —
    quando ci si e' gia' — apre il menu degli account.
-   IL SECONDO TOCCO ESISTE SOLO DOVE HA SENSO: dentro Telegram, in
-   demo e in vetrina il tappo fa quel che ha sempre fatto, perche' li'
-   di account da scegliere non ce n'e' (vedi accountVivi). Chi non e'
-   nel Profilo ci va, sempre: e' l'unico gesto che il tappo ha mai
-   avuto, e non deve cambiare sotto le dita. */
+   IL SECONDO TOCCO ESISTE SOLO DOVE HA SENSO: in demo, in vetrina e
+   dentro Telegram a leva spenta il tappo fa quel che ha sempre fatto,
+   perche' li' di account da scegliere non ce n'e' (vedi accountVivi).
+   Chi non e' nel Profilo ci va, sempre: e' l'unico gesto che il tappo
+   ha mai avuto, e non deve cambiare sotto le dita.
+   ⚠️ SUL TELEFONO IL TAPPO NEL PROFILO NON C'E' (16 ott 2026, dal
+   campo): vive nella testata di Esplora, che col Profilo sparisce —
+   il secondo tocco non aveva dove cadere. Li' lo prendono la FOTO
+   della testata e la pastiglia (renderPastigliaAccount). */
 /* L'ACCENNO, UNA VOLTA SOLA: il secondo tocco sul tappo non lo scopre
    nessuno da solo — e' la lezione del tocco lungo sulle card delle
    categorie, e la risposta e' la stessa: un TOAST, che e' l'unica
@@ -50733,10 +50988,17 @@ async function cambiaAccount(tgId){
    suggerimento che arriva prima di servire e' rumore. */
 function accennaAccount(){
   renderAccountSheet();
+  renderPastigliaAccount();
+  vestiContoInVista();
   if (!accountVivi() || accountAperti.length < 2) return;
   if (hintDismesso('duetocchi')) return;
+  /* MAI SOPRA UN FOGLIO APERTO (16 ott 2026, visto nel giro a 360 px):
+     il toast copriva il bottone di una conferma. Se un foglio e' aperto
+     tace e NON si consuma: parlera' alla prossima volta nel Profilo. */
+  if (document.querySelector('.sheet.open')) return;
   timbraVisto('duetocchi');
-  setTimeout(()=>toast('💡 Tocca di nuovo la tua foto per cambiare account', 4200), 900);
+  setTimeout(()=>{ if (!document.querySelector('.sheet.open'))
+    toast('💡 Tocca di nuovo la tua foto per cambiare account', 4200); }, 900);
 }
 
 function toccaTappo(){
@@ -50748,10 +51010,108 @@ function toccaTappo(){
   go('profilo');
 }
 
+/* LA PASTIGLIA (16 ott 2026, richiesta di Andrea: «così non serve
+   conoscere il doppio tocco»): sotto il titolo del Profilo, foto e
+   nome dell'account attivo, il numero degli aperti quando sono piu'
+   d'uno, e la freccia. Un tocco apre «I tuoi account» — anche con un
+   account solo, perche' li' c'e' «Aggiungi un account». E' una porta
+   al foglio e non un secondo elenco. */
+function renderPastigliaAccount(){
+  const posto = el('contoPastiglia');
+  if (!posto) return;
+  if (!accountVivi()) { posto.innerHTML = ''; return; }
+  const c = contoAttivoRiga()
+    || {nome: myNome || myUsername, avatar: myAvatar, negozio: myNegozio};
+  const quanti = accountAperti.length;
+  posto.innerHTML = `<button type="button" class="conto-pill" onclick="apriAccountSheet()"`
+    + ` aria-label="I tuoi account: cambia o aggiungi un account">`
+    + voltoConto(c)
+    + `<span class="nome">${esc(c.nome || c.username || 'Il tuo account')}</span>`
+    + (quanti > 1 ? `<span class="quanti">${quanti}</span>` : '')
+    + `<span class="fr" aria-hidden="true">▾</span></button>`;
+}
+
+/* «STAI USANDO …» (16 ott 2026): prima di ogni gesto coi soldi —
+   pagare, prendere un ordine P2P, liberare i sats — il volto e il
+   nome dell'account attivo, quando gli aperti sono piu' d'uno. Con
+   uno solo non c'e' niente da confondere, e la riga sarebbe rumore. */
+function contoInVistaHTML(){
+  if (!piuAccount || accountAperti.length < 2) return '';
+  const c = contoAttivoRiga();
+  if (!c) return '';
+  return voltoConto(c)
+    + `<span>Stai usando <b>${esc(c.nome || c.username || 'questo account')}</b>`
+    + `${c.telegram ? ' (Telegram)' : ''}</span>`;
+}
+function vestiContoInVista(){
+  const html = contoInVistaHTML();
+  document.querySelectorAll('[data-conto-in-vista]').forEach(n => {
+    n.innerHTML = html;
+    n.style.display = html ? '' : 'none';
+  });
+}
+
+/* «ESCI DA TUTTI» (16 ott 2026, richiesta di Andrea): rovescia la
+   regola d'agosto «un Esci per account», e per questo chiede prima.
+   Dentro Telegram escono gli account aggiunti e si resta sul proprio
+   Telegram; sul web escono tutti. Le chiavi Nostr ricordate su questo
+   dispositivo per firmare se ne vanno con loro. */
+function esciDaTutti(){
+  const mini = miniAccount();
+  /* IL FOGLIO DEGLI ACCOUNT SI CHIUDE PRIMA (16 ott 2026, visto nel giro
+     coi tocchi veri): #accountSheet sta DOPO #confermaSheet nel DOM, e
+     due fogli aperti li vince chi viene dopo — la domanda restava sotto,
+     col bottone che il dito non raggiungeva. closeSheet e non
+     navIndietro, la lezione della porta Nostr. */
+  closeSheet();
+  chiediConferma({
+    titolo: 'Esci da tutti gli account?',
+    corpo: mini
+      ? 'Escono tutti gli account che hai aggiunto qui. Resti sul tuo account Telegram.'
+      : 'Escono tutti gli account aperti su questo dispositivo. Per rientrare dovrai rifare l\'accesso.',
+    etichetta: 'Sì, esci da tutti',
+    vestito: 'allarme',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/logout/tutti`, {method:'POST',
+        headers: tg?.initData ? {'X-Tg-Init-Data': authHdr()} : {}});
+      if (!r.ok) {
+        const d = await r.json().catch(()=>({}));
+        toast(d.detail || 'Non è riuscito, riprova', 5000);
+        return;
+      }
+      /* le chiavi degli account chiusi: dentro Telegram si tiene solo
+         quella del Telegram, se ce n'e' una sua */
+      try { await scordaNsecConti(accountAperti.filter(c => !c.telegram)); } catch(e){}
+      scriviContoMini(''); CONTO_MINI = '';
+      ricaricaPerConto();
+    }
+  });
+}
+
+/* Le chiavi ricordate (nsec e sessione del bunker) degli account che
+   escono: per npub, mai «tutte» — quelle degli account che restano non
+   si toccano. */
+async function scordaNsecConti(righe){
+  const npub = (righe || []).map(c => String(c.npub || '')).filter(Boolean);
+  if (!npub.length) return;
+  await caricaNostrTools();
+  for (const n of npub) {
+    try {
+      const dec = window.NostrTools.nip19.decode(n);
+      if (dec.type !== 'npub') continue;
+      scordaNsec(dec.data);
+      scordaBunker(dec.data);
+    } catch(e){}
+  }
+}
+
 /* Le due porte del login web, dentro il foglio invece che nel banner
    della vetrina: qui si e' gia' dentro, e il portachiavi non si
    azzera — l'account di adesso resta aperto accanto a quello nuovo.
-   `dai` falsa = c'e' posto per nessuno: si svuota e basta. */
+   `dai` falsa = c'e' posto per nessuno: si svuota e basta.
+   DENTRO TELEGRAM la porta e' una sola, Nostr: un secondo Telegram
+   non si aggiunge da qui — lo dice Telegram stesso, col suo cambio
+   account, e la Mini App riceve solo quello attivo. */
 function montaPorteAccount(dai){
   const porte = el('accountPorte');
   porte.innerHTML = '';
@@ -50764,7 +51124,13 @@ function montaPorteAccount(dai){
   eti.style.paddingTop = '6px';
   eti.textContent = 'Aggiungi un account';
   porte.appendChild(eti);
-  if (collaudo) {
+  if (miniAccount()) {
+    const riga = document.createElement('div');
+    riga.className = 'hint';
+    riga.style.margin = '6px 0 4px';
+    riga.textContent = 'Qui si aggiungono account Nostr. Un altro account Telegram si apre dal menu di Telegram.';
+    porte.appendChild(riga);
+  } else if (collaudo) {
     /* In locale il widget vero non compare (vuole il dominio
        registrato su BotFather): resta la porta del collaudo. */
     const b = document.createElement('button');
@@ -50785,7 +51151,7 @@ function montaPorteAccount(dai){
   }
   const n = document.createElement('button');
   n.className = 'btn ghost';
-  n.innerHTML = etichettaNostr('…o entra con Nostr');
+  n.innerHTML = etichettaNostr(miniAccount() ? 'Aggiungi un account Nostr' : '…o entra con Nostr');
   /* closeSheet E NON navIndietro (6 ott 2026, dal campo: «premo e non
      succede nulla»): navIndietro e' un history.back(), cioe' ASINCRONO —
      il popstate arriva DOPO che apriNostrSheet ha gia' aperto il foglio,
@@ -50804,7 +51170,29 @@ function apriAccountSheet(){
   renderAccountSheet();
   el('sheetBg').classList.add('open');
   el('accountSheet').classList.add('open');
-  caricaAccount().then(renderAccountSheet);
+  caricaAccount().then(() => { renderAccountSheet(); renderPastigliaAccount(); });
+}
+
+/* L'AVVISO DEL BOT PER UN ALTRO ACCOUNT (16 ott 2026): dentro Telegram
+   il tasto di un avviso apre la Mini App sullo scambio o sull'ordine
+   P2P — e gli avvisi del bot sono SEMPRE del Telegram. Se in quel
+   momento e' scelto un account Nostr, lo scambio non e' suo: invece di
+   una pagina che dice «non trovato» si chiede, e un tocco porta al
+   Telegram restando sull'indirizzo. Mai un cambio da solo. */
+function avvisoPerAltroConto(){
+  if (!miniAccount() || !CONTO_MINI || !ARRIVO_PERSONALE) return;
+  const t = accountAperti.find(c => c.telegram);
+  const io = contoAttivoRiga();
+  if (!t || !io) return;
+  const nomeT = t.nome || t.username || 'il tuo account Telegram';
+  chiediConferma({
+    titolo: `Questo avviso è per ${nomeT}`,
+    corpo: `Ora stai usando ${io.nome || io.username || 'un altro account'}. `
+      + `Gli avvisi del bot arrivano al tuo account Telegram: passa a lui per aprirlo.`,
+    etichetta: `Passa a ${nomeT}`,
+    indietro: 'Resta qui',
+    poi: () => cambiaAccount(idConto(t), true)
+  });
 }
 
 /* ---------- PWA: banner «installa Barattolo» ---------- */
@@ -52869,6 +53257,26 @@ async function ricordaNsecSeMia(f){
 /* Il flusso, uguale per tutti i firmatari: sfida dal server -> firma
    dell'evento kind-22242 (stile NIP-42) -> il server verifica e apre
    la sessione cookie, la stessa del login Telegram. */
+/* IL LOGIN NOSTR DENTRO TELEGRAM (16 ott 2026, leva PIU_ACCOUNT_OVUNQUE):
+   con la firma di Telegram accanto il server mette la sessione nel
+   portachiavi di QUEL Telegram, senza cookie del web — e risponde
+   `X-Barattolo-Aperto` con chi e' entrato. A leva spenta nessuna
+   intestazione in piu': il login di ieri. */
+function intestaLoginMini(h){
+  if (miniAccount()) h['X-Tg-Init-Data'] = authHdr();
+  return h;
+}
+function adottaContoAperto(r){
+  if (!miniAccount()) return;
+  const id = String(r.headers.get('X-Barattolo-Aperto') || '');
+  if (!/^-?\d{1,20}$/.test(id)) return;
+  if (id === idTelegramMini()) {
+    toast('Questa chiave apre già il tuo account Telegram', 4000);
+    return;
+  }
+  scriviContoMini(id);
+  CONTO_MINI = leggiContoMini();
+}
 async function entraConNostr(firmatario){
   const rs = await fetch(`${API_BASE}/login/nostr/sfida`);
   const ds = await rs.json().catch(()=>({}));
@@ -52880,10 +53288,13 @@ async function entraConNostr(firmatario){
      sa chi sei, e un codice storto non ferma l'ingresso */
   const invito = (el('nostrInvitoCodice')?.value || '').trim();
   const r = await fetch(`${API_BASE}/login/nostr`, {method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers: intestaLoginMini({'Content-Type':'application/json'}),
     body: JSON.stringify(invito ? {evento, invito} : {evento})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'Accesso non riuscito, riprova', 6000); return; }
+  /* dentro Telegram l'account appena entrato diventa lo scelto: da
+     qui in giu' (la coda delle firme) le richieste sono sue */
+  adottaContoAperto(r);
   /* L'ESITO DEL CODICE SI LEGGE PRIMA DEL RELOAD, che si mangerebbe il
      toast: si aspetta il suo tempo di lettura, e poi si entra. */
   if (typeof d.invito === 'string') {
@@ -53020,13 +53431,14 @@ function apriCollega(c){
 }
 async function accettaCollega(){
   const r = await fetch(`${API_BASE}/login/nostr/collega`, {method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers: intestaLoginMini({'Content-Type':'application/json'}),
     body: JSON.stringify({biglietto: bigliettoCollega})});
   if (!r.ok) {
     toast('Invito scaduto: riprova il login', 6000);
     closeSheet();
     return;
   }
+  adottaContoAperto(r);
   navDaCapo(); location.reload();
 }
 
@@ -57301,8 +57713,15 @@ function sincronizzaMazzo(){
 /* IL CLOUD DI TELEGRAM, solo dentro Telegram VERO e col client che ce
    l'ha (Bot API 6.9): nel browser lo stub di telegram.org esiste comunque
    e mentirebbe — il patto di esportaDati. Fail-open in ogni verso: un
-   cloud che non risponde vale «niente», mai un'eccezione. */
+   cloud che non risponde vale «niente», mai un'eccezione.
+   ⚠️ E' DEL TELEGRAM, NON DELL'ACCOUNT ATTIVO (16 ott 2026, piu' account):
+   con un account Nostr scelto dentro la Mini App il suo mazzo P2P, i
+   visti e il resto finirebbero nella nuvola del Telegram che lo ospita
+   — la seconda memoria del conto sul dispositivo. Con CONTO_MINI il
+   cloud non c'e': quell'account vive nella memoria del telefono, come
+   sul web. */
 function cloudTelegram(){
+  if (typeof CONTO_MINI !== 'undefined' && CONTO_MINI) return null;
   return (tg?.initData && tg.isVersionAtLeast?.('6.9') && tg.CloudStorage) ? tg.CloudStorage : null;
 }
 /* TRE STATI E NON DUE (set 2026): `null` diceva insieme «vuoto» e
@@ -59845,6 +60264,25 @@ function provvisorioDelLibroP2P(o){
     return p.id;
   }
   return '';
+}
+/* L'ORDINE DI UN MIO ALTRO ACCOUNT (16 ott 2026, leva
+   PIU_ACCOUNT_OVUNQUE, decisione di Andrea): il server dice quali
+   ordini del libro sono stati pubblicati da un altro account aperto
+   su questo dispositivo — mai quale. Prenderlo vorrebbe dire pagare
+   le commissioni a se stessi per niente: si rifiuta. Non e' «tuo»
+   (non si apre come il proprio ordine): e' solo non prendibile da qui. */
+const P2P_ALTRO_MIO_CONTO = 'È un ordine di un tuo altro account aperto qui: '
+  + 'prenderlo vorrebbe dire pagare le commissioni a te stesso.';
+function ordineDiUnAltroMioContoP2P(id){
+  return !!id && typeof piuAccount !== 'undefined' && piuAccount
+    && typeof p2pAltriMiei !== 'undefined' && p2pAltriMiei.has(String(id));
+}
+function riquadroContoP2P(id){
+  if (ordineDiUnAltroMioContoP2P(id)) {
+    return '<div class="hint" style="margin:0 0 10px">🚫 ' + esc(P2P_ALTRO_MIO_CONTO) + '</div>';
+  }
+  const chi = typeof contoInVistaHTML === 'function' ? contoInVistaHTML() : '';
+  return chi ? '<div class="conto-in-vista">' + chi + '</div>' : '';
 }
 function ordineTuoP2P(id, o){
   if (!id) return false;
@@ -63220,6 +63658,10 @@ function renderDettaglioP2P(){
     /* IL «NO» DEL SERVER, sopra i bottoni (10 ott 2026, reputazione-p2p):
        il filtro di chi ha pubblicato o il limite delle prese, con la frase */
     (tuo || typeof avvisoVetoP2P !== 'function' ? '' : avvisoVetoP2P(o.id)) +
+    /* CHI STA PRENDENDO (16 ott 2026, piu' account): il volto
+       dell'account attivo sopra il bottone, o il «no» se l'ordine e' di
+       un altro mio account aperto qui */
+    (tuo || VETRINA || !myTgId || typeof riquadroContoP2P !== 'function' ? '' : riquadroContoP2P(o.id)) +
     (tuo
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
           '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
@@ -63249,6 +63691,10 @@ function renderDettaglioP2P(){
         /* spento quando il server ha detto di no (10 ott 2026): la frase
            sta nel riquadro qui sopra, e la cintura vera in `eseguiPresaP2P` */
         ((typeof vetoPresaP2P === 'function' && vetoPresaP2P(o.id)) ? ' disabled' : '') +
+        /* ...e spento sull'ordine di un mio altro account (16 ott 2026):
+           la frase sta nel riquadro qui sopra (riquadroContoP2P) */
+        ((typeof ordineDiUnAltroMioContoP2P === 'function' && ordineDiUnAltroMioContoP2P(o.id)
+          && !(typeof vetoPresaP2P === 'function' && vetoPresaP2P(o.id))) ? ' disabled' : '') +
         /* IL VERDE E IL ROSSO DEI DUE LATI (7 ott 2026, decisione di
            Andrea): «Compra» verde e «Vendi» rosso, gli stessi vestiti dei
            due «Pubblica ordine» (`vestitoInvioP2P`: `primary` e `rosso`) —
@@ -63390,6 +63836,7 @@ function confermaDettaglioP2P(){
     return;
   }
   const id = p2pDettOrdine;
+  if (typeof ordineDiUnAltroMioContoP2P === 'function' && ordineDiUnAltroMioContoP2P(id)) { toast(P2P_ALTRO_MIO_CONTO, 6000); return; }
   const o = rigaLibroP2P(id);
   if (!o) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   /* ...e la cintura resta, sul libro vero: la domanda di sopra */
@@ -63490,6 +63937,9 @@ async function eseguiPresaP2P(id, scelto, metodo){
     return;
   }
   if (ordineTuoP2P(id)) { toast('È il tuo ordine: non puoi prenderlo'); return; }
+  /* ...e quello di un MIO ALTRO account aperto qui (16 ott 2026): la
+     stessa cintura, dove passano tutte le prese */
+  if (typeof ordineDiUnAltroMioContoP2P === 'function' && ordineDiUnAltroMioContoP2P(id)) { toast(P2P_ALTRO_MIO_CONTO, 6000); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   /* IL SERVER DICE SE POSSO (10 ott 2026, reputazione-p2p): il filtro di
@@ -66068,6 +66518,7 @@ function rilasciaP2P(){
   if (o.stato === 'in_disputa') {
     chiediConferma({
       titolo: 'Rilasci i sats?',
+      soldi: true,
       corpo: RILASCIO_DISPUTA_AVVISO + '\n\nI sats partono verso chi compra e non tornano indietro.',
       etichetta: 'Sì, rilascio i sats',
       poi: () => mossaOrdineP2P(o.id, 'release', 'Sats rilasciati ✅ La disputa è chiusa',
@@ -66080,6 +66531,7 @@ function rilasciaP2P(){
   const contanti = scambioInContantiP2P(o);
   chiediConferma({
     titolo: contanti ? 'Hai contato i contanti davanti a chi ti ha pagato?' : 'Liberi i sats?',
+    soldi: true,
     corpo: tabacchinoP2P(o.metodi)
       ? 'Fallo solo se su Amazon il tuo ordine da ' + fmtEur(o.euro) + ' € risulta pagato davvero. I sats partono verso chi compra e non tornano indietro.'
       : contanti
@@ -75998,6 +76450,7 @@ async function chiediFotoLibroP2P(){
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
   if (d && Array.isArray(d.miei)) p2pVetrinaMiei = new Set(d.miei.map(String));
+  if (d && Array.isArray(d.miei)) p2pAltriMiei = new Set(Array.isArray(d.altri_miei) ? d.altri_miei.map(String) : []);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
@@ -76495,6 +76948,7 @@ let p2pVetrinaInVolo = false;
 let p2pVetrinaFresca = false;       // la prossima domanda salta la cache (ritorno in Esplora)
 let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
 let p2pVetrinaMiei = new Set();     // gli ordini della fotografia pubblicati da me, per il server
+let p2pAltriMiei = new Set();       // ...e quelli dei miei ALTRI account aperti qui (16 ott 2026)
 
 /* La vetrina e' quella nuda? */
 function vetrinaNudaP2P(){
@@ -76699,6 +77153,7 @@ async function chiediFotoVetrinaP2P(){
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
+  p2pAltriMiei = new Set(Array.isArray(d && d.altri_miei) ? d.altri_miei.map(String) : []);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   /* leva spenta sul server, o una fotografia di piu' di un giorno: la
@@ -83101,6 +83556,9 @@ async function avvia(){
        e il cassetto resta spento invece di mostrare un codice vuoto */
     myInviti = me.inviti || null;
     myClassifica = !!me.classifica_attiva;
+    /* PIU' ACCOUNT OVUNQUE: la leva viva (un server di ieri non la
+       manda, e resta spenta) */
+    piuAccount = !!me.piu_account;
     myClassificaNascosta = !!me.classifica_nascosta;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';
@@ -83222,8 +83680,12 @@ async function avvia(){
     preferiti = new Set(); myPreferiti = [];
     await caricaPreferiti();
     /* gli account aperti su questo browser: fire-and-forget, il
-       selettore vive nel Profilo e nessuno lo aspetta qui */
-    caricaAccount();
+       selettore vive nel Profilo e nessuno lo aspetta qui. Quando
+       arrivano si vestono la pastiglia e i «Stai usando», e se un
+       avviso del bot e' arrivato mentre e' scelto un altro account
+       si chiede (avvisoPerAltroConto) */
+    caricaAccount().then(() => { renderPastigliaAccount();
+      vestiContoInVista(); avvisoPerAltroConto(); });
     /* le offerte seguono l'identita' come i preferiti: si rileggono
        (servono anche a openDetail per il banner dell'accordo) */
     offerteMie = [];

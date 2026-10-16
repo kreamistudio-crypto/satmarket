@@ -64660,3 +64660,133 @@ P2P da desktop, con meno movimento: verde e rosso ereditati, corsa 0s.
 **DA GUARDARE.** Sul telefono, nella Mini App vera: la croce bianca
 nella luce del giorno (il 2,3:1 è il punto debole, l'ombra lo regge a
 occhio sullo schermo del PC).
+## Più account ovunque: il selettore anche dentro la Mini App, e il doppio tocco che non switchava (16 ott 2026, cantiere multi-account, richiesta di Andrea)
+
+**IL COMPITO.** Andrea: passare da un account all'altro in un tocco,
+come su Telegram — lista, «Aggiungi account», cambio rapido, uscita da
+uno solo, «Esci da tutti» — da qualunque ingresso, ANCHE dentro la Mini
+App (il suo Telegram + account Nostr) senza uscire. Il volto dell'account
+attivo prima di ogni gesto coi soldi, una leva SPENTA di serie. Piano in
+10 punti approvato con due cambi: l'antiabuso NON blocca voti, feedback e
+acquisti fra account aperti insieme ma li ANNOTA per il moderatore (si
+decide dopo se bloccare); il rifiuto di prendere un proprio ordine P2P
+invece resta («lì si perdono sats in commissioni per niente» — d'accordo).
+Più la prova dal vivo di Andrea: sulla web app il doppio tocco sulla foto
+non faceva switchare niente.
+
+**PERCHÉ NON SWITCHAVA: DUE GUASTI, trovati prima del codice.**
+1) Sul telefono il tappo nel Profilo NON C'È: vive nella testata di
+Esplora, che col Profilo sparisce; sotto i 768 px la nav non lo mostra.
+Il primo tocco portava al Profilo e il secondo non aveva dove cadere —
+verificato nel Browser pane a 360 px: zero tappi visibili nel Profilo.
+2) Anche dove il foglio si apriva (da computer), lo switch VERSO UN
+ACCOUNT NATO CON NOSTR rispondeva 400 «non è aperto»: gli id nativi
+arrivano fino a -2^63, JavaScript li arrotonda
+(`-1780604514590336967` → `-1780604514590337000`) e lo switch
+rimandava il numero arrotondato. Riprodotto nel browser con una chiave
+usa-e-getta generata lì. Cura: le righe di `/api/sessioni` portano
+anche `id` come TESTO (e `attivo_id`), il client chiede con quello.
+Pastiglia nel Profilo (foto + nome + numero degli aperti + ▾, sempre,
+anche con un account solo: dentro c'è «Aggiungi un account») e la FOTO
+della testata del Profilo che apre il foglio. Valgono anche a leva spenta.
+
+**DENTRO LA MINI APP (a leva accesa).** La firma di Telegram viaggia
+sempre; l'account scelto le viaggia accanto (`X-Barattolo-Conto`) e vale
+solo se la sua sessione sta nel portachiavi di QUEL Telegram
+(`barattolo_mini_<tg_id>`, HttpOnly, SameSite=None + Partitioned per
+l'iframe di Telegram Web). Un altro Telegram sullo stesso telefono non
+vede e non usa gli account del primo; un account scelto che non c'è più è
+un 401 detto, mai una ricaduta muta sul Telegram. Si aggiungono SOLO
+account Nostr: la Mini App riceve l'account Telegram attivo nel client, e
+un secondo Telegram si apre dal menu di Telegram (il foglio lo dice).
+Il CloudStorage di Telegram tace per l'account scelto (era la seconda
+memoria: il mazzo P2P di un Nostr nella nuvola del Telegram). Gli avvisi
+del bot restano del Telegram: se uno arriva mentre è scelto un Nostr,
+«Questo avviso è per X» e un tocco porta al Telegram sullo stesso
+indirizzo. Strada scartata: smettere di mandare l'initData e usare il
+cookie del web — il cookie della WebView è di tutti i Telegram del
+telefono. Il resto (coi perché) in Architettura, «PIÙ ACCOUNT OVUNQUE».
+
+**I SOLDI, L'USCITA, L'ANTIABUSO.** «Stai usando <volto, nome>» in sei
+conferme (`soldi: true`: libera i sats, rilascio P2P in disputa e no,
+reso ricevuto, eccedenza, pagamento da un'altra cassaforte), nei due
+fogli di pagamento e sopra il bottone della presa P2P — solo con due
+account o più. «Esci da tutti» con la sua conferma (rovescia la regola
+d'agosto «un Esci per account»: è la richiesta di Andrea). Le annotazioni
+in `account_insieme` per acquisto, carrello, puntata, feedback e
+recensione P2P fra account aperti INSIEME, nessun blocco; il cassetto «👥
+Account aperti insieme» nel pannello admin. Niente IP né impronte: chi
+esce e rientra le aggira, ed è il prezzo dichiarato. Il P2P: il libro
+manda `altri_miei` e il telefono non prende l'ordine di un proprio altro
+account (bottone spento, frase, cintura in `eseguiPresaP2P`). Tetto
+invariato: `MAX_ACCOUNT_BROWSER` = 5, dentro la Mini App il Telegram ne
+occupa uno.
+
+**LA LEVA.** `PIU_ACCOUNT_OVUNQUE = False` nel codice e nel config
+d'esempio; spegne SOLO le parti nuove (decisione di Andrea): Mini App,
+volto nelle conferme, «Esci da tutti», annotazioni, rifiuto P2P. Il web
+d'agosto vive anche spenta. Il pannello «⚙️ Stato delle leve» la mostra
+(gruppo «👥 Più account»). Come accenderla: PRODUZIONE, «PIÙ ACCOUNT
+OVUNQUE».
+
+**DUE DIFETTI VISTI SOLO COI TOCCHI VERI** (Playwright, Chrome, 360×780):
+«Esci da tutti» apriva la conferma SOTTO il foglio degli account
+(`#accountSheet` sta dopo `#confermaSheet` nel DOM: vince chi viene
+dopo), col bottone irraggiungibile — ora il foglio si chiude prima
+(`closeSheet`, la lezione della porta Nostr). E l'accenno «Tocca di nuovo
+la tua foto» poteva coprire il bottone di una conferma: ora tace (senza
+consumarsi) con un foglio aperto.
+
+**PROVATO.** `prove_piu_account_ovunque` (46): il portachiavi della Mini
+App sul cartone vero (porta, tetto col Telegram, scelto, altro Telegram,
+leva spenta), le righe che una svista toglierebbe, e un banco node che
+FA GIRARE il filo del client (chiave per Telegram, id esatto oltre 2^53,
+intestazione solo verso casa, il 401 che riporta al Telegram).
+`collaudo_piu_account.py` (56, in CI, verde nella gabbia): richieste vere
+con TestClient — leva spenta = ieri, l'account aggiunto dentro la Mini
+App, ordini separati comprati dai due account dello stesso telefono, il
+secondo Telegram, il libro coi «miei» e gli «altri miei», le
+annotazioni (acquisto e feedback fra account insieme NON bloccati e
+annotati, fra estranei niente, a leva spenta niente), lo switch del web
+verso un id grande (e il numero arrotondato di ieri che falliva),
+«Esci» e «Esci da tutti» con le sessioni morte nel database.
+`collaudo_account.py` d'agosto: 44 verdi. Toccate 13 prove esistenti che
+contavano quel che il cantiere cambia (le conferme 85 → 87, il `Vary` del
+libro, il montaggio unico di `fetch`, i ricarichi nostri, il censimento
+dei volti, i banchi che ritagliano il foglio di conferma e il cloud).
+SUITE e COLLAUDI: nel verbale del push, qui sotto.
+IL GIRO DAL VIVO, 44/44, in chiaro e scuro, web e Mini App, zero errori
+JS, scatti in `.claude/giri/multi-account/` (con lo script del giro): il
+caso dal campo rifatto (nel Profilo nessun tappo) e curato, il foglio con
+un account solo, un account Nostr aggiunto con una chiave usa-e-getta, lo
+switch avanti e indietro con l'id esatto, «Stai usando» nella conferma,
+«Esci da tutti»; nella Mini App il foglio col solo Telegram, il Nostr
+aggiunto e scelto, il cloud muto, l'avviso del bot per il Telegram, un
+secondo Telegram che vede solo se stesso, «Esci da questo account».
+NON provato dal vivo: il cookie Partitioned dentro Telegram Web (vuole
+Telegram vero) e il rifiuto P2P sul libro vero (provato nel collaudo e
+nelle sentinelle).
+
+**DA GUARDARE** (dopo il deploy, a leva accesa sul VPS): da Telegram
+Desktop, da Telegram Web e dal telefono, aggiungere un account Nostr e
+passare avanti e indietro; dal telefono con DUE account Telegram, che il
+secondo non veda gli account Nostr del primo; il tasto di un avviso del
+bot mentre è scelto il Nostr.
+
+**DA FARE (notati, non fatti).**
+- La porta Telegram del foglio account nell'APK resta rotta (il Login
+  Widget apre il popup fuori dalla TWA: CANTIERI, «La porta Nostr del
+  foglio account che non apriva niente», 6 ott): la strada proposta era
+  un login dal bot con link monouso, da decidere.
+- Gli id grandi altrove nel client: lo switch era il caso trovato, ma
+  ogni posto che RIMANDA al server il `tg_id` di un account nato con
+  Nostr (per esempio i gesti dei moderatori su un utente) va
+  censito con la stessa domanda.
+- Sul web gli avvisi del bot aprono il sito sull'ordine: se lì è attivo
+  un altro account del portachiavi, la pagina dice «non trovato» invece
+  di «questo è per X». Dentro la Mini App c'è; sul web no.
+- Le annotazioni non coprono le offerte sul carrello né i voti fuori da
+  un affare: si allargano se il cassetto mostrerà che servono.
+- Il mazzo P2P di un account Nostr scelto dentro la Mini App non va nel
+  cloud: vive nel telefono e si ricava dal seme come sul web. Da dire nel
+  patto «I tuoi dati» se Andrea accende la leva.

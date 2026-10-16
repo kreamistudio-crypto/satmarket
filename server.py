@@ -2036,6 +2036,13 @@ _HOST_RICHIESTA = contextvars.ContextVar("host_richiesta", default="")
 # non passa mai: "" == "" sarebbe vero per chiunque.
 _SEGNALE_RICHIESTA = contextvars.ContextVar("segnale_richiesta", default="")
 
+# PIU' ACCOUNT OVUNQUE (16 ott 2026): chi bussa porta con se' l'initData,
+# l'account SCELTO dentro la Mini App (`X-Barattolo-Conto`) e i cookie —
+# i portachiavi. Li legge `conto_scelto`, dentro `verifica_utente`, cosi'
+# i ~50 endpoint non cambiano firma. Vuoto (None) fuori da una richiesta:
+# le prove che chiamano i giudici a mano vedono il mondo di ieri.
+_CONTO_RICHIESTA = contextvars.ContextVar("conto_richiesta", default=None)
+
 
 @app.middleware("http")
 async def segna_host(request, call_next):
@@ -2043,6 +2050,10 @@ async def segna_host(request, call_next):
     questo si mette in coda: quando la rotta legge, l'host c'e'."""
     _HOST_RICHIESTA.set(request.headers.get("host", ""))
     _SEGNALE_RICHIESTA.set(request.headers.get("x-barattolo-onion", ""))
+    _CONTO_RICHIESTA.set({
+        "init": request.headers.get("x-tg-init-data", ""),
+        "conto": request.headers.get("x-barattolo-conto", ""),
+        "cookie": dict(request.cookies)})
     return await call_next(request)
 
 
@@ -5569,6 +5580,19 @@ def init_db():
         annuncio_id INTEGER NOT NULL,
         creato INTEGER,
         PRIMARY KEY(tg_id, annuncio_id)
+    );
+    CREATE TABLE IF NOT EXISTS account_insieme(
+        -- PIU' ACCOUNT OVUNQUE (16 ott 2026): due account aperti
+        -- INSIEME sullo stesso dispositivo che si comprano, si puntano
+        -- o si recensiscono. NON si blocca (decisione di Andrea): si
+        -- annota per il moderatore. Niente IP, niente impronte: chi,
+        -- l'altro, cosa, su cosa, quando.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chi INTEGER NOT NULL,
+        altro INTEGER NOT NULL,
+        cosa TEXT NOT NULL,
+        rif TEXT NOT NULL DEFAULT '',
+        quando INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS venditori_seguiti(
         -- «🔔 Segui» sulla pagina di un venditore (9 ott 2026,
@@ -9516,7 +9540,7 @@ def portachiavi_conti(raw: str) -> list:
     con = db()
     righe = con.execute(
         "SELECT s.token_hash, s.tg_id, u.nome, u.username, u.negozio, "
-        "       u.avatar, u.avatar_scelta "
+        "       u.avatar, u.avatar_scelta, u.npub_accesso "
         "FROM sessioni s JOIN utenti u ON u.tg_id = s.tg_id "
         f"WHERE s.token_hash IN ({','.join('?' * len(per_hash))}) "
         "  AND s.scade > ?",
@@ -9529,6 +9553,12 @@ def portachiavi_conti(raw: str) -> list:
         # tiene la sessione fresca invece di quella vecchia.
         per_tg[r["tg_id"]] = {
             "tg_id": r["tg_id"],
+            # L'ID ANCHE COME TESTO (16 ott 2026, dal campo: «il doppio
+            # tocco non switcha»): gli account nati con Nostr hanno id
+            # negativi fino a -2^63, e JavaScript li arrotonda — lo switch
+            # rimandava un numero che nel portachiavi non c'era. Il client
+            # chiede con QUESTO, e la regola del token resta intera.
+            "id": str(r["tg_id"]),
             "token": per_hash[r["token_hash"]],
             "nome": r["nome"] or "",
             "username": r["username"] or "",
@@ -9536,6 +9566,9 @@ def portachiavi_conti(raw: str) -> list:
             # La faccia segue la scelta dell'utente come in vetrina:
             # chi ha detto «nessuna» resta l'iniziale anche qui.
             "avatar": "" if r["avatar_scelta"] == "nessuna" else (r["avatar"] or ""),
+            # la chiave PUBBLICA con cui si entra: serve al client per
+            # scordare la nsec ricordata di un account che esce
+            "npub": r["npub_accesso"] or "",
         }
     ordine = {t: i for i, t in enumerate(token)}
     return sorted(per_tg.values(), key=lambda v: ordine[v["token"]])
@@ -9576,7 +9609,23 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
     vecchia lascia il posto alla sessione nuova.
     `sessione` e' il cookie attivo di ADESSO, e serve a chi era gia'
     dentro da prima che il portachiavi esistesse: senza, il suo
-    account sparirebbe dal mazzo proprio mentre ne aggiunge un altro."""
+    account sparirebbe dal mazzo proprio mentre ne aggiunge un altro.
+    DENTRO LA MINI APP (leva PIU_ACCOUNT_OVUNQUE, 16 ott 2026) il login
+    non tocca i cookie del web: la sessione va nel portachiavi di QUEL
+    Telegram, e l'header `X-Barattolo-Aperto` dice al client chi e'
+    appena entrato — e' lui che lo sceglie. Entrare col proprio Telegram
+    (la npub collegata a lui) non apre niente: c'e' gia'."""
+    t = telegram_della_richiesta()
+    if t is not None:
+        response.headers["X-Barattolo-Aperto"] = str(int(tg_id))
+        if int(tg_id) == t:
+            return ""
+        token = crea_sessione(tg_id)
+        resto = [x["token"] for x in conti_mini(t) if x["tg_id"] != tg_id]
+        # il Telegram occupa un posto: nel mazzo ne restano MAX - 1
+        posti = max(1, MAX_ACCOUNT_BROWSER - 1)
+        imposta_cookie_mini(response, t, (resto + [token])[-posti:])
+        return token
     token = crea_sessione(tg_id)
     resto = [c["token"] for c in portachiavi_adottato(portachiavi, sessione)
              if c["tg_id"] != tg_id]
@@ -9642,6 +9691,166 @@ MSG_ACCOUNT_ASSENTE = ("Questo account non è aperto su questo "
                        "dispositivo: rifai l'accesso")
 
 
+# ---------------- PIU' ACCOUNT OVUNQUE (16 ott 2026) ----------------
+# La decisione d'agosto («solo web e PWA») la rovescia Andrea: anche
+# DENTRO la Mini App si passa dal proprio Telegram a uno o piu' account
+# Nostr con un tocco. Vedi Architettura, «PIU' ACCOUNT OVUNQUE».
+# LA FIRMA DI TELEGRAM RESTA OBBLIGATORIA: l'initData si verifica come
+# sempre, e un initData storto resta 401. L'account scelto viaggia
+# ACCANTO (`X-Barattolo-Conto`) e vale solo se la sua sessione sta nel
+# portachiavi della Mini App legato a QUEL Telegram — un cookie per
+# ogni tg_id, perche' Telegram ha UNA WebView per tutti gli account
+# del telefono (la lezione del conto sul dispositivo, 10 set 2026): un
+# secondo Telegram che apre la Mini App non vede gli account Nostr del
+# primo. Spenta di serie: la decide Andrea dopo la sua prova.
+try:
+    from config import PIU_ACCOUNT_OVUNQUE
+except ImportError:
+    PIU_ACCOUNT_OVUNQUE = False
+
+# Un account scelto che non e' piu' aperto NON ricade in silenzio sul
+# Telegram: un gesto pensato per l'uno finirebbe sull'altro. Si dice,
+# e il client torna sul Telegram ricaricando — la frase e' il segnale.
+MSG_CONTO_CHIUSO = ("L'account che avevi scelto non è più aperto qui: "
+                    "torni al tuo account Telegram")
+
+
+def cookie_mini(tg_id: int) -> str:
+    """Il nome del portachiavi della Mini App per QUEL Telegram."""
+    return f"barattolo_mini_{int(tg_id)}"
+
+
+def imposta_cookie_mini(response: Response, tg_id: int, token_list: list):
+    """Il portachiavi della Mini App: HttpOnly come i fratelli, ma
+    SameSite=None e Partitioned — dentro Telegram Web la Mini App e' un
+    iframe, e un cookie Lax li' non viaggerebbe. Non e' una porta per
+    il CSRF: si legge SOLO accanto a un initData valido, che un sito
+    altrui non sa firmare. In collaudo (http) resta Lax: None senza
+    Secure il browser lo butta. Vuoto = si cancella con gli STESSI
+    attributi, o il browser non lo riconosce come suo."""
+    sicuro = cookie_sicuro()
+    opz = dict(httponly=True, secure=sicuro, path="/",
+               samesite="none" if sicuro else "lax")
+    valore = SEP_PORTACHIAVI.join(token_list)
+    eta = GIORNI_SESSIONE_WEB * 86400 if token_list else 0
+    try:
+        response.set_cookie(cookie_mini(tg_id), valore, max_age=eta,
+                            partitioned=sicuro, **opz)
+    except TypeError:
+        # una Starlette di ieri non conosce `partitioned`
+        response.set_cookie(cookie_mini(tg_id), valore, max_age=eta, **opz)
+
+
+def telegram_della_richiesta() -> int | None:
+    """Il Telegram che bussa, quando conta: leva accesa e initData
+    presente. Un initData storto alza il 401 di sempre — mai una
+    sessione aperta «da web» dentro la WebView di Telegram, dove
+    sarebbe di tutti gli account del telefono."""
+    if not PIU_ACCOUNT_OVUNQUE:
+        return None
+    c = _CONTO_RICHIESTA.get()
+    if not c or not c.get("init"):
+        return None
+    return int(_utente_da_initdata(c["init"])["id"])
+
+
+def conti_mini(tg_id: int) -> list:
+    """Gli account aperti nella Mini App di QUEL Telegram, vivi, col
+    token (che resta qui: non esce mai). Il Telegram stesso non c'e':
+    lui non ha una sessione, ha la firma."""
+    c = _CONTO_RICHIESTA.get() or {}
+    raw = (c.get("cookie") or {}).get(cookie_mini(tg_id), "")
+    return [x for x in portachiavi_conti(raw) if x["tg_id"] != int(tg_id)]
+
+
+def conto_scelto(user: dict) -> dict:
+    """L'ultimo passo di `verifica_utente` per chi arriva con l'initData:
+    se dentro la Mini App e' stato scelto un altro account, e quello sta
+    nel portachiavi di QUESTO Telegram, la richiesta e' sua."""
+    if not PIU_ACCOUNT_OVUNQUE:
+        return user
+    c = _CONTO_RICHIESTA.get()
+    grezzo = str((c or {}).get("conto") or "").strip()
+    if not grezzo:
+        return user
+    try:
+        chiesto = int(grezzo)
+    except ValueError:
+        raise HTTPException(401, MSG_CONTO_CHIUSO)
+    if chiesto == int(user["id"]):
+        return user
+    for x in conti_mini(int(user["id"])):
+        if x["tg_id"] == chiesto:
+            u = utente_da_sessione(x["token"])
+            if u:
+                return u
+    raise HTTPException(401, MSG_CONTO_CHIUSO)
+
+
+def conti_del_dispositivo() -> set:
+    """Tutti gli account aperti INSIEME da chi bussa: il portachiavi del
+    browser (piu' la sessione attiva) e, dentro la Mini App, il Telegram
+    col suo portachiavi. Niente IP, niente impronte: sono i mazzi di
+    chiavi che il dispositivo ci mostra da se'. Chi esce e rientra lo
+    aggira, ed e' il prezzo dichiarato di non raccogliere altro."""
+    c = _CONTO_RICHIESTA.get()
+    if not c:
+        return set()
+    cookie = c.get("cookie") or {}
+    ids = {x["tg_id"] for x in portachiavi_adottato(
+        cookie.get(COOKIE_PORTACHIAVI, ""), cookie.get("barattolo_sessione", ""))}
+    if c.get("init"):
+        try:
+            t = int(_utente_da_initdata(c["init"])["id"])
+        except HTTPException:
+            t = None
+        if t is not None:
+            ids.add(t)
+            ids |= {x["tg_id"] for x in conti_mini(t)}
+    return ids
+
+
+def annota_insieme(chi: int, altro: int, cosa: str, rif: str = "") -> bool:
+    """L'ANNOTAZIONE PER IL MODERATORE (decisione di Andrea, 16 ott 2026):
+    due account aperti insieme che si comprano, si puntano o si votano
+    NON si bloccano — si scrive una riga, e si decide dopo. Apre la sua
+    connessione e si chiama a transazione chiusa (o prima di aprirla):
+    un'annotazione non deve mai tenere in ostaggio il lucchetto di un
+    acquisto. Fail-open: un errore qui non ferma niente."""
+    if not PIU_ACCOUNT_OVUNQUE or not chi or not altro or chi == altro:
+        return False
+    try:
+        ids = conti_del_dispositivo()
+        if int(chi) not in ids or int(altro) not in ids:
+            return False
+        con = db()
+        try:
+            con.execute(
+                "INSERT INTO account_insieme(chi, altro, cosa, rif, quando) "
+                "VALUES(?,?,?,?,?)",
+                (int(chi), int(altro), cosa, rif[:120], int(time.time())))
+            con.commit()
+        finally:
+            con.close()
+        return True
+    except Exception as e:
+        print(f"👥 [account insieme] annotazione non scritta: {e}", flush=True)
+        return False
+
+
+def _quanto_aspetta(con, tg_id: int) -> int:
+    """Quante cose aspettano un gesto di quell'account mentre se ne usa
+    un altro: gli scambi P2P dove tocca a lui (i timer di Mostro corrono
+    comunque) e gli ordini pagati da spedire. Fail-open a zero."""
+    try:
+        n = _quanti_tocca_p2p(con, tg_id, int(time.time()))
+        n += con.execute("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
+                         "AND stato='locked'", (tg_id,)).fetchone()[0]
+        return int(n or 0)
+    except Exception:
+        return 0
+
+
 def _utente_da_initdata(init_data: str) -> dict:
     """L'initData GIUDICATO, senza scrivere niente (26 set 2026, con la
     fila «Scambi P2P» in vetrina): la firma dice CHI, la freschezza
@@ -9702,16 +9911,18 @@ def verifica_utente(init_data: str, sessione: str = "") -> dict:
         _upsert_da_telegram(con, user["id"], user["first_name"], user["username"])
         con.commit()
         con.close()
-        return user
+        return conto_scelto(user)
     try:
         con = db()
         _upsert_da_telegram(con, user["id"], user.get("first_name", ""),
                             user.get("username", ""))
         con.commit()
         con.close()
-        return user
     except Exception:
         raise HTTPException(401, "Autenticazione Telegram non valida")
+    # FUORI dal try, apposta: il suo 401 dice «l'account scelto non e'
+    # piu' aperto», e l'except qui sopra lo riscriverebbe generico
+    return conto_scelto(user)
 
 
 def utente_se_autenticato(init_data: str, sessione: str = "") -> dict | None:
@@ -9816,6 +10027,7 @@ async def login_telegram_ritorno(req: Request,
 
 @app.get("/api/sessioni")
 def sessioni_aperte(response: Response,
+                    x_tg_init_data: str = Header(""),
                     barattolo_sessione: str = Cookie(""),
                     barattolo_portachiavi: str = Cookie("")):
     """Gli account aperti su questo browser, per il menu del tappo.
@@ -9828,6 +10040,9 @@ def sessioni_aperte(response: Response,
     da un cookie HttpOnly per finire in mano al JavaScript, cioe' si
     butterebbe via l'unica difesa che quel cookie ha. A dire «passa a
     questo» basta il tg_id, che di suo non apre niente."""
+    t = telegram_della_richiesta() if x_tg_init_data else None
+    if t is not None:
+        return _sessioni_mini(response, t)
     conti = portachiavi_adottato(barattolo_portachiavi, barattolo_sessione)
     # Si riscrive il cookie solo se e' cambiato qualcosa: l'adozione, o
     # le sessioni morte che `portachiavi_conti` ha appena tolto.
@@ -9840,9 +10055,63 @@ def sessioni_aperte(response: Response,
             if c["token"] == barattolo_sessione:
                 attivo = c["tg_id"]
     return {"attivo": attivo,
+            "attivo_id": None if attivo is None else str(attivo),
             "massimo": MAX_ACCOUNT_BROWSER,
-            "conti": [{k: v for k, v in c.items() if k != "token"}
-                      for c in conti]}
+            "conti": _con_aspetta([{k: v for k, v in c.items() if k != "token"}
+                                   for c in conti])}
+
+
+def _con_aspetta(conti: list) -> list:
+    """Con la leva accesa ogni riga del selettore dice quante cose
+    aspettano quell'account (il segno «⚡»). Spenta: le righe di ieri."""
+    if not PIU_ACCOUNT_OVUNQUE or not conti:
+        return conti
+    con = db()
+    try:
+        for c in conti:
+            c["aspetta"] = _quanto_aspetta(con, c["tg_id"])
+    finally:
+        con.close()
+    return conti
+
+
+def _sessioni_mini(response: Response, t: int) -> dict:
+    """Il selettore DENTRO la Mini App: in testa il Telegram (che non si
+    puo' chiudere: e' Telegram a dirci chi e'), poi gli account aperti
+    nel suo portachiavi. L'attivo e' quello scelto, se e' ancora vivo;
+    se no il Telegram. Il cookie si riscrive solo se ha perso qualcuno,
+    come fa il fratello del web."""
+    c = _CONTO_RICHIESTA.get() or {}
+    conti = conti_mini(t)
+    vivi = [x["token"] for x in conti]
+    raw = (c.get("cookie") or {}).get(cookie_mini(t), "")
+    if raw and vivi != _portachiavi_token(raw):
+        imposta_cookie_mini(response, t, vivi)
+    con = db()
+    try:
+        u = con.execute("SELECT nome, username, negozio, avatar, avatar_scelta, "
+                        "npub_accesso FROM utenti WHERE tg_id=?", (t,)).fetchone()
+    finally:
+        con.close()
+    testa = {"tg_id": t, "id": str(t), "telegram": True,
+             "nome": (u["nome"] if u else "") or "",
+             "username": (u["username"] if u else "") or "",
+             "negozio": (u["negozio"] if u else "") or "",
+             "npub": (u["npub_accesso"] if u else "") or "",
+             "avatar": "" if (not u or u["avatar_scelta"] == "nessuna")
+                       else (u["avatar"] or "")}
+    ids = {x["tg_id"] for x in conti}
+    try:
+        scelto = int(str(c.get("conto") or "").strip() or t)
+    except ValueError:
+        scelto = t
+    attivo = scelto if scelto in ids else t
+    return {"attivo": attivo, "attivo_id": str(attivo),
+            "massimo": MAX_ACCOUNT_BROWSER,
+            "telegram": t, "telegram_id": str(t),
+            "conti": _con_aspetta(
+                [testa] + [{k: v for k, v in x.items() if k != "token"}
+                           for x in conti])}
 
 
 @app.post("/api/sessioni/attiva")
@@ -9872,7 +10141,8 @@ async def sessione_attiva(req: Request, response: Response,
 
 
 @app.post("/api/logout")
-def logout(response: Response, barattolo_sessione: str = Cookie(""),
+def logout(response: Response, x_tg_init_data: str = Header(""),
+           barattolo_sessione: str = Cookie(""),
            barattolo_portachiavi: str = Cookie("")):
     """Chiude SOLO la sessione di questo browser (altri dispositivi
     restano collegati). Funziona anche con un cookie ormai scaduto:
@@ -9882,7 +10152,18 @@ def logout(response: Response, barattolo_sessione: str = Cookie(""),
     logout di sempre, byte per byte. Chi vuole uscire da tutti tocca
     «Esci» una volta per account, ed e' voluto: un bottone che chiude
     in un colpo anche l'account su cui non si sta e' il modo di
-    buttare fuori qualcuno per sbaglio."""
+    buttare fuori qualcuno per sbaglio.
+    DENTRO LA MINI APP (leva PIU_ACCOUNT_OVUNQUE) esce l'account SCELTO
+    e si torna al Telegram, che da qui non si chiude: lui e' la firma."""
+    t = telegram_della_richiesta() if x_tg_init_data else None
+    if t is not None:
+        scelto = str((_CONTO_RICHIESTA.get() or {}).get("conto") or "").strip()
+        conti = conti_mini(t)
+        via = [x for x in conti if str(x["tg_id"]) == scelto]
+        _chiudi_sessioni([x["token"] for x in via])
+        imposta_cookie_mini(response, t,
+                            [x["token"] for x in conti if x not in via])
+        return {"ok": True, "attivo": t}
     resto = [c for c in portachiavi_conti(barattolo_portachiavi)
              if c["token"] != barattolo_sessione]
     if barattolo_sessione:
@@ -9898,6 +10179,73 @@ def logout(response: Response, barattolo_sessione: str = Cookie(""),
         return {"ok": True, "attivo": resto[-1]["tg_id"]}
     response.delete_cookie("barattolo_sessione", path="/")
     return {"ok": True, "attivo": None}
+
+
+def _chiudi_sessioni(token_list: list) -> int:
+    """Revoca nel database le sessioni di questi token (il cookie da
+    solo non basta: chi l'avesse copiato entrerebbe ancora)."""
+    hashes = [hashlib.sha256(t.encode()).hexdigest() for t in token_list if t]
+    if not hashes:
+        return 0
+    con = db()
+    try:
+        n = con.execute(
+            f"DELETE FROM sessioni WHERE token_hash IN "
+            f"({','.join('?' * len(hashes))})", hashes).rowcount
+        con.commit()
+    finally:
+        con.close()
+    return n
+
+
+@app.get("/api/admin/account-insieme")
+def account_insieme_admin(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le annotazioni «questi account erano aperti insieme»
+    (16 ott 2026), le piu' recenti prima, coi NOMI dei due — che il
+    pannello mostra gia' altrove. Con la leva spenta non esiste (404):
+    il cassetto non nasce. Il 403 prima di tutto, come le sorelle."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not PIU_ACCOUNT_OVUNQUE:
+        raise HTTPException(404, "Not Found")
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT a.id, a.chi, a.altro, a.cosa, a.rif, a.quando, "
+            "       u1.nome AS nome_chi, u2.nome AS nome_altro "
+            "FROM account_insieme a "
+            "LEFT JOIN utenti u1 ON u1.tg_id = a.chi "
+            "LEFT JOIN utenti u2 ON u2.tg_id = a.altro "
+            "ORDER BY a.id DESC LIMIT 100").fetchall()
+    finally:
+        con.close()
+    return [dict(r) for r in righe]
+
+
+@app.post("/api/logout/tutti")
+def logout_tutti(response: Response, x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie(""),
+                 barattolo_portachiavi: str = Cookie("")):
+    """«ESCI DA TUTTI» (16 ott 2026, richiesta di Andrea: rovescia la
+    regola d'agosto «un Esci per account», e il foglio lo chiede con una
+    conferma). Sul web chiude ogni sessione del portachiavi e la attiva;
+    dentro la Mini App gli account aggiunti, e si resta sul Telegram.
+    Con la leva spenta non esiste: 404, il mondo di ieri."""
+    if not PIU_ACCOUNT_OVUNQUE:
+        raise HTTPException(404, "Not Found")
+    t = telegram_della_richiesta() if x_tg_init_data else None
+    if t is not None:
+        n = _chiudi_sessioni([x["token"] for x in conti_mini(t)])
+        imposta_cookie_mini(response, t, [])
+        return {"ok": True, "chiusi": n, "attivo": t}
+    token = [c["token"] for c in portachiavi_adottato(barattolo_portachiavi,
+                                                      barattolo_sessione)]
+    n = _chiudi_sessioni(token + [barattolo_sessione])
+    imposta_cookie_portachiavi(response, [])
+    response.delete_cookie("barattolo_sessione", path="/")
+    return {"ok": True, "chiusi": n, "attivo": None}
 
 
 # --- Login Nostr: le fondamenta della verifica -----------------------
@@ -29937,6 +30285,17 @@ def _leve_stato():
             _leva("Annunci diversi in un carrello", "MAX_RIGHE_SET",
                   MAX_RIGHE_SET),
         ]},
+        {"gruppo": "👥 Più account", "voci": [
+            _leva("Più account ovunque", "PIU_ACCOUNT_OVUNQUE",
+                  bool(PIU_ACCOUNT_OVUNQUE),
+                  acceso="anche dentro la Mini App si aggiungono account "
+                         "Nostr; conferme col volto, «Esci da tutti», "
+                         "annotazioni per il moderatore",
+                  spento="il multi-account c'è solo sul web e nella PWA, "
+                         "com'era ad agosto"),
+            _leva("Account insieme sullo stesso dispositivo",
+                  "MAX_ACCOUNT_BROWSER", MAX_ACCOUNT_BROWSER),
+        ]},
         {"gruppo": "🏆 Classifica", "voci": [
             _leva("La classifica del mercatino", "CLASSIFICA_ATTIVA",
                   bool(CLASSIFICA_ATTIVA),
@@ -32836,6 +33195,8 @@ async def fai_puntata(annuncio_id: int, req: Request,
             _stesse_chiavi_nostr(con, a["venditore_id"], user["id"]):
         con.close()
         raise HTTPException(400, "Non puoi puntare sulla tua stessa asta")
+    annota_insieme(user["id"], a["venditore_id"], "puntata all'asta",
+                   f"annuncio #{annuncio_id}")
     # CINTURA: per costruzione non ci si arriva — un'asta viva blocca
     # la partenza per le ferie, quindi in ferie non ce ne sono. Ci va
     # lo stesso: una guardia che oggi non scatta e' quella che regge
@@ -35719,6 +36080,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
     if venditore_id == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    # due account aperti insieme: si annota, non si blocca (PIU' ACCOUNT
+    # OVUNQUE) — prima delle scritture, con la sua connessione
+    annota_insieme(user["id"], venditore_id, "acquisto avviato (carrello)",
+                   "annunci #" + ",".join(str(i) for i in richieste))
     # La quarta guardia dell'accordo (il calco del mono): il venditore
     # dell'accordo dev'essere quello del set. Per costruzione lo e' —
     # le righe vengono dalle figlie — ma una guardia che oggi non
@@ -37584,6 +37949,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Annuncio non disponibile")
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
+    # due account aperti insieme: si annota, non si blocca (PIU' ACCOUNT
+    # OVUNQUE) — prima delle scritture, con la sua connessione
+    annota_insieme(user["id"], a["venditore_id"], "acquisto avviato",
+                   f"annuncio #{a['id']}")
     # Il negozio in ferie non vende: qui, ben prima della invoice —
     # l'annuncio resta in vetrina, ma i sats non si muovono.
     guardia_ferie(con, a["venditore_id"])
@@ -42556,6 +42925,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # tarature — K, RIF e il peso sono roba del giudice, e un
     # numero in piu' qui non aiuterebbe nessuno a decidere niente.
     profilo["classifica_attiva"] = bool(CLASSIFICA_ATTIVA)
+    # PIU' ACCOUNT OVUNQUE (16 ott 2026): il client deve sapere se il
+    # selettore vive anche dentro Telegram, le conferme col volto e
+    # «Esci da tutti». Il FATTO, dalla leva viva.
+    profilo["piu_account"] = bool(PIU_ACCOUNT_OVUNQUE)
     # Stessa regola dei distintivi: catalogo COMPLETO col flag, cosi'
     # chi non ha ancora sbloccato un titolo vede comunque cosa c'e' e
     # cosa serve — che e' la molla.
@@ -50960,14 +51333,25 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     if chi:
         fuori["miei"] = sorted(d for d, t in (F.get("autori") or {}).items()
                                if t == chi)
+    # ...e quelli dei MIEI ALTRI account aperti qui (PIU' ACCOUNT
+    # OVUNQUE, 16 ott 2026): prenderli vorrebbe dire pagare le
+    # commissioni a se stessi per niente, e il client li rifiuta. Escono
+    # gli id e mai di quale account sono: chi guarda li ha gia' tutti.
+    altri = (_altri_conti_qui(chi) if chi and PIU_ACCOUNT_OVUNQUE
+             and fuori["eventi"] else set())
+    if altri:
+        fuori["altri_miei"] = sorted(
+            d for d, t in (F.get("autori") or {}).items() if t in altri)
     # L'ETAG (cura 4): la fila la rilegge ogni 15 s e la fotografia cambia
     # ogni minuto, quindi tre letture su quattro tornavano identiche —
     # centinaia di KB riserializzati e rimandati. L'impronta e' il
     # momento della fotografia piu' chi guarda: a impronta uguale un 304
     # nudo, e il client tiene la copia che ha.
-    etag = f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}"'
+    etag = (f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}'
+            f'-{len(fuori.get("altri_miei") or [])}"')
     testa = {"Cache-Control": "private, max-age=10",
-             "Vary": "X-Tg-Init-Data, Cookie", "ETag": etag}
+             "Vary": "X-Tg-Init-Data, X-Barattolo-Conto, Cookie",
+             "ETag": etag}
     if req.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=testa)
     return JSONResponse(fuori, headers=testa)
@@ -50984,11 +51368,40 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
 P2P_SESSIONI_VOLTI_S = 300
 _P2P_SESSIONI_VOLTI: dict = {}
 
+# GLI ALTRI MIEI ACCOUNT, per il libro (16 ott 2026): la stessa memoria
+# di cinque minuti dei volti — il libro si rilegge ogni 15 secondi, e i
+# mazzi di chiavi del dispositivo non cambiano cosi' spesso. La chiave
+# e' l'impronta dei cookie di chi guarda: un mazzo nuovo e' un'altra voce.
+_P2P_ALTRI_CONTI: dict = {}
+
+
+def _altri_conti_qui(chi: int) -> set:
+    c = _CONTO_RICHIESTA.get() or {}
+    cookie = c.get("cookie") or {}
+    impronta = hashlib.sha256(
+        (str(chi) + "|" + "|".join(f"{k}={v}" for k, v in sorted(cookie.items())
+                                   if k.startswith("barattolo_"))).encode()
+    ).hexdigest()
+    adesso = time.time()
+    v = _P2P_ALTRI_CONTI.get(impronta)
+    if v and v[0] > adesso:
+        return v[1]
+    try:
+        altri = conti_del_dispositivo() - {int(chi)}
+    except Exception:
+        altri = set()
+    if len(_P2P_ALTRI_CONTI) > 5000:
+        _P2P_ALTRI_CONTI.clear()
+    _P2P_ALTRI_CONTI[impronta] = (adesso + P2P_SESSIONI_VOLTI_S, altri)
+    return altri
+
 
 def _chi_guarda_p2p(init_data: str, sessione: str) -> int:
     if init_data:
+        # l'account SCELTO nella Mini App, se ce n'e' uno: i «miei» del
+        # libro sono suoi, non del Telegram che lo ospita
         try:
-            return int(_utente_da_initdata(init_data).get("id") or 0)
+            return int(conto_scelto(_utente_da_initdata(init_data)).get("id") or 0)
         except Exception:
             return 0
     if not sessione:
@@ -51570,6 +51983,7 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise
     finally:
         con.close()
+    annota_insieme(user["id"], per, "recensione P2P", f"{voto}★")
     stelle = "★" * voto
     # NIENTE ID NEL MESSAGGIO: nella pagina dello scambio l'id non si
     # mostra per decisione di Andrea («di qua non serve a nessuno, e di
@@ -73875,6 +74289,7 @@ async def lascia_feedback(ordine_id: int, req: Request,
         raise
     finally:
         con.close()
+    annota_insieme(user["id"], per, "feedback", f"ordine #{ordine_id}, {voto}★")
     stelle = "★" * voto
     await notifica(per,
                    f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "

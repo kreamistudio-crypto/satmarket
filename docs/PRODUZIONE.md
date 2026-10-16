@@ -264,6 +264,18 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `grep -n "^MODIFICA_MASSIVA_ATTIVA" /srv/barattolo/config.py`.
   Spegnerla = togliere la riga (o `False`) e riavviare: le modifiche
   già fatte restano, l'«↩︎ Annulla» sparisce con le rotte.
+- PIÙ ACCOUNT OVUNQUE (16 ott 2026): la leva `PIU_ACCOUNT_OVUNQUE` nasce
+  SPENTA nel codice e si AGGIUNGE al config del VPS solo dopo la prova di
+  Andrea. Prima si guarda, in sola lettura, che non ci sia già:
+  `grep -n "^PIU_ACCOUNT_OVUNQUE" /srv/barattolo/config.py`. Per accenderla
+  una riga `PIU_ACCOUNT_OVUNQUE = True` nel `config.py` del VPS, poi
+  `sudo systemctl restart barattolo`; per spegnerla si cancella la riga
+  e si riavvia. Nessuna colonna da migrare (la tabella
+  `account_insieme` nasce da sola all'avvio, vuota). Si verifica nel
+  pannello «⚙️ Stato delle leve», gruppo «👥 Più account». A leva
+  spenta resta il multi-account del web d'agosto, coi due guasti curati
+  (la pastiglia nel Profilo e lo switch verso gli account nati con
+  Nostr). Coi perché: Architettura, «PIÙ ACCOUNT OVUNQUE».
 - LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
   AGGIUNGE al config del VPS come le altre, e finche' manca o e'
   `False` le card le vedono solo i moderatori e chi e' in

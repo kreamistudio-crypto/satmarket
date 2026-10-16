@@ -147,3 +147,4 @@ collaudo_tempo_pubblica.py
 collaudo_gesti_ordine.py
 collaudo_ordine_in_pausa.py
 collaudo_paracadute.py
+collaudo_piu_account.py

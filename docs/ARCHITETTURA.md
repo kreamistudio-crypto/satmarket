@@ -9584,6 +9584,84 @@
   commenti — quindi il giro «dal vivo» stava entrando con l'identità
   finta del collaudo e diceva `WEB: false` per la ragione sbagliata.
   Una verifica che fallisce si guarda prima di crederle.
+  PIÙ ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea; leva
+  `PIU_ACCOUNT_OVUNQUE`, SPENTA di serie): rovescia due decisioni
+  d'agosto — «solo web e PWA» e «un Esci per account» — e ne lascia in
+  piedi il cuore: il cookie attivo del web, il portachiavi, la porta
+  unica `apri_sessione`, l'anti-oracolo. A leva spenta il mondo è quello
+  d'agosto byte per byte (i guasti curati sotto valgono anche spenta).
+  DENTRO LA MINI APP LA FIRMA DI TELEGRAM NON SI SCAVALCA MAI: ogni
+  richiesta porta l'initData come sempre, e un initData storto resta
+  401. L'account scelto viaggia ACCANTO, in `X-Barattolo-Conto`, e
+  `conto_scelto` (l'ultimo passo di `verifica_utente`, FUORI dal suo
+  try) lo accetta solo se la sua sessione sta nel portachiavi di QUEL
+  Telegram — il cookie `barattolo_mini_<tg_id>`, uno per ogni Telegram
+  del telefono, perché Telegram ha UNA WebView per tutti i suoi account
+  (la lezione del conto sul dispositivo, 10 set 2026). Così i ~50
+  endpoint non cambiano firma: lo legge un contextvar
+  (`_CONTO_RICHIESTA`, scritto da `segna_host`). La strada scartata è
+  «nella Mini App si smette di mandare l'initData e si usa il cookie
+  del web»: semplice, ma il cookie della WebView è di tutti i Telegram
+  del telefono, e il secondo userebbe gli account Nostr del primo.
+  UN ACCOUNT SCELTO CHE NON C'È PIÙ È UN 401 DETTO (`MSG_CONTO_CHIUSO`),
+  MAI UNA RICADUTA MUTA sul Telegram: un gesto pensato per l'uno
+  finirebbe sull'altro. Il client riconosce la frase nel suo filo
+  (`fetchColConto`, montato SOPRA `fetchCheRiprova` in un montaggio
+  solo), torna al Telegram e ricarica.
+  IL PORTACHIAVI DELLA MINI APP È HttpOnly, SameSite=None e Partitioned:
+  dentro Telegram Web la Mini App è un iframe, e un Lax lì non viaggia.
+  Non apre un CSRF perché si legge SOLO accanto a un initData valido,
+  che un sito altrui non sa firmare. In collaudo (http) resta Lax.
+  `apri_sessione`, con la firma accanto e la leva accesa, mette la
+  sessione lì e non tocca i cookie del web; risponde
+  `X-Barattolo-Aperto` col nuovo id, che il client fa diventare lo
+  scelto. Il Telegram occupa un posto del tetto (restano
+  `MAX_ACCOUNT_BROWSER - 1` account), e la propria npub non apre niente.
+  UN SECONDO TELEGRAM SI APRE DAL MENU DI TELEGRAM, non da qui: la Mini
+  App riceve solo l'account attivo nel client, e il foglio lo dice.
+  LA SCELTA STA NEL TELEFONO, per Telegram: `barattolo_conto_mini@<id>`.
+  Il tasto di un avviso del bot apre un'altra memoria e parte dal
+  Telegram — giusto, gli avvisi del bot sono suoi; e se arriva mentre è
+  scelto un account Nostr, `avvisoPerAltroConto` chiede «Questo avviso
+  è per X» e un tocco porta al Telegram SULLO STESSO INDIRIZZO
+  (`ricaricaPerConto(true)`), mai un cambio da solo.
+  IL CLOUDSTORAGE DI TELEGRAM È DEL TELEGRAM: con un account scelto
+  `cloudTelegram()` torna null, o il mazzo P2P di quell'account finirebbe
+  nella nuvola di chi lo ospita (la «seconda memoria»).
+  L'ID VIAGGIA COME TESTO (`c.id`, `attivo_id`), ed è il guasto dal campo
+  che il cantiere ha trovato: un account nato con Nostr ha un id fino a
+  -2^63, JavaScript lo arrotonda, e lo switch del web rispondeva «non è
+  aperto» verso di lui. L'altro guasto: sul telefono il tappo nel
+  Profilo NON c'è (vive nella testata di Esplora), quindi il «secondo
+  tocco» non aveva dove cadere — ora la foto della testata del Profilo
+  apre il foglio, e sotto il titolo c'è la PASTIGLIA dell'account
+  attivo (foto, nome, numero degli aperti), sempre, anche con un
+  account solo: lì c'è «Aggiungi un account». È una porta al foglio,
+  non un secondo elenco.
+  I GESTI COI SOLDI (`soldi: true` in `chiediConferma`, i due fogli di
+  pagamento, la pagina dell'ordine P2P sopra «Compra/Vendi») mostrano
+  «Stai usando <volto, nome>» quando gli aperti sono più d'uno.
+  «ESCI DA TUTTI» (`/api/logout/tutti`, 404 a leva spenta) chiude le
+  sessioni anche nel database, con una conferma — e il foglio degli
+  account si chiude PRIMA, perché sta dopo `#confermaSheet` nel DOM e la
+  domanda restava sotto (visto coi tocchi veri). Dentro la Mini App
+  escono gli aggiunti e resta il Telegram.
+  L'ANTIABUSO ANNOTA E NON BLOCCA (decisione di Andrea): acquisto,
+  carrello, puntata, feedback e recensione P2P fra due account aperti
+  INSIEME scrivono una riga in `account_insieme` (chi, l'altro, cosa,
+  su cosa, quando), che il cassetto «👥 Account aperti insieme» del
+  pannello admin mostra. Niente IP, niente impronte: «insieme» è quel
+  che i mazzi di chiavi del dispositivo dicono da sé
+  (`conti_del_dispositivo`), e chi esce e rientra lo aggira — il prezzo
+  dichiarato. `annota_insieme` apre la sua connessione e si chiama fuori
+  dalle transazioni: un'annotazione non tiene il lucchetto di un
+  acquisto. L'UNICO RIFIUTO è prendere un ordine P2P di un proprio
+  altro account (commissioni pagate a se stessi): `/api/p2p/libro`
+  manda `altri_miei` (gli id, mai di chi), e il telefono spegne il
+  bottone e rifiuta in `confermaDettaglioP2P` ed `eseguiPresaP2P`.
+  Le prove: `prove_piu_account_ovunque`, `collaudo_piu_account.py` (in
+  CI), e il giro coi tocchi veri del 16 ott (CANTIERI, «Più account
+  ovunque»).
   Doppia cittadinanza (lug 2026, poi set 2026): le due direzioni del
   collegamento. Telegram→Nostr: `POST /api/me/npub/collega-firma`
   (vedi «L'accesso Nostr firmato», qui sotto) è l'UNICA porta —

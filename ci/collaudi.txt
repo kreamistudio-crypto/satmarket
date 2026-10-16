@@ -114,6 +114,7 @@ collaudo_tempo_pubblica
 collaudo_gesti_ordine
 collaudo_ordine_in_pausa
 collaudo_paracadute
+collaudo_piu_account
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

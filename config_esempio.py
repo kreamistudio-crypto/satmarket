@@ -1665,13 +1665,26 @@ ORE_INITDATA = 24
 # PIU' ACCOUNT SULLO STESSO BROWSER (ago 2026): quante identita' si
 # tengono aperte insieme e si scambiano dal Profilo senza rifare il
 # login — il caso vero e' «il mio account e quello del negozio».
-# Vale SOLO su web e PWA: dentro Telegram l'identita' la impone il
-# client (l'initData firmato), e li' non c'e' niente da scegliere.
+# Vale su web e PWA; dentro Telegram solo con PIU_ACCOUNT_OVUNQUE
+# (qui sotto): li' l'identita' la impone l'initData firmato, e gli
+# account in piu' si aggiungono accanto, mai al suo posto.
 # Ogni account in piu' e' un token nel cookie del portachiavi (~43
 # caratteri): il tetto non protegge dal peso, tiene corta una lista
 # che si legge con un dito. Al limite cede il piu' VECCHIO, mai
 # l'account su cui si e' appena entrati.
+# Dentro la Mini App (con la leva qui sotto accesa) il Telegram occupa
+# un posto: restano MAX_ACCOUNT_BROWSER - 1 account Nostr.
 MAX_ACCOUNT_BROWSER = 5
+
+# PIU' ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea): il selettore
+# anche DENTRO la Mini App (il proprio Telegram + account Nostr, un
+# portachiavi per ogni Telegram del telefono), il volto dell'account
+# attivo in ogni conferma coi soldi, «Esci da tutti», il rifiuto di
+# prendere un ordine P2P di un proprio account, e le annotazioni per il
+# moderatore quando due account aperti insieme si comprano o si votano
+# (si ANNOTA, non si blocca). Il multi-account del web d'agosto vive
+# anche a leva spenta. SPENTA di serie: si accende dopo la prova.
+PIU_ACCOUNT_OVUNQUE = False
 
 # LA RICERCA NON HA PIU' UNA QUOTA (ago 2026): `TETTO_RICERCHE_AI_ORA`
 # frenava le chiamate ad Anthropic della ricerca, e la ricerca non
