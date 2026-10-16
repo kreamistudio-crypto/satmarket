@@ -60927,6 +60927,15 @@ apertura e NESSUN connect oggi.
 4. Si rimisura a metà novembre col comando A (e col comando C su due
    fatture fresche, per vedere se i suggerimenti cambiano).
 
+**LA DECISIONE DI ANDREA E ALAN** (16 ott 2026, dopo aver letto questa
+voce): si lascia tutto così. Nessuna apertura, nessun canale nuovo. Le
+commissioni di rete dei payout le assorbe Barattolo: per ora nessuna
+tariffa né al compratore né al venditore (la regola del «chi» del 15
+ott resta: se un giorno ci sarà, mai al venditore). Si rimisura a metà
+novembre col comando A dell'appendice, per tenere d'occhio quanto
+spendiamo; la condizione per riaprire il canale resta ≥1M on-chain
+sopra la riserva.
+
 **STRADE SCARTATE.** `039174f8` (non è nelle fatture di oggi); un canale
 verso `030936e7` (privato); lo swap da Lightning a on-chain per
 finanziare il canale; un canale piccolo con l'on-chain di oggi; un giro
