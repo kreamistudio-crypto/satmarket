@@ -60813,3 +60813,203 @@ resta 263).
 - Se un collaudo «a cronometro» comincia a ballare col parallelo, si
   dichiara e si guarda quel collaudo; non si torna a `--paralleli 1`
   senza averlo nominato.
+
+## Il canale verso Spark/WoS: quale nodo, quanto, e perché oggi no (16 ott 2026, cantiere canale-wos, studio chiesto da Andrea: comandi di sola lettura sul nodo lanciati da Andrea, nessun connect né apertura)
+
+**LA DOMANDA.** Aprire dal nodo un canale il più vicino possibile a
+Wallet of Satoshi/Spark per pagare meno commissioni sui payout. Gli
+studi del 15 e del 16 ott dicevano: il grosso delle commissioni va
+verso `030936e7` (privato, non si apre), e il primo salto (ACINQ) ne
+prende circa tre quarti. Andrea ha anticipato a oggi il riesame
+previsto per metà novembre. Tre comandi di sola lettura (A, B, C:
+appendice), scritti da me, provati su risposte di cartone e lanciati
+da Andrea uno alla volta; le fonti pubbliche da mempool.space.
+
+**COMANDO A: CHI CONSEGNA L'ULTIMO TRATTO** (pagamenti riusciti dei 30
+giorni verso `030936e7`, raggruppati per penultimo salto e per nostro
+primo canale; fee in sats e ppm del totale):
+
+| penultimo | primo canale | salti | htlc | sats | fee | primo | in mezzo | penultimo | ppm |
+|---|---|---|---|---|---|---|---|---|---|
+| `039174f8` | ACINQ1M | 4 | 11 | 1.143.944 | 3.769 | 2.456 | 166 | 1.139 | 3.295 |
+| `02a98e8c` | ACINQ1M | 3 | 6 | 832.968 | 3.385 | 2.552 | 0 | 830 | 4.064 |
+| `039174f8` | ACINQ400k | 4 | 10 | 172.184 | 510 | 324 | 14 | 168 | 2.962 |
+| `039174f8` | LNBiG | 4 | 3 | 122.827 | 269 | 73 | 74 | 121 | 2.190 |
+| `02a98e8c` | LNBiG | 3 | 2 | 96.088 | 180 | 85 | 0 | 95 | 1.873 |
+| `039174f8` | ACINQ400k | 3 | 4 | 36.501 | 185 | 148 | 0 | 35 | 5.068 |
+
+In tutto 2.404.512 sats e 8.298 di fee (0,35 %). Il primo salto ne
+prende 5.638 (68 %: ACINQ 1.900-4.000 ppm, LNBiG 600-900), quelli in
+mezzo 254, il penultimo 2.388 (~1.000 ppm per tutti e due). Il 91 %
+del volume è uscito da ACINQ. Penultimi: `039174f8` 1.475.456 sats
+(61 %), `02a98e8c` 929.056 (39 %). Un canale diretto verso il
+penultimo toglie primo salto e salti in mezzo: 5.892 sats, lo 0,245 %,
+cioè ~2.450 sats per ogni milione che ci passa.
+
+**LA CORREZIONE ALLO STUDIO DEL 15 OTT.** Là il volume verso Spark era
+stimato ~6,4M sats al mese e il risparmio ~19.000 sats; il volume vero
+dei 30 giorni è 2,40M e il risparmio massimo ~5.900 sats al mese (~4 €).
+
+**COMANDO B: I DUE CANDIDATI E I NOSTRI CANALI.** `039174f8` e
+`02a98e8c` sono gemelli: stesse funzioni (anchors, zero-conf,
+scid-alias, script-enforced-lease: un LND), alias esadecimali a caso,
+indirizzi solo in chiaro su Amazon in Oregon (porte 10015 e 10016, più
+un 172.30.x privato), nessun onion, nati lo stesso giorno (28 ott 2022),
+un canale da 5 BTC fra loro. Che siano di Lightspark/Spark è una
+deduzione, non è scritto da nessuna parte pubblica.
+- Nel NOSTRO grafo: `039174f8` 380 canali (170 lati spenti), età
+  mediana 252 giorni, 85 aperti negli ultimi 30 giorni; `02a98e8c` 411
+  (188 spenti), mediana 316, 54 in 30 giorni. Tariffa loro in uscita
+  0-500 ppm; quella dei vicini verso di loro, mediana 2.000.
+- Perché la «capacità» del nostro grafo dice 10,6M e 500k: LND scrive 0
+  sui canali di cui non ha verificato on-chain il funding, e somma solo
+  gli altri (10M + 444k + 200k; 300k + 200k). Probabile effetto del
+  bitcoind potato, non verificato. I numeri veri sono quelli pubblici.
+- Pubblici (mempool.space, i cui dati Lightning sono FERMI AL 30 AGO
+  2026): `039174f8` ~103,9 BTC, 195 canali attivi, 1.314 chiusi in
+  quattro anni; `02a98e8c` ~97,6 BTC, 197 attivi, 1.218 chiusi. Chiudono
+  spesso: un canale con River è durato ~20 ore; le chiusure della prima
+  pagina sono quasi tutte d'accordo, una forzata (speed6, dopo 129
+  giorni). Gli indirizzi IP del 30 ago non sono quelli del nostro grafo
+  di stamattina (`32.185.182.51:10015`, `52.41.221.255:10016`): per una
+  connessione si usa sempre quello del grafo del giorno.
+- Vicini: ACINQ ha 5 BTC con ciascuno; LNBiG Hub-3 4,05 BTC con
+  `039174f8`, LNBiG Hub-2 (il NOSTRO vicino, `033e9ce4`) due canali con
+  `02a98e8c`, 5 + 3,41 BTC. Nel nostro grafo ACINQ chiede 2.999 ppm per
+  andare a `02a98e8c`, LNBiG Hub-2 642.
+- I nostri canali: LNBiG 5M, lato nostro 117.787, riserva 50.000, uscita
+  utile 67.787; ACINQ400k utile 299.477; ACINQ1M utile 240.998. In
+  tutto ~608.000 sats d'uscita.
+
+**COMANDO C: LE FATTURE DI WOS E IL SALDO ON-CHAIN.** Due fatture fatte
+da Andrea nell'app WoS (1.000 e 200.000 sats, non pagate), stesso
+risultato: destinazione `030936e7`, cltv finale 60, due suggerimenti di
+rotta — `02a98e8c` (base 0, 1.000 ppm, cltv 40) e `0200f9cb` (base 4
+milioni di sats, cltv 40.000: un'ESCA, nessuno la userà mai).
+`039174f8` nelle fatture di oggi NON c'è, mentre nei 30 giorni ha
+portato il 61 %: i suggerimenti cambiano nel tempo, o da fattura a
+fattura, e due fatture dello stesso momento non dicono quale.
+On-chain: 148.468 confermati, 0 non confermati, 0 bloccati, 30.000
+tenuti da LND per gli anchor: ~118.000 utilizzabili. Nessun canale in
+sospeso. Le nostre tariffe: ACINQ (tutti e due) 1 sat + 500 ppm, LNBiG
+1 sat + 2.500 ppm (non toccano i nostri pagamenti: il primo canale
+non si paga a se stessi).
+
+**IL VECCHIO NODO PUBBLICO DI WOS** (`035e4ff4`, WalletOfSatoshi.com):
+al 30 ago ancora attivo, 65 canali, ~2,7 BTC, Lunanode in Canada,
+nessun onion (e rifiuta i peer che arrivano da un exit Tor: studio
+liquidità, set 2026). I nostri pagamenti non ci passano: nel comando A
+il penultimo è sempre uno dei due gemelli. Non serve.
+
+**I CONTI DEL CANALE DIRETTO** (1M verso `02a98e8c`, con la rete a 1
+sat/vB come oggi): apertura ~150-250 vB a 2 sat/vB, ~300-500 sats; una
+chiusura d'accordo costa altrettanto e la paghiamo noi (chi apre paga);
+una forzata da parte loro qualche centinaio di sats oggi, qualche
+migliaio a 20 sat/vB, e i nostri sats tornano dopo un blocco (anchor). I
+sats non si perdono: si perdono le fee on-chain. Il guadagno ~2.450 sats
+per milione che passa; ~5.900 al mese solo se il canale si riempie (i
+clienti con WoS che pagano noi), altrimenti si svuota in ~12 giorni. La
+nostra tariffa su quel canale andrebbe alta (1 sat + 2.500 ppm): i
+nostri pagamenti non la pagano, chi passa da noi verso Spark sì.
+
+**LA DECISIONE DI ANDREA** (16 ott 2026, dopo il comando C): NESSUNA
+apertura e NESSUN connect oggi.
+1. Il candidato giusto è `02a98e8c`: è nelle fatture di WoS di oggi.
+   `039174f8` solo se tornasse nei suggerimenti delle fatture.
+2. Il tema si riapre con ≥1M di sats on-chain SOPRA la riserva (oggi
+   ~118.000). Procurarseli con uno swap non conviene: 1M con SATS
+   Routing costa ~7.100 sats, più di un mese di risparmio, e toglie
+   uscita. Un canale piccolo (~100k) non ripaga apertura e chiusura.
+3. La strada gratis c'è già: la nostra uscita su LNBiG cresce da sola
+   coi pagamenti che entrano da lì, e LNBiG Hub-2 porta a `02a98e8c` a
+   ~1.650-1.900 ppm invece dei ~3.000-4.000 da ACINQ. LND la sceglie da
+   sé quando c'è uscita: niente spostamenti a mano.
+4. Si rimisura a metà novembre col comando A (e col comando C su due
+   fatture fresche, per vedere se i suggerimenti cambiano).
+
+**STRADE SCARTATE.** `039174f8` (non è nelle fatture di oggi); un canale
+verso `030936e7` (privato); lo swap da Lightning a on-chain per
+finanziare il canale; un canale piccolo con l'on-chain di oggi; un giro
+su noi stessi verso LNBiG (costa quanto si risparmia); il vecchio nodo
+pubblico di WoS (non è sulla strada).
+
+**NOTATO STRADA FACENDO** (non toccato):
+- Il `feereport` mostra un quarto canale, `1063344292329750528`
+  (967106x577x0, 1 sat + 1 ppm: le tariffe di partenza di LND, mai
+  ritoccate), che `listchannels` non ha. `feereport` legge il grafo,
+  `listchannels` il database dei canali aperti: è un canale chiuso
+  rimasto sul grafo, nato 9 blocchi prima di ACINQ1M, probabilmente il
+  lease Magma chiuso il 16 set. Nessun sats dentro. Da guardare con
+  `getchaninfo` e `closedchannels`, sola lettura.
+- Nel nostro grafo quasi tutti i canali dei due gemelli hanno capacità
+  0: se LND ne tenga conto nel calcolo delle probabilità di una rotta,
+  non l'ho guardato.
+- I dati Lightning di mempool.space sono fermi al 30 ago 2026: per
+  età, chiusure e indirizzi si incrocia con amboss o col nostro grafo.
+
+**DA FARE QUANDO SI RIAPRE.** La prova di connessione verso `02a98e8c`
+(collega e scollega, nessun canale: dice se parla con un nodo che
+arriva da un exit Tor; un rifiuto all'apertura non costa niente, la
+transazione parte solo dopo il loro sì), col suo ok; poi l'apertura,
+con un ok separato.
+
+**APPENDICE: I COMANDI** (da `~/nodo` sul nodo).
+
+Il comando A, chi consegna l'ultimo tratto verso WoS (sola lettura):
+```bash
+cd ~/nodo && docker compose exec -T lnd lncli listpayments --max_payments 100000 | python3 -c '
+import json,sys,time,collections
+lim=time.time()-30*86400
+N={"1066579055655714817":"LNBiG","1063354188044304385":"ACINQ1M","1061107885743538177":"ACINQ400k"}
+G=collections.defaultdict(lambda:[0,0,0,0,0,0])
+P={}
+for p in json.load(sys.stdin)["payments"]:
+    if p["status"]!="SUCCEEDED" or int(p["creation_time_ns"])/1e9<lim: continue
+    for h in p["htlcs"]:
+        if h["status"]!="SUCCEEDED": continue
+        s=h["route"]["hops"]
+        if len(s)<2 or not s[-1]["pub_key"].startswith("030936e7"): continue
+        pen=s[-2]["pub_key"]; P[pen[:8]]=pen
+        k=(pen[:8],N.get(s[0]["chan_id"],s[0]["chan_id"]),len(s))
+        f=[int(x["fee_msat"]) for x in s]
+        a=G[k]; a[0]+=1; a[1]+=int(s[-1]["amt_to_forward_msat"])//1000
+        a[2]+=sum(f)//1000; a[3]+=f[0]//1000; a[4]+=sum(f[1:-2])//1000 if len(s)>2 else 0; a[5]+=f[-2]//1000
+print("penultimo|primo canale|salti|htlc|sats|fee tot|fee primo|fee in mezzo|fee penultimo|ppm tot|ppm primo|ppm penultimo")
+for (pen,c,l),(n,v,t,f0,fm,fp) in sorted(G.items(),key=lambda x:-x[1][1]):
+    ppm=lambda x:round(x*1e6/v) if v else 0
+    print(pen,c,l,n,v,t,f0,fm,fp,ppm(t),ppm(f0),ppm(fp),sep="|")
+print("--- penultimi interi")
+for k,v in sorted(P.items()): print(v)
+print("--- fine comando A")
+'
+```
+
+Il comando C, i suggerimenti di rotta di due fatture WoS (da fare
+nell'app, NON pagare) al posto di `FATTURA_UNO` e `FATTURA_DUE`, e il
+saldo on-chain (sola lettura):
+```bash
+cd ~/nodo && L="docker compose exec -T lnd lncli" && for F in FATTURA_UNO FATTURA_DUE; do $L decodepayreq --pay_req $F | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+print("== fattura verso",d["destination"][:8],"| sats",d.get("num_satoshis"),"| cltv finale",d.get("cltv_expiry"),"| suggerimenti di rotta",len(d.get("route_hints",[])))
+for r in d.get("route_hints",[]):
+    print("   "+" -> ".join("%s base %s msat %s ppm cltv %s" % (h["node_id"][:8],h.get("fee_base_msat",0),h.get("fee_proportional_millionths",0),h.get("cltv_expiry_delta")) for h in r.get("hop_hints",[])))
+'; done; $L walletbalance | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+print("on-chain | confermati",d.get("confirmed_balance"),"| non confermati",d.get("unconfirmed_balance"),"| bloccati",d.get("locked_balance"),"| riserva anchor",d.get("reserved_balance_anchor_chan"))
+'; echo '--- fine comando C'
+```
+
+Il comando B (i due candidati dal nostro grafo e le uscite dei nostri
+canali) non si ricopia: ha le chiavi intere, che stanno nell'uscita del
+comando A («penultimi interi»).
+
+L'apertura, quando ci saranno i sats e l'ok di Andrea (NON lanciato; la
+chiave intera e l'indirizzo si prendono dal comando A e da `getnodeinfo`
+del giorno):
+```bash
+cd ~/nodo && docker compose exec lnd lncli openchannel --node_key <chiave intera di 02a98e8c> --connect <indirizzo del giorno> --local_amt 1000000 --sat_per_vbyte 2 --base_fee_msat 1000 --fee_rate_ppm 2500 --memo canale-wos
+```
+
+Nel commit c'è solo questa voce.
