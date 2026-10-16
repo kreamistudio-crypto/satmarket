@@ -2977,3 +2977,21 @@ originali, e TUTTO il lavoro precedente dichiarato.
   quello esistente (privato dall'8 ott, tre commit di sola dichiarazione)
   reso pubblico, o ne vogliono uno nuovo? La storia dell'8 ott conta come
   «lavoro precedente dichiarato», ed è un punto a favore.
+
+### 13.8 La vetrina vera nel collaudo della demo (16 ott, sera)
+
+Sul portatile della demo, col Barattolo in collaudo gia' creato (il
+server acceso almeno una volta: il database lo fa lui), dall'account
+`alanbimbati`, dopo `git pull` di `~/satmarket`:
+
+```bash
+cd ~/satmarket && git pull --ff-only && .venv/bin/python copia_vetrina_demo.py   # → «✓ N annunci di M venditori scritti…», poi «✓ foto: nuova …»
+.venv/bin/python copia_vetrina_demo.py stato                                      # → quanti venditori e annunci copiati
+```
+
+Copia la vetrina PUBBLICA di barattolo.store (annunci attivi, venditori
+coi dati gia' pubblici, foto e miniature) nel database di collaudo; non
+tocca il database di produzione, si rifiuta senza `MODALITA_COLLAUDO =
+True`, e rilanciato aggiorna. Il perché, le scelte di Andrea (nomi veri,
+tutto) e la prova in CANTIERI, «La vetrina vera nel collaudo della demo».
+Il server non va riavviato: la vetrina si rilegge a ogni apertura.

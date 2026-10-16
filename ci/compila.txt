@@ -132,6 +132,7 @@ collaudo_pagamenti_non_arrivati.py
 collaudo_carrello_salvato.py
 collaudo_bollino_staff.py
 semina_demo.py
+copia_vetrina_demo.py
 collaudo_semina_demo.py
 collaudo_campagna_p2p_tutti.py
 collaudo_statistiche_p2p.py

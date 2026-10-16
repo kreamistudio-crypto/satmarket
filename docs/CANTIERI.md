@@ -61320,3 +61320,65 @@ davvero.
   tetto all'1 %, ma la frase è sbagliata.
 - Vedere dal vivo, la prima volta che succede, una riga «uscita_corta»
   nel journal del VPS e se il payout poi passa davvero.
+
+## La vetrina vera nel collaudo della demo: `copia_vetrina_demo.py` (16 ott 2026, cantiere vetrina-demo, richiesta di Andrea)
+
+Andrea, la sera del 16, col Barattolo in collaudo acceso sul portatile
+di Alan: «popola dei dati in locale copiando ciò che c'è in
+barattolo.store, voglio vedere la vetrina popolata». Il collaudo nasce
+con la sola semina della demo (un negozio, un annuncio): a Torino la
+vetrina deve sembrare il mercatino vero.
+
+**COSA FA.** Legge la vetrina PUBBLICA di barattolo.store come la legge
+un visitatore (`GET /api/listings`, cento per pagina col cursore), e
+scrive nel database di collaudo gli annunci attivi coi loro id di
+produzione (le foto si chiamano `a<id>_<n>.jpg`: niente da rinominare)
+e i venditori coi dati che la vetrina gia' mostra a tutti; poi scarica
+dalle rotte pubbliche `/foto/` le foto, le miniature `_min` e gli
+avatar nella `foto/` accanto al codice. Le colonne sono l'incrocio fra
+le voci della vetrina e `PRAGMA table_info`: un campo calcolato dal
+server non diventa una colonna. Il tg_id dei venditori non e' pubblico
+e non si copia: ognuno riceve un id finto da 7.000.001 in su, stabile
+fra un giro e l'altro.
+
+**LE TRE SCELTE DI ANDREA** (domande del 16 sera): il portatile di Alan
+e non il fisso; i NOMI VERI dei venditori (nome, username, npub
+dichiarata, avatar: gia' pubblici, ma in sala li vedranno i giudici —
+detto prima di scegliere); tutti gli annunci con tutte le foto, non un
+centinaio.
+
+**I PERCHÉ.**
+- *Perché non il database di produzione*: dentro ci sono ordini, chat,
+  indirizzi, saldi, tg_id, chiavi; e il VPS e' fuori dal perimetro della
+  sessione. La vetrina pubblica basta, ed e' gia' di tutti.
+- *Perché fail-closed come la semina*: senza `MODALITA_COLLAUDO = True`
+  non scrive un byte, vuole il database creato dal server e ne controlla
+  le tabelle; niente `import server`.
+- *Perché le famiglie hanno il solo capofila*: la vetrina pubblica le
+  mostra cosi', e le sorelle non ci sono; per una vetrina basta.
+- *Perché quattro scaricamenti insieme*: e' il server vero, si va piano.
+
+**PROVATO.** Sul fisso, su un database di collaudo nuovo creato dal
+server vero (porta 8097, config di prova cancellato prima del commit):
+`--max 120`, cioe' due pagine col cursore → 120 annunci di 32
+venditori, 544 file (foto, miniature, avatar) in 42 secondi, nessun
+errore; la vetrina locale ne conta 120, una foto e la sua miniatura
+rispondono 200 dalla rotta `/foto/`, la ricerca «bitcoin» trova 10
+annunci, `/negozio/<codice>` di un venditore copiato risponde 200, e nel
+Browser pane la home mostra le card coi prezzi e le foto. `stato` conta
+venditori e annunci copiati senza scrivere. Prove: `prove_script_nel_workflow`
+e `prove_elenco_dei_collaudi` (lo script e' in `ci/compila.txt`).
+
+**DA FARE** (notati, non fatti):
+- Un collaudo in gabbia (`ci/collaudi.txt`) con una vetrina finta in
+  locale al posto di barattolo.store: oggi la prova e' stata dal vivo.
+- Le varianti delle famiglie (le sorelle) non arrivano: se in demo si
+  apre una famiglia, mostra una variante sola.
+
+Cosa è girato su quale albero: sul commit dello script sopra `482398f`,
+la suite severa intera, 24.566 passate e 0 fallite, e i collaudi della
+CI in gabbia, 83 verdi e 0 rossi. Main poi è corso di due commit (la
+strada a pezzi, `37e9a4e`): rebase con un solo conflitto, in coda a
+questo file; sull'albero finale rigirate le sezioni che leggono i file
+toccati (`ci/compila.txt`, HACKATHON-SETUP, CANTIERI). Push col sì di
+Andrea («si si ok», 16 ott sera).
