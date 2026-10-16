@@ -28988,7 +28988,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   mossa. Il moderatore ha la sua linea (`passiModP2P`, card aperta): un
   passo è fatto se la cronaca ne sa l'ora, il primo non fatto è «in
   corso» con la disputa sotto, o «Scambio annullato» con la ✕ se lo
-  scambio si è chiuso. Gli avvisi Telegram non portano l'ora (ce l'ha
+  scambio si è chiuso; il terzo passo si chiama come per le parti
+  («PayCode pagato», «Contanti consegnati», «Euro inviati»): lo decide
+  il server (`_passo_euro_p2p`, `passo_euro` della riga), le parole le
+  mette `nomePassoEuroModP2P`. I PASSI SONO DATI DI DISPUTA: nella
+  pagina delle parti la tacca e il passo fermo li dà
+  `passoScambioP2P(o, euroPartitiP2P(o, orari))` — «Euro inviati» è
+  fatto solo con `euroInviatiAt` sulla riga o `fiat` nella cronaca, e
+  una disputa (o un annullo dopo la disputa) senza euro sta su quel
+  passo; «Ordine pubblicato» a ordine preso dice il fatto
+  (`pubblicatoPresoP2P`). Gli avvisi Telegram non portano l'ora (ce l'ha
   già il messaggio). Verbale: CANTIERI, «L'ora di ogni passo».
   LA ✕ VALE PER L'ACCOUNT (7 ott 2026): prima di togliere,
   `togliScambioP2P` chiede `POST /api/p2p/scambi/togli`

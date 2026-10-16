@@ -60558,6 +60558,11 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
                 "SELECT momento, quando, giro FROM p2p_momenti WHERE ordine=?",
                 (ordine,))], giro=int(r["giro"] or 0)),
         "garanzia_il": int((g["q"] if g else 0) or 0),
+        # IL NOME DEL TERZO PASSO (16 ott 2026, orari-passi): quello che
+        # leggono le parti — col PayCode «PayCode pagato», col contanti
+        # di persona saputo (`contanti`: la forma del recapito o il solo
+        # «Contanti») «Contanti consegnati»; '' = «Euro inviati»
+        "passo_euro": _passo_euro_p2p(dati),
         "sei_parte": parte,
         "presa_da": (nudo(_persona_disputa_p2p(con, r["presa_da"])) if r["presa_da"] else ""),
         "presa_da_me": mia, "presa_il": int(r["presa_il"] or 0),
@@ -62263,6 +62268,20 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
             "preso": any(str(x.get("momento")) == "preso" for x in del_giro),
             "quando": int(ultimo.get("quando") or 0),
             "payout_fallito": m == "payout_fallito"}
+
+
+def _passo_euro_p2p(dati) -> str:
+    """PURA: COME SI CHIAMA IL TERZO PASSO per il moderatore (16 ott 2026,
+    orari-passi, decisione di Andrea), dai numeri della frase
+    (`_dati_frase_p2p`): 'paycode' col PayCode del tabacchino, che vince
+    come nella pagina delle parti; 'contanti' col contanti di persona
+    SAPUTO (`contanti`: la forma del recapito di questo giro, o il solo
+    «Contanti» fra i metodi — mai il solo «forse»); '' per gli euro.
+    Le parole le mette il client, le stesse delle parti."""
+    d = dati or {}
+    if d.get("tabacchino"):
+        return "paycode"
+    return "contanti" if d.get("contanti") else ""
 
 
 def _orari_passi_p2p(momenti, creato: int = 0, mio: bool = False,

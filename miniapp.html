@@ -64418,7 +64418,18 @@ function renderOrdineP2P(){
   /* col PayCode il terzo passo ha il suo nome (23 set 2026) */
   if (tabOrd) passi[2] = {t: 'PayCode pagato',
     d: o.lato === 'compro' ? 'Alla cassa del tabacchino, in contanti' : 'Chi compra l\'ha pagato alla cassa'};
-  const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
+  /* L'ORA DI OGNI PASSO (16 ott 2026, orari-passi): quella di mostrod,
+     dall'archivio del server (vedi «L'ORA DI OGNI PASSO»). Si legge
+     PRIMA dei passi perche' dice anche se gli euro sono partiti. */
+  const orari = orariPassiP2P(o, p2pScambiServer ? p2pScambiServer[o.id] : null);
+  /* ⚠️ «EURO INVIATI» E' FATTO SOLO SE QUALCUNO L'HA DETTO (16 ott 2026,
+     decisione di Andrea: sono dati di disputa). La tacca di `in_disputa`
+     e di un annullo dopo la disputa e' 3, cioe' segnava gli euro
+     inviati anche su una disputa aperta prima: `passoScambioP2P` la
+     riporta a 2 se ne' la riga (`euroInviatiAt`) ne' la cronaca
+     (`orari.fiat`) lo sanno. */
+  const passo = passoScambioP2P(o, euroPartitiP2P(o, orari));
+  const prog = passo.prog;
   /* ⚠️ UN ANNULLATO NON E' «IN CORSO» (27 set 2026, dal campo): lo
      stepper restava sul primo passo col cerchio tratteggiato, cioe'
      diceva «si aspetta» di uno scambio chiuso. Adesso il passo su cui
@@ -64426,13 +64437,17 @@ function renderOrdineP2P(){
      — «Ordine annullato», «Scambio annullato», «Ordine non pubblicato» —
      con la data, e la ✕ spenta al posto del cerchio; quelli prima sono
      fatti, quelli dopo restano grigi. */
-  const fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;
-  /* L'ORA DI OGNI PASSO (16 ott 2026, orari-passi): quella di mostrod,
-     dall'archivio del server (vedi «L'ORA DI OGNI PASSO»). Il passo su
-     cui l'annullo e' caduto dice la SUA ora al posto di «Il 12 ott»,
-     e se la cronaca non la sa resta la chiusura di sempre
+  const fermo = passo.fermo;
+  /* «ORDINE PUBBLICATO» A ORDINE PRESO DICE IL FATTO (16 ott 2026,
+     decisione di Andrea): «Aspetta chi ti compra i sats» sotto un passo
+     fatto, con l'ora sotto, si leggeva come un'attesa ancora aperta.
+     E' la regola della seconda riga: quando la mossa e' stata
+     dell'altra persona, la riga dice il fatto. */
+  const pubPreso = pubblicatoPresoP2P(o, prog, fermo);
+  if (pubPreso) passi[0] = pubPreso;
+  /* Il passo su cui l'annullo e' caduto dice la SUA ora al posto di
+     «Il 12 ott», e se la cronaca non la sa resta la chiusura di sempre
      (`chiusuraP2P`, che e' anche lei un'ora del coordinatore). */
-  const orari = orariPassiP2P(o, p2pScambiServer ? p2pScambiServer[o.id] : null);
   const adessoS = adessoServerP2P();
   const ore = orari.passi.slice();
   if (fermo >= 0) {
@@ -74391,6 +74406,46 @@ function orariPassiP2P(o, s){
   return {passi: [n(o.mio ? r.pubblicato : r.preso), n(r.garanzia), n(r.fiat), n(r.concluso)],
           disputa: n(r.disputa), chiuso: n(r.chiuso)};
 }
+/* PURA: GLI EURO SONO PARTITI? (16 ott 2026) Si' se l'ha detto la riga
+   di questo telefono (`euroInviatiAt`, timbrata al passaggio a
+   «euro_inviati») o la cronaca di mostrod (`fiat` del giro, dagli
+   `orari` dell'archivio). Nessuno dei due = no: e' il caso della
+   disputa aperta prima degli euro. */
+function euroPartitiP2P(o, orari){
+  return Number(o && o.euroInviatiAt) > 0
+    || Number(orari && orari.passi && orari.passi[2]) > 0;
+}
+/* PURA: A CHE PUNTO STA LA LINEA DEI PASSI — `prog` (la tacca, nella
+   scala di `P2P_PROGRESSO`) e `fermo` (il passo su cui un annullo e'
+   caduto, -1 se non e' annullato). Con gli euro MAI detti inviati la
+   tacca non passa il terzo passo: una disputa aperta prima degli euro
+   sta su «Euro inviati» (in corso), e lo scambio annullato da li' si
+   ferma su quel passo, non su quello dopo. */
+function passoScambioP2P(o, euroPartiti){
+  const base = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
+  let fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;
+  if (fermo > 2 && !euroPartiti) fermo = 2;
+  const prog = (o.stato === 'in_disputa' && base > 2 && !euroPartiti) ? 2 : base;
+  return {prog: prog, fermo: fermo};
+}
+/* PURA: IL PRIMO PASSO DI CHI HA PUBBLICATO, A ORDINE GIA' PRESO (16 ott
+   2026): la riga sotto dice il fatto — «L'ha preso chi ti compra i
+   sats» — e non piu' «Aspetta…». Preso = il primo passo e' fatto: la
+   tacca l'ha passato, o l'annullo e' caduto dopo. null = non e' il mio
+   ordine, o nessuno l'ha ancora preso (resta la frase dell'attesa). */
+function pubblicatoPresoP2P(o, prog, fermo){
+  if (!o || !o.mio || !(fermo >= 0 ? fermo > 0 : prog > 0)) return null;
+  return {t: 'Ordine pubblicato',
+    d: o.lato === 'compro' ? 'L\'ha preso chi ti vende i sats' : 'L\'ha preso chi ti compra i sats'};
+}
+/* PURA: il nome del terzo passo per il moderatore, lo stesso che leggono
+   le parti (`renderOrdineP2P`): col PayCode «PayCode pagato», col
+   contanti di persona «Contanti consegnati», altrimenti «Euro inviati».
+   `passo_euro` lo decide il server dalla riga della disputa. */
+function nomePassoEuroModP2P(d){
+  const k = d && d.passo_euro;
+  return k === 'paycode' ? 'PayCode pagato' : k === 'contanti' ? 'Contanti consegnati' : 'Euro inviati';
+}
 /* PURA: la riga piccola e grigia sotto un passo */
 function rigaOraPassoP2P(testo){
   return testo ? '<small class="step-ora">' + esc(testo) + '</small>' : '';
@@ -79730,7 +79785,7 @@ function passiModP2P(d){
   const r = (d && d.orari && typeof d.orari === 'object') ? d.orari : {};
   const n = x => Math.max(0, Math.floor(Number(x) || 0));
   const passi = [['Ordine preso', n(r.preso)], ['Sats bloccati', n(r.garanzia)],
-                 ['Euro inviati', n(r.fiat)], ['Scambio concluso', n(r.concluso)]];
+                 [nomePassoEuroModP2P(d), n(r.fiat)], ['Scambio concluso', n(r.concluso)]];
   const adesso = adessoServerP2P();
   let primo = passi.findIndex(p => !p[1]);
   const chiuso = n(r.chiuso);

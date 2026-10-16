@@ -64525,16 +64525,60 @@ fetch) solo se l'ultimo passo fatto non ha l'ora e la mossa ha meno di
   un secondo disegno subito dopo non richiede, una mossa di un'ora fa
   nemmeno.
 
+**I tre dati di disputa, prima del push (16 ott 2026, sera, decisione
+di Andrea).** Il primo resoconto li lasciava come «da fare»; Andrea li ha
+voluti corretti subito, perché in disputa sono quel che il moderatore
+legge.
+1. *«Euro inviati» fatto solo se qualcuno l'ha detto.* La tacca di
+   `in_disputa` è 3, e quella di un annullo arrivato dalla disputa
+   (`fermoA` scritto dallo stato di allora) pure: una disputa aperta
+   prima degli euro segnava gli euro inviati. Ora prog e fermo li decide
+   il giudice puro `passoScambioP2P(o, euroPartiti)`, e
+   `euroPartitiP2P` dice sì solo con `euroInviatiAt` sulla riga (il
+   passaggio a «euro_inviati» visto da questo telefono) o con `fiat`
+   nella cronaca di mostrod (`orari`). Senza nessuno dei due la disputa
+   sta su «Euro inviati» IN CORSO, con «⚖️ Disputa aperta» sotto, e lo
+   scambio annullato da lì si ferma su quel passo. Le tacche fuori dalla
+   disputa non cambiano (anche `euro_inviati` di una riga di prima,
+   senza `euroInviatiAt`, resta 3). Il moderatore lo faceva già: per lui
+   un passo è fatto se la cronaca ne sa l'ora. Un telefono che ha gli
+   euro detti solo su un altro dispositivo e l'archivio non ancora letto
+   vede il passo in corso finché l'archivio non arriva (al più due
+   minuti): nel dubbio la tacca non dice «fatto».
+2. *Il nome del passo anche al moderatore.* Il server lo decide
+   (`_passo_euro_p2p` dai numeri della frase: PayCode del tabacchino
+   prima, poi il contanti di persona SAPUTO — forma del recapito o solo
+   «Contanti» —, mai il solo «forse») e lo manda come `passo_euro`; il
+   client lo scrive con le parole delle parti (`nomePassoEuroModP2P`):
+   «PayCode pagato», «Contanti consegnati», «Euro inviati». Andrea aveva
+   scritto «es. PayCode mandato»: ho tenuto «PayCode pagato», il nome
+   che le due parti leggono già, perché moderatore e parti dicano la
+   stessa parola sullo stesso passo.
+3. *«Ordine pubblicato» a ordine preso dice il fatto.* Con l'ora sotto,
+   «Aspetta chi ti compra i sats» si leggeva come un'attesa ancora
+   aperta: a primo passo fatto (`pubblicatoPresoP2P`) la riga è «L'ha
+   preso chi ti compra i sats» (o «…chi ti vende i sats»). Prima della
+   presa, o a ordine annullato nel libro, resta l'attesa.
+
+Provato: `prove_passi_dati_disputa` (15), ogni regola con la sua
+controprova (gli euro detti, il caso fuori disputa, il contanti solo
+possibile, il segno sconosciuto, l'ordine non ancora preso); sei
+mutazioni a mano, una per pezzo (tacca della disputa, fermo
+dell'annullo, il `fiat` della cronaca, il server, il nome nel client, la
+condizione della frase), e ognuna fa cadere almeno una prova. Il banco
+della moderazione e quello degli orari portano i pezzi nuovi, e la
+sentinella degli annullati legge il fermo nel giudice puro. Giro dal
+vivo a 360 px, chiaro e scuro, sette scambi seminati (in più: PayCode in
+disputa dopo il pagato, contanti in disputa prima della consegna,
+annullato dal moderatore dopo una disputa senza euro, con la riga del
+compratore forzata a `fermoA = 3` come su un telefono rimasto fino alla
+fine): 20 scatti in `.claude/giri/orari-passi-2/`, e ogni tacca, ora e
+nome letti dal DOM sono quelli attesi. Una trappola del banco, non del
+codice: la mia semina lasciava `p2p_momenti.arrivato` a 0, e la pulizia
+dei quaranta giorni (che guarda `arrivato`) ha cancellato tutta la
+cronaca seminata a metà giro — scatti senza ore e scambi in corso
+spariti. Rifatta la semina con `arrivato` di adesso.
+
 **Da fare (notati, non fatti).**
-- «Ordine pubblicato» ha sotto la frase «Aspetta chi ti compra i sats»
-  anche a ordine preso: è la riga di sempre, ma ora con l'ora sotto si
-  legge come un passo ancora in attesa.
-- In disputa senza euro la tacca segna «Euro inviati» come fatto
-  (`P2P_PROGRESSO.in_disputa = 3`) senza che nessuno li abbia detti
-  inviati: la riga senza ora lo lascia vedere, il moderatore lo vede
-  grigio; la tacca delle parti resta quella di prima.
-- Il moderatore dice sempre «Euro inviati», anche negli scambi in
-  contanti o col PayCode dove le parti leggono «Contanti consegnati» o
-  «PayCode pagato».
 - Non provato su un telefono vero (Telegram Android/iOS, fusi diversi
   dall'italiano dal vivo).

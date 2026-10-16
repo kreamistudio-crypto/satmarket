@@ -134141,7 +134141,11 @@ def prove_annullati_ritocchi():
           in fn("function annulloGiaFattoP2P(e, id){"))
     rend = nudo(fn("function renderOrdineP2P(){"))
     prova("3) lo stepper di un annullato: il passo fermo prende il nome dello stato, niente «now»", True,
-          "const fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;" in rend
+          # (16 ott 2026, orari-passi: il fermo nasce nel giudice puro
+          # `passoScambioP2P`, che sa anche se gli euro sono partiti)
+          "let fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;"
+          in nudo(fn("function passoScambioP2P(o, euroPartiti){"))
+          and "const fermo = passo.fermo;" in rend
           # (16 ott 2026, orari-passi: «Il 12 ott» e' diventata la riga
           # dell'ora del passo fermo, la stessa degli altri passi)
           and "passi[fermo] = {t: st.t, d: ''};" in rend
@@ -134420,7 +134424,8 @@ def prove_orari_passi():
         "let p2pScartoOrologioS = 0;",
         fn("function prendiOraServerP2P(s){"), fn("function adessoServerP2P(){"),
         fn("function oraPassoP2P(ts, adesso){"), fn("function orariPassiP2P(o, s){"),
-        fn("function rigaOraPassoP2P(testo){"), fn("function passiModP2P(d){"),
+        fn("function rigaOraPassoP2P(testo){"), fn("function nomePassoEuroModP2P(d){"),
+        fn("function passiModP2P(d){"),
     ]) + r"""
 const out = {};
 const T = (a, me, g, h, mi) => Date.UTC(a, me - 1, g, h, mi) / 1000;
@@ -134508,6 +134513,137 @@ console.log(JSON.stringify(out));
            ["12 ott 18:05", "12 ott 18:09", "12 ott 18:30", "oggi 17:32"]], ro["mod"][2])
     prova("...e una riga senza orari: quattro passi grigi, nessuna ora",
           [["todo"] * 4, ["Ordine preso", "Sats bloccati", "Euro inviati", "Scambio concluso"], []], ro["mod"][3])
+
+
+def prove_passi_dati_disputa():
+    """I PASSI DELLO SCAMBIO SONO DATI DI DISPUTA (16 ott 2026, cantiere
+    orari-passi, decisione di Andrea prima del push). Tre cose che la
+    linea dei passi diceva storte:
+    1) in una disputa aperta PRIMA degli euro «Euro inviati» risultava
+       fatto (la tacca di `in_disputa` e' 3), e cosi' lo scambio annullato
+       dal moderatore — ora e' fatto solo se la riga (`euroInviatiAt`) o
+       la cronaca di mostrod (`orari.fiat`) lo sanno, per le parti e per
+       il moderatore;
+    2) il moderatore diceva sempre «Euro inviati»: col PayCode e col
+       contanti di persona ora legge il nome delle parti («PayCode
+       pagato», «Contanti consegnati»), deciso dal server
+       (`_passo_euro_p2p`);
+    3) «Ordine pubblicato» diceva «Aspetta chi ti compra i sats» anche a
+       ordine preso: ora dice il fatto («L'ha preso chi ti compra i
+       sats»).
+    Ogni regola ha la sua CONTROPROVA: il caso vicino in cui la risposta
+    deve restare quella di prima."""
+    import json as _json, os as _os, re as _re, shutil as _sh
+    import subprocess as _sp, tempfile as _tf
+    print("\n[i passi dello scambio come dati di disputa]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: _re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- il server: il nome del terzo passo ---------------------------
+    amb = {}
+    exec(pezzo("_passo_euro_p2p"), amb)
+    pe = amb["_passo_euro_p2p"]
+    prova("2) il server: PayCode, PayCode che vince sul contanti, contanti saputo",
+          ["paycode", "paycode", "contanti"],
+          [pe({"tabacchino": True}), pe({"tabacchino": True, "contanti": True}),
+           pe({"contanti": True})])
+    prova("...controprova: il contanti solo POSSIBILE («SEPA, Contanti» senza forma detta) resta euro, "
+          "e una riga vuota pure", ["", "", ""],
+          [pe({"contanti": False, "contanti_possibile": True}), pe({}), pe(None)])
+    prova("...e la riga del moderatore lo porta", True,
+          '"passo_euro": _passo_euro_p2p(dati),' in pezzo("_riga_disputa_p2p"))
+
+    # --- le sentinelle della pagina -----------------------------------
+    rend = nudo(fn("function renderOrdineP2P(){"))
+    prova("1) la pagina chiede la tacca al giudice puro, con gli euro della riga e della cronaca", True,
+          "const passo = passoScambioP2P(o, euroPartitiP2P(o, orari));" in rend
+          and "const prog = passo.prog;" in rend and "const fermo = passo.fermo;" in rend
+          and rend.index("const orari = orariPassiP2P(") < rend.index("const passo = passoScambioP2P("))
+    prova("3) ...e il primo passo di chi ha pubblicato, a ordine preso, al suo giudice", True,
+          "const pubPreso = pubblicatoPresoP2P(o, prog, fermo);" in rend
+          and "if (pubPreso) passi[0] = pubPreso;" in rend
+          and rend.index("const fermo = passo.fermo;") < rend.index("const pubPreso = "))
+    prova("2) le parole del moderatore sono quelle delle parti", [True, True],
+          ["passi[2] = {t: 'Contanti consegnati'," in rend and "'Contanti consegnati'" in fn("function nomePassoEuroModP2P(d){"),
+           "passi[2] = {t: 'PayCode pagato'," in rend and "'PayCode pagato'" in fn("function nomePassoEuroModP2P(d){")])
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco node dei passi di disputa", "node non c'e'")
+        return
+    i = mini.index("const esc = s =>")
+    esc_js = mini[i:mini.index(";\n", i) + 2]
+    i = mini.index("const P2P_PROGRESSO = {")
+    progresso = mini[i:mini.index("\n};", i) + 3]
+    banco = "\n".join([
+        "process.env.TZ = 'Europe/Rome';", esc_js, progresso,
+        _re.search(r"const P2P_MESI_BREVI = [^\n]*;", mini).group(0),
+        "let p2pScartoOrologioS = 0;",
+        fn("function fermoAnnulloP2P(o){"), fn("function adessoServerP2P(){"),
+        fn("function oraPassoP2P(ts, adesso){"), fn("function orariPassiP2P(o, s){"),
+        fn("function euroPartitiP2P(o, orari){"), fn("function passoScambioP2P(o, euroPartiti){"),
+        fn("function pubblicatoPresoP2P(o, prog, fermo){"),
+        fn("function nomePassoEuroModP2P(d){"), fn("function rigaOraPassoP2P(testo){"),
+        fn("function passiModP2P(d){"),
+    ]) + r"""
+const out = {};
+const vuoti = {passi: [0, 0, 0, 0], disputa: 0, chiuso: 0};
+out.partiti = [euroPartitiP2P({}, vuoti), euroPartitiP2P({euroInviatiAt: 5}, vuoti),
+               euroPartitiP2P({}, {passi: [1, 2, 3, 0]}), euroPartitiP2P(null, null)];
+const P = (o, e) => { const r = passoScambioP2P(o, e); return [r.prog, r.fermo]; };
+out.disputa = [P({stato: 'in_disputa'}, false), P({stato: 'in_disputa'}, true)];
+out.annullo = [P({stato: 'annullato', fermoA: 3}, false), P({stato: 'annullato', fermoA: 3}, true),
+               P({stato: 'annullato', fermoA: 1}, false), P({stato: 'rifiutato'}, false)];
+out.vicini = [P({stato: 'euro_inviati'}, false), P({stato: 'rilasciato'}, false),
+              P({stato: 'concluso'}, false), P({stato: 'attivo'}, false), P({stato: 'annullo_chiesto'}, false)];
+/* dall'archivio vero alla tacca: la cronaca con e senza il `fiat` */
+const arch = f => ({giro: 0, orari: {pubblicato: 0, preso: 10, garanzia: 20, fiat: f, concluso: 0, disputa: 40, chiuso: 0}});
+const dalServer = f => { const o = {stato: 'in_disputa', mio: false};
+  return passoScambioP2P(o, euroPartitiP2P(o, orariPassiP2P(o, arch(f)))).prog; };
+out.archivio = [dalServer(0), dalServer(30)];
+const pub = (o, p, f) => { const r = pubblicatoPresoP2P(o, p, f); return r ? r.d : null; };
+out.pubblicato = [pub({mio: true, lato: 'vendo'}, 0, -1), pub({mio: true, lato: 'vendo'}, 1, -1),
+                  pub({mio: true, lato: 'compro'}, 3, -1), pub({mio: false, lato: 'vendo'}, 2, -1),
+                  pub({mio: true, lato: 'vendo'}, 0, 0), pub({mio: true, lato: 'vendo'}, 0, 2), pub(null, 2, -1)];
+const titoli = h => (h.match(/<b>[^<]*<\/b>/g) || []).map(x => x.replace(/<[^>]+>/g, ''));
+const classi = h => (h.match(/class="step (\w+)"/g) || []).map(x => x.slice(12, -1));
+const mod = (passo, fiat) => passiModP2P({passo_euro: passo,
+  orari: {preso: 1790000000, garanzia: 1790000600, fiat: fiat, concluso: 0, disputa: 1790003600, chiuso: 0}});
+out.nomi = ['paycode', 'contanti', '', 'x', undefined].map(k => titoli(mod(k, 0))[2]);
+out.modSenza = classi(mod('', 0));
+out.modCon = classi(mod('contanti', 1790001200));
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="passi_disputa_")
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco dei passi di disputa gira", "", (r.stderr or "")[-500:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    prova("1) gli euro sono partiti se lo dice la riga o la cronaca, e solo allora",
+          [False, True, True, False], o["partiti"])
+    prova("...in disputa senza euro la tacca si ferma su «Euro inviati» (in corso); "
+          "controprova: con gli euro detti, passa", [[2, -1], [3, -1]], o["disputa"])
+    prova("...lo scambio annullato da una disputa senza euro si ferma su «Euro inviati»; "
+          "controprova: con gli euro, sul passo dopo; e i fermi prima non si toccano",
+          [[0, 2], [0, 3], [0, 1], [0, 0]], o["annullo"])
+    prova("...controprova: fuori dalla disputa la tacca e' quella di sempre",
+          [[3, -1], [3, -1], [4, -1], [2, -1], [2, -1]], o["vicini"])
+    prova("...e dall'archivio vero: senza `fiat` 2, col `fiat` 3", [2, 3], o["archivio"])
+    prova("3) «Ordine pubblicato» a ordine preso dice il fatto, dal verso di chi l'ha scritto; "
+          "controprova: prima della presa, non mio, o annullato nel libro resta l'attesa (null)",
+          [None, "L'ha preso chi ti compra i sats", "L'ha preso chi ti vende i sats", None,
+           None, "L'ha preso chi ti compra i sats", None], o["pubblicato"])
+    prova("2) il moderatore chiama il terzo passo come le parti; controprova: senza segno, o con uno "
+          "sconosciuto, «Euro inviati»",
+          ["PayCode pagato", "Contanti consegnati", "Euro inviati", "Euro inviati", "Euro inviati"], o["nomi"])
+    prova("1) ...e al moderatore la disputa senza euro lascia il terzo passo NON fatto; "
+          "controprova: col `fiat` e' fatto", [["done", "done", "now", "todo"], ["done", "done", "done", "now"]],
+          [o["modSenza"], o["modCon"]])
 
 
 def prove_card_annullati():
@@ -137392,7 +137528,8 @@ def prove_moderazione_p2p():
               "_confronto_presenze_p2p", "_confronto_giro_p2p",
               # chi ha messo la cauzione (1 ott 2026): la riga lo dice
               "_cauzione_di_p2p",
-              "_dichiara_disputa_p2p", "_orari_passi_p2p", "_riga_disputa_p2p",
+              "_dichiara_disputa_p2p", "_orari_passi_p2p", "_passo_euro_p2p",
+              "_riga_disputa_p2p",
               "_dispute_per_moderatore_p2p",
               "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
               "_esito_gesto_disputa_p2p"):
@@ -137591,6 +137728,7 @@ def prove_moderazione_p2p():
         riga_js("const P2P_MESI_BREVI = "), "let p2pScartoOrologioS = 0;",
         fn("function prendiOraServerP2P(s){"), fn("function adessoServerP2P(){"),
         fn("function oraPassoP2P(ts, adesso){"), fn("function rigaOraPassoP2P(testo){"),
+        fn("function nomePassoEuroModP2P(d){"),
         chat, modulo])
     cart = _tf.mkdtemp(prefix="moderazione_")
     pb = _os.path.join(cart, "banco.js")
@@ -168524,7 +168662,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
