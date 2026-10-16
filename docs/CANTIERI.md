@@ -65372,3 +65372,257 @@ correggere.
   comando qui sopra (uno alla volta, col freno, mai un post nuovo).
 - Le altre `print` d'errore del server senza `flush=True`: possono
   perdersi allo stesso modo. Non toccate (non chieste).
+
+## La chat negli ordini del mercatino: la chat dello scambio, dal pagamento alla decisione (16 ott 2026, cantiere chat-mercatino, richiesta di Andrea)
+
+**PERCHÉ.** Andrea: portare la chat dello scambio P2P «ESATTAMENTE
+com'è» (cifrata, con foto e PDF ripuliti, stessi limiti) negli ordini
+del mercatino; accesa appena chi compra paga, chiusa e CANCELLATA
+(messaggi e allegati) appena l'ordine è concluso. Leva in config,
+spenta di serie finché non la prova lui.
+
+**COSA SI È DECISO (Andrea, sulla proposta in dieci punti, approvata
+intera).** Un motore solo, nessuna copia: stesse rotte, stesso
+cassetto, stesse tabelle; l'ordine si chiama `m<numero>`. La chiave che
+nel P2P è «dello scambio» (la dice il coordinatore) qui è la «chiave
+dell'ordine», ricavata dal profilo di scambio che l'utente ha già; chi
+non ne ha uno non se lo vede nascere: la chiave nasce a caso su quel
+telefono, e da un altro dispositivo «Continua la chat qui». Il server
+fa da portinaio delle chiavi pubbliche (il prezzo dichiarato: è già lui
+a custodire i sats; per un account Telegram lo stesso costo del P2P,
+già nel patto). Aperta da `locked` a fine disputa e reso; cancellata a
+`confirmed`, `released`, `refund`, `refunded`. IN DISPUTA il moderatore
+legge, e i telefoni di TUTTE E DUE le parti gli danno la chiave (la
+disputa la apre solo chi compra: chi vende non deve dipendere da chi
+accusa); senza la chiave da moderatore sul dispositivo una riga lo
+dice; alla decisione si cancella tutto. Prima del pagamento niente,
+dopo la cancellazione una riga «Chat chiusa». Avviso «💬 Hai un nuovo
+messaggio nell'ordine #N.» col tasto che apre l'ordine, mai il testo.
+Resta tutto quel che c'era (nota alla cassa, indirizzo, appuntamento,
+i tondi @username/npub dove sono): la chat si aggiunge. Stesso cassetto
+e stessi tetti del P2P.
+
+**COME È FATTO.** Server: il blocco «LA CHAT NEGLI ORDINI DEL
+MERCATINO» dentro quello del postino — la leva `MERCATINO_CHAT_ORDINI`
+(solo True accende; pannello delle leve; config d'esempio a False),
+`FORMA_CHAT_MERCATINO`, gli stati, `_parti_ordine_mercatino` e
+`_parti_chat` (il giudice delle parti per tutti e due i mondi, usato da
+`_chat_p2p_stato` e dalla scopa), `_chat_mercatino_vista` (la riga di
+`/api/orders` dice `chat`), `_chat_mercatino_chiavi` e
+`_chat_mercatino_dichiara` (tabella `chiavi_ordine` nel cassetto, cinque
+per parte, una chiave è di una parte sola),
+`_chat_mercatino_per_moderatore`, `_poi_chat_mercatino` attorno ai
+cinque gesti che concludono (conferma, tre decisioni, reso ricevuto) e
+la scopa al minuto nell'orologio del mercatino. `_chat_p2p_chiede`
+sceglie la leva per forma: un ordine del mercatino non chiede il P2P
+attivo. La rete dei 30 giorni non tocca gli ordini del mercatino (una
+disputa col reso può durare di più). Il tasto dell'avviso è
+`/?ordine=N`, che `_startapp_da_link` traduce in `mercatino_N`.
+Telefono: l'adattatore dentro il blocco della chat (`chatScRigaP2P`,
+`chatScApertoP2P`, `chatScEl`, `chiaveOrdineMercatinoP2P`,
+`chatMercDichiaraP2P`, `chatMercBloccoHTML`…, vedi ARCHITETTURA); le
+funzioni del motore leggono la riga dall'adattatore invece che da
+`ordiniP2P()`, e la pagina davanti da `chatScApertoP2P()` invece che da
+`p2pOrdineAperto`. `chatScApriSalutoP2P` prova ogni chiave d'ordine
+dell'altra parte; `chatScPresentaP2P` rifà il saluto quando l'altra
+parte ne dichiara una nuova. In `openOrder` il richiamo in cima, il
+riquadro (o la riga «chat chiusa») prima della card dell'altra parte,
+la chat delle parti per il moderatore; in `renderOrders` il segno
+«Nuovo messaggio nella chat»; `apriOrdineDaUrl` per il tasto.
+
+**STRADE SCARTATE.** Un motore copiato per il mercatino (due chat da
+tenere in pari per sempre). La chiave dell'ordine data dal server (il
+server leggerebbe tutto, anche per chi entra con Nostr). Far nascere un
+profilo di scambio guardando un ordine (`assicuraMazzo`: un'identità P2P
+nuova a chi il P2P non l'ha mai toccato, e da lì niente torna
+indietro). La rete dei 30 giorni anche per il mercatino. La chiave al
+moderatore dal solo telefono di chi apre la disputa, come nel P2P (qui
+la apre solo chi compra). Un collegamento diretto `/ordine/<n>` (una
+rotta-pagina nuova, con la sua sentinella): basta la porta di casa con
+`?ordine=`. Togliere i tondi @username/npub (decisione di Andrea:
+restano dove sono).
+
+**PROVATO.** `prove_chat_mercatino` (nuova, 51): le sentinelle del
+server (la leva spenta, il ramo del mercatino prima del P2P attivo, la
+scopa con le chiavi d'ordine e senza la rete per il mercatino, il giro
+al minuto, i cinque gesti, la chiave al moderatore solo in disputa,
+l'avviso col numero e senza busta, la riga di `/api/orders`, il
+moderatore, la tabella solo nel cassetto); i giudici veri su sqlite in
+memoria (la vista nei dodici stati, le parti, le forme, la chiave
+d'ordine coi suoi rifiuti e il tetto, il moderatore fuori e dentro la
+disputa, con e senza chiave); il tasto nel server; le sentinelle del
+client (gli stati uguali nei due posti, nessun profilo che nasce, al
+server la sola pubblica, nessun `el('p2pChat` nel motore, la pagina
+dell'ordine, la lista, la porta del tasto nei due avvii); e i pezzi
+veri del client in node col bundle (la chiave d'ordine, la riga, il
+riquadro coi testi dell'ordine, niente prima del pagamento, la riga
+«chat chiusa», l'altrove, la leva spenta, il richiamo, il moderatore
+senza chiave, il tasto). `collaudo_chat_mercatino` (nuovo, 78, nella
+gabbia e in `ci/collaudi.txt`): le rotte VERE col P2P spento per tutti
+— la leva, l'accensione al pagamento, le chiavi d'ordine, messaggi e
+allegati, l'avviso col tasto e senza testo, il journal, la disputa col
+moderatore (anche il reso), la cancellazione nei quattro stati conclusi
+coi byte che spariscono DAL FILE, la rete dei 30 giorni, il pallino; e
+il CLIENT VERO in node contro il server vero: chi compra col profilo,
+chi vende senza (chiave a caso), i messaggi nei due sensi, il secondo
+dispositivo di chi vende che «continua la chat qui» (chi compra rifà il
+saluto e legge tutto, lì i messaggi di prima no), un secondo
+dispositivo di chi compra col suo profilo (nessuna chiave nuova, la
+chat ritrovata INTERA dalla copia sigillata), nessuna chiave ai
+moderatori prima della disputa, la chiave dai due telefoni in disputa,
+la fine. Emendate (le ancore che
+nominavano quel che è cambiato, nessun comportamento del P2P):
+`prove_chat_scambio` (sei: il giudice, la novita a due giri, la chiave
+d'ordine fra le richieste, il quarto «butta», il pallino, la chiave al
+moderatore, il battito), `prove_allegati_chat` (la rete dei 30 giorni),
+`prove_rimborso_meno_spese` (la decisione che passa da
+`_poi_chat_mercatino`). `collaudo_chat_scambio` e
+`collaudo_allegati_chat` rigirati: verdi.
+GIRO DAL VIVO (server di collaudo da una copia nello scratchpad, leva
+accesa, P2P spento, relay morti, Browser pane a 360 px): compratore,
+venditore e admin in tre schede; ordine `shipped`: la chiave d'ordine
+nasce a caso su tutti e due i telefoni (P2P spento: il `/api/p2p/seme`
+risponde 409 una volta e basta), i saluti, i messaggi nei due sensi,
+una foto vera dal flusso del 📎 (ridisegnata, cifrata, aperta
+dall'altra parte nel foglio); il segno nella lista, il richiamo «Chat
+1» in cima; l'ordine `released` con la riga «Chat chiusa»; l'ordine
+`creato` senza niente; l'ordine in disputa: i due telefoni danno la
+chiave, l'admin (chiave da moderatore sul dispositivo e nel
+`p2p_moderatori` del giro) legge «Chi compra»/«Chi vende», decide
+«Rimborsa subito» → `refund`, e nel cassetto di quell'ordine non resta
+niente (journal: «lo scambio m3 e' finito, buste cancellate»), il
+telefono di chi compra butta chiave e messaggi e mostra «Chat chiusa».
+L'avviso a chi compra fuori dall'app: «💬 Hai un nuovo messaggio
+nell'ordine #1.» col tasto `/?ordine=1`, e il testo del messaggio
+(apposta riconoscibile) zero volte nel journal; il tasto riapre l'ordine
+1 col richiamo «2 messaggi nuovi». Chiaro e scuro, nove fotografie.
+Nella console un solo errore, il 409 atteso del seme.
+TORTURA su una copia intera: 16 mutazioni (la leva accesa di serie, il
+mercatino che chiede il P2P attivo, la rete dei 30 giorni, la chat che
+si chiude in disputa, la chiave al moderatore fuori dalla disputa dal
+server e dal telefono, `released` che non è «chiusa», la chiave d'ordine
+dell'altra parte, il moderatore senza chiave, i gesti senza scopa,
+l'avviso senza il tasto, il profilo che nasce, la privata al server, la
+chat chiusa col riquadro, il saluto che guarda solo l'ultima chiave, la
+chiave a caso che si dichiara da sola): 14 prese al primo giro, le due
+vive (la chiave al moderatore dal telefono prima della disputa, che il
+server già rifiuta; il saluto con la sola ultima chiave) prese dalle
+due prove aggiunte al collaudo: 16 su 16.
+SUITE E COLLAUDI, sull'albero ribasato su 37ae7af (main con le prove
+verdi e compresse e lo studio Postepay; due conflitti in coda a
+`prove.py` e a CANTIERI, tenute le due parti): la suite intera severa
+**24.723 passate, 0 fallite**; i collaudi della CI nella gabbia, due
+alla volta, **84 verdi, 0 rossi** (c'è il nuovo). Scanner dei segreti
+della CI (le FORME e l'esadecimale) sulle righe nuove: zero.
+Poi main è corso a c0976d4 (la modifica di più annunci insieme): ribasato,
+di nuovo due conflitti solo in coda a `prove.py` e a CANTIERI, tenute le
+due parti; cercati per nome i simboli arrivati (nessuno tocca la chat,
+`mapOrder`, `openOrder`, `miei_ordini` o le porte d'arrivo). SULL'ALBERO
+FINALE: la suite intera severa **24.843 passate, 0 fallite**; i collaudi
+che toccano le stesse zone, due alla volta (chat degli ordini, chat
+dello scambio, allegati, modifica massiva): **4 verdi**. Gli 84 della CI
+sono girati sull'albero di prima (37ae7af).
+
+**LO SCHERMO LARGO E IL 409 (17 ott 2026, richieste di Andrea prima del
+push).** Main è corso a d6a1547 (quattordici commit, fra cui f8535fe «Lo
+schermo largo»): ribasato, i soliti conflitti solo in coda a `prove.py`
+e a CANTIERI, tenute le due parti; cercati per nome nei quattordici i
+simboli della chat, `mapOrder`, `openOrder`, `miei_ordini`, le porte
+d'arrivo, `db_chat`, l'orologio del mercatino: nessuno li tocca. Lo
+schermo largo mette a destra `#orderContent>.detail-body>.chatsc`, e il
+riquadro della chat dell'ordine è proprio un figlio diretto di
+`.detail-body` con la classe `chatsc`: niente da cambiare.
+GIRO A 1366 E 1920 PX (server di collaudo dalla copia ribasata, chi
+compra entrato dal SITO col login web vero — `fuori-telegram`, mouse —,
+chi vende dalla Mini App in un'altra scheda): l'ordine #1 aperto dal
+tasto dell'avviso (`/?ordine=1`, la porta d'arrivo sul sito); a 1366 due
+colonne da 592 px, la cassaforte a sinistra e la chat a destra
+(`position: sticky`), la pagina larga 1351 senza scorrimento di lato; a
+1920 tre colonne (503, 503, 554 px: cosa fare, la cassaforte, la chat).
+La memoria del browser del pane s'era svuotata fra i due giorni: i due
+lati sono arrivati come «un altro dispositivo» senza profilo (P2P spento
+nel giro) e il piede diceva «Continua la chat qui»; col tocco vero chi
+compra l'ha ripresa, chi vende pure, e i messaggi sono passati nei due
+sensi — scritto con la tastiera vera e inviato col tocco vero su «Invia»
+(il campo si svuota e resta col fuoco); a 1920 un messaggio arrivato è
+«visto» subito (la chat è nello schermo: il richiamo resta «Vai alla
+chat»). In cima alla chat la riga «6 messaggi di prima non si possono
+leggere da questo dispositivo», com'è giusto. Chiaro e scuro, quattro
+scatti.
+IL 409 DELLA CONSOLE È `POST /api/p2p/seme`, una volta per pagina (due
+nel journal del giro: chi compra e chi vende). È il telefono che cerca
+il profilo di scambio per farne nascere la chiave dell'ordine
+(`chatMercProfiloP2P` → `adottaProfiloContoP2P` → `semeProfiloP2P`): nel
+giro il P2P era spento (`P2P_ATTIVO = False` nel config del giro) e la
+rotta risponde 409 «Lo scambio P2P non e' attivo». Il telefono lo legge
+come «nessun profilo», com'è scritto nel patto della rotta, e la chiave
+dell'ordine nasce a caso su quel dispositivo; non si richiede (la
+promessa è tenuta per tutta la pagina). In produzione, P2P acceso, a chi
+entra da Telegram la rotta risponde 200 col seme; a un nativo Nostr
+senza nsec nel browser né copia sui relay risponde 409 APPOSTA (il
+server non ricava niente per un id negativo) — la stessa riga che già
+oggi esce aprendo il P2P.
+SULL'ALBERO FINALE (d6a1547 + questo commit): la suite intera severa
+**25.049 passate, 0 fallite**; i collaudi della CI nella gabbia, due alla
+volta, **85 verdi, 0 rossi**.
+
+**DA FARE (notati, non fatti).**
+- Il journal scrive «sullo scambio m42» anche per un ordine del
+  mercatino (le righe della chat dello scambio, invariate): si potrebbe
+  dire «sull'ordine #42».
+- I rifiuti dei tetti dicono «In questo scambio hai già mandato…» anche
+  nell'ordine (testi del server e del telefono condivisi).
+- Un ordine riaperto dal moderatore (una decisione incagliata,
+  `confirmed`/`refund` → `dispute`) riparte con la chat vuota: quella di
+  prima è già stata cancellata.
+- Il giro coi DUE telefoni veri e Telegram vero (l'avviso, il tasto
+  dentro la Mini App) e col profilo di scambio vero (P2P acceso): qui il
+  profilo l'ha provato il collaudo in node, il giro dal vivo è andato
+  col P2P spento.
+- Due dispositivi della stessa parte SENZA profilo aperti insieme: chi
+  non ha l'ultima chiave vede «messaggi che non si leggono» invece
+  dell'«altrove» (il caso c'è anche nel P2P prima della copia
+  sigillata).
+- Il moderatore, sullo schermo largo, legge la chat delle parti nella
+  colonna di sinistra (il suo riquadro non è `.chatsc`).
+
+**IL RICHIAMO SULLO SCHERMO LARGO (19 ott 2026, richiesta di Andrea prima
+del push).** Da 1280 px col mouse, fuori da Telegram, la chat sta già
+nella colonna di destra e in vista: il bottone «💬 Chat ↓» in cima alla
+colonna di sinistra portava dove si stava già guardando. Adesso si
+nasconde, nell'ordine del mercatino e nello scambio P2P; sul telefono
+resta com'è. SENZA `:has()` (regola di casa): il telefono, dopo ogni
+disegno della pagina (`renderOrdineP2P` e `openOrder`), mette la classe
+`con-chatsc` sul contenitore (`#p2pOrdineCorpo`, il `.detail-body`
+dell'ordine) quando il riquadro `.chatsc` è un suo figlio diretto —
+`chatScSegnaColonnaP2P`, nel blocco della chat — e la regola, solo nel
+blocco dello schermo largo da 1280, nasconde `.chatsc-richiamo` dentro
+quel contenitore. Strada scartata: nascondere il richiamo sempre, da
+1280, senza guardare la chat (basterebbe una pagina dove il riquadro non
+nasce per perderlo). PROVATO: `prove_chat_mercatino` (55, quattro nuove:
+la regola solo nel blocco da 1280 e una volta sola, senza `:has()`, il
+segno messo dopo il disegno nelle due pagine, e il giudice vero in node
+con la chat fra i figli, senza, e la chat che se ne va). GIRO (server di
+collaudo dalla copia ribasata su 6b256af, compratore dal sito col login
+web vero, venditore dalla Mini App): a 1366 l'ordine #1 con la chat a
+destra e il richiamo `display: none`, il `.detail-body` con
+`con-chatsc`, la chat ripresa col tocco vero su «Continua la chat qui» e
+un messaggio arrivato; a 360 nella Mini App il richiamo c'è («Vai alla
+chat», `display: flex`). Lo scambio P2P, nella stessa scheda da 1366
+col P2P spento nel giro: il suo contenitore vero con un richiamo e un
+riquadro finti dentro → `none`; senza il riquadro → `flex`. Due scatti.
+SULL'ALBERO FINALE (6b256af + questo commit; nei undici commit arrivati
+nessuno tocca la chat, `mapOrder`, `openOrder`, le porte d'arrivo o il
+cassetto; il «menu in alto» ha toccato lo schermo largo, e la regola
+nuova sta nel blocco com'è oggi): la suite intera severa **25.144
+passate, 0 fallite**; i collaudi della CI nella gabbia, due alla volta,
+**86 verdi, 0 rossi**.
+Poi main è corso a 04f8342 (il ✅ Venduto del canale: `server.py`,
+`prove.py`, il collaudo della modifica massiva; e la chiusura dell'hackathon,
+solo documenti): ribasato, i soliti conflitti in coda a `prove.py` e a
+CANTIERI, tenute le due parti. Sull'ultimo albero: le sezioni toccate
+(il Venduto del canale, la chat degli ordini, la chat dello scambio, gli
+allegati, e le sezioni che leggono CANTIERI e ARCHITETTURA) **2.541
+passate, 0 fallite**; i collaudi della chat degli ordini, della chat dello
+scambio, degli allegati e della modifica massiva **4 verdi**. Il resto lo
+fa la CI del push.

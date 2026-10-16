@@ -6770,6 +6770,10 @@ def prove_in_pagamento():
         m.amb["verifica_utente"] = lambda *x: {"id": chi}
         m.amb.update({"TIMBRO_SOSPESI": "sospesi-prova",
                       "BACKOFF_PAYOUT": (300, 1800, 7200, 21600, 86400)})
+        # la scopa della chat dell'ordine dopo la conferma (16 ott 2026,
+        # chat-mercatino) ha le sue prove (`prove_chat_mercatino`): qui
+        # passa il gesto e basta
+        exec("async def _poi_chat_mercatino(i, gesto):\n    return await gesto\n", m.amb)
         for nome, asincrona in (
                 ("_quando_ritentare", 0), ("_avvisa_in_pagamento", 1),
                 ("riprova_pagamenti_sospesi", 1), ("conferma_ricezione", 1),
@@ -12671,6 +12675,9 @@ def prove_nascondi_ordine():
                # le foto delle recensioni (ott 2026) hanno le loro prove
                # in `collaudo_foto_recensioni`: qui nessuna
                "foto_recensione": lambda v: [],
+               # la chat dell'ordine (16 ott 2026) ha le sue prove in
+               # `prove_chat_mercatino`: qui la leva e' spenta
+               "_chat_mercatino_vista": lambda *a: "", "MERCATINO_CHAT_ORDINI": False,
                "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
@@ -25536,7 +25543,8 @@ def prove_rimborso_meno_spese():
     prova("si decide solo da disputa aperta o reso in corso", True,
           'if stato not in ("dispute", "return_pending", "return_shipped"):\n'
           '            raise HTTPException(400, MSG_MENO_SPESE_DOVE)\n'
-          '        return await _rimborsa_meno_spese(ordine_id)' in rd)
+          # (16 ott 2026, chat-mercatino) e dopo la decisione la scopa della chat
+          '        return await _poi_chat_mercatino(ordine_id, _rimborsa_meno_spese(ordine_id))' in rd)
 
     # --- 3) LA TRANSAZIONE DELLE DUE META' ----------------------------
     # La scrittura sta in una funzione SINCRONA sua (`_scrivi_meno_spese`)
@@ -58860,6 +58868,9 @@ def prove_card_parte_ordine():
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
+    # la chat dell'ordine (16 ott 2026, chat-mercatino): la sua prova e' `prove_chat_mercatino`
+    amb["_chat_mercatino_vista"] = lambda *a: ""
+    amb["MERCATINO_CHAT_ORDINI"] = False
     for f in ("livello_utente", "_volti_persone", "miei_ordini"):
         exec(pezzo(f), amb)
     # la SPIA sul costruttore: chi gli si chiede, a ogni giro
@@ -93255,7 +93266,8 @@ def prove_ricarica_resta():
         corpo = _f("function %s(){" % p)
         m = re.search(r"\|\| (\w+)\) return;", corpo)
         bandiere[p] = m.group(1) if m else ""
-    prova("le porte dei link d'arrivo sono undici, ognuna con la sua bandierina", [11, []],
+    # (16 ott 2026, chat-mercatino) la dodicesima: `apriOrdineDaUrl`, il tasto dell'avviso della chat
+    prova("le porte dei link d'arrivo sono dodici, ognuna con la sua bandierina", [12, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
@@ -95230,14 +95242,23 @@ def prove_chat_scambio():
     prova("IL PALLINO non scrive niente: la sua domanda non ha un INSERT, un UPDATE ne' un DELETE",
           [], [p for p in ("INSERT", "UPDATE", "DELETE")
                if p in codice(_senza_prosa(pezzo("_chat_p2p_novita")))])
+    # dal 16 ott 2026 (chat-mercatino) il giudice passa da `_parti_chat`,
+    # che per uno scambio P2P e' ancora e solo `_parti_scambio_p2p`
     prova("le parti e la fine le dice il giudice di tutti, non una regola nuova", True,
-          "p = _parti_scambio_p2p(con, ordine)" in pezzo("_chat_p2p_stato")
-          and 'if not p["vivo"]:' in pezzo("_chat_p2p_stato"))
+          "p = _parti_chat(con, ordine)" in pezzo("_chat_p2p_stato")
+          and 'if not p["vivo"]:' in pezzo("_chat_p2p_stato")
+          and "    return _parti_scambio_p2p(con, ordine)" in pezzo("_parti_chat"))
 
     # --- 2) IL SERVER: I GIUDICI VERI, su sqlite in memoria ------------
     con, amb = _banco_eventi_p2p()
     for riga in re.findall(r"\n(P2P_CHAT_[A-Z_]+ = [^\n]+)", blocco_srv):
         exec(riga.split("  #")[0], amb)
+    # il giudice delle parti della chat (16 ott 2026, chat-mercatino) e le
+    # forme degli ordini del mercatino che lui riconosce
+    i_forme = blocco_srv.index("\nFORMA_CHAT_MERCATINO = ")
+    exec(blocco_srv[i_forme:blocco_srv.index("\nCHAT_MERCATINO_CHIAVI_MAX", i_forme)], amb)
+    for f in ("_parti_ordine_mercatino", "_parti_chat"):
+        exec(_senza_prosa(pezzo(f)), amb)
     for f in ("_chat_p2p_stato", "_chat_p2p_ritira", "_chat_p2p_posa", "_chat_p2p_avviso",
               "_chat_p2p_novita"):
         exec(_senza_prosa(pezzo(f)), amb)
@@ -95380,7 +95401,8 @@ def prove_chat_scambio():
     prova("...e non guarda la leva: a chat spenta gli ultimi sono vuoti, le finite ci sono lo stesso",
           ({}, [o4]), (spento["ultimi"], spento["finite"]))
     prova("...la rotta le manda sempre, anche a leva spenta", True,
-          'corpo = _chat_p2p_novita(con, cc, user["id"], ordini,' in blocco_srv
+          # (16 ott 2026, chat-mercatino) due giri, scambi e ordini, ognuno con la sua leva
+          'pezzo = _chat_p2p_novita(con, cc, user["id"], quali, accesa)' in blocco_srv
           and '"ultimi": corpo["ultimi"], "finite": corpo["finite"]},' in blocco_srv)
     o3 = "c4a70000-0000-4000-8000-0000000000c3"
     nasce(o3)
@@ -95429,6 +95451,8 @@ def prove_chat_scambio():
     chiamate = re.findall(r"chatScFetch\('([a-z]+)', \{([^}]*)\}", cod)
     prova("AL SERVER VANNO SOLO BUSTE: le richieste portano l'ordine (o gli ordini), il segnalibro, il tipo e la busta",
           [("invia", "ordine: id, tipo: 'chiave', busta: c.copia"), ("invia", "ordine: id, tipo: 'chiave', busta: vecchia"),
+           # (16 ott 2026, chat-mercatino) la PUBBLICA della chiave d'ordine
+           ("invia", "ordine: id, tipo: 'chiave_ordine', busta: k.pub"),
            ("invia", "ordine: id, tipo: 'mod', per: m, busta: busta"), ("invia", "ordine: id, tipo: 'msg', busta: b.busta"),
            ("invia", "ordine: id, tipo: 'saluto', busta: c.saluto.busta"),
            ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0"), ("moderatori", "ordine: id"),
@@ -95498,7 +95522,10 @@ def prove_chat_scambio():
           "chatScButtaP2P(id); }" in rit)
     prova("...e li butta a giro cambiato e a cassetto perso: SOLO sulla parola del server", True,
           "if (c0 && c0.giro !== d.giro) {" in rit and "if (c0 && d.perso) {" in rit
-          and rit.count("chatScButtaP2P(id)") == 3)
+          # (16 ott 2026) la quarta e' l'ordine del mercatino concluso, anche
+          # questa sulla parola del server
+          and rit.count("chatScButtaP2P(id)") == 4
+          and "if (merc && !d.aperta && d.finita) {" in rit)
     pota = pezzo_js(mini, "function chatScPotaP2P(", "\n}\n")
     polso = mini[mini.index("/* IL POLSO DELLA CHAT:"):mini.index("/* ---- LA CHAT DELLE DUE PARTI, PER IL MODERATORE")]
     prova("LA RIGA DEL TELEFONO NON BUTTA PIU' NIENTE (richiesta di Andrea): il ritiro non guarda la "
@@ -95509,7 +95536,8 @@ def prove_chat_scambio():
     novita = pezzo_js(mini, "function chatScNovitaP2P(", "\n}\n")
     prova("...la fa la risposta del pallino, che chiede anche di ogni voce del cassetto — e prima di "
           "guardare la leva", True,
-          "chatScPotaP2P(d.finite);\n    if (d.spenta) { chatScSpegniP2P(); return; }" in novita
+          "chatScPotaP2P(d.finite);\n    if (d.spenta_mercatino) chatMercSpegniP2P();\n"
+          "    if (d.spenta) { chatScSpegniP2P(); return; }" in novita
           and "Object.keys(chatScTutteP2P())" in novita)
     pres = pezzo_js(mini, "async function chatScPresentaP2P(", "\n}\n")
     prova("LA COPIA PRIMA DEL SALUTO: una chiave non si presenta all'altra persona finche' la sua "
@@ -95533,7 +95561,9 @@ def prove_chat_scambio():
           0 <= pres.find("chatScScriviP2P(id, c);") < pres.find("await chatScFetch('invia'"))
     mod = pezzo_js(mini, "async function chatScAiModeratoriP2P(", "\n}\n")
     prova("LA CHIAVE AI MODERATORI: solo a disputa aperta, e solo da chi l'ha aperta", True,
-          "if (!o || o.stato !== 'in_disputa' || !o.disputaMia || !tk) return;" in mod)
+          # (16 ott 2026) nel mercatino da tutte e due le parti, a ordine in disputa
+          "if (!o || !tk) return;\n  if (o.mercatino ? !o.disputa : (o.stato !== 'in_disputa' "
+          "|| !o.disputaMia)) return;" in mod)
     prova("...e `disputaMia` la scrive il motore quando lo conferma il coordinatore", 1,
           mini.count("if (azione === 'dispute-initiated-by-you') o.disputaMia = 1;"))
     # (13 ott 2026, disputa-per-sbaglio) un LETTORE in piu': la riga
@@ -95798,8 +95828,8 @@ def prove_chat_scambio():
           True,
           "await chiediScambiServerP2P()" in cerca and "adottaScambiServerP2P(ordiniP2P());" in cerca
           and "statoPubblicoOrdini" not in cerca and "riallineaScambioP2P" not in cerca
-          and 0 < bloccoF.find("chatScCercaControparteP2P(o.id)") < bloccoF.find("if (!chatScAccesaP2P() || !chatScServeP2P(o)) return '';")
-          and "chatScCercaControparteP2P(p2pOrdineAperto);\n    return;" in battito
+          and 0 < bloccoF.find("chatScCercaControparteP2P(o.id)") < bloccoF.find("if (!chatScAccesaP2P(o) || !chatScServeP2P(o)) return '';")
+          and "chatScCercaControparteP2P(aperto);\n    return;" in battito
           and "setInterval(chatScBattitoP2P, CHATSC_POLSO_MS);" in mini)
     prova("IL RICHIAMO conta i messaggi dell'altra persona non ancora visti (non i miei, non le righe "
           "di servizio)", [2, 0, 0], o["daLeggere"])
@@ -168154,7 +168184,8 @@ def prove_allegati_chat():
     prova("LA SCOPA: gli allegati se ne vanno con le buste (giro finito) e con la rete dei 30 giorni",
           (True, True, True),
           ('"DELETE FROM allegati WHERE ordine=? AND giro<>?"' in spazza,
-           '"DELETE FROM allegati WHERE quando<?"' in spazza,
+           # (16 ott 2026, chat-mercatino) la rete non tocca gli ordini del mercatino
+           '"DELETE FROM allegati WHERE quando<? AND NOT (ordine GLOB \'m[1-9]*\')"' in spazza,
            "UNION SELECT ordine FROM allegati" in spazza))
     prova("...e il ritiro della chat butta quelli di un giro di prima", True,
           'cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?", (ordine, st["giro"]))'
@@ -169672,6 +169703,347 @@ def prove_venduto_canale():
                              codice(pezzo(nome)))))
 
 
+def prove_chat_mercatino():
+    """LA CHAT NEGLI ORDINI DEL MERCATINO (16 ott 2026, cantiere
+    chat-mercatino, decisione di Andrea). La chat dello scambio P2P,
+    esattamente com'e', anche negli ordini del mercatino: si ACCENDE quando
+    chi compra paga, si CHIUDE e si CANCELLA a ordine concluso, in disputa
+    resta fino alla decisione e il moderatore la legge (i telefoni di
+    tutte e due le parti gli danno la chiave). UN MOTORE SOLO: stesse
+    rotte, stesso cassetto, l'ordine si chiama `m<numero>`; la chiave
+    dell'ordine nasce dal profilo di scambio (o a caso, dove un profilo non
+    c'e') e la parte pubblica la presenta il server. Leva SPENTA di serie.
+
+    Si rompe in silenzio: una leva accesa di serie; la chat che chiede il
+    P2P attivo; la rete dei 30 giorni che si porta via una disputa lunga;
+    una chiave d'ordine che diventa di tutte e due le parti; la chiave al
+    moderatore prima della disputa; il testo in un avviso; il telefono che
+    fa nascere un profilo di scambio guardando un ordine; la chat che
+    sopravvive all'ordine. Le sentinelle guardano i due blocchi; i giudici
+    VERI del server girano su sqlite in memoria; i pezzi puri del client
+    in node col bundle vero. Le rotte vere e i due telefoni stanno in
+    `collaudo_chat_mercatino`."""
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    print("\n[la chat negli ordini del mercatino: la chat dello scambio, dal pagamento alla decisione]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    es = open("config_esempio.py", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 1) IL SERVER: LE SENTINELLE ----------------------------------
+    i = src.index("# ═══ LA CHAT NEGLI ORDINI DEL MERCATINO (16 ott 2026")
+    blocco = src[i:src.index("\ndef _chat_vuoto_incrementale(", i)]
+    prova("LA LEVA nasce SPENTA: solo un True scritto la accende, e il config d'esempio la porta spenta",
+          (True, True, True),
+          ("MERCATINO_CHAT_ORDINI = MERCATINO_CHAT_ORDINI is True" in blocco,
+           "except ImportError:\n    MERCATINO_CHAT_ORDINI = False" in blocco,
+           "\nMERCATINO_CHAT_ORDINI = False\n" in es))
+    prova("...sta nel pannello «⚙️ Stato delle leve»", True,
+          '"MERCATINO_CHAT_ORDINI",\n                  MERCATINO_CHAT_ORDINI,' in pezzo("_leve_stato"))
+    chiede = codice(pezzo("_chat_p2p_chiede"))
+    prova("LA CHAT DEL MERCATINO NON CHIEDE IL P2P ATTIVO: il suo ramo viene prima, con la sua leva",
+          True, 0 < chiede.find("if FORMA_CHAT_MERCATINO.fullmatch(ordine):")
+          < chiede.find("if not MERCATINO_CHAT_ORDINI:") < chiede.find('_p2p_per(user["id"])'))
+    prova("...e la leva del P2P non spegne il mercatino (ne' il contrario)", True,
+          chiede.find("if not P2P_CHAT_SCAMBIO:") > chiede.find("    else:"))
+    stato = codice(pezzo("_chat_p2p_stato"))
+    prova("IL GIUDICE DELLE PARTI e' uno: `_parti_chat`, che per un `m<numero>` chiede alla riga di `ordini`",
+          (True, True, True),
+          ("p = _parti_chat(con, ordine)" in stato,
+           "return _parti_ordine_mercatino(con, ordine)" in pezzo("_parti_chat"),
+           'SELECT compratore_id, venditore_id, stato FROM ordini' in pezzo("_parti_ordine_mercatino")))
+    spazza = codice(pezzo("_chat_p2p_spazza"))
+    prova("LA SCOPA porta via anche le chiavi d'ordine, e passa da `_parti_chat`", (True, True, True),
+          ('"DELETE FROM chiavi_ordine WHERE ordine=? AND giro<>?"' in spazza,
+           "UNION SELECT ordine FROM chiavi_ordine" in spazza, "p = _parti_chat(con, o)" in spazza))
+    prova("...LA RETE DEI 30 GIORNI non tocca gli ordini del mercatino (una disputa col reso dura di piu')",
+          2, spazza.count("AND NOT (ordine GLOB 'm[1-9]*')"))
+    prova("...e il giro al minuto dell'orologio del mercatino la fa passare, anche a leva spenta", True,
+          "n = _chat_p2p_spazza(mercatino=True)" in pezzo("orologio_avvisi_mercatino")
+          and "MERCATINO_CHAT_ORDINI" not in codice(pezzo("orologio_avvisi_mercatino")))
+    prova("I GESTI CHE CONCLUDONO chiamano la scopa SUBITO: la conferma, le tre decisioni, il reso ricevuto",
+          (5, True),
+          (src.count("return await _poi_chat_mercatino(ordine_id, "),
+           "finally:\n        _chat_mercatino_dopo_stato(ordine_id)" in pezzo("_poi_chat_mercatino")))
+    invia = codice(pezzo("chat_invia_p2p"))
+    prova("LA CHIAVE AL MODERATORE, nel mercatino, parte solo a ordine IN DISPUTA", True,
+          "in CHAT_MERCATINO_DISPUTA" in invia and 'raise HTTPException(409, "La chiave al moderatore si dà solo in disputa")' in invia)
+    prova("LA CHIAVE D'ORDINE e' un tipo solo del mercatino, e non e' una busta", (True, False, True),
+          ('if tipo == "chiave_ordine" and mercatino:' in invia, "chiave_ordine" in blocco.split("P2P_CHAT_TIPI")[0],
+           0 < invia.find('if tipo == "chiave_ordine" and mercatino:') < invia.find("if tipo not in P2P_CHAT_TIPI")))
+    avv = _senza_prosa(pezzo("_chat_p2p_avviso"))
+    prova("L'AVVISO dice il numero dell'ordine e basta: al giudice la busta non arriva", (True, False),
+          ("Hai un nuovo messaggio nell'ordine #{int(ordine[1:])}." in avv, "busta" in avv.split(":")[0]))
+    avvisa = codice(pezzo("_chat_p2p_avvisa"))
+    prova("...col tasto che apre l'ordine (`/?ordine=`), e senza l'interruttore degli avvisi P2P", (True, True),
+          ('CHAT_MERCATINO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}"' in avvisa,
+           "accesi = True if mercatino else _avvisi_p2p_accesi(con, altro)" in avvisa))
+    prova("LA RIGA DELL'ORDINE dice la sua chat (`/api/orders`)", True,
+          'r["chat"] = _chat_mercatino_vista(' in pezzo("miei_ordini"))
+    prova("IL MODERATORE: la stessa rotta, col giudice del mercatino in testa", (True, True),
+          ("return _chat_mercatino_per_moderatore(con, cc, io, ordine)" in pezzo("_chat_p2p_per_moderatore"),
+           "_chat_mercatino_per_moderatore(con, cc, user[\"id\"], ordine)" in pezzo("moderazione_chat_allegato_p2p")))
+    prova("NEL CASSETTO, mai nel database di tutti: la tabella delle chiavi d'ordine nasce in `db_chat`",
+          (True, False), ("CREATE TABLE IF NOT EXISTS chiavi_ordine(" in pezzo("db_chat"),
+                          "chiavi_ordine" in pezzo("init_db", "\n\n\ndef ")))
+
+    # --- 2) IL SERVER: I GIUDICI VERI, su sqlite in memoria ------------
+    amb = {"re": re, "time": time}
+    i_f = blocco.index("\nFORMA_CHAT_MERCATINO = ")
+    exec(blocco[i_f:blocco.index("\n\n\ndef _parti_ordine_mercatino(", i_f)], amb)
+    amb["FORMA_PUBKEY_P2P"] = re.compile(r"[0-9a-f]{64}")
+    for f in ("_parti_ordine_mercatino", "_chat_mercatino_vista", "_chat_mercatino_chiavi",
+              "_chat_mercatino_dichiara", "_chat_mercatino_per_moderatore"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    vista = amb["_chat_mercatino_vista"]
+    STATI = ["creato", "locked", "shipped", "delivered", "confirmed", "released", "dispute",
+             "return_pending", "return_shipped", "refund", "refunded", "annullato"]
+    prova("LA VISTA, alle due parti: dal pagamento alla decisione 'aperta', concluso 'chiusa', prima niente",
+          ["", "aperta", "aperta", "aperta", "chiusa", "chiusa", "aperta", "aperta", "aperta", "chiusa",
+           "chiusa", ""], [vista(s, True, False, True) for s in STATI])
+    prova("...al moderatore (non una parte) solo in disputa e nel reso", ["moderazione"] * 3,
+          [vista(s, False, True, True) for s in ("dispute", "return_pending", "return_shipped")])
+    prova("...a un estraneo mai, e a leva spenta a nessuno", ([""] * 12, [""] * 12),
+          ([vista(s, False, False, True) for s in STATI], [vista(s, True, True, False) for s in STATI]))
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i_o = src.index("CREATE TABLE IF NOT EXISTS ordini(")
+    con.executescript(src[i_o:src.index("\n    );", i_o) + len("\n    );")])
+    i_m = src.index("CREATE TABLE IF NOT EXISTS p2p_moderatori(")
+    con.executescript(src[i_m:src.index("\n    );", i_m) + len("\n    );")])
+    con.execute("INSERT INTO ordini(id, compratore_id, venditore_id, stato) VALUES(7, 111, 222, 'locked')")
+    parti = amb["_parti_ordine_mercatino"]
+    prova("LE PARTI di un ordine: chi compra, chi vende, vivo da pagato; un ordine che non c'e' non e' noto",
+          [(111, 222, 0, True, "mercatino"), (0, 0, False, ""), (0, 0, False, "")],
+          [tuple(parti(con, "m7")[k] for k in ("compratore", "venditore", "giro", "vivo", "fonte")),
+           tuple(parti(con, "m8")[k] for k in ("compratore", "venditore", "vivo", "fonte")),
+           tuple(parti(con, "7")[k] for k in ("compratore", "venditore", "vivo", "fonte"))])
+    prova("...le forme: m e un numero senza zeri davanti, e basta", [True, True, False, False, False, False],
+          [bool(amb["FORMA_CHAT_MERCATINO"].fullmatch(x)) for x in
+           ("m7", "m123456789012", "m0", "m07", "m1234567890123", "c4a70000-0000-4000-8000-0000000000c1")])
+    schema = pezzo("db_chat")
+    schema = schema[schema.index('con.executescript("""') + len('con.executescript("""'):]
+    cc = sqlite3.connect(":memory:")
+    cc.row_factory = sqlite3.Row
+    cc.executescript(schema[:schema.index('""")')])
+    dich, chiavi = amb["_chat_mercatino_dichiara"], amb["_chat_mercatino_chiavi"]
+    KA, KB = "a" * 64, "b" * 64
+    esiti = [dich(cc, "m7", 0, 111, KA, 1), dich(cc, "m7", 0, 111, KA, 2), dich(cc, "m7", 0, 222, KA, 3),
+             dich(cc, "m7", 0, 222, "B" * 64, 4), dich(cc, "m7", 0, 222, KB, 5)]
+    prova("LA CHIAVE D'ORDINE: entra, ridichiarata non raddoppia, di una parte sola, solo nella forma",
+          [200, False, 200, 409, 400, 200],
+          [esiti[0][0], esiti[1][1]["nuova"], esiti[1][0], esiti[2][0], esiti[3][0], esiti[4][0]])
+    prova("...il server le presenta: a ognuno le sue e quelle dell'altra parte", ({"mie": [KA], "peers": [KB]},
+                                                                                  {"mie": [KB], "peers": [KA]}),
+          (chiavi(cc, "m7", 0, 111), chiavi(cc, "m7", 0, 222)))
+    tetto = amb["CHAT_MERCATINO_CHIAVI_MAX"]
+    oltre = [dich(cc, "m7", 0, 111, f"{k:02x}" * 32, 10)[0] for k in range(tetto)]
+    prova(f"...il tetto: {tetto} per parte", [200] * (tetto - 1) + [409], oltre)
+    mod = amb["_chat_mercatino_per_moderatore"]
+    cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) VALUES('m7',0,222,'msg','','x',1)")
+    cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) VALUES('m7',0,111,'mod',?,'p',2)",
+               ("c" * 64,))
+    cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) VALUES('m7',0,222,'mod',?,'q',3)",
+               ("d" * 64,))
+    con.execute("INSERT INTO p2p_moderatori(tg_id, chiave) VALUES(999, ?)", ("c" * 64,))
+    prova("IL MODERATORE: fuori dalla disputa non legge", 409, mod(con, cc, 999, "m7")[0])
+    con.execute("UPDATE ordini SET stato='dispute' WHERE id=7")
+    c_, corpo = mod(con, cc, 999, "m7")
+    prova("...in disputa legge le buste, i SOLI pacchi chiusi per la sua chiave, e le chiavi d'ordine delle parti",
+          (200, [("vende", "x")], ["p"], [KA], [KB]),
+          (c_, [(b["lato"], b["busta"]) for b in corpo["buste"]], [k["busta"] for k in corpo["chiavi"]],
+           corpo["lati"]["compra"][:1], corpo["lati"]["vende"]))
+    prova("...un admin senza chiave dichiarata no, e un ordine che non c'e' e' un 404", (409, 404),
+          (mod(con, cc, 998, "m7")[0], mod(con, cc, 999, "m9")[0]))
+
+    # --- 3) IL LINK DEL TASTO, NEL SERVER ------------------------------
+    amb_l = {"re": re, "URL_PUBBLICO": "https://barattolo.store", "STARTAPP_MAX": 64,
+             "_FORMA_STARTAPP": re.compile(r"[A-Za-z0-9_-]{1,64}"),
+             "_FORMA_ID_STARTAPP": re.compile(r"[0-9a-zA-Z-]{8,64}")}
+    exec(pezzo("_startapp_da_link"), amb_l)
+    sp = amb_l["_startapp_da_link"]
+    B = "https://barattolo.store"
+    prova("IL TASTO DELL'AVVISO: `/?ordine=<numero>` diventa `mercatino_<numero>`, e nient'altro",
+          ["mercatino_12", "mercatino_123456789012", "", "", "", "", "", "p2p"],
+          [sp(B + "/?ordine=12"), sp(B + "/?ordine=123456789012"), sp(B + "/?ordine=012"),
+           sp(B + "/?ordine=12&x=1"), sp(B + "/?ordine=1234567890123"), sp(B + "/?ordine=abc"),
+           sp("https://altrove.example/?ordine=12"), sp(B + "/p2p")])
+
+    # --- 4) IL CLIENT: LE SENTINELLE ----------------------------------
+    i_c = mini.index("/* ---- LA CHAT NEGLI ORDINI DEL MERCATINO (16 ott 2026, cantiere")
+    adattatore = mini[i_c:mini.index("/* ---- LA CHAT PARTE SUBITO: LA CONTROPARTE CHE MANCA", i_c)]
+    cod_a = re.sub(r"/\*[\s\S]*?\*/", "", adattatore)
+    m_srv = re.findall(r'"([a-z_]+)"', blocco[blocco.index("CHAT_MERCATINO_APERTA = "):
+                                            blocco.index(")", blocco.index("CHAT_MERCATINO_APERTA = "))])
+    m_cli = re.findall(r"'([a-z_]+)'", cod_a[cod_a.index("const CHATSC_MERC_APERTA = "):
+                                          cod_a.index("];", cod_a.index("const CHATSC_MERC_APERTA = "))])
+    d_srv = re.findall(r'"([a-z_]+)"', blocco[blocco.index("CHAT_MERCATINO_DISPUTA = "):
+                                            blocco.index(")", blocco.index("CHAT_MERCATINO_DISPUTA = "))])
+    d_cli = re.findall(r"'([a-z_]+)'", cod_a[cod_a.index("const CHATSC_MERC_DISPUTA = "):
+                                          cod_a.index("];", cod_a.index("const CHATSC_MERC_DISPUTA = "))])
+    prova("GLI STATI DELLA CHAT sono gli stessi nel server e nel telefono", (m_srv, d_srv), (m_cli, d_cli))
+    prova("...e sono stati veri della regola 4 (nessuno inventato)", [], [s for s in m_srv if s not in STATI])
+    prova("IL TELEFONO NON FA NASCERE UN PROFILO DI SCAMBIO guardando un ordine: lo ritrova "
+          "(`adottaProfiloContoP2P`) o fa a meno", (False, True),
+          ("assicuraMazzo(" in cod_a, "adottaProfiloContoP2P()" in cod_a))
+    prova("...al server va la sola PUBBLICA della chiave d'ordine; la privata vive nel cassetto della chat",
+          (True, ["busta: k.pub"]),
+          ("c.ordineSk = k.sk;" in cod_a, re.findall(r"tipo: 'chiave_ordine', (busta: [a-z.]+)", cod_a)))
+    prova("...e una chiave nata a caso si dichiara da sola SOLO se il server non ne conosce nessuna mia",
+          True, "if ((o.mie || []).length && !forza) return null;" in cod_a)
+    blocco_c = mini[mini.index("/* ═══ LA CHAT NELLO SCAMBIO (12 ott 2026, cantiere chat-nello-scambio,"):
+                    mini.index("/* ═══ fine: la chat nello scambio ═══ */")]
+    prova("GLI ELEMENTI della chat si cercano nella vista in primo piano: nessun `el('p2pChat` nel motore", 0,
+          len(re.findall(r"(?<![A-Za-z])el\('p2pChat", blocco_c)))
+    oo = pezzo_js(mini, "function openOrder(id){", "\n}\n")
+    prova("LA PAGINA DELL'ORDINE: il richiamo in cima, il riquadro (o la riga «chat chiusa»), il moderatore",
+          True, 0 < oo.find("${chatMercRichiamoHTML(o)}") < oo.find("${chatMercBloccoHTML(o)}")
+          < oo.find("${chatMercModHTML(o)}") < oo.find("cardParteOrdine(o, o.role==='buyer'"))
+    prova("...e la lista degli ordini col segno «Nuovo messaggio nella chat»", True,
+          "chatScSegnoCardP2P(chatScRigaP2P('m' + o.id))" in pezzo_js(mini, "function renderOrders(){", "\n}\n"))
+    prova("LA PORTA DEL TASTO (`/?ordine=`) sta nei due avvii, e in vetrina non apre niente", (2, True),
+          (mini.count("    apriOrdineDaUrl();\n"),
+           "if (!ORDINE_URL || ordineUrlAperto) return;\n  ordineUrlAperto = true;\n  if (DEMO || VETRINA) return;"
+           in mini))
+
+    # IL RICHIAMO SULLO SCHERMO LARGO (19 ott 2026, richiesta di Andrea):
+    # da 1280 px col mouse la chat sta a destra, in vista, e il «💬 Chat ↓»
+    # si nasconde — nell'ordine e nello scambio, mai sul telefono, e senza
+    # `:has()` (la classe `con-chatsc` la mette il telefono)
+    i_l = mini.index("@media (min-width:1280px) and (hover:hover) and (pointer:fine){")
+    largo = mini[i_l:mini.index("@media (min-width:1600px)", i_l)]
+    regola = ("html.fuori-telegram #orderContent>.detail-body.con-chatsc>.chatsc-richiamo,\n"
+              "    html.fuori-telegram #p2pOrdineCorpo.con-chatsc>.chatsc-richiamo{display:none}")
+    prova("SULLO SCHERMO LARGO il richiamo si nasconde, nell'ordine e nello scambio: la regola vive SOLO "
+          "da 1280 px col mouse, e una sola volta", (True, 1),
+          (regola in largo, mini.count("con-chatsc>.chatsc-richiamo{display:none}")))
+    prova("...senza `:has()`: la classe la mette il telefono", (False, True),
+          (":has(" in regola, "box.classList.toggle('con-chatsc'," in pezzo_js(mini, "function chatScSegnaColonnaP2P(box){", "\n}\n")))
+    rop = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("...e la mette DOPO il disegno, nello scambio e nell'ordine", (True, True),
+          (0 < rop.find("ridisegnaSeCambiaP2P(box,") < rop.find("chatScSegnaColonnaP2P(box);"),
+           0 < oo.find("chatScSegnaColonnaP2P(oc.querySelector('.detail-body'));") < oo.find("go('ordine');")))
+
+    # --- 5) IL CLIENT: I PEZZI VERI IN NODE ----------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("i pezzi del client della chat del mercatino", "node non c'e'")
+        return
+    pezzi = "\n".join(
+        [pezzo_js(mini, "const P2P_FINALI = ", ";\n") + ";\n",
+         pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n",
+         pezzo_js(mini, "function ordiniP2P(){", "\n}\n") + "\n}\n",
+         pezzo_js(mini, "function percorsoDaStartapp(p){", "\n}\n") + "\n}\n",
+         pezzo_js(mini, "function startappDaLink(link, base){", "\n}\n") + "\n}\n",
+         blocco_c])
+    prog = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const _box = {};
+const localStorage = {getItem: k => (k in _box ? _box[k] : null), setItem: (k, v) => { _box[k] = String(v); }};
+function chiaveP2P(k){ return k; }
+const MOSTRO_ORDINI_CHIAVE = 'barattolo_mostro_ordini';
+const DEMO = false, VETRINA = false; let myTgId = 111; let p2pOrdineAperto = '', p2pLeve = {chat: true};
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function nomeControparteP2P(o, r){ return r; } function el(){ return null; } function vistaAttivaP2P(){ return 'view-ordine'; }
+function chiaveModeratoreP2P(){ return MOD; } function archivioModP2P(){ return {}; }
+function linkPdfPayCodeP2P(){ return null; }
+let MOD = null, MAZZO = null; function mazzoMostro(){ return MAZZO; }
+let orders = [], currentOrder = null;
+""" + pezzi + r"""
+const R = {};
+const sk = NT.utils.bytesToHex(NT.generateSecretKey());
+const k12 = chiaveOrdineMercatinoP2P(sk, 'm12');
+R.chiave = [k12.pub === chiaveOrdineMercatinoP2P(sk, 'm12').pub, k12.pub !== chiaveOrdineMercatinoP2P(sk, 'm13').pub,
+            k12.pub !== NT.getPublicKey(NT.utils.hexToBytes(sk)), /^[0-9a-f]{64}$/.test(k12.pub),
+            NT.getPublicKey(NT.utils.hexToBytes(k12.sk)) === k12.pub];
+const om = (role, state, chat) => ({id: 12, role: role, state: state, chat: chat,
+  voltoVenditore: {nome: 'Vera Rossi'}, voltoCompratore: {nome: 'Carlo Bianchi'}});
+orders = [om('buyer', 'locked', 'aperta')];
+const riga = chatScRigaP2P('m12');
+R.riga = [riga.mercatino, riga.nome, riga.lato, riga.disputa, riga.peer, riga.mie.length];
+orders = [om('admin', 'dispute', 'moderazione')];
+R.rigaAdmin = chatScRigaP2P('m12');
+const blocco = (role, state, chat) => { orders = [om(role, state, chat)]; currentOrder = orders[0]; return chatMercBloccoHTML(orders[0]); };
+const b1 = blocco('buyer', 'locked', 'aperta');
+R.aperta = [b1.indexOf('id="p2pChatSc"') >= 0, b1.indexOf('Chat con Vera') >= 0, b1.indexOf(esc(CHATSC_MERC_AVVISO)) >= 0,
+            b1.indexOf(esc(CHATSC_MERC_PATTO)) >= 0, b1.indexOf("Si apre appena Vera apre l'ordine.") >= 0];
+const b2 = blocco('seller', 'locked', 'aperta');
+R.chiVende = b2.indexOf('Chat con Carlo') >= 0;
+R.vuote = [blocco('buyer', 'creato', ''), blocco('buyer', 'annullato', ''), blocco('admin', 'dispute', 'moderazione')];
+R.chiusa = [blocco('buyer', 'released', 'chiusa').indexOf(esc(CHATSC_MERC_CHIUSA)) >= 0,
+            blocco('seller', 'refunded', 'chiusa').indexOf('id="p2pChatSc"') >= 0];
+p2pChatScSapere['m12'] = {chiusa: true};
+R.dettaFinita = blocco('buyer', 'locked', 'aperta').indexOf(esc(CHATSC_MERC_CHIUSA)) >= 0;
+p2pChatScSapere = {};
+p2pChatMercInfo['m12'] = {peers: ['b'.repeat(64)], mie: ['c'.repeat(64)]};
+const b3 = blocco('buyer', 'shipped', 'aperta');
+R.altrove = [b3.indexOf('Continua la chat qui') >= 0, b3.indexOf('data-modo="altrove"') >= 0];
+MAZZO = {sk: sk};
+p2pChatMercInfo['m12'] = {peers: ['b'.repeat(64)], mie: [chiaveOrdineMercatinoP2P(sk, 'm12').pub]};
+R.colProfilo = !!chatMercChiaveP2P(chatScRigaP2P('m12'));
+p2pChatMercSpenta = true;
+R.spenta = [blocco('buyer', 'locked', 'aperta'), chatMercRichiamoHTML(orders[0])];
+p2pChatMercSpenta = false;
+R.richiamo = chatMercRichiamoHTML(orders[0]).indexOf('id="p2pChatRichiamo"') >= 0;
+orders = [om('admin', 'dispute', 'moderazione')];
+R.modSenza = chatMercModHTML(orders[0]).indexOf('serve la tua chiave da moderatore') >= 0;
+R.link = [percorsoDaStartapp('mercatino_12'), percorsoDaStartapp('mercatino_012'), percorsoDaStartapp('mercatino_1234567890123'),
+          startappDaLink('https://b.example/?ordine=12', 'https://b.example'), startappDaLink('https://b.example/?ordine=12&x', 'https://b.example'),
+          startappDaLink('https://altro.example/?ordine=12', 'https://b.example'), percorsoDaStartapp('ordine_c4a70000-0000-4000-8000-0000000000c1')];
+/* il segno sul contenitore: un figlio `.chatsc` lo accende, senza lo spegne */
+const scatola = figli => { const cl = new Set(['detail-body']);
+  return {classList: {toggle: (n, v) => { if (v) cl.add(n); else cl.delete(n); }, has: n => cl.has(n)},
+          children: figli.map(c => ({classList: {contains: n => c.split(' ').indexOf(n) >= 0}}))}; };
+const conChat = scatola(['chatsc-richiamo', 'ordine-testa', 'chatmod chatsc', 'vault']);
+const senza = scatola(['ordine-testa', 'trust-note', 'vault']);
+chatScSegnaColonnaP2P(conChat); chatScSegnaColonnaP2P(senza);
+const prima = scatola(['chatmod chatsc']); chatScSegnaColonnaP2P(prima);
+prima.children = []; chatScSegnaColonnaP2P(prima);
+R.colonna = [conChat.classList.has('con-chatsc'), senza.classList.has('con-chatsc'), prima.classList.has('con-chatsc')];
+console.log(JSON.stringify(R));
+"""
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "merc.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(prog)
+        r = _sp.run([node, f, os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "nostr.bundle.js")],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    try:
+        R = _json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        prova("il banco del client gira", "", (r.stdout + r.stderr)[-1500:])
+        return
+    prova("LA CHIAVE DELL'ORDINE: stesso profilo e stesso ordine, stessa chiave; un altro ordine, un'altra; "
+          "non e' la chiave del profilo", [True] * 5, R["chiave"])
+    prova("LA RIGA che il motore legge: un ordine del mercatino, il nome di battesimo dell'altra parte, il lato",
+          [True, "Vera", "compro", False, "", 0], R["riga"])
+    prova("...per chi non e' una parte (il moderatore) non c'e'", None, R["rigaAdmin"])
+    prova("IL RIQUADRO, a ordine pagato: la chat dello scambio, con l'avviso e il patto dell'ordine, e «si apre "
+          "appena Vera apre l'ordine»", [True] * 5, R["aperta"])
+    prova("...a chi vende, col nome di chi compra", True, R["chiVende"])
+    prova("PRIMA DEL PAGAMENTO, MAI PAGATO, e al moderatore: niente riquadro", ["", "", ""], R["vuote"])
+    prova("A ORDINE CONCLUSO la riga «chat chiusa», e nessun riquadro", [True, False], R["chiusa"])
+    prova("...anche quando a dirlo e' il server su una pagina gia' aperta", True, R["dettaFinita"])
+    prova("SU UN ALTRO DISPOSITIVO (il server conosce una chiave mia che qui non c'e'): «Continua la chat qui»",
+          [True, True], R["altrove"])
+    prova("...col profilo di scambio la chiave d'ordine si ritrova da sola", True, R["colProfilo"])
+    prova("A LEVA SPENTA niente riquadro e niente richiamo", ["", ""], R["spenta"])
+    prova("IL RICHIAMO «💬 Chat» in cima, a chat aperta", True, R["richiamo"])
+    prova("AL MODERATORE senza la sua chiave su questo dispositivo: una riga che lo dice", True, R["modSenza"])
+    prova("IL SEGNO DELLA COLONNA: col riquadro della chat fra i figli il contenitore ha `con-chatsc`; senza "
+          "(anche quando la chat se ne va) no", [True, False, False], R["colonna"])
+    prova("IL TASTO NEL CLIENT: `mercatino_<n>` si rilegge in `/?ordine=<n>`, e il gemello lo scrive; le forme "
+          "storte no; lo scambio P2P resta com'era",
+          ["/?ordine=12", "", "", "mercatino_12", "", "", "/p2p?ordine=c4a70000-0000-4000-8000-0000000000c1"],
+          R["link"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -170004,6 +170376,7 @@ def main():
               prove_modifica_massiva,
               prove_bundle_bitcoin,
               prove_venduto_canale,
+              prove_chat_mercatino,
               prove_config_esempio):
         try:
             f()

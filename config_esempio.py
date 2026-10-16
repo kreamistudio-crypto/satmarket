@@ -954,6 +954,15 @@ MERCATINO_AVVISI_NUOVI = True
 # su; storti o sotto 1 valgono 60 e 15.
 MERCATINO_AVVISI_NUOVI_MINUTI = 60
 MERCATINO_AVVISI_SEGUI_MINUTI = 15
+# LA CHAT NEGLI ORDINI DEL MERCATINO (16 ott 2026): SPENTA di serie. Accesa,
+# da quando chi compra paga le due parti si scrivono nella pagina dell'ordine
+# con la chat dello scambio P2P (cifrata sul telefono, foto e PDF, gli stessi
+# tetti), nello stesso file a parte (`chat-scambi.db`, fuori dai backup); a
+# ordine concluso — confermato, liberato, rimborsato — si cancella tutto. In
+# disputa resta fino alla decisione, e il moderatore la legge con la sua
+# chiave. Spenta, la chat sparisce dagli ordini; quelle che ci sono se ne
+# vanno come sempre. Solo True accende.
+MERCATINO_CHAT_ORDINI = False
 # I SUGGERIMENTI DEGLI INDIRIZZI DELL'APPUNTAMENTO (1 ott 2026): mentre chi
 # vende in contanti scrive dove vedersi, il server chiede indirizzi veri a
 # Photon (dati OpenStreetMap) mandando SOLO il testo cercato, col freno e

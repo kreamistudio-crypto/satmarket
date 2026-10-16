@@ -33025,3 +33025,90 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `testoContropartePerMotivoP2P` — mai col motivo `esterno`: con
   un'altra app la chat non c'è, e restano i recapiti — e sulla nota di
   chi non ha canali pubblici. Le frasi restano dove sono, intatte.
+- LA CHAT NEGLI ORDINI DEL MERCATINO (16 ott 2026, cantiere
+  chat-mercatino, decisione di Andrea; il perché in CANTIERI, «La chat
+  negli ordini del mercatino»). La chat dello scambio P2P, ESATTAMENTE
+  com'è — cifrata sul telefono, foto e PDF ripuliti, gli stessi tetti —
+  nella pagina di un ordine del mercatino: si ACCENDE quando chi compra
+  paga (`locked`), resta per `shipped`, `delivered`, `dispute`,
+  `return_pending`, `return_shipped`, e si CANCELLA (buste, file, chiavi)
+  a ordine concluso: `confirmed`, `released`, `refund`, `refunded`.
+  `annullato` non c'è: ci si arriva solo da `creato`, mai pagato.
+  UN MOTORE SOLO. Stesse rotte (`/api/p2p/chat/*`), stesso cassetto
+  (`chat-scambi.db`, fuori dai backup), stesse tabelle; un ordine del
+  mercatino lì si chiama `m<numero>` (`FORMA_CHAT_MERCATINO`, mai
+  confondibile con un UUID di Mostro). Il giudice delle parti è
+  `_parti_chat`: per `m<numero>` `_parti_ordine_mercatino` (la riga di
+  `ordini`: chi compra, chi vende, `vivo` negli stati della chat, giro
+  sempre 0), per tutto il resto `_parti_scambio_p2p`. Lo usano
+  `_chat_p2p_stato` e la scopa. `_chat_p2p_chiede` decide la leva per
+  forma: un ordine del mercatino NON chiede il P2P attivo e guarda
+  `MERCATINO_CHAT_ORDINI` (SPENTA di serie, solo True accende; nel
+  pannello delle leve, gruppo «💬 Chat negli ordini del mercatino»); uno
+  scambio guarda `P2P_CHAT_SCAMBIO` come prima.
+  LA CHIAVE DELL'ORDINE fa la parte della chiave dello scambio (firma i
+  saluti, sigilla la copia della usa-e-getta). Nel telefono
+  `chiaveOrdineMercatinoP2P(sk, id)`: HMAC-SHA256 col segreto del
+  PROFILO DI SCAMBIO e l'etichetta `barattolo/mercatino/chat/v1|m<n>`,
+  come `chiaveScambio`. Il profilo si RITROVA (`chatMercProfiloP2P` →
+  `adottaProfiloContoP2P`, una volta per pagina: seme dell'account per
+  Telegram, nsec o copia sui relay per Nostr) e non nasce MAI da qui
+  (niente `assicuraMazzo`). Senza profilo la chiave nasce a caso
+  (`ordineSk` nel cassetto della chat, se ne va con lei). La PUBBLICA va
+  al server (`invia` tipo `chiave_ordine`, tabella `chiavi_ordine` del
+  cassetto: `_chat_mercatino_dichiara`, una chiave è di una parte sola,
+  `CHAT_MERCATINO_CHIAVI_MAX` 5 per parte) e `leggi` le presenta:
+  `{mie, peers}` (`_chat_mercatino_chiavi`). La riga che il motore
+  legge (`chatScRigaP2P`) ha `peer` = l'ultima dell'altra parte e
+  `peers` tutte: `chatScApriSalutoP2P` prova con ognuna, e
+  `chatScPresentaP2P` rifà il saluto quando l'altra parte dichiara una
+  chiave nuova (`salutoPer`). Una chiave si dichiara da sola SOLO se il
+  server non ne conosce nessuna mia (`chatMercDichiaraP2P`); altrimenti
+  il piede è «altrove» e la dichiara «Continua la chat qui».
+  L'ADATTATORE (client, blocco «LA CHAT NEGLI ORDINI DEL MERCATINO»
+  dentro quello della chat): `chatScMercP2P`, `chatScRigaP2P`,
+  `chatScNomeP2P`, `chatScApertoP2P` (quale chat c'è davanti: lo
+  scambio o l'ordine), `chatScEl` (gli elementi della chat si cercano
+  nella vista IN PRIMO PIANO: le due pagine possono avere un riquadro con
+  gli stessi id), `chatScRifaiP2P`, `chatMercBloccoHTML` (riquadro, o la
+  riga «Chat chiusa: messaggi e file cancellati a ordine concluso.»),
+  `chatMercRichiamoHTML`, `chatMercModHTML`. In `openOrder` il richiamo
+  in cima, il riquadro prima della card dell'altra parte (i tondi
+  @username/npub restano dove sono), e in `renderOrders` il segno «Nuovo
+  messaggio nella chat». I testi che cambiano: `CHATSC_MERC_AVVISO`,
+  `CHATSC_MERC_PATTO`, `CHATSC_MERC_RIGA_FUORI`, «si apre appena … apre
+  l'ordine». `/api/orders` porta `chat`: 'aperta' | 'chiusa' |
+  'moderazione' | '' (`_chat_mercatino_vista`). Il pallino: la stessa
+  `/novita`, coi due giri (scambi e ordini) ognuno con la sua leva
+  (`spenta_mercatino`).
+  LA DISPUTA. I telefoni di TUTTE E DUE le parti danno la chiave di
+  lettura ai moderatori appena l'ordine è in disputa (o nel reso)
+  (`chatScAiModeratoriP2P`, condizione `o.disputa`); il server accetta
+  una busta `mod` del mercatino solo in quegli stati. Il moderatore
+  (admin con la chiave dichiarata in `p2p_moderatori`) legge dalla
+  pagina dell'ordine (`chatMercModHTML` → `chatPartiModP2P`), dalle
+  stesse rotte (`/api/p2p/moderazione/chat` e `/chat/allegato`) col
+  giudice `_chat_mercatino_per_moderatore`: le buste, i pacchi chiusi
+  per la SUA chiave, e `lati` (le chiavi d'ordine di ogni parte, che nel
+  P2P vengono dal coordinatore). Senza la chiave sul dispositivo una
+  riga lo dice.
+  LA FINE. `_poi_chat_mercatino` avvolge i gesti che concludono — la
+  conferma, le tre decisioni del moderatore, il reso ricevuto — e chiama
+  la scopa subito dopo (`_chat_mercatino_dopo_stato`); il giro al minuto
+  di `orologio_avvisi_mercatino` passa `_chat_p2p_spazza(mercatino=True)`
+  per tutto il resto (un payout ripreso dall'orologio, un rimborso
+  pagato), anche a leva spenta; le rotte a ordine concluso rispondono
+  `finita` e il telefono butta chiave e messaggi. LA RETE DEI 30 GIORNI
+  NON TOCCA gli ordini del mercatino (`NOT (ordine GLOB 'm[1-9]*')`).
+  L'AVVISO: «💬 Hai un nuovo messaggio nell'ordine #N.» col tasto «💬
+  Apri l'ordine» (`CHAT_MERCATINO_BOTTONE`, `/?ordine=N`, che
+  `_startapp_da_link` traduce in `mercatino_N` dentro Telegram e
+  `apriOrdineDaUrl` riapre); stessa regola anti-raffica, nessun
+  interruttore (come gli altri avvisi dell'ordine). SULLO SCHERMO LARGO
+  (da 1280 px col mouse, fuori da Telegram) il riquadro `.chatsc` va
+  nella colonna di destra, e il richiamo «💬 Chat ↓» si nasconde:
+  `chatScSegnaColonnaP2P(box)` mette `con-chatsc` sul contenitore
+  (`#p2pOrdineCorpo`, il `.detail-body` dell'ordine) quando il riquadro
+  è un suo figlio diretto, e la regola del blocco da 1280 nasconde
+  `.chatsc-richiamo` lì dentro — niente `:has()`. Le prove:
+  `prove_chat_mercatino`, `collaudo_chat_mercatino` (in CI).

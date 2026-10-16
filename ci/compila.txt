@@ -120,6 +120,7 @@ collaudo_avviso_chi_annulla.py
 collaudo_recapito_aggiornato.py
 collaudo_chat_scambio.py
 collaudo_allegati_chat.py
+collaudo_chat_mercatino.py
 collaudo_garanzia_lunga.py
 collaudo_promemoria_gesto.py
 collaudo_x_risonanza.py

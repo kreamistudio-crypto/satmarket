@@ -5086,6 +5086,38 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Due righe `saluto` dello stesso account nello stesso scambio vogliono
   dire due chiavi presentate (un «Continua la chat qui»); una riga
   `chiave` per ogni chiave vuol dire che le copie ci sono.
+- LA CHAT NEGLI ORDINI DEL MERCATINO: LA LEVA (16 ott 2026, cantiere
+  chat-mercatino; com'è fatta in ARCHITETTURA, «LA CHAT NEGLI ORDINI DEL
+  MERCATINO»). AL DEPLOY NON SUCCEDE NIENTE: la leva è SPENTA di serie e
+  il codice non la accende da solo. Il cassetto è lo stesso della chat
+  dello scambio (`/srv/barattolo/dati/chat-scambi.db`, fuori dai
+  backup); la tabella nuova `chiavi_ordine` nasce da sola al primo
+  avvio, nessuna migrazione di `satmarket.db`.
+  PER ACCENDERLA (quando Andrea l'ha provata): prima si guarda, in sola
+  lettura, che la riga non ci sia già
+  `grep -n "^MERCATINO_CHAT_ORDINI" /srv/barattolo/config.py`
+  poi si aggiunge in fondo al config del VPS la riga
+  `MERCATINO_CHAT_ORDINI = True`
+  e si riavvia (`sudo systemctl restart barattolo`). Il pannello «⚙️
+  Stato delle leve» dell'admin la deve dire accesa. Per spegnerla: la
+  riga a `False` (o via), e riavvio; le chat che ci sono se ne vanno
+  come sempre, a ordine concluso.
+  GUARDARE, in sola lettura (il testo non c'è: sono buste chiuse):
+  `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT COUNT(*), COUNT(DISTINCT ordine) FROM buste WHERE ordine GLOB 'm[1-9]*';"`
+  Quante buste, su quanti ordini del mercatino in corso. NEL JOURNAL le
+  righe sono quelle della chat dello scambio, con l'ordine scritto
+  `m<numero>` («💬 Chat P2P: nuovo messaggio sullo scambio m42,
+  avvisato …», «🧹 Chat P2P: lo scambio m42 e' finito, buste
+  cancellate»), e «🧹 Chat degli ordini: cancellate le buste di N ordini
+  conclusi» dal giro al minuto. Mai il testo.
+  IL MODERATORE legge la chat di un ordine in disputa SOLO con la sua
+  chiave di moderatore dichiarata (quella del P2P, `p2p_moderatori`) e
+  sullo stesso dispositivo: senza, la pagina dell'ordine dice «serve la
+  tua chiave da moderatore su questo dispositivo».
+  LA PROVA SUL CAMPO, prima di accenderla per tutti: due telefoni, un
+  ordine pagato, due messaggi per parte e una foto, l'avviso col tasto
+  «💬 Apri l'ordine» ad app chiusa; poi la conferma, e la riga «Chat
+  chiusa» su tutti e due, e il conto qui sopra che torna a zero.
 - L'AVVISO «INDICA I TUOI CORRIERI» (12 ott 2026, cantiere
   punti-ritiro): la leva `AVVISO_CORRIERI_PUNTI`, SPENTA di serie nel
   codice. Dal deploy di quel cantiere il ritiro in un punto si offre
