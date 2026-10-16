@@ -32582,6 +32582,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `allegaChatScambioP2P` (il 📎 del piede, solo dove
   `chatScAllegatiPossibiliP2P`), `apriAllegatoChatScP2P` (rigiudica,
   decifra, confronta i primi byte col tipo annunciato) e
+  IL CASSETTO CHE NON SCOPPIA (16 ott 2026, cantiere pdf-allegati): PDF
+  fino a 20 MB (`P2P_CHAT_FILE_MAX`, il tetto del server per qualunque
+  file: il tipo non lo sa), foto sotto i 2 (`CHATSC_FOTO_MAX`), dieci file e
+  40 MB per persona (`P2P_CHAT_PESO_PARTE`), 2 GB in tutto; il cassetto è
+  `auto_vacuum = INCREMENTAL` (`_chat_vuoto_incrementale`, un VACUUM alla
+  prima apertura se non lo era) e la scopa restituisce le pagine
+  (`PRAGMA incremental_vacuum` col `fetchall`); `_avviso_cassetto_chat`
+  (puro: 80 % una volta, riarmo sotto il 60 %) e
+  `_chat_p2p_guarda_cassetto` (compito a parte dopo ogni invio, anche
+  rifiutato) avvisano il gruppo degli admin, argomento errori. Il PDF si
+  ripulisce sul telefono con pdf-lib 1.17.1 (`/vendor/pdf-lib.js`):
+  `pulisciPdfChatScP2P` lo carica severo (`throwOnInvalidObject`, niente
+  pagine = errore), toglie /Info, /ID, /Metadata e /PieceInfo di ogni
+  oggetto e lo riscrive da capo (`useObjectStreams: false`, senza il nome
+  di pdf-lib); se fallisce, la domanda unica «Questo PDF non si
+  ripulisce» e `mandaAllegatoChatScP2P` solo su «Mandalo così».
   `mostraAllegatoChatScP2P` (la foto in `#p2pAllegatoSheet`, il PDF
   pagina per pagina con pdf.js da `/vendor/pdf.mjs`, `isEvalSupported:
   false`, niente livello dei link). Il file in chiaro non si salva mai.

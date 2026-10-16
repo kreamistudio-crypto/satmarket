@@ -50640,14 +50640,47 @@ FORMA_BUSTA_CHAT = re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$")
 # (`chat-scambi.db`: fuori dai backup, `secure_delete`) e se ne vanno
 # con loro, a scambio finito. I tetti sono qui e nel telefono: un client
 # ritoccato non deve poter riempire il disco.
-P2P_CHAT_FILE_MAX = 2 * 1024 * 1024          # il file in chiaro: 2 MB (decisione di Andrea per i PDF)
+# I TETTI DI ANDREA (16 ott 2026, cantiere pdf-allegati): il PDF fino a
+# 20 MB (le foto il telefono le ridisegna sotto i 2: il server non sa il
+# tipo, quindi il tetto del singolo file e' quello del piu' grande);
+# dieci file E 40 MB per persona in ogni scambio; 2 GB per tutto il
+# cassetto (sul VPS 25 GB liberi su 38). All'80 % del cassetto un avviso
+# nel gruppo degli admin, argomento errori; si riarma sotto il 60 %.
+P2P_CHAT_FILE_MAX = 20 * 1024 * 1024         # il file in chiaro: il PDF fino a 20 MB
 P2P_CHAT_ALLEGATO_MAX = P2P_CHAT_FILE_MAX + 28   # + 12 di iv e 16 di sigillo GCM
 P2P_CHAT_ALLEGATO_MIN = 29
 P2P_CHAT_ALLEGATI_PARTE = 10                  # per parte e per scambio
-P2P_CHAT_ALLEGATI_CASSETTO = 500 * 1024 * 1024   # tutto il cassetto, tutti gli scambi
+P2P_CHAT_PESO_PARTE = 40 * 1024 * 1024        # e in peso, per parte e per scambio
+P2P_CHAT_ALLEGATI_CASSETTO = 2 * 1024 * 1024 * 1024   # tutto il cassetto, tutti gli scambi
+P2P_CHAT_CASSETTO_AVVISO = 0.8
+P2P_CHAT_CASSETTO_RIARMO = 0.6
+_CASSETTO_AVVISATO = {"su": False}
 FORMA_ALLEGATO_CHAT = re.compile(r"^[0-9a-f]{32}$")
 _CHAT_PRONTA = {"file": ""}
 _TASK_CHAT_P2P = set()
+
+
+def _chat_vuoto_incrementale(con):
+    """LO SPAZIO CHE TORNA DAVVERO (16 ott 2026, cantiere pdf-allegati).
+    Con gli allegati il cassetto puo' arrivare a 2 GB, e sqlite di suo non
+    restringe il file quando si cancella: tiene le pagine libere e le
+    riusa, e il disco resta occupato al massimo raggiunto. Con
+    `auto_vacuum = INCREMENTAL` le pagine libere si restituiscono al disco
+    con `PRAGMA incremental_vacuum`, che la scopa fa dopo ogni pulizia.
+    Su un file che esiste gia' l'interruttore vale solo dopo un VACUUM:
+    si fa UNA volta, qui, alla prima apertura del processo (oggi il file e'
+    piccolo: buste di testo). Se non riesce — un'altra connessione a meta'
+    — si dice e si riprova al prossimo avvio: il cassetto funziona uguale."""
+    try:
+        if int(con.execute("PRAGMA auto_vacuum").fetchone()[0]) == 2:
+            return
+        con.execute("PRAGMA auto_vacuum = INCREMENTAL")
+        con.execute("VACUUM")
+        print("🧹 Chat P2P: il cassetto restituisce lo spazio dei file cancellati "
+              "(auto_vacuum incrementale acceso)", flush=True)
+    except sqlite3.Error as e:
+        print(f"⚠️ Chat P2P: auto_vacuum non acceso ({type(e).__name__}: {e}): "
+              "riprovo al prossimo avvio", flush=True)
 
 
 def db_chat():
@@ -50663,6 +50696,7 @@ def db_chat():
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA secure_delete = ON")
     if _CHAT_PRONTA["file"] != DB_CHAT:
+        _chat_vuoto_incrementale(con)
         con.executescript("""
             CREATE TABLE IF NOT EXISTS buste(
                 n INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50939,6 +50973,10 @@ def _chat_p2p_spazza(ordine: str = "") -> int:
             cc.execute("DELETE FROM allegati WHERE quando<?",
                        (adesso - P2P_CHAT_VITA_MAX_S,))
         cc.commit()
+        # lo spazio delle pagine liberate torna al disco (vedi
+        # `_chat_vuoto_incrementale`); il `fetchall` e' quel che lo fa
+        # girare fino in fondo, un passo per pagina
+        cc.execute("PRAGMA incremental_vacuum").fetchall()
         return svuotati
     finally:
         cc.close()
@@ -51089,11 +51127,16 @@ def _chat_p2p_allegato_posa(cc, ordine: str, giro: int, io: int, dati: bytes,
     if peso < P2P_CHAT_ALLEGATO_MIN:
         return (400, "Richiesta non valida")
     if peso > P2P_CHAT_ALLEGATO_MAX:
-        return (413, "Il file è troppo grande: al massimo 2 MB")
+        return (413, "Il file è troppo grande: al massimo 20 MB")
     mie = int(cc.execute("SELECT COUNT(*) FROM allegati WHERE ordine=? AND giro=? AND da=?",
                          (ordine, giro, int(io))).fetchone()[0] or 0)
     if mie >= P2P_CHAT_ALLEGATI_PARTE:
         return (409, f"In questo scambio hai già mandato {P2P_CHAT_ALLEGATI_PARTE} file")
+    peso_mio = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati WHERE ordine=? "
+                              "AND giro=? AND da=?", (ordine, giro, int(io))).fetchone()[0] or 0)
+    if peso_mio + peso > P2P_CHAT_PESO_PARTE:
+        return (409, f"In questo scambio hai già mandato quasi "
+                     f"{P2P_CHAT_PESO_PARTE // (1024 * 1024)} MB di file")
     tutto = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati").fetchone()[0] or 0)
     if tutto + peso > P2P_CHAT_ALLEGATI_CASSETTO:
         return (507, "Adesso non c'è spazio per i file: riprova più tardi")
@@ -51103,6 +51146,48 @@ def _chat_p2p_allegato_posa(cc, ordine: str, giro: int, io: int, dati: bytes,
                (ident, ordine, giro, int(io), sqlite3.Binary(bytes(dati)), peso, adesso))
     cc.commit()
     return (200, {"id": ident, "peso": peso})
+
+
+def _avviso_cassetto_chat(tutto: int, tetto: int, gia: bool) -> tuple:
+    """IL CASSETTO QUASI PIENO (16 ott 2026, richiesta di Andrea). Pura.
+    Torna `(testo, avvisato)`: un testo per il gruppo degli admin la PRIMA
+    volta che si passa l'80 % del tetto, e niente le volte dopo finche' non
+    si torna sotto il 60 % (si riarma). Il testo dice quanto e' pieno e
+    cosa guardare; i file se ne vanno da soli a scambio finito."""
+    if tetto <= 0:
+        return "", gia
+    quota = tutto / tetto
+    if gia:
+        return "", quota >= P2P_CHAT_CASSETTO_RIARMO
+    if quota < P2P_CHAT_CASSETTO_AVVISO:
+        return "", False
+    mb = lambda n: f"{n / (1024 * 1024):,.0f}".replace(",", ".")
+    return (f"📎 <b>Il cassetto dei file della chat P2P è quasi pieno</b>: "
+            f"{mb(tutto)} MB su {mb(tetto)} MB ({quota:.0%}). I file se ne vanno da "
+            "soli a scambio finito; se non scende, guarda gli scambi aperti e lo "
+            "spazio sul VPS (PRODUZIONE, «GLI ALLEGATI»). Al pieno chi manda un "
+            "file sente «Adesso non c'è spazio per i file».", True)
+
+
+async def _chat_p2p_guarda_cassetto():
+    """Dopo ogni file posato o rifiutato per spazio: il giudice, e se c'e'
+    da dirlo l'avviso nel gruppo degli admin (argomento errori). Mai un
+    errore a chi chiama."""
+    try:
+        cc = db_chat()
+        try:
+            tutto = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati").fetchone()[0] or 0)
+        finally:
+            cc.close()
+        testo, _CASSETTO_AVVISATO["su"] = _avviso_cassetto_chat(
+            tutto, P2P_CHAT_ALLEGATI_CASSETTO, _CASSETTO_AVVISATO["su"])
+        if testo:
+            print(f"📎 Chat P2P: cassetto dei file all'80 % ({tutto} byte): avviso agli admin",
+                  flush=True)
+            await notifica_admin(testo, argomento="errori")
+    except Exception as e:
+        print(f"⚠️ Chat P2P: il controllo del cassetto non e' riuscito "
+              f"({type(e).__name__}: {e})", flush=True)
 
 
 def _chat_p2p_allegato_prendi(cc, ordine: str, giro: int, ident: str):
@@ -51140,13 +51225,17 @@ async def chat_allegato_p2p(req: Request, x_tg_init_data: str = Header(""),
     async for pezzo in req.stream():
         dati.extend(pezzo)
         if len(dati) > P2P_CHAT_ALLEGATO_MAX:
-            raise HTTPException(413, "Il file è troppo grande: al massimo 2 MB")
+            raise HTTPException(413, "Il file è troppo grande: al massimo 20 MB")
     cc = db_chat()
     try:
         codice, esito = _chat_p2p_allegato_posa(cc, ordine, st["giro"], user["id"],
                                                 dati, int(time.time()))
     finally:
         cc.close()
+    # il cassetto quasi pieno: un compito a parte, chi manda non aspetta Telegram
+    t = asyncio.create_task(_chat_p2p_guarda_cassetto())
+    _TASK_CHAT_P2P.add(t)
+    t.add_done_callback(_TASK_CHAT_P2P.discard)
     if codice != 200:
         raise HTTPException(codice, str(esito))
     print(f"📎 Chat P2P: un allegato sullo scambio {ordine[:8]}, "
@@ -80896,6 +80985,18 @@ def vendor_pdfjs():
 def vendor_pdfjs_worker():
     """pdf.js, il lavoratore che legge il PDF (stessa versione)."""
     return FileResponse("vendor/pdf.worker.min.mjs", media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# PDF-LIB, PER RIPULIRE I PDF PRIMA CHE PARTANO (16 ott 2026, cantiere
+# pdf-allegati, richiesta di Andrea): il telefono rilegge il PDF e lo
+# riscrive senza autore, titolo, programma, date, XMP e identificativo.
+# Stesso patto: pdf-lib 1.17.1 (MIT, `vendor/pdf-lib-LICENSE.md`), il
+# file della distribuzione com'e', una rotta esplicita, mai una CDN.
+@app.get("/vendor/pdf-lib.js")
+def vendor_pdflib():
+    """pdf-lib 1.17.1, la build UMD (espone `PDFLib`)."""
+    return FileResponse("vendor/pdf-lib.min.js", media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 

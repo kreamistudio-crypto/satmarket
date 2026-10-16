@@ -21,7 +21,12 @@ l'autenticazione VERA:
       quello scambio;
    5. la fine: a scambio finito il file sparisce DAL FILE del cassetto,
       non solo dall'elenco, e chi lo chiede sente «non c'e' piu'»;
-   6. la leva della chat spenta: niente file nuovi.
+   6. la leva della chat spenta: niente file nuovi;
+   7. (16 ott 2026, cantiere pdf-allegati) i tetti di Andrea — il PDF fino
+      a 20 MB, 40 MB per persona in ogni scambio —, l'avviso nel gruppo
+      degli admin quando il cassetto passa l'80 % (una volta, riarmato
+      sotto il 60 %), e lo spazio dei file cancellati che torna DAVVERO
+      al disco (auto_vacuum incrementale).
 
 NON TOCCA NIENTE DI VERO: il config di cartone di
 `collaudo_pagamento_p2p`, niente Telegram, niente relay, niente
@@ -115,12 +120,14 @@ async def giro():
 
     print("\n2) i tetti")
     prova("troppo piccolo (meno di iv e sigillo): 400", 400, cs.no(await manda(V, o, b"x" * 20)))
-    prova("troppo grande (2 MB e un byte oltre il sigillo): 413", 413,
+    prova("troppo grande (20 MB e un byte oltre il sigillo): 413", 413,
           cs.no(await manda(V, o, b"x" * (SRV.P2P_CHAT_ALLEGATO_MAX + 1))))
     prova("...e il tetto vale anche a pezzi piccoli: il corpo si ferma prima", 413,
           cs.no(await manda(V, o, b"x" * (SRV.P2P_CHAT_ALLEGATO_MAX + 1), pezzo=1000)))
-    prova("2 MB esatti col sigillo entrano", True,
+    prova("20 MB esatti col sigillo entrano", True,
           (await manda(C, o, b"y" * SRV.P2P_CHAT_ALLEGATO_MAX)).get("ok"))
+    prova("...un secondo da 20 MB della stessa persona no: i 40 MB a persona (409)", 409,
+          cs.no(await manda(C, o, b"y" * SRV.P2P_CHAT_ALLEGATO_MAX)))
     for _ in range(SRV.P2P_CHAT_ALLEGATI_PARTE - 1):
         await manda(V, o, os.urandom(64))
     prova("al file numero undici della stessa parte: 409", 409, cs.no(await manda(V, o, os.urandom(64))))
@@ -129,6 +136,35 @@ async def giro():
     SRV.P2P_CHAT_ALLEGATI_CASSETTO = 1024
     prova("il cassetto pieno: 507", 507, cs.no(await manda(C, altro, os.urandom(2048))))
     SRV.P2P_CHAT_ALLEGATI_CASSETTO = prima
+    await asyncio.sleep(0.3)
+
+    print("\n7) l'avviso del cassetto quasi pieno")
+    tutto = lambda: int(cs.cassetto("SELECT COALESCE(SUM(peso), 0) FROM allegati")[0][0])
+    AVVISATI = []
+
+    async def admin_finto(testo, bottone=None, argomento=""):
+        AVVISATI.append((testo, argomento))
+    SRV.notifica_admin = admin_finto
+    avvisi = lambda: [t for t, a in AVVISATI if a == "errori" and "Il cassetto dei file della chat P2P è quasi pieno" in t]
+    SRV._CASSETTO_AVVISATO["su"] = False
+    n0 = len(avvisi())
+    SRV.P2P_CHAT_ALLEGATI_CASSETTO = tutto() + 10_000          # oltre l'80 % col prossimo file
+    await manda(C, altro, os.urandom(500))
+    await asyncio.sleep(0.3)
+    prova("passato l'80 %: UN avviso agli admin, col testo che dice quanto", 1, len(avvisi()) - n0)
+    await manda(C, altro, os.urandom(500))
+    await asyncio.sleep(0.3)
+    prova("...il file dopo non ne manda un secondo", 1, len(avvisi()) - n0)
+    SRV.P2P_CHAT_ALLEGATI_CASSETTO = tutto() * 3               # sotto il 60 %: si riarma
+    await manda(C, altro, os.urandom(500))
+    await asyncio.sleep(0.3)
+    prova("...sceso sotto il 60 % si riarma", False, SRV._CASSETTO_AVVISATO["su"])
+    SRV.P2P_CHAT_ALLEGATI_CASSETTO = tutto() + 10_000
+    await manda(C, altro, os.urandom(500))
+    await asyncio.sleep(0.3)
+    prova("...e ripassato l'80 % lo ridice", 2, len(avvisi()) - n0)
+    SRV.P2P_CHAT_ALLEGATI_CASSETTO = prima
+    SRV._CASSETTO_AVVISATO["su"] = False
 
     print("\n4) il moderatore")
     await cs.evento(o, "hold-invoice-paid", "seller", "active", kc, kv)
@@ -157,10 +193,17 @@ async def giro():
     pezzo_foto = foto[1000:1064]
     prova("(prima della fine i byte stanno nel file del cassetto)", True,
           pezzo_foto in open(SRV.DB_CHAT, "rb").read())
+    # la misura PRIMA degli eventi: e' l'evento che chiude a far girare la scopa
+    peso_prima = os.path.getsize(SRV.DB_CHAT)
     await cs.evento(o, "released", "mostro", "admin", kc, kv)
     await cs.evento(o, "success", "mostro", "", kc, kv)
     await asyncio.sleep(0.3)
     SRV._chat_p2p_spazza(o)
+    peso_dopo = os.path.getsize(SRV.DB_CHAT)
+    prova("LO SPAZIO TORNA AL DISCO: il cassetto e' incrementale, nessuna pagina libera resta, e il file "
+          "si restringe di almeno i 20 MB del PDF cancellato", (2, 0, True),
+          (int(cs.cassetto("PRAGMA auto_vacuum")[0][0]), int(cs.cassetto("PRAGMA freelist_count")[0][0]),
+           peso_prima - peso_dopo >= 20 * 1024 * 1024))
     prova("a scambio finito: nessuna riga di quello scambio nel cassetto", 0,
           len(cs.cassetto("SELECT id FROM allegati WHERE ordine=?", o)))
     prova("...e i byte non sono piu' nel file (secure_delete)", False,

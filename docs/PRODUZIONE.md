@@ -4941,6 +4941,30 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Nel journal una riga per file, col solo peso: «📎 Chat P2P: un
   allegato sullo scambio …, N KB». pdf.js (`vendor/pdf.min.mjs`,
   `vendor/pdf.worker.min.mjs`) viaggia col deploy come gli altri vendor.
+  IL CASSETTO DA 2 GB (16 ott 2026, cantiere pdf-allegati, decisioni di
+  Andrea): il PDF fino a 20 MB, le foto ridisegnate sotto i 2, dieci file
+  e 40 MB per persona in ogni scambio, 2 GB di file in tutto
+  (`P2P_CHAT_ALLEGATI_CASSETTO`; sul VPS il 16 ott 25 GB liberi su 38).
+  DOVE STANNO: dentro `/srv/barattolo/dati/chat-scambi.db`, come blob
+  cifrati. NON ENTRA NEI BACKUP, e coi 2 GB conta ancora di più: il
+  pre-deploy copia solo `satmarket.db` (con l'API di sqlite, per nome) e
+  il giornaliero (`deploy/backup-fuori.sh`) solo `satmarket.db`,
+  `config.py`, `buste/` e `contenuti/` — `buste/` è la cartella delle
+  buste di ritiro del mercatino, non la chat. Una prova fallisce se uno
+  dei due script nomina il cassetto. LO SPAZIO TORNA AL DISCO: dal primo
+  avvio dopo questo deploy il cassetto è `auto_vacuum = INCREMENTAL` (un
+  VACUUM UNA volta sola, al primo avvio: oggi il file è piccolo; nel
+  journal «🧹 Chat P2P: il cassetto restituisce lo spazio dei file
+  cancellati»), e la scopa, dopo ogni pulizia, restituisce le pagine
+  libere (`PRAGMA incremental_vacuum`): il file si restringe davvero. Se
+  il VACUUM non riesce lo dice («⚠️ Chat P2P: auto_vacuum non acceso») e
+  riprova al riavvio dopo. In sola lettura:
+  `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "PRAGMA auto_vacuum; PRAGMA freelist_count;"`
+  deve dire 2 e un numero piccolo. L'AVVISO: quando i file passano l'80 %
+  dei 2 GB, nel gruppo degli admin (argomento errori) «📎 Il cassetto dei
+  file della chat P2P è quasi pieno: … MB su 2.048 MB», una volta; si
+  riarma sotto il 60 %. Al pieno chi manda sente «Adesso non c'è spazio
+  per i file». pdf-lib (`vendor/pdf-lib.min.js`) viaggia col deploy.
   NEL JOURNAL (`journalctl -u barattolo | grep "Chat P2P"`): «💬 Chat
   P2P: nuovo messaggio sullo scambio …, avvisato …» quando parte un
   avviso; «🧹 Chat P2P: lo scambio … e' finito, buste cancellate» alla

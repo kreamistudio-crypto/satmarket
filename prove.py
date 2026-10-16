@@ -43462,8 +43462,10 @@ def prove_fogli_di_casa():
     # OTTANTAQUATTRO (16 ott 2026, barcode-paycode): «Apri il PDF» della
     # scheda del PayCode di Amazon in chat (`apriPdfPayCodeP2P`) chiede
     # prima «Stai aprendo un sito esterno» (richiesta di Andrea).
-    prova("i gesti che passano dalla domanda unica sono ottantaquattro",
-          84, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTACINQUE (16 ott 2026, cantiere pdf-allegati): il PDF che non si
+    # ripulisce chiede «Lo mandi lo stesso, così com'è?» (`allegaChatScambioP2P`).
+    prova("i gesti che passano dalla domanda unica sono ottantacinque",
+          85, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -157449,10 +157451,13 @@ def prove_canale_admin():
     # rimborso uscito.)
     # (15 ott 2026, cantiere relay-di-barattolo: la ronda dei relay Nostr
     # di casa — UNO, negli errori: 73 chiamate, 83 punti.)
+    # (16 ott 2026, cantiere pdf-allegati: il cassetto dei file della chat
+    # quasi pieno, `_chat_p2p_guarda_cassetto` — UNO, negli errori: 74
+    # chiamate, 84 punti.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 32, "moderazione": 14,
+          {"dispute": 2, "dm": 1, "errori": 33, "moderazione": 14,
            "riepiloghi": 25}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -157487,9 +157492,9 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "83 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
-          "spese di spedizione ferme, la fattura annullata pagata e la "
-          "ronda dei relay Nostr)", 83,
+          "84 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "spese di spedizione ferme, la fattura annullata pagata, la "
+          "ronda dei relay Nostr e il cassetto dei file della chat)", 84,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -164580,6 +164585,11 @@ fetch = async function(url, opz){
 /* la vista del file: nel banco si guarda COSA le arriva */
 const MOSTRATI = [];
 mostraAllegatoChatScP2P = async (chiaro, tipo) => { MOSTRATI.push({tipo: tipo, chiaro: chiaro}); };
+/* (16 ott 2026, pdf-allegati) pdf-lib VERO, dal file della distribuzione;
+   e la domanda unica di cartone: si guarda cosa chiede, e si tocca */
+window.PDFLib = require(require('path').resolve('vendor/pdf-lib.min.js'));
+const DOMANDE = [];
+function chiediConferma(c){ DOMANDE.push(c); }
 
 (async () => {
 const ORD = '5a1e0000-c2c2-4a2b-9c3d-0000000000a1';
@@ -164599,7 +164609,12 @@ const giro = async chi => { su(chi); await chatScRitiraP2P(ORD);
 await giro('a'); await giro('b'); await giro('a');
 const out = {};
 const enc = s => new TextEncoder().encode(s);
-const PDF = enc('%PDF-1.4\n% il PDF del PayCode 212-802-988\n' + 'x'.repeat(5000) + '\n%%EOF\n');
+/* un PDF VERO (passa dalla pulizia): una pagina, un flusso in chiaro col
+   PayCode (resta: e' contenuto), e l'autore (se ne va: e' un dato nascosto) */
+const PDF = await (async () => { const L = window.PDFLib; const d = await L.PDFDocument.create();
+  d.addPage([300, 200]); d.setAuthor('Mario Rossi');
+  d.catalog.set(L.PDFName.of('Barattolo'), d.context.register(d.context.stream('il PDF del PayCode 212-802-988 ' + 'x'.repeat(5000))));
+  return await d.save({useObjectStreams: false}); })();
 const contiene = (pagliaio, ago) => Buffer.from(pagliaio).indexOf(Buffer.from(ago)) >= 0;
 
 /* ===== 1) i pezzi puri ===== */
@@ -164614,6 +164629,8 @@ out.tag = [allegatoDaTagChatScP2P(T(ID, K, 'application/pdf', '5000')),
            allegatoDaTagChatScP2P(T(ID, K, 'image/gif', '5000')), allegatoDaTagChatScP2P(T('../x', K, 'image/png', '5')),
            allegatoDaTagChatScP2P(T(ID, 'zz', 'image/png', '5')), allegatoDaTagChatScP2P(T(ID, K, 'image/png', '0')),
            allegatoDaTagChatScP2P(T(ID, K, 'image/png', String(2 * 1024 * 1024 + 1))),
+           allegatoDaTagChatScP2P(T(ID, K, 'application/pdf', String(20 * 1024 * 1024))),
+           allegatoDaTagChatScP2P(T(ID, K, 'application/pdf', String(20 * 1024 * 1024 + 1))),
            allegatoDaTagChatScP2P(T(ID, K, 'image/png', '1.5')), allegatoDaTagChatScP2P([['o', ORD]]),
            allegatoDaTagChatScP2P(T(ID, K, 'image/webp', '5000'))];
 out.testi = ['image/jpeg', 'image/png', 'application/pdf', 'x'].map(testoAllegatoChatScP2P);
@@ -164646,17 +164663,18 @@ const bustaMsg = srv.buste.filter(b => b.tipo === 'msg').pop().busta;
 out.bustaMuta = [bustaMsg.indexOf(Object.keys(srv.allegati)[0]) < 0, bustaMsg.indexOf('application/pdf') < 0];
 const ca = chatScDiP2P(ORD);
 const mioF = ca.msgs[ca.msgs.length - 1];
-out.mio = [mioF.mio, mioF.testo, !!mioF.f, mioF.f && mioF.f.tipo, mioF.f && mioF.f.peso === PDF.length];
+out.mio = [mioF.mio, mioF.testo, !!mioF.f, mioF.f && mioF.f.tipo, mioF.f && mioF.f.peso > 0];
 const cb = await giro('b');
 const suoF = cb.msgs[cb.msgs.length - 1];
 out.suo = [suoF.mio, suoF.testo, suoF.f && suoF.f.tipo, suoF.f && suoF.f.k === mioF.f.k, suoF.f && suoF.f.id === mioF.f.id];
 const htmlB = chatScMessaggiHTML(cb, 'Venditore', disp.b.ordini[ORD]);
-out.vista = [htmlB.indexOf('class="chatsc-file"') >= 0, htmlB.indexOf('📄 PDF · 5 KB') >= 0,
+out.vista = [htmlB.indexOf('class="chatsc-file"') >= 0, /📄 PDF · \d+ KB/.test(htmlB),
              htmlB.indexOf('📎 PDF') < 0, htmlB.indexOf('chatsc-allarme') < 0];
 toasts = []; MOSTRATI.length = 0;
 await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: suoF.f.tipo, p: String(suoF.f.peso)});
 out.apre = [toasts, MOSTRATI.length, MOSTRATI[0] && MOSTRATI[0].tipo,
-            MOSTRATI[0] && Buffer.from(MOSTRATI[0].chiaro).equals(Buffer.from(PDF))];
+            !!MOSTRATI[0] && contiene(MOSTRATI[0].chiaro, enc('212-802-988'))
+            && (await window.PDFLib.PDFDocument.load(MOSTRATI[0].chiaro)).getAuthor() === undefined];
 /* il server manomette i byte: non si apre e lo dice */
 toasts = []; MOSTRATI.length = 0; srv.manomesso = suoF.f.id;
 await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: suoF.f.tipo, p: String(suoF.f.peso)});
@@ -164694,10 +164712,23 @@ srv.allegati['f'.repeat(32)] = {ordine: ORD, da: 222, dati: finto.dati};
 await apriAllegatoChatScP2P({o: ORD, i: 'f'.repeat(32), k: finto.chiave, t: 'image/jpeg', p: '112'});
 out.webpFinto = [MOSTRATI.length, toasts[0]];
 su('a'); p2pOrdineAperto = ORD;
-const grande = new Uint8Array(2 * 1024 * 1024 + 1); grande.set(enc('%PDF-1.4'));
+const grande = new Uint8Array(20 * 1024 * 1024 + 1); grande.set(enc('%PDF-1.4'));
 out.noGrande = await tenta(new Blob([grande]));
-const giusto = new Uint8Array(2 * 1024 * 1024); giusto.set(enc('%PDF-1.4'));
-out.siGiusto = await tenta(new Blob([giusto]));
+/* 20 MB esatti ma ROTTI: la pulizia non ci riesce, quindi la domanda; «Mandalo così» lo manda com'e' */
+const giusto = new Uint8Array(20 * 1024 * 1024); giusto.set(enc('%PDF-1.4'));
+DOMANDE.length = 0;
+const gTent = await tenta(new Blob([giusto]));
+const dom = DOMANDE[0] || {};
+const n20 = srv.allegatiN;
+if (dom.poi) await dom.poi();
+out.siGiusto = [gTent[0], DOMANDE.length, dom.titolo, dom.corpo, dom.etichetta, srv.allegatiN - n20,
+                srv.allegati[Object.keys(srv.allegati).pop()].dati.length];
+/* un altro da 20 MB: con quello di prima si passano i 40 MB a persona */
+DOMANDE.length = 0; p2pChatScUltimoInvio = 0; toasts = [];
+await tenta(new Blob([giusto]));
+const n40 = srv.allegatiN;
+if (DOMANDE[0] && DOMANDE[0].poi) await DOMANDE[0].poi();
+out.no40 = [srv.allegatiN - n40, toasts[toasts.length - 1]];
 /* il tetto dei dieci, contato sul cassetto di chi manda */
 const cTetto = chatScDiP2P(ORD);
 cTetto.msgs = cTetto.msgs.concat(Array.from({length: 10}, (_, i) => ({id: 'f' + i, t: 0, mio: true, testo: '📎 PDF',
@@ -164798,7 +164829,7 @@ def prove_allegati_chat():
                                         f.filter(_R("/api/p2p/chat/allegato", 413))])
     # le funzioni pure del server, su un cassetto in memoria
     amb = {"re": re, "secrets": __import__("secrets"), "sqlite3": sqlite3}
-    for riga in re.findall(r"\n((?:P2P_CHAT_(?:FILE_MAX|ALLEGATO_MAX|ALLEGATO_MIN|ALLEGATI_PARTE|ALLEGATI_CASSETTO)"
+    for riga in re.findall(r"\n((?:P2P_CHAT_(?:FILE_MAX|ALLEGATO_MAX|ALLEGATO_MIN|ALLEGATI_PARTE|PESO_PARTE|ALLEGATI_CASSETTO)"
                            r"|FORMA_ALLEGATO_CHAT) = [^\n]+)", blocco_srv):
         exec(riga.split("  #")[0], amb)
     for fn in ("_chat_p2p_allegato_posa", "_chat_p2p_allegato_prendi"):
@@ -164811,8 +164842,11 @@ def prove_allegati_chat():
     posa, prendi = amb["_chat_p2p_allegato_posa"], amb["_chat_p2p_allegato_prendi"]
     O1, O2 = "a11e0000-0000-4000-8000-000000000001", "a11e0000-0000-4000-8000-000000000002"
     r1 = posa(cc, O1, 1, 222, b"z" * 100, 1000)
-    prova("i tetti del server: 2 MB col sigillo, 29 byte al minimo, dieci per parte", (2097180, 29, 10),
-          (amb["P2P_CHAT_ALLEGATO_MAX"], amb["P2P_CHAT_ALLEGATO_MIN"], amb["P2P_CHAT_ALLEGATI_PARTE"]))
+    # (16 ott 2026, pdf-allegati) i tetti di Andrea: 20 MB, dieci e 40 MB a persona, 2 GB in tutto
+    prova("i tetti del server: 20 MB col sigillo, 29 byte al minimo, dieci e 40 MB per parte, 2 GB il cassetto",
+          (20971548, 29, 10, 41943040, 2147483648),
+          (amb["P2P_CHAT_ALLEGATO_MAX"], amb["P2P_CHAT_ALLEGATO_MIN"], amb["P2P_CHAT_ALLEGATI_PARTE"],
+           amb["P2P_CHAT_PESO_PARTE"], amb["P2P_CHAT_ALLEGATI_CASSETTO"]))
     prova("posato: un id a caso, il peso; ripreso uguale; da un altro scambio, giro o id: niente",
           (200, True, 100, b"z" * 100, None, None, None),
           (r1[0], bool(re.fullmatch(r"[0-9a-f]{32}", r1[1]["id"])), r1[1]["peso"],
@@ -164825,6 +164859,13 @@ def prove_allegati_chat():
         posa(cc, O1, 1, 222, b"z" * 40, 1000)
     prova("l'undicesimo della stessa parte 409, l'altra parte passa", (409, 200),
           (posa(cc, O1, 1, 222, b"z" * 40, 1000)[0], posa(cc, O1, 1, 111, b"z" * 40, 1000)[0]))
+    amb["P2P_CHAT_PESO_PARTE"] = 1000
+    O3 = "a11e0000-0000-4000-8000-000000000003"
+    prova("i 40 MB a persona (qui 1000 byte): il file che li passa 409, con la frase; l'altra parte passa",
+          [200, 409, "In questo scambio hai già mandato quasi 0 MB di file", 200],
+          [posa(cc, O3, 1, 222, b"z" * 600, 1000)[0], posa(cc, O3, 1, 222, b"z" * 500, 1000)[0],
+           posa(cc, O3, 1, 222, b"z" * 500, 1000)[1], posa(cc, O3, 1, 111, b"z" * 500, 1000)[0]])
+    amb["P2P_CHAT_PESO_PARTE"] = 41943040
     amb["P2P_CHAT_ALLEGATI_CASSETTO"] = 600
     prova("il cassetto pieno: 507", 507, posa(cc, O2, 1, 111, b"z" * 200, 1000)[0])
     # le rotte di pdf.js: esplicite, coi file committati, la licenza accanto
@@ -164843,11 +164884,17 @@ def prove_allegati_chat():
     al = pezzo_js(mini, "async function allegaChatScambioP2P(input){", "\n}\n")
     prova("il tipo si legge dai PRIMI BYTE, prima di tutto; il PDF parte com'e', la FOTO solo ridisegnata", True,
           _in_ordine(al, "const tipo = tipoDaByteChatScP2P(await byteDaBlobChatScP2P(file.slice(0, 12)));",
-                     "if (tipo === 'application/pdf') {", "chiaro = await byteDaBlobChatScP2P(file);",
+                     "if (tipo === 'application/pdf') {", "const grezzo = await byteDaBlobChatScP2P(file);",
+                     "try { chiaro = await pulisciPdfChatScP2P(grezzo); }",
                      "} else {", "const p = await preparaFotoChatScP2P(file, tipo === 'image/webp' ? 'image/jpeg' : tipo);",
-                     "const cif = await cifraAllegatoChatScP2P(chiaro);", "await chatScInviaP2P(id, testoAllegatoChatScP2P(t), {id: d.id, k: cif.chiave"))
+                     "await mandaAllegatoChatScP2P(id, chiaro, t);")
+          and _in_ordine(pezzo_js(mini, "async function mandaAllegatoChatScP2P(id, chiaro, t){", "\n}\n"),
+                         "if (giaMandati + chiaro.length > CHATSC_PESO_PARTE)",
+                         "const cif = await cifraAllegatoChatScP2P(chiaro);",
+                         "await chatScInviaP2P(id, testoAllegatoChatScP2P(t), {id: d.id, k: cif.chiave"))
     prova("...e al server va SOLO il cifrato, coi byte nudi e lo scambio nell'intestazione", True,
-          "headers: {'Content-Type': 'application/octet-stream', 'X-Tg-Init-Data': authHdr(), 'X-Chat-Ordine': id},\n      body: cif.dati});" in al)
+          "headers: {'Content-Type': 'application/octet-stream', 'X-Tg-Init-Data': authHdr(), 'X-Chat-Ordine': id},\n      body: cif.dati});"
+          in pezzo_js(mini, "async function mandaAllegatoChatScP2P(id, chiaro, t){", "\n}\n"))
     fo = pezzo_js(mini, "async function preparaFotoChatScP2P(file, tipo){", "\n}\n")
     prova("LA FOTO RIDISEGNATA: un canvas, il disegno e il blob del canvas — mai i byte del file", True,
           _in_ordine(fo, "ctx.drawImage(img, 0, 0, cv.width, cv.height);", "cv.toBlob(ok, formato, q)",
@@ -164876,16 +164923,19 @@ def prove_allegati_chat():
           ('<div class="sheet" id="p2pAllegatoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAllegatoTit">' in mini,
            "  el('p2pAllegatoSheet').classList.remove('open');" in pezzo_js(mini, "function closeSheet(){", "\n}"),
            'accept="image/jpeg,image/png,image/webp,application/pdf"' in mini))
-    prova("i tetti del telefono sono quelli del server", (2097152, 10),
-          (eval(re.search(r"const CHATSC_FILE_MAX = ([^;]+);", mini).group(1)),
-           int(re.search(r"const CHATSC_ALLEGATI_MAX = (\d+);", mini).group(1))))
+    prova("i tetti del telefono sono quelli del server: foto 2 MB, PDF 20 MB, dieci e 40 MB per persona",
+          (2097152, 20971520, 10, 41943040),
+          (eval(re.search(r"const CHATSC_FOTO_MAX = ([^;]+);", mini).group(1)),
+           eval(re.search(r"const CHATSC_PDF_MAX = ([^;]+);", mini).group(1)),
+           int(re.search(r"const CHATSC_ALLEGATI_MAX = (\d+);", mini).group(1)),
+           eval(re.search(r"const CHATSC_PESO_PARTE = ([^;]+);", mini).group(1))))
     prova("la busta porta il tag `f` DENTRO, e il messaggio aperto lo rigiudica (anche per il moderatore)", (True, True, True),
           ("if (f) tags.push(['f', f.id, f.k, f.tipo, String(f.peso)]);" in mini,
            "const f = allegatoDaTagChatScP2P(ev.tags);" in pezzo_js(mini, "function chatScApriMsgP2P(o, c, busta){", "\n}\n"),
            "f: allegatoDaTagChatScP2P(ev.tags)};" in pezzo_js(mini, "function chatPartiApriP2P(k, arch, ordine, d){", "\n}\n")))
     prova("i testi: «Info P2P» dice foto e PDF col 📎, cifrati e senza posizione; il patto dei dati il peso e la fine",
           (True, True, False),
-          ("Oltre al testo puoi mandare <b>foto (jpg, png, webp) e PDF</b> fino a 2 MB, col 📎" in mini,
+          ("Oltre al testo puoi mandare <b>foto (jpg, png, webp) e PDF</b> fino a 20 MB, col 📎" in mini,
            "del file il server vede solo <b>quanto pesa</b>, e lo cancella con la chat" in mini,
            "Solo testo, niente allegati." in mini))
     prova("i documenti sanno degli allegati", [True, True, True, True],
@@ -164926,8 +164976,10 @@ def prove_allegati_chat():
           ["image/jpeg", "image/png", "application/pdf", "", "", "", "", "", "image/webp", "", "", "", ""],
           out["tipi"])
     ID, K = "0" * 31 + "1", "a" * 64
-    prova("il tag `f`: buono solo con id, chiave, tipo ammesso e peso intero fino a 2 MB",
-          [{"id": ID, "k": K, "tipo": "application/pdf", "peso": 5000}] + [None] * 8, out["tag"])
+    prova("il tag `f`: buono solo con id, chiave, tipo ammesso e peso intero fino a 2 MB per la foto e 20 per il PDF",
+          [{"id": ID, "k": K, "tipo": "application/pdf", "peso": 5000}, None, None, None, None, None,
+           {"id": ID, "k": K, "tipo": "application/pdf", "peso": 20 * 1024 * 1024}, None, None, None, None],
+          out["tag"])
     prova("il testo del messaggio di un file e il peso detto bene",
           [["📎 Foto", "📎 Foto", "📎 PDF", "📎 File"], ["1 KB", "1 KB", "340 KB", "1,0 MB", "2,0 MB"]],
           [out["testi"], out["pesi"]])
@@ -164952,7 +165004,8 @@ def prove_allegati_chat():
           [False, "📎 PDF", "application/pdf", True, True], out["suo"])
     prova("...lo vede come riquadro del file, senza il testo «📎 PDF» e senza righe rosse",
           [True, True, True, True], out["vista"])
-    prova("...lo apre: arriva alla vista identico", [[], 1, "application/pdf", True], out["apre"])
+    prova("...lo apre: arriva alla vista RIPULITO (lo stesso che e' partito), col PayCode dentro e senza l'autore",
+          [[], 1, "application/pdf", True], out["apre"])
     prova("il server manomette un byte: non si apre e lo dice", [0, "Non si apre: il file non si apre con la chiave del messaggio"],
           out["manomesso"])
     prova("un messaggio che dice «foto» per un PDF: non si apre", [0, "Non si apre: il file non è quello che il messaggio dice: non lo apro"],
@@ -164968,9 +165021,14 @@ def prove_allegati_chat():
     prova("...e il tag di chi riceve non accetta un webp: viaggiano solo jpeg, png e pdf; un webp spacciato "
           "per jpeg non si apre", [0, "Non si apre: il file non è quello che il messaggio dice: non lo apro"],
           out["webpFinto"])
-    prova("...un PDF di 2 MB e un byte no; uno di 2 MB esatti si'",
-          [[0, "Non è partito: il PDF è troppo grande: al massimo 2 MB"], 1],
-          [out["noGrande"], out["siGiusto"][0]])
+    prova("...un PDF di 20 MB e un byte no; uno di 20 MB esatti che non si ripulisce: la domanda, e «Mandalo così» lo manda com'e'",
+          [[0, "Non è partito: il PDF è troppo grande: al massimo 20 MB"],
+           [0, 1, "Questo PDF non si ripulisce",
+            "Non riesco a togliere i dati nascosti del PDF (autore, programma, date). Lo mandi lo stesso, così com'è?",
+            "Mandalo così", 1, 20 * 1024 * 1024 + 28]],
+          [out["noGrande"], out["siGiusto"]])
+    prova("...un secondo da 20 MB della stessa persona no: i 40 MB a persona", [0, "Non è partito: in questo scambio hai già mandato quasi 40 MB di file"],
+          out["no40"])
     prova("...l'undicesimo file della stessa parte no; nessuna scelta, niente", [[0, "In questo scambio hai già mandato 10 file"], [0, 0]],
           [out["noUndicesimo"], out["niente"]])
     pv, pn = out["piedeVecchio"], out["piedeNuovo"]
@@ -165363,6 +165421,232 @@ console.log(JSON.stringify({
           [md["aperture"], md["buono"]])
 
 
+BANCO_PULIZIA_PDF = r"""
+const fs = require('fs'), path = require('path');
+const PDFLib = require(path.resolve('vendor/pdf-lib.min.js'));
+const window = {PDFLib: PDFLib};
+const FOTO_BASE = '';
+__PEZZI__
+(async () => {
+const L = PDFLib, out = {};
+const dentro = (b, s) => Buffer.from(b).toString('latin1').toLowerCase().indexOf(s.toLowerCase()) >= 0;
+const hex16 = s => 'feff' + Array.from(s).map(c => c.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+/* IL PDF «RICCO»: info del documento, XMP del documento e della pagina,
+   PieceInfo, identificativo, e un flusso in chiaro di contenuto che deve
+   RESTARE. Due volte: con gli object stream (le info compresse) e senza */
+const ricco = async compresso => {
+  const d = await L.PDFDocument.create();
+  const pg = d.addPage([400, 300]); d.addPage([400, 300]);
+  d.setTitle('Titolo Segreto'); d.setAuthor('Mario Rossi'); d.setSubject('Soggetto Segreto');
+  d.setProducer('Programma Segreto'); d.setCreator('Creatore Segreto'); d.setKeywords(['parolasegreta']);
+  d.setCreationDate(new Date(2020, 1, 2)); d.setModificationDate(new Date(2021, 3, 4));
+  const ctx = d.context;
+  d.catalog.set(L.PDFName.of('Metadata'), ctx.register(ctx.stream('<x:xmpmeta><dc:creator>Mario XMP</dc:creator></x:xmpmeta>',
+    {Type: 'Metadata', Subtype: 'XML'})));
+  pg.node.set(L.PDFName.of('Metadata'), ctx.register(ctx.stream('<x:xmpmeta>Pagina XMP Segreta</x:xmpmeta>',
+    {Type: 'Metadata', Subtype: 'XML'})));
+  pg.node.set(L.PDFName.of('PieceInfo'), ctx.obj({Programma: {Privato: L.PDFString.of('Dato Privato Segreto')}}));
+  ctx.trailerInfo.ID = ctx.obj([L.PDFHexString.of('00112233445566778899aabbccddeeff'), L.PDFHexString.of('00112233445566778899aabbccddeeff')]);
+  d.catalog.set(L.PDFName.of('Barattolo'), ctx.register(ctx.stream('PayCode 212-802-988 contenuto che resta')));
+  return await d.save({useObjectStreams: compresso});
+};
+const guarda = async (b) => {
+  const d = await L.PDFDocument.load(b, {updateMetadata: false});
+  return {titolo: d.getTitle() || '', autore: d.getAuthor() || '', soggetto: d.getSubject() || '',
+          programma: d.getProducer() || '', creatore: d.getCreator() || '', chiavi: d.getKeywords() || '',
+          creato: !!d.getCreationDate(), modificato: !!d.getModificationDate(),
+          xmp: !!d.catalog.get(L.PDFName.of('Metadata')), xmpPagina: !!d.getPage(0).node.get(L.PDFName.of('Metadata')),
+          piece: !!d.getPage(0).node.get(L.PDFName.of('PieceInfo')), id: !!d.context.trailerInfo.ID,
+          pagine: d.getPageCount()};
+};
+for (const [nome, compresso] of [['semplice', false], ['compresso', true]]) {
+  const r = await ricco(compresso);
+  const p = await pulisciPdfChatScP2P(r);
+  out[nome] = {prima: await guarda(r), dopo: await guarda(p),
+    grezzo: ['Mario', hex16('Mario Rossi'), 'Titolo Segreto', 'Programma Segreto', 'Pagina XMP Segreta', 'Dato Privato Segreto',
+             '00112233445566778899aabbccddeeff', '/ID', '/Info', 'pdf-lib'].map(x => dentro(p, x)),
+    resta: dentro(p, 'PayCode 212-802-988 contenuto che resta'), testa: Buffer.from(p.slice(0, 5)).toString('latin1')};
+}
+/* UN PDF DI UN ALTRO PROGRAMMA: Pillow, con titolo e autore suoi */
+const pil = fs.readFileSync(process.argv[2]);
+const pp = await pulisciPdfChatScP2P(pil);
+out.pillow = {prima: await guarda(pil), dopo: await guarda(pp), grezzo: ['Autore Pillow', 'Titolo Pillow'].map(x => dentro(pp, x))};
+/* QUELLI CHE NON SI RIPULISCONO: rotto, senza pagine, con password */
+const no = async b => { try { await pulisciPdfChatScP2P(b); return 'ripulito'; } catch(e) { return 'no'; } };
+const rotto = new Uint8Array(4096); rotto.set(new TextEncoder().encode('%PDF-1.4\n'));
+/* (pdf-lib, salvando un documento vuoto, gli aggiunge da solo una pagina: qui no) */
+const vuoto = await (await L.PDFDocument.create()).save({addDefaultPage: false});
+const cifrato = await (async () => { const d = await L.PDFDocument.create(); d.addPage();
+  d.context.trailerInfo.Encrypt = d.context.register(d.context.obj({Filter: 'Standard', V: 1, R: 2}));
+  return await d.save({useObjectStreams: false}); })();
+out.no = [await no(rotto), await no(vuoto), await no(cifrato), await no(new TextEncoder().encode('ciao'))];
+console.log(JSON.stringify(out));
+})().catch(e => console.log(JSON.stringify({esploso: String(e && e.stack || e)})));
+"""
+
+
+def prove_pdf_allegati():
+    """I PDF DELLA CHAT FINO A 20 MB, RIPULITI, E IL CASSETTO CHE NON
+    SCOPPIA (16 ott 2026, cantiere pdf-allegati, decisioni di Andrea).
+    1) I tetti: PDF fino a 20 MB, foto ridisegnate sotto i 2, dieci file
+    e 40 MB per persona in ogni scambio, 2 GB per tutto il cassetto (i
+    conti li prova `prove_allegati_chat`). 2) Il PDF si RIPULISCE sul
+    telefono con pdf-lib 1.17.1: riscritto da capo senza /Info, XMP,
+    /PieceInfo e /ID; se non ci si riesce (rotto, senza pagine, con
+    password) chi manda sceglie. 3) Lo spazio dei file cancellati torna
+    al DISCO (auto_vacuum incrementale, `incremental_vacuum` dopo la
+    scopa): il file di sqlite di suo non si restringe mai. 4) All'80 %
+    del cassetto un avviso nel gruppo degli admin, argomento errori, una
+    volta; si riarma sotto il 60 %. 5) Il cassetto non entra nei backup
+    (lo ridice qui, accanto ai 2 GB)."""
+    import base64
+    import io
+    import shutil
+    import sqlite3
+    import tempfile
+    print("\n[i PDF della chat fino a 20 MB, ripuliti, e il cassetto che non scoppia]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    def _in_ordine(t, *pezzi):
+        ii = [t.find(x) for x in pezzi]
+        return all(k >= 0 for k in ii) and ii == sorted(ii)
+
+    # --- 1) LE SENTINELLE --------------------------------------------------------
+    prova("I DUE BACKUP NON NOMINANO IL CASSETTO, anche coi suoi 2 GB: copiano satmarket.db per nome",
+          (False, False, True, True),
+          ("chat-scambi" in open("deploy.sh", encoding="utf-8").read(),
+           "chat-scambi" in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
+           'sqlite3 "$DIR_APP/satmarket.db" ".backup' in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
+           "from config import DB" in open("deploy.sh", encoding="utf-8").read()))
+    dbc = pezzo("db_chat")
+    prova("lo spazio torna al disco: il cassetto si prepara col vuoto incrementale PRIMA delle tabelle, "
+          "e la scopa restituisce le pagine dopo ogni pulizia (fino in fondo: il fetchall)", (True, True),
+          (_in_ordine(dbc, "_chat_vuoto_incrementale(con)", "con.executescript("),
+           _in_ordine(pezzo("_chat_p2p_spazza"), "cc.commit()", 'cc.execute("PRAGMA incremental_vacuum").fetchall()')))
+    rotta = pezzo("chat_allegato_p2p")
+    prova("l'invio guarda il cassetto ANCHE quando rifiuta (il 507), in un compito a parte; l'avviso va "
+          "al gruppo degli admin, argomento errori", (True, True),
+          (_in_ordine(rotta, "t = asyncio.create_task(_chat_p2p_guarda_cassetto())", "if codice != 200:"),
+           'await notifica_admin(testo, argomento="errori")' in pezzo("_chat_p2p_guarda_cassetto")))
+    prova("pdf-lib servito da casa: la rotta esplicita, il file della distribuzione e la licenza MIT", (True, True, True, True),
+          ('@app.get("/vendor/pdf-lib.js")' in src and 'FileResponse("vendor/pdf-lib.min.js"' in src,
+           os.path.isfile("vendor/pdf-lib.min.js") and "PDFLib" in open("vendor/pdf-lib.min.js", encoding="utf-8").read()[:400],
+           "MIT License" in open("vendor/pdf-lib-LICENSE.md", encoding="utf-8").read(),
+           "sc.src = `${FOTO_BASE}/vendor/pdf-lib.js?v=1.17.1`;" in mini))
+    pul = pezzo_js(mini, "async function pulisciPdfChatScP2P(chiaro){", "\n}\n")
+    prova("la pulizia: severa (oggetto storto o niente pagine = errore), senza il nome di pdf-lib, via info, "
+          "identificativo, XMP e PieceInfo, riscritta da capo", True,
+          _in_ordine(pul, "L.PDFDocument.load(chiaro, {updateMetadata: false, throwOnInvalidObject: true});",
+                     "if (doc.getPageCount() < 1) throw", "ctx.trailerInfo.Info = undefined;", "ctx.trailerInfo.ID = undefined;",
+                     "for (const k of ['Metadata', 'PieceInfo']) {", "await doc.save({useObjectStreams: false"))
+    al = pezzo_js(mini, "async function allegaChatScambioP2P(input){", "\n}\n")
+    prova("...e se non riesce chi manda sceglie: la domanda, e solo «Mandalo così» lo manda com'e'", True,
+          _in_ordine(al, "try { chiaro = await pulisciPdfChatScP2P(grezzo); }", "chiediConferma({titolo: 'Questo PDF non si ripulisce',",
+                     "poi: () => mandaAllegatoChatScP2P(id, grezzo, 'application/pdf')});\n        return;"))
+    for doc, cosa in (("docs/CANTIERI.md", "## I PDF della chat fino a 20 MB, ripuliti, e il cassetto che non scoppia"),
+                      ("docs/ARCHITETTURA.md", "IL CASSETTO CHE NON SCOPPIA (16 ott 2026"),
+                      ("docs/PRODUZIONE.md", "IL CASSETTO DA 2 GB (16 ott 2026"),
+                      ("docs/GUIDA-P2P-PASSI.md", "«Questo PDF non si ripulisce»")):
+        prova(f"{doc} sa dei PDF da 20 MB", True, cosa in open(doc, encoding="utf-8").read())
+
+    # --- 2) L'AVVISO DEL CASSETTO, PURO -----------------------------------------
+    i = src.index("# ═══ LA CHAT NELLO SCAMBIO: IL SERVER FA IL POSTINO")
+    blocco_srv = src[i:src.index("# ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE", i)]
+    amb = {"sqlite3": sqlite3}
+    for riga in re.findall(r"\n(P2P_CHAT_CASSETTO_(?:AVVISO|RIARMO) = [^\n]+)", blocco_srv):
+        exec(riga, amb)
+    exec(pezzo("_avviso_cassetto_chat"), amb)
+    av = amb["_avviso_cassetto_chat"]
+    G = 2 * 1024 * 1024 * 1024
+    passi = [av(int(G * 0.79), G, False), av(G * 8 // 10 + 1, G, False), av(int(G * 0.95), G, True),
+             av(int(G * 0.61), G, True), av(int(G * 0.59), G, True), av(int(G * 0.85), G, False), av(5, 0, False)]
+    prova("l'avviso: sotto l'80 % niente; all'80 % UNO; poi silenzio fino a sotto il 60 % (si riarma), e di nuovo",
+          [("", False), (True, True), ("", True), ("", True), ("", False), (True, True), ("", False)],
+          [(p[0] if not p[0] else True, p[1]) for p in passi])
+    prova("...e dice quanto e' pieno e cosa guardare", True,
+          passi[1][0].startswith("📎 <b>Il cassetto dei file della chat P2P è quasi pieno</b>: 1.638 MB su 2.048 MB (80%).")
+          and "PRODUZIONE, «GLI ALLEGATI»" in passi[1][0])
+
+    # --- 3) LO SPAZIO CHE TORNA AL DISCO, su un file vero --------------------------
+    amb2 = {"sqlite3": sqlite3, "print": lambda *a, **k: None}
+    exec(pezzo("_chat_vuoto_incrementale"), amb2)
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "chat-scambi.db")
+        vecchio = sqlite3.connect(f)          # un cassetto di prima: auto_vacuum spento
+        vecchio.execute("CREATE TABLE allegati(id TEXT PRIMARY KEY, dati BLOB)")
+        vecchio.commit()
+        prima = vecchio.execute("PRAGMA auto_vacuum").fetchone()[0]
+        vecchio.close()
+        con = sqlite3.connect(f)
+        con.execute("PRAGMA secure_delete = ON")
+        amb2["_chat_vuoto_incrementale"](con)
+        dopo = con.execute("PRAGMA auto_vacuum").fetchone()[0]
+        con.execute("INSERT INTO allegati VALUES('a', ?)", (sqlite3.Binary(os.urandom(3 * 1024 * 1024)),))
+        con.commit()
+        pieno = os.path.getsize(f)
+        con.execute("DELETE FROM allegati")
+        con.commit()
+        tenuto = os.path.getsize(f)
+        con.execute("PRAGMA incremental_vacuum").fetchall()
+        libere = con.execute("PRAGMA freelist_count").fetchone()[0]
+        vuoto = os.path.getsize(f)
+        amb2["_chat_vuoto_incrementale"](con)      # la seconda volta non rifa' il VACUUM
+        con.close()
+    prova("SU UN FILE VERO: il cassetto di prima passa all'incrementale; 3 MB cancellati restano sul disco "
+          "finche' non si restituiscono, poi tornano (nessuna pagina libera, il file si restringe)",
+          [0, 2, True, 0, True], [prima, dopo, tenuto >= pieno, libere, vuoto < pieno - 2 * 1024 * 1024])
+
+    # --- 4) LA PULIZIA VERA, in node con pdf-lib ----------------------------------
+    node = shutil.which("node")
+    if not node:
+        salta("la pulizia vera dei PDF", "node non c'e'")
+        return
+    try:
+        from PIL import Image
+    except ImportError:
+        salta("la pulizia vera dei PDF", "Pillow non c'e'")
+        return
+    buf = io.BytesIO()
+    Image.new("RGB", (200, 100), (255, 255, 255)).save(buf, "PDF", title="Titolo Pillow", author="Autore Pillow")
+    pezzi = (pezzo_js(mini, "function tipoDaByteChatScP2P(b){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function caricaPdfLibP2P(){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "async function pulisciPdfChatScP2P(chiaro){", "\n}\n") + "\n}\n")
+    import subprocess as _sp
+    with tempfile.TemporaryDirectory() as d:
+        fjs, fpdf = os.path.join(d, "pulizia.js"), os.path.join(d, "pillow.pdf")
+        with open(fjs, "w", encoding="utf-8") as fh:
+            fh.write(BANCO_PULIZIA_PDF.replace("__PEZZI__", pezzi))
+        with open(fpdf, "wb") as fh:
+            fh.write(buf.getvalue())
+        r = _sp.run([node, fjs, fpdf], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+    try:
+        out = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        out = {"esploso": (r.stdout + r.stderr)[-1500:]}
+    prova("il banco della pulizia gira", "", out.get("esploso", ""))
+    if out.get("esploso"):
+        return
+    VUOTO = {"titolo": "", "autore": "", "soggetto": "", "programma": "", "creatore": "", "chiavi": "",
+             "creato": False, "modificato": False, "xmp": False, "xmpPagina": False, "piece": False, "id": False,
+             "pagine": 2}
+    for nome in ("semplice", "compresso"):
+        o = out[nome]
+        prova(f"PDF {nome}: prima c'erano autore, titolo, programma, date, XMP, PieceInfo e identificativo",
+              [True] * 12, [bool(o["prima"][k]) for k in ("titolo", "autore", "soggetto", "programma", "creatore", "chiavi",
+                                                          "creato", "modificato", "xmp", "xmpPagina", "piece", "id")])
+        prova(f"...ripulito: niente di tutto questo, le due pagine restano", VUOTO, o["dopo"])
+        prova(f"...e nei byte non resta traccia (nemmeno in UTF-16, nemmeno il nome di pdf-lib); il contenuto resta",
+              [[False] * 10, True, "%PDF-"], [o["grezzo"], o["resta"], o["testa"]])
+    pl = out["pillow"]
+    prova("un PDF di un altro programma (Pillow): titolo e autore suoi prima, niente dopo, la pagina resta",
+          [["Titolo Pillow", "Autore Pillow"], ["", "", 1], [False, False]],
+          [[pl["prima"]["titolo"], pl["prima"]["autore"]], [pl["dopo"]["titolo"], pl["dopo"]["autore"], pl["dopo"]["pagine"]],
+           pl["grezzo"]])
+    prova("NON SI RIPULISCONO (e chi manda sceglie): un PDF rotto, uno senza pagine, uno con password, uno che non e' un PDF",
+          ["no", "no", "no", "no"], out["no"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -165683,6 +165967,7 @@ def main():
               prove_annullata_pagata,
               prove_barre_paycode,
               prove_allegati_chat,
+              prove_pdf_allegati,
               prove_config_esempio):
         try:
             f()

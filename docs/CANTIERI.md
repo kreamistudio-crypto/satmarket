@@ -61382,3 +61382,157 @@ strada a pezzi, `37e9a4e`): rebase con un solo conflitto, in coda a
 questo file; sull'albero finale rigirate le sezioni che leggono i file
 toccati (`ci/compila.txt`, HACKATHON-SETUP, CANTIERI). Push col sì di
 Andrea («si si ok», 16 ott sera).
+## I PDF della chat fino a 20 MB, ripuliti, e il cassetto che non scoppia (16 ott 2026, cantiere pdf-allegati, richiesta di Andrea)
+
+**PERCHÉ.** Andrea: «mettiamo il limite massimo del pdf a 20 mb». Un PDF
+di Amazon pesa poco, ma un preventivo o una scansione no. Il tetto del
+singolo file però non vive da solo: il server non sa che tipo di file
+riceve (è cifrato), quindi 20 MB valgono per qualunque file, e coi tetti
+di prima (10 file a persona, 500 MB per tutto il cassetto) una sola
+persona poteva caricare 200 MB e 25 PDF riempivano il cassetto di tutti.
+
+**COSA SI È DECISO (Andrea, sulla proposta).** PDF fino a 20 MB; foto
+sempre ridisegnate sotto i 2; dieci file E 40 MB per persona in ogni
+scambio; 2 GB per tutto il cassetto (sul VPS, il 16 ott: /dev/sda1 38 GB,
+12 usati, 25 liberi). E due aggiunte: dire dove stanno i file e
+controllare che i 2 GB non gonfino i backup e che lo spazio dei file
+cancellati torni davvero; avvisare il gruppo admin (argomento errori)
+prima che il cassetto si riempia. E la pulizia dei metadati del PDF, che
+nella parte C era rimasta fra i «da fare».
+
+**DOVE STANNO I FILE, E I BACKUP.** Dentro
+`/srv/barattolo/dati/chat-scambi.db`, come blob cifrati (tabella
+`allegati`). Riletti i due script: il pre-deploy (`deploy.sh`) copia SOLO
+`satmarket.db`, per nome e con l'API di sqlite; il giornaliero
+(`deploy/backup-fuori.sh`) solo `satmarket.db`, `config.py`, `buste/` e
+`contenuti/` — e `buste/` è la cartella delle buste di ritiro del
+mercatino, non la chat. Il cassetto non c'è, e una prova (anche in
+questa sezione nuova) fallisce se uno dei due lo nomina. PRODUZIONE non
+nomina snapshot del disco.
+
+**COME È FATTO.**
+- I TETTI: `P2P_CHAT_FILE_MAX` 20 MB (+28 di iv e sigillo), dieci file e
+  `P2P_CHAT_PESO_PARTE` 40 MB per persona e per scambio (409 «In questo
+  scambio hai già mandato quasi 40 MB di file»), `P2P_CHAT_ALLEGATI_CASSETTO`
+  2 GB (507). Sul telefono gli stessi: `CHATSC_FOTO_MAX` 2 MB (la foto
+  ridisegnata, e il tag di una foto non può dire di più),
+  `CHATSC_PDF_MAX` 20 MB, `CHATSC_PESO_PARTE` 40 MB contati sul cassetto
+  di chi manda.
+- LO SPAZIO CHE TORNA: sqlite di suo non restringe mai il file, tiene le
+  pagine libere e le riusa: il disco sarebbe rimasto al massimo raggiunto.
+  Adesso il cassetto è `auto_vacuum = INCREMENTAL`
+  (`_chat_vuoto_incrementale`: su un file che esiste già serve un VACUUM,
+  fatto UNA volta alla prima apertura del processo — oggi il file è
+  piccolo —; se non riesce lo dice e riprova al prossimo avvio), e la
+  scopa dopo ogni pulizia restituisce le pagine (`PRAGMA
+  incremental_vacuum` col `fetchall`: senza, sqlite ne libera una sola).
+  `secure_delete` resta: i byte cancellati sono zeri anche prima di
+  tornare al disco.
+- L'AVVISO: `_avviso_cassetto_chat` (pura) dice UNA volta quando i file
+  passano l'80 % del tetto, e tace finché non si torna sotto il 60 %
+  (si riarma); `_chat_p2p_guarda_cassetto` la chiama in un compito a
+  parte dopo ogni invio — anche rifiutato: è il 507 che deve suonare — e
+  manda il testo a `notifica_admin(..., argomento="errori")`.
+- IL PDF RIPULITO (sul telefono, prima di cifrare): pdf-lib 1.17.1 (MIT,
+  la build UMD della distribuzione, `vendor/pdf-lib.min.js`, rotta
+  esplicita `/vendor/pdf-lib.js`; integrità npm verificata:
+  `sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==`;
+  niente `eval`), caricato solo quando si manda un PDF.
+  `pulisciPdfChatScP2P` lo carica SEVERO (`throwOnInvalidObject`, e un
+  documento senza pagine è un errore), toglie le informazioni del
+  documento (/Info: autore, titolo, soggetto, programma, creatore, parole
+  chiave, date), l'identificativo (/ID), l'XMP (/Metadata) e /PieceInfo di
+  OGNI oggetto (documento, pagine, immagini), e lo riscrive DA CAPO senza
+  object stream e senza il nome di pdf-lib (`updateMetadata: false`):
+  delle revisioni vecchie (gli aggiornamenti incrementali, dove l'autore
+  di prima resta) non resta niente, per costruzione. Il contenuto delle
+  pagine resta byte per byte. Se non si ripulisce (rotto, con password,
+  senza pagine) la domanda unica «Questo PDF non si ripulisce» / «Non
+  riesco a togliere i dati nascosti del PDF (autore, programma, date). Lo
+  mandi lo stesso, così com'è?» / «Mandalo così»: decide chi manda
+  (`mandaAllegatoChatScP2P` solo sul sì). Le domande uniche sono 85.
+- I testi: «Info P2P» (fino a 20 MB, «i PDF senza i dati nascosti»), il
+  patto dei dati, GUIDA-P2P-PASSI §13; PRODUZIONE «IL CASSETTO DA 2 GB»
+  coi comandi in sola lettura; ARCHITETTURA «IL CASSETTO CHE NON SCOPPIA».
+
+**STRADE SCARTATE.** Il tetto dei 20 MB per i soli PDF sul server (il
+server non sa il tipo: sarebbe un tetto finto). Il VACUUM pieno a ogni
+pulizia (blocca il cassetto e chiede il doppio dello spazio: con 2 GB è
+un rischio, l'incrementale no). Un VACUUM a mano ogni tanto (dipende da
+qualcuno che se ne ricordi). Pulire il PDF «a mano» sovrascrivendo i byte
+delle info (le info nei PDF moderni stanno spesso dentro gli object
+stream compressi, e un byte sbagliato rompe gli indirizzi). pdf-lib
+tollerante com'è di serie: un PDF rotto diventava un PDF VUOTO che
+partiva senza dire niente — l'ha preso il banco (20 MB rotti → 115 byte),
+e da lì il caricamento severo e il controllo delle pagine.
+
+**PROVATO.** `prove_pdf_allegati` (nuova, 22): i backup che non nominano
+il cassetto; il vuoto incrementale prima delle tabelle e la scopa che
+restituisce le pagine; l'invio che guarda il cassetto anche quando
+rifiuta, l'avviso ad «errori»; pdf-lib in casa con la licenza; la
+pulizia severa e la domanda; l'avviso puro (79 %, 80 % una volta,
+silenzio, riarmo sotto il 60 %, di nuovo); LO SPAZIO SU UN FILE VERO (un
+cassetto vecchio passa all'incrementale, 3 MB cancellati restano sul
+disco finché non si restituiscono, poi il file si restringe e non resta
+nessuna pagina libera); e il banco node con pdf-lib VERO e la funzione
+vera del client: un PDF con titolo, autore, soggetto, programma,
+creatore, parole chiave, date, XMP del documento e della pagina,
+PieceInfo e /ID — semplice e con gli object stream — esce senza niente di
+tutto questo (anche cercato nei byte, anche in UTF-16, nemmeno il nome di
+pdf-lib), con le pagine e il contenuto; un PDF di Pillow col titolo e
+l'autore suoi esce pulito; rotto, senza pagine, con password, non-PDF:
+non si ripuliscono. `prove_allegati_chat` emendata coi tetti nuovi (il
+banco dei due telefoni ora manda un PDF VERO, che arriva ripulito; i 20
+MB rotti → la domanda → «Mandalo così»; il secondo da 20 MB fermato dai
+40 MB; i tag di foto e PDF), `prove_fogli_di_casa` (85 domande).
+`collaudo_allegati_chat` (35, nella gabbia e due alla volta col collaudo
+della chat): 20 MB entrano, il secondo da 20 MB della stessa persona no,
+l'avviso agli admin una volta, il riarmo, di nuovo; e sul server vero il
+cassetto incrementale senza pagine libere e il file che si restringe di
+almeno i 20 MB del PDF cancellato. Tortura su una copia intera: 17
+mutazioni (la pulizia tollerante, senza controllo delle pagine, le info,
+l'identificativo, XMP e PieceInfo che restano, pdf-lib che firma, «Mandalo
+così» che manda il niente, i 40 MB tolti dal telefono e dal server, il PDF
+fino a 200 MB, lo spazio che non torna, il vuoto incrementale mai acceso,
+l'avviso al 90 %, mai riarmato, a ogni file, non guardato sul rifiuto, in
+un'altra stanza): 17 prese.
+GIRO DAL VIVO (server di collaudo da una copia, relay morto, Browser
+pane): un PDF di Pillow con titolo, autore e soggetto dal vero `<input>`
+→ al server (intercettato) solo il cifrato; decifrato: niente titolo,
+autore, soggetto, programma, niente /Info, niente «pdf-lib», una pagina;
+e il CONTENUTO della pagina (testo e immagine) identico byte per byte
+all'originale. Un PDF rotto dal vero `<input>` → la domanda coi testi
+giusti → «Mandalo così» → parte com'è. Il disegno del PDF ripulito con
+pdf.js NON l'ho visto: il pane era nascosto, e in una pagina nascosta
+pdf.js non disegna (aspetta un fotogramma) — l'avevo visto disegnare un
+PDF nella parte C; qui resta per il telefono.
+SUITE E COLLAUDI, sopra a5044fd: la suite intera severa ha dato 24.585
+passate e 5 fallite. Due erano mie: il censimento degli avvisi agli
+admin (`prove_canale_admin`) conta un avviso in più negli «errori», il
+cassetto quasi pieno — emendato col perché (74 chiamate, 84 punti),
+rigirato: 87 su 87. Le altre tre («il canale e il bot che sfoglia»:
+gli altri articoli linkati, il titolo lungo, gli URL nudi) sono le
+stesse TRE che la CI di main dà già rosse su a5044fd («Link Telegram
+formattati nei post di canale», non di questo cantiere): non le curo
+io, si aspetta la correzione di chi le ha introdotte. Collaudi della
+CI nella gabbia, due alla volta: **83 verdi, 0 rossi**. Scanner dei
+segreti della CI sulle righe aggiunte, pdf-lib compreso: zero.
+L'ULTIMO ALBERO: Alan ha corretto a5044fd (4abef6c, 482398f) e main è
+corso a 99ef56d (anche la strada a pezzi di Phoenix e la vetrina della
+demo). Ribasato lì, un conflitto in coda a CANTIERI; rigirate le
+sezioni toccate dai due lati — canale e bot, controllo della fattura,
+censimento degli admin, allegati, PDF, chat, fogli di casa, bussola,
+le due della CI — 652 passate e 0 fallite; collaudi degli allegati,
+della chat e del controllo della fattura due alla volta: verdi. Il
+resto lo fa la CI.
+
+**DA FARE (notati, non fatti).**
+- Sul telefono: un PDF vero da 15-20 MB (tempo di pulizia e di invio coi
+  dati del telefono, memoria su un telefono vecchio), e il PDF di Amazon
+  ripulito aperto in pdf.js.
+- La foto ridisegnata non ha un controllo «quanto pesa per persona»
+  diverso dai PDF: conta nei 40 MB come tutti (voluto, ma da dire se
+  qualcuno chiede).
+- Il VACUUM della prima apertura sul VPS: guardare nel journal, dopo il
+  deploy, la riga «🧹 Chat P2P: il cassetto restituisce lo spazio…»
+  (oppure l'avviso «⚠️ … non acceso»).
