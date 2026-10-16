@@ -22991,15 +22991,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   suo inchiostro (`--pelle-fg`, nel `::before`; nel `::after` la blu,
   che il `::before` lo dà al contorno) — così la croce cambia colore con
   la stessa opacity che cambia la pelle, senza una transizione nuova.
-  LA CROCE DEL + DI CASA È BIANCA (16 ott 2026; CANTIERI, «La croce
-  bianca del + del mercatino»): l'unica eccezione allo scuro sui
-  pieni. La pelle `casa` prende `--piu-casa-fg` (#FFFFFF) e il suo
-  `::before` un'ombra scura sottile, `--piu-casa-ombra`; le due leve
-  stanno UNA volta in `:root` e la sera non le ridice, quindi valgono
-  nei due temi e in quello che decide Telegram. Le porta anche la
-  croce del fantasma `merc`. L'arancio del P2P fuori dal libro, il
-  verde, il rosso e il blu tengono il loro inchiostro; la pillola da
-  desktop resta scura (lì la croce sta accanto a «Vendi»).
+  LA CROCE DEL + DI CASA È BIANCA DI GIORNO (16 ott 2026; CANTIERI,
+  «La croce bianca del + del mercatino»): l'unica eccezione allo scuro
+  sui pieni, e solo nel tema chiaro. Due leve, `--piu-casa-fg` e
+  `--piu-casa-ombra`: in `:root` #FFFFFF e un'ombra scura sottile, nel
+  blocco della sera `var(--b-pri-fg)` (#2A1600) e `none` — quindi la
+  sera, anche quella che decide Telegram (stesso `data-tema`), la croce
+  è scura com'era. Le leggono la pelle `casa` (`--pelle-fg` e il
+  `text-shadow` del suo `::before`), la croce del fantasma `merc` e,
+  da desktop, il glifo `.ic` della pillola fuori dal P2P (`body:not(
+  .nav-p2p)`; «Vendi» accanto tiene il suo inchiostro, e nel P2P il
+  glifo torna a ereditare il colore della pillola, correndo con lei
+  salvo «meno movimento»). L'arancio del P2P fuori dal libro, il
+  verde, il rosso e il blu tengono il loro inchiostro.
   Il fantasma della morfosi parte dalla pelle e arriva al bottone
   d'arrivo (curva `--b-r`, filo, scritta in Baloo 2 col suo inchiostro).
   Da desktop la pillola del + usa le TINTE piene dei ruoli

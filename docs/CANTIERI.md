@@ -64629,6 +64629,34 @@ a fondo nero), fantasma uguale; scatti prima/dopo nello scratchpad
 della sessione. Relay morti nel config del giro, poi config e db tolti.
 Suite e collaudi: nel verbale del commit.
 
+**IL RITOCCO: BIANCA SOLO DI GIORNO (stesso giorno, prima del push,
+parola di Andrea).** SUPERA «nei due temi» e «la pillola da desktop
+resta scura» qui sopra. La croce è bianca con l'ombra SOLO nel tema
+chiaro; nel tema scuro, anche quando lo decide Telegram, torna scura
+#2A1600 senza ombra, com'era. Vale per il tondo, per il fantasma
+`merc` e per la pillola «＋ Vendi» da desktop. Fatto: il blocco della
+sera ridice le due leve (`--piu-casa-fg:var(--b-pri-fg)`,
+`--piu-casa-ombra:none`); nella media del desktop
+`body:not(.nav-p2p) nav button.sell .ic` le legge, così «Vendi» accanto
+resta col suo inchiostro e nel P2P il glifo torna a ereditare il verde
+o il rosso della pillola. Il glifo corre col fondo (stessa
+`--p2p-corsa`) in una media sua con `prefers-reduced-motion:
+no-preference`: cambiato di colpo, per un attimo sarebbe stato bianco
+sul rosso; con meno movimento non corre. La prova di `prove_nav_p2p`
+ora RISOLVE le leve tema per tema come il browser (la sera prima il
+suo blocco, poi la radice, i `var()` fino in fondo): di giorno #FFFFFF
+e l'ombra scura (≥7:1, opacità ≥.5), la sera #2A1600 e `none`, due
+definizioni per leva, e i tre che le leggono (pelle, fantasma,
+pillola) più la pillola che nel P2P eredita ancora. Tre controprove,
+una alla volta sul file vero e poi ripristinato: la sera bianca, la
+sera senza `none` (ombra ereditata dal giorno), la pillola con
+`color:inherit` — la prova cade a tutte e tre (108/109). Dal vivo con
+Playwright e Chrome, identità 222, a 360 px (densità 3) e 1366 px,
+chiaro, scuro e scuro di Telegram: tondo, fantasma e pillola bianchi
+con l'ombra di giorno e `rgb(42,22,0)` senza ombra la sera; «prima»
+scattato sulla Mini App di origin/main (scura ovunque). La pillola nel
+P2P da desktop, con meno movimento: verde e rosso ereditati, corsa 0s.
+
 **DA GUARDARE.** Sul telefono, nella Mini App vera: la croce bianca
 nella luce del giorno (il 2,3:1 è il punto debole, l'ombra lo regge a
 occhio sullo schermo del PC).

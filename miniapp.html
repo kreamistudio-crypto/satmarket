@@ -183,8 +183,11 @@
        inchiostro). Il bianco sull'arancio fa 2,3:1 (1,8 in cima al
        gradiente, 2,6 in fondo), sotto anche il 3:1 dei glifi grandi:
        lo stacca un'ombra scura sottile sotto la croce, e nessun fondo
-       cambia (scelta di Andrea fra le due). Uguale nei due temi: la
-       sera non la ridice. */
+       cambia (scelta di Andrea fra le due). SOLO DI GIORNO (ritocco di
+       Andrea, stesso giorno): la sera le ridice tutt'e due e la croce
+       torna lo scuro del principale, senza ombra — anche quando la sera
+       la decide Telegram, che accende lo stesso data-tema. Le leggono
+       il tondo, il suo fantasma e la pillola da desktop. */
     --piu-casa-fg:#FFFFFF; --piu-casa-ombra:0 1px 2px rgba(74,36,0,.6);
     --b-ok-bg:linear-gradient(180deg,#1B8150 0%,#16703F 100%);
     --b-ok-fg:#FFFFFF; --b-ok-line:rgba(8,60,34,.45);
@@ -448,6 +451,9 @@
        le ombre e i secondari, che si accendono un tono sopra la carta */
     --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.45),0 8px 20px -8px rgba(247,147,26,.5);
     --b-pri-sh-on:inset 0 2px 4px rgba(90,40,0,.4);
+    /* la croce del + di casa la sera e' scura com'era (LA CROCE BIANCA
+       DEL + DI CASA, nelle leve di giorno) */
+    --piu-casa-fg:var(--b-pri-fg); --piu-casa-ombra:none;
     --b-ok-bg:linear-gradient(180deg,#3CBE82 0%,#2C9E69 100%); --b-ok-fg:#0B2417; --b-ok-line:rgba(0,0,0,.35);
     --b-ok-sh:inset 0 1px 0 rgba(255,255,255,.3),0 1px 2px rgba(0,0,0,.45),0 8px 18px -9px rgba(52,180,122,.45);
     --b-ok-sh-on:inset 0 2px 4px rgba(0,40,20,.4);
@@ -5677,7 +5683,7 @@
      sarebbe rimasto per un attimo scuro sul verde o bianco
      sull'arancio.
      LA CASA E' L'ECCEZIONE (16 ott 2026, cantiere piu-bianco): la sua
-     croce e' BIANCA con un'ombra scura sottile, nei due temi (LA CROCE
+     croce e' BIANCA con un'ombra scura sottile di giorno, scura la sera (LA CROCE
      BIANCA DEL + DI CASA, accanto alle leve del vestito); l'arancio del
      P2P fuori dal libro resta scuro. */
   nav button.sell .pelle-casa{border-radius:18px;background:var(--b-pri-bg);
@@ -10237,6 +10243,14 @@
     box-shadow:0 2px 0 var(--sats-deep);
   }
 
+  /* la croce di casa nella pillola da desktop corre col fondo della
+     pillola (vedi LA CROCE BIANCA DEL + DI CASA, nella media qui sotto);
+     con meno movimento cambia di colpo */
+  @media (min-width:768px) and (prefers-reduced-motion:no-preference){
+    nav button.sell .ic{transition:color var(--p2p-corsa) var(--p2p-curva),
+      text-shadow var(--p2p-corsa) var(--p2p-curva)}
+  }
+
   /* ==================== DESKTOP (≥768px) ====================
      Sotto i 768px non cambia NULLA: il mobile è l'esperienza
      Telegram e resta identico. Qui sopra l'app respira: container
@@ -10311,6 +10325,13 @@
     /* la pelle e' del tondo, e qui il tondo non c'e': la pillola e' il
        bottone intero, e il glifo e' solo un glifo */
     nav button.sell .pelle{display:none}
+    /* ...e qui la croce di casa e' il glifo stesso: di giorno bianca con
+       l'ombra, la sera scura come la scritta (LA CROCE BIANCA DEL + DI
+       CASA); «Vendi» accanto resta col suo inchiostro. Nel P2P torna ad
+       ereditare il colore della pillola, e corre con lei: cambiato di
+       colpo sarebbe stato per un attimo bianco sul rosso */
+    body:not(.nav-p2p) nav button.sell .ic{color:var(--piu-casa-fg);
+      text-shadow:var(--piu-casa-ombra)}
     /* LA NAV TRASFORMATA, DA DESKTOP (set 2026): qui le voci sono
        pillole, non c'e' un + rialzato da far levitare. Le celle a
        strati smettono di allargarsi (flex:0 0 auto come le sorelle) e

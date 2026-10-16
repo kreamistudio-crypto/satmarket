@@ -69261,34 +69261,56 @@ def prove_nav_p2p():
            "var(--b-rosso-fg)", "var(--b-bz-fg)"],
           [(re.search(r"--pelle-fg:([^;}]*)", _regola_pelle(n)) or [None, None])[1]
            for n in ("casa", "verde", "arancio", "rossa", "bz")])
-    # LA CROCE BIANCA DEL + DI CASA: il COLORE, non solo il nome della leva.
-    # Bianco vero; definita UNA volta sola, nella radice, cosi' la sera (e
-    # il tema che decide Telegram, che accende lo stesso data-tema) non la
-    # ridice; l'ombra scura sotto la croce, abbastanza scura da staccarla
-    # (il bianco sull'arancio fa 2,3:1 da solo); e la stessa croce sul
-    # fantasma che parte dal + e ci torna
+    # LA CROCE BIANCA DEL + DI CASA: il COLORE, non solo il nome della leva,
+    # tema per tema. Di giorno BIANCO vero con l'ombra scura sotto la croce,
+    # abbastanza scura da staccarla (il bianco sull'arancio fa 2,3:1 da
+    # solo); la sera (anche quella che decide Telegram, che accende lo
+    # stesso data-tema) lo SCURO #2A1600 di prima e nessuna ombra (ritocco
+    # di Andrea, 16 ott 2026). Le leve si risolvono come il browser: la
+    # sera prima il suo blocco, poi la radice, e i var() fino in fondo.
+    # Le leggono il tondo, il fantasma che parte dal + e ci torna, e la
+    # pillola da desktop; nel P2P la pillola eredita ancora il suo colore
     def _lum_piu(rgb):
         v = [c / 255 for c in rgb]
         v = [c / 12.92 if c <= .03928 else ((c + .055) / 1.055) ** 2.4 for c in v]
         return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]
     _rad = mini[mini.index(":root{"):mini.index("}", mini.index(":root{"))]
-    _fg = re.search(r"--piu-casa-fg:\s*#([0-9A-Fa-f]{6});", _rad)
-    _om = re.search(r"--piu-casa-ombra:\s*0 1px 2px rgba\((\d+),(\d+),(\d+),\.(\d+)\);", _rad)
+    _i_sera_piu = mini.index('html[data-tema="scuro"]{')
+    _sera_piu = mini[_i_sera_piu:mini.index("}", _i_sera_piu)]
+    def _leva_piu(nome, sera):
+        for blocco in ((_sera_piu, _rad) if sera else (_rad,)):
+            m = re.search(r"--" + re.escape(nome) + r":\s*([^;]*);", blocco)
+            if m:
+                v = m.group(1).strip()
+                rif = re.fullmatch(r"var\(--([\w-]+)\)", v)
+                return _leva_piu(rif.group(1), sera) if rif else v
+        return None
+    def _ombra_scura(v):
+        m = re.fullmatch(r"0 1px 2px rgba\((\d+),(\d+),(\d+),\.(\d+)\)", v or "")
+        return bool(m) and (1.05 / (_lum_piu([int(x) for x in m.groups()[:3]]) + .05)) >= 7 \
+            and int(m.group(4)) >= 5
     _cs = re.search(r"nav button\.sell \.pelle-casa::before\{([^}]*)\}", mini)
     _mg = re.search(r"#p2pMorfo\.merc:not\(\.bz\) \.morfo-glifo\{([^}]*)\}", mini)
-    prova("la croce del + di casa e' BIANCA con un'ombra scura sottile, uguale "
-          "nei due temi, e il fantasma porta la stessa",
-          ["FFFFFF", True, 1, 1, True, "text-shadow:var(--piu-casa-ombra)",
-           "color:var(--piu-casa-fg);text-shadow:var(--piu-casa-ombra)"],
-          [_fg and _fg.group(1).upper(),
-           bool(_om) and (1.05 / (_lum_piu([int(x) for x in _om.groups()[:3]]) + .05)) >= 7
-           and int(_om.group(4)) >= 5,
+    # la pillola: dentro la media del desktop, e solo fuori dal P2P
+    _i_desk = mini.find("==================== DESKTOP")
+    _pil = re.search(r"body:not\(\.nav-p2p\) nav button\.sell \.ic\{([^}]*)\}", mini[_i_desk:]) \
+        if _i_desk >= 0 else None
+    _usa = "color:var(--piu-casa-fg);text-shadow:var(--piu-casa-ombra)"
+    prova("la croce del + di casa: di giorno BIANCA con un'ombra scura sottile, "
+          "la sera SCURA #2A1600 senza ombra; la leggono il tondo, il fantasma e "
+          "la pillola da desktop, che nel P2P eredita ancora il colore suo",
+          ["#FFFFFF", True, "#2A1600", "none", 2, 2,
+           "text-shadow:var(--piu-casa-ombra)", _usa, _usa, True],
+          [(_leva_piu("piu-casa-fg", False) or "").upper(),
+           _ombra_scura(_leva_piu("piu-casa-ombra", False)),
+           (_leva_piu("piu-casa-fg", True) or "").upper(),
+           _leva_piu("piu-casa-ombra", True),
            mini.count("--piu-casa-fg:"), mini.count("--piu-casa-ombra:"),
-           # e nessun tema la ridice: il blocco della sera non la nomina
-           "--piu-casa" not in mini[mini.index('html[data-tema="scuro"]{'):
-                                    mini.index("}", mini.index('html[data-tema="scuro"]{'))],
            _cs and _cs.group(1),
-           _mg and re.sub(r"\s+", "", _mg.group(1))])
+           _mg and re.sub(r"\s+", "", _mg.group(1)),
+           _pil and re.sub(r"\s+", "", _pil.group(1)),
+           "nav button.sell .ic,nav button.sell.active .ic{color:inherit;"
+           in mini[_i_desk:]])
     prova("...e le sorelle del tondo non portano piu' ne' fondo ne' ombre", [0, 0],
           [_ombre(pezzo_js(mini, f, "}") if f in mini else "") for f in _sorelle])
 
