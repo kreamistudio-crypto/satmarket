@@ -62771,3 +62771,293 @@ prima e **subito dopo** lo scatto.
   repo**: vivono solo nel workflow. Un `requirements-prove.txt` (o una
   riga in README) direbbe a chi clona cosa gli serve per avere un
   giro verde.
+
+## La ricarica Postepay in contanti come metodo del P2P: lo studio (16 ott 2026, cantiere postepay-contanti, studio chiesto da Andrea: solo documenti, è una PROPOSTA)
+
+**LA DOMANDA.** Aggiungere fra i metodi del P2P la ricarica di una carta
+Postepay pagata IN CONTANTI al tabacchino o alla posta: chi compra sats
+e non ha conto né carta paga in contanti, come col PayCode di
+Barattozon. Solo studio: niente codice, nessun account toccato, nessun
+modulo compilato (nemmeno «Recupera ricevuta» di PuntoLis). Le fonti
+sono i fogli informativi ufficiali, letti il 16 ott 2026 col testo
+estratto dai PDF (`pdftotext`), e le pagine di poste.it e puntolis.it
+dello stesso giorno. Mooney ha risposto 403 e sisal.it non ha risposto:
+di quelle due reti non so niente di prima mano.
+
+**1. COME FUNZIONA OGGI, DALLE FONTI.**
+- DOVE, IN CONTANTI. All'Ufficio Postale («Puoi ricaricare in Ufficio
+  Postale pagando: in contanti», poste.it, «Ricarica Carta prepagata
+  Postepay») e nelle tabaccherie della rete **PuntoLis** (servizio di
+  LIS Pay S.p.A., IMEL con socio unico PostePay S.p.A.). La pagina di
+  Poste nomina SOLO PuntoLis fra le reti dei tabaccai: Mooney, SisalPay,
+  Banca 5 non compaiono, e le guide che le citano sono vecchie (lo
+  dicono anche le guide divulgative del 2026). Gli ATM Postamat e il
+  portalettere ricaricano solo con carta, non coi contanti. Il punto
+  vendita si cerca su puntolis.it («Cerca il punto vendita»): non tutti
+  i tabaccai hanno il terminale LIS.
+- CHI PUÒ: «il titolare della carta o un terzo (anche in contanti)»
+  (poste.it; i fogli informativi FI_PS, FI_PE e FI_PDE, nota sui punti
+  vendita abilitati). Chi paga dev'essere MAGGIORENNE (foglio LIS Pay):
+  un codice fiscale di un minore ferma l'operazione.
+- COSA SERVE A CHI PAGA, al tabacchino: il NUMERO DELLA CARTA da
+  ricaricare; un suo documento d'identità «rilasciato in Italia,
+  valido, leggibile e in originale» (carta d'identità, passaporto,
+  patente) e il suo codice fiscale «sempre in originale» (tessera
+  sanitaria o CIE) — foglio LIS Pay, art. 2; senza, «il rivenditore non
+  potrà procedere» (poste.it). Alla prima ricarica, o con un documento
+  nuovo, l'addetto ACQUISISCE una copia del documento col lettore ottico
+  e chiede l'indirizzo di residenza (puntolis.it; con la CIE l'immagine
+  non si prende). E se chi paga non è il titolare: «fornisci anche il
+  codice fiscale del titolare» (puntolis.it, pagina Postepay). Quindi
+  il contante qui NON è anonimo: chi paga resta identificato da LIS Pay.
+  Per lo sportello postale le pagine non scrivono quali documenti
+  servono: lì non ho fonte.
+- QUANTO COSTA: **2,00 €** a ricarica nei punti vendita abilitati, a
+  carico di chi paga (foglio Postepay Standard FI_PS n. 17, decorrenza
+  1 gen 2026; Evolution FI_PE n. 34 e Digital Evolution FI_PDE n. 25,
+  decorrenza 20 giu 2026; foglio LIS Pay n. 5, agosto 2026: «Pagamento
+  ricariche carte Prepagate di Terzi 2,00» in contanti). All'Ufficio
+  Postale i fogli scrivono 1,00 € «da Uffici Postali abilitati (POS)»,
+  cioè con carta: una riga per il contante allo sportello non la
+  trovo, e non la indovino.
+- QUANTO, PER RICARICA: da 1,00 € a **997,99 €** a operazione (poste.it
+  e i tre fogli). I due centesimi che mancano a mille sono la
+  commissione: LIS Pay ha un tetto di 999,99 € in contanti per
+  operazione, commissione compresa (art. 4).
+- QUANTE, AL GIORNO: «con il limite di una sola ricarica giornaliera»
+  (i tre fogli di Poste, nota dei punti vendita). LIS Pay lo dice più
+  stretto nel luogo e più largo nel resto: «presso lo stesso Soggetto
+  Convenzionato, è possibile eseguire una sola ricarica al giorno su una
+  carta» (art. 4 b). Le due frasi non coincidono: va chiesto, e per
+  prudenza si legge quella di Poste (UNA al giorno su quella carta).
+- PER CHI PAGA (per codice fiscale, tutte le modalità, LIS Pay art. 4 b):
+  999,99 € al giorno e **20.000 € l'anno** (1 gen-31 dic), commissione
+  compresa.
+- PER LA CARTA: Postepay Standard ha un plafond (saldo massimo) di
+  **4.000 €** dal 15 apr 2026 e 50.000 € l'anno ricaricabili sulle
+  carte dello stesso titolare (FI_PS); Evolution e Digital Evolution
+  ricaricano «nei limiti del plafond», con 100.000 € l'anno sul totale
+  delle carte dello stesso titolare (FI_PE, FI_PDE).
+- TEMPI: «Riceverai l'importo ricaricato sulla tua Carta Postepay entro
+  pochi minuti» (poste.it). Per LIS Pay il debito si estingue
+  all'emissione dello scontrino (art. 3). Fuori servizio fra le 23.45 e
+  le 00.15 (poste.it, Carte Postepay).
+- IRREVOCABILE: «Una volta confermati i dati, l'operazione […] non potrà
+  più essere annullata; i fondi corrisposti non potranno essere
+  restituiti» (LIS Pay, art. 2), e fra i rischi: «in caso di inesatta
+  indicazione dei dati, il Cliente resta responsabile». Prima di pagare
+  si controlla un PRE-SCONTRINO e si conferma a voce.
+- LO SCONTRINO: «contenente tutti i dati della transazione»; per alcuni
+  servizi porta un QR code che apre la ricevuta completa, o la si
+  ritrova su `puntolis.it/it/assistenza/recupera-ricevuta` con l'ID
+  della ricevuta e il codice cliente (art. 2). Se il numero della carta
+  sia stampato intero o mascherato NON l'ho trovato: sta solo nelle
+  immagini di fac-simile del sito.
+- CHI RICEVE vede la ricarica nell'app: «Ricezione automatica e gratuita
+  di notifiche per tutte le tipologie di operazioni in dare o avere»
+  (FI_PS, notifiche in app). Come si chiama la riga nei movimenti (dice
+  PuntoLis? dice chi ha pagato?) non è scritto da nessuna parte.
+
+**2. COSA DEVE DARE CHI VENDE, E LA SUA PRIVACY.** Nel P2P chi VENDE
+sats riceve gli euro: deve dare a chi compra il **numero della carta**
+(16 cifre) e il **codice fiscale del titolare**, che il tabaccaio
+chiede a un terzo. Il nome non è chiesto dalle fonti, ma il codice
+fiscale lo racconta quasi tutto: consonanti di cognome e nome, data e
+luogo di nascita, sesso. È MOLTO più di quel che dà oggi chi vende con
+Revolut (un RevTag) o col PayCode (nove cifre che non dicono niente di
+lui), e più dell'IBAN col nome. Numero e codice fiscale da soli non
+bastano a pagare online (servono scadenza e CVV, che non si chiedono
+mai), ma sono il materiale perfetto per un phishing mirato («Sono
+Poste, sulla tua carta che finisce per…»).
+Come lo mostreremmo: come l'IBAN oggi — nel recapito cifrato fra le
+due chiavi dello scambio (`P2P_FORME_RECAPITO`), testo composto, mai dal
+server di Barattolo; ricordato SOLO sul telefono di chi vende (è la
+sua carta: `ricorda` come SEPA, con la possibilità di dimenticarlo).
+Come lo cancelleremmo: le buste della chat se ne vanno già con la
+scopa a scambio finito; ma da chi compra il recapito ricevuto resta nel
+record locale dello scambio (`o.campiLoro.euro.testo`, in localStorage),
+e oggi non vedo un punto che lo tolga alla chiusura. Proposta: a
+scambio concluso o annullato il telefono di chi compra riscrive quella
+riga in «Postepay •••• 1234» e butta il codice fiscale; e il testo
+nel foglio dice prima, a chi vende, cosa sta per consegnare. Va
+verificato nel codice, al cantiere, dove altro passa quel testo (il
+riepilogo, la chat del moderatore, gli avvisi).
+
+**3. LA PROVA DEL PAGAMENTO, LA RICEVUTA FALSA, LA DISPUTA.**
+- LA REGOLA, come per Barattozon («controlla su Amazon»): chi vende
+  libera SOLO quando la ricarica è nei MOVIMENTI dell'app Postepay,
+  con l'importo giusto e l'ora giusta. La foto dello scontrino non è
+  la prova: è l'indizio che fa guardare l'app.
+- LA FOTO dello scontrino viaggia col 📎 della chat dello scambio
+  (cifrata sul telefono, senza EXIF né GPS: voce «Gli allegati nella
+  chat dello scambio» qui sopra) — esiste già, non va costruito niente.
+- UNA RICEVUTA FALSA si riconosce, in ordine di forza: 1) la ricarica
+  non c'è nei movimenti (decide questo, sempre); 2) il QR non porta a
+  `puntolis.it`, o la ricevuta ritrovata col modulo ufficiale non
+  coincide (importo, data, ora, carta) — NON provato: lo si prova con
+  uno scontrino vero; 3) scontrino senza QR né ID, importo senza i
+  2 € di commissione, ora fuori dagli orari del tabaccaio o nella
+  finestra 23.45-00.15, numero di carta che non torna.
+- IL MODERATORE in disputa: chiede a chi compra la foto dello scontrino
+  (già in chat) e a chi vende uno screenshot dei movimenti della carta
+  di quel giorno, saldo coperto; se serve, apre la ricevuta col modulo
+  di PuntoLis. Non può interrogare Poste: decide sulle prove come per
+  un bonifico. Due casi tipici: scontrino vero ma carta sbagliata
+  (errore al pre-scontrino: la perdita è di chi ha pagato, LIS Pay lo
+  scrive; si annulla lo scambio e i sats tornano a chi vende);
+  ricarica arrivata ma «da un altro» (vedi la triangolazione qui
+  sotto: i sats NON si liberano).
+
+**4. LE TRUFFE TIPICHE, E COME LE RIDURREMMO.**
+- **LA TRIANGOLAZIONE**, la più seria. Il truffatore prende l'ordine
+  come compratore, e intanto «vende» un oggetto inesistente su un sito
+  di annunci a una vittima vera, dandole come conto il NUMERO E IL
+  CODICE FISCALE DI CHI VENDE da noi. La vittima ricarica, chi vende
+  vede i soldi e libera i sats al truffatore; la vittima denuncia, e
+  l'intestatario della carta è il primo indagato (è lo schema dei casi
+  di cronaca: la carta che incassa è di chi non sa niente). Il P2P col
+  bonifico ha lo stesso rischio, ma qui pesa di più: il codice fiscale
+  è proprio quel che serve per farlo sembrare un pagamento qualunque.
+  Riduzioni proposte: accettare SOLO una ricarica da punto vendita o da
+  sportello, mai una Postepay→Postepay o un bonifico (che portano il
+  nome di un altro); se nei movimenti compare un nome che non è quello
+  di chi ha preso l'ordine, non si libera e si apre la disputa; prima
+  di pubblicare, una riga che dice a chi vende cos'è la triangolazione.
+  Dirlo onesto: NON si azzera, perché anche la vittima può andare al
+  tabacchino coi contanti.
+- LO SCONTRINO FALSO O ALTRUI: lo chiude la regola dei movimenti.
+- IL CHARGEBACK non c'è: la ricarica è irrevocabile (LIS Pay, art. 2).
+  È il punto di forza rispetto a PayPal.
+- LA CARTA SBAGLIATA: perdita di chi paga; la guida insiste sul
+  pre-scontrino («leggi le ultime quattro cifre ad alta voce»).
+- UNA RICARICA AL GIORNO SULLA CARTA: un secondo compratore nello
+  stesso giorno verrebbe respinto alla cassa. Quindi UN SOLO ordine
+  Postepay vivo per chi vende, giudicato dal server.
+- LA CARTA BLOCCATA da Poste per movimenti insoliti: rischio di chi
+  vende, da scrivere nel foglio prima di pubblicare.
+- DIFESE DI CASA già pronte, da usare: il filtro «🛡️ Solo per chi ha
+  almeno N scambi P2P completati» (voce «Scambi chiari») IMPOSTO per
+  questo metodo; un TETTO in euro per ordine; i marchi dei non
+  completati. Numeri proposti, da decidere da Andrea: almeno 3 scambi
+  completati, tetto 250 € per l'avvio (come la beta on-chain), un
+  ordine vivo per venditore.
+
+**5. ANTIRICICLAGGIO E CONTANTE: SOLO DOMANDE, per il professionista
+(nessuna conclusione mia).** Il contesto che le fonti divulgative
+riportano: il tetto ai trasferimenti di contante fra soggetti diversi è
+5.000 € dal 1 gen 2023 (art. 49 D.Lgs. 231/2007, modificato dalla
+L. 197/2022), confermato nel 2026, col frazionamento artificioso
+vietato — da rileggere sul testo vigente.
+1. Contanti → ricarica della carta di uno sconosciuto → bitcoin: chi
+   dei due «trasferisce contante» all'altro ai fini dell'art. 49, visto
+   che il contante lo incassa LIS Pay e all'altro arriva moneta
+   elettronica?
+2. Barattolo che OFFRE il metodo, con guida e testi, è un soggetto
+   obbligato (adeguata verifica, conservazione, segnalazione di
+   operazioni sospette) o cambia qualcosa per noi rispetto a oggi?
+3. Il tetto LIS Pay di 20.000 € l'anno per chi paga e quello di 4.000 €
+   di saldo della Standard bastano a non «facilitare», o ci serve un
+   tetto nostro, per persona e per periodo, e quale?
+4. Più ricariche piccole in giorni diversi verso lo stesso venditore
+   sono frazionamento? E se le facciamo NOI possibili con un tetto
+   basso, ci esponiamo?
+5. Le condizioni contrattuali della Postepay (non lette in questo
+   studio) permettono a un consumatore di ricevere regolarmente
+   pagamenti per vendere bitcoin? Il rischio di chiusura della carta
+   va scritto all'utente?
+6. Con MiCA e il regime CASP: un metodo di pagamento in contanti nel
+   P2P cambia la nostra posizione rispetto al parere già in backlog?
+7. Il regolamento UE antiriciclaggio (2024/1624) e il suo tetto UE ai
+   pagamenti in contanti: quando si applica, e cambia qualcosa qui?
+8. La triangolazione: se chi vende da noi incassa una ricarica nata da
+   una truffa altrui, che obblighi abbiamo noi quando lo veniamo a
+   sapere (dati da conservare, a chi rispondere)?
+
+**6. COSA CAMBIEREBBE NEL CODICE (stima, nessuna riga scritta).**
+- LA VOCE in `P2P_METODI` (miniapp.html, oggi sette): il nome viaggia
+  in chiaro nel tag `pm` del libro pubblico e lo leggono i client
+  altrui, quindi corto, senza virgole e senza la parola «contanti»
+  (la forma `contanti` lo prenderebbe): proposta «Ricarica Postepay».
+- LA FORMA in `P2P_FORME_RECAPITO`, PRIMA di `contanti`: numero carta
+  (16 cifre, giudice di Luhn), codice fiscale del titolare (16
+  caratteri, giudice del carattere di controllo), intestatario
+  facoltativo; `componi` → «Ricarica Postepay\nCarta: …\nCodice fiscale
+  del titolare: …». Ricordata sul telefono di chi vende.
+- LA PULIZIA da chi compra a fine scambio (punto 2).
+- IL RIQUADRO DI CHI COMPRA, sul calco di `riquadroPayCodeP2P`, e LA
+  GUIDA «come si fa» in «Info» (i testi lunghi stanno lì; nei riquadri
+  una frase per gesto): 1) cerca un PuntoLis su puntolis.it, o vai
+  alla posta; 2) porta un documento italiano in originale e la tessera
+  sanitaria (la prima volta ti chiedono anche la residenza); 3) alla
+  cassa: «una ricarica Postepay di N euro su questa carta», e dai il
+  numero e il codice fiscale del titolare; 4) paga N + 2 € di
+  commissione; 5) leggi il PRE-SCONTRINO, le ultime quattro cifre, PRIMA
+  di confermare; 6) tieni lo scontrino, mandane la foto col 📎, e tocca
+  «Ho pagato». A chi vende: «libera solo quando la ricarica è nei
+  movimenti dell'app Postepay».
+- IL SERVER: il filtro N imposto e il tetto in € per questo metodo
+  (giudicati lì, non solo nel form), un ordine vivo per venditore; i
+  testi degli avvisi e del canale; `_metodi_libro` e il nome nel
+  canale come per Barattozon.
+- IT/EN: l'app oggi parla solo italiano (nessun testo inglese nel
+  codice); l'unico «pubblico straniero» è il tag `pm` letto dai client
+  Mostro altrui, che vedrebbero «Ricarica Postepay» com'è.
+- I DOCUMENTI: un percorso nuovo in `docs/GUIDA-P2P-PASSI.md` coi testi
+  esatti; le prove come per `prove_p2p_paycode`.
+
+**7. IL CONFRONTO COL PAYCODE DI BARATTOZON.**
+- Rete: tutti e due al tabacchino PuntoLis (il foglio LIS Pay li
+  elenca entrambi); la Postepay anche alla posta.
+- Commissione: PayCode 0 € («non è prevista l'applicazione di alcuna
+  commissione», LIS Pay); Postepay 2 €.
+- Documenti di chi paga: PayCode nessuno (LIS Pay chiede il documento
+  solo per ricariche, MAV e bollettini a mano); Postepay documento
+  italiano in originale + codice fiscale, e la prima volta la copia e
+  la residenza. È la differenza più grande per chi «non ha conto»: ha
+  comunque bisogno di un documento.
+- Chi vende dà: PayCode nove cifre anonime; Postepay numero carta e
+  codice fiscale, cioè la sua identità.
+- Cosa riceve chi vende: PayCode un acquisto Amazon; Postepay euro
+  veri, spendibili e prelevabili.
+- Tempo: il PayCode scade (~72 ore, e il libro lo segue); la ricarica
+  no.
+- Tetti: PayCode il valore dell'ordine Amazon (da noi minimo 25 €);
+  Postepay 997,99 € a ricarica, una al giorno sulla carta, 20.000 €
+  l'anno per chi paga, saldo della Standard 4.000 €.
+- Verifica: PayCode lo stato dell'ordine su Amazon; Postepay i
+  movimenti dell'app. Irrevocabili tutti e due dopo lo scontrino.
+- Triangolazione: col PayCode il conto esposto è un ordine Amazon e
+  non un nome; con la Postepay è il nome di chi vende.
+
+**RACCOMANDAZIONE (mia, da decidere da Andrea).** Il metodo funziona e
+le fonti lo reggono, ma costa a chi vende la sua identità e porta la
+triangolazione: lo metterei solo dopo il parere del professionista
+sulle domande del punto 5, e prima una PROVA VERA da 1 € di Andrea
+sulla sua carta a un PuntoLis (3 € in tutto), con la foto dello
+scontrino e lo screenshot del movimento: dice cosa è stampato, se la
+ricevuta si ritrova col modulo e come si chiama la riga nei movimenti
+— le tre cose che questo studio non ha potuto vedere.
+
+**COSA RESTA DA GUARDARE.** La commissione in contanti allo sportello
+postale; i documenti richiesti allo sportello; Mooney e Sisal (siti non
+letti); la frase «una al giorno» di Poste contro quella di LIS Pay; il
+contenuto dello scontrino e della riga nei movimenti; le condizioni
+contrattuali della Postepay.
+
+**PROVATO.** Solo documenti: nessun file di codice toccato. Le sezioni
+di `prove.py` che leggono i documenti, nel worktree (vedi il commit).
+
+Fonti (lette il 16 ott 2026):
+[poste.it, Ricarica Carta prepagata Postepay](https://www.poste.it/come-ricaricare-carta-postepay);
+[poste.it, Postepay Standard](https://www.poste.it/carte-postepay/postepay-standard);
+[poste.it, Postepay Evolution](https://www.poste.it/carte-postepay/postepay-evolution);
+[poste.it, orari dei servizi](https://www.poste.it/carte-postepay/orari-servizi-postepay);
+[Foglio informativo Postepay Standard FI_PS n. 17, dal 1 gen 2026](https://www.poste.it/resources/bancoposta/pdf/trasparenza/FI_PS.pdf);
+[Foglio informativo Postepay Evolution FI_PE n. 34, dal 20 giu 2026](https://www.poste.it/resources/bancoposta/pdf/trasparenza/FI_PE.pdf);
+[Foglio informativo Postepay Digital Evolution FI_PDE n. 25, dal 20 giu 2026](https://www.poste.it/resources/bancoposta/pdf/trasparenza/FI_PDE.pdf);
+[PuntoLis, ricarica Postepay](https://www.puntolis.it/it/pagamenti/carte_prepagate/postepay.html);
+[PuntoLis, trasparenza](https://puntolis.it/it/trasparenza);
+[Foglio informativo LIS Pay n. 5, agosto 2026](https://puntolis.it/content/dam/puntolis/documents/lis-paga/Foglio-Informativo-Servizi-di-Pagamento.pdf);
+[il tetto al contante, Studio Cataldi](https://www.studiocataldi.it/guide_legali/fisco/limite-contanti.asp) (divulgativa: il testo vigente va letto su Normattiva);
+[un caso di cronaca: chi ricarica e l'intestatario indagato](https://www.verbanonews.it/prima-pagina/2017/12/23/truffa-on-line-due-denunciati-dalla-polizia/3743/?output=pdf);
+[Polizia di Stato, carte Postepay usate per incassare truffe online](https://poliziadistato.it/articolo/pdf/15285767affdbaaa7715410598).
