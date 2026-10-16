@@ -62222,3 +62222,107 @@ coda: i suoi avvisi, col gruppo muto, ripiegano subito in privato
 - L'ordine dopo il ritorno del gruppo: un avviso nuovo può arrivare
   prima di quelli in coda (vedi sopra). Se dà fastidio, si accoda anche
   il nuovo finché la coda non è vuota.
+## «Aperta su un altro dispositivo» sullo stesso telefono: cercato, NON riprodotto (16 ott 2026, cantiere chat-stesso-telefono, richiesta di Andrea; solo documenti)
+
+**IL CASO.** Andrea ha preso un ordine P2P e l'ha aperto dalla WEB APP
+(non dal tasto di un avviso), sul suo telefono, senza cambiare
+dispositivo; nel piede della chat è comparso «Questa chat è aperta su un
+altro dispositivo o browser… Continua la chat qui». Riprovando non è più
+successo. La regola di Andrea per il cantiere: prima riprodurlo nel banco;
+se non si riproduce, il verbale di cosa si è provato e NESSUN codice.
+
+**DOVE NASCE LA FRASE.** `chatScPiedeP2P`, modo `altrove`: quando
+`chatScAltroveP2P(c)` — il mio ULTIMO saluto sul server presenta una
+chiave usa-e-getta che questa memoria non ha in mano — oppure quando la
+memoria non ha nessuna chiave ma il server ha già un mio saluto. Dal 12
+ott 2026 (la copia sigillata, voce «La chat segue lo scambio») una memoria
+che vede un mio saluto con una chiave che non ha la ADOTTA dalla sua
+copia sigillata, in `chatScPosaP2P`, prima ancora di disegnare: la frase
+dovrebbe restare solo quando quella copia non c'è o non si apre (un
+profilo di scambio davvero diverso).
+
+**IL TASTO «⚡ APRI LO SCAMBIO» E LA LEVA DEL VPS (verificato sul
+codice).** Sul VPS `TELEGRAM_MINIAPP_LINK = "https://t.me/ilbarattolobot"`
+(in `/srv/barattolo/config.py`, riga 125 — il config del VPS sta lì, non in
+`~/satmarket`). Con quel valore `_link_dentro_telegram` fa del tasto
+`https://t.me/ilbarattolobot?startapp=scambio_<id>`: è la forma della Mini
+App PRINCIPALE, che si apre DENTRO Telegram solo se il bot ha la Mini App
+principale accesa in BotFather; senza, Telegram apre la chat del bot.
+Il server lo controlla da solo all'avvio (`getMe`, `has_main_web_app`,
+in `_giudizio_link_miniapp`) e lo scrive nel journal (vedi il «da fare»
+qui sotto per le frasi esatte e il comando).
+Nel caso di Andrea il tasto non c'entrava: lo scambio l'aveva aperto
+dalla web app.
+
+**COSA HO PROVATO (banco a due finestre, fuori da prove.py, nello
+scratchpad).** Il motore VERO della chat — i pezzi di miniapp.html che
+usa il banco di `prove_chat_scambio` — caricato DUE volte in due contesti
+separati, come due finestre dello stesso account, con lo stesso postino di
+cartone e risposte che arrivano con ritardi a caso (0-30 ms all'andata e
+al ritorno, partenze sfalsate); dopo ogni giro e a ogni millisecondo il
+piede della chat di tutte e due. Chi vende aveva già presentato la sua
+chiave; chi compra partiva da un cassetto vuoto, come subito dopo la
+presa.
+1. STESSA MEMORIA (la web app installata e una scheda di Chrome sulla
+   stessa origine: lo stesso cassetto, scritto da due finestre insieme):
+   80 semi × 5 giri insieme + 2 giri da sole. «altrove» MAI (visti solo
+   `vuota`, `attesa`, `scrivi`); un saluto e una copia soli.
+2. MEMORIE SEPARATE (la Mini App e il browser): 80 semi × 5 giri. «altrove»
+   MAI; le due presentano ciascuna la sua chiave al primo giro e poi si
+   adottano a vicenda dalla copia.
+3. LA COPIA PERSA: due finestre della stessa memoria aprono insieme, la
+   seconda perde in rete la sua prima copia sigillata e si chiude, la
+   prima va avanti; poi apre una TERZA memoria dello stesso account: 60
+   semi, la terza adotta sempre (`scrivi`), nessun «altrove».
+Prima della prova, la stessa ricerca sul codice: la chiave non viene mai
+buttata dallo stato della riga (solo dalla parola del server), e la
+riapertura della pagina rifà il ritiro prima di disegnare.
+
+**COSA RESTA, SENZA PROVA (da fare, non fatti).**
+- IL PUNTO SOSPETTO, `chatScPresentaP2P` (miniapp.html, la funzione alla
+  riga 79166 di 7e0b330; la riga è la 79191): dopo aver spedito la copia
+  sigillata (`await chatScFetch('invia', {… tipo: 'chiave', busta:
+  c.copia})`, riga 79188) la funzione RILEGGE il cassetto (`c =
+  chatScDiP2P(id)`, riga 79189) e segna «al sicuro» la chiave che ci
+  trova: `c.copie = Object.assign({}, c.copie); c.copie[c.pub] = 1;`
+  (riga 79191). Con due finestre sulla stessa memoria (stessa origine) la
+  chiave riletta può essere quella scritta nel frattempo dall'altra
+  finestra, e non quella la cui copia è appena partita; poco sotto la
+  stessa funzione può allora spedire un saluto per quella chiave
+  (`chatScSalutoP2P(o, tk, c.pub, …)`) senza che la SUA copia sia sul
+  server. Effetto teorico: un'ALTRA memoria dello stesso account vede
+  quel saluto, non trova la copia, e mostra «altrove» finché la copia non
+  arriva (o per sempre, se la finestra che doveva mandarla si è chiusa).
+  LO SCENARIO PROVATO (banco «copia persa»): due finestre della stessa
+  memoria aprono insieme la chat appena presa, la seconda perde in rete
+  la sua prima copia e si chiude, la prima fa altri tre giri, poi apre
+  una terza memoria dello stesso account; 60 semi con ritardi a caso: la
+  terza adotta sempre (`scrivi`), «altrove» mai. La cura, se un giorno si
+  vede: tenere in una variabile locale la chiave di cui si è spedita la
+  copia, segnare quella e rimettere la propria se nel frattempo il
+  cassetto ne porta un'altra.
+- LA FRASE DEL JOURNAL SULLA MINI APP PRINCIPALE (server.py,
+  `_controllo_link_miniapp` e `_giudizio_link_miniapp`). Se il bot ha la
+  Mini App principale accesa in BotFather: «🔗 Link dentro Telegram:
+  accesi su https://t.me/ilbarattolobot» — il tasto «⚡ Apri lo scambio»
+  apre la Mini App dentro Telegram. Se no: «⚠️ Link dentro Telegram
+  SPENTI: il bot non ha la Mini App principale accesa in BotFather: il
+  link aprirebbe la chat e basta. I link restano quelli del sito.» — il
+  tasto apre il sito (browser interno di Telegram o del telefono, cioè
+  un'altra memoria). Se Telegram non risponde: «⚠️ Link dentro Telegram:
+  getMe non ha risposto (…)», e la leva resta com'è scritta. Il comando
+  in sola lettura, sul VPS:
+  `journalctl -u barattolo --since "7 days ago" | grep "Link dentro Telegram" | tail -n 3`
+- Un registro: quando una memoria mostra «altrove», il diario P2P
+  (`diarioP2P`) non scrive niente. Una riga con la chiave del mio ultimo
+  saluto, quella in mano e quali copie ci sono direbbe la prossima volta
+  la causa, senza doverla indovinare.
+- Il banco a due finestre si può portare in `prove.py` come prova delle
+  corse (oggi vive solo nello scratchpad di questo cantiere).
+- Sul telefono: se ricapita, uno screenshot del piede e l'ora; e se
+  possibile da che strada era aperta la pagina (app installata, Chrome,
+  Telegram).
+- Coordinamento: il cantiere `copia-recapito` (worktree d'un'altra
+  sessione, stessa base) cerca la stessa «seconda memoria» per l'avviso
+  doppio del recapito; qui non s'è trovato un difetto da condividere,
+  solo la mappa delle memorie qui sopra.
