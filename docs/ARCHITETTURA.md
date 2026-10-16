@@ -27786,6 +27786,31 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   parola, ai tre promemoria Telegram di chi paga
   (`SOLLECITO_EURO_PAYCODE_TESTI`). Il verbale e le fonti pubbliche guardate:
   CANTIERI, «I gesti prima di pagare il PayCode».
+  IL CODICE A BARRE DEL PAYCODE (16 ott 2026, cantiere barcode-paycode,
+  dal caso vero del 15: il tabacchino non leggeva il codice che l'utente
+  si era fatto dalle nove cifre). Il codice della cassa e' il GS1-128
+  del PDF di Amazon — 37 cifre, (01) un codice prodotto con la sua
+  cifra di controllo + (21) un seriale che CONTIENE il PayCode — e non
+  si ricava: si prende dal link del PDF (`barcode=`) o dal numero lungo.
+  Il blocco PURO fra i marcatori «IL CODICE A BARRE DEL PAYCODE» ha il
+  giudice (`giudizioBarrePayCodeP2P`, col PayCode dell'ordine: regola
+  provata su UN esempio), il lettore del link (`linkPdfPayCodeP2P`:
+  host `PAYCODE_PDF_HOST` e percorso `PAYCODE_PDF_PERCORSO` esatti, in
+  https), `barreDaIncollatoP2P`, `barreDaTestoP2P` (la riga «Codice a
+  barre:» del recapito cifrato) e il disegno (`valoriGs1128P2P`: start
+  C, FNC1, coppie nel set C, l'ultima cifra dispari nel set B, controllo
+  modulo 103; `svgGs1128P2P` a pixel interi per modulo, dieci moduli di
+  quiete). Chi vende lo da' nel foglio del PayCode (campo facoltativo
+  `p2pBarreCampo`, anteprima, `p2pNuovoTab.barre` → `ord.tabacchino.barre`)
+  o nel form dello scambio (quarto campo `barre` della forma tabacchino);
+  viaggia solo nel recapito cifrato, come il PayCode, e un testo senza la
+  riga resta byte per byte quello di prima. Chi compra lo apre da
+  `riquadroPayCodeP2P` («📊 Mostra il codice alla cassa», o
+  `P2P_BARRE_MANCA` se non c'e') o dalla scheda del PDF in chat: il
+  foglio `#p2pBarreSheet` (`apriBarreP2P`, che rigiudica: un codice che
+  non torna non si mostra mai) lo disegna girato sul lato lungo, fondo
+  bianco nei due temi. Il verbale: CANTIERI, «Il codice a barre del
+  PayCode e la scheda del PDF in chat».
   I LIMITI DI AMAZON (23 set 2026): 999 € per ordine e nessun minimo DI
   AMAZON oltre lo zero (il minimo e' NOSTRO, dal 30 set 2026: il
   paragrafo qui sotto), nessuna commissione — `P2P_PAYCODE_MAX_EURO` col
@@ -32456,7 +32481,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   modi `scrivi` | `attesa` | `altrove`), la riga `CHATSC_PATTO`. I link
   restano testo (`chatScTestoHTML`: mai un `<a>`) e `chatScAllarmiP2P`
   mette la riga rossa sotto i messaggi ALTRUI con un link o un invito a
-  spostarsi. `CHATSC_MAX_TESTO` 500, un invio ogni `CHATSC_FRENO_MS`.
+  spostarsi. Dal 16 ott 2026 (barcode-paycode) i link si vedono come
+  testo grigio e non sottolineato, con «📋 Copia link» sotto
+  (`chatScLinkP2P` li divide), e il link del PDF del PayCode di Amazon
+  diventa la scheda `schedaPdfPayCodeP2P`, senza riga rossa: vedi «IL
+  CODICE A BARRE DEL PAYCODE». `CHATSC_MAX_TESTO` 500, un invio ogni `CHATSC_FRENO_MS`.
   Il ritiro (`chatScRitiraP2P`) parte all'apertura dello scambio e ogni
   `CHATSC_POLSO_MS` (5 s) a pagina in vista; a un arrivo si riscrive la
   sola lista (`chatScRidisegnaP2P`), non la pagina.

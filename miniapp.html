@@ -3422,7 +3422,21 @@
       background:var(--warn-bg);color:var(--ink);font-size:13px;line-height:1.35;font-weight:600}
     .chatsc-allarme{margin-top:6px;padding-top:6px;border-top:1px dashed var(--danger);
       color:var(--danger);font-size:13px;font-weight:600;white-space:normal}
-    .chatsc-link{text-decoration:underline dotted;color:var(--danger)}
+    /* (16 ott 2026, barcode-paycode) il link si vede come TESTO: era
+       rosso e sottolineato, e chi lo vedeva lo toccava — e non
+       succedeva niente. Sotto il messaggio c'e' «📋 Copia link» */
+    .chatsc-link{color:var(--ink-soft);text-decoration:none;font-style:italic}
+    .chatsc-copie{white-space:normal}
+    .chatsc-copia{display:inline-block;margin:6px 6px 0 0;padding:5px 10px;border:1px solid var(--field-line);
+      border-radius:999px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:700;
+      white-space:nowrap;cursor:pointer}
+    /* la scheda del PDF del PayCode di Amazon, dentro il messaggio */
+    .chatsc-pdf{margin-top:8px;padding:10px;border-radius:12px;background:var(--card);
+      border:1px solid var(--field-line);white-space:normal}
+    .chatsc-pdf-tit{font-weight:800;font-size:14px;line-height:1.35}
+    .chatsc-pdf-bott{display:flex;gap:8px;margin-top:8px}
+    .chatsc-pdf-bott .btn{flex:1 1 0;width:auto;min-width:0;margin:0;padding-left:8px;padding-right:8px}
+    .chatsc-pdf>.btn.orange{margin:8px 0 0}
     .chatsc-sis{margin:6px 0;font-size:12px;color:var(--ink-soft);text-align:center}
     .chatsc-riga{display:flex;align-items:center;justify-content:space-between;gap:10px}
     .chatsc-riga small{font-size:12px}
@@ -4785,6 +4799,34 @@
      che e' com'erano gia' in pagina. */
   .sicu ol.p2p-paycode-passi{list-style:decimal outside;margin:8px 0 6px 20px}
   .sicu ol.p2p-paycode-passi li::marker{font-weight:800}
+  /* IL CODICE A BARRE DEL PAYCODE (16 ott 2026, barcode-paycode): il
+     campo facoltativo nel foglio di chi pubblica, l'anteprima, il
+     bottone del riquadro di chi compra e il foglio a tutto schermo —
+     fondo BIANCO in tutti e due i temi, che una cassa legge barre nere
+     su bianco e basta */
+  .p2p-barre-tab{margin:16px 0 4px;padding-top:12px;border-top:1px solid var(--field-line)}
+  .p2p-barre-tab label{display:block;font-weight:800;font-size:14px;margin-bottom:4px}
+  .p2p-facoltativo{font-weight:600;color:var(--ink-soft)}
+  .p2p-barre-campo{display:block;width:100%;box-sizing:border-box;margin:8px 0 4px;padding:10px 12px;
+    border:1.5px solid var(--field-line);border-radius:12px;background:var(--card);color:var(--ink);
+    font-size:14px;-webkit-appearance:none}
+  .p2p-barre-campo:focus{outline:none;border-color:var(--sats)}
+  .p2p-barre-anteprima{margin:8px 0 2px;padding:6px 0;background:#fff;border-radius:8px;
+    display:flex;justify-content:center;overflow:hidden}
+  .p2p-barre-anteprima .barre-svg{max-width:100%;height:auto}
+  .p2p-paycode .p2p-barre-mostra{margin:2px 0 10px}
+  #p2pBarreSheet{top:0;bottom:0;left:0;right:0;max-width:none;max-height:none;height:100%;
+    margin:0;padding:0;border-radius:0;background:#fff;color:#000;z-index:70;overflow:hidden;
+    transform:translateY(100%)}
+  #p2pBarreSheet.open{transform:none}
+  .barre-giro{position:absolute;top:50%;left:50%;box-sizing:border-box;padding:16px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    transform:translate(-50%,-50%);text-align:center}
+  .barre-giro.ruota{transform:translate(-50%,-50%) rotate(90deg)}
+  .barre-giro .barre-svg{display:block;flex:0 0 auto}
+  .barre-pc{font:800 32px/1 'JetBrains Mono',monospace;letter-spacing:3px;color:#000}
+  .barre-riga{font-size:16px;font-weight:700;color:#000}
+  .barre-piede{font-size:13px;font-weight:600;color:#555}
   /* L'AVVISO DEL BUONO REGALO (10 ott 2026, cantiere guida-paycode):
      sotto i quattro gesti, col rosso tenue delle ultime ore — e' la
      riga da rileggere alla cassa, se lo scontrino non torna */
@@ -13594,6 +13636,13 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pEuroTit">💶 L'importo esatto</h3>
     <div id="p2pEuroCorpo"></div>
+  </div>
+  <!-- IL CODICE ALLA CASSA (16 ott 2026, barcode-paycode): il GS1-128
+       del PDF di Amazon a tutto schermo, girato sul lato lungo. Lo
+       riempie `disegnaBarreP2P`; un tocco ovunque lo chiude. -->
+  <div class="sheet" id="p2pBarreSheet" role="dialog" aria-modal="true" aria-label="Codice a barre del PayCode"
+       onclick="chiudiFoglioP2P('p2pBarreSheet')">
+    <div id="p2pBarreCorpo"></div>
   </div>
 
   <!-- LA SCADENZA DEL PAYCODE (9 ott 2026): il foglio che la riga del
@@ -31410,6 +31459,7 @@ function closeSheet(){
   el('p2pScadeSheet').classList.remove('open');
   el('p2pPayCodeSheet').classList.remove('open');
   el('p2pEuroSheet').classList.remove('open');
+  el('p2pBarreSheet').classList.remove('open');
   el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
@@ -62322,6 +62372,7 @@ function riquadroPayCodeP2P(o, adesso){
   const testo = (((o || {}).campiLoro || {}).euro || {}).testo || '';
   const pc = payCodeDaTestoP2P(testo);
   if (!pc) return '';
+  const barre = barreDaTestoP2P(testo);
   const ora = adesso || Math.floor(Date.now() / 1000);
   const scade = scadenzaTabacchinoOrdineP2P(o);
   const manca = scade > 0 ? Math.max(0, scade - ora) : 0;
@@ -62331,6 +62382,15 @@ function riquadroPayCodeP2P(o, adesso){
     '<div class="p2p-paycode-cod"><b>' + esc(pc) + '</b>' +
       '<button type="button" class="p2p-paycode-copia" data-pc="' + esc(pc) + '" ' +
         'onclick="copiaLink(this.dataset.pc, \'PayCode copiato 📋\')" aria-label="Copia il PayCode">📋</button></div>' +
+    /* IL CODICE ALLA CASSA (16 ott 2026, barcode-paycode): quello del
+       PDF di Amazon, se chi vende l'ha mandato; se no lo si dice, e
+       non se ne inventa uno — un codice fatto dal PayCode la cassa lo
+       rifiuta (il caso vero del 15 ottobre) */
+    (barre
+      ? '<button type="button" class="btn orange p2p-barre-mostra" data-n="' + esc(barre) + '" data-pc="' + esc(pc) + '" '
+        + 'data-imp="' + esc(fmtEur(o.euro) + ' €') + '" data-sc="' + esc(scade > 0 ? dataTabacchinoP2P(scade) : '') + '" '
+        + 'onclick="apriBarreP2P(this.dataset)">📊 Mostra il codice alla cassa</button>'
+      : '<div class="hint">' + esc(P2P_BARRE_MANCA) + '</div>') +
     '<div class="p2p-paycode-riga"><span>Importo</span><b>' + fmtEur(o.euro) + ' € in contanti</b></div>' +
     (scade > 0
       ? '<div class="p2p-paycode-riga"><span>Scade il</span><b>' + esc(dataTabacchinoP2P(scade)) + '</b></div>' +
@@ -62388,6 +62448,61 @@ function riquadroPayCodeP2P(o, adesso){
     '<div class="hint">Il codice resta tuo e di chi vende: viaggia cifrato, e Barattolo non lo legge.</div>' +
   '</div>';
 }
+/* ---- IL CODICE ALLA CASSA, A TUTTO SCHERMO (16 ott 2026, cantiere
+   barcode-paycode) ----
+   Il GS1-128 del PDF di Amazon ha ~290 moduli con le zone di quiete:
+   sulla larghezza di un telefono in piedi (375 px) un modulo starebbe
+   sotto i due pixel, e la cassa non legge. Allora il codice si
+   disegna GIRATO, lungo il lato lungo dello schermo, con un numero
+   INTERO di pixel per modulo; sotto, il PayCode in chiaro (la cassa
+   puo' sempre digitarlo), l'importo e la scadenza. Fondo bianco in
+   tutti e due i temi. E' un foglio come gli altri (`.sheet`): il
+   gesto «indietro» lo chiude, e il tocco ovunque pure.
+   Lo apre il riquadro del PayCode di chi compra e la scheda del PDF
+   nella chat: tutti e due passano i quattro dati in `data-*`. */
+const P2P_BARRE_MANCA = 'Il codice a barre non c\'è: chiedi a chi vende il PDF di Amazon, o fai digitare il PayCode alla cassa.';
+/* PURA: il corpo del foglio, dai dati, dai pixel per modulo, dall'altezza
+   delle barre e dalla scatola (larga `w`, alta `h`, girata o no) */
+function corpoBarreSchermoP2P(d, px, alto, w, h, ruota){
+  const pc = payCodeP2P(d.pc);
+  return '<div class="barre-giro' + (ruota ? ' ruota' : '') + '" style="width:' + Math.floor(w) + 'px;height:'
+    + Math.floor(h) + 'px">'
+    + svgGs1128P2P(d.n, px, alto)
+    + '<div class="barre-pc">' + esc(pc) + '</div>'
+    + '<div class="barre-riga">' + esc([d.imp ? d.imp + ' in contanti' : '', d.sc ? 'scade ' + d.sc : '']
+        .filter(Boolean).join(' · ')) + '</div>'
+    + '<div class="barre-piede">Alza la luminosità dello schermo · tocca per chiudere</div>'
+    + '</div>';
+}
+let p2pBarreDati = null;
+function disegnaBarreP2P(){
+  const box = el('p2pBarreCorpo');
+  if (!box || !p2pBarreDati) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  const ruota = H > W, lungo = ruota ? H : W, corto = ruota ? W : H;
+  const tot = moduliTotGs1128P2P(p2pBarreDati.n);
+  const px = Math.max(1, Math.floor((lungo - 32) / Math.max(1, tot)));
+  const alto = Math.max(60, Math.min(240, Math.floor(corto * 0.42)));
+  box.innerHTML = corpoBarreSchermoP2P(p2pBarreDati, px, alto, lungo, corto, ruota);
+}
+function apriBarreP2P(d){
+  const pc = payCodeP2P(d && d.pc);
+  const g = giudizioBarrePayCodeP2P(d && d.n, pc);
+  /* un codice che non torna non si mostra MAI, nemmeno da qui */
+  if (g.stato !== 'buono') { toast(P2P_BARRE_MANCA, 6000); return; }
+  haptic();
+  p2pBarreDati = {n: g.numero, pc: pc, imp: String((d && d.imp) || ''), sc: String((d && d.sc) || '')};
+  disegnaBarreP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pBarreSheet').classList.add('open');
+}
+/* il telefono girato mentre il codice e' aperto: si ridisegna. Col
+   `typeof`: i banchi che ritagliano questo pezzo hanno un `window` di
+   cartone senza ascoltatori (la suite intera l'ha detto, 16 ott 2026) */
+if (typeof window.addEventListener === 'function')
+  window.addEventListener('resize', () => {
+    if (el('p2pBarreSheet')?.classList.contains('open')) disegnaBarreP2P();
+  });
 /* ---- LA MAPPA LA PUO' APRIRE CHI VENDE (10 ott 2026, cantiere
    guida-paycode) ----
    La mappa di Amazon chiede un account, e chi paga al tabacchino puo'
@@ -66927,7 +67042,7 @@ let p2pNuovoDue = false;     // il secondo campo dell'importo si e' fatto vedere
 let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di mercato
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
 let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
-let p2pNuovoTab = {ordine: '', importo: '', scade: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data
+let p2pNuovoTab = {ordine: '', importo: '', scade: '', barre: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data; `barre` il codice a barre facoltativo, gia' giudicato
 let p2pNuovoPremioTab = '';   // il premio di Barattozon, COME LO SCRIVE il campo (o il cursore): il testo, perche' «20,1» si deve poter rifiutare invece che tosare
 let p2pNuovoPremioTabMano = false;  // il premio di Barattozon si scrive invece di trascinarlo
 let p2pNuovoZona = '';        // la zona di scambio del contanti, come sta nel campo (10 ott 2026)
@@ -67406,7 +67521,7 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoFisso = false;
   p2pNuovoPremio = 0;
   p2pNuovoPremioMano = false;
-  p2pNuovoTab = {ordine: '', importo: '', scade: ''};
+  p2pNuovoTab = {ordine: '', importo: '', scade: '', barre: ''};
   p2pNuovoPremioTab = '';
   p2pNuovoPremioTabMano = false;
   p2pNuovoEuroVia = '';
@@ -69345,6 +69460,164 @@ function estraiPayCodeP2P(testo){
   const m = /(?:^|\D)(\d{3}[-\s]?\d{3}[-\s]?\d{3})(?!\d)/.exec(String(testo || ''));
   return m ? payCodeP2P(m[1]) : '';
 }
+/* ============ IL CODICE A BARRE DEL PAYCODE (16 ott 2026, cantiere
+   barcode-paycode, dal caso vero del 15: un ordine Barattozon da
+   39,99 €, e il tabacchino non leggeva il codice) ============
+   Il codice che la cassa legge NON e' il PayCode scritto a barre. Il
+   PDF di Amazon porta un GS1-128 (Code 128 col FNC1 in testa) di 37
+   cifre: (01) un codice prodotto di 14 cifre, poi (21) un seriale che
+   CONTIENE il PayCode. Esempio vero: PayCode 212-802-988 → 01
+   00860003622209 21 6085740002128029880. Le altre cifre le mette
+   Amazon, quindi il codice NON SI RICAVA: si prende dal link del PDF
+   (parametro `barcode=`) o dal numero lungo incollato, e si disegna
+   uguale. Un Code 128 con «212-802-988» (l'utente se l'era fatto da
+   solo) la cassa lo rifiuta: meglio nessun codice che uno sbagliato.
+   ⚠️ LA REGOLA «IL PAYCODE STA DENTRO IL SERIALE» E' PROVATA SU UN
+   SOLO ESEMPIO (decisione di Andrea, 16 ott 2026): la struttura (01)
+   + (21) e' quella di GS1; dove sta il PayCode nel seriale lo dice un
+   PDF solo. Se un secondo PDF la smentisce, si cambia qui e basta.
+   Tutto PURO: niente DOM, niente rete. */
+/* IL LINK DEL PDF: host e percorso ESATTI, in https. E' l'unico link
+   che la chat apre (dietro una domanda) — un dominio che gli somiglia
+   resta un link qualunque, coi suoi avvisi. */
+const PAYCODE_PDF_HOST = 'amsfm7t2lf.execute-api.eu-west-1.amazonaws.com';
+const PAYCODE_PDF_PERCORSO = '/prod/generate-pdf';
+/* PURA: la cifra di controllo di un codice prodotto GS1 a 14 cifre */
+function gtinBuonoP2P(c){
+  if (!/^\d{14}$/.test(String(c || ''))) return false;
+  let s = 0;
+  for (let i = 0; i < 13; i++) s += Number(c[i]) * (i % 2 ? 1 : 3);
+  return (10 - s % 10) % 10 === Number(c[13]);
+}
+/* PURA: il giudizio del numero lungo, col PayCode dell'ordine. Torna
+   {stato: 'vuoto'|'buono'|'storto', numero, frase}. Solo cifre (gli
+   spazi si tolgono), (01) con la sua cifra di controllo, (21), e nel
+   seriale le nove cifre del PayCode. Senza PayCode non si giudica:
+   e' il PayCode che dice di CHI e' il codice. */
+function giudizioBarrePayCodeP2P(numero, payCode){
+  const n = String(numero == null ? '' : numero).replace(/\s+/g, '');
+  if (!n) return {stato: 'vuoto', numero: '', frase: ''};
+  const pc = payCodeP2P(payCode).replace(/-/g, '');
+  if (!pc) return {stato: 'storto', numero: '', frase: 'Prima scrivi il PayCode: il codice a barre si controlla su quello'};
+  if (!/^01\d{14}21\d{9,20}$/.test(n) || !gtinBuonoP2P(n.slice(2, 16)))
+    return {stato: 'storto', numero: '', frase: 'Non è il codice a barre di un PayCode Amazon: copia il link del PDF o il numero lungo sotto le barre'};
+  if (n.slice(18).indexOf(pc) < 0)
+    return {stato: 'storto', numero: '', frase: 'Questo codice a barre è di un altro PayCode: dentro non c\'è il ' + payCodeP2P(pc)};
+  return {stato: 'buono', numero: n, frase: ''};
+}
+/* PURA: la data del PDF («domenica, 18 ottobre, 14:32 MET») corta,
+   «dom 18 ott 14:32»; '' se non ha quella forma */
+function scadePdfPayCodeP2P(t){
+  const m = /^\s*([a-zà-ù]{3,})\s*,\s*(\d{1,2})\s+([a-zà-ù]{3,})\s*,\s*(\d{1,2}):(\d{2})\b/i.exec(String(t || ''));
+  return m ? m[1].slice(0, 3).toLowerCase() + ' ' + Number(m[2]) + ' ' + m[3].slice(0, 3).toLowerCase()
+    + ' ' + m[4] + ':' + m[5] : '';
+}
+/* PURA: il primo link del PDF del PayCode di Amazon dentro un testo, o
+   null. Vale solo con host e percorso esatti, in https, senza porta né
+   credenziali, col `paycode=` buono e il `barcode=` presente (che sia
+   anche buono lo dice `barre`, vuoto se non lo e'). `testo` e' il link
+   come e' stato scritto (e' quello che si copia), `url` quello che si
+   apre. Importo e scadenza servono alla scheda, mai a un conto. */
+function linkPdfPayCodeP2P(testo){
+  const tutti = String(testo || '').match(/https:\/\/[^\s<>"']+/gi) || [];
+  for (const grezzo of tutti) {
+    const t = grezzo.replace(/[).,;:!?]+$/, '');
+    let u;
+    try { u = new URL(t); } catch(e) { continue; }
+    if (u.protocol !== 'https:' || u.hostname !== PAYCODE_PDF_HOST || u.port
+        || u.username || u.password || u.pathname !== PAYCODE_PDF_PERCORSO) continue;
+    const pc = payCodeP2P(u.searchParams.get('paycode') || '');
+    const barcode = u.searchParams.get('barcode');
+    if (!pc || !barcode) continue;
+    const g = giudizioBarrePayCodeP2P(barcode, pc);
+    const imp = centesimiP2P(u.searchParams.get('amount') || '');
+    return {testo: t, url: u.href, payCode: pc, barre: g.stato === 'buono' ? g.numero : '',
+            importo: (!imp.storto && imp.n > 0) ? centesimiTestoP2P(imp.n) : '',
+            scade: scadePdfPayCodeP2P(u.searchParams.get('expiration_date'))};
+  }
+  return null;
+}
+/* PURA: il numero lungo da quel che chi vende incolla — il link del
+   PDF (il suo `barcode=`) o il numero da solo (la prima fila di almeno
+   venti cifre, spazi ammessi). '' se non c'e' niente del genere; il
+   giudizio lo da' `giudizioBarrePayCodeP2P`. */
+function barreDaIncollatoP2P(testo){
+  const t = String(testo || '');
+  const l = linkPdfPayCodeP2P(t);
+  if (l) return String(new URL(l.url).searchParams.get('barcode') || '').replace(/\s+/g, '');
+  const m = /\d[\d ]{18,}\d/.exec(t);
+  return m ? m[0].replace(/\s+/g, '') : '';
+}
+/* PURA: il numero lungo dal TESTO COMPOSTO che viaggia — la sola riga
+   «Codice a barre:» —, giudicato col PayCode dello stesso testo. ''
+   se non c'e' (gli ordini di prima) o se non torna. */
+function barreDaTestoP2P(testo){
+  const m = /(?:^|\n)Codice a barre:\s*([^\n]+)/.exec(String(testo || ''));
+  if (!m) return '';
+  const g = giudizioBarrePayCodeP2P(m[1], payCodeDaTestoP2P(testo));
+  return g.stato === 'buono' ? g.numero : '';
+}
+/* IL GS1-128. Code 128 ha 107 segni: ognuno sei larghezze alterne
+   (barra, spazio, …) che fanno 11 moduli; lo stop ne ha sette e fa 13.
+   Le cifre vanno a COPPIE nel set C (un segno ogni due cifre), dopo
+   lo start C e il FNC1 che dice «e' GS1»; con un numero dispari
+   l'ultima cifra passa nel set B (code B, poi la cifra). In fondo il
+   controllo modulo 103 e lo stop. Il lettore della cassa rilegge le
+   stesse 37 cifre del PDF, col segno GS1: e' quel che conta, non che
+   le barre siano disegnate pixel per pixel come quelle di Amazon. */
+const CODE128_SEGNI = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 '
+  + '221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 '
+  + '312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 '
+  + '112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 '
+  + '211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 '
+  + '431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 '
+  + '241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 '
+  + '421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 '
+  + '311141 411131 211412 211214 211232 2331112').split(' ');
+/* PURA: i valori dei segni per un numero di sole cifre, controllo e
+   stop compresi; [] se non sono cifre */
+function valoriGs1128P2P(numero){
+  const n = String(numero || '');
+  if (!/^\d+$/.test(n)) return [];
+  const v = [105, 102];                       // start C, FNC1
+  for (let i = 0; i + 1 < n.length; i += 2) v.push(Number(n.substr(i, 2)));
+  if (n.length % 2) v.push(100, n.charCodeAt(n.length - 1) - 32);   // code B, l'ultima cifra
+  let s = v[0];
+  for (let i = 1; i < v.length; i++) s += i * v[i];
+  v.push(s % 103, 106);
+  return v;
+}
+/* PURA: le larghezze in moduli, alterne a partire da una barra */
+function moduliGs1128P2P(numero){
+  return valoriGs1128P2P(numero).reduce((a, x) => a.concat(CODE128_SEGNI[x].split('').map(Number)), []);
+}
+/* PURA: il disegno, in SVG. `px` moduli interi di larghezza (un modulo
+   a cavallo di due pixel si sfoca e la cassa sbaglia), dieci moduli
+   bianchi per lato (la zona di quiete), barre alte `alto` px. '' se il
+   numero non e' di sole cifre. */
+const GS1128_QUIETE = 10;
+function svgGs1128P2P(numero, px, alto){
+  const w = moduliGs1128P2P(numero);
+  if (!w.length) return '';
+  const p = Math.max(1, Math.floor(Number(px) || 1)), h = Math.max(1, Math.floor(Number(alto) || 1));
+  const tot = w.reduce((a, x) => a + x, 0) + 2 * GS1128_QUIETE;
+  let x = GS1128_QUIETE, barre = '';
+  w.forEach((l, i) => {
+    if (!(i % 2)) barre += '<rect x="' + x * p + '" y="0" width="' + l * p + '" height="' + h + '"/>';
+    x += l;
+  });
+  return '<svg xmlns="http://www.w3.org/2000/svg" class="barre-svg" width="' + tot * p + '" height="' + h
+    + '" viewBox="0 0 ' + tot * p + ' ' + h + '" shape-rendering="crispEdges" role="img" '
+    + 'aria-label="Codice a barre ' + esc(numero) + '"><rect width="100%" height="100%" fill="#fff"/>'
+    + '<g fill="#000">' + barre + '</g></svg>';
+}
+/* PURA: quanti moduli in tutto, zona di quiete compresa — per chi
+   sceglie quanti pixel dare a un modulo */
+function moduliTotGs1128P2P(numero){
+  const w = moduliGs1128P2P(numero);
+  return w.length ? w.reduce((a, x) => a + x, 0) + 2 * GS1128_QUIETE : 0;
+}
+/* ============ fine del codice a barre del PayCode ============ */
 /* PURE: le due righe dal valore com'e' nel foglio */
 function etichettaPayCodeTabP2P(ordine){
   return payCodeP2P(ordine) || 'Incolla il PayCode';
@@ -69380,9 +69653,36 @@ function limitiEuroTabP2P(minimo, tetto){
   const max = t > 0 ? Math.min(P2P_PAYCODE_MAX_EURO, t) : P2P_PAYCODE_MAX_EURO;
   return (m > 0 ? 'Da ' + m + ' € a ' : 'Fino a ') + max + ' €, coi centesimi della mail di Amazon.';
 }
-/* PURA: il corpo del foglio del PayCode, dalla bozza */
-function corpoPayCodeTabP2P(bozza){
+/* PURA: il riquadro del codice a barre sotto il PayCode (16 ott 2026,
+   barcode-paycode): il campo facoltativo, la frase rossa e l'anteprima.
+   `barre` e' quel che c'e' nel campo (il link o il numero). */
+function corpoBarreTabP2P(bozza, barre){
+  const t = String(barre || '');
+  const g = giudizioBarrePayCodeP2P(barreDaIncollatoP2P(t) || t, bozza);
+  return '<div class="p2p-barre-tab">'
+    + '<label for="p2pBarreCampo">Codice a barre <span class="p2p-facoltativo">(facoltativo)</span></label>'
+    + '<div class="hint">Incolla il link del PDF di Amazon o il numero lungo sotto le barre: alla cassa si mostra lo stesso codice.</div>'
+    + '<input id="p2pBarreCampo" class="p2p-barre-campo" type="text" maxlength="800" '
+    + 'placeholder="https://… oppure 0100…" value="' + esc(t) + '" autocomplete="off" autocapitalize="off" '
+    + 'spellcheck="false" aria-describedby="p2pBarreErr" oninput="scriviBarreTabP2P()" '
+    + 'onpaste="incollaNelCampoBarreP2P(event)">'
+    + '<div class="p2p-tappa-err" id="p2pBarreErr"' + (g.stato === 'storto' ? '' : ' hidden') + '>'
+    + esc(g.stato === 'storto' ? g.frase : '') + '</div>'
+    + '<div id="p2pBarreAnteprima">' + anteprimaBarreTabP2P(g) + '</div>'
+    + '</div>';
+}
+/* PURA: l'anteprima di un giudizio buono — il codice piccolo e la riga
+   che dice che il PayCode c'e' dentro; '' altrimenti */
+function anteprimaBarreTabP2P(g){
+  if (!g || g.stato !== 'buono') return '';
+  return '<div class="p2p-barre-anteprima">' + svgGs1128P2P(g.numero, 1, 44) + '</div>'
+    + '<div class="hint">✓ Codice di Amazon, col tuo PayCode dentro.</div>';
+}
+/* PURA: il corpo del foglio del PayCode, dalla bozza (e dal codice a
+   barre, facoltativo: senza, il foglio e' quello di prima piu' il campo) */
+function corpoPayCodeTabP2P(bozza, barre){
   const g = giudizioPayCodeP2P(bozza);
+  const gb = giudizioBarrePayCodeP2P(barreDaIncollatoP2P(barre) || String(barre || ''), bozza);
   return '<div class="hint">Le nove cifre della mail di Amazon, coi trattini o senza. Viaggia cifrato: lo legge solo chi prende l\'ordine.</div>'
     + '<input id="p2pPayCodeCampo" class="p2p-paycode-campo" type="text" inputmode="numeric" maxlength="11" '
     + 'placeholder="479-868-518" value="' + esc(bozza || '') + '" autocomplete="off" autocapitalize="off" '
@@ -69392,8 +69692,9 @@ function corpoPayCodeTabP2P(bozza){
     + '<div class="p2p-tappa-err" id="p2pPayCodeErr"' + (g.stato === 'storto' ? '' : ' hidden') + '>'
     + esc(g.stato === 'storto' ? g.frase : '') + '</div>'
     + '<button type="button" class="btn ghost p2p-incolla" onclick="incollaPayCodeTabP2P()">📋 Incolla dagli appunti</button>'
+    + corpoBarreTabP2P(bozza, barre)
     + '<button type="button" class="btn orange" id="p2pPayCodeOk" onclick="confermaPayCodeTabP2P()"'
-    + (g.stato === 'buono' ? '' : ' disabled') + '>Conferma</button>'
+    + (g.stato === 'buono' && gb.stato !== 'storto' ? '' : ' disabled') + '>Conferma</button>'
     + '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>';
 }
 /* ---- UN FOGLIO DELL'IMPORTO, TRE MODI (9 ott 2026, notte, richiesta di
@@ -69516,32 +69817,79 @@ function apriPayCodeTabP2P(){
   haptic();
   p2pPayCodeTrigger = el('p2pNuovoTabOrdine');
   const box = el('p2pPayCodeCorpo');
-  if (box) box.innerHTML = corpoPayCodeTabP2P(p2pNuovoTab.ordine);
+  if (box) box.innerHTML = corpoPayCodeTabP2P(p2pNuovoTab.ordine, p2pNuovoTab.barre);
   el('sheetBg').classList.add('open');
   el('p2pPayCodeSheet').classList.add('open');
 }
+/* i due giudizi del foglio, dai due campi com'e' adesso (16 ott 2026:
+   il codice a barre si giudica sul PayCode del campo sopra) */
+function giudiziFoglioPayCodeP2P(){
+  const c = el('p2pPayCodeCampo'), b = el('p2pBarreCampo');
+  const pc = c ? c.value : '', t = b ? String(b.value || '') : '';
+  return {g: giudizioPayCodeP2P(pc),
+          gb: giudizioBarrePayCodeP2P(barreDaIncollatoP2P(t) || t, pc)};
+}
 function scriviPayCodeTabP2P(subito){
   const c = el('p2pPayCodeCampo');
-  const g = giudizioPayCodeP2P(c ? c.value : '');
-  const ok = el('p2pPayCodeOk');
-  if (ok) ok.disabled = g.stato !== 'buono';
+  const {g} = giudiziFoglioPayCodeP2P();
   if (c) {
     if (g.stato === 'storto' && (subito || !el('p2pPayCodeErr').hidden)) c.setAttribute('aria-invalid', 'true');
     else c.removeAttribute('aria-invalid');
   }
   fraseFoglioTabP2P('p2pPayCodeErr', g, !!subito);
+  /* il PayCode cambiato puo' cambiare il giudizio del codice a barre */
+  scriviBarreTabP2P(subito);
 }
 function rivelaPayCodeTabP2P(){ scriviPayCodeTabP2P(true); }
+/* il codice a barre si riscrive IN PLACE: la frase, l'anteprima e
+   «Conferma», che vuole il PayCode buono e il codice buono o vuoto */
+function scriviBarreTabP2P(subito){
+  const {g, gb} = giudiziFoglioPayCodeP2P();
+  const ok = el('p2pPayCodeOk');
+  if (ok) ok.disabled = g.stato !== 'buono' || gb.stato === 'storto';
+  const b = el('p2pBarreCampo');
+  if (b) {
+    if (gb.stato === 'storto') b.setAttribute('aria-invalid', 'true');
+    else b.removeAttribute('aria-invalid');
+  }
+  fraseFoglioTabP2P('p2pBarreErr', gb, !!subito);
+  const a = el('p2pBarreAnteprima');
+  if (a) a.innerHTML = anteprimaBarreTabP2P(gb);
+}
+/* PURA: quel che un incolla porta al foglio — il PayCode (dal link del
+   PDF o da un testo qualunque) e, se e' il link del PDF, il codice a
+   barre: chi incolla il link in uno dei due campi li riempie tutti e due */
+function incollatoFoglioPayCodeP2P(testo){
+  const l = linkPdfPayCodeP2P(testo);
+  return l ? {pc: l.payCode, barre: l.barre}
+           : {pc: estraiPayCodeP2P(testo), barre: ''};
+}
+function riempiFoglioPayCodeP2P(dati){
+  const c = el('p2pPayCodeCampo'), b = el('p2pBarreCampo');
+  if (dati.pc && c) c.value = dati.pc;
+  if (dati.barre && b) b.value = dati.barre;
+  rivelaPayCodeTabP2P();
+}
 /* l'incolla DENTRO il campo: se nel testo c'e' un PayCode si prende
    quello, prima che il `maxlength` tagli «Il tuo PayCode: 479…» */
 function incollaNelCampoPayCodeP2P(ev){
   const testo = ev && ev.clipboardData ? ev.clipboardData.getData('text') : '';
-  const p = estraiPayCodeP2P(testo);
-  if (!p) return;
+  const d = incollatoFoglioPayCodeP2P(testo);
+  if (!d.pc) return;
+  ev.preventDefault();
+  riempiFoglioPayCodeP2P(d);
+}
+/* ...e dentro il campo del codice a barre: il link del PDF porta anche
+   il PayCode, se il campo sopra e' ancora vuoto; un numero nudo entra
+   com'e' (lo giudica `scriviBarreTabP2P`, dopo l'incolla) */
+function incollaNelCampoBarreP2P(ev){
+  const testo = ev && ev.clipboardData ? ev.clipboardData.getData('text') : '';
+  const l = linkPdfPayCodeP2P(testo);
+  if (!l) { setTimeout(() => scriviBarreTabP2P(true), 0); return; }
   ev.preventDefault();
   const c = el('p2pPayCodeCampo');
-  if (c) c.value = p;
-  rivelaPayCodeTabP2P();
+  riempiFoglioPayCodeP2P({pc: (c && payCodeP2P(c.value)) ? '' : l.payCode,
+                          barre: barreDaIncollatoP2P(l.testo)});
 }
 /* «📋 Incolla dagli appunti»: dove il browser non lascia leggere gli
    appunti (certi WebView) lo dice, e mette il fuoco nel campo per il
@@ -69556,16 +69904,19 @@ async function incollaPayCodeTabP2P(){
     if (c) try { c.focus(); } catch(e){}
     return;
   }
-  const p = estraiPayCodeP2P(testo);
-  if (!p) { toast('Negli appunti non c\'è un PayCode: copia le nove cifre dalla mail di Amazon'); return; }
-  if (c) c.value = p;
-  rivelaPayCodeTabP2P();
+  const d = incollatoFoglioPayCodeP2P(testo);
+  if (!d.pc) { toast('Negli appunti non c\'è un PayCode: copia le nove cifre dalla mail di Amazon'); return; }
+  riempiFoglioPayCodeP2P(d);
 }
 function confermaPayCodeTabP2P(){
   const c = el('p2pPayCodeCampo');
   const p = payCodeP2P(c ? c.value : '');
   if (!p) { rivelaPayCodeTabP2P(); return; }
+  const {gb} = giudiziFoglioPayCodeP2P();
+  if (gb.stato === 'storto') { scriviBarreTabP2P(true); return; }
   haptic();
+  /* il codice a barre si tiene GIA' GIUDICATO, come il solo numero */
+  p2pNuovoTab.barre = gb.stato === 'buono' ? gb.numero : '';
   vestiRigaTendinaTabP2P('p2pNuovoTabOrdine', p, etichettaPayCodeTabP2P(p), true);
   /* la funzione del campo di ieri: rilegge il `value` e riscrive il percorso */
   cambiaTabP2P();
@@ -70115,8 +70466,13 @@ async function inviaNuovoOrdineP2P(confermato){
     const t = {ordine: payCodeP2P(campi.tab.ordine) || String(campi.tab.ordine || '').trim(),
                importo: centesimiTestoP2P(esattoTab),
                scade: campi.scade};
+    /* IL CODICE A BARRE (16 ott 2026): giudicato di nuovo qui, col
+       PayCode che parte davvero — il foglio l'ha gia' fatto, ma e' qui
+       che il testo nasce */
+    const gb = giudizioBarrePayCodeP2P(campi.tab.barre || '', t.ordine);
+    if (gb.stato === 'buono') t.barre = gb.numero;
     t.testo = formaRecapito(P2P_TABACCHINO).componi(
-      {ordine: t.ordine, importo: t.importo, scade: dataTabacchinoP2P(campi.scade)})
+      {ordine: t.ordine, importo: t.importo, scade: dataTabacchinoP2P(campi.scade), barre: t.barre || ''})
       .slice(0, CAMPO_MAX_TESTO);
     ord.tabacchino = t;
   }
@@ -70964,9 +71320,18 @@ const P2P_FORME_RECAPITO = [
       vecchia («Numero ordine:») delle righe di prima */
    campi: [{k: 'ordine', et: 'PayCode (9 cifre)', ph: '479-868-518'},
            {k: 'importo', et: 'Importo del PayCode, in euro', ph: '23,47'},
-           {k: 'scade', et: 'Scade il (data e ora)', ph: '17/09/2026 alle 14:30'}],
+           {k: 'scade', et: 'Scade il (data e ora)', ph: '17/09/2026 alle 14:30'},
+           /* IL CODICE A BARRE (16 ott 2026, barcode-paycode): facoltativo,
+              il link del PDF di Amazon o il numero lungo; parte come il
+              solo numero, giudicato (vedi «IL CODICE A BARRE DEL
+              PAYCODE»). Il tetto e' quello di un link intero, ~310 caratteri */
+           {k: 'barre', et: 'Codice a barre (facoltativo): link del PDF di Amazon o numero lungo',
+            ph: 'https://… oppure 0100…', facoltativo: true, max: 800}],
+   /* la riga «Codice a barre:» c'e' solo se c'e' il numero: gli ordini
+      senza restano byte per byte quelli di prima */
    componi: c => 'Contanti al tabacchino\nPayCode: ' + c.ordine
-     + '\nImporto: ' + c.importo + ' €\nScade: ' + c.scade},
+     + '\nImporto: ' + c.importo + ' €\nScade: ' + c.scade
+     + (c.barre ? '\nCodice a barre: ' + c.barre : '')},
   /* IL CONTANTI DI PERSONA E' UN APPUNTAMENTO (1 ott 2026, richiesta di
      Andrea): il luogo come INDIRIZZO VALIDO — i suggerimenti mentre si
      scrive, o «📍 Usa la mia posizione», col punto nel campo nascosto —
@@ -71543,7 +71908,10 @@ function renderCampiP2P(){
        li ha, e il form nasce vuoto — si riscrivono dalla ricevuta */
     salvato = fr.ricorda === false
       ? (o.tabacchino ? {campi: {ordine: o.tabacchino.ordine, importo: o.tabacchino.importo,
-                                 scade: dataTabacchinoP2P(o.tabacchino.scade)}} : null)
+                                 scade: dataTabacchinoP2P(o.tabacchino.scade),
+                                 /* il codice a barre dalla riga, o dal testo gia' partito */
+                                 barre: o.tabacchino.barre
+                                   || barreDaTestoP2P(((miei.euro || {}).testo) || '')}} : null)
       : (recapitiMiei()[fr.forma] || null);
     /* IL RICORDO NON PORTA I CAMPI `nonRicordato` (9 ott 2026, sera):
        chi li ha salvati con l'app di ieri (la causale, per un giorno)
@@ -71721,7 +72089,22 @@ async function inviaCampoP2P(tipo, btn){
         return;
       }
       campi.importo = centesimiTestoP2P(imp.n);
+      /* il codice a barre, se c'e': dal link o dal numero, e deve
+         contenere QUESTO PayCode (16 ott 2026). Storto non parte: un
+         codice sbagliato alla cassa e' peggio di nessun codice */
+      if (campi.barre) {
+        const gb = giudizioBarrePayCodeP2P(barreDaIncollatoP2P(campi.barre) || campi.barre, pc);
+        if (gb.stato !== 'buono') {
+          toast(gb.frase, 6000);
+          el('p2pCampoEuro_barre')?.focus();
+          return;
+        }
+        campi.barre = gb.numero;
+        const ib = el('p2pCampoEuro_barre');
+        if (ib) ib.value = gb.numero;
+      }
       tabRiga = {ordine: campi.ordine, importo: campi.importo, scade: quando};
+      if (campi.barre) tabRiga.barre = campi.barre;
     }
     /* LA CAUSALE NON SI TAGLIA IN SILENZIO (9 ott 2026): un recapito
        tagliato a meta' e' un recapito ROTTO, e un nome lungo piu' una
@@ -78251,7 +78634,9 @@ function avvisaRecapitoP2P(id){
    parte; il gesto e' un tocco e non parte da solo.
    QUEL CHE SI VEDE dell'altra persona e' testo e basta: niente
    allegati, i link non si aprono, e sotto un messaggio che porta un
-   link o che chiede di spostarsi altrove c'e' una riga rossa. */
+   link o che chiede di spostarsi altrove c'e' una riga rossa. L'unico
+   link che si apre — dietro una domanda, e senza riga rossa — e' il PDF
+   del PayCode di Amazon (16 ott 2026: vedi `schedaPdfPayCodeP2P`). */
 const CHATSC_CHIAVE = 'barattolo_p2p_chat';
 /* i due eventi di dentro hanno un numero LORO, nella fascia di quelli
    che i relay non conservano: non sono note (kind 1), e una nota
@@ -79024,23 +79409,92 @@ const CHATSC_RE_FUORI = /\b(telegram|whats\s?app|signal|messenger|instagram|face
 /* un indirizzo email non e' un link: e' un recapito, e la riga rossa
    sopra un recapito insegnerebbe a non guardarla piu' */
 const CHATSC_RE_EMAIL = /[^\s@]@[^\s@]/;
+/* PURA: i link di un messaggio, nell'ordine, divisi in due (16 ott
+   2026, barcode-paycode): quelli del PDF del PayCode di Amazon (`pdf`,
+   gli oggetti di `linkPdfPayCodeP2P`: host e percorso esatti) e tutti
+   gli altri (`altri`, come sono scritti). Le email non sono link. */
+function chatScLinkP2P(testo){
+  const pdf = [], altri = [];
+  String(testo || '').split(/\s+/).forEach(parola => {
+    if (!parola || CHATSC_RE_EMAIL.test(parola)) return;
+    (parola.match(CHATSC_RE_LINK) || []).forEach(x => {
+      const l = linkPdfPayCodeP2P(x);
+      if (l) pdf.push(l); else altri.push(x);
+    });
+  });
+  return {pdf: pdf, altri: altri};
+}
+/* il link del PDF di Amazon NON accende la riga rossa: e' il link che
+   lo scambio Barattozon si aspetta, e lo dice la sua scheda. Tutti gli
+   altri si', come prima. */
 function chatScAllarmiP2P(testo){
   const t = String(testo || '');
-  const senzaEmail = t.split(/\s+/).filter(p => !CHATSC_RE_EMAIL.test(p)).join(' ');
-  CHATSC_RE_LINK.lastIndex = 0;
-  return {link: CHATSC_RE_LINK.test(senzaEmail), fuori: CHATSC_RE_FUORI.test(t)};
+  return {link: chatScLinkP2P(t).altri.length > 0, fuori: CHATSC_RE_FUORI.test(t)};
 }
 /* PURA: il testo di un messaggio, scappato. I link restano TESTO —
-   nessun <a>, mai — e si vedono segnati. */
-function chatScTestoHTML(testo){
+   nessun <a>, mai — e dal 16 ott 2026 si vedono come testo, non
+   sottolineati come se si potessero toccare: sotto c'e' «📋 Copia
+   link». Con `senzaPdf` il link del PDF di Amazon esce dal testo: al
+   suo posto c'e' la scheda (`schedaPdfPayCodeP2P`). */
+function chatScTestoHTML(testo, senzaPdf){
   return String(testo || '').split(/(\s+)/).map(parola => {
     if (CHATSC_RE_EMAIL.test(parola)) return esc(parola);
     CHATSC_RE_LINK.lastIndex = 0;
     return parola.split(CHATSC_RE_LINK).map((pezzo, i) =>
-      (i % 2) ? '<span class="chatsc-link">' + esc(pezzo) + '</span>' : esc(pezzo)).join('');
+      !(i % 2) ? esc(pezzo)
+      : (senzaPdf && linkPdfPayCodeP2P(pezzo)) ? ''
+      : '<span class="chatsc-link">' + esc(pezzo) + '</span>').join('');
   }).join('');
 }
-function chatScMessaggiHTML(c, altro){
+/* PURA: il PayCode di QUESTO scambio, se lo si sa: chi compra lo
+   rilegge dal testo arrivato, chi vende dalla riga o da quel che ha
+   mandato. '' fuori da Barattozon (la riga «PayCode:» non c'e'). */
+function payCodeScambioP2P(o){
+  if (!o) return '';
+  if (o.lato === 'compro') return payCodeDaTestoP2P((((o.campiLoro || {}).euro || {}).testo) || '');
+  return payCodeP2P((o.tabacchino || {}).ordine || '')
+    || payCodeDaTestoP2P((((o.campiMiei || {}).euro || {}).testo) || '');
+}
+/* PURA: LA SCHEDA DEL PDF DEL PAYCODE (16 ott 2026, barcode-paycode,
+   dal caso vero: il link stava in chat, arancione e sottolineato, non
+   si apriva e non si copiava, e la riga rossa diceva «non aprirlo»).
+   Il titolo coi dati del link, «Apri il PDF» (dietro la domanda del
+   sito esterno), «📋 Copia link» e, se il codice a barre del link e'
+   buono, quello pronto per la cassa. Se il PayCode del link non e'
+   quello dello scambio lo dice in rosso, e il codice non si offre. */
+function schedaPdfPayCodeP2P(l, pcScambio){
+  const pc = payCodeP2P(pcScambio);
+  const diverso = !!pc && pc !== l.payCode;
+  return '<div class="chatsc-pdf">'
+    + '<div class="chatsc-pdf-tit">📄 PDF del PayCode di Amazon'
+    + (l.importo ? ' · ' + esc(l.importo) + ' €' : '') + (l.scade ? ' · scade ' + esc(l.scade) : '') + '</div>'
+    + (diverso ? '<div class="chatsc-allarme">⚠️ È del PayCode ' + esc(l.payCode)
+        + ', non di quello dello scambio (' + esc(pc) + ').</div>' : '')
+    + '<div class="chatsc-pdf-bott">'
+    + '<button type="button" class="btn ghost" data-u="' + esc(l.url) + '" onclick="apriPdfPayCodeP2P(this.dataset.u)">Apri il PDF</button>'
+    + '<button type="button" class="btn ghost" data-l="' + esc(l.testo) + '" onclick="copiaLink(this.dataset.l, \'Link copiato 📋\')">📋 Copia link</button>'
+    + '</div>'
+    + ((l.barre && !diverso)
+      ? '<button type="button" class="btn orange" data-n="' + esc(l.barre) + '" data-pc="' + esc(l.payCode) + '" '
+        + 'data-imp="' + esc(l.importo ? l.importo + ' €' : '') + '" data-sc="' + esc(l.scade) + '" '
+        + 'onclick="apriBarreP2P(this.dataset)">📊 Codice per il tabacchino</button>'
+      : '')
+    + '</div>';
+}
+/* «Apri il PDF»: il link si rigiudica qui (non si apre niente che non
+   sia il PDF di Amazon), e prima si chiede */
+function apriPdfPayCodeP2P(u){
+  const l = linkPdfPayCodeP2P(u);
+  if (!l) return;
+  chiediConferma({titolo: 'Stai aprendo un sito esterno',
+    corpo: 'Il PDF del PayCode si apre sul sito di Amazon, fuori da Barattolo.',
+    etichetta: 'Apri il PDF',
+    poi: () => {
+      if (tg?.initData && tg.openLink) { try { tg.openLink(l.url); return; } catch(e){} }
+      window.open(l.url, '_blank', 'noopener');
+    }});
+}
+function chatScMessaggiHTML(c, altro, o){
   const l = (c && Array.isArray(c.msgs)) ? c.msgs : [];
   /* «ancora nessun messaggio» sotto «tre messaggi non si leggono»
      sarebbe una bugia (dal giro dal vivo): la riga dei muti basta. E
@@ -79048,14 +79502,19 @@ function chatScMessaggiHTML(c, altro){
      appena…»): due righe per dire «niente» erano una di troppo */
   if (!l.length)
     return ((c && c.muti) || !chatScProntaP2P(c)) ? '' : '<div class="hint">Ancora nessun messaggio.</div>';
+  const pcScambio = payCodeScambioP2P(o);
   return l.map(m => {
     if (m.sis)
       return '<div class="chatsc-sis">🔑 ' + esc(altro) + ' ha ripreso la chat da un altro dispositivo: i messaggi di prima lì non li vede.</div>';
     const al = m.mio ? {} : chatScAllarmiP2P(m.testo);
+    const li = chatScLinkP2P(m.testo);
     return '<div class="chatmod-msg' + (m.mio ? ' mio' : '') + '">'
       + '<small>' + esc(m.mio ? 'Tu' : altro)
       + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + '</small>'
-      + chatScTestoHTML(m.testo)
+      + chatScTestoHTML(m.testo, true)
+      + li.pdf.map(x => schedaPdfPayCodeP2P(x, pcScambio)).join('')
+      + (li.altri.length ? '<div class="chatsc-copie">' + li.altri.map(x => '<button type="button" class="chatsc-copia" data-l="' + esc(x) + '" '
+          + 'onclick="copiaLink(this.dataset.l, \'Link copiato 📋\')">📋 Copia link</button>').join('') + '</div>' : '')
       + (al.link ? '<div class="chatsc-allarme">⚠️ ' + esc(CHATSC_RIGA_LINK) + '</div>' : '')
       + (al.fuori ? '<div class="chatsc-allarme">⚠️ ' + esc(CHATSC_RIGA_FUORI) + '</div>' : '')
       + '</div>';
@@ -79098,7 +79557,7 @@ function chatScListaP2P(o, c){
       ? '<div class="chatsc-sis">' + (c.muti === 1 ? 'Un messaggio' : c.muti + ' messaggi')
         + ' di prima non si ' + (c.muti === 1 ? 'può' : 'possono') + ' leggere da questo dispositivo.</div>'
       : '')
-    + chatScMessaggiHTML(c, altro);
+    + chatScMessaggiHTML(c, altro, o);
 }
 /* PURA: il riquadro della chat nella pagina dello scambio. `sa` e'
    l'ultima parola del server su questa chat. */

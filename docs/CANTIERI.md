@@ -60378,3 +60378,169 @@ cd ~/nodo && docker compose exec -T lnd lncli walletbalance
 ```
 
 Nel commit c'è solo questa voce.
+## Il codice a barre del PayCode e la scheda del PDF in chat (16 ott 2026, cantiere barcode-paycode, richiesta di Andrea; prima parte, A+B)
+
+**PERCHÉ.** Il 15 ott un ordine Barattozon da 39,99 € in contanti si è
+fermato al tabacchino. Tre cose: A) il codice a barre mostrato alla
+cassa non era quello di Amazon, e la cassa non lo leggeva; B) nella
+chat dello scambio chi vende aveva mandato il link del PDF del PayCode,
+e chi compra non riusciva né ad aprirlo né a copiarlo (il link era
+arancione e sottolineato, sembrava toccabile, e sotto c'era «⚠️ C'è un
+link: non aprirlo per pagare…», che per quel PDF dice il contrario di
+quel che serve); C) gli allegati nella chat (secondo push, a parte).
+
+**COSA C'ERA DAVVERO.** Barattolo il codice a barre NON lo disegnava:
+il riquadro mostrava le nove cifre col 📋 e basta. Il codice letto dai
+due screenshot di Andrea (lettore Inlite): quello che l'utente si era
+fatto da solo è un Code 128 con «212-802-988» (11 caratteri) e la cassa
+lo rifiuta; quello del PDF di Amazon è un **GS1-128** (Ucc128, FNC1 in
+testa) di 37 cifre, `0100860003622209216085740002128029880`, uguale al
+parametro `barcode=` del link: (01) `00860003622209`, un codice prodotto
+la cui cifra di controllo torna, poi (21) `6085740002128029880`, un
+seriale che CONTIENE il PayCode `212802988`. Le altre cifre le mette
+Amazon: il codice **non si ricava** dal PayCode.
+
+**LA CONFERMA DAL CAMPO (16 ott 2026, parola di Andrea).** Utente vero,
+tabacchino vero: il Code 128 col solo PayCode «212-802-988» alla cassa
+NON funziona; il GS1-128 di Amazon (37 cifre,
+`0100860003622209216085740002128029880`) SÌ. La strada è giusta. È UN
+SOLO ESEMPIO: un PayCode, un PDF, una cassa.
+
+**COSA SI È DECISO (Andrea).** Il codice mostrato al tabacchino è
+identico a quello di Amazon; se non c'è, lo si dice («usa il PDF di
+Amazon») e non se ne inventa uno. Campo facoltativo per il link o il
+numero lungo; i vecchi ordini funzionano come prima. La regola «il
+PayCode sta dentro il numero lungo» si tiene **ed è provata su un solo
+esempio** (non c'era un secondo PDF): se un PDF la smentisce, si cambia
+in `giudizioBarrePayCodeP2P` e basta. In chat il solo link del PDF di
+Amazon (host e percorso esatti, `paycode` e `barcode` nei parametri)
+diventa una scheda apribile; tutti gli altri link restano non
+apribili, con l'avviso di oggi, ma non più sottolineati, e con «📋
+Copia link». Due push: A+B adesso, C dopo, ciascuno col suo ok.
+
+**COSA SI È FATTO.**
+- Il blocco PURO «IL CODICE A BARRE DEL PAYCODE» (miniapp, dopo
+  `estraiPayCodeP2P`): `giudizioBarrePayCodeP2P` (solo cifre, (01) con
+  `gtinBuonoP2P`, (21), il PayCode nel seriale, frasi per i tre torti),
+  `linkPdfPayCodeP2P` (https, `PAYCODE_PDF_HOST` e
+  `PAYCODE_PDF_PERCORSO` esatti, niente porta né credenziali,
+  punteggiatura in coda tolta; torna anche importo e scadenza corta,
+  «dom 18 ott 14:32», solo per la scheda), `barreDaIncollatoP2P`,
+  `barreDaTestoP2P` e il disegno: `valoriGs1128P2P` (start C, FNC1,
+  coppie nel set C, l'ultima cifra di un numero dispari nel set B,
+  controllo modulo 103, stop), `svgGs1128P2P` (pixel INTERI per modulo,
+  dieci moduli di quiete, fondo bianco, `crispEdges`).
+- Chi pubblica: nel foglio «🧾 Il PayCode», sotto «Incolla», «Codice a
+  barre (facoltativo)» con l'anteprima e «✓ Codice di Amazon, col tuo
+  PayCode dentro.»; incollare il link (in uno dei due campi) riempie
+  PayCode e codice; «Conferma» resta spento se il codice è di un altro
+  PayCode. Il numero giudicato va in `p2pNuovoTab.barre`, poi in
+  `ord.tabacchino.barre` e nel testo cifrato come riga «Codice a barre:»
+  (la pubblicazione lo rigiudica sul PayCode che parte). Senza codice il
+  testo è byte per byte quello di prima.
+- Chi vende a mano (form «🧾 Il PayCode per chi compra»): quarto campo
+  facoltativo `barre`, max 800 (un link intero); storto non parte.
+- Chi compra: nel riquadro, sotto il PayCode, «📊 Mostra il codice alla
+  cassa» o, senza codice, «Il codice a barre non c'è: chiedi a chi vende
+  il PDF di Amazon, o fai digitare il PayCode alla cassa.». Il foglio
+  `#p2pBarreSheet` (un `.sheet`: l'indietro e il tocco lo chiudono) lo
+  disegna GIRATO sul lato lungo — a 375 px in piedi un modulo starebbe
+  sotto i due pixel — col PayCode in chiaro, importo, scadenza e «Alza
+  la luminosità dello schermo · tocca per chiudere»; fondo bianco anche
+  nel tema scuro; `apriBarreP2P` rigiudica e un codice che non torna
+  non si mostra mai.
+- La chat: `chatScLinkP2P` divide i link; il PDF di Amazon esce dal
+  testo e al suo posto c'è `schedaPdfPayCodeP2P` («📄 PDF del PayCode di
+  Amazon · 39,99 € · scade dom 18 ott 14:32», «Apri il PDF» dietro
+  «Stai aprendo un sito esterno», «📋 Copia link», «📊 Codice per il
+  tabacchino»), senza riga rossa; se il PayCode del PDF non è quello
+  dello scambio (`payCodeScambioP2P`) la scheda lo dice in rosso e il
+  codice non si offre. Gli altri link: testo grigio in corsivo, «📋
+  Copia link» su una riga sua, la riga rossa di sempre. Mai un `<a>`.
+
+**STRADE SCARTATE.** Ricavare il codice dal PayCode (impossibile: le
+altre cifre sono di Amazon). Scaricare il PDF dal link per leggerne il
+codice (una richiesta ad Amazon con un PayCode vivo, e non serve: il
+numero è già nel link). Disegnare il codice stirato sulla larghezza
+del telefono (moduli frazionari: la cassa sbaglia). Una libreria di
+codici a barre (il Code 128 sono 107 righe di tabella: stessa regola di
+casa di nostr.js e qrcode.js, niente CDN). Un `<a href>` per il PDF (la
+chat non ne scrive mai; si apre con `tg.openLink` o `window.open`
+dietro la domanda).
+
+**PROVATO.** `prove_barre_paycode` (nuova, 53): sentinelle (host scritto
+una volta, blocco puro, la nota «un solo esempio», la tabella di Code
+128 nella forma — 107 segni diversi da 11 moduli, lo stop da 13 — e i
+tre segni speciali, l'ordine dei controlli nelle funzioni che
+mandano, il foglio nel DOM e in `closeSheet`) e il banco in node coi
+pezzi veri: giudice su undici casi (fra cui il Code 128 del caso vero),
+il link vero e dieci falsi (http, `…amazonaws.com.evil.it`, porta,
+percorso, credenziali, host somigliante…), la scadenza corta, il testo
+composto con e senza riga, i valori dei segni del numero vero (controllo
+29) e **le sue larghezze fermate**, il foglio, il tutto schermo, il
+riquadro nei tre casi, la chat (scheda, riga rossa, Copia link).
+Emendate col perché: `prove_fogli_di_casa` (le domande uniche sono 84:
+«Apri il PDF»), `prove_passi_barattozon_fogli` (due campi nel foglio, la
+firma nuova, l'incolla), e i banchi di `prove_chat_scambio` e
+`prove_p2p_paycode` portano il blocco nuovo (`barre_paycode_js`). **Il
+disegno riletto da zxing-cpp** (fuori dalla suite: in CI non c'è): il
+numero vero e 400 a caso, tutte le 100 coppie del set C e le lunghezze
+dispari: 401 su 401 riletti identici, col segno GS1 `]C1`. Tortura su una copia intera:
+21 mutazioni (host, https, PayCode dentro, GS1, FNC1, code B, controllo,
+quiete, riquadro, tutto schermo, riga rossa, scheda, form, testo,
+conferma, pubblicazione, «Copia link», CSS), 21 prese con una rossa col
+nome; al primo giro cinque ESPLODEVANO su un `.index()` mancante, rese
+robuste con `_in_ordine`.
+GIRO DAL VIVO (server di collaudo da una copia, relay morto, Browser
+pane a 375×812 e 320×640, chiaro e scuro): il foglio con il link
+incollato (anteprima, «Conferma»), col PayCode cambiato (frase rossa,
+«Conferma» spento); il riquadro di chi compra col bottone e, su un
+ordine senza codice, la frase; il tocco su «📊 Mostra il codice alla
+cassa» → il foglio girato, e **lo screenshot dello schermo riletto da
+zxing: `]C1 0100860003622209216085740002128029880`**, uguale al PDF
+(anche a 320×640 nel tema scuro, e aperto dalla chat); il tocco e
+l'indietro lo chiudono. In chat: scheda, «Apri il PDF» → la domanda →
+`window.open` col link giusto (intercettato: Amazon non è stato
+toccato), «📋 Copia link» sulla scheda e sotto un link qualunque (negli
+appunti il link intero), la riga rossa solo sul link qualunque. Il form
+di chi vende: il codice di un altro PayCode → la frase e niente invio;
+il link → testo con la riga «Codice a barre:» e `tabacchino.barre`.
+Nella console solo gli errori attesi (relay morto, il 409 del seme).
+LA SUITE INTERA HA PRESO UNA COSA: al primo giro (`PROVE_SEVERE=1`, sopra
+21ee58f) 268 rosse, tutte in `prove_p2p_motore`: il suo banco ritaglia
+la zona del riquadro e ha un `window` di cartone senza
+`addEventListener`, e il mio ascoltatore del `resize` a livello di file
+lo faceva esplodere. Ora sta dietro un `typeof`. Secondo giro sullo
+stesso albero col ritocco: **24.494 passate, 0 fallite**. Collaudi
+della CI nella gabbia: **82 verdi, 0 rossi** (girati sul commit prima
+del ritocco, che tocca solo una riga del client che i collaudi non
+eseguono). Scanner dei segreti della CI sulle righe aggiunte: zero, con
+la controprova che scatta.
+MAI UN CODICE DAL SOLO PAYCODE (richiesta di Andrea dopo la conferma
+dal tabacchino): controllati tutti i posti che disegnano — il disegno
+ha due chiamanti, l'anteprima (riceve solo un giudizio buono) e il
+tutto schermo (riceve solo i dati di `apriBarreP2P`, che rigiudica), e
+un PayCode di nove cifre non passa mai la forma (01…21…). Sei prove in
+più lo inchiodano: i due chiamanti e l'unico posto che scrive i dati
+del tutto schermo; il PayCode in cinque forme mai buono, mai
+un'anteprima, mai un disegno nel foglio; il riquadro senza numero
+lungo (ordine vecchio, riga col solo PayCode, riga vuota) con la sola
+frase; il link senza `barcode=` che non è una scheda e quello col
+PayCode al posto del numero che è una scheda senza codice;
+`apriBarreP2P` col solo PayCode che non apre, non disegna e dice la
+frase. Tre mutazioni mirate (il giudice, il riquadro, il tutto schermo
+che disegnano dal PayCode): tre prese.
+
+**DA FARE (notati, non fatti).**
+- La regola del PayCode dentro il numero è provata su un solo PDF: al
+  primo PayCode nuovo, rileggere il codice del suo PDF.
+- Dal link del PDF si potrebbero precompilare anche importo e scadenza
+  nel foglio di pubblicazione (oggi si leggono solo per la scheda).
+- La riga del passo 1 in «Pubblica» non dice se il codice a barre c'è.
+- «Info P2P», la voce Barattozon, non nomina ancora il codice a barre
+  né la scheda del PDF.
+- Nella chat del moderatore il link del PDF resta testo (niente
+  scheda): per chi decide una disputa è giusto, ma va detto.
+- Non provato sul telefono vero: lo scanner di una cassa vera su uno
+  schermo (luminosità, riflessi) e il tasto indietro di Android sul
+  foglio girato.

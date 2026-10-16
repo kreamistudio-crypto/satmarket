@@ -1014,7 +1014,17 @@ disputa.»
      l'ordine.», un campo grande, «📋 Incolla dagli appunti» (prende le
      nove cifre anche da una riga intera della mail), «Conferma» e
      «Annulla». Se gli appunti non si leggono: «Non riesco a leggere gli
-     appunti: tieni premuto sul campo e scegli «Incolla»». Sotto la riga
+     appunti: tieni premuto sul campo e scegli «Incolla»». Dal 16 ott
+     2026, fra «Incolla» e «Conferma», «**Codice a barre** (facoltativo)»:
+     «Incolla il link del PDF di Amazon o il numero lungo sotto le barre:
+     alla cassa si mostra lo stesso codice.», un campo («https://… oppure
+     0100…»). Incollato il link del PDF (anche nel campo del PayCode) si
+     riempiono tutti e due; sotto compare il codice piccolo e «✓ Codice di
+     Amazon, col tuo PayCode dentro.». Se il codice è di un altro
+     PayCode: «Questo codice a barre è di un altro PayCode: dentro non c'è
+     il 479-868-518» e «Conferma» spento; se non è un codice Amazon: «Non è
+     il codice a barre di un PayCode Amazon: copia il link del PDF o il
+     numero lungo sotto le barre». Sotto la riga
      restano «Nove cifre, coi trattini o senza. È il codice che chi
      compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge
      solo chi prende l'ordine.» e la riga delle esclusioni Amazon.
@@ -1095,7 +1105,10 @@ disputa.»
    ancora chi ha preso): «👉 tocca a te» con «Il PayCode non è ancora
    arrivato a chi compra: toccalo qui sotto per mandarlo.» e il bottone
    «🧾 **Manda il PayCode a chi compra**», che apre il foglio «🧾 **Il
-   PayCode per chi compra**» coi tre campi (PayCode, importo, scadenza) e
+   PayCode per chi compra**» coi tre campi (PayCode, importo, scadenza),
+   il quarto facoltativo dal 16 ott 2026 («Codice a barre (facoltativo):
+   link del PDF di Amazon o numero lungo»; storto non parte, con la frase
+   del foglio di pubblicazione) e
    lo stesso bottone «🧾 Manda il PayCode a chi compra»; dopo l'invio il
    bottone è «🧾 Aggiorna il PayCode» e sotto «✓ PayCode inviato. Se lo
    cambi, vale l'ultimo: cambialo solo se chi compra non ha ancora
@@ -1143,7 +1156,14 @@ disputa.»
    garanzia e ti ha già mandato il PayCode:** tocca a te.»; dal 15 ott
    2026, prima «…dove inviare 25,47 €»). 📱 Il riquadro «🧾 Il PayCode
    da pagare al tabacchino» compare con codice (e «📋»: «PayCode copiato
-   📋»), «Importo 25,47 € in contanti», «Scade il …», «Tempo che resta:
+   📋»); sotto (dal 16 ott 2026), se chi vende ha dato il codice a barre,
+   il bottone «**📊 Mostra il codice alla cassa**»: il codice del PDF di
+   Amazon a tutto schermo, fondo bianco, girato sul lato lungo, col
+   PayCode in chiaro, «39,99 € in contanti · scade …» e «Alza la
+   luminosità dello schermo · tocca per chiudere» (si chiude anche con
+   «indietro»); se non l'ha dato: «Il codice a barre non c'è: chiedi a
+   chi vende il PDF di Amazon, o fai digitare il PayCode alla cassa.».
+   Poi «Importo 25,47 € in contanti», «Scade il …», «Tempo che resta:
    <conto>», e i quattro passi, NUMERATI da 1 a 4 (dal 10 ott 2026: dove
    andare, cosa dire, cosa guardare): «**Trova un punto abilitato**:
    mappa di Amazon. Senza account Amazon: cerca per CAP su PuntoLis e
@@ -1952,9 +1972,21 @@ tutti e due.
   aspetta un momento».
 - **I messaggi**: «Tu · 14:32» e «<nome> · 14:33». Senza messaggi: «Ancora
   nessun messaggio.»
-- **I link non si aprono**: si vedono sottolineati, in rosso. Sotto un
-  messaggio dell'altra persona che ne porta uno: «⚠️ C'è un link: non
-  aprirlo per pagare o per «verificare» qualcosa.» Sotto uno che chiede di
+- **I link non si aprono**: dal 16 ott 2026 si vedono come testo, grigi
+  e in corsivo (non più sottolineati in rosso), con sotto «**📋 Copia
+  link**» («Link copiato 📋»). Sotto un messaggio dell'altra persona che
+  ne porta uno: «⚠️ C'è un link: non aprirlo per pagare o per
+  «verificare» qualcosa.»
+- **L'unico link che si apre è il PDF del PayCode di Amazon** (dal 16
+  ott 2026): al suo posto una scheda «📄 PDF del PayCode di Amazon ·
+  39,99 € · scade dom 18 ott 14:32» con «**Apri il PDF**» (prima la
+  domanda «Stai aprendo un sito esterno» / «Il PDF del PayCode si apre
+  sul sito di Amazon, fuori da Barattolo.» / «Apri il PDF» o «Annulla»),
+  «**📋 Copia link**» e, se il codice a barre del link è buono, «**📊
+  Codice per il tabacchino**» (lo stesso tutto schermo del riquadro).
+  Niente riga rossa sotto la scheda. Se il PayCode del PDF non è quello
+  dello scambio: «⚠️ È del PayCode 212-802-988, non di quello dello
+  scambio (479-868-518).» e niente codice. Sotto uno che chiede di
   spostarsi (Telegram, WhatsApp, «scrivimi», «in privato»…): «⚠️ Ti chiede
   di spostarti altrove: fuori dallo scambio Barattolo non può aiutarti.»
 - ✈️ **L'avviso all'altra persona**, se non sta guardando la chat: «💬 **Hai
