@@ -64189,7 +64189,8 @@ def _vetrina_venditore(a: dict, altri: list) -> str:
         t = (x.get("titolo") or "").strip()
         if len(t) > 46:
             t = t[:45].rstrip() + "…"
-        voci.append(f"\n• {html.escape(t)} — {link_telegram('annuncio', x['id'])}")
+        link = link_telegram('annuncio', x['id'])
+        voci.append(f"\n• <a href=\"{link}\">{html.escape(t)}</a>")
     return "\n\n🛍 Anche in vendita da lui:" + "".join(voci)
 
 
