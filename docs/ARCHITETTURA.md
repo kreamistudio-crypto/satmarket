@@ -10680,6 +10680,46 @@
   suona una volta al superamento, tace finche' resta sopra, si riarma
   quando scende di `P2P_DISPUTE_SOGLIA_RIARMO` (1 punto) sotto la soglia.
   Va a `notifica_admin`; porta numeri e id accorciati.
+  IL CRUSCOTTO SEMPLICE (16 ott 2026, cantiere cruscotto-admin, parola
+  di Andrea: «prima la cosa da fare, poi lo stato, poi i numeri»). In
+  cima a `/admin` quattro blocchi, sotto «Altro» con TUTTE le sezioni
+  di prima, chiuse (`<details class="grp">`, il gruppo del profilo
+  della Mini App), con le stesse funzioni e gli stessi testi; un
+  ridisegno riapre i gruppi che erano aperti, e i tre grafici di
+  «Iscritti e vendite» si disegnano solo a gruppo aperto (chiuso, il
+  riquadro e' largo zero). «🔁 Scambi P2P» sta in fondo, in un gruppo
+  che nasce `hidden` e si mostra dopo il controllo del 403. I quattro
+  blocchi: DA FARE — `dati_da_fare(con)`, pura: ordini in 'dispute',
+  annunci in 'revisione', pagamenti 'incerto' delle stesse tre tabelle
+  della coda 🧊 (`PAGAMENTI_INCERTI_TABELLE`, una prova le confronta
+  con `coda_pagamenti`), piu' le dispute P2P aperte di `dispute_p2p`;
+  una tabella che manca da' None e la carta non c'e'. VA TUTTO BENE? —
+  `dati_salute()`, che NON BUSSA A NESSUNO: il commit che gira
+  (`COMMIT_CHE_GIRA`, letto UNA volta all'avvio dal disco da
+  `_commit_dal_git`: HEAD, ramo sciolto o packed-refs, worktree; mai un
+  processo `git`), `AVVIATO_IL`, il ponte (`_ponte_pubblico`), l'eta'
+  del cambio, e le due ronde dei relay dalla LORO memoria
+  (`_RONDA_RELAY`, `_RONDA_NOSTR` via `_ronda_cruscotto`: a posto si',
+  no o non ancora chiesto, le parole del giudice tornate testo, l'ora
+  del giro); il nodo e' la risposta di LND che il cruscotto porta gia'.
+  Dopo un riavvio le ronde sono vuote fino al primo giro: la riga dice
+  «primo giro in corso». QUESTA SETTIMANA — dai dati della pagina; le
+  commissioni P2P solo a chi vede i conti (la stessa rotta, periodo 7).
+  IL GRAFICO ORDINI P2P / PREZZO — `GET /api/admin/p2p-grafico?periodo=
+  30|90|tutto&passo=giorno|settimana`, a TUTTI gli admin (`e_admin`,
+  primo gesto; sono conteggi). `_serie_grafico_p2p` fa i secchi, anche
+  vuoti: pubblicati da `p2p_ordini` (maker=1, visti sul libro), presi,
+  conclusi e annullati (annullato o tornato) da `p2p_conti`, consolidato
+  prima; il lato e' quello di chi pubblica (buy = Compra, sell =
+  Vendi), un lato ignoto non sta in nessuna barra; il prezzo da
+  `prezzo_storico` (l'ultimo giorno noto del secchio). LA CORRELAZIONE
+  SULLE VARIAZIONI (`_correlazione_variazioni`): Pearson fra la
+  variazione del conteggio e il logaritmo del rapporto dei prezzi, per
+  metrica e per lato; sotto `GRAFICO_P2P_PUNTI_MINIMI` (20) coppie il
+  numero non si da' e la frase dice «pochi dati, non concludere»
+  (`_frase_legame`). Sui livelli due serie che crescono insieme
+  sembrerebbero legate: una prova lo mostra. IL TEMA: quello di
+  Telegram SOLO con initData (fuori lo SDK dice sempre «light»).
   I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea): `/api/me`
   porta `livelli_scala` (`scala_livelli`): un gradino per livello con
   soglie XP/affari e i vantaggi che apre OGGI, letti dalle leve vive —

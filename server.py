@@ -28949,6 +28949,128 @@ async def dati_lnd_cruscotto(nostri: set, rimborsi: set = frozenset()) -> dict:
     return dati
 
 
+# --- IL CRUSCOTTO SEMPLICE (16 ott 2026, cantiere cruscotto-admin) ---
+# Parola di Andrea: «in primo piano solo i dati essenziali: prima la cosa
+# da fare, poi lo stato, poi i numeri». Tre domande che la pagina fa in
+# cima, e i dati qui sotto. NIENTE CHIAMATE ESTERNE NUOVE: il commit si
+# legge all'avvio dal disco, le ronde dei relay si leggono dalla loro
+# memoria, il nodo dalla cache di `dati_lnd_cruscotto`.
+
+# LE TABELLE DEI PAGAMENTI CHE ASPETTANO UN UMANO: le stesse tre della
+# coda 🧊 (`coda_pagamenti`, payout_stato='incerto'). Una prova controlla
+# che siano proprio quelle: se la coda ne impara una quarta, il conto
+# del cruscotto la deve imparare con lei.
+PAGAMENTI_INCERTI_TABELLE = ("ordini", "rimborsi_asta", "pagamenti")
+
+
+def dati_da_fare(con) -> dict:
+    """PURA sulla connessione: quante cose aspettano un moderatore. Solo
+    numeri, nessun nome. Una tabella che manca da' None per quella voce
+    (la pagina non disegna la carta), mai un errore che porti via il
+    cruscotto. Le dispute del mercatino sono gli ordini in 'dispute':
+    i resi in corso camminano da soli e non aspettano nessuno."""
+    def conta(sql):
+        try:
+            return int(con.execute(sql).fetchone()[0])
+        except sqlite3.Error:
+            return None
+    incerti = [conta(f"SELECT COUNT(*) FROM {t} WHERE payout_stato='incerto'")
+               for t in PAGAMENTI_INCERTI_TABELLE]
+    noti = [n for n in incerti if n is not None]
+    return {"dispute_mercatino": conta(
+                "SELECT COUNT(*) FROM ordini WHERE stato='dispute'"),
+            "annunci_revisione": conta(
+                "SELECT COUNT(*) FROM annunci WHERE stato='revisione'"),
+            "pagamenti_incerti": sum(noti) if noti else None}
+
+
+def _commit_dal_git(cartella: str) -> str:
+    """Il commit che gira, letto DAL DISCO e non da un processo `git`:
+    HEAD, poi il ramo (file sciolto o packed-refs). Regge anche un
+    worktree (`.git` e' un file «gitdir:», i rami stanno nella cartella
+    comune). '' se qualcosa non torna: la pagina dice «non lo so»."""
+    sha40 = re.compile(r"[0-9a-f]{40}")
+    try:
+        git = os.path.join(cartella, ".git")
+        if os.path.isfile(git):
+            with open(git, encoding="utf-8") as f:
+                riga = f.read().strip()
+            if not riga.startswith("gitdir:"):
+                return ""
+            git = os.path.normpath(os.path.join(cartella, riga[7:].strip()))
+        comune = git
+        if os.path.isfile(os.path.join(git, "commondir")):
+            with open(os.path.join(git, "commondir"), encoding="utf-8") as f:
+                comune = os.path.normpath(os.path.join(git, f.read().strip()))
+        with open(os.path.join(git, "HEAD"), encoding="utf-8") as f:
+            testa = f.read().strip()
+        if not testa.startswith("ref:"):
+            return testa if sha40.fullmatch(testa) else ""
+        ref = testa[4:].strip()
+        for base in (git, comune):
+            sciolto = os.path.join(base, *ref.split("/"))
+            if os.path.isfile(sciolto):
+                with open(sciolto, encoding="utf-8") as f:
+                    sha = f.read().strip()
+                return sha if sha40.fullmatch(sha) else ""
+        if os.path.isfile(os.path.join(comune, "packed-refs")):
+            with open(os.path.join(comune, "packed-refs"), encoding="utf-8") as f:
+                for riga in f:
+                    pezzi = riga.strip().split(" ")
+                    if len(pezzi) == 2 and pezzi[1] == ref \
+                            and sha40.fullmatch(pezzi[0]):
+                        return pezzi[0]
+    except (OSError, UnicodeDecodeError):
+        pass
+    return ""
+
+
+# LETTO UNA VOLTA, ALL'AVVIO: e' il codice che gira davvero. Dopo un
+# deploy il servizio riparte e lo rilegge; un `git reset` senza riavvio
+# non cambierebbe il codice in memoria, e qui non cambia nemmeno lui.
+COMMIT_CHE_GIRA = _commit_dal_git(os.path.dirname(os.path.abspath(__file__)))
+AVVIATO_IL = int(time.time())
+
+
+def _ronda_cruscotto(nome: str, accesa: bool, guardati: list,
+                     memoria: dict) -> dict:
+    """Una ronda dei relay come la vede il cruscotto, dalla SUA memoria
+    (nessuna domanda nuova ai relay): per relay a posto si', no o non
+    ancora chiesto (None), le parole del giudice e l'ora del giro. Le
+    parole stanno in memoria gia' scappate per l'HTML del pannello: qui
+    tornano testo, e le scappa la pagina."""
+    stati = memoria.get("stati") or {}
+    relay = []
+    for r in guardati:
+        detto = stati.get(r)
+        relay.append({
+            "relay": r.split("://", 1)[-1],
+            "a_posto": None if detto is None else detto in (
+                "a posto", "in collaudo non si chiede"),
+            "detto": html.unescape(detto or "non ancora chiesto")})
+    return {"nome": nome, "accesa": bool(accesa),
+            "giro": int(memoria.get("giro") or 0), "relay": relay}
+
+
+def dati_salute() -> dict:
+    """«VA TUTTO BENE?»: quel che il server sa gia', senza bussare a
+    nessuno. Il nodo NON sta qui: e' la risposta di LND che il cruscotto
+    porta gia' (`lnd`, con la sua cache)."""
+    quando = _cambio_cache["quando"]
+    return {
+        "commit": COMMIT_CHE_GIRA, "avviato": AVVIATO_IL,
+        "ponte": _ponte_pubblico(_guardiano_ponte_attivo(), _ponte["stato"]),
+        "cambio_valido": cambio_noto_ora() > 0,
+        "cambio_eta_s": int(time.time() - quando) if quando else None,
+        "ronde": [
+            _ronda_cruscotto("Relay di Mostro", ronda_relay_viva()
+                             and bool(_ronda_relay_guardati()),
+                             _ronda_relay_guardati(), _RONDA_RELAY),
+            _ronda_cruscotto("Relay Nostr", ronda_nostr_viva()
+                             and bool(_ronda_nostr_guardati()),
+                             _ronda_nostr_guardati(), _RONDA_NOSTR)]}
+
+
 @app.get("/api/admin/cruscotto")
 async def cruscotto_admin(x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie("")):
@@ -28960,6 +29082,8 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     con = db()
     try:
         dati = dati_cruscotto(con)
+        # le cose da fare (16 ott 2026): in cima alla pagina
+        dati["da_fare"] = dati_da_fare(con)
         nostri = hash_nostri(con)
         rimborsi = hash_rimborsi(con)
     finally:
@@ -28976,8 +29100,10 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     # `dati` porta dentro la risposta di LND, che e' la stessa per tutti
     # la card «Zap» (10 ott 2026, l'indirizzo Lightning di casa): None =
     # niente card. Anche questa entra nella COPIA, per la stessa ragione
+    # «va tutto bene?» (16 ott 2026): il commit, il ponte, il cambio, le
+    # ronde dei relay — tutto dalla memoria del server, nella COPIA
     return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"]),
-            "zap": await dati_zap_cruscotto()}
+            "zap": await dati_zap_cruscotto(), "salute": dati_salute()}
 
 
 @app.get("/api/admin/stats")
@@ -55887,6 +56013,176 @@ async def statistiche_p2p_admin(periodo: str = "oggi",
                      "motivo": lnd.get("motivo") or ""})
     _p2p_conti_cache[periodo] = (adesso, dati)
     return JSONResponse(dati, headers={"Cache-Control": "no-store"})
+
+
+# --- IL GRAFICO ORDINI P2P / PREZZO BTC (16 ott 2026, cantiere
+# cruscotto-admin, richiesta di Andrea) ---
+# Quanti ordini si pubblicano, si prendono, si concludono e si annullano,
+# divisi COMPRA e VENDI, accanto al prezzo BTC/EUR. Lo vedono TUTTI gli
+# admin (decisione di Andrea): sono solo conteggi per giorno, nessun id
+# e nessuna persona.
+# LE FONTI, nessuna nuova: i pubblicati da `p2p_ordini` (quelli di
+# Barattolo, `maker` = 1, come «Pubblicati» dei conti), presi, conclusi
+# e annullati dal registro `p2p_conti` — che tiene oltre i quaranta
+# giorni della cronaca —, il prezzo da `prezzo_storico` (una riga al
+# giorno dal termometro della fee dinamica, con lo storico di CoinGecko
+# la prima volta: nessun salvataggio nuovo). Uno scambio ancora in
+# corso entra nel «presi» quando si chiude. Il LATO e' quello di chi ha
+# pubblicato (`buy` = COMPRA, `sell` = VENDI): uno scambio senza lato
+# noto non sta in nessuna delle due barre.
+# LA CORRELAZIONE SI FA SULLE VARIAZIONI, MAI SUI LIVELLI: due serie che
+# crescono insieme nel tempo (piu' utenti, prezzo che sale) darebbero un
+# legame forte anche senza nessun legame. Si confronta quanto cambia il
+# conteggio da un passo al successivo con quanto cambia il prezzo (in
+# logaritmo) nello stesso passo. Sotto GRAFICO_P2P_PUNTI_MINIMI coppie
+# il numero non si da': «pochi dati, non concludere».
+GRAFICO_P2P_PERIODI = {"30": 30, "90": 90, "tutto": 0}
+GRAFICO_P2P_PASSI = ("giorno", "settimana")
+GRAFICO_P2P_METRICHE = ("pubblicati", "presi", "conclusi", "annullati")
+GRAFICO_P2P_LATI = ("buy", "sell")
+GRAFICO_P2P_PUNTI_MINIMI = 20      # la soglia di Andrea (16 ott 2026)
+
+
+def _passo_grafico(giorno: str, passo: str) -> str:
+    """PURA: il secchio di un giorno 'AAAA-MM-GG' — il giorno stesso, o
+    il lunedi' della sua settimana (UTC, come `_giorno`)."""
+    from datetime import date, timedelta
+    if passo != "settimana":
+        return giorno
+    d = date.fromisoformat(giorno)
+    return (d - timedelta(days=d.weekday())).isoformat()
+
+
+def _serie_grafico_p2p(con, periodo: str, passo: str, adesso: int) -> list:
+    """PURA sulla connessione: i secchi del periodo, ANCHE QUELLI VUOTI
+    (un giorno senza ordini e' uno zero, non un buco), ognuno col prezzo
+    di chiusura (l'ultimo giorno noto del secchio, None se non c'e') e,
+    per lato, [pubblicati, presi, conclusi, annullati]. «Annullati» sono
+    gli scambi presi e poi saltati, anche quelli tornati in vetrina: la
+    stessa riga dei conti P2P."""
+    eventi = []
+    for o in con.execute("SELECT creato, lato FROM p2p_ordini WHERE "
+                         "maker=1 AND COALESCE(stato,'')!='' AND creato>0"):
+        eventi.append((_giorno(o["creato"]), o["lato"] or "", 0))
+    for r in con.execute("SELECT esito, preso, chiuso, lato FROM p2p_conti"):
+        lato = r["lato"] or ""
+        if int(r["preso"] or 0) > 0 and r["esito"] in (
+                "completato", "annullato", "tornato"):
+            eventi.append((_giorno(r["preso"]), lato, 1))
+        if int(r["chiuso"] or 0) > 0:
+            if r["esito"] == "completato":
+                eventi.append((_giorno(r["chiuso"]), lato, 2))
+            elif r["esito"] in ("annullato", "tornato"):
+                eventi.append((_giorno(r["chiuso"]), lato, 3))
+    oggi = _giorno(adesso)
+    giorni = GRAFICO_P2P_PERIODI.get(periodo, 30)
+    if giorni:
+        inizio = _giorno(adesso - (giorni - 1) * 86400)
+    else:
+        inizio = min([g for g, _, _ in eventi] or [oggi])
+    from datetime import date, timedelta
+    secchi, punti = [], {}
+    d = date.fromisoformat(inizio)
+    while d.isoformat() <= oggi:
+        k = _passo_grafico(d.isoformat(), passo)
+        if k not in punti:
+            secchi.append(k)
+            punti[k] = {"k": k, "prezzo": None,
+                        **{lato: [0, 0, 0, 0] for lato in GRAFICO_P2P_LATI}}
+        d += timedelta(days=1)
+    for g, lato, i in eventi:
+        if inizio <= g <= oggi and lato in GRAFICO_P2P_LATI:
+            punti[_passo_grafico(g, passo)][lato][i] += 1
+    for p in con.execute("SELECT data, prezzo_eur FROM prezzo_storico "
+                         "WHERE data>=? AND data<=? ORDER BY data",
+                         (inizio, oggi)):
+        if float(p["prezzo_eur"] or 0) > 0:
+            punti[_passo_grafico(p["data"], passo)]["prezzo"] = \
+                round(float(p["prezzo_eur"]), 2)
+    return [punti[k] for k in secchi]
+
+
+def _correlazione_variazioni(conteggi: list, prezzi: list):
+    """PURA: la correlazione di Pearson fra la VARIAZIONE del conteggio
+    da un secchio al successivo e la variazione del prezzo (logaritmo
+    del rapporto) nello stesso passo. Una coppia vale solo se il prezzo
+    c'e' ai due capi. Torna (r arrotondato, n coppie); r None quando
+    non si puo' dire (meno di tre coppie, o una serie ferma)."""
+    dx, dy = [], []
+    for i in range(1, min(len(conteggi), len(prezzi))):
+        a, b = prezzi[i - 1], prezzi[i]
+        if a and b and a > 0 and b > 0:
+            dx.append(conteggi[i] - conteggi[i - 1])
+            dy.append(math.log(b / a))
+    n = len(dx)
+    if n < 3:
+        return None, n
+    mx, my = sum(dx) / n, sum(dy) / n
+    sxy = sum((x - mx) * (y - my) for x, y in zip(dx, dy))
+    sxx = sum((x - mx) ** 2 for x in dx)
+    syy = sum((y - my) ** 2 for y in dy)
+    if sxx <= 0 or syy <= 0:
+        return None, n
+    return round(sxy / math.sqrt(sxx * syy), 3), n
+
+
+def _frase_legame(r, n: int, minimo: int = GRAFICO_P2P_PUNTI_MINIMI) -> str:
+    """PURA: la correlazione detta in parole, corta. Sotto la soglia il
+    numero non conta, e si dice."""
+    if n < minimo:
+        return "pochi dati, non concludere"
+    if r is None:
+        return "niente da confrontare"
+    if abs(r) < 0.2:
+        return "nessun legame col prezzo"
+    verso = "salgono col prezzo" if r > 0 else "scendono quando il prezzo sale"
+    return ("legame debole: " if abs(r) < 0.5 else "legame forte: ") + verso
+
+
+def _legami_grafico_p2p(punti: list) -> dict:
+    """PURA: per ogni metrica e ogni lato, r (None sotto la soglia), il
+    numero di coppie e la frase."""
+    prezzi = [p["prezzo"] for p in punti]
+    fuori = {}
+    for i, metrica in enumerate(GRAFICO_P2P_METRICHE):
+        fuori[metrica] = {}
+        for lato in GRAFICO_P2P_LATI:
+            r, n = _correlazione_variazioni([p[lato][i] for p in punti], prezzi)
+            fuori[metrica][lato] = {
+                "r": r if n >= GRAFICO_P2P_PUNTI_MINIMI else None, "n": n,
+                "frase": _frase_legame(r, n)}
+    return fuori
+
+
+@app.get("/api/admin/p2p-grafico")
+def grafico_p2p_admin(periodo: str = "30", passo: str = "giorno",
+                      x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: il grafico ordini P2P / prezzo del cruscotto. Il
+    controllo e' il PRIMO gesto, prima del database. Prima dei conti si
+    consolida il registro (`_consolida_conti_p2p`, idempotente), come fa
+    la rotta dei conti: uno scambio chiuso stamattina deve esserci."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato agli admin")
+    if periodo not in GRAFICO_P2P_PERIODI or passo not in GRAFICO_P2P_PASSI:
+        raise HTTPException(400, "Periodo o passo sconosciuto")
+    adesso = int(time.time())
+    con = db()
+    try:
+        try:
+            _consolida_conti_p2p(con, adesso)
+        except sqlite3.Error as e:
+            print(f"⚠️ Grafico P2P: registro non consolidato ({e})",
+                  flush=True)
+        punti = _serie_grafico_p2p(con, periodo, passo, adesso)
+    finally:
+        con.close()
+    return JSONResponse({"periodo": periodo, "passo": passo,
+                         "punti": punti, "legami": _legami_grafico_p2p(punti),
+                         "minimo": GRAFICO_P2P_PUNTI_MINIMI,
+                         "generato": adesso},
+                        headers={"Cache-Control": "no-store"})
 
 
 # --- LE DISPUTE NEL CRUSCOTTO (12 ott 2026, cantiere dispute-nel-cruscotto) ---

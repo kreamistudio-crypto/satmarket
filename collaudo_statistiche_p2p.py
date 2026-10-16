@@ -196,6 +196,48 @@ def main():
           "uscite" in json.dumps(cr))
     banco.come(AMMINISTRATORE)
 
+    print("\n5-bis) il cruscotto semplice: da fare, salute, il grafico (16 ott 2026)")
+    cr = cruscotto()
+    prova("il cruscotto porta le tre cose da fare, contate", ["annunci_revisione",
+          "dispute_mercatino", "pagamenti_incerti"], sorted(
+              k for k, v in cr["da_fare"].items() if isinstance(v, int)))
+    prova("...e la salute dalla memoria del server: il commit (stringa), "
+          "le due ronde", (True, ["Relay di Mostro", "Relay Nostr"]),
+          (isinstance(cr["salute"]["commit"], str),
+           [r["nome"] for r in cr["salute"]["ronde"]]))
+
+    def grafico(periodo="30", passo="giorno"):
+        try:
+            r = SRV.grafico_p2p_admin(periodo=periodo, passo=passo,
+                                      x_tg_init_data="", barattolo_sessione="")
+            return json.loads(r.body)
+        except Exception as e:
+            return (getattr(e, "status_code", type(e).__name__),
+                    str(getattr(e, "detail", e)))
+    g = grafico()
+    con = banco.con_db()
+    da = SRV._giorno(adesso - 29 * 86400)
+    attesi = sum(1 for r in con.execute(
+        "SELECT chiuso, lato FROM p2p_conti WHERE esito='completato'")
+        if r["lato"] in ("buy", "sell") and SRV._giorno(r["chiuso"]) >= da)
+    con.close()
+    prova("il grafico: 30 secchi, i conclusi sono quelli del registro (e "
+          "ce ne sono), le quattro metriche, la soglia dei 20 punti",
+          (30, True, attesi, ["annullati", "conclusi", "presi", "pubblicati"], 20),
+          (len(g["punti"]), attesi > 0,
+           sum(p["buy"][2] + p["sell"][2] for p in g["punti"]),
+           sorted(g["legami"]), g["minimo"]))
+    prova("...per settimana, le stesse somme", sum(
+        p["buy"][2] + p["sell"][2] for p in g["punti"]), sum(
+        p["buy"][2] + p["sell"][2] for p in grafico("30", "settimana")["punti"]))
+    prova("...un passo inventato e' un 400", 400, codice(grafico("30", "anno")))
+    banco.come(MODERATORE)
+    prova("...lo vede anche il moderatore che i conti non li vede", 200,
+          codice(grafico()))
+    banco.come(111)
+    prova("...chi non e' admin riceve 403", 403, codice(grafico()))
+    banco.come(AMMINISTRATORE)
+
     print("\n6) i conti prima della scopa")
     prima = conti("tutto")
     dopo_la_memoria = adesso + SRV.P2P_LIBRO_MEMORIA_S + 3600

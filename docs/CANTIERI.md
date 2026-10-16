@@ -63363,3 +63363,170 @@ commit guardando `git status`, che è la ragione per cui si guarda.
 - `dati/vettori-bip.json` pesa 15 KB e i vettori BIP-39 sono 24 su 24
   per scelta: una copertura parziale di un insieme standard è il modo
   di non vedere il caso delle ventiquattro parole.
+
+## Il cruscotto semplice: prima la cosa da fare, poi lo stato, poi i numeri, e il grafico ordini P2P / prezzo (16 ott 2026, cantiere cruscotto-admin, richiesta di Andrea)
+
+LA DOMANDA. Il cruscotto `/admin` era troppo pieno: quattordici sezioni
+una sotto l'altra, tabelle lunghe in primo piano, e per sapere se c'era
+qualcosa da fare bisognava scorrere fino in fondo (le dispute P2P
+erano l'ULTIMA card). Andrea: in primo piano solo l'essenziale, in
+stile Barattolo, chiaro e scuro, leggibile a 320-360 px; dentro, un
+grafico NUOVO degli ordini P2P accanto al prezzo BTC/EUR, con la
+correlazione sulle variazioni. E il vincolo scritto in rosso: **niente
+si toglie** — il 15 ott un ridisegno di `/admin` aveva tolto sezioni
+(le dispute P2P) e main era andato rosso. A metà lavoro la regola di
+Andrea, più stretta: «se un elemento non serve a capire subito "cosa
+devo fare" o "va tutto bene?", va dentro Altro».
+
+LA VOCE DEL 15 OTT («Il cruscotto: tema dark di Barattolo col grafico
+delle fee», più in alto in questo file) NON DESCRIVE L'`admin.html` DI
+MAIN. La sequenza vera di `admin.html`, letta su GitHub il 16 ott:
+`74d4764` (Alan, 15 ott 16:59, il ridisegno scuro col grafico delle
+fee) → `96270e4` (15 ott 18:14, «Main torna a com'era prima degli otto
+commit del 15 ott pomeriggio», decisione di Andrea) → `334e92c` (Alan,
+18:47, il revert del revert: tornano il ridisegno e `fee_history`) →
+`c463c61` (Alan, 19:03, «Fix admin.html - ripristina versione
+funzionante»: un `admin.html` senza `fee_history` e senza il tema scuro
+come default, ed è quello da cui parte questo cantiere). `server.py`
+invece è rimasto quello rimesso da `334e92c`. Il titolo di quella voce
+è rimasto nell'elenco qui in cima: chi la legge non la prenda per lo
+stato delle cose.
+E MAIN NON È STATO RISCRITTO, come avevo scritto nella prima stesura di
+questo verbale (corretta prima del push). Nessun force push sul ramo
+dal 2 set (l'attività del ramo su GitHub); `96270e4`, `334e92c`,
+`fa4ec13` e `48be15e` sono tutti antenati di main (`gh api
+.../compare/<commit>...main`: «ahead», 0 dietro); `21ee58f` (16 ott
+01:44, «Incasso on-chain: la decisione di Andrea nel verbale», autore e
+committer kreamistudio-crypto, firma SSH come tutti i commit di main) è
+arrivato con un push normale. Sembrava la radice della storia perché il
+clone sul PC è SHALLOW: `.git/shallow`, nato il 16 ott alle 09:45, lo
+segna come confine, e il suo genitore `768a228` c'è. La lezione: in un
+clone shallow `git merge-base --is-ancestor` dice «no» anche a un
+commit che sta su main; per sapere se un commit è su main si chiede a
+GitHub.
+
+COSA C'È IN CIMA, in quest'ordine (la proposta approvata da Andrea):
+1. **Da fare** — quattro carte grandi, un numero e una parola: dispute
+   P2P aperte, dispute del mercatino (ordini in 'dispute': i resi
+   camminano da soli), annunci da approvare, pagamenti da verificare
+   (payout 'incerto' delle tre tabelle della coda 🧊, non i
+   'da_riprovare' che ritenta il server). Verdi a zero, arancio per gli
+   annunci, rosse le altre; sotto, dove si decide (Profilo › 👑
+   Amministrazione) o «Niente da fare adesso».
+2. **Va tutto bene?** — quattro righe col pallino. Nodo (canali accesi
+   su totali, dalla risposta di LND che il cruscotto aveva già; «non
+   risponde», o il ponte giù), Relay (le due ronde), Deploy (il commit
+   corto e da quanto è avviato), Cambio (da quanto è aggiornato, o
+   fermo).
+3. **Questa settimana** — iscritti (+ nuovi), ordini conclusi, sats
+   venduti, e le commissioni P2P solo a chi vede già i conti del P2P.
+4. **Ordini P2P e prezzo** — il grafico, coi bottoni metrica / passo /
+   periodo e due righe in parole sotto.
+
+E «Altro»: nove gruppi chiusi, il gruppo del profilo della Mini App
+(`<details class="grp">`) — Iscritti e vendite (col filtro di prima,
+le quattro carte e i tre grafici), Annullamenti, Simulatore della fee,
+Fee di routing e nodi pagati, Wallet, Canali, Relay e deploy (nuovo:
+ogni relay col suo stato, il commit lungo), Zap, Dispute P2P, Scambi
+P2P. Le funzioni e i testi di ogni sezione sono gli stessi di prima.
+
+RELAY E DEPLOY CON I SOLI DATI CHE IL SERVER HA (risposta 1 di Andrea:
+nessuna chiamata esterna nuova). Il commit: nessuno lo leggeva. Ora
+`COMMIT_CHE_GIRA` si legge UNA volta all'avvio, dal disco
+(`_commit_dal_git`: HEAD, il ramo sciolto o packed-refs, anche un
+worktree), senza lanciare `git`: il deploy fa `git reset --hard` e poi
+riavvia, quindi il commit letto all'avvio è il codice che gira. Le
+ronde: l'esito era GIÀ in memoria (`_RONDA_RELAY` e `_RONDA_NOSTR`,
+stato per relay e ora del giro, quello che legge il pannello delle
+leve); non serviva salvarlo, e non l'ho salvato. Il prezzo è che dopo
+un riavvio la riga dice «primo giro in corso» per i primi minuti.
+
+IL GRAFICO. `GET /api/admin/p2p-grafico?periodo=30|90|tutto&passo=
+giorno|settimana`, a tutti gli admin (risposta 2). Le fonti c'erano
+tutte: pubblicati da `p2p_ordini` (maker = 1, visti sul libro, la
+stessa regola di «Pubblicati» nei conti), presi / conclusi / annullati
+dal registro `p2p_conti`, consolidato prima di contare; il prezzo da
+`prezzo_storico`, che il termometro della fee dinamica riempie già una
+volta al giorno (con lo storico di CoinGecko al primo avvio): il
+«salvataggio giornaliero da oggi» della proposta esisteva, e non ho
+fatto una seconda tabella. LA CORRELAZIONE SI FA SULLE VARIAZIONI:
+Pearson fra quanto cambia il conteggio da un passo al successivo e il
+logaritmo del rapporto dei prezzi, per lato e per metrica. Sotto 20
+coppie (risposta 3) il numero non c'è e la riga dice «pochi dati, non
+concludere» col numero dei punti. Con le 30 giornate di oggi le coppie
+sono 29; per settimana, anche «Tutto» oggi resta sotto la soglia.
+
+LE STRADE SCARTATE. (a) Contare i «presi» anche degli scambi IN CORSO:
+`_consolida_conti_p2p` li restituisce senza il lato, e per averlo
+servirebbe un'altra lettura del libro; uno scambio dura ore, entra
+quando si chiude. (b) Correlare i livelli: due serie che crescono
+insieme (più utenti, prezzo che sale) sembrano legate senza esserlo —
+c'è una prova che lo mostra (sui livelli r > 0,9, sulle variazioni
+|r| < 0,2). (c) Un link diretto dal cruscotto al pannello admin della
+Mini App: non esiste un indirizzo che apra Profilo › Amministrazione, e
+farne uno era un cantiere a parte; la riga dice dove andare. (d) I
+grafici di «Iscritti e vendite» disegnati a gruppo chiuso: il riquadro
+è largo zero e l'SVG nasceva a 720 rimpicciolito; si disegnano
+all'apertura.
+
+UN DIFETTO TROVATO STRADA FACENDO, e curato perché il tema scuro era
+nella richiesta: fuori da Telegram la pagina restava SEMPRE chiara,
+anche su un telefono in scuro — lo SDK di Telegram, caricato in un
+browser qualunque, dice `colorScheme = 'light'`, e la pagina lo
+imponeva. Ora il tema di Telegram vale solo con l'initData.
+
+PROVATO, nel worktree (sopra 7e0b330):
+- `prove_cruscotto_semplice` (nuova, 49): da fare su un database di
+  cartone (e senza tabelle: None, mai un errore); le tabelle dei
+  pagamenti confrontate con la coda 🧊; il commit da ramo sciolto,
+  packed-refs, testa staccata, worktree, e '' quando non torna; le
+  ronde dalla memoria, parole tornate testo; la salute che non bussa;
+  i secchi (vuoti compresi, il tornato che è un annullato, lo scaduto
+  che non è preso, il lato ignoto fuori, 30/90/tutto, la settimana
+  col lunedì e le stesse somme); la correlazione nota su serie finte —
+  positiva +1, negativa −1, nulla 0, crescere insieme non è un legame,
+  il buco nel prezzo, la serie ferma —; le frasi e la soglia; POCHI
+  DATI con 10 punti; la rotta (admin prima del database, 403, 400);
+  la sentinella NIENTE SI TOGLIE (27 pezzi di prima, tutti dentro
+  «Altro»); la parte alta disegnata in node, coi colori, gli zeri, il
+  nodo muto, i testi pericolosi scappati.
+- Tortura a mano, sei mutazioni su una copia (correlazione sui
+  livelli, soglia tolta, i 'da_riprovare' contati, la card Zap tolta,
+  `esc` tolto da una riga, il verde a zero tolto): sei prese.
+- Le sezioni che già leggevano `/admin`: `prove_cruscotto_admin`,
+  `prove_statistiche_p2p`, `prove_dispute_cruscotto_p2p`,
+  `prove_indirizzo_lightning`, `prove_csp_prova`: verdi.
+- `collaudo_statistiche_p2p` col server vero, sette passi nuovi (le
+  due chiavi del cruscotto, il grafico coi conclusi del registro — e
+  ce ne sono —, la settimana, il 400, il moderatore che lo vede, il
+  403): 33 su 33, anche nella gabbia della CI.
+- Il giro nel browser, server del worktree in gabbia (porta 8791,
+  config di cartone, relay al relay morto, seme finto di 120 giorni):
+  Playwright con Chrome a 360 e 320 px, chiaro e scuro, foto prima e
+  dopo; nessun errore in pagina (il 404 è la favicon, c'era già);
+  nessuno scroll orizzontale; i nove gruppi aperti col dito, ognuno
+  con quel che c'era prima; i grafici alla larghezza vera; il filtro
+  del periodo che non chiude i gruppi; i bottoni del grafico.
+- SUITE E COLLAUDI. La suite intera severa sopra 7e0b330: **24.669
+  passate, 0 fallite**. Main era corso di sei commit (fra cui la coda
+  del gruppo degli admin e le prove compresse, che toccano `server.py` e
+  `prove.py`, nessun simbolo mio); ribasato su 37ae7af, un conflitto in
+  coda a CANTIERI (le due voci tenute). Sull'albero ribasato: le sezioni
+  toccate dai due lati — le sei del cruscotto e della CSP, la coda e il
+  gruppo degli admin, la stampa e i salti, i collaudi in CI, la bussola,
+  la CI leggera — 551 passate, 0 fallite; i collaudi della CI nella
+  gabbia, due alla volta: **83 verdi, 0 rossi**. Scanner dei segreti
+  sulle righe aggiunte: vuoto (e la controprova scatta).
+
+**DA FARE (notati, non fatti).**
+- Sul telefono, dentro Telegram: aprire `/admin` dal bottone del pannello
+  e guardare le carte e il tema (quello di Telegram).
+- Sul VPS, dopo il deploy: la riga «Deploy» deve dire il commit di main.
+  Se dice «commit non letto», l'utente `barattolo` non legge `.git`: lo
+  si guarda con un comando di sola lettura, che scrivo io.
+- Sul VPS: che `prezzo_storico` sia piena (quante righe, la prima e
+  l'ultima data), con un comando di sola lettura che scrivo io.
+- La voce del 15 ott qui sopra: una riga in testa che rimandi a questa
+  (oggi resta com'era).
+- I «presi» degli scambi ancora in corso (entrano quando si chiudono).
+- La favicon di `/admin` dà 404 (c'era già).

@@ -119491,6 +119491,416 @@ def prove_dispute_cruscotto_p2p():
           and "sopra la soglia" not in o["spenta"])
 
 
+def prove_cruscotto_semplice():
+    """IL CRUSCOTTO SEMPLICE (16 ott 2026, cantiere cruscotto-admin). In
+    cima a `/admin` tre domande — cosa devo fare, va tutto bene, come va
+    la settimana — e il grafico ordini P2P / prezzo; tutto il resto in
+    «Altro». I giudici puri girano su database e cartelle di cartone:
+    le cose da fare, il commit letto dal disco, le ronde dalla loro
+    memoria, i secchi del grafico e la correlazione sulle VARIAZIONI
+    (positiva, negativa, nulla, pochi dati). Poi la sentinella che il
+    15 ott mancava: ogni sezione di prima e' ancora nella pagina, dentro
+    «Altro». Infine la parte alta si disegna per davvero in node."""
+    import sqlite3, tempfile as _tf, json as _js, html as _html, math
+    print("\n[il cruscotto semplice]")
+    amb = {"time": time, "sqlite3": sqlite3, "os": os, "re": re,
+           "html": _html, "math": math}
+    for capo in ("PAGAMENTI_INCERTI_TABELLE = ", "GRAFICO_P2P_PERIODI = ",
+                 "GRAFICO_P2P_PASSI = ", "GRAFICO_P2P_METRICHE = ",
+                 "GRAFICO_P2P_LATI = ", "GRAFICO_P2P_PUNTI_MINIMI = "):
+        i = _SORGENTE.index("\n" + capo) + 1
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    for f in ("_giorno", "dati_da_fare", "_commit_dal_git", "_ronda_cruscotto",
+              "_passo_grafico", "_serie_grafico_p2p", "_correlazione_variazioni",
+              "_frase_legame", "_legami_grafico_p2p"):
+        exec(pezzo(f), amb)
+
+    # --- 1) COSA DEVO FARE -------------------------------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, payout_stato TEXT DEFAULT '');
+    CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT);
+    CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, payout_stato TEXT DEFAULT '');
+    CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, payout_stato TEXT DEFAULT '');
+    INSERT INTO ordini(stato, payout_stato) VALUES ('dispute',''), ('dispute',''),
+      ('return_pending',''), ('released','incerto'), ('released','uscito'),
+      ('released','da_riprovare');
+    INSERT INTO annunci(stato) VALUES ('revisione'), ('attivo'), ('revisione'), ('rimosso');
+    INSERT INTO rimborsi_asta(payout_stato) VALUES ('incerto'), ('uscito');
+    INSERT INTO pagamenti(payout_stato) VALUES ('incerto'), ('');
+    """)
+    prova("da fare: le dispute del mercatino (solo 'dispute', i resi "
+          "camminano da soli), gli annunci in revisione, i pagamenti "
+          "'incerto' delle tre tabelle (non quelli da riprovare)",
+          {"dispute_mercatino": 2, "annunci_revisione": 2,
+           "pagamenti_incerti": 3}, amb["dati_da_fare"](con))
+    con.executescript("DROP TABLE annunci; DROP TABLE pagamenti;")
+    prova("...una tabella che manca non porta via il cruscotto: None per "
+          "la sua voce, il resto si conta",
+          {"dispute_mercatino": 2, "annunci_revisione": None,
+           "pagamenti_incerti": 2}, amb["dati_da_fare"](con))
+    vuoto = sqlite3.connect(":memory:")
+    prova("...e su un database senza niente, tre None",
+          {"dispute_mercatino": None, "annunci_revisione": None,
+           "pagamenti_incerti": None}, amb["dati_da_fare"](vuoto))
+    coda = pezzo("coda_pagamenti")
+    alias = dict((a, t) for t, a in re.findall(r"FROM (\w+) (\w) ", coda))
+    prova("le tabelle contate sono le STESSE della coda 🧊 dei pagamenti "
+          "(se la coda ne impara una quarta, il conto la deve imparare)",
+          set(amb["PAGAMENTI_INCERTI_TABELLE"]),
+          {alias.get(a) for a in re.findall(r"WHERE (\w)\.payout_stato='incerto'", coda)})
+
+    # --- 2) IL COMMIT CHE GIRA, LETTO DAL DISCO ------------------------
+    sha, sha2 = "0123456789abcdef" * 2 + "01234567", "fedcba9876543210" * 2 + "76543210"
+    base = _tf.mkdtemp(prefix="commit_")
+
+    def cartella(nome, file):
+        radice = os.path.join(base, nome)
+        for percorso, testo in file.items():
+            p = os.path.join(radice, *percorso.split("/"))
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(testo)
+        return radice
+    c = amb["_commit_dal_git"]
+    prova("il commit dal ramo sciolto, dal packed-refs, da una testa "
+          "staccata", (sha, sha2, sha), (
+              c(cartella("sciolto", {".git/HEAD": "ref: refs/heads/main\n",
+                                     ".git/refs/heads/main": sha + "\n"})),
+              c(cartella("impacchettato", {
+                  ".git/HEAD": "ref: refs/heads/main\n",
+                  ".git/packed-refs": "# pack-refs with: peeled\n"
+                                      f"{sha} refs/heads/altro\n{sha2} refs/heads/main\n"})),
+              c(cartella("staccato", {".git/HEAD": sha + "\n"}))))
+    cartella("repo", {".git/refs/heads/cantiere/x": sha2 + "\n",
+                      ".git/worktrees/w/HEAD": "ref: refs/heads/cantiere/x\n",
+                      ".git/worktrees/w/commondir": "../..\n"})
+    prova("...e da un worktree (`.git` e' un file, il ramo sta nella "
+          "cartella comune)", sha2,
+          c(cartella("wt", {".git": "gitdir: ../repo/.git/worktrees/w\n"})))
+    prova("...e '' quando non torna: nessun .git, una testa storta, un "
+          "ramo che non c'e'", ("", "", ""), (
+              c(cartella("niente", {"leggimi.txt": "x"})),
+              c(cartella("storta", {".git/HEAD": "ciao\n"})),
+              c(cartella("senza", {".git/HEAD": "ref: refs/heads/main\n"}))))
+    prova("il commit si legge UNA volta, all'avvio, accanto al server", True,
+          "\nCOMMIT_CHE_GIRA = _commit_dal_git(os.path.dirname("
+          "os.path.abspath(__file__)))\n" in _SORGENTE)
+
+    # --- 3) LE RONDE DEI RELAY, DALLA LORO MEMORIA ---------------------
+    r = amb["_ronda_cruscotto"]("Relay Nostr", True,
+                                ["wss://a.example", "wss://b.example", "wss://c.example"],
+                                {"stati": {"wss://a.example": "a posto",
+                                           "wss://b.example": "rifiuta &lt;x&gt;"},
+                                 "giro": 1760000000.7})
+    prova("la ronda: a posto, un problema con le parole del giudice (tornate "
+          "testo: le scappa la pagina), uno non ancora chiesto; l'ora del giro",
+          {"nome": "Relay Nostr", "accesa": True, "giro": 1760000000,
+           "relay": [{"relay": "a.example", "a_posto": True, "detto": "a posto"},
+                     {"relay": "b.example", "a_posto": False, "detto": "rifiuta <x>"},
+                     {"relay": "c.example", "a_posto": None,
+                      "detto": "non ancora chiesto"}]}, r)
+    prova("...«in collaudo non si chiede» vale a posto", True,
+          amb["_ronda_cruscotto"]("x", True, ["ws://q"], {"stati": {
+              "ws://q": "in collaudo non si chiede"}})["relay"][0]["a_posto"])
+    sal = codice(pezzo("dati_salute"))
+    prova("la salute non bussa a nessuno: niente rete, niente nodo, niente "
+          "database", [], [x for x in ("await", "httpx", "_lnd_leggi", "db()",
+                                       "create_connection") if x in sal])
+    prova("...e legge le DUE ronde dalla loro memoria", True,
+          "_RONDA_RELAY)" in sal and "_RONDA_NOSTR)" in sal)
+    cr = pezzo("cruscotto_admin")
+    prova("il cruscotto porta da fare e salute, DOPO il controllo di chi e' "
+          "admin", True,
+          cr.index("e_admin(") < cr.index('dati["da_fare"] = dati_da_fare(con)')
+          and cr.index("e_admin(") < cr.index('"salute": dati_salute()'))
+
+    # --- 4) I SECCHI DEL GRAFICO ----------------------------------------
+    pg = amb["_passo_grafico"]
+    prova("la settimana e' il suo lunedi' (UTC): venerdi', lunedi', domenica",
+          ("2026-10-12", "2026-10-12", "2026-10-12", "2026-10-15"),
+          (pg("2026-10-16", "settimana"), pg("2026-10-12", "settimana"),
+           pg("2026-10-18", "settimana"), pg("2026-10-15", "giorno")))
+    ADESSO, G = 1792152000, 86400       # 16 ott 2026, mezzanotte UTC
+    g = amb["_giorno"]
+    oggi, ieri, l_altro = g(ADESSO), g(ADESSO - G), g(ADESSO - 2 * G)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER, creato INTEGER,
+      stato TEXT DEFAULT '', lato TEXT DEFAULT '', visto INTEGER DEFAULT 0,
+      maker INTEGER DEFAULT 0);
+    CREATE TABLE p2p_conti(ordine TEXT, giro INTEGER DEFAULT 0, esito TEXT,
+      preso INTEGER DEFAULT 0, chiuso INTEGER DEFAULT 0, lato TEXT DEFAULT '');
+    CREATE TABLE prezzo_storico(data TEXT PRIMARY KEY, prezzo_eur REAL DEFAULT 0);
+    """)
+    con.executemany("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, "
+                    "maker) VALUES(?,?,?,?,?,?)", [
+        ("o1", 1, ADESSO, "success", "buy", 1),
+        ("o2", 1, ADESSO - G, "pending", "sell", 1),
+        ("o3", 1, ADESSO, "pending", "buy", 0),         # preso da noi: non pubblicato
+        ("o4", 1, ADESSO, "", "sell", 1),               # mai visto sul libro
+        ("o5", 1, ADESSO - 40 * G, "success", "buy", 1)])
+    con.executemany("INSERT INTO p2p_conti(ordine, esito, preso, chiuso, lato) "
+                    "VALUES(?,?,?,?,?)", [
+        ("c1", "completato", ADESSO - G, ADESSO, "buy"),
+        ("c2", "annullato", ADESSO, ADESSO, "sell"),
+        ("c3", "tornato", ADESSO - 2 * G, ADESSO - 2 * G, "sell"),
+        ("c4", "scaduto", 0, ADESSO, "buy"),            # mai preso
+        ("c5", "completato", ADESSO, ADESSO, "")])      # lato ignoto
+    con.executemany("INSERT INTO prezzo_storico VALUES(?,?)",
+                    [(l_altro, 100.0), (ieri, 110.0), (g(ADESSO - 5 * G), 0)])
+    s30 = amb["_serie_grafico_p2p"](con, "30", "giorno", ADESSO)
+    prova("30 giorni = 30 secchi, dal primo all'oggi, anche vuoti",
+          (30, g(ADESSO - 29 * G), oggi), (len(s30), s30[0]["k"], s30[-1]["k"]))
+    prova("i conteggi [pubblicati, presi, conclusi, annullati] per lato: "
+          "oggi, ieri, l'altro ieri (un tornato in vetrina e' un annullato; "
+          "lo scaduto non e' preso; il lato ignoto non sta in nessuna barra)",
+          [{"k": l_altro, "prezzo": 100.0, "buy": [0, 0, 0, 0], "sell": [0, 1, 0, 1]},
+           {"k": ieri, "prezzo": 110.0, "buy": [0, 1, 0, 0], "sell": [1, 0, 0, 0]},
+           {"k": oggi, "prezzo": None, "buy": [1, 0, 1, 0], "sell": [0, 1, 0, 1]}],
+          s30[-3:])
+    prova("...un giorno senza niente e' uno zero, e un prezzo a zero non "
+          "e' un prezzo", {"k": g(ADESSO - 5 * G), "prezzo": None,
+                           "buy": [0, 0, 0, 0], "sell": [0, 0, 0, 0]}, s30[-6])
+    s90 = amb["_serie_grafico_p2p"](con, "90", "giorno", ADESSO)
+    tutto = amb["_serie_grafico_p2p"](con, "tutto", "giorno", ADESSO)
+    prova("90 giorni prende l'ordine di quaranta giorni fa; «tutto» parte "
+          "dal primo fatto", (90, 2, 41, g(ADESSO - 40 * G)),
+          (len(s90), sum(p["buy"][0] for p in s90), len(tutto), tutto[0]["k"]))
+    sett = amb["_serie_grafico_p2p"](con, "30", "settimana", ADESSO)
+    prova("per settimana: chiavi di lunedi', stesse somme, il prezzo e' "
+          "quello dell'ultimo giorno noto della settimana",
+          (True, [sum(p[l][i] for p in s30) for l in ("buy", "sell") for i in range(4)],
+           110.0),
+          (all(pg(p["k"], "settimana") == p["k"] for p in sett),
+           [sum(p[l][i] for p in sett) for l in ("buy", "sell") for i in range(4)],
+           sett[-1]["prezzo"]))
+    nudo = sqlite3.connect(":memory:")
+    nudo.row_factory = sqlite3.Row
+    nudo.executescript("CREATE TABLE p2p_ordini(creato, lato, maker, stato);"
+                       "CREATE TABLE p2p_conti(esito, preso, chiuso, lato);"
+                       "CREATE TABLE prezzo_storico(data, prezzo_eur);")
+    s0 = amb["_serie_grafico_p2p"](nudo, "30", "giorno", ADESSO)
+    prova("...e un database senza ordini da' secchi tutti a zero, non un "
+          "errore", (30, 0), (len(s0), sum(sum(p["buy"]) + sum(p["sell"]) for p in s0)))
+
+    # --- 5) LA CORRELAZIONE SULLE VARIAZIONI -----------------------------
+    def serie(delta, rendimenti):
+        conti, prezzi = [10], [100.0]
+        for d, r_ in zip(delta, rendimenti):
+            conti.append(conti[-1] + d)
+            prezzi.append(prezzi[-1] * math.exp(r_))
+        return conti, prezzi
+    corr = amb["_correlazione_variazioni"]
+    d24 = [2, -1, 3, -2, 1, 0, -3, 2] * 3
+    prova("positiva: gli ordini cambiano come il prezzo -> r = +1 su 24 punti",
+          (1.0, 24), corr(*serie(d24, [x * 0.01 for x in d24])))
+    prova("negativa: cambiano al contrario -> r = -1", (-1.0, 24),
+          corr(*serie(d24, [-x * 0.01 for x in d24])))
+    prova("nulla: variazioni che non si guardano -> r = 0", (0.0, 24),
+          corr(*serie([1, -1, 1, -1] * 6, [0.01, 0.01, -0.01, -0.01] * 6)))
+    # due serie che CRESCONO INSIEME senza legame nelle variazioni: sui
+    # livelli la correlazione sarebbe altissima, ed e' l'errore da non fare
+    cresce, sale = [], [100.0]
+    conteggi = [10 + i + (i % 2) * 3 for i in range(25)]
+    for i in range(24):
+        sale.append(sale[-1] * math.exp(0.01 + (0.004 if (i // 2) % 2 else -0.004)))
+    livelli = (lambda xs, ys: (lambda mx, my: sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+               / math.sqrt(sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys)))(
+        sum(xs) / len(xs), sum(ys) / len(ys)))(conteggi, sale)
+    rv, nv = corr(conteggi, sale)
+    prova("crescere insieme non e' un legame: sui livelli r > 0,9, sulle "
+          "variazioni |r| < 0,2", (True, True, 24),
+          (livelli > 0.9, abs(rv) < 0.2, nv))
+    c2, p2 = serie(d24, [x * 0.01 for x in d24])
+    p2[5] = None
+    prova("un buco nel prezzo toglie le due coppie che lo toccano", 22, corr(c2, p2)[1])
+    prova("meno di tre coppie, o una serie ferma: r None",
+          ((None, 2), (None, 24)),
+          (corr([1, 2, 3], [100, 101, 99]), corr([5] * 25, serie(d24, [x * 0.01 for x in d24])[1])))
+    f = amb["_frase_legame"]
+    prova("le parole: pochi dati sotto 20 punti (anche con r forte), nessun "
+          "legame, debole, forte, il verso",
+          ["pochi dati, non concludere", "legame forte: salgono col prezzo",
+           "nessun legame col prezzo", "legame debole: salgono col prezzo",
+           "legame forte: scendono quando il prezzo sale", "niente da confrontare"],
+          [f(0.9, 19), f(0.9, 20), f(0.1, 30), f(0.3, 30), f(-0.7, 30), f(None, 30)])
+    prova("la soglia e' quella di Andrea: 20 punti", 20, amb["GRAFICO_P2P_PUNTI_MINIMI"])
+    punti = [{"k": str(i), "prezzo": p, "buy": [c, 0, 0, 0], "sell": [0, 0, 0, 0]}
+             for i, (c, p) in enumerate(zip(*serie(d24[:10], [x * 0.01 for x in d24[:10]])))]
+    leg = amb["_legami_grafico_p2p"](punti)
+    prova("POCHI DATI: con 10 punti il numero non si da', si dice l'avviso",
+          {"r": None, "n": 10, "frase": "pochi dati, non concludere"},
+          leg["pubblicati"]["buy"])
+    punti = [{"k": str(i), "prezzo": p, "buy": [c, 0, 0, 0], "sell": [0, 0, 0, 0]}
+             for i, (c, p) in enumerate(zip(*serie(d24, [x * 0.01 for x in d24])))]
+    leg = amb["_legami_grafico_p2p"](punti)
+    prova("...con 24 si', separato per lato e per metrica",
+          ({"r": 1.0, "n": 24, "frase": "legame forte: salgono col prezzo"},
+           {"r": None, "n": 24, "frase": "niente da confrontare"},
+           sorted(leg)),
+          (leg["pubblicati"]["buy"], leg["pubblicati"]["sell"],
+           sorted(amb["GRAFICO_P2P_METRICHE"])))
+
+    # --- 6) LA ROTTA ---------------------------------------------------
+    rg = pezzo("grafico_p2p_admin")
+    prova("la rotta del grafico: admin PRIMA del database, 403 a chi non "
+          "lo e', 400 a un periodo o un passo inventato, il registro "
+          "consolidato prima di contare", True,
+          rg.index("e_admin(") < rg.index("db()")
+          and 'raise HTTPException(403, "Riservato agli admin")' in rg
+          and "if periodo not in GRAFICO_P2P_PERIODI or passo not in GRAFICO_P2P_PASSI" in rg
+          and rg.index("_consolida_conti_p2p(con, adesso)") < rg.index("_serie_grafico_p2p("))
+    prova("...la vedono TUTTI gli admin (decisione di Andrea): il giudice e' "
+          "e_admin, non quello dei conti", (True, False),
+          ("e_admin(user" in rg, "vede_statistiche_p2p" in rg))
+    prova("...periodi e passi sono quelli della pagina",
+          (["30", "90", "tutto"], ("giorno", "settimana")),
+          (list(amb["GRAFICO_P2P_PERIODI"]), amb["GRAFICO_P2P_PASSI"]))
+
+    # --- 7) LA PAGINA: NIENTE SI TOGLIE ---------------------------------
+    pagina = open("admin.html", encoding="utf-8").read()
+    di_prima = ["Nuovi iscritti per ${modo}", "Iscritti totali nel tempo",
+                "Sats venduti per ${modo}", "Iscritti totali</div>",
+                "Sats venduti in totale",
+                "[[30,'30 giorni'],[90,'90 giorni'],[365,'Un anno'],[0,'Da sempre']]",
+                "Vedi i numeri", "${cardAnnulli(D.annulli, L)}",
+                "<h2>Quanto avremmo guadagnato con una fee</h2>", "function simula(){",
+                "<h2>Fee di routing</h2>", "I nodi che abbiamo pagato",
+                "<h2>I wallet dei venditori</h2>", "<h2>I canali del nodo</h2>",
+                "${cardZap(D.zap)}", "${cardDisputeP2P(D.dispute_p2p)}",
+                '<div id="p2p"></div>', "if (D.p2p_statistiche) caricaP2P();",
+                "<h2>Scambi</h2>", "<h2>Volume</h2>", "Per tipo di ordine",
+                "Per metodo di pagamento", "<h2>Commissioni</h2>", "<h2>Ordini</h2>",
+                "<h2>Persone</h2>", "<h2>Ultimi scambi", "Cosa è certo e cosa è una stima"]
+    prova("NIENTE SI TOGLIE (la lezione del 15 ott): ogni sezione, numero e "
+          "bottone di prima e' ancora nella pagina", [],
+          [x for x in di_prima if x not in pagina])
+    altro = pagina.index('<div class="sez">Altro</div>')
+    prova("...e sta in «Altro», sotto le tre domande e il grafico", [],
+          [x for x in ("Nuovi iscritti per ${modo}", "${cardAnnulli(D.annulli, L)}",
+                       "<h2>Fee di routing</h2>", "<h2>I canali del nodo</h2>",
+                       "${cardZap(D.zap)}", "${cardDisputeP2P(D.dispute_p2p)}")
+           if pagina.find(x) < altro])      # -1 = sparita: rosso, non un'eccezione
+    prova("in cima, nell'ordine: da fare, salute, settimana, grafico", True,
+          pagina.index("${sezioneDaFare()}") < pagina.index("${sezioneSalute(L)}")
+          < pagina.index("${sezioneSettimana()}") < pagina.index("${sezioneGrafico()}")
+          < altro)
+    prova("la sezione degli Scambi P2P nasce nascosta e si mostra solo DOPO "
+          "il controllo del 403", True,
+          'id="p2pBox" hidden' in pagina
+          and pagina.index("{ P = null; box.innerHTML = ''; return; }")
+          < pagina.index("el('p2pBox').hidden = false;"))
+    prova("il tema di Telegram vale SOLO dentro Telegram (fuori lo SDK dice "
+          "sempre «light»)", True,
+          "if (tg && tg.initData && tg.colorScheme)" in pagina)
+    prova("...e il tema scuro c'e' nei due modi", True,
+          '@media (prefers-color-scheme: dark)' in pagina
+          and ':root[data-theme="dark"]' in pagina)
+
+    # --- 8) LA PARTE ALTA SI DISEGNA PER DAVVERO -------------------------
+    import shutil as _sh, subprocess as _sp
+    node = _sh.which("node")
+    if not node:
+        salta("la parte alta del cruscotto si disegna", "node non installato")
+        return
+
+    def fetta(capo, coda):
+        i = pagina.index(capo)
+        return pagina[i:pagina.index(coda, i)]
+    ORA = 1792152000
+    dati = {
+        "da_fare": {"dispute_mercatino": 0, "annunci_revisione": 2,
+                    "pagamenti_incerti": 1},
+        "dispute_p2p": {"aperte": [{"ordine": "x"}]},
+        "salute": {"commit": "abc1234def" + "0" * 30, "avviato": ORA - 7200,
+                   "ponte": "ok", "cambio_valido": True, "cambio_eta_s": 60,
+                   "ronde": [{"nome": "Relay Nostr", "accesa": True, "giro": ORA,
+                              "relay": [{"relay": "nos.lol", "a_posto": True, "detto": "a posto"},
+                                        {"relay": "<img src=x onerror=alert(1)>",
+                                         "a_posto": False, "detto": "<b>rifiuta</b>"}]}]},
+        "iscritti": [], "iscritti_totali": {"totale": 10}, "volume": [],
+        "p2p_statistiche": False}
+    zero = _js.loads(_js.dumps(dati))
+    zero["da_fare"] = {"dispute_mercatino": 0, "annunci_revisione": 0, "pagamenti_incerti": 0}
+    zero["dispute_p2p"] = {"aperte": []}
+    zero["salute"].update(ronde=[], commit="", cambio_valido=False)
+    leg = {m: {"buy": {"r": 0.87, "n": 25, "frase": "legame forte: salgono col prezzo"},
+               "sell": {"r": None, "n": 12, "frase": "pochi dati, non concludere"}}
+           for m in ("pubblicati", "presi", "conclusi", "annullati")}
+    banco = "\n".join([
+        fetta("const esc = s =>", "\nconst el = "),
+        "const el = () => null; const GIORNO = 86400000;",
+        "const colore = v => v; const intestazione = () => '';",
+        fetta("const breve = n =>", "\nfunction asse("),
+        fetta("const legenda = serie =>", "\nconst colore = "),
+        fetta("function tabella(testa, righe, numeriche){", "\n/* un nodo:"),
+        fetta("const STILE = {", "\n/* ANNULLAMENTI, RIMBORSI E TEMPI"),
+        "Date.now = () => %d * 1000;" % ORA,
+        "const fuori = {}; let D;",
+        "D = %s;" % _js.dumps(dati),
+        "fuori.dafare = sezioneDaFare(); fuori.salute = sezioneSalute({stato: 'ok', "
+        "canali: [{attivo: true}, {attivo: false}]}); fuori.relay = cardRelayDeploy(D.salute);",
+        "fuori.settimana = sezioneSettimana();",
+        "D = %s;" % _js.dumps(zero),
+        "fuori.zero = sezioneDaFare(); fuori.spento = sezioneSalute({stato: 'assente'});",
+        "D.salute.commit = '<i>x</i>'; fuori.cattivo = sezioneSalute({stato: 'ok', canali: []});",
+        "G = {passo: 'giorno', punti: [], legami: %s}; fuori.grafico = internoGrafico();" % _js.dumps(leg),
+        "G = null; erroreG = 'Non riesco a leggere gli ordini P2P: riprova fra poco.';"
+        " fuori.errore = internoGrafico();",
+        "console.log(JSON.stringify(fuori));"])
+    pf = os.path.join(_tf.mkdtemp(prefix="cruscotto_semplice_"), "banco.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco della parte alta gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _js.loads(r.stdout)
+    prova("da fare: una carta per numero, verde a zero, arancio da "
+          "guardare, rossa urgente; e dove si decide", [],
+          [x for x in ('<div class="carta urgente"><div class="n">1</div><div class="p">disputa P2P aperta',
+                       '<div class="carta bene"><div class="n">0</div><div class="p">dispute del mercatino',
+                       '<div class="carta guarda"><div class="n">2</div><div class="p">annunci da approvare',
+                       '<div class="carta urgente"><div class="n">1</div><div class="p">pagamento da verificare',
+                       "Si decide in Barattolo")
+           if x not in o["dafare"]])
+    prova("...tutto a zero: quattro carte verdi e «Niente da fare adesso»",
+          (4, True), (o["zero"].count('class="carta bene"'),
+                      "Niente da fare adesso." in o["zero"]))
+    prova("salute: il nodo con un canale spento si guarda, il relay giu' e' "
+          "urgente, il deploy dice il commit corto, il cambio fresco va bene", [],
+          [x for x in ('<div class="riga guarda"><i class="pallino"></i><b>Nodo</b><span>1 su 2 canali accesi',
+                       '<div class="riga urgente"><i class="pallino"></i><b>Relay</b><span>1 su 2 con un problema',
+                       '<div class="riga bene"><i class="pallino"></i><b>Deploy</b><span>abc1234 · avviato 2 ore fa',
+                       '<div class="riga bene"><i class="pallino"></i><b>Cambio</b><span>aggiornato adesso')
+           if x not in o["salute"]])
+    prova("...e il testo di una riga esce come TESTO", (False, True),
+          ("<i>x</i" in o["cattivo"], "&lt;i&gt;x&lt;/i" in o["cattivo"]))
+    prova("...nodo muto, ronda spenta, commit non letto, cambio fermo", [],
+          [x for x in ("<b>Nodo</b><span>non risponde", "<b>Relay</b><span>ronda spenta",
+                       "<b>Deploy</b><span>commit non letto", "<b>Cambio</b><span>fermo")
+           if x not in o["spento"]])
+    prova("le parole di un relay escono come TESTO", (False, False, True, True),
+          ("<img src=x" in o["relay"], "<b>rifiuta" in o["relay"],
+           "&lt;img src=x" in o["relay"], "&lt;b&gt;rifiuta" in o["relay"]))
+    prova("la settimana: il totale degli iscritti e gli zeri, senza la carta "
+          "delle commissioni per chi non vede i conti P2P",
+          (True, False), ('<div class="n">10</div>' in o["settimana"],
+                          "commissioni" in o["settimana"]))
+    prova("il grafico: r e punti dove i dati bastano, l'avviso «pochi dati» "
+          "col numero dei punti dove no, la riga sulle variazioni", [],
+          [x for x in ("legame forte: salgono col prezzo", "r +0,87 su 25 punti",
+                       "pochi dati, non concludere", "· 12 punti",
+                       "Si confrontano le variazioni, non i livelli.",
+                       'aria-pressed="true" onclick="scegliG(\'metrica\',\'pubblicati\')"')
+           if x not in o["grafico"]])
+    prova("...e senza dati dice perche', con i bottoni al loro posto",
+          (True, True), ("Non riesco a leggere gli ordini P2P" in o["errore"],
+                         "scegliG('periodo','tutto')" in o["errore"]))
+
+
 def prove_vantaggi_livelli():
     """I VANTAGGI DI OGNI LIVELLO (ott 2026, parola di Andrea). La scala
     la scrive il server dalle leve VIVE (`scala_livelli`) e il client la
@@ -166962,6 +167372,7 @@ def main():
               prove_tracking_facoltativo,
               prove_vantaggi_livelli, prove_cruscotto_admin,
               prove_statistiche_p2p, prove_dispute_cruscotto_p2p,
+              prove_cruscotto_semplice,
               prove_buoni_cumulabili,
               prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
