@@ -51406,6 +51406,26 @@ logging.getLogger("uvicorn.access").addFilter(_ChatFuoriDalJournal())
 #      economica fino al 100%): se non c'e' strada e' un avviso, se la
 #      piu' economica costa piu' di `sats × P2P_TETTO_ROTTA` il
 #      coordinatore, che ha quel tetto, non la pagherebbe — avviso.
+#   4) LA STRADA A PEZZI (16 ott 2026, cantiere strada-phoenix): una
+#      fattura Phoenix da 270.030 sats prendeva «non trova una strada»,
+#      e la strada c'era. QueryRoutes cerca UNA strada con la cifra
+#      INTERA, e se nessun nostro canale da solo la regge risponde
+#      «unable to find a path» (LND 0.19.3, `routing/pathfind.go`: «may
+#      still be possible to complete the payment by splitting»); il
+#      payout vero di Mostro la divide fino a 16 pezzi (non passa
+#      `max_parts`) quando la fattura dichiara MPP. Allora, se la cifra
+#      intera non passa, si chiede la strada per il PEZZO piu' piccolo
+#      che LND proverebbe (`_pezzo_lnd`): se non passa nemmeno quello
+#      la strada manca davvero. Se passa e la fattura si divide (bit 16
+#      o 17 nei `features` della decodifica), il costo si stima in
+#      proporzione e si guarda che l'uscita UTILIZZABILE dei canali in
+#      linea (`GET /v1/channels`, `offchain:read`: saldo meno riserva,
+#      ognuno entro il suo tetto degli appesi) copra cifra + rete; se
+#      non la copre e' un fatto NOSTRO e non del wallet — e la garanzia
+#      incassata rimette i sats prima del payout — quindi nessun avviso,
+#      solo la riga nel journal (`uscita_corta`). Se passa e la fattura
+#      NON si divide, va pagata intera: `pezzo_solo`, avviso. Nessuna
+#      sonda, nessun pagamento: solo domande al grafo.
 # IL TETTO e' `max_routing_fee` del settings.toml del nodo (0.01 dal
 # 17 set 2026, confermato da Andrea il 10 ott): il config del VPS lo
 # SPECCHIA, non lo legge — se cambia la', va cambiato qui.
@@ -51434,12 +51454,21 @@ P2P_INDIRIZZI_NON_PASSANO = {
     for k, v in (P2P_INDIRIZZI_NON_PASSANO.items()
                  if isinstance(P2P_INDIRIZZI_NON_PASSANO, dict) else ())
     if str(k).strip() and str(v).strip()}
-LND_FATTURA_ATTESA_S = 10         # per domanda: tre al massimo, e il client ne aspetta 40
+LND_FATTURA_ATTESA_S = 8          # per domanda: cinque al massimo, e il client ne aspetta 40
+# il pezzo piu' piccolo che LND prova quando divide (`DefaultShardMinAmt`,
+# routing/payment_session.go della 0.19.3) e quanti pezzi al massimo
+# (`DefaultMaxParts`, routerrpc: lo zero di Mostro vale 16)
+LND_PEZZO_MIN_SATS = 10_000
+LND_PEZZI_MAX = 16
 TETTO_CONTROLLI_FATTURA_ORA = 30  # per utente: ogni indirizzo e' un giro di rete verso un dominio scelto da lui
 FATTURA_FERMA = ("illeggibile", "importo", "scaduta", "corta", "rete",
                  "nodo_assente", "indirizzo", "wallet_non_passa")
-FATTURA_AVVISA = ("senza_strada", "costo")
+FATTURA_AVVISA = ("senza_strada", "costo", "pezzo_solo")
 FATTURA_NON_DISPONIBILE = "non_disponibile"
+# a pezzi la strada c'e', ma oggi i nostri canali non hanno tutta
+# l'uscita: passa senza avviso (non e' colpa del wallet), e il journal
+# lo dice
+FATTURA_USCITA_CORTA = "uscita_corta"
 LND_NEGATO = "negato"
 ALTRI_WALLET = ("Generane una da un altro wallet (Phoenix, Breez, Blink, "
                 "Wallet of Satoshi) o usa una Lightning address.")
@@ -51449,9 +51478,12 @@ MEGLIO_ALTRI_WALLET = ("Meglio una fattura da un altro wallet (Phoenix, "
 MSG_NODO_ASSENTE = ("Questa fattura non è raggiungibile dalla rete "
                     "Lightning: viene da un nodo privato senza indicazioni "
                     "di strada. " + ALTRI_WALLET)
-MSG_SENZA_STRADA = ("Il nostro nodo non trova una strada per arrivare a "
-                    "questa fattura: il pagamento potrebbe fallire. "
+MSG_SENZA_STRADA = ("La rete Lightning non trova un collegamento fino a "
+                    "questo wallet: il pagamento potrebbe fallire. "
                     + MEGLIO_ALTRI_WALLET)
+MSG_PEZZO_SOLO = ("Questa fattura chiede la cifra tutta in un colpo solo, "
+                  "e oggi nessuna strada la porta intera: il pagamento "
+                  "potrebbe fallire. " + MEGLIO_ALTRI_WALLET)
 MSG_SCADENZA_LUNGA = ("Rifalla con una scadenza più lunga: molti wallet "
                       "la fanno scegliere nelle opzioni della richiesta, "
                       "alla voce «Scadenza» (o «Expiry»).")
@@ -51463,9 +51495,14 @@ MSG_INDIRIZZO = {
                      "indicazioni di strada, che la rete Lightning non "
                      "raggiunge. Usa l'indirizzo di un altro wallet "
                      "(Blink, Alby) o incolla una fattura."),
-    "senza_strada": ("Il nostro nodo non trova una strada fino al wallet "
-                     "di questo indirizzo: il pagamento potrebbe fallire. "
-                     "Meglio l'indirizzo di un altro wallet, o una fattura."),
+    "senza_strada": ("La rete Lightning non trova un collegamento fino al "
+                     "wallet di questo indirizzo: il pagamento potrebbe "
+                     "fallire. Meglio l'indirizzo di un altro wallet, o una "
+                     "fattura."),
+    "pezzo_solo": ("Il wallet di questo indirizzo chiede la cifra tutta in "
+                   "un colpo solo, e oggi nessuna strada la porta intera: il "
+                   "pagamento potrebbe fallire. Meglio l'indirizzo di un "
+                   "altro wallet, o una fattura."),
 }
 # il wallet che si SA che non passa (`P2P_INDIRIZZI_NON_PASSANO`): la
 # famiglia delle due righe del foglio su Wallet of Satoshi, e la via
@@ -51559,6 +51596,68 @@ def _controllo_locale_fattura_p2p(bolt11: str, deve: int, finestra: int,
             "scade": letta["scade"]}
 
 
+def _fee_rotta_msat(rotte: dict) -> int | None:
+    """La commissione della strada piu' economica di una risposta di
+    QueryRoutes, in msat; None se le strade non ci sono. PURA: un
+    numero scritto storto vale zero, come prima del 16 ott."""
+    vie = rotte.get("routes") or []
+    if not vie:
+        return None
+    v0 = vie[0] if isinstance(vie[0], dict) else {}
+    try:
+        if v0.get("total_fees_msat") is not None:
+            return int(v0["total_fees_msat"])
+        return int(v0.get("total_fees") or 0) * 1000
+    except (TypeError, ValueError):
+        return 0
+
+
+def _pezzo_lnd(importo: int) -> int:
+    """Il pezzo piu' piccolo che LND prova quando divide un pagamento:
+    dimezza finche' il pezzo resta sopra `LND_PEZZO_MIN_SATS` e i pezzi
+    non passano `LND_PEZZI_MAX`. Una cifra che non si dimezza torna
+    intera. PURA."""
+    pezzo, pezzi = int(importo), 1
+    while pezzi * 2 <= LND_PEZZI_MAX and pezzo // 2 >= LND_PEZZO_MIN_SATS:
+        pezzo, pezzi = -(-pezzo // 2), pezzi * 2
+    return pezzo
+
+
+def _fattura_si_divide(dec: dict) -> bool:
+    """La fattura accetta un pagamento a pezzi (MPP, bit 16 o 17 nei
+    `features` di DecodePayReq)? PURA."""
+    f = dec.get("features")
+    return isinstance(f, dict) and any(str(b) in f for b in (16, 17))
+
+
+def _uscita_utilizzabile(canali: list) -> int:
+    """Quanti sats possono USCIRE adesso dai canali in linea, sommati:
+    per ognuno il saldo meno la riserva (`_sats_canale`), e non oltre il
+    suo tetto degli appesi — il piu' piccolo dei due
+    `max_pending_amt_msat`, meno gli HTLC gia' in USCITA. Un canale
+    senza tetti conta col solo saldo. PURA: un canale scritto storto
+    vale zero."""
+    somma = 0
+    for c in canali:
+        if not isinstance(c, dict) or not c.get("active"):
+            continue
+        esce = _sats_canale(c, "local")
+        try:
+            tetti = [int((c.get(lato + "_constraints") or {})
+                         .get("max_pending_amt_msat") or 0) // 1000
+                     for lato in ("local", "remote")]
+            appesi = sum(int(h.get("amount") or 0)
+                         for h in c.get("pending_htlcs") or []
+                         if not h.get("incoming"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        tetti = [t for t in tetti if t > 0]
+        if tetti:
+            esce = min(esce, max(0, min(tetti) - appesi))
+        somma += esce
+    return somma
+
+
 async def _controllo_rete_fattura_p2p(bolt11: str, sats: int,
                                       chiedi=None) -> dict:
     """LA RAGGIUNGIBILITA', chiesta al nostro LND (i tre passi del
@@ -51598,39 +51697,79 @@ async def _controllo_rete_fattura_p2p(bolt11: str, sats: int,
     if importo <= 0:
         return {"esito": "ok", "dest": dest,
                 "perche": "senza importo e cifra ignota: la strada non si prova"}
-    stato, rotte = await chiedi("POST", f"/v1/graph/routes/{dest}/{importo}",
-                                {"route_hints": hints}, "rotte")
     tetto = int(importo * P2P_TETTO_ROTTA)
-    if stato == "ok":
-        vie = rotte.get("routes") or []
-        if not vie:
-            return {"esito": "senza_strada", "dest": dest,
+    senza_strada = {"esito": "senza_strada", "dest": dest,
                     "messaggio": MSG_SENZA_STRADA}
-        v0 = vie[0] if isinstance(vie[0], dict) else {}
-        try:
-            fee = (int(v0["total_fees_msat"]) + 999) // 1000 \
-                if v0.get("total_fees_msat") is not None \
-                else int(v0.get("total_fees") or 0)
-        except (TypeError, ValueError):
-            fee = 0
-        if fee > tetto:
-            return {"esito": "costo", "dest": dest, "fee": fee, "tetto": tetto,
-                    "messaggio": f"Arrivare a questa fattura costa almeno "
-                                 f"{_fmt_sats(fee)} sats di rete, più del "
-                                 f"tetto di {_fmt_sats(tetto)} sats ammesso "
-                                 "per lo scambio: il pagamento molto "
-                                 "probabilmente fallirebbe. "
-                                 + MEGLIO_ALTRI_WALLET}
-        return {"esito": "ok", "dest": dest, "fee": fee, "tetto": tetto}
-    if stato == "errore":
+
+    def troppo_cara(fee):
+        return {"esito": "costo", "dest": dest, "fee": fee, "tetto": tetto,
+                "messaggio": f"Arrivare a questa fattura costa almeno "
+                             f"{_fmt_sats(fee)} sats di rete, più del "
+                             f"tetto di {_fmt_sats(tetto)} sats ammesso "
+                             "per lo scambio: il pagamento molto "
+                             "probabilmente fallirebbe. "
+                             + MEGLIO_ALTRI_WALLET}
+
+    async def strada(cifra, cosa):
+        """(stato, fee in msat) di QueryRoutes: 'ok', 'nessuna' (la
+        risposta di LND quando la strada non c'e'), o un «non so»."""
+        stato, rotte = await chiedi(
+            "POST", f"/v1/graph/routes/{dest}/{cifra}",
+            {"route_hints": hints}, cosa)
+        if stato == "ok":
+            fee = _fee_rotta_msat(rotte)
+            return ("nessuna", None) if fee is None else ("ok", fee)
         m = str(rotte.get("message") or "").lower()
-        if "unable to find a path" in m or "no path" in m \
-                or "unable to find node" in m:
-            return {"esito": "senza_strada", "dest": dest,
-                    "messaggio": MSG_SENZA_STRADA}
-    return {"esito": FATTURA_NON_DISPONIBILE, "dest": dest,
-            "perche": f"rotte {stato}" + (
-                f" ({rotte['message']})" if rotte.get("message") else "")}
+        if stato == "errore" and ("unable to find a path" in m
+                                  or "no path" in m
+                                  or "unable to find node" in m):
+            return "nessuna", None
+        return f"{cosa} {stato}" + (
+            f" ({rotte['message']})" if rotte.get("message") else ""), None
+
+    esito, fee_msat = await strada(importo, "rotte")
+    if esito == "ok":
+        fee = (fee_msat + 999) // 1000
+        if fee > tetto:
+            return troppo_cara(fee)
+        return {"esito": "ok", "dest": dest, "fee": fee, "tetto": tetto}
+    if esito != "nessuna":
+        return {"esito": FATTURA_NON_DISPONIBILE, "dest": dest,
+                "perche": esito}
+    # 4) la cifra intera non passa da UN canale: si prova il pezzo
+    pezzo = _pezzo_lnd(importo)
+    if pezzo >= importo:
+        return senza_strada
+    esito, fee_msat = await strada(pezzo, "pezzo")
+    if esito == "nessuna":
+        return senza_strada
+    if esito != "ok":
+        return {"esito": FATTURA_NON_DISPONIBILE, "dest": dest,
+                "perche": esito}
+    if not _fattura_si_divide(dec):
+        return {"esito": "pezzo_solo", "dest": dest,
+                "messaggio": MSG_PEZZO_SOLO}
+    # il costo dei pezzi, in proporzione: per eccesso, come la cifra intera
+    fee = -(-fee_msat * importo // (pezzo * 1000))
+    if fee > tetto:
+        return troppo_cara(fee)
+    a_pezzi = {"dest": dest, "fee": fee, "tetto": tetto}
+    stato, canali = await chiedi("GET", "/v1/channels?active_only=true",
+                                 None, "canali")
+    if stato != "ok":
+        return {"esito": "ok", **a_pezzi,
+                "perche": f"a pezzi da {_fmt_sats(pezzo)}, uscita non "
+                          f"letta (canali {stato})"}
+    uscita = _uscita_utilizzabile(canali.get("channels") or [])
+    if uscita < importo + fee:
+        return {"esito": FATTURA_USCITA_CORTA, **a_pezzi,
+                "perche": f"a pezzi da {_fmt_sats(pezzo)} la strada c'e', "
+                          f"ma l'uscita utilizzabile ({_fmt_sats(uscita)}) "
+                          f"non copre cifra + rete "
+                          f"({_fmt_sats(importo + fee)})"}
+    return {"esito": "ok", **a_pezzi,
+            "perche": f"a pezzi da {_fmt_sats(pezzo)}, uscita "
+                      f"{_fmt_sats(uscita)}"}
 
 
 async def _controllo_indirizzo_p2p(indirizzo: str, deve: int, chiedi=None,
@@ -51741,7 +51880,8 @@ def _risposta_fattura_p2p(v: dict, chi, ordine, adesso: int | None = None
     esito = str(v.get("esito") or "")
     ferma, avvisa = esito in FATTURA_FERMA, esito in FATTURA_AVVISA
     segno = ("⛔" if ferma else "⚠️" if avvisa
-             else "·" if esito == FATTURA_NON_DISPONIBILE else "✅")
+             else "·" if esito in (FATTURA_NON_DISPONIBILE,
+                                   FATTURA_USCITA_CORTA) else "✅")
     dest = str(v.get("dest") or "")
     pezzi = [str(v.get("tramite") or "")]
     # di un indirizzo, il dominio accanto al tramite («indirizzo

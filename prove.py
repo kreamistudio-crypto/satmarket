@@ -136601,7 +136601,9 @@ def prove_controllo_fattura_p2p():
         AssertionError("diagnosi_ln_address chiamata senza cartone"))
     for nome in ("importo_bolt11", "rete_bolt11",
                  "_controllo_locale_fattura_p2p", "_risposta_fattura_p2p",
-                 "_controllo_fattura_concesso"):
+                 "_controllo_fattura_concesso", "_fee_rotta_msat",
+                 "_pezzo_lnd", "_fattura_si_divide", "_uscita_utilizzabile",
+                 "_sats_canale"):
         exec(pezzo(nome), S)
     for nome in ("_controllo_rete_fattura_p2p", "_controllo_indirizzo_p2p",
                  "controlla_fattura_p2p"):
@@ -136782,6 +136784,179 @@ def prove_controllo_fattura_p2p():
     prova("...senza importo ma con la cifra dovuta, la strada si prova su QUELLA",
           f"/v1/graph/routes/{DEST}/5000", chiamate[-1][1])
 
+    # --- 3-bis) LA STRADA A PEZZI (16 ott 2026, cantiere strada-phoenix) --
+    # La fattura Phoenix vera da 270.030 sats, come l'ha decodificata il
+    # nodo: nodo privato, UN hop hint via ACINQ con un alias (chan_id
+    # oltre l'int64, non e' un canale del grafo), 1 sat + 100 ppm, 144
+    # blocchi, MPP facoltativo, il bit 149 sconosciuto. Il nostro LND
+    # rispondeva «unable to find a path»: QueryRoutes cerca UNA strada
+    # con la cifra intera, e nessun canale da solo la regge.
+    PHX = "03019a5aa9d5b272fbdcf255179c78d202bff937ac3ad640d3e2d9fcee8bd3c339"
+    ACQ = "03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f"
+    HINT_PHX = [{"hop_hints": [{"node_id": ACQ, "chan_id": "18436044651096163129",
+                                "fee_base_msat": 1000, "fee_proportional_millionths": 100,
+                                "cltv_expiry_delta": 144}]}]
+    FEAT_PHX = {"9": {"name": "tlv-onion", "is_required": False, "is_known": True},
+                "14": {"name": "payment-addr", "is_required": True, "is_known": True},
+                "17": {"name": "multi-path-payments", "is_required": False, "is_known": True},
+                "149": {"name": "", "is_required": False, "is_known": False}}
+    DEC_PHX = ("ok", {"destination": PHX, "num_satoshis": "270030", "route_hints": HINT_PHX,
+                      "cltv_expiry": "144", "expiry": "604800", "features": FEAT_PHX})
+    DEC_PHX_INTERA = ("ok", {**DEC_PHX[1], "features": {
+        k: f for k, f in FEAT_PHX.items() if k not in ("16", "17")}})
+
+    def canale(esce, riserva, tetto_loro, attivo=True, appesi=(), capienza=1_000_000):
+        """Un canale come lo scrive `GET /v1/channels`: `tetto_loro` e' il
+        `max_pending_amt_msat` che ACINQ mette a quel che offriamo noi
+        (450k sul canale da 1M), dal nostro lato il 99%."""
+        return {"active": attivo, "capacity": str(capienza), "remote_pubkey": ACQ,
+                "local_balance": str(esce), "remote_balance": "0",
+                "local_constraints": {"chan_reserve_sat": str(riserva),
+                                      "max_pending_amt_msat": str(tetto_loro * 1000)},
+                "remote_constraints": {"chan_reserve_sat": str(riserva),
+                                       "max_pending_amt_msat": str(capienza * 990)},
+                "pending_htlcs": [{"incoming": inc, "amount": str(a)} for inc, a in appesi]}
+
+    # i canali del 16 ott: ACINQ grande (1M, 250.952 in uscita) e ACINQ
+    # piccolo (310k, 303.479 in uscita, ma ACINQ ne tiene appesi al
+    # massimo il 45%: 139.500). Il piu' largo porta 240.952 in un pezzo.
+    CANALI_OGGI = [canale(250_952, 10_000, 450_000),
+                   canale(303_479, 3_100, 139_500, capienza=310_000)]
+    LARGO = 240_952
+
+    def lnd_largo(dec, canali=CANALI_OGGI, largo=LARGO, nodo=NODO_OK, canali_stato="ok"):
+        """Un LND di cartone che fa come QueryRoutes: una strada sola,
+        e solo se la cifra sta in un canale (`largo`); la commissione
+        e' quella del hint (1 sat + 100 ppm). `largo=0` = nessuna
+        strada a nessuna cifra."""
+        async def chiedi(metodo, percorso, corpo=None, cosa=""):
+            chiamate.append((metodo, percorso, corpo))
+            if percorso.startswith("/v1/payreq/"):
+                return dec
+            if percorso.startswith("/v1/graph/node/"):
+                return nodo
+            m = re.fullmatch(r"/v1/graph/routes/([0-9a-f]{66})/(\d+)", percorso)
+            if m:
+                amt = int(m.group(2))
+                if amt > largo:
+                    return ("errore", {"message": "unable to find a path to destination",
+                                       "status": 500})
+                return ROTTA(1000 + amt * 1000 * 100 // 1_000_000)
+            if percorso == "/v1/channels?active_only=true":
+                return (canali_stato, {"channels": canali} if canali_stato == "ok"
+                        else {"message": "permission denied"})
+            return ("errore", {"message": "Not Found", "status": 404})
+        return chiedi
+
+    pezzo_l, divide, uscita_u = S["_pezzo_lnd"], S["_fattura_si_divide"], S["_uscita_utilizzabile"]
+    prova("il pezzo di LND: dimezza fino a 16 pezzi, mai sotto 10.000 sats (270.030 → 16.877)",
+          [16_877, 62_500, 15_000, 10_000, 15_000, 19_999, 5_000],
+          [pezzo_l(x) for x in (270_030, 1_000_000, 30_000, 20_000, 15_000, 19_999, 5_000)])
+    prova("la fattura si divide col bit 16 o 17 nei features, non col 149 ne' senza features",
+          [True, True, False, False, False, False],
+          [divide({"features": {"17": {}}}), divide({"features": {"16": {}}}),
+           divide({"features": {"149": {}, "170": {}}}), divide({"features": {}}),
+           divide({}), divide({"features": ["17"]})])
+    prova("l'uscita utilizzabile dei canali del 16 ott: 240.952 + 139.500 (il piccolo fermo al tetto di ACINQ)",
+          380_452, uscita_u(CANALI_OGGI))
+    prova("...un canale fuori linea non conta, uno scritto storto nemmeno",
+          240_952, uscita_u([CANALI_OGGI[0], canale(300_000, 0, 0, attivo=False),
+                             {**CANALI_OGGI[1], "local_balance": "boh"}, "non un canale"]))
+    prova("...gli appesi IN USCITA mangiano il tetto, quelli in arrivo no",
+          [100_000, 139_500],
+          [uscita_u([canale(303_479, 3_100, 139_500, appesi=[(False, 39_500)])]),
+           uscita_u([canale(303_479, 3_100, 139_500, appesi=[(True, 39_500)])])])
+    prova("...senza tetti conta il solo saldo meno la riserva; col tetto nostro piu' basso vale quello",
+          [290_000, 50_000],
+          [uscita_u([{"active": True, "local_balance": "300000",
+                      "local_constraints": {"chan_reserve_sat": "10000"}}]),
+           uscita_u([{**canale(300_000, 10_000, 450_000),
+                      "remote_constraints": {"max_pending_amt_msat": "50000000"}}])])
+
+    chiamate.clear()
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX)))
+    prova("LA FATTURA PHOENIX DA 270.030: la cifra intera non passa da un canale, a pezzi si' — ok, NESSUN avviso",
+          ("ok", PHX), (esito(v), v["dest"]))
+    prova("...quattro domande: la decodifica, la strada intera, quella del PEZZO, i canali (il nodo no: c'e' il hint)",
+          ["/v1/payreq/" + buona, f"/v1/graph/routes/{PHX}/270030",
+           f"/v1/graph/routes/{PHX}/16877", "/v1/channels?active_only=true"],
+          [c[1] for c in chiamate])
+    prova("...il hint con l'ALIAS viaggia intatto nelle due POST (il chan_id oltre l'int64 resta una stringa)",
+          [{"route_hints": HINT_PHX}] * 2, [c[2] for c in chiamate if c[0] == "POST"])
+    prova("...la commissione in proporzione (2,687 sats sul pezzo da 16.877, per 270.030) e il tetto dell'1%",
+          (43, 2700), (v["fee"], v["tetto"]))
+    prova("...e il journal dice il pezzo e l'uscita", True,
+          v["perche"] == "a pezzi da 16.877, uscita 380.452")
+    r = S["_risposta_fattura_p2p"](v, 111, "abc")
+    prova("...al client: ok, senza messaggio, senza «usa comunque»",
+          (True, False, ""), (r["ok"], r["comunque"], r["messaggio"]))
+
+    chiamate.clear()
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX, largo=0)))
+    prova("NESSUNA strada, ne' intera ne' a pezzi: senza_strada, AVVISA col motivo in parole semplici",
+          ("senza_strada", K["MSG_SENZA_STRADA"], 3), (esito(v), v.get("messaggio"), len(chiamate)))
+    prova("...la frase dice la rete e il wallet, non piu' «il nostro nodo»", (True, False),
+          ("La rete Lightning non trova un collegamento" in v.get("messaggio"),
+           "nostro nodo" in v.get("messaggio")))
+
+    chiamate.clear()
+    corti = [canale(150_000, 10_000, 450_000), canale(110_000, 3_100, 139_500, capienza=310_000)]
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX, canali=corti)))
+    prova("IL PEZZO PASSA MA LA SOMMA NON BASTA (140.000 + 106.900 < 270.030 + 43): uscita_corta, nessun avviso",
+          ("uscita_corta", 4), (esito(v), len(chiamate)))
+    prova("...il perche' per il journal ha le due cifre", True,
+          "246.900" in v["perche"] and "270.073" in v["perche"])
+    r = S["_risposta_fattura_p2p"](v, 111, "abc")
+    prova("...al client passa come buona (ok, niente messaggio) e il journal la segna con «·»",
+          (True, False, "", True),
+          (r["ok"], r["comunque"], r["messaggio"], detto[-1].startswith("· Fattura P2P")))
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX, canali=[
+        canale(150_000, 10_000, 450_000), canale(130_073, 0, 139_500, capienza=310_000)])))
+    prova("...la somma che copre GIUSTA cifra + rete (140.000 + 130.073 = 270.073): ok", "ok", esito(v))
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX, canali=[
+        canale(150_000, 10_000, 450_000), canale(130_072, 0, 139_500, capienza=310_000)])))
+    prova("...un sat sotto: uscita_corta", "uscita_corta", esito(v))
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX, canali_stato=K["LND_NEGATO"])))
+    prova("...i canali che non si leggono sono un «non so»: ok, e il journal lo dice", ("ok", True),
+          (esito(v), "uscita non letta (canali negato)" in v["perche"]))
+
+    chiamate.clear()
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX_INTERA)))
+    prova("la stessa fattura SENZA MPP: va pagata intera, e intera non passa — pezzo_solo, AVVISA",
+          ("pezzo_solo", K["MSG_PEZZO_SOLO"], 3), (esito(v), v.get("messaggio"), len(chiamate)))
+    chiamate.clear()
+    v = gira(rete_j(buona, 200_000, lnd_largo(DEC_PHX_INTERA)))
+    prova("...e se la cifra intera passa da un canale, il MPP non serve: ok con una domanda di strada sola",
+          ("ok", 1), (esito(v), len([c for c in chiamate if c[0] == "POST"])))
+    v = gira(rete_j(buona, 270_030, lnd_largo(DEC_PHX_INTERA, largo=0)))
+    prova("...senza MPP e senza strada nemmeno per il pezzo: senza_strada", "senza_strada", esito(v))
+
+    async def _pezzo_caro(metodo, percorso, corpo=None, cosa=""):
+        if "/v1/graph/routes/" in percorso:
+            amt = int(percorso.rsplit("/", 1)[1])
+            return (("errore", {"message": "unable to find a path to destination"})
+                    if amt > LARGO else ROTTA(amt * 20))       # 2% del pezzo
+        return await lnd_largo(DEC_PHX)(metodo, percorso, corpo, cosa)
+    v = gira(rete_j(buona, 270_030, _pezzo_caro))
+    prova("a pezzi la rete costa il 2%: costo, AVVISA, con la stima in proporzione",
+          ("costo", 5401, 2700), (esito(v), v["fee"], v["tetto"]))
+
+    async def _pezzo_muto(metodo, percorso, corpo=None, cosa=""):
+        if percorso.endswith("/16877"):
+            return (K["LND_MUTO"], {})
+        return await lnd_largo(DEC_PHX)(metodo, percorso, corpo, cosa)
+    v = gira(rete_j(buona, 270_030, _pezzo_muto))
+    prova("il pezzo che non risponde: non_disponibile (passa), col perche'", ("non_disponibile", "pezzo muto"),
+          (esito(v), v["perche"]))
+    chiamate.clear()
+    v = gira(rete_j(buona, 15_000, lnd_largo(DEC_PHX, largo=10_000)))
+    prova("una cifra che LND non divide (15.000: il pezzo starebbe sotto 10.000): senza_strada, e nessun pezzo chiesto",
+          ("senza_strada", 2), (esito(v), len(chiamate)))
+    prova("...«insufficient local balance» (poca uscita in TOTALE) resta un «non so» che passa, come prima",
+          ("non_disponibile", True), (lambda v: (esito(v), "insufficient local balance" in v["perche"]))(
+              gira(rete_j(buona, 270_030, lnd({"/v1/payreq/": DEC_PHX, "/v1/graph/routes/": (
+                  "errore", {"message": "insufficient local balance", "status": 500})})))))
+
     # --- 4) LA LIGHTNING ADDRESS --------------------------------------
     indir = S["_controllo_indirizzo_p2p"]
     coniate = []
@@ -136813,6 +136988,17 @@ def prove_controllo_fattura_p2p():
     prova("...e il nodo privato si dice con la frase dell'INDIRIZZO, non quella della fattura",
           ("nodo_assente", K["MSG_INDIRIZZO"]["nodo_assente"], "indirizzo"),
           (esito(v), v["messaggio"], v["tramite"]))
+    # la strada a pezzi vale anche per la fattura che il wallet
+    # dell'indirizzo conia (16 ott 2026): stesso giudice, frasi sue
+    v = gira(indir("mario@wallet.com", 270_030, lnd_largo(DEC_PHX), risolvi, diag))
+    prova("l'indirizzo di 270.030 sats con MPP: a pezzi passa, ok senza avviso", ("ok", "indirizzo"),
+          (esito(v), v["tramite"]))
+    v = gira(indir("mario@wallet.com", 270_030, lnd_largo(DEC_PHX_INTERA), risolvi, diag))
+    prova("...senza MPP: pezzo_solo con la frase dell'INDIRIZZO",
+          ("pezzo_solo", K["MSG_INDIRIZZO"]["pezzo_solo"]), (esito(v), v["messaggio"]))
+    v = gira(indir("mario@wallet.com", 270_030, lnd_largo(DEC_PHX, largo=0), risolvi, diag))
+    prova("...nessuna strada: senza_strada con la frase dell'INDIRIZZO",
+          ("senza_strada", K["MSG_INDIRIZZO"]["senza_strada"]), (esito(v), v["messaggio"]))
 
     # --- 5) IL GIUDICE UNICO -------------------------------------------
     unico = S["controlla_fattura_p2p"]

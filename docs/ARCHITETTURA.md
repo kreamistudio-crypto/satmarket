@@ -31846,6 +31846,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   collaudo `collaudo_controllo_fattura` (LND di cartone in HTTPS coi tre
   macaroon). La procedura del macaroon nuovo e la verifica dal VPS:
   PRODUZIONE, «IL CONTROLLO DELLA FATTURA P2P».
+  Dal 16 ott 2026 (cantiere strada-phoenix; il perché in CANTIERI, «La
+  strada a pezzi») LA STRADA A PEZZI: QueryRoutes cerca UNA strada con la
+  cifra intera e risponde «unable to find a path» quando nessun nostro
+  canale da solo la regge, mentre il payout di Mostro la divide fino a 16
+  pezzi. Quando la cifra intera non passa (o `routes` torna vuoto),
+  `_controllo_rete_fattura_p2p` chiede la strada per `_pezzo_lnd(importo)`
+  (PURA: dimezza fino a `LND_PEZZI_MAX` = 16 pezzi, mai sotto
+  `LND_PEZZO_MIN_SATS` = 10.000; una cifra che non si dimezza non ha
+  pezzo, ed è `senza_strada`). Pezzo senza strada = `senza_strada`; pezzo
+  con strada e fattura che NON si divide (`_fattura_si_divide`: bit 16 o
+  17 nei `features` della decodifica) = `pezzo_solo`, in
+  `FATTURA_AVVISA` (`MSG_PEZZO_SOLO`, e la sua frase in `MSG_INDIRIZZO`);
+  pezzo con strada e fattura che si divide = il costo in proporzione
+  (commissione del pezzo × cifra / pezzo, per eccesso) contro il tetto
+  (`costo`), poi `GET /v1/channels?active_only=true` (`offchain:read`) e
+  `_uscita_utilizzabile` (PURA: per canale in linea `_sats_canale` del
+  lato locale, non oltre il più piccolo dei due `max_pending_amt_msat`
+  meno gli HTLC in uscita; senza tetti il solo saldo): se non copre cifra
+  + commissione l'esito è `uscita_corta` (`FATTURA_USCITA_CORTA`: fuori
+  dalle due tuple, quindi PASSA senza messaggio, «·» nel journal col
+  perché), sennò `ok` col perché «a pezzi da N, uscita M». I canali che
+  non si leggono sono un «non so»: `ok`. La strada di oggi coi suoi
+  esiti e «insufficient local balance» (`non_disponibile`) restano come
+  prima. Le domande sono al massimo cinque (`LND_FATTURA_ATTESA_S` = 8 s
+  ciascuna, il client ne aspetta 40). Il messaggio di `senza_strada` dice
+  «La rete Lightning non trova un collegamento fino a questo wallet».
   Dal 10 ott 2026 (seconda tappa) la RETE la giudica anche il client,
   prima di tutto: `reteBolt11` e `avvisoReteBolt11` accanto a
   `importoBolt11`, nel foglio a mano subito dopo «non si legge» e nella

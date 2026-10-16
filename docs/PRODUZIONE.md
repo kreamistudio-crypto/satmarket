@@ -1702,6 +1702,15 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   avvisata col «Usa comunque» (nessuna strada, costo oltre il tetto),
   · non si è potuto controllare (col perché), ✅ ok; mai la fattura
   intera, solo l'ordine e la destinazione accorciati.
+  Dal 16 ott 2026 (cantiere strada-phoenix) due righe in più, nessun
+  passo sul VPS (i canali si leggono con `offchain:read`, che il
+  macaroon ha già): «⚠️ … pezzo_solo» = una fattura senza MPP che
+  intera non passa da nessun canale; «· … uscita_corta» col perché («a
+  pezzi da N la strada c'è, ma l'uscita utilizzabile (X) non copre cifra
+  + rete (Y)») = la fattura è buona, è la NOSTRA uscita a essere corta in
+  quel momento: l'utente non vede niente, e se succede spesso è una
+  domanda per la guardia della liquidità. «✅ … a pezzi da N, uscita M:
+  ok» = la cifra intera non stava in un canale, a pezzi sì.
   I WALLET IL CUI INDIRIZZO NON PASSA (10 ott 2026, cantiere
   indirizzo-non-verificato): quando chi compra legge «Non sono riuscito
   a verificare questo indirizzo» e nel journal, lo stesso minuto, c'è

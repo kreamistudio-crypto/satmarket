@@ -61199,3 +61199,115 @@ Il resto lo fa la CI.
 - Il file su disco del cassetto non si restringe da solo dopo le
   cancellazioni (sqlite riusa lo spazio): se un giorno pesa, un VACUUM a
   mano a mercato fermo.
+
+
+## La strada a pezzi: la fattura Phoenix che «non trovava una strada» (16 ott 2026, cantiere strada-phoenix, richiesta di Andrea)
+
+**IL CASO.** Nel foglio «Dove ricevere i sats» del P2P una fattura
+Phoenix normale da 270.030 sats prendeva «Il nostro nodo non trova una
+strada per arrivare a questa fattura: il pagamento potrebbe fallire».
+La strada c'era. La decodifica sul nodo: destinazione Phoenix (nodo
+privato), UN hop hint via ACINQ con un chan_id alias
+(18436044651096163129, altezza ~16,7 milioni: non è un canale del
+grafo), 1 sat + 100 ppm, `cltv_expiry_delta` 144, cltv finale 144, MPP
+facoltativo, il bit 149 sconosciuto e facoltativo, scadenza 7 giorni.
+In uscita: due canali ACINQ con 303.479 e 250.952 sats. Un falso
+allarme che allontanava dal wallet che consigliamo.
+
+**LA CAUSA** (letta sul sorgente di LND 0.19.3, non a memoria).
+`_controllo_rete_fattura_p2p` chiedeva la strada con QueryRoutes
+(`POST /v1/graph/routes/{dest}/{sats}`, i hint nel corpo): hint e alias
+passavano bene. Ma QueryRoutes cerca UNA strada con la cifra INTERA, e
+in `routing/pathfind.go` (riga 681), partendo da noi, se il più largo
+dei nostri canali non regge la cifra risponde `errNoPathFound`, «unable
+to find a path to destination» — col commento loro: «may still be
+possible to complete the payment by splitting». La larghezza di un
+canale nostro è il saldo meno la riserva e meno quel che ACINQ accetta
+in volo (`MayAddOutgoingHtlc` → `ErrMaxPendingAmount`): il grande (1M)
+porta ~241k, il piccolo è fermo al 45 % della sua capienza. Il payout
+vero di Mostro passa da SendPaymentV2 senza `max_parts`, che LND legge
+come 16 pezzi (`DefaultMaxParts`), e la fattura Phoenix dichiara MPP:
+quello passa. **RIPRODOTTO SUL NODO** da Andrea, sola lettura:
+`lncli queryroutes --dest <ACINQ> --amt 270030` → «unable to find a
+path to destination». Non dipende dal wallet ma dalla CIFRA: colpiva
+ogni fattura e ogni indirizzo (lo stesso giudice) sopra il canale più
+largo — Phoenix, Breez, Blink, Wallet of Satoshi. Sotto, niente.
+
+**LA CURA** (piano in dieci righe, ok di Andrea con un'aggiunta).
+Quando la cifra intera non passa (o `routes` torna vuoto), una seconda
+QueryRoutes per il PEZZO più piccolo che LND proverebbe
+(`_pezzo_lnd`: dimezza fino a 16 pezzi e mai sotto i 10.000 sats di
+`DefaultShardMinAmt`; 270.030 → 16.877). Pezzo senza strada: la strada
+manca davvero, `senza_strada`, con la frase nuova «La rete Lightning non
+trova un collegamento fino a questo wallet». Pezzo con strada e fattura
+SENZA MPP (bit 16/17 nei `features`): va pagata intera e intera non
+passa, `pezzo_solo`, avviso col bottone «Usa comunque» e il motivo
+(«chiede la cifra tutta in un colpo solo, e oggi nessuna strada la
+porta intera»). Pezzo con strada e fattura che si divide: il costo in
+proporzione contro il tetto (`costo` come prima), poi L'AGGIUNTA DI
+ANDREA — il pezzo dimostra che passa un pezzo, non che passano tutti:
+la somma dell'uscita utilizzabile dei canali in linea
+(`GET /v1/channels?active_only=true`, `offchain:read` che il macaroon
+ha già; per canale saldo meno riserva, non oltre il più piccolo dei
+due `max_pending_amt_msat` meno gli HTLC in uscita) deve coprire cifra
++ commissione stimata. Se non la copre è un fatto NOSTRO, non del
+wallet, e la garanzia incassata rimette i sats prima del payout: esito
+`uscita_corta`, nessun avviso all'utente, «·» nel journal col perché.
+«insufficient local balance» sulla cifra intera resta com'era
+(`non_disponibile`, passa). Nessuna sonda e nessun pagamento: solo
+domande al grafo. Le domande diventano al massimo cinque e
+`LND_FATTURA_ATTESA_S` scende da 10 a 8, perché il client ne aspetta 40.
+
+**STRADE SCARTATE.** Le sonde (un pagamento con un hash finto): pagano
+il giro sui canali e non servono, il grafo basta per «c'è la strada».
+QueryRoutes con `source_pub_key` = ACINQ (come `_strada_phoenix` della
+guardia): toglie i nostri saldi dal conto, ma non conta la commissione
+del salto di ACINQ e vale solo per chi passa da lui. Il solo pezzo
+senza la somma: era il mio piano, Andrea l'ha completato. Spegnere
+l'avviso per ogni fattura MPP: tacerebbe anche le strade che mancano
+davvero.
+
+**PROVATO.**
+- `prove_controllo_fattura_p2p`: 118 passate, 0 fallite. La
+  fattura Phoenix decodificata com'era sul nodo, l'alias che viaggia
+  intatto nelle due POST, il pezzo, il costo in proporzione (43 su un
+  tetto di 2.700), il caso senza strada vera, IL PEZZO PASSA MA LA
+  SOMMA NON BASTA (140.000 + 106.900 contro 270.073) e il confine al sat
+  (270.073 ok, 270.072 `uscita_corta`), la fattura senza MPP, il pezzo
+  caro, il pezzo muto, la cifra che non si divide, i canali che non si
+  leggono, le tre frasi dell'indirizzo, i quattro aiutanti puri.
+- `collaudo_controllo_fattura`: 32 passate, 0 fallite, con l'LND di
+  cartone in HTTPS che fa come QueryRoutes (una strada sola, solo se la
+  cifra sta in un canale) e risponde a `/v1/channels`.
+- LE MUTAZIONI, su una copia del repo per ognuna: sedici,
+  tutte prese (il pezzo tolto, il MPP ignorato, la somma tolta o senza
+  la commissione, il tetto per canale tolto, la riserva ignorata, gli
+  appesi al contrario, il pezzo minimo e i 16 pezzi, il costo non in
+  proporzione, i canali fuori linea contati, il pezzo senza strada letto
+  come «non so», il segno del journal, il solo bit 17, il tetto nostro
+  ignorato, i canali illeggibili letti come uscita corta). Due erano
+  prese solo perché la prova esplodeva su `v["messaggio"]`: ora
+  `v.get(...)`, e segnano rosso.
+- IL GIRO DAL VIVO nel browser, su una copia col config di cartone
+  (collaudo, relay morto, l'LND del collaudo su una porta sua), un
+  ordine seminato da 270.030 sats e il foglio vero: la fattura Phoenix
+  passa senza avviso e arriva all'`add-invoice` (il coordinatore di
+  cartone non manda); quella senza MPP mostra l'avviso «pezzo solo» col
+  bottone; quella senza strada l'avviso nuovo. Il journal:
+  «✅ … fee 43/2700, a pezzi da 16.877, uscita 380.452: ok»,
+  «⚠️ …: pezzo_solo», «⚠️ …: senza_strada».
+- Suite e collaudi: nel verbale del push, qui sotto.
+
+**DA FARE** (notati, non fatti; decide Andrea):
+- I numeri del canale ACINQ piccolo nelle prove (capienza 310k, tetto
+  di ACINQ al 45 %) sono stimati: un `listchannels` sul nodo li
+  conferma.
+- QueryRoutes non riceve il `final_cltv_delta` della fattura (144 per
+  Phoenix) né i `dest_features`: usa i default di LND. Oggi non cambia
+  l'esito; il tempo totale della strada risulta più corto del vero.
+- Il cappello della sezione dice che senza `fee_limit` LND cerca «fino
+  al 100%»: il default è il 5 % sopra i 1.000 sats
+  (`DefaultRoutingFeeLimitForAmount`). Non cambia niente col nostro
+  tetto all'1 %, ma la frase è sbagliata.
+- Vedere dal vivo, la prima volta che succede, una riga «uscita_corta»
+  nel journal del VPS e se il payout poi passa davvero.
