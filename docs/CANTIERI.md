@@ -61296,7 +61296,16 @@ davvero.
   bottone; quella senza strada l'avviso nuovo. Il journal:
   «✅ … fee 43/2700, a pezzi da 16.877, uscita 380.452: ok»,
   «⚠️ …: pezzo_solo», «⚠️ …: senza_strada».
-- Suite e collaudi: nel verbale del push, qui sotto.
+- VERBALE DEL PUSH. Sull'albero `b902fef` (base `a5044fd`): suite
+  severa 24.593 passate, 3 fallite — le tre di `prove_canale_bot`, rosse
+  anche su origin/main pulito (`a5044fd` di Alan, CI di main rossa); i
+  collaudi della CI 83 verdi, 0 rossi. Push trattenuto finché la CI di
+  main non è tornata verde (`482398f` di Alan, che tocca solo
+  `prove.py` nella sezione del canale). Dopo il rebase su `482398f`
+  (albero `0bed432`): `prove_controllo_fattura_p2p` e
+  `prove_canale_bot` 210 passate, 0 fallite;
+  `collaudo_controllo_fattura` e `collaudo_guardia_liquidita` verdi
+  nella gabbia. Il resto lo fa la CI.
 
 **DA FARE** (notati, non fatti; decide Andrea):
 - I numeri del canale ACINQ piccolo nelle prove (capienza 310k, tetto
