@@ -90084,7 +90084,7 @@ DOM = null;
     # --- 7) A CHI COMPRA: il riquadro del PayCode ---------------------------
     _rc = out["riquadroCompro"]
     prova("a chi compra il riquadro porta il PayCode grande, l'importo, la scadenza e il tempo che resta", True,
-          "<b>479-868-518</b>" in _rc and "23.47 € in contanti" in _rc
+          '<b class="da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">479-868-518</b>' in _rc and "23.47 € in contanti" in _rc
           and 'id="p2pTabPayResta"' in _rc and 'data-fine="' + str(1800000000 + 30 * 3600) + '"' in _rc)
     # ⚠️ I QUATTRO GESTI SI CONTANO DENTRO LA LISTA, e non in tutto il
     # riquadro: dal 24 set 2026 «tieni lo scontrino» lo dice anche il
@@ -90223,8 +90223,15 @@ DOM = null;
           bool(_cssb) and "color:var(--rosso-p2p-testo)" in _cssb.group(1)
           and "background:var(--rosso-p2p-tenue)" in _cssb.group(1)
           and "#" not in _cssb.group(1))
-    prova("...e il bottone per copiare il codice", True,
-          "copiaLink(this.dataset.pc, 'PayCode copiato 📋')" in _rc)
+    # ⚠️ EMENDATA (16 ott 2026, copia-recapito, secondo giro): il 📋 passa
+    # da `copiaRecapitoP2P` (la stessa scala, col suo toast e il «✓» per
+    # due secondi), e il codice si copia anche toccandolo
+    prova("...e il bottone per copiare il codice, e il codice che si tocca", [True, True],
+          [bool(re.search(r'class="p2p-paycode-copia" data-v="\d{3}-\d{3}-\d{3}" '
+                          r'data-msg="PayCode copiato 📋" data-fatto="✓" '
+                          r'onclick="copiaRecapitoP2P\(this\)"', _rc)),
+           bool(re.search(r'<b class="da-toccare" onpointerdown="this\._giu=Date\.now\(\)" '
+                          r'onclick="toccaDatoP2P\(this\)">\d{3}-\d{3}-\d{3}</b>', _rc))])
     prova("senza un PayCode nel testo il riquadro non c'e' (vale il recapito di sempre)", "", out["riquadroSenza"])
     # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): il
     # recapito di chi compra — il riquadro del PayCode compreso — e'
@@ -123401,6 +123408,9 @@ def prove_ritocchi_scambio():
              mini.index("\n];", mini.index("const FORME_DA_INCOLLARE_P2P = [")) + 3],
         fn("function daIncollareP2P(r){"),
         fn("function copiaRecapitoP2P(b){"),
+        # (secondo giro) il tocco sul dato
+        re.search(r"const P2P_TOCCO_LUNGO_MS = [^\n]*;", mini).group(0),
+        fn("function toccaDatoP2P(el){"),
         fn("function recapitoCompratoreP2P(o){"),
         re.search(r"const P2P_FINALI = [^\n]*;", mini).group(0),
         mini[mini.index("const P2P_PROGRESSO = {"):
@@ -123427,9 +123437,9 @@ out.titolo = box.indexOf('<div class="p2p-recapito"><div class="p2p-paycode-tit"
 out.testaSenzaCopia = box.indexOf('<div class="p2p-recapito-testa">Bonifico SEPA</div><div class="p2p-recapito-riga">') >= 0;
 /* la riga dell'intestatario ha il suo «Copia» (9 ott 2026, sera, «I tre
    ritocchi alla causale»): prima era testo e basta */
-out.nomeConCopia = box.indexOf('<span>Intestatario</span><b>Mario Rossi</b></div>'
+out.nomeConCopia = box.indexOf('<span>Intestatario</span><b class="da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">Mario Rossi</b></div>'
   + '<button type="button" class="p2p-recapito-copia" data-v="Mario Rossi"') >= 0;
-out.ibanMono = box.indexOf('<b class="mono">IT60 X054 2811 1010 0000 0123 456</b>') >= 0;
+out.ibanMono = box.indexOf('<b class="mono da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">IT60 X054 2811 1010 0000 0123 456</b>') >= 0;
 /* a gruppi di quattro SOLO se ha la forma di un IBAN, e il «Copia» solo
    li' — che copia SENZA spazi anche quando e' arrivato con gli spazi */
 const strano = riquadroRecapitoP2P('IBAN: da chiedere al telefono\nIBAN2: it60x0542811101000000123456');
@@ -123437,9 +123447,9 @@ out.ibanStrano = strano.indexOf('<b class="mono">da chiedere al telefono</b>') >
   && strano.indexOf('<b>it60x0542811101000000123456</b>') >= 0;
 out.stranoCopie = (strano.match(/class="p2p-recapito-copia"/g) || []).length;
 const conSpazi = riquadroRecapitoP2P('IBAN: IT60 X054 2811 1010 0000 0123 456');
-out.ibanConSpazi = conSpazi.indexOf('<b class="mono">IT60 X054 2811 1010 0000 0123 456</b>') >= 0
+out.ibanConSpazi = conSpazi.indexOf('<b class="mono da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">IT60 X054 2811 1010 0000 0123 456</b>') >= 0
   && conSpazi.indexOf('data-v="IT60X0542811101000000123456"') >= 0;
-out.nomeNonMono = box.indexOf('<span>Intestatario</span><b>Mario Rossi</b>') >= 0;
+out.nomeNonMono = box.indexOf('<span>Intestatario</span><b class="da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">Mario Rossi</b>') >= 0;
 out.copiaDalDataset = (box.match(/data-v="[^"]*" onclick="copiaRecapitoP2P\(this\)"/g) || []).length;
 out.copiaIban = box.indexOf('data-v="IT60X0542811101000000123456"') >= 0;
 const cattivo = riquadroRecapitoP2P('IBAN: "><img src=x onerror=alert(1)>\nNota: \'); alert(1); //');
@@ -123487,7 +123497,8 @@ globalThis.setTimeout = (f, ms) => { timer.push([f, ms]); return timer.length; }
 globalThis.clearTimeout = () => {};
 globalThis.haptic = () => {};
 let presi = [];
-globalThis.copiaLink = (v, fatto) => { presi.push(v); return Promise.resolve(out.appunti); };
+let detti = [];
+globalThis.copiaLink = (v, fatto) => { presi.push(v); detti.push(fatto); return Promise.resolve(out.appunti); };
 const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isConnected: true,
   classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }}});
 (async () => {
@@ -123502,6 +123513,45 @@ const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isCon
   await copiaRecapitoP2P(c);
   out.rifiuto = [c.textContent, c.classList.s.has('fatto'), timer.length];
   out.presi = presi;
+  /* IL TOCCO SUL DATO (secondo giro): il tasto c'e' dove c'e' il dato da
+     incollare, e solo li'; il tocco fa il gesto del bottone della SUA
+     riga; con una selezione fatta a mano non si copia niente */
+  const tocchi = t => (riquadroRecapitoP2P(t).match(/onclick="toccaDatoP2P\(this\)"/g) || []).length;
+  const bottoni = t => (riquadroRecapitoP2P(t).match(/<button/g) || []).length;
+  out.tocchiPerMetodo = ['Revolut: @pseudolo', 'Satispay: 333 1234567', 'PayPal: a@b.it',
+    'Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60X0542811101000000123456\nCausale: regalo',
+    'Bonifico SEPA\nNota: dopo le 18', 'IBAN: da chiedere'].map(t => [tocchi(t), bottoni(t)]);
+  let SEL = {isCollapsed: true, toString: () => ''};
+  globalThis.window = {getSelection: () => SEL};
+  presi = []; out.appunti = true;
+  const b2 = bott();
+  const riga = {querySelector: q => /p2p-recapito-copia/.test(q) ? b2 : null};
+  const dato = {closest: q => /p2p-recapito-riga/.test(q) ? riga : null};
+  out.toccoCopia = toccaDatoP2P(dato);
+  await new Promise(r => r());
+  await new Promise(r => r());
+  out.toccoDopo = [b2.textContent, presi.slice()];
+  presi = [];
+  SEL = {isCollapsed: false, toString: () => 'pseudo'};
+  out.toccoSelezione = [toccaDatoP2P(dato), presi.length];
+  SEL = {isCollapsed: true, toString: () => ''};
+  out.toccoSenzaBottone = toccaDatoP2P({closest: () => ({querySelector: () => null})});
+  /* IL TOCCO LUNGO NON COPIA (dal giro dal vivo): il dito sceso piu' di
+     P2P_TOCCO_LUNGO_MS fa e' una pressione lunga, uno appena sceso no */
+  presi = [];
+  dato._giu = Date.now() - 900;
+  out.toccoLungo = [toccaDatoP2P(dato), presi.length];
+  dato._giu = Date.now() - 100;
+  out.toccoBreve = [toccaDatoP2P(dato), presi.length];
+  delete dato._giu;
+  /* il 📋 del PayCode: il suo toast e il suo «✓», e torna il 📋 */
+  timer.length = 0; detti = [];
+  const pc = {dataset: {v: '479-868-518', msg: 'PayCode copiato 📋', fatto: '✓'}, textContent: '📋',
+    isConnected: true, classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }}};
+  await copiaRecapitoP2P(pc);
+  out.payCode = [pc.textContent, detti[0]];
+  timer[timer.length - 1][0]();
+  out.payCodeTorna = pc.textContent;
   console.log(JSON.stringify(out));
 })();
 """)
@@ -123577,6 +123627,28 @@ const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isCon
                "ibanFinto": []},
               out.get("perMetodo"))
         prova("...con Revolut il tasto e' uno solo", 1, out.get("revolutUno"))
+        # (16 ott 2026, copia-recapito, secondo giro, richiesta di Andrea)
+        # IL TOCCO SUL DATO: sui soli dati col «📋», e fa il gesto del bottone
+        prova("il dato si tocca dove c'e' il 📋, e solo li' (Revolut, Satispay, "
+              "PayPal, il bonifico coi suoi tre; niente sulle righe descrittive)",
+              [[1, 1], [1, 1], [1, 1], [3, 3], [0, 0], [0, 0]], out.get("tocchiPerMetodo"))
+        prova("...il tocco copia il valore del bottone della sua riga, con lo "
+              "stesso «✓ Copiato»", [True, ["✓ Copiato", ["@pseudolo"]]],
+              [out.get("toccoCopia"), out.get("toccoDopo")])
+        prova("...con una selezione fatta a mano non si copia niente; senza "
+              "bottone nella riga, niente", [[False, 0], False],
+              [out.get("toccoSelezione"), out.get("toccoSenzaBottone")])
+        prova("...il tocco LUNGO non copia (piu' di mezzo secondo col dito giu'), "
+              "quello breve si'", [[False, 0], [True, 1], 500],
+              [out.get("toccoLungo"), out.get("toccoBreve"),
+               int(re.search(r"const P2P_TOCCO_LUNGO_MS = (\d+);", mini).group(1))])
+        prova("...e il dito che scende lascia solo l'ora, in una proprieta': "
+              "niente preventDefault, niente attributo che cambi l'HTML", True,
+              ' onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)"'
+              in fn("function rigaDato(et, v, op){")
+              and "preventDefault" not in fn("function toccaDatoP2P(el){"))
+        prova("...e il 📋 del PayCode dice «✓» col suo toast, poi torna 📋",
+              [["✓", "PayCode copiato 📋"], "📋"], [out.get("payCode"), out.get("payCodeTorna")])
         prova("il tocco: «✓ Copiato» per due secondi, poi «📋 Copia»; se gli "
               "appunti dicono di no il bottone non mente",
               [["✓ Copiato", True, 2000], ["📋 Copia", False],
@@ -124544,7 +124616,9 @@ globalThis.copiaLink = copiaLink;
    copiaLink */
 globalThis.copiaRecapitoP2P = copiaRecapitoP2P;
 function tocca(h){
-  const m = /onclick="([^"]*)"/.exec(h);
+  /* (16 ott 2026) il dato ha il suo onclick (il tocco sul dato): qui si
+     tocca il BOTTONE */
+  const m = /<button[^>]*onclick="([^"]*)"/.exec(h);
   /* (16 ott 2026) il «📋 Copia» scrive sul bottone: ✓ Copiato */
   new Function(m[1]).call({dataset: {v: /data-v="([^"]*)"/.exec(h)[1]}, isConnected: true,
                            classList: {add(){}, remove(){}}});
@@ -124925,7 +124999,8 @@ const CASI = {
     prova("la riga al byte: il «Copia» solo se chiesto (l'IBAN, senza spazi), "
           "senza etichetta niente <span>",
           ['<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
-           '<span>IBAN</span><b class="mono">IT60 X054 2811 1010 0000 0123 456</b></div>'
+           '<span>IBAN</span><b class="mono da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">'
+           'IT60 X054 2811 1010 0000 0123 456</b></div>'
            '<button type="button" class="p2p-recapito-copia" '
            'data-v="IT60X0542811101000000123456" '
            "onclick=\"copiaRecapitoP2P(this)\" "

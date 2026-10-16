@@ -28764,7 +28764,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   quello partito. Il «📋 Copia» del riquadro va sui soli dati da
   incollare (`daIncollareP2P`: per etichetta dei nostri form o per forma
   — @tag, email, numero, link) e dice «✓ Copiato» per 2 s
-  (`copiaRecapitoP2P`).
+  (`copiaRecapitoP2P`); toccato, il valore stesso fa il gesto del suo
+  bottone (`toccaDatoP2P`: niente con una selezione a mano, niente col
+  tocco lungo oltre `P2P_TOCCO_LUNGO_MS`), e così il numero del PayCode.
   `passoDopoGaranziaP2P` (pura) dà in app la STESSA frase uscendo da
   `attesa_mia_hold`, ovunque sia chi vende e qualunque foglio sia
   aperto («Sats bloccati ✅» usciva solo a foglio della garanzia

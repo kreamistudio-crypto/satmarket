@@ -4791,6 +4791,10 @@
   .p2p-paycode-cod b{font-size:28px;letter-spacing:2px;font-variant-numeric:tabular-nums}
   .p2p-paycode-copia{border:0;background:var(--sats-soft);border-radius:10px;
     font-size:18px;padding:6px 10px;cursor:pointer}
+  /* il «✓» del PayCode copiato (16 ott 2026, copia-recapito): il verde
+     del «✓ Copiato» del recapito, e la larghezza dell'icona tenuta */
+  .p2p-paycode-copia{min-width:44px}
+  .p2p-paycode-copia.fatto{background:var(--trust-soft);color:var(--trust-text)}
   .p2p-paycode-riga{display:flex;justify-content:space-between;gap:10px;font-size:13px;
     color:var(--muted);padding:3px 0}
   .p2p-paycode-riga b{color:var(--ink)}
@@ -4873,6 +4877,9 @@
      il bottone fermo quando la parola cambia, e la riga non salta */
   .p2p-recapito-copia:not(.icona){min-width:92px;white-space:nowrap}
   .p2p-recapito-copia.fatto{background:var(--trust-soft);color:var(--trust-text)}
+  /* il dato che si copia col tocco (secondo giro): la manina col mouse;
+     la selezione resta quella del riquadro */
+  .da-toccare{cursor:pointer}
   /* LE STESSE RIGHE NELLE BUSTE DEL MERCATINO (23 set 2026, «Dati di
      spedizione che si copiano»): l'indirizzo, l'email per il corriere e
      il punto di ritiro, dentro il loro .payout e SENZA la carta del
@@ -36507,9 +36514,20 @@ function copiaAllAntica(testo){
    che distingue lo 0 dalla O. */
 function rigaDato(et, v, op){
   const o = op || {};
+  /* IL DATO SI COPIA ANCHE TOCCANDOLO (16 ott 2026, cantiere
+     copia-recapito, secondo giro, richiesta di Andrea): dove c'e' il
+     «📋 Copia» grande — il recapito P2P, i soli dati da incollare —
+     un tocco sul valore fa lo stesso gesto del bottone (`toccaDatoP2P`).
+     Il 📋 piccolo delle buste del mercatino resta com'era. E' un
+     `onclick` e basta: il tocco lungo non fa un click, quindi la
+     selezione col dito resta (le prove del 23 set la difendono). */
+  const tocca = o.copia && !o.icona;
+  const classi = [o.mono ? 'mono' : '', tocca ? 'da-toccare' : ''].filter(Boolean).join(' ');
   return '<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
     + (et ? '<span>' + esc(et) + '</span>' : '')
-    + '<b' + (o.mono ? ' class="mono"' : '') + '>' + esc(o.vista || v) + '</b></div>'
+    + '<b' + (classi ? ' class="' + classi + '"' : '')
+    + (tocca ? ' onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)"' : '')
+    + '>' + esc(o.vista || v) + '</b></div>'
     + (o.copia ? (o.icona ? bottoneCopiaPiccolo(v, 'Copia ' + (et || v), o.icona)
                           : bottoneCopia(v, 'Copia ' + (et || v))) : '') + '</div>';
 }
@@ -36536,13 +36554,44 @@ function bottoneCopia(v, aria){
    recapito nuovo: un recapito cambiato si copia sempre nuovo. */
 function copiaRecapitoP2P(b){
   haptic();
-  return copiaLink(b.dataset.v, 'Copiato 📋').then(ok => {
+  /* (secondo giro) lo usa anche il 📋 del PayCode: il toast e la parola
+     del «fatto» possono essere suoi (`data-msg`, `data-fatto`), e torna
+     la parola che il bottone aveva prima del tocco */
+  const prima = b.dataset.prima || (b.dataset.prima = b.textContent);
+  return copiaLink(b.dataset.v, b.dataset.msg || 'Copiato 📋').then(ok => {
     if (!ok || b.isConnected === false) return;
-    b.textContent = '✓ Copiato';
+    b.textContent = b.dataset.fatto || '✓ Copiato';
     b.classList.add('fatto');
     clearTimeout(b._torna);
-    b._torna = setTimeout(() => { b.textContent = '📋 Copia'; b.classList.remove('fatto'); }, 2000);
+    b._torna = setTimeout(() => { b.textContent = prima; b.classList.remove('fatto'); }, 2000);
   });
+}
+/* IL TOCCO SUL DATO (16 ott 2026, copia-recapito, secondo giro): il
+   valore toccato fa il gesto del SUO bottone, nella stessa riga — lo
+   stesso valore (`data-v`, senza spazi per l'IBAN), lo stesso «✓
+   Copiato» per due secondi sul bottone. Se c'e' una selezione fatta a
+   mano (col mouse il trascinamento finisce in un click, e un tocco dentro
+   una selezione col dito anche) non si copia niente: la selezione e'
+   di chi la sta facendo.
+   E IL TOCCO LUNGO NON COPIA (stesso giorno, dal giro dal vivo): in
+   Chrome il dito fermo tre quarti di secondo sul dato finiva in un
+   click, e copiava. Il dito che scende lascia l'ora sull'elemento
+   (`onpointerdown`, che non ferma niente: niente preventDefault, la
+   selezione resta del browser) — una PROPRIETA' e non un attributo,
+   cosi' `ridisegnaSeCambiaP2P`, che confronta l'HTML, non vede un pezzo
+   cambiato — e oltre `P2P_TOCCO_LUNGO_MS` il click non e' un tocco. */
+const P2P_TOCCO_LUNGO_MS = 500;
+function toccaDatoP2P(el){
+  if (el && el._giu && Date.now() - el._giu > P2P_TOCCO_LUNGO_MS) return false;
+  try {
+    const sel = typeof window !== 'undefined' && window.getSelection && window.getSelection();
+    if (sel && !sel.isCollapsed && String(sel).trim()) return false;
+  } catch(e) {}
+  const riga = el && el.closest && el.closest('.p2p-recapito-riga, .p2p-paycode-cod');
+  const b = riga && riga.querySelector('.p2p-recapito-copia, .p2p-paycode-copia');
+  if (!b) return false;
+  copiaRecapitoP2P(b);
+  return true;
 }
 /* IL 📋 PICCOLO (6 ott 2026, «📦 Spedisci a»): solo l'icona, che passa
    da `copiaDato` — gli appunti e il ✓ sul bottone stesso. `classe` e'
@@ -63970,9 +64019,14 @@ function riquadroPayCodeP2P(o, adesso){
   const attivo = o.stato === 'attivo';
   return '<div class="p2p-paycode" data-fine="' + (scade || 0) + '">' +
     '<div class="p2p-paycode-tit">🧾 Il PayCode da pagare al tabacchino</div>' +
-    '<div class="p2p-paycode-cod"><b>' + esc(pc) + '</b>' +
-      '<button type="button" class="p2p-paycode-copia" data-pc="' + esc(pc) + '" ' +
-        'onclick="copiaLink(this.dataset.pc, \'PayCode copiato 📋\')" aria-label="Copia il PayCode">📋</button></div>' +
+    /* IL CODICE SI COPIA ANCHE TOCCANDOLO (16 ott 2026, copia-recapito,
+       secondo giro): il tocco sul numero fa il gesto del 📋 accanto, e
+       il 📋 dice «✓» per due secondi come il «📋 Copia» del recapito
+       (la parola intera accanto a un codice a 28 px non sta a 320 px) */
+    '<div class="p2p-paycode-cod"><b class="da-toccare" onpointerdown="this._giu=Date.now()" onclick="toccaDatoP2P(this)">' + esc(pc) + '</b>' +
+      '<button type="button" class="p2p-paycode-copia" data-v="' + esc(pc) + '" ' +
+        'data-msg="PayCode copiato 📋" data-fatto="✓" ' +
+        'onclick="copiaRecapitoP2P(this)" aria-label="Copia il PayCode">📋</button></div>' +
     /* IL CODICE ALLA CASSA (16 ott 2026, barcode-paycode): quello del
        PDF di Amazon, se chi vende l'ha mandato; se no lo si dice, e
        non se ne inventa uno — un codice fatto dal PayCode la cassa lo

@@ -64308,10 +64308,63 @@ quattordici di 78d6fdb — **2.298 passate, 0 fallite**, e
 verdi. Lo scanner dei segreti della CI (le FORME del workflow e i 64
 esadecimali) sulle 594 righe aggiunte: zero. Il resto lo fa la CI.
 
+**SECONDO GIRO: IL DATO SI COPIA ANCHE TOCCANDOLO (stesso giorno,
+richiesta di Andrea prima del push).** Un tocco sul valore (IBAN,
+RevTag, intestatario, causale, il numero del PayCode…) fa il gesto
+del suo «📋»: lo stesso valore, lo stesso «✓ Copiato» per due secondi
+sul bottone. Il 📋 resta. SOLO sui dati che hanno il 📋: le righe
+descrittive, il nome del metodo e le etichette non copiano.
+- COME: `rigaDato` mette sul `<b>` del valore `class="da-toccare"` e
+  `onclick="toccaDatoP2P(this)"` solo dove c'è il «📋 Copia» grande
+  (`copia` senza `icona`: il recapito P2P); il 📋 piccolo delle buste
+  del mercatino resta com'era. `toccaDatoP2P` trova il bottone della SUA
+  riga e chiama `copiaRecapitoP2P`. Nel riquadro del PayCode il numero
+  grande si tocca allo stesso modo, e il suo 📋 passa ora da
+  `copiaRecapitoP2P` col suo toast («PayCode copiato 📋», `data-msg`) e
+  un «✓» (`data-fatto`) invece della parola intera: accanto a un codice
+  a 28 px «✓ Copiato» non sta a 320 px. Torna la parola che il bottone
+  aveva prima del tocco (`data-prima`).
+- IL TOCCO LUNGO RESTA DELLA SELEZIONE: è un `onclick` e basta, nessun
+  `preventDefault`, nessun `user-select:none` (le prove del 23 set lo
+  censiscono e restano verdi). Due guardie: con una selezione fatta a
+  mano il click non copia (col mouse il trascinamento finisce in un
+  click); e — trovato dal giro dal vivo — in Chrome il dito fermo 0,9 s
+  sul dato finiva in un click e COPIAVA: ora il dito che scende lascia
+  l'ora sull'elemento (`onpointerdown="this._giu=Date.now()"`, una
+  PROPRIETÀ e non un attributo, così `ridisegnaSeCambiaP2P` non vede un
+  pezzo cambiato) e oltre `P2P_TOCCO_LUNGO_MS` (500) il click non copia.
+- L'IMPORTO NO: Andrea l'aveva nominato fra gli esempi, ma l'importo del
+  PayCode non ha un 📋 e la regola è «gli stessi che hanno il 📋»; non
+  si incolla da nessuna parte (si paga in contanti). Resta fuori, e lo
+  si chiede.
+- PROVATO: in `prove_ritocchi_scambio` il tocco c'è dove c'è il 📋 e
+  solo lì (Revolut, Satispay, PayPal, il bonifico coi suoi tre; niente
+  sulle righe descrittive né su «IBAN: da chiedere»), il tocco copia il
+  valore del bottone della sua riga con «✓ Copiato», con una selezione
+  non copia, senza bottone niente, il tocco lungo (900 ms) no e quello
+  breve sì, l'`onpointerdown` senza `preventDefault`, e il 📋 del
+  PayCode che dice «✓» col suo toast e torna 📋; in `prove_p2p_paycode`
+  il codice toccabile e il bottone nuovo. Emendate le righe al byte e
+  i riquadri attesi. GIRO DAL VIVO in Chrome (Playwright, densità 3,
+  relay morto, porta 8163), chi compra, 360 px chiaro e scuro e il
+  PayCode anche a 320: il tocco sull'IBAN copia
+  `IT60X0542811101000000123456` e il bottone dice «✓ Copiato», dopo 2 s
+  «📋 Copia»; il tocco sul nome del metodo e sull'etichetta non copia
+  niente; il tocco lungo col dito (CDP, 900 ms) arriva come click e NON
+  copia; una selezione fatta a mano resta («IT60 X054») e il click non
+  copia; il RevTag `@pseudolo`; il PayCode `479-868-518` col «✓», il
+  bottone dentro lo schermo anche a 320 px. Scatti `tocco-*` in
+  `.claude/giri/copia-recapito/`. NON PROVATO: la selezione VERA col
+  tocco lungo (la lente e le maniglie): Chrome di prova non la fa, va
+  vista sul telefono.
+
 **DA FARE (notati, non fatti).**
 - Sul telefono vero, iPhone e Android dentro Telegram: il tocco sul
-  «📋 Copia» (la WebView di Telegram Android a volte rifiuta gli appunti:
-  il gradino all'antica dovrebbe prenderla, da vedere).
+  «📋 Copia» e sul dato (la WebView di Telegram Android a volte rifiuta gli
+  appunti: il gradino all'antica dovrebbe prenderla, da vedere), e il
+  tocco lungo sul dato che seleziona e non copia.
+- L'importo del PayCode toccabile e col suo 📋: chiederlo ad Andrea
+  (oggi non ha il 📋, quindi non si tocca).
 - Gli scambi già aperti al momento del deploy: le versioni dette prima
   non sono in tabella, quindi un secondo dispositivo che ridichiara un
   recapito di prima del deploy può ancora far suonare un «📮» una volta.
