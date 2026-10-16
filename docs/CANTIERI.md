@@ -63227,3 +63227,139 @@ ANNUNCI INSIEME»; la leva in PRODUZIONE).
   spunte, filtri e il piede incollato coi tocchi veri.
 - La modifica in blocco dai filtri lato server (oggi l'elenco arriva
   intero fino a 1.000 righe): da guardare se un negozio ne ha di più.
+
+## Il bundle bitcoin del browser: sette pacchetti MIT, diciannove nomi, e i vettori ufficiali che li giudicano (16 ott 2026, cantiere pagamento-onchain tappa 1a, via libera di Andrea: «via con A»)
+
+Prima tappa del pagamento on-chain, e la più piccola che si potesse
+tagliare: **il codice che fa le chiavi**, vendorizzato e provato, e
+**niente altro**. Nessuna rotta, nessun caricatore, nessuna riga di
+`miniapp.html`, nessuna leva: in produzione, dopo questo commit, non
+cambia nulla. Il seme, le tre gambe del backup e «Avanzate → Esporta»
+sono la tappa 1b, e nascono insieme al primo schermo che li usa.
+
+**PERCHÉ SPEZZATA IN DUE.** La tappa ① dello studio («il seme e le
+chiavi nel browser») teneva dentro anche il seme, il backup e l'export:
+è un diff che tocca il file più grande del progetto e una funzione che
+custodisce soldi. Spezzandola, il pezzo che entra oggi è **leggibile in
+un pomeriggio** e si può controllare da fuori; e se domani il bundle si
+rivelasse sbagliato, si cambia un file e due righe invece di un
+cantiere intero. È la regola 7 applicata a una dipendenza nuova.
+
+**LA SCELTA, E IL VIA LIBERA.** Andrea ha scelto la strada **A** fra le
+due proposte: scarico i pacchetti da npm, costruisco il bundle, e la
+garanzia è **l'impronta sha256 nel repo più i vettori ufficiali in
+CI** — invece di fargli guardare un file da 334 KB prima del commit.
+
+**COSA ENTRA.** `vendor/btc.bundle.js`, 334 KB, **non minimizzato** (un
+file di crittografia che non si può leggere è un file di cui ci si fida
+per forza), costruito con esbuild 0.28.2 da sette pacchetti npm **tutti
+MIT**: `@scure/bip39` 2.4.0, `@scure/bip32` 2.4.0, `@scure/btc-signer`
+2.4.1, e sotto di loro `@noble/curves` 2.4.0, `@noble/hashes` 2.4.0,
+`@scure/base` 2.4.0, `micro-packed` 0.11.1. È **la stessa famiglia che
+serviamo da mesi**: `nostr.bundle.js` monta già @noble/curves,
+@noble/hashes e @noble/ciphers degli stessi autori, e btc-signer ha un
+audit di terzi (Cure53). Accanto, `vendor/btc-LICENZE.md` con le sette
+versioni, le licenze per esteso e **la ricetta per rifarlo byte per
+byte**.
+
+**DICIANNOVE NOMI, NÉ UNO DI PIÙ.** L'ingresso del bundle esporta solo
+quel che serve: le dodici parole (farle, controllarle, ricavarne seme
+ed entropia), `HDKey`, il 2-di-3 (`p2ms`, `p2wsh`, `sortedMultisig`),
+l'indirizzo, la PSBT (`Transaction`, `SigHash`), le due reti e
+hex/base64. **Fuori**: `musig2`, `net`, `p2p` di btc-signer e la
+`mnemonicToSeed` asincrona. Quel che non entra non finisce nel file
+servito, e una sentinella conta i nomi: il giorno che qualcuno rifà il
+bundle più grosso, la CI lo dice.
+LA LISTA INGLESE, NON L'ITALIANA — ed è una decisione, non un default:
+BIP-39 ha anche le parole italiane, ma un seme in italiano **non si
+recupera in Sparrow**. Le dodici parole sono inglesi perché la terza
+gamba del backup («Barattolo sparito, le due parti aprono tutto da
+sole») funzioni con gli strumenti che esistono.
+
+**LE TRE GUARDIE**, che fanno tre mestieri diversi:
+1. **L'IMPRONTA** sha256 del file, scritta in chiaro in `prove.py`
+   (`IMPRONTA_BTC`). È la risposta alla voce più scomoda dello studio —
+   *il codice dell'app lo serve il VPS, e chi comanda il VPS può
+   servirne un altro*: l'impronta sta dentro un repo firmato, e chi
+   vuole confronta quella del file che il browser ha scaricato. Non
+   elimina il rischio: lo rende **controllabile**.
+2. **L'ELENCO** dei diciannove export, più la forma (un IIFE con UNA
+   globale, non minimizzato, le licenze accanto).
+3. **IL BANCO**: il file VERO fatto girare in node contro i vettori
+   **ufficiali**, che stanno in `dati/vettori-bip.json` col loro
+   certificato di nascita (le tre URL e la data). Non si scaricano a
+   ogni giro — «una prova che dipende da un server altrui non è una
+   prova, è un oroscopo» — e **nessuno di quei numeri l'ho scritto io**:
+   vengono dal `vectors.json` di python-mnemonic e dai BIP-32 e 383.
+
+**COSA CHIEDE IL BANCO** (16 prove, tutte verdi):
+- i **24 vettori BIP-39 inglesi**, nei quattro versi: parole → seme (con
+  passphrase «TREZOR»), entropia → parole, parole → entropia, e il
+  controllo di validità. Dodici, diciotto e ventiquattro parole;
+- le **17 catene del BIP-32** sui quattro semi dei vettori, confrontando
+  **xprv e xpub** a ogni passo;
+- i **tre script del `sortedmulti`** del BIP-383, che è il passo più
+  facile da sbagliare in silenzio: le chiavi si ordinano **dopo** la
+  derivazione, e farlo prima dà un indirizzo diverso senza nessun
+  errore. Si usa `sortedMultisig(2, chiavi, witness)`, cioè l'API che
+  useremo noi, e si confronta il suo `witnessScript` col BIP;
+- il **2-di-3** che sarà l'indirizzo di un ordine: `wsh`, **105 byte**
+  di script (OP_2 + tre push da 33 + OP_3 + CHECKMULTISIG), lo stesso
+  su mainnet e signet, e l'indirizzo che **non dipende dall'ordine** in
+  cui arrivano le tre chiavi;
+- e **due cose che devono FALLIRE**: una parola cambiata non passa il
+  checksum, e una xpub non deriva un passo indurito (se un giorno lo
+  facesse, vorrebbe dire che le sta arrivando una chiave privata).
+Il motivo di tutto questo in una riga: una libreria di crittografia che
+si carica, risponde a tutto e **sbaglia** non si vede da nessun «import
+ok», e un seme sbagliato di un bit è un indirizzo che nessuno ha mai
+visto con dentro i sats di qualcuno.
+
+**COME GIRA IL BANCO**, che è un dettaglio con una ragione: il bundle è
+un IIFE (`var BarattoloBTC = ...`), e in node si carica con
+`new Function(sorgente + '; return BarattoloBTC;')()` invece che con
+`vm.runInThisContext` come fa il banco Nostr — dentro una funzione quel
+`var` resta suo, e nessuna globale si sporca.
+
+**DUE REGALI TROVATI STRADA FACENDO.** `btc-signer` esporta
+**`sortedMultisig`**, cioè l'ordinamento BIP-67 già fatto e provato: il
+`sortedmulti` del descrittore non lo scrivo io. E il **BIP-383** ha un
+vettore `sortedmulti(2, xpub, xpub)` con gli script attesi per gli
+indici 0, 1 e 2: prova in un colpo la derivazione dell'xpub,
+l'ordinamento e la costruzione dello script, tutto con numeri di
+qualcun altro.
+
+**COSA RESTA FUORI, e dove va.** La rotta `/vendor/btc.js`, il
+caricatore pigro (si scarica **solo** se si scegli on-chain: 334 KB a
+ogni apertura dell'app per una funzione che quasi nessuno usa sarebbe
+un regalo a nessuno), la dispensa del service worker e il `?v=`: tappa
+**1b**, insieme al seme e alle tre gambe. `embit` sul server e il
+descrittore col suo checksum: tappa **②**. Le PSBT e le firme: tappe
+**⑤** e **⑥**.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere
+(`cantiere/onchain-bundle`, su origin/main a 37ae7af): la sezione nuova
+da sola, **16 passate, 0 fallite** (banco in node compreso), e la suite
+intera con `PROVE_SEVERE=1` nell'ambiente coi quattro pacchetti della
+CI. I tre file nuovi non sono serviti da nessuna rotta, quindi la
+regola ferrea 3 non è toccata e in produzione non cambia niente.
+
+⚠️ **I VETTORI STANNO IN `vendor/` E NON IN `dati/`**, e la prima
+versione li aveva messi in `dati/`: lì sarebbe stato il posto giusto
+per nome — ma `dati/` è **ignorato per intero** (`.gitignore:46`),
+quindi il file non sarebbe mai arrivato in CI e il banco sarebbe
+esploso **là e solo là**, dopo un verde in locale. Preso prima del
+commit guardando `git status`, che è la ragione per cui si guarda.
+
+**DA FARE** (notati, non fatti):
+- **L'impronta pubblicata e firmata** su Nostr o un nsite: finché sta
+  solo nel repo, chi non si fida del VPS deve fidarsi di GitHub. È già
+  nei «da fare» dello studio e resta lì.
+- **La ricostruzione in CI**: oggi la CI controlla l'impronta di un
+  file che ho costruito io sul mio PC. Rifare il bundle dentro la CI e
+  confrontare i byte renderebbe la catena verificabile da sola, ma
+  vuole npm nel workflow (e un `package-lock.json` da tenere): si
+  valuta quando il bundle smette di cambiare.
+- `dati/vettori-bip.json` pesa 15 KB e i vettori BIP-39 sono 24 su 24
+  per scelta: una copertura parziale di un insieme standard è il modo
+  di non vedere il caso delle ventiquattro parole.

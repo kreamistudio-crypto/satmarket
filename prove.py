@@ -59390,6 +59390,246 @@ process.stdout.write(JSON.stringify(out));
     prova("bundle: hkdf.expand da' la lunghezza chiesta", 76, o["hkdfLen"])
 
 
+# Le diciannove cose che `vendor/btc.bundle.js` esporta, e nient'altro:
+# ogni nome in piu' e' superficie che un giorno qualcuno usa senza che
+# nessuno l'abbia deciso. L'elenco e' il contratto fra `ingresso.mjs`
+# (la ricetta, in vendor/btc-LICENZE.md) e il file servito.
+EXPORT_BTC = [
+    "Address", "HDKey", "NETWORK", "OutScript", "SigHash", "TEST_NETWORK",
+    "Transaction", "base64", "entropyToMnemonic", "generateMnemonic", "hex",
+    "mnemonicToEntropy", "mnemonicToSeedSync", "p2ms", "p2wpkh", "p2wsh",
+    "sortedMultisig", "validateMnemonic", "wordlist",
+]
+# L'impronta del file servito (16 ott 2026). Si rifa' coi due comandi di
+# vendor/btc-LICENZE.md e deve tornare identica: e' il modo in cui chi
+# non si fida del codice che gli arriva dal nostro VPS puo' CONTROLLARE
+# invece di crederci. Cambiarla a mano senza rifare il bundle e' il
+# gesto che questa riga esiste per rendere visibile.
+IMPRONTA_BTC = \
+    "e8e936915bc05165904e99bdc784ce071831c700f440106fd765c416710d68af"
+
+
+def prove_bundle_bitcoin():
+    """IL BUNDLE BITCOIN DEL BROWSER (16 ott 2026, cantiere
+    pagamento-onchain, tappa 1a). Il seme delle dodici parole, la
+    derivazione delle chiavi di un ordine e il 2-di-3 nascono NEL
+    BROWSER — la regola ferrea 2 vista dal lato dei soldi — e per
+    farlo serve codice che oggi in casa non c'e'. Sono sette pacchetti
+    npm, tutti MIT, della stessa famiglia che serviamo da mesi
+    (`nostr.bundle.js` monta @noble/curves, @noble/hashes,
+    @noble/ciphers): bip39, bip32 e btc-signer, uniti in un file solo
+    da esbuild. La ricetta per rifarlo byte per byte, le sette versioni
+    e le licenze per esteso stanno in `vendor/btc-LICENZE.md`.
+
+    TRE GUARDIE, e fanno tre mestieri diversi:
+    1. L'IMPRONTA del file (sha256). E' la risposta alla voce piu'
+       scomoda dello studio — «il codice dell'app lo serve il VPS, e
+       chi comanda il VPS puo' servirne un altro»: l'impronta e' qui,
+       in chiaro, dentro il repo firmato, e chi vuole la confronta con
+       quella del file che il browser ha scaricato.
+    2. L'ELENCO degli export: diciannove nomi, ne' uno di piu'. Il
+       giorno che qualcuno ricostruisce il bundle con dentro `musig2`,
+       `net` o `p2p` di btc-signer, questa riga diventa rossa.
+    3. IL BANCO: il file VERO, fatto girare in node, contro i vettori
+       UFFICIALI di BIP-39, BIP-32 e BIP-383, che stanno in
+       `dati/vettori-bip.json` con dentro la loro provenienza. Non si
+       scaricano a ogni giro (una prova che dipende da un server altrui
+       non e' una prova) e nessuno dei numeri l'ho scritto io: vengono
+       dal file di prova di python-mnemonic e dai due BIP.
+
+    ⚠️ COSA SI ROMPE IN SILENZIO, ed e' il motivo del banco invece del
+    solo elenco: una libreria di crittografia che si carica, risponde a
+    tutto e sbaglia non si vede da nessun «import ok». Un seme sbagliato
+    di un bit e' un indirizzo che nessuno ha mai visto, con dentro i
+    sats di qualcuno. Qui si chiede: i ventiquattro semi del BIP-39, le
+    diciassette catene del BIP-32, le chiavi del `sortedmulti` ordinate
+    DOPO la derivazione (il passo che il BIP-383 dice a parole e che
+    sbagliato da' un indirizzo diverso senza un errore), e due cose che
+    devono FALLIRE — una parola cambiata non passa il checksum, e una
+    xpub non deriva un passo indurito.
+
+    NESSUNA ROTTA, NESSUN CARICATORE, NESSUNA RIGA DI MINIAPP: il file
+    sta nel repo e non lo serve nessuno. La rotta nasce col primo
+    schermo che lo usa (tappa 1b), cosi' questa tappa non mette niente
+    in produzione e si puo' leggere in un pomeriggio."""
+    print("\n[il bundle bitcoin del browser]")
+    import hashlib as _hl
+    import shutil as _sh
+    import subprocess as _sp
+
+    # 1) l'impronta e l'elenco: la forma, senza far girare niente
+    grezzo = open("vendor/btc.bundle.js", "rb").read()
+    prova("btc: l'impronta del file servito e' quella scritta",
+          IMPRONTA_BTC, _hl.sha256(grezzo).hexdigest())
+    testo = grezzo.decode("utf-8")
+    blocco = testo[testo.index("__export(ingresso_exports, {"):]
+    blocco = blocco[:blocco.index("});")]
+    nomi = re.findall(r"^\s{4}(\w+): \(\) =>", blocco, re.M)
+    prova("btc: esporta i diciannove nomi dell'ingresso, e nient'altro",
+          EXPORT_BTC, sorted(nomi))
+    prova("btc: e' un IIFE con un nome solo, non tocca altre globali", True,
+          testo.startswith("var BarattoloBTC = (() => {"))
+    # non minimizzato, come il bundle Nostr: un file di crittografia che
+    # non si puo' leggere e' un file di cui ci si fida per forza
+    prova("btc: non e' minimizzato (i commenti dei moduli ci sono)", True,
+          "// node_modules/@noble/hashes/" in testo)
+    prova("btc: le licenze e la ricetta per rifarlo stanno accanto", True,
+          os.path.exists("vendor/btc-LICENZE.md")
+          and "esbuild ingresso.mjs --bundle" in
+          open("vendor/btc-LICENZE.md", encoding="utf-8").read())
+    # I VETTORI STANNO IN `vendor/` E NON IN `dati/`, e non e' estetica:
+    # `dati/` e' ignorato per intero (.gitignore), quindi in CI non
+    # arriverebbe e il banco esploderebbe la' e solo la'. In `vendor/`
+    # stanno accanto al bundle che giudicano, che e' il posto del
+    # materiale di terzi.
+    vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
+                          encoding="utf-8"))
+    prova("btc: i vettori dicono da dove vengono e quando",
+          [True, True, 3],
+          ["_fonti" in vett, vett.get("_preso_il") == "2026-10-16",
+           len(vett.get("_fonti", {}))])
+    prova("btc: ventiquattro vettori BIP-39, quattro semi BIP-32, il "
+          "sortedmulti con tre script", [24, 4, 3],
+          [len(vett["bip39_english"]), len(vett["bip32"]),
+           len(vett["bip383_sortedmulti2"]["script"])])
+
+    # 2) il banco: il file vero in node, contro i vettori
+    node = _sh.which("node")
+    if not node:
+        salta("btc: il banco sui vettori ufficiali", "node non installato")
+        return
+    banco = r"""
+const fs = require('fs');
+/* `new Function` e non `vm.runInThisContext`: il bundle e' un IIFE con
+   `var BarattoloBTC = ...`, e dentro una funzione quel var resta suo —
+   nessuna globale sporcata, e il valore si riprende col return. */
+const B = new Function(fs.readFileSync(process.argv[2], 'utf8')
+                       + '; return BarattoloBTC;')();
+const V = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const out = {};
+
+/* ---- BIP-39: dodici, diciotto e ventiquattro parole --------------- */
+const b39 = {semi: 0, parole: 0, entropia: 0, valide: 0, rotte: []};
+for (const v of V.bip39_english) {
+  const seme = B.hex.encode(B.mnemonicToSeedSync(v.parole, 'TREZOR'));
+  if (seme === v.seme) b39.semi++; else b39.rotte.push(['seme', v.parole]);
+  if (B.entropyToMnemonic(B.hex.decode(v.entropia), B.wordlist) === v.parole)
+    b39.parole++; else b39.rotte.push(['parole', v.entropia]);
+  if (B.hex.encode(B.mnemonicToEntropy(v.parole, B.wordlist)) === v.entropia)
+    b39.entropia++; else b39.rotte.push(['entropia', v.parole]);
+  if (B.validateMnemonic(v.parole, B.wordlist) === true) b39.valide++;
+  else b39.rotte.push(['valida', v.parole]);
+}
+out.bip39 = b39;
+/* una parola cambiata NON deve passare: il checksum serve a questo */
+const prime = V.bip39_english[0].parole.split(' ');
+out.storta = B.validateMnemonic(prime.slice(0, 11).concat(['zoo']).join(' '),
+                                B.wordlist);
+
+/* ---- BIP-32: il seme diventa chiavi, e le strade tornano ---------- */
+const b32 = {catene: 0, rotte: []};
+for (const v of V.bip32) {
+  const radice = B.HDKey.fromMasterSeed(B.hex.decode(v.seme));
+  for (const c of v.catene) {
+    const k = c.strada === 'm' ? radice : radice.derive(c.strada);
+    if (k.privateExtendedKey === c.xprv && k.publicExtendedKey === c.xpub)
+      b32.catene++; else b32.rotte.push([v.seme.slice(0, 8), c.strada]);
+  }
+}
+out.bip32 = b32;
+/* la meta' pubblica NON sa derivare un passo indurito: se un giorno lo
+   facesse vorrebbe dire che le sta arrivando una chiave privata */
+try {
+  B.HDKey.fromExtendedKey(V.bip32[0].catene[0].xpub).derive("m/0'");
+  out.induritoDaXpub = 'HA DERIVATO';
+} catch (e) { out.induritoDaXpub = 'rifiutato'; }
+
+/* ---- BIP-383: le chiavi si ordinano DOPO la derivazione ----------- */
+const d = V.bip383_sortedmulti2.descrittore;
+const chiavi = d.slice(d.indexOf('(') + 1, d.lastIndexOf(')'))
+                .split(',').slice(1);     // via la soglia: restano le chiavi
+const ms = {script: 0, rotte: [], indirizzi: []};
+for (let i = 0; i < V.bip383_sortedmulti2.script.length; i++) {
+  const pub = chiavi.map((e) => {
+    const pezzi = e.split('/');
+    const strada = pezzi.slice(1, -1);    // l'ultimo pezzo e' il `*`
+    const k = B.HDKey.fromExtendedKey(pezzi[0]);
+    return k.derive('m/' + strada.concat([String(i)]).join('/')).publicKey;
+  });
+  /* `sortedMultisig(m, chiavi, witness=true)` e' l'API che useremo noi:
+     ordina lei, e il suo witnessScript deve essere quello del BIP */
+  const w = B.sortedMultisig(2, pub, true);
+  const nudo = B.hex.encode(w.witnessScript);
+  if (nudo === V.bip383_sortedmulti2.script[i]) ms.script++;
+  else ms.rotte.push([i, nudo]);
+  ms.indirizzi.push(w.address);
+}
+out.sortedmulti = ms;
+/* ...e l'ordine NON dipende da come arrivano: mescolate, stesso script */
+const tre = V.bip32[0].catene.slice(0, 3)
+             .map((c) => B.HDKey.fromExtendedKey(c.xpub).publicKey);
+const uno = B.sortedMultisig(2, tre, true);
+const altro = B.sortedMultisig(2, [tre[2], tre[0], tre[1]], true);
+out.dueDiTre = {
+  mainnet: uno.address,
+  signet: B.sortedMultisig(2, tre, true, B.TEST_NETWORK).address,
+  stessoOrdine: uno.address === altro.address,
+  tipo: uno.type,
+  witnessByte: uno.witnessScript.length,
+};
+console.log(JSON.stringify(out));
+"""
+    with open(os.path.join(QUI, ".banco-btc.js"), "w",
+              encoding="utf-8") as fh:
+        fh.write(banco)
+    try:
+        r = _sp.run([node, os.path.join(QUI, ".banco-btc.js"),
+                     os.path.join(QUI, "vendor", "btc.bundle.js"),
+                     os.path.join(QUI, "vendor", "vettori-bip.json")],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=120)
+    finally:
+        os.unlink(os.path.join(QUI, ".banco-btc.js"))
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-900:])
+        prova("btc: il banco ha risposto", True, False)
+        return
+    n39 = len(vett["bip39_english"])
+    prova("btc: i ventiquattro semi del BIP-39 (passphrase «TREZOR»)",
+          [n39, n39, n39, n39, []],
+          [o["bip39"]["semi"], o["bip39"]["parole"], o["bip39"]["entropia"],
+           o["bip39"]["valide"], o["bip39"]["rotte"]])
+    prova("btc: ...e una parola cambiata NON passa il checksum",
+          False, o["storta"])
+    catene = sum(len(v["catene"]) for v in vett["bip32"])
+    prova("btc: le diciassette catene del BIP-32, xprv e xpub",
+          [catene, []], [o["bip32"]["catene"], o["bip32"]["rotte"]])
+    prova("btc: ...e una xpub NON deriva un passo indurito",
+          "rifiutato", o["induritoDaXpub"])
+    prova("btc: i tre script del sortedmulti del BIP-383 (chiavi ordinate "
+          "DOPO la derivazione)",
+          [3, []], [o["sortedmulti"]["script"], o["sortedmulti"]["rotte"]])
+    prova("btc: ...e sono indirizzi segwit nativi, tutti diversi",
+          [3, 3],
+          [sum(1 for a in o["sortedmulti"]["indirizzi"]
+               if a.startswith("bc1q")),
+           len(set(o["sortedmulti"]["indirizzi"]))])
+    # il 2-di-3 che sara' l'indirizzo di un ordine: 105 byte di script
+    # (OP_2 + tre volte push33 + OP_3 + CHECKMULTISIG), lo stesso su
+    # mainnet e signet — cambia solo il vestito dell'indirizzo
+    tdt = o["dueDiTre"]
+    prova("btc: il 2-di-3 e' un p2wsh da 105 byte di script",
+          ["wsh", 105], [tdt["tipo"], tdt["witnessByte"]])
+    prova("btc: ...l'indirizzo non dipende dall'ordine in cui arrivano le "
+          "chiavi (BIP-67)", True, tdt["stessoOrdine"])
+    prova("btc: ...e mainnet e signet si vedono dal prefisso",
+          [True, True],
+          [tdt["mainnet"].startswith("bc1q"),
+           tdt["signet"].startswith("tb1q")])
+
+
 def prove_tour_p2p():
     """IL TOUR DI BENVENUTO DEL P2P (set 2026): sei card, una scorsa,
     e poi il libro.
@@ -167003,6 +167243,7 @@ def main():
               prove_pdf_allegati,
               prove_stampa_e_salti,
               prove_modifica_massiva,
+              prove_bundle_bitcoin,
               prove_config_esempio):
         try:
             f()
