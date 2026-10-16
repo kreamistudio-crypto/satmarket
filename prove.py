@@ -33959,28 +33959,46 @@ def prove_canale_bot():
     altri = [{"id": 7, "titolo": "Amplificatore"},
              {"id": 8, "titolo": "Leggio"}]
     v = cap["_caption_canale"](a, 0, altri=altri)
-    # LA VETRINA PORTA IL DEEP LINK IN CHIARO (15 ott 2026, «Link
-    # Telegram deep link»): qui le voci non sono piu' ancore — il link
-    # sta scritto dopo il titolo, ed e' quello che apre la Mini App.
+    # LE VOCI SONO TORNATE ANCORE (16 ott 2026, chiesto da Andrea: «i
+    # link devono stare dentro le scritte»). Il DEEP LINK resta quello
+    # scelto il 15 ott — cambia solo come si vede: il titolo E' il
+    # link, e l'URL non si legge nel testo. Il 15 ott il link in
+    # chiaro era una CONSEGUENZA accettata della scelta del deep
+    # link, messa a verbale proprio perche' si potesse rimangiare: qui
+    # si rimangia quella, non il deep link.
     prova("gli altri articoli sono linkati", True,
-          "startapp=annuncio_7" in v and "startapp=annuncio_8" in v)
+          '<a href="https://t.me/ilbarattolobot?startapp=annuncio_7">'
+          'Amplificatore</a>' in v and "startapp=annuncio_8" in v)
     prova("e il negozio resta in coda come sempre", True,
           "vedi il suo negozio" in v)
     prova("senza altri articoli non compare la sezione", False,
           "Anche in vendita" in t)
     lungo = cap["_caption_canale"](a, 0, altri=[
         {"id": 9, "titolo": "T" * 80}])
+    # il troncamento si riconosce dal `…` attaccato alla chiusura
+    # dell'ancora: il titolo tagliato E' il testo del link
     prova("il titolo lungo si tronca", True,
           "…</a>" in lungo and "startapp=annuncio_9" in lungo)
     prova("e passa da escape", True, "&lt;i&gt;" in cap["_caption_canale"](
         a, 0, altri=[{"id": 9, "titolo": "<i>x</i>"}]))
-    # LA GUARDIA: ora i link della sezione "Anche in vendita" sono dentro
-    # tag `<a>` per nasconderli nel testo (ott 2026). L'importante resta
-    # che l'indirizzo del SITO non si veda mai in chiaro. Un `barattolo.store`
-    # sfuggito dentro una voce della vetrina fa ancora rossa questa riga.
-    prova("con la vetrina accesa gli URL nudi sono SOLO deep link del "
-          "bot: il sito in chiaro non si vede", True,
-          "barattolo.store" not in v and "startapp=annuncio_7" in v)
+    # LA GUARDIA, RISCRITTA UN'ALTRA VOLTA (16 ott 2026) E NON SPENTA,
+    # che e' la regola di casa: una sentinella che diventa tautologia si
+    # riscrive sulla cosa che ancora difende. Il 15 ott chiedeva «gli URL
+    # nudi sono SOLO deep link del bot, due contati»; con le voci tornate
+    # ancore i deep link nudi sono ZERO, e la riga dice la cosa PIU'
+    # forte di allora: nel testo che si legge non resta NESSUN indirizzo
+    # — ne' il sito ne' il bot.
+    # Lo strip degli href e' il cuore della prova e non si tocca: il
+    # ponte «vedi il suo negozio» e' un'ancora su URL_PUBBLICO, quindi
+    # senza togliere gli attributi la riga troverebbe `barattolo.store`
+    # dentro un href e sarebbe rossa per un motivo falso (ci sono
+    # cascato). Un `barattolo.store` sfuggito nel TESTO di una voce fa
+    # ancora rossa la riga, che e' la paura del cantiere di agosto.
+    nudi_v = re.sub(r'href="[^"]*"', "", v)
+    prova("con la vetrina accesa nel testo non resta NESSUN URL nudo: "
+          "ne' il sito ne' i deep link del bot", (False, 0),
+          ("barattolo.store" in nudi_v,
+           nudi_v.count("https://t.me/ilbarattolobot?startapp=annuncio_")))
 
     # Il venditore SENZA username (i nativi Nostr): niente «@», o
     # nascerebbe una menzione che Telegram non sa risolvere.
