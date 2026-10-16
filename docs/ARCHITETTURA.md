@@ -22991,6 +22991,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   suo inchiostro (`--pelle-fg`, nel `::before`; nel `::after` la blu,
   che il `::before` lo dà al contorno) — così la croce cambia colore con
   la stessa opacity che cambia la pelle, senza una transizione nuova.
+  LA CROCE DEL + DI CASA È BIANCA (16 ott 2026; CANTIERI, «La croce
+  bianca del + del mercatino»): l'unica eccezione allo scuro sui
+  pieni. La pelle `casa` prende `--piu-casa-fg` (#FFFFFF) e il suo
+  `::before` un'ombra scura sottile, `--piu-casa-ombra`; le due leve
+  stanno UNA volta in `:root` e la sera non le ridice, quindi valgono
+  nei due temi e in quello che decide Telegram. Le porta anche la
+  croce del fantasma `merc`. L'arancio del P2P fuori dal libro, il
+  verde, il rosso e il blu tengono il loro inchiostro; la pillola da
+  desktop resta scura (lì la croce sta accanto a «Vendi»).
   Il fantasma della morfosi parte dalla pelle e arriva al bottone
   d'arrivo (curva `--b-r`, filo, scritta in Baloo 2 col suo inchiostro).
   Da desktop la pillola del + usa le TINTE piene dei ruoli

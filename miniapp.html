@@ -177,6 +177,15 @@
     --b-pri-fg:#2A1600; --b-pri-line:rgba(170,90,0,.38);
     --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.5),0 1px 2px rgba(120,60,0,.22),0 7px 16px -7px rgba(232,128,10,.75);
     --b-pri-sh-on:inset 0 2px 4px rgba(120,60,0,.28),0 1px 1px rgba(120,60,0,.12);
+    /* LA CROCE BIANCA DEL + DI CASA (16 ott 2026, cantiere piu-bianco,
+       richiesta di Andrea): l'unica eccezione allo scuro sui pieni, e
+       solo per la croce del + del mercatino (il P2P resta col suo
+       inchiostro). Il bianco sull'arancio fa 2,3:1 (1,8 in cima al
+       gradiente, 2,6 in fondo), sotto anche il 3:1 dei glifi grandi:
+       lo stacca un'ombra scura sottile sotto la croce, e nessun fondo
+       cambia (scelta di Andrea fra le due). Uguale nei due temi: la
+       sera non la ridice. */
+    --piu-casa-fg:#FFFFFF; --piu-casa-ombra:0 1px 2px rgba(74,36,0,.6);
     --b-ok-bg:linear-gradient(180deg,#1B8150 0%,#16703F 100%);
     --b-ok-fg:#FFFFFF; --b-ok-line:rgba(8,60,34,.45);
     --b-ok-sh:inset 0 1px 0 rgba(255,255,255,.22),0 1px 2px rgba(10,60,35,.22),0 7px 16px -8px rgba(23,122,73,.7);
@@ -4576,7 +4585,11 @@
   html body #p2pMorfo.merc:not(.bz) .morfo-meta{background:var(--b-pri-bg);
     border-color:var(--b-pri-line);box-shadow:var(--b-pri-sh)}
   html body #p2pMorfo.merc:not(.bz) .morfo-eti{color:var(--b-pri-fg);font-size:var(--b-pri-fs)}
-  html body #p2pMorfo.merc:not(.bz) .morfo-glifo{color:var(--b-pri-fg)}
+  /* la croce del fantasma e' quella del + di casa (LA CROCE BIANCA DEL +
+     DI CASA): parte sopra il + e ci torna, scura sarebbe un'altra croce
+     per tutta la corsa */
+  html body #p2pMorfo.merc:not(.bz) .morfo-glifo{color:var(--piu-casa-fg);
+    text-shadow:var(--piu-casa-ombra)}
   /* ...e la scritta «Vendi» sotto il + esce con le voci: nel libro la sua
      gemella e' gia' scesa via, qui restava sotto il bottone che si
      allarga e ne spuntava a meta' corsa (visto nei fotogrammi fermi).
@@ -5662,9 +5675,13 @@
      opacity che cambia la pelle — una transizione di colore sul glifo
      sarebbe stata un'animazione nuova, e il glifo cambiato di colpo
      sarebbe rimasto per un attimo scuro sul verde o bianco
-     sull'arancio. */
+     sull'arancio.
+     LA CASA E' L'ECCEZIONE (16 ott 2026, cantiere piu-bianco): la sua
+     croce e' BIANCA con un'ombra scura sottile, nei due temi (LA CROCE
+     BIANCA DEL + DI CASA, accanto alle leve del vestito); l'arancio del
+     P2P fuori dal libro resta scuro. */
   nav button.sell .pelle-casa{border-radius:18px;background:var(--b-pri-bg);
-    box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh);--pelle-fg:var(--b-pri-fg)}
+    box-shadow:inset 0 0 0 1px var(--b-pri-line),var(--b-pri-sh);--pelle-fg:var(--piu-casa-fg)}
   nav button.sell .pelle-verde{background:var(--b-ok-bg);
     box-shadow:inset 0 0 0 1px var(--b-ok-line),var(--b-ok-sh);--pelle-fg:var(--b-ok-fg)}
   nav button.sell .pelle-rossa{background:var(--b-rosso-bg);
@@ -5676,6 +5693,7 @@
   nav button.sell .pelle-bz::after{content:'＋';position:absolute;inset:0;
     display:flex;align-items:center;justify-content:center;
     font-style:normal;color:var(--pelle-fg)}
+  nav button.sell .pelle-casa::before{text-shadow:var(--piu-casa-ombra)}
   /* quale pelle e' accesa lo dicono le classi di sempre, e a pari catena:
      il neutro (fuori dal libro) vince sul lato */
   body:not(.nav-p2p) nav button.sell .pelle-casa,

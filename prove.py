@@ -69197,7 +69197,9 @@ def prove_nav_p2p():
     # non da un numero ricopiato: il + di casa non si sposta (margine,
     # niente transform) e la pelle arancio ne ricopia l'ombra
     _casa = pezzo_js(mini, "  nav button.sell .ic{\n", "}")
-    _ombra = lambda r: r[r.index("box-shadow:"):] if "box-shadow:" in r else None
+    # (16 ott 2026) fino al punto e virgola: dopo l'ombra viene l'inchiostro
+    # della croce, che dalla croce bianca di casa non e' piu' lo stesso
+    _ombra = lambda r: r[r.index("box-shadow:"):].split(";")[0] if "box-shadow:" in r else None
     prova("...che e' proprio quella del + di casa: stessa ombra, nessuno "
           "spostamento", [True, False],
           [_ombra(_regola_pelle("casa")) == _ombra(_regola_pelle("arancio")),
@@ -69250,11 +69252,43 @@ def prove_nav_p2p():
            "inset 0 0 0 1px var(--b-bz-line),var(--b-bz-sh)"],
           [_ombra_di(_regola_pelle(n)) for n in ("casa", "verde", "arancio", "rossa",
                                                   "rossa::after", "bz")])
+    # (16 ott 2026, cantiere piu-bianco, richiesta di Andrea) tranne la
+    # CASA: la croce del + del mercatino e' bianca — l'arancio del P2P
+    # fuori dal libro resta scuro, e le altre come stavano
     prova("...e la croce di ogni pelle ha l'inchiostro del suo ruolo: scuro "
-          "sull'arancio", ["var(--b-pri-fg)", "var(--b-ok-fg)", "var(--b-pri-fg)",
-                           "var(--b-rosso-fg)", "var(--b-bz-fg)"],
+          "sull'arancio del P2P, bianco su quello di casa",
+          ["var(--piu-casa-fg)", "var(--b-ok-fg)", "var(--b-pri-fg)",
+           "var(--b-rosso-fg)", "var(--b-bz-fg)"],
           [(re.search(r"--pelle-fg:([^;}]*)", _regola_pelle(n)) or [None, None])[1]
            for n in ("casa", "verde", "arancio", "rossa", "bz")])
+    # LA CROCE BIANCA DEL + DI CASA: il COLORE, non solo il nome della leva.
+    # Bianco vero; definita UNA volta sola, nella radice, cosi' la sera (e
+    # il tema che decide Telegram, che accende lo stesso data-tema) non la
+    # ridice; l'ombra scura sotto la croce, abbastanza scura da staccarla
+    # (il bianco sull'arancio fa 2,3:1 da solo); e la stessa croce sul
+    # fantasma che parte dal + e ci torna
+    def _lum_piu(rgb):
+        v = [c / 255 for c in rgb]
+        v = [c / 12.92 if c <= .03928 else ((c + .055) / 1.055) ** 2.4 for c in v]
+        return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]
+    _rad = mini[mini.index(":root{"):mini.index("}", mini.index(":root{"))]
+    _fg = re.search(r"--piu-casa-fg:\s*#([0-9A-Fa-f]{6});", _rad)
+    _om = re.search(r"--piu-casa-ombra:\s*0 1px 2px rgba\((\d+),(\d+),(\d+),\.(\d+)\);", _rad)
+    _cs = re.search(r"nav button\.sell \.pelle-casa::before\{([^}]*)\}", mini)
+    _mg = re.search(r"#p2pMorfo\.merc:not\(\.bz\) \.morfo-glifo\{([^}]*)\}", mini)
+    prova("la croce del + di casa e' BIANCA con un'ombra scura sottile, uguale "
+          "nei due temi, e il fantasma porta la stessa",
+          ["FFFFFF", True, 1, 1, True, "text-shadow:var(--piu-casa-ombra)",
+           "color:var(--piu-casa-fg);text-shadow:var(--piu-casa-ombra)"],
+          [_fg and _fg.group(1).upper(),
+           bool(_om) and (1.05 / (_lum_piu([int(x) for x in _om.groups()[:3]]) + .05)) >= 7
+           and int(_om.group(4)) >= 5,
+           mini.count("--piu-casa-fg:"), mini.count("--piu-casa-ombra:"),
+           # e nessun tema la ridice: il blocco della sera non la nomina
+           "--piu-casa" not in mini[mini.index('html[data-tema="scuro"]{'):
+                                    mini.index("}", mini.index('html[data-tema="scuro"]{'))],
+           _cs and _cs.group(1),
+           _mg and re.sub(r"\s+", "", _mg.group(1))])
     prova("...e le sorelle del tondo non portano piu' ne' fondo ne' ombre", [0, 0],
           [_ombre(pezzo_js(mini, f, "}") if f in mini else "") for f in _sorelle])
 

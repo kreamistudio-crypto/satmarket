@@ -64582,3 +64582,53 @@ spariti. Rifatta la semina con `arrivato` di adesso.
 **Da fare (notati, non fatti).**
 - Non provato su un telefono vero (Telegram Android/iOS, fusi diversi
   dall'italiano dal vivo).
+
+
+## La croce bianca del + del mercatino (16 ott 2026, cantiere piu-bianco, richiesta di Andrea)
+
+**COSA.** Il tasto «+» della barra nel mercatino (la pelle `casa` del
+tondo di Vendi, la stessa nelle Aste) aveva la croce SCURA: `#2A1600`,
+l'inchiostro del principale (`--b-pri-fg`). Andrea la voleva bianca.
+Misurato PRIMA di toccare, sul server del worktree: la croce era scura
+in TUTTI e tre i temi (chiaro, scuro, scuro deciso da Telegram), non
+solo nel chiaro — `--b-pri-fg` è uno solo e la sera non lo ridice;
+dal vestito A (CANTIERI, «Bottoni più eleganti nel mercatino: il
+vestito A») era scura apposta, «testo scuro sui pieni».
+
+**IL CONTRASTO, DETTO PRIMA.** Il bianco sull'arancio del + fa 2,3:1
+sul #F7931A (1,8 in cima al gradiente, 2,6 in fondo): sotto anche il
+3:1 dei glifi grandi. Due strade proposte ad Andrea: croce bianca con
+un'ombra scura sottile e nessun fondo che cambia, oppure bianca su un
+arancio più scuro del solo tondo (≈#D97800, 3,2:1). SCELTA DI ANDREA:
+la prima, nei due temi; il resto del P2P come sta.
+
+**FATTO.** In `miniapp.html` due leve nuove in `:root`, accanto al
+vestito: `--piu-casa-fg:#FFFFFF` e `--piu-casa-ombra:0 1px 2px
+rgba(74,36,0,.6)` (l'ombra fa 13,6:1 col bianco). La pelle `casa`
+prende `--pelle-fg:var(--piu-casa-fg)`, il suo `::before` il
+`text-shadow`; la croce del fantasma `merc` (la morfosi del + verso
+il foglio) le stesse due, o partirebbe una croce scura sopra quella
+bianca. Nessun fondo, filo od ombra cambiati; le pelli verde, rossa,
+arancio (P2P fuori dal libro) e blu identiche. La pillola da desktop
+(≥768 px, niente pelli) resta con l'inchiostro scuro: non è il tasto
+di cui si parlava. Architettura: «IL VESTITO DEI BOTTONI», la riga
+«LA CROCE DEL + DI CASA È BIANCA».
+
+**PROVE.** In `prove_nav_p2p`: l'attesa dell'inchiostro della `casa`
+diventa `var(--piu-casa-fg)`, e una prova nuova guarda il COLORE —
+#FFFFFF in `:root`, ogni leva definita una volta e assente dal blocco
+della sera, l'ombra abbastanza scura (≥7:1 col bianco, opacità ≥.5),
+il `text-shadow` sul `::before` della casa e sul glifo del fantasma.
+Controprova: con `--piu-casa-fg:#2A1600` la prova cade (108/109).
+Il `_ombra` della prova «stessa ombra del + di casa» ora si ferma al
+punto e virgola: prima prendeva anche l'inchiostro, che fra casa e
+arancio del P2P non è più lo stesso. Dal vivo con Playwright e Chrome
+a 360 px, densità 3, identità 222: croce `rgb(255,255,255)` con l'ombra
+nei tre temi (chiaro, scuro, scuro di Telegram coi `tgWebAppThemeParams`
+a fondo nero), fantasma uguale; scatti prima/dopo nello scratchpad
+della sessione. Relay morti nel config del giro, poi config e db tolti.
+Suite e collaudi: nel verbale del commit.
+
+**DA GUARDARE.** Sul telefono, nella Mini App vera: la croce bianca
+nella luce del giorno (il 2,3:1 è il punto debole, l'ombra lo regge a
+occhio sullo schermo del PC).
