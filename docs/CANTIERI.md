@@ -64292,6 +64292,22 @@ ha spedito. Due strade al doppio:
   recapiti di chi compra mostra il riquadro col tasto dell'email. Gli
   scatti in `.claude/giri/copia-recapito/`.
 
+**COSA È GIRATO, E SU QUALE ALBERO.** Sul primo albero (sopra
+a98538a): `PROVE_SEVERE=1 python prove.py` **24.675 passate, 0
+fallite** — dopo un primo giro con 13 rosse in quattro sezioni, tutte
+di banchi che non conoscevano la tabella o il giudice nuovi
+(`prove_p2p_orologio`, `prove_p2p_tutti_i_relay`: la tabella nei loro
+elenchi di schema; `prove_recapito_corto`: il riquadro di cartone;
+`prove_causale_sepa`: il giudice nel banco e la sentinella emendata);
+collaudi della CI nella gabbia, due alla volta: **83 verdi, 0 rossi**.
+Poi main è corso di due commit (78d6fdb, le prove compresse, e
+37ae7af, lo studio Postepay): ribasato lì, un conflitto in coda a
+CANTIERI; rigirate le sezioni toccate dai due lati — le dieci mie e le
+quattordici di 78d6fdb — **2.298 passate, 0 fallite**, e
+`collaudo_recapito_aggiornato` e `collaudo_contanti_p2p` nella gabbia:
+verdi. Lo scanner dei segreti della CI (le FORME del workflow e i 64
+esadecimali) sulle 594 righe aggiunte: zero. Il resto lo fa la CI.
+
 **DA FARE (notati, non fatti).**
 - Sul telefono vero, iPhone e Android dentro Telegram: il tocco sul
   «📋 Copia» (la WebView di Telegram Android a volte rifiuta gli appunti:
