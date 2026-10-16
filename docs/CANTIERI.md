@@ -60544,3 +60544,104 @@ che disegnano dal PayCode): tre prese.
 - Non provato sul telefono vero: lo scanner di una cassa vera su uno
   schermo (luminosità, riflessi) e il tasto indietro di Android sul
   foglio girato.
+
+## Hackathon, la migrazione a Mutinynet: la VM e il fisso su Mutinynet, la variante override provata, le correzioni che il giro ha trovato (15-16 ott 2026, cantiere migrazione-mutinynet, secondo push, richiesta di Andrea)
+
+È HACKATHON-SETUP §13.4 eseguita, un passo alla volta: la sessione
+scriveva il comando con l'host in cima, Andrea lo lanciava dal WSL del
+fisso (o dalla distro di prova, o dal browser per il faucet) e incollava
+l'uscita. Programmata per il 13, fatta il 15; il passo 9 e questo push
+la mattina del 16. Il primo push del cantiere (il modello di QVAC) è la
+voce qui sopra.
+
+**COSA È SUCCESSO, passo per passo.** 0) le copie `.prima-mutinynet`
+accanto ai file della VM e del WSL (aggiunta di Andrea), poi i file
+nuovi; 1) quattro wallet nuovi (tre sulla VM, quello di PROVA sul fisso);
+2) il milione del faucet, in quattro invii (il primo da 600 sats per
+sbaglio, poi il resto: nessun danno); 3) gli UTXO colorabili; 4) USDB
+(`rgb:lF6gcSFS-…`, precisione 2) e MOON (`rgb:p201iE~i-…`, precisione 0)
+riemessi, controllati coi saldi dei wallet emittenti PRIMA di scriverli,
+e il backup; 5) gli id in `identita.mjs`, §2, §5 e §12.9, e i due annunci
+firmati con `--prova`, senza relay; 6) 500,00 USDB e 60 MOON al wallet di
+prova: il primo giro intero su Mutinynet fra la ruota Python e il WDK,
+l'unica cosa mai provata (§13.5), passato; 6-bis) la variante override
+(aggiunta di Andrea) nella distro jammy-pulita: 5 MOON ricevuti, 2
+rimandati, dopo due correzioni (sotto); poi la variante normale ha
+rimandato 1 MOON dal wallet di prova (autorizzato da Andrea: 60 → 59)
+per provare il riscatta nuovo; 7) `rgb_http.py` su Mutinynet, il tunnel
+a una gamba, 1,00 USDB al mercante, che ora conosce l'asset; 8) il
+servizio NWC sul wallet di prova (146.519 sats in `get_balance`); 9) il
+16 mattina, `rgb_http.py` fermo e il backup a due catene (i sei wallet
+nell'archivio delle 07:44).
+
+**I PERCHÉ DELLE CORREZIONI** (tutte trovate dal giro, nessuna nella
+lista di partenza):
+- *`pgrep -f` e `pkill -f` dentro `ssh`*: sulla VM il comando gira come
+  `bash -c '<tutto>'`, e se nomina `rgb_http.py` la shell stessa
+  combacia. Visto da Andrea al passo 0a come falso positivo; al passo 7
+  il `pkill` avrebbe ucciso il comando prima del `nohup`. Ora: `pgrep -a
+  python` e kill per PID. Provato con un finto processo prima di darlo.
+- *`punti.mjs` con l'override*: con `@utexo/rgb-sdk` 1.0.6 sei metodi del
+  wallet tornano una Promise (letto nei tipi della libreria): la fattura
+  usciva `undefined`, l'indirizzo come Promise, e il refresh si chiudeva
+  prima di finire. Cura: `await` davanti a ogni chiamata, innocuo con la
+  1.0.3. Le due fatture «undefined» avevano comunque prenotato i due UTXO
+  (InsufficientAllocationSlots al tentativo dopo): se ne sono fatti due in
+  più; le prenotazioni scadono da sole.
+- *Il `riscatta`*: il difetto vero sta DENTRO `wdk-wallet-rgb` 2.0.3, che
+  in `transfer()` chiama `sendBegin` senza `await` («psbtBase64 must be a
+  non-empty string»). La libreria non si tocca (la dichiarazione dice «no
+  source changes»): `punti.mjs` chiama da sé i tre metodi pubblici che
+  `transfer` usa, aspettandoli. Provato in tutt'e due le varianti con
+  invii veri.
+- *Il 7a appeso e il log vuoto*: in `source … && nohup … &` la `&`
+  prendeva la coppia intera e la sottoshell teneva aperta l'uscita di
+  `ssh`; Python teneva il log nel buffer. Ora `source … || exit 1; nohup
+  … &` e `python -u`, in tutte le sei righe del documento. Banco: 17-20 s
+  contro 1 s, anche ripetuto da Andrea sul Pop!_OS.
+- *Il servizio NWC morto al passo 8*: partito un istante prima che `nak`
+  ascoltasse. Riacceso con un'attesa sulla porta 7777; la cura nel codice
+  è un «da fare».
+
+**DECISIONI E FATTI NUOVI.** I due portatili di Alan confermati (il
+principale Pop!_OS 24.04, 32 GB, glibc 2.39, variante normale; la
+riserva Dell Inspiron 5491, Zorin OS 17.3, 16 GB, glibc 2.35, override),
+scritti in §13. Sul Pop!_OS l'utente è `hackaton`, senza h e senza sudo:
+le righe di sistema le lancia Alan dal suo account, e §10 è adattato.
+Le istruzioni ufficiali dei giudici (15 ott) e le bozze per il 16 in
+§13.6 e §13.7. La CI rossa del 15 per la data dello sconto P2P l'ha curata
+una sessione a parte (non questa).
+
+**PROVATO.** Ogni passo dal vivo, con le uscite lette; le correzioni di
+`punti.mjs` nelle due distro usa-e-getta (noble-pulita normale,
+jammy-pulita override) prima di darle; le righe di `ssh` corrette in un
+banco su jammy-pulita. Prove e collaudi: nel verbale del push, qui sotto.
+
+**DA FARE** (notati, non fatti):
+- `nwc-wdk.mjs serve` deve aspettare `nak`, o riprovare, invece di
+  morire; e la stessa attesa nei comandi della prova di riavvio (§6/§10)
+  e del passo 8.
+- `riscatta` mostra «sendBegin params {…}» con la fattura: lo stampa
+  `rgb-sdk`. In demo sembra un errore: filtrarlo o non mostrare quel
+  terminale.
+- `rgb.py trasferimenti <wallet>` senza asset_id stampa una lista vuota
+  (rgb-lib): l'aiuto dice «[asset_id]» facoltativo, ma serve.
+- Il backup delle 03:30 del 16 è girato con `rgb_http.py` acceso (è
+  finito bene): la sera va fermato a mano, o lo fa lo script.
+- La chiavetta rinfrescata (§13.1, punto 4): non fatta.
+- Il commento di `backup-rgb.sh` e tre commenti di `prove.py` dicono
+  ancora «domenica 11» (già nella voce del primo push).
+- Il 16: la decisione sul repo `fidelity-points` (§13.6), il portatile di
+  riserva, la prova di riavvio coi comandi corretti, le bozze di §13.7.
+
+**IL PASSO 9 E IL VERBALE DEL PUSH (16 ott, mattina).** Il backup a due
+catene: `rgb_http.py` fermo, `rgb-20261016-0744.tar.age` coi sei wallet,
+tirato sul PC da `pull.ps1`, e il drill con la chiave age (i tre
+`chiavi.json` di Mutinynet e le tre fotografie delle 07:44); il wallet di
+prova del fisso col suo `punti.mjs backup`. `rgb_http.py` resta fermo
+fino al wallet della demo. Cosa è girato su quale albero: sui nove commit
+ribasati su `21ee58f` (main del 16 mattina, CI verde e `pronto` allineato)
+la suite severa intera, 24.447 passate e 0 fallite, e i collaudi della CI
+in gabbia, 82 verdi e 0 rossi. Poi questa voce, e l'ultimo fetch e
+rebase prima del push: le sezioni toccate rigirate sull'albero finale
+sono scritte nel messaggio del commit del verbale.
