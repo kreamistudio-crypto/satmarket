@@ -78,11 +78,11 @@ modo in cui si rifà un errore già pagato.
   CHIUSO (committato, provato, collaudato, verbale scritto) e prove
   verdi nel worktree con `PROVE_SEVERE=1 python prove.py` più i collaudi
   della CI. Poi `git push origin HEAD:main` e la CI fino al verde
-  (`gh run watch --exit-status`). Un «non pushare ancora» di Andrea
-  vince sulla regola finché non lo scioglie. Se main è corso nel
-  frattempo: rebase, sezioni toccate + collaudi, push; nel verbale si
-  scrive COSA è girato su QUALE albero. I commit non miei che il push
-  porta con sé si NOMINANO nel rapporto.
+  (`gh run watch --exit-status`; con la coda, un giro «cancelled» non è
+  rosso: si guarda il giro dopo). Un «non pushare ancora» di Andrea
+  vince finché non lo scioglie. Main corso nel frattempo: rebase,
+  sezioni toccate + collaudi, push; il verbale dice COSA è girato su
+  QUALE albero, il rapporto NOMINA i commit non miei che il push porta.
 - IL VPS È FUORI DAL MIO PERIMETRO: niente ssh, niente query, nemmeno in
   sola lettura. I comandi li scrivo, li esegue Andrea e incolla il
   risultato. Il deploy è suo. Lo stesso vale per il nodo Mostro e per il

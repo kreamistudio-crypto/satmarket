@@ -60774,22 +60774,38 @@ invece di ~24: circa −37 %, cioè ~7.800 minuti al mese invece di
 che una sessione aspetta passa da ~21 a ~17 minuti, ~6 sui soli
 documenti. Il numero vero si legge sui giri di main dopo il push.
 
+**IL PRIMO GIRO SU GITHUB** (d51a2cb, 16 ott 2026, mattina; push di
+Andrea autorizzato, nessun commit altrui portato con sé). Tutti e tre i
+job verdi. Job `prove` 14,6 minuti invece di ~21: prove.py 6,3 minuti
+(24.511 passate, 0 fallite, `prove_ci_leggera` compresa col suo giro dal
+vero), collaudi 7,9 minuti invece di ~14,5 — «(i collaudi girano 2 alla
+volta)», 82 verdi e 0 rossi in 470 secondi, `collaudo_canale_admin`
+verde in 11 secondi su Linux. Il confronto con `pronto` ha detto «4
+file, non solo documenti: si gira tutto», cioè giusto. Su GitHub il
+parallelo rende PIÙ che in locale: −46 % sui collaudi, contro il −29 %
+misurato su Windows con due processori. Già da solo porta un push da ~24
+a ~18 minuti fatturati (prove 15, segreti 2, pronto 1), prima della coda
+e dei soli documenti.
+`pronto` SI È SPOSTATO DA SOLO su d51a2cb, col job `pronto` verde in
+35 secondi. La previsione scritta qui prima del push era sbagliata: il
+commit toccava `.github/workflows/prove.yml`, eppure il rifiuto di
+GitHub del 13 ott («refusing to allow a GitHub App to create or update
+workflow») NON è scattato, e Andrea non ha dovuto spostare niente.
+Quindi «dopo un commit al workflow `pronto` resta indietro» non è una
+regola: può succedere, e si guarda il ref dopo il giro (`git ls-remote
+origin refs/heads/pronto refs/heads/main`), non lo si prevede.
+La riga di CLAUDE.md sul giro «cancelled» è entrata col commit di questa
+correzione, dentro le stesse righe del paragrafo del push (il tetto
+resta 263).
+
 **DA FARE** (notati, non fatti):
-- Il commit tocca il workflow, quindi il job `pronto` di questo giro
-  sarà rosso («refusing to allow a GitHub App to create or update
-  workflow»), e anche quello dei push dopo finché il ref non salta il
-  commit: `pronto` lo sposta Andrea a mano (gesto di deploy), come il 13
-  ott.
-- CLAUDE.md dice «la CI fino al verde (`gh run watch --exit-status`)»:
-  con la coda una sessione può vedere il suo giro «cancelled» e deve
-  guardare quello dopo. Una riga in CLAUDE.md, come commit a parte, se
-  Andrea vuole.
-- Il numero vero del «dopo» si legge sui giri di main della prossima
-  settimana (stessa misura di `gh run list` + `gh run view --json
-  jobs`), e si scrive qui sotto.
-- Misurare in CI `--paralleli 3`: se i collaudi aspettano più che
-  calcolare, tre su due processori potrebbero rendere di più. Si prova
-  su un giro, non si cambia a occhio.
+- Misurare `--paralleli 3` su un giro di GitHub: se i collaudi
+  aspettano più che calcolare, tre su due processori potrebbero rendere
+  di più. Si prova su un giro, non si cambia a occhio.
+- Il risparmio vero al mese, dai giri di main della prossima settimana
+  (stessa misura: `gh run list` + `gh run view --json jobs`, minuti di
+  ogni job arrotondati per eccesso), scritto qui sotto accanto alla
+  stima del 16 ott (~7.800 al mese invece di ~12.400).
 - `collaudo_canale_admin` su Windows sotto carico (vedi PROVATO):
   succede anche in fila. Si potrebbe far ripulire la cartella con
   `ignore_cleanup_errors=True`, ma è un collaudo altrui e non è stato
