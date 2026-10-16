@@ -2992,6 +2992,35 @@
   DUE card (che su 1160px non scorre) le frecce restano spente e la
   rotellina cade giustamente sulla pagina; con TRE — il caso vero in
   produzione — la fila scorre 448 e le frecce fanno il loro mestiere.
+  LO SCHERMO LARGO (16 ott 2026, cantiere schermo-largo, decisione di
+  Andrea): dal COMPUTER la pagina usa tutto lo schermo, a qualunque
+  larghezza (anche 21:9), e non c'e' piu' il tetto dei 1160 px ne'
+  quello delle barre a 520. Tutto vive in UN blocco in fondo al foglio
+  di stile («LO SCHERMO LARGO»), dopo l'arrivo secco, e ogni sua regola
+  ha DUE guardie: `html.fuori-telegram` (la Mini App, anche Telegram
+  Desktop largo, non vede niente) e `(hover:hover) and (pointer:fine)`
+  in ogni @media (telefoni, tablet e APK sono a dito e restano quelli
+  di prima). I blocchi DESKTOP (≥768) e DESKTOP LARGO (≥1024) di sopra
+  restano com'erano: valgono ancora dentro Telegram Desktop.
+  Le soglie: da 768 niente tetto; da 1280 il menu' diventa una colonna
+  a sinistra da 88 px (icona sopra, etichetta sotto), da 1600 da 232
+  col logo e i nomi per esteso; le colonne di Esplora sono UN NUMERO
+  SOLO, `--colonne` (3, 4, 5 da 1280, 6 da 1700, 7 da 2100, 8 da 2400,
+  9 da 2800, 10 da 3200), che bevono insieme la `.grid` e la fila
+  «Scambi P2P». L'annuncio a tre pannelli da 1600 (foto | dettagli |
+  altri oggetti del venditore: `.detail-body` in `display:contents`);
+  il libro P2P in griglia col dettaglio come pannello fisso a destra
+  (il velo sparisce solo se e' l'unico foglio aperto); l'ordine e lo
+  scambio a due colonne, la terza alla chat quando la chat c'e'
+  (`:has(>.chatsc)`); il pagamento con il QR a sinistra; la cassa e le
+  pagine da leggere a colonne di giornale.
+  IL TRUCCO DELLA RIGA CHE SI ALLARGA: dove una colonna di destra deve
+  stare accanto a tanti pezzi di sinistra senza un contenitore suo, la
+  griglia ha `repeat(N,auto) 1fr` e il pezzo di destra occupa tutte le
+  righe (`1 / -1`): quel che ha in piu' finisce nell'ultima riga, quella
+  flessibile, mai fra due pezzi della colonna di sinistra. Solo CSS:
+  nessun JavaScript, testo o gesto toccato. La sentinella e'
+  `prove_schermo_largo`; il verbale col giro dal vivo in CANTIERI.
   LA CARD CHE NAVIGA (ago 2026, decisione di Andrea): «P2P» in TESTA
   alla fila — non accende un filtro, porta al «coming soon» del P2P,
   dove si vota «🔔 Avvisami». Serve a far crescere le iscrizioni: a

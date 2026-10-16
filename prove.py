@@ -53297,6 +53297,11 @@ def prove_strisce_web():
     # e il giudice non compare da nessun'altra parte del foglio: una
     # regola sparsa altrove sfuggirebbe al gate dei 768px
     _css = mini[:mini.index("</style>")]
+    # (dal 16 ott 2026 il giudice veste anche il blocco dello SCHERMO
+    # LARGO, in fondo al foglio: li' ogni @media ha la sua soglia e il
+    # mouse, e la sentinella e' sua — prove_schermo_largo)
+    if "/* ==================== LO SCHERMO LARGO" in _css:
+        _css = _css[:_css.index("/* ==================== LO SCHERMO LARGO")]
     prova("...e fuori di li' il giudice non veste niente",
           _web.count("html.fuori-telegram"),
           _css.count("html.fuori-telegram"))
@@ -122201,7 +122206,15 @@ def prove_foglio_tastiera_iphone():
           True,
           "@media (max-width:767px){\n    html.foglio-su body{overflow:hidden}\n  }"
           in nudo)
-    prova("...e `:has()` resta fuori da questo file", False, ":has(" in nudo)
+    # (dal 16 ott 2026 con UNA eccezione dichiarata: il blocco dello
+    # SCHERMO LARGO, solo computer col mouse e fuori da Telegram, dove i
+    # browser da scrivania lo hanno tutti e dove decide tre cose che senza
+    # JS non si dicono — la colonna della chat solo se c'e', il velo del
+    # pannello del libro, il terzo pannello dell'annuncio. Telefoni e
+    # Mini App non lo vedono: lo sorveglia prove_schermo_largo)
+    _senza_largo = re.sub(r"/\*.*?\*/", "", stile.split(
+        "/* ==================== LO SCHERMO LARGO")[0], flags=re.S)
+    prova("...e `:has()` resta fuori da questo file", False, ":has(" in _senza_largo)
     prova("i due guardiani partono all'avvio, prima della nav", True,
           "\ntastieraSegue();\nfermaPaginaSotto();\nnavMotore();"
           in mini.replace("\r\n", "\n"))
@@ -141366,7 +141379,12 @@ def prove_p2p_schermi_larghi():
     prova("a mobile la card della fila resta meta' riga, col gap di 12", True,
           "  .p2p-vt-fila .card{flex:0 0 calc((100% - 12px) / 2)}" in css
           and ".p2p-vt-fila{display:flex;gap:12px;" in css)
-    fuori = css.replace(d768, "").replace(d1024, "")
+    # (dal 16 ott 2026 anche il blocco dello SCHERMO LARGO, solo computer:
+    # lo sorveglia prove_schermo_largo)
+    _largo = css[css.find("/* ==================== LO SCHERMO LARGO"):] \
+        if "/* ==================== LO SCHERMO LARGO" in css else ""
+    fuori = css.replace(d768, "").replace(d1024, "").replace(_largo, "") if _largo \
+        else css.replace(d768, "").replace(d1024, "")
     prova("...e le regole nuove della fila vivono SOLO nei blocchi desktop",
           [0, 1], [fuori.count(".p2p-vt-fila{gap:"),
                    fuori.count(".p2p-vt-fila .card{flex:")])
@@ -143863,6 +143881,157 @@ def prove_negozi_grandi():
     esito = giro5()
     prova("...e nel giro vero la bozza non va all'AI: cinque guardate, cinque nate, cinque bozze",
           (5, 5, 5), (len(st5["voci_ai"]), esito.get("nuovi"), esito.get("non_pubblicati")))
+
+
+def prove_schermo_largo():
+    """LO SCHERMO LARGO (16 ott 2026, cantiere schermo-largo, decisione di
+    Andrea): dal computer la pagina usa tutto lo schermo, a qualunque
+    larghezza, con piu' colonne e pannelli affiancati. Qui le sentinelle
+    della sola cosa che deve restare vera per sempre: NIENTE DI NUOVO
+    arriva al telefono, al tablet, all'APK o alla Mini App — ogni regola
+    del blocco porta `html.fuori-telegram` e ogni @media il mouse — e la
+    griglia ha la sua tabella delle colonne, con la fila «Scambi P2P»
+    che la segue per costruzione. Il giro dal vivo (scatti a 360, 1366,
+    1920, 2560 e 3440, chiaro e scuro, la Mini App simulata uguale al
+    pixel, nessuno scorrimento orizzontale) sta nel verbale in CANTIERI,
+    «Lo schermo largo»."""
+    print("\n[lo schermo largo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    testa = "/* ==================== LO SCHERMO LARGO (16 ott 2026)"
+    i = css.find(testa)
+    prova("il blocco dello schermo largo c'e', una volta sola", [True, 1],
+          [i >= 0, css.count(testa)])
+    blocco = css[i:] if i >= 0 else ""
+    # IN FONDO, dopo l'arrivo secco: e' l'ultima cosa del foglio, cosi'
+    # vince per ordine sui blocchi desktop di sopra, che restano com'erano
+    prova("...ed e' in fondo al foglio, dopo l'arrivo secco", True,
+          0 <= css.find("html.arrivo-secco *,") < i)
+
+    # le @media: ognuna col mouse, e le loro soglie
+    medie = re.findall(r"@media ([^{]+)\{", blocco)
+    prova("...ha le sue @media (almeno dieci soglie)", True, len(medie) >= 10)
+    senza_mouse = [m for m in medie if "(hover:hover) and (pointer:fine)" not in m]
+    prova("OGNI @media del blocco chiede il mouse: telefoni, tablet e APK "
+          "(a dito) non le vedono mai", [], senza_mouse)
+
+    # ogni regola porta html.fuori-telegram: la Mini App non vede niente
+    corpo = re.sub(r"/\*.*?\*/", "", blocco, flags=re.S)
+    prova("...e non usa mai !important", False, "!important" in corpo)
+
+    def spezza(sel):
+        """i selettori di una lista, senza tagliare dentro le parentesi
+        (`:not(.a,.b)` e' UN selettore)"""
+        pezzi, fondo, ora = [], 0, ""
+        for ch in sel:
+            fondo += {"(": 1, ")": -1}.get(ch, 0)
+            if ch == "," and not fondo:
+                pezzi.append(ora.strip()); ora = ""
+            else:
+                ora += ch
+        return [x for x in pezzi + [ora.strip()] if x]
+    selettori = []
+    for m in re.finditer(r"([^{};]+)\{([^{}]*)\}", corpo):
+        sel = m.group(1).strip()
+        if sel.startswith("@media") or not sel:
+            continue
+        selettori += spezza(sel)
+    prova("...ha le sue regole (piu' di cento selettori)", True, len(selettori) > 100)
+    nudi = [s for s in selettori if not s.startswith("html.fuori-telegram")]
+    prova("OGNI selettore parte da html.fuori-telegram: dentro Telegram "
+          "(anche Telegram Desktop largo) non cambia niente", [], nudi)
+
+    # SOTTO LA SOGLIA DEL TELEFONO: le sole regole sotto i 768 sono il
+    # tetto tolto (che sotto i 520 non cambia un pixel) e le tre colonne
+    # da 600 in su — e chiedono anche loro il mouse
+    def blocchi_media():
+        """[(testa, corpo)] di ogni @media del blocco"""
+        fuori = []
+        for m in re.finditer(r"@media ([^{]+)\{", blocco):
+            j, fondo = m.end(), 1
+            while fondo and j < len(blocco):
+                fondo += {"{": 1, "}": -1}.get(blocco[j], 0)
+                j += 1
+            fuori.append((m.group(1).strip(), blocco[m.end():j - 1]))
+        return fuori
+    tutti = blocchi_media()
+    sotto = [(t, c) for t, c in tutti if "max-width" in t]
+    prova("sotto i 768 ci sono solo due blocchi, entrambi fino a 767,98",
+          [True, True], [len(sotto) == 2,
+                         all("(max-width:767.98px)" in t for t, _ in sotto)])
+    dichiarazioni_sotto = sorted(set(
+        d.strip() for _, c in sotto
+        for d in re.findall(r"\{([^}]*)\}", re.sub(r"/\*.*?\*/", "", c, flags=re.S))))
+    prova("...e dicono solo «niente tetto» e «tre colonne da 600»", [
+        "flex:0 0 calc((100% - 2 * 12px) / 3)",
+        "grid-template-columns:repeat(3,minmax(0,1fr))",
+        "max-width:none"], dichiarazioni_sotto)
+    prova("...e le tre colonne partono da 600, non prima", True,
+          any(t.startswith("(min-width:600px) and (max-width:767.98px)")
+              for t, _ in sotto))
+
+    # LA TABELLA DELLE COLONNE: un numero solo, in ordine crescente
+    soglie = []
+    for t, c in tutti:
+        m = re.match(r"\(min-width:(\d+)px\)", t)
+        n = re.search(r"--colonne:(\d+)", c)
+        if m and n:
+            soglie.append((int(m.group(1)), int(n.group(1))))
+    prova("le colonne di Esplora crescono con lo schermo", [
+        (768, 3), (1024, 4), (1280, 5), (1700, 6), (2100, 7),
+        (2400, 8), (2800, 9), (3200, 10)], soglie)
+    prova("...in ordine crescente nel foglio (il blocco dopo vince)", True,
+          [s for s, _ in soglie] == sorted(s for s, _ in soglie))
+
+    def colonne_a(largo):
+        """le colonne che la griglia ha a quella larghezza, col mouse e
+        fuori da Telegram: l'ultima soglia raggiunta"""
+        n = 0
+        for s, c in soglie:
+            if largo >= s:
+                n = c
+        return n
+    prova("Esplora: 5 colonne a 1366, 6 a 1920, 8 a 2560, 10 a 3440",
+          [5, 6, 8, 10], [colonne_a(w) for w in (1366, 1920, 2560, 3440)])
+    prova("...e sotto i 768 la tabella non vale (telefono a 2)", 0, colonne_a(767))
+
+    # LA GRIGLIA E LA FILA P2P BEVONO DALLO STESSO NUMERO
+    prova("la griglia usa --colonne e --gap-griglia", True,
+          "html.fuori-telegram .grid{grid-template-columns:repeat(var(--colonne),minmax(0,1fr));"
+          in blocco and "gap:var(--gap-griglia)}" in blocco)
+    prova("...e la fila «Scambi P2P» e' larga una colonna della griglia", True,
+          "flex:0 0 calc((100% - (var(--colonne) - 1) * var(--gap-griglia)) / var(--colonne))"
+          in blocco and "html.fuori-telegram .p2p-vt-fila{gap:var(--gap-griglia)}" in blocco)
+    prova("...e --colonne non si dichiara da nessun'altra parte", 0,
+          css[:i].count("--colonne"))
+
+    # IL TETTO DEI 1160 E DELLE BARRE DA 520 NON C'E' PIU' (col mouse)
+    prova("il contenuto non ha piu' tetto da 768", True,
+          "html.fuori-telegram #app{max-width:none}" in blocco)
+    prova("...e la barra del carrello neanche", True,
+          "html.fuori-telegram #barraPacco{max-width:none}" in blocco)
+    # i blocchi desktop di sempre restano: valgono per Telegram Desktop
+    prova("i blocchi desktop di prima ci sono ancora, intatti in testa", [True, True],
+          ["@media (min-width:768px){\n    #app{max-width:960px;padding-top:76px;padding-bottom:40px}" in css,
+           "@media (min-width:1024px){\n    #app{max-width:1160px}" in css])
+
+    # LA CROCE DEL + NEL MENU' A SINISTRA: bianca di giorno, scura la sera
+    prova("la croce del + e' bianca solo di giorno e fuori dal P2P", True,
+          'html.fuori-telegram:not([data-tema="scuro"]) body:not(.nav-p2p) nav button.sell .ic{'
+          "\n      color:#FFFFFF;" in blocco)
+    prova("...e la sera nessuna regola la ridipinge (eredita lo scuro)", False,
+          bool(re.search(r'(?<!:not\()\[data-tema="scuro"\][^{]*button\.sell \.ic\{', corpo)))
+
+    # IL PANNELLO DEL DETTAGLIO P2P: il velo sparisce solo se e' l'unico foglio
+    prova("col pannello del libro aperto il velo sparisce solo se non ci "
+          "sono altri fogli sopra", True,
+          "body:has(#p2pDettSheet.open):not(:has(.sheet.open:not(#p2pDettSheet))) #sheetBg{"
+          in blocco)
+    # la chat dell'ordine: lo spazio a destra nasce solo se la chat c'e'
+    prova("la colonna della chat nasce solo se la chat c'e' (:has(>.chatsc))",
+          True, "#orderContent>.detail-body:has(>.chatsc)" in blocco
+          and "#p2pOrdineCorpo:has(>.chatsc)" in blocco)
+
 
 
 def prove_carrello_salvato():
@@ -167915,6 +168084,7 @@ def main():
               prove_vestito_bottoni,
               prove_p2p_schermi_larghi,
               prove_pc_tema_e_ricerca,
+              prove_schermo_largo,
               prove_carrello_salvato,
               prove_bollino_staff,
               prove_scambi_verso,

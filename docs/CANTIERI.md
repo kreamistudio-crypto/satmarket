@@ -63804,3 +63804,191 @@ CloudStorage non esiste e il foglio lo dice).
   cosa vede Telegram, cosa vediamo noi) resta della tappa ③, come
   concordato: qui i tre avvisi stanno dentro i blocchi che li
   riguardano.
+
+## Lo schermo largo: dal computer la pagina usa tutto lo schermo (16 ott 2026, cantiere schermo-largo, richiesta di Andrea)
+
+**IL PROBLEMA (Andrea).** barattolo.store aperto dal PC, anche su uno
+schermo 16:9, si vedeva come una colonna stretta in mezzo. Misurato a
+1920: il contenuto si fermava a 1160 px, con 380 px vuoti per lato; il
+libro P2P, l'ordine, il profilo e le pagine da leggere erano colonne da
+608-680 px; la cassa una colonna da 520, come le barre in basso.
+
+**LA DECISIONE (Andrea, dopo due proposte in dieci righe).** Niente
+tetto di larghezza, a QUALUNQUE larghezza, anche 21:9 (2560 e 3440): la
+pagina usa tutto lo schermo, Esplora e le liste aggiungono colonne man
+mano che lo schermo cresce, annuncio, ordini, P2P e fogli si allargano
+con più colonne e pannelli affiancati, MAI una colonna di testo stretta
+in mezzo col vuoto ai lati. Telefono, tablet in verticale, Mini App e
+APK identici a oggi. Con cinque paletti: 1) la chat dell'ordine del
+mercatino la fa il cantiere chat-mercatino (non ancora su main): qui
+solo lo spazio a destra, che nasce se la chat c'è, senza toccare le
+`chatSc*` né il loro HTML; 2) pagamento, fogli P2P e pannello dello
+scambio: SOLO impaginazione, e se il pannello fisso vuole JavaScript ci
+si ferma e si chiede; 3) blocchi separati in fondo, righe esistenti
+toccate il meno possibile; 4) la croce del «＋ Vendi» nel menù a
+sinistra bianca di giorno e scura la sera, come nel cantiere
+piu-bianco; 5) niente push sabato 17 e domenica 18.
+
+**COM'È FATTO.** Un blocco solo, «LO SCHERMO LARGO», in fondo al foglio
+di stile (dopo l'arrivo secco), con DUE guardie in ogni regola:
+`html.fuori-telegram` davanti a ogni selettore (fuori dalla Mini App:
+dentro Telegram, anche Telegram Desktop a finestra larga, non cambia
+niente) e `(hover:hover) and (pointer:fine)` in ogni @media (un mouse o
+un touchpad: telefoni, tablet anche in orizzontale e APK sono a dito).
+I blocchi DESKTOP (≥768) e DESKTOP LARGO (≥1024) di sopra non sono
+toccati: valgono ancora per Telegram Desktop e per i tablet. Nessuna
+riga di JavaScript, nessun testo, passo, bottone o importo cambiato.
+- Sotto i 768, col mouse (finestra stretta del computer): via il tetto
+  dei 520 (sotto i 520 non cambia un pixel), e da 600 la griglia a tre
+  colonne con la fila P2P che la segue.
+- Da 768: niente tetto; `--colonne` è un numero solo per la `.grid` e
+  per la fila «Scambi P2P» (3, 4 da 1024, 5 da 1280, 6 da 1700, 7 da
+  2100, 8 da 2400, 9 da 2800, 10 da 3200: carte fra 230 e 300 px).
+- Da 1280: il menù diventa una colonna a sinistra da 88 px, la barra
+  del telefono messa in piedi (icona sopra, etichetta sotto, la voce
+  accesa come pillola; levetta, podio e tappo in fondo); da 1600 è
+  larga 232, col logo e i nomi per esteso, e levetta, podio e tappo in
+  fila. Testata, «altri oggetti» e carrello appiccicati al bordo di
+  sopra (la topbar non c'è più); barra del carrello, toast e
+  «aggiorno…» sul contenuto, non sotto il menù; i fogli centrati sul
+  contenuto, larghi 600.
+- Annuncio: foto a sinistra mai più alta dello schermo e ferma mentre
+  si scorre; da 1600 tre pannelli — foto, dettagli (fra 440 e 760 px,
+  righe leggibili anche a 3440), altri oggetti del venditore (carte da
+  150 px in su: a 1920 due colonne) — con
+  `.detail-body` in `display:contents`; senza altri oggetti la terza
+  colonna non nasce (`:has(.altri-sez)`).
+- P2P: le pagine perdono la colonna da 640; il libro e «I miei scambi»
+  in griglia (carte da 320 px in su); il dettaglio dell'ordine (e il
+  foglio «Pubblica») diventa un PANNELLO FISSO A DESTRA, il libro resta
+  visibile e toccabile accanto, il velo sparisce solo se è l'unico
+  foglio aperto. Nessun JavaScript: `apriDettaglioP2P` ridisegna il
+  foglio già aperto su un'altra card da sé.
+- Ordine del mercatino: a sinistra cosa fare, a destra la cassaforte
+  coi suoi passi; con la chat (`:has(>.chatsc)`) a destra va lei, e da
+  1600 sono tre colonne (cosa fare | passi | chat). Lo stesso nello
+  scambio P2P coi quattro passi e la sua chat.
+- Pagamento (il foglio della fattura): il QR a sinistra, tutto il
+  resto a destra. La cassa («Acquista»): articolo, consegna e nota a
+  sinistra, il conto e «Paga» a destra, con due colonne di giornale e
+  un a-capo forzato davanti al titolo del conto.
+- Sicurezza, Privacy e Info P2P a colonne di giornale da ~460 px;
+  Vendi, Profilo e Ordini a carte in griglia; il bottone «Pubblica»
+  fermo a 560.
+- La croce del «＋» nella colonna: bianca col filo d'ombra di giorno,
+  scura la sera (eredita l'inchiostro del principale), solo fuori dal
+  P2P. È scritta coi valori del cantiere piu-bianco e non con le sue
+  leve (`--piu-casa-fg`), che su main non ci sono ancora: quando
+  piu-bianco arriva, la regola si può riscrivere con le leve.
+
+**IL TRUCCO DELLA RIGA CHE SI ALLARGA.** Dove una colonna di destra deve
+stare accanto a tanti pezzi di sinistra senza un contenitore suo (il QR
+del pagamento, la cassaforte, la chat, gli altri oggetti), la griglia ha
+`repeat(N,auto) 1fr` e il pezzo di destra occupa tutte le righe: quel
+che ha in più finisce nell'ultima riga, quella flessibile, mai fra due
+pezzi della colonna di sinistra (con righe normali la cassaforte alta
+apriva buchi fra il prezzo e i bottoni).
+
+**STRADE SCARTATE.** Le colonne a `auto-fill` per Esplora: la fila
+P2P deve restare larga quanto una colonna e da un `auto-fill` il numero
+non si legge — una tabella di soglie con un numero solo sì. La griglia a
+righe condivise per la cassa (buchi fra «Consegna» e le sue opzioni):
+colonne di giornale. Toccare i blocchi desktop di ieri: avrebbe cambiato
+anche Telegram Desktop. Avvolgere il venditore e gli altri oggetti in
+un contenitore nel template dell'annuncio: JavaScript e ordine del
+telefono toccati; il terzo pannello è degli altri oggetti, e la card del
+venditore resta nei dettagli.
+
+**PROVE.** `prove_schermo_largo` (nuova): il blocco c'è, in fondo,
+senza !important; ogni @media chiede il mouse; ogni selettore parte da
+`html.fuori-telegram`; sotto i 768 solo «niente tetto» e «tre colonne
+da 600»; la tabella delle colonne (e 5/6/8/10 a 1366/1920/2560/3440);
+griglia e fila bevono dallo stesso numero; i blocchi desktop di prima
+intatti; la croce; il velo del pannello; la colonna della chat che nasce
+solo con la chat. Tortura 5 mutazioni su 5 prese. Ritoccate due
+sentinelle vecchie che contavano `html.fuori-telegram` e le regole della
+fila fuori dai loro blocchi: ora escludono il blocco nuovo, che ha la
+sua (`prove_strisce_web`, `prove_p2p_schermi_larghi`).
+`:has()` — UNA ECCEZIONE DICHIARATA. Il file non lo usava (cantiere
+della tastiera dell'iPhone: «in questo file non si usa», con la sua
+sentinella), e la regola resta per tutto il resto del foglio. Qui decide
+tre cose che senza JavaScript non si dicono: la colonna della chat solo
+se la chat c'è, il velo e il posto del pannello del libro, il terzo
+pannello dell'annuncio solo se ci sono altri oggetti (e la cassa a due
+colonne solo col conto). Vive nel solo blocco del computer, dove i
+browser da scrivania lo hanno tutti; un browser senza `:has()` scarta
+quelle regole e resta all'impaginazione più semplice, mai rotta. La
+sentinella di `prove_foglio_tastiera_iphone` ora guarda il foglio
+SENZA il blocco nuovo (controprova: un `:has(` messo in testa al foglio
+la fa ancora cadere).
+Suite intera con `PROVE_SEVERE=1` sull'albero ribasato su f4f819f:
+24896 passate, 1 fallita — `prove_bundle_bitcoin`, l'impronta di
+`vendor/btc.bundle.js`, arrivato con 4cadba8: nel mio checkout Windows
+il file esce con gli a-capo CRLF e l'impronta cambia; con il file com'è
+nel repo (LF) la sezione è verde, 16 su 16. Non è di questo cantiere.
+Collaudi della CI (`collaudi_ci.py --elenco ci/collaudi.txt
+--paralleli 2`) sullo stesso albero: 84 verdi, 0 rossi.
+
+**IL GIRO DAL VIVO.** Copia del worktree nello scratchpad, collaudo,
+relay morti, nsec a INCOLLA_QUI; la vetrina pubblica copiata con
+`copia_vetrina_demo.py --max 120` (120 annunci di 32 venditori, foto
+comprese, solo GET pubbliche); due ordini seminati nel database del
+banco per il compratore 111; il libro P2P seminato DALLA PAGINA (22
+eventi 38383 finti passati da `ordineDaEvento`, nessun relay). Chrome
+headless via CDP, scatti a 360 (a dito), 1366×768, 1920×1080,
+2560×1440 e 3440×1440, chiaro e scuro, sulle pagine Esplora, griglia,
+annuncio, ordini, ordine, P2P, dettaglio P2P, pagamento, Sicurezza,
+Profilo, Vendi, Info P2P, e la Mini App simulata
+(`#tgWebAppData=collaudo…`).
+NIENTE SCORRIMENTO ORIZZONTALE: `scrollWidth` uguale a `innerWidth` in
+tutti i 130 scatti «dopo». Esplora: 2 colonne a 360, 5 a 1366, 6 a
+1920, 8 a 2560, 10 a 3440.
+IL TELEFONO E LA MINI APP IDENTICI, e la prova ha dovuto diventare più
+severa del previsto. Su un server col cambio BTC/EUR FERMO (le cifre in
+sats non ballano) e lo stesso database, tre giri: due «prima» (main) e
+un «dopo», a 360 a dito su 13 pagine × 2 temi, e la Mini App simulata a
+1366, 1920, 2560 e 3440 × 2 temi. Lo scatto «con le foto» NON è
+deterministico: due «prima» identici differivano fra loro di qualche
+migliaio di pixel, sempre DENTRO una foto (miniatura e foto piena che
+arrivano quando vogliono), e così il prima/dopo. Allora per ogni
+pagina: la geometria di TUTTI gli elementi (posizione, misura,
+display, colore, fondo, corpo del testo) e uno scatto a foto nascoste.
+Risultato, col puntatore dichiarato (sotto): geometrie identiche 34 su
+34 e scatti senza foto uguali al pixel 34 su 34, prima contro dopo (e
+prima contro prima). Nella Mini App a 1366-3440 il mouse c'era
+(registrato in ogni scatto): è la guardia `fuori-telegram` a tenerla
+ferma, non l'assenza del mouse. Il pannello
+del libro col tocco vero a 1920 e 1366: si apre su una card, un tocco su
+un'altra lo ridisegna su di lei, la ✕ lo chiude, con un secondo foglio
+sopra il velo torna.
+IL BANCO MENTIVA SUL MOUSE, e va scritto: verso le 20 Chrome headless
+ha cominciato a rispondere `pointer:fine` falso e `hover:hover` falso
+(il tipo di puntatore lo decide Windows, e a PC lasciato solo cambia):
+un giro intero di «dopo» è uscito con l'impaginazione di ieri, senza
+nessun errore. Da lì il puntatore si DICHIARA all'avvio di Chrome
+(`--blink-settings`, mouse per il computer e dito per il telefono) e
+ogni scatto registra `(hover:hover) and (pointer:fine)` accanto alle
+misure; i numeri qui sopra sono del giro rifatto così. Nella vita vera
+vuol dire anche questo: un computer che non dichiara né mouse né
+touchpad vede la versione di prima (larga 1160), mai una rotta.
+SCATTI E TAVOLE: prima a 360, 1366, 1920, 2560 e 3440 chiaro e scuro
+(«prima» girati su 37ae7af, prima del rebase: main da lì non ha
+toccato l'impaginazione), dopo sull'albero finale.
+
+**DA FARE (notati, non fatti).**
+- La riga della croce bianca nella colonna, da riscrivere con le leve
+  di piu-bianco (`--piu-casa-fg`, `--piu-casa-ombra`) quando quel
+  cantiere arriva su main.
+- La chat del mercatino nella colonna di destra: provata solo col
+  selettore (`:has(>.chatsc)`), non dal vivo — va guardata quando
+  chat-mercatino è su main.
+- Lo scambio P2P con la chat (`#p2pOrdineCorpo`) non l'ho visto dal
+  vivo: serve uno scambio vero o il coordinatore di cartone.
+- Nelle pagine a colonne di giornale (Info P2P) un elenco numerato
+  lungo si spezza fra due colonne e la numerazione riparte: da guardare.
+- Su un 2560 e un 3440 l'ordine del mercatino senza chat lascia la
+  colonna della cassaforte molto larga e corta: forse tre colonne anche
+  senza chat.
+- La ricerca resta larga 640 anche a 3440.
+- Aste, negozio e classifica guardati solo di passaggio (usano la
+  stessa `.grid`).
