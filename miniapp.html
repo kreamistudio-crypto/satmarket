@@ -8953,6 +8953,43 @@
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sped-std-da{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);line-height:1.45}
   .sped-std-esito{font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.5;margin:4px 0 14px}
+  /* ✏️ LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026): il foglio
+     riusa le righe della spedizione in blocco (.sped-std-*) per
+     l'anteprima e l'esito; qui solo quel che e' suo — le righe da
+     spuntare (tutta la riga e' il bersaglio, 44px), i due filtri, i
+     gesti a pastiglie e il piede incollato in fondo al foglio. Solo
+     token di casa: i due temi li porta la palette. */
+  .acc-b .btn.ghost.mm-apri{margin:0 0 12px}
+  .mm-ultima{font-size:13px;font-weight:700;line-height:1.45;color:var(--ink);
+    background:var(--chip-bg);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+  .mm-link{border:0;background:none;padding:0;font:inherit;font-weight:800;
+    color:var(--sats-text);text-decoration:underline;cursor:pointer}
+  .mm-filtri{display:flex;gap:8px;margin-bottom:6px}
+  .mm-filtri select{flex:1 1 0;min-width:0;font:700 13px/1.2 Nunito,sans-serif;color:var(--ink);
+    background:var(--card);border:1.5px solid var(--field-line);border-radius:12px;padding:10px}
+  .mm-lista{list-style:none;margin:0;padding:0}
+  .mm-riga{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 2px;
+    border-top:1px solid var(--line);cursor:pointer;min-width:0}
+  .mm-riga input{flex:0 0 auto;width:20px;height:20px;margin:0;accent-color:var(--sats)}
+  .mm-tutti{border-top:0}
+  .mm-capito{border-top:0;margin-top:6px}
+  .mm-em{flex:0 0 28px;width:28px;min-width:0;font-size:20px;line-height:1;text-align:center}
+  .mm-t{display:flex;flex-direction:column;min-width:0}
+  .mm-t b{font-size:14px;font-weight:800;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mm-s{font-size:12.5px;font-weight:700;color:var(--ink-soft);line-height:1.4}
+  .mm-azioni{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
+  /* le pastiglie sono <button>: senza, prendono il carattere di sistema */
+  .mm-azioni .chip,.mm-valuta .chip{font-family:inherit}
+  .mm-campo{margin-top:4px}
+  .mm-valuta{display:flex;gap:8px;align-items:center}
+  .field .mm-valuta input{flex:1 1 auto;min-width:0;width:auto}
+  .mm-piede{position:sticky;bottom:-28px;margin:14px calc(-1 * var(--pad)) -28px;
+    padding:10px var(--pad) 28px;background:var(--card);border-top:1px solid var(--line)}
+  .mm-piede .btn{margin-top:0}
+  .mm-due{display:flex;gap:8px}
+  .mm-due .btn.ghost{flex:0 0 auto;width:auto;padding-left:18px;padding-right:18px}
+  .mm-due .btn.orange,.mm-due .btn.allarme{flex:1 1 auto;margin-bottom:0}
   /* il catalogo esterno dentro «📥 Importa in blocco» (set 2026): una
      seconda domanda nello stesso cassetto, staccata da un filo come il
      costo standard in «📦 Come spedisci» */
@@ -12824,7 +12861,10 @@ document.getElementById('cartello')?.remove();</script>
         <div class="grp-b">
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
+        <div class="acc-b"><!-- ✏️ la modifica di piu' annunci insieme (16 ott 2026): nasce
+             solo con la leva accesa e almeno due annunci (aggiornaBottoneMM) -->
+          <div id="mmApri" hidden><button type="button" class="btn ghost mm-apri" onclick="apriModificaMassiva(this)">✏️ Modifica più annunci</button></div>
+          <div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
       </div>
 
       <!-- Import in blocco da CSV: per i commercianti coi cataloghi
@@ -14189,6 +14229,19 @@ document.getElementById('cartello')?.remove();</script>
     <div id="spedStdCorpo" style="margin-bottom:14px"></div>
     <button class="btn orange" id="spedStdOk" onclick="applicaSpedStd(this)">🚚 Aggiorna</button>
     <button class="btn ghost" id="spedStdNo" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET MODIFICA DI PIU' ANNUNCI (16 ott 2026) ============
+       Quattro tempi nello stesso foglio — scegli, cosa cambi, anteprima,
+       esito — scritti da renderMM. Il piede resta incollato in fondo: il
+       bottone che manda avanti si vede anche con cento righe sopra. I
+       titoli degli annunci passano da esc(). -->
+  <div class="sheet" id="mmSheet" role="dialog" aria-modal="true"
+       aria-labelledby="mmTit">
+    <div class="grab"></div>
+    <h3 id="mmTit">✏️ Modifica più annunci</h3>
+    <div id="mmCorpo"></div>
+    <div class="mm-piede" id="mmPiede"></div>
   </div>
 
   <!-- ============ SHEET WIDGET DA INCORPORARE (ago 2026) ============
@@ -31496,6 +31549,7 @@ function closeSheet(){
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
   el('spedStdSheet').classList.remove('open');
+  el('mmSheet').classList.remove('open');
   el('widgetSheet').classList.remove('open');
   el('rilancioSheet').classList.remove('open');
   el('riscuotiSheet').classList.remove('open');
@@ -44363,11 +44417,493 @@ async function dopoRifornimento(id){
   if (attiva('negozio') && negozioPag.chi) ridisegnaNegozio(negozioPag.chi);
 }
 
+/* ---------------- ✏️ LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026) ----------------
+   Cantiere modifica-massiva, decisione di Andrea. Un foglio in quattro
+   tempi, nello stesso posto: SCEGLI (le spunte, «Seleziona tutti», due
+   filtri) → COSA CAMBI → ANTEPRIMA («Stai cambiando N annunci: prima →
+   dopo», e chi resta com'era col suo motivo) → ESITO (la frase finale e
+   «↩︎ Annulla», per 24 ore). Le regole le decide il server, una per
+   una: qui si sceglie, si mostra e si chiede. L'elenco da cui si sceglie
+   e' suo (`/api/me/modifica-massiva`), e non la pagina di «I tuoi
+   annunci»: i filtri e «Seleziona tutti» devono vedere il negozio
+   intero, non i primi cento.
+   La leva viene da /api/me (`modifica_massiva`): spenta, il bottone non
+   nasce. In DEMO non c'e'. */
+let modificaMassivaAttiva = false;
+let mm = null;   // lo stato del foglio: vedi apriModificaMassiva
+
+function aggiornaBottoneMM(){
+  const box = el('mmApri');
+  if (!box) return;
+  box.hidden = !(modificaMassivaAttiva && !DEMO && !VETRINA && myListings.length >= 2);
+}
+
+/* I GESTI, nell'ordine in cui si leggono: prima i numeri, poi i
+   cassetti, poi lo stato, e l'eliminazione in fondo. */
+const AZIONI_MM = [
+  ['prezzo', '💶 Prezzo'], ['percento', '％ Prezzo in %'],
+  ['quantita', '🔢 Quantità'], ['spedizione', '🚚 Spedizione'],
+  ['categoria', '🏷️ Categoria'], ['pausa', '⏸ Metti in pausa'],
+  ['riattiva', '▶ Riattiva'], ['elimina', '🗑 Elimina']];
+
+/* LE PAROLE DEI MOTIVI, singolare e plurale, scritte per stare dopo
+   «N non modificati:» — la frase chiesta da Andrea («3 non modificati:
+   hanno un ordine in corso»). I CODICI li decide il server
+   (MM_MOTIVI), e una prova li tiene in pari; l'ORDINE e' questo: prima
+   quel che passa col tempo, poi quel che vive altrove, poi le scelte
+   del venditore su quell'annuncio. */
+const MOTIVI_MM = {
+  ordine: ['ha un ordine in corso', 'hanno un ordine in corso'],
+  riservati: ['ha dei pezzi in pagamento proprio ora', 'hanno dei pezzi in pagamento proprio ora'],
+  offerta: ["ha un'offerta aperta: rispondi prima", "hanno un'offerta aperta: rispondi prima"],
+  lampo: ["ha un'offerta lampo in corso", "hanno un'offerta lampo in corso"],
+  revisione: ['è in revisione', 'sono in revisione'],
+  esaurito: ['è esaurito: prima riforniscilo', 'sono esauriti: prima riforniscili'],
+  asta: ["è all'asta: le aste si gestiscono una per una", "sono all'asta: le aste si gestiscono una per una"],
+  negozio: ['arriva dal tuo negozio collegato', 'arrivano dal tuo negozio collegato'],
+  nostr: ['è importato da Nostr', 'sono importati da Nostr'],
+  servizio: ['è un servizio, senza scorte', 'sono servizi, senza scorte'],
+  valuta: ["ha il prezzo nell'altra valuta", "hanno il prezzo nell'altra valuta"],
+  cambio: ["è in euro, e il cambio adesso non c'è", "sono in euro, e il cambio adesso non c'è"],
+  tetto: ['supererebbe il prezzo massimo', 'supererebbero il prezzo massimo'],
+  condizione: ['non ha la condizione che quella categoria chiede', 'non hanno la condizione che quella categoria chiede'],
+  ritiro: ['si ritira solo a mano', 'si ritirano solo a mano'],
+  digitale: ['è digitale', 'sono digitali'],
+  senza_consegna: ['non ha una consegna indicata', 'non hanno una consegna indicata'],
+  no_casa: ['non spedisce nel tuo paese', 'non spediscono nel tuo paese'],
+  gratis: ['ha la spedizione gratis', 'hanno la spedizione gratis'],
+  uguale: ['è già così', 'sono già così'],
+  cambiato: ['è cambiato proprio mentre salvavo', 'sono cambiati proprio mentre salvavo'],
+  sparito: ['non è più tra i tuoi annunci', 'non sono più tra i tuoi annunci'],
+};
+function etichettaMotivoMM(motivo, origine, n){
+  if (motivo === 'negozio' && origine)
+    return n === 1 ? `arriva dal tuo negozio ${origine}` : `arrivano dal tuo negozio ${origine}`;
+  const v = MOTIVI_MM[motivo] || ['per un altro motivo', 'per un altro motivo'];
+  return v[n === 1 ? 0 : 1];
+}
+/* I rimasti fuori raggruppati per motivo, nell'ordine qui sopra (il
+   calco di gruppiFuoriSpedStd). */
+function gruppiFuoriMM(fuori){
+  const gruppi = new Map();
+  for (const f of (fuori || [])){
+    const chiave = f.motivo === 'negozio' ? 'negozio:' + (f.origine || '') : f.motivo;
+    if (!gruppi.has(chiave))
+      gruppi.set(chiave, {motivo: f.motivo, origine: f.origine || '', titoli: []});
+    gruppi.get(chiave).titoli.push(f.titolo || '');
+  }
+  const ordine = Object.keys(MOTIVI_MM);
+  const pos = m => { const i = ordine.indexOf(m); return i < 0 ? ordine.length : i; };
+  return [...gruppi.values()]
+    .map(g => ({...g, n: g.titoli.length,
+                etichetta: etichettaMotivoMM(g.motivo, g.origine, g.titoli.length)}))
+    .sort((a, b) => pos(a.motivo) - pos(b.motivo));
+}
+/* «3 non modificati: hanno un ordine in corso» con un motivo solo;
+   con piu' motivi ognuno dice il suo numero. Nella FRASE il motivo
+   va corto — senza il consiglio dopo i due punti, che resta nei gruppi
+   dell'anteprima: cinque consigli in fila in una frase sola erano un
+   muro (visto a 360 px). */
+const cortoMM = e => e.split(':')[0];
+function fraseFuoriMM(fuori){
+  const m = (fuori || []).length;
+  if (!m) return '';
+  const g = gruppiFuoriMM(fuori);
+  const testa = `${fmt(m)} non modificat${m === 1 ? 'o' : 'i'}: `;
+  return testa + (g.length === 1 ? cortoMM(g[0].etichetta)
+    : g.map(x => `${fmt(x.n)} ${cortoMM(x.etichetta)}`).join(', '));
+}
+const nAnnunciMM = n => `${fmt(n)} annunc${n === 1 ? 'io' : 'i'}`;
+
+/* Cosa fa il gesto, in poche parole: il cartello dell'annulla e la
+   testa dell'anteprima. */
+function descriviAzioneMM(azione, par){
+  par = par || {};
+  switch (azione){
+    case 'prezzo': return par.valuta === 'eur'
+      ? `prezzo a ${fmtEur(Number(par.prezzo) || 0)} €` : `prezzo a ${fmt(Number(par.prezzo) || 0)} sats`;
+    case 'percento': {
+      const p = Number(par.percento) || 0;
+      return `prezzo ${p > 0 ? '+' : '−'}${Math.abs(p)} %`;
+    }
+    case 'quantita': return `${fmt(Number(par.quantita) || 0)} pezz${Number(par.quantita) === 1 ? 'o' : 'i'} ciascuno`;
+    case 'spedizione': return 'il costo di spedizione standard';
+    case 'categoria': return `categoria «${par.categoria || ''}»`;
+    case 'pausa': return 'messi in pausa';
+    case 'riattiva': return 'di nuovo in vetrina';
+    case 'elimina': return 'eliminati';
+  }
+  return '';
+}
+/* Le scorte come si leggono: «3 pezzi», «in pausa». */
+const scorteMM = (q, stato) => stato === 'venduto' ? 'in pausa'
+  : `${fmt(q)} pezz${q === 1 ? 'o' : 'i'}`;
+/* «Da quanto a quanto» di UN annuncio, nella valuta del SUO listino. */
+function righeCambioMM(v, azione){
+  if (azione === 'prezzo' || azione === 'percento'){
+    const f = x => v.valuta === 'eur' ? `${fmtEur(x[1])} €` : `${fmt(x[0])} sats`;
+    return [`${f(v.prima)} → ${f(v.dopo)}`];
+  }
+  if (azione === 'quantita' || azione === 'pausa' || azione === 'riattiva')
+    return [`${scorteMM(v.prima[0], v.prima[1])} → ${scorteMM(v.dopo[0], v.dopo[1])}`];
+  if (azione === 'categoria')
+    return [`${EMOJI_CAT[v.prima] || '📦'} ${v.prima} → ${EMOJI_CAT[v.dopo] || '📦'} ${v.dopo}`
+      + (v.condizione_via ? ' (la condizione si toglie)' : '')];
+  if (azione === 'spedizione') return righeCambioSpedStd(v);
+  return ['si elimina'];
+}
+/* La riga corta dell'elenco da cui si sceglie: prezzo, scorte, stato. */
+function sottoRigaMM(a){
+  const pezzi = [a.valuta === 'eur' ? `${fmtEur(a.prezzo_eur)} €` : `${fmt(a.prezzo_sats)} sats`];
+  if (a.stato === 'venduto') pezzi.push('esaurito');
+  else if (a.stato === 'revisione') pezzi.push('in revisione');
+  else if (!a.asta) pezzi.push(scorteMM(a.quantita || 1, 'attivo'));
+  if (a.asta) pezzi.push('🔨 asta');
+  if (a.origine) pezzi.push(`da ${a.origine}`);
+  return pezzi.join(' · ');
+}
+
+async function apriModificaMassiva(btn){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  const ripristina = bottoneInAttesa(btn, 'Guardo i tuoi annunci…');
+  try {
+    const r = await fetch(`${API_BASE}/me/modifica-massiva`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    mm = {passo: 'scegli', elenco: d.annunci || [], tetto: d.tetto || 100,
+          troncato: !!d.troncato, ultima: d.ultima || null, scelti: new Set(),
+          filtroCat: '', filtroStato: '', azione: '', valuta: 'sats',
+          campi: {prezzo: '', percento: '', quantita: '', categoria: ''},
+          capito: false, anteprima: null, esito: null, annullo: null};
+    renderMM();
+    el('sheetBg').classList.add('open');
+    el('mmSheet').classList.add('open');
+    el('mmSheet').scrollTop = 0;
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+
+const mmVisibili = () => (mm ? mm.elenco : []).filter(a =>
+  (!mm.filtroCat || a.categoria === mm.filtroCat)
+  && (!mm.filtroStato || a.stato === mm.filtroStato));
+
+function renderMM(errore){
+  const corpo = el('mmCorpo'), piede = el('mmPiede');
+  if (!mm || !corpo || !piede) return;
+  const err = errore ? `<div class="sped-std-errore" role="alert">${esc(errore)}</div>` : '';
+  const f = {scegli: htmlScegliMM, cosa: htmlCosaMM, anteprima: htmlAnteprimaMM,
+             esito: htmlEsitoMM}[mm.passo];
+  const [tit, h, p] = f(err);
+  el('mmTit').textContent = tit;
+  corpo.innerHTML = h;
+  piede.innerHTML = p;
+}
+
+/* ---- 1) SCEGLI ---- */
+function htmlScegliMM(err){
+  const vis = mmVisibili();
+  const cat = [...new Set(mm.elenco.map(a => a.categoria))].sort((a, b) => a.localeCompare(b, 'it'));
+  const opz = (v, t, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(t)}</option>`;
+  let h = '';
+  if (mm.ultima){
+    const u = mm.ultima;
+    const ora = new Date(u.scade * 1000).toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+    h += `<div class="mm-ultima">↩︎ L'ultima modifica (${esc(descriviAzioneMM(u.azione, u.parametri))},
+      ${nAnnunciMM(u.quanti)}) si può annullare fino alle ${esc(ora)} di domani.
+      <button type="button" class="mm-link" onclick="mmAnnulla(this, ${Number(u.id)})">Annullala</button></div>`;
+  }
+  h += err;
+  h += `<div class="mm-filtri">
+    <select id="mmFCat" aria-label="Categoria" onchange="mmFiltro()">${opz('', 'Tutte le categorie', !mm.filtroCat)}${
+      cat.map(c => opz(c, c, mm.filtroCat === c)).join('')}</select>
+    <select id="mmFStato" aria-label="Stato" onchange="mmFiltro()">${opz('', 'Tutti', !mm.filtroStato)}${
+      opz('attivo', 'In vetrina', mm.filtroStato === 'attivo')}${opz('venduto', 'Esauriti', mm.filtroStato === 'venduto')}${
+      opz('revisione', 'In revisione', mm.filtroStato === 'revisione')}</select>
+  </div>`;
+  const tutti = vis.length > 0 && vis.every(a => mm.scelti.has(a.id));
+  h += `<label class="mm-riga mm-tutti"><input type="checkbox" id="mmTutti"${tutti ? ' checked' : ''}
+      onchange="mmTutti(this.checked)"><span class="mm-t"><b>Seleziona tutti (${fmt(vis.length)})</b></span></label>`;
+  h += vis.length ? `<ul class="mm-lista">${vis.map(a => `<li><label class="mm-riga">
+      <input type="checkbox" data-id="${a.id}"${mm.scelti.has(a.id) ? ' checked' : ''} onchange="mmSpunta(this)">
+      <span class="mm-em" aria-hidden="true">${EMOJI_CAT[a.categoria] || '📦'}</span>
+      <span class="mm-t"><b>${esc(a.titolo)}</b><span class="mm-s">${esc(sottoRigaMM(a))}</span></span>
+    </label></li>`).join('')}</ul>`
+    : `<div class="sped-std-esito">Nessun annuncio con questi filtri.</div>`;
+  if (mm.troncato)
+    h += `<div class="sped-std-nota">Qui ci sono i tuoi ${fmt(mm.elenco.length)} annunci più recenti.</div>`;
+  return ['✏️ Modifica più annunci', h, pieneScegliMM()];
+}
+function pieneScegliMM(){
+  const n = mm.scelti.size, troppi = n > mm.tetto;
+  return `${troppi ? `<div class="sped-std-errore">Al massimo ${fmt(mm.tetto)} per volta: togline ${fmt(n - mm.tetto)}.</div>` : ''}
+    <button class="btn orange" id="mmAvanti" onclick="mmAvanti()"${!n || troppi ? ' disabled' : ''}>${
+      n ? `Avanti · ${nAnnunciMM(n)}` : 'Scegli gli annunci'}</button>`;
+}
+/* La spunta NON ridisegna la lista (si perderebbe lo scorrimento):
+   cambia il numero nel piede e la casella «Seleziona tutti». */
+function mmSpunta(cb){
+  const id = Number(cb.dataset.id);
+  if (cb.checked) mm.scelti.add(id); else mm.scelti.delete(id);
+  const vis = mmVisibili();
+  const t = el('mmTutti');
+  if (t) t.checked = vis.length > 0 && vis.every(a => mm.scelti.has(a.id));
+  el('mmPiede').innerHTML = pieneScegliMM();
+}
+/* «Seleziona tutti» prende i VISIBILI (i filtri dicono quali) fino al
+   tetto, e lo dice; toglie i visibili e lascia gli altri. */
+function mmTutti(on){
+  haptic();
+  const vis = mmVisibili();
+  if (on){
+    let presi = 0;
+    for (const a of vis){
+      if (mm.scelti.size >= mm.tetto) break;
+      if (!mm.scelti.has(a.id)) { mm.scelti.add(a.id); presi++; }
+    }
+    if (vis.some(a => !mm.scelti.has(a.id)))
+      toast(`Ne ho scelti ${fmt(mm.scelti.size)}: è il massimo per volta`);
+  } else vis.forEach(a => mm.scelti.delete(a.id));
+  const sc = el('mmCorpo').closest('.sheet').scrollTop;
+  renderMM();
+  el('mmSheet').scrollTop = sc;
+}
+function mmFiltro(){
+  mm.filtroCat = el('mmFCat').value;
+  mm.filtroStato = el('mmFStato').value;
+  renderMM();
+}
+function mmAvanti(){
+  haptic();
+  if (!mm.scelti.size || mm.scelti.size > mm.tetto) return;
+  mm.passo = 'cosa';
+  renderMM();
+  el('mmSheet').scrollTop = 0;
+}
+
+/* ---- 2) COSA CAMBI ---- */
+function htmlCosaMM(err){
+  const a = mm.azione, c = mm.campi;
+  let h = `<div class="sped-std-testa">Hai scelto ${nAnnunciMM(mm.scelti.size)}. Cosa cambi?</div>
+    <div class="mm-azioni" role="radiogroup" aria-label="Cosa cambi">${AZIONI_MM.map(([k, t]) =>
+      `<button type="button" class="chip${a === k ? ' active' : ''}" role="radio" aria-checked="${a === k}"
+        onclick="mmScegliAzione('${k}')">${t}</button>`).join('')}</div>`;
+  h += err;
+  const nota = t => `<div class="sped-std-nota">${t}</div>`;
+  if (a === 'prezzo'){
+    h += `<div class="field mm-campo"><label for="mmPrezzo">Il prezzo nuovo</label>
+      <div class="mm-valuta">
+        <input id="mmPrezzo" inputmode="decimal" autocomplete="off" value="${esc(c.prezzo)}"
+          placeholder="${mm.valuta === 'eur' ? 'es. 19,90' : 'es. 25000'}" oninput="mm.campi.prezzo=this.value">
+        <button type="button" class="chip${mm.valuta === 'sats' ? ' active' : ''}" onclick="mmValuta('sats')">sats</button>
+        <button type="button" class="chip${mm.valuta === 'eur' ? ' active' : ''}" onclick="mmValuta('eur')">€</button>
+      </div></div>`
+      + nota(`Vale per gli annunci col prezzo in ${mm.valuta === 'eur' ? 'euro' : 'sats'}: gli altri restano com'erano.`);
+  } else if (a === 'percento'){
+    h += `<div class="field mm-campo"><label for="mmPercento">Di quanto, in percentuale</label>
+      <input id="mmPercento" inputmode="text" autocomplete="off" value="${esc(c.percento)}"
+        placeholder="es. -10 oppure +5" oninput="mm.campi.percento=this.value"></div>`
+      + nota('Col meno abbassi, col più alzi: da −90 a +200. Ogni annuncio nella sua valuta, sats interi ed euro al centesimo.');
+  } else if (a === 'quantita'){
+    h += `<div class="field mm-campo"><label for="mmQuantita">Quanti pezzi, per ognuno</label>
+      <input id="mmQuantita" inputmode="numeric" autocomplete="off" value="${esc(c.quantita)}"
+        placeholder="es. 5" oninput="mm.campi.quantita=this.value"></div>`
+      + nota('È il numero che hai adesso, non quanti ne aggiungi. Gli esauriti tornano in vetrina; gli affari in corso restano dove sono.');
+  } else if (a === 'spedizione'){
+    h += mySpedStd
+      ? nota(`Porta sugli annunci il tuo costo standard: <b>a casa ${esc(cifraStdSalvato(mySpedStd))}</b>. Lo cambi in «📦 Come spedisci».`)
+      : `<div class="sped-std-errore">Scrivi prima il costo di spedizione standard in «📦 Come spedisci».</div>`;
+  } else if (a === 'categoria'){
+    h += `<div class="field mm-campo"><label for="mmCategoria">La categoria nuova</label>
+      <select id="mmCategoria" onchange="mm.campi.categoria=this.value"><option value="">Scegli…</option>${
+        Object.keys(EMOJI_CAT).map(k => `<option value="${esc(k)}"${c.categoria === k ? ' selected' : ''}>${EMOJI_CAT[k]} ${esc(k)}</option>`).join('')}</select></div>`;
+  } else if (a === 'pausa'){
+    h += nota('Escono dalla vetrina come esauriti: il link resta vivo e li riattivi quando vuoi. Le offerte aperte su questi annunci decadono, e chi le aveva fatte riceve un messaggio solo.');
+  } else if (a === 'riattiva'){
+    h += nota('Tornano in vetrina coi pezzi che avevano prima della pausa (uno, se la pausa l\'avevi messa annuncio per annuncio).');
+  } else if (a === 'elimina'){
+    h += `<div class="sped-std-errore">Spariscono dalla vetrina e dai relay Nostr. L'eliminazione non si annulla.</div>`;
+  }
+  const pronto = a && !(a === 'spedizione' && !mySpedStd);
+  return ['✏️ Cosa cambi', h, `<div class="mm-due">
+    <button class="btn ghost" onclick="mmIndietro()">Indietro</button>
+    <button class="btn orange" onclick="mmAnteprima(this)"${pronto ? '' : ' disabled'}>Vedi l'anteprima</button></div>`];
+}
+function mmScegliAzione(k){
+  haptic();
+  mm.azione = k;
+  renderMM();
+  const campo = {prezzo: 'mmPrezzo', percento: 'mmPercento', quantita: 'mmQuantita'}[k];
+  if (campo && el(campo)) el(campo).focus();
+}
+function mmValuta(v){
+  haptic();
+  mm.valuta = v;
+  renderMM();
+}
+function payloadMM(){
+  const p = {ids: [...mm.scelti], azione: mm.azione}, c = mm.campi;
+  if (mm.azione === 'prezzo') { p.valuta = mm.valuta; p.prezzo = c.prezzo.trim(); }
+  if (mm.azione === 'percento') p.percento = c.percento.trim();
+  if (mm.azione === 'quantita') p.quantita = c.quantita.trim();
+  if (mm.azione === 'categoria') p.categoria = c.categoria;
+  if (mm.azione === 'elimina') p.conferma = 'elimina';
+  return p;
+}
+async function mmAnteprima(btn){
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Preparo l\'anteprima…');
+  try {
+    const p = payloadMM();
+    delete p.conferma;
+    const r = await fetch(`${API_BASE}/me/modifica-massiva/anteprima`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify(p)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { renderMM(d.detail || 'Non ci sono riuscito: riprova'); return; }
+    mm.anteprima = d;
+    mm.capito = false;
+    mm.passo = 'anteprima';
+    renderMM();
+    el('mmSheet').scrollTop = 0;
+  } catch(e) { renderMM('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+
+/* ---- 3) ANTEPRIMA ---- */
+function htmlAnteprimaMM(err){
+  const d = mm.anteprima, cambiano = d.cambiano || [], fuori = d.fuori || [];
+  const n = cambiano.length, elimina = d.azione === 'elimina';
+  /* il verbo e' il gesto quando il gesto e' uno stato: «Stai
+     eliminando 6 annunci», non «Stai cambiando 6 annunci: eliminati» */
+  const verboTesta = {elimina: 'Stai eliminando', pausa: 'Stai mettendo in pausa',
+                      riattiva: 'Stai rimettendo in vetrina'}[d.azione];
+  let h = `<div class="sped-std-testa">${!n ? 'Nessun annuncio da cambiare.'
+    : verboTesta ? `${verboTesta} <b>${nAnnunciMM(n)}</b>.`
+    : `Stai cambiando <b>${nAnnunciMM(n)}</b>: ${esc(descriviAzioneMM(d.azione, d.parametri))}.`}</div>`;
+  h += err;
+  if (n){
+    /* per l'eliminazione «prima → dopo» non c'e': bastano i titoli */
+    h += `<div class="sped-std-sez">${elimina ? 'Si eliminano' : 'Prima → dopo'} (${fmt(n)})</div>
+      <ul class="sped-std-lista">${cambiano.map(v => `<li>
+        <b class="sped-std-tit">${esc(v.titolo)}</b>
+        ${elimina ? '' : righeCambioMM(v, d.azione).map(r => `<span class="sped-std-da">${esc(r)}</span>`).join('')}
+      </li>`).join('')}</ul>`;
+    h += `<div class="sped-std-nota">${elimina
+      ? 'Escono dalla vetrina e dai relay Nostr, e i post nei canali si tolgono. Gli ordini mai pagati su questi annunci si annullano.'
+      : d.azione === 'pausa'
+      ? 'Nessun avviso a chi ti segue. Le offerte aperte decadono, con un messaggio solo per ogni compratore.'
+      : 'Non ripassano dalla moderazione e nessuno riceve avvisi: né chi ti segue né le ricerche salvate.'}${
+      elimina ? '' : ' Potrai annullare per 24 ore.'}</div>`;
+  }
+  if (fuori.length)
+    h += `<div class="sped-std-sez">Non si toccano (${fmt(fuori.length)})</div>
+      <ul class="sped-std-lista">${gruppiFuoriMM(fuori).map(g => `<li>
+        <b class="sped-std-tit">${esc(g.etichetta.charAt(0).toUpperCase() + g.etichetta.slice(1))} (${fmt(g.n)})</b>
+        <span class="sped-std-da">${esc(g.titoli.filter(Boolean).join(', ') || '—')}</span>
+      </li>`).join('')}</ul>`;
+  if (n && elimina)
+    h += `<label class="mm-riga mm-capito"><input type="checkbox"${mm.capito ? ' checked' : ''}
+      onchange="mm.capito=this.checked;el('mmConferma').disabled=!this.checked">
+      <span class="mm-t"><b>Ho capito: l'eliminazione non si annulla</b></span></label>`;
+  const verbo = elimina ? `🗑 Elimina ${nAnnunciMM(n)}` : `✔ Cambia ${nAnnunciMM(n)}`;
+  return ['✏️ Anteprima', h, `<div class="mm-due">
+    <button class="btn ghost" onclick="mmIndietro()">Indietro</button>
+    ${n ? `<button class="btn ${elimina ? 'allarme' : 'orange'}" id="mmConferma" onclick="mmConferma(this)"${
+      elimina && !mm.capito ? ' disabled' : ''}>${verbo}</button>` : ''}</div>`];
+}
+async function mmConferma(btn){
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Salvo…');
+  try {
+    const r = await fetch(`${API_BASE}/me/modifica-massiva/applica`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify(payloadMM())});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { renderMM(d.detail || 'Non ci sono riuscito: riprova'); return; }
+    mm.esito = d;
+    mm.annullo = null;
+    mm.passo = 'esito';
+    renderMM();
+    el('mmSheet').scrollTop = 0;
+  } catch(e) { renderMM('Rete assente: riprova'); return; }
+  finally { ripristina(); }
+  dopoModificaMM();
+}
+
+/* ---- 4) ESITO, e l'annulla ---- */
+/* LA FRASE FINALE: «12 annunci cambiati; 3 non modificati: hanno un
+   ordine in corso.» */
+function fraseEsitoMM(d){
+  const n = (d && d.aggiornati) || 0;
+  const verbo = d && d.azione === 'elimina' ? 'eliminat' : 'cambiat';
+  let s = `${nAnnunciMM(n)} ${verbo}${n === 1 ? 'o' : 'i'}`;
+  const f = fraseFuoriMM(d && d.fuori);
+  return (f ? `${s}; ${f}` : s) + '.';
+}
+function fraseAnnulloMM(d){
+  const n = (d && d.ripristinati) || 0;
+  let s = `Annullata: ${nAnnunciMM(n)} tornat${n === 1 ? 'o' : 'i'} com'era${n === 1 ? '' : 'no'}`;
+  const m = (d && d.fuori || []).length;
+  if (m) s += `; ${fmt(m)} lasciat${m === 1 ? 'o' : 'i'} così: `
+    + gruppiFuoriMM(d.fuori).map(g => `${fmt(g.n)} ${cortoMM(g.etichetta)}`).join(', ');
+  return s + '.';
+}
+function htmlEsitoMM(err){
+  const d = mm.esito;
+  let h = err;
+  if (mm.annullo) h += `<div class="sped-std-esito">${esc(fraseAnnulloMM(mm.annullo))}</div>`;
+  else {
+    h += `<div class="sped-std-esito">${esc(fraseEsitoMM(d))}</div>`;
+    if (d.registro)
+      h += `<div class="sped-std-nota">Hai cambiato idea? Puoi annullare fino a domani alle ${esc(
+        new Date(d.annullabile_fino * 1000).toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'}))}:
+        tornano com'erano gli annunci che nel frattempo nessuno ha toccato.</div>`;
+  }
+  const annulla = !mm.annullo && d.registro
+    ? `<button class="btn ghost" onclick="mmAnnulla(this, ${Number(d.registro)})">↩︎ Annulla</button>` : '';
+  return [mm.annullo ? '↩︎ Modifica annullata' : '✔ Fatto', h, `<div class="mm-due">${annulla}
+    <button class="btn orange" onclick="navIndietro()">Fatto</button></div>`];
+}
+async function mmAnnulla(btn, rid){
+  haptic();
+  const ripristina = bottoneInAttesa(btn, 'Annullo…');
+  try {
+    const r = await fetch(`${API_BASE}/me/modifica-massiva/annulla`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({registro: rid})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { renderMM(d.detail || 'Non ci sono riuscito: riprova'); return; }
+    mm.annullo = d;
+    mm.esito = mm.esito || {aggiornati: 0, fuori: []};
+    mm.ultima = null;
+    mm.passo = 'esito';
+    renderMM();
+    el('mmSheet').scrollTop = 0;
+  } catch(e) { renderMM('Rete assente: riprova'); return; }
+  finally { ripristina(); }
+  dopoModificaMM();
+}
+function mmIndietro(){
+  haptic();
+  mm.passo = mm.passo === 'anteprima' ? 'cosa' : 'scegli';
+  renderMM();
+  el('mmSheet').scrollTop = 0;
+}
+/* Le copie in pagina si rifanno DOPO la frase, che e' la cosa che si
+   aspetta di leggere (il patto di applicaSpedStd). */
+async function dopoModificaMM(){
+  try { await loadListings(); await loadMyListings(); renderMyListings(); renderGrid(); }
+  catch(e) { /* le copie in pagina si rifanno al prossimo giro */ }
+}
+
 function renderMyListings(){
   const box = el('myListings');
   if (!box) return;
   box.innerHTML = myListings.length ? myListings.map(rigaMioAnnuncio).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo dalla scheda Vendi ＋ ⚡</div>`;
+  aggiornaBottoneMM();
 }
 
 /* ---------------- 🫙 preferiti: «nel tuo barattolo» ----------------
@@ -81227,6 +81763,10 @@ async function avvia(){
        adotta, non si indovina (un server di ieri non manda la chiave
        e resta il valore di partenza) */
     if (me.max_barattolo > 0) MAX_PREFERITI = Number(me.max_barattolo);
+    /* la modifica di piu' annunci insieme: la leva VIVA del server (un
+       server di ieri non manda la chiave, e il bottone resta spento) */
+    modificaMassivaAttiva = me.modifica_massiva === true;
+    aggiornaBottoneMM();
     astaLeve = me.asta_leve || null;
     aggiornaAstaVisibilita();
     /* la leva dello scambio P2P per chi e' dentro: la prima delle due

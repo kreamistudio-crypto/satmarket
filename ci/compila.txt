@@ -105,6 +105,7 @@ prepara_logo_consigliato.py
 prepara_banner_fee.py
 ritaglia_banner_fee.py
 collaudo_spedizione_standard.py
+collaudo_modifica_massiva.py
 collaudo_catalogo_esterno.py
 collaudo_nuova_fattura.py
 collaudo_quantita_servizi.py

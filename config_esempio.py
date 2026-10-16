@@ -308,6 +308,14 @@ MAX_PREFERITI = 10           # quanti annunci ATTIVI stanno «nel tuo
                              # infinita. Contano solo gli attivi —
                              # comprare qualcosa che c'e' dentro
                              # libera spazio da solo
+# LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026): in «I tuoi
+# annunci» il venditore ne sceglie fino a 100 e cambia in un colpo
+# prezzo (fisso o in percentuale), quantita', costo standard di
+# spedizione, categoria, pausa, riattivazione o li elimina — con
+# l'anteprima e l'«↩︎ Annulla» per 24 ore. Nasce SPENTA finche' Andrea
+# non l'ha provata; spenta, il bottone non c'e' e le rotte dicono 404.
+# Solo True accende: una stringa o un numero restano spenti.
+MODIFICA_MASSIVA_ATTIVA = False
 
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un

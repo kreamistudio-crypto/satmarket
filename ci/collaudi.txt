@@ -62,6 +62,7 @@ collaudo_letture_relay
 collaudo_foto_scartate
 collaudo_foto_obbligatorie
 collaudo_spedizione_standard
+collaudo_modifica_massiva
 collaudo_catalogo_esterno
 collaudo_nuova_fattura
 collaudo_classifica

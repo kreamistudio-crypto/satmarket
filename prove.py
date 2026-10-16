@@ -128142,6 +128142,12 @@ def prove_cambio_converte():
         "toggleValutaSoglia": "conserva",
         # P2P: si sceglie la valuta FIAT dell'ordine, non sats ⇄ €
         "apriValutaP2P": "fiat", "scegliValutaP2P": "fiat",
+        # la modifica di piu' annunci insieme (16 ott 2026): il prezzo
+        # FISSO in blocco. Il bottone dice su QUALI listini vale (sats o
+        # euro: gli altri restano fuori, «valuta»), quindi il numero
+        # scritto resta com'e' — convertirlo direbbe un'equivalenza che
+        # il venditore non ha chiesto
+        "mmValuta": "conserva",
     }
     prova("il censimento dei bottoni di valuta e' completo (uno nuovo "
           "decide qui cosa fa ai numeri gia' scritti)", set(CENSIMENTO),
@@ -166246,6 +166252,433 @@ def prove_stampa_e_salti():
           True, 'if os.path.isfile(a))' in sorgente)
 
 
+def prove_modifica_massiva():
+    """LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026, cantiere
+    modifica-massiva, decisione di Andrea).
+
+    Chi vende sceglie fino a cento annunci in «📋 I tuoi annunci» e
+    cambia in un colpo prezzo (fisso o in percentuale), quantita',
+    costo standard di spedizione, categoria, pausa, riattivazione o li
+    elimina — con l'anteprima, il motivo per ogni escluso e l'«↩︎
+    Annulla» per 24 ore. Qui girano i giudici VERI estratti dal
+    sorgente (i parametri, le esclusioni, i numeri nuovi, i gesti verso
+    il mondo, l'annullo), le sentinelle sui patti (la leva spenta, niente
+    moderazione e niente avvisi, la transazione, i lotti verso i relay)
+    e in node le frasi del foglio. Il server vero su un database vero
+    sta in `collaudo_modifica_massiva.py`."""
+    print("\n[la modifica di piu' annunci insieme]")
+    import asyncio as _asMM
+    import math as _mMM
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # ---- 1) i giudici del server, veri ------------------------------
+    class _Rifiuto(Exception):
+        def __init__(self, codice, detail=""):
+            super().__init__(detail)
+            self.status_code = codice
+            self.detail = detail
+
+    amb = {"json": json, "math": _mMM, "re": re, "time": time,
+           "HTTPException": _Rifiuto, "TETTO_SATS_ANNUNCIO": 0,
+           "MAX_QUANTITA_ANNUNCIO": int(re.search(
+               r"MAX_QUANTITA_ANNUNCIO = (\d+)", src).group(1))}
+    # le costanti si eseguono dal sorgente, mai ricopiate
+    for inizio, fine in (("SPED_STD_TETTO_SATS = ", "\n\n"),
+                         ("_SPED_STD_ISTANTANEA = (", ")\n"),
+                         ("NOMI_ORIGINE = {", "}\n"),
+                         ("CATEGORIE = (", ")\n\n"),
+                         ("CATEGORIE_SENZA_CONDIZIONE = frozenset(", ")\n"),
+                         ("MM_TETTO = ", "\n\n\n")):
+        i = src.index(inizio)
+        exec(src[i:src.index(fine, i) + len(fine)], amb)
+    for nome in ("origine_annuncio", "nome_origine", "_non_spedisce_casa",
+                 "_sped_std_escluso", "senza_condizione", "_mm_ids",
+                 "_mm_intero", "_mm_euro", "_mm_percento", "_mm_parametri",
+                 "_mm_percento_su", "_mm_escluso", "_mm_gesto",
+                 "_mm_toccato_dopo", "_mm_annullabile"):
+        exec(pezzo(nome), amb)
+    exec("async " + pezzo("_mm_nuovi"), amb)
+    amb["sottocategoria_valida"] = lambda c, s: ""
+    amb["sottocategoria_indovina"] = lambda c, t, d: f"sotto-{c}"
+
+    def _rifiuto(f, *a):
+        try:
+            f(*a)
+        except _Rifiuto as e:
+            return (e.status_code, e.detail)
+        except Exception as e:
+            return ("ESPLOSO", type(e).__name__, str(e)[:80])
+        return None
+
+    def _detto(f, *a, dentro=""):
+        r = _rifiuto(f, *a)
+        return bool(r) and r[0] == 400 and dentro.lower() in r[1].lower()
+
+    prova("il tetto e' cento, e la finestra dell'annulla un giorno",
+          (100, 86400), (amb["MM_TETTO"], amb["MM_ANNULLA_S"]))
+    ids = amb["_mm_ids"]
+    prova("gli id: interi, senza doppioni, nell'ordine", [3, 1, 2],
+          ids([3, 1, 3, 2, 1]))
+    for storto, dentro in (([], "almeno un annuncio"), (None, "almeno"),
+                           (["4"], "formato"), ([True], "formato"),
+                           ([0], "formato"), ([-2], "formato"),
+                           (list(range(1, 102)), "ne hai scelti 101"),
+                           ([1] * 1001, "formato")):
+        prova(f"gli id {str(storto)[:24]}: 400 «{dentro}»", True,
+              _detto(ids, storto, dentro=dentro))
+    prova("cento esatti passano", 100, len(ids(list(range(1, 101)))))
+    par = amb["_mm_parametri"]
+    prova("il prezzo in sats", ("prezzo", {"valuta": "sats", "prezzo": 25000}),
+          par({"azione": "prezzo", "valuta": "sats", "prezzo": "25000"}))
+    prova("il prezzo in euro, con la virgola",
+          ("prezzo", {"valuta": "eur", "prezzo": 19.9}),
+          par({"azione": "prezzo", "valuta": "eur", "prezzo": "19,90"}))
+    prova("la percentuale col meno tipografico e il %",
+          ("percento", {"percento": -10}),
+          par({"azione": "percento", "percento": "−10 %"}))
+    prova("...e col piu'", ("percento", {"percento": 15}),
+          par({"azione": "percento", "percento": "+15"}))
+    prova("pausa, riattiva ed elimina non hanno parametri",
+          [("pausa", {}), ("riattiva", {}), ("elimina", {})],
+          [par({"azione": a}) for a in ("pausa", "riattiva", "elimina")])
+    for corpo, dentro in (
+            ({"azione": "titolo"}, "cosa cambiare"),
+            ({"azione": "prezzo", "valuta": "usd", "prezzo": "5"}, "sats o in euro"),
+            ({"azione": "prezzo", "valuta": "sats", "prezzo": "5.000"}, "senza punti"),
+            ({"azione": "prezzo", "valuta": "sats", "prezzo": "0"}, "almeno 1"),
+            ({"azione": "prezzo", "valuta": "sats", "prezzo": True}, "intero"),
+            ({"azione": "prezzo", "valuta": "eur", "prezzo": "0,001"}, "0,01"),
+            ({"azione": "prezzo", "valuta": "eur", "prezzo": "inf"}, "almeno 0,01"),
+            ({"azione": "prezzo", "valuta": "eur", "prezzo": "tre"}, "numero"),
+            ({"azione": "percento", "percento": "0"}, "zero"),
+            ({"azione": "percento", "percento": "-91"}, "da -90"),
+            ({"azione": "percento", "percento": "201"}, "+200"),
+            ({"azione": "percento", "percento": "7,5"}, "intero"),
+            ({"azione": "quantita", "quantita": "0"}, "almeno 1"),
+            ({"azione": "quantita", "quantita": "abc"}, "intero"),
+            ({"azione": "quantita", "quantita": "99999999"}, "al massimo"),
+            ({"azione": "categoria", "categoria": "Pozioni"}, "elenco")):
+        prova(f"parametri {str(corpo)[:50]}: 400", True,
+              _detto(par, corpo, dentro=dentro))
+
+    su = amb["_mm_percento_su"]
+    prova("il -10 % in sats, interi arrotondati a meta' in su",
+          [27000, 9, 1, 2], [su(30000, -10, False), su(10, -10, False),
+                             su(1, -90, False), su(1, 50, False)])
+    prova("il -10 % in euro, al centesimo e mai sotto", [17.99, 0.01],
+          [su(19.99, -10, True), su(0.01, -90, True)])
+
+    adesso = 1_000_000
+
+    def riga(**k):
+        r = dict(id=1, titolo="T", stato="attivo", valuta="sats",
+                 prezzo_sats=30000, prezzo_eur=0.0, quantita=3,
+                 categoria="Altro", sottocategoria="", condizione="buono",
+                 descrizione="d", consegna="spedizione", contatto_nostr="",
+                 fonte="", asta_base_sats=0, lampo_percento=0,
+                 lampo_scadenza=0, non_spedisce_casa=0, spedizione_sats=3000,
+                 spedizione_eur=0.0)
+        r.update(k)
+        return r
+
+    esc_ = amb["_mm_escluso"]
+
+    def motivo(a, azione, vivi=0, saldi=0, offerte=0, cambio=100_000.0,
+               valuta=""):
+        return esc_(a, azione, vivi, saldi, offerte, adesso, cambio, valuta)
+
+    tutte = amb["MM_AZIONI"]
+    prova("il libero non ha motivi, per nessun gesto che gli si addice",
+          {a: "" for a in tutte if a != "riattiva"},
+          {a: motivo(riga(), a) for a in tutte if a != "riattiva"})
+    prova("l'asta resta fuori da TUTTO, anche dall'eliminazione",
+          {a: "asta" for a in tutte},
+          {a: motivo(riga(asta_base_sats=5000), a) for a in tutte})
+    prova("l'importato da Nostr: fuori, ma si elimina (come da solo)",
+          {**{a: "nostr" for a in tutte if a != "elimina"}, "elimina": ""},
+          {a: motivo(riga(contatto_nostr="npub1x"), a) for a in tutte})
+    prova("il negozio collegato: «negozio»", "negozio",
+          motivo(riga(fonte="shopify"), "percento"))
+    prova("la revisione: fuori, ma si elimina",
+          ("revisione", "revisione", ""),
+          (motivo(riga(stato="revisione"), "prezzo"),
+           motivo(riga(stato="revisione"), "pausa"),
+           motivo(riga(stato="revisione"), "elimina")))
+    es = riga(stato="venduto", quantita=0)
+    prova("l'esaurito: niente prezzo, categoria, spedizione, elimina",
+          ["esaurito"] * 5, [motivo(es, a) for a in
+                             ("prezzo", "percento", "categoria",
+                              "spedizione", "elimina")])
+    prova("...ma quantita' e riattiva si', e la pausa e' «uguale»",
+          ("", "", "uguale"), (motivo(es, "quantita"), motivo(es, "riattiva"),
+                               motivo(es, "pausa")))
+    prova("riattivare chi e' in vetrina: «uguale»", "uguale",
+          motivo(riga(), "riattiva"))
+    prova("il servizio non ha scorte", ["servizio"] * 2,
+          [motivo(riga(consegna="servizio"), a) for a in ("quantita", "pausa")])
+    prova("l'ordine vivo ferma prezzo, categoria e spedizione",
+          ["ordine"] * 4, [motivo(riga(), a, vivi=1) for a in
+                           ("prezzo", "percento", "categoria", "spedizione")])
+    prova("...NON quantita' e pausa (la regola della ricarica, parola "
+          "di Andrea)", ("", ""),
+          (motivo(riga(), "quantita", vivi=1, saldi=1),
+           motivo(riga(), "pausa", vivi=1, saldi=1)))
+    prova("l'eliminazione la ferma solo l'affare SALDO", ("", "ordine"),
+          (motivo(riga(), "elimina", vivi=1), motivo(riga(), "elimina", saldi=1)))
+    prova("sul prezzo: l'offerta aperta", "offerta",
+          motivo(riga(), "percento", offerte=1))
+    prova("...la lampo in corso, e non quella scaduta", ("lampo", ""),
+          (motivo(riga(lampo_percento=10, lampo_scadenza=adesso + 1), "prezzo"),
+           motivo(riga(lampo_percento=10, lampo_scadenza=adesso - 1), "prezzo")))
+    prova("...l'offerta NON ferma la quantita'", "",
+          motivo(riga(), "quantita", offerte=1))
+    prova("il prezzo fisso nell'altra valuta: «valuta»", ("valuta", ""),
+          (motivo(riga(valuta="eur"), "prezzo", valuta="sats"),
+           motivo(riga(valuta="eur"), "prezzo", valuta="eur")))
+    prova("il listino in euro senza cambio: «cambio»", "cambio",
+          motivo(riga(valuta="eur"), "percento", cambio=0.0))
+    prova("la spedizione chiede al giudice del suo gesto", ("ritiro", "gratis"),
+          (motivo(riga(consegna="ritiro"), "spedizione"),
+           motivo(riga(spedizione_sats=0), "spedizione")))
+    prova("una riga rimossa: «sparito»", "sparito",
+          motivo(riga(stato="rimosso"), "pausa"))
+
+    def nuovi(a, azione, p=None, q_pausa=0):
+        return _asMM.run(amb["_mm_nuovi"](a, azione, p or {}, 100_000.0,
+                                          None, q_pausa))
+    prova("il -10 % in sats", ({"prezzo_sats": 27000, "prezzo_eur": 0.0}, ""),
+          nuovi(riga(), "percento", {"percento": -10})[:2])
+    prova("il -10 % in euro: l'euro e i sats al cambio",
+          ({"prezzo_eur": 18.0, "prezzo_sats": 18000}, ""),
+          nuovi(riga(valuta="eur", prezzo_eur=20.0, prezzo_sats=20000),
+                "percento", {"percento": -10})[:2])
+    prova("lo stesso prezzo: «uguale»", (None, "uguale"),
+          nuovi(riga(), "prezzo", {"valuta": "sats", "prezzo": 30000})[:2])
+    amb["TETTO_SATS_ANNUNCIO"] = 50000
+    prova("oltre il tetto di rodaggio, se acceso: «tetto»", (None, "tetto"),
+          nuovi(riga(), "percento", {"percento": 100})[:2])
+    amb["TETTO_SATS_ANNUNCIO"] = 0
+    prova("la quantita' riattiva l'esaurito", {"quantita": 7, "stato": "attivo"},
+          nuovi(es, "quantita", {"quantita": 7})[0])
+    prova("...e la stessa quantita' e' «uguale»", "uguale",
+          nuovi(riga(), "quantita", {"quantita": 3})[1])
+    prova("la pausa e' lo zero della ricarica",
+          {"quantita": 0, "stato": "venduto"}, nuovi(riga(), "pausa")[0])
+    prova("riattiva coi pezzi di prima della pausa, o uno",
+          ({"quantita": 5, "stato": "attivo"}, {"quantita": 1, "stato": "attivo"}),
+          (nuovi(es, "riattiva", q_pausa=5)[0], nuovi(es, "riattiva")[0]))
+    prova("la categoria: la sottovoce rifatta, la condizione resta",
+          {"categoria": "Elettronica", "sottocategoria": "sotto-Elettronica",
+           "condizione": "buono"},
+          nuovi(riga(), "categoria", {"categoria": "Elettronica"})[0])
+    prova("...verso una categoria senza condizione la si toglie", "",
+          nuovi(riga(), "categoria", {"categoria": "Alimenti e bevande"})[0]
+          ["condizione"])
+    prova("...e da una senza a una con: «condizione»", (None, "condizione"),
+          nuovi(riga(categoria="Alimenti e bevande", condizione=""),
+                "categoria", {"categoria": "Elettronica"})[:2])
+    prova("l'eliminazione e' lo stato rimosso", {"stato": "rimosso"},
+          nuovi(riga(), "elimina")[0])
+
+    g = amb["_mm_gesto"]
+    prova("i gesti verso il mondo",
+          ["ritira", "sold", "active", "aggiorna", "", "aggiorna"],
+          [g("attivo", {"stato": "rimosso"}),
+           g("attivo", {"quantita": 0, "stato": "venduto"}),
+           g("venduto", {"quantita": 4, "stato": "attivo"}),
+           g("attivo", {"prezzo_sats": 1, "prezzo_eur": 0.0}),
+           g("attivo", {"quantita": 4, "stato": "attivo"}),
+           g("attivo", {"categoria": "Altro", "sottocategoria": "",
+                        "condizione": "buono"})])
+    t = amb["_mm_toccato_dopo"]
+    prova("toccato dopo: una vendita ha cambiato la quantita'", True,
+          t(riga(quantita=2), {"quantita": 3, "stato": "attivo"}))
+    prova("...intatto: si annulla", False,
+          t(riga(), {"quantita": 3, "stato": "attivo"}))
+    prova("...sul listino in euro i sats non contano", False,
+          t(riga(valuta="eur", prezzo_eur=18.0, prezzo_sats=17999),
+            {"prezzo_eur": 18.0, "prezzo_sats": 18000}))
+    an = amb["_mm_annullabile"]
+    prova("l'annullo: si', gia' fatto, eliminazione, scaduto",
+          [True, True, True, True],
+          [an({"annullata": 0, "azione": "pausa", "creato": adesso},
+              adesso + 10) == "",
+           "già" in an({"annullata": 5, "azione": "pausa",
+                        "creato": adesso}, adesso),
+           "non si annulla" in an({"annullata": 0, "azione": "elimina",
+                                   "creato": adesso}, adesso),
+           "24 ore" in an({"annullata": 0, "azione": "pausa",
+                           "creato": adesso}, adesso + 86401)])
+    prova("le colonne scritte non sono mai testi, foto o consegna", set(),
+          amb["_MM_SCRIVIBILI"] & {"titolo", "descrizione", "foto",
+                                   "consegna", "condizione_note",
+                                   "non_spedisce_casa"})
+
+    # ---- 2) le sentinelle sui patti -----------------------------------
+    i = src.index("# LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026, cantiere")
+    blocco = codice(src[i:src.index('@app.post("/api/me/punti-ritiro")', i)])
+    prova("la leva nasce SPENTA nel codice", True,
+          "except ImportError:\n    MODIFICA_MASSIVA_ATTIVA = False" in blocco)
+    prova("...e solo True la accende", True,
+          "MODIFICA_MASSIVA_ATTIVA = MODIFICA_MASSIVA_ATTIVA is True" in blocco)
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e nel config d'esempio", True,
+          "\nMODIFICA_MASSIVA_ATTIVA = False\n" in cfg.replace("\r\n", "\n"))
+    rotte = re.findall(r'@app\.(?:get|post)\("(/api/me/modifica-massiva[^"]*)"\)'
+                       r'\n(?:async )?def (\w+)\(', blocco)
+    prova("le quattro rotte", ["/api/me/modifica-massiva",
+                               "/api/me/modifica-massiva/anteprima",
+                               "/api/me/modifica-massiva/applica",
+                               "/api/me/modifica-massiva/annulla"],
+          [r for r, _ in rotte])
+    corpi = {n: codice(pezzo(n)) for _, n in rotte}
+    prova("ognuna chiede la leva", True,
+          len(corpi) == 4 and all("_mm_attiva()" in c for c in corpi.values()))
+    prova("ognuna chiede chi e' (verifica_utente)", True,
+          len(corpi) == 4 and all("verifica_utente(" in c
+                                  for c in corpi.values()))
+    prova("applica e annulla passano dal freno", True,
+          all('_frena("annunci"' in corpi.get(n, "")
+              for n in ("mm_applica", "mm_annulla")))
+    prova("applica e annulla scrivono dentro BEGIN IMMEDIATE", True,
+          all("BEGIN IMMEDIATE" in corpi.get(n, "")
+              for n in ("mm_applica", "mm_annulla")))
+    prova("l'anteprima non scrive: nessun UPDATE, INSERT, commit", True,
+          not any(s in corpi.get("mm_anteprima", "UPDATE ")
+                  + codice(pezzo("_mm_giro"))
+                  for s in ("UPDATE ", "INSERT ", "commit(")))
+    prova("l'eliminazione vuole la conferma scritta", True,
+          'd.get("conferma") != "elimina"' in corpi.get("mm_applica", ""))
+    for spia in ("moderazione_ai", "controlla_vietato", "registra_moderazione",
+                 "avvisa_revisione", "notifica_admin", "promo_annuncio",
+                 "avvisa_ricerche", "avvisa_follower", "_avvisa_seguaci",
+                 "pubblica_nota"):
+        prova(f"nessuna traccia di {spia} nel gesto in blocco", False,
+              spia in blocco)
+    prova("notifica() parla solo da _mm_avvisa_offerte",
+          1, blocco.count("await notifica("))
+    prova("...ed e' dentro il ciclo PER COMPRATORE", True,
+          "for tg_id, titoli in per_compratore.items():" in
+          codice(pezzo("_mm_avvisa_offerte")))
+    fuori = codice(pezzo("_mm_fuori"))
+    prova("i relay a lotti: LOTTO_NOSTR e PAUSA_NOSTR", True,
+          "[:LOTTO_NOSTR]" in fuori and "asyncio.sleep(PAUSA_NOSTR)" in fuori)
+    prova("...un giro per venditore, il secondo si accoda", True,
+          "coda.update(gesti)" in fuori and "_MM_CODA.pop(tg_id, None)" in fuori)
+    prova("...e i gesti sono NIP-99, kind 5 e canale: mai un kind 1", True,
+          set(re.findall(r"await (\w+)\(", codice(pezzo("_mm_un_gesto"))))
+          == {"annuncio_su_nostr", "promo_venduto", "ritira_da_nostr",
+              "promo_rimuovi"})
+    prova("le colonne scritte passano dalla lista chiusa", True,
+          "_MM_SCRIVIBILI" in codice(pezzo("_mm_scrivi")))
+    prova("la pausa fa decadere le offerte col giudice unico", True,
+          '_decadi_offerte_esaurito(con, a["id"])' in codice(pezzo("_mm_scrivi")))
+    prova("/api/me porta la leva viva al client", True,
+          'profilo["modifica_massiva"] = MODIFICA_MASSIVA_ATTIVA' in src)
+    prova("il pannello «Stato delle leve» ha la sua riga", True,
+          '"MODIFICA_MASSIVA_ATTIVA", MODIFICA_MASSIVA_ATTIVA' in src)
+    prova("la fusione degli account porta il registro", True,
+          "UPDATE modifiche_massive SET tg_id=? WHERE tg_id=?" in src)
+
+    # ---- 3) il client: parita' coi codici e sentinelle -----------------
+    motivi_js = re.findall(r"^  (\w+): \[", pezzo_js(
+        mini, "const MOTIVI_MM = {", "\n};\n"), re.M)
+    prova("le parole dei motivi coprono TUTTI i codici del server, e "
+          "nient'altro", sorted(amb["MM_MOTIVI"]), sorted(motivi_js))
+    azioni_js = re.findall(r"\['(\w+)', '", pezzo_js(
+        mini, "const AZIONI_MM = [", "];\n"))
+    prova("i gesti del foglio sono quelli del server, in quell'ordine",
+          list(amb["MM_AZIONI"]), azioni_js)
+    prova("il foglio esiste, e si registra in closeSheet", (True, True),
+          ('id="mmSheet"' in mini,
+           "el('mmSheet').classList.remove('open')"
+           in pezzo_js(mini, "function closeSheet(){", "\n}\n")))
+    prova("il bottone nasce dalla leva viva di /api/me", True,
+          "modificaMassivaAttiva = me.modifica_massiva === true;" in mini)
+    prova("...e renderMyListings lo accende", True,
+          "aggiornaBottoneMM();" in pezzo_js(mini, "function renderMyListings(){",
+                                             "\n}\n"))
+    prova("...mai in DEMO", True, "!DEMO" in pezzo_js(
+        mini, "function aggiornaBottoneMM(){", "\n}\n"))
+    prova("il tetto il client lo legge dal server", True,
+          "tetto: d.tetto" in pezzo_js(mini, "async function apriModificaMassiva(",
+                                       "\n}\n"))
+    prova("l'eliminazione chiede «Ho capito» prima del bottone", True,
+          "elimina && !mm.capito ? ' disabled'" in mini)
+
+    blocco_js = mini[mini.index("const AZIONI_MM = ["):
+                     mini.index("\nasync function apriModificaMassiva(")]
+    banco = "\n".join([
+        pezzo_js(mini, "const fmt = n =>", "\n"),
+        pezzo_js(mini, "const fmtEur = e =>", ";\n") + ";",
+        "const EMOJI_CAT = {'Altro':'📦','Elettronica':'🔌'};",
+        "function righeCambioSpedStd(v){ return ['spedizione']; }",
+        blocco_js,
+        pezzo_js(mini, "function fraseEsitoMM(", "\n}\n") + "\n}",
+        pezzo_js(mini, "function fraseAnnulloMM(", "\n}\n") + "\n}",
+        BANCO_FRASI_MM])
+    o = _node_banco(banco)
+    if o is None:
+        salta("le frasi del foglio in node", "node non installato")
+        return
+    prova("«3 non modificati: hanno un ordine in corso», la frase di Andrea",
+          "3 non modificati: hanno un ordine in corso", o.get("uno"))
+    prova("...al singolare", "1 non modificato: è in revisione",
+          o.get("singolo"))
+    prova("piu' motivi: ognuno col suo numero, corto, nell'ordine dei motivi",
+          "4 non modificati: 1 ha un ordine in corso, 1 ha un'offerta aperta, "
+          "1 è all'asta, 1 arriva dal tuo negozio Shopify", o.get("misti"))
+    prova("la frase finale", "12 annunci cambiati; 3 non modificati: hanno "
+          "un ordine in corso.", o.get("esito"))
+    prova("...al singolare, senza esclusi", "1 annuncio cambiato.",
+          o.get("esito1"))
+    prova("...e per l'eliminazione", "2 annunci eliminati.", o.get("elimina"))
+    prova("la frase dell'annullo", "Annullata: 4 annunci tornati com'erano; "
+          "1 lasciato così: 1 è cambiato proprio mentre salvavo.",
+          o.get("annullo"))
+    prova("i gruppi nell'ordine dei motivi", ["ordine", "offerta", "asta",
+                                              "negozio"], o.get("gruppi"))
+    prova("un motivo sconosciuto non esplode", "per un altro motivo",
+          o.get("ignoto"))
+    prova("cosa fa il gesto, in parole",
+          ["prezzo −10 %", "prezzo a 19,90 €", "1 pezzo ciascuno"], o.get("desc"))
+    prova("prima → dopo, nella valuta del listino e nelle scorte",
+          [["30 000 sats → 27 000 sats"], ["20,00 € → 18,00 €"],
+           ["3 pezzi → in pausa"],
+           ["📦 Altro → 🔌 Elettronica (la condizione si toglie)"]],
+          o.get("righe"))
+
+
+# Il banco delle frasi del foglio (prove_modifica_massiva): i casi, in
+# node, sulle funzioni VERE ritagliate da miniapp.html.
+BANCO_FRASI_MM = r"""
+const fuori = [
+  {motivo:'ordine', titolo:'A'}, {motivo:'ordine', titolo:'B'},
+  {motivo:'ordine', titolo:'C'}];
+const misti = [{motivo:'asta', titolo:'X'}, {motivo:'offerta', titolo:'Y'},
+  {motivo:'ordine', titolo:'Z'}, {motivo:'negozio', origine:'Shopify', titolo:'W'}];
+console.log(JSON.stringify({
+  uno: fraseFuoriMM(fuori),
+  singolo: fraseFuoriMM([{motivo:'revisione', titolo:'R'}]),
+  misti: fraseFuoriMM(misti),
+  esito: fraseEsitoMM({azione:'percento', aggiornati:12, fuori}),
+  esito1: fraseEsitoMM({azione:'pausa', aggiornati:1, fuori:[]}),
+  elimina: fraseEsitoMM({azione:'elimina', aggiornati:2, fuori:[]}),
+  annullo: fraseAnnulloMM({ripristinati:4, fuori:[{motivo:'cambiato', titolo:'Q'}]}),
+  gruppi: gruppiFuoriMM(misti).map(g => g.motivo),
+  ignoto: etichettaMotivoMM('boh', '', 2),
+  desc: [descriviAzioneMM('percento', {percento:-10}),
+         descriviAzioneMM('prezzo', {valuta:'eur', prezzo:19.9}),
+         descriviAzioneMM('quantita', {quantita:1})],
+  righe: [righeCambioMM({valuta:'sats', prima:[30000,0], dopo:[27000,0]}, 'percento'),
+          righeCambioMM({valuta:'eur', prima:[20000,20], dopo:[18000,18]}, 'prezzo'),
+          righeCambioMM({prima:[3,'attivo'], dopo:[0,'venduto']}, 'pausa'),
+          righeCambioMM({prima:'Altro', dopo:'Elettronica', condizione_via:true}, 'categoria')],
+}));
+"""
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -166569,6 +167002,7 @@ def main():
               prove_allegati_chat,
               prove_pdf_allegati,
               prove_stampa_e_salti,
+              prove_modifica_massiva,
               prove_config_esempio):
         try:
             f()

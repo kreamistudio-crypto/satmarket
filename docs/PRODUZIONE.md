@@ -246,6 +246,24 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   e nei 30 giorni finche' non ne escono: si guarda prima di fidarsi
   della percentuale. Coi perche': Architettura, «LE DISPUTE NEL
   CRUSCOTTO».
+- LA MODIFICA DI PIÙ ANNUNCI INSIEME (16 ott 2026, leva
+  `MODIFICA_MASSIVA_ATTIVA`; com'è fatta in ARCHITETTURA, «LA MODIFICA
+  DI PIÙ ANNUNCI INSIEME»; perché in CANTIERI, «La modifica di più
+  annunci insieme»). Nasce SPENTA: finché manca nel config del VPS il
+  bottone «✏️ Modifica più annunci» non c'è e le quattro rotte
+  `/api/me/modifica-massiva…` rispondono 404. PER ACCENDERLA, dopo la
+  prova di Andrea: una riga nel `config.py` del VPS,
+  `MODIFICA_MASSIVA_ATTIVA = True`, poi `sudo systemctl restart
+  barattolo`. Solo `True` accende (una stringa resta spenta, e
+  all'avvio il journal lo dice). La tabella del registro
+  (`modifiche_massive`) nasce da sola al riavvio, niente di esistente
+  toccato. Si verifica nel pannello «⚙️ Stato delle leve», riga
+  «Modifica di più annunci insieme», e aprendo «📋 I tuoi annunci» da
+  un account con almeno due annunci. Prima di accenderla si guarda
+  che la riga non ci sia già, in sola lettura, la sola riga:
+  `grep -n "^MODIFICA_MASSIVA_ATTIVA" /srv/barattolo/config.py`.
+  Spegnerla = togliere la riga (o `False`) e riavviare: le modifiche
+  già fatte restano, l'«↩︎ Annulla» sparisce con le rotte.
 - LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
   AGGIUNGE al config del VPS come le altre, e finche' manca o e'
   `False` le card le vedono solo i moderatori e chi e' in

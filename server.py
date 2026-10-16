@@ -6486,6 +6486,28 @@ def init_db():
     -- Niente indice, ed e' il rovescio del vicino: `preferiti` ne ha uno
     -- perche' si conta per ANNUNCIO, qui non si interroga mai per rete
     -- sola — si legge sempre per `tg_id`, che e' il prefisso della PK.
+    CREATE TABLE IF NOT EXISTS modifiche_massive(
+        -- IL REGISTRO DELLA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott
+        -- 2026): chi, quando, cosa e quanti — e per ogni annuncio
+        -- toccato il PRIMA e il DOPO delle sole colonne cambiate, che
+        -- e' quel che serve all'«↩︎ Annulla» (entro 24 ore: lo dice
+        -- MM_ANNULLA_S, non questa tabella). `annullata` e' il timbro
+        -- dell'annullo (0 = no), `annullate_n` quante righe sono
+        -- tornate davvero. Le righe non si cancellano: sono la storia
+        -- del negozio, piccola, e dicono a «Riattiva» quanti pezzi
+        -- c'erano prima di una pausa.
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id       INTEGER NOT NULL,
+        creato      INTEGER NOT NULL,
+        azione      TEXT NOT NULL,          -- una voce di MM_AZIONI
+        parametri   TEXT DEFAULT '{}',      -- JSON: prezzo, percento...
+        quanti      INTEGER DEFAULT 0,
+        righe       TEXT DEFAULT '[]',      -- JSON: [{id, prima, dopo}]
+        annullata   INTEGER DEFAULT 0,
+        annullate_n INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_modifiche_massive_tg
+        ON modifiche_massive(tg_id, id);
     CREATE TABLE IF NOT EXISTS offerte(
         -- la contrattazione strutturata (MAI una chat): proposta del
         -- compratore, al massimo UNA controproposta del venditore,
@@ -17102,6 +17124,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # ...e i paracadute (13 ott 2026) seguono gli ordini: la PK e'
         # l'ordine, quindi qui non collide niente
         con.execute("UPDATE p2p_paracadute SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # ...e il registro della modifica in blocco (16 ott 2026) segue
+        # il venditore: niente da far collidere (la PK e' la modifica),
+        # e l'«↩︎ Annulla» resta suo anche dopo la fusione
+        con.execute("UPDATE modifiche_massive SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
@@ -29726,6 +29753,15 @@ def _leve_stato():
                   "MAX_TARIFFA_CONNETTORE_SATS", MAX_TARIFFA_CONNETTORE_SATS),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
+            # LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026): spenta
+            # di serie finche' Andrea non l'ha provata
+            _leva("Modifica di più annunci insieme",
+                  "MODIFICA_MASSIVA_ATTIVA", MODIFICA_MASSIVA_ATTIVA,
+                  acceso=f"in «I tuoi annunci» c'è «✏️ Modifica più "
+                         f"annunci»: fino a {MM_TETTO} per volta, "
+                         f"annullabile per 24 ore",
+                  spento="il bottone non c'è e le rotte rispondono 404: "
+                         "gli annunci si modificano uno per uno"),
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
                   acceso="il cartello si apre una volta al giorno per "
                          "dispositivo, e la fascia resta sotto la vetrina"),
@@ -42054,6 +42090,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
     # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
     profilo["max_barattolo"] = MAX_PREFERITI
+    # La modifica di piu' annunci insieme (16 ott 2026): la leva VIVA,
+    # perche' il bottone in «I tuoi annunci» nasca solo quando le sue
+    # rotte rispondono.
+    profilo["modifica_massiva"] = MODIFICA_MASSIVA_ATTIVA
     # NIP-85 (set 2026): la pubkey di servizio e i relay servono al
     # browser per costruire e firmare il kind 10040 (la dichiarazione di
     # fiducia in Barattolo per il tag "30382:rank") — mai una copia a
@@ -42839,6 +42879,854 @@ async def sped_std_applica(req: Request,
             "aggiornati": len(fatti),
             "cambiano": [_sped_std_pubblico(v) for v in fatti],
             "fuori": fuori, "esauriti": giro["esauriti"]}
+
+
+# ===================================================================
+# LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026, cantiere
+# modifica-massiva, decisione di Andrea). Il fratello maggiore
+# dell'aggiornamento in blocco della spedizione: chi vende sceglie gli
+# annunci in «📋 I tuoi annunci», dice COSA cambia, guarda l'anteprima
+# «prima → dopo» e conferma — invece di aprirli uno per uno.
+# SI CAMBIANO SOLO NUMERI E CASSETTI: prezzo (fisso, nella valuta del
+# listino, o in percentuale), quantita', il costo standard di
+# spedizione del negozio, la categoria, la pausa e la riattivazione,
+# l'eliminazione. I TESTI NO — titolo, descrizione, foto, condizione,
+# consegna: sono quel che legge la moderazione e sono del singolo
+# pezzo, e per loro c'e' la Modifica di sempre.
+# I PATTI, uno per riga (il perche' lungo sta in CANTIERI, «La modifica
+# di piu' annunci insieme»):
+#   · NIENTE MODERAZIONE: legge titolo, descrizione, foto e link, e qui
+#     non cambiano (il patto scritto in `sped_std_applica`);
+#   · NIENTE AVVISI a follower, ricerche salvate o gruppo admin: non e'
+#     una pubblicazione. Suonano solo i compratori le cui offerte
+#     decadono per una pausa, UN messaggio per compratore;
+#   · LE ESCLUSIONI sono quelle dei gesti singoli (Modifica, «🔄
+#     Aggiorna i pezzi», Elimina) lette una per una, col motivo per
+#     riga: gli altri vanno avanti. Quantita' e pausa seguono la
+#     ricarica, che non aspetta gli affari in corso (parola di Andrea);
+#   · I RELAY A LOTTI (LOTTO_NOSTR, PAUSA_NOSTR), un giro per
+#     venditore, solo NIP-99 e kind 5: nessun kind 1;
+#   · UN REGISTRO per annullare entro 24 ore. L'eliminazione no.
+# SPENTA DI SERIE: la si accende dal config del VPS dopo la prova di
+# Andrea. Spenta, le rotte rispondono 404 e il bottone non nasce.
+# ===================================================================
+try:
+    from config import MODIFICA_MASSIVA_ATTIVA
+    if not isinstance(MODIFICA_MASSIVA_ATTIVA, bool):
+        print("[modifica massiva] MODIFICA_MASSIVA_ATTIVA non e' "
+              "True/False: resta SPENTA")
+    MODIFICA_MASSIVA_ATTIVA = MODIFICA_MASSIVA_ATTIVA is True
+except ImportError:
+    MODIFICA_MASSIVA_ATTIVA = False
+
+# IL TETTO: cento annunci per modifica. Tre ragioni, nessuna di
+# politica: la scrittura sta in UNA transazione `BEGIN IMMEDIATE` e
+# deve restare breve (chi compra aspetta dietro di lei: la lezione
+# della fame di lucchetto); cento rilanci sui relay a lotti di cinque
+# con un secondo e mezzo di respiro fanno mezzo minuto; e un'anteprima
+# di cento righe si legge ancora davvero. Chi ne ha di piu' ripete coi
+# filtri.
+MM_TETTO = 100
+MM_ANNULLA_S = 24 * 3600          # la finestra dell'«↩︎ Annulla»
+MM_PERCENTO_MIN, MM_PERCENTO_MAX = -90, 200
+MM_ELENCO_MAX = 1000              # le righe da cui si sceglie
+MM_AZIONI = ("prezzo", "percento", "quantita", "spedizione", "categoria",
+             "pausa", "riattiva", "elimina")
+# LE PAROLE DEI MOTIVI stanno nel client (MOTIVI_MM); qui i CODICI, e
+# una prova li tiene in pari. Dalla spedizione in blocco arrivano
+# anche i suoi (ritiro, digitale, servizio, senza_consegna, no_casa,
+# gratis): `_sped_std_escluso` e' il giudice di quel gesto e si riusa.
+MM_MOTIVI = ("sparito", "nostr", "negozio", "asta", "revisione", "esaurito",
+             "servizio", "ordine", "riservati", "offerta", "lampo",
+             "valuta", "cambio", "tetto", "condizione", "ritiro",
+             "digitale", "senza_consegna", "no_casa", "gratis", "uguale",
+             "cambiato")
+# Le famiglie: quali colonne tocca un'azione, quindi quali regole valgono
+# e quale fotografia si confronta fra l'anteprima e la scrittura.
+_MM_FAMIGLIA = {"prezzo": "prezzo", "percento": "prezzo",
+                "quantita": "quantita", "pausa": "quantita",
+                "riattiva": "quantita", "categoria": "categoria",
+                "spedizione": "spedizione", "elimina": "elimina"}
+_MM_ISTANTANEA = {
+    "prezzo": ("stato", "valuta", "prezzo_sats", "prezzo_eur",
+               "lampo_percento", "lampo_scadenza"),
+    "quantita": ("stato", "quantita", "consegna"),
+    "categoria": ("stato", "categoria", "sottocategoria", "condizione",
+                  "consegna"),
+    "spedizione": _SPED_STD_ISTANTANEA + ("spedizione_zone",),
+    "elimina": ("stato",),
+}
+# Le SOLE colonne che questo gesto scrive: i nomi entrano nell'UPDATE
+# come testo, quindi passano da qui e da nessun'altra parte.
+_MM_SCRIVIBILI = frozenset({
+    "prezzo_sats", "prezzo_eur", "quantita", "stato", "categoria",
+    "sottocategoria", "condizione", "spedizione_zone"} | set(
+    _SPED_STD_ISTANTANEA[4:]))      # le sole tariffe, da spedizione_sats
+
+
+def _mm_attiva():
+    """La leva: spenta, ogni rotta di qui e' una porta che non c'e'."""
+    if not MODIFICA_MASSIVA_ATTIVA:
+        raise HTTPException(404, "Funzione non attiva")
+
+
+def _mm_ids(grezzi) -> list:
+    """Gli annunci scelti: interi positivi, senza doppioni, da 1 al
+    tetto. Il tetto si dice con un 400 parlante, mai tagliando la lista
+    in silenzio — chi ne sceglie 120 deve sapere che 20 non c'erano."""
+    if not isinstance(grezzi, list) or not grezzi:
+        raise HTTPException(400, "Scegli almeno un annuncio")
+    if len(grezzi) > MM_TETTO * 10:
+        raise HTTPException(400, "Formato non valido")
+    for x in grezzi:
+        if isinstance(x, bool) or not isinstance(x, int) or x <= 0:
+            raise HTTPException(400, "Formato non valido")
+    ids = list(dict.fromkeys(grezzi))
+    if len(ids) > MM_TETTO:
+        raise HTTPException(400, f"Al massimo {MM_TETTO} annunci per "
+                                 f"volta: ne hai scelti {len(ids)}. Usa i "
+                                 f"filtri e fai due giri")
+    return ids
+
+
+def _mm_intero(v, cosa: str, minimo: int, massimo: int) -> int:
+    """Un intero SCRITTO: niente punti ne' virgole («5.000» sarebbero
+    cinque sats, la lezione del costo standard), niente booleani."""
+    if isinstance(v, bool):
+        raise HTTPException(400, f"{cosa}: scrivi un numero intero")
+    s = str(v).strip() if v is not None else ""
+    if not re.fullmatch(r"[0-9]{1,16}", s):
+        raise HTTPException(400, f"{cosa}: scrivi un numero intero, senza "
+                                 f"punti né virgole")
+    n = int(s)
+    if n < minimo:
+        raise HTTPException(400, f"{cosa}: almeno {minimo}")
+    if n > massimo:
+        raise HTTPException(400, f"{cosa}: al massimo "
+                                 f"{massimo:,}".replace(",", "."))
+    return n
+
+
+def _mm_euro(v) -> float:
+    if isinstance(v, bool) or v is None:
+        raise HTTPException(400, "Prezzo: scrivi un numero")
+    try:
+        x = float(str(v).strip().replace(",", "."))
+    except ValueError:
+        raise HTTPException(400, "Prezzo: scrivi un numero")
+    if not math.isfinite(x) or round(x, 2) < 0.01:
+        raise HTTPException(400, "Prezzo: almeno 0,01 €")
+    if x > SPED_STD_TETTO_EUR:
+        raise HTTPException(400, "Prezzo: troppo alto")
+    return round(x, 2)
+
+
+def _mm_percento(v) -> int:
+    """La percentuale, col segno: «-10», «+15», «−10 %». Intera, da
+    −90 a +200: sotto il −90 non e' un ritocco ma un regalo per
+    sbaglio, e un refuso da +2000 non deve passare."""
+    s = str(v if v is not None and not isinstance(v, bool) else "")
+    s = s.replace("−", "-").replace("%", "").replace(" ", "")
+    if not re.fullmatch(r"[+-]?[0-9]{1,3}", s):
+        raise HTTPException(400, "Percentuale: scrivi un numero intero, "
+                                 "col meno davanti per abbassare")
+    n = int(s)
+    if n == 0:
+        raise HTTPException(400, "Percentuale: zero non cambia niente")
+    if not MM_PERCENTO_MIN <= n <= MM_PERCENTO_MAX:
+        raise HTTPException(400, f"Percentuale: da {MM_PERCENTO_MIN} a "
+                                 f"+{MM_PERCENTO_MAX}")
+    return n
+
+
+def _mm_parametri(d: dict) -> tuple:
+    """(azione, parametri) dal corpo, gia' giudicati: un 400 che dice
+    quale casella, prima di guardare un solo annuncio."""
+    azione = d.get("azione")
+    if azione not in MM_AZIONI:
+        raise HTTPException(400, "Scegli cosa cambiare")
+    par = {}
+    if azione == "prezzo":
+        valuta = d.get("valuta")
+        if valuta == "sats":
+            par = {"valuta": "sats", "prezzo": _mm_intero(
+                d.get("prezzo"), "Prezzo", 1, SPED_STD_TETTO_SATS)}
+        elif valuta == "eur":
+            par = {"valuta": "eur", "prezzo": _mm_euro(d.get("prezzo"))}
+        else:
+            raise HTTPException(400, "Il prezzo si scrive in sats o in euro")
+    elif azione == "percento":
+        par = {"percento": _mm_percento(d.get("percento"))}
+    elif azione == "quantita":
+        par = {"quantita": _mm_intero(d.get("quantita"), "Quantità", 1,
+                                      MAX_QUANTITA_ANNUNCIO)}
+    elif azione == "categoria":
+        if d.get("categoria") not in CATEGORIE:
+            raise HTTPException(400, "Scegli una categoria dell'elenco")
+        par = {"categoria": d["categoria"]}
+    return azione, par
+
+
+def _mm_percento_su(x, percento: int, euro: bool):
+    """Il prezzo ritoccato: euro al centesimo, sats interi arrotondati
+    a meta' in su (in aritmetica intera: nessun 0,1 di float decide un
+    sat). Mai sotto il minimo: un prezzo scritto non diventa zero."""
+    if euro:
+        return max(0.01, round(x * (100 + percento) / 100 + 1e-9, 2))
+    return max(1, (int(x) * (100 + percento) + 50) // 100)
+
+
+def _mm_offerte_aperte(con, annuncio_id: int) -> int:
+    """Le trattative APERTE sull'annuncio, singole o dentro un carrello:
+    quelle che un prezzo nuovo farebbe decadere (la regola della
+    Modifica). Le accettate no: l'accordo e' stretto."""
+    return con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE stato IN "
+        "('proposta','controproposta') AND (annuncio_id=? OR "
+        "(annuncio_id=0 AND id IN (SELECT offerta_id FROM offerte_righe "
+        "WHERE annuncio_id=?)))", (annuncio_id, annuncio_id)).fetchone()["n"]
+
+
+def _mm_fatti(con, a) -> tuple:
+    """Quel che il giudice deve sapere e la riga non dice: (affari vivi
+    alla maniera della Modifica, affari SALDI alla maniera di Elimina,
+    offerte aperte, pezzi in pagamento)."""
+    aid = a["id"]
+    return (_ordini_vivi_annuncio(con, aid, ("released", "refunded",
+                                             "annullato"), esclusi=True),
+            _ordini_vivi_annuncio(con, aid, ("locked", "shipped",
+                                             "confirmed", "dispute")),
+            _mm_offerte_aperte(con, aid), _riservati(con, aid))
+
+
+def _mm_escluso(a, azione: str, vivi: int, saldi: int, offerte: int,
+                adesso: int, cambio: float, valuta_par: str = "") -> str:
+    """Perche' QUESTO annuncio resta com'era ('' = non resta fuori).
+
+    SINCRONA E SENZA DATABASE, il patto di `_sped_std_escluso`: la
+    chiamano l'anteprima e, di nuovo, l'applicazione DENTRO la sua
+    transazione, coi fatti riletti li'. Le regole sono quelle dei gesti
+    singoli, e il primo motivo che vale e' quello che si dice:
+      · la riga che vive altrove (Nostr, negozio collegato): il sync la
+        riscriverebbe entro l'ora — Elimina invece si', come da solo;
+      · l'asta: non si tocca MAI da qui, nemmeno per eliminarla (con le
+        puntate e' vincolante, senza si ritira una per una);
+      · la revisione aspetta un moderatore (Elimina la ritira, come da
+        sola);
+      · l'esaurito non si modifica e non si elimina («finche' e'
+        esaurito non si modifica»): si rifornisce;
+      · il servizio non ha scorte;
+      · l'affare in corso ferma prezzo, spedizione e categoria (chi paga
+        trova l'annuncio com'era) e, se saldo, l'eliminazione; NON
+        quantita' e pausa, che seguono la ricarica;
+      · sul prezzo, le offerte aperte (decadrebbero con un avviso a
+        testa) e la lampo in corso (lo sconto e' una promessa fatta su
+        quel prezzo)."""
+    fam = _MM_FAMIGLIA[azione]
+    stato = a["stato"]
+    if stato not in ("attivo", "venduto", "revisione"):
+        return "sparito"
+    o = origine_annuncio(a)
+    if o and azione != "elimina":
+        return "nostr" if o == "nostr" else "negozio"
+    if (a["asta_base_sats"] or 0) > 0:
+        return "asta"
+    if stato == "revisione" and azione != "elimina":
+        return "revisione"
+    if stato == "venduto":
+        if azione == "pausa":
+            return "uguale"
+        if fam != "quantita":
+            return "esaurito"
+    elif azione == "riattiva":
+        return "uguale"
+    if fam == "quantita":
+        return "servizio" if a["consegna"] == "servizio" else ""
+    if azione == "elimina":
+        return "ordine" if saldi else ""
+    if vivi:
+        return "ordine"
+    if fam == "prezzo":
+        if offerte:
+            return "offerta"
+        if (a["lampo_percento"] or 0) > 0 and (a["lampo_scadenza"] or 0) > adesso:
+            return "lampo"
+        listino = "eur" if a["valuta"] == "eur" else "sats"
+        if valuta_par and valuta_par != listino:
+            return "valuta"
+        if listino == "eur" and not cambio > 0:
+            return "cambio"
+    if fam == "spedizione":
+        return _sped_std_escluso(a, vivi, cambio)
+    return ""
+
+
+async def _mm_nuovi(a, azione: str, par: dict, cambio: float, std,
+                    q_pausa: int) -> tuple:
+    """I numeri NUOVI di un annuncio gia' ammesso: (colonne, motivo,
+    extra). Un motivo qui nasce solo dal RISULTATO — gia' cosi'
+    («uguale»), oltre il tetto di rodaggio, una categoria che vuole la
+    condizione che l'annuncio non ha."""
+    euro = a["valuta"] == "eur"
+    extra = {}
+    if azione in ("prezzo", "percento"):
+        if euro:
+            eur = (par["prezzo"] if azione == "prezzo" else
+                   _mm_percento_su(a["prezzo_eur"] or 0, par["percento"],
+                                   True))
+            if eur == round(a["prezzo_eur"] or 0, 2):
+                return None, "uguale", extra
+            nuovi = {"prezzo_eur": eur, "prezzo_sats": max(
+                1, round(eur / cambio * 100_000_000))}
+        else:
+            sats = (par["prezzo"] if azione == "prezzo" else
+                    _mm_percento_su(a["prezzo_sats"], par["percento"], False))
+            if sats == a["prezzo_sats"]:
+                return None, "uguale", extra
+            nuovi = {"prezzo_sats": sats, "prezzo_eur": 0.0}
+        if TETTO_SATS_ANNUNCIO and nuovi["prezzo_sats"] > TETTO_SATS_ANNUNCIO:
+            return None, "tetto", extra
+        return nuovi, "", extra
+    if azione == "quantita":
+        q = par["quantita"]
+        if a["stato"] == "attivo" and q == a["quantita"]:
+            return None, "uguale", extra
+        return {"quantita": q, "stato": "attivo"}, "", extra
+    if azione == "pausa":
+        return {"quantita": 0, "stato": "venduto"}, "", extra
+    if azione == "riattiva":
+        # i pezzi di PRIMA della pausa, se la pausa l'ha scritta il
+        # registro; senza (la pausa del gesto singolo) uno, e
+        # l'anteprima lo dice
+        return {"quantita": max(1, q_pausa or 1), "stato": "attivo"}, "", extra
+    if azione == "categoria":
+        cat = par["categoria"]
+        if cat == a["categoria"]:
+            return None, "uguale", extra
+        if senza_condizione(cat, a["consegna"] or ""):
+            cond = ""
+        else:
+            cond = a["condizione"] or ""
+            if not cond:
+                return None, "condizione", extra
+        sotto = (sottocategoria_valida(cat, a["sottocategoria"])
+                 or sottocategoria_indovina(cat, a["titolo"] or "",
+                                            a["descrizione"] or ""))
+        return ({"categoria": cat, "sottocategoria": sotto,
+                 "condizione": cond}, "", extra)
+    if azione == "spedizione":
+        nuovi, convertito = await _sped_std_nuovi(a, std, cambio)
+        if _sped_std_pari(a, nuovi):
+            return None, "uguale", extra
+        nuovi["spedizione_zone"] = _sped_std_mappa(
+            a, nuovi["spedizione_sats"], nuovi["spedizione_eur"])
+        extra["convertito"] = convertito
+        return nuovi, "", extra
+    return {"stato": "rimosso"}, "", extra
+
+
+def _mm_vista(a, azione: str, nuovi: dict, extra: dict) -> dict:
+    """Una riga dell'anteprima come la legge il client: «prima → dopo»
+    nei numeri del SUO listino, e niente chiavi di servizio."""
+    fam = _MM_FAMIGLIA[azione]
+    voce = {"id": a["id"], "titolo": a["titolo"],
+            "valuta": "eur" if a["valuta"] == "eur" else "sats"}
+    if fam == "prezzo":
+        voce["prima"] = [a["prezzo_sats"], a["prezzo_eur"] or 0]
+        voce["dopo"] = [nuovi["prezzo_sats"], nuovi["prezzo_eur"]]
+    elif fam == "quantita":
+        voce["prima"] = [a["quantita"], a["stato"]]
+        voce["dopo"] = [nuovi["quantita"], nuovi["stato"]]
+    elif fam == "categoria":
+        voce["prima"], voce["dopo"] = a["categoria"], nuovi["categoria"]
+        voce["condizione_via"] = bool(a["condizione"]
+                                      and not nuovi["condizione"])
+    elif fam == "spedizione":
+        voce["prima"] = _sped_std_tre(a)
+        voce["dopo"] = _sped_std_tre({**dict(a), **nuovi})
+        voce["convertito"] = extra.get("convertito", False)
+    return voce
+
+
+def _mm_quantita_prima_della_pausa(con, tg_id: int) -> dict:
+    """{annuncio: pezzi} dalle pause scritte nel registro, la piu'
+    recente vince. Letto DIFENSIVO: una riga storta non ferma niente."""
+    out = {}
+    for r in con.execute(
+            "SELECT righe FROM modifiche_massive WHERE tg_id=? AND "
+            "azione='pausa' ORDER BY id DESC LIMIT 50", (tg_id,)):
+        try:
+            righe = json.loads(r["righe"] or "[]")
+        except ValueError:
+            continue
+        for x in righe if isinstance(righe, list) else []:
+            try:
+                aid, q = int(x["id"]), int(x["prima"]["quantita"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if q > 0:
+                out.setdefault(aid, q)
+    return out
+
+
+async def _mm_giro(tg_id: int, azione: str, par: dict, ids: list) -> dict:
+    """L'ANTEPRIMA: cosa succederebbe a ogni annuncio scelto. Non scrive
+    niente — la rifa' l'applicazione, e poi rigiudica ogni riga dentro
+    la transazione (il patto di `_sped_std_giro`). Gli id di un altro
+    venditore, o spariti, escono «sparito» e SENZA titolo: da qui non
+    si legge il negozio di nessuno."""
+    fam = _MM_FAMIGLIA[azione]
+    cambio = await cambio_btc_eur() if fam in ("prezzo", "spedizione") else 0.0
+    # il costo standard SALVATO, dalla sua porta (`_sped_std_da_usare`
+    # senza corpo): lo standard lo leggono solo le sue porte, ed e' una
+    # sentinella del suo cantiere a volerlo
+    std = _sped_std_da_usare({}, tg_id)[0] if fam == "spedizione" else None
+    adesso = int(time.time())
+    con = db()
+    try:
+        righe = {r["id"]: r for r in con.execute(
+            f"SELECT * FROM annunci WHERE venditore_id=? AND id IN "
+            f"({','.join('?' * len(ids))})", (tg_id, *ids))}
+        fatti = {aid: _mm_fatti(con, a) for aid, a in righe.items()}
+        q_pausa = (_mm_quantita_prima_della_pausa(con, tg_id)
+                   if azione == "riattiva" else {})
+    finally:
+        con.close()
+    cambiano, fuori = [], []
+    for aid in ids:
+        a = righe.get(aid)
+        if not a:
+            fuori.append({"id": aid, "titolo": "", "motivo": "sparito"})
+            continue
+        vivi, saldi, offerte, riservati = fatti[aid]
+        motivo = _mm_escluso(a, azione, vivi, saldi, offerte, adesso, cambio,
+                             par.get("valuta", ""))
+        nuovi, extra = None, {}
+        if not motivo:
+            nuovi, motivo, extra = await _mm_nuovi(
+                a, azione, par, cambio, std, q_pausa.get(aid, 0))
+        if not motivo and fam == "quantita" and nuovi["quantita"] < riservati:
+            motivo = "riservati"
+        if motivo:
+            voce = {"id": aid, "titolo": a["titolo"], "motivo": motivo}
+            if motivo == "negozio":
+                voce["origine"] = nome_origine(a)
+            fuori.append(voce)
+            continue
+        cambiano.append({**_mm_vista(a, azione, nuovi, extra),
+                         "_nuovi": nuovi,
+                         "_istantanea": tuple(a[k] for k in _MM_ISTANTANEA[fam])})
+    return {"cambiano": cambiano, "fuori": fuori, "cambio": cambio}
+
+
+def _mm_pubblico(v: dict) -> dict:
+    return {k: x for k, x in v.items() if not k.startswith("_")}
+
+
+def _mm_scrivi(con, a, nuovi: dict, adesso: int) -> list:
+    """Scrive UNA riga dentro la transazione del chiamante, e i suoi
+    effetti di casa: il massimo dei pezzi che non scende mai, la data
+    della modifica (solo dove cambia l'annuncio e non le scorte: la
+    ricarica non la scrive), gli ordini «creato» annullati con
+    l'eliminazione (il patto di `rimuovi_annuncio`), le offerte che
+    decadono quando l'annuncio si esaurisce (`_decadi_offerte_esaurito`,
+    il giudice unico). Torna i compratori da avvisare."""
+    fuori_lista = set(nuovi) - _MM_SCRIVIBILI
+    if fuori_lista:
+        raise ValueError(f"colonne non ammesse: {sorted(fuori_lista)}")
+    sql = "UPDATE annunci SET " + ", ".join(f"{k}=?" for k in nuovi)
+    valori = list(nuovi.values())
+    if "quantita" in nuovi:
+        sql += ", quantita_max=MAX(quantita_max,?)"
+        valori.append(nuovi["quantita"])
+    if set(nuovi) - {"quantita", "stato"}:
+        sql += ", modificato=?"
+        valori.append(adesso)
+    con.execute(sql + " WHERE id=?", (*valori, a["id"]))
+    if nuovi.get("stato") == "rimosso":
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                    "(SELECT ordine_id FROM ordine_righe WHERE "
+                    "annuncio_id=?))", (adesso, a["id"], a["id"]))
+    if a["stato"] == "attivo" and nuovi.get("stato") == "venduto":
+        return _decadi_offerte_esaurito(con, a["id"])
+    return []
+
+
+def _mm_gesto(stato_prima: str, nuovi: dict) -> str:
+    """Cosa deve sapere il mondo fuori di un annuncio appena scritto:
+    'ritira' (kind 5 e post del canale tolti), 'sold' / 'active' (lo
+    stato NIP-99 e la spunta del canale, i due versi della ricarica),
+    'aggiorna' (l'evento rilanciato coi numeri nuovi), '' (niente: le
+    scorte non stanno nell'evento, e la ricarica non lo rilancia)."""
+    dopo = nuovi.get("stato", stato_prima)
+    if dopo == "rimosso":
+        return "ritira"
+    if stato_prima == "attivo" and dopo == "venduto":
+        return "sold"
+    if stato_prima == "venduto" and dopo == "attivo":
+        return "active"
+    if dopo == "attivo" and set(nuovi) - {"quantita", "stato"}:
+        return "aggiorna"
+    return ""
+
+
+# I giri in corsa, uno per venditore: {tg_id: {annuncio: gesto}}. E i
+# task, che senza un riferimento il garbage collector raccoglierebbe a
+# meta' volo (il patto di `_TASK_SPED_STD`).
+_MM_CODA: dict = {}
+_TASK_MM: set = set()
+
+
+async def _mm_un_gesto(annuncio_id: int, gesto: str):
+    try:
+        if gesto == "aggiorna":
+            await annuncio_su_nostr(annuncio_id, "active",
+                                    solo_aggiornamento=True)
+        elif gesto == "sold":
+            await annuncio_su_nostr(annuncio_id, "sold",
+                                    solo_aggiornamento=True)
+            await promo_venduto(annuncio_id)
+        elif gesto == "active":
+            await annuncio_su_nostr(annuncio_id, "active",
+                                    solo_aggiornamento=True)
+            await promo_venduto(annuncio_id, venduto=False)
+        elif gesto == "ritira":
+            await ritira_da_nostr(annuncio_id)
+            await promo_rimuovi(annuncio_id)
+    except Exception as e:
+        print(f"⚠️ Modifica in blocco, annuncio #{annuncio_id} "
+              f"({gesto}) non rilanciato: {e}", flush=True)
+
+
+async def _mm_fuori(tg_id: int, gesti: dict):
+    """I relay e il canale, A LOTTI col respiro dell'import in blocco
+    (`LOTTO_NOSTR`, `PAUSA_NOSTR`): cento annunci in una raffica sola
+    sono il modo di farsi limitare dai relay. UN GIRO PER VENDITORE: una
+    seconda modifica mentre la prima e' ancora in volo si accoda alla
+    SUA coda (l'ultimo gesto per annuncio vince), e `annuncio_su_nostr`
+    rilegge la riga al momento dell'invio. Solo NIP-99 e kind 5: nessun
+    kind 1, che e' quello che i relay ci contano."""
+    if not gesti:
+        return
+    coda = _MM_CODA.get(tg_id)
+    if coda is not None:
+        coda.update(gesti)
+        return
+    coda = _MM_CODA[tg_id] = dict(gesti)
+    try:
+        while coda:
+            lotto = sorted(coda)[:LOTTO_NOSTR]
+            fatti = [(x, coda.pop(x)) for x in lotto]
+            await asyncio.gather(*[_mm_un_gesto(x, g) for x, g in fatti])
+            if coda:
+                await asyncio.sleep(PAUSA_NOSTR)
+    finally:
+        _MM_CODA.pop(tg_id, None)
+
+
+async def _mm_avvisa_offerte(per_compratore: dict):
+    """Le offerte decadute per una pausa in blocco: UN messaggio per
+    compratore, con i titoli dentro — mai uno per annuncio. Il testo
+    del caso singolo e' quello di `_avvisa_offerte_esaurito`."""
+    for tg_id, titoli in per_compratore.items():
+        nomi = [f"«{html.escape((t or '?')[:60])}»"
+                for t in dict.fromkeys(titoli)]
+        if len(nomi) == 1:
+            testo = (f"🕊 {nomi[0]} per ora è esaurito: il venditore ha "
+                     f"finito le scorte, e la tua offerta decade. Se "
+                     f"rimette dei pezzi lo ritrovi nel suo negozio.")
+        else:
+            elenco = ", ".join(nomi[:5]) + (
+                f" e altri {len(nomi) - 5}" if len(nomi) > 5 else "")
+            testo = (f"🕊 Il venditore ha messo in pausa {len(nomi)} "
+                     f"annunci su cui avevi un'offerta: {elenco}. Le tue "
+                     f"offerte decadono. Se rimette dei pezzi li ritrovi "
+                     f"nel suo negozio.")
+        try:
+            await notifica(tg_id, testo)
+        except Exception as e:
+            print(f"⚠️ Avviso offerte decadute saltato ({tg_id}): {e}")
+
+
+def _mm_dopo(tg_id: int, gesti: dict, decadute: dict):
+    """In sottofondo, DOPO il commit: chi preme non aspetta i relay."""
+    for coro in ((_mm_fuori(tg_id, gesti),) if gesti else ()) + (
+            (_mm_avvisa_offerte(decadute),) if decadute else ()):
+        t = asyncio.create_task(coro)
+        _TASK_MM.add(t)
+        t.add_done_callback(_TASK_MM.discard)
+
+
+def _mm_annullabile(reg, adesso: int) -> str:
+    """'' se la modifica si puo' ancora annullare, altrimenti il perche'."""
+    if reg["annullata"]:
+        return "Questa modifica è già stata annullata"
+    if reg["azione"] == "elimina":
+        return ("Un'eliminazione non si annulla: gli annunci sono già "
+                "stati ritirati anche dai relay")
+    if adesso - reg["creato"] > MM_ANNULLA_S:
+        return ("Sono passate più di 24 ore: cambia gli annunci con una "
+                "modifica nuova")
+    return ""
+
+
+def _mm_ultima(con, tg_id: int, adesso: int):
+    """L'ultima modifica che si puo' ancora annullare, per il cartello
+    dentro il foglio; None se non c'e'."""
+    r = con.execute(
+        "SELECT * FROM modifiche_massive WHERE tg_id=? AND annullata=0 AND "
+        "azione<>'elimina' AND creato>? ORDER BY id DESC LIMIT 1",
+        (tg_id, adesso - MM_ANNULLA_S)).fetchone()
+    if not r:
+        return None
+    try:
+        par = json.loads(r["parametri"] or "{}")
+    except ValueError:
+        par = {}
+    return {"id": r["id"], "azione": r["azione"], "quanti": r["quanti"],
+            "parametri": par if isinstance(par, dict) else {},
+            "creato": r["creato"], "scade": r["creato"] + MM_ANNULLA_S}
+
+
+def _mm_toccato_dopo(a, dopo: dict) -> bool:
+    """La riga e' cambiata DOPO la modifica (una vendita, un ritocco a
+    mano)? Allora l'annulla la lascia com'e': rimetterci il «prima»
+    cancellerebbe un fatto piu' nuovo. Sul listino in euro i sats sono
+    un equivalente e non si confrontano."""
+    for k, v in dopo.items():
+        if k == "prezzo_sats" and a["valuta"] == "eur":
+            continue
+        x = a[k]
+        if isinstance(v, float) or isinstance(x, float):
+            if round(float(x or 0), 2) != round(float(v or 0), 2):
+                return True
+        elif x != v:
+            return True
+    return False
+
+
+@app.get("/api/me/modifica-massiva")
+async def mm_elenco(x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """Da dove si sceglie: gli annunci del venditore in vetrina, esauriti
+    o in revisione — una riga corta per annuncio, TUTTI e non la pagina
+    di «I tuoi annunci» (i filtri e «Seleziona tutti» devono vedere il
+    negozio intero), fino a MM_ELENCO_MAX. E l'ultima modifica ancora
+    annullabile."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _mm_attiva()
+    adesso = int(time.time())
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT * FROM annunci WHERE venditore_id=? AND stato IN "
+            "('attivo','venduto','revisione') ORDER BY id DESC LIMIT ?",
+            (user["id"], MM_ELENCO_MAX + 1)).fetchall()
+        ultima = _mm_ultima(con, user["id"], adesso)
+    finally:
+        con.close()
+    return {"ok": True, "tetto": MM_TETTO, "ultima": ultima,
+            "troncato": len(righe) > MM_ELENCO_MAX,
+            "annunci": [{"id": a["id"], "titolo": a["titolo"],
+                         "categoria": a["categoria"], "stato": a["stato"],
+                         "valuta": "eur" if a["valuta"] == "eur" else "sats",
+                         "prezzo_sats": a["prezzo_sats"],
+                         "prezzo_eur": a["prezzo_eur"] or 0,
+                         "quantita": a["quantita"],
+                         "asta": (a["asta_base_sats"] or 0) > 0,
+                         "origine": nome_origine(a)}
+                        for a in righe[:MM_ELENCO_MAX]]}
+
+
+@app.post("/api/me/modifica-massiva/anteprima")
+async def mm_anteprima(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """«Stai cambiando N annunci: prima → dopo», e chi resta com'era col
+    suo motivo. NON SCRIVE NIENTE."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _mm_attiva()
+    d = await leggi_json(req)
+    ids = _mm_ids(d.get("ids"))
+    azione, par = _mm_parametri(d)
+    giro = await _mm_giro(user["id"], azione, par, ids)
+    return {"ok": True, "azione": azione, "parametri": par,
+            "annullabile": azione != "elimina",
+            "cambiano": [_mm_pubblico(v) for v in giro["cambiano"]],
+            "fuori": giro["fuori"]}
+
+
+@app.post("/api/me/modifica-massiva/applica")
+async def mm_applica(req: Request, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """LA MODIFICA: il piano rifatto da capo e ogni riga RIGIUDICATA
+    dentro `BEGIN IMMEDIATE`, il patto di `sped_std_applica` — chi ha
+    comprato fra l'anteprima e adesso lascia l'annuncio com'era, una riga
+    cambiata sotto i piedi resta sua («cambiato»). Nella stessa
+    transazione il registro, con il prima e il dopo di ogni riga.
+    L'eliminazione vuole una conferma scritta nel corpo: e' il solo
+    gesto di qui che non si annulla."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _mm_attiva()
+    _frena("annunci", user["id"])
+    d = await leggi_json(req)
+    ids = _mm_ids(d.get("ids"))
+    azione, par = _mm_parametri(d)
+    if azione == "elimina" and d.get("conferma") != "elimina":
+        raise HTTPException(400, "Per eliminare serve la conferma")
+    giro = await _mm_giro(user["id"], azione, par, ids)
+    fam = _MM_FAMIGLIA[azione]
+    adesso = int(time.time())
+    fatti, fuori = [], list(giro["fuori"])
+    registro, gesti, decadute, reg_id = [], {}, {}, 0
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        for v in giro["cambiano"]:
+            a = con.execute("SELECT * FROM annunci WHERE id=? AND "
+                            "venditore_id=?", (v["id"], user["id"])).fetchone()
+            motivo = "" if a else "sparito"
+            if a:
+                vivi, saldi, offerte, riservati = _mm_fatti(con, a)
+                motivo = _mm_escluso(a, azione, vivi, saldi, offerte, adesso,
+                                     giro["cambio"], par.get("valuta", ""))
+                if (not motivo and tuple(a[k] for k in _MM_ISTANTANEA[fam])
+                        != v["_istantanea"]):
+                    motivo = "cambiato"
+                if (not motivo and fam == "quantita"
+                        and v["_nuovi"]["quantita"] < riservati):
+                    motivo = "riservati"
+            if motivo:
+                fuori.append({"id": v["id"], "titolo": v["titolo"],
+                              "motivo": motivo})
+                continue
+            nuovi = v["_nuovi"]
+            for c in _mm_scrivi(con, a, nuovi, adesso):
+                decadute.setdefault(c, []).append(a["titolo"])
+            registro.append({"id": a["id"],
+                             "prima": {k: a[k] for k in nuovi},
+                             "dopo": nuovi})
+            g = _mm_gesto(a["stato"], nuovi)
+            if g:
+                gesti[a["id"]] = g
+            fatti.append(v)
+        if registro:
+            reg_id = con.execute(
+                "INSERT INTO modifiche_massive(tg_id, creato, azione, "
+                "parametri, quanti, righe) VALUES(?,?,?,?,?,?)",
+                (user["id"], adesso, azione, json.dumps(par), len(registro),
+                 json.dumps(registro))).lastrowid
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    _mm_dopo(user["id"], gesti, decadute)
+    annullabile = bool(reg_id) and azione != "elimina"
+    return {"ok": True, "azione": azione, "aggiornati": len(fatti),
+            "cambiano": [_mm_pubblico(v) for v in fatti], "fuori": fuori,
+            "registro": reg_id if annullabile else 0,
+            "annullabile_fino": adesso + MM_ANNULLA_S if annullabile else 0}
+
+
+# L'azione che si giudica quando si TORNA indietro: il prezzo torna in
+# percentuale (cioe' senza la regola della valuta: il prima e' nella
+# valuta del suo listino per costruzione), la pausa torna con la
+# riattivazione e viceversa.
+_MM_INVERSA = {"prezzo": "percento", "percento": "percento",
+               "quantita": "quantita", "pausa": "riattiva",
+               "riattiva": "pausa", "categoria": "categoria",
+               "spedizione": "spedizione"}
+
+
+@app.post("/api/me/modifica-massiva/annulla")
+async def mm_annulla(req: Request, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """«↩︎ Annulla», entro 24 ore: rimette il PRIMA sulle righe che da
+    allora nessuno ha toccato, con le stesse regole all'indietro (un
+    ordine nato nel frattempo ferma il prezzo, come lo fermerebbe una
+    modifica nuova). Le righe cambiate dopo restano com'erano, e si
+    dice quante. Un annullo solo per modifica."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _mm_attiva()
+    _frena("annunci", user["id"])
+    d = await leggi_json(req)
+    rid = d.get("registro")
+    if isinstance(rid, bool) or not isinstance(rid, int) or rid <= 0:
+        raise HTTPException(400, "Formato non valido")
+    adesso = int(time.time())
+    con = db()
+    reg = con.execute("SELECT * FROM modifiche_massive WHERE id=? AND "
+                      "tg_id=?", (rid, user["id"])).fetchone()
+    con.close()
+    if not reg:
+        raise HTTPException(404, "Modifica non trovata")
+    no = _mm_annullabile(reg, adesso)
+    if no:
+        raise HTTPException(400, no)
+    azione = reg["azione"]
+    inversa = _MM_INVERSA[azione]
+    fam = _MM_FAMIGLIA[azione]
+    cambio = await cambio_btc_eur() if fam == "prezzo" else 0.0
+    try:
+        righe = json.loads(reg["righe"] or "[]")
+    except ValueError:
+        righe = []
+    rimessi, fuori, gesti, decadute = 0, [], {}, {}
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        # il doppio tocco: il secondo annullo trova la riga gia' timbrata
+        if con.execute("SELECT annullata FROM modifiche_massive WHERE id=?",
+                       (rid,)).fetchone()["annullata"]:
+            raise HTTPException(400, "Questa modifica è già stata annullata")
+        for x in righe if isinstance(righe, list) else []:
+            try:
+                aid, prima, dopo = int(x["id"]), dict(x["prima"]), dict(x["dopo"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if set(prima) - _MM_SCRIVIBILI or set(dopo) - _MM_SCRIVIBILI:
+                continue
+            a = con.execute("SELECT * FROM annunci WHERE id=? AND "
+                            "venditore_id=?", (aid, user["id"])).fetchone()
+            if not a:
+                fuori.append({"id": aid, "titolo": "", "motivo": "sparito"})
+                continue
+            motivo = "cambiato" if _mm_toccato_dopo(a, dopo) else ""
+            if not motivo:
+                vivi, saldi, offerte, riservati = _mm_fatti(con, a)
+                motivo = _mm_escluso(a, inversa, vivi, saldi, offerte,
+                                     adesso, cambio)
+                if (not motivo and fam == "quantita"
+                        and int(prima.get("quantita", 0)) < riservati):
+                    motivo = "riservati"
+            if motivo:
+                fuori.append({"id": aid, "titolo": a["titolo"],
+                              "motivo": motivo})
+                continue
+            if fam == "prezzo" and a["valuta"] == "eur":
+                # l'euro e' il listino; i sats tornano al cambio di adesso
+                prima["prezzo_sats"] = max(1, round(
+                    float(prima.get("prezzo_eur") or 0) / cambio
+                    * 100_000_000))
+            for c in _mm_scrivi(con, a, prima, adesso):
+                decadute.setdefault(c, []).append(a["titolo"])
+            g = _mm_gesto(a["stato"], prima)
+            if g:
+                gesti[aid] = g
+            rimessi += 1
+        con.execute("UPDATE modifiche_massive SET annullata=?, "
+                    "annullate_n=? WHERE id=?", (adesso, rimessi, rid))
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    _mm_dopo(user["id"], gesti, decadute)
+    return {"ok": True, "azione": azione, "ripristinati": rimessi,
+            "fuori": fuori}
 
 
 @app.post("/api/me/punti-ritiro")

@@ -6505,6 +6505,66 @@
   secondo si accoda). I codici dei motivi (`SPED_STD_MOTIVI`) e le
   parole del client (`MOTIVI_SPED_STD`) stanno in pari per prova.
   Verbale in CANTIERI, «Il costo di spedizione standard del negozio».
+  LA MODIFICA DI PIÙ ANNUNCI INSIEME (16 ott 2026, cantiere
+  modifica-massiva, decisione di Andrea): il fratello maggiore
+  dell'aggiornamento in blocco qui sopra. In «📋 I tuoi annunci» il
+  bottone «✏️ Modifica più annunci» (`aggiornaBottoneMM`: leva viva da
+  /api/me `modifica_massiva`, almeno due annunci, mai in DEMO) apre
+  `#mmSheet`, un foglio in quattro tempi scritto da `renderMM`: SCEGLI
+  (spunte, «Seleziona tutti» sui visibili fino al tetto, filtri per
+  categoria e stato; l'elenco è suo, `GET /api/me/modifica-massiva`,
+  tutti gli annunci attivi, esauriti e in revisione fino a
+  `MM_ELENCO_MAX`, e non la pagina da cento di «I tuoi annunci») →
+  COSA CAMBI (`AZIONI_MM`) → ANTEPRIMA (`/anteprima`, non scrive) →
+  ESITO (`/applica`, la frase «N annunci cambiati; M non modificati:
+  …» e «↩︎ Annulla» → `/annulla`). I GESTI (`MM_AZIONI`): prezzo fisso
+  nella valuta del listino (gli altri «valuta»), prezzo in percentuale
+  da −90 a +200 (sats interi a metà in su, euro al centesimo, mai sotto
+  il minimo: `_mm_percento_su`), quantità assoluta, il costo standard
+  di spedizione del negozio (i giudici `_sped_std_*` di sopra), la
+  categoria (sottovoce rifatta, condizione tolta verso una categoria
+  che non la chiede, «condizione» nel verso opposto), pausa (lo zero
+  della ricarica: stato `venduto`, quantità 0), riattiva (i pezzi di
+  prima della pausa letti dal registro, o uno), elimina (lo stato
+  `rimosso` e gli ordini «creato» annullati, come `rimuovi_annuncio`;
+  vuole `conferma: "elimina"` nel corpo e «Ho capito» nel foglio).
+  MAI titolo, descrizione, foto, condizione, consegna: le colonne
+  scritte passano dalla lista chiusa `_MM_SCRIVIBILI`. LE ESCLUSIONI
+  sono un giudice solo, sincrono e senza database
+  (`_mm_escluso(a, azione, vivi, saldi, offerte, …)`), chiamato
+  dall'anteprima e di nuovo dentro `BEGIN IMMEDIATE`: le regole dei
+  gesti singoli lette una per una (importati fuori tranne che per
+  eliminare, l'asta sempre fuori, la revisione fuori tranne che per
+  eliminare, l'esaurito solo quantità e riattiva, il servizio senza
+  scorte, l'affare vivo che ferma prezzo, spedizione e categoria ma
+  NON quantità e pausa — la regola della ricarica, parola di Andrea —
+  l'affare saldo che ferma l'eliminazione, l'offerta aperta e la lampo
+  che fermano il prezzo); `_mm_nuovi` dice i numeri e i motivi che
+  nascono dal risultato («uguale», «tetto», «condizione»), e i pezzi in
+  pagamento sotto la quantità nuova sono «riservati». I codici
+  (`MM_MOTIVI`) e le parole (`MOTIVI_MM`, scritte per stare dopo «N non
+  modificati:») stanno in pari per prova. NIENTE MODERAZIONE E NIENTE
+  AVVISI: nessun campo di qui è letto dalla moderazione; nessuno
+  squillo a follower, ricerche salvate o gruppo admin; parlano soltanto
+  le offerte che una pausa fa decadere (`_decadi_offerte_esaurito`, il
+  giudice unico), UN messaggio per compratore coi titoli dentro
+  (`_mm_avvisa_offerte`). IL MONDO FUORI dopo il commit (`_mm_dopo`):
+  `_mm_gesto` dice per ogni riga 'aggiorna' (NIP-99 rilanciato),
+  'sold'/'active' (stato NIP-99 e spunta del canale, i due versi della
+  ricarica), 'ritira' (kind 5 e post del canale tolti) o niente (la
+  quantità sola non sta nell'evento), e `_mm_fuori` li manda a lotti di
+  `LOTTO_NOSTR` con `PAUSA_NOSTR` di respiro, un giro per venditore (il
+  secondo si accoda alla coda `_MM_CODA`): mai un kind 1. IL REGISTRO
+  `modifiche_massive` (chi, quando, azione, parametri, quanti, e per
+  riga il prima e il dopo delle sole colonne toccate) fa l'annullo
+  entro `MM_ANNULLA_S` (24 ore), una volta sola, mai per
+  un'eliminazione: rimette il prima solo dove la riga è ancora il dopo
+  (`_mm_toccato_dopo`; sul listino in euro i sats non contano e
+  tornano al cambio di adesso), con le stesse regole all'indietro
+  (`_MM_INVERSA`). Il tetto `MM_TETTO` (100) è un 400 parlante, mai un
+  taglio muto. Leva `MODIFICA_MASSIVA_ATTIVA`, spenta di serie (le
+  rotte 404 con `_mm_attiva`), nel pannello delle leve. Verbale in
+  CANTIERI, «La modifica di più annunci insieme».
   IL CAMBIO DI VALUTA CHE CONVERTE (set 2026, dalla foto di un
   venditore: in «Come spedisci» 11800, 10300 e 500 sats diventavano
   vuoto, vuoto e «0»). Dove un bottoncino sats ⇄ € gira su caselle già

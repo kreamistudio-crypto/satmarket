@@ -63061,3 +63061,169 @@ Fonti (lette il 16 ott 2026):
 [il tetto al contante, Studio Cataldi](https://www.studiocataldi.it/guide_legali/fisco/limite-contanti.asp) (divulgativa: il testo vigente va letto su Normattiva);
 [un caso di cronaca: chi ricarica e l'intestatario indagato](https://www.verbanonews.it/prima-pagina/2017/12/23/truffa-on-line-due-denunciati-dalla-polizia/3743/?output=pdf);
 [Polizia di Stato, carte Postepay usate per incassare truffe online](https://poliziadistato.it/articolo/pdf/15285767affdbaaa7715410598).
+
+## La modifica di più annunci insieme: scegli, cosa cambi, anteprima, conferma, annulla (16 ott 2026, cantiere modifica-massiva, decisione di Andrea)
+
+**PERCHÉ.** Chi vende deve poter cambiare più annunci in un colpo,
+invece di aprirli uno per uno (parola di Andrea). Il precedente in casa
+c'era già: l'aggiornamento in blocco del costo standard di spedizione
+(settembre), con l'anteprima, i motivi per riga e i relay a lotti. Si
+è partiti da lì.
+
+**COSA SI È DECISO (Andrea, proposta in dieci righe approvata il 16
+ott, con una risposta).**
+- SI CAMBIANO: prezzo fisso (nella valuta di ogni listino) o in
+  percentuale, quantità, il costo standard di spedizione del negozio,
+  la categoria, metti in pausa / riattiva, elimina. NON SI CAMBIANO
+  titolo, descrizione, foto, condizione e consegna: sono quel che legge
+  la moderazione e sono del singolo pezzo.
+- SI SCEGLIE in «📋 I tuoi annunci» col bottone «✏️ Modifica più
+  annunci»: spunte, «Seleziona tutti», filtri per categoria e stato. A
+  360 px una colonna sola.
+- L'ANTEPRIMA dice «Stai cambiando N annunci» col prima → dopo di
+  ognuno e i non toccati raggruppati col motivo; niente si scrive prima
+  della conferma, e alla conferma ogni riga si ricontrolla.
+- NON SI TOCCANO: le aste (sempre), gli annunci in revisione, gli
+  importati (Nostr, negozi collegati), gli esauriti (tranne quantità e
+  riattiva). Con un ordine in corso restano fuori prezzo, spedizione e
+  categoria; QUANTITÀ E PAUSA NO, seguono la regola della ricarica di
+  oggi («chi ha già pagato non conta sul numero in vetrina»: la
+  risposta di Andrea alla domanda della proposta). Sul prezzo restano
+  fuori anche le offerte aperte e le offerte lampo in corso: così
+  nessuna offerta decade e nessun compratore riceve avvisi.
+- NESSUNA REVISIONE: nessuno di questi campi è letto dalla
+  moderazione, è il patto già scritto per la spedizione in blocco.
+  NESSUN AVVISO a chi segue, alle ricerche salvate, al gruppo admin.
+  Parlano solo le offerte che una pausa fa decadere (oggi la ricarica a
+  zero le fa decadere con un messaggio): UN messaggio per compratore,
+  coi titoli dentro.
+- NOSTR: si rilanciano solo gli annunci cambiati che sono già sui
+  relay, a lotti di 5 con 1,5 s di respiro, un giro per venditore. Solo
+  NIP-99 (30402) e kind 5: nessun kind 1, che è quello per cui
+  relay.mostro.network ci ha limitati.
+- REGISTRO E ANNULLA: chi, quando, cosa, quanti, e per ogni riga il
+  prima e il dopo; «↩︎ Annulla» per 24 ore, una volta, solo sulle righe
+  che da allora nessuno ha toccato. L'eliminazione non si annulla (il
+  kind 5 è già partito): l'anteprima lo dice e chiede «Ho capito».
+- TETTO DI 100 per modifica: una transazione breve (chi compra aspetta
+  dietro di lei), circa mezzo minuto di relay, un'anteprima che si
+  legge. Un 400 parlante, mai un taglio muto.
+- LEVA `MODIFICA_MASSIVA_ATTIVA`, SPENTA di serie finché Andrea non la
+  prova.
+
+**COME È FATTO** (l'architettura in ARCHITETTURA, «LA MODIFICA DI PIÙ
+ANNUNCI INSIEME»; la leva in PRODUZIONE).
+- QUATTRO ROTTE (`/api/me/modifica-massiva`, `/anteprima`, `/applica`,
+  `/annulla`), tutte dietro `_mm_attiva()` (404 a leva spenta). L'elenco
+  da cui si sceglie è una rotta sua e non la pagina da cento di «I tuoi
+  annunci»: i filtri e «Seleziona tutti» devono vedere il negozio
+  intero.
+- UN GIUDICE SOLO DELLE ESCLUSIONI, `_mm_escluso`, sincrono e senza
+  database come `_sped_std_escluso` (che riusa per la spedizione):
+  l'anteprima lo chiama coi fatti letti fuori, l'applicazione di nuovo
+  dentro `BEGIN IMMEDIATE` coi fatti riletti lì. In più la fotografia
+  delle colonne della famiglia (`_MM_ISTANTANEA`): una riga cambiata
+  fra l'anteprima e la scrittura resta sua («cambiato»).
+- LA PAUSA NON È UNO STATO NUOVO: è lo zero della ricarica (stato
+  `venduto`, quantità 0), con le offerte che decadono dal giudice unico
+  `_decadi_offerte_esaurito`. «Riattiva» rimette i pezzi di prima della
+  pausa letti dal registro; se la pausa l'aveva messa il gesto singolo,
+  uno (l'anteprima lo dice).
+- LE COLONNE SCRITTE passano da una lista chiusa (`_MM_SCRIVIBILI`):
+  i nomi entrano nell'UPDATE come testo, e lì non c'è nessun testo né
+  foto. `modificato` si scrive per prezzo, categoria e spedizione, non
+  per le scorte (come la ricarica).
+- IL MONDO FUORI in sottofondo dopo il commit: `_mm_gesto` per riga,
+  `_mm_fuori` a lotti. I gesti sono quelli dei gesti singoli: NIP-99
+  rilanciato, stato sold/active con la spunta del canale, kind 5 col
+  post del canale tolto.
+- IL CLIENT: un foglio solo (`#mmSheet`) in quattro tempi
+  (`renderMM`), le righe dell'anteprima prese in prestito dalla
+  spedizione in blocco (`.sped-std-*`), il piede incollato in fondo.
+  La spunta non ridisegna la lista (lo scorrimento resta). La frase
+  finale è quella chiesta: «12 annunci cambiati; 3 non modificati:
+  hanno un ordine in corso.» — con più motivi ognuno dice il suo
+  numero, corto; i consigli («rispondi prima», «prima riforniscilo»)
+  stanno nei gruppi dell'anteprima.
+
+**STRADE SCARTATE.**
+- Uno stato «pausa» nuovo per gli annunci: avrebbe chiesto vetrina,
+  filtri, NIP-99 (che ha solo active e sold) e scheda. Lo zero della
+  ricarica fa già tutto, e si chiama già «pausa» nel form di Vendi.
+- Il prezzo fisso convertito nella valuta di ogni listino: un 29,90 €
+  che diventa «≈ 29.900 sats» su un listino in sats è una scelta che il
+  venditore non ha fatto. Resta fuori («ha il prezzo nell'altra
+  valuta»), e per tutti c'è la percentuale.
+- Selezionare dalla lista di «I tuoi annunci» già caricata: è a pagine
+  da cento, e «Seleziona tutti» avrebbe mentito sui negozi grandi.
+- La doppia conferma col foglio di casa per l'eliminazione: due fogli
+  aperti, e vince chi viene dopo nel DOM (lezione già pagata). Una
+  casella «Ho capito» nello stesso foglio.
+
+**PROVATO.**
+- `prove_modifica_massiva` (nuova): i giudici veri estratti dal
+  sorgente (parametri, tetto, esclusioni caso per caso, numeri nuovi,
+  gesti verso il mondo, annullo), le sentinelle (leva spenta, le
+  quattro rotte con leva e freno, transazione, anteprima che non
+  scrive, niente moderazione né avvisi, `notifica` solo per compratore,
+  lotti, nessun kind 1, colonne chiuse, /api/me, pannello, fusione) e
+  in node le frasi del foglio. 120 passate. La tortura su una copia:
+  quattro mutazioni (togliere l'ordine vivo, togliere l'offerta aperta,
+  chiamare la moderazione, togliere una parola di motivo), quattro
+  prese.
+- `collaudo_modifica_massiva.py` (nuovo, in `ci/collaudi.txt`): il
+  server vero su un database usa-e-getta. Leva spenta = 404 dappertutto
+  e /api/me senza bottone; parametri storti e 101 annunci = 400;
+  l'anteprima del −10 % su tutto che non scrive niente in nessuna
+  tabella; applica e annulla del prezzo (sats ed euro), prezzo fisso
+  con «valuta», quantità anche con un ordine in corso, pausa con le
+  offerte decadute (accettate comprese) e UN avviso per compratore,
+  riattiva coi pezzi di prima, annullo che lascia le righe toccate
+  dopo, categoria con la condizione tolta e rimessa, spedizione con
+  «ritiro» e la traduzione in euro, la corsa (ordine nato e riga
+  cambiata fra piano e scrittura), l'eliminazione con conferma, ordine
+  «creato» annullato e niente annulla, la scadenza a 24 ore, l'annuncio
+  di un altro mai toccato, nessuna moderazione e nessun avviso ai
+  moderatori, i relay a lotti 5/5/2 e la coda del secondo giro. 110
+  passate, verde anche nella gabbia della CI (15 s).
+- IL GIRO DAL VIVO a 360 px, chiaro e scuro, nel Browser pane: il
+  server della copia del worktree sulla 8161 col config di cartone
+  (relay morti, nsec `INCOLLA_QUI`), dodici annunci di 222 (euro e
+  sats, un esaurito, uno in revisione, un'asta, uno con un ordine
+  bloccato, uno con un'offerta aperta). Scegli, cosa cambi, anteprima,
+  esito, annullo; l'eliminazione (fino al «Ho capito»); una pausa con
+  l'offerta del Ledger decaduta: nel log del server un solo «📨
+  notifica simulata per utente 111», nessun «Nuovo annuncio», nessun
+  errore in console. Nove screenshot mandati ad Andrea. Corretti
+  strada facendo: la colonna delle icone (il «₿» sfalsava i titoli),
+  le pastiglie che non ereditavano Nunito, il bottone «Conferma: cambia
+  3 annunci» che andava a capo, il ✔ e il ↩︎ doppi, la frase finale
+  troppo lunga coi consigli, «Prima → dopo: si elimina» ripetuto, «Stai
+  cambiando 6 annunci: eliminati».
+- LA SUITE INTERA, primo giro (`PROVE_SEVERE=1`, albero ribasato su
+  37ae7af): 24.789 passate, 3 fallite, tutte sentinelle d'altri
+  cantieri che il mio codice toccava. (1) La regola 4 vieta il nome
+  `"in_pagamento"` nel server (sarebbe uno stato d'ordine): il mio
+  codice motivo si chiamava così, ora è `riservati`, come il giudice
+  `_riservati` che lo decide. (2) Il costo standard lo nominano solo le
+  sue porte: `_mm_standard` leggeva la colonna da sé, ora lo chiede a
+  `_sped_std_da_usare` senza corpo. (3) Il censimento dei bottoni di
+  valuta vuole il verdetto di ogni bottone nuovo: `mmValuta` CONSERVA
+  il numero (sceglie su quali listini vale il prezzo fisso, convertire
+  direbbe un'equivalenza non chiesta). Rigirate le quattro sezioni:
+  545 passate, 0 fallite. I collaudi della CI nella gabbia, due alla
+  volta: 84 verdi, 0 rossi. Il giro finale della suite: nel verbale del
+  commit.
+
+**DA FARE (notati, non fatti).**
+- PREESISTENTE, NON MIO: `promo_venduto` chiama `a.get(...)` su una
+  riga sqlite (`a.get("post_bitcoin_podcast_id")`), quindi la spunta
+  «✅ Venduto» nei post dei canali salta SEMPRE con «'sqlite3.Row'
+  object has no attribute 'get'» — anche con la ricarica singola e con
+  le vendite vere. Visto nel log del giro dal vivo. Si cura con
+  `dict(a).get(...)` o `a["post_bitcoin_podcast_id"]`, in un cantiere
+  suo.
+- Il giro sul telefono vero di Andrea, dopo l'accensione della leva:
+  spunte, filtri e il piede incollato coi tocchi veri.
+- La modifica in blocco dai filtri lato server (oggi l'elenco arriva
+  intero fino a 1.000 righe): da guardare se un negozio ne ha di più.
