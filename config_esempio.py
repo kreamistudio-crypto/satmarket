@@ -1564,6 +1564,18 @@ ADMIN_CANALE_ID = 0
 # Es.: {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,
 #       "dm": 10, "riepiloghi": 12}
 ADMIN_CANALE_ARGOMENTI = {}
+# ...e la sua CODA (16 ott 2026): un avviso che il gruppo non prende (la
+# rete che cade, Telegram che chiede di aspettare, il bot tolto) non
+# ripiega subito in privato: si riprova dopo 30 secondi e dopo 2 minuti.
+# Poi gli URGENTI (dispute, revisioni coi ✅/❌, liquidita', errori)
+# arrivano in privato come prima; gli altri (annunci nuovi e moderazione,
+# banner, riepiloghi, DM) in privato MAI: aspettano in coda, sul
+# database, e arrivano nel gruppo quando riprende (dopo tre giorni si
+# scartano). Ogni ripiego e ogni recupero ha la sua riga nel journal
+# («Gruppo degli admin: ...»).
+# False = come prima del 16 ott 2026: subito in privato. Vale solo col
+# gruppo acceso (ADMIN_CANALE_ID).
+GRUPPO_ADMIN_CODA = True
 
 # L'avviso dei DM su Nostr (ott 2026): quando qualcuno scrive un DM al
 # profilo Nostr di Barattolo (la chiave di NOSTR_NSEC_PIATTAFORMA) i

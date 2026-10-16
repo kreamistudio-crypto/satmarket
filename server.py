@@ -5609,6 +5609,32 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_mercatino_avvisi_coda
         ON mercatino_avvisi_coda(tg_id, mandato);
+    CREATE TABLE IF NOT EXISTS gruppo_admin_coda(
+        -- LA CODA DEL GRUPPO DEGLI ADMIN (16 ott 2026, cantiere
+        -- avvisi-doppi): un avviso da admin che il gruppo non ha preso
+        -- aspetta qui il tentativo dopo, e un riavvio non lo perde.
+        -- `creato` e' l'ora del primo tentativo fallito, `tentativi`
+        -- quanti ne sono andati (il primo compreso), `prossimo` l'ora
+        -- del prossimo. `urgente` = 1: dopo i tentativi va in privato,
+        -- nel modo che dice `ripiego` (JSON: {"via": "notifica" |
+        -- "tastiera" | "ponte" | "p2p", ...}); 0: in privato mai, si
+        -- aspetta il gruppo. `tastiera` e' la reply_markup in JSON, o
+        -- ''. La riga se ne va appena l'avviso arriva da qualche parte,
+        -- e dopo tre giorni comunque (`_giro_coda_gruppo_admin`).
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        creato INTEGER NOT NULL,
+        argomento TEXT DEFAULT '',
+        testo TEXT NOT NULL,
+        tastiera TEXT DEFAULT '',
+        foto TEXT DEFAULT '',
+        urgente INTEGER DEFAULT 0,
+        ripiego TEXT DEFAULT '',
+        tentativi INTEGER DEFAULT 1,
+        prossimo INTEGER NOT NULL,
+        errore TEXT DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_gruppo_admin_coda
+        ON gruppo_admin_coda(prossimo);
     CREATE TABLE IF NOT EXISTS preferiti(
         -- «nel tuo barattolo»: gli annunci messi da parte col 🫙.
         -- CHI ha salvato non esce MAI (i preferiti restano privati);
@@ -14145,7 +14171,7 @@ async def _avvisa_ponte(testo: str):
     deve poter leggere."""
     # nel gruppo degli admin, se c'e' e riceve (12 ott 2026): la leva
     # GUARDIANO_PONTE_AVVISA resta la strada di riserva
-    if await _al_gruppo_admin(testo, "liquidita"):
+    if await _al_gruppo_admin(testo, "liquidita", ripiego={"via": "ponte"}):
         print("   🌉 ↳ gruppo degli admin: mandato", flush=True)
         return
     for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
@@ -15962,6 +15988,26 @@ ADMIN_ARGOMENTI = {
     "riepiloghi": "📊 Riepiloghi",
 }
 TIMBRO_GRUPPO_ADMIN = "gruppo_admin_giu"
+# LA CODA DEL GRUPPO (16 ott 2026, cantiere avvisi-doppi). Il 15 ott alle
+# 19:19 un «🆕 Nuovo annuncio» e' arrivato ad Andrea in privato: il gruppo
+# c'era, ma quell'invio e' caduto per la rete (ConnectError) e il codice
+# di ieri ripiegava SUBITO in privato. Con la coda accesa un invio
+# fallito si riprova: dopo 30 secondi e dopo 2 minuti dal primo. Poi:
+#  · gli URGENTI (dispute, liquidita', errori — e la revisione ✅/❌, che
+#    lo dice da se') vanno in privato come ieri;
+#  · gli altri (nuovi annunci e moderazione, banner, riepiloghi, DM
+#    Nostr) in privato MAI: restano in coda, si riprovano ogni 5 minuti,
+#    e arrivano nel gruppo quando riprende. Dopo tre giorni si scartano.
+# Un avviso che Telegram rifiuta PER SE' (troppo lungo, una foto che non
+# scarica) non arrivera' mai cosi': l'urgente va subito in privato, gli
+# altri si riprovano una volta di solo testo, accorciato, e se non passa
+# nemmeno cosi' si scartano con la loro riga nel journal.
+GRUPPO_ADMIN_URGENTI = ("dispute", "liquidita", "errori")
+GRUPPO_ADMIN_ATTESE = (30, 120)     # secondi dal primo tentativo fallito
+GRUPPO_ADMIN_RIPROVA = 300          # poi, per i non urgenti, ogni 5 minuti
+GRUPPO_ADMIN_TETTO = 3 * 86400      # oltre, l'avviso in coda si scarta
+GRUPPO_ADMIN_SOLO_TESTO = 3500      # il solo testo, accorciato (Telegram: 4096)
+GRUPPO_ADMIN_PAUSA = 3              # secondi fra due recuperi (20/min nei gruppi)
 try:
     from config import ADMIN_CANALE_ID
 except ImportError:
@@ -15970,6 +16016,16 @@ try:
     from config import ADMIN_CANALE_ARGOMENTI
 except ImportError:
     ADMIN_CANALE_ARGOMENTI = {}
+# La leva della coda: di serie ACCESA. A False si torna al codice di
+# ieri, riga per riga: un invio che non arriva ripiega subito in privato.
+try:
+    from config import GRUPPO_ADMIN_CODA
+    if not isinstance(GRUPPO_ADMIN_CODA, bool):
+        print("[admin] GRUPPO_ADMIN_CODA non e' True/False: la coda del "
+              "gruppo degli admin resta ACCESA", flush=True)
+        GRUPPO_ADMIN_CODA = True
+except ImportError:
+    GRUPPO_ADMIN_CODA = True
 
 
 def _leggi_gruppo_admin(canale, argomenti) -> tuple:
@@ -16144,11 +16200,19 @@ async def _gruppo_admin_giu(perche: str):
         return
     G["giu"] = True
     timbro_scrivi(TIMBRO_GRUPPO_ADMIN, str(int(time.time())))
+    if GRUPPO_ADMIN_CODA:
+        # la coda accesa (16 ott 2026): la frase dice cosa succede DAVVERO
+        cosa = ("Da adesso gli avvisi urgenti (dispute, revisioni, "
+                "liquidità, errori) arrivano qui in privato, dopo due "
+                "tentativi nel gruppo; gli altri aspettano in coda e "
+                "arrivano nel gruppo quando riprende.")
+    else:
+        cosa = ("Da adesso gli avvisi da admin tornano qui in privato, "
+                "finché il gruppo non riprende: non se ne perde nessuno.")
     await _admin_in_privato(
         "⚠️ <b>Il gruppo degli admin non riceve.</b>\n"
         f"Telegram dice: <code>{html.escape(perche)}</code>\n\n"
-        "Da adesso gli avvisi da admin tornano qui in privato, finché il "
-        "gruppo non riprende: non se ne perde nessuno. Controlla che il "
+        f"{cosa} Controlla che il "
         "bot sia ancora nel gruppo, che possa scrivere, e il numero in "
         "<code>ADMIN_CANALE_ID</code>. Non lo ripeto.")
 
@@ -16166,33 +16230,27 @@ def _gruppo_admin_riprende():
         print("✅ Gruppo degli admin: ha ripreso a ricevere", flush=True)
 
 
-async def _al_gruppo_admin(testo: str, argomento: str = "", bottone: tuple = None,
-                           tastiera: dict = None, foto: str = "") -> bool:
-    """LA PORTA DEL GRUPPO: True = l'avviso e' arrivato nel gruppo degli
-    admin, False = non c'e' andato, e chi chiama fa quel che faceva
-    ieri (un messaggio in privato a ogni moderatore). False anche a
-    leva spenta: per questo ogni chiamante e' due righe davanti al suo
-    codice di sempre, e senza la leva quel codice gira identico.
-    `argomento` e' una chiave di `ADMIN_ARGOMENTI`; `bottone` e' la
-    coppia di `notifica`, `tastiera` una `reply_markup` gia' fatta (i
-    ✅/❌ della revisione), `foto` l'indirizzo di un'immagine (il
-    banner). Un argomento senza il suo numero va nel Generale.
+async def _tenta_gruppo_admin(testo: str, argomento: str = "", tastiera: dict = None,
+                              foto: str = "", in_coda: bool = False) -> tuple:
+    """UN TENTATIVO verso il gruppo degli admin (il corpo della porta di
+    ieri, 12 ott 2026, staccato il 16 ott perche' adesso lo chiamano in
+    due: la porta e il giro della coda). Torna `(esito, dettaglio)` coi
+    nomi di `_giudizio_gruppo_admin` — 'ok', 'piano', 'gruppo',
+    'argomento', 'messaggio', 'rete' — e fa quel che faceva: toglie il
+    segno «giu'» quando arriva, ricorda l'attesa del 429, dice UNA volta
+    che il gruppo non riceve. `in_coda` cambia solo le parole del
+    journal: «va in coda» invece di «ripiega in privato».
     MAI SILENZIOSO: nessun `disable_notification`, da nessuna parte.
     NON ALZA MAI: e' sulla strada di avvisi che partono da dentro i
     flussi dei soldi."""
     G = _GRUPPO_ADMIN
-    if not G["id"]:
-        return False
+    poi = "va in coda" if in_coda else "ripiega in privato"
     try:
         stanza = int(G["stanze"].get(argomento) or 0)
         if time.time() < G["piano_fino"]:
             print("⚠️ Gruppo degli admin: Telegram ha chiesto di aspettare, "
-                  "l'avviso ripiega in privato", flush=True)
-            return False
-        if bottone:
-            tastiera = {"inline_keyboard": [[
-                {"text": str(bottone[0]),
-                 "url": str(_link_dentro_telegram(bottone[1]))}]]}
+                  f"l'avviso {poi}", flush=True)
+            return "piano", "Telegram ha chiesto di aspettare"
         campo = "caption" if foto else "text"
         dati = {"chat_id": G["id"], campo: testo, "parse_mode": "HTML"}
         if foto:
@@ -16223,26 +16281,369 @@ async def _al_gruppo_admin(testo: str, argomento: str = "", bottone: tuple = Non
             break
         if esito == "ok":
             _gruppo_admin_riprende()
-            return True
+            return "ok", ""
         if esito == "piano":
             G["piano_fino"] = time.time() + attesa
             print(f"⚠️ Gruppo degli admin: Telegram a briglia corta (429), per "
-                  f"{attesa}s gli avvisi da admin ripiegano in privato",
+                  f"{attesa}s gli avvisi da admin "
+                  + ("aspettano in coda" if in_coda else "ripiegano in privato"),
                   flush=True)
         elif esito in ("gruppo", "argomento"):
             # 'argomento' senza piu' una stanza da togliere: e' il
             # Generale stesso a non ricevere, cioe' il gruppo
             await _gruppo_admin_giu(dettaglio)
+            esito = "gruppo"
         else:
             print(f"⚠️ Gruppo degli admin: avviso non consegnato ({esito}"
-                  f"{': ' + dettaglio if dettaglio else ''}) — ripiega in "
-                  "privato", flush=True)
+                  f"{': ' + dettaglio if dettaglio else ''}) — {poi}",
+                  flush=True)
+        # 'spoglio' qui vuol dire rifiutato anche spoglio: e' il
+        # messaggio, non il gruppo
+        return ("messaggio" if esito == "spoglio" else esito), dettaglio
     except Exception as e:
         # solo il TIPO: il testo di un errore di rete puo' portarsi
         # dietro l'indirizzo chiamato, e li' dentro c'e' il token del bot
         print(f"⚠️ Gruppo degli admin: invio caduto ({type(e).__name__}) — "
+              f"l'avviso {poi}", flush=True)
+        return "rete", type(e).__name__
+
+
+async def _al_gruppo_admin(testo: str, argomento: str = "", bottone: tuple = None,
+                           tastiera: dict = None, foto: str = "",
+                           urgente: bool = None, ripiego: dict = None) -> bool:
+    """LA PORTA DEL GRUPPO: True = l'avviso e' del gruppo degli admin (ci
+    e' arrivato, o aspetta in coda di arrivarci), False = non ci va, e chi
+    chiama fa quel che faceva ieri (un messaggio in privato a ogni
+    moderatore). False anche a leva spenta: per questo ogni chiamante e'
+    due righe davanti al suo codice di sempre, e senza la leva quel
+    codice gira identico.
+    `argomento` e' una chiave di `ADMIN_ARGOMENTI`; `bottone` e' la
+    coppia di `notifica`, `tastiera` una `reply_markup` gia' fatta (i
+    ✅/❌ della revisione), `foto` l'indirizzo di un'immagine (il
+    banner). Un argomento senza il suo numero va nel Generale.
+    LA CODA (16 ott 2026, leva `GRUPPO_ADMIN_CODA`, di serie accesa): un
+    invio che non arriva non ripiega piu' subito — va in
+    `gruppo_admin_coda` e lo riprova `_giro_coda_gruppo_admin`.
+    `urgente` (None = lo dice l'argomento: `GRUPPO_ADMIN_URGENTI`) decide
+    se dopo i tentativi l'avviso va in privato, e `ripiego` come ci va
+    (vedi `_ripiego_privato_admin`). Torna False, cioe' privato SUBITO
+    come ieri, solo un urgente che Telegram rifiuta per se' o che la
+    coda non riesce a scrivere: aspettare non lo farebbe arrivare.
+    A leva spenta e' la porta di ieri, riga per riga.
+    NON ALZA MAI."""
+    G = _GRUPPO_ADMIN
+    if not G["id"]:
+        return False
+    try:
+        if bottone:
+            tastiera = {"inline_keyboard": [[
+                {"text": str(bottone[0]),
+                 "url": str(_link_dentro_telegram(bottone[1]))}]]}
+    except Exception as e:
+        print(f"⚠️ Gruppo degli admin: invio caduto ({type(e).__name__}) — "
               "l'avviso ripiega in privato", flush=True)
-    return False
+        return False
+    if not GRUPPO_ADMIN_CODA:
+        esito, _ = await _tenta_gruppo_admin(testo, argomento, tastiera, foto)
+        return esito == "ok"
+    if urgente is None:
+        urgente = _gruppo_admin_urgente(argomento)
+    voce = {"testo": testo, "argomento": argomento, "tastiera": tastiera,
+            "foto": foto, "urgente": bool(urgente),
+            "ripiego": dict(ripiego or {"via": "notifica"})}
+    esito, dettaglio = await _tenta_gruppo_admin(testo, argomento, tastiera,
+                                                 foto, in_coda=True)
+    if esito == "ok":
+        _sveglia_coda_gruppo_admin()
+        return True
+    if esito == "messaggio":
+        if voce["urgente"]:
+            print(f"↪️ Gruppo degli admin: avviso URGENTE «{argomento or 'generale'}» "
+                  f"rifiutato dal gruppo ({dettaglio}) — in privato subito",
+                  flush=True)
+            return False
+        await _solo_testo_gruppo_admin(voce, dettaglio)
+        return True
+    if _accoda_gruppo_admin(voce, dettaglio):
+        return True
+    if voce["urgente"]:
+        return False
+    print(f"🗑 Gruppo degli admin: avviso «{argomento or 'generale'}» PERSO — "
+          "il gruppo non l'ha preso e la coda non si scrive", flush=True)
+    return True
+
+
+def _gruppo_admin_urgente(argomento: str) -> bool:
+    """PURA: un avviso di questo argomento va in privato, se il gruppo
+    non lo prende? Si' per dispute, liquidita' ed errori — e per un
+    argomento che non esiste, che e' il verso giusto in cui sbagliare."""
+    return argomento in GRUPPO_ADMIN_URGENTI or argomento not in ADMIN_ARGOMENTI
+
+
+def _prossimo_gruppo_admin(creato: int, tentativi: int, adesso: int) -> int:
+    """PURA: quando si riprova un avviso in coda che ha gia' fatto
+    `tentativi` tentativi, il primo fallito all'ora `creato`: 30 secondi
+    e 2 minuti dopo il primo, poi ogni 5 minuti da adesso."""
+    if 1 <= tentativi <= len(GRUPPO_ADMIN_ATTESE):
+        return max(int(creato) + GRUPPO_ADMIN_ATTESE[tentativi - 1], int(adesso))
+    return int(adesso) + GRUPPO_ADMIN_RIPROVA
+
+
+def _accoda_gruppo_admin(voce: dict, dettaglio: str, adesso: int = 0) -> bool:
+    """In coda, col primo tentativo gia' contato. Se Telegram ha chiesto
+    di aspettare, il prossimo non viene prima. False se la coda non si
+    scrive (e chi chiama decide). Una riga nel journal: id, argomento,
+    perche', fra quanto."""
+    adesso = int(adesso or time.time())
+    prossimo = max(_prossimo_gruppo_admin(adesso, 1, adesso),
+                   int(_GRUPPO_ADMIN["piano_fino"] or 0))
+    try:
+        con = db()
+        cur = con.execute(
+            "INSERT INTO gruppo_admin_coda(creato, argomento, testo, tastiera, "
+            "foto, urgente, ripiego, tentativi, prossimo, errore) "
+            "VALUES(?,?,?,?,?,?,?,1,?,?)",
+            (adesso, voce.get("argomento") or "", voce["testo"],
+             json.dumps(voce["tastiera"]) if voce.get("tastiera") else "",
+             voce.get("foto") or "", 1 if voce.get("urgente") else 0,
+             json.dumps(voce.get("ripiego") or {}), prossimo,
+             str(dettaglio or "")[:200]))
+        numero = cur.lastrowid
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Gruppo degli admin: la coda non si scrive ({type(e).__name__})",
+              flush=True)
+        return False
+    print(f"⏳ Gruppo degli admin: avviso #{numero} «{voce.get('argomento') or 'generale'}»"
+          f"{' URGENTE' if voce.get('urgente') else ''} in coda "
+          f"({dettaglio or 'non consegnato'}) — riprovo fra {prossimo - adesso} s",
+          flush=True)
+    return True
+
+
+def _sveglia_coda_gruppo_admin(adesso: int = 0):
+    """Il gruppo ha appena preso un avviso: chi aspetta in coda si
+    riprova al prossimo giro, senza aspettare i suoi 5 minuti. Fail-open:
+    al peggio aspetta il suo turno."""
+    adesso = int(adesso or time.time())
+    try:
+        con = db()
+        con.execute("UPDATE gruppo_admin_coda SET prossimo=? WHERE prossimo>?",
+                    (adesso, adesso))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Gruppo degli admin: coda non svegliata ({type(e).__name__})",
+              flush=True)
+
+
+def _togli_dalla_coda_gruppo_admin(numero: int):
+    try:
+        con = db()
+        con.execute("DELETE FROM gruppo_admin_coda WHERE id=?", (int(numero),))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Gruppo degli admin: avviso #{numero} non tolto dalla coda "
+              f"({type(e).__name__}): potrebbe ripetersi", flush=True)
+
+
+def _testo_solo_gruppo_admin(testo: str) -> str:
+    """PURA: il solo testo di un avviso che Telegram ha rifiutato —
+    senza tag, accorciato a `GRUPPO_ADMIN_SOLO_TESTO` caratteri, poi
+    scappato (si accorcia PRIMA di scappare: un taglio non spezza mai
+    un «&amp;»)."""
+    nudo = spoglia_html(testo or "")
+    if len(nudo) > GRUPPO_ADMIN_SOLO_TESTO:
+        nudo = nudo[:GRUPPO_ADMIN_SOLO_TESTO].rstrip() + "…"
+    return html.escape(nudo, quote=False)
+
+
+async def _solo_testo_gruppo_admin(voce: dict, dettaglio: str, adesso: int = 0):
+    """Un avviso NON urgente che Telegram rifiuta per se': si riprova una
+    volta di solo testo — niente foto, niente bottoni, accorciato. Se
+    passa, bene; se e' rifiutato anche cosi', si scarta; se nel frattempo
+    e' caduta la rete, il solo testo va in coda come gli altri."""
+    arg = voce.get("argomento") or "generale"
+    print(f"✂️ Gruppo degli admin: avviso «{arg}» rifiutato da Telegram "
+          f"({dettaglio}) — riprovo di solo testo, senza foto né bottoni",
+          flush=True)
+    semplice = dict(voce, testo=_testo_solo_gruppo_admin(voce["testo"]),
+                    tastiera=None, foto="")
+    esito, dett = await _tenta_gruppo_admin(semplice["testo"], voce.get("argomento") or "",
+                                            None, "", in_coda=True)
+    if esito == "ok":
+        print(f"✅ Gruppo degli admin: avviso «{arg}» consegnato di solo testo",
+              flush=True)
+        _sveglia_coda_gruppo_admin(adesso)
+    elif esito == "messaggio":
+        print(f"🗑 Gruppo degli admin: avviso «{arg}» SCARTATO — Telegram "
+              f"rifiuta anche il solo testo ({dett})", flush=True)
+    elif not _accoda_gruppo_admin(semplice, dett, adesso):
+        print(f"🗑 Gruppo degli admin: avviso «{arg}» PERSO — la coda non si "
+              "scrive", flush=True)
+
+
+async def _ripiego_privato_admin(voce: dict) -> str:
+    """L'urgente che il gruppo non ha preso, in privato COME IERI: ogni
+    `via` rifa' il ripiego del suo chiamante — `notifica` quello di
+    `notifica_admin` (col bottone), `tastiera` quello della revisione,
+    `ponte` quello del ponte e della liquidita' (GUARDIANO_PONTE_AVVISA
+    compresa), `p2p` quello di `_recapita_p2p` (meno chi ha fatto il
+    gesto). Una prova li tiene gemelli. Torna gli esiti, per il
+    journal."""
+    rip = voce.get("ripiego") or {}
+    via = rip.get("via") or "notifica"
+    testo = voce["testo"]
+    esiti = []
+    if via == "ponte":
+        for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
+            try:
+                esiti.append(f"{chat}: {await _manda_telegram(chat, testo) or 'mandato'}")
+            except Exception as e:
+                esiti.append(f"{chat}: NON consegnato ({type(e).__name__})")
+        return " | ".join(esiti)
+    if via == "p2p":
+        tranne = int(rip.get("tranne") or 0)
+        for mod in _moderatori_p2p():
+            if mod != tranne:
+                esiti.append(f"{mod}: {await notifica(mod, testo)}")
+        return " | ".join(esiti)
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for tg_id in sorted(destinatari):
+        if via == "tastiera" and voce.get("tastiera"):
+            await bot_api("sendMessage", {
+                "chat_id": tg_id, "parse_mode": "HTML", "text": testo,
+                "reply_markup": voce["tastiera"]})
+            esiti.append(f"{tg_id}: tastiera")
+        else:
+            bottone = rip.get("bottone")
+            esiti.append(f"{tg_id}: " + str(await notifica(
+                tg_id, testo, *([tuple(bottone)] if bottone else []))))
+    return " | ".join(esiti)
+
+
+async def _giro_coda_gruppo_admin(adesso: int = 0) -> int:
+    """UN GIRO DELLA CODA: gli avvisi il cui turno e' venuto, nell'ordine
+    in cui sono entrati. Arrivato → via dalla coda, e chi aspetta si
+    sveglia. Non arrivato → l'urgente al terzo tentativo va in privato
+    (`_ripiego_privato_admin`), gli altri al prossimo turno. Dopo il
+    primo che non arriva, i NON urgenti di questo giro non bussano
+    nemmeno (il gruppo e' giu', inutile chiederglielo trenta volte):
+    passano al turno dopo. Oltre `GRUPPO_ADMIN_TETTO` si scarta. Ogni
+    recupero, ripiego e scarto ha la sua riga nel journal. Torna quanti
+    sono arrivati nel gruppo. NON ALZA MAI."""
+    if not (GRUPPO_ADMIN_CODA and _GRUPPO_ADMIN["id"]):
+        return 0
+    adesso = int(adesso or time.time())
+    try:
+        con = db()
+        righe = [dict(r) for r in con.execute(
+            "SELECT * FROM gruppo_admin_coda WHERE prossimo<=? ORDER BY id LIMIT 30",
+            (adesso,)).fetchall()]
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Gruppo degli admin: la coda non si legge ({type(e).__name__})",
+              flush=True)
+        return 0
+    arrivati, giu, rimandati = 0, False, 0
+    for r in righe:
+        numero, arg = int(r["id"]), r["argomento"] or "generale"
+        eta = adesso - int(r["creato"] or 0)
+        try:
+            voce = {"testo": r["testo"], "argomento": r["argomento"] or "",
+                    "tastiera": json.loads(r["tastiera"]) if r["tastiera"] else None,
+                    "foto": r["foto"] or "", "urgente": bool(r["urgente"]),
+                    "ripiego": json.loads(r["ripiego"]) if r["ripiego"] else {}}
+        except ValueError:
+            voce = None
+        if voce is None or eta > GRUPPO_ADMIN_TETTO:
+            _togli_dalla_coda_gruppo_admin(numero)
+            print(f"🗑 Gruppo degli admin: avviso #{numero} «{arg}» SCARTATO — "
+                  + ("illeggibile" if voce is None else
+                     f"in coda da {eta // 3600} ore, oltre il tetto di tre giorni"),
+                  flush=True)
+            continue
+        tentativi = int(r["tentativi"] or 1)
+        if giu and not voce["urgente"]:
+            # il turno dopo e' fra 5 minuti: quando il gruppo riprende
+            # lo sveglia il primo avviso che arriva
+            _sposta_in_coda_gruppo_admin(numero, tentativi,
+                                         adesso + GRUPPO_ADMIN_RIPROVA)
+            rimandati += 1
+            continue
+        esito, dettaglio = await _tenta_gruppo_admin(
+            voce["testo"], voce["argomento"], voce["tastiera"], voce["foto"],
+            in_coda=True)
+        if esito == "ok":
+            _togli_dalla_coda_gruppo_admin(numero)
+            arrivati += 1
+            print(f"✅ Gruppo degli admin: avviso #{numero} «{arg}» RECUPERATO al "
+                  f"tentativo {tentativi + 1}, dopo {eta} s", flush=True)
+            if arrivati == 1:
+                _sveglia_coda_gruppo_admin(adesso)
+            await asyncio.sleep(GRUPPO_ADMIN_PAUSA)
+            continue
+        if esito == "messaggio":
+            _togli_dalla_coda_gruppo_admin(numero)
+            if voce["urgente"]:
+                print(f"↪️ Gruppo degli admin: avviso URGENTE #{numero} «{arg}» "
+                      f"rifiutato dal gruppo ({dettaglio}) — in privato: "
+                      + await _ripiego_privato_admin(voce), flush=True)
+            else:
+                await _solo_testo_gruppo_admin(voce, dettaglio, adesso)
+            continue
+        giu = True
+        tentativi += 1
+        if voce["urgente"] and tentativi > len(GRUPPO_ADMIN_ATTESE):
+            _togli_dalla_coda_gruppo_admin(numero)
+            print(f"↪️ Gruppo degli admin: avviso URGENTE #{numero} «{arg}» in "
+                  f"privato dopo {tentativi} tentativi ({dettaglio}): "
+                  + await _ripiego_privato_admin(voce), flush=True)
+            continue
+        prossimo = _prossimo_gruppo_admin(r["creato"], tentativi, adesso)
+        _sposta_in_coda_gruppo_admin(numero, tentativi, prossimo, dettaglio)
+        print(f"⏳ Gruppo degli admin: avviso #{numero} «{arg}», tentativo "
+              f"{tentativi} non arrivato ({dettaglio}) — riprovo fra "
+              f"{prossimo - adesso} s", flush=True)
+    if rimandati:
+        print(f"⏳ Gruppo degli admin: ancora giù, {rimandati} avvisi non urgenti "
+              "aspettano il turno dopo", flush=True)
+    return arrivati
+
+
+def _sposta_in_coda_gruppo_admin(numero: int, tentativi: int, prossimo: int,
+                                 errore: str = None):
+    try:
+        con = db()
+        if errore is None:
+            con.execute("UPDATE gruppo_admin_coda SET tentativi=?, prossimo=? "
+                        "WHERE id=?", (tentativi, prossimo, int(numero)))
+        else:
+            con.execute("UPDATE gruppo_admin_coda SET tentativi=?, prossimo=?, "
+                        "errore=? WHERE id=?",
+                        (tentativi, prossimo, str(errore)[:200], int(numero)))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Gruppo degli admin: avviso #{numero} non spostato in coda "
+              f"({type(e).__name__})", flush=True)
+
+
+async def orologio_gruppo_admin():
+    """Il giro della coda del gruppo, ogni dieci secondi: i tentativi
+    sono a 30 secondi e a 2 minuti, e l'orologio grande batte ogni dieci
+    minuti. Parte solo a leva accesa e col gruppo (`avvia_orologio`)."""
+    while True:
+        try:
+            await _giro_coda_gruppo_admin()
+        except Exception as e:
+            print(f"⚠️ Gruppo degli admin: giro della coda caduto "
+                  f"({type(e).__name__})", flush=True)
+        await asyncio.sleep(10)
 
 
 async def notifica_admin(testo: str, bottone: tuple = None,
@@ -16256,7 +16657,9 @@ async def notifica_admin(testo: str, bottone: tuple = None,
     (`ADMIN_ARGOMENTI`): se il gruppo c'e' e riceve, l'avviso va li' —
     UNO, non uno a testa — e qui sotto non si arriva. Senza il gruppo,
     o se non risponde, e' la strada di sempre."""
-    if await _al_gruppo_admin(testo, argomento, *([bottone] if bottone else [])):
+    if await _al_gruppo_admin(testo, argomento, *([bottone] if bottone else []),
+                              ripiego={"via": "notifica",
+                                       "bottone": list(bottone or ())}):
         return
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
@@ -26192,7 +26595,10 @@ async def avvisa_revisione(annuncio_id: int, motivo: str):
     # NEL GRUPPO DEGLI ADMIN NE PARTE UNA SOLA (12 ott 2026): chi tocca
     # per primo decide, e il messaggio cambia sotto gli occhi di tutti —
     # `callback_revisione` guarda chi ha toccato, non dove
-    if await _al_gruppo_admin(testo, "moderazione", tastiera=tastiera):
+    # URGENTE anche se sta nella stanza «moderazione»: una decisione da
+    # prendere, e senza i suoi bottoni non si prende (16 ott 2026)
+    if await _al_gruppo_admin(testo, "moderazione", tastiera=tastiera,
+                              urgente=True, ripiego={"via": "tastiera"}):
         return
     destinatari = set(ADMIN_IDS)
     if MODALITA_COLLAUDO:
@@ -28762,6 +29168,15 @@ def _leve_stato():
                          "privato, e lo si dice una volta",
                   spento="gli avvisi da admin arrivano in privato a ogni "
                          "moderatore, insieme a quelli da utente"),
+            # LA CODA DEL GRUPPO (16 ott 2026, cantiere avvisi-doppi)
+            _leva("Coda del gruppo degli admin", "GRUPPO_ADMIN_CODA",
+                  bool(GRUPPO_ADMIN_CODA),
+                  acceso="un avviso che il gruppo non prende si riprova "
+                         "dopo 30 secondi e dopo 2 minuti; poi gli urgenti "
+                         "(dispute, revisioni, liquidità, errori) vanno in "
+                         "privato, gli altri aspettano il gruppo",
+                  spento="un avviso che il gruppo non prende ripiega subito "
+                         "in privato, come prima del 16 ott 2026"),
         ]},
         {"gruppo": "🔒 Escrow e denaro", "voci": [
             _leva("Cassaforte del denaro nuovo: LNbits sul nodo",
@@ -58379,7 +58794,8 @@ async def _recapita_p2p(tg_id: int, testo: str, tranne: int = 0,
     e vale solo per la persona: al gruppo degli admin non si passa."""
     if not tg_id or tg_id != gruppo_admin_id():
         return await notifica(tg_id, testo, *([bottone] if bottone else []))
-    if await _al_gruppo_admin(testo, "dispute"):
+    if await _al_gruppo_admin(testo, "dispute",
+                              ripiego={"via": "p2p", "tranne": int(tranne or 0)}):
         return "gruppo degli admin"
     esiti = [str(await notifica(mod, testo))
              for mod in _moderatori_p2p() if mod != int(tranne or 0)]
@@ -69242,7 +69658,7 @@ async def _avvisa_liquidita(testo: str):
     riga nel journal per destinatario."""
     # nel gruppo degli admin, se c'e' e riceve (12 ott 2026): la regola
     # di `_avvisa_ponte`
-    if await _al_gruppo_admin(testo, "liquidita"):
+    if await _al_gruppo_admin(testo, "liquidita", ripiego={"via": "ponte"}):
         print("   💧 ↳ gruppo degli admin: mandato", flush=True)
         return
     for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
@@ -78920,6 +79336,7 @@ async def avvisa_saas_senza_doveri():
 
 
 _TASK_AVVISI_MERCATINO = None
+_TASK_GRUPPO_ADMIN = None
 
 
 @app.on_event("startup")
@@ -78933,6 +79350,12 @@ async def avvia_orologio():
     # batte ogni dieci. Parte sempre: a leva spenta esce da solo.
     global _TASK_AVVISI_MERCATINO
     _TASK_AVVISI_MERCATINO = asyncio.create_task(orologio_avvisi_mercatino())
+    # La coda del gruppo degli admin (16 ott 2026): un giro ogni dieci
+    # secondi, solo a leva accesa e col gruppo. Gli avvisi rimasti in
+    # coda da prima del riavvio li riprende lei.
+    if GRUPPO_ADMIN_CODA and gruppo_admin_id():
+        global _TASK_GRUPPO_ADMIN
+        _TASK_GRUPPO_ADMIN = asyncio.create_task(orologio_gruppo_admin())
     # Il campanello dello scambio P2P ha un giro SUO da un minuto (la
     # finestra del taker e' 900 secondi: dieci minuti li' dentro
     # sarebbero un ottavo del tempo che ha per rispondere). Si avvia

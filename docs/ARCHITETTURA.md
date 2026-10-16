@@ -32417,6 +32417,53 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   eseguono chi passa dalla porta montano i pezzi veri a leva spenta:
   `gruppo_admin_spento` in prove.py.
 
+- LA CODA DEL GRUPPO DEGLI ADMIN (16 ott 2026; perché in CANTIERI, «La
+  coda del gruppo degli admin»; la leva in PRODUZIONE, «LA CODA DEL
+  GRUPPO»). Leva `GRUPPO_ADMIN_CODA`, di serie True; a False la porta è
+  quella di ieri riga per riga (le prove di `prove_canale_admin` girano
+  così, ed è la loro prova). Vale solo col gruppo acceso.
+  IL TENTATIVO È UNO, `_tenta_gruppo_admin(testo, argomento, tastiera,
+  foto)`: il corpo della porta di ieri (stanza persa → Generale, HTML
+  rotto → spoglio, 429 → `piano_fino`, gruppo muto → l'avvertimento
+  UNA volta), che torna `(esito, dettaglio)` coi nomi di
+  `_giudizio_gruppo_admin`. Lo chiamano la porta e il giro della coda.
+  LA PORTA, `_al_gruppo_admin(..., urgente=None, ripiego=None)`, a leva
+  accesa: arrivato → True (e `_sveglia_coda_gruppo_admin`: chi aspetta
+  si riprova al giro dopo); non arrivato → una riga in
+  `gruppo_admin_coda` (`_accoda_gruppo_admin`) e True. False — cioè il
+  privato SUBITO del chiamante, come ieri — solo per un urgente che
+  Telegram rifiuta per sé (esito 'messaggio') o che la coda non riesce
+  a scrivere. Un NON urgente rifiutato per sé passa da
+  `_solo_testo_gruppo_admin`: un tentativo di solo testo (spoglio,
+  accorciato a 3500, scappato dopo il taglio, senza foto né bottoni),
+  poi lo scarto.
+  URGENTE (`_gruppo_admin_urgente`): gli argomenti di
+  `GRUPPO_ADMIN_URGENTI` — dispute, liquidita, errori — e un argomento
+  che non esiste; la revisione lo dice da sé (`urgente=True`) perché
+  è una decisione da prendere coi suoi bottoni. Il banner no.
+  IL RIPIEGO DEGLI URGENTI È QUELLO DI IERI, porta per porta, scritto
+  nella riga (`ripiego` in JSON) perché sopravviva al riavvio:
+  `notifica` (notifica_admin, col bottone), `tastiera` (revisione),
+  `ponte` (ponte e liquidità, `GUARDIANO_PONTE_AVVISA` compresa), `p2p`
+  (`_recapita_p2p`, meno `tranne`). Lo rifà `_ripiego_privato_admin`:
+  è il GEMELLO dei rami di ripiego dei chiamanti, che restano dove
+  sono per la leva spenta; una prova manda lo stesso avviso per le due
+  strade e confronta.
+  IL GIRO, `_giro_coda_gruppo_admin(adesso)`, ogni 10 secondi
+  (`orologio_gruppo_admin`, avviato da `avvia_orologio` solo a leva
+  accesa e col gruppo): fino a 30 righe col turno venuto, in ordine di
+  id. Il calendario è `_prossimo_gruppo_admin` (PURA): 30 e 120 secondi
+  dal primo fallito (`GRUPPO_ADMIN_ATTESE`), poi ogni 300. Al terzo
+  fallito l'urgente va in privato; il non urgente aspetta, fino a
+  `GRUPPO_ADMIN_TETTO` (tre giorni), poi si scarta. Dopo il primo
+  fallito di un giro i non urgenti non bussano (passano al turno dopo):
+  un giro bussa al gruppo giù una volta, non trenta. I recuperi sono
+  distanziati di `GRUPPO_ADMIN_PAUSA` (3 s: Telegram ne lascia circa 20
+  al minuto per gruppo). Ogni passo ha la sua riga nel journal, tutte
+  con «Gruppo degli admin:», mai il testo di un'eccezione. Restano
+  fuori `deploy.sh` (il suo `avvisa()` non ha coda) e gli avvisi da
+  utente, che non passano da questa porta.
+
 - GLI AVVISI DI `deploy.sh` NEL GRUPPO DEGLI ADMIN (12 ott 2026; perché
   in CANTIERI, «Gli avvisi del deploy nel gruppo degli admin»; il
   gruppo: qui sopra, «IL GRUPPO DEGLI ADMIN»). `deploy.sh` non passa

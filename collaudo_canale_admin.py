@@ -36,6 +36,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -193,8 +194,12 @@ class _Con:
         pass
 
 
-def monta(base, canale_id, argomenti, detto, timbri, fatti):
-    """Un server in miniatura: le leve come le leggerebbe dal config."""
+def monta(base, canale_id, argomenti, detto, timbri, fatti, coda=""):
+    """Un server in miniatura: le leve come le leggerebbe dal config.
+    `coda` (16 ott 2026, cantiere avvisi-doppi): il file sqlite della
+    coda del gruppo — con lui la leva GRUPPO_ADMIN_CODA e' accesa e
+    `db()` e' quel database; senza, la leva e' spenta (il codice di
+    ieri, che le sezioni da 1 a 9 collaudano com'erano)."""
     i = SRC.index("ADMIN_ARGOMENTI = {")
     S = {"__name__": "collaudo", "asyncio": asyncio, "html": html, "json": json,
          "time": time, "contextvars": contextvars, "httpx": Deviato(base),
@@ -210,11 +215,18 @@ def monta(base, canale_id, argomenti, detto, timbri, fatti):
          "spoglia_html": lambda t: html.unescape(re.sub(r"<[^>]+>", "", t)),
          "db": lambda: _Con(), "testo_prezzo": lambda *a: "90.000 sats",
          "riga_link_moderazione": lambda d: "",
-         "upsert_utente": lambda u: None}
+         "upsert_utente": lambda u: None, "asyncio": asyncio,
+         "GRUPPO_ADMIN_CODA": bool(coda)}
     exec(SRC[i:SRC.index("try:\n    from config import ADMIN_CANALE_ID", i)], S)
     for nome in ("_leggi_gruppo_admin", "gruppo_admin_id", "_posta_gruppo_admin",
                  "_giudizio_gruppo_admin", "_admin_in_privato",
                  "_gruppo_admin_giu", "_gruppo_admin_riprende",
+                 "_tenta_gruppo_admin", "_gruppo_admin_urgente",
+                 "_prossimo_gruppo_admin", "_accoda_gruppo_admin",
+                 "_sveglia_coda_gruppo_admin", "_togli_dalla_coda_gruppo_admin",
+                 "_sposta_in_coda_gruppo_admin", "_testo_solo_gruppo_admin",
+                 "_solo_testo_gruppo_admin", "_ripiego_privato_admin",
+                 "_giro_coda_gruppo_admin",
                  "_al_gruppo_admin", "notifica_admin", "bot_api", "e_admin",
                  "e_admin_bot", "comando_dove", "_comando_nel_gruppo",
                  "gestisci_update", "gestisci_callback", "callback_revisione",
@@ -225,6 +237,19 @@ def monta(base, canale_id, argomenti, detto, timbri, fatti):
     S["_GRUPPO_ADMIN"] = {"id": gruppo, "stanze": stanze, "giu": None,
                           "piano_fino": 0.0}
     S["lamentele"] = lamentele
+    if coda:
+        # la tabella com'e' scritta nello script dell'avvio, sul file vero
+        i = SRC.index("CREATE TABLE IF NOT EXISTS gruppo_admin_coda(")
+        fine = "ON gruppo_admin_coda(prossimo);"
+        con = sqlite3.connect(coda)
+        con.executescript(SRC[i:SRC.index(fine, i) + len(fine)])
+        con.close()
+
+        def db():
+            c = sqlite3.connect(coda)
+            c.row_factory = sqlite3.Row
+            return c
+        S.update(db=db, GRUPPO_ADMIN_PAUSA=0)
 
     # il privato: un messaggio del bot alla persona, col `bot_api` vero
     async def notifica(tg_id, testo, bottone=None):
@@ -608,7 +633,66 @@ def main():
           "vale, e tutto va in privato a tutti e due", ieri,
           sorted(in_privato()))
 
-    # --- 10. il journal ------------------------------------------------
+    # --- 10. la coda del gruppo (16 ott 2026, cantiere avvisi-doppi) ----
+    # Il caso del 15 ott: il gruppo c'e', ma un invio cade per la rete.
+    # La rete che cade qui e' VERA: httpx vero verso una porta dove non
+    # ascolta nessuno, cioe' un httpx.ConnectError vero.
+    ANNUNCIO = "🆕 <b>Nuovo annuncio #3113</b>\n«ChatGPT Pro» — 829,00 EUR"
+    DISPUTA = "⚠️ <b>Disputa aperta</b> sull'ordine #9."
+    cartella = tempfile.mkdtemp(prefix="barattolo-coda-gruppo-")
+    file_coda = os.path.join(cartella, "coda.db")
+    T.nuovo()
+    timbri.clear()
+    detto.clear()
+    C = monta(base, GRUPPO, STANZE, detto, timbri, fatti, coda=file_coda)
+    C["httpx"] = Deviato("http://127.0.0.1:9")
+    asyncio.run(C["notifica_admin"](ANNUNCIO, argomento="moderazione"))
+    prova("CODA ACCESA, la rete cade davvero (ConnectError): l'avviso NON "
+          "va in privato, aspetta in coda, e il journal lo dice",
+          ([], [], True, True),
+          (in_privato(), nel_gruppo(),
+           any("invio caduto (ConnectError) — l'avviso va in coda" in r for r in detto),
+           any("in coda (ConnectError) — riprovo fra 30 s" in r for r in detto)))
+    C["httpx"] = Deviato(base)
+    adesso = int(time.time())
+    asyncio.run(C["_giro_coda_gruppo_admin"](adesso + 10))
+    prova("...a 10 secondi il giro non bussa", [], T.bussate)
+    asyncio.run(C["_giro_coda_gruppo_admin"](adesso + 30))
+    prova("...a 30 secondi il secondo tentativo arriva: UNA volta nel "
+          "gruppo, nella stanza della moderazione, e in privato niente",
+          ([(8, ANNUNCIO)], [], True),
+          (nel_gruppo(), in_privato(),
+           any("RECUPERATO al tentativo 2" in r for r in detto)))
+    T.nuovo()
+    T.gruppi[GRUPPO]["bot"] = False
+    asyncio.run(C["notifica_admin"](ANNUNCIO, argomento="moderazione"))
+    asyncio.run(C["notifica_admin"](DISPUTA, argomento="dispute"))
+    adesso = int(time.time())
+    for passo in (30, 120, 420, 3600):
+        asyncio.run(C["_giro_coda_gruppo_admin"](adesso + passo))
+    veri = [p for p in in_privato() if "gruppo degli admin non riceve" not in p[1]]
+    prova("BOT TOLTO A LUNGO: la disputa arriva in privato a tutti e due "
+          "dopo i tentativi; il nuovo annuncio in privato MAI",
+          sorted([(ANDREA, DISPUTA), (ALAN, DISPUTA)]), sorted(veri))
+    prova("...l'avvertimento una volta a testa, con le parole della coda",
+          (sorted([ANDREA, ALAN]), True),
+          (sorted(avvertimenti()),
+           all("gli altri aspettano in coda" in t for _, t in in_privato()
+               if "non riceve" in t)))
+    T.gruppi[GRUPPO]["bot"] = True             # Andrea lo rimette...
+    T.arrivati.clear()
+    C2 = monta(base, GRUPPO, STANZE, detto, timbri, fatti, coda=file_coda)
+    asyncio.run(C2["_giro_coda_gruppo_admin"](adesso + 3600 + 300))
+    prova("...e DOPO UN RIAVVIO (un server nuovo sullo stesso database) il "
+          "nuovo annuncio arriva nel gruppo, nella sua stanza; in privato "
+          "niente, e la coda e' vuota",
+          ([(8, ANNUNCIO)], [], 0),
+          (nel_gruppo(), in_privato(),
+           sqlite3.connect(file_coda).execute(
+               "SELECT COUNT(*) FROM gruppo_admin_coda").fetchone()[0]))
+    shutil.rmtree(cartella, ignore_errors=True)
+
+    # --- 11. il journal ------------------------------------------------
     prova("nel journal mai il token del bot", False,
           any(TOKEN in r for r in detto))
     print("  --- le righe del journal, per chi legge ---")

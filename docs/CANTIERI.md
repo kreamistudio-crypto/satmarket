@@ -62087,3 +62087,138 @@ uscita on-chain, e se lasciano scegliere la fee).
   guardato di nuovo la sera, **si è ripreso da sé** — `pronto` e `main`
   stanno tutt'e due a 7e0b330. Non l'ho toccato, e resta la lezione:
   si guarda, non si dà per scontato.
+
+## La coda del gruppo degli admin: niente più «🆕 Nuovo annuncio» in privato per una rete caduta (16 ott 2026, cantiere avvisi-doppi, richiesta di Andrea)
+
+**PERCHÉ.** Andrea riceveva ancora in privato dal bot dei «🆕 Nuovo
+annuncio #N», con gli avvisi dei nuovi annunci spenti nel Profilo e il
+gruppo degli admin acceso. Il formato veniva da un posto solo,
+`crea_annuncio` → `notifica_admin(..., argomento="moderazione")`:
+l'avviso ai moderatori, non quello degli iscritti. L'interruttore del
+Profilo («🛒 Avvisami dei nuovi annunci») vale per l'altro avviso, il
+«🆕 N nuovi annunci nel mercatino», e quello lo rispettava già. La
+causa l'ha trovata Andrea nel journal: il #3113 è nato il 15 ott alle
+19:19 (17:19 UTC), nello stesso secondo di un «Gruppo degli admin:
+invio caduto (ConnectError)». La porta del gruppo, al primo invio
+fallito, ripiegava SUBITO in privato a ogni moderatore. Non era un
+doppione: era il ripiego.
+
+**COSA SI È DECISO (Andrea, piano approvato in due giri).** Prima di
+ripiegare si riprova nel gruppo, dopo 30 secondi e dopo 2 minuti. Gli
+URGENTI (dispute, revisione ✅/❌, liquidità, errori), falliti i
+tentativi, vanno in privato come oggi. I NON urgenti (nuovo annuncio e
+il resto della moderazione, banner, riepiloghi, DM Nostr — «dm» non
+urgente, scelta di Andrea) in privato MAI: aspettano in coda su
+database e arrivano nel gruppo quando riprende. Tetto di tre giorni,
+poi lo scarto. Un avviso che Telegram rifiuta PER SÉ: prima un secondo
+tentativo di solo testo (senza foto né tastiera, accorciato), poi lo
+scarto con la sua riga. Ogni ripiego, recupero e scarto lascia una riga
+nel journal. Leva `GRUPPO_ADMIN_CODA`, di serie True; a False il
+comportamento di ieri, con la sua prova. Tabella nuova con CREATE TABLE
+IF NOT EXISTS, nessun dato toccato.
+
+**COME È FATTO** (l'architettura in ARCHITETTURA, «LA CODA DEL GRUPPO
+DEGLI ADMIN»; la leva in PRODUZIONE, «LA CODA DEL GRUPPO»).
+- IL TENTATIVO STACCATO DALLA PORTA: il corpo di `_al_gruppo_admin` di
+  ieri è diventato `_tenta_gruppo_admin`, che torna `(esito,
+  dettaglio)`. A leva spenta la porta lo chiama e torna `esito == "ok"`:
+  è il codice di ieri. Le sole differenze sono due parole del journal
+  («va in coda» invece di «ripiega in privato», solo a leva accesa) e
+  il bottone del DM, che si costruisce prima della chiamata col suo
+  `try`.
+- A LEVA ACCESA LA PORTA TORNA True ANCHE QUANDO L'AVVISO È IN CODA:
+  così i sei chiamanti non hanno un ramo nuovo. Torna False — cioè il
+  ripiego SUBITO del chiamante, quello di ieri — solo per un urgente
+  che Telegram rifiuta per sé (aspettare non lo farebbe arrivare) o che
+  la coda non riesce a scrivere.
+- IL RIPIEGO DOPO I TENTATIVI deve rifare quel che faceva il chiamante
+  anche dopo un riavvio. Per questo la riga porta `ripiego` in JSON
+  (`notifica` col bottone, `tastiera`, `ponte`, `p2p` con `tranne`) e
+  `_ripiego_privato_admin` è il GEMELLO dei rami di ripiego dei
+  chiamanti, che restano dove sono per la leva spenta. Strada scartata:
+  spostare i ripieghi dei chiamanti in una funzione sola, usata dalle
+  due parti. È più pulito ma tocca sei funzioni e la leva spenta non
+  sarebbe più «il codice di ieri riga per riga». Il prezzo è un gemello
+  da tenere allineato: la prova manda lo stesso avviso per le due
+  strade (porta per porta, tastiera e bottone compresi) e confronta.
+- LA REVISIONE È URGENTE pur stando nella stanza «moderazione»
+  (`urgente=True` passato da `avvisa_revisione`): è una decisione da
+  prendere coi suoi bottoni. Il banner no (scelta di Andrea: lo si
+  decide anche dal pannello).
+- IL GIRO, ogni 10 secondi, solo a leva accesa e col gruppo. Dopo il
+  primo fallito di un giro i non urgenti non bussano: col gruppo giù si
+  bussa una volta per giro, non una per avviso, e i rimandati aspettano
+  5 minuti. Quando un avviso arriva (nuovo o recuperato) la coda si
+  SVEGLIA: chi aspetta passa al giro dopo, in ordine d'ingresso, con 3
+  secondi fra un recupero e l'altro (i 20 al minuto di Telegram nei
+  gruppi). Un avviso nuovo, se il gruppo è tornato, arriva subito e può
+  quindi passare davanti a quelli in coda: imperfezione dichiarata.
+- IL 429: un avviso nuovo durante l'attesa chiesta da Telegram non
+  bussa e va in coda; il suo primo tentativo non viene prima
+  dell'attesa.
+- L'AVVERTIMENTO «il gruppo non riceve» resta UNO, in privato, con la
+  frase giusta a leva accesa («gli urgenti … arrivano qui dopo due
+  tentativi; gli altri aspettano in coda»).
+- IL PANNELLO DELLE LEVE ha la riga «Coda del gruppo degli admin».
+
+**COSA NON TOCCA.** Gli avvisi da utente: «🆕 N nuovi annunci nel
+mercatino» (l'interruttore del Profilo, che resta l'unico giudice:
+admin compresi), i venditori seguiti, le ricerche salvate, la 🔔 del
+libro P2P. Non passano da questa porta, e una prova lo tiene fermo.
+`deploy.sh` ha un suo `avvisa()` in Python dentro lo script, senza
+coda: i suoi avvisi, col gruppo muto, ripiegano subito in privato
+(vedi «da fare»).
+
+**PROVATO.**
+- `prove_gruppo_admin_coda` (nuova, 41 prove): il database vero su un
+  file, il Telegram di cartone, l'orologio in mano. Il caso del 15 ott
+  (ConnectError e poi ok → solo gruppo, nessun privato, lo stesso testo
+  nella stessa stanza, «RECUPERATO al tentativo 2, dopo 30 s» nel
+  journal, mai il token); l'urgente che arriva al secondo tentativo;
+  il gruppo giù per ore (annuncio e riepilogo mai in privato, una
+  bussata per giro), un riavvio sullo stesso database (arrivano nel
+  gruppo, in ordine) e lo scarto dopo tre giorni; la disputa (in coda
+  fino al terzo tentativo, poi a ogni admin); i gemelli porta per
+  porta (notifica col bottone, ponte con GUARDIANO_PONTE_AVVISA,
+  liquidità, P2P meno chi ha fatto il gesto, la tastiera della
+  revisione identica); il banner mai in privato e con la sua foto; il
+  rifiuto per sé (solo testo che arriva; scartato; urgente subito in
+  privato; la foto che non si scarica → didascalia); il 429; la coda
+  che si sveglia; la leva spenta (ConnectError → privato subito, coda
+  intatta) e senza gruppo; il config d'esempio, PRODUZIONE, l'avvio,
+  il pannello, la tabella rigirata due volte con una riga dentro, il
+  journal, e gli avvisi da utente fuori dalla porta.
+- LA TORTURA, cinque mutazioni del server tutte prese: la leva
+  ignorata, i non urgenti in privato, la coda che non si sveglia, il
+  P2P che scrive anche a chi ha fatto il gesto, la revisione non
+  urgente.
+- `prove_canale_admin`: le sue 87 prove ora girano a leva spenta, e
+  sono la prova che spenta è il codice di ieri (due sentinelle
+  aggiornate: `ADMIN_IDS` e `_moderatori_p2p` li nomina anche il
+  gemello).
+- `collaudo_canale_admin` (httpx vero, Telegram di cartone): le
+  sezioni di ieri a leva spenta, e una nuova con la coda. Una
+  ConnectError VERA (porta morta) → in coda, mai in privato, e a 30
+  secondi nel gruppo. Il bot tolto a lungo → la disputa in privato dopo
+  i tentativi, l'annuncio mai. Un server nuovo sullo stesso database
+  col bot rimesso → l'annuncio nel gruppo, coda vuota. 42 passate.
+- L'ALBERO: ribasato su 7e0b330 (main, fermo da allora). La suite intera
+  con PROVE_SEVERE=1: 24.660 passate e 1 fallita, una sentinella di
+  `prove_disputa_per_sbaglio` che cercava la chiamata alla porta su una
+  riga sola (ora ha il ripiego): corretta mentre la suite girava, la sua
+  sezione rigirata dopo, 44 passate e 0 fallite; `prove_canale_admin`,
+  `prove_gruppo_admin_coda` e la bussola dopo il rebase: 132 e 0. I
+  collaudi della CI in gabbia, due alla volta: 83 verdi, 0 rossi. Nessun
+  segreto nel diff (le forme dello scanner, cercate a mano).
+
+**DA FARE (notati, non fatti).**
+- `deploy.sh`: il suo `avvisa()` non ha la coda. «🚀 Barattolo
+  aggiornato» (riepiloghi) col gruppo muto arriva ancora in privato.
+  Se si vuole la stessa regola, il deploy dovrebbe scrivere in
+  `gruppo_admin_coda` — ma è la catena del deploy, e va deciso a parte.
+- Il giro col bot vero dopo il deploy: il primo «Gruppo degli admin:
+  … in coda» e il suo «RECUPERATO» nel journal del VPS li vedrà Andrea
+  alla prossima caduta. Il comando è in PRODUZIONE.
+- L'ordine dopo il ritorno del gruppo: un avviso nuovo può arrivare
+  prima di quelli in coda (vedi sopra). Se dà fastidio, si accoda anche
+  il nuovo finché la coda non è vuota.

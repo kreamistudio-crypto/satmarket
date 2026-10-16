@@ -4876,6 +4876,36 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (una disputa aperta, una garanzia fra le 72 e le 88 ore) può essere
   ridetto una volta nel gruppo: il «già detto» è per destinatario, e
   il gruppo è un destinatario nuovo.
+  LA CODA DEL GRUPPO (16 ott 2026, leva `GRUPPO_ADMIN_CODA`; com'è
+  fatta in ARCHITETTURA, «LA CODA DEL GRUPPO DEGLI ADMIN»; perché in
+  CANTIERI, «La coda del gruppo degli admin»). CAMBIA IL «COSA SUCCEDE
+  SE» QUI SOPRA: un avviso che il gruppo non prende (rete caduta, 429,
+  bot tolto) NON ripiega più subito in privato. Si riprova dopo 30
+  secondi e dopo 2 minuti; poi gli URGENTI (dispute, revisioni coi
+  ✅/❌, liquidità, errori) arrivano in privato come prima, gli altri
+  (nuovi annunci e moderazione, banner, riepiloghi, DM) in privato
+  MAI: aspettano in coda — sul database, tabella `gruppo_admin_coda`,
+  quindi anche attraverso un riavvio — e arrivano nel gruppo quando
+  riprende; dopo tre giorni si scartano. Un avviso che Telegram rifiuta
+  per sé (troppo lungo, una foto che non scarica): l'urgente in privato
+  subito, gli altri riprovati di solo testo e, se non passa, scartati.
+  NON C'È NIENTE DA ACCENDERE: di serie è accesa, e la tabella nasce da
+  sola al riavvio (CREATE TABLE IF NOT EXISTS, niente di esistente
+  toccato). Si guarda che sul VPS non ci sia una riga che la spegne,
+  in sola lettura, la sola riga:
+  `grep -n "^GRUPPO_ADMIN_CODA" /srv/barattolo/config.py`
+  Niente = accesa (il default del codice). `GRUPPO_ADMIN_CODA = False`
+  = il comportamento di prima del 16 ott (subito in privato), e si
+  toglie a mano. Il pannello «⚙️ Stato delle leve» dice «Coda del
+  gruppo degli admin» accesa o spenta. Nel journal ogni passo ha la sua
+  riga — in coda, tentativo non arrivato, RECUPERATO, in privato dopo i
+  tentativi, SCARTATO:
+  `journalctl -u barattolo --since "1 hour ago" | grep "Gruppo degli admin"`
+  E quanti aspettano in coda adesso, in sola lettura:
+  `sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT argomento, urgente, tentativi FROM gruppo_admin_coda"`
+  ⚠️ `deploy.sh` NON ha la coda: i suoi avvisi («🚀 Barattolo
+  aggiornato» compreso) col gruppo muto ripiegano in privato subito,
+  come prima.
 
 - GLI AVVISI DEL DEPLOY NEL GRUPPO DEGLI ADMIN (12 ott 2026; com'è
   fatto in ARCHITETTURA, «GLI AVVISI DI `deploy.sh` NEL GRUPPO DEGLI
