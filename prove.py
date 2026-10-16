@@ -31,12 +31,26 @@ PASSATE, FALLITE, SALTATE = 0, 0, 0
 # le prove lo stesso, e gli basta vederlo scritto.
 SEVERE = bool(os.environ.get("PROVE_SEVERE"))
 
+# LA STAMPA COMPRESSA (16 ott 2026, richiesta di Andrea). Un giro
+# stampava 25.020 righe per dire 23.901 volte «✓», e una rossa in mezzo
+# a quel muro non la vede nessuno: un log che nessuno legge non protegge
+# niente. Di serie le spunte TACCIONO e restano i titoli delle sezioni
+# (dove sono arrivato), le rosse, le saltate e il totale: ~1.100 righe.
+# `PROVE_TUTTO=1` le ridà tutte, per quando una sezione si legge riga
+# per riga.
+# ⚠️ IL FILTRO VALE SOLO SUL «SÌ», e non è pignoleria: rosse e saltate
+# restano sempre a voce alta, che la lezione della docstring di `salta()`
+# — una saltata sussurrata ha nascosto per mesi una prova che non
+# girava — vale nell'altro verso esattamente come in questo.
+TUTTO = bool(os.environ.get("PROVE_TUTTO"))
+
 
 def prova(nome, atteso, avuto):
     global PASSATE, FALLITE
     if atteso == avuto:
         PASSATE += 1
-        print(f"  ✓ {nome}")
+        if TUTTO:
+            print(f"  ✓ {nome}")
     else:
         FALLITE += 1
         print(f"  ✗ {nome}\n      atteso: {atteso!r}\n      avuto:  {avuto!r}")
@@ -9411,7 +9425,7 @@ def prove_busta_ritiro():
               ["da oggi", "da 1 giorno", "da 2 giorni", "da 9 giorni",
                "da oggi", "da oggi"], _v)
     except FileNotFoundError:
-        salta("il conto dei giorni (node non c'e')")
+        salta("il conto dei giorni", "node non c'e'")
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("client: bustaIl in mapOrder e pannello presente", True,
           "bustaIl:o.busta_il" in mini and "pannelloBustaRitiro" in mini)
@@ -38161,7 +38175,7 @@ def prove_onion():
     # `bottoneLoginNostr` pure, e insieme facevano due porte uguali.
     _banco = _banco_banner(mini)
     if _banco is None:
-        salta("il banner composto: node non c'e'")
+        salta("il banner composto", "node non c'e'")
     else:
         for _nome, _atteso, _avuto in _banco:
             prova(_nome, _atteso, _avuto)
@@ -38607,7 +38621,7 @@ def prove_onion():
     # chi apre quel foglio da Tor.
     _banco = _banco_invito(mini)
     if _banco is None:
-        salta("il foglio girato: node non c'e'")
+        salta("il foglio girato", "node non c'e'")
     else:
         for _nome, _atteso, _avuto in _banco:
             prova(_nome, _atteso, _avuto)
@@ -41883,7 +41897,7 @@ def prove_ai_segnala():
               [6000, 11720, 14000, 6000, 6000],
               _js2.loads(_r2.stdout.strip()))
     except FileNotFoundError:
-        salta("il tempo di lettura (node non c'e')")
+        salta("il tempo di lettura", "node non c'e'")
 
 
     prova("il vietato passa da _vietato_bloccante", True,
@@ -47628,7 +47642,7 @@ def prove_scoprire():
                "CARD_W" in (_asseg.group(0) if _asseg else ""),
                "_webW" in (_asseg.group(0) if _asseg else "")))
     except ImportError:
-        salta("misura dei banner: serve Pillow")
+        salta("misura dei banner", "serve Pillow")
 
     # ---- 2. I FLAG DELLA BUSTA passano da _where_occasioni: il
     # predicato della card E' quello del filtro, mai una WHERE
@@ -48167,6 +48181,26 @@ def prove_scoprire():
     # sono MIGLIORATI (erano 10,7 / 11,9 / 12,9 a 250x115): la fascia
     # e' in px CSS mentre il disegno si scala, quindi in proporzione
     # copre meno immagine e resta piu' a sinistra, dove e' scura.
+    # I DUE AIUTI STANNO FUORI DAL `try` DEL PILLOW (16 ott 2026,
+    # cantiere prove-verdi-compresse): leggono il CSS del foglio, con
+    # Pillow non c'entrano niente, e dentro il try erano una trappola —
+    # senza Pillow l'ImportError saltava la loro definizione, e la
+    # sezione moriva venti righe dopo con un UnboundLocalError su
+    # `_blocco`, portandosi via anche le prove che Pillow non lo
+    # vogliono. Qui fuori servono tutt'e due i rami.
+    def _blocco(sel):
+        _i = mini.find(sel)
+        if _i < 0:
+            return ""
+        _r = mini[_i + len(sel):]
+        return _r[:_r.index("}")]
+
+    def _num(_b, chiave, se_manca=None):
+        if chiave not in _b:
+            return se_manca
+        _p = _b[_b.index(chiave) + len(chiave):]
+        return float(re.match(r"[\d.]+", _p).group())
+
     try:
         from PIL import Image as _Im
 
@@ -48189,19 +48223,6 @@ def prove_scoprire():
         # quello dove sono finite. L'id della card E' il nome del file
         # (il patto di FILE_SCOPRIRE), quindi il legame fra la regola
         # e il banner non ha bisogno di un secondo elenco.
-        def _blocco(sel):
-            _i = mini.find(sel)
-            if _i < 0:
-                return ""
-            _r = mini[_i + len(sel):]
-            return _r[:_r.index("}")]
-
-        def _num(_b, chiave, se_manca=None):
-            if chiave not in _b:
-                return se_manca
-            _p = _b[_b.index(chiave) + len(chiave):]
-            return float(re.match(r"[\d.]+", _p).group())
-
         # la base MOBILE si ancora all'indentazione, o il find
         # prenderebbe la variante desktop, che contiene la stessa
         # sottostringa (oggi sta dopo nel foglio, ma «dopo» non e'
@@ -48282,7 +48303,7 @@ def prove_scoprire():
                       f" ({_f}, {_dove})", True,
                       (_lc + .05) / (_lmax + .05) >= 4.5)
     except ImportError:
-        salta("contrasto del titolo: serve Pillow")
+        salta("contrasto del titolo", "serve Pillow")
 
     # ---- 6bis. LA SCRITTA DEL LANCIO (30 set 2026, card «P2P in
     # arrivo»): tre righe su un VELO del colore del fondo del disegno,
@@ -48380,7 +48401,7 @@ def prove_scoprire():
         prova("al picco del battito la data regge anche sulla sfumatura",
               True, (_lumL(_colori["data"]) + .05) / (_peggio + .05) >= 4.5)
     except ImportError:
-        salta("contrasto della scritta del lancio: serve Pillow")
+        salta("contrasto della scritta del lancio", "serve Pillow")
     # lo spegnimento deve VINCERE per specificita': col selettore nudo
     # perdeva contro [data-id="lampo"] img e i disegni si muovevano
     # anche in reduced-motion — la sentinella diceva che la regola
@@ -48420,7 +48441,7 @@ def prove_scoprire_p2p(mini=None, node=None):
     if node is None:
         node = _sh.which("node")
     if not node:
-        salta("la card che naviga: serve node")
+        salta("la card che naviga", "serve node")
         return
 
     def _fetta(inizio, fine):
@@ -49895,7 +49916,7 @@ def prove_sponsor():
     import shutil as _sh, subprocess as _sp, tempfile as _tf
     _node = _sh.which("node")
     if not _node:
-        salta("le aperture girate: serve node")
+        salta("le aperture girate", "serve node")
         return
     _js = ("""
 let VETRINA = false, DEMO = false, myNegozio = '', raccontoAperto = false;
@@ -50332,7 +50353,7 @@ def prove_numeri_negozio():
     import shutil as _sh, subprocess as _spr, tempfile as _tf
     _node = _sh.which("node")
     if not _node:
-        salta("il cassetto girato: serve node")
+        salta("il cassetto girato", "serve node")
         return
     _fmt = re.search(r"^const fmt = n =>.*$", mini, re.M).group()
     _js = """
@@ -53384,7 +53405,7 @@ def prove_strisce_web():
         prova("le illustrazioni reggono la card del web a 2x (%s)" % _chi,
               True, _peggio <= 1)
     except ImportError:
-        salta("le immagini alla misura del web: serve Pillow")
+        salta("le immagini alla misura del web", "serve Pillow")
 
     # ---- 8. LE DUE STRISCE SI SCORRONO COL MOUSE (ago 2026, dal
     # campo). Le fila hanno la barra NASCOSTA da sempre, e sul mouse
@@ -77218,7 +77239,7 @@ def prove_p2p_pubblica():
     import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
     _node = _sh.which("node")
     if not _node:
-        salta("le regole del nuovo ordine: serve node")
+        salta("le regole del nuovo ordine", "serve node")
         return
     _i = mini.index("const P2P_FORME_RECAPITO = [")
     _forme = mini[_i:mini.index("\n];", _i) + 3]
@@ -105220,7 +105241,7 @@ def prove_banner_negozio():
         prova("...e la cifra sopravvive a quattro vestizioni", "20000",
               _t["cifra"])
     else:
-        salta("il titolo della tassa col barrato (serve node)")
+        salta("il titolo della tassa col barrato", "serve node")
     # ...e il ramo escrow non lo nomina: e' cio' che rende il cambio
     # d'abito pulito PER COSTRUZIONE, senza una riga di pulizia da
     # ricordare in ogni flusso che apre il foglio.
@@ -107545,7 +107566,7 @@ def prove_connettori_varianti():
         r = None
     os.unlink(p)
     if r is None:
-        salta("il riepilogo del cassetto gira in node (node assente)")
+        salta("il riepilogo del cassetto gira in node", "node assente")
     elif r.returncode != 0:
         prova("il riepilogo del cassetto gira in node", "", r.stderr[-300:])
     else:
@@ -107836,7 +107857,7 @@ def prove_famiglie():
         rp = None
     os.unlink(p)
     if rp is None:
-        salta("le celle del carrello girano in node (node assente)")
+        salta("le celle del carrello girano in node", "node assente")
     else:
         prova("carrello: le scelte tutte, la provenienza in testa, UNA per "
               "famiglia senza scelte, niente di un altro venditore",
@@ -107887,7 +107908,7 @@ def prove_famiglie():
         r = None
     os.unlink(p)
     if r is None:
-        salta("i bottoncini della famiglia girano in node (node assente)")
+        salta("i bottoncini della famiglia girano in node", "node assente")
         return
     if r.returncode != 0:
         prova("i bottoncini della famiglia girano in node", "",
@@ -146359,7 +146380,16 @@ def prove_leva_rgb():
           False, "cassiere" in (blocco + pezzo("_leve_stato")
                                 + src[src.index("def nip05_nostr_json("):]).lower())
     prova("...e nemmeno il config d'esempio", False, "cassiere" in cfg.lower())
-    attrezzi = sorted(glob.glob(os.path.join(QUI, "deploy", "rgb", "*")))
+    # SOLO I FILE, e la cartella che non c'era: appena qualcosa importa
+    # `deploy/rgb/*.py` nasce `__pycache__/`, e aprirla come se fosse un
+    # file alza IsADirectoryError — la sezione intera esplodeva. In CI
+    # non si vedeva mai (repo appena clonato, nessun import prima),
+    # mentre sul PC di chi lavora diventava rossa dal primo giro in poi
+    # e non tornava verde da sola. La prova guarda i FILE di quella
+    # cartella: una cartella in piu' non e' un attrezzo mancante.
+    attrezzi = sorted(a for a in glob.glob(os.path.join(QUI, "deploy",
+                                                        "rgb", "*"))
+                      if os.path.isfile(a))
     prova("deploy/rgb/ ha i suoi attrezzi (banco, wallet, servizio NWC, identita')",
           True, {"rgb.py", "punti.mjs", "nwc-wdk.mjs", "identita.mjs",
                  "rgb_http.py", "consiglio.py", "qvac.config.json"}
@@ -166115,6 +166145,107 @@ def prove_pdf_allegati():
           ["no", "no", "no", "no"], out["no"])
 
 
+def prove_stampa_e_salti():
+    """LA STAMPA COMPRESSA E LE SALTATE CHE ESPLODEVANO (16 ott 2026,
+    cantiere prove-verdi-compresse, richiesta di Andrea: «i test devono
+    essere verdi, e questi test devono anche essere compressi»).
+
+    DUE COSE, e la seconda e' un difetto vero. 1) Di serie le spunte
+    tacciono: 25.020 righe per 23.901 «sì» sono un muro in cui una
+    rossa non si vede, e un log che nessuno legge non protegge niente.
+    2) SEDICI chiamate a `salta()` passavano UN argomento a una firma
+    che ne vuole due, col perche' cucito dentro il nome
+    (`salta("il banner composto: node non c'e'")`): nel momento in cui
+    quel ramo si apriva davvero non saltavano, ESPLODEVANO con un
+    TypeError — e la sezione intera moriva con loro. In CI non si
+    vedeva (node e Pillow li installa il workflow), si vedeva solo
+    sulla macchina a cui mancava qualcosa, cioe' esattamente dove
+    quelle righe servivano.
+
+    Qui si guarda quel che si rompe in silenzio: una spunta che torna a
+    stampare da sola (il muro si rifa'), una ROSSA o una SALTATA
+    zittita dal filtro (il caso che la docstring di `salta()` racconta,
+    al rovescio: li' una saltata sussurrata ha nascosto per mesi una
+    prova che non girava), e una diciassettesima `salta()` scritta a un
+    argomento solo. Il giudice delle sedici e' l'albero sintattico e
+    non una regex: `salta("... (node non c'e')")` ha una parentesi
+    dentro la stringa, e una regex sul testo ne perdeva sei."""
+    print("\n[la stampa compressa e le saltate]")
+    import contextlib as _cl
+    import glob as _gl
+    import io as _io
+
+    def stampato(acceso, f):
+        """Quel che `f()` scrive, con TUTTO acceso o spento.
+
+        ⚠️ I CONTATORI SI RIMETTONO COME ERANO, e non e' un dettaglio:
+        qui dentro si fabbricano di proposito una rossa e una saltata
+        FINTE — servono a vedere che il filtro non le zittisce — e se
+        contassero nei totali veri la suite uscirebbe con 1 a tutto
+        verde, cioe' questa sentinella romperebbe esattamente la cosa
+        che deve proteggere. Succede: la prima versione lo faceva."""
+        prima = (PASSATE, FALLITE, SALTATE, TUTTO)
+        globals()["TUTTO"] = acceso
+        buf = _io.StringIO()
+        try:
+            with _cl.redirect_stdout(buf):
+                f()
+        finally:
+            (globals()["PASSATE"], globals()["FALLITE"],
+             globals()["SALTATE"], globals()["TUTTO"]) = prima
+        return buf.getvalue()
+
+    # 1) la spunta tace di serie, e con PROVE_TUTTO torna
+    prova("di serie una prova passata non stampa niente", "",
+          stampato(False, lambda: prova("muta", 1, 1)))
+    prova("...e con PROVE_TUTTO=1 la spunta torna", True,
+          "  ✓ parlante\n" == stampato(True, lambda: prova("parlante", 1, 1)))
+    # 2) la rossa e la saltata NON passano dal filtro, in nessun verso
+    # i conti si leggono PRIMA e SUBITO DOPO lo scatto: una `prova()`
+    # vera in mezzo alzerebbe lei il contatore, e la misura direbbe una
+    # bugia su se stessa
+    conti = (PASSATE, FALLITE, SALTATE)
+    rossa = stampato(False, lambda: prova("rossa", 1, 2))
+    dopo = (PASSATE, FALLITE, SALTATE)
+    prova("una ROSSA si stampa anche col filtro acceso, con atteso e avuto",
+          [True, True, True],
+          ["  ✗ rossa" in rossa, "atteso: 1" in rossa, "avuto:  2" in rossa])
+    prova("...e la rossa finta non conta nei totali veri", conti, dopo)
+    prova("una SALTATA si stampa anche col filtro acceso, col perche'",
+          "  · SALTATA: muta — niente node\n",
+          stampato(False, lambda: salta("muta", "niente node")))
+    # ...e la forma, che il filtro non scivoli dove non deve: una sola
+    # `if TUTTO` in tutto il file, dentro `prova()`
+    sorgente = open("prove.py", encoding="utf-8").read()
+    prova("il filtro si legge dall'ambiente, e si chiama PROVE_TUTTO", True,
+          'TUTTO = bool(os.environ.get("PROVE_TUTTO"))' in sorgente)
+    corpo_salta = sorgente[sorgente.index("def salta(nome, perche):"):]
+    prova("...e dentro `salta()` non entra", False,
+          "if TUTTO" in corpo_salta[:corpo_salta.index("\n\n\ndef ")])
+    # 3) nessuna `salta()` a un argomento solo: il giudice e' l'albero
+    a_un_argomento = [n.lineno for n in ast.walk(ast.parse(sorgente))
+                      if isinstance(n, ast.Call)
+                      and isinstance(n.func, ast.Name) and n.func.id == "salta"
+                      and len(n.args) == 1]
+    prova("nessuna `salta()` chiamata con un argomento solo (esploderebbe)",
+          [], a_un_argomento)
+    # e le sedici riparate dicono il perche' nel SECONDO argomento
+    due = [n for n in ast.walk(ast.parse(sorgente))
+           if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+           and n.func.id == "salta" and len(n.args) == 2]
+    prova("...e quelle a due sono tante quante prima (sedici riparate e le altre)",
+          True, len(due) >= 16)
+    # 4) gli attrezzi di deploy/rgb/ sono solo FILE (il __pycache__)
+    attrezzi = sorted(a for a in _gl.glob(os.path.join(QUI, "deploy",
+                                                       "rgb", "*"))
+                      if os.path.isfile(a))
+    prova("gli attrezzi di deploy/rgb/ sono solo file, mai una cartella",
+          [], [os.path.basename(a) for a in attrezzi
+               if not os.path.isfile(a)])
+    prova("...e la riga che li raccoglie ha il filtro, non il glob nudo",
+          True, 'if os.path.isfile(a))' in sorgente)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -166437,6 +166568,7 @@ def main():
               prove_barre_paycode,
               prove_allegati_chat,
               prove_pdf_allegati,
+              prove_stampa_e_salti,
               prove_config_esempio):
         try:
             f()

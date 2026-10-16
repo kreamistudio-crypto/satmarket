@@ -62636,3 +62636,138 @@ Fonti: [massmux, «A new Boltz's fork is running: SATS Routing»](https://massmu
 [CMS sul regime transitorio](https://cms.law/it/ita/publication/il-regime-transitorio-per-i-fornitori-di-servizi-di-cripto-assets-in-italia-alla-luce-delle-recenti-modifiche-normative);
 [Banca d'Italia, FAQ CASP](https://www.bancaditalia.it/compiti/vigilanza/accesso-mercato/soggetti-mercato-cripto-attivita/casp/faq-casp/);
 `mempool.space/api/v1/lightning/nodes/…`, `/channels`, `/fees/recommended`, `/prices` (16 ott).
+
+## Le prove verdi e compresse: sedici `salta()` che esplodevano, il muro delle spunte, e il `__pycache__` che arrossiva il PC (16 ott 2026, cantiere prove-verdi-compresse, richiesta di Andrea: «i test devono essere verdi, e questi test devono anche essere compressi»)
+
+Il compito, parola di Andrea la sera del 16 ott: le prove devono essere
+**verdi**, e il loro output **compresso**. «Compresso» poteva voler dire
+quattro cose diverse — l'output, il file da 9,1 MB, il numero delle
+prove, il tempo del giro — e gliele ho messe in fila: ha scelto
+**l'output**. Le altre tre non si sono toccate.
+
+**COSA NON ERA VERDE, E PERCHÉ NON SI VEDEVA.** Un giro locale dava
+*23.899 passate, 18 fallite, 30 saltate*. Nessuna delle diciotto era
+mia e nessuna era un difetto del prodotto: mancavano i quattro
+pacchetti che la CI installa (`websocket-client`, `pillow`,
+`cryptography`, `snowballstemmer` — workflow, riga 115). Con quelli
+montati in un ambiente a parte: **24.553 passate, 1 fallita**. E
+quell'una ha aperto il cantiere.
+
+**I QUATTRO DIFETTI VERI** (tutti invisibili in CI, tutti visibili solo
+dove si lavora):
+
+1. **Sedici `salta()` chiamate con UN argomento** contro una firma che
+   ne vuole due, col perché cucito dentro il nome:
+   `salta("il banner composto: node non c'e'")`. Nel momento in cui
+   quel ramo si apre davvero non saltano, **esplodono** con un
+   TypeError, e la sezione intera muore con loro — `prove_scoprire` e
+   `prove_strisce_web` sono morte così nel primo giro. In CI non si
+   vedono mai (node e Pillow li installa il workflow): si vedono
+   **soltanto** sulla macchina a cui manca qualcosa, cioè esattamente
+   dove quelle righe esistevano per dire «questa prova non è girata».
+   Riparate una per una, dividendo il nome dal perché.
+   ⚠️ IL GIUDICE È L'ALBERO SINTATTICO, NON UNA REGEX, e qui si è
+   pagato: un primo `grep` ne trovava dieci, perché sei portano la
+   parentesi dentro la stringa — `salta("il conto dei giorni (node non
+   c'e')")` — e una regex che si ferma alla prima `)` le perde. Con
+   `ast` (che `prove.py` già importa) sono sedici. La sentinella usa
+   l'albero per la stessa ragione.
+2. **Il muro delle spunte.** 25.020 righe stampate per dire 23.901
+   volte «✓»: una rossa in mezzo a quel muro non la vede nessuno, e un
+   log che nessuno legge non protegge niente. Di serie le spunte adesso
+   **tacciono**; restano i titoli delle 458 sezioni (dove sono
+   arrivato), le **rosse**, le **saltate** e il totale. `PROVE_TUTTO=1`
+   le ridà tutte, per quando una sezione si legge riga per riga.
+   ⚠️ IL FILTRO VALE SOLO SUL «SÌ». Rosse e saltate restano a voce alta
+   sempre: è la lezione già scritta nella docstring di `salta()` — una
+   saltata sussurrata ha nascosto per mesi una prova che non girava —
+   e vale in questo verso come in quello. C'è la prova su tutt'e due.
+3. **Il `__pycache__` che arrossiva il PC.** `prove_leva_rgb`
+   raccoglieva `deploy/rgb/*` col glob nudo e apriva **tutto** come
+   file. Appena qualcosa importa quei moduli nasce
+   `deploy/rgb/__pycache__/`, che è una cartella, e la sezione esplode
+   con `IsADirectoryError`. In CI il repo è appena clonato e la cartella
+   non c'è: verde per sempre. Sul PC di chi lavora: rossa dal primo
+   giro in poi, e **non torna verde da sola**. Ora il glob tiene i soli
+   file, perché una cartella in più non è un attrezzo mancante.
+
+4. **E LO STRATO SOTTO, che si è visto solo dopo aver riparato il
+   primo.** Con le sedici `salta()` funzionanti, `prove_scoprire` ha
+   smesso di esplodere sulla chiamata e ha cominciato a esplodere
+   VENTI RIGHE DOPO, con un `UnboundLocalError` su `_blocco`: i due
+   aiuti che leggono il CSS (`_blocco`, `_num`) erano definiti DENTRO
+   il `try` del Pillow, e senza Pillow l'ImportError saltava la loro
+   definizione mentre il codice dopo l'`except` li usava. Con Pillow
+   non si vedeva mai. Sono stati tirati FUORI dal try — con Pillow non
+   c'entrano niente — e non si è messo un `return` nell'`except`
+   proprio per non buttare via le prove che Pillow non lo vogliono:
+   quella sezione, senza Pillow, da **0 prove (esplosa)** passa a **94
+   verdi e 3 saltate**; con Pillow fa 104, come prima.
+   LA LEZIONE: una riga che ripara un guasto ne scopre un altro più in
+   basso, e la saltata che funziona è quella che te lo fa vedere.
+
+**LA SENTINELLA NUOVA** (`prove_stampa_e_salti`, 11 prove) guarda quel
+che si rompe in silenzio: una spunta che torna a stampare da sola (il
+muro si rifà), una rossa o una saltata **zittita** dal filtro, una
+diciassettesima `salta()` scritta a un argomento solo, e il glob degli
+attrezzi che torna nudo.
+⚠️ E HA MORSO SE STESSA, due volte, nel modo che vale raccontare.
+(a) Per vedere che il filtro non zittisce una rossa bisogna
+**fabbricarne una**, e una rossa finta contava nei totali veri: la
+suite usciva con 1 a tutto verde, cioè la sentinella rompeva
+esattamente la cosa che deve proteggere. Ora lo scatto rimette a posto
+i tre contatori, e c'è una prova che lo dice.
+(b) La prima versione di quella prova leggeva i contatori **prima** e
+**dopo** con una `prova()` vera in mezzo — che li alzava lei — e
+accusava la rossa finta di un incremento non suo. I conti si leggono
+prima e **subito dopo** lo scatto.
+
+**COSA NON SI È TOCCATO, e il perché.**
+- **I 44 `collaudo_*.py`** hanno ognuno la sua `prova()` e stampano a
+  loro volta: comprimere anche quelli vuol dire 44 file in un colpo,
+  ed è un cantiere suo (nei «da fare»).
+- **Le righe `⚠️` del log** non sono prove: è il **codice sotto esame**
+  che parla (`no such table: payout_passi` su un database di cartone).
+  Zittirle nasconderebbe qualcosa di vero.
+- **Il file `prove.py`** resta uno da 9,1 MB e 165.000 righe, e **il
+  numero delle prove** resta 20.989: Andrea ha scelto l'output, e
+  accorpare prove è il modo di perdere copertura in silenzio.
+- **Niente installato sul PC di Andrea**: il `pip` di sistema è
+  protetto (PEP 668) e non gli si è forzata la mano. I quattro
+  pacchetti stanno in un ambiente dentro la cartella temporanea della
+  sessione, che si butta.
+
+**COSA È GIRATO SU QUALE ALBERO.** Tutto sull'albero del cantiere
+(`cantiere/prove-verdi-compresse`, su origin/main a a98538a):
+- `PROVE_SEVERE=1` con i quattro pacchetti → **24.667 passate, 0
+  fallite, 0 saltate**, uscita 0. L'output da **25.020 righe a 1.064**:
+  ventitré volte più corto, e una rossa adesso si vede.
+- Lo stesso giro **senza** i quattro pacchetti → **24.098 passate, 15
+  fallite, 36 saltate**: le rosse scendono da 18 a 15 e le sedici che
+  esplodevano adesso **saltano**, con nome e perché; le due sezioni che
+  morivano (`prove_scoprire`, `prove_strisce_web`) arrivano in fondo.
+  Le 15 che restano sono prove che vogliono Pillow o websocket **senza
+  nessuna guardia**: non sono di questo cantiere (nei «da fare»).
+- `prove_scoprire` da sola, nei due mondi: **104 verdi** con Pillow,
+  **94 verdi e 3 saltate** senza — prima, senza, erano zero.
+- La sezione nuova da sola, con `PROVE_TUTTO=1` e senza, per vedere il
+  filtro nei due versi.
+
+**DA FARE** (notati, non fatti):
+- **Il giro verde anche senza i quattro pacchetti**: restano 15 rosse,
+  tutte prove che vogliono Pillow o `websocket` senza una guardia
+  (`prove_condividi_ordine_p2p`, `prove_anteprima_avvisi_p2p`, le
+  cinque dell'insegna dal banner, i file dei loghi, le cinque sezioni
+  che importano `websocket` in cima). Ognuna vuole il suo `salta()`,
+  ed è un cantiere di pazienza: in CI non si vede niente di tutto
+  questo, perché là i quattro si installano.
+- **I 44 collaudi** stampano ancora tutto: una `prova()` condivisa (un
+  modulo solo, importato da tutti) chiuderebbe il muro anche là, e
+  toglierebbe 44 copie della stessa funzione.
+- **Il tempo del giro**: ~25 minuti in un filo solo. Le 458 sezioni si
+  possono girare in parallelo, ma prima vanno isolate quelle che
+  scrivono su file di appoggio.
+- **I quattro pacchetti di prova non sono scritti da nessuna parte nel
+  repo**: vivono solo nel workflow. Un `requirements-prove.txt` (o una
+  riga in README) direbbe a chi clona cosa gli serve per avere un
+  giro verde.
