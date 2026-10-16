@@ -66194,3 +66194,136 @@ della CI nella gabbia, due alla volta, **86 verdi, 0 rossi**.
 - La riga del journal del vuoto del cassetto («🧹 Chat P2P: il cassetto
   restituisce lo spazio…») vale per tutti e due i mondi e resta «Chat
   P2P».
+
+## Lo swap del venditore, prima tappa: la cella «Swap» dietro la leva e le aste da Esplora (16 ott 2026, cantiere swap-venditore, richiesta di Andrea)
+
+**LA DECISIONE** (Andrea, 16 ott 2026): integrare SATS Routing per far
+scegliere al venditore, al momento dell'incasso, «⚡ Lightning» o «₿
+On-chain (swap)»: uno swap Lightning → on-chain NON custodial, con un
+preventivo riga per riga prima della conferma. Il guadagno principale è
+la QUOTA DEL 10 % sulle commissioni che SATS Routing incassa sugli swap
+portati da noi (offerta di Massimo, detta ad Andrea): chi fa lo swap non
+paga niente in più. Una nostra fee (0,5 %) resta solo un'alternativa da
+confrontare, dietro una leva SPENTA. Lo studio: la voce «Gli swap di
+SATS Routing dentro Barattolo», qui sopra.
+
+**IL PIANO APPROVATO** (16 ott 2026, sera), in breve:
+1. La chiave del ritiro la crea e la tiene il TELEFONO del venditore,
+   mai il server: lo swap nasce solo quando lui tocca «Incassa
+   on-chain», ad app aperta. Noi paghiamo la fattura dello swap come un
+   payout. Se chiude l'app a metà, alla riapertura il ritiro riparte;
+   se non torna prima della scadenza, SATS Routing si riprende
+   l'on-chain, il nostro pagamento si annulla e l'incasso torna «da
+   incassare». Fino al ritiro i sats sono nostri: si perde tempo, mai
+   fondi.
+2. La chiave di recupero (12 parole) nasce e resta nel telefono, con
+   la copia proposta sempre (file o parole); MAI sul server, nemmeno
+   cifrata (regola ferrea 2: è la strada già respinta col segreto NWC).
+3. Gli stati di SATS Routing (`swap.created`, `transaction.mempool`,
+   `invoice.settled`, e i falliti `swap.expired`,
+   `transaction.failed`, `transaction.refunded`) diventano frasi corte
+   IT/EN e un avviso Telegram per il fallimento.
+4. Il preventivo legge dal vivo `/v2/swap/reverse` con l'intestazione
+   del partner: commissione, rete (lockup e claim), la nostra fee se la
+   leva è accesa, «ricevi»; arrotondamenti loro (percentuale per
+   eccesso, ricevuto per difetto), `pairHash` per non pagare una
+   tariffa cambiata. Minimo nostro proposto: 25.000 sats.
+5. La quota: 60 sats su uno swap da 100.000, 600 su 1M, 3.000 su 5M (lo
+   0,6 % di oggi × 10 %). Si conta, nel loro codice, sulla sola
+   commissione percentuale degli swap riusciti, sommata per mese
+   (`referrals.feeShare`); si legge da `/v2/referral/fees` con chiave e
+   HMAC che stanno nel config del VPS; il pagamento a noi è a mano, da
+   mettere per iscritto.
+6. La quarta cella della nav diventa «Swap» a leva accesa; le aste da
+   un tasto «🔨 Aste» in cima a Esplora e dal filtro «solo all'asta».
+7. Non cambiano P2P e Mostro, il payout Lightning (resta la scelta di
+   serie), il checkout. Con il cantiere pagamento-onchain: una scelta
+   sola, «₿ On-chain»; la strada (2-di-3 nativo o swap) la decide il
+   tipo d'ordine; il campo indirizzo si fa una volta per tutt'e due.
+8. L'ordine dei cantieri piccoli: (1) questa tappa; (2) il preventivo
+   in sola lettura; (3) il motore dello swap nel telefono e la sua
+   chiave; (4) il server che paga la fattura dello swap e sa aspettare;
+   (5) stati, avvisi e recupero; (6) il maturato della quota nel
+   pannello admin. Prima di accendere la leva: il testo firmato di
+   SATS Routing e il parere MiCA/CASP.
+   AGGIUNTA DI ANDREA PER LA TAPPA (4): un TETTO PER SWAP e un TETTO
+   TOTALE dei pagamenti appesi verso gli swap, che tengano conto del
+   tetto ACINQ di 450.000 in volo (cantiere phoenix-blocca-sats-2) e
+   della nostra uscita (oggi ~630.000), con la guardia della liquidità
+   che li conosce. Il perché: una fattura di swap è una hold invoice,
+   il nostro pagamento resta appeso fino al ritiro del venditore, e
+   ogni sats appeso lì è uscita che i payout normali non hanno.
+
+**QUESTA TAPPA, cosa fa.** Server: la leva `SWAP_ATTIVO` (False nel
+codice e nel config d'esempio), `swap_leve` in `/api/me` e solo lì, il
+gruppo «🔄 Swap» nel pannello delle leve. Client: la quarta cella cambia
+VESTITO a leva accesa (icona delle due frecce in tondo, «Swap») senza
+cambiare numero di celle; la pagina «Swap» vuota con i testi IT/EN; la
+porta «🔨 Aste ›» in Esplora, accesa solo quando la cella è dello swap.
+A leva spenta niente cambia, nemmeno un pixel: è lo stato della
+produzione. Nessuna chiamata a SATS Routing, nessun sats.
+
+**PERCHÉ COSÌ.**
+- La regola della barra («mai una cella accesa e spenta a runtime»,
+  ago 2026: era il posto dove il + si scentrava) vieta di aggiungere
+  una cella o di nasconderne una: la cella è la stessa, cambia vestito.
+  «Swap» e «Aste» hanno quattro lettere; misurato dal vivo a 375 px:
+  il + resta a 188 su 187,5 di metà.
+- La leva solo da `/api/me`: l'anonimo in vetrina non ha incassi, e
+  una seconda fonte (la busta di prima pagina, come per aste e P2P)
+  gli aprirebbe una pagina che per lui non esiste.
+- La porta delle aste FUORI dall'header: la striscia delle pillole è
+  appesa all'header (`top:100%`), e un header che cresce a runtime è
+  il difetto già pagato dei 148/154 px.
+- L'id della cella resta `nav-aste`: la prova delle celle, il CSS e
+  `voceNav` lo conoscono; rinominarlo per una leva spenta sarebbe un
+  rischio senza un guadagno.
+- L'inglese c'è solo in questa pagina: il resto dell'app è italiano,
+  e una lingua per tutta l'app è un cantiere suo (da fare, sotto).
+
+**PROVATO.**
+- `prove_swap_cella` (nuova, 23): sentinelle sulla leva (spenta, una
+  sola fonte, nel pannello, nessun «satsrouting» nel codice) e sul
+  markup; un banco node che ESEGUE `vestiCellaAste`, `toccaCellaAste`,
+  `voceNav` e `renderSwap` su un DOM di cartone: leva assente, accesa,
+  rispenta (il vestito torna al carattere), l'uscita dalla pagina a
+  leva scoperta spenta, inglese/italiano/senza Telegram. Tortura 4 su
+  4 (porta mai accesa, cella sempre aste, voceNav senza swap, inglese
+  sempre): ogni mutazione fa rossa la prova.
+- Le prove della barra, del pannello e del config d'esempio
+  (`prove_config_esempio`, `prove_interesse`, `prove_recupero_cambi`,
+  `prove_seo`, `prove_verde_e_filtri`, `prove_nav_p2p`): 666 verdi.
+- Dal vivo, server del worktree in collaudo sulla porta 8191 (la 8137
+  era di un'altra sessione: non toccata), relay del P2P al relay
+  morto, 375×812, identità 222. Leva accesa: «Swap» nella barra, il +
+  al centro, la pillola «🔨 Aste ›» sotto la riga di fiducia; tocco
+  vero su Swap → pagina col testo italiano e la cella accesa; indietro
+  di Telegram → Esplora; tocco vero sulla pillola → la vetrina delle
+  aste («Chi chiude prima», spunta accesa) con Esplora accesa nella
+  barra. Leva spenta (server riavviato): «Aste» nella barra, pillola
+  nascosta, le aste come prima con la loro cella accesa. Il config del
+  giro (copia del config d'esempio, mai quello locale) e il database
+  sono stati cancellati prima del commit.
+- UN FALSO ALLARME, scritto perché non si ripeta: ricaricando sulla
+  pagina Swap si tornava su Esplora, e ho dato la colpa alla guardia
+  di `navRendiVista` (leva non ancora arrivata letta come spenta).
+  L'ho cambiata, e la ricarica cadeva ancora su Esplora: anche
+  «Ordini» ricaricato ci cade. Dentro Telegram una ricarica riparte
+  sempre da Esplora, per ogni pagina. La guardia più prudente
+  (`swapLeve && !swapLeve.attivo`) è rimasta perché è giusta comunque;
+  i due commenti che raccontavano la prova sbagliata sono stati
+  riscritti prima del commit.
+- La suite intera ha preso UNA riga mia: `prove_introduzioni_leggibili`
+  censisce gli stili a 12,5 px in `--muted` e vuole ogni nuovo
+  guardato. La pillola è un comando (vestita come «Ordina» e «Filtro»),
+  quindi è entrata nell'elenco dei controlli col suo commento; il
+  colore non è cambiato.
+- Suite e collaudi: nel verbale del push.
+
+**DA FARE** (notati, non fatti):
+- Una lingua per tutta l'app: oggi l'inglese c'è solo nella pagina
+  Swap (`SWAP_TESTI`).
+- Le domande per Massimo da avere per iscritto (le ha Andrea in chat,
+  16 ott): percentuale, base del conto, durata, pagamento, minimo,
+  chiavi, scadenze, limiti, gestore, termini, audit, ambiente di prova.
+- La tappa (4) coi due tetti e la guardia della liquidità (sopra).

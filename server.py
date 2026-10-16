@@ -1436,6 +1436,21 @@ try:
     from config import ASTA_ABILITATA
 except ImportError:
     ASTA_ABILITATA = False         # spenta di serie: si accende dal VPS
+# LO SWAP DEGLI INCASSI (16 ott 2026, cantiere swap-venditore): il
+# venditore potra' scegliere di ricevere l'incasso in bitcoin on-chain
+# con uno swap di SATS Routing, NON custodial — la chiave del ritiro la
+# crea e la tiene il suo telefono, mai il server (CANTIERI, «Gli swap
+# di SATS Routing dentro Barattolo», e la voce di questo cantiere).
+# Questa prima tappa porta SOLO la leva, il vestito «Swap» della quarta
+# cella della nav e la pagina «Swap»: nessuna chiamata a SATS Routing,
+# nessun sats mosso. Nasce SPENTA come le aste, e in produzione resta
+# spenta finche' non ci sono il testo firmato di SATS Routing (la quota
+# del 10 %) e il parere MiCA/CASP: si accende dal config del VPS, mai
+# per effetto di un deploy.
+try:
+    from config import SWAP_ATTIVO
+except ImportError:
+    SWAP_ATTIVO = False            # spenta di serie: si accende dal VPS
 # I SERVIZI (ago 2026): la vendita di prestazioni DEFINITE — un'ora di
 # lezione, una consulenza — con un appuntamento concordato dentro
 # l'ordine. Nasce SPENTA come ASTA_ABILITATA e IMPORT_NOSTR_APERTO, e
@@ -30001,6 +30016,15 @@ def _leve_stato():
             _leva("Aste vive per venditore", "ASTA_MAX_ATTIVE_VENDITORE",
                   ASTA_MAX_ATTIVE_VENDITORE),
         ]},
+        {"gruppo": "🔄 Swap", "voci": [
+            _leva("Swap degli incassi (on-chain)", "SWAP_ATTIVO",
+                  bool(SWAP_ATTIVO),
+                  spento="nella nav il quarto tasto resta il martelletto "
+                         "delle Aste e la pagina «Swap» non si "
+                         "raggiunge. Oggi la leva non muove sats: porta "
+                         "solo la pagina, gli swap veri arrivano coi "
+                         "cantieri dopo"),
+        ]},
         {"gruppo": "📅 Servizi", "voci": [
             _leva("Servizi", "SERVIZI_ATTIVI", bool(SERVIZI_ATTIVI),
                   spento="non si pubblicano prestazioni: chi la dichiara "
@@ -42987,6 +43011,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["servizio_leve"] = {
         "attivi": bool(SERVIZI_ATTIVI),
         "max_giorni": SERVIZIO_MAX_GIORNI}
+    # ...e quella dello SWAP (16 ott 2026): decide il vestito della
+    # quarta cella della nav (Aste o Swap) e se la pagina «Swap» si
+    # raggiunge. Solo qui e non nella busta di vetrina: lo swap e' degli
+    # incassi, e l'anonimo in vetrina non incassa niente — per lui la
+    # cella resta il martelletto.
+    profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO)}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per

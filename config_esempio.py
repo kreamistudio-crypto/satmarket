@@ -701,6 +701,13 @@ SERVIZIO_MAX_APERTI = 0      # ordini servizio aperti INSIEME per chi
 # SPENTO: le aste muovono denaro vero in uscita, si accende qui con un
 # gesto consapevole guardando il primo giro (come l'import Nostr).
 ASTA_ABILITATA = False       # interruttore generale (False = spento)
+# LO SWAP DEGLI INCASSI (ott 2026): il venditore potra' ricevere
+# l'incasso in bitcoin on-chain con uno swap di SATS Routing, non
+# custodial. Acceso, il quarto tasto della nav diventa «Swap» e le
+# aste si raggiungono dal tasto «🔨 Aste» in cima a Esplora. Resta
+# SPENTO in produzione finche' non ci sono il testo firmato di SATS
+# Routing e il parere legale (MiCA/CASP).
+SWAP_ATTIVO = False          # False = la cella resta «Aste»
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

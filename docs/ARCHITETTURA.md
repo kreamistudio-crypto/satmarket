@@ -33203,3 +33203,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nella colonna di destra (da 1600 la terza) con `.con-chatsc` — niente
   `:has()`. Le prove:
   `prove_chat_mercatino`, `collaudo_chat_mercatino` (in CI).
+- LO SWAP DEGLI INCASSI, LA PRIMA TAPPA (16 ott 2026, cantiere
+  swap-venditore; perché in CANTIERI, «Lo swap del venditore, prima
+  tappa»). La leva `SWAP_ATTIVO`, SPENTA di serie (default nel server,
+  riga in `config_esempio.py`, gruppo «🔄 Swap» del pannello «⚙️ Stato
+  delle leve»), arriva al client SOLO da `/api/me` come `swap_leve:
+  {attivo}` — non dalla busta di vetrina: lo swap è degli incassi, e
+  l'anonimo non incassa. Giudice: `swapAcceso()`.
+  LA QUARTA CELLA È UNA SOLA. La regola della barra (markup statico,
+  mai una cella accesa e spenta a runtime) resta: a leva accesa
+  `vestiCellaAste()` cambia il VESTITO della stessa cella — icona ed
+  etichetta «Swap», `data-vestito` — e l'id resta `nav-aste`. Il
+  vestito di sempre si ricorda dal markup al primo giro e torna al
+  carattere se la leva si rispegne. Il tocco passa da
+  `toccaCellaAste()`: leva accesa → `vaiSwap()`, sennò `vaiAste()` come
+  prima.
+  LE ASTE A LEVA ACCESA si raggiungono dalla porta `#portaAste` («🔨
+  Aste ›»), sotto l'header di Esplora e fuori da lui (comparendo non
+  cambia l'altezza su cui è appesa la striscia delle pillole). Nasce
+  nascosta e la accende solo `vestiCellaAste`. In quel caso `voceNav`
+  accende Esplora e non la quarta cella, per il ramo aste e per
+  `astepresto`.
+  LA PAGINA `view-swap`: markup fisso con tre segnaposto, i testi li
+  scrive `renderSwap()` da `SWAP_TESTI` (it/en, l'inglese se la lingua
+  di Telegram non è l'italiano: `linguaSwap()`), chiamata da `go()` come
+  `renderInteresse` per i coming soon. Radice sorella in `RADICI`;
+  `voceNav('swap')` → `aste` (la cella). In `navRendiVista` una entry
+  `swap` ricade su Esplora solo a leva SAPUTA spenta (`swapLeve &&
+  !swapLeve.attivo`); se si scopre dopo, `vestiCellaAste` porta fuori
+  chi è sulla pagina. Nessuna chiamata a SATS Routing in questa tappa
+  (sentinella in `prove_swap_cella`).

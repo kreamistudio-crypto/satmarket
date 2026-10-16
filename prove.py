@@ -100960,6 +100960,7 @@ def prove_introduzioni_leggibili():
         ".strumenti select,.strumenti button",   # controlli
         ".p2p-leva", ".tema-pill", ".tour-salta",  # controlli
         ".giro-porta",                            # il link che riapre il tour
+        ".porta-aste",                            # la porta delle aste (16 ott 2026): un controllo, vestito come Ordina e Filtro
         ".p2p-sez-tit",                           # titoli di sezione
         ".acc-h .conta",                          # il conteggio del cassetto
         ".p2p-meta", ".p2p-box", ".order .sub",   # dati
@@ -169747,6 +169748,157 @@ def prove_stampa_e_salti():
                if not os.path.isfile(a)])
     prova("...e la riga che li raccoglie ha il filtro, non il glob nudo",
           True, 'if os.path.isfile(a))' in sorgente)
+def prove_swap_cella():
+    """LO SWAP DEGLI INCASSI, LA PRIMA TAPPA (16 ott 2026, cantiere
+    swap-venditore, richiesta di Andrea): la leva SWAP_ATTIVO nasce
+    SPENTA, arriva al client SOLO da /api/me, e a leva accesa la quarta
+    cella della nav cambia VESTITO (Swap) senza cambiare numero di
+    celle; le aste restano raggiungibili dalla porta «🔨 Aste» in cima
+    a Esplora. Le sentinelle guardano il testo; il banco node ESEGUE la
+    cella, il giudice della nav e la pagina su un DOM di cartone (una
+    chiamata dietro un ramo morto si prende solo eseguendo)."""
+    print("\n[lo swap degli incassi: la leva, la cella, la pagina]")
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- la leva: spenta nel codice, dichiarata, e un solo canale ---
+    prova("SWAP_ATTIVO nasce spenta nel server", True,
+          "    SWAP_ATTIVO = False            # spenta di serie" in src)
+    prova("...e spenta nel config d'esempio", True,
+          "\nSWAP_ATTIVO = False" in esempio)
+    prova("la leva arriva al client da /api/me", True,
+          'profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO)}' in src)
+    # SOLO da /api/me: l'anonimo in vetrina non incassa, e una seconda
+    # fonte (la busta di prima pagina) sarebbe una porta a uno swap che
+    # per lui non esiste
+    prova("...e solo da li' (niente busta di vetrina)", 1,
+          src.count("swap_leve"))
+    prova("il pannello «Stato delle leve» la mostra", True,
+          '_leva("Swap degli incassi (on-chain)", "SWAP_ATTIVO",' in src)
+    # questa tappa non parla con nessuno: niente SATS Routing ne' nel
+    # server ne' nel client, finche' non arrivano i cantieri dopo
+    prova("nessuna chiamata a SATS Routing in questa tappa", (0, 0),
+          (src.lower().count("satsrouting"),
+           mini.lower().count("satsrouting")))
+
+    # --- il markup: la cella e' la stessa, la porta nasce nascosta ---
+    prova("la quarta cella passa dal giudice", True,
+          '<button id="nav-aste" onclick="toccaCellaAste()">' in mini)
+    prova("...e il suo vestito di sempre e' ancora il martelletto", True,
+          '</svg></span>Aste</button>' in mini)
+    i_esp = mini.index('id="view-esplora"')
+    i_hdr = mini.index("</header>", i_esp)
+    i_porta = mini.index('id="portaAste"')
+    prova("la porta delle aste sta in Esplora, sotto l'header", True,
+          i_hdr < i_porta < mini.index('id="fasciaTest"'))
+    prova("...nasce nascosta e porta alle aste", True,
+          'onclick="vaiAste()" style="display:none">🔨 Aste' in mini)
+    prova("la pagina «Swap» esiste ed e' una radice sorella", (True, True),
+          ('<div class="view" id="view-swap">' in mini,
+           "'swap'," in pezzo_js(mini, "const RADICI = new Set(", "]);")))
+    # SOLO a leva che SAPPIAMO spenta: una entry si puo' rileggere
+    # prima che arrivi /api/me, e col giudice nudo (`!swapAcceso()`)
+    # «non ancora arrivata» varrebbe «spenta»
+    _nrv = pezzo_js(mini, "function navRendiVista(b){", "\n}\n")
+    prova("dalla cronologia, a leva spenta, la pagina non si riapre", True,
+          "if (b.v === 'swap' && swapLeve && !swapLeve.attivo) return go('esplora');"
+          in _nrv)
+    prova("...ma a leva non ancora arrivata non si esce",
+          False, "if (b.v === 'swap' && !swapAcceso())" in _nrv)
+    prova("go() scrive i testi della pagina da ogni strada", True,
+          "if (view==='swap') renderSwap();" in mini)
+    prova("/api/me veste la cella", True,
+          "swapLeve = me.swap_leve || null;\r\n    vestiCellaAste();" in mini
+          or "swapLeve = me.swap_leve || null;\n    vestiCellaAste();" in mini)
+
+    # --- il banco: la cella, il giudice della nav, la pagina ---
+    blocco = pezzo_js(mini, "/* LO SWAP DEGLI INCASSI, la prima tappa",
+                      "function vaiAste(){")
+    voce = pezzo_js(mini, "function voceNav(view){", "\n}") + "\n}\n"
+    cella0 = pezzo_js(mini, '<button id="nav-aste"', "</button>")
+    cella0 = cella0[cella0.index(">") + 1:]
+    js = r"""
+const ELS = {};
+function el(id){ return ELS[id] || null; }
+ELS['nav-aste'] = {innerHTML: %s, dataset: {}, style: {}};
+ELS['portaAste'] = {style: {display: 'none'}};
+let swapAttiva = false;
+ELS['view-swap'] = {classList: {contains: () => swapAttiva}};
+for (const k of ['swapTitolo','swapTesto','swapVuoto']) ELS[k] = {textContent: ''};
+let viste = [], aste = 0, ramoVetrina = 'esplora';
+function go(v){ viste.push(v); }
+function haptic(){}
+function navRiflette(){}
+function vaiAste(){ aste++; }
+let tg = {initDataUnsafe: {user: {language_code: ''}}};
+%s
+%s
+const out = {};
+const originale = ELS['nav-aste'].innerHTML;
+// leva assente: la cella resta il martelletto, la porta nascosta
+vestiCellaAste();
+toccaCellaAste();
+out.spento = [ELS['nav-aste'].innerHTML === originale,
+              ELS['portaAste'].style.display, aste, viste.length];
+out.voceSpento = [voceNav('swap'), voceNav('astepresto'),
+                  (ramoVetrina = 'aste', voceNav('esplora'))];
+ramoVetrina = 'esplora';
+// leva accesa: stessa cella, vestito Swap, porta accesa
+swapLeve = {attivo: true};
+vestiCellaAste();
+toccaCellaAste();
+out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span>Swap'),
+              ELS['nav-aste'].dataset.vestito,
+              ELS['portaAste'].style.display, aste, viste.slice()];
+out.voceAcceso = [voceNav('swap'), voceNav('astepresto'),
+                  (ramoVetrina = 'aste', voceNav('esplora'))];
+// leva rispenta: torna il vestito di prima, al carattere
+swapLeve = {attivo: false};
+vestiCellaAste();
+out.rispento = [ELS['nav-aste'].innerHTML === originale,
+                ELS['portaAste'].style.display];
+// la leva risulta spenta mentre si e' sulla pagina Swap: si esce
+viste = []; swapAttiva = true;
+vestiCellaAste();
+out.uscita = viste.slice();
+// ...e da un'altra pagina, a leva spenta, nessuno si muove
+viste = []; swapAttiva = false;
+vestiCellaAste();
+out.ferma = viste.length;
+// i testi: inglese con Telegram in un'altra lingua, italiano senza
+tg.initDataUnsafe.user.language_code = 'en';
+renderSwap();
+out.en = [ELS['swapTitolo'].textContent, ELS['swapVuoto'].textContent];
+tg.initDataUnsafe.user.language_code = 'it-IT';
+renderSwap();
+out.it = ELS['swapVuoto'].textContent;
+tg = undefined;
+renderSwap();
+out.senza = ELS['swapVuoto'].textContent;
+console.log(JSON.stringify(out));
+""" % (json.dumps(cella0), voce, blocco)
+    r = _node_banco(js)
+    if r is None:
+        salta("il banco della cella dello swap", "node non c'e'")
+        return
+    prova("a leva assente la cella resta il martelletto e porta alle aste",
+          [True, "none", 1, 0], r.get("spento"))
+    prova("...e la nav accende le aste come sempre",
+          ["aste", "aste", "aste"], r.get("voceSpento"))
+    prova("a leva accesa la STESSA cella si veste da Swap e apre la pagina",
+          [True, "swap", "", 1, ["swap"]], r.get("acceso"))
+    prova("...e le aste, raggiunte dalla porta, accendono Esplora",
+          ["aste", "esplora", "esplora"], r.get("voceAcceso"))
+    prova("a leva rispenta torna il vestito di prima, al carattere",
+          [True, "none"], r.get("rispento"))
+    prova("...e chi era sulla pagina «Swap» esce su Esplora",
+          (["esplora"], 0), (r.get("uscita"), r.get("ferma")))
+    prova("i testi in inglese per Telegram in un'altra lingua",
+          ["Swap", "No swaps yet."], r.get("en"))
+    prova("...in italiano per l'italiano e senza Telegram",
+          ["Per ora non hai nessuno swap.", "Per ora non hai nessuno swap."],
+          [r.get("it"), r.get("senza")])
 
 
 def prove_modifica_massiva():
@@ -171191,7 +171343,7 @@ def main():
               prove_pagina_scambio_ridisegno,
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
-              prove_servizi,
+              prove_servizi, prove_swap_cella,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,

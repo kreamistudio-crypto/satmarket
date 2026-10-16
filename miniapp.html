@@ -899,6 +899,15 @@
     padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text);
     border:0;background:none;font-family:inherit;width:100%;cursor:pointer}
   .trust-line .fr{font-size:15px;line-height:1;opacity:.75}
+  /* La porta delle aste (16 ott 2026): una pillola piccola sotto
+     l'header, coi colori dei comandi di vetrina — non e' una notizia,
+     e' una strada */
+  .porta-aste{display:flex;align-items:center;gap:6px;margin:8px auto 0;
+    padding:6px 14px;font:800 12.5px/1.2 Nunito,sans-serif;
+    color:var(--muted);background:var(--card);border:1.5px solid var(--line);
+    border-radius:999px;cursor:pointer}
+  .porta-aste .fr{font-size:15px;line-height:1;opacity:.75}
+  .swap-vuoto{display:block;margin-top:10px;font-weight:700}
 
   /* ---------- strumenti di vetrina (ordina + filtri) ---------- */
   .strumenti{display:flex;gap:8px;align-items:center;justify-content:flex-end;
@@ -11362,6 +11371,16 @@ document.getElementById('cartello')?.remove();</script>
            dettaglio e sopra il Profilo. -->
       <div class="chips" id="chips"></div>
     </header>
+    <!-- LA PORTA DELLE ASTE (16 ott 2026, cantiere swap-venditore):
+         quando la leva dello swap e' accesa il quarto tasto della nav
+         diventa «Swap», e le aste si raggiungono da qui. Nasce nascosta
+         e la accende SOLO vestiCellaAste(): a leva spenta il
+         martelletto e' ancora nella nav, e due porte per la stessa
+         pagina sarebbero una di troppo. Fuori dall'header apposta:
+         comparendo non cambia l'altezza su cui e' appesa la striscia
+         delle pillole. -->
+    <button type="button" class="porta-aste" id="portaAste"
+            onclick="vaiAste()" style="display:none">🔨 Aste <span class="fr">›</span></button>
     <!-- La porta fissa al canale durante il rodaggio: la riempie
          renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
     <div id="fasciaTest" style="display:none"></div>
@@ -11662,6 +11681,21 @@ document.getElementById('cartello')?.remove();</script>
        l'immagine non arriva) — nessun token nuovo, quindi chiaro e
        scuro vengono gratis. Vale anche in DEMO e in vetrina anonima:
        la' la leva non arriva e questa e' la risposta onesta. -->
+  <!-- LA PAGINA «SWAP» (16 ott 2026, cantiere swap-venditore, prima
+       tappa): qui vivranno gli incassi ricevuti on-chain con uno swap
+       e il loro recupero. Oggi e' la pagina vuota, e ci si arriva solo
+       a leva accesa (toccaCellaAste). MARKUP FISSO e segnaposto vuoti:
+       i testi li scrive renderSwap() con textContent, in italiano o in
+       inglese (SWAP_TESTI). Riusa lo stato vuoto di casa, come i
+       «coming soon». -->
+  <div class="view" id="view-swap">
+    <div class="empty" style="padding-top:34px">
+      <div class="big">🔄</div>
+      <b class="empty-title" id="swapTitolo"></b>
+      <span id="swapTesto"></span>
+      <span id="swapVuoto" class="swap-vuoto"></span>
+    </div>
+  </div>
   <div class="view" id="view-astepresto">
     <div class="empty" style="padding-top:34px">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -13931,7 +13965,7 @@ document.getElementById('cartello')?.remove();</script>
          convenzione della nav non cambia. Inchiostro dentro [2,22],
          la mano di tagliaSVG. -->
     <div class="nav-cella nav-lato">
-    <button id="nav-aste" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
+    <button id="nav-aste" onclick="toccaCellaAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M2.8 8.4L8.4 2.8l2.9 2.9-5.6 5.6z"/><path d="M9.6 9.6l8 8"/><path d="M12.6 20.4h7.2"/></svg></span>Aste</button>
     <!-- I miei scambi: le DUE FRECCE dello scambio, andata e ritorno —
          niente velo perche' non c'e' una pancia da riempire, come
          non ce l'ha il tratto della lente. Dentro: gli ordini
@@ -17584,7 +17618,11 @@ function voceNav(view){
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
-  else if (view === 'astepresto') view = 'aste';
+  else if (view === 'astepresto') view = swapAcceso() ? 'esplora' : 'aste';
+  /* LA PAGINA «SWAP» (16 ott 2026) accende la quarta cella, che a leva
+     accesa e' vestita da Swap — l'id resta nav-aste, la cella e' la
+     stessa (vestiCellaAste) */
+  else if (view === 'swap') view = 'aste';
   /* ...e il gemello del P2P accende la sua: stessa ragione */
   else if (view === 'p2ppresto') view = 'p2p';
   /* nella nav trasformata (set 2026) il libro accende «Libro ordini»
@@ -17601,7 +17639,9 @@ function voceNav(view){
      vero finche' il reparto si apriva da UN ALTRO TAB; adesso si apre
      dalla home, quindi «Esplora» e' la verita' — e a dire che e'
      filtrata c'e' la pillola accesa, appiccicata in cima. */
-  return (view === 'esplora' && ramoVetrina === 'aste')
+  /* ...ma a leva dello swap accesa la quarta cella dice «Swap»: le aste
+     ci si arrivano dalla porta in Esplora, e la voce giusta e' Esplora */
+  return (view === 'esplora' && ramoVetrina === 'aste' && !swapAcceso())
     ? ramoVetrina : view;
 }
 
@@ -17612,6 +17652,73 @@ function voceNav(view){
    rimette anche filtro e ordinamento com'erano: il tab li aveva
    accesi lui. Radice sorella: l'indietro passa da Esplora, la
    convenzione di casa. */
+/* LO SWAP DEGLI INCASSI, la prima tappa (16 ott 2026, cantiere
+   swap-venditore). La leva viene SOLO da /api/me (`swap_leve`): lo
+   swap e' degli incassi, e l'anonimo in vetrina non incassa — per lui,
+   in DEMO e a leva spenta il giudice dice no e la cella resta il
+   martelletto. */
+let swapLeve = null;          // da /api/me.swap_leve: {attivo}
+const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
+/* LA QUARTA CELLA, UNA SOLA (la regola della barra: mai una cella
+   accesa e spenta a runtime, era il posto dove il + si scentrava). A
+   leva accesa la stessa cella cambia VESTITO — icona ed etichetta —
+   e l'id resta nav-aste; «Swap» e «Aste» hanno le stesse quattro
+   lettere, e la larghezza non si muove. Il vestito di sempre si
+   ricorda dal markup al primo giro, cosi' una leva rispenta torna
+   indietro senza una seconda copia del martelletto da tenere uguale. */
+let cellaAsteMarkup = null;
+const CELLA_SWAP = '<span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true">'
+  + '<path d="M18.6 9.4A7 7 0 0 0 6.3 7.6"/><path d="M5.4 14.6a7 7 0 0 0 12.3 1.8"/>'
+  + '<path d="M6.3 3.8v3.8h3.8"/><path d="M17.7 20.2v-3.8h-3.8"/></svg></span>Swap';
+function vestiCellaAste(){
+  const b = el('nav-aste');
+  if (!b) return;
+  if (cellaAsteMarkup === null) cellaAsteMarkup = b.innerHTML;
+  const vestito = swapAcceso() ? 'swap' : 'aste';
+  if (b.dataset.vestito !== vestito) {
+    b.innerHTML = vestito === 'swap' ? CELLA_SWAP : cellaAsteMarkup;
+    b.dataset.vestito = vestito;
+  }
+  /* la porta delle aste in Esplora vive solo quando la cella non e'
+     piu' loro: due porte per la stessa pagina sarebbero una di troppo */
+  const p = el('portaAste');
+  if (p) p.style.display = vestito === 'swap' ? '' : 'none';
+  /* ...e se la leva risulta spenta mentre si e' sulla pagina «Swap»
+     (una ricarica, una entry della cronologia), si esce su Esplora:
+     la pagina vive solo a leva accesa */
+  if (vestito === 'aste' && el('view-swap')?.classList.contains('active'))
+    go('esplora');
+}
+function toccaCellaAste(){
+  if (swapAcceso()) { vaiSwap(); return; }
+  vaiAste();
+}
+function vaiSwap(){
+  haptic();
+  go('swap');
+  if (typeof navRiflette === 'function') navRiflette();
+}
+/* I TESTI DELLA PAGINA, in italiano e in inglese (richiesta di Andrea):
+   l'inglese per chi ha Telegram in un'altra lingua. Corti, una frase
+   per gesto (la regola dei riquadri). */
+const SWAP_TESTI = {
+  it: {titolo: 'Swap',
+       testo: 'Qui troverai gli incassi che ricevi in bitcoin on-chain, con uno swap fatto dal tuo telefono.',
+       vuoto: 'Per ora non hai nessuno swap.'},
+  en: {titolo: 'Swap',
+       testo: 'Here you will find the payouts you receive in on-chain bitcoin, through a swap made from your phone.',
+       vuoto: 'No swaps yet.'}};
+function linguaSwap(){
+  let l = '';
+  try { l = String(tg?.initDataUnsafe?.user?.language_code || ''); } catch(e){}
+  return (!l || l.toLowerCase().startsWith('it')) ? 'it' : 'en';
+}
+function renderSwap(){
+  const t = SWAP_TESTI[linguaSwap()];
+  if (el('swapTitolo')) el('swapTitolo').textContent = t.titolo;
+  if (el('swapTesto')) el('swapTesto').textContent = t.testo;
+  if (el('swapVuoto')) el('swapVuoto').textContent = t.vuoto;
+}
 function vaiAste(){
   haptic();
   /* A LEVA SPENTA IL TASTO NON MENTE: porta a una pagina che dice
@@ -17804,6 +17911,9 @@ function go(view){
      go(b.v) generico di navRendiVista e da vaiP2P non passano mai.
      Qui invece ci passa ogni strada. */
   if (view==='p2ppresto' || view==='astepresto') renderInteresse();
+  /* ...e la pagina «Swap» (16 ott 2026), per la stessa ragione: ci si
+     torna anche dalla cronologia, che da toccaCellaAste non passa */
+  if (view==='swap') renderSwap();
   /* la pagina vera dello scambio (set 2026): il libro si ridisegna QUI
      per la ragione delle due sorelle — ci si torna anche dalla
      cronologia, e da vaiP2P non si passa. renderP2P dipinge ENTRAMBI
@@ -18024,6 +18134,9 @@ const RADICI = new Set(['esplora','vendi','affari','profilo',
      radici sorelle — si SOSTITUISCE come le altre e l'indietro passa
      da Esplora, mai un gradino che intrappola */
   'astepresto','p2ppresto',
+  /* la pagina «Swap» (16 ott 2026): ci si arriva dalla quarta cella,
+     quindi radice sorella come le altre */
+  'swap',
   /* la pagina vera dello scambio (set 2026): radice sorella come il
      suo coming soon, che resta per chi ha la leva spenta */
   'p2p',
@@ -18709,6 +18822,14 @@ function navRendiVista(b){
      dell'offerta sul carrello e' morto col foglio vero, ma una entry
      gia' scritta puo' ancora nominarlo — stessa degradazione. */
   if (b.v === 'offertapresto') return go('esplora');
+  /* ...e la pagina «Swap» con la leva spenta nel frattempo: una entry
+     della cronologia non riapre una porta che il server ha chiuso. Solo
+     se lo SAPPIAMO: una entry si puo' rileggere prima che /api/me porti
+     la leva, e «non ancora arrivata» non e' «spenta». Se si scopre
+     dopo, ci pensa vestiCellaAste. (Dentro Telegram una ricarica
+     riparte comunque da Esplora, per ogni pagina: visto dal vivo il 16
+     ott anche su «Ordini».) */
+  if (b.v === 'swap' && swapLeve && !swapLeve.attivo) return go('esplora');
   go(b.v);
 }
 
@@ -84383,6 +84504,10 @@ async function avvia(){
     aggiornaBottoneMM();
     astaLeve = me.asta_leve || null;
     aggiornaAstaVisibilita();
+    /* ...e quella dello swap (16 ott 2026): veste la quarta cella e
+       accende la porta delle aste in Esplora */
+    swapLeve = me.swap_leve || null;
+    vestiCellaAste();
     /* la leva dello scambio P2P per chi e' dentro: la prima delle due
        fonti di p2pAcceso, il calco di astaLeve */
     p2pLeve = me.p2p_leve || null;
