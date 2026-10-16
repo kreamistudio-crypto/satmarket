@@ -59405,8 +59405,17 @@ EXPORT_BTC = [
 # non si fida del codice che gli arriva dal nostro VPS puo' CONTROLLARE
 # invece di crederci. Cambiarla a mano senza rifare il bundle e' il
 # gesto che questa riga esiste per rendere visibile.
-IMPRONTA_BTC = \
-    "e8e936915bc05165904e99bdc784ce071831c700f440106fd765c416710d68af"
+#
+# ⚠️ SPEZZATA IN DUE, e non e' un vezzo: lo scanner dei segreti della
+# CI cerca `[0-9a-f]{64}` in ogni file fuori da `vendor/`, e un sha256
+# intero ha esattamente quella forma — la prima versione di questa riga
+# ha fatto ROSSA la CI su main. E' il trattamento che il workflow
+# dichiara per gli sha256 e per il vettore della NIP-49 («in prove.py
+# oggi sta spezzato in due»). Il valore intero, essendo gia' entrato
+# nella storia con 4cadba8, ha anche la sua eccezione per VALORE in
+# `CARTONE_HEX`: la storia non si riscrive.
+IMPRONTA_BTC = ("e8e936915bc05165904e99bdc784ce07"
+                "1831c700f440106fd765c416710d68af")
 
 
 def prove_bundle_bitcoin():
@@ -146878,6 +146887,125 @@ console.log(JSON.stringify(out));
           anello("chiaro", set(o["p2pFatto"][0]), ("display",)).get("display"))
 
 
+def prove_cancello_onchain():
+    """IL CANCELLO DELL'ON-CHAIN, PRIMA DELLE PORTE (16 ott 2026,
+    cantiere pagamento-onchain, decisione di Andrea: «i pagamenti
+    on-chain al momento abilitali solo agli admin, Alan e Andrea»).
+
+    Due leve perche' sono due decisioni: `ONCHAIN_ATTIVO` dice se la
+    funzione esiste, `ONCHAIN_SOLO_ADMIN` per chi. Tutt'e due nascono
+    nel verso piu' chiuso, e si accendono con una riga nel config del
+    VPS — mai per effetto di un deploy.
+
+    QUEL CHE SI ROMPE IN SILENZIO, e che queste righe guardano:
+    1. una porta che nasce senza cancello. Oggi non esiste nessuna
+       rotta `/api/onchain/*`; il giorno che nasce la prima, se non
+       passa da `onchain_ammesso` questa prova diventa rossa. E' il
+       motivo per cui il cancello si scrive PRIMA: una guardia che
+       arriva dopo la porta e' una guardia che qualcuno dimentica.
+    2. la porticina laterale. A leva madre spenta il no vale per
+       CHIUNQUE, admin compresi: e' la lezione gia' scritta in
+       `rgb_ammesso`, e qui c'e' la prova che vale anche per 999.
+    3. il default che si rovescia da solo. Se un domani
+       `ONCHAIN_SOLO_ADMIN` nascesse True nel config ma False nel
+       codice, un VPS senza quella riga aprirebbe a tutti senza che
+       nessuno l'abbia deciso: il default del codice e' il piu'
+       chiuso, e lo si chiede qui.
+
+    Il giudice `e_admin` non si riprova (ha le sue prove): nel banco
+    gli si mette uno di cartone che conosce solo il 999, cosi' si
+    guarda il CANCELLO e non lui."""
+    import types
+    print("\n⛓️ Il cancello dell'on-chain")
+    src = _SORGENTE
+    i = src.index("# IL CANCELLO DELL'ON-CHAIN (16 ott 2026")
+    blocco = src[i:src.index("# IL NIP-05 DI CASA (ott 2026)", i)]
+    cod = codice(blocco)
+
+    # 1) le due leve nascono chiuse e si leggono dal config
+    prova("ONCHAIN_ATTIVO nasce False nel codice", True,
+          "except ImportError:\n    ONCHAIN_ATTIVO = False" in cod)
+    prova("ONCHAIN_SOLO_ADMIN nasce True: il default e' il piu' chiuso",
+          True, "except ImportError:\n    ONCHAIN_SOLO_ADMIN = True" in cod)
+    prova("...e tutt'e due si leggono dal config col pattern di casa",
+          [True, True],
+          ["from config import ONCHAIN_ATTIVO" in cod,
+           "from config import ONCHAIN_SOLO_ADMIN" in cod])
+    cfg = open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read()
+    for riga in ("ONCHAIN_ATTIVO = False", "ONCHAIN_SOLO_ADMIN = True"):
+        prova(f"il config d'esempio dice `{riga}`", True, riga in cfg)
+
+    # 2) il cancello ESEGUITO, con un e_admin di cartone
+    def esegui(**config):
+        finto = types.ModuleType("config")
+        for k, v in config.items():
+            setattr(finto, k, v)
+        vero = sys.modules.get("config")
+        sys.modules["config"] = finto
+        amb = {"__builtins__": __builtins__,
+               # di cartone: conosce solo il 999, come il collaudo
+               "e_admin": lambda tg_id: tg_id == 999}
+        try:
+            exec(cod, amb)
+        finally:
+            if vero is not None:
+                sys.modules["config"] = vero
+            else:
+                del sys.modules["config"]
+        return amb
+
+    a = esegui()
+    prova("senza config: tutt'e due le leve nel verso chiuso",
+          (False, True), (a["ONCHAIN_ATTIVO"], a["ONCHAIN_SOLO_ADMIN"]))
+    prova("...e il cancello dice no a chiunque, 999 COMPRESO (niente "
+          "porticina laterale)", False,
+          any(a["onchain_ammesso"](x) for x in (111, 222, 999, "999", None)))
+    b = esegui(ONCHAIN_ATTIVO=True)
+    prova("accesa la madre, con SOLO_ADMIN di serie: passa solo l'admin",
+          [True, False, False],
+          [b["onchain_ammesso"](999), b["onchain_ammesso"](111),
+           b["onchain_ammesso"](222)])
+    c = esegui(ONCHAIN_ATTIVO=True, ONCHAIN_SOLO_ADMIN=False)
+    prova("...e spenta la seconda (il giorno che la beta si allarga) "
+          "passano tutti", [True, True, True],
+          [c["onchain_ammesso"](111), c["onchain_ammesso"](222),
+           c["onchain_ammesso"](999)])
+    d = esegui(ONCHAIN_ATTIVO=False, ONCHAIN_SOLO_ADMIN=False)
+    prova("la madre spenta VINCE sulla seconda: no anche a leva aperta",
+          False, any(d["onchain_ammesso"](x) for x in (111, 999)))
+
+    # 3) nessuna porta senza cancello (oggi: nessuna porta)
+    rotte = re.findall(
+        r'@app\.(?:get|post|put|delete)\("(/api/onchain/[^"]*)"', src)
+    prova("oggi non esiste nessuna rotta /api/onchain/*", [], rotte)
+    # il conto che conta: ogni rotta on-chain che nascera' deve nominare
+    # il cancello nel suo corpo. Vuoto == vuoto oggi, e il giorno della
+    # prima porta questa riga diventa la guardia vera.
+    senza = []
+    for r in rotte:
+        i_r = src.index(f'"{r}"')
+        resto = src[i_r:]
+        corpo = resto[:resto.index("\n@app.")] if "\n@app." in resto else resto
+        if "onchain_ammesso" not in corpo:
+            senza.append(r)
+    prova("...e ogni rotta on-chain di domani passa da `onchain_ammesso`",
+          [], senza)
+    # il giudice e' UNO: due `onchain_ammesso` sarebbero due regole, e
+    # la seconda la aggiornerebbe qualcuno un giorno e l'altra no.
+    # L'ancora della lezione e' una frase CORTA, che sta su una riga
+    # anche dopo un riaccapo della docstring (la prima versione cercava
+    # la frase intera e si e' rotta sull'andare a capo).
+    prova("il cancello e' UNO e porta scritta la lezione della porticina",
+          [1, True],
+          [src.count("def onchain_ammesso(tg_id) -> bool:"),
+           "porticina laterale non e' un cancello" in src])
+    # il pannello delle leve dice i valori VIVI, come per ogni altra
+    prova("il pannello «Stato delle leve» mostra tutt'e due le leve",
+          [True, True],
+          ['_leva("Pagamento on-chain", "ONCHAIN_ATTIVO"' in src,
+           '_leva("Solo gli admin", "ONCHAIN_SOLO_ADMIN"' in src])
+
+
 def prove_leva_rgb():
     """LA LEVA RGB E IL NIP-05 DI CASA (8 ott 2026): il solo cancello
     dell'hackathon di Torino, prima dell'evento. Nasce spento, si legge
@@ -167514,6 +167642,7 @@ def main():
     prove_p2p_velo_pubblica,
     prove_p2p_barattozon,
     prove_p2p_paycode,
+    prove_cancello_onchain,
     prove_leva_rgb,
     prove_annuncio_identita,
     prove_mutinynet_prep,

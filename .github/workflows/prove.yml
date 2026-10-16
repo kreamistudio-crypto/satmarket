@@ -328,7 +328,17 @@ jobs:
       # prefisso di 16; in prove.py oggi sta spezzato in due, e l'albero
       # e' pulito anche SENZA questa eccezione (provato in locale sui
       # due passi).
-      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g'
+      # E L'IMPRONTA DEL BUNDLE BITCOIN (16 ott 2026, cantiere
+      # pagamento-onchain): lo sha256 di `vendor/btc.bundle.js`, che
+      # `prove.py` confronta a ogni giro perche' chi non si fida del
+      # codice servito dal VPS possa CONTROLLARE invece di crederci.
+      # E' un'impronta pubblica di un file pubblico — il contrario di
+      # un segreto —, ma ha la forma di una chiave e con 4cadba8 e'
+      # entrata intera nella storia: stesso trattamento degli altri
+      # sha256, per VALORE col prefisso di 16. Nell'albero di oggi sta
+      # SPEZZATA IN DUE in prove.py, quindi questa eccezione serve
+      # soltanto alla cronologia (provato in locale sui due passi).
+      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g;s/\b3501454135014541[0-9a-f]{48}\b//g;s/\be8e936915bc05165[0-9a-f]{48}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5

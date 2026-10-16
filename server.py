@@ -30240,6 +30240,24 @@ def _leve_stato():
                          "qualunque del coro, anche di uno da cui il "
                          "coordinator non legge"),
         ]},
+        {"gruppo": "⛓️ Pagamento on-chain", "voci": [
+            # IL CANCELLO E LA SUA PORTICINA (16 ott 2026): due leve
+            # perche' dicono due cose diverse — se la funzione esiste, e
+            # per chi. Oggi non c'e' nessuna rotta da aprire: il
+            # cancello nasce prima delle porte.
+            _leva("Pagamento on-chain", "ONCHAIN_ATTIVO",
+                  bool(ONCHAIN_ATTIVO),
+                  acceso="le rotte /api/onchain/* rispondono e la scelta "
+                         "«₿ On-chain» compare (a chi è ammesso)",
+                  spento="esiste solo Lightning, come ieri: nessuna rotta "
+                         "on-chain, nessun foglio, nemmeno per gli admin"),
+            _leva("Solo gli admin", "ONCHAIN_SOLO_ADMIN",
+                  bool(ONCHAIN_SOLO_ADMIN),
+                  acceso="l'on-chain lo vedono solo i moderatori "
+                         "(ADMIN_IDS): è la beta chiusa di Andrea e Alan",
+                  spento="appena ONCHAIN_ATTIVO si accende vale per "
+                         "chiunque: è il gesto che allarga la beta"),
+        ]},
         {"gruppo": "🪙 Punti e dollari su RGB (hackathon)", "voci": [
             # IL CANCELLO DELL'HACKATHON (ott 2026): la riga chiede al
             # giudice `_rgb_leve()` come fa il P2P, cosi' il giorno in
@@ -46831,6 +46849,55 @@ def rgb_ammesso(tg_id) -> bool:
         return int(tg_id) in RGB_PROVA_IDS
     except (TypeError, ValueError):
         return False
+
+
+# IL CANCELLO DELL'ON-CHAIN (16 ott 2026, cantiere pagamento-onchain).
+# Lo studio — il 2-di-3 non custodial, le chiavi nel browser, la beta a
+# 250 euro — sta in CANTIERI, «Il pagamento on-chain come opzione». Qui
+# c'e' il SOLO cancello, sul calco di RGB, e oggi non ha nessuna porta
+# da guardare: non esiste una rotta `/api/onchain/*` ne' un foglio.
+# Nasce spento, si accende con una riga nel config del VPS e mai per
+# effetto di un deploy.
+try:
+    from config import ONCHAIN_ATTIVO
+except ImportError:
+    ONCHAIN_ATTIVO = False
+# La decisione di Andrea del 16 ott 2026: anche a funzione accesa, per
+# ora l'on-chain lo vedono SOLO i moderatori — cioe' lui e Alan, che
+# stanno in ADMIN_IDS del VPS. Nasce True, che e' il verso chiuso: un
+# VPS che non dichiara la riga non apre a nessuno per distrazione.
+try:
+    from config import ONCHAIN_SOLO_ADMIN
+except ImportError:
+    ONCHAIN_SOLO_ADMIN = True
+
+
+def onchain_ammesso(tg_id) -> bool:
+    """CHI PUO' PAGARE ON-CHAIN (16 ott 2026, decisione di Andrea: «i
+    pagamenti on-chain al momento abilitali solo agli admin, Alan e
+    Andrea»). Sul calco di `rgb_ammesso`, con la stessa lezione: a leva
+    madre spenta e' no per CHIUNQUE, admin compresi — un cancello con
+    una porticina laterale non e' un cancello.
+
+    DUE LEVE E NON UNA, perche' dicono due cose diverse:
+    `ONCHAIN_ATTIVO` e' «la funzione esiste», `ONCHAIN_SOLO_ADMIN` e'
+    «e per ora la vedono solo loro due». Accendere la prima lasciando
+    la seconda apre a due persone, che e' il gesto che Andrea ha
+    chiesto; spegnere la seconda e' il gesto SEPARATO del giorno in cui
+    la beta si allarga, e vuole la sua riga nel config del VPS.
+    ⚠️ ADMIN = `ADMIN_IDS` del VPS, dove Andrea e Alan stanno gia'
+    (verificato da Andrea, vedi `e_admin_bot`): nessuna lista nuova da
+    tenere in pari, e nessun id scritto nel codice.
+
+    Ogni rotta `/api/onchain/*` di domani comincia da qui — oggi
+    nessuna esiste, e una prova pretende che resti vero: il cancello
+    nasce PRIMA delle porte, cosi' non c'e' il giorno in cui una porta
+    nasce senza passare da lui."""
+    if not ONCHAIN_ATTIVO:
+        return False
+    if ONCHAIN_SOLO_ADMIN:
+        return e_admin(tg_id)
+    return True
 
 
 # IL NIP-05 DI CASA (ott 2026): i nomi che /.well-known/nostr.json

@@ -1050,6 +1050,20 @@ DB = "satmarket.db"
 # docs/STUDIO-HACKATHON-RGB-2026-10.md (parte seconda) e la lista di
 # cosa si prepara prima in docs/HACKATHON-SETUP.md (sezione 10).
 RGB_ATTIVO = False
+# ── IL PAGAMENTO ON-CHAIN (16 ott 2026): il cancello, e niente altro.
+# Lo studio — il 2-di-3 non custodial, le chiavi nel browser, la beta a
+# 250 euro — sta in docs/CANTIERI.md, «Il pagamento on-chain come
+# opzione». Oggi NON esiste nessuna rotta /api/onchain/* e nessun
+# foglio: queste due righe sono il cancello che nasce PRIMA delle
+# porte, cosi' il giorno in cui la prima porta si apre deve passare da
+# qui per forza (lo pretende una prova). Spento e' no per CHIUNQUE,
+# admin compresi.
+ONCHAIN_ATTIVO = False
+# ...e la decisione di Andrea del 16 ott: anche a funzione accesa, per
+# ora l'on-chain lo vedono SOLO i moderatori di ADMIN_IDS — cioe' lui e
+# Alan. Spegnere questa riga e' il gesto SEPARATO del giorno in cui la
+# beta si allarga: due leve perche' sono due decisioni.
+ONCHAIN_SOLO_ADMIN = True
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

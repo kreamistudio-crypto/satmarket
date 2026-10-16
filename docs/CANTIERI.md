@@ -63530,3 +63530,107 @@ PROVATO, nel worktree (sopra 7e0b330):
   (oggi resta com'era).
 - I «presi» degli scambi ancora in corso (entrano quando si chiudono).
 - La favicon di `/admin` dà 404 (c'era già).
+
+## Il cancello dell'on-chain, prima delle porte: due leve, solo Andrea e Alan (16 ott 2026, cantiere pagamento-onchain tappa 1a-bis, decisione di Andrea: «i pagamenti on-chain al momento abilitali solo agli admin, Alan e Andrea»)
+
+Andrea l'ha detto a cantiere ① appena aperto, e la decisione è stata
+scritta **dove la CI la fa rispettare** invece che dove me la ricordo
+io. Non c'è ancora niente da abilitare — l'on-chain non esiste: non una
+rotta, non un foglio, non una riga di `miniapp.html`. Proprio per
+questo il cancello si scrive **ora**: una guardia che arriva dopo la
+porta è una guardia che qualcuno dimentica.
+
+**DUE LEVE, PERCHÉ SONO DUE DECISIONI.** `ONCHAIN_ATTIVO` dice *se la
+funzione esiste*; `ONCHAIN_SOLO_ADMIN` dice *per chi*. Accendere la
+prima lasciando la seconda apre a due persone, che è il gesto chiesto;
+spegnere la seconda è il gesto **separato** del giorno in cui la beta
+si allarga, e vuole la sua riga nel config del VPS. Una leva sola
+avrebbe legato le due cose, e allargare la beta sarebbe diventato un
+effetto collaterale dell'accendere.
+
+**TUTT'E DUE NASCONO NEL VERSO CHIUSO**, e il secondo default è quello
+che conta: `ONCHAIN_SOLO_ADMIN` nasce **True**. Se nascesse False, un
+VPS che non dichiara la riga aprirebbe a tutti **per distrazione** —
+cioè il modo in cui una beta chiusa si apre senza che nessuno l'abbia
+deciso. C'è la prova sul default.
+
+**GLI ADMIN SONO GIÀ LORO DUE, e non si scrive nessuna lista**: il
+cancello chiama `e_admin`, cioè `ADMIN_IDS` del config del VPS, e la
+docstring di `e_admin_bot` dice che «Andrea e Alan stanno in ADMIN_IDS
+del VPS (verificato da Andrea)». Nessun id nel codice, nessuna seconda
+lista da tenere in pari — che è l'errore che quella stessa docstring
+racconta per gli username di un tempo.
+
+**LA PORTICINA LATERALE NON ESISTE**, ed è copiata parola per parola da
+`rgb_ammesso`: a leva madre spenta il no vale per **chiunque**, admin
+compresi. Un cancello con una porticina laterale non è un cancello.
+C'è la prova che vale anche per il 999 del collaudo.
+
+**LA SENTINELLA** (`prove_cancello_onchain`, 14 prove) guarda tre cose
+che si rompono in silenzio:
+1. **Una porta che nasce senza cancello.** Oggi `/api/onchain/*` non
+   esiste e la prova lo verifica; il giorno che la prima rotta nasce,
+   se il suo corpo non nomina `onchain_ammesso` la prova diventa rossa.
+   Oggi è `[] == []`, domani è la guardia vera.
+2. **Il cancello eseguito**, non letto: il blocco gira con quattro
+   config di cartone — niente config, madre accesa, seconda spenta,
+   madre spenta e seconda spenta — e si chiede chi passa. Il giudice
+   `e_admin` non si riprova (ha le sue prove): gliene si mette uno di
+   cartone che conosce solo il 999, così si guarda **il cancello** e
+   non lui.
+3. **Il giudice è UNO**: due `onchain_ammesso` sarebbero due regole, e
+   un giorno qualcuno aggiornerebbe una sola.
+
+⚠️ **DOVE STANNO LE RIGHE, E PERCHÉ INSIEME.** Le due leve e il
+cancello sono **un blocco contiguo** in `server.py`, dopo `rgb_ammesso`
+e prima del NIP-05 di casa. La prima versione aveva le leve su (accanto
+a `RGB_ATTIVO`) e la funzione giù (accanto a `rgb_ammesso`): la prova
+estrae un blocco e lo esegue, e quel blocco conteneva le leve **senza**
+il cancello — `KeyError: 'onchain_ammesso'`. Il guasto era nella prova,
+ma la cura giusta era nel codice: le leve e il giudice che le legge si
+leggono insieme.
+
+**UNA ROSSA ONESTA, e la lezione:** la sentinella cercava la frase
+della porticina *per intero* in `server.py`, e la docstring la mandava
+a capo. Ora l'ancora è una frase **corta**, che sta su una riga anche
+dopo un riaccapo. Un'ancora lunga è una prova che si rompe per colpa
+della formattazione.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere
+(`cantiere/onchain-cancello`, su origin/main a 4cadba8): la sezione
+nuova da sola, **14 passate, 0 fallite**; poi la suite intera con
+`PROVE_SEVERE=1`. In produzione non cambia niente: due leve spente e
+una funzione che nessuno chiama ancora.
+
+**⚠️ E LA CI ROSSA SU MAIN, CHE È UN ERRORE GIÀ PAGATO IN CASA.** Il
+commit della tappa 1a (4cadba8) ha fatto **rossa** la CI sul job
+`segreti`: «Sembra esserci una chiave privata in esadecimale». Non erano
+i vettori — `vendor/` è escluso da quella regola — era
+**`IMPRONTA_BTC` in `prove.py`**, lo sha256 del bundle scritto per
+intero: 64 esadecimali di fila sono *esattamente* la forma che lo
+scanner cerca, e `prove.py` non è in `vendor/`. Per dieci minuti il
+semaforo del deploy è rimasto fermo (`pronto` a 37ae7af).
+LA COSA DA NON DIMENTICARE È CHE ERA GIÀ SCRITTA: a `f58b940`, col
+vettore di prova della NIP-49, è successo **lo stesso**, e la lezione
+sta nel commento di `prove.py` — «a cedere è il banco, mai la regola».
+Non ho letto quella riga prima di scriverne una identica.
+LA CURA È QUELLA DI CASA, nei due passi che il workflow dichiara: nel
+file l'impronta sta **spezzata in due** (così l'albero è pulito senza
+nessuna eccezione), e nella **cronologia** — che un commit dopo non
+ripulisce, e la storia non si riscrive — il valore ha la sua eccezione
+per VALORE in `CARTONE_HEX`, col prefisso di 16 come gli altri sha256.
+PROVATO IN LOCALE SUI DUE PASSI, com'è tradizione di quella riga:
+l'albero pulito, la cronologia a zero **con** l'eccezione e a uno
+**senza** — che è il modo di dimostrare che l'eccezione serve e non è
+un ornamento.
+La regola non è stata allargata di un millimetro: nessuna cartella
+nuova esclusa, nessuna forma ammorbidita.
+
+**DA FARE** (notati, non fatti):
+- Il **pannello «⚙️ Stato delle leve»** mostra già le due righe coi
+  valori vivi: quando Andrea accenderà `ONCHAIN_ATTIVO` sul VPS, quello
+  è il posto dove si controlla che la seconda sia rimasta True.
+- Le altre leve dello studio (`ONCHAIN_MAX_EURO`, `ONCHAIN_CONFERME`,
+  i margini, i tetti) **non sono nate**: nascono con la tappa che le
+  usa, non prima. Un config pieno di leve che non fanno niente è un
+  config che nessuno legge più.
