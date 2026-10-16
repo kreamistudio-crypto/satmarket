@@ -73370,8 +73370,9 @@ def prove_p2p_motore():
     # della parentesi, e senza sarebbe stata l'unica in minuscola dei
     # due stepper dell'app.
     prova("...e la spiegazione non porta piu' le parentesi", True,
-          "'</b><small>' + esc(p.d) + '</small></div>'"
-          in _ren.replace("\r\n", "\n").replace("\n        + ", " + ")
+          # (16 ott 2026, orari-passi: dopo la frase, la riga dell'ora)
+          "'</b><small>' + esc(p.d) + '</small>' + rigaOraPassoP2P(ora) + '</div>'"
+          in _ren.replace("\r\n", "\n").replace("\n          + ", " + ")
           and "<small>('" not in _ren)
     # ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO: portava il
     # metodo e il lato, e tutt'e due lo dicono gia' altri — le due
@@ -97063,7 +97064,9 @@ def prove_scambi_ovunque():
               "_parti_mostro_p2p", "_tocca_a_me_p2p",
               # «📍 Sono qui» del contanti (1 ott 2026, al posto della prova
               # col QR): senza la tabella vale None
-              "_tabella_p2p", "_presenze_per_parte_p2p", "_scambi_p2p",
+              "_tabella_p2p", "_presenze_per_parte_p2p",
+              # (16 ott 2026, orari-passi) l'ora di ogni passo nell'archivio
+              "_orari_passi_p2p", "_scambi_p2p",
               # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
               "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
@@ -97945,7 +97948,7 @@ def prove_tolti_ovunque():
     prova("l'archivio manda l'elenco dei tolti, finche' la ✕ vale", True,
           '_tolti_p2p(con, user["id"], int(time.time()))' in arch
           and "_tolto_vale_p2p(esiti.get(o), q)" in arch
-          and '{"scambi": esiti, "tolti": tolti}' in arch)
+          and '{"scambi": esiti, "tolti": tolti, "adesso": int(time.time())}' in arch)
     prova("...e lo scambio tolto RESTA fra gli scambi: chi e' rimasto indietro lo porta alla fine",
           False, "p2p_tolti" in pezzo("_scambi_p2p"))
     prova("la pulizia li porta via con la cronaca", True,
@@ -97969,7 +97972,9 @@ def prove_tolti_ovunque():
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p",
               "_stato_scambio_p2p", "_tocca_a_me_p2p", "_tabella_p2p",
-              "_presenze_per_parte_p2p", "_scambi_p2p",
+              "_presenze_per_parte_p2p",
+              # (16 ott 2026, orari-passi) l'ora di ogni passo nell'archivio
+              "_orari_passi_p2p", "_scambi_p2p",
               # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
               "_conto_scambio_p2p",
               "_tolti_p2p", "_tolto_vale_p2p", "_togli_scambio_p2p"):
@@ -98125,6 +98130,8 @@ def prove_tolti_ovunque():
                  "function lapidataP2P(id, giro){", "function togliScambioP2P(id, ev){", "function cancellaRigaP2P(id){",
                  "function toltoAltroveP2P(id){", "function applicaToltiP2P(){",
                  "async function togliScambioServerP2P(ordine){", "async function chiediScambiServerP2P(){",
+                 # l'ora del server dalla risposta (16 ott 2026, orari-passi)
+                 "function prendiOraServerP2P(s){",
                  "function statoDaRestoreP2P(o, statoMostro){", "function fermoDaMomentiP2P(momenti){",
                  "function indiceDaChiaveP2P(mz, pub, max){", "function presenzeDaServerP2P(p, giro){",
                  "function uniscePresenzeP2P(a, b){", "function rigaDaServerP2P(id, s, tk, stato, adesso){",
@@ -132392,7 +132399,8 @@ def prove_ritocchi_flusso_p2p():
               # «📍 Sono qui» del contanti (1 ott 2026, al posto della prova
               # col QR): senza la tabella vale None
               "_tabella_p2p", "_presenze_per_parte_p2p",
-              "_scambi_p2p", "_quanti_tocca_p2p",
+              # (16 ott 2026, orari-passi) l'ora di ogni passo nell'archivio
+              "_orari_passi_p2p", "_scambi_p2p", "_quanti_tocca_p2p",
               # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
               "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
@@ -134134,8 +134142,11 @@ def prove_annullati_ritocchi():
     rend = nudo(fn("function renderOrdineP2P(){"))
     prova("3) lo stepper di un annullato: il passo fermo prende il nome dello stato, niente «now»", True,
           "const fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;" in rend
-          and "passi[fermo] = {t: st.t, d: quando ? 'Il ' + quando : ''};" in rend
-          and "(fermo >= 0 ? (i < fermo ? 'done' : i === fermo ? 'stop' : 'todo')" in rend)
+          # (16 ott 2026, orari-passi: «Il 12 ott» e' diventata la riga
+          # dell'ora del passo fermo, la stessa degli altri passi)
+          and "passi[fermo] = {t: st.t, d: ''};" in rend
+          and "ore[fermo] = orari.chiuso || chiusuraP2P(o);" in rend
+          and "fermo >= 0 ? (i < fermo ? 'done' : i === fermo ? 'stop' : 'todo')" in rend)
     prova("...con la ✕ spenta nel CSS", True,
           ".step.stop .dot::after{content:'✕'}" in mini
           and ".step.stop .dot{background:var(--card);border-color:var(--muted);color:var(--muted)" in mini)
@@ -134313,6 +134324,190 @@ console.log(JSON.stringify(out));
     prova("4) un ordine a prezzo FISSO mai preso: ritirato, con la sua frase", [15000, "annullato", True, "Ordine annullato"],
           o["fisso"])
     prova("...ma preso (la hold chiesta) resta uno scambio annullato", [False, "Scambio annullato"], o["presoFisso"])
+
+
+def prove_orari_passi():
+    """L'ORA DI OGNI PASSO DELLO SCAMBIO P2P (16 ott 2026, cantiere
+    orari-passi, decisione di Andrea): sotto ogni passo FATTO della linea
+    dello scambio, una riga piccola e grigia con quando e' successo.
+    L'ora e' quella di mostrod, dalla cronaca del server
+    (`_orari_passi_p2p`, il giudice unico), uguale per chi compra, chi
+    vende e il moderatore; il telefono la scrive nel suo fuso, «oggi» e
+    «ieri» contati sull'ora del server. Qui: il giudice sulle cronache
+    (giri, prima volta, momenti estranei, disputa, annullo), le
+    sentinelle sui posti che lo servono, e in node la scrittura in DUE
+    FUSI, «oggi/ieri» a cavallo della mezzanotte e dell'anno, l'orologio
+    del telefono sbagliato di tre giorni, la riga di un passo senza ora e
+    la linea del moderatore."""
+    import json as _json, os as _os, re as _re, shutil as _sh
+    import subprocess as _sp, tempfile as _tf
+    print("\n[l'ora di ogni passo dello scambio P2P]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # --- il giudice del server ----------------------------------------
+    amb = {}
+    i = src.index("_PESO_MOMENTO_P2P = {")
+    exec(src[i:src.index("}\n", i) + 2], amb)
+    exec(pezzo("_orari_passi_p2p"), amb)
+    orari = amb["_orari_passi_p2p"]
+    M = lambda m, q, g=0: {"momento": m, "quando": q, "giro": g}
+    cronaca = [M("preso", 100), M("tornato", 150),
+               M("preso", 200, 1), M("fattura_data", 250, 1), M("garanzia_pagata", 260, 1),
+               M("recapito", 280, 1), M("fiat", 320, 1), M("fiat", 300, 1),
+               M("rilasciato", 390, 1), M("concluso", 400, 1)]
+    prova("il giudice: i passi dell'ULTIMO giro, di ogni momento la prima volta",
+          {"pubblicato": 0, "preso": 200, "garanzia": 260, "fiat": 300, "concluso": 400,
+           "disputa": 0, "chiuso": 0}, orari(cronaca, 50))
+    prova("...la pubblicazione solo per chi l'ha scritto, ed e' quella del server",
+          [50, 0], [orari(cronaca, 50, True)["pubblicato"], orari(cronaca, 50, False)["pubblicato"]])
+    prova("...il giro detto (il moderatore guarda quello della sua disputa)",
+          {"pubblicato": 0, "preso": 100, "garanzia": 0, "fiat": 0, "concluso": 0,
+           "disputa": 0, "chiuso": 150}, orari(cronaca, 50, giro=0))
+    prova("...la disputa prima degli euro: niente ora inventata per «Euro inviati»",
+          [260, 0, 330], [orari([M("preso", 200), M("garanzia_pagata", 260), M("disputa", 330)])[k]
+                          for k in ("garanzia", "fiat", "disputa")])
+    prova("...l'annullo, la scadenza e il ritorno in vetrina chiudono: vale il primo",
+          [500, 610, 700], [orari([M("preso", 400), M("annullato", 500)])["chiuso"],
+                            orari([M("scaduto", 610), M("annullato", 640)])["chiuso"],
+                            orari([M("preso", 600), M("tornato", 700)])["chiuso"]])
+    prova("...senza cronaca, o con soli momenti estranei e ore a zero: tutto zero",
+          [{"pubblicato": 0, "preso": 0, "garanzia": 0, "fiat": 0, "concluso": 0,
+            "disputa": 0, "chiuso": 0}] * 3,
+          [orari([]), orari(None), orari([M("recapito", 900), M("preso", 0)])])
+
+    # --- le sentinelle: chi lo serve, e a chi ---------------------------
+    sc = pezzo("_scambi_p2p")
+    prova("l'archivio dello scambio serve gli orari, con la pubblicazione del server", True,
+          '"orari": _orari_passi_p2p(momenti, int(o["creato"] or 0) if o else 0,' in sc
+          and "bool(mio))," in sc)
+    rd = pezzo("_riga_disputa_p2p")
+    prova("...la riga del moderatore anche, dal giro della disputa", True,
+          '"orari": _orari_passi_p2p(' in rd and 'giro=int(r["giro"] or 0)),' in rd)
+    prova("...e le due risposte portano l'ora del server", [True, True],
+          ['"adesso": int(adesso)}' in pezzo("_dispute_per_moderatore_p2p"),
+           '"adesso": int(time.time())}' in pezzo("scambi_p2p")])
+    rend = fn("function renderOrdineP2P(){")
+    prova("la pagina dello scambio: le ore dall'archivio, «oggi» dal server", True,
+          "const orari = orariPassiP2P(o, p2pScambiServer ? p2pScambiServer[o.id] : null);" in rend
+          and "const adessoS = adessoServerP2P();" in rend)
+    prova("...la riga sotto i passi fatti e sotto quello fermo, la disputa sotto quello in corso", True,
+          "const ora = (cl === 'done' || cl === 'stop') ? oraPassoP2P(ore[i], adessoS)" in rend
+          and "(cl === 'now' && o.stato === 'in_disputa' && orari.disputa)" in rend
+          and "+ esc(p.d) + '</small>' + rigaOraPassoP2P(ora) + '</div>';" in rend)
+    prova("...e il passo appena fatto richiede l'archivio, da fuori dal motore", True,
+          "typeof chiediOrariP2P === 'function') chiediOrariP2P(o.id);" in rend
+          and "chiediScambiServerP2P().then(" in fn("function chiediOrariP2P(id){"))
+    prova("il telefono prende l'ora del server dalle due risposte", [True, True],
+          ["prendiOraServerP2P(d.adesso);" in fn("async function chiediScambiServerP2P(){"),
+           "prendiOraServerP2P(d.adesso);" in mini[mini.index("p2pMod = d; p2pModQuando = Date.now();"):][:200]])
+    prova("la card del moderatore aperta ha la sua linea dei passi", True,
+          "+ (aperta ? passiModP2P(d) : '');" in fn("function cardDisputaModP2P(d, ho){"))
+    prova("...e la riga e' piccola e grigia (il grigio di `.step small`)", True,
+          ".step small.step-ora{display:block;font-size:11px;font-weight:500;" in mini
+          and ".step small{color:var(--muted);" in mini)
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco node degli orari dei passi", "node non c'e'")
+        return
+    i = mini.index("const esc = s =>")
+    esc_js = mini[i:mini.index(";\n", i) + 2]
+    banco_base = "\n".join([
+        esc_js,
+        _re.search(r"const P2P_MESI_BREVI = [^\n]*;", mini).group(0),
+        "let p2pScartoOrologioS = 0;",
+        fn("function prendiOraServerP2P(s){"), fn("function adessoServerP2P(){"),
+        fn("function oraPassoP2P(ts, adesso){"), fn("function orariPassiP2P(o, s){"),
+        fn("function rigaOraPassoP2P(testo){"), fn("function passiModP2P(d){"),
+    ]) + r"""
+const out = {};
+const T = (a, me, g, h, mi) => Date.UTC(a, me - 1, g, h, mi) / 1000;
+const ORA = T(2026, 10, 16, 15, 40);           /* 17:40 a Roma, 11:40 a New York */
+out.ore = [T(2026, 10, 16, 15, 32), T(2026, 10, 15, 7, 14), T(2026, 10, 15, 23, 30),
+           T(2026, 10, 12, 16, 5), T(2025, 12, 31, 22, 30)].map(t => oraPassoP2P(t, ORA));
+/* «ieri» a cavallo dell'anno */
+out.capodanno = oraPassoP2P(T(2025, 12, 31, 20, 0), T(2026, 1, 1, 10, 0));
+out.vuote = [oraPassoP2P(0, ORA), oraPassoP2P(null, ORA), oraPassoP2P(-5, ORA), oraPassoP2P('x', ORA)];
+/* L'OROLOGIO DEL TELEFONO SBAGLIATO DI TRE GIORNI: l'ora del passo non
+   cambia, e «oggi» resta oggi perche' si conta dal server */
+const vero = Date.now;
+Date.now = () => (ORA + 3 * 86400) * 1000 + 1234;
+out.senzaServer = oraPassoP2P(T(2026, 10, 16, 15, 32), adessoServerP2P());
+prendiOraServerP2P(ORA);
+out.conServer = oraPassoP2P(T(2026, 10, 16, 15, 32), adessoServerP2P());
+prendiOraServerP2P('rotta');                  /* una risposta storta non sposta lo scarto */
+out.dopoStorta = oraPassoP2P(T(2026, 10, 16, 15, 32), adessoServerP2P());
+Date.now = vero;
+/* i passi di una riga dall'archivio */
+const or = {pubblicato: 10, preso: 20, garanzia: 30, fiat: 0, concluso: 0, disputa: 40, chiuso: 0};
+out.passi = [orariPassiP2P({mio: true, giro: 2}, {giro: 2, orari: or}),
+             orariPassiP2P({mio: false}, {giro: 2, orari: or}),
+             orariPassiP2P({mio: false, giro: 1}, {giro: 2, orari: or}),
+             orariPassiP2P({mio: false}, {giro: 2}),
+             orariPassiP2P(null, null)];
+out.righe = [rigaOraPassoP2P(''), rigaOraPassoP2P('oggi 17:32'), rigaOraPassoP2P('<b>')];
+/* la linea del moderatore */
+p2pScartoOrologioS = ORA - Math.floor(Date.now() / 1000);
+const classi = h => (h.match(/class="step (\w+)"/g) || []).map(x => x.slice(12, -1));
+const righeOra = h => (h.match(/<small class="step-ora">[^<]*<\/small>/g) || []).map(x => x.replace(/<[^>]+>/g, ''));
+const titoli = h => (h.match(/<b>[^<]*<\/b>/g) || []).map(x => x.replace(/<[^>]+>/g, ''));
+const mod = [
+  {orari: {preso: T(2026, 10, 16, 13, 0), garanzia: T(2026, 10, 16, 13, 5), fiat: 0, concluso: 0,
+           disputa: T(2026, 10, 16, 15, 32), chiuso: 0}},
+  {orari: {preso: T(2026, 10, 15, 7, 14), garanzia: T(2026, 10, 15, 7, 20), fiat: 0, concluso: 0,
+           disputa: T(2026, 10, 15, 8, 0), chiuso: T(2026, 10, 16, 15, 32)}},
+  {orari: {preso: T(2026, 10, 12, 16, 5), garanzia: T(2026, 10, 12, 16, 9), fiat: T(2026, 10, 12, 16, 30),
+           concluso: T(2026, 10, 16, 15, 32), disputa: T(2026, 10, 13, 9, 0), chiuso: 0}},
+  {}];
+out.mod = mod.map(d => { const h = passiModP2P(d); return [classi(h), titoli(h), righeOra(h)]; });
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="orari_passi_")
+    fuori = {}
+    for fuso in ("Europe/Rome", "America/New_York"):
+        p = _os.path.join(cart, "banco.js")
+        # il fuso si sceglie DENTRO node: da Git Bash su Windows la TZ
+        # dell'ambiente non arriva
+        open(p, "w", encoding="utf-8").write("process.env.TZ = '" + fuso + "';\n" + banco_base)
+        r = _sp.run([node, p], capture_output=True, text=True, timeout=60, encoding="utf-8")
+        prova(f"il banco degli orari gira ({fuso})", "", (r.stderr or "")[-500:])
+        if r.returncode or not r.stdout.strip():
+            _sh.rmtree(cart, ignore_errors=True)
+            return
+        fuori[fuso] = _json.loads(r.stdout)
+    _sh.rmtree(cart, ignore_errors=True)
+    ro, ny = fuori["Europe/Rome"], fuori["America/New_York"]
+    prova("Roma: oggi, ieri, la notte appena passata e' «oggi», un giorno della settimana, l'anno scorso",
+          ["oggi 17:32", "ieri 09:14", "oggi 01:30", "12 ott 18:05", "31 dic 2025 23:30"], ro["ore"])
+    prova("...New York, stessi istanti: la stessa notte e' «ieri», le ore sono le sue",
+          ["oggi 11:32", "ieri 03:14", "ieri 19:30", "12 ott 12:05", "31 dic 2025 17:30"], ny["ore"])
+    prova("...«ieri» a cavallo dell'anno (Roma, New York)", ["ieri 21:00", "ieri 15:00"],
+          [ro["capodanno"], ny["capodanno"]])
+    prova("...senza un'ora, niente", ["", "", "", ""], ro["vuote"])
+    prova("l'orologio del telefono avanti di tre giorni: senza il server sbaglia «oggi», col server no",
+          ["16 ott 17:32", "oggi 17:32", "oggi 17:32"],
+          [ro["senzaServer"], ro["conServer"], ro["dopoStorta"]])
+    vuoti = {"passi": [0, 0, 0, 0], "disputa": 0, "chiuso": 0}
+    prova("i passi di una riga: chi ha pubblicato parte dalla pubblicazione, chi ha preso dalla presa; "
+          "un altro giro o niente orari, niente ore",
+          [{"passi": [10, 30, 0, 0], "disputa": 40, "chiuso": 0},
+           {"passi": [20, 30, 0, 0], "disputa": 40, "chiuso": 0}, vuoti, vuoti, vuoti], ro["passi"])
+    prova("...la riga: vuota senza ora, scappata con", ["", '<small class="step-ora">oggi 17:32</small>',
+          '<small class="step-ora">&lt;b&gt;</small>'], ro["righe"])
+    prova("il moderatore, disputa prima degli euro: due passi fatti con l'ora, la disputa sotto «Euro inviati», "
+          "in corso come per le parti",
+          [["done", "done", "now", "todo"], ["Ordine preso", "Sats bloccati", "Euro inviati", "Scambio concluso"],
+           ["oggi 15:00", "oggi 15:05", "⚖️ Disputa aperta oggi 17:32"]], ro["mod"][0])
+    prova("...decisa coi sats a chi vende: il passo dopo l'ultimo fatto e' «Scambio annullato» con la sua ora",
+          [["done", "done", "stop", "todo"], ["Ordine preso", "Sats bloccati", "Scambio annullato", "Scambio concluso"],
+           ["ieri 09:14", "ieri 09:20", "oggi 17:32"]], ro["mod"][1])
+    prova("...decisa coi sats a chi compra: tutti fatti, nessuna riga di disputa",
+          [["done"] * 4, ["Ordine preso", "Sats bloccati", "Euro inviati", "Scambio concluso"],
+           ["12 ott 18:05", "12 ott 18:09", "12 ott 18:30", "oggi 17:32"]], ro["mod"][2])
+    prova("...e una riga senza orari: quattro passi grigi, nessuna ora",
+          [["todo"] * 4, ["Ordine preso", "Sats bloccati", "Euro inviati", "Scambio concluso"], []], ro["mod"][3])
 
 
 def prove_card_annullati():
@@ -137180,7 +137375,10 @@ def prove_moderazione_p2p():
                  "FORMA_CHIAVE_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)], amb)
-    for bl, fine in (("P2P_DISPUTA_ESITI = {", "}\n"), ("FORMA_DISPUTA_P2P = re.compile(", ")\n")):
+    # (16 ott 2026, orari-passi) la riga del moderatore porta l'ora di
+    # ogni passo, e il giudice pesa i momenti
+    for bl, fine in (("P2P_DISPUTA_ESITI = {", "}\n"), ("FORMA_DISPUTA_P2P = re.compile(", ")\n"),
+                     ("_PESO_MOMENTO_P2P = {", "}\n")):
         i = src.index("\n" + bl) + 1
         exec(src[i:src.index(fine, i) + len(fine)], amb)
     # il bollino 🛡️ Staff (6 ott 2026) ha la sua prova (prove_bollino_staff): qui nessuno e' dello staff
@@ -137194,7 +137392,8 @@ def prove_moderazione_p2p():
               "_confronto_presenze_p2p", "_confronto_giro_p2p",
               # chi ha messo la cauzione (1 ott 2026): la riga lo dice
               "_cauzione_di_p2p",
-              "_dichiara_disputa_p2p", "_riga_disputa_p2p", "_dispute_per_moderatore_p2p",
+              "_dichiara_disputa_p2p", "_orari_passi_p2p", "_riga_disputa_p2p",
+              "_dispute_per_moderatore_p2p",
               "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
               "_esito_gesto_disputa_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
@@ -137386,6 +137585,12 @@ def prove_moderazione_p2p():
         fn("function contantiModP2P(d){"),
         fn("function quandoIncontroP2P(ts){"),
         fn("function distanzaIncontroP2P(p){"),
+        # la linea dei passi con le loro ore sulla card aperta (16 ott
+        # 2026, orari-passi): i pezzi VERI che `passiModP2P` chiama, e
+        # l'ora del server che la risposta porta
+        riga_js("const P2P_MESI_BREVI = "), "let p2pScartoOrologioS = 0;",
+        fn("function prendiOraServerP2P(s){"), fn("function adessoServerP2P(){"),
+        fn("function oraPassoP2P(ts, adesso){"), fn("function rigaOraPassoP2P(testo){"),
         chat, modulo])
     cart = _tf.mkdtemp(prefix="moderazione_")
     pb = _os.path.join(cart, "banco.js")
@@ -168319,7 +168524,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

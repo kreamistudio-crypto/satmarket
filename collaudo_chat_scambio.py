@@ -197,6 +197,8 @@ def dispositivo_chat(mini):
                            "function lapidiP2P(){", "function lapidataP2P(id, giro){",
                            "function toltoAltroveP2P(id){",
                            "async function chiediScambiServerP2P(){",
+                           # l'ora del server dalla risposta (16 ott 2026, orari-passi)
+                           "function prendiOraServerP2P(s){",
                            "function statoDaRestoreP2P(o, statoMostro){",
                            "function fermoDaMomentiP2P(momenti){", "function indiceDaChiaveP2P(mz, pub, max){",
                            "function presenzeDaServerP2P(p, giro){", "function uniscePresenzeP2P(a, b){",

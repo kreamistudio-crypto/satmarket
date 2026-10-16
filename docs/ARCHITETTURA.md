@@ -28959,6 +28959,37 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   più alto del suo, e la ✕ su una presa messa da parte col giro noto la
   scrive sul nome vero. La diagnosi dice `giro=`. Verbale: CANTIERI, «Lo
   stesso id, un giro nuovo».
+  L'ORA DI OGNI PASSO (16 ott 2026, decisione di Andrea): sotto ogni
+  passo FATTO della linea dello scambio, una riga piccola e grigia
+  (`small.step-ora`) con quando è successo — «oggi 17:32», «ieri
+  09:14», «12 ott 18:05», l'anno solo se non è questo, nel fuso del
+  telefono; niente sotto i passi da fare. L'ORA È DI MOSTROD: il giudice
+  unico è `_orari_passi_p2p(momenti, creato, mio, giro)` sul server,
+  dalla cronaca (`p2p_momenti.quando`) del giro detto o dell'ultimo, di
+  ogni momento la PRIMA volta — `pubblicato` (solo per chi ha scritto
+  l'ordine: `p2p_ordini.creato`, l'ora in cui il server l'ha saputo; il
+  libro non ha un momento della pubblicazione), `preso`, `garanzia`
+  (`garanzia_pagata`), `fiat`, `concluso`, `disputa`, `chiuso` (annullato,
+  scaduto, tornato). Lo servono `orari` in `/api/p2p/scambi` e nella riga
+  di `/api/p2p/moderazione` (giro della disputa): la stessa ora per chi
+  compra, chi vende e il moderatore. 0 = la cronaca non la sa, e il passo
+  resta senza riga (una disputa aperta prima degli euro segna «Euro
+  inviati» fatto e senza ora). Nel client `orariPassiP2P(o, s)` legge la
+  voce di `p2pScambiServer` (un altro giro = niente ore), `oraPassoP2P`
+  la scrive, `renderOrdineP2P` la mette sotto i passi `done`, sotto
+  quello `stop` dell'annullo (al posto di «Il 12 ott»; senza `chiuso`
+  vale `chiusuraP2P`) e, in disputa, «⚖️ Disputa aperta …» sotto il passo
+  in corso. «OGGI» È QUELLO DEL SERVER: le due risposte portano `adesso`,
+  `prendiOraServerP2P` tiene lo scarto e `adessoServerP2P` lo applica —
+  un orologio sbagliato non sposta l'istante e nemmeno più «oggi/ieri».
+  Il passo appena fatto e non ancora nella fotografia: `chiediOrariP2P`
+  (fuori dal motore) richiede l'archivio al più ogni `P2P_ORARI_OGNI_MS`
+  (30 s) per scambio, e solo per `P2P_ORARI_FRESCHI_S` (10 minuti) dalla
+  mossa. Il moderatore ha la sua linea (`passiModP2P`, card aperta): un
+  passo è fatto se la cronaca ne sa l'ora, il primo non fatto è «in
+  corso» con la disputa sotto, o «Scambio annullato» con la ✕ se lo
+  scambio si è chiuso. Gli avvisi Telegram non portano l'ora (ce l'ha
+  già il messaggio). Verbale: CANTIERI, «L'ora di ogni passo».
   LA ✕ VALE PER L'ACCOUNT (7 ott 2026): prima di togliere,
   `togliScambioP2P` chiede `POST /api/p2p/scambi/togli`
   (`togliScambioServerP2P`, blocco suo fuori dal motore: sessione, nel

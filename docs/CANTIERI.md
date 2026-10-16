@@ -64438,3 +64438,103 @@ prima, 15 e 1 rossa); `prove_csp_prova` e la bussola verdi.
 principale di Andrea, i worktree aperti) il file resta CRLF finché non
 lo si riprende una volta: `git checkout -- vendor/btc.bundle.js` (o lo
 si cancella e lo si riprende). I worktree nuovi nascono già giusti.
+
+## L'ora di ogni passo dello scambio P2P (16 ott 2026, cantiere orari-passi, decisione di Andrea)
+
+**La richiesta.** Nella linea dei passi dello scambio P2P («Ordine
+pubblicato» o «Ordine preso», «Sats bloccati», «Euro inviati», «Scambio
+concluso», e gli stati fermi come annullato e disputa), sotto ogni passo
+FATTO la data e l'ora in cui è successo: una riga piccola e grigia,
+l'ora vera del passo e non quella in cui il telefono l'ha visto, uguale
+per chi compra e chi vende, e gli stessi orari al moderatore in disputa.
+La proposta in dieci righe è stata approvata così com'era prima di
+scrivere codice.
+
+**Da dove viene l'ora.** Dalla cronaca del server (`p2p_momenti.quando`),
+cioè l'ora che mostrod scrive in ogni evento: un istante solo per
+scambio, lo stesso per le due parti e per il moderatore. Scartate l'ora
+del telefono (diversa su ogni dispositivo, e sbagliata se lo è
+l'orologio) e il `created_at` dei messaggi Nostr (arriva per busta, non
+per scambio). Il giudice unico è `_orari_passi_p2p` sul server; il client
+scrive soltanto. Per «Ordine pubblicato» (solo chi ha scritto l'ordine)
+vale `p2p_ordini.creato`, l'ora in cui il server l'ha saputo: il libro
+non ha un momento della pubblicazione. Di ogni momento vale la PRIMA
+volta, del giro detto (il moderatore: quello della disputa) o
+dell'ultimo (dopo un ritorno in vetrina i passi di prima non sono di
+questo scambio). Un passo di cui la cronaca non sa l'ora resta SENZA
+riga: in una disputa aperta prima degli euro «Euro inviati» è segnato
+fatto (la tacca di sempre) e non riceve un'ora inventata.
+
+**Scambi vecchi.** Nessuna migrazione: l'ora si ricostruisce da sola per
+tutto quel che la cronaca ha ancora (40 giorni), cioè per ogni scambio
+che l'archivio mostra (30). Dove la cronaca non c'è, l'ora non compare.
+
+**Il formato e «oggi».** «oggi 17:32», «ieri 09:14», «12 ott 18:05»,
+l'anno solo se non è questo, nel fuso del telefono (`oraPassoP2P`, mesi
+da `P2P_MESI_BREVI`). «Oggi» e «ieri» si contano sull'ora del SERVER: le
+due risposte (`/api/p2p/scambi`, `/api/p2p/moderazione`) portano
+`adesso`, e `prendiOraServerP2P` tiene lo scarto. Così un telefono con
+l'orologio sbagliato vede lo stesso istante e la stessa parola.
+
+**Dove compare.** Sotto i passi `done`; sotto quello `stop` dell'annullo,
+al posto di «Il 12 ott» (senza `chiuso` resta `chiusuraP2P`); in disputa,
+«⚖️ Disputa aperta oggi 16:09» sotto il passo in corso. Il moderatore ha
+la sua linea nella card aperta (`passiModP2P`): fatto = la cronaca ne sa
+l'ora, il primo non fatto è «in corso» con la disputa sotto, oppure
+«Scambio annullato» con la ✕ se lo scambio si è chiuso. Al primo giro
+dal vivo quel passo era «da fare», e la riga della disputa usciva
+sbiadita dall'opacità di `.todo` proprio dove il moderatore guarda:
+corretto in «in corso», come lo vedono le due parti. Negli avvisi
+Telegram NIENTE ora: il messaggio ce l'ha già.
+
+**Il passo appena fatto.** La pagina vede il passo dai messaggi del
+coordinatore prima che l'archivio (riletto ogni 2 minuti) lo sappia:
+`renderOrdineP2P` chiama `chiediOrariP2P` (fuori dal motore, perché è una
+fetch) solo se l'ultimo passo fatto non ha l'ora e la mossa ha meno di
+10 minuti, e al più una volta ogni 30 secondi per scambio.
+
+**Cosa è stato provato.**
+- `prove_orari_passi` (28): il giudice sulle cronache (ultimo giro, prima
+  volta, giro detto, disputa senza euro, i tre modi di chiudere, momenti
+  estranei); le sentinelle su archivio, moderazione, pagina, CSS; in
+  node, con Roma e New York, gli stessi istanti («oggi 01:30» a Roma è
+  «ieri 19:30» a New York), «ieri» a cavallo dell'anno, l'orologio del
+  telefono avanti di tre giorni (senza server «16 ott 17:32», col server
+  «oggi 17:32»), la riga scappata, la linea del moderatore in quattro
+  casi. Due mutazioni a mano (`max` al posto di `min` nel giudice, «ieri»
+  a due giorni) fanno cadere 6 prove.
+- Quattro banchi che eseguono `_scambi_p2p`, `_riga_disputa_p2p` e la
+  card del moderatore avevano bisogno dei pezzi nuovi (la lezione delle
+  ancore nei banchi); tre sentinelle vecchie portavano il testo di
+  prima (la riga `'</small></div>'`, «Il ' + quando», la risposta
+  dell'archivio senza `adesso`): aggiornate. E due collaudi della CI
+  (`collaudo_tolti_ovunque`, `collaudo_chat_scambio`) ritagliano
+  `chiediScambiServerP2P`, che ora chiama `prendiOraServerP2P`: rossi
+  al primo giro (la funzione mancava, la richiesta cadeva nel `catch`),
+  verdi con la funzione accanto.
+- Suite intera `PROVE_SEVERE=1`: vedi il verbale del push.
+- Giro dal vivo su una copia nello scratchpad (config di cartone, tutti
+  i relay al relay morto, Chrome headless con risoluzione fuori dal PC
+  solo per telegram.org e i font), database seminato con quattro scambi
+  fra 111 e 222 (euro inviati, concluso, disputa prima degli euro,
+  annullato) e una disputa aperta: 360 px, densità 3, chiaro e scuro, 14
+  scatti in `.claude/giri/orari-passi/`. Ogni ora letta dal DOM coincide
+  con la semina; chi compra e chi vende leggono le stesse ore sui passi
+  comuni, il moderatore anche. Nessuna eccezione in pagina. Dal vivo
+  anche il passo appena fatto: senza ora → una richiesta → «oggi 17:34»;
+  un secondo disegno subito dopo non richiede, una mossa di un'ora fa
+  nemmeno.
+
+**Da fare (notati, non fatti).**
+- «Ordine pubblicato» ha sotto la frase «Aspetta chi ti compra i sats»
+  anche a ordine preso: è la riga di sempre, ma ora con l'ora sotto si
+  legge come un passo ancora in attesa.
+- In disputa senza euro la tacca segna «Euro inviati» come fatto
+  (`P2P_PROGRESSO.in_disputa = 3`) senza che nessuno li abbia detti
+  inviati: la riga senza ora lo lascia vedere, il moderatore lo vede
+  grigio; la tacca delle parti resta quella di prima.
+- Il moderatore dice sempre «Euro inviati», anche negli scambi in
+  contanti o col PayCode dove le parti leggono «Contanti consegnati» o
+  «PayCode pagato».
+- Non provato su un telefono vero (Telegram Android/iOS, fusi diversi
+  dall'italiano dal vivo).

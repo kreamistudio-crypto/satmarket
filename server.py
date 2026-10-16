@@ -60551,6 +60551,12 @@ def _riga_disputa_p2p(con, r, io: int) -> dict:
         # mostrod (`apply_to = take` sul nodo) — 'compra' | 'vende' | ''.
         # Il client la propone solo sugli scambi in contanti.
         "cauzione_di": _cauzione_di_p2p(con, ordine),
+        # L'ORA DI OGNI PASSO DEL GIRO DELLA DISPUTA (16 ott 2026,
+        # orari-passi): la stessa che leggono le due parti
+        "orari": _orari_passi_p2p(
+            [dict(m) for m in con.execute(
+                "SELECT momento, quando, giro FROM p2p_momenti WHERE ordine=?",
+                (ordine,))], giro=int(r["giro"] or 0)),
         "garanzia_il": int((g["q"] if g else 0) or 0),
         "sei_parte": parte,
         "presa_da": (nudo(_persona_disputa_p2p(con, r["presa_da"])) if r["presa_da"] else ""),
@@ -60614,7 +60620,10 @@ def _dispute_per_moderatore_p2p(con, io: int, adesso: int) -> dict:
     return {"dispute": [_riga_disputa_p2p(con, r, io) for r in list(vive) + list(chiuse)],
             "aperte": len(vive),
             "chiave": _chiave_moderatore_p2p(con, io),
-            "moderatori": moderatori}
+            "moderatori": moderatori,
+            # l'ora del server, per «oggi» e «ieri» anche su un telefono
+            # con l'orologio sbagliato (16 ott 2026, orari-passi)
+            "adesso": int(adesso)}
 
 
 def _prendi_disputa_p2p(con, io: int, ordine, chiave, fatto: bool, adesso: int) -> tuple:
@@ -62256,6 +62265,48 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
             "payout_fallito": m == "payout_fallito"}
 
 
+def _orari_passi_p2p(momenti, creato: int = 0, mio: bool = False,
+                     giro=None) -> dict:
+    """PURA: QUANDO E' SUCCESSO OGNI PASSO DELLO SCAMBIO (16 ott 2026,
+    cantiere orari-passi, decisione di Andrea): l'ora che la linea dei
+    passi scrive, piccola e grigia, sotto ogni passo fatto.
+    L'ORA E' QUELLA DI MOSTROD, cioe' `quando` della cronaca
+    (`p2p_momenti`): un istante solo per scambio, uguale per chi compra,
+    per chi vende e per il moderatore. Mai l'ora in cui un telefono l'ha
+    visto, che e' diversa su ogni dispositivo.
+    I PASSI, nella scala di `P2P_PROGRESSO` del client:
+    • `pubblicato` — solo per chi l'ordine l'ha scritto (`mio`): quando
+      il server l'ha saputo (`p2p_ordini.creato`); il libro non ha un
+      momento della pubblicazione;
+    • `preso` — la presa; `garanzia` — la hold pagata (`garanzia_pagata`);
+      `fiat` — gli euro detti inviati; `concluso` — il pagamento arrivato;
+    • `disputa` — l'apertura; `chiuso` — l'annullo, la scadenza o il
+      ritorno in vetrina.
+    DEL GIRO detto (il moderatore guarda quello della sua disputa) o
+    dell'ULTIMO della cronaca, come `_stato_scambio_p2p`: dopo un
+    ritorno in vetrina i passi di prima non sono di questo scambio. Di
+    ogni momento vale la PRIMA volta. 0 = non si sa, e allora il passo
+    resta senza ora: un'ora inventata e' peggio di nessuna (una disputa
+    aperta prima degli euro non ha un `fiat`, e non lo riceve)."""
+    noti = [m for m in (momenti or []) if str(m.get("momento") or "") in _PESO_MOMENTO_P2P]
+    if giro is None:
+        giro = max([int(m.get("giro") or 0) for m in noti] or [0])
+    del_giro = [m for m in noti if int(m.get("giro") or 0) == int(giro or 0)]
+
+    def primo(*nomi) -> int:
+        ore = [int(m.get("quando") or 0) for m in del_giro
+               if str(m.get("momento") or "") in nomi and int(m.get("quando") or 0) > 0]
+        return min(ore) if ore else 0
+
+    return {"pubblicato": int(creato or 0) if mio else 0,
+            "preso": primo("preso"),
+            "garanzia": primo("garanzia_pagata"),
+            "fiat": primo("fiat"),
+            "concluso": primo("concluso"),
+            "disputa": primo("disputa"),
+            "chiuso": primo("annullato", "scaduto", "tornato")}
+
+
 def _tocca_a_me_p2p(stato: str, lato: str, recapito_detto: bool) -> bool:
     """PURA: in questo scambio la mossa e' di chi legge? Il calco di
     `azioniDisponibili` del client, stato per stato (24 set 2026, il
@@ -62380,6 +62431,11 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "momenti": [{"m": str(m.get("momento") or ""), "q": int(m.get("quando") or 0),
                          "a": str(m.get("attore") or ""), "d": str(m.get("dettaglio") or "")}
                         for m in momenti],
+            # L'ORA DI OGNI PASSO (16 ott 2026, orari-passi): quella di
+            # mostrod, uguale per i due — la linea dei passi la scrive
+            # sotto ogni passo fatto
+            "orari": _orari_passi_p2p(momenti, int(o["creato"] or 0) if o else 0,
+                                      bool(mio)),
             # LA RIGA DEL CONTO NELL'APP (10 ott 2026, l'avviso del blocco):
             # se QUESTO giro mi e' stato contato come non completato, la
             # stessa frase del Telegram — la pagina dello scambio tornato
@@ -62537,7 +62593,9 @@ async def scambi_p2p(x_tg_init_data: str = Header(""),
                        if _tolto_vale_p2p(esiti.get(o), q))[:MAX_ORDINI_P2P]
     finally:
         con.close()
-    return JSONResponse({"scambi": esiti, "tolti": tolti},
+    # `adesso` (16 ott 2026, orari-passi): l'ora del server, con cui il
+    # telefono decide «oggi» e «ieri» anche con l'orologio sbagliato
+    return JSONResponse({"scambi": esiti, "tolti": tolti, "adesso": int(time.time())},
                         headers={"Cache-Control": "no-store"})
 
 

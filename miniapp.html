@@ -8856,7 +8856,10 @@
   /* Lo step corrente: il cerchio tratteggiato che aspetta la spunta */
   .step.now .dot{border:2px dashed var(--trust);background:var(--card)}
   .step b{font-size:13.5px;display:block}
-  .step small{color:var(--muted);font-size:12px;font-weight:600}
+  .step small{color:var(--muted);font-size:12px;font-weight:600}  /* l'ora del passo dello scambio P2P (16 ott 2026, orari-passi): una
+     riga sua, piu' piccola e piu' leggera della frase, cifre in colonna */
+  .step small.step-ora{display:block;font-size:11px;font-weight:500;margin-top:1px;font-variant-numeric:tabular-nums}
+
   .step.todo{opacity:.45}
   /* il passo su cui uno scambio si e' fermato (27 set 2026): la ✕ spenta
      del badge «annullato», niente tratteggio che dica «si aspetta» */
@@ -64424,10 +64427,25 @@ function renderOrdineP2P(){
      con la data, e la ✕ spenta al posto del cerchio; quelli prima sono
      fatti, quelli dopo restano grigi. */
   const fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;
+  /* L'ORA DI OGNI PASSO (16 ott 2026, orari-passi): quella di mostrod,
+     dall'archivio del server (vedi «L'ORA DI OGNI PASSO»). Il passo su
+     cui l'annullo e' caduto dice la SUA ora al posto di «Il 12 ott»,
+     e se la cronaca non la sa resta la chiusura di sempre
+     (`chiusuraP2P`, che e' anche lei un'ora del coordinatore). */
+  const orari = orariPassiP2P(o, p2pScambiServer ? p2pScambiServer[o.id] : null);
+  const adessoS = adessoServerP2P();
+  const ore = orari.passi.slice();
   if (fermo >= 0) {
-    const quando = dataBreveP2P(chiusuraP2P(o));
-    passi[fermo] = {t: st.t, d: quando ? 'Il ' + quando : ''};
+    passi[fermo] = {t: st.t, d: ''};
+    ore[fermo] = orari.chiuso || chiusuraP2P(o);
   }
+  /* il passo appena fatto qui e non ancora nella cronaca che il
+     telefono ha: si richiede l'archivio, poco e solo per dieci minuti
+     dalla mossa (`chiediOrariP2P` sta fuori dal motore: e' una fetch) */
+  const ultimoFatto = (fermo >= 0 || o.stato === 'in_disputa') ? -1 : prog - 1;
+  if (ultimoFatto >= 0 && !ore[ultimoFatto]
+      && adessoS - (Number(o.ultimaMossa) || 0) < P2P_ORARI_FRESCHI_S
+      && typeof chiediOrariP2P === 'function') chiediOrariP2P(o.id);
   const tog = p2pTogliibile(o);
   /* IL CONTO E' QUELLO DEL LIBRO, tradotto al verso di chi l'ordine
      ce l'ha (set 2026, richiesta di Andrea): stesse righe, stessi
@@ -64549,12 +64567,18 @@ function renderOrdineP2P(){
     riquadroIncassoCauzioneP2P(o) +
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
-      passi.map((p, i) =>
-        '<div class="step ' + (fermo >= 0 ? (i < fermo ? 'done' : i === fermo ? 'stop' : 'todo')
-                               : (i < prog ? 'done' : i === prog ? 'now' : 'todo')) + '">' +
-        '<span class="dot"></span><b>' + esc(p.t) + '</b><small>'
-        + esc(p.d) + '</small></div>'
-      ).join('') +
+      passi.map((p, i) => {
+        const cl = fermo >= 0 ? (i < fermo ? 'done' : i === fermo ? 'stop' : 'todo')
+                              : (i < prog ? 'done' : i === prog ? 'now' : 'todo');
+        /* l'ora sotto i passi fatti e sotto quello fermo; in disputa,
+           sotto il passo in corso, quando e' stata aperta */
+        const ora = (cl === 'done' || cl === 'stop') ? oraPassoP2P(ore[i], adessoS)
+          : (cl === 'now' && o.stato === 'in_disputa' && orari.disputa)
+            ? '⚖️ Disputa aperta ' + oraPassoP2P(orari.disputa, adessoS) : '';
+        return '<div class="step ' + cl + '">' +
+          '<span class="dot"></span><b>' + esc(p.t) + '</b><small>'
+          + esc(p.d) + '</small>' + rigaOraPassoP2P(ora) + '</div>';
+      }).join('') +
     '</div></div>' +
     /* LE DUE PILLOLE ANCHE NELLA PAGINA (24 set 2026): «👉 tocca a te»
        quando c'e' il bottone pieno, «✋ Aspetta» con la riga di chi fa
@@ -74315,6 +74339,63 @@ function fermoAnnulloP2P(o){
     return Math.max(0, Math.min(3, Number(o.fermoA) || 0));
   return (o.giroMorto || o.preso) ? 1 : 0;
 }
+/* ============ L'ORA DI OGNI PASSO (16 ott 2026, cantiere orari-passi, decisione di Andrea) ============
+   Sotto ogni passo FATTO della linea dello scambio, una riga piccola e
+   grigia dice quando e' successo: «oggi 17:32», «ieri 09:14», «12 ott
+   18:05» (l'anno solo se non e' questo), nel fuso del telefono. I passi
+   non ancora fatti non dicono niente.
+   L'ORA E' DI MOSTROD, NON DEL TELEFONO: la calcola il server dalla
+   cronaca (`_orari_passi_p2p`, il giudice unico) e arriva con
+   l'archivio (`orari` in `/api/p2p/scambi`) — la stessa per chi compra,
+   per chi vende e per il moderatore. Un passo di cui la cronaca non sa
+   l'ora resta senza riga: un'ora inventata e' peggio di nessuna.
+   E «OGGI» E' QUELLO DEL SERVER: l'ora del passo e' un istante, e un
+   orologio sbagliato non la sposta; potrebbe spostare solo «oggi» e
+   «ieri», e per questo si contano dall'ora che il server manda con la
+   risposta (`p2pScartoOrologioS`). */
+let p2pScartoOrologioS = 0;
+/* quanto e' fresca una mossa per cui vale la pena richiedere l'ora */
+const P2P_ORARI_FRESCHI_S = 600;
+function prendiOraServerP2P(s){
+  const n = Math.floor(Number(s) || 0);
+  if (n > 1600000000) p2pScartoOrologioS = n - Math.floor(Date.now() / 1000);
+}
+function adessoServerP2P(){
+  return Math.floor(Date.now() / 1000) + p2pScartoOrologioS;
+}
+/* PURA: l'ora di un passo come si legge, '' se non si sa. `adesso` in
+   secondi (quello del server); il fuso e' quello del telefono. */
+function oraPassoP2P(ts, adesso){
+  const n = Math.floor(Number(ts) || 0);
+  if (n <= 0) return '';
+  const d = new Date(n * 1000);
+  const ora = new Date((Math.floor(Number(adesso) || 0) || Math.floor(Date.now() / 1000)) * 1000);
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const giorno = x => x.getFullYear() * 10000 + x.getMonth() * 100 + x.getDate();
+  if (giorno(d) === giorno(ora)) return 'oggi ' + hm;
+  if (giorno(d) === giorno(new Date(ora.getFullYear(), ora.getMonth(), ora.getDate() - 1)))
+    return 'ieri ' + hm;
+  return d.getDate() + ' ' + P2P_MESI_BREVI[d.getMonth()]
+    + (d.getFullYear() !== ora.getFullYear() ? ' ' + d.getFullYear() : '') + ' ' + hm;
+}
+/* PURA: le ore dei quattro passi di una riga, dalla sua voce
+   dell'archivio (`s`): `passi` nella scala di `P2P_PROGRESSO` (il primo
+   e' la pubblicazione per chi l'ha scritto, la presa per chi l'ha
+   preso), `disputa` e `chiuso`. Un archivio di un ALTRO giro (l'ordine
+   tornato in vetrina e ripreso) non parla di questo scambio: tutto 0. */
+function orariPassiP2P(o, s){
+  const vuoti = {passi: [0, 0, 0, 0], disputa: 0, chiuso: 0};
+  if (!o || !s || !s.orari || typeof s.orari !== 'object') return vuoti;
+  if (Number(o.giro) > 0 && Number(s.giro) > 0 && Number(o.giro) !== Number(s.giro)) return vuoti;
+  const r = s.orari, n = x => Math.max(0, Math.floor(Number(x) || 0));
+  return {passi: [n(o.mio ? r.pubblicato : r.preso), n(r.garanzia), n(r.fiat), n(r.concluso)],
+          disputa: n(r.disputa), chiuso: n(r.chiuso)};
+}
+/* PURA: la riga piccola e grigia sotto un passo */
+function rigaOraPassoP2P(testo){
+  return testo ? '<small class="step-ora">' + esc(testo) + '</small>' : '';
+}
+/* ============ fine dell'ora di ogni passo ============ */
 /* PURA: la data breve — giorno e mese, e l'ANNO solo se non e' questo
    (richiesta di Andrea: «anno solo se non è questo»). Un'altra data di
    casa la scrive per esteso, ma qui sta in un angolo di card e i
@@ -77731,7 +77812,9 @@ async function chiediScambiServerP2P(){
       const lista = (d && d.scambi && typeof d.scambi === 'object' && !Array.isArray(d.scambi))
         ? d.scambi : null;
       if (!lista) return false;
-      p2pScambiServer = lista;
+      p2pScambiServer = lista;      /* l'ora del server, per «oggi» e «ieri» sotto i passi (16 ott 2026) */
+      prendiOraServerP2P(d.adesso);
+
       /* GLI SCAMBI TOLTI CON LA ✕ (7 ott 2026): solo stringhe nella
          forma di un ordine, e un server di ieri senza l'elenco vale un
          elenco vuoto. A toglierli e' `applicaToltiP2P`, al render */
@@ -77752,6 +77835,22 @@ async function chiediScambiServerP2P(){
     finally { p2pScambiGiro = null; }
   })();
   return p2pScambiGiro;
+}
+/* L'ORA DEL PASSO APPENA FATTO (16 ott 2026, orari-passi): la pagina
+   dello scambio ha visto il passo dai messaggi del coordinatore e
+   l'archivio non lo sa ancora — si richiede, al piu' una volta ogni
+   `P2P_ORARI_OGNI_MS` per scambio, e se la pagina e' ancora quella si
+   ridisegna. La chiama `renderOrdineP2P`, solo per dieci minuti dalla
+   mossa. */
+const P2P_ORARI_OGNI_MS = 30000;
+const p2pOrariChiesti = {};
+function chiediOrariP2P(id){
+  const adesso = Date.now();
+  if (adesso - (p2pOrariChiesti[id] || 0) < P2P_ORARI_OGNI_MS) return;
+  p2pOrariChiesti[id] = adesso;
+  chiediScambiServerP2P().then(ok => {
+    if (ok && p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+  }).catch(() => {});
 }
 function battitoScambiP2P(){
   const adesso = Date.now();
@@ -78709,6 +78808,7 @@ function chiediModerazioneP2P(forza){
   if (!forza && p2pMod && Date.now() - p2pModQuando < MOD_OGNI_MS) return Promise.resolve(p2pMod);
   p2pModInVolo = modFetch('moderazione').then(d => {
     p2pMod = d; p2pModQuando = Date.now();
+    prendiOraServerP2P(d.adesso);       /* «oggi» e «ieri» dei passi (16 ott 2026) */
     adottaChiaviModP2P();
     renderStrisciaModP2P();
     if (vistaAttivaP2P() === 'view-p2pmod') renderModerazioneP2P();
@@ -79616,6 +79716,36 @@ function rigaIncontroModP2P(d, aperta){
 const MOD_STATI_P2P = {aperta: 'Aperta', presa: 'Presa', chiusa: 'Chiusa'};
 const MOD_CHIUSA_DA_P2P = {moderatore: 'decisa da un moderatore', parti: 'chiusa dalle parti',
   scadenza: 'chiusa per scadenza', sconosciuto: 'chiusa'};
+/* PURA: LA LINEA DEI PASSI DEL MODERATORE (16 ott 2026, cantiere
+   orari-passi, decisione di Andrea: «vede gli stessi orari in
+   disputa»). Le ore sono quelle del server (`orari` della riga, dalla
+   cronaca del giro della disputa), le stesse delle due parti. Qui non
+   c'e' lo stato del telefono di nessuno: un passo e' FATTO se la
+   cronaca ne sa l'ora, e il moderatore legge cosi' anche quel che NON
+   e' successo — «Euro inviati» grigio vuol dire che nessuno li ha detti
+   inviati. Sul primo passo non fatto, quando la disputa e' stata
+   aperta; se lo scambio si e' chiuso senza arrivare in fondo, quel
+   passo diventa «Scambio annullato» con la ✕ e la sua ora. */
+function passiModP2P(d){
+  const r = (d && d.orari && typeof d.orari === 'object') ? d.orari : {};
+  const n = x => Math.max(0, Math.floor(Number(x) || 0));
+  const passi = [['Ordine preso', n(r.preso)], ['Sats bloccati', n(r.garanzia)],
+                 ['Euro inviati', n(r.fiat)], ['Scambio concluso', n(r.concluso)]];
+  const adesso = adessoServerP2P();
+  let primo = passi.findIndex(p => !p[1]);
+  const chiuso = n(r.chiuso);
+  return '<div class="p2p-passi mod-passi"><div class="steps">' + passi.map((p, i) => {
+    const fermo = chiuso && i === primo;
+    /* il passo su cui la disputa si e' fermata e' «in corso», come lo
+       vedono le due parti: da «da fare» la sua riga usciva sbiadita */
+    const cl = p[1] ? 'done' : fermo ? 'stop' : (i === primo && n(r.disputa)) ? 'now' : 'todo';
+    const ora = p[1] ? oraPassoP2P(p[1], adesso)
+      : fermo ? oraPassoP2P(chiuso, adesso)
+      : (i === primo && n(r.disputa)) ? '⚖️ Disputa aperta ' + oraPassoP2P(n(r.disputa), adesso) : '';
+    return '<div class="step ' + cl + '"><span class="dot"></span><b>'
+      + esc(fermo ? 'Scambio annullato' : p[0]) + '</b>' + rigaOraPassoP2P(ora) + '</div>';
+  }).join('') + '</div></div>';
+}
 function cardDisputaModP2P(d, ho){
   const aperta = p2pModAperta === d.ordine;
   const scade = scadenzaGaranziaModP2P(d, p2pInfo);
@@ -79631,7 +79761,10 @@ function cardDisputaModP2P(d, ho){
     + (d.euro ? ' per ' + esc(d.euro) : '') + (d.metodi ? ' · ' + esc(d.metodi) : '') + '</div>'
     /* la prova d'incontro del contanti (30 set 2026): la riga che si legge
        PRIMA di decidere, con la sua cautela quando la card e' aperta */
-    + rigaIncontroModP2P(d, aperta);
+    + rigaIncontroModP2P(d, aperta)
+    /* la linea dei passi con le loro ore, a card aperta (16 ott 2026,
+       orari-passi): le stesse che leggono le due parti */
+    + (aperta ? passiModP2P(d) : '');
   if (d.stato === 'chiusa') {
     h += '<div class="mod-riga">' + esc(MOD_CHIUSA_DA_P2P[d.chiusa_da] || 'chiusa') + ': '
       + esc(d.esito === 'compratore' ? 'i sats a chi compra' : 'i sats a chi vende')
