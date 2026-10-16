@@ -51947,9 +51947,12 @@ def prove_collaudi_in_ci():
     i = job.find("python collaudi_ci.py")
     prova("lo step dei collaudi sta nel job `prove`", True, i > 0)
     # L'ELENCO STA IN ci/collaudi.txt (13 ott 2026): il passo dice solo
-    # DOVE, con la riga esatta — vedi `prove_elenco_dei_collaudi`
+    # DOVE, con la riga esatta — vedi `prove_elenco_dei_collaudi`. Le
+    # due opzioni in coda sono della CI leggera (16 ott 2026), e le
+    # guarda `prove_ci_leggera`.
     prova("...e legge l'elenco dal suo file, fuori dal workflow",
-          "python collaudi_ci.py --elenco ci/collaudi.txt",
+          "python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2 "
+          "--salvo-solo-documenti-da pronto",
           job[i:job.find("\n", i)].strip() if i > 0 else None)
     elenco = _collaudi_della_ci()
     prova("...con un elenco scritto a mano, non un glob", True,
@@ -52079,9 +52082,15 @@ def prove_collaudi_in_ci():
            "✗ [altro → atteso casa | detto altro] Tappeto"],
           rosse_fn(uscita3) if callable(rosse_fn) else None)
     lanciatore = open("collaudi_ci.py", encoding="utf-8").read()
-    corpo_main = lanciatore[lanciatore.find("\ndef main("):]
+    # dal 16 ott 2026 (ci-leggera) il blocco di un collaudo finito lo
+    # stampa `racconta()`, chiamata da main() per ognuno: il corpo che
+    # conta parte da li', e main() la deve chiamare davvero
+    corpo_main = lanciatore[lanciatore.find("\ndef racconta("):]
     prova("...e il lanciatore le stampa tutte, una annotazione ::error:: per riga, senza il segno", True,
-          "rosse = righe_rosse(uscita)" in corpo_main
+          "\ndef racconta(" in lanciatore
+          and "racconta(nome, ok, secondi, uscita, bussate)"
+          in lanciatore[lanciatore.find("\ndef main("):]
+          and "rosse = righe_rosse(uscita)" in corpo_main
           and 'print(f"::error::{nome}: {senza_segno(r)}")' in corpo_main
           and "r.startswith(SEGNI_ROSSI)" in corpo_main
           and 'print(f"::error::{nome}: {rosse[fine - 1].strip()}")' in corpo_main)
@@ -52115,6 +52124,195 @@ def prove_collaudi_in_ci():
           "::error::collaudo_cartone_due_rosse: la prima rossa, in cima" in r.stdout)
     prova("...e il Traceback con cui finisce ha la sua, che dice l'ECCEZIONE", True,
           "::error::collaudo_cartone_due_rosse: KeyError: 'fine'" in r.stdout)
+
+
+def prove_ci_leggera():
+    """LA CI LEGGERA (16 ott 2026, cantiere ci-leggera, richiesta di
+    Andrea): meno minuti di GitHub cambiando QUANDO e COME gira la CI,
+    mai COSA controlla. Tre leve, e qui si tiene il verso di ognuna:
+    la CODA (un giro alla volta, quello che corre finisce sempre), i
+    collaudi SALTATI solo se l'albero differisce da `pronto` per dei .md,
+    e i collaudi DUE ALLA VOLTA. Il salto e il parallelo si girano dal
+    vero, su un repo di cartone e su collaudi di cartone. Il perche':
+    docs/CANTIERI.md, «La CI leggera»."""
+    print("\n[la CI leggera]")
+    import re as _re
+    import subprocess
+    import tempfile
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    testa = wf.split("\njobs:", 1)[0]
+    job_prove = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    job_segreti = wf[wf.index("\n  segreti:"):wf.index("\n  pronto:")]
+    job_pronto = wf[wf.index("\n  pronto:"):]
+    senza_commenti = "\n".join(r for r in wf.splitlines()
+                               if not r.lstrip().startswith("#"))
+    # 1. LA CODA: per ramo, e il giro che corre non si interrompe
+    prova("la coda vale per tutto il workflow, un gruppo per ramo", True,
+          _re.search(r"(?m)^concurrency:\n  group: prove-\$\{\{ github\.ref \}\}\n"
+                     r"  cancel-in-progress: false$", testa) is not None)
+    prova("...e da nessuna parte un giro che corre si interrompe", False,
+          _re.search(r"cancel-in-progress:\s*true", senza_commenti) is not None)
+    # 2. I TETTI, uno per job
+    prova("ogni job ha il suo tetto di minuti",
+          ["60", "15", "10"],
+          [(_re.search(r"(?m)^    timeout-minutes: (\d+)\s*$", j) or [None, None])[1]
+           for j in (job_prove, job_segreti, job_pronto)])
+    # 3. IL SALTO DEI DOCUMENTI tocca SOLO i collaudi: prove.py e i
+    # segreti girano interi a ogni giro, senza condizioni nuove
+    passo_prove = job_prove[job_prove.index("- name: Le prove\n"):]
+    passo_prove = passo_prove[:passo_prove.index("\n      - name:", 1)]
+    prova("prove.py gira intero a ogni giro: nessuna condizione sul suo passo",
+          [False, True],
+          ["if:" in passo_prove, "run: python prove.py" in passo_prove])
+    prova("...e il confronto coi documenti non entra nei segreti ne' nel semaforo",
+          [False, False],
+          ["solo-documenti" in job_segreti, "solo-documenti" in job_pronto])
+    prova("...e solo il passo dei collaudi lo chiede, contro `pronto`", 1,
+          senza_commenti.count("--salvo-solo-documenti-da pronto"))
+
+    amb = {"__file__": "collaudi_ci.py"}
+    exec(open("collaudi_ci.py", encoding="utf-8").read()
+         .split("\ndef gira(")[0], amb)
+    solo = amb.get("solo_documenti")
+    prova("il giudice dei documenti dice si' SOLO a un elenco non vuoto di .md",
+          [True, True, False, False, False, False, False, False],
+          [solo(["docs/CANTIERI.md"]), solo(["README.md", "docs/spec/NWC-RGB.md"]),
+           solo(["docs/CANTIERI.md", "server.py"]), solo(["ci/collaudi.txt"]),
+           solo(["docs/nota.md.py"]), solo([]), solo(None), solo(["docs/"])]
+          if callable(solo) else None)
+    cambiati = amb.get("cambiati_da")
+    prova("...e un ramo dal nome storto non si chiede nemmeno: None, cioe' si gira tutto",
+          [None, None, None, None],
+          [cambiati(n) for n in ("", "-x", "pronto; rm -rf .", None)]
+          if callable(cambiati) else None)
+
+    # DAL VERO: un origin di cartone con `pronto`, un clone, il
+    # lanciatore vero copiato dentro e un collaudo di cartone che e'
+    # SEMPRE rosso. Se i collaudi girano lo step esce con 1; se li salta,
+    # con 0 e la riga ⏭. I commit si fanno con la plumbing (niente firma,
+    # niente identita' da chiedere): e' un repo usa-e-getta.
+    radice = tempfile.mkdtemp(prefix="ci-leggera-")
+    origine, clone = os.path.join(radice, "origine"), os.path.join(radice, "clone")
+    gamb = dict(os.environ, GIT_AUTHOR_NAME="cartone", GIT_AUTHOR_EMAIL="c@c",
+                GIT_COMMITTER_NAME="cartone", GIT_COMMITTER_EMAIL="c@c",
+                GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0")
+    gamb.pop("GIT_DIR", None)
+    gamb.pop("GIT_WORK_TREE", None)
+
+    def git(dove, *a):
+        return subprocess.run(["git", "-c", "core.autocrlf=false", *a], cwd=dove,
+                              env=gamb, capture_output=True, encoding="utf-8",
+                              errors="replace", timeout=60).stdout.strip()
+
+    def committa(dove, messaggio):
+        git(dove, "add", "-A")
+        albero = git(dove, "write-tree")
+        padre = git(dove, "rev-parse", "--verify", "-q", "HEAD")
+        sha = git(dove, "commit-tree", albero, "-m", messaggio,
+                  *(["-p", padre] if padre else []))
+        git(dove, "update-ref", "HEAD", sha)
+        return sha
+
+    def scrivi(dove, nome, testo):
+        p = os.path.join(dove, nome)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(testo)
+
+    def lancia(*opzioni):
+        r = subprocess.run([sys.executable, "collaudi_ci.py", "--elenco",
+                            "lista.txt", *opzioni], cwd=clone,
+                           capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=180,
+                           env=dict(gamb, PYTHONUTF8="1"))
+        return r.returncode, r.stdout
+
+    try:
+        os.makedirs(origine)
+        git(origine, "init", "-q", "-b", "main")
+        scrivi(origine, "collaudi_ci.py",
+               open("collaudi_ci.py", encoding="utf-8").read())
+        scrivi(origine, "collaudo_sempre_rosso.py",
+               "print('  ✗ rosso apposta')\nraise SystemExit(1)\n")
+        scrivi(origine, "lista.txt", "collaudo_sempre_rosso\n")
+        scrivi(origine, "docs/nota.md", "prima\n")
+        base = committa(origine, "base")
+        git(origine, "update-ref", "refs/heads/pronto", base)
+        git(radice, "clone", "-q", origine, clone)
+        stesso = lancia("--salvo-solo-documenti-da", "pronto")
+        scrivi(clone, "docs/nota.md", "dopo\n")
+        scrivi(clone, "README.md", "nuovo\n")
+        committa(clone, "solo documenti")
+        documenti = lancia("--salvo-solo-documenti-da", "pronto")
+        senza_opzione = lancia()
+        ramo_che_manca = lancia("--salvo-solo-documenti-da", "non-esiste")
+        scrivi(clone, "lista.txt", "collaudo_sempre_rosso\n\n")
+        committa(clone, "un .txt")
+        con_txt = lancia("--salvo-solo-documenti-da", "pronto")
+    finally:
+        import shutil
+        shutil.rmtree(radice, ignore_errors=True)
+    prova("dal vero: lo stesso albero di `pronto` gira tutto (un giro rifatto a mano lo vuole intero)",
+          [1, True], [stesso[0], "lo stesso albero, si gira tutto" in stesso[1]])
+    prova("...solo .md rispetto a `pronto`: i collaudi non girano, e lo dice con la riga e l'annotazione",
+          [0, True, True, False],
+          [documenti[0], "⏭ rispetto a `pronto` sono cambiati solo documenti (2 file .md)" in documenti[1],
+           "::notice::collaudi saltati" in documenti[1], "rosso apposta" in documenti[1]])
+    prova("...lo stesso albero senza l'opzione gira tutto, come sempre", 1, senza_opzione[0])
+    prova("...un ramo che non c'e' gira tutto", [1, True],
+          [ramo_che_manca[0], "confronto non riuscito, si gira tutto" in ramo_che_manca[1]])
+    prova("...e un .txt accanto ai documenti gira tutto", [1, True],
+          [con_txt[0], "non solo documenti: si gira tutto" in con_txt[1]])
+
+    # IL PARALLELO, dal vero e d'ORDINE, non di cronometro: il primo
+    # collaudo aspetta un file che scrive il SECONDO. In fila il primo
+    # aspetterebbe invano e sarebbe rosso; due alla volta passano tutti
+    # e due. E un terzo, rosso, deve restare rosso col suo blocco intero.
+    cartella = tempfile.mkdtemp(prefix="ci-leggera-par-")
+    bandierina = os.path.join(cartella, "bandierina").replace("\\", "/")
+    nomi = ["collaudo_cartone_aspetta", "collaudo_cartone_scrive",
+            "collaudo_cartone_rosso"]
+    testi = [
+        "import os, time\nfor _ in range(300):\n"
+        f"    if os.path.exists({bandierina!r}):\n"
+        "        print('  ✓ la bandierina c\\'e\\''); raise SystemExit(0)\n"
+        "    time.sleep(0.1)\nprint('  ✗ nessuna bandierina'); raise SystemExit(1)\n",
+        f"open({bandierina!r}, 'w').write('su')\nprint('  ✓ scritta')\n",
+        "print('  ✗ il rosso di cartone')\nprint('      atteso: 1')\n"
+        "print('      avuto:  2')\nraise SystemExit(1)\n"]
+    for n, t in zip(nomi, testi):
+        with open(n + ".py", "w", encoding="utf-8") as f:
+            f.write(t)
+    try:
+        r = subprocess.run([sys.executable, "collaudi_ci.py", "--paralleli", "2",
+                            *nomi], capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=120)
+        storta = subprocess.run([sys.executable, "collaudi_ci.py", "--paralleli",
+                                 "due", nomi[1]], capture_output=True,
+                                encoding="utf-8", errors="replace", timeout=60)
+    finally:
+        for n in nomi:
+            if os.path.exists(n + ".py"):
+                os.remove(n + ".py")
+        import shutil
+        shutil.rmtree(cartella, ignore_errors=True)
+    righe = r.stdout.splitlines()
+    prova("due alla volta: chi aspetta l'altro passa, il rosso resta rosso",
+          [1, True, True, True, True],
+          [r.returncode, "✓ collaudo_cartone_aspetta" in r.stdout,
+           "✓ collaudo_cartone_scrive" in r.stdout,
+           "✗ collaudo_cartone_rosso" in r.stdout,
+           "2 verdi, 1 rossi" in r.stdout])
+    i = next((k for k, x in enumerate(righe) if x.startswith("✗ collaudo_cartone_rosso")), -1)
+    blocco = righe[i:]
+    fine = next((k for k, x in enumerate(blocco)
+                 if x == "::error::collaudo_cartone_rosso e' rosso"), -1)
+    prova("...e il blocco del rosso sta intero, senza righe d'altri in mezzo",
+          [True, True, []],
+          [i >= 0, fine > 0,
+           [x for x in blocco[:fine] if x.startswith(("✓", "✗ collaudo_cartone_a"))]])
+    prova("un --paralleli storto ferma il lanciatore con 2, non gira in un modo diverso",
+          2, storta.returncode)
 
 
 def prove_servizio_non_root():
@@ -164655,7 +164853,7 @@ def main():
               prove_catalogo_esterno,
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
-              prove_giudice_deploy, prove_collaudi_in_ci,
+              prove_giudice_deploy, prove_collaudi_in_ci, prove_ci_leggera,
               prove_elenco_dei_collaudi,
               prove_servizio_non_root,
               prove_guardiano_ponte,

@@ -60645,3 +60645,155 @@ la suite severa intera, 24.447 passate e 0 fallite, e i collaudi della CI
 in gabbia, 82 verdi e 0 rossi. Poi questa voce, e l'ultimo fetch e
 rebase prima del push: le sezioni toccate rigirate sull'albero finale
 sono scritte nel messaggio del commit del verbale.
+## La CI leggera: la coda dei giri, i collaudi saltati sui commit di soli documenti, i collaudi due alla volta e i tetti dei job (16 ott 2026, cantiere ci-leggera, richiesta di Andrea)
+
+**LA DOMANDA.** Ogni push su main faceva ~21 minuti di job `prove`, e con
+tante sessioni i push sono tanti: meno minuti di GitHub e giri più corti,
+SENZA perdere sicurezza. Le condizioni di Andrea: `pronto` si muove solo
+su commit firmati con CI verde, come prima; il controllo delle firme sul
+VPS non si tocca; nessuna prova tolta — si cambia QUANDO e COME gira la
+CI, mai COSA controlla.
+
+**IL PIANO IN DIECI RIGHE** (misurato sui 200 giri dal 6 al 15 ott 2026,
+tutti push su main; approvato da Andrea per i punti 2, 3 e 4):
+1. Oggi: ~22 push al giorno, ognuno ~24 minuti fatturati (job `prove`
+   ~21 — collaudi ~14,5, prove.py ~6, il resto ~0,5 —, `segreti` 1,3 che
+   si paga 2, `pronto` 0,5 che si paga 1: GitHub arrotonda ogni job al
+   minuto). Fa ~12.400 minuti al mese sulla media del periodo, ~16.000 al
+   ritmo degli ultimi giorni. La fattura vera è nell'account di Andrea,
+   non guardata.
+2. La coda (`concurrency`, `cancel-in-progress: false`): un giro alla
+   volta per ramo, quello che corre finisce sempre, in attesa ne resta
+   uno solo (l'ultimo). Il giudice del VPS chiede il verde sulla punta e
+   non cambia; un commit saltato non è mai punta di `pronto`. Simulata
+   sugli orari veri: −17 %. Il 15 ott cinque push in trenta minuti.
+3. Commit di soli documenti: 33 sezioni di prove.py leggono i .md e
+   restano tutte, perché prove.py gira intero; si saltano SOLO i
+   collaudi, che girano il server, e il server non legge nessun .md. Il
+   confronto è con l'albero di `pronto`, non col push prima. 33 giri su
+   200: ~−8 %.
+4. Cache di pip e npm: ~10 secondi a giro, scartate. Il risparmio facile
+   vero sono i collaudi due alla volta (processi già separati, database
+   usa-e-getta ciascuno) e un tetto di minuti per job.
+5. Suite intera di notte e a ogni push solo le sezioni toccate: NO. Il
+   verde parziale manderebbe in produzione codice controllato a metà, e
+   la mappa «file → sezioni» su 455 sezioni sarebbe una sentinella molle.
+6. Runner nostro: NO, solo valutato. Il codice di ogni push girerebbe su
+   una macchina con config, chiavi e ssh verso il VPS, e un runner
+   compromesso può fingere il verde che il giudice del deploy si fida a
+   leggere; in più, PC spento vuol dire niente CI e quindi niente deploy.
+7. Stima del piano: 2 −17 %, 3 −8 %, collaudi in parallelo −25/30 %, in
+   tutto ~−40 %. CORRETTA dopo la misura (sotto): il parallelo rende
+   meno del previsto, e il totale stimato è ~−37 %.
+
+**COSA C'È.**
+- `.github/workflows/prove.yml`: `concurrency` in testa (gruppo
+  `prove-${{ github.ref }}`, `cancel-in-progress: false`, col perché);
+  `timeout-minutes` 60 / 15 / 10 sui tre job (di serie erano 360); il
+  passo dei collaudi diventa `python collaudi_ci.py --elenco
+  ci/collaudi.txt --paralleli 2 --salvo-solo-documenti-da pronto`.
+  Nient'altro: nomi dei job, `needs`, permessi, il passo di `pronto`, i
+  segreti e prove.py sono quelli di prima.
+- `collaudi_ci.py`: le due opzioni (senza, gira come sempre).
+  `solo_documenti()` dice sì solo a un elenco NON VUOTO di file tutti
+  `.md`; `cambiati_da()` prende la punta di `pronto` (`--depth=1`) e
+  confronta gli ALBERI, e a qualunque intoppo torna None, cioè si gira
+  tutto. Lo stesso albero di `pronto` gira tutto (un giro rifatto a mano
+  lo si vuole intero). Il salto si DICE: la riga ⏭ coi file e un
+  `::notice::`. Il parallelo: un pool di fili che aspettano i processi;
+  il blocco di ogni collaudo finito lo stampa `racconta()` dal filo
+  principale, quindi due uscite non si mescolano; l'ordine è quello di
+  fine, il conto in fondo lo stesso.
+- `prove.py`: `prove_ci_leggera` (nuova) — la coda per ramo e nessun
+  `cancel-in-progress: true`, i tre tetti, prove.py senza condizioni,
+  il confronto coi documenti solo nel passo dei collaudi e solo contro
+  `pronto`; il giudice dei documenti sui casi (vuoto, None, un .txt, un
+  `.md.py`); dal vero su un repo di cartone con `pronto` (commit con la
+  plumbing, niente firma né identità): stesso albero → gira, solo .md →
+  salta con la riga e l'annotazione, senza opzione → gira, ramo che non
+  c'è → gira, un .txt → gira; il parallelo dal vero e D'ORDINE, non di
+  cronometro (il primo collaudo aspetta un file che scrive il secondo: in
+  fila sarebbe rosso), il rosso resta rosso col blocco intero, un
+  `--paralleli due` ferma con 2. `prove_collaudi_in_ci`: la riga attesa
+  del passo ha le due opzioni, e le annotazioni si cercano da
+  `racconta()` (con la chiamata in main()) invece che da main().
+
+**PERCHÉ `pronto` E NON IL PUSH PRIMA.** Con la coda un giro in attesa
+può essere sostituito e non girare mai. Se quel commit toccava il codice
+e il successivo solo i documenti, il diff col push prima direbbe «solo
+documenti» e il codice nuovo andrebbe in produzione senza collaudi.
+`pronto` invece è per costruzione l'ultimo albero passato col giro
+intero, o con un giro di soli .md sopra un albero passato intero: quel
+che ne differisce solo per dei .md ha il codice già collaudato. Il buco
+che resta, dichiarato: se un giorno `pronto` venisse spostato a mano su
+un commit mai verde, il confronto partirebbe da lì (il VPS comunque non
+lo tirerebbe: il giudice chiede il verde).
+
+**PERCHÉ LA CODA E NON L'INTERRUZIONE.** `cancel-in-progress: true`
+risparmia di più (simulato −22 % contro −17 %), ma con le sessioni che
+pushano a raffica ogni giro verrebbe ucciso dal successivo e `pronto`
+potrebbe restare fermo per ore. In coda c'è sempre un giro che arriva in
+fondo. Un giro sostituito in attesa risulta «cancelled»: NON è un rosso,
+il suo commit lo prova il giro dopo, che contiene il suo albero.
+
+**PROVATO.** Nel worktree, su origin/main 21ee58f: `PROVE_SEVERE=1 python
+prove.py` 24462 passate e 1 fallita — la bussola dei documenti, che ha
+preso il `docs/NOTE.md` del repo di cartone per un rimando rotto
+(rinominato `docs/nota.md`, che la bussola non guarda) —, poi le due
+sezioni rigirate verdi. Le sezioni che leggono il workflow o il
+lanciatore (`prove_ci_leggera`, `prove_collaudi_in_ci`,
+`prove_elenco_dei_collaudi`, `prove_runner_fisso`, `prove_bussola`)
+verdi. I due scalini di prima (compileall da `ci/compila.txt`, il config
+d'esempio), il YAML riletto (`concurrency` e i tre tetti), e i due passi
+dei segreti sulle righe aggiunte (FORME, SEGNAPOSTI ed esadecimale nudo
+presi dal workflow, con la controprova che morde): puliti.
+I COLLAUDI INTERI, due giri con DUE PROCESSORI SOLI (l'affinità del
+processo: il runner privato di GitHub ne ha due), lanciati insieme su
+processori diversi: in fila 81 verdi e 1 rosso in 21,7 minuti, due alla
+volta 81 verdi e 1 rosso in 15,5 minuti. Il rosso è lo STESSO nei due
+giri, `collaudo_canale_admin`: la bash di Git tiene occupata la cartella
+temporanea un attimo dopo la fine («il file è utilizzato da un altro
+processo»), su Windows e sotto carico (in quel momento giravano anche
+la suite e l'altro giro). C'è anche in fila, cioè col codice di sempre:
+non viene dal parallelo. Rigirato da solo, verde 2 volte su 2; due alla
+volta accanto a `collaudo_freni`, verde 3 volte su 3. Su Linux una
+cartella in uso si cancella, quindi in CI non può capitare.
+
+**I MINUTI, PRIMA E DOPO.** PRIMA (giri veri di main, 6-15 ott 2026): ~24 minuti
+fatturati a push (job `prove` ~21, di cui collaudi ~14,5 e prove.py ~6;
+`segreti` 2, `pronto` 1), ~22 push al giorno: ~12.400 minuti al mese
+sulla media del periodo, ~16.000 al ritmo degli ultimi giorni.
+DOPO (stima, coi numeri misurati qui): collaudi due alla volta −29 % a
+parità di processori (21,7 → 15,5 minuti in locale), cioè in CI da ~14,5
+a ~10,3; il job `prove` da ~21 a ~17 minuti, un push da ~24 a ~20
+minuti fatturati. Poi i soli documenti (16 % dei push, ~10 minuti di
+collaudi in meno ciascuno: ~1,7 a push in media) e la coda (−17 % dei
+giri, simulata sugli orari veri). In tutto ~15 minuti a push in media
+invece di ~24: circa −37 %, cioè ~7.800 minuti al mese invece di
+~12.400 (~10.000 invece di ~16.000 al ritmo di ottobre). Il giro singolo
+che una sessione aspetta passa da ~21 a ~17 minuti, ~6 sui soli
+documenti. Il numero vero si legge sui giri di main dopo il push.
+
+**DA FARE** (notati, non fatti):
+- Il commit tocca il workflow, quindi il job `pronto` di questo giro
+  sarà rosso («refusing to allow a GitHub App to create or update
+  workflow»), e anche quello dei push dopo finché il ref non salta il
+  commit: `pronto` lo sposta Andrea a mano (gesto di deploy), come il 13
+  ott.
+- CLAUDE.md dice «la CI fino al verde (`gh run watch --exit-status`)»:
+  con la coda una sessione può vedere il suo giro «cancelled» e deve
+  guardare quello dopo. Una riga in CLAUDE.md, come commit a parte, se
+  Andrea vuole.
+- Il numero vero del «dopo» si legge sui giri di main della prossima
+  settimana (stessa misura di `gh run list` + `gh run view --json
+  jobs`), e si scrive qui sotto.
+- Misurare in CI `--paralleli 3`: se i collaudi aspettano più che
+  calcolare, tre su due processori potrebbero rendere di più. Si prova
+  su un giro, non si cambia a occhio.
+- `collaudo_canale_admin` su Windows sotto carico (vedi PROVATO):
+  succede anche in fila. Si potrebbe far ripulire la cartella con
+  `ignore_cleanup_errors=True`, ma è un collaudo altrui e non è stato
+  chiesto.
+- Se un collaudo «a cronometro» comincia a ballare col parallelo, si
+  dichiara e si guarda quel collaudo; non si torna a `--paralleli 1`
+  senza averlo nominato.

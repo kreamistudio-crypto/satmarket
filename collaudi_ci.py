@@ -36,6 +36,10 @@ viaggia nel PYTHONPATH.
 
 Uso:  python collaudi_ci.py --elenco ci/collaudi.txt     (quel che fa la CI)
       python collaudi_ci.py collaudo_porta_timer collaudo_... [...]
+Opzioni (16 ott 2026, la CI leggera; senza, si gira come sempre):
+      --paralleli N                 N collaudi alla volta (la CI: 2)
+      --salvo-solo-documenti-da R   niente collaudi se HEAD differisce
+                                    dal ramo R di origin solo per dei .md
 """
 import os
 import re
@@ -43,6 +47,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 QUI = os.path.dirname(os.path.abspath(__file__))
 TEMPO_MAX_S = 600
@@ -215,6 +220,69 @@ def leggi_elenco(percorso):
     return dentro, fuori, storte
 
 
+# ------------- LA CI LEGGERA (16 ott 2026, cantiere ci-leggera) ------
+# Due leve, tutte e due di QUANDO e COME girano i collaudi, mai di COSA:
+# l'elenco resta quello, la gabbia resta quella, e un collaudo rosso
+# ferma il deploy come prima. Il perche' e i numeri: docs/CANTIERI.md,
+# «La CI leggera».
+
+# Il commit di soli documenti: i collaudi girano il SERVER, e il server
+# non legge nessun .md (verificato il 16 ott: in server.py e nei
+# collaudi i .md compaiono solo nei commenti). Le sezioni di prove.py
+# che leggono i documenti girano TUTTE lo stesso, perche' prove.py non
+# si tocca. Solo `.md`: un .txt, un .json o uno script accanto ai
+# documenti fanno girare tutto.
+FORMA_DOCUMENTO = re.compile(r".+\.md")
+
+
+def solo_documenti(cambiati):
+    """Vero solo se c'e' almeno un file cambiato e sono TUTTI .md.
+
+    L'elenco VUOTO non e' «solo documenti»: vuol dire lo stesso albero
+    di `pronto`, cioe' un giro rifatto a mano (un rosso a caso da
+    ricontrollare), e chi rifà un giro lo vuole intero. None (il
+    confronto non e' riuscito) gira tutto, sempre."""
+    return bool(cambiati) and all(FORMA_DOCUMENTO.fullmatch(n)
+                                  for n in cambiati)
+
+
+def cambiati_da(base):
+    """I file in cui l'albero di HEAD differisce da quello di `base`
+    (un ramo di origin: in CI `pronto`). None se qualunque passo non
+    riesce — e None vuol dire girare TUTTO.
+
+    IL CONFRONTO E' CON `pronto` E NON COL PUSH DI PRIMA, ed e' il
+    pezzo da non cambiare: con la coda della CI un giro in attesa puo'
+    essere sostituito dal successivo e non girare mai. Se il commit
+    saltato toccava il codice e quello dopo solo i documenti, il diff
+    col push di prima direbbe «solo documenti» e il codice nuovo
+    andrebbe in produzione senza un collaudo. `pronto` invece e' per
+    costruzione l'ultimo albero passato col giro intero (o con un giro
+    di soli documenti sopra un albero passato intero): quel che ne
+    differisce solo per dei .md ha lo stesso codice gia' collaudato.
+    Si confrontano gli ALBERI, non la storia: il checkout della CI e'
+    corto, e basta la punta di `pronto` (--depth=1)."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", base or ""):
+        return None
+    locale = f"refs/remotes/origin/{base}"
+    try:
+        f = subprocess.run(["git", "fetch", "--quiet", "--depth=1", "origin",
+                            f"+refs/heads/{base}:{locale}"],
+                           cwd=QUI, capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=120)
+        if f.returncode != 0:
+            return None
+        d = subprocess.run(["git", "diff", "--name-only", "--no-renames",
+                            locale, "HEAD"],
+                           cwd=QUI, capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if d.returncode != 0:
+        return None
+    return [r for r in d.stdout.splitlines() if r.strip()]
+
+
 def gira(nome, gabbia, segni):
     """Un collaudo, nella gabbia. Torna (ok, secondi, uscita)."""
     percorso = os.path.join(QUI, nome + ".py")
@@ -238,9 +306,73 @@ def gira(nome, gabbia, segni):
     return codice == 0, time.time() - inizio, uscita
 
 
+def togli_opzioni(argv):
+    """Le due opzioni della CI leggera, tolte da argv ovunque stiano.
+    Torna (paralleli, base, resto) oppure None se un'opzione e' storta
+    — e chi chiama si FERMA: un «--paralleli due» ignorato in silenzio
+    girerebbe in un modo diverso da quello scritto."""
+    paralleli, base, resto = 1, None, []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--paralleli", "--salvo-solo-documenti-da"):
+            if i + 1 >= len(argv):
+                return None
+            v = argv[i + 1]
+            if a == "--paralleli":
+                if not v.isdigit() or not 1 <= int(v) <= 16:
+                    return None
+                paralleli = int(v)
+            else:
+                base = v
+            i += 2
+            continue
+        resto.append(a)
+        i += 1
+    return paralleli, base, resto
+
+
+def racconta(nome, ok, secondi, uscita, bussate):
+    """Il blocco di un collaudo finito: la riga, e se e' rosso la coda,
+    le righe rosse e le annotazioni. Lo stampa un filo solo (il
+    principale), quindi due collaudi in parallelo non si mescolano."""
+    segno = "✓" if ok else "✗"
+    print(f"{segno} {nome}  ({secondi:.0f}s)", flush=True)
+    if ok:
+        return
+    print("\n".join("    " + r for r in uscita.splitlines()[-40:]))
+    # E QUALI RIGHE SONO CADUTE, TUTTE, anche se stanno ben prima
+    # della coda — una annotazione per riga, che GitHub mostra in
+    # cima alla corsa senza aprire il registro
+    rosse = righe_rosse(uscita)
+    if rosse:
+        print(f"    --- le righe rosse di {nome}, tutte ---")
+        print("\n".join("    " + r for r in rosse))
+        for k, r in enumerate(rosse):
+            if r.startswith("Traceback"):
+                # l'annotazione dice l'ECCEZIONE, cioe' l'ultima
+                # riga del blocco (le righe del blocco sono rientrate)
+                fine = k + 1
+                while fine < len(rosse) and rosse[fine].startswith("    "):
+                    fine += 1
+                print(f"::error::{nome}: {rosse[fine - 1].strip()}")
+            elif r.startswith(SEGNI_ROSSI) or FORMA_ECCEZIONE.match(r):
+                print(f"::error::{nome}: {senza_segno(r)}")
+    for b in bussate:
+        print(f"    ⛔ rete: {b}")
+        print(f"::error::{nome}: ha provato a uscire in rete ({b})")
+    print(f"::error::{nome} e' rosso", flush=True)
+
+
 def main(nomi):
     # la console di Windows parla cp1252, e una ✓ la farebbe esplodere
     sys.stdout.reconfigure(encoding="utf-8")
+    opzioni = togli_opzioni(nomi)
+    if opzioni is None:
+        print("::error::opzione storta: --paralleli vuole un numero da 1 a "
+              "16, --salvo-solo-documenti-da il nome di un ramo")
+        return 2
+    paralleli, base, nomi = opzioni
     if nomi[:1] == ["--elenco"]:
         # DAL FILE, che e' quel che fa la CI. Un elenco che non si
         # legge, vuoto o con una riga storta e' ROSSO, mai «0 verdi, 0
@@ -264,46 +396,57 @@ def main(nomi):
         print("Uso: python collaudi_ci.py --elenco ci/collaudi.txt\n"
               "     python collaudi_ci.py collaudo_uno collaudo_due ...")
         return 2
+    if base is not None:
+        cambiati = cambiati_da(base)
+        if solo_documenti(cambiati):
+            # si dice, e si dice QUALI: un salto muto sembrerebbe un
+            # giro verde, ed e' la cosa che un «verde» non deve mai fare
+            print(f"⏭ rispetto a `{base}` sono cambiati solo documenti "
+                  f"({len(cambiati)} file .md): i {len(nomi)} collaudi "
+                  "non girano, perche' il codice e' quello gia' collaudato. "
+                  "prove.py e i segreti girano interi.")
+            print("\n".join("    " + n for n in cambiati[:30]))
+            print(f"::notice::collaudi saltati: rispetto a {base} solo "
+                  f"documenti ({len(cambiati)} file .md)")
+            return 0
+        print(f"rispetto a `{base}`: "
+              + ("confronto non riuscito, si gira tutto" if cambiati is None
+                 else "lo stesso albero, si gira tutto" if not cambiati
+                 else f"{len(cambiati)} file, non solo documenti: si gira "
+                      "tutto"), flush=True)
     gabbia = tempfile.mkdtemp(prefix="gabbia-collaudi-")
     with open(os.path.join(gabbia, "sitecustomize.py"), "w",
               encoding="utf-8") as f:
         f.write(GABBIA)
-    rossi = []
-    for nome in nomi:
-        nome = nome.removesuffix(".py")
+    nomi = [n.removesuffix(".py") for n in nomi]
+
+    def uno(nome):
         segni = os.path.join(gabbia, nome + ".segni")
         ok, secondi, uscita = gira(nome, gabbia, segni)
         bussate = (open(segni, encoding="utf-8").read().splitlines()
                    if os.path.exists(segni) else [])
-        if bussate:
-            ok = False
-        segno = "✓" if ok else "✗"
-        print(f"{segno} {nome}  ({secondi:.0f}s)", flush=True)
+        return nome, ok and not bussate, secondi, uscita, bussate
+
+    rossi = []
+    inizio = time.time()
+    if paralleli == 1:
+        finiti = map(uno, nomi)
+    else:
+        # IN PARALLELO (16 ott 2026): ogni collaudo e' gia' un processo
+        # suo, col suo database usa-e-getta in una cartella temporanea e
+        # il suo file di segni; i fili qui aspettano e basta. L'ordine in
+        # cui si stampano e' quello in cui FINISCONO; il conto in fondo
+        # e' lo stesso.
+        print(f"(i collaudi girano {paralleli} alla volta)", flush=True)
+        pool = ThreadPoolExecutor(max_workers=paralleli)
+        finiti = (f.result() for f in
+                  as_completed([pool.submit(uno, n) for n in nomi]))
+    for nome, ok, secondi, uscita, bussate in finiti:
+        racconta(nome, ok, secondi, uscita, bussate)
         if not ok:
             rossi.append(nome)
-            print("\n".join("    " + r for r in uscita.splitlines()[-40:]))
-            # E QUALI RIGHE SONO CADUTE, TUTTE, anche se stanno ben prima
-            # della coda — una annotazione per riga, che GitHub mostra in
-            # cima alla corsa senza aprire il registro
-            rosse = righe_rosse(uscita)
-            if rosse:
-                print(f"    --- le righe rosse di {nome}, tutte ---")
-                print("\n".join("    " + r for r in rosse))
-                for k, r in enumerate(rosse):
-                    if r.startswith("Traceback"):
-                        # l'annotazione dice l'ECCEZIONE, cioe' l'ultima
-                        # riga del blocco (le righe del blocco sono rientrate)
-                        fine = k + 1
-                        while fine < len(rosse) and rosse[fine].startswith("    "):
-                            fine += 1
-                        print(f"::error::{nome}: {rosse[fine - 1].strip()}")
-                    elif r.startswith(SEGNI_ROSSI) or FORMA_ECCEZIONE.match(r):
-                        print(f"::error::{nome}: {senza_segno(r)}")
-            for b in bussate:
-                print(f"    ⛔ rete: {b}")
-                print(f"::error::{nome}: ha provato a uscire in rete ({b})")
-            print(f"::error::{nome} e' rosso")
-    print(f"\n{len(nomi) - len(rossi)} verdi, {len(rossi)} rossi")
+    print(f"\n{len(nomi) - len(rossi)} verdi, {len(rossi)} rossi"
+          f"  (in {time.time() - inizio:.0f}s)")
     return 1 if rossi else 0
 
 

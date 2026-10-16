@@ -10,6 +10,31 @@ on:
   push:
   pull_request:
 
+# LA CODA (16 ott 2026, cantiere ci-leggera): un giro alla volta per
+# ramo. Se arrivano altri push mentre un giro corre, ne ASPETTA uno
+# solo — l'ultimo arrivato, che sostituisce quelli in attesa prima di
+# lui — e il giro gia' partito finisce SEMPRE. Il 15 ott cinque push in
+# trenta minuti hanno fatto cinque giri da venti minuti; con la coda
+# sarebbero stati due, e l'ultimo prova l'albero che contiene tutti.
+#
+# `cancel-in-progress: false` E' VOLUTO, ed e' la riga da non girare.
+# Interrompere il giro che corre risparmierebbe qualche minuto in piu',
+# ma con tante sessioni che pushano a raffica `pronto` potrebbe non
+# muoversi per ore: ogni giro ucciso a meta' dal successivo. In coda
+# invece c'e' sempre un giro che arriva in fondo, e `pronto` prende
+# l'ultimo commit verde come oggi. Il giudice del VPS non cambia: chiede
+# il verde di `prove` e `segreti` sulla punta, e un commit saltato dalla
+# coda non e' mai una punta di `pronto`. I segreti non perdono niente:
+# guardano TUTTA la cronologia, quindi il giro dopo guarda anche i
+# commit saltati.
+#
+# Un giro sostituito in attesa risulta «cancelled»: non e' un rosso, il
+# suo commit lo prova il giro dopo. Il perche' e i numeri:
+# docs/CANTIERI.md, «La CI leggera».
+concurrency:
+  group: prove-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   prove:
     # La CI legge e basta: compila, prova, guarda. Non commenta, non
@@ -29,6 +54,12 @@ jobs:
     # Quando e come salire a Ubuntu 26.04, con una prova su un ramo
     # prima: docs/CANTIERI.md, "Il runner della CI col numero".
     runs-on: ubuntu-24.04
+    # IL TETTO DEL GIRO (16 ott 2026, ci-leggera): di serie GitHub ne
+    # aspetta 360, e un giro appeso li paga tutti mentre la coda qui
+    # sopra tiene fermi i push dopo di lui. Oggi il job ne dura ~20 (in
+    # fila) e il tetto e' il triplo abbondante: chi lo tocca, lo tocca
+    # perche' la suite e' cresciuta davvero, non per far passare un giro.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
@@ -175,9 +206,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: pip install --quiet fastapi httpx anthropic
 
+      # LE DUE OPZIONI DELLA CI LEGGERA (16 ott 2026), che cambiano
+      # QUANDO e COME girano i collaudi e mai QUALI (il perche' sta in
+      # collaudi_ci.py e in docs/CANTIERI.md, «La CI leggera»):
+      # `--paralleli 2`, due alla volta, quanti sono i processori del
+      # runner; `--salvo-solo-documenti-da pronto`, niente collaudi se
+      # l'albero differisce da quello di `pronto` solo per dei .md — il
+      # confronto e' con `pronto` e non col push prima, e se non riesce
+      # si gira tutto.
       - name: I collaudi, senza rete
         if: ${{ !cancelled() }}
-        run: python collaudi_ci.py --elenco ci/collaudi.txt
+        run: python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2 --salvo-solo-documenti-da pronto
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.
@@ -194,6 +233,8 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
+    # dura ~1 minuto e mezzo (la cronologia intera): il tetto e' largo
+    timeout-minutes: 15
     env:
       # Le forme dei segreti, scritte UNA volta: le guardano sia i file
       # di oggi sia la cronologia, e due elenchi che divergono sarebbero
@@ -457,6 +498,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       # La STORIA INTERA, e non e' un dettaglio: il checkout di serie e'
       # SHALLOW (un commit solo), quindi git non puo' dimostrare che
