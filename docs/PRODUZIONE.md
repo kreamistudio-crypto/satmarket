@@ -4919,6 +4919,19 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `ls -la /srv/barattolo/dati/chat-scambi.db`
   `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT COUNT(*), COUNT(DISTINCT ordine) FROM buste;"`
   Quante buste, su quanti scambi: a mercato fermo deve tornare a zero.
+  GLI ALLEGATI (16 ott 2026, cantiere barcode-paycode, parte C): foto e
+  PDF della chat stanno nello STESSO file, tabella `allegati`, gia'
+  cifrati dal telefono (il server non sa nemmeno che tipo sono). Nasce
+  da sola al primo avvio, nessuna migrazione. Il file puo' crescere fino
+  al tetto di 500 MB di allegati (`P2P_CHAT_ALLEGATI_CASSETTO`; oltre,
+  chi manda sente «Adesso non c'è spazio per i file»); se ne vanno a
+  scambio finito come le buste, e lo spazio torna libero dentro il file
+  (sqlite lo riusa; il file su disco non si restringe da solo). In sola
+  lettura:
+  `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT COUNT(*), COALESCE(SUM(peso),0)/1048576 FROM allegati;"`
+  Nel journal una riga per file, col solo peso: «📎 Chat P2P: un
+  allegato sullo scambio …, N KB». pdf.js (`vendor/pdf.min.mjs`,
+  `vendor/pdf.worker.min.mjs`) viaggia col deploy come gli altri vendor.
   NEL JOURNAL (`journalctl -u barattolo | grep "Chat P2P"`): «💬 Chat
   P2P: nuovo messaggio sullo scambio …, avvisato …» quando parte un
   avviso; «🧹 Chat P2P: lo scambio … e' finito, buste cancellate» alla

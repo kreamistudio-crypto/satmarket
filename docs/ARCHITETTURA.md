@@ -30310,6 +30310,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    nell'iframe di un estraneo — tutte le altre lo vietano con
    `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
+   `/vendor/pdf.mjs` e `/vendor/pdf.worker.mjs` (16 ott 2026: pdf.js
+   4.10.38, per disegnare i PDF della chat; vedi «GLI ALLEGATI»),
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
    da ago 2026 i font stanno in casa e non li chiede più nessuno a
    Google — vedi «I FONT VENGONO IN CASA»),
@@ -32534,7 +32536,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `/api/p2p/chat/invia` `{ordine, tipo, busta[, per]}`;
   `/api/p2p/chat/moderatori` `{ordine}` → le chiavi pubbliche di
   `p2p_moderatori`; `/api/p2p/moderazione/chat` `{ordine}` (solo chi ha
-  PRESO la disputa). I giudici: `_chat_p2p_stato` (parti e fine da
+  PRESO la disputa). GLI ALLEGATI (16 ott 2026, cantiere barcode-paycode,
+  parte C): foto (jpg, png, webp — il webp parte ridisegnato in jpeg) e PDF fino a 2 MB, CIFRATI SUL TELEFONO con
+  AES-256-GCM e una chiave a caso per file; la chiave, il tipo e il peso
+  viaggiano nel tag `f` del messaggio (busta chiusa), il testo e' «📎
+  Foto»/«📎 PDF». Tabella `allegati` nello stesso cassetto (id a caso,
+  ordine, giro, da, dati, peso, quando: il tipo il server non lo sa);
+  `/api/p2p/chat/allegato` (i byte nudi `iv || cifrato`, lo scambio
+  nell'intestazione `X-Chat-Ordine`, il corpo letto a pezzi col tetto)
+  → `{id}`; `/api/p2p/chat/allegato/leggi` `{ordine, id}` → i byte;
+  `/api/p2p/moderazione/chat/allegato` `{ordine, id}` (solo a disputa
+  presa). Tetti `P2P_CHAT_ALLEGATO_MAX` (2 MB + 28), dieci per parte,
+  500 MB per tutto il cassetto (507). Se ne vanno con le buste
+  (`_chat_p2p_spazza`, il ritiro del giro nuovo, la rete dei 30
+  giorni). Nel client il blocco «GLI ALLEGATI» del motore della chat:
+  `tipoDaByteChatScP2P` (il tipo dai primi byte), `preparaFotoChatScP2P`
+  (la foto ridisegnata su un canvas: niente EXIF, niente GPS; png resta
+  png, sopra i 2 MB jpeg piu' piccola), `cifra`/`decifraAllegatoChatScP2P`,
+  `allegaChatScambioP2P` (il 📎 del piede, solo dove
+  `chatScAllegatiPossibiliP2P`), `apriAllegatoChatScP2P` (rigiudica,
+  decifra, confronta i primi byte col tipo annunciato) e
+  `mostraAllegatoChatScP2P` (la foto in `#p2pAllegatoSheet`, il PDF
+  pagina per pagina con pdf.js da `/vendor/pdf.mjs`, `isEvalSupported:
+  false`, niente livello dei link). Il file in chiaro non si salva mai.
+  I giudici: `_chat_p2p_stato` (parti e fine da
   `_parti_scambio_p2p`: aperta a scambio VIVO e con due account;
   `finito`, `estraneo` → 403, `solo`); `_chat_p2p_ritira`;
   `_chat_p2p_posa` (i tetti: `P2P_CHAT_BUSTA_MAX` 4096,

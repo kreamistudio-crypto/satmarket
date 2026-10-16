@@ -50631,6 +50631,21 @@ P2P_CHAT_NOVITA_MAX = 30          # scambi per domanda del pallino
 # spedita (`_chat_p2p_ritira`), e se ne va con le altre buste
 P2P_CHAT_TIPI = ("saluto", "msg", "mod", "chiave")
 FORMA_BUSTA_CHAT = re.compile(r"^[A-Za-z0-9+/]{40,}={0,2}$")
+# GLI ALLEGATI (16 ott 2026, cantiere barcode-paycode, parte C, richiesta
+# di Andrea: chi vende doveva mandare il PDF del PayCode). Una foto o un
+# PDF, CIFRATO SUL TELEFONO (AES-256-GCM, una chiave a caso per file): qui
+# arriva solo `iv || cifrato`, la chiave viaggia DENTRO il messaggio della
+# chat, che e' una busta chiusa come le altre. Il server non sa nemmeno
+# che tipo di file sia. Stanno nello STESSO cassetto delle buste
+# (`chat-scambi.db`: fuori dai backup, `secure_delete`) e se ne vanno
+# con loro, a scambio finito. I tetti sono qui e nel telefono: un client
+# ritoccato non deve poter riempire il disco.
+P2P_CHAT_FILE_MAX = 2 * 1024 * 1024          # il file in chiaro: 2 MB (decisione di Andrea per i PDF)
+P2P_CHAT_ALLEGATO_MAX = P2P_CHAT_FILE_MAX + 28   # + 12 di iv e 16 di sigillo GCM
+P2P_CHAT_ALLEGATO_MIN = 29
+P2P_CHAT_ALLEGATI_PARTE = 10                  # per parte e per scambio
+P2P_CHAT_ALLEGATI_CASSETTO = 500 * 1024 * 1024   # tutto il cassetto, tutti gli scambi
+FORMA_ALLEGATO_CHAT = re.compile(r"^[0-9a-f]{32}$")
 _CHAT_PRONTA = {"file": ""}
 _TASK_CHAT_P2P = set()
 
@@ -50660,6 +50675,16 @@ def db_chat():
                 quando INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_buste_ordine ON buste(ordine, giro, n);
+            CREATE TABLE IF NOT EXISTS allegati(
+                id TEXT PRIMARY KEY,
+                ordine TEXT NOT NULL,
+                giro INTEGER NOT NULL,
+                da INTEGER NOT NULL,
+                dati BLOB NOT NULL,
+                peso INTEGER NOT NULL,
+                quando INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_allegati_ordine ON allegati(ordine, giro);
             CREATE TABLE IF NOT EXISTS letture(
                 ordine TEXT NOT NULL,
                 giro INTEGER NOT NULL,
@@ -50888,7 +50913,7 @@ def _chat_p2p_spazza(ordine: str = "") -> int:
         dove, arg = (" WHERE ordine=?", (ordine,)) if ordine else ("", ())
         ordini = [r[0] for r in cc.execute(
             "SELECT ordine FROM buste" + dove + " UNION SELECT ordine FROM letture"
-            + dove, arg + arg)]
+            + dove + " UNION SELECT ordine FROM allegati" + dove, arg + arg + arg)]
         vivi = {}
         if ordini:
             con = db()
@@ -50904,9 +50929,14 @@ def _chat_p2p_spazza(ordine: str = "") -> int:
                              (o, giro)).rowcount
             via += cc.execute("DELETE FROM letture WHERE ordine=? AND giro<>?",
                               (o, giro)).rowcount
+            # gli allegati se ne vanno con le buste (16 ott 2026)
+            via += cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?",
+                              (o, giro)).rowcount
             svuotati += 1 if via else 0
         if not ordine:
             cc.execute("DELETE FROM buste WHERE quando<?",
+                       (adesso - P2P_CHAT_VITA_MAX_S,))
+            cc.execute("DELETE FROM allegati WHERE quando<?",
                        (adesso - P2P_CHAT_VITA_MAX_S,))
         cc.commit()
         return svuotati
@@ -50987,6 +51017,7 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         # le buste di un giro di prima, se ce ne sono ancora: via
         cc.execute("DELETE FROM buste WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
         cc.execute("DELETE FROM letture WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
+        cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
         corpo = _chat_p2p_ritira(cc, ordine, st["giro"], user["id"], dopo,
                                  int(time.time()))
     finally:
@@ -51045,6 +51076,132 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
         t.add_done_callback(_TASK_CHAT_P2P.discard)
     return JSONResponse({"ok": True, "n": corpo["n"], "quando": corpo["quando"]},
                         headers={"Cache-Control": "no-store"})
+
+
+def _chat_p2p_allegato_posa(cc, ordine: str, giro: int, io: int, dati: bytes,
+                            adesso: int) -> tuple:
+    """UN ALLEGATO ENTRA NEL CASSETTO (16 ott 2026). Pura sulla
+    connessione del cassetto. `dati` e' gia' cifrato dal telefono: qui
+    si guarda solo quanto pesa. Torna `(200, {id, peso})` o `(codice,
+    perche')`. L'id lo sceglie il server, a caso: non dice niente di chi
+    l'ha mandato ne' di quando."""
+    peso = len(dati or b"")
+    if peso < P2P_CHAT_ALLEGATO_MIN:
+        return (400, "Richiesta non valida")
+    if peso > P2P_CHAT_ALLEGATO_MAX:
+        return (413, "Il file è troppo grande: al massimo 2 MB")
+    mie = int(cc.execute("SELECT COUNT(*) FROM allegati WHERE ordine=? AND giro=? AND da=?",
+                         (ordine, giro, int(io))).fetchone()[0] or 0)
+    if mie >= P2P_CHAT_ALLEGATI_PARTE:
+        return (409, f"In questo scambio hai già mandato {P2P_CHAT_ALLEGATI_PARTE} file")
+    tutto = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati").fetchone()[0] or 0)
+    if tutto + peso > P2P_CHAT_ALLEGATI_CASSETTO:
+        return (507, "Adesso non c'è spazio per i file: riprova più tardi")
+    ident = secrets.token_hex(16)
+    cc.execute("INSERT INTO allegati(id, ordine, giro, da, dati, peso, quando) "
+               "VALUES(?,?,?,?,?,?,?)",
+               (ident, ordine, giro, int(io), sqlite3.Binary(bytes(dati)), peso, adesso))
+    cc.commit()
+    return (200, {"id": ident, "peso": peso})
+
+
+def _chat_p2p_allegato_prendi(cc, ordine: str, giro: int, ident: str):
+    """I byte cifrati di un allegato di QUESTO scambio e di QUESTO giro, o
+    None. Pura sulla connessione del cassetto."""
+    if not FORMA_ALLEGATO_CHAT.fullmatch(str(ident or "")):
+        return None
+    r = cc.execute("SELECT dati FROM allegati WHERE id=? AND ordine=? AND giro=?",
+                   (ident, ordine, int(giro))).fetchone()
+    return bytes(r["dati"]) if r else None
+
+
+def _risposta_allegato(dati: bytes) -> Response:
+    """I byte cifrati, cosi' come sono: nessuno qui sa cosa siano."""
+    return Response(content=dati, media_type="application/octet-stream",
+                    headers={"Cache-Control": "no-store",
+                             "Content-Disposition": "attachment; filename=allegato.bin"})
+
+
+@app.post("/api/p2p/chat/allegato")
+async def chat_allegato_p2p(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie(""),
+                            x_chat_ordine: str = Header("")):
+    """Il telefono consegna un allegato GIA' CIFRATO: il corpo sono i
+    byte nudi (`iv || cifrato`), lo scambio sta nell'intestazione
+    `X-Chat-Ordine` (mai nell'indirizzo: uvicorn lo scriverebbe). Il
+    corpo si legge A PEZZI col tetto, come il cestino della CSP: un
+    Content-Length che mente non cambia niente. Nel journal una riga
+    col peso, e basta: il tipo il server non lo sa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    ordine, st = _chat_p2p_chiede({"ordine": x_chat_ordine}, user)
+    if not st["aperta"]:
+        raise HTTPException(409, "La chat di questo scambio non e' aperta")
+    dati = bytearray()
+    async for pezzo in req.stream():
+        dati.extend(pezzo)
+        if len(dati) > P2P_CHAT_ALLEGATO_MAX:
+            raise HTTPException(413, "Il file è troppo grande: al massimo 2 MB")
+    cc = db_chat()
+    try:
+        codice, esito = _chat_p2p_allegato_posa(cc, ordine, st["giro"], user["id"],
+                                                dati, int(time.time()))
+    finally:
+        cc.close()
+    if codice != 200:
+        raise HTTPException(codice, str(esito))
+    print(f"📎 Chat P2P: un allegato sullo scambio {ordine[:8]}, "
+          f"{max(1, esito['peso'] // 1024)} KB", flush=True)
+    return JSONResponse({"ok": True, "id": esito["id"]}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/chat/allegato/leggi")
+async def chat_allegato_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """Una delle due parti ritira i byte cifrati di un allegato del giro
+    in corso. Nel corpo `{ordine, id}`. La chiave ce l'ha il suo
+    telefono, nel messaggio che l'ha portato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine, st = _chat_p2p_chiede(d, user)
+    if not st["aperta"]:
+        return _chat_p2p_chiusa(ordine, st)
+    cc = db_chat()
+    try:
+        dati = _chat_p2p_allegato_prendi(cc, ordine, st["giro"], d.get("id"))
+    finally:
+        cc.close()
+    if dati is None:
+        raise HTTPException(404, "Questo file non c'è più")
+    return _risposta_allegato(dati)
+
+
+@app.post("/api/p2p/moderazione/chat/allegato")
+async def moderazione_chat_allegato_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """SOLO IL MODERATORE CHE HA PRESO LA DISPUTA, come per le buste della
+    chat: i byte cifrati di un allegato del giro della disputa. Li apre
+    il suo telefono SOLO se una delle parti gli ha dato la chiave della
+    chat, che porta quella del file. Nel corpo `{ordine, id}`."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Richiesta non valida")
+    con, cc = db(), db_chat()
+    try:
+        r = con.execute("SELECT giro, stato, presa_da FROM p2p_dispute WHERE ordine=?",
+                        (ordine,)).fetchone()
+        if not r:
+            raise HTTPException(404, "Disputa non trovata")
+        if r["stato"] != "presa" or int(r["presa_da"] or 0) != int(user["id"]):
+            raise HTTPException(409, "La chat si legge dopo aver preso la disputa")
+        dati = _chat_p2p_allegato_prendi(cc, ordine, int(r["giro"] or 0), d.get("id"))
+    finally:
+        con.close()
+        cc.close()
+    if dati is None:
+        raise HTTPException(404, "Questo file non c'è più")
+    return _risposta_allegato(dati)
 
 
 @app.post("/api/p2p/chat/moderatori")
@@ -80574,6 +80731,30 @@ def vendor_qrcode():
     deve poter cambiare quel codice. Cache lunga col ?v= nel src."""
     return FileResponse("vendor/qrcode.js",
                         media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# PDF.JS, PER I PDF DELLA CHAT (16 ott 2026, cantiere barcode-paycode,
+# parte C). La WebView di Telegram su Android un PDF non lo apre, e un
+# file della chat si apre SOLO in memoria (e' cifrato sul server): le
+# pagine le disegna pdf.js nella pagina, su un canvas, senza script del
+# PDF e senza link. Stesso patto di nostr.js e qrcode.js: pdfjs-dist
+# 4.10.38 di Mozilla (Apache-2.0, `vendor/pdfjs-LICENSE.txt`), la build
+# «legacy» che gira anche sui telefoni meno nuovi, file committati a
+# versione bloccata (l'integrita' npm sta in CANTIERI), due rotte
+# esplicite, mai una CDN, mai StaticFiles (regola ferrea 3). Il lavoratore
+# e' un modulo: `worker-src 'self'` della CSP lo ammette gia'.
+@app.get("/vendor/pdf.mjs")
+def vendor_pdfjs():
+    """pdf.js, il modulo della pagina (pdfjs-dist 4.10.38, legacy)."""
+    return FileResponse("vendor/pdf.min.mjs", media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/vendor/pdf.worker.mjs")
+def vendor_pdfjs_worker():
+    """pdf.js, il lavoratore che legge il PDF (stessa versione)."""
+    return FileResponse("vendor/pdf.worker.min.mjs", media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 

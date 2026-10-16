@@ -96,6 +96,7 @@ collaudo_giro_nuovo
 collaudo_avviso_chi_annulla
 collaudo_recapito_aggiornato
 collaudo_chat_scambio
+collaudo_allegati_chat
 collaudo_garanzia_lunga
 collaudo_promemoria_gesto
 collaudo_x_risonanza

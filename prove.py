@@ -164346,6 +164346,443 @@ def prove_posta_relay():
            codice(blocco).count("create_connection")))
 
 
+BANCO_ALLEGATI_CHAT = r"""
+/* ---- (16 ott 2026, barcode-paycode, parte C) IL POSTINO DI CARTONE
+   SA ANCHE DEGLI ALLEGATI: tre rotte in piu', davanti a quelle della
+   chat. Il corpo dell'invio sono byte nudi, lo scambio nell'intestazione;
+   la risposta del ritiro sono byte. Il postino non sa che file sia. ---- */
+srv.allegati = {}; srv.allegatiN = 0; srv.manomesso = '';
+const fetchChat = fetch;
+fetch = async function(url, opz){
+  const io = myTgId;
+  const byte = d => ({ok: true, status: 200, json: async () => { throw new Error('non e\' JSON'); },
+                      arrayBuffer: async () => d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength)});
+  const no = (c, m) => ({ok: false, status: c, json: async () => ({detail: m})});
+  if (url.endsWith('/p2p/chat/allegato')) {
+    srv.chiamate.push({url, metodo: opz.method, tipo: opz.headers['Content-Type'], ordine: opz.headers['X-Chat-Ordine'],
+                       peso: opz.body.length});
+    const parti = srv.parti[opz.headers['X-Chat-Ordine']] || [];
+    if (parti.indexOf(io) < 0) return no(403, 'Non sei una delle due parti di questo scambio');
+    const id = (++srv.allegatiN).toString(16).padStart(32, '0');
+    srv.allegati[id] = {ordine: opz.headers['X-Chat-Ordine'], da: io, dati: new Uint8Array(opz.body)};
+    return {ok: true, status: 200, json: async () => ({ok: true, id: id})};
+  }
+  if (url.endsWith('/p2p/chat/allegato/leggi') || url.endsWith('/p2p/moderazione/chat/allegato')) {
+    const corpo = JSON.parse(opz.body);
+    srv.chiamate.push({url, corpo: opz.body});
+    const a = srv.allegati[corpo.id];
+    const mod = url.indexOf('moderazione') >= 0;
+    if (!mod && (srv.parti[corpo.ordine] || []).indexOf(io) < 0) return no(403, 'Non sei una delle due parti di questo scambio');
+    if (!a || a.ordine !== corpo.ordine) return no(404, 'Questo file non c\'è più');
+    if (srv.manomesso === corpo.id) { const d = a.dati.slice(); d[d.length - 1] ^= 1; return byte(d); }
+    return byte(a.dati);
+  }
+  return fetchChat(url, opz);
+};
+/* la vista del file: nel banco si guarda COSA le arriva */
+const MOSTRATI = [];
+mostraAllegatoChatScP2P = async (chiaro, tipo) => { MOSTRATI.push({tipo: tipo, chiaro: chiaro}); };
+
+(async () => {
+const ORD = '5a1e0000-c2c2-4a2b-9c3d-0000000000a1';
+const nuovoMazzo = () => { const sk = NT.generateSecretKey();
+  return {sk: NT.utils.bytesToHex(sk), pub: NT.getPublicKey(sk), indice: 9}; };
+dispositivo('a', 222, nuovoMazzo());      // chi vende
+dispositivo('b', 111, nuovoMazzo());      // chi compra
+dispositivo('x', 333, nuovoMazzo());      // un estraneo
+srv.parti[ORD] = [222, 111];
+su('a'); const tkA = chiaveScambio(disp.a.mazzo.sk, 3);
+su('b'); const tkB = chiaveScambio(disp.b.mazzo.sk, 5);
+disp.a.ordini[ORD] = {id: ORD, indice: 3, peer: tkB.pub, stato: 'attivo', lato: 'vendo'};
+disp.b.ordini[ORD] = {id: ORD, indice: 5, peer: tkA.pub, stato: 'attivo', lato: 'compro'};
+const giro = async chi => { su(chi); await chatScRitiraP2P(ORD);
+  await new Promise(r => setTimeout(r, 5)); await (p2pChatScInVolo[ORD] || null);
+  return chatScDiP2P(ORD); };
+await giro('a'); await giro('b'); await giro('a');
+const out = {};
+const enc = s => new TextEncoder().encode(s);
+const PDF = enc('%PDF-1.4\n% il PDF del PayCode 212-802-988\n' + 'x'.repeat(5000) + '\n%%EOF\n');
+const contiene = (pagliaio, ago) => Buffer.from(pagliaio).indexOf(Buffer.from(ago)) >= 0;
+
+/* ===== 1) i pezzi puri ===== */
+out.tipi = [[0xFF, 0xD8, 0xFF, 0xE0], [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A], Array.from(enc('%PDF-1.7')),
+            Array.from(enc('GIF89a')), Array.from(enc('MZ\x90\x00')), Array.from(enc('<svg ')), Array.from(enc('%PDF')),
+            [], Array.from(enc('RIFF\x10\x00\x00\x00WEBPVP8 ')), Array.from(enc('RIFF\x10\x00\x00\x00WAVEfmt ')),
+            Array.from(enc('<!DOCTYPE html>')), Array.from(enc('<html><body>')), Array.from(enc('<?xml version="1.0"?><svg'))
+           ].map(tipoDaByteChatScP2P);
+const T = (id, k, t, p) => [['o', ORD], ['f', id, k, t, p]];
+const ID = '0'.repeat(31) + '1', K = 'a'.repeat(64);
+out.tag = [allegatoDaTagChatScP2P(T(ID, K, 'application/pdf', '5000')),
+           allegatoDaTagChatScP2P(T(ID, K, 'image/gif', '5000')), allegatoDaTagChatScP2P(T('../x', K, 'image/png', '5')),
+           allegatoDaTagChatScP2P(T(ID, 'zz', 'image/png', '5')), allegatoDaTagChatScP2P(T(ID, K, 'image/png', '0')),
+           allegatoDaTagChatScP2P(T(ID, K, 'image/png', String(2 * 1024 * 1024 + 1))),
+           allegatoDaTagChatScP2P(T(ID, K, 'image/png', '1.5')), allegatoDaTagChatScP2P([['o', ORD]]),
+           allegatoDaTagChatScP2P(T(ID, K, 'image/webp', '5000'))];
+out.testi = ['image/jpeg', 'image/png', 'application/pdf', 'x'].map(testoAllegatoChatScP2P);
+out.pesi = [1, 1023, 340 * 1024, 1024 * 1024, 2 * 1024 * 1024 - 1].map(pesoTestoChatScP2P);
+out.riquadro = [allegatoChatScHTML({id: ID, k: K, tipo: 'application/pdf', peso: 5000}, ORD, false),
+                allegatoChatScHTML({id: ID, k: K, tipo: 'image/jpeg', peso: 340 * 1024}, ORD, true)];
+
+/* ===== 2) la cifratura vera (WebCrypto di node) ===== */
+const cif = await cifraAllegatoChatScP2P(PDF);
+out.cifra = [cif.chiave.length, cif.dati.length === PDF.length + 28, contiene(cif.dati, enc('212-802-988')),
+             contiene(cif.dati, enc('%PDF'))];
+out.decifra = Buffer.from(await decifraAllegatoChatScP2P(cif.dati, cif.chiave)).equals(Buffer.from(PDF));
+const sbaglia = async (d, k) => { try { await decifraAllegatoChatScP2P(d, k); return 'aperto'; } catch(e) { return 'no'; } };
+const toccato = cif.dati.slice(); toccato[40] ^= 1;
+out.decifraNo = [await sbaglia(cif.dati, 'b'.repeat(64)), await sbaglia(toccato, cif.chiave)];
+const cif2 = await cifraAllegatoChatScP2P(PDF);
+out.chiaveOgniVolta = cif2.chiave !== cif.chiave && !Buffer.from(cif2.dati).equals(Buffer.from(cif.dati));
+
+/* ===== 3) chi vende manda il PDF, chi compra lo riceve e lo apre ===== */
+su('a'); p2pOrdineAperto = ORD; p2pChatScUltimoInvio = 0; toasts = [];
+const busteMsgPrima = srv.buste.filter(b => b.tipo === 'msg').length;
+await allegaChatScambioP2P({files: [new Blob([PDF])], value: 'C:\\fakepath\\paycode.pdf'});
+const caricato = Object.values(srv.allegati)[0];
+const chiamataInvio = srv.chiamate.find(c => c.url.endsWith('/p2p/chat/allegato'));
+out.invio = [toasts, !!caricato, caricato && contiene(caricato.dati, enc('212-802-988')),
+             caricato && contiene(caricato.dati, enc('%PDF')), chiamataInvio && chiamataInvio.tipo,
+             chiamataInvio && chiamataInvio.ordine, srv.buste.filter(b => b.tipo === 'msg').length - busteMsgPrima];
+/* la busta del messaggio sul postino non dice niente del file */
+const bustaMsg = srv.buste.filter(b => b.tipo === 'msg').pop().busta;
+out.bustaMuta = [bustaMsg.indexOf(Object.keys(srv.allegati)[0]) < 0, bustaMsg.indexOf('application/pdf') < 0];
+const ca = chatScDiP2P(ORD);
+const mioF = ca.msgs[ca.msgs.length - 1];
+out.mio = [mioF.mio, mioF.testo, !!mioF.f, mioF.f && mioF.f.tipo, mioF.f && mioF.f.peso === PDF.length];
+const cb = await giro('b');
+const suoF = cb.msgs[cb.msgs.length - 1];
+out.suo = [suoF.mio, suoF.testo, suoF.f && suoF.f.tipo, suoF.f && suoF.f.k === mioF.f.k, suoF.f && suoF.f.id === mioF.f.id];
+const htmlB = chatScMessaggiHTML(cb, 'Venditore', disp.b.ordini[ORD]);
+out.vista = [htmlB.indexOf('class="chatsc-file"') >= 0, htmlB.indexOf('📄 PDF · 5 KB') >= 0,
+             htmlB.indexOf('📎 PDF') < 0, htmlB.indexOf('chatsc-allarme') < 0];
+toasts = []; MOSTRATI.length = 0;
+await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: suoF.f.tipo, p: String(suoF.f.peso)});
+out.apre = [toasts, MOSTRATI.length, MOSTRATI[0] && MOSTRATI[0].tipo,
+            MOSTRATI[0] && Buffer.from(MOSTRATI[0].chiaro).equals(Buffer.from(PDF))];
+/* il server manomette i byte: non si apre e lo dice */
+toasts = []; MOSTRATI.length = 0; srv.manomesso = suoF.f.id;
+await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: suoF.f.tipo, p: String(suoF.f.peso)});
+out.manomesso = [MOSTRATI.length, toasts[0]];
+srv.manomesso = '';
+/* un messaggio che dice «foto» per un PDF: non si apre */
+toasts = []; MOSTRATI.length = 0;
+await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: 'image/png', p: String(suoF.f.peso)});
+out.tipoFalso = [MOSTRATI.length, toasts[0]];
+/* un estraneo non lo ritira */
+su('x'); toasts = []; MOSTRATI.length = 0;
+await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: suoF.f.tipo, p: String(suoF.f.peso)});
+out.estraneo = [MOSTRATI.length, toasts[0]];
+/* il moderatore: la sua rotta */
+su('b'); toasts = []; MOSTRATI.length = 0;
+await apriAllegatoChatScP2P({o: ORD, i: suoF.f.id, k: suoF.f.k, t: suoF.f.tipo, p: String(suoF.f.peso), m: '1'});
+out.moderatore = [MOSTRATI.length, srv.chiamate[srv.chiamate.length - 1].url];
+out.riquadroMod = allegatoChatScHTML(suoF.f, ORD, true).indexOf('data-m="1"') > 0;
+
+/* ===== 4) cosa NON parte ===== */
+su('a'); p2pOrdineAperto = ORD;
+const tenta = async blob => { p2pChatScUltimoInvio = 0; toasts = []; const n = srv.allegatiN;
+  await allegaChatScambioP2P({files: [blob], value: 'x'}); return [srv.allegatiN - n, toasts[toasts.length - 1]]; };
+out.noGif = await tenta(new Blob([enc('GIF89a' + 'x'.repeat(100))]));
+out.noExe = await tenta(new Blob([enc('MZ' + 'x'.repeat(100))]));
+out.noSvg = await tenta(new Blob([enc('<svg xmlns="http://www.w3.org/2000/svg"></svg>')]));
+out.noHtml = await tenta(new Blob([enc('<!DOCTYPE html><html><script>alert(1)</script></html>')]));
+/* il webp passa il cancello dei byte e va a ridisegnarsi (in node non c'e'
+   il canvas: si ferma li', ma NON con la frase dei tipi) */
+out.webpPassa = await tenta(new Blob([enc('RIFF\x10\x00\x00\x00WEBPVP8 ' + 'x'.repeat(100))]));
+/* un webp spacciato per jpeg: chi riceve lo decifra e non lo apre */
+su('b'); toasts = []; MOSTRATI.length = 0;
+const finto = await cifraAllegatoChatScP2P(enc('RIFF\x10\x00\x00\x00WEBPVP8 ' + 'y'.repeat(100)));
+srv.allegati['f'.repeat(32)] = {ordine: ORD, da: 222, dati: finto.dati};
+await apriAllegatoChatScP2P({o: ORD, i: 'f'.repeat(32), k: finto.chiave, t: 'image/jpeg', p: '112'});
+out.webpFinto = [MOSTRATI.length, toasts[0]];
+su('a'); p2pOrdineAperto = ORD;
+const grande = new Uint8Array(2 * 1024 * 1024 + 1); grande.set(enc('%PDF-1.4'));
+out.noGrande = await tenta(new Blob([grande]));
+const giusto = new Uint8Array(2 * 1024 * 1024); giusto.set(enc('%PDF-1.4'));
+out.siGiusto = await tenta(new Blob([giusto]));
+/* il tetto dei dieci, contato sul cassetto di chi manda */
+const cTetto = chatScDiP2P(ORD);
+cTetto.msgs = cTetto.msgs.concat(Array.from({length: 10}, (_, i) => ({id: 'f' + i, t: 0, mio: true, testo: '📎 PDF',
+  f: {id: ID, k: K, tipo: 'application/pdf', peso: 10}})));
+chatScScriviP2P(ORD, cTetto);
+out.noUndicesimo = await tenta(new Blob([PDF]));
+/* senza nessuna scelta (il telefono ha annullato) non succede niente */
+p2pChatScUltimoInvio = 0; toasts = []; const n0 = srv.allegatiN;
+await allegaChatScambioP2P({files: [], value: ''});
+out.niente = [srv.allegatiN - n0, toasts.length];
+
+/* ===== 5) il piede: il 📎 solo se il telefono sa cifrare e ridisegnare ===== */
+const oA = disp.a.ordini[ORD], cA = chatScDiP2P(ORD);
+out.piedeVecchio = chatScPiedeP2P(oA, cA).html;
+window.crypto = globalThis.crypto; window.Response = Response; window.Blob = Blob;
+globalThis.HTMLCanvasElement = function(){}; HTMLCanvasElement.prototype.toBlob = function(){};
+out.piedeNuovo = chatScPiedeP2P(oA, cA).html;
+
+console.log(JSON.stringify(out));
+})().catch(e => { console.log(JSON.stringify({esploso: String(e && e.stack || e)})); });
+"""
+
+
+def prove_allegati_chat():
+    """GLI ALLEGATI DELLA CHAT (16 ott 2026, cantiere barcode-paycode,
+    parte C, richiesta di Andrea: chi vende doveva mandare il PDF del
+    PayCode). Foto (jpg, png) e PDF fino a 2 MB, col 📎: il file si
+    CIFRA SUL TELEFONO (AES-256-GCM, una chiave a caso per file), al
+    server arriva solo `iv || cifrato`, la chiave viaggia dentro il
+    messaggio della chat; le foto si ridisegnano (niente EXIF, niente
+    GPS); i file stanno nel cassetto della chat e se ne vanno con lei;
+    il moderatore li apre solo con la chiave che una parte gli da' in
+    disputa, come i messaggi. Le rotte vere girano in
+    `collaudo_allegati_chat`; qui le sentinelle e il banco node coi due
+    telefoni, la cifratura vera e il postino di cartone. Il ridisegno
+    delle foto (canvas) non gira in node: lo prova il giro dal vivo."""
+    import logging
+    import shutil
+    import sqlite3
+    print("\n[gli allegati della chat: cifrati sul telefono, senza GPS, via con la chat]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    def _in_ordine(t, *pezzi):
+        ii = [t.find(x) for x in pezzi]
+        return all(k >= 0 for k in ii) and ii == sorted(ii)
+
+    # --- 1) IL SERVER ----------------------------------------------------------
+    prova("la tabella degli allegati nasce SOLO nel cassetto della chat (fuori dai backup)", (1, False),
+          (src.count("CREATE TABLE IF NOT EXISTS allegati("),
+           "CREATE TABLE IF NOT EXISTS allegati(" in pezzo("init_db", "\n\n\ndef ")))
+    i = src.index("# ═══ LA CHAT NELLO SCAMBIO: IL SERVER FA IL POSTINO")
+    blocco_srv = src[i:src.index("# ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE", i)]
+    senza_doc = re.sub(r'"""[\s\S]*?"""', '""', codice(blocco_srv))
+    righe = senza_doc.split("\n")
+    # una riga di continuazione (comincia con «+» o con le virgolette) vale
+    # quanto la `cc.execute(` delle righe sopra
+    storte = [r.strip() for k, r in enumerate(righe)
+              if re.search(r"\b(FROM|INTO|UPDATE)\s+allegati\b", r) and "cc.execute" not in r
+              and not (r.strip()[:1] in ('"', "+") and "cc.execute(" in "".join(righe[max(0, k - 3):k]))]
+    prova("ogni riga che tocca gli allegati parla col cassetto (`cc`), mai col database di tutti", [], storte)
+    prova("IL SERVER NON SA CHE FILE SIA: nel suo codice nessun tipo di file", [],
+          [x for x in ("image/jpeg", "image/png", "application/pdf", "%PDF") if x in senza_doc])
+    spazza = pezzo("_chat_p2p_spazza")
+    prova("LA SCOPA: gli allegati se ne vanno con le buste (giro finito) e con la rete dei 30 giorni",
+          (True, True, True),
+          ('"DELETE FROM allegati WHERE ordine=? AND giro<>?"' in spazza,
+           '"DELETE FROM allegati WHERE quando<?"' in spazza,
+           "UNION SELECT ordine FROM allegati" in spazza))
+    prova("...e il ritiro della chat butta quelli di un giro di prima", True,
+          'cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?", (ordine, st["giro"]))'
+          in pezzo("chat_leggi_p2p"))
+    inv = pezzo("chat_allegato_p2p")
+    prova("l'invio: lo scambio dall'intestazione, il corpo letto A PEZZI col tetto PRIMA di posarlo, "
+          "e nel journal solo lo scambio e i KB", (True, True, True),
+          ("x_chat_ordine: str = Header(\"\")" in inv,
+           _in_ordine(inv, "async for pezzo in req.stream():", "if len(dati) > P2P_CHAT_ALLEGATO_MAX:",
+                      "codice, esito = _chat_p2p_allegato_posa("),
+           "print(f\"📎 Chat P2P: un allegato sullo scambio {ordine[:8]}, \"\n"
+           "          f\"{max(1, esito['peso'] // 1024)} KB\", flush=True)" in inv))
+    mod = pezzo("moderazione_chat_allegato_p2p")
+    prova("il moderatore: solo moderatori, solo a disputa PRESA da lui, solo il giro della disputa", True,
+          _in_ordine(mod, "user = _moderatore_o_403(", "if r[\"stato\"] != \"presa\" or int(r[\"presa_da\"] or 0) != int(user[\"id\"]):",
+                     "dati = _chat_p2p_allegato_prendi(cc, ordine, int(r[\"giro\"] or 0), d.get(\"id\"))"))
+    filtro = src[src.index("class _ChatFuoriDalJournal(logging.Filter):"):src.index(
+        'logging.getLogger("uvicorn.access").addFilter(_ChatFuoriDalJournal())')]
+    amb_f = {"logging": logging}
+    exec(filtro, amb_f)
+    f = amb_f["_ChatFuoriDalJournal"]()
+
+    class _R:
+        def __init__(self, via, codice):
+            self.args = ("127.0.0.1", "POST", via, "1.1", codice)
+    prova("le tre rotte nuove restano fuori dal journal quando riescono, e dentro quando sbagliano",
+          [False, False, False, True], [f.filter(_R("/api/p2p/chat/allegato", 200)),
+                                        f.filter(_R("/api/p2p/chat/allegato/leggi", 200)),
+                                        f.filter(_R("/api/p2p/moderazione/chat/allegato", 200)),
+                                        f.filter(_R("/api/p2p/chat/allegato", 413))])
+    # le funzioni pure del server, su un cassetto in memoria
+    amb = {"re": re, "secrets": __import__("secrets"), "sqlite3": sqlite3}
+    for riga in re.findall(r"\n((?:P2P_CHAT_(?:FILE_MAX|ALLEGATO_MAX|ALLEGATO_MIN|ALLEGATI_PARTE|ALLEGATI_CASSETTO)"
+                           r"|FORMA_ALLEGATO_CHAT) = [^\n]+)", blocco_srv):
+        exec(riga.split("  #")[0], amb)
+    for fn in ("_chat_p2p_allegato_posa", "_chat_p2p_allegato_prendi"):
+        exec(pezzo(fn), amb)
+    schema = pezzo("db_chat")
+    schema = schema[schema.index('con.executescript("""') + len('con.executescript("""'):]
+    cc = sqlite3.connect(":memory:")
+    cc.row_factory = sqlite3.Row
+    cc.executescript(schema[:schema.index('""")')])
+    posa, prendi = amb["_chat_p2p_allegato_posa"], amb["_chat_p2p_allegato_prendi"]
+    O1, O2 = "a11e0000-0000-4000-8000-000000000001", "a11e0000-0000-4000-8000-000000000002"
+    r1 = posa(cc, O1, 1, 222, b"z" * 100, 1000)
+    prova("i tetti del server: 2 MB col sigillo, 29 byte al minimo, dieci per parte", (2097180, 29, 10),
+          (amb["P2P_CHAT_ALLEGATO_MAX"], amb["P2P_CHAT_ALLEGATO_MIN"], amb["P2P_CHAT_ALLEGATI_PARTE"]))
+    prova("posato: un id a caso, il peso; ripreso uguale; da un altro scambio, giro o id: niente",
+          (200, True, 100, b"z" * 100, None, None, None),
+          (r1[0], bool(re.fullmatch(r"[0-9a-f]{32}", r1[1]["id"])), r1[1]["peso"],
+           prendi(cc, O1, 1, r1[1]["id"]), prendi(cc, O2, 1, r1[1]["id"]), prendi(cc, O1, 2, r1[1]["id"]),
+           prendi(cc, O1, 1, "x' OR '1'='1")))
+    prova("i rifiuti: troppo piccolo 400, troppo grande 413", (400, 413),
+          (posa(cc, O1, 1, 222, b"z" * 28, 1000)[0],
+           posa(cc, O1, 1, 222, b"z" * (amb["P2P_CHAT_ALLEGATO_MAX"] + 1), 1000)[0]))
+    for _ in range(9):
+        posa(cc, O1, 1, 222, b"z" * 40, 1000)
+    prova("l'undicesimo della stessa parte 409, l'altra parte passa", (409, 200),
+          (posa(cc, O1, 1, 222, b"z" * 40, 1000)[0], posa(cc, O1, 1, 111, b"z" * 40, 1000)[0]))
+    amb["P2P_CHAT_ALLEGATI_CASSETTO"] = 600
+    prova("il cassetto pieno: 507", 507, posa(cc, O2, 1, 111, b"z" * 200, 1000)[0])
+    # le rotte di pdf.js: esplicite, coi file committati, la licenza accanto
+    prova("pdf.js servito da casa: due rotte esplicite, i due file e la licenza nel repo", (True, True, True, True),
+          ('@app.get("/vendor/pdf.mjs")' in src and 'FileResponse("vendor/pdf.min.mjs"' in src,
+           '@app.get("/vendor/pdf.worker.mjs")' in src and 'FileResponse("vendor/pdf.worker.min.mjs"' in src,
+           os.path.isfile("vendor/pdf.min.mjs") and os.path.isfile("vendor/pdf.worker.min.mjs"),
+           "Apache License" in open("vendor/pdfjs-LICENSE.txt", encoding="utf-8").read()))
+    prova("...ed e' la 4.10.38: la versione scritta nel file e' quella chiesta dalla pagina", (True, True, 2),
+          ("pdfjs_version" in open("vendor/pdf.min.mjs", encoding="utf-8").read()
+           or '"4.10.38"' in open("vendor/pdf.min.mjs", encoding="utf-8").read(),
+           '"4.10.38"' in open("vendor/pdf.worker.min.mjs", encoding="utf-8").read(),
+           mini.count("?v=4.10.38`")))
+
+    # --- 2) IL CLIENT: LE SENTINELLE ------------------------------------------
+    al = pezzo_js(mini, "async function allegaChatScambioP2P(input){", "\n}\n")
+    prova("il tipo si legge dai PRIMI BYTE, prima di tutto; il PDF parte com'e', la FOTO solo ridisegnata", True,
+          _in_ordine(al, "const tipo = tipoDaByteChatScP2P(await byteDaBlobChatScP2P(file.slice(0, 12)));",
+                     "if (tipo === 'application/pdf') {", "chiaro = await byteDaBlobChatScP2P(file);",
+                     "} else {", "const p = await preparaFotoChatScP2P(file, tipo === 'image/webp' ? 'image/jpeg' : tipo);",
+                     "const cif = await cifraAllegatoChatScP2P(chiaro);", "await chatScInviaP2P(id, testoAllegatoChatScP2P(t), {id: d.id, k: cif.chiave"))
+    prova("...e al server va SOLO il cifrato, coi byte nudi e lo scambio nell'intestazione", True,
+          "headers: {'Content-Type': 'application/octet-stream', 'X-Tg-Init-Data': authHdr(), 'X-Chat-Ordine': id},\n      body: cif.dati});" in al)
+    fo = pezzo_js(mini, "async function preparaFotoChatScP2P(file, tipo){", "\n}\n")
+    prova("LA FOTO RIDISEGNATA: un canvas, il disegno e il blob del canvas — mai i byte del file", True,
+          _in_ordine(fo, "ctx.drawImage(img, 0, 0, cv.width, cv.height);", "cv.toBlob(ok, formato, q)",
+                     "return {dati: await byteDaBlobChatScP2P(blob), tipo: formato};")
+          and "byteDaBlobChatScP2P(file)" not in fo)
+    blocco_c = mini[mini.index("/* ---- GLI ALLEGATI (16 ott 2026"):mini.index("function chatScMessaggiHTML(c, altro, o){")]
+    prova("il file in chiaro non si salva MAI: nessuna memoria del telefono nel blocco degli allegati", [],
+          [x for x in ("localStorage", "sessionStorage", "indexedDB", "chatScScriviP2P") if x in blocco_c])
+    ap = pezzo_js(mini, "async function apriAllegatoChatScP2P(d){", "\n}\n")
+    prova("aprire: il tag rigiudicato, poi il cifrato, la chiave, i primi byte, e solo allora la vista", True,
+          _in_ordine(ap, "const f = allegatoDaTagChatScP2P([['f', d.i, d.k, d.t, d.p]]);",
+                     "const chiaro = await decifraAllegatoChatScP2P(", "if (tipoDaByteChatScP2P(chiaro) !== f.tipo)",
+                     "await mostraAllegatoChatScP2P(chiaro, f.tipo);"))
+    mo = pezzo_js(mini, "async function mostraAllegatoChatScP2P(chiaro, tipo){", "\n}\n")
+    prova("LA VISTA: il blob col tipo GIUDICATO dai byte, solo dentro un <img> (o il canvas di pdf.js); mai "
+          "aperto come pagina, mai un download", (True, True, []),
+          ("p2pAllegatoUrl = URL.createObjectURL(new Blob([chiaro], {type: tipo}));" in mo
+           and "img.src = p2pAllegatoUrl;" in mo,
+           "if (tipo !== 'application/pdf') {" in mo,
+           [x for x in ("window.open", "location", "iframe", "<embed", "<object", "download", ".href", "tg.openLink")
+            if x in mo + ap]))
+    prova("IL PDF SOLO IN VISUALIZZAZIONE: niente eval, niente XFA, nessun livello di link o di testo", (True, []),
+          ("pdfjs.getDocument({data: chiaro, isEvalSupported: false, enableXfa: false})" in mo,
+           [x for x in ("AnnotationLayer", "TextLayer", "annotationMode", "<a ", "href") if x in mo]))
+    prova("il foglio del file c'e' e closeSheet lo conosce; il 📎 accetta solo jpg, png, webp e pdf", (True, True, True),
+          ('<div class="sheet" id="p2pAllegatoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAllegatoTit">' in mini,
+           "  el('p2pAllegatoSheet').classList.remove('open');" in pezzo_js(mini, "function closeSheet(){", "\n}"),
+           'accept="image/jpeg,image/png,image/webp,application/pdf"' in mini))
+    prova("i tetti del telefono sono quelli del server", (2097152, 10),
+          (eval(re.search(r"const CHATSC_FILE_MAX = ([^;]+);", mini).group(1)),
+           int(re.search(r"const CHATSC_ALLEGATI_MAX = (\d+);", mini).group(1))))
+    prova("la busta porta il tag `f` DENTRO, e il messaggio aperto lo rigiudica (anche per il moderatore)", (True, True, True),
+          ("if (f) tags.push(['f', f.id, f.k, f.tipo, String(f.peso)]);" in mini,
+           "const f = allegatoDaTagChatScP2P(ev.tags);" in pezzo_js(mini, "function chatScApriMsgP2P(o, c, busta){", "\n}\n"),
+           "f: allegatoDaTagChatScP2P(ev.tags)};" in pezzo_js(mini, "function chatPartiApriP2P(k, arch, ordine, d){", "\n}\n")))
+    prova("i testi: «Info P2P» dice foto e PDF col 📎, cifrati e senza posizione; il patto dei dati il peso e la fine",
+          (True, True, False),
+          ("Oltre al testo puoi mandare <b>foto (jpg, png, webp) e PDF</b> fino a 2 MB, col 📎" in mini,
+           "del file il server vede solo <b>quanto pesa</b>, e lo cancella con la chat" in mini,
+           "Solo testo, niente allegati." in mini))
+    prova("i documenti sanno degli allegati", [True, True, True, True],
+          ["## Gli allegati nella chat dello scambio: foto e PDF cifrati sul telefono" in open("docs/CANTIERI.md", encoding="utf-8").read(),
+           "GLI ALLEGATI (16 ott 2026, cantiere barcode-paycode," in open("docs/ARCHITETTURA.md", encoding="utf-8").read(),
+           "GLI ALLEGATI (16 ott 2026, cantiere barcode-paycode, parte C)" in open("docs/PRODUZIONE.md", encoding="utf-8").read(),
+           "- **Foto e PDF** (dal 16 ott 2026)" in open("docs/GUIDA-P2P-PASSI.md", encoding="utf-8").read()])
+
+    # --- 3) IL BANCO: due telefoni, la cifratura vera, il postino di cartone ---
+    node = shutil.which("node")
+    if not node:
+        salta("il banco degli allegati", "node non c'e'")
+        return
+    i = mini.index("/* ═══ LA CHAT NELLO SCAMBIO")
+    blocco = mini[i:mini.index("/* ═══ fine: la chat nello scambio ═══ */", i)]
+    pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function testoContropartePerMotivoP2P(motivo){", "\n}\n") + "\n}\n"
+             + barre_paycode_js(mini) + blocco)
+    testa = BANCO_CHAT_SCAMBIO[:BANCO_CHAT_SCAMBIO.index("__PEZZI__")]
+    import tempfile as _tf2
+    import subprocess as _sp2
+    with _tf2.TemporaryDirectory() as d:
+        fjs = os.path.join(d, "allegati.js")
+        with open(fjs, "w", encoding="utf-8") as fh:
+            fh.write(testa + pezzi + BANCO_ALLEGATI_CHAT)
+        r = _sp2.run([node, fjs, "vendor/nostr.bundle.js"], capture_output=True, text=True,
+                     encoding="utf-8", errors="replace", timeout=180)
+    try:
+        out = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        out = {"esploso": (r.stdout + r.stderr)[-1500:]}
+    prova("il banco degli allegati gira", "", out.get("esploso", ""))
+    if out.get("esploso"):
+        return
+    prova("il tipo dai primi byte: jpg, png, pdf e webp si'; gif, exe, svg, un pdf troncato, il vuoto, "
+          "un wav (RIFF ma non WEBP), html e svg con la sua testa xml no",
+          ["image/jpeg", "image/png", "application/pdf", "", "", "", "", "", "image/webp", "", "", "", ""],
+          out["tipi"])
+    ID, K = "0" * 31 + "1", "a" * 64
+    prova("il tag `f`: buono solo con id, chiave, tipo ammesso e peso intero fino a 2 MB",
+          [{"id": ID, "k": K, "tipo": "application/pdf", "peso": 5000}] + [None] * 8, out["tag"])
+    prova("il testo del messaggio di un file e il peso detto bene",
+          [["📎 Foto", "📎 Foto", "📎 PDF", "📎 File"], ["1 KB", "1 KB", "340 KB", "1,0 MB", "2,0 MB"]],
+          [out["testi"], out["pesi"]])
+    rq = out["riquadro"]
+    prova("il riquadro del file: icona, nome, peso, «Apri» per il PDF e «Vedi» per la foto; quello del moderatore lo dice",
+          [True, True, False, True, True],
+          ["📄 PDF · 5 KB" in rq[0], ">Apri</button>" in rq[0], 'data-m="1"' in rq[0],
+           "📷 Foto · 340 KB" in rq[1] and ">Vedi</button>" in rq[1], 'data-m="1"' in rq[1]])
+    prova("LA CIFRATURA VERA: chiave di 64 esadecimali, iv e sigillo in piu', dentro niente del PDF",
+          [64, True, False, False], out["cifra"])
+    prova("...si riapre identico; con un'altra chiave o un byte toccato no; ogni file ha la sua chiave",
+          [True, ["no", "no"], True], [out["decifra"], out["decifraNo"], out["chiaveOgniVolta"]])
+    prova("CHI VENDE MANDA IL PDF: nessun avviso, il postino riceve byte che non dicono niente, coi byte "
+          "nudi e lo scambio nell'intestazione, e poi UN messaggio",
+          [[], True, False, False, "application/octet-stream", "5a1e0000-c2c2-4a2b-9c3d-0000000000a1", 1],
+          out["invio"])
+    prova("...la busta del messaggio sul postino non porta ne' l'id ne' il tipo in chiaro", [True, True],
+          out["bustaMuta"])
+    prova("...e nel suo cassetto il messaggio porta il file (tipo e peso veri)",
+          [True, "📎 PDF", True, "application/pdf", True], out["mio"])
+    prova("CHI COMPRA LO RICEVE: stesso id e stessa chiave, dentro la busta",
+          [False, "📎 PDF", "application/pdf", True, True], out["suo"])
+    prova("...lo vede come riquadro del file, senza il testo «📎 PDF» e senza righe rosse",
+          [True, True, True, True], out["vista"])
+    prova("...lo apre: arriva alla vista identico", [[], 1, "application/pdf", True], out["apre"])
+    prova("il server manomette un byte: non si apre e lo dice", [0, "Non si apre: il file non si apre con la chiave del messaggio"],
+          out["manomesso"])
+    prova("un messaggio che dice «foto» per un PDF: non si apre", [0, "Non si apre: il file non è quello che il messaggio dice: non lo apro"],
+          out["tipoFalso"])
+    prova("un estraneo: il postino dice di no, niente vista", [0, "Non si apre: Non sei una delle due parti di questo scambio"],
+          out["estraneo"])
+    prova("il moderatore lo apre dalla SUA rotta", [1, "/api/p2p/moderazione/chat/allegato"], out["moderatore"])
+    NO = "Non è partito: si possono mandare solo foto (jpg, png, webp) e PDF"
+    prova("NON PARTONO: un gif, un eseguibile, un svg, un html (niente sul postino, e la frase)",
+          [[0, NO], [0, NO], [0, NO], [0, NO]], [out["noGif"], out["noExe"], out["noSvg"], out["noHtml"]])
+    prova("il webp passa il cancello dei byte (si ferma dopo, al canvas che node non ha: mai con la frase dei tipi)",
+          [0, False], [out["webpPassa"][0], out["webpPassa"][1] == NO])
+    prova("...e il tag di chi riceve non accetta un webp: viaggiano solo jpeg, png e pdf; un webp spacciato "
+          "per jpeg non si apre", [0, "Non si apre: il file non è quello che il messaggio dice: non lo apro"],
+          out["webpFinto"])
+    prova("...un PDF di 2 MB e un byte no; uno di 2 MB esatti si'",
+          [[0, "Non è partito: il PDF è troppo grande: al massimo 2 MB"], 1],
+          [out["noGrande"], out["siGiusto"][0]])
+    prova("...l'undicesimo file della stessa parte no; nessuna scelta, niente", [[0, "In questo scambio hai già mandato 10 file"], [0, 0]],
+          [out["noUndicesimo"], out["niente"]])
+    pv, pn = out["piedeVecchio"], out["piedeNuovo"]
+    prova("il 📎: su un telefono che non sa cifrare non c'e', e una riga lo dice; su uno che sa, c'e' col suo campo",
+          [False, True, True, True, False],
+          ['id="p2pChatScAllega"' in pv, "Da questo telefono si mandano solo messaggi: per foto e PDF serve un browser più recente." in pv,
+           'id="p2pChatScAllega"' in pn, 'id="p2pChatScFile" accept="image/jpeg,image/png,image/webp,application/pdf" hidden' in pn,
+           "Da questo telefono si mandano solo messaggi" in pn])
+
+
 def prove_barre_paycode():
     """IL CODICE A BARRE DEL PAYCODE E LA SCHEDA DEL PDF IN CHAT (16 ott
     2026, cantiere barcode-paycode, dal caso vero del 15: un ordine
@@ -164436,7 +164873,7 @@ def prove_barre_paycode():
           mini.count("p2pNuovoTab = {ordine: '', importo: '', scade: '', barre: ''};"))
     ch = pezzo_js(mini, "function chatScMessaggiHTML(c, altro, o){", "\n}\n")
     prova("in chat: il testo senza il link del PDF, la scheda, «📋 Copia link» per gli altri, poi le righe rosse",
-          True, _in_ordine(ch, "+ chatScTestoHTML(m.testo, true)",
+          True, _in_ordine(ch, ": chatScTestoHTML(m.testo, true))",
                            "+ li.pdf.map(x => schedaPdfPayCodeP2P(x, pcScambio)).join('')",
                            "+ (li.altri.length ? '<div class=\"chatsc-copie\">' + li.altri.map(x => '<button type=\"button\" class=\"chatsc-copia\"",
                            "+ (al.link ? '<div class=\"chatsc-allarme\">"))
@@ -165047,6 +165484,7 @@ def main():
               prove_notifica_porta_allo_scambio,
               prove_annullata_pagata,
               prove_barre_paycode,
+              prove_allegati_chat,
               prove_config_esempio):
         try:
             f()

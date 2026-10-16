@@ -1970,6 +1970,22 @@ tutti e due.
   prima». Due invii troppo vicini: «Un momento: un messaggio alla volta».
   Troppi in un minuto: «Non è partito: Stai scrivendo troppo in fretta:
   aspetta un momento».
+- **Foto e PDF** (dal 16 ott 2026): accanto a «Invia» il bottone «📎»
+  (si sceglie una foto jpg/png/webp — il webp parte come jpeg — o un PDF). Le foto partono ridisegnate
+  (lato lungo 1600 px, senza posizione né dati della fotocamera; «Preparo
+  la foto…»), il PDF com'è, fino a 2 MB, tutto cifrato dal telefono. Nel
+  messaggio un riquadro «📷 Foto · 340 KB» con «**Vedi**» o «📄 PDF · 5
+  KB» con «**Apri**»: si apre il foglio «📎 Il file della chat» con la
+  foto, o le pagine del PDF (al massimo 10: «Le altre N pagine non si
+  mostrano qui.») e «Chiudi». I no: «Non è partito: si possono mandare
+  solo foto (jpg, png, webp) e PDF», «Non è partito: il PDF è troppo grande: al
+  massimo 2 MB», «In questo scambio hai già mandato 10 file»; aprendo:
+  «Non si apre: il file non è quello che il messaggio dice: non lo
+  apro», «Non si apre: Questo file non c'è più», «Questo PDF non si apre
+  qui.». Su un telefono che non sa cifrare il 📎 non c'è: «Da questo
+  telefono si mandano solo messaggi: per foto e PDF serve un browser più
+  recente.». Il moderatore, in disputa, apre i file dalla sua card come
+  i messaggi.
 - **I messaggi**: «Tu · 14:32» e «<nome> · 14:33». Senza messaggi: «Ancora
   nessun messaggio.»
 - **I link non si aprono**: dal 16 ott 2026 si vedono come testo, grigi

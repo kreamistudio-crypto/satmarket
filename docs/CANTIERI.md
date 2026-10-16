@@ -61022,3 +61022,180 @@ cd ~/nodo && docker compose exec lnd lncli openchannel --node_key <chiave intera
 ```
 
 Nel commit c'è solo questa voce.
+## Gli allegati nella chat dello scambio: foto e PDF cifrati sul telefono (16 ott 2026, cantiere barcode-paycode, richiesta di Andrea; seconda parte, C)
+
+**PERCHÉ.** Lo scambio del 15 ott: chi vende doveva far arrivare a chi
+compra il PDF di Amazon col codice a barre, e la chat portava solo
+testo. A+B (il codice a barre e la scheda del link, voce qui sopra) è
+sul VPS da 048f4a5; questa è la terza richiesta, col secondo push.
+
+**COSA SI È DECISO (Andrea, piano approvato).** Bottone «📎» nella chat;
+file cifrati sul telefono; il server non vede mai il contenuto; sul VPS
+in `chat-scambi.db`; foto senza GPS; jpg, png e pdf; PDF fino a 2 MB;
+spariscono con la chat; il moderatore li vede solo se gli vengono
+mostrati in disputa, come oggi per i messaggi.
+
+**COME È FATTO.**
+- IL TELEFONO CIFRA: una chiave a caso PER FILE (AES-256-GCM,
+  WebCrypto), al server va solo `iv || cifrato`. La chiave, il tipo e il
+  peso viaggiano nel tag `f` DENTRO il messaggio della chat — la busta
+  chiusa fra le due chiavi usa-e-getta di sempre —, il cui testo è «📎
+  Foto» o «📎 PDF» (un'app di prima mostra quello). Il server non sa
+  nemmeno che tipo di file sia: nel suo codice nessun tipo compare.
+- LE FOTO SI RIDISEGNANO su un canvas (lato lungo 1600 px): dal disegno
+  non esce niente dei metadati, quindi niente EXIF, niente GPS, niente
+  marca della fotocamera. Il png resta png (un codice a barre
+  fotografato non va sporcato); se non sta nei 2 MB scende a jpeg 1280,
+  poi 1024. Il PDF parte com'è (non c'è un modo sicuro di pulirlo nel
+  browser): lo dico nel verbale e nei testi non prometto di più.
+- IL TIPO VERO DAI PRIMI BYTE, mai dal nome: jpg, png, pdf; un gif, un
+  eseguibile, un svg non partono. Chi riceve rifà lo stesso controllo
+  dopo aver decifrato: un file che non è quel che il messaggio dice non
+  si apre.
+- IL SERVER: tabella `allegati` nel cassetto della chat (fuori dai
+  backup, `secure_delete`), tre rotte — l'invio coi byte nudi e lo
+  scambio nell'intestazione `X-Chat-Ordine` (mai nell'indirizzo: uvicorn
+  lo scriverebbe), il corpo letto A PEZZI col tetto; il ritiro delle due
+  parti; il ritiro del moderatore solo a disputa PRESA da lui. Tetti: 2
+  MB più i 28 byte di iv e sigillo, dieci file per parte e per scambio,
+  500 MB per tutto il cassetto (507). La scopa delle buste porta via
+  anche loro (scambio finito, giro nuovo, rete dei 30 giorni). Nel
+  journal una riga col solo peso; gli accessi riusciti restano fuori
+  dal registro di uvicorn come quelli della chat.
+- LA VISTA: «Vedi»/«Apri» ritira il cifrato, lo apre con la chiave del
+  messaggio, controlla i primi byte e mostra: la foto in
+  `#p2pAllegatoSheet`, il PDF disegnato pagina per pagina (al massimo
+  dieci) da **pdf.js 4.10.38**, build «legacy», servito da casa
+  (`/vendor/pdf.mjs`, `/vendor/pdf.worker.mjs`, Apache-2.0, licenza in
+  `vendor/pdfjs-LICENSE.txt`; integrità npm del pacchetto verificata:
+  `sha512-/Y3fcFrXEAsMjJXeL9J8+ZG9U01LbuWaYypvDW2ycW1jL269L3js3DVBjDJ0Up9Np1uqDXsDrRihHANhZOlwdQ==`),
+  con `isEvalSupported: false` (e la CSP non ha `unsafe-eval`), niente
+  XFA, nessun livello di link o di testo: solo canvas. Il file in chiaro
+  non si salva mai (né cassetto né memoria del browser).
+- I TELEFONI VECCHI: senza WebCrypto o `canvas.toBlob` il 📎 non c'è e
+  una riga lo dice; i messaggi di testo vanno come prima.
+- IL MODERATORE: apre i file dalla sua card, con la chiave della chat
+  che una parte gli ha dato aprendo la disputa — senza quella, i byte
+  che il server gli dà non si aprono.
+- I testi: «Info P2P» (la chat: «Oltre al testo puoi mandare foto (jpg,
+  png) e PDF fino a 2 MB, col 📎…»), il patto «I tuoi dati» (del file
+  il server vede solo quanto pesa), GUIDA-P2P-PASSI §13.
+
+**STRADE SCARTATE.** Il file dentro la busta NIP-44 (tetto di 64 KB, e
+il cassetto delle buste ne terrebbe duecento). Blossom o il nostro relay
+(un file lì è pubblico per indirizzo, la cancellazione è una richiesta
+e le copie possono restare, e serve un'altra macchina). Una cartella sul
+VPS accanto a `foto/` (finirebbe vicino ai backup, e la cancellazione
+sicura la fa sqlite). Aprire il PDF in un iframe o con un link `blob:`
+(la WebView di Telegram su Android non lo mostra, e scaricarlo non si
+può: il server non ha il chiaro). Il tipo detto in chiaro al server
+per il journal (Andrea lo voleva nei log: il server non lo sa, ed è il
+punto — nel journal c'è il peso).
+
+**PROVATO.** `prove_allegati_chat` (nuova): le sentinelle del server
+(tabella solo nel cassetto, ogni riga dalla connessione del cassetto,
+nessun tipo di file nel codice, la scopa, l'invio a pezzi col tetto
+prima di posare, il moderatore solo a disputa presa, il filtro del
+journal sulle tre rotte), le funzioni pure su un cassetto in memoria
+(tetti, rifiuti, il cassetto pieno), pdf.js committato coi file e la
+licenza e la versione detta dalla pagina; le sentinelle del client (il
+tipo dai primi byte prima di tutto, la foto solo ridisegnata, al server
+solo il cifrato, niente memoria del telefono, l'apertura che rigiudica
+e controlla i byte, il PDF senza eval né link, il foglio, i tetti uguali
+al server, il tag `f` dentro la busta e riletto anche dal moderatore, i
+testi); e il BANCO coi due telefoni sul postino di cartone e la
+crittografia vera (WebCrypto di node, nostr-tools vero): chi vende manda
+il PDF, il postino riceve byte che non dicono niente e UN messaggio la
+cui busta non porta né id né tipo in chiaro, chi compra lo riceve con
+la stessa chiave, lo vede come riquadro senza riga rossa e lo apre
+identico; il server che manomette un byte, un messaggio che dice «foto»
+per un PDF, un estraneo: non si apre, e lo dice; il moderatore dalla sua
+rotta; gif, eseguibile, svg, PDF da 2 MB più un byte, l'undicesimo file:
+non partono; il 📎 c'è solo sul telefono che sa. Emendata
+`prove_barre_paycode` (un'ancora: il testo del messaggio di un file non
+si ripete). `collaudo_allegati_chat` (nuovo, 29, nella gabbia e in
+`ci/collaudi.txt`): le rotte VERE con l'autenticazione vera — il file
+torna identico alle due parti e mai a un estraneo o a un altro scambio,
+i tetti (anche a pezzi piccoli), il journal col solo peso, il
+moderatore prima e dopo la presa, la fine (i byte spariscono DAL FILE
+del cassetto: `secure_delete`), la leva spenta. `collaudo_chat_scambio`
+rigirato sul server nuovo: verde. Tortura su una copia intera: 17
+mutazioni (sei del server — il tetto del corpo, il peso, i dieci, la
+scopa, il moderatore senza presa, l'id nel journal — e undici del
+telefono — la foto che parte com'è, il gif, l'apertura che non guarda
+i byte, il tag che accetta tutto, il 📎 sempre, pdf.js con eval, il
+chiaro al server, il tag  perso in andata o al ritorno, il PDF senza
+tetto, il moderatore senza la sua rotta): 17 prese, nessuna esplosa.
+GIRO DAL VIVO (server di collaudo da una copia, relay morto, Browser
+pane): una foto JPEG vera con GPS (Torino), marca e modello nell'EXIF,
+scelta dal VERO `<input type=file>` del piede: al server (intercettato)
+solo byte cifrati senza «Exif», «JFIF» né la marca; decifrata, è un
+jpeg 400×300 senza EXIF, senza GPS, senza marca né modello (l'originale
+li aveva tutti); il campo si svuota. Una foto 4000×3000 → 1600×1200,
+95 KB; un PNG resta PNG; un PNG di rumore da 8,8 MB → jpeg 1280, 877 KB,
+sotto i 2 MB. La foto nel foglio; un PDF vero col codice a barre
+disegnato da pdf.js in 262 ms, le due rotte di pdf.js a 200, nessun
+link nella vista. Nella console solo gli errori attesi (relay morto, e
+le richieste fatte mentre il server del giro era fermo).
+SUITE E COLLAUDI: sopra 43e7cd5 (main con la migrazione a Mutinynet
+dell'hackathon) la suite intera severa **24.547 passate, 0 fallite**, e
+i collaudi della CI nella gabbia **83 verdi, 0 rossi** (c'è anche il
+nuovo). Scanner dei segreti della CI sui file nuovi, pdf.js compreso:
+zero, con la controprova che scatta.
+Poi main è corso a d51a2cb (la CI leggera: i collaudi due alla volta):
+ribasato lì, un solo conflitto in coda a CANTIERI; rigirate le sezioni
+toccate — allegati, chat, codice a barre, fogli di casa, motore, bussola
+e le due della CI leggera — 740 passate e 0 fallite, e quattro collaudi
+(allegati, chat, PayCode riconosciuto, scambi ovunque) con
+`--paralleli 2`: verdi. Il resto lo fa la CI del push.
+
+**LE DOMANDE DI ANDREA PRIMA DEL PUSH (16 ott 2026), e il webp.** 1) pdf.js
+è la 4.10.38 (il CVE-2024-4367 è chiuso dalla 4.2.67) con
+`isEvalSupported: false`. 2) La dimensione la giudica anche il server
+(corpo letto a pezzi col tetto, peso, dieci per parte, cassetto); il
+TIPO no, e non può: vede solo il cifrato — Andrea l'ha accettato,
+«è coerente». I file stanno dentro `chat-scambi.db`, nessuna rotta li
+serve come pagina. 3) Li scaricano le due parti del giro in corso e,
+fra i moderatori, solo chi ha preso la disputa (e li apre solo con la
+chiave che una parte gli dà); si cancellano a scambio finito, al giro
+nuovo, e comunque a 30 giorni. Poi la sua lista: SOLO jpeg, png, webp e
+pdf, dai primi byte; SVG e HTML sempre rifiutati; dopo la decifratura le
+immagini solo in un `<img>` e i PDF solo con pdf.js, mai il blob come
+pagina. Mancava il WEBP: aggiunto (`RIFF` + `WEBP` nei primi dodici
+byte; un `RIFF` qualunque, come un wav, no), si sceglie dal 📎 ma parte
+RIDISEGNATO IN JPEG — a chi riceve arrivano sempre jpeg, png o pdf, e
+un webp spacciato per jpeg non si apre. Un download nel telefono non
+c'è (il file non si salva mai); il ritiro dal server è
+`application/octet-stream` con `attachment`, e il blob della vista
+porta il tipo giudicato dai byte. Prove: il banco coi tipi (webp sì; wav,
+html, svg con la testa xml no), il webp che passa il cancello, quello
+spacciato per jpeg, l'html che non parte; una sentinella sulla vista
+(solo `<img>`/canvas, niente `window.open`, iframe, download, link).
+Cinque mutazioni mirate (il webp non riconosciuto, il webp che viaggia
+com'è, chi riceve che accetta il webp, il RIFF che basta, la foto aperta
+come pagina): cinque prese. Dal vivo: un webp vero 2000×1500 dal vero
+`<input>` → jpeg 1600×1200; un html chiamato «foto.jpg» e un svg
+chiamato «foto.png» rifiutati, niente al server.
+L'ULTIMO ALBERO: col webp, ribasato su 5dadcf4 (solo documenti, la CI
+leggera): le sezioni toccate — allegati, chat, codice a barre, fogli di
+casa, motore, bussola, le due della CI leggera, i testi del P2P — 763
+passate e 0 fallite; collaudi della chat e degli allegati due alla
+volta: verdi. La suite intera (24.547) e gli 83 collaudi sono girati
+sull'albero di prima del webp (sopra 43e7cd5). Poi main è corso a
+3896170 (lo studio del canale verso Spark/WoS, solo CANTIERI): ribasato,
+un conflitto in coda a CANTIERI, rigirate le sezioni che leggono i
+documenti (allegati, codice a barre, bussola: 107 passate, 0 fallite).
+Il resto lo fa la CI.
+
+**DA FARE (notati, non fatti).**
+- Il giro coi DUE telefoni veri e il postino vero (un relay locale per
+  i saluti della chat) non l'ho fatto: lì il flusso intero l'ha
+  provato il banco node; il server vero il collaudo.
+- Il PDF parte com'è: autore, programma e date dentro il PDF restano.
+  Si potrebbe avvisare chi lo manda («il PDF parte com'è»).
+- Sul telefono vero: la scelta del file da Telegram iOS (HEIC → JPEG lo
+  fa iOS), la memoria su un telefono vecchio con una foto da 20 MB, e il
+  PDF di Amazon vero dentro pdf.js.
+- Il file su disco del cassetto non si restringe da solo dopo le
+  cancellazioni (sqlite riusa lo spazio): se un giorno pesa, un VACUUM a
+  mano a mercato fermo.

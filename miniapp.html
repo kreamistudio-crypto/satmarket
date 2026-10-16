@@ -3437,6 +3437,17 @@
     .chatsc-pdf-bott{display:flex;gap:8px;margin-top:8px}
     .chatsc-pdf-bott .btn{flex:1 1 0;width:auto;min-width:0;margin:0;padding-left:8px;padding-right:8px}
     .chatsc-pdf>.btn.orange{margin:8px 0 0}
+    /* gli allegati (16 ott 2026, parte C): il 📎 accanto a «Invia», il
+       riquadro del file nel messaggio, e il foglio che lo mostra */
+    .chatsc-riga .btn.chatsc-allega{min-width:48px;width:48px;padding-left:0;padding-right:0;margin-left:auto;font-size:20px}
+    .chatsc-file{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;
+      padding:8px 10px;border-radius:12px;background:var(--card);border:1px solid var(--field-line);white-space:normal}
+    .chatsc-file span{font-weight:700;font-size:14px}
+    .chatsc-file .btn{width:auto;min-width:76px;margin:0;padding:8px 12px}
+    #p2pAllegatoCorpo{margin:10px 0}
+    .chatsc-file-foto{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:12px}
+    .chatsc-file-pagina{display:block;width:100%;height:auto;margin:0 0 10px;background:#fff;
+      border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.18)}
     .chatsc-sis{margin:6px 0;font-size:12px;color:var(--ink-soft);text-align:center}
     .chatsc-riga{display:flex;align-items:center;justify-content:space-between;gap:10px}
     .chatsc-riga small{font-size:12px}
@@ -11684,7 +11695,7 @@ document.getElementById('cartello')?.remove();</script>
            in cima alla chat (`CHATSC_AVVISO`), e la frase del patto e'
            `CHATSC_PATTO`: una prova le tiene in pari. -->
       <h3 id="p2pinfo-chat">La chat dello scambio</h3>
-      <p>Da quando l'ordine è <b>preso</b> a quando lo scambio finisce, nella sua pagina c'è una <b>chat fra voi due</b>: serve a mettervi d'accordo, a dirvi «fatto», a chiedere «ti è arrivato?». Solo testo, niente allegati. Il recapito per gli euro resta nel suo riquadro, così non si perde fra i messaggi.</p>
+      <p>Da quando l'ordine è <b>preso</b> a quando lo scambio finisce, nella sua pagina c'è una <b>chat fra voi due</b>: serve a mettervi d'accordo, a dirvi «fatto», a chiedere «ti è arrivato?». Oltre al testo puoi mandare <b>foto (jpg, png, webp) e PDF</b> fino a 2 MB, col 📎: partono <b>cifrati dal tuo telefono</b>, le foto <b>senza la posizione</b>, e se ne vanno con la chat. Il recapito per gli euro resta nel suo riquadro, così non si perde fra i messaggi.</p>
       <p><b>È cifrata fra voi due.</b> Ogni telefono fa nascere a caso una chiave apposta per quello scambio; Barattolo trasporta i messaggi <b>già chiusi</b>. <b>A fine scambio la cancella</b>: i telefoni buttano chiave e messaggi, il nostro server cancella le buste, e nei backup non ci sono mai entrate.</p>
       <ul class="sicu-lista">
         <li><b>Barattolo non ti scrive mai qui.</b> Chi nella chat si presenta come «assistenza» è l'altra persona.</li>
@@ -12274,7 +12285,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Se togli uno scambio chiuso con la ✕, il server ricorda <b>il numero dell'ordine e quando l'hai tolto</b>, così sparisce anche dagli altri tuoi dispositivi. Si cancella da solo dopo quaranta giorni, e subito se dimentichi il profilo.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Negli scambi l'altra persona vede il tuo profilo Barattolo: il nome e la foto che hai scelto, le recensioni, il livello, da quanto sei iscritto, gli scambi completati e non completati e, se li hai, il tuo @username Telegram e la tua chiave Nostr (npub), così potete scrivervi. Non vede mai il tuo numero di telefono, da dove ti colleghi, i tuoi recapiti né cosa hai comprato. Se vuoi scambiare senza profilo, entra con una chiave Nostr nuova.</b> Vale con qualunque modo di entrare: anche chi entra con una chiave Nostr è riconosciuto dall'altra persona come tutti (dal 12 ottobre 2026) — chi ha pubblicato vede il suo profilo, e le due parti possono recensirsi. Una chiave Nostr nuova, per l'altra persona, è un'altra persona: non c'è un interruttore, e non c'è un modo di scambiare da Barattolo senza farsi vedere dall'altra parte. <b>L'esito dello scambio si scrive sul suo account come per tutti</b> — è il paragrafo qui sopra sugli esiti degli scambi —, e se arriva al contatore «⚠️ N non completati» quello compare dove compare lui: nella pagina del suo negozio e sugli ordini che pubblica. Gli scambi già presi prima del 12 ottobre restano come erano, e a cancellare il pregresso c'è «dimentica il profilo» — che toglie le prese annotate, <b>non gli esiti</b>. Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
-      <p>Dal <b>12 ottobre 2026</b>, dentro ogni scambio <b>preso</b> c'è una <b>chat</b>. <b>La chat è cifrata fra voi due e Barattolo la trasporta. Se il tuo account è nato su Nostr, Barattolo non la può aprire. Se è nato con Telegram (anche se poi entri con Nostr), il tuo profilo di scambio lo ricava il server: per questo ritrovi scambio e chat su ogni dispositivo, e per questo Barattolo durante lo scambio potrebbe tecnicamente aprirla. Non lo fa. A fine scambio la chat si cancella, per tutti. Il moderatore la legge solo se una di voi due apre una disputa.</b> Per intero. Ogni telefono fa nascere <b>a caso</b> una <b>chiave usa-e-getta</b> per quello scambio: <b>non si ricalcola da niente</b>. Perché tu ritrovi la chat se cambi telefono o browser, o se la memoria del browser si svuota, il telefono ne lascia sul nostro server una <b>copia sigillata</b>, chiusa con la chiave di quello scambio: la apre solo chi ha il tuo <b>profilo di scambio</b>, e il server la riconsegna <b>solo a te</b> — mai all'altra persona, mai a un moderatore. È qui la differenza, e conta dove è nato l'account, non come entri: il profilo di scambio di un account nato su Nostr lo ha solo lui; quello di un account nato con Telegram lo ricava il nostro server dall'account — anche quando poi entri con una chiave Nostr collegata —, ed è per questo che torna da solo su ogni dispositivo. I messaggi arrivano al nostro server <b>già chiusi</b>. Di ognuno il server vede <b>su quale scambio, chi dei due l'ha spedito, a che ora, quanto pesa e fin dove l'altra persona ha ritirato</b>: gli serve per consegnarlo e per avvisare. Il testo no. L'avviso «hai un nuovo messaggio» <b>non porta il testo</b>. A scambio finito — concluso, annullato, o quando chi vende ha liberato i sats — i due telefoni <b>buttano chiave e messaggi</b> e il server <b>cancella le buste, le copie sigillate e quegli orari</b>: stanno in un archivio a parte che <b>non entra nei backup</b>, e nel registro del server non resta una riga per messaggio, solo quella di un avviso partito. Se una di voi due <b>apre una disputa</b>, il suo telefono chiude la chiave di lettura in una busta per i moderatori — lo legge scritto prima di confermare —; la apre solo il moderatore che prende la disputa, che legge e non può scrivere al posto vostro, e a disputa chiusa si cancella tutto allo stesso modo. Quello che non possiamo cancellare: quel che l'altra persona ha <b>copiato o fotografato</b> dal suo schermo.</p>
+      <p>Dal <b>12 ottobre 2026</b>, dentro ogni scambio <b>preso</b> c'è una <b>chat</b>. <b>La chat è cifrata fra voi due e Barattolo la trasporta. Se il tuo account è nato su Nostr, Barattolo non la può aprire. Se è nato con Telegram (anche se poi entri con Nostr), il tuo profilo di scambio lo ricava il server: per questo ritrovi scambio e chat su ogni dispositivo, e per questo Barattolo durante lo scambio potrebbe tecnicamente aprirla. Non lo fa. A fine scambio la chat si cancella, per tutti. Il moderatore la legge solo se una di voi due apre una disputa.</b> Per intero. Ogni telefono fa nascere <b>a caso</b> una <b>chiave usa-e-getta</b> per quello scambio: <b>non si ricalcola da niente</b>. Perché tu ritrovi la chat se cambi telefono o browser, o se la memoria del browser si svuota, il telefono ne lascia sul nostro server una <b>copia sigillata</b>, chiusa con la chiave di quello scambio: la apre solo chi ha il tuo <b>profilo di scambio</b>, e il server la riconsegna <b>solo a te</b> — mai all'altra persona, mai a un moderatore. È qui la differenza, e conta dove è nato l'account, non come entri: il profilo di scambio di un account nato su Nostr lo ha solo lui; quello di un account nato con Telegram lo ricava il nostro server dall'account — anche quando poi entri con una chiave Nostr collegata —, ed è per questo che torna da solo su ogni dispositivo. I messaggi arrivano al nostro server <b>già chiusi</b>. Di ognuno il server vede <b>su quale scambio, chi dei due l'ha spedito, a che ora, quanto pesa e fin dove l'altra persona ha ritirato</b>: gli serve per consegnarlo e per avvisare. Il testo no. Lo stesso per le <b>foto e i PDF</b> che vi mandate (dal 16 ottobre 2026): partono cifrati dal telefono, con una chiave a caso che viaggia <b>dentro</b> il messaggio; del file il server vede solo <b>quanto pesa</b>, e lo cancella con la chat. Le foto partono ridisegnate, <b>senza la posizione</b> né gli altri dati della fotocamera. L'avviso «hai un nuovo messaggio» <b>non porta il testo</b>. A scambio finito — concluso, annullato, o quando chi vende ha liberato i sats — i due telefoni <b>buttano chiave e messaggi</b> e il server <b>cancella le buste, le copie sigillate e quegli orari</b>: stanno in un archivio a parte che <b>non entra nei backup</b>, e nel registro del server non resta una riga per messaggio, solo quella di un avviso partito. Se una di voi due <b>apre una disputa</b>, il suo telefono chiude la chiave di lettura in una busta per i moderatori — lo legge scritto prima di confermare —; la apre solo il moderatore che prende la disputa, che legge e non può scrivere al posto vostro, e a disputa chiusa si cancella tutto allo stesso modo. Quello che non possiamo cancellare: quel che l'altra persona ha <b>copiato o fotografato</b> dal suo schermo.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
       <p>Dal <b>10 ottobre 2026</b>, negli scambi <b>in contanti di persona</b>, ci sono «📍 Sono qui» e l'appuntamento. <b>«Sono qui»</b> lo tocchi tu, se e quando vuoi: il server riceve una nota firmata con la tua chiave usa-e-getta, con l'<b>ora</b> e — solo se il telefono la dà — la <b>posizione</b> (il telefono te la chiede, e si può dire di no); se la dai, ne ricaviamo subito la distanza dall'altra persona e dal luogo dell'appuntamento. <b>L'appuntamento</b> lo scrive chi vende nel recapito, che viaggia cifrato fra voi due: al server arrivano solo l'<b>ora</b> e le <b>coordinate</b> del punto, se l'indirizzo è stato riconosciuto — mai il testo. Mentre chi vende scrive l'indirizzo, i suggerimenti li chiediamo noi a <b>Photon</b>, che usa i dati di OpenStreetMap, mandando <b>solo il testo cercato</b>: né chi sei né dove sei; «Usa la mia posizione» non esce dal nostro server. <b>Chi legge:</b> l'altra persona vede l'ora delle tue presenze, mai la tua posizione; un moderatore vede il confronto se si apre una disputa. Posizioni e testi cercati non li scriviamo nei registri del server. <b>Per quanto:</b> le posizioni e il punto restano solo finché una disputa sui contanti è possibile — si cancellano quando i sats vengono liberati o lo scambio si chiude (annullato, scaduto, tornato nel libro), e in ogni caso entro <b>quindici giorni</b>; restano le ore e le distanze, che se ne vanno con la cronaca dopo quaranta giorni. Con «dimentica il profilo» se ne vanno anche le tue presenze e i tuoi appuntamenti; su uno scambio ancora aperto resta solo l'ora, perché l'altra persona l'ha già vista. Il GPS si può falsificare: per noi è una conferma, non una prova assoluta.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
@@ -13643,6 +13654,15 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet" id="p2pBarreSheet" role="dialog" aria-modal="true" aria-label="Codice a barre del PayCode"
        onclick="chiudiFoglioP2P('p2pBarreSheet')">
     <div id="p2pBarreCorpo"></div>
+  </div>
+  <!-- IL FILE DELLA CHAT (16 ott 2026, barcode-paycode, parte C): la
+       foto o le pagine del PDF, aperte in memoria e mai salvate. Lo
+       riempie `mostraAllegatoChatScP2P`. -->
+  <div class="sheet" id="p2pAllegatoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pAllegatoTit">
+    <div class="grab"></div>
+    <h3 id="p2pAllegatoTit">📎 Il file della chat</h3>
+    <div id="p2pAllegatoCorpo"></div>
+    <button type="button" class="btn ghost" onclick="chiudiFoglioP2P('p2pAllegatoSheet')">Chiudi</button>
   </div>
 
   <!-- LA SCADENZA DEL PAYCODE (9 ott 2026): il foglio che la riga del
@@ -31460,6 +31480,7 @@ function closeSheet(){
   el('p2pPayCodeSheet').classList.remove('open');
   el('p2pEuroSheet').classList.remove('open');
   el('p2pBarreSheet').classList.remove('open');
+  el('p2pAllegatoSheet').classList.remove('open');
   el('p2pDettSheet').classList.remove('open');
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
@@ -78632,8 +78653,8 @@ function avvisaRecapitoP2P(id){
    vero: una chiave la cui copia non c'e' (una chat aperta prima della
    cura, da un telefono che non torna). Vale l'ULTIMO saluto di ogni
    parte; il gesto e' un tocco e non parte da solo.
-   QUEL CHE SI VEDE dell'altra persona e' testo e basta: niente
-   allegati, i link non si aprono, e sotto un messaggio che porta un
+   QUEL CHE SI VEDE dell'altra persona e' testo, e dal 16 ott 2026 anche
+   foto e PDF cifrati sul telefono (vedi «GLI ALLEGATI»); i link non si aprono, e sotto un messaggio che porta un
    link o che chiede di spostarsi altrove c'e' una riga rossa. L'unico
    link che si apre — dietro una domanda, e senza riga rossa — e' il PDF
    del PayCode di Amazon (16 ott 2026: vedi `schedaPdfPayCodeP2P`). */
@@ -78993,10 +79014,13 @@ function chatScMieChiaviP2P(c){
 }
 /* PURA: un messaggio, dentro e fuori — chiuso fra la mia chiave
    usa-e-getta e quella dell'altra parte, firmato dalla mia. */
-function chatScBustaP2P(o, c, testo, quando){
+function chatScBustaP2P(o, c, testo, quando, f){
   const NT = window.NostrTools;
+  /* un file (16 ott 2026): il tag `f` porta id, chiave, tipo e peso, DENTRO la busta */
+  const tags = [['o', String(o.id)]];
+  if (f) tags.push(['f', f.id, f.k, f.tipo, String(f.peso)]);
   const dentro = NT.finalizeEvent({
-    kind: CHATSC_MSG, created_at: quando, tags: [['o', String(o.id)]], content: testo
+    kind: CHATSC_MSG, created_at: quando, tags: tags, content: testo
   }, NT.utils.hexToBytes(c.sk));
   return {dentro: dentro,
           busta: NT.nip44.encrypt(JSON.stringify(dentro), chatScSegretoP2P(c.sk, c.loro.pub))};
@@ -79016,8 +79040,9 @@ function chatScApriMsgP2P(o, c, busta){
       if (!ev || ev.kind !== CHATSC_MSG || !NT.verifyEvent(ev)) return null;
       if (ev.pubkey !== mia.pub && ev.pubkey !== l.pub) return null;
       if (((ev.tags || []).find(t => t[0] === 'o') || [])[1] !== String(o.id)) return null;
-      return {id: ev.id, t: ev.created_at || 0, mio: ev.pubkey === mia.pub,
-              testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO)};
+      const f = allegatoDaTagChatScP2P(ev.tags);
+      return Object.assign({id: ev.id, t: ev.created_at || 0, mio: ev.pubkey === mia.pub,
+              testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO)}, f ? {f: f} : {});
     }
   return null;
 }
@@ -79286,17 +79311,18 @@ function chatScRitiraP2P(id){
   return p2pChatScInVolo[id];
 }
 /* ---- quel che si scrive ---- */
-async function chatScInviaP2P(id, testo){
+async function chatScInviaP2P(id, testo, f){
   const o = ordiniP2P()[id];
   const c = chatScDiP2P(id);
   if (!chatScServeP2P(o) || !chatScProntaP2P(c)) throw new Error('La chat non è ancora aperta');
   const quando = Math.floor(Date.now() / 1000);
-  const b = chatScBustaP2P(o, c, testo, quando);
+  const b = chatScBustaP2P(o, c, testo, quando, f);
   await chatScFetch('invia', {ordine: id, tipo: 'msg', busta: b.busta});
   const agg = chatScDiP2P(id);
   if (!agg) return;
   if (!(agg.msgs || []).some(m => m.id === b.dentro.id))
-    agg.msgs = (agg.msgs || []).concat([{id: b.dentro.id, t: quando, mio: true, testo: testo}])
+    agg.msgs = (agg.msgs || []).concat([Object.assign({id: b.dentro.id, t: quando, mio: true, testo: testo},
+                                                      f ? {f: f} : {})])
       .slice(-CHATSC_MAX_MSG);
   chatScScriviP2P(id, agg);
 }
@@ -79494,6 +79520,254 @@ function apriPdfPayCodeP2P(u){
       window.open(l.url, '_blank', 'noopener');
     }});
 }
+/* ---- GLI ALLEGATI (16 ott 2026, cantiere barcode-paycode, parte C,
+   richiesta di Andrea: chi vende doveva mandare il PDF del PayCode) ----
+   Una foto (jpg, png, webp) o un PDF, al massimo 2 MB. IL FILE SI CIFRA SUL
+   TELEFONO, con una chiave a caso PER FILE (AES-256-GCM, WebCrypto): al
+   server va solo `iv || cifrato`, e lui non sa nemmeno che tipo sia. La
+   chiave, il tipo e il peso viaggiano in un tag `f` DENTRO il messaggio
+   della chat — la busta chiusa di sempre — e il testo di quel messaggio
+   e' «📎 Foto» o «📎 PDF», che un'app di prima mostra cosi' com'e'.
+   LE FOTO SI RIDISEGNANO prima di partire (un canvas, lato lungo 1600
+   px): dal disegno non esce niente dei metadati, quindi niente EXIF e
+   niente GPS. Il PDF parte com'e' (non c'e' un modo sicuro di pulirlo
+   qui): lo vedono solo l'altra persona e, in disputa, il moderatore.
+   SE NE VANNO CON LA CHAT: sul server con la scopa delle buste, qui con
+   il cassetto dello scambio (la chiave sta nel messaggio). Il file in
+   chiaro non si salva mai: si scarica, si apre, si guarda.
+   CHI LO GUARDA: le foto in un foglio; il PDF disegnato pagina per
+   pagina da pdf.js servito da casa (la WebView di Telegram su Android i
+   PDF non li apre), senza script del PDF e senza link cliccabili. Chi
+   riceve controlla i primi byte: un file che non e' quel che il
+   messaggio dice non si apre. */
+const CHATSC_FILE_MAX = 2 * 1024 * 1024;        // il file in chiaro, lo stesso tetto del server
+const CHATSC_FOTO_LATO = 1600;
+const CHATSC_FOTO_GREZZA_MAX = 20 * 1024 * 1024;  // la foto scelta, prima di ridisegnarla
+const CHATSC_ALLEGATI_MAX = 10;                   // per parte e per scambio, come il server
+const CHATSC_PDF_PAGINE = 10;
+const CHATSC_TIPI_FILE = {
+  'image/jpeg': {nome: 'Foto', ico: '📷'},
+  'image/png': {nome: 'Foto', ico: '📷'},
+  'application/pdf': {nome: 'PDF', ico: '📄'}
+};
+/* PURA: il tipo VERO dai primi byte, o '' — mai dal nome del file */
+function tipoDaByteChatScP2P(b){
+  const u = b || [];
+  if (u[0] === 0xFF && u[1] === 0xD8 && u[2] === 0xFF) return 'image/jpeg';
+  if (u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4E && u[3] === 0x47
+      && u[4] === 0x0D && u[5] === 0x0A && u[6] === 0x1A && u[7] === 0x0A) return 'image/png';
+  if (u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46 && u[4] === 0x2D) return 'application/pdf';
+  /* IL WEBP (16 ott 2026, richiesta di Andrea): «RIFF», quattro byte di
+     lunghezza, «WEBP». Si SCEGLIE ma non viaggia: si ridisegna in jpeg
+     (`allegaChatScambioP2P`), quindi a chi riceve arrivano sempre jpeg,
+     png o pdf — e un webp annunciato come altro non si apre */
+  if (u[0] === 0x52 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x46
+      && u[8] === 0x57 && u[9] === 0x45 && u[10] === 0x42 && u[11] === 0x50) return 'image/webp';
+  return '';
+}
+/* PURA: il tag `f` di un messaggio, giudicato, o null */
+function allegatoDaTagChatScP2P(tags){
+  const t = (tags || []).find(x => Array.isArray(x) && x[0] === 'f');
+  if (!t) return null;
+  const peso = Number(t[4]);
+  if (!/^[0-9a-f]{32}$/.test(String(t[1] || '')) || !/^[0-9a-f]{64}$/.test(String(t[2] || ''))
+      || !CHATSC_TIPI_FILE[t[3]] || !(Number.isInteger(peso) && peso > 0 && peso <= CHATSC_FILE_MAX)) return null;
+  return {id: t[1], k: t[2], tipo: t[3], peso: peso};
+}
+/* PURA: il testo del messaggio che porta un file */
+function testoAllegatoChatScP2P(tipo){
+  return '📎 ' + ((CHATSC_TIPI_FILE[tipo] || {}).nome || 'File');
+}
+/* PURA: «340 KB», «1,2 MB» */
+function pesoTestoChatScP2P(n){
+  const b = Number(n) || 0;
+  return b < 1024 * 1024 ? Math.max(1, Math.round(b / 1024)) + ' KB'
+    : (Math.round(b / 104857.6) / 10).toFixed(1).replace('.', ',') + ' MB';
+}
+/* PURA: il riquadro del file dentro il messaggio. `mod`: lo apre il
+   moderatore, dalla sua rotta */
+function allegatoChatScHTML(f, ordine, mod){
+  const tf = CHATSC_TIPI_FILE[f.tipo];
+  return '<div class="chatsc-file"><span>' + tf.ico + ' ' + esc(tf.nome) + ' · ' + esc(pesoTestoChatScP2P(f.peso)) + '</span>'
+    + '<button type="button" class="btn ghost" data-o="' + esc(ordine) + '" data-i="' + esc(f.id) + '" '
+    + 'data-k="' + esc(f.k) + '" data-t="' + esc(f.tipo) + '" data-p="' + esc(String(f.peso)) + '"'
+    + (mod ? ' data-m="1"' : '') + ' onclick="apriAllegatoChatScP2P(this.dataset)">'
+    + (f.tipo === 'application/pdf' ? 'Apri' : 'Vedi') + '</button></div>';
+}
+/* il telefono sa fare tutto quel che serve? Senza, il 📎 non c'e' */
+function chatScAllegatiPossibiliP2P(){
+  try {
+    return !!(window.crypto && crypto.subtle && crypto.getRandomValues && window.Response && window.Blob
+      && typeof HTMLCanvasElement !== 'undefined' && HTMLCanvasElement.prototype.toBlob);
+  } catch(e) { return false; }
+}
+function hexDaByteChatScP2P(u){ return Array.from(u, x => (x < 16 ? '0' : '') + x.toString(16)).join(''); }
+function byteDaHexChatScP2P(h){
+  const u = new Uint8Array(h.length / 2);
+  for (let i = 0; i < u.length; i++) u[i] = parseInt(h.substr(i * 2, 2), 16);
+  return u;
+}
+async function byteDaBlobChatScP2P(b){ return new Uint8Array(await new Response(b).arrayBuffer()); }
+async function cifraAllegatoChatScP2P(chiaro){
+  const k = crypto.getRandomValues(new Uint8Array(32)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ck = await crypto.subtle.importKey('raw', k, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv: iv}, ck, chiaro));
+  const dati = new Uint8Array(12 + ct.length);
+  dati.set(iv); dati.set(ct, 12);
+  return {chiave: hexDaByteChatScP2P(k), dati: dati};
+}
+async function decifraAllegatoChatScP2P(dati, chiave){
+  const ck = await crypto.subtle.importKey('raw', byteDaHexChatScP2P(chiave), 'AES-GCM', false, ['decrypt']);
+  return new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: dati.slice(0, 12)}, ck, dati.slice(12)));
+}
+/* LA FOTO RIDISEGNATA: dal canvas esce solo il disegno, niente EXIF e
+   niente GPS. Il png resta png (un codice a barre fotografato non va
+   sporcato); se non sta nei 2 MB si scende a jpeg, piu' piccola */
+async function preparaFotoChatScP2P(file, tipo){
+  let img;
+  try { img = await createImageBitmap(file, {imageOrientation: 'from-image'}); }
+  catch(e) {
+    img = await new Promise((ok, ko) => {
+      const u = URL.createObjectURL(file), i = new Image();
+      i.onload = () => { URL.revokeObjectURL(u); ok(i); };
+      i.onerror = () => { URL.revokeObjectURL(u); ko(new Error('La foto non si legge')); };
+      i.src = u;
+    });
+  }
+  const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight;
+  if (!(w0 > 0 && h0 > 0)) throw new Error('La foto non si legge');
+  for (const [lato, formato, q] of [[CHATSC_FOTO_LATO, tipo, 0.85], [1280, 'image/jpeg', 0.8], [1024, 'image/jpeg', 0.7]]) {
+    const s = Math.min(1, lato / Math.max(w0, h0));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(w0 * s)); cv.height = Math.max(1, Math.round(h0 * s));
+    const ctx = cv.getContext('2d');
+    if (formato === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); }
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    const blob = await new Promise(ok => cv.toBlob(ok, formato, q));
+    if (blob && blob.size <= CHATSC_FILE_MAX) return {dati: await byteDaBlobChatScP2P(blob), tipo: formato};
+  }
+  throw new Error('La foto è troppo grande anche ridotta');
+}
+function scegliAllegatoChatScP2P(){ haptic(); el('p2pChatScFile')?.click(); }
+/* «📎»: si legge il tipo dai primi byte, si prepara, si cifra, si
+   manda il file e poi il messaggio che lo porta */
+async function allegaChatScambioP2P(input){
+  const file = input && input.files && input.files[0];
+  if (input) input.value = '';
+  const id = p2pOrdineAperto;
+  if (!file || !id) return;
+  const c = chatScDiP2P(id);
+  if (((c && c.msgs) || []).filter(m => m.mio && m.f).length >= CHATSC_ALLEGATI_MAX) {
+    toast('In questo scambio hai già mandato ' + CHATSC_ALLEGATI_MAX + ' file'); return;
+  }
+  if (Date.now() - p2pChatScUltimoInvio < CHATSC_FRENO_MS) { toast('Un momento: un messaggio alla volta'); return; }
+  p2pChatScUltimoInvio = Date.now();
+  const btn = el('p2pChatScAllega');
+  if (btn) btn.disabled = true;
+  try {
+    const tipo = tipoDaByteChatScP2P(await byteDaBlobChatScP2P(file.slice(0, 12)));
+    if (!tipo) throw new Error('si possono mandare solo foto (jpg, png, webp) e PDF');
+    let chiaro, t = tipo;
+    if (tipo === 'application/pdf') {
+      if (file.size > CHATSC_FILE_MAX) throw new Error('il PDF è troppo grande: al massimo 2 MB');
+      chiaro = await byteDaBlobChatScP2P(file);
+    } else {
+      if (file.size > CHATSC_FOTO_GREZZA_MAX) throw new Error('la foto è troppo grande');
+      toast('Preparo la foto…');
+      /* il webp si ridisegna in jpeg: e' l'unico che chi riceve sa aprire ovunque */
+      const p = await preparaFotoChatScP2P(file, tipo === 'image/webp' ? 'image/jpeg' : tipo);
+      chiaro = p.dati; t = p.tipo;
+    }
+    const cif = await cifraAllegatoChatScP2P(chiaro);
+    const r = await fetch(`${API_BASE}/p2p/chat/allegato`, {method: 'POST',
+      headers: {'Content-Type': 'application/octet-stream', 'X-Tg-Init-Data': authHdr(), 'X-Chat-Ordine': id},
+      body: cif.dati});
+    let d = null;
+    try { d = await r.json(); } catch(e) {}
+    if (!r.ok || !d || !/^[0-9a-f]{32}$/.test(String(d.id || '')))
+      throw new Error((d && d.detail) || 'il file non è partito');
+    await chatScInviaP2P(id, testoAllegatoChatScP2P(t), {id: d.id, k: cif.chiave, tipo: t, peso: chiaro.length});
+  } catch(e) {
+    toast('Non è partito: ' + String((e && e.message) || e), 6000);
+  } finally {
+    if (el('p2pChatScAllega')) el('p2pChatScAllega').disabled = false;
+  }
+  chatScRidisegnaP2P(id);
+}
+/* «Vedi» / «Apri»: si ritira il cifrato, si apre con la chiave del
+   messaggio, si controlla che sia quel che dice, e si mostra */
+let p2pAllegatoUrl = '';
+async function apriAllegatoChatScP2P(d){
+  const f = allegatoDaTagChatScP2P([['f', d.i, d.k, d.t, d.p]]);
+  if (!f) return;
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/p2p/${d.m ? 'moderazione/chat/allegato' : 'chat/allegato/leggi'}`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: d.o, id: f.id})});
+    if (!r.ok) {
+      let x = null;
+      try { x = await r.json(); } catch(e) {}
+      throw new Error((x && x.detail) || 'il file non si apre');
+    }
+    const chiaro = await decifraAllegatoChatScP2P(new Uint8Array(await r.arrayBuffer()), f.k)
+      .catch(() => { throw new Error('il file non si apre con la chiave del messaggio'); });
+    if (tipoDaByteChatScP2P(chiaro) !== f.tipo) throw new Error('il file non è quello che il messaggio dice: non lo apro');
+    await mostraAllegatoChatScP2P(chiaro, f.tipo);
+  } catch(e) {
+    toast('Non si apre: ' + String((e && e.message) || e), 6000);
+  }
+}
+let pdfjsPromessa = null;
+function caricaPdfJsP2P(){
+  if (!pdfjsPromessa) pdfjsPromessa = import(`${FOTO_BASE}/vendor/pdf.mjs?v=4.10.38`).then(m => {
+    m.GlobalWorkerOptions.workerSrc = `${FOTO_BASE}/vendor/pdf.worker.mjs?v=4.10.38`;
+    return m;
+  }).catch(e => { pdfjsPromessa = null; throw e; });
+  return pdfjsPromessa;
+}
+async function mostraAllegatoChatScP2P(chiaro, tipo){
+  const box = el('p2pAllegatoCorpo');
+  if (!box) return;
+  if (p2pAllegatoUrl) { try { URL.revokeObjectURL(p2pAllegatoUrl); } catch(e){} p2pAllegatoUrl = ''; }
+  box.innerHTML = '';
+  el('sheetBg').classList.add('open');
+  el('p2pAllegatoSheet').classList.add('open');
+  if (tipo !== 'application/pdf') {
+    p2pAllegatoUrl = URL.createObjectURL(new Blob([chiaro], {type: tipo}));
+    const img = document.createElement('img');
+    img.className = 'chatsc-file-foto';
+    img.alt = 'La foto mandata nella chat';
+    img.src = p2pAllegatoUrl;
+    box.appendChild(img);
+    return;
+  }
+  box.innerHTML = '<div class="hint">Apro il PDF…</div>';
+  try {
+    const pdfjs = await caricaPdfJsP2P();
+    /* solo in visualizzazione: niente eval, niente moduli XFA, niente
+       livello dei link — si disegnano le pagine e basta */
+    const doc = await pdfjs.getDocument({data: chiaro, isEvalSupported: false, enableXfa: false}).promise;
+    box.innerHTML = '';
+    const n = Math.min(doc.numPages, CHATSC_PDF_PAGINE);
+    const largo = Math.max(240, box.clientWidth || 320), dpr = Math.min(3, window.devicePixelRatio || 1);
+    for (let i = 1; i <= n; i++) {
+      const pag = await doc.getPage(i);
+      const v1 = pag.getViewport({scale: 1});
+      const v = pag.getViewport({scale: (largo * dpr) / v1.width});
+      const cv = document.createElement('canvas');
+      cv.className = 'chatsc-file-pagina';
+      cv.width = Math.floor(v.width); cv.height = Math.floor(v.height);
+      box.appendChild(cv);
+      await pag.render({canvasContext: cv.getContext('2d'), viewport: v}).promise;
+    }
+    if (doc.numPages > n) box.insertAdjacentHTML('beforeend',
+      '<div class="hint">Le altre ' + (doc.numPages - n) + ' pagine non si mostrano qui.</div>');
+    try { doc.destroy(); } catch(e){}
+  } catch(e) {
+    box.innerHTML = '<div class="hint">Questo PDF non si apre qui.</div>';
+  }
+}
 function chatScMessaggiHTML(c, altro, o){
   const l = (c && Array.isArray(c.msgs)) ? c.msgs : [];
   /* «ancora nessun messaggio» sotto «tre messaggi non si leggono»
@@ -79511,7 +79785,9 @@ function chatScMessaggiHTML(c, altro, o){
     return '<div class="chatmod-msg' + (m.mio ? ' mio' : '') + '">'
       + '<small>' + esc(m.mio ? 'Tu' : altro)
       + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + '</small>'
-      + chatScTestoHTML(m.testo, true)
+      /* il messaggio di un file: il riquadro al posto di «📎 Foto» */
+      + ((m.f && m.testo === testoAllegatoChatScP2P(m.f.tipo)) ? '' : chatScTestoHTML(m.testo, true))
+      + (m.f ? allegatoChatScHTML(m.f, (o && o.id) || '', false) : '')
       + li.pdf.map(x => schedaPdfPayCodeP2P(x, pcScambio)).join('')
       + (li.altri.length ? '<div class="chatsc-copie">' + li.altri.map(x => '<button type="button" class="chatsc-copia" data-l="' + esc(x) + '" '
           + 'onclick="copiaLink(this.dataset.l, \'Link copiato 📋\')">📋 Copia link</button>').join('') + '</div>' : '')
@@ -79548,8 +79824,19 @@ function chatScPiedeP2P(o, c){
        dal vivo): senza, il campo lo perde a ogni messaggio e sul
        telefono la tastiera si chiude e si riapre. Il tocco resta un
        tocco — il `click` parte lo stesso — ma il cursore resta dov'era. */
+    /* «📎» (16 ott 2026): una foto o un PDF, cifrati qui prima di
+       partire. Dove il telefono non sa cifrare o ridisegnare, il
+       bottone non c'e' e una riga lo dice */
+    + (chatScAllegatiPossibiliP2P()
+      ? '<button class="btn ghost chatsc-allega" id="p2pChatScAllega" onpointerdown="event.preventDefault()" '
+        + 'onclick="scegliAllegatoChatScP2P()" aria-label="Allega una foto o un PDF">📎</button>'
+        + '<input type="file" id="p2pChatScFile" accept="image/jpeg,image/png,image/webp,application/pdf" hidden '
+        + 'onchange="allegaChatScambioP2P(this)">'
+      : '')
     + '<button class="btn orange" id="p2pChatScInvia" onpointerdown="event.preventDefault()" '
-    + 'onclick="inviaChatScambioP2P()">Invia</button></div>'};
+    + 'onclick="inviaChatScambioP2P()">Invia</button></div>'
+    + (chatScAllegatiPossibiliP2P() ? ''
+      : '<div class="hint">Da questo telefono si mandano solo messaggi: per foto e PDF serve un browser più recente.</div>')};
 }
 function chatScListaP2P(o, c){
   const altro = nomeControparteP2P(o, 'L\'altra persona');
@@ -79790,7 +80077,9 @@ function chatPartiApriP2P(k, arch, ordine, d){
           && (ev.pubkey === c.a || ev.pubkey === c.b)
           && ((ev.tags || []).find(t => t[0] === 'o') || [])[1] === ordine)
         m = {id: ev.id, n: b.n | 0, t: ev.created_at || 0, lato: eph[ev.pubkey],
-             testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO)};
+             testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO),
+             /* il file, se c'e' (16 ott 2026): il moderatore lo apre dalla sua rotta */
+             f: allegatoDaTagChatScP2P(ev.tags)};
       break;
     }
     if (m) { if (!msgs.some(x => x.id === m.id)) msgs.push(m); } else mute++;
@@ -79829,7 +80118,9 @@ function chatPartiModP2P(d){
   else corpo = '<div class="chatmod-lista">' + s.msgs.map(m =>
       '<div class="chatmod-msg' + (m.lato === 'vende' ? ' mio' : '') + '"><small>'
       + (m.lato === 'compra' ? 'Chi compra' : 'Chi vende')
-      + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + '</small>' + chatScTestoHTML(m.testo) + '</div>').join('')
+      + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + '</small>'
+      + ((m.f && m.testo === testoAllegatoChatScP2P(m.f.tipo)) ? '' : chatScTestoHTML(m.testo))
+      + (m.f ? allegatoChatScHTML(m.f, d.ordine, true) : '') + '</div>').join('')
       + '</div>'
       + (s.mute ? '<div class="hint">' + (s.mute === 1 ? 'Un messaggio non si apre' : s.mute + ' messaggi non si aprono')
         + ' con la chiave che hai: sono stati scritti da un altro dispositivo.</div>' : '');
