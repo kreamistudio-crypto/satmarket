@@ -64146,3 +64146,160 @@ passate, 0 fallite).
 
 **DA GUARDARE.** Nessuna sentinella in `prove.py` tiene ferme le due righe:
 se un giorno sparissero, nessuna prova lo direbbe.
+## Il «📋 Copia» sui dati del recapito, e l'avviso del recapito mai doppio (16 ott 2026, cantiere copia-recapito, richiesta di Andrea)
+
+**PERCHÉ.** Due problemi del P2P, segnalati da Andrea. 1) Nel riquadro
+«💶 Dove mandare gli euro» il RevTag di Revolut (es. `@pseudolo`), il
+numero Satispay, l'email PayPal non avevano un tasto per copiarli: chi
+compra doveva selezionarli col dito. 2) L'avviso «📮 <nome> ha aggiornato
+il recapito. Controlla il nuovo prima di inviare gli euro.» a volte
+arrivava due volte di fila (13 ott 2026, 17:38, FabrizioD).
+
+**COSA SI È DECISO (Andrea, sul piano in dieci righe).**
+- Il «📋 Copia» SOLO sui dati che si incollano in un'altra app: RevTag,
+  numero o tag Satispay, email o link PayPal, IBAN, intestatario,
+  causale, e gli stessi dati degli altri metodi. Mai sul nome del metodo
+  né sulle righe descrittive: con Revolut c'è UN tasto, e la colonna di
+  bottoni del 23 set 2026 («Ritocchi allo scambio P2P», secondo giro:
+  sette bottoni uguali facevano confusione) non torna.
+- Dopo il tocco il bottone dice «✓ Copiato» per due secondi; l'IBAN si
+  copia senza spazi (lo faceva già); a 320-360 px e col tema scuro.
+- L'avviso del recapito: niente per un testo uguale; una VERSIONE del
+  recapito sul server; la stessa cura per «🕒 ha cambiato
+  l'appuntamento».
+- LA PAUSA DEI 60 SECONDI, che il piano proponeva per «due salvataggi in
+  pochi secondi», NON C'È: rovesciava la decisione del 7 ott 2026
+  («OGNI CAMBIO AVVISA CHI COMPRA», commento di `P2P_RECAPITO_MAX`: un
+  recapito cambiato dentro la pausa restava muto e chi compra poteva
+  pagare quello vecchio). Detto ad Andrea prima di scrivere il server;
+  la sua scelta: «Niente finestra». Due correzioni diverse di fila
+  restano due avvisi, perché sono due notizie.
+
+**DA DOVE NASCEVA IL DOPPIO (letto sul codice, non provato sul VPS:
+Andrea ha detto che la prova non serve).** L'avviso parte dal telefono di
+chi vende (`avvisaRecapitoP2P` → `POST /api/p2p/recapito`); il server
+non vede il recapito, conta gli avvisi già mandati (`recapito1`,
+`recapito2`… in `p2p_avvisi`) e dal secondo scrive «📮 ha aggiornato».
+Il ricordo «già avvisato» (`recapitoAvvisato`) sta SOLO nel telefono che
+ha spedito. Due strade al doppio:
+- UN SECONDO DISPOSITIVO di chi vende, o la sua seconda memoria (la Mini
+  App aperta dal tasto di un avviso Telegram, che ha un localStorage suo),
+  riceve dal relay la propria busta (`campoArriva` →
+  `campoScrivi(..., mio)`), non ha il ricordo, e la dichiara come nuova
+  — senza `ripetuto`, che è anche lui un ricordo del primo telefono. Il
+  server la conta come un aggiornamento. È la forma più probabile del
+  caso del 13 ott.
+- «AGGIORNA IL RECAPITO» COL TESTO IDENTICO: spediva una busta nuova (un
+  id nuovo) e partiva «ha aggiornato» senza che fosse cambiato niente.
+- Il doppio clic NO: `bottoneInAttesa` ferma il bottone mentre invia, e
+  `p2pRecapitoTentati` tiene un minuto fra due tentativi nella stessa
+  pagina.
+- Gli ALTRI avvisi P2P no: hanno un momento a nome fisso nella chiave di
+  `p2p_avvisi` (ordine, momento, giro, persona). Il recapito è il solo
+  contato con un numero che cresce; il suo gemello «🕒 ha cambiato
+  l'appuntamento» è la stessa funzione e prende la stessa cura.
+
+**COME È FATTO.**
+- IL GIUDICE DEI DATI DA INCOLLARE: `daIncollareP2P(r)` (pura) accanto a
+  `riquadroRecapitoP2P`. Per ETICHETTA, quelle che scrivono i nostri
+  form (`ETICHETTE_DA_INCOLLARE_P2P`: intestatario, causale, revolut,
+  revtag, satispay, paypal); per FORMA, per i metodi che il form non
+  conosce e per i testi di un altro client (`FORME_DA_INCOLLARE_P2P`: un
+  @tag, un'email, un numero di almeno sei cifre con + spazi trattini,
+  un link paypal.me o http). L'IBAN resta sulla sua strada (per forma,
+  a gruppi di quattro, copia senza spazi). Restano senza tasto la riga
+  del nome del metodo, «Nota: dopo le 18», l'ora e le coordinate
+  dell'appuntamento, un «IBAN: da chiedere».
+- IL TOCCO: `bottoneCopia` (usato solo dal riquadro del recapito) chiama
+  `copiaRecapitoP2P(this)`: la scala di sempre (`copiaLink`: appunti, poi
+  `copiaAllAntica` con `execCommand('copy')`, poi il valore nel toast) e
+  sul bottone «✓ Copiato» per 2 s, classe `fatto` (il verde della
+  fiducia, come il ✓ del 📋 piccolo); un secondo tocco riparte da capo
+  (`clearTimeout`). `min-width: 92px` e `nowrap` tengono il bottone fermo
+  quando la parola cambia. Il valore sta nel `data-v`, che il ridisegno
+  rifà a ogni recapito nuovo (`campoScrivi` → `renderOrdineP2P`, che
+  passa da `ridisegnaSeCambiaP2P`): un recapito cambiato si copia nuovo.
+- IL FOGLIO «🤝 I vostri recapiti» di chi compra mostrava il recapito
+  come testo con gli a-capo, senza tasti: ora è lo stesso riquadro
+  (`riquadroRecapitoP2P`, col titolo «📍 Dove vedervi» per il contanti).
+- LO STESSO TESTO NON RIPARTE: in `inviaCampoP2P`, prima del bottone in
+  attesa, se il testo composto è identico a quello già partito (la riga
+  VIVA, non la `o` dell'apertura del foglio) non parte niente, e il toast
+  dice «È già questo il recapito: chi compra lo vede già.» (o
+  «l'appuntamento», o «il PayCode»). La busta di prima è già partita.
+- LA VERSIONE: `avvisaRecapitoP2P` manda `versione` = `campo.t`, l'ora in
+  secondi in cui il recapito è nato (il `created_at` della busta): la
+  stessa su tutti i dispositivi, perché la busta è una; del contenuto
+  non dice niente. Sul server `_versione_recapito_p2p` (pura) la accetta
+  solo intera e fra il 2020 e il 2100, il resto vale «non detta» (i
+  telefoni di ieri). `_avviso_recapito_p2p(..., versione=)` guarda se il
+  giro l'ha già vista e la scrive in una tabella nuova,
+  `p2p_recapiti_versioni` (ordine, giro, versione, quando; se ne va con
+  la cronaca in `_pulisci_memoria_p2p`), anche quando si dichiara presto;
+  una versione già vista, con qualcosa già detto a chi compra, tace con
+  la sua riga nel journal («· Recapito P2P: … nessun avviso (già detto a
+  chi compra: questa versione del recapito è già stata dichiarata…)»).
+  Vale anche per il caso «dichiarato presto, detto dalla garanzia»: il
+  secondo dispositivo che lo ritrova a scambio attivo tace.
+
+**STRADE SCARTATE.**
+- La pausa di 60 secondi (vedi sopra): rifà l'errore del 7 ott.
+- Mandare al server un'impronta del TESTO (un hash, anche con la chiave
+  dello scambio): avrebbe riconosciuto «stesso testo» su tutti i
+  dispositivi, ma è un dato derivato dal recapito sul server; il numero
+  dell'ora dice solo «quale», e col controllo del testo uguale nel
+  telefono basta.
+- Un «📋 Copia» su ogni riga: la colonna del 23 set.
+
+**PROVATO.**
+- `prove.py`: in `prove_ritocchi_scambio` la copia per metodo (Revolut,
+  Satispay, PayPal email e link, il bonifico coi suoi tre, Wise col @tag,
+  Postepay col numero, un'email nuda; nessun tasto sulle righe
+  descrittive, sull'appuntamento, su «IBAN: da chiedere»), un tasto solo
+  con Revolut, il tocco («✓ Copiato» per 2000 ms e ritorno; se gli
+  appunti dicono di no il bottone non mente); in `prove_p2p_eventi` sul
+  banco degli avvisi coi giudici veri: il primo avvisa e la stessa
+  versione dal secondo dispositivo tace, il cambio vero avvisa una volta
+  anche dichiarato due volte e dieci secondi dopo il primo, una versione
+  vecchia ritrovata tace, la tabella tiene solo ordine giro e numero, il
+  telefono di ieri fa come prima, il presto detto dalla garanzia tace, e
+  l'appuntamento «📍» + «🕒» + gemello muto; il giudice della versione
+  (bool, stringa, decimale, fuori scala → None) e la rotta che lo passa;
+  in `prove_contanti_a_mano` sul foglio VERO eseguito: testo identico →
+  niente busta né ricordo e il toast (anche col PayCode), un carattere
+  diverso → parte; in `prove_p2p_recapito_passo` il corpo con la
+  versione, e senza `t` niente versione. Emendate col loro perché: il
+  foglio che mostrava il testo a righe, l'esc() che ora sta in
+  `rigaDato`, l'onclick nuovo nelle righe al byte, le chiavi lette dalla
+  rotta.
+- `collaudo_recapito_aggiornato`, punto 8, sulle ROTTE VERE e col
+  database dell'avvio vero: stessa versione da un altro dispositivo →
+  niente e la riga nel journal; cambio vero → un avviso anche se
+  dichiarato due volte; una versione-stringa → la strada di ieri; nel
+  database le due versioni e nient'altro. Nella gabbia: verde.
+- GIRO DAL VIVO nell'app vera (copia nello scratchpad, config
+  dall'esempio, relay morto `ws://127.0.0.1:9`, porta 8163), chi compra
+  111. Nel Browser pane a 360 px: il riquadro Revolut con un tasto, il
+  tocco vero copia `@pseudolo`, «✓ Copiato» e dopo 2,0 s «📋 Copia» (dal
+  registro delle mutazioni); un tocco ha preso NotAllowedError dagli
+  appunti e il gradino all'antica ha copiato lo stesso. In Chrome
+  (Playwright, densità 3) a 360 e 320 px, chiaro e scuro: Revolut,
+  bonifico, Satispay, PayPal coi loro tasti e i valori giusti, nessuno
+  scorrimento orizzontale, i tasti dentro lo schermo; il tocco sull'IBAN
+  → «✓ Copiato» e negli appunti `IT60X0542811101000000123456`, dopo 2 s
+  «📋 Copia»; il recapito cambiato a pagina aperta (dalla porta di chi
+  riceve, `campoScrivi`) → il tocco copia l'IBAN NUOVO. Il foglio dei
+  recapiti di chi compra mostra il riquadro col tasto dell'email. Gli
+  scatti in `.claude/giri/copia-recapito/`.
+
+**DA FARE (notati, non fatti).**
+- Sul telefono vero, iPhone e Android dentro Telegram: il tocco sul
+  «📋 Copia» (la WebView di Telegram Android a volte rifiuta gli appunti:
+  il gradino all'antica dovrebbe prenderla, da vedere).
+- Gli scambi già aperti al momento del deploy: le versioni dette prima
+  non sono in tabella, quindi un secondo dispositivo che ridichiara un
+  recapito di prima del deploy può ancora far suonare un «📮» una volta.
+  Si spegne da solo con gli scambi nuovi.
+- Due correzioni diverse a pochi secondi restano due avvisi (scelta di
+  Andrea): se dal vivo sembrassero troppe, se ne riparla col perché del
+  7 ott davanti.

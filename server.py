@@ -6084,6 +6084,20 @@ def init_db():
         PRIMARY KEY(ordine, momento, giro, tg_id)
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_tg ON p2p_avvisi(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_recapiti_versioni(
+        -- LE VERSIONI DEL RECAPITO GIA' DICHIARATE (16 ott 2026, cantiere
+        -- copia-recapito): il numero che il telefono di chi vende manda
+        -- con la dichiarazione (`versione`, l'ora in cui il recapito e'
+        -- nato) — mai il recapito, che qui non passa. Una riga per
+        -- versione e giro: una versione gia' scritta, ridichiarata da un
+        -- secondo dispositivo, non e' un aggiornamento e tace
+        -- (`_avviso_recapito_p2p`). Se ne va con la cronaca.
+        ordine TEXT NOT NULL,
+        giro INTEGER NOT NULL DEFAULT 0,
+        versione INTEGER NOT NULL,
+        quando INTEGER DEFAULT 0,
+        PRIMARY KEY(ordine, giro, versione)
+    );
     CREATE TABLE IF NOT EXISTS p2p_attese(
         -- GLI AVVISI CHE ASPETTANO UN MINUTO (patch 0007). Due casi:
         -- la RISERVA DEL LIBRO — presa, concluso, annullato, scaduto,
@@ -51816,7 +51830,11 @@ def mio_sconto_p2p(x_tg_init_data: str = Header(""),
 # dice con una riga sua («⛔ Recapito P2P»). I doppioni li fermano gli
 # altri freni: lo stesso recapito ridichiarato (`ripetuto`), il
 # telefono che segna il recapito come gia' detto, il timbro prima
-# dell'invio.
+# dell'invio — e dal 16 ott 2026 (copia-recapito) la VERSIONE del
+# recapito gia' vista (`p2p_recapiti_versioni`), che ferma il secondo
+# dispositivo di chi vende, e il telefono che col testo identico non
+# rispedisce niente. LA PAUSA NON E' TORNATA (stesso giorno, scelta di
+# Andrea): due correzioni diverse di fila sono due notizie.
 P2P_RECAPITO_MAX = 10
 # i momenti che CHIUDONO un giro dello scambio: da li' in poi non c'e'
 # piu' nessuno a cui dire dove mandare gli euro
@@ -51871,9 +51889,21 @@ def _parti_scambio_p2p(con, ordine: str) -> dict:
             "vivo": vivo_libro, "fonte": "libro"}
 
 
+def _versione_recapito_p2p(v):
+    """La `versione` del corpo di /api/p2p/recapito (16 ott 2026,
+    copia-recapito): un intero, l'ora in secondi in cui il recapito e'
+    nato sul telefono di chi vende — fra il 2020 e il 2100. Tutto il
+    resto (un testo, un vero/falso, un decimale, un numero fuori scala)
+    vale «non detta», cioe' la strada di prima: e' la forma dei telefoni
+    di ieri, che il numero non lo mandano. PURA."""
+    if isinstance(v, bool) or not isinstance(v, int):
+        return None
+    return v if 1_577_836_800 <= v <= 4_102_444_800 else None
+
+
 def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
                          attivo: bool = True, ripetuto: bool = False,
-                         contanti=None) -> tuple:
+                         contanti=None, versione=None) -> tuple:
     """Chi vende ha mandato dove ricevere gli euro: a chi dirlo, e con
     che frase. Puro sulla connessione. Torna `(tg_id, testo)`, o
     `(0, perche')` quando non parte niente — e il perche' e' per il
@@ -51895,6 +51925,11 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
     `ripetuto` = lo STESSO recapito, ridichiarato a scambio attivo dopo
     una dichiarazione fatta presto: se a chi compra e' gia' stato detto
     non e' una correzione, e tace.
+    `versione` (16 ott 2026, copia-recapito) = l'ora in cui QUESTO
+    recapito e' nato, uguale su tutti i dispositivi di chi vende: una
+    versione gia' dichiarata in questo giro, se a chi compra qualcosa e'
+    gia' stato detto, tace — vale anche per «🕒 ha cambiato
+    l'appuntamento», che e' la stessa strada. None = un telefono di ieri.
     IL TIMBRO PRIMA DELL'INVIO, il patto delle sorelle."""
     pulite = _ordini_puliti_p2p([ordine] if isinstance(ordine, str) else ordine)
     if len(pulite) != 1:
@@ -51935,6 +51970,20 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
         "giro, attore, dettaglio, arrivato) "
         "VALUES(?,'recapito',?,'telefono',?,'seller',?,?)",
         (ordine, adesso, giro, forma, adesso))
+    # ...E LA SUA VERSIONE (16 ott 2026, cantiere copia-recapito): se il
+    # telefono la dice e questo giro l'ha gia' vista, e' lo STESSO
+    # recapito ridichiarato — da un secondo dispositivo di chi vende, o
+    # dalla seconda memoria del telefono — e non una correzione. Si
+    # guarda PRIMA di scriverla; il silenzio si decide piu' sotto, dove
+    # si sa se a chi compra e' gia' stato detto qualcosa
+    gia_vista = False
+    if versione is not None:
+        gia_vista = con.execute(
+            "SELECT 1 FROM p2p_recapiti_versioni WHERE ordine=? AND giro=? "
+            "AND versione=?", (ordine, giro, versione)).fetchone() is not None
+        con.execute(
+            "INSERT OR IGNORE INTO p2p_recapiti_versioni(ordine, giro, "
+            "versione, quando) VALUES(?,?,?,?)", (ordine, giro, versione, adesso))
     # ...e i solleciti del recapito che aspettavano se ne vanno SUBITO (10
     # ott 2026, sera): il giudice alla scadenza resta, ma cosi' uno scambio
     # andato bene non lascia righe «non parte» nel journal
@@ -51953,6 +52002,9 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
         (ordine, giro, altro)).fetchone()[0] or 0)
     if ripetuto and n > 0:
         return 0, "gia' detto a chi compra: e' lo stesso recapito, ridichiarato"
+    if gia_vista and n > 0:
+        return 0, ("gia' detto a chi compra: questa versione del recapito e' "
+                   "gia' stata dichiarata (un altro dispositivo di chi vende)")
     if n >= P2P_RECAPITO_MAX:
         # il tetto ANTI-ABUSO (7 ott 2026): la rotta lo scrive nel
         # journal con una riga sua, riconoscibile dal ⛔
@@ -52047,7 +52099,8 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
             con, (d or {}).get("ordine"), user["id"], int(time.time()),
             attivo=(d or {}).get("attivo") is not False,
             ripetuto=(d or {}).get("ripetuto") is True,
-            contanti=forma if isinstance(forma, bool) else None)
+            contanti=forma if isinstance(forma, bool) else None,
+            versione=_versione_recapito_p2p((d or {}).get("versione")))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -56591,6 +56644,8 @@ def _pulisci_memoria_p2p(con, adesso: int) -> int:
     tolte = 0
     for tabella, colonna in (("p2p_momenti", "arrivato"),
                              ("p2p_avvisi", "quando"),
+                             # le versioni del recapito (16 ott 2026)
+                             ("p2p_recapiti_versioni", "quando"),
                              ("p2p_scambi", "aggiornato"),
                              ("p2p_tolti", "quando"),
                              # i tentativi (10 ott 2026) vivono quanto la cronaca

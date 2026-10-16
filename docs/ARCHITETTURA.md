@@ -28750,6 +28750,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   negli stati di `P2P_GIRO_APERTO`, timbro `recapitoDetto`, freno suo
   (`id:presto`) che non ferma la dichiarazione a scambio attivo — e a
   scambio attivo manda `ripetuto` se l'id del recapito è lo stesso.
+  LA VERSIONE DEL RECAPITO (16 ott 2026, cantiere copia-recapito): il
+  corpo porta anche `versione`, l'ora in secondi in cui il recapito è
+  nato (`campo.t`, il `created_at` della busta: la stessa su tutti i
+  dispositivi di chi vende). `_versione_recapito_p2p` la vuole intera e
+  fra il 2020 e il 2100, sennò vale «non detta» (la strada di ieri).
+  `_avviso_recapito_p2p` la scrive in `p2p_recapiti_versioni` (ordine,
+  giro, versione, quando; la pulisce `_pulisci_memoria_p2p`) e, se il
+  giro l'aveva già vista e a chi compra qualcosa è già stato detto,
+  tace: è lo stesso recapito ridichiarato da un secondo dispositivo, non
+  una correzione. Nessuna pausa fra due versioni diverse (la regola del
+  7 ott). Nel client `inviaCampoP2P` non rispedisce un testo identico a
+  quello partito. Il «📋 Copia» del riquadro va sui soli dati da
+  incollare (`daIncollareP2P`: per etichetta dei nostri form o per forma
+  — @tag, email, numero, link) e dice «✓ Copiato» per 2 s
+  (`copiaRecapitoP2P`).
   `passoDopoGaranziaP2P` (pura) dà in app la STESSA frase uscendo da
   `attesa_mia_hold`, ovunque sia chi vende e qualunque foglio sia
   aperto («Sats bloccati ✅» usciva solo a foglio della garanzia

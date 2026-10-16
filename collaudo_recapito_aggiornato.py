@@ -24,7 +24,9 @@ database usa-e-getta:
   5. dopo «Ho inviato gli euro» (detto da mostrod): la frase dei gia'
      inviati;
   6. il tetto alto: dieci avvisi, poi la riga ⛔ nel journal;
-  7. un recapito messo nel corpo apposta non arriva da nessuna parte.
+  7. un recapito messo nel corpo apposta non arriva da nessuna parte;
+  8. (16 ott 2026, copia-recapito) la VERSIONE: la stessa da un secondo
+     dispositivo tace, un cambio vero avvisa una volta.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
@@ -156,6 +158,35 @@ async def giro():
     prova("un recapito messo nel corpo apposta: l'avviso parte, senza di lui",
           ([(C, AGG)], False, False),
           (detti, "IT60" in json.dumps(detti) + giornale, "SEGRETO" in json.dumps(detti) + giornale))
+    print("\n8) LA VERSIONE: il secondo dispositivo di chi vende (16 ott 2026)")
+    # «📮 ha aggiornato il recapito» arrivava due volte (13 ott 2026,
+    # 17:38): un secondo dispositivo di chi vende — o la seconda memoria
+    # del telefono — ritrovava lo stesso recapito e lo ridichiarava come
+    # nuovo. Col numero dell'ora del recapito (`versione`) la rotta tace
+    # sulla versione gia' vista; la tabella nasce dall'avvio vero
+    o = ordine(4)
+    await scambio(o)
+    v1 = adesso() - 30
+    v2 = v1 + 10
+    primo = (await recapito(o, {"versione": v1}))[0]
+    detti, giornale, r = await recapito(o, {"versione": v1})
+    prova("il primo avvisa; la stessa versione da un altro dispositivo tace, "
+          "e la rotta risponde ok", (1, [], {"ok": True}), (len(primo), detti, r))
+    prova("...il journal dice perche'", True,
+          "nessun avviso (gia' detto a chi compra: questa versione del recapito "
+          "e' gia' stata dichiarata" in giornale)
+    cambio = (await recapito(o, {"versione": v2}))[0]
+    eco = (await recapito(o, {"versione": v2}))[0]
+    prova("un cambio vero avvisa una volta sola, anche se due dispositivi lo "
+          "dichiarano", ([(C, AGG)], []), (cambio, eco))
+    prova("...una versione che non e' un numero vale «non detta»: la strada di ieri",
+          [(C, AGG)], (await recapito(o, {"versione": str(v2)}))[0])
+    con = banco.con_db()
+    righe = con.execute("SELECT versione FROM p2p_recapiti_versioni WHERE ordine=? "
+                        "ORDER BY versione", (o,)).fetchall()
+    con.close()
+    prova("...e nel database restano le due versioni, e del recapito nient'altro",
+          [v1, v2], [x[0] for x in righe])
     if SRV._TASK_EVENTI_P2P:
         await asyncio.gather(*list(SRV._TASK_EVENTI_P2P), return_exceptions=True)
 

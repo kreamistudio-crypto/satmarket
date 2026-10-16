@@ -76917,8 +76917,12 @@ def prove_p2p_chat():
               False, any(w in testo for w in ("nostr", "nsec", "relay", "chiave")))
     rc = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
     inviaCampoP2P_ = pezzo_js(mini, "async function inviaCampoP2P(", "\n}\n")
+    # ⚠️ EMENDATA (16 ott 2026, copia-recapito): il recapito degli euro
+    # nel foglio e' il riquadro, e l'esc() sta nella sua riga (`rigaDato`)
     prova("i recapiti dell'altra persona passano da esc()", True,
-          "esc(loro.euro.testo)" in rc and "esc(loro.contatto.testo)" in rc)
+          "riquadroRecapitoP2P(loro.euro.testo," in rc and "esc(loro.contatto.testo)" in rc
+          and "esc(o.vista || v)" in pezzo_js(mini, "function rigaDato(et, v, op){", "\n}\n")
+          and "(et ? '<span>' + esc(et) + '</span>' : '')" in pezzo_js(mini, "function rigaDato(et, v, op){", "\n}\n"))
     # ⚠️ EMENDATA (7 ott 2026, il testo corto): «nessun altro li legge»
     # e' diventato «Lo vedete solo tu e l'altra persona, nemmeno
     # Barattolo» — le righe intere le prova prove_recapito_corto
@@ -77102,8 +77106,12 @@ def prove_p2p_chat():
     # PAGINA il recapito non e' piu' un testo con gli a-capo ma un rigo
     # per dato (`riquadroRecapitoP2P`, provato in prove_ritocchi_scambio),
     # e l'a-capo lo fa lo split sulle righe; nel FOGLIO resta com'era.
-    prova("...e il recapito arrivato mostra anche gli a-capo", True,
-          "esc(loro.euro.testo).replace(/\\n/g, '<br>')" in rc
+    # ⚠️ E DAL 16 OTT 2026 (copia-recapito, richiesta di Andrea) anche il
+    # FOGLIO ha il riquadro: col testo a righe non c'era un «📋 Copia», e
+    # chi compra selezionava il dato col dito
+    prova("...e il recapito arrivato e' il riquadro anche nel foglio, un rigo per dato", True,
+          "esc(loro.euro.testo).replace(/\\n/g, '<br>')" not in rc
+          and "riquadroRecapitoP2P(loro.euro.testo," in rc
           and ".split('\\n')" in pezzo_js(mini, "function righeRecapitoP2P(testo){", "\n}\n"))
 
     # --- 8) IL BANCO: il blocco gira col bundle VERO ------------------
@@ -93335,6 +93343,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
                           ("p2p_ordini", "ON p2p_ordini(tg_id);"),
                           ("p2p_momenti", "\n    );"), ("p2p_scambi", "\n    );"),
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
+                          # (16 ott 2026, copia-recapito) le versioni del recapito
+                          ("p2p_recapiti_versioni", "\n    );"),
                           ("p2p_attese", "ON p2p_attese(scade);"),
                           # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                           ("p2p_tolti", "\n    );"),
@@ -93865,6 +93875,91 @@ def prove_p2p_eventi():
            "giorno, ora e luogo sono lì" in t1, a2,
            t2.startswith("🕒 <b>Anna ha cambiato l'appuntamento.</b>"), "inviare" in t1 + t2,
            bool(re.search(r"\d\d:\d\d", t1 + t2))])
+    # --- 5b-bis) LA VERSIONE DEL RECAPITO (16 ott 2026, cantiere
+    # copia-recapito): «📮 ha aggiornato il recapito» arrivava DUE volte
+    # (13 ott 2026, 17:38). Il ricordo «gia' avvisato» sta solo nel
+    # telefono che ha spedito: un secondo dispositivo di chi vende — o la
+    # seconda memoria del telefono — ritrovava lo stesso recapito e lo
+    # ridichiarava come nuovo. Ora il telefono manda l'ORA in cui il
+    # recapito e' nato (`versione`, uguale su tutti i dispositivi), e il
+    # server tace sulla versione gia' vista. Nessuna pausa: due correzioni
+    # diverse di fila restano due notizie (la scelta del 7 ott, confermata)
+    V1, V2 = ORA + 300, ORA + 310
+    ORDV = "dddddddd-eeee-4fff-8aaa-000000000001"
+    libro(ORDV, B, A, "sell")
+    arriva("taken", "buyer", "invoice-next", ORA, ORDV)
+    arriva("buyer-invoice-added", "buyer", "hold-next", ORA + 20, ORDV)
+    arriva("hold-invoice-requested", "mostro", "invoice", ORA + 20, ORDV)
+    arriva("hold-invoice-paid", "seller", "active", ORA + 60, ORDV)
+    def recapiti_detti(o):
+        return con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND "
+                           "momento LIKE 'recapito%'", (o,)).fetchone()[0]
+    primo = recapito(con, ORDV, B, ORA + 301, attivo=True, versione=V1)
+    gemello = recapito(con, ORDV, B, ORA + 302, attivo=True, versione=V1)
+    prova("il primo recapito avvisa; la STESSA versione dal secondo dispositivo "
+          "tace — un avviso solo",
+          [A, True, 0, True, 1],
+          [primo[0], primo[1].startswith("💶 <b>Anna ti ha indicato dove inviare"),
+           gemello[0], "versione del recapito e' gia' stata dichiarata" in gemello[1],
+           recapiti_detti(ORDV)])
+    cambio = recapito(con, ORDV, B, ORA + 311, attivo=True, versione=V2)
+    eco = recapito(con, ORDV, B, ORA + 315, attivo=True, versione=V2)
+    prova("...un cambio VERO e' un aggiornamento, uno solo anche se due "
+          "dispositivi lo dichiarano (e dieci secondi dopo il primo: nessuna pausa)",
+          [A, "📮 <b>Anna ha aggiornato il recapito.</b> Controlla il nuovo prima "
+              "di inviare gli euro.", 0, 2],
+          [cambio[0], cambio[1], eco[0], recapiti_detti(ORDV)])
+    prova("...anche una versione vecchia, ritrovata dopo da un dispositivo, tace",
+          0, recapito(con, ORDV, B, ORA + 900, attivo=True, versione=V1)[0])
+    prova("...le versioni stanno in una riga per giro, e del recapito nient'altro",
+          ([(ORDV, 1, V1), (ORDV, 1, V2)], ["giro", "ordine", "quando", "versione"]),
+          ([tuple(r) for r in con.execute(
+              "SELECT ordine, giro, versione FROM p2p_recapiti_versioni WHERE "
+              "ordine=? ORDER BY versione", (ORDV,))],
+           sorted(r[1] for r in con.execute("PRAGMA table_info(p2p_recapiti_versioni)"))))
+    prova("...e un telefono di ieri (senza versione) fa come prima",
+          A, recapito(con, ORDV, B, ORA + 950, attivo=True)[0])
+    # DICHIARATO PRESTO, poi la garanzia: la frase della garanzia ha gia'
+    # detto il recapito, e il secondo dispositivo che lo ritrova a
+    # scambio attivo — senza il `ripetuto`, che e' un ricordo del primo
+    # telefono — non lo fa suonare come una correzione
+    ORDW = "dddddddd-eeee-4fff-8aaa-000000000002"
+    libro(ORDW, B, A, "sell")
+    arriva("taken", "buyer", "invoice-next", ORA, ORDW)
+    recapito(con, ORDW, B, ORA + 5, attivo=False, versione=ORA + 4)
+    arriva("buyer-invoice-added", "buyer", "hold-next", ORA + 20, ORDW)
+    arriva("hold-invoice-requested", "mostro", "invoice", ORA + 20, ORDW)
+    arriva("hold-invoice-paid", "seller", "active", ORA + 60, ORDW)
+    prova("dichiarato presto, detto dalla garanzia: il secondo dispositivo tace",
+          [0, 1], [recapito(con, ORDW, B, ORA + 120, attivo=True, versione=ORA + 4)[0],
+                   recapiti_detti(ORDW)])
+    # LA STESSA CURA PER L'APPUNTAMENTO: e' la stessa strada
+    ORDX = "dddddddd-eeee-4fff-8aaa-000000000003"
+    libro(ORDX, B, A, "sell")
+    con.execute("UPDATE p2p_ordini SET metodi=? WHERE ordine=?", ('["Contanti"]', ORDX))
+    arriva("taken", "buyer", "invoice-next", ORA, ORDX)
+    arriva("buyer-invoice-added", "buyer", "hold-next", ORA + 20, ORDX)
+    arriva("hold-invoice-requested", "mostro", "invoice", ORA + 20, ORDX)
+    arriva("hold-invoice-paid", "seller", "active", ORA + 60, ORDX)
+    ax = [recapito(con, ORDX, B, ORA + 100 + i, attivo=True, versione=v)
+          for i, v in enumerate((ORA + 99, ORA + 130, ORA + 130))]
+    prova("...e per l'appuntamento: uno «📍», un «🕒» per il cambio, e il "
+          "gemello del cambio tace",
+          [A, A, 0, True, True],
+          [ax[0][0], ax[1][0], ax[2][0],
+           ax[0][1].startswith("📍 <b>Anna ti ha indicato dove e quando vedervi.</b>"),
+           ax[1][1].startswith("🕒 <b>Anna ha cambiato l'appuntamento.</b>")])
+    # IL GIUDICE DELLA VERSIONE: un intero in secondi fra il 2020 e il
+    # 2100; tutto il resto vale «non detta», la strada di ieri
+    _gv = {}
+    exec(pezzo("_versione_recapito_p2p"), _gv)
+    prova("la versione: solo un intero in secondi, il resto vale «non detta»",
+          [ORA, None, None, None, None, None, None, None],
+          [_gv["_versione_recapito_p2p"](x) for x in
+           (ORA, True, False, "1760000000", float(ORA), 12, 99_999_999_999, None)])
+    _rotta = pezzo("recapito_p2p")
+    prova("...e la rotta la passa al giudice, dal corpo", True,
+          "versione=_versione_recapito_p2p((d or {}).get(\"versione\")))" in _rotta)
     # SENZA IL COORDINATORE vale la parola del telefono, com'era: presto
     # no, a scambio attivo si' — anche se e' un «ripetuto» mai detto
     ORDL = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
@@ -99235,6 +99330,8 @@ def prove_p2p_orologio():
                         ("p2p_attese", "ON p2p_attese(scade);"), ("p2p_scambi", "\n    );"),
                         # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                         ("p2p_tolti", "\n    );"),
+                        # (16 ott 2026, copia-recapito) le versioni del recapito: la pulizia le porta via
+                        ("p2p_recapiti_versioni", "\n    );"),
                         # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                         ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
                         ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
@@ -99531,6 +99628,8 @@ def prove_p2p_tutti_i_relay():
                         ("p2p_attese", "ON p2p_attese(scade);"),
                         # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                         ("p2p_tolti", "\n    );"),
+                        # (16 ott 2026, copia-recapito) le versioni del recapito: la pulizia le porta via
+                        ("p2p_recapiti_versioni", "\n    );"),
                         # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                         ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
                         ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
@@ -100171,6 +100270,8 @@ def prove_p2p_ascolto():
                         ("p2p_attese", "ON p2p_attese(scade);"),
                         # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                         ("p2p_tolti", "\n    );"),
+                        # (16 ott 2026, copia-recapito) le versioni del recapito: la pulizia le porta via
+                        ("p2p_recapiti_versioni", "\n    );"),
                         # (10 ott 2026, reputazione-p2p) gli esiti e i tentativi
                         ("p2p_esiti", "ON p2p_esiti(tg_id, esito, quando);"),
                         ("p2p_tentativi", "ON p2p_tentativi(ordine, tg_id, quando);")):
@@ -101525,6 +101626,8 @@ def _schema_p2p_pieno(src):
                           ("p2p_ordini", "ON p2p_ordini(tg_id);"),
                           ("p2p_momenti", "\n    );"), ("p2p_scambi", "\n    );"),
                           ("p2p_avvisi", "ON p2p_avvisi(tg_id);"),
+                          # (16 ott 2026, copia-recapito) le versioni del recapito
+                          ("p2p_recapiti_versioni", "\n    );"),
                           ("p2p_attese", "ON p2p_attese(scade);"),
                           # (7 ott 2026) e gli scambi tolti con la ✕: la pulizia li porta via
                           ("p2p_tolti", "\n    );"),
@@ -101833,8 +101936,11 @@ def prove_p2p_recapito_passo():
     # (10 ott 2026, riquadro-contanti-sepa) e un terzo SI'/NO, `contanti`: la
     # FORMA del recapito — appuntamento o posto dove mandare gli euro —,
     # letta per tipo (`isinstance(bool)`): una stringa vale «non detta»
-    prova("la rotta legge dal corpo l'id dell'ordine e tre SI'/NO, e nient'altro",
-          ["attivo", "contanti", "ordine", "ripetuto"],
+    # (16 ott 2026, copia-recapito) e la VERSIONE: l'ora in cui il recapito
+    # e' nato, un intero che dice «quale» e mai «cosa» — e passa dal suo
+    # giudice (`_versione_recapito_p2p`), provato in prove_p2p_eventi
+    prova("la rotta legge dal corpo l'id dell'ordine, tre SI'/NO e la versione, e nient'altro",
+          ["attivo", "contanti", "ordine", "ripetuto", "versione"],
           sorted(set(re.findall(r'\.get\("(\w+)"\)', codice(rotta)))))
     prova("...e i due SI'/NO si leggono per identita': quel che non e' un "
           "booleano non vale niente", True,
@@ -102241,6 +102347,10 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
                 await prova({stato: 'pubblicato'})];
   out.soloChiVende = await prova({lato: 'compro'});
   out.senzaRecapito = await prova({campiMiei: {}});
+  /* (16 ott 2026, copia-recapito) un recapito senza la sua ora non
+     inventa una versione: il corpo e' quello di ieri */
+  out.senzaOra = [await prova({campiMiei: {euro: {id: 'm3', testo: 'IBAN'}}}),
+                  'versione' in ((chiamate[0] || {}).corpo || {})];
   /* il server che non risponde: non si segna, e si riprova non prima di un minuto */
   rispostaOk = false;
   out.fallitoNonSegna = [await prova({}), ordini[ID].recapitoAvvisato === undefined];
@@ -102272,31 +102382,35 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     finally:
         _sh.rmtree(d, ignore_errors=True)
     prova("chi vende, a scambio attivo, col recapito partito: l'avviso parte", 1, o["recapitoParte"])
-    prova("...con l'id dell'ordine e la FORMA (un SI'/NO, qui l'IBAN): il recapito non passa dal server",
-          '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"contanti":false} /api/p2p/recapito',
+    # ⚠️ EMENDATE (16 ott 2026, copia-recapito): i corpi portano anche la
+    # `versione`, l'ora del recapito (qui `t`, 5 e 9): il numero, mai il testo
+    prova("...con l'id dell'ordine, la FORMA (un SI'/NO, qui l'IBAN) e la versione: il recapito non passa dal server",
+          '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"contanti":false,"versione":5} /api/p2p/recapito',
           o["recapitoCorpo"])
     prova("...si segna QUALE recapito e' stato detto, e non si ripete", ["m1", 0],
           [o["recapitoSegnato"], o["recapitoNonRipete"]])
     prova("...una correzione e' un altro recapito, e riparte", 1, o["correzioneRiparte"])
     prova("PRIMA dello scambio attivo si dichiara e basta: `attivo: false`, "
           "segnato a parte — e «avvisato» resta vuoto",
-          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":false,"contanti":false}', "m1", True],
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":false,"contanti":false,"versione":5}', "m1", True],
           o["prestoDichiara"])
     prova("...una volta sola", 0, o["prestoNonRipete"])
     prova("...e a scambio attivo lo stesso recapito si RIDICHIARA come ripetuto",
-          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"ripetuto":true,"contanti":false}', "m1"],
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"ripetuto":true,"contanti":false,"versione":5}', "m1"],
           o["attivoRidichiara"])
     prova("...e il freno del «presto» non ferma la dichiarazione a scambio "
           "attivo, dieci secondi dopo", [False, True], o.get("freniSeparati"))
     prova("DOPO «HO INVIATO GLI EURO» (7 ott 2026): parte SOLO un recapito nato "
           "dopo l'ora del pagato, come aggiornamento; uno di prima, o della stessa "
           "ora, no — e nemmeno in disputa, o con l'ora del pagato a zero",
-          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"contanti":false}', "m2", 0, 0, 0, 0],
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"contanti":false,"versione":9}', "m2", 0, 0, 0, 0],
           o.get("dopoPagato"))
     prova("a euro inviati senza l'ora del pagato, a scambio concluso, o a ordine "
           "ancora in vetrina, non parte niente", [0, 0, 0], o["dopoNo"])
     prova("chi compra non avvisa nessuno, e senza recapito non c'e' niente da dire",
           [0, 0], [o["soloChiVende"], o["senzaRecapito"]])
+    prova("...e un recapito senza la sua ora parte senza versione, come ieri", [1, False],
+          o.get("senzaOra"))
     prova("se il server non risponde non si segna (si riprovera')", [1, True], o["fallitoNonSegna"])
     prova("...ma non prima di un minuto: niente martello", 0, o["nonMartella"])
 
@@ -123281,6 +123395,12 @@ def prove_ritocchi_scambio():
         fn("function bottoneCopia(v, aria){"),
         fn("function righeRecapitoP2P(testo){"),
         fn("function riquadroRecapitoP2P(testo, titolo){"),
+        # (16 ott 2026, copia-recapito) il giudice dei dati da incollare
+        re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*;", mini).group(0),
+        mini[mini.index("const FORME_DA_INCOLLARE_P2P = ["):
+             mini.index("\n];", mini.index("const FORME_DA_INCOLLARE_P2P = [")) + 3],
+        fn("function daIncollareP2P(r){"),
+        fn("function copiaRecapitoP2P(b){"),
         fn("function recapitoCompratoreP2P(o){"),
         re.search(r"const P2P_FINALI = [^\n]*;", mini).group(0),
         mini[mini.index("const P2P_PROGRESSO = {"):
@@ -123320,7 +123440,7 @@ const conSpazi = riquadroRecapitoP2P('IBAN: IT60 X054 2811 1010 0000 0123 456');
 out.ibanConSpazi = conSpazi.indexOf('<b class="mono">IT60 X054 2811 1010 0000 0123 456</b>') >= 0
   && conSpazi.indexOf('data-v="IT60X0542811101000000123456"') >= 0;
 out.nomeNonMono = box.indexOf('<span>Intestatario</span><b>Mario Rossi</b>') >= 0;
-out.copiaDalDataset = (box.match(/data-v="[^"]*" onclick="copiaLink\(this\.dataset\.v, 'Copiato 📋'\)"/g) || []).length;
+out.copiaDalDataset = (box.match(/data-v="[^"]*" onclick="copiaRecapitoP2P\(this\)"/g) || []).length;
 out.copiaIban = box.indexOf('data-v="IT60X0542811101000000123456"') >= 0;
 const cattivo = riquadroRecapitoP2P('IBAN: "><img src=x onerror=alert(1)>\nNota: \'); alert(1); //');
 out.cattivoSenzaTag = cattivo.indexOf('<img') < 0;
@@ -123341,7 +123461,49 @@ out.presto = recapitoCompratoreP2P(conIban('attesa_hold_venditore'));
 out.concluso = recapitoCompratoreP2P(conIban('concluso'));
 out.paycode = recapitoCompratoreP2P({lato: 'compro', stato: 'attivo', metodi: ['Contanti al tabacchino'],
   campiLoro: {euro: {testo: 'Contanti al tabacchino\nPayCode: 479-868-518'}}});
-console.log(JSON.stringify(out));
+/* I DATI DA INCOLLARE (16 ott 2026, copia-recapito): un «Copia» per
+   ogni dato che si incolla in un'altra app, coi valori che copia */
+const copie = t => (riquadroRecapitoP2P(t).match(/data-v="[^"]*"/g) || [])
+  .map(x => x.slice(8, -1));
+out.perMetodo = {
+  revolut: copie('Revolut: @pseudolo'),
+  satispay: copie('Satispay: 333 1234567'),
+  paypal: copie('PayPal: mario@esempio.it'),
+  paypalMe: copie('PayPal: https://paypal.me/mario'),
+  sepa: copie('Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60 X054 2811 1010 0000 0123 456\nCausale: regalo Mario'),
+  wise: copie('Wise: @mario.rossi'),
+  postepay: copie('Postepay: 5333 1712 3456 7890'),
+  nudo: copie('mario@esempio.it'),
+  descrittive: copie('Bonifico SEPA\nNota: dopo le 18\nPreferisco: istantaneo'),
+  appuntamento: copie('Contanti alla mano — propongo di vederci: Bar Sport\nQuando: 17/10/2026 alle 18:30\nCoordinate: 45.07, 7.68'),
+  ibanFinto: copie('IBAN: da chiedere'),
+};
+/* ...e con Revolut il tasto e' UNO: la colonna del 23 set non torna */
+out.revolutUno = (riquadroRecapitoP2P('Revolut: @pseudolo').match(/<button/g) || []).length;
+/* «✓ Copiato» per due secondi, poi «📋 Copia»; e niente se gli appunti
+   dicono di no (resta il toast col valore, che e' di copiaLink) */
+const timer = [];
+globalThis.setTimeout = (f, ms) => { timer.push([f, ms]); return timer.length; };
+globalThis.clearTimeout = () => {};
+globalThis.haptic = () => {};
+let presi = [];
+globalThis.copiaLink = (v, fatto) => { presi.push(v); return Promise.resolve(out.appunti); };
+const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isConnected: true,
+  classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }}});
+(async () => {
+  out.appunti = true;
+  const b = bott();
+  await copiaRecapitoP2P(b);
+  out.dopo = [b.textContent, b.classList.s.has('fatto'), timer.length ? timer[0][1] : 0];
+  timer[0][0]();
+  out.torna = [b.textContent, b.classList.s.has('fatto')];
+  out.appunti = false;
+  const c = bott();
+  await copiaRecapitoP2P(c);
+  out.rifiuto = [c.textContent, c.classList.s.has('fatto'), timer.length];
+  out.presi = presi;
+  console.log(JSON.stringify(out));
+})();
 """)
     if out:
         prova("il testo SEPA: il nome del metodo in testa, poi un dato per rigo",
@@ -123401,6 +123563,25 @@ console.log(JSON.stringify(out));
               and "Non inviare ancora" not in out.get("concluso", ""))
         prova("...e col PayCode il recapito e' il suo riquadro", '<div class="p2p-paycode">PAYCODE</div>',
               out.get("paycode"))
+        # (16 ott 2026, copia-recapito, richiesta di Andrea) «📋 Copia»
+        # SOLO sui dati che si incollano in un'altra app: il valore senza
+        # l'etichetta, l'IBAN senza spazi; mai sul nome del metodo ne'
+        # sulle righe descrittive
+        prova("il «Copia» per metodo: Revolut, Satispay, PayPal (email e link), "
+              "il bonifico coi suoi tre, e i metodi che il form non conosce",
+              {"revolut": ["@pseudolo"], "satispay": ["333 1234567"],
+               "paypal": ["mario@esempio.it"], "paypalMe": ["https://paypal.me/mario"],
+               "sepa": ["Mario Rossi", "IT60X0542811101000000123456", "regalo Mario"],
+               "wise": ["@mario.rossi"], "postepay": ["5333 1712 3456 7890"],
+               "nudo": ["mario@esempio.it"], "descrittive": [], "appuntamento": [],
+               "ibanFinto": []},
+              out.get("perMetodo"))
+        prova("...con Revolut il tasto e' uno solo", 1, out.get("revolutUno"))
+        prova("il tocco: «✓ Copiato» per due secondi, poi «📋 Copia»; se gli "
+              "appunti dicono di no il bottone non mente",
+              [["✓ Copiato", True, 2000], ["📋 Copia", False],
+               ["📋 Copia", False, 1], ["@pseudolo", "@pseudolo"]],
+              [out.get("dopo"), out.get("torna"), out.get("rifiuto"), out.get("presi")])
 
     # --- 3a) IL SERVER: il giudice del pagamento a chi compra ----------
     def tabella(nome):
@@ -124061,6 +124242,8 @@ def prove_dati_spedizione_copia():
         return pezzo_js(mini, firma, "\n}\n") + "\n}"
 
     FIRME = ["function rigaDato(et, v, op){", "function bottoneCopia(v, aria){",
+             # (16 ott 2026, copia-recapito) il tocco del «📋 Copia»
+             "function copiaRecapitoP2P(b){",
              "function righeIndirizzo(i, estero){", "function spedEstero(o){",
              "function indirizzoPerEtichetta(i, estero){",
              "function copiaIndirizzo(){", "function pannelloIndirizzoCasa(o){",
@@ -124140,11 +124323,13 @@ def prove_dati_spedizione_copia():
           (True, True),
           ("if (serveSpedisciA(o)) return '';" in pic,
            "if (serveSpedisciA(o)) return '';" in pem))
-    # IL «📋 COPIA» GRANDE RESTA DEL SOLO IBAN; il 📋 PICCOLO e' delle
+    # IL «📋 COPIA» GRANDE E' DEL SOLO RIQUADRO DEL RECAPITO (dal 16 ott
+    # 2026, copia-recapito, anche sui dati da incollare: `daIncollareP2P`,
+    # provato in prove_ritocchi_scambio); il 📋 PICCOLO e' delle
     # righe di chi vende (indirizzo, punto, email) e del tracciamento
     # di chi compra, e passa SOLO da `copiaDato`
     riq = fn("function riquadroRecapitoP2P(testo, titolo){")
-    prova("un solo «📋 Copia» grande in tutto il client: quello dell'IBAN", (1, True, True),
+    prova("un solo «📋 Copia» grande in tutto il client: quello del riquadro del recapito", (1, True, True),
           (mini.count("bottoneCopia(") - mini.count("function bottoneCopia("),
            "bottoneCopia(v, 'Copia ' + (et || v))" in fn("function rigaDato(et, v, op){"),
            bool(re.search(r"FORMA_IBAN\.test\(nudo\)\s*\?\s*rigaDato\(r\.et, nudo, "
@@ -124355,9 +124540,14 @@ const RIGA_IBAN = () => rigaDato('IBAN', IBAN, {vista: 'IT60 X054 2811 1010 0000
    `data-v` che il browser gli darebbe — e un onclick vive nello scope
    GLOBALE, quindi la funzione che chiama deve stare li' */
 globalThis.copiaLink = copiaLink;
+/* (16 ott 2026, copia-recapito) e' il «📋 Copia» a chiamarla, e lei
+   copiaLink */
+globalThis.copiaRecapitoP2P = copiaRecapitoP2P;
 function tocca(h){
   const m = /onclick="([^"]*)"/.exec(h);
-  new Function(m[1]).call({dataset: {v: /data-v="([^"]*)"/.exec(h)[1]}});
+  /* (16 ott 2026) il «📋 Copia» scrive sul bottone: ✓ Copiato */
+  new Function(m[1]).call({dataset: {v: /data-v="([^"]*)"/.exec(h)[1]}, isConnected: true,
+                           classList: {add(){}, remove(){}}});
 }
 const CASI = {
   righe(){
@@ -124729,13 +124919,16 @@ const CASI = {
           {"senzaTag": True, "nelTesto": True, "etichetta": True,
            "onclick": ["copiaDato(this)"], "dataV": True},
           g("cattivo"))
+    # ⚠️ EMENDATA (16 ott 2026, copia-recapito): l'onclick del «📋 Copia»
+    # e' `copiaRecapitoP2P(this)`, che passa da copiaLink e scrive
+    # «✓ Copiato» sul bottone per due secondi
     prova("la riga al byte: il «Copia» solo se chiesto (l'IBAN, senza spazi), "
           "senza etichetta niente <span>",
           ['<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
            '<span>IBAN</span><b class="mono">IT60 X054 2811 1010 0000 0123 456</b></div>'
            '<button type="button" class="p2p-recapito-copia" '
            'data-v="IT60X0542811101000000123456" '
-           "onclick=\"copiaLink(this.dataset.v, 'Copiato 📋')\" "
+           "onclick=\"copiaRecapitoP2P(this)\" "
            'aria-label="Copia IBAN">📋 Copia</button></div>',
            '<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
            '<b>Via Roma 1</b></div></div>',
@@ -124743,7 +124936,7 @@ const CASI = {
            '<span>Email</span><b class="mono">a@b.it</b></div></div>',
            '<button type="button" class="p2p-recapito-copia" '
            'data-v="Locker &quot;A&quot; &amp; &lt;b&gt;" '
-           "onclick=\"copiaLink(this.dataset.v, 'Copiato 📋')\" "
+           "onclick=\"copiaRecapitoP2P(this)\" "
            'aria-label="Copia l&#39;email">📋 Copia</button>'], g("righeAlByte"))
     ve = g("venditore")
     prova("chi vende: prima «Mostra», e nessun dato finche' non lo chiede",
@@ -136051,6 +136244,12 @@ def prove_contanti_a_mano():
         prova("...se il recapito non parte non parte nemmeno l'appuntamento, e il foglio lo dice",
               ["recapito", "toast:Non è partito: relay giù"], f["fallito"])
         prova("...e un server che non risponde non ferma il foglio (il tetto dei sei secondi)", ok_contanti, f["muto"])
+        prova("LO STESSO RECAPITO NON RIPARTE: col testo identico niente busta e niente "
+              "avviso, e il foglio lo dice (anche col PayCode); un recapito diverso parte",
+              [["toast:È già questo il recapito: chi compra lo vede già."],
+               ["toast:È già questo il PayCode: chi compra lo vede già."],
+               ["recapito", "ricordo", "toast:Recapito inviato a chi compra ✓"]],
+              [f.get("uguale"), f.get("ugualePayCode"), f.get("diverso")])
         prova("...e il form del contanti e' quello che porta l'appuntamento", True,
               "{forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i, appuntamento: true," in mini)
         ad = f["adozione"]
@@ -136131,6 +136330,17 @@ async function giro(forma, opz){
   out.tabacchino = await giro(TAB, {});
   out.fallito = await giro(CONTANTI, {fallisce: true});
   out.muto = await giro(CONTANTI, {muto: true});
+  /* LO STESSO RECAPITO NON RIPARTE (16 ott 2026, copia-recapito): col
+     testo identico a quello partito niente busta, niente ricordo, e il
+     foglio lo dice; un carattere diverso e' un recapito nuovo e parte */
+  ORDINI['ORD-1'].campiMiei = {euro: {id: 'e1', t: 5, testo: 'IBAN: IT60X0542811101000000123456'}};
+  out.uguale = await giro(SEPA, {});
+  ORDINI['ORD-1'].campiMiei = {euro: {id: 'e1', t: 5,
+    testo: 'Contanti al tabacchino\nPayCode: 479-868-518\nImporto: 39,99 €\nScade: 17/09/2026 alle 14:30'}};
+  out.ugualePayCode = await giro(TAB, {});
+  ORDINI['ORD-1'].campiMiei = {euro: {id: 'e1', t: 5, testo: 'IBAN: IT60X0542811101000000123457'}};
+  out.diverso = await giro(SEPA, {});
+  delete ORDINI['ORD-1'].campiMiei;
   const P = (g, mia, altra) => ({giro: g, mia: mia, altra: altra});
   const mia = {ora: 100, posizione: true, volte: 1};
   out.adozione = {
@@ -144940,6 +145150,10 @@ def prove_recapito_corto():
         "const dataTabacchinoP2P = () => '';\n"
         "const testoAppuntamentoP2P = () => '';\n"
         "const quandoDaCampoP2P = () => 0, puntoDaCampoP2P = () => null;\n"
+        # (16 ott 2026, copia-recapito) il recapito di chi compra e' il
+        # riquadro, che ha le sue prove (prove_ritocchi_scambio): qui di
+        # cartone, il banco guarda le righe del foglio
+        "const riquadroRecapitoP2P = t => '<div class=\"p2p-recapito\">' + t + '</div>';\n"
         + pezzo_js(mini, "const P2P_FORME_RECAPITO = [", "\n];\n") + "\n];\n"
         + pezzo_js(mini, "function formaRecapito(metodo){", "\n}\n") + "\n}\n"
         + pezzo_js(mini, "function metodoRecapitoScelto(o){", "\n}\n") + "\n}\n"
@@ -145060,9 +145274,12 @@ def prove_causale_sepa():
           "        if (inp) inp.value = v;           // il campo mostra il testo convertito\n"
           "        const no = giudiceCausaleSepaP2P(v, c.max);\n"
           "        if (no) { toast(no, 6000); if (inp) inp.focus(); return; }" in invio)
+    # ⚠️ EMENDATA (16 ott 2026, copia-recapito): il giudice e'
+    # `daIncollareP2P`, e causale e intestatario stanno nelle sue etichette
     prova("chi compra: «Copia» su causale e intestatario, riconosciuti per etichetta", True,
-          "copia: /^(causale|intestatario)$/i.test(r.et)" in
-          pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n"))
+          "copia: daIncollareP2P(r)" in
+          pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n")
+          and bool(re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = /\^\(intestatario\|causale\|", m)))
     rc = pezzo_js(m, "function renderCampiP2P(", "\n}\n")
     prova("il form toglie dal ricordo i campi nonRicordato e rilegge la causale dal testo partito",
           [True, True],
@@ -145112,6 +145329,10 @@ def prove_causale_sepa():
         + pezzo_js(m, "function bottoneCopia(v, aria){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function righeRecapitoP2P(testo){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function riquadroRecapitoP2P(testo, titolo){", "\n}\n") + "\n}\n"
+        # (16 ott 2026, copia-recapito) il giudice dei dati da incollare
+        + re.search(r"const ETICHETTE_DA_INCOLLARE_P2P = [^\n]*;", m).group(0) + "\n"
+        + pezzo_js(m, "const FORME_DA_INCOLLARE_P2P = [", "\n];\n") + "\n];\n"
+        + pezzo_js(m, "function daIncollareP2P(r){", "\n}\n") + "\n}\n"
         + r"""
 const campo = (k, v) => { INPUT['p2pCampoEuro_' + k] = {value: v, focus(){ FOCUS = k; }}; };
 async function giro(nome, iban, causale){

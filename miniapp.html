@@ -4868,6 +4868,11 @@
   .p2p-recapito-copia{flex:0 0 auto;border:0;background:var(--sats-soft);color:var(--ink);
     border-radius:10px;font:inherit;font-size:13px;font-weight:800;padding:8px 11px;
     cursor:pointer;user-select:none;-webkit-user-select:none}
+  /* «✓ Copiato» per due secondi (16 ott 2026, copia-recapito): il verde
+     della fiducia, come il ✓ del 📋 piccolo; la larghezza minima tiene
+     il bottone fermo quando la parola cambia, e la riga non salta */
+  .p2p-recapito-copia:not(.icona){min-width:92px;white-space:nowrap}
+  .p2p-recapito-copia.fatto{background:var(--trust-soft);color:var(--trust-text)}
   /* LE STESSE RIGHE NELLE BUSTE DEL MERCATINO (23 set 2026, «Dati di
      spedizione che si copiano»): l'indirizzo, l'email per il corriere e
      il punto di ritiro, dentro il loro .payout e SENZA la carta del
@@ -36517,8 +36522,27 @@ function rigaDato(et, v, op){
    apici. */
 function bottoneCopia(v, aria){
   return '<button type="button" class="p2p-recapito-copia" data-v="' + esc(v) + '" '
-    + 'onclick="copiaLink(this.dataset.v, \'Copiato 📋\')" '
+    + 'onclick="copiaRecapitoP2P(this)" '
     + 'aria-label="' + esc(aria) + '">📋 Copia</button>';
+}
+/* il tocco sul «📋 Copia» (16 ott 2026, copia-recapito, richiesta di
+   Andrea): la stessa scala di `copiaDato` — appunti, poi il gradino
+   all'antica, poi il valore nel toast — e quando gli appunti dicono si'
+   il bottone stesso dice «✓ Copiato» per due secondi: nel riquadro del
+   bonifico i tasti sono tre, ed e' cosi' che si vede QUALE dato si e'
+   preso. Un secondo tocco dentro i due secondi riparte dal suo: il
+   timer vecchio non rimette «📋 Copia» a meta'. Il valore lo prende dal
+   `data-v` del bottone, che il ridisegno della pagina rifa' a ogni
+   recapito nuovo: un recapito cambiato si copia sempre nuovo. */
+function copiaRecapitoP2P(b){
+  haptic();
+  return copiaLink(b.dataset.v, 'Copiato 📋').then(ok => {
+    if (!ok || b.isConnected === false) return;
+    b.textContent = '✓ Copiato';
+    b.classList.add('fatto');
+    clearTimeout(b._torna);
+    b._torna = setTimeout(() => { b.textContent = '📋 Copia'; b.classList.remove('fatto'); }, 2000);
+  });
 }
 /* IL 📋 PICCOLO (6 ott 2026, «📦 Spedisci a»): solo l'icona, che passa
    da `copiaDato` — gli appunti e il ✓ sul bottone stesso. `classe` e'
@@ -63829,7 +63853,13 @@ function righeRecapitoP2P(testo){
    campi del bonifico si incollano tutti e tre nel modulo della banca, e
    tre bottoni uguali in colonna sono il modulo, non la confusione dei
    sette del 23 set (allora c'era un «Copia» anche sul nome del metodo e
-   sulle righe degli altri recapiti). */
+   sulle righe degli altri recapiti).
+   ...E SUI DATI CHE SI INCOLLANO IN UN'ALTRA APP (16 ott 2026, cantiere
+   copia-recapito, richiesta di Andrea): il RevTag, il numero Satispay,
+   l'email o il link PayPal — e gli stessi dati degli altri metodi. Chi
+   compra doveva selezionarli col dito. Il giudice e' `daIncollareP2P`,
+   qui sotto; il nome del metodo e le righe descrittive restano senza:
+   con Revolut c'e' UN tasto, e la colonna del 23 set non torna. */
 function riquadroRecapitoP2P(testo, titolo){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
@@ -63842,9 +63872,36 @@ function riquadroRecapitoP2P(testo, titolo){
         return FORMA_IBAN.test(nudo)
           ? rigaDato(r.et, nudo, {vista: nudo.replace(/(.{4})(?=.)/g, '$1 '),
                                   mono: true, copia: true})
-          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et), copia: /^(causale|intestatario)$/i.test(r.et)});
+          : rigaDato(r.et, r.v, {mono: /^iban$/i.test(r.et), copia: daIncollareP2P(r)});
       }).join('')
     + '</div>';
+}
+/* I DATI DA INCOLLARE (16 ott 2026, copia-recapito). PURA. Una riga ha
+   il suo «📋 Copia» se il suo valore e' un dato che si incolla in
+   un'altra app — e lo si riconosce in due modi:
+   • per ETICHETTA, quelle che scrivono i nostri form (`P2P_FORME_RECAPITO`):
+     intestatario e causale del bonifico, Revolut, Satispay, PayPal;
+   • per FORMA, per i metodi che il form non conosce («Wise: @mario»,
+     «Postepay: 5333 …») e per i recapiti scritti da un altro client: un
+     @tag, un'email, un numero (almeno sei cifre, col + davanti e gli
+     spazi o i trattini che ci si mettono), un link.
+   Il resto e' descrittivo — «Nota: dopo le 18», l'ora o le coordinate
+   dell'appuntamento — e resta testo da leggere. L'IBAN ha la sua strada
+   nel riquadro (per forma, senza spazi): un «IBAN: da chiedere» non e'
+   un dato. */
+const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal)$/i;
+const FORME_DA_INCOLLARE_P2P = [
+  /^@[\w.\-]{2,40}$/,
+  /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
+  /^\+?[0-9](?:[ .\-\/]?[0-9]){5,}$/,
+  /^(?:https?:\/\/)?(?:www\.)?paypal\.me\/\S+$/i,
+  /^https?:\/\/\S+$/i
+];
+function daIncollareP2P(r){
+  if (!r || r.testa || !String(r.v || '').trim()) return false;
+  if (ETICHETTE_DA_INCOLLARE_P2P.test(String(r.et || '').trim())) return true;
+  const v = String(r.v).trim();
+  return FORME_DA_INCOLLARE_P2P.some(f => f.test(v));
 }
 /* LA MAPPA DEI PUNTI ABILITATI AL PAYCODE (10 ott 2026, cantiere
    guida-paycode): l'indirizzo e' di Amazon ed e' scritto QUI, non da un
@@ -73507,7 +73564,12 @@ function renderCampiP2P(){
   box.innerHTML =
     (o.lato === 'compro'
       ? (loro.euro
-        ? '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>' + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>'
+        /* IL RIQUADRO DELLA PAGINA DELLO SCAMBIO (16 ott 2026,
+           copia-recapito): era un testo di righe, senza «📋 Copia» — chi
+           compra doveva selezionare il dato col dito. Lo stesso
+           riquadro, col titolo del contanti di persona dove serve */
+        ? riquadroRecapitoP2P(loro.euro.testo,
+            typeof pagaInContantiP2P === 'function' && pagaInContantiP2P(o) ? '📍 Dove vedervi' : '')
         : '<div class="hint">💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.</div>')
       : '') +
     /* ⚠️ IL CAMPO DEL PROPRIO RECAPITO NON C'E' PIU' (17 set 2026):
@@ -73656,6 +73718,20 @@ async function inviaCampoP2P(tipo, btn){
     fr.campi.forEach(c => { if (c.nonRicordato) delete ricordo[c.k]; });
     daRicordare = fr.ricorda === false ? null : {forma: fr.forma, campi: ricordo};
     if (tabRiga) tabRiga.testo = testo;
+  }
+  /* LO STESSO RECAPITO NON RIPARTE (16 ott 2026, cantiere copia-recapito,
+     richiesta di Andrea): «Aggiorna» col testo identico a quello gia'
+     partito spediva una busta nuova — un id nuovo — e a chi compra
+     arrivava «📮 ha aggiornato il recapito» senza che fosse cambiato
+     niente. La busta di prima e' gia' partita, e chi compra la legge
+     gia': non parte niente, e lo si dice. Il confronto e' sulla riga
+     viva, non sulla `o` presa all'apertura del foglio. */
+  const giaPartito = ((ordiniP2P()[o.id] || o).campiMiei || {})[tipo];
+  if (giaPartito && String(giaPartito.testo || '') === testo) {
+    toast(appuntamento ? 'È già questo l\'appuntamento: chi compra lo vede già.'
+          : tabRiga ? 'È già questo il PayCode: chi compra lo vede già.'
+          : 'È già questo il recapito: chi compra lo vede già.');
+    return;
   }
   const rip = bottoneInAttesa(btn, 'Invio…');
   try {
@@ -80114,6 +80190,18 @@ function avvisaRecapitoP2P(id){
      testo del recapito resta fuori dal filo, come sempre. */
   const contanti = recapitoInContantiP2P(o);
   if (contanti !== null) corpo.contanti = contanti;
+  /* LA VERSIONE, NON IL RECAPITO (16 ott 2026, cantiere copia-recapito):
+     l'ORA in cui il recapito e' nato (`campo.t`, il created_at della
+     busta, in secondi). E' la stessa su tutti i dispositivi di chi
+     vende, perche' la busta e' una — e il ricordo «gia' avvisato» qui
+     sopra no: sta solo nel telefono che l'ha spedita. Un secondo
+     dispositivo (o la seconda memoria, la Mini App aperta dal tasto di
+     un avviso) che ritrovava lo stesso recapito lo ridichiarava come
+     nuovo, e a chi compra arrivava un secondo «📮 ha aggiornato il
+     recapito» — la forma del doppio del 13 ott 2026, 17:38. Col numero
+     il server riconosce la versione gia' detta e tace. Del contenuto
+     non dice niente. */
+  if (Number(campo.t) > 0) corpo.versione = Math.floor(Number(campo.t));
   fetch(`${API_BASE}/p2p/recapito`, {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
     body: JSON.stringify(corpo)})
