@@ -61200,7 +61200,6 @@ Il resto lo fa la CI.
   cancellazioni (sqlite riusa lo spazio): se un giorno pesa, un VACUUM a
   mano a mercato fermo.
 
-
 ## La strada a pezzi: la fattura Phoenix che «non trovava una strada» (16 ott 2026, cantiere strada-phoenix, richiesta di Andrea)
 
 **IL CASO.** Nel foglio «Dove ricevere i sats» del P2P una fattura
@@ -61536,3 +61535,555 @@ resto lo fa la CI.
 - Il VACUUM della prima apertura sul VPS: guardare nel journal, dopo il
   deploy, la riga «🧹 Chat P2P: il cassetto restituisce lo spazio…»
   (oppure l'avviso «⚠️ … non acceso»).
+
+## Il pagamento on-chain come opzione: il 2-di-3 non custodial, le chiavi nel browser, la beta a 250 € (16 ott 2026, cantiere pagamento-onchain, studio chiesto da Andrea e Alan: solo documenti, niente codice; è una PROPOSTA, e i cantieri si aprono uno alla volta col suo ok)
+
+Il compito (Andrea e Alan, la sera del 16 ott): nel mercatino ci sono
+annunci da 2.000-4.000 €, e **Lightning non li regge** — l'uscita del
+nodo sta a ~608.000 sats e il canale ACINQ tiene 450.000 sats per volo,
+mentre 4.000 € sono **5.542.400 sats** (a 72.171 €/BTC): nove volte
+l'uscita. Quindi si aggiunge il pagamento **on-chain come OPZIONE**,
+mai obbligatoria, con un escrow **2-di-3 non custodial**. Lo studio
+risponde alle undici domande di Alan, mostra il quadro da 4.000 € nei
+quattro casi, elenca le criticità con le decisioni prese, e propone
+l'ordine dei cantieri. Nessuna riga di codice scritta.
+
+**COSA CAMBIA DAL «NO» DI STAMATTINA.** Lo studio del 16 ott
+(«Gli incassi grossi on-chain quando la rete è calma») si chiudeva con
+un no, e quel no **resta valido per quello che guardava**: pagare in
+on-chain i payout dei venditori per risparmiare lo 0,4 % verso
+Spark/WoS. Due cose qui sono diverse, e ribaltano il conto.
+1. **Il motivo non è il risparmio, è la capienza.** Là si discuteva di
+   3.300 sats al mese (~2,4 €); qui si discute di vendite che oggi **non
+   si possono fare**. Un affare da 4.000 € non entra in un canale.
+2. **La voce «liquidità» sparisce.** Là il payout on-chain svuotava il
+   wallet on-chain del nodo e i sats del deposito restavano nei canali,
+   e per riempire la riserva serviva uno swap allo 0,6 %: una perdita
+   netta. Qui i sats **non passano mai dai canali**: vanno dal wallet
+   del compratore all'indirizzo dell'ordine, e da lì al wallet del
+   venditore. Il nodo non presta liquidità, non ha riserva da
+   riempire, e non ci mette un sats.
+Resta valido anche il terzo pezzo di quello studio, ed è il motivo per
+cui l'on-chain è **un'opzione e non la strada**: i wallet custodial
+trattengono per ricevere on-chain (WoS l'1 %, Blink 2.500 sats), quindi
+sotto una certa cifra Lightning conviene a tutti e due. Qui il costo di
+rete è l'opposto: la transazione di payout è **~146 vB**, cioè ~440
+sats a 3 sat/vB, lo **0,008 %** di un affare da 4.000 € — dove
+Lightning, se ce la facesse, ne chiederebbe lo 0,21 %, ~11.600 sats.
+L'on-chain non costa di più: costa di più **sotto**, e sopra costa
+venticinque volte meno. La soglia esiste per questo.
+
+**I TRE PRINCIPI** (parola di Andrea e Alan, non si discutono):
+- **NON CUSTODIAL.** Barattolo ha UNA chiave sola, la sua, e non
+  conserva mai le chiavi degli utenti. È la regola ferrea 2 applicata
+  ai soldi invece che a Nostr.
+- **NIENTE IBRIDI.** Un ordine si paga o tutto on-chain o tutto
+  Lightning. Lightning resta esattamente com'è oggi: non si tocca una
+  riga di `_sblocca_sats`, né le hold invoice, né LNbits.
+- **COMPLESSITÀ NASCOSTA.** L'utente paga e riceve col SUO wallet
+  (BlueWallet, Sparrow, una hardware) e **non vede mai il multisig**.
+  Le parole «2-di-3», «descrittore», «PSBT» non compaiono nei fogli, e
+  stanno solo in «Avanzate» e qui.
+
+### La forma: l'indirizzo dell'ordine
+
+Per ogni ordine on-chain nasce **un indirizzo nuovo**, un 2-di-3 fra
+tre chiavi: compratore, venditore, Barattolo. Nel giro normale firmano
+**compratore e venditore**, da soli; la nostra chiave entra **solo in
+disputa**. Lo script è `wsh(sortedmulti(2, ...))` — segwit nativo,
+`bc1q…` —, scelto perché è la forma che **ogni** strumento sa leggere
+e cofirmare (Sparrow, Electrum, bitcoind, BlueWallet), al contrario di
+un taproot multisig che oggi i wallet normali non importano.
+
+**IL DESCRITTORE PORTA LE CHIAVI DELL'ORDINE, NON LE XPUB** (decisione
+di Andrea: «sì, molto meglio»). Un descrittore con le tre xpub sarebbe
+più comodo da recuperare in Sparrow, ma lo riceve **anche la
+controparte**: e con l'xpub del venditore chiunque può derivare gli
+indirizzi di **tutte le sue altre vendite** e leggerle in catena, per
+sempre. Quindi nel descrittore vanno le tre chiavi pubbliche **di
+quell'ordine e basta**: in catena due ordini della stessa persona non
+si legano più fra loro, e chi ha comprato una volta non impara niente
+sul resto. Il prezzo lo paga il recupero (vedi «le dodici parole non
+bastano»), e si paga volentieri.
+
+Le tre chiavi, una per volta:
+- **Compratore**: una chiave nuova al checkout, derivata (BIP32) dal
+  seme che sta nel suo browser.
+- **Venditore**: una **xpub dedicata a Barattolo** — mai quella del suo
+  wallet — che la sua app genera quando accende l'on-chain. Il server
+  ne deriva una chiave per ordine, quindi un venditore **offline** ha
+  comunque la sua chiave nell'indirizzo. Dall'xpub il server non può
+  firmare: deriva solo metà pubbliche.
+- **Barattolo**: una chiave per ordine da una xpub del server. Sul VPS
+  **solo la xpub**; la privata vive in un **firmatario sul NODO**, che
+  firma soltanto le dispute decise da un moderatore. È la stessa regola
+  dei payout: «una chiave che sa PAGARE qui non entra» (PRODUZIONE).
+
+### Le librerie, e perché
+
+**NEL BROWSER (Mini App): la famiglia che già serviamo.**
+`vendor/nostr.bundle.js` monta da mesi `@noble/curves`, `@noble/hashes`
+e `@noble/ciphers`; si aggiungono dello stesso autore e con lo stesso
+stile di audit: **`@scure/bip39`** (le dodici parole),
+**`@scure/bip32`** (la derivazione) e **`@scure/btc-signer`** (PSBT
+BIP-174, p2wsh, multisig; audit Cure53). Perché queste: JavaScript
+puro, nessun WASM, funzionano **senza rete**, licenza MIT, e la CSP di
+casa è `script-src 'self'` — niente CDN, il file lo serviamo noi come
+gli altri. Il descrittore con il suo checksum lo scriviamo noi: sono
+venti righe e un vettore di prova.
+
+**SUL SERVER (VPS): `embit`.** Python puro, nessuna dipendenza C —
+quindi gira **anche in CI**, dove `coincurve` non c'è —, piccola,
+leggibile, è la libreria di Specter. Sul VPS fa tre cose e nessuna di
+più: deriva **chiavi pubbliche**, scrive il descrittore, impagina le
+PSBT. Chiavi private sul VPS: **nessuna**, mai.
+
+**NEL FIRMATARIO (NODO): nessuna crittografia scritta da noi.** Firma
+`bitcoind` col suo `walletprocesspsbt` su un wallet a descrittori. Dove
+ci sono i soldi non si mette codice nostro.
+
+**IN CI il banco è doppio**, sul calco di `prove_bundle_nostr`: `embit`
+da una parte, il bundle vero sotto node dall'altra, e si chiede che
+diano **gli stessi byte** sui vettori BIP. ⚠️ `schnorr_puro.py` qui
+**non serve**: il 2-di-3 p2wsh firma in **ECDSA**, non in schnorr
+BIP-340. La parte pura di `embit` è anche il verificatore del banco.
+
+### Dove sta ogni chiave, e i cinque casi
+
+| Chiave | Dove vive | Chi la vede |
+|---|---|---|
+| Seme del compratore | solo nel suo browser (+ le tre gambe del backup) | solo lui |
+| Seme del venditore | solo nel suo browser (+ le tre gambe) | solo lui |
+| xpub delle parti | database del VPS | noi |
+| Chiave di Barattolo | privata **solo nel firmatario sul nodo**; xpub sul VPS | noi |
+| Descrittore dell'ordine | nostro database, backup del compratore, backup del venditore | i tre dell'ordine |
+
+Il seme è **uno per utente**, BIP39, generato sul telefono dentro
+Barattolo e **mai mostrato di serie**; le chiavi degli ordini si
+derivano da lui. Le tre gambe del backup sono **le stesse del mazzo del
+profilo di scambio**, che quel mestiere lo fa già da settembre
+(ARCHITETTURA, «le gambe sono e restano tre»): il CloudStorage di
+Telegram, la copia cifrata NIP-44 per sé sui relay, le dodici parole in
+«Avanzate → Esporta». ⚠️ **Il seme dei soldi è SEPARATO dal mazzo del
+P2P**, e non è pignoleria: il codice del mazzo si incolla in mostro-cli
+e in Mostro mobile, e un'app di terzi non deve diventare la custode
+delle chiavi degli ordini del mercatino.
+
+**LE DODICI PAROLE DA SOLE NON BASTANO**, ed è la cosa che più
+facilmente si dà per scontata: per spendere da un 2-di-3 servono anche
+le **altre due chiavi pubbliche**, cioè il descrittore. Chi ritrova il
+seme e non ha il descrittore guarda i sats e non li tocca. Quindi il
+backup è **seme + descrittore di ogni ordine aperto**, e il descrittore
+si salva **insieme alla chiave, in ogni gamba** (decisione di Andrea:
+«puoi pure chiedere una firma a ogni ordine, basta che mentre
+backuppi la chiave tieni anche il descrittore»). Costa una scrittura
+nel cloud e **una firma Amber per ordine** a chi usa Nostr: Andrea l'ha
+accettata.
+
+**E LA COPIA DI BARATTOLO** (richiesta di Andrea): i descrittori stanno
+nel nostro database (la copia di lavoro), nell'**archivio age** del
+backup del nodo, e su **Telegram** — ma come **file age**, non come
+lista in chiaro. Il motivo è la regola di casa: il canale Telegram non
+è cifrato end-to-end, e un descrittore, pur non potendo spendere
+niente, **è il registro leggibile di tutti i depositi** (indirizzi,
+importi, e il filo che lega un ordine all'altro): mandarcelo in chiaro
+rimetterebbe in piazza la privacy appena comprata togliendo le xpub.
+Cifrato, il canale porta un blocco illeggibile e la copia sta dove
+serve.
+
+I cinque casi, uno per uno:
+- **Account Telegram perso** (non entri più): entri da un altro
+  dispositivo con lo stesso account e il cloud ti ridà seme e
+  descrittori. Se l'account è perso **per sempre** e non hai le altre
+  due gambe, la strada è la disputa: i sats si possono mandare al tuo
+  indirizzo, ma serve la firma della controparte o la nostra (sotto, la
+  correzione).
+- **Account Telegram rubato**: chi entra nel tuo account trova il seme
+  nel cloud. È qui — e non sul nostro server — che si gioca la
+  sicurezza vera, ed è a questo che serve la **Protezione extra**.
+- **PIN dimenticato**: il PIN cifra la copia **nel cloud**, non il
+  seme. Si recupera dalle dodici parole o dal backup Nostr; se non hai
+  nessuna delle due, vedi il caso sopra.
+- **Telefono perso**: si rientra da un altro dispositivo, e **una gamba
+  basta** — purché porti anche i descrittori, e da questo cantiere li
+  porta.
+- **Barattolo sparito** (il server spento, noi scomparsi): compratore e
+  venditore, **loro due soli**, sbloccano tutto. Due firme su tre sono
+  loro: con il descrittore esportato e le dodici parole, in Sparrow,
+  senza chiedere niente a nessuno. È la prova che il non custodial è
+  vero e non un aggettivo.
+
+### La controparte che prende la chiave dell'altro
+
+Due chiavi su tre spendono: se il venditore ottiene la chiave del
+compratore, i sats li muove senza di noi. La strada vera **non passa
+dal nostro server** — passa dall'account Telegram o dal browser del
+compratore. La **Protezione extra** (PIN o Face ID sulla copia nel
+cloud) alza il muro esattamente lì: sopra la soglia
+(`ONCHAIN_PROTEZIONE_SOGLIA_EURO`, es. 1.000 €) si propone, e si dice chiaro
+che **senza di lei un account Telegram rubato è un seme rubato**. Non
+la si impone: imporla a chi compra da 50 € vorrebbe dire un PIN
+dimenticato in più e nessun rischio in meno.
+
+### Il codice dell'app servito dal VPS
+
+È il rischio più grosso del disegno, e **non si cancella**: chi comanda
+il VPS può servire una pagina che manda il seme altrove. Si riduce in
+quattro modi, tutti già in casa:
+1. **Il firmatario non sta sul VPS.** Chi prende il VPS non firma le
+   dispute: la chiave di Barattolo è sul nodo, un'altra macchina.
+2. **L'impronta del bundle è provata in CI** e scritta in chiaro in
+   «Avanzate», così è confrontabile da fuori; più gli header anti-cache
+   di `/` e `/miniapp.html` e il `?v=` che sveglia la cache, che
+   esistono già.
+3. **Avanzate → Esporta**: chi preferisce non fidarsi firma **fuori**,
+   in Sparrow, col descrittore e le sue dodici parole.
+4. **Una riga onesta in «Info»**: *il codice di questa pagina arriva
+   dal nostro server a ogni apertura*. Chi vuole di più ha il punto 3.
+La pubblicazione dell'impronta firmata su Nostr (o un nsite) resta la
+tappa seria e **non è di questo cantiere**: va nei «da fare».
+
+### I due invii: la commissione e il prezzo
+
+Un QR `bitcoin:` **non sa fare due destinatari** — non esiste uno
+standard BIP-21 multi-uscita. Quindi:
+- **La fase 1 parte con la commissione SPENTA**, cioè **un invio solo**,
+  e la domanda non esiste. È la scelta di Andrea («valutiamola poi»).
+- Quando si accende: **due fogli in sequenza, prima la commissione**.
+  È piccola e è nostra: se arriva solo lei, nessun deposito è in gioco
+  e si rimborsa. Il QR del prezzo compare dopo averla vista. Se invece
+  arrivasse solo il prezzo, il deposito è buono e la commissione si
+  richiama: **dal 2-di-3 non si prende**, perché sta fuori per scelta
+  (così le parti non possono prendersela, e noi neppure).
+- «Due destinatari in una transazione» esiste a mano in Sparrow e in
+  BlueWallet, non in Phoenix (che on-chain manda a un indirizzo solo) e
+  non in WoS. **Va provato sulle app vere** (Andrea: «sì, faremo dei
+  test»): dal tavolo non lo scriviamo come un fatto.
+
+### Chi sorveglia gli indirizzi
+
+Il `bitcoind` del nodo è **potato**, e per questo mestiere va benissimo
+a una condizione: **il descrittore si importa PRIMA di mostrare
+l'indirizzo**. Un wallet watch-only a descrittori guarda **in avanti**;
+quel che un nodo potato non sa fare è ripescare un indirizzo importato
+**dopo**.
+- **Nodo giù**: quando risale scarica i blocchi che ha perso e li
+  guarda passare, quindi il pagamento si ritrova **da solo**. La
+  conseguenza vera non è perdere un pagamento, è **vederlo tardi**: con
+  il nodo spento l'ordine resta fermo, e la cadenza della ronda diventa
+  il tempo d'attesa del compratore.
+- **Descrittore perso e reimportato dopo** (un database ripristinato da
+  un backup vecchio): su un nodo potato **non si rescansiona**. Per
+  questo il descrittore sta in tre posti, e la riconciliazione si fa a
+  mano su un nodo intero o su un explorer pubblico — con il suo costo
+  di privacy, dichiarato, e solo quando qualcuno dice «ho pagato e non
+  lo vedete».
+- Dal nodo al VPS si parla **col calco della ronda** (il VPS tiene la
+  coda, il nodo legge e riferisce): nessuna chiave che paga sul VPS, e
+  nessun comando mio sul nodo — i comandi li scrivo, li lancia Andrea.
+⚠️ **Da verificare sul nodo**: che il wallet di `bitcoind` sia perfino
+abilitato (nei setup Mostro gira spesso con `-disablewallet`). Se non
+lo è, la sorveglianza cambia disegno, e il cantiere ④ si apre solo dopo
+quella risposta.
+
+### I casi strani, ognuno con la sua strada
+
+L'**indirizzo di ritorno del compratore si chiede al checkout**, prima
+del QR: senza quello nessun caso strano ha una strada, e un rimborso
+diventa una trattativa.
+
+| Caso | Cosa si fa |
+|---|---|
+| **Poco** | «Mancano X sats»: o si completa con una seconda transazione, o si rimborsa all'indirizzo di ritorno. Mai la differenza al venditore. |
+| **Troppo** | Si paga il venditore e **l'eccesso torna al compratore** (una uscita in più, se vale la pena: vedi `ONCHAIN_RESTO_MIN_SATS`). |
+| **Doppio** | Il secondo torna indietro, intero meno la rete. |
+| **In ritardo** (ordine già scaduto) | Si riprende l'ordine se si può, altrimenti rimborso. **Mai si tiene.** |
+| **Mai arrivato** | L'ordine scade come oggi, le chiavi derivate restano inutilizzate: non è successo niente. |
+Andrea (16 ott): con un wallet on-chain vero l'importo parte **esatto**
+e la fee la paga a parte, quindi «poco» è un caso strano e non la
+norma — ci si arriva con un «invia tutto», con un wallet custodial che
+sottrae, o con un errore.
+
+### Transazioni bloccate, e il backup del descrittore
+
+Le uscite partono con **RBF accesa** e la fee stimata **a media
+priorità al momento** (decisione di Andrea). Una transazione ferma **si
+spinge, mai si rifà**: è la regola dell'«incerto» dei payout
+Lightning, già scritta e già provata — bump della stessa, o CPFP sul
+resto. **Mai due pagamenti al venditore.** Stati: *in volo* col txid
+finché non c'è una conferma, *uscito* alla conferma.
+
+**IL MARGINE DI RETE.** Il compratore deposita **prezzo + margine** (la
+stima a media priorità moltiplicata per `ONCHAIN_MARGINE_RETE_X`,
+minimo `ONCHAIN_MARGINE_MIN_SATS`), e al payout la fee vera si prende
+dal margine. L'**avanzo** torna al compratore solo se vale più di una
+uscita in più (~2.000 sats), altrimenti va al venditore: è detto in
+«Info», perché un avanzo che si volatilizza senza una riga è un sats
+che qualcuno cerca. Se la rete è schizzata e il margine non basta, **si
+attende e si spinge**: nessuna delle due parti ci rimette, e il
+venditore riceve **il prezzo intero** (regola 10).
+
+### Il quadro da 4.000 €, nei quattro casi
+
+Un quadro a 4.000 € = **5.542.400 sats**. Il tetto della fase 1 è 250 €
+(sotto, «la beta a 250 €»), quindi questo è il racconto **di dove si
+arriva**, non del primo collaudo. Margine di rete 1.500 sats; fee vera
+al payout, a 3 sat/vB su 146 vB, ~440 sats; commissione spenta.
+
+**CASO A — tutto liscio.**
+1. Nel foglio di pagamento il compratore sceglie **₿ On-chain** (⚡
+   Lightning è grigio col perché: «5.542.400 sats non entrano in un
+   canale»).
+2. Dà **l'indirizzo di ritorno** del suo wallet. Senza quello il QR non
+   compare.
+3. Nasce l'indirizzo dell'ordine: la sua chiave dal seme nel browser,
+   quella del venditore derivata dalla xpub dedicata, la nostra dalla
+   xpub del server. Il foglio dice: **Prezzo 5.542.400 + Rete 1.500 =
+   5.543.900 sats** a `bc1q…`, «una volta sola, da un wallet tuo».
+4. Paga da BlueWallet. Visto in mempool in un minuto; a **1 conferma**
+   (~10 minuti) l'ordine va `locked`, **gli orologi partono da lì**, e
+   al venditore arriva «spedisci».
+5. Il venditore spedisce. Il quadro arriva. Il compratore tocca
+   **«Libera i sats»** — e il foglio glielo dice prima: **questo tocco
+   è definitivo**.
+6. La sua app firma la PSBT: 5.542.400 + l'avanzo del margine (1.060
+   sats, sotto la soglia del resto) all'indirizzo di ricezione del
+   venditore, 440 sats di rete. L'app del venditore **co-firma da sola**
+   appena lui apre Barattolo, perché la PSBT paga il suo indirizzo.
+7. Trasmessa. Entrambi vedono il txid; a 1 conferma l'ordine è
+   `released`. **Il venditore ha incassato 5.543.460 sats** — il prezzo
+   intero e un pelo d'avanzo. **La nostra chiave non è stata usata.**
+   Costo nostro: zero. Costo del compratore: ~440 sats di rete, lo
+   0,008 %.
+
+**CASO B — disputa vinta dal compratore** (il quadro non arriva, o
+arriva rotto). La disputa si apre **prima** del tocco definitivo: il
+moderatore legge la chat, decide, e nel pannello usa «**Rilascia i sats
+al compratore**». Il firmatario sul nodo firma una PSBT che paga
+**l'indirizzo di ritorno dichiarato al checkout** (5.543.460 sats meno
+la rete); il compratore co-firma **con un tocco** e la transazione
+parte. Se non firma, un richiamo: i sats restano nel 2-di-3 e **non
+sono mai nostri**. Il reso (`return_pending`/`return_shipped`) cammina
+sulla stessa strada — nessun meccanismo nuovo —, con la firma dopo che
+il venditore conferma di aver ricevuto il quadro indietro. La
+commissione, quando esisterà, torna a chi ha ragione meno la rete,
+dalla cassa commissioni.
+
+**CASO C — disputa vinta dal venditore** (il quadro è arrivato e il
+compratore non libera). È anche la strada del **silenzio**, ed è la
+decisione di Andrea del 16 ott: *se il compratore tace, il venditore
+apre la disputa*. Quando: **finiti i promemoria al compratore** (oggi
+`PROMEMORIA_CONFERMA_GIORNI = 3` per `MAX = 3`, cioè ~9 giorni), un
+orologio solo e nessuna taratura nuova. Il motivo si marca
+«**silenzio**», separato da una disputa vera, altrimenti la percentuale
+di dispute — quella che fa scattare l'avviso ai moderatori — si riempie
+di litigi che non esistono e il numero smette di dire qualcosa. Il
+moderatore guarda il tracking, decide, firma il nodo, e **l'app del
+venditore co-firma da sola**: 5.543.460 sats meno la rete sul suo
+indirizzo. Qui la nostra chiave **viene usata**, e nel caso ordinario:
+va detto a voce alta in «Info», non nascosto.
+
+**CASO D — il compratore sparisce.** Tre sotto-casi, e cambia tutto:
+- **Prima di pagare**: non è successo niente. L'indirizzo non riceve
+  mai, l'ordine scade come oggi, nessun sats in gioco.
+- **Dopo aver pagato, prima di liberare**: è il **caso C**. Il
+  venditore apre la disputa dopo i promemoria, e incassa.
+- **Sparito E con la chiave persa, dopo aver vinto una disputa**: è il
+  solo caso senza uscita, e sta nel paragrafo che segue.
+
+### La correzione: il vincitore che perde la chiave
+
+Nella chat ho scritto ad Andrea che «la tua firma serve a dare, non a
+ricevere», e **è vero solo a metà**: va corretto qui, perché è l'unico
+caso in cui dei sats possono restare fermi per sempre.
+Per ricevere non serve la **tua** chiave — serve che **due delle tre**
+firmino. Nel giro normale e nel silenzio quelle due ci sono sempre
+(noi e chi ha vinto, o le due parti). Ma se **chi ha vinto la disputa
+ha perso la chiave**, le due firme che restano sono la nostra e quella
+di **chi ha perso** — e chi ha perso non co-firma un pagamento al suo
+avversario. I sats restano nell'indirizzo: **non nostri, non suoi, non
+di nessuno**.
+Quattro cose lo tengono piccolo, e nessuna lo chiude:
+1. Le tre gambe del backup, che da questo cantiere portano anche il
+   descrittore: perdere la chiave è difficile.
+2. La chiave serve per **settimane**, non per anni.
+3. Il tetto della fase 1 a **250 €** è il tetto del danno.
+4. Si dice in chiaro nella pagina della trasparenza: *se perdi la
+   chiave e hai una disputa vinta in corso, i sats restano in garanzia
+   finché non la ritrovi.*
+**La strada per chiuderlo c'è e NON è di questa fase**: un ramo di
+recupero a tempo nel descrittore — miniscript, `or_d(multi(2,…),
+and_v(v:pk(Barattolo),older(N)))` —, cioè «dopo N mesi Barattolo da
+solo può mandare quei sats al vincitore». Il prezzo è una **finestra di
+custodia dichiarata** (dopo N mesi, su fondi abbandonati, potremmo
+muoverli noi) e un descrittore che **Sparrow legge ma i wallet semplici
+no**. A 250 € non vale; **prima di alzare il tetto va deciso**, ed è il
+primo dei «da fare».
+
+### Le quattordici criticità, e cosa si è deciso
+
+Alan le ha elencate, Andrea ha risposto la sera del 16 ott. Qui restano
+scritte perché nessuna torni a sorpresa.
+1. **Le dodici parole da sole non bastano** → risolto: il descrittore
+   si salva con la chiave, in ogni gamba, anche a costo di una firma
+   Amber per ordine (Andrea).
+2. **La nostra chiave non serve «solo in disputa»** → risolto dalla
+   decisione sul silenzio: *il venditore apre la disputa*, quindi la
+   nostra chiave entra solo da una disputa — ma le dispute «silenzio»
+   saranno frequenti, e si marcano a parte.
+3. **On-chain non si torna indietro** → accettato e dichiarato
+   («tutto trasparente», Andrea). Conseguenze: il tocco del compratore
+   è **l'ultimo** gesto, la finestra della disputa sta **prima**, e la
+   porta del ripensamento del moderatore (`disputata=1`,
+   server.py:67655) **on-chain non esiste**. Va scritto nel pannello.
+4. **I wallet custodial sottraggono in uscita** → scende a caso strano
+   (Andrea: «quei wallet non sono on-chain»), con il suo stato.
+5. **La fee stimata al checkout e pagata settimane dopo** → risolto:
+   stima **al momento, media priorità**, con margine; l'avanzo torna
+   sopra i ~2.000 sats; se non basta si attende e si spinge.
+6. **Mai zero-conf** → **1 conferma** in fase 1 (a 250 € il rischio di
+   riorganizzazione è trascurabile) e **gli orologi partono dalla
+   conferma**, non dal pagamento. La tabella per fascia nasce quando il
+   tetto sale.
+7. **Dodici stati, due strade** → tutti gli stati esistono, e il
+   rimborso del reso passa dalla **stessa strada della disputa**: nessun
+   meccanismo nuovo, parole chiare prima di pagare.
+8. **La cassa commissioni è un secondo portafoglio con una chiave che
+   paga** → parcheggiata: commissione spenta, cantiere ⑦.
+9. **Il nodo entra nel mercatino** → da verificare (sotto, la lista).
+10. **I wallet veri** → si provano dal telefono, non si scrivono come
+    fatti.
+11. **La leva deve spegnere in modo MORBIDO**: nessun ordine on-chain
+    nuovo, quelli aperti camminano fino in fondo. Spegnere e lasciare
+    sats in catena senza foglio è il modo di perdere soldi senza
+    perdere una chiave.
+12. **In CI non c'è bitcoin, e `schnorr_puro.py` non serve** (ECDSA, non
+    schnorr): il banco è `embit` contro il bundle sotto node.
+13. **`miniapp.html` è già 4,7 MB**: il bundle si carica **solo** quando
+    si scegli on-chain, o ogni apertura paga per una funzione che quasi
+    nessuno usa.
+14. **Il P2P è a 250 € in beta e qui si parlava di 4.000** → risolto da
+    Andrea: **anche l'on-chain a 250 €**, per ora.
+
+### La beta a 250 €, e cosa vuol dire
+
+Decisione di Andrea: `ONCHAIN_MAX_EURO = 250`, come il P2P. Una cosa va
+detta chiara, e non è un'obiezione: **250 € sono ~346.000 sats, e
+Lightning li regge** (uscita ~608.000). Quindi con questo tetto
+l'on-chain **non risolve ancora niente per chi vende**: è la **beta
+della macchina**, da collaudare in piccolo, dove un errore costa 250 €
+e non 4.000. Il quadro da 4.000 € arriva quando il tetto sale — e prima
+di alzarlo ci sono due cose da decidere: il **ramo di recupero a tempo**
+e la **tabella delle conferme per fascia**. Per la stessa ragione il
+«⚡ Lightning grigio col perché» del disegno **nasce spento**: a 250 €
+Lightning non va mai grigio.
+
+### Cosa NON cambia per Mostro e il P2P
+
+Niente. Il coordinator, le hold invoice, la cauzione sul metodo, i tetti
+e i tempi restano Lightning identici: questo cantiere **non apre
+`mostrod`, non tocca `settings.toml`, non chiede una patch**. Il
+firmatario on-chain è un pezzo nuovo **accanto** a quelli del nodo, con
+la sua chiave e i suoi tetti, e non parla con `mostrod`. E il seme dei
+soldi resta separato dal mazzo del profilo di scambio.
+
+### Le leve (nomi proposti, tutte spente nel codice)
+
+`ONCHAIN_ATTIVO` (False; la leva madre, spegnimento morbido) ·
+`ONCHAIN_MAX_EURO` (250) · `ONCHAIN_SOGLIA_EURO` (da quale importo
+l'on-chain si propone accanto a Lightning: **proposta 100 €**, così in
+beta la finestra 100-250 € esiste e qualcuno la prova; sotto, l'opzione
+non si vede nemmeno, perché là Lightning conviene a tutti e due) ·
+`ONCHAIN_TETTO_TOTALE_SATS`
+(quanto può stare in catena in tutto) · `ONCHAIN_CONFERME` (1) ·
+`ONCHAIN_MARGINE_RETE_X` e `ONCHAIN_MARGINE_MIN_SATS` ·
+`ONCHAIN_RESTO_MIN_SATS` (2000) · `ONCHAIN_XPUB` (la nostra, pubblica)
+· `ONCHAIN_PROTEZIONE_SOGLIA_EURO` (1000) · `ONCHAIN_FIRMATARIO_*` (il
+pezzo sul nodo) · `ONCHAIN_COMMISSIONE_*` (percentuale, minimo, massimo;
+spenta). Valori vivi nel pannello «⚙️ Stato delle leve», come le altre.
+Avvisi nel gruppo admin **a ogni** payout, rimborso e rifiuto del
+firmatario.
+
+### Le domande per un professionista (solo domande)
+
+1. Un escrow 2-di-3 in cui non possiamo muovere niente da soli è
+   «custodia» ai fini MiCA/CASP? La chiave della disputa cambia la
+   risposta?
+2. Un **ramo di recupero a tempo** («dopo N mesi Barattolo da solo») la
+   cambierebbe?
+3. Decidere una disputa è **arbitrato**? Serve una clausola scritta nei
+   Termini, e con quali limiti?
+4. La commissione «Garanzia» è un servizio di pagamento o di
+   mediazione? Come si fattura — a chi, con quale IVA, con quale
+   cambio? Cambia se la riceviamo in bitcoin?
+5. Hodl Hodl opera non-custodial con un 2-di-3 identico al nostro
+   (STUDIO-CONTANTI-A-MANO, §1c): su quale base, e vale in UE?
+6. Quali obblighi antiriciclaggio nascono sopra i 1.000 € per ordine?
+   E sopra i 4.000?
+7. Un **rifiuto del firmatario** (non firmiamo una decisione) ci espone
+   a una richiesta di danni?
+8. I descrittori nel nostro database e nell'archivio age: sono dati
+   personali? Per quanto si tengono dopo la fine dell'ordine?
+
+### L'ordine dei cantieri, e le stime
+
+Uno alla volta, ciascuno col suo ok di Andrea. ① e ② non vedono un
+sats: `ONCHAIN_ATTIVO` nasce **False**, e tutto gira su **signet**.
+1. **① Il seme e le chiavi nel browser** — bundle vendorato (bip39,
+   bip32, btc-signer), seme BIP39, le tre gambe col **descrittore**,
+   «Avanzate → Esporta», il banco doppio sui vettori BIP. Nessun
+   bitcoin in giro. *1 sessione.*
+2. **② L'indirizzo dell'ordine** — xpub dedicata del venditore, xpub
+   del server, descrittore con le chiavi dell'ordine e il suo checksum,
+   indirizzo per ordine, `embit` sul server. Solo signet. *1 sessione.*
+3. **③ Il foglio di pagamento** — la scelta ⚡/₿, il QR, l'indirizzo di
+   ritorno, i tempi in parole semplici, IT/EN, le soglie — più **la
+   pagina completa della trasparenza** (richiesta di Andrea): cosa resta
+   pubblico per sempre sulla catena, cosa vede Telegram, cosa vediamo
+   noi, cosa può leggere solo tu, e la riga che chiude — *chi vuole più
+   privacy entra con Nostr, e il suo backup non passa da Telegram*.
+   *1-2 sessioni.*
+4. **④ La sorveglianza** — wallet watch-only sul nodo, la ronda
+   on-chain, gli stati dell'ordine, i casi strani, gli avvisi admin.
+   **Si apre solo dopo la verifica del nodo.** *1-2 sessioni.*
+5. **⑤ Il rilascio normale** — PSBT, la firma del compratore, la
+   co-firma del venditore, il broadcast, RBF e CPFP. *1-2 sessioni.*
+6. **⑥ La disputa** — il firmatario sul nodo, i due bottoni nel
+   pannello, il motivo «silenzio», le guardie di oggi, nessuna porta di
+   ripensamento. *1-2 sessioni.*
+7. **⑦ La commissione «Garanzia»** — leve, secondo invio, cassa
+   commissioni, rimborso in disputa. *1 sessione.*
+8. **⑧ La prova vera** — signet da capo a fondo, poi mainnet con il
+   tetto a 250 € e un ordine finto fra Andrea e Alan. *1 sessione.*
+In tutto **9-13 sessioni**. Nessun cantiere tocca Lightning.
+
+### Da verificare fuori dal mio perimetro
+
+Sul **nodo** (i comandi li scrivo al cantiere ④, li lancia Andrea):
+che il wallet di `bitcoind` sia abilitato; che si possa creare un
+wallet a descrittori watch-only; che `importdescriptors` con
+`"timestamp": "now"` funzioni con la potatura; che `walletprocesspsbt`
+firmi un 2-di-3; quanto spazio chiede. ⚠️ Sul nodo manca il programma
+`sqlite3` (verificato il 12 ott): i comandi vanno in `sudo python3`.
+Sui **wallet veri**, dal telefono: BlueWallet (manda a un p2wsh? due
+destinatari? che fee mostra?), Sparrow (importa il descrittore con le
+chiavi dell'ordine? co-firma?), Phoenix e WoS (quanto trattengono in
+uscita on-chain, e se lasciano scegliere la fee).
+
+### Da fare (notati, non fatti)
+
+- **Il ramo di recupero a tempo**: deciderlo PRIMA di alzare il tetto
+  sopra i 250 € — è l'unico caso senza uscita (il vincitore che perde
+  la chiave).
+- **La tabella delle conferme per fascia**: serve quando il tetto sale.
+- **L'impronta del bundle pubblicata e firmata** su Nostr o un nsite,
+  per chi non si fida del codice servito dal VPS.
+- **Il tracking verificato** rende più solida la disputa «silenzio»: il
+  moderatore oggi guarda un numero che il venditore ha scritto a mano.
+- **La commissione minima fissa** del backlog tocca anche l'on-chain:
+  su 440 sats di rete una percentuale non si sente, su 250 € sì.
+- **`pronto` era rimasto indietro** (a 1049863 mentre `main` stava a
+  a5044fd, il caso previsto da CLAUDE.md dopo un commit sui workflow):
+  guardato di nuovo la sera, **si è ripreso da sé** — `pronto` e `main`
+  stanno tutt'e due a 7e0b330. Non l'ho toccato, e resta la lezione:
+  si guarda, non si dà per scontato.
