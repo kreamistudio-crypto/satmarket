@@ -64358,6 +64358,39 @@ descrittive, il nome del metodo e le etichette non copiano.
   tocco lungo (la lente e le maniglie): Chrome di prova non la fa, va
   vista sul telefono.
 
+**IL «€ €» DEGLI SCATTI NON È DELLA PAGINA (17 ott 2026, prova chiesta
+da Andrea prima del push).** Uno scatto del PayCode diceva «23,47 € €
+in contanti»: la semina del giro aveva messo `euro: '23,47 €'`, un
+TESTO, e `fmtEur` lo ripete com'è. Nell'app `o.euro` è sempre un numero:
+il libro (`fa` con `Number`, `euroTabacchinoP2P` sul `pm`),
+l'archivio del server (`Number(s.euro)`, `Number(cifre.euro)`) e la
+pubblicazione (`interoP2P(...).n`, `centesimiP2P(...).n`). Rifatto
+dal vivo con l'importo scritto come un utente nel form di chi vende
+e passato dalle funzioni vere (`centesimiP2P` → `centesimiTestoP2P` →
+`componi`, e `euroTabacchinoP2P(metodoTabacchinoP2P(n))` per la riga):
+«100,00» → nel recapito «Importo: 100,00 €», nel riquadro «100,00 € in
+contanti», un € solo, chiaro e scuro; il tocco sull'importo non copia
+niente (non ha il 📋: negli appunti resta quel che c'era), il tocco sul
+PayCode copia «479-868-518». «100 €» il form di chi vende lo RIFIUTA
+(`centesimiP2P` dice `storto`, e il toast chiede la cifra): a chi
+compra non arriva. Niente da correggere. Scatti `euro-*` in
+`.claude/giri/copia-recapito/`.
+
+**L'ULTIMO ALBERO, quello del push (sopra ffc36db).** Main era corso
+di sette commit (il bundle bitcoin, il cruscotto semplice, il cancello
+e il banco delle chiavi on-chain, lo schermo largo, la chiave che nasce
+da sola, le copie del config fuori da git): nessuno usa i nomi toccati
+qui (cercati per nome). Sul secondo giro: suite severa intera **24.812
+passate, 0 fallite** e collaudi della CI **84 verdi, 0 rossi** sopra
+c0976d4. Dopo il rebase: le dieci sezioni mie, `prove_p2p_paycode` e le
+tredici toccate da loro — **1.412 passate, 1 fallita**, e la fallita
+non è di questo cantiere: `prove_bundle_bitcoin` confronta lo sha256 di
+`vendor/btc.bundle.js` col file del checkout, che su Windows è CRLF
+(`autocrlf`); coi fine riga LF l'impronta è quella scritta, e in CI il
+file è LF. `collaudo_recapito_aggiornato`, `collaudo_contanti_p2p` e
+`collaudo_statistiche_p2p` nella gabbia: verdi. Lo scanner dei segreti
+col workflow nuovo sulle 806 righe aggiunte: zero. Il resto lo fa la CI.
+
 **DA FARE (notati, non fatti).**
 - Sul telefono vero, iPhone e Android dentro Telegram: il tocco sul
   «📋 Copia» e sul dato (la WebView di Telegram Android a volte rifiuta gli
@@ -64372,3 +64405,9 @@ descrittive, il nome del metodo e le etichette non copiano.
 - Due correzioni diverse a pochi secondi restano due avvisi (scelta di
   Andrea): se dal vivo sembrassero troppe, se ne riparla col perché del
   7 ott davanti.
+- `prove_bundle_bitcoin` è rossa sui checkout Windows (sha256 di un file
+  CRLF): non di questo cantiere; da dire a chi l'ha scritta (normalizzare
+  i fine riga prima dell'impronta).
+- Il form del PayCode di chi vende rifiuta «100 €» (col simbolo): si
+  potrebbe togliere il € prima di giudicare, come il foglio della
+  pubblicazione fa coi campi. Non fatto, da decidere.
