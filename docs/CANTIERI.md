@@ -64120,3 +64120,29 @@ glifi restano nelle righe di stato, che sono `div`, dove sono ammessi.
   veri non si toccano (regola di casa), quindi la cassetta on-chain è
   provata nella forma e nel codice, ma il viaggio vero lo farà Andrea
   dal telefono.
+
+## Le copie del config fuori da git (17 ott 2026, cantiere ignora-copie-config, richiesta di Andrea)
+
+Nella cartella principale c'era, non tracciato, `config.py.prima-collaudo`:
+una copia del config locale salvata a mano la sera dell'8 ottobre, prima
+delle tre righe del collaudo (relay morto e `NIP05_NOMI`). Porta gli stessi
+valori del `config.py` di oggi: le chiavi del wallet LNbits di prova e la
+nsec di prova, non i segreti di produzione. Ma `.gitignore` escludeva solo
+il nome esatto `config.py`, quindi un `git add -A` distratto l'avrebbe messa
+nel commit.
+
+**LA CURA.** Due righe in `.gitignore`, subito sotto `config.py`:
+`config.py.*` (le copie col suffisso, come questa) e `config*.py.bak`.
+Nessuna delle due prende `config_esempio.py`, che resta tracciato. Il file
+non è stato toccato né cancellato: è di Andrea.
+
+**PROVATO.** `git check-ignore -v`: la copia è ignorata dalla riga 7,
+`config_esempio.py` no, ed è ancora in `git ls-files`. Nella storia non è
+mai entrata una copia del config: `git log --all` sui percorsi
+`config.py.*` e `*config*.bak` è vuoto, e fra tutti i file mai aggiunti
+l'unico `config` Python è `config_esempio.py`. Verdi le due sezioni che
+leggono `.gitignore` (`prove_deploy`, `prove_servizio_non_root`: 142
+passate, 0 fallite).
+
+**DA GUARDARE.** Nessuna sentinella in `prove.py` tiene ferme le due righe:
+se un giorno sparissero, nessuna prova lo direbbe.

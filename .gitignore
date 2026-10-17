@@ -1,5 +1,11 @@
 # SEGRETI — mai su GitHub!
 config.py
+# ...e le sue copie fatte a mano prima di un collaudo o di una prova
+# (17 ott 2026): portano gli stessi segreti dell'originale, e un
+# `git add -A` distratto le prenderebbe. config_esempio.py NON
+# rientra in queste forme e resta tracciato.
+config.py.*
+config*.py.bak
 
 # Dati locali (database, foto degli annunci, ZIP dell'import in corso)
 *.db
