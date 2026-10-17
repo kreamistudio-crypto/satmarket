@@ -38,3 +38,13 @@
 # rete se un giorno qualcuno lo aggiungesse per sbaglio: un .db passato
 # per una conversione di fine-riga e' un database rotto.
 *.db   binary
+
+# IL BUNDLE BITCOIN SERVITO ESCE LF ANCHE SU WINDOWS (17 ott 2026). E'
+# l'eccezione che la riga qui in cima prevedeva: `prove_bundle_bitcoin`
+# confronta lo sha256 del file com'e' sul disco con `IMPRONTA_BTC`, e
+# con `core.autocrlf=true` il checkout lo riscriveva coi CRLF (10.917
+# righe): impronta diversa, prova rossa sul PC e verde su Linux. Qui
+# il fine-riga fa parte del CONTENUTO: l'impronta e' quella che chi non
+# si fida rifa' sul file che il VPS gli manda, e deve tornare la stessa
+# su ogni macchina. Un file solo, per nome: gli altri restano come sono.
+vendor/btc.bundle.js text eol=lf

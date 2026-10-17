@@ -64411,3 +64411,30 @@ col workflow nuovo sulle 806 righe aggiunte: zero. Il resto lo fa la CI.
 - Il form del PayCode di chi vende rifiuta «100 €» (col simbolo): si
   potrebbe togliere il € prima di giudicare, come il foglio della
   pubblicazione fa coi campi. Non fatto, da decidere.
+
+## Il bundle bitcoin esce LF anche su Windows (17 ott 2026, cantiere bundle-lf, richiesta di Andrea)
+
+LA DOMANDA. `prove_bundle_bitcoin` confronta lo sha256 di
+`vendor/btc.bundle.js`, com'è sul disco, con `IMPRONTA_BTC`. Sul PC di
+Andrea (`core.autocrlf=true`) il checkout riscriveva il file coi CRLF
+(10.917 righe): impronta diversa, la prova era rossa su Windows e verde
+su Linux (CI e VPS). Notato nel cantiere cruscotto-admin.
+
+LA CURA, una riga in `.gitattributes`: `vendor/btc.bundle.js text
+eol=lf`, col suo perché accanto. È l'eccezione che la testa del file
+prevedeva («se un domani lo si vorrà, è una riga sola e un checkout»):
+per questo file il fine riga fa parte del contenuto, perché
+l'impronta è quella che chi non si fida rifà sul file che il VPS gli
+manda. Un file solo, per nome: gli altri restano come sono, e la regola
+`* text=auto` non cambia. Il contenuto in git non cambia (era già LF).
+
+PROVATO nel worktree, sopra ffc36db: il checkout normale riproduceva il
+difetto (10.917 CRLF, impronta `7f03e957…`); con la riga, il file tolto
+dal disco e ripreso da git esce con 0 CRLF e l'impronta di
+`IMPRONTA_BTC`; `prove_bundle_bitcoin` 16 su 16 (sullo stesso PC,
+prima, 15 e 1 rossa); `prove_csp_prova` e la bussola verdi.
+
+**DA FARE.** Nelle copie di lavoro che esistono già (la cartella
+principale di Andrea, i worktree aperti) il file resta CRLF finché non
+lo si riprende una volta: `git checkout -- vendor/btc.bundle.js` (o lo
+si cancella e lo si riprende). I worktree nuovi nascono già giusti.
