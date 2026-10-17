@@ -169533,6 +169533,145 @@ console.log(JSON.stringify({
 """
 
 
+def prove_venduto_canale():
+    """IL ✅ VENDUTO E IL RITIRO DEI POST, SU UNA RIGA SQLITE VERA (17 ott
+    2026, cantiere venduto-canale, trovato dal giro di modifica-massiva).
+
+    Dal 15 ott (7f60c7b, il canale BitcoinPodcastTelegram) `promo_venduto`
+    e `promo_rimuovi` chiamavano `a.get(...)` su una sqlite3.Row, che il
+    `.get` non ce l'ha: ogni ✅ Venduto e ogni ritiro dei post saltavano,
+    su TUTTI i canali, con «'sqlite3.Row' object has no attribute 'get'»
+    nel journal. Le prove di allora guardavano la forma del testo, e un
+    dizionario al posto della riga avrebbe dato verde lo stesso: qui le
+    due funzioni VERE girano su un database sqlite vero (row_factory
+    sqlite3.Row, come `db()`), con `bot_api` di cartone che scrive cosa
+    gli si chiede. E la controprova: con la riga di prima, lo stesso
+    banco diventa rosso."""
+    print("\n[il ✅ venduto e il ritiro dei post, su righe sqlite vere]")
+    import asyncio as _asVC
+    import sqlite3 as _sqVC
+    import tempfile as _tfVC
+
+    cartella = _tfVC.mkdtemp(prefix="venduto-canale-")
+
+    def banco(sorgente_venduto, sorgente_rimuovi, con_podcast=True):
+        """Un database nuovo, un annuncio coi suoi tre post, e le due
+        funzioni eseguite da `sorgente_*`. Torna (chiamate, stampe, riga)
+        dopo promo_venduto e promo_rimuovi."""
+        percorso = os.path.join(cartella, f"b{len(os.listdir(cartella))}.db")
+        con = _sqVC.connect(percorso)
+        colonne = ("id INTEGER PRIMARY KEY, venditore_id INTEGER, titolo TEXT, "
+                   "foto TEXT DEFAULT '[]', post_canale_id INTEGER DEFAULT 0, "
+                   "post_vetrina_id INTEGER DEFAULT 0, post_nostr_id TEXT "
+                   "DEFAULT ''" + (", post_bitcoin_podcast_id INTEGER DEFAULT 0"
+                                   if con_podcast else ""))
+        con.execute(f"CREATE TABLE annunci({colonne})")
+        con.execute("CREATE TABLE utenti(tg_id INTEGER, nome TEXT, username "
+                    "TEXT, npub TEXT, npub_verificata INTEGER, npub_accesso "
+                    "INTEGER, negozio TEXT)")
+        con.execute("INSERT INTO utenti VALUES(222,'V','v','',0,0,'neg')")
+        if con_podcast:
+            con.execute("INSERT INTO annunci(id,venditore_id,titolo,"
+                        "post_canale_id,post_vetrina_id,"
+                        "post_bitcoin_podcast_id,post_nostr_id) "
+                        "VALUES(1,222,'T',11,22,33,'abc')")
+        else:
+            con.execute("INSERT INTO annunci(id,venditore_id,titolo,"
+                        "post_canale_id,post_vetrina_id,post_nostr_id) "
+                        "VALUES(1,222,'T',11,22,'')")
+        con.commit()
+        con.close()
+
+        def db():
+            c = _sqVC.connect(percorso)
+            c.row_factory = _sqVC.Row
+            return c
+
+        chiamate, stampe = [], []
+
+        async def bot_api(metodo, dati):
+            chiamate.append((metodo, dati["chat_id"], dati["message_id"]))
+            return {"ok": True}
+
+        async def cambio():
+            return 100_000.0
+
+        async def relay(evento):
+            chiamate.append(("kind5", evento[0], evento[1]))
+
+        amb = {"db": db, "bot_api": bot_api, "cambio_btc_eur": cambio,
+               "_altri_del_venditore": lambda con, a: [],
+               "_caption_canale": lambda a, cambio, venduto=True, altri=None:
+                   ("✅ Venduto " if venduto else "") + a["titolo"],
+               "_foto_url_nostr": lambda foto: "",
+               "canale_id": lambda: "@nostro", "canale_vetrina": lambda: "@vetrina",
+               "canale_bitcoin_podcast": lambda: "@podcast",
+               "_NOSTR": ("chiave", "pub"), "_spedisci_ai_relay": relay,
+               "firma_evento": lambda kind, tag, testo: (kind, tag[0][1]),
+               "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
+        for nome in ("_post_vetrina", "_post_podcast"):
+            exec(pezzo(nome), amb)
+        exec(sorgente_venduto, amb)
+        exec(sorgente_rimuovi, amb)
+        _asVC.run(amb["promo_venduto"](1))
+        dopo_venduto = list(chiamate)
+        _asVC.run(amb["promo_rimuovi"](1))
+        c = db()
+        r = dict(c.execute("SELECT * FROM annunci WHERE id=1").fetchone())
+        c.close()
+        return dopo_venduto, chiamate[len(dopo_venduto):], stampe, r
+
+    venduto = "async " + pezzo("promo_venduto")
+    rimuovi = "async " + pezzo("promo_rimuovi")
+    ven, rim, stampe, riga = banco(venduto, rimuovi)
+    prova("✅ Venduto: la didascalia si riscrive nei TRE canali, ognuno col "
+          "suo post", [("editMessageText", "@nostro", 11),
+                       ("editMessageText", "@vetrina", 22),
+                       ("editMessageText", "@podcast", 33)], ven)
+    prova("ritiro: i tre post si cancellano e la nota riceve il suo kind 5",
+          [("deleteMessage", "@nostro", 11), ("deleteMessage", "@vetrina", 22),
+           ("deleteMessage", "@podcast", 33), ("kind5", 5, "abc")], rim)
+    prova("...e le colonne dei post si azzerano",
+          (0, 0, 0, ""), (riga["post_canale_id"], riga["post_vetrina_id"],
+                          riga["post_bitcoin_podcast_id"], riga["post_nostr_id"]))
+    prova("nessun «saltato» nel journal", [], stampe)
+
+    ven, rim, stampe, riga = banco(venduto, rimuovi, con_podcast=False)
+    prova("un database senza la colonna del podcast: il nostro canale e la "
+          "vetrina si aggiornano lo stesso",
+          [("editMessageText", "@nostro", 11), ("editMessageText", "@vetrina", 22)],
+          ven)
+    # (il ritiro no, ed e' giusto cosi': `promo_rimuovi` NOMINA le colonne
+    # dei post nella sua SELECT, la vetrina come il podcast, e la
+    # migrazione d'avvio le aggiunge prima che giri qualunque cosa)
+
+    # LA CONTROPROVA: la riga di prima del 17 ott, rimessa al suo posto
+    vecchio = lambda s: s.replace("_post_podcast(a)",
+                                  'a.get("post_bitcoin_podcast_id")')
+    ven, rim, stampe, _r = banco(vecchio(venduto), vecchio(rimuovi))
+    prova("controprova: con a.get(...) sulla riga il banco vede il guasto "
+          "del 15 ott (niente edit, niente ritiro, due «saltato»)",
+          ([], [], 2, True),
+          (ven, rim, len(stampe),
+           all("has no attribute 'get'" in s for s in stampe)))
+
+    # LA SENTINELLA: nelle due funzioni dei post la riga si legge con le
+    # parentesi quadre o coi due giudici, mai con .get
+    for nome in ("promo_venduto", "promo_rimuovi"):
+        prova(f"{nome}: nessun .get( sulla riga sqlite", [],
+              re.findall(r"\ba\.get\(", codice(pezzo(nome))))
+    prova("le tre letture del podcast passano dal giudice", 3,
+          codice(pezzo("promo_venduto") + pezzo("promo_rimuovi"))
+          .count("_post_podcast(a)"))
+    # IL «SALTATO» SI VEDE SUBITO: sul VPS il guasto e' scattato e il
+    # journal non l'ha mai mostrato — la riga restava nel buffer dello
+    # stdout e ai riavvii si perdeva (conto di Andrea, 17 ott 2026)
+    for nome in ("promo_venduto", "promo_rimuovi"):
+        prova(f"{nome}: la riga del «saltato» esce con flush=True", True,
+              bool(re.search(r'saltato: \{e\}",\s*flush=True\)',
+                             codice(pezzo(nome)))))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -169864,6 +170003,7 @@ def main():
               prove_stampa_e_salti,
               prove_modifica_massiva,
               prove_bundle_bitcoin,
+              prove_venduto_canale,
               prove_config_esempio):
         try:
             f()

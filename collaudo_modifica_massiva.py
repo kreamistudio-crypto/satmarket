@@ -678,6 +678,75 @@ def main():
          SRV.promo_rimuovi, SRV.PAUSA_NOSTR, SRV.LOTTO_NOSTR) = veri
         SRV.asyncio.gather = vero_gather
 
+    # ---------------------------------------------------------------
+    # IL GIRO ARRIVA AI CANALI (17 ott 2026, cantiere venduto-canale):
+    # pausa ed eliminazione in blocco su annunci col post nel canale, con
+    # `promo_venduto` e `promo_rimuovi` VERI — e' qui che il giro dal
+    # vivo del 16 ott ha visto «'sqlite3.Row' object has no attribute
+    # 'get'». Di cartone solo Telegram (chi chiama e con cosa) e i relay.
+    print("\n[il giro della modifica in blocco arriva ai canali: pausa ed "
+          "elimina]")
+    con = db()
+    pausa_id, via_id = (con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+        "categoria,zona,stato,creato,consegna,quantita,valuta,condizione,"
+        "spedizione_sats,post_canale_id) VALUES(?,?,'d',20000,'Altro',"
+        "'Torino (TO)','attivo',1,'spedizione',2,'sats','buono',3000,?)",
+        (VENDE, titolo, msg)).lastrowid
+        for titolo, msg in (("Col post, in pausa", 501), ("Col post, via", 502)))
+    con.commit()
+    con.close()
+    TELEGRAM, STAMPE = [], []
+
+    async def bot_api(metodo, dati):
+        TELEGRAM.append((metodo, dati.get("chat_id"), dati.get("message_id")))
+        return {"ok": True}
+
+    async def niente(*a, **k):
+        return 0
+    veri = (SRV.bot_api, SRV.canale_id, SRV.canale_vetrina,
+            SRV.canale_bitcoin_podcast, SRV.annuncio_su_nostr,
+            SRV.ritira_da_nostr, SRV.PAUSA_NOSTR)
+    SRV.bot_api = bot_api
+    SRV.canale_id = lambda: "@nostro"
+    SRV.canale_vetrina = lambda: ""
+    SRV.canale_bitcoin_podcast = lambda: ""
+    SRV.annuncio_su_nostr = SRV.ritira_da_nostr = niente
+    SRV.PAUSA_NOSTR = 0
+    # le stampe del server: un «saltato» qui e' il guasto
+    SRV.print = lambda *a, **k: STAMPE.append(" ".join(map(str, a)))
+    try:
+        DOPO.clear()
+        r = c.post("/api/me/modifica-massiva/applica", json={
+            "ids": [pausa_id], "azione": "pausa"})
+        prova("la pausa in blocco: 200, e il gesto verso il mondo e' «sold»",
+              (200, {pausa_id: "sold"}),
+              (r.status_code, DOPO[-1][1] if DOPO else {}))
+        asyncio.run(SRV._mm_fuori(VENDE, DOPO[-1][1] if DOPO else {}))
+        prova("...il post nel canale riceve la didascalia nuova (✅ Venduto)",
+              True, any(m in ("editMessageCaption", "editMessageText")
+                        and ch == "@nostro" and mid == 501
+                        for m, ch, mid in TELEGRAM))
+        TELEGRAM.clear()
+        DOPO.clear()
+        r = c.post("/api/me/modifica-massiva/applica", json={
+            "ids": [via_id], "azione": "elimina", "conferma": "elimina"})
+        prova("l'eliminazione in blocco: 200, e il gesto e' «ritira»",
+              (200, {via_id: "ritira"}),
+              (r.status_code, DOPO[-1][1] if DOPO else {}))
+        asyncio.run(SRV._mm_fuori(VENDE, DOPO[-1][1] if DOPO else {}))
+        prova("...il post si cancella dal canale", [("deleteMessage", "@nostro", 502)],
+              TELEGRAM)
+        prova("...e la colonna del post si azzera", 0,
+              riga(via_id)["post_canale_id"])
+        prova("nessun «saltato» nelle stampe del server", [],
+              [s for s in STAMPE if "saltato" in s])
+    finally:
+        (SRV.bot_api, SRV.canale_id, SRV.canale_vetrina,
+         SRV.canale_bitcoin_podcast, SRV.annuncio_su_nostr,
+         SRV.ritira_da_nostr, SRV.PAUSA_NOSTR) = veri
+        del SRV.print
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)

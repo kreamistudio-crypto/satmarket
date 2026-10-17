@@ -65242,3 +65242,133 @@ annotare».
 **DA GUARDARE.** Sul telefono vero, nel browser e nella PWA; nella Mini
 App solo il giorno che la leva `PIU_ACCOUNT_OVUNQUE` si accende (lì il
 tappo nasce a 14px dalla cima, misurato, ma non provato col dito).
+
+## Il ✅ Venduto e il ritiro dei post: `.get()` su una riga sqlite (17 ott 2026, cantiere venduto-canale, richiesta di Andrea)
+
+**PERCHÉ.** Il giro dal vivo di modifica-massiva (16 ott) ha visto nel
+log «⚠️ Aggiornamento post venduto #4 saltato: 'sqlite3.Row' object has
+no attribute 'get'». `promo_venduto` e `promo_rimuovi` leggevano la
+colonna del canale BitcoinPodcastTelegram con `a.get(...)`, e una
+`sqlite3.Row` il `.get` non ce l'ha.
+
+**DA DOVE.** `7f60c7b` (Alan, 15 ott 16:59, «Pubblicazione su
+BitcoinPodcastTelegram completata»), tolto dal revert di Andrea delle
+18:14 (`96270e4`) e rientrato col revert del revert delle 18:47
+(`334e92c`). Tre righe: una in `promo_venduto`, due in `promo_rimuovi`.
+
+**CHI NE ERA TOCCATO: TUTTE LE STRADE, NON SOLO MODIFICA-MASSIVA.** Le
+due funzioni non ricevono la riga da chi le chiama: la RILEGGONO da
+sole con `db()`, che ha `row_factory = sqlite3.Row`. Quindi ogni
+chiamata, da qualunque strada — eliminazione (`rimuovi_annuncio`),
+rimozione admin, rifiuto e riapertura della revisione
+(`decidi_revisione`), vendita che esaurisce (`_incassa_ordine`), pausa e
+rifornimento (`ricarica_quantita`), rimborso e annullo
+(`_rimborsa_compratore`, `_avvisa_piazze_annullo`) e la modifica in
+blocco (`_mm_un_gesto`) — saltava, per ogni annuncio, in sats o in euro,
+col post o senza: la riga si valutava prima di guardare se il post
+c'era. Effetti: niente ✅ Venduto (né la spunta tolta al ritorno in
+vetrina) in nessuno dei tre canali; e coi ritiri i post restavano
+pubblicati, la nota Nostr non riceveva il suo kind 5, le colonne non si
+azzeravano.
+
+**IN PRODUZIONE È SCATTATO, E IL JOURNAL NON L'HA VISTO** (conti di
+Andrea sul VPS, 17-19 ott). Il primo conto diceva zero righe «has no
+attribute 'get'» dal 15 ott 16:55, e in un primo giro di questo verbale
+ne avevo dedotto che nessun gesto avesse chiamato le due funzioni: era
+SBAGLIATO. Il secondo conto: le tre righe `a.get(...)` sono nel
+`server.py` del VPS, e dal 15 ott 16:55 ci sono 5 chiamate web
+(`rimuovi`, `quantita`, `revisione`) più le vendite — ognuna ha fatto
+saltare il suo ✅ o il suo ritiro. Le due `print` dell'`except` non
+avevano `flush=True`: la riga restava nel buffer dello stdout e ai
+riavvii si perdeva (lettura di Andrea). Adesso escono con `flush=True`,
+e una sentinella le tiene così.
+IL RIPASSO: lo decide Andrea col numero degli annunci rimasti. Il
+comando di SOLA LETTURA per contarli (id, stato e quali post, niente
+titoli né persone) prende tre fonti: gli id delle chiamate web dal
+journal, gli annunci di ordini toccati dopo il 15 ott 16:55 (epoch
+1792076100, mono e righe dei set) e i rimossi con un post rimasto
+(`promo_rimuovi` riuscito azzera le colonne, quindi uno rimasto è un
+ritiro fallito); tiene i soli rimossi ed esauriti/in pausa con almeno un
+post. Provato su un database finto con otto casi (dentro 4, fuori 4):
+
+    journalctl -u barattolo --since "2026-10-15 16:55" --no-pager | grep -oE 'POST /api/(admin/)?listings/[0-9]+/(rimuovi|quantita|revisione)' | grep -oE '[0-9]+' | python3 -c 'import sys, sqlite3
+    T = 1792076100
+    web = {int(x) for x in sys.stdin.read().split()}
+    c = sqlite3.connect("file:/srv/barattolo/dati/satmarket.db?mode=ro", uri=True)
+    vendite = {r[0] for r in c.execute("SELECT annuncio_id FROM ordini WHERE aggiornato >= ? AND annuncio_id > 0 UNION SELECT r.annuncio_id FROM ordine_righe r JOIN ordini o ON o.id = r.ordine_id WHERE o.aggiornato >= ?", (T, T))}
+    rimossi = {r[0] for r in c.execute("SELECT id FROM annunci WHERE stato = ? AND (post_canale_id > 0 OR post_vetrina_id > 0 OR post_bitcoin_podcast_id > 0 OR post_nostr_id <> ?)", ("rimosso", ""))}
+    n = 0
+    for i in sorted(web | vendite | rimossi):
+        a = c.execute("SELECT id, stato, post_canale_id > 0, post_vetrina_id > 0, post_bitcoin_podcast_id > 0, post_nostr_id <> ? FROM annunci WHERE id = ?", ("", i)).fetchone()
+        if not a or a[1] not in ("rimosso", "venduto") or not any(a[2:]):
+            continue
+        n += 1
+        print(a[0], a[1], " ".join(k for k, v in zip(("canale", "vetrina", "podcast", "nostr"), a[2:]) if v))
+    print(n, "annunci con un post rimasto (id dal journal:", len(web), "- dalle vendite:", len(vendite), ")")'
+
+Non sta nel repo come script apposta: si lancia una volta. Non vede gli annunci
+tornati in vetrina con un ✅ rimasto (rimborso, rifornimento): non
+chiesti, e da guardare a parte se servisse.
+
+**LA CORREZIONE.** `_post_podcast(a)`, gemello di `_post_vetrina(a)`
+(stesso perché, scritto lì: la riga si legge con le parentesi quadre, e
+la colonna che manca vale 0), al posto delle tre `a.get(...)`. Nient'altro.
+
+**GLI ALTRI `.get()` NELLO STESSO FILE.** Cercati con un banco sull'AST
+(i nomi che nella stessa funzione vengono da `.fetchone()` o da un `for`
+su `con.execute`/`.fetchall()`): 19 candidati. Tre sono questi; gli altri
+sedici sono innocui — righe già fatte dizionari con `[dict(r) for r in
+…]` (`mostra_categoria`, `_statistiche_p2p`, `miei_ordini`,
+`_sollecito_euro_p2p_fermo`, `_sollecito_recapito_p2p_fermo`), righe
+d'annuncio già dizionari (`_segna_staff_venditori`, che ci scrive dentro),
+o risposte HTTP che il cercatore ha preso per righe (`bot_api` in
+`mostra_categoria`, i pagamenti in `salva_ln_address`). Nessuno da
+correggere.
+
+**PROVATO.**
+- `prove_venduto_canale` (nuova): le due funzioni VERE su un sqlite vero
+  con `sqlite3.Row`, `bot_api` di cartone. ✅ Venduto nei tre canali,
+  ognuno col suo post; il ritiro che cancella i tre post, manda il kind
+  5 e azzera le colonne; nessun «saltato»; un database senza la colonna
+  del podcast dove `promo_venduto` aggiorna lo stesso il nostro canale e
+  la vetrina (il ritiro no, ed è giusto: nomina le colonne nella sua
+  SELECT, e la migrazione d'avvio le aggiunge). La controprova dentro la
+  prova: con la riga di prima lo stesso banco vede il guasto del 15 ott.
+  Le sentinelle: nessun `a.get(` nelle due funzioni, tre letture dal
+  giudice. 9 passate. Mutazione su una copia (la riga di prima rimessa):
+  5 rosse.
+- `collaudo_modifica_massiva.py`, una sezione in più (richiesta di
+  Andrea): pausa ed eliminazione in blocco su due annunci col post nel
+  canale, con `promo_venduto` e `promo_rimuovi` veri e solo Telegram e
+  relay di cartone — la didascalia nuova sul post, il post cancellato, la
+  colonna azzerata, nessun «saltato». 116 passate. Lo stesso collaudo sul
+  `server.py` di origin/main: 4 rosse, coi due «saltato» identici al
+  giro dal vivo.
+- COSA È GIRATO SU QUALE ALBERO. Su 3fd1c53 + il cantiere: la suite
+  intera con `PROVE_SEVERE=1` → 24.963 passate, 1 fallita: «btc:
+  l'impronta del file servito è quella scritta». Non era il codice: il
+  worktree era nato prima del `.gitattributes` di 3fd1c53, e la copia
+  di lavoro di `vendor/btc.bundle.js` era quella di prima; rifatto il
+  checkout del solo file, `prove_bundle_bitcoin` 16 passate, 0 fallite.
+  I collaudi della CI nella gabbia, due alla volta: 84 verdi, 0 rossi.
+  Poi main è corso di sei commit (più account, croce bianca, orari dei
+  passi): rebase su 228679b, conflitto solo additivo in CANTIERI; lì
+  rigirate `prove_venduto_canale`, `prove_modifica_massiva`,
+  `prove_bundle_bitcoin`, `prove_spedizione_standard`,
+  `prove_in_pagamento`, `prove_cambio_converte` → 570 passate, 0
+  fallite; i collaudi `modifica_massiva`, `piu_account`,
+  `tolti_ovunque`, `chat_scambio` → 4 verdi; il cercatore dei `.get()`
+  sul server ribasato → 16 candidati, nessuno nuovo da main.
+- IL GIRO FINALE (19 ott, dopo il flush e il verbale corretto): rebase
+  su 6b256af (sette commit di main, fra cui le due regole nuove di
+  CLAUDE.md: questo cantiere non tocca né backup né socket), suite
+  intera con `PROVE_SEVERE=1` → 25.100 passate, 0 fallite, 0 saltate;
+  collaudi della CI in gabbia → 85 verdi, 0 rossi. Poi un ultimo
+  rebase su 5878750 (solo `docs/HACKATHON-SETUP.md`):
+  `prove_venduto_canale` e `prove_mutinynet_prep` → 78 passate.
+
+**DA FARE (notati, non fatti).**
+- Il ripasso dei post rimasti, se Andrea lo decide col numero del
+  comando qui sopra (uno alla volta, col freno, mai un post nuovo).
+- Le altre `print` d'errore del server senza `flush=True`: possono
+  perdersi allo stesso modo. Non toccate (non chieste).

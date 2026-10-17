@@ -66987,6 +66987,20 @@ def _post_vetrina(a) -> int:
         return 0
 
 
+def _post_podcast(a) -> int:
+    """Il message_id del post su BitcoinPodcastTelegram, o 0: il gemello
+    di `_post_vetrina`, con lo stesso perche' (17 ott 2026, cantiere
+    venduto-canale). Al suo posto c'era `a.get(...)`, che una
+    sqlite3.Row NON ha: dal 15 ott ogni ✅ Venduto e ogni ritiro dei
+    post saltavano su TUTTI i canali, nostro compreso, con «'sqlite3.Row'
+    object has no attribute 'get'» nel journal. La riga sqlite si legge
+    con le parentesi quadre, e la colonna che manca vale 0."""
+    try:
+        return a["post_bitcoin_podcast_id"] or 0
+    except (KeyError, IndexError):
+        return 0
+
+
 async def _manda_post_canale(dove: str, caption: str, foto: list) -> int:
     """Manda UN post in UN canale e torna il suo message_id (0 se non
     e' partito).
@@ -69111,7 +69125,7 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         # ci ha tolto i permessi, il nostro si aggiorna lo stesso.
         dove = [(canale_id(), a["post_canale_id"]),
                 (canale_vetrina(), _post_vetrina(a)),
-                (canale_bitcoin_podcast(), a.get("post_bitcoin_podcast_id"))]
+                (canale_bitcoin_podcast(), _post_podcast(a))]
         if not any(c and m for c, m in dove):
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
@@ -69133,7 +69147,12 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
                 if r and r.get("ok"):
                     break
     except Exception as e:
-        print(f"⚠️ Aggiornamento post venduto #{annuncio_id} saltato: {e}")
+        # flush=True (17 ott 2026, cantiere venduto-canale): senza, la
+        # riga restava nel buffer dello stdout e ai riavvii si perdeva —
+        # sul VPS il guasto del .get() e' scattato e il journal non l'ha
+        # mai mostrato. Un errore si vede SUBITO o non serve.
+        print(f"⚠️ Aggiornamento post venduto #{annuncio_id} saltato: {e}",
+              flush=True)
 
 
 async def promo_rimuovi(annuncio_id: int):
@@ -69148,12 +69167,12 @@ async def promo_rimuovi(annuncio_id: int):
         con.close()
         vetrina = _post_vetrina(a) if a else 0
         if not a or not (a["post_canale_id"] or vetrina
-                         or a.get("post_bitcoin_podcast_id") or a["post_nostr_id"]):
+                         or _post_podcast(a) or a["post_nostr_id"]):
             return
         # ogni canale col SUO id, e ognuno fallisce per conto suo
         for canale, msg in ((canale_id(), a["post_canale_id"]),
                             (canale_vetrina(), vetrina),
-                            (canale_bitcoin_podcast(), a.get("post_bitcoin_podcast_id"))):
+                            (canale_bitcoin_podcast(), _post_podcast(a))):
             if canale and msg:
                 await bot_api("deleteMessage",
                               {"chat_id": canale, "message_id": msg})
@@ -69168,7 +69187,8 @@ async def promo_rimuovi(annuncio_id: int):
         con.commit()
         con.close()
     except Exception as e:
-        print(f"⚠️ Ritiro post automatici #{annuncio_id} saltato: {e}")
+        print(f"⚠️ Ritiro post automatici #{annuncio_id} saltato: {e}",
+              flush=True)
 
 
 @app.post("/api/orders/{ordine_id}/invoice")
