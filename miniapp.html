@@ -10742,9 +10742,19 @@
      regola del 6 ott): chi cambia la tabella delle soglie qui sotto le
      muove insieme per costruzione. */
   @media (min-width:768px) and (hover:hover) and (pointer:fine){
-    html.fuori-telegram{--colonne:3;--gap-griglia:14px;--lato:0px}
+    html.fuori-telegram{--colonne:3;--gap-griglia:14px}
     html.fuori-telegram #app{max-width:none}
+    /* IL MENU' RESTA IN ALTO, a ogni larghezza (17 ott 2026, cantiere
+       menu-in-alto, decisione di Andrea: la colonna a sinistra da 1280
+       non gli piaceva). E' la topbar di sempre del blocco DESKTOP, alta
+       60: qui solo larga quanto la finestra, coi margini di --pad, che
+       crescono con lo schermo (16, 24 da 1280, 32 da 1600). */
     html.fuori-telegram nav{padding:0 var(--pad)}
+    /* LA CROCE DEL + nella pillola della barra in alto non si ridice qui:
+       la colora il blocco DESKTOP con le leve di piu-bianco
+       (`--piu-casa-fg`, `--piu-casa-ombra`: bianca col filo d'ombra di
+       giorno, scura la sera), una volta sola per il computer e per
+       Telegram Desktop */
     html.fuori-telegram #barraPacco{max-width:none}
     html.fuori-telegram .grid{grid-template-columns:repeat(var(--colonne),minmax(0,1fr));
       gap:var(--gap-griglia)}
@@ -10780,60 +10790,12 @@
     html.fuori-telegram{--colonne:10}
   }
 
-  /* ---- da 1280: il menu' a sinistra, e i pannelli affiancati ---- */
+  /* ---- da 1280: i pannelli affiancati ---- */
   @media (min-width:1280px) and (hover:hover) and (pointer:fine){
-    html.fuori-telegram{--lato:88px;--pad:24px;--pannello:420px}
-    /* la topbar non c'e' piu': la pagina parte dal bordo di sopra e
-       lascia a sinistra il posto al menu' */
-    html.fuori-telegram #app{margin:0;padding-top:0;padding-left:var(--lato)}
-    html.fuori-telegram header,
-    html.fuori-telegram .altri-azione,
-    html.fuori-telegram .pacco-appiccicato{top:0}
-    html.fuori-telegram #p2pChatSc{scroll-margin-top:16px}
-
-    /* IL MENU' IN PIEDI: la barra del telefono messa di fianco — icona
-       sopra, etichetta piccola sotto, la voce accesa come pillola */
-    html.fuori-telegram nav{top:0;bottom:0;left:0;right:auto;
-      width:var(--lato);height:auto;margin:0;
-      flex-direction:column;justify-content:flex-start;align-items:stretch;gap:4px;
-      padding:14px 8px;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;
-      border-bottom:0;border-top:0;border-right:1px solid var(--line)}
-    html.fuori-telegram nav::before{top:0;bottom:0;left:0;right:-1px;
-      box-shadow:inset -4px 0 12px rgba(0,0,0,.5),inset -1px 0 0 rgba(255,255,255,.08)}
-    html.fuori-telegram[data-tema="scuro"] nav::before{
-      box-shadow:inset -4px 0 12px rgba(0,0,0,.65),inset -1px 0 0 rgba(255,255,255,.06)}
-    html.fuori-telegram .nav-logo{margin:0 0 14px;justify-content:center;flex:0 0 auto}
-    html.fuori-telegram .nav-logo .lockup{display:none}
-    html.fuori-telegram nav .nav-cella{flex:0 0 auto;width:100%}
-    html.fuori-telegram nav button:not(.tema-btn,.podio-testa,.avatar-btn){flex:0 0 auto;width:100%;flex-direction:column;
-      gap:4px;font-size:11px;padding:9px 2px;border-radius:14px}
-    html.fuori-telegram nav .nav-cella>button{justify-content:center}
-    html.fuori-telegram nav button .nav-ico{width:24px;height:24px}
-    html.fuori-telegram nav button.sell{margin:6px 0;border-radius:16px;padding:10px 2px}
-    html.fuori-telegram nav button.sell .ic{font-size:20px;line-height:1}
-    /* LA CROCE DEL + (scelta di Andrea, come nel cantiere piu-bianco):
-       bianca col suo filo d'ombra di giorno, scura la sera — la sera la
-       pillola tiene l'inchiostro del principale, che e' gia' quello che
-       eredita. Solo fuori dal P2P: li' la pillola cambia colore e la
-       croce corre con lei. */
-    html.fuori-telegram:not([data-tema="scuro"]) body:not(.nav-p2p) nav button.sell .ic{
-      color:#FFFFFF;text-shadow:0 1px 2px rgba(74,36,0,.6)}
-    /* levetta, podio e tappo in fondo alla colonna, uno sotto l'altro,
-       con la loro misura di sempre (la larghezza piena e' delle voci) */
-    html.fuori-telegram nav .tema-btn,html.fuori-telegram nav .podio-testa{width:32px;flex:0 0 32px;padding:0}
-    html.fuori-telegram nav .avatar-btn{width:36px;flex:0 0 36px;padding:0}
-    html.fuori-telegram nav .tema-btn{margin:auto auto 0}
-    html.fuori-telegram nav .podio-testa.on,
-    html.fuori-telegram nav .avatar-btn.on{margin:8px auto 0}
-
-    /* le barre e gli avvisi stanno sul contenuto, non sotto il menu' */
-    html.fuori-telegram #barraPacco{left:var(--lato);right:0;margin:0}
-    html.fuori-telegram .toast,
-    html.fuori-telegram .p2p-aggiorno{left:calc(50% + var(--lato) / 2)}
-
-    /* I FOGLI: finestre centrate sul CONTENUTO (non sullo schermo
-       intero, che col menu' di fianco le mostrerebbe storte) */
-    html.fuori-telegram .sheet{left:calc(50% + var(--lato) / 2);width:min(600px,92vw)}
+    html.fuori-telegram{--pad:24px;--pannello:420px}
+    /* I FOGLI restano finestre centrate (la regola del blocco DESKTOP),
+       un po' piu' larghe */
+    html.fuori-telegram .sheet{width:min(600px,92vw)}
 
     /* IL PAGAMENTO IN DUE COLONNE: il QR a sinistra, tutto il resto a
        destra. Il trucco della riga che si allarga: il QR occupa TUTTE
@@ -10850,12 +10812,15 @@
        toccabile accanto (un'altra card riapre il pannello su di lei).
        Il velo non c'e' finche' e' il solo foglio aperto. */
     html.fuori-telegram #p2pDettSheet,html.fuori-telegram #p2pNuovoSheet{
-      left:auto;right:0;top:0;bottom:0;width:var(--pannello);
-      max-height:none;height:calc(100vh / var(--fs-zoom,1));
-      height:calc(100dvh / var(--fs-zoom,1));border-radius:0;
+      left:auto;right:0;top:60px;bottom:0;width:var(--pannello);
+      max-height:none;height:calc(100vh / var(--fs-zoom,1) - 60px);
+      height:calc(100dvh / var(--fs-zoom,1) - 60px);border-radius:0;
       border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(0,0,0,.12);
       transform:translateX(100%)}
     html.fuori-telegram #p2pDettSheet.open,html.fuori-telegram #p2pNuovoSheet.open{transform:none}
+    /* il pannello sta SOTTO la barra in alto (top 60): la barra resta
+       visibile e toccabile, perche' il pannello comincia dove lei finisce
+       (menu-in-alto, 17 ott 2026) */
     html.fuori-telegram body:has(#p2pDettSheet.open):not(:has(.sheet.open:not(#p2pDettSheet))) #sheetBg{
       display:none}
     html.fuori-telegram body:has(#p2pDettSheet.open) #view-p2p{padding-right:var(--pannello)}
@@ -10911,7 +10876,7 @@
        ferma mentre si scorrono i dettagli */
     html.fuori-telegram #detailContent{
       grid-template-columns:minmax(0,min(46%,calc(100vh / var(--fs-zoom,1) - 64px))) minmax(0,1fr)}
-    html.fuori-telegram #detailContent>.detail-foto{position:sticky;top:16px}
+    html.fuori-telegram #detailContent>.detail-foto{position:sticky;top:76px}
     html.fuori-telegram #detailContent .altri-griglia{
       grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 
@@ -10928,7 +10893,7 @@
     html.fuori-telegram #orderContent>.detail-body>.vault{grid-column:2;grid-row:1 / -1}
     html.fuori-telegram #orderContent>.detail-body:has(>.chatsc)>.vault{grid-column:1;grid-row:auto}
     html.fuori-telegram #orderContent>.detail-body>.chatsc{grid-column:2;grid-row:1 / -1;
-      position:sticky;top:16px}
+      position:sticky;top:76px}
 
     /* LO SCAMBIO P2P: a sinistra il conto e i gesti, a destra i quattro
        passi; con la chat, a destra la chat */
@@ -10939,27 +10904,12 @@
     html.fuori-telegram #p2pOrdineCorpo>.p2p-passi{grid-column:2;grid-row:1 / -1}
     html.fuori-telegram #p2pOrdineCorpo:has(>.chatsc)>.p2p-passi{grid-column:1;grid-row:auto}
     html.fuori-telegram #p2pOrdineCorpo>.chatsc{grid-column:2;grid-row:1 / -1;
-      position:sticky;top:16px}
+      position:sticky;top:76px}
   }
 
-  /* ---- da 1600: il menu' largo, coi nomi per esteso, e tre pannelli ---- */
+  /* ---- da 1600: tre pannelli ---- */
   @media (min-width:1600px) and (hover:hover) and (pointer:fine){
-    html.fuori-telegram{--lato:232px;--pad:32px;--pannello:460px}
-    html.fuori-telegram nav{padding:18px 14px;gap:2px;
-      display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
-      grid-template-rows:repeat(7,auto) 1fr auto;align-content:stretch}
-    html.fuori-telegram nav>*{grid-column:1 / -1}
-    html.fuori-telegram .nav-logo{justify-content:flex-start;padding:0 6px;margin:0 0 18px}
-    html.fuori-telegram .nav-logo .lockup{display:inline}
-    html.fuori-telegram nav button:not(.tema-btn,.podio-testa,.avatar-btn){flex-direction:row;justify-content:flex-start;
-      gap:12px;font-size:15px;padding:11px 14px;border-radius:999px}
-    html.fuori-telegram nav .nav-cella>button{justify-content:flex-start}
-    html.fuori-telegram nav button.sell{justify-content:center;margin:10px 0;padding:11px 14px;border-radius:999px}
-    html.fuori-telegram nav button.sell .ic{font-size:18px}
-    /* in fondo, in fila: levetta, podio, tappo */
-    html.fuori-telegram nav .tema-btn,html.fuori-telegram nav .podio-testa.on,
-    html.fuori-telegram nav .avatar-btn.on{grid-column:auto;grid-row:9;margin:0;justify-self:center}
-
+    html.fuori-telegram{--pad:32px;--pannello:460px}
     html.fuori-telegram #paySheet{width:min(920px,92vw)}
 
     /* L'ANNUNCIO SU TRE PANNELLI: foto | dettagli | gli altri oggetti

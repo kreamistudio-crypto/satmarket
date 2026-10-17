@@ -64901,3 +64901,82 @@ confronto fra le due trascrizioni su 74 descrittori);
 - **La prova in Sparrow** resta un gesto di Andrea: adesso il
   descrittore è importabile per davvero, e quella è la verifica che
   conta.
+
+## Il menù resta in alto: via la colonna a sinistra dello schermo largo (17 ott 2026, cantiere menu-in-alto, richiesta di Andrea)
+
+**LA DECISIONE (Andrea).** Con lo schermo largo (f8535fe) dal computer il
+menù era diventato una colonna a sinistra: 88 px da 1280, 232 coi nomi da
+1600. Non gli piace: lo vuole IN ALTO come prima, a qualunque larghezza,
+largo quanto la finestra. Tutto il resto dello schermo largo resta (niente
+tetto, colonne che crescono, pannelli affiancati). Proposta in cinque righe
+approvata; una richiesta in più: se il cantiere piu-bianco (croce del «＋»
+bianca solo di giorno, #2A1600 la sera) arriva su main prima, si usano le
+SUE leve per la pillola «＋ Vendi», senza duplicarle.
+
+**COSA È CAMBIATO.** Solo il blocco «LO SCHERMO LARGO» di miniapp.html, e
+solo CSS.
+- Via la colonna: da 1280 la nav in piedi (`--lato`, larghezza fissa,
+  `flex-direction:column`, il bordo a destra, il logo centrato, le voci a
+  icona sopra) e da 1600 la nav a griglia coi nomi; via anche tutto quel
+  che le faceva posto: il contenuto spostato a destra di `--lato` e senza
+  il respiro in cima, le parti appiccicate a `top:0`, la barra del
+  carrello, i toast, «aggiorno…» e i fogli spostati di mezzo `--lato`.
+- La barra in alto è la topbar del blocco DESKTOP (alta 60, logo a
+  sinistra, a destra Esplora, P2P, «＋ Vendi», Aste, Ordini, tema, podio,
+  profilo: stesso ordine e stesse pillole di prima), larga quanto la
+  finestra coi margini di `--pad`, che crescono con lo schermo (16, 24 da
+  1280, 32 da 1600). La regola c'era già da f8535fe (`nav{padding:0
+  var(--pad)}` da 768): non serviva altro.
+- Le parti appiccicate in cima tornano sotto la barra: testata, «altri
+  oggetti» e carrello riprendono il loro `top:60px` del blocco DESKTOP; la
+  foto dell'annuncio e la chat dell'ordine e dello scambio si fermano a 76
+  invece di 16; il pannello del libro P2P (e il foglio «Pubblica») parte
+  da 60 ed è alto uno schermo meno 60, così la barra resta visibile e
+  toccabile mentre il pannello è aperto. I fogli tornano centrati sulla
+  finestra (la regola del blocco DESKTOP), larghi 600.
+- La croce del «＋»: piu-bianco è arrivato su main mentre il cantiere
+  girava (0bb8160 e 9872407, ribasato sopra). La sua regola nel blocco
+  DESKTOP colora già il glifo della pillola della barra in alto con le
+  sue leve (`--piu-casa-fg`, `--piu-casa-ombra`: bianca col filo d'ombra
+  di giorno, #2A1600 la sera), per il computer e per Telegram Desktop.
+  La riga che schermo-largo aveva scritto a mano per la colonna è TOLTA:
+  nessun doppione. Guardata negli scatti a 1366, chiaro e scuro.
+
+**PROVE.** `prove_schermo_largo` aggiornata: nessuna `--lato`, nessuna
+regola della nav con `flex-direction:column`, larghezza da variabile,
+`bottom:0`, bordo a destra o griglia; niente nav a griglia né logo
+spostato; la barra larga coi margini di `--pad`; il contenuto né spostato
+a destra né senza respiro in cima; nessun `top:0` sulle parti
+appiccicate; il pannello da 60; foto e chat a 76 (tre volte, nessuna a
+16); la croce NON si ridice nel blocco largo e la dà il blocco DESKTOP
+con le leve di piu-bianco. La soglia «più di cento selettori» è
+scesa a settanta: il blocco ne ha 99 dopo le righe tolte. Tortura: cinque
+mutazioni (la nav in piedi, `top:0` sulla testata, il pannello da 0,
+`--lato` rimesso, la croce riscritta nel blocco), cinque prese.
+Sull'albero ribasato su 228679b (con piu-bianco): `PROVE_SEVERE=1
+prove.py` 25056 passate, 0 fallite; `collaudi_ci.py --elenco
+ci/collaudi.txt --paralleli 2` 85 verdi, 0 rossi. (Nel worktree nato
+prima di 3fd1c53 il bundle bitcoin era uscito CRLF e la sua impronta
+cadeva: rimesso fuori da git con `eol=lf`, verde.)
+
+**IL GIRO DAL VIVO.** Lo stesso banco di schermo-largo: due copie del
+repo nello scratchpad (main di oggi e menù in alto), stesso database
+(vetrina pubblica copiata, due ordini seminati, libro P2P seminato dalla
+pagina), cambio BTC/EUR fermo, Chrome headless col puntatore DICHIARATO
+(mouse per il computer, dito per il telefono) e registrato in ogni scatto.
+Prima/dopo a 1366, 1920 e 3440, chiaro e scuro, su 13 pagine: 78 scatti
+«dopo», nessuno scorrimento orizzontale, Esplora a 5, 6 e 10 colonne, la
+barra in alto larga quanto la finestra, la croce bianca di giorno e scura
+la sera a 1366. Il telefono e la Mini App, con lo stesso metodo di
+schermo-largo (tre giri: due «prima» e un «dopo»): a 360 a dito su 13
+pagine × 2 temi e la Mini App simulata a 1366, 1920, 2560 e 3440 × 2
+temi col mouse dichiarato, geometria di tutti gli elementi identica 34 su
+34, scatti a foto nascoste uguali al pixel 33 su 34 — l'unico diverso è
+il secondo del conto alla rovescia del dettaglio P2P (23:59:58 contro
+23:59:59, 9×11 pixel), che balla anche fra due «prima».
+
+**DA FARE (notati, non fatti).**
+- Le stesse voci di schermo-largo restano aperte (la chat del mercatino
+  nella colonna di destra, l'admin «⛓️ On-chain (prova)» a colonna sola,
+  gli elenchi numerati nelle colonne di Info P2P, l'ordine senza chat a
+  2560+, la ricerca a 640 anche a 3440).

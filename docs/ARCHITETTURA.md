@@ -3002,9 +3002,14 @@
   in ogni @media (telefoni, tablet e APK sono a dito e restano quelli
   di prima). I blocchi DESKTOP (≥768) e DESKTOP LARGO (≥1024) di sopra
   restano com'erano: valgono ancora dentro Telegram Desktop.
-  Le soglie: da 768 niente tetto; da 1280 il menu' diventa una colonna
-  a sinistra da 88 px (icona sopra, etichetta sotto), da 1600 da 232
-  col logo e i nomi per esteso; le colonne di Esplora sono UN NUMERO
+  Le soglie: da 768 niente tetto, e il menu' resta la topbar IN ALTO
+  a ogni larghezza, larga quanto la finestra coi margini di `--pad` (16,
+  24 da 1280, 32 da 1600): la colonna a sinistra dei primi giorni (88 px
+  da 1280, 232 da 1600) e' stata tolta il 17 ott 2026 (cantiere
+  menu-in-alto, decisione di Andrea), e con lei ogni regola che le
+  faceva posto — le parti appiccicate restano sotto la barra (60), la
+  foto dell'annuncio e la chat si fermano a 76, il pannello del libro
+  parte da 60. Le colonne di Esplora sono UN NUMERO
   SOLO, `--colonne` (3, 4, 5 da 1280, 6 da 1700, 7 da 2100, 8 da 2400,
   9 da 2800, 10 da 3200), che bevono insieme la `.grid` e la fila
   «Scambi P2P». L'annuncio a tre pannelli da 1600 (foto | dettagli |

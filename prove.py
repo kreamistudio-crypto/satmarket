@@ -144900,7 +144900,7 @@ def prove_schermo_largo():
         if sel.startswith("@media") or not sel:
             continue
         selettori += spezza(sel)
-    prova("...ha le sue regole (piu' di cento selettori)", True, len(selettori) > 100)
+    prova("...ha le sue regole (piu' di settanta selettori)", True, len(selettori) > 70)
     nudi = [s for s in selettori if not s.startswith("html.fuori-telegram")]
     prova("OGNI selettore parte da html.fuori-telegram: dentro Telegram "
           "(anche Telegram Desktop largo) non cambia niente", [], nudi)
@@ -144979,12 +144979,12 @@ def prove_schermo_largo():
           ["@media (min-width:768px){\n    #app{max-width:960px;padding-top:76px;padding-bottom:40px}" in css,
            "@media (min-width:1024px){\n    #app{max-width:1160px}" in css])
 
-    # LA CROCE DEL + NEL MENU' A SINISTRA: bianca di giorno, scura la sera
-    prova("la croce del + e' bianca solo di giorno e fuori dal P2P", True,
-          'html.fuori-telegram:not([data-tema="scuro"]) body:not(.nav-p2p) nav button.sell .ic{'
-          "\n      color:#FFFFFF;" in blocco)
-    prova("...e la sera nessuna regola la ridipinge (eredita lo scuro)", False,
-          bool(re.search(r'(?<!:not\()\[data-tema="scuro"\][^{]*button\.sell \.ic\{', corpo)))
+    # LA CROCE DEL + (17 ott 2026, cantiere menu-in-alto): la dicono le leve
+    # di piu-bianco nel blocco DESKTOP, e il blocco largo non la ridice
+    prova("la croce del + non si ridice nel blocco largo", False,
+          bool(re.search(r"button\.sell \.ic\{", corpo)))
+    prova("...la colora il blocco DESKTOP con le leve di piu-bianco", True,
+          "body:not(.nav-p2p) nav button.sell .ic{color:var(--piu-casa-fg);" in css[:i])
 
     # IL PANNELLO DEL DETTAGLIO P2P: il velo sparisce solo se e' l'unico foglio
     prova("col pannello del libro aperto il velo sparisce solo se non ci "
@@ -144995,6 +144995,28 @@ def prove_schermo_largo():
     prova("la colonna della chat nasce solo se la chat c'e' (:has(>.chatsc))",
           True, "#orderContent>.detail-body:has(>.chatsc)" in blocco
           and "#p2pOrdineCorpo:has(>.chatsc)" in blocco)
+
+    # IL MENU' RESTA IN ALTO (17 ott 2026, cantiere menu-in-alto, decisione
+    # di Andrea): nessuna colonna a sinistra a NESSUNA larghezza. La barra
+    # e' la topbar del blocco DESKTOP, larga quanto la finestra.
+    nav_regole = [(m.group(1), m.group(2)) for m in
+                  re.finditer(r"([^{};]*\bnav\b[^{};]*)\{([^{}]*)\}", corpo)]
+    prova("nessuna colonna del menu': niente --lato, niente nav in piedi", [0, []],
+          [corpo.count("--lato"),
+           [s.strip() for s, d in nav_regole
+            if re.search(r"flex-direction:column|width:var|bottom:0|border-right|grid-template", d)]])
+    prova("...niente nav a griglia, niente logo spostato", [False, False],
+          ["nav{padding:18px" in corpo, ".nav-logo" in corpo])
+    prova("...la barra in alto e' larga quanto la finestra, coi margini di --pad", True,
+          "html.fuori-telegram nav{padding:0 var(--pad)}" in corpo)
+    prova("...e il contenuto non si sposta a destra ne' sale sotto la barra", [False, False],
+          ["padding-left:var(" in corpo, "padding-top:0" in corpo])
+    prova("le parti appiccicate restano sotto la barra (nessun top:0 nel blocco)", False,
+          bool(re.search(r"(header|\.altri-azione|\.pacco-appiccicato)[^{]*\{[^}]*top:0", corpo)))
+    prova("il pannello del libro parte sotto la barra (top 60)", True,
+          "left:auto;right:0;top:60px;bottom:0;width:var(--pannello);" in corpo)
+    prova("foto e chat si fermano sotto la barra (76)", [0, 3],
+          [corpo.count("sticky;top:16px"), corpo.count("sticky;top:76px")])
 
 
 
