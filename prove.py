@@ -147071,6 +147071,213 @@ console.log(JSON.stringify(out));
           anello("chiaro", set(o["p2pFatto"][0]), ("display",)).get("display"))
 
 
+def prove_chiave_che_nasce_da_sola():
+    """LA CHIAVE CHE NASCE DA SOLA (16 ott 2026, cantiere
+    pagamento-onchain tappa 1c, parola di Andrea: «l'utente finale NON
+    deve avere l'esperienza di dover creare un nuovo wallet su
+    Barattolo: avendo gia' fatto il login con Telegram o con Nostr, le
+    persone devono poter pagare on-chain e ricevere i fondi attraverso
+    una chiave autogenerata... e nemmeno Barattolo puo' ricavarla
+    perche' e' stata generata dall'utente, non da noi»).
+
+    LA TRAPPOLA CUSTODIAL, inchiodata qui: per un account Telegram il
+    profilo di scambio lo RICAVA IL SERVER (`/api/p2p/seme`). Se il
+    seme on-chain venisse da la', Barattolo saprebbe rifare la chiave
+    del compratore e — col suo terzo pezzo — avrebbe DUE chiavi su tre:
+    l'escrow sarebbe custodial senza che nessuno l'abbia deciso, e la
+    frase di Andrea sarebbe falsa. Quindi il seme e' RANDOM nel
+    browser, e questa sezione pretende che nel blocco non compaia mai
+    quella rotta. E' la prova piu' importante del cantiere.
+
+    E QUEL CHE SI ROMPE IN SILENZIO:
+    1. LA SCHERMATA DI CREAZIONE CHE RINASCE. Il bottone «crea le
+       dodici parole» e' stato tolto: se torna, torna l'esperienza che
+       Andrea ha chiesto di non avere.
+    2. UNA CASA MUTA PRESA PER UNA CASA VUOTA. Dentro Telegram il cloud
+       C'E': se non risponde, far nascere una chiave nuova la' sopra
+       sovrascriverebbe quella buona al primo singhiozzo di rete, e i
+       sats di un ordine aperto resterebbero chiusi da una chiave che
+       nessuno ha piu'. Il codice si FERMA e lo dice.
+    3. LE DUE CASSETTE CHE SI MESCOLANO. Il profilo di scambio e la
+       chiave dei soldi vivono nello stesso kind (30078) con due `d`
+       diversi: se un giorno fossero lo stesso, chi cancella il profilo
+       di scambio si porterebbe via la chiave dei sats.
+    4. LA COPIA SUI RELAY IN CHIARO. Va cifrata NIP-44 verso la PROPRIA
+       pubkey, o quella chiave la leggerebbe chiunque legga un relay."""
+    print("\n⛓️ La chiave che nasce da sola")
+    import shutil as _sh
+    import subprocess as _sp
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i_b = mini.index("/* ============ LA CHIAVE NASCE DA SOLA")
+    blocco = mini[i_b:mini.index("async function onchainChiavi(", i_b)]
+
+    # 1) LA TRAPPOLA CUSTODIAL: il seme non viene MAI dal server
+    tutto_onchain = mini[mini.index(
+        "/* ============ ⛓️ IL BANCO DELLE CHIAVI ON-CHAIN"):
+        mini.index("\n}\n", mini.index("async function onchainEsporta"))]
+    # SI GUARDA IL CODICE, NON LA PROSA (la lezione dei fogli di casa):
+    # qui sopra il commento NOMINA `/api/p2p/seme` apposta, per dire
+    # perche' non si usa — una sentinella che cercasse nel testo
+    # pescherebbe la spiegazione e direbbe che il difetto c'e'.
+    def _solo_codice(js):
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+    cod_onchain = _solo_codice(tutto_onchain)
+    prova("il seme on-chain NON arriva da /api/p2p/seme (sarebbe "
+          "custodial: il server sa rifarlo)", [0, 0],
+          [cod_onchain.count("p2p/seme"), cod_onchain.count("semeP2P")])
+    prova("...e il perche' e' scritto accanto al codice", True,
+          "avrebbe DUE\n   chiavi su tre" in mini
+          or "DUE chiavi su tre" in mini)
+    prova("il seme nasce RANDOM nel browser", True,
+          "B.generateMnemonic(B.wordlist, 128)" in blocco)
+
+    # 2) nessuna schermata di creazione, e la lapide che lo dice
+    prova("il bottone «crea le dodici parole» non esiste piu'", [0, 0],
+          [mini.count("onchainCrea("), mini.count("onchainSenzaSeme(")])
+    prova("...e la lapide spiega al prossimo che e' stato togliere "
+          "apposta", True,
+          "sono MORTE con la tappa 1c" in mini)
+    prova("la pagina assicura il seme da sola, all'apertura", True,
+          "const parole = await onchainSemeAssicurato();" in mini)
+
+    # 3) l'ordine della ricerca: prima le case, poi la nascita
+    i_n = blocco.index("async function onchainSemeAssicurato()")
+    corpo = blocco[i_n:blocco.index("\n}\n", i_n)]
+    prova("si cerca PRIMA nelle case e solo dopo nasce (una chiave "
+          "nuova a chi ne aveva una sarebbe un secondo mazzo)",
+          True,
+          corpo.index("cloudLeggiEsito") < corpo.index("onchainDaiRelay")
+          < corpo.index("generateMnemonic"))
+    prova("una casa MUTA non e' una casa vuota: dentro Telegram si "
+          "ferma invece di sovrascrivere", True,
+          "if (!r.ok && cloudTelegram()) {" in corpo
+          and "non faccio nascere una chiave nuova" in corpo)
+
+    # 4) le due cassette, e la copia cifrata verso se stessi
+    prova("le due cassette hanno due `d` diversi", [True, True, False],
+          ["const ONCHAIN_COPIA_D = 'barattolo/onchain/v1';" in mini,
+           "const P2P_COPIA_D = 'barattolo/p2p/profilo/v1';" in mini,
+           "ONCHAIN_COPIA_D = P2P_COPIA_D" in mini])
+    prova("la copia sui relay e' cifrata NIP-44 verso la PROPRIA pubkey",
+          True, "await auto.f.cifra44(pub, corpo)" in blocco)
+    prova("...e si rilegge, perche' una copia che nessuno rida' non e' "
+          "una copia", True,
+          "x.ev.id === ev.id" in blocco)
+    prova("il backup e' fail-open: un relay giu' non ferma un pagamento",
+          [True, True],
+          ["catch(e){ onchainCase.nuvola = false; }" in blocco,
+           "catch(e){ onchainCase.relay = false; }" in blocco])
+    prova("e un backup che NON c'e' si dice, non si nasconde", True,
+          "⚠️ Nessun backup." in mini)
+
+    # 5) il banco: l'ordine della ricerca, provato per davvero
+    node = _sh.which("node")
+    if not node:
+        salta("onchain: l'ordine della ricerca girato per davvero",
+              "node non installato")
+        return
+    pezzi = []
+    for firma in ("function eventoCopiaOnchain(cifrato, adesso){",
+                  "async function onchainSemeAssicurato(){"):
+        pezzi.append(pezzo_js(mini, firma, "\n}\n") + "\n}")
+    banco = """
+const fs = require('fs');
+const B = new Function(fs.readFileSync(process.argv[2], 'utf8')
+                       + '; return BarattoloBTC;')();
+const V = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const P2P_COPIA_KIND = 30078;
+const ONCHAIN_COPIA_D = 'barattolo/onchain/v1';
+const ONCHAIN_CLOUD = 'barattolo_onchain';
+const PAROLE = V.bip39_english[0].parole;
+let onchainNato = '', memoria = '';
+const onchainSrv = {strada: 'm/0/0'};
+const caricaBitcoin = async () => B;
+const onchainSemeLocale = () => memoria;
+const onchainScriviLocale = (p) => { memoria = p; return true; };
+const onchainMettiAlSicuro = async () => {};
+/* le case: il banco le muove da fuori */
+let CLOUD = {ok: false, testo: ''}, IN_TELEGRAM = false, RELAY = '';
+const cloudLeggiEsito = async () => CLOUD;
+const cloudTelegram = () => (IN_TELEGRAM ? {} : null);
+const onchainDaiRelay = async () => RELAY;
+__PEZZI__
+(async () => {
+  const out = {};
+  const giro = async (st) => {
+    memoria = st.locale || '';
+    CLOUD = st.cloud || {ok: false, testo: ''};
+    IN_TELEGRAM = !!st.inTelegram;
+    RELAY = st.relay || '';
+    onchainNato = '';
+    try { const p = await onchainSemeAssicurato();
+          return {nato: onchainNato, parole: p}; }
+    catch(e){ return {errore: String(e.message || e)}; }
+  };
+  const conCloud = {ok: true, testo: JSON.stringify({parole: PAROLE})};
+  /* 1) ce l'ha qui: non si tocca niente */
+  out.locale = await giro({locale: PAROLE});
+  /* 2) non ce l'ha qui ma e' nella nuvola: la riprende */
+  out.nuvola = await giro({cloud: conCloud, inTelegram: true});
+  /* 3) nemmeno nella nuvola, ma c'e' sui relay */
+  out.relay = await giro({cloud: {ok: true, testo: ''}, inTelegram: true,
+                          relay: PAROLE});
+  /* 4) in nessuna casa: nasce, ed e' valida e diversa */
+  out.nuova = await giro({cloud: {ok: true, testo: ''}});
+  out.nuovaValida = out.nuova.parole
+    ? B.validateMnemonic(out.nuova.parole, B.wordlist) : false;
+  out.nuovaDiversa = out.nuova.parole !== PAROLE;
+  /* 5) IL CASO CHE CONTA: dentro Telegram col cloud MUTO non deve
+        nascere niente — si ferma e lo dice */
+  out.muta = await giro({cloud: {ok: false, testo: ''}, inTelegram: true});
+  /* 6) ...ma FUORI da Telegram il cloud non esiste: la' si nasce */
+  out.fuori = await giro({cloud: {ok: false, testo: ''}});
+  /* e l'evento della cassetta porta il `d` suo */
+  const ev = eventoCopiaOnchain('xyz', 1700000000);
+  out.evento = {kind: ev.kind, d: (ev.tags[0] || [])[1],
+                contenuto: ev.content};
+  console.log(JSON.stringify(out));
+})();
+"""
+    banco = banco.replace("__PEZZI__", "\n".join(pezzi))
+    strada = os.path.join(QUI, ".banco-nasce.js")
+    with open(strada, "w", encoding="utf-8") as fh:
+        fh.write(banco)
+    try:
+        r = _sp.run([node, strada,
+                     os.path.join(QUI, "vendor", "btc.bundle.js"),
+                     os.path.join(QUI, "vendor", "vettori-bip.json")],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=120)
+    finally:
+        os.unlink(strada)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-900:])
+        prova("onchain: il banco della nascita ha risposto", True, False)
+        return
+    prova("ce l'ha qui: non si tocca niente", ["locale", True],
+          [o["locale"]["nato"], o["locale"]["parole"] == o["nuvola"]["parole"]])
+    prova("non ce l'ha qui ma e' nella nuvola: la RIPRENDE, non ne fa "
+          "una nuova", "nuvola", o["nuvola"]["nato"])
+    prova("...e se e' solo sui relay, la riprende da la'", "relay",
+          o["relay"]["nato"])
+    prova("in nessuna casa: ne nasce una, valida e diversa",
+          ["nuovo", True, True],
+          [o["nuova"]["nato"], o["nuovaValida"], o["nuovaDiversa"]])
+    prova("⚠️ IL CASO CHE CONTA: dentro Telegram col cloud MUTO non "
+          "nasce niente, e si dice", [None, True],
+          [o["muta"].get("nato"),
+           "non risponde" in (o["muta"].get("errore") or "")])
+    prova("...ma fuori da Telegram il cloud non esiste, e la' si nasce",
+          "nuovo", o["fuori"]["nato"])
+    prova("l'evento della cassetta e' un 30078 col `d` dell'on-chain",
+          [30078, "barattolo/onchain/v1", "xyz"],
+          [o["evento"]["kind"], o["evento"]["d"], o["evento"]["contenuto"]])
+
+
 def prove_banco_chiavi_onchain():
     """IL BANCO DELLE CHIAVI ON-CHAIN (16 ott 2026, cantiere
     pagamento-onchain tappa 1b, richiesta di Andrea: «vorrei vederlo
@@ -167998,6 +168205,7 @@ def main():
     prove_p2p_paycode,
     prove_cancello_onchain,
     prove_banco_chiavi_onchain,
+    prove_chiave_che_nasce_da_sola,
     prove_leva_rgb,
     prove_annuncio_identita,
     prove_mutinynet_prep,

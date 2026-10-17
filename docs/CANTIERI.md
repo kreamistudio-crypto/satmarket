@@ -63992,3 +63992,131 @@ toccato l'impaginazione), dopo sull'albero finale.
 - La ricerca resta larga 640 anche a 3440.
 - Aste, negozio e classifica guardati solo di passaggio (usano la
   stessa `.grid`).
+
+## La chiave che nasce da sola: niente wallet da creare, due case per il backup, e la trappola custodial inchiodata (16 ott 2026, cantiere pagamento-onchain tappa 1c, correzione di Andrea)
+
+Andrea, guardando il banco della tappa 1b: «**l'utente finale non deve
+avere l'esperienza di dover creare un nuovo wallet su Barattolo**,
+perché avendo già fatto il login con Telegram o con Nostr, le persone
+devono poter pagare on-chain e poter ricevere i fondi attraverso una
+chiave autogenerata a partire dai loro profili, deve essere **randomica
+e usata temporaneamente** per quella transazione; tanto il descriptor
+in effetti ogni volta è diverso, quindi con quella sola seed phrase non
+si ottiene nulla, **e nemmeno Barattolo può ricavarla** perché è stata
+generata dall'utente non da noi». E, dopo una domanda: «chi entra con
+Nostr ha le chiavi **backuppate sui relay in modo cifrato**».
+
+Aveva ragione su tutto, e la sua ultima riga era un fatto che non
+sapevo: **la cassetta sui relay esiste già** — NIP-78 (kind 30078)
+cifrata NIP-44 verso la propria pubkey, pubblicata, riletta e ripresa
+al login — ed è nata per il profilo di scambio. Non c'era da
+inventarla: c'era da riusarla con un'etichetta sua.
+
+**LA TRAPPOLA CUSTODIAL, ED È IL CUORE DEL CANTIERE.** La condizione di
+Andrea — *nemmeno Barattolo può ricavarla* — con Telegram **non sarebbe
+stata vera** per la strada più comoda. L'architettura lo dice:
+> «per un account Telegram il profilo di scambio **lo ricava il
+> server** (`/api/p2p/seme`); per un nativo Nostr no.»
+Derivare da lì anche la chiave dei soldi avrebbe dato a Barattolo la
+chiave del compratore, e **col suo terzo pezzo due chiavi su tre**:
+l'escrow sarebbe diventato custodial **senza che nessuno l'avesse
+deciso**, e l'unico a saperlo sarebbe stato chi legge il codice. Per
+questo il seme è **random nel browser**, e una prova conta che nel
+codice on-chain quella rotta **non compaia mai**.
+E anche volendo, una derivazione deterministica dal profilo Nostr non
+si potrebbe fare con **Amber**: NIP-04 e NIP-44 cifrano con un nonce
+casuale, quindi non si ripetono. Il backup non è una comodità: è
+l'unica strada.
+
+**NIENTE WALLET DA CREARE.** Il bottone «🎲 Crea le dodici parole» è
+morto, e la sua lapide lo dice al prossimo che la cerca. Adesso la
+chiave **c'è già quando apri**: se non c'era, è nata mentre aprivi, e
+la pagina racconta quale delle tre cose è successa — *è nata adesso a
+caso dentro questo telefono* / *l'ho ritrovata nel cloud di Telegram* /
+*l'ho ritrovata sui relay, cifrata con la tua chiave*. Le dodici parole
+restano, perché sono la forma che ogni wallet legge, ma non si mostrano
+a nessuno di serie.
+
+**L'ORDINE DELLA RICERCA NON È UN DETTAGLIO**: prima il dispositivo,
+poi il cloud di Telegram, poi i relay, e **solo allora** nasce. Una
+chiave nuova a chi ne aveva già una sarebbe un secondo mazzo, cioè due
+identità per la stessa persona — la lezione già pagata coi due mazzi
+del P2P (set 2026). C'è il banco che prova i quattro casi in fila.
+
+⚠️ **UNA CASA MUTA NON È UNA CASA VUOTA**, ed è il guasto che ho visto
+mentre scrivevo il «dimentica». Dentro Telegram il cloud **c'è**: se
+non risponde, non si può sapere se la copia non esiste o se è solo un
+momento. Far nascere una chiave nuova lì sopra avrebbe **sovrascritto
+quella buona al primo singhiozzo di rete**, e i sats di un ordine
+aperto sarebbero rimasti chiusi da una chiave che nessuno ha più.
+Adesso il codice **si ferma e lo dice**: riprovare costa un tocco, una
+chiave persa no. Fuori da Telegram, dove il cloud non esiste proprio,
+si nasce regolarmente — e il banco prova tutt'e due i rami.
+
+**DUE CASSETTE, DUE ETICHETTE.** `barattolo/onchain/v1` accanto a
+`barattolo/p2p/profilo/v1`, stesso kind 30078. Separate apposta: chi
+cancella o esporta il profilo di scambio non si porta via la chiave dei
+sats, e viceversa.
+
+**E UN BACKUP CHE NON C'È SI DICE.** Chi apre da un browser fuori da
+Telegram e senza Nostr tiene la chiave nel solo localStorage: la pagina
+glielo scrive in rosso, con la conseguenza vera — *se perdi questo
+dispositivo la tua firma è persa; i sats no, si sbloccano con noi e la
+controparte, in disputa*. È la differenza fra «sei coperto» e «credevi
+di esserlo».
+
+**UNA CORREZIONE A UNA PAROLA DI ANDREA**, piccola e importante:
+«temporanea per quella transazione» non può voler dire *finché dura la
+pagina*. La chiave deve vivere **quanto l'ordine** — settimane — o i
+sats restano fermi. Resta vero il resto: **una chiave per ordine**
+(cambia l'indice BIP32, il descrittore è diverso ogni volta) e la
+cancellazione quando l'ordine si chiude. E resta giusta l'osservazione
+che la rende tranquilla: quella seed è **una chiave su tre**, da sola
+non spende niente — ed è anche il motivo per cui il **descrittore** va
+salvato con lei.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere
+(`cantiere/onchain-silenzio`, su origin/main a f8535fe):
+`prove_chiave_che_nasce_da_sola`, **20 passate, 0 fallite**, di cui sei
+sono comportamento vero girato in node sulla funzione estratta da
+`miniapp.html`: ce l'ha già qui → non tocca niente; non qui ma nella
+nuvola → la riprende; solo sui relay → la riprende da là; in nessuna
+casa → ne nasce una valida e diversa; **dentro Telegram col cloud muto
+→ non nasce niente e si dice**; fuori da Telegram → si nasce. Più la
+suite intera con `PROVE_SEVERE=1`.
+
+**UNA SENTINELLA CHE HA PESCATO LA PROSA.** La prima versione della
+prova «il seme non arriva da `/api/p2p/seme`» contava le occorrenze nel
+testo e trovava **il mio commento**, quello che spiega perché quella
+rotta non si usa. Adesso guarda il **codice** coi commenti tolti: è la
+lezione dei fogli di casa (`solo_codice`), ripetuta su un caso nuovo —
+una sentinella che legge la prosa certifica il contrario di quel che
+crede.
+
+**LA QUINTA SENTINELLA, e com'era ben fatta.** Nel bottone del backup
+avevo messo «☁️🟣 Rifai il backup adesso», e il censimento del **glifo
+viola** l'ha preso: un'emoji a colori **ignora `color`**, quindi quel
+viola non è mai stato il nostro — qualcuno l'ha scoperto ad agosto e ha
+scritto un censimento **per forma e non per elenco**, così prende anche
+il sito che qualcun altro scriverà sei mesi dopo. Ha preso il mio.
+⚠️ E LA CURA OVVIA SAREBBE STATA SBAGLIATA: passare l'etichetta dal
+giudice di casa (`etichettaNostr`) avrebbe sballato l'**altro**
+censimento, quello che conta le sue chiamate (otto), e avrebbe fatto
+rossa una seconda prova. La cura giusta era un'altra: quel bottone
+agisce su **tutt'e due** le case, quindi non è un bottone Nostr — i
+glifi restano nelle righe di stato, che sono `div`, dove sono ammessi.
+
+**DA FARE** (notati, non fatti):
+- **Una chiave per ordine con l'indice vero**: oggi la strada è una
+  sola (`m/0/0`, la dice il server). L'indice per ordine nasce con la
+  tappa ②, dove un ordine esiste davvero.
+- **La cancellazione a ordine chiuso** (la parte «temporanea» della
+  richiesta di Andrea): vuole un ordine vero da chiudere, quindi
+  tappa ② o ⑤.
+- **I descrittori nelle cassette**: oggi ci va il solo seme. I
+  descrittori hanno senso quando esistono ordini veri — e lì diventano
+  la parte **indispensabile** del backup, non un di più.
+- **Il giro dal vivo sui relay** non è provato: in collaudo i relay
+  veri non si toccano (regola di casa), quindi la cassetta on-chain è
+  provata nella forma e nel codice, ma il viaggio vero lo farà Andrea
+  dal telefono.

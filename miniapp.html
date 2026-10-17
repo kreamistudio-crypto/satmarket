@@ -50992,6 +50992,172 @@ function onchainScriviLocale(parole){
   catch(e){ return false; }
 }
 
+/* ============ LA CHIAVE NASCE DA SOLA (16 ott 2026, tappa 1c) =======
+   Parola di Andrea: «l'utente finale NON deve avere l'esperienza di
+   dover creare un nuovo wallet su Barattolo: avendo gia' fatto il login
+   con Telegram o con Nostr, le persone devono poter pagare on-chain e
+   ricevere i fondi attraverso una chiave autogenerata».
+   Quindi qui non c'e' nessuna procedura, nessuna schermata, nessun
+   «scrivi le dodici parole su un foglio»: la chiave NASCE la prima
+   volta che serve, in silenzio, e si mette al sicuro dove quella
+   persona ha gia' una casa. Le dodici parole restano — sono la forma
+   che ogni wallet legge — ma non si mostrano a nessuno di serie: stanno
+   in «Avanzate», per chi le cerca.
+
+   ⚠️ E' RANDOM, NON DERIVATA DAL CONTO, ed e' la riga piu' importante
+   del blocco: per un account Telegram il profilo di scambio lo RICAVA
+   IL SERVER (`/api/p2p/seme`, scritto in ARCHITETTURA). Derivare da li'
+   anche la chiave dei soldi vorrebbe dire che Barattolo sa rifarla — e
+   col suo terzo pezzo avrebbe DUE chiavi su tre, cioe' l'escrow
+   sarebbe custodial senza dirlo. Random nel browser e' l'unica forma in
+   cui «nemmeno Barattolo puo' ricavarla» (parola di Andrea) e' vera, e
+   una prova pretende che il seme on-chain non arrivi MAI da quella
+   rotta. Con Amber una derivazione deterministica non si potrebbe
+   comunque fare: NIP-04 e NIP-44 cifrano con un nonce casuale, quindi
+   non si ripetono — il backup non e' una scelta di comodita'.
+
+   LE DUE CASE, e nessuna e' la nostra:
+   - dentro Telegram → il CloudStorage (client → cloud di Telegram, mai
+     il nostro server). Non e' end-to-end, e il foglio lo dice;
+   - nativo Nostr → la CASSETTA SUI RELAY che esiste gia' per il profilo
+     di scambio: NIP-78 (kind 30078) cifrata NIP-44 verso la PROPRIA
+     pubkey, con un `d` suo. Il testo lo apre solo la sua chiave, che
+     noi non abbiamo (parola di Andrea: «chi entra con nostr ha le
+     chiavi backuppate sui relay in modo cifrato»).
+   Chi ha tutt'e due le case va in tutt'e due. Chi non ne ha nessuna
+   (browser fuori da Telegram, senza Nostr) tiene la chiave nel solo
+   localStorage, e il foglio glielo DICE invece di tacere. */
+const ONCHAIN_COPIA_D = 'barattolo/onchain/v1';
+let onchainNato = '';                            // '' | nuovo | nuvola | relay | locale
+let onchainCase = {nuvola: null, relay: null};   // null = non provata
+
+/* PURA: l'evento NIP-78 della cassetta on-chain, gemello di
+   `eventoCopiaProfiloP2P` ma col suo `d`. DUE ETICHETTE, DUE CASSETTE:
+   il profilo di scambio e la chiave dei soldi non si mescolano, cosi'
+   chi esporta o cancella uno non si porta via l'altro. */
+function eventoCopiaOnchain(cifrato, adesso){
+  return {kind: P2P_COPIA_KIND,
+          created_at: Math.floor(Number(adesso) || 0) || Math.floor(Date.now() / 1000),
+          tags: [['d', ONCHAIN_COPIA_D]], content: String(cifrato || '')};
+}
+
+/* IL SEME, CHE CI SIA GIA' O CHE DEBBA NASCERE. Si cerca PRIMA nelle
+   case — una chiave nuova a chi ne aveva gia' una sarebbe un secondo
+   mazzo, cioe' due identita' per la stessa persona (la lezione dei due
+   mazzi, set 2026) — e solo se non c'e' da nessuna parte nasce. */
+async function onchainSemeAssicurato(){
+  const B = await caricaBitcoin();
+  let parole = onchainSemeLocale();
+  if (parole) { onchainNato = onchainNato || 'locale'; return parole; }
+  /* 1) la nuvola di Telegram */
+  const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+  if (r.ok && r.testo) {
+    try { parole = (JSON.parse(r.testo).parole || '').trim(); }
+    catch(e){ parole = ''; }
+    if (parole && B.validateMnemonic(parole, B.wordlist)) {
+      onchainScriviLocale(parole);
+      onchainNato = 'nuvola';
+      return parole;
+    }
+  }
+  /* ⚠️ UNA CASA MUTA NON E' UNA CASA VUOTA, e qui ci si gioca una
+     chiave: dentro Telegram il cloud C'E', e se non risponde non si
+     puo' sapere se la copia non esiste o se e' solo un momento. Farne
+     nascere una nuova la' sopra vorrebbe dire SOVRASCRIVERE quella
+     buona al primo singhiozzo di rete — e i sats di un ordine aperto
+     resterebbero chiusi da una chiave che nessuno ha piu'. Quindi si
+     ferma e lo dice: riprovare costa un tocco, una chiave persa no. */
+  if (!r.ok && cloudTelegram()) {
+    throw new Error('il cloud di Telegram non risponde: riprova fra un '
+                    + 'momento (non faccio nascere una chiave nuova '
+                    + 'sopra la tua)');
+  }
+  /* 2) la cassetta sui relay, per chi ha una chiave Nostr */
+  parole = await onchainDaiRelay();
+  if (parole) { onchainScriviLocale(parole); onchainNato = 'relay'; return parole; }
+  /* 3) nasce adesso, random, qui dentro */
+  parole = B.generateMnemonic(B.wordlist, 128);
+  if (!B.validateMnemonic(parole, B.wordlist)) {
+    throw new Error('parole non valide (non dovrebbe capitare)');
+  }
+  onchainScriviLocale(parole);
+  onchainNato = 'nuovo';
+  await onchainMettiAlSicuro(parole);
+  return parole;
+}
+
+/* IL SALVATAGGIO E' FAIL-OPEN: un cloud muto o un relay giu' non devono
+   fermare un pagamento. Quel che e' andato e quel che no lo dice il
+   foglio, che legge `onchainCase` — e un backup che non c'e' va
+   DETTO, non nascosto. */
+async function onchainMettiAlSicuro(parole){
+  const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || 'm/0/0'});
+  try { onchainCase.nuvola = await cloudScrivi(ONCHAIN_CLOUD, corpo); }
+  catch(e){ onchainCase.nuvola = false; }
+  try { onchainCase.relay = await onchainSuiRelay(corpo); }
+  catch(e){ onchainCase.relay = false; }
+}
+
+/* La cassetta sui relay, in SCRITTURA: riusa il firmatario, i relay e
+   la pubblicazione del profilo di scambio. Torna `true` solo se almeno
+   un relay RIDA' l'evento appena scritto — una copia che nessuno rida'
+   non e' una copia (la lezione di `pubblicaCopiaProfiloP2P`).
+   `null` = niente chiave Nostr, che non e' un guasto. */
+async function onchainSuiRelay(corpo){
+  if (typeof firmatarioCifranteP2P !== 'function') return null;
+  const auto = await firmatarioCifranteP2P();
+  if (!auto) return null;
+  try {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const pub = String(await auto.f.pubkey() || '').toLowerCase();
+    if (!FORMA_HEX64.test(pub)) return false;
+    const cifrato = await auto.f.cifra44(pub, corpo);
+    const ev = await auto.f.firma(eventoCopiaOnchain(cifrato));
+    if (!ev || ev.pubkey !== pub || !NT.verifyEvent(ev)) return false;
+    const relays = await relayPerCopiaP2P(pub);
+    if (!relays.length) return false;
+    await pubblicaEventoSuRelay(relays, ev);
+    const letti = await leggiDaRelayP2P(relays,
+      {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [ONCHAIN_COPIA_D]},
+      P2P_COPIA_MS);
+    return new Set(letti.filter(x => x.ev && x.ev.id === ev.id)
+                        .map(x => x.relay)).size > 0;
+  } catch(e){ return false; }
+  finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
+}
+
+/* ...e in LETTURA: la copia piu' recente che sia nostra e porti il
+   nostro `d`, decifrata col firmatario. '' se non c'e' o non si apre. */
+async function onchainDaiRelay(){
+  if (typeof firmatarioCifranteP2P !== 'function') return '';
+  const auto = await firmatarioCifranteP2P();
+  if (!auto) return '';
+  try {
+    const pub = String(await auto.f.pubkey() || '').toLowerCase();
+    if (!FORMA_HEX64.test(pub)) return '';
+    const relays = await relayPerCopiaP2P(pub);
+    const letti = await leggiDaRelayP2P(relays,
+      {kinds: [P2P_COPIA_KIND], authors: [pub], '#d': [ONCHAIN_COPIA_D]},
+      P2P_COPIA_MS);
+    let scelto = null;
+    for (const x of (letti || [])) {
+      const ev = x && x.ev;
+      if (!ev || ev.kind !== P2P_COPIA_KIND || ev.pubkey !== pub) continue;
+      if (!(ev.tags || []).some(t => t && t[0] === 'd'
+                                     && t[1] === ONCHAIN_COPIA_D)) continue;
+      if (!ev.content) continue;
+      if (!scelto || (ev.created_at | 0) > (scelto.created_at | 0)) scelto = ev;
+    }
+    if (!scelto) return '';
+    const testo = await auto.f.decifra44(pub, scelto.content);
+    const parole = (JSON.parse(testo || '{}').parole || '').trim();
+    const B = await caricaBitcoin();
+    return B.validateMnemonic(parole, B.wordlist) ? parole : '';
+  } catch(e){ return ''; }
+  finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
+}
+
 /* Le TRE chiavi dell'ordine, calcolate qui e da nessun'altra parte.
    `strada` la dice il server (m/0/0), cosi' due dispositivi dello
    stesso conto fanno lo STESSO indirizzo — che e' esattamente quel che
@@ -51063,8 +51229,10 @@ async function renderOnchain(){
       if (!r.ok) throw new Error('il server non risponde');
       onchainSrv = await r.json();
     }
-    const parole = onchainSemeLocale();
-    if (!parole) { box.innerHTML = onchainSenzaSeme(); return; }
+    /* LA CHIAVE C'E' GIA' QUANDO APRI: se non l'aveva, nasce qui — in
+       silenzio, cercandola prima nelle sue case. Nessuna schermata di
+       creazione, che e' il punto della tappa 1c. */
+    const parole = await onchainSemeAssicurato();
     const k = await onchainChiavi(parole, onchainSrv);
     box.innerHTML = onchainConSeme(parole, k);
   } catch(e) {
@@ -51074,32 +51242,11 @@ async function renderOnchain(){
   }
 }
 
-function onchainSenzaSeme(){
-  return `
-    <div class="hint">Qui si guardano le <b>chiavi</b> di un ordine
-      on-chain e si prova che il <b>backup regge</b>. Non si paga
-      niente: nessun satoshi, nessun nodo, e la rete è
-      <b>testnet</b> — gli indirizzi cominciano per
-      <span class="mono">tb1</span> e non esiste nessun indirizzo
-      vero.</div>
-    <div class="payout">
-      <h4>1. Le tue dodici parole</h4>
-      <div class="hint">Nascono <b>nel tuo telefono</b> e non partono
-        mai: il nostro server non le vede e non le può vedere. Da loro
-        si ricava la tua chiave di ogni ordine.</div>
-      <button class="btn" onclick="onchainCrea(this)">🎲 Crea le dodici parole</button>
-    </div>
-    <div class="payout" style="border-color:var(--danger)">
-      <h4>…o ripristina quelle di prima</h4>
-      <div class="hint">Se le avevi e hai premuto «dimentica», o se sei
-        su un dispositivo nuovo: il backup nel cloud di Telegram le
-        riporta qui. ${onchainPrimaLetta()
-          ? 'Il <b>metro</b> è preso: appena tornano, Barattolo ti dirà da sé se l\'indirizzo combacia.'
-          : ''}</div>
-      <button class="btn ghost" onclick="onchainRipristina(this)">♻️ Ripristina dal cloud di Telegram</button>
-    </div>`;
-}
-
+/* (`onchainSenzaSeme` e `onchainCrea` sono MORTE con la tappa 1c: non
+   esiste piu' uno stato «senza seme» da disegnare ne' un bottone per
+   crearlo — la chiave c'e' gia' quando apri, e se non c'era e' nata
+   mentre aprivi. Chi cercasse qui la schermata di creazione: era
+   quella, ed e' stata togliere apposta.) */
 function onchainConSeme(parole, k){
   const prima = onchainPrimaLetta();
   const uguale = prima && prima.indirizzo === k.indirizzo
@@ -51110,9 +51257,15 @@ function onchainConSeme(parole, k){
       calcola da nessuna parte.</div>
 
     <div class="payout">
-      <h4>1. Le tue dodici parole</h4>
-      <div class="hint">Vivono <b>solo</b> in questo browser. Il server
-        non le ha mai viste.</div>
+      <h4>1. La tua chiave, che è nata da sé</h4>
+      <div class="hint">${onchainComEnata()}
+        Non c'è nessun wallet da creare: sei già entrato con il tuo
+        profilo, e la chiave è venuta dietro.</div>
+      ${onchainDoveAbita()}
+      <div class="hint" style="margin-top:8px">Dietro c'è una frase di
+        dodici parole inglesi — è la forma che ogni wallet legge, e
+        serve solo se un giorno vuoi portarti le chiavi fuori da
+        qui.</div>
       ${onchainParoleViste
         ? `<div class="mono" style="word-break:break-word;line-height:1.7">${esc(parole)}</div>
            <button class="btn ghost" onclick="onchainParoleViste=false;renderOnchain()">🙈 Nascondi</button>`
@@ -51154,13 +51307,16 @@ function onchainConSeme(parole, k){
     </div>
 
     <div class="payout">
-      <h4>4. Il backup</h4>
-      <div class="hint">Nel <b>CloudStorage di Telegram</b>: dal tuo
-        telefono al cloud di Telegram, <b>mai</b> dal nostro server.
-        Non è cifrato end-to-end — <b>Telegram lo può leggere</b> — e
-        serve a ritrovare le chiavi su un altro dispositivo.</div>
-      <button class="btn ghost" onclick="onchainBackup(this)">☁️ Salva nel cloud di Telegram</button>
-      <button class="btn ghost" onclick="onchainGuarda(this)">🔍 Guarda cosa c'è nel cloud</button>
+      <h4>4. Il backup, che si fa da sé</h4>
+      <div class="hint">Alla nascita la chiave è andata <b>da sola</b>
+        dove hai una casa: il cloud di Telegram se sei dentro Telegram,
+        e i relay Nostr — cifrata con la <b>tua</b> chiave, che noi non
+        abbiamo — se hai collegato Nostr. Lo stato è scritto nel
+        blocco 1. Qui ci sono i due gesti per <b>rifarlo a mano</b> e
+        per <b>guardare cosa c'è</b>, che su un banco di prova
+        servono.</div>
+      <button class="btn ghost" onclick="onchainBackup(this)">Rifai il backup adesso</button>
+      <button class="btn ghost" onclick="onchainGuarda(this)">🔍 Guarda cosa c'è nelle case</button>
       <div id="onchainCloud" class="hint"></div>
     </div>
 
@@ -51196,6 +51352,58 @@ function onchainConSeme(parole, k){
     </div>`;
 }
 
+/* COM'E' NATA, detto in una riga: chi guarda deve capire che non ha
+   fatto niente e che niente gli e' stato chiesto. */
+function onchainComEnata(){
+  if (onchainNato === 'nuovo') {
+    return 'È <b>nata adesso</b>, a caso, dentro questo telefono: '
+         + 'nessuno — noi compresi — la può rifare.';
+  }
+  if (onchainNato === 'nuvola') {
+    return 'L\'ho <b>ritrovata nel cloud di Telegram</b>: era già tua, '
+         + 'da un\'altra volta.';
+  }
+  if (onchainNato === 'relay') {
+    return 'L\'ho <b>ritrovata sui relay</b>, nella copia cifrata con la '
+         + 'tua chiave Nostr: era già tua.';
+  }
+  return 'Era già qui, in questo browser.';
+}
+
+/* DOVE ABITA, e soprattutto DOVE NON ABITA. Un backup che non c'è si
+   dice: è la differenza fra «sei coperto» e «credevi di esserlo». */
+function onchainDoveAbita(){
+  const righe = [];
+  righe.push('<div>📱 <b>Questo dispositivo</b> — sempre</div>');
+  if (onchainCase.nuvola === true) {
+    righe.push('<div>☁️ <b>Il cloud di Telegram</b> — copia fatta. '
+             + 'Non è cifrato end-to-end: Telegram la può leggere</div>');
+  } else if (onchainCase.nuvola === false) {
+    righe.push('<div style="color:var(--danger)">☁️ Il cloud di Telegram '
+             + '<b>non ha risposto</b>: qui non c\'è copia</div>');
+  }
+  if (onchainCase.relay === true) {
+    righe.push('<div>🟣 <b>I relay Nostr</b> — copia cifrata con la tua '
+             + 'chiave: la apri solo tu, noi no</div>');
+  } else if (onchainCase.relay === false) {
+    righe.push('<div style="color:var(--danger)">🟣 I relay <b>non hanno '
+             + 'ridato la copia</b>: qui non c\'è copia</div>');
+  }
+  if (onchainCase.nuvola === null && onchainCase.relay === null) {
+    righe.push('<div class="hint">Nessun\'altra casa provata in questa '
+             + 'apertura: la chiave era già qui.</div>');
+  }
+  if (onchainCase.nuvola !== true && onchainCase.relay !== true
+      && onchainNato === 'nuovo') {
+    righe.push('<div style="color:var(--danger)"><b>⚠️ Nessun backup.</b> '
+             + 'Se perdi questo dispositivo, la tua firma è persa — i '
+             + 'sats no (si sbloccano con noi e la controparte, in '
+             + 'disputa). Apri Barattolo dentro Telegram, o collega una '
+             + 'chiave Nostr.</div>');
+  }
+  return `<div class="hint" style="margin-top:8px;line-height:1.8">${righe.join('')}</div>`;
+}
+
 function onchainRigaChiave(chi, chiave, nota){
   return `
     <div style="margin-top:10px">
@@ -51210,54 +51418,63 @@ function onchainPrimaLetta(){
   catch(e){ return null; }
 }
 
-async function onchainCrea(btn){
-  haptic();
-  const rip = onchainAttesa(btn, 'Creo…');
-  try {
-    const B = await caricaBitcoin();
-    /* 128 bit = dodici parole: la lunghezza che ogni wallet legge */
-    const parole = B.generateMnemonic(B.wordlist, 128);
-    if (!B.validateMnemonic(parole, B.wordlist)) {
-      throw new Error('parole non valide (non dovrebbe capitare)');
-    }
-    if (!onchainScriviLocale(parole)) throw new Error('memoria non scrivibile');
-    onchainParoleViste = true;
-    toast('🎲 Dodici parole create, solo nel tuo telefono');
-  } catch(e) { toast(`⚠️ ${e.message || 'non riuscito'}`); }
-  rip();
-  renderOnchain();
-}
-
 async function onchainBackup(btn){
   haptic();
   const rip = onchainAttesa(btn, 'Salvo…');
   const parole = onchainSemeLocale();
-  const fatto = parole
-    ? await cloudScrivi(ONCHAIN_CLOUD, JSON.stringify(
-        {parole, strada: onchainSrv?.strada || 'm/0/0'}))
-    : false;
+  if (!parole) { rip(); return toast('⚠️ Non c\'è nessuna chiave da salvare'); }
+  await onchainMettiAlSicuro(parole);
   rip();
-  toast(fatto ? '☁️ Salvato nel cloud di Telegram'
-              : '⚠️ Il cloud non ha risposto (sei dentro Telegram?)');
+  const fatte = [onchainCase.nuvola === true ? 'cloud di Telegram' : '',
+                 onchainCase.relay === true ? 'relay Nostr' : '']
+                .filter(Boolean);
+  toast(fatte.length ? `✅ Copia nelle case: ${fatte.join(' e ')}`
+                     : '⚠️ Nessuna casa ha risposto: la chiave resta '
+                       + 'solo su questo dispositivo');
+  renderOnchain();
 }
 
 async function onchainGuarda(btn){
   haptic();
   const rip = onchainAttesa(btn, 'Guardo…');
   const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+  const suiRelay = await onchainDaiRelay();
   rip();
   const box = el('onchainCloud');
   if (!box) return;
+  const righe = [];
   if (!r.ok) {
-    box.innerHTML = 'Il cloud non ha risposto: fuori da Telegram non esiste.';
-    return;
+    righe.push(cloudTelegram()
+      ? '☁️ Il cloud di Telegram <b>non ha risposto</b>.'
+      : '☁️ Fuori da Telegram il cloud non esiste.');
+  } else if (!r.testo) {
+    righe.push('☁️ Nel cloud di Telegram non c\'è niente.');
+  } else {
+    let quante = 0;
+    try { quante = (JSON.parse(r.testo).parole || '').split(' ').length; }
+    catch(e){ quante = 0; }
+    righe.push(quante
+      ? `☁️ Nel cloud ci sono <b>${quante} parole</b> e la strada dell'ordine.`
+      : '☁️ Nel cloud c\'è qualcosa, ma non è nella forma che aspetto.');
   }
-  if (!r.testo) { box.innerHTML = 'Nel cloud non c\'è niente.'; return; }
-  let quante = 0;
-  try { quante = (JSON.parse(r.testo).parole || '').split(' ').length; }
-  catch(e){ quante = 0; }
-  box.innerHTML = `Nel cloud ci sono <b>${quante} parole</b> e la strada
-    dell'ordine. ${quante ? 'Il ripristino può funzionare.' : 'Forma non riconosciuta.'}`;
+  righe.push(suiRelay
+    ? '🟣 Sui relay c\'è la <b>copia cifrata</b>, e si apre con la tua chiave.'
+    : '🟣 Sui relay non ho trovato nessuna copia (serve una chiave Nostr '
+      + 'collegata).');
+  /* e la riga che conta: le due case dicono la STESSA chiave? */
+  const qui = onchainSemeLocale();
+  let dalCloud = '';
+  try { dalCloud = (JSON.parse(r.testo || '{}').parole || '').trim(); }
+  catch(e){ dalCloud = ''; }
+  const combaciano = [dalCloud, suiRelay].filter(Boolean)
+                     .every(x => x === qui);
+  if (qui && (dalCloud || suiRelay)) {
+    righe.push(combaciano
+      ? '✅ Le copie dicono <b>la stessa chiave</b> di questo dispositivo.'
+      : '⚠️ Una copia dice una chiave <b>diversa</b> da questa: '
+        + 'fermati e dimmelo, è il caso che non deve succedere.');
+  }
+  box.innerHTML = righe.join('<br>');
 }
 
 function onchainMetro(btn){
@@ -51308,21 +51525,28 @@ function onchainDimentica(){
   });
 }
 
+/* IL RIPRISTINO NON E' PIU' UN BOTTONE SOLO SUO: dopo il «dimentica»
+   la pagina ritrova la chiave DA SE', cercandola nelle case —
+   `onchainSemeAssicurato` fa quello, e il blocco 1 racconta dove l'ha
+   trovata. Questo gesto resta per il banco: forza il giro adesso e
+   dice cosa ha trovato, invece di far ricaricare la pagina. */
 async function onchainRipristina(btn){
   haptic();
-  const rip = onchainAttesa(btn, 'Cerco…');
-  const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
-  rip();
-  let parole = '';
-  try { parole = (JSON.parse(r.testo || '{}').parole || '').trim(); }
-  catch(e){ parole = ''; }
-  if (!parole) return toast('⚠️ Nel cloud non c\'è niente da ripristinare');
-  const B = await caricaBitcoin();
-  if (!B.validateMnemonic(parole, B.wordlist)) {
-    return toast('⚠️ Le parole nel cloud non passano il controllo');
+  const rip = onchainAttesa(btn, 'Cerco nelle case…');
+  try {
+    const prima = onchainNato;
+    onchainNato = '';
+    await onchainSemeAssicurato();
+    rip();
+    toast(onchainNato === 'nuvola' ? '♻️ Ritrovata nel cloud di Telegram'
+        : onchainNato === 'relay' ? '♻️ Ritrovata sui relay, cifrata'
+        : onchainNato === 'nuovo' ? '🎲 Non c\'era in nessuna casa: ne è nata una nuova'
+        : '📱 Era già qui su questo dispositivo');
+    if (!onchainNato) onchainNato = prima;
+  } catch(e) {
+    rip();
+    toast(`⚠️ ${e.message || 'non riuscito'}`);
   }
-  onchainScriviLocale(parole);
-  toast('♻️ Ripristinato: guarda il confronto qui sotto');
   renderOnchain();
 }
 
