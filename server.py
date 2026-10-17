@@ -9825,10 +9825,14 @@ def annota_insieme(chi: int, altro: int, cosa: str, rif: str = "") -> bool:
             return False
         con = db()
         try:
+            # una riga uguale non si raddoppia: il telefono rimanda le
+            # sue liste, e la stessa presa non vale due annotazioni
             con.execute(
                 "INSERT INTO account_insieme(chi, altro, cosa, rif, quando) "
-                "VALUES(?,?,?,?,?)",
-                (int(chi), int(altro), cosa, rif[:120], int(time.time())))
+                "SELECT ?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM "
+                "account_insieme WHERE chi=? AND altro=? AND cosa=? AND rif=?)",
+                (int(chi), int(altro), cosa, rif[:120], int(time.time()),
+                 int(chi), int(altro), cosa, rif[:120]))
             con.commit()
         finally:
             con.close()
@@ -9836,6 +9840,33 @@ def annota_insieme(chi: int, altro: int, cosa: str, rif: str = "") -> bool:
     except Exception as e:
         print(f"👥 [account insieme] annotazione non scritta: {e}", flush=True)
         return False
+
+
+def _annota_prese_p2p(chi: int, ordini) -> int:
+    """Le prese P2P di `chi` su ordini pubblicati da un altro account
+    aperto INSIEME a lui: una riga per il moderatore, nessun rifiuto
+    (decisione di Andrea, 17 ott 2026). Conta solo una presa che la
+    registrazione ha accettato (`preso_da` o `preso_dichiarato` a lui),
+    mai un ordine che ha soltanto nominato. Fail-open come annota_insieme."""
+    if not PIU_ACCOUNT_OVUNQUE:
+        return 0
+    try:
+        pulite = _ordini_puliti_p2p(ordini)
+        if not pulite:
+            return 0
+        con = db()
+        try:
+            righe = con.execute(
+                "SELECT ordine, tg_id FROM p2p_ordini "
+                f"WHERE ordine IN ({','.join('?' * len(pulite))}) "
+                "AND (preso_da=? OR preso_dichiarato=?)",
+                (*pulite, int(chi), int(chi))).fetchall()
+        finally:
+            con.close()
+    except Exception:
+        return 0
+    return sum(1 for r in righe if r["tg_id"] and annota_insieme(
+        chi, r["tg_id"], "presa P2P", f"ordine {str(r['ordine'])[:8]}"))
 
 
 def _quanto_aspetta(con, tg_id: int) -> int:
@@ -51193,6 +51224,11 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
                                        or esito.get("confermate")
                                        or esito.get("in_attesa")):
         raise HTTPException(403, "Non risulti fra le due parti di questo scambio")
+    # LA PRESA FRA DUE ACCOUNT APERTI INSIEME SI ANNOTA, NON SI FERMA
+    # (PIU' ACCOUNT OVUNQUE, decisione di Andrea del 17 ott 2026): dopo la
+    # registrazione, che ha gia' detto chi ha preso davvero
+    if (d or {}).get("presi"):
+        _annota_prese_p2p(user["id"], (d or {}).get("ordini"))
     # I VOLTI DELLA FOTOGRAFIA SI RIFANNO SUBITO (28 set 2026, dalla prova
     # di Alan): chi arriva dopo il giro della fotografia — questa rotta e
     # il canale partono insieme e senza un ordine fra loro, e la restore
@@ -51333,22 +51369,12 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     if chi:
         fuori["miei"] = sorted(d for d, t in (F.get("autori") or {}).items()
                                if t == chi)
-    # ...e quelli dei MIEI ALTRI account aperti qui (PIU' ACCOUNT
-    # OVUNQUE, 16 ott 2026): prenderli vorrebbe dire pagare le
-    # commissioni a se stessi per niente, e il client li rifiuta. Escono
-    # gli id e mai di quale account sono: chi guarda li ha gia' tutti.
-    altri = (_altri_conti_qui(chi) if chi and PIU_ACCOUNT_OVUNQUE
-             and fuori["eventi"] else set())
-    if altri:
-        fuori["altri_miei"] = sorted(
-            d for d, t in (F.get("autori") or {}).items() if t in altri)
     # L'ETAG (cura 4): la fila la rilegge ogni 15 s e la fotografia cambia
     # ogni minuto, quindi tre letture su quattro tornavano identiche —
     # centinaia di KB riserializzati e rimandati. L'impronta e' il
     # momento della fotografia piu' chi guarda: a impronta uguale un 304
     # nudo, e il client tiene la copia che ha.
-    etag = (f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}'
-            f'-{len(fuori.get("altri_miei") or [])}"')
+    etag = f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}"'
     testa = {"Cache-Control": "private, max-age=10",
              "Vary": "X-Tg-Init-Data, X-Barattolo-Conto, Cookie",
              "ETag": etag}
@@ -51367,33 +51393,6 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
 # troppo.
 P2P_SESSIONI_VOLTI_S = 300
 _P2P_SESSIONI_VOLTI: dict = {}
-
-# GLI ALTRI MIEI ACCOUNT, per il libro (16 ott 2026): la stessa memoria
-# di cinque minuti dei volti — il libro si rilegge ogni 15 secondi, e i
-# mazzi di chiavi del dispositivo non cambiano cosi' spesso. La chiave
-# e' l'impronta dei cookie di chi guarda: un mazzo nuovo e' un'altra voce.
-_P2P_ALTRI_CONTI: dict = {}
-
-
-def _altri_conti_qui(chi: int) -> set:
-    c = _CONTO_RICHIESTA.get() or {}
-    cookie = c.get("cookie") or {}
-    impronta = hashlib.sha256(
-        (str(chi) + "|" + "|".join(f"{k}={v}" for k, v in sorted(cookie.items())
-                                   if k.startswith("barattolo_"))).encode()
-    ).hexdigest()
-    adesso = time.time()
-    v = _P2P_ALTRI_CONTI.get(impronta)
-    if v and v[0] > adesso:
-        return v[1]
-    try:
-        altri = conti_del_dispositivo() - {int(chi)}
-    except Exception:
-        altri = set()
-    if len(_P2P_ALTRI_CONTI) > 5000:
-        _P2P_ALTRI_CONTI.clear()
-    _P2P_ALTRI_CONTI[impronta] = (adesso + P2P_SESSIONI_VOLTI_S, altri)
-    return altri
 
 
 def _chi_guarda_p2p(init_data: str, sessione: str) -> int:

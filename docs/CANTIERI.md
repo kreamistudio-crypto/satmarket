@@ -64716,15 +64716,15 @@ d'agosto «un Esci per account»: è la richiesta di Andrea). Le annotazioni
 in `account_insieme` per acquisto, carrello, puntata, feedback e
 recensione P2P fra account aperti INSIEME, nessun blocco; il cassetto «👥
 Account aperti insieme» nel pannello admin. Niente IP né impronte: chi
-esce e rientra le aggira, ed è il prezzo dichiarato. Il P2P: il libro
-manda `altri_miei` e il telefono non prende l'ordine di un proprio altro
-account (bottone spento, frase, cintura in `eseguiPresaP2P`). Tetto
+esce e rientra le aggira, ed è il prezzo dichiarato. Il P2P: anche la
+presa dell'ordine di un proprio altro account si ANNOTA e passa (il
+primo giro la rifiutava: vedi «Il giro del 17 ottobre» qui sotto). Tetto
 invariato: `MAX_ACCOUNT_BROWSER` = 5, dentro la Mini App il Telegram ne
 occupa uno.
 
 **LA LEVA.** `PIU_ACCOUNT_OVUNQUE = False` nel codice e nel config
 d'esempio; spegne SOLO le parti nuove (decisione di Andrea): Mini App,
-volto nelle conferme, «Esci da tutti», annotazioni, rifiuto P2P. Il web
+volto nelle conferme, «Esci da tutti», annotazioni. Il web
 d'agosto vive anche spenta. Il pannello «⚙️ Stato delle leve» la mostra
 (gruppo «👥 Più account»). Come accenderla: PRODUZIONE, «PIÙ ACCOUNT
 OVUNQUE».
@@ -64737,6 +64737,30 @@ dopo), col bottone irraggiungibile — ora il foglio si chiude prima
 la tua foto» poteva coprire il bottone di una conferma: ora tace (senza
 consumarsi) con un foglio aperto.
 
+**IL GIRO DEL 17 OTTOBRE (prima del push, due conferme di Andrea).**
+1) SOLO ANNOTARE, MAI BLOCCARE, e vale anche per il P2P: il 16 Andrea
+aveva tenuto il rifiuto della presa dell'ordine di un proprio altro
+account («lì si perdono sats in commissioni»), il 17 lo rovescia — voti,
+recensioni, feedback, acquisti e ordini P2P fra account dello stesso
+portachiavi passano normalmente, e il server scrive solo la riga.
+Tolto il rifiuto (bottone spento, frase, cintura in `eseguiPresaP2P`, e
+`altri_miei` del libro con la sua cache); la presa si annota in
+`/api/p2p/ordini` dopo la registrazione (`_annota_prese_p2p`, solo su una
+presa accettata), e una riga uguale non si raddoppia. Nel collaudo la
+presa fra i due account insieme passa (200) e lascia UNA riga anche
+mandata due volte. 2) IL DOPPIO TOCCO DAL BROWSER DEL TELEFONO, provato
+PRIMA E DOPO col giro coi tocchi veri a 360×780 sulla web app, A LEVA
+SPENTA come in produzione: «prima» è main senza il cantiere (f8535fe),
+«dopo» è il ramo. PRIMA: nel Profilo zero foto-tappo visibili, il
+secondo tocco sulla foto non apre niente — mentre la pagina stessa
+consigliava «💡 Tocca di nuovo la tua foto per cambiare account» — e,
+aperto il foglio come da computer, il tocco sull'account nato con Nostr
+lascia dentro il Telegram (`/api/me` resta 601, il nome nel Profilo
+resta «Andrea»). DOPO: il secondo tocco apre «I tuoi account», e il tocco
+sull'account Nostr porta davvero a lui (`/api/me` col suo id esatto, la
+pastiglia e la testata col suo nome). Scatti `prima-*` e `dopo-*` in
+`.claude/giri/multi-account/`, con lo script (`giro_prima_dopo.js`).
+
 **PROVATO.** `prove_piu_account_ovunque` (46): il portachiavi della Mini
 App sul cartone vero (porta, tetto col Telegram, scelto, altro Telegram,
 leva spenta), le righe che una svista toglierebbe, e un banco node che
@@ -64745,9 +64769,10 @@ intestazione solo verso casa, il 401 che riporta al Telegram).
 `collaudo_piu_account.py` (56, in CI, verde nella gabbia): richieste vere
 con TestClient — leva spenta = ieri, l'account aggiunto dentro la Mini
 App, ordini separati comprati dai due account dello stesso telefono, il
-secondo Telegram, il libro coi «miei» e gli «altri miei», le
-annotazioni (acquisto e feedback fra account insieme NON bloccati e
-annotati, fra estranei niente, a leva spenta niente), lo switch del web
+secondo Telegram, il libro coi «miei» dell'account scelto, le
+annotazioni (acquisto, feedback e presa P2P fra account insieme NON
+bloccati e annotati una volta sola, fra estranei niente, a leva spenta
+niente), lo switch del web
 verso un id grande (e il numero arrotondato di ieri che falliva),
 «Esci» e «Esci da tutti» con le sessioni morte nel database.
 `collaudo_account.py` d'agosto: 44 verdi. Toccate 13 prove esistenti che
@@ -64764,8 +64789,8 @@ switch avanti e indietro con l'id esatto, «Stai usando» nella conferma,
 aggiunto e scelto, il cloud muto, l'avviso del bot per il Telegram, un
 secondo Telegram che vede solo se stesso, «Esci da questo account».
 NON provato dal vivo: il cookie Partitioned dentro Telegram Web (vuole
-Telegram vero) e il rifiuto P2P sul libro vero (provato nel collaudo e
-nelle sentinelle).
+Telegram vero) e la presa P2P annotata sul libro vero (provata nel
+collaudo e nelle sentinelle).
 
 **DA GUARDARE** (dopo il deploy, a leva accesa sul VPS): da Telegram
 Desktop, da Telegram Web e dal telefono, aggiungere un account Nostr e

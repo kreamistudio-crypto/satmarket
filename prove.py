@@ -109824,8 +109824,19 @@ def prove_piu_account_ovunque():
     prova("«Esci da tutti» a leva spenta non esiste", True,
           'raise HTTPException(404, "Not Found")'
           in codice(pezzo("logout_tutti")).split("PIU_ACCOUNT_OVUNQUE", 2)[1][:80])
-    prova("le annotazioni stanno nei cinque gesti", 5,
+    # sei dal 17 ott 2026: anche la presa P2P (`_annota_prese_p2p`)
+    prova("le annotazioni stanno nei sei gesti", 6,
           codice(_SORGENTE).count("annota_insieme(") - 1)
+    # SOLO ANNOTARE, MAI BLOCCARE (decisione di Andrea, 17 ott 2026): la
+    # presa P2P si annota DOPO la registrazione, e il libro non dice piu'
+    # quali ordini sono «dei miei altri account» (servivano al rifiuto)
+    rp2 = codice(pezzo("registra_ordini_p2p"))
+    prova("la presa P2P fra account insieme si annota, dopo il 403", True,
+          0 < rp2.index("Non risulti fra le due parti") < rp2.index("_annota_prese_p2p("))
+    prova("...e il libro non porta piu' gli ordini dei miei altri account", False,
+          "altri_miei" in _SORGENTE)
+    prova("un'annotazione uguale non si raddoppia", True,
+          "WHERE NOT EXISTS (SELECT 1 FROM" in codice(pezzo("annota_insieme")))
     prova("il libro varia anche con l'account scelto", True,
           '"Vary": "X-Tg-Init-Data, X-Barattolo-Conto, Cookie"' in _SORGENTE)
     prova("le righe del selettore portano l'id come TESTO", True,
@@ -109847,10 +109858,10 @@ def prove_piu_account_ovunque():
           mini.count("soldi: true,"))
     prova("...e i due fogli di pagamento hanno il loro posto", 2,
           mini.count('<div class="conto-in-vista" data-conto-in-vista'))
-    prova("il no all'ordine di un mio altro account nelle due porte della presa",
-          (True, True),
-          ("ordineDiUnAltroMioContoP2P(id)" in _fn_js(mini, "async function eseguiPresaP2P("),
-           "ordineDiUnAltroMioContoP2P(id)" in _fn_js(mini, "function confermaDettaglioP2P(")))
+    prova("nessun rifiuto sull'ordine P2P di un proprio altro account", (False, False),
+          ("AltroMioConto" in mini, "altri_miei" in mini))
+    prova("...e sopra il bottone della presa resta il volto di chi prende", True,
+          "riquadroContoP2P(o.id)" in _fn_js(mini, "function renderDettaglioP2P("))
     rp = _fn_js(mini, "function renderProfilo(")
     prova("nel Profilo la foto apre «I tuoi account» e c'e' la pastiglia",
           (True, True), ("fotoMia.onclick = apriAccountSheet;" in rp,

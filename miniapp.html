@@ -60265,22 +60265,11 @@ function provvisorioDelLibroP2P(o){
   }
   return '';
 }
-/* L'ORDINE DI UN MIO ALTRO ACCOUNT (16 ott 2026, leva
-   PIU_ACCOUNT_OVUNQUE, decisione di Andrea): il server dice quali
-   ordini del libro sono stati pubblicati da un altro account aperto
-   su questo dispositivo — mai quale. Prenderlo vorrebbe dire pagare
-   le commissioni a se stessi per niente: si rifiuta. Non e' «tuo»
-   (non si apre come il proprio ordine): e' solo non prendibile da qui. */
-const P2P_ALTRO_MIO_CONTO = 'È un ordine di un tuo altro account aperto qui: '
-  + 'prenderlo vorrebbe dire pagare le commissioni a te stesso.';
-function ordineDiUnAltroMioContoP2P(id){
-  return !!id && typeof piuAccount !== 'undefined' && piuAccount
-    && typeof p2pAltriMiei !== 'undefined' && p2pAltriMiei.has(String(id));
-}
+/* IL VOLTO DI CHI PRENDE (16 ott 2026, piu' account): sopra il bottone
+   della presa, quando gli account aperti sono piu' d'uno. NESSUN RIFIUTO
+   sull'ordine di un proprio altro account (decisione di Andrea, 17 ott
+   2026: si annota e basta, lo fa il server alla presa). */
 function riquadroContoP2P(id){
-  if (ordineDiUnAltroMioContoP2P(id)) {
-    return '<div class="hint" style="margin:0 0 10px">🚫 ' + esc(P2P_ALTRO_MIO_CONTO) + '</div>';
-  }
   const chi = typeof contoInVistaHTML === 'function' ? contoInVistaHTML() : '';
   return chi ? '<div class="conto-in-vista">' + chi + '</div>' : '';
 }
@@ -63659,8 +63648,7 @@ function renderDettaglioP2P(){
        il filtro di chi ha pubblicato o il limite delle prese, con la frase */
     (tuo || typeof avvisoVetoP2P !== 'function' ? '' : avvisoVetoP2P(o.id)) +
     /* CHI STA PRENDENDO (16 ott 2026, piu' account): il volto
-       dell'account attivo sopra il bottone, o il «no» se l'ordine e' di
-       un altro mio account aperto qui */
+       dell'account attivo sopra il bottone */
     (tuo || VETRINA || !myTgId || typeof riquadroContoP2P !== 'function' ? '' : riquadroContoP2P(o.id)) +
     (tuo
       ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
@@ -63691,10 +63679,6 @@ function renderDettaglioP2P(){
         /* spento quando il server ha detto di no (10 ott 2026): la frase
            sta nel riquadro qui sopra, e la cintura vera in `eseguiPresaP2P` */
         ((typeof vetoPresaP2P === 'function' && vetoPresaP2P(o.id)) ? ' disabled' : '') +
-        /* ...e spento sull'ordine di un mio altro account (16 ott 2026):
-           la frase sta nel riquadro qui sopra (riquadroContoP2P) */
-        ((typeof ordineDiUnAltroMioContoP2P === 'function' && ordineDiUnAltroMioContoP2P(o.id)
-          && !(typeof vetoPresaP2P === 'function' && vetoPresaP2P(o.id))) ? ' disabled' : '') +
         /* IL VERDE E IL ROSSO DEI DUE LATI (7 ott 2026, decisione di
            Andrea): «Compra» verde e «Vendi» rosso, gli stessi vestiti dei
            due «Pubblica ordine» (`vestitoInvioP2P`: `primary` e `rosso`) —
@@ -63836,7 +63820,6 @@ function confermaDettaglioP2P(){
     return;
   }
   const id = p2pDettOrdine;
-  if (typeof ordineDiUnAltroMioContoP2P === 'function' && ordineDiUnAltroMioContoP2P(id)) { toast(P2P_ALTRO_MIO_CONTO, 6000); return; }
   const o = rigaLibroP2P(id);
   if (!o) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   /* ...e la cintura resta, sul libro vero: la domanda di sopra */
@@ -63937,9 +63920,6 @@ async function eseguiPresaP2P(id, scelto, metodo){
     return;
   }
   if (ordineTuoP2P(id)) { toast('È il tuo ordine: non puoi prenderlo'); return; }
-  /* ...e quello di un MIO ALTRO account aperto qui (16 ott 2026): la
-     stessa cintura, dove passano tutte le prese */
-  if (typeof ordineDiUnAltroMioContoP2P === 'function' && ordineDiUnAltroMioContoP2P(id)) { toast(P2P_ALTRO_MIO_CONTO, 6000); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   /* IL SERVER DICE SE POSSO (10 ott 2026, reputazione-p2p): il filtro di
@@ -76450,7 +76430,6 @@ async function chiediFotoLibroP2P(){
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
   if (d && Array.isArray(d.miei)) p2pVetrinaMiei = new Set(d.miei.map(String));
-  if (d && Array.isArray(d.miei)) p2pAltriMiei = new Set(Array.isArray(d.altri_miei) ? d.altri_miei.map(String) : []);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
@@ -76948,7 +76927,6 @@ let p2pVetrinaInVolo = false;
 let p2pVetrinaFresca = false;       // la prossima domanda salta la cache (ritorno in Esplora)
 let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
 let p2pVetrinaMiei = new Set();     // gli ordini della fotografia pubblicati da me, per il server
-let p2pAltriMiei = new Set();       // ...e quelli dei miei ALTRI account aperti qui (16 ott 2026)
 
 /* La vetrina e' quella nuda? */
 function vetrinaNudaP2P(){
@@ -77153,7 +77131,6 @@ async function chiediFotoVetrinaP2P(){
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
-  p2pAltriMiei = new Set(Array.isArray(d && d.altri_miei) ? d.altri_miei.map(String) : []);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   /* leva spenta sul server, o una fotografia di piu' di un giorno: la

@@ -9655,10 +9655,14 @@
   (`conti_del_dispositivo`), e chi esce e rientra lo aggira — il prezzo
   dichiarato. `annota_insieme` apre la sua connessione e si chiama fuori
   dalle transazioni: un'annotazione non tiene il lucchetto di un
-  acquisto. L'UNICO RIFIUTO è prendere un ordine P2P di un proprio
-  altro account (commissioni pagate a se stessi): `/api/p2p/libro`
-  manda `altri_miei` (gli id, mai di chi), e il telefono spegne il
-  bottone e rifiuta in `confermaDettaglioP2P` ed `eseguiPresaP2P`.
+  acquisto. E UNA RIGA UGUALE NON SI RADDOPPIA (`WHERE NOT EXISTS`):
+  il telefono rimanda le sue liste. NESSUN RIFIUTO, NEMMENO NEL P2P
+  (decisione di Andrea del 17 ott 2026, che rovescia quella del 16: il
+  primo giro rifiutava la presa dell'ordine di un proprio altro account
+  per le commissioni pagate a se stessi). La presa si annota DOPO la
+  registrazione (`_annota_prese_p2p` in `/api/p2p/ordini`, solo sulle
+  righe con `preso_da` o `preso_dichiarato` a chi prende), e il libro
+  non porta più gli ordini «dei miei altri account».
   Le prove: `prove_piu_account_ovunque`, `collaudo_piu_account.py` (in
   CI), e il giro coi tocchi veri del 16 ott (CANTIERI, «Più account
   ovunque»).

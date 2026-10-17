@@ -1679,10 +1679,10 @@ MAX_ACCOUNT_BROWSER = 5
 # PIU' ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea): il selettore
 # anche DENTRO la Mini App (il proprio Telegram + account Nostr, un
 # portachiavi per ogni Telegram del telefono), il volto dell'account
-# attivo in ogni conferma coi soldi, «Esci da tutti», il rifiuto di
-# prendere un ordine P2P di un proprio account, e le annotazioni per il
-# moderatore quando due account aperti insieme si comprano o si votano
-# (si ANNOTA, non si blocca). Il multi-account del web d'agosto vive
+# attivo in ogni conferma coi soldi, «Esci da tutti», e le annotazioni
+# per il moderatore quando due account aperti insieme si comprano, si
+# votano o si prendono un ordine P2P (si ANNOTA, MAI si blocca: decisione
+# di Andrea del 17 ott 2026). Il multi-account del web d'agosto vive
 # anche a leva spenta. SPENTA di serie: si accende dopo la prova.
 PIU_ACCOUNT_OVUNQUE = False
 

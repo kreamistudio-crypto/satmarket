@@ -233,31 +233,23 @@ def main():
           c.get("/api/me", headers=con_conto(710, "non-un-numero")).status_code)
 
     # ------------------------------------------------------------------
-    print("\n[il libro P2P: i miei, e quelli dei miei altri account]")
+    print("\n[il libro P2P: i miei sono dell'account scelto]")
     leve_vere = server._p2p_leve
     foto_vera = dict(server._P2P_FOTO)
     server._p2p_leve = lambda: dict(leve_vere(), attivo=True)
     server._P2P_FOTO.update({"eventi": [{"id": "e1"}], "quando": adesso,
                              "autori": {"ordN": GRANDE, "ordT": 710,
                                         "ordX": 555}})
-    server._P2P_ALTRI_CONTI.clear()
     server._P2P_SESSIONI_VOLTI.clear()
     try:
         lN = c.get("/api/p2p/libro", headers=con_conto(710, GRANDE)).json()
         prova("con l'account scelto, i «miei» sono i SUOI", ["ordN"],
               lN.get("miei"))
-        prova("...e quelli del Telegram sono di un altro mio account",
-              ["ordT"], lN.get("altri_miei"))
         lT = c.get("/api/p2p/libro", headers=tg(710, "Andrea")).json()
-        prova("dal Telegram, il rovescio", (["ordT"], ["ordN"]),
-              (lT.get("miei"), lT.get("altri_miei")))
-        prova("l'ordine di un estraneo non e' mai fra i miei", False,
-              "ordX" in (lT.get("altri_miei") or []) + (lN.get("altri_miei") or []))
-        server.PIU_ACCOUNT_OVUNQUE = False
-        server._P2P_ALTRI_CONTI.clear()
-        prova("a leva spenta il libro non lo dice", None,
-              c.get("/api/p2p/libro", headers=tg(710, "Andrea")).json().get("altri_miei"))
-        server.PIU_ACCOUNT_OVUNQUE = True
+        prova("...e dal Telegram quelli del Telegram", ["ordT"], lT.get("miei"))
+        prova("il libro non dice quali sono dei miei altri account "
+              "(niente rifiuto, decisione di Andrea)", (None, None),
+              (lN.get("altri_miei"), lT.get("altri_miei")))
     finally:
         server._p2p_leve = leve_vere
         server._P2P_FOTO.clear()
@@ -306,8 +298,31 @@ def main():
     prova("il voto al proprio altro account passa (decisione di Andrea)",
           200, r.status_code)
     prova("...e si annota", prima + 2, quante_note())
+    # la PRESA P2P (17 ott 2026, «solo annotare, mai bloccare»): il Cliente
+    # prende l'ordine che la Bottega ha pubblicato sul libro
+    per_vero, ric_vero = server._p2p_per, server._p2p_riconosciuto
+    server._p2p_per = lambda t: dict(per_vero(t), attivo=True)
+    server._p2p_riconosciuto = lambda con, t: True
+    try:
+        con = server.db()
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, maker) "
+                    "VALUES('ordine-pp-0001', 812, ?, 1)", (adesso,))
+        con.commit()
+        con.close()
+        r = w.post("/api/p2p/ordini", json={"ordini": ["ordine-pp-0001"],
+                                            "presi": True})
+        prova("prendere l'ordine P2P del proprio altro account passa", 200,
+              r.status_code)
+        prova("...e si annota", prima + 3, quante_note())
+        w.post("/api/p2p/ordini", json={"ordini": ["ordine-pp-0001"],
+                                        "presi": True})
+        prova("...una volta sola: il telefono rimanda la lista, la riga no",
+              prima + 3, quante_note())
+    finally:
+        server._p2p_per, server._p2p_riconosciuto = per_vero, ric_vero
     note = adm.get("/api/admin/account-insieme", headers=tg(999, "Admin")).json()
     prova("il moderatore legge chi, l'altro e cosa", [
+        ("Cliente", "Bottega", "presa P2P"),
         ("Cliente", "Bottega", "feedback"),
         ("Cliente", "Bottega", "acquisto avviato")],
         [(x["nome_chi"], x["nome_altro"], x["cosa"]) for x in note])
@@ -315,7 +330,7 @@ def main():
           w.get("/api/admin/account-insieme").status_code)
     server.PIU_ACCOUNT_OVUNQUE = False
     w.post("/api/orders", json={"annuncio_id": 9201})
-    prova("a leva spenta non si annota niente", prima + 2, quante_note())
+    prova("a leva spenta non si annota niente", prima + 3, quante_note())
     server.PIU_ACCOUNT_OVUNQUE = True
 
     # ------------------------------------------------------------------
