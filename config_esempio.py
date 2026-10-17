@@ -1064,6 +1064,16 @@ ONCHAIN_ATTIVO = False
 # Alan. Spegnere questa riga e' il gesto SEPARATO del giorno in cui la
 # beta si allarga: due leve perche' sono due decisioni.
 ONCHAIN_SOLO_ADMIN = True
+# L'XPUB DI BARATTOLO, cioe' la TERZA chiave del 2-di-3 — quella che
+# serve SOLO in disputa. Qui va la META' PUBBLICA e nient'altro: la
+# privata non entra su questa macchina (vivra' in un firmatario sul
+# nodo, mai sul VPS). Vuota: il server usa una xpub DI CARTONE, presa
+# dai vettori di prova del BIP-32 — pubblicata in uno standard, non e'
+# la chiave di nessuno — e lo DICE al foglio, che la mostra scritto.
+# ⚠️ Nella tappa di prova (16 ott 2026) la rete e' SEMPRE testnet e un
+# indirizzo mainnet non si calcola da nessuna parte: cosi' e'
+# impossibile mandare sats veri a un 2-di-3 di cartone.
+ONCHAIN_XPUB = ""
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

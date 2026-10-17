@@ -43478,8 +43478,14 @@ def prove_fogli_di_casa():
     # prima «Stai aprendo un sito esterno» (richiesta di Andrea).
     # OTTANTACINQUE (16 ott 2026, cantiere pdf-allegati): il PDF che non si
     # ripulisce chiede «Lo mandi lo stesso, così com'è?» (`allegaChatScambioP2P`).
-    prova("i gesti che passano dalla domanda unica sono ottantacinque",
-          85, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTASEI (16 ott 2026, cantiere pagamento-onchain tappa 1b): il
+    # «dimentica il seme su questo dispositivo» del banco delle chiavi
+    # (`onchainDimentica`) chiede prima, e nella domanda c'e' scritto
+    # che il backup nel cloud RESTA — sennò sembrerebbe la cancellazione
+    # di tutto, mentre e' proprio la prova da fare. Nato con un
+    # `confirm()` di sistema, che questa sentinella ha preso.
+    prova("i gesti che passano dalla domanda unica sono ottantasei",
+          86, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -59302,9 +59308,18 @@ def prove_bundle_nostr():
     pre = pre[:pre.index("];")]
     prova("bundle: fuori dall'addAll atomico del SW", False,
           "/vendor/nostr.js" in pre)
-    prova("bundle: dentro la dispensa a runtime del SW", True,
-          "const IN_DISPENSA = new Set([...PRECACHE, '/vendor/nostr.js']);"
-          in swjs)
+    # L'ANCORA GUARDA L'INSIEME, NON LA RIGA (16 ott 2026): era la riga
+    # INTERA, e il giorno in cui la dispensa ha accolto un secondo
+    # bundle (`/vendor/btc.js`, tappa 1b dell'on-chain) questa prova e'
+    # diventata rossa pur essendo tutto giusto — la regola non era
+    # cambiata, l'ancora era fragile. Adesso si legge l'insieme e si
+    # chiede quel che conta: che la dispensa erediti PRECACHE e che il
+    # bundle Nostr ci sia dentro. Un terzo file domani non la rompe.
+    dentro = re.search(r"const IN_DISPENSA = new Set\(\[([^\]]*)\]\)",
+                       swjs).group(1)
+    prova("bundle: dentro la dispensa a runtime del SW", [True, True],
+          ["...PRECACHE" in dentro,
+           "/vendor/nostr.js" in re.findall(r"'([^']+)'", dentro)])
     # v10 (1 ott 2026): il bundle con l'innesto nip49 — la dispensa a
     # runtime lo serve CACHE-FIRST, e si rifa' solo con un SW nuovo
     prova("bundle: la VERSIONE del SW e' salita col cambio dell'elenco", True,
@@ -146887,6 +146902,170 @@ console.log(JSON.stringify(out));
           anello("chiaro", set(o["p2pFatto"][0]), ("display",)).get("display"))
 
 
+def prove_banco_chiavi_onchain():
+    """IL BANCO DELLE CHIAVI ON-CHAIN (16 ott 2026, cantiere
+    pagamento-onchain tappa 1b, richiesta di Andrea: «vorrei vederlo
+    solo lato admin per fare delle prove, voglio capire anche quali
+    sono le chiavi, fare dei test di verifica di ripristino»).
+
+    La pagina non paga niente: fa nascere le dodici parole NEL BROWSER,
+    mostra le TRE chiavi di un ordine finto, l'indirizzo e il
+    descrittore, salva nel cloud di Telegram e — il punto — misura il
+    RIPRISTINO confrontando da sola l'indirizzo di prima con quello di
+    dopo, invece di chiedere a un umano di guardare due stringhe.
+
+    IL BANCO FA GIRARE `onchainChiavi` VERA, estratta da miniapp.html,
+    col bundle VERO sotto node: e' l'unico modo di sapere che le chiavi
+    che Andrea vedra' sul telefono sono quelle giuste. Si chiede quel
+    che si rompe in silenzio:
+    1. DETERMINISMO. Lo stesso seme deve dare lo stesso indirizzo, o la
+       prova del ripristino direbbe «diverso» su un backup sano.
+    2. TESTNET E SOLO TESTNET (parola di Andrea: «in collaudo voglio
+       provare tutto in testnet»). Con una chiave di cartone dentro il
+       2-di-3, un `bc1...` a schermo sarebbe un invito a mandarci sats
+       veri che nessuno potrebbe piu' sbloccare.
+    3. TRE CHIAVI DI TRE PERSONE. Derivare anche il venditore dal seme
+       di chi guarda mostrerebbe la stessa persona due volte, cioe'
+       racconterebbe una bugia sul 2-di-3.
+    4. IL SEME NON ESCE: nel blocco non deve comparire nessuna fetch.
+       E' la regola ferrea 2 dal lato dei soldi, e un giorno qualcuno
+       potrebbe «solo salvarle sul server per comodita'»."""
+    print("\n⛓️ Il banco delle chiavi on-chain")
+    import shutil as _sh
+    import subprocess as _sp
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # --- 1) la forma: il cancello, le rotte, il caricatore pigro ------
+    prova("il server dice al client se passa dal cancello", True,
+          'profilo["onchain"] = onchain_ammesso(user["id"])' in src)
+    prova("la rotta della prova esiste e passa dal cancello", [True, True],
+          ['@app.get("/api/onchain/prova")' in src,
+           'if not onchain_ammesso(user["id"]):\n        raise HTTPException(404'
+           in src])
+    prova("...e il bundle ha la sua rotta esplicita, mai uno StaticFiles",
+          [True, False],
+          ['@app.get("/vendor/btc.js")' in src, "app.mount(" in src])
+    prova("il client legge il CANCELLO dal server, non `isAdmin`",
+          [True, True],
+          ["myOnchain = !!me.onchain;" in mini,
+           "el('admOnchain').style.display = myOnchain ? '' : 'none';" in mini])
+    prova("il caricatore e' PIGRO e timbrato col suo ?v=", [True, True],
+          ["if (window.BarattoloBTC) return Promise.resolve(window.BarattoloBTC);"
+           in mini,
+           "s.src = `${FOTO_BASE}/vendor/btc.js?v=${ONCHAIN_VER}`;" in mini])
+    swjs = open("sw.js", encoding="utf-8").read()
+    pre = swjs[swjs.index("const PRECACHE = ["):]
+    pre = pre[:pre.index("];")]
+    prova("il bundle sta nella dispensa a RUNTIME e non nell'addAll atomico",
+          [True, False],
+          ["'/vendor/btc.js'" in swjs, "/vendor/btc.js" in pre])
+    prova("...e la VERSIONE del SW e' salita col cambio dell'elenco", True,
+          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 11)
+    i_b = mini.index("/* ============ ⛓️ IL BANCO DELLE CHIAVI ON-CHAIN")
+    blocco = mini[i_b:mini.index("let onchainSrv = null;", i_b)]
+    prova("nel blocco del seme non c'e' NESSUNA fetch: le dodici parole "
+          "non escono dal telefono", [0, 0],
+          [blocco.count("fetch("), blocco.count("XMLHttpRequest")])
+    prova("il «dimentica» tocca il dispositivo e NON la nuvola",
+          [True, False],
+          ["localStorage.removeItem(onchainChiave());" in mini,
+           "cloudCancella(ONCHAIN_CLOUD)" in mini])
+    prova("il seme sta sotto il CONTO, come il mazzo del P2P", True,
+          "return `barattolo_onchain_${myTgId || 'x'}`;" in mini)
+
+    # --- 2) il banco: `onchainChiavi` VERA, col bundle vero -----------
+    node = _sh.which("node")
+    if not node:
+        salta("onchain: le chiavi calcolate dal codice vero",
+              "node non installato")
+        return
+    # ⚠️ `pezzo_js` taglia PRIMA della graffa di chiusura (per cercare
+    # dentro una funzione va benissimo, per ESEGUIRLA no): gliela si
+    # rimette, o node dice «Unexpected end of input» e il banco muore
+    # senza aver provato niente.
+    chiavi_js = pezzo_js(mini, "async function onchainChiavi(parole, srv){",
+                         "\n}\n") + "\n}"
+    vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
+                          encoding="utf-8"))
+    srv = {"xpub": vett["bip32"][0]["catene"][0]["xpub"],
+           "xpub_venditore": vett["bip32"][1]["catene"][0]["xpub"],
+           "strada": "m/0/0"}
+    banco = """
+const fs = require('fs');
+const B = new Function(fs.readFileSync(process.argv[2], 'utf8')
+                       + '; return BarattoloBTC;')();
+const V = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const srv = JSON.parse(process.argv[4]);
+/* il codice vero chiede `caricaBitcoin()`: qui gli si da' il bundle
+   gia' in mano, come fa il browser al secondo giro */
+const caricaBitcoin = () => Promise.resolve(B);
+__PEZZO__
+(async () => {
+  const out = {};
+  const A = V.bip39_english[0].parole;      // le dodici degli «abandon»
+  const Z = V.bip39_english[1].parole;      // un altro seme
+  const k1 = await onchainChiavi(A, srv);
+  const k2 = await onchainChiavi(A, srv);   // lo STESSO seme, due volte
+  const k3 = await onchainChiavi(Z, srv);   // un seme diverso
+  out.deterministico = k1.indirizzo === k2.indirizzo
+                       && k1.descrittore === k2.descrittore;
+  out.semeDiversoIndirizzoDiverso = k1.indirizzo !== k3.indirizzo;
+  out.indirizzo = k1.indirizzo;
+  out.tre = [k1.compratore, k1.venditore, k1.barattolo];
+  out.treDiverse = new Set(out.tre).size === 3;
+  out.ordinateSonoLeTre =
+    JSON.stringify([...k1.ordinate].sort())
+    === JSON.stringify([...out.tre].sort());
+  out.descrittore = k1.descrittore;
+  out.scriptByte = k1.script.length / 2;
+  const bar = B.HDKey.fromExtendedKey(srv.xpub).derive(srv.strada);
+  out.barattoloEQuellaDelServer =
+    k1.barattolo === B.hex.encode(bar.publicKey);
+  console.log(JSON.stringify(out));
+})();
+"""
+    banco = banco.replace("__PEZZO__", chiavi_js)
+    strada = os.path.join(QUI, ".banco-onchain.js")
+    with open(strada, "w", encoding="utf-8") as fh:
+        fh.write(banco)
+    try:
+        r = _sp.run([node, strada,
+                     os.path.join(QUI, "vendor", "btc.bundle.js"),
+                     os.path.join(QUI, "vendor", "vettori-bip.json"),
+                     json.dumps(srv)],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=120)
+    finally:
+        os.unlink(strada)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-900:])
+        prova("onchain: il banco ha risposto", True, False)
+        return
+    prova("lo STESSO seme da' lo STESSO indirizzo (sennò la prova del "
+          "ripristino direbbe «diverso» su un backup sano)",
+          True, o["deterministico"])
+    prova("...e un seme diverso un indirizzo diverso", True,
+          o["semeDiversoIndirizzoDiverso"])
+    prova("l'indirizzo e' TESTNET (`tb1`), e di mainnet non si parla",
+          [True, True],
+          [o["indirizzo"].startswith("tb1q"),
+           "B.NETWORK" not in chiavi_js])
+    prova("le tre chiavi sono di TRE persone diverse", [True, 3],
+          [o["treDiverse"], len(o["tre"])])
+    prova("...e la terza e' davvero quella che il server ha mandato",
+          True, o["barattoloEQuellaDelServer"])
+    prova("le chiavi ordinate nello script sono le stesse tre (BIP-67)",
+          True, o["ordinateSonoLeTre"])
+    prova("il descrittore e' un wsh(sortedmulti(2, ...)) con tre chiavi",
+          [True, 3],
+          [o["descrittore"].startswith("wsh(sortedmulti(2,"),
+           o["descrittore"].count(",")])
+    prova("...e lo script e' il 2-di-3 da 105 byte", 105, o["scriptByte"])
+
+
 def prove_cancello_onchain():
     """IL CANCELLO DELL'ON-CHAIN, PRIMA DELLE PORTE (16 ott 2026,
     cantiere pagamento-onchain, decisione di Andrea: «i pagamenti
@@ -146977,10 +147156,16 @@ def prove_cancello_onchain():
     # 3) nessuna porta senza cancello (oggi: nessuna porta)
     rotte = re.findall(
         r'@app\.(?:get|post|put|delete)\("(/api/onchain/[^"]*)"', src)
-    prova("oggi non esiste nessuna rotta /api/onchain/*", [], rotte)
-    # il conto che conta: ogni rotta on-chain che nascera' deve nominare
-    # il cancello nel suo corpo. Vuoto == vuoto oggi, e il giorno della
-    # prima porta questa riga diventa la guardia vera.
+    # LA PRIMA PORTA E' NATA (16 ott 2026, tappa 1b), e questa riga ha
+    # fatto il suo mestiere: diceva «oggi non esiste nessuna rotta» e il
+    # giorno dopo e' diventata rossa, da sola, senza che nessuno se lo
+    # ricordasse. Adesso dice la cosa vera di adesso — che di porte ce
+    # n'e' una — e la guardia qui sotto, che era un confronto fra due
+    # liste vuote, e' diventata il cancello vero.
+    prova("le rotte /api/onchain/* esistono e si contano",
+          ["/api/onchain/prova"], rotte)
+    # il conto che conta: ogni rotta on-chain deve nominare il cancello
+    # nel suo corpo.
     senza = []
     for r in rotte:
         i_r = src.index(f'"{r}"')
@@ -167643,6 +167828,7 @@ def main():
     prove_p2p_barattozon,
     prove_p2p_paycode,
     prove_cancello_onchain,
+    prove_banco_chiavi_onchain,
     prove_leva_rgb,
     prove_annuncio_identita,
     prove_mutinynet_prep,

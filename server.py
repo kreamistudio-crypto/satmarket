@@ -42199,6 +42199,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         profilo["avatar"] = avatar_da_mostrare(
             u["avatar"], u["avatar_scelta"])
     profilo["admin"] = e_admin(user["id"])
+    # Chi vede il foglio «⛓️ On-chain (prova)». E' il CANCELLO che
+    # risponde, non `admin`: le due cose oggi coincidono (ONCHAIN_SOLO_
+    # ADMIN) ma dicono due cose diverse, e il giorno che la beta si
+    # allarga questa riga e' gia' giusta. A leva spenta e' False per
+    # tutti, moderatori compresi, e il bottone non compare a nessuno.
+    profilo["onchain"] = onchain_ammesso(user["id"])
     profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
     profilo["offerte_da_agire"] = da_agire
@@ -46870,6 +46876,36 @@ try:
     from config import ONCHAIN_SOLO_ADMIN
 except ImportError:
     ONCHAIN_SOLO_ADMIN = True
+# L'XPUB DI BARATTOLO: la TERZA chiave del 2-di-3, quella che serve solo
+# in disputa. Qui ne sta la META' PUBBLICA e nient'altro — la privata
+# non entra su questa macchina (vivra' in un firmatario sul nodo), e da
+# un'xpub non si firma niente, si derivano solo altre meta' pubbliche.
+# VUOTA = XPUB DI CARTONE, e il foglio lo dice scritto: e' quella dei
+# vettori di prova del BIP-32, pubblicata in uno standard, che non e' la
+# chiave di nessuno. Serve a far VEDERE le tre chiavi e a provare il
+# ripristino prima che esista una chiave nostra da proteggere.
+XPUB_CARTONE = ("xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8Nqtwyb"
+                "GhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
+# ...e il VENDITORE di cartone dell'ordine finto: il secondo vettore
+# del BIP-32, un'altra chiave pubblicata in uno standard. Serve perche'
+# nel foglio si vedano TRE chiavi diverse e di tre proprietari diversi:
+# derivare anche questa dal seme di chi guarda mostrerebbe la stessa
+# persona due volte, cioe' racconterebbe una bugia sul 2-di-3.
+XPUB_CARTONE_VENDITORE = (
+    "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9"
+    "W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB")
+try:
+    from config import ONCHAIN_XPUB
+except ImportError:
+    ONCHAIN_XPUB = ""
+# LA RETE DELLA TAPPA DI PROVA (16 ott 2026, parola di Andrea: «in
+# collaudo voglio provare tutto in testnet»). Non e' una leva: e' una
+# COSTANTE, e un indirizzo mainnet in questa tappa non si calcola da
+# nessuna parte — ne' qui ne' nel browser. Il motivo e' semplice: un
+# 2-di-3 con una chiave di cartone che mostrasse un `bc1q...` sarebbe
+# un invito a mandarci sats veri che nessuno potrebbe piu' sbloccare.
+# La rete diventera' una leva alla tappa dei pagamenti, non prima.
+ONCHAIN_RETE = "test"
 
 
 def onchain_ammesso(tg_id) -> bool:
@@ -82622,6 +82658,74 @@ def vendor_nostr():
     libreria rifa' anche l'innesto: prove_chiave_moderatore_portatile
     lo pretende sul vettore di prova della NIP."""
     return FileResponse("vendor/nostr.bundle.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/onchain/prova")
+async def onchain_prova(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """LA PRIMA PORTA DELL'ON-CHAIN, e l'unica di questa tappa: dice al
+    browser la TERZA chiave del 2-di-3 (l'xpub di Barattolo) e su che
+    rete si sta giocando. Non scrive niente, non legge il database, non
+    sa chi compra o chi vende: e' il foglio «⛓️ On-chain (prova)» del
+    Profilo, dove si guardano le chiavi e si prova il ripristino.
+
+    PASSA DAL CANCELLO, che e' il motivo per cui il cancello esisteva
+    prima di lei (`onchain_ammesso`): leva spenta → 404, e un 404 e'
+    piu' onesto di un 403 su una funzione che per il mondo non esiste
+    ancora. Oggi vuol dire Andrea e Alan, e nessun altro.
+
+    QUEL CHE NON C'E' QUI DENTRO, e si vede: nessuna chiave privata,
+    nessun seme, nessun indirizzo. Il seme nasce e muore nel browser
+    (regola ferrea 2 dal lato dei soldi), e l'indirizzo lo calcola il
+    telefono con le tre meta' pubbliche. Il server non e' in grado di
+    spendere niente, e non e' una promessa: e' che non ha i pezzi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    cartone = not (ONCHAIN_XPUB or "").strip()
+    return {
+        "xpub": (ONCHAIN_XPUB or "").strip() or XPUB_CARTONE,
+        # il VENDITORE dell'ordine finto: sempre di cartone, in questa
+        # tappa non esiste un venditore vero da cui prendere un'xpub
+        "xpub_venditore": XPUB_CARTONE_VENDITORE,
+        # «di cartone» il foglio lo scrive a schermo: chi prova deve
+        # sapere che quella terza chiave non e' di nessuno
+        "cartone": cartone,
+        "rete": ONCHAIN_RETE,
+        # il percorso dell'ordine finto, cosi' il client non inventa
+        # numeri suoi e due dispositivi dello stesso conto fanno lo
+        # STESSO indirizzo — che e' esattamente quel che la prova del
+        # ripristino deve poter confrontare
+        "strada": "m/0/0",
+    }
+
+
+@app.get("/vendor/btc.js")
+def vendor_btc():
+    """Il bundle bitcoin: le dodici parole, la derivazione delle chiavi
+    e il 2-di-3, nel BROWSER. Stesso patto di /vendor/nostr.js e per la
+    stessa ragione, un gradino piu' in alto: qui non si incolla una
+    nsec, qui NASCE il seme che tiene i sats di un ordine, e nessun
+    terzo deve poter cambiare quel codice. Rotta esplicita, mai
+    StaticFiles su una directory (regola ferrea 3).
+
+    SETTE PACCHETTI NPM, TUTTI MIT, uniti da esbuild: versioni, licenze
+    per esteso e la ricetta per rifarlo byte per byte stanno in
+    `vendor/btc-LICENZE.md`; l'impronta sha256 sta in `prove.py` e la
+    CI la controlla a ogni commit. Chi non si fida del codice che gli
+    arriva da questo VPS confronta l'impronta — e' il motivo per cui e'
+    scritta in chiaro in un repo firmato.
+
+    NON E' DIETRO IL CANCELLO, apposta: e' codice PUBBLICO di un repo
+    pubblico, e metterlo dietro `onchain_ammesso` darebbe l'illusione
+    di un segreto che non c'e' — mentre romperebbe la dispensa del
+    service worker. A stare dietro il cancello e' la PAGINA che lo usa,
+    e chi non ci passa non lo scarica mai: il caricatore e' pigro, e
+    334 KB a ogni apertura per una funzione che quasi nessuno usa
+    sarebbero un regalo a nessuno."""
+    return FileResponse("vendor/btc.bundle.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 

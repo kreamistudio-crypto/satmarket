@@ -63634,3 +63634,173 @@ nuova esclusa, nessuna forma ammorbidita.
   i margini, i tetti) **non sono nate**: nascono con la tappa che le
   usa, non prima. Un config pieno di leve che non fanno niente è un
   config che nessuno legge più.
+
+## Il banco delle chiavi on-chain: le dodici parole, le tre chiavi, e la prova del ripristino che si misura da sé (16 ott 2026, cantiere pagamento-onchain tappa 1b, richiesta di Andrea)
+
+Parola di Andrea, dopo la tappa 1a: «non vedo paga onchain sull'interfaccia,
+invece vorrei vederlo **solo lato admin** per fare delle prove, voglio
+capire anche **quali sono le chiavi**, fare dei **test di verifica di
+ripristino**». E, subito dopo: «**in collaudo voglio provare tutto in
+testnet**».
+
+**LA COSA CHE HA DECISO IL TAGLIO DEL CANTIERE:** le tre cose che
+chiede **non hanno bisogno di soldi**. Vedere le chiavi, capire chi ha
+cosa e provare che il backup regge si fanno con **zero sats, zero nodo,
+zero rete** — quindi questa tappa si può accendere sul telefono di
+Andrea, solo per lui e Alan, senza nessun rischio. Il pagamento vero
+(QR, indirizzo dell'ordine, conferme, PSBT) resta alle tappe sue.
+
+**TESTNET, E SOLO TESTNET.** La rete non è una leva: è una costante
+(`ONCHAIN_RETE = "test"`), e un indirizzo mainnet in questa tappa **non
+si calcola da nessuna parte** — né sul server né nel browser. Il perché
+è concreto: nel 2-di-3 di prova una delle tre chiavi è **di cartone**,
+e un `bc1q…` a schermo sarebbe un invito a mandarci sats veri che
+**nessuno** potrebbe più sbloccare. Testnet e signet danno lo stesso
+indirizzo (`tb1…`, stessi parametri): cambia solo la catena su cui si
+trasmette, e quello conta dalla tappa dei pagamenti in poi.
+
+**COSA SI VEDE** — «⛓️ On-chain (prova)», nel cassetto Amministrazione
+del Profilo, in sei blocchi:
+1. **Le dodici parole**, che nascono nel browser e non partono mai. Si
+   mostrano solo a richiesta.
+2. **Le tre chiavi** di un ordine finto, una per riga, con scritto
+   accanto **da dove viene** e **chi ce l'ha**: compratore (dal tuo
+   seme), venditore (dalla sua xpub dedicata), Barattolo (dalla nostra;
+   la privata non sta sul VPS). Più la riga che spiega l'ordine
+   alfabetico del BIP-67.
+3. **L'indirizzo e il descrittore**, col perché il descrittore viaggia
+   in ogni backup: *le dodici parole da sole non aprono niente*.
+4. **Il backup** nel CloudStorage di Telegram, con detto chiaro che
+   **non è end-to-end** e che Telegram lo può leggere.
+5. **La prova del ripristino.**
+6. **Esporta**: parole + descrittore, per rifare lo stesso indirizzo in
+   Sparrow senza di noi.
+
+**LA PROVA DEL RIPRISTINO SI MISURA DA SÉ**, ed è la parte che Andrea
+ha chiesto per nome. Tre gesti: `📏 Prendi il metro` (segna indirizzo e
+descrittore di adesso), `🧹 Dimentica su questo dispositivo`, `♻️
+Ripristina dal cloud`. Poi l'app dice **✅ identico** o **⚠️ diverso**.
+DUE DECISIONI DENTRO QUESTO DISEGNO:
+- **Il «dimentica» tocca il dispositivo e NON la nuvola**, perché è il
+  caso vero da provare (telefono perso, cache svuotata): cancellare
+  anche il backup renderebbe la prova impossibile invece che utile.
+- **Il metro non si cancella col seme**, e vive in una chiave sua: è il
+  confronto a dover sopravvivere al gesto che si sta provando.
+  Altrimenti bisognerebbe guardare due stringhe di sessanta caratteri a
+  occhio — che è il modo di dichiarare «funziona» senza averlo visto.
+
+**LE CHIAVI DI CARTONE, E PERCHÉ DUE E NON UNA.** Venditore e Barattolo
+sono due **xpub dei vettori del BIP-32**, pubblicate in uno standard e
+di nessuno; il foglio lo scrive a schermo. Sono **due e diverse**
+apposta: derivare anche il venditore dal seme di chi guarda mostrerebbe
+la stessa persona due volte, cioè **racconterebbe una bugia sul
+2-di-3** — e la sentinella pretende che le tre chiavi siano di tre.
+
+**IL SEME NON ESCE, E SI PUÒ CONTROLLARE.** Il blocco del seme in
+`miniapp.html` non contiene **nessuna** `fetch` né `XMLHttpRequest`, e
+c'è una prova che lo conta: è la regola ferrea 2 vista dal lato dei
+soldi, e la trappola del futuro ha già un nome — «salviamole sul
+server, per comodità». Il seme sta **sotto il conto**
+(`barattolo_onchain_<tg_id>`) come il mazzo del P2P: due account
+Telegram sullo stesso telefono sono due persone, e una WebView sola con
+un localStorage solo li confonderebbe.
+
+**IL SERVER METTE UNA COSA SOLA**, e si vede: `/api/onchain/prova`
+risponde con l'**xpub di Barattolo**, quella del venditore finto e la
+strada dell'ordine. Non scrive niente, non apre il database, non sa chi
+compra. **Nessuna chiave privata, nessun seme, nessun indirizzo**:
+l'indirizzo lo calcola il telefono con le tre metà pubbliche. Il server
+non è in grado di spendere — non è una promessa, è che non ha i pezzi.
+E la rotta **passa dal cancello**, che è il motivo per cui il cancello
+è nato prima di lei: a leva spenta risponde **404**, più onesto di un
+403 su una funzione che per il mondo non esiste ancora.
+
+**IL BUNDLE È PIGRO, E LA SUA ROTTA È PUBBLICA.** `/vendor/btc.js` non
+sta dietro il cancello, apposta: è codice pubblico di un repo pubblico,
+e nasconderlo darebbe l'illusione di un segreto che non c'è mentre
+romperebbe la dispensa del service worker. Dietro il cancello sta la
+**pagina**; chi non entra non scarica mai quei 334 KB. Il bundle vive
+nella dispensa a **runtime** del SW (mai nell'`addAll` atomico
+dell'installazione), con il suo `?v=` e la VERSIONE del SW salita a
+v11 — il salto non è burocrazia: è l'unica leva per buttare una copia
+stantia da un telefono che non possiamo toccare.
+
+⚠️ **DUE INCIAMPI, utili al prossimo che passa.**
+- `bottoneInAttesa` accende il velo «Invio sats in corso…» a tutto
+  schermo: l'avevo usato per cinque bottoni di questa pagina, dove non
+  viaggia **nessun** satoshi. Un velo così su una derivazione da due
+  millisecondi dice a chi guarda una cosa falsa. Al suo posto
+  `onchainAttesa`, che spegne il solo bottone.
+- `pezzo_js` taglia **prima** della graffa di chiusura: per cercare
+  dentro una funzione va benissimo, per **eseguirla** in node no — e il
+  banco moriva con «Unexpected end of input» senza aver provato niente.
+  La graffa si rimette, con il commento che dice perché.
+
+**LE QUATTRO ROSSE DELLA SUITE, e la terza è una vittoria.**
+1. **`confirm()` di sistema**: ne avevo scritto uno nel «dimentica».
+   Nel client i dialoghi del browser sono a **zero** da ago 2026 —
+   ventinove convertiti in un cantiere — e una sentinella non li fa
+   rinascere. L'ha preso. Sostituito con `chiediConferma`, il foglio di
+   casa.
+2. **La dispensa del service worker**: `prove_bundle_nostr` ancorava
+   alla **riga intera** `const IN_DISPENSA = new Set([...PRECACHE,
+   '/vendor/nostr.js']);`, e il giorno in cui la dispensa ha accolto un
+   secondo bundle è diventata rossa **pur essendo tutto giusto**. La
+   regola non era cambiata: l'ancora era fragile. Adesso la prova
+   **legge l'insieme** e chiede quel che conta — che erediti `PRECACHE`
+   e che il bundle Nostr ci sia dentro — e un terzo file domani non la
+   rompe. È il caso in cui cede il banco perché la regola non era in
+   discussione.
+3. **«Oggi non esiste nessuna rotta `/api/onchain/*`»** — la sentinella
+   che avevo scritto stanotte, a cancello appena fatto, **è diventata
+   rossa da sola** il giorno dopo, appena è nata la prima porta. È
+   esattamente il mestiere per cui era stata scritta: non si è fidata
+   della mia memoria. Adesso dice la cosa vera di adesso (di porte ce
+   n'è una, e si chiama) e la guardia che le sta sotto — «ogni rotta
+   on-chain passa da `onchain_ammesso`» — da confronto fra due liste
+   vuote è diventata il **cancello vero**.
+4. **Il censimento dei gesti che passano dalla domanda unica** tiene il
+   conto **con la cronaca di ognuno**: ottantacinque voci datate, una
+   per una, dal 2026. Il mio è l'ottantaseiesimo e ora ha la sua riga.
+   Non conoscevo quella tradizione, e la sentinella me l'ha insegnata
+   invece di lasciarmi sballare un numero.
+QUATTRO VOLTE IN UNA SERATA una sentinella mi ha fermato su qualcosa
+che la mia memoria non copriva — i dialoghi di sistema aboliti in
+agosto, un'ancora fragile scritta da altri, una guardia scritta da me
+ieri, una tradizione di conteggio che non sapevo esistesse. Il tempo
+speso a rifarle verdi è esattamente quel che quelle righe comprano.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere
+(`cantiere/onchain-prova`, su origin/main a f4f819f): `prove_banco_
+chiavi_onchain` da sola, **18 passate, 0 fallite**, col banco che fa
+girare `onchainChiavi` **vera** — estratta da `miniapp.html` — sul
+bundle vero sotto node: lo stesso seme dà lo stesso indirizzo, un seme
+diverso un indirizzo diverso, l'indirizzo è `tb1`, le tre chiavi sono
+di tre persone, la terza è davvero quella mandata dal server, le chiavi
+ordinate nello script sono quelle tre, e lo script è il 2-di-3 da 105
+byte. Più la suite intera con `PROVE_SEVERE=1`.
+
+**COSA SERVE AD ANDREA PER PROVARLO** (due righe nel config del VPS,
+che le mette lui):
+```
+ONCHAIN_ATTIVO = True
+ONCHAIN_SOLO_ADMIN = True
+```
+e un riavvio. Poi: Profilo → Amministrazione → «⛓️ On-chain (prova)».
+La parte del cloud vuole il telefono **dentro Telegram** (fuori, il
+CloudStorage non esiste e il foglio lo dice).
+
+**DA FARE** (notati, non fatti):
+- **Il checksum del descrittore**: oggi il descrittore si mostra
+  **senza**, e Sparrow lo accetta ricalcolandolo. Il checksum nasce
+  alla tappa dell'indirizzo dell'ordine, dove avrà i suoi vettori:
+  scriverlo a occhio e sbagliarlo sarebbe peggio che non scriverlo.
+- **La gamba Nostr del backup** (copia cifrata NIP-44 sui relay) non
+  c'è: in questa tappa il backup è il solo CloudStorage. La terza gamba
+  — le dodici parole scritte a mano — c'è già come «Esporta».
+- **Il ripristino provato in Sparrow** è un gesto di Andrea, non una
+  prova della CI: l'export è fatto per quello.
+- **La pagina della trasparenza** (cosa resta pubblico per sempre,
+  cosa vede Telegram, cosa vediamo noi) resta della tappa ③, come
+  concordato: qui i tre avvisi stanno dentro i blocchi che li
+  riguardano.

@@ -12,7 +12,7 @@
    se cambi quelli, o l'elenco, alzala e le dispense vecchie si
    svuotano da sole. */
 
-const VERSIONE = 'barattolo-v10';
+const VERSIONE = 'barattolo-v11';
 const CACHE_STATICA = `statica-${VERSIONE}`;
 
 // La dispensa: solo asset di casa, immutabili o quasi. Mai pagine HTML
@@ -60,7 +60,13 @@ const PRECACHE = [
    svuotando le dispense vecchie e' l'unica leva che abbiamo per buttare
    via una copia stantia rimasta appesa a quel timbro su un telefono che
    non possiamo toccare. */
-const IN_DISPENSA = new Set([...PRECACHE, '/vendor/nostr.js']);
+/* …e dal 16 ott 2026 anche il bundle BITCOIN, con lo stesso patto e
+   per la stessa ragione: sta nella dispensa a RUNTIME e MAI
+   nell'addAll atomico dell'installazione — chi non apre mai il banco
+   delle chiavi non deve scaricare 334 KB per nessuno. Chi lo apre, al
+   secondo giro lo trova qui. */
+const IN_DISPENSA = new Set([...PRECACHE, '/vendor/nostr.js',
+                             '/vendor/btc.js']);
 
 self.addEventListener('install', (e) => {
   // addAll e' atomico: o entra tutto in dispensa, o il SW non si

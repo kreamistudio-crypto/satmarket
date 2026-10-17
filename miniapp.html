@@ -13246,6 +13246,14 @@ document.getElementById('cartello')?.remove();</script>
       <!-- il rimando alla moderazione delle dispute P2P (28 set 2026):
            la sezione vive nel P2P, qui c'e' la porta -->
       <button type="button" class="btn ghost" id="admModP2P" onclick="go('p2pmod')">⚖️ Moderazione P2P</button>
+      <!-- IL BANCO DI PROVA DELL'ON-CHAIN (16 ott 2026): nasce
+           NASCOSTO e lo accende `renderProfilo` solo se il server ha
+           detto `onchain: true` — cioe' se si passa dal CANCELLO, non
+           se si e' admin. Le due cose oggi coincidono ma dicono cose
+           diverse: a leva spenta questo bottone non compare a nessuno,
+           moderatori compresi. -->
+      <button type="button" class="btn ghost" id="admOnchain" style="display:none"
+              onclick="go('onchain')">⛓️ On-chain (prova)</button>
       <div id="adminStats"></div>
         </div>
       </div>
@@ -13270,6 +13278,27 @@ document.getElementById('cartello')?.remove();</script>
           title="Rivedi il giro di benvenuto: le quattro tappe che raccontano il mercatino. I suggerimenti che hai già spento restano spenti.">Tutorial</button>
         <button class="btn ghost" id="profiloEsci" style="display:none" onclick="esciWeb()">Esci</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ============ ⛓️ ON-CHAIN (PROVA) — IL BANCO DELLE CHIAVI ======
+       (16 ott 2026, cantiere pagamento-onchain tappa 1b, richiesta di
+       Andrea: «vorrei vederlo solo lato admin per fare delle prove,
+       voglio capire anche quali sono le chiavi, fare dei test di
+       verifica di ripristino».)
+       QUI NON SI PAGA NIENTE, e non e' una limitazione: le tre cose
+       che servono — vedere le chiavi, capire chi ha cosa, provare che
+       il backup regge — si fanno con ZERO sats, zero nodo, zero rete.
+       La rete e' SEMPRE testnet e un indirizzo mainnet non si calcola
+       da nessuna parte: un 2-di-3 con una chiave di cartone che
+       mostrasse un `bc1q...` sarebbe un invito a mandarci sats veri
+       che nessuno potrebbe piu' sbloccare.
+       Il corpo lo scrive `renderOnchain()`: qui c'e' il guscio, perche'
+       un ridisegno non debba ricostruire la pagina. -->
+  <div class="view" id="view-onchain">
+    <div class="form">
+      <h2 class="profilo-tit">⛓️ On-chain (prova)</h2>
+      <div id="onchainCorpo"></div>
     </div>
   </div>
 
@@ -15123,6 +15152,10 @@ if (diagnosiApertura) mostraDiagnosiApertura();
 let collaudo = false;
 let collaudoId = 111, collaudoName = 'Compratore';
 let myTgId = null, isAdmin = false;
+/* Chi passa dal cancello dell'on-chain (16 ott 2026): lo dice il
+   SERVER in /api/me, e non si deduce da `isAdmin` — a leva spenta e'
+   falso anche per i moderatori. */
+let myOnchain = false;
 
 function authHdr(){
   if (tg?.initData) return tg.initData;
@@ -17272,6 +17305,9 @@ function go(view){
      nel libro non piu' (scuotiLogoP2P toglie la classe a fine giro) */
   if (view==='p2p' && !p2pLogoSalutato) { p2pLogoSalutato = true; scuotiLogoP2P(); }
   if (view==='p2pordine') renderOrdineP2P();
+  /* il banco delle chiavi on-chain: il bundle lo carica LUI, alla
+     prima apertura, e chi non entra qui non lo scarica mai */
+  if (view==='onchain') renderOnchain();
   /* LA MODERAZIONE (28 set 2026): la striscia in cima a «I miei
      scambi» e la sua pagina, solo per chi e' moderatore — a tutti gli
      altri `chiediModerazioneP2P` non chiede niente */
@@ -45913,6 +45949,14 @@ async function loadAdminStats(){
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
     if (el('grpAdmin')) el('grpAdmin').style.display = '';
+    /* IL BANCO DELL'ON-CHAIN si accende col CANCELLO e non con
+       `isAdmin` (16 ott 2026): a leva spenta `myOnchain` e' falso anche
+       per i moderatori, e il bottone non compare a nessuno. Sta qui
+       dentro perche' il cassetto «Amministrazione» e' suo, ma la
+       condizione e' un'altra — due giudici, due righe. */
+    if (el('admOnchain')) {
+      el('admOnchain').style.display = myOnchain ? '' : 'none';
+    }
   } catch(e) {
     box.innerHTML = '';
     if (el('grpAdmin')) el('grpAdmin').style.display = 'none';
@@ -50592,6 +50636,420 @@ function caricaNostrTools(){
     document.head.appendChild(s);
   });
   return nostrToolsPromessa;
+}
+
+/* ============ ⛓️ IL BANCO DELLE CHIAVI ON-CHAIN (16 ott 2026) =======
+   Tappa 1b del pagamento on-chain, richiesta di Andrea: «vorrei vederlo
+   solo lato admin per fare delle prove, voglio capire anche quali sono
+   le chiavi, fare dei test di verifica di ripristino».
+
+   QUI NON SI PAGA NIENTE, e le tre cose che servono si fanno con ZERO
+   sats: vedere le tre chiavi, capire chi ha cosa, e provare che il
+   backup regge davvero. La rete e' SEMPRE testnet (`tb1...`) e un
+   indirizzo mainnet non si calcola da nessuna parte — con una chiave di
+   cartone nel 2-di-3, un `bc1q...` a schermo sarebbe un invito a
+   mandarci sats veri che nessuno potrebbe piu' sbloccare.
+
+   IL SEME NASCE E MUORE NEL BROWSER (regola ferrea 2 dal lato dei
+   soldi): al server non arriva mai, e il server non ha i pezzi per
+   spendere niente — non e' una promessa, e' un fatto di costruzione.
+   Il seme sta sotto il CONTO, come il mazzo del P2P: due account
+   Telegram sullo stesso telefono sono due persone, e una WebView sola
+   con un localStorage solo li confonderebbe (la lezione di `MOSTRO_
+   CHIAVE`, set 2026).
+
+   LE DODICI PAROLE SONO INGLESI per scelta: un seme in italiano non si
+   recupera in Sparrow, e la terza gamba del backup — «Barattolo
+   sparito, le due parti aprono tutto da sole» — deve funzionare con
+   gli strumenti che esistono. */
+const ONCHAIN_VER = '2.4.1-bar1';
+let btcPromessa = null;
+function caricaBitcoin(){
+  if (window.BarattoloBTC) return Promise.resolve(window.BarattoloBTC);
+  if (!btcPromessa) btcPromessa = new Promise((ok, no)=>{
+    const s = document.createElement('script');
+    s.src = `${FOTO_BASE}/vendor/btc.js?v=${ONCHAIN_VER}`;
+    /* si azzera nel ramo dell'errore, come il caricatore di nostr-tools:
+       chi svuota la cache e riprova non deve ricaricare la pagina */
+    s.onload = ()=>{
+      if (window.BarattoloBTC) return ok(window.BarattoloBTC);
+      btcPromessa = null;
+      no(new Error('libreria bitcoin incompleta'));
+    };
+    s.onerror = ()=>{ btcPromessa = null;
+                      no(new Error('libreria bitcoin non raggiungibile')); };
+    document.head.appendChild(s);
+  });
+  return btcPromessa;
+}
+/* La cassetta di questo conto. `prima` NON si cancella col «dimentica»:
+   e' il metro del confronto, e senza di lei la prova del ripristino
+   chiederebbe di guardare due stringhe a occhio. */
+function onchainChiave(){ return `barattolo_onchain_${myTgId || 'x'}`; }
+function onchainChiavePrima(){ return `${onchainChiave()}_prima`; }
+const ONCHAIN_CLOUD = 'barattolo_onchain';   // la nuvola e' per conto
+function onchainSemeLocale(){
+  try { return localStorage.getItem(onchainChiave()) || ''; }
+  catch(e){ return ''; }
+}
+function onchainScriviLocale(parole){
+  try { localStorage.setItem(onchainChiave(), parole); return true; }
+  catch(e){ return false; }
+}
+
+/* Le TRE chiavi dell'ordine, calcolate qui e da nessun'altra parte.
+   `strada` la dice il server (m/0/0), cosi' due dispositivi dello
+   stesso conto fanno lo STESSO indirizzo — che e' esattamente quel che
+   la prova del ripristino deve poter confrontare. */
+async function onchainChiavi(parole, srv){
+  const B = await caricaBitcoin();
+  const rete = B.TEST_NETWORK;          // sempre testnet, in questa tappa
+  const seme = B.mnemonicToSeedSync(parole, '');
+  const mia = B.HDKey.fromMasterSeed(seme).derive(srv.strada);
+  const ven = B.HDKey.fromExtendedKey(srv.xpub_venditore).derive(srv.strada);
+  const bar = B.HDKey.fromExtendedKey(srv.xpub).derive(srv.strada);
+  const tre = [mia.publicKey, ven.publicKey, bar.publicKey];
+  const w = B.sortedMultisig(2, tre, true, rete);
+  const hex = (b)=>B.hex.encode(b);
+  return {
+    compratore: hex(mia.publicKey),
+    venditore: hex(ven.publicKey),
+    barattolo: hex(bar.publicKey),
+    /* le chiavi ORDINATE come stanno nello script (BIP-67): e' l'ordine
+       che conta per l'indirizzo, e vederlo spiega perche' l'indirizzo
+       non cambia se le tre arrivano in un altro ordine */
+    ordinate: [hex(w.witnessScript.slice(2, 35)),
+               hex(w.witnessScript.slice(36, 69)),
+               hex(w.witnessScript.slice(70, 103))],
+    /* il descrittore SENZA checksum: Sparrow lo accetta e lo ricalcola
+       da se'. Il checksum nasce alla tappa dell'indirizzo dell'ordine,
+       dove avra' i suoi vettori — scriverlo a occhio e sbagliarlo
+       sarebbe peggio che non scriverlo. */
+    descrittore: `wsh(sortedmulti(2,${tre.map(hex).join(',')}))`,
+    indirizzo: w.address,
+    script: hex(w.witnessScript),
+  };
+}
+
+/* L'attesa PICCOLA, e non `bottoneInAttesa`: quello accende il velo
+   «Invio sats in corso…» a tutto schermo, e qui non viaggia nessun
+   satoshi — un velo del genere su una derivazione da due millisecondi
+   direbbe una cosa falsa a chi guarda. */
+function onchainAttesa(btn, testo){
+  if (!btn) return ()=>{};
+  const prima = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = testo;
+  return ()=>{ btn.disabled = false; btn.innerHTML = prima; };
+}
+
+let onchainSrv = null;         // quel che il server dice (xpub, strada)
+let onchainParoleViste = false;  // le dodici parole si mostrano a richiesta
+
+/* IL FOGLIO. Si ridisegna intero a ogni gesto: e' una pagina di prova
+   per due persone, e la semplicita' vale piu' di un aggiornamento
+   chirurgico. */
+async function renderOnchain(){
+  const box = el('onchainCorpo');
+  if (!box) return;
+  box.innerHTML = '<div class="hint">Carico…</div>';
+  try {
+    if (!onchainSrv) {
+      const r = await fetch(`${API_BASE}/onchain/prova`,
+                            {headers: {'X-Tg-Init-Data': authHdr()}});
+      if (r.status === 404) {
+        /* il cancello: a leva spenta questa pagina non esiste, e lo
+           dice invece di girare a vuoto */
+        box.innerHTML = `<div class="hint">Il pagamento on-chain è
+          <b>spento</b> su questo server (<span class="mono">ONCHAIN_ATTIVO</span>).
+          Si accende con una riga nel config del VPS.</div>`;
+        return;
+      }
+      if (!r.ok) throw new Error('il server non risponde');
+      onchainSrv = await r.json();
+    }
+    const parole = onchainSemeLocale();
+    if (!parole) { box.innerHTML = onchainSenzaSeme(); return; }
+    const k = await onchainChiavi(parole, onchainSrv);
+    box.innerHTML = onchainConSeme(parole, k);
+  } catch(e) {
+    box.innerHTML = `<div class="hint">Non sono riuscito a preparare il
+      banco: ${esc(e.message || 'errore')}.</div>
+      <button class="btn ghost" onclick="onchainSrv=null;renderOnchain()">Riprova</button>`;
+  }
+}
+
+function onchainSenzaSeme(){
+  return `
+    <div class="hint">Qui si guardano le <b>chiavi</b> di un ordine
+      on-chain e si prova che il <b>backup regge</b>. Non si paga
+      niente: nessun satoshi, nessun nodo, e la rete è
+      <b>testnet</b> — gli indirizzi cominciano per
+      <span class="mono">tb1</span> e non esiste nessun indirizzo
+      vero.</div>
+    <div class="payout">
+      <h4>1. Le tue dodici parole</h4>
+      <div class="hint">Nascono <b>nel tuo telefono</b> e non partono
+        mai: il nostro server non le vede e non le può vedere. Da loro
+        si ricava la tua chiave di ogni ordine.</div>
+      <button class="btn" onclick="onchainCrea(this)">🎲 Crea le dodici parole</button>
+    </div>
+    <div class="payout" style="border-color:var(--danger)">
+      <h4>…o ripristina quelle di prima</h4>
+      <div class="hint">Se le avevi e hai premuto «dimentica», o se sei
+        su un dispositivo nuovo: il backup nel cloud di Telegram le
+        riporta qui. ${onchainPrimaLetta()
+          ? 'Il <b>metro</b> è preso: appena tornano, Barattolo ti dirà da sé se l\'indirizzo combacia.'
+          : ''}</div>
+      <button class="btn ghost" onclick="onchainRipristina(this)">♻️ Ripristina dal cloud di Telegram</button>
+    </div>`;
+}
+
+function onchainConSeme(parole, k){
+  const prima = onchainPrimaLetta();
+  const uguale = prima && prima.indirizzo === k.indirizzo
+                 && prima.descrittore === k.descrittore;
+  return `
+    <div class="hint">Rete <b>testnet</b>: gli indirizzi cominciano per
+      <span class="mono">tb1</span>, e un indirizzo mainnet qui non si
+      calcola da nessuna parte.</div>
+
+    <div class="payout">
+      <h4>1. Le tue dodici parole</h4>
+      <div class="hint">Vivono <b>solo</b> in questo browser. Il server
+        non le ha mai viste.</div>
+      ${onchainParoleViste
+        ? `<div class="mono" style="word-break:break-word;line-height:1.7">${esc(parole)}</div>
+           <button class="btn ghost" onclick="onchainParoleViste=false;renderOnchain()">🙈 Nascondi</button>`
+        : `<button class="btn ghost" onclick="onchainParoleViste=true;renderOnchain()">👁 Mostra le dodici parole</button>`}
+    </div>
+
+    <div class="payout">
+      <h4>2. Le tre chiavi di un ordine finto</h4>
+      <div class="hint">Un ordine on-chain ha <b>un indirizzo suo</b>,
+        chiuso da tre chiavi: ne servono <b>due</b> per spendere. Nel
+        giro normale firmano compratore e venditore; la nostra serve
+        <b>solo in disputa</b>.</div>
+      ${onchainRigaChiave('🧍 Tu (compratore)', k.compratore,
+        'dal tuo seme, qui nel telefono')}
+      ${onchainRigaChiave('🏪 Il venditore', k.venditore,
+        'dalla sua xpub dedicata' + (onchainSrv.cartone ? ' — di cartone, dai vettori BIP-32' : ''))}
+      ${onchainRigaChiave('🫙 Barattolo', k.barattolo,
+        onchainSrv.cartone
+          ? '<b>chiave di cartone</b>: è quella dei vettori di prova del BIP-32, pubblicata in uno standard. Non è una chiave nostra, e nessuno ha la sua privata'
+          : 'dalla nostra xpub; la privata non sta su questo server')}
+      <div class="hint" style="margin-top:8px">Nello script le tre
+        chiavi stanno <b>in ordine alfabetico</b> (BIP-67): per questo
+        l'indirizzo è lo stesso qualunque sia l'ordine in cui
+        arrivano.</div>
+    </div>
+
+    <div class="payout">
+      <h4>3. L'indirizzo e il descrittore</h4>
+      <div class="hint">L'indirizzo è dove andrebbero i sats. Il
+        descrittore è la <b>ricetta</b> per ricostruirlo: senza di lui
+        le dodici parole da sole <b>non aprono niente</b>, e per questo
+        viaggia in ogni backup.</div>
+      <div><b>Indirizzo</b> (testnet)</div>
+      <div class="mono" style="word-break:break-all">${esc(k.indirizzo)}</div>
+      <div style="margin-top:8px"><b>Descrittore</b></div>
+      <div class="mono" style="word-break:break-all;font-size:11px">${esc(k.descrittore)}</div>
+      <div class="hint">Senza checksum: Sparrow lo accetta e lo
+        ricalcola da sé.</div>
+    </div>
+
+    <div class="payout">
+      <h4>4. Il backup</h4>
+      <div class="hint">Nel <b>CloudStorage di Telegram</b>: dal tuo
+        telefono al cloud di Telegram, <b>mai</b> dal nostro server.
+        Non è cifrato end-to-end — <b>Telegram lo può leggere</b> — e
+        serve a ritrovare le chiavi su un altro dispositivo.</div>
+      <button class="btn ghost" onclick="onchainBackup(this)">☁️ Salva nel cloud di Telegram</button>
+      <button class="btn ghost" onclick="onchainGuarda(this)">🔍 Guarda cosa c'è nel cloud</button>
+      <div id="onchainCloud" class="hint"></div>
+    </div>
+
+    <div class="payout" style="border-color:var(--danger)">
+      <h4>5. La prova del ripristino</h4>
+      <div class="hint">Il punto di tutto: <b>dimentica</b> il seme su
+        questo dispositivo, poi <b>ripristina</b> dal cloud — e
+        Barattolo confronta da sé l'indirizzo di prima con quello di
+        dopo. Se tornano identici, il backup regge.</div>
+      ${prima
+        ? `<div class="hint">Metro preso: <span class="mono">${esc(prima.indirizzo)}</span></div>`
+        : `<div class="hint">Nessun metro ancora: premi «Prendi il metro» prima di dimenticare.</div>`}
+      ${uguale
+        ? `<div class="hint" style="color:var(--ok)"><b>✅ Il ripristino
+             funziona</b>: indirizzo e descrittore sono identici a prima.</div>`
+        : prima
+        ? `<div class="hint" style="color:var(--danger)"><b>⚠️ Diverso da
+             prima</b>: questo seme non è quello di cui hai preso il
+             metro.</div>`
+        : ''}
+      <button class="btn ghost" onclick="onchainMetro(this)">📏 Prendi il metro</button>
+      <button class="btn ghost" onclick="onchainDimentica(this)">🧹 Dimentica su questo dispositivo</button>
+      <button class="btn ghost" onclick="onchainMetroVia(this)">🗑 Butta il metro</button>
+    </div>
+
+    <div class="payout">
+      <h4>6. Esporta</h4>
+      <div class="hint">Le dodici parole <b>e</b> il descrittore: è
+        quello che serve per ritrovare gli stessi sats in Sparrow
+        <b>senza Barattolo</b>.</div>
+      <button class="btn ghost" onclick="onchainEsporta(this)">📤 Mostra tutto da copiare</button>
+      <div id="onchainExport"></div>
+    </div>`;
+}
+
+function onchainRigaChiave(chi, chiave, nota){
+  return `
+    <div style="margin-top:10px">
+      <div><b>${chi}</b></div>
+      <div class="mono" style="word-break:break-all;font-size:11px">${esc(chiave)}</div>
+      <div class="hint">${nota}</div>
+    </div>`;
+}
+
+function onchainPrimaLetta(){
+  try { return JSON.parse(localStorage.getItem(onchainChiavePrima()) || 'null'); }
+  catch(e){ return null; }
+}
+
+async function onchainCrea(btn){
+  haptic();
+  const rip = onchainAttesa(btn, 'Creo…');
+  try {
+    const B = await caricaBitcoin();
+    /* 128 bit = dodici parole: la lunghezza che ogni wallet legge */
+    const parole = B.generateMnemonic(B.wordlist, 128);
+    if (!B.validateMnemonic(parole, B.wordlist)) {
+      throw new Error('parole non valide (non dovrebbe capitare)');
+    }
+    if (!onchainScriviLocale(parole)) throw new Error('memoria non scrivibile');
+    onchainParoleViste = true;
+    toast('🎲 Dodici parole create, solo nel tuo telefono');
+  } catch(e) { toast(`⚠️ ${e.message || 'non riuscito'}`); }
+  rip();
+  renderOnchain();
+}
+
+async function onchainBackup(btn){
+  haptic();
+  const rip = onchainAttesa(btn, 'Salvo…');
+  const parole = onchainSemeLocale();
+  const fatto = parole
+    ? await cloudScrivi(ONCHAIN_CLOUD, JSON.stringify(
+        {parole, strada: onchainSrv?.strada || 'm/0/0'}))
+    : false;
+  rip();
+  toast(fatto ? '☁️ Salvato nel cloud di Telegram'
+              : '⚠️ Il cloud non ha risposto (sei dentro Telegram?)');
+}
+
+async function onchainGuarda(btn){
+  haptic();
+  const rip = onchainAttesa(btn, 'Guardo…');
+  const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+  rip();
+  const box = el('onchainCloud');
+  if (!box) return;
+  if (!r.ok) {
+    box.innerHTML = 'Il cloud non ha risposto: fuori da Telegram non esiste.';
+    return;
+  }
+  if (!r.testo) { box.innerHTML = 'Nel cloud non c\'è niente.'; return; }
+  let quante = 0;
+  try { quante = (JSON.parse(r.testo).parole || '').split(' ').length; }
+  catch(e){ quante = 0; }
+  box.innerHTML = `Nel cloud ci sono <b>${quante} parole</b> e la strada
+    dell'ordine. ${quante ? 'Il ripristino può funzionare.' : 'Forma non riconosciuta.'}`;
+}
+
+function onchainMetro(btn){
+  haptic();
+  const parole = onchainSemeLocale();
+  if (!parole) return toast('⚠️ Non c\'è nessun seme da misurare');
+  caricaBitcoin()
+    .then(()=>onchainChiavi(parole, onchainSrv))
+    .then(k=>{
+      try {
+        localStorage.setItem(onchainChiavePrima(), JSON.stringify(
+          {indirizzo: k.indirizzo, descrittore: k.descrittore}));
+      } catch(e){}
+      toast('📏 Metro preso: ora puoi dimenticare');
+      renderOnchain();
+    })
+    .catch(e=>toast(`⚠️ ${e.message || 'non riuscito'}`));
+}
+
+function onchainMetroVia(){
+  haptic();
+  try { localStorage.removeItem(onchainChiavePrima()); } catch(e){}
+  toast('🗑 Metro buttato');
+  renderOnchain();
+}
+
+/* IL «DIMENTICA» TOCCA SOLO QUESTO DISPOSITIVO, e non la nuvola: è il
+   caso vero da provare (telefono perso, cache svuotata), e cancellare
+   anche il backup renderebbe la prova impossibile invece che utile.
+   Il metro resta: è lui che dirà se il ripristino ha funzionato. */
+function onchainDimentica(){
+  /* `chiediConferma` e non il `confirm()` di sistema: nel client i
+     dialoghi del browser sono a ZERO da ago 2026 (ventinove convertiti
+     in un cantiere, e una sentinella che non li fa rinascere). Qui
+     c'era un `confirm`, e la prova l'ha preso. */
+  chiediConferma({
+    titolo: 'Dimentico il seme qui?',
+    corpo: 'Cancello le dodici parole da QUESTO dispositivo. Il backup '
+         + 'nel cloud di Telegram resta, ed è quello che serve a '
+         + 'ritrovarle: è proprio la prova da fare.',
+    etichetta: '🧹 Dimentica qui',
+    poi: ()=>{
+      try { localStorage.removeItem(onchainChiave()); } catch(e){}
+      onchainParoleViste = false;
+      toast('🧹 Dimenticato qui. Ora prova «Ripristina dal cloud».');
+      renderOnchain();
+    },
+  });
+}
+
+async function onchainRipristina(btn){
+  haptic();
+  const rip = onchainAttesa(btn, 'Cerco…');
+  const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+  rip();
+  let parole = '';
+  try { parole = (JSON.parse(r.testo || '{}').parole || '').trim(); }
+  catch(e){ parole = ''; }
+  if (!parole) return toast('⚠️ Nel cloud non c\'è niente da ripristinare');
+  const B = await caricaBitcoin();
+  if (!B.validateMnemonic(parole, B.wordlist)) {
+    return toast('⚠️ Le parole nel cloud non passano il controllo');
+  }
+  onchainScriviLocale(parole);
+  toast('♻️ Ripristinato: guarda il confronto qui sotto');
+  renderOnchain();
+}
+
+async function onchainEsporta(btn){
+  haptic();
+  const rip = onchainAttesa(btn, 'Preparo…');
+  const parole = onchainSemeLocale();
+  let k = null;
+  try { k = await onchainChiavi(parole, onchainSrv); } catch(e){}
+  rip();
+  const box = el('onchainExport');
+  if (!box || !k) return toast('⚠️ Non riesco a comporre l\'export');
+  box.innerHTML = `
+    <div class="hint" style="margin-top:8px">Copialo e tienilo dove
+      tieni le cose che non si perdono. Chi ha queste righe può
+      ricostruire l'indirizzo e firmare, <b>senza di noi</b>.</div>
+    <textarea class="mono" style="min-height:120px;font-size:11px" readonly
+      >Barattolo — prova on-chain (testnet)
+Dodici parole: ${parole}
+Strada: ${onchainSrv.strada}
+Descrittore: ${k.descrittore}
+Indirizzo: ${k.indirizzo}</textarea>`;
 }
 
 /* 1) Estensione NIP-07 (Alby, nos2x…): firma lei, noi non vediamo nulla */
@@ -81640,6 +82098,9 @@ async function avvia(){
     scaduta = (r.status === 401 && !!tg?.initData);
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
+    /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il
+       giorno che la beta si allarga questa riga e' gia' giusta */
+    myOnchain = !!me.onchain;
     allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
