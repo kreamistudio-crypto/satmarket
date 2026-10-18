@@ -167290,6 +167290,7 @@ def prove_posta_relay():
     import asyncio as _aio
     import ipaddress as _ipa
     import queue as _queue
+    import socket as _so
     import ssl as _ssl
     import threading as _th
     from concurrent.futures import ThreadPoolExecutor
@@ -167400,6 +167401,7 @@ def prove_posta_relay():
                       SVELTO: Relay(), CADE: Relay(chiudi_al=1),
                       GIU: Relay(giu=True), FUORI: Relay()})
         amb = {"create_connection": connetti, "json": json, "ssl": _ssl,
+               "socket": _so,
                "time": time, "threading": _th, "asyncio": _aio,
                "ipaddress": _ipa, "urlparse": _urlparse,
                "MODALITA_COLLAUDO": False, "_LETTURE_SIMULATE": set(),
@@ -167534,6 +167536,106 @@ def prove_posta_relay():
     vivi = [t for t in _th.enumerate() if t.name == "posta dei relay"]
     prova("...e i thread lettori sono al massimo uno per relay della lista",
           True, len(vivi) <= len(amb["RELAYS_VERIFICA"]) * 3)
+
+    # --- 6b) IL NUMERO DEL SOCKET NON SI LIBERA SOTTO IL LETTORE ---
+    # 18-19 ott 2026, il database rotto due volte: il custode e il tetto
+    # chiudevano il socket da un ALTRO thread mentre il lettore era
+    # dentro recv(); il numero liberato andava al database, e il saluto
+    # TLS del lettore finiva nella testata. Qui un socket VERO (una
+    # coppia del sistema) dentro una connessione che si comporta come
+    # websocket-client: `.sock`, e shutdown() che chiude il socket.
+    class SockSpia:
+        def __init__(self, vero, diario):
+            self.vero, self.diario, self.dentro = vero, diario, False
+
+        def recv(self, n):
+            self.dentro = True
+            try:
+                return self.vero.recv(n)
+            finally:
+                self.dentro = False
+
+        def shutdown(self, come):
+            self.diario.append(("sveglia", _th.current_thread().name, come))
+            self.vero.shutdown(come)
+
+        def close(self):
+            self.diario.append(("chiude", _th.current_thread().name,
+                                self.dentro))
+            self.vero.close()
+
+    class ConnVera:
+        def __init__(self, diario, zitta):
+            a, self.b = _so.socketpair()
+            self.sock, self.zitta, self.resto = SockSpia(a, diario), zitta, b""
+
+        def settimeout(self, t):
+            pass
+
+        def send(self, s):
+            m = json.loads(s)
+            if not self.zitta and m[0] == "EVENT":
+                self.b.sendall((json.dumps(["OK", m[1]["id"], True, ""])
+                                + "\n").encode())
+
+        def recv(self):
+            while b"\n" not in self.resto:
+                sock = self.sock
+                pezzo_letto = sock.recv(65536) if sock else b""
+                if not pezzo_letto:
+                    raise ConnectionError("chiusa")
+                self.resto += pezzo_letto
+            riga, self.resto = self.resto.split(b"\n", 1)
+            return riga.decode()
+
+        def shutdown(self):
+            if self.sock:
+                self.sock.close()
+                self.sock = None
+
+        close = shutdown
+
+    def chi_chiude(zitta):
+        diario, aperte = [], []
+
+        def apri(relay, timeout=None, sslopt=None):
+            aperte.append(ConnVera(diario, zitta))
+            return aperte[-1]
+        amb = mondo()
+        amb["_posta_connetti"] = apri
+        esito = amb["invia_evento_relay"](SVELTO, evento(40))
+        if not zitta:
+            amb["POSTA_RIPOSO_S"] = 0
+            amb["_posta_riposa"]()
+        fine = time.time() + 3
+        while time.time() < fine and not any(d[0] == "chiude" for d in diario):
+            time.sleep(0.02)
+            # SU WINDOWS shutdown() non sveglia un recv() bloccato (su
+            # Linux, cioe' VPS e CI, si'): li' il lettore lo sveglia il
+            # relay che riattacca. Chi chiude, e quando, si giudica uguale.
+            if sys.platform == "win32" and time.time() > fine - 2.5:
+                for c in aperte:
+                    c.b.close()
+        return esito, diario
+
+    for zitta, chi in ((False, "IL CUSTODE (la connessione a riposo)"),
+                       (True, "IL TETTO (la richiesta senza risposta)")):
+        esito, diario = chi_chiude(zitta)
+        chiusure = [d for d in diario if d[0] == "chiude"]
+        prova(f"{chi}: il socket lo CHIUDE solo il thread lettore, e fuori "
+              "da recv() — mai un altro thread mentre il lettore ci sta "
+              "dentro (il numero liberato andava al database)",
+              (not zitta, [("chiude", "posta dei relay", False)]),
+              (esito, chiusure))
+        prova(f"...{chi.split(' (')[0].lower()} lo SVEGLIA con "
+              "shutdown(SHUT_RDWR), da fuori", True,
+              any(d[0] == "sveglia" and d[1] != "posta dei relay"
+                  and d[2] == _so.SHUT_RDWR for d in diario))
+    prova("la sveglia e la chiusura del postino stanno col lucchetto preso "
+          "(nessun send() a meta')", True,
+          codice(src[src.index("def riposa(self"):
+                     src.index("def _posta_riposa")]).count(
+                         "            _posta_spezza(ws)") == 1)
 
     # --- 7) CHI NON PASSA DALLA POSTA, e il patto delle firme ---
     for nome in ("_dm_filo", "_orecchio_filo", "_ascolto_p2p_filo",

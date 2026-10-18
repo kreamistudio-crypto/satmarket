@@ -64980,3 +64980,80 @@ il secondo del conto alla rovescia del dettaglio P2P (23:59:58 contro
   nella colonna di destra, l'admin «⛓️ On-chain (prova)» a colonna sola,
   gli elenchi numerati nelle colonne di Info P2P, l'ordine senza chat a
   2560+, la ricerca a 640 anche a 3440).
+
+## Il saluto TLS nel database: la posta dei relay chiudeva il socket sotto il lettore (18-19 ott 2026, cantiere posta-fd, richiesta di Andrea: «risolvi»)
+
+**IL GUASTO.** Il 18 ott alle 09:04:41 (ora del VPS) il 🧊 del libro
+mastro ha detto «51 controlli non tornano — file is not a database», e
+`/api/salute` rispondeva «non sto bene». Disco al 33 %, collegamento
+`satmarket.db → dati/satmarket.db` giusto, le prime 16 lettere sane.
+`od -A d -t u1 -N 100` sulla testata: i byte 0..17 giusti, 44..99 giusti
+(formato 4, UTF-8, sqlite 3.46.1), i byte **18..43 sbagliati**. Letti da
+19: `23 3 3 0 19` — un record TLS (application data, versione 3.3, 19
+byte), cioè 5 + 19 = 24 byte, la misura esatta di un avviso TLS 1.3
+cifrato (2 byte, 1 di tipo, 16 di etichetta): il saluto di chiusura di
+una connessione cifrata, scritto DENTRO il file. Nel registro della
+macchina fra le 09:03 e le 09:06 solo il timer del deploy (vuoto) e i
+soliti tentativi ssh respinti: a scrivere è stato il processo del
+server. Il 19 ott, dopo il ripristino, di nuovo.
+
+**IL PERCHÉ.** `_posta_spezza` (la posta dei relay, 15 ott) chiudeva il
+socket con `ws.shutdown()` di websocket-client, cioè `sock.close()`, da
+un ALTRO thread — il custode (ogni 30 s, connessioni ferme da 120), il
+tetto di una richiesta, un invio fallito — mentre il thread lettore era
+dentro `recv()` su quel socket (il commento lo diceva: «il lettore sta
+dentro recv() in un altro thread»). La chiusura libera il NUMERO del
+socket; il sistema lo ridà al primo file aperto, e il server apre il
+database a ogni richiesta; il lettore, ancora dentro OpenSSL con il
+numero vecchio, al risveglio scrive il suo avviso TLS sul database.
+Perché solo dal 15 ott: prima ogni richiesta aveva la sua connessione,
+aperta e chiusa nello stesso thread. Gli altri lettori (`_orecchio`
+della cassetta, l'ascolto P2P, i DM, le ronde) chiudono ognuno la
+propria connessione nel proprio thread: guardati uno per uno, nessuno
+chiude da fuori.
+
+**LA CURA.** Da fuori si SVEGLIA e basta: `_posta_spezza` fa
+`ws.sock.shutdown(socket.SHUT_RDWR)`, che su Linux fa tornare `recv()`
+subito e lascia il numero al socket. La chiusura vera è
+`_posta_chiudi`, e la chiama solo il lettore nel suo `finally`, fuori
+da `recv()` e col lucchetto del postino preso — dove stanno tutti i
+`send()`. Anche le tre sveglie (custode, tetto, invio fallito) stanno
+dentro il lucchetto, così sveglia e chiusura non si incrociano. Il
+cartone delle prove non ha `.sock`: per lui resta il gesto di prima.
+Su Windows `shutdown` NON sveglia un `recv()` bloccato (provato): in
+collaudo una connessione a riposo resta appesa finché il relay non
+riattacca. Non è un pericolo (il numero non si libera) ed è solo del PC.
+
+**LE STRADE SCARTATE.** Tornare a una connessione per richiesta (i 429
+di nos.lol, il motivo della posta); un timeout corto sul lettore, che
+chiuderebbe da sé (il socket resterebbe comunque chiuso da fuori nel
+tetto e nel custode); il WAL (non c'entra: il guasto è un numero di
+file, non il giornale).
+
+**LA RIPARAZIONE DEL FILE (sul VPS, i comandi li ha lanciati Andrea).**
+I 26 byte si rifanno: 18..23 dal backup sano (`1 1 0 64 32 32`), il
+contatore uguale a «versione-valida-per» (byte 92..95), il numero di
+pagine dalla misura del file, la lista delle pagine libere a zero, il
+cookie dello schema dal backup; poi `VACUUM INTO` riscrive le sole
+pagine vive. Lo script (`ripara_testata.py`, nello scratchpad della
+sessione, non nel repo) è stato provato prima su una copia del db
+locale con GLI STESSI 26 byte: «file is not a database» riprodotto,
+`integrity_check` ok, nessuna riga persa. Sul VPS il 18 ott:
+`integrity_check` ok, `foreign_key_check` 0, nessuna riga persa dalle
+07:16 alle 09:04 (1 annuncio, 4 utenti, 2 feedback, 1 scambio P2P,
+345 viste…); le tre tabelle «con meno righe» erano l'indice FTS5
+fuso e la pulizia di `avvisi_notificati`.
+
+**PROVE.** `prove_posta_relay`, sezione 6b: un socket VERO (una coppia
+del sistema) dentro una connessione che fa come websocket-client
+(`.sock`, `shutdown()` che chiude), con un diario di chi sveglia e di
+chi chiude e se il lettore era dentro `recv()`. Sul codice di prima,
+nel WSL: `('chiude', 'MainThread', True)` per il custode e per il
+tetto — il guasto, ripreso — 5 rosse. Dopo: 30/30 su Linux (WSL) e su
+Windows (dove il lettore lo sveglia il relay che riattacca: chi chiude
+si giudica uguale). Suite e collaudi: nel verbale del push.
+
+**DA GUARDARE.** Che il 🧊 del libro mastro torni muto dopo il deploy;
+che il journal non dica più «file is not a database»; le copie del file
+rotto in `/root` (`satmarket-rotto-*.db`) si tengono finché il db non
+ha girato qualche giorno sano.

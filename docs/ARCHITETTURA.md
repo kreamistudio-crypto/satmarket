@@ -32599,8 +32599,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   eose, chiuso, tempo, caduto, giu, coda, doppio. Caduta a metà: il
   lettore sveglia chi aspettava («caduto») e la richiesta riprova una
   volta su una connessione nuova. Tempo scaduto: la connessione si
-  spezza (`_posta_spezza`, shutdown senza saluto, perché il lettore sta
-  dentro recv). Apertura fallita: pausa 1, 2, 4… fino a
+  spezza (`_posta_spezza`). CHI CHIUDE IL SOCKET (19 ott 2026, il
+  database rotto due volte; perché in CANTIERI, «Il saluto TLS nel
+  database»): da un altro thread (custode, tetto, invio fallito) solo
+  `shutdown(SHUT_RDWR)` sul socket, che sveglia recv() e NON libera il
+  numero; la chiusura vera (`_posta_chiudi`) la fa SOLO il lettore,
+  fuori da recv() e col lucchetto del postino, dove stanno tutti i
+  send(). Chiudere da fuori ridava il numero al database e il TLS del
+  lettore ci scriveva dentro. Apertura fallita: pausa 1, 2, 4… fino a
   `POSTA_PAUSA_MAX_S`, e intanto «giu» senza bussare. Il custode
   (thread `custode della posta`, ogni 30 s) chiude le connessioni ferme
   da `POSTA_RIPOSO_S`. Le porte che ci passano: `invia_evento_relay`

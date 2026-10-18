@@ -63916,12 +63916,37 @@ _POSTA_LUCCHETTO = threading.Lock()
 _POSTA_CUSTODE = []
 
 
-def _posta_spezza(ws):
-    """Chiude il socket SUBITO, senza il saluto di chiusura: il lettore
-    sta dentro recv() in un altro thread, e il saluto vorrebbe leggere
-    la risposta proprio da li'."""
+def _posta_chiudi(ws):
+    """Chiude il socket SUBITO, senza il saluto di chiusura. La chiama
+    SOLO il thread lettore di quella connessione, fuori da recv() e col
+    lucchetto del postino preso: nessun altro e' dentro il socket."""
     try:
         (getattr(ws, "shutdown", None) or ws.close)()
+    except Exception:
+        pass
+
+
+def _posta_spezza(ws):
+    """SVEGLIA il lettore di una connessione da un ALTRO thread (il
+    custode, il tetto di una richiesta), SENZA chiuderla: la chiude lui
+    (`_posta_chiudi`), appena esce da recv().
+    IL PERCHE' (18-19 ott 2026, il database rotto due volte): chiudere
+    da qui libera il NUMERO del socket mentre il lettore e' ancora
+    dentro recv() su quel numero. Il sistema lo ridava al primo file
+    aperto — il database del mercatino — e quando il lettore si
+    svegliava, il TLS scriveva il suo saluto di chiusura lì dentro: 24
+    byte a partire dal byte 19 della testata (`23 3 3 0 19` = un record
+    TLS da 19 byte) e «file is not a database». shutdown(SHUT_RDWR)
+    sveglia recv() subito e il numero resta del socket finche' il
+    lettore non lo chiude. Il cartone delle prove non ha `.sock`: per
+    lui resta il gesto di prima."""
+    try:
+        if not hasattr(ws, "sock"):
+            (getattr(ws, "shutdown", None) or ws.close)()
+            return
+        sock = ws.sock
+        if sock is not None:
+            sock.shutdown(socket.SHUT_RDWR)
     except Exception:
         pass
 
@@ -63987,11 +64012,13 @@ class _Postino:
                 if self.ws is ws:
                     self.ws = None
                 rimaste = [a for a in self.attese.values() if a["giro"] == giro]
+                # la chiude il lettore, fuori da recv() e col lucchetto:
+                # ogni send() del postino sta dentro questo lucchetto
+                _posta_chiudi(ws)
             for a in rimaste:
                 if not a["pronto"].is_set():
                     a["stato"] = "caduto"
                     a["pronto"].set()
-            _posta_spezza(ws)
 
     def _smista(self, msg, giro):
         tipo = msg[0]
@@ -64053,8 +64080,8 @@ class _Postino:
                         mandato = False
                         if self.ws is ws:
                             self.ws = None
+                        _posta_spezza(ws)
                 if not mandato:
-                    _posta_spezza(ws)
                     a["stato"] = "caduto"
                 else:
                     a["pronto"].wait(max(0.0, scade - time.time()))
@@ -64068,7 +64095,7 @@ class _Postino:
                     with self.lucchetto:
                         if self.ws is ws:
                             self.ws = None
-                    _posta_spezza(ws)
+                        _posta_spezza(ws)
                 return a
             return a
         finally:
@@ -64104,7 +64131,7 @@ class _Postino:
                     or adesso - self.usato < POSTA_RIPOSO_S:
                 return
             self.ws = None
-        _posta_spezza(ws)
+            _posta_spezza(ws)
 
 
 def _posta_riposa():
