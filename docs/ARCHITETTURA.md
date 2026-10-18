@@ -9643,6 +9643,20 @@
   attivo (foto, nome, numero degli aperti), sempre, anche con un
   account solo: lì c'è «Aggiungi un account». È una porta al foglio,
   non un secondo elenco.
+  IL TAPPO NEL PROFILO, NELLO STESSO PUNTO (18 ott 2026; CANTIERI, «Il
+  secondo tocco trova la foto»): la foto della testata del Profilo NON
+  bastava — dopo il primo tocco, sotto il dito c'era il titolo, e
+  l'accenno «Tocca di nuovo la tua foto» portava a un punto vuoto. Sotto
+  i 768px il Profilo ha un SECONDO TAPPO (`#tappoProfilo`, lo stesso
+  bottone: `toccaTappo`, foto e iniziale da `renderAvatar`) a 14px dalla
+  cima della vista e `--pad` dal bordo, cioè dove la testata di Esplora
+  mette il suo; si accende (`vivo`) solo dove `accountVivi()`, da
+  `renderPastigliaAccount`. Con Esplora scorsa la testata appiccicata
+  tiene il tappo in cima allo schermo, mentre il Profilo riparte sotto il
+  benvenuto del web: `toccaTappo` posa allora la pagina più giù, col
+  conto fatto su ESPLORA prima di `go()` (il Profilo appena aperto sta
+  per un istante 6px più giù di dove si posa). Da desktop il tappo sta
+  nella barra e niente cambia.
   I GESTI COI SOLDI (`soldi: true` in `chiediConferma`, i due fogli di
   pagamento, la pagina dell'ordine P2P sopra «Compra/Vendi») mostrano
   «Stai usando <volto, nome>» quando gli aperti sono più d'uno.

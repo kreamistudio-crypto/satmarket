@@ -109678,7 +109678,9 @@ def prove_portachiavi():
 
     # --- IL GESTO DEL TAPPO (ago 2026): primo tocco il Profilo,
     #     secondo il menu degli account. ---
-    tap = _fetta(mini, "function toccaTappo()", 500)
+    # (18 ott 2026) la funzione INTERA e non i suoi primi 500 caratteri:
+    # col tappo del Profilo e' cresciuta, e la fetta tagliava go('profilo')
+    tap = _fn_js(mini, "function toccaTappo(")
     prova("il tappo passa dal gesto e non piu' da go('profilo')", 2,
           mini.count('class="avatar-btn" onclick="toccaTappo()"'))
     prova("...e nessuna istanza e' rimasta indietro", 0,
@@ -109689,6 +109691,44 @@ def prove_portachiavi():
           "accountVivi()" in tap)
     prova("...ma chi e' altrove va al Profilo, come sempre", True,
           "go('profilo');" in tap)
+    # IL TAPPO NEL PROFILO, NELLO STESSO PUNTO (18 ott 2026, cantiere
+    # doppio-tocco, richiesta di Andrea): sul telefono la testata col tappo
+    # sta in Esplora e il Profilo la nasconde, quindi il secondo tocco
+    # cadeva sul titolo e l'accenno «Tocca di nuovo la tua foto» portava a
+    # un punto vuoto. Ora il Profilo ha il suo tappo DOVE stava quello: la
+    # misura si prende dalla testata e non da un numero ricopiato, cosi'
+    # chi cambia il padding della testata vede rossa questa prova.
+    _vp = mini[mini.index('<div class="view" id="view-profilo">'):]
+    _vp = _vp[:_vp.index('<div class="form">')]
+    prova("il Profilo ha il suo tappo, prima del form, e fa il gesto di sempre",
+          [True, 1],
+          ['class="avatar-btn tappo-profilo" id="tappoProfilo" onclick="toccaTappo()"' in _vp,
+           mini.count('id="tappoProfilo"')])
+    _testata = re.search(r"\n  header\{[^}]*padding:(\d+)px var\(--pad\) \d+px;", mini)
+    _tp = re.search(r"@media \(max-width:767px\)\{\s*#view-profilo\{position:relative\}\s*"
+                    r"#view-profilo \.tappo-profilo\.on\.vivo\{display:inline-flex;position:absolute;\s*"
+                    r"top:(\d+)px;right:var\(--pad\);z-index:2\}", mini)
+    prova("...nello STESSO punto del tappo in testata (il padding di sopra e "
+          "--pad a destra), e solo sotto i 768px",
+          [True, True], [bool(_testata and _tp),
+                         bool(_testata and _tp) and _testata.group(1) == _tp.group(1)])
+    _pa = _fn_js(mini, "function renderPastigliaAccount(")
+    prova("...acceso solo dove gli account esistono, prima di ogni uscita",
+          True, "el('tappoProfilo')?.classList.toggle('vivo', accountVivi());" in _pa
+          and _pa.index("toggle('vivo'") < _pa.index("return"))
+    # il salto si conta su Esplora PRIMA di go(): subito dopo il Profilo sta
+    # 6px piu' giu' di dove si posa (misurato a 360 px), e un conto fatto
+    # li' diventava uno scatto a ogni primo tocco
+    prova("con Esplora scorsa la pagina si posa sotto il dito: il conto e' "
+          "di Esplora, prima di go(), e si scorre solo dopo",
+          True, all(s in tap for s in (
+              "const vistaSu = el('view-esplora').getBoundingClientRect().top + window.scrollY;",
+              "parseFloat(getComputedStyle(tp).top)", "if (salto > 0) window.scrollTo(0, salto);"))
+          and tap.index("const vistaSu") < tap.index("go('profilo');")
+          < tap.index("window.scrollTo(0, salto)"))
+    prova("...e l'accenno dice di nuovo il vero: si tocca la foto", True,
+          "Tocca di nuovo la tua foto per cambiare account" in
+          _fn_js(mini, "function accennaAccount("))
     # La lista vive in UN posto solo: in pagina non deve tornare, o
     # sarebbero due elenchi della stessa cosa e il gesto non avrebbe
     # piu' niente da dire.

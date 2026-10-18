@@ -7642,6 +7642,26 @@
     font-size:11.5px;line-height:20px;text-align:center}
   .conto-pill .fr{flex:0 0 auto;color:var(--muted)}
   .conto-pill:focus-visible{outline:2px solid var(--sats);outline-offset:2px}
+  /* IL TAPPO NEL PROFILO, NELLO STESSO PUNTO (18 ott 2026, cantiere
+     doppio-tocco, richiesta di Andrea): sul telefono la testata col tappo
+     vive in Esplora e il Profilo la nasconde — il secondo tocco cadeva
+     sul titolo, e il consiglio «Tocca di nuovo la tua foto» portava a un
+     punto vuoto. Qui un secondo tappo, lo STESSO bottone (toccaTappo,
+     foto e iniziale da renderAvatar), dove stava il primo: 14px dalla
+     cima della vista come il padding della testata, --pad dal bordo come
+     la fine della riga .brand. Il Profilo riparte dalla cima, quindi il
+     dito ci ritrova la foto. Solo sotto i 768px (da desktop il tappo sta
+     nella barra e resta dov'e') e solo dove gli account esistono
+     (`vivo`, da renderPastigliaAccount): senza, sarebbe un bottone muto.
+     Scorre via col Profilo: non galleggia sopra i cassetti.
+     ⚠️ UN CASO SOLO NON TORNA: nel web col benvenuto ancora aperto ED
+     Esplora scorsa, il tappo della testata appiccicata sta in cima allo
+     schermo, e il Profilo riparte sotto il benvenuto. */
+  @media (max-width:767px){
+    #view-profilo{position:relative}
+    #view-profilo .tappo-profilo.on.vivo{display:inline-flex;position:absolute;
+      top:14px;right:var(--pad);z-index:2}
+  }
   /* «Stai usando …»: il volto dell'account attivo in testa a ogni gesto
      coi soldi, solo quando gli account aperti sono piu' d'uno */
   .conto-in-vista{display:flex;align-items:center;gap:8px;margin:0 0 10px;
@@ -13120,6 +13140,10 @@ document.getElementById('cartello')?.remove();</script>
        blocchi interni restano gli stessi di sempre: cambia la casa,
        non la logica. -->
   <div class="view" id="view-profilo">
+    <!-- Il tappo nello stesso punto della testata (18 ott 2026): il
+         secondo tocco apre «I tuoi account» anche sul telefono. Lo
+         accendono renderAvatar (on) e renderPastigliaAccount (vivo). -->
+    <button class="avatar-btn tappo-profilo" id="tappoProfilo" onclick="toccaTappo()" title="I tuoi account" aria-label="I tuoi account"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
     <div class="form">
       <!-- IL TITOLO IN ALTO, AL CENTRO (set 2026, «Il profilo più
            elegante»): era l'etichetta di servizio in maiuscoletto
@@ -50957,7 +50981,31 @@ function toccaTappo(){
      vista sarebbe un secondo posto da tenere in pari. */
   const qui = (document.querySelector('.view.active')?.id || '').replace('view-','');
   if (qui === 'profilo' && accountVivi()) { apriAccountSheet(); return; }
+  /* IL SECONDO TOCCO TROVA LA FOTO (18 ott 2026, cantiere doppio-tocco):
+     sul telefono il Profilo ha il suo tappo dove stava quello della
+     testata (vedi IL TAPPO NEL PROFILO). Il Profilo riparte dalla cima,
+     ma la testata di Esplora e' appiccicata: con Esplora scorsa e il
+     benvenuto del web sopra le viste, il tappo era in cima allo schermo
+     e quello del Profilo nascerebbe sotto il benvenuto. Allora la pagina
+     si posa piu' giu' di quanto serve — il benvenuto resta fuori vista,
+     com'era in Esplora — e il dito ritrova la foto. Da desktop il tappo
+     del Profilo non c'e', e non si sposta niente.
+     IL CONTO SI FA SU ESPLORA, NON SUL PROFILO APPENA APERTO: subito dopo
+     go() il Profilo sta per un istante 6px piu' giu' di dove si posa
+     (misurato a 360 px), e un salto calcolato li' sarebbe uno scatto di
+     6px a ogni primo tocco. Le due viste nascono nello stesso punto
+     (sotto il benvenuto), quindi basta la cima di Esplora nella pagina
+     piu' il `top` del tappo del Profilo. */
+  const tappoSu = qui === 'esplora'
+    ? document.querySelector('#view-esplora header .avatar-btn')?.getBoundingClientRect().top
+    : null;
+  const vistaSu = el('view-esplora').getBoundingClientRect().top + window.scrollY;
   go('profilo');
+  const tp = el('tappoProfilo');
+  if (tappoSu != null && tp && tp.offsetParent !== null) {
+    const salto = Math.round(vistaSu + parseFloat(getComputedStyle(tp).top) - tappoSu);
+    if (salto > 0) window.scrollTo(0, salto);
+  }
 }
 
 /* LA PASTIGLIA (16 ott 2026, richiesta di Andrea: «così non serve
@@ -50968,6 +51016,9 @@ function toccaTappo(){
    al foglio e non un secondo elenco. */
 function renderPastigliaAccount(){
   const posto = el('contoPastiglia');
+  /* il tappo del Profilo vive dove vive la pastiglia: senza account da
+     scegliere il secondo tocco non avrebbe niente da aprire */
+  el('tappoProfilo')?.classList.toggle('vivo', accountVivi());
   if (!posto) return;
   if (!accountVivi()) { posto.innerHTML = ''; return; }
   const c = contoAttivoRiga()

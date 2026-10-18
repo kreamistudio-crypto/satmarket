@@ -65184,3 +65184,61 @@ codice che gira (`grep -c "def _posta_chiudi" server.py` = 1); una volta
 sola l'unità del deploy ricopiata (`TimeoutStartUSec=10min`); al deploy
 dopo, l'archivio «prima del deploy» sul canale dei backup; che il 🧊
 del libro mastro torni muto.
+
+## Il secondo tocco trova la foto (18 ott 2026, cantiere doppio-tocco, richiesta di Andrea)
+
+**IL GUASTO.** Verificato dal vivo il 18 ott (web app a 360 px, due
+account: un Telegram e uno con l'id oltre 2^53): il primo tocco sul
+tappo della testata apre il Profilo, ma la testata vive in Esplora e il
+Profilo la nasconde — nello stesso punto c'era il titolo «Il tuo
+profilo», il secondo tocco non apriva niente, e l'accenno «💡 Tocca di
+nuovo la tua foto per cambiare account» portava a un punto vuoto. La
+pastiglia sotto il titolo e il doppio clic da desktop (il tappo resta
+nella barra) funzionavano già, in tutte e due le direzioni dello switch.
+
+**LA SCELTA (Andrea).** Tenere la foto nello stesso punto anche nel
+Profilo; il testo nuovo («Tocca il tuo nome sotto il titolo…») solo se
+non si poteva senza rompere il Profilo. Si poteva.
+
+**FATTO.** In `miniapp.html` un secondo tappo, `#tappoProfilo`, in cima
+a `#view-profilo`: lo STESSO bottone (`onclick="toccaTappo()"`, foto e
+iniziale da `renderAvatar` come ogni `.avatar-btn`), sotto i 768px,
+assoluto a `top:14px` (il padding di sopra della testata) e
+`right:var(--pad)` (dove finisce la riga `.brand`). Si accende (`vivo`)
+solo dove `accountVivi()`, da `renderPastigliaAccount`: nella Mini App a
+leva spenta non ci sono account, e un bottone muto sarebbe peggio.
+Scorre via col Profilo, non galleggia sui cassetti. L'accenno resta
+quello: adesso dice il vero.
+IL CASO CHE MANCAVA, Esplora scorsa col benvenuto del web aperto (resta
+finché non si tocca la ✕): la testata appiccicata tiene il tappo a 14px
+dalla cima dello SCHERMO, e il Profilo riparte sotto il benvenuto (161px
+a 360). `toccaTappo` posa allora la pagina più giù — il benvenuto resta
+fuori vista com'era in Esplora. IL CONTO SI FA SU ESPLORA PRIMA DI
+`go()`: il Profilo appena aperto sta per un istante 6px più giù di dove
+si posa, e il primo conto, fatto lì, dava uno scatto di 6px a ogni primo
+tocco (misurato, poi curato). Da desktop niente cambia.
+
+**PROVE.** In `prove_portachiavi`: la fetta di `toccaTappo` diventa la
+funzione intera (i 500 caratteri tagliavano `go('profilo')` dopo il
+commento nuovo), e cinque prove: il tappo prima del form col gesto di
+sempre, lo stesso punto della testata (il numero si legge dal padding
+della testata: chi lo cambia vede rossa la prova), acceso solo con gli
+account, il conto su Esplora prima di `go()`, l'accenno. Tre controprove
+sul file vero, poi ripristinato: tappo a 20px, `vivo` tolto, conto dopo
+`go()` — cade la prova giusta ogni volta (56/57). Dal vivo con
+Playwright e Chrome, puntatore dichiarato, web app a 360 px densità 3,
+chiaro e scuro, Esplora in cima e scorsa: due tocchi VERI nello stesso
+punto → sotto il dito il tappo del Profilo, si apre «I tuoi account», la
+riga dell'altro account cambia davvero `/api/me`; a 1366 col mouse il
+tappo del Profilo non c'è e il doppio clic resta quello di prima. Server
+del giro da una copia nello scratchpad, relay morti, leva spenta come in
+produzione. Suite e collaudi: nel verbale del commit.
+
+**DECISO E NON TOCCATO.** «Non puoi puntare sulla tua stessa asta» sulla
+stessa chiave Nostr (aste, 4 ago 2026, `dbabd4f`) RESTA: protegge i
+compratori (Andrea, 18 ott). L'antiabuso dei più account resta «solo
+annotare».
+
+**DA GUARDARE.** Sul telefono vero, nel browser e nella PWA; nella Mini
+App solo il giorno che la leva `PIU_ACCOUNT_OVUNQUE` si accende (lì il
+tappo nasce a 14px dalla cima, misurato, ma non provato col dito).
