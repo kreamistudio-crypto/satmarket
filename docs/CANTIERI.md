@@ -64815,3 +64815,89 @@ bot mentre è scelto il Nostr.
 - Il mazzo P2P di un account Nostr scelto dentro la Mini App non va nel
   cloud: vive nel telefono e si ricava dal seme come sul web. Da dire nel
   patto «I tuoi dati» se Andrea accende la leva.
+
+## Il checksum del descrittore: le otto lettere senza cui un nodo non importa niente, e la prova doppia che le giudica (17 ott 2026, cantiere pagamento-onchain tappa 2a, «vai direttamente con le prove»)
+
+Era il **primo dei «da fare»** della tappa 1b, dove il descrittore si
+mostrava NUDO con una riga che diceva «Sparrow lo accetta e lo
+ricalcola». Vero per Sparrow, falso per tutto il resto:
+**`bitcoin-cli importdescriptors` RIFIUTA un descrittore senza
+checksum**. E un descrittore che un nodo non importa non è un backup —
+è una stringa. Il giorno in cui qualcuno dovrà ricostruire l'indirizzo
+di un ordine **senza di noi**, quelle otto lettere sono il pezzo che
+gli serve buono.
+
+**PERCHÉ IERI NO E OGGI SÌ**, che è la cosa da imparare da questa
+voce: ieri non c'erano i vettori. Scrivere a occhio un codice
+correttore e sbagliarlo è **peggio** che non scriverlo, perché un
+checksum sbagliato ha l'aria giusta — otto lettere plausibili su un
+descrittore che nessun nodo accetta. Un «da fare» rimandato per
+mancanza di vettori è una decisione, non una pigrizia.
+
+**LA PROVA È DOPPIA, e per un codice correttore è l'unica che vale.**
+Nel prodotto c'è la mia traduzione in JavaScript della ricetta del
+BIP-380; nel banco c'è la **ricetta originale ricopiata in Python**
+(`descsum_polymod`, `descsum_expand`, `descsum_create`, dal
+`bip-0380.mediawiki` letto il 17 ott). Le due si confrontano su **74
+descrittori**: il vettore ufficiale `raw(deadbeef)#89f8spxm`, il
+descrittore vero del BIP-383, le xpub dei quattro vettori BIP-32,
+sessanta 2-di-3 di chiavi finte, e i casi scomodi (vuoto, un carattere
+solo, `#` da solo, caratteri fuori alfabeto). Combaciano su tutti.
+⚠️ IL GIUDICE STA NEL BANCO E NON NEL PRODOTTO, apposta: un giudice che
+venisse dallo stesso codice che deve giudicare non giudicherebbe
+niente. E prima di giudicare **dimostra di saper giudicare**, sul
+vettore ufficiale e sul caso del carattere non ammesso.
+
+⚠️ **IL GUASTO CHE QUESTA SEZIONE ESISTE PER PRENDERE, e che avrei
+fatto senza pensarci.** I numeri del generatore superano i 32 bit
+(`0xf5dee51989`), e in JavaScript gli operatori `^` `<<` `>>` lavorano
+a **32 bit**: scritto con quelli, il checksum sarebbe **sbagliato ma
+dall'aria giusta**. Per questo tutto è in **BigInt** — generatore,
+turni e maschere — e ci sono due sentinelle che pretendono i suffissi
+`n`: se un domani qualcuno «semplifica» togliendoli, la CI diventa
+rossa invece di spedire indirizzi che nessuno ritrova.
+
+**LA REGOLA DEL CASO BRUTTO:** se il descrittore contiene un carattere
+fuori dall'alfabeto del BIP, `descrittoreChecksum` torna `''` e il
+descrittore resta **NUDO**. Meglio nudo — Sparrow lo accetta e lo
+ricalcola — che con otto lettere false, che sembrano buone e portano
+altrove. C'è la prova su due casi (`raw(Ü)` e un 2-di-3 con una lettera
+accentata dentro).
+
+**COSA SI VEDE ADESSO NEL FOGLIO.** Il descrittore dell'ordine esce
+completo — `wsh(sortedmulti(2,…))#y955504p` — e la riga sotto non dice
+più «senza checksum» ma cosa sono quelle otto lettere e perché senza di
+loro un nodo rifiuta. Il testo di ieri era diventato falso nel momento
+in cui il codice è cambiato: **un testo che descrive il codice va
+corretto col codice**, o diventa la bugia più credibile che c'è.
+
+⚠️ **LA SESTA SENTINELLA DELLA SERIE mi ha ripreso subito**, ed è il
+caso più istruttivo: il banco della tappa 1b estrae `onchainChiavi` da
+`miniapp.html` e la fa girare da sola — ma da oggi quella funzione
+**chiama** `descrittoreConChecksum`, e il banco è morto con un
+`ReferenceError` nel momento esatto in cui il checksum è nato. Non
+l'avevo previsto: l'ha detto la suite. Riparato dandogli anche il
+blocco del checksum, col commento che racconta cosa è successo — così
+chi aggiungerà il prossimo pezzo a `onchainChiavi` sa già cosa gli
+succederà.
+
+**COSA È GIRATO SU QUALE ALBERO.** Sull'albero del cantiere
+(`cantiere/onchain-checksum`, su origin/main a 228679b):
+`prove_checksum_descrittore`, **11 passate, 0 fallite** (di cui il
+confronto fra le due trascrizioni su 74 descrittori);
+`prove_banco_chiavi_onchain` riparata e verde; la suite intera con
+`PROVE_SEVERE=1` → **25.055 passate, 0 fallite, 0 saltate**.
+
+**DA FARE** (notati, non fatti):
+- **Una chiave per ordine con l'indice vero**: la strada è ancora una
+  sola (`m/0/0`, la dice il server). L'indice per ordine vuole un
+  ordine vero, quindi la tappa dell'indirizzo dell'ordine.
+- **L'xpub dedicata del venditore**: oggi è di cartone (un vettore
+  BIP-32). Quella vera nasce quando il venditore accende l'on-chain
+  dalla sua app, e vuole una colonna sua e un gesto suo.
+- **`descsum_check`** (verificare un checksum che arriva da fuori) non
+  serve finché non importiamo descrittori altrui: nascerà col giorno in
+  cui qualcuno incolla il suo.
+- **La prova in Sparrow** resta un gesto di Andrea: adesso il
+  descrittore è importabile per davvero, e quella è la verifica che
+  conta.

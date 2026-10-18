@@ -148046,6 +148046,168 @@ console.log(JSON.stringify(out));
           anello("chiaro", set(o["p2pFatto"][0]), ("display",)).get("display"))
 
 
+def prove_checksum_descrittore():
+    """IL CHECKSUM DEL DESCRITTORE (17 ott 2026, cantiere
+    pagamento-onchain tappa 2a; era il primo dei «da fare» della tappa
+    1b, dove il descrittore si mostrava NUDO).
+
+    Le otto lettere dopo il `#` sono il codice correttore del BIP-380.
+    Non sono un ornamento: `bitcoin-cli importdescriptors` RIFIUTA un
+    descrittore senza checksum, e un descrittore che un nodo non
+    importa non e' un backup — e' una stringa. Il giorno in cui qualcuno
+    dovra' ricostruire l'indirizzo di un ordine SENZA DI NOI, questo e'
+    il pezzo che gli serve buono.
+
+    LA PROVA E' DOPPIA, e per un codice correttore e' l'unica che vale:
+    la traduzione in JavaScript che gira nel browser, confrontata con
+    la RICETTA ORIGINALE del BIP ricopiata qui in Python, su piu' di
+    settanta descrittori — piu' il vettore ufficiale
+    `raw(deadbeef)#89f8spxm`. Due trascrizioni indipendenti che
+    combaciano su tutto sono una cosa; una sola che «sembra giusta» e'
+    il modo di spedire indirizzi che nessuno ritrova.
+
+    ⚠️ IL GUASTO CHE QUESTA SEZIONE ESISTE PER PRENDERE: i numeri del
+    generatore superano i 32 bit (`0xf5dee51989`), e in JavaScript gli
+    operatori `^` `<<` `>>` lavorano a 32 bit. Scritto con quelli, il
+    checksum sarebbe SBAGLIATO MA DALL'ARIA GIUSTA — otto lettere
+    plausibili su un descrittore che nessun nodo accetta. Per questo il
+    codice e' in BigInt, e il banco lo dimostra sul vettore ufficiale.
+    E un carattere fuori dall'alfabeto del BIP non deve produrre un
+    checksum qualunque: la funzione torna '' e il descrittore resta
+    NUDO, che Sparrow accetta ricalcolandolo."""
+    print("\n⛓️ Il checksum del descrittore (BIP-380)")
+    import shutil as _sh
+    import subprocess as _sp
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # LA RICETTA DEL BIP, RICOPIATA (bip-0380.mediawiki, letto il 17 ott
+    # 2026). Sta qui e NON nel prodotto: e' il giudice, e un giudice che
+    # venisse dallo stesso codice che deve giudicare non giudicherebbe
+    # niente.
+    INGRESSO = ("0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>"
+                "?!^_|~ijklmnopqrstuvwxyzABCDEFGH`#\"\\ ")
+    USCITA = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    GEN = [0xf5dee51989, 0xa9fdca3312, 0x1bab10e32d, 0x3706b1677a,
+           0x644d626ffd]
+
+    def _polymod(simboli):
+        chk = 1
+        for v in simboli:
+            top = chk >> 35
+            chk = (chk & 0x7ffffffff) << 5 ^ v
+            for i in range(5):
+                chk ^= GEN[i] if ((top >> i) & 1) else 0
+        return chk
+
+    def _espandi(s):
+        gruppi, simboli = [], []
+        for c in s:
+            if c not in INGRESSO:
+                return None
+            v = INGRESSO.find(c)
+            simboli.append(v & 31)
+            gruppi.append(v >> 5)
+            if len(gruppi) == 3:
+                simboli.append(gruppi[0] * 9 + gruppi[1] * 3 + gruppi[2])
+                gruppi = []
+        if len(gruppi) == 1:
+            simboli.append(gruppi[0])
+        elif len(gruppi) == 2:
+            simboli.append(gruppi[0] * 3 + gruppi[1])
+        return simboli
+
+    def _crea(s):
+        simboli = _espandi(s)
+        if simboli is None:
+            return ""
+        chk = _polymod(simboli + [0] * 8) ^ 1
+        return "".join(USCITA[(chk >> (5 * (7 - i))) & 31] for i in range(8))
+
+    # il giudice sa giudicare? sul vettore UFFICIALE del BIP-380
+    prova("la ricetta del BIP ricopiata da' il vettore ufficiale "
+          "`raw(deadbeef)#89f8spxm`", "89f8spxm", _crea("raw(deadbeef)"))
+    prova("...e su un carattere fuori dall'alfabeto non inventa niente",
+          "", _crea("raw(Ü)"))
+    # ...e una lettera cambiata cambia il checksum: e' il mestiere di un
+    # codice correttore, e se non lo facesse non proteggerebbe nulla
+    prova("...e una lettera cambiata nel descrittore cambia il checksum",
+          True, _crea("raw(deadbeef)") != _crea("raw(deedbeef)"))
+
+    # la forma: in BigInt, e il prodotto lo usa davvero
+    i_c = mini.index("/* ============ IL CHECKSUM DEL DESCRITTORE")
+    blocco = mini[i_c:mini.index("/* Le TRE chiavi dell'ordine", i_c)]
+    prova("il generatore e' in BigInt (a 32 bit il checksum sarebbe "
+          "sbagliato ma dall'aria giusta)", [True, False],
+          ["0xf5dee51989n" in blocco, "0xf5dee51989," in blocco])
+    prova("i turni e le maschere sono BigInt anche loro", [True, True],
+          ["chk >> 35n" in blocco, "0x7ffffffffn" in blocco])
+    prova("il descrittore dell'ordine PASSA dal checksum", True,
+          "descrittore: descrittoreConChecksum(" in mini)
+    prova("...e se il checksum non si puo' fare il descrittore resta "
+          "NUDO, non sbagliato", True,
+          "return c ? `${s}#${c}` : s;" in blocco)
+
+    # il banco: la mia traduzione contro la ricetta, su molti casi
+    node = _sh.which("node")
+    if not node:
+        salta("checksum: le due trascrizioni confrontate",
+              "node non installato")
+        return
+    vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
+                          encoding="utf-8"))
+    # un ventaglio largo: il vettore del BIP, il descrittore vero del
+    # BIP-383, le xpub dei vettori, 2-di-3 di chiavi finte, e i casi
+    # scomodi (vuoto, un carattere solo, caratteri NON ammessi)
+    casi = ["raw(deadbeef)",
+            vett["bip383_sortedmulti2"]["descrittore"],
+            "wsh(%s)" % vett["bip383_sortedmulti2"]["descrittore"],
+            "wpkh(%s)" % vett["bip32"][0]["catene"][0]["xpub"],
+            "", "a", "#", "wsh(sortedmulti(2))",
+            "raw(Ü)", "wsh(sortedmulti(2,è))"]
+    for v in vett["bip32"]:
+        casi.append("wsh(sortedmulti(2,%s/0/*,%s/1/*))"
+                    % (v["catene"][0]["xpub"], v["catene"][-1]["xpub"]))
+    for i in range(60):          # tanti 2-di-3 di chiavi finte, in fila
+        tre = ",".join("02" + ("%062x" % (i * 3 + k)) for k in range(3))
+        casi.append("wsh(sortedmulti(2,%s))" % tre)
+    attesi = [_crea(c) for c in casi]
+
+    banco = """
+const casi = JSON.parse(process.argv[2]);
+__BLOCCO__
+console.log(JSON.stringify({
+  fuori: casi.map(descrittoreChecksum),
+  interi: casi.map(descrittoreConChecksum),
+}));
+"""
+    banco = banco.replace("__BLOCCO__", blocco)
+    strada = os.path.join(QUI, ".banco-checksum.js")
+    with open(strada, "w", encoding="utf-8") as fh:
+        fh.write(banco)
+    try:
+        r = _sp.run([node, strada, json.dumps(casi)],
+                    capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=120)
+    finally:
+        os.unlink(strada)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-900:])
+        prova("checksum: il banco ha risposto", True, False)
+        return
+    prova("la traduzione in JavaScript e la ricetta del BIP dicono LA "
+          "STESSA COSA su tutti i casi", attesi, o["fuori"])
+    prova("...e i casi erano tanti e scomodi (vettori, xpub, 2-di-3, "
+          "vuoto, caratteri non ammessi)", True, len(casi) >= 70)
+    prova("il prodotto compone il vettore ufficiale del BIP-380",
+          "raw(deadbeef)#89f8spxm", o["interi"][0])
+    nudi = [o["interi"][casi.index(c)]
+            for c in ("raw(Ü)", "wsh(sortedmulti(2,è))")]
+    prova("...e un descrittore con caratteri non ammessi resta nudo",
+          ["raw(Ü)", "wsh(sortedmulti(2,è))"], nudi)
+
+
 def prove_chiave_che_nasce_da_sola():
     """LA CHIAVE CHE NASCE DA SOLA (16 ott 2026, cantiere
     pagamento-onchain tappa 1c, parola di Andrea: «l'utente finale NON
@@ -148337,6 +148499,13 @@ def prove_banco_chiavi_onchain():
     # senza aver provato niente.
     chiavi_js = pezzo_js(mini, "async function onchainChiavi(parole, srv){",
                          "\n}\n") + "\n}"
+    # ...e col blocco del CHECKSUM davanti (17 ott 2026): `onchainChiavi`
+    # da quel giorno chiama `descrittoreConChecksum`, e un banco che
+    # estraesse la sola funzione morirebbe con un ReferenceError —
+    # l'ha fatto, il giorno in cui il checksum e' nato.
+    i_ck = mini.index("/* ============ IL CHECKSUM DEL DESCRITTORE")
+    chiavi_js = (mini[i_ck:mini.index("/* Le TRE chiavi dell'ordine", i_ck)]
+                 + chiavi_js)
     vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
                           encoding="utf-8"))
     srv = {"xpub": vett["bip32"][0]["catene"][0]["xpub"],
@@ -169181,6 +169350,7 @@ def main():
     prove_cancello_onchain,
     prove_banco_chiavi_onchain,
     prove_chiave_che_nasce_da_sola,
+    prove_checksum_descrittore,
     prove_leva_rgb,
     prove_annuncio_identita,
     prove_mutinynet_prep,

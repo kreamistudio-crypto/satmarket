@@ -51661,6 +51661,86 @@ async function onchainDaiRelay(){
   finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
 }
 
+/* ============ IL CHECKSUM DEL DESCRITTORE (17 ott 2026) ============
+   Le otto lettere dopo il `#` sono il codice correttore del BIP-380, e
+   non sono un ornamento: `bitcoin-cli importdescriptors` RIFIUTA un
+   descrittore senza checksum, e un descrittore che un nodo non importa
+   non e' un backup — e' una stringa. Il giorno in cui qualcuno dovra'
+   ricostruire l'indirizzo di un ordine senza di noi, questo e' il
+   pezzo che gli serve buono.
+
+   E' LA RICETTA DEL BIP, TRADOTTA RIGA PER RIGA, non una
+   reinterpretazione: `descsum_polymod`, `descsum_expand` e
+   `descsum_create` stanno nel BIP-380 in Python, e qui sono le stesse
+   in JavaScript. Il banco di prove.py confronta la MIA traduzione con
+   la ricetta originale ricopiata in Python su centinaia di
+   descrittori, piu' il vettore ufficiale `raw(deadbeef)#89f8spxm`: due
+   trascrizioni indipendenti che combaciano sono la sola forma di
+   fiducia che un codice correttore merita.
+
+   ⚠️ I NUMERI DEL GENERATORE SUPERANO I 32 BIT (0xf5dee51989 e
+   compagni), e in JavaScript gli operatori `^` `<<` `>>` lavorano a
+   32 bit: usarli qui darebbe un checksum sbagliato ma dall'aria
+   giusta, cioe' il guasto peggiore. Quindi si fa tutto in BigInt, e il
+   banco lo dimostra sul vettore. */
+const DESC_ALFABETO =
+  "0123456789()[],'/*abcdefgh@:$%{}IJKLMNOPQRSTUVWXYZ&+-.;<=>?!^_|~"
+  + 'ijklmnopqrstuvwxyzABCDEFGH`#"\\ ';
+const DESC_CHECKSUM_ALFABETO = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const DESC_GENERATORE = [0xf5dee51989n, 0xa9fdca3312n, 0x1bab10e32dn,
+                         0x3706b1677an, 0x644d626ffdn];
+
+function descPolymod(simboli){
+  let chk = 1n;
+  for (const v of simboli) {
+    const top = chk >> 35n;
+    chk = ((chk & 0x7ffffffffn) << 5n) ^ BigInt(v);
+    for (let i = 0n; i < 5n; i++) {
+      if ((top >> i) & 1n) chk ^= DESC_GENERATORE[Number(i)];
+    }
+  }
+  return chk;
+}
+
+/* null se un carattere non sta nell'alfabeto del BIP: chi chiama NON
+   deve inventarsi un checksum su un testo che la specifica non ammette */
+function descEspandi(s){
+  const gruppi = [], simboli = [];
+  for (const c of String(s)) {
+    const v = DESC_ALFABETO.indexOf(c);
+    if (v < 0) return null;
+    simboli.push(v & 31);
+    gruppi.push(v >> 5);
+    if (gruppi.length === 3) {
+      simboli.push(gruppi[0] * 9 + gruppi[1] * 3 + gruppi[2]);
+      gruppi.length = 0;
+    }
+  }
+  if (gruppi.length === 1) simboli.push(gruppi[0]);
+  else if (gruppi.length === 2) simboli.push(gruppi[0] * 3 + gruppi[1]);
+  return simboli;
+}
+
+/* Le otto lettere, o '' se il descrittore non e' ammesso dal BIP */
+function descrittoreChecksum(s){
+  const simboli = descEspandi(s);
+  if (!simboli) return '';
+  const chk = descPolymod(simboli.concat([0, 0, 0, 0, 0, 0, 0, 0])) ^ 1n;
+  let fuori = '';
+  for (let i = 0n; i < 8n; i++) {
+    fuori += DESC_CHECKSUM_ALFABETO[Number((chk >> (5n * (7n - i))) & 31n)];
+  }
+  return fuori;
+}
+
+/* Il descrittore col suo `#`, o NUDO se il checksum non si puo' fare:
+   Sparrow un descrittore nudo lo accetta e lo ricalcola, uno con otto
+   lettere sbagliate lo accetta e sbaglia indirizzo. */
+function descrittoreConChecksum(s){
+  const c = descrittoreChecksum(s);
+  return c ? `${s}#${c}` : s;
+}
+
 /* Le TRE chiavi dell'ordine, calcolate qui e da nessun'altra parte.
    `strada` la dice il server (m/0/0), cosi' due dispositivi dello
    stesso conto fanno lo STESSO indirizzo — che e' esattamente quel che
@@ -51685,11 +51765,16 @@ async function onchainChiavi(parole, srv){
     ordinate: [hex(w.witnessScript.slice(2, 35)),
                hex(w.witnessScript.slice(36, 69)),
                hex(w.witnessScript.slice(70, 103))],
-    /* il descrittore SENZA checksum: Sparrow lo accetta e lo ricalcola
-       da se'. Il checksum nasce alla tappa dell'indirizzo dell'ordine,
-       dove avra' i suoi vettori — scriverlo a occhio e sbagliarlo
-       sarebbe peggio che non scriverlo. */
-    descrittore: `wsh(sortedmulti(2,${tre.map(hex).join(',')}))`,
+    /* IL DESCRITTORE COL SUO CHECKSUM (17 ott 2026): le otto lettere
+       dopo il `#` sono il codice correttore del BIP-380. Senza di loro
+       `bitcoin-cli importdescriptors` RIFIUTA, e un descrittore che un
+       nodo non importa non e' un backup: e' una stringa.
+       `descrittoreChecksum` torna '' se il testo ha un carattere fuori
+       dall'alfabeto del BIP, e allora il descrittore resta NUDO —
+       meglio nudo (Sparrow lo accetta e lo ricalcola) che con otto
+       lettere sbagliate, che sembrano buone e non lo sono. */
+    descrittore: descrittoreConChecksum(
+      `wsh(sortedmulti(2,${tre.map(hex).join(',')}))`),
     indirizzo: w.address,
     script: hex(w.witnessScript),
   };
@@ -51805,8 +51890,11 @@ function onchainConSeme(parole, k){
       <div class="mono" style="word-break:break-all">${esc(k.indirizzo)}</div>
       <div style="margin-top:8px"><b>Descrittore</b></div>
       <div class="mono" style="word-break:break-all;font-size:11px">${esc(k.descrittore)}</div>
-      <div class="hint">Senza checksum: Sparrow lo accetta e lo
-        ricalcola da sé.</div>
+      <div class="hint">Le <b>otto lettere dopo il <span class="mono">#</span></b>
+        sono il codice di controllo del BIP-380: senza di loro un nodo
+        Bitcoin rifiuta di importarlo, e un descrittore che un nodo non
+        importa non è un backup. Puoi incollarlo in Sparrow o in
+        <span class="mono">importdescriptors</span> così com'è.</div>
     </div>
 
     <div class="payout">
