@@ -133,6 +133,14 @@ modo in cui si rifà un errore già pagato.
   si dà per scontato. La catena intera, `/api/salute`, il backup
   pre-deploy, le procedure (leve del P2P, import Nostr, anello,
   `/setdomain`, dipendenze pip): PRODUZIONE.
+- IL BACKUP ESCE PRIMA DI OGNI DEPLOY (19 ott 2026, regola di Andrea):
+  `deploy.sh` manda su Telegram l'archivio cifrato di `backup-fuori.sh`
+  prima del `git reset`, e il giornaliero parte alle 04:30; entrambi
+  dicono subito in chat un database non sano. Un cantiere che toglie,
+  salta o indebolisce uno dei due non si pusha (`prove_backup_prima_del_deploy`).
+- MAI CHIUDERE UN SOCKET O UN FILE DA UN THREAD CHE NON È IL SUO: il
+  numero liberato va al database e ci si scrive dentro (successo due
+  volte, 18-19 ott 2026: Cantieri, «Il saluto TLS nel database»).
 - Webhook del bot: `TELEGRAM_WEBHOOK_SEGRETO` nel config del server e al
   riavvio si registra da solo (riga «🔔 Webhook Telegram» nel journal).
   ATTENZIONE: mai avviare MODALITA_COLLAUDO=False col BOT_TOKEN vero
