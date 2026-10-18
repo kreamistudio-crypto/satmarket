@@ -60,4 +60,4 @@ RuntimeDirectoryMode=0700
 ExecStart=/bin/bash -c 'cp /root/satmarket/deploy.sh /run/barattolo-deploy/deploy.sh && exec /bin/bash /run/barattolo-deploy/deploy.sh'
 ; Un deploy che si impianta non deve restare appeso per sempre: il
 ; giro dopo riprova da capo.
-TimeoutStartSec=300
+TimeoutStartSec=600

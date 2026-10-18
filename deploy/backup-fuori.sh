@@ -31,7 +31,21 @@
 
 set -euo pipefail
 
-ENV_FILE=/etc/barattolo-backup.env
+# PRIMA DI OGNI DEPLOY (19 ott 2026, il database rotto due volte, richiesta
+# di Andrea): `deploy.sh` chiama questo stesso script con
+# `--prima-del-deploy <commit>`, prima del `git reset`. L'archivio e' lo
+# stesso del giornaliero, cambiano il nome (`-deploy-<commit>`) e la
+# didascalia: sul canale si vede quale versione stava per arrivare.
+PRIMA_DEL_DEPLOY=""
+if [ "${1:-}" = "--prima-del-deploy" ]; then
+    PRIMA_DEL_DEPLOY=$(printf '%s' "${2:-}" | tr -cd '0-9a-f' | cut -c1-8)
+    [ -n "$PRIMA_DEL_DEPLOY" ] || PRIMA_DEL_DEPLOY="senza-nome"
+fi
+
+# Il file dell'ambiente si puo' spostare solo per le prove (il banco
+# di prove.py gira lo script vero con un ambiente finto): sul VPS e'
+# sempre questo.
+ENV_FILE="${BARATTOLO_BACKUP_ENV:-/etc/barattolo-backup.env}"
 if [ ! -f "$ENV_FILE" ]; then
     echo "manca $ENV_FILE: il backup non sa dove andare" >&2
     exit 1
@@ -47,12 +61,41 @@ DIR_OUT="$DIR_APP/backup/fuori"
 mkdir -p "$DIR_OUT"
 
 STAMP=$(date +%Y%m%d-%H%M)
+[ -z "$PRIMA_DEL_DEPLOY" ] || STAMP="$STAMP-deploy-$PRIMA_DEL_DEPLOY"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
+# Una riga in chat, col bot dei backup. Fail-open: se Telegram e' giu'
+# parla il journal.
+di_in_chat() {
+    curl -sf --max-time 30 \
+         -F "chat_id=$CHAT_ID_BACKUP" \
+         -F "text=$1" \
+         "https://api.telegram.org/bot$BOT_TOKEN_BACKUP/sendMessage" \
+         > /dev/null || true
+}
+
+# 0) IL DATABASE E' SANO? (19 ott 2026) Il 18 ottobre il file era rotto
+#    dalle 09:04 e lo ha detto solo il libro mastro, una volta al giorno.
+#    Da qui lo chiede ogni backup — quello delle 04:30 e quello prima di
+#    ogni deploy — e un «no» arriva SUBITO sul canale dei backup, anche
+#    quando la copia poi non si puo' fare. `quick_check` legge tutto il
+#    file ma non gli indici uno per uno: sui 40 MB di oggi, un secondo.
+SANO=$(sqlite3 "$DIR_APP/satmarket.db" "PRAGMA quick_check;" 2>&1 | head -3 | tr '\n' ' ' | sed 's/ *$//') || true
+ATTENZIONE_DB=""
+if [ "$SANO" != "ok" ]; then
+    ATTENZIONE_DB=" — ⚠️ DATABASE NON SANO"
+    echo "⚠️ il database NON e' sano: $SANO" >&2
+    di_in_chat "⚠️ Barattolo: il database NON e' sano (${SANO:0:200}). Prima di toccare qualcosa: si guarda la testata (od -A d -t u1 -N 100) e si chiede a Claude."
+fi
+
 # 1) Il database, con il backup vero di sqlite: atomico anche a server
 #    acceso. E' la stessa regola del pre-deploy di deploy.sh.
-sqlite3 "$DIR_APP/satmarket.db" ".backup '$TMP/satmarket.db'"
+if ! sqlite3 "$DIR_APP/satmarket.db" ".backup '$TMP/satmarket.db'"; then
+    echo "⚠️ copia del database NON riuscita: nessun archivio" >&2
+    di_in_chat "⚠️ Barattolo: la copia del database NON e' riuscita, nessun archivio questa volta. Gli archivi di prima restano nel canale."
+    exit 1
+fi
 
 # 2) Il resto. config.py contiene la nsec della piattaforma, la chiave
 #    dei contenuti e le chiavi LNbits: da qui in poi esiste solo dentro
@@ -144,15 +187,26 @@ fi
 ARCHIVIO="$DIR_OUT/barattolo-$STAMP.tar.gz.age"
 tar -C "$TMP" -czf - . | age -r "$AGE_PUBBLICA" > "$ARCHIVIO"
 
-# 4) La guardia delle dimensioni: il limite di un bot Telegram e' 50 MB
-#    a file. Oggi l'archivio pesa ~5 MB: se si avvicina alla soglia va
-#    saputo PRIMA che l'invio cominci a fallire in silenzio.
+# 4) Il limite di un bot Telegram e' 50 MB a file. Il 18 ott 2026
+#    l'archivio pesava gia' 37 MB (era ~5 ad agosto): oltre i 45 si
+#    SPEZZA in parti da 45 MB (`.parte-00`, `.parte-01`…) e si mandano
+#    tutte. Al ripristino si rimettono insieme con
+#    `cat barattolo-X.tar.gz.age.parte-* > barattolo-X.tar.gz.age`
+#    (deploy/RIPRISTINO.md). L'archivio intero resta qui per il PC.
 DIM=$(stat -c%s "$ARCHIVIO")
-if [ "$DIM" -ge $((49 * 1024 * 1024)) ]; then
-    echo "⚠️ archivio da $((DIM / 1024 / 1024)) MB: oltre il limite Telegram, NON inviato — serve spezzarlo o cambiare strada" >&2
+# (BARATTOLO_BACKUP_PARTE sposta la misura solo per il banco di prove.py)
+PARTE="${BARATTOLO_BACKUP_PARTE:-$((45 * 1024 * 1024))}"
+if [ "$DIM" -gt "$PARTE" ]; then
+    split -b "$PARTE" -d -a 2 "$ARCHIVIO" "$ARCHIVIO.parte-"
+    PEZZI=( "$ARCHIVIO".parte-* )
+else
+    PEZZI=( "$ARCHIVIO" )
+fi
+if [ "${#PEZZI[@]}" -gt 20 ]; then
+    echo "⚠️ archivio da $((DIM / 1024 / 1024)) MB: piu' di 20 parti, NON inviato — serve un'altra strada" >&2
+    rm -f "$ARCHIVIO".parte-*
+    di_in_chat "⚠️ Barattolo: l'archivio pesa $((DIM / 1024 / 1024)) MB, troppo per il canale. Resta sul VPS per il PC."
     exit 1
-elif [ "$DIM" -ge $((40 * 1024 * 1024)) ]; then
-    echo "⚠️ archivio da $((DIM / 1024 / 1024)) MB: si avvicina al limite dei 50 MB di Telegram" >&2
 fi
 
 # 5) L'invio. Si guarda la risposta — un backup che muore in silenzio
@@ -161,14 +215,27 @@ fi
 #    il pull del PC lo raccoglie: la seconda gamba esiste apposta.
 MB=$((DIM / 1024 / 1024)); [ "$MB" -lt 1 ] && MB=1
 CAPTION="Barattolo — backup $(date '+%Y-%m-%d %H:%M') (~$MB MB)"
-if curl -sf --max-time 120 \
-        -F "chat_id=$CHAT_ID_BACKUP" \
-        -F "document=@$ARCHIVIO" \
-        -F "caption=$CAPTION" \
-        "https://api.telegram.org/bot$BOT_TOKEN_BACKUP/sendDocument" \
-        | grep -q '"ok":true'; then
+[ -z "$PRIMA_DEL_DEPLOY" ] || CAPTION="$CAPTION · prima del deploy $PRIMA_DEL_DEPLOY"
+CAPTION="$CAPTION$ATTENZIONE_DB"
+INVIATI=0
+for i in "${!PEZZI[@]}"; do
+    DIDA="$CAPTION"
+    [ "${#PEZZI[@]}" -eq 1 ] || DIDA="$CAPTION · parte $((i + 1)) di ${#PEZZI[@]}"
+    if curl -sf --max-time 120 \
+            -F "chat_id=$CHAT_ID_BACKUP" \
+            -F "document=@${PEZZI[$i]}" \
+            -F "caption=$DIDA" \
+            "https://api.telegram.org/bot$BOT_TOKEN_BACKUP/sendDocument" \
+            | grep -q '"ok":true'; then
+        INVIATI=$((INVIATI + 1))
+    else
+        break
+    fi
+done
+rm -f "$ARCHIVIO".parte-*
+if [ "$INVIATI" -eq "${#PEZZI[@]}" ]; then
     date +%s > "$DIR_OUT/.ultimo-successo"
-    echo "📦 backup inviato: $(basename "$ARCHIVIO") ($DIM byte)"
+    echo "📦 backup inviato: $(basename "$ARCHIVIO") ($DIM byte, ${#PEZZI[@]} file)"
 else
     echo "⚠️ invio a Telegram non riuscito: l'archivio resta in $DIR_OUT" >&2
     # Tre giorni di silenzio non sono un singhiozzo: si prova almeno a
@@ -187,7 +254,11 @@ fi
 
 # 6) La retention locale: 7 giornaliere, piu' le domeniche per 28
 #    giorni. Il canale Telegram tiene tutto da solo (i messaggi non
-#    scadono); queste sono le copie che il PC specchia.
+#    scadono); queste sono le copie che il PC specchia. Di quelle prima
+#    del deploy, che possono essere dieci al giorno, qui restano le
+#    ultime 10: le altre sono nel canale.
+ls -1t "$DIR_OUT"/barattolo-*-deploy-*.tar.gz.age 2>/dev/null \
+    | tail -n +11 | xargs -r rm -f || true
 find "$DIR_OUT" -name 'barattolo-*.tar.gz.age' -mtime +7 -print0 \
 | while IFS= read -r -d '' f; do
     data=$(basename "$f" | sed 's/^barattolo-\([0-9]\{8\}\).*/\1/')

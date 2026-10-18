@@ -161102,15 +161102,19 @@ def prove_deploy_nel_gruppo():
 
     # --- le otto chiamate, in bash ------------------------------------------
     chiamate = re.findall(r'^\s*avvisa "(.{0,40})', sh, re.M)
+    # Il nono (19 ott 2026, cantiere backup-deploy, richiesta di Andrea):
+    # il backup su Telegram prima del deploy che non parte. Aggiunto
+    # apposta, nella stanza degli errori come gli altri.
     OTTO = ["⛔ <b>Deploy rifiutato</b>", "⏳ <b>Deploy fermo</b> da",
+            "⚠️ <b>Il backup su Telegram prima del de",
             "❌ <b>Deploy fermo</b>: git reset",
             "❌ <b>Deploy annullato</b>: il codice",
             "❌ <b>Deploy</b>: il riavvio",
             "🚀 <b>Barattolo aggiornato</b>",
             "↩️ <b>Deploy annullato</b>: <code>", "🆘 <b>Barattolo e' GIU'</b>"]
-    prova("gli avvisi del deploy sono gli otto di ieri, nello stesso "
-          "ordine e con le stesse parole in testa: nessuno tolto, nessuno "
-          "aggiunto", OTTO,
+    prova("gli avvisi del deploy sono i nove di oggi (gli otto di ieri e "
+          "il backup su Telegram), nello stesso ordine e con le stesse "
+          "parole in testa: nessuno tolto, nessuno aggiunto", OTTO,
           [a if c.startswith(a) else c for c, a in zip(chiamate, OTTO)]
           + chiamate[len(OTTO):])
     prova("...e UNA sola dice una stanza: l'aggiornamento riuscito, nei "
@@ -161126,10 +161130,10 @@ def prove_deploy_nel_gruppo():
           sorted(set(importati) | {m.strip() for riga in re.findall(
               r"^import (.+)$", corpo, re.M) for m in riga.split(",")}))
     prova("...e il timeout di ogni richiesta e' quello di ieri, dieci "
-          "secondi: tre tentativi a vuoto stanno larghi nei 300 del "
-          "servizio", (True, True),
+          "secondi: tre tentativi a vuoto stanno larghi nei 600 del "
+          "servizio (300 fino al backup prima del deploy)", (True, True),
           ("timeout=10) as risposta:" in corpo,
-           "TimeoutStartSec=300" in open(os.path.join(
+           "TimeoutStartSec=600" in open(os.path.join(
                "deploy", "barattolo-deploy.service"), encoding="utf-8").read()))
 
 
@@ -167863,6 +167867,206 @@ console.log(JSON.stringify(out));
 """
 
 
+def prove_backup_prima_del_deploy():
+    """IL BACKUP CHE ESCE PRIMA DI OGNI DEPLOY (19 ott 2026, il database
+    rotto due volte, richiesta di Andrea): `deploy.sh` manda al canale
+    dei backup l'archivio cifrato di `deploy/backup-fuori.sh` PRIMA del
+    `git reset`; lo stesso script, ogni volta, chiede a sqlite se il file
+    e' sano e lo dice in chat se non lo e'; e un archivio oltre i 45 MB
+    si spezza in parti invece di non partire (il 18 ott pesava 37 MB).
+    Si guarda il testo dei due script, e si GIRA lo script vero su un
+    database finto: al posto di age, curl e sqlite3 tre comparse che
+    scrivono cosa avrebbero fatto. Su Windows gira nel WSL."""
+    print("\n[il backup prima di ogni deploy]")
+    import shlex
+    import shutil
+    import sqlite3
+    import subprocess
+    import tarfile
+    import tempfile
+
+    dep = open("deploy.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    bak = open("deploy/backup-fuori.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    unita = open("deploy/barattolo-deploy.service", encoding="utf-8").read()
+
+    # --- 1) IL TESTO: dove sta la chiamata nel deploy ---
+    chiamata = 'bash deploy/backup-fuori.sh --prima-del-deploy "${LA:0:8}"'
+    prova("deploy.sh manda l'archivio cifrato prima di ogni deploy", True,
+          chiamata in dep)
+    if chiamata in dep:
+        i = dep.index(chiamata)
+        prova("...DOPO la copia locale e PRIMA del reset (si salva quel "
+              "che c'era, non quel che arriva)", True,
+              dep.index("sorgente.backup(destinazione)") < i
+              < dep.index('git reset --hard --quiet "$LA"'))
+        riga = dep[dep.rindex("\n", 0, i):dep.index("\n", i)]
+        prova("...con un tetto di tempo, dentro i 600 secondi dell'unita'",
+              True, "timeout 120 " in riga and "TimeoutStartSec=600" in unita)
+        ramo = dep[i:dep.index("\nfi\n", i)]
+        prova("...e se non parte NON ferma il deploy (una cura urgente "
+              "deve poter arrivare) ma lo DICE in chat", (True, False),
+              ("avvisa " in ramo, re.search(r"\bexit\b", ramo) is not None))
+    copia = dep[dep.index("sorgente.backup(destinazione)") - 600:
+                dep.index("sorgente.backup(destinazione)")]
+    prova("una copia locale non riuscita si dice in chat, non solo nel "
+          "journal", True,
+          "copia del database non riuscita" in copia and "avvisa " in copia)
+    prova("il backup chiede a sqlite se il file e' sano PRIMA di copiarlo",
+          True, "PRAGMA quick_check" in bak
+          and bak.index("PRAGMA quick_check") < bak.index('".backup'))
+    prova("...e il file della chat resta fuori (la decisione del 12 ott)",
+          False, "chat-scambi" in bak)
+
+    # --- 2) LO SCRIPT VERO ---
+    wsl = shutil.which("wsl.exe") if sys.platform == "win32" else None
+    if sys.platform == "win32" and not wsl:
+        salta("lo script di backup vero", "su Windows serve il WSL")
+        return
+    base = tempfile.mkdtemp(prefix="prove-backup-")
+
+    def lf(nome, testo, eseguibile=False):
+        p = os.path.join(base, nome)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(testo)
+        if eseguibile:
+            os.chmod(p, 0o755)
+        return p
+
+    def nel_linux(p):
+        if not wsl:
+            return p
+        p = p.replace("\\", "/")
+        return re.sub(r"^([A-Za-z]):", lambda m: "/mnt/" + m.group(1).lower(), p)
+
+    lf("backup.sh", bak)
+    lf("finti/age", "#!/bin/sh\ncat\n", True)
+    lf("finti/curl", "#!/bin/sh\n"
+       "printf '%s\\n' \"$*\" >> \"$REGISTRO\"\n"
+       "for a in \"$@\"; do case \"$a\" in document=@*) "
+       "cp \"${a#document=@}\" \"$MANDATI/\";; esac; done\n"
+       "echo '{\"ok\":true}'\n", True)
+    lf("finti/sqlite3", "#!/usr/bin/env python3\n"
+       "import re, sqlite3, sys\n"
+       "db, cmd = sys.argv[1], sys.argv[2]\n"
+       "try:\n"
+       "    c = sqlite3.connect(db)\n"
+       "    if cmd.startswith('.backup'):\n"
+       "        d = sqlite3.connect(re.search(r\"'(.*)'\", cmd).group(1))\n"
+       "        c.backup(d); d.close()\n"
+       "    else:\n"
+       "        for r in c.execute(cmd): print('|'.join(map(str, r)))\n"
+       "except Exception as e:\n"
+       "    print('Error:', e, file=sys.stderr); sys.exit(1)\n", True)
+    lf("ambiente", "BOT_TOKEN_BACKUP=finto\nCHAT_ID_BACKUP=-1001\n"
+       "AGE_PUBBLICA=age1finta\n")
+
+    def giro(nome, args="", rotto=False, grande=False):
+        app = os.path.join(base, nome, "app")
+        os.makedirs(os.path.join(app, "buste"))
+        os.makedirs(os.path.join(app, "contenuti"))
+        os.makedirs(os.path.join(base, nome, "mandati"))
+        lf(f"{nome}/app/config.py", "BOT_TOKEN = 'finto'\n")
+        con = sqlite3.connect(os.path.join(app, "satmarket.db"))
+        con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, nota)")
+        con.executemany("INSERT INTO ordini(nota) VALUES(?)",
+                        [("uno",), ("due",), ("tre",)])
+        con.commit()
+        con.close()
+        sqlite3.connect(os.path.join(app, "chat-scambi.db")).close()
+        if grande:
+            with open(os.path.join(app, "contenuti", "blob"), "wb") as f:
+                f.write(os.urandom(500_000))
+        if rotto:
+            # la testata del 18 ottobre, byte per byte
+            p = os.path.join(app, "satmarket.db")
+            b = bytearray(open(p, "rb").read())
+            b[18:44] = bytes([1, 23, 3, 3, 0, 19, 223, 69, 216, 52, 141, 22,
+                              164, 138, 68, 236, 70, 62, 132, 50, 66, 244,
+                              231, 192, 140, 194])
+            open(p, "wb").write(bytes(b))
+        L = lambda p: shlex.quote(nel_linux(os.path.join(base, p)))
+        script = (f"export PATH={L('finti')}:$PATH "
+                  f"BARATTOLO_DIR={L(nome + '/app')} "
+                  f"BARATTOLO_BACKUP_ENV={L('ambiente')} "
+                  f"BARATTOLO_BACKUP_PARTE=200000 "
+                  f"REGISTRO={L(nome + '/registro')} "
+                  f"MANDATI={L(nome + '/mandati')}; "
+                  f"bash {L('backup.sh')} {args} < /dev/null")
+        cmd = [wsl, "-e", "bash", "-c", script] if wsl \
+            else ["bash", "-c", script]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", timeout=120)
+        reg = os.path.join(base, nome, "registro")
+        righe = open(reg, encoding="utf-8").read().splitlines() \
+            if os.path.exists(reg) else []
+        fuori = os.path.join(app, "backup", "fuori")
+        archivi = sorted(a for a in os.listdir(fuori) if ".tar.gz.age" in a) \
+            if os.path.isdir(fuori) else []
+        return r, righe, fuori, archivi
+
+    try:
+        # a) prima del deploy, database sano
+        r, righe, fuori, archivi = giro("deploy", "--prima-del-deploy abcdef1234567890")
+        doc = [x for x in righe if "sendDocument" in x]
+        prova("PRIMA DEL DEPLOY: l'archivio parte, uno, col commit nel nome "
+              "e nella didascalia, e nessun allarme",
+              (0, 1, True, True, 0),
+              (r.returncode, len(doc),
+               any(a.endswith("-deploy-abcdef12.tar.gz.age") for a in archivi),
+               bool(doc) and "prima del deploy abcdef12" in doc[0],
+               sum("sendMessage" in x for x in righe)))
+        if r.returncode not in (0, 1):
+            print('      ', r.stderr[-400:])
+        dentro, righe_db = [], None
+        if archivi:
+            with tarfile.open(os.path.join(fuori, archivi[0]), "r:gz") as t:
+                dentro = t.getnames()
+                t.extract("./satmarket.db", os.path.join(base, "estratto"))
+            c = sqlite3.connect(os.path.join(base, "estratto", "satmarket.db"))
+            righe_db = c.execute("SELECT COUNT(*) FROM ordini").fetchone()[0]
+            c.close()
+        prova("...dentro c'e' il database intero e il config, e NON il "
+              "file della chat", (3, True, False),
+              (righe_db, "./config.py" in dentro,
+               any("chat-scambi" in n for n in dentro)))
+
+        # b) il giornaliero, con un archivio piu' grosso di una parte
+        r, righe, fuori, archivi = giro("grande", grande=True)
+        doc = [x for x in righe if "sendDocument" in x]
+        intero = open(os.path.join(fuori, archivi[0]), "rb").read() if archivi else b""
+        mandati = os.path.join(base, "grande", "mandati")
+        pezzi = sorted(os.listdir(mandati))
+        cucito = b"".join(open(os.path.join(mandati, p), "rb").read() for p in pezzi)
+        prova("UN ARCHIVIO OLTRE LA MISURA si spezza: parte tutto, a pezzi "
+              "numerati, e i pezzi ricuciti sono l'archivio",
+              (0, True, True, True),
+              (r.returncode, len(doc) >= 3,
+               bool(doc) and f"parte 1 di {len(doc)}" in doc[0]
+               and f"parte {len(doc)} di {len(doc)}" in doc[-1],
+               bool(intero) and cucito == intero))
+        if r.returncode not in (0, 1):
+            print('      ', r.stderr[-400:])
+        prova("...il giornaliero non si dice «prima del deploy», e i pezzi "
+              "non restano sul disco", (False, [], False),
+              (any("prima del deploy" in x for x in doc),
+               [a for a in archivi if ".parte-" in a],
+               any("-deploy-" in a for a in archivi)))
+
+        # c) il database rotto come il 18 ottobre
+        r, righe, fuori, archivi = giro("rotto", "--prima-del-deploy abcdef12", rotto=True)
+        msg = [x for x in righe if "sendMessage" in x]
+        prova("IL DATABASE ROTTO (la testata del 18 ottobre): lo si dice "
+              "SUBITO in chat, e non parte un archivio vuoto",
+              (1, True, 0, []),
+              (r.returncode, any("NON e' sano" in x for x in msg),
+               sum("sendDocument" in x for x in righe), archivi))
+        if r.returncode not in (0, 1):
+            print('      ', r.stderr[-400:])
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+
+
 def prove_allegati_chat():
     """GLI ALLEGATI DELLA CHAT (16 ott 2026, cantiere barcode-paycode,
     parte C, richiesta di Andrea: chi vende doveva mandare il PDF del
@@ -169355,7 +169559,7 @@ def main():
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
               prove_podio_riepilogo, prove_vetrina_negozio,
-              prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo, prove_posta_relay,
+              prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo, prove_posta_relay, prove_backup_prima_del_deploy,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,

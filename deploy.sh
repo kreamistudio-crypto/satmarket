@@ -406,9 +406,12 @@ dillo "🚀 aggiornamento: ${QUI:0:8} → ${LA:0:8}  ·  $MOTIVO  ·  $(firme_de
 # con le sue migrazioni.
 mkdir -p backup
 chmod 700 backup     # dentro c'e' il database intero: solo root
+# Se la copia non riesce si va avanti lo stesso — il deploy puo' essere
+# proprio la cura — ma da ottobre 2026 lo si DICE in chat: il 18 ott il
+# database era rotto e questa riga lo scriveva solo nel journal.
 python3 - "backup/pre-deploy-$(date +%Y%m%d-%H%M%S)-${QUI:0:8}.db" <<'PY' 2>/dev/null \
   && dillo "💾 copia del database messa da parte" \
-  || dillo "⚠️ copia del database non riuscita: si va avanti lo stesso"
+  || { dillo "⚠️ copia del database non riuscita: si va avanti lo stesso"; avvisa "⚠️ <b>La copia del database prima del deploy non è riuscita</b>: il file potrebbe essere rotto. Il deploy va avanti; guardare subito <code>/api/salute</code>."; }
 import sys, sqlite3
 from config import DB
 sorgente = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
@@ -419,6 +422,28 @@ destinazione.close(); sorgente.close()
 PY
 ls -1t backup/pre-deploy-*.db 2>/dev/null | tail -n +$((BACKUP_DA_TENERE + 1)) \
   | xargs -r rm -f
+
+# IL BACKUP CHE ESCE, PRIMA DI OGNI DEPLOY (19 ott 2026, il database
+# rotto due volte; richiesta di Andrea). La copia qui sopra sta sullo
+# STESSO disco: se il VPS sparisce, sparisce con lui. Quindi prima del
+# reset parte anche l'archivio cifrato del giornaliero
+# (`deploy/backup-fuori.sh`, lo stesso script, lo stesso bot, lo stesso
+# canale), col nome del commit che sta per arrivare. Gira dal file del
+# repo PRIMA del reset: nessuno lo riscrive mentre corre.
+# NON FERMA IL DEPLOY, ed e' voluto: con Telegram giu' una cura urgente
+# deve poter arrivare lo stesso — la copia locale qui sopra c'e', e
+# l'archivio resta in backup/fuori/ per il PC. Ma lo si DICE in chat.
+# Il tetto di 120 secondi sta largo anche nei 300 dell'unita' di prima (la nuova ne da' 600).
+if [ -f "${BARATTOLO_BACKUP_ENV:-/etc/barattolo-backup.env}" ]; then
+  if timeout 120 bash deploy/backup-fuori.sh --prima-del-deploy "${LA:0:8}"; then
+    dillo "📦 archivio cifrato mandato al canale dei backup"
+  else
+    dillo "⚠️ archivio per il canale dei backup non riuscito: si va avanti"
+    avvisa "⚠️ <b>Il backup su Telegram prima del deploy non è partito</b> (${LA:0:8}). Il deploy va avanti; la copia locale c'è. Guardare <code>journalctl -u barattolo-deploy -n 40</code>."
+  fi
+else
+  dillo "⚠️ manca /etc/barattolo-backup.env: nessun archivio prima del deploy"
+fi
 
 git reset --hard --quiet "$LA" || {
   dillo "❌ git reset non riuscito: non tocco niente"

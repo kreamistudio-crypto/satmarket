@@ -1283,6 +1283,27 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   è un file che al momento del bisogno non si apre. Non sostituisce il
   backup giornaliero — è la rete per i cinque minuti attorno al
   deploy, quando gira anche `init_db` con le sue migrazioni.
+  IL BACKUP CHE ESCE, PRIMA DI OGNI DEPLOY (19 ott 2026, cantiere
+  backup-deploy; perché in CANTIERI, «Il backup prima di ogni deploy»).
+  Dopo la copia locale e prima del `git reset`, `deploy.sh` lancia
+  `deploy/backup-fuori.sh --prima-del-deploy <commit>`: lo stesso
+  archivio cifrato del giornaliero, sullo stesso canale e col suo bot,
+  col nome `barattolo-<data>-deploy-<commit>.tar.gz.age` e «prima del
+  deploy <commit>» nella didascalia. Tetto 120 secondi; se non parte il
+  deploy VA AVANTI e arriva «⚠️ Il backup su Telegram prima del deploy
+  non è partito» nella stanza degli errori. In `backup/fuori/` ne
+  restano le ultime 10 (il canale le tiene tutte). Ogni backup, anche
+  quello delle 04:30, chiede prima `PRAGMA quick_check`: un file non
+  sano lo dice SUBITO sul canale dei backup («⚠️ il database NON è
+  sano») e la didascalia porta «⚠️ DATABASE NON SANO». Oltre i 45 MB
+  l'archivio si spezza in parti da 45 («parte 1 di N»; si ricuciono
+  con `cat`, deploy/RIPRISTINO.md). Anche la copia locale non riuscita
+  ora arriva in chat. L'UNITÀ VA RICOPIATA UNA VOLTA (il deploy non
+  tocca `/etc`): `TimeoutStartSec` passa da 300 a 600 —
+  `cp /srv/barattolo/deploy/barattolo-deploy.service /etc/systemd/system/ && systemctl daemon-reload`.
+  LA PROVA, al primo deploy dopo questo: sul canale dei backup un
+  archivio «prima del deploy …», e
+  `journalctl -u barattolo-deploy --since "15 min ago" | grep "📦"`.
   A MANO, quando serve: `./deploy.sh --dimmi` dice a che punto sta
   senza toccare niente, `--forza` riapplica e riavvia. Il primo giro
   (installazione del timer) è in `deploy/barattolo-deploy.service` e

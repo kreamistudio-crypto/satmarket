@@ -65057,3 +65057,67 @@ si giudica uguale). Suite e collaudi: nel verbale del push.
 che il journal non dica più «file is not a database»; le copie del file
 rotto in `/root` (`satmarket-rotto-*.db`) si tengono finché il db non
 ha girato qualche giorno sano.
+
+## Il backup prima di ogni deploy: l'archivio cifrato su Telegram, il database che si dice malato, le parti oltre i 45 MB (19 ott 2026, cantiere backup-deploy, richiesta di Andrea)
+
+**LA RICHIESTA.** Dopo il database rotto due volte (la voce qui sopra,
+«Il saluto TLS nel database»), Andrea: il backup su Telegram prima di
+ogni deploy, nelle CI e in CLAUDE.md, e ogni giorno tutto quel che
+conta.
+
+**COSA C'ERA GIÀ.** Il giornaliero delle 04:30 (`deploy/backup-fuori.sh`,
+il suo bot, il canale privato, age con la sola pubblica): database,
+config, `buste/`, `contenuti/`, Caddyfile, unit, crontab, torrc, la
+chiave dell'onion e quella del client verso il nodo, LNbits del nodo
+(db atomico, `.env`, compose, data/), `wg0.conf`. Prima del deploy solo
+la copia LOCALE (`backup/pre-deploy-*.db`, stesso disco).
+
+**COSA È CAMBIATO.**
+- `deploy.sh`, dopo la copia locale e PRIMA del `git reset`, lancia
+  `deploy/backup-fuori.sh --prima-del-deploy <commit>` con un tetto di
+  120 secondi (sta largo nei 300 dell'unità di prima; l'unità nuova ne
+  dà 600). Lo stesso archivio, `-deploy-<commit>` nel nome, «prima del
+  deploy <commit>» nella didascalia; in `backup/fuori/` restano le
+  ultime 10. NON FERMA IL DEPLOY se non parte: con Telegram giù una
+  cura urgente (come quella di oggi) deve poter arrivare, la copia
+  locale c'è; lo si dice nella stanza degli errori (il nono avviso del
+  deploy, e la sentinella degli avvisi lo conta).
+- Anche la copia LOCALE non riuscita ora arriva in chat: il 18 ott la
+  riga «copia del database non riuscita» finiva solo nel journal.
+- Ogni backup chiede `PRAGMA quick_check` PRIMA di copiare: un no
+  arriva subito sul canale dei backup («il database NON è sano»), e la
+  didascalia porta «⚠️ DATABASE NON SANO». Se la copia non si può fare
+  (la testata rotta del 18 ott) lo dice e non manda un archivio vuoto.
+- Oltre i 45 MB l'archivio si SPEZZA in parti da 45 («parte 1 di N»)
+  invece di non partire: il 18 ott pesava 37 MB (era ~5 ad agosto), e il
+  vecchio script a 49 MB si sarebbe fermato. Si ricuciono con `cat`
+  (deploy/RIPRISTINO.md, anche la riga per Windows).
+
+**COSA RESTA FUORI, ED È VOLUTO (da riconfermare con Andrea).**
+`chat-scambi.db` (le buste delle chat in corso: decisione del 12 ott,
+una copia le farebbe sopravvivere alla loro cancellazione; una prova lo
+tiene fuori); `foto/` (centinaia di MB: la tira il PC con rclone, non
+il canale).
+
+**LE STRADE SCARTATE.** Un secondo script per il pre-deploy (due copie
+della stessa lista divergono); fermare il deploy se il backup non parte
+(blocca proprio la cura); `systemctl start barattolo-backup` dal deploy
+(la didascalia non sa del commit, e il tempo si conta uguale).
+
+**PROVE.** `prove_backup_prima_del_deploy` (12): il testo (la chiamata
+dopo la copia e prima del reset, il tetto, il ramo che avvisa e non
+esce, la copia locale che avvisa, quick_check prima di `.backup`, la
+chat fuori) e lo script VERO su un database finto, con comparse al
+posto di age, curl e sqlite3 (su Windows nel WSL): prima del deploy
+parte UN archivio col commit, dentro il db intero e il config e non la
+chat; un archivio oltre la misura parte in pezzi numerati che ricuciti
+sono l'archivio, e non restano sul disco; la testata del 18 ottobre
+byte per byte → allarme in chat, nessun archivio. Sugli script di prima
+7 rosse; dopo 12/12. `prove_deploy_nel_gruppo` emendata (nove avvisi, i
+600 secondi). Le sezioni che leggono i due script: 603 passate.
+
+**DA FARE SUL VPS (Andrea, una volta):** ricopiare l'unità del deploy
+(PRODUZIONE, «IL BACKUP CHE ESCE, PRIMA DI OGNI DEPLOY») e, al deploy
+dopo quello che porta questo commit, guardare che sul canale arrivi
+l'archivio «prima del deploy». Il primo deploy gira ancora col
+`deploy.sh` di prima (si copia in /run prima del reset).

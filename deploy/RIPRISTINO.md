@@ -25,7 +25,16 @@ foglio esiste.
 1. **VPS nuovo** (qualunque fornitore), Ubuntu, Caddy, Python come da
    CLAUDE.md. `git clone` del repo.
 2. **L'ultimo archivio**: dal canale Telegram (o da
-   `BarattoloBackup\fuori\` sul PC, se Telegram non c'è).
+   `BarattoloBackup\fuori\` sul PC, se Telegram non c'è). Dal 19 ott
+   2026 ce n'è uno anche **prima di ogni deploy** (`…-deploy-<commit>`,
+   «prima del deploy …» nella didascalia): l'ultimo prima del disastro
+   è spesso quello. **Se la didascalia dice «parte 1 di N»** l'archivio
+   è spezzato (oltre i 45 MB): si scaricano TUTTE le parti e si
+   ricuciono prima di decifrare,
+   `cat barattolo-XXXX.tar.gz.age.parte-* > barattolo-XXXX.tar.gz.age`
+   (su Windows: `copy /b barattolo-XXXX.tar.gz.age.parte-00 + barattolo-XXXX.tar.gz.age.parte-01 barattolo-XXXX.tar.gz.age`).
+   Un archivio con «⚠️ DATABASE NON SANO» nella didascalia è stato fatto
+   da un file già malato: si prende quello prima.
 3. **Decifrare**: la chiave age da Bitwarden (o dal foglietto) in un
    file `chiave.txt`, poi
    `age -d -i chiave.txt barattolo-XXXX.tar.gz.age | tar xz`.
