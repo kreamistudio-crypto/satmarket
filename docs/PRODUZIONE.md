@@ -1397,6 +1397,22 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   IL CONTROLLO SUL PROCESSO VIVO dopo un riavvio: `systemctl show
   barattolo -p ActiveEnterTimestamp` e la riga `tr … environ | grep
   UVICORN` qui sopra, che deve dire `UVICORN_TIMEOUT_GRACEFUL_SHUTDOWN=10`.
+- IL JOURNAL SENZA BUFFER (19 ott 2026, cantiere journal-senza-buffer,
+  richiesta di Andrea): ogni `print` del server arriva SUBITO nel
+  journal, anche quelle senza `flush=True`. Il 15-17 ott le righe
+  «saltato» di `promo_venduto` e `promo_rimuovi` sono scattate e si sono
+  perse ai riavvii (CANTIERI, «Il ✅ Venduto e il ritiro dei post»). È
+  il drop-in `barattolo.service.d/journal.conf` (copia in
+  `deploy/utente/barattolo-journal.conf`, col perché): una riga,
+  `Environment=PYTHONUNBUFFERED=1`. Si posa ACCANTO a `utente.conf` e
+  `riavvio-dolce.conf` senza toccarli, poi `systemctl daemon-reload`;
+  vale dal riavvio SUCCESSIVO — il prossimo deploy lo fa da solo, o un
+  `systemctl restart barattolo` (il riavvio dolce: ~1,5 s di buco che
+  Caddy copre; mai durante un deploy in corso). Dopo il riavvio si vede
+  nel processo:
+  `tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value barattolo)/environ | grep PYTHONUNBUFFERED`
+  deve dire `PYTHONUNBUFFERED=1`.
+  TORNARE INDIETRO: `rm` del drop-in e `systemctl daemon-reload`.
 - IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion): dal `.onion`
   il login reggeva SOLO con Tor Browser, che tratta l'onion come contesto
   sicuro; Chrome, Brave e Vanadium con Orbot scartano un cookie «Secure»

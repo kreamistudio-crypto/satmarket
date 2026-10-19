@@ -170624,6 +170624,43 @@ console.log(JSON.stringify(R));
           R["link"])
 
 
+def prove_journal_senza_buffer():
+    """IL JOURNAL SENZA BUFFER (19 ott 2026, cantiere journal-senza-buffer,
+    richiesta di Andrea). Le righe «saltato» del 15-17 ott sono scattate e
+    il journal non le ha mai mostrate: lo stdout di Python sotto systemd
+    e' un tubo col buffer, e ai riavvii si perdeva. Il drop-in
+    `deploy/utente/barattolo-journal.conf` passa `PYTHONUNBUFFERED=1` al
+    servizio. Qui: il drop-in dice quella riga e SOLO quella (si toglie
+    senza toccare niente), porta i due comandi per tornare indietro, e
+    PRODUZIONE ha la procedura con la riga che la verifica sul processo
+    vivo."""
+    print("\n[il journal senza buffer]")
+    percorso = os.path.join("deploy", "utente", "barattolo-journal.conf")
+    testo = open(percorso, encoding="utf-8").read()
+    righe = [r.strip() for r in testo.split("\n")
+             if r.strip() and not r.lstrip().startswith(";")]
+    prova("il drop-in dice una riga sola: PYTHONUNBUFFERED=1",
+          ["[Service]", "Environment=PYTHONUNBUFFERED=1"], righe)
+    prova("...niente ExecStart (la riga della unit resta una sola)", False,
+          any(r.startswith("ExecStart") for r in righe))
+    prova("...e porta dove si posa e i due comandi per tornare indietro",
+          [True, True, True],
+          ["/etc/systemd/system/barattolo.service.d/journal.conf" in testo,
+           "rm /etc/systemd/system/barattolo.service.d/journal.conf" in testo,
+           "systemctl daemon-reload" in testo])
+    prova("...con le righe di commento di systemd (il «;»), non il «#» di "
+          "Python", True, all(not r.startswith("#") for r in righe))
+    prod = open(os.path.join("docs", "PRODUZIONE.md"),
+                encoding="utf-8").read().replace("\r\n", "\n")
+    prova("PRODUZIONE ha la procedura: la copia, il daemon-reload, la "
+          "verifica sul processo vivo, il ritorno", [True] * 4,
+          ["`deploy/utente/barattolo-journal.conf`" in prod,
+           "barattolo.service.d/journal.conf" in prod,
+           "environ | grep PYTHONUNBUFFERED" in prod,
+           "TORNARE INDIETRO: `rm` del drop-in e `systemctl daemon-reload`."
+           in prod[prod.index("IL JOURNAL SENZA BUFFER"):]])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -170958,6 +170995,7 @@ def main():
               prove_bundle_bitcoin,
               prove_venduto_canale,
               prove_chat_mercatino,
+              prove_journal_senza_buffer,
               prove_config_esempio):
         try:
             f()

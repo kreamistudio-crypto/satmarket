@@ -65925,3 +65925,51 @@ server vecchio il ⚠️ⓘ solo dopo la risposta; il libro senza cambio.
 Nessun errore di pagina; fuori da 127.0.0.1 solo lo script di Telegram,
 fermato.
 
+## Il journal senza buffer: PYTHONUNBUFFERED=1 in un drop-in del servizio (19 ott 2026, cantiere journal-senza-buffer, richiesta di Andrea)
+
+**PERCHÉ.** Il cantiere venduto-canale ha mostrato che una `print` senza
+`flush=True` può non arrivare mai al journal: le righe «saltato» di
+`promo_venduto` e `promo_rimuovi` sono scattate dal 15 ott e si sono
+perse ai riavvii. Sotto systemd lo stdout di Python è un tubo, e Python
+lo tiene in un buffer. Quelle due ora hanno il `flush`; per tutte le
+altre, invece di toccarle una a una, Andrea ha chiesto
+`PYTHONUNBUFFERED=1` al servizio.
+
+**COSA SI È FATTO.** Nel repo l'unità intera `barattolo.service` non
+c'è: il servizio si cambia coi drop-in, ognuno con la sua ragione e i
+suoi due comandi per tornare indietro (`utente.conf` per l'utente,
+`riavvio-dolce.conf` per lo spegnimento). Il terzo è
+`deploy/utente/barattolo-journal.conf`, da posare come
+`/etc/systemd/system/barattolo.service.d/journal.conf`: una riga,
+`Environment=PYTHONUNBUFFERED=1`. Dall'ambiente e non con `python -u`
+in ExecStart, per la ragione già scritta in `riavvio-dolce.conf`: la
+riga ExecStart resta una sola, e il drop-in si toglie senza toccarla.
+La procedura (posa, `daemon-reload`, verifica sul processo vivo con
+`/proc/<pid>/environ`, ritorno) sta in PRODUZIONE, «IL JOURNAL SENZA
+BUFFER».
+
+**STRADE SCARTATE.** Aggiungere la riga a `riavvio-dolce.conf`: parla
+d'altro (lo spegnimento), e due ragioni in un file solo non si tolgono
+una alla volta. Il `flush=True` su ogni `print`: centinaia di righe
+toccate per lo stesso effetto, e la prossima `print` nuova lo
+dimenticherebbe.
+
+**IL RIAVVIO.** Il drop-in vale dal riavvio successivo: lo fa da solo
+il prossimo deploy (anche quello di questo commit, se il drop-in è
+posato prima), o `systemctl restart barattolo`, il riavvio dolce di
+sempre (~1,5 s, Caddy aspetta). Il libro fermo non serve: quello
+riguarda i riavvii di mostro sul nodo, e un riavvio di barattolo è quel
+che succede a ogni deploy.
+
+**PROVATO.** `prove_journal_senza_buffer` (nuova): il drop-in dice
+`[Service]` e `Environment=PYTHONUNBUFFERED=1` e nient'altro, niente
+ExecStart, i commenti col «;» di systemd, dove si posa e i due comandi
+per tornare indietro; PRODUZIONE ha la procedura con la verifica sul
+processo vivo. Con `prove_servizio_non_root`: 48 passate. Su 99ec413
++ il cantiere: `PROVE_SEVERE=1` → 25.160 passate, 0 fallite; i collaudi
+della CI in gabbia, due alla volta → 86 verdi, 0 rossi. Dopo il rebase:
+nel verbale del commit.
+
+**DA VERIFICARE SUL VPS** (Andrea): dopo il riavvio, la riga
+`tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value barattolo)/environ | grep PYTHONUNBUFFERED`
+deve dire `PYTHONUNBUFFERED=1`.
