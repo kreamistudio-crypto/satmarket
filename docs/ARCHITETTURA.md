@@ -18046,23 +18046,22 @@
   nuova, qui sotto.)
   IL CAMBIO IN CHIARO (19 ott 2026, cantiere tasso-in-chiaro). UNA riga
   pulita, «1 BTC ≈ 98.450 €», nient'altro (decisione di Andrea: niente
-  ora, niente note, niente «cambio della presa»); oltre `CAMBIO_VECCHIO_MS`
-  (5 minuti) un ⚠️ davanti al numero, senza parole. La frase è PURA,
-  `testoTassoP2P`, e la cifra è un gruppo con spazi non separabili.
-  L'età viene dal server: accanto a `cambio_eur`, nella rotta
-  `/api/cambio` e nella busta della vetrina, viaggia `cambio_eta_s`, da
-  quanti SECONDI la fonte ha dato quel numero (`cambio_eta_ora`, la stessa
-  cache; None senza cambio). Un'età e non un'ora: il telefono la toglie
-  dal SUO adesso (`impostaOraCambio` → `cambioQuando`), e un orologio
-  storto non inventa un ⚠️; senza età mai il ⚠️. Due posti, la stessa
-  riga: UNA volta sopra il libro P2P (`#p2pTasso`, markup fisso fra il
-  banner delle commissioni e la riga dell'ordine sparito, scritto da
-  `aggiornaTassoLibroP2P` in `renderP2P`) e nel conto di un ordine DA
-  PRENDERE (`rigaTassoContoP2P` in `contoDettP2P`: il foglio del libro e
-  la pagina dello scambio), sotto la convenienza e nella stessa testa
-  (`testaContoP2P`, una scatola e non `:has()`); dopo la presa niente. Il
-  battito ridisegna anche quando cambia il solo ⚠️ (`firmaTassoP2P`): con
-  CoinGecko muto il numero resta, e la riga deve passare al ⚠️ da sola.
+  ora, niente note, niente «cambio della presa»), CENTRATA, e SOLO nel
+  dettaglio di un ordine DA PRENDERE (`rigaTassoContoP2P` in
+  `contoDettP2P`: il foglio del libro e la pagina dello scambio), sotto
+  la convenienza e nella stessa testa (`testaContoP2P`, una scatola e non
+  `:has()`); dopo la presa niente, e sopra il libro niente (c'è stata un
+  giro, tolta da Andrea). Oltre `CAMBIO_VECCHIO_MS` (5 minuti) un ⚠️
+  davanti al numero, senza parole. La frase è PURA, `testoTassoP2P`, e la
+  cifra è un gruppo con spazi non separabili. L'età viene dal server:
+  accanto a `cambio_eur`, nella rotta `/api/cambio` e nella busta della
+  vetrina, viaggia `cambio_eta_s`, da quanti SECONDI la fonte ha dato quel
+  numero (`cambio_eta_ora`, la stessa cache; None senza cambio). Un'età e
+  non un'ora: il telefono la toglie dal SUO adesso (`impostaOraCambio` →
+  `cambioQuando`), e un orologio storto non inventa un ⚠️; senza età mai
+  il ⚠️. Il battito ridisegna anche quando cambia il solo ⚠️
+  (`firmaTassoP2P`): con CoinGecko muto il numero resta, e la riga deve
+  passare al ⚠️ da sola.
   IL RITORNO IN PRIMO PIANO NON LAMPEGGIA: la pagina che si nasconde mette
   il cambio in dubbio (`cambioDubbio`), e in dubbio il ⚠️ non si mostra;
   tornando visibile (`ritornoCambioP2P`, un ascoltatore dopo l'interval

@@ -153212,10 +153212,11 @@ def prove_tasso_in_chiaro():
     1) il server manda accanto al cambio la sua ETA' (`cambio_eta_s`), nella
        rotta `/api/cambio` e nella busta della vetrina — un'eta' e non
        un'ora, cosi' un orologio storto del telefono non inventa un ⚠️;
-    2) UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro: sopra il libro P2P
-       e nel conto di un ordine da prendere (`contoDettP2P`: il foglio del
-       libro e la pagina dello scambio), la stessa; oltre cinque minuti un
-       ⚠️ davanti al numero, senza parole; dopo la presa niente;
+    2) UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro, centrata, SOLO nel
+       dettaglio di un ordine da prendere (`contoDettP2P`: il foglio del
+       libro e la pagina dello scambio) — sopra il libro non c'e' piu'
+       (Andrea, al secondo giro); oltre cinque minuti un ⚠️ davanti al
+       numero, senza parole; dopo la presa niente;
     3) il battito ridisegna anche quando cambia soltanto il ⚠️ (CoinGecko
        muto: stesso numero, e la riga deve passare al ⚠️ da sola);
     4) al ritorno in primo piano il cambio si chiede SUBITO, e il ⚠️ si
@@ -153231,7 +153232,7 @@ def prove_tasso_in_chiaro():
     l'eta' di uno zero che cancella quella buona; una parola in piu' sulla
     riga; la riga su uno scambio gia' preso; il ⚠️ che resta spento per
     sempre col server muto; il ⚠️ che lampeggia al ritorno da una pausa."""
-    print("\n[il cambio in chiaro: la riga sopra il libro e nel conto, il ⚠️, il ritorno]")
+    print("\n[il cambio in chiaro: la riga nel dettaglio, il ⚠️, il ritorno]")
     src = _SORGENTE
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
@@ -153270,13 +153271,11 @@ def prove_tasso_in_chiaro():
            in mini,
            "impostaCambio(j && j.cambio_eur);\n      if (j) impostaOraCambio(j.cambio_eur, "
            "j.cambio_eta_s);" in mini])
-    prova("la riga sopra il libro: markup fisso spento, fuori dal blocco attaccato, sopra la "
-          "riga dell'ordine sparito; la scrive renderP2P appena sa di avere il libro",
-          [1, True, True],
-          [mini.count('<div class="p2p-tasso" id="p2pTasso" hidden></div>'),
-           mini.find('id="p2pFeeBanner"') < mini.find('id="p2pTasso"')
-           < mini.find('id="p2pOrdineSparito"') < mini.find('<div id="p2pCorpo">'),
-           "  if (!box) return;\n  aggiornaTassoLibroP2P();\n" in fn("function renderP2P(){")])
+    prova("SOPRA IL LIBRO NON C'E' (Andrea, al secondo giro: solo nel dettaglio): ne' il "
+          "markup, ne' il suo CSS, ne' chi la scriveva, ne' la chiamata in renderP2P",
+          [0, 0, 0],
+          [mini.count('p2pTasso'), mini.count('p2p-tasso'),
+           mini.count('aggiornaTassoLibroP2P')])
     cd = nudo(fn("function contoDettP2P(o){"))
     prova("nel conto la riga sta subito sotto la convenienza, nella stessa testa, prima del "
           "Controvalore; e la testa e' una scatola solo quando ci sono tutt'e due",
@@ -153287,10 +153286,11 @@ def prove_tasso_in_chiaro():
            "return (conv && tasso) ? '<div class=\"ctrl-testa\">' + conv + tasso + '</div>' "
            ": conv + tasso;" in fn("function testaContoP2P(conv, tasso){")])
     css = mini[:mini.find("</style>")]
-    prova("piccola e grigia, nell'inchiostro morbido di casa (che ha il suo valore in chiaro "
-          "e in scuro); e nessuna regola per una nota sotto", [True, True, True, 0],
-          [".p2p-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);" in css,
-           ".conto-p2p .ctrl-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);" in css,
+    prova("piccola, grigia e CENTRATA nella sua riga, nell'inchiostro morbido di casa (che ha "
+          "il suo valore in chiaro e in scuro); e nessuna regola per una nota sotto",
+          [True, True, 0],
+          [".conto-p2p .ctrl-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);\n"
+           "    text-align:center;" in css,
            css.count("--ink-soft:") >= 2, mini.count("tasso-nota")])
     prova("UNA riga e nient'altro (decisione di Andrea): via «aggiornato alle», la nota "
           "sull'altra fonte e «cambio della presa» da ogni frase che va a schermo",
@@ -153315,19 +153315,15 @@ Date.now = () => ORA;
 let DEMO = false, VETRINA = false;
 const API_BASE = '/api';
 const document = {visibilityState: 'visible'};
-const NODI = {p2pTasso: {textContent: '', hidden: true, scritture: 0}};
-let FOTO = [];            // la riga sopra il libro a ogni scrittura: il lampo si vede qui
-function el(id){
-  const n = NODI[id];
-  if (!n) return null;
-  return {get textContent(){ return n.textContent; },
-          set textContent(v){ n.textContent = v; n.scritture++; FOTO.push(v); },
-          get hidden(){ return n.hidden; }, set hidden(v){ n.hidden = v; }};
-}
+function el(){ return null; }
+/* il dettaglio di cartone: ogni ridisegno riscrive la riga, e FOTO le
+   tiene tutte — il lampo del ⚠️ si vedrebbe qui */
+let RIGA = '', FOTO = [];
+function disegna(){ RIGA = tassoAdessoP2P(); FOTO.push(RIGA); }
 let VISTA = 'view-p2p';
 function vistaAttivaP2P(){ return VISTA; }
 let disegni = 0;
-function ridisegnaLibroFermoP2P(){ disegni++; aggiornaTassoLibroP2P(); }
+function ridisegnaLibroFermoP2P(){ disegni++; disegna(); }
 let RISPOSTA = {cambio_eur: 100000, cambio_eta_s: 0}, domande = 0;
 let FETCH = () => Promise.resolve({ok: true, json: async () => RISPOSTA});
 function fetch(...a){ domande++; return FETCH(...a); }
@@ -153352,14 +153348,12 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   cambioQuando = 123; impostaOraCambio(0, 10); prove.push(cambioQuando);
   cambioQuando = 123; impostaOraCambio(undefined, 10); prove.push(cambioQuando);
   out.eta = prove;
-  /* LA RIGA SOPRA IL LIBRO */
-  cambioVivo = false; cambioQuando = 0; aggiornaTassoLibroP2P();
-  out.riserva = [NODI.p2pTasso.hidden, NODI.p2pTasso.textContent, tassoAdessoP2P()];
+  /* LA RIGA DEL CAMBIO IN MANO */
+  cambioVivo = false; cambioQuando = 0; disegna();
+  out.riserva = [RIGA, tassoAdessoP2P()];
   impostaCambio(98450); impostaOraCambio(98450, 40);
-  aggiornaTassoLibroP2P();
-  out.libro = [NODI.p2pTasso.hidden, NODI.p2pTasso.textContent];
-  const s0 = NODI.p2pTasso.scritture; aggiornaTassoLibroP2P();
-  out.ferma = NODI.p2pTasso.scritture - s0;
+  disegna();
+  out.libro = RIGA;
   /* IL BATTITO: stesso numero, l'eta' che cresce */
   RISPOSTA = {cambio_eur: 98450, cambio_eta_s: 40};
   ORA += 61000; battitoCambioLibroP2P(); await tick(); await tick();
@@ -153372,12 +153366,12 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   const d3 = disegni;                       // il ⚠️ arriva: un ridisegno
   ORA += 61000; RISPOSTA = {cambio_eur: 98450, cambio_eta_s: 5};
   battitoCambioLibroP2P(); await tick(); await tick();
-  out.battito = [d1, d2, d3, disegni, NODI.p2pTasso.textContent];   // ...e se ne va: un altro
+  out.battito = [d1, d2, d3, disegni, RIGA];   // ...e se ne va: un altro
   /* il server muto: la domanda cade, e la riga passa al ⚠️ da sola */
   const m0 = disegni;
   FETCH = () => Promise.reject(new Error('rete'));
   for (let i = 0; i < 6; i++) { ORA += 61000; battitoCambioLibroP2P(); await tick(); await tick(); }
-  out.muto = [disegni - m0, NODI.p2pTasso.textContent];
+  out.muto = [disegni - m0, RIGA];
   /* lo zero del server non porta via ne' il numero ne' la sua eta' */
   FETCH = () => Promise.resolve({ok: true, json: async () => ({cambio_eur: 0, cambio_eta_s: null})});
   const q0 = cambioQuando;
@@ -153388,18 +153382,18 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
      al ritorno il cambio in memoria ha dieci minuti, ma il ⚠️ NON si vede
      finche' la domanda non ha risposto; la risposta fresca lo tiene spento */
   FETCH = () => Promise.resolve({ok: true, json: async () => RISPOSTA});
-  impostaCambio(98450); impostaOraCambio(98450, 0); aggiornaTassoLibroP2P();
+  impostaCambio(98450); impostaOraCambio(98450, 0); disegna();
   document.visibilityState = 'hidden'; ritornoCambioP2P();
   ORA += 10 * 60000;
   let appesa = null;
   FETCH = () => new Promise(r => { appesa = r; });
   document.visibilityState = 'visible'; FOTO = []; domande = 0;
   ritornoCambioP2P();
-  aggiornaTassoLibroP2P();                       // un render qualunque, mentre si aspetta
-  const inVolo = [domande, tassoAdessoP2P(), NODI.p2pTasso.textContent];
+  disegna();                                     // un render qualunque, mentre si aspetta
+  const inVolo = [domande, tassoAdessoP2P(), RIGA];
   appesa({ok: true, json: async () => ({cambio_eur: 98500, cambio_eta_s: 20})});
   await tick(); await tick(); await tick();
-  out.ritornoFresco = [inVolo, NODI.p2pTasso.textContent, FOTO.some(f => f.indexOf('⚠️') === 0)];
+  out.ritornoFresco = [inVolo, RIGA, FOTO.some(f => f.indexOf('⚠️') === 0)];
   /* ...e se anche DOPO la domanda il server ha un cambio vecchio, il ⚠️ e' vero */
   document.visibilityState = 'hidden'; ritornoCambioP2P();
   ORA += 10 * 60000;
@@ -153408,7 +153402,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   ritornoCambioP2P();
   const prima = tassoAdessoP2P();
   await tick(); await tick(); await tick();
-  out.ritornoVecchio = [domande, prima, NODI.p2pTasso.textContent];
+  out.ritornoVecchio = [domande, prima, RIGA];
   /* ...e con la rete giu' la domanda cade: il cambio e' vecchio davvero, ⚠️ */
   document.visibilityState = 'hidden'; ritornoCambioP2P();
   impostaOraCambio(98500, 0); cambioDubbio = true;   // fresco quando la pagina s'e' nascosta
@@ -153417,7 +153411,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   document.visibilityState = 'visible'; ritornoCambioP2P();
   const primaRete = tassoAdessoP2P();
   await tick(); await tick(); await tick();
-  out.ritornoRete = [primaRete, NODI.p2pTasso.textContent, cambioDubbio];
+  out.ritornoRete = [primaRete, RIGA, cambioDubbio];
   /* ...e una pausa BREVE: l'ultima domanda e' di venti secondi prima di
      nascondersi, la pausa dura trenta — il minuto del battito non e' passato,
      ma al ritorno si chiede lo stesso, subito (il dubbio non aspetta) */
@@ -153466,10 +153460,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
     prova("l'eta' che arriva: 0 e 120 secondi si tolgono dall'adesso del telefono; null, "
           "assente, negativa, una parola o vuota = eta' non nota (0); col cambio a zero o "
           "assente non si tocca quella di prima", [0, 120, 0, 0, 0, 0, 0, 123, 123], o.get("eta"))
-    prova("sopra il libro: col cambio di riserva la riga resta spenta e muta", [True, "", ""],
-          o.get("riserva"))
-    prova("...col cambio vero si accende; riscritta solo se la frase cambia",
-          [[False, "1 BTC ≈ 98.450 €"], 0], [o.get("libro"), o.get("ferma")])
+    prova("col cambio di riserva la riga non c'e'", ["", ""], o.get("riserva"))
+    prova("...col cambio vero c'e', il solo numero", "1 BTC ≈ 98.450 €", o.get("libro"))
     prova("il battito ridisegna quando compare o se ne va il ⚠️ anche a numero fermo, e non "
           "quando non cambia niente", [0, 0, 1, 2, "1 BTC ≈ 98.450 €"], o.get("battito"))
     prova("server muto: la domanda cade, e dopo cinque minuti la riga passa al ⚠️ da sola, con "

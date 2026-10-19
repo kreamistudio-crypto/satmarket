@@ -65835,3 +65835,37 @@ NON FATTO, e si vede: la fila «Scambi P2P» di Esplora e la vetrina non
 dicono il cambio (non richiesto); il ⚠️ non ha un nome per chi legge con
 la voce (Andrea l'ha voluto senza parole: un `aria-label` sarebbe una
 parola che non si vede, da decidere).
+
+## Il cambio in chiaro, secondo giro: solo nel dettaglio, e centrato (19 ott 2026, cantiere tasso-in-chiaro, richiesta di Andrea)
+
+«La riga del controvalore mettila solo nel dettaglio di un annuncio, non
+nel libro ordini, e mettila centrata nella riga.» La riga è
+«1 BTC ≈ 98.450 €» del primo giro: via da sopra il libro (il markup
+`#p2pTasso`, il suo CSS, `aggiornaTassoLibroP2P` e la sua chiamata in
+`renderP2P`), resta SOLO nel conto del dettaglio di un ordine da prendere
+(il foglio del libro e la pagina dello scambio), con `text-align:center`.
+Il battito resta com'era: è lui che porta il ⚠️ nel foglio aperto, e il
+ritorno in primo piano vale lì. LETTO COSÌ: «dettaglio di un annuncio» è
+il dettaglio di un ordine del libro — l'unico altro posto dove la riga
+stava; la scheda di un annuncio del mercatino non l'ha mai avuta, e non
+è stata toccata.
+PROVATO. `prove_tasso_in_chiaro` riscritta per la forma nuova: una
+sentinella d'ASSENZA sopra il libro (markup, CSS, funzione, chiamata), il
+CSS centrato, e il banco che guarda la riga del dettaglio invece di
+quella del libro (riserva, battito, server muto, i quattro ritorni in
+primo piano). Tortura 16 su 16 (nuove: la riga rimessa sul libro, il
+centrato tolto). Suite `PROVE_SEVERE=1` 25103 passate, 0 fallite e
+collaudi 85 verdi sull'albero di 81446f6 più il cantiere; poi, RIBASATO
+su 6b256af (main corso col cantiere doppio-tocco: in comune solo le code
+dei documenti), 25108 passate, 0 fallite, nessuna saltata, e collaudi 85
+verdi, 0 rossi. Il ramo è stato ripushato con `--force-with-lease`.
+DAL VIVO (stesso banco del primo giro, 360×780, chiaro e scuro), 24 su
+24: il libro non dice più il cambio; nei due fogli la riga è centrata al
+pixel (margini uguali a destra e a sinistra), anche col ⚠️; il ⚠️ arriva
+da solo col server vecchio e se ne va col cambio nuovo; il ritorno in
+primo piano col foglio aperto senza lampo, e col server vecchio il ⚠️
+solo dopo la risposta (la prima stesura del giro leggeva la riga in un
+secondo passo, e col server locale la risposta arrivava prima: corsa del
+banco, non del codice — ora la lettura sta nello stesso giro sincrono del
+ritorno); dopo la presa (iniettato) nessuna riga.
+

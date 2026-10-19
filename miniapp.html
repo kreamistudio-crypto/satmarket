@@ -4037,12 +4037,6 @@
   .p2p-sparito{display:flex;align-items:flex-start;gap:10px;
     margin:12px 0 4px;padding:12px;font-size:13.5px;line-height:1.4}
   .p2p-sparito[hidden]{display:none}
-  /* IL CAMBIO IN CHIARO SOPRA IL LIBRO (19 ott 2026): una riga piccola e
-     grigia, una volta sola per tutte le card — il numero e' lo stesso
-     per tutte. Fuori dal blocco attaccato, come il banner: se ne va col
-     primo dito e non ruba spazio alle card. */
-  .p2p-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);margin:2px 4px 8px}
-  .p2p-tasso[hidden]{display:none}
   .p2p-sparito b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
   .p2p-sparito>div{flex:1;min-width:0}
   #view-p2p .btn{margin-top:14px}
@@ -6772,13 +6766,14 @@
   .conto-p2p .ctrl-conv .p2p-avviso{color:var(--rosso-p2p-testo)}
   .conto-p2p .ctrl-conv .p2p-affare{color:var(--trust)}
   /* IL CAMBIO IN CHIARO (19 ott 2026): «1 BTC ≈ 98.450 €» e nient'altro,
-     sotto la convenienza, piu' piccolo ancora e nello stesso inchiostro
+     CENTRATO nella sua riga (richiesta di Andrea), sotto la convenienza,
+     piu' piccolo ancora e nello stesso inchiostro
      morbido — e' il metro delle cifre,
      non una cifra. Col suo filo sotto; con la convenienza stanno tutt'e
      due nella scatola `ctrl-testa` (`testaContoP2P`), che porta un filo
      solo, e i fili loro se ne vanno. */
   .conto-p2p .ctrl-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);
-    padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
+    text-align:center;padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
   .conto-p2p .ctrl-testa{padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
   .conto-p2p .ctrl-testa .ctrl-conv{border-bottom:0;padding-bottom:3px;margin-bottom:0}
   .conto-p2p .ctrl-testa .ctrl-tasso{border-bottom:0;padding-bottom:0;margin-bottom:0}
@@ -11825,11 +11820,6 @@ document.getElementById('cartello')?.remove();</script>
            Se il file non arriva il bottone se ne va: un bottone vuoto
            in cima al libro sarebbe un buco. -->
       <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1000" height="258"alt="Fee P2P: 2% barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5" onerror="this.parentNode.remove()"><span class="fee-pz fee-pz1" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz2" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3 fee-tag" aria-hidden="true"><i></i></span><span class="fee-barra" aria-hidden="true"></span></button>
-      <!-- IL CAMBIO IN CHIARO (19 ott 2026, tasso-in-chiaro): «1 BTC ≈
-           98.450 €», col ⚠️ davanti se ha piu' di cinque minuti, una
-           volta sola sopra le card. La scrive `aggiornaTassoLibroP2P` da
-           renderP2P; spenta finche' non c'e' un cambio vero. -->
-      <div class="p2p-tasso" id="p2pTasso" hidden></div>
       <!-- L'ORDINE CONDIVISO CHE NON C'E' PIU' (10 ott 2026): chi apre
            il link di un ordine preso, scaduto o ritirato atterra sul
            libro degli altri, e questa riga gli dice perche' non vede
@@ -23417,10 +23407,12 @@ let cambioChiesto = 0;              // l'ultima domanda, o l'ultimo arrivo
 let cambioGiro = null;              // la domanda in volo, se c'e'
 let cambioRidisegna = false;        // vero SOLO dentro il ridisegno del battito
 /* IL CAMBIO IN CHIARO (19 ott 2026, cantiere tasso-in-chiaro, decisione
-   di Andrea): UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro — la
-   stessa sopra il libro P2P e nel conto di un ordine da prendere
-   (`rigaTassoContoP2P`). Fin qui il cambio viveva solo DENTRO le cifre —
-   i «≈» e le % — e chi guardava non poteva sapere quale fosse.
+   di Andrea): UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro, centrata,
+   SOLO nel dettaglio di un ordine da prendere (`rigaTassoContoP2P`: il
+   foglio del libro e la pagina dello scambio). Fin qui il cambio viveva
+   solo DENTRO le cifre — i «≈» e le % — e chi guardava non poteva sapere
+   quale fosse. SOPRA IL LIBRO C'E' STATA per un giro, una volta per tutte
+   le card: tolta lo stesso giorno da Andrea, la vuole solo nel dettaglio.
    OLTRE CINQUE MINUTI, UN ⚠️ DAVANTI AL NUMERO, senza parole. IL NUMERO
    RESTA — un valore segnato vecchio vale piu' di nessun valore — e resta
    quel che faceva il client: lo zero del server non entra
@@ -23471,15 +23463,6 @@ function testoTassoP2P(eurBtc, quando, adesso){
 function tassoAdessoP2P(){
   return (cambioVivo && eurPerSat > 0)
     ? testoTassoP2P(eurPerSat * 1e8, cambioDubbio ? 0 : cambioQuando, Date.now()) : '';
-}
-/* la riga sopra il libro: markup fisso, la scrive renderP2P (e quindi il
-   battito, che passa di li') e si tocca solo se la frase e' cambiata */
-function aggiornaTassoLibroP2P(){
-  const r = el('p2pTasso');
-  if (!r) return;
-  const t = tassoAdessoP2P();
-  if (r.textContent !== t) r.textContent = t;
-  r.hidden = !t;
 }
 /* LA FIRMA DEL ⚠️: «c'e'» o «non c'e'», mai il numero (quello lo dice gia'
    `rileggiCambio`). Serve al battito: CoinGecko muto vuol dire stesso
@@ -56057,7 +56040,6 @@ function renderP2P(){
   /* la gemella dei propri scambi: stessa ragione, stesso contenitore */
   const mieiTesta = el('p2pMieiTesta');
   if (!box) return;
-  aggiornaTassoLibroP2P();
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
   /* IL TOUR NON ASPETTA PIU' IL LIBRO (26 set 2026, «IL LIBRO
@@ -63595,8 +63577,9 @@ function etichettaPremioP2P(mio, prem, affare){
     + (affare ? ' che hai richiesto ' : ' che hai offerto ') + num;
   return num + (affare ? ' più' : ' meno') + ' conveniente';
 }
-/* IL CAMBIO IN CHIARO NEL CONTO (19 ott 2026, tasso-in-chiaro): la STESSA
-   riga di sopra il libro, sotto la convenienza, finche' l'ordine e' da
+/* IL CAMBIO IN CHIARO NEL CONTO (19 ott 2026, tasso-in-chiaro): la riga,
+   centrata, sotto la convenienza — il SOLO posto dove sta (la riga sopra
+   il libro Andrea l'ha tolta) —, finche' l'ordine e' da
    prendere — cioe' finche' il conto e' fatto col cambio di adesso. Dopo
    la presa niente: le cifre sono un fatto, il cambio di adesso non le
    muove, e «cambio della presa» Andrea l'ha tolto (una riga sola, la
