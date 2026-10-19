@@ -5120,12 +5120,18 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   come sempre, a ordine concluso.
   GUARDARE, in sola lettura (il testo non c'è: sono buste chiuse):
   `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT COUNT(*), COUNT(DISTINCT ordine) FROM buste WHERE ordine GLOB 'm[1-9]*';"`
-  Quante buste, su quanti ordini del mercatino in corso. NEL JOURNAL le
-  righe sono quelle della chat dello scambio, con l'ordine scritto
-  `m<numero>` («💬 Chat P2P: nuovo messaggio sullo scambio m42,
-  avvisato …», «🧹 Chat P2P: lo scambio m42 e' finito, buste
-  cancellate»), e «🧹 Chat degli ordini: cancellate le buste di N ordini
-  conclusi» dal giro al minuto. Mai il testo.
+  Quante buste, su quanti ordini del mercatino in corso. NEL JOURNAL
+  (dal 19 ott 2026, chat-mercatino-2) l'ordine col suo numero, e la
+  sigla sua: `journalctl -u barattolo | grep "Chat degli ordini"` —
+  «💬 Chat degli ordini: nuovo messaggio sull'ordine 42, avvisato …»,
+  «📎 Chat degli ordini: un allegato sull'ordine 42, N KB», «🧹 Chat degli
+  ordini: l'ordine 42 e' concluso, buste cancellate», e «🧹 Chat degli
+  ordini: cancellate le buste di N ordini conclusi» dal giro al minuto.
+  Le righe dello scambio P2P restano «Chat P2P … sullo scambio …». Mai
+  il testo. LA CHAT FERMA: un ordine deciso dal moderatore il cui
+  pagamento non è andato a segno (`refund` o `confirmed` con
+  `disputata=1`, o `confirmed` chiuso dal timer) tiene la chat in sola
+  lettura finché i sats arrivano; si vede contando le buste qui sopra.
   IL MODERATORE legge la chat di un ordine in disputa SOLO con la sua
   chiave di moderatore dichiarata (quella del P2P, `p2p_moderatori`) e
   sullo stesso dispositivo: senza, la pagina dell'ordine dice «serve la

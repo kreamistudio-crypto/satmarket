@@ -33179,5 +33179,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `chatScSegnaColonnaP2P(box)` mette `con-chatsc` sul contenitore
   (`#p2pOrdineCorpo`, il `.detail-body` dell'ordine) quando il riquadro
   è un suo figlio diretto, e la regola del blocco da 1280 nasconde
-  `.chatsc-richiamo` lì dentro — niente `:has()`. Le prove:
+  `.chatsc-richiamo` lì dentro — niente `:has()`.
+  IL SECONDO GIRO (19 ott 2026, cantiere chat-mercatino-2). LA CHAT
+  FERMA: `_chat_mercatino_ferma(stato, disputata, sbloccato_auto_il)` —
+  i casi che `risolvi_disputa` può riaprire: `confirmed`/`refund` con
+  `disputata=1`, `confirmed` con lo sblocco automatico. Lì
+  `_parti_ordine_mercatino` dice `vivo` (la scopa non cancella) e
+  `ferma`; `_chat_p2p_stato` porta `ferma`, `leggi` la ripete al
+  telefono, `invia` e l'allegato rifiutano tutto con
+  `CHAT_MERCATINO_FERMA_TESTO`; la riga di `/api/orders` dice 'ferma' alle
+  parti e 'moderazione' al moderatore, che la rilegge
+  (`_chat_mercatino_per_moderatore` accetta disputa O ferma). Nel
+  telefono la riga ha `ferma` (la parola del ritiro vince sulla lista),
+  il piede è `CHATSC_MERC_FERMA` senza campo né 📎, e
+  `chatScPresentaP2P` e `chatMercDichiaraP2P` non mandano niente. Si
+  cancella a `released`/`refunded`; un `confirmed` dato di persona da chi
+  compra si cancella subito. IL JOURNAL: `_chat_nel_journal(ordine)` dà
+  etichetta e frasi (`Chat degli ordini … sull'ordine 42`, `Chat P2P …
+  sullo scambio c4a70000`, invariata). I RIFIUTI: `_chat_questo` /
+  `chatScQuestoP2P` («questo ordine» / «questo scambio»). IL MODERATORE A
+  DESTRA: `chatMercModHTML` avvolge la chat delle parti in `.chatsc-mod`,
+  `chatScSegnaColonnaP2P` la conta, e il CSS dello schermo largo la mette
+  nella colonna di destra (da 1600 la terza) con `.con-chatsc` — niente
+  `:has()`. Le prove:
   `prove_chat_mercatino`, `collaudo_chat_mercatino` (in CI).

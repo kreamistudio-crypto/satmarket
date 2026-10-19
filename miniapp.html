@@ -10970,6 +10970,12 @@
        telefono (`chatScSegnaColonnaP2P`): niente `:has()` */
     html.fuori-telegram #orderContent>.detail-body.con-chatsc>.chatsc-richiamo,
     html.fuori-telegram #p2pOrdineCorpo.con-chatsc>.chatsc-richiamo{display:none}
+    /* LA CHAT DELLE PARTI PER IL MODERATORE, A DESTRA (19 ott 2026,
+       cantiere chat-mercatino-2): come quella delle parti, con la classe
+       `con-chatsc` che mette il telefono — niente `:has()` */
+    html.fuori-telegram #orderContent>.detail-body.con-chatsc>.vault{grid-column:1;grid-row:auto}
+    html.fuori-telegram #orderContent>.detail-body>.chatsc-mod{grid-column:2;grid-row:1 / -1;
+      position:sticky;top:76px}
   }
 
   /* ---- da 1600: tre pannelli ---- */
@@ -11001,6 +11007,11 @@
       grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)}
     html.fuori-telegram #orderContent>.detail-body:has(>.chatsc)>.vault{grid-column:2;grid-row:1 / -1}
     html.fuori-telegram #orderContent>.detail-body>.chatsc{grid-column:3}
+    /* ...e la chat delle parti per il moderatore (19 ott 2026), senza :has() */
+    html.fuori-telegram #orderContent>.detail-body.con-chatsc{
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)}
+    html.fuori-telegram #orderContent>.detail-body.con-chatsc>.vault{grid-column:2;grid-row:1 / -1}
+    html.fuori-telegram #orderContent>.detail-body>.chatsc-mod{grid-column:3}
     html.fuori-telegram #p2pOrdineCorpo:has(>.chatsc){
       grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)}
     html.fuori-telegram #p2pOrdineCorpo:has(>.chatsc)>.p2p-passi{grid-column:2;grid-row:1 / -1}
@@ -16446,7 +16457,7 @@ function mapOrder(o){
     /* LA CHAT DELL'ORDINE (16 ott 2026, cantiere chat-mercatino): la dice
        il server — 'aperta', 'chiusa', 'moderazione' o '' (vedi
        `_chat_mercatino_vista`) */
-    chat:(['aperta','chiusa','moderazione'].indexOf(o.chat) >= 0 ? o.chat : ''),
+    chat:(['aperta','ferma','chiusa','moderazione'].indexOf(o.chat) >= 0 ? o.chat : ''),
     /* di chi e' il negozio (ott 2026): il carrello salvato si svuota
        solo pagando un ordine dello STESSO venditore (carrelloDopoPagamento) */
     sellerId:o.venditore_id,
@@ -81505,6 +81516,14 @@ const CHATSC_MERC_AVVISO = 'Barattolo non ti scrive mai qui. Non pagare fuori da
 const CHATSC_MERC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta e non la legge, e a ordine concluso la cancella. Un moderatore la legge solo se l\'ordine va in disputa.';
 const CHATSC_MERC_RIGA_FUORI = 'Ti chiede di spostarti altrove: fuori dall\'ordine Barattolo non può aiutarti.';
 const CHATSC_MERC_CHIUSA = 'Chat chiusa: messaggi e file cancellati a ordine concluso.';
+/* LA CHAT FERMA (19 ott 2026, cantiere chat-mercatino-2, decisione di
+   Andrea): ordine deciso ma riapribile dal moderatore, sats non ancora
+   arrivati — la chat resta in SOLA LETTURA e si cancella quando i sats
+   arrivano; se il moderatore riapre torna scrivibile. La frase e' la
+   stessa del server (`CHAT_MERCATINO_FERMA_TESTO`) */
+const CHATSC_MERC_FERMA = 'La decisione è presa: la chat si cancella quando i sats arrivano.';
+/* PURA: «questo ordine» o «questo scambio», per i rifiuti che legge chi scrive */
+function chatScQuestoP2P(id){ return chatScMercP2P(id) ? 'questo ordine' : 'questo scambio'; }
 let p2pChatMercSpenta = false;    // il server ha detto che la leva del mercatino e' spenta
 let p2pChatMercInfo = {};         // ordine -> {peers, mie}: le chiavi d'ordine dette dal server
 let p2pChatMercProfilo = null;    // il profilo di scambio, cercato UNA volta per pagina
@@ -81536,6 +81555,9 @@ function chatScRigaP2P(id){
           peer: peers.length ? peers[peers.length - 1] : '', peers: peers,
           mie: (info.mie || []).filter(k => /^[0-9a-f]{64}$/.test(k)),
           disputa: CHATSC_MERC_DISPUTA.indexOf(om.state) >= 0, nome: chatMercNomeP2P(om),
+          /* ferma: l'ultima parola del ritiro, se c'e' (la decisione o la
+             riapertura possono arrivare a pagina aperta); sennò la lista */
+          ferma: typeof info.ferma === 'boolean' ? info.ferma : om.chat === 'ferma',
           lato: om.role === 'buyer' ? 'compro' : 'vendo'};
 }
 /* il nome dell'altra persona nelle frasi della chat */
@@ -81577,7 +81599,8 @@ function chatScEl(id){
 function chatScSegnaColonnaP2P(box){
   if (!box || !box.classList || !box.children) return;
   box.classList.toggle('con-chatsc',
-    Array.prototype.some.call(box.children, x => x.classList && x.classList.contains('chatsc')));
+    Array.prototype.some.call(box.children, x => x.classList
+      && (x.classList.contains('chatsc') || x.classList.contains('chatsc-mod'))));
 }
 /* LA PAGINA INTERA SI RIDISEGNA: quella dello scambio, o quella
    dell'ordine del mercatino */
@@ -81644,6 +81667,8 @@ async function chatMercDichiaraP2P(id, forza){
   if (!o) return null;
   const gia = chatMercChiaveP2P(o);
   if (gia) return gia;
+  /* la chat ferma non accetta niente di nuovo, chiavi comprese */
+  if (o.ferma) return null;
   if ((o.mie || []).length && !forza) return null;
   await chatMercProfiloP2P();
   let k = chatMercCandidateP2P(id).slice(-1)[0] || null;
@@ -81680,14 +81705,14 @@ function chatMercBloccoHTML(om){
   const id = 'm' + om.id;
   const chiusa = '<div class="trust-note"><span>💬</span><span>' + esc(CHATSC_MERC_CHIUSA) + '</span></div>';
   if (om.chat === 'chiusa') return chiusa;
-  if (om.chat !== 'aperta' || p2pChatMercSpenta) return '';
+  if ((om.chat !== 'aperta' && om.chat !== 'ferma') || p2pChatMercSpenta) return '';
   /* il server ha appena detto che e' finita: la riga, non il riquadro */
   if ((p2pChatScSapere[id] || {}).chiusa) return chiusa;
   const o = chatScRigaP2P(id);
   return o ? bloccoChatScambioP2P(o) : '';
 }
 function chatMercRichiamoHTML(om){
-  if (!om || om.chat !== 'aperta' || p2pChatMercSpenta) return '';
+  if (!om || (om.chat !== 'aperta' && om.chat !== 'ferma') || p2pChatMercSpenta) return '';
   const o = chatScRigaP2P('m' + om.id);
   return o ? chatScRichiamoP2P(o) : '';
 }
@@ -81731,7 +81756,10 @@ function chatScServeP2P(o){
      server dice che la chat c'e' (la leva, lo stato). L'altra parte puo'
      non essersi ancora presentata: il riquadro c'e' lo stesso, e il
      piede dice che si apre appena lei apre l'ordine */
-  if (o && o.mercatino) return o.chat === 'aperta' && CHATSC_MERC_APERTA.indexOf(o.stato) >= 0;
+  /* ...o ferma (19 ott 2026): deciso, riapribile, in sola lettura */
+  if (o && o.mercatino)
+    return (o.chat === 'aperta' || o.chat === 'ferma')
+      && (CHATSC_MERC_APERTA.indexOf(o.stato) >= 0 || !!o.ferma);
   return !!(o && o.peer && idMostroVero(o.id)
     && P2P_FINALI.indexOf(o.stato) < 0 && CHATSC_DOPO.indexOf(o.stato) < 0);
 }
@@ -81911,7 +81939,7 @@ function chatScNovitaP2P(){
     .filter(id => chatScServeP2P(righe[id]) && chatScTradeP2P(righe[id])) : [];
   /* ...gli ordini del mercatino con la chat aperta (16 ott 2026)... */
   const merc = (!p2pChatMercSpenta && typeof orders !== 'undefined' && Array.isArray(orders))
-    ? orders.filter(x => x && x.chat === 'aperta').map(x => 'm' + x.id) : [];
+    ? orders.filter(x => x && (x.chat === 'aperta' || x.chat === 'ferma')).map(x => 'm' + x.id) : [];
   /* ...e OGNI voce del cassetto, per sapere dal server se il suo
      scambio e' finito: e' l'unica cosa che fa buttare una chiave */
   const ids = vivi.concat(merc.filter(id => vivi.indexOf(id) < 0)).concat(Object.keys(chatScTutteP2P())
@@ -82184,6 +82212,8 @@ async function chatScPresentaP2P(id, forza){
   const o = chatScRigaP2P(id);
   const tk = chatScTradeP2P(o);
   let c = chatScDiP2P(id);
+  /* la chat ferma (19 ott 2026) si legge e basta: niente saluti ne' copie */
+  if (o && o.ferma) return;
   /* nel mercatino il saluto si chiude per la chiave d'ordine dell'altra
      parte: finche' il server non la dice, si aspetta */
   if (!o || !tk || !c || (o.mercatino && !o.peer)) return;
@@ -82270,7 +82300,8 @@ function chatScRitiraP2P(id){
     const d = await chatScFetch('leggi', {ordine: id, dopo: (prima && prima.cursore) | 0});
     /* le chiavi d'ordine che il server presenta (mercatino) */
     if (merc && d.aperta)
-      p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : []};
+      p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : [],
+                             ferma: !!d.ferma};
     if (merc && d.aperta && !chatScTradeP2P(chatScRigaP2P(id))) {
       try { await chatMercDichiaraP2P(id, false); } catch(e) {}
     }
@@ -82774,7 +82805,7 @@ async function allegaChatScambioP2P(input){
   if (!file || !id) return;
   const c = chatScDiP2P(id);
   if (((c && c.msgs) || []).filter(m => m.mio && m.f).length >= CHATSC_ALLEGATI_MAX) {
-    toast('In questo scambio hai già mandato ' + CHATSC_ALLEGATI_MAX + ' file'); return;
+    toast('In ' + chatScQuestoP2P(id) + ' hai già mandato ' + CHATSC_ALLEGATI_MAX + ' file'); return;
   }
   if (Date.now() - p2pChatScUltimoInvio < CHATSC_FRENO_MS) { toast('Un momento: un messaggio alla volta'); return; }
   p2pChatScUltimoInvio = Date.now();
@@ -82822,7 +82853,7 @@ async function mandaAllegatoChatScP2P(id, chiaro, t){
     const c = chatScDiP2P(id);
     const giaMandati = ((c && c.msgs) || []).filter(m => m.mio && m.f).reduce((a, m) => a + (Number(m.f.peso) || 0), 0);
     if (giaMandati + chiaro.length > CHATSC_PESO_PARTE)
-      throw new Error('in questo scambio hai già mandato quasi ' + (CHATSC_PESO_PARTE / 1048576) + ' MB di file');
+      throw new Error('in ' + chatScQuestoP2P(id) + ' hai già mandato quasi ' + (CHATSC_PESO_PARTE / 1048576) + ' MB di file');
     const cif = await cifraAllegatoChatScP2P(chiaro);
     const r = await fetch(`${API_BASE}/p2p/chat/allegato`, {method: 'POST',
       headers: {'Content-Type': 'application/octet-stream', 'X-Tg-Init-Data': authHdr(), 'X-Chat-Ordine': id},
@@ -82953,6 +82984,9 @@ function oraBreveChatScP2P(ts){
    quale: lo legge il ridisegno, che il campo di testo non lo rifa' se
    non serve (rifarlo chiuderebbe la tastiera a chi sta scrivendo). */
 function chatScPiedeP2P(o, c){
+  /* LA CHAT FERMA (19 ott 2026): una frase, niente campo e niente 📎 */
+  if (o && o.mercatino && o.ferma)
+    return {modo: 'ferma', html: '<div class="hint">' + esc(CHATSC_MERC_FERMA) + '</div>'};
   /* nel mercatino: il server conosce chiavi d'ordine mie, e nessuna e'
      di questo dispositivo — la chat e' aperta altrove */
   const altroveOrdine = !!(o && o.mercatino && (o.mie || []).length && !chatScTradeP2P(o));
@@ -83289,7 +83323,10 @@ function chatPartiModP2P(d){
         + ' con la chiave che hai: sono stati scritti da un altro dispositivo.</div>' : '');
   return '<div class="chatmod"><b>💬 La chat fra le due parti</b>'
     + (chatScMercP2P(d.ordine)
-      ? '<div class="hint">La leggi perché l\'ordine è in disputa e una delle parti ti ha dato la chiave. Qui non si scrive. Alla decisione si cancella.</div>'
+      /* (19 ott 2026, chat-mercatino-2) la chat resta anche dopo una
+         decisione che non e' andata a segno: si cancella quando i sats
+         arrivano, non alla decisione */
+      ? '<div class="hint">La leggi perché in disputa una delle parti ti ha dato la chiave. Qui non si scrive. Si cancella quando i sats arrivano.</div>'
       : '<div class="hint">La leggi perché chi ha aperto la disputa ti ha dato la chiave. Qui non si scrive: '
         + 'alle parti rispondi nei due riquadri qui sopra. A disputa chiusa si cancella.</div>')
     + corpo
@@ -83304,7 +83341,10 @@ function chatMercModHTML(om){
   if (!chiaveModeratoreP2P())
     return '<div class="trust-note"><span>💬</span><span>Questo ordine ha la chat delle parti: per leggerla '
       + 'serve la tua chiave da moderatore su questo dispositivo.</span></div>';
-  return chatPartiModP2P({ordine: 'm' + om.id});
+  /* `chatsc-mod` (19 ott 2026, chat-mercatino-2): sullo schermo largo
+     va nella colonna di destra come la chat delle parti (vedi
+     `chatScSegnaColonnaP2P` e il blocco da 1280 del CSS) */
+  return '<div class="chatsc-mod">' + chatPartiModP2P({ordine: 'm' + om.id}) + '</div>';
 }
 /* ═══ fine: la chat nello scambio ═══ */
 

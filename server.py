@@ -52794,7 +52794,51 @@ CHAT_MERCATINO_DISPUTA = ("dispute", "return_pending", "return_shipped")
 # cioe' senza aver mai pagato, e una chat non c'e' mai stata
 CHAT_MERCATINO_CHIUSA = ("confirmed", "released", "refund", "refunded")
 CHAT_MERCATINO_CHIAVI_MAX = 5     # chiavi d'ordine per parte: una per dispositivo senza profilo
+# LA CHAT FERMA (19 ott 2026, cantiere chat-mercatino-2, decisione di
+# Andrea): a ordine DECISO ma non ancora pagato, quando il moderatore lo
+# puo' ancora riaprire, la chat resta — in sola lettura — e si cancella
+# quando i sats arrivano. La frase e' quella del piede del telefono.
+CHAT_MERCATINO_FERMA_TESTO = "La decisione è presa: la chat si cancella quando i sats arrivano"
 CHAT_MERCATINO_BOTTONE = "💬 Apri l'ordine"
+
+
+def _chat_mercatino_ferma(stato, disputata, sbloccato_auto_il) -> bool:
+    """PURA: l'ordine e' DECISO ma il moderatore lo puo' ancora riaprire
+    (19 ott 2026, chat-mercatino-2)? Sono esattamente i casi che
+    `risolvi_disputa` riapre: 'confirmed' o 'refund' dopo una disputa (il
+    pagamento della decisione non e' andato a segno), e 'confirmed' chiuso
+    dal timer automatico. Li' la chat NON si cancella: resta in sola
+    lettura finche' i sats arrivano ('released', 'refunded'), e se il
+    moderatore riapre torna scrivibile con tutti i messaggi — dopo una
+    cancellazione non si ritroverebbero piu', nemmeno con la chiave data
+    al moderatore, perche' nel file non ci sono piu'. Un 'confirmed' dato
+    DI PERSONA da chi compra non si riapre: quello si cancella come
+    sempre."""
+    stato = str(stato or "")
+    if int(disputata or 0) and stato in ("confirmed", "refund"):
+        return True
+    return bool(int(sbloccato_auto_il or 0)) and stato == "confirmed"
+
+
+def _chat_nel_journal(ordine: str) -> dict:
+    """PURA: come le righe del journal nominano una chat (19 ott 2026,
+    chat-mercatino-2): un ordine del mercatino col suo numero («sull'ordine
+    42», «Chat degli ordini»), uno scambio P2P come sempre («sullo scambio
+    c4a70000», «Chat P2P») — per il P2P le righe restano identiche."""
+    o = str(ordine or "")
+    if FORMA_CHAT_MERCATINO.fullmatch(o):
+        n = int(o[1:])
+        return {"etichetta": "Chat degli ordini", "su": f"sull'ordine {n}",
+                "di": f"dell'ordine {n}", "fine": f"l'ordine {n} e' concluso"}
+    return {"etichetta": "Chat P2P", "su": f"sullo scambio {o[:8]}",
+            "di": f"di {o[:8]}", "fine": f"lo scambio {o[:8]} e' finito"}
+
+
+def _chat_questo(ordine: str) -> str:
+    """PURA: «questo ordine» o «questo scambio», per le frasi dei rifiuti
+    che legge chi scrive (19 ott 2026, chat-mercatino-2)."""
+    return ("questo ordine" if FORMA_CHAT_MERCATINO.fullmatch(str(ordine or ""))
+            else "questo scambio")
 
 
 def _parti_ordine_mercatino(con, ordine: str) -> dict:
@@ -52805,18 +52849,22 @@ def _parti_ordine_mercatino(con, ordine: str) -> dict:
     0: un ordine del mercatino non torna nel libro. `fonte` vuota = la
     riga non c'e' (o l'id non ha la forma): niente da tenere."""
     vuoto = {"compratore": 0, "venditore": 0, "giro": 0, "vivo": False,
-             "fonte": "", "stato": ""}
+             "fonte": "", "stato": "", "ferma": False}
     if not FORMA_CHAT_MERCATINO.fullmatch(str(ordine or "")):
         return vuoto
-    r = con.execute("SELECT compratore_id, venditore_id, stato FROM ordini "
-                    "WHERE id=?", (int(ordine[1:]),)).fetchone()
+    r = con.execute("SELECT compratore_id, venditore_id, stato, disputata, "
+                    "sbloccato_auto_il FROM ordini WHERE id=?",
+                    (int(ordine[1:]),)).fetchone()
     if not r:
         return vuoto
     stato = r["stato"] or ""
+    # FERMA (19 ott 2026): deciso, riapribile, sats non ancora arrivati —
+    # la chat resta (viva per la scopa), in sola lettura
+    ferma = _chat_mercatino_ferma(stato, r["disputata"], r["sbloccato_auto_il"])
     return {"compratore": int(r["compratore_id"] or 0),
             "venditore": int(r["venditore_id"] or 0),
-            "giro": 0, "vivo": stato in CHAT_MERCATINO_APERTA,
-            "fonte": "mercatino", "stato": stato}
+            "giro": 0, "vivo": stato in CHAT_MERCATINO_APERTA or ferma,
+            "fonte": "mercatino", "stato": stato, "ferma": ferma}
 
 
 def _parti_chat(con, ordine: str) -> dict:
@@ -52828,21 +52876,25 @@ def _parti_chat(con, ordine: str) -> dict:
 
 
 def _chat_mercatino_vista(stato: str, parte: bool, admin: bool,
-                          accesa: bool) -> str:
+                          accesa: bool, ferma: bool = False) -> str:
     """PURA: cosa dice di se' la chat sulla riga di un ordine del
     mercatino, per chi la chiede. 'aperta' (le due parti, dal pagamento
-    alla decisione), 'chiusa' (le due parti, a ordine pagato e concluso:
-    la riga «chat chiusa»), 'moderazione' (un moderatore che non e' una
-    parte, a ordine in disputa), o '' (niente: prima del pagamento, mai
-    pagato, o leva spenta)."""
+    alla decisione), 'ferma' (le due parti, a ordine deciso e riapribile:
+    sola lettura, 19 ott 2026), 'chiusa' (le due parti, a ordine pagato e
+    concluso: la riga «chat chiusa»), 'moderazione' (un moderatore che non
+    e' una parte, a ordine in disputa o fermo: deve poter rileggere prima
+    di ridecidere), o '' (niente: prima del pagamento, mai pagato, o leva
+    spenta)."""
     if not accesa:
         return ""
     stato = str(stato or "")
     if parte:
         if stato in CHAT_MERCATINO_APERTA:
             return "aperta"
+        if ferma:
+            return "ferma"
         return "chiusa" if stato in CHAT_MERCATINO_CHIUSA else ""
-    return "moderazione" if admin and stato in CHAT_MERCATINO_DISPUTA else ""
+    return "moderazione" if admin and (stato in CHAT_MERCATINO_DISPUTA or ferma) else ""
 
 
 def _chat_mercatino_chiavi(cc, ordine: str, giro: int, io: int) -> dict:
@@ -52896,7 +52948,9 @@ def _chat_mercatino_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
     p = _parti_ordine_mercatino(con, ordine)
     if not p["fonte"]:
         return (404, "Ordine non trovato")
-    if p["stato"] not in CHAT_MERCATINO_DISPUTA:
+    # ...anche a ordine FERMO (19 ott 2026): e' in coda per essere
+    # ridecisa, e prima di ridecidere si rilegge
+    if p["stato"] not in CHAT_MERCATINO_DISPUTA and not p.get("ferma"):
         return (409, "La chat si legge solo a disputa aperta")
     r = con.execute("SELECT chiave FROM p2p_moderatori WHERE tg_id=?",
                     (int(io),)).fetchone()
@@ -53057,7 +53111,12 @@ def _chat_p2p_stato(con, ordine: str, io: int) -> dict:
     if not altro or altro == io:
         return {"aperta": False, "giro": giro, "altro": 0, "perche": "solo",
                 "noto": noto}
-    return {"aperta": True, "giro": giro, "altro": altro, "perche": "", "noto": noto}
+    corpo = {"aperta": True, "giro": giro, "altro": altro, "perche": "", "noto": noto}
+    # la chat FERMA di un ordine deciso (19 ott 2026): aperta per leggere,
+    # chiusa per scrivere (lo guardano `invia` e l'allegato)
+    if p.get("ferma"):
+        corpo["ferma"] = True
+    return corpo
 
 
 def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
@@ -53118,16 +53177,16 @@ def _chat_p2p_posa(cc, ordine: str, giro: int, io: int, tipo: str,
         (ordine, giro) + a).fetchone()[0] or 0)
     if tipo == "msg":
         if conta("tipo='msg'") >= P2P_CHAT_MSG_MAX:
-            return (409, "Questo scambio ha raggiunto il limite di messaggi")
+            return (409, f"{_chat_questo(ordine).capitalize()} ha raggiunto il limite di messaggi")
         if conta("tipo='msg' AND da=? AND quando>?", int(io), adesso - 60) \
                 >= P2P_CHAT_RAFFICA:
             return (429, "Stai scrivendo troppo in fretta: aspetta un momento")
     elif tipo == "saluto":
         if conta("tipo='saluto' AND da=?", int(io)) >= P2P_CHAT_SALUTI_MAX:
-            return (409, "La chat di questo scambio e' stata riaperta troppe volte")
+            return (409, f"La chat di {_chat_questo(ordine)} e' stata riaperta troppe volte")
     elif tipo == "chiave":
         if conta("tipo='chiave' AND da=?", int(io)) >= P2P_CHAT_CHIAVI_MAX:
-            return (409, "La chat di questo scambio e' stata riaperta troppe volte")
+            return (409, f"La chat di {_chat_questo(ordine)} e' stata riaperta troppe volte")
     elif conta("tipo='mod' AND da=?", int(io)) >= P2P_CHAT_MOD_MAX:
         return (409, "La chiave ai moderatori e' gia' stata data troppe volte")
     n = cc.execute("INSERT INTO buste(ordine, giro, da, tipo, per, busta, quando) "
@@ -53220,7 +53279,8 @@ async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
                 _TASK_CHAT_P2P.add(t)
                 t.add_done_callback(_TASK_CHAT_P2P.discard)
             elif testo.startswith("⛔"):
-                print(f"⛔ Chat P2P: sullo scambio {ordine[:8]}: {testo[2:]}", flush=True)
+                j = _chat_nel_journal(ordine)
+                print(f"⛔ {j['etichetta']}: {j['su']}: {testo[2:]}", flush=True)
             return
         try:
             if mercatino:
@@ -53233,11 +53293,13 @@ async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
                                                       f"{LINK_LIBRO_P2P}?scambio={ordine}"))
         except Exception as e:
             esito = f"SALTATO ({type(e).__name__}: {e})"
-        print(f"💬 Chat P2P: nuovo messaggio sullo scambio {ordine[:8]}, "
+        j = _chat_nel_journal(ordine)
+        print(f"💬 {j['etichetta']}: nuovo messaggio {j['su']}, "
               f"avvisato {a_chi}", flush=True)
         _esiti_p2p_dice("💬", [(a_chi, esito)])
     except Exception as e:
-        print(f"⚠️ Chat P2P: l'avviso sullo scambio {ordine[:8]} non e' partito "
+        j = _chat_nel_journal(ordine)
+        print(f"⚠️ {j['etichetta']}: l'avviso {j['su']} non e' partito "
               f"({type(e).__name__}: {e})", flush=True)
 
 
@@ -53318,10 +53380,11 @@ def _chat_p2p_dopo_evento(ordine: str):
     la sua chat se ne va ADESSO. Mai un errore a chi chiama."""
     try:
         if _chat_p2p_spazza(ordine):
-            print(f"🧹 Chat P2P: lo scambio {ordine[:8]} e' finito, buste cancellate",
-                  flush=True)
+            j = _chat_nel_journal(ordine)
+            print(f"🧹 {j['etichetta']}: {j['fine']}, buste cancellate", flush=True)
     except Exception as e:
-        print(f"⚠️ Chat P2P: le buste di {ordine[:8]} non si sono cancellate "
+        j = _chat_nel_journal(ordine)
+        print(f"⚠️ {j['etichetta']}: le buste {j['di']} non si sono cancellate "
               f"({type(e).__name__}: {e}): ripassa la scopa del minuto", flush=True)
 
 
@@ -53349,7 +53412,7 @@ def _chat_p2p_chiede(d: dict, user: dict) -> tuple:
     finally:
         con.close()
     if st["perche"] == "estraneo":
-        raise HTTPException(403, "Non sei una delle due parti di questo scambio")
+        raise HTTPException(403, f"Non sei una delle due parti di {_chat_questo(ordine)}")
     return ordine, st
 
 
@@ -53392,6 +53455,7 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         # e quelle dell'altra parte, nell'ordine in cui sono nate
         if FORMA_CHAT_MERCATINO.fullmatch(ordine):
             corpo.update(_chat_mercatino_chiavi(cc, ordine, st["giro"], user["id"]))
+            corpo["ferma"] = bool(st.get("ferma"))
     finally:
         cc.close()
     corpo.update(ok=True, aperta=True, giro=st["giro"])
@@ -53412,7 +53476,10 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
     d = await leggi_json(req)
     ordine, st = _chat_p2p_chiede(d, user)
     if not st["aperta"]:
-        raise HTTPException(409, "La chat di questo scambio non e' aperta")
+        raise HTTPException(409, f"La chat di {_chat_questo(ordine)} non e' aperta")
+    # LA CHAT FERMA (19 ott 2026): niente di nuovo, si legge e basta
+    if st.get("ferma"):
+        raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
     tipo, busta, per = d.get("tipo"), d.get("busta"), d.get("per") or ""
     mercatino = bool(FORMA_CHAT_MERCATINO.fullmatch(ordine))
     # LA CHIAVE D'ORDINE (mercatino, 16 ott 2026): la sola parte pubblica,
@@ -53490,11 +53557,11 @@ def _chat_p2p_allegato_posa(cc, ordine: str, giro: int, io: int, dati: bytes,
     mie = int(cc.execute("SELECT COUNT(*) FROM allegati WHERE ordine=? AND giro=? AND da=?",
                          (ordine, giro, int(io))).fetchone()[0] or 0)
     if mie >= P2P_CHAT_ALLEGATI_PARTE:
-        return (409, f"In questo scambio hai già mandato {P2P_CHAT_ALLEGATI_PARTE} file")
+        return (409, f"In {_chat_questo(ordine)} hai già mandato {P2P_CHAT_ALLEGATI_PARTE} file")
     peso_mio = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati WHERE ordine=? "
                               "AND giro=? AND da=?", (ordine, giro, int(io))).fetchone()[0] or 0)
     if peso_mio + peso > P2P_CHAT_PESO_PARTE:
-        return (409, f"In questo scambio hai già mandato quasi "
+        return (409, f"In {_chat_questo(ordine)} hai già mandato quasi "
                      f"{P2P_CHAT_PESO_PARTE // (1024 * 1024)} MB di file")
     tutto = int(cc.execute("SELECT COALESCE(SUM(peso), 0) FROM allegati").fetchone()[0] or 0)
     if tutto + peso > P2P_CHAT_ALLEGATI_CASSETTO:
@@ -53579,7 +53646,9 @@ async def chat_allegato_p2p(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     ordine, st = _chat_p2p_chiede({"ordine": x_chat_ordine}, user)
     if not st["aperta"]:
-        raise HTTPException(409, "La chat di questo scambio non e' aperta")
+        raise HTTPException(409, f"La chat di {_chat_questo(ordine)} non e' aperta")
+    if st.get("ferma"):
+        raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
     dati = bytearray()
     async for pezzo in req.stream():
         dati.extend(pezzo)
@@ -53597,7 +53666,8 @@ async def chat_allegato_p2p(req: Request, x_tg_init_data: str = Header(""),
     t.add_done_callback(_TASK_CHAT_P2P.discard)
     if codice != 200:
         raise HTTPException(codice, str(esito))
-    print(f"📎 Chat P2P: un allegato sullo scambio {ordine[:8]}, "
+    j = _chat_nel_journal(ordine)
+    print(f"📎 {j['etichetta']}: un allegato {j['su']}, "
           f"{max(1, esito['peso'] // 1024)} KB", flush=True)
     return JSONResponse({"ok": True, "id": esito["id"]}, headers={"Cache-Control": "no-store"})
 
@@ -73414,7 +73484,9 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # in moderazione, o niente — il giudice e' `_chat_mercatino_vista`
         r["chat"] = _chat_mercatino_vista(
             r["stato"], user["id"] in (r["compratore_id"], r["venditore_id"]),
-            e_admin(user["id"]), MERCATINO_CHAT_ORDINI)
+            e_admin(user["id"]), MERCATINO_CHAT_ORDINI,
+            _chat_mercatino_ferma(r["stato"], r.get("disputata"),
+                                  r.get("sbloccato_auto_il")))
     return righe
 
 

@@ -66089,3 +66089,108 @@ zero.
 **DA FARE (notati, non fatti).**
 - Sul telefono vero (iPhone e Android in Telegram): il tocco sulla
   cifra, il «✓ Copiato» nel conto, e il tocco lungo che seleziona.
+
+## La chat negli ordini, secondo giro: il journal, i rifiuti, la chat ferma che si riapre, il moderatore a destra (19 ott 2026, cantiere chat-mercatino-2, richiesta di Andrea)
+
+**PERCHÉ.** I quattro «da fare» di chat-mercatino (99ec413), da chiudere
+prima di accendere `MERCATINO_CHAT_ORDINI`.
+
+**COSA SI È DECISO (Andrea, sulla proposta in dieci righe).** 1. Il
+journal dice «ordine 42». 2. I rifiuti dei tetti dicono «questo ordine».
+3. I messaggi cancellati NON si possono ritrovare, nemmeno con la chiave
+consegnata in disputa: quella chiave apre buste che esistono, e dopo la
+cancellazione (`secure_delete`) nel file non c'è più niente — busta del
+moderatore compresa. La cura è non cancellare quando l'ordine si può
+ancora riaprire: chat in SOLA LETTURA col piede «La decisione è presa:
+la chat si cancella quando i sats arrivano», scrivibile di nuovo solo
+se il moderatore riapre, cancellata a `released`/`refunded`; il
+`confirmed` dato di persona da chi compra si cancella subito come prima.
+4. Il moderatore legge la chat a destra sullo schermo largo, come le
+parti. Leva sempre spenta di serie.
+
+**COME È FATTO.** Server: `_chat_mercatino_ferma` (i casi esatti della
+query di `risolvi_disputa`: `confirmed`/`refund` con `disputata=1`,
+`confirmed` con `sbloccato_auto_il`), `_parti_ordine_mercatino` legge
+`disputata` e `sbloccato_auto_il` e dice `vivo` e `ferma` (la scopa non
+tocca una chat ferma), `_chat_p2p_stato` porta `ferma`, `invia` e
+l'allegato la rifiutano con `CHAT_MERCATINO_FERMA_TESTO`, `leggi` la
+dice al telefono, `_chat_mercatino_vista` dice 'ferma' alle parti e
+'moderazione' al moderatore, e il moderatore rilegge anche a ordine
+fermo (deve, prima di ridecidere). `_chat_nel_journal` dà etichetta e
+frasi alle sei righe della chat (per il P2P identiche a ieri);
+`_chat_questo` ai sette rifiuti. Telefono: la riga ha `ferma` (la parola
+dell'ultimo ritiro vince sulla lista: la decisione e la riapertura
+possono arrivare a pagina aperta), il piede `ferma` (una frase, niente
+campo, niente 📎), saluto e chiave d'ordine non partono, il riquadro e
+il richiamo ci sono; `chatScQuestoP2P` nei due rifiuti degli allegati;
+`chatMercModHTML` avvolge la chat delle parti in `.chatsc-mod`, che
+`chatScSegnaColonnaP2P` conta, e il CSS dello schermo largo la mette a
+destra (da 1600 terza colonna) con `.con-chatsc`, senza `:has()`. La
+frase del riquadro del moderatore non dice più «Alla decisione si
+cancella» (non è più vero) ma «Si cancella quando i sats arrivano».
+
+**STRADE SCARTATE.** Ritrovare i messaggi dopo la cancellazione (non c'è
+niente da aprire). Tenere la chat scrivibile negli ordini riapribili
+(scelta di Andrea: sola lettura). Allargare la chat ferma a ogni
+`confirmed` (quello di persona non si riapre: si cancella come prima).
+Una regola CSS con `:has()` per il moderatore (regola di casa).
+
+**PROVATO.** `prove_chat_mercatino` (77, ventidue nuove): il journal
+(il giudice nei due mondi, e nessuna riga della chat che scrive ancora
+«scambio {ordine[:8]}» a mano: sei righe dal giudice), i rifiuti (il
+tetto dei messaggi, la chat riaperta troppe volte, i dieci file, i 40 MB,
+le rotte — eseguiti davvero sui giudici del server, nei due mondi), la
+chat ferma (la matrice degli stati, gli stessi casi della query del
+moderatore, viva per la scopa, la vista, il moderatore che rilegge coi
+pacchi, i rifiuti con la frase, la frase uguale nel server e nel
+telefono), il moderatore a destra (le regole da 1280 e da 1600 senza
+`:has()`, la classe, il segno) e, in node col bundle vero, la chat ferma
+(riquadro con la frase, niente campo né 📎), la riapertura (il campo
+torna), il moderatore con la sua chiave (il riquadro della colonna di
+destra) e i rifiuti del telefono. Emendate le ancore che leggevano il
+codice cambiato: `prove_chat_scambio` (gli aiutanti nel banco del
+giudice), `prove_allegati_chat` (la riga del journal dal giudice, e
+`_chat_questo` nel banco), `prove_nascondi_ordine` e
+`prove_card_parte_ordine` (lo stub di `_chat_mercatino_ferma`).
+`collaudo_chat_mercatino`, sezione 11 nuova, LA RIAPERTURA VERA: un
+ordine in disputa con messaggi, file e pacco al moderatore; deciso col
+pagamento non andato a segno (`refund`, `disputata=1`): la chat non si
+cancella né dal gesto né dalla scopa, si legge, la riga dice 'ferma' e
+'moderazione', messaggi/file/saluti/chiavi nuove sono un 409 con la
+frase; il moderatore rilegge (i due messaggi, il pacco, il file); poi
+RIAPRE con la rotta vera (`risolvi_disputa`, «reso» → `return_pending`)
+e la chat ritrova tutto, torna scrivibile, il moderatore legge ancora;
+un `confirmed` chiuso dal timer resta fermo; a `refunded` via tutto, la
+riga «chiusa», e il journal dice «Chat degli ordini: l'ordine N e'
+concluso»; l'estraneo sente «questo ordine».
+GIRO DAL VIVO (server di collaudo dalla copia, database nuovo, leva
+accesa nel config del giro, P2P spento, relay morti): chi compra e chi
+vende dalla Mini App a 360, l'admin dal sito col login web vero a 1366.
+Ordine in disputa: messaggi dai due lati, la chiave al moderatore dai
+due telefoni; l'admin legge la chat delle parti nella colonna di destra
+(`con-chatsc`, riquadro a 692 px, `sticky`, la cassaforte a sinistra).
+«Rimborsa subito» col tocco del suo bottone → il rimborso non va a segno
+(LNbits finto) → `refund`: a 360 chi compra vede la chat con «La
+decisione è presa: la chat si cancella quando i sats arrivano», senza
+campo; l'admin la rilegge a destra. «Rimborso previa restituzione» →
+`return_pending`: chi compra ritrova i due messaggi di prima e scrive di
+nuovo; l'admin legge i tre. A `refunded` il cassetto di quell'ordine è
+vuoto (buste, letture, file, chiavi d'ordine: zero) e il journal dice
+«💬 Chat degli ordini: nuovo messaggio sull'ordine 2, avvisato 222» e
+«🧹 Chat degli ordini: l'ordine 2 e' concluso, buste cancellate». Chiaro
+e scuro, sei scatti. Nel giro una memoria vecchia del browser (un `m1`
+di un giro di prima, su un altro database) ha messo il primo ordine
+«altrove»: è un artefatto del giro (stesso id, server rinato senza
+segnalibro), ripartito su un ordine nuovo.
+SUITE E COLLAUDI: la suite intera severa **25.264 passate e 1 fallita** — la sentinella dello schermo largo che conta gli «sticky» sotto la barra (da 3 a 4: il riquadro del moderatore), emendata e rigirata con le sezioni dei documenti: **verde**; i collaudi
+della CI nella gabbia, due alla volta, **86 verdi, 0 rossi**.
+
+**DA FARE (notati, non fatti).**
+- Il cassetto della chat del server rinato con la stessa memoria del
+  telefono e il segnalibro a zero (niente «perso»): una chat vecchia con
+  lo stesso id resta «altrove». Si vede solo coi giri di prova.
+- Il patto sotto la chat dice ancora «a ordine concluso la cancella»: in
+  una chat ferma si potrebbe dire «quando i sats arrivano».
+- La riga del journal del vuoto del cassetto («🧹 Chat P2P: il cassetto
+  restituisce lo spazio…») vale per tutti e due i mondi e resta «Chat
+  P2P».

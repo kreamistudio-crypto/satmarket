@@ -503,6 +503,89 @@ async def giro():
         prova("...senza ordini del mercatino, a P2P spento, resta il 409 di sempre", 409,
               cs.no(await cs.chiama(SRV.chat_novita_p2p, C, {"ordini": []})))
 
+    async def s11():
+        # LA RIAPERTURA VERA (19 ott 2026, cantiere chat-mercatino-2): un
+        # ordine deciso il cui pagamento non va a segno resta riapribile, e
+        # la chat resta — in sola lettura — finche' i sats non arrivano; il
+        # moderatore la rilegge, la riapre con la rotta vera, e alla fine
+        # se ne va.
+        n = nuovo_ordine("dispute")
+        o = f"m{n}"
+        await cs.chiama(invia, C, {"ordine": o, "tipo": "chiave_ordine", "busta": cs.chiave(0x71)})
+        await cs.chiama(invia, V, {"ordine": o, "tipo": "chiave_ordine", "busta": cs.chiave(0x72)})
+        await cs.chiama(invia, C, {"ordine": o, "tipo": "msg", "busta": cs.busta("il telaio e' crepato")})
+        await cs.chiama(invia, V, {"ordine": o, "tipo": "msg", "busta": cs.busta("era integro")})
+        f = await ca.manda(C, o, os.urandom(2048))
+        await cs.chiama(invia, C, {"ordine": o, "tipo": "mod", "per": kmod,
+                                   "busta": cs.busta("pacco-di-chi-compra")})
+        prima = righe_cassetto(o)
+        # LA DECISIONE il cui pagamento non va a segno: 'refund' con la disputa alle spalle
+        con = banco.con_db()
+        con.execute("UPDATE ordini SET stato='refund', disputata=1 WHERE id=?", (n,))
+        con.commit()
+        con.close()
+        SRV._chat_mercatino_dopo_stato(n)
+        SRV._chat_p2p_spazza(mercatino=True)
+        prova("DECISO MA RIAPRIBILE ('refund' dopo la disputa): la chat NON si cancella, ne' dal gesto ne' "
+              "dalla scopa del minuto", (prima, True), (righe_cassetto(o), prima[0] > 0 and prima[2] > 0))
+        r = await cs.chiama(leggi, C, {"ordine": o, "dopo": 0})
+        prova("...si legge (aperta e ferma), e la riga dell'ordine lo dice: 'ferma' alle parti, "
+              "'moderazione' al moderatore",
+              (True, True, 2, "ferma", "ferma", "moderazione"),
+              (r.get("aperta"), r.get("ferma"), len(r.get("buste") or []), chat_della_riga(C, n),
+               chat_della_riga(V, n), chat_della_riga(ADMIN, n)))
+        rif = await cs.chiama(invia, V, {"ordine": o, "tipo": "msg", "busta": cs.busta("ancora una cosa")})
+        prova("...SOLA LETTURA: un messaggio nuovo e' un 409 con la frase del piede",
+              (409, SRV.CHAT_MERCATINO_FERMA_TESTO), (cs.no(rif), rif[1] if isinstance(rif, cs.Rifiuto) else ""))
+        prova("...e cosi' un file, un saluto, una chiave d'ordine nuova", (409, 409, 409),
+              (cs.no(await ca.manda(V, o, os.urandom(64))),
+               cs.no(await cs.chiama(invia, V, {"ordine": o, "tipo": "saluto", "busta": cs.busta("s")})),
+               cs.no(await cs.chiama(invia, V, {"ordine": o, "tipo": "chiave_ordine", "busta": cs.chiave(0x73)}))))
+        letta = await cs.chiama(mod_chat, ADMIN, {"ordine": o})
+        prova("...il moderatore la RILEGGE prima di ridecidere: i due messaggi, il pacco, il file",
+              (2, ["compra"], True),
+              (len(letta.get("buste") or []), [k["lato"] for k in letta.get("chiavi") or []],
+               isinstance(await ca.ritira(ADMIN, o, f.get("id", ""), mod=True), bytes)))
+        # LA RIAPERTURA VERA: la rotta del moderatore, «rimborso previa restituzione»
+        try:
+            esito = await SRV.risolvi_disputa(n, banco.Busta({"esito": "reso"}), **cs.ACCESSO[ADMIN])
+        except SRV.HTTPException as e:
+            esito = {"errore": (e.status_code, e.detail)}
+        prova("IL MODERATORE RIAPRE (la rotta vera, «reso»): l'ordine va in 'return_pending'",
+              "return_pending", esito.get("stato") if isinstance(esito, dict) else esito)
+        r = await cs.chiama(leggi, C, {"ordine": o, "dopo": 0})
+        prova("...e la chat RITROVA TUTTO: le buste di prima, non piu' ferma, si riscrive",
+              (True, False, 2, True, "aperta"),
+              (r.get("aperta"), r.get("ferma"), len(r.get("buste") or []),
+               bool((await cs.chiama(invia, V, {"ordine": o, "tipo": "msg",
+                                                "busta": cs.busta("ok, aspetto il reso")})).get("ok")),
+               chat_della_riga(V, n)))
+        prova("...il moderatore legge ancora, coi pacchi consegnati in disputa", (3, ["compra"]),
+              (len((await cs.chiama(mod_chat, ADMIN, {"ordine": o})).get("buste") or []),
+               [k["lato"] for k in (await cs.chiama(mod_chat, ADMIN, {"ordine": o})).get("chiavi") or []]))
+        # IL TIMER: 'confirmed' chiuso dalla macchina e' riapribile, quello di persona no
+        nt = nuovo_ordine("locked")
+        await cs.chiama(invia, C, {"ordine": f"m{nt}", "tipo": "msg", "busta": cs.busta("timer")})
+        con = banco.con_db()
+        con.execute("UPDATE ordini SET stato='confirmed', sbloccato_auto_il=? WHERE id=?", (adesso(), nt))
+        con.commit()
+        con.close()
+        SRV._chat_mercatino_dopo_stato(nt)
+        prova("CHIUSO DAL TIMER ('confirmed' con lo sblocco automatico): ferma, non si cancella",
+              (1, "ferma"), (righe_cassetto(f"m{nt}")[0], chat_della_riga(C, nt)))
+        # LA FINE VERA: i sats arrivano
+        giornale = io.StringIO()
+        metti(n, "refunded")
+        with contextlib.redirect_stdout(giornale):
+            SRV._chat_mercatino_dopo_stato(n)
+        prova("I SATS ARRIVANO ('refunded'): via tutto, e la riga dice «chiusa»", ((0, 0, 0, 0), "chiusa"),
+              (righe_cassetto(o), chat_della_riga(C, n)))
+        prova("IL JOURNAL dice l'ordine col suo numero, non «scambio m…»",
+              (True, False), (f"🧹 Chat degli ordini: l'ordine {n} e' concluso, buste cancellate" in giornale.getvalue(),
+                              f"scambio m{n}" in giornale.getvalue()))
+        prova("I RIFIUTI DICONO «ordine»: l'estraneo", "Non sei una delle due parti di questo ordine",
+              (await cs.chiama(leggi, X, {"ordine": f"m{nt}", "dopo": 0}))[1])
+
     async def s10():
         import shutil
         import subprocess
@@ -637,6 +720,7 @@ async def giro():
     await sezione(8, "LA RETE DEI 30 GIORNI", s8)
     await sezione(9, "IL PALLINO", s9)
     await sezione(10, "IL CLIENT VERO CONTRO IL SERVER VERO", s10)
+    await sezione(11, "LA RIAPERTURA VERA: LA CHAT FERMA, RILETTA E RITROVATA", s11)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)
