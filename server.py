@@ -52806,6 +52806,10 @@ P2P_CHAT_ALLEGATI_CASSETTO = 2 * 1024 * 1024 * 1024   # tutto il cassetto, tutti
 P2P_CHAT_CASSETTO_AVVISO = 0.8
 P2P_CHAT_CASSETTO_RIARMO = 0.6
 _CASSETTO_AVVISATO = {"su": False}
+# IL CASSETTO E' DI TUTTI E DUE (19 ott 2026, cantiere chat-mercatino-3):
+# le righe del journal che parlano del FILE — il vuoto incrementale, il
+# cassetto quasi pieno — valgono per gli scambi e per gli ordini insieme
+CHAT_CASSETTO_ETICHETTA = "Chat (scambi e ordini)"
 FORMA_ALLEGATO_CHAT = re.compile(r"^[0-9a-f]{32}$")
 _CHAT_PRONTA = {"file": ""}
 _TASK_CHAT_P2P = set()
@@ -53077,10 +53081,10 @@ def _chat_vuoto_incrementale(con):
             return
         con.execute("PRAGMA auto_vacuum = INCREMENTAL")
         con.execute("VACUUM")
-        print("🧹 Chat P2P: il cassetto restituisce lo spazio dei file cancellati "
+        print(f"🧹 {CHAT_CASSETTO_ETICHETTA}: il cassetto restituisce lo spazio dei file cancellati "
               "(auto_vacuum incrementale acceso)", flush=True)
     except sqlite3.Error as e:
-        print(f"⚠️ Chat P2P: auto_vacuum non acceso ({type(e).__name__}: {e}): "
+        print(f"⚠️ {CHAT_CASSETTO_ETICHETTA}: auto_vacuum non acceso ({type(e).__name__}: {e}): "
               "riprovo al prossimo avvio", flush=True)
 
 
@@ -53141,6 +53145,14 @@ def db_chat():
                 quando INTEGER NOT NULL,
                 PRIMARY KEY(ordine, giro, tg_id, pub)
             );
+            -- LA NASCITA DEL CASSETTO (19 ott 2026, cantiere
+            -- chat-mercatino-3): un segno a caso scritto UNA volta, quando
+            -- il file nasce. Se il file rinasce (un ripristino, un
+            -- trasloco, il file perso) il segno cambia, e il telefono lo
+            -- vede anche quando il suo segnalibro non e' oltre l'ultima
+            -- busta (`perso` non basta: il server nuovo puo' avere gia'
+            -- numeri piu' alti). Vedi `_chat_nascita`.
+            CREATE TABLE IF NOT EXISTS nascita(token TEXT NOT NULL);
         """)
         con.commit()
         try:
@@ -53184,6 +53196,23 @@ def _chat_p2p_stato(con, ordine: str, io: int) -> dict:
     if p.get("ferma"):
         corpo["ferma"] = True
     return corpo
+
+
+def _chat_nascita(cc) -> str:
+    """IL SEGNO DI NASCITA DEL CASSETTO (19 ott 2026, cantiere
+    chat-mercatino-3). Pura sulla connessione del cassetto: il segno c'e'
+    gia', o nasce adesso (16 esadecimali a caso). Il ritiro lo dice al
+    telefono, che lo tiene nella voce della chat: un segno diverso vuol
+    dire che le buste che il telefono conosceva qui non ci sono piu' —
+    saluto e copia della chiave compresi — e si riparte. Non dice niente
+    di nessuno."""
+    r = cc.execute("SELECT token FROM nascita LIMIT 1").fetchone()
+    if r and r[0]:
+        return str(r[0])
+    token = secrets.token_hex(8)
+    cc.execute("INSERT INTO nascita(token) VALUES(?)", (token,))
+    cc.commit()
+    return token
 
 
 def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
@@ -53370,7 +53399,7 @@ async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
               f"({type(e).__name__}: {e})", flush=True)
 
 
-def _chat_p2p_spazza(ordine: str = "", mercatino: bool = False) -> int:
+def _chat_p2p_spazza(ordine: str = "", mercatino: bool = False, conti: dict = None) -> int:
     """LA SCOPA: via le buste (e i segnalibri) di ogni scambio che non e'
     piu' in corso, e di ogni giro che non e' piu' quello vivo. Con
     `ordine` guarda solo quello — la chiamano le rotte e l'evento che
@@ -53419,6 +53448,11 @@ def _chat_p2p_spazza(ordine: str = "", mercatino: bool = False) -> int:
             via += cc.execute("DELETE FROM chiavi_ordine WHERE ordine=? AND giro<>?",
                               (o, giro)).rowcount
             svuotati += 1 if via else 0
+            # (19 ott 2026) chi chiede `conti` li vuole divisi: il journal
+            # dice «scambi» e «ordini», e non mescola
+            if via and conti is not None:
+                chiave = "ordini" if FORMA_CHAT_MERCATINO.fullmatch(o) else "scambi"
+                conti[chiave] = conti.get(chiave, 0) + 1
         if not ordine and not mercatino:
             cc.execute("DELETE FROM buste WHERE quando<? AND NOT (ordine GLOB 'm[1-9]*')",
                        (adesso - P2P_CHAT_VITA_MAX_S,))
@@ -53436,10 +53470,18 @@ def _chat_p2p_spazza(ordine: str = "", mercatino: bool = False) -> int:
 
 async def _giro_chat_p2p():
     """La scopa della chat, nel battito pieno dell'orologio P2P."""
-    n = _chat_p2p_spazza()
+    conti = {}
+    _chat_p2p_spazza(conti=conti)
+    n = conti.get("scambi", 0)
     if n:
         print(f"🧹 Chat P2P: cancellate le buste di {n} "
               f"{'scambio finito' if n == 1 else 'scambi finiti'}", flush=True)
+    # la stessa scopa porta via anche le chat degli ordini conclusi (lo fa
+    # anche il giro al minuto del mercatino): la riga e' la loro
+    m = conti.get("ordini", 0)
+    if m:
+        print(f"🧹 Chat degli ordini: cancellate le buste di {m} "
+              f"{'ordine concluso' if m == 1 else 'ordini conclusi'}", flush=True)
 
 
 def _chat_p2p_dopo_evento(ordine: str):
@@ -53518,6 +53560,9 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
         corpo = _chat_p2p_ritira(cc, ordine, st["giro"], user["id"], dopo,
                                  int(time.time()))
+        # il segno di nascita del cassetto (19 ott 2026): il telefono vede
+        # se il file e' rinato anche quando `perso` non lo vede
+        corpo["cassetto"] = _chat_nascita(cc)
         # nel mercatino le chiavi d'ordine le presenta il server: le mie
         # e quelle dell'altra parte, nell'ordine in cui sono nate
         if FORMA_CHAT_MERCATINO.fullmatch(ordine):
@@ -53655,9 +53700,10 @@ def _avviso_cassetto_chat(tutto: int, tetto: int, gia: bool) -> tuple:
     if quota < P2P_CHAT_CASSETTO_AVVISO:
         return "", False
     mb = lambda n: f"{n / (1024 * 1024):,.0f}".replace(",", ".")
-    return (f"📎 <b>Il cassetto dei file della chat P2P è quasi pieno</b>: "
+    return (f"📎 <b>Il cassetto dei file della chat (scambi e ordini) è quasi pieno</b>: "
             f"{mb(tutto)} MB su {mb(tetto)} MB ({quota:.0%}). I file se ne vanno da "
-            "soli a scambio finito; se non scende, guarda gli scambi aperti e lo "
+            "soli a scambio o ordine concluso; se non scende, guarda gli scambi e gli "
+            "ordini aperti e lo "
             "spazio sul VPS (PRODUZIONE, «GLI ALLEGATI»). Al pieno chi manda un "
             "file sente «Adesso non c'è spazio per i file».", True)
 
@@ -53675,11 +53721,11 @@ async def _chat_p2p_guarda_cassetto():
         testo, _CASSETTO_AVVISATO["su"] = _avviso_cassetto_chat(
             tutto, P2P_CHAT_ALLEGATI_CASSETTO, _CASSETTO_AVVISATO["su"])
         if testo:
-            print(f"📎 Chat P2P: cassetto dei file all'80 % ({tutto} byte): avviso agli admin",
+            print(f"📎 {CHAT_CASSETTO_ETICHETTA}: cassetto dei file all'80 % ({tutto} byte): avviso agli admin",
                   flush=True)
             await notifica_admin(testo, argomento="errori")
     except Exception as e:
-        print(f"⚠️ Chat P2P: il controllo del cassetto non e' riuscito "
+        print(f"⚠️ {CHAT_CASSETTO_ETICHETTA}: il controllo del cassetto non e' riuscito "
               f"({type(e).__name__}: {e})", flush=True)
 
 

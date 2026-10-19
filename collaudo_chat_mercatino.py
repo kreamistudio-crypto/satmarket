@@ -586,6 +586,117 @@ async def giro():
         prova("I RIFIUTI DICONO «ordine»: l'estraneo", "Non sei una delle due parti di questo ordine",
               (await cs.chiama(leggi, X, {"ordine": f"m{nt}", "dopo": 0}))[1])
 
+    async def s12():
+        # LA CHAT «ALTROVE» PER SBAGLIO (19 ott 2026, cantiere chat-mercatino-3,
+        # richiesta di Andrea). Il cassetto del server rinasce (un ripristino,
+        # un trasloco, il file perso): il telefono di chi NON ha un profilo di
+        # scambio ha la sua chiave d'ordine solo nella memoria della chat — e
+        # la memoria della chat, al «cassetto perso», si buttava intera, chiave
+        # compresa. La chiave era gia' stata ridichiarata al server nuovo: al
+        # giro dopo il server la diceva sua, il telefono non l'aveva piu', e la
+        # chat diventava «aperta su un altro dispositivo». E se il server
+        # rinasce e riceve piu' buste di quante il telefono ne aveva viste, il
+        # «perso» non si accorge di niente: il telefono crede che il suo saluto
+        # e la sua copia siano ancora la', e non li rimanda.
+        import shutil
+        import subprocess
+        import tempfile
+        import collaudo_tolti_ovunque as tolti
+        node = shutil.which("node")
+        if not node:
+            prova("node c'e'", True, False)
+            return
+        n = nuovo_ordine("locked")
+        o = f"m{n}"
+        srv, base = tolti.avvia_ponte()
+        cart = tempfile.mkdtemp(prefix="chat_rinasce_")
+        mini = open(os.path.join(banco.QUI, "miniapp.html"), encoding="utf-8").read()
+        prog = os.path.join(cart, "telefono.js")
+        open(prog, "w", encoding="utf-8").write(dispositivo(mini))
+        chi = {"C": (C, "Compratore"), "V": (V, "Venditore")}
+
+        def telefono(nome, *passi):
+            conto, come_si_chiama = chi[nome]
+            r = subprocess.run([node, prog, os.path.join(banco.QUI, "vendor", "nostr.bundle.js"),
+                                os.path.join(cart, nome + ".json"), base, str(conto), come_si_chiama, *passi],
+                               capture_output=True, text=True, encoding="utf-8", timeout=120)
+            try:
+                fuori = json.loads(r.stdout.strip().splitlines()[-1])
+            except Exception:
+                fuori = [{"ERRORE": (r.stdout or "")[-300:] + (r.stderr or "")[-700:]}] * len(passi)
+            return fuori[-1]
+
+        def rinasce():
+            # il file del cassetto se ne va, e il prossimo `db_chat` lo rifa' vuoto
+            for suff in ("", "-wal", "-shm", "-journal"):
+                if os.path.exists(SRV.DB_CHAT + suff):
+                    os.remove(SRV.DB_CHAT + suff)
+            SRV._CHAT_PRONTA["file"] = ""
+        try:
+            telefono("C", f"profilo|{o}")
+            telefono("V", f"ordine|{n}|seller|locked|aperta")
+            telefono("C", f"ordine|{n}|buyer|locked|aperta", "battito")
+            telefono("V", "battito", "scrivi|Prima della rinascita")
+            f = telefono("C", "battito")
+            prova("PRIMA: chi vende (senza profilo, chiave a caso) e chi compra (col profilo) si scrivono",
+                  ("scrivi", ["altro: Prima della rinascita"]), (f.get("modo"), f.get("msgs")))
+            # 1) IL CASSETTO RINASCE VUOTO: il telefono ha visto piu' buste di quante il server ne ha
+            rinasce()
+            f = telefono("V", "battito", "battito")
+            prova("IL CASSETTO RINASCE VUOTO: chi vende NON resta «altrove», tiene la sua chiave d'ordine "
+                  "e la ridichiara", ("non altrove", True, 1),
+                  ("altrove" if f.get("modo") == "altrove" else "non altrove", f.get("caso"), f.get("mie")))
+            f = telefono("C", "battito", "battito")
+            telefono("V", "battito")
+            telefono("V", "scrivi|Dopo la rinascita")
+            f = telefono("C", "battito")
+            prova("...e la chat riparte: chi compra legge il messaggio nuovo", True,
+                  "altro: Dopo la rinascita" in (f.get("msgs") or []))
+            # 2) IL CASSETTO RINASCE E SI RIEMPIE PRIMA CHE IL TELEFONO TORNI: il
+            # segnalibro del telefono e' sotto il numero piu' alto del server
+            # nuovo, e il «perso» non lo vede
+            telefono("V", "battito")
+            rinasce()
+            cc = SRV.db_chat()
+            # il file nuovo ha gia' una busta di quest'ordine, col numero 901:
+            # piu' alto di ogni segnalibro dei due telefoni, quindi `perso` tace
+            cc.execute("INSERT INTO buste(n, ordine, giro, da, tipo, per, busta, quando) "
+                       "VALUES(901, ?, 0, ?, 'msg', '', ?, ?)", (o, C, cs.busta("da un cassetto rinato"), adesso()))
+            cc.commit()
+            cc.close()
+            telefono("C", "battito", "battito")
+            f = telefono("V", "battito", "battito")
+            prova("IL CASSETTO RINASCE E SI RIEMPIE PRIMA (numeri piu' alti del segnalibro): chi vende se ne "
+                  "accorge lo stesso e si ripresenta (copia e saluto sul server nuovo)", (True, True),
+                  ("saluto" in [r[0] for r in cs.cassetto("SELECT tipo FROM buste WHERE ordine=? AND da=?", o, V)],
+                   "chiave" in [r[0] for r in cs.cassetto("SELECT tipo FROM buste WHERE ordine=? AND da=?", o, V)]))
+            telefono("C", "battito")
+            telefono("V", "battito", "scrivi|Dopo la seconda rinascita")
+            f = telefono("C", "battito")
+            prova("...e chi compra legge il messaggio nuovo", True,
+                  "altro: Dopo la seconda rinascita" in (f.get("msgs") or []))
+            # LE RIGHE DEL CASSETTO E DELLA SCOPA (19 ott 2026, chat-mercatino-3)
+            metti(n, "released")
+            giornale = io.StringIO()
+            with contextlib.redirect_stdout(giornale):
+                await SRV._giro_chat_p2p()
+                rinasce()
+                SRV.db_chat().close()
+            riga = giornale.getvalue()
+            prova("LA SCOPA DELL'OROLOGIO P2P, su una chat d'ordine: «Chat degli ordini … 1 ordine concluso», "
+                  "mai «scambio finito»", (True, False),
+                  ("🧹 Chat degli ordini: cancellate le buste di 1 ordine concluso" in riga, "scambio finito" in riga))
+            prova("IL CASSETTO che rinasce si dice per tutti e due: «Chat (scambi e ordini)», non «Chat P2P»",
+                  (True, False), ("🧹 Chat (scambi e ordini): il cassetto restituisce" in riga,
+                                  "Chat P2P: il cassetto" in riga))
+        finally:
+            srv.shutdown()
+            qui = asyncio.get_running_loop()
+            for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
+                for c in list(gruppo):
+                    if c.get_loop() is not qui:
+                        gruppo.discard(c)
+
     async def s10():
         import shutil
         import subprocess
@@ -721,6 +832,7 @@ async def giro():
     await sezione(9, "IL PALLINO", s9)
     await sezione(10, "IL CLIENT VERO CONTRO IL SERVER VERO", s10)
     await sezione(11, "LA RIAPERTURA VERA: LA CHAT FERMA, RILETTA E RITROVATA", s11)
+    await sezione(12, "IL CASSETTO DEL SERVER RINASCE: NESSUNA CHAT «ALTROVE» PER SBAGLIO", s12)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)

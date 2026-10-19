@@ -95588,7 +95588,11 @@ def prove_chat_scambio():
           "if (d.finita && prima) { scrivi('scambio finito per il server, chiave e messaggi buttati'); "
           "chatScButtaP2P(id); }" in rit)
     prova("...e li butta a giro cambiato e a cassetto perso: SOLO sulla parola del server", True,
-          "if (c0 && c0.giro !== d.giro) {" in rit and "if (c0 && d.perso) {" in rit
+          "if (c0 && c0.giro !== d.giro) {" in rit
+          # (19 ott 2026, chat-mercatino-3) a cassetto perso O rinato: anche
+          # il segno di nascita e' la parola del server (`d.cassetto`)
+          and "if (c0 && (d.perso || rinato)) {" in rit
+          and "const rinato = !!(c0 && d.cassetto && c0.cassetto && c0.cassetto !== d.cassetto);" in rit
           # (16 ott 2026) la quarta e' l'ordine del mercatino concluso, anche
           # questa sulla parola del server
           and rit.count("chatScButtaP2P(id)") == 4
@@ -169613,11 +169617,15 @@ def prove_pdf_allegati():
           [("", False), (True, True), ("", True), ("", True), ("", False), (True, True), ("", False)],
           [(p[0] if not p[0] else True, p[1]) for p in passi])
     prova("...e dice quanto e' pieno e cosa guardare", True,
-          passi[1][0].startswith("📎 <b>Il cassetto dei file della chat P2P è quasi pieno</b>: 1.638 MB su 2.048 MB (80%).")
+          # (19 ott 2026, chat-mercatino-3) il cassetto e' degli scambi e degli ordini
+          passi[1][0].startswith("📎 <b>Il cassetto dei file della chat (scambi e ordini) è quasi pieno</b>: 1.638 MB su 2.048 MB (80%).")
           and "PRODUZIONE, «GLI ALLEGATI»" in passi[1][0])
 
     # --- 3) LO SPAZIO CHE TORNA AL DISCO, su un file vero --------------------------
-    amb2 = {"sqlite3": sqlite3, "print": lambda *a, **k: None}
+    amb2 = {"sqlite3": sqlite3, "print": lambda *a, **k: None,
+            # (19 ott 2026, chat-mercatino-3) l'etichetta delle righe del
+            # cassetto, quella VERA del server
+            "CHAT_CASSETTO_ETICHETTA": re.search(r'\nCHAT_CASSETTO_ETICHETTA = "([^"]+)"\n', src).group(1)}
     exec(pezzo("_chat_vuoto_incrementale"), amb2)
     with tempfile.TemporaryDirectory() as d:
         f = os.path.join(d, "chat-scambi.db")
@@ -170687,6 +170695,32 @@ def prove_chat_mercatino():
     prova("...un admin senza chiave dichiarata no, e un ordine che non c'e' e' un 404", (409, 404),
           (mod(con, cc, 998, "m7")[0], mod(con, cc, 999, "m9")[0]))
 
+    # --- 2c) IL TERZO GIRO (19 ott 2026, cantiere chat-mercatino-3) ----
+    prova("IL SEGNO DI NASCITA DEL CASSETTO: una tabella del cassetto, e il ritiro lo dice al telefono",
+          (True, True, True),
+          ("CREATE TABLE IF NOT EXISTS nascita(token TEXT NOT NULL);" in pezzo("db_chat"),
+           'corpo["cassetto"] = _chat_nascita(cc)' in pezzo("chat_leggi_p2p"),
+           "CREATE TABLE IF NOT EXISTS nascita(" not in pezzo("init_db", "\n\n\ndef ")))
+    amb_n = {"secrets": __import__("secrets")}
+    exec(_senza_prosa(pezzo("_chat_nascita")), amb_n)
+    c_n = sqlite3.connect(":memory:")
+    c_n.execute("CREATE TABLE nascita(token TEXT NOT NULL)")
+    s1, s2 = amb_n["_chat_nascita"](c_n), amb_n["_chat_nascita"](c_n)
+    c_n2 = sqlite3.connect(":memory:")
+    c_n2.execute("CREATE TABLE nascita(token TEXT NOT NULL)")
+    prova("...nasce una volta e resta; un cassetto nuovo ne ha un altro", (16, True, True),
+          (len(s1), s1 == s2, amb_n["_chat_nascita"](c_n2) != s1))
+    prova("LE RIGHE DEL CASSETTO (il file e' di tutti e due) non dicono piu' «Chat P2P»",
+          ([], 4), ([r.strip()[:50] for r in codice(pezzo("_chat_vuoto_incrementale") + pezzo("_chat_p2p_guarda_cassetto"))
+                     .split("\n") if "Chat P2P" in r],
+                    (codice(pezzo("_chat_vuoto_incrementale")) + codice(pezzo("_chat_p2p_guarda_cassetto")))
+                    .count("{CHAT_CASSETTO_ETICHETTA}:")))
+    prova("...l'avviso agli admin dice «scambi e ordini»", True,
+          "Il cassetto dei file della chat (scambi e ordini) è quasi pieno" in pezzo("_avviso_cassetto_chat"))
+    prova("...e la scopa dell'orologio P2P conta i due mondi a parte: «scambi finiti» e «ordini conclusi»",
+          (True, True), ('🧹 Chat P2P: cancellate le buste di {n} "' in pezzo("_giro_chat_p2p"),
+                         '🧹 Chat degli ordini: cancellate le buste di {m} "' in pezzo("_giro_chat_p2p")))
+
     # --- 2b) IL SECONDO GIRO (19 ott 2026, cantiere chat-mercatino-2) ---
     # 1. IL JOURNAL: «ordine 42», e per il P2P le righe di sempre
     j = amb["_chat_nel_journal"]
@@ -170881,6 +170915,18 @@ function chiaveModeratoreP2P(){ return MOD; } function archivioModP2P(){ return 
 function linkPdfPayCodeP2P(){ return null; }
 let MOD = null, MAZZO = null; function mazzoMostro(){ return MAZZO; }
 let orders = [], currentOrder = null;
+/* (19 ott 2026, chat-mercatino-3) la rete di cartone per il ritiro: le
+   risposte di `leggi` in fila, e ogni domanda annotata */
+const API_BASE = '/api'; function authHdr(){ return ''; } async function caricaNostrTools(){}
+let RISPOSTE = [], DOMANDE = [];
+globalThis.fetch = async (url, o) => {
+  const corpo = JSON.parse((o && o.body) || '{}');
+  const rotta = String(url).split('/p2p/chat/')[1];
+  DOMANDE.push([rotta, corpo.tipo || '', corpo.dopo]);
+  const d = rotta === 'leggi' ? (RISPOSTE.shift() || {ok: true, aperta: true, giro: 0, buste: [], fino: 0})
+                              : {ok: true, n: 1, quando: 1};
+  return {ok: true, status: 200, json: async () => d};
+};
 """ + pezzi + r"""
 const R = {};
 const scatola = figli => { const cl = new Set(['detail-body']);
@@ -170937,6 +170983,24 @@ p2pChatMercInfo['m12'] = {peers: [], mie: [], ferma: false};
 R.riaperta = blocco('buyer', 'return_pending', 'aperta').indexOf('data-modo="ferma"') < 0;
 p2pChatMercInfo = {};
 R.questo = [chatScQuestoP2P('m12'), chatScQuestoP2P('c4a70000-0000-4000-8000-0000000000c1')];
+/* (19 ott 2026, chat-mercatino-3, dal giro) la parola del ritiro vale per lo
+   stato in cui e' stata detta: detta in disputa e poi l'ordine deciso, vince
+   la lista; detta a ordine deciso (il server ha riaperto), vince lei */
+orders = [om('buyer', 'refund', 'ferma')];
+p2pChatMercInfo['m12'] = {peers: [], mie: [], ferma: false, stato: 'dispute'};
+const rigaDecisa = chatScRigaP2P('m12');
+p2pChatMercInfo['m12'] = {peers: [], mie: [], ferma: false, stato: 'refund'};
+const rigaRiaperta = chatScRigaP2P('m12');
+p2pChatMercInfo = {};
+R.parola = [rigaDecisa.ferma, chatScServeP2P(rigaDecisa), rigaRiaperta.ferma];
+/* 1. IL PATTO SOTTO LA CHAT FERMA (19 ott 2026, chat-mercatino-3) */
+p2pChatMercInfo['m12'] = {peers: [], mie: [], ferma: true};
+const bp = blocco('buyer', 'refund', 'ferma');
+p2pChatMercInfo['m12'] = {peers: [], mie: [], ferma: false};
+const ba = blocco('buyer', 'shipped', 'aperta');
+p2pChatMercInfo = {};
+R.patto = [bp.indexOf(esc(CHATSC_MERC_PATTO_FERMA)) >= 0, bp.indexOf(esc(CHATSC_MERC_PATTO)) < 0,
+           ba.indexOf(esc(CHATSC_MERC_PATTO)) >= 0, ba.indexOf(esc(CHATSC_MERC_PATTO_FERMA)) < 0];
 R.link = [percorsoDaStartapp('mercatino_12'), percorsoDaStartapp('mercatino_012'), percorsoDaStartapp('mercatino_1234567890123'),
           startappDaLink('https://b.example/?ordine=12', 'https://b.example'), startappDaLink('https://b.example/?ordine=12&x', 'https://b.example'),
           startappDaLink('https://altro.example/?ordine=12', 'https://b.example'), percorsoDaStartapp('ordine_c4a70000-0000-4000-8000-0000000000c1')];
@@ -170950,7 +171014,50 @@ chatScSegnaColonnaP2P(conChat); chatScSegnaColonnaP2P(senza);
 const prima = scatola2(['chatmod chatsc']); chatScSegnaColonnaP2P(prima);
 prima.children = []; chatScSegnaColonnaP2P(prima);
 R.colonna = [conChat.classList.has('con-chatsc'), senza.classList.has('con-chatsc'), prima.classList.has('con-chatsc')];
-console.log(JSON.stringify(R));
+/* 3. IL CASSETTO DEL SERVER RINASCE (19 ott 2026, chat-mercatino-3): il
+   ritiro VERO, con la rete di cartone. Chi non ha un profilo ha la chiave
+   d'ordine solo nella voce della chat. */
+(async () => {
+  MAZZO = null; orders = [om('seller', 'locked', 'aperta')];
+  const KO = NT.utils.bytesToHex(NT.generateSecretKey()), KOp = NT.getPublicKey(NT.utils.hexToBytes(KO));
+  const U = NT.utils.bytesToHex(NT.generateSecretKey()), Up = NT.getPublicKey(NT.utils.hexToBytes(U));
+  const voce = () => ({giro: 0, ordineSk: KO, sk: U, pub: Up, mioUltimo: {pub: Up, t: 5, n: 3},
+                       copie: {[Up]: 1}, msgs: [], loroTutte: [], cursore: 7, cassetto: 'aaaa'});
+  const attendi = async () => { for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 10));
+    if (!p2pChatScInVolo['m12']) { await new Promise(r => setTimeout(r, 10)); if (!p2pChatScInVolo['m12']) return; } } };
+  /* A) il cassetto e' vuoto (`perso`): la chiave d'ordine RESTA */
+  chatScScriviP2P('m12', voce()); p2pChatMercInfo = {}; DOMANDE = [];
+  RISPOSTE = [{ok: true, aperta: true, giro: 0, buste: [], fino: 0, perso: true, mie: [KOp], peers: [], cassetto: 'aaaa'}];
+  await chatScRitiraP2P('m12'); await attendi();
+  const ca = chatScDiP2P('m12') || {};
+  R.perso = [ca.ordineSk === KO, !!chatMercChiaveP2P(chatScRigaP2P('m12')),
+             chatScPiedeP2P(chatScRigaP2P('m12'), ca).modo !== 'altrove', ca.sk !== U];
+  /* B) il cassetto e' RINATO con numeri piu' alti del segnalibro: `perso`
+     tace, il segno di nascita no — si riparte e si rilegge da zero */
+  chatScScriviP2P('m12', voce()); p2pChatMercInfo = {}; DOMANDE = []; p2pChatScUltimoGiro = {};
+  RISPOSTE = [{ok: true, aperta: true, giro: 0, fino: 901, perso: false, mie: [KOp], peers: [], cassetto: 'bbbb',
+               buste: [{n: 901, tipo: 'msg', mia: false, busta: 'eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4', quando: 1}]},
+              {ok: true, aperta: true, giro: 0, fino: 901, perso: false, mie: [KOp], peers: [], cassetto: 'bbbb',
+               buste: [{n: 901, tipo: 'msg', mia: false, busta: 'eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4', quando: 1}]}];
+  await chatScRitiraP2P('m12'); await attendi();
+  const cb = chatScDiP2P('m12') || {};
+  const letture = DOMANDE.filter(x => x[0] === 'leggi');
+  R.rinato = [cb.ordineSk === KO, cb.sk !== U, cb.cassetto === 'bbbb', letture.length, letture.length > 1 ? letture[1][2] : -1];
+  /* C) lo stesso segno: niente si butta */
+  chatScScriviP2P('m12', voce()); p2pChatMercInfo = {}; DOMANDE = []; p2pChatScUltimoGiro = {};
+  RISPOSTE = [{ok: true, aperta: true, giro: 0, fino: 7, perso: false, mie: [KOp], peers: [], cassetto: 'aaaa', buste: []}];
+  await chatScRitiraP2P('m12'); await attendi();
+  const cc2 = chatScDiP2P('m12') || {};
+  R.stesso = [cc2.sk === U, cc2.cursore === 7];
+  /* D) una voce di ieri senza il segno: lo prende, e non butta niente */
+  const vecchia = voce(); delete vecchia.cassetto;
+  chatScScriviP2P('m12', vecchia); p2pChatMercInfo = {}; DOMANDE = []; p2pChatScUltimoGiro = {};
+  RISPOSTE = [{ok: true, aperta: true, giro: 0, fino: 7, perso: false, mie: [KOp], peers: [], cassetto: 'cccc', buste: []}];
+  await chatScRitiraP2P('m12'); await attendi();
+  const cd = chatScDiP2P('m12') || {};
+  R.adotta = [cd.sk === U, cd.cassetto === 'cccc'];
+  console.log(JSON.stringify(R));
+})();
 """
     with _tf.TemporaryDirectory() as d:
         f = os.path.join(d, "merc.js")
@@ -170986,6 +171093,18 @@ console.log(JSON.stringify(R));
           [True] * 5, R["ferma"])
     prova("...riaperta dal moderatore, il campo torna", True, R["riaperta"])
     prova("I RIFIUTI DEL TELEFONO dicono dove si e'", ["questo ordine", "questo scambio"], R["questo"])
+    prova("LA DECISIONE A PAGINA APERTA: la parola vecchia del ritiro (detta in disputa) non vince sulla "
+          "lista che dice l'ordine deciso — la chat resta, ferma; detta a ordine deciso (riaperto), vince lei",
+          [True, True, False], R["parola"])
+    prova("IL PATTO SOTTO LA CHAT FERMA dice «la cancella quando i sats arrivano», e quello della chat aperta "
+          "resta «a ordine concluso»", [True] * 4, R["patto"])
+    prova("IL CASSETTO VUOTO (`perso`): la chiave d'ordine di chi non ha un profilo RESTA, la chat non va "
+          "«altrove», e si riparte con una chiave usa-e-getta nuova", [True] * 4, R["perso"])
+    prova("IL CASSETTO RINATO coi numeri piu' alti (dove `perso` tace): il segno di nascita lo dice — la chiave "
+          "d'ordine resta, la usa-e-getta e' nuova, il segno e' quello nuovo, e si rilegge da zero",
+          [True, True, True, 2, 0], R["rinato"])
+    prova("...lo stesso segno non butta niente", [True, True], R["stesso"])
+    prova("...una voce di ieri, senza segno, lo prende e non butta niente", [True, True], R["adotta"])
     prova("IL SEGNO DELLA COLONNA: col riquadro della chat fra i figli il contenitore ha `con-chatsc`; senza "
           "(anche quando la chat se ne va) no", [True, False, False], R["colonna"])
     prova("IL TASTO NEL CLIENT: `mercatino_<n>` si rilegge in `/?ordine=<n>`, e il gemello lo scrive; le forme "

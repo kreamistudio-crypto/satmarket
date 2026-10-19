@@ -5051,22 +5051,27 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   dei due script nomina il cassetto. LO SPAZIO TORNA AL DISCO: dal primo
   avvio dopo questo deploy il cassetto è `auto_vacuum = INCREMENTAL` (un
   VACUUM UNA volta sola, al primo avvio: oggi il file è piccolo; nel
-  journal «🧹 Chat P2P: il cassetto restituisce lo spazio dei file
-  cancellati»), e la scopa, dopo ogni pulizia, restituisce le pagine
+  journal «🧹 Chat (scambi e ordini): il cassetto restituisce lo spazio
+  dei file cancellati» — fino al 19 ott 2026 diceva «Chat P2P»), e la scopa, dopo ogni pulizia, restituisce le pagine
   libere (`PRAGMA incremental_vacuum`): il file si restringe davvero. Se
-  il VACUUM non riesce lo dice («⚠️ Chat P2P: auto_vacuum non acceso») e
+  il VACUUM non riesce lo dice («⚠️ Chat (scambi e ordini): auto_vacuum
+  non acceso») e
   riprova al riavvio dopo. In sola lettura:
   `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "PRAGMA auto_vacuum; PRAGMA freelist_count;"`
   deve dire 2 e un numero piccolo. L'AVVISO: quando i file passano l'80 %
   dei 2 GB, nel gruppo degli admin (argomento errori) «📎 Il cassetto dei
-  file della chat P2P è quasi pieno: … MB su 2.048 MB», una volta; si
+  file della chat (scambi e ordini) è quasi pieno: … MB su 2.048 MB», una
+  volta (nel journal «📎 Chat (scambi e ordini): cassetto dei file
+  all'80 %»); si
   riarma sotto il 60 %. Al pieno chi manda sente «Adesso non c'è spazio
   per i file». pdf-lib (`vendor/pdf-lib.min.js`) viaggia col deploy.
   NEL JOURNAL (`journalctl -u barattolo | grep "Chat P2P"`): «💬 Chat
   P2P: nuovo messaggio sullo scambio …, avvisato …» quando parte un
   avviso; «🧹 Chat P2P: lo scambio … e' finito, buste cancellate» alla
   fine di uno scambio; «🧹 … cancellate le buste di N scambi finiti»
-  quando le trova la scopa del minuto; «⛔ Chat P2P» se scatta il tetto
+  quando le trova la scopa del minuto (dal 19 ott 2026 le chat degli
+  ordini che la stessa scopa porta via hanno la riga loro: «🧹 Chat degli
+  ordini: cancellate le buste di N ordini conclusi»); «⛔ Chat P2P» se scatta il tetto
   anti-abuso degli avvisi. Una riga per busta NON c'è, apposta, e gli
   accessi riusciti alle rotte della chat non compaiono nel registro di
   uvicorn (gli errori sì).

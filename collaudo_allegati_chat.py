@@ -145,7 +145,7 @@ async def giro():
     async def admin_finto(testo, bottone=None, argomento=""):
         AVVISATI.append((testo, argomento))
     SRV.notifica_admin = admin_finto
-    avvisi = lambda: [t for t, a in AVVISATI if a == "errori" and "Il cassetto dei file della chat P2P è quasi pieno" in t]
+    avvisi = lambda: [t for t, a in AVVISATI if a == "errori" and "Il cassetto dei file della chat (scambi e ordini) è quasi pieno" in t]
     SRV._CASSETTO_AVVISATO["su"] = False
     n0 = len(avvisi())
     SRV.P2P_CHAT_ALLEGATI_CASSETTO = tutto() + 10_000          # oltre l'80 % col prossimo file

@@ -81674,6 +81674,9 @@ const CHATSC_MERC_CHIUSA = 'Chat chiusa: messaggi e file cancellati a ordine con
    arrivano; se il moderatore riapre torna scrivibile. La frase e' la
    stessa del server (`CHAT_MERCATINO_FERMA_TESTO`) */
 const CHATSC_MERC_FERMA = 'La decisione è presa: la chat si cancella quando i sats arrivano.';
+/* ...e il patto sotto la chat ferma (19 ott 2026, chat-mercatino-3): non
+   «a ordine concluso» ma quando i sats arrivano, com'e' davvero */
+const CHATSC_MERC_PATTO_FERMA = 'Cifrata fra voi due: Barattolo la trasporta e non la legge, e la cancella quando i sats arrivano. Un moderatore la legge solo se l\'ordine va in disputa.';
 /* PURA: «questo ordine» o «questo scambio», per i rifiuti che legge chi scrive */
 function chatScQuestoP2P(id){ return chatScMercP2P(id) ? 'questo ordine' : 'questo scambio'; }
 let p2pChatMercSpenta = false;    // il server ha detto che la leva del mercatino e' spenta
@@ -81708,8 +81711,12 @@ function chatScRigaP2P(id){
           mie: (info.mie || []).filter(k => /^[0-9a-f]{64}$/.test(k)),
           disputa: CHATSC_MERC_DISPUTA.indexOf(om.state) >= 0, nome: chatMercNomeP2P(om),
           /* ferma: l'ultima parola del ritiro, se c'e' (la decisione o la
-             riapertura possono arrivare a pagina aperta); sennò la lista */
-          ferma: typeof info.ferma === 'boolean' ? info.ferma : om.chat === 'ferma',
+             riapertura possono arrivare a pagina aperta); sennò la lista.
+             LA PAROLA VALE PER LO STATO IN CUI E' STATA DETTA (19 ott 2026,
+             chat-mercatino-3, dal giro): detta in disputa («non ferma») e
+             poi la lista dice l'ordine deciso — la lista e' piu' fresca, e
+             vince lei; altrimenti la chat spariva fino a una ricarica */
+          ferma: (typeof info.ferma === 'boolean' && info.stato === om.state) ? info.ferma : om.chat === 'ferma',
           lato: om.role === 'buyer' ? 'compro' : 'vendo'};
 }
 /* il nome dell'altra persona nelle frasi della chat */
@@ -82453,7 +82460,7 @@ function chatScRitiraP2P(id){
     /* le chiavi d'ordine che il server presenta (mercatino) */
     if (merc && d.aperta)
       p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : [],
-                             ferma: !!d.ferma};
+                             ferma: !!d.ferma, stato: (chatMercOrdineP2P(id) || {}).state || ''};
     if (merc && d.aperta && !chatScTradeP2P(chatScRigaP2P(id))) {
       try { await chatMercDichiaraP2P(id, false); } catch(e) {}
     }
@@ -82493,12 +82500,36 @@ function chatScRitiraP2P(id){
     /* IL CASSETTO DEL SERVER E' RINATO (`perso`): le buste che questo
        telefono aveva visto la' non ci sono piu', saluti compresi. Si
        riparte da zero con una chiave nuova — l'altro telefono fa lo
-       stesso al suo prossimo giro */
-    if (c0 && d.perso) {
-      scrivi('le buste sul server non ci sono piu\': si riparte');
-      chatScButtaP2P(id); c0 = null;
+       stesso al suo prossimo giro.
+       LA CHIAVE D'ORDINE NON SI BUTTA (19 ott 2026, cantiere
+       chat-mercatino-3): chi non ha un profilo di scambio ce l'ha SOLO
+       qui (`ordineSk`), e il ritiro l'ha gia' ridichiarata al server
+       nuovo; buttarla insieme ai messaggi lasciava il server a dirla mia
+       e il telefono senza, cioe' la chat «aperta su un altro
+       dispositivo» per sbaglio.
+       E IL SEGNO DI NASCITA (`cassetto`): se il file e' rinato e ha gia'
+       numeri piu' alti del segnalibro, `perso` non lo vede — e il
+       telefono crederebbe ancora sul server il suo saluto e la sua
+       copia. Un segno diverso da quello che la voce ricorda e' la stessa
+       notizia: si riparte, e si rilegge da capo. */
+    const rinato = !!(c0 && d.cassetto && c0.cassetto && c0.cassetto !== d.cassetto);
+    if (c0 && (d.perso || rinato)) {
+      scrivi(rinato ? 'il cassetto del server e\' rinato: si riparte'
+                    : 'le buste sul server non ci sono piu\': si riparte');
+      const sk0 = c0.ordineSk;
+      chatScButtaP2P(id);
+      c0 = {giro: d.giro, cassetto: d.cassetto || ''};
+      if (sk0) c0.ordineSk = sk0;
+      if (rinato) {
+        /* il ritiro era dal segnalibro vecchio: si rilegge da zero */
+        chatScScriviP2P(id, c0);
+        rileggi = true;
+        return;
+      }
     }
     const esito = chatScPosaP2P(o, tk, c0, d.buste, d.giro);
+    /* il segno di nascita del cassetto che ha dato queste buste */
+    if (d.cassetto) esito.c.cassetto = d.cassetto;
     chatScScriviP2P(id, esito.c);
     if (esito.adottata) scrivi('chiave ritrovata dalla copia sigillata, la chat continua qui');
     rileggi = !!esito.rileggi;
@@ -83201,7 +83232,7 @@ function chatScBloccoHTML(o, c, sa){
     + '<div class="chatsc-avviso"><span>🛡️</span><span>' + esc(merc ? CHATSC_MERC_AVVISO : CHATSC_AVVISO) + '</span></div>'
     + '<div class="chatmod-lista" id="p2pChatScLista">' + chatScListaP2P(o, c) + '</div>'
     + '<div id="p2pChatScPiede" data-modo="' + piede.modo + '">' + piede.html + '</div>'
-    + '<div class="hint">🔒 ' + esc(merc ? CHATSC_MERC_PATTO : CHATSC_PATTO) + '</div>'
+    + '<div class="hint">🔒 ' + esc(merc ? (o.ferma ? CHATSC_MERC_PATTO_FERMA : CHATSC_MERC_PATTO) : CHATSC_PATTO) + '</div>'
     + '</div>';
 }
 /* Il riquadro, per `renderOrdineP2P`. NON E' PURA, e sono due gesti

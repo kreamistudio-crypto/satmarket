@@ -66650,3 +66650,110 @@ trigger (il giro partirebbe lo stesso, e un giro a mano salterebbe).
 
 **DA GUARDARE.** Il primo lancio a mano su un ramo, quando servirà:
 che parta, e che `pronto` resti fermo.
+
+## La chat negli ordini, terzo giro: il patto della chat ferma, le righe del cassetto, la chat «altrove» dopo che il server rinasce (19 ott 2026, cantiere chat-mercatino-3, richiesta di Andrea)
+
+**PERCHÉ.** I tre «da fare» di chat-mercatino-2 (7a4afd6), chiusi subito
+su richiesta di Andrea, prima di accendere `MERCATINO_CHAT_ORDINI`.
+
+**COSA SI È DECISO.** 1. Sotto la chat FERMA il patto dice «la cancella
+quando i sats arrivano» (`CHATSC_MERC_PATTO_FERMA`); sotto quella aperta
+resta «a ordine concluso». 2. Le righe del journal che parlano del FILE
+(vuoto incrementale, 80 %, controllo, avviso agli admin) valgono per
+scambi e ordini insieme: «Chat (scambi e ordini)»
+(`CHAT_CASSETTO_ETICHETTA`); la scopa dell'orologio P2P, che porta via
+anche le chat degli ordini, ne conta due a parte — «Chat P2P: … scambi
+finiti» e «Chat degli ordini: … ordini conclusi». Le righe per
+scambio/ordine erano già giuste da chat-mercatino-2 (`_chat_nel_journal`).
+3. La chat «altrove» dopo la rinascita: trovata la causa, curata, e
+riprodotta.
+
+**LA CAUSA.** Due buchi, uno dentro l'altro. (a) Su `perso` (il telefono
+ha un segnalibro oltre l'ultima busta del server: il file è rinato)
+`chatScRitiraP2P` buttava TUTTA la voce della chat, `ordineSk` compresa.
+Chi non ha un profilo di scambio ha la chiave d'ordine SOLO lì; ma il
+ritiro l'aveva GIÀ ridichiarata al server nuovo. Risultato: il server
+dice «questa chiave è tua», il telefono non ce l'ha più, e la chat va
+«aperta su un altro dispositivo» — per sempre, su quell'ordine. (b) Se
+il file rinasce e riceve buste prima che il telefono torni, i numeri del
+server nuovo superano il segnalibro e `perso` TACE: il telefono crede
+ancora sul server il suo saluto e la sua copia della chiave, e non li
+rimanda. È il caso che il giro di chat-mercatino-2 aveva preso per un
+artefatto.
+
+**COME È FATTO.** Server: la tabella `nascita(token)` nel cassetto (mai in
+`init_db`), `_chat_nascita(cc)` la scrive una volta (16 esadecimali a
+caso), `leggi` la manda come `cassetto`. Telefono: la voce della chat
+tiene il segno; segno diverso = rinato, come `perso`. In tutti e due i
+casi la voce si butta MA `ordineSk` passa nella voce nuova; sul segno
+cambiato si rilegge da zero (il ritiro era partito dal segnalibro
+vecchio). Una voce di ieri senza segno lo prende e non butta niente. Il
+segno non dice niente di nessuno: è del file, non delle persone.
+UNA REGRESSIONE MIA DI chat-mercatino-2, presa dal giro e curata (la
+regola lo consente): la parola `ferma` dell'ultimo ritiro vinceva sempre
+sulla lista. Detta in disputa («non ferma»), restava lì anche quando la
+lista diceva l'ordine deciso, e la chat spariva fino a una ricarica.
+Adesso la parola vale per lo stato in cui è stata detta
+(`p2pChatMercInfo[id].stato`); se la lista dice uno stato nuovo, vince
+la lista.
+
+**STRADE SCARTATE.** Tenere il segnalibro a zero dopo la rinascita: non
+basta, `perso` non vede il caso (b). Confrontare i numeri delle buste: un
+file nuovo può avere qualunque numero. Ricavare il segno dal nome o
+dalla data del file: un trasloco a mano li conserva. Il segno nel
+database del mercatino: il cassetto può rinascere da solo (non entra
+nei backup, apposta), e il segno deve nascere col file.
+
+**PROVATO.**
+- `prove_chat_mercatino` (88 passate): le sentinelle del server (la
+  tabella nel cassetto e non in `init_db`, `leggi` che manda il segno,
+  `_chat_nascita` eseguita: nasce una volta e resta, un cassetto nuovo ne
+  ha un altro; nessuna riga del cassetto dice più «Chat P2P», le quattro
+  con l'etichetta; l'avviso agli admin; la scopa divisa). Nel banco node
+  il ritiro VERO (`chatScRitiraP2P`) con una rete di cartone: `perso`
+  tiene `ordineSk` e la chat non va «altrove»; il cassetto rinato coi
+  numeri più alti (dove `perso` tace) butta la voce, tiene la chiave
+  d'ordine, prende il segno nuovo e rilegge da zero (due letture, la
+  seconda da 0); lo stesso segno non butta niente; una voce senza segno
+  lo prende. Il patto ferma/aperta; la parola del ritiro detta in un
+  altro stato. LA RIPRODUZIONE: le prove nuove girate su una copia col
+  codice di prima: rosse; col codice nuovo: verdi.
+- `collaudo_chat_mercatino`, sezione 12 nuova, IL CASSETTO DEL SERVER
+  RINASCE: due telefoni veri in node (chi vende senza profilo, chi
+  compra col profilo) si scrivono; il file del cassetto si cancella e
+  il server lo rifà. Vuoto: chi vende non resta «altrove», tiene la sua
+  chiave d'ordine e la ridichiara, e chi compra legge il messaggio
+  nuovo. Riempito prima che il telefono torni (numeri più alti del
+  segnalibro): chi vende se ne accorge dal segno e si ripresenta (saluto
+  e copia sul server nuovo). Poi la scopa dell'orologio P2P su una chat
+  d'ordine dice «Chat degli ordini: … 1 ordine concluso» e mai «scambio
+  finito», e il cassetto rinato dice «Chat (scambi e ordini)». Col
+  codice di prima la sezione è rossa. `collaudo_allegati_chat`: il
+  filtro dell'avviso col testo nuovo.
+- IL GIRO DAL VIVO (copia del worktree, config di cartone con la leva
+  accesa, P2P spento, relay morti, database nuovo, porta 8471): chi
+  compra e chi vende dalla Mini App a 360. Ordine in disputa, deciso
+  senza che il rimborso vada a segno: la chat ferma col patto nuovo,
+  chiaro e scuro. Poi il cassetto cancellato a server spento e il
+  server riacceso: nel journal «🧹 Chat (scambi e ordini): il cassetto
+  restituisce lo spazio…»; chi vende (senza profilo) ha tenuto
+  `ordineSk`, ha preso il segno nuovo, è passato da «in attesa» a
+  «scrivi» appena chi compra si è ripresentato, e ha scritto; «💬 Chat
+  degli ordini: nuovo messaggio sull'ordine 2». Chiaro e scuro, quattro
+  scatti mandati ad Andrea. Il giro ha trovato la regressione della
+  parola `ferma` (sopra).
+- SUITE E COLLAUDI, su 2d64133 + il cantiere: la prima suite intera
+  severa **25.308 passate e 2 fallite**, tutte e due banchi di altri
+  cantieri che il codice nuovo ha spostato — la sentinella di
+  `prove_chat_scambio` che legge per forma la riga di `perso` (ora
+  `if (c0 && (d.perso || rinato))`, e il segno di nascita accanto: resta
+  «sulla parola del server») e il banco del vuoto incrementale di
+  `prove_pdf_allegati` che esegue la funzione senza la costante nuova
+  (ora prende `CHAT_CASSETTO_ETICHETTA` dal sorgente). Curati, le tre
+  sezioni da sole 306/0, poi la suite intera rigirata: **25.319
+  passate, 0 fallite**. I collaudi della CI nella gabbia, due alla
+  volta: **86 verdi, 0 rossi**. Scanner dei segreti (le FORME e la
+  forma esadecimale del workflow, con le controprove) pulito.
+
+**DA FARE (notati, non fatti).**
+- Niente di nuovo da questo cantiere.

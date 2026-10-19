@@ -33208,6 +33208,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nella colonna di destra (da 1600 la terza) con `.con-chatsc` — niente
   `:has()`. Le prove:
   `prove_chat_mercatino`, `collaudo_chat_mercatino` (in CI).
+  IL TERZO GIRO (19 ott 2026, cantiere chat-mercatino-3). IL SEGNO DI
+  NASCITA DEL CASSETTO: la tabella `nascita(token)` di `chat-scambi.db`
+  (nel cassetto, MAI in `init_db`), scritta una volta da
+  `_chat_nascita(cc)` (16 esadecimali a caso) e mandata da `leggi` come
+  `cassetto`. Il telefono la tiene nella voce della chat; un segno
+  diverso vuol dire «il file e' rinato» anche quando `perso` tace (il
+  server nuovo ha gia' numeri piu' alti del segnalibro): si butta la
+  voce e si rilegge da zero (`rileggi`), e saluto e copia della chiave
+  ripartono. Una voce senza segno lo prende e non butta niente. LA
+  CHIAVE D'ORDINE RESTA: su `perso` e sul segno cambiato `ordineSk` (chi
+  non ha un profilo ce l'ha solo li') passa nella voce nuova — il ritiro
+  l'ha gia' ridichiarata al server, e buttarla lasciava la chat
+  «altrove». IL PATTO DELLA CHAT FERMA: `CHATSC_MERC_PATTO_FERMA` («la
+  cancella quando i sats arrivano») sotto la chat `ferma`, il
+  `CHATSC_MERC_PATTO` di sempre sotto quella aperta. LA PAROLA DEL
+  RITIRO (`ferma`) vale solo per lo stato in cui e' stata detta
+  (`p2pChatMercInfo[id].stato`): se la lista dice uno stato nuovo,
+  vince la lista. IL JOURNAL DEL FILE: le righe del cassetto (vuoto
+  incrementale, 80 %, controllo) dicono `CHAT_CASSETTO_ETICHETTA` =
+  «Chat (scambi e ordini)», e l'avviso agli admin «Il cassetto dei file
+  della chat (scambi e ordini)»; la scopa dell'orologio P2P
+  (`_chat_p2p_spazza(conti=…)`) conta a parte «scambi finiti» e «ordini
+  conclusi».
 - LO SWAP DEGLI INCASSI, LA PRIMA TAPPA (16 ott 2026, cantiere
   swap-venditore; perché in CANTIERI, «Lo swap del venditore, prima
   tappa»). La leva `SWAP_ATTIVO`, SPENTA di serie (default nel server,
