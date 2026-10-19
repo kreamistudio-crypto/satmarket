@@ -17480,10 +17480,16 @@ def _pulisci_fusioni():
 
 
 @app.post("/api/me/collega-telegram")
-def collega_telegram(x_tg_init_data: str = Header(""),
+async def collega_telegram(x_tg_init_data: str = Header(""),
                      barattolo_sessione: str = Cookie("")):
     """L'utente Nostr chiede il lasciapassare per il bot: il frontend
-    apre t.me/ilbarattolobot?start=CODICE e il resto succede in chat."""
+    apre t.me/ilbarattolobot?start=CODICE e il resto succede in chat.
+    E' `async` APPOSTA (19 ott 2026, cantiere account-doppio-bot): i
+    lasciapassare li toccano anche i gesti del bot, che girano nel loop;
+    da sincrona questa rotta girava in un thread, e la sua pulizia
+    poteva trovarsi un dizionario cambiato sotto i piedi a meta' giro.
+    Ora tutti i tocchi ai dizionari in memoria stanno nello stesso loop
+    (la regola la conta `prove_dizionari_nel_loop`)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if user["id"] >= 0:
         raise HTTPException(400, "Il tuo Telegram e' gia' collegato: "

@@ -355,6 +355,38 @@ def main():
         headers={"X-Tg-Init-Data": "collaudo:600:Tele"}).status_code)
 
     # ------------------------------------------------------------------
+    print("\n[da onion]")
+    o = TestClient(server.app, base_url="http://barattoloxyz.onion")
+    r = o.post("/api/login/bot/inizia")
+    prova("anche da Tor l'ingresso nasce", 200, r.status_code)
+    s, _ = (lambda d: (avvia_bot(tel, 811, "DaTor", carico_dal_link(d["link"])), d))(r.json())
+    figure, _ = figure_della_tastiera(s[0])
+    tocca(tel, 811, [cb for f, cb in figure if f == r.json()["figura"]][0])
+    prova("...e il browser di Tor entra col Telegram che ha premuto Avvia",
+          {"stato": "dentro", "nome": "DaTor"}, o.post("/api/login/bot/stato").json())
+    prova("...e da li' /api/me e' lui", 811, o.get("/api/me").json()["tg_id"])
+
+    # ------------------------------------------------------------------
+    print("\n[la fusione Nostr→Telegram, dalla rotta async]")
+    f = TestClient(server.app)
+    f.post("/api/login/telegram", json={"collaudo": True, "id": -77, "first_name": "Nostrano"})
+    con = server.db()
+    con.execute("UPDATE utenti SET npub=?, npub_accesso=? WHERE tg_id=-77",
+                ("npub1fintafusione", "npub1fintafusione"))
+    con.commit()
+    con.close()
+    r = f.post("/api/me/collega-telegram")
+    prova("il lasciapassare nasce dalla rotta (ora async)", (200, 32),
+          (r.status_code, len(r.json().get("codice", ""))))
+    vecchio = r.json()["codice"]
+    r = f.post("/api/me/collega-telegram")
+    prova("...chiederne un altro brucia il vecchio", (False, True),
+          (vecchio in server.CODICI_FUSIONE, r.json()["codice"] in server.CODICI_FUSIONE))
+    m = avvia_bot(tel, 812, "Tele", r.json()["codice"])
+    prova("...e il bot lo riconosce: chiede la conferma della fusione", True,
+          "Stai per collegare" in m[0]["text"] and "fondi:" in str(m[0]["reply_markup"]))
+
+    # ------------------------------------------------------------------
     print("\n[a leva spenta di nuovo]")
     d = w.post("/api/login/bot/inizia").json()
     server.LOGIN_DAL_BOT = False

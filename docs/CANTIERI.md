@@ -67212,3 +67212,77 @@ aperto; dal computer, il QR inquadrato col telefono.
 - Su onion la porta Telegram resta assente come prima, ma il bot ci
   funzionerebbe (non serve il dominio di BotFather, e non si carica
   niente da telegram.org): da decidere.
+
+## Entra dal bot, secondo giro: anche su onion col QR, e la fusione nel loop (19 ott 2026, cantiere account-doppio-bot, sì di Andrea ai due notati)
+
+**COSA.** Due voci del «da fare» del giro di prima, approvate da Andrea:
+1. LA ROTTA DELLA FUSIONE NEL LOOP. `/api/me/collega-telegram` era
+   sincrona, cioè girava in un thread, mentre i lasciapassare che pulisce
+   (`CODICI_FUSIONE`, `CONFERME_FUSIONE`) li toccano anche i gesti del
+   bot, nel loop: la pulizia poteva trovarsi il dizionario cambiato a
+   metà giro. Ora è `async def`, come le rotte dell'ingresso dal bot. La
+   regola diventa un censimento, `prove_dizionari_nel_loop`: l'ast di
+   server.py, ogni rotta che nomina i dizionari della fusione o degli
+   ingressi (o le loro pulizie) deve essere `async` — oggi sono tre,
+   `collega_telegram`, `inizia_login_bot`, `stato_login_bot` — e async
+   anche i quattro gesti del bot che li toccano.
+2. «ENTRA CON TELEGRAM» SU ONION, dietro la stessa leva `LOGIN_DAL_BOT`.
+   Il widget lì non c'è mai stato perché vuole il dominio di BotFather e
+   si tira dietro uno script da telegram.org; il bot non vuole né l'uno
+   né l'altro. `avviaVetrina` chiama `bottoneLoginTelegram` anche su
+   onion, e la scelta sta lì: porta aperta → il bottone del bot; porta
+   chiusa su onion → niente (MAI il widget). Con la porta aperta il
+   banner diventa «entra con Telegram o con la tua chiave Nostr…» e la
+   porta Nostr torna SECONDA («…o entra con Nostr», come sul clearnet;
+   per trovarla ha preso l'id `vetrinaEntraNostr`). Nel foglio account
+   non serviva niente: la porta del bot ci compare già quando è aperta.
+
+**IL PERCHÉ DEL QR SEMPRE, SU ONION.** Il codice di casa dice già che
+da Tor il link t.me non si apre (è la ragione per cui di là non si
+collega Telegram dal Profilo). Il QR invece funziona per costruzione: lo
+inquadra la fotocamera del telefono, Avvia e la figura succedono nel
+Telegram del telefono, e la sessione arriva al browser di Tor perché il
+legame sta nel SUO cookie. Quindi su onion il foglio mostra il QR anche
+dal telefono e lo dice: «Da Tor il link di Telegram può non aprirsi:
+inquadra il codice con la fotocamera del telefono…». «Apri Telegram»
+resta, per chi ce l'ha fatta ad aprirlo.
+
+**TOCCATA UNA PROVA DI SETTEMBRE.** `prove.py` chiedeva «su onion il
+login Telegram non si disegna» con la riga `if (!suOnion())
+bottoneLoginTelegram();`. La regola che difendeva era il widget (il muro
+del dominio, la fuga verso telegram.org), e resta: la prova ora guarda
+che su onion il WIDGET non si monti mai, dove si sceglie
+(`suOnion() ? null : widgetLoginTelegram(posto)`).
+E in `prove_onion` il conto delle chiamate al giudice `etichettaNostr(`
+passa da OTTO a NOVE: la nona è la porta Nostr della vetrina che su onion
+torna «…o entra con Nostr», dallo stesso giudice.
+
+**PROVE.** `prove_dizionari_nel_loop` (3); in `prove_login_dal_bot` il
+banco node su onion: il QR anche dal telefono e la frase, a porta chiusa
+niente e Nostr unica porta, a porta aperta il bottone, il banner nuovo e
+Nostr seconda. `collaudo_login_bot.py` ha due sezioni nuove (73 su 73):
+l'ingresso da un host .onion fino a `/api/me`, e la fusione dalla rotta
+async (il lasciapassare nasce, uno nuovo brucia il vecchio, il bot lo
+riconosce e chiede la conferma). CONTROPROVE sul file vero, poi
+ripristinato: con la rotta sincrona cade il censimento; col widget su
+onion cade il banco.
+
+**DAL VIVO SU ONION** (Playwright e Chromium, 360×780 densità 2, chiaro e
+scuro, user agent di Tor Browser per Android): la pagina servita a un
+indirizzo .onion finto, ogni sua richiesta girata da Playwright al server
+del giro con l'Host .onion, tutto il resto abortito. La vetrina col
+banner nuovo, «Entra con Telegram» e «…o entra con Nostr»; il foglio col
+QR e la frase di Tor; il bot simulato (Avvia e la figura) e la pagina
+dentro come quell'account (`/api/me` 821). Nessun errore di pagina; lo
+script del widget mai chiesto. Fuori dal loopback solo
+`telegram-web-app.js`: sul VPS dall'onion la pagina esce senza (lo
+toglie il server, `su_onion`, quando l'Host è l'`ONION_HOST`
+configurato), e nel config del giro `ONION_HOST` non c'era.
+
+**DA GUARDARE** (dopo il deploy, a leva accesa): da Tor Browser sul
+computer, il QR inquadrato col telefono; da Tor Browser sul telefono,
+se «Apri Telegram» apre l'app.
+
+**NOTATO, NON FATTO.** Su onion il banner di chi è dentro dice «da qui
+gli avvisi in chat non si possono attivare»: per chi è appena entrato
+dal bot non è vero (ha premuto Avvia, gli avvisi arrivano).

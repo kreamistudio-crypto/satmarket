@@ -289,7 +289,8 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   la riga «🔔 Webhook Telegram» nel journal). Niente da migrare: gli
   ingressi vivono in memoria due minuti, e un riavvio perde solo quelli
   in volo (si ritocca «Entra con Telegram»). La prova dal vivo, dopo il
-  deploy, sta nella voce del cantiere in CANTIERI. Coi perché:
+  deploy, sta nella voce del cantiere in CANTIERI. La stessa leva accende
+  la porta anche sull'onion (lì col QR), senza altre righe. Coi perché:
   Architettura, «ENTRA DAL BOT».
 - LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
   AGGIUNGE al config del VPS come le altre, e finche' manca o e'

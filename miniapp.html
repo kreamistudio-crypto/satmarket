@@ -51120,6 +51120,9 @@ const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram
    — di la' Telegram non e' una strada, e nominarla sarebbe mandare
    qualcuno contro un muro. */
 const BANNER_VETRINA_ONION = '🛍️ Stai guardando la vetrina — entra con la tua chiave Nostr per comprare e vendere anche da qui';
+/* ...e con la porta del bot accesa (LOGIN_DAL_BOT) anche da Tor si
+   entra con Telegram, col QR: la riga li nomina tutti e due. */
+const BANNER_VETRINA_ONION_BOT = '🛍️ Stai guardando la vetrina — entra con Telegram o con la tua chiave Nostr per comprare e vendere anche da qui';
 /* L'initData di Telegram dura 24 ore (ago 2026) e NON si rinfresca
    finché la Mini App resta aperta: solo riaprirla ne conia uno nuovo.
    Senza questa riga chi scade si ritroverebbe nella vetrina anonima
@@ -51701,10 +51704,19 @@ async function apriIngressoBot(){
   fermaIngressoBot();
   const foglio = el('botEntraSheet');
   const pc = !telefonoQui();
+  /* DA TOR il link t.me puo' non aprirsi (e' la ragione per cui di la'
+     non si collega Telegram dal Profilo): il QR si mostra SEMPRE, e lo
+     inquadra la fotocamera del telefono — la sessione arriva qui lo
+     stesso, perche' la tiene il legame di questo browser. */
+  const onion = suOnion();
   el('botEntraFigura').style.display = 'none';
   el('botEntraQrBox').style.display = 'none';
   el('botEntraApri').style.display = 'none';
-  el('botEntraSub').innerHTML = pc
+  el('botEntraSub').innerHTML = onion
+    ? 'Da Tor il link di Telegram pu\u00f2 non aprirsi: inquadra il codice con '
+      + 'la fotocamera del telefono, tocca <b>Avvia</b> nel bot e poi la figura '
+      + 'qui sotto.'
+    : pc
     ? 'Inquadra il codice col telefono e tocca <b>Avvia</b> nel bot, poi '
       + 'la figura qui sotto.'
     : 'Si apre il bot di Barattolo: tocca <b>Avvia</b>, poi la figura qui '
@@ -51731,7 +51743,7 @@ async function apriIngressoBot(){
   apri.href = d.link;
   apri.innerHTML = etichettaTelegram(pc ? 'Apri Telegram Desktop' : 'Apri Telegram');
   apri.style.display = '';
-  if (pc) {
+  if (pc || onion) {
     el('botEntraQrBox').style.display = '';
     disegnaQr(el('botEntraQr'), d.link).then(ok => {
       if (!ok) el('botEntraQrBox').style.display = 'none';
@@ -51899,7 +51911,12 @@ function bottoneLoginTelegram(){
      bot (vedi ENTRA DAL BOT): il posto si prende subito, cosi' l'ordine
      del banner resta quello di sempre anche se la risposta arriva dopo
      la porta Nostr. */
-  leggiPortaBot().then(si => si ? bottoneLoginBot(posto) : widgetLoginTelegram(posto));
+  /* SU ONION (19 ott 2026, decisione di Andrea) la porta del bot SI
+     offre e il widget MAI: il widget vuole il dominio di BotFather e si
+     tira dietro uno script da telegram.org, il bot no — e la strada da
+     Tor e' il QR (vedi apriIngressoBot). */
+  leggiPortaBot().then(si => si ? bottoneLoginBot(posto)
+                                : suOnion() ? null : widgetLoginTelegram(posto));
 }
 function bottoneLoginBot(posto){
   const b = document.createElement('button');
@@ -51910,6 +51927,16 @@ function bottoneLoginBot(posto){
   b.innerHTML = etichettaTelegram('Entra con Telegram');
   b.onclick = () => apriIngressoBot();
   posto.appendChild(b);
+  /* Su onion il banner parlava della sola chiave Nostr, e la porta
+     Nostr era l'unica («Entra con Nostr»): con Telegram accanto la riga
+     li nomina tutti e due, e Nostr torna la SECONDA porta, come sul
+     clearnet. */
+  if (suOnion()) {
+    const riga = el('demoBanner').firstElementChild;
+    if (riga && riga.tagName === 'DIV') riga.textContent = BANNER_VETRINA_ONION_BOT;
+    const n = el('vetrinaEntraNostr');
+    if (n) n.innerHTML = etichettaNostr('…o entra con Nostr');
+  }
 }
 function widgetLoginTelegram(posto){
   const s = document.createElement('script');
@@ -54268,12 +54295,14 @@ function apriLinkGuida(quale){
    funziona anche in locale. */
 function bottoneLoginNostr(){
   const btn = document.createElement('button');
+  btn.id = 'vetrinaEntraNostr';
   btn.className = 'demo-cta';
   btn.style.cssText = 'border:none;cursor:pointer;margin-top:8px';
   /* IL «...o» NOMINA UN'ALTERNATIVA, e su onion non c'e': li' questa
      e' l'unica porta, mentre sul clearnet e' la SECONDA — dopo il
-     widget Telegram, che infatti `avviaVetrina` mette solo di qua. E'
-     la stessa riga del foglio invito: cade il mezzo, resta la porta. */
+     widget Telegram, che su onion non si monta. E' la stessa riga del
+     foglio invito: cade il mezzo, resta la porta. Su onion con la porta
+     del bot accesa la riscrive `bottoneLoginBot`: li' torna SECONDA. */
   btn.innerHTML = etichettaNostr(suOnion() ? 'Entra con Nostr'
                                             : '…o entra con Nostr');
   btn.onclick = apriNostrSheet;
@@ -84516,14 +84545,18 @@ async function avviaVetrina(){
     renderAvatar();            // in vetrina anonima il tappo non compare
     renderPodioTesta();        // ...e il podio nemmeno: la cintura di apriClassifica
     mostraBanner(suOnion() ? BANNER_VETRINA_ONION : BANNER_VETRINA);
-    /* SU ONION IL LOGIN TELEGRAM NON SI OFFRE, e non e' prudenza:
+    /* SU ONION IL WIDGET TELEGRAM NON SI OFFRE, e non e' prudenza:
        il Login Widget funziona SOLO sul dominio registrato con
        /setdomain, che e' uno per bot — quindi di la' porterebbe a un
        muro, ed e' la regola di casa (un bottone che porta a un muro e'
        peggio di un bottone che non c'e'). In piu' il widget si tira
        dietro uno script da telegram.org, cioe' la fuga che su quella
-       strada si e' appena chiusa. Resta Nostr, che di la' funziona. */
-    if (!suOnion()) bottoneLoginTelegram();
+       strada si e' appena chiusa. Resta Nostr, che di la' funziona.
+       DAL 19 OTT 2026 di la' si offre la porta del BOT, a leva
+       LOGIN_DAL_BOT accesa: niente dominio, niente script da fuori, e il
+       QR che si inquadra col telefono. La scelta la fa
+       `bottoneLoginTelegram`: su onion, a porta chiusa, non monta niente. */
+    bottoneLoginTelegram();
     /* LA PORTA NOSTR LA METTE LUI, ed e' l'unica: `mostraBanner` su
        onion il suo CTA non lo disegna proprio, perche' porterebbe
        alla Mini App. Due mani che scrivono nello stesso banner: chi

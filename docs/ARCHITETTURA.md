@@ -9637,7 +9637,15 @@
   così); dal computer c'è anche il QR, da inquadrare col telefono. Vale
   uguale nella PWA e nell'APK, dove il widget si rompeva (il popup
   usciva dalla TWA). Dentro la Mini App la porta non c'è: lì entra già
-  l'account attivo. Su onion nessuna porta Telegram, come prima.
+  l'account attivo. SU ONION (dal 19 ott 2026, decisione di Andrea) la
+  porta del bot c'è, dietro la stessa leva, e il widget MAI: il bot non
+  vuole il dominio di BotFather e non carica niente da telegram.org. Da
+  Tor il link t.me può non aprirsi, quindi lì il foglio mostra SEMPRE il
+  QR (anche dal telefono) e lo dice; il banner nomina Telegram e Nostr,
+  e Nostr torna la seconda porta («…o entra con Nostr»). A porta chiusa
+  su onion non si monta niente, come prima. I DIZIONARI IN MEMORIA
+  (ingressi e lasciapassare della fusione) li toccano solo rotte `async`
+  e i gesti del bot, tutti nel loop: `prove_dizionari_nel_loop` le conta.
   LA CHIAVE NOSTR GIÀ APERTA (stesso cantiere): `giaApertoNostr`, in
   testa a `entraConNostr` e PRIMA della sfida, confronta nel browser la
   npub del firmatario con quelle degli account aperti. Se c'è: «Questo

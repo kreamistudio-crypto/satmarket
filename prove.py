@@ -37952,8 +37952,13 @@ def prove_onion():
     # /setdomain, che e' uno per bot: di la' porterebbe a un muro. Ed
     # e' anche uno script in piu' verso telegram.org, cioe' la fuga
     # appena chiusa che rientrerebbe da un'altra porta.
-    prova("su onion il login Telegram non si disegna", True,
-          "if (!suOnion()) bottoneLoginTelegram();" in mini)
+    # DAL 19 OTT 2026 (decisione di Andrea, cantiere account-doppio-bot)
+    # di la' si offre la porta del BOT, a leva LOGIN_DAL_BOT accesa: non
+    # vuole il dominio e non carica niente da telegram.org. Il WIDGET su
+    # onion resta vietato, e la riga lo guarda dove si sceglie.
+    prova("su onion il widget Telegram non si disegna mai (la porta del bot si')", True,
+          ": suOnion() ? null : widgetLoginTelegram(posto));"
+          in _fn_js(mini, "function bottoneLoginTelegram(){"))
     # E IL «...o» NON SI DICE SU ONION, che li' quella e' l'UNICA
     # porta: il puntino di sospensione nomina un'alternativa, e sul
     # clearnet e' vero (viene dopo il widget Telegram) mentre di la'
@@ -38429,8 +38434,13 @@ def prove_onion():
     # l'ottava e' il bottone «Pubblica su Nostr» accanto a «🔗 Condividi»
     # (`bottoniCondividiP2P`), che compare solo a chi e' entrato con
     # Nostr — un bottone col glifo, cioe' proprio il mestiere del giudice.
-    prova("...e le chiamate al giudice sono OTTO", 8,
+    # ⚠️ E SONO NOVE (19 ott 2026, cantiere account-doppio-bot): su onion,
+    # con la porta del bot accesa, `bottoneLoginBot` riscrive la porta
+    # Nostr della vetrina in «…o entra con Nostr» — dallo stesso giudice.
+    prova("...e le chiamate al giudice sono NOVE", 9,
           mini.count("etichettaNostr("))
+    prova("...la nona e' la porta Nostr della vetrina su onion, che torna seconda", True,
+          "if (n) n.innerHTML = etichettaNostr('\u2026o entra con Nostr');" in mini)
     prova("...l'ottava e' il «Pubblica su Nostr» di un ordine P2P", True,
           "etichettaNostr('Pubblica su Nostr')" in mini)
     # ⚠️ IL CENSIMENTO HA CAMBIATO LATO (ago 2026, dal campo, e la
@@ -110230,6 +110240,9 @@ def prove_login_dal_bot():
         return
     banco = r"""
 let collaudo = false, accountAperti = [], mini = false, tg = null, ricaricata = 0;
+let onion = false;
+const suOnion = () => onion;
+const BANNER_VETRINA_ONION_BOT = 'BANNER-ONION-BOT';
 let chiamate = [], risposte = [], ua = 'Mozilla/5.0 (Linux; Android 15)';
 const miniAccount = () => mini;
 const etichettaNostr = t => 'N ' + t;
@@ -110249,7 +110262,8 @@ const setInterval = () => 1, clearInterval = () => {};
 const fetch = async (url, opz) => { chiamate.push((opz?.method || 'GET') + ' ' + url);
   const r = risposte.shift(); return {ok: r.ok !== false, status: r.status || 200, json: async () => r.json}; };
 const document = {hidden: false, addEventListener(){}, createElement: nodo};
-function nodo(tag){ return {tag, figli: [], style: {}, attr: {}, textContent: '', _h: '', classList: {
+function nodo(tag){ return {tag, tagName: String(tag).toUpperCase(), figli: [], style: {}, attr: {}, textContent: '', _h: '',
+  get firstElementChild(){ return this.figli[0]; }, classList: {
     _c: new Set(), add(c){ this._c.add(c); }, remove(c){ this._c.delete(c); }, contains(c){ return this._c.has(c); }},
   get innerHTML(){ return this._h; }, set innerHTML(v){ this._h = v; if (v === '') this.figli = []; },
   appendChild(f){ f.padre = this; this.figli.push(f); }, append(...f){ f.forEach(x => this.appendChild(x)); },
@@ -110321,6 +110335,18 @@ const giri = {};
   const banner = el('demoBanner'); bottoneLoginTelegram(); await portaBotPromessa; await null;
   portaBotPromessa = Promise.resolve(false); bottoneLoginTelegram(); await portaBotPromessa; await null;
   giri.vetrina = banner.figli.map(p => p.figli[0]?.tag === 'script' ? 'widget' : p.figli[0]?.id);
+  // su onion: il QR sempre (anche dal telefono), mai il widget, e il banner nomina tutti e due
+  onion = true; ua = 'Mozilla/5.0 (Android 14; Mobile; rv:128.0) Gecko/20100101 Firefox/128.0'; qr = 0;
+  risposte = [{json: {link: 'L', figura: '🍒'}}]; await apriIngressoBot();
+  giri.onionFoglio = [el('botEntraQrBox').style.display, qr, el('botEntraSub').innerHTML.startsWith('Da Tor il link di Telegram pu\u00f2 non aprirsi: inquadra'),
+    el('botEntraApri').innerHTML.replace(/<img[^>]*> /, '')];
+  const bo = el('demoBanner'); bo.figli = []; bo.appendChild(nodo('div'));
+  el('vetrinaEntraNostr').innerHTML = 'N Entra con Nostr';
+  portaBotPromessa = Promise.resolve(false); bottoneLoginTelegram(); await portaBotPromessa; await null;
+  giri.onionChiusa = [bo.figli.length, bo.figli[1].figli.length, el('vetrinaEntraNostr').innerHTML];
+  portaBotPromessa = Promise.resolve(true); bottoneLoginTelegram(); await portaBotPromessa; await null;
+  giri.onionAperta = [bo.figli[2].figli[0]?.id, bo.figli[0].textContent, el('vetrinaEntraNostr').innerHTML];
+  onion = false;
   console.log(JSON.stringify(giri));
 })().catch(e => console.error(e.stack));
 """
@@ -110370,6 +110396,45 @@ const giri = {};
     prova("...col «Riprova» in vista", "", g["freno"][4])
     prova("la vetrina: il bottone del bot a porta aperta, il widget a porta chiusa",
           ["vetrinaEntraBot", "widget"], g["vetrina"])
+    prova("su onion il QR c'e' anche dal telefono, e il foglio dice perche'",
+          ["", 1, True, "Apri Telegram"], g["onionFoglio"])
+    prova("su onion, a porta chiusa: niente (MAI il widget), e Nostr resta l'unica porta",
+          [2, 0, "N Entra con Nostr"], g["onionChiusa"])
+    prova("su onion, a porta aperta: il bottone del bot, il banner che nomina tutti e due, "
+          "e Nostr torna seconda", ["vetrinaEntraBot", "BANNER-ONION-BOT", "N …o entra con Nostr"],
+          g["onionAperta"])
+
+
+def prove_dizionari_nel_loop():
+    """I DIZIONARI IN MEMORIA, TUTTI NEL LOOP (19 ott 2026, cantiere
+    account-doppio-bot, chiesto da Andrea): i lasciapassare della fusione
+    e gli ingressi dal bot li toccano i gesti del bot, che girano nel
+    loop di uvicorn. Una rotta SINCRONA gira in un thread a parte, e la
+    sua pulizia (una lista fatta scorrendo il dizionario) poteva trovarsi
+    il dizionario cambiato sotto i piedi a meta' giro. Si conta con l'ast
+    di server.py: ogni rotta che nomina quei dizionari, o le loro
+    pulizie, e' `async def`."""
+    print("\n[i dizionari in memoria, tutti nel loop]")
+    nomi = {"CODICI_FUSIONE", "CONFERME_FUSIONE", "_pulisci_fusioni",
+            "INGRESSI_BOT", "CODICI_INGRESSO", "TOKEN_INGRESSO", "_pulisci_ingressi"}
+    rotte = {}
+    for f in ast.parse(_SORGENTE).body:
+        if not isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not any(isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute)
+                   and isinstance(d.func.value, ast.Name) and d.func.value.id == "app"
+                   for d in f.decorator_list):
+            continue
+        if {n.id for n in ast.walk(f) if isinstance(n, ast.Name)} & nomi:
+            rotte[f.name] = isinstance(f, ast.AsyncFunctionDef)
+    prova("le rotte che toccano lasciapassare e ingressi sono queste tre",
+          ["collega_telegram", "inizia_login_bot", "stato_login_bot"], sorted(rotte))
+    prova("...e sono tutte async: nessun thread sui dizionari", [],
+          [n for n, a in rotte.items() if not a])
+    prova("...e i gesti del bot che li toccano sono async anche loro", True,
+          all(f"async def {n}(" in _SORGENTE for n in (
+              "avvia_fusione", "gestisci_callback", "avvia_ingresso_bot",
+              "callback_ingresso_bot")))
 
 
 def prove_piu_account_ovunque():
@@ -172026,7 +172091,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,
