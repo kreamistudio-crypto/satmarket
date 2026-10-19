@@ -109517,7 +109517,8 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
               "portachiavi_conti", "portachiavi_adottato",
               "cookie_mini", "imposta_cookie_mini", "telegram_della_richiesta",
               "conti_mini", "utente_da_sessione", "conto_scelto",
-              "conti_del_dispositivo", "_chiudi_rientro", "apri_sessione"):
+              "conti_del_dispositivo", "_chiudi_rientro", "_chiudi_sessioni",
+              "_al_tetto", "apri_sessione"):
         exec(pezzo(n), amb)
     return amb, con, Resp
 
@@ -109857,6 +109858,43 @@ def prove_account_doppio():
     CV.set(None)
     amb["PIU_ACCOUNT_OVUNQUE"] = False
 
+    # --- IL TETTO (19 ott 2026, stesso cantiere): chi cede il posto si
+    #     chiude anche nel database, gli altri restano aperti ---
+    for tg, nome in ((31, "Uno"), (32, "Due"), (33, "Tre"), (34, "Quattro")):
+        con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                    "avatar_scelta) VALUES(?,?,?,?,?,'')", (tg, nome, nome.lower(), "", ""))
+    con.commit()
+    mazzo, tok = "", {}
+    for tg in (31, 32, 33):                       # MAX_ACCOUNT_BROWSER = 3
+        rr = Resp()
+        tok[tg] = amb["apri_sessione"](rr, tg, mazzo)
+        mazzo = rr.cookie["barattolo_portachiavi"]
+    prova("sotto il tetto nessuno cede", [31, 32, 33],
+          [tg for tg in (31, 32, 33) if (entra(tok[tg]) or {}).get("id") == tg])
+    rr = Resp()
+    tok[34] = amb["apri_sessione"](rr, 34, mazzo)
+    prova("al tetto la sessione di chi CEDE il posto non apre piu' niente (401)",
+          None, entra(tok[31]))
+    prova("...gli altri restano aperti, il nuovo compreso", [32, 33, 34],
+          [tg for tg in (32, 33, 34) if (entra(tok[tg]) or {}).get("id") == tg])
+    prova("...e il mazzo e' quello di sempre", [32, 33, 34],
+          [c["tg_id"] for c in amb["portachiavi_conti"](rr.cookie["barattolo_portachiavi"])])
+    prova("_al_tetto sotto il tetto non chiude niente", ["a", "b"],
+          amb["_al_tetto"](["a", "b"], 3))
+    # dentro la Mini App: 3 posti, uno e' del Telegram
+    amb["PIU_ACCOUNT_OVUNQUE"] = True
+    cookie, tm = {}, {}
+    for tg in (31, 32, 33):
+        CV.set({"init": "collaudo:710:Andrea", "conto": "", "cookie": cookie})
+        rr = Resp()
+        tm[tg] = amb["apri_sessione"](rr, tg, "")
+        cookie = {"barattolo_mini_710": rr.cookie["barattolo_mini_710"]}
+    CV.set(None)
+    amb["PIU_ACCOUNT_OVUNQUE"] = False
+    prova("dentro Telegram al tetto chi cede si chiude, gli altri restano",
+          (None, 32, 33), (entra(tm[31]), (entra(tm[32]) or {}).get("id"),
+                           (entra(tm[33]) or {}).get("id")))
+
     # --- la chiusura passa da apri_sessione, nei due rami, PRIMA della nuova ---
     ap = codice(pezzo("apri_sessione"))
     prova("apri_sessione chiude il rientro nei due rami, prima di crea_sessione",
@@ -109864,6 +109902,7 @@ def prove_account_doppio():
           [ap.count("_chiudi_rientro("),
            0 < ap.find("_chiudi_rientro(") < ap.find("crea_sessione("),
            ap.rfind("_chiudi_rientro(") < ap.rfind("crea_sessione(")])
+    prova("...e i due tetti passano da _al_tetto", 2, ap.count("_al_tetto("))
     prova("...e il DELETE guarda il tg_id", True,
           "WHERE tg_id=? AND token_hash IN" in codice(pezzo("_chiudi_rientro")))
 

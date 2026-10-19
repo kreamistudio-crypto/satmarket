@@ -65703,10 +65703,22 @@ riga al posto del widget, il tocco che lo fa comparire, il rientro
 → «passo a …» col mazzo IDENTICO e zero richieste a `/api/login/nostr*`,
 e «sei già qui». Suite e collaudi: nel verbale del commit.
 
+**IL TETTO, LO STESSO GIORNO (Andrea: «subito, nello stesso ramo»).**
+Al tetto `apri_sessione` toglieva dal mazzo l'account più vecchio, ma la
+sua sessione restava valida nel database fino alla scadenza: lo stesso
+difetto del rientro, su un altro account. Ora i due tetti (web,
+`MAX_ACCOUNT_BROWSER`; Mini App, un posto in meno per il Telegram)
+passano da `_al_tetto(mazzo, posti)`, che tiene gli ultimi `posti` e
+chiude con `_chiudi_sessioni` i token che escono — solo token di questo
+mazzo, chiavi di questo dispositivo. Prove: in `prove_account_doppio`
+sotto il tetto nessuno cede, al tetto la sessione di chi cede non apre
+più niente e gli altri tre (il nuovo compreso) sì, il mazzo è quello di
+sempre, lo stesso nella Mini App; in `collaudo_account.py`, sezione «il
+tetto», la sessione di chi ha ceduto provata da un altro browser → 401,
+le altre tre → 200. Controprova sul file vero, poi ripristinato: senza la
+chiusura in `_al_tetto` cadono 2 prove e 1 collaudo (50/51).
+
 **DA FARE (notati, non fatti).**
-- Al TETTO `apri_sessione` toglie dal mazzo l'account più vecchio, ma la
-  sua sessione resta valida nel database fino alla scadenza: lo stesso
-  difetto del rientro, su un altro account.
 - La porta del collaudo nel foglio («🍪 Entra come l'identità di
   collaudo») non si raggiunge: `collaudo` è vero solo fuori dal web, e
   fuori dal web il foglio non si apre.

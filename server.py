@@ -9609,7 +9609,8 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
     vecchia lascia il posto alla sessione nuova, E SI CHIUDE ANCHE NEL
     DATABASE (19 ott 2026, cantiere account-doppio, richiesta di
     Andrea): uscita dal portachiavi non la usava piu' nessuno, ma
-    restava valida fino alla scadenza — vedi `_chiudi_rientro`.
+    restava valida fino alla scadenza — vedi `_chiudi_rientro`. Lo
+    stesso per chi cede il posto al tetto: vedi `_al_tetto`.
     `sessione` e' il cookie attivo di ADESSO, e serve a chi era gia'
     dentro da prima che il portachiavi esistesse: senza, il suo
     account sparirebbe dal mazzo proprio mentre ne aggiunge un altro.
@@ -9630,7 +9631,7 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
         resto = [x["token"] for x in conti_mini(t) if x["tg_id"] != tg_id]
         # il Telegram occupa un posto: nel mazzo ne restano MAX - 1
         posti = max(1, MAX_ACCOUNT_BROWSER - 1)
-        imposta_cookie_mini(response, t, (resto + [token])[-posti:])
+        imposta_cookie_mini(response, t, _al_tetto(resto + [token], posti))
         return token
     _chiudi_rientro(_portachiavi_token(portachiavi) + [sessione], tg_id)
     token = crea_sessione(tg_id)
@@ -9639,8 +9640,24 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
     # Al tetto cede il piu' VECCHIO, mai quello appena aperto: chi ha
     # appena messo la password si aspetta di trovarsi li' dentro.
     imposta_cookie_sessione(response, token)
-    imposta_cookie_portachiavi(response, (resto + [token])[-MAX_ACCOUNT_BROWSER:])
+    imposta_cookie_portachiavi(response, _al_tetto(resto + [token],
+                                                   MAX_ACCOUNT_BROWSER))
     return token
+
+
+def _al_tetto(mazzo: list, posti: int) -> list:
+    """I token che restano nel mazzo al tetto: gli ultimi `posti`, cioe'
+    cede il piu' VECCHIO. E CHI CEDE SI CHIUDE ANCHE NEL DATABASE (19 ott
+    2026, cantiere account-doppio, richiesta di Andrea): uscito dal mazzo
+    non lo usava piu' nessuno, ma la sua sessione restava valida fino
+    alla scadenza — lo stesso difetto del rientro (`_chiudi_rientro`),
+    su un altro account. Si chiudono SOLO i token di questo mazzo che
+    escono: sono chiavi di questo dispositivo, e nessun altro le ha."""
+    tenuti = mazzo[-posti:] if posti > 0 else []
+    fuori = mazzo[:len(mazzo) - len(tenuti)]
+    if fuori:
+        _chiudi_sessioni(fuori)
+    return tenuti
 
 
 def _chiudi_rientro(token_list: list, tg_id: int) -> int:

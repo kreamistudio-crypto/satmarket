@@ -37,7 +37,8 @@ Le domande a cui risponde:
   · IL RIENTRO CHIUDE LA VECCHIA (19 ott 2026, cantiere account-doppio):
     chi rientra sullo stesso account prende una sessione nuova, e quella
     vecchia — uscita dal mazzo — non apre piu' niente, nemmeno da un
-    altro browser che l'avesse copiata; l'altro account resta aperto.
+    altro browser che l'avesse copiata; l'altro account resta aperto. Lo
+    stesso AL TETTO: chi cede il posto si chiude anche nel database.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna
@@ -208,15 +209,27 @@ def main():
 
     print("\n[il tetto]")
     c3 = TestClient(server.app)
+    chiavi = {}
     for i, n in enumerate(["Uno", "Due", "Tre", "Quattro"]):
         c3.post("/api/login/telegram",
                 json={"collaudo": True, "id": 700 + i, "first_name": n})
+        chiavi[700 + i] = c3.cookies.get("barattolo_sessione")
     conti = c3.get("/api/sessioni").json()["conti"]
     prova("al tetto (3) restano tre account", 3, len(conti))
     prova("...e a cedere e' il PIU' VECCHIO", [701, 702, 703],
           [x["tg_id"] for x in conti])
     prova("...mentre chi e' appena entrato c'e'", 703,
           c3.get("/api/me").json()["tg_id"])
+    # CHI CEDE SI CHIUDE ANCHE NEL DATABASE (19 ott 2026, cantiere
+    # account-doppio): la sua sessione, provata da un ALTRO browser che
+    # l'avesse copiata, non apre piu' niente; gli altri tre si'.
+    def da_fuori(tok):
+        b = TestClient(server.app)
+        b.cookies.set("barattolo_sessione", tok)
+        return b.get("/api/me").status_code
+    prova("la sessione di chi ha ceduto il posto: 401", 401, da_fuori(chiavi[700]))
+    prova("...e gli altri tre restano 200", [200, 200, 200],
+          [da_fuori(chiavi[k]) for k in (701, 702, 703)])
 
     # ------------------------------------------------------------------
     # LA SESSIONE DI IERI (ago 2026, il caso dal campo: «non riesco a

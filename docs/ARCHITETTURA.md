@@ -9504,7 +9504,9 @@
   mazzo restano aperti. Al TETTO
   (`MAX_ACCOUNT_BROWSER`, 5) cede il più VECCHIO e mai chi è appena
   entrato: chi ha appena messo la password si aspetta di trovarsi lì
-  dentro.
+  dentro. E CHI CEDE SI CHIUDE ANCHE NEL DATABASE (19 ott 2026, stesso
+  cantiere): i due tetti, web e Mini App, passano da `_al_tetto`, che
+  chiude con `_chiudi_sessioni` i token usciti dal mazzo.
   LA SESSIONE DI IERI SI ADOTTA (ago 2026, caso dal campo: «non riesco
   a switchare nonostante il commit sia in prod»), ed è il pezzo che al
   cantiere mancava: **chi era già loggato PRIMA del deploy ha il
