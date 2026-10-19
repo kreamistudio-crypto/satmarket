@@ -109616,6 +109616,8 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
            "_utente_da_initdata": lambda s: {"id": int(s.split(":")[1]),
                                              "first_name": s.split(":")[2]},
            "GIORNI_SESSIONE_WEB": 30, "MAX_ACCOUNT_BROWSER": 3,
+           # il rinnovo a ogni uso (19 ott 2026, logout-apk)
+           "GIORNI_SESSIONE_TETTO": 90, "re": re,
            "COOKIE_PORTACHIAVI": "barattolo_portachiavi",
            "SEP_PORTACHIAVI": ".", "Response": Resp, "secrets": __import__("secrets"),
            # i due testimoni del tunnel (cantiere cookie-onion): i
@@ -109633,6 +109635,7 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
               "cookie_mini", "imposta_cookie_mini", "telegram_della_richiesta",
               "conti_mini", "utente_da_sessione", "conto_scelto",
               "conti_del_dispositivo", "traccia_chiusura",
+              "nuova_scadenza_sessione", "rinfresca_cookie_rinnovati",
               "_chiudi_rientro", "_chiudi_sessioni",
               "_al_tetto", "apri_sessione"):
         exec(pezzo(n), amb)
@@ -110862,6 +110865,249 @@ function azzera(){ eventi.length = 0; magazzino.myTgId = null; nodi.riprovo.stor
     prova("un errore del codice dice che e' un errore, non un'uscita",
           {"scheda": True, "titolo": "Si è inceppato qualcosa", "chiudi": "", "vetrina": False,
            "console": True, "riprova": True, "chiusa": True}, g["errore"])
+
+
+def prove_logout_apk_due():
+    """IL SECONDO GIRO DEL CANTIERE LOGOUT-APK (19 ott 2026, decisioni di
+    Andrea): (1) la sessione si rinnova a ogni uso, al piu' una volta al
+    giorno e mai oltre 90 giorni dal login, e il cookie la segue; (2) il
+    biglietto del collegamento sta nel database, solo come hash, e
+    sopravvive al riavvio; (3) la pagina «Sei senza rete» riprova da
+    sola quando torna la rete o il server."""
+    import sqlite3 as _s, subprocess as _sp, shutil as _sh, tempfile as _tf
+    import json as _json
+    print("\n[il falso logout dell'APK, secondo giro]")
+    G = 86400
+
+    # ---------------- (1) IL RINNOVO A OGNI USO -----------------------
+    amb, con, Resp = _amb_portachiavi()
+    ns = amb["nuova_scadenza_sessione"]
+    t0 = 1_800_000_000
+    prova("appena entrato non si rinnova", None, ns(t0, t0 + 30 * G, t0 + 3600))
+    prova("...e nemmeno dopo 23 ore", None, ns(t0, t0 + 30 * G, t0 + 23 * 3600))
+    prova("dopo un giorno si', a 30 giorni da adesso", t0 + 2 * G + 30 * G,
+          ns(t0, t0 + 30 * G, t0 + 2 * G))
+    prova("al piu' una volta al giorno: rinnovata un'ora fa, niente", None,
+          ns(t0, t0 + 2 * G + 30 * G, t0 + 2 * G + 3600))
+    prova("mai oltre il tetto dei 90 giorni dal login", t0 + 90 * G,
+          ns(t0, t0 + 79 * G, t0 + 80 * G))
+    prova("...e al tetto non si tocca piu'", None, ns(t0, t0 + 90 * G, t0 + 89 * G))
+    prova("...e mai indietro", None, ns(t0, t0 + 90 * G, t0 + 89 * G + 3600))
+
+    class Orologio:
+        """Il tempo del banco: lo sposta la prova."""
+        def __init__(self, t): self.t = t
+        def time(self): return self.t
+    ora = Orologio(t0)
+    amb["time"] = ora
+    for tg in (51, 52):
+        con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                    "avatar_scelta) VALUES(?,?,?,?,?,'')", (tg, f"N{tg}", f"u{tg}", "", ""))
+    con.commit()
+    entra, CV = amb["utente_da_sessione"], amb["_CONTO_RICHIESTA"]
+    scade = lambda tk: con.execute(
+        "SELECT scade FROM sessioni WHERE token_hash=?",
+        (amb["hashlib"].sha256(tk.encode()).hexdigest(),)).fetchone()[0]
+    tok = amb["crea_sessione"](51)
+    usata = amb["crea_sessione"](52)
+    ora.t = t0 + 12 * 3600
+    prova("in giornata la sessione apre e non si riscrive", (51, t0 + 30 * G),
+          ((entra(tok) or {}).get("id"), scade(tok)))
+    ora.t = t0 + 2 * G
+    banco = {"cookie": {}}
+    CV.set(banco)
+    prova("usata dopo due giorni: altri 30 da adesso", (51, t0 + 32 * G),
+          ((entra(tok) or {}).get("id"), scade(tok)))
+    prova("...e la richiesta lo segna per il cookie", {tok}, banco.get("rinnovate"))
+    CV.set(None)
+    # un uso al giorno fino al novantesimo: dentro; il novantesimo e un secondo, fuori
+    for giorno in range(3, 90):
+        ora.t = t0 + giorno * G
+        entra(tok)
+    prova("chi la usa ogni giorno resta dentro fino al tetto", (51, t0 + 90 * G),
+          ((entra(tok) or {}).get("id"), scade(tok)))
+    ora.t = t0 + 90 * G + 1
+    prova("...e al novantesimo giorno dal login esce, usata o no", None, entra(tok))
+    prova("chi non la usa esce a 30 giorni come prima", None, entra(usata))
+    ra = codice(pezzo("utente_da_sessione"))
+    prova("il rinnovo e' un UPDATE che non va mai indietro", True,
+          '"UPDATE sessioni SET scade=? WHERE token_hash=? AND scade<?"' in ra)
+    prova("...e non aspetta il lucchetto: preso, si salta", True,
+          'con.execute("PRAGMA busy_timeout = 200")' in ra
+          and "except sqlite3.OperationalError:" in ra
+          and ra.index("PRAGMA busy_timeout") < ra.index("UPDATE sessioni"))
+    # il lucchetto preso davvero: la lettura risponde lo stesso, senza rinnovo
+    import sqlite3 as _sq
+    cart = _tf.mkdtemp()
+    fdb = os.path.join(cart, "lucchetto.db")
+    _c = _sq.connect(fdb)
+    _c.executescript("CREATE TABLE sessioni(token_hash TEXT PRIMARY KEY, tg_id INTEGER, creato INTEGER, scade INTEGER);"
+                     "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, username TEXT);"
+                     "INSERT INTO utenti VALUES(61,'L','l');")
+    th = amb["hashlib"].sha256(b"LUCCHETTO").hexdigest()
+    _c.execute("INSERT INTO sessioni VALUES(?,?,?,?)", (th, 61, t0, t0 + 30 * G))
+    _c.commit()
+    def apri():
+        k = _sq.connect(fdb, timeout=15); k.row_factory = _sq.Row; return k
+    amb2 = {"hashlib": amb["hashlib"], "time": Orologio(t0 + 5 * G), "db": apri,
+            "sqlite3": _sq, "GIORNI_SESSIONE_WEB": 30, "GIORNI_SESSIONE_TETTO": 90,
+            "_CONTO_RICHIESTA": amb["_CONTO_RICHIESTA"]}
+    exec(pezzo("nuova_scadenza_sessione") + "\n\n" + pezzo("utente_da_sessione"), amb2)
+    _c.execute("BEGIN IMMEDIATE")                  # qualcuno scrive
+    inizio = time.time()
+    chi = (amb2["utente_da_sessione"]("LUCCHETTO") or {}).get("id")
+    durata = time.time() - inizio
+    _c.rollback()
+    prova("col lucchetto preso la sessione apre lo stesso, in fretta, senza rinnovo",
+          (61, True, t0 + 30 * G), (chi, durata < 2,
+                                    _c.execute("SELECT scade FROM sessioni").fetchone()[0]))
+    _c.close()
+    _sh.rmtree(cart, ignore_errors=True)
+
+    # il cookie segue il rinnovo
+    class RespH(Resp):
+        def __init__(self, gia=()):
+            super().__init__()
+            gia = list(gia)
+            class H:
+                def getlist(_self, k): return [f"{n}=x; Path=/" for n in gia]
+            self.headers = H()
+    rcr = amb["rinfresca_cookie_rinnovati"]
+    r = RespH()
+    rcr(r, {"barattolo_sessione": "AAA", "barattolo_portachiavi": "BBB.AAA"}, {"AAA"})
+    prova("il cookie attivo rinnovato si riscrive, col portachiavi",
+          {"barattolo_sessione": "AAA", "barattolo_portachiavi": "BBB.AAA"}, r.cookie)
+    prova("...con gli stessi scudi di sempre", (True, "lax", 30 * G),
+          (r.scudi["barattolo_sessione"]["httponly"], r.scudi["barattolo_sessione"]["samesite"],
+           r.scudi["barattolo_sessione"]["max_age"]))
+    r = RespH(gia=["barattolo_sessione"])
+    rcr(r, {"barattolo_sessione": "AAA", "barattolo_portachiavi": "AAA"}, {"AAA"})
+    prova("chi ha gia' scritto il cookie in questa risposta vince", {"barattolo_portachiavi": "AAA"},
+          r.cookie)
+    r = RespH()
+    rcr(r, {"barattolo_sessione": "AAA", "barattolo_mini_710": "MMM.NNN"}, {"NNN"})
+    prova("dentro la Mini App si riscrive il portachiavi di QUEL Telegram",
+          {"barattolo_mini_710": "MMM.NNN"}, r.cookie)
+    r = RespH()
+    rcr(r, {"barattolo_sessione": "AAA"}, {"ZZZ"})
+    prova("un token che non sta nei cookie non riscrive niente", {}, r.cookie)
+    sh = codice(pezzo("segna_host"))
+    prova("il middleware rinfresca DOPO la rotta, con la busta della richiesta", True,
+          sh.index("risposta = await call_next(request)")
+          < sh.index("rinfresca_cookie_rinnovati(risposta, conto[\"cookie\"], conto[\"rinnovate\"])"))
+
+    # ---------------- (2) IL BIGLIETTO NEL DATABASE ------------------
+    prova("il biglietto non vive piu' in memoria", False,
+          bool(re.search(r"\bBIGLIETTI_COLLEGAMENTO\b", codice(_SORGENTE))))
+    prova("...la tabella c'e', con l'hash e non il biglietto", True,
+          "CREATE TABLE IF NOT EXISTS biglietti_collegamento(" in _SORGENTE
+          and "biglietto_hash TEXT PRIMARY KEY," in _SORGENTE)
+    prova("...login e collegamento passano dalle due porte", True,
+          "nuovo_biglietto_collegamento(righe[0][\"tg_id\"], npub)" in pezzo("login_nostr")
+          and "brucia_biglietto_collegamento(d.get(\"biglietto\") or \"\")" in pezzo("login_nostr_collega"))
+    prova("...e la spazzatura li pulisce", True,
+          "DELETE FROM biglietti_collegamento WHERE scade < ?" in pezzo("controlla_scadenze"))
+    cartella = _tf.mkdtemp()
+    file_db = os.path.join(cartella, "biglietti.db")
+    schema = re.search(r"CREATE TABLE IF NOT EXISTS biglietti_collegamento\(.*?\);",
+                       _SORGENTE, re.S).group(0)
+    schema = "\n".join(r for r in schema.split("\n") if not r.strip().startswith("--"))
+    _c = _s.connect(file_db); _c.executescript(schema); _c.close()
+
+    def processo():
+        a = {"time": time, "secrets": __import__("secrets"), "hashlib": __import__("hashlib"),
+             "db": lambda: _s.connect(file_db), "SECONDI_SFIDA_LOGIN": 600,
+             "TETTO_BIGLIETTI_COLLEGAMENTO": 10000}
+        exec(pezzo("nuovo_biglietto_collegamento") + "\n\n"
+             + pezzo("brucia_biglietto_collegamento"), a)
+        return a
+    prima = processo()
+    b = prima["nuovo_biglietto_collegamento"](841, "npub1prova")
+    _c = _s.connect(file_db)
+    righe = _c.execute("SELECT * FROM biglietti_collegamento").fetchall()
+    _c.close()
+    prova("nel database c'e' l'hash del biglietto, mai il biglietto", (1, False),
+          (len(righe), any(b in str(x) for x in righe)))
+    dopo = processo()                                   # il deploy
+    prova("un biglietto dato PRIMA del riavvio vale DOPO", (841, "npub1prova"),
+          dopo["brucia_biglietto_collegamento"](b))
+    prova("...una volta sola", None, dopo["brucia_biglietto_collegamento"](b))
+    prova("...uno inventato no", None, dopo["brucia_biglietto_collegamento"]("ab" * 16))
+    prova("...il vuoto nemmeno", None, dopo["brucia_biglietto_collegamento"](""))
+    vecchio = dopo["nuovo_biglietto_collegamento"](842, "npub1vecchio")
+    _c = _s.connect(file_db)
+    _c.execute("UPDATE biglietti_collegamento SET scade=?", (int(time.time()) - 1,))
+    _c.commit(); _c.close()
+    prova("...uno scaduto no", None, dopo["brucia_biglietto_collegamento"](vecchio))
+    dopo["TETTO_BIGLIETTI_COLLEGAMENTO"] = 3
+    fila = [dopo["nuovo_biglietto_collegamento"](900 + i, f"npub1n{i}") for i in range(5)]
+    _c = _s.connect(file_db)
+    n = _c.execute("SELECT COUNT(*) FROM biglietti_collegamento").fetchone()[0]
+    _c.close()
+    prova("al tetto cedono i piu' vecchi, mai l'ultimo", (3, (904, "npub1n4"), None),
+          (n, dopo["brucia_biglietto_collegamento"](fila[-1]),
+           dopo["brucia_biglietto_collegamento"](fila[0])))
+    _sh.rmtree(cartella, ignore_errors=True)
+
+    # ---------------- (3) LA PAGINA «SEI SENZA RETE» -----------------
+    off = open("offline.html", encoding="utf-8").read()
+    sw = open("sw.js", encoding="utf-8").read()
+    prova("la pagina offline resta fuori dall'indice, col suo Riprova", True,
+          'content="noindex,follow"' in off and '<button onclick="location.reload()">Riprova</button>' in off)
+    prova("...e dice che riprova da sola", True, "riprovo da solo" in off)
+    prova("la dispensa del service worker e' alzata (offline.html e' cambiata)", True,
+          "const VERSIONE = 'barattolo-v12';" in sw and "barattolo-v11'" not in sw)
+    prova("...e il service worker continua a non toccare le API", True,
+          "if (url.pathname.startsWith('/api/')) return;" in sw)
+    if not _sh.which("node"):
+        salta("il banco node della pagina offline", "node non c'e'")
+        return
+    script = off[off.index("<script>") + 8:off.index("</script>")]
+    banco = r"""
+const ascolti = {online: [], visibilitychange: []};
+let intervallo = null, ricariche = 0, chiamate = [], risposta = null;
+const window = {addEventListener: (k, f) => ascolti[k].push(f)};
+const document = {visibilityState: 'visible', addEventListener: (k, f) => ascolti[k].push(f)};
+const location = {reload: () => { ricariche++; }};
+function setInterval(f, ms){ intervallo = {f, ms}; }
+function fetch(u, o){ chiamate.push([u, o && o.cache]); return risposta(); }
+const r = (status, tipo) => () => Promise.resolve({status, headers: {get: () => tipo}});
+""" + script + r"""
+const giri = {};
+const pausa = () => new Promise(res => setTimeout(res, 0));
+(async () => {
+  giri.ritmo = intervallo.ms;
+  risposta = () => Promise.reject(new TypeError('Failed to fetch'));
+  intervallo.f(); await pausa(); giri.reteMorta = ricariche;
+  risposta = r(502, 'text/html'); intervallo.f(); await pausa(); giri.caddy = ricariche;
+  risposta = r(504, null); intervallo.f(); await pausa(); giri.caddy504 = ricariche;
+  document.visibilityState = 'hidden'; const n = chiamate.length;
+  intervallo.f(); await pausa(); giri.nascosta = chiamate.length - n;
+  document.visibilityState = 'visible';
+  risposta = r(503, 'application/json'); ascolti.visibilitychange[0](); await pausa();
+  giri.app503 = ricariche; giri.prima = chiamate[0];
+  intervallo.f(); (ascolti.online[0] || (() => {}))(); await pausa(); giri.unaVolta = ricariche;
+  console.log(JSON.stringify(giri));
+})();
+"""
+    rr = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+    try:
+        g = _json.loads(rr.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        prova("il banco node della pagina offline gira", "", (rr.stdout + rr.stderr)[-600:])
+        return
+    prova("la pagina offline bussa ogni 5 secondi", 5000, g["ritmo"])
+    prova("...rete morta, il 502 e il 504 di Caddy: resta li'", (0, 0, 0),
+          (g["reteMorta"], g["caddy"], g["caddy504"]))
+    prova("...a pagina nascosta non bussa", 0, g["nascosta"])
+    prova("...il server che risponde (anche un 503 JSON dell'app) la ricarica", 1, g["app503"])
+    prova("...bussa a /api/salute senza cache", ["/api/salute", "no-store"], g["prima"])
+    prova("...e ricarica una volta sola, anche se tornano rete e server insieme", 1, g["unaVolta"])
+    # l'evento online da solo
+    banco2 = banco.replace("(async () => {", "(async () => { const on = ascolti.online[0] || (() => {}); on(); on(); console.log(JSON.stringify({online: ricariche})); return;")
+    rr = _sp.run(["node", "-e", banco2], capture_output=True, text=True, timeout=30)
+    prova("la rete che torna (evento online) ricarica, una volta", '{"online":1}',
+          rr.stdout.strip().splitlines()[-1] if rr.stdout.strip() else rr.stderr[-300:])
 
 
 def prove_piu_account_ovunque():
@@ -172521,7 +172767,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop, prove_logout_apk,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop, prove_logout_apk, prove_logout_apk_due,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,

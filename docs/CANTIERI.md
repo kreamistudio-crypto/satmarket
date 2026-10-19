@@ -67426,3 +67426,87 @@ RESTA DA GUARDARE: il biglietto del collegamento
 dell'APK resta lento per le attese del bunker NIP-46 (questo cantiere
 toglie solo il rifiuto al deploy); la pagina «Sei senza rete» del
 service worker non riprova da sola all'evento online.
+
+## Il falso logout dell'APK, secondo giro: il rinnovo a ogni uso, il biglietto nel database, la pagina offline che riprova da sola (19 ott 2026, cantiere logout-apk, decisioni di Andrea)
+
+LE TRE DECISIONI, dopo il parere del primo giro. 1) La sessione si
+rinnova a ogni uso, con un tetto assoluto di 90 giorni dal login e al
+più una volta al giorno. 2) Il biglietto del collegamento nel database
+con scadenza breve, come le sfide. 3) La pagina «Sei senza rete» del
+service worker riprova da sola quando torna la rete.
+COSA SI È FATTO (ARCHITETTURA, «IL RINNOVO A OGNI USO», «IL BIGLIETTO
+DEL COLLEGAMENTO», «LA PAGINA «SEI SENZA RETE» RIPROVA DA SOLA»).
+1) Il rinnovo sta in `utente_da_sessione`, l'unica lettura delle
+   sessioni-cookie; la regola è una pura (`nuova_scadenza_sessione`).
+   IL COOKIE ERA LA METÀ NASCOSTA: il database rinnovato da solo non
+   basta, perché il cookie ha il suo `max_age` dal login e il browser lo
+   butta a 30 giorni comunque. Lo riscrive `segna_host` a risposta
+   pronta, coi `imposta_cookie_*` di sempre, solo per i cookie che
+   portano un token rinnovato; se la rotta ha già scritto quel cookie,
+   vince la rotta (uno switch rovesciato dal rinnovo sarebbe il guasto
+   peggiore: si tornerebbe sull'account di prima). Il passaggio dalla
+   rotta al middleware è la busta della richiesta: le rotte sincrone
+   girano in un altro filo con una COPIA del contesto, quindi un
+   contextvar scritto là non tornerebbe indietro — un dizionario
+   condiviso sì. E IL RINNOVO NON ASPETTA IL LUCCHETTO: `utente_da_
+   sessione` era una lettura e ora a volte scrive; chi la chiamasse
+   tenendo aperta una sua scrittura aspetterebbe se stesso per i 15 s
+   di `DB_BUSY_TIMEOUT` e poi cadrebbe. Quindi `busy_timeout` a 200 ms
+   per il solo UPDATE e, a lucchetto preso, si salta: ci riprova la
+   richiesta dopo.
+2) Il biglietto in `biglietti_collegamento`, ma SOLO come hash: a
+   differenza della sfida apre una sessione, quindi è una credenziale.
+   Avendo un `tg_id`, l'ha visto il censimento della fusione
+   (`prove_punti_salvati`, «ogni tabella figlia dell'utente è nominata
+   nella fusione»): `esegui_fusione` lo sposta sull'account vivo, come
+   le sessioni.
+3) `offline.html` ricarica all'evento `online` e, per il deploy (la
+   rete c'è, `online` non arriva), quando `/api/salute` risponde
+   qualcosa che non è il 502/503/504 di Caddy; bussa ogni 5 s a pagina
+   in vista, ricarica una volta. `VERSIONE` del service worker a
+   `barattolo-v12`.
+STRADE SCARTATE. Rinfrescare il cookie solo in `/api/me`: copre l'avvio
+dell'app ma non chi la tiene aperta per giorni (il PWA che non si
+ricarica), e la Mini App ha il suo cookie per Telegram; il middleware
+copre tutte le rotte con un posto solo. Un `max_age` del cookie pari al
+resto della sessione: il database decide comunque, e un cookie che
+sopravvive alla sua sessione è solo un cookie morto. Riscrivere il
+cookie a ogni richiesta: un Set-Cookie per richiesta, e la regola «una
+volta al giorno» sarebbe vera solo a metà.
+UNA TRAPPOLA DEL BANCO, trovata qui: `pezzo()` di prove.py taglia una
+funzione alla prima doppia riga vuota, e la funzione nuova accanto a
+`GIORNI_SESSIONE_WEB` ne aveva una sola prima del blocco del
+portachiavi: il banco si portava dietro `MAX_ACCOUNT_BROWSER = 5` e
+sei prove del portachiavi cadevano. Due righe vuote, come in tutto il
+file.
+PROVATO. `prove_logout_apk_due` (44): la pura del rinnovo nei sette casi
+(appena entrato, 23 ore, un giorno, una volta al giorno, il tetto, al
+tetto, mai indietro); il lucchetto preso davvero (`BEGIN IMMEDIATE` su un file): la sessione
+apre lo stesso, in meno di 2 s, senza rinnovo; `utente_da_sessione` con
+l'orologio del banco (in
+giornata niente, a due giorni rinnovo e segno nella busta, un uso al
+giorno fino al novantesimo, al novantesimo e un secondo fuori, chi non
+usa fuori a 30); `rinfresca_cookie_rinnovati` su una risposta finta
+(attivo e portachiavi coi loro scudi, chi ha già scritto vince, il
+portachiavi della Mini App, un token estraneo non scrive); i biglietti
+fra due «processi» sullo stesso file (il riavvio), solo hash, monouso,
+inventato, vuoto, scaduto, tetto; la pagina offline in node (ritmo 5 s,
+rete morta e 502/504 di Caddy restano, pagina nascosta non bussa, un
+503 JSON dell'app ricarica, `/api/salute` senza cache, una ricarica
+sola, l'evento `online`). Controprova: senza il rinnovo cadono le cinque
+prove sue, senza la guardia del cookie quella sua, senza l'ascolto
+`online` quella sua. In `collaudo_piu_account` (in CI) la sezione «il
+rinnovo a ogni uso» sul server vero: appena entrato niente; invecchiata
+di due giorni si rinnova a 30 da adesso e la risposta riscrive sessione
+e portachiavi; la seconda richiesta niente; oltre i 90 giorni 401;
+dentro la Mini App il cookie di quel Telegram. In `collaudo_account` la
+sezione «il biglietto del collegamento nel database» (la chiave
+verificata riceve il biglietto senza sessione, in tabella solo l'hash,
+il «Sì» entra nell'account Telegram, la seconda volta 401). DAL VIVO
+(360×780, chiaro e scuro, service worker vero): server spento e
+ricarica, «Sei senza rete» con «riprovo da solo»; server riacceso, la
+pagina torna dentro da sola, senza tocchi. SUITE `PROVE_SEVERE=1`
+25327 passate, 0 fallite, nessuna saltata; collaudi della CI 86 verdi,
+0 rossi, più `collaudo_account` verde nella gabbia — sull'albero del
+primo giro (1c2df89, su 6b2e4af) più questo. Il rebase sul main corso e
+la firma per il VPS li fa una sessione sul PC di Andrea.

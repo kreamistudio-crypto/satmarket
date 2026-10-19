@@ -12,7 +12,7 @@
    se cambi quelli, o l'elenco, alzala e le dispense vecchie si
    svuotano da sole. */
 
-const VERSIONE = 'barattolo-v11';
+const VERSIONE = 'barattolo-v12';   // v12: offline.html riprova da sola (logout-apk)
 const CACHE_STATICA = `statica-${VERSIONE}`;
 
 // La dispensa: solo asset di casa, immutabili o quasi. Mai pagine HTML

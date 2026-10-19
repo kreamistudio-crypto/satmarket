@@ -2104,11 +2104,41 @@ async def segna_host(request, call_next):
     questo si mette in coda: quando la rotta legge, l'host c'e'."""
     _HOST_RICHIESTA.set(request.headers.get("host", ""))
     _SEGNALE_RICHIESTA.set(request.headers.get("x-barattolo-onion", ""))
-    _CONTO_RICHIESTA.set({
+    conto = {
         "init": request.headers.get("x-tg-init-data", ""),
         "conto": request.headers.get("x-barattolo-conto", ""),
-        "cookie": dict(request.cookies)})
-    return await call_next(request)
+        "cookie": dict(request.cookies)}
+    _CONTO_RICHIESTA.set(conto)
+    risposta = await call_next(request)
+    if conto.get("rinnovate"):
+        rinfresca_cookie_rinnovati(risposta, conto["cookie"], conto["rinnovate"])
+    return risposta
+
+
+def rinfresca_cookie_rinnovati(risposta, cookie: dict, rinnovate: set):
+    """IL COOKIE SEGUE IL RINNOVO (19 ott 2026, cantiere logout-apk):
+    la sessione rinnovata nel database (utente_da_sessione) vale altri
+    30 giorni, ma il cookie che la porta ne aveva 30 dal login — senza
+    rinfrescarlo il rinnovo morirebbe nel browser. Si riscrivono, con gli
+    STESSI scudi di sempre (le stesse funzioni), i cookie che contengono
+    un token rinnovato: la sessione attiva, il portachiavi, il
+    portachiavi della Mini App di quel Telegram. CHI HA GIA' SCRITTO
+    QUEL COOKIE IN QUESTA RISPOSTA VINCE: uno switch d'account, un
+    login, un logout sanno quel che fanno, e un secondo Set-Cookie
+    dopo il loro li rovescerebbe."""
+    scritti = {h.split("=", 1)[0].strip() for h in
+               risposta.headers.getlist("set-cookie")}
+    attiva = cookie.get("barattolo_sessione", "")
+    if attiva in rinnovate and "barattolo_sessione" not in scritti:
+        imposta_cookie_sessione(risposta, attiva)
+    mazzo = _portachiavi_token(cookie.get(COOKIE_PORTACHIAVI, ""))
+    if rinnovate & set(mazzo) and COOKIE_PORTACHIAVI not in scritti:
+        imposta_cookie_portachiavi(risposta, mazzo)
+    for nome, valore in cookie.items():
+        m = re.fullmatch(r"barattolo_mini_(-?\d{1,20})", nome)
+        mini = _portachiavi_token(valore) if m else []
+        if mini and rinnovate & set(mini) and nome not in scritti:
+            imposta_cookie_mini(risposta, int(m.group(1)), mini)
 
 
 # L'ISTANZA DI PROVA E' PRIVATA (19 ott 2026, cantiere collaudo-vm,
@@ -5469,6 +5499,15 @@ def init_db():
         -- le sfide del login Nostr (19 ott 2026, cantiere logout-apk):
         -- qui e non in memoria, cosi' un deploy non le cancella
         sfida TEXT PRIMARY KEY,
+        scade INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS biglietti_collegamento(
+        -- i biglietti «collega la chiave al tuo Telegram» (19 ott 2026,
+        -- cantiere logout-apk): sopravvivono al deploy; SOLO l'hash,
+        -- perche' il biglietto apre una sessione
+        biglietto_hash TEXT PRIMARY KEY,
+        tg_id INTEGER,
+        npub TEXT,
         scade INTEGER
     );
     CREATE TABLE IF NOT EXISTS feedback(
@@ -9570,6 +9609,33 @@ elif not pillow_heif:
 
 GIORNI_SESSIONE_WEB = 30   # quanto dura il login dal browser
 
+# IL RINNOVO A OGNI USO (19 ott 2026, cantiere logout-apk, decisione di
+# Andrea): fino a oggi i 30 giorni partivano dal login e basta, e chi
+# usava l'app tutti i giorni il trentunesimo era fuori lo stesso. Ora
+# ogni uso li rimette a 30 da adesso, con due freni:
+# · il TETTO ASSOLUTO di GIORNI_SESSIONE_TETTO dal login (`creato`):
+#   un token rubato vive quanto lo si usa, e senza tetto vivrebbe per
+#   sempre — al novantesimo giorno si rifa' il login, usato o no;
+# · AL PIU' UNA VOLTA AL GIORNO: la Mini App fa decine di richieste a
+#   sessione, e una scrittura per richiesta sarebbe un lucchetto preso
+#   per niente (vedi DB_BUSY_TIMEOUT).
+# Chi non usa l'app esce a 30 giorni dall'ultimo uso, come prima.
+GIORNI_SESSIONE_TETTO = 90
+
+
+def nuova_scadenza_sessione(creato: int, scade: int, adesso: int):
+    """La scadenza rinnovata di una sessione, o None se non si tocca.
+    L'ultimo rinnovo (o il login) e' `scade` meno i 30 giorni: se e'
+    di meno di un giorno fa, niente. Mai oltre il tetto dal login, e
+    mai indietro."""
+    durata = GIORNI_SESSIONE_WEB * 86400
+    if adesso - (scade - durata) < 86400:
+        return None
+    nuova = min(adesso + durata,
+                int(creato or adesso) + GIORNI_SESSIONE_TETTO * 86400)
+    return nuova if nuova > scade else None
+
+
 # --- PIU' ACCOUNT SULLO STESSO BROWSER (ago 2026) -------------------
 # Chi ha due identita' (la sua e quella del negozio) le tiene aperte
 # INSIEME e passa dall'una all'altra senza rifare il login.
@@ -9887,13 +9953,36 @@ def utente_da_sessione(token: str) -> dict | None:
     if not token:
         return None
     th = hashlib.sha256(token.encode()).hexdigest()
+    adesso = int(time.time())
     con = db()
-    r = con.execute(
-        "SELECT s.tg_id, u.nome, u.username FROM sessioni s "
-        "JOIN utenti u ON u.tg_id = s.tg_id "
-        "WHERE s.token_hash=? AND s.scade > ?",
-        (th, int(time.time()))).fetchone()
-    con.close()
+    try:
+        r = con.execute(
+            "SELECT s.tg_id, s.creato, s.scade, u.nome, u.username "
+            "FROM sessioni s JOIN utenti u ON u.tg_id = s.tg_id "
+            "WHERE s.token_hash=? AND s.scade > ?",
+            (th, adesso)).fetchone()
+        # IL RINNOVO A OGNI USO (vedi nuova_scadenza_sessione): una
+        # scrittura al giorno al piu', e il cookie lo rinfresca
+        # `segna_host` a risposta pronta. NON ASPETTA IL LUCCHETTO: questa
+        # e' una LETTURA per chi chiama, e chi la chiamasse tenendo aperta
+        # una sua scrittura aspetterebbe se stesso per DB_BUSY_TIMEOUT e
+        # poi cadrebbe. Lucchetto preso = si salta, e ci riprova la
+        # richiesta dopo (la condizione resta vera fino al rinnovo).
+        nuova = nuova_scadenza_sessione(r["creato"], r["scade"], adesso) if r else None
+        if nuova:
+            try:
+                con.execute("PRAGMA busy_timeout = 200")
+                if con.execute(
+                        "UPDATE sessioni SET scade=? WHERE token_hash=? AND scade<?",
+                        (nuova, th, nuova)).rowcount:
+                    con.commit()
+                    c = _CONTO_RICHIESTA.get()
+                    if c is not None:
+                        c.setdefault("rinnovate", set()).add(token)
+            except sqlite3.OperationalError:
+                pass
+    finally:
+        con.close()
     if not r:
         return None
     return {"id": r["tg_id"], "first_name": r["nome"],
@@ -10660,7 +10749,58 @@ def verifica_evento_login(evento, host: str) -> str:
 # funzionano invariati. La derivazione serve SOLO alla creazione:
 # i login successivi trovano la riga per npub_accesso.
 
-BIGLIETTI_COLLEGAMENTO: dict[str, tuple] = {}  # biglietto -> (tg_id, npub, scade)
+# I BIGLIETTI DEL COLLEGAMENTO STANNO NEL DATABASE (19 ott 2026, cantiere
+# logout-apk, richiesta di Andrea), come le sfide: in memoria un deploy
+# fra «vuoi collegarla al tuo account Telegram?» e il tocco su «Sì» li
+# perdeva, e si rifaceva il login da capo. A differenza della sfida il
+# biglietto E' una credenziale — chi lo presenta collega la chiave e
+# entra — quindi nella tabella `biglietti_collegamento` c'e' solo il suo
+# hash, come per le sessioni. Monouso, dieci minuti, tetto diecimila.
+TETTO_BIGLIETTI_COLLEGAMENTO = 10000
+
+
+def nuovo_biglietto_collegamento(tg_id: int, npub: str) -> str:
+    """Emette il biglietto per collegare `npub` all'account `tg_id`."""
+    adesso = int(time.time())
+    biglietto = secrets.token_hex(16)
+    con = db()
+    try:
+        con.execute("DELETE FROM biglietti_collegamento WHERE scade < ?", (adesso,))
+        troppi = con.execute("SELECT COUNT(*) FROM biglietti_collegamento"
+                             ).fetchone()[0] - (TETTO_BIGLIETTI_COLLEGAMENTO - 1)
+        if troppi > 0:
+            con.execute("DELETE FROM biglietti_collegamento WHERE biglietto_hash IN "
+                        "(SELECT biglietto_hash FROM biglietti_collegamento "
+                        "ORDER BY scade LIMIT ?)", (troppi,))
+        con.execute("INSERT INTO biglietti_collegamento(biglietto_hash, tg_id, "
+                    "npub, scade) VALUES(?,?,?,?)",
+                    (hashlib.sha256(biglietto.encode()).hexdigest(), int(tg_id),
+                     npub, adesso + SECONDI_SFIDA_LOGIN))
+        con.commit()
+    finally:
+        con.close()
+    return biglietto
+
+
+def brucia_biglietto_collegamento(biglietto: str):
+    """(tg_id, npub) del biglietto, UNA volta sola e se non e' scaduto;
+    altrimenti None. Vince chi lo cancella: due tocchi insieme non
+    collegano due volte."""
+    if not biglietto:
+        return None
+    th = hashlib.sha256(str(biglietto).encode()).hexdigest()
+    con = db()
+    try:
+        r = con.execute("SELECT tg_id, npub FROM biglietti_collegamento "
+                        "WHERE biglietto_hash=? AND scade >= ?",
+                        (th, int(time.time()))).fetchone()
+        preso = bool(r) and con.execute(
+            "DELETE FROM biglietti_collegamento WHERE biglietto_hash=?",
+            (th,)).rowcount == 1
+        con.commit()
+    finally:
+        con.close()
+    return (r[0], r[1]) if preso else None
 
 
 def tg_id_da_pubkey(pubkey: str, con) -> int:
@@ -10743,13 +10883,7 @@ async def login_nostr(req: Request, response: Response,
         (npub,)).fetchall()
     con.close()
     if len(righe) == 1:
-        adesso = int(time.time())
-        for b in [b for b, v in BIGLIETTI_COLLEGAMENTO.items()
-                  if v[2] < adesso]:
-            BIGLIETTI_COLLEGAMENTO.pop(b, None)
-        biglietto = secrets.token_hex(16)
-        BIGLIETTI_COLLEGAMENTO[biglietto] = (
-            righe[0]["tg_id"], npub, adesso + SECONDI_SFIDA_LOGIN)
+        biglietto = nuovo_biglietto_collegamento(righe[0]["tg_id"], npub)
         return {"collega": {"nome": righe[0]["nome"],
                             "username": righe[0]["username"],
                             "biglietto": biglietto}}
@@ -10793,10 +10927,10 @@ async def login_nostr_collega(req: Request, response: Response,
     Se invece rifiuta, il client chiude il foglio e basta: il
     biglietto muore da solo, nessun doppione."""
     d = await leggi_json(req)
-    dati = BIGLIETTI_COLLEGAMENTO.pop(d.get("biglietto") or "", None)
-    if not dati or dati[2] < int(time.time()):
+    dati = brucia_biglietto_collegamento(d.get("biglietto") or "")
+    if not dati:
         raise HTTPException(401, "Invito scaduto: riprova il login")
-    tg_id, npub = dati[0], dati[1]
+    tg_id, npub = dati
     con = db()
     try:
         con.execute("UPDATE utenti SET npub_accesso=? WHERE tg_id=? "
@@ -17655,6 +17789,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # Il browser dell'utente Nostr resta loggato: le sue sessioni
         # migrano vive e al prossimo /api/me si risveglia qui.
         con.execute("UPDATE sessioni SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # ...e un biglietto di collegamento ancora in volo segue l'account
+        # vivo, come le sessioni (19 ott 2026, cantiere logout-apk: da
+        # quando i biglietti stanno nel database hanno un tg_id)
+        con.execute("UPDATE biglietti_collegamento SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # I distintivi migrano in unione: se entrambe le meta' avevano
         # lo stesso, la PK lo tiene una volta sola (resta quello
@@ -75619,6 +75758,7 @@ async def controlla_scadenze():
     scadute = con.execute("DELETE FROM sessioni WHERE scade < ?",
                           (adesso,)).rowcount
     con.execute("DELETE FROM sfide_login WHERE scade < ?", (adesso,))
+    con.execute("DELETE FROM biglietti_collegamento WHERE scade < ?", (adesso,))
     con.commit()
     traccia_chiusura("scaduta", scadute)
     con.close()

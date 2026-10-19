@@ -47,8 +47,41 @@
   <img src="/assets/mascotte.jpeg" alt="La mascotte di Barattolo"
        onerror="this.style.display='none'">
   <h1>🫙 Sei senza rete</h1>
-  <p>Il barattolo ti aspetta: appena torni online, il mercatino è lì.</p>
+  <p>Il barattolo ti aspetta: appena torna la rete riprovo da solo.</p>
   <button onclick="location.reload()">Riprova</button>
 </main>
+<script>
+/* RIPROVA DA SOLA (19 ott 2026, cantiere logout-apk, richiesta di
+   Andrea): prima restava qui finche' non si toccava «Riprova», anche a
+   rete tornata da un pezzo. Ora ricarica da sola in due casi: il
+   telefono dice che la rete e' tornata (l'evento `online`), oppure il
+   server risponde di nuovo — che e' il caso del deploy, dove la rete
+   non e' mai mancata e `online` non arriva. La bussata e' leggera e
+   rada: /api/salute (il service worker le API non le tocca mai), ogni
+   ATTESA_MS, solo a pagina in vista. Il server «c'e'» se risponde
+   qualcosa che non e' il 502/503/504 di Caddy col backend spento —
+   le risposte dell'app sono JSON anche quando dicono «non sto bene». */
+var ATTESA_MS = 5000;
+var ricaricata = false;
+function serverTornato(r){
+  if (!r) return false;
+  var tipo = (r.headers && r.headers.get && r.headers.get('content-type')) || '';
+  return r.status < 500 || /json/i.test(tipo);
+}
+function ricarica(){
+  if (ricaricata) return;
+  ricaricata = true;
+  location.reload();
+}
+function bussa(){
+  if (ricaricata || document.visibilityState !== 'visible') return;
+  fetch('/api/salute', {cache: 'no-store'})
+    .then(function(r){ if (serverTornato(r)) ricarica(); })
+    .catch(function(){});
+}
+window.addEventListener('online', ricarica);
+document.addEventListener('visibilitychange', bussa);
+setInterval(bussa, ATTESA_MS);
+</script>
 </body>
 </html>

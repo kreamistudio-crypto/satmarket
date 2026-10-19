@@ -349,6 +349,50 @@ def main():
               TestClient(server.app).post("/api/login/nostr",
                                           json={"evento": ev3}).status_code)
 
+        # IL BIGLIETTO DEL COLLEGAMENTO NEL DATABASE (19 ott 2026, stesso
+        # cantiere): la chiave verificata su un account Telegram riceve il
+        # biglietto «collegala»; sta nella tabella, SOLO come hash, e vale
+        # una volta.
+        print("\n[il biglietto del collegamento nel database]")
+        sk2 = PrivateKey()
+        pub2 = sk2.public_key_xonly.format().hex()
+        c10 = TestClient(server.app)
+        c10.post("/api/login/telegram",
+                 json={"collaudo": True, "id": 841, "first_name": "DaCollegare"})
+        con = server.db()
+        con.execute("UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso='' "
+                    "WHERE tg_id=841", (server.hex_to_npub(pub2),))
+        con.commit()
+        con.close()
+        c11 = TestClient(server.app)
+        sfida4 = c11.get("/api/login/nostr/sfida").json()["sfida"]
+        ev4 = {"pubkey": pub2, "created_at": int(time.time()), "kind": 22242,
+               "tags": [["relay", "http://testserver"], ["challenge", sfida4]],
+               "content": ""}
+        ser4 = json.dumps([0, pub2, ev4["created_at"], 22242, ev4["tags"], ""],
+                          separators=(",", ":"), ensure_ascii=False)
+        ev4["id"] = hashlib.sha256(ser4.encode()).hexdigest()
+        ev4["sig"] = sk2.sign_schnorr(bytes.fromhex(ev4["id"])).hex()
+        r11 = c11.post("/api/login/nostr", json={"evento": ev4}).json()
+        biglietto = (r11.get("collega") or {}).get("biglietto", "")
+        prova("la chiave verificata riceve il biglietto, senza sessione", (True, None),
+              (bool(biglietto), c11.cookies.get("barattolo_sessione")))
+        con = server.db()
+        righe = [tuple(r) for r in con.execute(
+            "SELECT biglietto_hash, tg_id FROM biglietti_collegamento")]
+        con.close()
+        prova("...nel database c'e' il suo hash, mai il biglietto",
+              [(hashlib.sha256(biglietto.encode()).hexdigest(), 841)],
+              [r for r in righe if r[1] == 841])
+        prova("...e nessuna colonna lo porta in chiaro", False,
+              any(biglietto in str(r) for r in righe))
+        r12 = c11.post("/api/login/nostr/collega", json={"biglietto": biglietto})
+        prova("il «Sì» col biglietto collega e fa entrare nell'account Telegram",
+              (200, 841), (r12.status_code, c11.get("/api/me").json().get("tg_id")))
+        prova("...il biglietto non vale una seconda volta", 401,
+              TestClient(server.app).post("/api/login/nostr/collega",
+                                          json={"biglietto": biglietto}).status_code)
+
     print("\n[il rientro chiude la vecchia]")
     c7 = TestClient(server.app)
     c7.post("/api/login/telegram",

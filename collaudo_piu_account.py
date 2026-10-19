@@ -353,6 +353,65 @@ def main():
                       json={"tg_id": arrotondato}).status_code)
 
     # ------------------------------------------------------------------
+    # IL RINNOVO A OGNI USO (19 ott 2026, cantiere logout-apk): la
+    # sessione usata si rinnova nel database al piu' una volta al giorno
+    # e il cookie che la porta si riscrive nella stessa risposta — sul
+    # web (sessione attiva e portachiavi) e dentro la Mini App (il
+    # portachiavi di QUEL Telegram). Una sessione «di due giorni fa» si
+    # finge spostando indietro `creato` e `scade` nel database.
+    print("\n[il rinnovo a ogni uso]")
+    import hashlib
+
+    def invecchia(token, giorni):
+        th = hashlib.sha256(token.encode()).hexdigest()
+        con = server.db()
+        con.execute("UPDATE sessioni SET creato=creato-?, scade=scade-? "
+                    "WHERE token_hash=?", (giorni * 86400, giorni * 86400, th))
+        con.commit()
+        con.close()
+
+    def scadenza(token):
+        th = hashlib.sha256(token.encode()).hexdigest()
+        con = server.db()
+        r = con.execute("SELECT creato, scade FROM sessioni WHERE token_hash=?",
+                        (th,)).fetchone()
+        con.close()
+        return r
+
+    def cookie_scritti(r):
+        return sorted({h.split("=", 1)[0] for h in r.headers.get_list("set-cookie")})
+
+    rw = TestClient(server.app)
+    rw.post("/api/login/telegram",
+            json={"collaudo": True, "id": 761, "first_name": "Rinnovo"})
+    tok = rw.cookies.get("barattolo_sessione")
+    r = rw.get("/api/me")
+    prova("appena entrato: niente rinnovo, niente cookie riscritti", (200, []),
+          (r.status_code, cookie_scritti(r)))
+    invecchia(tok, 2)
+    adesso = int(time.time())
+    r = rw.get("/api/me")
+    prova("usata dopo due giorni: la sessione si rinnova a 30 giorni da adesso", True,
+          r.status_code == 200 and abs(scadenza(tok)["scade"] - (adesso + 30 * 86400)) < 60)
+    prova("...e la risposta riscrive sessione e portachiavi", ["barattolo_portachiavi",
+                                                             "barattolo_sessione"],
+          cookie_scritti(r))
+    r = rw.get("/api/me")
+    prova("...e la seconda richiesta dello stesso giorno non riscrive niente", [],
+          cookie_scritti(r))
+    invecchia(tok, 89)                 # login di 91 giorni fa: oltre il tetto
+    prova("oltre il tetto dei 90 giorni dal login si e' fuori, usata o no", 401,
+          rw.get("/api/me").status_code)
+    # dentro la Mini App: l'account aggiunto accanto al Telegram 770
+    m = TestClient(server.app)
+    aggiungi_dentro(m, 770, 771, "Accanto")
+    tm = m.cookies.get("barattolo_mini_770").split(".")[0]
+    invecchia(tm, 3)
+    r = m.get("/api/me", headers=con_conto(770, 771))
+    prova("dentro la Mini App l'account scelto si rinnova", (200, 771, ["barattolo_mini_770"]),
+          (r.status_code, r.json().get("tg_id"), cookie_scritti(r)))
+
+    # ------------------------------------------------------------------
     print("\n[uscire]")
     r = c.post("/api/logout", headers=con_conto(710, GRANDE))
     prova("«Esci» dentro la Mini App chiude l'account scelto", 200,

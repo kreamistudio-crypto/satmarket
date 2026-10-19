@@ -9221,7 +9221,9 @@
   `sessioni` (in DB SOLO l'hash SHA-256 del token), cookie
   `barattolo_sessione` HttpOnly + Secure (fuori collaudo) +
   SameSite=Lax, 30 giorni (`GIORNI_SESSIONE_WEB`), purga
-  nell'orologio. ATTENZIONE, due derivazioni di chiave DIVERSE:
+  nell'orologio. DAL 19 OTT 2026 I 30 GIORNI SI RINNOVANO A OGNI USO
+  (cantiere logout-apk, decisione di Andrea): vedi «IL RINNOVO A OGNI
+  USO», piu' sotto fra le voci del cantiere. ATTENZIONE, due derivazioni di chiave DIVERSE:
   widget = `SHA256(BOT_TOKEN)` (`verifica_login_widget`, auth_date
   entro 5 min), Mini App = `HMAC("WebAppData", BOT_TOKEN)`.
   L'INITDATA SCADE (ago 2026, la seconda voce alta dell'audit): la
@@ -9248,8 +9250,8 @@
   offre di entrare a chi è già dentro e nessuno dice che basta
   riaprire — ora la vetrina resta (il mercatino si sfoglia lo stesso)
   ma `BANNER_SCADUTO` dice la verità, e il suo CTA verso il bot È il
-  rimedio. Le sessioni cookie non c'entrano: hanno già la loro
-  scadenza a 30 giorni.
+  rimedio. Le sessioni cookie non c'entrano: hanno la loro scadenza
+  a 30 giorni, rinnovata a ogni uso fino a 90 dal login.
   `verifica_utente(init_data, sessione)` cade sul cookie SOLO a
   header vuoto (initData invalido resta 401); ogni endpoint dichiara
   `barattolo_sessione: str = Cookie("")` esplicitamente — niente
@@ -30698,8 +30700,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   anche con due richieste insieme. Dieci minuti come prima
   (`SECONDI_SFIDA_LOGIN`). La sfida non è una credenziale (va in chiaro
   al client e da sola non apre niente), quindi niente hash. La
-  spazzatura di `controlla_scadenze` pulisce anche lei. Il biglietto
-  del collegamento (`BIGLIETTI_COLLEGAMENTO`) resta in memoria.
+  spazzatura di `controlla_scadenze` pulisce anche lei.
+  E IL BIGLIETTO DEL COLLEGAMENTO (stesso cantiere, secondo giro): la
+  tabella `biglietti_collegamento(biglietto_hash, tg_id, npub, scade)`
+  al posto del dizionario `BIGLIETTI_COLLEGAMENTO`. A differenza della
+  sfida il biglietto È una credenziale (chi lo presenta collega la
+  chiave all'account Telegram ed entra), quindi in tabella c'è solo lo
+  SHA-256, come per le sessioni. `nuovo_biglietto_collegamento` pulisce,
+  tiene il tetto (`TETTO_BIGLIETTI_COLLEGAMENTO` = 10000) e scrive;
+  `brucia_biglietto_collegamento` legge e cancella, e vince solo chi
+  cancella (`rowcount == 1`). Dieci minuti (`SECONDI_SFIDA_LOGIN`).
+- IL RINNOVO A OGNI USO (19 ott 2026, cantiere logout-apk, secondo
+  giro, decisione di Andrea): `utente_da_sessione` rinnova `scade` con
+  `nuova_scadenza_sessione(creato, scade, adesso)`: niente se l'ultimo
+  rinnovo (`scade` meno 30 giorni) è di meno di un giorno fa; se no
+  30 giorni da adesso, mai oltre `GIORNI_SESSIONE_TETTO` (90) da
+  `creato`, mai indietro (l'UPDATE vuole `scade<?`). Chi la usa resta
+  dentro fino al novantesimo giorno dal login; chi non la usa esce a
+  30 dall'ultimo uso. L'UPDATE NON ASPETTA IL LUCCHETTO (`busy_timeout`
+  200 ms, `OperationalError` = si salta): per chi chiama è una lettura. Il token rinnovato si segna nella busta della
+  richiesta (`_CONTO_RICHIESTA`, chiave `rinnovate`), e `segna_host`, a
+  risposta pronta, chiama `rinfresca_cookie_rinnovati`: riscrive con
+  le funzioni di sempre (stessi scudi) la sessione attiva, il
+  portachiavi e il portachiavi della Mini App che contengono un token
+  rinnovato. Chi ha già scritto quel cookie nella stessa risposta
+  (switch, login, logout) vince. Prove: `prove_logout_apk_due`; dal
+  vero, la sezione «il rinnovo a ogni uso» di `collaudo_piu_account`.
+- LA PAGINA «SEI SENZA RETE» RIPROVA DA SOLA (stesso giro):
+  `offline.html` ricarica all'evento `online` e quando il server
+  risponde di nuovo (il deploy, dove la rete non manca mai): una
+  bussata a `/api/salute` ogni 5 s, solo a pagina in vista; «c'è» è
+  qualunque risposta che non sia il 502/503/504 non JSON di Caddy.
+  Ricarica una volta sola. La dispensa del service worker è alzata a
+  `barattolo-v12`, o i telefoni terrebbero la pagina vecchia.
 - LA TRACCIA DELLE CHIUSURE (19 ott 2026, stesso cantiere): ogni
   sessione cancellata scrive nel journal «🔑 Sessioni chiuse: N
   (motivo)» con `flush=True`, da `traccia_chiusura`; zero non si
