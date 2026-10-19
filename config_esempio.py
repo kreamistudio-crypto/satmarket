@@ -723,6 +723,12 @@ SWAP_ATTIVO = False          # False = la cella resta «Aste»
 # chiamata API dello swap, e conta a nostro nome la quota del 10 % della
 # loro commissione (accordo con Massimo, 19 ott 2026). Non e' un segreto.
 SWAP_REFERRAL_ID = ""        # vuoto finche' non arriva da SATS Routing
+# Le DUE CHIAVI per leggere la quota da SATS Routing (/v2/referral/fees,
+# firmata con l'HMAC): SEGRETE. Non si scrivono qui ne' a mano: sul VPS
+# le chiede il comando col `read -s` di PRODUZIONE («LE CHIAVI DEL
+# CODICE PARTNER DI SATS ROUTING»). Vuote = la quota non si legge.
+SWAP_REFERRAL_API_KEY = ""
+SWAP_REFERRAL_API_SECRET = ""
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

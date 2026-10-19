@@ -1462,6 +1462,34 @@ try:
     from config import SWAP_REFERRAL_ID
 except ImportError:
     SWAP_REFERRAL_ID = ""          # vuoto finche' SATS Routing non lo da'
+# LE CHIAVI PER LEGGERE LA QUOTA (19 ott 2026, Massimo ha dato una coppia
+# api_key/api_secret per `/v2/referral/fees`): la tappa che conta la quota
+# la leggera' da loro, firmando la richiesta con l'HMAC della loro
+# documentazione. Sono SEGRETI NOSTRI: solo nel config del VPS, scritti
+# da Andrea con un `read -s` (PRODUZIONE, «LE CHIAVI DEL CODICE PARTNER
+# DI SATS ROUTING»), mai nel repo, mai in chat, mai al telefono, e nel
+# pannello esce solo il fatto che ci sono. Vuote di serie: oggi non le
+# legge nessuna rotta.
+try:
+    from config import SWAP_REFERRAL_API_KEY
+except ImportError:
+    SWAP_REFERRAL_API_KEY = ""     # vuota: si scrive solo sul VPS
+try:
+    from config import SWAP_REFERRAL_API_SECRET
+except ImportError:
+    SWAP_REFERRAL_API_SECRET = ""  # vuota: si scrive solo sul VPS
+
+
+def chiavi_referral_presenti() -> bool:
+    """Ci sono tutt'e due le chiavi per leggere la quota da SATS Routing?
+    Un segnaposto `INCOLLA…` non conta. Esce SOLO questo fatto, mai un
+    carattere delle chiavi."""
+    def _vera(v):
+        v = str(v or "").strip()
+        return bool(v) and not v.startswith("INCOLLA")
+    return _vera(SWAP_REFERRAL_API_KEY) and _vera(SWAP_REFERRAL_API_SECRET)
+
+
 # I SERVIZI (ago 2026): la vendita di prestazioni DEFINITE — un'ora di
 # lezione, una consulenza — con un appuntamento concordato dentro
 # l'ordine. Nasce SPENTA come ASTA_ABILITATA e IMPORT_NOSTR_APERTO, e
@@ -30183,6 +30211,13 @@ def _leve_stato():
                          "raggiunge. Oggi la leva non muove sats: porta "
                          "solo la pagina, gli swap veri arrivano coi "
                          "cantieri dopo"),
+            # le chiavi per leggere la quota: esce il FATTO che ci sono,
+            # mai il valore (il patto della ronda del nodo)
+            _leva("Chiavi per leggere la quota (SATS Routing)",
+                  "SWAP_REFERRAL_API_SECRET", chiavi_referral_presenti(),
+                  spento="la quota del 10 % non si legge da loro: resta "
+                         "il nostro conto. Si scrivono sul VPS col "
+                         "read -s di PRODUZIONE, tutt'e due"),
             _leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",
                   str(SWAP_REFERRAL_ID or "").strip(),
                   spento="vuoto: gli swap partirebbero senza il nostro "

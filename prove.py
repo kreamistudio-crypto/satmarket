@@ -33516,6 +33516,10 @@ _SEGRETI_FINTI = {
     "X_API_SECRET": "SEGRETO-x-api-secret",
     "X_ACCESS_TOKEN": "SEGRETO-x-access-token",
     "X_ACCESS_SECRET": "SEGRETO-x-access-secret",
+    # le due chiavi per leggere la quota da SATS Routing (19 ott 2026):
+    # nel pannello esce il FATTO che ci sono, mai il valore
+    "SWAP_REFERRAL_API_KEY": "SEGRETO-referral-api-key",
+    "SWAP_REFERRAL_API_SECRET": "SEGRETO-referral-api-secret",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -33785,6 +33789,9 @@ def _censimento(acceso, dopo=None):
               "zap_wallet", "zap_vivo", "zap_destinatario",
               "zap_nostr_vivo", "zap_max_sats", "zap_indirizzo",
               "_zap_leve",
+              # le chiavi della quota di SATS Routing (19 ott 2026): la
+              # riga del pannello CHIAMA `chiavi_referral_presenti()`
+              "chiavi_referral_presenti",
               # l'avviso dei DM Nostr (11 ott 2026): la decima volta
               # della trappola, `_dm_leve()` e i suoi due giudici — le
               # solite tre esplosioni lontane
@@ -169859,6 +169866,42 @@ def prove_swap_cella():
     prova("...e il pannello lo mostra", True,
           '_leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",'
           in src)
+    # LE CHIAVI PER LEGGERE LA QUOTA (19 ott 2026): segrete, vuote di
+    # serie, mai al telefono, nel pannello solo il fatto, nello scanner
+    prova("le due chiavi della quota nascono vuote", (True, True, True),
+          ('    SWAP_REFERRAL_API_KEY = ""     # vuota' in src,
+           '    SWAP_REFERRAL_API_SECRET = ""  # vuota' in src,
+           '\nSWAP_REFERRAL_API_KEY = ""\nSWAP_REFERRAL_API_SECRET = ""\n'
+           in esempio))
+    _busta = src[src.index('profilo["swap_leve"]'):]
+    _busta = _busta[:_busta.index("}") + 1]
+    prova("...non arrivano mai al telefono", (0, 0),
+          (mini.count("SWAP_REFERRAL_API"),
+           _busta.count("SWAP_REFERRAL_API")))
+    _pan = pezzo("_leve_stato")
+    prova("...e nel pannello esce solo il fatto, mai il valore",
+          (True, False, False),
+          ('"SWAP_REFERRAL_API_SECRET", chiavi_referral_presenti(),' in _pan,
+           "SWAP_REFERRAL_API_SECRET)" in _pan,
+           "SWAP_REFERRAL_API_KEY," in _pan))
+    # LO SCANNER LE CONOSCE: la forma della CI, letta dal workflow e
+    # provata su campioni costruiti qui (mai scritti interi nel file)
+    # (la riga si legge come la legge la prova di ONION_SEGNALE: in CI
+    # PyYAML non e' garantito, e prove.py non lo usa)
+    _wf = open(os.path.join(".github", "workflows", "prove.yml"),
+               encoding="utf-8").read()
+    _riga = next((r for r in _wf.splitlines() if "SEGRETI_PROFILO_P2P" in r
+                  and "[[:space:]]*=" in r), "").strip()
+    _forme = re.compile(_riga.replace("[[:space:]]", r"\s"))
+    _vero = "SWAP_REFERRAL_API_" + "SECRET = " + '"' + "a1b2" + "c3d4" + '"'
+    _chiave = "SWAP_REFERRAL_API_" + "KEY" + "='" + "zz" + "99'"
+    prova("lo scanner della CI prende le due chiavi scritte con un valore",
+          (True, True), (bool(_forme.search(_vero)),
+                         bool(_forme.search(_chiave))))
+    prova("...e lascia passare le righe vuote del config d'esempio",
+          (False, False),
+          (bool(_forme.search('SWAP_REFERRAL_API_KEY = ""')),
+           bool(_forme.search('SWAP_REFERRAL_API_SECRET = ""'))))
     # questa tappa non parla con nessuno: niente SATS Routing ne' nel
     # server ne' nel client, finche' non arrivano i cantieri dopo
     prova("nessuna chiamata a SATS Routing in questa tappa", (0, 0),

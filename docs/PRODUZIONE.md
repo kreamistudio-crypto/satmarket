@@ -5196,3 +5196,44 @@ tutte e tre (e dice «BitcoinPodcast è spento» quando è vuoto). Il
 pannello «⚙️ Stato delle leve» NON basta: nomina il solo canale di casa
 (`TELEGRAM_CANALE_ID`) — né l'ospite né il BitcoinPodcast ci compaiono,
 e cercarli là non dà risposta.
+- LE CHIAVI DEL CODICE PARTNER DI SATS ROUTING (19 ott 2026, cantiere
+  swap-chiavi-referral; perché in CANTIERI, «Le chiavi della quota di
+  SATS Routing»). Tre righe nel `config.py` del VPS: `SWAP_REFERRAL_ID`
+  (il codice partner, «barattolo», NON segreto) e le due chiavi per
+  leggere la quota da `/v2/referral/fees` (SEGRETE). SI LANCIA QUANDO
+  la tappa che legge la quota sarà sul VPS: prima nessuna rotta le
+  legge, e una chiave scritta senza servire è solo una chiave in più da
+  custodire. Le chiavi le chiede il terminale SENZA mostrarle
+  (`read -s`): non passano dalla chat, non finiscono nella history (il
+  comando contiene solo i nomi delle variabili), e non stanno negli
+  argomenti di nessun processo (`printf` è un comando interno di bash,
+  e il testo arriva a `sudo tee` dallo stdin). UN COMANDO ALLA VOLTA,
+  da bash sul VPS:
+  1) la copia di riserva:
+     `sudo cp -p /srv/barattolo/config.py /srv/barattolo/config.py.prima-referral`
+  2) le righe non ci sono già (deve dire `0`):
+     `sudo grep -c "^SWAP_REFERRAL" /srv/barattolo/config.py`
+  3) il codice partner, che non è un segreto:
+     `printf '\nSWAP_REFERRAL_ID = "barattolo"\n' | sudo tee -a /srv/barattolo/config.py > /dev/null`
+  4) le due chiavi, in una riga sola (chiede prima la password di sudo,
+     poi le due chiavi, che non si vedono mentre si incollano):
+     `sudo -v && read -rsp "API key di SATS Routing: " K && echo && read -rsp "API secret di SATS Routing: " S && echo && if [ -z "$K" ] || [ -z "$S" ]; then echo "Una e' vuota: non scrivo niente"; elif [[ "$K$S" == *[\"\'\\]* ]]; then echo "Contengono virgolette o barre: non scrivo niente, chiedi a Claude"; else printf 'SWAP_REFERRAL_API_KEY = %s%s%s\nSWAP_REFERRAL_API_SECRET = %s%s%s\n' '"' "$K" '"' '"' "$S" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && echo "Scritte"; fi; unset K S`
+     Deve dire «Scritte». (Il formato compone le virgolette a parte
+     apposta: una riga di documento col nome della chiave, l'uguale e
+     una virgoletta attaccata è la forma che lo scanner dei segreti della
+     CI prende per una chiave vera.)
+  5) il file si legge ancora (deve dire `ok`):
+     `sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"`
+  6) le righe ci sono, senza mostrarle (deve dire `3`):
+     `sudo grep -c "^SWAP_REFERRAL" /srv/barattolo/config.py`
+  7) `sudo systemctl restart barattolo`, poi il pannello «⚙️ Stato delle
+     leve», gruppo «🔄 Swap»: «Chiavi per leggere la quota (SATS
+     Routing)» ACCESA e «Codice partner di SATS Routing» = barattolo. Il
+     pannello non mostra mai le chiavi, solo che ci sono.
+  Una chiave incollata male: la copia di riserva al suo posto
+  (`sudo cp -p /srv/barattolo/config.py.prima-referral /srv/barattolo/config.py`)
+  e si rifà dal passo 3. MAI le chiavi in chat (nemmeno con Claude), nel
+  canale del nodo o in un file del repo; mai `cat`, `sed -n` o
+  `grep -A/-B/-C` sul config (si guarda solo la riga, e qui nemmeno
+  quella: si contano). Se una chiave esce da qualche parte va RUOTATA:
+  si chiede a Massimo una coppia nuova e si rifà dal passo 1.

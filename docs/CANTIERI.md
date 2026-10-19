@@ -66299,6 +66299,9 @@ SATS Routing dentro Barattolo», qui sopra.
    (5) stati, avvisi e recupero; (6) il maturato della quota nel
    [CORRETTO il 19 ott, 17:20: niente chiave per leggerlo da loro —
    diventa il NOSTRO conto, sotto]
+   [RICORRETTO il 19 ott, sera: Massimo ha dato le chiavi — si legge
+   da loro, e il nostro conto fa da controprova: voce «Le chiavi della
+   quota di SATS Routing»]
    pannello admin. Prima di accendere la leva: il testo firmato di
    SATS Routing e il parere MiCA/CASP.
    AGGIUNTA DI ANDREA PER LA TAPPA (4): un TETTO PER SWAP e un TETTO
@@ -66925,3 +66928,58 @@ non nomina gli id, l'allarme. Controprova: tolto il giudice dal
 campanello, il collaudo è rosso (2 fallite). L'ambiente `_censimento`
 del pannello e `_amb_seo` della pagina conoscono le leve nuove.
 Su 9da1e4a (main corso ancora: la CI solo su main, la chat negli ordini al terzo giro) coi due commit del cantiere: le 34 sezioni toccate da qui e da la', quelle della pagina, del pannello e dei documenti, PROVE_SEVERE=1 2.705 verdi, 0 saltate; i collaudi della CI 87 verdi; lo scanner dei segreti del workflow pulito.
+
+## Le chiavi della quota di SATS Routing: il codice «barattolo» e due leve segrete vuote (19 ott 2026, cantiere swap-chiavi-referral, richiesta di Andrea)
+
+**IL FATTO.** Massimo ha confermato il codice partner, «barattolo», e
+ha dato una coppia `api_key`/`api_secret` per leggere il maturato da
+`/v2/referral/fees`. Rovescia la riga del 19 ott, 17:20 («niente
+chiave per leggere il maturato», voce «Lo swap del venditore, prima
+tappa»): la tappa (6) può LEGGERE la quota da loro (la rotta vuole la
+firma HMAC della loro documentazione, `docs/api-v2.md`,
+«Authentication»), e il nostro conto resta come controprova.
+
+**COSA C'È.** Due leve SEGRETE, `SWAP_REFERRAL_API_KEY` e
+`SWAP_REFERRAL_API_SECRET`, vuote di serie nel server e nel config
+d'esempio; il giudice `chiavi_referral_presenti()` (tutt'e due scritte,
+un segnaposto `INCOLLA…` non conta); nel pannello «⚙️ Stato delle
+leve», gruppo «🔄 Swap», la riga «Chiavi per leggere la quota» col SOLO
+fatto acceso/spento, come la ronda del nodo e le chiavi di X. Non
+arrivano mai al telefono (fuori da `swap_leve`, fuori da
+`miniapp.html`). Oggi non le legge nessuna rotta: le leggerà la tappa
+(6). I due nomi sono nell'alternativa delle chiavi nominate dello
+scanner dei segreti della CI (`FORME` del workflow, prima di
+`SEGRETI_PROFILO_P2P`, che deve restare l'ultimo): una chiave vera
+scritta con un valore in un file o nella cronologia fa rossa la CI.
+`SWAP_REFERRAL_ID` resta vuoto nel codice (decisione del 19 ott): il
+«barattolo» si scrive nel config del VPS insieme alle chiavi.
+
+**LA PROCEDURA PER ANDREA** è in PRODUZIONE, «LE CHIAVI DEL CODICE
+PARTNER DI SATS ROUTING»: copia di riserva, controllo che le righe non
+ci siano, il codice partner con un `printf`, le due chiavi chieste da un
+`read -s` (non si vedono, non vanno nella history, non stanno negli
+argomenti di un processo: `printf` è interno a bash e passa a `sudo tee`
+dallo stdin), il file che si legge ancora, il conto delle righe senza
+mostrarle, il riavvio e il pannello. Si lancia quando la tappa (6) sarà
+sul VPS, non prima. Il comando compone le virgolette a parte: la forma
+«nome, uguale, virgoletta» in una riga di documento è quella che lo
+scanner prende per una chiave (la lezione della procedura del 10 ott).
+
+**PROVATO.** In `prove_swap_cella`: le due leve vuote nel server e nel
+config d'esempio; nessuna traccia nel client né nella busta di
+`/api/me`; nel pannello il giudice e mai il valore; lo scanner della
+CI, letto dal workflow come lo legge la prova di `ONION_SEGNALE`, prende
+le due chiavi scritte con un valore (campioni costruiti al momento, mai
+scritti interi nel file) e lascia passare le righe vuote. Nel banco del
+pannello (`prove_leve`) il giudice nuovo entra fra quelli da posare —
+la quindicesima volta della trappola «int object is not callable» — e
+le due chiavi entrano fra i `_SEGRETI_FINTI`, così la prova «il valore
+non esce» guarda anche loro. Tortura 2 su 2: il pannello col segreto
+vero al posto del fatto (3 rosse) e lo scanner senza i due nomi (1
+rossa). Suite e collaudi: nel messaggio del commit.
+
+**DA FARE** (notati, non fatti):
+- Il comando di PRODUZIONE, da Andrea, quando la tappa (6) sarà sul
+  VPS.
+- La tappa (6): la lettura firmata del maturato, il confronto col
+  nostro conto e col pagamento di fine mese.
