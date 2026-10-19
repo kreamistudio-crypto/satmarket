@@ -6548,7 +6548,12 @@
   (spunte, «Seleziona tutti» sui visibili fino al tetto, filtri per
   categoria e stato; l'elenco è suo, `GET /api/me/modifica-massiva`,
   tutti gli annunci attivi, esauriti e in revisione fino a
-  `MM_ELENCO_MAX`, e non la pagina da cento di «I tuoi annunci») →
+  `MM_ELENCO_MAX`, e non la pagina da cento di «I tuoi annunci»; ogni
+  riga porta la PRIMA foto, `_mm_prima_foto`, letta difensiva, e il
+  foglio ne mostra la miniatura con `fotoMM` — la gemella _min delle
+  card, pigra, 40 px nell'elenco e 36 nell'anteprima, l'emoji di
+  categoria come riserva se manca o non arriva, grigia sugli esauriti
+  e in revisione: 19 ott 2026, cantiere modifica-massiva-foto) →
   COSA CAMBI (`AZIONI_MM`) → ANTEPRIMA (`/anteprima`, non scrive) →
   ESITO (`/applica`, la frase «N annunci cambiati; M non modificati:
   …» e «↩︎ Annulla» → `/annulla`). I GESTI (`MM_AZIONI`): prezzo fisso

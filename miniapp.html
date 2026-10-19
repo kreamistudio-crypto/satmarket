@@ -9104,7 +9104,19 @@
   .mm-riga input{flex:0 0 auto;width:20px;height:20px;margin:0;accent-color:var(--sats)}
   .mm-tutti{border-top:0}
   .mm-capito{border-top:0;margin-top:6px}
-  .mm-em{flex:0 0 28px;width:28px;min-width:0;font-size:20px;line-height:1;text-align:center}
+  /* LA FOTO DELL'ANNUNCIO (19 ott 2026, cantiere modifica-massiva-foto):
+     la miniatura quadrata al posto dell'icona, con l'arrotondamento delle
+     righe di «I tuoi annunci». Senza foto, o se non arriva, nello stesso
+     riquadro l'emoji di categoria di prima, sul fondo tenue. In pausa,
+     esaurito o in revisione: grigia e velata, come in «I tuoi annunci». */
+  .mm-foto{flex:0 0 40px;width:40px;height:40px;border-radius:10px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--chip-bg);font-size:20px;line-height:1}
+  .mm-foto img{width:100%;height:100%;object-fit:cover;display:block}
+  .mm-foto.piccola{flex-basis:36px;width:36px;height:36px;font-size:18px}
+  .mm-foto.spento{filter:grayscale(1);opacity:.6}
+  .mm-ant{display:flex;align-items:center;gap:10px}
+  .mm-ant-t{flex:1 1 auto;min-width:0}
   .mm-t{display:flex;flex-direction:column;min-width:0}
   .mm-t b{font-size:14px;font-weight:800;color:var(--ink);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -45468,6 +45480,21 @@ function righeCambioMM(v, azione){
   if (azione === 'spedizione') return righeCambioSpedStd(v);
   return ['si elimina'];
 }
+/* LA FOTO NEL FOGLIO (19 ott 2026, cantiere modifica-massiva-foto): la
+   MINIATURA della prima foto (`fotoMini`, la gemella _min che il server
+   salva accanto a ogni foto: quella delle card, mai l'originale), pigra
+   — si scarica quando la riga entra nello schermo — e la riserva
+   nello stesso riquadro: l'emoji di categoria se la foto non c'e', e la
+   stessa se la miniatura non arriva (l'onerror non prova l'originale
+   pesante: a 40 px non vale il peso). L'indirizzo passa da esc(). */
+function fotoMM(a, classe){
+  const emoji = EMOJI_CAT[a.categoria] || '📦';
+  const spento = a.stato === 'venduto' || a.stato === 'revisione';
+  const src = a.foto ? fotoUrl(fotoMini(a.foto)) : '';
+  return `<span class="mm-foto${classe ? ' ' + classe : ''}${spento ? ' spento' : ''}" aria-hidden="true">${src
+    ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" data-e="${esc(emoji)}" onerror="this.parentNode.textContent=this.dataset.e">`
+    : emoji}</span>`;
+}
 /* La riga corta dell'elenco da cui si sceglie: prezzo, scorte, stato. */
 function sottoRigaMM(a){
   const pezzi = [a.valuta === 'eur' ? `${fmtEur(a.prezzo_eur)} €` : `${fmt(a.prezzo_sats)} sats`];
@@ -45543,7 +45570,7 @@ function htmlScegliMM(err){
       onchange="mmTutti(this.checked)"><span class="mm-t"><b>Seleziona tutti (${fmt(vis.length)})</b></span></label>`;
   h += vis.length ? `<ul class="mm-lista">${vis.map(a => `<li><label class="mm-riga">
       <input type="checkbox" data-id="${a.id}"${mm.scelti.has(a.id) ? ' checked' : ''} onchange="mmSpunta(this)">
-      <span class="mm-em" aria-hidden="true">${EMOJI_CAT[a.categoria] || '📦'}</span>
+      ${fotoMM(a)}
       <span class="mm-t"><b>${esc(a.titolo)}</b><span class="mm-s">${esc(sottoRigaMM(a))}</span></span>
     </label></li>`).join('')}</ul>`
     : `<div class="sped-std-esito">Nessun annuncio con questi filtri.</div>`;
@@ -45700,11 +45727,15 @@ function htmlAnteprimaMM(err){
     : `Stai cambiando <b>${nAnnunciMM(n)}</b>: ${esc(descriviAzioneMM(d.azione, d.parametri))}.`}</div>`;
   h += err;
   if (n){
+    /* la foto e lo stato vengono dall'elenco che il foglio ha gia': la
+       risposta dell'anteprima non li porta, e non serve che li porti */
+    const perId = new Map(mm.elenco.map(a => [a.id, a]));
     /* per l'eliminazione «prima → dopo» non c'e': bastano i titoli */
     h += `<div class="sped-std-sez">${elimina ? 'Si eliminano' : 'Prima → dopo'} (${fmt(n)})</div>
-      <ul class="sped-std-lista">${cambiano.map(v => `<li>
-        <b class="sped-std-tit">${esc(v.titolo)}</b>
-        ${elimina ? '' : righeCambioMM(v, d.azione).map(r => `<span class="sped-std-da">${esc(r)}</span>`).join('')}
+      <ul class="sped-std-lista">${cambiano.map(v => `<li class="mm-ant">
+        ${fotoMM(perId.get(v.id) || {categoria: '', stato: ''}, 'piccola')}
+        <div class="mm-ant-t"><b class="sped-std-tit">${esc(v.titolo)}</b>
+        ${elimina ? '' : righeCambioMM(v, d.azione).map(r => `<span class="sped-std-da">${esc(r)}</span>`).join('')}</div>
       </li>`).join('')}</ul>`;
     h += `<div class="sped-std-nota">${elimina
       ? 'Escono dalla vetrina e dai relay Nostr, e i post nei canali si tolgono. Gli ordini mai pagati su questi annunci si annullano.'

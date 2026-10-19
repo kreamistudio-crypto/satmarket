@@ -66515,3 +66515,80 @@ La mia proposta: i quattro passi senza sats, poi A con
 si vuole una cassa di prova separata per sempre. La leva e il
 cancello per persona nascono con la tappa (2), il preventivo, che è
 dove il tetto si guarda.
+
+## Le foto vere nel foglio della modifica in blocco (19 ott 2026, cantiere modifica-massiva-foto, decisione di Andrea)
+
+**PERCHÉ.** Nel foglio «✏️ Modifica più annunci» gli annunci si
+riconoscevano dall'emoji della categoria e dal titolo: con trenta
+magliette o trenta barattoli di miele l'icona è la stessa per tutti.
+Andrea vuole le foto vere, in piccolo. La leva
+`MODIFICA_MASSIVA_ATTIVA` in produzione è già accesa.
+
+**COSA SI È DECISO (Andrea, proposta in dieci punti approvata).**
+- DOVE: nell'elenco da cui si sceglie la foto prende il posto
+  dell'icona; nell'anteprima va a sinistra di ogni annuncio che cambia.
+  I gruppi «Non si toccano» restano una riga di titoli per motivo e
+  l'esito una frase: lì non c'è una riga per annuncio. L'emoji nella
+  riga del cambio di categoria resta: lì è un dato.
+- QUALE: la miniatura `_min.jpg` della prima foto, quella delle card e
+  di «I tuoi annunci» (`fotoMini`), mai l'originale. 40×40
+  nell'elenco, 36×36 nell'anteprima, `object-fit: cover`,
+  arrotondamento di 10 px come «I tuoi annunci».
+- IL PESO, detto: le miniature sono a `MINIATURA_LATO = 640` e qualità
+  87, ~100-160 KB l'una (il commento di `fotoMini` dice ancora 320 px:
+  è vecchio). Spesso sono già in cache, perché «I tuoi annunci» carica
+  le stesse. La variante piccola da 96 px non è stata fatta (vorrebbe
+  file nuovi sul disco e un giro per le foto vecchie).
+- CARICAMENTO: `loading="lazy"`, `decoding="async"`; la spunta non
+  ridisegna la lista.
+- RISERVA: senza foto l'emoji di categoria nello stesso riquadro, sul
+  fondo tenue; se la miniatura non arriva l'`onerror` mette l'emoji, e
+  non prova l'originale pesante.
+- STATO: in pausa, esaurito o in revisione la cella è grigia e velata
+  (`filter: grayscale(1); opacity: .6`), come in «I tuoi annunci»; la
+  riga sotto dice già «esaurito» o «in revisione».
+- NOSTR: niente. SERVER: una riga — l'elenco `/api/me/modifica-massiva`
+  manda `foto`, la prima della colonna (`_mm_prima_foto`: letta
+  difensiva, storta = «nessuna foto», mai un 500). L'anteprima prende
+  foto e stato dall'elenco che il foglio ha già.
+
+**COME È FATTO.** `fotoMM(a, classe)` in miniapp.html disegna la cella
+(l'indirizzo passa da `esc()`); `.mm-foto` al posto della vecchia
+`.mm-em`, che non c'è più. Nell'anteprima `mm.elenco` diventa una
+mappa per id.
+
+**PROVATO.**
+- `prove_modifica_massiva_foto` (nuova): `_mm_prima_foto` caso per caso
+  (nome, indirizzo d'importato, vuota, storta, d'altra forma), l'elenco
+  che manda la foto; le sentinelle sul foglio (la foto nell'elenco e
+  nell'anteprima, niente più `mm-em`, la cella quadrata, arrotondata,
+  `cover`, il grigio); in node la cella VERA: la miniatura _min e mai
+  l'originale, lazy e async, la riserva emoji con l'`onerror`, il 📦
+  per una categoria ignota, spenta su esaurito e revisione, la piccola
+  dell'anteprima, l'importato col suo indirizzo, un indirizzo storto
+  che passa da `esc()`. Con `prove_modifica_massiva`: 137 passate.
+- `collaudo_modifica_massiva.py`: l'elenco porta la prima foto, e
+  stringa vuota senza. Verde in gabbia.
+- IL GIRO DAL VIVO: copia del worktree con un config di cartone
+  (relay morti, nsec `INCOLLA_QUI`), server sulla 8171; 35 annunci con
+  una foto generata per il giro (piena a 1200 px e `_min` a 640, come
+  il server), più uno senza foto, un esaurito, uno in revisione,
+  un'asta, un importato con la foto su un indirizzo morto (127.0.0.1:9).
+  Nel Browser pane: 37 celle, 35 immagini, le due emoji (senza foto e
+  importato tornato all'emoji dall'`onerror`), due celle spente. IL
+  CARICAMENTO PIGRO MISURATO con 107 annunci: all'apertura il browser
+  ha chiesto 33 miniature su 105, le altre mentre si scorre. Con 37
+  righe da 56 px quasi tutte stanno nel margine di anticipo di Chrome
+  e arrivano subito. Gli scatti con Chrome headless via CDP (il pane
+  usciva a 800×600): 360×780 e 1366×768, chiaro e scuro — l'elenco in
+  cima, l'elenco all'altezza dell'asta, dell'esaurito e della
+  revisione, l'anteprima di un −10 % su dieci annunci scelti (sette
+  cambiano, con la foto; i tre fuori coi motivi). In ogni scatto tutte
+  le foto visibili caricate. Dieci scatti mandati ad Andrea.
+- La suite intera e i collaudi della CI: nel verbale del commit.
+
+**DA FARE (notati, non fatti).**
+- Il commento di `fotoMini` in miniapp.html dice «320px, un decimo del
+  peso»: oggi `MINIATURA_LATO` è 640. Da riallineare (solo il commento).
+- Se il peso delle miniature in liste lunghe si fa sentire su rete
+  lenta: la variante da 96 px, coi file nuovi e il giro delle vecchie.

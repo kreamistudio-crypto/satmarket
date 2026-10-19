@@ -61,7 +61,7 @@ def semina():
                     "registrato) VALUES(?,?,?,1)", (tg, nome, f"neg{tg}"))
     adesso = int(time.time())
     casi = {
-        "a": {},
+        "a": dict(foto='["a1_0.jpg", "a1_1.jpg"]'),
         "b": dict(prezzo_sats=10_000, quantita=1),
         "euro": dict(valuta="eur", prezzo_eur=20.0, prezzo_sats=20_000),
         "ordine": {},
@@ -214,6 +214,11 @@ def main():
     prova("una riga dice valuta e prezzo del suo listino",
           ("eur", 20.0), (va.get("valuta"), va.get("prezzo_eur")))
     prova("nessuna modifica da annullare, all'inizio", None, d.get("ultima"))
+    per_id = {v["id"]: v for v in d.get("annunci", [])}
+    prova("ogni riga porta la PRIMA foto (il client ne fa la miniatura), "
+          "e senza foto la stringa vuota",
+          ("a1_0.jpg", ""), (per_id.get(ids["a"], {}).get("foto"),
+                             per_id.get(ids["b"], {}).get("foto")))
 
     # ---------------------------------------------------------------
     print("\n[i parametri storti e il tetto]")

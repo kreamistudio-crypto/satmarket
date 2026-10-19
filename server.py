@@ -44022,6 +44022,23 @@ async def _mm_giro(tg_id: int, azione: str, par: dict, ids: list) -> dict:
     return {"cambiano": cambiano, "fuori": fuori, "cambio": cambio}
 
 
+def _mm_prima_foto(grezzo) -> str:
+    """La PRIMA foto di un annuncio, come la colonna la scrive: un nome
+    di file nostro (a123_0.jpg) o l'indirizzo di un importato. Il foglio
+    ne mostra la miniatura (19 ott 2026, cantiere modifica-massiva-foto:
+    le foto vere al posto delle icone). La miniatura la deriva il client
+    (`fotoMini`), come per le card: qui non si inventa nessun nome.
+    Letta DIFENSIVA: una colonna storta vale «nessuna foto» (il client
+    mette l'icona di categoria), mai un 500 sull'elenco."""
+    try:
+        nomi = json.loads(grezzo or "[]")
+    except (ValueError, TypeError):
+        return ""
+    if isinstance(nomi, list) and nomi and isinstance(nomi[0], str):
+        return nomi[0]
+    return ""
+
+
 def _mm_pubblico(v: dict) -> dict:
     return {k: x for k, x in v.items() if not k.startswith("_")}
 
@@ -44238,7 +44255,8 @@ async def mm_elenco(x_tg_init_data: str = Header(""),
                          "prezzo_eur": a["prezzo_eur"] or 0,
                          "quantita": a["quantita"],
                          "asta": (a["asta_base_sats"] or 0) > 0,
-                         "origine": nome_origine(a)}
+                         "origine": nome_origine(a),
+                         "foto": _mm_prima_foto(a["foto"])}
                         for a in righe[:MM_ELENCO_MAX]]}
 
 

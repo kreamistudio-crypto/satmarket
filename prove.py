@@ -171131,6 +171131,99 @@ const cifra = () => ({dataset: {v: '100,00'}, innerHTML: '<span class="num">100,
           ["100,00 €", False], o["negato"])
 
 
+def prove_modifica_massiva_foto():
+    """LE FOTO VERE NEL FOGLIO DELLA MODIFICA IN BLOCCO (19 ott 2026,
+    cantiere modifica-massiva-foto, decisione di Andrea): al posto
+    dell'icona di categoria, la miniatura della prima foto — nell'elenco
+    da cui si sceglie e nell'anteprima. Qui: il server che manda la prima
+    foto (letta difensiva), e in node la cella vera (`fotoMM`) caso per
+    caso — la miniatura e non l'originale, pigra, la riserva emoji senza
+    foto e quando la miniatura non arriva, il grigio sugli esauriti e in
+    revisione, l'indirizzo passato da esc()."""
+    print("\n[le foto vere nel foglio della modifica in blocco]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    amb = {"json": json}
+    exec(pezzo("_mm_prima_foto"), amb)
+    pf = amb["_mm_prima_foto"]
+    prova("la prima foto: il nome di file della colonna",
+          "a12_0.jpg", pf('["a12_0.jpg", "a12_1.jpg"]'))
+    prova("...o l'indirizzo di un importato, com'e'",
+          "https://esempio.org/x.jpg", pf('["https://esempio.org/x.jpg"]'))
+    prova("senza foto, colonna storta o di un'altra forma: «nessuna foto», "
+          "mai un 500", ["", "", "", "", "", ""],
+          [pf(""), pf(None), pf("[]"), pf("{rotto"), pf('{"a": 1}'),
+           pf("[3]")])
+    prova("l'elenco del foglio manda la prima foto", True,
+          '"foto": _mm_prima_foto(a["foto"])' in codice(pezzo("mm_elenco")))
+
+    # ---- le sentinelle sul client ---------------------------------------
+    scegli = pezzo_js(mini, "function htmlScegliMM(", "\n}\n")
+    ant = pezzo_js(mini, "function htmlAnteprimaMM(", "\n}\n")
+    prova("l'elenco da cui si sceglie usa la foto, e l'icona di prima non "
+          "c'e' piu'", (True, False),
+          ("${fotoMM(a)}" in scegli, "mm-em" in mini))
+    prova("l'anteprima mette la foto (piccola) a sinistra di ogni annuncio "
+          "che cambia", True,
+          "fotoMM(perId.get(v.id)" in ant and "'piccola')" in ant)
+    stile = mini[mini.index("  .mm-foto{"):mini.index("  .mm-ant-t{")]
+    prova("la cella e' quadrata, arrotondata come «I tuoi annunci», e la "
+          "foto la riempie senza deformarsi", [True] * 4,
+          ["width:40px;height:40px" in stile, "border-radius:10px" in stile,
+           "object-fit:cover" in stile, "overflow:hidden" in stile])
+    prova("in pausa, esaurito o in revisione: grigia e velata", True,
+          ".mm-foto.spento{filter:grayscale(1);opacity:.6}" in stile)
+
+    # ---- la cella vera, in node -------------------------------------------
+    banco = "\n".join([
+        "const API_BASE = 'https://barattolo.store/api';",
+        pezzo_js(mini, "const FOTO_BASE = ", "\n"),
+        pezzo_js(mini, "function fotoUrl(f){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function fotoMini(nome){", "\n}\n") + "\n}",
+        pezzo_js(mini, "const esc = s =>", ";\n") + ";",
+        "const EMOJI_CAT = {'Elettronica':'🔌'};",
+        pezzo_js(mini, "function fotoMM(a, classe){", "\n}\n") + "\n}",
+        r"""
+console.log(JSON.stringify({
+  foto: fotoMM({foto:'a12_0.jpg', categoria:'Elettronica', stato:'attivo'}),
+  senza: fotoMM({foto:'', categoria:'Elettronica', stato:'attivo'}),
+  ignota: fotoMM({foto:'', categoria:'Boh', stato:'attivo'}),
+  esaurito: fotoMM({foto:'a12_0.jpg', categoria:'Elettronica', stato:'venduto'}),
+  revisione: fotoMM({foto:'', categoria:'Elettronica', stato:'revisione'}),
+  piccola: fotoMM({foto:'a12_0.jpg', categoria:'Elettronica', stato:'attivo'}, 'piccola'),
+  fuori: fotoMM({foto:'https://esempio.org/x.jpg', categoria:'Elettronica', stato:'attivo'}),
+  storta: fotoMM({foto:'https://x.org/"><b>', categoria:'Elettronica', stato:'attivo'}),
+}));
+"""])
+    o = _node_banco(banco)
+    if o is None:
+        salta("la cella della foto in node", "node non installato")
+        return
+    f = o.get("foto", "")
+    prova("con la foto: la MINIATURA _min, mai l'originale", (True, False),
+          ('src="https://barattolo.store/foto/a12_0_min.jpg"' in f,
+           'a12_0.jpg"' in f))
+    prova("...pigra e decodificata a parte", (True, True),
+          ('loading="lazy"' in f, 'decoding="async"' in f))
+    prova("...e se non arriva, nello stesso riquadro l'emoji di categoria",
+          (True, True),
+          ('data-e="🔌"' in f,
+           'onerror="this.parentNode.textContent=this.dataset.e"' in f))
+    prova("senza foto: l'emoji di categoria, niente <img>",
+          '<span class="mm-foto" aria-hidden="true">🔌</span>', o.get("senza"))
+    prova("...e il 📦 per una categoria sconosciuta", True,
+          o.get("ignota", "").endswith(">📦</span>"))
+    prova("esaurito e in revisione: la cella spenta, foto o no", (True, True),
+          ('class="mm-foto spento"' in o.get("esaurito", ""),
+           'class="mm-foto spento"' in o.get("revisione", "")))
+    prova("nell'anteprima la cella piccola", True,
+          'class="mm-foto piccola"' in o.get("piccola", ""))
+    prova("l'importato: il suo indirizzo, com'e'", True,
+          'src="https://esempio.org/x.jpg"' in o.get("fuori", ""))
+    prova("un indirizzo storto non apre un tag: passa da esc()",
+          (False, True), ("<b>" in o.get("storta", ""),
+                          "&quot;&gt;&lt;b&gt;" in o.get("storta", "")))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -171467,6 +171560,7 @@ def main():
               prove_venduto_canale,
               prove_chat_mercatino,
               prove_journal_senza_buffer,
+              prove_modifica_massiva_foto,
               prove_config_esempio):
         try:
             f()
