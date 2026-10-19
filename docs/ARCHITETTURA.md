@@ -33422,6 +33422,58 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   della chat (scambi e ordini)»; la scopa dell'orologio P2P
   (`_chat_p2p_spazza(conti=…)`) conta a parte «scambi finiti» e «ordini
   conclusi».
+  LA CHAT DALLA NOTIFICA (20 ott 2026, cantiere chat-dalla-notifica;
+  perché in CANTIERI). IL TASTO: l'avviso di un messaggio porta
+  `&chat=1` (`/?ordine=<n>&chat=1`, `/p2p?scambio=<id>&chat=1`), che
+  dentro Telegram diventa `mercatino_<n>_chat` / `scambio_<id>_chat`
+  (`_startapp_da_link`, `startappDaLink`, `percorsoDaStartapp`: i tre
+  gemelli). La pagina lo legge in `CHAT_DA_AVVISO` e, aperto l'ordine o
+  lo scambio, `chatDaAvvisoP2P(id)` aspetta il riquadro (o la riga
+  `#chatscChiusa`), lo scorre in vista se non e' appeso (sullo schermo
+  largo e' `sticky` a destra e non si scorre), lo illumina due secondi
+  (`.chatsc-evidenza`) e mette il cursore nella casella (subito, a 1,5
+  e a 3,5 s, finche' la persona non ha toccato altro). Chi guarda la
+  chat: `P2P_CHAT_PRESENTE_S` = 12 (era 20). LA SCORTA DI LUCCHETTI:
+  tabella `scorta(pub, tg_id, seme, quando, ordine, giro)` nel
+  CASSETTO; la riempie `chatScortaP2P` dal battito (al piu' ogni dieci
+  minuti), via `/api/p2p/chat/scorta` (`_chat_scorta_posa`, solo
+  `{pub, seme}`, tetto `CHAT_SCORTA_PIENA` 20, si riempie sotto
+  `CHAT_SCORTA_RICARICA` 5). Col profilo di scambio un lucchetto e'
+  `chiaveScortaP2P(profilo, seme)` (HMAC, a senso unico: il seme e'
+  pubblico e da solo non apre niente); senza, nasce a caso e la segreta
+  sta in `barattolo_chat_scorta@<conto>`. IL RITIRO di un ordine del
+  mercatino (`chat_leggi_p2p`) fa `_chat_scorta_assegna` per l'ALTRA
+  parte se non ha chiavi d'ordine: il suo lucchetto piu' recente si
+  brucia (`ordine` pieno) ed entra in `chiavi_ordine`; il ritiro dice
+  anche `semi` (i miei lucchetti nati dal profilo) e, se l'altra parte
+  non ha niente, `altro_senza_chiave`/`chiamato`. Il telefono riconosce
+  il lucchetto fra le sue candidate (`chatMercCandidateP2P`) e, se la
+  chiave nasce dal profilo, lo ritrova prima di dire «altrove»
+  (`chatMercDichiaraP2P`). SI SCRIVE SUBITO: `chatScLoroP2P(c, o)` e'
+  la usa-e-getta dell'altra parte o, finche' non si presenta, la sua
+  chiave d'ordine (nel P2P la chiave dello scambio); `chatScApriMsgP2P`
+  prova anche le coppie con le chiavi d'ordine (la mia `tk`, le sue
+  `chatScPeersP2P`), il pacco al moderatore le porta (`chatScPaccoP2P(o,
+  c, tk)`: tutte chiavi di QUELL'ordine) e `chatPartiApriP2P` da' un lato
+  anche a una chiave d'ordine (`lati`). LA SCORTA FINITA: piede
+  `chiama` («🔔 Avvisa …», `chiamaChatScP2P`) → `/api/p2p/chat/chiama`
+  (`_chat_mercatino_chiamata`, uno per ordine e per persona, tabella
+  `chiamate` nel cassetto) → «💬 Chi compra vuole scriverti nell'ordine
+  #42», tasto `CHAT_MERCATINO_CHIAMA_BOTTONE` con `&chat=1`; poi piede
+  `chiamato`. La scopa porta via lucchetti bruciati e chiamate con la
+  chat dell'ordine; la scorta mai. Le prove:
+  `prove_chat_dalla_notifica`, `collaudo_chat_mercatino` sezione 13.
+  E TRE CONTORNI (stesso cantiere): il ritorno dal login web porta anche
+  la query, in forma stretta (`FORMA_RITORNO_LOGIN`: lettere, cifre,
+  `_ - . = &`; `urlRitornoLogin` la manda solo in quella forma, senza
+  `accesso`), cosi' `da=/?ordine=1&chat=1` riporta nella chat; il
+  cursore entra appena il piede diventa «scrivi»
+  (`chatDaAvvisoFuocoP2P`, chiamata da `chatScRidisegnaP2P` e da
+  `bloccoChatScambioP2P`); «📦 Spedisci a» mentre il dato si apre ha gia'
+  tutte le righe possibili invisibili (`riservaSpedisciA`,
+  `.sped-riserva`), e col dato si accorcia, mai il contrario. Dal tasto
+  della chat il foglio «📦 La tua prima spedizione» non si apre
+  (`forseAvvisoTrasporto` guarda `CHAT_DA_AVVISO`, il timbro resta).
 - LO SWAP DEGLI INCASSI, LA PRIMA TAPPA (16 ott 2026, cantiere
   swap-venditore; perché in CANTIERI, «Lo swap del venditore, prima
   tappa»). La leva `SWAP_ATTIVO`, SPENTA di serie (default nel server,

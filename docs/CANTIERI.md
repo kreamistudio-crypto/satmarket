@@ -67945,3 +67945,199 @@ il Lightning address (il suo incasso parte da solo: va con la tappa 4).
   (domanda ad Andrea sulla riga in CLAUDE.md).
 - La tappa 3: lo swap creato dal telefono (`boltz-core`), la chiave, il
   ritiro; la CSP verso SATS Routing o un passaggio dal server.
+
+## La chat dalla notifica: il tasto dritto alla chat, i 12 secondi, e si scrive subito coi lucchetti in scorta (20 ott 2026, cantiere chat-dalla-notifica, richiesta di Andrea)
+
+**PERCHÉ.** Visto da Andrea dal vivo, con la chat degli ordini accesa
+dal 19 ott alle 21:19. A) Il tasto della notifica «nuovo messaggio»
+apriva la pagina generica dell'ordine. B) La notifica arrivava «dopo un
+po'». C) Si poteva scrivere solo quando ANCHE l'altra parte aveva
+aperto la pagina dell'ordine: la sua chiave d'ordine nasceva lì, e
+senza una sua chiave il messaggio non si chiude.
+
+**COSA SI È DECISO (Andrea, sul piano in dieci righe).** A) Il tasto
+porta `&chat=1`, nella Mini App `startapp` con `_chat` in coda. Si apre
+dritti sulla chat: sul telefono scorsa, illuminata due secondi, cursore
+nella casella; sullo schermo largo illuminata a destra. Chat cancellata
+→ la riga «Chat chiusa…». B) Il server l'avviso lo manda SUBITO. Aspetta
+solo se chi riceve ha guardato la chat negli ultimi 20 secondi (secondo
+sguardo a 21 s), e manda un avviso solo finché l'altro non legge. Sì ai
+12 secondi (secondo sguardo a 13). C) NIENTE CHIAVE UNICA PER CONTO (il
+punto 7 del piano, respinto): in disputa il moderatore riceve la
+chiave di lettura, e con una chiave per conto potrebbe aprire anche le
+chat degli altri ordini della stessa persona. Invece COME SIGNAL: ogni
+telefono lascia al server una SCORTA di lucchetti usa-e-getta (20,
+ricaricati sotto i 5); il server ne assegna uno diverso a ogni ordine
+nuovo e lo brucia. Niente derivazioni additive da una chiave del conto
+(una figlia rivelata svelerebbe la madre). Scorta finita: «vuole
+scriverti» (punto 9, sì). Leva sempre spenta di serie.
+
+**PIÙ DISPOSITIVI (la domanda di Andrea).** Chi ha un profilo di
+scambio fa nascere i lucchetti dal profilo con un SEME a caso:
+`HMAC(profilo, etichetta|seme)`, a senso unico. Il seme sta sul server
+ed è pubblico, e da solo non apre niente. Ogni dispositivo col profilo
+ricalcola dal seme la chiave segreta del lucchetto bruciato per il suo
+ordine: Mini App, web app, APK, un altro telefono. Chi non ha un
+profilo li fa nascere a caso, e la chiave segreta sta solo in quella
+memoria: da un altro dispositivo la chat è «aperta su un altro
+dispositivo», con «Continua la chat qui», come prima. Gli account nati
+con Telegram il profilo lo ritrovano sempre (`adottaProfiloContoP2P`),
+quindi il caso a caso è dei nativi Nostr senza nsec nel browser. Il
+costo già scritto nel patto resta: per un account nato con Telegram il
+profilo lo ricava il server.
+
+**COME È FATTO.** Server: tabelle `scorta` e `chiamate` nel cassetto,
+`_chat_scorta_stato/_posa/_assegna/_semi`, `_chat_mercatino_chiamata`,
+`_chat_chiama_testo`, le rotte `/api/p2p/chat/scorta` e `/chiama`. Il
+ritiro brucia un lucchetto per l'ALTRA parte se non ha chiavi d'ordine
+(mai a chi chiede, che se la dichiara da sé; mai a chat ferma). La
+scopa porta via lucchetti bruciati e chiamate con la chat dell'ordine.
+Telefono: `chatScortaP2P` dal battito (al più ogni dieci minuti),
+`chiaveScortaP2P`, le candidate coi lucchetti, `chatScLoroP2P` (la
+chiave d'ordine dell'altra parte finché non si presenta: anche nel
+P2P, dove è la chiave dello scambio), le coppie con le chiavi d'ordine
+nella lettura, nel pacco al moderatore e nella sua lettura, il piede
+`chiama`/`chiamato`, `chatDaAvvisoP2P` e i tre gemelli dello startapp.
+Dettagli in ARCHITETTURA, «LA CHAT DALLA NOTIFICA».
+
+**STRADE SCARTATE.** La chiave unica per conto (Andrea, sopra). Le
+derivazioni additive (BIP32 non indurito): con una figlia e la madre
+pubblica si ricava la madre segreta. Una coda dei messaggi sul telefono
+di chi scrive, spediti quando l'altro si presenta: il messaggio
+resterebbe fermo ad app chiusa. L'avviso «vuole scriverti» automatico
+all'apertura della pagina: chi paga apre sempre la pagina, e l'avviso
+direbbe una cosa non vera. Parte dal tocco su «🔔 Avvisa …».
+
+**PROVATO.**
+- `prove_chat_dalla_notifica` (39 passate). Le funzioni pure del server
+  su un cassetto vero in memoria: forme, tetto dei venti, un lucchetto
+  già visto non rientra, a ogni ordine un lucchetto diverso bruciato,
+  chi ha già una chiave non ne riceve, semi solo a chi li ha, la
+  chiamata una volta, la scopa. Le rotte. I tre gemelli del tasto in
+  pari. La pagina col `chat=1`. Il banco node col motore VERO, due
+  ordini dello stesso venditore che non ha mai aperto la pagina:
+  scorta dal profilo (al server solo `{pub, seme}`) e a caso (con la
+  potatura), chi compra scrive subito, due lucchetti diversi bruciati,
+  chi vende legge al primo ingresso, un suo secondo dispositivo col
+  profilo e la memoria vuota ritrova tutto dal seme. LA PROVA DI
+  ANDREA: le chiavi del pacco del moderatore per un ordine non aprono
+  NESSUNA busta dell'altro ordine della stessa persona, e aprono tutte
+  le sue. Poi «🔔 Avvisa» una volta sola, e nel P2P chi scrive prima che
+  l'altra si presenti viene letto, anche dal moderatore. CONTROPROVA:
+  tolta la chiave d'ordine provvisoria (`chatScLoroP2P`), il banco è
+  rosso.
+- Nove sentinelle di cantieri vecchi aggiornate alla forma nuova, con la
+  data: il tasto `&chat=1` nei due mondi, i 12 secondi, le domande al
+  server (`chiama`, `scorta`), «da sola scrive subito» nel P2P, la terza
+  rotta «non aperta», la dichiarazione che ritrova il profilo, la firma
+  di `chatScApriMsgP2P`, la riga che apre lo scambio dal link.
+- `collaudo_chat_mercatino`, sezione 13 nuova (server vero, telefoni
+  veri in node): chi vende apre Barattolo e non l'ordine (20 lucchetti
+  col seme); chi compra scrive SUBITO; l'avviso col tasto `&chat=1`;
+  chi vende apre per la prima volta e legge, risponde; un secondo
+  ordine, un altro lucchetto; un moderatore con una chiave VERA legge
+  l'ordine in disputa e le sue chiavi non aprono nessuna busta
+  dell'altro; chi non ha mai aperto Barattolo: «🔔 Avvisa», un avviso
+  solo, col tasto dritto alla chat; un estraneo non chiama; la scopa.
+  Tre prove vecchie aggiornate (il tasto, «🔔 Avvisa» al posto
+  dell'attesa, chi vende senza profilo scrive subito), e la scorta
+  pulita in testa alle sezioni coi telefoni (ogni sezione ha memorie
+  sue). `collaudo_chat_scambio`: il tasto, chi apre per primo scrive
+  subito, e le domande sullo scambio senza quella della scorta.
+- IL GIRO DAL VIVO (copia del worktree, config di cartone con la leva
+  accesa, P2P spento, relay morti, database nuovo, porta 8471): Sara
+  apre la home e la scorta si riempie (20 lucchetti a caso: col P2P
+  spento il profilo non si ritrova). Bruno apre l'ordine #1 e scrive
+  SUBITO. Il journal: «💬 Chat degli ordini: nuovo messaggio sull'ordine
+  1, avvisato 222», col tasto `/?ordine=1&chat=1`. Sara tocca il tasto
+  (`startapp=mercatino_1_chat`): l'ordine si apre dritto sulla chat
+  illuminata, cursore nella casella, il messaggio c'è. Teo non ha mai
+  aperto Barattolo: «🔔 Avvisa Teo» → «Avvisato…», e nel journal «chi
+  compra vuole scrivere sull'ordine 3, avvisato 333». Lo schermo largo
+  con Chrome headless e il mouse dichiarato: chat appesa a destra,
+  illuminata, scrivibile, la pagina non scorre, il cursore nella
+  casella; e da un altro browser senza il profilo, giustamente,
+  «aperta su un altro dispositivo». 360 chiaro e scuro, 1366 chiaro e
+  scuro, undici scatti mandati ad Andrea.
+- SUITE E COLLAUDI. Su 6c6ca3e + il cantiere (rebase su tre commit di
+  main, conflitto solo additivo in CANTIERI): la prima suite intera
+  severa **25.423 passate e 1 fallita** — la nona sentinella di un
+  cantiere vecchio (`prove_promemoria_gesto`, la riga che apre lo
+  scambio dal link, ora con la graffa), aggiornata; rigirata intera
+  **25.424 / 0**; collaudi della CI **87 verdi, 0 rossi**. Poi il
+  foglio della prima spedizione e lo scivolamento (sotto), e un rebase
+  su otto commit di main (91c26af: l'entrata dal bot, il logout
+  dell'APK, le miniature, i quattro rami; nessun simbolo di questo
+  cantiere toccato, cercato per nome): su 91c26af + il cantiere la suite
+  intera severa **25.653 passate, 0 fallite** e i collaudi della CI
+  **89 verdi, 0 rossi**. Scanner dei segreti (le FORME e la forma
+  esadecimale del workflow, con le controprove) pulito.
+- Poi un rebase su e1a84b0 (lo swap, tappa 2: tocca solo lo swap):
+  le dieci sezioni toccate, compresa la sua `prove_swap_preventivo`,
+  **755 / 0**; `collaudo_chat_mercatino`, `collaudo_chat_scambio`,
+  `collaudo_allegati_chat` e il suo `collaudo_swap_preventivo` verdi.
+
+**IL FOGLIO SOPRA LA CHAT (lo scatto 8, richiesta di Andrea prima del
+push).** «📦 La tua prima spedizione» (`forseAvvisoTrasporto`, una volta
+nella vita, alla prima vendita da spedire) si apriva SOPRA la chat
+quando chi vende arrivava dal tasto dell'avviso, ed è proprio il caso
+di chi vende per la prima volta. Adesso, con `CHAT_DA_AVVISO`, il foglio
+non si apre (nemmeno ai ridisegni dell'ordine) e il timbro non si
+consuma: arriva alla prossima apertura di Barattolo. Intanto gli stessi
+consigli (tracciamento, copertura del corriere) stanno nel pannello «📦
+Spedisci» della pagina. Prova in node col giudice vero: dal tasto
+niente foglio e timbro intatto, al ridisegno idem, senza il tasto il
+foglio e il timbro; controprova (tolta la riga) rossa. IL GIRO ha
+trovato anche un difetto mio: la chat era portata in vista, poi la
+pagina cresceva sopra (i dati di «📦 Spedisci» arrivano dopo il
+disegno) e la chat scivolava sotto lo schermo. Adesso ai controlli di
+0,6, 1,5 e 3,5 secondi, se nessuno ha scorso, la chat torna in vista
+(mai dove è appesa). Giro con Nina, venditrice nuova: Bruno le scrive,
+lei tocca il tasto, chat in vista illuminata, niente foglio, chiaro e
+scuro; riaperto l'ordine senza il tasto, il foglio arriva. Tre scatti.
+
+**I TRE «DA FARE», FATTI (richiesta di Andrea prima del push, stesso
+commit).**
+- IL RITORNO DAL LOGIN WEB CONSERVA LA QUERY. `_dove_tornare` rifiutava
+  ogni query, apposta (il login non deve fare da trampolino), e il
+  telefono mandava solo `location.pathname`. Adesso `FORMA_RITORNO_LOGIN`
+  accetta una query in forma STRETTA — lettere, cifre, `_ - . = &`:
+  niente barre, `:`, `%`, `#`, spazi o a capo — e `urlRitornoLogin`
+  manda percorso e query (senza `accesso`), solo se in quella forma.
+  Un login rifiutato accoda `accesso=no` con `&`. Prove: i ritorni
+  buoni (ordine, scambio, negozio) e nove storti che tornano alla radice
+  (`//evil`, `https:`, `%2F`, `#`, spazio, CR-LF, `\`…); il client in
+  node su cinque indirizzi; la prova vecchia («`/a?b=1` → `/`»)
+  aggiornata. Dal vivo: il login firmato con `da=/?ordine=9&chat=1`
+  atterra su `/?ordine=9&chat=1`, chat illuminata e in vista.
+- IL CURSORE APPENA IL PIEDE DIVENTA «SCRIVI». `chatDaAvvisoFuocoP2P(id)`:
+  la chiamano chi riscrive il piede (`chatScRidisegnaP2P`, quando passa
+  a «scrivi») e chi riscrive la pagina intera (`bloccoChatScambioP2P`).
+  Il cursore entra una volta sola, solo per l'ordine del tasto, entro
+  venti secondi, e mai se la persona ha toccato altro. I controlli a
+  tempo restano come rete. Prova in node: senza campo no, altro ordine
+  no, col campo sì, poi mai più, toccato altro no, scaduto no. Dal vivo:
+  il piede diventa «scrivi» a 705 ms e il fuoco è lì nello stesso
+  istante.
+- LO SPAZIO DI «📦 SPEDISCI A» RISERVATO. La misura vera ha corretto la
+  diagnosi: negli ordini del giro senza indirizzo non cresceva niente
+  sopra la chat; con l'indirizzo «📦 Spedisci a» nasce come una riga
+  («⏳ Apro l'indirizzo…») e arrivato il dato è alto 553 px. Adesso
+  mentre si apre ha GIÀ tutte le righe possibili, invisibili e
+  intoccabili (`riservaSpedisciA`, `.sped-riserva`, `aria-hidden`,
+  `inert`): 578 px in attesa, 553 col dato. Il riquadro si accorcia,
+  mai il contrario (un valore lunghissimo che va a capo è la sola
+  eccezione, e lì la chat la rimettono in vista i controlli). Lo stesso
+  per l'email del locker. Dal vivo, con l'indirizzo ritardato di 1,5 s
+  apposta: la chat resta in vista (258-259 px dall'alto) e non scivola.
+  Prove: le righe riservate, il CSS, e il banco di «Spedisci a» col
+  pezzo nuovo; il conto dei 📋 piccoli aggiornato (la riga riservata
+  dell'email).
+
+SUITE E COLLAUDI DEI TRE «DA FARE», su e1a84b0 + il cantiere: la suite
+intera severa **25.695 passate, 0 fallite**; i collaudi della CI **90
+verdi, 0 rossi**. Poi un rebase su bcca675 (la ronda sul nodo): le
+sezioni toccate e i collaudi della chat, nel verbale del commit.
+
+**DA FARE (notati, non fatti).**
+- Niente di nuovo.

@@ -5224,7 +5224,18 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   ordini: l'ordine 42 e' concluso, buste cancellate», e «🧹 Chat degli
   ordini: cancellate le buste di N ordini conclusi» dal giro al minuto.
   Le righe dello scambio P2P restano «Chat P2P … sullo scambio …». Mai
-  il testo. LA CHAT FERMA: un ordine deciso dal moderatore il cui
+  il testo. Dal 20 ott 2026 (chat-dalla-notifica) anche «💬 Chat degli
+  ordini: chi compra vuole scrivere sull'ordine 42, avvisato …» — il
+  tocco su «🔔 Avvisa …» quando l'altra parte non ha mai aperto
+  Barattolo. LA SCORTA DI LUCCHETTI sta nello stesso cassetto (solo
+  chiavi pubbliche e semi; fuori dai backup come tutto il file): in sola
+  lettura `sqlite3 -readonly /srv/barattolo/dati/chat-scambi.db "SELECT COUNT(DISTINCT tg_id), SUM(ordine=''), SUM(ordine<>'') FROM scorta;"`
+  dice quante persone ne hanno una, quanti lucchetti aspettano e quanti
+  sono bruciati per ordini aperti. Se il cassetto rinasce la scorta si
+  rifa' da sola al prossimo giro dei telefoni. IL TASTO DELL'AVVISO
+  porta `&chat=1`: la pagina apre l'ordine dritta sulla chat. L'avviso
+  di un messaggio aspetta un secondo sguardo di 13 secondi (non piu' 21)
+  se chi riceve stava guardando la chat. LA CHAT FERMA: un ordine deciso dal moderatore il cui
   pagamento non è andato a segno (`refund` o `confirmed` con
   `disputata=1`, o `confirmed` chiuso dal timer) tiene la chat in sola
   lettura finché i sats arrivano; si vede contando le buste qui sopra.

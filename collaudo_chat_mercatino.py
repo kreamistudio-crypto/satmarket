@@ -102,6 +102,20 @@ def chat_della_riga(chi, n):
     return None
 
 
+def scorta_pulita():
+    """(20 ott 2026) TELEFONI NUOVI: la scorta di lucchetti lasciata dai
+    telefoni di una sezione di prima non e' di questi (ogni sezione ha le
+    sue memorie), e un lucchetto bruciato per un ordine nuovo andrebbe a un
+    telefono che non ce l'ha. Lo stesso caso, nella vita vera, e' un
+    dispositivo perso senza profilo di scambio: «Continua la chat qui»."""
+    cc = banco.SRV.db_chat()
+    try:
+        cc.execute("DELETE FROM scorta")
+        cc.commit()
+    finally:
+        cc.close()
+
+
 def avvisi_chat():
     return [(chi, t, b) for chi, t, b in DETTI if t.startswith("💬 <b>Hai un nuovo messaggio")]
 
@@ -231,6 +245,37 @@ const foto = () => {
         fuori.push(Object.assign({passo: passo}, foto()));
       } else if (cosa === 'foto') {
         fuori.push(Object.assign({passo: passo}, foto()));
+      } else if (cosa === 'scorta') {
+        /* (20 ott 2026) Barattolo aperto su un'altra pagina: la scorta di lucchetti si riempie */
+        await chatScortaP2P(true);
+        fuori.push({passo: passo});
+      } else if (cosa === 'nuovomod') {
+        /* un moderatore con una chiave VERA, nata qui */
+        if (!_box.MOD) { const sk = NT.generateSecretKey();
+          _box.MOD = JSON.stringify({sk: NT.utils.bytesToHex(sk), pub: NT.getPublicKey(sk)}); }
+        fuori.push({passo: passo, pub: JSON.parse(_box.MOD).pub});
+      } else if (cosa === 'leggimod') {
+        /* il moderatore legge l'ordine `a` dalla sua rotta; poi le chiavi del
+           pacco di `a` contro le buste dell'ordine `b` */
+        const k = JSON.parse(_box.MOD);
+        const leggi = async o => (await fetch(API_BASE + '/p2p/moderazione/chat', {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify({ordine: o})})).json();
+        const d1 = await leggi(a), d2 = await leggi(b);
+        const l1 = chatPartiApriP2P(k, d1.lati || {}, a, d1);
+        const lati1 = [].concat((d1.lati || {}).compra || [], (d1.lati || {}).vende || []);
+        const segreti = [];
+        for (const p of (d1.chiavi || [])) for (const t of lati1) {
+          try { const pacco = JSON.parse(NT.nip44.decrypt(p.busta, NT.nip44.getConversationKey(NT.utils.hexToBytes(k.sk), t)));
+                (pacco.chiavi || []).forEach(x => segreti.push(x.k)); break; } catch(e) {}
+        }
+        let aperte = 0;
+        for (const s of segreti) for (const bb of (d2.buste || []))
+          try { NT.nip44.decrypt(bb.busta, NT.utils.hexToBytes(s)); aperte++; } catch(e) {}
+        const l2 = chatPartiApriP2P(k, d2.lati || {}, b, {buste: d2.buste || [], chiavi: d1.chiavi || []});
+        fuori.push({passo: passo, letti: l1.msgs.map(m => m.lato + ': ' + m.testo), mute: l1.mute,
+                    segreti: segreti.length, buste2: (d2.buste || []).length, aperteAltro: aperte,
+                    altroLetti: l2.msgs.length, altroMute: l2.mute});
       }
     } catch(x) { fuori.push({passo: passo, ESPLOSO: String(x && x.stack || x)}); }
   }
@@ -370,8 +415,9 @@ async def giro():
               (bool(f.get("id")), isinstance(await ca.ritira(C, o, f.get("id", "")), bytes),
                cs.no(await ca.ritira(X, o, f.get("id", "")))))
         detti = avvisi_chat()
+        # (20 ott 2026, chat-dalla-notifica) il tasto porta dritto alla chat: `&chat=1`
         prova("L'AVVISO: uno solo, a chi compra, col NUMERO DELL'ORDINE e il tasto che lo apre",
-              [(C, True, (SRV.CHAT_MERCATINO_BOTTONE, f"{SRV.URL_PUBBLICO}/?ordine={n}"))],
+              [(C, True, (SRV.CHAT_MERCATINO_BOTTONE, f"{SRV.URL_PUBBLICO}/?ordine={n}&chat=1"))],
               [(chi, f"nell'ordine #{n}." in t, bt) for chi, t, bt in detti])
         prova("...e il testo del messaggio non c'e', ne' la busta", [False],
               [segreto in t or cs.busta(segreto) in t for _, t, _ in detti])
@@ -606,6 +652,7 @@ async def giro():
         if not node:
             prova("node c'e'", True, False)
             return
+        scorta_pulita()
         n = nuovo_ordine("locked")
         o = f"m{n}"
         srv, base = tolti.avvia_ponte()
@@ -697,6 +744,149 @@ async def giro():
                     if c.get_loop() is not qui:
                         gruppo.discard(c)
 
+    async def s13():
+        # DRITTI ALLA CHAT, E SI SCRIVE SUBITO (20 ott 2026, cantiere
+        # chat-dalla-notifica, richiesta di Andrea): prima si poteva scrivere
+        # solo quando ANCHE l'altra parte aveva aperto la pagina dell'ordine.
+        # Adesso ogni telefono lascia al server una SCORTA di lucchetti
+        # usa-e-getta, e a ogni ordine nuovo il server ne brucia uno come
+        # chiave d'ordine di chi non si e' ancora presentato. Due utenti: il
+        # secondo NON HA MAI APERTO LA PAGINA. E il moderatore di una disputa
+        # legge quell'ordine e nessun altro della stessa persona.
+        import shutil
+        import subprocess
+        import tempfile
+        import collaudo_tolti_ovunque as tolti
+        node = shutil.which("node")
+        if not node:
+            prova("node c'e'", True, False)
+            return
+        SRV.MERCATINO_CHAT_ORDINI = True
+        scorta_pulita()
+        n1, n2, n3 = nuovo_ordine("locked"), nuovo_ordine("locked"), nuovo_ordine("locked", venditore=X)
+        o1, o2, o3 = f"m{n1}", f"m{n2}", f"m{n3}"
+        srv, base = tolti.avvia_ponte()
+        cart = tempfile.mkdtemp(prefix="chat_dalla_notifica_")
+        mini = open(os.path.join(banco.QUI, "miniapp.html"), encoding="utf-8").read()
+        prog = os.path.join(cart, "telefono.js")
+        open(prog, "w", encoding="utf-8").write(dispositivo(mini))
+        chi = {"C": (C, "Compratore"), "V": (V, "Venditore"), "A": (ADMIN, "Admin")}
+
+        def telefono(nome, *passi):
+            conto, come_si_chiama = chi[nome]
+            r = subprocess.run([node, prog, os.path.join(banco.QUI, "vendor", "nostr.bundle.js"),
+                                os.path.join(cart, nome + ".json"), base, str(conto), come_si_chiama, *passi],
+                               capture_output=True, text=True, encoding="utf-8", timeout=120)
+            try:
+                fuori = json.loads(r.stdout.strip().splitlines()[-1])
+            except Exception:
+                fuori = [{"ERRORE": (r.stdout or "")[-300:] + (r.stderr or "")[-700:]}] * len(passi)
+            return fuori[-1]
+
+        def conta(sql, *a):
+            return len(cs.cassetto(sql, *a))
+
+        async def avvisi_a(chi_riceve, inizio, numero):
+            # l'avviso parte in un compito del server: si aspetta che arrivi, e
+            # si guardano solo quelli di QUESTO ordine (un compito di una
+            # sezione di prima puo' arrivare adesso)
+            suo = lambda d: d[0] == chi_riceve and f"nell'ordine #{numero}." in d[1]
+            for _ in range(80):
+                v = [d for d in DETTI[inizio:] if suo(d)]
+                if v:
+                    return v
+                await asyncio.sleep(0.05)
+            return [d for d in DETTI[inizio:] if suo(d)]
+        try:
+            # 1) chi vende apre Barattolo (non l'ordine): la scorta si riempie
+            f = telefono("V", f"profilo|{o1}", "scorta")
+            prova("CHI VENDE apre Barattolo, non l'ordine: venti lucchetti in scorta, ognuno col suo seme "
+                  "(e' nato dal profilo), nessuno ancora bruciato", (20, 20, 0, ""),
+                  (conta("SELECT 1 FROM scorta WHERE tg_id=? AND ordine=''", V),
+                   conta("SELECT 1 FROM scorta WHERE tg_id=? AND length(seme)=32", V),
+                   conta("SELECT 1 FROM chiavi_ordine WHERE tg_id=?", V), f.get("ESPLOSO", "") or f.get("ERRORE", "")))
+            # 2) chi compra apre per primo, e scrive SUBITO
+            f = telefono("C", f"profilo|{o1}", f"ordine|{n1}|buyer|locked|aperta", "battito")
+            prova("CHI COMPRA apre l'ordine pagato e SCRIVE SUBITO, anche se chi vende non ha MAI aperto "
+                  "la pagina: la sua chiave d'ordine e' il lucchetto che il server ha bruciato",
+                  ("scrivi", 1, 1, 19),
+                  (f.get("modo"), f.get("peers"), conta("SELECT 1 FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o1, V),
+                   conta("SELECT 1 FROM scorta WHERE tg_id=? AND ordine=''", V)))
+            inizio = len(DETTI)
+            telefono("C", "battito", "scrivi|Ciao, prima che tu apra l'ordine")
+            av = await avvisi_a(V, inizio, n1)
+            prova("...l'avviso arriva a chi vende, col tasto che porta DRITTO alla chat",
+                  [("💬 Apri l'ordine", f"{SRV.URL_PUBBLICO}/?ordine={n1}&chat=1")], [d[2] for d in av])
+            # 3) chi vende apre per la prima volta, e legge
+            f = telefono("V", f"ordine|{n1}|seller|locked|aperta")
+            prova("CHI VENDE apre l'ordine per la PRIMA volta e legge quel che gli hanno scritto prima, e scrive",
+                  ("scrivi", ["altro: Ciao, prima che tu apra l'ordine"], 0, 1),
+                  (f.get("modo"), f.get("msgs"), f.get("muti"),
+                   conta("SELECT 1 FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o1, V)))
+            telefono("V", "scrivi|Eccomi, la spedisco oggi")
+            f = telefono("C", "battito")
+            prova("...e chi compra legge la risposta", ["io: Ciao, prima che tu apra l'ordine", "altro: Eccomi, la spedisco oggi"],
+                  f.get("msgs"))
+            # 4) un secondo ordine della stessa persona: un altro lucchetto
+            telefono("C", f"ordine|{n2}|buyer|locked|aperta", "battito", "scrivi|Secondo ordine: spedisci insieme?")
+            p1 = [r[0] for r in cs.cassetto("SELECT pub FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o1, V)]
+            p2 = [r[0] for r in cs.cassetto("SELECT pub FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o2, V)]
+            prova("UN SECONDO ORDINE DELLA STESSA PERSONA: un lucchetto DIVERSO, bruciato anche lui", (1, 1, True, 18),
+                  (len(p1), len(p2), p1 != p2, conta("SELECT 1 FROM scorta WHERE tg_id=? AND ordine=''", V)))
+            f = telefono("V", f"ordine|{n2}|seller|locked|aperta")
+            prova("...e chi vende lo legge", ["altro: Secondo ordine: spedisci insieme?"], f.get("msgs"))
+            # 5) la disputa sul primo: il moderatore legge quello, e solo quello
+            fm = telefono("A", "nuovomod")
+            con = banco.con_db()
+            con.execute("UPDATE p2p_moderatori SET chiave=? WHERE tg_id=?", (fm.get("pub") or "", ADMIN))
+            con.commit()
+            con.close()
+            metti(n1, "dispute")
+            metti(n2, "dispute")
+            telefono("C", f"ordine|{n1}|buyer|dispute|aperta", "moderatori")
+            telefono("V", f"ordine|{n1}|seller|dispute|aperta", "moderatori")
+            f = telefono("A", f"leggimod|{o1}|{o2}")
+            prova("IN DISPUTA il moderatore legge la chat di quell'ordine, compreso il messaggio scritto prima "
+                  "che chi vende aprisse", (["compra: Ciao, prima che tu apra l'ordine", "vende: Eccomi, la spedisco oggi"], 0),
+                  (f.get("letti"), f.get("mute")))
+            prova("LA PROVA DI ANDREA, sul server vero: le chiavi che il moderatore ha avuto per un ordine non "
+                  "aprono NESSUNA busta dell'altro ordine della stessa persona",
+                  (True, 1, 0, 0, 1), (f.get("segreti", 0) > 0, f.get("buste2"), f.get("aperteAltro"),
+                                       f.get("altroLetti"), f.get("altroMute")))
+            # 6) chi non ha mai aperto Barattolo: niente lucchetti, «vuole scriverti»
+            f = telefono("C", f"ordine|{n3}|buyer|locked|aperta", "battito")
+            prova("CHI VENDE NON HA MAI APERTO BARATTOLO (nessun lucchetto): al posto del campo «🔔 Avvisa»",
+                  ("chiama", 0), (f.get("modo"), f.get("peers")))
+            inizio = len(DETTI)
+            r1 = await cs.chiama(SRV.chat_chiama_p2p, C, {"ordine": o3})
+            r2 = await cs.chiama(SRV.chat_chiama_p2p, C, {"ordine": o3})
+            av = [d for d in DETTI[inizio:] if d[0] == X]
+            prova("...il tocco manda UN avviso «vuole scriverti», col tasto dritto alla chat; il secondo no",
+                  (True, True, ["💬 <b>Chi compra vuole scriverti nell'ordine #%d.</b>" % n3],
+                   [("💬 Apri la chat", f"{SRV.URL_PUBBLICO}/?ordine={n3}&chat=1")]),
+                  (r1.get("avvisato"), r2.get("gia"), [d[1].split("\n")[0] for d in av], [d[2] for d in av]))
+            f = telefono("C", "battito")
+            prova("...e il piede dice che e' avvisato", "chiamato", f.get("modo"))
+            r3 = await cs.chiama(SRV.chat_chiama_p2p, C, {"ordine": o1})
+            r4 = await cs.chiama(SRV.chat_chiama_p2p, X, {"ordine": o1})
+            prova("...chi ha gia' una chiave non si chiama (si scrive e basta); un estraneo non chiama nessuno",
+                  (False, 403), (r3.get("serve"), r4[0] if isinstance(r4, tuple) else r4))
+            # 7) la scopa: a ordine concluso via i lucchetti bruciati e le chiamate
+            for n in (n1, n2, n3):
+                metti(n, "released")
+                SRV._chat_mercatino_dopo_stato(n)
+            prova("A ORDINE CONCLUSO i lucchetti bruciati e le chiamate se ne vanno; la scorta resta",
+                  (0, 0, 18), (conta("SELECT 1 FROM scorta WHERE ordine IN (?,?,?)", o1, o2, o3),
+                               conta("SELECT 1 FROM chiamate WHERE ordine=?", o3),
+                               conta("SELECT 1 FROM scorta WHERE tg_id=? AND ordine=''", V)))
+        finally:
+            srv.shutdown()
+            qui = asyncio.get_running_loop()
+            for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
+                for c in list(gruppo):
+                    if c.get_loop() is not qui:
+                        gruppo.discard(c)
+
     async def s10():
         import shutil
         import subprocess
@@ -706,6 +896,7 @@ async def giro():
         if not node:
             prova("node c'e'", True, False)
             return
+        scorta_pulita()
         n = nuovo_ordine("locked")
         o = f"m{n}"
         srv, base = tolti.avvia_ponte()
@@ -738,12 +929,16 @@ async def giro():
                    cs.cassetto("SELECT pub FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o, C) and
                    [r[0] for r in cs.cassetto("SELECT pub FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o, C)],
                    f.get("ESPLOSO", "") or f.get("ERRORE", "")))
-            prova("...l'altra parte non c'e' ancora: aspetta, e il saluto non parte senza la sua chiave",
-                  ("attesa", []), (f.get("modo"), tipi(C)))
+            # (20 ott 2026, chat-dalla-notifica) chi vende non ha ne' una chiave ne' una
+            # scorta di lucchetti (non ha mai aperto Barattolo): al posto del campo «🔔 Avvisa»
+            prova("...l'altra parte non c'e' ancora e non ha nessuna chiave: «🔔 Avvisa», e il saluto non "
+                  "parte senza la sua chiave", ("chiama", []), (f.get("modo"), tipi(C)))
             f = telefono("V", f"ordine|{n}|seller|locked|aperta")
+            # (20 ott 2026, chat-dalla-notifica) e scrive SUBITO, per la chiave d'ordine
+            # di chi compra: non aspetta piu' il suo saluto
             prova("CHI VENDE, SENZA profilo: la chiave d'ordine nasce A CASO sul telefono, si presenta, e "
-                  "aspetta il saluto di chi compra",
-                  (True, True, True, "attesa", ["chiave", "saluto"]),
+                  "scrive subito, senza aspettare il saluto di chi compra",
+                  (True, True, True, "scrivi", ["chiave", "saluto"]),
                   (f.get("riquadro"), f.get("caso"), f.get("laSua") is not None, f.get("modo"), tipi(V)))
             f = telefono("C", "battito")
             prova("...chi compra al suo battito presenta la sua chiave e si scrive",
@@ -765,8 +960,10 @@ async def giro():
                   "niente da solo", ("altrove", False, 1), (f.get("modo"), f.get("caso"),
                                                           len(cs.cassetto("SELECT 1 FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o, V))))
             f = telefono("V2", "continua")
-            prova("...«Continua la chat qui»: una chiave d'ordine nuova, presentata; aspetta che chi compra "
-                  "risaluti la chiave nuova", ("attesa", True, 2),
+            # (20 ott 2026, chat-dalla-notifica) ...e si scrive subito, per la chiave
+            # d'ordine di chi compra
+            prova("...«Continua la chat qui»: una chiave d'ordine nuova, presentata, e si scrive subito, "
+                  "senza aspettare che chi compra risaluti", ("scrivi", True, 2),
                   (f.get("modo"), f.get("caso"),
                    len(cs.cassetto("SELECT 1 FROM chiavi_ordine WHERE ordine=? AND tg_id=?", o, V))))
             f = telefono("C", "battito")
@@ -833,6 +1030,7 @@ async def giro():
     await sezione(10, "IL CLIENT VERO CONTRO IL SERVER VERO", s10)
     await sezione(11, "LA RIAPERTURA VERA: LA CHAT FERMA, RILETTA E RITROVATA", s11)
     await sezione(12, "IL CASSETTO DEL SERVER RINASCE: NESSUNA CHAT «ALTROVE» PER SBAGLIO", s12)
+    await sezione(13, "DRITTI ALLA CHAT, E SI SCRIVE SUBITO: IL SECONDO NON HA MAI APERTO LA PAGINA", s13)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)

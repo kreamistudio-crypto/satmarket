@@ -84,6 +84,14 @@ def chiave(n):
     return f"{n:02x}" * 32
 
 
+def sullo_scambio(f):
+    """(20 ott 2026, chat-dalla-notifica) Le domande che la pagina fa SULLO
+    SCAMBIO. Il battito chiede anche della scorta di lucchetti della chat
+    degli ordini (`p2p/chat/scorta`, una volta ogni dieci minuti, su ogni
+    pagina): non riguarda lo scambio, e qui non si conta."""
+    return [x for x in (f.get("chiamate") or []) if x != "p2p/chat/scorta"]
+
+
 def busta(testo):
     """Una busta finta: base64 di qualcosa, che il server non apre."""
     import base64
@@ -408,7 +416,8 @@ async def giro():
                   arrivate[-1]["busta"] if arrivate else "")
             detti = avvisi_chat()
             prova(f"{nome}: a chi compra un avviso solo, senza il testo, col bottone",
-                  [(c, True, (SRV.P2P_BOTTONE_SCAMBIO, f"{SRV.LINK_LIBRO_P2P}?scambio={o}"))],
+                  # (20 ott 2026, chat-dalla-notifica) il tasto porta dritto alla chat: `&chat=1`
+                  [(c, True, (SRV.P2P_BOTTONE_SCAMBIO, f"{SRV.LINK_LIBRO_P2P}?scambio={o}&chat=1"))],
                   [(chi, f"#{o[:4]}" in t and "msg-v" not in t and busta(f"msg-v-{i}") not in t, bt)
                    for chi, t, bt in detti])
             del DETTI[:]
@@ -965,27 +974,30 @@ async def giro():
             f = telefono("T", f"riga|{t}|compro|1|prendo|", "battito")
             prova("PRIMA che il coordinatore risponda la pagina non chiede niente a nessuno: non c'e' "
                   "ancora uno scambio", ([], False, False),
-                  (f.get("chiamate"), f.get("controparte"), f.get("riquadro")))
+                  (sullo_scambio(f), f.get("controparte"), f.get("riquadro")))
             f = telefono("T", f"stato|{t}|attesa_mia_fattura")
             prova("IL COORDINATORE HA RISPOSTO e il server non sa ancora della presa: la pagina CHIEDE "
                   "SUBITO la controparte (una domanda all'archivio), e non la trova",
                   (["p2p/scambi"], False, False, ""),
-                  (f.get("chiamate"), f.get("controparte"), f.get("riquadro"), f.get("ERRORE", "") or f.get("ESPLOSO", "")))
+                  (sullo_scambio(f), f.get("controparte"), f.get("riquadro"), f.get("ERRORE", "") or f.get("ESPLOSO", "")))
             await evento(t, "taken", "buyer", "invoice-next", kt, km)
             f = telefono("T", "avanti|5000", "battito")
             prova("AL BATTITO DOPO (cinque secondi), a pagina aperta e MAI riaperta, con la chat in fondo e "
                   "MAI scorsa: la controparte arriva, il riquadro nasce, la chiave pure",
                   (True, True, True, False, "p2p/scambi"),
                   (f.get("controparte"), f.get("riquadro"), f.get("chiave"), f.get("inVista"),
-                   (f.get("chiamate") or [""])[0]))
+                   (sullo_scambio(f) or [""])[0]))
             prova("...sul server ci sono la sua copia sigillata e il suo saluto, e il diario lo dice",
                   (["chiave", "saluto"], True),
                   (buste_di(TG_C), any("controparte arrivata dal server" in r for r in f.get("diario") or [])))
-            prova("...e intanto aspetta l'altra persona, com'e' giusto", "attesa", f.get("modo"))
+            # (20 ott 2026, chat-dalla-notifica) ...e intanto SCRIVE: per la chiave dello
+            # scambio dell'altra persona, che il coordinatore ha gia' detto
+            prova("...e intanto si scrive gia': per la chiave dello scambio dell'altra persona", "scrivi",
+                  f.get("modo"))
             # CHI HA PUBBLICATO ha la pagina del suo ordine gia' davanti quando viene preso
             f = telefono("M", f"riga|{t}|vendo|1|pubblicato|mio", "battito")
             prova("CHI HA PUBBLICATO, con la pagina del suo ordine gia' aperta: finche' il passo e' «nel "
-                  "libro» non chiede niente", ([], False), (f.get("chiamate"), f.get("riquadro")))
+                  "libro» non chiede niente", ([], False), (sullo_scambio(f), f.get("riquadro")))
             f = telefono("M", f"stato|{t}|attesa_mia_hold")
             prova("...gli arriva «blocca i sats»: la pagina chiede la controparte, la chat parte SUBITO — "
                   "senza riaprire, senza scorrere — e trova gia' la chiave dell'altra persona",

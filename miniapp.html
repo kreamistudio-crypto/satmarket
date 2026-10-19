@@ -3433,6 +3433,12 @@
     #modChiaveCorpo .hint+.hint{margin-top:6px}
     .chatmod{margin:12px 0;padding:12px 14px;border-radius:16px;
       border:1px solid var(--field-line);background:var(--card)}
+    /* DRITTI ALLA CHAT DAL TASTO DELL'AVVISO (20 ott 2026, cantiere
+       chat-dalla-notifica): per due secondi il riquadro si fa vedere,
+       anche dove non scorre (sullo schermo largo e' gia' a destra) */
+    .chatmod.chatsc-evidenza,.trust-note.chatsc-evidenza{outline:3px solid var(--sats);outline-offset:2px}
+    /* «📦 Spedisci a» mentre il dato si apre: lo spazio c'e', il dato no */
+    .sped-riserva{visibility:hidden;pointer-events:none}
     .chatmod small{color:var(--ink-soft);font-weight:600}
     .chatmod-lista{margin:8px 0;max-height:260px;overflow-y:auto}
     .chatmod-msg{margin:6px 0;padding:8px 10px;border-radius:12px;background:var(--chip-bg);
@@ -15166,8 +15172,12 @@ function percorsoDaStartapp(p){
   /* UN ORDINE DEL MERCATINO (16 ott 2026, cantiere chat-mercatino): il
      tasto dell'avviso di un messaggio nuovo nella chat dell'ordine. Si
      rilegge in `/?ordine=<numero>`, che `apriOrdineDaUrl` sa aprire */
-  const om = /^mercatino_([1-9][0-9]{0,11})$/.exec(p);
-  if (om) return '/?ordine=' + om[1];
+  /* ...e con `_chat` in coda (20 ott 2026, cantiere chat-dalla-notifica)
+     dritti alla chat: `&chat=1` */
+  const om = /^mercatino_([1-9][0-9]{0,11})(_chat)?$/.exec(p);
+  if (om) return '/?ordine=' + om[1] + (om[2] ? '&chat=1' : '');
+  const sc = /^scambio_([0-9a-zA-Z-]{8,64})_chat$/.exec(p);
+  if (sc && p.length <= 64) return '/p2p?scambio=' + sc[1] + '&chat=1';
   const m = /^(scambio|ordine)_([0-9a-zA-Z-]{8,64})$/.exec(p);
   return (m && p.length <= 64) ? '/p2p?' + m[1] + '=' + m[2] : '';
 }
@@ -15493,14 +15503,17 @@ let tgMiniappLink = '';
 function startappDaLink(link, base){
   const u = String(link || ''), radice = base + '/p2p';
   /* l'ordine del mercatino (16 ott 2026): il gemello di `_startapp_da_link` */
-  const om = /^\/\?ordine=([1-9][0-9]{0,11})$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
-  if (om) return 'mercatino_' + om[1];
+  /* ...e dritti alla chat (20 ott 2026): `&chat=1` diventa `_chat` */
+  const om = /^\/\?ordine=([1-9][0-9]{0,11})(&chat=1)?$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
+  if (om) return 'mercatino_' + om[1] + (om[2] ? '_chat' : '');
   if (u === radice) return 'p2p';
   if (u === radice + '?pausa=1') return 'pausa';
   for (const nome of ['scambio', 'ordine']) {
     const testa = radice + '?' + nome + '=';
     if (u.indexOf(testa) === 0) {
-      const p = nome + '_' + u.slice(testa.length);
+      let resto = u.slice(testa.length), coda = '';
+      if (nome === 'scambio' && /&chat=1$/.test(resto)) { resto = resto.slice(0, -'&chat=1'.length); coda = '_chat'; }
+      const p = nome + '_' + resto + coda;
       if (percorsoDaStartapp(p)) return p;
     }
   }
@@ -35715,6 +35728,13 @@ function forseAvvisoTrasporto(o){
   if (o.consegnaScelta==='ritiro' || o.consegnaScelta==='digitale'
       || o.consegnaScelta==='servizio') return;
   if (o.asta && !o.consegnaScelta) return;   // aspetta la scelta del vincitore
+  /* DAL TASTO DI UN AVVISO DELLA CHAT (20 ott 2026, cantiere
+     chat-dalla-notifica, richiesta di Andrea): chi tocca «Apri l'ordine»
+     sotto un messaggio viene a rispondere, e il foglio si aprirebbe
+     SOPRA la chat. Non si apre e il timbro non si consuma: arriva alla
+     prossima apertura di Barattolo. Intanto i consigli sulla spedizione
+     restano nel pannello «📦 Spedisci» della pagina */
+  if (typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO) return;
   myAvvisatoTrasporto = 1;                   // il timbro PRIMA di aprire
   el('sheetBg').classList.add('open');
   el('trasportoSheet').classList.add('open');
@@ -44603,12 +44623,34 @@ function riquadroSpedisciA(o){
   const coda = (manca.indirizzo || manca.email)
     ? (attesa ? `<div class="hint" style="margin-top:6px">⏳ Apro ${manca.indirizzo ? 'l\'indirizzo' : 'l\'email'}…</div>` : riprova)
     : '';
+  /* LO SPAZIO RISERVATO (20 ott 2026, cantiere chat-dalla-notifica,
+     richiesta di Andrea): mentre l'indirizzo (o l'email) si apre, le sue
+     righe ci sono gia' — invisibili, con «…» al posto del dato — cosi'
+     quando arriva il riquadro non cresce e quel che sta sotto, la chat,
+     non scivola. Tutte le righe possibili: se il dato vero ne ha meno, il
+     riquadro si ACCORCIA, mai il contrario */
+  if (attesa && !o.viaPunto && manca.indirizzo) {
+    const tutti = {};
+    for (const k of ['nome', 'via', 'cap', 'citta', 'provincia', 'paese', 'telefono', 'note']) tutti[k] = '…';
+    corpo = riservaSpedisciA(righeIndirizzo(tutti, spedEstero(o))
+      + '<button class="btn ghost sped-tutto" tabindex="-1">📋 Copia tutto l\'indirizzo</button>');
+  } else if (attesa && o.viaPunto && manca.email) {
+    corpo += riservaSpedisciA('<div class="dati-copia">'
+      + rigaDato('Email', '…', Object.assign({mono: true}, COPIA_PICCOLA)) + '</div>'
+      + '<button class="btn ghost sped-tutto" tabindex="-1">📋 Copia tutto</button>');
+  }
   return `<div class="payout spedisci-a" id="spedisciA">
       <h4>${o.state === 'shipped' ? '📦 Spedito a' : '📦 Spedisci a'}</h4>
       <div class="sped-tipo">${tipo}</div>
       ${corpo}
       ${coda}${bottoneTutto}
     </div>`;
+}
+
+/* PURA: lo spazio riservato del riquadro — c'e', occupa, non si vede e
+   non si tocca (20 ott 2026) */
+function riservaSpedisciA(html){
+  return '<div class="sped-riserva" aria-hidden="true" inert>' + html + '</div>';
 }
 
 /* «Copia tutto»: i valori delle righe, uno per riga — l'indirizzo
@@ -52173,8 +52215,16 @@ function widgetLoginTelegram(posto){
    widget lo risolve da se' con un'ancora (`a.href`), e ogni uso di
    location.origin nel file e' censito apposta. */
 function urlRitornoLogin(){
+  /* ...E LA QUERY (20 ott 2026, cantiere chat-dalla-notifica): il link
+     di un avviso — `/?ordine=1&chat=1` — deve riportare li' dopo il
+     login, nella chat. Solo nella forma che il server accetta
+     (`FORMA_RITORNO_LOGIN`), e senza il segno di un login rifiutato: fuori
+     forma si torna al solo percorso, come prima */
+  const p = new URLSearchParams(location.search);
+  p.delete('accesso');
+  const q = p.toString();
   return API_BASE + '/login/telegram/ritorno?da='
-    + encodeURIComponent(location.pathname);
+    + encodeURIComponent(location.pathname + (q && /^[A-Za-z0-9_\-.=&]+$/.test(q) ? '?' + q : ''));
 }
 /* ...e un login rifiutato torna con `?accesso=no`: la stessa frase di
    prima, e il parametro si toglie dalla barra senza ricaricare. */
@@ -82248,7 +82298,108 @@ function chatMercCandidateP2P(id){
     try { v.push({sk: c.ordineSk, pub: NT.getPublicKey(NT.utils.hexToBytes(c.ordineSk))}); } catch(e) {}
   const mz = (typeof mazzoMostro === 'function') ? mazzoMostro() : null;
   if (mz && mz.sk) try { v.push(chiaveOrdineMercatinoP2P(mz.sk, id)); } catch(e) {}
+  /* ...e I LUCCHETTI DELLA SCORTA (20 ott 2026) che il server ha bruciato
+     per questo ordine come MIEI: quelli nati qui a caso (la chiave
+     segreta e' in questa memoria) e quelli nati dal profilo (col seme
+     che il server ripete) */
+  const info = p2pChatMercInfo[id] || {};
+  const loc = chatScortaLocaleP2P();
+  for (const pub of (info.mie || [])) {
+    if (/^[0-9a-f]{64}$/.test(loc[pub] || '')) v.push({sk: loc[pub], pub: pub});
+    const seme = (info.semi || {})[pub];
+    if (seme && mz && mz.sk)
+      try { const k = chiaveScortaP2P(mz.sk, seme); if (k.pub === pub) v.push(k); } catch(e) {}
+  }
   return v;
+}
+/* ---- LA SCORTA DI LUCCHETTI (20 ott 2026, cantiere chat-dalla-notifica,
+   decisione di Andrea: «fai come Signal») ----
+   Prima si poteva scrivere solo quando ANCHE l'altra parte aveva aperto
+   la pagina dell'ordine: la sua chiave d'ordine nasceva li'. Adesso ogni
+   telefono lascia al server, a ogni apertura di Barattolo, una SCORTA di
+   lucchetti aperti usa-e-getta: la sola parte pubblica di chiavi nate
+   qui. A ogni ordine nuovo il server da' all'altra parte UNO dei miei
+   come mia chiave d'ordine, e lo brucia. Ogni ordine ha cosi' la sua
+   chiave: la chiave di lettura che va al moderatore in disputa apre
+   quell'ordine e nessun altro (il perche' di Andrea contro una chiave
+   unica per conto). Niente derivazioni additive da una chiave madre.
+   PIU' DISPOSITIVI: chi ha un profilo di scambio fa nascere i lucchetti
+   dal profilo con un SEME a caso (HMAC, a senso unico), e ogni suo
+   dispositivo li ritrova dal seme; chi non ce l'ha li fa nascere a caso
+   e li tiene solo questa memoria (`CHATSC_SCORTA_CHIAVE`): da un altro
+   dispositivo la chat e' «aperta altrove», come prima. */
+const CHATSC_SCORTA_CHIAVE = 'barattolo_chat_scorta';
+const CHATSC_SCORTA_ETICHETTA = 'barattolo/mercatino/chat/scorta/v1';
+const CHATSC_SCORTA_OGNI_MS = 10 * 60 * 1000;   // una domanda ogni dieci minuti, ad app in vista
+let p2pChatScortaUltima = 0;
+let p2pChatScortaInVolo = null;
+/* le chiavi segrete dei lucchetti nati a caso qui: `{pub: sk}` */
+function chatScortaLocaleP2P(){
+  try {
+    const v = JSON.parse(localStorage.getItem(chiaveP2P(CHATSC_SCORTA_CHIAVE)) || '{}');
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  } catch(e) { return {}; }
+}
+function chatScortaScriviP2P(v){
+  try { localStorage.setItem(chiaveP2P(CHATSC_SCORTA_CHIAVE), JSON.stringify(v || {})); } catch(e) {}
+}
+/* PURA (a parte la crittografia): un lucchetto dal profilo e dal suo
+   seme — HMAC-SHA256 con un'etichetta sua, come le chiavi d'ordine */
+function chiaveScortaP2P(sk, seme){
+  const NT = window.NostrTools;
+  const enc = new TextEncoder();
+  const skB = NT.utils.hexToBytes(sk);
+  for (let giro = 0; giro < 8; giro++) {
+    const cand = NT.hmac(NT.sha256, skB, enc.encode(CHATSC_SCORTA_ETICHETTA + '|' + seme + (giro ? '/' + giro : '')));
+    try { return {sk: NT.utils.bytesToHex(cand), pub: NT.getPublicKey(cand)}; } catch(e) {}
+  }
+  throw new Error('lucchetto non derivabile');
+}
+/* LA SCORTA SI GUARDA E SI RIEMPIE: una domanda (quanti ne ho, quali
+   tiene il server), le chiavi segrete di quelli che non ci sono piu'
+   buttate, e sotto la soglia nuovi lucchetti fino alla scorta piena.
+   PRIMA si scrive, POI si spedisce: un lucchetto dato al server e perso
+   qui sarebbe una chat che l'altro scrive a nessuno. */
+function chatScortaP2P(forza){
+  if (p2pChatScortaInVolo) return p2pChatScortaInVolo;
+  if ((typeof VETRINA !== 'undefined' && VETRINA) || (typeof DEMO !== 'undefined' && DEMO) || !myTgId)
+    return Promise.resolve(null);
+  if (!forza && Date.now() - p2pChatScortaUltima < CHATSC_SCORTA_OGNI_MS) return Promise.resolve(null);
+  p2pChatScortaUltima = Date.now();
+  p2pChatScortaInVolo = (async () => {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    let d = await chatScFetch('scorta', {lucchetti: []});
+    /* la leva spenta: si richiede fra un'ora */
+    if (d.spenta) { p2pChatScortaUltima = Date.now() + 50 * 60 * 1000; return d; }
+    const loc = chatScortaLocaleP2P();
+    const vivi = Array.isArray(d.vivi) ? d.vivi : [];
+    let cambiata = false;
+    for (const pub of Object.keys(loc)) if (vivi.indexOf(pub) < 0) { delete loc[pub]; cambiata = true; }
+    const manca = (d.piena | 0) - (d.quante | 0);
+    if ((d.quante | 0) >= (d.ricarica | 0) || manca <= 0) {
+      if (cambiata) chatScortaScriviP2P(loc);
+      return d;
+    }
+    const mz = await chatMercProfiloP2P();
+    const lucchetti = [];
+    for (let i = 0; i < manca; i++) {
+      if (mz && mz.sk) {
+        /* 16 byte a caso: quelli del generatore di chiavi */
+        const seme = NT.utils.bytesToHex(NT.generateSecretKey().slice(0, 16));
+        lucchetti.push({pub: chiaveScortaP2P(mz.sk, seme).pub, seme: seme});
+      } else {
+        const sk = NT.generateSecretKey();
+        const pub = NT.getPublicKey(sk);
+        loc[pub] = NT.utils.bytesToHex(sk);
+        lucchetti.push({pub: pub, seme: ''});
+      }
+    }
+    chatScortaScriviP2P(loc);
+    d = await chatScFetch('scorta', {lucchetti: lucchetti});
+    return d;
+  })().catch(() => null).finally(() => { p2pChatScortaInVolo = null; });
+  return p2pChatScortaInVolo;
 }
 /* la chiave dell'ordine di questo dispositivo, fra quelle che il server
    conosce come MIE: senza, qui non si firma niente */
@@ -82281,7 +82432,17 @@ async function chatMercDichiaraP2P(id, forza){
   if (gia) return gia;
   /* la chat ferma non accetta niente di nuovo, chiavi comprese */
   if (o.ferma) return null;
-  if ((o.mie || []).length && !forza) return null;
+  if ((o.mie || []).length && !forza) {
+    /* (20 ott 2026) il server conosce una chiave mia nata dal profilo —
+       un lucchetto della scorta — e il profilo qui non e' ancora in
+       mano: lo si ritrova, e si riguarda, prima di dire «altrove» */
+    if (!mazzoMostro() && Object.keys((p2pChatMercInfo[id] || {}).semi || {}).length) {
+      await chatMercProfiloP2P();
+      const ora = chatMercChiaveP2P(chatScRigaP2P(id));
+      if (ora) return ora;
+    }
+    return null;
+  }
   await chatMercProfiloP2P();
   let k = chatMercCandidateP2P(id).slice(-1)[0] || null;
   /* il profilo dice la sua per ultimo: se c'e', la chiave e' la sua */
@@ -82315,7 +82476,7 @@ function chatMercSpegniP2P(){
 function chatMercBloccoHTML(om){
   if (!om || (om.role !== 'buyer' && om.role !== 'seller')) return '';
   const id = 'm' + om.id;
-  const chiusa = '<div class="trust-note"><span>💬</span><span>' + esc(CHATSC_MERC_CHIUSA) + '</span></div>';
+  const chiusa = '<div class="trust-note" id="chatscChiusa"><span>💬</span><span>' + esc(CHATSC_MERC_CHIUSA) + '</span></div>';
   if (om.chat === 'chiusa') return chiusa;
   if ((om.chat !== 'aperta' && om.chat !== 'ferma') || p2pChatMercSpenta) return '';
   /* il server ha appena detto che e' finita: la riga, non il riquadro */
@@ -82679,17 +82840,22 @@ function chatScBustaP2P(o, c, testo, quando, f){
     kind: CHATSC_MSG, created_at: quando, tags: tags, content: testo
   }, NT.utils.hexToBytes(c.sk));
   return {dentro: dentro,
-          busta: NT.nip44.encrypt(JSON.stringify(dentro), chatScSegretoP2P(c.sk, c.loro.pub))};
+          busta: NT.nip44.encrypt(JSON.stringify(dentro), chatScSegretoP2P(c.sk, chatScLoroP2P(c, o).pub))};
 }
 /* PURA: un messaggio che arriva. Si prova con ogni chiave MIA (quella
    in mano e quelle ritrovate dalle copie) e con ogni chiave che
    l'altra parte ha presentato (di solito una e una); a firmare
    dev'essere una delle due chiavi di QUELLA coppia. Torna
-   `{id, t, mio, testo}` o null. */
-function chatScApriMsgP2P(o, c, busta){
+   `{id, t, mio, testo}` o null.
+   (20 ott 2026) ANCHE LE COPPIE CON LE CHIAVI D'ORDINE: un messaggio
+   scritto prima che una delle due parti si presentasse e' chiuso per la
+   chiave d'ordine dell'altra (`chatScLoroP2P`) — la mia `tk`, o la sua. */
+function chatScApriMsgP2P(o, c, busta, tk){
   const NT = window.NostrTools;
-  for (const mia of chatScMieChiaviP2P(c))
-    for (const l of ((c && c.loroTutte) || []).slice().reverse()) {
+  const mie = chatScMieChiaviP2P(c).concat(tk && tk.sk && tk.pub ? [{sk: tk.sk, pub: tk.pub}] : []);
+  const loro = ((c && c.loroTutte) || []).slice().reverse().concat(chatScPeersP2P(o).map(p => ({pub: p})));
+  for (const mia of mie)
+    for (const l of loro) {
       let ev;
       try { ev = JSON.parse(NT.nip44.decrypt(busta, chatScSegretoP2P(mia.sk, l.pub))); }
       catch(e) { continue; }
@@ -82768,7 +82934,7 @@ function chatScPosaP2P(o, tk, c0, buste, giro){
   }
   for (const b of lista) {
     if (!b || b.tipo !== 'msg') continue;
-    const m = chatScApriMsgP2P(o, c, b.busta);
+    const m = chatScApriMsgP2P(o, c, b.busta, tk);
     if (!m) { c.muti = (c.muti | 0) + 1; continue; }
     /* il mio appena spedito torna dal server col suo numero: lo prende,
        cosi' resta al suo posto fra quelli arrivati dopo */
@@ -82792,10 +82958,28 @@ function chatScPosaP2P(o, tk, c0, buste, giro){
 function chatScAltroveP2P(c){
   return !!(c && c.mioUltimo && c.mioUltimo.pub !== c.pub);
 }
+/* PURA: LA CHIAVE DELL'ALTRA PARTE A CUI SI SCRIVE (20 ott 2026, cantiere
+   chat-dalla-notifica): quella usa-e-getta che ha presentato col suo
+   saluto o, FINCHE' NON SI E' PRESENTATA, la sua chiave d'ordine — nel
+   mercatino il lucchetto della sua scorta che il server ha bruciato per
+   questo ordine, nel P2P la chiave dello scambio che dice il
+   coordinatore. Si scrive subito; il suo telefono apre con la chiave
+   d'ordine (`chatScApriMsgP2P`). Senza `o` vale solo il saluto, come
+   prima. */
+function chatScLoroP2P(c, o){
+  if (c && c.loro) return c.loro;
+  return (o && o.peer) ? {pub: o.peer, provv: 1} : null;
+}
+/* PURA: le chiavi d'ordine (o dello scambio) dell'altra parte */
+function chatScPeersP2P(o){
+  if (!o) return [];
+  const v = (o.mercatino ? (o.peers || []) : []).concat(o.peer ? [o.peer] : []);
+  return v.filter((k, i) => /^[0-9a-f]{64}$/.test(k) && v.indexOf(k) === i);
+}
 /* PURA: si puo' scrivere? Serve la mia chiave, presentata per ultima,
-   e quella dell'altra parte. */
-function chatScProntaP2P(c){
-  return !!(c && c.sk && c.loro && c.mioUltimo && !chatScAltroveP2P(c));
+   e una chiave dell'altra parte (`chatScLoroP2P`). */
+function chatScProntaP2P(c, o){
+  return !!(c && c.sk && chatScLoroP2P(c, o) && c.mioUltimo && !chatScAltroveP2P(c));
 }
 
 /* ---- il filo col server: solo POST col corpo, mai un dato nell'indirizzo ---- */
@@ -82913,7 +83097,11 @@ function chatScRitiraP2P(id){
     /* le chiavi d'ordine che il server presenta (mercatino) */
     if (merc && d.aperta)
       p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : [],
-                             ferma: !!d.ferma, stato: (chatMercOrdineP2P(id) || {}).state || ''};
+                             ferma: !!d.ferma, stato: (chatMercOrdineP2P(id) || {}).state || '',
+                             /* (20 ott 2026) i semi dei miei lucchetti, e se l'altra
+                                parte non ha nessuna chiave (si puo' chiamarla) */
+                             semi: (d.semi && typeof d.semi === 'object') ? d.semi : {},
+                             senzaChiave: !!d.altro_senza_chiave, chiamato: !!d.chiamato};
     if (merc && d.aperta && !chatScTradeP2P(chatScRigaP2P(id))) {
       try { await chatMercDichiaraP2P(id, false); } catch(e) {}
     }
@@ -83023,7 +83211,7 @@ function chatScRitiraP2P(id){
 async function chatScInviaP2P(id, testo, f){
   const o = chatScRigaP2P(id);
   const c = chatScDiP2P(id);
-  if (!chatScServeP2P(o) || !chatScProntaP2P(c)) throw new Error('La chat non è ancora aperta');
+  if (!chatScServeP2P(o) || !chatScProntaP2P(c, o)) throw new Error('La chat non è ancora aperta');
   const quando = Math.floor(Date.now() / 1000);
   const b = chatScBustaP2P(o, c, testo, quando, f);
   await chatScFetch('invia', {ordine: id, tipo: 'msg', busta: b.busta});
@@ -83055,6 +83243,24 @@ async function inviaChatScambioP2P(){
     toast('Non è partito: ' + String((e && e.message) || e));
   } finally {
     if (chatScEl('p2pChatScInvia')) chatScEl('p2pChatScInvia').disabled = false;
+  }
+  chatScRidisegnaP2P(id);
+}
+/* «VUOLE SCRIVERTI» (20 ott 2026, cantiere chat-dalla-notifica): il
+   tocco su «🔔 Avvisa …». Il server manda un avviso, uno per ordine */
+async function chiamaChatScP2P(){
+  const id = chatScApertoP2P();
+  if (!id || !chatScMercP2P(id)) return;
+  haptic();
+  const btn = chatScEl('p2pChatScChiama');
+  if (btn) btn.disabled = true;
+  try {
+    const d = await chatScFetch('chiama', {ordine: id});
+    const info = p2pChatMercInfo[id] || (p2pChatMercInfo[id] = {peers: [], mie: []});
+    if (d.serve === false) { info.senzaChiave = false; chatScRitiraP2P(id); }
+    else { info.chiamato = true; toast(d.gia ? 'Già avvisato' : '🔔 Avvisato'); }
+  } catch(e) {
+    toast('Non è partito: ' + String((e && e.message) || e));
   }
   chatScRidisegnaP2P(id);
 }
@@ -83094,7 +83300,7 @@ function chatScContaP2P(){
    preso la disputa (e' li' che il coordinatore gli dice le due chiavi
    dello scambio). LEGGE E NON SCRIVE: per scrivere servirebbe la mia
    chiave usa-e-getta, che non parte. */
-function chatScPaccoP2P(o, c){
+function chatScPaccoP2P(o, c, tk){
   const NT = window.NostrTools;
   /* TUTTE le mie chiavi (quella in mano e le ritrovate) per tutte le
      sue: il moderatore legge la chat intera, da qualunque memoria sia
@@ -83105,6 +83311,19 @@ function chatScPaccoP2P(o, c){
   for (const mia of chatScMieChiaviP2P(c))
     for (const l of (c.loroTutte || []))
       chiavi.push({a: mia.pub, b: l.pub, k: NT.utils.bytesToHex(chatScSegretoP2P(mia.sk, l.pub))});
+  /* (20 ott 2026) ...e le coppie con le CHIAVI D'ORDINE dei messaggi
+     scritti prima che una parte si presentasse: la mia usa-e-getta con le
+     sue chiavi d'ordine, la mia chiave d'ordine con le sue usa-e-getta.
+     Sono tutte chiavi di QUESTO ordine: il pacco non apre nient'altro.
+     La coppia delle due chiavi d'ordine no: e' quella dei saluti, che
+     nel pacco ci sono gia' */
+  const peers = chatScPeersP2P(o);
+  for (const mia of chatScMieChiaviP2P(c))
+    for (const p of peers)
+      chiavi.push({a: mia.pub, b: p, k: NT.utils.bytesToHex(chatScSegretoP2P(mia.sk, p))});
+  if (tk && tk.sk && tk.pub)
+    for (const l of (c.loroTutte || []))
+      chiavi.push({a: tk.pub, b: l.pub, k: NT.utils.bytesToHex(chatScSegretoP2P(tk.sk, l.pub))});
   return {v: 1, ordine: String(o.id), saluti: saluti, chiavi: chiavi};
 }
 async function chatScAiModeratoriP2P(id){
@@ -83118,8 +83337,11 @@ async function chatScAiModeratoriP2P(id){
   if (!o || !tk) return;
   if (o.mercatino ? !o.disputa : (o.stato !== 'in_disputa' || !o.disputaMia)) return;
   if (!chatScAccesaP2P(o)) return;
-  if (!c || !c.sk || !(c.loroTutte || []).length) return;
-  const cosa = chatScMieChiaviP2P(c).map(m => m.pub).join(',') + '|' + (c.loroTutte || []).map(l => l.pub).join(',');
+  /* (20 ott 2026) anche senza un saluto dell'altra parte: i messaggi
+     scritti per la sua chiave d'ordine si leggono lo stesso */
+  if (!c || !c.sk || (!(c.loroTutte || []).length && !chatScPeersP2P(o).length)) return;
+  const cosa = chatScMieChiaviP2P(c).map(m => m.pub).join(',') + '|' + (c.loroTutte || []).map(l => l.pub).join(',')
+    + '|' + chatScPeersP2P(o).join(',');
   if (c.modDato && c.modTutti && Object.keys(c.modDato).every(m => c.modDato[m] === cosa)) {
     /* gia' dato a tutti quelli che c'erano: si richiede l'elenco solo
        ogni tanto, per un moderatore arrivato dopo */
@@ -83134,7 +83356,7 @@ async function chatScAiModeratoriP2P(id){
     c.mioSaluti = [chatScSalutoP2P(o, tk, c.pub, (c.saluto && c.saluto.t) || Math.floor(Date.now() / 1000)).dentro];
     chatScScriviP2P(id, c);
   }
-  const pacco = JSON.stringify(chatScPaccoP2P(o, c));
+  const pacco = JSON.stringify(chatScPaccoP2P(o, c, tk));
   for (const m of chiavi) {
     c = chatScDiP2P(id);
     if (!c) return;
@@ -83587,7 +83809,7 @@ function chatScMessaggiHTML(c, altro, o){
      finche' la chat non e' aperta lo dice gia' il piede («si apre
      appena…»): due righe per dire «niente» erano una di troppo */
   if (!l.length)
-    return ((c && c.muti) || !chatScProntaP2P(c)) ? '' : '<div class="hint">Ancora nessun messaggio.</div>';
+    return ((c && c.muti) || !chatScProntaP2P(c, o)) ? '' : '<div class="hint">Ancora nessun messaggio.</div>';
   /* il PayCode e' delle sole pagine degli scambi */
   const pcScambio = (o && o.mercatino) ? '' : payCodeScambioP2P(o);
   return l.map(m => {
@@ -83630,7 +83852,19 @@ function chatScPiedeP2P(o, c){
     return {modo: 'altrove', html:
       '<div class="hint">Questa chat è aperta su un altro dispositivo o browser. Riaprila da lì e torna anche qui; se la continui qui, i messaggi di prima qui non si vedono.</div>'
       + '<button class="btn ghost" onclick="continuaChatScambioP2P()">Continua la chat qui</button>'};
-  if (!chatScProntaP2P(c))
+  /* L'ALTRA PARTE NON HA NESSUNA CHIAVE (20 ott 2026): non ha aperto
+     Barattolo da quando c'e' la scorta. La si puo' chiamare: un avviso,
+     col tasto che la porta dritta qui */
+  const infoMerc = (o && o.mercatino) ? (p2pChatMercInfo[o.id] || {}) : {};
+  if (!chatScProntaP2P(c, o) && o && o.mercatino && infoMerc.senzaChiave && !o.peer) {
+    const chi = chatScNomeP2P(o, o.lato === 'compro' ? 'chi vende' : 'chi compra');
+    return infoMerc.chiamato
+      ? {modo: 'chiamato', html: '<div class="hint">Avvisato: la chat si apre appena ' + esc(chi) + ' entra.</div>'}
+      : {modo: 'chiama', html: '<div class="hint">Si apre appena ' + esc(chi) + ' entra in Barattolo.</div>'
+          + '<button class="btn ghost" id="p2pChatScChiama" onclick="chiamaChatScP2P()">🔔 Avvisa '
+          + esc(chi) + '</button>'};
+  }
+  if (!chatScProntaP2P(c, o))
     return {modo: 'attesa', html:
       '<div class="hint">Si apre appena ' + esc(chatScNomeP2P(o, o.mercatino ? (o.lato === 'compro' ? 'chi vende' : 'chi compra') : 'l\'altra persona'))
       + (o.mercatino ? ' apre l\'ordine.' : ' apre lo scambio.') + '</div>'};
@@ -83714,6 +83948,9 @@ function bloccoChatScambioP2P(o){
         nuovo.focus();
         try { nuovo.setSelectionRange(fuoco[0], fuoco[1]); } catch(e){}
       }
+      /* la pagina intera riscritta col campo nuovo: se si aspettava il
+         cursore dal tasto di un avviso, entra adesso (20 ott 2026) */
+      else if (nuovo) chatDaAvvisoFuocoP2P(o.id);
     }, 0);
   }
   return chatScBloccoHTML(o, chatScDiP2P(o.id), p2pChatScSapere[o.id]);
@@ -83781,6 +84018,84 @@ function chatScGuardataP2P(){
   chatScVistoP2P(id);
   chatScRichiamoAggiornaP2P(id);
 }
+/* ---- DRITTI ALLA CHAT DAL TASTO DELL'AVVISO (20 ott 2026, cantiere
+   chat-dalla-notifica, richiesta di Andrea) ----
+   Il tasto di «Hai un nuovo messaggio» (e di «vuole scriverti») porta
+   `&chat=1`: aperto l'ordine o lo scambio, la pagina va al riquadro
+   della chat — sul telefono ci scorre, sullo schermo largo e' gia' a
+   destra — lo fa vedere per due secondi e mette il cursore nella
+   casella. Il riquadro puo' arrivare dopo (gli ordini, la controparte):
+   si riguarda ogni quarto di secondo, per quindici secondi al massimo.
+   Una chat gia' cancellata ha la sua riga («Chat chiusa…»): si va li'. */
+const CHAT_DA_AVVISO = /[?&]chat=1(?:&|$)/.test(typeof location !== 'undefined' ? location.search : '');
+let p2pChatDaAvviso = null;       // {id, fino}: la chat a cui il tasto vuole portare
+let p2pChatDaAvvisoFuoco = null;  // {id, fino}: il cursore aspetta il campo
+/* IL CURSORE APPENA C'E' IL CAMPO (20 ott 2026, richiesta di Andrea): se
+   si e' arrivati dal tasto e il piede nasce «si apre appena…», il campo
+   arriva al primo ritiro. Lo chiama chi riscrive il piede quando diventa
+   «scrivi»: il cursore entra li', e una volta sola. Mai se la persona ha
+   gia' toccato altro. */
+function chatDaAvvisoFuocoP2P(id){
+  const v = p2pChatDaAvvisoFuoco;
+  if (!v || v.id !== String(id) || Date.now() > v.fino || typeof document === 'undefined') return false;
+  const campo = chatScEl('p2pChatScTesto');
+  if (!campo) return false;
+  const att = document.activeElement;
+  if (att && att !== campo && att !== document.body && att.tagName !== 'BUTTON') { p2pChatDaAvvisoFuoco = null; return false; }
+  p2pChatDaAvvisoFuoco = null;
+  try { campo.focus({preventScroll: true}); } catch(e) { campo.focus(); }
+  return true;
+}
+function chatDaAvvisoP2P(id){
+  if (typeof document === 'undefined' || !id) return;
+  p2pChatDaAvviso = {id: String(id), fino: Date.now() + 15000};
+  p2pChatDaAvvisoFuoco = {id: String(id), fino: Date.now() + 20000};
+  chatDaAvvisoProvaP2P();
+}
+function chatDaAvvisoProvaP2P(){
+  const v = p2pChatDaAvviso;
+  if (!v) return;
+  if (Date.now() > v.fino) { p2pChatDaAvviso = null; return; }
+  const box = chatScApertoP2P() === v.id ? (chatScEl('p2pChatSc') || chatScEl('chatscChiusa')) : null;
+  if (!box) { setTimeout(chatDaAvvisoProvaP2P, 250); return; }
+  p2pChatDaAvviso = null;
+  /* sullo schermo largo il riquadro e' appeso a destra (sticky): non
+     si scorre la pagina, si illumina */
+  const appeso = typeof getComputedStyle === 'function' && getComputedStyle(box).position === 'sticky';
+  if (!appeso) box.scrollIntoView({behavior: 'auto', block: 'start'});
+  box.classList.add('chatsc-evidenza');
+  setTimeout(() => { const b = chatScEl('p2pChatSc') || chatScEl('chatscChiusa'); if (b) b.classList.remove('chatsc-evidenza'); }, 2000);
+  /* il cursore nella casella: subito, e di nuovo dopo il primo ritiro
+     (il piede puo' passare da «si apre appena…» a «scrivi»), finche'
+     la persona non ha toccato altro */
+  /* LA PAGINA CRESCE SOPRA DOPO IL DISEGNO (dal giro: i dati di «📦
+     Spedisci» arrivano dopo, e la chat scivolava sotto lo schermo): se
+     nessuno ha scorso nel frattempo e la chat non e' piu' in vista, ci
+     si torna */
+  let lasciato = typeof scrollY === 'number' ? scrollY : 0;
+  const rimetti = () => {
+    if (appeso || chatScApertoP2P() !== v.id) return;
+    const b2 = chatScEl('p2pChatSc') || chatScEl('chatscChiusa');
+    if (!b2 || Math.abs((scrollY || 0) - lasciato) > 2) return;
+    const r = b2.getBoundingClientRect();
+    if (r.top >= 0 && r.top < (innerHeight || 0) / 2) return;
+    b2.scrollIntoView({behavior: 'auto', block: 'start'});
+    lasciato = scrollY || 0;
+  };
+  const fuoco = () => {
+    if (chatScApertoP2P() !== v.id) return;
+    rimetti();
+    const campo = chatScEl('p2pChatScTesto');
+    const att = document.activeElement;
+    if (!campo || att === campo || (att && att !== document.body && att.tagName !== 'BUTTON')) return;
+    try { campo.focus({preventScroll: true}); } catch(e) { campo.focus(); }
+  };
+  fuoco();
+  setTimeout(fuoco, 600);
+  setTimeout(fuoco, 1500);
+  setTimeout(fuoco, 3500);
+  setTimeout(chatScGuardataP2P, 60);
+}
 function vaiAllaChatP2P(){
   const b = chatScEl('p2pChatSc');
   if (!b) return;
@@ -83809,7 +84124,12 @@ function chatScRidisegnaP2P(id){
   lista.innerHTML = chatScListaP2P(o, c);
   if (inFondo) lista.scrollTop = lista.scrollHeight;
   const p = chatScPiedeP2P(o, c);
-  if (piede.dataset.modo !== p.modo) { piede.dataset.modo = p.modo; piede.innerHTML = p.html; }
+  if (piede.dataset.modo !== p.modo) {
+    piede.dataset.modo = p.modo; piede.innerHTML = p.html;
+    /* il piede e' diventato «scrivi»: se si e' arrivati dal tasto di un
+       avviso, il cursore entra adesso (20 ott 2026) */
+    if (p.modo === 'scrivi') chatDaAvvisoFuocoP2P(id);
+  }
   chatScRichiamoAggiornaP2P(id);
 }
 /* IL POLSO DELLA CHAT: finche' lo scambio e' davanti e la pagina e' in
@@ -83824,6 +84144,9 @@ function chatScBattitoP2P(){
   if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
   /* il pallino: una domanda ogni mezzo minuto, su qualunque pagina */
   if (!(p2pChatScBattiti++ % CHATSC_NOVITA_OGNI)) chatScNovitaP2P();
+  /* la scorta dei lucchetti (20 ott 2026): il freno dei dieci minuti e'
+     dentro */
+  chatScortaP2P();
   const aperto = chatScApertoP2P();
   if (!aperto) return;
   if (chatScSenzaControparteP2P(chatScRigaP2P(aperto))) {
@@ -83869,6 +84192,10 @@ function chatPartiApriP2P(k, arch, ordine, d){
   for (const t of [].concat(arch.compra || [])) if (/^[0-9a-f]{64}$/.test(t)) lati[t] = 'compra';
   for (const t of [].concat(arch.vende || [])) if (/^[0-9a-f]{64}$/.test(t)) lati[t] = 'vende';
   const eph = {};                 // chiave usa-e-getta -> lato
+  /* (20 ott 2026) il lato di una chiave: usa-e-getta (dal saluto) o
+     d'ordine (dal server): i messaggi scritti prima di un saluto sono
+     chiusi per una chiave d'ordine */
+  const lato = x => eph[x] || lati[x] || '';
   const chiavi = [];              // {a, b, k}
   for (const p of (d.chiavi || [])) {
     let pacco = null;
@@ -83887,7 +84214,7 @@ function chatPartiApriP2P(k, arch, ordine, d){
       eph[ev.content] = lati[ev.pubkey];
     }
     for (const c of (pacco.chiavi || []))
-      if (c && /^[0-9a-f]{64}$/.test(c.k || '') && eph[c.a] && eph[c.b] && eph[c.a] !== eph[c.b])
+      if (c && /^[0-9a-f]{64}$/.test(c.k || '') && lato(c.a) && lato(c.b) && lato(c.a) !== lato(c.b))
         chiavi.push(c);
   }
   const msgs = [];
@@ -83901,7 +84228,7 @@ function chatPartiApriP2P(k, arch, ordine, d){
       if (ev && ev.kind === CHATSC_MSG && NT.verifyEvent(ev)
           && (ev.pubkey === c.a || ev.pubkey === c.b)
           && ((ev.tags || []).find(t => t[0] === 'o') || [])[1] === ordine)
-        m = {id: ev.id, n: b.n | 0, t: ev.created_at || 0, lato: eph[ev.pubkey],
+        m = {id: ev.id, n: b.n | 0, t: ev.created_at || 0, lato: lato(ev.pubkey),
              testo: String(ev.content || '').slice(0, CHATSC_MAX_TESTO),
              /* il file, se c'e' (16 ott 2026): il moderatore lo apre dalla sua rotta */
              f: allegatoDaTagChatScP2P(ev.tags)};
@@ -84462,8 +84789,11 @@ function apriP2PDaUrl(){
     && typeof apriOrdineCondivisoP2P === 'function';
   if (condiviso) p2pCondivisoInVolo = true;
   vaiP2P();
-  if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function')
+  if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function') {
     apriOrdineP2P(P2P_SCAMBIO_URL);
+    /* il tasto di «Hai un nuovo messaggio» (20 ott 2026): dritti alla chat */
+    if (typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO) chatDaAvvisoP2P(P2P_SCAMBIO_URL);
+  }
   else if (condiviso) {
     /* il velo d'apertura aspetta l'ordine: scende a dettaglio aperto, o
        con la riga «non piu' disponibile» (vedi IL LINK DEL P2P SENZA IL
@@ -84578,7 +84908,11 @@ function apriOrdineDaUrl(){
   ordineUrlAperto = true;
   if (DEMO || VETRINA) return;
   const id = Number(ORDINE_URL);
-  if (orders.find(x => x.id === id)) openOrder(id);
+  if (orders.find(x => x.id === id)) {
+    openOrder(id);
+    /* il tasto di un avviso della chat (20 ott 2026): dritti alla chat */
+    if (typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO) chatDaAvvisoP2P('m' + id);
+  }
   else go('affari');
 }
 const OFFERTA_URL = location.pathname.match(/^\/offerta\/(\d+)/);

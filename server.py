@@ -10545,14 +10545,21 @@ async def login_telegram(req: Request, response: Response,
     return {"ok": True}
 
 
-FORMA_RITORNO_LOGIN = re.compile(r"/[A-Za-z0-9_\-./]*")
+# (20 ott 2026, cantiere chat-dalla-notifica) ...e una QUERY in forma
+# stretta: il link di un avviso (`/?ordine=1&chat=1`) deve riportare li'
+# dopo il login. Solo lettere, cifre, `_ - . = &`: niente barre, niente
+# `:`, niente `%`, niente `#` — nessun modo di farci passare un altro host
+FORMA_RITORNO_LOGIN = re.compile(r"/[A-Za-z0-9_\-./]*(\?[A-Za-z0-9_\-.=&]*)?")
 
 
 def _dove_tornare(da) -> str:
     """Il percorso di casa da cui era partito il login, o la radice.
     Solo un percorso ASSOLUTO di questo sito: niente `//altrove` (che il
-    browser legge come un altro host), niente schema, niente query — e'
-    la riga che impedisce di usare il login come trampolino."""
+    browser legge come un altro host), niente schema — e' la riga che
+    impedisce di usare il login come trampolino. LA QUERY (20 ott 2026,
+    cantiere chat-dalla-notifica) si', ma nella forma stretta di
+    `FORMA_RITORNO_LOGIN`: `/?ordine=1&chat=1` torna nella chat
+    dell'ordine; fuori forma si torna alla radice, come prima."""
     da = str(da or "")
     if FORMA_RITORNO_LOGIN.fullmatch(da) and not da.startswith("//"):
         return da
@@ -10586,7 +10593,9 @@ async def login_telegram_ritorno(req: Request,
     try:
         user = verifica_login_widget(d)
     except HTTPException:
-        return RedirectResponse(da + "?accesso=no", status_code=303)
+        # con una query gia' nel ritorno il segno si accoda con `&`
+        return RedirectResponse(da + ("&" if "?" in da else "?") + "accesso=no",
+                                status_code=303)
     user["id"] = int(user["id"])
     upsert_utente(user)
     risposta = RedirectResponse(da, status_code=303)
@@ -16610,11 +16619,19 @@ def _startapp_da_link(url) -> str:
     una prova tiene in pari i tre.
     (16 ott 2026, cantiere chat-mercatino) E un ORDINE DEL MERCATINO:
     `/?ordine=<numero>` → `mercatino_<numero>`, il tasto dell'avviso di un
-    messaggio nuovo nella chat dell'ordine. Solo cifre, senza zeri davanti."""
+    messaggio nuovo nella chat dell'ordine. Solo cifre, senza zeri davanti.
+    (20 ott 2026, cantiere chat-dalla-notifica) E DRITTI ALLA CHAT: con
+    `&chat=1` in coda — `/?ordine=<numero>&chat=1` e `/p2p?scambio=<id>&chat=1`
+    — la parola prende `_chat` in coda."""
     u = str(url or "")
     testa = URL_PUBBLICO + "/?ordine="
-    if u.startswith(testa) and re.fullmatch(r"[1-9][0-9]{0,11}", u[len(testa):]):
-        return "mercatino_" + u[len(testa):]
+    if u.startswith(testa):
+        resto = u[len(testa):]
+        chat = resto.endswith("&chat=1")
+        if chat:
+            resto = resto[:-len("&chat=1")]
+        if re.fullmatch(r"[1-9][0-9]{0,11}", resto):
+            return "mercatino_" + resto + ("_chat" if chat else "")
     base = URL_PUBBLICO + "/p2p"
     if u == base:
         return "p2p"
@@ -16624,7 +16641,10 @@ def _startapp_da_link(url) -> str:
         testa = f"{base}?{nome}="
         if u.startswith(testa):
             oid = u[len(testa):]
-            p = f"{nome}_{oid}"
+            coda = ""
+            if nome == "scambio" and oid.endswith("&chat=1"):
+                oid, coda = oid[:-len("&chat=1")], "_chat"
+            p = f"{nome}_{oid}{coda}"
             if (_FORMA_ID_STARTAPP.fullmatch(oid) and len(p) <= STARTAPP_MAX
                     and _FORMA_STARTAPP.fullmatch(p)):
                 return p
@@ -53665,7 +53685,13 @@ P2P_CHAT_CHIAVI_MAX = 20          # copie sigillate della propria chiave, per pa
 P2P_CHAT_MOD_MAX = 40             # buste per i moderatori, per parte
 P2P_CHAT_RAFFICA = 20             # messaggi al minuto, per chi scrive
 P2P_CHAT_RITIRO_MAX = 300         # buste per risposta
-P2P_CHAT_PRESENTE_S = 20          # chi ha ritirato da meno di cosi' sta guardando
+# chi ha ritirato da meno di cosi' sta guardando, e l'avviso aspetta un
+# secondo sguardo. 12 e non piu' 20 (20 ott 2026, cantiere
+# chat-dalla-notifica, sì di Andrea): il telefono che guarda la chat
+# ritira ogni 5 secondi (`CHATSC_POLSO_MS`), quindi 12 tengono due battiti
+# e un margine, e chi ha appena chiuso l'app sente l'avviso 13 secondi
+# dopo invece di 21
+P2P_CHAT_PRESENTE_S = 12
 P2P_CHAT_AVVISI_MAX = 30          # avvisi per scambio e per persona: anti-abuso
 P2P_CHAT_VITA_MAX_S = 30 * 86400  # la rete sotto la scopa: nessuno scambio dura tanto
 P2P_CHAT_NOVITA_MAX = 30          # scambi per domanda del pallino
@@ -53763,6 +53789,29 @@ CHAT_MERCATINO_CHIAVI_MAX = 5     # chiavi d'ordine per parte: una per dispositi
 # quando i sats arrivano. La frase e' quella del piede del telefono.
 CHAT_MERCATINO_FERMA_TESTO = "La decisione è presa: la chat si cancella quando i sats arrivano"
 CHAT_MERCATINO_BOTTONE = "💬 Apri l'ordine"
+# LA SCORTA DI LUCCHETTI (20 ott 2026, cantiere chat-dalla-notifica,
+# decisione di Andrea: «fai come Signal»). Prima si poteva scrivere solo
+# quando ANCHE l'altra parte aveva aperto la pagina dell'ordine: i
+# messaggi si chiudono con una sua chiave, e la sua chiave d'ordine
+# arrivava solo da li'. Adesso ogni telefono lascia qui, a ogni apertura
+# di Barattolo, una SCORTA di lucchetti aperti usa-e-getta (i «prekey»
+# di Signal): solo la parte PUBBLICA di chiavi nate sul telefono. A ogni
+# ordine nuovo il server ne da' UNO dell'altra parte come sua chiave
+# d'ordine, e lo BRUCIA: non torna piu' in scorta. Cosi' ogni ordine ha
+# la sua chiave, e il moderatore di una disputa riceve la chiave di
+# lettura di QUELL'ordine e di nessun altro della stessa persona — il
+# perche' di Andrea contro una chiave unica per conto. Niente
+# derivazioni additive da una chiave del conto: una chiave figlia
+# rivelata svelerebbe la madre. Chi ha un profilo di scambio fa nascere
+# i suoi lucchetti dal profilo con un SEME a caso (HMAC, a senso unico:
+# il seme qui e' pubblico, e da solo non apre niente), cosi' ogni suo
+# dispositivo li ritrova; chi non ce l'ha li fa nascere a caso, e li ha
+# solo quel telefono. Scorta finita: l'altra parte puo' chiamarlo
+# («vuole scriverti», `chat_chiama_p2p`).
+CHAT_SCORTA_PIENA = 20       # lucchetti in scorta per persona
+CHAT_SCORTA_RICARICA = 5     # sotto questi il telefono la riempie di nuovo
+FORMA_SEME_SCORTA = re.compile(r"^[0-9a-f]{32}$")
+CHAT_MERCATINO_CHIAMA_BOTTONE = "💬 Apri la chat"
 
 
 def _chat_mercatino_ferma(stato, disputata, sbloccato_auto_il) -> bool:
@@ -53896,6 +53945,112 @@ def _chat_mercatino_dichiara(cc, ordine: str, giro: int, io: int, pub: str,
                "VALUES(?,?,?,?,?)", (ordine, int(giro), int(io), pub, int(adesso)))
     cc.commit()
     return (200, {"nuova": True})
+
+
+def _chat_scorta_stato(cc, io: int) -> dict:
+    """LA MIA SCORTA, PER IL TELEFONO (20 ott 2026). Pura sulla connessione
+    del cassetto. `quante` sono i lucchetti ancora in scorta; `vivi` tutti
+    quelli miei che il server tiene — in scorta o bruciati per un ordine
+    ancora aperto. Il telefono butta le chiavi segrete di quelli che qui
+    non ci sono piu'."""
+    righe = cc.execute("SELECT pub, ordine FROM scorta WHERE tg_id=?",
+                       (int(io),)).fetchall()
+    return {"quante": sum(1 for r in righe if not r["ordine"]),
+            "vivi": [r["pub"] for r in righe]}
+
+
+def _chat_scorta_posa(cc, io: int, lucchetti, adesso: int) -> tuple:
+    """I LUCCHETTI ENTRANO IN SCORTA (20 ott 2026). Pura sulla connessione
+    del cassetto. Torna `(200, stato)` o `(codice, perche')`. Solo parti
+    pubbliche, nella loro forma; un lucchetto gia' visto (di chiunque, in
+    scorta o gia' chiave d'ordine) non rientra; e la scorta non passa
+    `CHAT_SCORTA_PIENA`: un client ritoccato non riempie il cassetto."""
+    if not isinstance(lucchetti, list) or len(lucchetti) > CHAT_SCORTA_PIENA:
+        return (400, "Richiesta non valida")
+    puliti = []
+    for x in lucchetti:
+        if not isinstance(x, dict):
+            return (400, "Richiesta non valida")
+        pub, seme = str(x.get("pub") or ""), str(x.get("seme") or "")
+        if not FORMA_PUBKEY_P2P.fullmatch(pub) or (seme and not FORMA_SEME_SCORTA.fullmatch(seme)):
+            return (400, "Richiesta non valida")
+        puliti.append((pub, seme))
+    for pub, seme in puliti:
+        quante = int(cc.execute("SELECT COUNT(*) FROM scorta WHERE tg_id=? AND ordine=''",
+                                (int(io),)).fetchone()[0] or 0)
+        if quante >= CHAT_SCORTA_PIENA:
+            break
+        if cc.execute("SELECT 1 FROM scorta WHERE pub=?", (pub,)).fetchone() \
+                or cc.execute("SELECT 1 FROM chiavi_ordine WHERE pub=?", (pub,)).fetchone():
+            continue
+        cc.execute("INSERT INTO scorta(pub, tg_id, seme, quando) VALUES(?,?,?,?)",
+                   (pub, int(io), seme, int(adesso)))
+    cc.commit()
+    return (200, _chat_scorta_stato(cc, io))
+
+
+def _chat_scorta_assegna(cc, ordine: str, giro: int, chi: int, adesso: int) -> str:
+    """UN LUCCHETTO DELLA SCORTA DIVENTA LA CHIAVE D'ORDINE DI CHI NON SI E'
+    ANCORA PRESENTATO (20 ott 2026). Pura sulla connessione del cassetto.
+    Se `chi` ha gia' una chiave d'ordine non si tocca niente; altrimenti il
+    lucchetto arrivato per ultimo (di solito dal dispositivo che usa di
+    piu') si BRUCIA per questo ordine — non torna piu' in scorta — ed
+    entra fra le chiavi d'ordine, dove l'altra parte lo trova al prossimo
+    ritiro e puo' scrivere SUBITO. Torna la chiave, o '' (niente da fare,
+    o scorta vuota)."""
+    if not int(chi or 0):
+        return ""
+    if cc.execute("SELECT 1 FROM chiavi_ordine WHERE ordine=? AND giro=? AND tg_id=?",
+                  (ordine, int(giro), int(chi))).fetchone():
+        return ""
+    r = cc.execute("SELECT pub FROM scorta WHERE tg_id=? AND ordine='' "
+                   "ORDER BY quando DESC, rowid DESC LIMIT 1", (int(chi),)).fetchone()
+    if not r:
+        return ""
+    if not cc.execute("UPDATE scorta SET ordine=?, giro=? WHERE pub=? AND ordine=''",
+                      (ordine, int(giro), r["pub"])).rowcount:
+        return ""
+    cc.execute("INSERT OR IGNORE INTO chiavi_ordine(ordine, giro, tg_id, pub, quando) "
+               "VALUES(?,?,?,?,?)", (ordine, int(giro), int(chi), r["pub"], int(adesso)))
+    cc.commit()
+    return r["pub"]
+
+
+def _chat_scorta_semi(cc, ordine: str, giro: int, io: int) -> dict:
+    """I SEMI DEI MIEI LUCCHETTI BRUCIATI PER QUESTO ORDINE (20 ott 2026):
+    `{chiave: seme}`, solo per quelli nati dal profilo di scambio. Con il
+    seme ogni mio dispositivo col profilo ricalcola la chiave segreta.
+    Pura sulla connessione del cassetto."""
+    return {r["pub"]: r["seme"] for r in cc.execute(
+        "SELECT pub, seme FROM scorta WHERE tg_id=? AND ordine=? AND giro=? AND seme<>''",
+        (int(io), ordine, int(giro)))}
+
+
+def _chat_mercatino_chiamata(cc, ordine: str, giro: int, io: int, altro: int,
+                             adesso: int) -> str:
+    """«VUOLE SCRIVERTI»: SI PUO' CHIAMARE? (20 ott 2026, punto 9 del piano,
+    sì di Andrea). Pura sulla connessione del cassetto. 'ha_chiave' se
+    l'altra parte una chiave d'ordine ce l'ha gia' (si scrive e basta),
+    'gia' se l'ho gia' chiamata su questo ordine, 'nuova' se si chiama
+    adesso — il timbro e' scritto PRIMA dell'invio, come per ogni avviso."""
+    if cc.execute("SELECT 1 FROM chiavi_ordine WHERE ordine=? AND giro=? AND tg_id=?",
+                  (ordine, int(giro), int(altro))).fetchone():
+        return "ha_chiave"
+    if cc.execute("SELECT 1 FROM chiamate WHERE ordine=? AND giro=? AND da=?",
+                  (ordine, int(giro), int(io))).fetchone():
+        return "gia"
+    cc.execute("INSERT INTO chiamate(ordine, giro, da, quando) VALUES(?,?,?,?)",
+               (ordine, int(giro), int(io), int(adesso)))
+    cc.commit()
+    return "nuova"
+
+
+def _chat_chiama_testo(ordine: str, lato: str) -> str:
+    """PURA: l'avviso «vuole scriverti» (20 ott 2026). Come ogni avviso
+    della chat: chi e l'ordine, mai un testo di nessuno."""
+    chi = "Chi compra" if lato == "compra" else "Chi vende"
+    return (f"💬 <b>{chi} vuole scriverti nell'ordine #{int(ordine[1:])}.</b>\n"
+            "Apri la chat dell'ordine: si apre appena entri, ed è cifrata fra voi due.")
 
 
 def _chat_mercatino_per_moderatore(con, cc, io: int, ordine: str) -> tuple:
@@ -54045,6 +54200,32 @@ def db_chat():
             -- busta (`perso` non basta: il server nuovo puo' avere gia'
             -- numeri piu' alti). Vedi `_chat_nascita`.
             CREATE TABLE IF NOT EXISTS nascita(token TEXT NOT NULL);
+            -- LA SCORTA DI LUCCHETTI (20 ott 2026, cantiere
+            -- chat-dalla-notifica): la parte pubblica dei lucchetti
+            -- usa-e-getta di ogni persona. `seme` c'e' per quelli nati dal
+            -- profilo di scambio (il telefono li ricalcola), vuoto per quelli
+            -- nati a caso su un dispositivo. `ordine` vuoto = in scorta;
+            -- pieno = BRUCIATO per quell'ordine, e se ne va con la sua chat.
+            -- Vedi `_chat_scorta_assegna`.
+            CREATE TABLE IF NOT EXISTS scorta(
+                pub TEXT PRIMARY KEY,
+                tg_id INTEGER NOT NULL,
+                seme TEXT NOT NULL DEFAULT '',
+                quando INTEGER NOT NULL,
+                ordine TEXT NOT NULL DEFAULT '',
+                giro INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_scorta_chi ON scorta(tg_id, ordine);
+            -- «VUOLE SCRIVERTI» (20 ott 2026): chi ha gia' chiamato l'altra
+            -- parte su un ordine. Uno per ordine e per persona; se ne va con
+            -- la chat dell'ordine.
+            CREATE TABLE IF NOT EXISTS chiamate(
+                ordine TEXT NOT NULL,
+                giro INTEGER NOT NULL,
+                da INTEGER NOT NULL,
+                quando INTEGER NOT NULL,
+                PRIMARY KEY(ordine, giro, da)
+            );
         """)
         con.commit()
         try:
@@ -54271,14 +54452,17 @@ async def _chat_p2p_avvisa(ordine: str, giro: int, altro: int, n: int,
                 print(f"⛔ {j['etichetta']}: {j['su']}: {testo[2:]}", flush=True)
             return
         try:
+            # IL TASTO PORTA DRITTO ALLA CHAT (20 ott 2026, cantiere
+            # chat-dalla-notifica): `&chat=1` dice alla pagina di scorrere
+            # fino alla chat col cursore nella casella. Dentro Telegram la
+            # Mini App (`mercatino_<n>_chat`, `scambio_<id>_chat`), altrove
+            # il sito o l'APK — vedi `_startapp_da_link`
             if mercatino:
-                # il tasto apre l'ordine (`/?ordine=`): dentro Telegram la
-                # Mini App, altrove il sito — vedi `_startapp_da_link`
                 esito = await notifica(a_chi, testo, (
-                    CHAT_MERCATINO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}"))
+                    CHAT_MERCATINO_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"))
             else:
                 esito = await notifica(a_chi, testo, (P2P_BOTTONE_SCAMBIO,
-                                                      f"{LINK_LIBRO_P2P}?scambio={ordine}"))
+                                                      f"{LINK_LIBRO_P2P}?scambio={ordine}&chat=1"))
         except Exception as e:
             esito = f"SALTATO ({type(e).__name__}: {e})"
         j = _chat_nel_journal(ordine)
@@ -54314,10 +54498,16 @@ def _chat_p2p_spazza(ordine: str = "", mercatino: bool = False, conti: dict = No
             dove, arg = " WHERE ordine GLOB 'm[1-9]*'", ()
         else:
             dove, arg = "", ()
+        # (20 ott 2026) anche i lucchetti BRUCIATI per un ordine e le
+        # chiamate: quelli in scorta (`ordine` vuoto) non sono di nessun
+        # ordine, e la scopa non li tocca mai
+        bruciati = " WHERE ordine<>''" + (dove.replace(" WHERE ", " AND ") if dove else "")
         ordini = [r[0] for r in cc.execute(
             "SELECT ordine FROM buste" + dove + " UNION SELECT ordine FROM letture"
             + dove + " UNION SELECT ordine FROM allegati" + dove
-            + " UNION SELECT ordine FROM chiavi_ordine" + dove, arg * 4)]
+            + " UNION SELECT ordine FROM chiavi_ordine" + dove
+            + " UNION SELECT ordine FROM chiamate" + dove
+            + " UNION SELECT ordine FROM scorta" + bruciati, arg * 6)]
         vivi = {}
         if ordini:
             con = db()
@@ -54338,6 +54528,11 @@ def _chat_p2p_spazza(ordine: str = "", mercatino: bool = False, conti: dict = No
                               (o, giro)).rowcount
             # e le chiavi d'ordine del mercatino (16 ott 2026)
             via += cc.execute("DELETE FROM chiavi_ordine WHERE ordine=? AND giro<>?",
+                              (o, giro)).rowcount
+            # ...i lucchetti bruciati per lui e le chiamate (20 ott 2026)
+            via += cc.execute("DELETE FROM scorta WHERE ordine=? AND giro<>?",
+                              (o, giro)).rowcount
+            via += cc.execute("DELETE FROM chiamate WHERE ordine=? AND giro<>?",
                               (o, giro)).rowcount
             svuotati += 1 if via else 0
             # (19 ott 2026) chi chiede `conti` li vuole divisi: il journal
@@ -54458,8 +54653,20 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         # nel mercatino le chiavi d'ordine le presenta il server: le mie
         # e quelle dell'altra parte, nell'ordine in cui sono nate
         if FORMA_CHAT_MERCATINO.fullmatch(ordine):
+            # LA SCORTA (20 ott 2026): l'altra parte non si e' ancora
+            # presentata? Il suo lucchetto in scorta diventa la sua chiave
+            # d'ordine, e si scrive subito. A chat ferma niente di nuovo
+            if not st.get("ferma"):
+                _chat_scorta_assegna(cc, ordine, st["giro"], st["altro"], int(time.time()))
             corpo.update(_chat_mercatino_chiavi(cc, ordine, st["giro"], user["id"]))
+            corpo["semi"] = _chat_scorta_semi(cc, ordine, st["giro"], user["id"])
             corpo["ferma"] = bool(st.get("ferma"))
+            # ...e se nemmeno la scorta c'era: si puo' chiamarla
+            if not corpo["peers"]:
+                corpo["altro_senza_chiave"] = True
+                corpo["chiamato"] = bool(cc.execute(
+                    "SELECT 1 FROM chiamate WHERE ordine=? AND giro=? AND da=?",
+                    (ordine, st["giro"], int(user["id"]))).fetchone())
     finally:
         cc.close()
     corpo.update(ok=True, aperta=True, giro=st["giro"])
@@ -54544,6 +54751,75 @@ async def chat_invia_p2p(req: Request, x_tg_init_data: str = Header(""),
         t.add_done_callback(_TASK_CHAT_P2P.discard)
     return JSONResponse({"ok": True, "n": corpo["n"], "quando": corpo["quando"]},
                         headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/chat/scorta")
+async def chat_scorta_p2p(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """LA SCORTA DI LUCCHETTI (20 ott 2026, cantiere chat-dalla-notifica).
+    Nel corpo `{lucchetti: [{pub, seme}]}`, anche vuoto: torna quanti ne
+    ho in scorta, quali tiene il server, e le due soglie. Non chiede il
+    P2P attivo: e' della chat degli ordini, con la sua leva."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not MERCATINO_CHAT_ORDINI:
+        return JSONResponse({"ok": True, "spenta": True},
+                            headers={"Cache-Control": "no-store"})
+    cc = db_chat()
+    try:
+        codice, corpo = _chat_scorta_posa(cc, user["id"], (d or {}).get("lucchetti") or [],
+                                          int(time.time()))
+    finally:
+        cc.close()
+    if codice != 200:
+        raise HTTPException(codice, str(corpo))
+    corpo.update(ok=True, piena=CHAT_SCORTA_PIENA, ricarica=CHAT_SCORTA_RICARICA)
+    return JSONResponse(corpo, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/p2p/chat/chiama")
+async def chat_chiama_p2p(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """«VUOLE SCRIVERTI» (20 ott 2026, punto 9 del piano, sì di Andrea):
+    l'altra parte di un ordine non ha ancora nessuna chiave — non ha
+    aperto Barattolo da quando c'e' la scorta — e chi vuole scriverle la
+    chiama. Un avviso, uno per ordine e per persona, col tasto che porta
+    DRITTO alla chat. Nel corpo `{ordine}`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine, st = _chat_p2p_chiede(d, user)
+    if not FORMA_CHAT_MERCATINO.fullmatch(ordine):
+        raise HTTPException(400, "Richiesta non valida")
+    if not st["aperta"]:
+        raise HTTPException(409, f"La chat di {_chat_questo(ordine)} non e' aperta")
+    if st.get("ferma"):
+        raise HTTPException(409, CHAT_MERCATINO_FERMA_TESTO)
+    con = db()
+    try:
+        p = _parti_ordine_mercatino(con, ordine)
+    finally:
+        con.close()
+    lato = "compra" if int(p["compratore"]) == int(user["id"]) else "vende"
+    adesso = int(time.time())
+    cc = db_chat()
+    try:
+        # prima un lucchetto: se nel frattempo e' arrivato, non serve chiamare
+        _chat_scorta_assegna(cc, ordine, st["giro"], st["altro"], adesso)
+        esito = _chat_mercatino_chiamata(cc, ordine, st["giro"], user["id"], st["altro"], adesso)
+    finally:
+        cc.close()
+    if esito != "nuova":
+        return JSONResponse({"ok": True, "gia": esito == "gia", "serve": esito != "ha_chiave"},
+                            headers={"Cache-Control": "no-store"})
+    try:
+        e = await notifica(st["altro"], _chat_chiama_testo(ordine, lato), (
+            CHAT_MERCATINO_CHIAMA_BOTTONE, f"{URL_PUBBLICO}/?ordine={int(ordine[1:])}&chat=1"))
+    except Exception as x:
+        e = f"SALTATO ({type(x).__name__}: {x})"
+    print(f"💬 Chat degli ordini: {'chi compra' if lato == 'compra' else 'chi vende'} vuole "
+          f"scrivere sull'ordine {int(ordine[1:])}, avvisato {st['altro']}", flush=True)
+    _esiti_p2p_dice("💬", [(st["altro"], e)])
+    return JSONResponse({"ok": True, "avvisato": True}, headers={"Cache-Control": "no-store"})
 
 
 def _chat_p2p_allegato_posa(cc, ordine: str, giro: int, io: int, dati: bytes,
