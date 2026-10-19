@@ -65727,3 +65727,111 @@ chiusura in `_al_tetto` cadono 2 prove e 1 collaudo (50/51).
 - Da guardare sul telefono vero: il widget vero dopo «tocca qui», e il
   rientro col widget vero (stessa porta del collaudo, non provato col
   dito).
+
+## Il cambio in chiaro: «1 BTC ≈ 98.450 €» sopra il libro e nel conto, col ⚠️ oltre cinque minuti (19 ott 2026, cantiere tasso-in-chiaro, richiesta e decisioni di Andrea)
+
+LA DOMANDA. Contro cosa si calcola il «X% più conveniente» del libro P2P?
+Risposta (sola lettura): contro il cambio del nostro server (CoinGecko,
+rinfrescato ogni minuto, riletto dal telefono ogni minuto col libro
+davanti); la % è già dinamica e va bene. Mancava il cambio stesso: viveva
+solo DENTRO le cifre, e chi guardava non poteva sapere quale fosse.
+
+COSA SI È FATTO. Una riga sola, piccola e grigia (`--ink-soft`, 12 px),
+«1 BTC ≈ 98.450 €», e nient'altro: UNA volta sopra il libro (`#p2pTasso`,
+markup fisso fuori dal blocco attaccato, fra il banner delle commissioni
+e la riga dell'ordine sparito) e nel conto di un ordine DA PRENDERE
+(`rigaTassoContoP2P` dentro `contoDettP2P`: il foglio del libro e la
+pagina dello scambio), sotto la convenienza e nella stessa testa. Oltre
+cinque minuti un ⚠️ davanti al numero, senza parole. La cifra è un gruppo
+con spazi non separabili: a 360 px il «€» non resta mai solo a capo (lo
+faceva, alla prima stesura, nella versione lunga del ⚠️).
+L'ETÀ VIENE DAL SERVER: `cambio_eta_s` viaggia accanto a `cambio_eur`
+nella rotta `/api/cambio` e nella busta della vetrina (`cambio_eta_ora`,
+la stessa cache: mai rete, mai database; None senza cambio). Un'età e non
+un'ora: il telefono la toglie dal SUO adesso, e un orologio storto non
+inventa un ⚠️. Il battito ridisegna anche quando cambia il solo ⚠️
+(`firmaTassoP2P`): con CoinGecko muto il numero resta uguale, e senza
+questo la riga non passerebbe mai al ⚠️.
+IL RITORNO IN PRIMO PIANO (richiesta di Andrea a metà cantiere): dopo una
+pausa il cambio in memoria ha facilmente più di cinque minuti, ma è
+vecchio il telefono, non il server. La pagina che si nasconde mette il
+cambio in dubbio (`cambioDubbio`) e in dubbio il ⚠️ non si mostra;
+tornando visibile (`ritornoCambioP2P`) si chiede SUBITO il cambio, anche
+se il minuto del battito non è passato, e il dubbio lo scioglie la
+risposta — qualunque, anche la rete caduta — o la busta della vetrina.
+Il ⚠️ che resta dopo quella domanda è vero.
+
+LE DECISIONI E LE STRADE SCARTATE.
+- La prima stesura diceva «1 BTC ≈ 98.450 € · aggiornato alle 14:32»,
+  il ⚠️ con le parole («⚠️ cambio delle 14:32, non aggiornato»), una
+  nota sotto il conto degli ordini a mercato («alla presa i sats si
+  fissano con un'altra fonte, yadio: può scostarsi di qualche decimo») e,
+  dopo la presa, «cambio della presa». Andrea, vista la proposta: UNA
+  riga pulita, solo il numero, e il ⚠️ senza parole; tutto il resto via.
+  Dopo la presa quindi niente riga: le cifre sono un fatto, e il cambio
+  di adesso non le muove.
+- La riga su OGNI card Barattozon: scartata da Andrea, una volta sola
+  sopra il libro — il numero è lo stesso per tutte.
+- `:has()` per tenere convenienza e cambio sopra un filo solo: in questo
+  foglio non entra fuori dal blocco dello schermo largo (sentinella di
+  `prove_foglio_tastiera_iphone`). Al suo posto una scatola,
+  `testaContoP2P`, solo quando ci sono tutt'e due.
+- La nota sull'altra fonte, finché c'è stata, NON nominava il
+  coordinatore: la regola di casa (il nome vive solo in «I tuoi dati»),
+  che la sentinella del motore ha ricordato alla prima stesura.
+- Un'ora del server al posto dell'età: scartata per gli orologi storti.
+- IL ROVESCIO DEL 10 OTT: «IL CAMBIO SCADUTO NON SI DICE», con la riga
+  «Prezzo del bitcoin non aggiornato» tolta e un «non riproporla senza
+  che la chieda lui». L'ha chiesta lui, nella forma più piccola. Lo zero
+  del server continua a non entrare, e `impostaCambio` è quella di prima
+  (la sentinella di `prove_cambio_ovunque` la tiene).
+
+PROVATO. `prove_tasso_in_chiaro`, nuova: il server (l'età: None senza
+cambio, intera, mai negativa, None oltre `ORE_CAMBIO_VALIDO`; nella rotta
+e nella busta), le sentinelle (dove arriva l'età, il markup, l'ordine nel
+conto, il CSS, nessuna parola in più a schermo, l'ascoltatore fuori dal
+blocco del cambio) e il banco node col blocco VERO: la frase al filo dei
+cinque minuti e un millesimo dopo, il gruppo non separabile, l'età che
+arriva in sette forme, la riga di riserva spenta, il battito che
+ridisegna solo quando compare o se ne va il ⚠️, il server muto, lo zero,
+il ritorno in primo piano in quattro casi (server fresco senza lampo in
+nessuna scrittura, server vecchio col ⚠️ dopo la domanda, rete giù, pausa
+breve) e la riga del conto da prendere, presa, vecchia, muta. Ritoccate
+le sentinelle di `prove_cambio_libro_p2p` e `prove_cambio_ovunque` (la
+rotta con l'età, il battito col «|| mossa») e i banchi di
+`prove_p2p_dettaglio` (le due funzioni nuove del
+conto). `collaudo_cambio_libro_p2p`, 19: l'età nella rotta e nella busta
+col server vero. Tortura: 16 mutazioni su 16 uccise, ognuna con una rossa
+col suo nome.
+DAL VIVO (Chromium headless a 360×780 col tocco, chiaro e scuro; copia
+del worktree nello scratchpad, config finto del banco dei collaudi,
+server nella gabbia, P2P acceso coi relay morti, due ordini finti nella
+fotografia del libro — uno a mercato, uno a sats fissi — e una manopola
+del cambio al posto di CoinGecko), 30 su 30: la riga sopra il libro e
+nei due fogli, alta una riga, senza scorrimento di lato; il server che
+invecchia il cambio senza che si tocchi niente → dopo 63 secondi il ⚠️
+nel foglio aperto e sopra il libro; il cambio che torna → il ⚠️ se ne
+va; il ritorno in primo piano dopo una pausa (simulata: la pagina si dice
+nascosta e il cambio in memoria si fa vecchio di dieci minuti) senza un
+lampo, e col server vecchio il ⚠️ solo dopo la risposta; il conto di uno
+scambio preso (iniettato: il giro non ha uno scambio vero) senza riga.
+Nessun errore di pagina; fuori da 127.0.0.1 solo lo script di Telegram,
+fermato.
+SUITE E COLLAUDI, prima su 489554e più questo cantiere (25086 passate, 0
+fallite; 85 verdi), poi sull'albero RIBASATO su 81446f6 (main corso nel
+frattempo coi cantieri posta-fd e backup-deploy: nessun file in comune
+fuori dalle code di CANTIERI): `PROVE_SEVERE=1 prove.py` 25103 passate,
+0 fallite, nessuna saltata (nostr-tools installato come in CI);
+`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2` 85 verdi, 0 rossi. Pushato sul ramo
+`cantiere/tasso-in-chiaro` e NON su main (sessione cloud: il commit è
+firmato con la chiave del container, non con quella che il VPS accetta;
+il passaggio su main lo fa Andrea dal PC).
+
+RESTA DA GUARDARE. Sul telefono vero: il ritorno da una pausa lunga con
+Telegram chiuso e riaperto (il «visibilitychange» della WebView); il ⚠️
+dal vivo il giorno che CoinGecko tace. Sul VPS niente da toccare: nessuna
+leva nuova, il campo nasce col deploy.
+NON FATTO, e si vede: la fila «Scambi P2P» di Esplora e la vetrina non
+dicono il cambio (non richiesto); il ⚠️ non ha un nome per chi legge con
+la voce (Andrea l'ha voluto senza parole: un `aria-label` sarebbe una
+parola che non si vede, da decidere).

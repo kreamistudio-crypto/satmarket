@@ -19,7 +19,11 @@ la' non si puo' fare:
   e nemmeno con la cache piu' vecchia della sua soglia calda
   (`CAMBIO_TTL`) si mette a rileggere — che e' la differenza con
   `cambio_btc_eur`, quello delle invoice;
-- un cambio troppo vecchio vale 0, «non disponibile», come nella busta.
+- un cambio troppo vecchio vale 0, «non disponibile», come nella busta;
+- (19 ott 2026, tasso-in-chiaro) accanto al cambio viaggia la sua ETA'
+  in secondi, `cambio_eta_s`, nella rotta e nella busta, la stessa: il
+  client, oltre cinque minuti, mette un ⚠️ davanti a «1 BTC ≈ X €».
+  Senza cambio e' null, mai un'eta' di un numero che non c'e'.
 
 NON TOCCA NIENTE DI VERO: il `config` finto lo installa `avvio()` del
 banco, PRIMA dell'import di server. Nessuna rete (e la gabbia della CI
@@ -73,12 +77,14 @@ def main():
     print("\n[la rotta: aperta, in GET, col numero della cache]")
     metti(0)
     r = c.get(VIA)
-    prova("senza cambio in mano risponde 200 con 0, «non disponibile»",
-          [200, {"cambio_eur": 0.0}], [r.status_code, r.json()])
+    prova("senza cambio in mano risponde 200 con 0, «non disponibile», e "
+          "nessuna eta'",
+          [200, {"cambio_eur": 0.0, "cambio_eta_s": None}], [r.status_code, r.json()])
     metti(98765.5)
     r = c.get(VIA)
-    prova("col cambio in cache dice quello, a chi non ha una sessione",
-          [200, {"cambio_eur": 98765.5}], [r.status_code, r.json()])
+    prova("col cambio in cache dice quello, a chi non ha una sessione, con "
+          "la sua eta' (appena letto: zero secondi)",
+          [200, {"cambio_eur": 98765.5, "cambio_eta_s": 0}], [r.status_code, r.json()])
     prova("...e non si tiene in nessuna cache", "no-store",
           r.headers.get("cache-control"))
     prova("...in sola GET: una POST e' 405", 405, c.post(VIA).status_code)
@@ -88,6 +94,18 @@ def main():
     prova("la prima pagina della vetrina risponde", 200, v.status_code)
     prova("...e il suo `cambio_eur` e' quello di /api/cambio",
           r.json()["cambio_eur"], v.json().get("cambio_eur"))
+
+    print("\n[l'eta' del cambio: nella rotta e nella busta, la stessa]")
+    metti(99500.0, eta_s=125)
+    eta = c.get(VIA).json()["cambio_eta_s"]
+    prova("un cambio letto da 125 secondi dice 125 (un secondo di tolleranza "
+          "per l'orologio del collaudo), ed e' un intero", [True, True],
+          [eta in (125, 126), isinstance(eta, int)])
+    prova("...e la busta dice la stessa eta'", True,
+          c.get("/api/listings?limit=20").json().get("cambio_eta_s") in (125, 126))
+    metti(99500.0, eta_s=-30)
+    prova("un `quando` nel futuro (un database toccato a mano) non da' un'eta' "
+          "negativa", 0, c.get(VIA).json()["cambio_eta_s"])
 
     print("\n[segue la cache, senza un giro in mezzo]")
     metti(101234.0)
@@ -130,10 +148,11 @@ def main():
     print("\n[troppo vecchio = non disponibile]")
     if S.ORE_CAMBIO_VALIDO:
         metti(99000.0, eta_s=S.ORE_CAMBIO_VALIDO * 3600 + 60)
-        prova("oltre ORE_CAMBIO_VALIDO la rotta dice 0", 0.0,
-              c.get(VIA).json()["cambio_eur"])
-        prova("...come la busta", 0.0,
-              c.get("/api/listings?limit=20").json().get("cambio_eur"))
+        prova("oltre ORE_CAMBIO_VALIDO la rotta dice 0, e nessuna eta'",
+              {"cambio_eur": 0.0, "cambio_eta_s": None}, c.get(VIA).json())
+        busta = c.get("/api/listings?limit=20").json()
+        prova("...come la busta", [0.0, None],
+              [busta.get("cambio_eur"), busta.get("cambio_eta_s")])
         metti(99000.0, eta_s=S.ORE_CAMBIO_VALIDO * 3600 - 60)
         prova("...e un minuto prima del filo lo dice ancora", 99000.0,
               c.get(VIA).json()["cambio_eur"])

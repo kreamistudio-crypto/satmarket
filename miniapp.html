@@ -4037,6 +4037,12 @@
   .p2p-sparito{display:flex;align-items:flex-start;gap:10px;
     margin:12px 0 4px;padding:12px;font-size:13.5px;line-height:1.4}
   .p2p-sparito[hidden]{display:none}
+  /* IL CAMBIO IN CHIARO SOPRA IL LIBRO (19 ott 2026): una riga piccola e
+     grigia, una volta sola per tutte le card — il numero e' lo stesso
+     per tutte. Fuori dal blocco attaccato, come il banner: se ne va col
+     primo dito e non ruba spazio alle card. */
+  .p2p-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);margin:2px 4px 8px}
+  .p2p-tasso[hidden]{display:none}
   .p2p-sparito b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
   .p2p-sparito>div{flex:1;min-width:0}
   #view-p2p .btn{margin-top:14px}
@@ -6765,6 +6771,17 @@
      `.ctrl-riga` qui non arrivano: la frase non e' una riga) */
   .conto-p2p .ctrl-conv .p2p-avviso{color:var(--rosso-p2p-testo)}
   .conto-p2p .ctrl-conv .p2p-affare{color:var(--trust)}
+  /* IL CAMBIO IN CHIARO (19 ott 2026): «1 BTC ≈ 98.450 €» e nient'altro,
+     sotto la convenienza, piu' piccolo ancora e nello stesso inchiostro
+     morbido — e' il metro delle cifre,
+     non una cifra. Col suo filo sotto; con la convenienza stanno tutt'e
+     due nella scatola `ctrl-testa` (`testaContoP2P`), che porta un filo
+     solo, e i fili loro se ne vanno. */
+  .conto-p2p .ctrl-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);
+    padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
+  .conto-p2p .ctrl-testa{padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
+  .conto-p2p .ctrl-testa .ctrl-conv{border-bottom:0;padding-bottom:3px;margin-bottom:0}
+  .conto-p2p .ctrl-testa .ctrl-tasso{border-bottom:0;padding-bottom:0;margin-bottom:0}
   /* ⚠️ LE CIFRE DEL CALCOLO NON SONO PIU' COLORATE (12 set 2026,
      ritocco di Andrea che rovescia il verde/rosso «direzione» del
      giorno prima): i sats di fee, premio e subtotale perdono la
@@ -11808,6 +11825,11 @@ document.getElementById('cartello')?.remove();</script>
            Se il file non arriva il bottone se ne va: un bottone vuoto
            in cima al libro sarebbe un buco. -->
       <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1000" height="258"alt="Fee P2P: 2% barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5" onerror="this.parentNode.remove()"><span class="fee-pz fee-pz1" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz2" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3" aria-hidden="true"><i></i></span><span class="fee-pz fee-pz3 fee-tag" aria-hidden="true"><i></i></span><span class="fee-barra" aria-hidden="true"></span></button>
+      <!-- IL CAMBIO IN CHIARO (19 ott 2026, tasso-in-chiaro): «1 BTC ≈
+           98.450 €», col ⚠️ davanti se ha piu' di cinque minuti, una
+           volta sola sopra le card. La scrive `aggiornaTassoLibroP2P` da
+           renderP2P; spenta finche' non c'e' un cambio vero. -->
+      <div class="p2p-tasso" id="p2pTasso" hidden></div>
       <!-- L'ORDINE CONDIVISO CHE NON C'E' PIU' (10 ott 2026): chi apre
            il link di un ordine preso, scaduto o ritirato atterra sul
            libro degli altri, e questa riga gli dice perche' non vede
@@ -17077,7 +17099,10 @@ async function loadListings(anonimo){
   vetrinaCursore = j.cursore || null;
   /* il cambio del SERVER, prima che la griglia si disegni (vedi
      impostaCambio): fonte unica, zero chiamate in piu' */
-  if (j.cambio_eur !== undefined) impostaCambio(j.cambio_eur);
+  if (j.cambio_eur !== undefined) {
+    impostaCambio(j.cambio_eur);
+    impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
+  }
   /* il dominio di casa, che serve solo a chi arriva dall'onion: la
      riga la legge baseCondivisione, e senza (server di ieri) resta
      location.origin, cioe' il comportamento di sempre */
@@ -23391,6 +23416,86 @@ const CAMBIO_ATTESA_MS = 8000;      // oltre, vale il cambio di prima
 let cambioChiesto = 0;              // l'ultima domanda, o l'ultimo arrivo
 let cambioGiro = null;              // la domanda in volo, se c'e'
 let cambioRidisegna = false;        // vero SOLO dentro il ridisegno del battito
+/* IL CAMBIO IN CHIARO (19 ott 2026, cantiere tasso-in-chiaro, decisione
+   di Andrea): UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro — la
+   stessa sopra il libro P2P e nel conto di un ordine da prendere
+   (`rigaTassoContoP2P`). Fin qui il cambio viveva solo DENTRO le cifre —
+   i «≈» e le % — e chi guardava non poteva sapere quale fosse.
+   OLTRE CINQUE MINUTI, UN ⚠️ DAVANTI AL NUMERO, senza parole. IL NUMERO
+   RESTA — un valore segnato vecchio vale piu' di nessun valore — e resta
+   quel che faceva il client: lo zero del server non entra
+   (`impostaCambio`), e quindi nemmeno la sua eta' (qui sotto). E' la
+   decisione del 10 ott 2026 («IL CAMBIO SCADUTO NON SI DICE») rovesciata
+   da Andrea stesso, nella forma piu' piccola.
+   L'ETA' ARRIVA COME ETA': il server manda da quanti secondi la fonte gli
+   ha dato quel numero (`cambio_eta_s`), e il telefono la toglie dal SUO
+   adesso. Un'ora del server letta su un orologio storto darebbe un ⚠️
+   falso; un'eta' no. Senza eta' (un server di ieri) mai il ⚠️.
+   STRADE SCARTATE, lo stesso giorno (Andrea, alla prima stesura):
+   «aggiornato alle hh:mm», la nota sotto su chi fissa i sats alla presa
+   e «cambio della presa» nel conto di uno scambio preso. Una riga sola.
+   Senza cambio vero in mano (`cambioVivo` falso: il valore di riserva)
+   la riga non c'e'. */
+const CAMBIO_VECCHIO_MS = 5 * 60000;   // oltre, il ⚠️
+let cambioQuando = 0;   // quando la fonte ha dato il numero, sull'orologio del telefono; 0 = non si sa
+/* IL RITORNO IN PRIMO PIANO NON FA LAMPEGGIARE IL ⚠️ (richiesta di
+   Andrea): dopo una pausa il cambio in memoria ha facilmente piu' di
+   cinque minuti, ma e' vecchio il TELEFONO, non il server. Quindi: la
+   pagina che si nasconde mette il cambio «in dubbio», e finche' e' in
+   dubbio il ⚠️ non si mostra; tornando visibile si chiede subito il
+   cambio (`ritornoCambioP2P`), e il dubbio lo scioglie la risposta —
+   qualunque risposta, anche la rete caduta. Se DOPO quella domanda il
+   cambio e' ancora vecchio, il ⚠️ e' vero: e' il server (o la rete) a
+   non averlo fresco. Lo scioglie anche la busta della vetrina, che e'
+   una risposta del server come l'altra. */
+let cambioDubbio = false;
+function impostaOraCambio(eurPerBtc, etaS){
+  if (!(Number(eurPerBtc) > 0)) return;   // lo zero non entra, e la sua eta' nemmeno
+  const e = (etaS === null || etaS === undefined || etaS === '') ? NaN : Number(etaS);
+  cambioQuando = (isFinite(e) && e >= 0) ? Date.now() - e * 1000 : 0;
+  cambioDubbio = false;
+}
+/* PURA: la riga. `eurBtc` in euro per BITCOIN, `quando` e `adesso` in
+   millisecondi; '' senza un cambio. La cifra e' un gruppo che non si
+   spezza (la regola di casa): spazi non separabili, e a 360 px non resta
+   mai «€» da solo a capo. Un `quando` nel futuro (l'orologio del
+   telefono tornato indietro) vale «adesso». */
+function testoTassoP2P(eurBtc, quando, adesso){
+  const v = Math.round(Number(eurBtc) || 0);
+  if (!(v > 0)) return '';
+  const cifra = '1\u00a0BTC\u00a0≈\u00a0' + v.toLocaleString('it-IT') + '\u00a0€';
+  return (quando > 0 && adesso - quando > CAMBIO_VECCHIO_MS) ? '⚠️\u00a0' + cifra : cifra;
+}
+/* la riga del cambio in mano adesso; '' senza il cambio vero. In dubbio
+   (il ritorno in primo piano) l'eta' non si guarda */
+function tassoAdessoP2P(){
+  return (cambioVivo && eurPerSat > 0)
+    ? testoTassoP2P(eurPerSat * 1e8, cambioDubbio ? 0 : cambioQuando, Date.now()) : '';
+}
+/* la riga sopra il libro: markup fisso, la scrive renderP2P (e quindi il
+   battito, che passa di li') e si tocca solo se la frase e' cambiata */
+function aggiornaTassoLibroP2P(){
+  const r = el('p2pTasso');
+  if (!r) return;
+  const t = tassoAdessoP2P();
+  if (r.textContent !== t) r.textContent = t;
+  r.hidden = !t;
+}
+/* LA FIRMA DEL ⚠️: «c'e'» o «non c'e'», mai il numero (quello lo dice gia'
+   `rileggiCambio`). Serve al battito: CoinGecko muto vuol dire stesso
+   numero a ogni domanda, e senza questa la riga non passerebbe mai al ⚠️. */
+function firmaTassoP2P(){
+  return tassoAdessoP2P().indexOf('⚠️') === 0 ? 'vecchio' : '';
+}
+let tassoBattito = '';   // la firma vista dall'ultimo battito
+/* la pagina si nasconde: il cambio va in dubbio; torna visibile: si
+   chiede SUBITO (il battito, col suo minuto azzerato), e la risposta
+   scioglie il dubbio e ridisegna se il ⚠️ e' cambiato */
+function ritornoCambioP2P(){
+  if (document.visibilityState === 'hidden') { cambioDubbio = true; return; }
+  cambioChiesto = 0;
+  battitoCambioLibroP2P();
+}
 /* torna true se il cambio in mano e' CAMBIATO */
 function rileggiCambio(){
   if (DEMO) return Promise.resolve(false);
@@ -23406,10 +23511,11 @@ function rileggiCambio(){
       if (!r.ok) return false;
       const j = await r.json();
       impostaCambio(j && j.cambio_eur);
+      if (j) impostaOraCambio(j.cambio_eur, j.cambio_eta_s);
       return cambioVivo && eurPerSat !== prima;
     } catch(e) {
       return false;
-    } finally { clearTimeout(t); cambioGiro = null; }
+    } finally { clearTimeout(t); cambioGiro = null; cambioDubbio = false; }
   })();
   return cambioGiro;
 }
@@ -23517,7 +23623,12 @@ function battitoCambioLibroP2P(){
   if (Date.now() - cambioChiesto < CAMBIO_LIBRO_MS) return;
   if (document.visibilityState === 'hidden' || !cambioDavantiP2P()) return;
   rileggiCambio().then(cambiato => {
-    if (cambiato) ridisegnaColCambioP2P();
+    /* ...e anche se e' cambiato soltanto il ⚠️ del cambio in chiaro
+       (19 ott 2026): il cambio diventato vecchio con la fonte muta, o
+       tornato fresco, o il dubbio del ritorno sciolto */
+    const firma = firmaTassoP2P(), mossa = firma !== tassoBattito;
+    tassoBattito = firma;
+    if (cambiato || mossa) ridisegnaColCambioP2P();
   }).catch(() => {});
 }
 
@@ -23933,6 +24044,9 @@ setInterval(() => {
       && document.querySelector('#detailContent .lampo-count'))
     openDetail(currentListing.id);
 }, 1000);
+/* il ritorno in primo piano e il cambio in chiaro (19 ott 2026): vedi
+   `ritornoCambioP2P`, nel blocco del cambio */
+document.addEventListener('visibilitychange', ritornoCambioP2P);
 /* ============ I TEMPI DELL'ESCROW, IN UN POSTO SOLO ============
    Le finestre dell'affare vivono nel CONFIG DEL SERVER e il client non
    se le sente dire da nessuna risposta: qui sono scritte a mano. Prima
@@ -55943,6 +56057,7 @@ function renderP2P(){
   /* la gemella dei propri scambi: stessa ragione, stesso contenitore */
   const mieiTesta = el('p2pMieiTesta');
   if (!box) return;
+  aggiornaTassoLibroP2P();
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
   /* IL TOUR NON ASPETTA PIU' IL LIBRO (26 set 2026, «IL LIBRO
@@ -63393,7 +63508,8 @@ function contoDettP2P(o){
      da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo')
     + '">'
-    + rigaConvenienzaFissaP2P(o, convFissa)
+    + testaContoP2P(rigaConvenienzaFissaP2P(o, convFissa),
+                    rigaTassoContoP2P(o, detto))
     + r(etichettaCtrl, cifra('ctrl'))
     + premio
     /* ⚠️ IL SUBTOTALE STA FRA IL PREMIO E LA FEE, e non e' un vezzo di
@@ -63478,6 +63594,29 @@ function etichettaPremioP2P(mio, prem, affare){
   if (mio) return (prem > 0 ? 'Premio' : 'Sconto')
     + (affare ? ' che hai richiesto ' : ' che hai offerto ') + num;
   return num + (affare ? ' più' : ' meno') + ' conveniente';
+}
+/* IL CAMBIO IN CHIARO NEL CONTO (19 ott 2026, tasso-in-chiaro): la STESSA
+   riga di sopra il libro, sotto la convenienza, finche' l'ordine e' da
+   prendere — cioe' finche' il conto e' fatto col cambio di adesso. Dopo
+   la presa niente: le cifre sono un fatto, il cambio di adesso non le
+   muove, e «cambio della presa» Andrea l'ha tolto (una riga sola, la
+   stessa ovunque). Preso = a sats fissi coi miei sats detti (`preso`),
+   a mercato con la cifra del coordinatore (`detto`): le domande di
+   `scambioAlCambioP2P`. '' quando non c'e' niente da dire. */
+/* (le funzioni del cambio vivono nel blocco del cambio: da qui il typeof,
+   per i banchi che fanno girare il conto senza quel blocco) */
+function rigaTassoContoP2P(o, detto){
+  if (typeof tassoAdessoP2P !== 'function') return '';
+  if ((o.sats > 0 && o.preso) || detto > 0) return '';
+  const t = tassoAdessoP2P();
+  return t ? '<div class="ctrl-tasso">' + esc(t) + '</div>' : '';
+}
+/* LA TESTA DEL CONTO: la convenienza e il cambio, quando ci sono tutt'e
+   due, in UNA scatola col filo sotto — i due stanno insieme, e un filo
+   fra l'uno e l'altro li direbbe due cose. Una scatola e non `:has()`, che
+   fuori dallo schermo largo in questo file non entra. */
+function testaContoP2P(conv, tasso){
+  return (conv && tasso) ? '<div class="ctrl-testa">' + conv + tasso + '</div>' : conv + tasso;
 }
 /* LA RIGA DELLA CONVENIENZA A SATS FISSI (27 set 2026, richiesta di
    Andrea), in cima al conto del dettaglio e della pagina dello scambio:

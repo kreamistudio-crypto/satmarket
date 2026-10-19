@@ -18038,11 +18038,38 @@
   vista e si rifà IN PIÙ a quel che ha sotto, con
   `ridisegnaFoglioFermoP2P` (tiene lo scorrimento e la domanda del
   metodo).
-  IL CAMBIO SCADUTO NON SI DICE: lo zero che il server risponde oltre
+  LO ZERO NON ENTRA: lo zero che il server risponde oltre
   `ORE_CAMBIO_VALIDO` nel client non entra e non accende niente; resta
-  il numero di prima, o quello di riserva. Una riga «Prezzo del bitcoin
+  il numero di prima, o quello di riserva. (Una riga «Prezzo del bitcoin
   non aggiornato» è esistita per poche ore la sera del 10 ott 2026 e
-  Andrea l'ha tolta la notte stessa: non riproporla.
+  Andrea l'ha tolta la notte stessa; il 19 ott ha chiesto lui la forma
+  nuova, qui sotto.)
+  IL CAMBIO IN CHIARO (19 ott 2026, cantiere tasso-in-chiaro). UNA riga
+  pulita, «1 BTC ≈ 98.450 €», nient'altro (decisione di Andrea: niente
+  ora, niente note, niente «cambio della presa»); oltre `CAMBIO_VECCHIO_MS`
+  (5 minuti) un ⚠️ davanti al numero, senza parole. La frase è PURA,
+  `testoTassoP2P`, e la cifra è un gruppo con spazi non separabili.
+  L'età viene dal server: accanto a `cambio_eur`, nella rotta
+  `/api/cambio` e nella busta della vetrina, viaggia `cambio_eta_s`, da
+  quanti SECONDI la fonte ha dato quel numero (`cambio_eta_ora`, la stessa
+  cache; None senza cambio). Un'età e non un'ora: il telefono la toglie
+  dal SUO adesso (`impostaOraCambio` → `cambioQuando`), e un orologio
+  storto non inventa un ⚠️; senza età mai il ⚠️. Due posti, la stessa
+  riga: UNA volta sopra il libro P2P (`#p2pTasso`, markup fisso fra il
+  banner delle commissioni e la riga dell'ordine sparito, scritto da
+  `aggiornaTassoLibroP2P` in `renderP2P`) e nel conto di un ordine DA
+  PRENDERE (`rigaTassoContoP2P` in `contoDettP2P`: il foglio del libro e
+  la pagina dello scambio), sotto la convenienza e nella stessa testa
+  (`testaContoP2P`, una scatola e non `:has()`); dopo la presa niente. Il
+  battito ridisegna anche quando cambia il solo ⚠️ (`firmaTassoP2P`): con
+  CoinGecko muto il numero resta, e la riga deve passare al ⚠️ da sola.
+  IL RITORNO IN PRIMO PIANO NON LAMPEGGIA: la pagina che si nasconde mette
+  il cambio in dubbio (`cambioDubbio`), e in dubbio il ⚠️ non si mostra;
+  tornando visibile (`ritornoCambioP2P`, un ascoltatore dopo l'interval
+  unico) si chiede SUBITO il cambio, e il dubbio lo scioglie la risposta,
+  qualunque — anche la rete caduta — o la busta della vetrina. Il ⚠️ che
+  resta dopo quella domanda è vero: il server (o la rete) non ha un
+  cambio fresco.
   CHI NON È ENTRATO, SUL LIBRO: in `battitoScambiP2P`, prima della
   rotta degli scambi che per lui non esiste, un ridisegno fermo ogni
   `P2P_SCAMBI_OGNI_MS` — è il render che attraversa la rilettura dei 60

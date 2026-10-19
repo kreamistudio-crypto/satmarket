@@ -13805,6 +13805,21 @@ def cambio_noto_ora(valuta: str = "eur") -> float:
                           ORE_CAMBIO_VALIDO)
 
 
+def cambio_eta_ora(valuta: str = "eur"):
+    """Quanti SECONDI ha il cambio che `cambio_noto_ora` sta dando, cioe'
+    da quando la fonte ci ha dato quel numero; None se il cambio non c'e'
+    (tasso-in-chiaro, 19 ott 2026). Viaggia accanto al cambio perche' il
+    telefono, oltre cinque minuti, metta un ⚠️ davanti a «1 BTC ≈ X €».
+    UN'ETA' E NON UN'ORA, ed e' la scelta: un'ora del server letta
+    sull'orologio di un telefono avanti o indietro di qualche minuto
+    darebbe un ⚠️ falso, o lo nasconderebbe. L'eta' non dipende da
+    nessuno dei due orologi: il telefono la toglie dal SUO adesso.
+    Mai la rete, mai il database: e' la stessa cache."""
+    if cambio_noto_ora(valuta) <= 0:
+        return None
+    return max(0, int(time.time() - _cambio_cache["quando"]))
+
+
 def cambio_per_import() -> dict:
     """Il cambio nella forma che vuole l'import da Nostr: {'EUR': x,
     'USD': y}, con dentro solo quel che e' davvero utilizzabile.
@@ -13961,7 +13976,8 @@ def cambio_da_solo():
     APERTA E SENZA PARAMETRI: il cambio non e' di nessuno, e il libro
     lo guarda anche chi non ha una sessione. `no-store`: un cambio
     tenuto in una cache e' di nuovo il cambio vecchio."""
-    return JSONResponse({"cambio_eur": cambio_noto_ora()},
+    return JSONResponse({"cambio_eur": cambio_noto_ora(),
+                         "cambio_eta_s": cambio_eta_ora()},
                         headers={"Cache-Control": "no-store"})
 
 
@@ -24257,6 +24273,10 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # sfoglia il mercatino non deve aspettare nessuno. 0 = non
         # disponibile, e il client sa gia' cosa farne (omette il «≈»).
         risposta["cambio_eur"] = cambio_noto_ora()
+        # ...e la sua eta' in secondi (19 ott 2026, tasso-in-chiaro): il
+        # libro P2P e il conto di un ordine dicono il cambio in chiaro,
+        # con l'ora; None = non c'e' (vedi `cambio_eta_ora`)
+        risposta["cambio_eta_s"] = cambio_eta_ora()
         # IL DOMINIO DI CASA, che il client da solo non puo' sapere
         # (ago 2026, col servizio nascosto Tor): serve a comporre i
         # link da CONDIVIDERE quando si arriva dall'onion — un
