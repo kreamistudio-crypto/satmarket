@@ -6766,17 +6766,38 @@
   .conto-p2p .ctrl-conv .p2p-avviso{color:var(--rosso-p2p-testo)}
   .conto-p2p .ctrl-conv .p2p-affare{color:var(--trust)}
   /* IL CAMBIO IN CHIARO (19 ott 2026): «1 BTC ≈ 98.450 €» e nient'altro,
-     CENTRATO nella sua riga (richiesta di Andrea), sotto la convenienza,
-     piu' piccolo ancora e nello stesso inchiostro
-     morbido — e' il metro delle cifre,
-     non una cifra. Col suo filo sotto; con la convenienza stanno tutt'e
-     due nella scatola `ctrl-testa` (`testaContoP2P`), che porta un filo
-     solo, e i fili loro se ne vanno. */
-  .conto-p2p .ctrl-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);
-    text-align:center;padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
-  .conto-p2p .ctrl-testa{padding:0 0 9px;margin:0 0 4px;border-bottom:1px dashed var(--line-soft)}
-  .conto-p2p .ctrl-testa .ctrl-conv{border-bottom:0;padding-bottom:3px;margin-bottom:0}
-  .conto-p2p .ctrl-testa .ctrl-tasso{border-bottom:0;padding-bottom:0;margin-bottom:0}
+     in una CASELLA SUA sotto la convenienza, piccolo, nell'inchiostro
+     morbido — e' il metro delle cifre, non una cifra.
+     AL CENTRO ESATTO, e il perche' dei numeri: la casella va dal filo di
+     sopra (quello della convenienza, o il bordo del riquadro se e' la
+     prima) al suo filo di sotto. Sopra c'e' sempre 4px da annullare — il
+     `margin-bottom` della convenienza, o il `padding-top` del riquadro —
+     ed e' il `margin-top:-4px`; poi 9px sopra e 9px sotto, e il flex
+     mette il contenuto nel mezzo. Il `margin-bottom` restituisce i 4px
+     alla riga dopo, come fa la convenienza.
+     IL BOTTONE ⚠️ⓘ non sposta niente: il dito ha un'area grande (padding)
+     che i margini negativi tolgono dall'impaginazione. Il messaggio
+     galleggia sotto la casella, centrato e largo al piu' quanto lei. */
+  .conto-p2p .ctrl-tasso{position:relative;display:flex;justify-content:center;
+    align-items:center;font-size:12px;line-height:1.45;color:var(--ink-soft);
+    padding:9px 0;margin:-4px 0 4px;border-bottom:1px dashed var(--line-soft)}
+  .conto-p2p .ctrl-tasso .tasso-riga{display:inline-flex;align-items:center;gap:6px}
+  .conto-p2p .ctrl-tasso .tasso-info{display:inline-flex;align-items:center;gap:3px;
+    background:none;border:0;color:inherit;font:inherit;cursor:pointer;
+    padding:10px 8px;margin:-10px -8px;-webkit-tap-highlight-color:transparent}
+  .conto-p2p .ctrl-tasso .tasso-warn{font-size:12px;line-height:1}
+  .conto-p2p .ctrl-tasso .tasso-i{display:inline-flex;align-items:center;justify-content:center;
+    width:13px;height:13px;border-radius:50%;border:1.5px solid currentColor;
+    font:italic 700 9px/1 Georgia,'Times New Roman',serif}
+  .conto-p2p .ctrl-tasso .tasso-info:focus-visible{outline:2px solid var(--ink-soft);
+    outline-offset:-4px;border-radius:8px}
+  .conto-p2p .ctrl-tasso .tasso-msg{position:absolute;top:calc(100% + 4px);left:50%;
+    transform:translateX(-50%);z-index:3;width:max-content;max-width:100%;
+    box-sizing:border-box;padding:7px 10px;border-radius:10px;
+    background:var(--card);border:1px solid var(--line);color:var(--ink);
+    font-size:12.5px;line-height:1.4;font-weight:600;text-align:center;
+    box-shadow:0 4px 14px rgba(0,0,0,.14)}
+  .conto-p2p .ctrl-tasso .tasso-msg[hidden]{display:none}
   /* ⚠️ LE CIFRE DEL CALCOLO NON SONO PIU' COLORATE (12 set 2026,
      ritocco di Andrea che rovescia il verde/rosso «direzione» del
      giorno prima): i sats di fee, premio e subtotale perdono la
@@ -23413,7 +23434,10 @@ let cambioRidisegna = false;        // vero SOLO dentro il ridisegno del battito
    solo DENTRO le cifre — i «≈» e le % — e chi guardava non poteva sapere
    quale fosse. SOPRA IL LIBRO C'E' STATA per un giro, una volta per tutte
    le card: tolta lo stesso giorno da Andrea, la vuole solo nel dettaglio.
-   OLTRE CINQUE MINUTI, UN ⚠️ DAVANTI AL NUMERO, senza parole. IL NUMERO
+   OLTRE CINQUE MINUTI, ACCANTO AL NUMERO UN'ICONCINA ⚠️ CON UNA «i»: un
+   bottone, e nessuna parola a schermo finche' non lo si tocca; toccato,
+   apre un messaggio piccolo («Cambio delle 14:32, non aggiornato: il
+   prezzo potrebbe essere cambiato.», `rigaTassoContoP2P`). IL NUMERO
    RESTA — un valore segnato vecchio vale piu' di nessun valore — e resta
    quel che faceva il client: lo zero del server non entra
    (`impostaCambio`), e quindi nemmeno la sua eta' (qui sotto). E' la
@@ -23448,27 +23472,39 @@ function impostaOraCambio(eurPerBtc, etaS){
   cambioDubbio = false;
 }
 /* PURA: la riga. `eurBtc` in euro per BITCOIN, `quando` e `adesso` in
-   millisecondi; '' senza un cambio. La cifra e' un gruppo che non si
-   spezza (la regola di casa): spazi non separabili, e a 360 px non resta
-   mai «€» da solo a capo. Un `quando` nel futuro (l'orologio del
-   telefono tornato indietro) vale «adesso». */
-function testoTassoP2P(eurBtc, quando, adesso){
+   millisecondi; null senza un cambio, senno' {cifra, vecchio, messaggio}.
+   La cifra e' un gruppo che non si spezza (la regola di casa): spazi non
+   separabili, e a 360 px non resta mai «€» da solo a capo. `messaggio`
+   c'e' solo col cambio vecchio: e' quel che si legge toccando ⚠️ⓘ, con
+   l'ORA di quando la fonte l'ha dato (e il giorno, se non e' oggi). Un
+   `quando` nel futuro (l'orologio del telefono tornato indietro) vale
+   «adesso», e senza `quando` il cambio non e' mai vecchio. */
+function statoTassoP2P(eurBtc, quando, adesso){
   const v = Math.round(Number(eurBtc) || 0);
-  if (!(v > 0)) return '';
+  if (!(v > 0)) return null;
   const cifra = '1\u00a0BTC\u00a0≈\u00a0' + v.toLocaleString('it-IT') + '\u00a0€';
-  return (quando > 0 && adesso - quando > CAMBIO_VECCHIO_MS) ? '⚠️\u00a0' + cifra : cifra;
+  if (!(quando > 0 && adesso - quando > CAMBIO_VECCHIO_MS))
+    return {cifra: cifra, vecchio: false, messaggio: ''};
+  const d = new Date(quando), due = n => String(n).padStart(2, '0');
+  const ora = due(d.getHours()) + ':' + due(d.getMinutes());
+  const oggi = new Date(adesso).toDateString() === d.toDateString();
+  return {cifra: cifra, vecchio: true,
+          messaggio: 'Cambio ' + (oggi ? 'delle ' + ora
+              : 'del ' + due(d.getDate()) + '/' + due(d.getMonth() + 1) + ' alle ' + ora)
+            + ', non aggiornato: il prezzo potrebbe essere cambiato.'};
 }
-/* la riga del cambio in mano adesso; '' senza il cambio vero. In dubbio
-   (il ritorno in primo piano) l'eta' non si guarda */
+/* lo stato del cambio in mano adesso; null senza il cambio vero. In
+   dubbio (il ritorno in primo piano) l'eta' non si guarda */
 function tassoAdessoP2P(){
   return (cambioVivo && eurPerSat > 0)
-    ? testoTassoP2P(eurPerSat * 1e8, cambioDubbio ? 0 : cambioQuando, Date.now()) : '';
+    ? statoTassoP2P(eurPerSat * 1e8, cambioDubbio ? 0 : cambioQuando, Date.now()) : null;
 }
 /* LA FIRMA DEL ⚠️: «c'e'» o «non c'e'», mai il numero (quello lo dice gia'
    `rileggiCambio`). Serve al battito: CoinGecko muto vuol dire stesso
    numero a ogni domanda, e senza questa la riga non passerebbe mai al ⚠️. */
 function firmaTassoP2P(){
-  return tassoAdessoP2P().indexOf('⚠️') === 0 ? 'vecchio' : '';
+  const t = tassoAdessoP2P();
+  return t && t.vecchio ? 'vecchio' : '';
 }
 let tassoBattito = '';   // la firma vista dall'ultimo battito
 /* la pagina si nasconde: il cambio va in dubbio; torna visibile: si
@@ -63490,8 +63526,8 @@ function contoDettP2P(o){
      da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo')
     + '">'
-    + testaContoP2P(rigaConvenienzaFissaP2P(o, convFissa),
-                    rigaTassoContoP2P(o, detto))
+    + rigaConvenienzaFissaP2P(o, convFissa)
+    + rigaTassoContoP2P(o, detto)
     + r(etichettaCtrl, cifra('ctrl'))
     + premio
     /* ⚠️ IL SUBTOTALE STA FRA IL PREMIO E LA FEE, e non e' un vezzo di
@@ -63578,28 +63614,56 @@ function etichettaPremioP2P(mio, prem, affare){
   return num + (affare ? ' più' : ' meno') + ' conveniente';
 }
 /* IL CAMBIO IN CHIARO NEL CONTO (19 ott 2026, tasso-in-chiaro): la riga,
-   centrata, sotto la convenienza — il SOLO posto dove sta (la riga sopra
-   il libro Andrea l'ha tolta) —, finche' l'ordine e' da
-   prendere — cioe' finche' il conto e' fatto col cambio di adesso. Dopo
-   la presa niente: le cifre sono un fatto, il cambio di adesso non le
-   muove, e «cambio della presa» Andrea l'ha tolto (una riga sola, la
-   stessa ovunque). Preso = a sats fissi coi miei sats detti (`preso`),
-   a mercato con la cifra del coordinatore (`detto`): le domande di
-   `scambioAlCambioP2P`. '' quando non c'e' niente da dire. */
+   sotto la convenienza, IN UNA CASELLA SUA, al centro esatto — in
+   orizzontale e in verticale (Andrea, dal telefono: la vedeva scentrata;
+   la misura sta nel giro dal vivo). Il SOLO posto dove sta (la riga sopra
+   il libro Andrea l'ha tolta), finche' l'ordine e' da prendere — cioe'
+   finche' il conto e' fatto col cambio di adesso. Dopo la presa niente:
+   le cifre sono un fatto, il cambio di adesso non le muove, e «cambio
+   della presa» Andrea l'ha tolto. Preso = a sats fissi coi miei sats
+   detti (`preso`), a mercato con la cifra del coordinatore (`detto`): le
+   domande di `scambioAlCambioP2P`. '' quando non c'e' niente da dire.
+   COL CAMBIO VECCHIO, accanto al numero il bottone ⚠️ⓘ e nient'altro di
+   visibile: il messaggio sta nella casella SPENTO, e lo accende il tocco
+   (`infoTassoP2P`). Sta fuori dal flusso (sopra le righe sotto), cosi'
+   aprendolo la casella non cambia altezza e il numero non si sposta.
+   Il nome per chi legge con la voce e' sul bottone: non si vede. */
 /* (le funzioni del cambio vivono nel blocco del cambio: da qui il typeof,
    per i banchi che fanno girare il conto senza quel blocco) */
 function rigaTassoContoP2P(o, detto){
   if (typeof tassoAdessoP2P !== 'function') return '';
   if ((o.sats > 0 && o.preso) || detto > 0) return '';
   const t = tassoAdessoP2P();
-  return t ? '<div class="ctrl-tasso">' + esc(t) + '</div>' : '';
+  if (!t) return '';
+  return '<div class="ctrl-tasso"><span class="tasso-riga"><span class="tasso-cifra">'
+    + esc(t.cifra) + '</span>'
+    + (t.vecchio
+      ? '<button type="button" class="tasso-info" aria-expanded="false" '
+        + 'aria-label="Cambio non aggiornato" onclick="infoTassoP2P(this)">'
+        + '<span class="tasso-warn" aria-hidden="true">⚠️</span>'
+        + '<span class="tasso-i" aria-hidden="true">i</span></button>'
+      : '')
+    + '</span>'
+    + (t.vecchio ? '<span class="tasso-msg" role="status" hidden>' + esc(t.messaggio) + '</span>' : '')
+    + '</div>';
 }
-/* LA TESTA DEL CONTO: la convenienza e il cambio, quando ci sono tutt'e
-   due, in UNA scatola col filo sotto — i due stanno insieme, e un filo
-   fra l'uno e l'altro li direbbe due cose. Una scatola e non `:has()`, che
-   fuori dallo schermo largo in questo file non entra. */
-function testaContoP2P(conv, tasso){
-  return (conv && tasso) ? '<div class="ctrl-testa">' + conv + tasso + '</div>' : conv + tasso;
+/* il tocco su ⚠️ⓘ: apre (o richiude) il messaggio della sua casella; aperto,
+   lo chiude il primo tocco, ovunque — anche sull'iconcina, che lo richiude
+   da se' prima che il tocco arrivi al documento. L'ascolto si arma al giro
+   dopo, o il tocco che apre lo richiuderebbe subito. Un ridisegno lo
+   richiude da se' (rinasce spento), ed e' giusto: il cambio puo' essere
+   cambiato. */
+function infoTassoP2P(btn){
+  const casella = btn && btn.closest('.ctrl-tasso');
+  const msg = casella && casella.querySelector('.tasso-msg');
+  if (!msg) return;
+  const apri = msg.hidden;
+  msg.hidden = !apri;
+  btn.setAttribute('aria-expanded', apri ? 'true' : 'false');
+  if (apri) setTimeout(() => document.addEventListener('click', () => {
+    msg.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }, {once: true}), 0);
 }
 /* LA RIGA DELLA CONVENIENZA A SATS FISSI (27 set 2026, richiesta di
    Andrea), in cima al conto del dettaglio e della pagina dello scambio:

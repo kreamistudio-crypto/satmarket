@@ -65869,3 +65869,59 @@ secondo passo, e col server locale la risposta arrivava prima: corsa del
 banco, non del codice — ora la lettura sta nello stesso giro sincrono del
 ritorno); dopo la presa (iniettato) nessuna riga.
 
+## Il cambio in chiaro, terzo giro: al centro esatto della sua casella, e il ⚠️ⓘ che si tocca (19 ott 2026, cantiere tasso-in-chiaro, correzioni di Andrea)
+
+LE TRE CORREZIONI (solo P2P). 1) Dal telefono la riga si vedeva
+scentrata: deve stare ESATTAMENTE al centro della sua casella, in
+orizzontale e in verticale, misurato al pixel. 2) Niente scritte vicino
+alla riga. 3) Col cambio vecchio solo un'iconcina ⚠️ con una «i»
+accanto al numero; toccata, un messaggio piccolo («Cambio delle 14:32,
+non aggiornato: il prezzo potrebbe essere cambiato.»); niente testo
+visibile finché non si tocca.
+PERCHÉ ERA SCENTRATA. In orizzontale no (era `text-align:center`); in
+verticale sì, e di molto: la riga stava nella stessa scatola della
+convenienza o in cima al riquadro, con 4px sopra (il padding del
+riquadro) e 13 sotto (9 di padding più 4 di margine).
+COSA SI È FATTO. La riga ha una CASELLA SUA (la scatola comune del
+secondo giro, `testaContoP2P`, non c'è più), che va dal filo di chi sta
+sopra — la convenienza, o il bordo del riquadro — al suo filo di sotto:
+`margin-top:-4px` annulla i 4px di sopra in tutti e due i casi, poi 9px
+sopra e 9 sotto e il flex nel mezzo. Il ⚠️ⓘ è un bottone con l'area del
+dito allargata dal padding e tolta all'impaginazione coi margini
+negativi, quindi non sposta niente; il messaggio galleggia sotto la
+casella (`position:absolute`), largo al più quanto lei, e aprendolo il
+numero non si muove. Si chiude al primo tocco, ovunque (anche
+sull'iconcina); un ridisegno lo fa rinascere chiuso. Il nome per chi
+legge con la voce, «Cambio non aggiornato», sta nell'`aria-label`: non si
+vede (era il «non fatto» del primo giro). La funzione pura diventa
+`statoTassoP2P` → {cifra, vecchio, messaggio}; il battito guarda il solo
+«vecchio sì/no».
+TOCCATA UNA SENTINELLA DEL 10 OTT: `prove_cambio_ovunque` vietava la
+stringa «non aggiornato:» ovunque, a guardia della riga «Prezzo del
+bitcoin non aggiornato: le cifre…» tolta quella notte. Il messaggio che
+Andrea chiede ora la contiene; la sentinella guarda adesso il seguito
+delle due frasi vecchie («le cifre», «stime e percentuali»), che restano
+vietate.
+PROVATO. `prove_tasso_in_chiaro` aggiornata: la casella sua e nessuna
+scatola comune; il CSS della centratura (padding, `margin-top:-4px`,
+flex); il messaggio (nessuno col fresco, l'ora col vecchio, il giorno se
+non è oggi, nessuno senza età); l'HTML della casella fresca e vecchia
+(bottone, `aria-label`, messaggio spento); il tocco su un DOM di cartone
+(apre, l'ascolto del tocco altrove armato solo al giro dopo e una volta,
+chiude fuori, chiude sull'iconcina, niente senza messaggio). Tortura 23
+su 23. Suite `PROVE_SEVERE=1` 25110 passate, 0 fallite, nessuna
+saltata; collaudi della CI 85 verdi, 0 rossi (sull'albero di 6b256af più
+il cantiere).
+DAL VIVO (360×780, chiaro e scuro, stesso banco), 30 su 30: col cambio
+fresco, a mercato (prima casella del conto) e a sats fissi (sotto la
+convenienza), il contenuto sta a 9,00px dal filo di sopra e 9,00 da
+quello di sotto, e a 114,88 / 114,89 px dai bordi sinistro e destro;
+col cambio vecchio, cifra più ⚠️ⓘ a 96,39 / 96,39 e 9 / 9; a schermo
+solo «1 BTC ≈ 98.450 € ⚠️ i», il messaggio spento; il tocco lo apre con
+l'ora, centrato sotto la casella e mai più largo, e la casella non si
+muove di un decimo; un tocco altrove e un secondo tocco sull'iconcina lo
+richiudono; il ritorno in primo piano senza ⚠️ⓘ col server fresco, e col
+server vecchio il ⚠️ⓘ solo dopo la risposta; il libro senza cambio.
+Nessun errore di pagina; fuori da 127.0.0.1 solo lo script di Telegram,
+fermato.
+

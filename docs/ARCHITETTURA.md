@@ -18046,18 +18046,25 @@
   nuova, qui sotto.)
   IL CAMBIO IN CHIARO (19 ott 2026, cantiere tasso-in-chiaro). UNA riga
   pulita, «1 BTC ≈ 98.450 €», nient'altro (decisione di Andrea: niente
-  ora, niente note, niente «cambio della presa»), CENTRATA, e SOLO nel
-  dettaglio di un ordine DA PRENDERE (`rigaTassoContoP2P` in
-  `contoDettP2P`: il foglio del libro e la pagina dello scambio), sotto
-  la convenienza e nella stessa testa (`testaContoP2P`, una scatola e non
-  `:has()`); dopo la presa niente, e sopra il libro niente (c'è stata un
-  giro, tolta da Andrea). Oltre `CAMBIO_VECCHIO_MS` (5 minuti) un ⚠️
-  davanti al numero, senza parole. La frase è PURA, `testoTassoP2P`, e la
-  cifra è un gruppo con spazi non separabili. L'età viene dal server:
-  accanto a `cambio_eur`, nella rotta `/api/cambio` e nella busta della
-  vetrina, viaggia `cambio_eta_s`, da quanti SECONDI la fonte ha dato quel
-  numero (`cambio_eta_ora`, la stessa cache; None senza cambio). Un'età e
-  non un'ora: il telefono la toglie dal SUO adesso (`impostaOraCambio` →
+  ora, niente note, niente «cambio della presa»), SOLO nel dettaglio di
+  un ordine DA PRENDERE (`rigaTassoContoP2P` in `contoDettP2P`: il foglio
+  del libro e la pagina dello scambio), sotto la convenienza, in una
+  CASELLA SUA al centro esatto: `margin-top:-4px` annulla i 4px di chi sta
+  sopra (il margine della convenienza, o il padding del riquadro se è la
+  prima casella), poi 9px sopra e 9 sotto e il flex nel mezzo — il giro
+  dal vivo misura le quattro distanze al pixel. Dopo la presa niente, e
+  sopra il libro niente (c'è stata un giro, tolta da Andrea). Oltre
+  `CAMBIO_VECCHIO_MS` (5 minuti) accanto al numero un bottone ⚠️ⓘ e
+  nessuna parola a schermo (il nome per la voce sta nell'`aria-label`);
+  toccato (`infoTassoP2P`) apre un messaggio piccolo, «Cambio delle 14:32,
+  non aggiornato: il prezzo potrebbe essere cambiato.», che galleggia
+  sotto la casella senza spostarla e si richiude al primo tocco. Lo stato
+  è PURO, `statoTassoP2P` → {cifra, vecchio, messaggio}; la cifra è un
+  gruppo con spazi non separabili. L'età viene dal server: accanto a
+  `cambio_eur`, nella rotta `/api/cambio` e nella busta della vetrina,
+  viaggia `cambio_eta_s`, da quanti SECONDI la fonte ha dato quel numero
+  (`cambio_eta_ora`, la stessa cache; None senza cambio). Un'età e non
+  un'ora: il telefono la toglie dal SUO adesso (`impostaOraCambio` →
   `cambioQuando`), e un orologio storto non inventa un ⚠️; senza età mai
   il ⚠️. Il battito ridisegna anche quando cambia il solo ⚠️
   (`firmaTassoP2P`): con CoinGecko muto il numero resta, e la riga deve

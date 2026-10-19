@@ -66616,9 +66616,9 @@ def prove_p2p_dettaglio():
         "function capiP2P(da, a){",
         # (27 set 2026) la riga «Premio scelto · Al prezzo di adesso»
         "function rigaConvenienzaFissaP2P(o, conv){",
-        # (19 ott 2026) il cambio in chiaro e la testa del conto: qui senza
-        # il blocco del cambio, quindi la riga tace (`prove_tasso_in_chiaro`)
-        "function rigaTassoContoP2P(o, detto){", "function testaContoP2P(conv, tasso){",
+        # (19 ott 2026) il cambio in chiaro: qui senza il blocco del cambio,
+        # quindi la riga tace (`prove_tasso_in_chiaro`)
+        "function rigaTassoContoP2P(o, detto){",
         # (28 set 2026) l'etichetta del premio: l'effetto per chi guarda,
         # e sotto il perche'
         "function etichettaPremioP2P(mio, prem, affare){",
@@ -153212,11 +153212,13 @@ def prove_tasso_in_chiaro():
     1) il server manda accanto al cambio la sua ETA' (`cambio_eta_s`), nella
        rotta `/api/cambio` e nella busta della vetrina — un'eta' e non
        un'ora, cosi' un orologio storto del telefono non inventa un ⚠️;
-    2) UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro, centrata, SOLO nel
+    2) UNA riga pulita, «1 BTC ≈ 98.450 €», nient'altro, in una casella
+       sua al centro esatto (il giro dal vivo lo misura al pixel), SOLO nel
        dettaglio di un ordine da prendere (`contoDettP2P`: il foglio del
        libro e la pagina dello scambio) — sopra il libro non c'e' piu'
-       (Andrea, al secondo giro); oltre cinque minuti un ⚠️ davanti al
-       numero, senza parole; dopo la presa niente;
+       (Andrea, al secondo giro); oltre cinque minuti, accanto al numero,
+       un bottone ⚠️ⓘ e nessuna parola: toccato, apre un messaggio piccolo
+       con l'ora del cambio (terzo giro); dopo la presa niente;
     3) il battito ridisegna anche quando cambia soltanto il ⚠️ (CoinGecko
        muto: stesso numero, e la riga deve passare al ⚠️ da sola);
     4) al ritorno in primo piano il cambio si chiede SUBITO, e il ⚠️ si
@@ -153277,20 +153279,21 @@ def prove_tasso_in_chiaro():
           [mini.count('p2pTasso'), mini.count('p2p-tasso'),
            mini.count('aggiornaTassoLibroP2P')])
     cd = nudo(fn("function contoDettP2P(o){"))
-    prova("nel conto la riga sta subito sotto la convenienza, nella stessa testa, prima del "
-          "Controvalore; e la testa e' una scatola solo quando ci sono tutt'e due",
-          [True, True],
-          ["    + testaContoP2P(rigaConvenienzaFissaP2P(o, convFissa),\n"
-           "                    rigaTassoContoP2P(o, detto))\n"
+    prova("nel conto la riga sta in una casella SUA, subito sotto la convenienza e prima del "
+          "Controvalore; la scatola comune del secondo giro non c'e' piu'",
+          [True, 0],
+          ["    + rigaConvenienzaFissaP2P(o, convFissa)\n"
+           "    + rigaTassoContoP2P(o, detto)\n"
            "    + r(etichettaCtrl, cifra('ctrl'))" in cd,
-           "return (conv && tasso) ? '<div class=\"ctrl-testa\">' + conv + tasso + '</div>' "
-           ": conv + tasso;" in fn("function testaContoP2P(conv, tasso){")])
+           mini.count("ctrl-testa") + mini.count("testaContoP2P")])
     css = mini[:mini.find("</style>")]
-    prova("piccola, grigia e CENTRATA nella sua riga, nell'inchiostro morbido di casa (che ha "
+    prova("piccola, grigia e al CENTRO della sua casella: 9px sopra e 9 sotto, i 4px di chi "
+          "sta sopra annullati (`margin-top:-4px`), il flex nel mezzo; nell'inchiostro morbido di casa (che ha "
           "il suo valore in chiaro e in scuro); e nessuna regola per una nota sotto",
           [True, True, 0],
-          [".conto-p2p .ctrl-tasso{font-size:12px;line-height:1.45;color:var(--ink-soft);\n"
-           "    text-align:center;" in css,
+          [".conto-p2p .ctrl-tasso{position:relative;display:flex;justify-content:center;\n"
+           "    align-items:center;font-size:12px;line-height:1.45;color:var(--ink-soft);\n"
+           "    padding:9px 0;margin:-4px 0 4px;border-bottom:1px dashed var(--line-soft)}" in css,
            css.count("--ink-soft:") >= 2, mini.count("tasso-nota")])
     prova("UNA riga e nient'altro (decisione di Andrea): via «aggiornato alle», la nota "
           "sull'altra fonte e «cambio della presa» da ogni frase che va a schermo",
@@ -153319,7 +153322,10 @@ function el(){ return null; }
 /* il dettaglio di cartone: ogni ridisegno riscrive la riga, e FOTO le
    tiene tutte — il lampo del ⚠️ si vedrebbe qui */
 let RIGA = '', FOTO = [];
-function disegna(){ RIGA = tassoAdessoP2P(); FOTO.push(RIGA); }
+/* lo stato come si vede: la cifra, e col cambio vecchio l'iconcina ⚠️ⓘ */
+const vista = t => t ? t.cifra + (t.vecchio ? ' ⚠️ⓘ' : '') : '';
+const tassoV = () => vista(tassoAdessoP2P());
+function disegna(){ RIGA = tassoV(); FOTO.push(RIGA); }
 let VISTA = 'view-p2p';
 function vistaAttivaP2P(){ return VISTA; }
 let disegni = 0;
@@ -153329,13 +153335,15 @@ let FETCH = () => Promise.resolve({ok: true, json: async () => RISPOSTA});
 function fetch(...a){ domande++; return FETCH(...a); }
 const tick = () => new Promise(r => setImmediate(r));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
-""" + blocco + fn("function rigaTassoContoP2P(o, detto){") + r"""
+""" + blocco + fn("function rigaTassoContoP2P(o, detto){") + fn("function infoTassoP2P(btn){") + r"""
 (async () => {
   /* LA RIGA, PURA */
-  const t = testoTassoP2P;
+  const t = (...a) => vista(statoTassoP2P(...a));
+  const m = (...a) => (statoTassoP2P(...a) || {}).messaggio;
   const q = new Date(2026, 9, 19, 14, 32, 0).getTime();
-  out.gruppo = t(98450, 0, 0) === '1 BTC ≈ 98.450 €'
-    && t(98450, q, q + 5 * 60000 + 1) === '⚠️ 1 BTC ≈ 98.450 €';
+  out.messaggi = [m(98450, q, q), m(98450, q, q + 5 * 60000 + 1), m(98450, q, q + 26 * 3600000),
+                  m(98450, 0, q + 3600000), m(0, q, q + 3600000)];
+  out.gruppo = statoTassoP2P(98450, 0, 0).cifra === '1\u00a0BTC\u00a0≈\u00a098.450\u00a0€';
   out.frasi = [t(98450, q, q), t(98450.4, q, q + 5 * 60000), t(98450, q, q + 5 * 60000 + 1),
                t(98450, q, q + 26 * 3600000), t(98450, 0, q + 3600000), t(0, q, q),
                t(98450, q, q - 60000), t(1234567, q, q)];
@@ -153350,7 +153358,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   out.eta = prove;
   /* LA RIGA DEL CAMBIO IN MANO */
   cambioVivo = false; cambioQuando = 0; disegna();
-  out.riserva = [RIGA, tassoAdessoP2P()];
+  out.riserva = [RIGA, tassoV()];
   impostaCambio(98450); impostaOraCambio(98450, 40);
   disegna();
   out.libro = RIGA;
@@ -153390,17 +153398,17 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   document.visibilityState = 'visible'; FOTO = []; domande = 0;
   ritornoCambioP2P();
   disegna();                                     // un render qualunque, mentre si aspetta
-  const inVolo = [domande, tassoAdessoP2P(), RIGA];
+  const inVolo = [domande, tassoV(), RIGA];
   appesa({ok: true, json: async () => ({cambio_eur: 98500, cambio_eta_s: 20})});
   await tick(); await tick(); await tick();
-  out.ritornoFresco = [inVolo, RIGA, FOTO.some(f => f.indexOf('⚠️') === 0)];
+  out.ritornoFresco = [inVolo, RIGA, FOTO.some(f => f.indexOf('⚠️') >= 0)];
   /* ...e se anche DOPO la domanda il server ha un cambio vecchio, il ⚠️ e' vero */
   document.visibilityState = 'hidden'; ritornoCambioP2P();
   ORA += 10 * 60000;
   FETCH = () => Promise.resolve({ok: true, json: async () => ({cambio_eur: 98500, cambio_eta_s: 700})});
   document.visibilityState = 'visible'; FOTO = []; domande = 0;
   ritornoCambioP2P();
-  const prima = tassoAdessoP2P();
+  const prima = tassoV();
   await tick(); await tick(); await tick();
   out.ritornoVecchio = [domande, prima, RIGA];
   /* ...e con la rete giu' la domanda cade: il cambio e' vecchio davvero, ⚠️ */
@@ -153409,7 +153417,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   ORA += 10 * 60000;
   FETCH = () => Promise.reject(new Error('rete'));
   document.visibilityState = 'visible'; ritornoCambioP2P();
-  const primaRete = tassoAdessoP2P();
+  const primaRete = tassoV();
   await tick(); await tick(); await tick();
   out.ritornoRete = [primaRete, RIGA, cambioDubbio];
   /* ...e una pausa BREVE: l'ultima domanda e' di venti secondi prima di
@@ -153425,7 +153433,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   out.ritornoBreve = [domande, cambioDubbio];
   /* ...e la busta della vetrina scioglie il dubbio come la domanda */
   cambioDubbio = true; impostaOraCambio(98500, 400);
-  out.busta = [cambioDubbio, tassoAdessoP2P()];
+  out.busta = [cambioDubbio, tassoV()];
 
   /* LA RIGA DEL CONTO */
   ORA = ORA0; impostaCambio(98450); impostaOraCambio(98450, 0);
@@ -153440,22 +153448,49 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
   out.contoVecchio = r({euro: 50, premium: 2, metodi: ['SEPA']});
   cambioVivo = false;
   out.contoMuto = r({euro: 50, premium: 2, metodi: ['SEPA']});
+
+  /* IL TOCCO SU ⚠️ⓘ, con un DOM di cartone: il bottone dentro la casella,
+     il messaggio spento accanto, e il documento che raccoglie i tocchi */
+  const ascolti = [];
+  document.addEventListener = (tipo, f, opz) => ascolti.push({tipo, f, una: !!(opz && opz.once)});
+  const msg = {hidden: true};
+  const attr = {};
+  const btn = {closest: s => s === '.ctrl-tasso' ? casella : null,
+               setAttribute: (k, v) => { attr[k] = v; }};
+  const casella = {querySelector: s => s === '.tasso-msg' ? msg : null};
+  const tocca = bersaglio => { const a = ascolti.splice(0); a.forEach(x => x.f({target: bersaglio})); };
+  infoTassoP2P(btn);
+  const aperto = [msg.hidden, attr['aria-expanded'], ascolti.length];
+  await new Promise(r => setTimeout(r, 0)); await tick();
+  const dopoUnGiro = [ascolti.length, ascolti[0] && ascolti[0].tipo, ascolti[0] && ascolti[0].una];
+  tocca('altrove');
+  const fuori = [msg.hidden, attr['aria-expanded']];
+  infoTassoP2P(btn); await new Promise(r => setTimeout(r, 0)); await tick();
+  infoTassoP2P(btn); tocca('icona');                 // il secondo tocco sull'iconcina
+  const iconcina = [msg.hidden, attr['aria-expanded']];
+  infoTassoP2P({closest: () => ({querySelector: () => null}), setAttribute(){}});
+  out.tocco = {aperto, dopoUnGiro, fuori, iconcina, senzaMessaggio: ascolti.length};
   /* da qui gli spazi non separabili si leggono come spazi: `gruppo` li ha
      gia' guardati, e le frasi qui sotto restano leggibili */
-  console.log(JSON.stringify(out).replace(/ /g, ' '));
+  console.log(JSON.stringify(out).replace(/\u00a0/g, ' '));
 })();
 """
     o = _node_banco(js)
     if o is None:
         salta("il banco del cambio in chiaro", "node non c'e'")
         return
-    prova("«1 BTC ≈ 98.450 €», col ⚠️ davanti, e' un gruppo che non si spezza: spazi non "
-          "separabili", True, o.get("gruppo"))
-    prova("la riga: il solo numero, anche al filo dei cinque minuti; un millesimo dopo il ⚠️ "
-          "davanti, senza parole; un giorno dopo lo stesso; senza eta' mai il ⚠️; senza cambio "
+    prova("«1 BTC ≈ 98.450 €» e' un gruppo che non si spezza: spazi non separabili", True,
+          o.get("gruppo"))
+    prova("il messaggio del ⚠️ⓘ: nessuno col cambio fresco; col vecchio l'ora, e il giorno se non "
+          "e' oggi; senza eta' nessuno; senza cambio nessuno stato",
+          ["", "Cambio delle 14:32, non aggiornato: il prezzo potrebbe essere cambiato.",
+           "Cambio del 19/10 alle 14:32, non aggiornato: il prezzo potrebbe essere cambiato.",
+           "", None], o.get("messaggi"))
+    prova("la riga: il solo numero, anche al filo dei cinque minuti; un millesimo dopo "
+          "l'iconcina ⚠️ⓘ accanto, senza parole; un giorno dopo lo stesso; senza eta' mai il ⚠️; senza cambio "
           "niente; un `quando` nel futuro vale adesso; le migliaia col punto",
-          ["1 BTC ≈ 98.450 €", "1 BTC ≈ 98.450 €", "⚠️ 1 BTC ≈ 98.450 €",
-           "⚠️ 1 BTC ≈ 98.450 €", "1 BTC ≈ 98.450 €", "", "1 BTC ≈ 98.450 €",
+          ["1 BTC ≈ 98.450 €", "1 BTC ≈ 98.450 €", "1 BTC ≈ 98.450 € ⚠️ⓘ",
+           "1 BTC ≈ 98.450 € ⚠️ⓘ", "1 BTC ≈ 98.450 €", "", "1 BTC ≈ 98.450 €",
            "1 BTC ≈ 1.234.567 €"], o.get("frasi"))
     prova("l'eta' che arriva: 0 e 120 secondi si tolgono dall'adesso del telefono; null, "
           "assente, negativa, una parola o vuota = eta' non nota (0); col cambio a zero o "
@@ -153465,7 +153500,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
     prova("il battito ridisegna quando compare o se ne va il ⚠️ anche a numero fermo, e non "
           "quando non cambia niente", [0, 0, 1, 2, "1 BTC ≈ 98.450 €"], o.get("battito"))
     prova("server muto: la domanda cade, e dopo cinque minuti la riga passa al ⚠️ da sola, con "
-          "un ridisegno solo", [1, "⚠️ 1 BTC ≈ 98.450 €"], o.get("muto"))
+          "un ridisegno solo", [1, "1 BTC ≈ 98.450 € ⚠️ⓘ"], o.get("muto"))
     prova("lo zero del server non porta via ne' il numero ne' la sua eta'", [True, True, 98450],
           o.get("zero"))
     prova("IL RITORNO IN PRIMO PIANO dopo dieci minuti: si chiede SUBITO il cambio, e finche' "
@@ -153474,22 +153509,37 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0)
           [[1, "1 BTC ≈ 98.450 €", "1 BTC ≈ 98.450 €"], "1 BTC ≈ 98.500 €", False],
           o.get("ritornoFresco"))
     prova("...se anche dopo la domanda il server ha un cambio vecchio, il ⚠️ e' vero e si vede",
-          [1, "1 BTC ≈ 98.500 €", "⚠️ 1 BTC ≈ 98.500 €"], o.get("ritornoVecchio"))
+          [1, "1 BTC ≈ 98.500 €", "1 BTC ≈ 98.500 € ⚠️ⓘ"], o.get("ritornoVecchio"))
     prova("...con la rete giu' la domanda cade: il dubbio si scioglie lo stesso, e il cambio "
-          "vecchio di dieci minuti porta il ⚠️", ["1 BTC ≈ 98.500 €", "⚠️ 1 BTC ≈ 98.500 €", False],
+          "vecchio di dieci minuti porta il ⚠️", ["1 BTC ≈ 98.500 €", "1 BTC ≈ 98.500 € ⚠️ⓘ", False],
           o.get("ritornoRete"))
     prova("...e dopo una pausa breve (il minuto del battito non ancora passato) si chiede "
           "lo stesso, subito", [1, False], o.get("ritornoBreve"))
-    prova("...e la busta della vetrina scioglie il dubbio come la domanda", [False, "⚠️ 1 BTC ≈ 98.500 €"],
+    prova("...e la busta della vetrina scioglie il dubbio come la domanda", [False, "1 BTC ≈ 98.500 € ⚠️ⓘ"],
           o.get("busta"))
-    riga = '<div class="ctrl-tasso">1 BTC ≈ 98.450 €</div>'
+    riga = ('<div class="ctrl-tasso"><span class="tasso-riga"><span class="tasso-cifra">'
+            '1 BTC ≈ 98.450 €</span></span></div>')
     prova("nel conto la STESSA riga, a mercato e a sats fissi, finche' l'ordine e' da "
           "prendere; dopo la presa (a sats fissi coi miei sats, a mercato con la cifra del "
           "coordinatore) niente",
           {"mercato": riga, "fisso": riga, "fissoPreso": "", "mercatoPreso": ""}, o.get("conto"))
-    prova("...col ⚠️ quando e' vecchia, e niente a cambio muto",
-          ['<div class="ctrl-tasso">⚠️ 1 BTC ≈ 98.450 €</div>', ""],
-          [o.get("contoVecchio"), o.get("contoMuto")])
+    vecchia = ('<div class="ctrl-tasso"><span class="tasso-riga"><span class="tasso-cifra">'
+               '1 BTC ≈ 98.450 €</span><button type="button" class="tasso-info" '
+               'aria-expanded="false" aria-label="Cambio non aggiornato" '
+               'onclick="infoTassoP2P(this)"><span class="tasso-warn" aria-hidden="true">⚠️</span>'
+               '<span class="tasso-i" aria-hidden="true">i</span></button></span>'
+               '<span class="tasso-msg" role="status" hidden>Cambio delle 14:25, non aggiornato: '
+               'il prezzo potrebbe essere cambiato.</span></div>')
+    prova("...col cambio vecchio, accanto alla cifra il bottone ⚠️ⓘ (il nome per la voce sta "
+          "nell'aria-label, che non si vede) e il messaggio con l'ora, SPENTO; a cambio muto "
+          "niente", [vecchia, ""], [o.get("contoVecchio"), o.get("contoMuto")])
+    prova("IL TOCCO su ⚠️ⓘ: apre il messaggio e lo dice al lettore di schermo; l'ascolto del "
+          "tocco altrove si arma solo DOPO (il tocco che apre non lo richiude) e vale una volta; "
+          "un tocco altrove chiude; un secondo tocco sull'iconcina chiude anche lui (e "
+          "l'ascolto non lo riapre); senza messaggio non fa niente",
+          {"aperto": [False, "true", 0], "dopoUnGiro": [1, "click", True],
+           "fuori": [True, "false"], "iconcina": [True, "false"], "senzaMessaggio": 0},
+          o.get("tocco"))
 
 
 def prove_cambio_ovunque():
@@ -153534,7 +153584,11 @@ def prove_cambio_ovunque():
           "due righe, ne' il loro CSS, ne' la frase", [0, 0, 0, 0],
           [len(re.findall(r"cambioFermo|segnaCambioFermo|mostraCambioFermo", mini)),
            mini.count("cambio-fermo"), mini.count("Prezzo del bitcoin non aggiornato"),
-           mini.count("non aggiornato:")])
+           # (19 ott 2026, tasso-in-chiaro, terzo giro) «non aggiornato:» da
+           # solo non basta piu': il messaggio del ⚠️ⓘ, chiesto da Andrea, lo
+           # dice («Cambio delle 14:32, non aggiornato: il prezzo...»). Si
+           # guarda il seguito delle due frasi VECCHIE, che restano vietate
+           len(re.findall(r"non aggiornato: (?:le cifre|stime e percentuali)", mini))])
     prova("...e `impostaCambio` e' tornata quella di prima: lo zero esce senza toccare niente",
           "function impostaCambio(eurPerBtc){\n"
           "  const v = Number(eurPerBtc) || 0;\n"
