@@ -9273,6 +9273,12 @@
   .mio-riga .mio-tit>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Il quadratino con l'emoji dell'oggetto, a sinistra della riga */
   .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+  /* il riquadro delle liste piccole (`riquadroMini`, 19 ott 2026):
+     l'emoji sotto, la miniatura sopra a coprirla */
+  .riq-mini{position:relative;display:inline-flex;align-items:center;
+    justify-content:center;flex:none;border-radius:10px;overflow:hidden;
+    background:var(--chip-bg);line-height:1}
+  .riq-mini>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .order-ic{width:56px;height:56px;border-radius:12px;background:var(--chip-bg);
     display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto}
   /* LA FOTO DELL'ORDINE E' QUASI RADDOPPIATA (22 set 2026, richiesta
@@ -15832,11 +15838,23 @@ function fotoUrl(f){
   return (f.startsWith('http') || f.startsWith('data:')) ? f : `${FOTO_BASE}/foto/${f}`;
 }
 /* La miniatura e' una convenzione di nome: accanto a a123_0.jpg il
-   server salva a123_0_min.jpg (320px, un decimo del peso). Gli URL
-   esterni (import Nostr) e i data: passano invariati. */
+   server salva a123_0_min.jpg (quadrata, 480px, MINIATURA_LATO nel
+   server). Gli URL esterni (import Nostr) e i data: passano invariati. */
 function fotoMini(nome){
   if (!nome || nome.startsWith('http') || nome.startsWith('data:')) return nome;
   return nome.replace(/\.jpg$/i, '_min.jpg');
+}
+/* IL RIQUADRO DELLE LISTE PICCOLE (19 ott 2026, miniature-leggere,
+   decisione di Andrea): nelle offerte (40px), in «I tuoi annunci»
+   (44px) e nelle testate da 44px dei fogli offerta, lampo, rifornisci
+   e della puntata si mostra la miniatura e basta. Sotto c'e' sempre l'emoji
+   della categoria su sfondo tenue: se la miniatura manca o non si
+   carica, l'onerror toglie l'<img> e resta quella — mai la foto piena
+   (dieci volte il peso per un francobollo), mai il 💰 ne' l'icona
+   dell'immagine rotta. Mentre carica, l'emoji fa da segnaposto. */
+function riquadroMini(src, emoji, lato, stile){
+  const img = src ? `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
+  return `<span class="riq-mini" style="width:${lato}px;height:${lato}px;font-size:${Math.round(lato / 2)}px${stile || ''}">${esc(emoji)}${img}</span>`;
 }
 /* Il francobollo della foto profilo (avatar lug 2026): un <img> da
    posare DENTRO un cerchio .avatar, sopra l'iniziale — se la foto
@@ -31095,7 +31113,7 @@ function apriPunta(modo){
   const top = astaInfo ? astaInfo.top_sats : (l.astaTop || 0);
   const minimo = minimoAsta(l);
   el('puntaTestata').innerHTML = `
-    ${l.photos && l.photos[0] ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" style="width:44px;height:44px;object-fit:cover;border-radius:10px" alt="">` : `<span style="font-size:30px">${l.emoji}</span>`}
+    ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}
     <div style="min-width:0"><b>${esc(l.title)}</b><div style="font-size:12px;color:var(--muted);font-weight:600">${top>0?`testa ${fmt(top)} sats`:`base ${fmt(l.astaBase)} sats`} · ${astaInfo?astaInfo.puntate_n:l.astaPuntate} offerenti</div></div>`;
   if (topup) {
     /* il top-up del leader: nessun minimo da superare, si alza solo
@@ -32951,9 +32969,7 @@ function aggiornaFoglioOfferta(){
   const l = currentListing; if (!l) return;
   const inEur = l.valuta==='eur' && l.priceEur>0;
   el('offTestata').innerHTML = `
-    ${l.thumbs && l.thumbs[0]
-      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
-      : `<span style="font-size:28px">${l.emoji}</span>`}
+    ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}
     <div style="min-width:0;flex:1">
       <b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
       ${/* niente «al pezzo» qui: lo stepper accanto ruba la riga e il
@@ -33565,9 +33581,7 @@ function apriLampo(){
   }
   const inEur = l.valuta==='eur' && l.priceEur>0;
   el('lampoTestata').innerHTML = `
-    ${l.thumbs && l.thumbs[0]
-      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
-      : `<span style="font-size:28px">${l.emoji}</span>`}
+    ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}
     <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
     <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${inEur ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span></div>`;
   el('lampoChips').innerHTML = (lampoLeve.sconti||[]).map(p => {
@@ -33892,9 +33906,7 @@ function renderOfferte(){
     let thumb = '';
     try { const nomi = o.foto ? JSON.parse(o.foto) : [];
           if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
-    const ic = carr ? '🛒' : thumb
-      ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
-      : '💰';
+    const ic = carr ? '🛒' : riquadroMini(thumb, EMOJI_CAT[o.categoria] || '📦', 40);
     let stato = '', azioni = '';
     if (o.stato==='proposta') {
       if (compro) {
@@ -34238,9 +34250,7 @@ function testataOfferta(o){
   let thumb = '';
   try { const nomi = o.foto ? JSON.parse(o.foto) : [];
         if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
-  return (thumb
-      ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
-      : '<span style="font-size:28px">💰</span>')
+  return riquadroMini(thumb, EMOJI_CAT[o.categoria] || '📦', 40)
     + `<b style="font-size:14px">${esc(o.titolo)}</b>`;
 }
 async function eseguiConferma(btn){
@@ -45238,9 +45248,7 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
   esa = l.stato==='venduto', spento = rev || esa, apre = !rev; return `
     <div class="order">
       <div class="row mio-riga">
-        <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${l.photos&&l.photos[0]
-          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
-          : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span>${
+        <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44, spento ? ';filter:grayscale(1);opacity:.6' : '')}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span>${
         /* Il 🟣 dell'IMPORTATO (ago 2026): senza, un annuncio che vive
            sui relay e uno nato qui sono indistinguibili in questa
            lista — li si separava solo aprendoli — e «togli quello
@@ -45309,9 +45317,7 @@ function apriRifornisci(id){
   if (!l) { toast('Annuncio non trovato'); return; }
   rifId = id;
   el('rifTestata').innerHTML = `
-    ${l.thumbs && l.thumbs[0]
-      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
-      : `<span style="font-size:28px">${l.emoji}</span>`}
+    ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}
     <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
     <span style="font-size:12.5px;color:var(--muted);font-weight:700">${esaurito(l)
       ? 'ora è esaurito'

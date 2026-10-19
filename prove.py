@@ -144429,7 +144429,11 @@ def prove_foto_anomala():
     if mini:
         with Image.open(io.BytesIO(mini)) as im:
             lato_mini = im.size
-    prova("...e la miniatura e' il quadrato di sempre", (640, 640), lato_mini)
+    # il lato si legge dal server: la ricetta e' scesa a 480 il 19 ott
+    # 2026 (miniature-leggere), e qui si prova il quadrato, non la misura
+    quadro = int(re.search(r"MINIATURA_LATO = (\d+)", _SORGENTE).group(1))
+    prova("...e la miniatura e' il quadrato di sempre", (quadro, quadro),
+          lato_mini)
     prova("...e non e' vuota", False, amb["_foto_vuota"](grande))
     # --- il tetto e' quello dei telefoni di oggi, con margine ----------
     prova("il tetto ammette i 200 MP dei telefoni", True,
@@ -172750,6 +172754,181 @@ def prove_istanza_prova():
           and "allarme=PROVA_SOLO_IDS == {0}" in ls)
 
 
+def prove_miniature_leggere():
+    """LE MINIATURE PIU' LEGGERE (19 ott 2026, cantiere miniature-leggere,
+    decisioni di Andrea).
+
+    1) La ricetta scende da 640 q87 (~160KB) a 480 q82: copre la card a
+       360px su schermo 3x (158 CSS → 474) e la foto dell'ordine nel
+       dettaglio (132 CSS → 396). Il commento «320px» del client e'
+       corretto.
+    2) Il backfill d'avvio NON rifa' le 640 (resterebbero buone, solo
+       piu' pesanti): le rifa' `rifai_miniature.py`, a mano, con --prova
+       che non scrive e --davvero che tocca solo i *_min.jpg, salta
+       av_/pod_/neg_/ban_, non scrive mai gli originali e sostituisce in
+       un colpo (os.replace).
+    3) Nelle liste piccole (offerte 40px, «I tuoi annunci» 44px) e
+       nelle testate da 44px dei fogli offerta, lampo, rifornisci e
+       della puntata, se la miniatura manca o non si carica, resta
+       l'emoji della categoria su sfondo tenue: mai il 💰, mai
+       l'immagine rotta, mai la foto piena."""
+    print("\n[le miniature piu' leggere, e il riquadro delle liste piccole]")
+    import hashlib as _hl, shutil as _sh, subprocess as _sp, tempfile as _tf
+    import io as _io
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+
+    # --- 1) la ricetta, coi conti presi dal foglio -------------------
+    lato = int(re.search(r"MINIATURA_LATO = (\d+)", _SORGENTE).group(1))
+    qual = int(re.search(r"MINIATURA_QUALITA = (\d+)", _SORGENTE).group(1))
+    prova("la ricetta nuova: 480 px, qualita' 82", (480, 82), (lato, qual))
+    pad = int(re.search(r"--pad:(\d+)px", css).group(1))
+    gap = int(re.search(r"\.grid\{display:grid;grid-template-columns:1fr 1fr;"
+                        r"gap:(\d+)px", css).group(1))
+    card = (360 - 2 * pad - gap) / 2
+    prova("la card a 360px e' larga 158 CSS (dal foglio)", 158, card)
+    prova("...e la miniatura basta per lo schermo 3x (474)", True,
+          lato >= card * 3)
+    prova("il commento del client non dice piu' 320px", (False, True),
+          ("(320px, un decimo" in mini,
+           "quadrata, 480px, MINIATURA_LATO" in mini))
+
+    # --- 2) il backfill non rifa' le grandi; lo script si' ------------
+    try:
+        from PIL import Image, ImageOps, ImageStat
+    except ImportError:
+        salta("le miniature rifatte per davvero", "Pillow non e' installata")
+        return
+    amb = {"os": os, "io": _io, "ImmaginePillow": Image,
+           "ImageOps": ImageOps, "ImageStat": ImageStat,
+           "threading": __import__("threading"),
+           "print": lambda *a, **k: None}
+    for inizio in ("MINIATURA_LATO = ", "TETTO_PIXEL_FOTO = "):
+        i = _SORGENTE.index(inizio)
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    for f in ("_foto_anomala", "miniatura_jpeg", "_miniatura_da_rifare"):
+        exec(pezzo(f), amb)
+    with _tf.TemporaryDirectory() as tmp:
+        d = os.path.join(tmp, "foto")
+        os.makedirs(d)
+        # una foto «vera»: rumore, cosi' il JPEG ha qualcosa da pesare
+        foto = Image.effect_noise((1600, 1200), 60).convert("RGB")
+        foto.save(os.path.join(d, "a1_0.jpg"), quality=88)
+        ImageOps.fit(foto, (640, 640), Image.Resampling.LANCZOS).save(
+            os.path.join(d, "a1_0_min.jpg"), quality=87, optimize=True)
+        foto.crop((0, 0, 300, 300)).save(os.path.join(d, "a2_0.jpg"))
+        foto.crop((0, 0, 300, 300)).save(os.path.join(d, "a2_0_min.jpg"))
+        for n in ("av_ab_1", "pod_1", "neg_1", "ban_1"):
+            for suf in (".jpg", "_min.jpg"):
+                foto.crop((0, 0, 700, 700)).save(os.path.join(d, n + suf))
+        foto.crop((0, 0, 700, 700)).save(os.path.join(d, "a9_0_min.jpg"))
+        p = lambda n: os.path.join(d, n)
+        prova("il backfill d'avvio non rifa' la 640 (la ricetta e' calata)",
+              False, amb["_miniatura_da_rifare"](p("a1_0_min.jpg"),
+                                                 p("a1_0.jpg")))
+        firma = lambda: {n: _hl.sha256(open(p(n), "rb").read()).hexdigest()
+                         for n in os.listdir(d)}
+        import rifai_miniature as rm
+        muto = lambda *a, **k: None
+        vecchia = os.path.getsize(p("a1_0_min.jpg"))
+        rm.print = muto     # nelle globali del modulo: vince sul builtin
+        try:
+            prima = firma()
+            esito = rm.main(["--prova"], foto_dir=d)
+            prova("--prova non scrive un byte", (0, prima), (esito, firma()))
+            prova("senza --prova ne' --davvero non parte",
+                  (2, prima), (rm.main([], foto_dir=d), firma()))
+            esito = rm.main(["--davvero"], foto_dir=d)
+            dopo = firma()
+        finally:
+            del rm.print
+        cambiati = sorted(n for n in prima if prima[n] != dopo.get(n))
+        prova("--davvero rifa' SOLO la miniatura grande con l'originale",
+              (0, ["a1_0_min.jpg"]), (esito, cambiati))
+        prova("...nessun file in piu' (il temporaneo se n'e' andato)",
+              sorted(prima), sorted(dopo))
+        with Image.open(p("a1_0_min.jpg")) as img:
+            prova("...e la nuova e' 480x480", (480, 480), img.size)
+        prova("...identica a quella che farebbe il server", True,
+              open(p("a1_0_min.jpg"), "rb").read()
+              == amb["miniatura_jpeg"](open(p("a1_0.jpg"), "rb").read()))
+        prova("...e pesa meno della 640 di prima", True,
+              os.path.getsize(p("a1_0_min.jpg")) < vecchia)
+        rm.print = muto
+        try:
+            prova("rilanciato a lavoro fatto non cambia niente",
+                  (0, dopo), (rm.main(["--davvero"], foto_dir=d), firma()))
+        finally:
+            del rm.print
+    src = open("rifai_miniature.py", encoding="utf-8").read()
+    prova("sentinella: lo script sostituisce in un colpo e non apre mai "
+          "l'originale in scrittura", (True, 1, True),
+          ("os.replace(tmp, p_min)" in src, src.count('open(p_pieno, "rb")'),
+           'SALTA = ("av_", "pod_", "neg_", "ban_")' in src))
+    prova("sentinella: la stessa lista di salti del backfill", True,
+          all(x in pezzo("genera_miniature_mancanti")
+              for x in ('"av_"', '"pod_"', '"neg_"', '"ban_"')))
+    prova("lo script e' nella lista di compilazione della CI", True,
+          "rifai_miniature.py" in open("ci/compila.txt").read().split())
+
+    # --- 3) il riquadro delle liste piccole ---------------------------
+    prova("nessun 💰 al posto della foto, nessuna foto piena nelle "
+          "liste piccole", (0, 7),
+          (mini.count("replaceWith('💰')"), mini.count("riquadroMini(")
+           - 1))
+    # fino alla funzione dopo: dentro ci sono funzioni annidate
+    i = mini.index("async function caricaAltriMiei(){")
+    altri = mini[i:re.compile(r"^(async )?function ", re.M).search(mini, i + 1).start()]
+    prova("«I tuoi annunci»: il riquadro a 44, mai il ripiego sul pieno",
+          (True, False),
+          ("${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44, " in altri,
+           "this.src=this.dataset.full" in altri))
+    # le quattro testate da 44 dei fogli (secondo giro, stessa decisione)
+    for firma, nome in (("function apriPunta(modo){", "della puntata"),
+                        ("function aggiornaFoglioOfferta(){", "dell'offerta"),
+                        ("function apriLampo(){", "del lampo"),
+                        ("function apriRifornisci(id){", "del rifornisci")):
+        i = mini.index(firma)
+        corpo = mini[i:re.compile(r"^(async )?function ", re.M).search(mini, i + 1).start()]
+        prova(f"la testata {nome}: il riquadro a 44, niente <img> sciolta "
+              "ne' foto piena", (True, False, False),
+              ("${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}" in corpo,
+               "<img src=" in corpo, "l.photos[0]" in corpo))
+    prova("le offerte: il riquadro a 40 con l'emoji della categoria", 2,
+          mini.count("riquadroMini(thumb, EMOJI_CAT[o.categoria] || '📦', 40)"))
+    prova("...e la categoria arriva dal server", True,
+          "a.titolo, a.foto, a.categoria, " in pezzo("mie_offerte"))
+    prova("il riquadro ha il suo sfondo tenue, e la foto lo copre", (True, True),
+          (".riq-mini{position:relative;" in css and
+           "background:var(--chip-bg)" in css[css.index(".riq-mini{"):],
+           ".riq-mini>img{position:absolute;inset:0;" in css))
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del riquadro", "node non c'e'")
+        return
+    banco = "\n".join([
+        pezzo_js(mini, "const esc = s =>", ";\n") + ";",
+        pezzo_js(mini, "function riquadroMini(", "\n}\n") + "\n}",
+        "console.log(JSON.stringify([riquadroMini('/foto/a1_0_min.jpg', '👟', 40),"
+        " riquadroMini('', '👟', 44, ';opacity:.6'), riquadroMini(undefined, '📦', 44)]));"])
+    cart = _tf.mkdtemp()
+    f = os.path.join(cart, "riquadro.js")
+    open(f, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node del riquadro gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    con, senza, vuoto = json.loads(r.stdout)
+    prova("con la miniatura: l'emoji sotto, l'<img> sopra che si toglie "
+          "se non carica", (True, True, True),
+          ("👟<img src=\"/foto/a1_0_min.jpg\"" in con,
+           'onerror="this.remove()"' in con, "width:40px;height:40px" in con))
+    prova("senza miniatura: solo l'emoji nel riquadro, col suo stile",
+          (False, True, False, True),
+          ("<img" in senza, "width:44px;height:44px;font-size:22px;opacity:.6\">👟</span>" in senza,
+           "<img" in vuoto, "📦" in vuoto))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -173089,6 +173268,7 @@ def main():
               prove_journal_senza_buffer,
               prove_modifica_massiva_foto,
               prove_istanza_prova,
+              prove_miniature_leggere,
               prove_config_esempio):
         try:
             f()

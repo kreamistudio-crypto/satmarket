@@ -5290,11 +5290,13 @@
   (patto delle app di mercatino), in DEMO client-side sui dati finti.
   La ricerca per parole SI COMPONE con questi filtri, e non è una
   strada a parte: vive nella stessa rotta (vedi «LA RICERCA»). Le MINIATURE dal lug 2026 sono QUADRATE
-  (ImageOps.fit al centro, 640 q87 LANCZOS, `MINIATURA_LATO/QUALITA`):
+  (ImageOps.fit al centro, LANCZOS, `MINIATURA_LATO/QUALITA`; dal 19
+  ott 2026 480 q82, prima 640 q87 — i conti sotto, «LA MISURA DELLE
+  MINIATURE»):
   la card 1:1 col cover ingrandiva il lato corto delle vecchie
   rettangolari (la sgranatura); il backfill rifà da solo quelle di
-  ricette vecchie confrontando le intestazioni col lato CORTO della
-  foto piena. Nasce
+  ricette vecchie PIÙ PICCOLE confrontando le intestazioni col lato
+  CORTO della foto piena. Nasce
   `GET /api/listings/{id}` (registrato DOPO /miei: l'ordine delle
   rotte conta) per il deep-link /annuncio/{id} oltre le pagine
   caricate.
@@ -5472,6 +5474,26 @@
   (`genera_miniature_mancanti`), la modifica cancella anche la
   gemella, Cache-Control di 1 giorno su /foto (i nomi sono
   versionati).
+  LA MISURA DELLE MINIATURE (19 ott 2026, miniature-leggere): 480 px
+  q82, perché a 360 px la card è larga 158 CSS (474 pixel a 3×) e la
+  foto dell'ordine nel dettaglio 132 CSS (396 a 3×, misurata da
+  `prove_card_ordini`). La 640 q87 pesava ~160 KB; 320 si
+  sgranerebbe a 3×; il WebP vorrebbe un secondo nome accanto a
+  `_min.jpg`. Quando la ricetta CALA il backfill non tocca le vecchie
+  (sono solo più pesanti): le rifà a mano `rifai_miniature.py`
+  (`--prova` non scrive, `--davvero` tocca solo i `*_min.jpg` con
+  l'originale accanto, salta `av_`/`pod_`/`neg_`/`ban_`, mai gli
+  originali, `os.replace` da un temporaneo coi permessi della vecchia;
+  la ricetta la esegue da `server.py`, non da una copia).
+  IL RIQUADRO DELLE LISTE PICCOLE (`riquadroMini`, stesso giorno,
+  decisione di Andrea): nelle offerte (40 px, lista e testata), in
+  «I tuoi annunci» (44 px) e nelle testate da 44 dei fogli offerta,
+  lampo, rifornisci e della puntata l'emoji della categoria sta sotto, su
+  `--chip-bg`, e la miniatura sopra; se manca o non carica l'onerror
+  toglie l'`<img>` e resta l'emoji. Mai la foto piena lì, mai 💰 né
+  l'immagine rotta. La categoria delle offerte arriva da
+  `/api/offerte` (`a.categoria`). Le card e la foto dell'ordine invece
+  ripiegano sul pieno, ed è voluto: lì la foto È il contenuto.
   `/foto` NON È PIÙ UNA DIRECTORY MONTATA (ago 2026, la prima voce
   alta dell'audit): era l'ultimo StaticFiles del progetto, l'unica
   cartella servita in blocco, mentre ogni altra rotta pubblica

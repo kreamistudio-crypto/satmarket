@@ -20092,13 +20092,21 @@ def converti_in_jpeg(raw: bytes):
 # della sgranatura (lug 2026): thumbnail() limita il lato LUNGO, cosi'
 # una 1200x900 diventava 480x360 e il cover della card quadrata
 # ingrandiva il lato corto del 60-70% sugli schermi retina. Col
-# ritaglio quadrato il lato corto E' il lato della ricetta. 640 q87
-# LANCZOS (il filtro fine, non il BICUBIC frettoloso di default):
-# ~60-90KB, nitida anche a 300px CSS per 2x di densita', e sempre
-# molto meno del JPEG pieno. Se si ritocca ancora, il backfill
-# rigenera da solo le miniature piu' piccole del lato nuovo.
-MINIATURA_LATO = 640
-MINIATURA_QUALITA = 87
+# ritaglio quadrato il lato corto E' il lato della ricetta. LANCZOS
+# (il filtro fine, non il BICUBIC frettoloso di default).
+# LA MISURA, RIFATTA COI CONTI (19 ott 2026, cantiere
+# miniature-leggere): la 640 q87 in produzione pesava ~160KB, il
+# doppio di quel che diceva questo commento. A 360px la card e' larga
+# 158 CSS: 316 pixel a 2x, 474 a 3x; la foto dell'ordine nel
+# dettaglio e' 132 CSS, 396 a 3x (c'e' una prova che lo misura).
+# 480 q82 copre tutti e due con margine e pesa circa la meta'. Piu'
+# giu' (320) si sgranerebbe proprio sui telefoni a 3x, e il WebP
+# vorrebbe un secondo nome accanto a `_min.jpg` in sei posti.
+# Se la ricetta CRESCE, il backfill rigenera da solo le miniature
+# piu' piccole del lato nuovo; se CALA, come qui, le vecchie restano
+# buone (solo piu' pesanti) e le rifa' `rifai_miniature.py`, a mano.
+MINIATURA_LATO = 480
+MINIATURA_QUALITA = 82
 
 
 def miniatura_jpeg(raw: bytes):
@@ -35667,7 +35675,10 @@ def mie_offerte(x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     righe = con.execute(
-        "SELECT o.*, a.titolo, a.foto, a.stato AS stato_annuncio, "
+        # la categoria per l'emoji del riquadro quando la miniatura
+        # manca (19 ott 2026, miniature-leggere)
+        "SELECT o.*, a.titolo, a.foto, a.categoria, "
+        "a.stato AS stato_annuncio, "
         "a.prezzo_sats AS listino_sats, a.prezzo_eur AS listino_eur, "
         "a.consegna, uc.nome AS compratore_nome, uv.nome AS venditore_nome "
         "FROM offerte o "

@@ -67510,3 +67510,116 @@ pagina torna dentro da sola, senza tocchi. SUITE `PROVE_SEVERE=1`
 0 rossi, più `collaudo_account` verde nella gabbia — sull'albero del
 primo giro (1c2df89, su 6b2e4af) più questo. Il rebase sul main corso e
 la firma per il VPS li fa una sessione sul PC di Andrea.
+## Le miniature più leggere: 480 q82, lo script per le vecchie, e il riquadro delle liste piccole (19 ott 2026, cantiere miniature-leggere, decisioni di Andrea)
+
+**IL PERCHÉ.** Le `_min.jpg` erano 640 px a qualità 87 e in produzione
+pesavano ~160 KB l'una, mentre il commento del client diceva «320px, un
+decimo del peso» e quello del server «~60-90KB». Andrea ha chiesto i
+conti prima del codice (proposta in dieci righe, ok suo).
+
+**I CONTI, E LA MISURA SCELTA: 480 px, JPEG q82** (`MINIATURA_LATO`,
+`MINIATURA_QUALITA`). Dove si usa la `_min`: le card della vetrina
+(`mapListing`), la foto degli Ordini (`fotoOrdine`, 100 e 132 CSS), le
+offerte (40), «I tuoi annunci» (44), le testate dei fogli (44) e
+l'anteprima dei link (`og:image`/JSON-LD). NON Nostr: i tag `image`
+portano la foto piena (`_foto_url_nostr`). A 360 px la card è larga
+(360 − 2×16 − 12)/2 = 158 CSS: 316 pixel a 2×, **474 a 3×**; la foto
+dell'ordine nel dettaglio 132 CSS, **396 a 3×** (`prove_card_ordini` la
+misura contro il server da allora). 480 copre tutti e due. Peso: su
+un'immagine rumorosa di prova 640 q87 → 480 q82 va da 90 a 37 KB (41%);
+su un nostro asset illustrato il 53%. In produzione ci si aspetta
+~160 → 70-85 KB: il numero vero lo dice `--prova` sul VPS.
+- STRADE SCARTATE: **320 px** (un quarto del peso) si sgranerebbe sui
+  telefoni a 3× e farebbe rossa la prova del 396; **WebP** (un altro
+  ~40%) vorrebbe un secondo nome accanto a `_min.jpg` in sei posti
+  (frontend, `og:image`, le due cancellazioni, `copia_vetrina_demo`, il
+  backfill) e alcune anteprime di link lo digeriscono male; un
+  `srcset` a due misure, che darebbe il 640 solo al desktop retina, è un
+  cantiere a sé. Il prezzo accettato: sul desktop retina a 4-5 colonne
+  la card è un filo meno nitida di prima.
+
+**LE VECCHIE: `rifai_miniature.py`, a mano.** Il backfill d'avvio
+(`_miniatura_da_rifare`) rifà solo le miniature PIÙ PICCOLE della
+ricetta: con la ricetta che cala, le 640 restano dove sono, buone e
+pesanti, e nessun riavvio le tocca. Le rifà lo script, quando lo
+lancia Andrea: `--prova` calcola tutto in memoria e dice quante e i KB
+prima/dopo senza scrivere; `--davvero` scrive. Tocca SOLO i `*_min.jpg`
+con l'originale accanto e il lato sopra la ricetta; salta `av_`,
+`pod_`, `neg_`, `ban_` (la lista del backfill); l'originale si apre solo
+in lettura; la nuova va in un temporaneo `.rifai_*.tmp` nella stessa
+cartella, coi permessi della vecchia, e `os.replace` la mette al posto
+in un colpo; se non pesa meno, resta la vecchia; un'orfana (senza
+pieno) si lascia e si dice. La ricetta non è copiata: lo script esegue
+`miniatura_jpeg` e `_foto_anomala` da `server.py` accanto a sé, e si
+ferma senza scrivere se non le trova. Idempotente.
+
+**IL RIQUADRO DELLE LISTE PICCOLE** (aggiunta di Andrea al piano).
+Nelle offerte (lista e testata, 40 px) una miniatura che non caricava
+diventava 💰, e in «I tuoi annunci» (44 px) ripiegava sulla foto PIENA
+(dieci volte il peso per un francobollo). Ora `riquadroMini(src,
+emoji, lato, stile)`: l'emoji della categoria sta sotto, su
+`--chip-bg`, e la miniatura sopra, `position:absolute`; l'onerror toglie
+l'`<img>` e resta l'emoji. Mentre carica, l'emoji fa da segnaposto.
+Anche senza foto si vede il riquadro (in «I tuoi annunci» prima era
+un'emoji nuda da 22 px). Per le offerte la categoria non arrivava al
+client: `/api/offerte` ora seleziona anche `a.categoria` (LEFT JOIN:
+offerta su annuncio cancellato → `📦`, come `mapListing`). Il 🛒 della
+testata carrello resta. Card e foto ordine continuano a ripiegare sul
+pieno, ed è giusto: lì la foto è il contenuto.
+⚠️ La riga da 44 di `caricaAltriMiei` è la stessa che tocca il cantiere
+modifica-massiva-foto: chi pusha per secondo ribasa e tiene tutte e due
+(parola di Andrea).
+
+**PROVE.** `prove_miniature_leggere`: la ricetta 480/82; la card a 158
+CSS letta dal foglio e il 3×; il commento «320px» sparito; il backfill
+che non rifà una 640; lo script girato davvero in una cartella finta
+(`--prova` non cambia un byte, senza bandiera non parte, `--davvero`
+cambia SOLO la `_min` grande, nessun file in più, 480×480, identica a
+quella del server, più leggera; rilanciato non cambia niente); le
+sentinelle di `os.replace`, dell'originale aperto solo in lettura e
+della lista dei salti; lo script in `ci/compila.txt`; nessun
+`replaceWith('💰')`, «I tuoi annunci» senza ripiego sul pieno, le offerte
+con `EMOJI_CAT[o.categoria]`, `a.categoria` nella query, il CSS del
+riquadro; un banco node su `riquadroMini` con e senza miniatura.
+Emendata `prove_foto_anomala` («il quadrato di sempre» leggeva 640 a
+mano: ora legge `MINIATURA_LATO`). Giro visivo con Chromium a 360 px, 3×,
+chiaro e scuro, col CSS e la funzione veri ritagliati dal client:
+miniatura buona sopra, miniatura che manca → emoji, annuncio senza foto
+→ emoji, spento in grigio, nessuno scorrimento orizzontale.
+
+**COSA È GIRATO, E SU QUALE ALBERO.** Sopra 6b2e4af (l'importo che si
+copia) + il cantiere, verbali compresi: `PROVE_SEVERE=1 python prove.py`
+**25.262 passate, 0 fallite, 0 saltate** (nostr-tools 2.25.2 fuori dal
+repo, come la CI); collaudi della CI nella gabbia, due alla volta:
+**86 verdi, 0 rossi** (`collaudo_offerta_carrello` compreso: tocca
+`/api/offerte`). Poi main è corso di tre commit (la chat negli ordini,
+secondo giro; lo swap del venditore; i verbali di SATS Routing): ribasato
+su 0fd3816, conflitto solo additivo qui in CANTIERI; sull'albero
+ribasato la suite severa intera **25.310 passate, 0 fallite**, e
+`collaudo_offerta_carrello`, `collaudo_chat_mercatino`,
+`collaudo_modifica_massiva`, `collaudo_foto_obbligatorie`,
+`collaudo_foto_scartate`: verdi. Lo script NON è girato sul VPS: i due
+comandi li lancia Andrea, prima `--prova`.
+
+**DA GUARDARE.**
+- L'uscita di `--prova` sul VPS: quante miniature e i KB veri prima/dopo.
+- Sul telefono vero: la vetrina a 3× dopo `--davvero` (nitidezza della
+  card), e le offerte con una miniatura cancellata a mano.
+
+**SECONDO GIRO, LE QUATTRO TESTATE DA 44** (stesso giorno, richiesta di
+Andrea sui due notati). Le testate dei fogli offerta
+(`aggiornaFoglioOfferta`), lampo (`apriLampo`) e rifornisci
+(`apriRifornisci`) toglievano l'`<img>` che non caricava e lasciavano un
+buco; quella della puntata (`apriPunta`) ripiegava sulla foto PIENA e
+non aveva onerror (immagine rotta). Ora tutte e quattro
+`${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}`: emoji della
+categoria sotto, miniatura sopra, mai il pieno. L'emoji senza foto
+passa da 28-30 px a 22 (metà del riquadro, come nelle liste).
+`prove_miniature_leggere` le guarda una per una (il riquadro c'è,
+nessuna `<img src=` sciolta, nessun `l.photos[0]` nel corpo): 28/0. Giro
+visivo a 360 px chiaro e scuro con le quattro testate nel loro
+contenitore vero (flex, gap 10): buona → la 480, mancante e senza foto
+→ emoji, titolo lungo coi puntini, nessuno scorrimento. Sull'albero
+finale (0fd3816 + il cantiere coi due giri) la suite severa intera:
+**25.314 passate, 0 fallite**; `collaudo_offerta_carrello`,
+`collaudo_rilancio`, `collaudo_modifica_massiva`: verdi.
