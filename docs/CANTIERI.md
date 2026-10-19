@@ -62823,6 +62823,11 @@ prima e **subito dopo** lo scatto.
 
 ## La ricarica Postepay in contanti come metodo del P2P: lo studio (16 ott 2026, cantiere postepay-contanti, studio chiesto da Andrea: solo documenti, è una PROPOSTA)
 
+**DECISIONE (19 ott 2026, Andrea).** Per ora la ricarica Postepay NON
+entra fra i metodi del P2P, proprio per il rischio della triangolazione
+(punto 4). Si riapre solo dopo la prova vera da 1 € a un PuntoLis e il
+parere del professionista sulle otto domande del punto 5.
+
 **LA DOMANDA.** Aggiungere fra i metodi del P2P la ricarica di una carta
 Postepay pagata IN CONTANTI al tabacchino o alla posta: chi compra sats
 e non ha conto né carta paga in contanti, come col PayCode di
