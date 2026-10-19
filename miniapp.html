@@ -10287,6 +10287,20 @@
     box-shadow:0 8px 20px rgba(0,0,0,.18);
   }
   .riprovo.show{opacity:1;transform:translateX(-50%)}
+  /* La scheda dell'avvio che non parte (19 ott 2026, cantiere
+     logout-apk): «Manca la rete, riprova» o «Si è inceppato qualcosa».
+     Coi token del tema, quindi chiaro e scuro senza un blocco suo; il
+     velo e' quello di #attesaOverlay, la carta quella dei fogli. */
+  #avvioFermo{position:fixed;inset:0;z-index:10001;display:none;align-items:center;
+    justify-content:center;padding:16px;background:rgba(20,20,22,.55)}
+  #avvioFermo.on{display:flex}
+  .avvio-fermo-card{background:var(--card);color:var(--ink);border-radius:var(--radius);
+    padding:22px 20px 16px;width:100%;max-width:360px;text-align:center;
+    box-shadow:0 10px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:10px}
+  .avvio-fermo-icona{font-size:34px;line-height:1}
+  .avvio-fermo-titolo{font-family:var(--b-font);font-weight:800;font-size:19px;line-height:1.25}
+  .avvio-fermo-testo{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:4px}
+  .avvio-fermo-card .btn{width:100%;margin:0}
   /* «← Torna» del negozio e della pagina sicurezza: rettangolo come
      tutti gli altri bottoni dall'ago 2026 (era l'ultima pillola
      rimasta su quelle due pagine) */
@@ -15033,6 +15047,16 @@ document.getElementById('cartello')?.remove();</script>
   <div class="toast" id="toast"></div>
   <!-- «Un attimo, riprovo…»: il server che si riavvia (vedi fetchCheRiprova) -->
   <div class="riprovo" id="riprovo" role="status">Un attimo, riprovo…</div>
+  <!-- L'avvio che non parte (cantiere logout-apk): «Manca la rete» o l'errore, mai la vetrina -->
+  <div id="avvioFermo" role="alertdialog" aria-labelledby="avvioFermoTitolo" aria-describedby="avvioFermoTesto">
+    <div class="avvio-fermo-card">
+      <div class="avvio-fermo-icona" id="avvioFermoIcona" aria-hidden="true">📡</div>
+      <div class="avvio-fermo-titolo" id="avvioFermoTitolo">Manca la rete, riprova</div>
+      <div class="avvio-fermo-testo" id="avvioFermoTesto"></div>
+      <button type="button" class="btn primary" id="avvioFermoRiprova">Riprova</button>
+      <button type="button" class="btn ghost" id="avvioFermoChiudi" style="display:none">Chiudi</button>
+    </div>
+  </div>
   <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-anello"></span><span class="attesa-spunta" aria-hidden="true">✓</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
 
@@ -15231,9 +15255,23 @@ function attendiRiprovo(ms, segnale){
 }
 
 /* La pastiglia: accesa finche' almeno una richiesta aspetta il server */
+/* ...e la stessa pastiglia la usa la sonda dell'avvio (19 ott 2026,
+   cantiere logout-apk, vedi sondaMe): due ragioni, un elemento — due
+   pastiglie nello stesso punto si coprirebbero. Finche' la sonda cerca
+   il server la pastiglia dice «Riconnessione…», anche quando ad
+   accenderla e' il portinaio che lavora sotto di lei. */
+let riprovoPortinaio = false;   // il portinaio aspetta il server
+let avvioCerca = false;         // la sonda dell'avvio sta cercando
+let avvioRiconnette = false;    // ...e lo dice anche senza il portinaio
 function avvisoRiprovo(acceso){
+  riprovoPortinaio = !!acceso;
+  disegnaRiprovo();
+}
+function disegnaRiprovo(){
   const p = document.getElementById('riprovo');
-  if (p) p.classList.toggle('show', acceso);
+  if (!p) return;
+  p.textContent = avvioCerca ? 'Riconnessione…' : 'Un attimo, riprovo…';
+  p.classList.toggle('show', riprovoPortinaio || avvioRiconnette);
 }
 
 /* ══ PIU' ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea) ══════
@@ -84664,15 +84702,15 @@ async function avvia(){
        Il cookie va provato PRIMA del collaudo: in produzione l'header
        collaudo dà sempre 401, e in locale è l'unico modo di esercitare
        davvero il percorso web. */
-    let r = await fetch(`${API_BASE}/me`,
-      {headers:{'X-Tg-Init-Data': tg?.initData || ''}});
+    /* LA SONDA NON MOLLA (19 ott 2026, cantiere logout-apk): una rete
+       che manca o un server che si riavvia non sono un «no» — vedi
+       sondaMe. Qui arriva solo una risposta VERA del server. */
+    let {r, me} = await sondaMe(tg?.initData || '');
     WEB = !!(r.ok && !tg?.initData);
     if (!r.ok && !tg?.initData) {
       /* Niente cookie: proviamo le identità finte del collaudo */
-      r = await fetch(`${API_BASE}/me`,
-        {headers:{'X-Tg-Init-Data': authHdr()}});
+      ({r, me} = await sondaMe(authHdr()));
     }
-    const me = await r.json();
     /* Senza initData il backend ci riconosce solo col cookie o col
        collaudo acceso. Se ci dice di no siamo nel browser, fuori da
        Telegram: vetrina.
@@ -84681,7 +84719,7 @@ async function avvia(){
        Telegram e la sessione è scaduta (24h). La vetrina resta —
        il mercatino si sfoglia lo stesso — ma il banner lo dice. */
     scaduta = (r.status === 401 && !!tg?.initData);
-    if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
+    if (!r.ok || !me.tg_id) throw ANONIMO;
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
     /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il
        giorno che la beta si allarga questa riga e' gia' giusta */
@@ -84982,11 +85020,128 @@ async function avvia(){
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });
   } catch (e) {
+    /* UN ERRORE NON E' UN'USCITA (19 ott 2026, cantiere logout-apk): fino
+       a ieri QUALUNQUE eccezione di questo blocco — anche un intoppo del
+       codice dopo un /me buono — finiva nella vetrina anonima, che a
+       chi era dentro diceva «sei fuori». Alla vetrina va solo chi il
+       server non ha riconosciuto (ANONIMO); il resto e' un errore, e
+       lo si dice come tale. */
+    if (e !== ANONIMO) { avvisoAvvio('errore', e); return; }
     /* Browser fuori da Telegram: vetrina vera in sola lettura
        (con la demo finta come rete di sicurezza se il backend tace) */
     await avviaVetrina();
     if (scaduta) mostraBanner(BANNER_SCADUTO);   // dopo: l'ultima parola
   }
+}
+
+/* ══ IL FALSO LOGOUT (19 ott 2026, cantiere logout-apk, dal campo) ════
+   Un utente dell'APK entrava al mattino e al pomeriggio «era fuori»:
+   Android aveva chiuso l'app in sottofondo, alla riapertura la pagina
+   ripartiva da capo e il primo /api/me non trovava la rete (il
+   telefono si stava svegliando) o trovava il server a meta' di un
+   deploy. Il /me fallito finiva nel catch di avvia(), cioe' nella
+   vetrina anonima: il cookie era buono, ma lo schermo diceva il
+   contrario, e lui rifaceva il login (con Nostr, minuti).
+   LA REGOLA: a portare fuori e' solo un NO del server — una risposta
+   4xx (il 401 della sessione che non c'e' piu'). Rete muta, tempo
+   scaduto, un 5xx, una pagina che non e' JSON (Caddy, il portale di un
+   wifi) non sono un no: si riprova da soli per qualche secondo con la
+   pastiglia «Riconnessione…», poi si dice «Manca la rete, riprova» col
+   suo tasto, e si resta li' finche' la risposta non arriva. Il
+   portinaio di sempre (fetchCheRiprova) lavora sotto, dentro ogni
+   tentativo: la sonda e' il suo tetto, non un secondo portinaio.
+   Tutto quel che tocca il mondo si puo' passare da fuori: la prova la
+   fa girare in node con un server che cade e si rialza. */
+const ANONIMO = Symbol('anonimo');        // il «no» vero del server
+/* I TEMPI: otto secondi di «Riconnessione…», poi la scheda. Un tentativo
+   ne ha dieci, non meno: il /me e' una busta grossa, e su una rete lenta
+   ma viva un tetto stretto lo taglierebbe ogni volta — «Manca la rete»
+   a chi la rete ce l'ha. La rete muta invece si sa subito, e dentro i
+   dieci secondi la riprova gia' il portinaio. */
+const SONDA_ME_PAZIENZA_MS = 8000;        // i secondi di «Riconnessione…»
+const SONDA_ME_TENTATIVO_MS = 10000;      // il tetto di UN tentativo
+const SONDA_ME_ATTESE_MS = [700, 1500, 2500];
+
+/* Un tentativo: {r, me} se il server ha risposto davvero, null se no */
+async function tentaMe(hdr, fetchVero, tetto){
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const t = ctl ? setTimeout(() => ctl.abort(), tetto) : null;
+  try {
+    const r = await fetchVero(`${API_BASE}/me`,
+      {headers:{'X-Tg-Init-Data': hdr}, signal: ctl ? ctl.signal : undefined});
+    if (r.status >= 500 || r.status === 408 || r.status === 429) return null;
+    let me = null;
+    try { me = await r.json(); } catch(e){}
+    if (r.ok && (!me || typeof me !== 'object')) return null;   // 200 non JSON: non e' lui
+    return {r, me: me || {}};
+  } catch(e){
+    return null;                          // rete muta o tempo scaduto
+  } finally {
+    if (t) clearTimeout(t);
+  }
+}
+
+async function sondaMe(hdr, {fetchVero = (...a) => fetch(...a), attendi = ms => attendiRiprovo(ms),
+                             ora = () => Date.now(), stato = avvisoAvvio,
+                             aspettaRiprova = aspettaRiprovaAvvio} = {}){
+  stato('cerca');
+  for (;;) {
+    const inizio = ora();
+    for (let giro = 0; ; giro++) {
+      const esito = await tentaMe(hdr, fetchVero, SONDA_ME_TENTATIVO_MS);
+      if (esito) { stato(''); return esito; }
+      if (ora() - inizio >= SONDA_ME_PAZIENZA_MS) break;
+      stato('riconnessione');
+      await attendi(SONDA_ME_ATTESE_MS[Math.min(giro, SONDA_ME_ATTESE_MS.length - 1)]);
+    }
+    stato('senza-rete');
+    await aspettaRiprova();
+    stato('riconnessione');
+  }
+}
+
+/* «Riprova»: il tasto, la rete che torna o l'app che torna in vista */
+let riprovaAvvio = null;
+function aspettaRiprovaAvvio(){
+  return new Promise(ok => {
+    const via = () => {
+      riprovaAvvio = null;
+      window.removeEventListener('online', via);
+      document.removeEventListener('visibilitychange', vista);
+      ok();
+    };
+    const vista = () => { if (document.visibilityState === 'visible') via(); };
+    riprovaAvvio = via;
+    window.addEventListener('online', via);
+    document.addEventListener('visibilitychange', vista);
+  });
+}
+
+/* Le facce dell'avvio che non parte: '' (niente), 'cerca' (la sonda
+   e' partita: la pastiglia, se il portinaio l'accende, dice
+   «Riconnessione…»), 'riconnessione' (la pastiglia accesa), 'senza-rete'
+   ed 'errore' (la scheda al centro). */
+function avvisoAvvio(cosa, errore){
+  avvioCerca = ['cerca', 'riconnessione', 'senza-rete'].includes(cosa);
+  avvioRiconnette = cosa === 'riconnessione';
+  disegnaRiprovo();
+  const s = document.getElementById('avvioFermo');
+  if (!s) return;
+  if (cosa !== 'senza-rete' && cosa !== 'errore') { s.classList.remove('on'); return; }
+  const rete = cosa === 'senza-rete';
+  if (!rete && errore) console.error('🟥 [avvio]', errore);
+  el('avvioFermoIcona').textContent = rete ? '📡' : '⚠️';
+  el('avvioFermoTitolo').textContent = rete ? 'Manca la rete, riprova'
+                                            : 'Si è inceppato qualcosa';
+  el('avvioFermoTesto').textContent = rete
+    ? 'Barattolo non riesce a raggiungere il server. Non sei uscito: il tuo accesso è al sicuro, e appena torna la connessione riprendo da qui.'
+    : 'È un errore dell\'app, non un\'uscita: il tuo accesso è al sicuro. Riprova, e se torna scrivici.';
+  el('avvioFermoChiudi').style.display = rete ? 'none' : '';
+  el('avvioFermoRiprova').onclick = rete
+    ? () => { if (riprovaAvvio) riprovaAvvio(); }
+    : () => location.reload();
+  el('avvioFermoChiudi').onclick = () => s.classList.remove('on');
+  s.classList.add('on');
 }
 /* Le sentinelle dello scroll infinito: un osservatore per griglia,
    armato una volta per sempre. Le guardie (demo, fine lista,

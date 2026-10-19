@@ -39961,9 +39961,10 @@ def prove_seo():
     # scarica una vetrina intera per buttarla via, proprio sulla pagina
     # che deve essere veloce per chi arriva da un motore.
     corpo_avvia = pezzo_js(testo_mini, "async function avvia(){", "\n}\n")
+    # (19 ott 2026, logout-apk) il primo giro di rete e' la sonda del /me
     prova("...e la chiamata sta prima del primo giro di rete", True,
-          corpo_avvia.index("preparaCategoriaDaUrl();")
-          < corpo_avvia.index("await fetch"))
+          -1 < corpo_avvia.find("preparaCategoriaDaUrl();")
+          < corpo_avvia.find("await sondaMe("))
     # LA TRAPPOLA PEGGIORE: dimenticare la chiamata in avviaVetrina()
     # vuol dire che funziona in Telegram e in collaudo e NON funziona
     # esattamente per chi arriva dai motori.
@@ -39995,11 +39996,11 @@ def prove_seo():
     for f in ("apriSicurezzaDaUrl", "apriPrivacyDaUrl"):
         prova(f"{f} si chiama PRIMA del primo giro di rete", True,
               corpo_avvia.index(f"{f}();")
-              < corpo_avvia.index("await fetch"))
+              < corpo_avvia.index("await sondaMe("))
     for f in ("apriAnnuncioDaUrl", "apriNegozioDaUrl"):
         prova(f"...mentre {f} aspetta i dati", True,
               corpo_avvia.index(f"{f}();")
-              > corpo_avvia.index("await fetch"))
+              > corpo_avvia.index("await sondaMe("))
     # E LA TRATTATIVA VA ANTICIPATA DOPO IL /me MA PRIMA DELLA
     # VETRINA: prima non si sa chi sei (e in vetrina la vista Ordini
     # non esiste), dopo si e' gia' visto la home piena.
@@ -40011,7 +40012,7 @@ def prove_seo():
     # affatto — si aprirebbe la scheda e un istante dopo l'invito.
     prova("...ma dopo il /me, dove l'identita' e' nota", True,
           corpo_avvia.index("apriOffertaDaUrl();")
-          > corpo_avvia.index("await fetch"))
+          > corpo_avvia.index("await sondaMe("))
 
     # --- 14) NESSUN GEMELLO CLIENT DI _slug ------------------------
     # E' la sentinella d'ARCHITETTURA: lo slug arriva dal server, e chi
@@ -40082,8 +40083,8 @@ def prove_seo():
     prova("la fascia si disegna PRIMA della griglia, nei due avvii", 2,
           testo_mini.count("await fasciaPrima();\n    renderGrid();"))
     prova("...e il banner del rodaggio parte in testa, in parallelo",
-          True, avvia_js.index("caricaBannerTest();")
-          < avvia_js.index("${API_BASE}/me"))
+          True, -1 < avvia_js.find("caricaBannerTest();")
+          < avvia_js.find("await sondaMe("))   # il /me (19 ott 2026, logout-apk)
     prova("le card non aspettano ordini/preferiti/offerte/puntate",
           True, avvia_js.index("await fasciaPrima()")
           < avvia_js.index("await loadOrders()"))
@@ -93376,8 +93377,11 @@ def prove_ricarica_resta():
             if not m.group(0).lstrip().startswith(("/*", "*", "//")) and "SOPRAVVIVE" not in m.group(0)]
     _dove = []
     for pos, riga in _ric:
-        f = mini.rfind("\nasync function ", 0, pos)
-        _dove.append((mini[f + 16:mini.index("(", f)], riga.strip()))
+        # la funzione che lo contiene, async o no (dal 19 ott 2026: la
+        # scheda dell'avvio fermo sta in una funzione semplice)
+        f = max(mini.rfind("\nasync function ", 0, pos), mini.rfind("\nfunction ", 0, pos))
+        nome = mini[f:mini.index("(", f)].split("function ")[1]
+        _dove.append((nome, riga.strip()))
     prova("i cinque location.reload() sono i nostri, e ripartono tutti da capo",
           [("esciWeb", "navDaCapo(); location.reload();"),
            # (16 ott 2026, piu' account) i ricarichi del cambio d'account
@@ -93388,7 +93392,11 @@ def prove_ricarica_resta():
            ("bussaIngressoBot", "navDaCapo(); location.reload();"),
            ("provaLoginWeb", "navDaCapo(); location.reload();"),
            ("entraConNostr", "navDaCapo(); location.reload();"),
-           ("accettaCollega", "navDaCapo(); location.reload();")], _dove)
+           ("accettaCollega", "navDaCapo(); location.reload();"),
+           # (19 ott 2026, logout-apk) il «Riprova» dell'errore d'avvio:
+           # come un F5, DOVE si era — l'identita' non cambia, quindi la
+           # pagina ricordata vale ancora e niente navDaCapo
+           ("avvisoAvvio", ": () => location.reload();")], _dove)
     prova("navDaCapo svuota la entry solo nel sito", True,
           "if (navSitoBrowser()) try { history.replaceState(null, '', location.href); } catch(e){}"
           in _f("function navDaCapo(){"))
@@ -109624,7 +109632,8 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
               "portachiavi_conti", "portachiavi_adottato",
               "cookie_mini", "imposta_cookie_mini", "telegram_della_richiesta",
               "conti_mini", "utente_da_sessione", "conto_scelto",
-              "conti_del_dispositivo", "_chiudi_rientro", "_chiudi_sessioni",
+              "conti_del_dispositivo", "traccia_chiusura",
+              "_chiudi_rientro", "_chiudi_sessioni",
               "_al_tetto", "apri_sessione"):
         exec(pezzo(n), amb)
     return amb, con, Resp
@@ -110484,6 +110493,375 @@ def prove_dizionari_nel_loop():
           all(f"async def {n}(" in _SORGENTE for n in (
               "avvia_fusione", "gestisci_callback", "avvia_ingresso_bot",
               "callback_ingresso_bot")))
+
+
+def prove_logout_apk():
+    """IL FALSO LOGOUT DELL'APK (19 ott 2026, cantiere logout-apk, dal
+    campo): «entro al mattino, al pomeriggio sono fuori». Quattro cose,
+    una prova per ciascuna: (1) il comando di sola lettura del VPS legge
+    il database VERO e solo conteggi; (2) un /api/me fallito per rete,
+    tempo o 5xx non porta MAI alla vetrina anonima — la vera avvia() gira
+    in node contro un server che e' fermo e poi si riaccende; (3) la
+    sfida del login Nostr sopravvive a un riavvio; (4) ogni sessione
+    cancellata lascia nel journal una riga col motivo, senza token."""
+    import contextlib as _cl, io as _io, sqlite3 as _s, subprocess as _sp
+    import shutil as _sh, tempfile as _tf, json as _json
+    print("\n[il falso logout dell'APK]")
+
+    # ---------------- (4) LA TRACCIA DELLE CHIUSURE -----------------
+    amb, con, Resp = _amb_portachiavi()
+    for tg in (41, 42, 43, 44):
+        con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                    "avatar_scelta) VALUES(?,?,?,?,?,'')",
+                    (tg, f"Nome{tg}", f"utente{tg}", "", ""))
+    con.commit()
+    uscita = _io.StringIO()
+    with _cl.redirect_stdout(uscita):
+        r1 = Resp(); t41 = amb["apri_sessione"](r1, 41, "")
+        r2 = Resp(); amb["apri_sessione"](r2, 41, r1.cookie["barattolo_portachiavi"],
+                                          r1.cookie["barattolo_sessione"])  # rientro
+        mazzo = r2.cookie["barattolo_portachiavi"]
+        for tg in (42, 43, 44):                                    # tetto = 3
+            rr = Resp(); amb["apri_sessione"](rr, tg, mazzo)
+            mazzo = rr.cookie["barattolo_portachiavi"]
+        tok = mazzo.split(".")
+        amb["_chiudi_sessioni"]([tok[-1]], "logout")
+        amb["_chiudi_sessioni"](tok[:-1], "logout tutti")
+        amb["_chiudi_sessioni"](["inventato"], "logout")            # zero: muto
+    righe = [r for r in uscita.getvalue().splitlines() if r.startswith("🔑")]
+    prova("ogni chiusura scrive la sua riga col motivo, zero non scrive",
+          ["🔑 Sessioni chiuse: 1 (rientro)", "🔑 Sessioni chiuse: 1 (tetto)",
+           "🔑 Sessioni chiuse: 1 (logout)", "🔑 Sessioni chiuse: 2 (logout tutti)"],
+          righe)
+    tutto = uscita.getvalue()
+    spie = tok + [t41] + [_h for (_h,) in con.execute("SELECT token_hash FROM sessioni")]
+    prova("...e nel journal niente token, niente hash, niente id, niente nomi", [],
+          [x for x in spie + ["41", "42", "43", "44", "Nome4", "utente4"] if x and x in tutto])
+    prova("i motivi sono i cinque del cantiere", ("logout", "logout tutti", "rientro",
+                                                  "tetto", "scaduta"),
+          ast.literal_eval(re.search(r"MOTIVI_CHIUSURA = (\(.*?\))", _SORGENTE).group(1)))
+    tr = codice(pezzo("traccia_chiusura"))
+    prova("la traccia va nel journal subito (flush) e solo con n > 0", True,
+          "flush=True" in tr and "if n > 0:" in tr)
+    # censimento: chi cancella sessioni lascia la traccia
+    senza = [f.split("(")[0] for f in _SORGENTE.split("\ndef ")[1:]
+             + _SORGENTE.split("\nasync def ")[1:]
+             if "DELETE FROM sessioni" in codice(f) and "traccia_chiusura(" not in codice(f)]
+    prova("OGNI DELETE sulle sessioni lascia la traccia (censimento)", [], senza)
+    motivi = set(re.findall(r'_chiudi_sessioni\(.*?, "([a-z ]+)"\)', codice(_SORGENTE)))
+    prova("...e ogni _chiudi_sessioni dice il suo motivo", True,
+          motivi <= {"logout", "logout tutti", "rientro", "tetto", "scaduta"}
+          and {"logout", "logout tutti", "tetto"} <= motivi)
+    prova("...nessuna chiamata senza motivo", [],
+          [r.strip() for r in codice(_SORGENTE).split("\n")
+           if "_chiudi_sessioni(" in r and "def _chiudi_sessioni" not in r
+           and not re.search(r', "[a-z ]+"\)', r)])
+    lg = codice(pezzo("logout"))
+    prova("il logout web chiude dalla porta della traccia", True,
+          '_chiudi_sessioni([barattolo_sessione], "logout")' in lg
+          and "DELETE FROM sessioni" not in lg)
+    sc = codice(pezzo("controlla_scadenze"))
+    prova("la spazzatura delle scadute conta e lo dice", True,
+          'traccia_chiusura("scaduta", scadute)' in sc
+          and "scadute = con.execute(\"DELETE FROM sessioni WHERE scade < ?\"" in sc)
+
+    # ---------------- (3) LA SFIDA SOPRAVVIVE AL RIAVVIO -------------
+    prova("la sfida del login non vive piu' in memoria", False,
+          bool(re.search(r"\bSFIDE_LOGIN\b", codice(_SORGENTE))))
+    prova("...la tabella c'e' nello schema", True,
+          "CREATE TABLE IF NOT EXISTS sfide_login(" in _SORGENTE)
+    prova("...verifica_evento_login la brucia nel database", True,
+          "if not brucia_sfida_login(sfida):" in pezzo("verifica_evento_login"))
+    prova("...e la spazzatura pulisce le scadute", True,
+          'DELETE FROM sfide_login WHERE scade < ?' in sc)
+    cartella = _tf.mkdtemp()
+    file_db = os.path.join(cartella, "sfide.db")
+    schema = re.search(r"CREATE TABLE IF NOT EXISTS sfide_login\(.*?\);", _SORGENTE,
+                       re.S).group(0)
+    _c = _s.connect(file_db); _c.executescript(schema); _c.close()
+
+    def processo():
+        """Un processo del server: le sue funzioni, la sua memoria, lo
+        stesso file del database. Due processi = un riavvio."""
+        a = {"time": time, "secrets": __import__("secrets"),
+             "db": lambda: _s.connect(file_db), "SECONDI_SFIDA_LOGIN": 600,
+             "TETTO_SFIDE_LOGIN": 10000}
+        exec(pezzo("nuova_sfida_login") + "\n\n" + pezzo("brucia_sfida_login"), a)
+        return a
+    prima = processo()
+    sfida = prima["nuova_sfida_login"]()
+    dopo = processo()                                   # il deploy
+    prova("una sfida chiesta PRIMA del riavvio vale DOPO", True,
+          dopo["brucia_sfida_login"](sfida))
+    prova("...una volta sola", False, dopo["brucia_sfida_login"](sfida))
+    prova("...una sfida inventata no", False, dopo["brucia_sfida_login"]("ab" * 16))
+    prova("...e il vuoto nemmeno", False, dopo["brucia_sfida_login"](""))
+    _c = _s.connect(file_db)
+    _c.execute("INSERT INTO sfide_login VALUES('vecchia', ?)", (int(time.time()) - 1,))
+    _c.commit(); _c.close()
+    prova("...una scaduta no", False, dopo["brucia_sfida_login"]("vecchia"))
+    dopo["TETTO_SFIDE_LOGIN"] = 3
+    fila = [dopo["nuova_sfida_login"]() for _ in range(5)]
+    _c = _s.connect(file_db)
+    restano = [r[0] for r in _c.execute("SELECT sfida FROM sfide_login")]
+    _c.close()
+    prova("al tetto cedono le piu' vecchie, mai l'ultima", (3, True, False),
+          (len(restano), fila[-1] in restano, fila[0] in restano))
+    prova("la sfida dura ancora dieci minuti", True,
+          "SECONDI_SFIDA_LOGIN = 600" in _SORGENTE
+          and "TETTO_SFIDE_LOGIN = 10000" in _SORGENTE)
+    _sh.rmtree(cartella, ignore_errors=True)
+
+    # ---------------- (1) IL COMANDO DEL VPS -------------------------
+    prod = open("docs/PRODUZIONE.md", encoding="utf-8").read()
+    i = prod.index("LE SESSIONI CHIUSE, IN SOLA LETTURA")
+    blocco = prod[i:prod.index("COME SI LEGGE", i)]
+    py = next(r for r in blocco.splitlines() if r.startswith('python3 -c "'))
+    prova("il comando legge il database VERO, in sola lettura", True,
+          "file:/srv/barattolo/dati/satmarket.db?mode=ro" in py)
+    sess = re.search(r"CREATE TABLE IF NOT EXISTS sessioni\((.*?)\);", _SORGENTE, re.S).group(1)
+    colonne = re.findall(r"^\s*([a-z_]+) [A-Z]", sess, re.M)
+    prova("la tabella e le colonne sono quelle dello schema", ["token_hash", "tg_id", "creato", "scade"],
+          colonne)
+    usate = set(re.findall(r"\b(token_hash|tg_id|creato|scade)\b", py))
+    prova("...il comando usa tg_id, creato e scade, mai il token", {"tg_id", "creato", "scade"}, usate)
+    prova("...e stampa solo conteggi", True,
+          py.count("SELECT COUNT(*)") == 3 and "SELECT tg_id FROM" in py
+          and "print(" in py and "nome" not in py)
+    cartella = _tf.mkdtemp()
+    finto = os.path.join(cartella, "satmarket.db")
+    _c = _s.connect(finto)
+    _c.executescript("CREATE TABLE sessioni(" + sess + ");")
+    adesso = int(time.time())
+    for th, tg, cr in (("h1", 5, adesso - 3600), ("h2", 5, adesso - 60),
+                       ("h3", 6, adesso - 10 * 86400)):
+        _c.execute("INSERT INTO sessioni VALUES(?,?,?,?)", (th, tg, cr, cr + 30 * 86400))
+    _c.commit(); _c.close()
+    giro = _sp.run(["bash", "-c", py.replace("/srv/barattolo/dati/satmarket.db", finto)],
+                   capture_output=True, text=True, timeout=30)
+    prova("il comando gira e conta giusto", ["sessioni vive: 3",
+                                              "aperte nelle 48h e ancora vive: 2",
+                                              "account con 2+ sessioni aperte nelle 48h: 1"],
+          giro.stdout.strip().splitlines())
+    prova("...senza token ne' id nell'uscita", False,
+          any(x in giro.stdout for x in ("h1", "h2", "h3")))
+    aw = next(r for r in blocco.splitlines() if "Sessioni chiuse" in r and r.startswith("journalctl"))
+    with _cl.redirect_stdout(_io.StringIO()) as finto_journal:
+        amb["traccia_chiusura"]("logout", 1); amb["traccia_chiusura"]("logout tutti", 3)
+        amb["traccia_chiusura"]("logout", 2); amb["traccia_chiusura"]("scaduta", 7)
+    giro = _sp.run(["bash", "-c", aw.split(" | ", 1)[1]], input=finto_journal.getvalue(),
+                   capture_output=True, text=True, timeout=30)
+    prova("...e la sua riga del journal legge proprio la traccia",
+          ["chiuse 3 (logout tutti)", "chiuse 3 (logout)", "chiuse 7 (scaduta)"],
+          sorted(giro.stdout.strip().splitlines()))
+    _sh.rmtree(cartella, ignore_errors=True)
+
+    # ---------------- (2) IL FALSO LOGOUT, NEL CLIENT ----------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    av = _fn_js(mini, "async function avvia(){")
+    prova("avvia() chiede il /me dalla sonda, nei due giri", (2, 0),
+          (av.count("await sondaMe("), av.count("fetch(`${API_BASE}/me`")))
+    prova("...alla vetrina va solo il NO del server (ANONIMO)", True,
+          "if (!r.ok || !me.tg_id) throw ANONIMO;" in av
+          and -1 < av.find("if (e !== ANONIMO) { avvisoAvvio('errore', e); return; }")
+          < av.find("await avviaVetrina();"))
+    tm = _fn_js(mini, "async function tentaMe(")
+    prova("un 5xx, un 408, un 429 non sono un no", True,
+          "if (r.status >= 500 || r.status === 408 || r.status === 429) return null;" in tm)
+    prova("la scheda c'e' una volta, coi testi del cantiere", (1, True, True), (
+        mini.count('<div id="avvioFermo" role="alertdialog"'),
+        "'Manca la rete, riprova'" in mini and ">Riprova</button>" in mini,
+        "'Si è inceppato qualcosa'" in mini))
+    css = mini[mini.index(".avvio-fermo-card{"):mini.index(".avvio-fermo-card .btn{")]
+    prova("...vestita coi token del tema (chiaro e scuro senza un blocco suo)", (True, []),
+          ("var(--card)" in css and "var(--ink)" in css and "var(--muted)" in css,
+           re.findall(r"(?<!rgba\()#[0-9A-Fa-f]{3,6}\b", css)))
+
+    if not _sh.which("node"):
+        salta("il banco node del falso logout", "node non c'e'")
+        return
+    pezzi = "".join(x + "\n" for x in (
+        _riga_js(mini, "const RIPROVO_ATTESE_MS = "), _riga_js(mini, "const RIPROVO_TETTO_MS = "),
+        _fn_js(mini, "function rispostaDelPortinaio(r){"),
+        _fn_js(mini, "function fetchCheRiprova(fetchVero, {attendi, ora, origine, avviso}){"),
+        _riga_js(mini, "let riprovoPortinaio = "), _riga_js(mini, "let avvioCerca = "),
+        _riga_js(mini, "let avvioRiconnette = "),
+        _fn_js(mini, "function avvisoRiprovo(acceso){"), _fn_js(mini, "function disegnaRiprovo(){"),
+        av,
+        _riga_js(mini, "const ANONIMO = "), _riga_js(mini, "const SONDA_ME_PAZIENZA_MS = "),
+        _riga_js(mini, "const SONDA_ME_TENTATIVO_MS = "), _riga_js(mini, "const SONDA_ME_ATTESE_MS = "),
+        tm, _fn_js(mini, "async function sondaMe("), _riga_js(mini, "let riprovaAvvio = "),
+        _fn_js(mini, "function aspettaRiprovaAvvio(){"), _fn_js(mini, "function avvisoAvvio(cosa, errore){")))
+    banco = r"""
+'use strict';
+/* LO STUB UNIVERSALE: la vera avvia() chiama un centinaio di funzioni
+   dell'app; qui ognuna e' un tutto-fare che non fa niente (si chiama,
+   si legge, si aspetta). Quelle che la prova guarda sono vere o finte
+   col nome, nel magazzino. */
+const STUB = new Proxy(function(){}, {
+  get(t, k){
+    if (k === 'then') return (ok) => { if (ok) ok(undefined); return STUB; };
+    if (k === Symbol.toPrimitive) return () => '';
+    if (k === Symbol.iterator) return function*(){};
+    return STUB;
+  },
+  apply(){ return STUB; }, construct(){ return STUB; }, set(){ return true; }
+});
+function nodo(id){
+  const classi = new Set();
+  const n = {id, style: {}, onclick: null, _t: '', storia: [],
+    classList: {add: c => classi.add(c), remove: c => classi.delete(c),
+                toggle: (c, si) => (si ? classi.add(c) : classi.delete(c)),
+                contains: c => classi.has(c)},
+    get textContent(){ return this._t; },
+    set textContent(v){ this._t = v; this.storia.push(v); }};
+  return n;
+}
+const nodi = {};
+for (const id of ['riprovo', 'avvioFermo', 'avvioFermoIcona', 'avvioFermoTitolo',
+                  'avvioFermoTesto', 'avvioFermoRiprova', 'avvioFermoChiudi'])
+  nodi[id] = nodo(id);
+let orologio = 0;
+class FintaData extends Date { static now(){ return orologio; } }
+const ascolti = {online: [], visibilitychange: []};
+const server = {acceso: false, cookie: true, mezzo: [], chiamate: 0};
+/* il server finto: spento = rete muta; acceso = /me vero */
+async function rete(input, init){
+  server.chiamate++;
+  if (!server.acceso) throw new TypeError('Failed to fetch');
+  const prossimo = server.mezzo.shift();
+  if (prossimo) return prossimo;
+  const hdr = (init && init.headers && init.headers['X-Tg-Init-Data']) || '';
+  const dentro = hdr ? hdr === 'telegram-buono' : server.cookie;
+  const corpo = dentro ? {tg_id: 111, nome: 'Compratore'} : {detail: 'Non autenticato'};
+  return {status: dentro ? 200 : 401, ok: dentro,
+          headers: {get: () => 'application/json'}, json: async () => corpo};
+}
+const eventi = [];
+const magazzino = {
+  API_BASE: '/api', tg: null, WEB: false, DEMO: false, VETRINA: false, myTgId: null,
+  Date: FintaData, collaudo: false, collaudoId: 0,
+  el: id => nodi[id] || STUB,
+  document: {getElementById: id => nodi[id] || null, visibilityState: 'visible',
+             addEventListener: (k, f) => (ascolti[k] || []).push(f),
+             removeEventListener: (k, f) => { const a = ascolti[k] || []; const i = a.indexOf(f); if (i > -1) a.splice(i, 1); }},
+  window: {addEventListener: (k, f) => (ascolti[k] || []).push(f),
+           removeEventListener: (k, f) => { const a = ascolti[k] || []; const i = a.indexOf(f); if (i > -1) a.splice(i, 1); }},
+  location: {reload: () => eventi.push('reload'), protocol: 'https:', origin: 'https://barattolo.store',
+             pathname: '/', search: '', href: 'https://barattolo.store/'},
+  console: {error: () => eventi.push('console.error'), log(){}, warn(){}},
+  attendiRiprovo: async ms => { orologio += ms; },
+  authHdr: () => magazzino.tg ? magazzino.tg.initData : 'collaudo:0:nessuno',
+  avviaVetrina: async () => eventi.push('vetrina'),
+  mostraBanner: t => eventi.push('banner:' + t),
+  BANNER_SCADUTO: 'scaduta',
+};
+magazzino.fetch = null;   // montato sotto, col portinaio vero
+const scopo = new Proxy(magazzino, {
+  has: (t, k) => k in t || !(k in globalThis),
+  get: (t, k) => (k === Symbol.unscopables ? undefined : (k in t ? t[k] : STUB)),
+  set: (t, k, v) => { t[k] = v; return true; }
+});
+"""
+    banco = banco.replace("'use strict';\n", "")
+    banco += "const fabbrica = new Function('scopo', 'with (scopo) {' + " + _json.dumps(pezzi) + \
+        " + '\\n return {avvia, fetchCheRiprova, avvisoRiprovo, sondaMe}; }');\n" + r"""
+const app = fabbrica(scopo);
+magazzino.fetch = app.fetchCheRiprova(rete, {attendi: async ms => { orologio += ms; },
+  ora: () => orologio, origine: 'https://barattolo.store', avviso: app.avvisoRiprovo});
+const giri = {};
+const pausa = () => new Promise(r => setImmediate(r));
+async function finche(cond, giri = 2000){ for (let i = 0; i < giri && !cond(); i++) await pausa(); return cond(); }
+const fermo = () => nodi.avvioFermo.classList.contains('on');
+const pastiglia = () => nodi.riprovo.classList.contains('show');
+function azzera(){ eventi.length = 0; magazzino.myTgId = null; nodi.riprovo.storia.length = 0;
+  nodi.avvioFermo.classList.remove('on'); nodi.riprovo.classList.remove('show'); }
+(async () => {
+  // 1) SERVER FERMO -> RICARICO -> NON VEDO LA VETRINA -> SERVER ACCESO -> SONO DENTRO
+  azzera(); server.acceso = false; server.cookie = true;
+  let p = app.avvia();
+  const visto = await finche(fermo);
+  giri.fermo = {scheda: visto, titolo: nodi.avvioFermoTitolo.textContent,
+                riprova: !!nodi.avvioFermoRiprova.onclick,
+                chiudi: nodi.avvioFermoChiudi.style.display,
+                pastiglia: [...new Set(nodi.riprovo.storia)], vetrina: eventi.includes('vetrina'),
+                dentro: magazzino.myTgId, secondi: Math.round(orologio / 1000) > 0};
+  server.acceso = true;
+  (nodi.avvioFermoRiprova.onclick || (() => {}))();
+  await p;
+  giri.acceso = {dentro: magazzino.myTgId, web: magazzino.WEB, scheda: fermo(),
+                 pastiglia: pastiglia(), vetrina: eventi.includes('vetrina')};
+  // 2) la rete che torna da sola (l'evento online) riprende senza tocco
+  azzera(); server.acceso = false; orologio = 0;
+  p = app.avvia(); await finche(fermo);
+  server.acceso = true; ascolti.online.slice().forEach(f => f());
+  await p;
+  giri.online = {dentro: magazzino.myTgId, scheda: fermo(), ascolti: ascolti.online.length};
+  // 3) il deploy: due 502 di Caddy e un 503 JSON dell'app, poi il server -> dentro
+  azzera(); server.acceso = true;
+  const caddy = () => ({status: 502, ok: false, headers: {get: () => 'text/html'}, json: async () => { throw new SyntaxError('html'); }});
+  server.mezzo = [caddy(), caddy(),
+    {status: 503, ok: false, headers: {get: () => 'application/json'}, json: async () => ({detail: 'non sto bene'})}];
+  await app.avvia();
+  giri.deploy = {dentro: magazzino.myTgId, scheda: fermo(), vetrina: eventi.includes('vetrina'),
+                 pastiglia: nodi.riprovo.storia.includes('Riconnessione…'), spenta: !pastiglia()};
+  // 4) il portale del wifi: 200 ma non JSON -> non e' lui, si riprova
+  azzera(); server.mezzo = [{status: 200, ok: true, headers: {get: () => 'text/html'},
+                             json: async () => { throw new SyntaxError('html'); }}];
+  await app.avvia();
+  giri.portale = {dentro: magazzino.myTgId, vetrina: eventi.includes('vetrina')};
+  // 5) IL NO VERO: cookie morto -> 401 -> la vetrina di sempre, subito
+  azzera(); server.cookie = false; const c0 = server.chiamate;
+  await app.avvia();
+  giri.no = {vetrina: eventi.includes('vetrina'), scheda: fermo(), dentro: magazzino.myTgId,
+             chiamate: server.chiamate - c0};
+  // 6) dentro Telegram, initData scaduto -> 401 -> vetrina col banner «scaduta»
+  azzera(); magazzino.tg = {initData: 'telegram-vecchio'};
+  await app.avvia();
+  giri.telegram = eventi.slice();
+  magazzino.tg = null; server.cookie = true;
+  // 7) UN ERRORE DEL CODICE dopo un /me buono: si dice, non e' un'uscita
+  azzera(); magazzino.allineaContoP2P = () => { throw new Error('boom'); };
+  await app.avvia();
+  giri.errore = {scheda: fermo(), titolo: nodi.avvioFermoTitolo.textContent,
+                 chiudi: nodi.avvioFermoChiudi.style.display, vetrina: eventi.includes('vetrina'),
+                 console: eventi.includes('console.error')};
+  (nodi.avvioFermoRiprova.onclick || (() => {}))(); giri.errore.riprova = eventi.includes('reload');
+  (nodi.avvioFermoChiudi.onclick || (() => {}))(); giri.errore.chiusa = !fermo();
+  delete magazzino.allineaContoP2P;
+  console.log(JSON.stringify(giri));
+})().catch(e => { console.log(JSON.stringify({esplosa: String(e && e.stack || e)})); });
+"""
+    r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=60)
+    try:
+        g = _json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        prova("il banco node del falso logout gira", "", (r.stdout + r.stderr)[-900:])
+        return
+    if "esplosa" in g:
+        prova("il banco node del falso logout gira", "", g["esplosa"][-900:])
+        return
+    prova("server FERMO e ricarico: niente vetrina anonima, la scheda «Manca la rete»",
+          {"scheda": True, "titolo": "Manca la rete, riprova", "riprova": True, "chiudi": "none",
+           "pastiglia": ["Riconnessione…"], "vetrina": False, "dentro": None, "secondi": True},
+          g["fermo"])
+    prova("...server ACCESO e «Riprova»: sono dentro, scheda e pastiglia spente",
+          {"dentro": 111, "web": True, "scheda": False, "pastiglia": False, "vetrina": False},
+          g["acceso"])
+    prova("la rete che torna da sola (evento online) riprende senza tocco",
+          {"dentro": 111, "scheda": False, "ascolti": 0}, g["online"])
+    prova("il deploy (502 di Caddy, 503 dell'app) e' «Riconnessione…», poi dentro",
+          {"dentro": 111, "scheda": False, "vetrina": False, "pastiglia": True, "spenta": True},
+          g["deploy"])
+    prova("il portale del wifi (200 non JSON) non e' una risposta", {"dentro": 111, "vetrina": False},
+          g["portale"])
+    prova("il NO vero (401) porta alla vetrina di sempre, senza attese",
+          {"vetrina": True, "scheda": False, "dentro": None, "chiamate": 2}, g["no"])
+    prova("dentro Telegram l'initData scaduto e' la vetrina col banner di sempre",
+          ["vetrina", "banner:scaduta"], g["telegram"])
+    prova("un errore del codice dice che e' un errore, non un'uscita",
+          {"scheda": True, "titolo": "Si è inceppato qualcosa", "chiudi": "", "vetrina": False,
+           "console": True, "riprova": True, "chiusa": True}, g["errore"])
 
 
 def prove_piu_account_ovunque():
@@ -144385,8 +144763,11 @@ def prove_freni():
               "_troppi_ordini_aperti(con, user[\"id\"])" in p
               and p.index("_troppi_ordini_aperti(") < p.index("crea_invoice_escrow("))
     # le sfide: dizionario piu' largo
+    # (dal 19 ott 2026, cantiere logout-apk, il tetto e' nel database:
+    # lo gira prove_logout_apk)
     prova("le sfide del login: diecimila posti, non mille", True,
-          "while len(SFIDE_LOGIN) >= 10000:" in pezzo("nuova_sfida_login"))
+          "TETTO_SFIDE_LOGIN = 10000" in _SORGENTE
+          and "(TETTO_SFIDE_LOGIN - 1)" in pezzo("nuova_sfida_login"))
     # il canale: un post per ordine, uno ogni dieci minuti, mai un 429
     c = pezzo("annuncia_ordine_p2p_canale")
     prova("canale: doppione e raffica saltano il post senza un 429", True,
@@ -172140,7 +172521,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop, prove_logout_apk,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,

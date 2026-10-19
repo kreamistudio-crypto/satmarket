@@ -5465,6 +5465,12 @@ def init_db():
         creato INTEGER,
         scade INTEGER
     );
+    CREATE TABLE IF NOT EXISTS sfide_login(
+        -- le sfide del login Nostr (19 ott 2026, cantiere logout-apk):
+        -- qui e non in memoria, cosi' un deploy non le cancella
+        sfida TEXT PRIMARY KEY,
+        scade INTEGER
+    );
     CREATE TABLE IF NOT EXISTS feedback(
         -- il giudizio reciproco a affare concluso: da qui nascono
         -- rating e n_feedback dell'utente (sempre per RICALCOLO,
@@ -9656,6 +9662,24 @@ def crea_sessione(tg_id: int) -> str:
     return token
 
 
+# LA TRACCIA DELLE CHIUSURE (19 ott 2026, cantiere logout-apk, richiesta
+# di Andrea): una sessione cancellata non lasciava NIENTE — la riga se ne
+# va, e «perche' quel telefono e' uscito?» non aveva risposta. Ora ogni
+# porta che cancella dice nel journal QUANTE e PERCHE', e basta: niente
+# token, niente hash, niente tg_id, niente nomi (il journal non e' un
+# posto per chi e' entrato dove). I motivi sono cinque, e sono gli unici
+# DELETE sulla tabella; una porta nuova che cancella sessioni sceglie
+# uno di questi o ne aggiunge uno qui.
+MOTIVI_CHIUSURA = ("logout", "logout tutti", "rientro", "tetto", "scaduta")
+
+
+def traccia_chiusura(motivo: str, n: int):
+    """La riga del journal per `n` sessioni cancellate. Zero non si
+    scrive: un logout con un cookie gia' morto non ha chiuso niente."""
+    if n > 0:
+        print(f"🔑 Sessioni chiuse: {int(n)} ({motivo})", flush=True)
+
+
 def imposta_cookie_sessione(response: Response, token: str):
     """Il cookie di sessione, identico per ogni porta d'ingresso
     (login Telegram, login Nostr, collegamento account)."""
@@ -9826,7 +9850,7 @@ def _al_tetto(mazzo: list, posti: int) -> list:
     tenuti = mazzo[-posti:] if posti > 0 else []
     fuori = mazzo[:len(mazzo) - len(tenuti)]
     if fuori:
-        _chiudi_sessioni(fuori)
+        _chiudi_sessioni(fuori, "tetto")
     return tenuti
 
 
@@ -9853,6 +9877,7 @@ def _chiudi_rientro(token_list: list, tg_id: int) -> int:
         con.commit()
     finally:
         con.close()
+    traccia_chiusura("rientro", n)
     return n
 
 
@@ -10422,19 +10447,14 @@ def logout(response: Response, x_tg_init_data: str = Header(""),
         scelto = str((_CONTO_RICHIESTA.get() or {}).get("conto") or "").strip()
         conti = conti_mini(t)
         via = [x for x in conti if str(x["tg_id"]) == scelto]
-        _chiudi_sessioni([x["token"] for x in via])
+        _chiudi_sessioni([x["token"] for x in via], "logout")
         imposta_cookie_mini(response, t,
                             [x["token"] for x in conti if x not in via])
         return {"ok": True, "attivo": t}
     resto = [c for c in portachiavi_conti(barattolo_portachiavi)
              if c["token"] != barattolo_sessione]
     if barattolo_sessione:
-        con = db()
-        con.execute(
-            "DELETE FROM sessioni WHERE token_hash=?",
-            (hashlib.sha256(barattolo_sessione.encode()).hexdigest(),))
-        con.commit()
-        con.close()
+        _chiudi_sessioni([barattolo_sessione], "logout")
     imposta_cookie_portachiavi(response, [c["token"] for c in resto])
     if resto:
         imposta_cookie_sessione(response, resto[-1]["token"])
@@ -10443,9 +10463,10 @@ def logout(response: Response, x_tg_init_data: str = Header(""),
     return {"ok": True, "attivo": None}
 
 
-def _chiudi_sessioni(token_list: list) -> int:
+def _chiudi_sessioni(token_list: list, motivo: str = "logout") -> int:
     """Revoca nel database le sessioni di questi token (il cookie da
-    solo non basta: chi l'avesse copiato entrerebbe ancora)."""
+    solo non basta: chi l'avesse copiato entrerebbe ancora). Il motivo
+    finisce nel journal: vedi `traccia_chiusura`."""
     hashes = [hashlib.sha256(t.encode()).hexdigest() for t in token_list if t]
     if not hashes:
         return 0
@@ -10457,6 +10478,7 @@ def _chiudi_sessioni(token_list: list) -> int:
         con.commit()
     finally:
         con.close()
+    traccia_chiusura(motivo, n)
     return n
 
 
@@ -10499,12 +10521,12 @@ def logout_tutti(response: Response, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Not Found")
     t = telegram_della_richiesta() if x_tg_init_data else None
     if t is not None:
-        n = _chiudi_sessioni([x["token"] for x in conti_mini(t)])
+        n = _chiudi_sessioni([x["token"] for x in conti_mini(t)], "logout tutti")
         imposta_cookie_mini(response, t, [])
         return {"ok": True, "chiusi": n, "attivo": t}
     token = [c["token"] for c in portachiavi_adottato(barattolo_portachiavi,
                                                       barattolo_sessione)]
-    n = _chiudi_sessioni(token + [barattolo_sessione])
+    n = _chiudi_sessioni(token + [barattolo_sessione], "logout tutti")
     imposta_cookie_portachiavi(response, [])
     response.delete_cookie("barattolo_sessione", path="/")
     return {"ok": True, "chiusi": n, "attivo": None}
@@ -10516,13 +10538,20 @@ def logout_tutti(response: Response, x_tg_init_data: str = Header(""),
 # kind-22242 (stile NIP-42, il kind di autenticazione: effimero, i
 # relay non lo conservano) e il server controlla la firma Schnorr.
 # La nsec NON viaggia mai: arriva solo l'evento gia' firmato.
-# Le sfide vivono in memoria: uvicorn e' mono-processo, e se il server
-# riparte la sfida muore — il client ne chiede semplicemente un'altra.
+# LE SFIDE STANNO NEL DATABASE (19 ott 2026, cantiere logout-apk,
+# richiesta di Andrea): fino a ieri vivevano in un dizionario, e un
+# riavvio le cancellava tutte. Con dieci deploy in un giorno, chi approvava su
+# Amber nel minuto sbagliato tornava con la firma buona e si sentiva
+# dire «Sfida scaduta: riprova il login» — e col bunker rifarlo costa
+# minuti. Nella tabella `sfide_login` la sfida sopravvive al riavvio e
+# resta quello che era: monouso, dieci minuti, tetto a diecimila. Non
+# e' una credenziale (viaggia in chiaro verso il client e da sola non
+# apre niente: serve la firma della chiave), quindi non si fa l'hash.
 
-SFIDE_LOGIN: dict[str, int] = {}     # sfida -> scadenza (unix)
 SECONDI_SFIDA_LOGIN = 600            # 10 minuti per firmare, poi si rifa'
 # (erano 5 fino al 10 ott 2026: con un firmatario sullo stesso telefono
 # si cambia app due volte, e la seconda approvazione puo' arrivare tardi)
+TETTO_SFIDE_LOGIN = 10000            # oltre, cedono le piu' vecchie
 
 RE_HEX_64 = re.compile(r"[0-9a-f]{64}")
 RE_HEX_128 = re.compile(r"[0-9a-f]{128}")
@@ -10534,13 +10563,38 @@ def nuova_sfida_login() -> str:
     oltre, via le piu' vecchie; il freno vero e' quello per IP della
     rotta, che sull'onion non c'e' — di qui la larghezza."""
     adesso = int(time.time())
-    for s in [s for s, scade in SFIDE_LOGIN.items() if scade < adesso]:
-        SFIDE_LOGIN.pop(s, None)
-    while len(SFIDE_LOGIN) >= 10000:
-        SFIDE_LOGIN.pop(next(iter(SFIDE_LOGIN)))
     sfida = secrets.token_hex(16)
-    SFIDE_LOGIN[sfida] = adesso + SECONDI_SFIDA_LOGIN
+    con = db()
+    try:
+        con.execute("DELETE FROM sfide_login WHERE scade < ?", (adesso,))
+        troppe = con.execute("SELECT COUNT(*) FROM sfide_login"
+                             ).fetchone()[0] - (TETTO_SFIDE_LOGIN - 1)
+        if troppe > 0:
+            con.execute("DELETE FROM sfide_login WHERE sfida IN (SELECT "
+                        "sfida FROM sfide_login ORDER BY scade LIMIT ?)",
+                        (troppe,))
+        con.execute("INSERT INTO sfide_login(sfida, scade) VALUES(?,?)",
+                    (sfida, adesso + SECONDI_SFIDA_LOGIN))
+        con.commit()
+    finally:
+        con.close()
     return sfida
+
+
+def brucia_sfida_login(sfida: str) -> bool:
+    """La sfida si consuma: vera UNA volta sola, e solo se non e'
+    scaduta. Il DELETE e' il controllo e il consumo insieme — due
+    richieste con la stessa sfida non passano tutte e due."""
+    if not sfida:
+        return False
+    con = db()
+    try:
+        n = con.execute("DELETE FROM sfide_login WHERE sfida=? AND scade >= ?",
+                        (str(sfida), int(time.time()))).rowcount
+        con.commit()
+    finally:
+        con.close()
+    return n == 1
 
 
 def verifica_evento_login(evento, host: str) -> str:
@@ -10574,7 +10628,7 @@ def verifica_evento_login(evento, host: str) -> str:
     # se il tentativo poi fallisce (chi sbaglia ne chiede un'altra).
     sfida = next((t[1] for t in tags
                   if len(t) >= 2 and t[0] == "challenge"), None)
-    if not sfida or SFIDE_LOGIN.pop(sfida, 0) < int(time.time()):
+    if not brucia_sfida_login(sfida):
         raise HTTPException(401, "Sfida scaduta: riprova il login")
     # Il tag "relay" porta l'origine della pagina: legare la firma al
     # NOSTRO sito blocca il riuso su altri servizi. Confronto solo su
@@ -75560,9 +75614,13 @@ async def controlla_scadenze():
         "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
         "AND spedito_il < ? AND consegna_scelta='digitale'",
         (adesso - ORE_SILENZIO_DIGITALE * 3600,))]
-    # Spazzatura: via le sessioni web ormai scadute
-    con.execute("DELETE FROM sessioni WHERE scade < ?", (adesso,))
+    # Spazzatura: via le sessioni web ormai scadute (e il journal lo
+    # dice, vedi traccia_chiusura), e via le sfide del login scadute
+    scadute = con.execute("DELETE FROM sessioni WHERE scade < ?",
+                          (adesso,)).rowcount
+    con.execute("DELETE FROM sfide_login WHERE scade < ?", (adesso,))
     con.commit()
+    traccia_chiusura("scaduta", scadute)
     con.close()
     for oid in scaduti_consegna + scaduti_silenzio + scaduti_digitale:
         # UN ORDINE GIA' IN PAGAMENTO NON E' DEL TIMER (set 2026): la

@@ -5253,3 +5253,33 @@ e cercarli là non dà risposta.
   `grep -A/-B/-C` sul config (si guarda solo la riga, e qui nemmeno
   quella: si contano). Se una chiave esce da qualche parte va RUOTATA:
   si chiede a Massimo una coppia nuova e si rifà dal passo 1.
+
+LE SESSIONI CHIUSE, IN SOLA LETTURA (19 ott 2026, cantiere logout-apk;
+perché in CANTIERI, «Il falso logout dell'APK»). Una sessione chiusa nel
+database non lascia la riga (è un DELETE), quindi il PERCHÉ sta nel
+journal: dal deploy di questo cantiere ogni porta che chiude scrive
+«🔑 Sessioni chiuse: N (motivo)», coi cinque motivi `logout`,
+`logout tutti`, `rientro`, `tetto`, `scaduta` — mai token, hash, id o
+nomi. Il comando qui sotto legge TRE cose e stampa solo conteggi: il
+database VERO (`/srv/barattolo/dati/satmarket.db`, `mode=ro`: non
+scrive nemmeno per sbaglio; tabella `sessioni`, colonne `tg_id`,
+`creato`, `scade`, mai `token_hash`), le righe della traccia, e le
+righe d'accesso di uvicorn delle rotte di login e logout (senza IP:
+`grep -o` tiene solo il pezzo fra virgolette). Si lancia così com'è,
+da root, ed è sicuro anche incollato a metà:
+```
+python3 -c "import sqlite3,time;c=sqlite3.connect('file:/srv/barattolo/dati/satmarket.db?mode=ro',uri=True);t=int(time.time());d=t-172800;q=lambda s,*a:c.execute(s,a).fetchone()[0];print('sessioni vive:',q('SELECT COUNT(*) FROM sessioni WHERE scade>?',t));print('aperte nelle 48h e ancora vive:',q('SELECT COUNT(*) FROM sessioni WHERE creato>?',d));print('account con 2+ sessioni aperte nelle 48h:',q('SELECT COUNT(*) FROM (SELECT tg_id FROM sessioni WHERE creato>? GROUP BY tg_id HAVING COUNT(*)>1)',d))"
+journalctl -u barattolo --since "48 hours ago" -o cat | grep -oE '🔑 Sessioni chiuse: [0-9]+ \([a-z ]+\)' | awk '{m=substr($0,index($0,"(")); n[m]+=$4} END{for(m in n) print "chiuse", n[m], m}'
+journalctl -u barattolo --since "48 hours ago" -o cat | grep -oE '"(GET|POST) /api/(logout(/tutti)?|login/[a-z/]+|me) HTTP/[0-9.]+" [0-9]{3}' | sed 's/^"//; s/ HTTP\/[0-9.]*"//' | sort | uniq -c | sort -rn
+echo "riavvii: $(journalctl -u barattolo --since '48 hours ago' -o cat | grep -c 'Application startup complete')"
+```
+COME SI LEGGE: le righe «chiuse N (motivo)» sono la risposta (per le
+ore PRIMA del deploy del cantiere non esistono: lì restano i conteggi
+delle rotte). `POST /api/logout 200` è un'uscita voluta; tanti
+`POST /api/login/nostr 200` contro poche «aperte nelle 48h» vuol dire
+sessioni aperte e già chiuse (rientro o tetto); i `GET /api/me 401`
+contano anche i visitatori anonimi della vetrina, quindi da soli non
+dicono niente. «riavvii» è quante volte un deploy ha fermato il server:
+è il momento in cui, prima di questo cantiere, una riapertura dell'app
+poteva finire nella vetrina anonima (il falso logout) e un login Nostr
+a metà perdeva la sfida.

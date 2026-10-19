@@ -30669,6 +30669,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   systemd. Prova: `prove_connettore_interrompibile`. La metà di
   macchina (Caddy che aspetta, il tetto dello stop) sta in PRODUZIONE,
   «IL RIAVVIO DOLCE».
+- IL FALSO LOGOUT (19 ott 2026, cantiere logout-apk; perché in
+  CANTIERI, «Il falso logout dell'APK»): in `avvia()` il /api/me passa
+  da `sondaMe`, che restituisce SOLO una risposta vera del server. Un
+  tentativo (`tentaMe`, tetto `SONDA_ME_TENTATIVO_MS` = 10 s, col
+  portinaio di sopra che lavora dentro) vale null per rete muta, tempo
+  scaduto, 5xx, 408, 429 o un 200 che non è JSON (Caddy, il portale di
+  un wifi); un 4xx o un 200 JSON sono la risposta. Per
+  `SONDA_ME_PAZIENZA_MS` (8 s) si riprova con la pastiglia `#riprovo`
+  che dice «Riconnessione…» (una pastiglia per due ragioni:
+  `avvisoRiprovo` del portinaio e `avvisoAvvio` della sonda passano
+  da `disegnaRiprovo`); poi la scheda `#avvioFermo`, «Manca la rete,
+  riprova», col tasto Riprova, e la sonda aspetta lì il tasto, l'evento
+  `online` o il ritorno in vista. Nel catch di `avvia()` alla vetrina
+  anonima va SOLO `ANONIMO` (il no del server); ogni altra eccezione è
+  la scheda «Si è inceppato qualcosa» (Riprova = `location.reload()`
+  DOVE si era, Chiudi = si resta), e l'errore va in console. La
+  scheda è vestita coi token del tema (`--card`, `--ink`, `--muted`):
+  chiaro e scuro senza un blocco suo. Prova: `prove_logout_apk`, che
+  fa girare la VERA `avvia()` in node (con uno stub universale per il
+  resto dell'app) contro un server fermo e poi acceso.
+- LE SFIDE DEL LOGIN NOSTR NEL DATABASE (19 ott 2026, stesso cantiere):
+  tabella `sfide_login(sfida, scade)`, non più il dizionario
+  `SFIDE_LOGIN`. `nuova_sfida_login` pulisce le scadute, tiene il tetto
+  (`TETTO_SFIDE_LOGIN` = 10000, cedono le più vecchie) e scrive;
+  `brucia_sfida_login` è il controllo e il consumo in un DELETE solo
+  (`WHERE sfida=? AND scade >= ?`, vale se `rowcount == 1`): monouso
+  anche con due richieste insieme. Dieci minuti come prima
+  (`SECONDI_SFIDA_LOGIN`). La sfida non è una credenziale (va in chiaro
+  al client e da sola non apre niente), quindi niente hash. La
+  spazzatura di `controlla_scadenze` pulisce anche lei. Il biglietto
+  del collegamento (`BIGLIETTI_COLLEGAMENTO`) resta in memoria.
+- LA TRACCIA DELLE CHIUSURE (19 ott 2026, stesso cantiere): ogni
+  sessione cancellata scrive nel journal «🔑 Sessioni chiuse: N
+  (motivo)» con `flush=True`, da `traccia_chiusura`; zero non si
+  scrive. I motivi sono `MOTIVI_CHIUSURA`: `logout` (`/api/logout`, web
+  e Mini App), `logout tutti` (`/api/logout/tutti`), `rientro`
+  (`_chiudi_rientro`), `tetto` (`_al_tetto`), `scaduta` (la spazzatura
+  di `controlla_scadenze`). `_chiudi_sessioni` prende il motivo, e il
+  logout web non ha più un DELETE suo. Mai token, hash, tg_id o nomi.
+  Un censimento in `prove_logout_apk` vuole la traccia in ogni funzione
+  che contiene `DELETE FROM sessioni`. Il comando di lettura per il
+  VPS: PRODUZIONE, «LE SESSIONI CHIUSE, IN SOLA LETTURA».
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a

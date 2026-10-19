@@ -67328,3 +67328,101 @@ su Barattolo dal browser. Gli avvisi sui tuoi ordini ti arrivano in chat
 da @ilbarattolobot.»; nessun errore di pagina. Il server del giro ha
 provato a chiedere il cambio a api.coingecko.com, e il proxy l'ha
 fermato: è il server, non la pagina, e non tocca il cantiere.
+## Il falso logout dell'APK: la sonda che non molla, le sfide nel database, la traccia delle chiusure (19 ott 2026, cantiere logout-apk, richiesta e decisioni di Andrea)
+
+IL CASO. Un utente dell'app Android (APK da Zapstore, l'involucro TWA)
+entra con Nostr o Telegram al mattino e al pomeriggio si ritrova fuori;
+rifà il login, e con Nostr ci mette minuti. Prima del codice, la sola
+lettura (dieci righe ad Andrea): la sessione dura 30 giorni fissi
+(`GIORNI_SESSIONE_WEB`), senza rinnovo; nell'APK vive nel cookie del
+browser che ospita la TWA (Chrome), che né il risparmio batteria né
+l'aggiornamento dell'APK cancellano; il cantiere account-doppio chiude
+solo token dello stesso dispositivo. L'IPOTESI, poi confermata dal
+codice: Android chiude l'app in sottofondo, alla riapertura la pagina
+riparte e il primo /api/me non trova la rete (il telefono si sveglia) o
+trova il server a metà di un deploy (il portinaio riprova 30 s e poi si
+arrende); `avvia()` cadeva nel suo catch, cioè nella VETRINA ANONIMA, e
+lo schermo diceva «sei fuori» con un cookie buono. Lo stesso catch
+prendeva anche un errore del codice dopo un /me riuscito.
+LE QUATTRO DECISIONI DI ANDREA, e cosa si è fatto.
+1) IL COMANDO DEL VPS sul database VERO (`/srv/barattolo/dati/
+   satmarket.db`, non il collegamento): schema verificato sul codice
+   (`sessioni(token_hash, tg_id, creato, scade)`), il comando usa solo
+   `tg_id`, `creato`, `scade` e stampa conteggi. Sta in PRODUZIONE, «LE
+   SESSIONI CHIUSE, IN SOLA LETTURA», con le righe del journal.
+2) IL FALSO LOGOUT: `sondaMe` (vedi ARCHITETTURA, «IL FALSO LOGOUT»).
+   Solo un no del server (un 4xx) porta alla vetrina; rete, tempo, 5xx,
+   408, 429, un 200 non JSON si riprovano 8 s con la pastiglia
+   «Riconnessione…», poi la scheda «Manca la rete, riprova» col tasto,
+   che si riprende anche da sola all'evento `online`. Un errore del
+   codice è la scheda «Si è inceppato qualcosa» (Riprova, Chiudi), mai
+   la vetrina. I tempi: un tentativo ha 10 s e non meno, perché il /me è
+   una busta grossa e su una rete lenta ma viva un tetto stretto direbbe
+   «Manca la rete» a chi la rete ce l'ha.
+3) LE SFIDE DEL LOGIN NEL DATABASE (`sfide_login`): un deploy fra la
+   sfida e la firma non la perde più; resta monouso (il DELETE è il
+   controllo), dieci minuti, tetto diecimila.
+4) LA TRACCIA: «🔑 Sessioni chiuse: N (motivo)» con `flush=True`, motivi
+   logout, logout tutti, rientro, tetto, scaduta; mai token, hash, id o
+   nomi. (Main ha messo `PYTHONUNBUFFERED=1` lo stesso giorno, cantiere
+   journal-senza-buffer: il `flush` resta, costa niente e non dipende dal
+   drop-in posato.)
+STRADE SCARTATE. Un secondo portinaio per il /me: il portinaio c'è già
+(`fetchCheRiprova`) e lavora dentro ogni tentativo; la sonda è il suo
+tetto. Due pastiglie: si coprirebbero nello stesso punto — una sola,
+che durante la sonda dice «Riconnessione…». La scheda bloccante anche
+per l'errore senza «Chiudi»: un intoppo in un ridisegno minore
+fermerebbe un'app quasi intera. L'hash della sfida: non è una
+credenziale.
+TOCCATE TRE SENTINELLE VECCHIE, per lo stesso motivo (il primo giro di
+rete di `avvia()` è ora `await sondaMe(`): in `prove_seo` l'ordine
+categoria/sicurezza/privacy/annuncio/negozio/offerta e il banner del
+rodaggio, misurati contro `await fetch` e `${API_BASE}/me`; il
+censimento dei `location.reload()` («LA RICARICA RESTA DOVE SI ERA»)
+accoglie il Riprova dell'errore, che ricarica DOVE si era (l'identità
+non cambia), e ora trova la funzione che lo contiene anche se non è
+async; la prova del tetto delle sfide guarda `TETTO_SFIDE_LOGIN`.
+PROVATO. `prove_logout_apk` (40): la traccia (le righe, niente spie, il
+censimento dei DELETE, ogni `_chiudi_sessioni` col suo motivo), le
+sfide fra due «processi» sullo stesso file (il riavvio), monouso,
+scaduta, tetto; il comando del VPS fatto girare su un database finto con
+lo schema vero, e la sua riga del journal sulla traccia vera; nel
+client, la VERA `avvia()` in node con uno stub universale per il resto
+dell'app: server fermo → ricarico → nessuna vetrina, «Manca la rete» →
+server acceso → Riprova → dentro; l'evento online; il deploy (502 di
+Caddy, 503 dell'app); il portale del wifi; il 401 vero (vetrina subito,
+due chiamate); l'initData scaduto dentro Telegram (vetrina col banner
+di sempre); l'errore del codice. Controprova: con la sonda di ieri (un
+fallimento = una risposta) cadono le tre prove del server fermo; senza
+la traccia del rientro cadono la riga e il censimento. In
+`collaudo_account` (fuori dalla CI: vuole coincurve) le sezioni «la
+sfida nel database» (in tabella, si entra, sparisce, la seconda volta
+401) e «la traccia delle chiusure» (il logout vero scrive la riga, senza
+token/id/nome): 58 passate. SUITE `PROVE_SEVERE=1` 25283 passate, 0
+fallite, nessuna saltata, e collaudi della CI 86 verdi, 0 rossi
+(più `collaudo_account` verde nella gabbia), sull'albero di 6b2e4af
+(main corso nel frattempo coi cantieri importo-copia e
+journal-senza-buffer: in comune solo le code dei documenti) più il
+cantiere.
+DAL VIVO (Playwright e Chromium, 360×780, densità 2, chiaro e scuro,
+server di collaudo coi relay morti, identità 111 col cookie del login
+web), 24 su 24: con /api/me senza rete la pastiglia «Riconnessione…»,
+dopo 10 s la scheda, nessuna vetrina e nessuna identità; tolto il
+guasto, Riprova → dentro; il 502 di Caddy per 3 s → dentro senza
+scheda; l'errore iniettato → «Si è inceppato qualcosa»; senza cookie
+nessuna scheda. E il server SPENTO DAVVERO (uvicorn fermato) col
+service worker vero: la ricarica dà la pagina «Sei senza rete», non la
+vetrina; riacceso e Riprova, dentro con lo stesso cookie. Scatti nello
+scratchpad della sessione. Config e database del giro fuori dal repo
+(scratchpad), mai `config.py` nel worktree.
+RESTA DA DECIDERE (Andrea): il rinnovo dei 30 giorni a ogni uso — il
+parere sta nel rapporto della sessione, qui la sostanza: chi usa l'app
+non scadrebbe più, ma un token rubato vivrebbe quanto lo si usa; il
+contrappeso è un tetto assoluto dalla `creato` e un rinnovo al più una
+volta al giorno. Non spiega il caso del pomeriggio (ore, non 30 giorni).
+RESTA DA GUARDARE: il biglietto del collegamento
+(`BIGLIETTI_COLLEGAMENTO`) vive ancora in memoria e un deploy lo perde
+(stesso difetto della sfida, strada più rara); il login Nostr lento
+dell'APK resta lento per le attese del bunker NIP-46 (questo cantiere
+toglie solo il rifiuto al deploy); la pagina «Sei senza rete» del
+service worker non riprova da sola all'evento online.

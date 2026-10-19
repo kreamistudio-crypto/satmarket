@@ -320,6 +320,35 @@ def main():
         prova("...col Telegram di prima ancora raggiungibile", 831,
               c6.get("/api/me").json()["tg_id"])
 
+        # LA SFIDA NEL DATABASE (19 ott 2026, cantiere logout-apk): sta
+        # nella tabella e non in memoria, quindi un deploy fra la sfida
+        # e la firma non la perde; e resta monouso.
+        print("\n[la sfida nel database]")
+        c8 = TestClient(server.app)
+        sfida3 = c8.get("/api/login/nostr/sfida").json()["sfida"]
+        con = server.db()
+        n = con.execute("SELECT COUNT(*) n FROM sfide_login WHERE sfida=?",
+                        (sfida3,)).fetchone()["n"]
+        con.close()
+        prova("la sfida chiesta sta nel database (sopravvive al riavvio)", 1, n)
+        ev3 = {"pubkey": pub, "created_at": int(time.time()), "kind": 22242,
+               "tags": [["relay", "http://testserver"], ["challenge", sfida3]],
+               "content": ""}
+        ser3 = json.dumps([0, pub, ev3["created_at"], 22242, ev3["tags"], ""],
+                          separators=(",", ":"), ensure_ascii=False)
+        ev3["id"] = hashlib.sha256(ser3.encode()).hexdigest()
+        ev3["sig"] = sk.sign_schnorr(bytes.fromhex(ev3["id"])).hex()
+        prova("...si entra con lei", 200,
+              c8.post("/api/login/nostr", json={"evento": ev3}).status_code)
+        con = server.db()
+        n = con.execute("SELECT COUNT(*) n FROM sfide_login WHERE sfida=?",
+                        (sfida3,)).fetchone()["n"]
+        con.close()
+        prova("...e dopo il login la sfida non c'e' piu'", 0, n)
+        prova("...la stessa firma una seconda volta: no", 401,
+              TestClient(server.app).post("/api/login/nostr",
+                                          json={"evento": ev3}).status_code)
+
     print("\n[il rientro chiude la vecchia]")
     c7 = TestClient(server.app)
     c7.post("/api/login/telegram",
@@ -349,6 +378,24 @@ def main():
     n151 = con.execute("SELECT COUNT(*) n FROM sessioni WHERE tg_id=151").fetchone()["n"]
     con.close()
     prova("...e nel database c'e' UNA sola sessione sua", 1, n151)
+
+    # LA TRACCIA NEL JOURNAL (19 ott 2026, cantiere logout-apk): il
+    # logout vero, per la rotta vera, scrive la sua riga — senza token.
+    print("\n[la traccia delle chiusure]")
+    import contextlib
+    import io
+    c9 = TestClient(server.app)
+    c9.post("/api/login/telegram",
+            json={"collaudo": True, "id": 161, "first_name": "Traccia"})
+    tok9 = c9.cookies.get("barattolo_sessione")
+    giornale = io.StringIO()
+    with contextlib.redirect_stdout(giornale):
+        r9 = c9.post("/api/logout")
+    prova("il logout risponde come sempre", 200, r9.status_code)
+    prova("...e il journal dice quante e perche'", True,
+          "🔑 Sessioni chiuse: 1 (logout)" in giornale.getvalue())
+    prova("...senza il token, senza l'id, senza il nome", False,
+          any(x in giornale.getvalue() for x in (tok9, "161", "Traccia")))
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
