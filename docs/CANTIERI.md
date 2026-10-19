@@ -65973,3 +65973,119 @@ nel verbale del commit.
 **DA VERIFICARE SUL VPS** (Andrea): dopo il riavvio, la riga
 `tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value barattolo)/environ | grep PYTHONUNBUFFERED`
 deve dire `PYTHONUNBUFFERED=1`.
+## L'importo da pagare si copia toccandolo, e il € si toglie da solo (19 ott 2026, cantiere importo-copia, decisioni di Andrea)
+
+**PERCHÉ.** Il seguito di «Il «📋 Copia» sui dati del recapito» (16-17
+ott): lì l'importo del PayCode era rimasto fuori, perché non aveva il 📋
+e la regola era «gli stessi che hanno il 📋»; e il form del PayCode di chi
+vende rifiutava «100 €» scritto col simbolo. Andrea ha deciso tutte e due.
+
+**COSA SI È DECISO (Andrea, sul piano in 5 righe).**
+1. Nella pagina dello scambio l'importo da pagare si copia toccando il
+   numero: la SOLA cifra («100,00», senza €), con lo stesso «✓ Copiato»
+   per 2 secondi degli altri dati. NESSUNA icona 📋 in più: interfaccia
+   pulita. Il tocco lungo continua a selezionare senza copiare. A chi
+   compra soltanto: chi vende l'importo non lo paga.
+2. Nei campi dell'importo il € scritto col numero («100 €», «€100»,
+   «100,00€») si toglie da solo prima del controllo.
+
+**COME È FATTO.**
+- DOVE SI TOCCA: la cifra del «Totale da inviare» / «Totale da
+  consegnare» del conto (`contoDettP2P`), che la SOLA pagina dello
+  scambio accende con `toccaImporto: o.lato === 'compro'` (il libro non
+  lo passa mai: c'è una prova che conta i chiamanti), e la riga «Importo …
+  in contanti» del riquadro del PayCode (`riquadroPayCodeP2P`, che è solo
+  di chi compra).
+- `attrImportoP2P(euro, dentro)` veste la cifra: uno `<span
+  class="importo-tocca">` col valore nel `data-v` — `centesimiTestoP2P`,
+  quindi coi centesimi e SENZA migliaia né simbolo («1500,00», non
+  «1.500,00 €»: è la forma che il campo di una banca accetta) — e
+  `onpointerdown="this._giu=Date.now()"` + `onclick="toccaImportoP2P(this)"`.
+  A riposo niente cambia a vista (solo la manina col mouse).
+- `toccaImportoP2P` è il gemello di `toccaDatoP2P`: le stesse due
+  guardie (una selezione fatta a mano, il tocco lungo oltre
+  `P2P_TOCCO_LUNGO_MS`), `copiaLink` con «Importo copiato 📋», e il
+  «✓ Copiato» lo dice la cifra stessa — non c'è un bottone che lo dica —
+  nella pastiglia verde della fiducia (`.importo-tocca.fatto`) per 2 s;
+  poi torna la cifra di prima, tenuta UNA volta (`_prima`, una proprietà)
+  così un secondo tocco dentro i due secondi non si ricorda «✓ Copiato»
+  come cifra. Se gli appunti dicono di no la cifra non cambia (resta il
+  toast col valore, che è di `copiaLink`).
+- IL €: `senzaEuroP2P(t)` (pura) toglie il € e gli spazi che gli stanno
+  attorno. La chiamano: il form del recapito del PayCode
+  (`centesimiP2P(senzaEuroP2P(campi.importo))` in `inviaCampoP2P`: «100 €»
+  parte come «100,00») e i due filtri `beforeinput` dei campi importo,
+  `soloCifreP2P` e `soloCentesimiP2P`, che il € ora lo lasciano entrare —
+  lo toglie la rete (`ripuliCifreP2P`, `ripuliCentesimiP2P`). Il foglio
+  di pubblicazione usa il tastierino di casa: lì il € non si scrive
+  proprio. LA REGOLA DEL 10 SET RESTA: «100,00€» in un campo a soli
+  interi (il «Quanti euro» di chi prende un ordine a intervallo) diventa
+  «100,00» e si rifiuta ancora intero — «meglio niente che un altro
+  numero», e il 100,00 non deve diventare 10000.
+
+**STRADE SCARTATE.** Un 📋 accanto all'importo (Andrea: interfaccia
+pulita). Togliere il € dentro `centesimiP2P`/`interoP2P`: sono giudici
+anche di testi che non arrivano da un campo, e il cambio si fa dove si
+scrive. Il tocco anche a chi vende (sul piano: no).
+
+**PROVATO.**
+- `prove_importo_copia` (nuova, 20 prove): dove si tocca e solo lì (un
+  solo chiamante di `toccaImporto`), il PayCode, nessun bottone né 📋 in
+  `attrImportoP2P`, il CSS del «fatto», il form del PayCode e i due
+  filtri col `senzaEuroP2P`; in node coi giudici veri: il € davanti,
+  dietro, attaccato, con lo spazio; i centesimi del PayCode («100 €» →
+  100, «€23,47» → 23,47); il filtro dei soli interi che lascia il € e
+  rifiuta ancora «100,00€» e le lettere; quello dei centesimi; la rete;
+  negli appunti «100,00», «1500,00», «23,47»; il tocco che copia e dice
+  «✓ Copiato» per 2000 ms e poi torna la cifra (anche dopo un secondo
+  tocco); il tocco lungo no e quello breve sì; con una selezione niente;
+  gli appunti che dicono di no e la cifra che non mente. Emendate col
+  loro perché: la riga dell'importo del PayCode in `prove_p2p_paycode`
+  e la sentinella del Controvalore in `prove_conto_intervallo`;
+  i banchi che ritagliano il riquadro del PayCode, i filtri e il foglio di
+  chi vende hanno le funzioni nuove.
+- GIRO DAL VIVO in Chrome (Playwright, densità 3, relay morto, porta
+  8163), 360 px chiaro e scuro. Chi compra, bonifico da 100 €: una cifra
+  toccabile (il totale), a riposo «100,00 € 🇪🇺»; il tocco → «✓ Copiato»
+  e negli appunti `100,00`; a 1,5 s ancora «✓ Copiato» (il ridisegno
+  della pagina non lo porta via), a 2 s di nuovo la cifra; il tocco lungo
+  (CDP, 900 ms) non copia; una selezione fatta a mano resta e il click
+  non copia. Chi compra, PayCode da 23,47 €: il tocco sulla riga Importo →
+  «✓ Copiato», negli appunti `23,47`; nessuno scorrimento orizzontale.
+  Chi vende: nessuna cifra toccabile. Il form del PayCode coi giudici
+  veri nella pagina: «100 €», «€100», «100,00€» → 100,00; «€ 23,47» →
+  23,47. Scatti `importo-*` in `.claude/giri/importo-copia/`.
+- I «TRACEBACK» DEL PRIMO GIRO (rifatto il 19 ott su richiesta di Andrea,
+  stessa sequenza — lo stesso albero 854ae43, database nuovo, tre giri di
+  fila — e il journal letto PRIMA di togliere la copia): tre, comparsi
+  dopo il secondo e il terzo giro, tutti uguali — `Exception in callback
+  _ProactorBasePipeTransport._call_connection_lost()` →
+  `ConnectionResetError: [WinError 10054]`, ognuno nel punto in cui il
+  giro chiude un contesto del browser (subito prima del «GET /?r=2» del
+  contesto dopo). È il ciclo di asyncio di WINDOWS (Proactor) che scrive
+  un traceback quando il client stacca una connessione col reset: non
+  passa dal codice di Barattolo, nessuna richiesta è fallita (zero 500,
+  zero «Exception in ASGI»). Sul VPS (Linux, ciclo a selettore, Caddy
+  davanti) quel trasporto non esiste: non può capitare. Nel secondo giro
+  di verifica erano zero per caso: dipende da quando il browser chiude.
+
+**COSA È GIRATO, E SU QUALE ALBERO.** Sopra b1e65ce: suite severa intera
+**24.939 passate, 2 fallite**, tutte e due dello stesso banco —
+`prove_p2p_motore` esegue il conto vero e non conosceva
+`attrImportoP2P` (la trappola dei due ritagli: vive di là dal confine
+del motore); aggiunta alle sue pure, la sezione dà 359/0. Collaudi della
+CI nella gabbia, due alla volta: **86 verdi, 0 rossi**. Poi main è
+corso di tre commit («il cambio in chiaro», che tocca il conto ma non
+le righe del totale): ribasato su 3e679b2, rigirate le sezioni
+toccate dai due lati (le mie, il motore, quelle che ritagliano il conto,
+il PayCode e i filtri, e le cinque del cambio) — **2.087 passate, 0
+fallite** — e `collaudo_recapito_aggiornato`, `collaudo_contanti_p2p`,
+`collaudo_cambio_libro_p2p`: verdi. Scanner dei segreti sulle righe
+aggiunte: zero. Ultimo albero, quello del push: ribasato su 24b21ca (il journal
+senza buffer: servizio e prove), rigirate la mia, la loro, il motore, il
+PayCode e il backup prima del deploy — 538 passate, 0 fallite; scanner a
+zero.
+
+**DA FARE (notati, non fatti).**
+- Sul telefono vero (iPhone e Android in Telegram): il tocco sulla
+  cifra, il «✓ Copiato» nel conto, e il tocco lungo che seleziona.

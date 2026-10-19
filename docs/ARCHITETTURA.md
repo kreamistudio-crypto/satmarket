@@ -28942,6 +28942,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`copiaRecapitoP2P`); toccato, il valore stesso fa il gesto del suo
   bottone (`toccaDatoP2P`: niente con una selezione a mano, niente col
   tocco lungo oltre `P2P_TOCCO_LUNGO_MS`), e così il numero del PayCode.
+  L'IMPORTO DA PAGARE (19 ott 2026, cantiere importo-copia): nella sola
+  pagina dello scambio, a chi compra (`toccaImporto`), la cifra del totale
+  e quella del riquadro del PayCode si toccano senza nessun 📋
+  (`attrImportoP2P`, `toccaImportoP2P`): negli appunti la sola cifra
+  (`centesimiTestoP2P`, «100,00»), «✓ Copiato» al posto della cifra per
+  2 s. Nei campi dell'importo il € lo toglie `senzaEuroP2P` prima dei
+  filtri e del giudice del PayCode; i decimali in un campo a soli interi
+  restano rifiutati (regola del 10 set).
   `passoDopoGaranziaP2P` (pura) dà in app la STESSA frase uscendo da
   `attesa_mia_hold`, ovunque sia chi vende e qualunque foglio sia
   aperto («Sats bloccati ✅» usciva solo a foglio della garanzia

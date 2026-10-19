@@ -73719,7 +73719,11 @@ def prove_p2p_motore():
             # accanto a `copiaLink` — di la' dal confine, e vera. Col
             # suo «Copia», che resta sul solo IBAN.
             "function rigaDato(et, v, op){",
-            "function bottoneCopia(v, aria){")) + "\n"
+            "function bottoneCopia(v, aria){",
+            # (19 ott 2026, importo-copia) la cifra da pagare che si
+            # tocca: il conto e il riquadro del PayCode la vestono, e
+            # vive accanto a `copiaLink`, di la' dal confine
+            "function attrImportoP2P(euro, dentro){")) + "\n"
     banco = r"""
 const fs = require('fs'), vm = require('vm');
 vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
@@ -77629,6 +77633,8 @@ def prove_p2p_pubblica():
         # la rete e la cifra come si legge
         + "\n" + _intera("function centesimiP2P(testo){")
         + "\n" + _intera("function centesimiTestoP2P(n){")
+        # (19 ott 2026, importo-copia) il € che si toglie da solo
+        + "\n" + _intera("function senzaEuroP2P(t){")
         + "\n" + _intera("function soloCentesimiP2P(ev){")
         + "\n" + _intera("function ripuliCentesimiP2P(inp){")
         + "\n" + _intera("function soloCifreP2P(ev){")
@@ -89586,6 +89592,8 @@ def prove_p2p_paycode():
             "function payCodeInRigaP2P(o){",
             "function statoPayCodeP2P(o){", "function inizioEuroInviatiP2P(o){",
             "function riquadroPayCodeP2P(o, adesso){",
+            # (19 ott 2026, importo-copia) la cifra che si tocca
+            "function attrImportoP2P(euro, dentro){", "function centesimiTestoP2P(n){",
             "function riquadroControlloTabP2P(o, adesso){",
             # (10 ott 2026, guida-paycode) la mappa col CAP di chi paga
             "function promemoriaMappaVendoP2P(o){"))
@@ -90224,9 +90232,14 @@ DOM = null;
     _nudi = [re.sub(r"<[^>]+>", "", g).strip() for g in _gesti]
     prova("i gesti restano corti: nessuno oltre 130 caratteri, i quattro insieme sotto i 400", [True, True],
           [max(len(g) for g in _nudi) <= 130, sum(len(g) for g in _nudi) <= 400])
+    # ⚠️ EMENDATA (19 ott 2026, importo-copia): la cifra si copia
+    # toccandola, quindi sta dentro `attrImportoP2P` — negli appunti
+    # «23,47», senza simbolo
     prova("...e non ripetono l'importo, che sta nella riga sopra: nessuna cifra, nessun «€»", [False, False, True],
           [any("€" in g for g in _nudi), any(re.search(r"\d", g) for g in _nudi),
-           "<span>Importo</span><b>23.47 € in contanti</b>" in _rc])
+           '<span>Importo</span><b><span class="importo-tocca" data-v="23,47" '
+           'onpointerdown="this._giu=Date.now()" onclick="toccaImportoP2P(this)">'
+           '23.47 € in contanti</span></b>' in _rc])
     _dopo = _rc[_rc.index("</ol>"):]
     prova("sotto i gesti l'avviso del buono regalo: non toccare «Ho pagato», scrivi a chi vende", True,
           _dopo.startswith('</ol><div class="p2p-paycode-buono">⚠️ <b>Ti danno un buono regalo?</b> '
@@ -137272,6 +137285,8 @@ def prove_contanti_a_mano():
           and fetta.count("\n") == 3)
     foglio = "\n".join([
         riga_js("const CAMPO_MAX_TESTO = "), fn("async function inviaCampoP2P(tipo, btn){"),
+        # (19 ott 2026, importo-copia) il € dell'importo del PayCode
+        fn("function senzaEuroP2P(t){"),
         fn("function presenzeDaServerP2P(p, giro){"), fn("function uniscePresenzeP2P(a, b){"),
         "function adottaPresenze(gia, s){\n  let mosso = false;\n" + fetta
         + "\n  return [gia.presenze || null, mosso];\n}"])
@@ -139656,7 +139671,11 @@ def prove_conto_intervallo():
           ["₿" in cdc, "conBtc" in mini])
     prova("...e il Controvalore dice i suoi euro nell'etichetta", True,
           "const etichettaCtrl = euroNoto ? 'Controvalore di <b>'" in cd
-          and "const cifreEuro = euroNoto ? num(euriTesto + ' ' + monetaP2P(o)) : num('—');" in cd)
+          # ⚠️ EMENDATA (19 ott 2026, importo-copia): la cifra del totale
+          # si tocca nella pagina dello scambio di chi compra, e veste
+          # `attrImportoP2P`; altrove resta il `num` di sempre
+          and "    : num(euriTesto + ' ' + monetaP2P(o));" in cd
+          and "const toccaImporto = euroNoto && compro && o.toccaImporto;" in cd)
     # (7 ott 2026, decisione di Andrea) NESSUNA PAGINA CHIEDE PIU' DUE
     # COLONNE: la pagina del MIO scambio a intervallo, prima della presa,
     # mostra la fascia e la frase (la cifra la sceglie chi prende); il
@@ -169148,6 +169167,8 @@ def prove_barre_paycode():
             "function corpoPayCodeTabP2P(bozza, barre){", "function incollatoFoglioPayCodeP2P(testo){",
             "function corpoBarreSchermoP2P(d, px, alto, w, h, ruota){",
             "function riquadroPayCodeP2P(o, adesso){",
+            # (19 ott 2026, importo-copia) la cifra che si tocca
+            "function attrImportoP2P(euro, dentro){", "function centesimiTestoP2P(n){",
             "function chatScLinkP2P(testo){", "function chatScAllarmiP2P(testo){",
             "function chatScTestoHTML(testo, senzaPdf){", "function payCodeScambioP2P(o){",
             "function schedaPdfPayCodeP2P(l, pcScambio){", "function chatScMessaggiHTML(c, altro, o){",
@@ -170661,6 +170682,152 @@ def prove_journal_senza_buffer():
            in prod[prod.index("IL JOURNAL SENZA BUFFER"):]])
 
 
+def prove_importo_copia():
+    """L'IMPORTO DA PAGARE SI COPIA TOCCANDOLO, E IL € SI TOGLIE DA SOLO
+    (19 ott 2026, cantiere importo-copia, decisioni di Andrea).
+
+    1) Nella pagina dello scambio, a chi compra, la cifra del «Totale da
+       inviare» e quella del riquadro del PayCode si copiano toccandole:
+       negli appunti la SOLA cifra («100,00», senza migliaia ne' €), e la
+       cifra stessa dice «✓ Copiato» per due secondi — nessun 📋 in piu'.
+       Il tocco lungo e una selezione fatta a mano non copiano.
+    2) Nei campi dell'importo il € scritto o incollato col numero («100 €»,
+       «€100», «100,00€») se ne va da solo prima del controllo; il resto
+       si giudica come sempre («100,00» in un campo a soli interi resta
+       rifiutato: la regola del 10 set)."""
+    print("\n[l'importo che si copia toccandolo, e il € che si toglie da solo]")
+    import shutil as _sh, subprocess as _sp, tempfile as _tf, json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    cd = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
+    rq = pezzo_js(mini, "function riquadroPayCodeP2P(o, adesso){", "\n}\n")
+    inv = pezzo_js(mini, "async function inviaCampoP2P(tipo, btn){", "\n}\n")
+    ror = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+
+    # --- 1) sul testo: dove si tocca, e solo li' ---------------------
+    prova("il totale si tocca solo nella pagina dello scambio, a chi compra", [True, True, True],
+          ["const toccaImporto = euroNoto && compro && o.toccaImporto;" in cd,
+           "toccaImporto ? attrImportoP2P(o.euro, " in cd,
+           "toccaImporto: o.lato === 'compro'," in ror])
+    prova("...e il libro non lo accende mai (nessun altro chiamante passa toccaImporto)", 1,
+          mini.count("toccaImporto: "))
+    prova("l'importo del PayCode si tocca, dentro la sua riga", True,
+          "'<div class=\"p2p-paycode-riga\"><span>Importo</span><b>'\n"
+          "      + attrImportoP2P(o.euro, fmtEur(o.euro) + ' € in contanti') + '</b></div>'" in rq)
+    prova("nessun 📋 in piu' sull'importo: la cifra a riposo non ha bottoni", [False, False],
+          ["<button" in pezzo_js(mini, "function attrImportoP2P(euro, dentro){", "\n}\n"),
+           "📋" in pezzo_js(mini, "function attrImportoP2P(euro, dentro){", "\n}\n")])
+    prova("il «✓ Copiato» della cifra veste il verde della fiducia, e a riposo niente", [True, True],
+          [".importo-tocca{cursor:pointer}" in css,
+           ".importo-tocca.fatto{color:var(--trust-text);background:var(--trust-soft);" in css])
+    prova("il form del PayCode toglie il € prima del giudice dei centesimi", True,
+          "const imp = centesimiP2P(senzaEuroP2P(campi.importo));" in inv)
+    prova("i due filtri dei campi importo lasciano passare il € (lo toglie la rete)", [True, True],
+          ["/[^0-9]/.test(senzaEuroP2P(d))" in pezzo_js(mini, "function soloCifreP2P(ev){", "\n}\n"),
+           "const s = senzaEuroP2P(d);" in pezzo_js(mini, "function soloCentesimiP2P(ev){", "\n}\n")])
+
+    # --- 2) il banco: i giudici VERI in node --------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dell'importo", "node non c'e'")
+        return
+    js = "\n".join([
+        mini[mini.index("const esc = s =>"):mini.index("const el = id =>")],
+        re.search(r"const P2P_TOCCO_LUNGO_MS = [^\n]*;", mini).group(0),
+        fn("function senzaEuroP2P(t){"), fn("function centesimiP2P(testo){"),
+        fn("function interoP2P(testo){"), fn("function centesimiTestoP2P(n){"),
+        fn("function soloCifreP2P(ev){"), fn("function soloCentesimiP2P(ev){"),
+        fn("function ripuliCifreP2P(inp){"), fn("function ripuliCentesimiP2P(inp){"),
+        fn("function attrImportoP2P(euro, dentro){"), fn("function toccaImportoP2P(el){"),
+    ]) + r"""
+const out = {};
+out.senza = ['100 €', '€100', '100,00€', '€ 100', '  23,47  € ', '100', '', null, '1€00']
+  .map(senzaEuroP2P);
+out.centesimi = ['100 €', '100,00€', '€23,47', '€ 0,5'].map(t => centesimiP2P(senzaEuroP2P(t)).n);
+const prova = (f, d) => { let no = false; f({data: d, target: {value: ''}, preventDefault(){ no = true; }}); return no; };
+out.cifre = ['100 €', '€100', '€', '100,00€', 'abc', '5,5', null].map(d => prova(soloCifreP2P, d));
+out.cent = ['100,00€', '€ 23,47', '1,2,3', 'x'].map(d => prova(soloCentesimiP2P, d));
+const inp = v => ({value: v, selectionStart: v.length, setSelectionRange(){}});
+out.rete = [ripuliCifreP2P(inp('100 €')), ripuliCentesimiP2P(inp('100,00 €')), ripuliCifreP2P(inp('€100'))];
+out.attr = [100, 1500, 23.47].map(e => /data-v="([^"]*)"/.exec(attrImportoP2P(e, 'X'))[1]);
+out.attrDentro = attrImportoP2P(100, '<span class="num">100,00 €</span>');
+/* il tocco: copiaLink di cartone, il timer a mano */
+const timer = [];
+globalThis.setTimeout = (f, ms) => { timer.push([f, ms]); return timer.length; };
+globalThis.clearTimeout = () => {};
+globalThis.haptic = () => {};
+let presi = [], esito = true;
+globalThis.copiaLink = (v, msg) => { presi.push([v, msg]); return Promise.resolve(esito); };
+let SEL = {isCollapsed: true, toString: () => ''};
+globalThis.window = {getSelection: () => SEL};
+const cifra = () => ({dataset: {v: '100,00'}, innerHTML: '<span class="num">100,00 €</span>', textContent: '100,00 €',
+  isConnected: true, classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }}});
+(async () => {
+  const c = cifra();
+  out.tocco = toccaImportoP2P(c);
+  await null; await null;
+  out.dopo = [c.textContent, c.classList.s.has('fatto'), presi.slice(), timer.length ? timer[0][1] : 0];
+  /* un secondo tocco dentro i due secondi non si ricorda «✓ Copiato» */
+  toccaImportoP2P(c);
+  await null; await null;
+  timer[timer.length - 1][0]();
+  out.torna = [c.innerHTML, c.classList.s.has('fatto')];
+  presi = [];
+  const l = cifra(); l._giu = Date.now() - 900;
+  out.lungo = [toccaImportoP2P(l), presi.length];
+  const b = cifra(); b._giu = Date.now() - 100;
+  out.breve = toccaImportoP2P(b);
+  await null; await null;
+  out.breveCopia = presi.length;
+  presi = [];
+  SEL = {isCollapsed: false, toString: () => '100'};
+  out.selezione = [toccaImportoP2P(cifra()), presi.length];
+  SEL = {isCollapsed: true, toString: () => ''};
+  esito = false; presi = [];
+  const n = cifra();
+  toccaImportoP2P(n);
+  await null; await null;
+  out.negato = [n.textContent, n.classList.s.has('fatto')];
+  console.log(JSON.stringify(out));
+})();
+"""
+    d = _tf.mkdtemp()
+    try:
+        f = os.path.join(d, "importo.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(js)
+        r = _sp.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    prova("il banco dell'importo gira in node", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _js.loads(r.stdout.strip().splitlines()[-1])
+    prova("il € se ne va da solo, davanti, dietro, attaccato o con lo spazio",
+          ["100", "100", "100,00", "100", "23,47", "100", "", "", "100"], o["senza"])
+    prova("...e il giudice dei centesimi legge la cifra (il PayCode)", [100, 100, 23.47, 0.5], o["centesimi"])
+    prova("il filtro dei soli interi lascia passare il €, e rifiuta ancora i decimali e le lettere",
+          [False, False, False, True, True, True, False], o["cifre"])
+    prova("...quello dei centesimi lascia il €, e rifiuta ancora due separatori e le lettere",
+          [False, False, True, True], o["cent"])
+    prova("...e la rete toglie il € che e' entrato", ["100", "100,00", "100"], o["rete"])
+    prova("negli appunti la sola cifra: coi centesimi, senza migliaia ne' €",
+          ["100,00", "1500,00", "23,47"], o["attr"])
+    prova("...e a riposo la cifra resta quella di prima, nella sua veste", True,
+          o["attrDentro"].endswith('onclick="toccaImportoP2P(this)"><span class="num">100,00 €</span></span>'))
+    prova("il tocco copia «100,00» e la cifra dice «✓ Copiato» per due secondi",
+          [True, ["✓ Copiato", True, [["100,00", "Importo copiato 📋"]], 2000]],
+          [o["tocco"], o["dopo"]])
+    prova("...poi torna la cifra, anche dopo un secondo tocco dentro i due secondi",
+          ['<span class="num">100,00 €</span>', False], o["torna"])
+    prova("il tocco lungo non copia, quello breve si'", [[False, 0], True, 1],
+          [o["lungo"], o["breve"], o["breveCopia"]])
+    prova("con una selezione fatta a mano non si copia niente", [False, 0], o["selezione"])
+    prova("se gli appunti dicono di no, la cifra non mente (resta la cifra)",
+          ["100,00 €", False], o["negato"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -170992,6 +171159,7 @@ def main():
               prove_pdf_allegati,
               prove_stampa_e_salti,
               prove_modifica_massiva,
+              prove_importo_copia,
               prove_bundle_bitcoin,
               prove_venduto_canale,
               prove_chat_mercatino,

@@ -4899,6 +4899,13 @@
   /* il dato che si copia col tocco (secondo giro): la manina col mouse;
      la selezione resta quella del riquadro */
   .da-toccare{cursor:pointer}
+  /* l'importo da pagare che si copia toccandolo (19 ott 2026,
+     importo-copia): nessun segno in piu' a riposo, la manina col mouse;
+     dopo il tocco «✓ Copiato» nel verde della fiducia, la stessa
+     pastiglia del bottone del recapito */
+  .importo-tocca{cursor:pointer}
+  .importo-tocca.fatto{color:var(--trust-text);background:var(--trust-soft);
+    border-radius:8px;padding:1px 8px;font-weight:800;white-space:nowrap}
   /* LE STESSE RIGHE NELLE BUSTE DEL MERCATINO (23 set 2026, «Dati di
      spedizione che si copiano»): l'indirizzo, l'email per il corriere e
      il punto di ritiro, dentro il loro .payout e SENZA la carta del
@@ -36927,6 +36934,43 @@ function toccaDatoP2P(el){
   copiaRecapitoP2P(b);
   return true;
 }
+/* ---- L'IMPORTO CHE SI COPIA TOCCANDOLO (19 ott 2026, cantiere
+   importo-copia, decisione di Andrea) ----
+   Il gemello di `toccaDatoP2P` per la cifra da pagare: senza un 📋
+   accanto (interfaccia pulita), quindi il «✓ Copiato» lo dice la cifra
+   stessa, al posto suo, per due secondi. Negli appunti la SOLA cifra,
+   coi centesimi e senza migliaia ne' simbolo — «100,00», «1500,00» — che
+   e' la forma che il campo di una banca accetta. Le stesse due guardie
+   del dato: niente con una selezione fatta a mano, niente col tocco
+   lungo (il dito che scende lascia l'ora in una PROPRIETA', mai in un
+   attributo: il ridisegno confronta l'HTML).
+   `attrImportoP2P` veste la cifra: il valore nel `data-v`, mai
+   nell'onclick. */
+function attrImportoP2P(euro, dentro){
+  return '<span class="importo-tocca" data-v="' + esc(centesimiTestoP2P(euro)) + '" '
+    + 'onpointerdown="this._giu=Date.now()" onclick="toccaImportoP2P(this)">' + dentro + '</span>';
+}
+function toccaImportoP2P(el){
+  if (!el || (el._giu && Date.now() - el._giu > P2P_TOCCO_LUNGO_MS)) return false;
+  try {
+    const sel = typeof window !== 'undefined' && window.getSelection && window.getSelection();
+    if (sel && !sel.isCollapsed && String(sel).trim()) return false;
+  } catch(e) {}
+  haptic();
+  /* la cifra di prima la si tiene UNA volta: un secondo tocco dentro i
+     due secondi non deve ricordarsi «✓ Copiato» come cifra */
+  if (el._prima == null) el._prima = el.innerHTML;
+  copiaLink(el.dataset.v, 'Importo copiato 📋').then(ok => {
+    if (!ok || el.isConnected === false) return;
+    el.textContent = '✓ Copiato';
+    el.classList.add('fatto');
+    clearTimeout(el._torna);
+    el._torna = setTimeout(() => {
+      el.innerHTML = el._prima; el._prima = null; el.classList.remove('fatto');
+    }, 2000);
+  });
+  return true;
+}
 /* IL 📋 PICCOLO (6 ott 2026, «📦 Spedisci a»): solo l'icona, che passa
    da `copiaDato` — gli appunti e il ✓ sul bottone stesso. `classe` e'
    'icona' nelle righe, 'icona in-riga' dentro una frase. Il valore nel
@@ -62769,6 +62813,17 @@ function centesimiP2P(testo){
      quindi Number() e' gia' al centesimo (la tortura l'ha detto) */
   return {vuoto: false, storto: false, n: Number(t.replace(',', '.'))};
 }
+/* IL € SI TOGLIE DA SOLO (19 ott 2026, cantiere importo-copia, decisione
+   di Andrea): chi scrive o incolla «100 €», «€100», «100,00€» o «€ 100»
+   intende la cifra, e il simbolo gli era rifiutato insieme al resto. Il
+   € e gli spazi che gli stanno attorno se ne vanno PRIMA del controllo,
+   e il resto si giudica come sempre — quindi «100,00€» in un campo a
+   soli interi resta rifiutato intero: la regola del 10 set («un incolla
+   storto si rifiuta, non si ripulisce») vale per le cifre, non per il
+   simbolo. PURA. */
+function senzaEuroP2P(t){
+  return String(t == null ? '' : t).replace(/\s*€\s*/g, '').trim();
+}
 /* la cifra come la si legge: virgola e due decimali, sempre */
 function centesimiTestoP2P(n){
   return (Math.round(Number(n) * 100) / 100).toFixed(2).replace('.', ',');
@@ -62777,7 +62832,8 @@ function centesimiTestoP2P(n){
 function soloCentesimiP2P(ev){
   const d = ev && ev.data;
   if (d == null) return;
-  const s = String(d);
+  /* (19 ott 2026, importo-copia) il € no: lo toglie la rete qui sotto */
+  const s = senzaEuroP2P(d);
   if (/[^0-9.,]/.test(s) || (s.match(/[.,]/g) || []).length > 1) { ev.preventDefault(); return; }
   const gia = String((ev.target && ev.target.value) || '');
   if (/[.,]/.test(s) && /[.,]/.test(gia)) ev.preventDefault();
@@ -62808,7 +62864,8 @@ function ripuliCentesimiP2P(inp){
    `ev.data` e' `null` sulle cancellazioni, e li' non si tocca niente. */
 function soloCifreP2P(ev){
   const d = ev && ev.data;
-  if (d != null && /[^0-9]/.test(String(d))) ev.preventDefault();
+  /* (19 ott 2026, importo-copia) il € no: lo toglie la rete qui sotto */
+  if (d != null && /[^0-9]/.test(senzaEuroP2P(d))) ev.preventDefault();
 }
 /* LA RETE, per le strade che `beforeinput` non copre (un browser che
    non ce l'ha, una composizione IME, un valore messo da fuori). Qui
@@ -63380,7 +63437,17 @@ function contoDettP2P(o){
      vale, a destra le sole cifre in sats. La riga e' una sola regola
      ripetuta tre volte. */
   const euriTesto = esc(fmtEur(o.euro));
-  const cifreEuro = euroNoto ? num(euriTesto + ' ' + monetaP2P(o)) : num('—');
+  /* L'IMPORTO DA PAGARE SI COPIA TOCCANDOLO (19 ott 2026, cantiere
+     importo-copia, decisione di Andrea): nella SOLA pagina dello
+     scambio, a chi compra (`toccaImporto`, che il libro non passa mai),
+     la cifra del «Totale da inviare» copia il numero senza il simbolo
+     — «100,00», come si incolla nel campo di una banca o di un'app — e
+     dice «✓ Copiato» per due secondi al posto suo. Nessun 📋: la riga
+     resta com'era. La strada e' `toccaImportoP2P`. */
+  const toccaImporto = euroNoto && compro && o.toccaImporto;
+  const cifreEuro = !euroNoto ? num('—')
+    : toccaImporto ? attrImportoP2P(o.euro, '<span class="num">' + euriTesto + ' ' + monetaP2P(o) + '</span>')
+    : num(euriTesto + ' ' + monetaP2P(o));
   const etichettaCtrl = euroNoto ? 'Controvalore di <b>' + euriTesto + ' '
     + segnoMonetaP2P(o) + '</b>' : 'Controvalore';
   /* la commissione: percentuale di chi legge + la sua cifra; «in
@@ -64894,7 +64961,10 @@ function riquadroPayCodeP2P(o, adesso){
         + 'data-imp="' + esc(fmtEur(o.euro) + ' €') + '" data-sc="' + esc(scade > 0 ? dataTabacchinoP2P(scade) : '') + '" '
         + 'onclick="apriBarreP2P(this.dataset)">📊 Mostra il codice alla cassa</button>'
       : '<div class="hint">' + esc(P2P_BARRE_MANCA) + '</div>') +
-    '<div class="p2p-paycode-riga"><span>Importo</span><b>' + fmtEur(o.euro) + ' € in contanti</b></div>' +
+    /* l'importo si copia toccandolo (19 ott 2026, importo-copia): la
+       sola cifra, «23,47», e «✓ Copiato» al posto suo per due secondi */
+    '<div class="p2p-paycode-riga"><span>Importo</span><b>'
+      + attrImportoP2P(o.euro, fmtEur(o.euro) + ' € in contanti') + '</b></div>' +
     (scade > 0
       ? '<div class="p2p-paycode-riga"><span>Scade il</span><b>' + esc(dataTabacchinoP2P(scade)) + '</b></div>' +
         '<div class="p2p-paycode-resta' + (manca <= 0 ? ' scaduto' : manca <= P2P_TAB_ULTIMA_S ? ' ultima' : '') + '">' +
@@ -65343,6 +65413,8 @@ function renderOrdineP2P(){
                                            {satsDetti: o.satsNetti || 0,
                                             scontoMancato: !!o.scontoMancato,
                                             mio: true,
+                                            /* (19 ott 2026) la cifra da pagare si tocca */
+                                            toccaImporto: o.lato === 'compro',
                                             consegna: typeof pagaInContantiP2P === 'function'
                                               && pagaInContantiP2P(o)}));
   const azione = azioniDisponibili(o);
@@ -74625,7 +74697,9 @@ async function inviaCampoP2P(tipo, btn){
         return;
       }
       campi.scade = dataTabacchinoP2P(quando);
-      const imp = centesimiP2P(campi.importo);
+      /* il € scritto o incollato col numero se ne va da solo (19 ott
+         2026, importo-copia): «100 €» e' 100,00 */
+      const imp = centesimiP2P(senzaEuroP2P(campi.importo));
       if (!(imp.n > 0)) {
         toast('L\'importo dell\'ordine e\' una cifra in euro, coi centesimi se servono (23,47)');
         el('p2pCampoEuro_importo')?.focus();
