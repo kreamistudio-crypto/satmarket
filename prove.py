@@ -110221,6 +110221,55 @@ def prove_login_dal_bot():
     prova("nel foglio la porta del bot viene PRIMA della riga e del widget", True,
           -1 < porte.find("if (miniAccount()) {") < porte.find("} else if (portaBotSi) {")
           < porte.find("telegramNelPortachiavi() && !portaTelegramSvelata"))
+    # --- chi ha premuto Avvia, e il banner su onion (terzo giro) ---
+    prova("la colonna di chi ha premuto Avvia nasce a 0", True,
+          '"bot_avviato INTEGER DEFAULT 0"' in src)
+    prova("...e la scrive l'Avvia dell'ingresso, per QUEL Telegram", True,
+          'con.execute("UPDATE utenti SET bot_avviato=? WHERE tg_id=?",\n'
+          '                    (int(time.time()), int(chat)))' in pezzo("avvia_ingresso_bot"))
+    prova("il client la legge da /api/me", True,
+          "myBotAvviato = !!me.bot_avviato;" in mini)
+    _bw = _fn_js(mini, "function barraWeb(nome){")
+    prova("su onion chi ha premuto Avvia passa PRIMA del «non si possono attivare»", True,
+          -1 < _bw.find("suOnion() && myBotAvviato")
+          < _bw.find("da qui gli avvisi in chat non si possono attivare"))
+    import shutil as _shb
+    if _shb.which("node"):
+        _bancobw = r"""
+let onion = false, myBotAvviato = false, myTgId = 0;
+const suOnion = () => onion, hintDismesso = () => false, esc = t => t;
+const b = {style: {}, className: '', innerHTML: ''};
+const el = () => b;
+""" + _bw + r"""
+const giri = {};
+for (const [k, o, a, id] of [['onionAvviato', true, true, 501], ['onionNo', true, false, 501],
+                             ['chiaroAvviato', false, true, 501], ['chiaroNostr', false, false, -5]]) {
+  onion = o; myBotAvviato = a; myTgId = id; barraWeb('Andrea');
+  giri[k] = b.innerHTML.replace(/<[^>]+>/g, '').replace('✕', '').trim();
+}
+console.log(JSON.stringify(giri));
+"""
+        import subprocess as _spw, json as _jw
+        _r = _spw.run(["node", "-e", _bancobw], capture_output=True, text=True, timeout=30)
+        try:
+            _g = _jw.loads(_r.stdout.strip())
+        except ValueError:
+            prova("il banco node del banner gira", "", _r.stderr[-600:])
+            _g = None
+        if _g:
+            prova("su onion, chi e' entrato dal bot: gli avvisi gli arrivano, e glielo si dice",
+                  "👋 Ciao Andrea — sei su Barattolo dal browser. Gli avvisi sui tuoi ordini "
+                  "ti arrivano in chat da @ilbarattolobot.Esci", _g["onionAvviato"])
+            prova("...e niente «non si possono attivare»", False,
+                  "non si possono attivare" in _g["onionAvviato"])
+            prova("su onion, chi non l'ha premuto: la riga di sempre", True,
+                  "da qui gli avvisi in chat non si possono attivare" in _g["onionNo"])
+            prova("fuori da onion niente cambia (chi ha premuto Avvia ha la riga di sempre)",
+                  True, "Per ricevere gli avvisi sugli ordini apri una volta @ilbarattolobot"
+                  in _g["chiaroAvviato"])
+            prova("...e i nativi Nostr pure", True, "sei entrato con Nostr" in _g["chiaroNostr"])
+    else:
+        salta("il banco node del banner", "node non c'e'")
     prova("la frase di prima non c'e' piu' quando c'e' il bot", False,
           "Esci da Telegram Web" in _fn_js(mini, "function portaBot(altro){"))
     prova("il foglio rilegge la porta insieme agli account", True,

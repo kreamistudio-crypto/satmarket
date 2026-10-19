@@ -67286,3 +67286,45 @@ se «Apri Telegram» apre l'app.
 **NOTATO, NON FATTO.** Su onion il banner di chi è dentro dice «da qui
 gli avvisi in chat non si possono attivare»: per chi è appena entrato
 dal bot non è vero (ha premuto Avvia, gli avvisi arrivano).
+
+## Entra dal bot, terzo giro: su onion chi ha premuto Avvia non legge «gli avvisi non si possono attivare» (19 ott 2026, cantiere account-doppio-bot, sì di Andrea al notato)
+
+**IL DIFETTO.** Su onion il banner di chi è dentro diceva a tutti «da qui
+gli avvisi in chat non si possono attivare: ricontrolla i tuoi Ordini».
+Era vero finché da Tor non si poteva arrivare al bot; dal secondo giro
+chi entra dal bot ha appena premuto Avvia, la chat col bot c'è, e gli
+avvisi gli arrivano.
+
+**COSA.** Il fatto lo sa solo il server, e non c'era scritto da nessuna
+parte: nasce la colonna `utenti.bot_avviato` (l'ora dell'ultimo Avvia
+di un ingresso dal bot, 0 = mai; si aggiunge da sola all'avvio come le
+sorelle), la scrive `avvia_ingresso_bot` all'Avvia, ed esce da /api/me
+col SELECT * di sempre. Il client la tiene in `myBotAvviato`, e
+`barraWeb` ha un ramo in più, PRIMA di quello di onion: su onion e con
+l'Avvia premuto dice «Gli avvisi sui tuoi ordini ti arrivano in chat da
+@ilbarattolobot.» — senza link, che di là non si aprirebbe. Fuori da
+onion niente cambia (lì la riga col link era già giusta).
+
+**PERCHÉ ALL'AVVIA E NON ALLA FIGURA GIUSTA.** È l'Avvia che apre la
+chat col bot: da lì il bot può scrivergli, anche se poi la figura era
+sbagliata. **PERCHÉ SOLO L'AVVIA DELL'INGRESSO** e non ogni /start: è
+quel che Andrea ha chiesto («chi è entrato dal bot»), e chi ha premuto
+Avvia prima di oggi non ha la data — per lui resta la riga di prima,
+che sbaglia per prudenza, mai per eccesso. Se un giorno serve, la
+stessa colonna si può scrivere a ogni /start.
+
+**PROVE.** In `prove_login_dal_bot`: la colonna nasce a 0, la scrive
+l'Avvia per QUEL Telegram, il client la legge, il ramo nuovo sta prima
+di «non si possono attivare»; un banco node che fa girare `barraWeb`
+vera nei quattro casi (onion con Avvia: la riga nuova e niente «non si
+possono attivare»; onion senza: la riga di sempre; fuori da onion con
+Avvia: la riga col link di sempre; nativo Nostr: la sua). In
+`collaudo_login_bot.py` /api/me dice `bot_avviato` > 0 dopo l'ingresso
+dal bot, e 0 a chi non l'ha mai premuto (75 su 75). CONTROPROVA: col
+ramo spento cadono 3 prove. DAL VIVO su onion (stesso banco del secondo
+giro, 360×780, chiaro e scuro, il tour di benvenuto saltato col suo
+«Salta»): dopo l'ingresso dal bot il banner dice «👋 Ciao Andrea — sei
+su Barattolo dal browser. Gli avvisi sui tuoi ordini ti arrivano in chat
+da @ilbarattolobot.»; nessun errore di pagina. Il server del giro ha
+provato a chiedere il cambio a api.coingecko.com, e il proxy l'ha
+fermato: è il server, non la pagina, e non tocca il cantiere.

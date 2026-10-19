@@ -7762,7 +7762,15 @@ def init_db():
                     "avvisi_mercatino_categorie TEXT DEFAULT ''",
                     "avvisi_mercatino_prezzo REAL DEFAULT 0",
                     "avvisi_mercatino_valuta TEXT DEFAULT ''",
-                    "spedizione_standard TEXT DEFAULT ''"):
+                    "spedizione_standard TEXT DEFAULT ''",
+                    # HA PREMUTO AVVIA PER ENTRARE (19 ott 2026, cantiere
+                    # account-doppio-bot): l'ora dell'ultimo Avvia di un
+                    # ingresso dal bot (`avvia_ingresso_bot`), 0 = mai. Chi
+                    # l'ha premuto ha una chat col bot, quindi gli avvisi
+                    # gli arrivano: su onion il banner di chi e' dentro
+                    # non deve dirgli che «non si possono attivare». Esce
+                    # da /api/me col SELECT *, come le colonne sorelle.
+                    "bot_avviato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -18310,6 +18318,14 @@ async def avvia_ingresso_bot(mittente: dict, codice: str):
                     "con Telegram»."})
     nome = mittente.get("first_name") or mittente.get("username") or "te"
     i.update(stato="in_chat", tg_id=int(chat), nome=nome)
+    # Ha premuto Avvia: da qui il bot gli puo' scrivere (vedi la colonna)
+    con = db()
+    try:
+        con.execute("UPDATE utenti SET bot_avviato=? WHERE tg_id=?",
+                    (int(time.time()), int(chat)))
+        con.commit()
+    finally:
+        con.close()
     chi = html.escape(nome)
     if mittente.get("username"):
         chi += f" (@{html.escape(mittente['username'])})"

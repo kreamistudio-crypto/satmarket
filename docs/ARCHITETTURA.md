@@ -9646,6 +9646,12 @@
   su onion non si monta niente, come prima. I DIZIONARI IN MEMORIA
   (ingressi e lasciapassare della fusione) li toccano solo rotte `async`
   e i gesti del bot, tutti nel loop: `prove_dizionari_nel_loop` le conta.
+  CHI HA PREMUTO AVVIA (terzo giro): la colonna `utenti.bot_avviato`
+  (l'ora dell'ultimo Avvia di un ingresso dal bot, 0 = mai) la scrive
+  `avvia_ingresso_bot` ed esce da /api/me; su onion il banner di chi è
+  dentro (`barraWeb`) a chi l'ha premuto dice «Gli avvisi sui tuoi ordini
+  ti arrivano in chat da @ilbarattolobot.» invece di «non si possono
+  attivare». Fuori da onion il banner non cambia.
   LA CHIAVE NOSTR GIÀ APERTA (stesso cantiere): `giaApertoNostr`, in
   testa a `entraConNostr` e PRIMA della sfida, confronta nel browser la
   npub del firmatario con quelle degli account aperti. Se c'è: «Questo

@@ -15752,6 +15752,10 @@ let myTgId = null, isAdmin = false;
    SERVER in /api/me, e non si deduce da `isAdmin` — a leva spenta e'
    falso anche per i moderatori. */
 let myOnchain = false;
+/* Ha premuto Avvia per entrare dal bot (19 ott 2026, ENTRA DAL BOT):
+   gli avvisi in chat gli arrivano, e su onion il banner glielo dice
+   invece di «non si possono attivare». Da /api/me, `bot_avviato`. */
+let myBotAvviato = false;
 
 function authHdr(){
   if (tg?.initData) return tg.initData;
@@ -51151,7 +51155,13 @@ function barraWeb(nome){
      ci cade anche il DOPPIO CITTADINO: chi entra con una npub che e'
      la chiave d'accesso di un account Telegram ha il tg_id POSITIVO,
      quindi senza questa riga prenderebbe il ramo che nomina il bot. */
-  const avvisi = suOnion()
+  /* ...MA CHI E' ENTRATO DAL BOT (19 ott 2026, cantiere
+     account-doppio-bot) ha gia' premuto Avvia: la chat col bot c'e', e
+     gli avvisi gli arrivano. A lui si dice questo, senza link (di qua
+     non si aprirebbe). */
+  const avvisi = suOnion() && myBotAvviato
+    ? `Gli avvisi sui tuoi ordini ti arrivano in chat da @ilbarattolobot.`
+    : suOnion()
     ? `da qui gli avvisi in chat non si possono attivare: ricontrolla`
       + ` i tuoi Ordini di tanto in tanto`
     : myTgId < 0
@@ -84684,6 +84694,7 @@ async function avvia(){
     myNip85Collaudo = !!me.nip85_collaudo;
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
+    myBotAvviato = !!me.bot_avviato;
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
     /* un server di ieri non manda la chiave: vale «accesi», il default */

@@ -241,6 +241,11 @@ def main():
     prova("...e bussare di nuovo non riapre niente", {"stato": "scaduto"},
           w.post("/api/login/bot/stato").json())
     vecchia_andrea = w.cookies.get("barattolo_sessione")
+    prova("/api/me sa che ha premuto Avvia (il banner di onion lo usa)", True,
+          w.get("/api/me").json().get("bot_avviato", 0) > 0)
+    mai = TestClient(server.app)
+    mai.post("/api/login/telegram", json={"collaudo": True, "id": 530, "first_name": "MaiAvvia"})
+    prova("...e chi non l'ha mai premuto ha 0", 0, mai.get("/api/me").json().get("bot_avviato"))
 
     # ------------------------------------------------------------------
     print("\n[due Telegram sullo stesso telefono]")
