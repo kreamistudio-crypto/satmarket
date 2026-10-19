@@ -76,6 +76,17 @@ TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # journal dice perche' («⚠️ Link dentro Telegram SPENTI»). Una forma
 # storta la spegne. Il valore vivo sta nel pannello «⚙️ Stato delle leve».
 TELEGRAM_MINIAPP_LINK = ""
+# L'INDIRIZZO DEL SITO E IL BOT (19 ott 2026): servono SOLO all'istanza
+# di prova (sezione in fondo); in produzione non si scrivono, e valgono
+# questi. URL_PUBBLICO e' dove il bot registra il webhook e dove puntano
+# i link delle notifiche, della sitemap e delle condivisioni: https,
+# minuscole, senza barra in fondo. LINK_BOT e' il bot dei link «apri il
+# bot» e del login dal browser: il server ne scrive il nome anche nella
+# Mini App. Scritti male restano questi, e il journal lo dice. Con
+# TELEGRAM_MINIAPP_LINK accesa, il `getMe` dell'avvio controlla anche
+# che LINK_BOT sia il bot del BOT_TOKEN («⚠️ LINK_BOT dice @…»).
+URL_PUBBLICO = "https://barattolo.store"
+LINK_BOT = "https://t.me/ilbarattolobot"
 
 # --- Anthropic (ricerca AI in linguaggio naturale) -------------------
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
@@ -1860,3 +1871,75 @@ CLASSIFICA_KD = 0               # quante persone servono perche' il bonus
 # deve poterselo portare dietro per distrazione. Accenderlo dev'essere
 # un gesto, e in locale e' il primo che si fa.
 MODALITA_COLLAUDO = False
+
+# --- L'istanza di prova (collaudo dal telefono) ------------------------
+# (19 ott 2026, cantiere collaudo-vm; il disegno:
+# docs/STUDIO-ISTANZA-PROVA-2026-10-08.md.) Una copia di
+# Barattolo che gira come quella vera, su un'ALTRA macchina, col SUO bot,
+# per provare dal telefono i rami prima dell'ok al push.
+# CHI PUO' USARLA: gli id Telegram in lista; gli altri ricevono 403
+# «Istanza di prova, privata» (restano aperti solo la salute, il webhook
+# del bot e il login). Chi non si fa riconoscere puo' solo LEGGERE (la
+# vetrina della prova e' fatta di dati finti). VUOTA = nessun filtro, ed
+# e' la produzione: qui resta vuota. Una lista scritta male (una
+# stringa, un nome) chiude la prova a TUTTI, e il journal lo dice.
+PROVA_SOLO_IDS = []
+# IL CONFIG DELLA PROVA si scrive DA QUI e non copiando quello del VPS
+# (che non lascia mai il VPS): sotto ci sono le righe che cambiano,
+# tutto il resto resta com'e' in questo file. MAI una chiave vera — ne'
+# il BOT_TOKEN di produzione (ruberebbe il webhook), ne' una chiave
+# LNbits che paga sats veri, ne' una nsec.
+#   MODALITA_COLLAUDO = False          # identita' Telegram vere, col bot di prova
+#   URL_PUBBLICO = "https://collaudo.barattolo.store"
+#   LINK_BOT = "https://t.me/<bot di prova>"
+#   TELEGRAM_MINIAPP_LINK = "https://t.me/<bot di prova>"
+#   BOT_TOKEN = "<token del bot di prova, da BotFather>"
+#   TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_NATO_SULLA_PROVA"
+#   PROVA_SOLO_IDS = [<id di Andrea>, <id di Alan>]
+#   ADMIN_IDS = [<id di Andrea>, <id di Alan>]
+#   FONDATORI = [<id di Andrea>, <id di Alan>]
+#   BANNER_TEST = True
+#   BANNER_TEST_TESTO = "🧪 Questa è l'istanza di PROVA: dati finti, sats finti."
+#   # i pagamenti: LNbits della prova col portafoglio FINTO (FakeWallet)
+#   LNBITS_URL = "http://127.0.0.1:5001"
+#   LNBITS_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY_DEL_WALLET_DI_PROVA"
+#   LNBITS_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY_DEL_WALLET_DI_PROVA"
+#   LNBITS_NODO_URL = "http://127.0.0.1:5001"
+#   LNBITS_NODO_INVOICE_KEY = "INCOLLA_QUI_LA_STESSA_INVOICE_KEY"
+#   LNBITS_NODO_ADMIN_KEY = "INCOLLA_QUI_LA_STESSA_ADMIN_KEY"
+#   CASSAFORTE_NUOVA = True
+#   LND_PONTE_MACAROON_LETTURA = ""    # LND «spento»: decide LNbits
+#   LND_PONTE_MACAROON_HOLD = ""
+#   GUARDIANO_PONTE = False
+#   # Nostr e Mostro: nessun relay vero, nessuna chiave
+#   NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
+#   RELAY_NOSTR = []
+#   RELAY_NOSTR_IMPORT = []
+#   IMPORT_NOSTR_APERTO = False
+#   TRASLOCO_NOSTR = False
+#   SEGRETI_PROFILO_P2P = {}
+#   P2P_ATTIVO = False                 # acceso solo col relay morto, sotto
+#   MOSTRO_RELAY = ["ws://127.0.0.1:9"]
+#   MOSTRO_RELAY_SPECCHIO = ["ws://127.0.0.1:9"]
+#   MOSTRO_RELAY_CONFERMA = []
+#   AVVISO_DM_NOSTR = False
+#   AVVISO_DM_NOSTR_RELAY = []
+#   RONDA_RELAY_MOSTRO = False
+#   RONDA_RELAY_NOSTR = False
+#   RONDA_RELAY_CANARINO = []
+#   ZAP_ATTIVO = False
+#   X_RIPUBBLICA = False
+#   # canali e post: niente esce verso i canali veri
+#   TELEGRAM_CANALE_ID = ""
+#   TELEGRAM_CANALE_RIEPILOGO = ""
+#   TELEGRAM_CANALE_VETRINA = ""       # o il canale di prova, privato
+#   TELEGRAM_CANALE_BITCOIN_PODCAST = ""
+#   ADMIN_CANALE_ID = 0
+#   POST_AUTOMATICI = False
+#   RIEPILOGO_SETTIMANALE = False
+#   # il resto del mondo: spento
+#   ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
+#   CONNETTORI_NEGOZIO_APERTI = False
+#   CONNETTORI_NEGOZIO_PER_TUTTI = False
+#   ONION_HOST = ""
+#   CHIAVE_CONTENUTI_DIGITALI = "INCOLLA_QUI_UNA_CHIAVE_NATA_SULLA_PROVA"

@@ -37558,7 +37558,10 @@ def _amb_seo():
                  "META_NOINDEX = ", "TETTO_CARTELLO = ",
                  "CACHE_SEO_HOME = ", "CAMPI_CARTELLO = ",
                  "OG_REPARTO = ",
-                 "TETTO_SITEMAP = ", "CACHE_SITEMAP = "):
+                 "TETTO_SITEMAP = ", "CACHE_SITEMAP = ",
+                 # il bot nella pagina (19 ott 2026, collaudo-vm)
+                 "LINK_BOT_DI_SERIE = ", "_FORMA_LINK_BOT = ",
+                 "_RIGA_BOT_PAGINA = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     # multi-riga: vogliono il taglio alla riga VUOTA, non al primo \n
@@ -37589,10 +37592,11 @@ def _amb_seo():
               "_seo_annuncio",
               "_seo_negozio", "_seo_categoria", "_seo_home",
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
-              "_hash_asset", "_timbra_asset_pagina",
+              "_hash_asset", "_timbra_asset_pagina", "_bot_nella_pagina",
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
+    amb["BOT_NOME"] = "ilbarattolobot"     # la leva non dichiarata
     # IL GIUDICE DELLA COPERTINA (30 set 2026): `_seo_negozio` lo chiama,
     # e si monta VERO — nessuna pagina del server pubblicata, qui, quindi
     # solo il negozio di casa esce con la sua copertina (vedi
@@ -38177,7 +38181,7 @@ def prove_onion():
     prova("...e non mette una seconda porta Nostr", False,
           "apriNostrSheet()" in mb)
     prova("...mentre fuori resta quello di sempre", True,
-          'href="https://t.me/ilbarattolobot"' in mb)
+          'href="https://t.me/${BOT_TG}"' in mb)
     prova("...col testo che non nomina piu' una strada chiusa", True,
           "mostraBanner(suOnion() ? BANNER_VETRINA_ONION : BANNER_VETRINA);"
           in mini)
@@ -38664,7 +38668,7 @@ def _banco_banner(mini):
     testi = mini[mini.index("const BANNER_VETRINA ="):]
     testi = testi[:testi.index("BANNER_VETRINA_ONION = ") + 200]
     testi = testi[:testi.rindex("';") + 2]
-    js = """
+    js = _riga_js(mini, "const BOT_TG = ") + """
 const figli = [];
 const banner = {
   className: '', style: {},
@@ -38767,7 +38771,7 @@ def _banco_invito(mini):
     # rimetterla node dice «Unexpected end of input» — che e' anche
     # il modo in cui un ritaglio a occhio si fa vedere.
     fn = pezzo_js(mini, "function invitoTelegram(", "\n}\n") + "\n}"
-    js = """
+    js = _riga_js(mini, "const BOT_TG = ") + """
 const nodi = {};
 function el(id){
   if (!nodi[id]) nodi[id] = {textContent:'', className:'', style:{},
@@ -56074,6 +56078,10 @@ def prove_link_dentro_telegram():
     prova("le riprove: un minuto, cinque, un quarto d'ora, poi ogni ora per un giorno",
           [(60, 300, 900), 24, {3600}], [RIPROVE[:3], len(RIPROVE[3:]), set(RIPROVE[3:])])
     amb["asyncio"] = _aio
+    # dal 19 ott 2026 (collaudo-vm) il controllo guarda anche LINK_BOT:
+    # qui il bot della leva e' quello di getMe, e quella riga tace
+    exec(pezzo("_giudizio_link_bot"), amb)
+    amb["BOT_NOME"] = "ilbarattolobot"
     exec("async " + pezzo("_controllo_link_miniapp"), amb)
     TOKEN = "123456:SEGRETO-DEL-BOT"
 
@@ -110030,7 +110038,7 @@ const el = id => porte;
         "function rigaAltroTelegram(){", "async function giaApertoNostr(firmatario){")) \
     .replace("function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n}\n",
              "function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n") \
-    + "\n" + _riga_js(mini, "let portaTelegramSvelata = false;") + r"""
+    + "\n" + _riga_js(mini, "let portaTelegramSvelata = false;") + _riga_js(mini, "const BOT_TG = ") + r"""
 const cosa = () => porte.figli.map(f => f.tag === 'div' && f.figli[0]?.tag === 'script' ? 'widget'
   : f.id || f.textContent || f.innerHTML);
 const giri = {};
@@ -159555,6 +159563,7 @@ const localStorage = {getItem: k => store.has(k) ? store.get(k) : null,
 let tg = null;                       /* fuori da Telegram: niente cloud */
 let DEMO = false, VETRINA = false, myTgId = -555;
 const API_BASE = '/api';
+const BOT_TG = 'ilbarattolobot';     /* la riga di miniapp.html (collaudo-vm) */
 function authHdr(){ return 'x'; }
 let fetches = [];
 async function fetch(url, opt){
@@ -171389,6 +171398,179 @@ console.log(JSON.stringify({
                           "&quot;&gt;&lt;b&gt;" in o.get("storta", "")))
 
 
+def prove_istanza_prova():
+    """L'ISTANZA DI PROVA (19 ott 2026, cantiere «collaudo-vm», richiesta
+    di Andrea; il disegno e' docs/STUDIO-ISTANZA-PROVA-2026-10-08.md).
+    Il primo passo, il codice: l'indirizzo e
+    il bot diventano leve (URL_PUBBLICO, LINK_BOT), il nome del bot entra
+    nella Mini App da una riga sola che il server riscrive, e la leva
+    PROVA_SOLO_IDS chiude la prova a chi non e' in lista.
+    Qui i giudici puri, le leve davanti a un config finto e le
+    sentinelle sul testo; il server vero col middleware davanti a tutte
+    le rotte lo gira `collaudo_istanza_prova.py`."""
+    print("\n[l'istanza di prova: le leve, il bot nella pagina, la lista]")
+    import types as _types
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+
+    def con_config(blocco, **valori):
+        """Esegue `blocco` davanti a un config che dichiara SOLO `valori`:
+        torna (ambiente, righe stampate)."""
+        finto = _types.ModuleType("config")
+        for k, v in valori.items():
+            setattr(finto, k, v)
+        prima = sys.modules.get("config")
+        sys.modules["config"] = finto
+        righe = []
+        amb = {"re": re, "print": lambda *a, **k: righe.append(" ".join(map(str, a)))}
+        try:
+            exec(blocco, amb)
+        finally:
+            if prima is None:
+                del sys.modules["config"]
+            else:
+                sys.modules["config"] = prima
+        return amb, righe
+
+    # ---------------- 1) URL_PUBBLICO e LINK_BOT -----------------------
+    i = src.index("URL_PUBBLICO_DI_SERIE = ")
+    leve = src[i:src.index("\n\n\ndef link_telegram(", i)]
+    amb, righe = con_config(leve)
+    prova("non dichiarate: l'indirizzo e il bot di sempre, in silenzio",
+          ("https://barattolo.store", "https://t.me/ilbarattolobot", "ilbarattolobot", []),
+          (amb["URL_PUBBLICO"], amb["LINK_BOT"], amb["BOT_NOME"], righe))
+    amb, righe = con_config(leve, URL_PUBBLICO="https://collaudo.barattolo.store",
+                            LINK_BOT="https://t.me/barattolo_prova_bot")
+    prova("dichiarate bene: valgono, e il nome del bot viene dal link",
+          ("https://collaudo.barattolo.store", "barattolo_prova_bot", []),
+          (amb["URL_PUBBLICO"], amb["BOT_NOME"], righe))
+    storti_url = ["http://collaudo.barattolo.store", "https://collaudo.barattolo.store/",
+                  "https://Collaudo.barattolo.store", "https://a.b/c", "", None, 7,
+                  "https://collaudo.barattolo.store\n"]
+    esiti = [con_config(leve, URL_PUBBLICO=s) for s in storti_url]
+    prova("un URL_PUBBLICO storto resta quello di sempre, e il journal lo dice",
+          [("https://barattolo.store", 1)] * len(storti_url),
+          [(a["URL_PUBBLICO"], len(r)) for a, r in esiti])
+    storti_bot = ["https://t.me/ab", "http://t.me/barattolo_prova_bot",
+                  "https://t.me/barattolo_prova_bot/app", "https://t.me.evil.example/x_bot",
+                  "barattolo_prova_bot", "https://t.me/barattolo_prova_bot?start=x", None]
+    esiti = [con_config(leve, LINK_BOT=s) for s in storti_bot]
+    prova("un LINK_BOT storto resta quello di sempre, e il journal lo dice",
+          [("https://t.me/ilbarattolobot", "ilbarattolobot", 1)] * len(storti_bot),
+          [(a["LINK_BOT"], a["BOT_NOME"], len(r)) for a, r in esiti])
+    prova("il nome del bot che esce dalla forma non puo' chiudere una stringa JS",
+          True, all(re.fullmatch(r"[A-Za-z0-9_]+", con_config(leve, LINK_BOT=l)[0]["BOT_NOME"])
+                    for l in ("https://t.me/abcd", "https://t.me/A_b_c_1")))
+    prova("config_esempio dichiara le due leve coi valori di serie del codice", [True, True],
+          ['\nURL_PUBBLICO = "https://barattolo.store"\n' in es,
+           '\nLINK_BOT = "https://t.me/ilbarattolobot"\n' in es])
+
+    # ---------------- 2) il controllo all'avvio: LINK_BOT contro getMe --
+    amb = {}
+    exec(pezzo("_giudizio_link_bot"), amb)
+    g = amb["_giudizio_link_bot"]
+    prova("getMe: lo stesso bot tace (anche con le maiuscole diverse)", ["", ""],
+          [g("ilbarattolobot", {"username": "ilbarattolobot"}),
+           g("IlBarattoloBot", {"username": "ilbarattolobot"})])
+    prova("...un altro bot si dice, coi due nomi", True,
+          "@ilbarattolobot" in g("ilbarattolobot", {"username": "barattolo_prova_bot"})
+          and "@barattolo_prova_bot" in g("ilbarattolobot", {"username": "barattolo_prova_bot"}))
+    cl = pezzo("_controllo_link_miniapp")
+    prova("...e il controllo dell'avvio lo chiama DOPO il giudizio della Mini App, senza spegnere niente",
+          True, cl.index("_giudizio_link_miniapp(") < cl.index("_giudizio_link_bot(BOT_NOME, io)")
+          and "LINK_BOT = " not in cl)
+
+    # ---------------- 3) il bot nella pagina ---------------------------
+    riga = "const BOT_TG = 'ilbarattolobot';"
+    prova("la Mini App nomina il bot in UNA riga sola", (1, 1),
+          (mini.count("ilbarattolobot"), mini.count(riga)))
+    prova("...e nessun link al bot e' piu' scritto a mano", 0, mini.count("t.me/ilbarattolobot"))
+    prova("...ma i posti che lo usano lo leggono da li'", True,
+          mini.count("t.me/${BOT_TG}") >= 5
+          and mini.count("'data-telegram-login', BOT_TG)") == 2)
+    amb = {"re": re}
+    for r_ in ("LINK_BOT_DI_SERIE = ", "_FORMA_LINK_BOT = ", "_RIGA_BOT_PAGINA = "):
+        k = src.index(r_)
+        exec(src[k:src.index("\n", k)], amb)
+    righe = []
+    amb["print"] = lambda *a, **k: righe.append(a)
+    exec(pezzo("_bot_nella_pagina"), amb)
+    b = amb["_bot_nella_pagina"]
+    prova("la riga che il server cerca e' quella del file", riga.encode(), amb["_RIGA_BOT_PAGINA"])
+    grezzo = mini.encode("utf-8")
+    prova("col bot di serie la pagina esce IDENTICA (lo stesso oggetto)", True,
+          b(grezzo, "ilbarattolobot") is grezzo)
+    altra = b(grezzo, "barattolo_prova_bot")
+    prova("col bot di prova cambia la sola riga", (len(grezzo) + len("barattolo_prova_bot") - len("ilbarattolobot"), 0, 1),
+          (len(altra), altra.count(b"ilbarattolobot"), altra.count(b"const BOT_TG = 'barattolo_prova_bot';")))
+    prova("una riga che manca non s'indovina: pagina com'era, e lo si dice", (b"x", 1),
+          (b(b"x", "barattolo_prova_bot"), len(righe)))
+    doppia = riga.encode() + b"\n" + riga.encode()
+    prova("...e due righe nemmeno", doppia, b(doppia, "barattolo_prova_bot"))
+    cm = pezzo("_pagina_con_meta")
+    prova("la pagina la riscrive una volta per rilettura, dopo il timbro degli asset", True,
+          cm.index("grezzo = _timbra_asset_pagina(grezzo)")
+          < cm.index("grezzo = _bot_nella_pagina(grezzo, BOT_NOME)")
+          < cm.index("_PAGINA_CACHE.update("))
+
+    # ---------------- 4) PROVA_SOLO_IDS --------------------------------
+    i = src.index("try:\n    from config import PROVA_SOLO_IDS")
+    blocco = src[i:src.index("\n\n# Le porte che restano aperte", i)]
+    prova("la lista: non dichiarata = nessun filtro (la produzione), in silenzio",
+          (set(), []), tuple(v if j else v["PROVA_SOLO_IDS"] for j, v in enumerate(con_config(blocco))))
+    prova("...dichiarata vuota idem", set(), con_config(blocco, PROVA_SOLO_IDS=[])[0]["PROVA_SOLO_IDS"])
+    prova("...con gli id (anche scritti come testo di cifre) e' l'insieme degli id",
+          {111, 222}, con_config(blocco, PROVA_SOLO_IDS=[111, "222"])[0]["PROVA_SOLO_IDS"])
+    storte = ["111", b"111", ["andrea"], 111, [None]]
+    esiti = [con_config(blocco, PROVA_SOLO_IDS=s) for s in storte]
+    prova("...scritta male e' CHIUSA a tutti ({0}), e lo dice",
+          [({0}, 1)] * len(storte), [(a["PROVA_SOLO_IDS"], len(r)) for a, r in esiti])
+    amb = {}
+    for r_ in ("PROVA_PORTE_APERTE = ", "PROVA_PREFISSO_LOGIN = "):
+        k = src.index(r_)
+        exec(src[k:src.index("\n", k)], amb)
+    exec(pezzo("_prova_esente"), amb)
+    exec(pezzo("_prova_decide"), amb)
+    es_, dec = amb["_prova_esente"], amb["_prova_decide"]
+    prova("aperte a tutti: la salute, il campanello del bot, le rotte del login",
+          [True] * 5, [es_(p) for p in ("/api/salute", "/api/telegram/aggiornamenti",
+                                       "/api/login/telegram", "/api/login/nostr/sfida",
+                                       "/api/login/nostr/cassetta/chiudi")])
+    prova("...e nient'altro, nemmeno chi somiglia", [False] * 6,
+          [es_(p) for p in ("/", "/api/me", "/api/salute/x", "/api/loginx",
+                            "/api/telegram/aggiornamenti/", "/api/orders")])
+    A = {111}
+    prova("chi si riconosce passa solo se e' in lista, qualunque sia il metodo",
+          [True, True, False, False],
+          [dec(111, "GET", A), dec(111, "POST", A), dec(222, "GET", A), dec(222, "DELETE", A)])
+    prova("chi non si riconosce legge e basta",
+          [True, True, True, False, False, False, False],
+          [dec(None, m, A) for m in ("GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE")])
+    prova("...e la lista {0} non apre a nessuno che si riconosca", False, dec(111, "GET", {0}))
+
+    # ---------------- 5) il middleware: dove sta e cosa fa per primo ----
+    mw = src[src.index("async def solo_chi_prova("):]
+    mw = mw[:mw.index("\n\n\n")]
+    ultimo = src.rindex('@app.middleware("http")\n')
+    prova("e' l'ULTIMO middleware registrato, cioe' il primo a girare", True,
+          src[ultimo:].startswith('@app.middleware("http")\nasync def solo_chi_prova('))
+    prova("...e a lista vuota esce alla prima riga (la produzione non paga niente)", True,
+          codice(mw).split('"""')[-1].lstrip().startswith(
+              "if not PROVA_SOLO_IDS or _prova_esente(request.url.path):\n"
+              "        return await call_next(request)"))
+    pc = pezzo("_prova_chi")
+    prova("chi e' lo dice lo stesso giudice delle rotte, poi il cookie del login", True,
+          "_utente_da_initdata(init)" in pc and 'request.cookies.get("barattolo_sessione"' in pc
+          and "imposta_cookie_sessione" in src and '"barattolo_sessione", token' in src)
+    prova("config_esempio porta la lista VUOTA, e la sezione della prova senza segreti", True,
+          "\nPROVA_SOLO_IDS = []\n" in es and "#   MOSTRO_RELAY = [\"ws://127.0.0.1:9\"]" in es
+          and "#   RELAY_NOSTR = []" in es and "#   MODALITA_COLLAUDO = False" in es)
+    prova("il collaudo del server vero e' nella gabbia della CI", [True, True],
+          ["\ncollaudo_istanza_prova\n" in "\n" + open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_istanza_prova.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -171727,6 +171909,7 @@ def main():
               prove_chat_mercatino,
               prove_journal_senza_buffer,
               prove_modifica_massiva_foto,
+              prove_istanza_prova,
               prove_config_esempio):
         try:
             f()

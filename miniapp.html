@@ -14840,7 +14840,7 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="invitoTit">🫙 Ti aspettiamo su Telegram</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600" id="invitoTesto"></div>
     <a class="btn orange" id="invitoTg" style="display:block;text-align:center;text-decoration:none;margin-top:14px"
-       href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">Apri @ilbarattolobot</a>
+       href="#" target="_blank" rel="noopener">Apri il bot</a>
     <!-- La seconda porta: chi arriva da un DM Nostr entra con la sua
          chiave e ritrova l'annuncio autenticato (l'URL non cambia).
          SU ONION E' LA PRIMA E L'UNICA — vedi invitoTelegram(). -->
@@ -15027,6 +15027,13 @@ document.getElementById('cartello')?.remove();</script>
    In produzione non serve toccare nulla: servita da https funziona. */
 const API_BASE = location.protocol.startsWith('http') ? '/api' : 'http://localhost:8080/api';
 const tg = window.Telegram?.WebApp;
+/* IL NOME DEL BOT (19 ott 2026, cantiere collaudo-vm): UNA riga sola, e
+   ogni link «apri il bot» e il login dal browser la leggono da qui. Il
+   server la RISCRIVE quando serve la pagina (`_bot_nella_pagina`, dalla
+   leva LINK_BOT): sull'istanza di prova porta il bot di prova, in
+   produzione esce identica a com'e' qui. Il nome scritto a mano altrove
+   lo ferma una sentinella di prove.py. */
+const BOT_TG = 'ilbarattolobot';
 
 /* ══ IL LINK DENTRO TELEGRAM (10 ott 2026) ═══════════════════════
    Un link `https://t.me/<bot>?startapp=<parametro>` toccato dentro
@@ -32288,7 +32295,8 @@ function invitoTelegram(testo, chiave){
   /* col codice d'invito in attesa la porta del bot lo porta con se'
      (`?start=`, la porta che il bot sa gia' leggere) */
   const codInv = invitoInAttesa();
-  el('invitoTg').href = 'https://t.me/ilbarattolobot' + (codInv ? `?start=${codInv}` : '');
+  el('invitoTg').href = `https://t.me/${BOT_TG}` + (codInv ? `?start=${codInv}` : '');
+  el('invitoTg').textContent = `Apri @${BOT_TG}`;
   const nos = el('invitoNostr');
   /* IL PIENO SEGUE LA PORTA VERA: lasciare Nostr in ghost sotto un
      bottone sparito lo vestirebbe da ripiego proprio dove e' l'unica
@@ -41258,7 +41266,7 @@ async function collegaTelegram(){
   if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   if (collaudo) console.log('🧪 codice fusione (per il curl al webhook):', d.codice);
   toast('✈️ Ti aspetto nella chat del bot: conferma lì il collegamento', 6000);
-  window.open(`https://t.me/ilbarattolobot?start=${d.codice}`, '_blank', 'noopener');
+  window.open(`https://t.me/${BOT_TG}?start=${d.codice}`, '_blank', 'noopener');
 }
 
 /* Rimozione della npub: l'unica strada, sempre con conferma. Per il
@@ -51074,8 +51082,8 @@ function mostraBanner(testo){
   b.innerHTML =
     `<div>${testo}</div>`
     + (suOnion() ? ''
-       : `<a class="demo-cta" href="https://t.me/ilbarattolobot"`
-         + ` target="_blank" rel="noopener">Apri @ilbarattolobot →</a>`);
+       : `<a class="demo-cta" href="https://t.me/${BOT_TG}"`
+         + ` target="_blank" rel="noopener">Apri @${BOT_TG} →</a>`);
   b.style.display = 'block';
 }
 const BANNER_DEMO = '🫙 Questa è solo la demo — il mercatino vero vive su Telegram';
@@ -51120,8 +51128,8 @@ function barraWeb(nome){
       + ` dalla scheda Profilo (sezione «🆔 Identità»), oppure ricontrolla`
       + ` i tuoi Ordini di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
-      + `<a href="https://t.me/ilbarattolobot" target="_blank"`
-      + ` rel="noopener">@ilbarattolobot</a>`;
+      + `<a href="https://t.me/${BOT_TG}" target="_blank"`
+      + ` rel="noopener">@${BOT_TG}</a>`;
   b.innerHTML =
     `<button class="demo-x" onclick="chiudiBarraWeb()" title="Ho capito, non mostrarlo più">✕</button>`
     + `<div style="padding:0 18px">👋 Ciao ${esc(nome)} — sei su Barattolo dal browser. ${avvisi}</div>`
@@ -51537,7 +51545,7 @@ function portaTelegram(){
   const posto = document.createElement('div');
   const s = document.createElement('script');
   s.src = 'https://telegram.org/js/telegram-widget.js?22';
-  s.setAttribute('data-telegram-login', 'ilbarattolobot');
+  s.setAttribute('data-telegram-login', BOT_TG);
   s.setAttribute('data-size', 'medium');
   s.setAttribute('data-request-access', 'write');
   s.setAttribute('data-auth-url', urlRitornoLogin());
@@ -51705,7 +51713,7 @@ function bottoneLoginTelegram(){
   el('demoBanner').appendChild(posto);
   const s = document.createElement('script');
   s.src = 'https://telegram.org/js/telegram-widget.js?22';
-  s.setAttribute('data-telegram-login', 'ilbarattolobot');
+  s.setAttribute('data-telegram-login', BOT_TG);
   s.setAttribute('data-size', 'medium');
   s.setAttribute('data-request-access', 'write');  // può scriverci: avvisi!
   s.setAttribute('data-auth-url', urlRitornoLogin());
@@ -57878,7 +57886,7 @@ function comeRiprendereChiaviP2P(){
     : 'Le ritrovi sul dispositivo dove hai preso lo scambio, o aprendo Barattolo dal tuo Telegram: lì il profilo torna da solo.';
 }
 function contattoSupportoP2P(){
-  const bot = '<a href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">@ilbarattolobot</a>';
+  const bot = `<a href="https://t.me/${BOT_TG}" target="_blank" rel="noopener">@${BOT_TG}</a>`;
   if (!(numeroConto(myTgId) < 0)) return bot;
   let npub = '';
   try {

@@ -3126,3 +3126,60 @@ bene; se no, i giudici non lo vedono più: Andrea guarda.
 | la chiave SSH `rgb_prova_torino` | VM, `authorized_keys` riga 2 | **togliere** se il portatile non lavora più sulla VM; **tenere** se Alan farà lo swap da lì (allora resta, e lo si scrive in §1) |
 | il ramo `cantiere/hackathon-rgb` | `satmarket` su origin | **tenere**: è la sorgente delle patch consegnate; si cancella solo dopo averlo portato su main o deciso di no |
 | le quattro distro WSL di prova e le chiavette | fisso | **tenere fino a decisione**: la riserva (Zorin) è ancora da preparare se mai servirà |
+
+### 14.5 RGB spento, la VM passa al collaudo (19 ott, pomeriggio)
+
+**La decisione di Andrea (19 ott):** RGB non si userà più, e la VM
+`vm-2050` diventa tutta l'ambiente di COLLAUDO di Barattolo: una copia
+che gira come quella vera, per provare dal telefono i rami prima dell'ok
+al push (il disegno: `docs/STUDIO-ISTANZA-PROVA-2026-10-08.md`; il
+cantiere: CANTIERI, «L'istanza di prova, primo passo»). Supera il secondo
+punto di 14.3 («la VM resta per lo swap») e la tabella di 14.4. Da oggi i
+gesti sulla VM li fa la sessione, uno alla volta, ognuno scritto prima e
+col suo ok (prima li lanciava Andrea); il VPS, il nodo e il relay restano
+fuori.
+
+**Il backup finale, verificato sul PC.**
+- Spenti a mano i due `rgb_http.py` di Mutinynet (porte 8787 e 8788,
+  accesi dal 18 mattina) alle 14:12 UTC: erano processi lanciati con
+  `nohup`, non servizi, e non ripartono da soli.
+- L'archivio delle 14:24 aveva tutte e sei le fotografie, ma tre si
+  chiamavano `-1423`: il backup era partito alle 14:23:58 e il signet era
+  passato nel minuto prima. Il filtro del controllo, che cercava `1424`,
+  le nascondeva. Rifatto partire a inizio minuto: **`rgb-20261019-1433.tar.age`,
+  impronta `0f5437b1f15fcfb7`** (i primi 16 caratteri dello SHA-256),
+  con 6 `chiavi.json` (barattolo, to-the-mooon e usdb, sul signet e su
+  Mutinynet) e 6 fotografie `-20261019-1433.rgb-backup`. Andrea l'ha
+  tirato col `pull.ps1` e controllato sul PC: impronta uguale, 12 righe.
+  La lezione: un backup che dura qualche secondo si fa partire a inizio
+  minuto, o i nomi finiscono su due minuti diversi. Le due corse a mano
+  hanno fatto girare la rotazione di `backup-rgb.sh` (tre fotografie per
+  wallet in `~/rgb/backup*`): le piu' vecchie tolte da li' restano negli
+  archivi delle notti prima, sul PC.
+- Il controllo si rifà così, senza scrivere niente in chiaro (PowerShell):
+  `cmd /c "<age.exe> -d -i C:\Users\Andrea\BarattoloBackup\rgb-prova.key C:\Users\Andrea\BarattoloBackup\rgb\rgb-20261019-1433.tar.age | tar -tf - | findstr /C:chiavi.json /C:1433.rgb-backup"`
+  (`age.exe` sta in `%LOCALAPPDATA%\Microsoft\WinGet\Packages\FiloSottile.age_…\age\`).
+
+**Spento e disattivato, nulla cancellato (gesto 1, ok di Andrea):**
+`sudo systemctl disable --now rgb-backup.timer` (il servizio parte solo
+da lui); `docker update --restart=no` sui tre container e
+`docker compose stop` (non `down`). Restano sul disco: `~/rgb` (75 MB:
+venv, i sei wallet, le fotografie), i volumi `rgb_bitcoind-dati`
+(31,2 GB, la catena signet), `rgb_electrs-db` (1,8 GB) e `rgb_proxy-dati`
+(153 kB), le tre immagini (0,98 GB) e gli archivi in `/var/backups/rgb`
+(33 MB). Dopo: RAM disponibile 3,3 GB su 3,8 (era 1,3), disco libero
+26 GB su 62: per il collaudo basta, niente swap. Liberare i 33 GB della
+catena e' un gesto a parte, che decide Andrea.
+
+**Cosa resta acceso o aperto:** l'utente `pull` della VM con la sua
+chiave vincolata a `internal-sftp -R` e la gamba `rgb/` di `pull.ps1`
+(non trovano archivi nuovi: innocue finche' non si decide); il ramo
+`cantiere/hackathon-rgb` su origin (14.4); le quattro distro WSL sul
+fisso.
+
+**La chiave del portatile di Alan, tolta (gesto 2, ok di Andrea, 15:08
+UTC):** copia del file accanto (`~/.ssh/authorized_keys.prima-19ott`),
+poi via la sola riga «alan pop-os, VM rgb-prova…» (`SHA256:WOvjwtZK…`).
+Un login nuovo con la chiave del fisso entra; in `authorized_keys` resta
+una chiave sola, `lnvps-nodo`. Quando Alan servira' sulla VM: una
+chiave NUOVA, dedicata.

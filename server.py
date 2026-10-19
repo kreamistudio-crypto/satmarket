@@ -2083,6 +2083,91 @@ async def segna_host(request, call_next):
     return await call_next(request)
 
 
+# L'ISTANZA DI PROVA E' PRIVATA (19 ott 2026, cantiere collaudo-vm,
+# richiesta di Andrea; il disegno e' STUDIO-ISTANZA-PROVA, §4). La leva
+# `PROVA_SOLO_IDS` e' la lista degli id Telegram che possono usarla.
+# NON DICHIARATA o VUOTA = nessun filtro: e' la produzione, byte per
+# byte, e il middleware qui sotto esce alla prima riga. SCRITTA MALE =
+# chiusa a tutti ({0}, un id che non esiste) e lo si dice: una lista
+# storta su una prova non deve aprirla al mondo. E' il calco di
+# P2P_PROVA_IDS, compresa la trappola della stringa.
+try:
+    from config import PROVA_SOLO_IDS
+    if isinstance(PROVA_SOLO_IDS, (str, bytes)):
+        raise TypeError("una stringa non e' una lista di id")
+    PROVA_SOLO_IDS = {int(i) for i in PROVA_SOLO_IDS}
+except ImportError:
+    PROVA_SOLO_IDS = set()          # non dichiarata: nessun filtro
+except (TypeError, ValueError):
+    PROVA_SOLO_IDS = {0}            # storta: chiusa a tutti, e si dice
+    print("[prova] PROVA_SOLO_IDS non e' una lista di numeri: l'istanza "
+          "resta CHIUSA a tutti (0 e' un id che non esiste)", flush=True)
+
+# Le porte che restano aperte a chiunque: la salute (la guarda il
+# deploy), il campanello di Telegram (ha il suo segreto, e senza il bot
+# di prova sarebbe sordo) e il login (senza, nessuno potrebbe dire chi
+# e'). Per PREFISSO solo il login, che ha sei rotte sorelle.
+PROVA_PORTE_APERTE = ("/api/salute", "/api/telegram/aggiornamenti")
+PROVA_PREFISSO_LOGIN = "/api/login/"
+MSG_PROVA_PRIVATA = "Istanza di prova, privata"
+
+
+def _prova_esente(percorso: str) -> bool:
+    """PURA: questa rotta resta aperta anche sulla prova privata?"""
+    return (percorso in PROVA_PORTE_APERTE
+            or percorso.startswith(PROVA_PREFISSO_LOGIN))
+
+
+def _prova_decide(chi, metodo: str, ammessi: set) -> bool:
+    """PURA: la richiesta passa? `chi` e' l'id Telegram che la richiesta
+    DIMOSTRA (firma dell'initData o cookie di sessione), None se non ne
+    dimostra nessuno.
+    - chi si e' fatto riconoscere passa solo se e' nella lista;
+    - chi non si e' fatto riconoscere LEGGE e basta: alcune chiamate del
+      client partono apposta senza identita' (il cartello del rodaggio,
+      il cambio), e una Mini App dove anche Andrea vedesse dei 403 non
+      sarebbe una prova. Senza identita' le rotte che contano danno gia'
+      401, e la vetrina della prova e' fatta di dati finti; un gesto
+      (POST, PUT, DELETE) senza identita' invece si ferma qui."""
+    if chi is not None:
+        return chi in ammessi
+    return metodo in ("GET", "HEAD", "OPTIONS")
+
+
+async def _prova_chi(request):
+    """L'id che la richiesta dimostra, o None. Lo stesso giudice delle
+    rotte (`_utente_da_initdata`: firma e freschezza, senza scrivere),
+    poi il cookie del login web. Una firma sbagliata o scaduta vale
+    «nessuno»: la rotta, dopo, dara' il suo 401 di sempre."""
+    init = request.headers.get("x-tg-init-data", "")
+    if init:
+        try:
+            return int(_utente_da_initdata(init)["id"])
+        except Exception:
+            return None
+    token = request.cookies.get("barattolo_sessione", "")
+    if token:
+        try:
+            u = await asyncio.to_thread(utente_da_sessione, token)
+        except Exception:
+            u = None
+        return int(u["id"]) if u else None
+    return None
+
+
+@app.middleware("http")
+async def solo_chi_prova(request, call_next):
+    """Registrato DOPO gli altri, quindi gira PRIMA di tutti: chi non e'
+    ammesso non arriva nemmeno a scrivere il suo utente nel database."""
+    if not PROVA_SOLO_IDS or _prova_esente(request.url.path):
+        return await call_next(request)
+    chi = await _prova_chi(request)
+    if _prova_decide(chi, request.method, PROVA_SOLO_IDS):
+        return await call_next(request)
+    return JSONResponse({"detail": MSG_PROVA_PRIVATA}, status_code=403,
+                        headers={"Cache-Control": "no-store"})
+
+
 def su_onion() -> bool:
     """La richiesta corrente e' arrivata dal servizio nascosto?
 
@@ -19193,6 +19278,15 @@ def _giudizio_link_miniapp(leva: str, io: dict) -> str:
     return ""
 
 
+def _giudizio_link_bot(nome: str, io: dict) -> str:
+    """PURA: il bot di `LINK_BOT` e' QUESTO bot? '' se si', altrimenti
+    la frase per il journal. Il gemello di `_giudizio_link_miniapp`."""
+    bot = str((io or {}).get("username") or "")
+    if (nome or "").lower() == bot.lower():
+        return ""
+    return f"dice @{nome}, ma questo bot e' @{bot or '?'}"
+
+
 # UN GETME CADUTO NON E' UN NO (11 ott 2026, richiesta di Andrea). La
 # prima stesura leggeva `result` dalla risposta e basta: a un errore di
 # Telegram scritto in JSON — un 429 «troppe richieste», un 5xx, un
@@ -19277,6 +19371,16 @@ async def _controllo_link_miniapp(chiedi=None, dormi=None) -> str:
                       "quelli del sito.", flush=True)
                 TELEGRAM_MINIAPP_LINK = ""
                 return "spenta"
+            # LINK_BOT si GUARDA e non si spegne (19 ott 2026, cantiere
+            # collaudo-vm): sulla prova, dimenticata, e' il bot di
+            # produzione nei link, e lo si deve leggere nel journal al
+            # primo avvio. Qui e non sopra: se il link della Mini App
+            # e' gia' di un altro bot, la riga di sopra l'ha detto.
+            altro = _giudizio_link_bot(BOT_NOME, io)
+            if altro:
+                print(f"⚠️ LINK_BOT {altro}: i link «apri il bot» portano "
+                      "a un ALTRO bot, correggi la riga nel config.",
+                      flush=True)
             print(f"🔗 Link dentro Telegram: accesi su {TELEGRAM_MINIAPP_LINK}"
                   + (f" (al tentativo {tentativo})" if tentativo > 1 else ""),
                   flush=True)
@@ -63948,8 +64052,38 @@ async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
 # tacciono, l'annuncio su Barattolo vive normalmente e resta solo un
 # avviso in console. Gli utenti solo-Telegram non vedono nulla.
 
-URL_PUBBLICO = "https://barattolo.store"
-LINK_BOT = "https://t.me/ilbarattolobot"
+# L'INDIRIZZO E IL BOT SONO LEVE (19 ott 2026, cantiere collaudo-vm,
+# richiesta di Andrea; il disegno e' STUDIO-ISTANZA-PROVA, §3). Erano
+# costanti: un'istanza di PROVA che le eredita registrerebbe il webhook
+# del SUO bot sull'indirizzo di produzione (che lo rifiuta col segreto
+# diverso: bot sordo) e metterebbe link di produzione in ogni notifica.
+# NON DICHIARATE = il mondo di ieri byte per byte: il config del VPS non
+# ha bisogno di nessuna riga. SCRITTE MALE = il default e lo si DICE nel
+# journal, come TELEGRAM_MINIAPP_LINK: sul VPS un errore di battitura non
+# deve spegnere il sito, e sulla prova la riga si legge al primo avvio.
+URL_PUBBLICO_DI_SERIE = "https://barattolo.store"
+LINK_BOT_DI_SERIE = "https://t.me/ilbarattolobot"
+_FORMA_URL_PUBBLICO = re.compile(r"https://[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:[0-9]{1,5})?")
+_FORMA_LINK_BOT = re.compile(r"https://t\.me/([A-Za-z][A-Za-z0-9_]{3,31})")
+try:
+    from config import URL_PUBBLICO
+except ImportError:
+    URL_PUBBLICO = URL_PUBBLICO_DI_SERIE
+if not (isinstance(URL_PUBBLICO, str) and _FORMA_URL_PUBBLICO.fullmatch(URL_PUBBLICO)):
+    print("[indirizzo] URL_PUBBLICO non e' https://<nome> (minuscole, senza "
+          f"barra in fondo): resta {URL_PUBBLICO_DI_SERIE}", flush=True)
+    URL_PUBBLICO = URL_PUBBLICO_DI_SERIE
+try:
+    from config import LINK_BOT
+except ImportError:
+    LINK_BOT = LINK_BOT_DI_SERIE
+if not (isinstance(LINK_BOT, str) and _FORMA_LINK_BOT.fullmatch(LINK_BOT)):
+    print("[telegram] LINK_BOT non e' https://t.me/<bot>: resta "
+          f"{LINK_BOT_DI_SERIE}", flush=True)
+    LINK_BOT = LINK_BOT_DI_SERIE
+# Il nome del bot, senza @: lo usano la Mini App (`_bot_nella_pagina`)
+# e il controllo all'avvio contro `getMe`.
+BOT_NOME = _FORMA_LINK_BOT.fullmatch(LINK_BOT).group(1)
 
 
 def link_telegram(tipo: str, id_: str) -> str:
@@ -82336,6 +82470,33 @@ def _timbra_asset_pagina(grezzo: bytes) -> bytes:
     return _RX_ASSET.sub(timbra, grezzo)
 
 
+# IL BOT NELLA PAGINA (19 ott 2026, cantiere collaudo-vm). La Mini App
+# porta il nome del bot in UNA riga (`const BOT_TG`), e da li' lo leggono
+# i link «apri il bot» e il login dal browser. Sull'istanza di prova la
+# leva LINK_BOT dice un altro bot, e la riga si riscrive qui: senza, il
+# login dal browser chiederebbe la firma al bot di produzione (che la
+# prova non sa verificare) e i link porterebbero la' la gente.
+_RIGA_BOT_PAGINA = b"const BOT_TG = 'ilbarattolobot';"
+
+
+def _bot_nella_pagina(grezzo: bytes, nome: str) -> bytes:
+    """PURA. Col bot di serie la pagina esce IDENTICA, senza nemmeno
+    cercare; con un altro, la sola riga di `BOT_TG` cambia. Una riga
+    che non c'e' (o c'e' due volte) non si indovina: la pagina esce
+    com'e' e lo si dice — e' una sola stampa per rilettura del file.
+    `nome` arriva da `_FORMA_LINK_BOT`: lettere, cifre e trattino basso,
+    niente che possa chiudere la stringa JavaScript."""
+    if nome == _FORMA_LINK_BOT.fullmatch(LINK_BOT_DI_SERIE).group(1):
+        return grezzo
+    if grezzo.count(_RIGA_BOT_PAGINA) != 1:
+        print("⚠️ [pagina] la riga «const BOT_TG = 'ilbarattolobot';» non "
+              f"c'e' una volta sola in miniapp.html: @{nome} non entra nella "
+              "pagina, che resta col bot di produzione", flush=True)
+        return grezzo
+    return grezzo.replace(_RIGA_BOT_PAGINA,
+                          f"const BOT_TG = '{nome}';".encode("ascii"))
+
+
 def _spezza_pagina(grezzo: bytes) -> dict:
     """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
 
@@ -82416,6 +82577,8 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         # una volta per rilettura e ogni rotta-pagina lo eredita per
         # costruzione, come la quarta fessura.
         grezzo = _timbra_asset_pagina(grezzo)
+        # Il bot della leva LINK_BOT, anche lui una volta per rilettura
+        grezzo = _bot_nella_pagina(grezzo, BOT_NOME)
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.

@@ -66757,3 +66757,111 @@ nei backup, apposta), e il segno deve nascere col file.
 
 **DA FARE (notati, non fatti).**
 - Niente di nuovo da questo cantiere.
+
+## L'istanza di prova, primo passo: l'indirizzo e il bot diventano leve, la prova si chiude a chi non e' in lista (19 ott 2026, cantiere collaudo-vm, richiesta di Andrea)
+
+**PERCHÉ.** Hackathon finito: Andrea ha deciso che la VM `vm-2050`
+(LNVPS, quella di RGB) diventa l'ambiente di COLLAUDO di Barattolo, per
+provare dal telefono i rami prima del suo ok al push. Si parte dallo
+studio dell'8 ott (`docs/STUDIO-ISTANZA-PROVA-2026-10-08.md`): stessa
+catena, ma sulla macchina che abbiamo gia' invece di un VPS nuovo. Lo
+studio diceva di cominciare dal codice, e questo e' quel primo passo. La
+VM (RGB spento, backup finale) sta in HACKATHON-SETUP §14.5; la
+procedura della VM, `docs/COLLAUDO.md`, nasce col passo dopo, quando
+c'e' qualcosa da descrivere.
+
+**LE DECISIONI DI ANDREA (19 ott, sul confronto con lo studio).**
+- Il ref «produzione» dello studio (§5): NON ora (strada B). Il collaudo
+  serve per i rami PRIMA dell'ok al push, e la produzione segue `pronto`
+  come oggi; come passare alla A si scrive in COLLAUDO.md.
+- Lightning: LNbits col portafoglio finto (FakeWallet), come lo studio.
+- I gesti sulla VM li fa la sessione, uno alla volta, scritti prima e
+  col suo ok. Il record DNS e il bot di prova li fa Andrea.
+- Il DNS della zona (DS 47673, il trasloco) non si tocca: al collaudo
+  basta un record A.
+
+**COME È FATTO.**
+- `URL_PUBBLICO` e `LINK_BOT` sono leve (erano costanti in `server.py`),
+  col valore di sempre se la riga manca: il config del VPS non cambia.
+  Scritte male restano quelle di sempre e il journal lo dice, come
+  `TELEGRAM_MINIAPP_LINK`: sul VPS un errore di battitura non deve
+  spegnere il sito. Dalla forma di `LINK_BOT` esce `BOT_NOME` (solo
+  lettere, cifre e trattino basso).
+- All'avvio, se `TELEGRAM_MINIAPP_LINK` e' accesa, il `getMe` che gia'
+  c'era guarda anche `LINK_BOT` (`_giudizio_link_bot`): se e' un altro
+  bot lo dice nel journal («⚠️ LINK_BOT dice @…») e non spegne niente.
+  La riga sta DOPO il giudizio della Mini App: se il link della Mini App
+  e' gia' di un altro bot, quello l'ha detto.
+- IL BOT NELLA MINI APP. Lo studio contava i 77 usi delle due costanti
+  nel server, ma la Mini App aveva il nome del bot scritto a mano in otto
+  punti (il foglio d'invito, il collegamento dell'account, il banner
+  della vetrina, la barra web, i due login dal browser, il supporto P2P).
+  Sulla prova avrebbero mandato al bot di produzione, e il login dal
+  browser avrebbe chiesto una firma che la prova non sa verificare. Ora
+  il nome sta in UNA riga, `const BOT_TG = 'ilbarattolobot';`, e gli otto
+  punti la leggono. Il server la riscrive quando legge il file
+  (`_bot_nella_pagina`, accanto al timbro degli asset, una volta per
+  rilettura). Col bot di serie la pagina esce IDENTICA, senza nemmeno
+  cercare. Una riga mancante o doppia non si indovina: pagina com'era, e
+  una stampa. Il bottone statico del foglio d'invito dice «Apri il bot»
+  e prende nome e link da `invitoTelegram`, che e' l'unica strada che lo
+  apre.
+- `PROVA_SOLO_IDS`, il calco di `P2P_PROVA_IDS`: vuota o non dichiarata =
+  nessun filtro (la produzione: il middleware esce alla prima riga);
+  storta = chiusa a tutti (`{0}`) e lo dice. Il middleware
+  `solo_chi_prova` e' l'ULTIMO registrato, quindi gira per primo: chi
+  non e' ammesso non arriva nemmeno a scrivere il suo utente nel
+  database (il collaudo lo controlla). Chi e' la richiesta lo dice lo
+  stesso giudice delle rotte (`_utente_da_initdata`, che non scrive),
+  poi il cookie del login web.
+- UNA DIFFERENZA DALLO STUDIO, voluta: lo studio voleva il 403 anche
+  alla vetrina anonima. Ma alcune chiamate del client partono apposta
+  senza identita' (il cartello del rodaggio, `/api/banner-test`, e altre
+  di sola lettura), e un 403 li' avrebbe rotto la Mini App anche ad
+  Andrea. Quindi chi non si fa riconoscere LEGGE e basta (GET, HEAD,
+  OPTIONS); un gesto senza identita' si ferma; chi si fa riconoscere
+  passa solo se e' in lista. Senza identita' le rotte che contano danno
+  gia' 401, e la vetrina della prova e' fatta di dati finti. Aperte a
+  tutti: `/api/salute`, il campanello del bot, le rotte `/api/login/`.
+- `config_esempio.py`: le tre leve, e la sezione «L'istanza di prova»
+  con le righe del config della VM una per una (commentate: si copiano
+  da li', mai dal VPS). Come nello studio §3, piu' le leve arrivate dopo
+  l'8 ott che parlano col mondo: i DM Nostr, le ronde dei relay, gli
+  zap, X, il canale degli admin.
+
+**PROVE.** `prove_istanza_prova` (32): le leve davanti a un config finto
+(assenti, buone, storte), il giudizio contro getMe, la riga del bot (una
+sola nel file, nessun `t.me/ilbarattolobot` scritto a mano, la pagina
+identica col bot di serie, la sola riga cambiata con un altro), la lista
+e i giudici puri del middleware, il suo posto (ultimo registrato) e la
+sua prima riga. `collaudo_istanza_prova` (25, nella gabbia e in
+`ci/collaudi.txt` + `ci/compila.txt`): il server vero a leva spenta e
+accesa, il cookie del login, il 333 che non viene scritto, le porte
+aperte, la leva storta, la pagina col bot di prova su `/` e
+`/miniapp.html`. La controprova: col middleware spento a mano il
+collaudo diventa rosso. Emendati i banchi che fanno girare le funzioni
+toccate (`prove_link_dentro_telegram`, `prove_onion`,
+`prove_account_doppio`, `prove_tor_chiavi_scambio`, l'ambiente
+`_amb_seo`): ora conoscono `BOT_TG`, `BOT_NOME` e `_bot_nella_pagina`.
+SUITE: su 6b2e4af + il cantiere, PROVE_SEVERE=1 25.275 passate, 0 fallite; collaudi della CI 87 verdi, due alla volta (quello nuovo compreso).
+Main e' corso due volte. Ribasato su 0fd3816 (lo swap del venditore, la
+chat negli ordini): le 28 sezioni toccate da qui e da la' e quelle dei
+documenti 1.990 verdi, i collaudi della CI 87 verdi. Poi su 2e07fd4 (solo
+CANTIERI): le sezioni dei documenti e le mie, 398 verdi. Lo scanner dei
+segreti del workflow, girato prima del push sulle righe nuove, ha preso
+sei segnaposti `<…>` della sezione di prova accanto a `KEY` e `SEGRETO`
+(sarebbe stata CI rossa): riscritti `INCOLLA_QUI_…`, che lo scanner
+riconosce; dopo, sull'albero intero, zero. Terzo giro, su 2d64133 (le
+foto vere nella modifica in blocco: server.py, miniapp.html, prove.py; i
+conflitti solo «aggiunti nello stesso posto», tenuti tutti e due): 21
+sezioni (le mie, la sua, quelle della pagina e dei documenti) 1.631
+verdi, 0 saltate; collaudo_istanza_prova e collaudo_modifica_massiva
+verdi. Gli altri collaudi della CI sono girati verdi su 0fd3816.
+
+**COSA RESTA.** La VM, un gesto alla volta: utente `collaudo`, Caddy,
+LNbits FakeWallet in Docker, il servizio, il timer di `deploy.sh` che
+segue `pronto` (con firmatari e token di sola lettura suoi), i comandi
+per mettere su un ramo e tornare a `pronto`, la semina e il reset;
+`docs/COLLAUDO.md`. Da Andrea: il bot su BotFather (anche `/setdomain`,
+che il login dal browser vuole), il record A. Non provato qui: il bot di
+prova vero, il getMe vero, un telefono.
