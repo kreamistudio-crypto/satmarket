@@ -33208,8 +33208,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tappa»). La leva `SWAP_ATTIVO`, SPENTA di serie (default nel server,
   riga in `config_esempio.py`, gruppo «🔄 Swap» del pannello «⚙️ Stato
   delle leve»), arriva al client SOLO da `/api/me` come `swap_leve:
-  {attivo}` — non dalla busta di vetrina: lo swap è degli incassi, e
-  l'anonimo non incassa. Giudice: `swapAcceso()`.
+  {attivo, referral}` — non dalla busta di vetrina: lo swap è degli
+  incassi, e l'anonimo non incassa. Giudice: `swapAcceso()`.
+  `referral` è `SWAP_REFERRAL_ID` (19 ott 2026), il codice partner di
+  SATS Routing, VUOTO di serie e nel pannello: non è un segreto, e il
+  telefono lo porterà in ogni chiamata (`referralId`, `Referral`),
+  perché la quota del 10 % della loro commissione si conti a nostro
+  nome.
   LA QUARTA CELLA È UNA SOLA. La regola della barra (markup statico,
   mai una cella accesa e spenta a runtime) resta: a leva accesa
   `vestiCellaAste()` cambia il VESTITO della stessa cella — icona ed

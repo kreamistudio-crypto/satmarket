@@ -62621,6 +62621,49 @@ CANTIERI: nel verbale del commit.
   strada per gli ordini pagati in Lightning: il venditore vedrà una
   scelta sola, «₿ On-chain», e la strada la decide il tipo d'ordine.
 
+**LE RISPOSTE DI MASSIMO (19 ott 2026, 16:17, riportate da Andrea).**
+Superano il §5 e le domande del §5 che riguardano la quota:
+- La quota è il 10 % della COMMISSIONE TOTALE di SATS Routing, non
+  dell'importo dello swap; si calcola a fine mese.
+- Nessun minimo (la pagina del Partner Program, copiata da Boltz,
+  diceva 1.000 sats: per noi non vale).
+- Vale in tutte le direzioni.
+- Il codice partner lo creano loro e va riportato in OGNI chiamata API:
+  è la leva `SWAP_REFERRAL_ID`, vuota di serie (cantiere
+  swap-venditore).
+- Se chiudono, gli swap aperti si completano lo stesso, perché sono
+  non custodial: il ritiro o il rimborso li firma chi ha la chiave, e
+  dopo la scadenza il rimborso non chiede niente al loro server.
+- Il resto sta nella documentazione e nel loro repo open source con
+  tutti i fix: è la FONTE per SDK, stati e recupero. Letti il 19 ott:
+  - [SatsRouting/boltz-backend](https://github.com/SatsRouting/boltz-backend):
+    3.13.0, HEAD `0f75a4f5` (4 set 2026) = `ebaebc5f` (1 set, il
+    commit che Zeus ha visto in servizio, con le correzioni
+    dell'audit) più tre commit di solo README. Il conto della quota:
+    `lib/db/repositories/ReferralRepository.ts`.
+  - [SatsRouting/boltz-web-app](https://github.com/SatsRouting/boltz-web-app):
+    2.2.1, `004f4077` (6 set), lo stesso che il sito dichiara nel piè
+    di pagina; usa `boltz-core` ^4.0.5. La chiave di recupero:
+    `src/utils/rescueFile.ts`; il recupero: `src/pages/Rescue.tsx` e
+    `src/pages/external-rescue/`.
+  - [SatsRouting/satsrouting-api-docs](https://github.com/SatsRouting/satsrouting-api-docs):
+    `c6b88d31` (5 set). Gli stati: `docs/lifecycle.md`; il ritiro e il
+    rimborso: `docs/claiming-swaps.md`; il recupero dalla chiave:
+    `docs/swap-restore.md`; i conti: `docs/swap-limits-and-fees.md`;
+    l'API, il referral e l'HMAC: `docs/api-v2.md`; le librerie:
+    `docs/libraries.md`.
+  - [`boltz-core` su npm](https://www.npmjs.com/package/boltz-core):
+    5.0.0 l'ultima (22 mag 2026), quella del loro backend.
+Una riga da tenere d'occhio, NON una contraddizione accertata: nel
+codice pubblico la quota si applica alla sola commissione percentuale
+salvata per ogni swap (`fee × feeShare / 100`), non alla parte che
+copre la rete. Se per «commissione totale» Massimo intende la loro
+commissione di servizio, coincide; se intende anche la rete, il codice
+pubblico non la conta così. Restano aperti dal §5: chi è il gestore e
+i termini di servizio (`/terms` dava 404), come e quando arriva il
+pagamento (la documentazione dice un indirizzo Lightning entro 14
+giorni, ma è il testo di Boltz), la chiave per leggere il maturato.
+
 Fonti: [massmux, «A new Boltz's fork is running: SATS Routing»](https://massmux.org/p/a-new-boltzs-fork-is-running-sats) (20 ago 2026);
 [il video in italiano](https://www.massmux.com/satsrouting-exchange-swap-non-custodial-atomico/);
 [satsrouting.exchange](https://satsrouting.exchange) (`/rescue`, `/terms` 404);
@@ -66233,7 +66276,11 @@ SATS Routing dentro Barattolo», qui sopra.
    commissione percentuale degli swap riusciti, sommata per mese
    (`referrals.feeShare`); si legge da `/v2/referral/fees` con chiave e
    HMAC che stanno nel config del VPS; il pagamento a noi è a mano, da
-   mettere per iscritto.
+   mettere per iscritto. RISPOSTE DI MASSIMO (19 ott): 10 % della loro
+   commissione totale, calcolata a fine mese, nessun minimo, tutte le
+   direzioni; il codice partner lo creano loro e va in ogni chiamata
+   (la leva `SWAP_REFERRAL_ID`, sotto). Il dettaglio nella voce
+   swap-studio qui sopra.
 6. La quarta cella della nav diventa «Swap» a leva accesa; le aste da
    un tasto «🔨 Aste» in cima a Esplora e dal filtro «solo all'asta».
 7. Non cambiano P2P e Mostro, il payout Lightning (resta la scelta di
@@ -66262,6 +66309,35 @@ cambiare numero di celle; la pagina «Swap» vuota con i testi IT/EN; la
 porta «🔨 Aste ›» in Esplora, accesa solo quando la cella è dello swap.
 A leva spenta niente cambia, nemmeno un pixel: è lo stato della
 produzione. Nessuna chiamata a SATS Routing, nessun sats.
+IL CODICE PARTNER (19 ott 2026, dopo le risposte di Massimo): la leva
+`SWAP_REFERRAL_ID`, VUOTA di serie (nel server, nel config d'esempio,
+nel pannello «Codice partner di SATS Routing»), arriva al telefono
+dentro `swap_leve` (`referral`, ripulito). Non è un segreto: lo
+porterà il telefono del venditore nelle sue chiamate a SATS Routing
+(`referralId` alla creazione, `Referral` sulle tariffe). Si scrive nel
+config del VPS quando SATS Routing lo manda.
+
+**LE FONTI DEI CANTIERI DOPO** (parola di Andrea: il loro repo open
+source con tutti i fix è la fonte per SDK, stati e recupero; versioni
+lette il 19 ott 2026):
+  - [SatsRouting/boltz-backend](https://github.com/SatsRouting/boltz-backend):
+    3.13.0, HEAD `0f75a4f5` (4 set 2026) = `ebaebc5f` (1 set, il
+    commit che Zeus ha visto in servizio, con le correzioni
+    dell'audit) più tre commit di solo README. Il conto della quota:
+    `lib/db/repositories/ReferralRepository.ts`.
+  - [SatsRouting/boltz-web-app](https://github.com/SatsRouting/boltz-web-app):
+    2.2.1, `004f4077` (6 set), lo stesso che il sito dichiara nel piè
+    di pagina; usa `boltz-core` ^4.0.5. La chiave di recupero:
+    `src/utils/rescueFile.ts`; il recupero: `src/pages/Rescue.tsx` e
+    `src/pages/external-rescue/`.
+  - [SatsRouting/satsrouting-api-docs](https://github.com/SatsRouting/satsrouting-api-docs):
+    `c6b88d31` (5 set). Gli stati: `docs/lifecycle.md`; il ritiro e il
+    rimborso: `docs/claiming-swaps.md`; il recupero dalla chiave:
+    `docs/swap-restore.md`; i conti: `docs/swap-limits-and-fees.md`;
+    l'API, il referral e l'HMAC: `docs/api-v2.md`; le librerie:
+    `docs/libraries.md`.
+  - [`boltz-core` su npm](https://www.npmjs.com/package/boltz-core):
+    5.0.0 l'ultima (22 mag 2026), quella del loro backend.
 
 **PERCHÉ COSÌ.**
 - La regola della barra («mai una cella accesa e spenta a runtime»,
@@ -66323,7 +66399,28 @@ produzione. Nessuna chiamata a SATS Routing, nessun sats.
 **DA FARE** (notati, non fatti):
 - Una lingua per tutta l'app: oggi l'inglese c'è solo nella pagina
   Swap (`SWAP_TESTI`).
-- Le domande per Massimo da avere per iscritto (le ha Andrea in chat,
-  16 ott): percentuale, base del conto, durata, pagamento, minimo,
-  chiavi, scadenze, limiti, gestore, termini, audit, ambiente di prova.
+- Da Massimo, dopo le risposte del 19 ott (voce swap-studio): se la
+  «commissione totale» comprende la parte di rete (il codice pubblico
+  conta solo la percentuale), come e quando arriva il pagamento, la
+  chiave per leggere il maturato, il gestore e i termini di servizio,
+  le scadenze dei reverse swap, un ambiente di prova.
+- Il codice partner nel config del VPS, quando arriva (la riga
+  `SWAP_REFERRAL_ID`; la leva dello swap resta spenta).
 - La tappa (4) coi due tetti e la guardia della liquidità (sopra).
+
+**IL VERBALE DEL PUSH (19 ott 2026, sul PC di Andrea, firma
+`andrea-firma-barattolo` verificata, ok di Andrea al push stretto).**
+- Rebase su `6b2e4af` (30 commit arrivati in tre giorni): conflitti
+  solo di coda in CANTIERI e ARCHITETTURA, il codice fuso da solo.
+  `prove_swap_cella` 23/23 sull'albero fuso, poi sull'albero `fd20b46`
+  la suite INTERA (25.266 verdi, 0 rosse) e i collaudi della CI (86
+  verdi, 0 rossi).
+- Poi il codice partner e le risposte di Massimo (commit a parte):
+  le 137 sezioni che toccano documenti, leve, config d'esempio e
+  `/api/me` — una rossa, la mia sentinella sulla riga di `/api/me`
+  scritta nella forma di prima, corretta; tortura 2 su 2 sulle
+  sentinelle nuove; i 21 collaudi che passano da `/api/me` o dal
+  pannello delle leve.
+- Main è corso ancora (`7a4afd6`, la chat negli ordini, secondo giro):
+  rebase e, sull'ultimo albero, le sole sezioni toccate; il resto lo
+  rifà la CI. I numeri dell'ultimo giro nel messaggio del commit.

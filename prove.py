@@ -169768,7 +169768,7 @@ def prove_swap_cella():
     prova("...e spenta nel config d'esempio", True,
           "\nSWAP_ATTIVO = False" in esempio)
     prova("la leva arriva al client da /api/me", True,
-          'profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO)}' in src)
+          'profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO),' in src)
     # SOLO da /api/me: l'anonimo in vetrina non incassa, e una seconda
     # fonte (la busta di prima pagina) sarebbe una porta a uno swap che
     # per lui non esiste
@@ -169776,6 +169776,18 @@ def prove_swap_cella():
           src.count("swap_leve"))
     prova("il pannello «Stato delle leve» la mostra", True,
           '_leva("Swap degli incassi (on-chain)", "SWAP_ATTIVO",' in src)
+    # IL CODICE PARTNER (19 ott 2026, risposte di Massimo): vuoto di
+    # serie, dichiarato, nel pannello e nella busta di /api/me — il
+    # telefono lo portera' in ogni chiamata a SATS Routing
+    prova("SWAP_REFERRAL_ID nasce vuoto nel server e nel config d'esempio",
+          (True, True),
+          ('    SWAP_REFERRAL_ID = ""          # vuoto' in src,
+           '\nSWAP_REFERRAL_ID = ""' in esempio))
+    prova("...arriva al telefono con la leva, ripulito",
+          True, '"referral": str(SWAP_REFERRAL_ID or "").strip()}' in src)
+    prova("...e il pannello lo mostra", True,
+          '_leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",'
+          in src)
     # questa tappa non parla con nessuno: niente SATS Routing ne' nel
     # server ne' nel client, finche' non arrivano i cantieri dopo
     prova("nessuna chiamata a SATS Routing in questa tappa", (0, 0),

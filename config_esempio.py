@@ -708,6 +708,10 @@ ASTA_ABILITATA = False       # interruttore generale (False = spento)
 # SPENTO in produzione finche' non ci sono il testo firmato di SATS
 # Routing e il parere legale (MiCA/CASP).
 SWAP_ATTIVO = False          # False = la cella resta «Aste»
+# Il codice partner che SATS Routing crea per Barattolo: va in ogni
+# chiamata API dello swap, e conta a nostro nome la quota del 10 % della
+# loro commissione (accordo con Massimo, 19 ott 2026). Non e' un segreto.
+SWAP_REFERRAL_ID = ""        # vuoto finche' non arriva da SATS Routing
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

@@ -1451,6 +1451,17 @@ try:
     from config import SWAP_ATTIVO
 except ImportError:
     SWAP_ATTIVO = False            # spenta di serie: si accende dal VPS
+# IL CODICE PARTNER DI SATS ROUTING (19 ott 2026, risposte di Massimo):
+# lo creano loro, e va portato in OGNI chiamata API dello swap
+# (`referralId` alla creazione, l'intestazione `Referral` sulle
+# tariffe) — e' cosi' che la quota del 10 % della loro commissione si
+# conta a nostro nome. Non e' un segreto: viaggia dal telefono del
+# venditore nelle chiamate che fa lui. VUOTO di serie finche' il codice
+# non arriva; vuoto, gli swap partirebbero senza il nostro nome.
+try:
+    from config import SWAP_REFERRAL_ID
+except ImportError:
+    SWAP_REFERRAL_ID = ""          # vuoto finche' SATS Routing non lo da'
 # I SERVIZI (ago 2026): la vendita di prestazioni DEFINITE — un'ora di
 # lezione, una consulenza — con un appuntamento concordato dentro
 # l'ordine. Nasce SPENTA come ASTA_ABILITATA e IMPORT_NOSTR_APERTO, e
@@ -30024,6 +30035,11 @@ def _leve_stato():
                          "raggiunge. Oggi la leva non muove sats: porta "
                          "solo la pagina, gli swap veri arrivano coi "
                          "cantieri dopo"),
+            _leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",
+                  str(SWAP_REFERRAL_ID or "").strip(),
+                  spento="vuoto: gli swap partirebbero senza il nostro "
+                         "codice, e la quota del 10 % della loro "
+                         "commissione non si conterebbe a nostro nome"),
         ]},
         {"gruppo": "📅 Servizi", "voci": [
             _leva("Servizi", "SERVIZI_ATTIVI", bool(SERVIZI_ATTIVI),
@@ -43016,7 +43032,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # raggiunge. Solo qui e non nella busta di vetrina: lo swap e' degli
     # incassi, e l'anonimo in vetrina non incassa niente — per lui la
     # cella resta il martelletto.
-    profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO)}
+    profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO),
+                            # il codice partner, per le chiamate che il
+                            # telefono fara' a SATS Routing (vuoto = niente)
+                            "referral": str(SWAP_REFERRAL_ID or "").strip()}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
