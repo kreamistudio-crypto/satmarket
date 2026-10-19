@@ -2995,3 +2995,134 @@ tocca il database di produzione, si rifiuta senza `MODALITA_COLLAUDO =
 True`, e rilanciato aggiorna. Il perché, le scelte di Andrea (nomi veri,
 tutto) e la prova in CANTIERI, «La vetrina vera nel collaudo della demo».
 Il server non va riavviato: la vetrina si rilegge a ogni apertura.
+
+## 14. La chiusura (19 ott 2026): com'è andata, cosa è stato consegnato, cosa resta acceso
+
+Scritta il 19 ott, a hackathon finito, su richiesta di Andrea. Chiude
+§13: da qui in poi questo documento è un verbale, non una lista da
+eseguire. Niente qui dentro è un segreto.
+
+### 14.1 I fatti del 15 e del 16, in ordine (quel che §13 non sapeva)
+
+- **La migrazione a Mutinynet** (§13.4) è stata fatta il **15 ott**, non
+  il 13; il passo 9 (backup a due catene, drill sul PC) la mattina del
+  16. Tutto in CANTIERI, «La migrazione a Mutinynet». Le cinque
+  correzioni trovate dal giro (i `pgrep`/`pkill` dentro `ssh`, gli
+  `await` di `punti.mjs` per la variante override, il riscatto in tre
+  tempi, `rgb_http.py` che appendeva `ssh`, il servizio NWC partito
+  prima di `nak`) sono su main dal 16.
+- **Il portatile della demo si usa dall'account `alanbimbati`**, non da
+  `hackaton`: Alan lavora solo dal suo (16 ott); l'account `hackaton`
+  esiste ma è rimasto vuoto. L'avviso in testa alla lista «15 ott» di
+  §10 e il punto 1 adattato restano come storia. Node 22.23.3 di
+  default e 24 per QVAC, i pacchetti del wallet nella variante
+  originale, `nak`, rgb-lib e i tre modelli: tutto nella sua home.
+- **Il wallet della DEMO** è nato il 16 sul portatile, in
+  `~/wdk-prova/mutinynet/utente` di `alanbimbati`: 150.000 sats dalla
+  scorta di `barattolo`, 3 UTXO colorabili, **500,00 USDB** dal wallet
+  `usdb` e **60 MOON** da `to-the-mooon` (quattro mosse ciascuno: fattura,
+  invio, ACK, trasmissione; settled dai due lati), backup cifrato con
+  `punti.mjs backup`. Nessun seme ha viaggiato: la strada C di §12.10.
+- **La chiave SSH del portatile per la VM**: `~/.ssh/rgb_prova_torino`
+  (ed25519, con passphrase), nata il 16, autorizzata su
+  `debian@vm-2050.lnvps.cloud` come seconda riga di `authorized_keys`
+  (la prima è quella del fisso); l'impronta della VM confrontata al
+  primo collegamento. **Da togliere**: una riga da cancellare sulla VM
+  (14.4).
+- **Il servizio NWC del portatile** ha chiavi sue, nate il 16. Il client
+  `barattolo` è stato **ruotato** lo stesso giorno: la connection string
+  del primo (`51fe725e…`) è finita in chat per sbaglio, il client è stato
+  tolto da `nwc/connessioni.json` e rifatto (`f9e90c26…`), il servizio
+  riavviato, la stringa nuova incollata nel Profilo dall'editor. Regola
+  di casa confermata: un segreto in chat si ruota, anche se locale.
+- **QVAC sul portatile** (grafica Intel Arrow Lake, Vulkan 1.4, Mesa):
+  gira sulla GPU. **Il primo avvio in assoluto del worker supera i 30
+  secondi** e il server risponde 503 «RPC initialization timed out»
+  finché non lo si riavvia: la seconda partenza va. Tempi col nostro
+  schema a caldo, il 16: **2B 12,9 s, 0.8B 9,4 s** (15-25 token/s),
+  quasi tutti spesi nei ~100 token del «perché»; con la risposta
+  accorciata, il 17, il 2B è sceso a **3,2 s** (README consegnato).
+- **Sul portatile il 16 sera era acceso tutto**: `rgb_http.py` sulla VM
+  riacceso DAL portatile con la chiave nuova (`/salute` e `/saldo` dal
+  tunnel), `nak` coi quattro eventi firmati sul fisso e ripubblicati
+  dal file `annunci-firmati.jsonl` (le chiavi private delle identità
+  sono rimaste sul fisso: un evento nuovo a nome di un emittente si
+  firma lì), il servizio NWC, QVAC coi tre alias, Barattolo in collaudo
+  sulla 8080 col wallet collegato (`get_info → ok`), e la vetrina vera
+  copiata con `copia_vetrina_demo.py` (§13.8). La prova di riavvio di
+  §10 punto 10 è stata fatta così, dal portatile.
+- **Il portatile di riserva** (Zorin, variante override) NON è stato
+  preparato: la variante era provata (6-bis), la macchina no.
+- **Syncthing** fra il fisso e il portatile: tre file pubblici (la
+  pagina di prova di Consigliami, un saldo d'esempio, gli annunci
+  firmati), poi la cartella svuotata.
+- **La pagina di prova «🪙 I miei punti»** e il disegno dell'aiutante
+  che spende i punti da solo (`C:\Users\Andrea\fidelity-mockup\`, solo
+  locale, mai committati) sono stati la guida del sabato: «Design only».
+
+### 14.2 Cosa è stato consegnato, e dove
+
+Il repo consegnato ai giudici è **`kreamistudio-crypto/fidelity-points`**
+(reso pubblico il 16 ott, con la mail agli organizzatori). Dentro, al
+19 ott: il README (team, idea, stack, cosa funzionava prima, cosa è
+stato costruito al weekend con i txid veri su Mutinynet, le prove
+locali, la disposizione, il lavoro precedente dichiarato, gli strumenti
+di terzi), le copie di `deploy/rgb/` e di `docs/spec/`, la cartella
+`qvac/`, e **`barattolo-patches/`**: le modifiche a Barattolo del 17 e
+18 come patch datate, una per commit (la 0001 → 0033). I commit sono
+di Alan, sabato dalle 10:43 alle 21:19 e domenica dalle 07:09 alle
+10:42 (le PR #1, #2, #3 fuse su `main`; rami `develop` e
+`feature/barattolo-usdb-checkout`).
+
+Costruito al weekend, dal README: il checkout in USDB coi tre livelli
+di autorizzazione; l'agente autonomo che riscatta i premi dentro le
+regole dell'utente (digitale, servizi, spedito — mai il ritiro a mano,
+che si propone soltanto); «Consigliami» col modello locale (3,2 s a
+caldo sul 2B) e lo sconto pagato in punti veri; le card fedeltà per
+negozio nel Profilo con l'emittente verificato (38180 + NIP-05) e il
+link alla prova in catena; il bonus dopo il pagamento (1 punto ogni
+1.000 sats) dal wallet del negozio alla fattura del cliente; lo scambio
+di punti fra clienti via escrow, suggerito dal matchmaker locale che
+legge il libro dei bonus e mai i wallet; la pagina del wallet Lightning
+RGB del cliente; la pagina Swap con le quotazioni RFQ di KaleidoSwap
+(lo swap vero sui canali RGB Lightning è roadmap: il maker non
+rispondeva); la domenica, gli scambi guidati dal barattolo dei preferiti
+🫙, il link mempool su ogni movimento, l'APK, la demo ripetibile
+(`semina_demo.py demo`, `demo-su.sh`). Suite verde a 24.880 prove
+sull'albero completo.
+
+**In `satmarket`** quel codice sta nel ramo **`cantiere/hackathon-rgb`**
+(22 commit del 17 ott, autore Alan, base `f4f819f`: +2.830 righe in nove
+file — `server.py`, `miniapp.html`, `nwc-wdk.mjs`, `rgb_http.py`,
+`semina_demo.py`, `prove.py`, `config_esempio.py`, ARCHITETTURA e
+CANTIERI), **non su
+`main`**: main ha solo l'infrastruttura di prima (`deploy/rgb/`, la
+leva `RGB_ATTIVO` spenta, `copia_vetrina_demo.py`). Portarlo su main è
+un cantiere a sé, da decidere con Alan.
+
+⚠️ Il 19 ott l'API di GitHub dice il repo `fidelity-points` **PRIVATO**
+(`visibility: PRIVATE`). Se è stato richiuso apposta dopo il giudizio va
+bene; se no, i giudici non lo vedono più: Andrea guarda.
+
+### 14.3 Le decisioni di Andrea (19 ott)
+
+- **La cartella Syncthing resta aperta** fra il fisso e il portatile di
+  Alan, per scambiare file (sul PC ora si chiama «Barattolo»). Regola:
+  **mai segreti dentro** — niente seed, chiavi, connection string,
+  `config.py`, backup dei wallet. Le cose segrete viaggiano solo
+  cifrate con la chiave pubblica age della VM, o non viaggiano.
+- **La VM `vm-2050` (rgb-prova) RESTA**: servirà all'integrazione dello
+  swap (la pagina Swap di KaleidoSwap, roadmap del README). Restano con
+  lei i tre wallet di Mutinynet, il signet del piano B, il backup
+  notturno delle 03:30 e il `pull.ps1` dal PC.
+
+### 14.4 Cosa è acceso solo per l'hackathon (al 19 ott, da decidere)
+
+| Cosa | Dove | Il consiglio |
+|---|---|---|
+| `rgb_http.py` sul wallet `barattolo` | VM | **spegnere** (`pgrep -a python \| awk "/rgb_http/ {print \$1}" \| xargs -r kill`): occupa il wallet del mercante, e il backup delle 03:30 lo vuole fermo; si riaccende in una riga quando serve |
+| il tunnel `-L 8787` | fisso (e portatile) | **chiudere**: è la finestra `ssh -N`; senza `rgb_http.py` acceso non serve |
+| `nak serve` e `nwc-wdk.mjs serve` | fisso | **spegnere**: tengono aperto il wallet di PROVA e un relay locale senza clienti; chi li vuole li riaccende col `source` |
+| la chiave SSH `rgb_prova_torino` | VM, `authorized_keys` riga 2 | **togliere** se il portatile non lavora più sulla VM; **tenere** se Alan farà lo swap da lì (allora resta, e lo si scrive in §1) |
+| il ramo `cantiere/hackathon-rgb` | `satmarket` su origin | **tenere**: è la sorgente delle patch consegnate; si cancella solo dopo averlo portato su main o deciso di no |
+| le quattro distro WSL di prova e le chiavette | fisso | **tenere fino a decisione**: la riserva (Zorin) è ancora da preparare se mai servirà |
