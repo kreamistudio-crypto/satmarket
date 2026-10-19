@@ -83,6 +83,8 @@ modo in cui si rifà un errore già pagato.
   vince finché non lo scioglie. Main corso nel frattempo: rebase,
   sezioni toccate + collaudi, push; il verbale dice COSA è girato su
   QUALE albero, il rapporto NOMINA i commit non miei che il push porta.
+- LE SESSIONI CLOUD NON ASPETTANO PIÙ LA CI SUL RAMO (da sola parte solo
+  su main, 19 ott 2026): la loro prova è suite e collaudi locali.
 - IL VPS È FUORI DAL MIO PERIMETRO: niente ssh, niente query, nemmeno in
   sola lettura. I comandi li scrivo, li esegue Andrea e incolla il
   risultato. Il deploy è suo. Lo stesso vale per il nodo Mostro e per il
