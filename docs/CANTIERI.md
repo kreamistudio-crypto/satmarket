@@ -67053,17 +67053,54 @@ rosse. Cinque mutazioni della regola (qualunque modulo, `Order Id`
 facoltativo, niente inizio di riga, testo prima dell'hash, frase
 storpiata): tutte prese. Suite e collaudi: nel messaggio del commit.
 
+**SUL NODO, 19 ott 2026 (comandi di Andrea, uno alla volta, procedura
+di PRODUZIONE «LA RONDA DEL NODO OGNI ORA», passi 4-9).** Mostro non è
+stato toccato. Il file preso da `origin/main` ha la stessa impronta sul
+PC e sul nodo dopo il `sed` dei CRLF: `8999f530…`. `py_compile` è
+passato. La versione di prima (`3bf6f8e3…`, identica alla copia del
+repo prima del cantiere) sta in `/root/ronda-pagamenti.py.prima-19ott`,
+e per tornare indietro: `sudo install -m 755
+/root/ronda-pagamenti.py.prima-19ott /usr/local/bin/ronda-pagamenti.py`.
+Installata con `sudo install -m 755`, impronta ricontrollata in
+`/usr/local/bin`. Il giro a mano: 156 letti, 0 sconosciuti, 0 in
+attesa, allarmi aperti 0, nessuna fonte muta, esito 0. Quel giro però
+NON provava la regola nuova: `89cc…` stava già in `pagamenti_noti` come
+`imparato` (riconosciuto a mano fra le 17:05 e le 18:05), e i noti non
+si rigiudicano. La prova vera è stata in sola lettura: `fonti_locali()`
+dello script installato, sui log veri del nodo, dice `[('89cc4234b6793701',
+'mostro-log')] []`, cioè la riga «keeping payout claim» spiega l'hash e
+nessuna fonte è muta.
+
+**IL RITENTATIVO, VERIFICATO IN SOLA LETTURA** (`lncli listpayments`
+e `decodepayreq` con lo script installato, e il journal della ronda).
+I quattro tentativi da 243.676 sats:
+- `25985ba…`, `89cc…`, `bace3e…`: FAILED per TIMEOUT, nati alle
+  16:42:32, 16:44:18 e 16:46:19, con 0 HTLC (LND non ha trovato una
+  strada in 60 s: non è partito niente), tutti verso `030936e7…`.
+- `917cc80…`: SUCCEEDED, nato alle 16:49:19 e chiuso alle 16:49:21, 1
+  HTLC, verso `035e2a5f…`.
+La destinazione è DIVERSA: al quarto giro il Lightning address del
+compratore ha dato una fattura emessa da un altro nodo. La regola del
+ritentativo vuole la stessa cifra E la stessa destinazione, quindi non
+poteva spiegarlo a nessuna ora. L'allarme è partito col giro delle
+17:05:10, non alle 16:44: le 16:44:18 sono l'ora di nascita del
+pagamento, che l'allarme stampa. Quel giro ha visto il successo e ha
+spiegato tre pagamenti su quattro: «3 riconosciuti adesso (mostro 1,
+mostro-log 2), 1 sconosciuti». `917cc80…` dal database (`mostro`, la
+fattura del compratore), `25985ba…` e `bace3e…` dai log (`mostro-log`).
+Per quei due mostrod ha scritto una riga che la ronda conosceva già;
+quale delle due (il «has failed!» del watcher arrivato in tempo, o
+altro) non è stato guardato. Al giro delle 18:05: allarmi aperti 0.
+La regola del ritentativo non è stata toccata. Allargarla a «stessa
+cifra, qualunque destinazione» vorrebbe dire spiegare proprio il caso
+in cui un furto si nasconderebbe dietro un payout vero: due pagamenti
+uguali verso nodi diversi.
+
 **RESTA DA GUARDARE.**
-- Lo script va portato sul nodo: lo fa Andrea, coi comandi uno alla
-  volta (PRODUZIONE, «LA RONDA DEL NODO OGNI ORA», passi 4-9). Mostro
-  non si riavvia.
 - Un invio che LND rifiuta subito («re-arming retry for hash …») e
   lascia un FAILED in `listpayments`: se capita, lo spiega solo il
-  ritentativo riuscito dopo. Non visto finora.
-- Perché la regola del ritentativo non l'ha preso al giro dopo (FAILED
-  e poi SUCCEEDED con la stessa cifra): o la destinazione delle due
-  fatture era diversa (un Lightning address può dare fatture da nodi
-  diversi), o il giro era prima delle 16:49. Non verificato.
+  ritentativo riuscito dopo, e solo se la destinazione è la stessa.
+  Non visto finora.
 - Una finestra di circa 15 secondi resta scoperta: fra il FAILED di LND
   (60 s), che la riconciliazione può già leggere, e la riga «keeping»
   (75 s). Una ronda che legge proprio lì griderebbe ancora. Non
