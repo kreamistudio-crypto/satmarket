@@ -12,9 +12,10 @@
 #   1) mostro.db, in SOLA LETTURA: l'hash della fattura del compratore
 #      (buyer_invoice decodificata qui), della dev fee, di un payout in
 #      volo (payout_payment_hash);
-#   2) i log di mostrod: le righe «Invoice with hash: … paid!» e quelle
-#      della dev fee — la sola strada per i payout a un Lightning
-#      address, di cui il database non tiene l'hash;
+#   2) i log di mostrod: le righe «Invoice with hash: … paid!», quelle
+#      della dev fee e quelle del payout andato in timeout («keeping
+#      payout claim for hash …») — la sola strada per i payout a un
+#      Lightning address, di cui il database non tiene l'hash;
 #   3) un FAILED seguito da un SUCCEEDED dello stesso importo verso la
 #      stessa destinazione: un ritentativo, che non ha mosso niente;
 #   4) il VPS di Barattolo, POST /api/nodo/pagamenti-noti via Tor, che
@@ -97,6 +98,15 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 # il payout («Order Id …: Invoice with hash: H paid!» / «has failed!»,
 # src/app/release.rs) e la dev fee («Amount: N sats, Hash: H»,
 # «Payment hash: H», src/app/dev_fee.rs).
+# E IL PAYOUT ANDATO IN TIMEOUT («Order Id …: keeping payout claim for
+# hash H: …», 19 ott 2026): dalla 0.19.0, se LND non dice ne' si' ne' no
+# entro 75 secondi, mostrod lascia andare l'invio e scrive SOLO questa
+# riga — niente «has failed!». Poi la riconciliazione legge il FAILED da
+# LND, cancella l'hash da mostro.db e riparte con una fattura nuova (un
+# Lightning address ne fa una a ogni giro): di quel tentativo resta
+# soltanto questa riga. Senza, la ronda ha gridato SCONOSCIUTO al primo
+# dei quattro tentativi dell'ordine f285e973. La riga «re-arming retry
+# for hash H» invece NON entra: li' l'hash viene dopo un testo variabile.
 # ⚠️ LA RIGA DEV'ESSERE DI MOSTROD, NON SOLO CONTENERE LE PAROLE, ed e'
 # la riga da non ammorbidire: mostrod stampa anche eventi interi
 # ({:#?}), e dentro un evento c'e' testo scritto da chiunque — un
@@ -110,8 +120,9 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 # ANSI si tolgono prima.
 RIGA_HASH_MOSTRO = re.compile(
     r"^\S+\s+(?:INFO|WARN|ERROR)\s+mostrod?::app::(?:release|dev_fee):\s+"
-    r"(?:Order Id [0-9a-f-]+: Invoice with hash: |Amount: \d+ sats, Hash: "
-    r"|Payment hash: )([0-9a-f]{64})\b", re.M)
+    r"(?:Order Id [0-9a-f-]+: (?:Invoice with hash: |keeping payout claim "
+    r"for hash )|Amount: \d+ sats, Hash: |Payment hash: )([0-9a-f]{64})\b",
+    re.M)
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _ALF = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 _GEN = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
@@ -367,8 +378,9 @@ def testo_allarme(p, dest: str, descrizione: str, motivo: str = "") -> str:
         "Cosa fare:",
         "1) VERIFICA. Se e' tuo (Zeus, uno swap, un lease) riconoscilo: "
         f"sudo /usr/local/bin/ronda-nodo.sh --impara {h[:16]}",
-        "   Se dovrebbe essere di Barattolo, sul VPS: sqlite3 -readonly "
-        "~/satmarket/satmarket.db \"SELECT tabella,riga_id,esito,cassaforte "
+        "   Se dovrebbe essere di Barattolo, sul VPS: sudo -u barattolo "
+        "sqlite3 -readonly /srv/barattolo/dati/satmarket.db \"SELECT "
+        "tabella,riga_id,esito,cassaforte "
         f"FROM payout_tentati WHERE hash LIKE '{h[:16]}%'\"",
         "2) SOLO SE NON E' DI NESSUNO: revoca il macaroon di LNbits "
         "(ferma anche i payout del mercatino): sudo docker exec "

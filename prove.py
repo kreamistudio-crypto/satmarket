@@ -121392,6 +121392,60 @@ def prove_ronda_nodo():
           "moduli che non pagano: no", {H(51), H(52), H(53), H(54)},
           r.hash_dai_log(log))
 
+    # IL PAYOUT ANDATO IN TIMEOUT (19 ott 2026, ordine f285e973): dalla
+    # 0.19.0 mostrod scrive solo «keeping payout claim for hash H», niente
+    # «has failed!», e poi cancella l'hash da mostro.db. La prima riga e'
+    # quella vera del nodo (16:45:33 UTC), con l'hash di cartone.
+    log_timeout = "\n".join([
+        f"2026-10-19T16:45:33Z WARN mostrod::app::release: Order Id "
+        f"f285e973-b83d-414c-8302-58f504f18011: keeping payout claim for "
+        f"hash {H(71)}: no terminal state after 75s; a locked-in HTLC "
+        "cannot be cancelled by the sender and may still settle — "
+        "reconciliation will resolve it",
+        # coi colori, come la stampa davvero docker logs
+        f"{E}[2m2026-10-19T16:50:01.5Z{E}[0m {E}[33m WARN{E}[0m "
+        f"{E}[2mmostrod::app::release{E}[0m{E}[2m:{E}[0m Order Id "
+        f"f285e973-b83d-414c-8302-58f504f18011: keeping payout claim for "
+        f"hash {H(72)}: send errored (x) but LND reports the payment "
+        "pending or settled",
+        # la stessa frase dentro un evento stampato intero, su piu' righe
+        "2026-10-19T16:46:00Z  INFO mostrod::app::dispute: Publishing "
+        "dispute event: Event {",
+        f'    content: "Order Id 1-2: keeping payout claim for hash {H(73)}",',
+        # ...e la riga INTERA scritta dentro un evento, su una riga sola
+        "2026-10-19T16:46:01Z  INFO mostrod::app::dispute: Event { content: "
+        f'"mostrod::app::release: Order Id 1-2: keeping payout claim for '
+        f'hash {H(74)}: x" }}',
+        # la frase giusta sotto un altro modulo
+        f"2026-10-19T16:46:02Z  WARN mostrod::app::order: Order Id "
+        f"1-2: keeping payout claim for hash {H(75)}: x",
+        f"2026-10-19T16:46:03Z  WARN mostrod::scheduler: Order Id "
+        f"1-2: keeping payout claim for hash {H(76)}: x",
+        # il modulo giusto, ma la riga del re-arm: l'hash dopo un testo
+        # variabile, e quella NON entra
+        f"2026-10-19T16:46:04Z  WARN mostrod::app::release: Order Id "
+        f"1-2: payout dispatch failed (boom); re-arming retry for hash {H(77)}",
+        # la frase senza l'Order Id davanti
+        f"2026-10-19T16:46:05Z  WARN mostrod::app::release: keeping payout "
+        f"claim for hash {H(78)}: x",
+    ])
+    prova("PAYOUT IN TIMEOUT: la riga «keeping payout claim» di mostrod "
+          "spiega l'hash, anche coi colori", {H(71), H(72)},
+          r.hash_dai_log(log_timeout))
+    prova("...ma non la stessa frase dentro un evento, sotto un altro "
+          "modulo, nella riga del re-arm o senza l'Order Id",
+          set(), r.hash_dai_log(log_timeout) & {H(n) for n in range(73, 79)})
+    locali_t = {h: "mostro-log" for h in r.hash_dai_log(log_timeout)}
+    v_t = r.giudica([{"payment_hash": H(71), "status": "FAILED",
+                      "value_sat": "243676", "fee_sat": "0",
+                      "creation_time_ns": str(1792427058 * 10 ** 9)}],
+                    {}, locali_t, [], lambda hs: ({h: False for h in hs}, ""),
+                    lambda p: "", {}, 1792430700)
+    prova("...e il giudice lo dice di mostrod, senza allarme, anche col VPS "
+          "che dice no e il successo non ancora arrivato",
+          ({H(71): "mostro-log"}, []),
+          (v_t["riconosciuti"], v_t["sconosciuti"]))
+
     # --- 6) IL VERDETTO -------------------------------------------------
     T0 = 1790000000
 
@@ -121478,6 +121532,12 @@ def prove_ronda_nodo():
                                    "payout_tentati", "deletemacaroonid 1")))
     prova("...nell'ordine giusto: la revoca viene DOPO la verifica", True,
           testo.index("VERIFICA") < testo.index("deletemacaroonid"))
+    # Il percorso VERO del database del VPS (19 ott 2026): il comando di
+    # prima puntava a ~/satmarket/satmarket.db, che sul VPS non c'e'.
+    prova("...e il comando per il VPS legge il database vero, come "
+          "barattolo e in sola lettura", (True, False),
+          ("sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db"
+           in testo, "~/satmarket" in testo))
     # il VPS che non risponde
     chiesti = []
     v = g([pag(91)], {}, {}, [], vps_muto(chiesti), dest_di, {}, T0)

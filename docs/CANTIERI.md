@@ -66983,3 +66983,84 @@ rossa). Suite e collaudi: nel messaggio del commit.
   VPS.
 - La tappa (6): la lettura firmata del maturato, il confronto col
   nostro conto e col pagamento di fine mese.
+
+## La ronda e il payout andato in timeout: «keeping payout claim» spiega l'hash, e l'avviso legge il database vero (19 ott 2026, cantiere ronda-tentativi-mostro, richiesta di Andrea)
+
+**IL FATTO.** Il 19 ott la ronda del nodo ha mandato «🚨 PAGAMENTO
+SCONOSCIUTO» per l'hash `89cc4234b6793701…`: 243.676 sats, FAILED
+TIMEOUT, nato verso le 16:44 UTC. Era il primo dei quattro tentativi
+di payout di mostrod al compratore dell'ordine P2P `f285e973` (tre
+falliti, riuscito alle 16:49). Nessun sat è uscito: era un FAILED.
+
+**PERCHÉ NESSUNA FONTE LO SPIEGAVA**, letto nel sorgente di Mostro
+0.19.0 (`src/app/release.rs`, `classify_dispatch`) e confermato da
+Andrea sulla riga vera del nodo (16:45:33 UTC). LND rinuncia a trovare
+una strada dopo 60 s (`LND_PAYMENT_ROUTE_TIMEOUT_SECS`), mostrod
+lascia andare l'invio dopo 75 s (`PAYOUT_SEND_PAYMENT_TIMEOUT`). Se lo
+stato finale non gli è arrivato, mostrod NON scrive «Invoice with
+hash: … has failed!»: scrive soltanto `WARN mostrod::app::release:
+Order Id …: keeping payout claim for hash H: no terminal state after
+75s; …`. Il «claim» non è una tabella a sé, è
+`orders.payout_payment_hash` (con `payout_claimed_at`). La
+riconciliazione dello scheduler legge il FAILED da LND, CANCELLA
+quell'hash e riparte con una fattura nuova: un Lightning address ne fa
+una a ogni giro. Quindi al giro della ronda (minuto 5) mostro.db aveva
+già dimenticato l'hash, i log avevano solo una riga che la ronda non
+conosceva, e il VPS ha risposto giustamente di no.
+
+**LA CURA.** In `deploy/nodo/ronda-pagamenti.py`, `RIGA_HASH_MOSTRO`
+prende anche `Order Id <uuid>: keeping payout claim for hash H`, con le
+stesse pretese delle righe di prima: l'inizio di una riga di tracing
+(ora, livello), il modulo `mostrod::app::release` subito dopo il
+livello, il testo esatto e l'hash SUBITO dopo. Quella riga la stampa
+solo mostrod, per un hash che sta pagando LUI: un pagamento fatto da
+altri col macaroon non la lascia, e un testo scritto dentro un evento
+arriva con l'escape e dopo il modulo di chi lo stampa. Quindi la ronda
+non diventa cieca a un pagamento estraneo. Le altre fonti restano
+uguali.
+E il testo dell'allarme: il comando per il VPS puntava a
+`~/satmarket/satmarket.db`, che sul VPS non c'è. Ora dice `sudo -u
+barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db "…"`.
+
+**LE STRADE SCARTATE.**
+- La riga «payout dispatch failed (…); re-arming retry for hash H»:
+  l'hash viene DOPO un testo variabile (l'errore di invio), e una
+  regola che lo prendesse dovrebbe ammorbidire proprio la riga da non
+  ammorbidire. È il caso in cui LND dice che non c'è niente in volo:
+  se ne resta un FAILED, oggi lo spiega solo la regola del ritentativo
+  (sotto, «resta da guardare»).
+- Le righe «holding payout of hash …» e «dropping … dispatch of hash
+  …»: lì l'invio non è partito, quindi non c'è un pagamento da
+  spiegare.
+- Smettere di gridare per i FAILED (non muovono un sat): un FAILED fatto
+  con un macaroon rubato resta un segnale, e il disegno della ronda lo
+  vuole gridato.
+
+**PROVATO.** In `prove_ronda_nodo` (109/0): la riga vera del nodo e la
+stessa coi colori ANSI spiegano l'hash; la stessa frase dentro un
+evento su più righe, la riga INTERA dentro un evento su una riga, la
+frase sotto `mostrod::app::order` e sotto `mostrod::scheduler`, la
+riga del re-arm e la frase senza `Order Id` NON lo spiegano; il
+giudice lo riconosce come «mostro-log» anche col VPS che dice no e col
+successo non ancora arrivato; il comando dell'allarme ha il percorso
+vero e non più `~/satmarket`. La controprova sullo script di prima: 3
+rosse. Cinque mutazioni della regola (qualunque modulo, `Order Id`
+facoltativo, niente inizio di riga, testo prima dell'hash, frase
+storpiata): tutte prese. Suite e collaudi: nel messaggio del commit.
+
+**RESTA DA GUARDARE.**
+- Lo script va portato sul nodo: lo fa Andrea, coi comandi uno alla
+  volta (PRODUZIONE, «LA RONDA DEL NODO OGNI ORA», passi 4-9). Mostro
+  non si riavvia.
+- Un invio che LND rifiuta subito («re-arming retry for hash …») e
+  lascia un FAILED in `listpayments`: se capita, lo spiega solo il
+  ritentativo riuscito dopo. Non visto finora.
+- Perché la regola del ritentativo non l'ha preso al giro dopo (FAILED
+  e poi SUCCEEDED con la stessa cifra): o la destinazione delle due
+  fatture era diversa (un Lightning address può dare fatture da nodi
+  diversi), o il giro era prima delle 16:49. Non verificato.
+- Una finestra di circa 15 secondi resta scoperta: fra il FAILED di LND
+  (60 s), che la riconciliazione può già leggere, e la riga «keeping»
+  (75 s). Una ronda che legge proprio lì griderebbe ancora. Non
+  verificato quanto è larga sul nodo (dipende dalla grazia della
+  riconciliazione, minimo 30 s).
