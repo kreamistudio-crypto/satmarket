@@ -1879,7 +1879,9 @@ MODALITA_COLLAUDO = False
 # per provare dal telefono i rami prima dell'ok al push.
 # CHI PUO' USARLA: gli id Telegram in lista; gli altri ricevono 403
 # «Istanza di prova, privata» (restano aperti solo la salute, il webhook
-# del bot e il login). Chi non si fa riconoscere puo' solo LEGGERE (la
+# del bot e il login) e il bot non risponde loro, nemmeno al /start.
+# Il pannello «⚙️ Stato delle leve» dice QUANTI sono, mai quali.
+# Chi non si fa riconoscere puo' solo LEGGERE (la
 # vetrina della prova e' fatta di dati finti). VUOTA = nessun filtro, ed
 # e' la produzione: qui resta vuota. Una lista scritta male (una
 # stringa, un nome) chiude la prova a TUTTI, e il journal lo dice.

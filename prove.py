@@ -33586,6 +33586,11 @@ def _censimento(acceso, dopo=None):
     # della fase P2P — un insieme e un dizionario che il pannello
     # ITERA con `sorted`, e che a leve spente sono vuoti con un senso.
     amb["RGB_PROVA_IDS"] = {1, 2, 3} if acceso else set()
+    # L'ISTANZA DI PROVA (19 ott 2026): la lista e' un insieme che il
+    # pannello CONTA, l'indirizzo e il bot sono testo
+    amb["PROVA_SOLO_IDS"] = {111111111, 222222222} if acceso else set()
+    amb["URL_PUBBLICO"] = amb["URL_PUBBLICO_DI_SERIE"] = "https://barattolo.store"
+    amb["LINK_BOT"] = "https://t.me/ilbarattolobot"
     amb["NIP05_NOMI"] = {"usdb": "a" * 64} if acceso else {}
     # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
     # config finto darebbe la stringa di _SEGRETI_FINTI e il
@@ -37559,9 +37564,10 @@ def _amb_seo():
                  "CACHE_SEO_HOME = ", "CAMPI_CARTELLO = ",
                  "OG_REPARTO = ",
                  "TETTO_SITEMAP = ", "CACHE_SITEMAP = ",
-                 # il bot nella pagina (19 ott 2026, collaudo-vm)
+                 # il bot e il dominio nella pagina (19 ott 2026, collaudo-vm)
                  "LINK_BOT_DI_SERIE = ", "_FORMA_LINK_BOT = ",
-                 "_RIGA_BOT_PAGINA = "):
+                 "_RIGA_BOT_PAGINA = ", "URL_PUBBLICO_DI_SERIE = ",
+                 "_RIGA_DOMINIO_PAGINA = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     # multi-riga: vogliono il taglio alla riga VUOTA, non al primo \n
@@ -37593,10 +37599,12 @@ def _amb_seo():
               "_seo_negozio", "_seo_categoria", "_seo_home",
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
               "_hash_asset", "_timbra_asset_pagina", "_bot_nella_pagina",
+              "_dominio_nella_pagina",
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
-    amb["BOT_NOME"] = "ilbarattolobot"     # la leva non dichiarata
+    amb["BOT_NOME"] = "ilbarattolobot"     # le leve non dichiarate
+    amb["DOMINIO_PUBBLICO"] = "barattolo.store"
     # IL GIUDICE DELLA COPERTINA (30 set 2026): `_seo_negozio` lo chiama,
     # e si monta VERO — nessuna pagina del server pubblicata, qui, quindi
     # solo il negozio di casa esce con la sua copertina (vedi
@@ -171569,6 +171577,72 @@ def prove_istanza_prova():
     prova("il collaudo del server vero e' nella gabbia della CI", [True, True],
           ["\ncollaudo_istanza_prova\n" in "\n" + open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_istanza_prova.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
+
+    # ---------------- 6) il bot di prova non risponde a chi non e' in lista
+    # (19 ott 2026, sera, decisione di Andrea: nemmeno al /start)
+    amb = {}
+    exec(pezzo("_prova_ignora_update"), amb)
+    ig = amb["_prova_ignora_update"]
+    def msg(chi, tipo="message"):
+        return {"update_id": 1, tipo: {"from": {"id": chi}, "text": "/start"}}
+    prova("lista vuota (la produzione): non cade niente, nemmeno l'update storto",
+          [False, False, False], [ig(msg(222), set()), ig({}, set()), ig("x", set())])
+    prova("in lista: il messaggio, il messaggio modificato e il tocco su un bottone passano",
+          [False, False, False],
+          [ig(msg(111), {111}), ig(msg(111, "edited_message"), {111}),
+           ig(msg("111", "callback_query"), {111})])
+    prova("fuori lista: cadono tutti e tre", [True, True, True],
+          [ig(msg(222), {111}), ig(msg(222, "edited_message"), {111}),
+           ig(msg(222, "callback_query"), {111})])
+    prova("...e senza un mittente leggibile si cade dal lato chiuso", [True] * 5,
+          [ig({}, {111}), ig("x", {111}), ig({"message": {"text": "ciao"}}, {111}),
+           ig({"message": {"from": {"id": "andrea"}}}, {111}), ig({"channel_post": {}}, {111})])
+    ta = pezzo("telegram_aggiornamenti")
+    prova("il campanello chiede il giudice PRIMA di gestire l'update", True,
+          ta.index("_prova_ignora_update(aggiornamento, PROVA_SOLO_IDS)")
+          < ta.index("await gestisci_update(aggiornamento)")
+          and ta.count("gestisci_update(") == 1)
+
+    # ---------------- 7) i testi che scrivono l'indirizzo del sito ------
+    prova("la Mini App ha la riga del dominio, una volta sola", 1,
+          mini.count("const DOMINIO_SITO = 'barattolo.store';"))
+    prova("...e i tre testi del negozio la leggono, nessuno lo scrive a mano", (3, 0),
+          (mini.count("${DOMINIO_SITO}/negozio/"), mini.count("barattolo.store/negozio/${")))
+    amb, _r = con_config(leve, URL_PUBBLICO="https://collaudo.barattolo.store")
+    prova("il dominio esce dall'indirizzo della leva, senza https://",
+          ["barattolo.store", "collaudo.barattolo.store", "prova.example:8443"],
+          [con_config(leve)[0]["DOMINIO_PUBBLICO"], amb["DOMINIO_PUBBLICO"],
+           con_config(leve, URL_PUBBLICO="https://prova.example:8443")[0]["DOMINIO_PUBBLICO"]])
+    amb = {"re": re}
+    for r_ in ("URL_PUBBLICO_DI_SERIE = ", "_RIGA_DOMINIO_PAGINA = "):
+        k = src.index(r_)
+        exec(src[k:src.index("\n", k)], amb)
+    righe = []
+    amb["print"] = lambda *a, **k: righe.append(a)
+    exec(pezzo("_dominio_nella_pagina"), amb)
+    dn = amb["_dominio_nella_pagina"]
+    prova("col dominio di serie la pagina esce IDENTICA (lo stesso oggetto)", True,
+          dn(grezzo, "barattolo.store") is grezzo)
+    alt = dn(grezzo, "collaudo.barattolo.store")
+    prova("...con un altro cambia la sola riga", (1, 0, len(grezzo) + len("collaudo.")),
+          (alt.count(b"const DOMINIO_SITO = 'collaudo.barattolo.store';"),
+           alt.count(b"const DOMINIO_SITO = 'barattolo.store';"), len(alt)))
+    prova("...e una riga che manca non s'indovina, e lo si dice", (b"x", 1),
+          (dn(b"x", "collaudo.barattolo.store"), len(righe)))
+    prova("la pagina la riscrive subito dopo il bot", True,
+          cm.index("grezzo = _bot_nella_pagina(grezzo, BOT_NOME)")
+          < cm.index("grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)")
+          < cm.index("_PAGINA_CACHE.update("))
+
+    # ---------------- 8) il pannello «Stato delle leve» -----------------
+    ls = pezzo("_leve_stato")
+    prova("il pannello mostra l'indirizzo, il bot e QUANTI id (mai quali)", True,
+          '"URL_PUBBLICO", URL_PUBBLICO' in ls and '"LINK_BOT", LINK_BOT' in ls
+          and '"PROVA_SOLO_IDS",\n                  len(PROVA_SOLO_IDS)' in ls
+          and "sorted(PROVA_SOLO_IDS)" not in ls)
+    prova("...e suona l'allarme per la prova aperta e per la lista storta", True,
+          "URL_PUBBLICO != URL_PUBBLICO_DI_SERIE\n                           and not PROVA_SOLO_IDS" in ls
+          and "allarme=PROVA_SOLO_IDS == {0}" in ls)
 
 
 def main():

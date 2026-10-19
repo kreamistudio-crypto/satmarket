@@ -2134,6 +2134,29 @@ def _prova_decide(chi, metodo: str, ammessi: set) -> bool:
     return metodo in ("GET", "HEAD", "OPTIONS")
 
 
+def _prova_ignora_update(aggiornamento, ammessi: set) -> bool:
+    """PURA: il bot di prova lascia cadere questo update? (19 ott 2026,
+    decisione di Andrea: chi non e' in lista non riceve NIENTE, nemmeno
+    la risposta al /start, e non finisce scritto nel database.)
+    Lista vuota = la produzione: non si lascia cadere nulla. Il mittente
+    e' il `from` del messaggio o del tocco su un bottone — i due soli
+    tipi che il webhook chiede (`allowed_updates`). Senza un mittente
+    leggibile l'update cade: sulla prova si sbaglia dal lato chiuso."""
+    if not ammessi:
+        return False
+    if not isinstance(aggiornamento, dict):
+        return True
+    for chiave in ("message", "edited_message", "callback_query"):
+        corpo = aggiornamento.get(chiave)
+        if isinstance(corpo, dict):
+            mittente = corpo.get("from")
+            try:
+                return int(mittente["id"]) not in ammessi
+            except (TypeError, KeyError, ValueError):
+                return True
+    return True
+
+
 async def _prova_chi(request):
     """L'id che la richiesta dimostra, o None. Lo stesso giudice delle
     rotte (`_utente_da_initdata`: firma e freschezza, senza scrivere),
@@ -19205,7 +19228,11 @@ async def telegram_aggiornamenti(req: Request):
     if not hmac.compare_digest(segreto, atteso):
         raise HTTPException(403, "Segreto sbagliato")
     try:
-        await gestisci_update(await req.json())
+        aggiornamento = await req.json()
+        # sull'istanza di prova il bot non risponde a chi non e' in
+        # lista: nemmeno al /start (vedi `_prova_ignora_update`)
+        if not _prova_ignora_update(aggiornamento, PROVA_SOLO_IDS):
+            await gestisci_update(aggiornamento)
     except Exception as e:
         print(f"⚠️ Update Telegram indigesto: {e}")
     return {"ok": True}
@@ -29834,6 +29861,23 @@ def _leve_stato():
                   acceso="in produzione va SPENTA: accesa, l'header "
                          "«collaudo:111» apre l'account di chiunque senza "
                          "una firma"),
+            # L'ISTANZA DI PROVA (19 ott 2026, collaudo-vm): l'indirizzo,
+            # il bot e la lista. Della lista solo QUANTI, mai quali (il
+            # patto di ADMIN_IDS: il pannello lo leggono i moderatori).
+            # L'allarme: un indirizzo che non e' quello di serie senza la
+            # lista e' una prova aperta al mondo; {0} e' la lista storta.
+            _leva("Indirizzo del sito", "URL_PUBBLICO", URL_PUBBLICO,
+                  acceso="dove il bot registra il webhook e dove portano "
+                         "i link delle notifiche",
+                  allarme=(URL_PUBBLICO != URL_PUBBLICO_DI_SERIE
+                           and not PROVA_SOLO_IDS)),
+            _leva("Bot dei link e del login", "LINK_BOT", LINK_BOT),
+            _leva("Istanza di prova: id ammessi", "PROVA_SOLO_IDS",
+                  len(PROVA_SOLO_IDS),
+                  acceso="istanza di PROVA: la usano solo questi id, gli "
+                         "altri ricevono 403 e il bot non risponde loro",
+                  spento="nessun filtro, come in produzione",
+                  allarme=PROVA_SOLO_IDS == {0}),
             _leva("Scadenza dell'initData (ore)", "ORE_INITDATA",
                   ORE_INITDATA, allarme=not ORE_INITDATA,
                   spento="un initData catturato apre quell'account per "
@@ -64084,6 +64128,10 @@ if not (isinstance(LINK_BOT, str) and _FORMA_LINK_BOT.fullmatch(LINK_BOT)):
 # Il nome del bot, senza @: lo usano la Mini App (`_bot_nella_pagina`)
 # e il controllo all'avvio contro `getMe`.
 BOT_NOME = _FORMA_LINK_BOT.fullmatch(LINK_BOT).group(1)
+# L'indirizzo come lo si SCRIVE in un testo («barattolo.store»): la
+# forma di sopra lo garantisce fatto di minuscole, cifre, punti, trattini
+# e al piu' i due punti della porta (`_dominio_nella_pagina`).
+DOMINIO_PUBBLICO = URL_PUBBLICO[len("https://"):]
 
 
 def link_telegram(tipo: str, id_: str) -> str:
@@ -82497,6 +82545,29 @@ def _bot_nella_pagina(grezzo: bytes, nome: str) -> bytes:
                           f"const BOT_TG = '{nome}';".encode("ascii"))
 
 
+# Il gemello per l'indirizzo che i testi della Mini App SCRIVONO («il
+# tuo negozio e' su barattolo.store/negozio/…», 19 ott 2026, decisione
+# di Andrea): sulla prova direbbero l'indirizzo di produzione.
+_RIGA_DOMINIO_PAGINA = b"const DOMINIO_SITO = 'barattolo.store';"
+
+
+def _dominio_nella_pagina(grezzo: bytes, dominio: str) -> bytes:
+    """PURA, con le stesse regole di `_bot_nella_pagina`: col dominio di
+    serie la pagina esce IDENTICA; con un altro cambia la sola riga; una
+    riga che manca o c'e' due volte non s'indovina, e lo si dice.
+    `dominio` arriva da `_FORMA_URL_PUBBLICO`: niente apici, niente
+    barre, niente che possa chiudere la stringa JavaScript."""
+    if dominio == URL_PUBBLICO_DI_SERIE[len("https://"):]:
+        return grezzo
+    if grezzo.count(_RIGA_DOMINIO_PAGINA) != 1:
+        print("⚠️ [pagina] la riga «const DOMINIO_SITO = 'barattolo.store';» "
+              f"non c'e' una volta sola in miniapp.html: {dominio} non entra "
+              "nella pagina, che resta coi testi di produzione", flush=True)
+        return grezzo
+    return grezzo.replace(_RIGA_DOMINIO_PAGINA,
+                          f"const DOMINIO_SITO = '{dominio}';".encode("ascii"))
+
+
 def _spezza_pagina(grezzo: bytes) -> dict:
     """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
 
@@ -82579,6 +82650,7 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         grezzo = _timbra_asset_pagina(grezzo)
         # Il bot della leva LINK_BOT, anche lui una volta per rilettura
         grezzo = _bot_nella_pagina(grezzo, BOT_NOME)
+        grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.

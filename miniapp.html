@@ -15034,6 +15034,10 @@ const tg = window.Telegram?.WebApp;
    produzione esce identica a com'e' qui. Il nome scritto a mano altrove
    lo ferma una sentinella di prove.py. */
 const BOT_TG = 'ilbarattolobot';
+/* Il gemello per l'indirizzo del sito, nei testi che lo SCRIVONO
+   («il tuo negozio è su barattolo.store/negozio/…»): lo riscrive
+   `_dominio_nella_pagina`, dalla leva URL_PUBBLICO. */
+const DOMINIO_SITO = 'barattolo.store';
 
 /* ══ IL LINK DENTRO TELEGRAM (10 ott 2026) ═══════════════════════
    Un link `https://t.me/<bot>?startapp=<parametro>` toccato dentro
@@ -40790,7 +40794,7 @@ function renderSlugNegozio(){
   el('slugNegozioConta').textContent = myNegozioSlug ? '✅' : '';
   const link = myNegozioSlug || myNegozio;
   const attuale = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
-    Il tuo negozio si trova su <b style="color:var(--ink)">barattolo.store/negozio/${esc(link)}</b>${
+    Il tuo negozio si trova su <b style="color:var(--ink)">${DOMINIO_SITO}/negozio/${esc(link)}</b>${
       myNegozioSlug ? ''
         : ' — il codice di sempre: puoi scegliertene uno più bello.'}</div>`;
   /* LA PORTA CHIUSA SI DICE, come nel banner: chi non ha ancora il
@@ -40849,7 +40853,7 @@ function chiediSlugNegozio(){
   chiediConferma({
     titolo: 'Cambiare il link del negozio?',
     corpo: `Paghi ${fmt(slugNegozioLeve.prezzo_sats)} sats e il tuo negozio `
-         + `si trova su barattolo.store/negozio/${slug}. Si paga a ogni `
+         + `si trova su ${DOMINIO_SITO}/negozio/${slug}. Si paga a ogni `
          + 'cambio, non è un abbonamento.\n\n'
          + 'Se nel frattempo qualcun altro prende lo stesso nome, ti '
          + 'scriviamo noi per sistemarlo — i sats non si perdono.',
@@ -40913,7 +40917,7 @@ async function verificaSlugNegozio(pid){
       myNegozioSlug = d.slug || slugNegozioInCorso;
       renderSlugNegozio();
       apriCassettoProfilo('accSlugNegozio');
-      toast(`🔗 Fatto! Il tuo negozio è su barattolo.store/negozio/${myNegozioSlug}`, 6000);
+      toast(`🔗 Fatto! Il tuo negozio è su ${DOMINIO_SITO}/negozio/${myNegozioSlug}`, 6000);
       return;
     }
     toast('Questo pagamento non è più in attesa', 5000);

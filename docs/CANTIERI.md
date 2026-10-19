@@ -66515,6 +66515,12 @@ La mia proposta: i quattro passi senza sats, poi A con
 si vuole una cassa di prova separata per sempre. La leva e il
 cancello per persona nascono con la tappa (2), il preventivo, che è
 dove il tetto si guarda.
+DECISO DA ANDREA (19 ott, sera, nella sessione del collaudo): per lo
+swap con sats veri vale la strada A (il nodo di produzione, la leva ai
+soli moderatori, tetti bassi). La B è SCARTATA: niente phoenixd sulla
+VM di collaudo, che resta coi sats finti (LNbits FakeWallet, vedi «L'istanza
+di prova, primo passo»). Il regtest di Boltz del punto 4 resta
+possibile: lì le monete sono finte.
 
 ## Le foto vere nel foglio della modifica in blocco (19 ott 2026, cantiere modifica-massiva-foto, decisione di Andrea)
 
@@ -66865,3 +66871,57 @@ per mettere su un ramo e tornare a `pronto`, la semina e il reset;
 `docs/COLLAUDO.md`. Da Andrea: il bot su BotFather (anche `/setdomain`,
 che il login dal browser vuole), il record A. Non provato qui: il bot di
 prova vero, il getMe vero, un telefono.
+
+## L'istanza di prova, secondo giro: il bot che ignora chi non è in lista, i testi col dominio, le leve nel pannello (19 ott 2026, sera, cantiere collaudo-vm, decisioni di Andrea)
+
+**PERCHÉ.** Le cose notate in fondo al primo giro, decise da Andrea una
+per una, prima del push del primo commit; le tre di codice nello stesso
+commit.
+
+**COSA SI È DECISO.**
+1. Lo swap con sats veri: la strada A del verbale dello swap (il nodo di
+   produzione, la leva ai soli moderatori, tetti bassi). La B, phoenixd
+   sulla VM di collaudo, è scartata: il collaudo resta coi sats finti.
+   La riga della decisione sta nel verbale dello swap, sotto la proposta.
+2. Il bot di prova non risponde a chi non è in `PROVA_SOLO_IDS`, nemmeno
+   al /start.
+3. I tre testi «il tuo negozio è su barattolo.store/negozio/…» della
+   Mini App prendono l'indirizzo da `URL_PUBBLICO`, come il nome del bot.
+4. Il pannello «⚙️ Stato delle leve» mostra `URL_PUBBLICO`, `LINK_BOT` e
+   `PROVA_SOLO_IDS`: della lista solo quanti id, non quali.
+5. Gli avanzi RGB sulla VM (la gamba `rgb/` di `pull.ps1`, l'utente
+   `pull`, la catena signet) restano dove sono: va scritto in
+   `docs/COLLAUDO.md`, che nasce con la tappa del servizio.
+
+**COME È FATTO.**
+- Il campanello del bot (`/api/telegram/aggiornamenti`), passato il
+  controllo del segreto, chiede a `_prova_ignora_update` se lasciar
+  cadere l'update, PRIMA di `gestisci_update`: a lista vuota mai (la
+  produzione); a lista accesa cade ciò che arriva da un id fuori lista
+  — messaggio, messaggio modificato, tocco su un bottone, i tipi che il
+  webhook chiede — e ciò che non ha un mittente leggibile (si sbaglia
+  dal lato chiuso). A Telegram si risponde 200 come sempre, così non
+  ritenta. Chi cade non arriva nemmeno all'upsert dell'utente.
+- `DOMINIO_PUBBLICO` è `URL_PUBBLICO` senza `https://`. Nella Mini App
+  c'è una seconda riga, `const DOMINIO_SITO = 'barattolo.store';`,
+  gemella di `BOT_TG`, e i tre testi (`renderSlugNegozio`,
+  `chiediSlugNegozio`, `verificaSlugNegozio`) la leggono.
+  `_dominio_nella_pagina` la riscrive subito dopo il bot, con le stesse
+  regole: col dominio di serie la pagina esce identica.
+- Il pannello, nel gruppo «🚦 Sicurezza» sotto la modalità collaudo:
+  l'indirizzo, il bot, e la lista come CONTEGGIO (il patto di
+  `ADMIN_IDS`: il pannello lo leggono i moderatori). Due allarmi: un
+  indirizzo che non è quello di serie senza la lista (una prova aperta
+  al mondo) e la lista storta (`{0}`).
+
+**PROVE.** `prove_istanza_prova` sale a 46: il giudice dell'update in
+tutti i casi (vuota, dentro, fuori, senza mittente), il campanello che
+lo chiede prima di gestire, la riga del dominio e i tre testi, il
+dominio che esce dalla leva, la riscrittura, il pannello che conta e
+non elenca. `collaudo_istanza_prova` sale a 34: il /start di 222 che a
+lista accesa non arriva al bot e quello di 111 sì, la pagina col
+dominio della prova, il pannello vero (`/api/admin/leve`) che dice 2 e
+non nomina gli id, l'allarme. Controprova: tolto il giudice dal
+campanello, il collaudo è rosso (2 fallite). L'ambiente `_censimento`
+del pannello e `_amb_seo` della pagina conoscono le leve nuove.
+Su 9da1e4a (main corso ancora: la CI solo su main, la chat negli ordini al terzo giro) coi due commit del cantiere: le 34 sezioni toccate da qui e da la', quelle della pagina, del pannello e dei documenti, PROVE_SEVERE=1 2.705 verdi, 0 saltate; i collaudi della CI 87 verdi; lo scanner dei segreti del workflow pulito.

@@ -127,6 +127,66 @@ def main():
     prova("rimesso il bot di serie, la pagina torna identica a prima",
           pagina, c.get("/").text)
 
+    print("\n[il bot di prova non risponde a chi non e' in lista]")
+    gestiti = []
+
+    async def gestisci_finto(aggiornamento):
+        gestiti.append(aggiornamento["message"]["from"]["id"])
+    vero = S.gestisci_update
+    S.gestisci_update = gestisci_finto
+    campanello = {"X-Telegram-Bot-Api-Secret-Token": "collaudo"}   # il segreto del collaudo
+
+    def start(n):
+        return c.post("/api/telegram/aggiornamenti", headers=campanello,
+                      json={"update_id": n, "message": {"from": {"id": n},
+                                                        "chat": {"id": n}, "text": "/start"}})
+    try:
+        r = start(222)
+        prova("a lista vuota il /start di 222 arriva al bot (la produzione)",
+              (200, [222]), (r.status_code, gestiti[:]))
+        S.PROVA_SOLO_IDS = {111}
+        gestiti.clear()
+        r = start(222)
+        prova("a lista accesa il /start di 222 non arriva al bot...",
+              (200, {"ok": True}, []), (r.status_code, r.json(), gestiti[:]))
+        start(111)
+        prova("...e quello di 111 si'", [111], gestiti[:])
+    finally:
+        S.gestisci_update = vero
+        S.PROVA_SOLO_IDS = set()
+
+    print("\n[il dominio nei testi della pagina]")
+    S._PAGINA_CACHE["timbro"] = False
+    prova("col dominio di serie la riga resta quella del file", 1,
+          c.get("/").text.count("const DOMINIO_SITO = 'barattolo.store';"))
+    S.DOMINIO_PUBBLICO = "collaudo.barattolo.store"
+    S._PAGINA_CACHE["timbro"] = False
+    p = c.get("/").text
+    prova("col dominio della prova la riga porta il suo", (1, 0),
+          (p.count("const DOMINIO_SITO = 'collaudo.barattolo.store';"),
+           p.count("const DOMINIO_SITO = 'barattolo.store';")))
+    S.DOMINIO_PUBBLICO = "barattolo.store"
+    S._PAGINA_CACHE["timbro"] = False
+    prova("rimesso quello di serie, la pagina torna identica", pagina, c.get("/").text)
+
+    print("\n[il pannello «Stato delle leve»]")
+    def righe_leve():
+        g = c.get("/api/admin/leve", headers=chi(999, "Admin")).json()["gruppi"]
+        return {v["chiave"]: v for gr in g for v in gr["voci"]}
+    v = righe_leve()
+    prova("l'indirizzo, il bot e la lista ci sono, la lista come numero",
+          ["https://barattolo.store", "https://t.me/ilbarattolobot", 0],
+          [v["URL_PUBBLICO"]["valore"], v["LINK_BOT"]["valore"], v["PROVA_SOLO_IDS"]["valore"]])
+    S.PROVA_SOLO_IDS = {111, 999}
+    v = righe_leve()
+    prova("a lista accesa dice QUANTI, e nessuno dei due id compare", (2, False),
+          (v["PROVA_SOLO_IDS"]["valore"], "111" in str(v["PROVA_SOLO_IDS"])))
+    S.PROVA_SOLO_IDS = set()
+    S.URL_PUBBLICO = "https://collaudo.barattolo.store"
+    prova("un indirizzo di prova senza lista suona l'allarme", True,
+          righe_leve()["URL_PUBBLICO"].get("allarme", False))
+    S.URL_PUBBLICO = S.URL_PUBBLICO_DI_SERIE
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)
