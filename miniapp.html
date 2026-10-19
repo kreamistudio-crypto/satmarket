@@ -51165,24 +51165,10 @@ function montaPorteAccount(dai){
     riga.style.margin = '6px 0 4px';
     riga.textContent = 'Qui si aggiungono account Nostr. Un altro account Telegram si apre dal menu di Telegram.';
     porte.appendChild(riga);
-  } else if (collaudo) {
-    /* In locale il widget vero non compare (vuole il dominio
-       registrato su BotFather): resta la porta del collaudo. */
-    const b = document.createElement('button');
-    b.className = 'btn ghost';
-    b.textContent = '🍪 Entra come l\'identità di collaudo';
-    b.onclick = provaLoginWeb;
-    porte.appendChild(b);
+  } else if (telegramNelPortachiavi() && !portaTelegramSvelata) {
+    porte.appendChild(rigaAltroTelegram());
   } else {
-    const posto = document.createElement('div');
-    const s = document.createElement('script');
-    s.src = 'https://telegram.org/js/telegram-widget.js?22';
-    s.setAttribute('data-telegram-login', 'ilbarattolobot');
-    s.setAttribute('data-size', 'medium');
-    s.setAttribute('data-request-access', 'write');
-    s.setAttribute('data-auth-url', urlRitornoLogin());
-    posto.appendChild(s);
-    porte.appendChild(posto);
+    porte.appendChild(portaTelegram());
   }
   const n = document.createElement('button');
   n.className = 'btn ghost';
@@ -51197,11 +51183,70 @@ function montaPorteAccount(dai){
   porte.appendChild(n);
 }
 
+/* LA PORTA TELEGRAM DEL FOGLIO: il widget vero, o in locale la porta
+   del collaudo — il widget vero non compare (vuole il dominio
+   registrato su BotFather). */
+function portaTelegram(){
+  if (collaudo) {
+    const b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.textContent = '🍪 Entra come l\'identità di collaudo';
+    b.onclick = provaLoginWeb;
+    return b;
+  }
+  const posto = document.createElement('div');
+  const s = document.createElement('script');
+  s.src = 'https://telegram.org/js/telegram-widget.js?22';
+  s.setAttribute('data-telegram-login', 'ilbarattolobot');
+  s.setAttribute('data-size', 'medium');
+  s.setAttribute('data-request-access', 'write');
+  s.setAttribute('data-auth-url', urlRitornoLogin());
+  posto.appendChild(s);
+  return posto;
+}
+
+/* IL TELEGRAM GIA' APERTO (19 ott 2026, cantiere account-doppio, dal
+   telefono di Andrea): sotto «Aggiungi un account» il widget diceva
+   «Accedi come AndreAI» con AndreAI gia' aperto. QUALE account c'e'
+   nel bottone Barattolo non lo puo' sapere: lo scrive Telegram in un
+   riquadro di un altro sito (oauth.telegram.org), e il browser non ci
+   lascia guardare dentro — il nome arriva solo DOPO il tocco. Allora
+   la regola guarda il portachiavi: con un account Telegram gia' aperto
+   il widget non si monta, e al suo posto c'e' una riga piccola che lo
+   fa comparire a chi ne vuole davvero un altro. Solo Nostr avrebbe
+   chiuso per sempre la strada a un secondo Telegram vero sul web.
+   Un account Telegram ha l'id POSITIVO (i nativi Nostr ce l'hanno
+   negativo, vedi server.py): la riga del web non porta un `telegram`,
+   e aggiungerlo cambierebbe chi «Esci da tutti» lascia ricordato.
+   La scelta di svelarlo vale finche' il foglio resta aperto:
+   apriAccountSheet la azzera, e il ridisegno dopo caricaAccount la
+   rispetta. */
+let portaTelegramSvelata = false;
+function telegramNelPortachiavi(){
+  return accountAperti.some(c => /^\d{1,20}$/.test(idConto(c)) && idConto(c) !== '0');
+}
+function rigaAltroTelegram(){
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'accountAltroTelegram';
+  b.style.cssText = 'display:block;width:100%;border:0;background:none;padding:8px 0;'
+    + 'margin:2px 0 0;font:inherit;font-size:12.5px;color:var(--ink-soft);'
+    + 'font-weight:600;line-height:1.5;text-align:left;cursor:pointer';
+  b.innerHTML = 'Un altro account Telegram? Esci da Telegram Web e '
+    + '<u style="font-weight:800;text-underline-offset:3px">tocca qui</u>';
+  b.onclick = () => {
+    portaTelegramSvelata = true;
+    b.replaceWith(portaTelegram());
+  };
+  return b;
+}
+
 /* Il menu si apre coi dati che si hanno e li RILEGGE: una sessione
    puo' essere scaduta da un'altra parte, e la lista deve dirlo — ma
    il foglio si vede subito, mai un'attesa davanti a un elenco vuoto
    (il patto del rientro istantaneo della cassa). */
 function apriAccountSheet(){
+  portaTelegramSvelata = false;
   renderAccountSheet();
   el('sheetBg').classList.add('open');
   el('accountSheet').classList.add('open');
@@ -53401,6 +53446,7 @@ function adottaContoAperto(r){
   CONTO_MINI = leggiContoMini();
 }
 async function entraConNostr(firmatario){
+  if (await giaApertoNostr(firmatario)) return;
   const rs = await fetch(`${API_BASE}/login/nostr/sfida`);
   const ds = await rs.json().catch(()=>({}));
   if (!rs.ok) { toast(ds.detail || 'Login Nostr non disponibile', 6000); return; }
@@ -53443,6 +53489,37 @@ async function entraConNostr(firmatario){
      server resterebbe aperta i suoi dieci minuti */
   if (firmatario.chiudi) { try { firmatario.chiudi(); } catch(e){} }
   navDaCapo(); location.reload();
+}
+
+/* LA CHIAVE GIA' APERTA (19 ott 2026, cantiere account-doppio): chi
+   entra con Nostr con una chiave che sta gia' nel portachiavi non
+   apre una sessione nuova — il controllo e' qui nel browser, PRIMA
+   della sfida, contro le npub degli account aperti (dentro la Mini App
+   c'e' anche quella del Telegram, se ne ha collegata una). Si dice, e
+   si passa a lui; se e' gia' lui, si chiude il foglio e basta.
+   La nsec si puo' ricordare lo stesso: la pubkey COINCIDE, che e' la
+   prova che firmatarioNsec chiede per scriverla. Un firmatario che non
+   sa dire la sua pubkey va avanti come sempre: decide il server. */
+async function giaApertoNostr(firmatario){
+  if (!accountVivi() || !accountAperti.length) return false;
+  let npub = '';
+  try {
+    await caricaNostrTools();
+    const pub = String(await firmatario.pubkey() || '').toLowerCase();
+    if (/^[0-9a-f]{64}$/.test(pub)) npub = window.NostrTools.nip19.npubEncode(pub);
+  } catch(e){ return false; }
+  const c = npub && accountAperti.find(x => String(x.npub || '') === npub);
+  if (!c) return false;
+  if (firmatario.ricorda) { try { firmatario.ricorda(); } catch(e){} }
+  closeSheet();
+  const id = idConto(c);
+  if (id === accountAttivoId) {
+    toast('Questo account è già aperto: sei già qui', 4000);
+    return true;
+  }
+  toast(`Questo account è già aperto: passo a ${c.nome || c.username || 'quell\'account'}`, 3000);
+  setTimeout(() => cambiaAccount(id), 900);
+  return true;
 }
 
 /* Il foglio del firmatario serve a DUE cose: entrare (login, il

@@ -9606,7 +9606,10 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
     insieme apposta — erano due righe ripetute in quattro punti, e il
     quinto ingresso di domani si sarebbe scordato il portachiavi.
     Chi rientra su un account che c'e' gia' non lo raddoppia: la voce
-    vecchia lascia il posto alla sessione nuova.
+    vecchia lascia il posto alla sessione nuova, E SI CHIUDE ANCHE NEL
+    DATABASE (19 ott 2026, cantiere account-doppio, richiesta di
+    Andrea): uscita dal portachiavi non la usava piu' nessuno, ma
+    restava valida fino alla scadenza — vedi `_chiudi_rientro`.
     `sessione` e' il cookie attivo di ADESSO, e serve a chi era gia'
     dentro da prima che il portachiavi esistesse: senza, il suo
     account sparirebbe dal mazzo proprio mentre ne aggiunge un altro.
@@ -9620,12 +9623,16 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
         response.headers["X-Barattolo-Aperto"] = str(int(tg_id))
         if int(tg_id) == t:
             return ""
+        raw = ((_CONTO_RICHIESTA.get() or {}).get("cookie") or {}).get(
+            cookie_mini(t), "")
+        _chiudi_rientro(_portachiavi_token(raw), tg_id)
         token = crea_sessione(tg_id)
         resto = [x["token"] for x in conti_mini(t) if x["tg_id"] != tg_id]
         # il Telegram occupa un posto: nel mazzo ne restano MAX - 1
         posti = max(1, MAX_ACCOUNT_BROWSER - 1)
         imposta_cookie_mini(response, t, (resto + [token])[-posti:])
         return token
+    _chiudi_rientro(_portachiavi_token(portachiavi) + [sessione], tg_id)
     token = crea_sessione(tg_id)
     resto = [c["token"] for c in portachiavi_adottato(portachiavi, sessione)
              if c["tg_id"] != tg_id]
@@ -9634,6 +9641,32 @@ def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
     imposta_cookie_sessione(response, token)
     imposta_cookie_portachiavi(response, (resto + [token])[-MAX_ACCOUNT_BROWSER:])
     return token
+
+
+def _chiudi_rientro(token_list: list, tg_id: int) -> int:
+    """IL RIENTRO CHIUDE LA VECCHIA (19 ott 2026, cantiere account-doppio):
+    fra i token che QUESTO dispositivo ci mostra (portachiavi e sessione
+    attiva), quelli dello STESSO account che sta rientrando si chiudono
+    nel database — la sessione nuova prende il loro posto nel mazzo, e
+    una chiave tolta dal mazzo ma ancora buona e' una chiave in giro
+    (un cookie copiato entrerebbe fino alla scadenza). Il filtro sul
+    tg_id e' la meta' che conta: gli altri account del mazzo restano
+    aperti, e un token altrui non si tocca nemmeno per sbaglio. Anche le
+    due sessioni che la fusione degli account lascia sulla stessa
+    persona se ne vanno insieme: dal mazzo uscivano gia' tutte e due."""
+    hashes = [hashlib.sha256(t.encode()).hexdigest()
+              for t in dict.fromkeys(token_list) if t]
+    if not hashes:
+        return 0
+    con = db()
+    try:
+        n = con.execute(
+            "DELETE FROM sessioni WHERE tg_id=? AND token_hash IN "
+            f"({','.join('?' * len(hashes))})", (int(tg_id), *hashes)).rowcount
+        con.commit()
+    finally:
+        con.close()
+    return n
 
 
 def utente_da_sessione(token: str) -> dict | None:

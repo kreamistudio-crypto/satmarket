@@ -65626,3 +65626,92 @@ allegati, e le sezioni che leggono CANTIERI e ARCHITETTURA) **2.541
 passate, 0 fallite**; i collaudi della chat degli ordini, della chat dello
 scambio, degli allegati e della modifica massiva **4 verdi**. Il resto lo
 fa la CI del push.
+
+## L'account doppio: il widget Telegram che offriva l'account già aperto, la chiave Nostr già aperta, e la sessione vecchia che restava valida (19 ott 2026, cantiere account-doppio, richiesta di Andrea)
+
+**IL GUASTO (dal telefono di Andrea).** Nel foglio «I tuoi account»,
+sotto «Aggiungi un account», il widget di Telegram diceva «Accedi come
+AndreAI» con AndreAI già aperto.
+
+**LA DOMANDA PRIMA DEL CODICE.** Barattolo può sapere quale account c'è
+nel widget prima del tocco? NO: il nome lo scrive Telegram in un riquadro
+di oauth.telegram.org, e il browser non lascia guardare dentro un sito
+altrui; il nome arriva solo DOPO il tocco, col ritorno firmato. Quindi
+«nascondilo solo se è lo stesso» non si può fare. Oggi (prima del
+cantiere) il tocco con lo stesso account non faceva doppioni:
+`apri_sessione` toglie dal mazzo la voce vecchia dello stesso tg_id e la
+pagina si ricarica uguale — ma la sessione vecchia RESTAVA VALIDA nel
+database fino alla scadenza. Con Nostr lo stesso, e in più nessun avviso:
+si ricaricava e si passava a quell'account in silenzio.
+
+**LA SCELTA (Andrea, 19 ott).** Fra «riga che spiega» e «solo Nostr»: la
+riga, ma che FA COMPARIRE il widget. Con un account Telegram nel
+portachiavi il widget non si monta; al suo posto «Un altro account
+Telegram? Esci da Telegram Web e tocca qui», e il tocco lo monta. Solo
+Nostr avrebbe chiuso per sempre la strada a un secondo Telegram vero sul
+web. Più, chiesto da Andrea subito e non nel verbale: chi rientra sullo
+stesso account chiude ANCHE NEL DATABASE la sessione vecchia.
+
+**FATTO.**
+- `server.py`: `_chiudi_rientro(token_list, tg_id)` — DELETE delle
+  sessioni fra i token che il dispositivo mostra, SOLO dello stesso
+  tg_id. La chiama `apri_sessione` nei due rami, prima di
+  `crea_sessione`: sul web col mazzo più la sessione attiva (anche quella
+  di ieri, adottata), nella Mini App col mazzo di QUEL Telegram. Il
+  proprio Telegram nella Mini App non apre e non chiude niente (come
+  prima). Le due sessioni che la fusione lascia sulla stessa persona se
+  ne vanno insieme: dal mazzo uscivano già tutte e due.
+- `miniapp.html`: `montaPorteAccount` sceglie fra `portaTelegram()` (il
+  widget, o la porta del collaudo) e `rigaAltroTelegram()` con
+  `telegramNelPortachiavi()` — id POSITIVO, perché la riga del web non
+  porta un `telegram` e aggiungerlo cambierebbe chi «Esci da tutti»
+  lascia ricordato. `portaTelegramSvelata` si azzera in
+  `apriAccountSheet`, così il ridisegno dopo `caricaAccount` non
+  rinasconde un widget appena chiesto. `giaApertoNostr` in testa a
+  `entraConNostr`, prima della sfida: npub del firmatario contro quelle
+  degli account aperti → «Questo account è già aperto: passo a …» e
+  `cambiaAccount`, o «…: sei già qui». Nessuna richiesta al server. La
+  nsec si ricorda lo stesso (la pubkey COINCIDE: la prova che
+  `firmatarioNsec` chiede). Un firmatario che non sa dire la pubkey va
+  avanti come sempre.
+
+**SCARTATO.** Indovinare dal widget (la larghezza del riquadro cambia fra
+loggato e non, ma non dice CHI): una regola su un dettaglio di Telegram
+si rompe al suo prossimo ritocco. Mettere `telegram: true` sulle righe
+del web: vedi sopra, «Esci da tutti».
+
+**PROVE.** `prove_account_doppio` in `prove.py` (30): sul database di
+cartone il rientro web (la vecchia → `None`, la nuova e l'altro account
+vivi, una sessione per account), la sessione di ieri adottata, la
+fusione, il filtro sul tg_id, la Mini App (la vecchia chiusa, l'altra
+viva, il proprio Telegram neutro); le sentinelle sull'ordine in
+`apri_sessione`; un banco node che fa girare le funzioni vere del foglio
+(senza account, solo Nostr, con Telegram, il tocco che svela, il
+ridisegno, la Mini App) e `giaApertoNostr` (altra chiave aperta, la
+stessa su cui si è, chiave nuova, firmatario muto, fuori dagli account).
+Controprove sul file vero, poi ripristinato: senza la chiusura cadono 4
+prove; senza il controllo del foglio e della chiave ne cadono 5.
+`collaudo_account.py` ha la sezione «il rientro chiude la vecchia» con
+le richieste vere (un altro browser con la vecchia copiata → 401); senza
+la chiusura cade (47/49). Giro dal vivo con Playwright e Chromium, web
+app a 360×780 densità 2, chiaro e scuro, tocchi veri, server del giro da
+una copia nello scratchpad, relay morti e ogni richiesta fuori dal
+loopback abortita; il widget vero in locale non c'è (vuole il dominio
+su BotFather) e al suo posto un finto disegnato dove andrebbe. Visto: la
+riga al posto del widget, il tocco che lo fa comparire, il rientro
+(vecchia 401, nuova 200), un account Nostr accanto, la stessa chiave
+→ «passo a …» col mazzo IDENTICO e zero richieste a `/api/login/nostr*`,
+e «sei già qui». Suite e collaudi: nel verbale del commit.
+
+**DA FARE (notati, non fatti).**
+- Al TETTO `apri_sessione` toglie dal mazzo l'account più vecchio, ma la
+  sua sessione resta valida nel database fino alla scadenza: lo stesso
+  difetto del rientro, su un altro account.
+- La porta del collaudo nel foglio («🍪 Entra come l'identità di
+  collaudo») non si raggiunge: `collaudo` è vero solo fuori dal web, e
+  fuori dal web il foglio non si apre.
+- Il server del giro in collaudo prova a scaricare lo storico dei prezzi
+  (fee dinamica) da internet: niente relay, ma è una richiesta fuori.
+- Da guardare sul telefono vero: il widget vero dopo «tocca qui», e il
+  rientro col widget vero (stessa porta del collaudo, non provato col
+  dito).

@@ -109517,7 +109517,7 @@ def _amb_portachiavi(collaudo=True, onion_host="", onion_segnale=""):
               "portachiavi_conti", "portachiavi_adottato",
               "cookie_mini", "imposta_cookie_mini", "telegram_della_richiesta",
               "conti_mini", "utente_da_sessione", "conto_scelto",
-              "conti_del_dispositivo", "apri_sessione"):
+              "conti_del_dispositivo", "_chiudi_rientro", "apri_sessione"):
         exec(pezzo(n), amb)
     return amb, con, Resp
 
@@ -109782,6 +109782,199 @@ def prove_portachiavi():
           "prima di aprire il login", (True, False),
           ("closeSheet(); apriNostrSheet();" in porte,
            "navIndietro(); apriNostrSheet();" in porte))
+
+
+def prove_account_doppio():
+    """L'ACCOUNT DOPPIO (19 ott 2026, cantiere account-doppio, dal
+    telefono di Andrea): nel foglio «I tuoi account» il widget diceva
+    «Accedi come AndreAI» con AndreAI gia' aperto. Tre cose: con un
+    Telegram nel portachiavi il widget non si monta (al suo posto la
+    riga che lo fa comparire); una chiave Nostr gia' aperta non apre una
+    sessione nuova, si dice e si passa a lei; e chi rientra sullo stesso
+    account CHIUDE nel database la sessione vecchia che il portachiavi
+    butta via — non resta valida fino alla scadenza."""
+    print("\n[account doppio]")
+    amb, con, Resp = _amb_portachiavi()
+    for tg, nome in ((11, "AndreAI"), (22, "Negozio"), (-5, "Nostrano"),
+                     (710, "Andrea"), (711, "Aggiunto"), (712, "Terzo")):
+        con.execute("INSERT INTO utenti(tg_id,nome,username,negozio,avatar,"
+                    "avatar_scelta) VALUES(?,?,?,?,?,'')",
+                    (tg, nome, nome.lower(), f"n{tg}", ""))
+    con.commit()
+    entra = amb["utente_da_sessione"]
+
+    # --- il web: rientro col Telegram sullo stesso account ---
+    r1 = Resp(); t11 = amb["apri_sessione"](r1, 11, "")
+    r2 = Resp(); t22 = amb["apri_sessione"](r2, 22, r1.cookie["barattolo_portachiavi"],
+                                            r1.cookie["barattolo_sessione"])
+    r3 = Resp(); t11b = amb["apri_sessione"](r3, 11, r2.cookie["barattolo_portachiavi"],
+                                             r2.cookie["barattolo_sessione"])
+    prova("dopo il rientro la sessione VECCHIA non apre piu' niente", None, entra(t11))
+    prova("...la nuova si'", 11, (entra(t11b) or {}).get("id"))
+    prova("...e l'altro account del mazzo resta aperto", 22, (entra(t22) or {}).get("id"))
+    prova("...e nel database resta UNA sessione per account", [(11, 1), (22, 1)],
+          [tuple(x) for x in con.execute(
+              "SELECT tg_id, COUNT(*) FROM sessioni GROUP BY tg_id ORDER BY tg_id")])
+    prova("...e nel mazzo nessun doppione", [22, 11],
+          [c["tg_id"] for c in amb["portachiavi_conti"](r3.cookie["barattolo_portachiavi"])])
+
+    # --- la sessione di ieri, adottata (nessun portachiavi): chiusa anche lei ---
+    ieri = amb["crea_sessione"](-5)
+    r4 = Resp(); t5 = amb["apri_sessione"](r4, -5, "", ieri)
+    prova("il rientro con Nostr chiude la sessione attiva di ieri", (None, -5),
+          (entra(ieri), (entra(t5) or {}).get("id")))
+
+    # --- la fusione: due token sulla stessa persona, se ne vanno tutti e due ---
+    fa, fb = amb["crea_sessione"](22), amb["crea_sessione"](11)
+    con.execute("UPDATE sessioni SET tg_id=11 WHERE tg_id=22"); con.commit()
+    r5 = Resp(); tf = amb["apri_sessione"](r5, 11, fa + "." + fb)
+    prova("dopo una fusione il rientro chiude le DUE vecchie", (None, None, 11),
+          (entra(fa), entra(fb), (entra(tf) or {}).get("id")))
+
+    # --- il filtro sul tg_id: un token altrui nel mazzo non si tocca ---
+    altro = amb["crea_sessione"](-5)
+    prova("_chiudi_rientro non chiude il token di un ALTRO account", (0, -5),
+          (amb["_chiudi_rientro"]([altro, "", altro], 11), (entra(altro) or {}).get("id")))
+    prova("...e senza token non fa niente", 0, amb["_chiudi_rientro"]([], 11))
+
+    # --- dentro la Mini App: lo stesso, nel portachiavi di QUEL Telegram ---
+    amb["PIU_ACCOUNT_OVUNQUE"] = True
+    CV = amb["_CONTO_RICHIESTA"]
+    CV.set({"init": "collaudo:710:Andrea", "conto": "", "cookie": {}})
+    m1 = Resp(); a1 = amb["apri_sessione"](m1, 711, "")
+    CV.set({"init": "collaudo:710:Andrea", "conto": "",
+            "cookie": {"barattolo_mini_710": m1.cookie["barattolo_mini_710"]}})
+    m2 = Resp(); a3 = amb["apri_sessione"](m2, 712, "")
+    CV.set({"init": "collaudo:710:Andrea", "conto": "",
+            "cookie": {"barattolo_mini_710": m2.cookie["barattolo_mini_710"]}})
+    m3 = Resp(); a1b = amb["apri_sessione"](m3, 711, "")
+    prova("dentro Telegram il rientro chiude la vecchia e tiene l'altra",
+          (None, 711, 712), (entra(a1), (entra(a1b) or {}).get("id"),
+                             (entra(a3) or {}).get("id")))
+    m4 = Resp(); amb["apri_sessione"](m4, 710, "")
+    prova("...e il PROPRIO Telegram non apre e non chiude niente", (711, 712),
+          ((entra(a1b) or {}).get("id"), (entra(a3) or {}).get("id")))
+    CV.set(None)
+    amb["PIU_ACCOUNT_OVUNQUE"] = False
+
+    # --- la chiusura passa da apri_sessione, nei due rami, PRIMA della nuova ---
+    ap = codice(pezzo("apri_sessione"))
+    prova("apri_sessione chiude il rientro nei due rami, prima di crea_sessione",
+          [2, True, True],
+          [ap.count("_chiudi_rientro("),
+           0 < ap.find("_chiudi_rientro(") < ap.find("crea_sessione("),
+           ap.rfind("_chiudi_rientro(") < ap.rfind("crea_sessione(")])
+    prova("...e il DELETE guarda il tg_id", True,
+          "WHERE tg_id=? AND token_hash IN" in codice(pezzo("_chiudi_rientro")))
+
+    # --- il client: il foglio e la chiave ---
+    mini = open("miniapp.html", encoding="utf-8").read()
+    porte = _fn_js(mini, "function montaPorteAccount(dai){")
+    prova("il foglio monta il widget solo senza un Telegram nel portachiavi",
+          True, "} else if (telegramNelPortachiavi() && !portaTelegramSvelata) {" in porte
+          and "porte.appendChild(rigaAltroTelegram());" in porte
+          and "porte.appendChild(portaTelegram());" in porte)
+    prova("...dentro la Mini App resta la riga di sempre, prima di tutto", True,
+          -1 < porte.find("if (miniAccount()) {") < porte.find("telegramNelPortachiavi()"))
+    prova("...«…o entra con Nostr» resta sempre", True,
+          "'…o entra con Nostr'" in porte and porte.rfind("porte.appendChild(n);") >
+          porte.find("telegramNelPortachiavi()") > -1)
+    prova("la scelta di svelarlo si azzera a ogni apertura del foglio", True,
+          "portaTelegramSvelata = false;\n  renderAccountSheet();" in
+          _fn_js(mini, "function apriAccountSheet("))
+    en = _fn_js(mini, "async function entraConNostr(")
+    prova("la chiave gia' aperta si guarda PRIMA della sfida", True,
+          0 < en.find("if (await giaApertoNostr(firmatario)) return;")
+          < en.find("/login/nostr/sfida"))
+
+    import shutil as _sh, subprocess as _sp, json as _json
+    if not _sh.which("node"):
+        salta("il banco node del foglio account", "node non c'e'")
+        return
+    banco = r"""
+let collaudo = false, accountAperti = [], accountAttivoId = '', mini = false;
+let vivi = true, eventi = [];
+const miniAccount = () => mini, accountVivi = () => vivi;
+const etichettaNostr = t => 'N ' + t;
+const urlRitornoLogin = () => '/api/login/telegram/ritorno?da=%2F';
+const provaLoginWeb = () => {};
+const closeSheet = () => eventi.push('chiudi');
+const apriNostrSheet = () => {};
+const toast = t => eventi.push('toast:' + t);
+const cambiaAccount = id => eventi.push('passa:' + id);
+const setTimeout = f => f();
+const caricaNostrTools = async () => {};
+const window = {NostrTools: {nip19: {npubEncode: h => 'npub1' + h.slice(0, 6)}}};
+function nodo(tag){ return {tag, figli: [], style: {}, attr: {}, textContent: '', _h: '',
+  get innerHTML(){ return this._h; }, set innerHTML(v){ this._h = v; if (v === '') this.figli = []; },
+  appendChild(f){ f.padre = this; this.figli.push(f); },
+  setAttribute(k, v){ this.attr[k] = v; },
+  replaceWith(n){ const i = this.padre.figli.indexOf(this); n.padre = this.padre; this.padre.figli[i] = n; }}; }
+const document = {createElement: nodo};
+const porte = nodo('div');
+const el = id => porte;
+""" + "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function idConto(c)", "function montaPorteAccount(dai){",
+        "function portaTelegram(){", "function telegramNelPortachiavi(){",
+        "function rigaAltroTelegram(){", "async function giaApertoNostr(firmatario){")) \
+    .replace("function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n}\n",
+             "function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n") \
+    + "\n" + _riga_js(mini, "let portaTelegramSvelata = false;") + r"""
+const cosa = () => porte.figli.map(f => f.tag === 'div' && f.figli[0]?.tag === 'script' ? 'widget'
+  : f.id || f.textContent || f.innerHTML);
+const giri = {};
+accountAperti = [];                               montaPorteAccount(true); giri.vuoto = cosa();
+accountAperti = [{id: '-5', npub: 'npub1aaaaaa'}]; montaPorteAccount(true); giri.soloNostr = cosa();
+accountAperti = [{id: '11'}, {id: '-5'}];          montaPorteAccount(true); giri.conTelegram = cosa();
+porte.figli[1].onclick();                                                    giri.svelato = cosa();
+montaPorteAccount(true);                                                     giri.ridisegno = cosa();
+collaudo = true; portaTelegramSvelata = false;     montaPorteAccount(true); giri.collaudo = cosa();
+porte.figli[1].onclick();                                                    giri.collaudoSvelato = porte.figli[1].textContent;
+collaudo = false; mini = true;                     montaPorteAccount(true); giri.mini = cosa();
+mini = false;
+(async () => {
+  const f = (hex, ok = true) => ({pubkey: async () => { if (!ok) throw 0; return hex; },
+                                  ricorda: () => eventi.push('ricorda')});
+  accountAperti = [{id: '11', nome: 'AndreAI', npub: 'npub1bbbbbb'},
+                   {id: '-5', nome: 'Nostrano', npub: 'npub1aaaaaa'}];
+  accountAttivoId = '11';
+  const prova = async (fi) => { eventi = []; const r = await giaApertoNostr(fi); return [r, eventi]; };
+  giri.altra = await prova(f('aaaaaa' + '0'.repeat(58)));
+  giri.stessa = await prova(f('bbbbbb' + '0'.repeat(58)));
+  giri.nuova = await prova(f('cccccc' + '0'.repeat(58)));
+  giri.muta = await prova(f('', false));
+  vivi = false; giri.fuori = await prova(f('aaaaaa' + '0'.repeat(58))); vivi = true;
+  console.log(JSON.stringify(giri));
+})();
+"""
+    r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+    try:
+        g = _json.loads(r.stdout.strip())
+    except ValueError:
+        prova("il banco node del foglio account gira", "", r.stderr[-600:])
+        return
+    prova("senza account il widget c'e' (con Nostr sotto)", ["Aggiungi un account", "widget", "N …o entra con Nostr"],
+          g["vuoto"])
+    prova("con un solo account Nostr il widget c'e' ancora", "widget", g["soloNostr"][1])
+    prova("con un Telegram nel portachiavi: la riga piccola al posto del widget",
+          ["Aggiungi un account", "accountAltroTelegram", "N …o entra con Nostr"], g["conTelegram"])
+    prova("...e il suo tocco fa comparire il widget, con Nostr sempre sotto",
+          ["Aggiungi un account", "widget", "N …o entra con Nostr"], g["svelato"])
+    prova("...e il ridisegno del foglio aperto non lo rinasconde", "widget", g["ridisegno"][1])
+    prova("in collaudo la stessa regola vale per la porta finta",
+          ("accountAltroTelegram", "🍪 Entra come l'identità di collaudo"),
+          (g["collaudo"][1], g["collaudoSvelato"]))
+    prova("dentro la Mini App niente widget e niente riga nuova",
+          ["Aggiungi un account", "Qui si aggiungono account Nostr. Un altro account Telegram "
+           "si apre dal menu di Telegram.", "N Aggiungi un account Nostr"], g["mini"])
+    prova("una chiave gia' aperta su un ALTRO account: lo dice e passa a lui",
+          [True, ["ricorda", "chiudi", "toast:Questo account è già aperto: passo a Nostrano", "passa:-5"]],
+          g["altra"])
+    prova("...sull'account in cui si e': lo dice e basta, nessun passaggio",
+          [True, ["ricorda", "chiudi", "toast:Questo account è già aperto: sei già qui"]], g["stessa"])
+    prova("una chiave nuova va avanti col login di sempre", [False, []], g["nuova"])
+    prova("...e un firmatario che non sa dire la pubkey anche", [False, []], g["muta"])
+    prova("fuori dagli account vivi (vetrina, demo) non guarda niente", [False, []], g["fuori"])
 
 
 def prove_piu_account_ovunque():
@@ -170061,7 +170254,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi, prove_piu_account_ovunque,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,

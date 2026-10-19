@@ -34,6 +34,10 @@ Le domande a cui risponde:
     apriva VUOTO: qui il caso si riproduce invece di descriverlo;
   · LA PORTA NOSTR mette la sua riga nel mazzo senza buttare fuori chi
     c'era: e' quella da cui si entra col secondo account.
+  · IL RIENTRO CHIUDE LA VECCHIA (19 ott 2026, cantiere account-doppio):
+    chi rientra sullo stesso account prende una sessione nuova, e quella
+    vecchia — uscita dal mazzo — non apre piu' niente, nemmeno da un
+    altro browser che l'avesse copiata; l'altro account resta aperto.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna
@@ -302,6 +306,36 @@ def main():
         c6.post("/api/sessioni/attiva", json={"tg_id": 831})
         prova("...col Telegram di prima ancora raggiungibile", 831,
               c6.get("/api/me").json()["tg_id"])
+
+    print("\n[il rientro chiude la vecchia]")
+    c7 = TestClient(server.app)
+    c7.post("/api/login/telegram",
+            json={"collaudo": True, "id": 151, "first_name": "AndreAI"})
+    vecchia = c7.cookies.get("barattolo_sessione")
+    c7.post("/api/login/telegram",
+            json={"collaudo": True, "id": 152, "first_name": "Negozio"})
+    altra = c7.cookies.get("barattolo_sessione")
+    # il tocco sul widget con lo STESSO account: la porta e' la stessa
+    c7.post("/api/login/telegram",
+            json={"collaudo": True, "id": 151, "first_name": "AndreAI"})
+    nuova = c7.cookies.get("barattolo_sessione")
+    prova("il rientro da' una sessione nuova", True, nuova != vecchia)
+    prova("...e il browser resta su di lui, col mazzo di DUE", (151, 2),
+          (c7.get("/api/me").json()["tg_id"],
+           len(c7.get("/api/sessioni").json()["conti"])))
+    # un ALTRO browser con la vecchia copiata: e' la chiave in giro
+    ladro = TestClient(server.app)
+    ladro.cookies.set("barattolo_sessione", vecchia)
+    prova("la sessione VECCHIA non apre piu' niente", 401,
+          ladro.get("/api/me").status_code)
+    altro_br = TestClient(server.app)
+    altro_br.cookies.set("barattolo_sessione", altra)
+    prova("...l'altro account del mazzo resta aperto", 152,
+          altro_br.get("/api/me").json()["tg_id"])
+    con = server.db()
+    n151 = con.execute("SELECT COUNT(*) n FROM sessioni WHERE tg_id=151").fetchone()["n"]
+    con.close()
+    prova("...e nel database c'e' UNA sola sessione sua", 1, n151)
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

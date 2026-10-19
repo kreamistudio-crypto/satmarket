@@ -9492,7 +9492,16 @@
   CENSIMENTO che lo verifica: nessuna funzione fuori di lì chiama
   `crea_sessione`.
   CHI RIENTRA SU UN ACCOUNT GIÀ APERTO non lo raddoppia (la voce
-  vecchia lascia il posto alla sessione fresca), e al TETTO
+  vecchia lascia il posto alla sessione fresca) E LA VECCHIA SI CHIUDE
+  ANCHE NEL DATABASE (19 ott 2026, cantiere account-doppio, richiesta
+  di Andrea): `_chiudi_rientro`, chiamata da `apri_sessione` nei due
+  rami (web e Mini App) PRIMA di `crea_sessione`, cancella fra i token
+  che il dispositivo mostra (il mazzo e la sessione attiva; nella Mini
+  App il mazzo di QUEL Telegram) quelli dello STESSO tg_id. Uscita dal
+  mazzo non la usava più nessuno, ma restava valida fino alla
+  scadenza: una chiave tolta dal mazzo e ancora buona è una chiave in
+  giro. Il filtro sul tg_id è la metà che conta: gli altri account del
+  mazzo restano aperti. Al TETTO
   (`MAX_ACCOUNT_BROWSER`, 5) cede il più VECCHIO e mai chi è appena
   entrato: chi ha appena messo la password si aspetta di trovarsi lì
   dentro.
@@ -9579,6 +9588,23 @@
   Nostr) e la differenza è che il portachiavi NON si azzera; al TETTO
   non si montano affatto e la riga dice perché — un bottone che porta
   a un muro è peggio di un bottone che non c'è.
+  IL TELEGRAM GIÀ APERTO (19 ott 2026, cantiere account-doppio): QUALE
+  account c'è dentro il widget Barattolo non lo può sapere — lo scrive
+  Telegram in un riquadro di oauth.telegram.org, dove il browser non
+  lascia guardare, e il nome arriva solo DOPO il tocco. Quindi la regola
+  guarda il portachiavi: con un account Telegram già aperto (id
+  POSITIVO; i nativi Nostr sono negativi) il widget non si monta, e al
+  suo posto c'è la riga «Un altro account Telegram? Esci da Telegram Web
+  e tocca qui», che lo fa comparire (`portaTelegramSvelata`, azzerata a
+  ogni apertura del foglio). Solo Nostr avrebbe chiuso per sempre la
+  strada a un secondo Telegram vero. Dentro la Mini App il widget non
+  c'era già. «…o entra con Nostr» resta sempre.
+  LA CHIAVE NOSTR GIÀ APERTA (stesso cantiere): `giaApertoNostr`, in
+  testa a `entraConNostr` e PRIMA della sfida, confronta nel browser la
+  npub del firmatario con quelle degli account aperti. Se c'è: «Questo
+  account è già aperto», si passa a lui (o «sei già qui»), nessuna
+  richiesta al server e nessuna sessione nuova. Un firmatario che non
+  sa dire la pubkey va avanti come sempre: decide il server.
   IL FOGLIO SI APRE SUBITO E POI RILEGGE (`apriAccountSheet`): disegna
   coi dati che ha e richiama `caricaAccount`, perché una sessione può
   essere scaduta da un'altra parte — mai un'attesa davanti a un elenco
