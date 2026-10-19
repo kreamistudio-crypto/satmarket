@@ -110254,7 +110254,7 @@ def prove_login_dal_bot():
           < _bw.find("da qui gli avvisi in chat non si possono attivare"))
     import shutil as _shb
     if _shb.which("node"):
-        _bancobw = r"""
+        _bancobw = _riga_js(mini, "const BOT_TG = ") + r"""
 let onion = false, myBotAvviato = false, myTgId = 0;
 const suOnion = () => onion, hintDismesso = () => false, esc = t => t;
 const b = {style: {}, className: '', innerHTML: ''};
@@ -110306,7 +110306,7 @@ console.log(JSON.stringify(giri));
     if not _sh.which("node"):
         salta("il banco node di entra dal bot", "node non c'e'")
         return
-    banco = r"""
+    banco = _riga_js(mini, "const BOT_TG = ") + r"""
 let collaudo = false, accountAperti = [], mini = false, tg = null, ricaricata = 0;
 let onion = false;
 const suOnion = () => onion;
@@ -110647,8 +110647,13 @@ def prove_logout_apk():
                        ("h3", 6, adesso - 10 * 86400)):
         _c.execute("INSERT INTO sessioni VALUES(?,?,?,?)", (th, tg, cr, cr + 30 * 86400))
     _c.commit(); _c.close()
-    giro = _sp.run(["bash", "-c", py.replace("/srv/barattolo/dati/satmarket.db", finto)],
-                   capture_output=True, text=True, timeout=30)
+    # la riga di PRODUZIONE e' un `python3 -c "..."`: la si spezza come
+    # farebbe la shell e la si gira col Python di qui, perche' su Windows
+    # `bash` e' quello di WSL e il database finto non lo vedrebbe
+    import shlex as _shl
+    _cmd = _shl.split(py.replace("/srv/barattolo/dati/satmarket.db", finto.replace(os.sep, "/")))
+    giro = _sp.run([sys.executable] + _cmd[1:], capture_output=True, text=True,
+                   encoding="utf-8", timeout=30)
     prova("il comando gira e conta giusto", ["sessioni vive: 3",
                                               "aperte nelle 48h e ancora vive: 2",
                                               "account con 2+ sessioni aperte nelle 48h: 1"],
@@ -110842,7 +110847,10 @@ function azzera(){ eventi.length = 0; magazzino.myTgId = null; nodi.riprovo.stor
   console.log(JSON.stringify(giri));
 })().catch(e => { console.log(JSON.stringify({esplosa: String(e && e.stack || e)})); });
 """
-    r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=60)
+    # da stdin e non con -e: su Windows la riga di comando si ferma a
+    # 32.767 caratteri, e questo banco e' piu' lungo
+    r = _sp.run(["node", "-"], input=banco, capture_output=True, text=True,
+                encoding="utf-8", timeout=60)
     try:
         g = _json.loads(r.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):

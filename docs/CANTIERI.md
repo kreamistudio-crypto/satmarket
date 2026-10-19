@@ -67069,6 +67069,7 @@ storpiata): tutte prese. Suite e collaudi: nel messaggio del commit.
   (75 s). Una ronda che legge proprio lì griderebbe ancora. Non
   verificato quanto è larga sul nodo (dipende dalla grazia della
   riconciliazione, minimo 30 s).
+
 ## Entra dal bot: «Entra con Telegram» con l'account attivo nell'app, non quello ricordato dal browser (19 ott 2026, cantiere account-doppio-bot, idea di Andrea)
 
 **IL GUASTO (dal telefono di Andrea).** Due account Telegram sullo
@@ -67328,6 +67329,7 @@ su Barattolo dal browser. Gli avvisi sui tuoi ordini ti arrivano in chat
 da @ilbarattolobot.»; nessun errore di pagina. Il server del giro ha
 provato a chiedere il cambio a api.coingecko.com, e il proxy l'ha
 fermato: è il server, non la pagina, e non tocca il cantiere.
+
 ## Il falso logout dell'APK: la sonda che non molla, le sfide nel database, la traccia delle chiusure (19 ott 2026, cantiere logout-apk, richiesta e decisioni di Andrea)
 
 IL CASO. Un utente dell'app Android (APK da Zapstore, l'involucro TWA)
@@ -67510,6 +67512,7 @@ pagina torna dentro da sola, senza tocchi. SUITE `PROVE_SEVERE=1`
 0 rossi, più `collaudo_account` verde nella gabbia — sull'albero del
 primo giro (1c2df89, su 6b2e4af) più questo. Il rebase sul main corso e
 la firma per il VPS li fa una sessione sul PC di Andrea.
+
 ## Le miniature più leggere: 480 q82, lo script per le vecchie, e il riquadro delle liste piccole (19 ott 2026, cantiere miniature-leggere, decisioni di Andrea)
 
 **IL PERCHÉ.** Le `_min.jpg` erano 640 px a qualità 87 e in produzione
@@ -67623,6 +67626,7 @@ contenitore vero (flex, gap 10): buona → la 480, mancante e senza foto
 finale (0fd3816 + il cantiere coi due giri) la suite severa intera:
 **25.314 passate, 0 fallite**; `collaudo_offerta_carrello`,
 `collaudo_rilancio`, `collaudo_modifica_massiva`: verdi.
+
 ## L'indirizzo della quota: swap@barattolo.store (19 ott 2026, cantiere swap-indirizzo, decisione di Andrea)
 
 **LA RICHIESTA.** Un Lightning address dedicato alla quota mensile di
@@ -67734,3 +67738,37 @@ prima fattura vera (21 sat) e l'avviso nella stanza; lo spazio in
 entrata prima della prima quota; se LNbits del nodo ha un massimo suo
 per le fatture in entrata, lo dirà il journal alla prima fattura
 grossa («fattura non coniata»).
+
+## I quattro rami delle sessioni cloud, portati su main in fila (19 ott 2026, cantiere quattro-rami, richiesta di Andrea)
+
+**COSA.** account-doppio-bot, logout-apk, miniature-leggere e
+swap-indirizzo, ognuno ribasato sul precedente (il primo su
+origin/main 725371d) e rifirmato commit per commit con la chiave del
+repo: i commit delle sessioni cloud non erano firmati, e il VPS tira
+solo una punta firmata. Conflitti tutti di aggiunta: le code di
+CANTIERI, PRODUZIONE, `ci/collaudi.txt`, `ci/compila.txt` e prove.py
+(funzioni nuove prima di `main()` e nell'elenco finale), più tre
+punti A METÀ di prove.py dove due cantieri hanno accodato righe alla
+stessa lista — la funzione di logout-apk accanto a quella di
+account-doppio-bot con i due nomi nella stessa riga dell'elenco, e nel
+banco di `prove_leve` le chiavi di swap-chiavi-referral (già su main)
+accanto alla invoice key di swap@ e i loro giudici. Uniti tenendo
+tutto, prima main e poi il ramo, col sì di Andrea; nessun nome doppio
+nel dizionario dei segreti finti (25) né nella tupla dei giudici (54).
+
+**L'INCASTRO CHE NESSUN CONFLITTO DICEVA.** L'istanza di prova (main,
+e2fd797) ha fatto del nome del bot una riga sola, `const BOT_TG`; il
+terzo giro di account-doppio-bot, nato prima, scriveva
+`@ilbarattolobot` a mano nel banner di onion e i suoi due banchi node
+non posavano `BOT_TG`. Al primo giro della suite: quattro rosse
+(`prove_istanza_prova` conta il nome due volte, i due banchi esplodono
+con «BOT_TG is not defined»). Il testo ora dice `@${BOT_TG}`, i banchi
+posano la riga vera con `_riga_js`.
+
+**DUE ROSSE DI WINDOWS, NON DELL'UNIONE.** `prove_logout_apk`, scritta
+in una sessione Linux, girava un banco node più lungo dei 32.767
+caratteri della riga di comando di Windows (`node -e`: WinError 206) e
+la riga `python3 -c` di PRODUZIONE dentro `bash -c` — che sul PC è il
+bash di WSL, cieco ai percorsi di Windows. Ora il banco passa da stdin
+(UTF-8) e la riga si spezza con `shlex` e gira col Python corrente:
+stesso comando, stesse prove, su tutt'e due i sistemi.
