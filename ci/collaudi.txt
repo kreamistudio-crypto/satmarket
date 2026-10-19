@@ -117,6 +117,7 @@ collaudo_ordine_in_pausa
 collaudo_paracadute
 collaudo_piu_account
 collaudo_istanza_prova
+collaudo_login_bot
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

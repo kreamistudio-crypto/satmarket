@@ -93374,6 +93374,8 @@ def prove_ricarica_resta():
            # passano da una porta sola, e l'avviso del bot tiene l'indirizzo
            ("ricaricaPerConto", "if (restaQui) { location.reload(); return; }"),
            ("ricaricaPerConto", "navDaCapo(); location.reload();"),
+           # (19 ott 2026, account-doppio-bot) l'ingresso dal bot, come ogni login
+           ("bussaIngressoBot", "navDaCapo(); location.reload();"),
            ("provaLoginWeb", "navDaCapo(); location.reload();"),
            ("entraConNostr", "navDaCapo(); location.reload();"),
            ("accettaCollega", "navDaCapo(); location.reload();")], _dove)
@@ -110028,6 +110030,7 @@ def prove_account_doppio():
     banco = r"""
 let collaudo = false, accountAperti = [], accountAttivoId = '', mini = false;
 let vivi = true, eventi = [];
+let portaBotSi = false;   // il mondo di prima: la porta del bot chiusa
 const miniAccount = () => mini, accountVivi = () => vivi;
 const etichettaNostr = t => 'N ' + t;
 const urlRitornoLogin = () => '/api/login/telegram/ritorno?da=%2F';
@@ -110109,6 +110112,264 @@ mini = false;
     prova("una chiave nuova va avanti col login di sempre", [False, []], g["nuova"])
     prova("...e un firmatario che non sa dire la pubkey anche", [False, []], g["muta"])
     prova("fuori dagli account vivi (vetrina, demo) non guarda niente", [False, []], g["fuori"])
+
+
+def prove_login_dal_bot():
+    """ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot, idea di
+    Andrea): sul web «Entra con Telegram» passa dal bot, cosi' entra
+    l'account ATTIVO nell'app e non quello che il browser ricorda. Qui
+    la forma — la leva spenta di serie, la terza porta del /start che
+    passa per prima, il codice che si brucia, il legame che non esce, la
+    sessione dalla porta unica — e un banco node che fa girare le
+    funzioni vere del foglio. Il giro con le richieste vere e il bot
+    simulato sta in collaudo_login_bot.py."""
+    print("\n[entra dal bot]")
+    src = _SORGENTE
+    prova("la leva nasce SPENTA nel codice", True,
+          "    LOGIN_DAL_BOT = False\n" in src)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("...e nel config d'esempio, spiegata", True,
+          "\nLOGIN_DAL_BOT = False\n" in esempio and "ENTRA DAL BOT" in esempio)
+    prova("...e sta nel pannello delle leve", True,
+          '_leva("Entra dal bot", "LOGIN_DAL_BOT"' in src)
+    porta = codice(pezzo("porta_bot_aperta"))
+    prova("la porta vuole la leva E il campanello del bot", True,
+          "bool(LOGIN_DAL_BOT) and (MODALITA_COLLAUDO or webhook_attivo())" in porta)
+    gu = codice(pezzo("gestisci_update"))
+    prova("al /start la porta dell'ingresso passa PER PRIMA", True,
+          -1 < gu.find("if carico.startswith(PREFISSO_INGRESSO):")
+          < gu.find("normalizza_codice_invito(carico)")
+          < gu.find("avvia_fusione(chat, carico)"))
+    prova("...e il benvenuto in anagrafe viene prima di tutto", True,
+          -1 < gu.find("upsert_utente(") < gu.find("PREFISSO_INGRESSO"))
+    prova("il tocco «entra:» va alle figure", True,
+          'if azione == "entra":\n        # le figure dell\'ingresso dal bot (ENTRA DAL BOT)\n'
+          '        return await callback_ingresso_bot(cb, token)' in pezzo("gestisci_callback"))
+    av = codice(pezzo("avvia_ingresso_bot"))
+    prova("il CODICE si brucia all'Avvia (monouso)", True,
+          "CODICI_INGRESSO.pop(codice, None)" in av)
+    prova("...solo se ha la forma giusta", True,
+          "FORMA_CODICE_INGRESSO.fullmatch(codice)" in av)
+    prova("...e l'ingresso si lega a chi ha premuto Avvia", True,
+          'i.update(stato="in_chat", tg_id=int(chat), nome=nome)' in av)
+    prova("il nome nel messaggio passa da html.escape", True,
+          "chi = html.escape(nome)" in av and "html.escape(mittente['username'])" in av)
+    cb = codice(pezzo("callback_ingresso_bot"))
+    prova("la figura vale solo per QUEL Telegram, e una volta", True,
+          'i["tg_id"] != (cb.get("from") or {}).get("id")' in cb
+          and "TOKEN_INGRESSO.pop(token, None)" in cb
+          and 'i["stato"] != "in_chat"' in cb)
+    prova("...la sbagliata annulla, come il «non sono stato io»", 2,
+          cb.count('i["stato"] = "no"'))
+    prova("...e giusta vuol dire QUELLA della pagina", True,
+          'i["scelte"][int(scelta)] != i["figura"]' in cb)
+    ini = codice(pezzo("inizia_login_bot"))
+    prova("l'ingresso nasce col freno del login", True, '_frena("login", _ip_di(req))' in ini)
+    prova("le rotte girano nel loop, come i gesti del bot (niente thread sui dizionari)", True,
+          '@app.post("/api/login/bot/inizia")\nasync def inizia_login_bot(' in src
+          and '@app.post("/api/login/bot/stato")\nasync def stato_login_bot(' in src)
+    prova("...mai dentro la Mini App", True,
+          "if x_tg_init_data:" in ini and "raise HTTPException(400" in ini)
+    prova("...uno solo vivo per browser", True,
+          "INGRESSI_BOT.pop(_hash_legame(barattolo_ingresso), None)" in ini)
+    prova("...tre figure DIVERSE, una giusta, a caso vero", True,
+          "secrets.SystemRandom().sample(FIGURE_INGRESSO, 3)" in ini
+          and "secrets.choice(scelte)" in ini)
+    prova("il LEGAME sta in un cookie HttpOnly, sulle sole rotte della porta", True,
+          "httponly=True" in ini and "path=PERCORSO_INGRESSO" in ini
+          and 'PERCORSO_INGRESSO = "/api/login/bot"' in src)
+    ritorno = ini[ini.rfind("return {"):]
+    prova("...e non esce nella risposta (solo link, figura, tempo)", True,
+          "legame" not in ritorno and '"link"' in ritorno and '"figura"' in ritorno)
+    prova("in memoria si tiene l'HASH del legame, non il legame", True,
+          "lh = _hash_legame(legame)" in ini and "INGRESSI_BOT[lh] = {" in ini)
+    st = codice(pezzo("stato_login_bot"))
+    prova("la sessione si apre dalla PORTA UNICA (portachiavi, tetto, rientro)", True,
+          "apri_sessione(response, int(i[\"tg_id\"]), barattolo_portachiavi," in st)
+    prova("...solo a figura giusta", True,
+          -1 < st.find('if i["stato"] != "ok":') < st.find("apri_sessione("))
+    prova("...e l'ingresso finito se ne va col suo cookie", True,
+          -1 < st.find("INGRESSI_BOT.pop(lh, None)") < st.find("apri_sessione(")
+          and "response.delete_cookie(COOKIE_INGRESSO, path=PERCORSO_INGRESSO)" in st)
+    ns = {"re": re}
+    exec(pezzo("_dispositivo_da_ua"), ns)
+    prova("chi chiede, in una parola", [
+        "un browser su iPhone o iPad", "un browser su Android", "un computer Windows",
+        "un Mac", "un browser"], [ns["_dispositivo_da_ua"](u) for u in (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)", "Mozilla/5.0 (Linux; Android 15)",
+            "Mozilla/5.0 (Windows NT 10.0; Win64)", "Mozilla/5.0 (Macintosh; Intel Mac OS X)", "")])
+    exec(next(r for r in src.split("\n")
+              if r.startswith("FORMA_CODICE_INGRESSO = ")), ns)
+    prova("la forma del codice: quello che nasce passa, l'HTML no", (True, False, False),
+          (bool(ns["FORMA_CODICE_INGRESSO"].fullmatch("Ab-_" + "x" * 18)),
+           bool(ns["FORMA_CODICE_INGRESSO"].fullmatch("<b>x")),
+           bool(ns["FORMA_CODICE_INGRESSO"].fullmatch("corto"))))
+
+    # --- il client ---
+    mini = open("miniapp.html", encoding="utf-8").read()
+    porte = _fn_js(mini, "function montaPorteAccount(dai){")
+    prova("nel foglio la porta del bot viene PRIMA della riga e del widget", True,
+          -1 < porte.find("if (miniAccount()) {") < porte.find("} else if (portaBotSi) {")
+          < porte.find("telegramNelPortachiavi() && !portaTelegramSvelata"))
+    prova("la frase di prima non c'e' piu' quando c'e' il bot", False,
+          "Esci da Telegram Web" in _fn_js(mini, "function portaBot(altro){"))
+    prova("il foglio rilegge la porta insieme agli account", True,
+          "Promise.all([caricaAccount(), leggiPortaBot()])" in
+          _fn_js(mini, "function apriAccountSheet("))
+    prova("closeSheet chiude anche il foglio del bot", True,
+          "el('botEntraSheet').classList.remove('open');" in _fn_js(mini, "function closeSheet(){"))
+    prova("il foglio ha la figura, il bottone, il QR e il «Riprova»", True,
+          all(f'id="{i}"' in mini for i in ("botEntraSheet", "botEntraEmoji", "botEntraApri",
+                                             "botEntraQr", "botEntraStato", "botEntraRifai")))
+    prova("Telegram si apre da un LINK vero (il tocco del dito, non uno script)", True,
+          '<a class="btn primary" id="botEntraApri"' in mini)
+
+    import shutil as _sh, subprocess as _sp, json as _json
+    if not _sh.which("node"):
+        salta("il banco node di entra dal bot", "node non c'e'")
+        return
+    banco = r"""
+let collaudo = false, accountAperti = [], mini = false, tg = null, ricaricata = 0;
+let chiamate = [], risposte = [], ua = 'Mozilla/5.0 (Linux; Android 15)';
+const miniAccount = () => mini;
+const etichettaNostr = t => 'N ' + t;
+const LOGO_TELEGRAM = 'data:x';
+const API_BASE = '/api';
+const urlRitornoLogin = () => '/r';
+const provaLoginWeb = () => {};
+const closeSheet = () => {};
+const apriNostrSheet = () => {};
+const navDaCapo = () => {};
+const location = {reload: () => { ricaricata++; }};
+const navigator = {userAgent: '', platform: '', maxTouchPoints: 0};
+Object.defineProperty(navigator, 'userAgent', {get: () => ua});
+let qr = 0;
+const disegnaQr = async () => { qr++; return true; };
+const setInterval = () => 1, clearInterval = () => {};
+const fetch = async (url, opz) => { chiamate.push((opz?.method || 'GET') + ' ' + url);
+  const r = risposte.shift(); return {ok: r.ok !== false, status: r.status || 200, json: async () => r.json}; };
+const document = {hidden: false, addEventListener(){}, createElement: nodo};
+function nodo(tag){ return {tag, figli: [], style: {}, attr: {}, textContent: '', _h: '', classList: {
+    _c: new Set(), add(c){ this._c.add(c); }, remove(c){ this._c.delete(c); }, contains(c){ return this._c.has(c); }},
+  get innerHTML(){ return this._h; }, set innerHTML(v){ this._h = v; if (v === '') this.figli = []; },
+  appendChild(f){ f.padre = this; this.figli.push(f); }, append(...f){ f.forEach(x => this.appendChild(x)); },
+  setAttribute(k, v){ this.attr[k] = v; }}; }
+const nodi = {};
+const el = id => (nodi[id] ||= nodo(id));
+""" + "".join(_fn_js(mini, f) for f in (
+        "function idConto(c)", "function montaPorteAccount(dai){", "function portaTelegram(){",
+        "function telegramNelPortachiavi(){", "function rigaAltroTelegram(){",
+        "function leggiPortaBot(){", "function telefonoQui(){", "function portaBot(altro){",
+        "function fermaIngressoBot(){", "function dettaIngressoBot(testo, fine){",
+        "async function apriIngressoBot(){", "async function bussaIngressoBot(){",
+        "function bottoneLoginTelegram(){", "function bottoneLoginBot(posto){",
+        "function widgetLoginTelegram(posto){")) \
+    .replace("function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n}\n",
+             "function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n") \
+    + _riga_js(mini, "let portaTelegramSvelata = false;") \
+    + _riga_js(mini, "let portaBotSi = null;") + _riga_js(mini, "let portaBotPromessa = null;") \
+    + pezzo_js(mini, "const etichettaTelegram = ", ";\n") + ";\n" \
+    + _riga_js(mini, "let ingressoBotTimer = null,") + r"""
+const porte = el('accountPorte');
+const cosa = () => porte.figli.map(f => f.tag === 'div' && f.figli[0]?.tag === 'script' ? 'widget'
+  : f.figli[0]?.id ? f.figli.map(x => x.id + '|' + (x.textContent || x.innerHTML.replace(/<img[^>]*> /, ''))) : (f.id || f.textContent || f.innerHTML));
+const giri = {};
+(async () => {
+  // il foglio account, nelle quattro situazioni
+  portaBotSi = null;  accountAperti = [];                   montaPorteAccount(true); giri.nonSo = cosa();
+  portaBotSi = true;  accountAperti = [];                   montaPorteAccount(true); giri.vuoto = cosa();
+  accountAperti = [{id: '11'}, {id: '-5'}];                  montaPorteAccount(true); giri.conTelegram = cosa();
+  portaBotSi = false;                                        montaPorteAccount(true); giri.chiusa = cosa();
+  mini = true; portaBotSi = true;                            montaPorteAccount(true); giri.mini = cosa(); mini = false;
+  // la porta si chiede una volta sola, e dentro Telegram mai
+  portaBotSi = null; portaBotPromessa = null; chiamate = [];
+  risposte = [{json: {aperta: true}}];
+  giri.leggi = [await leggiPortaBot(), await leggiPortaBot(), chiamate.slice()];
+  tg = {initData: 'x'}; portaBotPromessa = null; chiamate = [];
+  giri.dentroTelegram = [await leggiPortaBot(), chiamate.length]; tg = null;
+  portaBotPromessa = null; chiamate = []; risposte = [{ok: false, status: 500}];
+  giri.guasto = await leggiPortaBot();
+  // il giro del foglio, dal telefono
+  ricaricata = 0; chiamate = []; portaBotSi = true;
+  risposte = [{json: {link: 'https://t.me/ilbarattolobot?start=entra_abc', figura: '🍐', valida_secondi: 120}}];
+  await apriIngressoBot();
+  const f = () => [el('botEntraStato').textContent, el('botEntraEmoji').textContent,
+    el('botEntraFigura').style.display, el('botEntraApri').style.display, el('botEntraRifai').style.display,
+    el('botEntraQrBox').style.display];
+  giri.telefono = [f(), el('botEntraApri').href, el('botEntraApri').innerHTML.replace(/<img[^>]*> /, ''), qr];
+  risposte = [{json: {stato: 'attesa'}}];   await bussaIngressoBot(); giri.attesa = f()[0];
+  risposte = [{json: {stato: 'in_chat'}}];  await bussaIngressoBot(); giri.inChat = f()[0];
+  risposte = [{json: {stato: 'dentro', nome: 'Negozio'}}]; await bussaIngressoBot();
+  giri.dentro = [f()[0], ricaricata];
+  giri.chiamate = chiamate.slice();
+  // scaduto, annullato, la leva spenta a meta' strada, la rete che balla
+  for (const [k, r] of [['scaduto', {json: {stato: 'scaduto'}}], ['annullato', {json: {stato: 'annullato'}}],
+                        ['spenta', {ok: false, status: 404}], ['rete', null]]) {
+    risposte = [{json: {link: 'L', figura: '🍋'}}]; await apriIngressoBot();
+    if (r) risposte = [r]; else risposte = [];
+    try { await bussaIngressoBot(); } catch(e) {}
+    giri[k] = f();
+  }
+  // dal computer: il QR e il bottone di Telegram Desktop
+  ua = 'Mozilla/5.0 (Windows NT 10.0)'; qr = 0;
+  risposte = [{json: {link: 'L', figura: '🍇'}}]; await apriIngressoBot();
+  giri.computer = [el('botEntraQrBox').style.display, qr, el('botEntraApri').innerHTML.replace(/<img[^>]*> /, '')];
+  // il link non si prepara: si dice, e si puo' riprovare
+  risposte = [{ok: false, status: 429}]; await apriIngressoBot(); giri.freno = f();
+  // il banner della vetrina: bottone del bot o widget
+  portaBotPromessa = Promise.resolve(true);
+  const banner = el('demoBanner'); bottoneLoginTelegram(); await portaBotPromessa; await null;
+  portaBotPromessa = Promise.resolve(false); bottoneLoginTelegram(); await portaBotPromessa; await null;
+  giri.vetrina = banner.figli.map(p => p.figli[0]?.tag === 'script' ? 'widget' : p.figli[0]?.id);
+  console.log(JSON.stringify(giri));
+})().catch(e => console.error(e.stack));
+"""
+    r = _sp.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+    try:
+        g = _json.loads(r.stdout.strip())
+    except ValueError:
+        prova("il banco node di entra dal bot gira", "", r.stderr[-900:])
+        return
+    prova("finche' non si sa se c'e' la porta: niente widget che poi sparisce",
+          ["Aggiungi un account", "N …o entra con Nostr"], g["nonSo"])
+    prova("senza account: «Entra con Telegram» e la riga che dice QUALE entra, poi Nostr",
+          ["Aggiungi un account", ["accountEntraBot|Entra con Telegram",
+           "accountEntraBotRiga|Entra l’account aperto ora nell’app Telegram."],
+           "N …o entra con Nostr"], g["vuoto"])
+    prova("con un Telegram aperto: «Aggiungi un altro Telegram», e come si fa",
+          ["accountEntraBot|Aggiungi un altro Telegram",
+           "accountEntraBotRiga|Prima sceglilo nell’app Telegram, poi tocca qui."],
+          g["conTelegram"][1])
+    prova("a porta chiusa il mondo di prima (la riga del widget)", "accountAltroTelegram",
+          g["chiusa"][1])
+    prova("dentro la Mini App niente porta del bot", 3, len(g["mini"]))
+    prova("...e la riga di sempre", True, g["mini"][1].startswith("Qui si aggiungono account Nostr"))
+    prova("la porta si chiede UNA volta", [True, True, ["GET /api/login/bot"]], g["leggi"])
+    prova("...e dentro Telegram mai", [False, 0], g["dentroTelegram"])
+    prova("...e un server che non risponde vuol dire widget", False, g["guasto"])
+    prova("dal telefono: la figura, «Apri Telegram» e niente QR",
+          [["Aspetto che tocchi Avvia nel bot…", "🍐", "", "", "none", "none"],
+           "https://t.me/ilbarattolobot?start=entra_abc", "Apri Telegram", 0], g["telefono"])
+    prova("dopo l'Avvia la pagina dice QUALE figura toccare", "Ora nel bot tocca 🍐", g["inChat"])
+    prova("figura giusta: si e' dentro e la pagina si ricarica",
+          ["✅ Sei dentro come Negozio", 1], g["dentro"])
+    prova("si chiede una volta e si bussa con POST", ["POST /api/login/bot/inizia"]
+          + ["POST /api/login/bot/stato"] * 3, g["chiamate"])
+    prova("scaduto: si dice, e c'e' «Riprova» al posto della figura",
+          ["Il link è scaduto: riprova, ci vuole un attimo.", "🍋", "none", "none", "", "none"],
+          g["scaduto"])
+    prova("annullato nel bot: lo stesso", "Ingresso annullato nel bot. Se eri tu, riprova.",
+          g["annullato"][0])
+    prova("...anche se la leva si spegne a meta' strada", g["annullato"], g["spenta"])
+    prova("la rete che balla non chiude niente: si ribussa", ["Aspetto che tocchi Avvia nel bot…",
+          "🍋", "", "", "none", "none"], g["rete"])
+    prova("dal computer: il QR e «Apri Telegram Desktop»", ["", 1, "Apri Telegram Desktop"],
+          g["computer"])
+    prova("troppi tentativi: si dice, e si puo' riprovare",
+          "Troppi tentativi in poco tempo: riprova fra un minuto.", g["freno"][0])
+    prova("...col «Riprova» in vista", "", g["freno"][4])
+    prova("la vetrina: il bottone del bot a porta aperta, il widget a porta chiusa",
+          ["vetrinaEntraBot", "widget"], g["vetrina"])
 
 
 def prove_piu_account_ovunque():
@@ -171765,7 +172026,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,

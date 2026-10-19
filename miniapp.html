@@ -14857,6 +14857,29 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
 
+  <!-- ============ SHEET ENTRA DAL BOT (19 ott 2026) ============
+       Il giro di «Entra con Telegram» a leva LOGIN_DAL_BOT accesa: la
+       FIGURA in alto, perche' va vista PRIMA di andare nel bot; il
+       bottone che apre Telegram; il QR solo dal computer. Lo riempie e
+       lo tiene in pari apriIngressoBot(). -->
+  <div class="sheet" id="botEntraSheet">
+    <div class="grab"></div>
+    <h3 id="botEntraTitolo">Entra con Telegram</h3>
+    <div id="botEntraSub" style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.5"></div>
+    <div id="botEntraFigura" style="display:none;text-align:center;margin:14px 0 4px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:700">Nel bot tocca questa figura</div>
+      <div id="botEntraEmoji" style="font-size:60px;line-height:1.25" aria-live="polite"></div>
+    </div>
+    <div id="botEntraQrBox" style="display:none;margin-bottom:6px">
+      <div class="qr" id="botEntraQr"></div>
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px;text-align:center">Inquadralo col telefono: entra l'account aperto nel Telegram del telefono.</div>
+    </div>
+    <a class="btn primary" id="botEntraApri" style="display:none;text-decoration:none" target="_blank" rel="noopener" href="#">Apri Telegram</a>
+    <div id="botEntraStato" role="status" style="font-size:13px;color:var(--ink-soft);font-weight:700;text-align:center;margin:10px 0 2px;min-height:20px"></div>
+    <button class="btn ghost" id="botEntraRifai" style="display:none" onclick="apriIngressoBot()">🔄 Riprova</button>
+    <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
+  </div>
+
   <!-- ============ SHEET LOGIN NOSTR ============ -->
   <div class="sheet" id="nostrSheet">
     <div class="grab"></div>
@@ -32358,6 +32381,7 @@ function closeSheet(){
   el('paccoSvuotaSheet').classList.remove('open');
   el('corrieriSheet').classList.remove('open');
   el('accountSheet').classList.remove('open');
+  el('botEntraSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
      scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui),
@@ -51517,6 +51541,12 @@ function montaPorteAccount(dai){
     riga.style.margin = '6px 0 4px';
     riga.textContent = 'Qui si aggiungono account Nostr. Un altro account Telegram si apre dal menu di Telegram.';
     porte.appendChild(riga);
+  } else if (portaBotSi) {
+    porte.appendChild(portaBot(telegramNelPortachiavi()));
+  } else if (portaBotSi === null) {
+    /* non si sa ancora se c'e' la porta del bot: niente, per un attimo,
+       invece di un widget che sparisce sotto il dito — il ridisegno
+       arriva con la risposta (apriAccountSheet) */
   } else if (telegramNelPortachiavi() && !portaTelegramSvelata) {
     porte.appendChild(rigaAltroTelegram());
   } else {
@@ -51593,6 +51623,155 @@ function rigaAltroTelegram(){
   return b;
 }
 
+/* ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot, idea di
+   Andrea). Il widget di Telegram entra con l'account che il BROWSER
+   ricorda su oauth.telegram.org, non con quello attivo nell'app: con
+   due Telegram sullo stesso telefono entrava sempre il primo. A leva
+   LOGIN_DAL_BOT accesa «Entra con Telegram» passa dal bot, e entra chi
+   ha premuto Avvia. Il giro e i suoi perche' (il codice monouso, il
+   legame nel cookie, le tre figure contro il link inoltrato) stanno in
+   server.py, «ENTRA DAL BOT»; qui c'e' la meta' della pagina: chiedere
+   l'ingresso, mostrare la figura, aprire Telegram, bussare finche' il
+   bot non ha detto si'. A leva spenta, o col bot sordo, la porta non
+   c'e' e resta il widget di sempre (`portaTelegram`).
+   Dentro Telegram non serve: la Mini App entra gia' con l'account
+   attivo, e la domanda non si fa nemmeno. */
+let portaBotSi = null;          // null = non si sa ancora
+let portaBotPromessa = null;
+function leggiPortaBot(){
+  if (tg?.initData) { portaBotSi = false; return Promise.resolve(false); }
+  if (!portaBotPromessa) {
+    portaBotPromessa = fetch(`${API_BASE}/login/bot`)
+      .then(r => r.ok ? r.json() : {aperta: false})
+      .then(d => (portaBotSi = !!d.aperta))
+      .catch(() => (portaBotSi = false));
+  }
+  return portaBotPromessa;
+}
+const etichettaTelegram = testo => `<img src="${LOGO_TELEGRAM}" width="20" `
+  + `height="20" alt="" draggable="false" style="flex:none;border-radius:50%;`
+  + `vertical-align:-5px">` + ' ' + testo;
+/* Il telefono si riconosce come fa il banner dell'installazione: li' il
+   bot si apre nell'app, dal computer serve il QR da inquadrare. */
+function telefonoQui(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+/* La porta nel foglio «I tuoi account»: un bottone e una riga che dice
+   QUALE account entra — e con un Telegram gia' aperto, come se ne
+   aggiunge un altro (prima si sceglie nell'app). */
+function portaBot(altro){
+  const box = document.createElement('div');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn primary';
+  b.id = 'accountEntraBot';
+  b.innerHTML = etichettaTelegram(altro ? 'Aggiungi un altro Telegram'
+                                        : 'Entra con Telegram');
+  /* closeSheet e non navIndietro: la stessa ragione della porta Nostr
+     qui sotto (il popstate asincrono smonterebbe il foglio nuovo) */
+  b.onclick = () => { closeSheet(); apriIngressoBot(); };
+  const r = document.createElement('div');
+  r.id = 'accountEntraBotRiga';
+  r.style.cssText = 'font-size:12.5px;color:var(--ink-soft);font-weight:600;'
+    + 'line-height:1.5;text-align:center;margin:6px 0 2px';
+  r.textContent = altro ? 'Prima sceglilo nell’app Telegram, poi tocca qui.'
+                        : 'Entra l’account aperto ora nell’app Telegram.';
+  box.append(b, r);
+  return box;
+}
+
+let ingressoBotTimer = null, ingressoBotFigura = '', bussaInVolo = false;
+function fermaIngressoBot(){
+  if (ingressoBotTimer) { clearInterval(ingressoBotTimer); ingressoBotTimer = null; }
+}
+/* La riga di stato del foglio; `fine` = il giro e' finito male (scaduto,
+   annullato, rete): via figura e bottone, e compare «Riprova». */
+function dettaIngressoBot(testo, fine){
+  el('botEntraStato').textContent = testo;
+  el('botEntraRifai').style.display = fine ? '' : 'none';
+  if (fine) {
+    fermaIngressoBot();
+    el('botEntraFigura').style.display = 'none';
+    el('botEntraQrBox').style.display = 'none';
+    el('botEntraApri').style.display = 'none';
+  }
+}
+async function apriIngressoBot(){
+  fermaIngressoBot();
+  const foglio = el('botEntraSheet');
+  const pc = !telefonoQui();
+  el('botEntraFigura').style.display = 'none';
+  el('botEntraQrBox').style.display = 'none';
+  el('botEntraApri').style.display = 'none';
+  el('botEntraSub').innerHTML = pc
+    ? 'Inquadra il codice col telefono e tocca <b>Avvia</b> nel bot, poi '
+      + 'la figura qui sotto.'
+    : 'Si apre il bot di Barattolo: tocca <b>Avvia</b>, poi la figura qui '
+      + 'sotto. Entra l’account aperto ora nell’app Telegram.';
+  dettaIngressoBot('Preparo il link…');
+  el('sheetBg').classList.add('open');
+  foglio.classList.add('open');
+  let d;
+  try {
+    const r = await fetch(`${API_BASE}/login/bot/inizia`, {method: 'POST'});
+    if (!r.ok) throw new Error(r.status === 429
+      ? 'Troppi tentativi in poco tempo: riprova fra un minuto.'
+      : 'Non riesco a preparare il link: riprova.');
+    d = await r.json();
+  } catch(e) {
+    dettaIngressoBot(e.message || 'Non riesco a preparare il link: riprova.', true);
+    return;
+  }
+  if (!foglio.classList.contains('open')) return;   // chiuso nel frattempo
+  ingressoBotFigura = String(d.figura || '');
+  el('botEntraEmoji').textContent = ingressoBotFigura;
+  el('botEntraFigura').style.display = '';
+  const apri = el('botEntraApri');
+  apri.href = d.link;
+  apri.innerHTML = etichettaTelegram(pc ? 'Apri Telegram Desktop' : 'Apri Telegram');
+  apri.style.display = '';
+  if (pc) {
+    el('botEntraQrBox').style.display = '';
+    disegnaQr(el('botEntraQr'), d.link).then(ok => {
+      if (!ok) el('botEntraQrBox').style.display = 'none';
+    });
+  }
+  dettaIngressoBot('Aspetto che tocchi Avvia nel bot…');
+  ingressoBotTimer = setInterval(bussaIngressoBot, 2000);
+}
+/* Si bussa ogni due secondi finche' il foglio e' aperto, e SUBITO al
+   ritorno dall'app di Telegram (visibilitychange): chi torna non deve
+   aspettare il giro dopo per vedersi dentro. */
+async function bussaIngressoBot(){
+  if (!el('botEntraSheet').classList.contains('open')) { fermaIngressoBot(); return; }
+  if (bussaInVolo) return;
+  bussaInVolo = true;
+  let d;
+  try {
+    const r = await fetch(`${API_BASE}/login/bot/stato`, {method: 'POST'});
+    d = r.ok ? await r.json() : {stato: r.status === 404 ? 'annullato' : ''};
+  } catch(e) {
+    d = {stato: ''};                // rete ballerina: si ribussa al giro dopo
+  } finally {
+    bussaInVolo = false;
+  }
+  if (d.stato === 'dentro') {
+    fermaIngressoBot();
+    dettaIngressoBot(`✅ Sei dentro come ${d.nome || 'te'}`);
+    navDaCapo(); location.reload();
+  } else if (d.stato === 'in_chat') {
+    dettaIngressoBot(`Ora nel bot tocca ${ingressoBotFigura}`);
+  } else if (d.stato === 'scaduto') {
+    dettaIngressoBot('Il link è scaduto: riprova, ci vuole un attimo.', true);
+  } else if (d.stato === 'annullato') {
+    dettaIngressoBot('Ingresso annullato nel bot. Se eri tu, riprova.', true);
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && ingressoBotTimer) bussaIngressoBot();
+});
+
 /* Il menu si apre coi dati che si hanno e li RILEGGE: una sessione
    puo' essere scaduta da un'altra parte, e la lista deve dirlo — ma
    il foglio si vede subito, mai un'attesa davanti a un elenco vuoto
@@ -51602,7 +51781,8 @@ function apriAccountSheet(){
   renderAccountSheet();
   el('sheetBg').classList.add('open');
   el('accountSheet').classList.add('open');
-  caricaAccount().then(() => { renderAccountSheet(); renderPastigliaAccount(); });
+  Promise.all([caricaAccount(), leggiPortaBot()])
+    .then(() => { renderAccountSheet(); renderPastigliaAccount(); });
 }
 
 /* L'AVVISO DEL BOT PER UN ALTRO ACCOUNT (16 ott 2026): dentro Telegram
@@ -51715,6 +51895,23 @@ function bottoneLoginTelegram(){
   posto.id = 'loginTelegram';
   posto.style.marginTop = '8px';
   el('demoBanner').appendChild(posto);
+  /* A leva LOGIN_DAL_BOT accesa al posto del widget c'e' la porta del
+     bot (vedi ENTRA DAL BOT): il posto si prende subito, cosi' l'ordine
+     del banner resta quello di sempre anche se la risposta arriva dopo
+     la porta Nostr. */
+  leggiPortaBot().then(si => si ? bottoneLoginBot(posto) : widgetLoginTelegram(posto));
+}
+function bottoneLoginBot(posto){
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = 'vetrinaEntraBot';
+  b.className = 'demo-cta';
+  b.style.cssText = 'border:none;cursor:pointer;margin-top:0';
+  b.innerHTML = etichettaTelegram('Entra con Telegram');
+  b.onclick = () => apriIngressoBot();
+  posto.appendChild(b);
+}
+function widgetLoginTelegram(posto){
   const s = document.createElement('script');
   s.src = 'https://telegram.org/js/telegram-widget.js?22';
   s.setAttribute('data-telegram-login', BOT_TG);

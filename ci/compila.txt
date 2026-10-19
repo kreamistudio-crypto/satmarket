@@ -150,3 +150,4 @@ collaudo_ordine_in_pausa.py
 collaudo_paracadute.py
 collaudo_piu_account.py
 collaudo_istanza_prova.py
+collaudo_login_bot.py

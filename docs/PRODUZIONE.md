@@ -276,6 +276,21 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   spenta resta il multi-account del web d'agosto, coi due guasti curati
   (la pastiglia nel Profilo e lo switch verso gli account nati con
   Nostr). Coi perché: Architettura, «PIÙ ACCOUNT OVUNQUE».
+- ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): la leva
+  `LOGIN_DAL_BOT` nasce SPENTA nel codice e si AGGIUNGE al config del VPS
+  quando Andrea la vuole provare. Prima si guarda, in sola lettura, la
+  sola riga: `grep -n "^LOGIN_DAL_BOT" /srv/barattolo/config.py`. Per
+  accenderla una riga `LOGIN_DAL_BOT = True` nel `config.py` del VPS,
+  poi `sudo systemctl restart barattolo`; per spegnerla si cancella la
+  riga e si riavvia. VUOLE IL CAMPANELLO DEL BOT: con
+  `TELEGRAM_WEBHOOK_SEGRETO` mancante o segnaposto la porta resta chiusa
+  e sul web torna il widget (lo dice il pannello «⚙️ Stato delle leve»,
+  gruppo «👥 Più account», riga «Entra dal bot»; il campanello lo dice
+  la riga «🔔 Webhook Telegram» nel journal). Niente da migrare: gli
+  ingressi vivono in memoria due minuti, e un riavvio perde solo quelli
+  in volo (si ritocca «Entra con Telegram»). La prova dal vivo, dopo il
+  deploy, sta nella voce del cantiere in CANTIERI. Coi perché:
+  Architettura, «ENTRA DAL BOT».
 - LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
   AGGIUNGE al config del VPS come le altre, e finche' manca o e'
   `False` le card le vedono solo i moderatori e chi e' in

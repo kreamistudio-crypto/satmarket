@@ -67069,3 +67069,146 @@ storpiata): tutte prese. Suite e collaudi: nel messaggio del commit.
   (75 s). Una ronda che legge proprio lì griderebbe ancora. Non
   verificato quanto è larga sul nodo (dipende dalla grazia della
   riconciliazione, minimo 30 s).
+## Entra dal bot: «Entra con Telegram» con l'account attivo nell'app, non quello ricordato dal browser (19 ott 2026, cantiere account-doppio-bot, idea di Andrea)
+
+**IL GUASTO (dal telefono di Andrea).** Due account Telegram sullo
+stesso telefono: nell'app passa al secondo, sulla web app tocca «tocca
+qui» sotto «Un altro account Telegram? Esci da Telegram Web e…» — ed
+entra sempre il primo. Il widget non guarda l'app: entra con l'account
+che il BROWSER ricorda su oauth.telegram.org (il numero dell'ultimo
+accesso). La riga del cantiere di stamattina («account-doppio») non lo
+risolveva e non si capiva.
+
+**LA STRADA (idea di Andrea, piano approvato in sei punti prima del
+codice).** Si entra PASSANDO DAL BOT: «Entra con Telegram» → il bot con
+un codice monouso → Avvia → dentro, con l'account che ha premuto Avvia,
+cioè quello attivo nell'app. Barattolo un login via bot non l'aveva; lo
+schema c'era già, nella fusione Nostr→Telegram (deep-link con codice da
+5 minuti, conferma a tastiera), e qui si ripete con quel che serve in
+più per un LOGIN.
+
+**FATTO.**
+- `server.py`, blocco «ENTRA DAL BOT» prima del bot che sfoglia: leva
+  `LOGIN_DAL_BOT` (spenta di serie; nel pannello delle leve, gruppo «👥
+  Più account», che dice anche se manca il campanello);
+  `porta_bot_aperta` = leva E campanello del bot (in collaudo il
+  campanello si suona a mano); `GET /api/login/bot` (c'è la porta?),
+  `POST /api/login/bot/inizia` (link `t.me/ilbarattolobot?start=entra_
+  CODICE`, la FIGURA, e il LEGAME in un cookie HttpOnly sulle sole rotte
+  `/api/login/bot`; 400 dentro la Mini App; freno del login; uno vivo per
+  browser), `POST /api/login/bot/stato` (attesa, in_chat, dentro,
+  annullato, scaduto: a figura giusta la sessione si apre QUI, da
+  `apri_sessione`). Nel bot: `/start entra_…` passa PER PRIMO, prima
+  dell'invito e della fusione (`avvia_ingresso_bot`: il codice si brucia,
+  l'ingresso si lega a chi ha premuto, «🔑 Entri su Barattolo come Nome
+  (@utente)?», «Te lo chiede un browser su Android», tre figure e «❌ Non
+  sono stato io»); il tocco `entra:` (`callback_ingresso_bot`: vale solo
+  per quel Telegram e una volta; sbagliata o «non sono io» annullano).
+  In memoria, due minuti, come i lasciapassare della fusione. Le due
+  rotte che scrivono sono `async` come i gesti del bot: tutti i tocchi
+  ai dizionari girano nello stesso loop, nessun thread se li trova
+  cambiati sotto i piedi a metà di una pulizia (la fusione, sincrona,
+  quel rischio piccolo ce l'ha ancora).
+- `miniapp.html`: il foglio `botEntraSheet` (la figura in alto, «Apri
+  Telegram» come LINK vero, il QR solo dal computer con «Apri Telegram
+  Desktop», la riga di stato, «Riprova»); `apriIngressoBot` e
+  `bussaIngressoBot` (ogni 2 s col foglio aperto, e subito al ritorno in
+  primo piano); nel foglio «I tuoi account» `portaBot`: «Entra con
+  Telegram» + «Entra l'account aperto ora nell'app Telegram.», o, con un
+  Telegram già aperto, «Aggiungi un altro Telegram» + «Prima sceglilo
+  nell'app Telegram, poi tocca qui.»; nel banner della vetrina il
+  bottone al posto del widget. `leggiPortaBot` chiede una volta, mai
+  dentro Telegram; finché non si sa, nel foglio non compare niente
+  (meglio di un widget che sparisce sotto il dito). A porta chiusa (leva
+  spenta, bot sordo, server che non risponde) tutto come prima: widget,
+  riga, porta del collaudo.
+
+**LE DECISIONI E I PERCHÉ.**
+- LE TRE FIGURE invece di un «sì». Il codice viaggia in un link, e un
+  link si inoltra: chi manda il SUO link a un altro («tocca qui e
+  Avvia») si farebbe confermare dall'altro il proprio browser, ed
+  entrerebbe nel suo account. Chi riceve un link inoltrato non vede la
+  pagina di chi l'ha chiesto: tira a indovinare una volta su tre, e al
+  primo sbaglio l'ingresso muore. Per chi entra davvero è sempre UN
+  tocco. In più, la riga «Te lo chiede un computer Windows» a chi ha in
+  mano il telefono dice che non è lui.
+- IL LEGAME NEL COOKIE: il codice si vede (link, QR, chat), quindi da
+  solo non deve valere niente. La sessione va al browser che ha il
+  cookie, e il legame non esce mai in una risposta.
+- LA SESSIONE DALLA PORTA UNICA (`apri_sessione`): il tetto, il rientro
+  e il portachiavi sono quelli di ogni login. OLTRE IL TETTO (decisione
+  di Andrea): si entra, esce il più vecchio e la sua sessione si chiude
+  nel database, niente rifiuto.
+- UN TOCCO IN PIÙ SULLA PAGINA, ed è voluto: la figura va vista PRIMA di
+  andare nel bot, e Telegram si apre col tocco del dito su un `<a>` —
+  le app di Telegram prendono i link t.me solo da un gesto vero; uno
+  `location.href` dopo una richiesta, o un redirect dal nostro server,
+  su iPhone e nell'APK si comportano ognuno a modo suo, e qui non si
+  potevano provare. Il giro per chi entra: «Entra con Telegram» → «Apri
+  Telegram» → Avvia → la figura.
+- PWA e APK: stessa pagina, stessa strada, e nell'APK è anche la cura
+  della porta Telegram rotta dal 6 ott (il popup del widget usciva dalla
+  TWA; CANTIERI, «La porta Nostr del foglio account che non apriva
+  niente»). Dentro la Mini App la porta non c'è: lì entra già l'account
+  attivo, e un altro Telegram si sceglie dal menu di Telegram.
+
+**SCARTATO.** Il «sì» semplice (vedi le figure). Il link che porta il
+codice al server e poi rimbalza su t.me (`/api/login/bot/vai`): un tocco
+in meno, ma la figura non si vedrebbe prima, e nella PWA di iPhone il
+cookie finirebbe nel Safari sbagliato. Aprire Telegram da script dopo la
+richiesta: vedi sopra. Togliere il widget del tutto: resta, ma solo a
+porta chiusa.
+
+**PROVE.** `prove_login_dal_bot` in `prove.py`: le forme lato server
+(leva spenta in codice e nel config d'esempio, il pannello, la porta che
+vuole il campanello, l'ordine del `/start`, il codice che si brucia e la
+sua forma, l'ingresso legato a chi ha premuto, il nome passato da
+`html.escape`, la figura che vale per QUEL Telegram e una volta e che
+deve essere QUELLA della pagina, il freno, la Mini App, il legame
+HttpOnly e mai nella risposta, la sessione da `apri_sessione` solo a
+figura giusta) e un banco node con le funzioni vere del foglio (le
+quattro situazioni del foglio account, la porta chiesta una volta e mai
+dentro Telegram, il giro dal telefono, gli stati, scaduto, annullato, la
+leva spenta a metà, la rete che balla, il computer col QR, il freno, la
+vetrina bottone/widget). Toccate due prove di ieri, senza cambiarne il
+senso: il banco di `prove_account_doppio` dichiara `portaBotSi = false`
+(il mondo di prima) e il censimento dei `location.reload()` conta anche
+`bussaIngressoBot` (riparte da capo, come ogni login).
+`collaudo_login_bot.py` (nuovo, nella CI): richieste vere e bot
+simulato — 67 su 67: il giro intero, due Telegram dello stesso telefono
+aperti insieme e lo switch, il link inoltrato (un altro Telegram lo
+trova usato e non può confermare; un browser senza legame non incassa;
+la figura sbagliata annulla e chi aveva inoltrato non entra), monouso e
+scadenza, codici inventati e storti, il tetto (a 3: entra il quarto,
+esce il più vecchio, e la sua sessione copiata altrove dà 401), il
+rientro, la Mini App, la leva spenta a metà strada. CONTROPROVE sul file
+vero, poi ripristinato: senza il controllo della figura il collaudo cade
+(3) e da allora anche `prove.py` ha la sua sentinella; con il codice
+letto e non bruciato cade `prove.py` (1) — il collaudo no, perché lo
+stato «in_chat» chiude la porta lo stesso: due cinture.
+
+**DAL VIVO** (Playwright e Chromium, 360×780 densità 2, chiaro e scuro,
+tocchi veri, server del giro da una copia nello scratchpad con leva
+accesa, relay morti, ogni richiesta fuori da 127.0.0.1 abortita, il bot
+simulato dal campanello e le sue risposte lette dal log): la vetrina col
+bottone, il foglio con la figura, il messaggio del bot (riprodotto in un
+riquadro finto per vedere parole e bottoni), «Ora nel bot tocca 🍋», la
+figura giusta e la pagina dentro; il foglio account con «Aggiungi un
+altro Telegram»; il secondo Telegram dentro, più un account con id da
+Nostr: tre account aperti insieme, e un tocco riporta ad Andrea; la
+figura sbagliata e «Ingresso annullato nel bot. Se eri tu, riprova.»;
+dal computer (1280×860) il QR e «Apri Telegram Desktop». Nessun errore
+di pagina; fuori dal loopback solo `telegram-web-app.js` (lo script di
+sempre), fermato; lo script del widget non è mai stato chiesto.
+
+**DA GUARDARE** (dopo il deploy, a leva accesa sul VPS, perché qui
+Telegram vero non c'è): dal telefono con due account, passare al
+secondo nell'app e toccare «Entra con Telegram» — entra il secondo;
+che «Apri Telegram» apra l'app e non la pagina web di t.me (Android,
+iPhone, PWA, APK); che Avvia arrivi anche a chi il bot l'aveva già
+aperto; dal computer, il QR inquadrato col telefono.
+
+**DA FARE (notati, non fatti).**
+- Su onion la porta Telegram resta assente come prima, ma il bot ci
+  funzionerebbe (non serve il dominio di BotFather, e non si carica
+  niente da telegram.org): da decidere.

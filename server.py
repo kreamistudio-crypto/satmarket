@@ -9920,6 +9920,17 @@ try:
 except ImportError:
     PIU_ACCOUNT_OVUNQUE = False
 
+# ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot, idea di
+# Andrea): sul web e nella PWA «Entra con Telegram» passa dal bot, cosi'
+# entra l'account ATTIVO nell'app di Telegram e non quello che il
+# browser ricorda su oauth.telegram.org. Spenta di serie: la accende
+# Andrea sul VPS. A leva spenta, o col campanello del bot spento, torna
+# il Login Widget di sempre. Vedi Architettura, «ENTRA DAL BOT».
+try:
+    from config import LOGIN_DAL_BOT
+except ImportError:
+    LOGIN_DAL_BOT = False
+
 # Un account scelto che non e' piu' aperto NON ricade in silenzio sul
 # Telegram: un gesto pensato per l'uno finirebbe sull'altro. Si dice,
 # e il client torna sul Telegram ricaricando — la frase e' il segnale.
@@ -18114,6 +18125,238 @@ async def avvia_fusione(id_telegram: int, codice: str):
         ]]}})
 
 
+# ------------- ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot) ----
+# IL GUASTO (dal telefono di Andrea): due account Telegram sullo stesso
+# telefono, nell'app passa al secondo, sul web tocca il widget — ed entra
+# sempre il primo. Il widget sceglie dal numero e dal browser
+# (oauth.telegram.org ricorda chi ha fatto l'ultimo accesso), non
+# dall'account attivo nell'app. LA STRADA: si entra passando dal bot,
+# e allora l'account e' per forza quello che ha premuto Avvia.
+#
+# IL GIRO, in quattro passi:
+#   1. il browser chiede un ingresso (`/api/login/bot/inizia`): riceve
+#      il link t.me/...?start=entra_CODICE e una FIGURA da cercare, e
+#      tiene un LEGAME in un cookie HttpOnly che il JavaScript non vede;
+#   2. nel bot, Avvia: il CODICE si brucia (monouso) e si lega a QUEL
+#      Telegram, che vede «Entri come Nome?» e tre figure;
+#   3. tocca la figura che la pagina gli mostra: l'ingresso e' pronto;
+#   4. il browser bussa col suo legame (`/api/login/bot/stato`) e solo
+#      lui incassa la sessione, dalla porta di sempre (`apri_sessione`:
+#      portachiavi, tetto, rientro).
+#
+# PERCHE' LE FIGURE E NON UN «SI'»: il codice viaggia in un link, e un
+# link si inoltra. Chi ne manda uno suo a qualcun altro («tocca qui e
+# Avvia») si farebbe confermare dall'altro il PROPRIO browser, ed
+# entrerebbe nel suo account. Con le figure chi riceve un link inoltrato
+# non vede la pagina di chi l'ha chiesto, e non sa quale toccare: tira a
+# indovinare una volta su tre, e al primo sbaglio l'ingresso muore. Per
+# chi entra davvero e' sempre UN tocco, come il «si'».
+# PERCHE' IL LEGAME: il codice si vede (nel link, nel QR, nella chat):
+# chi lo copia o fotografa il QR non incassa niente, perche' la sessione
+# va solo al browser che ha il cookie.
+# In memoria e a vita breve, come i lasciapassare della fusione
+# (uvicorn e' mono-processo): un riavvio perde gli ingressi in volo, e
+# si rifa' il tocco.
+# LE ROTTE SONO `async` APPOSTA, come i gesti del bot: cosi' chi tocca
+# questi dizionari gira tutto nello stesso loop, e una pulizia non si
+# trova un dizionario cambiato sotto i piedi da un altro thread.
+SECONDI_INGRESSO_BOT = 120
+COOKIE_INGRESSO = "barattolo_ingresso"
+PERCORSO_INGRESSO = "/api/login/bot"
+PREFISSO_INGRESSO = "entra_"
+# Figure facili da distinguere a colpo d'occhio, anche piccole.
+FIGURE_INGRESSO = ("🍐", "🍋", "🥕", "🍇", "🍒", "🥝", "🍄", "🌽",
+                   "🍉", "🥑", "🍓", "🥥")
+INGRESSI_BOT: dict[str, dict] = {}    # hash del legame -> l'ingresso
+CODICI_INGRESSO: dict[str, str] = {}  # codice del link -> hash del legame
+TOKEN_INGRESSO: dict[str, str] = {}   # token della tastiera -> hash del legame
+FORMA_CODICE_INGRESSO = re.compile(r"[A-Za-z0-9_\-]{16,40}")
+
+
+def porta_bot_aperta() -> bool:
+    """La porta del bot c'e' se la leva e' accesa E il bot riceve i
+    messaggi: senza campanello l'Avvia non arriverebbe mai, e un bottone
+    che porta a un muro e' peggio di un bottone che non c'e' (resta il
+    widget). In collaudo il campanello si suona a mano."""
+    return bool(LOGIN_DAL_BOT) and (MODALITA_COLLAUDO or webhook_attivo())
+
+
+def _pulisci_ingressi():
+    """Via gli ingressi scaduti e i rimandi rimasti senza ingresso; il
+    tetto tiene a bada chi ne chiede a raffica."""
+    adesso = int(time.time())
+    for k in [k for k, v in INGRESSI_BOT.items() if v["scade"] < adesso]:
+        INGRESSI_BOT.pop(k, None)
+    while len(INGRESSI_BOT) >= 1000:
+        INGRESSI_BOT.pop(next(iter(INGRESSI_BOT)))
+    for d in (CODICI_INGRESSO, TOKEN_INGRESSO):
+        for k in [k for k, v in d.items() if v not in INGRESSI_BOT]:
+            d.pop(k, None)
+
+
+def _hash_legame(legame: str) -> str:
+    return hashlib.sha256((legame or "").encode()).hexdigest()
+
+
+def _dispositivo_da_ua(ua: str) -> str:
+    """Una parola su chi ha chiesto di entrare, per la conferma nel bot:
+    chi la legge «da un computer Windows» mentre ha in mano il telefono
+    capisce che non e' lui. Grossolana apposta: e' un indizio, non un
+    controllo."""
+    ua = (ua or "").lower()
+    if "iphone" in ua or "ipad" in ua:
+        return "un browser su iPhone o iPad"
+    if "android" in ua:
+        return "un browser su Android"
+    if "windows" in ua:
+        return "un computer Windows"
+    if "mac os" in ua or "macintosh" in ua:
+        return "un Mac"
+    if "linux" in ua or "x11" in ua:
+        return "un computer Linux"
+    return "un browser"
+
+
+@app.get("/api/login/bot")
+def porta_login_bot():
+    """Il client chiede se c'e' la porta del bot, per scegliere fra il
+    bottone «Entra con Telegram» e il widget. Non apre niente."""
+    return {"aperta": porta_bot_aperta()}
+
+
+@app.post("/api/login/bot/inizia")
+async def inizia_login_bot(req: Request, response: Response,
+                     x_tg_init_data: str = Header(""),
+                     barattolo_ingresso: str = Cookie("")):
+    """Il passo 1: un ingresso nuovo per QUESTO browser. Uno solo vivo
+    per browser — chiederne un altro brucia il vecchio, cosi' una pagina
+    lasciata aperta non tiene in giro un link buono."""
+    if not porta_bot_aperta():
+        raise HTTPException(404, "Porta spenta")
+    if x_tg_init_data:
+        # dentro Telegram si e' gia' dentro col proprio account
+        raise HTTPException(400, "Dentro Telegram sei già col tuo account")
+    _frena("login", _ip_di(req))
+    _pulisci_ingressi()
+    INGRESSI_BOT.pop(_hash_legame(barattolo_ingresso), None)
+    legame = secrets.token_urlsafe(32)
+    codice = secrets.token_urlsafe(16)
+    token = secrets.token_hex(16)   # 32 char: nei 64 di callback_data ci sta
+    scelte = secrets.SystemRandom().sample(FIGURE_INGRESSO, 3)
+    figura = secrets.choice(scelte)
+    lh = _hash_legame(legame)
+    INGRESSI_BOT[lh] = {
+        "scade": int(time.time()) + SECONDI_INGRESSO_BOT,
+        "stato": "attesa", "tg_id": None, "nome": "",
+        "scelte": scelte, "figura": figura, "token": token,
+        "dispositivo": _dispositivo_da_ua(req.headers.get("user-agent", "")),
+    }
+    CODICI_INGRESSO[codice] = lh
+    TOKEN_INGRESSO[token] = lh
+    response.set_cookie(
+        COOKIE_INGRESSO, legame, max_age=SECONDI_INGRESSO_BOT + 60,
+        httponly=True, secure=cookie_sicuro(), samesite="lax",
+        path=PERCORSO_INGRESSO)
+    return {"link": f"{LINK_BOT}?start={PREFISSO_INGRESSO}{codice}",
+            "figura": figura, "valida_secondi": SECONDI_INGRESSO_BOT}
+
+
+@app.post("/api/login/bot/stato")
+async def stato_login_bot(response: Response,
+                    barattolo_ingresso: str = Cookie(""),
+                    barattolo_portachiavi: str = Cookie(""),
+                    barattolo_sessione: str = Cookie("")):
+    """Il passo 4: il browser bussa col suo legame. Finche' si aspetta
+    dice a che punto e' («attesa», «in_chat»); a figura giusta apre la
+    sessione QUI, dalla porta di ogni login — il portachiavi si allunga,
+    al tetto cede il piu' vecchio e si chiude nel database, chi rientra
+    chiude la sua vecchia. Esito finale (dentro, annullato, scaduto):
+    l'ingresso e il suo cookie se ne vanno."""
+    if not LOGIN_DAL_BOT:
+        raise HTTPException(404, "Porta spenta")
+    lh = _hash_legame(barattolo_ingresso)
+    i = INGRESSI_BOT.get(lh) if barattolo_ingresso else None
+    if i and i["scade"] >= int(time.time()) and i["stato"] in ("attesa", "in_chat"):
+        return {"stato": i["stato"]}
+    INGRESSI_BOT.pop(lh, None)
+    response.delete_cookie(COOKIE_INGRESSO, path=PERCORSO_INGRESSO)
+    if not i or i["scade"] < int(time.time()):
+        return {"stato": "scaduto"}
+    if i["stato"] != "ok":
+        return {"stato": "annullato"}
+    apri_sessione(response, int(i["tg_id"]), barattolo_portachiavi,
+                  barattolo_sessione)
+    return {"stato": "dentro", "nome": i["nome"]}
+
+
+async def avvia_ingresso_bot(mittente: dict, codice: str):
+    """Il passo 2, /start entra_CODICE: il codice si brucia subito
+    (monouso anche se poi qualcosa va storto) e l'ingresso si lega a chi
+    ha premuto Avvia — un altro Telegram che arrivasse dopo con lo
+    stesso link trova un link gia' usato."""
+    chat = mittente["id"]
+    lh = CODICI_INGRESSO.pop(codice, None) if FORMA_CODICE_INGRESSO.fullmatch(codice) else None
+    i = INGRESSI_BOT.get(lh) if lh else None
+    if not i or i["scade"] < int(time.time()) or i["stato"] != "attesa":
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "⏳ Questo link per entrare è scaduto o è già stato "
+                    "usato. Torna su Barattolo e tocca di nuovo «Entra "
+                    "con Telegram»."})
+    nome = mittente.get("first_name") or mittente.get("username") or "te"
+    i.update(stato="in_chat", tg_id=int(chat), nome=nome)
+    chi = html.escape(nome)
+    if mittente.get("username"):
+        chi += f" (@{html.escape(mittente['username'])})"
+    t = i["token"]
+    await bot_api("sendMessage", {
+        "chat_id": chat, "parse_mode": "HTML",
+        "text": (f"🔑 <b>Entri su Barattolo come {chi}?</b>\n\n"
+                 f"Te lo chiede {html.escape(i['dispositivo'])}. Tocca qui "
+                 "sotto la figura che vedi sulla pagina di Barattolo.\n\n"
+                 "Non hai chiesto tu di entrare? Non toccare niente: il "
+                 "link scade da solo fra due minuti."),
+        "reply_markup": {"inline_keyboard": [
+            [{"text": f, "callback_data": f"entra:{t}:{n}"}
+             for n, f in enumerate(i["scelte"])],
+            [{"text": "❌ Non sono stato io", "callback_data": f"entra:{t}:x"}],
+        ]}})
+
+
+async def callback_ingresso_bot(cb: dict, resto: str):
+    """Il passo 3, il tocco su una figura. Vale solo per il Telegram che
+    ha premuto Avvia, e UNA volta: giusta → l'ingresso e' pronto per il
+    browser; sbagliata o «Non sono stato io» → l'ingresso muore, e il
+    browser se lo sente dire."""
+    msg = cb.get("message") or {}
+    modifica = lambda testo: bot_api("editMessageText", {
+        "chat_id": (msg.get("chat") or {}).get("id"),
+        "message_id": msg.get("message_id"),
+        "text": testo, "parse_mode": "HTML"})
+    token, _, scelta = resto.partition(":")
+    lh = TOKEN_INGRESSO.get(token)
+    i = INGRESSI_BOT.get(lh) if lh else None
+    if (not i or i["scade"] < int(time.time()) or i["stato"] != "in_chat"
+            or i["tg_id"] != (cb.get("from") or {}).get("id")):
+        return await modifica("⏳ Questo ingresso è scaduto: torna su "
+                              "Barattolo e tocca di nuovo «Entra con Telegram».")
+    TOKEN_INGRESSO.pop(token, None)
+    if scelta == "x":
+        i["stato"] = "no"
+        return await modifica("👌 Annullato: nessuno è entrato. Se qualcuno "
+                              "ti ha mandato quel link, non era per te.")
+    if not scelta.isdigit() or int(scelta) >= len(i["scelte"]) \
+            or i["scelte"][int(scelta)] != i["figura"]:
+        i["stato"] = "no"
+        return await modifica("❌ <b>Figura sbagliata</b>: per sicurezza ho "
+                              "annullato questo ingresso. Se eri tu, torna su "
+                              "Barattolo e tocca di nuovo «Entra con Telegram».")
+    # Il tempo per tornare alla pagina riparte da qui: chi ha appena
+    # toccato non deve trovarsi scaduto mentre cambia app.
+    i.update(stato="ok", scade=int(time.time()) + SECONDI_INGRESSO_BOT)
+    await modifica(f"✅ <b>Fatto!</b> Torna su Barattolo: sei dentro come "
+                   f"{html.escape(i['nome'])}.")
+
+
 # ------------- IL BOT CHE SFOGLIA (e che spinge la Mini App) --------
 # Regola di prodotto (ago 2026, decisione di Andrea): LA MINI APP
 # VIENE PRIMA. Chi apre il bot deve trovare l'invito ad aprire
@@ -19008,6 +19251,9 @@ async def gestisci_callback(cb: dict):
     if azione == "ban":
         # la tastiera ✅/❌ del banner del negozio (solo moderatori)
         return await callback_banner(cb, token)
+    if azione == "entra":
+        # le figure dell'ingresso dal bot (ENTRA DAL BOT)
+        return await callback_ingresso_bot(cb, token)
     if azione == "sfo":
         # la griglia «Sfoglia»: aperta a tutti, non tocca niente e non
         # dice niente di privato — nessun token da controllare
@@ -19186,6 +19432,12 @@ async def gestisci_update(update: dict):
         coda = ""
         if len(parti) == 2:
             carico = parti[1].strip()
+            # LA TERZA PORTA (19 ott 2026): l'ingresso sul web dal bot ha
+            # il suo prefisso, e passa per primo — un codice d'ingresso non
+            # deve mai finire nella fusione o nell'invito.
+            if carico.startswith(PREFISSO_INGRESSO):
+                return await avvia_ingresso_bot(
+                    mittente, carico[len(PREFISSO_INGRESSO):])
             # DUE PORTE SULLO STESSO /start (set 2026), e le separa la
             # FORMA: il lasciapassare della fusione e' un esadecimale da
             # 32, il codice invito sei caratteri del suo alfabeto. E
@@ -30625,6 +30877,14 @@ def _leve_stato():
                          "com'era ad agosto"),
             _leva("Account insieme sullo stesso dispositivo",
                   "MAX_ACCOUNT_BROWSER", MAX_ACCOUNT_BROWSER),
+            _leva("Entra dal bot", "LOGIN_DAL_BOT", bool(LOGIN_DAL_BOT),
+                  acceso="sul web «Entra con Telegram» passa dal bot: entra "
+                         "l'account attivo nell'app di Telegram"
+                         + ("" if webhook_attivo() else
+                            " — MA il campanello del bot è spento: resta "
+                            "il widget"),
+                  spento="sul web resta il bottone di Telegram (il widget), "
+                         "che entra con l'account ricordato dal browser"),
         ]},
         {"gruppo": "🏆 Classifica", "voci": [
             _leva("La classifica del mercatino", "CLASSIFICA_ATTIVA",

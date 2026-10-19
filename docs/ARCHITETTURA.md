@@ -9606,6 +9606,38 @@
   ogni apertura del foglio). Solo Nostr avrebbe chiuso per sempre la
   strada a un secondo Telegram vero. Dentro la Mini App il widget non
   c'era già. «…o entra con Nostr» resta sempre.
+  ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot, leva
+  `LOGIN_DAL_BOT`, spenta di serie): la riga qui sopra non bastava — il
+  widget entra con l'account che il BROWSER ricorda su
+  oauth.telegram.org, e con due Telegram sullo stesso telefono entrava
+  sempre il primo, qualunque fosse quello attivo nell'app. A leva
+  accesa e col campanello del bot acceso (`porta_bot_aperta`) «Entra con
+  Telegram» passa dal bot, nel banner della vetrina e nel foglio (dove,
+  con un Telegram già aperto, diventa «Aggiungi un altro Telegram» con
+  sotto «Prima sceglilo nell'app Telegram, poi tocca qui»). IL GIRO:
+  `POST /api/login/bot/inizia` dà il link `t.me/ilbarattolobot?start=
+  entra_CODICE` e una FIGURA, e mette un LEGAME in un cookie HttpOnly
+  sulle sole rotte `/api/login/bot` (in memoria si tiene il suo hash);
+  all'Avvia il bot brucia il codice (monouso), lega l'ingresso a chi ha
+  premuto e mostra «Entri su Barattolo come Nome (@utente)?», da dove
+  viene la richiesta e TRE figure; la figura giusta rende l'ingresso
+  pronto, una sbagliata o «Non sono stato io» lo annullano; il browser
+  bussa ogni due secondi (e subito al ritorno in primo piano) con
+  `POST /api/login/bot/stato`, e solo lui, col legame, incassa la
+  sessione — da `apri_sessione`, quindi portachiavi, TETTO (esce il più
+  vecchio e la sua sessione si chiude nel database) e rientro come ogni
+  login. PERCHÉ LE FIGURE: il codice viaggia in un link e un link si
+  inoltra; chi ne riceve uno non vede la pagina di chi l'ha chiesto, e
+  non può confermare il browser di un altro se non tirando a indovinare
+  una volta su tre, e al primo sbaglio l'ingresso muore. PERCHÉ IL
+  LEGAME: chi copia il link o fotografa il QR non incassa niente. Due
+  minuti di vita, uno vivo per browser, il freno del login sulla
+  richiesta. Dal telefono il foglio apre Telegram con un LINK vero
+  (`<a>`, il tocco del dito: le app di Telegram prendono i t.me solo
+  così); dal computer c'è anche il QR, da inquadrare col telefono. Vale
+  uguale nella PWA e nell'APK, dove il widget si rompeva (il popup
+  usciva dalla TWA). Dentro la Mini App la porta non c'è: lì entra già
+  l'account attivo. Su onion nessuna porta Telegram, come prima.
   LA CHIAVE NOSTR GIÀ APERTA (stesso cantiere): `giaApertoNostr`, in
   testa a `entraConNostr` e PRIMA della sfida, confronta nel browser la
   npub del firmatario con quelle degli account aperti. Se c'è: «Questo

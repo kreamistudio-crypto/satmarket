@@ -1723,6 +1723,14 @@ MAX_ACCOUNT_BROWSER = 5
 # anche a leva spenta. SPENTA di serie: si accende dopo la prova.
 PIU_ACCOUNT_OVUNQUE = False
 
+# ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): sul web e
+# nella PWA «Entra con Telegram» apre il bot con un codice monouso, e
+# entra l'account ATTIVO nell'app di Telegram (il widget di Telegram
+# entrava sempre con quello ricordato dal browser). Vuole il campanello
+# del bot acceso (TELEGRAM_WEBHOOK_SEGRETO): senza, resta il widget.
+# SPENTA di serie: si accende dopo la prova.
+LOGIN_DAL_BOT = False
+
 # LA RICERCA NON HA PIU' UNA QUOTA (ago 2026): `TETTO_RICERCHE_AI_ORA`
 # frenava le chiamate ad Anthropic della ricerca, e la ricerca non
 # chiama piu' nessuno — e' un indice full-text dentro SQLite. Una riga
