@@ -143,6 +143,7 @@ collaudo_malus_p2p.py
 collaudo_feedback_p2p.py
 collaudo_cambio_libro_p2p.py
 collaudo_indirizzo_lightning.py
+collaudo_indirizzo_swap.py
 collaudo_dispute_cruscotto.py
 collaudo_tempo_pubblica.py
 collaudo_gesti_ordine.py

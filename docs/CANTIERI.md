@@ -67623,3 +67623,114 @@ contenitore vero (flex, gap 10): buona → la 480, mancante e senza foto
 finale (0fd3816 + il cantiere coi due giri) la suite severa intera:
 **25.314 passate, 0 fallite**; `collaudo_offerta_carrello`,
 `collaudo_rilancio`, `collaudo_modifica_massiva`: verdi.
+## L'indirizzo della quota: swap@barattolo.store (19 ott 2026, cantiere swap-indirizzo, decisione di Andrea)
+
+**LA RICHIESTA.** Un Lightning address dedicato alla quota mensile di
+SATS Routing (il 10 % della loro commissione sugli swap: voce
+swap-studio, le risposte di Massimo del 19 ott), `swap@barattolo.store`,
+separato da `zap@barattolo.store`, con un tetto per pagamento più alto
+dato da una leva. Prima il piano in dieci righe, poi l'ok di Andrea,
+poi il codice. Lavoro fatto nel cloud: push sul ramo
+`cantiere/swap-indirizzo`, non su main; rebase e firma li fa una
+sessione sul PC di Andrea.
+
+**COSA C'ERA GIÀ (letto, non supposto).** zap@ (voce «L'indirizzo
+Lightning di casa») conia sul wallet LNbits «zap» del nodo con la sola
+invoice key; il tetto dei 100.000 sats è la decisione 2 di Andrea del
+10 ott, nel codice `ZAP_MAX_SATS`. Nessun ramo su origin sul tema (le
+PR aperte non si potevano leggere: niente `gh` nel cloud e il
+connettore GitHub non si è collegato).
+
+**LE DECISIONI DI ANDREA (19 ott).** 1) Wallet LNbits SUO, «swap», con
+la sola invoice key `SWAP_LNBITS_INVOICE_KEY` — non lo stesso wallet
+degli zap con un'etichetta. 2) L'avviso di ogni pagamento nel gruppo
+degli admin, stanza 📊 Riepiloghi, non urgente, con importo e ora. 3)
+`SWAP_INDIRIZZO_ATTIVO` spenta di serie, `SWAP_MAX_SATS = 2_000_000`.
+4) Niente zap Nostr su swap@: solo pagamenti. 5) Prove in prove.py,
+collaudo con richieste vere, nessuna fattura vera pagata. 6) I passi
+per creare il wallet e accendere la leva in PRODUZIONE: li fa lui dopo
+il deploy.
+
+**COM'È FATTO** (per intero in ARCHITETTURA, «L'INDIRIZZO DELLA
+QUOTA»). Un blocco suo in fondo a server.py, dopo quello degli zap da
+cui prende i pezzi: il citofono è la STESSA rotta
+`/.well-known/lnurlp/{nome}` con un secondo nome nella whitelist (una
+seconda rotta con lo stesso schema non sarebbe mai stata raggiunta, e
+la sentinella della regola ferrea 3 la conta una volta sola); il
+callback `/api/lnurl/swap`; l'orologio `giro_swap`; la card
+«🔄 Quota SATS Routing» in `/admin`; tre voci nel pannello delle leve.
+`zap_conia` e `zap_pagata` prendono il wallet come argomento (senza, è
+il salvadanaio degli zap di sempre): la cintura che rilegge la fattura
+è una sola per tutt'e due gli indirizzi.
+
+**LE SCELTE CHE NON ERANO NELLA PROPOSTA, e perché.**
+- LA TABELLA È SUA (`swap_quota`), NON UNA COLONNA IN `zap`. Il piano
+  diceva «stessa tabella più una colonna `indirizzo`»: a codice aperto
+  ogni domanda del blocco degli zap (l'orologio, la card, il tetto
+  delle attese, le ricevute) guarda TUTTA la tabella `zap` con la SUA
+  chiave, e una riga di swap lì dentro si sarebbe chiesta al wallet
+  sbagliato. Con una colonna sarebbero serviti sei filtri nel codice
+  degli zap, e il primo dimenticato mescolava i due registri; con una
+  tabella sua il codice degli zap non cambia comportamento.
+- LA CHIAVE DEGLI ZAP SPEGNE swap@. Se nel config la
+  `SWAP_LNBITS_INVOICE_KEY` è la stessa del salvadanaio, `swap_wallet()`
+  torna vuoto: due indirizzi sullo stesso wallet sono esattamente la
+  cosa che la decisione 1 esclude. Il pannello lo dice con l'allarme,
+  il journal all'avvio pure.
+- IL FRENO È QUELLO DEGLI ZAP (gli stessi secchi, `FRENI["zap"]` e
+  `FRENI["zap_tutti"]`): ogni colpo è una fattura sullo stesso nodo, e
+  chi paga swap@ è uno solo al mese. Il tetto delle attese è suo
+  (`SWAP_MAX_ATTESA = 20`).
+- L'AVVISO NON PORTA IL COMMENTO. Importo e ora, come chiesto; il
+  commento lo scrive chi paga, e swap@ lo può pagare chiunque. Il
+  commento si legge nella card, passato da `esc`.
+- LA QUERY DEL CALLBACK FUORI DAL REGISTRO DEGLI ACCESSI, come per
+  zap@: un ramo in più nel filtro `_ZapQueryFuoriDalJournal`.
+
+**IL TETTO E LA LIQUIDITÀ.** La leva dice al wallet quanto può
+mandare; quanto ENTRA davvero lo decide lo spazio in entrata dei canali
+del nodo (LNbits poggia sul LND del nodo). Da qui il nodo non si legge
+(fuori perimetro): l'ultimo numero scritto è la stima del 1 ott
+(STUDIO-LIQUIDITA §7: ~3,28M in entrata dopo il canale LNBiG da 5M),
+prima dei due ACINQ del 12 ott. Il numero vivo lo dà `/canali` nel bot,
+colonna «loro»; è il passo 7 della procedura, prima di dare
+l'indirizzo a SATS Routing. Un pagamento che chi paga non spezza deve
+stare in UN canale.
+
+**STRADE SCARTATE.** Lo stesso wallet degli zap con un'etichetta
+(decisione 1). Una colonna in `zap` (sopra). Una seconda rotta
+`/.well-known/lnurlp/swap` (sopra). Gli zap Nostr (decisione 4).
+L'avviso in 💧 Liquidità (è urgente, andrebbe in privato a gruppo giù:
+una quota arrivata non lo è).
+
+**PROVATO.** `prove_indirizzo_swap` (43): chi è vivo e quando (la
+leva, la chiave, il segnaposto, la chiave degli zap, l'indirizzo di
+LNbits), il tetto, il citofono che ha SOLO i sei campi di LUD-06/12,
+l'avviso, la tabella, e le sentinelle (la rotta unica, l'ordine del
+callback, il wallet «swap» in ogni chiamata, l'avviso dopo il
+cancello e nei riepiloghi, il journal guardato con l'albero, il
+filtro, la card, il config d'esempio, i documenti).
+`collaudo_indirizzo_swap` (60), il server vero per HTTP col LNbits di
+cartone di `collaudo_indirizzo_lightning`: spento, la chiave che manca
+e quella degli zap, il citofono senza Nostr anche con gli zap Nostr
+accesi, una fattura da 2.000.000 sul wallet «swap», i limiti e la
+richiesta di zap rifiutata senza coniare, zap@ accanto (ognuno col suo
+wallet, l'orologio degli zap non chiede delle fatture di swap@), il
+pagamento con UN avviso in «riepiloghi», LNbits che tace e la
+scadenza, il freno, la card, le leve, i segreti, il registro degli
+accessi. Tortura 3 su 3: un `allowsNostr` nel citofono, l'avviso in
+«dispute», la chiave degli zap accettata — rosse in tutt'e due.
+`prove_leve` ha i giudici nuovi nel banco (la quindicesima volta
+della trappola) e la invoice key fra i segreti finti. DUE PROVE
+LONTANE prese al primo giro della suite, e curate: il censimento degli
+avvisi da admin di `prove_canale_admin` (un avviso nuovo nei
+riepiloghi: 26 lì, 85 punti in tutto — è fatto apposta per arrossire)
+e la sentinella di `prove_swap_cella` che conta `swap_leve` nel
+sorgente (la busta di /api/me della cella Swap): la mia `_swap_leve` la
+conteneva, ora si chiama `_swap_quota_leve`.
+
+**DA GUARDARE DAL VIVO** (PRODUZIONE, «L'INDIRIZZO DELLA QUOTA»): la
+prima fattura vera (21 sat) e l'avviso nella stanza; lo spazio in
+entrata prima della prima quota; se LNbits del nodo ha un massimo suo
+per le fatture in entrata, lo dirà il journal alla prima fattura
+grossa («fattura non coniata»).

@@ -110,6 +110,7 @@ collaudo_malus_p2p
 collaudo_feedback_p2p
 collaudo_cambio_libro_p2p
 collaudo_indirizzo_lightning
+collaudo_indirizzo_swap
 collaudo_dispute_cruscotto
 collaudo_tempo_pubblica
 collaudo_gesti_ordine

@@ -1276,6 +1276,23 @@ ZAP_MAX_SATS = 100_000
 # codice: la riga serve solo per un giro di prova con un'altra chiave.
 ZAP_NPUB = "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
 
+# --- L'indirizzo della quota: swap@barattolo.store (19 ott 2026) ---
+# Dove SATS Routing manda a fine mese la quota di Barattolo sugli swap.
+# E' un altro Lightning address, separato da zap@: wallet LNbits SUO
+# («swap»), tetto piu' alto, niente zap Nostr, e un avviso nel gruppo
+# degli admin (📊 Riepiloghi) a ogni pagamento. Nasce SPENTO: con la
+# leva False (o senza l'invoice key) /.well-known/lnurlp/swap dice 404.
+SWAP_INDIRIZZO_ATTIVO = False
+# La INVOICE key del wallet «swap» (LNbits del nodo → wallet «swap» →
+# «Invoice/read key»). SOLO quella, e NON quella del wallet «zap»: con
+# la stessa chiave l'indirizzo vale spento. Solo nel config del VPS.
+SWAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY_DEL_WALLET_SWAP"
+# Dove sta quel wallet: vuoto = lo stesso LNbits del nodo.
+SWAP_LNBITS_URL = ""
+# Il massimo di un singolo pagamento, in sats. Il limite vero e' la
+# liquidita' in entrata dei canali del nodo (/canali nel bot).
+SWAP_MAX_SATS = 2_000_000
+
 # --- Import aperto da Nostr -------------------------------------------
 # Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque
 # pubblichi in italiano si ritrova in vetrina, e chi non ci vuole

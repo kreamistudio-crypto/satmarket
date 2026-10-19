@@ -4430,6 +4430,81 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   LNbits. Lo stato VIVO sta nel pannello «⚙️ Stato delle leve», gruppo
   «⚡ Indirizzo Lightning di casa».
 
+- L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026; perché in
+  CANTIERI, «L'indirizzo della quota: swap@barattolo.store»; com'è fatto
+  in ARCHITETTURA, «L'INDIRIZZO DELLA QUOTA»). Dove SATS Routing manda a
+  fine mese la quota di Barattolo sugli swap. Separato da zap@: wallet
+  LNbits SUO («swap»), tetto per pagamento 2.000.000 sats
+  (`SWAP_MAX_SATS`), niente zap Nostr, e a ogni pagamento un avviso nel
+  gruppo degli admin, stanza 📊 Riepiloghi: «🔄 Arrivati N sats su
+  swap@barattolo.store, <giorno> alle <ora>». Nel codice nasce SPENTO:
+  finché non lo si accende,
+  `https://barattolo.store/.well-known/lnurlp/swap` risponde 404.
+  PER ACCENDERLO, DOPO IL DEPLOY, in quest'ordine:
+  1) IL WALLET «swap», SUL PC: il pannello di LNbits del nodo come per
+     zap@ (`ssh -N -L 5001:127.0.0.1:5001 root@VPS` in un terminale,
+     poi `http://127.0.0.1:5001` nel browser, login «LNbits nodo» in
+     KeePass). Con lo STESSO utente della cassaforte: «Add a new
+     wallet», nome `swap`. Dentro il wallet nuovo, «Node URL, API keys
+     and API docs»: si copia la «Invoice/read key» del wallet «swap» —
+     SOLO quella, e NON quella del wallet «zap» (con la stessa chiave
+     l'indirizzo vale spento, ed è voluto). La «Admin key» non si copia.
+  2) IL CONFIG, SUL VPS, da `barattolo`: prima si guarda che le righe
+     non ci siano già — `grep -n "^SWAP_" /srv/barattolo/config.py`
+     (possono esserci `SWAP_ATTIVO` e `SWAP_REFERRAL_ID`: sono la cella
+     «Swap» dei venditori, un'altra cosa, e non si toccano) —
+     poi si aggiungono in fondo a `/srv/barattolo/config.py` due righe:
+     `SWAP_LNBITS_INVOICE_KEY` uguale alla invoice key copiata (fra
+     virgolette) e `SWAP_INDIRIZZO_ATTIVO = True`. Nient'altro: il
+     tetto di serie è 2.000.000 (`SWAP_MAX_SATS = …` solo per
+     cambiarlo), l'indirizzo di LNbits è quello del nodo. La invoice
+     key non si scrive mai in chat, su GitHub o in un log.
+  3) IL RIAVVIO: `sudo systemctl restart barattolo`.
+  4) IL JOURNAL, subito dopo:
+     `journalctl -u barattolo -n 120 --no-pager | grep "Indirizzo della quota"`
+     — «🔄 Indirizzo della quota: swap@barattolo.store ACCESO — fino a
+     2.000.000 sats a pagamento, niente zap Nostr» è il verde; «⚠️
+     SWAP_INDIRIZZO_ATTIVO e' True ma manca SWAP_LNBITS_INVOICE_KEY (o
+     e' quella del wallet degli zap)» vuol dire chiave non letta, o
+     copiata dal wallet sbagliato.
+  5) IL CITOFONO, da qualunque computer:
+     `curl -s https://barattolo.store/.well-known/lnurlp/swap` — un JSON
+     con `"tag":"payRequest"`, `"maxSendable":2000000000` (in
+     MILLIsatoshi) e SENZA `allowsNostr`. Un `{"status":"ERROR"…}` vuol
+     dire spento.
+  6) UNA FATTURA DI PROVA. ⚠️ È LA PRIMA FATTURA VERA di swap@: prima
+     del push è stato provato tutto con un LNbits di cartone. Sul VPS
+     si tiene aperto `journalctl -u barattolo -f | grep "swap@"`, poi da
+     un wallet si mandano 21 sat a `swap@barattolo.store` (o si chiede
+     la fattura a mano:
+     `curl -s "https://barattolo.store/api/lnurl/swap?amount=21000"` e
+     si paga la `pr`). NEL JOURNAL, in ordine: «🔄 swap@: fattura da 21
+     sats, abcd1234…» e, entro una decina di secondi dal pagamento,
+     «🔄 swap@: arrivati 21 sats, fattura abcd1234…». NEL GRUPPO DEGLI
+     ADMIN, stanza 📊 Riepiloghi, l'avviso con importo e ora. In `/admin`
+     la card «🔄 Quota SATS Routing» col saldo del wallet «swap».
+     Se il journal dice «⚠️ swap@: fattura non coniata (…)»: LNbits o il
+     ponte sono giù, o la chiave è sbagliata (401); «non porta
+     l'impronta» è lo stesso caso di zap@ (si spegne la leva e si
+     riporta la riga).
+  7) LA LIQUIDITÀ, PRIMA DI DARE L'INDIRIZZO: un pagamento entra solo se
+     i canali del nodo hanno abbastanza spazio IN ENTRATA. Si guarda
+     `/canali` nel bot (solo admin, sola lettura): la colonna «loro» di
+     ogni canale è quanto può ARRIVARE da lì. Un pagamento grosso che
+     chi paga non spezza in più parti deve stare tutto in UN canale;
+     spezzato, si somma. Se la quota attesa supera lo spazio in entrata,
+     si sposta fuori il saldo prima (sotto).
+  8) SOLO ADESSO L'INDIRIZZO A SATS ROUTING: Andrea lo comunica a
+     Massimo (`swap@barattolo.store`), accanto al codice partner.
+  COME SI SPOSTANO I SATS: a mano, dal pannello di LNbits — wallet
+  «swap» > «Send». Il server non può farlo (sola invoice key). La quota
+  è un RICAVO del mercatino: conta nei conti dei ricavi netti (la parte
+  di Alan), e per questo sta in un wallet suo.
+  PER SPEGNERLO: `SWAP_INDIRIZZO_ATTIVO = False` (o via la riga) e
+  riavvio; il citofono torna 404 (zap@ non se ne accorge). Lo stato VIVO
+  sta nel pannello «⚙️ Stato delle leve», gruppo «🔄 Indirizzo della
+  quota SATS Routing».
+
 - L'AVVISO DEI DM NOSTR (11 ott 2026; perché in CANTIERI, «L'avviso dei
   DM a Barattolo su Nostr»; com'è fatto in ARCHITETTURA, «L'AVVISO DEI
   DM A BARATTOLO»). Quando qualcuno scrive un DM al profilo Nostr di

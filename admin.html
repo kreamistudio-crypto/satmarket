@@ -480,6 +480,10 @@ function disegna(){
   ${cardZap(D.zap)}
   </div></details>` : ''}
 
+  ${D.swap ? `<details class="grp" id="altroSwap"><summary>🔄 Quota SATS Routing</summary><div class="grp-b">
+  ${cardSwap(D.swap)}
+  </div></details>` : ''}
+
   ${D.dispute_p2p ? `<details class="grp" id="altroDispute"><summary>⚖️ Dispute P2P</summary><div class="grp-b">
   ${cardDisputeP2P(D.dispute_p2p)}
   </div></details>` : ''}`;
@@ -749,6 +753,25 @@ function cardZap(Z){
     </div>
     <div class="tab">${tabella(['Quando', 'Sats', 'Da chi', 'Messaggio'], (Z.ultimi || []).map(u => [data(u.pagato_il), fmt(u.sats), chi(u), esc(u.commento || '')]), [1])}</div>
     <div class="nota">Gli ultimi venti. I sats si spostano a mano dal pannello di LNbits (wallet «zap»): il server ha la sola chiave che incassa.</div>
+  </div>`;
+}
+
+/* ---- LA QUOTA DI SATS ROUTING (19 ott 2026): swap@barattolo.store ----
+   Un wallet suo, «swap», separato dal salvadanaio degli zap e dalle
+   cassaforti: il server ne ha la sola invoice key, qui si GUARDA. `S`
+   nullo = indirizzo spento e mai un pagamento: niente card. Il commento
+   lo scrive chi paga (swap@ lo puo' pagare chiunque): sempre `esc`. */
+function cardSwap(S){
+  if (!S) return '';
+  const data = ts => ts ? new Date(ts * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '—';
+  return `<div class="card"><h2>🔄 Quota SATS Routing</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">Nel wallet «swap»</div><div class="v">${S.saldo_sats == null ? '—' : fmt(S.saldo_sats) + ' sats'}</div><div class="d">${S.saldo_sats == null ? 'LNbits non risponde' : 'saldo vivo'}</div></div>
+      <div class="tile"><div class="k">Arrivati in tutto</div><div class="v">${fmt(S.totale_sats)} sats</div><div class="d">${fmt(S.quanti)} ${S.quanti === 1 ? 'pagamento' : 'pagamenti'}</div></div>
+      <div class="tile"><div class="k">Indirizzo</div><div class="v" style="font-size:15px">${esc(S.indirizzo)}</div><div class="d">${S.vivo ? `acceso, fino a ${fmt(S.max_sats)} sats` : 'spento'}${S.in_attesa ? ` · ${fmt(S.in_attesa)} in attesa` : ''}</div></div>
+    </div>
+    <div class="tab">${tabella(['Quando', 'Sats', 'Messaggio'], (S.ultimi || []).map(u => [data(u.pagato_il), fmt(u.sats), esc(u.commento || '')]), [1])}</div>
+    <div class="nota">Gli ultimi venti. Non sono zap e non sono garanzie: i sats si spostano a mano dal pannello di LNbits (wallet «swap»).</div>
   </div>`;
 }
 

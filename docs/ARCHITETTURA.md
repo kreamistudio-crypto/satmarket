@@ -30819,6 +30819,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    LUD-16 e il callback che conia la fattura; JSON, CORS aperto, mai un
    redirect, il SOLO nome `zap` — ogni altro è 404 —, e 404 anche a
    leva `ZAP_ATTIVO` spenta; vedi «L'INDIRIZZO LIGHTNING DI CASA»),
+   `/.well-known/lnurlp/swap` e `/api/lnurl/swap` (19 ott 2026,
+   l'indirizzo della quota `swap@barattolo.store`: lo STESSO citofono
+   di zap@ con un secondo nome nella whitelist, e il suo callback;
+   niente Nostr, 404 a leva `SWAP_INDIRIZZO_ATTIVO` spenta; vedi
+   «L'INDIRIZZO DELLA QUOTA»),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
@@ -32634,6 +32639,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `collaudo_indirizzo_lightning` (il server vero per HTTP con un LNbits
   di cartone, in CI nella gabbia). La procedura: PRODUZIONE,
   «L'INDIRIZZO LIGHTNING DI CASA».
+- L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
+  in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
+  SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo
+  stesso meccanismo di zap@, in un blocco suo in fondo a server.py,
+  DOPO quello degli zap (che ne presta i pezzi: `zap_leggi_bolt11`,
+  `_zap_risposta`, `_zap_errore`, le costanti dei tempi).
+  LE ROTTE: il citofono è lo stesso `GET/HEAD /.well-known/lnurlp/{nome}`
+  (`zap_lnurlp`), la whitelist ha DUE nomi e `swap` risponde da
+  `swap_citofono` PRIMA del controllo di `zap`; il callback è
+  `GET /api/lnurl/swap` (`swap_fattura`). NIENTE NOSTR: il citofono non
+  dichiara `allowsNostr` né `nostrPubkey`, e un parametro `nostr` si
+  rifiuta prima di coniare. Tetto `swap_max_sats()` (leva `SWAP_MAX_SATS`,
+  2.000.000 di serie), commento a `ZAP_COMMENTO`.
+  IL WALLET È SUO, «swap», di cui il server ha la SOLA invoice key
+  (`SWAP_LNBITS_INVOICE_KEY`; `SWAP_LNBITS_URL` se traslocasse). Non è
+  il salvadanaio degli zap e non è una cassaforte: `zap_conia` e
+  `zap_pagata` prendono il wallet come argomento (senza, è quello degli
+  zap di sempre) e il blocco passa sempre `swap_wallet()`. Se la chiave
+  nel config è LA STESSA degli zap, `swap_wallet()` torna vuoto e
+  l'indirizzo vale spento (il pannello lo dice con l'allarme).
+  LA TABELLA È SUA, `swap_quota` (payment hash unico, sats, commento,
+  `stato` attesa | pagato | scaduto): ogni domanda del blocco degli zap
+  guarda tutta la tabella `zap` con la sua chiave, e una riga di swap
+  lì dentro si chiederebbe al wallet sbagliato.
+  IL CALLBACK, NELL'ORDINE: la leva, il freno (gli STESSI secchi degli
+  zap: ogni colpo è una fattura sullo stesso nodo), i limiti, il no a
+  Nostr, il tetto delle attese (`SWAP_MAX_ATTESA`), poi LNbits e la
+  riga. L'OROLOGIO, `orologio_swap` → `giro_swap`, coi tempi di quello
+  degli zap; `_swap_incassa` cambia stato con l'UPDATE condizionato e
+  SOLO DOPO manda l'avviso (`swap_avviso`: importo e ora, mai il
+  commento — swap@ lo può pagare chiunque) con `notifica_admin(…,
+  argomento="riepiloghi")`: nel gruppo la stanza 📊 Riepiloghi, non
+  urgente (col gruppo giù aspetta in coda, non va in privato).
+  NEL JOURNAL: «🔄 swap@: fattura da N sats», «🔄 swap@: arrivati N
+  sats»; la query del callback esce dal registro degli accessi come
+  quella degli zap (`_ZapQueryFuoriDalJournal`).
+  DOVE SI VEDE: la card «🔄 Quota SATS Routing» di `/admin`
+  (`dati_swap_cruscotto`: saldo vivo del wallet «swap», totale, il
+  tetto, gli ultimi venti; il commento passa da `esc`) e il gruppo «🔄
+  Indirizzo della quota SATS Routing» del pannello delle leve
+  (`_swap_quota_leve`). LE PROVE: `prove_indirizzo_swap` e
+  `collaudo_indirizzo_swap` (in CI nella gabbia). La procedura:
+  PRODUZIONE, «L'INDIRIZZO DELLA QUOTA».
 
 - L'AVVISO DEI DM A BARATTOLO (11 ott 2026, perché in CANTIERI,
   «L'avviso dei DM a Barattolo su Nostr»). Un DM al profilo Nostr di

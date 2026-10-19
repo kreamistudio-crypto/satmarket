@@ -33520,6 +33520,9 @@ _SEGRETI_FINTI = {
     # nel pannello esce il FATTO che ci sono, mai il valore
     "SWAP_REFERRAL_API_KEY": "SEGRETO-referral-api-key",
     "SWAP_REFERRAL_API_SECRET": "SEGRETO-referral-api-secret",
+    # la invoice key del wallet «swap» (19 ott 2026, swap@): nel
+    # pannello esce il fatto che c'e', mai lei
+    "SWAP_LNBITS_INVOICE_KEY": "SEGRETO-invoice-key-swap",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -33792,6 +33795,10 @@ def _censimento(acceso, dopo=None):
               # le chiavi della quota di SATS Routing (19 ott 2026): la
               # riga del pannello CHIAMA `chiavi_referral_presenti()`
               "chiavi_referral_presenti",
+              # l'indirizzo della quota, swap@ (19 ott 2026): la
+              # quindicesima volta, `_swap_quota_leve()` e i suoi giudici
+              "swap_wallet", "swap_stessa_chiave_degli_zap", "swap_vivo",
+              "swap_max_sats", "swap_indirizzo", "_swap_quota_leve",
               # l'avviso dei DM Nostr (11 ott 2026): la decima volta
               # della trappola, `_dm_leve()` e i suoi due giudici — le
               # solite tre esplosioni lontane
@@ -116079,6 +116086,238 @@ def prove_indirizzo_lightning():
           and "/.well-known/lnurlp/zap" in prod)
 
 
+def _banco_swap(extra=None):
+    """L'ambiente dell'indirizzo della quota: quello degli zap (swap@
+    ne usa la lettura della fattura e le costanti) piu' i pezzi VERI
+    del blocco di swap@. Le invoice key in un DIZIONARIO, la forma che
+    lo scanner dei segreti non prende."""
+    amb = _banco_zap()
+    amb.update({"SWAP_INDIRIZZO_ATTIVO": True, "SWAP_LNBITS_URL": "",
+                "SWAP_MAX_SATS": 2_000_000,
+                "SWAP_LNBITS_INVOICE_KEY": "collaudo-usa-e-getta-swap"})
+    src = _SORGENTE
+    i = src.index('SWAP_NOME = "swap"')
+    exec(src[i:src.index("def swap_wallet(", i)], amb)
+    i = src.index("MESI_IT = (")
+    exec(src[i:src.index("def data_ferie(", i)], amb)
+    for f in ("_fmt_sats", "_quando_appuntamento", "swap_wallet",
+              "swap_stessa_chiave_degli_zap", "swap_vivo", "swap_max_sats",
+              "swap_indirizzo", "swap_metadata", "swap_citofono",
+              "swap_avviso", "_swap_prepara_tabella"):
+        exec(pezzo(f), amb)
+    amb.update(extra or {})
+    return amb
+
+
+def prove_indirizzo_swap():
+    """L'INDIRIZZO DELLA QUOTA (19 ott 2026): swap@barattolo.store, dove
+    SATS Routing manda la quota mensile. Qui i pezzi PURI — chi e' vivo
+    e quando (la chiave degli zap lo spegne), il tetto, il citofono
+    SENZA Nostr, l'avviso, la tabella — e le sentinelle: la rotta
+    unica del citofono, l'ordine dei gesti nel callback, il wallet suo
+    in ogni chiamata a LNbits, l'avviso dopo il cancello e nella stanza
+    dei riepiloghi, il journal. Il server vero, con un LNbits di
+    cartone, sta in `collaudo_indirizzo_swap`."""
+    print("\n[l'indirizzo della quota, swap@]")
+    import ast as _ast
+    import sqlite3
+    amb = _banco_swap()
+    src = _SORGENTE
+    blocco = src[src.index("# ---------- L'INDIRIZZO DELLA QUOTA: swap@"):]
+    nudo = codice(blocco)
+
+    # --- 1) chi e' vivo, e quando ------------------------------------
+    prova("leva accesa e invoice key sua: vivo, sul LNbits del nodo",
+          (True, ("http://127.0.0.1:5001", "collaudo-usa-e-getta-swap")),
+          (amb["swap_vivo"](), amb["swap_wallet"]()))
+    for nome, valore, perche in (
+            ("SWAP_INDIRIZZO_ATTIVO", False, "la leva spenta"),
+            ("SWAP_LNBITS_INVOICE_KEY", "", "senza l'invoice key"),
+            ("SWAP_LNBITS_INVOICE_KEY", "INCOLLA_QUI_LA_INVOICE_KEY_DEL_WALLET_SWAP",
+             "col segnaposto del config d'esempio"),
+            ("SWAP_LNBITS_INVOICE_KEY", "collaudo-usa-e-getta-zap",
+             "con la STESSA chiave del salvadanaio degli zap"),
+            ("LNBITS_NODO_URL", "", "senza un indirizzo di LNbits")):
+        prova(f"{perche}: spento", False,
+              _banco_swap({nome: valore})["swap_vivo"]())
+    prova("la chiave degli zap si riconosce (il pannello la dice)",
+          (True, False),
+          (_banco_swap({"SWAP_LNBITS_INVOICE_KEY": "collaudo-usa-e-getta-zap"})
+           ["swap_stessa_chiave_degli_zap"](),
+           amb["swap_stessa_chiave_degli_zap"]()))
+    prova("...ma due righe vuote non sono «la stessa chiave»", False,
+          _banco_swap({"SWAP_LNBITS_INVOICE_KEY": "",
+                       "ZAP_LNBITS_INVOICE_KEY": ""})
+          ["swap_stessa_chiave_degli_zap"]())
+    prova("SWAP_LNBITS_URL, se c'e', vince sull'indirizzo del nodo",
+          "https://altrove.example",
+          _banco_swap({"SWAP_LNBITS_URL": "https://altrove.example/"})
+          ["swap_wallet"]()[0])
+    prova("il tetto: il numero del config, e 2.000.000 se e' storto o zero",
+          [500, 2_000_000, 2_000_000, 2_000_000, 5_000_000],
+          [_banco_swap({"SWAP_MAX_SATS": v})["swap_max_sats"]()
+           for v in (500, "storto", 0, None, 5_000_000)])
+    prova("...e il tetto degli zap resta il suo", 100_000, amb["zap_max_sats"]())
+
+    # --- 2) il citofono, senza Nostr -----------------------------------
+    cit = amb["swap_citofono"]()
+    prova("il citofono: un payRequest da 1 a 2.000.000 sat, commento a 140",
+          ("payRequest", "https://barattolo.store/api/lnurl/swap", 1000,
+           2_000_000_000, 140),
+          (cit["tag"], cit["callback"], cit["minSendable"], cit["maxSendable"],
+           cit["commentAllowed"]))
+    prova("...la metadata porta swap@barattolo.store",
+          [["text/plain", "Quota di SATS Routing a Barattolo"],
+           ["text/identifier", "swap@barattolo.store"]],
+          json.loads(cit["metadata"]))
+    prova("...e NIENT'ALTRO: nessun campo Nostr, anche con la chiave della "
+          "piattaforma", ({"tag", "callback", "minSendable", "maxSendable",
+                           "metadata", "commentAllowed"}, True),
+          (set(cit), amb["_NOSTR"] is not None))
+    prova("...ed e' la STESSA metadata che il callback impronta", True,
+          "zap_conia(sats, swap_metadata(), swap_wallet(), SWAP_TESTO)"
+          in codice(pezzo("swap_fattura")))
+
+    # --- 3) l'avviso -----------------------------------------------------
+    ts = 1_792_400_000
+    testo = amb["swap_avviso"](2_000_000, ts)
+    prova("l'avviso dice l'importo, l'indirizzo e l'ora", True,
+          "2.000.000 sats" in testo and "swap@barattolo.store" in testo
+          and amb["_quando_appuntamento"](ts) in testo)
+    prova("...e prende SOLO importo e ora: il commento non ci puo' entrare",
+          ["sats", "quando"],
+          [a.arg for a in _ast.parse(pezzo("swap_avviso")).body[0].args.args])
+
+    # --- 4) la tabella ---------------------------------------------------
+    con = sqlite3.connect(":memory:")
+    amb["_swap_prepara_tabella"](con)
+    amb["_swap_prepara_tabella"](con)         # due volte: non alza
+    colonne = {r[1] for r in con.execute("PRAGMA table_info(swap_quota)")}
+    prova("la tabella swap_quota ha le colonne che il giro legge e scrive",
+          True, {"payment_hash", "bolt11", "sats", "commento", "stato",
+                 "creato", "scade", "pagato_il"} <= colonne)
+    con.execute("INSERT INTO swap_quota(payment_hash) VALUES('h1')")
+    doppia = False
+    try:
+        con.execute("INSERT INTO swap_quota(payment_hash) VALUES('h1')")
+    except sqlite3.IntegrityError:
+        doppia = True
+    prova("...un payment hash non entra due volte, e la riga nasce in attesa",
+          (True, "attesa"), (doppia, con.execute(
+              "SELECT stato FROM swap_quota").fetchone()[0]))
+    con.close()
+    prova("la tabella e' sua: il blocco non scrive mai in quella degli zap",
+          False, "INTO zap" in nudo or "UPDATE zap " in nudo
+          or "FROM zap " in nudo)
+
+    # --- 5) le sentinelle sul testo ----------------------------------------
+    prova("il citofono resta UNO, GET e HEAD (regola ferrea 3)", (1, 1),
+          (src.count('@app.get("/.well-known/lnurlp/{nome}")'),
+           src.count('@app.head("/.well-known/lnurlp/{nome}")')))
+    prova("...e il callback di swap@ c'e' una volta", 1,
+          src.count('@app.get("/api/lnurl/swap")'))
+    cit_src = codice(pezzo("zap_lnurlp"))
+    prova("il citofono: il nome swap risponde da swap_citofono, 404 a leva spenta",
+          True, "if nome == SWAP_NOME:" in cit_src
+          and cit_src.index("if not swap_vivo():") < cit_src.index("swap_citofono()")
+          and cit_src.index("swap_citofono()") < cit_src.index("if nome != ZAP_NOME"))
+    cb = codice(pezzo("swap_fattura"))
+    ordine = [cb.index(x) for x in (
+        "if not swap_vivo():", "_secchio_passa(", "int(amount) % 1000",
+        "sats <= swap_max_sats()", "len(comment) > ZAP_COMMENTO", "if nostr:",
+        "in_attesa >= SWAP_MAX_ATTESA", "await zap_conia(",
+        "INSERT OR IGNORE INTO swap_quota")]
+    prova("il callback: la leva, il freno, i limiti, il no a Nostr, il tetto — "
+          "e SOLO DOPO LNbits e la riga", ordine, sorted(ordine))
+    prova("...col freno degli zap (lo stesso nodo conia)", True,
+          '_secchio_passa(f"zap:{ip}", *FRENI["zap"], adesso)' in cb
+          and '_secchio_passa("zap_tutti:tutti", *FRENI["zap_tutti"], adesso)' in cb)
+    prova("...e una richiesta di zap non arriva al giudice degli zap", False,
+          "zap_giudica_richiesta" in cb)
+    prova("zap_conia e zap_pagata: senza wallet il salvadanaio di sempre", True,
+          "url, chiave = zap_wallet() if wallet is None else wallet"
+          in codice(pezzo("zap_conia"))
+          and "url, chiave = zap_wallet() if wallet is None else wallet"
+          in codice(pezzo("zap_pagata")))
+    prova("ogni chiamata a LNbits del blocco porta il wallet «swap»",
+          (1, 1, 1), (nudo.count("await zap_conia("),
+                      nudo.count("await zap_pagata(h, swap_wallet())"),
+                      nudo.count("url, chiave = swap_wallet()")))
+    giro = codice(pezzo("giro_swap"))
+    prova("una fattura scade solo DOPO un «non pagata», e un LNbits che tace "
+          "ferma il giro", True,
+          giro.index("await zap_pagata(") < giro.index("stato='scaduto'")
+          and giro.index("except Exception as e:") < giro.index("break")
+          < giro.index("stato='scaduto'"))
+    incassa = codice(pezzo("_swap_incassa"))
+    prova("UN avviso per pagamento: dopo il cancello, nella stanza dei riepiloghi",
+          True, "WHERE id=? AND stato='attesa'" in incassa
+          and "cur.rowcount == 1" in incassa
+          and incassa.index("if not mia:") < incassa.index("await notifica_admin(")
+          and 'argomento="riepiloghi"' in incassa
+          and "swap_avviso(riga[\"sats\"], adesso)" in incassa)
+    prova("...e i riepiloghi non sono urgenti (col gruppo giu' aspettano)",
+          True, '"riepiloghi"' not in src[src.index("GRUPPO_ADMIN_URGENTI = "):
+                                         src.index("GRUPPO_ADMIN_ATTESE")])
+    prova("il blocco non conosce una chiave che paga, ne' Nostr",
+          [False] * 5, ["ADMIN_KEY" in nudo, "_chiavi_cassaforte(" in nudo,
+                        '"out": True' in nudo, "allowsNostr" in codice(
+                            pezzo("swap_citofono")), "9735" in nudo])
+    prova("...e le cassaforti non conoscono lui", False,
+          "SWAP_" in codice(pezzo("_chiavi_cassaforte")))
+    vietati = {"commento", "comment", "bolt11", "chiave", "nostr",
+               "SWAP_LNBITS_INVOICE_KEY"}
+    nominati, stampe = set(), 0
+    for nodo in _ast.walk(_ast.parse(blocco)):
+        if isinstance(nodo, _ast.Call) and getattr(nodo.func, "id", "") == "print":
+            stampe += 1
+            for dentro in _ast.walk(nodo):
+                if isinstance(dentro, _ast.Name):
+                    nominati.add(dentro.id)
+                elif isinstance(dentro, _ast.Subscript) \
+                        and isinstance(dentro.slice, _ast.Constant):
+                    nominati.add(dentro.slice.value)
+    prova("il journal di swap@ non stampa mai commento, fattura o chiave",
+          (set(), True), (nominati & vietati, stampe >= 6))
+    filtro = src[src.index("class _ZapQueryFuoriDalJournal("):
+                 src.index('@app.get("/.well-known/lnurlp/{nome}")')]
+    prova("la query del callback di swap@ non entra nel registro degli accessi",
+          True, 'a[2].startswith("/api/lnurl/swap?")' in filtro
+          and '("/api/lnurl/swap?…",)' in filtro)
+    prova("il pannello delle leve chiede a _swap_quota_leve", True,
+          "_swap_quota_leve()" in codice(pezzo("_leve_stato")))
+    prova("...e il cruscotto porta la card, DOPO il controllo di chi e' admin",
+          True, (lambda c: c.index("if not e_admin(") < c.index(
+              '"swap": await dati_swap_cruscotto()'))(codice(pezzo("cruscotto_admin"))))
+    pagina = open("admin.html", encoding="utf-8").read()
+    card = pagina[pagina.index("function cardSwap("):]
+    card = card[:card.index("\n}\n")]
+    prova("la pagina /admin disegna la card e scappa il commento", True,
+          "${cardSwap(D.swap)}" in pagina and "esc(u.commento || '')" in card
+          and "if (!S) return '';" in card)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("nel config d'esempio la leva nasce SPENTA, la chiave e' il "
+          "segnaposto, il tetto 2.000.000", True,
+          "\nSWAP_INDIRIZZO_ATTIVO = False\n" in esempio
+          and '\nSWAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI' in esempio
+          and "\nSWAP_MAX_SATS = 2_000_000\n" in esempio)
+    prova("...e nel codice pure: senza la riga nel config vale False", True,
+          "except ImportError:\n    SWAP_INDIRIZZO_ATTIVO = False\n" in blocco
+          and "except ImportError:\n    SWAP_MAX_SATS = 2_000_000\n" in blocco)
+    prova("il collaudo gira in CI, nella gabbia", True,
+          "collaudo_indirizzo_swap" in _collaudi_della_ci())
+    arch = open(os.path.join("docs", "ARCHITETTURA.md"), encoding="utf-8").read()
+    prova("ARCHITETTURA elenca le rotte e la voce", True,
+          "`/.well-known/lnurlp/swap`" in arch and "`/api/lnurl/swap`" in arch
+          and "L'INDIRIZZO DELLA QUOTA" in arch)
+    prod = open(os.path.join("docs", "PRODUZIONE.md"), encoding="utf-8").read()
+    prova("PRODUZIONE ha la procedura: il wallet, la riga, la leva, il controllo",
+          True, "L'INDIRIZZO DELLA QUOTA" in prod
+          and "SWAP_LNBITS_INVOICE_KEY" in prod
+          and "SWAP_INDIRIZZO_ATTIVO = True" in prod
+          and "/.well-known/lnurlp/swap" in prod)
+
+
 def prove_avviso_dm_nostr():
     """L'AVVISO DEI DM A BARATTOLO (11 ott 2026, richiesta di Andrea) —
     senza fastapi: le sentinelle sul testo, e i pezzi VERI fatti girare
@@ -161816,11 +162055,14 @@ def prove_canale_admin():
     # (16 ott 2026, cantiere pdf-allegati: il cassetto dei file della chat
     # quasi pieno, `_chat_p2p_guarda_cassetto` — UNO, negli errori: 74
     # chiamate, 84 punti.)
+    # (19 ott 2026, cantiere swap-indirizzo: un pagamento arrivato su
+    # swap@, la quota di SATS Routing — UNO, nei riepiloghi: 75
+    # chiamate, 85 punti.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
           {"dispute": 2, "dm": 1, "errori": 33, "moderazione": 14,
-           "riepiloghi": 25}, per_stanza)
+           "riepiloghi": 26}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -161855,9 +162097,10 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "84 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "85 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
-          "ronda dei relay Nostr e il cassetto dei file della chat)", 84,
+          "ronda dei relay Nostr, il cassetto dei file della chat e la "
+          "quota arrivata su swap@)", 85,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -173238,6 +173481,7 @@ def main():
               prove_feedback_p2p,
               prove_x_risonanza,
               prove_indirizzo_lightning,
+              prove_indirizzo_swap,
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,
               prove_foto_obbligatorie,

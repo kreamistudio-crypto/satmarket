@@ -30228,11 +30228,13 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     # alla rotta che rifa' la stessa domanda. COPIA e non scrittura:
     # `dati` porta dentro la risposta di LND, che e' la stessa per tutti
     # la card «Zap» (10 ott 2026, l'indirizzo Lightning di casa): None =
-    # niente card. Anche questa entra nella COPIA, per la stessa ragione
+    # niente card. Anche questa entra nella COPIA, per la stessa ragione;
+    # e la card «🔄 Quota SATS Routing» (19 ott 2026, swap@) uguale
     # «va tutto bene?» (16 ott 2026): il commit, il ponte, il cambio, le
     # ronde dei relay — tutto dalla memoria del server, nella COPIA
     return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"]),
-            "zap": await dati_zap_cruscotto(), "salute": dati_salute()}
+            "zap": await dati_zap_cruscotto(),
+            "swap": await dati_swap_cruscotto(), "salute": dati_salute()}
 
 
 @app.get("/api/admin/stats")
@@ -31474,6 +31476,10 @@ def _leve_stato():
         # L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026): le voci le da'
         # `_zap_leve`, che chiede ai giudici vivi e non dice la chiave.
         {"gruppo": "⚡ Indirizzo Lightning di casa", "voci": _zap_leve()},
+        # L'INDIRIZZO DELLA QUOTA (19 ott 2026): swap@, le voci da
+        # `_swap_quota_leve`.
+        {"gruppo": "🔄 Indirizzo della quota SATS Routing",
+         "voci": _swap_quota_leve()},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
                   bool(AVVISI_ISCRITTI),
@@ -86843,7 +86849,8 @@ def _zap_db():
     return con
 
 
-async def zap_conia(sats: int, descrizione: str) -> dict:
+async def zap_conia(sats: int, descrizione: str, wallet: tuple = None,
+                    memo: str = "") -> dict:
     """Conia sul salvadanaio una fattura che porta l'IMPRONTA di
     `descrizione` (lo sha256, il campo `h` di BOLT11) al posto del
     testo: e' quel che LUD-06 chiede per la stringa `metadata`, e NIP-57
@@ -86852,15 +86859,19 @@ async def zap_conia(sats: int, descrizione: str) -> dict:
     esadecimale), e poi NON CI SI FIDA: la fattura tornata si rilegge
     qui, e se non porta quell'impronta e quell'importo si ALZA — una
     fattura senza impronta un wallet serio la rifiuta, e uno zap pagato
-    li' sopra non sarebbe uno zap per nessun client."""
-    url, chiave = zap_wallet()
+    li' sopra non sarebbe uno zap per nessun client.
+    `wallet` e `memo` li passa SOLO l'indirizzo della quota (swap@): un
+    altro wallet con la sua invoice key, un altro memo. Senza, e' il
+    salvadanaio degli zap di sempre."""
+    url, chiave = zap_wallet() if wallet is None else wallet
     grezzo = descrizione.encode("utf-8")
     impronta = hashlib.sha256(grezzo).hexdigest()
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.post(f"{url}/api/v1/payments",
                          headers={"X-Api-Key": chiave},
                          json={"out": False, "amount": sats,
-                               "memo": ZAP_TESTO, "expiry": ZAP_SCADENZA_S,
+                               "memo": memo or ZAP_TESTO,
+                               "expiry": ZAP_SCADENZA_S,
                                "unhashed_description": grezzo.hex(),
                                "description_hash": impronta})
         r.raise_for_status()
@@ -86875,13 +86886,13 @@ async def zap_conia(sats: int, descrizione: str) -> dict:
             "bolt11": bolt11}
 
 
-async def zap_pagata(payment_hash: str):
+async def zap_pagata(payment_hash: str, wallet: tuple = None):
     """Chiede a LNbits di UNA fattura del salvadanaio: None = non
     pagata, un dizionario = pagata (con la `preimage`, se LNbits la da'
     e torna col payment hash). Un LNbits che non risponde ALZA: «non lo
     so» non e' «non pagata», e chi chiama non deve far scadere niente
-    su un silenzio."""
-    url, chiave = zap_wallet()
+    su un silenzio. `wallet` come in `zap_conia`: lo passa solo swap@."""
+    url, chiave = zap_wallet() if wallet is None else wallet
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(f"{url}/api/v1/payments/{payment_hash}",
                         headers={"X-Api-Key": chiave})
@@ -87098,6 +87109,11 @@ class _ZapQueryFuoriDalJournal(logging.Filter):
             if isinstance(a, tuple) and len(a) >= 3 and isinstance(a[2], str) \
                     and a[2].startswith("/api/lnurl/zap?"):
                 record.args = a[:2] + ("/api/lnurl/zap?…",) + a[3:]
+            elif isinstance(a, tuple) and len(a) >= 3 and isinstance(a[2], str) \
+                    and a[2].startswith("/api/lnurl/swap?"):
+                # lo stesso per l'indirizzo della quota (swap@, 19 ott 2026):
+                # anche li' la query porta il commento di chi paga
+                record.args = a[:2] + ("/api/lnurl/swap?…",) + a[3:]
         except Exception:
             pass
         return True
@@ -87112,9 +87128,14 @@ def zap_lnurlp(nome: str):
     """IL CITOFONO di zap@barattolo.store. Stesso patto di `nostr.json`:
     rotta esplicita (regola ferrea 3), HEAD con la sua riga, CORS aperto
     perche' a chiedere e' il JavaScript di un client su un altro
-    dominio, mai un redirect. Il nome arriva dal client e passa dalla
-    whitelist piu' corta che c'e': uno. Non tocca ne' il database ne'
-    LNbits, quindi non ha un freno."""
+    dominio, mai un redirect. Il nome arriva dal client e passa da una
+    whitelist di DUE: `zap` e, dal 19 ott 2026, `swap` (l'indirizzo
+    della quota di SATS Routing, che ha il suo citofono senza Nostr).
+    Non tocca ne' il database ne' LNbits, quindi non ha un freno."""
+    if nome == SWAP_NOME:
+        if not swap_vivo():
+            return _zap_errore("Qui questo indirizzo non c'è", 404)
+        return _zap_risposta(swap_citofono(), cache="public, max-age=300")
     if nome != ZAP_NOME or not zap_vivo():
         return _zap_errore("Qui questo indirizzo non c'è", 404)
     return _zap_risposta(zap_citofono(), cache="public, max-age=300")
@@ -87262,3 +87283,373 @@ def _zap_leve() -> list:
 # (Qui finisce il blocco dell'indirizzo Lightning di casa. La riga non e'
 # un vezzo: le prove ritagliano una funzione fino alle due righe vuote
 # che la seguono, e l'ultima del file senza niente dopo non si ritaglia.)
+
+
+# ---------- L'INDIRIZZO DELLA QUOTA: swap@barattolo.store ----------
+# (19 ott 2026, cantiere «swap-indirizzo», decisione di Andrea.)
+# SATS Routing paga a fine mese la quota di Barattolo sugli swap (il 10 %
+# della loro commissione: Cantieri, «Gli swap di SATS Routing dentro
+# Barattolo: lo studio»). Ci vuole un Lightning address dove mandarla, e
+# NON e' zap@: e' un ricavo del mercatino, con un tetto piu' alto, e i
+# suoi sats non si mescolano a quelli degli zap. E' lo stesso meccanismo
+# dell'indirizzo di casa, coi suoi pezzi:
+#
+#   · IL CITOFONO e' lo stesso `/.well-known/lnurlp/{nome}` di zap@ (la
+#     rotta e' una sola, regola ferrea 3): il nome `swap` risponde da
+#     `swap_citofono`. NIENTE Nostr: niente `allowsNostr`, niente
+#     `nostrPubkey`, e il callback rifiuta una richiesta di zap.
+#   · IL CALLBACK, `/api/lnurl/swap`: conia la fattura sul wallet
+#     «swap», col freno degli zap (ogni colpo e' una fattura sullo
+#     stesso nodo: il secchio e' lo stesso).
+#   · L'OROLOGIO, `orologio_swap`: chiede a LNbits delle fatture in
+#     attesa e per ognuna pagata manda UN avviso al gruppo degli admin,
+#     stanza 📊 Riepiloghi, non urgente.
+#
+# IL WALLET «swap» E' SUO, con la SOLA invoice key
+# (`SWAP_LNBITS_INVOICE_KEY`): conia e guarda, non spende. Non e' il
+# salvadanaio degli zap e non e' una cassaforte — e se nel config la
+# chiave fosse LA STESSA degli zap, l'indirizzo vale spento: la
+# separazione e' il motivo per cui esiste.
+# La tabella e' sua (`swap_quota`), non una colonna in piu' in `zap`:
+# ogni domanda del blocco degli zap (l'orologio, la card, il tetto delle
+# attese) guarda TUTTA la sua tabella con la SUA chiave, e una riga di
+# swap li' dentro verrebbe chiesta al wallet sbagliato.
+#
+# SENZA LA LEVA, O SENZA L'INVOICE KEY, IL CITOFONO DICE 404.
+try:
+    from config import SWAP_INDIRIZZO_ATTIVO
+except ImportError:
+    SWAP_INDIRIZZO_ATTIVO = False
+try:
+    from config import SWAP_LNBITS_INVOICE_KEY
+except ImportError:
+    SWAP_LNBITS_INVOICE_KEY = ""
+# Dove sta il wallet «swap»: vuoto = lo stesso LNbits del nodo.
+try:
+    from config import SWAP_LNBITS_URL
+except ImportError:
+    SWAP_LNBITS_URL = ""
+# Il massimo di UN pagamento. Il limite vero di un pagamento grosso e'
+# la liquidita' IN ENTRATA dei canali del nodo (`/canali`): un tetto piu'
+# alto di quella non fa arrivare niente di piu'.
+try:
+    from config import SWAP_MAX_SATS
+except ImportError:
+    SWAP_MAX_SATS = 2_000_000
+
+SWAP_NOME = "swap"
+SWAP_TESTO = "Quota di SATS Routing a Barattolo"
+SWAP_MAX_SATS_SERIE = 2_000_000
+SWAP_MAX_ATTESA = 20            # fatture in attesa tutte insieme
+_SWAP_STATO = {"attesa": True, "giri": 0}
+_SWAP_VISTI: dict = {}          # payment_hash -> ultima domanda a LNbits
+_TASK_SWAP = None
+
+
+def swap_wallet() -> tuple:
+    """(url, invoice key) del wallet «swap»; ('', '') se non c'e' — o se
+    la chiave e' quella del salvadanaio degli zap: due indirizzi sullo
+    stesso wallet sono proprio quel che questo blocco esiste per non
+    fare."""
+    url = str(SWAP_LNBITS_URL or LNBITS_NODO_URL or "").rstrip("/")
+    chiave = str(SWAP_LNBITS_INVOICE_KEY or "")
+    if not url.startswith("http") or not chiave or "INCOLLA_QUI" in chiave \
+            or chiave == str(ZAP_LNBITS_INVOICE_KEY or ""):
+        return "", ""
+    return url, chiave
+
+
+def swap_stessa_chiave_degli_zap() -> bool:
+    """Il caso storto che spegne l'indirizzo: la riga c'e', ma e' la
+    chiave del salvadanaio. Lo dice il pannello delle leve."""
+    chiave = str(SWAP_LNBITS_INVOICE_KEY or "")
+    return bool(chiave) and chiave == str(ZAP_LNBITS_INVOICE_KEY or "")
+
+
+def swap_vivo() -> bool:
+    """L'indirizzo risponde: la leva accesa E il suo wallet."""
+    return bool(SWAP_INDIRIZZO_ATTIVO) and bool(swap_wallet()[0])
+
+
+def swap_max_sats() -> int:
+    """Il tetto di un pagamento, letto vivo; una riga storta vale il
+    default, non zero."""
+    try:
+        n = int(SWAP_MAX_SATS)
+    except (TypeError, ValueError):
+        return SWAP_MAX_SATS_SERIE
+    return n if n >= ZAP_MIN_SATS else SWAP_MAX_SATS_SERIE
+
+
+def swap_indirizzo() -> str:
+    """swap@barattolo.store, col dominio di URL_PUBBLICO."""
+    return f"{SWAP_NOME}@{urlparse(URL_PUBBLICO).hostname or ''}"
+
+
+def swap_metadata() -> str:
+    """La `metadata` di LUD-06 di swap@, sempre la stessa byte per byte
+    (la fattura ne porta l'impronta)."""
+    return json.dumps([["text/plain", SWAP_TESTO],
+                       ["text/identifier", swap_indirizzo()]],
+                      separators=(",", ":"), ensure_ascii=False)
+
+
+def swap_citofono() -> dict:
+    """La risposta di `/.well-known/lnurlp/swap`: un payRequest di
+    LUD-06 col commento di LUD-12, e NIENT'ALTRO — niente campi Nostr."""
+    return {"tag": "payRequest",
+            "callback": f"{URL_PUBBLICO}/api/lnurl/swap",
+            "minSendable": ZAP_MIN_SATS * 1000,
+            "maxSendable": swap_max_sats() * 1000,
+            "metadata": swap_metadata(),
+            "commentAllowed": ZAP_COMMENTO}
+
+
+def _swap_prepara_tabella(con):
+    """`swap_quota`: una riga per fattura coniata da swap@."""
+    con.execute("""CREATE TABLE IF NOT EXISTS swap_quota(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payment_hash TEXT UNIQUE,
+        bolt11 TEXT DEFAULT '',
+        sats INTEGER DEFAULT 0,
+        commento TEXT DEFAULT '',
+        stato TEXT DEFAULT 'attesa',       -- attesa | pagato | scaduto
+        creato INTEGER DEFAULT 0,
+        scade INTEGER DEFAULT 0,
+        pagato_il INTEGER DEFAULT 0)""")
+
+
+def _swap_db():
+    con = db()
+    _swap_prepara_tabella(con)
+    return con
+
+
+def swap_avviso(sats: int, quando: int) -> str:
+    """PURA: il testo dell'avviso al gruppo. Importo e ora, e nient'altro:
+    il commento lo scrive chi paga, e swap@ lo puo' pagare chiunque."""
+    return (f"🔄 Arrivati {_fmt_sats(sats)} sats su {swap_indirizzo()}, "
+            f"{_quando_appuntamento(quando)}.\n"
+            "È l'indirizzo della quota di SATS Routing: i sats stanno nel "
+            "wallet «swap» di LNbits.")
+
+
+async def _swap_incassa(riga: dict, adesso: int):
+    """Una fattura di swap@ risulta PAGATA: la riga cambia stato una
+    volta sola (l'UPDATE condizionato e' il cancello: un secondo giro
+    non manda un secondo avviso), il journal lo dice, e parte l'avviso."""
+    con = _swap_db()
+    try:
+        cur = con.execute("UPDATE swap_quota SET stato='pagato', pagato_il=? "
+                          "WHERE id=? AND stato='attesa'", (adesso, riga["id"]))
+        con.commit()
+        mia = cur.rowcount == 1
+    finally:
+        con.close()
+    if not mia:
+        return
+    print(f"🔄 swap@: arrivati {_fmt_sats(riga['sats'])} sats, fattura "
+          f"{riga['payment_hash'][:8]}…", flush=True)
+    try:
+        await notifica_admin(swap_avviso(riga["sats"], adesso),
+                             argomento="riepiloghi")
+    except Exception as e:
+        print(f"⚠️ swap@: avviso al gruppo non partito ({type(e).__name__})",
+              flush=True)
+
+
+async def giro_swap() -> int:
+    """UN GIRO DELL'OROLOGIO di swap@, coi tempi di quello degli zap:
+    ogni fattura in attesa si chiede a LNbits, quelle pagate si
+    incassano, e una scade SOLO dopo un «non pagata» a tempo scaduto.
+    Se LNbits tace il giro si ferma e riprova. Torna quante incassate."""
+    if not swap_vivo():
+        return 0
+    adesso = int(time.time())
+    con = _swap_db()
+    try:
+        attese = [dict(r) for r in con.execute(
+            "SELECT * FROM swap_quota WHERE stato='attesa' ORDER BY id")]
+    finally:
+        con.close()
+    incassate = 0
+    for r in attese:
+        h = r["payment_hash"]
+        scaduta = adesso > r["scade"] + ZAP_GRAZIA_S
+        if not scaduta and adesso - r["creato"] > ZAP_FRESCA_S \
+                and adesso - _SWAP_VISTI.get(h, 0) < ZAP_LENTO_S:
+            continue
+        _SWAP_VISTI[h] = adesso
+        try:
+            esito = await zap_pagata(h, swap_wallet())
+        except Exception as e:
+            print(f"⚠️ swap@: LNbits non risponde ({type(e).__name__}: "
+                  f"{str(e)[:120]}): le fatture restano in attesa", flush=True)
+            break
+        if esito is not None:
+            await _swap_incassa(r, adesso)
+            incassate += 1
+        elif scaduta:
+            con = _swap_db()
+            try:
+                con.execute("UPDATE swap_quota SET stato='scaduto' WHERE id=? "
+                            "AND stato='attesa'", (r["id"],))
+                con.commit()
+            finally:
+                con.close()
+    vive = {r["payment_hash"] for r in attese}
+    for h in [h for h in _SWAP_VISTI if h not in vive]:
+        _SWAP_VISTI.pop(h, None)
+    if not attese:
+        _SWAP_STATO["attesa"] = False
+    _SWAP_STATO["giri"] += 1
+    return incassate
+
+
+async def orologio_swap():
+    while True:
+        try:
+            if _SWAP_STATO["attesa"]:
+                await giro_swap()
+        except Exception as e:
+            print(f"⚠️ swap@: giro saltato ({type(e).__name__}: "
+                  f"{str(e)[:120]}): il prossimo riparte da solo", flush=True)
+        await asyncio.sleep(ZAP_GIRO_S)
+
+
+@app.on_event("startup")
+async def avvia_swap():
+    global _TASK_SWAP
+    if SWAP_INDIRIZZO_ATTIVO and not swap_vivo():
+        print("⚠️ SWAP_INDIRIZZO_ATTIVO e' True ma manca "
+              "SWAP_LNBITS_INVOICE_KEY (o e' quella del wallet degli zap): "
+              "l'indirizzo della quota vale SPENTO", flush=True)
+    if not swap_vivo():
+        print("🔄 Indirizzo della quota (swap@): spento "
+              "(SWAP_INDIRIZZO_ATTIVO)", flush=True)
+        return
+    print(f"🔄 Indirizzo della quota: {swap_indirizzo()} ACCESO — fino a "
+          f"{_fmt_sats(swap_max_sats())} sats a pagamento, niente zap Nostr",
+          flush=True)
+    _TASK_SWAP = asyncio.create_task(orologio_swap())
+
+
+@app.get("/api/lnurl/swap")
+async def swap_fattura(request: Request, amount: str = "", comment: str = "",
+                       nostr: str = ""):
+    """IL CALLBACK di swap@: conia la fattura sul wallet «swap». Gli
+    stessi controlli di quello degli zap, nello stesso ordine, col tetto
+    suo; una richiesta di zap (`nostr`) si rifiuta prima di coniare."""
+    if not swap_vivo():
+        return _zap_errore("Qui questo indirizzo non c'è", 404)
+    adesso = time.time()
+    ip = _ip_di(request)
+    # il freno e' quello degli zap, apposta: lo stesso nodo conia
+    if (ip and not _secchio_passa(f"zap:{ip}", *FRENI["zap"], adesso)) \
+            or not _secchio_passa("zap_tutti:tutti", *FRENI["zap_tutti"], adesso):
+        return _zap_errore(MSG_FRENO, 429)
+    if not re.fullmatch(r"[0-9]{1,15}", amount) or int(amount) % 1000:
+        return _zap_errore("L'importo va in millisatoshi e deve fare sat interi")
+    sats = int(amount) // 1000
+    if not ZAP_MIN_SATS <= sats <= swap_max_sats():
+        return _zap_errore(f"L'importo va da {ZAP_MIN_SATS} a "
+                           f"{swap_max_sats()} sat")
+    if len(comment) > ZAP_COMMENTO:
+        return _zap_errore(f"Il commento può avere al massimo {ZAP_COMMENTO} "
+                           "caratteri")
+    if nostr:
+        return _zap_errore("Questo indirizzo non riceve zap Nostr: solo "
+                           "pagamenti")
+    con = _swap_db()
+    try:
+        in_attesa = con.execute(
+            "SELECT COUNT(*) AS n FROM swap_quota WHERE stato='attesa' "
+            "AND scade>?", (int(adesso),)).fetchone()["n"]
+    finally:
+        con.close()
+    if in_attesa >= SWAP_MAX_ATTESA:
+        return _zap_errore(MSG_FRENO, 429)
+    try:
+        inv = await zap_conia(sats, swap_metadata(), swap_wallet(), SWAP_TESTO)
+    except Exception as e:
+        print(f"⚠️ swap@: fattura non coniata ({type(e).__name__}: "
+              f"{str(e)[:160]})", flush=True)
+        return _zap_errore("Il nodo non risponde: riprova fra poco", 503)
+    con = _swap_db()
+    try:
+        con.execute(
+            "INSERT OR IGNORE INTO swap_quota(payment_hash,bolt11,sats,"
+            "commento,stato,creato,scade) VALUES(?,?,?,?,'attesa',?,?)",
+            (inv["payment_hash"], inv["bolt11"], sats, comment[:ZAP_COMMENTO],
+             int(adesso), int(adesso) + ZAP_SCADENZA_S))
+        con.commit()
+    finally:
+        con.close()
+    _SWAP_STATO["attesa"] = True
+    print(f"🔄 swap@: fattura da {_fmt_sats(sats)} sats, "
+          f"{inv['payment_hash'][:8]}…", flush=True)
+    return _zap_risposta({"pr": inv["bolt11"], "routes": []})
+
+
+async def dati_swap_cruscotto():
+    """La card «🔄 Quota SATS Routing» di `/admin`: il saldo VIVO del
+    wallet «swap», quanti pagamenti e gli ultimi venti. None = niente
+    card (indirizzo spento e nessuna riga). Il commento e' testo di uno
+    sconosciuto: la pagina lo scrive passando da `esc`."""
+    con = _swap_db()
+    try:
+        tot = con.execute("SELECT COUNT(*) AS n, COALESCE(SUM(sats),0) AS s "
+                          "FROM swap_quota WHERE stato='pagato'").fetchone()
+        in_attesa = con.execute("SELECT COUNT(*) AS n FROM swap_quota "
+                                "WHERE stato='attesa'").fetchone()["n"]
+        ultimi = [dict(r) for r in con.execute(
+            "SELECT pagato_il, sats, commento FROM swap_quota "
+            "WHERE stato='pagato' ORDER BY pagato_il DESC, id DESC LIMIT 20")]
+    finally:
+        con.close()
+    if not swap_vivo() and not tot["n"]:
+        return None
+    saldo = None
+    url, chiave = swap_wallet()
+    if url:
+        try:
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f"{url}/api/v1/wallet",
+                                headers={"X-Api-Key": chiave})
+            if r.status_code == 200:
+                saldo = int(r.json().get("balance") or 0) // 1000
+        except Exception:
+            saldo = None
+    return {"vivo": swap_vivo(), "indirizzo": swap_indirizzo(),
+            "max_sats": swap_max_sats(), "saldo_sats": saldo,
+            "quanti": tot["n"], "totale_sats": tot["s"],
+            "in_attesa": in_attesa, "ultimi": ultimi}
+
+
+def _swap_quota_leve() -> list:
+    """Le voci del pannello «Stato delle leve»: i fatti, mai la chiave."""
+    return [
+        _leva("Indirizzo della quota (swap@)", "SWAP_INDIRIZZO_ATTIVO",
+              swap_vivo(),
+              allarme=bool(SWAP_INDIRIZZO_ATTIVO) and not swap_vivo(),
+              acceso=f"{swap_indirizzo()} risponde e conia fatture sul "
+                     "wallet «swap», senza zap Nostr",
+              spento="/.well-known/lnurlp/swap risponde 404; se la leva è "
+                     "True nel config, manca l'invoice key del wallet «swap»"),
+        _leva("Il wallet «swap»", "SWAP_LNBITS_INVOICE_KEY",
+              bool(swap_wallet()[0]),
+              allarme=swap_stessa_chiave_degli_zap(),
+              acceso="c'è la sola invoice key: il server conia e guarda, "
+                     "non può spendere",
+              spento=("è la STESSA chiave del salvadanaio degli zap: vale "
+                      "spenta, ci vuole il wallet «swap»"
+                      if swap_stessa_chiave_degli_zap() else
+                      "senza, la leva qui sopra vale spenta")),
+        _leva("Importo massimo di un pagamento su swap@ (sats)",
+              "SWAP_MAX_SATS", swap_max_sats()),
+    ]
+
+
+# (Qui finisce il blocco dell'indirizzo della quota. La riga non e' un
+# vezzo: le prove ritagliano una funzione fino alle due righe vuote che
+# la seguono, e l'ultima del file senza niente dopo non si ritaglia.)
