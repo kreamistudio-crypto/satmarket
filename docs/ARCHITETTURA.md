@@ -33457,3 +33457,44 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   !swapLeve.attivo`); se si scopre dopo, `vestiCellaAste` porta fuori
   chi è sulla pagina. Nessuna chiamata a SATS Routing in questa tappa
   (sentinella in `prove_swap_cella`).
+- LO SWAP, TAPPA 2: IL PREVENTIVO (19 ott 2026, cantiere swap-preventivo;
+  perché in CANTIERI, «Lo swap del venditore, tappa 2: il preventivo»).
+  IL GIUDICE PER PERSONA è `swap_per(tg_id)`: `SWAP_ATTIVO`, e a
+  `SWAP_SOLO_MODERATORI` acceso (di serie) solo `e_admin`. Lo legge
+  `/api/me` (`swap_leve.attivo`, con `minimo`, `massimo`, `referral`), e
+  quindi veste anche la quarta cella della nav.
+  LA ROTTA: `GET /api/swap/preventivo/{ordine_id}[?hash=…]` — il cancello
+  per persona (403), poi solo chi VENDE (404) e solo a ordine
+  `confirmed` (409); la cifra è quella della fattura del venditore,
+  `netto_venditore(prezzo − protezione)`. Non scrive niente. Risponde
+  `{ok, righe, ricevi, fattura, onchain, hash, valido_s, cambiata}` o
+  `{ok: false, motivo: sotto_minimo|sopra_tetto|non_risponde}`.
+  `cambiata` = l'impronta mandata dal client non è quella di adesso.
+  LE TARIFFE le legge SOLO `leggi_tariffa_swap()`: `GET
+  {SWAP_API_BASE}/v2/swap/reverse` con l'intestazione
+  `Referral: <SWAP_REFERRAL_ID>`, copia di 30 s (`_TARIFFE_SWAP`),
+  `tariffa_swap_da_risposta` tiene la sola coppia BTC/BTC e rifiuta una
+  forma storta. IN COLLAUDO una base fuori da 127.0.0.1/localhost non
+  si legge mai (`swap_lettura_simulata`, il calco di
+  `lettura_simulata`: «🟣 [swap simulato]» nel journal).
+  IL CONTO è `preventivo_swap(dovuto, tariffa, fee, minimo, massimo)`,
+  puro: la fee nostra (in millesimi di punto, per eccesso) si toglie
+  prima; commissione = percentuale della fattura PER ECCESSO, on-chain
+  = fattura − commissione − rete d'invio PER DIFETTO, ricevi = on-chain
+  − ritiro stimato; i tetti nostri insieme ai loro, vince il più
+  stretto. Le regole e le fonti: `docs/swap-limits-and-fees.md` di
+  satsrouting-api-docs `c6b88d31`, `calculateReverseSwapAmounts` in
+  `lib/service/Service.ts` di boltz-backend `0f75a4f5`.
+  IL CLIENT non parla mai con SATS Routing (la CSP non cambia): nel
+  ramo «Incassa subito» di `payoutPanel`, a ordine `confirmed` e a
+  `swapAcceso()`, `selettoreIncassoSwap` mette in cima «⚡ Lightning /
+  ₿ On-chain (swap)» (Lightning di serie); lo swap mostra
+  `pannelloPreventivoSwap` (righe da `SWAP_TESTI`, it/en, la riga
+  Barattolo solo se la fee c'è). Il riquadro ha l'id `payoutIncasso` e
+  `ridisegnaIncassoSwap` lo rifà da solo. `confermaSwapProva` in questa
+  tappa ricontrolla con l'impronta e basta. Le mappe
+  `sceltaIncassoSwap` e `preventiviSwap` hanno chiavi NUMERICHE.
+  IL CARTONE: `cartone_satsrouting.py` (libreria standard), numeri del
+  16 ott, impronta finta, modi `normale|cambiata|giu|storta` da
+  `/cartone/modo`, `/cartone/visto` per l'ultimo `Referral`. Serve al
+  collaudo, ai giri dal vivo e alla VM di collaudo.

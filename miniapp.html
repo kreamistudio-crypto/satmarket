@@ -9463,6 +9463,34 @@
     padding:16px;margin:16px 0;
   }
   .payout h4{font-size:14.5px;margin-bottom:6px}
+  /* LO SWAP, LA SCELTA E IL PREVENTIVO (19 ott 2026, tappa 2): la scelta
+     ha il vestito dell'interruttore €/₿ della testata (inchiostro pieno
+     sul tasto scelto), il preventivo e' un conto a righe con le cifre
+     incolonnate a destra */
+  .scelta-incasso{display:grid;grid-template-columns:1fr 1fr;gap:4px;
+    padding:3px;border:1.5px solid var(--line);border-radius:12px;
+    margin-bottom:14px}
+  .scelta-incasso button{border:0;background:none;border-radius:9px;
+    padding:9px 6px;min-height:40px;font:800 14px/1.2 Nunito,sans-serif;
+    color:var(--ink);cursor:pointer}
+  .scelta-incasso button.on{background:var(--ink);color:var(--on-ink)}
+  .swap-righe{border:1.5px solid var(--line);border-radius:12px;
+    padding:2px 12px;margin:10px 0 8px}
+  .swap-riga{display:flex;justify-content:space-between;align-items:baseline;
+    gap:12px;padding:8px 0;font-size:14px;font-weight:600;color:var(--ink);
+    border-bottom:1px solid var(--line)}
+  .swap-riga b{font-family:'JetBrains Mono',monospace;font-weight:700;
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  .swap-riga.meno b{color:var(--ink-soft)}
+  .swap-riga.totale{border-bottom:0;font-weight:800}
+  .swap-riga.totale b{color:var(--sats-deep)}
+  .swap-riga .unit{margin-left:4px;font-size:12px}
+  .swap-rifiuto{padding:10px 12px;border-radius:10px;margin:4px 0 12px;
+    background:var(--sats-soft);color:var(--sats-text);font-weight:700;
+    font-size:14px;line-height:1.45}
+  .swap-rifiuto.prossima{background:none;border:1.5px dashed var(--line);
+    color:var(--ink)}
+  .swap-prev .btn{margin-top:12px}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5}
   /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
@@ -17810,14 +17838,135 @@ function vaiSwap(){
 const SWAP_TESTI = {
   it: {titolo: 'Swap',
        testo: 'Qui troverai gli incassi che ricevi in bitcoin on-chain, con uno swap fatto dal tuo telefono.',
-       vuoto: 'Per ora non hai nessuno swap.'},
+       vuoto: 'Per ora non hai nessuno swap.',
+       scegli: 'Come ricevi i sats', onchain: 'On-chain (swap)',
+       carico: 'Leggo le tariffe di SATS Routing…',
+       titoloPrev: 'Preventivo dello swap', ricevi: 'Ricevi on-chain, circa',
+       valgonoOra: 'Tariffe di SATS Routing di adesso: si ricontrollano alla conferma.',
+       conferma: 'Conferma lo swap', tornaLn: 'Incassa in Lightning',
+       sottoMinimo: 'Sotto i {n} sats lo swap costa troppo: incassa in Lightning.',
+       sopraTetto: 'Sopra i {n} sats, per ora, solo Lightning.',
+       cambiata: 'Le tariffe sono cambiate: ecco il preventivo nuovo.',
+       nonRisponde: 'SATS Routing ora non risponde: incassa in Lightning.',
+       spento: 'Lo swap ora non è disponibile: incassa in Lightning.',
+       prossima: 'Lo swap vero arriva con la prossima versione: per ora nessun sats si muove.',
+       voci: {dovuto: 'Ti spettano', fee_barattolo: 'Commissione Barattolo ({p}\u00a0%)',
+              commissione: 'Commissione SATS Routing ({p}\u00a0%)',
+              rete_invio: 'Rete: invio di SATS Routing',
+              rete_ritiro: 'Rete: il tuo ritiro (stima)'}},
   en: {titolo: 'Swap',
        testo: 'Here you will find the payouts you receive in on-chain bitcoin, through a swap made from your phone.',
-       vuoto: 'No swaps yet.'}};
+       vuoto: 'No swaps yet.',
+       scegli: 'How you receive the sats', onchain: 'On-chain (swap)',
+       carico: 'Reading SATS Routing rates…',
+       titoloPrev: 'Swap quote', ricevi: 'You receive on-chain, about',
+       valgonoOra: 'Current SATS Routing rates: checked again when you confirm.',
+       conferma: 'Confirm the swap', tornaLn: 'Receive via Lightning',
+       sottoMinimo: 'Below {n} sats a swap costs too much: receive via Lightning.',
+       sopraTetto: 'Above {n} sats, for now, Lightning only.',
+       cambiata: 'The rates have changed: here is the new quote.',
+       nonRisponde: 'SATS Routing is not responding: receive via Lightning.',
+       spento: 'Swaps are not available right now: receive via Lightning.',
+       prossima: 'The real swap comes with the next version: no sats move for now.',
+       voci: {dovuto: 'You are owed', fee_barattolo: 'Barattolo fee ({p}%)',
+              commissione: 'SATS Routing fee ({p}%)',
+              rete_invio: 'Network: SATS Routing send',
+              rete_ritiro: 'Network: your claim (estimate)'}}};
 function linguaSwap(){
   let l = '';
   try { l = String(tg?.initDataUnsafe?.user?.language_code || ''); } catch(e){}
   return (!l || l.toLowerCase().startsWith('it')) ? 'it' : 'en';
+}
+/* LA TAPPA 2, IL PREVENTIVO (19 ott 2026, cantiere swap-preventivo). A
+   ordine confermato, nel pannello dell'incasso, chi vende sceglie
+   «⚡ Lightning» (di serie: il pannello di sempre) o «₿ On-chain (swap)»:
+   il preventivo lo fa il SERVER (`/api/swap/preventivo/<ordine>`), che
+   legge le tariffe di SATS Routing e fa il conto con le loro regole; qui
+   si mostra e basta. Il «Conferma lo swap» di questa tappa ricontrolla
+   le tariffe con l'impronta di quelle mostrate: se sono cambiate lo
+   dice, col preventivo nuovo; se no dice che lo swap vero arriva con la
+   prossima versione. Nessuno swap, nessun sats. */
+let sceltaIncassoSwap = {};   // ordine -> 'ln' | 'swap'
+let preventiviSwap = {};      // ordine -> {stato, dati, quando, nota}
+function testiSwap(){ return SWAP_TESTI[linguaSwap()]; }
+function selettoreIncassoSwap(id, scelta){
+  const t = testiSwap(), n = Number(id);
+  const tasto = (s, testo) => `<button type="button" role="radio" `
+    + `aria-checked="${scelta === s}" class="${scelta === s ? 'on' : ''}" `
+    + `onclick="scegliIncassoSwap(${n},'${s}')">${testo}</button>`;
+  return `<div class="scelta-incasso" role="radiogroup" aria-label="${esc(t.scegli)}">`
+    + tasto('ln', '⚡ Lightning') + tasto('swap', '₿ ' + esc(t.onchain)) + `</div>`;
+}
+function ridisegnaIncassoSwap(){
+  const box = el('payoutIncasso');
+  if (box && currentOrder) box.outerHTML = payoutPanel(currentOrder);
+}
+function scegliIncassoSwap(id, s){
+  haptic();
+  sceltaIncassoSwap[id] = s;
+  const p = preventiviSwap[id];
+  /* il preventivo vale un minuto (`valido_s`): scaduto, si rilegge */
+  const vecchio = !p || !p.dati
+    || Date.now() - (p.quando || 0) > ((p.dati.valido_s || 60) * 1000);
+  if (s === 'swap' && vecchio) { caricaPreventivoSwap(id, false); return; }
+  ridisegnaIncassoSwap();
+}
+async function caricaPreventivoSwap(id, ricontrolla){
+  const prima = preventiviSwap[id];
+  const hash = ricontrolla && prima && prima.dati && prima.dati.hash;
+  preventiviSwap[id] = Object.assign({}, prima, {stato: 'carico'});
+  ridisegnaIncassoSwap();
+  let d;
+  try {
+    const q = hash ? `?hash=${encodeURIComponent(hash)}` : '';
+    const r = await fetch(`${API_BASE}/swap/preventivo/${Number(id)}${q}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => null);
+    if (!r.ok || !d) d = {ok: false, motivo: r.status === 403 ? 'spento' : 'non_risponde'};
+  } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
+  const nota = !ricontrolla ? '' : (d.cambiata ? 'cambiata' : (d.ok ? 'prossima' : ''));
+  preventiviSwap[id] = {stato: 'pronto', dati: d, quando: Date.now(), nota};
+  if (currentOrder && Number(currentOrder.id) === Number(id)) ridisegnaIncassoSwap();
+}
+function confermaSwapProva(id){
+  haptic();
+  caricaPreventivoSwap(id, true);
+}
+function percentoSwap(p){
+  const s = String(Number(p) || 0);
+  return linguaSwap() === 'it' ? s.replace('.', ',') : s;
+}
+function etichettaVoceSwap(r, t){
+  return (t.voci[r.voce] || r.voce).replace('{p}', percentoSwap(r.percento));
+}
+function pannelloPreventivoSwap(o){
+  const n = Number(o.id), t = testiSwap(), p = preventiviSwap[n];
+  if (!p || !p.dati)
+    return `<div class="swap-prev"><div class="hint">${esc(t.carico)}</div></div>`;
+  const d = p.dati;
+  if (!d.ok) {
+    const testo = d.motivo === 'sotto_minimo' ? t.sottoMinimo.replace('{n}', fmt(d.minimo))
+      : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
+      : d.motivo === 'spento' ? t.spento : t.nonRisponde;
+    return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(testo)}</div>`
+      + `<button class="btn ghost" onclick="scegliIncassoSwap(${n},'ln')">⚡ ${esc(t.tornaLn)}</button></div>`;
+  }
+  const righe = (d.righe || []).map(r => `<div class="swap-riga${r.sats < 0 ? ' meno' : ''}">`
+    + `<span>${esc(etichettaVoceSwap(r, t))}</span>`
+    + `<b>${r.sats < 0 ? '−' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
+  const nota = p.nota === 'cambiata'
+      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>`
+    : p.nota === 'prossima'
+      ? `<div class="swap-rifiuto prossima" role="status">${esc(t.prossima)}</div>` : '';
+  return `<div class="swap-prev">
+      <h4>₿ ${esc(t.titoloPrev)}</h4>
+      ${nota}
+      <div class="swap-righe">${righe}
+        <div class="swap-riga totale"><span>${esc(t.ricevi)}</span><b>${fmt(d.ricevi)}<span class="unit">sats</span></b></div>
+      </div>
+      <div class="hint">${esc(t.valgonoOra)}</div>
+      <button class="btn orange" onclick="confermaSwapProva(${n})"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
+    </div>`;
 }
 function renderSwap(){
   const t = SWAP_TESTI[linguaSwap()];
@@ -35892,8 +36041,20 @@ function payoutPanel(o){
      IN EVIDENZA quando e' l'unico gesto che manca (set 2026): lo stadio
      «in pagamento» dice a chi vende che serve una fattura, e il campo
      dove metterla e' questo. */
+  /* LO SWAP (19 ott 2026, tappa 2): a ordine CONFERMATO, e solo a chi
+     il server lo apre (`swapAcceso`, per persona), in cima la scelta
+     «⚡ Lightning / ₿ On-chain (swap)». Lightning resta la scelta di
+     serie e il pannello di sempre; lo swap mostra il preventivo. Il
+     riquadro ha un id suo perche' la scelta lo ridisegna da solo,
+     senza rifare la pagina dell'ordine. */
+  const swapQui = swapAcceso() && o.state === 'confirmed';
+  const sceltaSwap = swapQui ? (sceltaIncassoSwap[Number(o.id)] || 'ln') : 'ln';
+  const selettoreSwap = swapQui ? selettoreIncassoSwap(o.id, sceltaSwap) : '';
+  if (sceltaSwap === 'swap') return `
+    <div class="payout" id="payoutIncasso">${selettoreSwap}${pannelloPreventivoSwap(o)}</div>`;
   return `
-    <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}">
+    <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}" id="payoutIncasso">
+      ${selettoreSwap}
       <h4>💰 Incassa subito i tuoi sats</h4>
       <div class="hint">${o.pagamento && o.pagamento.motivo==='altra_cassaforte'
         ? 'Il pagamento di prima è rimasto <b>bloccato per un guasto nostro</b>, non tuo, e te li mandiamo da un\'altra strada: ci serve una fattura <b>nuova</b>. Ti aspettano'

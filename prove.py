@@ -6650,6 +6650,11 @@ def prove_fattura_solo_incasso():
           "const esc = x => String(x);\n"
           "let myLnAddress = '';\n"
           "function nettoVenditore(o){ return o.listing.price; }\n"
+          # lo swap (19 ott 2026, tappa 2): il pannello chiede
+          # `swapAcceso()` nel ramo «incassa subito»; qui SPENTO, cosi'
+          # il banco prova il pannello di sempre (lo swap acceso lo
+          # prova `prove_swap_preventivo`)
+          "const swapAcceso = () => false;\n"
           + pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
           + pezzo_js(mini, "function leggiBolt11(pr){", "\n}\n") + "\n}\n"
           + pp +
@@ -171162,13 +171167,14 @@ def prove_swap_cella():
           "    SWAP_ATTIVO = False            # spenta di serie" in src)
     prova("...e spenta nel config d'esempio", True,
           "\nSWAP_ATTIVO = False" in esempio)
+    # (dal 19 ott, tappa 2, la leva e' PER PERSONA: `swap_per`)
     prova("la leva arriva al client da /api/me", True,
-          'profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO),' in src)
+          'profilo["swap_leve"] = {"attivo": swap_per(user["id"]),' in src)
     # SOLO da /api/me: l'anonimo in vetrina non incassa, e una seconda
     # fonte (la busta di prima pagina) sarebbe una porta a uno swap che
     # per lui non esiste
     prova("...e solo da li' (niente busta di vetrina)", 1,
-          src.count("swap_leve"))
+          src.count('"swap_leve"'))
     prova("il pannello «Stato delle leve» la mostra", True,
           '_leva("Swap degli incassi (on-chain)", "SWAP_ATTIVO",' in src)
     # IL CODICE PARTNER (19 ott 2026, risposte di Massimo): vuoto di
@@ -171219,11 +171225,11 @@ def prove_swap_cella():
           (False, False),
           (bool(_forme.search('SWAP_REFERRAL_API_KEY = ""')),
            bool(_forme.search('SWAP_REFERRAL_API_SECRET = ""'))))
-    # questa tappa non parla con nessuno: niente SATS Routing ne' nel
-    # server ne' nel client, finche' non arrivano i cantieri dopo
-    prova("nessuna chiamata a SATS Routing in questa tappa", (0, 0),
-          (src.lower().count("satsrouting"),
-           mini.lower().count("satsrouting")))
+    # IL TELEFONO NON PARLA CON SATS ROUTING (fino alla tappa 3): dalla
+    # tappa 2 le tariffe le legge il SERVER, da una strada sola —
+    # `leggi_tariffa_swap`, guardata da `prove_swap_preventivo`
+    prova("il telefono non parla con SATS Routing", 0,
+          mini.lower().count("satsrouting"))
 
     # --- il markup: la cella e' la stessa, la porta nasce nascosta ---
     prova("la quarta cella passa dal giudice", True,
@@ -173180,6 +173186,241 @@ def prove_miniature_leggere():
            "<img" in vuoto, "📦" in vuoto))
 
 
+def prove_swap_preventivo():
+    """LO SWAP, TAPPA 2: IL PREVENTIVO (19 ott 2026, cantiere
+    swap-preventivo, piano approvato da Andrea). Il conto e' puro e si
+    gira qui con i numeri veri del 16 ott (0,6 %, 324, 234): la
+    percentuale per eccesso, il ricevuto per difetto, la fee nostra in
+    millesimi, i tetti nostri e loro. Poi la lettura della risposta di
+    SATS Routing (anche storta), il cancello per persona, il «non si
+    esce dal computer» in collaudo, e le sentinelle sulla rotta, sulle
+    leve e sul cartone. In fondo il banco node ESEGUE il pannello
+    dell'incasso e il preventivo veri su un DOM di cartone: una scelta
+    che non compare, o compare a chi non deve, si prende solo cosi'."""
+    print("\n[lo swap, tappa 2: il preventivo]")
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- il conto, puro ---
+    amb = {}
+    exec(pezzo("preventivo_swap"), amb)
+    pv = amb["preventivo_swap"]
+    T16 = {"hash": "h16", "percento": 0.6, "lockup": 324, "claim": 234,
+           "minimo": 2142, "massimo": 5_000_000}
+    p = pv(48_000, T16, 0, 25_000, 50_000)
+    prova("48.000 sats con le tariffe del 16 ott: ricevi 47.154",
+          (True, 48_000, 47_388, 47_154),
+          (p["ok"], p["fattura"], p["onchain"], p["ricevi"]))
+    prova("...e le righe dicono ogni costo, nell'ordine",
+          [("dovuto", 48_000), ("commissione", -288), ("rete_invio", -324),
+           ("rete_ritiro", -234)],
+          [(r["voce"], r["sats"]) for r in p["righe"]])
+    prova("...la riga di Barattolo non c'e' a fee zero", False,
+          any(r["voce"] == "fee_barattolo" for r in p["righe"]))
+    prova("...e le righe tornano al sat col ricevuto", p["ricevi"],
+          sum(r["sats"] for r in p["righe"]))
+    f = pv(48_000, T16, 0.25, 25_000, 50_000)
+    prova("la fee nostra allo 0,25 % non si perde in un arrotondamento",
+          (-120, 47_880, -288, 47_034),
+          (f["righe"][1]["sats"], f["fattura"], f["righe"][2]["sats"],
+           f["ricevi"]))
+    prova("la commissione per eccesso anche quando il conto e' quasi tondo",
+          -200, pv(33_333, T16, 0, 25_000, 50_000)["righe"][1]["sats"])
+    sotto = pv(20_000, T16, 0, 25_000, 50_000)
+    sopra = pv(60_000, T16, 0, 25_000, 50_000)
+    prova("sotto il minimo: no, col minimo da dire", (False, "sotto_minimo", 25_000),
+          (sotto["ok"], sotto["motivo"], sotto["minimo"]))
+    prova("sopra il massimo: no, col massimo da dire", (False, "sopra_tetto", 50_000),
+          (sopra["ok"], sopra["motivo"], sopra["massimo"]))
+    prova("al massimo esatto: si'", True, pv(50_000, T16, 0, 25_000, 50_000)["ok"])
+    loro = dict(T16, minimo=30_000, massimo=40_000)
+    prova("i limiti di SATS Routing valgono insieme ai nostri: il piu' stretto",
+          ("sotto_minimo", 30_000, "sopra_tetto", 40_000),
+          (pv(28_000, loro, 0, 25_000, 50_000)["motivo"],
+           pv(28_000, loro, 0, 25_000, 50_000)["minimo"],
+           pv(45_000, loro, 0, 25_000, 50_000)["motivo"],
+           pv(45_000, loro, 0, 25_000, 50_000)["massimo"]))
+    prova("massimo nostro a 0 = vale solo il loro", True,
+          pv(60_000, T16, 0, 25_000, 0)["ok"])
+
+    # --- la lettura della risposta ---
+    exec(pezzo("tariffa_swap_da_risposta"), amb)
+    leggi = amb["tariffa_swap_da_risposta"]
+    vera = {"BTC": {"BTC": {"hash": "abc", "rate": 1,
+                            "limits": {"maximal": 5_000_000, "minimal": 2142},
+                            "fees": {"percentage": 0.6,
+                                     "minerFees": {"claim": 234, "lockup": 324}}}}}
+    prova("la risposta vera diventa la tariffa", dict(T16, hash="abc"),
+          leggi(vera))
+    prova("...una risposta storta non diventa un preventivo", (None, None, None),
+          (leggi({"BTC": {"BTC": {"hash": "x", "fees": "zero"}}}),
+           leggi({}),
+           leggi({"BTC": {"BTC": dict(vera["BTC"]["BTC"],
+                                      fees={"percentage": -1, "minerFees":
+                                            {"claim": 1, "lockup": 1}})}})))
+
+    # --- il cancello per persona ---
+    def per(attivo, solo):
+        a = {"SWAP_ATTIVO": attivo, "SWAP_SOLO_MODERATORI": solo,
+             "e_admin": lambda t: t == 999}
+        exec(pezzo("swap_per"), a)
+        return (a["swap_per"](999), a["swap_per"](222))
+    prova("leva spenta: nessuno; solo moderatori: il 999; aperta: tutti",
+          [(False, False), (True, False), (True, True)],
+          [per(False, True), per(True, True), per(True, False)])
+
+    # --- in collaudo le tariffe non escono dal computer ---
+    import contextlib
+    import io
+
+    def simulata(collaudo, base):
+        a = {"MODALITA_COLLAUDO": collaudo, "_SWAP_DETTO_SIMULATO": set(),
+             "urlparse": __import__("urllib.parse").parse.urlparse}
+        exec(pezzo("_swap_base_di_casa"), a)
+        exec(pezzo("swap_lettura_simulata"), a)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return a["swap_lettura_simulata"](base)
+    prova("in collaudo la base vera non si legge, il cartone si'",
+          (True, False, False),
+          (simulata(True, "https://api.satsrouting.exchange"),
+           simulata(True, "http://127.0.0.1:9077"),
+           simulata(False, "https://api.satsrouting.exchange")))
+
+    # --- le sentinelle: la rotta, la lettura, le leve ---
+    rotta = pezzo("swap_preventivo")
+    prova("la rotta e' una GET che non crea niente", True,
+          '@app.get("/api/swap/preventivo/{ordine_id}")' in src
+          and "INSERT" not in rotta and "UPDATE" not in rotta)
+    prova("...prima il cancello per persona, poi l'ordine", True,
+          0 < rotta.index("swap_per(user[\"id\"])") < rotta.index("SELECT"))
+    prova("...solo chi vende, solo a ordine confermato", (True, True),
+          ('o["venditore_id"] != user["id"]' in rotta,
+           'o["stato"] != "confirmed"' in rotta))
+    prova("...la cifra e' quella della fattura del venditore", True,
+          'netto_venditore(o["prezzo_sats"] - o["protezione_sats"])' in rotta)
+    lettura = pezzo("leggi_tariffa_swap")
+    prova("il codice partner va in ogni lettura delle tariffe", True,
+          'intestazioni["Referral"] = codice' in lettura
+          and "headers=intestazioni" in lettura)
+    prova("...e la lettura passa dal giudice del collaudo", True,
+          "swap_lettura_simulata(base)" in lettura)
+    # (solo le stringhe del codice: i commenti che citano la rotta non
+    # sono strade)
+    prova("nessun'altra strada verso SATS Routing nel server", 1,
+          len(re.findall(r"[\"']\S*/v2/swap/", src)))
+    prova("le leve della tappa nascono come da piano", (True,) * 5,
+          ("\nSWAP_SOLO_MODERATORI = True" in esempio,
+           "\nSWAP_MIN_SATS = 25_000" in esempio,
+           "\nSWAP_MAX_SATS = 50_000" in esempio,
+           "\nSWAP_FEE_PERCENTO = 0" in esempio,
+           '\nSWAP_API_BASE = "https://api.satsrouting.exchange"' in esempio))
+    prova("...e nel server gli stessi valori di serie", (True,) * 4,
+          ("    SWAP_SOLO_MODERATORI = True" in src,
+           "    SWAP_MIN_SATS = 25_000" in src,
+           "    SWAP_MAX_SATS = 50_000" in src,
+           "    SWAP_FEE_PERCENTO = 0" in src))
+    _pan = pezzo("_leve_stato")
+    prova("il pannello le mostra tutte", (True,) * 5,
+          tuple(f'"{n}",' in _pan for n in (
+              "SWAP_SOLO_MODERATORI", "SWAP_MIN_SATS", "SWAP_MAX_SATS",
+              "SWAP_FEE_PERCENTO", "SWAP_API_BASE")))
+
+    # --- il cartone e la CI ---
+    cart = open("cartone_satsrouting.py", encoding="utf-8").read()
+    prova("il cartone ha i numeri del 16 ott e un'impronta finta", (True, True, 0),
+          ('"percentage": 0.6' in cart and '"claim": 234, "lockup": 324' in cart,
+           '"hash": "cartone-tariffa-16ott"' in cart,
+           len(re.findall(r"\b[0-9a-f]{64}\b", cart))))
+    lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
+    compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
+    prova("il collaudo nuovo e il cartone stanno negli elenchi della CI",
+          (True, True, True),
+          ("\ncollaudo_swap_preventivo" in "\n" + lista,
+           "collaudo_swap_preventivo.py" in compila,
+           "cartone_satsrouting.py" in compila))
+
+    # --- il banco: il pannello dell'incasso e il preventivo, eseguiti ---
+    motore = pezzo_js(mini, "/* LA TAPPA 2, IL PREVENTIVO", "function renderSwap(){")
+    testi = pezzo_js(mini, "const SWAP_TESTI = {", "function linguaSwap(){")
+    lingua = pezzo_js(mini, "function linguaSwap(){", "\n}") + "\n}\n"
+    pannello = pezzo_js(mini, "function payoutPanel(o){", "\nasync function saveLnAddress")
+    js = r"""
+const esc = s => String(s);
+const fmt = n => String(n);
+function el(){ return null; }
+function haptic(){}
+function leggiBolt11(){ return null; }
+function nettoVenditore(o){ return o.listing.price; }
+let myLnAddress = '', currentOrder = null, swapLeve = null;
+const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
+let tg = {initDataUnsafe: {user: {language_code: 'it'}}};
+__TESTI__
+__LINGUA__
+__MOTORE__
+__PANNELLO__
+const o = {id: 7, state: 'confirmed', listing: {price: 48000}, pagamento: null};
+const out = {};
+out.spento = payoutPanel(o).includes('scelta-incasso');
+swapLeve = {attivo: true};
+const ln = payoutPanel(o);
+out.ln = [ln.includes('scelta-incasso'), ln.includes('aria-checked="true" class="on" onclick="scegliIncassoSwap(7,\'ln\')"'),
+          ln.includes('Incassa subito'), ln.includes('id="payoutIncasso"')];
+out.prima = payoutPanel(Object.assign({}, o, {state: 'shipped'})).includes('scelta-incasso');
+out.tocca = payoutPanel(Object.assign({}, o, {state: 'shipped', pagamento: {gesto_venditore: true}})).includes('scelta-incasso');
+sceltaIncassoSwap[7] = 'swap';
+out.carico = payoutPanel(o).includes('Leggo le tariffe');
+preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 47154,
+  righe: [{voce: 'dovuto', sats: 48000}, {voce: 'commissione', sats: -288, percento: 0.6},
+          {voce: 'rete_invio', sats: -324}, {voce: 'rete_ritiro', sats: -234}]}};
+const sw = payoutPanel(o);
+out.swap = [sw.includes('Commissione SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
+            sw.includes('Ricevi on-chain, circa'), sw.includes('47154'),
+            sw.includes('sellerInvoice'), sw.includes('confermaSwapProva(7)')];
+preventiviSwap[7].nota = 'cambiata';
+out.cambiata = payoutPanel(o).includes('Le tariffe sono cambiate');
+preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: false, motivo: 'sotto_minimo', minimo: 25000}};
+out.sotto = payoutPanel(o).includes('Sotto i 25000 sats lo swap costa troppo');
+preventiviSwap[7].dati = {ok: false, motivo: 'sopra_tetto', massimo: 50000};
+out.sopra = payoutPanel(o).includes('Sopra i 50000 sats, per ora, solo Lightning');
+preventiviSwap[7].dati = {ok: false, motivo: 'non_risponde'};
+const giu = payoutPanel(o);
+out.giu = [giu.includes('SATS Routing ora non risponde'), giu.includes("scegliIncassoSwap(7,'ln')")];
+tg.initDataUnsafe.user.language_code = 'en';
+preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: 'prossima', dati: {ok: true, hash: 'h', ricevi: 1,
+  righe: [{voce: 'commissione', sats: -288, percento: 0.6}]}};
+const en = payoutPanel(o);
+out.en = [en.includes('SATS Routing fee (0.6%)'), en.includes('The real swap comes with the next version')];
+console.log(JSON.stringify(out));
+""".replace("__TESTI__", testi).replace("__LINGUA__", lingua).replace(
+        "__MOTORE__", motore).replace("__PANNELLO__", pannello)
+    r = _node_banco(js)
+    if r is None:
+        salta("il banco del pannello dell'incasso con lo swap", "node non c'e'")
+        return
+    prova("senza leva la scelta non compare", False, r.get("spento"))
+    prova("con la leva compare in cima, Lightning gia' scelto, e il pannello di sempre",
+          [True, True, True, True], r.get("ln"))
+    # ...anche quando il ramo «tocca a lui» si apre PRIMA della conferma
+    # (la fattura nuova chiesta da un moderatore, «altra cassaforte»):
+    # li' lo swap non c'e' (trovato dalla tortura del 19 ott)
+    prova("...ma solo a ordine confermato, anche a fattura chiesta",
+          (False, False), (r.get("prima"), r.get("tocca")))
+    prova("scelto lo swap, prima si leggono le tariffe", True, r.get("carico"))
+    prova("...poi il preventivo riga per riga, senza il campo della fattura",
+          [True, True, True, True, False, True], r.get("swap"))
+    prova("i quattro rifiuti dicono il perche'", (True, True, True, [True, True]),
+          (r.get("cambiata"), r.get("sotto"), r.get("sopra"), r.get("giu")))
+    prova("in inglese per Telegram in un'altra lingua", [True, True], r.get("en"))
+    # (19 ott: il titolo del preventivo si chiamava `titolo` come quello
+    # della pagina Swap, e nell'oggetto dei testi lo sovrascriveva)
+    prova("il titolo della pagina e quello del preventivo sono due chiavi",
+          (2, 1, 1, 1), (testi.count("titolo: 'Swap',"),
+                         testi.count("titoloPrev: 'Preventivo dello swap'"),
+                         testi.count("titoloPrev: 'Swap quote'"),
+                         testi.count("titolo: 'Swap',\n       testo: 'Here")))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -173405,7 +173646,7 @@ def main():
               prove_pagina_scambio_ridisegno,
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
-              prove_servizi, prove_swap_cella,
+              prove_servizi, prove_swap_cella, prove_swap_preventivo,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,

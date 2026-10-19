@@ -1490,6 +1490,200 @@ def chiavi_referral_presenti() -> bool:
     return _vera(SWAP_REFERRAL_API_KEY) and _vera(SWAP_REFERRAL_API_SECRET)
 
 
+# LA TAPPA 2 DELLO SWAP: IL PREVENTIVO (19 ott 2026, cantiere
+# swap-preventivo, piano approvato da Andrea). Il venditore, a ordine
+# confermato, sceglie «⚡ Lightning» o «₿ On-chain (swap)»; scegliendo lo
+# swap vede il preventivo riga per riga. In questa tappa NIENTE SDK e
+# NESSUNO SWAP: si leggono solo le tariffe pubbliche di SATS Routing
+# (`/v2/swap/reverse`, la loro `docs/api-v2.md` al commit `c6b88d31`) e
+# si fa il conto con le loro regole (`docs/swap-limits-and-fees.md`, e il
+# loro `calculateReverseSwapAmounts` in `lib/service/Service.ts` al
+# commit `0f75a4f5`): la percentuale per eccesso, quel che si riceve per
+# difetto. Il «Conferma lo swap» di questa tappa ricontrolla le tariffe
+# e basta: lo swap vero nasce con la tappa 3, dal telefono.
+#
+# SOLO I MODERATORI finche' Andrea non decide altrimenti: la leva generale
+# resta `SWAP_ATTIVO` (spenta), e a leva accesa `SWAP_SOLO_MODERATORI`
+# (accesa di serie) la apre alle sole persone di `ADMIN_IDS`. Il giudice
+# per persona e' `swap_per`, ed e' lui che veste la cella della nav.
+try:
+    from config import SWAP_SOLO_MODERATORI
+except ImportError:
+    SWAP_SOLO_MODERATORI = True    # di serie solo i moderatori
+# I TETTI di ogni swap, sulla cifra che spetta al venditore: sotto il
+# minimo la rete pesa troppo (una prova da 25.000 costa ~700 sats), sopra
+# il massimo per ora solo Lightning. Valgono INSIEME ai limiti che SATS
+# Routing dichiara: vince il piu' stretto.
+try:
+    from config import SWAP_MIN_SATS
+except ImportError:
+    SWAP_MIN_SATS = 25_000
+try:
+    from config import SWAP_MAX_SATS
+except ImportError:
+    SWAP_MAX_SATS = 50_000
+# LA NOSTRA FEE sullo swap, in percentuale: 0 di serie e SPENTA finche'
+# non ci sono la risposta di Massimo e il parere legale. La strada del
+# guadagno e' la quota del 10 % della loro commissione, che non costa
+# niente a chi vende.
+try:
+    from config import SWAP_FEE_PERCENTO
+except ImportError:
+    SWAP_FEE_PERCENTO = 0
+# DOVE SI LEGGONO LE TARIFFE: l'API pubblica di SATS Routing, senza
+# chiavi. Nel collaudo e sulla VM di collaudo punta al SATS Routing di
+# CARTONE (`cartone_satsrouting.py`, su una porta di casa): in
+# MODALITA_COLLAUDO una base fuori dal computer non si legge mai.
+try:
+    from config import SWAP_API_BASE
+except ImportError:
+    SWAP_API_BASE = "https://api.satsrouting.exchange"
+
+# la copia delle tariffe: 30 secondi bastano a non bussare a ogni tocco,
+# e sono meno del minuto che il preventivo dichiara di valere
+SWAP_TARIFFE_COPIA_S = 30
+SWAP_PREVENTIVO_VALE_S = 60
+_TARIFFE_SWAP = {"quando": 0.0, "dati": None}
+_SWAP_DETTO_SIMULATO = set()
+
+
+def swap_per(tg_id: int) -> bool:
+    """LO SWAP C'E' PER QUESTA PERSONA? La leva generale, e a solo-moderatori
+    acceso la sola lista dei moderatori. Decide il server, a ogni
+    richiesta: il client lo legge in `swap_leve.attivo` e non lo
+    indovina mai."""
+    if not SWAP_ATTIVO:
+        return False
+    if SWAP_SOLO_MODERATORI:
+        return e_admin(int(tg_id or 0))
+    return True
+
+
+def _swap_base_di_casa(base: str) -> bool:
+    """La base delle tariffe sta su questo computer? (il cartone)"""
+    try:
+        host = (urlparse(str(base or "")).hostname or "").lower()
+    except Exception:
+        return False
+    return host in ("127.0.0.1", "localhost", "::1")
+
+
+def swap_lettura_simulata(base: str) -> bool:
+    """IN COLLAUDO LE TARIFFE NON SI LEGGONO FUORI DAL COMPUTER: il calco
+    di `lettura_simulata` dei relay. True = la lettura non si fa, e il
+    preventivo dice «non risponde». Lo dice UNA volta per base."""
+    if not MODALITA_COLLAUDO or _swap_base_di_casa(base):
+        return False
+    if base not in _SWAP_DETTO_SIMULATO:
+        _SWAP_DETTO_SIMULATO.add(base)
+        print(f"🟣 [swap simulato] le tariffe da {base}: in collaudo non "
+              "si esce dal computer (punta SWAP_API_BASE al cartone)",
+              flush=True)
+    return True
+
+
+def tariffa_swap_da_risposta(dati) -> dict | None:
+    """Dalla risposta di `/v2/swap/reverse` la sola coppia che serve,
+    Lightning -> bitcoin on-chain (BTC/BTC). None se la forma non torna:
+    meglio nessun preventivo che un preventivo sbagliato."""
+    try:
+        c = dati["BTC"]["BTC"]
+        tariffa = {
+            "hash": str(c["hash"]),
+            "percento": float(c["fees"]["percentage"]),
+            "lockup": int(c["fees"]["minerFees"]["lockup"]),
+            "claim": int(c["fees"]["minerFees"]["claim"]),
+            "minimo": int(c["limits"]["minimal"]),
+            "massimo": int(c["limits"]["maximal"])}
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not tariffa["hash"] or tariffa["percento"] < 0 \
+            or min(tariffa["lockup"], tariffa["claim"], tariffa["minimo"],
+                   tariffa["massimo"]) < 0:
+        return None
+    return tariffa
+
+
+async def leggi_tariffa_swap() -> dict | None:
+    """Le tariffe di adesso, con la copia di 30 secondi. Il codice
+    partner va in OGNI lettura (l'intestazione `Referral`, la loro
+    `docs/pro.md`), cosi' SATS Routing sa da chi arriva. None = SATS
+    Routing non risponde (o in collaudo si e' fermato da solo)."""
+    adesso = time.time()
+    if _TARIFFE_SWAP["dati"] is not None \
+            and adesso - _TARIFFE_SWAP["quando"] < SWAP_TARIFFE_COPIA_S:
+        return _TARIFFE_SWAP["dati"]
+    base = str(SWAP_API_BASE or "").rstrip("/")
+    if not base or swap_lettura_simulata(base):
+        return None
+    intestazioni = {}
+    codice = str(SWAP_REFERRAL_ID or "").strip()
+    if codice:
+        intestazioni["Referral"] = codice
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"{base}/v2/swap/reverse", headers=intestazioni)
+        if r.status_code != 200:
+            return None
+        tariffa = tariffa_swap_da_risposta(r.json())
+    except Exception as e:
+        print(f"⚠️ Swap: le tariffe di SATS Routing non arrivano ({e})",
+              flush=True)
+        return None
+    if tariffa is not None:
+        _TARIFFE_SWAP.update(quando=adesso, dati=tariffa)
+    return tariffa
+
+
+def preventivo_swap(dovuto: int, tariffa: dict, fee_percento=0,
+                    minimo=0, massimo=0) -> dict:
+    """IL CONTO DEL PREVENTIVO, puro: niente rete, niente database.
+
+    `dovuto` e' quel che spetta al venditore (lo stesso numero che la
+    fattura Lightning dovrebbe portare). La nostra fee, se accesa, si
+    toglie PRIMA: la fattura dello swap e' quel che resta. Poi le regole
+    di SATS Routing per lo swap Lightning -> on-chain: commissione =
+    percentuale della fattura PER ECCESSO, on-chain = fattura -
+    commissione - rete del loro invio PER DIFETTO; il ritiro lo paga chi
+    riceve, ed e' una stima. I tetti: il nostro minimo e massimo insieme
+    ai loro, vince il piu' stretto."""
+    dovuto = int(dovuto)
+    # la fee nostra in millesimi di punto, per eccesso: uno 0,25 % non
+    # deve diventare 0 per un arrotondamento a intero
+    fee = float(fee_percento or 0)
+    fee_mill = round(fee * 1000)
+    fee_nostra = -(-dovuto * fee_mill // 100_000) if fee_mill > 0 else 0
+    fattura = dovuto - fee_nostra
+    soglia_min = max(int(minimo or 0), int(tariffa["minimo"]))
+    soglia_max = int(tariffa["massimo"])
+    if int(massimo or 0) > 0:
+        soglia_max = min(soglia_max, int(massimo))
+    base = {"dovuto": dovuto, "hash": tariffa["hash"],
+            "minimo": soglia_min, "massimo": soglia_max}
+    if fattura < soglia_min:
+        return dict(base, ok=False, motivo="sotto_minimo")
+    if fattura > soglia_max:
+        return dict(base, ok=False, motivo="sopra_tetto")
+    # la percentuale per eccesso, in interi: «0,6 %» non diventa 0,59999
+    millesimi = round(float(tariffa["percento"]) * 1000)
+    commissione = -(-fattura * millesimi // 100_000)
+    onchain = fattura - commissione - int(tariffa["lockup"])
+    ricevi = onchain - int(tariffa["claim"])
+    if ricevi <= 0:
+        return dict(base, ok=False, motivo="sotto_minimo")
+    righe = [{"voce": "dovuto", "sats": dovuto}]
+    if fee_nostra:
+        righe.append({"voce": "fee_barattolo", "sats": -fee_nostra,
+                      "percento": fee})
+    righe += [
+        {"voce": "commissione", "sats": -commissione,
+         "percento": tariffa["percento"]},
+        {"voce": "rete_invio", "sats": -int(tariffa["lockup"])},
+        {"voce": "rete_ritiro", "sats": -int(tariffa["claim"])}]
+    return dict(base, ok=True, righe=righe, fattura=fattura,
+                onchain=onchain, ricevi=ricevi)
+
+
 # I SERVIZI (ago 2026): la vendita di prestazioni DEFINITE — un'ora di
 # lezione, una consulenza — con un appuntamento concordato dentro
 # l'ordine. Nasce SPENTA come ASTA_ABILITATA e IMPORT_NOSTR_APERTO, e
@@ -30695,6 +30889,24 @@ def _leve_stato():
                   spento="la quota del 10 % non si legge da loro: resta "
                          "il nostro conto. Si scrivono sul VPS col "
                          "read -s di PRODUZIONE, tutt'e due"),
+            _leva("Swap: solo i moderatori", "SWAP_SOLO_MODERATORI",
+                  bool(SWAP_SOLO_MODERATORI),
+                  acceso="a leva dello swap accesa, la cella «Swap» e il "
+                         "preventivo li vedono solo i moderatori",
+                  spento="a leva dello swap accesa, lo vedono TUTTI i "
+                         "venditori"),
+            _leva("Swap: minimo per swap (sats)", "SWAP_MIN_SATS",
+                  int(SWAP_MIN_SATS or 0)),
+            _leva("Swap: massimo per swap (sats)", "SWAP_MAX_SATS",
+                  int(SWAP_MAX_SATS or 0),
+                  spento="a 0 vale solo il massimo di SATS Routing"),
+            _leva("Swap: la nostra fee (%)", "SWAP_FEE_PERCENTO",
+                  float(SWAP_FEE_PERCENTO or 0),
+                  acceso="chi vende la vede come riga sua nel preventivo",
+                  spento="nessuna fee nostra: il guadagno e' la quota "
+                         "del 10 % della commissione di SATS Routing"),
+            _leva("Swap: dove si leggono le tariffe", "SWAP_API_BASE",
+                  str(SWAP_API_BASE or "")),
             _leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",
                   str(SWAP_REFERRAL_ID or "").strip(),
                   spento="vuoto: gli swap partirebbero senza il nostro "
@@ -43707,7 +43919,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # raggiunge. Solo qui e non nella busta di vetrina: lo swap e' degli
     # incassi, e l'anonimo in vetrina non incassa niente — per lui la
     # cella resta il martelletto.
-    profilo["swap_leve"] = {"attivo": bool(SWAP_ATTIVO),
+    # (19 ott 2026, tappa 2) `attivo` e' il giudice PER PERSONA: con
+    # SWAP_SOLO_MODERATORI acceso la cella «Swap» e il preventivo li vede
+    # solo chi sta in ADMIN_IDS
+    profilo["swap_leve"] = {"attivo": swap_per(user["id"]),
+                            "minimo": int(SWAP_MIN_SATS or 0),
+                            "massimo": int(SWAP_MAX_SATS or 0),
                             # il codice partner, per le chiamate che il
                             # telefono fara' a SATS Routing (vuoto = niente)
                             "referral": str(SWAP_REFERRAL_ID or "").strip()}
@@ -70487,6 +70704,41 @@ async def promo_rimuovi(annuncio_id: int):
     except Exception as e:
         print(f"⚠️ Ritiro post automatici #{annuncio_id} saltato: {e}",
               flush=True)
+
+
+@app.get("/api/swap/preventivo/{ordine_id}")
+async def swap_preventivo(ordine_id: int, hash: str = "",
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """IL PREVENTIVO DELLO SWAP (19 ott 2026, tappa 2): per il venditore
+    di un ordine CONFERMATO, quanto riceverebbe on-chain con uno swap di
+    SATS Routing invece che in Lightning. Non crea niente e non muove
+    niente: legge le tariffe e fa il conto.
+    `hash` = l'impronta del preventivo che il client ha gia' mostrato:
+    se le tariffe nel frattempo sono cambiate la risposta lo dice
+    (`cambiata`), col preventivo nuovo — e' il rifiuto «tariffa
+    cambiata» che la tappa 3 usera' alla conferma vera."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not swap_per(user["id"]):
+        raise HTTPException(403, "Lo swap non e' disponibile")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    con.close()
+    if not o or o["venditore_id"] != user["id"]:
+        raise HTTPException(404, "Ordine non trovato")
+    if o["stato"] != "confirmed":
+        raise HTTPException(409, "Lo swap si sceglie quando i sats "
+                                 "sono da incassare")
+    dovuto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+    tariffa = await leggi_tariffa_swap()
+    if tariffa is None:
+        return {"ok": False, "motivo": "non_risponde", "dovuto": dovuto}
+    p = preventivo_swap(dovuto, tariffa, SWAP_FEE_PERCENTO,
+                        SWAP_MIN_SATS, SWAP_MAX_SATS)
+    p["cambiata"] = bool(hash) and hash != tariffa["hash"]
+    p["valido_s"] = SWAP_PREVENTIVO_VALE_S
+    return p
 
 
 @app.post("/api/orders/{ordine_id}/invoice")

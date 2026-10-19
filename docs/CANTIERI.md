@@ -67772,3 +67772,139 @@ la riga `python3 -c` di PRODUZIONE dentro `bash -c` — che sul PC è il
 bash di WSL, cieco ai percorsi di Windows. Ora il banco passa da stdin
 (UTF-8) e la riga si spezza con `shlex` e gira col Python corrente:
 stesso comando, stesse prove, su tutt'e due i sistemi.
+
+## Lo swap del venditore, tappa 2: il preventivo (19 ott 2026, cantiere swap-preventivo, piano approvato da Andrea)
+
+**COSA FA.** A ordine CONFERMATO, nel pannello dell'incasso, chi vende
+(oggi solo i moderatori) sceglie «⚡ Lightning» — di serie, il pannello
+di sempre — o «₿ On-chain (swap)», e vede il preventivo riga per riga:
+ti spettano, commissione di SATS Routing con la sua percentuale, rete
+del loro invio, rete del tuo ritiro (stima), «Ricevi on-chain, circa».
+Con le tariffe del 16 ott, su 48.000: −288, −324, −234 = 47.154. La
+riga di Barattolo c'è solo se `SWAP_FEE_PERCENTO` è sopra 0 (è 0). I
+rifiuti, una frase ciascuno con la strada Lightning a un tocco: sotto
+il minimo, sopra il massimo, tariffe cambiate (col preventivo nuovo),
+SATS Routing che non risponde. «Conferma lo swap» in questa tappa
+ricontrolla le tariffe con l'impronta di quelle mostrate e basta:
+nessuno swap, nessun sats; lo swap vero nasce con la tappa 3.
+
+**LE SCELTE, COI PERCHÉ.**
+- NIENTE SDK: il preventivo legge solo le tariffe pubbliche
+  (`/v2/swap/reverse`); l'SDK (`boltz-core`) serve quando il telefono
+  dovrà CREARE lo swap, tappa 3. Le fonti, con le versioni lette il
+  19 ott: `docs/api-v2.md`, `docs/pro.md` (l'intestazione `Referral`) e
+  `docs/swap-limits-and-fees.md` di satsrouting-api-docs `c6b88d31`; il
+  conto confrontato con `calculateReverseSwapAmounts` di boltz-backend
+  `0f75a4f5` (la percentuale sulla fattura per eccesso, il resto per
+  difetto).
+- LE TARIFFE LE LEGGE IL SERVER, con una copia di 30 secondi: la CSP
+  della Mini App non cambia (una `fetch` dalla pagina verso il cartone
+  è stata bloccata nel giro dal vivo, come deve), e il conto lo fa un
+  giudice solo. Il codice partner va in ogni lettura.
+- IN COLLAUDO NON SI ESCE DAL COMPUTER: una base delle tariffe che non è
+  127.0.0.1 o localhost non si legge (`swap_lettura_simulata`, il calco
+  di `lettura_simulata` dei relay), e il preventivo dice «non
+  risponde». Nel collaudo e sulla VM si punta al cartone.
+- IL CANCELLO È PER PERSONA (`swap_per`): leva generale `SWAP_ATTIVO`,
+  e a `SWAP_SOLO_MODERATORI` acceso (di serie) solo `ADMIN_IDS`. Lo stesso
+  giudice veste la cella della nav: un venditore qualunque continua a
+  vedere «Aste» (visto dal vivo col 222).
+- I TETTI: `SWAP_MIN_SATS` 25.000 e `SWAP_MAX_SATS` 50.000 di serie,
+  sulla cifra che spetta al venditore, insieme ai limiti che SATS
+  Routing dichiara: vince il più stretto. 0 nel massimo = solo il loro.
+- LA FEE NOSTRA si conta in millesimi di punto, per eccesso: uno 0,25 %
+  — l'alternativa nominata da Andrea — non deve sparire in un
+  arrotondamento a intero (provato: 120 sats su 48.000).
+- LA SCELTA STA SOLO NEL RAMO «INCASSA SUBITO» A ORDINE CONFERMATO. Non
+  nel ramo aperto da un moderatore per una fattura nuova («altra
+  cassaforte», ordine non ancora confermato): lì serve una fattura e
+  basta. E non per chi ha il Lightning address: il suo incasso parte
+  da solo alla conferma, senza un momento in cui scegliere — la
+  preferenza «incasso on-chain» salvata in anticipo è della tappa 4.
+- IL CARTONE (`cartone_satsrouting.py`), libreria standard, coi numeri
+  veri del 16 ott e un'impronta FINTA non esadecimale (un esadecimale
+  da 64 nel repo fa rossa la CI): normale, cambiata (0,7 %), giù,
+  storta; ricorda l'ultimo `Referral`. Le tappe dopo ci aggiungeranno
+  la creazione, gli stati e il recupero.
+
+**LA REGOLA DELLA VM (Andrea, 19 ott 2026).** Prima di accendere
+`SWAP_ATTIVO` in produzione, OGNI TAPPA si prova sulla VM di collaudo
+(collaudo.barattolo.store) col SATS Routing di cartone e, dalla tappa
+3, col regtest di Boltz sulla VM. Per questa tappa, sulla VM: il cartone
+acceso (`python cartone_satsrouting.py --porta 9077`), e nel config della
+VM `SWAP_ATTIVO = True`, `SWAP_API_BASE = "http://127.0.0.1:9077"`,
+`SWAP_REFERRAL_ID = "barattolo"` (la VM è in collaudo: una base vera non
+si leggerebbe comunque). OGGI LA VM NON HA ANCORA IL SERVIZIO (cantiere
+della VM di collaudo, a metà): la prova di questa tappa sulla VM è DA
+FARE, e la leva in produzione resta spenta finché non è fatta. La regola
+va anche in `docs/COLLAUDO.md`, che non esiste ancora: lo scrive il
+cantiere della VM, e un file nuovo in `docs/` vuole una riga in
+CLAUDE.md (la bussola), che è al tetto (273 righe su 273) — chiesto ad
+Andrea.
+
+**CANTIERE GEMELLO.** Sul ramo remoto `cantiere/swap-indirizzo` (non
+ancora su main) un'altra sessione fa l'indirizzo Lightning della quota
+mensile (`swap@barattolo.store`): tocca `server.py` e il config
+d'esempio vicino alle leve di questa tappa. Chi arriva secondo si fonde.
+
+**PROVATO.**
+- `prove_swap_preventivo` (nuova, 35): il conto puro sui numeri del 16
+  ott (righe che tornano al sat, la riga Barattolo assente a fee zero,
+  lo 0,25 %, la percentuale per eccesso su un conto quasi tondo, i
+  tetti nostri e loro, il massimo a 0), la lettura della risposta
+  (anche storta), il cancello per persona, il collaudo che non esce,
+  le sentinelle su rotta, lettura, leve, pannello, cartone ed elenchi
+  della CI; e un banco node che ESEGUE `payoutPanel` e il preventivo
+  veri: la scelta che non compare senza leva, compare a ordine
+  confermato con Lightning già scelto, NON compare prima della
+  conferma nemmeno a fattura chiesta da un moderatore, i quattro
+  rifiuti, l'inglese. Tortura 4 su 4 (commissione per difetto, codice
+  partner tolto, cancello che ignora i moderatori, scelta senza il
+  controllo dello stato) — la quarta all'inizio PASSAVA: il caso del
+  ramo aperto prima della conferma mancava, aggiunto.
+- `prove_swap_cella`, di ieri, aggiornata: la leva in `/api/me` è per
+  persona; «nessuna chiamata a SATS Routing» è diventata «il telefono
+  non parla con SATS Routing» (il server ora legge le tariffe apposta).
+  E UN DIFETTO MIO preso da lei: il titolo del preventivo si chiamava
+  `titolo` come quello della pagina Swap, e nell'oggetto dei testi lo
+  sovrascriveva (la pagina avrebbe detto «Preventivo dello swap»).
+  Ora `titoloPrev`, con la sua sentinella.
+- `collaudo_swap_preventivo` (nuovo, 23, in `ci/collaudi.txt`): la app
+  vera via TestClient contro il cartone acceso su 127.0.0.1, con
+  l'`httpx` vero (il banco ne mette uno finto per LNbits): il
+  cancello, il preventivo da 48.000, il `Referral` arrivato, la copia
+  di 30 s, i quattro rifiuti, le porte (404, 409), la leva aperta a
+  tutti e spenta, la base vera che in collaudo non si legge. Verde
+  anche nella gabbia della CI.
+- DAL VIVO, server del worktree in collaudo sulla 8191 e cartone sulla
+  9077 (porte libere, guardate prima), ordini 1 (48.000) e 2 (20.000)
+  seminati confermati per il 999, 360×780, tocchi veri: Lightning di
+  serie; lo swap col preventivo (chiaro); «Conferma» → «Lo swap vero
+  arriva con la prossima versione»; il cartone in «cambiata» → 0,7 %,
+  −336, 47.106 (scuro); l'ordine da 20.000 → «Sotto i 25 000 sats…»
+  (scuro), e «Incassa in Lightning» riporta il pannello col campo
+  della fattura; il cartone «giù» → «SATS Routing ora non risponde»
+  (chiaro); il 222 vede «Aste» e `swap_leve.attivo` false. Il cartone
+  ha visto `Referral: barattolo`. UN DIFETTO PRESO DAGLI SCATTI: «(0,6
+  %)» andava a capo fra numero e simbolo — ora lo spazio è uno spazio
+  che non si spezza. Config del giro e database cancellati.
+- LA SUITE INTERA ha preso 13 rosse in `prove_fattura_solo_incasso`: il suo
+  banco ritaglia `payoutPanel` e lo esegue in node con le sue sole finte,
+  e il pannello ora chiede `swapAcceso()`: alla chiamata del caso
+  «confirmed» lo script intero cadeva, e con lui tutte le sue prove. Ha
+  ceduto il banco: la finta `swapAcceso = () => false`, cioè il pannello
+  di sempre (lo swap acceso lo prova `prove_swap_preventivo`).
+- Suite e collaudi: nel messaggio del commit.
+
+**STRADE SCARTATE.** L'SDK adesso (non serve per leggere); la lettura
+dal telefono (CSP da allargare, e un secondo giudice del conto in JS);
+la fee contata a interi (perde lo 0,25 %); la scelta anche per chi ha
+il Lightning address (il suo incasso parte da solo: va con la tappa 4).
+
+**DA FARE** (notati, non fatti):
+- La prova di questa tappa sulla VM di collaudo, quando la VM avrà il
+  servizio (la regola qui sopra).
+- `docs/COLLAUDO.md`: la regola dello swap, quando il file nasce
+  (domanda ad Andrea sulla riga in CLAUDE.md).
+- La tappa 3: lo swap creato dal telefono (`boltz-core`), la chiave, il
+  ritiro; la CSP verso SATS Routing o un passaggio dal server.

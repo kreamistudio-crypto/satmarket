@@ -729,6 +729,20 @@ SWAP_REFERRAL_ID = ""        # vuoto finche' non arriva da SATS Routing
 # CODICE PARTNER DI SATS ROUTING»). Vuote = la quota non si legge.
 SWAP_REFERRAL_API_KEY = ""
 SWAP_REFERRAL_API_SECRET = ""
+# LA TAPPA 2, IL PREVENTIVO (ott 2026). A leva dello swap accesa, di
+# serie lo vedono solo i moderatori (ADMIN_IDS): False = tutti i venditori.
+SWAP_SOLO_MODERATORI = True
+# I tetti di ogni swap sulla cifra che spetta al venditore (vale anche il
+# limite di SATS Routing: vince il piu' stretto). 0 nel massimo = solo il loro.
+SWAP_MIN_SATS = 25_000
+SWAP_MAX_SATS = 50_000
+# La nostra fee sullo swap, in percentuale: 0 = spenta (la quota del 10 %
+# della loro commissione non costa niente a chi vende).
+SWAP_FEE_PERCENTO = 0
+# Dove si leggono le tariffe. Nel collaudo e sulla VM di collaudo: il
+# SATS Routing di cartone, es. "http://127.0.0.1:9077" (cartone_satsrouting.py);
+# in collaudo una base fuori dal computer non si legge mai.
+SWAP_API_BASE = "https://api.satsrouting.exchange"
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa
