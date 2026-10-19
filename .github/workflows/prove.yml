@@ -1,4 +1,4 @@
-# La rete di sicurezza di Barattolo, a ogni commit e a ogni PR.
+# La rete di sicurezza di Barattolo, a ogni commit su main.
 #
 # Gira SOLO cio' che non ha bisogno di segreti: niente config.py,
 # niente database, niente chiamate ai relay o ad Anthropic. Una CI
@@ -6,9 +6,21 @@
 # raffreddore, e a furia di rossi ingiusti si smette di guardarla.
 name: prove
 
+# SOLO MAIN (19 ott 2026, cantiere ci-solo-main, decisione di Andrea):
+# da sola la CI parte SOLO sui push a main, che sono quelli che contano
+# per `pronto` e per il giudice del VPS. Sui rami (cantiere/*, le PR di
+# Alan) non parte piu' da sola: chi la vuole la lancia a mano da GitHub,
+# Actions → prove → «Run workflow», scegliendo il ramo. Un giro a mano
+# non sposta mai `pronto` (il job chiede `push`) e il giudice non lo
+# conta (chiede `event == push` su main). Attenzione: GitHub legge
+# questo blocco dal commit pushato, quindi un ramo tagliato da un main
+# di prima continua a partire da solo finche' non lo si ribasa.
+# Le sessioni cloud non aspettano la CI sul ramo: la loro prova e' la
+# suite e i collaudi in locale. Il perche': docs/CANTIERI.md, «Solo main».
 on:
   push:
-  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 # LA CODA (16 ott 2026, cantiere ci-leggera): un giro alla volta per
 # ramo. Se arrivano altri push mentre un giro corre, ne ASPETTA uno

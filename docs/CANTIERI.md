@@ -66592,3 +66592,61 @@ mappa per id.
   peso»: oggi `MINIATURA_LATO` è 640. Da riallineare (solo il commento).
 - Se il peso delle miniature in liste lunghe si fa sentire su rete
   lenta: la variante da 96 px, coi file nuovi e il giro delle vecchie.
+
+## Solo main: la CI parte da sola solo sui push a main, sui rami si lancia a mano (19 ott 2026, cantiere ci-solo-main, decisione di Andrea)
+
+**PERCHÉ.** Ogni push su un ramo `cantiere/*` (e ogni PR) faceva
+partire un giro intero: prove, segreti, collaudi, venti minuti di
+GitHub per un albero che poi, ribasato, si riprova comunque su main.
+Il giro che conta è uno solo: quello sul push a main, che sposta
+`pronto` e che il giudice del VPS guarda. Andrea ha deciso: da sola
+la CI parte SOLO lì, sui rami la si lancia a mano quando serve.
+
+**COSA SI È DECISO (Andrea, cinque righe approvate).**
+- `on:` di `.github/workflows/prove.yml` (l'unico workflow) diventa
+  `push: branches: [main]` più `workflow_dispatch:`. Via
+  `pull_request:`: anche le PR di Alan non partono più da sole («SOLO
+  sui push a main», preso alla lettera e confermato da Andrea).
+- IL LANCIO A MANO: su GitHub, Actions → prove → «Run workflow», e si
+  sceglie il ramo. Prova TUTTO (prove, segreti, collaudi): nessun
+  lavoro guarda il tipo di evento.
+- IDENTICO A OGGI: i tre lavori e i loro nomi; `pronto` solo su
+  `refs/heads/main` con `event_name == 'push'`, quindi un giro a mano,
+  anche su main, non sposta mai la bandierina; il giudice del VPS
+  (`giudice_deploy.py`) già conta solo i giri `push` su main, e non è
+  stato toccato; la coda (`cancel-in-progress: false`, un gruppo per
+  ramo); il salto dei collaudi quando l'albero differisce da `pronto`
+  solo per dei `.md`.
+- I GIRI GIÀ IN CODA finiscono come sono partiti. Ma GitHub legge `on:`
+  dal commit pushato: un ramo tagliato da un main di prima continua a
+  partire da solo finché non lo si ribasa sul main nuovo. Le due PR di
+  Alan aperte (#15 `feed-merchant`, #18 `poster-annuncio-simile`, ferme
+  dal 2 set) sono di quelle.
+- CLAUDE.md, una regola nuova (+2 righe, `TETTO_CLAUDE_MD` da 271 a
+  273): le sessioni cloud non aspettano più la CI sul ramo, la loro
+  prova è suite e collaudi locali.
+
+**STRADE SCARTATE.** `paths-ignore` sui rami (il salto dei documenti
+c'è già, e più fine, dentro il giro); tenere `pull_request` (Andrea:
+no, anche le PR a mano); un `if:` sui lavori al posto del filtro sul
+trigger (il giro partirebbe lo stesso, e un giro a mano salterebbe).
+
+**PROVATO.**
+- `prove_ci_solo_main` (nuova, 7): i trigger esatti; niente PR, orari
+  o `branches-ignore`; i tre lavori coi nomi del giudice; `pronto`
+  solo su push a main; prove e segreti senza condizioni su ramo o
+  evento; il salto dei documenti; la riga di CLAUDE.md. LA TORTURA,
+  sulla copia intera del worktree: otto mutazioni (torna
+  `pull_request`, push su tutti i rami, niente lancio a mano, `pronto`
+  anche a mano, `prove` saltato a mano, salto dei documenti tolto,
+  `segreti` rinominato, riga tolta da CLAUDE.md), otto morte.
+- Il YAML letto da PyYAML: trigger, lavori, `if:` di `pronto` e coda
+  come attesi. Con `prove_ci_leggera`, `prove_giudice_deploy`,
+  `prove_tetto_claude_md`, `prove_bussola`, `prove_script_nel_workflow`
+  e `prove_collaudi_in_ci`: 111 passate, 0 fallite.
+- La suite intera e i collaudi della CI: nel verbale del commit. Il
+  primo giro su main dirà dal vero che il push la fa partire e che
+  `pronto` avanza.
+
+**DA GUARDARE.** Il primo lancio a mano su un ramo, quando servirà:
+che parta, e che `pronto` resti fermo.

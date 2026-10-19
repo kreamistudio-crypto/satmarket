@@ -52184,6 +52184,49 @@ def prove_collaudi_in_ci():
           "::error::collaudo_cartone_due_rosse: KeyError: 'fine'" in r.stdout)
 
 
+def prove_ci_solo_main():
+    """LA CI PARTE DA SOLA SOLO SU MAIN (19 ott 2026, cantiere
+    ci-solo-main, decisione di Andrea): i push a main la fanno partire,
+    sui rami e sulle PR si lancia a mano (workflow_dispatch). Quel che
+    NON deve cambiare si tiene qui accanto: `pronto` si alza solo su un
+    push a main, i tre lavori hanno i loro nomi, nessun lavoro si salta
+    per il tipo di evento (un giro a mano su un ramo prova TUTTO), e il
+    salto dei soli documenti resta dei collaudi. Il giudice del VPS che
+    conta solo i `push` su main ha la sua prova in prove_giudice_deploy.
+    Il perche': docs/CANTIERI.md, «Solo main»."""
+    print("\n[la CI solo su main]")
+    import re as _re
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    wf = wf.replace("\r\n", "\n")
+    senza_commenti = "\n".join(r for r in wf.splitlines()
+                               if r.strip() and not r.lstrip().startswith("#"))
+    blocco_on = _re.search(r"(?ms)^on:\n(.*?)^(?=\S)", senza_commenti + "\nx")
+    prova("i trigger sono due: push SOLO su main e il lancio a mano",
+          "  push:\n    branches: [main]\n  workflow_dispatch:\n",
+          blocco_on.group(1) if blocco_on else None)
+    prova("...nessuna pull request, nessun orario, nessun altro evento",
+          [False, False, False],
+          ["pull_request" in senza_commenti, "schedule:" in senza_commenti,
+           "branches-ignore" in senza_commenti])
+    lavori = _re.findall(r"(?m)^  ([a-z_]+):\n", senza_commenti.split("\njobs:\n", 1)[1])
+    prova("i tre lavori, coi nomi che il giudice del VPS chiede",
+          ["prove", "segreti", "pronto"], lavori)
+    job_pronto = wf[wf.index("\n  pronto:"):]
+    prova("`pronto` si alza SOLO su un push a main: un giro a mano non lo sposta",
+          1, job_pronto.count(
+              "if: github.ref == 'refs/heads/main' && github.event_name == 'push'"))
+    prima_di_pronto = wf[:wf.index("\n  pronto:")]
+    prova("...e prove e segreti non guardano ne' il ramo ne' l'evento: a mano provano tutto",
+          [False, False],
+          ["github.event_name" in prima_di_pronto, "github.ref ==" in prima_di_pronto])
+    prova("il salto dei soli documenti resta, contro `pronto`", 1,
+          senza_commenti.count("--salvo-solo-documenti-da pronto"))
+    claude = open("CLAUDE.md", encoding="utf-8").read().replace("\r\n", "\n")
+    prova("CLAUDE.md lo dice alle sessioni cloud", True,
+          "LE SESSIONI CLOUD NON ASPETTANO PIÙ LA CI SUL RAMO" in claude
+          and "la loro prova è suite e collaudi locali" in claude)
+
+
 def prove_ci_leggera():
     """LA CI LEGGERA (16 ott 2026, cantiere ci-leggera, richiesta di
     Andrea): meno minuti di GitHub cambiando QUANDO e COME gira la CI,
@@ -171354,6 +171397,7 @@ def main():
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci, prove_ci_leggera,
+              prove_ci_solo_main,
               prove_elenco_dei_collaudi,
               prove_servizio_non_root,
               prove_guardiano_ponte,
