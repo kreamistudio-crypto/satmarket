@@ -65121,3 +65121,66 @@ byte per byte → allarme in chat, nessun archivio. Sugli script di prima
 dopo quello che porta questo commit, guardare che sul canale arrivi
 l'archivio «prima del deploy». Il primo deploy gira ancora col
 `deploy.sh` di prima (si copia in /run prima del reset).
+
+## Il verbale del push: il saluto TLS nel database e il backup prima di ogni deploy (19 ott 2026, cantieri posta-fd e backup-deploy)
+
+**L'INCIDENTE.** Il 18 ott alle 09:04:41 UTC il primo «file is not a
+database» del server (`python3[423363]`), dopo l'ultima richiesta sana
+alle 09:04:38; il 🧊 del libro mastro ha mandato 51 controlli rotti e
+`/api/salute` diceva «non sto bene». Nella macchina, fra le 09:03 e le
+09:06, solo il timer del deploy (vuoto) e i soliti ssh respinti. La
+testata del file: byte 0..17 e 44..99 sani, 18..43 un record TLS da 24
+byte (`23 3 3 0 19`). Il 19 ott di nuovo, con la stessa firma byte per
+byte dal byte 19 (gli orari del secondo stanno nel journal del VPS;
+il comando per leggerli è nel rapporto di sessione, l'uscita non è
+arrivata qui).
+
+**LA CAUSA.** La posta dei relay (15 ott) chiudeva il socket da un altro
+thread mentre il lettore era dentro recv(): il numero liberato andava
+al database e il saluto TLS del lettore ci finiva dentro. Le due voci
+qui sopra, «Il saluto TLS nel database» e «Il backup prima di ogni
+deploy», dicono la cura e il resto.
+
+**LE RIPARAZIONI.** Tutte e due le volte il file è stato RECUPERATO, non
+sostituito: i 26 byte rifatti (`ripara_testata.py`, nello scratchpad
+della sessione), `VACUUM INTO`, `integrity_check` ok, `foreign_key_check`
+0, il vivo spostato in `/root` come prova (`satmarket-rotto-*.db`) e
+messo al suo posto il riparato a server fermo, col `-journal` eventuale
+spostato via. Il backup pre-deploy del 18 ott 07:16 UTC è servito solo
+da stampo e da confronto. Nessuna tabella ha perso righe rispetto al
+file al momento del guasto, salvo code che si svuotano da sole (indice
+FTS5 fuso, `avvisi_notificati`, `coda_vetrina`, `p2p_attese`); il
+secondo recupero ha tenuto i due ordini e l'annuncio arrivati fra i
+due guasti (ordini 112 → 114, annunci 3120 → 3122 sul backup).
+
+**LA VERIFICA DELLE PERDITE (`verifica_perdite.py`, sola lettura, sul
+VPS, uscita riferita da Andrea).** Rispetto alla seconda riparazione
+nessuna riga mancante. Rispetto alla prima mancano 3 `sessioni` (tre
+login web da rifare), 4 `p2p_attese` (timer da un minuto di avvisi
+P2P già scaduti: nessun sat, nessuno scambio appeso — i sats del P2P
+stanno sul nodo) e 2 righe di `coda_vetrina` (annunci in fila per il
+canale della comunità). Gli ordini nati dal 18 ott 07:00 UTC (#241 e
+#246) ci sono. Dei pagamenti LNbits dalla stessa ora, NESSUN INCASSO
+RIUSCITO SENZA ORDINE; quattro fatture «non riuscito» senza traccia
+(135.724, 141.210, 156.750 e 142.122 sat, 18 ott 12:23–14:03 UTC): checkout
+abbandonati o fatture rifatte, il cui hash se ne va con la lapide
+dell'ordine dopo un'ora (`controlla_abbandonati`, poi la pulizia) o con
+`nuova_fattura_ordine`. Niente da sistemare a mano.
+
+**COSA È GIRATO, E SU QUALE ALBERO.** I tre commit `bd767f8` (la cura
+della posta), `19fdec7` (il backup prima di ogni deploy), `9a5235e`
+(CLAUDE.md), firmati con andrea-firma-barattolo, sopra `489554e`, che
+era ancora la punta di main: nessun rebase da fare. Sull'albero di
+`9a5235e`: `PROVE_SEVERE=1 prove.py` 25.084 passate, 0 fallite, 0
+saltate; `collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2` 85
+verdi, 0 rossi. Sulla sola cura (`bd767f8`), prima: suite 25.072/0 e i
+collaudi rimasti a 74 verdi quando la sessione di prima si è chiusa
+(6 interrotti, poi rigirati verdi uno per uno). Scanner dei segreti
+sulle righe aggiunte: vuoto. Push su main `489554e..9a5235e`; la CI
+(segreti, prove, pronto) verde; `pronto` su `9a5235e`.
+
+**DA GUARDARE (Andrea).** Sul VPS: la riga 🚀 del deploy e la cura nel
+codice che gira (`grep -c "def _posta_chiudi" server.py` = 1); una volta
+sola l'unità del deploy ricopiata (`TimeoutStartUSec=10min`); al deploy
+dopo, l'archivio «prima del deploy» sul canale dei backup; che il 🧊
+del libro mastro torni muto.
