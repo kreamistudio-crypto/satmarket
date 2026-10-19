@@ -62663,6 +62663,12 @@ pubblico non la conta così. Restano aperti dal §5: chi è il gestore e
 i termini di servizio (`/terms` dava 404), come e quando arriva il
 pagamento (la documentazione dice un indirizzo Lightning entro 14
 giorni, ma è il testo di Boltz), la chiave per leggere il maturato.
+SECONDO GIRO (19 ott 2026, 17:20): la quota si paga a fine mese via
+Lightning, come fa Alby; NON esiste un ambiente di prova (né sandbox
+né testnet); il codice partner serve solo a dire da chi arriva lo
+swap, e l'API è pubblica, senza chiavi — quindi niente chiave per
+leggere il maturato. Le conseguenze per le prove: voce «Lo swap del
+venditore, prima tappa», «LE PROVE DELLO SWAP».
 
 Fonti: [massmux, «A new Boltz's fork is running: SATS Routing»](https://massmux.org/p/a-new-boltzs-fork-is-running-sats) (20 ago 2026);
 [il video in italiano](https://www.massmux.com/satsrouting-exchange-swap-non-custodial-atomico/);
@@ -66291,6 +66297,8 @@ SATS Routing dentro Barattolo», qui sopra.
    in sola lettura; (3) il motore dello swap nel telefono e la sua
    chiave; (4) il server che paga la fattura dello swap e sa aspettare;
    (5) stati, avvisi e recupero; (6) il maturato della quota nel
+   [CORRETTO il 19 ott, 17:20: niente chiave per leggerlo da loro —
+   diventa il NOSTRO conto, sotto]
    pannello admin. Prima di accendere la leva: il testo firmato di
    SATS Routing e il parere MiCA/CASP.
    AGGIUNTA DI ANDREA PER LA TAPPA (4): un TETTO PER SWAP e un TETTO
@@ -66424,3 +66432,86 @@ lette il 19 ott 2026):
 - Main è corso ancora (`7a4afd6`, la chat negli ordini, secondo giro):
   rebase e, sull'ultimo albero, le sole sezioni toccate; il resto lo
   rifà la CI. I numeri dell'ultimo giro nel messaggio del commit.
+
+**LE RISPOSTE DI MASSIMO, SECONDO GIRO (19 ott 2026, 17:20, riportate
+da Andrea).**
+- La quota si paga a FINE MESE via LIGHTNING, come fa Alby.
+- NON esiste un ambiente di prova di SATS Routing: né sandbox né
+  testnet (la loro documentazione lo diceva già per testnet).
+- Il codice partner serve SOLO a dire da chi arriva lo swap; l'API è
+  pubblica, SENZA chiavi. La tappa (6) del piano quindi non legge il
+  maturato da `/v2/referral/fees` (quella rotta, nel loro codice,
+  vuole una chiave e un HMAC che a noi non servono): diventa il NOSTRO
+  conto — ogni swap riuscito registrato con la commissione del suo
+  preventivo, il 10 % atteso del mese, e il confronto col pagamento che
+  arriva. Una differenza si chiede a Massimo coi numeri in mano.
+
+**LE PROVE DELLO SWAP: SENZA SATS PRIMA, POI MAINNET CON TETTI BASSI**
+(decisione di Andrea, 19 ott: le prove vere su mainnet, piccole, con
+la leva `SWAP_MAX_SATS` piccola di serie; il collaudo con FakeWallet
+non basta, perché lo swap vuole un pagamento Lightning vero che resta
+appeso finché il telefono non ritira on-chain).
+
+SENZA SATS VERI, cosa si prova e con cosa:
+1. I PREVENTIVI. L'API delle tariffe è pubblica e senza chiave: nelle
+   prove e in CI (rete staccata) con le risposte REGISTRATE di
+   `/v2/swap/reverse` (i numeri del 16 ott sono nella tabella della
+   voce swap-studio; la risposta intera si registra con la tappa 2), più
+   i casi che il registro deve saper rifiutare (tariffa cambiata:
+   `pairHash`; sotto il minimo; sopra `SWAP_MAX_SATS`); dal vivo con la
+   lettura vera, che non muove niente.
+2. GLI STATI. Un SATS Routing «di cartone», sul calco del coordinatore
+   di cartone del P2P: risponde e manda gli stati di `docs/lifecycle.md`
+   nelle sequenze vere — `swap.created` → `transaction.mempool` →
+   `transaction.confirmed` → `invoice.settled`, e i falliti
+   `swap.expired`, `transaction.failed`, `transaction.refunded` — per
+   provare frasi, avvisi, ritorno a «da incassare» e la ripresa dopo
+   la chiusura dell'app.
+3. LA CHIAVE E IL RECUPERO. La derivazione è deterministica: una frase
+   fissa di prova → xpub, chiavi `m/44/0/0/0/i`, segreto =
+   `sha256(chiave privata)`, confrontati in node col LORO codice
+   (`src/utils/rescueDerivation.ts` di boltz-web-app `004f4077`), così
+   uno swap nostro si recupera anche dalla loro pagina «Rescue». Più la
+   forma della richiesta di `/v2/swap/restore` (registrata).
+4. LO SWAP INTERO CON MONETE FINTE: il REGTEST DI BOLTZ
+   ([BoltzExchange/regtest](https://github.com/BoltzExchange/regtest),
+   aggiornato il 4 set 2026; `./start.sh`, API su 9001, sito su 8080,
+   bitcoind, Elements, Esplora e due LND, «cliente» e «server»). Un
+   LNbits del collaudo attaccato all'LND «cliente» (cassa `LndRestWallet`)
+   fa da nostro nodo: si provano davvero il pagamento appeso della
+   hold invoice, il ritiro cooperativo e quello dallo script, e la
+   SCADENZA — minando blocchi, cosa che su mainnet vuole ore. Vuole
+   Docker sulla VM di collaudo (o nel WSL). È il backend di Boltz e non
+   il fork di SATS Routing: stessa API v2, ma senza le loro correzioni
+   dell'audit — per la forma va bene, per la sicurezza no.
+
+CON SATS VERI, su mainnet, solo dopo i quattro passi sopra; resta
+quello che solo la rete vera dice — la strada dal nostro nodo a
+SatsRouting2, le scadenze vere, le commissioni vere, e lo swap che
+arriva a fine mese col nostro nome. Chi paga la fattura dello swap,
+tre strade:
+- A) IL NODO DI PRODUZIONE, sul VPS, con la leva accesa SOLO per i
+  moderatori e `SWAP_MAX_SATS` piccola: Andrea compra da sé un oggetto
+  di prova e incassa on-chain. È la strada vera di un payout (LNbits
+  «nodo», i tetti ACINQ, la ronda), nessuna macchina e nessun costo
+  d'avvio; il prezzo è che si prova in produzione, e quindi vuole il
+  cancello per persona e i tetti PRIMA.
+- B) PHOENIXD sulla VM di collaudo, cassa di LNbits (`PhoenixdWallet`,
+  documentata da LNbits): isolato dalla produzione, ma al primo incasso
+  phoenixd compra un canale da 2M sats e paga l'1 % più la rete
+  (pagina «Auto Liquidity» di ACINQ, letta il 19 ott: ~20.000 sats più
+  il mining, non rimborsabili), poi ogni ricarica oltre il canale
+  ricomincia. Per poche prove da 25-50k è il costo più alto delle tre.
+- C) NWC verso un wallet che Andrea ha già, con un tetto di spesa
+  messo nel wallet (cassa `NWCWallet` di LNbits): niente costo
+  d'avvio. Da verificare PRIMA: una hold invoice resta appesa per
+  minuti, e una richiesta NWC che non torna in tempo può lasciare
+  LNbits col pagamento «in sospeso» — è proprio il caso da provare, e
+  il regtest (4) non lo dice. Il segreto NWC sarebbe nostro e sulla VM
+  di collaudo, mai sul server di produzione.
+La mia proposta: i quattro passi senza sats, poi A con
+`SWAP_MAX_SATS` = 50.000 di serie e il minimo a 25.000 (una prova da
+25.000 costa oggi ~700 sats: 0,6 % + 324 + ~234 a 1 sat/vB); B solo se
+si vuole una cassa di prova separata per sempre. La leva e il
+cancello per persona nascono con la tappa (2), il preventivo, che è
+dove il tetto si guarda.
