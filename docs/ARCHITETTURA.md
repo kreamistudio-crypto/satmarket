@@ -30832,6 +30832,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    nell'iframe di un estraneo — tutte le altre lo vietano con
    `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
+   `/vendor/swap.js` e `/swap-telefono.js` (20 ott 2026, la tappa 3
+   dello swap: la libreria e il codice dello swap dal telefono, scaricati
+   solo a swap acceso; vedi «LO SWAP, TAPPA 3»),
    `/vendor/pdf.mjs` e `/vendor/pdf.worker.mjs` (16 ott 2026: pdf.js
    4.10.38, per disegnare i PDF della chat; vedi «GLI ALLEGATI»),
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
@@ -33551,3 +33554,60 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   16 ott, impronta finta, modi `normale|cambiata|giu|storta` da
   `/cartone/modo`, `/cartone/visto` per l'ultimo `Referral`. Serve al
   collaudo, ai giri dal vivo e alla VM di collaudo.
+- LO SWAP, TAPPA 3: LO SWAP DAL TELEFONO (20 ott 2026, cantiere
+  swap-telefono; perché in CANTIERI, «Lo swap dal telefono, tappa 3»).
+  Da qui la frase della tappa 2 «il client non parla mai con SATS
+  Routing» non vale più: ci parla il TELEFONO, direttamente, e il
+  server di Barattolo non vede niente dello swap.
+  I FILE: `swap-telefono.js` (rotta esplicita `/swap-telefono.js`,
+  chiamato con `?v=SWAP_TELEFONO_VER`, l'inizio del suo sha256) e
+  `vendor/swap.bundle.js` (rotta `/vendor/swap.js`, `?v=5.0.0-bar1`,
+  global `BarattoloSwap`). La pagina scarica il primo con
+  `caricaSwapTelefono()` all'arrivo di `swap_leve` se `swapAcceso()`;
+  il file scarica il bundle con `caricaBundleSwap()` quando serve.
+  `swapTelefonoPronto()` (= c'è `pannelloSwapTelefono`) è la condizione
+  in più della scelta in `payoutPanel`; uno swap già nato sull'ordine
+  rende «swap» la scelta di serie.
+  LA BUSTA: `swap_leve` in `/api/me` ha anche `api` (`SWAP_API_BASE`
+  ripulita) e `rete` (`swap_rete()`: `SWAP_RETE` fra `bitcoin`,
+  `testnet`, `regtest`, sennò `bitcoin`).
+  LA CSP: `_csp_prova()` aggiunge a `connect-src` `swap_origine_api()`
+  (schema://host[:porta] di `SWAP_API_BASE`, vuota se non http/https)
+  SOLO a `SWAP_ATTIVO`; calcolata all'avvio (`CSP_PROVA`).
+  IL MOTORE (funzioni pure sopra `S` = `BarattoloSwap`): `swapChiavi(S,
+  parole, i)` → privata, pubblica, segreto = sha256(privata), impronta
+  = sha256(segreto), in `m/44/0/0/0/i`; `swapXpub` (radice, per
+  `/v2/swap/restore`); `swapVerifica(S, rete, risposta, chiavi,
+  {sats, onchainMin})` → null o il nome della bugia (`risposta`,
+  `fattura`, `importo`, `impronta`, `albero`, `indirizzo`, `meno`);
+  `swapRitiro(...)` → `{hex, id, cooperativo}`, cooperativo con
+  `chiediFirma(txHex, nonce)` e, se fallisce, dallo script.
+  `leggiBolt11` della pagina restituisce anche `hash` (tag p).
+  IL CASSETTO: `barattolo_swap_<tg_id>` = `{parole, prossimo, copiata}`
+  e `barattolo_swap_lista_<tg_id>` = gli swap (`id, ordine, indice,
+  invoice, lockupAddress, refundPublicKey, swapTree,
+  timeoutBlockHeight, onchainAmount, ricevi, indirizzo, stato, creato,
+  ritiro?, errore?, coopRifiutato?`). `prossimo` si salva PRIMA della
+  richiesta.
+  LE CHIAMATE (solo `swapApi`, l'unica `fetch` del file, su
+  `swapLeve.api`): `POST /v2/swap/reverse` (`from`, `to`,
+  `invoiceAmount` = `fattura` del preventivo, `preimageHash`,
+  `claimPublicKey`, `pairHash` = `hash` del preventivo, `referralId`);
+  `GET /v2/swap/<id>` ogni 5 s finché c'è uno swap aperto
+  (`swapSorveglia`, `swapGiro`; riparte all'apertura con
+  `swapRiprendi`); a `transaction.mempool|confirmed` `swapRitira`:
+  `GET /v2/swap/reverse/<id>/transaction`, `POST
+  /v2/swap/reverse/<id>/claim`, `POST /v2/chain/BTC/transaction`;
+  `POST /v2/swap/restore` dalla pagina Swap.
+  I PASSI del pannello (`swapPassi[ordine]`): `preventivo` →
+  `parole` (solo se le parole non sono `copiata`) → `indirizzo` →
+  `creo`; poi `cartaSwap`. La pagina Swap ha `#swapTelefono`, scritto
+  da `renderSwapTelefono` (chiamata da `renderSwap`): lista, parole a
+  richiesta, recupero. L'ASCOLTATORE è uno, delegato sul `click` del
+  document, e conosce `scegli`, `avanti`, `parole-fatte`, `crea`,
+  `mostra-parole`, `recupera`, `ritira-a`.
+  IL CARTONE ora crea, sorveglia, firma, trasmette e recupera
+  (`cartone_satsrouting_cripto.js` per la crittografia, BIP-340 in
+  Python per giudicare la firma), coi modi `mente_*`, `non_firma`,
+  `rifiuta_cooperativo` e `/cartone/stato`. Il collaudo è
+  `collaudo_swap_telefono`.

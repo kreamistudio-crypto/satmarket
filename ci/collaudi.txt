@@ -120,6 +120,7 @@ collaudo_piu_account
 collaudo_istanza_prova
 collaudo_login_bot
 collaudo_swap_preventivo
+collaudo_swap_telefono
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

@@ -743,6 +743,9 @@ SWAP_FEE_PERCENTO = 0
 # SATS Routing di cartone, es. "http://127.0.0.1:9077" (cartone_satsrouting.py);
 # in collaudo una base fuori dal computer non si legge mai.
 SWAP_API_BASE = "https://api.satsrouting.exchange"
+# La rete dello swap: "bitcoin" in produzione, "regtest" sulla VM di
+# collaudo col regtest di Boltz (il telefono controlla da se' gli indirizzi).
+SWAP_RETE = "bitcoin"
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

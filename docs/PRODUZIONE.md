@@ -4430,6 +4430,25 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   LNbits. Lo stato VIVO sta nel pannello «⚙️ Stato delle leve», gruppo
   «⚡ Indirizzo Lightning di casa».
 
+- LO SWAP DAL TELEFONO: LE LEVE (20 ott 2026, tappa 3; perché in
+  CANTIERI, «Lo swap dal telefono, tappa 3»; com'è fatto in
+  ARCHITETTURA, «LO SWAP, TAPPA 3»). SUL VPS NON CAMBIA NIENTE:
+  `SWAP_ATTIVO` resta spenta, e a leva spenta la CSP è quella di
+  sempre e la pagina non scarica né `/swap-telefono.js` né
+  `/vendor/swap.js`. La leva nuova `SWAP_RETE` NON si aggiunge al config
+  del VPS: il default del codice è `bitcoin`. Le rotte nuove sono due
+  file del repo: niente da copiare a mano.
+  SULLA VM DI COLLAUDO, per lo swap intero sul regtest di Boltz (da
+  fare): `SWAP_ATTIVO = True`, `SWAP_RETE = "regtest"`, e
+  `SWAP_API_BASE` sull'API del regtest; poi riavvio (la CSP si calcola
+  all'avvio e ammette la sola origine di quella base). ATTENZIONE: la
+  base la chiamano DUE parti — il server (le tariffe del preventivo; in
+  `MODALITA_COLLAUDO` solo se è 127.0.0.1 o localhost) e il BROWSER del
+  telefono (tutto il resto, con CORS). Sulla VM va scelta una base che
+  regga tutt'e due. Il controllo, in sola lettura: `grep -n
+  "^SWAP_RETE\|^SWAP_API_BASE\|^SWAP_ATTIVO" /srv/barattolo/config.py`
+  (la sola riga, mai le vicine).
+
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026; perché in
   CANTIERI, «L'indirizzo della quota: swap@barattolo.store»; com'è fatto
   in ARCHITETTURA, «L'INDIRIZZO DELLA QUOTA»). Dove SATS Routing manda a
