@@ -13883,8 +13883,8 @@ document.getElementById('cartello')?.remove();</script>
        QUI NON SI PAGA NIENTE, e non e' una limitazione: le tre cose
        che servono — vedere le chiavi, capire chi ha cosa, provare che
        il backup regge — si fanno con ZERO sats, zero nodo, zero rete.
-       La rete e' SEMPRE testnet e un indirizzo mainnet non si calcola
-       da nessuna parte: un 2-di-3 con una chiave di cartone che
+       La rete e' SEMPRE signet (testnet fino al 20 ott 2026) e un
+       indirizzo mainnet non si calcola da nessuna parte: un 2-di-3 con una chiave di cartone che
        mostrasse un `bc1q...` sarebbe un invito a mandarci sats veri
        che nessuno potrebbe piu' sbloccare.
        Il corpo lo scrive `renderOnchain()`: qui c'e' il guscio, perche'
@@ -52791,7 +52791,7 @@ function caricaNostrTools(){
 
    QUI NON SI PAGA NIENTE, e le tre cose che servono si fanno con ZERO
    sats: vedere le tre chiavi, capire chi ha cosa, e provare che il
-   backup regge davvero. La rete e' SEMPRE testnet (`tb1...`) e un
+   backup regge davvero. La rete e' SEMPRE signet (`tb1...`) e un
    indirizzo mainnet non si calcola da nessuna parte — con una chiave di
    cartone nel 2-di-3, un `bc1q...` a schermo sarebbe un invito a
    mandarci sats veri che nessuno potrebbe piu' sbloccare.
@@ -53095,7 +53095,7 @@ function descrittoreConChecksum(s){
    la prova del ripristino deve poter confrontare. */
 async function onchainChiavi(parole, srv){
   const B = await caricaBitcoin();
-  const rete = B.TEST_NETWORK;          // sempre testnet, in questa tappa
+  const rete = B.TEST_NETWORK;   // signet: le stesse forme di testnet (tb1)
   const seme = B.mnemonicToSeedSync(parole, '');
   const mia = B.HDKey.fromMasterSeed(seme).derive(srv.strada);
   const ven = B.HDKey.fromExtendedKey(srv.xpub_venditore).derive(srv.strada);
@@ -53188,9 +53188,10 @@ function onchainConSeme(parole, k){
   const uguale = prima && prima.indirizzo === k.indirizzo
                  && prima.descrittore === k.descrittore;
   return `
-    <div class="hint">Rete <b>testnet</b>: gli indirizzi cominciano per
-      <span class="mono">tb1</span>, e un indirizzo mainnet qui non si
-      calcola da nessuna parte.</div>
+    <div class="hint">Rete <b>signet</b>, la rete di prova: gli
+      indirizzi cominciano per <span class="mono">tb1</span> (come su
+      testnet), i sats non valgono niente, e un indirizzo mainnet qui
+      non si calcola da nessuna parte.</div>
 
     <div class="payout">
       <h4>1. La tua chiave, che è nata da sé</h4>
@@ -53234,7 +53235,7 @@ function onchainConSeme(parole, k){
         descrittore è la <b>ricetta</b> per ricostruirlo: senza di lui
         le dodici parole da sole <b>non aprono niente</b>, e per questo
         viaggia in ogni backup.</div>
-      <div><b>Indirizzo</b> (testnet)</div>
+      <div><b>Indirizzo</b> (signet)</div>
       <div class="mono" style="word-break:break-all">${esc(k.indirizzo)}</div>
       <div style="margin-top:8px"><b>Descrittore</b></div>
       <div class="mono" style="word-break:break-all;font-size:11px">${esc(k.descrittore)}</div>
@@ -53503,7 +53504,7 @@ async function onchainEsporta(btn){
       tieni le cose che non si perdono. Chi ha queste righe può
       ricostruire l'indirizzo e firmare, <b>senza di noi</b>.</div>
     <textarea class="mono" style="min-height:120px;font-size:11px" readonly
-      >Barattolo — prova on-chain (testnet)
+      >Barattolo — prova on-chain (signet)
 Dodici parole: ${parole}
 Strada: ${onchainSrv.strada}
 Descrittore: ${k.descrittore}

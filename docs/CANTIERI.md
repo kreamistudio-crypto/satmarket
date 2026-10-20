@@ -61538,6 +61538,18 @@ resto lo fa la CI.
 
 ## Il pagamento on-chain come opzione: il 2-di-3 non custodial, le chiavi nel browser, la beta a 250 € (16 ott 2026, cantiere pagamento-onchain, studio chiesto da Andrea e Alan: solo documenti, niente codice; è una PROPOSTA, e i cantieri si aprono uno alla volta col suo ok)
 
+**LA RETE DI PROVA È SIGNET (20 ott 2026, decisione di Andrea, cantiere
+onchain-tappa2).** Lo studio diceva signet, il codice delle tappe 1b-2a
+diceva testnet («in collaudo voglio provare tutto in testnet»): da oggi
+codice e studio dicono la stessa cosa, **signet** (`ONCHAIN_RETE`, una
+costante e non una leva). Signet ha le stesse forme di testnet —
+indirizzi `tb1…`, chiavi `tpub…`, coin type 1 — quindi gli indirizzi
+non cambiano aspetto; cambia la catena che li guarda. La verifica dei
+pagamenti della tappa ④, **sul collaudo**, chiederà all'API pubblica
+signet di mempool.space (`https://mempool.space/signet/api`), senza un
+nodo nostro; la sorveglianza della produzione resta il wallet
+watch-only sul nodo descritto qui sotto, e si decide alla ④.
+
 Il compito (Andrea e Alan, la sera del 16 ott): nel mercatino ci sono
 annunci da 2.000-4.000 €, e **Lightning non li regge** — l'uscita del
 nodo sta a ~608.000 sats e il canale ACINQ tiene 450.000 sats per volo,

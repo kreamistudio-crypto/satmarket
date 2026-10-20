@@ -1133,9 +1133,15 @@ ONCHAIN_SOLO_ADMIN = True
 # nodo, mai sul VPS). Vuota: il server usa una xpub DI CARTONE, presa
 # dai vettori di prova del BIP-32 — pubblicata in uno standard, non e'
 # la chiave di nessuno — e lo DICE al foglio, che la mostra scritto.
-# ⚠️ Nella tappa di prova (16 ott 2026) la rete e' SEMPRE testnet e un
-# indirizzo mainnet non si calcola da nessuna parte: cosi' e'
-# impossibile mandare sats veri a un 2-di-3 di cartone.
+# ⚠️ Nella tappa di prova la rete e' SEMPRE signet (dal 20 ott 2026;
+# testnet prima) e un indirizzo mainnet non si calcola da nessuna
+# parte: cosi' e' impossibile mandare sats veri a un 2-di-3 di cartone.
+# Per lo stesso motivo una xpub vera qui deve essere una `tpub...` (di
+# signet): una `xpub...` di mainnet il server la RIFIUTA, e un `xprv` o
+# un `tprv` (privata) li rifiuta sempre, senza ripeterli da nessuna
+# parte. L'indirizzo di ogni ordine si calcola sul server con la
+# libreria `embit` (requirements.txt): se manca, le rotte on-chain
+# rispondono 503 e il resto vive.
 ONCHAIN_XPUB = ""
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena

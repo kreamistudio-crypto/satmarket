@@ -49004,13 +49004,20 @@ try:
 except ImportError:
     ONCHAIN_XPUB = ""
 # LA RETE DELLA TAPPA DI PROVA (16 ott 2026, parola di Andrea: «in
-# collaudo voglio provare tutto in testnet»). Non e' una leva: e' una
-# COSTANTE, e un indirizzo mainnet in questa tappa non si calcola da
-# nessuna parte — ne' qui ne' nel browser. Il motivo e' semplice: un
-# 2-di-3 con una chiave di cartone che mostrasse un `bc1q...` sarebbe
-# un invito a mandarci sats veri che nessuno potrebbe piu' sbloccare.
-# La rete diventera' una leva alla tappa dei pagamenti, non prima.
-ONCHAIN_RETE = "test"
+# collaudo voglio provare tutto in testnet»; SIGNET dal 20 ott 2026,
+# decisione di Andrea: «rete di prova: signet», come diceva lo studio).
+# Non e' una leva: e' una COSTANTE, e un indirizzo mainnet in questa
+# tappa non si calcola da nessuna parte — ne' qui ne' nel browser. Il
+# motivo e' semplice: un 2-di-3 con una chiave di cartone che
+# mostrasse un `bc1q...` sarebbe un invito a mandarci sats veri che
+# nessuno potrebbe piu' sbloccare. La rete diventera' una leva alla
+# tappa dei pagamenti, non prima.
+# ⚠️ SIGNET HA LE STESSE FORME DI TESTNET: indirizzi `tb1...`, chiavi
+# estese `tpub...`, coin type 1 nel BIP-44/48. Quel che cambia e' la
+# CATENA che li guarda: la verifica dei pagamenti (tappa 4) chiedera'
+# all'API signet di mempool.space (`https://mempool.space/signet/api`),
+# e un pagamento mandato da un wallet testnet li' non si vede.
+ONCHAIN_RETE = "signet"
 
 
 def onchain_ammesso(tg_id) -> bool:
