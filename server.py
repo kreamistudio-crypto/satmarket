@@ -66422,15 +66422,31 @@ def evento_annuncio_importato(a: dict, titolo: str, descrizione: str,
             "content": (descrizione or titolo).strip()}
 
 
-def invia_evento_relay(relay: str, evento: dict) -> bool:
+def invia_evento_relay(relay: str, evento: dict, esterno: bool = False) -> bool:
     """Consegna un evento firmato a UN relay e aspetta il suo "OK".
     E' SINCRONA (websocket-client): va chiamata in asyncio.to_thread.
     Per i relay di casa passa dal loro postino (LA POSTA DEI RELAY): una
     connessione riusata invece di una nuova a ogni evento.
     Sull'istanza di prova, verso un relay che non e' di casa, non parte
-    niente (`fuori_dal_recinto`): prima del postino e prima della rete."""
+    niente (`fuori_dal_recinto`): prima del postino e prima della rete.
+    `esterno` (20 ott 2026, cantiere relay-risolti): il relay l'ha SCRITTO
+    UN UTENTE (il suo 10050 o 10002). Allora non c'e' postino e la
+    connessione si apre su un indirizzo gia' risolto e controllato
+    (`_presa_esterna`): un nome che porta a casa nostra non si raggiunge."""
     if fuori_dal_recinto(relay, "scrittura"):
         return False
+    if esterno:
+        presa = None
+        try:
+            presa = _presa_esterna(relay)
+            if presa is None:
+                return False
+            ws = create_connection(relay, timeout=5, socket=presa)
+        except Exception:
+            if presa is not None:
+                presa.close()
+            return False
+        return _consegna_ws(ws, relay, evento)
     posta = _posta_per(relay)
     if posta is not None:
         a = posta.pubblica(evento)
@@ -66445,6 +66461,15 @@ def invia_evento_relay(relay: str, evento: dict) -> bool:
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
+    except Exception:
+        return False              # relay muto o irraggiungibile: pazienza
+    return _consegna_ws(ws, relay, evento)
+
+
+def _consegna_ws(ws, relay: str, evento: dict) -> bool:
+    """La consegna su una websocket gia' aperta: l'EVENT, l'attesa
+    dell'OK, la chiusura (nello stesso thread che l'ha aperta)."""
+    try:
         ws.send(json.dumps(["EVENT", evento]))
         inizio = time.time()
         while time.time() - inizio < 6:
@@ -66461,7 +66486,14 @@ def invia_evento_relay(relay: str, evento: dict) -> bool:
                 return preso
         ws.close()
     except Exception:
-        pass                  # relay muto o irraggiungibile: pazienza
+        # relay muto o irraggiungibile: pazienza — ma la presa si chiude
+        # QUI, nel thread che l'ha aperta, e non al raccoglitore di chissa'
+        # quale thread (CLAUDE.md, «mai chiudere un socket da un thread che
+        # non e' il suo»)
+        try:
+            ws.close()
+        except Exception:
+            pass
     return False
 
 
@@ -67042,7 +67074,9 @@ DM_RELAY_CACHE_IGNOTO_S = 300
 # · MAI un indirizzo IP che non sia «globale»: loopback, 10/8,
 #   172.16/12, 192.168/16, 169.254/16 (link-local), fc00::/7, fe80::/10,
 #   e con loro le altre riservate (0.0.0.0, la CGNAT 100.64/10, ...);
-# · MAI un nome locale: `localhost`, `*.localhost`, `*.local` (mDNS);
+# · MAI un nome locale: `localhost`, `*.localhost`, `*.local` (mDNS), e
+#   (stesso giorno, cantiere relay-risolti) `*.lan`, `*.internal`,
+#   `*.home.arpa`, i nomi delle reti di casa e dei datacenter;
 # · MAI un .onion: dal VPS i DM partono DIRETTI — `invia_evento_relay`
 #   e il postino aprono la websocket senza proxy — quindi un onion non
 #   si raggiunge (Tor sul VPS serve solo al sito .onion in ENTRATA). Il
@@ -67050,10 +67084,25 @@ DM_RELAY_CACHE_IGNOTO_S = 300
 # · MAI un nome che non finisce con un dominio di lettere: `2130706433`
 #   o `0x7f.1` sono 127.0.0.1 scritti in un altro modo, e un nome senza
 #   punto si risolve coi domini di ricerca della macchina.
-# Senza risolvere niente (un DNS e' gia' una domanda fatta al mondo): un
-# nome pubblico che punta a un indirizzo privato passa, ed e' un limite
-# scritto nel verbale.
+# Il giudice qui sotto NON risolve nomi (e' puro: lo chiamano le liste);
+# il nome si risolve AL MOMENTO DI BUSSARE, in `_presa_esterna` (cantiere
+# relay-risolti, decisione di Andrea): e' li' che un nome pubblico che
+# punta a un indirizzo privato viene fermato.
 _FORMA_TLD = re.compile(r"(?:xn--[a-z0-9-]+|[a-z]{2,63})")
+_NOMI_LOCALI = (".localhost", ".local", ".onion", ".lan", ".internal",
+                ".home.arpa")
+
+
+def ip_esterno(testo) -> bool:
+    """PURA: questo indirizzo IP e' di internet? Solo un IP «globale»
+    (l'IPv4 dentro un IPv6 si guarda per quel che e'; lo scope id di un
+    link-local non lo salva). Non un IP, o non globale: no."""
+    try:
+        ip = ipaddress.ip_address(str(testo or "").split("%", 1)[0])
+    except ValueError:
+        return False
+    mappato = getattr(ip, "ipv4_mapped", None)
+    return bool((mappato or ip).is_global)
 
 
 def relay_esterno(relay) -> bool:
@@ -67070,13 +67119,11 @@ def relay_esterno(relay) -> bool:
     if not host:
         return False
     try:
-        ip = ipaddress.ip_address(host.split("%", 1)[0])
+        ipaddress.ip_address(host.split("%", 1)[0])
+        return ip_esterno(host)
     except ValueError:
-        ip = None
-    if ip is not None:
-        mappato = getattr(ip, "ipv4_mapped", None)
-        return bool((mappato or ip).is_global)
-    if host == "localhost" or host.endswith((".localhost", ".local", ".onion")):
+        pass
+    if ("." + host).endswith(_NOMI_LOCALI):
         return False
     if "." not in host:
         return False
@@ -67098,13 +67145,90 @@ def relay_suoi_dm(lista) -> list:
     return fuori[:4]
 
 
+# IL NOME SI RISOLVE AL MOMENTO DI BUSSARE (20 ott 2026, cantiere
+# relay-risolti, decisione di Andrea). `relay_esterno` guarda il NOME, e
+# un nome pubblico puo' puntare a 127.0.0.1 o a una rete privata. Quindi,
+# per i soli relay scritti da un utente, quando il server ci scrive:
+# 1) risolve il nome UNA volta (`_risolvi_relay`), e se anche UNO solo
+#    degli indirizzi risolti non e' di internet (`ip_esterno`) il relay
+#    vale irraggiungibile — tutto o niente, che un nome con un indirizzo
+#    buono e uno di casa e' gia' una porta verso casa;
+# 2) si connette a QUEGLI indirizzi, gia' controllati, e mai piu' al nome:
+#    una seconda risoluzione potrebbe dare un'altra risposta (il
+#    «rebinding» del DNS: buono al controllo, 127.0.0.1 alla connessione);
+# 3) il nome resta per il TLS (SNI: il relay sa quale certificato dare) e
+#    per l'intestazione Host della websocket (la mette la libreria
+#    dall'indirizzo, che non cambia).
+# Una risoluzione che fallisce, o che non da' niente: irraggiungibile.
+# Il certificato si tratta come per gli altri relay del server
+# (`cert_reqs: CERT_NONE`, la regola di sempre di `invia_evento_relay`):
+# qui cambia DOVE ci si connette, non come.
+# I nostri relay (dal config) non passano di qui: escono come sempre.
+def _risolvi_relay(host: str, porta: int) -> list:
+    """La risoluzione del nome, in un posto solo (le prove la sostituiscono
+    con una di cartone: la gabbia dei collaudi non ha DNS)."""
+    return socket.getaddrinfo(host, porta, type=socket.SOCK_STREAM)
+
+
+def indirizzi_esterni(relay) -> list:
+    """Gli indirizzi a cui bussare per un relay scritto da un utente, gia'
+    controllati: `[(famiglia, indirizzo), ...]`, o [] = irraggiungibile
+    (non passa `relay_esterno`, la risoluzione fallisce o non da' niente,
+    o anche UNO degli indirizzi risolti non e' di internet)."""
+    if not relay_esterno(relay):
+        return []
+    try:
+        u = urlparse(str(relay).strip())
+        host, porta = u.hostname, u.port or 443
+    except ValueError:
+        return []
+    try:
+        risolti = _risolvi_relay(host, porta)
+    except Exception:
+        return []
+    fuori = []
+    for voce in risolti or []:
+        famiglia, indirizzo = voce[0], voce[4]
+        if famiglia not in (socket.AF_INET, socket.AF_INET6) \
+                or not ip_esterno(indirizzo[0]):
+            return []
+        if (famiglia, indirizzo) not in fuori:
+            fuori.append((famiglia, indirizzo))
+    return fuori
+
+
+def _presa_esterna(relay, tetto: float = 5):
+    """La presa TLS verso un relay scritto da un utente, aperta su un
+    indirizzo GIA' controllato (`indirizzi_esterni`) e col nome per lo
+    SNI; None = irraggiungibile. SINCRONA: gira nel thread di chi la usa,
+    che e' anche quello che la chiude."""
+    indirizzi = indirizzi_esterni(relay)
+    if not indirizzi:
+        return None
+    host = urlparse(str(relay).strip()).hostname
+    contesto = ssl.create_default_context()
+    contesto.check_hostname = False
+    contesto.verify_mode = ssl.CERT_NONE
+    for famiglia, indirizzo in indirizzi:
+        grezza = socket.socket(famiglia, socket.SOCK_STREAM)
+        grezza.settimeout(tetto)
+        try:
+            grezza.connect(indirizzo)
+            return contesto.wrap_socket(grezza, server_hostname=host)
+        except Exception:
+            grezza.close()
+    return None
+
+
 def relay_riserva_dm(lettura, nostri) -> list:
     """PURA: i relay dove consegnare a chi NON pubblica un 10050 — i
-    primi quattro di lettura del suo 10002 (quelli di `relay_esterno`),
-    poi i primi quattro di `nostri`, senza doppioni (la barra finale non
-    fa un relay diverso), al piu' DM_RISERVA_MAX_RELAY."""
+    primi quattro BUONI di lettura del suo 10002 (prima il filtro di
+    `relay_esterno`, poi i quattro: la regola del 10050, `relay_suoi_dm`,
+    dal cantiere relay-risolti), poi i primi quattro di `nostri`, senza
+    doppioni (la barra finale non fa un relay diverso), al piu'
+    DM_RISERVA_MAX_RELAY."""
     fuori, visti = [], set()
-    suoi = [(r, True) for r in list(lettura or [])[:4]]
+    suoi = [(r, True) for r in relay_suoi_dm(lettura)]
     for r, suo in suoi + [(r, False) for r in list(nostri or [])[:4]]:
         r = str(r or "").strip()
         chiave = r.lower().rstrip("/")
@@ -67196,14 +67320,17 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
             print(f"💌 [dm nostr simulato per {dest_hex[:16]}…] {testo}")
             return True
         relays, stato = await relay_dm_dove(dest_hex)
+        # (cantiere relay-risolti) i relay scritti da lui escono col nome
+        # risolto e controllato; i nostri, dal config, come sempre
+        nostri = {str(r).strip() for r in RELAYS_VERIFICA}
         esiti = await asyncio.gather(*[
-            asyncio.to_thread(invia_evento_relay, r, pacco)
+            asyncio.to_thread(invia_evento_relay, r, pacco, r not in nostri)
             for r in relays])
         vecchi = []
         if stato != "si" and DM_NIP04_RISERVA and AesDM is not None:
             vecchio = impacchetta_dm_nip04(dest_hex, testo)
             vecchi = await asyncio.gather(*[
-                asyncio.to_thread(invia_evento_relay, r, vecchio)
+                asyncio.to_thread(invia_evento_relay, r, vecchio, r not in nostri)
                 for r in relays])
         if stato != "si":
             print(f"📭 DM Nostr a {dest_hex[:16]}…: "

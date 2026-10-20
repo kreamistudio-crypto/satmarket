@@ -33734,6 +33734,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_controlla_relay_dm` vale `no`. Il 10002 resta «i primi quattro
   scritti, poi il filtro» (dentro `relay_riserva_dm`). `relay_di_casa`,
   il giudice delle letture in collaudo e del recinto, non cambia.
+  (cantiere relay-risolti, stesso giorno) Il 10002 ora fa come il 10050:
+  `relay_riserva_dm` prende i suoi da `relay_suoi_dm` (prima il filtro,
+  poi i quattro). `_NOMI_LOCALI` aggiunge `.lan`, `.internal`,
+  `.home.arpa`; il giudice degli IP è `ip_esterno`, puro.
+  5) IL NOME SI RISOLVE AL MOMENTO DI BUSSARE (cantiere relay-risolti):
+  `manda_dm_nostr` chiama `invia_evento_relay(r, evento, esterno)` con
+  `esterno = r not in RELAYS_VERIFICA`. Esterno: niente postino;
+  `_presa_esterna` → `indirizzi_esterni` risolve il nome UNA volta
+  (`_risolvi_relay`, `socket.getaddrinfo`; le prove la sostituiscono) e
+  rende [] se anche un solo indirizzo non passa `ip_esterno`, se la
+  risoluzione fallisce o è vuota; poi apre TCP all'indirizzo controllato
+  (il successivo se rifiuta) e lo avvolge in TLS con `server_hostname` =
+  il nome (SNI), certificato come gli altri relay (`CERT_NONE`). La
+  websocket nasce con `create_connection(relay, timeout=5, socket=presa)`:
+  l'indirizzo col nome resta per l'intestazione Host, e la libreria con
+  `socket=` non risolve e non riapre niente. La consegna (EVENT, OK,
+  chiusura nello stesso thread) è `_consegna_ws`, comune alle due strade.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —

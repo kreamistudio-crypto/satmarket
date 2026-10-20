@@ -70514,3 +70514,75 @@ COSA RESTA.
   arrivati. Da guardare se capita (si potrebbe cercare la spesa del
   lockup sulla rete).
 - Suite e collaudi: nel messaggio del commit.
+## Il nome dei relay dell'utente si risolve prima di bussare, e il 10002 filtra prima di contare (20 ott 2026, cantiere relay-risolti, decisione di Andrea)
+
+**IL PERCHÉ.** Il filtro del cantiere filtro-10050 guardava il NOME del
+relay, e lo diceva come limite: un nome pubblico che punta a 127.0.0.1
+o a una rete privata passava. Andrea: si chiude ora. E sì alle due cose
+notate: «prima filtra, poi i primi quattro» anche sul 10002; `.lan`,
+`.internal`, `.home.arpa` fra i nomi scartati.
+
+**COSA SI È DECISO.**
+- AL MOMENTO DELLA CONNESSIONE, per i soli relay scritti dall'utente
+  (`esterno` = non nella nostra lista; i nostri escono come sempre, col
+  loro postino): il nome si risolve UNA volta; se anche UN indirizzo
+  risolto non è di internet (`ip_esterno`, lo stesso giudice degli IP di
+  `relay_esterno`) il relay vale irraggiungibile — tutto o niente, che un
+  nome con un indirizzo buono e uno di casa è già una porta verso casa;
+  una risoluzione che fallisce o non dà niente, idem.
+- CI SI CONNETTE ALL'IP GIÀ CONTROLLATO, mai di nuovo al nome: niente
+  rebinding del DNS (buono al controllo, 127.0.0.1 alla connessione). Il
+  nome resta per lo SNI del TLS e per l'Host della websocket. Con
+  `websocket-client` 1.9: `create_connection(..., socket=presa)` usa la
+  presa com'è e NON la avvolge in TLS (letto in `_http.connect`: con
+  `socket` torna subito), quindi la presa TLS la apre `_presa_esterna`,
+  con lo stesso trattamento del certificato degli altri relay
+  (`CERT_NONE`). Se il primo indirizzo rifiuta si prova il successivo,
+  già controllato anche lui.
+- LA CONSEGNA (EVENT, OK, chiusura) è diventata `_consegna_ws`, comune
+  alle due strade; nel suo ramo d'errore la websocket ora si CHIUDE, nel
+  thread che l'ha aperta (prima restava al raccoglitore: la regola di
+  CLAUDE.md sui socket chiusi da un altro thread).
+- IL 10002: `relay_riserva_dm` prende i suoi da `relay_suoi_dm`, prima il
+  filtro e poi i quattro, come il 10050.
+
+**PROVATO.** `prove_relay_risolti` (17), coi pezzi veri e DNS, presa e
+TLS di cartone: `ip_esterno`; un nome finto che risolve a 127.0.0.1
+scartato, uno che risolve a un IP pubblico che passa (con la sua porta),
+il misto buono+privato scartato, IPv6 pubblico sì e IPv4 privato dentro
+un IPv6 no, la risoluzione fallita o vuota, il nome scartato che non si
+chiede nemmeno al DNS; il REBINDING (il DNS di cartone risponde un IP
+pubblico la prima volta e 127.0.0.1 la seconda: una sola domanda, e la
+connessione va all'IP controllato), lo SNI col nome, il secondo
+indirizzo quando il primo rifiuta (e la presa rifiutata chiusa), nessuna
+presa verso casa; `invia_evento_relay(..., esterno=True)` che apre la
+websocket con `socket=` e senza postino, e non apre niente verso un nome
+che porta a casa; `manda_dm_nostr` che segna esterni i relay non nostri.
+`prove_filtro_10050` coi suffissi nuovi (e `plan.example`,
+`arpa.example`, `lan.example` che passano); `prove_avvisi_nostr_arrivano`
+con la regola nuova del 10002. `collaudo_avvisi_nostr_arrivano` (40):
+i relay dell'utente spediti «esterni» e i nostri no; sul server vero, col
+DNS di cartone, il nome che risolve a 127.0.0.1 non apre niente, quello
+pubblico passa, e la websocket nasce sulla presa già aperta.
+LA ROTTURA APPOSTA, sei mutazioni, tutte rosse: via il controllo sugli IP
+risolti (prove 5, collaudo 1), la connessione al nome invece che all'IP
+(2), niente SNI (3), la consegna che salta la risoluzione (prove 2,
+collaudo 2), il 10002 coi quattro prima del filtro (2), `.lan` ammesso (1).
+I banchi d'altri che eseguono `invia_evento_relay` (la posta dei relay, i
+relay di Barattolo) ora caricano anche `_consegna_ws`.
+
+**IL GIRO, mirato (regola di Andrea).** Sopra `6643c53`, col codice di questo commit e coi documenti scritti: le sezioni che
+nominano i pezzi toccati — `invia_evento_relay`, `create_connection`,
+`manda_dm_nostr` e i giudici: 23 — più quelle che leggono i documenti, 84
+in tutto: 5.269 passate, 0 fallite, 0 saltate; i collaudi che li usano
+(`letture_relay`, `x_risonanza`, `istanza_prova`, il mio) e quello della
+fusione: 5 verdi.
+Poi develop è corso di tre (`626e97c` il pip del seguace, `d5f83f7` il
+collaudo sulla vm-2050 con la semina, `181856c` il ritiro senza la loro
+API): nessuno nomina i simboli di qui (controllato per nome; le mie
+sezioni e il mio collaudo compaiono solo come righe vicine negli elenchi).
+Rebase, conflitti solo di accodamento (la coda di questo file, la lista
+di `main()`), tenute tutte e due le parti. Sull'albero che va su develop:
+le mie sezioni, quelle che i loro commit toccano, quelle che leggono i
+documenti, il mio collaudo e quello della fusione — i numeri nel rapporto
+ad Andrea.
