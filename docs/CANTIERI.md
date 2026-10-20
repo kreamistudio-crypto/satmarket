@@ -69959,3 +69959,59 @@ Lavoro su `develop`, mai su main.
   Si butta e si riprende.
 - **La tappa ③**, il foglio di pagamento: lì `ordine_id` smette di
   essere vuoto e le porte di prova lasciano il posto all'ordine vero.
+
+## La percentuale senza segno su «I miei scambi»: «20% più conveniente per te» (20 ott 2026, cantiere percento-senza-segno, decisione di Andrea)
+
+**COSA.** Sulla card di «I miei scambi» la riga del premio diceva
+«+20% più conveniente per te» / «−5% meno conveniente per te»: il
+numero lo scriveva `premioTestoP2P`, col segno del PREMIO, e subito
+dopo le parole dicevano l'EFFETTO per chi legge. Due versi in una
+riga, e non sempre d'accordo: su un mio ordine di vendita un «+»
+stava accanto a «più conveniente», su uno d'acquisto lo stesso «+»
+accanto a «meno». Andrea: quando dopo c'è già la parola che dice il
+verso, il segno se ne va. Ora `premioMioP2P` scrive il valore
+assoluto, `Math.abs(Math.round(p)) + '%'`, come il badge del libro:
+«20% più conveniente per te», «5% meno conveniente per te». La tinta
+non cambia (sempre `affareP2P`), lo zero resta «al prezzo di
+mercato», nessun calcolo toccato. La funzione non guarda chi legge:
+il testo è lo stesso per chi compra, per chi vende e per il
+moderatore.
+
+**LA RICOGNIZIONE, prima del codice (approvata da Andrea).** Segno
+più parola usciva SOLO lì. Gli altri posti con la stessa frase erano
+già senza segno: il badge del libro (`badgePremioP2P`), la riga del
+conto (`etichettaPremioP2P`, «Premio che hai richiesto 4%»), i testi
+del bot (`server.py`, le due funzioni della convenienza). RESTANO COL
+SEGNO, per decisione, i posti dove il segno è l'UNICA cosa che dice il
+verso: i capi del cursore del filtro (`capiDoppioP2P`, «Sconto: −20% ·
+Premio: +20%» — «Sconto» e «Premio» nominano il capo, non il verso:
+un intervallo da +2 a +5 si legge «Sconto: +2%»), il valore mentre si
+pubblica e quello di Barattozon (anche nel testo copiato, «Premio:
++5%»), la riga dei due numeri a sats fissi (`rigaConvenienzaFissaP2P`,
+due numeri da confrontare sulla stessa scala). Fuori tema e intatti:
+il paracadute «(−5,4%)» e la modifica di massa «prezzo +10 %».
+
+**COSA È STATO PROVATO.**
+- `prove.py`, emendate col loro perché: `prove_p2p_card_scambio` (il
+  numero non passa più da `premioTestoP2P`; i quattro casi compro/vendo
+  sopra/sotto con «4% più/meno conveniente per te» e la tinta giusta;
+  una prova nuova che nessun «+4%»/«−4%» compaia; il banco dei «segni
+  con tutt'e due le tinte» ora legge il segno dal PREMIO, perché la
+  card non lo scrive più, e l'invariante che il colore non segue il
+  segno resta sorvegliato; il prezzo fisso «140%», Barattozon «22%»,
+  «5%», «10%» preso e chiuso), `prove_premio_barattozon`,
+  `prove_convenienza_vera`, `prove_barattozon_mercato`.
+- GIRO DAL VIVO in Chromium (Playwright, densità 3, server di
+  collaudo su una copia dell'albero, relay morto `ws://127.0.0.1:9`,
+  porta 8163), 360 px chiaro e scuro, Compratore 111 con cinque scambi
+  seminati nel browser: «al prezzo di mercato»; «5% meno conveniente
+  per te» rosso (vendo −5); «20% più conveniente per te» verde (compro
+  −20); «4% più conveniente per te» verde (vendo +4); «4% meno
+  conveniente per te» rosso (compro +4). Nessun segno, nessuno
+  scorrimento orizzontale (`scrollWidth` 360), nessun errore JS.
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA DA GUARDARE.** Niente di nuovo: se un domani il segno
+dovesse sparire anche dai capi del cursore o dalla riga dei due
+numeri, lì servirebbe una parola al suo posto (decisione di Andrea,
+oggi no).

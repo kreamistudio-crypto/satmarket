@@ -84743,17 +84743,18 @@ def prove_p2p_card_scambio():
     accanto, lo stato in un riquadro contornato, il metodo nella
     scatola piena delle card del libro.
 
-    ⚠️ QUI IL PREMIO NON PORTA UN GIUDIZIO, ed e' la differenza che
-    questo banco sorveglia: chi legge e' l'AUTORE dell'ordine e il
-    premio se l'e' scelto, quindi si dice il FATTO col suo segno
-    («+4%», «−4%») e non «piu'/meno conveniente» — quelle parole
-    restano al libro, dove chi legge sta dall'altra parte e deve
-    decidere in fretta.
+    ⚠️ IL PREMIO PORTA IL GIUDIZIO «PER TE», SENZA SEGNO: la prima
+    stesura diceva il FATTO col suo segno («+4%»), poi Andrea l'ha
+    voluta col verso a parole, «4% meno conveniente per te», e dal 20
+    ott 2026 (cantiere «percento-senza-segno») il segno davanti alle
+    parole e' tolto — diceva il verso del PREMIO accanto a quello
+    dell'EFFETTO, e su un ordine di vendita un «+» stava accanto a
+    «più conveniente».
     ⚠️ MA LA TINTA RESTA IL GIUDIZIO, e il caso che lo prova e' lo
-    STESSO SEGNO CON TUTT'E DUE I COLORI: un «+4%» e' rosso sul
+    STESSO PREMIO CON TUTT'E DUE I COLORI: un premio di +4 e' rosso sul
     proprio ordine di acquisto (si ricevono meno sats) e verde su
     quello di vendita (se ne consegnano meno). Se un domani il colore
-    si mettesse a seguire il segno, quella riga diventa rossa.
+    si mettesse a seguire il segno del premio, quella riga diventa rossa.
 
     E il banco gira le funzioni VERE: la sola cosa di cartone e' il
     formato delle cifre."""
@@ -84868,12 +84869,15 @@ def prove_p2p_card_scambio():
           and "(a ? 'più' : 'meno')" in _mio)
     prova("...e la frase del libro resta la sua", 1,
           mini.count("' conveniente</span>'"))
-    # IL SEGNO LO SCRIVE `premioTestoP2P`, che gia' lo fa per i capi
-    # del cursore del filtro: il «−» tipografico sta in un posto solo.
+    # IL NUMERO E' SENZA SEGNO (20 ott 2026, «percento-senza-segno»):
+    # fino ad allora lo scriveva `premioTestoP2P`, quello dei capi del
+    # cursore, e davanti a «più/meno conveniente» il segno diceva il
+    # verso due volte. Ora il valore assoluto, come il badge del libro.
     # (27 set 2026) su `p`, che a sats fissi e' la convenienza vera —
     # adesso nel libro, ferma alla presa — e per gli altri `o.premium`
-    prova("il segno del premio viene da premioTestoP2P", True,
-          "premioTestoP2P(p)" in _mio
+    prova("il numero e' senza segno, e non passa da premioTestoP2P", True,
+          "premioTestoP2P(" not in _mio
+          and "Math.abs(Math.round(p)) + '%</b> '" in _mio
           and "const p = o.sats > 0 ? convenienzaFissaP2P(o, metroFissoP2P(o)) : (o.premium || 0);" in _mio)
     # ⚠️ LA CARD E IL CAPPELLO NON CONDIVIDONO PIU' NIENTE DI TESTO
     # (set 2026, due ritocchi di Andrea in fila). Il primo aveva
@@ -85138,8 +85142,8 @@ out.bzChiuso = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, met
 out.bzSenzaCambio = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ, satsMiei: 29117}));
 out.compro = rigaScambioP2P(riga({}));
 out.vendo = rigaScambioP2P(riga({lato: 'vendo'}));
-/* IL SEGNO E' UN FATTO, LA TINTA UN GIUDIZIO: gli stessi quattro casi
-   del libro, ma senza le parole del verso */
+/* LA TINTA E' IL GIUDIZIO, e il numero e' senza segno (20 ott 2026):
+   gli stessi quattro casi del libro, con «per te» */
 out.comproSopra = rigaScambioP2P(riga({premium: 4}));
 out.vendoSopra = rigaScambioP2P(riga({lato: 'vendo', premium: 4}));
 out.comproSotto = rigaScambioP2P(riga({premium: -4}));
@@ -85286,7 +85290,7 @@ const verdi = [], rossi = [];
 for (const lato of ['compro', 'vendo'])
   for (const pm of [-9, -4, -1, 1, 4, 9]) {
     const h = rigaScambioP2P(riga({lato: lato, premium: pm}));
-    const segno = h.indexOf('>+') >= 0 ? '+' : '-';
+    const segno = pm > 0 ? '+' : '-';   /* il segno del PREMIO: la card non lo scrive piu' */
     (h.indexOf('p2p-affare') >= 0 ? verdi : rossi).push(segno);
   }
 out.segniVerdi = verdi.filter((s, i, a) => a.indexOf(s) === i).sort();
@@ -85405,19 +85409,24 @@ console.log(JSON.stringify(out));
     prova("l'intervallo porta i due capi in euro, a parole", [True, False],
           ["da\u00a050,00 a\u00a0100,00 €" in o["range"], "–" in o["range"]])
 
-    # ⚠️ IL PREMIO E' SECCO: il segno e basta. Il giudizio lo dice la
-    # tinta, e il rovesciamento e' lo stesso del libro — un +4% pesa su
-    # chi COMPRA sats (ne riceve meno) e alleggerisce chi li VENDE.
+    # ⚠️ IL NUMERO E' SENZA SEGNO (20 ott 2026, «percento-senza-segno»):
+    # il verso lo dicono le parole e la tinta, e il rovesciamento e' lo
+    # stesso del libro — un premio di +4 pesa su chi COMPRA sats (ne
+    # riceve meno) e alleggerisce chi li VENDE.
     prova("la riga propria si traduce nel vocabolario del libro",
           ["sell", "buy"], o["tradotto"])
-    prova("col premio sopra il segno e' +, la tinta cambia col lato",
+    prova("col premio sopra: 4% senza segno, verso e tinta col lato",
           [True, True],
-          ['<b class="p2p-avviso">+4%</b>' in o["comproSopra"],
-           '<b class="p2p-affare">+4%</b>' in o["vendoSopra"]])
-    prova("col premio sotto il segno e' −, e le tinte si rovesciano",
+          ['<b class="p2p-avviso">4%</b> meno conveniente per te' in o["comproSopra"],
+           '<b class="p2p-affare">4%</b> più conveniente per te' in o["vendoSopra"]])
+    prova("col premio sotto: 4% senza segno, e verso e tinte si rovesciano",
           [True, True],
-          ['<b class="p2p-affare">−4%</b>' in o["comproSotto"],
-           '<b class="p2p-avviso">−4%</b>' in o["vendoSotto"]])
+          ['<b class="p2p-affare">4%</b> più conveniente per te' in o["comproSotto"],
+           '<b class="p2p-avviso">4%</b> meno conveniente per te' in o["vendoSotto"]])
+    prova("nessun + o − davanti alla percentuale della card mia",
+          [False] * 8,
+          [s in o[k] for k in ("comproSopra", "vendoSopra", "comproSotto", "vendoSotto")
+           for s in ('">+4%', '">−4%')])
     # ⚠️ LA PROVA CHE IL COLORE NON SEGUE IL SEGNO: tutt'e due i segni
     # compaiono in verde e tutt'e due in rosso. Se un domani la tinta
     # si mettesse a seguire il segno — il difetto piu' facile da
@@ -85437,20 +85446,21 @@ console.log(JSON.stringify(out));
     # non lo guarda». Ma il vantaggio di chi prende si muove col bitcoin, e
     # Andrea l'ha chiesto anche qui: 12.000 sats per 5 € a 0.001 sono il
     # 140% sopra il mercato — senza tetto
-    prova("a prezzo fisso la convenienza vera, col segno, «per te» e senza tetto", True,
-          '<b class="p2p-affare">−140%</b> più conveniente per te' in o["fisso"])
+    prova("a prezzo fisso la convenienza vera, senza segno, «per te» e senza tetto", True,
+          '<b class="p2p-affare">140%</b> più conveniente per te' in o["fisso"])
     # --- BARATTOZON NEI MIEI SCAMBI (27 set 2026): nel libro la
     # convenienza di ADESSO, dopo la presa quella di quel momento, ferma.
-    # Sul mio ordine di vendita un «−» e' uno sconto che PAGO io
+    # Sul mio ordine di vendita un −22 e' uno sconto che PAGO io; la card
+    # lo dice a parole, senza segno (20 ott 2026)
     prova("Barattozon nel libro: la convenienza di adesso, −22 (non il −10 scelto), +5 e zero",
           [True, True, True],
-          ['<b class="p2p-avviso">−22%</b> meno conveniente per te' in o["bzLibro"],
-           '<b class="p2p-affare">+5%</b> più conveniente per te' in o["bzPiuCinque"],
+          ['<b class="p2p-avviso">22%</b> meno conveniente per te' in o["bzLibro"],
+           '<b class="p2p-affare">5%</b> più conveniente per te' in o["bzPiuCinque"],
            '<span class="p2p-badge">al prezzo di mercato</span>' in o["bzZero"]])
     prova("...preso: quella della presa (−10), anche a scambio chiuso; senza il suo cambio tace",
           [True, True, False],
-          ['<b class="p2p-avviso">−10%</b> meno conveniente per te' in o["bzPreso"],
-           '−10%</b>' in o["bzChiuso"], "p2p-badge" in o["bzSenzaCambio"]])
+          ['<b class="p2p-avviso">10%</b> meno conveniente per te' in o["bzPreso"],
+           '>10%</b> meno conveniente per te' in o["bzChiuso"], "p2p-badge" in o["bzSenzaCambio"]])
 
     # IL METODO: l'elenco finche' nessuno ha scelto, la scelta quando
     # c'e'. E fail-closed — un metodo fuori dall'elenco non e' una
@@ -88792,8 +88802,8 @@ process.stdout.write(JSON.stringify(out));
            '<span class="p2p-affarone super">⚡⚡ Super affare</span>', '',
            '<span class="p2p-affarone">⚡ Ottimo affare</span>'], o["affarone"])
     prova("I MIEI SCAMBI: sul mio ordine di vendita lo sconto lo pago io, «per te»",
-          ['<span class="p2p-badge"><b class="p2p-avviso">−10%</b> meno conveniente per te</span>',
-           '<span class="p2p-badge"><b class="p2p-avviso">−5%</b> meno conveniente per te</span>',
+          ['<span class="p2p-badge"><b class="p2p-avviso">10%</b> meno conveniente per te</span>',
+           '<span class="p2p-badge"><b class="p2p-avviso">5%</b> meno conveniente per te</span>',
            '<span class="p2p-badge">al prezzo di mercato</span>'], o["miei"])
     # (27 set 2026) il premio SCELTO dal server lo legge il dettaglio
     # (`rigaConvenienzaFissaP2P`), non piu' la card
@@ -88805,7 +88815,7 @@ process.stdout.write(JSON.stringify(out));
            '<span class="p2p-badge">al prezzo di mercato</span>',
            '<span class="p2p-affarone super">⚡⚡ Super affare</span>',
            '<span class="p2p-affarone">⚡ Ottimo affare</span>', '',
-           '<span class="p2p-badge"><b class="p2p-affare">+3%</b> più conveniente per te</span>'],
+           '<span class="p2p-badge"><b class="p2p-affare">3%</b> più conveniente per te</span>'],
           o["normali"])
 
 
@@ -89005,8 +89015,8 @@ process.stdout.write(JSON.stringify(out));
           [["", ""], ["5% più conveniente", ""]], o["muto"])
     prova("A CHI HA PUBBLICATO: adesso −20 «per te»; preso, quello della presa (zero) anche col BTC salito; "
           "preso senza il suo cambio niente; e `satsNetti` da solo non vuol dire preso",
-          ["−20% meno conveniente per te", "al prezzo di mercato", "",
-           "−20% meno conveniente per te"], o["miei"])
+          ["20% meno conveniente per te", "al prezzo di mercato", "",
+           "20% meno conveniente per te"], o["miei"])
     # (28 set 2026) «da chi vende»: il premio scelto dice chi l'ha scelto
     prova("LA RIGA DEI DUE NUMERI: Barattozon «Premio scelto · Al prezzo di adesso», dopo la presa «della presa»",
           ['<div class="ctrl-conv">Premio scelto: <b class="p2p-affare">−10%</b> · '
@@ -90030,7 +90040,7 @@ console.log(JSON.stringify(out));
     prova("LE CARD a mercato: il premio del filo, +3 a 0,0005, 0,0009 e 0,0003 — FERMO col bitcoin che si muove",
           [[3, 3, 3], ["3% meno conveniente"] * 3, True],
           [[r[0] for r in c], [re.sub(r"<[^>]+>", "", r[1]) for r in c],
-           all("+3%" in r[2] and "meno conveniente per te" in r[2] for r in c)])
+           all('">3%</b> meno conveniente per te' in r[2] for r in c)])
     prova("...e a sats fissi la convenienza di ADESSO, che si muove: 0,0005 → +3, 0,0009 → −75, 0,0003 → +42",
           [3, -75, 42], [r[3] for r in c])
     prova("la stima a mercato di un Barattozon sta sull'intero per eccesso (52000, 50440); gli altri metodi come prima (50940, 38800)",
