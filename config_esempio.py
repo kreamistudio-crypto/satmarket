@@ -887,11 +887,6 @@ P2P_MAX_EURO = 0
 # come a prezzo fisso. Lo giudica il foglio Pubblica (dalla busta delle
 # leve) e lo ripete la rotta del canale. Non dichiarata = 25; 0 = spento.
 BARATTOZON_MIN_EURO = 25
-# IL MINIMO DI UN PAYCODE BARATTOZON (30 set 2026): sotto questa cifra
-# in euro un ordine «Contanti al tabacchino» non si pubblica, a mercato
-# come a prezzo fisso. Lo giudica il foglio Pubblica (dalla busta delle
-# leve) e lo ripete la rotta del canale. Non dichiarata = 25; 0 = spento.
-BARATTOZON_MIN_EURO = 25
 # IL TETTO DEL CONTANTI DI PERSONA (30 set 2026, decisione di Andrea):
 # il massimo in euro di un ordine P2P col metodo «Contanti» — quello
 # dell'incontro a mano, NON «Contanti al tabacchino» di Barattozon, che
@@ -1304,8 +1299,9 @@ SWAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY_DEL_WALLET_SWAP"
 # Dove sta quel wallet: vuoto = lo stesso LNbits del nodo.
 SWAP_LNBITS_URL = ""
 # Il massimo di un singolo pagamento, in sats. Il limite vero e' la
-# liquidita' in entrata dei canali del nodo (/canali nel bot).
-SWAP_MAX_SATS = 2_000_000
+# liquidita' in entrata dei canali del nodo (/canali nel bot). (Non e'
+# SWAP_MAX_SATS: quello e' il tetto di uno swap dei venditori, piu' su.)
+SWAP_INDIRIZZO_MAX_SATS = 2_000_000
 
 # --- Import aperto da Nostr -------------------------------------------
 # Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque

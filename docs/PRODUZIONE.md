@@ -4435,7 +4435,9 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   in ARCHITETTURA, «L'INDIRIZZO DELLA QUOTA»). Dove SATS Routing manda a
   fine mese la quota di Barattolo sugli swap. Separato da zap@: wallet
   LNbits SUO («swap»), tetto per pagamento 2.000.000 sats
-  (`SWAP_MAX_SATS`), niente zap Nostr, e a ogni pagamento un avviso nel
+  (`SWAP_INDIRIZZO_MAX_SATS`; fino al 20 ott 2026 si chiamava
+  `SWAP_MAX_SATS`, nome che ora e' SOLO il tetto di uno swap dei
+  venditori), niente zap Nostr, e a ogni pagamento un avviso nel
   gruppo degli admin, stanza 📊 Riepiloghi: «🔄 Arrivati N sats su
   swap@barattolo.store, <giorno> alle <ora>». Nel codice nasce SPENTO:
   finché non lo si accende,
@@ -4456,7 +4458,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
      poi si aggiungono in fondo a `/srv/barattolo/config.py` due righe:
      `SWAP_LNBITS_INVOICE_KEY` uguale alla invoice key copiata (fra
      virgolette) e `SWAP_INDIRIZZO_ATTIVO = True`. Nient'altro: il
-     tetto di serie è 2.000.000 (`SWAP_MAX_SATS = …` solo per
+     tetto di serie è 2.000.000 (`SWAP_INDIRIZZO_MAX_SATS = …` solo per
      cambiarlo), l'indirizzo di LNbits è quello del nodo. La invoice
      key non si scrive mai in chat, su GitHub o in un log.
   3) IL RIAVVIO: `sudo systemctl restart barattolo`.

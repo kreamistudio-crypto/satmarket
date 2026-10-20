@@ -87860,10 +87860,15 @@ except ImportError:
 # Il massimo di UN pagamento. Il limite vero di un pagamento grosso e'
 # la liquidita' IN ENTRATA dei canali del nodo (`/canali`): un tetto piu'
 # alto di quella non fa arrivare niente di piu'.
+# (20 ott 2026) SI CHIAMA SWAP_INDIRIZZO_MAX_SATS, e non SWAP_MAX_SATS
+# come quando e' nato: quel nome l'ha preso anche il tetto di UNO swap dei
+# venditori (la tappa 2), e due import dello stesso nome si sovrascrivono
+# in silenzio — l'ultimo letto vinceva per tutt'e due. La sentinella
+# `prove_leve_mai_doppie` fa rossa la CI se ricapita.
 try:
-    from config import SWAP_MAX_SATS
+    from config import SWAP_INDIRIZZO_MAX_SATS
 except ImportError:
-    SWAP_MAX_SATS = 2_000_000
+    SWAP_INDIRIZZO_MAX_SATS = 2_000_000
 
 SWAP_NOME = "swap"
 SWAP_TESTO = "Quota di SATS Routing a Barattolo"
@@ -87903,7 +87908,7 @@ def swap_max_sats() -> int:
     """Il tetto di un pagamento, letto vivo; una riga storta vale il
     default, non zero."""
     try:
-        n = int(SWAP_MAX_SATS)
+        n = int(SWAP_INDIRIZZO_MAX_SATS)
     except (TypeError, ValueError):
         return SWAP_MAX_SATS_SERIE
     return n if n >= ZAP_MIN_SATS else SWAP_MAX_SATS_SERIE
@@ -88174,7 +88179,7 @@ def _swap_quota_leve() -> list:
                       if swap_stessa_chiave_degli_zap() else
                       "senza, la leva qui sopra vale spenta")),
         _leva("Importo massimo di un pagamento su swap@ (sats)",
-              "SWAP_MAX_SATS", swap_max_sats()),
+              "SWAP_INDIRIZZO_MAX_SATS", swap_max_sats()),
     ]
 
 

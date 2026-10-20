@@ -164,10 +164,10 @@ def main():
     prova("ogni altro nome resta un 404", [404, 404, 404],
           [c.get("/.well-known/lnurlp/" + n).status_code
            for n in ("Swap", "swap2", "quota")])
-    SRV.SWAP_MAX_SATS = 5_000_000
+    SRV.SWAP_INDIRIZZO_MAX_SATS = 5_000_000
     prova("il tetto e' una leva: il citofono la legge viva", 5_000_000_000,
           c.get(VIA).json().get("maxSendable"))
-    SRV.SWAP_MAX_SATS = 2_000_000
+    SRV.SWAP_INDIRIZZO_MAX_SATS = 2_000_000
 
     # ---- 3) la fattura: due milioni sul wallet «swap» -----------------
     print("\n[la fattura, sul wallet «swap»]")

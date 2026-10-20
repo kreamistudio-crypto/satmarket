@@ -68203,3 +68203,50 @@ per questo si girano anche qui. Firma della punta controllata
 **DA FARE (notati, non fatti).**
 - Riportare il DR secondo una delle due strade sopra, quando Alan e Andrea
   lo decidono.
+
+## Una leva, un posto: SWAP_INDIRIZZO_MAX_SATS, il doppione di BARATTOZON_MIN_EURO e la sentinella dei nomi doppi (20 ott 2026, cantiere leve-doppie, richiesta di Andrea)
+
+**IL GUAIO, ED È MIO.** Il controllo chiesto da Andrea sui nomi delle leve
+ha trovato che il tetto di swap@barattolo.store (2.000.000, cantiere
+swap-indirizzo, `2302060`) e il tetto di UNO swap dei venditori (50.000,
+tappa 2, `e1a84b0`) si chiamavano tutt'e due `SWAP_MAX_SATS`. Il server lo
+importava due volte (`server.py`, righe 1522 e 87864 di allora) e l'ultimo
+letto vinceva per entrambi: senza la riga nel config, 2.000.000 anche per
+lo swap — il tetto basso delle prove su mainnet non c'era. Il config
+d'esempio lo scriveva due volte (vinceva il 2.000.000), e il pannello delle
+leve aveva due righe con la stessa chiave. L'ha creato il MIO rebase del 19
+sera sopra `2302060`: git ha fuso «pulito» perché le righe non si
+toccavano, e io non ho cercato per nome i simboli arrivati. Nessuna prova
+se n'è accorta (la sentinella cercava un testo che c'era, il collaudo
+impostava la leva a mano, il censimento delle leve guarda un insieme).
+Oggi senza danni: `SWAP_ATTIVO` spenta, e il config del VPS non ha
+`SWAP_MAX_SATS` (letto da Andrea, 20 ott).
+
+**LA CURA** (decisione di Andrea): il tetto dell'indirizzo si chiama
+`SWAP_INDIRIZZO_MAX_SATS` (default 2.000.000), coi suoi fratelli
+`SWAP_INDIRIZZO_*`: server, config d'esempio, pannello, `prove_indirizzo_swap`,
+`collaudo_indirizzo_swap`, PRODUZIONE «L'INDIRIZZO DELLA QUOTA» e
+ARCHITETTURA. `SWAP_MAX_SATS` resta SOLO il tetto di uno swap, a 50.000.
+Nel config del VPS non c'è niente da cambiare.
+
+**IL SECONDO DOPPIONE**, trovato dalla sentinella fatta girare su tutto il
+config come voleva Andrea (e mi sono fermato a dirlo prima di toccare):
+`BARATTOZON_MIN_EURO` scritta due volte nel config d'esempio, commento e
+valore identici (= 25), dal 30 set (`2f98ecb`). Tolta la seconda copia;
+il server la importa una volta sola, niente cambia.
+
+**LA SENTINELLA** (`prove_leve_mai_doppie`): sull'ALBERO SINTATTICO, su
+tutto il config — nel server ogni `from config import` di un nome una
+volta sola (278 leve), nel config d'esempio ogni assegnazione in cima al
+modulo una volta sola (281). Con la sua controprova (un import doppio e
+un'assegnazione doppia costruiti lì devono vedersi) e i due nomi al loro
+posto. Tortura 2 su 2 su una copia: il doppio import rimesso nel server
+(2 rosse) e il doppione rimesso nel config d'esempio (1 rossa).
+
+**LA LEZIONE**, già scritta nelle note e qui pagata: dopo un rebase su un
+cantiere vicino si cercano per NOME i simboli arrivati — le leve nuove,
+non solo i conflitti che git mostra.
+
+**PROVATO.** `prove_leve_mai_doppie`, `prove_indirizzo_swap`,
+`prove_swap_preventivo`, `prove_swap_cella`, `prove_config_esempio`,
+`prove_leve`: 223 verdi. Suite e collaudi: nel messaggio del commit.

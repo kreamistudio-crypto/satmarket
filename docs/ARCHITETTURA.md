@@ -32650,7 +32650,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swap_citofono` PRIMA del controllo di `zap`; il callback è
   `GET /api/lnurl/swap` (`swap_fattura`). NIENTE NOSTR: il citofono non
   dichiara `allowsNostr` né `nostrPubkey`, e un parametro `nostr` si
-  rifiuta prima di coniare. Tetto `swap_max_sats()` (leva `SWAP_MAX_SATS`,
+  rifiuta prima di coniare. Tetto `swap_max_sats()` (leva
+  `SWAP_INDIRIZZO_MAX_SATS` dal 20 ott 2026, prima `SWAP_MAX_SATS`,
   2.000.000 di serie), commento a `ZAP_COMMENTO`.
   IL WALLET È SUO, «swap», di cui il server ha la SOLA invoice key
   (`SWAP_LNBITS_INVOICE_KEY`; `SWAP_LNBITS_URL` se traslocasse). Non è

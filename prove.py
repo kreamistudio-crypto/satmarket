@@ -116118,7 +116118,7 @@ def _banco_swap(extra=None):
     lo scanner dei segreti non prende."""
     amb = _banco_zap()
     amb.update({"SWAP_INDIRIZZO_ATTIVO": True, "SWAP_LNBITS_URL": "",
-                "SWAP_MAX_SATS": 2_000_000,
+                "SWAP_INDIRIZZO_MAX_SATS": 2_000_000,
                 "SWAP_LNBITS_INVOICE_KEY": "collaudo-usa-e-getta-swap"})
     src = _SORGENTE
     i = src.index('SWAP_NOME = "swap"')
@@ -116180,7 +116180,7 @@ def prove_indirizzo_swap():
           ["swap_wallet"]()[0])
     prova("il tetto: il numero del config, e 2.000.000 se e' storto o zero",
           [500, 2_000_000, 2_000_000, 2_000_000, 5_000_000],
-          [_banco_swap({"SWAP_MAX_SATS": v})["swap_max_sats"]()
+          [_banco_swap({"SWAP_INDIRIZZO_MAX_SATS": v})["swap_max_sats"]()
            for v in (500, "storto", 0, None, 5_000_000)])
     prova("...e il tetto degli zap resta il suo", 100_000, amb["zap_max_sats"]())
 
@@ -116325,10 +116325,10 @@ def prove_indirizzo_swap():
           "segnaposto, il tetto 2.000.000", True,
           "\nSWAP_INDIRIZZO_ATTIVO = False\n" in esempio
           and '\nSWAP_LNBITS_INVOICE_KEY = "INCOLLA_QUI' in esempio
-          and "\nSWAP_MAX_SATS = 2_000_000\n" in esempio)
+          and "\nSWAP_INDIRIZZO_MAX_SATS = 2_000_000\n" in esempio)
     prova("...e nel codice pure: senza la riga nel config vale False", True,
           "except ImportError:\n    SWAP_INDIRIZZO_ATTIVO = False\n" in blocco
-          and "except ImportError:\n    SWAP_MAX_SATS = 2_000_000\n" in blocco)
+          and "except ImportError:\n    SWAP_INDIRIZZO_MAX_SATS = 2_000_000\n" in blocco)
     prova("il collaudo gira in CI, nella gabbia", True,
           "collaudo_indirizzo_swap" in _collaudi_della_ci())
     arch = open(os.path.join("docs", "ARCHITETTURA.md"), encoding="utf-8").read()
@@ -173947,6 +173947,75 @@ console.log(JSON.stringify(out));
                          testi.count("titolo: 'Swap',\n       testo: 'Here")))
 
 
+def prove_leve_mai_doppie():
+    """UNA LEVA, UN POSTO (20 ott 2026, cantiere leve-doppie, richiesta di
+    Andrea). Il 19 ott il tetto di swap@barattolo.store (2.000.000) e il
+    tetto di UNO swap dei venditori (50.000) erano nati in due cantieri
+    con lo STESSO nome, `SWAP_MAX_SATS`: il rebase li ha fusi «puliti»,
+    il server importava il nome due volte e l'ultimo letto vinceva per
+    tutt'e due — senza config, 2.000.000 anche per lo swap. E il config
+    d'esempio aveva `BARATTOZON_MIN_EURO` scritta due volte dal 30 set:
+    stesso valore, ma chi avesse cambiato la prima avrebbe visto vincere
+    la seconda. Nessuna prova se n'era accorta: le sentinelle cercano un
+    testo, che c'era, e il censimento delle leve guarda un INSIEME di
+    nomi, dove un doppione non si vede.
+    Qui si contano i nomi sull'ALBERO SINTATTICO, su tutto il config e
+    non sulle sole leve dello swap: nel server ogni `from config import`
+    di un nome una volta sola, nel config d'esempio ogni assegnazione in
+    cima al modulo una volta sola."""
+    print("\n[una leva, un posto: nessun nome doppio]")
+    import ast as _ast
+    import collections as _col
+
+    def doppi_importati(sorgente):
+        conta = _col.Counter()
+        for n in _ast.walk(_ast.parse(sorgente)):
+            if isinstance(n, _ast.ImportFrom) and n.module == "config":
+                for a in n.names:
+                    conta[a.name] += 1
+        return sorted(k for k, v in conta.items() if v > 1), len(conta)
+
+    def doppi_assegnati(sorgente):
+        conta = _col.Counter()
+        for n in _ast.parse(sorgente).body:
+            bersagli = (n.targets if isinstance(n, _ast.Assign)
+                        else [n.target] if isinstance(n, _ast.AnnAssign)
+                        else [])
+            for t in bersagli:
+                if isinstance(t, _ast.Name):
+                    conta[t.id] += 1
+        return sorted(k for k, v in conta.items() if v > 1), len(conta)
+
+    srv = open("server.py", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    doppi_s, tutti_s = doppi_importati(srv)
+    doppi_e, tutti_e = doppi_assegnati(esempio)
+    prova("il server legge dal config piu' di duecento leve", True,
+          tutti_s > 200)
+    prova("...e nessuna leva si importa due volte nel server", [], doppi_s)
+    prova("il config d'esempio ne dichiara piu' di duecento", True,
+          tutti_e > 200)
+    prova("...e nessuna compare due volte", [], doppi_e)
+    # LA CONTROPROVA: i due giudici prendono davvero un doppione (un
+    # contatore che non conta passerebbe verde per sempre)
+    prova("controprova: un import doppio si vede", ["X_PROVA"],
+          doppi_importati("try:\n    from config import X_PROVA\n"
+                          "except ImportError:\n    X_PROVA = 1\n"
+                          "try:\n    from config import X_PROVA\n"
+                          "except ImportError:\n    X_PROVA = 2\n")[0])
+    prova("controprova: un'assegnazione doppia si vede", ["Y_PROVA"],
+          doppi_assegnati("Y_PROVA = 1\nZ = 2\nY_PROVA = 3\n")[0])
+    # I DUE NOMI DI IERI, ognuno al suo posto
+    prova("il tetto di swap@ si chiama SWAP_INDIRIZZO_MAX_SATS, a 2.000.000",
+          (True, True),
+          ("except ImportError:\n    SWAP_INDIRIZZO_MAX_SATS = 2_000_000\n"
+           in srv, "\nSWAP_INDIRIZZO_MAX_SATS = 2_000_000\n" in esempio))
+    prova("...e SWAP_MAX_SATS e' solo il tetto di uno swap, a 50.000",
+          (1, True),
+          (srv.count("from config import SWAP_MAX_SATS\n"),
+           "except ImportError:\n    SWAP_MAX_SATS = 50_000\n" in srv))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -174172,7 +174241,7 @@ def main():
               prove_pagina_scambio_ridisegno,
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
-              prove_servizi, prove_swap_cella, prove_swap_preventivo,
+              prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,
