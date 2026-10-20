@@ -151268,6 +151268,30 @@ def prove_indirizzo_ordine_onchain():
           ['_leva("Libreria del 2-di-3 (embit)", "pip install embit",'
            in src, '_leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",' in src,
            '"ONCHAIN_XPUB", ONCHAIN_XPUB' in src])
+    # il foglio (blocchi 4 e 5): dal telefono esce SOLO la xpub, e un
+    # indirizzo si mostra dopo che il telefono l'ha rifatto
+    accendi = pezzo_js(mini, "async function onchainAccendi(btn){", "\n}\n")
+    prova("«Accendi l'on-chain» manda la sola xpub, mai le parole",
+          [True, False, False],
+          ["body: JSON.stringify({xpub})}" in accendi,
+           "parole})" in accendi, "JSON.stringify({parole" in accendi])
+    rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
+    prova("ogni indirizzo del server passa da onchainVerificaRiga prima del "
+          "foglio", True,
+          rendi.index("onchainVerificaRiga(parole, onchainSrv, r)")
+          < rendi.index("box.innerHTML = onchainConSeme(parole, k, miaXpub, "
+                        "verifiche);"))
+    riga_js = pezzo_js(mini, "function onchainRigaIndirizzo(r, v){", "\n}\n")
+    prova("...e uno che non combacia esce PRIMA di scrivere l'indirizzo",
+          True, riga_js.index("if (!v.uguale) {")
+          < riga_js.index("esc(r.indirizzo)"))
+    prova("i blocchi del foglio: 4 accendi, 5 indirizzo vero, e i vecchi "
+          "rinumerati", [True] * 5,
+          ["<h4>4. Accendi l'on-chain</h4>" in mini,
+           "<h4>5. Un indirizzo vero, con un altro admin</h4>" in mini,
+           "<h4>6. Il backup, che si fa da sé</h4>" in mini,
+           "<h4>7. La prova del ripristino</h4>" in mini,
+           "<h4>8. Esporta</h4>" in mini])
     req = open(os.path.join(QUI, "requirements.txt"), encoding="utf-8").read()
     prova("embit sta in requirements.txt, con la versione inchiodata", True,
           bool(re.search(r"(?m)^embit==\d+\.\d+\.\d+$", req)))
