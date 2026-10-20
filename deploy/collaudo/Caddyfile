@@ -1,0 +1,13 @@
+# IL SITO DEL COLLAUDO (20 ott 2026, cantiere collaudo-privato; procedura:
+# docs/COLLAUDO.md). Si posa come /etc/caddy/Caddyfile sulla VM di
+# collaudo (vm-2050), MAI sul VPS. Caddy chiede da solo il certificato a
+# Let's Encrypt: il record A di collaudo.barattolo.store deve esistere
+# PRIMA (c'e' dal 19 ott). Nessuna password HTTP (nella Mini App va
+# male): chi non e' in lista lo ferma il server (PROVA_SOLO_IDS), e qui
+# si dice soltanto ai motori di non indicizzare niente — anche le foto e
+# gli script, che il meta noindex della pagina non copre.
+collaudo.barattolo.store {
+	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow, noarchive"
+	reverse_proxy 127.0.0.1:8090
+}

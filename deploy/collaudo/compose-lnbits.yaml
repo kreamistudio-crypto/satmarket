@@ -1,0 +1,23 @@
+# LNBITS DEL COLLAUDO, COL PORTAFOGLIO FINTO (20 ott 2026, cantiere
+# collaudo-privato; disegno: STUDIO-ISTANZA-PROVA §3). FakeWallet: le
+# invoice sono VERE nella forma (bolt11, hash, scadenza) ma si pagano
+# solo DENTRO questa istanza, da un secondo wallet del pannello; nessun
+# satoshi esiste. Lo stesso tag della cassaforte di produzione, PINNATO
+# (mai `latest`). Ascolta SOLO su 127.0.0.1:5001: il pannello si apre
+# dal tunnel ssh. Si accende con
+#   docker compose -f compose-lnbits.yaml -p collaudo-lnbits up -d
+# dalla cartella /srv/collaudo/lnbits (dove sta questo file, copiato).
+services:
+  lnbits:
+    image: lnbits/lnbits:v1.6.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5001:5000"
+    environment:
+      LNBITS_BACKEND_WALLET_CLASS: FakeWallet
+      LNBITS_DATA_FOLDER: /app/data
+      LNBITS_SITE_TITLE: "LNbits del collaudo (sats finti)"
+    volumes:
+      - lnbits-dati:/app/data
+volumes:
+  lnbits-dati:

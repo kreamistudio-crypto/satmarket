@@ -174596,6 +174596,174 @@ def prove_leve_mai_doppie():
            "except ImportError:\n    SWAP_MAX_SATS = 50_000\n" in srv))
 
 
+def prove_collaudo_segue_develop():
+    """IL COLLAUDO SEGUE DEVELOP (20 ott 2026, cantiere collaudo-privato,
+    decisione di Andrea; procedura: docs/COLLAUDO.md). I file che si
+    posano sulla VM di collaudo (deploy/collaudo/), le loro regole lette
+    sul testo, e il seguace `segui.sh` fatto GIRARE su un repo finto:
+    avanza, sta fermo in pausa, torna indietro se il nuovo non regge e
+    non lo riprova, segue un ramo scelto, accetta un develop rimesso
+    indietro dopo una promozione, rifiuta un nome storto, e non tocca i
+    file non tracciati (il config)."""
+    print("\n[il collaudo segue develop: i file della VM e il seguace]")
+    import shutil
+    import subprocess
+    import tempfile
+    cart = os.path.join(QUI, "deploy", "collaudo")
+    leggi = lambda f: open(os.path.join(cart, f), encoding="utf-8").read()
+    # le sole righe di codice di uno script o di una unit: via i commenti
+    codice_sh = lambda t: "\n".join(r for r in t.splitlines()
+                                    if not r.lstrip().startswith(("#", ";")))
+    attesi = ["Caddyfile", "barattolo-collaudo-segui.service",
+              "barattolo-collaudo-segui.timer", "barattolo-collaudo.service",
+              "collaudo.sh", "compose-lnbits.yaml", "segui.sh"]
+    prova("i file della VM ci sono tutti, e nient'altro", attesi, sorted(os.listdir(cart)))
+    tutti = {f: leggi(f) for f in attesi}
+    prova("in nessuno un relay, un esadecimale da chiave o un token", [],
+          [f for f, t in tutti.items()
+           if re.search(r"wss?://|\b[0-9a-f]{64}\b|[0-9]{8,12}:[A-Za-z0-9_-]{30,}", t)])
+    seg, com = tutti["segui.sh"], tutti["collaudo.sh"]
+    prova("il seguace non pusha mai, e il solo --force e' quello del checkout", [False, 2, 2],
+          ["push" in codice_sh(seg), codice_sh(seg).count("--force"),
+           codice_sh(seg).count("checkout -q --force --detach")])
+    prova("...segue develop di serie, o il ramo scritto, col nome controllato", True,
+          "RAMO=develop" in seg and '"$STATO/ramo"' in seg
+          and "^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$" in seg and "*..*" in seg)
+    prova("...e il token del bot non va mai sulla riga di comando (curl lo legge dallo stdin)",
+          True, "curl -s -m 10 -K -" in seg and "bot%s/sendMessage" in seg)
+    u = tutti["barattolo-collaudo.service"]
+    prova("il servizio: utente collaudo, solo loopback, mai root", True,
+          "User=collaudo" in u and "--host 127.0.0.1 --port 8090" in u
+          and "User=root" not in u and "NoNewPrivileges=true" in u)
+    prova("il seguace gira dalla COPIA in /usr/local/sbin, ogni minuto", True,
+          "ExecStart=/usr/local/sbin/collaudo-segui" in tutti["barattolo-collaudo-segui.service"]
+          and "OnUnitActiveSec=1min" in tutti["barattolo-collaudo-segui.timer"])
+    c = tutti["Caddyfile"]
+    prova("Caddy: il solo collaudo, noindex su tutto, e nessuna password HTTP", True,
+          "collaudo.barattolo.store {" in c and "reverse_proxy 127.0.0.1:8090" in c
+          and 'X-Robots-Tag "noindex, nofollow, noarchive"' in c
+          and "basicauth" not in codice_sh(c).lower() and "basic_auth" not in codice_sh(c).lower())
+    lb = tutti["compose-lnbits.yaml"]
+    prova("LNbits: portafoglio FINTO, tag pinnato, solo loopback", True,
+          "LNBITS_BACKEND_WALLET_CLASS: FakeWallet" in lb
+          and "image: lnbits/lnbits:v1.6.1" in lb and '"127.0.0.1:5001:5000"' in lb
+          and "latest" not in codice_sh(lb))
+    prova("il comando: azzera SPOSTA il database (non lo cancella) e tiene gli ultimi tre giri",
+          True, 'mv "$DIR/$f" "$DIR/azzerati/' in com and "AZZERATI_TENUTI=3" in com
+          and "semina_demo.py" in com and "rm -f \"$DIR/dati" not in com)
+    doc = open(os.path.join(QUI, "docs", "COLLAUDO.md"), encoding="utf-8").read()
+    prova("COLLAUDO.md dice il flusso, la deploy key senza scrittura, gli avanzi RGB, la strada A",
+          [True] * 7,
+          ["git push --force-with-lease origin origin/main:develop" in doc,
+           "senza «Allow write access»" in doc, "## 9. Gli avanzi di RGB" in doc,
+           "## 10. Passare alla strada A" in doc, "Mai una copia del database vero" in doc,
+           "MAI la chiave del moderatore" in doc, "sudo collaudo azzera" in doc])
+    prova("CLAUDE.md la nomina nella regola del perimetro, senza una riga in piu'", True,
+          "La VM di collaudo no: un gesto alla volta, col suo ok (`docs/COLLAUDO.md`)."
+          in open(os.path.join(QUI, "CLAUDE.md"), encoding="utf-8").read())
+
+    # --- il seguace che GIRA, su un repo finto ---------------------------
+    bash, git = shutil.which("bash"), shutil.which("git")
+    if not bash or not git:
+        salta("il seguace su un repo finto", "manca bash o git")
+        return
+
+    def posix(p):
+        if sys.platform != "win32":
+            return p
+        cyg = shutil.which("cygpath")
+        if cyg:
+            return subprocess.run([cyg, "-u", p], capture_output=True, text=True).stdout.strip()
+        p = p.replace("\\", "/")
+        return re.sub(r"^([A-Za-z]):", lambda m: "/" + m.group(1).lower(), p)
+
+    casa = tempfile.mkdtemp(prefix="collaudo-segue-")
+    env_git = dict(os.environ, GIT_AUTHOR_NAME="prova", GIT_AUTHOR_EMAIL="p@x",
+                   GIT_COMMITTER_NAME="prova", GIT_COMMITTER_EMAIL="p@x")
+
+    def g(cwd, *a):
+        # i commit del repo finto non si firmano (sul PC la firma e' accesa)
+        r = subprocess.run([git, "-c", "commit.gpgsign=false", *a], cwd=cwd,
+                           env=env_git, capture_output=True, text=True)
+        return r.stdout.strip()
+    try:
+        origine = os.path.join(casa, "origine.git")
+        lavoro = os.path.join(casa, "lavoro")
+        vm = os.path.join(casa, "vm")
+        stato = os.path.join(casa, "stato")
+        g(casa, "init", "-q", "--bare", origine)
+        g(casa, "clone", "-q", origine, lavoro)
+
+        def commit(nome, ramo="develop"):
+            with open(os.path.join(lavoro, "f.py"), "w", encoding="utf-8") as fh:
+                fh.write(f"X = '{nome}'\n")
+            g(lavoro, "add", "f.py")
+            g(lavoro, "commit", "-q", "-m", nome)
+            g(lavoro, "push", "-q", "origin", f"HEAD:refs/heads/{ramo}")
+            return g(lavoro, "rev-parse", "HEAD")
+        g(lavoro, "checkout", "-q", "-b", "develop")
+        A = commit("A")
+        g(casa, "clone", "-q", origine, vm)
+        g(vm, "checkout", "-q", "--detach", A)
+        with open(os.path.join(vm, "config.py"), "w", encoding="utf-8") as fh:
+            fh.write("SEGRETO = 'resto qui'\n")
+        sano = os.path.join(casa, "sano.txt")
+        open(sano, "w").write("ok")
+        script = os.path.join(casa, "segui.sh")
+        with open(script, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(seg.replace("\r\n", "\n"))
+
+        def url_file(p):
+            """Il curl di Git per Windows vuole file:///C:/..., quello di Linux file:///..."""
+            return "file:///" + p.replace("\\", "/").lstrip("/")
+
+        def segui(salute=True):
+            env = dict(env_git, COLLAUDO_DIR=posix(vm), COLLAUDO_STATO=posix(stato),
+                       COLLAUDO_COME="", COLLAUDO_RIAVVIA="true",
+                       COLLAUDO_PY=posix(sys.executable), COLLAUDO_ATTESA="2",
+                       COLLAUDO_SEGRETI=posix(os.path.join(casa, "nessuno")),
+                       COLLAUDO_SALUTE=url_file(sano if salute else os.path.join(casa, "no")))
+            r = subprocess.run([bash, posix(script)], env=env, capture_output=True,
+                               text=True, encoding="utf-8", errors="replace", timeout=120)
+            return r.returncode, g(vm, "rev-parse", "HEAD")
+        esiti = {}
+        esiti["pari"] = segui()
+        B = commit("B")
+        esiti["avanti"] = segui()
+        open(os.path.join(stato, "pausa"), "w").close()
+        C = commit("C")
+        esiti["pausa"] = segui()
+        os.remove(os.path.join(stato, "pausa"))
+        esiti["non_regge"] = segui(salute=False)
+        bocciato = open(os.path.join(stato, "bocciato")).read().strip()
+        esiti["non_riprova"] = segui()
+        g(lavoro, "checkout", "-q", "-b", "cantiere/x")
+        D = commit("D", ramo="cantiere/x")
+        with open(os.path.join(stato, "ramo"), "w") as fh:
+            fh.write("cantiere/x\n")
+        esiti["ramo"] = segui()
+        os.remove(os.path.join(stato, "ramo"))
+        g(lavoro, "push", "-q", "--force", "origin", f"{A}:refs/heads/develop")
+        esiti["indietro"] = segui()
+        with open(os.path.join(stato, "ramo"), "w") as fh:
+            fh.write("../storto\n")
+        esiti["storto"] = segui()
+        config_resta = open(os.path.join(vm, "config.py"), encoding="utf-8").read()
+        prova("in pari non fa niente", (0, A), esiti["pari"])
+        prova("develop avanza: il collaudo lo mette su", (0, B), esiti["avanti"])
+        prova("in pausa resta dov'e'", (0, B), esiti["pausa"])
+        prova("un commit che non regge: torna a quello di prima e lo timbra",
+              ((1, B), C), (esiti["non_regge"], bocciato))
+        prova("...e non lo riprova al giro dopo", (0, B), esiti["non_riprova"])
+        prova("segue il ramo scelto (collaudo ramo cantiere/x)", (0, D), esiti["ramo"])
+        prova("accetta develop rimesso indietro (dopo una promozione)", (0, A), esiti["indietro"])
+        prova("un nome di ramo storto: resta fermo e lo dice", (1, A), esiti["storto"])
+        prova("il config (non tracciato) resta dov'era dopo tutti i giri",
+              "SEGRETO = 'resto qui'\n", config_resta)
+    finally:
+        shutil.rmtree(casa, ignore_errors=True)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -174939,6 +175107,7 @@ def main():
               prove_modifica_massiva_foto,
               prove_istanza_prova,
               prove_miniature_leggere,
+              prove_collaudo_segue_develop,
               prove_config_esempio):
         try:
             f()

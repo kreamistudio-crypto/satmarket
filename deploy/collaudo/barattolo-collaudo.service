@@ -1,0 +1,29 @@
+; IL SERVIZIO DEL COLLAUDO (20 ott 2026, cantiere collaudo-privato;
+; procedura: docs/COLLAUDO.md). Sulla VM di collaudo (vm-2050), MAI sul
+; VPS di produzione. Gira da `collaudo`, mai da root, e ascolta solo sul
+; loopback: davanti c'e' Caddy (deploy/collaudo/Caddyfile).
+; Il config sta in /srv/collaudo/barattolo/config.py (root:collaudo 640,
+; scritto dalla sezione «L'istanza di prova» di config_esempio.py); il
+; database in dati/, le foto in foto/: tutto non tracciato, e il
+; seguace (segui.sh) non lo tocca.
+[Unit]
+Description=Barattolo, l'istanza di COLLAUDO (segue develop)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=collaudo
+Group=collaudo
+WorkingDirectory=/srv/collaudo/barattolo
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/srv/collaudo/venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8090
+Restart=on-failure
+RestartSec=3
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
