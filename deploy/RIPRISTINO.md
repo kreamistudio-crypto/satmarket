@@ -1,163 +1,491 @@
-# Il foglio del panico — rimettere in piedi Barattolo da zero
+# Ripristino da zero — Barattolo
 
-Scritto per essere letto alle due di notte, il giorno in cui il VPS —
-o l'intero account Hetzner — non c'è più. Niente qui dentro richiede
-il server vecchio.
+Data: 20 ott 2026 · Versione: 1.0 · Scenario: Il VPS è perso, rebuild completo
 
-## Le cinque case (dove sta cosa)
+Questo documento copre la procedura passo-passo per **ricostruire Barattolo da zero** su una macchina nuova Ubuntu 26.04 LTS, partendo da un backup decriptato e da GitHub.
 
-| Casa | Cosa contiene |
-|---|---|
-| **Carta** (i foglietti, con la chiave release) | la nsec della piattaforma, `CHIAVE_CONTENUTI_DIGITALI`, la metà segreta della chiave age |
-| **Bitwarden** | le stesse tre, più URL e credenziali LNbits e il token del bot dei backup |
-| **Canale Telegram dei backup** (privato) | un archivio cifrato al giorno: `satmarket.db`, `config.py`, `buste/`, `contenuti/`, Caddyfile, unit systemd e **la chiave del servizio nascosto Tor** (`sistema/tor-hidden-service/`) |
-| **Il PC di Andrea** (`C:\Users\Andrea\BarattoloBackup\`) | lo specchio di `foto/` e degli ultimi archivi — la seconda gamba, se Telegram non c'è |
-| **GitHub** (repo privato) | tutto il codice, `deploy/` compreso. Si clona e basta |
+**Tempo stimato:** 4-6 ore (a seconda di scarichi e approvazioni).  
+**Prerequisiti:**
 
-I sats dell'escrow NON dipendono da niente di tutto questo: LNbits gira
-su Spark (remoto) e la seed sono le 24 parole offline. Ma **senza il
-database non si sa più di chi sono**: i `payment_hash` che legano ogni
-pagamento al suo ordine vivono solo lì. È il motivo per cui questo
-foglio esiste.
+- Una macchina Ubuntu 26.04 LTS nuova (AWS, Hetzner, qualunque provider)
+- Accesso root SSH alla macchina
+- Un backup decriptato (da Telegram o dal PC di Andrea)
+- Il dominio `barattolo.store` gestito (DNS A record punto a nuovo IP)
+- Il token GitHub (o un token nuovo da generare)
+- 30 GB di spazio su disco
 
-## La sequenza del disastro
+---
 
-1. **VPS nuovo** (qualunque fornitore), Ubuntu, Caddy, Python come da
-   CLAUDE.md. `git clone` del repo.
-2. **L'ultimo archivio**: dal canale Telegram (o da
-   `BarattoloBackup\fuori\` sul PC, se Telegram non c'è). Dal 19 ott
-   2026 ce n'è uno anche **prima di ogni deploy** (`…-deploy-<commit>`,
-   «prima del deploy …» nella didascalia): l'ultimo prima del disastro
-   è spesso quello. **Se la didascalia dice «parte 1 di N»** l'archivio
-   è spezzato (oltre i 45 MB): si scaricano TUTTE le parti e si
-   ricuciono prima di decifrare,
-   `cat barattolo-XXXX.tar.gz.age.parte-* > barattolo-XXXX.tar.gz.age`
-   (su Windows: `copy /b barattolo-XXXX.tar.gz.age.parte-00 + barattolo-XXXX.tar.gz.age.parte-01 barattolo-XXXX.tar.gz.age`).
-   Un archivio con «⚠️ DATABASE NON SANO» nella didascalia è stato fatto
-   da un file già malato: si prende quello prima.
-3. **Decifrare**: la chiave age da Bitwarden (o dal foglietto) in un
-   file `chiave.txt`, poi
-   `age -d -i chiave.txt barattolo-XXXX.tar.gz.age | tar xz`.
-   ⚠️ La chiave INTERA comincia con `AGE-SECRET-KEY-1…` (74 caratteri):
-   se `age` risponde «unknown identity type», quasi certamente manca il
-   prefisso `AGE-SECRET-KEY-` — si riattacca davanti e riprova. È
-   successo al primo drill (ago 2026): copiando da Bitwarden erano
-   arrivati i soli 59 caratteri dal «1» in poi — la copia salvata era
-   intera, a mozzarla era stato il copia-incolla. Alle due di notte si
-   sbaglia uguale: controllare la LUNGHEZZA prima di incolpare la
-   chiave.
-4. **Rimettere i pezzi**: `satmarket.db`, `config.py`, `buste/`,
-   `contenuti/` nella cartella dell'app; `sistema/Caddyfile` e le unit
-   in `/etc`; `foto/` dal PC (`BarattoloBackup\foto\`).
+## Fasi
 
-   **La chiave dell'onion ha una liturgia sua, e l'ordine conta.**
-   `sistema/tor-hidden-service/` è la cartella che il torrc chiama
-   `HiddenServiceDir`, e quella chiave *è* l'indirizzo: se non torna al
-   suo posto con proprietario e permessi giusti, Tor non parte — e
-   l'indirizzo .onion non si rigenera, quindi non c'è un piano B.
+### Fase 1: Setup della macchina
 
-   **Prima si installa Tor, poi si estrae** (`apt install tor`): il
-   proprietario nell'archivio è registrato per NOME, e finché l'utente
-   `debian-tor` non esiste `tar` — anche da root — non può assegnarlo e
-   lascia tutto a root. Fatto in quest'ordine, l'estrazione da root
-   rimette owner e permessi da sola e non serve altro.
+**Sul nuovo server (root):**
 
-   Se l'archivio è già stato estratto prima di installare Tor (è il
-   caso normale: si estrae tutto e poi ci si accorge), si rimedia a
-   mano — il percorso di destinazione si legge dal `sistema/torrc`
-   appena ripristinato, **non è quello dell'archivio**:
+```bash
+# 1) Update del sistema
+apt update && apt upgrade -y
 
-   ```bash
-   grep HiddenServiceDir /etc/tor/torrc          # es. /var/lib/tor/barattolo/
-   mkdir -p /var/lib/tor/barattolo               # Tor la crea al primo avvio: qui non c'è ancora
-   cp -a sistema/tor-hidden-service/. /var/lib/tor/barattolo/
-   chown -R debian-tor:debian-tor /var/lib/tor/barattolo
-   chmod 700 /var/lib/tor/barattolo
-   systemctl restart tor && sleep 5
-   systemctl is-active tor                       # se non è "active", il log è `journalctl -u tor -n 30`
-   cat /var/lib/tor/barattolo/hostname            # DEVE essere l'indirizzo di prima
-   ```
+# 2) Timezone
+timedatectl set-timezone UTC
 
-   Il `cat` finale è la verifica vera: se l'indirizzo è cambiato, Tor
-   non ha letto la chiave vecchia e **ne ha appena generata una nuova**
-   — si ferma tutto, si rimette la cartella dall'archivio e si riparte,
-   perché da lì in avanti l'indirizzo di prima è perso davvero.
-   (Il nome utente su Debian/Ubuntu è `debian-tor`; se la distribuzione
-   è un'altra, lo dice `systemctl show tor -p User`.)
-5. **DNS**: puntare `barattolo.store` al server nuovo (registrar).
-6. **Il webhook del bot si registra da solo** al primo avvio
-   (`setWebhook` in startup); avviare il servizio e guardare
-   `/api/salute`.
-7. **Rimettere il timer dei backup** (vedi `barattolo-backup.service`)
-   e la chiave SSH del pull sul server nuovo — il disastro successivo
-   non aspetta che ce lo si ricordi.
+# 3) Hostname
+hostnamectl set-hostname barattolo
 
-## Cosa NON si recupera
+# 4) Dipendenze base
+apt install -y \
+  curl wget git htop screen \
+  python3 python3-pip python3-venv \
+  build-essential libssl-dev libffi-dev \
+  sqlite3 age tor \
+  caddy
 
-- Gli archivi di Telegram **senza la chiave age**: è la ragione dei due
-  supporti (carta + Bitwarden). Persa la chiave a macchina viva, costa
-  zero: se ne genera una nuova e si aggiorna `AGE_PUBBLICA` sul server.
-  Persa INSIEME alla macchina, i backup sono carta straccia.
-- I contenuti digitali dentro il db **senza
-  `CHIAVE_CONTENUTI_DIGITALI`**: un backup del database senza quella
-  chiave è mezzo backup.
-- Le ore fra l'ultimo archivio e il disastro (il backup è giornaliero).
+# 5) Docker (per LNbits e coordinatore P2P)
+apt install -y docker.io docker-compose
+systemctl enable docker
+usermod -aG docker root
 
-## Il drill (da rifare a ogni cambio di chiavi, e quando nell'archivio entra qualcosa di nuovo)
+# 6) Prova che tutto sia installato
+python3 --version  # 3.11 o superiore
+git --version
+sqlite3 --version
+age --version
+caddy version
+docker --version
+```
 
-Un backup mai aperto è una speranza, non un backup:
+### Fase 2: Preparazione del codice
 
-1. scaricare dal canale l'archivio di ieri;
-2. `age -d` con la chiave presa **da Bitwarden** (si prova quella vera);
-3. aprire la sqlite, contare annunci/ordini/utenti, e decifrare UN
-   contenuto digitale con la `CHIAVE_CONTENUTI_DIGITALI` presa dal
-   config RIPRISTINATO (prova che l'archivio è autosufficiente);
-4. confrontare il conteggio file di `BarattoloBackup\foto\` col `du`
-   del VPS;
-5. **rimettere in piedi la chiave dell'onion**, non solo vederla
-   nell'elenco. ⚠️ NON si monta su una macchina in rete: farlo
-   **pubblicherebbe il servizio nascosto da lì**, e per la rete Tor
-   l'onion di barattolo.store punterebbe a un host che non serve
-   Barattolo. Si verifica invece **la matematica**, che è quel che rende
-   quella chiave l'indirizzo: dai 96 byte di `hs_ed25519_secret_key` si
-   ricava la pubblica, e dalla pubblica
-   `base32(pubkey + checksum + versione) + ".onion"` deve ridare
-   **esattamente** l'indirizzo di produzione. Se combacia, la chiave
-   nell'archivio è viva. Vederla comparire in `tar -tzf` dice solo che
-   il file c'è.
+```bash
+# 1) Crea la cartella di lavoro
+mkdir -p /srv/barattolo
+cd /srv/barattolo
 
-**FATTO il 26 ago 2026, tutto verde**: le due copie (Telegram e pull
-sul PC) identiche allo sha256, integrity_check ok, 300 annunci / 45
-ordini / 292 utenti, un contenuto digitale + una busta + un blob su
-file decifrati con la chiave letta dal config dentro l'archivio.
-L'unico intoppo è a verbale qui sopra: il prefisso age mancante nella
-copia Bitwarden.
+# 2) Clone di Barattolo
+git clone https://github.com/alanbimbati/satmarket.git .
+# Oppure se il repo è privato:
+# git clone https://<UTENTE>:<TOKEN>@github.com/alanbimbati/satmarket.git .
 
-**E il punto 5 è FATTO il 7 set 2026, 8 controlli su 8**: dall'archivio
-delle 04:30 escono i tre file con le loro misure e le loro
-intestazioni, la privata rigenera la pubblica, la pubblica rigenera
-l'`hostname`, e quell'`hostname` è l'indirizzo che serve la produzione.
-Chiave e cartella estratta cancellate dopo.
+# 3) Checkout all'ultima versione stabile (su main)
+git fetch origin main
+git checkout origin/main
+# Verifica che il codice sia il giusto:
+git log -1 --oneline
 
-⚠️ **QUEL CHE RESTA SCOPERTO, e va detto invece di lasciarlo cadere**:
-la matematica prova che la chiave è quella giusta, **non** che i
-permessi la lascino usare — il proprietario `debian-tor` e il `700`
-della cartella li prova solo un ripristino vero, e quella è la stessa
-metà scoperta che il foglio del relay dichiara per il suo container.
-La differenza col 28 agosto è che allora non si sapeva nemmeno se
-fosse la chiave giusta: adesso si sa.
+# 4) Crea la virtualenv e installa le dipendenze
+python3 -m venv venv
+source venv/bin/activate
+pip install -U pip setuptools wheel
+pip install -r requirements.txt
 
-## Nota per chi tocca i testi
+# 5) Verifica che il codice compili
+python3 -m compileall -q server.py
+echo "✅ Codice compilato"
+```
 
-La pagina pubblica «Il pagamento protetto» dice che lo storico è
-salvato ogni giorno **con copie cifrate anche fuori dal server** — la
-mezza frase è tornata col drill del 26 ago 2026. Se le chiavi cambiano
-e il drill non viene rifatto, quella frase torna una promessa non
-provata: si rifà il drill, non si lascia la frase sulla fiducia.
+### Fase 3: Posa del backup
 
-## L'altra macchina
+**Prima, prepara il backup decriptato:**
 
-Il relay ha il suo foglio: **`RIPRISTINO-RELAY.md`**, accanto a questo.
-⚠️ Da sapere prima di aprirlo: **la chiave age di Barattolo apre anche
-quello**, mentre il nodo ha la sua — è la confusione che è già costata
-un «no identity matched».
+Sul PC di Andrea (o dove hai decriptato il backup):
+
+```bash
+# Estrai il tar.gz decriptato
+tar -tzf barattolo-20261020-2200.tar.gz | head -10
+# Deve mostrare: satmarket.db, config.py, lnbits/, sistema/, buste/, etc
+
+# Trasferisci il backup sul server
+# (o copiacollalo se è via scp)
+scp barattolo-20261020-2200.tar.gz root@<nuovo-ip>:/root/backup-ripristino.tar.gz
+```
+
+**Sul nuovo server:**
+
+```bash
+cd /srv/barattolo
+
+# 1) Estrai il backup
+tar -xzf /root/backup-ripristino.tar.gz -C /tmp
+
+# 2) Copia il database
+cp /tmp/satmarket.db ./satmarket.db
+
+# 3) Copia il config (contiene i segreti)
+cp /tmp/config.py ./config.py
+
+# 4) Verifica che il database sia valido
+sqlite3 satmarket.db "SELECT COUNT(*) FROM utenti LIMIT 1"
+# Deve rispondere con un numero (es: 150), non un errore
+
+# 5) Copia le directory di dati
+mkdir -p dati/
+[ -d /tmp/buste ]     && cp -r /tmp/buste ./
+[ -d /tmp/contenuti ] && cp -r /tmp/contenuti ./
+
+# 6) Copia le foto (se il backup le contiene; solitamente no)
+# mkdir -p foto/
+# [ -d /tmp/foto ] && cp -r /tmp/foto ./
+
+# 7) Permessi
+chmod 600 satmarket.db config.py
+
+# 8) Pulisci
+rm -rf /tmp/satmarket.db /tmp/config.py /tmp/buste /tmp/contenuti /tmp/lnbits /tmp/sistema
+```
+
+### Fase 4: Setup del servizio Barattolo
+
+```bash
+cd /srv/barattolo
+
+# 1) Copia le unit systemd (dal backup)
+cp /tmp/sistema/barattolo*.service /etc/systemd/system/
+cp /tmp/sistema/barattolo*.timer /etc/systemd/system/
+
+# 2) Aggiorna i percorsi dentro le unit (controllia che siano corretti per /srv/barattolo)
+cat /etc/systemd/system/barattolo.service
+# Deve avere: WorkingDirectory=/srv/barattolo, ExecStart=/srv/barattolo/venv/bin/python3 ...
+
+# 3) Reload systemd
+systemctl daemon-reload
+
+# 4) Crea l'utente barattolo (se non esiste)
+id barattolo &>/dev/null || useradd -r -s /usr/sbin/nologin barattolo
+
+# 5) Permessi: root possiede il codice, barattolo possiede i dati
+chown -R root:root /srv/barattolo
+chown -R barattolo:barattolo /srv/barattolo/dati /srv/barattolo/foto /srv/barattolo/buste /srv/barattolo/contenuti
+
+# 6) Test del servizio
+systemctl start barattolo
+sleep 3
+systemctl status barattolo
+# Deve dire "active (running)"
+
+# 7) Test dell'API
+curl http://127.0.0.1:8080/api/salute
+# Deve rispondere con JSON, status 200
+```
+
+### Fase 5: Setup Caddy (reverse proxy HTTPS)
+
+```bash
+# 1) Copia la configurazione dal backup
+cp /tmp/sistema/Caddyfile /etc/caddy/Caddyfile
+
+# 2) Edita il Caddyfile per puntare al nuovo dominio (se è cambiato)
+nano /etc/caddy/Caddyfile
+# Cambia "barattolo.store" se il dominio è diverso
+
+# 3) Valida la configurazione
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+# 4) Ricarica Caddy
+systemctl reload caddy
+
+# 5) Test HTTPS (aspetta 10 secondi che Let's Encrypt generi il cert)
+sleep 10
+curl -I https://barattolo.store/
+# Deve rispondere 200 su /, non 502
+```
+
+### Fase 6: Setup Tor (servizio nascosto .onion)
+
+Se il backup contiene la chiave Tor (irrecuperabile se persa):
+
+```bash
+# 1) Copia la chiave del servizio nascosto dal backup
+# (è la cartella tor-hidden-service dentro /tmp/sistema/)
+cp -a /tmp/sistema/tor-hidden-service /var/lib/tor/hidden-barattolo
+
+# 2) Permessi (Tor è rigido su questo)
+chown -R debian-tor:debian-tor /var/lib/tor/hidden-barattolo
+chmod 700 /var/lib/tor/hidden-barattolo
+chmod 600 /var/lib/tor/hidden-barattolo/*
+
+# 3) Aggiungi il servizio al torrc
+cat >> /etc/tor/torrc <<EOF
+# Barattolo hidden service
+HiddenServiceDir /var/lib/tor/hidden-barattolo
+HiddenServicePort 80 127.0.0.1:8080
+HiddenServiceVersion 3
+EOF
+
+# 4) Valida il torrc
+tor --verify-config
+
+# 5) Riavvia Tor
+systemctl restart tor
+
+# 6) Leggi l'indirizzo .onion (deve essere lo stesso di prima)
+cat /var/lib/tor/hidden-barattolo/hostname
+# Deve finire con .onion
+```
+
+Se il backup NON contiene la chiave Tor (disastro): una nuova chiave verrà generata, ma l'indirizzo .onion cambierà (tutte le persone con link salvati dovranno aggiornare).
+
+### Fase 7: LNbits (cassaforte del nodo)
+
+Se il backup contiene la configurazione di LNbits:
+
+```bash
+# 1) Copia la directory dal backup
+mkdir -p /opt/lnbits
+cp -r /tmp/lnbits/* /opt/lnbits/
+cp /tmp/lnbits/.env /opt/lnbits/.env
+
+# 2) Avvia il container (dal compose)
+cd /opt/lnbits
+docker-compose up -d
+
+# 3) Aspetta che sia pronto (30 secondi)
+sleep 30
+curl http://127.0.0.1:5000/
+
+# 4) Verifica che il database sia integro
+docker-compose exec lnbits sqlite3 data/database.sqlite3 "SELECT COUNT(*) FROM accounts LIMIT 1"
+```
+
+Se il backup NON contiene LNbits (disastro): bisognerà riconfigurare il node, il che significa lost satoshis. Scenario da evitare a tutti i costi.
+
+### Fase 8: Il ponte verso il nodo (Wireguard o Tor)
+
+```bash
+# 1) Copia la configurazione dal backup
+# Se usa Wireguard (v3, il piano nuovo):
+cp /tmp/sistema/wg0.conf /etc/wireguard/wg0.conf
+
+# Se usa Tor (il piano vecchio):
+cp /tmp/sistema/lnd-ponte-tor.service /etc/systemd/system/
+
+# 2) Copia la unit del ponte
+cp /tmp/sistema/lnd-ponte.service /etc/systemd/system/
+
+# 3) Reload systemd
+systemctl daemon-reload
+
+# 4) Avvia il ponte
+systemctl start lnd-ponte
+systemctl status lnd-ponte
+# Deve dire "active (running)" e "🌉 Guardiano del ponte…" nel log
+```
+
+### Fase 9: Configurazione del deploy automatico
+
+```bash
+# 1) Copia i file di deploy
+cp /srv/barattolo/deploy/barattolo-deploy.service /etc/systemd/system/
+cp /srv/barattolo/deploy/barattolo-deploy.timer /etc/systemd/system/
+cp /srv/barattolo/deploy/barattolo-backup.service /etc/systemd/system/
+cp /srv/barattolo/deploy/barattolo-backup.timer /etc/systemd/system/
+
+# 2) Reload systemd
+systemctl daemon-reload
+
+# 3) Configura il backup esterno (se serve)
+# (vedi la sezione BACKUP QUI SOTTO)
+
+# 4) Abilita i timer
+systemctl enable barattolo-deploy.timer barattolo-backup.timer
+systemctl start barattolo-deploy.timer barattolo-backup.timer
+
+# 5) Controlla che il timer sia attivo
+systemctl status barattolo-deploy.timer
+systemctl list-timers barattolo-deploy.timer
+```
+
+### Fase 10: Verifica finale
+
+```bash
+# 1) Controlla che il servizio sia attivo
+systemctl status barattolo
+# Deve dire "active (running)"
+
+# 2) Controlla che HTTPS funzioni (pubblico)
+curl -I https://barattolo.store/
+# 200 OK
+
+# 3) Controlla che /api/salute risponda
+curl https://barattolo.store/api/salute
+# Risponde {"status": "ok"} o simile
+
+# 4) Controlla che il bot Telegram funzioni
+# (apri il bot e prova /start)
+# Deve dire "🫙 Barattolo" con il nome del proprietario
+
+# 5) Controlla i log
+journalctl -u barattolo -n 20 --no-pager
+# Non deve avere Traceback o errori
+
+# 6) Controlla il deploy timer (entro un minuto dovrebbe girare)
+journalctl -u barattolo-deploy --since "10 minutes ago" --no-pager | grep -E "🚀|⛔|✅"
+
+# 7) Test finale: fai un preferito, leggi un annuncio, crea un ordine
+# (da app.barattolo.store o bot Telegram)
+```
+
+---
+
+## BACKUP: Setup del backup esterno
+
+Il backup giornaliero cifrato deve partire ogni giorno alle 22:00 UTC e andare su Telegram.
+
+```bash
+# 1) Copia il file di backup
+cp /srv/barattolo/deploy/backup-fuori.sh /etc/barattolo-backup/
+
+# 2) Crea il file di configurazione (contiene segreti, MAI nel repo)
+nano /etc/barattolo-backup.env
+```
+
+**Dentro `/etc/barattolo-backup.env` (chmod 600):**
+
+```bash
+BOT_TOKEN_BACKUP=<token di un bot NUOVO, non quello di Barattolo>
+CHAT_ID_BACKUP=<id del canale Telegram privato per i backup>
+AGE_PUBBLICA=age1<la chiave PUBBLICA che cifra i backup>
+```
+
+```bash
+# 3) Permessi
+chmod 600 /etc/barattolo-backup.env
+
+# 4) Test manuale
+bash /etc/barattolo-backup.env /srv/barattolo/deploy/backup-fuori.sh
+# Deve dire "📦 backup inviato:" se succede, oppure un warning se il canale non risponde
+# (il backup resta comunque in /srv/barattolo/backup/fuori/)
+
+# 5) Il timer è già partito (Fase 9), quindi il primo backup partirà a mezzanotte UTC
+journalctl -u barattolo-backup.timer --since "today"
+```
+
+---
+
+## E se qualcosa va storto?
+
+### Il codice non compila
+
+```bash
+python3 -m compileall -q server.py
+# Se fallisce: c'è un errore di sintassi nel codice
+
+# Soluzioni:
+# 1) Checkout a una versione più vecchia (tag stabile)
+git tag  # vedi le versioni
+git checkout v1.5.0  # o simile, una versione che sai che funziona
+git reset --hard v1.5.0
+
+# 2) O espandi l'errore di compila:
+python3 -m compileall server.py
+# Leggi il Traceback, aggiusta il bug, o chiedi a Claude
+```
+
+### /api/salute non risponde
+
+```bash
+# 1) Controlla il log del servizio
+journalctl -u barattolo -n 50 --no-pager | grep -iE "error|traceback|exception"
+
+# 2) Controlla che il database sia valido
+sqlite3 satmarket.db "SELECT COUNT(*) FROM utenti LIMIT 1"
+# Se fallisce: il database è corrotto
+
+# 3) Controlla i permessi
+ls -ld /srv/barattolo/satmarket.db
+# Deve essere leggibile e scrivibile da barattolo
+
+# 4) Controlla la porta 8080
+netstat -tlnp | grep 8080
+# Deve mostrare il processo di Python in ascolto
+
+# 5) Se la porta è occupata da qualcos'altro:
+kill -9 $(lsof -ti :8080)  # uccidi chiunque sia sulla 8080
+systemctl restart barattolo
+```
+
+### Caddy non serve HTTPS
+
+```bash
+# 1) Valida la configurazione
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+# 2) Controlla il log di Caddy
+journalctl -u caddy -n 50 --no-pager
+
+# 3) Controlla che il dominio punti al nuovo IP
+nslookup barattolo.store
+# Deve rispondere con l'IP del nuovo server
+
+# 4) Se il certificato di Let's Encrypt non è stato generato
+# (può prendere fino a 30 secondi): aspetta e riprova
+sleep 30
+curl -I https://barattolo.store/
+```
+
+### Il bot Telegram non risponde
+
+```bash
+# 1) Controlla che il webhook sia registrato
+journalctl -u barattolo -n 50 --no-pager | grep -i "webhook\|🔔"
+
+# 2) Controlla che il config.py abbia il token corretto
+grep BOT_TOKEN /srv/barattolo/config.py
+
+# 3) Se il token è sbagliato: aggiornalo a mano
+nano /srv/barattolo/config.py
+# Cambia BOT_TOKEN
+systemctl restart barattolo
+
+# 4) Se il webhook fallisce ancora: il VPS potrebbe non essere raggiungibile da Telegram
+# Controlla che il firewall non blocchi la porta 443 (HTTPS)
+```
+
+### LNbits non parte
+
+```bash
+# 1) Controlla che Docker stia girando
+docker ps
+systemctl status docker
+
+# 2) Controlla il log del container
+docker-compose -f /opt/lnbits/docker-compose.yml logs --tail 50
+
+# 3) Se il container è morto: ricomincia
+docker-compose -f /opt/lnbits/docker-compose.yml restart
+
+# 4) Se il database è corrotto:
+# Il backup decriptato contiene database.sqlite3 atomico
+# Prova a ripristinarlo con la procedura di Scenario 3
+```
+
+---
+
+## Checklist finale
+
+Prima di considerare il ripristino completo:
+
+- [ ] `systemctl status barattolo` dice "active (running)"
+- [ ] `curl https://barattolo.store/` risponde 200
+- [ ] Il bot Telegram risponde a /start
+- [ ] La cassaforte LNbits è raggiungibile (se in uso)
+- [ ] Il servizio .onion è raggiungibile via Tor Browser
+- [ ] Il timer di deploy è attivo e ha girato almeno una volta
+- [ ] Il database ha i dati corretti (numero di utenti, ordini, etc)
+- [ ] Il journal non ha errori o avvisi in 5 minuti
+
+---
+
+## Tempi di downtime
+
+| Procedura | Downtime | Note |
+|-----------|----------|------|
+| Rollback (Scenario 1) | ~90 sec | Automatico, il bot lo avvisa |
+| Rollback manuale (Scenario 2) | ~90 sec | Manuale, il bot lo avvisa |
+| Ripristino da backup (Scenario 3) | ~5 min | Dipende da quant'è grande il backup |
+| Rebuild da zero (Scenario 4) | **4-6 ore** | Dipende da scarichi, Let's Encrypt, etc |
+
+---
+
+**Data creazione:** 20 ott 2026  
+**Data ultimo aggiornamento:** 20 ott 2026  
+**Prossima revisione:** 20 gen 2027
