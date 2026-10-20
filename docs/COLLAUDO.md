@@ -123,6 +123,14 @@ aggiunge, si toglie la vecchia da GitHub.
   servirà la verifica dei pagamenti, l'API pubblica testnet di
   mempool.space, nessun nodo nostro.
 - **Telegram**: il bot di prova e il solo canale «Vetrina · prova».
+- **Lo swap dei venditori** (regola di Andrea): ogni tappa
+  si prova QUI col SATS Routing di cartone (`cartone_satsrouting.py`)
+  e, dalla tappa 3 (lo swap dal telefono), col regtest di Boltz, prima
+  di accendere `SWAP_ATTIVO` in produzione. Sul collaudo: `SWAP_ATTIVO`,
+  `SWAP_RETE = "regtest"` e `SWAP_API_BASE` sull'API del regtest. Quella
+  base la chiamano il server (le tariffe) e il BROWSER del telefono (lo
+  swap, con CORS): va scelta perché regga tutt'e due (PRODUZIONE, «LO
+  SWAP DAL TELEFONO: LE LEVE»). Mai SATS Routing vero da qui.
 
 ## 7. Accendere da zero (i gesti, uno alla volta col sì di Andrea)
 
