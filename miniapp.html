@@ -76516,10 +76516,18 @@ function satsScambioP2P(o){
   return '≈ ' + capiP2P(fmt(da), a ? fmt(a) : '') + ' sats';
 }
 /* PURA: il premio come lo legge CHI L'ORDINE L'HA SCRITTO (set 2026,
-   terzo ridisegno di Andrea). Tre pezzi in una riga: il segno — «+5%»,
-   «−5%», che lo scrive `premioTestoP2P`, lo stesso dei capi del
-   cursore del filtro —, la tinta, e le parole del verso chiuse da
-   «per te».
+   terzo ridisegno di Andrea). Tre pezzi in una riga: il numero, la
+   tinta, e le parole del verso chiuse da «per te».
+   ⚠️ IL NUMERO NON PORTA IL SEGNO (20 ott 2026, decisione di Andrea,
+   cantiere «percento-senza-segno»): fino ad allora era «+5% più
+   conveniente per te», col segno del PREMIO (`premioTestoP2P`) davanti
+   alle parole dell'EFFETTO — due versi in una riga, e su un ordine di
+   vendita un «+» accanto a «più conveniente» e su uno di acquisto lo
+   stesso «+» accanto a «meno». Il verso lo dicono gia' le parole, come
+   nel badge del libro: qui si scrive come la', «5% più conveniente per
+   te». Il segno resta dove e' l'UNICA cosa che dice il verso: i capi
+   del cursore del filtro, il valore mentre si pubblica, la riga dei due
+   numeri a sats fissi (`rigaConvenienzaFissaP2P`).
    ⚠️ IL «PER TE» NON E' UN VEZZO, ed e' la ragione per cui questa
    funzione non e' quella del libro: lo STESSO premio si legge al
    rovescio dai due lati del vetro. Sul MIO ordine di vendita un +5%
@@ -76551,7 +76559,7 @@ function premioMioP2P(o){
   const a = affareP2P({lato: o.lato, premium: p});
   return '<span class="p2p-badge"><b class="'
     + (a ? 'p2p-affare' : 'p2p-avviso') + '">'
-    + premioTestoP2P(p) + '</b> '
+    + Math.abs(Math.round(p)) + '%</b> '
     + (a ? 'più' : 'meno') + ' conveniente per te</span>';
 }
 /* ---- la riga di uno scambio nella lista ----
@@ -76561,7 +76569,8 @@ function premioMioP2P(o){
       piu' la preposizione, che lega la riga 1 alla 2: le due si
       leggono come una frase sola, «Stai comprando sats per 5,00 €».
    2. la cifra in euro (i due capi su un intervallo) e ACCANTO il
-      premio secco, «+5%» / «−5%» o «al prezzo di mercato».
+      premio secco, «+5%» / «−5%» o «al prezzo di mercato» (oggi
+      «5% più conveniente per te», senza segno: `premioMioP2P`).
    3. lo STATO, in un riquadro contornato: e' la ragione per cui uno
       apre questa pagina, e in corpo piccolo grigio si perdeva.
    4. il METODO di pagamento, nella scatola piena delle card del
