@@ -32105,6 +32105,19 @@ def _leve_stato():
                          "(ADMIN_IDS): è la beta chiusa di Andrea e Alan",
                   spento="appena ONCHAIN_ATTIVO si accende vale per "
                          "chiunque: è il gesto che allarga la beta"),
+            # LA TAPPA 2 (20 ott 2026): la libreria che fa i conti degli
+            # indirizzi, e la terza chiave — detta per quel che E', mai
+            # stampata (una xpub non e' un segreto, ma non si sparge)
+            _leva("Libreria del 2-di-3 (embit)", "pip install embit",
+                  bool(EMBIT),
+                  acceso="gli indirizzi degli ordini si calcolano qui e "
+                         "il telefono li rifà da sé",
+                  spento="manca: le rotte on-chain che fanno i conti "
+                         "rispondono 503 (pip install -r requirements.txt)",
+                  allarme=bool(ONCHAIN_ATTIVO) and not EMBIT),
+            _leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",
+                  "vera (tpub)" if str(ONCHAIN_XPUB or "").strip()
+                  else "di cartone (vettori BIP-32: la privata è pubblica)"),
         ]},
         {"gruppo": "🪙 Punti e dollari su RGB (hackathon)", "voci": [
             # IL CANCELLO DELL'HACKATHON (ott 2026): la riga chiede al
@@ -86148,6 +86161,272 @@ def vendor_nostr():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# L'INDIRIZZO DELL'ORDINE ON-CHAIN (20 ott 2026, cantiere onchain-tappa2,
+# piano approvato da Andrea). La tappa 2 dello studio: ogni ordine ha un
+# indirizzo SUO, un 2-di-3 fra tre chiavi pubbliche — compratore,
+# venditore, Barattolo —, ciascuna presa dalla «xpub dedicata» del suo
+# proprietario col numero che questo server assegna UNA volta sola. Il
+# server fa i conti con `embit` (Python puro, la libreria di Specter) e
+# il telefono li RIFA' col suo codice (`onchainVerificaRiga`): l'indirizzo
+# si mostra solo se le due parti combaciano.
+# ⚠️ QUI NON ENTRA NESSUNA CHIAVE PRIVATA, e non e' una promessa: le
+# rotte accettano solo meta' pubbliche, rifiutano un `xprv`/`tprv` prima
+# ancora di leggerlo, e non lo ripetono mai (ne' nella risposta ne' nel
+# journal). Da una xpub si ricavano solo chiavi pubbliche.
+# ⚠️ EMBIT E' FACOLTATIVO ALL'AVVIO: se manca (un VPS a cui nessuno l'ha
+# ancora installato) il server parte lo stesso, le rotte che fanno i
+# conti rispondono 503 e il pannello delle leve lo dice. La lista delle
+# dipendenze e' `requirements.txt`; il collaudo la installa da solo
+# (`deploy/collaudo/segui.sh`), la produzione a mano (PRODUZIONE).
+try:
+    from embit import bip32 as _embit_bip32
+    from embit.descriptor import Descriptor as _EmbitDescrittore
+    from embit.descriptor.checksum import add_checksum as _embit_checksum
+    from embit.networks import NETWORKS as _EMBIT_RETI
+    EMBIT = True
+except ImportError:
+    EMBIT = False
+# una xpub e' lunga 111 caratteri: il tetto ferma i corpi assurdi prima
+# che arrivino alla libreria
+ONCHAIN_XPUB_MAX = 200
+# il numero di un ordine sta sotto il primo indice indurito del BIP-32
+ONCHAIN_NUMERO_MAX = 2 ** 31 - 1
+
+
+def _onchain_sembra_privata(s: str) -> bool:
+    """`xprv`, `tprv` e cugine (yprv, zprv, Yprv...): il prefisso basta
+    per dire di no SENZA decodificarla — una privata non si legge."""
+    return s[1:4].lower() == "prv"
+
+
+def onchain_xpub_motivo(testo) -> str:
+    """'' se `testo` e' una xpub DEDICATA buona, sennò il perche' (mai
+    con la chiave dentro). Buona vuol dire: pubblica, di signet (una
+    `tpub`), e il conto del 2-di-3 — profondita' 4, ultimo passo 2'
+    (ONCHAIN_STRADA_CONTO). Una xpub del wallet della persona, o di
+    un'altra strada, non e' dedicata e si rifiuta: gli indirizzi
+    nascerebbero dove il suo wallet non li cerca."""
+    s = str(testo or "").strip()
+    if not s or len(s) > ONCHAIN_XPUB_MAX:
+        return "manca la chiave pubblica"
+    if _onchain_sembra_privata(s):
+        return "questa è una chiave PRIVATA: qui non entra, e non va data a nessuno"
+    try:
+        k = _embit_bip32.HDKey.from_string(s)
+    except Exception:
+        return "non è una chiave estesa leggibile"
+    if k.is_private:
+        return "questa è una chiave PRIVATA: qui non entra, e non va data a nessuno"
+    if k.version != _EMBIT_RETI[ONCHAIN_RETE]["xpub"]:
+        return f"non è una chiave di {ONCHAIN_RETE} (deve cominciare per tpub)"
+    if k.depth != 4 or k.child_number != 0x80000002:
+        return f"non è il conto del 2-di-3 ({ONCHAIN_STRADA_CONTO})"
+    return ""
+
+
+def onchain_xpub_barattolo() -> tuple:
+    """(xpub, di_cartone) della TERZA chiave. Vuota → quella di cartone
+    dei vettori BIP-32. Piena → deve essere una `tpub` PUBBLICA di
+    signet: una `xpub` di mainnet finche' la rete e' di prova e' un
+    errore di chi ha scritto il config, e si dice (ValueError) invece di
+    calcolare indirizzi che mischiano due reti."""
+    s = (ONCHAIN_XPUB or "").strip()
+    if not s:
+        return XPUB_CARTONE, True
+    if _onchain_sembra_privata(s):
+        raise ValueError("ONCHAIN_XPUB e' una chiave privata: va tolta "
+                         "dal config, e ruotata")
+    try:
+        k = _embit_bip32.HDKey.from_string(s)
+    except Exception:
+        raise ValueError("ONCHAIN_XPUB non si legge")
+    if k.is_private:
+        raise ValueError("ONCHAIN_XPUB e' una chiave privata: va tolta "
+                         "dal config, e ruotata")
+    if k.version != _EMBIT_RETI[ONCHAIN_RETE]["xpub"]:
+        raise ValueError(f"ONCHAIN_XPUB non e' di {ONCHAIN_RETE} (una tpub)")
+    return s, False
+
+
+def onchain_chiave(xpub: str, numero: int) -> str:
+    """La chiave PUBBLICA numero `numero` di una xpub: `/0/numero`, la
+    stessa strada di `onchainFiglia` nel telefono. Esadecimale compresso."""
+    if not 0 <= int(numero) <= ONCHAIN_NUMERO_MAX:
+        raise ValueError("numero fuori misura")
+    k = _embit_bip32.HDKey.from_string(xpub).derive([0, int(numero)])
+    return k.key.sec().hex()
+
+
+def onchain_descrittore(compratore: str, venditore: str, barattolo: str) -> str:
+    """Il descrittore col checksum del BIP-380, con le chiavi
+    nell'ordine compratore, venditore, Barattolo — lo stesso testo che
+    scrive il telefono, byte per byte (lo pretende la prova doppia)."""
+    return _embit_checksum(
+        f"wsh(sortedmulti(2,{compratore},{venditore},{barattolo}))")
+
+
+def onchain_indirizzo_da(descrittore: str) -> str:
+    """L'indirizzo di un descrittore sulla rete di prova. Dalla parte
+    PRIMA del `#`: il checksum lo giudica la prova, non la libreria."""
+    corpo = descrittore.split("#", 1)[0]
+    return _EmbitDescrittore.from_string(corpo).address(
+        _EMBIT_RETI[ONCHAIN_RETE])
+
+
+def _onchain_prepara_tabelle(con):
+    """Le due tabelle della tappa 2.
+    `onchain_xpub`: la xpub dedicata di chi ha acceso l'on-chain, una per
+    persona (rifarla dallo stesso seme da' la stessa: si sovrascrive).
+    `onchain_indirizzi`: un indirizzo per ordine, con i TRE numeri e le
+    tre chiavi pubbliche fotografate — un indirizzo non si ricalcola mai
+    dopo: se domani cambia una xpub, quelli di ieri restano veri.
+    `ordine_id` resta vuoto fino alla tappa 3 (il foglio di pagamento):
+    oggi gli indirizzi nascono dal foglio di prova, fra due admin. I
+    vincoli UNIQUE sono la cintura del numero «una volta sola»: anche un
+    giorno che il conto sbagliasse, il database direbbe di no."""
+    con.execute("""CREATE TABLE IF NOT EXISTS onchain_xpub(
+        tg_id INTEGER PRIMARY KEY,
+        xpub TEXT NOT NULL,
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS onchain_indirizzi(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER,
+        rete TEXT NOT NULL,
+        compratore_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        xpub_compratore TEXT NOT NULL,
+        numero_compratore INTEGER NOT NULL,
+        xpub_venditore TEXT NOT NULL,
+        numero_venditore INTEGER NOT NULL,
+        xpub_barattolo TEXT NOT NULL,
+        numero_barattolo INTEGER NOT NULL,
+        chiave_compratore TEXT NOT NULL,
+        chiave_venditore TEXT NOT NULL,
+        chiave_barattolo TEXT NOT NULL,
+        descrittore TEXT NOT NULL,
+        indirizzo TEXT NOT NULL UNIQUE,
+        creato INTEGER DEFAULT 0,
+        UNIQUE(xpub_compratore, numero_compratore),
+        UNIQUE(xpub_venditore, numero_venditore),
+        UNIQUE(xpub_barattolo, numero_barattolo))""")
+
+
+def _onchain_db():
+    con = db()
+    _onchain_prepara_tabelle(con)
+    return con
+
+
+def _onchain_prossimo(con, xpub: str) -> int:
+    """Il prossimo numero di una xpub di PERSONA: uno dopo il piu' alto
+    mai usato, da compratore O da venditore — la stessa persona fa
+    tutt'e due le parti, e i suoi numeri sono una fila sola. Niente
+    contatore da tenere in pari: la verita' sono le righe."""
+    r = con.execute(
+        "SELECT MAX(n) FROM ("
+        " SELECT numero_compratore AS n FROM onchain_indirizzi"
+        "  WHERE xpub_compratore=?"
+        " UNION ALL"
+        " SELECT numero_venditore FROM onchain_indirizzi"
+        "  WHERE xpub_venditore=?)", (xpub, xpub)).fetchone()
+    return 0 if r[0] is None else int(r[0]) + 1
+
+
+def _onchain_prossimo_barattolo(con, xpub: str) -> int:
+    r = con.execute("SELECT MAX(numero_barattolo) FROM onchain_indirizzi "
+                    "WHERE xpub_barattolo=?", (xpub,)).fetchone()
+    return 0 if r[0] is None else int(r[0]) + 1
+
+
+def onchain_nuovo_indirizzo(con, compratore_id: int, venditore_id: int,
+                            adesso: int) -> int:
+    """Nasce l'indirizzo di un ordine: i tre numeri, le tre chiavi, il
+    descrittore, l'indirizzo, e la riga. Torna l'id della riga.
+    TUTTO DENTRO UNA TRANSAZIONE IMMEDIATE: due ordini nello stesso
+    istante leggerebbero lo stesso «prossimo numero», e due ordini con
+    la stessa chiave sono proprio il legame in catena che la chiave per
+    ordine esiste per togliere. Con IMMEDIATE il secondo aspetta il
+    primo; e se un giorno qualcuno la togliesse, i vincoli UNIQUE
+    direbbero di no al posto suo.
+    ValueError col motivo, detto a parole, se manca un pezzo."""
+    if int(compratore_id) == int(venditore_id):
+        raise ValueError("compratore e venditore sono la stessa persona")
+    xb, _ = onchain_xpub_barattolo()
+    con.execute("BEGIN IMMEDIATE")
+    try:
+        xp = {r["tg_id"]: r["xpub"] for r in con.execute(
+            "SELECT tg_id, xpub FROM onchain_xpub WHERE tg_id IN (?, ?)",
+            (int(compratore_id), int(venditore_id)))}
+        xc, xv = xp.get(int(compratore_id)), xp.get(int(venditore_id))
+        if not xc:
+            raise ValueError("chi compra non ha ancora acceso l'on-chain")
+        if not xv:
+            raise ValueError("chi vende non ha ancora acceso l'on-chain")
+        if xc == xv:
+            # lo stesso seme su due conti: due chiavi uguali in un
+            # 2-di-3 vorrebbero dire una persona sola con due firme
+            raise ValueError("compratore e venditore hanno la stessa chiave")
+        nc, nv = _onchain_prossimo(con, xc), _onchain_prossimo(con, xv)
+        nb = _onchain_prossimo_barattolo(con, xb)
+        kc, kv = onchain_chiave(xc, nc), onchain_chiave(xv, nv)
+        kb = onchain_chiave(xb, nb)
+        desc = onchain_descrittore(kc, kv, kb)
+        indirizzo = onchain_indirizzo_da(desc)
+        cur = con.execute(
+            "INSERT INTO onchain_indirizzi(rete, compratore_id, venditore_id,"
+            " xpub_compratore, numero_compratore, xpub_venditore,"
+            " numero_venditore, xpub_barattolo, numero_barattolo,"
+            " chiave_compratore, chiave_venditore, chiave_barattolo,"
+            " descrittore, indirizzo, creato)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (ONCHAIN_RETE, int(compratore_id), int(venditore_id), xc, nc,
+             xv, nv, xb, nb, kc, kv, kb, desc, indirizzo, int(adesso)))
+        con.commit()
+        return cur.lastrowid
+    except Exception:
+        con.rollback()
+        raise
+
+
+def onchain_riga_per(riga, tg_id: int, nome_altro: str = "") -> dict:
+    """Un indirizzo d'ordine come lo vede UNA delle due parti: il suo
+    ruolo, il suo numero (per rifare la sua chiave), le tre chiavi
+    PUBBLICHE, descrittore e indirizzo. Le xpub NON escono: con la xpub
+    dell'altro si leggerebbero in catena tutte le sue altre vendite — e'
+    la decisione dello studio, «il descrittore porta le chiavi
+    dell'ordine, non le xpub»."""
+    da_compratore = int(riga["compratore_id"]) == int(tg_id)
+    return {
+        "id": riga["id"],
+        "ruolo": "compratore" if da_compratore else "venditore",
+        "mio_numero": riga["numero_compratore" if da_compratore
+                           else "numero_venditore"],
+        "controparte": nome_altro or "?",
+        "chiavi": {"compratore": riga["chiave_compratore"],
+                   "venditore": riga["chiave_venditore"],
+                   "barattolo": riga["chiave_barattolo"]},
+        "cartone": riga["xpub_barattolo"] == XPUB_CARTONE,
+        "descrittore": riga["descrittore"],
+        "indirizzo": riga["indirizzo"],
+        "rete": riga["rete"],
+        "creato": riga["creato"],
+    }
+
+
+def _onchain_nome(con, tg_id) -> str:
+    r = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    return (r["nome"] if r and r["nome"] else "") or f"utente {tg_id}"
+
+
+def _onchain_serve_embit():
+    """503 se `embit` manca: la funzione esiste, la libreria no."""
+    if not EMBIT:
+        raise HTTPException(503, "Su questo server manca la libreria "
+                                 "embit (requirements.txt)")
+
+
 @app.get("/api/onchain/prova")
 async def onchain_prova(x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
@@ -86171,6 +86450,32 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
     cartone = not (ONCHAIN_XPUB or "").strip()
+    # LA TAPPA 2 (20 ott 2026): la mia xpub dedicata se l'ho gia' data,
+    # con chi posso fare un indirizzo di prova (gli altri ammessi che
+    # l'hanno data), e i miei ultimi indirizzi. Si legge anche senza
+    # embit: i conti sono gia' fatti e fotografati nelle righe.
+    con = _onchain_db()
+    try:
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        mia_xpub = r["xpub"] if r else ""
+        controparti = [
+            {"id": x["tg_id"], "nome": _onchain_nome(con, x["tg_id"])}
+            for x in con.execute("SELECT tg_id FROM onchain_xpub "
+                                 "WHERE tg_id != ? ORDER BY aggiornato DESC",
+                                 (user["id"],))
+            if onchain_ammesso(x["tg_id"])]
+        indirizzi = []
+        for x in con.execute(
+                "SELECT * FROM onchain_indirizzi WHERE compratore_id=? "
+                "OR venditore_id=? ORDER BY id DESC LIMIT 5",
+                (user["id"], user["id"])):
+            altro = (x["venditore_id"] if x["compratore_id"] == user["id"]
+                     else x["compratore_id"])
+            indirizzi.append(onchain_riga_per(x, user["id"],
+                                              _onchain_nome(con, altro)))
+    finally:
+        con.close()
     return {
         "xpub": (ONCHAIN_XPUB or "").strip() or XPUB_CARTONE,
         # il VENDITORE dell'ordine finto: sempre di cartone, in questa
@@ -86186,7 +86491,93 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
         # ripristino deve poter confrontare. L'ordine finto e' il numero
         # 0 di quel conto (`/0/0`), dalla tappa 2 (prima: `m/0/0`)
         "strada": ONCHAIN_STRADA_CONTO,
+        # la tappa 2: senza embit il foglio lo dice, e i gesti nuovi no
+        "embit": EMBIT,
+        "mia_xpub": mia_xpub,
+        "controparti": controparti,
+        "indirizzi": indirizzi,
     }
+
+
+@app.post("/api/onchain/xpub")
+async def onchain_xpub(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """«ACCENDI L'ON-CHAIN» (20 ott 2026, tappa 2): il telefono manda la
+    meta' PUBBLICA del conto del 2-di-3 (`m/48'/1'/0'/2'`), la «xpub
+    dedicata». Da lei il server ricava le chiavi pubbliche degli ordini
+    anche a telefono spento — e nient'altro: con una xpub non si spende.
+    PASSA DAL CANCELLO, come ogni porta on-chain. Una privata si rifiuta
+    prima di leggerla, e la risposta non ripete MAI quel che e' arrivato.
+    Lo stesso seme da' la stessa xpub (un secondo telefono, un
+    ripristino): si riscrive la riga e i numeri gia' usati restano suoi.
+    Un seme DIVERSO da' un'altra xpub: gli indirizzi di ieri restano
+    veri (le chiavi sono fotografate nelle righe), quelli di domani
+    nascono dalla nuova."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    xpub = str(d.get("xpub") or "").strip()
+    motivo = onchain_xpub_motivo(xpub)
+    if motivo:
+        raise HTTPException(400, motivo)
+    adesso = int(time.time())
+    con = _onchain_db()
+    try:
+        con.execute(
+            "INSERT INTO onchain_xpub(tg_id, xpub, creato, aggiornato) "
+            "VALUES (?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+            "xpub=excluded.xpub, aggiornato=excluded.aggiornato",
+            (user["id"], xpub, adesso, adesso))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
+
+
+@app.post("/api/onchain/prova/indirizzo")
+async def onchain_prova_indirizzo(req: Request,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """UN INDIRIZZO VERO FRA DUE AMMESSI (20 ott 2026, tappa 2): chi
+    chiama e' il compratore, `venditore_id` e' un altro che ha acceso
+    l'on-chain. Nascono i tre numeri, le tre chiavi e l'indirizzo
+    (`onchain_nuovo_indirizzo`, embit), e il telefono li rifa' da se'
+    prima di mostrarli. Nessun ordine dietro: e' il banco della tappa 2,
+    l'ordine vero arriva con la tappa 3. Signet: i sats non valgono.
+    PASSA DAL CANCELLO due volte: per chi chiama e per l'altro — un
+    indirizzo con qualcuno che l'on-chain non lo vede sarebbe un
+    indirizzo che lui non sa di avere."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    try:
+        venditore = int(d.get("venditore_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Con chi? Manca la controparte")
+    if not onchain_ammesso(venditore):
+        raise HTTPException(400, "La controparte non può usare l'on-chain")
+    try:
+        onchain_xpub_barattolo()
+    except ValueError as e:
+        # la TERZA chiave storta e' un guasto del config, non di chi chiama
+        raise HTTPException(503, str(e))
+    con = _onchain_db()
+    try:
+        try:
+            nuovo = onchain_nuovo_indirizzo(con, user["id"], venditore,
+                                            int(time.time()))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        riga = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                           (nuovo,)).fetchone()
+        return onchain_riga_per(riga, user["id"],
+                                _onchain_nome(con, venditore))
+    finally:
+        con.close()
 
 
 @app.get("/vendor/btc.js")

@@ -151202,6 +151202,360 @@ __PEZZO__
           [True, True], o["daVenditore"])
 
 
+def prove_indirizzo_ordine_onchain():
+    """L'INDIRIZZO DELL'ORDINE ON-CHAIN (20 ott 2026, cantiere
+    onchain-tappa2, piano approvato da Andrea). La tappa 2 dello studio:
+    la xpub dedicata di chi accende l'on-chain, una chiave per ordine col
+    numero assegnato UNA volta sola, e l'indirizzo che il server calcola
+    con `embit` e il telefono rifa' col bundle.
+
+    LA PROVA E' DOPPIA, sul calco del checksum (17 ott): da una parte il
+    blocco VERO del server eseguito con embit, dall'altra il blocco VERO
+    del telefono sotto node col bundle vero. Devono dare gli STESSI byte
+    su xpub, chiavi, descrittore e indirizzo — un indirizzo che il server
+    calcola e il telefono non ritrova e' un indirizzo dove i sats entrano
+    e nessuno sa piu' da dove escono. In mezzo, quel che si rompe in
+    silenzio:
+    1. UNA PRIVATA ARRIVA. Si rifiuta prima di leggerla, e il motivo non
+       la ripete (ne' nella risposta ne' altrove).
+    2. UN NUMERO DUE VOLTE. Due ordini con la stessa chiave si legano in
+       catena: e' esattamente quel che la chiave per ordine toglie. Si
+       prova in fila e coi fili in parallelo.
+    3. LA XPUB DELL'ALTRO ESCE. Con la xpub del venditore il compratore
+       leggerebbe tutte le sue altre vendite: alla controparte vanno le
+       chiavi DELL'ORDINE e basta.
+    4. EMBIT MANCA. Il server parte lo stesso e le rotte dicono 503."""
+    import shutil as _sh
+    import sqlite3 as _sq
+    import subprocess as _sp
+    import tempfile as _tf
+    import threading as _th
+    print("\n⛓️ L'indirizzo dell'ordine on-chain (tappa 2)")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = src.index("# L'INDIRIZZO DELL'ORDINE ON-CHAIN (20 ott 2026")
+    blocco = src[i:src.index('@app.get("/api/onchain/prova")', i)]
+    cod = codice(blocco)
+
+    # --- 1) la forma ---------------------------------------------------
+    prova("embit e' FACOLTATIVO: senza, il server parte (EMBIT = False)",
+          [True, True],
+          ["try:\n    from embit import bip32 as _embit_bip32" in cod,
+           "except ImportError:\n    EMBIT = False" in cod])
+    rotte = {r: src[src.index(f'"{r}"'):] for r in
+             ("/api/onchain/xpub", "/api/onchain/prova/indirizzo")}
+    rotte = {r: t[:t.index("\n@app.")] for r, t in rotte.items()}
+    prova("le due rotte nuove passano dal cancello e chiedono embit",
+          [[True, True]] * 2,
+          [["if not onchain_ammesso(user[\"id\"]):\n        raise "
+            "HTTPException(404" in t, "_onchain_serve_embit()" in t]
+           for t in rotte.values()])
+    prova("...l'indirizzo chiede il cancello anche per la controparte",
+          True, "if not onchain_ammesso(venditore):"
+          in rotte["/api/onchain/prova/indirizzo"])
+    prova("la xpub arrivata non torna MAI indietro (ne' nella risposta "
+          "ne' nel journal)", [True, False, False],
+          ['return {"ok": True}' in rotte["/api/onchain/xpub"],
+           "print(" in codice(rotte["/api/onchain/xpub"]),
+           "detail=xpub" in rotte["/api/onchain/xpub"]])
+    ritorno = pezzo("onchain_riga_per").split('return {', 1)[1]
+    prova("la riga per una parte NON porta le xpub delle persone",
+          [False, False, False],
+          ['riga["xpub_compratore"]' in ritorno,
+           'riga["xpub_venditore"]' in ritorno, '"xpub":' in ritorno])
+    prova("il pannello dice embit e la terza chiave, senza stamparla",
+          [True, True, False],
+          ['_leva("Libreria del 2-di-3 (embit)", "pip install embit",'
+           in src, '_leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",' in src,
+           '"ONCHAIN_XPUB", ONCHAIN_XPUB' in src])
+    req = open(os.path.join(QUI, "requirements.txt"), encoding="utf-8").read()
+    prova("embit sta in requirements.txt, con la versione inchiodata", True,
+          bool(re.search(r"(?m)^embit==\d+\.\d+\.\d+$", req)))
+
+    try:
+        import embit  # noqa: F401
+        from embit import bip32 as E32, bip39 as E39
+        from embit.networks import NETWORKS as ERETI
+    except ImportError:
+        salta("onchain tappa 2: il blocco del server eseguito",
+              "embit non installato (pip install -r requirements.txt)")
+        return
+
+    # --- 2) il blocco del server, ESEGUITO -----------------------------
+    vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
+                          encoding="utf-8"))
+    parole = [v["parole"] for v in vett["bip39_english"][:4]]
+
+    class _H(Exception):
+        def __init__(self, status_code, detail=""):
+            self.status_code, self.detail = status_code, detail
+
+    def esegui(xpub_barattolo=""):
+        amb = {"__builtins__": __builtins__, "HTTPException": _H,
+               "ONCHAIN_RETE": "signet",
+               "ONCHAIN_STRADA_CONTO": "m/48'/1'/0'/2'",
+               "ONCHAIN_XPUB": xpub_barattolo,
+               "XPUB_CARTONE": vett["bip32"][0]["catene"][0]["xpub"]}
+        exec(cod, amb)
+        return amb
+
+    def conto(p, versione="signet", strada="m/48h/1h/0h/2h"):
+        """la xpub dedicata, rifatta con embit: la verita' di confronto"""
+        radice = E32.HDKey.from_seed(E39.mnemonic_to_seed(p),
+                                     version=ERETI["signet"]["xprv"])
+        return radice.derive(strada).to_public().to_string(
+            version=ERETI[versione]["xpub"])
+
+    S = esegui()
+    mot = S["onchain_xpub_motivo"]
+    buona = conto(parole[0])
+    prova("la xpub dedicata di signet passa", "", mot(buona))
+    privata = E32.HDKey.from_seed(E39.mnemonic_to_seed(parole[0]),
+                                  version=ERETI["signet"]["xprv"]).derive(
+        "m/48h/1h/0h/2h").to_string(version=ERETI["signet"]["xprv"])
+    rifiuti = {
+        "una tprv (privata)": privata,
+        "una xprv (privata, mainnet)": vett["bip32"][0]["catene"][0]["xprv"],
+        "una xpub di mainnet": conto(parole[0], versione="main"),
+        "il conto sbagliato (m/48'/1'/0')": conto(parole[0],
+                                                  strada="m/48h/1h/0h"),
+        "il conto di un altro tipo (1' = p2sh-p2wsh)": conto(
+            parole[0], strada="m/48h/1h/0h/1h"),
+        "una stringa qualunque": "tpubNONSONOUNACHIAVE",
+        "vuota": "",
+        "troppo lunga": "tpub" + "x" * 300,
+    }
+    esiti = {k: mot(v) for k, v in rifiuti.items()}
+    prova("tutte le altre si rifiutano, ognuna col suo motivo",
+          [], [k for k, m in esiti.items() if not m])
+    prova("...le private col motivo «PRIVATA», senza leggerle",
+          [True, True],
+          ["PRIVATA" in esiti["una tprv (privata)"],
+           "PRIVATA" in esiti["una xprv (privata, mainnet)"]])
+    prova("...e nessun motivo ripete la chiave che e' arrivata", [],
+          [k for k, m in esiti.items() if rifiuti[k] and rifiuti[k][:20] in m])
+
+    xb = S["onchain_xpub_barattolo"]
+    prova("la terza chiave vuota e' quella di cartone", True, xb()[1])
+    tb = conto(parole[3])
+    prova("...una tpub vera passa", (tb, False), esegui(tb)["onchain_xpub_barattolo"]())
+    rotte_b = []
+    for nome, x in (("xpub di mainnet", conto(parole[3], versione="main")),
+                    ("tprv", privata), ("illeggibile", "tpubNO")):
+        try:
+            esegui(x)["onchain_xpub_barattolo"]()
+            rotte_b.append((nome, "passata"))
+        except ValueError as e:
+            if x[:20] in str(e):
+                rotte_b.append((nome, "ripetuta"))
+    prova("...una xpub di mainnet, una privata o una storta: ValueError, "
+          "senza ripeterla", [], rotte_b)
+
+    # il database: in un file, perche' i fili hanno bisogno di
+    # connessioni loro
+    casa = _tf.mkdtemp(prefix="onchain-tappa2-")
+    try:
+        dbf = os.path.join(casa, "p.db")
+
+        def db():
+            con = _sq.connect(dbf, timeout=30)
+            con.row_factory = _sq.Row
+            return con
+        S["db"] = db
+        con = S["_onchain_db"]()
+        con.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT)")
+        xa, xv, xc = conto(parole[0]), conto(parole[1]), conto(parole[2])
+        for tg, x in ((111, xa), (222, xv), (333, xc), (444, xa)):
+            con.execute("INSERT INTO onchain_xpub(tg_id, xpub) VALUES (?,?)",
+                        (tg, x))
+        con.commit()
+        nuovo = S["onchain_nuovo_indirizzo"]
+        ids = [nuovo(con, 111, 222, 1) for _ in range(3)]
+        ids += [nuovo(con, 222, 111, 2) for _ in range(2)]
+        righe = [dict(r) for r in con.execute(
+            "SELECT * FROM onchain_indirizzi ORDER BY id")]
+        prova("i numeri di una persona sono UNA fila, da compratore e da "
+              "venditore", ([0, 1, 2, 3, 4], [0, 1, 2, 3, 4]),
+              ([r["numero_compratore"] for r in righe[:3]]
+               + [r["numero_venditore"] for r in righe[3:]],
+               [r["numero_venditore"] for r in righe[:3]]
+               + [r["numero_compratore"] for r in righe[3:]]))
+        prova("...e Barattolo ha la sua fila", [0, 1, 2, 3, 4],
+              [r["numero_barattolo"] for r in righe])
+        prova("cinque ordini, cinque indirizzi e quindici chiavi diverse",
+              [5, 5, 15],
+              [len(ids), len({r["indirizzo"] for r in righe}),
+               len({r[f"chiave_{p}"] for r in righe
+                    for p in ("compratore", "venditore", "barattolo")})])
+        prova("...di signet (tb1q), rete scritta nella riga", [True, {"signet"}],
+              [all(r["indirizzo"].startswith("tb1q") for r in righe),
+               {r["rete"] for r in righe}])
+        prova("...e ogni descrittore ha il suo checksum", True,
+              all(re.fullmatch(r"wsh\(sortedmulti\(2,[0-9a-f,]+\)\)#[a-z0-9]{8}",
+                               r["descrittore"]) for r in righe))
+        motivi = []
+        for c, v in ((111, 111), (111, 999), (999, 111), (111, 444)):
+            try:
+                nuovo(con, c, v, 3)
+                motivi.append("nato")
+            except ValueError as e:
+                motivi.append(str(e).split(" ")[0])
+        prova("di no: con se stesso, con chi non ha la xpub (dalle due "
+              "parti), e con la STESSA chiave su due conti",
+              ["compratore", "chi", "chi", "compratore"], motivi)
+        prova("...e un no non lascia righe ne' numeri consumati", 5,
+              con.execute("SELECT COUNT(*) FROM onchain_indirizzi").fetchone()[0])
+        rp = S["onchain_riga_per"](con.execute(
+            "SELECT * FROM onchain_indirizzi WHERE id=?", (ids[0],)).fetchone(),
+            222, "Andrea")
+        prova("la riga per il venditore: il suo ruolo, il suo numero, niente "
+              "xpub", ["venditore", 0, False, "Andrea"],
+              [rp["ruolo"], rp["mio_numero"],
+               any(x in json.dumps(rp) for x in (xa, xv)), rp["controparte"]])
+        con.close()
+
+        # i fili: otto alla volta, ognuno con la sua connessione
+        errori, fatti = [], []
+
+        def filo(k):
+            c2 = db()
+            try:
+                for _ in range(5):
+                    a, b = (111, 333) if k % 2 else (333, 222)
+                    fatti.append(nuovo(c2, a, b, 4))
+            except Exception as e:
+                errori.append(repr(e))
+            finally:
+                c2.close()
+        fili = [_th.Thread(target=filo, args=(k,)) for k in range(8)]
+        for f in fili:
+            f.start()
+        for f in fili:
+            f.join(120)
+        con = db()
+        tutte = [dict(r) for r in con.execute("SELECT * FROM onchain_indirizzi")]
+        con.close()
+        per_xpub = {}
+        for r in tutte:
+            for p in ("compratore", "venditore"):
+                per_xpub.setdefault(r[f"xpub_{p}"], []).append(r[f"numero_{p}"])
+        prova("otto fili insieme: 40 indirizzi, nessun errore", [40, []],
+              [len(fatti), errori])
+        prova("...ogni fila senza buchi e senza doppioni", [],
+              [x[-8:] for x, n in per_xpub.items()
+               if sorted(n) != list(range(len(n)))])
+        prova("...e la fila di Barattolo pure, 0-44", list(range(45)),
+              sorted(r["numero_barattolo"] for r in tutte))
+    finally:
+        _sh.rmtree(casa, ignore_errors=True)
+
+    # --- 3) la prova doppia: embit contro il telefono ------------------
+    node = _sh.which("node")
+    if not node:
+        salta("onchain tappa 2: embit contro il telefono", "node non installato")
+        return
+    i_ck = mini.index("/* ============ IL CHECKSUM DEL DESCRITTORE")
+    blocco_js = mini[i_ck:mini.index("/* L'attesa PICCOLA", i_ck)]
+    # sessanta ordini: chiavi dai conti di tre semi e dalla cartone, coi
+    # numeri che non si ripetono
+    casi = []
+    for n in range(60):
+        pc, pv = parole[n % 3], parole[(n + 1) % 3]
+        casi.append({"pc": pc, "nc": n, "xv": conto(pv), "nv": 2 * n + 1,
+                     "xb": vett["bip32"][n % 4]["catene"][0]["xpub"],
+                     "nb": n * 7})
+    py = []
+    for c in casi:
+        kc = S["onchain_chiave"](conto(c["pc"]), c["nc"])
+        kv = S["onchain_chiave"](c["xv"], c["nv"])
+        kb = S["onchain_chiave"](c["xb"], c["nb"])
+        d = S["onchain_descrittore"](kc, kv, kb)
+        py.append({"c": kc, "v": kv, "b": kb, "d": d,
+                   "a": S["onchain_indirizzo_da"](d)})
+    # e due righe VERE del server, verificate dal telefono di ciascuno
+    con2_casa = _tf.mkdtemp(prefix="onchain-righe-")
+    try:
+        f2 = os.path.join(con2_casa, "r.db")
+
+        def db2():
+            c = _sq.connect(f2)
+            c.row_factory = _sq.Row
+            return c
+        S["db"] = db2
+        c2 = S["_onchain_db"]()
+        for tg, p in ((111, parole[0]), (222, parole[1])):
+            c2.execute("INSERT INTO onchain_xpub(tg_id, xpub) VALUES (?,?)",
+                       (tg, conto(p)))
+        c2.commit()
+        S["onchain_nuovo_indirizzo"](c2, 111, 222, 1)
+        S["onchain_nuovo_indirizzo"](c2, 111, 222, 1)
+        r = c2.execute("SELECT * FROM onchain_indirizzi WHERE id=2").fetchone()
+        righe_vere = [{"parole": parole[0],
+                       "riga": S["onchain_riga_per"](r, 111)},
+                      {"parole": parole[1],
+                       "riga": S["onchain_riga_per"](r, 222)},
+                      {"parole": parole[2],
+                       "riga": S["onchain_riga_per"](r, 111)}]
+        c2.close()
+    finally:
+        _sh.rmtree(con2_casa, ignore_errors=True)
+    banco = """
+const fs = require('fs');
+const B = new Function(fs.readFileSync(process.argv[2], 'utf8')
+                       + '; return BarattoloBTC;')();
+const IN = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const caricaBitcoin = () => Promise.resolve(B);
+__PEZZO__
+(async () => {
+  const srv = {strada: "m/48'/1'/0'/2'"};
+  const out = {xpub: [], casi: [], righe: []};
+  for (const p of IN.semi) out.xpub.push(await onchainMiaXpub(p, srv));
+  for (const c of IN.casi) {
+    const kc = onchainFiglia(onchainConto(B, c.pc, srv.strada), c.nc);
+    const kv = onchainFiglia(onchainLeggiXpub(B, c.xv), c.nv);
+    const kb = onchainFiglia(onchainLeggiXpub(B, c.xb), c.nb);
+    const k = onchainDaTre(B, [kc.publicKey, kv.publicKey, kb.publicKey]);
+    out.casi.push({c: k.compratore, v: k.venditore, b: k.barattolo,
+                   d: k.descrittore, a: k.indirizzo});
+  }
+  for (const r of IN.righe) {
+    const v = await onchainVerificaRiga(r.parole, srv, r.riga);
+    out.righe.push([v.mia, v.uguale]);
+  }
+  console.log(JSON.stringify(out));
+})();
+""".replace("__PEZZO__", blocco_js)
+    strada = os.path.join(QUI, ".banco-onchain-tappa2.js")
+    dati = os.path.join(QUI, ".banco-onchain-tappa2.json")
+    with open(strada, "w", encoding="utf-8") as fh:
+        fh.write(banco)
+    with open(dati, "w", encoding="utf-8") as fh:
+        json.dump({"semi": parole[:3], "casi": casi, "righe": righe_vere}, fh)
+    try:
+        r = _sp.run([node, strada, os.path.join(QUI, "vendor", "btc.bundle.js"),
+                     dati], capture_output=True, text=True, encoding="utf-8",
+                    errors="replace", timeout=300)
+    finally:
+        os.unlink(strada)
+        os.unlink(dati)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-900:])
+        prova("onchain tappa 2: il banco node ha risposto", True, False)
+        return
+    prova("la xpub dedicata: il telefono e embit danno la STESSA tpub "
+          "(tre semi)", [conto(p) for p in parole[:3]], o["xpub"])
+    prova("...e il server la accetta", ["", "", ""],
+          [mot(x) for x in o["xpub"]])
+    diversi = [n for n, (a, b) in enumerate(zip(py, o["casi"])) if a != b]
+    prova("sessanta ordini: chiavi, descrittore e indirizzo IDENTICI fra "
+          "embit e il telefono", (60, []), (len(o["casi"]), diversi))
+    prova("una riga VERA del server: il compratore la ritrova sua e uguale, "
+          "il venditore pure, un seme estraneo no",
+          [[True, True], [True, True], [False, True]], o["righe"])
+
+
 def prove_cancello_onchain():
     """IL CANCELLO DELL'ON-CHAIN, PRIMA DELLE PORTE (16 ott 2026,
     cantiere pagamento-onchain, decisione di Andrea: «i pagamenti
@@ -151298,8 +151652,12 @@ def prove_cancello_onchain():
     # ricordasse. Adesso dice la cosa vera di adesso — che di porte ce
     # n'e' una — e la guardia qui sotto, che era un confronto fra due
     # liste vuote, e' diventata il cancello vero.
+    # ...e la tappa 2 (20 ott 2026) ne ha aperte altre due, contate qui
+    # per nome: una porta nuova che non si aggiunge a questa lista e'
+    # una porta che nessuno ha guardato.
     prova("le rotte /api/onchain/* esistono e si contano",
-          ["/api/onchain/prova"], rotte)
+          ["/api/onchain/prova", "/api/onchain/xpub",
+           "/api/onchain/prova/indirizzo"], rotte)
     # il conto che conta: ogni rotta on-chain deve nominare il cancello
     # nel suo corpo.
     senza = []
@@ -175776,6 +176134,13 @@ def prove_collaudo_segue_develop():
     prova("...segue develop di serie, o il ramo scritto, col nome controllato", True,
           "RAMO=develop" in seg and '"$STATO/ramo"' in seg
           and "^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$" in seg and "*..*" in seg)
+    prova("pip gira come il PADRONE del venv, letto da bin/python, e le prove "
+          "lo sostituiscono", [True, True],
+          ['PIP=(runuser -u "$(stat -c %U "$(dirname "$(dirname "$PY")")")" '
+           '-- "$PY" -m pip)' in seg, 'read -r -a PIP <<< "$COLLAUDO_PIP"' in seg])
+    prova("...e la lista si legge dal COMMIT nuovo, prima del checkout", True,
+          seg.index('git_ show "$LA:requirements.txt"')
+          < seg.index('git_ checkout -q --force --detach "$LA"'))
     prova("...e il token del bot non va mai sulla riga di comando (curl lo legge dallo stdin)",
           True, "curl -s -m 10 -K -" in seg and "bot%s/sendMessage" in seg)
     u = tutti["barattolo-collaudo.service"]
@@ -175864,9 +176229,21 @@ def prove_collaudo_segue_develop():
             """Il curl di Git per Windows vuole file:///C:/..., quello di Linux file:///..."""
             return "file:///" + p.replace("\\", "/").lstrip("/")
 
+        # il pip di cartone (20 ott 2026, le dipendenze prima del
+        # codice): scrive cosa gli si chiede e fallisce se c'e' `pip_rotto`
+        registro = os.path.join(casa, "pip.log")
+        rotto = os.path.join(casa, "pip_rotto")
+        finto_pip = os.path.join(casa, "pip.sh")
+        with open(finto_pip, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write('#!/bin/bash\n'
+                     f'echo "$*" >> "{posix(registro)}"\n'
+                     f'[ -e "{posix(rotto)}" ] && exit 1\n'
+                     'exit 0\n')
+
         def segui(salute=True):
             env = dict(env_git, COLLAUDO_DIR=posix(vm), COLLAUDO_STATO=posix(stato),
                        COLLAUDO_COME="", COLLAUDO_RIAVVIA="true",
+                       COLLAUDO_PIP=f"{bash} {posix(finto_pip)}",
                        COLLAUDO_PY=posix(sys.executable), COLLAUDO_ATTESA="2",
                        COLLAUDO_SEGRETI=posix(os.path.join(casa, "nessuno")),
                        COLLAUDO_SALUTE=url_file(sano if salute else os.path.join(casa, "no")))
@@ -175907,6 +176284,67 @@ def prove_collaudo_segue_develop():
         prova("un nome di ramo storto: resta fermo e lo dice", (1, A), esiti["storto"])
         prova("il config (non tracciato) resta dov'era dopo tutti i giri",
               "SEGRETO = 'resto qui'\n", config_resta)
+
+        # --- le dipendenze prima del codice (20 ott 2026) --------------
+        os.remove(os.path.join(stato, "ramo"))
+        g(lavoro, "checkout", "-q", "develop")
+        g(lavoro, "reset", "-q", "--hard", A)
+
+        def commit_req(nome, req):
+            with open(os.path.join(lavoro, "requirements.txt"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(req)
+            g(lavoro, "add", "requirements.txt")
+            return commit(nome)
+        pip_righe = lambda: (open(registro).read().splitlines()
+                             if os.path.exists(registro) else [])
+        E = commit_req("E", "fastapi\nembit==0.8.0\n")
+        dip = {"nuova": segui()}
+        dip["chiamate_nuova"] = len(pip_righe())
+        F = commit("F")
+        dip["uguale"] = segui()
+        dip["chiamate_uguale"] = len(pip_righe())
+        open(rotto, "w").close()
+        G = commit_req("G", "fastapi\nembit==0.8.0\nqualcosa\n")
+        dip["rotto"] = segui()
+        dip["rotto_ancora"] = segui()
+        dip["chiamate_rotto"] = len(pip_righe())
+        bocciato_g = (open(os.path.join(stato, "bocciato")).read().strip()
+                      if os.path.exists(os.path.join(stato, "bocciato")) else "")
+        pip_fallito = open(os.path.join(stato, "pip_fallito")).read().strip()
+        os.remove(rotto)
+        dip["riparato"] = segui()
+        # il seguace posato DOPO il commit: in pari, senza impronta
+        prima_pari = len(pip_righe())
+        os.remove(os.path.join(stato, "requisiti"))
+        dip["pari"] = segui()
+        dip["chiamate_pari"] = len(pip_righe()) - prima_pari
+        dip["pari_di_nuovo"] = segui()
+        dip["chiamate_pari_di_nuovo"] = len(pip_righe()) - prima_pari
+        prova("requirements.txt nuovo: pip lo installa (-r) e il collaudo "
+              "va avanti", ((0, E), 1, True),
+              (dip["nuova"], dip["chiamate_nuova"],
+               "install" in pip_righe()[0] and " -r " in pip_righe()[0]))
+        prova("...senza -U: quel che c'e' gia' non si aggiorna", False,
+              any(" -U" in r or "--upgrade" in r for r in pip_righe()))
+        prova("lo stesso requirements.txt: pip non si richiama", ((0, F), 1),
+              (dip["uguale"], dip["chiamate_uguale"]))
+        prova("pip che fallisce: resta sul commit di prima, NON timbra il "
+              "bocciato, e riprova al giro dopo",
+              ((1, F), (1, F), 3, True, G),
+              (dip["rotto"], dip["rotto_ancora"], dip["chiamate_rotto"],
+               bocciato_g != G, pip_fallito))
+        prova("...e appena pip torna, il collaudo va avanti e dimentica il "
+              "fallimento", ((0, G), False),
+              (dip["riparato"], os.path.exists(os.path.join(stato, "pip_fallito"))))
+        prova("un seguace posato DOPO il commit: installa anche in pari, una "
+              "volta sola", ((0, G), 1, (0, G), 1),
+              (dip["pari"], dip["chiamate_pari"], dip["pari_di_nuovo"],
+               dip["chiamate_pari_di_nuovo"]))
+        prova("...e in pari, con dipendenze nuove, riavvia il server", True,
+              'dillo "dipendenze installate in pari: riavviato' in seg
+              and seg.index('if [ "$NUOVE" = 1 ]; then\n    $RIAVVIA')
+              < seg.index('dillo "aggiorno:'))
     finally:
         shutil.rmtree(casa, ignore_errors=True)
 
@@ -176100,6 +176538,7 @@ def main():
     prove_p2p_paycode,
     prove_cancello_onchain,
     prove_banco_chiavi_onchain,
+    prove_indirizzo_ordine_onchain,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,

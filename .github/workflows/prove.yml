@@ -151,8 +151,14 @@ jobs:
       # (niente piu' challenge da verificare sui relay — vedi
       # docs/CANTIERI.md, "IL SECONDO GIRO"). Quel che resta si prova
       # con un doppio, come sempre qui.
+      #
+      # EMBIT (20 ott 2026, cantiere onchain-tappa2): la libreria che fa
+      # i conti degli indirizzi on-chain, e la prova doppia
+      # (prove_indirizzo_ordine_onchain) la vuole per davvero. La
+      # versione NON si scrive qui: si prende da requirements.txt, la
+      # lista delle dipendenze, cosi' CI e collaudo girano la stessa.
       - name: Installa il minimo indispensabile
-        run: pip install --quiet websocket-client pillow cryptography snowballstemmer
+        run: pip install --quiet websocket-client pillow cryptography snowballstemmer "$(grep -E '^embit==' requirements.txt)"
 
       # nostr-tools per `prove_annuncio_identita` (8 ott 2026): lo script
       # deploy/rgb/identita.mjs — le identita' Nostr di prova
@@ -244,7 +250,7 @@ jobs:
       # stesso, e con lui il semaforo del deploy.
       - name: Le dipendenze del server, per i collaudi
         if: ${{ !cancelled() }}
-        run: pip install --quiet fastapi httpx anthropic
+        run: pip install --quiet fastapi httpx anthropic "$(grep -E '^embit==' requirements.txt)"
 
       # LE DUE OPZIONI DELLA CI LEGGERA (16 ott 2026), che cambiano
       # QUANDO e COME girano i collaudi e mai QUALI (il perche' sta in
