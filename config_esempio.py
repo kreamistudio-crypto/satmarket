@@ -882,6 +882,13 @@ P2P_COMMISSIONE_PERCENTO = 2
 # cifra: il coordinatore non lo conosce e non lo applica. 0 =
 # spento, nessun tetto in euro.
 P2P_MAX_EURO = 0
+# IL TETTO DEGLI ORDINI DAL COLLAUDO (20 ott 2026): sull'istanza di prova
+# il P2P parla col coordinatore VERO (sats veri), e un ordine dal collaudo
+# non supera questi sats, nel pubblicare e nel prendere. Vale SOLO quando
+# PROVA_SOLO_IDS non e' vuota: in produzione non esiste. Il client lo
+# traduce in euro al cambio vivo e vince il tetto piu' stretto. Non si
+# spegne: uno zero o un refuso lasciano 10.000.
+P2P_MAX_SATS_PROVA = 10_000
 # IL MINIMO DI UN PAYCODE BARATTOZON (30 set 2026): sotto questa cifra
 # in euro un ordine «Contanti al tabacchino» non si pubblica, a mercato
 # come a prezzo fisso. Lo giudica il foglio Pubblica (dalla busta delle
@@ -1968,10 +1975,19 @@ PROVA_SOLO_IDS = []
 #   RELAY_NOSTR_IMPORT = []
 #   IMPORT_NOSTR_APERTO = False
 #   TRASLOCO_NOSTR = False
-#   SEGRETI_PROFILO_P2P = {}
-#   P2P_ATTIVO = False                 # acceso solo col relay morto, sotto
-#   MOSTRO_RELAY = ["ws://127.0.0.1:9"]
-#   MOSTRO_RELAY_SPECCHIO = ["ws://127.0.0.1:9"]
+#   # Il P2P (decisione di Andrea con Alan, 20 ott 2026): il coordinatore
+#   # VERO, quindi ordini e sats veri, coi paletti: lo usano solo gli id
+#   # in lista, ogni ordine al massimo P2P_MAX_SATS_PROVA, e sulla VM MAI
+#   # la chiave di moderatore/solver ne' altre chiavi Mostro di
+#   # produzione (le dispute degli ordini del collaudo si risolvono dal
+#   # Barattolo vero). I relay sono quelli del coordinatore, senza il
+#   # nostro (la riga del VPS dice quali: grep -n "^MOSTRO_RELAY").
+#   SEGRETI_PROFILO_P2P = {1: "INCOLLA_QUI_UN_SEGRETO_NATO_SULLA_PROVA"}
+#   P2P_ATTIVO = True
+#   P2P_PROVA_IDS = [<gli stessi di PROVA_SOLO_IDS>]
+#   P2P_MAX_SATS_PROVA = 10_000
+#   MOSTRO_RELAY = ["INCOLLA_QUI_I_RELAY_DEL_COORDINATORE"]
+#   MOSTRO_RELAY_SPECCHIO = []
 #   MOSTRO_RELAY_CONFERMA = []
 #   AVVISO_DM_NOSTR = False
 #   AVVISO_DM_NOSTR_RELAY = []

@@ -33750,6 +33750,9 @@ def _censimento(acceso, dopo=None):
     amb["PROVA_SOLO_IDS"] = {111111111, 222222222} if acceso else set()
     amb["URL_PUBBLICO"] = amb["URL_PUBBLICO_DI_SERIE"] = "https://barattolo.store"
     amb["LINK_BOT"] = "https://t.me/ilbarattolobot"
+    # il tetto del collaudo (20 ott 2026): una FUNZIONE, che `__missing__`
+    # risolverebbe in un 7 da chiamare
+    amb["tetto_sats_prova"] = lambda: 10_000 if acceso else 0
     amb["NIP05_NOMI"] = {"usdb": "a" * 64} if acceso else {}
     # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
     # config finto darebbe la stringa di _SEGRETI_FINTI e il
@@ -82723,7 +82726,9 @@ def prove_p2p_server():
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              # i wallet il cui indirizzo non passa (10 ott 2026), in busta
-             "P2P_INDIRIZZI_NON_PASSANO": {"walletofsatoshi.com": "Wallet of Satoshi"}}
+             "P2P_INDIRIZZI_NON_PASSANO": {"walletofsatoshi.com": "Wallet of Satoshi"},
+             # il tetto del collaudo (20 ott 2026): 0 fuori dall'istanza di prova
+             "tetto_sats_prova": lambda: 0}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -82750,9 +82755,11 @@ def prove_p2p_server():
     # (12 ott 2026, sera) QUINDICI: la chat nello scambio, accesa di serie
     # (12 ott 2026, sera) SEDICI: i relay che contano come conferma
     # (13 ott 2026) DICIASSETTE: il paracadute degli ordini, spento di serie
-    prova("le chiavi sono diciassette e sono sempre quelle",
+    # (20 ott 2026) DICIOTTO: il tetto del collaudo, 0 in produzione
+    prova("le chiavi sono diciotto e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
-           "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "minEuroBz", "mostro", "paracadute",
+           "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz", "mostro",
+           "paracadute",
            "relay", "specchio", "tempoPubblica"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
@@ -114216,7 +114223,8 @@ def prove_avvisi_nuovi_ordini():
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
-             "P2P_INDIRIZZI_NON_PASSANO": {}}
+             "P2P_INDIRIZZI_NON_PASSANO": {},
+             "tetto_sats_prova": lambda: 0}    # (20 ott 2026) il tetto del collaudo, spento
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
     prova("la busta delle leve porta la leva e la finestra", (True, 15),
           (amb_l["_p2p_leve"]()["avvisiNuovi"], amb_l["_p2p_leve"]()["avvisiNuoviMinuti"]))
@@ -138031,7 +138039,8 @@ def prove_contanti_a_mano():
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
-             "P2P_INDIRIZZI_NON_PASSANO": {}}
+             "P2P_INDIRIZZI_NON_PASSANO": {},
+             "tetto_sats_prova": lambda: 0}    # (20 ott 2026) il tetto del collaudo, spento
     exec(_senza_prosa(pezzo("_p2p_leve")), amb_l)
     prova("la busta delle leve porta `maxEuroContanti`, intero", 250, amb_l["_p2p_leve"]()["maxEuroContanti"])
     prova("...e viaggia anche a zero (spenta), mai assente", 0,
@@ -148937,7 +148946,8 @@ def prove_indirizzo_non_verificato():
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
-             "P2P_INDIRIZZI_NON_PASSANO": elenco}
+             "P2P_INDIRIZZI_NON_PASSANO": elenco,
+             "tetto_sats_prova": lambda: 0}    # (20 ott 2026) il tetto del collaudo, spento
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
 
@@ -173866,7 +173876,7 @@ def prove_istanza_prova():
           "_utente_da_initdata(init)" in pc and 'request.cookies.get("barattolo_sessione"' in pc
           and "imposta_cookie_sessione" in src and '"barattolo_sessione", token' in src)
     prova("config_esempio porta la lista VUOTA, e la sezione della prova senza segreti", True,
-          "\nPROVA_SOLO_IDS = []\n" in es and "#   MOSTRO_RELAY = [\"ws://127.0.0.1:9\"]" in es
+          "\nPROVA_SOLO_IDS = []\n" in es and "#   P2P_MAX_SATS_PROVA = 10_000" in es
           and '#   RELAY_NOSTR = ["ws://127.0.0.1:7777"]' in es and "#   MODALITA_COLLAUDO = False" in es)
     prova("il collaudo del server vero e' nella gabbia della CI", [True, True],
           ["\ncollaudo_istanza_prova\n" in "\n" + open("ci/collaudi.txt", encoding="utf-8").read(),
@@ -174058,6 +174068,53 @@ def prove_istanza_prova():
           [["ws://127.0.0.1:7777"], []],
           [relays_import(PROVA_SOLO_IDS=[111], RELAY_NOSTR=["ws://127.0.0.1:7777", "wss://nos.lol"]),
            relays_import(PROVA_SOLO_IDS=[111], RELAY_NOSTR=[])])
+
+    # ---------------- 11) il tetto in sats del collaudo (20 ott 2026) --
+    i = src.index("P2P_MAX_SATS_PROVA_DI_SERIE = ")
+    blocco_t = src[i:src.index("\n\n\ndef tetto_sats_prova(", i)]
+    prova("la leva: non dichiarata 10.000, dichiarata vale, storta o spenta resta 10.000 e lo dice",
+          [(10000, 0), (5000, 0), (10000, 1), (10000, 1), (10000, 1)],
+          [(a["P2P_MAX_SATS_PROVA"], len(r)) for a, r in (
+              con_config(blocco_t), con_config(blocco_t, P2P_MAX_SATS_PROVA=5000),
+              con_config(blocco_t, P2P_MAX_SATS_PROVA=0), con_config(blocco_t, P2P_MAX_SATS_PROVA="x"),
+              con_config(blocco_t, P2P_MAX_SATS_PROVA=-3))])
+    amb = {"P2P_MAX_SATS_PROVA": 7000}
+    exec(pezzo("tetto_sats_prova"), amb)
+    amb["PROVA_SOLO_IDS"] = set()
+    fuori_ = amb["tetto_sats_prova"]()
+    amb["PROVA_SOLO_IDS"] = {111}
+    prova("vale SOLO sull'istanza di prova: 0 in produzione", (0, 7000),
+          (fuori_, amb["tetto_sats_prova"]()))
+    prova("...e viaggia in busta come maxSatsProva, dal giudice", True,
+          '"maxSatsProva": tetto_sats_prova(),' in pezzo("_p2p_leve"))
+    js = ("const fmt = n => String(n);\nlet cambioVivo = true, eurPerSat = 0.001;\n"
+          "let COORD = {};\nconst p2pCoord = () => COORD;\n"
+          + _fn_js(mini, "function maxEuroP2P(){")
+          + _fn_js(mini, "function giudiceTettoProvaP2P(euro){") + r"""
+const out = {};
+COORD = {maxEuro: 250};                 out.produzione = [maxEuroP2P(), giudiceTettoProvaP2P(1000)];
+COORD = {maxEuro: 0};                   out.senzaTetti = [maxEuroP2P(), giudiceTettoProvaP2P(1000)];
+COORD = {maxEuro: 250, maxSatsProva: 10000}; out.prova = [maxEuroP2P(), giudiceTettoProvaP2P(10), giudiceTettoProvaP2P(11)];
+COORD = {maxEuro: 5, maxSatsProva: 10000};   out.vinceStretto = maxEuroP2P();
+COORD = {maxEuro: 0, maxSatsProva: 10000};   out.soloProva = maxEuroP2P();
+cambioVivo = false;                     out.senzaCambio = maxEuroP2P();
+console.log(JSON.stringify(out));""")
+    o = _node_banco(js)
+    if o is None:
+        salta("il tetto del collaudo nel client", "node non c'e'")
+    else:
+        prova("nel client, a busta di produzione (maxSatsProva assente) tutto come prima",
+              {"produzione": [250, ""], "senzaTetti": [0, ""]},
+              {k: o.get(k) for k in ("produzione", "senzaTetti")})
+        prova("sul collaudo i sats diventano euro al cambio vivo, e la presa oltre si ferma",
+              [10, "", "Sul collaudo il massimo è 10000 sats (circa 10 €)"], o.get("prova"))
+        prova("...vince il tetto piu' stretto, anche senza quello in euro",
+              [5, 10], [o.get("vinceStretto"), o.get("soloProva")])
+        prova("...e senza cambio non si indovina: 1 €, cioe' fermo", 1, o.get("senzaCambio"))
+    cd = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
+    prova("la presa chiede il tetto del collaudo prima di partire", True,
+          "giudiceTettoProvaP2P(g ? g.euro : o.euro)" in cd
+          and cd.index("giudiceTettoProvaP2P(") < cd.index("eseguiPresaP2P("))
 
 
 def prove_miniature_leggere():

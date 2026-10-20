@@ -65044,6 +65044,10 @@ function confermaDettaglioP2P(){
   if (g && !g.ok) { toast(g.dillo); p2pDettImporto = 0; renderDettaglioP2P(); return; }
   const troppo = giudiceContantiP2P(g ? g.euro : o.euro, metPresa, maxEuroContantiP2P());
   if (troppo) { toast(troppo); return; }
+  /* il tetto del collaudo (20 ott 2026): vale anche per chi prende */
+  const oltre = typeof giudiceTettoProvaP2P === 'function'
+    ? giudiceTettoProvaP2P(g ? g.euro : o.euro) : '';
+  if (oltre) { toast(oltre); return; }
   haptic();
   chiudiFoglioP2P('p2pDettSheet');
   /* ⚠️ LA STESSA CHIAMATA DI PRIMA, e quindi lo stesso messaggio a
@@ -71580,7 +71584,26 @@ function maxSatsTestoP2P(){
 function maxEuroP2P(){
   const c = p2pCoord();
   const n = c ? Math.floor(Number(c.maxEuro)) : 0;
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const tetto = Number.isFinite(n) && n > 0 ? n : 0;
+  /* IL TETTO DEL COLLAUDO (20 ott 2026): `maxSatsProva` in busta, 0 in
+     produzione (e allora qui non cambia niente). Sul collaudo i sats
+     diventano euro al cambio vivo, e vince il tetto più stretto; senza
+     cambio non si indovina: 1 €, cioè fermo — sul collaudo i sats sono
+     veri, e un tetto che non si sa calcolare non è un via libera. */
+  const prova = c ? Math.floor(Number(c.maxSatsProva)) || 0 : 0;
+  if (!(prova > 0)) return tetto;
+  const daSats = (cambioVivo && eurPerSat > 0) ? Math.max(1, Math.floor(prova * eurPerSat)) : 1;
+  return tetto > 0 ? Math.min(tetto, daSats) : daSats;
+}
+/* ...e lo stesso tetto quando si PRENDE un ordine dal collaudo: la frase,
+   o '' quando non c'è niente da dire (in produzione, sempre). */
+function giudiceTettoProvaP2P(euro){
+  const c = p2pCoord();
+  const sats = c ? Math.floor(Number(c.maxSatsProva)) || 0 : 0;
+  if (!(sats > 0)) return '';
+  const max = maxEuroP2P();
+  return euro > max ? 'Sul collaudo il massimo è ' + fmt(sats) + ' sats (circa '
+                      + fmt(max) + ' €)' : '';
 }
 /* IL TETTO DEL CONTANTI DI PERSONA (30 set 2026): la gemella, in busta
    come `maxEuroContanti` — 250 di serie sul server, 0 = spenta. Vale
