@@ -20807,6 +20807,7 @@ def prove_collega_npub_firma():
     exec(pezzo("hex_to_npub"), amb)
     exec(pezzo("accoda_firma"), amb)
     exec(pezzo("_accoda_trasloco_di"), amb)
+    exec(pezzo("_spegni_badge_altrove"), amb)
     exec("async " + pezzo("collega_npub_firma"), amb)
     exec("async " + pezzo("unisci_nostr"), amb)
     exec(pezzo("_pulisci_fusioni"), amb)
@@ -21024,6 +21025,254 @@ def prove_collega_npub_firma():
           "riparte", (True, True),
           ("await caricaAccount();" in ecf,
            "if (d.unione_fatta) setTimeout(() => ricaricaPerConto(true), 3000);" in ecf))
+
+
+def prove_npub_una_casa():
+    """UNA CHIAVE, UNA CASA (20 ott 2026, cantiere npub-una-casa, ok di
+    Andrea). Il caso vero: A collega X, disabilita l'accesso (il badge
+    verificato resta), B collega X, disabilita — e il login con X
+    trovava DUE badge e apriva in silenzio un terzo account. Si gira
+    il caso coi pezzi veri del server su un database in memoria con
+    l'indice unico vero: i quattro passi, il 409 sui dati vecchi, la
+    corsa dei due primi login e l'import che non sceglie a caso."""
+    import asyncio
+    import hashlib
+    import sqlite3
+    import time
+    print("\n[una chiave, una casa]")
+
+    class _HTTP(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+
+    class _ReqFinta:
+        headers = {"host": "barattolo.store"}
+
+    amb = {"Header": lambda d="": d, "Cookie": lambda d="": d,
+           "Request": object, "Response": object, "HTTPException": _HTTP,
+           "ChiavePubblicaNostr": object, "time": time, "sqlite3": sqlite3,
+           "hashlib": hashlib}
+    i = _SORGENTE.index("CHARSET_BECH32 = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    i = _SORGENTE.index("SQL_CHIAVE_PROVATA = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for nome in ("_bech32_polymod", "npub_to_hex", "hex_to_npub",
+                 "accoda_firma", "_accoda_trasloco_di",
+                 "_spegni_badge_altrove", "disabilita_accesso_nostr",
+                 "tg_id_da_pubkey", "crea_utente_nostr",
+                 "casa_della_chiave", "venditori_nostr_attivi"):
+        exec(pezzo(nome), amb)
+    for nome in ("collega_npub_firma", "login_nostr",
+                 "_accogli_venditore_nostr"):
+        exec("async " + pezzo(nome), amb)
+
+    firma = {"pubkey": ""}
+    amb["verifica_evento_login"] = lambda evento, host: firma["pubkey"]
+    utente = {"id": 0}
+    amb["verifica_utente"] = lambda *a: utente
+    sessioni, biglietti = [], []
+    amb["apri_sessione"] = lambda resp, tg_id, *a: sessioni.append(tg_id)
+    amb["_invito_al_login"] = lambda tg_id, codice: {}
+    amb["nuovo_biglietto_collegamento"] = \
+        lambda tg_id, npub: biglietti.append(tg_id) or "biglietto"
+    amb["_frena"] = lambda *a: None
+    amb["_ip_di"] = lambda req: "127.0.0.1"
+    amb["nuovo_codice_negozio"] = lambda con: "NEG"
+    amb["chiave_di_casa"] = lambda chiave: False
+    amb.update(asyncio=asyncio, BENVENUTO_NOSTR="{url}{giorni}",
+               URL_PUBBLICO="", SUGGERIMENTI_OGNI_GIORNI=0)
+
+    async def niente(*a, **k):
+        return None
+    amb["premia_distintivi"] = niente
+    amb["premia_reputazione_nostr"] = niente
+    amb["aggiorna_profilo_social"] = niente
+    amb["notifica"] = niente
+
+    async def json_finto(req):
+        return {"evento": {}}
+    amb["leggi_json"] = json_finto
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT DEFAULT '',
+            username TEXT DEFAULT '', registrato INTEGER DEFAULT 0,
+            negozio TEXT DEFAULT '', npub TEXT DEFAULT '',
+            npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '',
+            verifica_codice TEXT DEFAULT '', verifica_scade INTEGER DEFAULT 0);
+        CREATE UNIQUE INDEX idx_utenti_npub_accesso
+            ON utenti(npub_accesso) WHERE npub_accesso != '';
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+            nostr_event_id TEXT DEFAULT '', nostr_autore TEXT DEFAULT '',
+            contatto_nostr TEXT DEFAULT '');
+        CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY,
+            tg_id INTEGER, azione TEXT, creato INTEGER);
+    """)
+    con.executemany("INSERT INTO utenti(tg_id, nome) VALUES(?,?)",
+                    [(1, "A"), (2, "B")])
+    con.commit()
+    chiusure = []
+
+    class Finta:
+        """Tutto alla connessione vera tranne close(), che si conta: la
+        prova guarda il database DOPO, e vuole sapere che si e' chiusa."""
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            chiusure.append(1)
+    amb["db"] = lambda: Finta()
+
+    def esito(coro):
+        try:
+            return ("ok", asyncio.run(coro))
+        except _HTTP as e:
+            return (e.status_code, e.detail)
+
+    def badge(tg_id):
+        r = con.execute("SELECT npub_verificata, npub_accesso FROM utenti "
+                        "WHERE tg_id=?", (tg_id,)).fetchone()
+        return (r["npub_verificata"], bool(r["npub_accesso"]))
+
+    hx = "d" * 64
+    x = amb["hex_to_npub"](hx)
+    firma["pubkey"] = hx
+    righe_prima = con.execute("SELECT COUNT(*) FROM utenti").fetchone()[0]
+
+    # --- I QUATTRO PASSI DEL CASO ------------------------------------
+    utente["id"] = 1
+    prova("passo 1: A collega X", "ok",
+          esito(amb["collega_npub_firma"](_ReqFinta()))[0])
+    prova("...A ha badge e porta", (1, True), badge(1))
+    amb["disabilita_accesso_nostr"]()
+    prova("passo 2: A disabilita l'accesso, il badge resta", (1, False),
+          badge(1))
+    utente["id"] = 2
+    prova("passo 3: B collega X", "ok",
+          esito(amb["collega_npub_firma"](_ReqFinta()))[0])
+    prova("...e il badge rimasto su A si SPEGNE (una chiave, una casa)",
+          (0, False), badge(1))
+    prova("...B ha badge e porta", (1, True), badge(2))
+    amb["disabilita_accesso_nostr"]()
+    prova("passo 4: B disabilita, il badge di B resta", (1, False), badge(2))
+    prova("il badge verificato di X sta su UNA riga sola", 1,
+          con.execute("SELECT COUNT(*) FROM utenti WHERE npub=? "
+                      "AND npub_verificata=1", (x,)).fetchone()[0])
+    r = esito(amb["login_nostr"](_ReqFinta(), None))
+    prova("il login con X propone B, l'unica casa rimasta",
+          ("ok", [2]), (r[0], biglietti))
+    prova("...e NON apre un account in piu'", righe_prima,
+          con.execute("SELECT COUNT(*) FROM utenti").fetchone()[0])
+
+    # --- IL 409 SUI DATI DI PRIMA (due badge, nessuna porta) ----------
+    con.execute("UPDATE utenti SET npub=?, npub_verificata=1 WHERE tg_id=1",
+                (x,))
+    con.commit()
+    sessioni.clear()
+    biglietti.clear()
+    r = esito(amb["login_nostr"](_ReqFinta(), None))
+    prova("due badge verificati e nessuna porta: 409", 409, r[0])
+    prova("...che dice come uscirne", True,
+          "piu' account Telegram" in str(r[1])
+          and "Entra anche con Nostr" in str(r[1]))
+    prova("...nessun account nuovo, nessuna sessione, nessun biglietto",
+          (righe_prima, [], []),
+          (con.execute("SELECT COUNT(*) FROM utenti").fetchone()[0],
+           sessioni, biglietti))
+    # la via d'uscita detta dal 409: A collega da Telegram
+    utente["id"] = 1
+    con.execute("UPDATE utenti SET npub_accesso='' WHERE tg_id=1")
+    prova("...e la via d'uscita funziona: A collega X", "ok",
+          esito(amb["collega_npub_firma"](_ReqFinta()))[0])
+    prova("...il badge di B si spegne, A e' l'unica casa", ((1, True), (0, False)),
+          (badge(1), badge(2)))
+    r = esito(amb["login_nostr"](_ReqFinta(), None))
+    prova("...e il login con X entra in A", ("ok", [1]), (r[0], sessioni))
+
+    # --- LA FUSIONE SPEGNE ANCHE LEI ----------------------------------
+    fus = codice(pezzo("esegui_fusione"))
+    i_del = fus.find('con.execute("DELETE FROM utenti WHERE tg_id=?", (id_nostr,))')
+    i_sp = fus.find('_spegni_badge_altrove(con, n["npub_accesso"], id_telegram)')
+    i_acc = fus.find('"UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso=?, "')
+    prova("la fusione spegne i badge altrove, fra la riga che muore e "
+          "la porta che si accende", True, 0 <= i_del < i_sp < i_acc)
+    prova("collega-firma spegne solo se la chiave e' davvero entrata", True,
+          "if scritta:\n            _spegni_badge_altrove(con, npub, user[\"id\"])"
+          in pezzo("collega_npub_firma"))
+    # il pezzo stesso: una riga CON porta non si tocca mai
+    con.execute("INSERT INTO utenti(tg_id, npub, npub_verificata, npub_accesso) "
+                "VALUES(7, 'npub1altra', 1, 'npub1altra'), "
+                "(8, 'npub1altra', 1, ''), (9, '', 0, '')")
+    spente = amb["_spegni_badge_altrove"](con, "npub1altra", 9)
+    prova("_spegni_badge_altrove spegne il badge senza porta e lascia "
+          "quella con la porta", (1, [(7, 1), (8, 0), (9, 0)]),
+          (spente, [tuple(r) for r in con.execute(
+              "SELECT tg_id, npub_verificata FROM utenti "
+              "WHERE tg_id IN (7,8,9) ORDER BY tg_id")]))
+    con.execute("DELETE FROM utenti WHERE tg_id IN (7,8,9)")
+    con.commit()
+
+    # --- LA CORSA DEI DUE PRIMI LOGIN: «riprova», non un 500 ----------
+    hy = "e" * 64
+    y = amb["hex_to_npub"](hy)
+    prima = len(chiusure)
+    tg_y = amb["crea_utente_nostr"](hy, y)
+    prova("il primo login con una chiave nuova apre il nativo", True,
+          tg_y < 0)
+    prova("...e chiude la sua connessione", 1, len(chiusure) - prima)
+    prima = len(chiusure)
+    try:
+        amb["crea_utente_nostr"](hy, y)   # il secondo, arrivato insieme
+        r = ("ok",)
+    except _HTTP as e:
+        r = (e.status_code, e.detail)
+    except Exception as e:                # il 500 di prima: rossa, non un crollo
+        r = (type(e).__name__,)
+    prova("il secondo, insieme, e' un 409 «riprova» e non un 500",
+          (409, True), (r[0], "riprova" in str(r[-1])))
+    prova("...e la connessione si chiude comunque", 1,
+          len(chiusure) - prima)
+    prova("...e di righe con quella porta ce n'e' una", 1,
+          con.execute("SELECT COUNT(*) FROM utenti WHERE npub_accesso=?",
+                      (y,)).fetchone()[0])
+
+    # --- L'IMPORT NON SCEGLIE A CASO ----------------------------------
+    hz = "f" * 64
+    z = amb["hex_to_npub"](hz)
+    # Z: due badge verificati, nessuna porta (il caso del 409)
+    con.execute("INSERT INTO utenti(tg_id, npub, npub_verificata) "
+                "VALUES(30, ?, 1), (31, ?, 1)", (z, z))
+    # X: porta su A (1) + un badge vecchio riacceso a mano su 32, come
+    # la riga di produzione (-1411...) prima del comando una tantum
+    con.execute("INSERT INTO utenti(tg_id, npub, npub_verificata) "
+                "VALUES(32, ?, 1)", (x,))
+    con.commit()
+    import io
+    import contextlib
+    giornale = io.StringIO()
+    with contextlib.redirect_stdout(giornale):
+        coppie = amb["venditori_nostr_attivi"]()
+    prova("l'import serve X UNA volta sola, alla riga che ci entra",
+          [1], [tg for k, tg in coppie if k == x])
+    prova("...Y (una riga sola) com'era", [tg_y],
+          [tg for k, tg in coppie if k == y])
+    prova("...Z (due badge, nessuna porta) nessuna", [],
+          [tg for k, tg in coppie if k == z])
+    prova("...e lo dice nel journal", True,
+          "nessuno ci entra" in giornale.getvalue()
+          and z[:16] in giornale.getvalue())
+    creati = []
+    amb["crea_utente_nostr"] = lambda h, n: creati.append(n) or -77
+    with contextlib.redirect_stdout(io.StringIO()):
+        a_x = asyncio.run(amb["_accogli_venditore_nostr"](hx))
+        a_z = asyncio.run(amb["_accogli_venditore_nostr"](hz))
+        a_n = asyncio.run(amb["_accogli_venditore_nostr"]("a" * 64))
+    prova("l'accoglienza porta X alla riga con la porta", 1, a_x)
+    prova("...Z a nessuna, senza aprire un account", (None, []),
+          (a_z, [c for c in creati if c == z]))
+    prova("...e una chiave mai vista apre il nativo come prima", -77, a_n)
+    con.close()
 
 
 def prove_bip353():
@@ -175115,6 +175364,7 @@ def main():
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_firme_nsec,
               prove_trasloco_nostr, prove_collega_npub_firma,
+              prove_npub_una_casa,
               prove_conta_feedback,
               prove_classifica, prove_classifica_nascosta,
               prove_classifica_recensioni_tutte,

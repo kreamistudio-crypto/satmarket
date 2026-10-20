@@ -69125,3 +69125,84 @@ usa lo stesso bundle, e la firma la giudica Python).
   uno swap pronto.
 - Un ritiro con le tariffe di ADESSO per uno swap recuperato (che il
   preventivo non l'ha): provato solo nel collaudo col cartone.
+
+## Una chiave, una casa: la stessa npub su più account (20 ott 2026, cantiere npub-una-casa, ok di Andrea)
+
+**DA DOVE.** Una domanda di Andrea sulla doppia cittadinanza (sola
+lettura, stessa giornata): la PORTA (`npub_accesso`) è 1:1 per indice
+unico, ma il BADGE verificato (`npub` + `npub_verificata=1`) no. Il
+giro che lo rompeva, tutto con bottoni veri: A collega X con «Entra
+anche con Nostr», A disabilita l'accesso (si toglie la porta, il badge
+resta), B collega X (passa: l'indice guarda solo le porte), B
+disabilita. Il login con X trovava DUE badge senza porta, `len(righe)
+== 1` era falso e si cadeva nel ramo del nativo: un TERZO account, in
+silenzio. E l'import (`venditori_nostr_attivi`) serviva la stessa
+chiave una volta per riga: l'UPDATE dell'annuncio scrive
+`venditore_id=?`, quindi a ogni giro gli annunci finivano sull'ULTIMA
+riga, magari quella senza porta. In produzione c'è UN caso: la stessa
+npub sull'account Telegram 658176069 (porta accesa, il login entra lì)
+e sulla riga solo-Nostr -1411495424481242136 (badge, niente porta, 0
+annunci, 0 ordini).
+
+**COSA SI È DECISO (Andrea).**
+- Login: più badge verificati e nessuna porta = 409 che dice come
+  uscirne («apri il Barattolo da Telegram con quello giusto e usa
+  «Entra anche con Nostr»»), mai un account nuovo.
+- `_spegni_badge_altrove(con, npub, tg_id)`: quando una chiave diventa
+  la porta di un account, il badge verificato della stessa npub sulle
+  ALTRE righe senza porta si spegne. Chi firma adesso ha la chiave in
+  mano: decide lui dove abita. La chiamano `collega_npub_firma` (solo
+  se l'UPDATE ha scritto davvero: mai spegnere per una casa che non
+  c'è) ed `esegui_fusione` (dopo che la riga nativa muore, prima che
+  la porta si accenda). Le righe CON porta non si toccano.
+- `crea_utente_nostr`: due primi login insieme con la stessa chiave
+  urtano l'indice unico; era un 500 con la connessione lasciata
+  aperta, ora la connessione si chiude comunque e torna un 409
+  «riprova» (al secondo giro la riga c'è e si entra).
+- Import: `casa_della_chiave(righe, npub)` — una riga sola: quella;
+  più righe: quella con la porta; nessuna con la porta: None e una
+  riga nel journal («nessuno ci entra»). La usano
+  `venditori_nostr_attivi` (una chiave, un giro) e
+  `_accogli_venditore_nostr` (che con None NON apre un nativo).
+- Il caso di produzione si chiude con un comando una tantum (nel
+  report della sessione, lo lancia Andrea dopo il deploy): copia del
+  database, controllo prima, `npub_verificata=0` solo su quella riga e
+  solo se ha ancora 0 annunci, controllo dopo. Niente fusione: non c'è
+  niente da fondere. Col codice nuovo già deployato l'import serve
+  comunque la sola riga con la porta.
+
+**STRADE SCARTATE.**
+- Un indice unico anche sul badge verificato: la migrazione fallirebbe
+  sul caso di produzione (e su ogni dato vecchio come lui), e il badge
+  senza porta di un vecchio venditore importato è legittimo finché è
+  solo.
+- Rifiutare `collega-firma` quando la npub è verificata altrove: è
+  proprio la via d'uscita che il 409 indica.
+- Nell'import, scegliere «la più vecchia» o «la positiva» quando
+  nessuna ha la porta: è scegliere a caso con un'aria seria.
+
+**COSA È STATO PROVATO.**
+- `prove_npub_una_casa` (in `prove.py`), coi pezzi veri del server su
+  un database in memoria con l'indice unico vero: i quattro passi del
+  caso (il badge di A si spegne al passo 3; dopo il passo 4 il login
+  propone B e non nasce nessuna riga); il 409 sui dati vecchi (due
+  badge, nessuna porta: niente riga, niente sessione, niente
+  biglietto) e la sua via d'uscita (A collega, il badge di B si
+  spegne, il login entra in A); l'ordine nella fusione; il pezzo che
+  non tocca le righe con porta; la corsa dei due primi login (409
+  «riprova», connessione chiusa, una riga sola); l'import (X una
+  volta sola alla riga con la porta, Z con due badge a nessuna e la
+  riga nel journal) e l'accoglienza (X alla porta, Z a nessuna senza
+  aprire un nativo, una chiave nuova apre il nativo come prima).
+  CONTROPROVA, quattro mutanti: senza il 409 (8 rosse), senza lo
+  spegnimento (5), l'import di prima (2), senza l'except (1).
+- `prove_collega_npub_firma` esegue anche il pezzo nuovo (il suo
+  banco lo chiama).
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA DA GUARDARE.**
+- Il comando una tantum sul VPS (Andrea), coi due controlli: prima
+  `2|1|1|0`, dopo `1|0|1|0`.
+- Il 409 del login si legge solo come toast: chi ha due account
+  Telegram con la stessa chiave deve sapere quale dei due tenere.
+  Oggi in produzione nessuno è in quel caso.
