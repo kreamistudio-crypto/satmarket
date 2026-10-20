@@ -123,6 +123,7 @@ collaudo_swap_preventivo
 collaudo_swap_telefono
 collaudo_avvisi_nostr_arrivano
 collaudo_swap_instradatore
+collaudo_onchain_indirizzo
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

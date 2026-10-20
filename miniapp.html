@@ -53193,7 +53193,14 @@ async function renderOnchain(){
        creazione, che e' il punto della tappa 1c. */
     const parole = await onchainSemeAssicurato();
     const k = await onchainChiavi(parole, onchainSrv);
-    box.innerHTML = onchainConSeme(parole, k);
+    /* LA TAPPA 2 (20 ott 2026): la mia xpub dedicata, e ogni indirizzo
+       che il server dice mio RIFATTO qui prima di mostrarlo */
+    const miaXpub = await onchainMiaXpub(parole, onchainSrv);
+    const verifiche = [];
+    for (const r of (onchainSrv.indirizzi || [])) {
+      verifiche.push(await onchainVerificaRiga(parole, onchainSrv, r));
+    }
+    box.innerHTML = onchainConSeme(parole, k, miaXpub, verifiche);
   } catch(e) {
     box.innerHTML = `<div class="hint">Non sono riuscito a preparare il
       banco: ${esc(e.message || 'errore')}.</div>
@@ -53206,7 +53213,7 @@ async function renderOnchain(){
    crearlo — la chiave c'e' gia' quando apri, e se non c'era e' nata
    mentre aprivi. Chi cercasse qui la schermata di creazione: era
    quella, ed e' stata togliere apposta.) */
-function onchainConSeme(parole, k){
+function onchainConSeme(parole, k, miaXpub, verifiche){
   const prima = onchainPrimaLetta();
   const uguale = prima && prima.indirizzo === k.indirizzo
                  && prima.descrittore === k.descrittore;
@@ -53269,8 +53276,12 @@ function onchainConSeme(parole, k){
         <span class="mono">importdescriptors</span> così com'è.</div>
     </div>
 
+    ${onchainBloccoAccendi(miaXpub)}
+
+    ${onchainBloccoIndirizzi(miaXpub, verifiche || [])}
+
     <div class="payout">
-      <h4>4. Il backup, che si fa da sé</h4>
+      <h4>6. Il backup, che si fa da sé</h4>
       <div class="hint">Alla nascita la chiave è andata <b>da sola</b>
         dove hai una casa: il cloud di Telegram se sei dentro Telegram,
         e i relay Nostr — cifrata con la <b>tua</b> chiave, che noi non
@@ -53284,7 +53295,7 @@ function onchainConSeme(parole, k){
     </div>
 
     <div class="payout" style="border-color:var(--danger)">
-      <h4>5. La prova del ripristino</h4>
+      <h4>7. La prova del ripristino</h4>
       <div class="hint">Il punto di tutto: <b>dimentica</b> il seme su
         questo dispositivo, poi <b>ripristina</b> dal cloud — e
         Barattolo confronta da sé l'indirizzo di prima con quello di
@@ -53306,13 +53317,167 @@ function onchainConSeme(parole, k){
     </div>
 
     <div class="payout">
-      <h4>6. Esporta</h4>
+      <h4>8. Esporta</h4>
       <div class="hint">Le dodici parole <b>e</b> il descrittore: è
         quello che serve per ritrovare gli stessi sats in Sparrow
         <b>senza Barattolo</b>.</div>
       <button class="btn ghost" onclick="onchainEsporta(this)">📤 Mostra tutto da copiare</button>
       <div id="onchainExport"></div>
     </div>`;
+}
+
+/* ============ ACCENDI L'ON-CHAIN, E UN INDIRIZZO VERO (20 ott 2026,
+   tappa 2) ============
+   Blocco 4: la xpub dedicata va al server con un gesto della persona —
+   non in silenzio come la chiave, perche' qui qualcosa ESCE dal
+   telefono (la meta' pubblica del conto) e chi la da' deve saperlo.
+   Blocco 5: un indirizzo vero con un altro ammesso. Lo calcola il
+   server, e questo telefono lo RIFA' da solo prima di mostrarlo
+   (`onchainVerificaRiga`): un indirizzo che non combacia non si vede.
+   Le ultime otto lettere della xpub bastano a riconoscerla: intera
+   non serve a chi guarda, e non si sparge. */
+function onchainCoda(x){ return String(x || '').slice(-8); }
+
+function onchainBloccoAccendi(miaXpub){
+  const srv = onchainSrv || {};
+  const sua = srv.mia_xpub || '';
+  let stato;
+  if (!srv.embit) {
+    stato = `<div class="hint" style="color:var(--danger)">Su questo
+      server manca la libreria che fa i conti degli indirizzi
+      (<span class="mono">embit</span>): l'accensione aspetta che venga
+      installata.</div>`;
+  } else if (sua && sua === miaXpub) {
+    stato = `<div class="hint" style="color:var(--ok)"><b>✅ Acceso.</b>
+      Il server ha la tua chiave pubblica dedicata (finisce in
+      <span class="mono">…${esc(onchainCoda(sua))}</span>).</div>`;
+  } else if (sua) {
+    stato = `<div class="hint" style="color:var(--danger)"><b>⚠️ Il
+      server ha un'altra tua chiave pubblica</b> (finisce in
+      <span class="mono">…${esc(onchainCoda(sua))}</span>): è di un altro
+      seme, forse di un altro telefono. Gli indirizzi già fatti restano
+      veri; con «Usa questa» i prossimi nasceranno da questo seme.</div>
+      <button class="btn ghost" onclick="onchainAccendi(this)">🔁 Usa questa</button>`;
+  } else {
+    stato = `<button class="btn" onclick="onchainAccendi(this)">⛓️ Accendi l'on-chain</button>`;
+  }
+  return `
+    <div class="payout">
+      <h4>4. Accendi l'on-chain</h4>
+      <div class="hint">Per pagare e ricevere on-chain, Barattolo deve
+        poter calcolare l'indirizzo di ogni ordine anche quando il tuo
+        telefono è spento. Per questo gli dai la <b>metà pubblica</b> di
+        un conto che serve solo qui
+        (<span class="mono">${esc(srv.strada || '')}</span>): non è il tuo
+        wallet, e con lei <b>non si spende niente</b>. Ogni ordine
+        prenderà da lì una chiave sua, mai usata prima.</div>
+      ${stato}
+    </div>`;
+}
+
+function onchainBloccoIndirizzi(miaXpub, verifiche){
+  const srv = onchainSrv || {};
+  const acceso = srv.mia_xpub && srv.mia_xpub === miaXpub;
+  const altri = srv.controparti || [];
+  let gesti;
+  if (!acceso) {
+    gesti = '<div class="hint">Prima accendi l\'on-chain (blocco 4).</div>';
+  } else if (!srv.embit) {
+    gesti = '';
+  } else if (!altri.length) {
+    gesti = `<div class="hint">Nessun altro admin ha ancora acceso
+      l'on-chain: quando lo fa, compare qui.</div>`;
+  } else {
+    gesti = altri.map(a => `<button class="btn ghost"
+      onclick="onchainNuovoIndirizzo(this, ${Number(a.id)})">➕ Con
+      ${esc(a.nome)}</button>`).join(' ');
+  }
+  const righe = (srv.indirizzi || []).map((r, n) =>
+    onchainRigaIndirizzo(r, verifiche[n] || {})).join('');
+  return `
+    <div class="payout">
+      <h4>5. Un indirizzo vero, con un altro admin</h4>
+      <div class="hint">Tu fai da compratore, l'altro da venditore, e
+        Barattolo è la terza chiave. Il server calcola l'indirizzo, e
+        <b>questo telefono lo rifà da solo</b> con le sue chiavi: lo vedi
+        solo se i due conti tornano identici. Non c'è nessun ordine
+        dietro, e la rete è signet: i sats non valgono niente.</div>
+      ${gesti}
+      ${righe
+        ? `<div style="margin-top:10px"><b>I tuoi indirizzi</b> (gli
+             ultimi cinque)</div>${righe}`
+        : ''}
+    </div>`;
+}
+
+function onchainRigaIndirizzo(r, v){
+  const testa = `<div><b>N. ${Number(r.id)}</b> · tu ${r.ruolo === 'venditore'
+    ? 'vendi a' : 'compri da'} ${esc(r.controparte || '?')} · la tua chiave
+    è la numero ${Number(r.mio_numero)}</div>`;
+  if (!v.uguale) {
+    return `<div style="margin-top:10px">${testa}
+      <div class="hint" style="color:var(--danger)"><b>⛔ Non
+        combacia</b>: il conto del server e quello del telefono danno
+        indirizzi diversi, e l'indirizzo non si mostra. Fermati e
+        dimmelo: è il caso che non deve succedere.</div></div>`;
+  }
+  const nota = v.mia
+    ? `<div class="hint" style="color:var(--ok)">✅ Il tuo telefono ha
+         rifatto lo stesso indirizzo, e la chiave da ${esc(r.ruolo)} è
+         la tua.</div>`
+    : `<div class="hint" style="color:var(--danger)"><b>⚠️ L'indirizzo
+         torna, ma la chiave da ${esc(r.ruolo)} non è di questo
+         seme</b>: è nata da un'altra tua chiave pubblica (un altro
+         telefono, o un seme di prima). Da qui non potresti
+         firmare.</div>`;
+  return `<div style="margin-top:10px">${testa}${nota}
+    <div class="mono" style="word-break:break-all">${esc(r.indirizzo)}</div>
+    <div class="mono" style="word-break:break-all;font-size:11px">${esc(r.descrittore)}</div>
+    ${r.cartone ? '<div class="hint">Terza chiave <b>di cartone</b>.</div>' : ''}
+  </div>`;
+}
+
+async function onchainAccendi(btn){
+  haptic();
+  const parole = onchainSemeLocale();
+  if (!parole || !onchainSrv) return toast('⚠️ Non c\'è nessuna chiave da accendere');
+  const rip = onchainAttesa(btn, 'Accendo…');
+  try {
+    const xpub = await onchainMiaXpub(parole, onchainSrv);
+    const q = await fetch(`${API_BASE}/onchain/xpub`,
+      {method:'POST', headers:{'Content-Type':'application/json',
+                               'X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({xpub})});
+    const d = await q.json().catch(()=>({}));
+    rip();
+    if (!q.ok) return toast(`⚠️ ${d.detail || 'Non riuscito'}`, 4000);
+    toast('⛓️ On-chain acceso: il server ha la tua chiave pubblica dedicata');
+  } catch(e) {
+    rip();
+    return toast('Rete assente: riprova');
+  }
+  onchainSrv = null;
+  renderOnchain();
+}
+
+async function onchainNuovoIndirizzo(btn, altro){
+  haptic();
+  const rip = onchainAttesa(btn, 'Calcolo…');
+  try {
+    const q = await fetch(`${API_BASE}/onchain/prova/indirizzo`,
+      {method:'POST', headers:{'Content-Type':'application/json',
+                               'X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({venditore_id: altro})});
+    const d = await q.json().catch(()=>({}));
+    rip();
+    if (!q.ok) return toast(`⚠️ ${d.detail || 'Non riuscito'}`, 4000);
+    toast(`➕ Indirizzo n. ${Number(d.id)} fatto: lo rifaccio qui per controllarlo`);
+  } catch(e) {
+    rip();
+    return toast('Rete assente: riprova');
+  }
+  onchainSrv = null;
+  renderOnchain();
 }
 
 /* COM'E' NATA, detto in una riga: chi guarda deve capire che non ha
