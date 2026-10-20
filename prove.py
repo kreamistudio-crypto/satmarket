@@ -51857,7 +51857,7 @@ def prove_deploy():
     prova("il giudice si chiama NUDO, senza condizioni davanti", True,
           chiamata > -1)
     prova("il giudice gira PRIMA di toccare qualunque cosa", True,
-          -1 < chiamata < sh.index("sorgente.backup")
+          -1 < chiamata < sh.index("python3 deploy/copia-db.py")
           < sh.index('reset --hard --quiet "$LA"'))
     # --forza riprova, ma non salta il giudice: fra `giudica` e il reset
     # non c'e' nessun ramo che guardi --forza
@@ -51925,7 +51925,7 @@ def prove_deploy():
           sh.index("compileall") < sh.index("systemctl restart"))
     # e il database si mette da parte PRIMA di toccare i file
     prova("la copia del database viene prima del reset", True,
-          sh.index("sorgente.backup") < sh.index('reset --hard --quiet "$LA"'))
+          sh.index("python3 deploy/copia-db.py") < sh.index('reset --hard --quiet "$LA"'))
     # ogni esito si dice: un aggiornamento silenzioso e' un
     # aggiornamento di cui nessuno sa la data
     prova("i tre esiti si raccontano", True, sh.count("avvisa ") >= 4)
