@@ -269,6 +269,18 @@ aspetta_che_stia_bene() {
 # le parole di un motivo finiscono in un messaggio HTML
 scappa() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' <<<"$1"; }
 
+# L'AVVISO IN PRESTITO (20 ott 2026, cantiere backup-database-occupato):
+# il backup giornaliero (`deploy/backup-fuori.sh`) quando cade lo deve
+# dire nella stessa stanza degli avvisi del deploy, con lo stesso bot e la
+# stessa regola del gruppo. La regola vive QUI, in `avvisa`, e una seconda
+# copia nel backup sarebbe una terza da tenere uguale: lui chiama
+# `deploy.sh --avvisa "<testo>"`, e questo ramo manda e se ne va PRIMA di
+# ogni git, senza toccare niente.
+if [[ "${1:-}" == "--avvisa" ]]; then
+  avvisa "${2:-}"
+  exit 0
+fi
+
 # SI TIRANO TUTT'E DUE: `pronto` e' il campanello, `main` e' il metro
 # con cui lo si misura. I refspec sono ESPLICITI: un clone nato
 # `--single-branch` tirerebbe main senza scrivere origin/main, e il
@@ -409,17 +421,25 @@ chmod 700 backup     # dentro c'e' il database intero: solo root
 # Se la copia non riesce si va avanti lo stesso — il deploy puo' essere
 # proprio la cura — ma da ottobre 2026 lo si DICE in chat: il 18 ott il
 # database era rotto e questa riga lo scriveva solo nel journal.
-python3 - "backup/pre-deploy-$(date +%Y%m%d-%H%M%S)-${QUI:0:8}.db" <<'PY' 2>/dev/null \
-  && dillo "💾 copia del database messa da parte" \
-  || { dillo "⚠️ copia del database non riuscita: si va avanti lo stesso"; avvisa "⚠️ <b>La copia del database prima del deploy non è riuscita</b>: il file potrebbe essere rotto. Il deploy va avanti; guardare subito <code>/api/salute</code>."; }
-import sys, sqlite3
-from config import DB
-sorgente = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-destinazione = sqlite3.connect(sys.argv[1])
-with destinazione:
-    sorgente.backup(destinazione)
-destinazione.close(); sorgente.close()
-PY
+# UNA COPIA SOLA, CONTROLLATA (20 ott 2026, cantiere
+# backup-database-occupato): la fa `deploy/copia-db.py` — API di backup,
+# 30 s di attesa sul lucchetto, tetto di 90 s, `integrity_check` sulla
+# copia — e da QUESTA copia nasce anche l'archivio qui sotto. Prima erano
+# due letture del vivo, e la seconda (il `sqlite3` senza attesa) cadeva
+# su «database is locked» mentre la prima era riuscita. Il `timeout 150`
+# e' la cintura sopra il tetto dell'aiutante.
+COPIA="backup/pre-deploy-$(date +%Y%m%d-%H%M%S)-${QUI:0:8}.db"
+DB_VIVO="$(python3 -c 'from config import DB; print(DB)' 2>/dev/null)"
+ESITO_COPIA="$(timeout 150 python3 deploy/copia-db.py "${DB_VIVO:-satmarket.db}" "$COPIA" 2>/dev/null)"
+case $? in
+  0) COPIA_DETTA="integra"
+     dillo "💾 copia del database messa da parte, integra: $COPIA ($ESITO_COPIA)" ;;
+  3) COPIA_DETTA="non-integra"
+     dillo "⚠️ copia del database messa da parte ma NON integra: $ESITO_COPIA" ;;
+  *) COPIA_DETTA=""
+     rm -f "$COPIA" "$COPIA.parziale"
+     dillo "⚠️ copia del database NON riuscita: ${ESITO_COPIA:-nessuna risposta (tetto di tempo?)} — si va avanti lo stesso" ;;
+esac
 ls -1t backup/pre-deploy-*.db 2>/dev/null | tail -n +$((BACKUP_DA_TENERE + 1)) \
   | xargs -r rm -f
 
@@ -434,16 +454,41 @@ ls -1t backup/pre-deploy-*.db 2>/dev/null | tail -n +$((BACKUP_DA_TENERE + 1)) \
 # deve poter arrivare lo stesso — la copia locale qui sopra c'e', e
 # l'archivio resta in backup/fuori/ per il PC. Ma lo si DICE in chat.
 # Il tetto di 120 secondi sta largo anche nei 300 dell'unita' di prima (la nuova ne da' 600).
-if [ -f "${BARATTOLO_BACKUP_ENV:-/etc/barattolo-backup.env}" ]; then
-  if timeout 120 bash deploy/backup-fuori.sh --prima-del-deploy "${LA:0:8}"; then
+# Dal 20 ott l'archivio prende la copia di qui sopra (`--copia`) invece di
+# rileggere il vivo; senza una copia non c'e' archivio da fare, e lo si
+# dice. 150 + 120 secondi stanno ancora nei 600 dell'unita'.
+ARCHIVIO=""
+if [ -z "$COPIA_DETTA" ]; then
+  ARCHIVIO="senza-copia"
+  dillo "⚠️ niente copia, niente archivio per il canale dei backup: si va avanti"
+elif [ -f "${BARATTOLO_BACKUP_ENV:-/etc/barattolo-backup.env}" ]; then
+  if timeout 120 bash deploy/backup-fuori.sh --prima-del-deploy "${LA:0:8}" --copia "$COPIA"; then
+    ARCHIVIO="mandato"
     dillo "📦 archivio cifrato mandato al canale dei backup"
   else
+    ARCHIVIO="non-partito"
     dillo "⚠️ archivio per il canale dei backup non riuscito: si va avanti"
-    avvisa "⚠️ <b>Il backup su Telegram prima del deploy non è partito</b> (${LA:0:8}). Il deploy va avanti; la copia locale c'è. Guardare <code>journalctl -u barattolo-deploy -n 40</code>."
   fi
 else
+  ARCHIVIO="senza-env"
   dillo "⚠️ manca /etc/barattolo-backup.env: nessun archivio prima del deploy"
 fi
+# L'AVVISO DICE LA VERITA' (20 ott 2026): il 20 ott il bot ha scritto «la
+# copia locale c'è» senza saperlo. Adesso un avviso solo, che nomina lo
+# stato vero di tutt'e due: la copia (c'e' ed e' integra / c'e' ma rotta /
+# non c'e') e l'archivio. Tutto a posto, o solo l'env mancante (com'era):
+# nessun avviso, bastano le righe del journal.
+GUARDA="Guardare <code>journalctl -u barattolo-deploy -n 40</code>."
+case "$COPIA_DETTA:$ARCHIVIO" in
+  integra:mandato|integra:senza-env) ;;
+  integra:*)
+    avvisa "⚠️ <b>Il backup su Telegram prima del deploy non è partito</b> (${LA:0:8}). La copia locale c'è ed è integra (<code>integrity_check</code> ok): <code>$COPIA</code>. Il deploy va avanti. $GUARDA" ;;
+  non-integra:*)
+    if [ "$ARCHIVIO" = "mandato" ]; then STATO_ARCHIVIO="l'archivio è partito lo stesso, con la copia rotta"; else STATO_ARCHIVIO="nessun archivio nel canale"; fi
+    avvisa "⚠️ <b>La copia del database prima del deploy NON è integra</b> (${LA:0:8}): $(scappa "$ESITO_COPIA"). Vuol dire che è rotto il database vivo; $STATO_ARCHIVIO. Il deploy va avanti: guardare subito <code>/api/salute</code>, e prima di toccare qualcosa si chiede a Claude. $GUARDA" ;;
+  *)
+    avvisa "⚠️ <b>La copia del database prima del deploy NON è riuscita</b> (${LA:0:8}): $(scappa "${ESITO_COPIA:-nessuna risposta, tetto di tempo}"). Nessuna copia locale nuova e nessun archivio nel canale: restano quelli di prima. Il deploy va avanti; guardare <code>/api/salute</code>. $GUARDA" ;;
+esac
 
 git reset --hard --quiet "$LA" || {
   dillo "❌ git reset non riuscito: non tocco niente"

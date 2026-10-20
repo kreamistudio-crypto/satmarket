@@ -115,6 +115,7 @@ schnorr_puro.py
 collaudo_controllo_fattura.py
 collaudo_guardia_liquidita.py
 deploy/nodo/sonda-rotte.py
+deploy/copia-db.py
 collaudo_canale_admin.py
 collaudo_avviso_chi_annulla.py
 collaudo_recapito_aggiornato.py
