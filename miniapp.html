@@ -243,6 +243,13 @@
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
        sono leggibili sui fondi tenui */
     --sats-deep:#D97706; --sats-text:#B45309;
+    /* L'ARANCIO SULLA CARTA BIANCA (20 ott 2026, cantiere onion-contrasto,
+       richiesta di Andrea): le pillole del banner (.demo-cta) restano
+       BIANCHE anche al buio, come il cartellino di carta, quindi la loro
+       scritta non segue --sats-text, che di sera si schiarisce (#FFB25C
+       su bianco: 1,78:1, illeggibile). Questo token NON si ridefinisce
+       nel tema scuro: #B45309 su bianco fa 5,02:1 nei due temi. */
+    --sats-su-carta:#B45309;
     /* L'ASTA parla PETROLIO (ago 2026, deciso con Andrea — prima blu,
        poi verde-blu scuro tenuto sul lato BLU della famiglia, ~195°:
        il verde della protezione sta a ~151°, e si toccano nel punto
@@ -10454,7 +10461,7 @@
      ⚠️ Chi ritocca questi tre valori li rimisuri insieme: da soli si
      annullano. */
   .demo-cta{
-    display:inline-block;margin-top:8px;background:#fff;color:var(--sats-text);
+    display:inline-block;margin-top:8px;background:#fff;color:var(--sats-su-carta);
     text-decoration:none;border-radius:999px;padding:6px 15px;
     font:inherit;font-weight:800;font-size:13px;line-height:1.5;
     box-shadow:0 2px 0 var(--sats-deep);
@@ -32777,6 +32784,12 @@ const INVITO_ONION = {
 const INVITO_ONION_GENERICO =
   'Per comprare, offrire o vendere serve un account: da qui si entra '
   + 'con la tua chiave Nostr.';
+/* ...e quando sotto c'e' anche Telegram (la porta del bot aperta, 20 ott
+   2026, cantiere onion-contrasto): il generico li nomina tutti e due,
+   Nostr per primo. Le voci per gesto non nominano il mezzo. */
+const INVITO_ONION_GENERICO_BOT =
+  'Per comprare, offrire o vendere serve un account: da qui si entra '
+  + 'con la tua chiave Nostr o con Telegram.';
 
 /* Il foglio-invito della vetrina: spiega e accompagna verso la porta.
    SU ONION SI GIRA — titolo, testo e porte — perche' di la' il bot
@@ -32851,7 +32864,9 @@ function invitoTelegram(testo, chiave){
   tgo.innerHTML = '';
   if (onion) leggiPortaBot().then(si => {
     tgo.innerHTML = '';
-    if (si && suOnion()) tgo.appendChild(portaTelegramOnion('invitoEntraBot', 'btn mini'));
+    if (!si || !suOnion()) return;
+    tgo.appendChild(portaTelegramOnion('invitoEntraBot', 'btn mini'));
+    if (!INVITO_ONION[chiave]) el('invitoTesto').textContent = INVITO_ONION_GENERICO_BOT;
   });
   el('sheetBg').classList.add('open');
   el('invitoSheet').classList.add('open');

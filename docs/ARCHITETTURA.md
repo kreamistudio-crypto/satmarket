@@ -9687,7 +9687,13 @@
   un posto solo, `portaTelegramOnion`. Il banner nomina Nostr per primo.
   A porta chiusa su onion c'è il solo Nostr, e MAI il widget (anche nel
   foglio account, dove prima a porta chiusa si montava). Fuori da onion
-  non cambia niente. I DIZIONARI IN MEMORIA
+  non cambia niente. Nel foglio invito, con Telegram sotto, il testo
+  GENERICO (un gesto senza voce nel catalogo) dice «…con la tua chiave
+  Nostr o con Telegram» (`INVITO_ONION_GENERICO_BOT`); le voci per gesto
+  non nominano il mezzo. LA SCRITTA DELLE PILLOLE BIANCHE del banner
+  (`.demo-cta`, onion e sito normale) usa `--sats-su-carta` (#B45309,
+  5,02:1 sul bianco), che il tema scuro NON ridefinisce: la pillola
+  resta bianca anche al buio, mentre `--sats-text` di sera si schiarisce. I DIZIONARI IN MEMORIA
   (ingressi e lasciapassare della fusione) li toccano solo rotte `async`
   e i gesti del bot, tutti nel loop: `prove_dizionari_nel_loop` le conta.
   CHI HA PREMUTO AVVIA (terzo giro): la colonna `utenti.bot_avviato`

@@ -69380,3 +69380,53 @@ qualunque delle tre che diventi vera cambia la raccomandazione.
 Utexo (chiuse a fisarmonica); gli importi di Atomiq. Nessun account
 aperto, nessuno swap, nessun sats mosso: solo pagine pubbliche e
 chiamate API di sola lettura (coppie, monete, cambi, prezzi).
+
+## Le pillole bianche del banner leggibili al buio, e il generico dell'invito che nomina Telegram (20 ott 2026, cantiere onion-contrasto, richiesta di Andrea)
+
+**COSA.** I due «notati» del cantiere onion-nostr-prima, approvati da
+Andrea nello stesso giro:
+1. LA SCRITTA DELLE PILLOLE BIANCHE DEL BANNER IN TEMA SCURO. `.demo-cta`
+   ha il fondo BIANCO in tutti e due i temi e la scritta in
+   `--sats-text`, che di sera diventa #FFB25C: 1,78:1 sul bianco,
+   illeggibile («Entra con Nostr» sull'onion, «Apri @ilbarattolobot»,
+   «Entra con Telegram», «…o entra con Nostr» ed «Esci» sul sito
+   normale). Nasce `--sats-su-carta` (#B45309, il valore di giorno di
+   `--sats-text`), definito UNA volta e mai nel tema scuro: 5,02:1 sul
+   bianco nei due temi (WCAG AA chiede 4,5). È il ragionamento di casa
+   del cartellino di carta: quel che resta chiaro al buio tiene
+   l'inchiostro di giorno. Di giorno non cambia un pixel.
+2. IL GENERICO DEL FOGLIO INVITO SU ONION. Con la porta del bot aperta
+   il Telegram piccolo sta sotto, e il testo generico diceva ancora «da
+   qui si entra con la tua chiave Nostr». Ora, quando il Telegram
+   piccolo si monta e il gesto non ha una voce nel catalogo, il testo
+   diventa `INVITO_ONION_GENERICO_BOT`: «…da qui si entra con la tua
+   chiave Nostr o con Telegram.». A porta chiusa resta quello di
+   sempre; le voci per gesto («Per comprare in sicurezza serve un
+   account…») non nominano il mezzo e non cambiano. Il titolo «🧅 Entra
+   con la tua chiave» non è stato toccato (non chiesto).
+
+**STRADE SCARTATE.** Ridefinire `.demo-cta` dentro i due blocchi del tema
+scuro: due righe da tenere in pari invece di un token che non si muove.
+Scurire `--sats-text` di sera: è l'inchiostro dell'arancio sui fondi
+scuri, dove #B45309 sarebbe il problema rovesciato.
+
+**PROVE.** In `prove_onion`, accanto alle sentinelle del vestito del
+CTA: la scritta usa `--sats-su-carta`, il token è definito una volta
+sola, e il contrasto sul bianco si CALCOLA dal valore vero (≥ 4,5:1). In
+`prove_login_dal_bot`, nel banco del foglio invito: il generico con
+Telegram sotto (prima della risposta quello di sempre, dopo quello con
+Telegram), a porta chiusa quello di sempre, la voce «compra» invariata,
+e riaperto a porta chiusa torna quello di sempre. CONTROPROVE sul file
+vero, poi ripristinato: sei mutanti, sei uccisi (il colore di prima, il
+token ridefinito nel tema scuro, un arancio troppo chiaro, il generico
+col bot mai, su ogni voce, anche a porta chiusa).
+
+**DAL VIVO** (stesso banco del cantiere di prima: Playwright e Chromium,
+360×780 densità 2, chiaro e scuro, onion finto e sito normale, foto
+PRIMA da `origin/develop` e DOPO da questo albero): il colore calcolato
+di ogni pillola bianca del banner è rgb(180, 83, 9), 5,02:1, nei due
+temi e nei due mondi (prima, al buio, rgb(255, 178, 92)); il foglio
+invito generico su onion dice «…con la tua chiave Nostr o con
+Telegram.»; in chiaro banner, invito e foglio account sono IDENTICI
+BYTE PER BYTE a prima, e in scuro il foglio account pure. Zero errori di
+pagina, nessuno scorrimento orizzontale. Copia del giro cancellata.
