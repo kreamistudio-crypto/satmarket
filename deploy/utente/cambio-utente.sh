@@ -97,17 +97,19 @@ aspetta_salute() {
 # deploy.sh, e non col comando `sqlite3`: quello e' un pacchetto a
 # parte, e il giorno della prova su una macchina gemella non c'era —
 # lo script si sarebbe fermato (prima di toccare niente, ma fermato).
+# DAL 20 OTT 2026 (cantiere backup-ritocchi) la fa `deploy/copia-db.py`,
+# la stessa di deploy.sh e del giornaliero: qui il server GIRA ancora
+# (lo stop viene dopo), e la copia di prima non aveva un tetto ne'
+# controllava quel che aveva copiato. Adesso aspetta il lucchetto (30 s,
+# tetto 90) e fa `integrity_check`: una copia NON integra vale come una
+# copia non riuscita — col database rotto non si trasloca niente, prima
+# si guarda lui. Il file resta in backup/, ed e' la prova.
 copia_db() {
-  (cd "$1" && python3 - "$2" <<'PY'
-import sys, sqlite3
-from config import DB
-sorgente = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-destinazione = sqlite3.connect(sys.argv[1])
-with destinazione:
-    sorgente.backup(destinazione)
-destinazione.close(); sorgente.close()
-PY
-  )
+  local db esito codice=0
+  db="$(cd "$1" && python3 -c 'from config import DB; print(DB)' 2>/dev/null)"
+  esito="$(cd "$1" && python3 deploy/copia-db.py "${db:-satmarket.db}" "$2")" || codice=$?
+  dillo "   la copia: ${esito:-nessuna risposta}"
+  return "$codice"
 }
 
 # L'UNICO file fuori dalla cartella che il server legge: il certificato
@@ -271,7 +273,7 @@ fai() {
   while systemctl is-active --quiet barattolo-deploy.service 2>/dev/null; do sleep 2; done
   mkdir -p "$qui/backup" && chmod 700 "$qui/backup"
   copia_db "$qui" "$qui/backup/pre-cambio-utente-$(date +%Y%m%d-%H%M%S).db" \
-    || { guasto "la copia del database non e' riuscita: non ho fermato niente"; systemctl start $TIMER 2>/dev/null; exit 1; }
+    || { guasto "la copia del database non e' riuscita o non e' integra: non ho fermato niente"; systemctl start $TIMER 2>/dev/null; exit 1; }
   dillo "💾 copia del database in backup/"
 
   dillo; dillo "== STOP: da qui il sito e' giu' =="

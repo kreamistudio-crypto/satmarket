@@ -70580,3 +70580,84 @@ PROVE.
 COSA RESTA. Sulla VM l'esplora del regtest deve rispondere anche a
 `/address/<a>/txs`, `/tx/<id>` e `/tx/<id>/outspend/<n>` (PRODUZIONE,
 «DOVE SI LEGGE IL LOCKUP»). Suite e collaudi: nel messaggio del commit.
+
+## I ritocchi del backup: LNbits col tetto corto prima del deploy, cambio-utente con la stessa copia, il giornaliero fermato da fuori che parla (20 ott 2026, cantiere backup-ritocchi, richiesta di Andrea)
+
+Le quattro voci rimaste aperte da «Il backup col database occupato», col
+sì di Andrea.
+
+DECISO.
+- LNBITS COL TETTO CORTO PRIMA DEL DEPLOY. Tutto backup-fuori.sh sta
+  sotto il `timeout 120` di deploy.sh, e la copia di LNbits col tetto del
+  giornaliero (90 s + 30 di attesa) poteva prenderseli tutti: l'archivio
+  del mercatino cadeva per colpa del database di un altro. Prima del
+  deploy adesso `--tetto=15 --attesa=10` e una cintura di `timeout 30`;
+  di notte resta il tetto pieno (c'è tempo). Un giro troncato non lascia
+  il `.parziale` nell'archivio: resta la copia a caldo del `cp -a`, com'era,
+  e lo stderr lo dice. `copia-db.py` ha preso `--tetto=` e `--attesa=` da
+  riga di comando, e l'attesa non supera mai il tetto: un passo bloccato
+  aspetta al più quella, quindi il giro intero sta sotto tetto + attesa.
+  Il resto dei 120 s è dell'invio a Telegram (curl a 120 per pezzo): un
+  Telegram lentissimo può ancora farlo scadere, e allora l'avviso dice
+  «non è partito… la copia locale c'è ed è integra».
+- CAMBIO-UTENTE CON LA STESSA COPIA. `copia_db` chiama
+  `deploy/copia-db.py`: il server lì gira ancora (lo stop viene dopo), e
+  la copia di prima non aveva tetto né controllo. Una copia NON integra
+  vale come non riuscita: col database rotto non si trasloca niente, si
+  guarda lui prima; il file resta in `backup/`, è la prova.
+- IL GIORNALIERO FERMATO DA FUORI. Provato qui: quando systemd manda
+  SIGTERM al gruppo (i 600 s della unit), bash muore senza far partire
+  la trappola d'uscita — nessun avviso, come prima di tutto questo. Con
+  `trap 'exit 143' TERM` la trappola parte col 143 e dice «fermato prima
+  di finire», con lo stato di copia e archivio. Ogni volta che avvisa scrive in
+  `backup/.giornaliero-avvisato` il numero del giro di systemd
+  (`$INVOCATION_ID`). Sotto c'è l'ultima rete: `ExecStopPost=` nella unit
+  chiama `deploy/backup-caduto.sh`, che legge `$SERVICE_RESULT` e parla
+  SOLO se il giro è finito male e il segno non è di quel giro (SIGKILL
+  dopo il SIGTERM, memoria finita, un bash che non è partito). Esce
+  sempre 0, e lancia deploy.sh solo se conosce `--avvisa`.
+- `apt install sqlite3` tolto dall'intestazione di backup-fuori.sh e
+  dalla unit: le copie le fa il python di sistema.
+
+SCARTATO. `OnFailure=` con una unit gemella: un file in più in `/etc`,
+e non sa niente del giro (ExecStopPost ha `$SERVICE_RESULT` e lo stesso
+`$INVOCATION_ID`). Il segno nella cartella di `/run` della unit: a
+ExecStopPost può già non esserci più. backup-caduto.sh copiato prima di
+girare, come fa la unit per backup-fuori.sh: la cartella di `/run` è lo
+stesso problema, e il `$` dentro una riga di systemd va raddoppiato;
+invece tutto il corpo sta in una funzione chiamata con `exit` sulla
+stessa riga, che bash legge intera prima di partire (bash rilegge il
+file dopo ogni comando esterno: un `git reset` a metà darebbe la riga
+dopo di un altro script). Un tetto unico più corto anche di notte: il
+giornaliero ha 600 s, e lì aspettare LNbits è giusto.
+
+DA FARE ALLA PROMOZIONE: la unit del backup sta in `/etc` e va ricopiata
+a mano, con la copia di riserva e il ritorno — PRODUZIONE, «IL
+GIORNALIERO FERMATO DA FUORI». Senza quel gesto non si rompe niente:
+manca solo l'ultima rete (la trappola sul SIGTERM arriva col deploy).
+
+PROVE.
+- `prove_backup_prima_del_deploy`: LNbits tenuto occupato 60 s prima del
+  deploy → l'archivio parte in meno di 35 s, con la copia a caldo di
+  LNbits e senza `.parziale`, e lo stderr lo dice; SIGTERM a tutto il
+  gruppo mentre l'invio è lento (`set -m`, come systemd) → esce 143, un
+  avviso «fermato prima di finire… integra», il segno col numero del
+  giro.
+- `prove_backup_database_occupato`: `copia-db.py --tetto=2 --attesa=10`
+  si arrende in meno di 5 s; la `copia_db` VERA di cambio-utente,
+  ritagliata dallo script, col database tenuto 3 s (aspetta, integra, 301
+  righe) e rotto (codice 3, «non integra»); backup-caduto.sh in otto casi
+  (bene, fuori da systemd, tempo scaduto, già detto, detto per un altro
+  giro, SIGKILL, codice già detto, deploy.sh senza `--avvisa`) e il
+  perché giusto nel testo; la riga `ExecStopPost=` nella unit; niente più
+  `apt install age sqlite3`.
+- `prove_servizio_non_root`: la sentinella della copia col nome nuovo.
+- Le mutazioni, una alla volta, ognuna ROSSA: LNbits col tetto e la
+  cintura del giornaliero; la riga `trap 'exit 143' TERM` tolta.
+
+COSA RESTA.
+- Il gesto della unit alla promozione (sopra).
+- `TimeoutStopSec` resta quello di serie (90 s): la trappola e
+  l'ExecStopPost usano al più 60 s ciascuno per l'avviso. Se Telegram
+  non risponde, il SIGKILL arriva prima della fine della trappola, e
+  allora parla (o prova a parlare) l'ExecStopPost.

@@ -10,7 +10,7 @@
 ; esegue, e la riga dopo sarebbe di un altro script.
 ;
 ; Installazione (una volta sola, da root):
-;     apt install age sqlite3
+;     apt install age
 ;     cp deploy/barattolo-backup.* /etc/systemd/system/
 ;     systemctl daemon-reload
 ;     systemctl enable --now barattolo-backup.timer
@@ -36,3 +36,15 @@ ExecStart=/bin/bash -c 'cp /root/satmarket/deploy/backup-fuori.sh /run/barattolo
 ; Un archivio da ~5 MB su una rete viva parte in secondi; dieci minuti
 ; coprono anche la giornata storta senza restare appesi per sempre.
 TimeoutStartSec=600
+; QUANDO IL GIRO FINISCE MALE E NON HA POTUTO DIRLO (20 ott 2026, cantiere
+; backup-ritocchi): systemd chiama deploy/backup-caduto.sh con lo stato
+; in $SERVICE_RESULT. Il backup di solito avvisa da solo (anche al
+; SIGTERM dei 600 s) e lascia il segno: allora lui tace. Parla dopo un
+; SIGKILL, la memoria finita, un bash che non e' partito. Gira dal repo,
+; non da una copia (la cartella di /run qui sopra a questo punto puo'
+; gia' non esserci piu'): lo script e' tutto in una funzione, letta
+; intera prima di partire, e un `git reset` a meta' non lo storce. Lo stop ha i
+; suoi 90 s (TimeoutStopSec di serie): l'avviso ne usa al piu' 60.
+; NON ARRIVA COL DEPLOY: questo file sta in /etc, e va ricopiato a mano
+; (PRODUZIONE, «IL GIORNALIERO FERMATO DA FUORI»).
+ExecStopPost=/bin/bash /root/satmarket/deploy/backup-caduto.sh

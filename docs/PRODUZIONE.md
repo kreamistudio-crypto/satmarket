@@ -1335,7 +1335,36 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   ricopia `deploy.sh` a ogni giro; il primo archivio lo fa ancora lo
   script vecchio), il giornaliero dalla notte dopo. LA PROVA: al
   secondo deploy, `journalctl -u barattolo-deploy --since "15 min ago"
-  | grep -E "💾|📦"` — «integra» e «archivio cifrato mandato». L'UNITÀ VA RICOPIATA UNA VOLTA (il deploy non
+  | grep -E "💾|📦"` — «integra» e «archivio cifrato mandato».
+  I RITOCCHI (20 ott 2026, cantiere backup-ritocchi; CANTIERI, «I
+  ritocchi del backup»): prima del deploy la copia di LNbits ha un tetto
+  corto (15 s + 10 di attesa, cintura 30), così l'archivio sta nei suoi
+  120 s anche con LNbits occupato; `cambio-utente.sh` copia con lo
+  stesso `deploy/copia-db.py`; il giornaliero fermato dal SIGTERM dei
+  600 s avvisa da solo («⚠️ Il backup giornaliero è stato fermato prima
+  di finire») e lascia il segno in `backup/.giornaliero-avvisato`.
+  IL GIORNALIERO FERMATO DA FUORI — DA FARE ALLA PROMOZIONE (una volta,
+  da root, dopo che il commit è su main e il deploy l'ha tirato): la
+  unit del backup prende `ExecStopPost=` → `deploy/backup-caduto.sh`,
+  che parla quando il backup non ha potuto (SIGKILL, memoria finita) e
+  tace se ha già detto. La unit sta in `/etc` e il deploy non la tocca:
+  1) guardare che le differenze siano SOLO le righe nuove (il commento,
+     `apt install age`, `ExecStopPost=`); altro → ci si ferma e si chiede:
+     `diff /etc/systemd/system/barattolo-backup.service /srv/barattolo/deploy/barattolo-backup.service`
+  2) la copia di riserva, poi la unit nuova:
+     `cp -a /etc/systemd/system/barattolo-backup.service /root/barattolo-backup.service.prima-20261020`
+     `cp /srv/barattolo/deploy/barattolo-backup.service /etc/systemd/system/ && systemctl daemon-reload`
+  3) la prova, senza far partire un backup:
+     `systemd-analyze verify /etc/systemd/system/barattolo-backup.service`
+     (nessuna riga di errore) e
+     `systemctl show barattolo-backup -p ExecStopPost | grep -c backup-caduto`
+     (dice 1). Il timer non va toccato. Facoltativo, e manda un avviso
+     VERO nella stanza degli errori: `SERVICE_RESULT=timeout
+     INVOCATION_ID=prova-a-mano bash /srv/barattolo/deploy/backup-caduto.sh`.
+  TORNARE INDIETRO:
+  `cp /root/barattolo-backup.service.prima-20261020 /etc/systemd/system/barattolo-backup.service && systemctl daemon-reload`.
+  Senza questo gesto non si rompe niente: manca solo l'ultima rete.
+  (19 ott 2026) L'UNITÀ DEL DEPLOY VA RICOPIATA UNA VOLTA (il deploy non
   tocca `/etc`): `TimeoutStartSec` passa da 300 a 600 —
   `cp /srv/barattolo/deploy/barattolo-deploy.service /etc/systemd/system/ && systemctl daemon-reload`.
   LA PROVA, al primo deploy dopo questo: sul canale dei backup un
