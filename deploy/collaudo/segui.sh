@@ -63,9 +63,13 @@ avvisa() {
 }
 git_() { "${COME[@]}" git -C "$DIR" "$@"; }
 # pip: il padrone del venv (bin/python sta in <venv>/bin), o quel che
-# dicono le prove
+# dicono le prove: una riga di shell con le sue VIRGOLETTE, letta come
+# la leggerebbe la shell, cosi' un percorso con uno spazio resta UN
+# argomento. Il `read -a` di prima spezzava a ogni spazio, virgolette
+# comprese: col bash di «C:\Program Files» il pip finto non partiva mai
+# (20 ott 2026). Sulla VM COLLAUDO_PIP non c'e', e questa riga non gira.
 if [ -n "${COLLAUDO_PIP+x}" ]; then
-  read -r -a PIP <<< "$COLLAUDO_PIP"
+  eval "PIP=($COLLAUDO_PIP)"
 else
   PIP=(runuser -u "$(stat -c %U "$(dirname "$(dirname "$PY")")")" -- "$PY" -m pip)
 fi

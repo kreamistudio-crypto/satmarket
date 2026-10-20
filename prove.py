@@ -176176,6 +176176,7 @@ def prove_collaudo_segue_develop():
     indietro dopo una promozione, rifiuta un nome storto, e non tocca i
     file non tracciati (il config)."""
     print("\n[il collaudo segue develop: i file della VM e il seguace]")
+    import shlex
     import shutil
     import subprocess
     import tempfile
@@ -176202,7 +176203,7 @@ def prove_collaudo_segue_develop():
     prova("pip gira come il PADRONE del venv, letto da bin/python, e le prove "
           "lo sostituiscono", [True, True],
           ['PIP=(runuser -u "$(stat -c %U "$(dirname "$(dirname "$PY")")")" '
-           '-- "$PY" -m pip)' in seg, 'read -r -a PIP <<< "$COLLAUDO_PIP"' in seg])
+           '-- "$PY" -m pip)' in seg, 'eval "PIP=($COLLAUDO_PIP)"' in seg])
     prova("...e la lista si legge dal COMMIT nuovo, prima del checkout", True,
           seg.index('git_ show "$LA:requirements.txt"')
           < seg.index('git_ checkout -q --force --detach "$LA"'))
@@ -176305,10 +176306,16 @@ def prove_collaudo_segue_develop():
                      f'[ -e "{posix(rotto)}" ] && exit 1\n'
                      'exit 0\n')
 
-        def segui(salute=True):
+        # la riga del pip con le sue virgolette (20 ott 2026). Di serie il
+        # bash nella forma posix, che non ha spazi su nessun sistema (su
+        # Windows «/usr/bin/bash.EXE» invece di «C:\Program Files\...»):
+        # lo spazio lo guarda UNA prova sola, in fondo, uguale qui e in CI.
+        riga_pip = lambda *a: " ".join(shlex.quote(x) for x in a)
+
+        def segui(salute=True, pip=None):
             env = dict(env_git, COLLAUDO_DIR=posix(vm), COLLAUDO_STATO=posix(stato),
                        COLLAUDO_COME="", COLLAUDO_RIAVVIA="true",
-                       COLLAUDO_PIP=f"{bash} {posix(finto_pip)}",
+                       COLLAUDO_PIP=pip or riga_pip(posix(bash), posix(finto_pip)),
                        COLLAUDO_PY=posix(sys.executable), COLLAUDO_ATTESA="2",
                        COLLAUDO_SEGRETI=posix(os.path.join(casa, "nessuno")),
                        COLLAUDO_SALUTE=url_file(sano if salute else os.path.join(casa, "no")))
@@ -176410,6 +176417,27 @@ def prove_collaudo_segue_develop():
               'dillo "dipendenze installate in pari: riavviato' in seg
               and seg.index('if [ "$NUOVE" = 1 ]; then\n    $RIAVVIA')
               < seg.index('dillo "aggiorno:'))
+
+        # --- un bash in un percorso con lo SPAZIO (20 ott 2026) -------
+        # Il bash di Git per Windows sta in «C:\Program Files», e il `read
+        # -a` di prima lo spezzava in due: qui lo si mette apposta in una
+        # cartella con lo spazio, su ogni sistema, con un bash di cartone
+        # che passa la mano a quello vero.
+        spazio = os.path.join(casa, "bin con spazio")
+        os.makedirs(spazio)
+        bash_spazio = os.path.join(spazio, "bash")
+        with open(bash_spazio, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(f'#!/bin/sh\nexec {shlex.quote(posix(bash))} "$@"\n')
+        os.chmod(bash_spazio, 0o755)
+        pip_spazio = os.path.join(spazio, "pip finto.sh")
+        shutil.copy(finto_pip, pip_spazio)
+        prima_spazio = len(pip_righe())
+        os.remove(os.path.join(stato, "requisiti"))
+        esito_spazio = segui(pip=riga_pip(posix(bash_spazio), posix(pip_spazio)))
+        prova("bash e pip in un percorso con lo spazio: pip parte lo stesso, "
+              "una volta, e l'impronta si scrive", ((0, G), 1, True),
+              (esito_spazio, len(pip_righe()) - prima_spazio,
+               os.path.exists(os.path.join(stato, "requisiti"))))
     finally:
         shutil.rmtree(casa, ignore_errors=True)
 

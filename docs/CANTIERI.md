@@ -70011,3 +70011,35 @@ le sezioni che quel commit tocca (`prove_freni`,
 quelle che leggono i documenti, le mie due, e `collaudo_onchain_indirizzo`
 coi miei due collaudi — i numeri nel rapporto ad Andrea, perché scriverli
 qui vorrebbe dire rigirarle ancora.
+
+## Il pip del seguace in un percorso con lo spazio, ed embit nelle prove di questo PC (20 ott 2026, cantiere collaudo-ritocco, commit a parte, richiesta di Andrea)
+
+**COSA SI E' VISTO.** Rigirando la suite sull'albero con la tappa 2
+on-chain (`5493247`), due rosse non del ritocco: (1) la sezione
+dell'indirizzo on-chain SALTATA e il collaudo `collaudo_onchain_indirizzo`
+rosso, perche' sul Python delle prove di questo PC mancava `embit`; (2)
+`prove_collaudo_segue_develop` ESPLOSA su `stato/requisiti`: il pip di
+cartone non partiva mai. La causa: `segui.sh` leggeva `COLLAUDO_PIP` con
+`read -r -a`, che spezza a ogni spazio come un'espansione senza virgolette,
+e il bash di Git per Windows sta in «C:\Program Files». Sulla VM la riga
+non gira (COLLAUDO_PIP non c'e'); in CI, su Linux, il bash non ha spazi:
+per questo li' era verde.
+
+**LA CURA (decisione di Andrea: le chiudo io, in un commit a parte).**
+- `embit`: `pip install -r requirements.txt` nel Python delle prove di
+  questo PC (non c'e' un venv: e' quello di `py -3`), come fa la CI. Senza
+  `-U`: e' arrivato solo `embit==0.8.0`, il resto c'era gia'.
+- `segui.sh`: la riga delle prove porta le sue VIRGOLETTE e si legge come
+  la leggerebbe la shell (`eval "PIP=($COLLAUDO_PIP)"`), cosi' un
+  percorso con lo spazio resta un argomento. Il test la scrive con
+  `shlex.quote`; di serie usa il bash nella forma posix, senza spazi su
+  nessun sistema, e lo spazio lo guarda UNA prova sola, uguale qui e in
+  CI: un bash di cartone in «bin con spazio» che passa la mano a quello
+  vero, col pip finto accanto («pip finto.sh»).
+- ROTTA APPOSTA, due volte, su copie rimesse a posto: la riga senza
+  virgolette nel test, e `segui.sh` di nuovo col `read -a`. Tutte e due:
+  30 verdi e 1 rossa, ed e' proprio la prova nuova.
+
+**NOTATO E NON TOCCATO.** Lo stesso `read -r -a` legge `COLLAUDO_COME` in
+`segui.sh` e in `collaudo.sh`, e `$RIAVVIA` gira senza virgolette per
+disegno: oggi nessuna prova ci mette un percorso, quindi non mordono.
