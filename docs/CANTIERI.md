@@ -69442,3 +69442,121 @@ invito generico su onion dice «…con la tua chiave Nostr o con
 Telegram.»; in chiaro banner, invito e foglio account sono IDENTICI
 BYTE PER BYTE a prima, e in scuro il foglio account pure. Zero errori di
 pagina, nessuno scorrimento orizzontale. Copia del giro cancellata.
+
+## L'indirizzo dell'ordine on-chain: il conto BIP-48, la chiave per ordine, embit sul server, e la rete signet (20 ott 2026, cantiere onchain-tappa2, piano approvato da Andrea)
+
+**IL COMPITO.** Ripartire dal lavoro di Alan sull'on-chain (la sua chat
+è persa, il repo no: tappe 1a, 1a-bis, 1b, 1c e 2a tutte su main, nessun
+ramo da salvare) e chiudere la **tappa ②** dello studio, «L'indirizzo
+dell'ordine», sui quattro «da fare» che la 2a aveva lasciato: una chiave
+per ordine col numero vero, la xpub dedicata del venditore, `embit` sul
+server, la prova in Sparrow (questa resta un gesto di Andrea). Più due
+decisioni di Andrea: **la rete di prova è signet** (codice e studio
+allineati; la verifica futura dei pagamenti sul collaudo via API signet
+di mempool.space), e **embit nella lista delle dipendenze**, installata
+da sola sul collaudo. In produzione `ONCHAIN_ATTIVO` resta spenta.
+Lavoro su `develop`, mai su main.
+
+**COSA SI È DECISO, E PERCHÉ.**
+- **Il conto BIP-48** `m/48'/1'/0'/2'` (scopo multisig, coin type 1
+  delle reti di prova, conto 0, p2wsh) al posto della chiave unica
+  `m/0/0`. La sua metà pubblica è la «xpub dedicata»: un conto che
+  serve solo qui, mai il wallet della persona. Ogni ordine prende
+  `/0/n`, non indurito, così il server rifà le chiavi PUBBLICHE dalla
+  sola xpub anche a telefono spento. Il giorno della mainnet il coin
+  type diventa 0: un altro conto, apposta.
+- **La xpub dedicata la mandano tutti e due i ruoli**, non solo il
+  venditore: lo studio la voleva del venditore («un venditore offline ha
+  comunque la sua chiave») e una chiave del compratore «al checkout»;
+  con una xpub per persona il compratore fa la stessa strada, e la sua
+  chiave d'ordine si ricava come quella del venditore. Il seme resta nel
+  telefono (tappa 1c): esce solo la metà pubblica del conto, con un
+  gesto («⛓️ Accendi l'on-chain»), perché qui qualcosa ESCE e chi lo dà
+  deve saperlo.
+- **I numeri si leggono dalle righe**, non da un contatore: il prossimo
+  numero di una persona è uno dopo il più alto mai usato, da compratore
+  O da venditore (una fila sola per persona); Barattolo ha la sua. Tutto
+  dentro una `BEGIN IMMEDIATE`, con tre vincoli UNIQUE come cintura. Un
+  contatore sarebbe una seconda verità da tenere in pari.
+- **Il server calcola, il telefono rifà.** `onchain_nuovo_indirizzo`
+  (embit) fotografa nella riga i tre numeri, le tre chiavi, il
+  descrittore col checksum e l'indirizzo; il telefono, prima di
+  disegnarlo, rifà descrittore e indirizzo dalle tre chiavi col SUO
+  codice e controlla che la chiave del suo ruolo sia quella del suo
+  conto a quel numero (`onchainVerificaRiga`). Non combacia → l'indirizzo
+  non si mostra.
+- **Le xpub delle persone non escono mai verso la controparte**: la
+  riga per una parte porta le tre chiavi dell'ordine e basta (è la
+  decisione dello studio, «il descrittore porta le chiavi dell'ordine,
+  non le xpub»).
+- **Embit facoltativo all'avvio**: senza, il server parte, le rotte che
+  fanno i conti dicono 503 e il pannello delle leve lo dice (allarme se
+  `ONCHAIN_ATTIVO` è accesa). Un pacchetto che manca non deve spegnere
+  il mercatino.
+- **La lista delle dipendenze non c'era**: nasce `requirements.txt`, con
+  embit inchiodato a 0.8.0 (la versione su cui è girata la prova
+  doppia) e gli altri senza versione per non spostare niente. Il
+  seguace del collaudo la installa PRIMA del checkout, letta dal commit,
+  come il padrone del venv e senza `-U`; se pip non ce la fa resta sul
+  commit di prima SENZA timbrarlo bocciato (non è colpa del commit) e
+  riprova ogni minuto, con una riga al bot per commit; la guarda anche
+  in pari, per il seguace posato dopo, e allora riavvia. La CI prende
+  embit da lì. La produzione no: a mano, prima della promozione.
+- **Signet** ha le forme di testnet (`tb1`, `tpub`): gli indirizzi non
+  cambiano aspetto. Una xpub di mainnet si rifiuta, sia dal telefono sia
+  come `ONCHAIN_XPUB` nel config (503: è un guasto del config).
+
+**STRADE SCARTATE.**
+- **La chiave del compratore mandata a ogni ordine** (una chiave
+  pubblica nuova al checkout, invece di una xpub): funziona solo a
+  telefono acceso, e farebbe due strade diverse per due ruoli che sono
+  la stessa persona in giorni diversi.
+- **Un contatore per persona** in `onchain_xpub`: una seconda verità.
+- **Le xpub nella riga per la controparte**, per far rifare al telefono
+  anche le chiavi altrui: è proprio la fuga di privacy che lo studio ha
+  tolto.
+- **Un freno (429) sulle due porte nuove**: i numeri dei freni li
+  concorda Andrea, e oggi le porte sono di due persone. Nei «da fare».
+- **Toccare `deploy.sh` per installare le dipendenze in produzione**:
+  la regola di Andrea è che in produzione il pip lo lancia lui.
+
+**COSA È STATO PROVATO** (sull'albero di `cantiere/onchain-tappa2`, da
+`origin/develop` a 417e175).
+- `prove_indirizzo_ordine_onchain`, 33: il blocco del server eseguito
+  con embit (le xpub buone e otto rifiutate, private comprese, senza mai
+  ripeterle; la terza chiave; le file dei numeri; i no; otto fili in
+  parallelo, 40 indirizzi senza buchi né doppioni) e la PROVA DOPPIA col
+  bundle vero sotto node: la stessa tpub da tre semi, sessanta ordini
+  identici byte per byte fra embit e il telefono, una riga vera del
+  server ritrovata dal compratore e dal venditore e non da un seme
+  estraneo; e il foglio (la sola xpub esce, la verifica prima del
+  disegno). CONTROPROVA in una copia: il descrittore del telefono in un
+  altro ordine, il numero riusato, la versione non controllata — rosse.
+- `prove_banco_chiavi_onchain`: il conto e la verifica della riga (+13),
+  la rete signet e la strada BIP-48 dette dalla rotta.
+- `prove_collaudo_segue_develop`: il seguace con un pip di cartone
+  (+9). `prove_cancello_onchain`: tre rotte contate per nome.
+- `collaudo_onchain_indirizzo`, 28, col server vero per HTTP; verde
+  nella gabbia, iscritto in `ci/collaudi.txt` e `ci/compila.txt`.
+- Giro dal vivo su una copia con un config di cartone e Chromium che
+  risolve solo 127.0.0.1, a 390x844 chiaro e scuro: Alan accende,
+  Andrea accende e fa un indirizzo con Alan, Alan lo ritrova da
+  venditore. Nessun errore JS.
+- Suite intera e collaudi della CI: nel report della sessione.
+
+**COSA RESTA DA GUARDARE.**
+- **Il seguace nuovo va posato a mano sulla VM** (una volta,
+  COLLAUDO.md §4): finché gira il vecchio, embit non arriva e il foglio
+  dice «manca embit» — il resto vive.
+- **In produzione**: `pip install embit==0.8.0` PRIMA della promozione
+  (PRODUZIONE, «L'ON-CHAIN, TAPPA 2: EMBIT»), lo lancia Andrea quando lo
+  dice. Il commit tocca `.github/workflows/`: dopo la promozione si
+  guarda il ref `pronto`.
+- **La prova in Sparrow** (Andrea): il descrittore di un indirizzo vero
+  importato in un wallet signet, e un faucet signet per vederci arrivare
+  qualcosa — la prova che la tappa 4 dovrà saper guardare.
+- **Chi aveva preso il «metro» del ripristino** nel foglio lo trova
+  diverso: l'ordine finto è passato da `m/0/0` al numero 0 del conto.
+  Si butta e si riprende.
+- **La tappa ③**, il foglio di pagamento: lì `ordine_id` smette di
+  essere vuoto e le porte di prova lasciano il posto all'ordine vero.

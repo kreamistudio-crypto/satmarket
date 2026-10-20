@@ -33708,3 +33708,63 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   della tappa 2 dicono il fornitore (`{f}`) e la nota `ripiego`. Il
   cartone ha lo stato per istanza (`nuovo_cartone`, `avvia(porta, rete,
   percento)`). Il collaudo è `collaudo_swap_instradatore`.
+- IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
+  (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
+  perché in CANTIERI, «Il pagamento on-chain come opzione» e
+  «L'indirizzo dell'ordine on-chain»). Tutto dietro il cancello
+  `onchain_ammesso(tg_id)`: `ONCHAIN_ATTIVO` (False) e
+  `ONCHAIN_SOLO_ADMIN` (True); a leva spenta ogni rotta `/api/onchain/*`
+  è 404 per chiunque, admin compresi.
+  LA RETE è la costante `ONCHAIN_RETE = "signet"` (forme di testnet:
+  `tb1`, `tpub`); un indirizzo mainnet non si calcola da nessuna parte.
+  IL CONTO è `ONCHAIN_STRADA_CONTO = "m/48'/1'/0'/2'"` (BIP-48, p2wsh);
+  la chiave dell'ordine n è `/0/n` dal conto.
+  NEL TELEFONO (miniapp.html, blocco «IL BANCO DELLE CHIAVI ON-CHAIN» e
+  seguenti; bundle `/vendor/btc.js`, caricato pigro da `caricaBitcoin`):
+  il seme BIP-39 nasce a caso nel browser e sta in
+  `barattolo_onchain_<tg_id>` (localStorage), con le copie nel
+  CloudStorage di Telegram (`barattolo_onchain`) e sui relay (NIP-78
+  kind 30078, `d` = `barattolo/onchain/v1`, cifrato NIP-44 verso sé);
+  al server non arriva mai. `onchainConto`, `onchainFiglia`,
+  `onchainLeggiXpub` (tpub con le versioni di prova, le xpub di cartone
+  di serie), `onchainDaTre` (il 2-di-3 `wsh(sortedmulti(2,…))` da tre
+  chiavi pubbliche nell'ordine compratore, venditore, Barattolo, col
+  checksum del BIP-380 di `descrittoreConChecksum`), `onchainMiaXpub`,
+  `onchainVerificaRiga` (rifà un indirizzo del server: `mia` e
+  `uguale`). Il foglio è `view-onchain` (`renderOnchain`), dal bottone
+  «⛓️ On-chain (prova)» del Profilo che compare solo se `/api/me` dice
+  `onchain: true`: 1 la chiave, 2-3 l'ordine finto (numero 0 del conto,
+  venditore e Barattolo di cartone), 4 «Accendi l'on-chain», 5 un
+  indirizzo vero con un altro ammesso (si disegna solo se `uguale`), 6
+  backup, 7 prova del ripristino, 8 esporta.
+  SUL SERVER (blocco «L'INDIRIZZO DELL'ORDINE ON-CHAIN» prima di
+  `/api/onchain/prova`): `embit` importato in un try (`EMBIT`; senza,
+  `_onchain_serve_embit` dà 503); `onchain_xpub_motivo` (solo tpub,
+  profondità 4, ultimo passo 2'; una privata si rifiuta dal prefisso;
+  il motivo non ripete mai la chiave), `onchain_xpub_barattolo` (vuota
+  = `XPUB_CARTONE`; piena = tpub pubblica, sennò ValueError),
+  `onchain_chiave`, `onchain_descrittore`, `onchain_indirizzo_da`,
+  `onchain_nuovo_indirizzo` (BEGIN IMMEDIATE; il numero di una persona
+  è il MAX+1 delle sue righe da compratore e da venditore, Barattolo ha
+  la sua fila), `onchain_riga_per` (la vista di una parte: ruolo,
+  `mio_numero`, le tre chiavi, descrittore, indirizzo — MAI le xpub).
+  TABELLE (nascono da `_onchain_prepara_tabelle`): `onchain_xpub`
+  (tg_id, xpub, creato, aggiornato) e `onchain_indirizzi` (ordine_id —
+  vuoto fino alla tappa 3 —, rete, compratore_id, venditore_id, per
+  ciascuno dei tre xpub_* e numero_*, chiave_compratore/venditore/
+  barattolo, descrittore, indirizzo UNIQUE, creato; UNIQUE su ogni
+  coppia xpub-numero).
+  ROTTE: `GET /api/onchain/prova` (xpub di Barattolo e del venditore di
+  cartone, `cartone`, `rete`, `strada`, `embit`, `mia_xpub`,
+  `controparti` [{id, nome}], `indirizzi` gli ultimi cinque);
+  `POST /api/onchain/xpub` ({xpub} → {ok}); `POST
+  /api/onchain/prova/indirizzo` ({venditore_id} → la riga per chi
+  chiama, che è il compratore). Il pannello «⚙️ Stato delle leve», gruppo
+  «⛓️ Pagamento on-chain»: le due leve, «Libreria del 2-di-3 (embit)» e
+  «Terza chiave (Barattolo)» (vera o di cartone, mai stampata).
+  LE DIPENDENZE: `requirements.txt` (embit==0.8.0); il collaudo la
+  installa da solo (`deploy/collaudo/segui.sh`), la CI ne legge embit,
+  la produzione a mano (PRODUZIONE). Le prove: `prove_cancello_onchain`,
+  `prove_banco_chiavi_onchain`, `prove_chiave_che_nasce_da_sola`,
+  `prove_checksum_descrittore`, `prove_indirizzo_ordine_onchain`,
+  `prove_bundle_bitcoin`; il collaudo `collaudo_onchain_indirizzo`.
