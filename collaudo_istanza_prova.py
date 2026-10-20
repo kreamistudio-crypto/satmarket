@@ -287,6 +287,43 @@ def main():
           righe_leve()["URL_PUBBLICO"].get("allarme", False))
     S.URL_PUBBLICO = S.URL_PUBBLICO_DI_SERIE
 
+    print("\n[il recinto dei relay: chi bussa, e dove]")
+    bussati = []
+
+    def connessione_finta(relay, **kw):
+        bussati.append(relay)
+        raise OSError("nessuna rete nel collaudo")
+    vera_conn, vera_posta = S.create_connection, S._posta_per
+    S.create_connection = connessione_finta
+    S._posta_per = lambda relay: None
+    evento = {"id": "e" * 64, "kind": 1, "content": "prova"}
+    try:
+        S.PROVA_SOLO_IDS = set()
+        S.invia_evento_relay("wss://relay.barattolo.store", evento)
+        prova("a lista vuota (la produzione) la scrittura bussa al nostro relay come sempre",
+              ["wss://relay.barattolo.store"], bussati[:])
+        S.PROVA_SOLO_IDS = {111}
+        bussati.clear()
+        esiti = [S.invia_evento_relay(r, evento) for r in
+                 ("wss://relay.barattolo.store", "wss://nos.lol", "wss://relay.primal.net")]
+        prova("sull'istanza di prova la scrittura non bussa a NESSUN relay vero",
+              ([False] * 3, []), (esiti, bussati[:]))
+        S.invia_evento_relay("ws://127.0.0.1:7777", evento)
+        prova("...e bussa al relay di prova di casa", ["ws://127.0.0.1:7777"], bussati[:])
+        bussati.clear()
+        # in collaudo `lettura_simulata` ferma gia' ogni lettura da un
+        # relay vero: per QUESTA riga la si spegne (la connessione e'
+        # finta, la rete non esce) e si guarda il solo recinto
+        S.MODALITA_COLLAUDO = False
+        S.info_libro_da_relay("wss://relay.mostro.network", S.MOSTRO_NPUB)
+        S.MODALITA_COLLAUDO = True
+        prova("...mentre il P2P parla coi relay di Mostro", ["wss://relay.mostro.network"],
+              bussati[:])
+    finally:
+        S.create_connection, S._posta_per = vera_conn, vera_posta
+        S.PROVA_SOLO_IDS = set()
+        S.MODALITA_COLLAUDO = True
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)

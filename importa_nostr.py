@@ -31,12 +31,14 @@ amico, non per uno sconosciuto.
 REQUISITI: pip install websocket-client   (gia' installato)
 """
 
+import ipaddress
 import json
 import os
 import sqlite3
 import ssl
 import time
 import urllib.request
+from urllib.parse import urlparse
 
 from websocket import create_connection
 
@@ -114,6 +116,33 @@ RELAYS = list(dict.fromkeys(
      if str(r).strip()]))
 if not RELAYS:                    # il fail-safe del server, qui uguale
     RELAYS = list(RELAY_DI_SERIE)
+
+
+def _di_casa(relay: str) -> bool:
+    """PURA: il relay sta su questa macchina (loopback)? Il gemello di
+    `relay_di_casa` del server, che da qui non si importa."""
+    try:
+        host = (urlparse(str(relay or "").strip()).hostname or "").lower()
+    except ValueError:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+# IL RECINTO DELL'ISTANZA DI PROVA (20 ott 2026, vedi `fuori_dal_recinto`
+# nel server): con PROVA_SOLO_IDS nel config, qualunque cosa ci sia
+# scritta, l'import legge SOLO dai relay di casa, e senza il ripiego sui
+# relay di serie qui sopra.
+try:
+    from config import PROVA_SOLO_IDS as _PROVA_SOLO_IDS
+except ImportError:
+    _PROVA_SOLO_IDS = []
+if _PROVA_SOLO_IDS:
+    RELAYS = [r for r in RELAYS if _di_casa(r)]
 
 # Quanti eventi chiedere a ogni relay, SEPARATAMENTE per gli annunci e
 # per le cancellazioni (vedi interroga: un tetto solo per tutti e due

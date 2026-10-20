@@ -1959,9 +1959,12 @@ PROVA_SOLO_IDS = []
 #   LND_PONTE_MACAROON_LETTURA = ""    # LND «spento»: decide LNbits
 #   LND_PONTE_MACAROON_HOLD = ""
 #   GUARDIANO_PONTE = False
-#   # Nostr e Mostro: nessun relay vero, nessuna chiave
-#   NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
-#   RELAY_NOSTR = []
+#   # Nostr: sull'istanza di prova il server parla SOLO coi relay di casa
+#   # (il loopback), qualunque cosa ci sia scritto qui: vuota vuol dire
+#   # NESSUNO, mai «quelli di serie». Fuori dal recinto restano solo il
+#   # P2P (Mostro) e il login col bunker dei tester. La chiave e' NUOVA.
+#   NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_NUOVA_DEL_COLLAUDO"
+#   RELAY_NOSTR = ["ws://127.0.0.1:7777"]   # il relay di prova sulla VM, o []
 #   RELAY_NOSTR_IMPORT = []
 #   IMPORT_NOSTR_APERTO = False
 #   TRASLOCO_NOSTR = False

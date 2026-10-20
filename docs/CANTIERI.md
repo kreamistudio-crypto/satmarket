@@ -68338,3 +68338,45 @@ viene scritto; l'initData rotto dà 401; e la PASSATA SU OGNI ROTTA GET
 del server da anonimo: il titolo dell'annuncio seminato non esce da
 nessuna, e fuori dal guscio è 403 o 303. Controprova: tolta la
 riscrittura di `/` il titolo esce (2 rosse).
+
+## Il recinto dei relay: il collaudo non pubblica né legge sui relay veri, tranne il P2P e il bunker (20 ott 2026, cantiere collaudo-privato, commit 2 di 4, richiesta di Andrea)
+
+**PERCHÉ.** «Niente annunci né post del collaudo sui relay veri: i relay
+veri solo per il P2P» (Andrea, 20 ott). La trappola trovata
+nell'analisi: `RELAY_NOSTR = []` NON voleva dire «nessuno». Il server
+ripiega sui relay di serie, `relay.barattolo.store` compreso, e la
+sezione di prova di `config_esempio.py` del 19 diceva proprio `[]`.
+
+**COME È FATTO.** Due cinture, accese solo quando `PROVA_SOLO_IDS` non è
+vuota (a lista vuota la produzione è identica).
+1. LE LISTE: `RELAYS_VERIFICA` sulla prova è
+   `_RELAY_NOSTR_DICHIARATI` filtrata ai relay di casa (il loopback),
+   senza il ripiego sui relay di serie: vuota vuol dire nessuno.
+   `importa_nostr.RELAYS` idem, con un `_di_casa` gemello (il server da
+   lì non si importa). Il tag client 31990 non legge più il primo relay
+   di una lista vuota (`if _NOSTR and RELAYS_VERIFICA:`).
+2. LE PORTE: un giudice nuovo, `fuori_dal_recinto(relay, cosa)`, sul
+   calco di `lettura_simulata`: True solo sulla prova e solo verso un
+   relay che non è di casa, detto una volta per relay. Lo chiedono PRIMA
+   della rete le quattro porte non P2P: `invia_evento_relay` (ogni
+   scrittura, prima anche del postino dei relay), `_kind0_profilo`,
+   `chiedi_relay_dm`, `_x_note_da_relay`. Nei tre lettori la guardia di
+   `lettura_simulata` resta com'era, da sola (la vuole così la sentinella
+   delle letture), e il recinto le sta sotto.
+- FUORI DAL RECINTO, apposta: il P2P (il libro, l'ascolto, la copia del
+  profilo sullo specchio: Mostro vero è la decisione di Andrea con Alan)
+  e la cassetta NIP-46 del login col bunker dei tester.
+- `config_esempio.py`: la sezione di prova dice ora la verità
+  (`RELAY_NOSTR = ["ws://127.0.0.1:7777"]`, il relay di prova sulla VM,
+  o `[]` = nessuno), e la chiave della piattaforma è NUOVA.
+
+**PROVE.** `prove_istanza_prova` a 75: il giudice (spento in produzione;
+sulla prova ferma relay.barattolo.store, i pubblici e un nome che
+finge il loopback; lascia passare 127.0.0.1 e localhost; lo dice una
+volta), le quattro porte che lo chiedono prima della rete, il P2P che
+non lo chiede, la lista e l'import in produzione e sulla prova.
+`collaudo_istanza_prova` a 50: con una `create_connection` finta che
+annota chi bussa, a lista vuota la scrittura bussa al nostro relay come
+sempre, sulla prova a nessuno dei tre relay veri, al relay di casa sì, e
+il libro P2P bussa a relay.mostro.network. La sentinella delle letture
+(`prove_letture_relay_collaudo`) conosce il giudice nuovo.
