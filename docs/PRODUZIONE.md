@@ -1372,14 +1372,24 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   li fa uno alla volta col via di Andrea (come per il collaudo).
   LA LEVA è la variabile del repo `RUNNER_PROVE`, in GitHub → Settings →
   Secrets and variables → Actions → Variables: `vm-2050` = sulla VM,
-  vuota o cancellata = su GitHub. Si cambia SENZA commit, e vale dal
-  giro che parte dopo. Un lancio a mano su un ramo va sempre su GitHub.
+  vuota o cancellata = su GitHub (GitHub non accetta un valore vuoto:
+  «vuota» è il cestino). Si cambia SENZA commit. ⚠️ LA VARIABILE SI LEGGE
+  QUANDO IL GIRO NASCE, non quando il suo job parte (visto il 20 ott
+  2026: il giro di `f9b01ed`, nato alle 13:39 senza variabile, è andato
+  su GitHub anche se `vm-2050` era tornata alle 13:46, prima che i suoi
+  job partissero): vale per i giri CREATI dopo il cambio, e un giro già
+  in coda resta dov'era destinato. Un lancio a mano su un ramo va sempre
+  su GitHub.
   LA VM SPENTA (o il runner offline): il giro resta «Queued» e la coda
   tiene fermi i push dopo di lui; il giudice del VPS dice «aspetta» e
-  non deploya niente. Si svuota `RUNNER_PROVE`, si annulla il giro
-  appeso (Actions → il giro → Cancel workflow), e quello in coda parte
-  su GitHub; oppure, senza giri in coda, un push nuovo o un «Re-run all
-  jobs». Riaccesa la VM, si rimette `vm-2050`.
+  non deploya niente. Si cancella `RUNNER_PROVE`, poi si annullano il
+  giro appeso E quello in coda (Actions → il giro → Cancel workflow:
+  tutt'e due nati con la variabile, tutt'e due aspetterebbero la VM), e
+  si fa nascere un giro nuovo su main: un push qualunque, o il commit
+  vuoto firmato «Rilascio» (`git commit --allow-empty -m "Rilascio" &&
+  git push origin HEAD:main`). Un «Re-run all jobs» del giro vecchio NON
+  è provato: potrebbe tenersi la variabile di quando era nato. Riaccesa
+  la VM, si rimette `vm-2050`.
   COSA C'È SULLA VM (tutto fuori dal collaudo, che non si tocca):
   l'utente `ci` (senza password, senza sudo, fuori da `docker` e
   `collaudo`); il runner in `/home/ci/actions-runner` (registrato SOLO su

@@ -68431,14 +68431,49 @@ un'etichetta `self-hosted` generica. La strada B (vedi sopra).
   il ramo, che apre alle PR, che dice sì quando dice no), undici morte.
 - La suite intera e i collaudi della CI: nel verbale del commit.
 
-**DA GUARDARE (gesto 10, dopo il push).** Andrea mette
-`RUNNER_PROVE=vm-2050` e lancia a mano su main (non sposta `pronto`): la
-riga «guardia vm-2050: ok» nel log (che le variabili `GITHUB_*` arrivino
-davvero alla guardia), la durata contro i ~15,5 minuti di GitHub, il
-picco di memoria del servizio (`MemoryPeak`) col collaudo spento e poi
-acceso. Poi il ripiego: variabile vuota, lancio a mano, il giro su
-GitHub. La prova di isolamento da rifare quando nasce la deploy key del
-collaudo.
+**IL GESTO 10, FATTO (20 ott 2026, il pomeriggio).** Il push di
+`cecb7db`: CI verde su GitHub (variabile ancora vuota), `pronto` avanzato
+anche se il commit toccava il workflow. Poi Andrea mette
+`RUNNER_PROVE=vm-2050`:
+- IL LANCIO A MANO su main (`cecb7db`): `Runner name: 'vm-2050'`, nel
+  passo «Set up runner» la riga «guardia vm-2050: ok» con repo, ref,
+  evento `workflow_dispatch`, job e workflow — le variabili `GITHUB_*`
+  arrivano alla guardia; «Successfully set up CPython (3.12.15)» e node
+  «Found in cache @ /opt/hostedtoolcache/node/22.23.3» (niente scaricato);
+  prove.py 25.713/0 e collaudi 90/0, GLI STESSI NUMERI del giro su GitHub
+  dello stesso commit (git e grep di Debian non hanno cambiato niente);
+  `segreti` su GitHub, `pronto` saltato (giusto: a mano).
+- IL PRIMO PUSH sulla VM (`774f946`, di un'altra sessione): verde, 25.718
+  e 90, e `pronto` AVANZATO da un giro il cui `prove` è girato sulla VM.
+- I TEMPI: il job `prove` 20,5-20,8 minuti sulla VM contro 16,2 su GitHub
+  (prove.py 9,9 contro 6,8, collaudi 10,3 contro 8,9: 2 vCPU condivise),
+  e ZERO minuti fatturati per lui; un push ne costa ora 3 (`segreti` 2,
+  `pronto` 1) invece di 19. Il tetto del job (60) resta largo.
+- LA MEMORIA: picco del servizio 1,59 GB su due giri (tetto 2,5),
+  `MemorySwapPeak=0`; la VM a 1,5 GB usati. Col collaudo SPENTO: il picco
+  «insieme» resta da misurare quando il collaudo girerà.
+- IL RIPIEGO: variabile cancellata, lancio a mano su main → `prove` su
+  `GitHub Actions …`, `Image: ubuntu-24.04`, `vm-2050` fermo. Provato.
+  E UNA COSA IMPARATA E CORRETTA in PRODUZIONE: la variabile si legge
+  quando il giro NASCE, non quando il job parte — avevo scritto il
+  contrario. Il giro di `f9b01ed`, nato alle 13:39 senza variabile, è
+  andato su GitHub anche se Andrea l'aveva rimessa alle 13:46, prima che
+  i suoi job partissero. Quindi con la VM spenta un giro già in coda NON
+  si salva svuotando la variabile: si annulla e se ne fa nascere uno nuovo.
+- LA PROVA DI ISOLAMENTO, rifatta il giorno stesso con la deploy key del
+  collaudo (`/srv/collaudo/.ssh/deploy_satmarket`, 600 in una `.ssh` 700):
+  come `ci` negati la chiave, la sua `.pub`, `known_hosts`, `bot_token`,
+  l'elenco di `/srv/collaudo`, della `.ssh`, di `/etc/barattolo-collaudo`
+  e `/home/debian`, `docker ps` e `sudo -n`; il `find` su tutto il disco
+  dei file di `collaudo` leggibili da `ci`: zero su 9.713; dal servizio
+  le tre cartelle `d---------`. (La prima stesura della prova faceva un
+  `cat` per ogni file del collaudo: con ~10.000 file non finiva — la
+  prova si fa MIRATA, come in PRODUZIONE.)
+- E IL ROSSO CHE NON ERA DELLA VM: il push di Alan `ee112c8` è caduto
+  sulla VM su `collaudo_fusione_da_telegram` («coincurve non c'e'»); lo
+  stesso commit lanciato a mano su GitHub è caduto uguale, stesso motivo.
+  La cura è il commit prima di questo (cantiere fusione-schnorr).
+RESTA DA GUARDARE: il picco di memoria col collaudo acceso.
 
 ## Le figure del mercatino nel login dal bot: 🍯 Miele, 🚲 Bici, 📚 Libri… col loro nome (20 ott 2026, cantiere figure-barattolo, decisione di Andrea)
 
