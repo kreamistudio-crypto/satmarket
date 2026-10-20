@@ -336,6 +336,58 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
     ord++;
   }
 
+  // --- (20 ott 2026, swap-senza-api) L'API DEL FORNITORE SI SPEGNE.
+  // Prima: subito dopo aver ricevuto il segreto (la richiesta di firma
+  // cooperativa). Il telefono ritira lo stesso, dallo script, sulla rete.
+  const spenta = async (ordine, prima) => {
+    A.run(`elementi.swapIndirizzo_${ordine} = {value: '${D.indirizzo}'}`);
+    await A.run(`swapAvanti(${ordine})`);
+    await A.run(`swapCrea(${ordine})`);
+    const rS = lista(memA).find(r => r.ordine === ordine);
+    const vPrima = await visto();
+    await prima(rS);
+    const giaCh = chiamate.length;
+    await A.run('swapGiro()');
+    const rS2 = lista(memA).find(r => r.ordine === ordine);
+    const vDopo = await visto();
+    const tS = vDopo.trasmesse.find(x => rS2.ritiro && x.txid === rS2.ritiro.txid) || {};
+    const nuove = chiamate.slice(giaCh);
+    await modo('normale');
+    return {ritirato: !!(rS2.ritiro && rS2.ritiro.txid), coop: rS2.ritiro && rS2.ritiro.cooperativo,
+            errore: rS2.errore || '', via: tS.via, strade: tS.strade,
+            sats: tS.uscite && tS.uscite[0].sats,
+            firme: vDopo.firme.filter(id => id === rS.id).length,
+            trasmesseInPiu: vDopo.trasmesse.length - vPrima.trasmesse.length,
+            perIndirizzo: nuove.filter(c => c.url.includes(`/esplora/address/${rS.lockupAddress}/`)).length,
+            sullaRete: nuove.filter(c => c.metodo === 'POST' && c.url === BASE + '/esplora/tx').length};
+  };
+  out.spentaDopoSegreto = await spenta(14, async rS => {
+    await modo('giu_dopo_firma');
+    await stato(rS.id, 'transaction.mempool');
+  });
+  /* Poi: spenta PRIMA che i bitcoin si blocchino. Lo stato non arriva piu',
+     ma la rete vede il lockup: il giro ritira lo stesso. Lo swap e' come
+     uno recuperato (senza «ricevi»): la fee viene dalla rete. */
+  out.spentaPrima = await spenta(15, async rS => {
+    await modo('giu');
+    await stato(rS.id, 'transaction.mempool');
+    const l = lista(memA);
+    delete l.find(r => r.id === rS.id).ricevi;
+    memA.set('barattolo_swap_lista_222', JSON.stringify(l));
+  });
+  /* E a fornitore giu, uno swap senza lockup sulla rete resta fermo:
+     niente ritiro tentato, niente firma chiesta */
+  A.run(`elementi.swapIndirizzo_16 = {value: '${D.indirizzo}'}`);
+  await A.run('swapAvanti(16)');
+  await A.run('swapCrea(16)');
+  await modo('giu');
+  const gia16 = chiamate.length;
+  await A.run('swapGiro()');
+  const r16 = lista(memA).find(r => r.ordine === 16);
+  out.spentaSenzaLockup = {ritirato: !!r16.ritiro, errore: r16.errore || '',
+                           claim: chiamate.slice(gia16).filter(c => c.url.endsWith('/claim')).length};
+  await modo('normale');
+
   // --- LA SENTINELLA: dove sono andate le chiamate, e cosa portavano
   const priv = [];
   for (let i = 0; i < 12; i++) {
@@ -354,7 +406,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                     /* (20 ott 2026) il fornitore, e il finto mempool da cui si
                        legge il lockup */
                     fuori: chiamate.filter(c => !c.url.startsWith(BASE + '/v2/')
-                                             && !c.url.startsWith(BASE + '/esplora/tx/')).map(c => c.url),
+                                             && !c.url.startsWith(BASE + '/esplora/')).map(c => c.url),
                     mempool: chiamate.filter(c => c.url.startsWith(BASE + '/esplora/tx/')).length,
                     api: chiamate.filter(c => c.url.includes('/api/')).length,
                     parole: tutto.includes(parole)
@@ -527,6 +579,20 @@ def il_telefono(base):
         prova(f"{m}: niente ritiro, il perche', nessuna firma chiesta, nessuna trasmissione",
               {"ritirato": False, "errore": motivo, "firme": 0, "tentate": 0},
               (r.get("lockup") or {}).get(m))
+
+    print("\n[l'API del fornitore si spegne: il ritiro regge]")
+    prova("spenta dopo il segreto: si ritira lo stesso, dallo script, sulla rete",
+          {"ritirato": True, "coop": False, "errore": "", "via": "script",
+           "strade": ["rete"], "sats": 47_154, "firme": 1, "trasmesseInPiu": 1,
+           "perIndirizzo": 1, "sullaRete": 1},
+          r.get("spentaDopoSegreto"))
+    prova("spenta prima del lockup: la rete lo vede, il giro ritira, la fee dalla rete",
+          {"ritirato": True, "coop": False, "errore": "", "via": "script",
+           "strade": ["rete"], "sats": 47_388 - 2 * 160, "firme": 0, "trasmesseInPiu": 1,
+           "perIndirizzo": 2, "sullaRete": 1},
+          r.get("spentaPrima"))
+    prova("...e senza lockup sulla rete niente ritiro tentato, niente firma chiesta",
+          {"ritirato": False, "errore": "", "claim": 0}, r.get("spentaSenzaLockup"))
 
     print("\n[la sentinella]")
     se = r["sentinella"]

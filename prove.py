@@ -175371,7 +175371,8 @@ def prove_swap_telefono():
        un'aritmetica che non e' quella del bundle (BIP-340 in Python
        puro, `cartone_satsrouting.schnorr_verifica`).
     3. IL TELEFONO NON PARLA COL SERVER: nei file del telefono nessuna
-       chiamata a /api, una sola `fetch` (verso SATS Routing), nessun
+       chiamata a /api, due sole `fetch` (verso il fornitore e verso la
+       rete, dal 20 ott 2026), nessun
        onclick, un ascoltatore delegato che conosce ESATTAMENTE le azioni
        che il markup usa; le chiavi del cassetto portano il conto.
     4. IL CONTORNO: la versione nella pagina e' l'impronta del file, le
@@ -175432,7 +175433,8 @@ def prove_swap_telefono():
     prova("...le due fetch del tipo: l'api del fornitore e il mempool della rete", True,
           "async function swapApiBoltz(base, percorso, corpo){" in bz
           and "const api = (percorso, corpo) => swapApiBoltz(cfg.api, percorso, corpo);" in bz
-          and "const vista = await fetch(`${base}/tx/${txid}/hex`);" in bz
+          and "async function swapMempool(base, percorso, corpo){" in bz
+          and "const r = await fetch(base + percorso, opz);" in bz
           and "const base = String(cfg.mempool || '')" in bz)
     # (20 ott 2026, cantiere swap-lockup) I TRE CONTROLLI PRIMA DEL SEGRETO:
     # il lockup si legge dal mempool e il segreto parte solo dopo; nel
@@ -175441,9 +175443,26 @@ def prove_swap_telefono():
     i_rit = bz.index("async ritira(rec, parole){")
     prova("il lockup si legge dal mempool PRIMA che il segreto possa uscire",
           (True, True, True),
-          (bz.index("const vista = await fetch(", i_rit) < bz.index("const chiediFirma", i_rit),
+          (bz.index("lockHex = await swapMempool(base, `/tx/${txid}/hex`);", i_rit)
+           < bz.index("const chiediFirma", i_rit),
            "swapRitiro(S, rete, rec, chiavi, lockHex," in bz,
            "lock.hex" not in bz))
+    # (20 ott 2026, cantiere swap-senza-api) IL RITIRO REGGE SENZA LA LORO
+    # API: il lockup si cerca prima sulla rete, per indirizzo; il ritiro si
+    # trasmette su tutte e due le strade; il giro ritira anche a fornitore
+    # muto, se la rete vede il lockup. La prova coi gesti (il cartone che
+    # si spegne dopo il segreto, e prima) e' `collaudo_swap_telefono`.
+    fin_rit = bz.index("    /* IL RECUPERO dalla xpub di radice.", i_rit)
+    rit = bz[i_rit:fin_rit]
+    prova("il ritiro senza la loro API: lockup dalla rete, due strade, giro a fornitore muto",
+          (True, True, True, True, True),
+          (rit.index("let txid = await swapLockupPerIndirizzo(base, rec.lockupAddress, rec.onchainAmount);")
+           < rit.index("/transaction`"),
+           "swapMempool(base, '/tx', fatto.hex)," in rit
+           and "api('/v2/chain/BTC/transaction', {hex: fatto.hex})]);" in rit,
+           "fee = Math.ceil(Number(f.fastestFee) * 160);" in rit,
+           "try { inRete = await f.lockupInRete(rec); } catch(e){ inRete = false; }" in js,
+           "if (inRete) await swapRitira(rec);" in js))
     prova("nel ritiro: l'uscita dello script atteso, e non meno della promessa",
           (True, True, True),
           ("const uscita = S.detectSwap(tweaked.aggPubkey, lockup, atteso);" in bz,

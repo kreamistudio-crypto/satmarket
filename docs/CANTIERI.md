@@ -70130,3 +70130,75 @@ dei segreti, albero e storia, pulito su ogni albero.
 e unita' dal nuovo develop — il seguace non si aggiorna da solo — poi
 `sudo collaudo azzera`); le npub di Andrea in `PROVA_SOLO_IDS`; il giro
 dal telefono su liste, carrello, chat e «I miei ordini».
+
+## Il ritiro senza la loro API: il lockup cercato sulla rete, la trasmissione su due strade (20 ott 2026, cantiere swap-senza-api, decisione di Andrea)
+
+LA DOMANDA. Dopo il ritiro indurito il telefono chiedeva ancora al
+fornitore l'id del lockup e la trasmissione del ritiro: se l'API di SATS
+Routing si spegne DOPO che il segreto è uscito (nella richiesta di firma
+cooperativa), il fornitore può incassare la fattura e chi vende non
+ritirare più. Andrea: «il nostro ritiro deve reggere senza la loro API».
+
+DECISO.
+- LA RETE È IL SECONDO CANALE, dalla stessa origine già aperta dal
+  ritiro indurito (`cfg.mempool`, di serie mempool.space della rete):
+  niente CSP nuova, niente leva nuova. Una funzione sola,
+  `swapMempool`, con la seconda `fetch` del file.
+- IL LOCKUP PER INDIRIZZO: l'id si cerca PRIMA sulla rete
+  (`/address/<lockupAddress>/utxo`, l'uscita non spesa che porta almeno
+  la promessa; se nessuna la porta, la prima, e il controllo
+  dell'importo la ferma). Il fornitore si sente solo se la rete tace. I
+  byte vengono sempre dalla rete: i tre controlli del ritiro indurito
+  restano dove sono, prima del segreto.
+- LA TRASMISSIONE SU DUE STRADE, insieme: `POST /tx` alla rete (testo
+  semplice: niente richiesta preventiva CORS) e quella di sempre al
+  fornitore. Basta che una la prenda — il calco del rimborso della loro
+  web app, che trasmette su più esplora.
+- IL GIRO A FORNITORE MUTO: se lo stato non arriva, `swapGiro` chiede
+  alla rete (`lockupInRete`, metodo facoltativo del tipo) e, se i
+  bitcoin sono bloccati, ritira lo stesso. Senza lockup sulla rete non
+  si tenta niente, e non si chiede nessuna firma.
+- LA FEE DI UNO SWAP RECUPERATO (che non ha il preventivo): dalle
+  tariffe del fornitore, o se tace da `/v1/fees/recommended` della rete
+  (`fastestFee` × 160 vbyte, che bastano anche al ritiro dallo script).
+
+SCARTATO. Una leva per una seconda rete di riserva (un altro esplora):
+nuova origine nella CSP e un fornitore di dati in più per una regola
+che oggi una basta; si rifà il conto se mempool.space cade insieme al
+fornitore. Il ritiro solo sulla rete (senza il fornitore): se la rete
+risponde storto e il fornitore no, si perderebbe una strada buona.
+
+PROVE.
+- `collaudo_swap_telefono`, tre scene nuove contro il cartone: (1) API
+  spenta SUBITO DOPO il segreto (modo nuovo `giu_dopo_firma`: la
+  richiesta di firma arriva e si conta, poi 503 e il cartone resta giù)
+  → ritirato dallo script, sulla sola rete, coi sats del preventivo; (2)
+  API spenta PRIMA del lockup, swap senza «ricevi» come uno recuperato →
+  il giro vede il lockup sulla rete, ritira dallo script, la fee dalla
+  rete (47.388 − 2×160); (3) API spenta e nessun lockup → niente ritiro,
+  niente firma chiesta. Le scene di prima restano verdi: cooperativo,
+  dallo script, ripresa, recupero, il rifiuto del cooperativo (ora su
+  tutte e due le strade), i tre lockup bugiardi.
+- LE MUTAZIONI, una alla volta sul file, ognuna ROSSA: niente
+  trasmissione sulla rete; il lockup solo dal fornitore; il giro che non
+  ritira a fornitore muto; la fee solo dal fornitore; `lockupInRete`
+  sempre no.
+- `prove_swap_telefono`: le sentinelle lette sul codice (la ricerca per
+  indirizzo prima di quella del fornitore, le due strade, la fee dalla
+  rete, il giro), le due `fetch` del tipo.
+- `collaudo_swap_instradatore`: la sentinella ammette tutto il finto
+  mempool dei due cartoni (prima solo `/tx/`).
+- CORS di mempool.space: `Access-Control-Allow-Origin: *` letto con una
+  GET (20 ott). La POST vera non è provata (servirebbe una transazione).
+
+COSA RESTA.
+- Sulla VM: l'esplora del regtest deve rispondere a `/address/<a>/utxo`,
+  `/v1/fees/recommended` e `POST /tx`, con CORS (PRODUZIONE, «DOVE SI
+  LEGGE IL LOCKUP»).
+- Un caso non coperto: la rete prende la trasmissione ma la risposta
+  non si legge e il fornitore è giù. Il giro dopo il lockup risulta già
+  speso, la ricerca per indirizzo non lo trova e il fornitore tace: lo
+  swap resta con l'errore «il lockup non si trova» anche se i sats sono
+  arrivati. Da guardare se capita (si potrebbe cercare la spesa del
+  lockup sulla rete).
+- Suite e collaudi: nel messaggio del commit.

@@ -25,6 +25,9 @@
                                      un errore con `.tipo` = 'mente' (la
                                      risposta non torna) o 'giu'
      stato(rec)                      lo stato di adesso, o null
+     lockupInRete(rec)               (facoltativo) i bitcoin sono bloccati
+                                     sulla rete? per ritirare anche quando
+                                     l'API del fornitore tace
      ritira(rec, parole)             -> {txid, cooperativo}
      recupera(parole)                -> {swap: [...], prossimo}
    Il PREVENTIVO non sta qui: lo fa il server di Barattolo per fornitore
@@ -194,8 +197,8 @@ function caricaBundleSwap(){
 
 /* ─── 3. IL FORNITORE, direttamente ─────────────────────────────────────
    Una delle due `fetch` di questo file: verso l'`api` del fornitore (la
-   seconda, in `ritira`, legge il lockup da mempool), mai verso il server
-   di Barattolo. */
+   seconda, in `swapMempool`, parla con la rete), mai verso il server di
+   Barattolo. */
 async function swapApiBoltz(base, percorso, corpo){
   base = String(base || '').replace(/\/+$/, '');
   if (!base) throw new Error('fornitore senza indirizzo');
@@ -209,6 +212,33 @@ async function swapApiBoltz(base, percorso, corpo){
     throw e;
   }
   return d;
+}
+/* LA RETE (20 ott 2026, cantiere swap-senza-api): l'API mempool della rete
+   del fornitore (`cfg.mempool`, di serie mempool.space, la stessa origine
+   dell'on-chain). Da qui il telefono trova il lockup per indirizzo, ne legge
+   i byte, la fee del momento, e ci trasmette il ritiro: cosi' il ritiro
+   regge anche se l'API del fornitore si spegne. `corpo` = testo da
+   trasmettere (POST, text/plain: niente richiesta preventiva CORS). */
+async function swapMempool(base, percorso, corpo){
+  base = String(base || '').replace(/\/+$/, '');
+  if (!base) throw new Error('nessuna rete da cui leggere il lockup');
+  const opz = corpo === undefined ? {} : {method: 'POST', body: String(corpo)};
+  const r = await fetch(base + percorso, opz);
+  const testo = String(await r.text().catch(() => '')).trim();
+  if (!r.ok) throw new Error(testo.slice(0, 80) || ('rete: HTTP ' + r.status));
+  return testo;
+}
+/* il lockup di uno swap, cercato sulla rete per indirizzo: l'id della
+   transazione che paga `lockupAddress` e non e' ancora spesa, o '' */
+async function swapLockupPerIndirizzo(base, indirizzo, minimo){
+  if (!indirizzo) return '';
+  let uscite;
+  try { uscite = JSON.parse(await swapMempool(base, `/address/${encodeURIComponent(indirizzo)}/utxo`)); }
+  catch(e){ return ''; }
+  if (!Array.isArray(uscite)) return '';
+  const buone = uscite.filter(u => u && /^[0-9a-f]{64}$/.test(String(u.txid || '')));
+  const piena = buone.find(u => Number(u.value) >= Number(minimo || 0));
+  return String(((piena || buone[0]) || {}).txid || '');
 }
 function swapErrore(tipo, perche){
   const e = new Error(perche || tipo);
@@ -269,31 +299,47 @@ window.SWAP_TIPI.boltz = function(cfg){
     /* IL RITIRO. Un ritiro cooperativo gia' RIFIUTATO alla trasmissione
        (la firma messa insieme col fornitore non reggeva) non si ripete:
        dal giro dopo si ritira dallo script, che dipende solo da noi */
+    /* IL LOCKUP E' SULLA RETE? (20 ott 2026, swap-senza-api) Per il giro,
+       quando l'API del fornitore non risponde: se la rete vede i bitcoin
+       bloccati, si ritira lo stesso. */
+    async lockupInRete(rec){
+      return !!(await swapLockupPerIndirizzo(cfg.mempool, rec.lockupAddress, rec.onchainAmount));
+    },
     async ritira(rec, parole){
       const S = await caricaBundleSwap();
       const rete = swapRete(S, cfg.rete);
       const chiavi = swapChiavi(S, parole, rec.indice);
+      const base = String(cfg.mempool || '').replace(/\/+$/, '');
+      if (!base) throw new Error('nessuna rete da cui leggere il lockup');
       let ricevi = Number(rec.ricevi);
       if (!(ricevi > 0)) {
         /* uno swap recuperato non ha il preventivo: la fee del ritiro
-           dalle tariffe di adesso */
-        const tar = await api('/v2/swap/reverse');
-        ricevi = Number(rec.onchainAmount) - Number(tar.BTC.BTC.fees.minerFees.claim);
+           dalle tariffe di adesso; se il fornitore tace, da quella della
+           rete (160 vbyte bastano anche al ritiro dallo script) */
+        let fee;
+        try {
+          const tar = await api('/v2/swap/reverse');
+          fee = Number(tar.BTC.BTC.fees.minerFees.claim);
+        } catch(e){
+          const f = JSON.parse(await swapMempool(base, '/v1/fees/recommended'));
+          fee = Math.ceil(Number(f.fastestFee) * 160);
+        }
+        ricevi = Number(rec.onchainAmount) - fee;
       }
-      /* IL TERZO CONTROLLO (20 ott 2026, cantiere swap-lockup): il lockup
-         si legge dalla RETE, non dal fornitore. Dal fornitore si prende
-         solo l'id della transazione; i suoi byte li da' mempool (l'API
-         della rete del fornitore, `cfg.mempool`, la stessa scelta per
-         l'on-chain). Se la rete non la conosce, o la conosce diversa,
-         niente ritiro e niente segreto: si riprova al giro dopo. Senza un
-         indirizzo di mempool non si ritira affatto. */
-      const lock = await api(`/v2/swap/reverse/${id(rec.id)}/transaction`);
-      const base = String(cfg.mempool || '').replace(/\/+$/, '');
-      if (!base) throw new Error('nessuna rete da cui leggere il lockup');
-      const txid = String((lock && lock.id) || '');
-      if (!/^[0-9a-f]{64}$/.test(txid)) throw new Error('il lockup non ha un id');
-      const vista = await fetch(`${base}/tx/${txid}/hex`);
-      const lockHex = vista.ok ? String(await vista.text()).trim() : '';
+      /* IL TERZO CONTROLLO (20 ott 2026, cantiere swap-lockup) e il ritiro
+         SENZA LA LORO API (swap-senza-api): il lockup si legge dalla RETE.
+         L'id si cerca prima sulla rete, per indirizzo; solo se la rete non
+         lo dice si chiede al fornitore. I byte vengono sempre dalla rete:
+         se non li conosce, o li conosce diversi, niente ritiro e niente
+         segreto, si riprova al giro dopo. */
+      let txid = await swapLockupPerIndirizzo(base, rec.lockupAddress, rec.onchainAmount);
+      if (!txid) {
+        try { txid = String(((await api(`/v2/swap/reverse/${id(rec.id)}/transaction`)) || {}).id || ''); }
+        catch(e){ txid = ''; }
+      }
+      if (!/^[0-9a-f]{64}$/.test(txid)) throw new Error('il lockup non si trova');
+      let lockHex = '';
+      try { lockHex = await swapMempool(base, `/tx/${txid}/hex`); } catch(e){ lockHex = ''; }
       if (!lockHex) throw new Error('il lockup non si vede sulla rete');
       if (S.Transaction.fromRaw(S.hex.decode(lockHex),
             {allowUnknownOutputs: true, allowUnknownInputs: true}).id !== txid)
@@ -303,13 +349,15 @@ window.SWAP_TIPI.boltz = function(cfg){
         {index: 0, preimage: S.hex.encode(chiavi.segreto), pubNonce: nonce, transaction: txHex});
       const fatto = await swapRitiro(S, rete, rec, chiavi, lockHex, rec.indirizzo, ricevi,
                                      chiediFirma, !rec.coopRifiutato);
-      try {
-        const inviata = await api('/v2/chain/BTC/transaction', {hex: fatto.hex});
-        return {txid: String((inviata && inviata.id) || fatto.id), cooperativo: fatto.cooperativo};
-      } catch(e){
-        if (fatto.cooperativo) rec.coopRifiutato = true;
-        throw e;
-      }
+      /* LA TRASMISSIONE, su due strade insieme: la rete e il fornitore (il
+         calco del rimborso della loro web app). Basta che una la prenda. */
+      const esiti = await Promise.allSettled([
+        swapMempool(base, '/tx', fatto.hex),
+        api('/v2/chain/BTC/transaction', {hex: fatto.hex})]);
+      if (esiti.some(e => e.status === 'fulfilled'))
+        return {txid: fatto.id, cooperativo: fatto.cooperativo};
+      if (fatto.cooperativo) rec.coopRifiutato = true;
+      throw esiti[0].reason || esiti[1].reason;
     },
     /* IL RECUPERO dalla xpub di radice. Il contatore riparte DOPO
        l'indice piu' alto trovato: mai un segreto riusato */
