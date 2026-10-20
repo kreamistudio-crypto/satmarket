@@ -69578,3 +69578,204 @@ studio in 10 righe col suo ok).
 **COSA RESTA.** Lo studio KaleidoSwap (10 righe, poi l'ok di Andrea); le
 VM col regtest di Boltz; la tappa 4 (il server paga la fattura dello
 swap del fornitore scelto).
+
+## Comprare sats con USDT: le strade da «ho USDT» a «ho sats su Lightning» (20 ott 2026, cantiere usdt-studio, decisione di Andrea; solo studio, nessun codice)
+
+**LA DOMANDA DI ANDREA.** L'obiettivo di Barattolo è «compra sats con
+USDT normali, tutto dentro Barattolo, in modo semplice»; la parte legale
+la segue lui. Studio in sola lettura, poi il suo ok. ESCLUSO LIQUID: nessuna
+strada che passi da Liquid o da L-USDT, nemmeno come tappa intermedia
+(decisione di Andrea: la federazione è stata svuotata a settembre 2026; le
+cronache: blocchi fermi dal 6 al 10 settembre dopo circa 4.000 BTC usciti
+dal portafoglio della federazione per un difetto di Elements,
+https://cryptobriefing.com/white-hat-hacker-drains-liquid-network-btc/ e
+https://www.onebullex.com/news/articles/liquid-network-restarts-block-production-after-320m-elements-exploit).
+Tutti i numeri qui sotto sono letti il 20 ott 2026, con la fonte accanto;
+dove una fonte non lo dice, è scritto.
+
+**IL PREZZO DI RIFERIMENTO DEI CONTI.** BTC 81.408 $, USDT 0,9991 $
+(https://api.coingecko.com/api/v3/simple/price, ids bitcoin e tether;
+Kraken XBT/USDT 81.499 come controprova,
+https://api.kraken.com/0/public/Ticker?pair=XBTUSDT). Quindi 1 USDT ≈
+1.227 sats al prezzo di mercato, e 100 USDT ≈ 122.730 sats: è il metro
+del «costo totale» di ogni strada.
+
+**LE DUE LETTURE SU KALEIDOSWAP (chieste prima di tutto).**
+- Le coppie sul maker signet, in sola lettura (`GET
+  https://maker.signet.kaleidoswap.com/v2/swap/{reverse,submarine,chain}`,
+  versione del maker 0.10.1): USDT-RGB è ATTIVO nelle due direzioni che
+  servono. Sats Lightning → USDT-RGB: 0,5 %, da 50.000 a circa 30,9
+  milioni di sats. USDT-RGB → sats Lightning: 0,5 %, da 10 a circa 880
+  USDT di prova. Ci sono anche coppie Liquid e Arkade (fuori, per la
+  decisione su Liquid). Niente swap on-chain di RGB. È SIGNET: l'USDT è
+  un asset di prova, non il Tether vero.
+- Il LICENSE di swap-sdk
+  (https://raw.githubusercontent.com/kaleidoswap/swap-sdk/trunk/LICENSE):
+  una licenza MIT intera, con due righe di copyright, «The boltz-rust
+  contributors» e «KaleidoSwap». GitHub la segna «Other» solo per le due
+  righe: è MIT.
+
+**STRADA 1 — USDT SU RGB (ponte Utexo + KaleidoSwap).**
+- Come funziona il ponte: «lock-and-mint». Gli USDT da Ethereum, Tron,
+  Polygon o Plasma passano con USDT0/LayerZero ad Arbitrum, lì restano
+  BLOCCATI nel contratto del ponte, e su Bitcoin si conia l'USDT RGB
+  (https://docs.utexo.com/product-suite/mint.md).
+- CHI TIENE I FONDI: gli USDT0 bloccati stanno nel contratto su Arbitrum.
+  Il conio lo firma UN solo «mint signer» dentro un AWS Nitro Enclave; il
+  rilascio vuole un quorum M-di-N di firmatari, ognuno nel suo enclave
+  (stessa pagina). Quindi per tutta la vita dell'USDT su RGB il suo
+  controvalore è nelle mani di una FEDERAZIONE di firmatari, non di un
+  contratto senza fiducia. Tether come custode: non trovato.
+- Commissione del ponte 0,1 %, più il gas di Arbitrum e la fee BTC della
+  transazione RGB (https://docs.utexo.com/mint/getting-started.md); poi
+  lo swap KaleidoSwap USDT-RGB → Lightning allo 0,5 % (dal maker signet).
+  Totale stimato su 100 USDT: circa 0,6 % più tre commissioni di rete.
+- Cosa deve avere l'utente: un wallet EVM con ETH su Arbitrum per il gas,
+  un wallet RGB basato sulla rgb-lib giusta con un saldo BTC
+  (getting-started), poi lo swap. Wallet RGB in integrazione citati in
+  una call di luglio: Tribe, Kaleidoswap (beta), Iris, Layer Z, Xverse,
+  Unisat (in test) (https://rgb.info/utexo-rgb-sdk-bridge-community-call-demo/).
+  Almeno quattro passi e due o tre app.
+- STATO: «the only tested and available route is Arbitrum (mainnet) to
+  Bitcoin (Utexo signet). Bitcoin mainnet is not available yet»
+  (getting-started). Le cronache di inizio ottobre danno il lancio in
+  mainnet «a ottobre», senza data, e Lightning «in una fase successiva»
+  (https://en.cryptonomist.ch/2026/10/02/usdt-bitcoin-network-utexo/).
+  KaleidoSwap non ha un maker mainnet
+  (https://github.com/kaleidoswap/swap-sdk). Il nodo RGB Lightning di
+  Utexo è «Pre-1.0 beta» (https://docs.utexo.com/llms.txt).
+- Se si blocca: lo swap KaleidoSwap ha il rimborso dopo la scadenza; ma il
+  recupero dalle 12 parole NON vale per USDT-RGB (si conservano le
+  risposte di creazione), e una spesa sbagliata dell'HTLC brucia l'asset
+  (https://github.com/kaleidoswap/swap-sdk/releases/tag/v0.11.0). Il
+  ponte non ha una via d'uscita senza la federazione.
+- Si può provare: solo su signet, con asset di prova.
+- VERDETTO: oggi NON è una strada per l'utente comune (niente mainnet), e
+  domani resta custodiale in una federazione di firmatari.
+
+**STRADA 2 — CAMBI ISTANTANEI (USDT su Tron, Ethereum e altre reti →
+Lightning).**
+- FIXEDFLOAT (ff.io). L'UNICO verificato con dati veri. Dai file pubblici
+  dei cambi (https://ff.io/rates/float.xml e fixed.xml) USDT verso
+  «BTCLN» (Lightning) esiste da Tron, Ethereum, Arbitrum, BSC, Polygon,
+  Solana e Avalanche. Commissioni dichiarate: tasso variabile 0,5 % più
+  rete, tasso fisso 1 % più rete, bloccato 10 minuti
+  (https://ff.io/faq). Su 100 USDT, al prezzo di mercato di oggi:
+  variabile da Tron 121.524 sats (−0,98 %), da Arbitrum 121.913
+  (−0,67 %); fisso da Tron 120.911 (−1,48 %), da Arbitrum 121.300
+  (−1,17 %); più la commissione di rete del mittente (non misurata).
+  Minimi: circa 9,9 USDT da Tron, circa 2–2,4 dalle reti economiche, circa
+  24 da Ethereum; massimo circa 14.670 USDT. Passi per l'utente: tre (dà
+  la fattura Lightning, manda gli USDT all'indirizzo mostrato, aspetta);
+  serve solo un wallet USDT e un wallet Lightning. Tempi: «1 TRX
+  blockchain confirmation» da Tron
+  (https://ff.io/en/exchange/usdttrc-to-btcln), poi il pagamento Lightning.
+  CHI TIENE I FONDI: FixedFloat, dal deposito al pagamento (minuti), anche
+  se nei termini si dice «non-custodial». KYC: nessuna registrazione, ma
+  ordini sospesi e richiesta della provenienza dei fondi se li legano ad
+  attività illecite, fondi congelabili per restituirli alle vittime o per
+  sanzioni; per gli ordini da un partner la verifica la fa il PARTNER
+  (https://ff.io/terms-of-service). Paesi esclusi: Georgia, India, USA.
+  API: chiave e segreto, firma HMAC di ogni richiesta (https://ff.io/api):
+  quindi solo dal SERVER. Programma partner: 40 % del profitto, prelievo
+  da 0,001 BTC (https://ff.io/affiliate), più `afftax` e `refcode`
+  dall'API. Incidenti: furto di circa 26 milioni di dollari a febbraio
+  2024 (https://www.bitget.com/news/detail/12560603907341) e 3 milioni di
+  movimenti «sospetti» ad aprile 2024
+  (https://www.coindesk.com/markets/2024/04/02/bitcoin-lightning-exchange-fixedfloat-sees-suspicious-transfers-of-3m-to-ethereum-tron);
+  lamentele di ordini sospesi per AML fra settembre e ottobre 2026
+  (https://www.bestchange.com/fixedfloat-exchanger.html). Testnet: nessuna
+  trovata; si prova solo con importi veri minimi.
+- SIDESHIFT: OGGI NON FA LIGHTNING. L'elenco delle monete della loro API
+  dà per BTC solo «bitcoin» e «liquid» (https://sideshift.ai/api/v2/coins;
+  anche https://sideshift.ai/chains). Per il resto: commissione nel cambio,
+  minimo di serie 3 $, affiliazione dallo 0 al 2 % pagata nel loro token
+  XAI (https://docs.sideshift.ai/api-intro/monetization), possibile
+  congelamento «per il tempo dell'indagine» (https://sideshift.ai/legal),
+  nessun ambiente di prova (https://docs.sideshift.ai/faq). Fuori.
+- CHANGENOW: la pagina commerciale «USDT (TRC20) to BTC (LN)» esiste
+  (https://changenow.io/currencies/tether-trc20/bitcoin-lightning-network),
+  ma l'elenco delle monete attive della loro API (1.265 voci) non ha
+  nessuna rete Lightning
+  (https://api.changenow.io/v2/exchange/currencies?active=true): non
+  integrabile oggi. Lamentele di fondi fermi per mesi
+  (https://medium.com/@Artur_andy/changenow-no-eta-no-refund-no-answers-29ee9b5d9f59).
+- TROCADOR (aggregatore): il sito ha risposto 503 a ogni tentativo; non
+  verificato. TronDealer: una sola fonte, non verificata
+  (https://www.trondealer.com/en/guides/lightning-swap-trondealer).
+
+**STRADA 3 — SENZA CUSTODIA, DIRETTE.**
+- BOLTZ (scambi USDT, da marzo 2026: sats Lightning ↔ USDT0 su Arbitrum,
+  con tBTC e un passaggio su un DEX legati da un contratto,
+  https://news.bitcoin.com/boltz-launches-non-custodial-usdt-swaps-connecting-lightning-to-stablecoins/).
+  Sarebbe stata la strada naturale (lo stesso protocollo del nostro
+  `swap/boltz.js`). MA BOLTZ È FERMO: servizio sospeso dal 3 agosto 2026
+  «fino a nuovo avviso», i fondatori si sono fatti da parte il 12 agosto,
+  e `boltz.exchange` e `api.boltz.exchange` non esistono più nei DNS
+  (NXDOMAIN su 1.1.1.1 e 8.8.8.8, verificato anche da qui)
+  (https://github.com/Ride-The-Lightning/RTL/issues/1724,
+  https://github.com/BoltzExchange/boltz-client/issues/732; l'ultimo
+  commit della loro web app è l'avviso di sospensione, 4 ago 2026). Da
+  rivedere se riparte. NB: SATS Routing è un servizio separato, che usa
+  il loro codice; il nostro swap degli incassi non dipende da Boltz.
+- ATOMIQ: scambi senza fiducia fra Bitcoin/Lightning e Solana, Starknet,
+  Citrea, con escrow e un light client di Bitcoin; esiste il tipo
+  «smart chain → Lightning» (https://docs.atomiq.exchange/overview/swaps/sc-lightning.md);
+  rimborso da soli dopo 5 giorni per Lightning
+  (https://www.atomiq.exchange); SDK per browser, licenza Apache-2.0,
+  ultimo aggiornamento del codice 17 ago 2026
+  (https://github.com/atomiqlabs/atomiq-sdk). USDT tra i token: NON
+  TROVATO (le rotte citate sono USDC su Solana, SOL, WBTC); un loro post
+  su X parla di rotte messe offline, data incerta. Da verificare, non una
+  strada oggi.
+- UTEXO SWAP: swap per «intenti» fra Ethereum, Tron, Solana e Bitcoin con
+  un escrow per ogni swap (contratto sulle reti EVM e Tron, HTLC Taproot
+  su Bitcoin), «non-custodial» (https://docs.utexo.com/product-suite/swap.md).
+  Ma arriva su Bitcoin ON-CHAIN, non su Lightning: servirebbe un secondo
+  swap (on-chain → Lightning, che SATS Routing fa) con due attese di
+  conferme; chiede una chiave affiliato; disponibilità in mainnet non
+  verificata. È la sola combinazione davvero senza custodia che si
+  intravede, ma oggi non è provata e non è semplice.
+
+**LA RACCOMANDAZIONE.** Oggi nessuna strada è insieme semplice, senza
+custodia e disponibile. La più semplice e l'unica verificata con numeri
+veri è un CAMBIO ISTANTANEO, FixedFloat: tre passi, due wallet che
+l'utente ha già, circa lo 0,7–1 % a tasso variabile (1,2–1,5 % a tasso
+fisso) su 100 USDT, minuti. Il prezzo da pagare è che FixedFloat tiene
+gli USDT per qualche minuto e può congelarli per AML, e che nel 2024 è
+stato derubato due volte. Se si fa:
+- IL TASSO FISSO con una fattura Lightning a importo FISSO fatta dal
+  wallet dell'utente: FixedFloat o paga esattamente quella fattura o
+  rimborsa; Barattolo non tocca mai né gli USDT né i sats.
+- L'INDIRIZZO DI RIMBORSO obbligatorio, un tetto per ordine (come i 250 €
+  del P2P), e «Eseguito da FixedFloat» ben visibile prima di pagare.
+- LA DIREZIONE DEL CONTROLLO: per gli ordini via partner la verifica
+  antifrode la fa il partner (termini di FixedFloat): è una domanda per
+  la parte legale di Andrea prima di tutto il resto.
+
+COME ENTREREBBE NELL'INSTRADATORE: una strada nuova, «compra sats con
+USDT» (`usdt-ln`), accanto a `ln-btc`. Un TIPO nuovo, «cambio», perché
+l'interfaccia di oggi ha nove voci pensate per swap con chiavi: per un
+cambio `nuoveParole`, `ritira` e `recupera` non servono (non ci sono
+chiavi dell'utente), e la «verifica della risposta» diventa: l'importo
+della fattura Lightning è quello del preventivo, l'indirizzo di deposito
+è della rete scelta, il cambio non è peggiore del preventivo. Il
+PREVENTIVO e la CREAZIONE dell'ordine stanno sul SERVER (la chiave e il
+segreto di FixedFloat non possono stare nel telefono), come il preventivo
+della tappa 2; la sorveglianza dello stato pure. Il telefono mostra il
+preventivo con «Eseguito da FixedFloat», chiede la fattura al wallet
+dell'utente (o il suo Lightning address), mostra l'indirizzo USDT col QR
+e il conto alla rovescia, e segue lo stato. Un secondo cambio, quando ce
+ne sarà uno verificato, entra come secondo fornitore della stessa strada:
+la scelta del migliore e il ripiego ci sono già.
+
+QUANDO RIGUARDARE: (a) il lancio in mainnet di USDT su RGB e del maker
+KaleidoSwap, e un wallet RGB di tutti i giorni (la strada più bitcoiner,
+ma custodiale nel ponte); (b) Boltz, se riparte; (c) Atomiq con USDT. Una
+qualunque delle tre che diventi vera cambia la raccomandazione.
+
+**COSA NON SI È POTUTO VEDERE.** I siti di Boltz (fermo) e di Trocador
+(503); il sito di KaleidoSwap (403 all'agente di lettura); le FAQ di
+Utexo (chiuse a fisarmonica); gli importi di Atomiq. Nessun account
+aperto, nessuno swap, nessun sats mosso: solo pagine pubbliche e
+chiamate API di sola lettura (coppie, monete, cambi, prezzi).
