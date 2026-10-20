@@ -68141,3 +68141,65 @@ sezioni toccate e i collaudi della chat, nel verbale del commit.
 
 **DA FARE (notati, non fatti).**
 - Niente di nuovo.
+
+## Il piano DR di Alan spostato sul ramo cantiere/disaster-recovery (20 ott 2026, cantiere sposta-dr, decisione di Andrea con Alan)
+
+PERCHÉ. Il 20 ott su main sono arrivati due commit di Alan, 5466567 e
+76ba773: il piano di Disaster Recovery (`docs/DISASTER-RECOVERY.md`,
+`docs/DISASTER-RECOVERY-TESTS.md`, `docs/DR-TELEGRAM-PUBLIC.md`,
+`deploy/utility-ripristino.sh`, `deploy/RIPRISTINO.md` riscritto, cinque
+righe in `CLAUDE.md`). La CI è diventata rossa per due motivi: il nuovo
+documento non era nominato in `CLAUDE.md`, e `CLAUDE.md` era arrivato a 278
+righe su un tetto di 273. In più i due commit sono firmati con una chiave PGP
+di Alan, che non è fra i firmatari del VPS. `pronto` si è fermato a
+5d7c3d4. Decisione di Andrea con Alan: il lavoro di Alan va per ora su un
+ramo a parte, e main deve tornare verde.
+
+COSA SI È FATTO.
+- Il ramo `cantiere/disaster-recovery` su origin punta a 76ba773: i due
+  commit di Alan ci sono intatti, con la loro firma. Il ramo è di Alan e NON
+  si cancella.
+- Su main c'è UN commit, firmato da Andrea, che fa il revert dei due insieme
+  (`git revert --no-commit 76ba773 5466567`). L'albero del codice torna
+  identico a 5d7c3d4; in più c'è solo questa voce. Niente push forzato e
+  niente storia riscritta: i due commit restano nella storia di main.
+
+PERCHÉ IL REVERT BASTA AL DEPLOY (letto in `deploy.sh`, `giudica()`). Il
+giudice guarda solo lo sha portato da `pronto`: quel commit deve stare su
+main, venire DOPO quel che gira, avere una firma della lista dei firmatari e
+la CI verde. Il commento lo dice: «Si guarda la sola PUNTA». Il revert è
+figlio di 76ba773, quindi sta su main e va in avanti rispetto a 5d7c3d4, ed
+è firmato da Andrea. I due commit firmati da Alan in mezzo non si guardano.
+Anche il job `pronto` della CI (che sposta il ref senza forzare) va solo in
+avanti.
+
+⚠️ PER RIPORTARE IL DR SU MAIN (da ricordare). Un `git merge
+cantiere/disaster-recovery` su main NON porterà niente: 5466567 e 76ba773
+sono già antenati di main, e git li considera già presenti. Ci sono due
+strade:
+- un «revert del revert» (il revert di questo commit) FIRMATO DA ANDREA,
+  dopo aver sistemato le due cause del rosso: il documento nominato in
+  `CLAUDE.md` e il tetto (oppure le righe spostate in un documento in
+  `docs/`);
+- oppure Alan rifà i commit sopra main (cherry-pick o commit nuovi), con
+  sha nuovi, e la punta la firma una chiave del VPS.
+In tutti e due i casi la punta che va su `pronto` deve portare una firma
+del file dei firmatari. La chiave PGP di Alan oggi non c'è; aggiungerla è un
+gesto sul VPS e una decisione di Andrea.
+
+LE SESSIONI PARTITE DA 76ba773 (i worktree `runner-vm` e `leve-doppie`, il
+filone swap e collaudo-vm). Quando ribasano su main, rimettono sopra il
+revert solo i propri commit, e i file DR spariscono dal loro albero. Un
+conflitto è possibile solo se hanno toccato `CLAUDE.md` vicino alle cinque
+righe di Alan, o i file DR.
+
+COSA È STATO PROVATO. Nel worktree, sull'albero del revert: la suite
+intera severa (**25.695 passate, 0 fallite**) e i collaudi della CI
+(**90 verdi, 0 rossi**), sull'albero 76ba773 + il revert. Il passo dei collaudi in CI li salta quando l'albero
+differisce da `pronto` solo per dei `.md`, ed è il caso di questo commit:
+per questo si girano anche qui. Firma della punta controllata
+(`gpgsig` = 1) prima del push.
+
+**DA FARE (notati, non fatti).**
+- Riportare il DR secondo una delle due strade sopra, quando Alan e Andrea
+  lo decidono.

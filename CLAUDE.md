@@ -16,11 +16,6 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   `docs/CANTIERI-ARCHIVIO-2026.md` (intere; in CANTIERI resta l'indice
   dei titoli).
 - `docs/PRODUZIONE.md` — la macchina, la catena del deploy, le procedure.
-- `docs/DISASTER-RECOVERY.md` — backup, rollback e rebuild: i 4 scenari
-  (automatico, manuale, ripristino da backup, rebuild da zero), testing
-  mensile, contatti di emergenza. Per il rebuild da zero vedi
-  `deploy/RIPRISTINO.md` (passo-passo). Versione semplice per Telegram:
-  `docs/DR-TELEGRAM-PUBLIC.md`. Utility: `deploy/utility-ripristino.sh`.
 - `docs/NODO-MOSTRO.md` — il coordinator P2P su un'ALTRA macchina:
   audit, timer, sonda, dev fee, coi perché.
 - Gli audit `docs/AUDIT-PAGAMENTI-2026-09-19.md` e
