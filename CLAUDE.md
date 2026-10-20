@@ -63,7 +63,7 @@ modo in cui si rifà un errore già pagato.
 - IL WORKTREE È LA CARTELLA DI LAVORO, sempre. Andrea tiene più sessioni
   aperte sulla stessa working copy, quindi lì dentro compaiono modifiche
   altrui che non si toccano e non si committano. Si lavora in
-  `git worktree add -b cantiere/<nome> .claude/worktrees/<nome> origin/main`
+  `git worktree add -b cantiere/<nome> .claude/worktrees/<nome> origin/develop`
   e si fa TUTTO là: edit, prove, commit, push. Se le prove vogliono
   `config.py`, la copia nel worktree si cancella prima del commit (è un
   segreto in una cartella in più). Mai `git add -A`, mai `git commit -a`,
@@ -73,16 +73,20 @@ modo in cui si rifà un errore già pagato.
   da solo (config globale); `git commit-tree` è plumbing e firma SOLO
   con `-S`. Prima di ogni push:
   `git cat-file commit HEAD | grep -c '^gpgsig'` deve dire 1.
-- IL PUSH È MIO, IL DEPLOY È SUO. Si pusha su `main` (mai su un ramo: il
-  deploy prende solo main) SENZA chiedere, a due condizioni: cantiere
-  CHIUSO (committato, provato, collaudato, verbale scritto) e prove
-  verdi nel worktree con `PROVE_SEVERE=1 python prove.py` più i collaudi
-  della CI. Poi `git push origin HEAD:main` e la CI fino al verde
-  (`gh run watch --exit-status`; con la coda, un giro «cancelled» non è
-  rosso: si guarda il giro dopo). Un «non pushare ancora» di Andrea
-  vince finché non lo scioglie. Main corso nel frattempo: rebase,
-  sezioni toccate + collaudi, push; il verbale dice COSA è girato su
-  QUALE albero, il rapporto NOMINA i commit non miei che il push porta.
+- IL PUSH È MIO SU `develop`, LA PROMOZIONE SU `main` È SUA (20 ott
+  2026). A cantiere CHIUSO (committato, provato, collaudato, verbale
+  scritto) e con prove verdi nel worktree (`PROVE_SEVERE=1 python
+  prove.py` più i collaudi della CI) si pusha su `develop` SENZA
+  chiedere e mai con force: il collaudo sulla vm-2050 lo mette su da
+  solo (la CI gira solo su main). `main` riceve solo la PROMOZIONE, col
+  sì di Andrea e la sua frase intera: rebase su main, rifirma con
+  `andrea-firma-barattolo`, un push solo, CI fino al verde (`gh run
+  watch --exit-status`; con la coda un «cancelled» non è rosso), poi
+  `develop` rimesso uguale a main con `--force-with-lease`: l'unico
+  force ammesso, solo su develop, solo da chi promuove. Un «non pushare
+  ancora» di Andrea vince finché non lo scioglie. Ramo corso nel
+  frattempo: rebase, sezioni toccate + collaudi, push; il verbale dice
+  COSA è girato su QUALE albero, il rapporto NOMINA i commit non miei.
 - LE SESSIONI CLOUD NON ASPETTANO PIÙ LA CI SUL RAMO (da sola parte solo
   su main, 19 ott 2026): la loro prova è suite e collaudi locali.
 - IL VPS È FUORI DAL MIO PERIMETRO: niente ssh, niente query, nemmeno in
@@ -93,12 +97,14 @@ modo in cui si rifà un errore già pagato.
   il server si ferma da solo (`lettura_simulata`, solo loopback), il
   BROWSER no — nel config del giro `MOSTRO_RELAY` e `MOSTRO_RELAY_SPECCHIO`
   vanno al relay morto (`ws://127.0.0.1:9`) e la nsec a `INCOLLA_QUI`.
+  Unica eccezione, il P2P della VM di collaudo: le righe della produzione,
+  relay.barattolo.store compreso; annunci, post e DM restano nel recinto.
   Mai copiare il `config.py` locale (ha una nsec di prova). Un collaudo
   nuovo: prima nella gabbia (`python collaudi_ci.py collaudo_x`), poi una
   riga in `ci/collaudi.txt` e in `ci/compila.txt`, MAI nel workflow.
 - PULIZIA A FINE GIRO, dopo il push verde: si esce dal worktree,
   `git worktree remove --force <il mio>`, `git worktree prune`, e via i
-  rami dei cantieri già su origin/main (`git branch --merged origin/main
+  rami dei cantieri già su origin/develop (`git branch --merged origin/develop
   --list "cantiere/*"` + `-d`). Un worktree altrui con modifiche non
   committate si LASCIA e si dice perché.
 - COSA NON SI TOCCA: `config.py`, `*.db`, `foto/`, chiavi, token (regola

@@ -70274,3 +70274,42 @@ di `main()`), tenute tutte e due le parti. Sull'albero che va su develop:
 le mie sezioni, quelle che i loro commit toccano, quelle che leggono i
 documenti, il mio collaudo e quello della fusione — i numeri nel rapporto
 ad Andrea.
+
+## La regola di develop in CLAUDE.md, e il gesto 9 sulla vm-2050 (20 ott 2026, cantiere collaudo-vm, decisioni di Andrea)
+
+**CLAUDE.md** (la regola cambia davvero, quindi il tetto sale da 273 a
+279, col perche' accanto al numero): il push delle sessioni va su
+`develop`, senza chiedere a cantiere chiuso e mai con force; `main` riceve
+solo la promozione, col si' di Andrea e la sua frase intera (rebase,
+rifirma con `andrea-firma-barattolo`, un push, CI fino al verde, poi
+`develop` rimesso uguale a main con `--force-with-lease`, l'unico force
+ammesso); il worktree e la pulizia partono da `origin/develop`; e
+l'unica eccezione al «mai relay veri»: il P2P della VM di collaudo usa le
+righe della produzione, `relay.barattolo.store` compreso.
+
+**IL GESTO 9, fatto un passo alla volta col suo ok** (9a-9e scritti
+prima per intero: comando, macchina e utente, cosa cambia, il ritorno,
+cosa aspettarsi; il VPS di produzione non toccato):
+- 9a: in pausa il seguace; copie di prima in `/root/prima-del-9`;
+  posati seguace, comando, le due unita' (`MemoryMax` 734003200 tutte e
+  due) e il compose. LNbits aveva gia' il tetto di 400 MB e non si e'
+  ricreato.
+- 9b: tolta la pausa, una passata: «requirements.txt cambiato», embit
+  0.8.0 nel venv, riavvio in pari su `181856c` (develop era corso con lo
+  swap di un'altra sessione), picco 92 MB, salute 200 in 4 secondi.
+- 9c: `ONCHAIN_ATTIVO = True` c'era gia' in fondo al config: lasciato
+  (decisione di Andrea). Una svista mia: per guardarlo ho usato `tail`
+  sul config invece del solo `grep -n "^NOME"`; uscite due righe di leve
+  e un commento, nessun segreto (li' non ce ne sono), ma la regola e' il
+  grep.
+- 9d: `MERCATINO_CHAT_ORDINI = True` in fondo al config (riserva prima,
+  grep dopo: riga 2097, 640 root:collaudo), poi `collaudo azzera`: 4
+  venditori, annunci {'attivo': 12, 'venduto': 2}, ordini locked e
+  released per il primo id della lista, 28 file di foto; il database di prima in
+  `azzerati/`.
+- 9e: salute 200; `x-robots-tag: noindex, nofollow, noarchive`; chi non
+  e' in lista prende 403 su `/api/listings`; 0 traceback; servizio a 127
+  MB; 2,7 GB disponibili; il runner della CI acceso.
+
+**DA GUARDARE.** Il giro dal telefono (liste, carrello, chat, «I miei
+ordini», l'on-chain da admin); le npub di Andrea in `PROVA_SOLO_IDS`.
