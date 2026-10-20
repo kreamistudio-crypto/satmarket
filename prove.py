@@ -166725,7 +166725,16 @@ async function togliPausaAdessoP2P(){ tolte++; return TOGLIE; }
         "function filtroVuotoP2P(){", "function filtroAccesoP2P(f){",
         "function passaFiltroP2P(o, f){", "function passaRepP2P(f, faccia){",
         "function vuotoLibroP2P(vivi, filtro, lato){",
-        "function chiediConferma(c){", "async function eseguiConfermaAltra(btn){")) \
+        "function chiediConferma(c){", "async function eseguiConfermaAltra(btn){",
+        # (20 ott 2026, cantiere banchi-premio-card) il filtro legge il
+        # premio della CARD: senza la sua catena, il primo caso che
+        # arrivasse alla fascia del premio esploderebbe con un
+        # ReferenceError invece di dare un ✗ che dice cosa e' successo.
+        # Il cambio e' quello di riserva del client (muto), dal client.
+        "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+        "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
+        "function premioCardP2P(o){")) \
+        + _riga_js(m, "let eurPerSat = ") + _riga_js(m, "let cambioVivo = ") \
         + rep + blocco + r"""
 (async () => {
 const c = {};
