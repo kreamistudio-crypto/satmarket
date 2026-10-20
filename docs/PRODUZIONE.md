@@ -4526,6 +4526,41 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   I file del telefono ora stanno sotto `/swap/` (`boltz.js`,
   `instradatore.js`): `/swap-telefono.js` non c'è più.
 
+- L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
+  2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo
+  dell'ordine on-chain»; com'è fatto in ARCHITETTURA, «IL PAGAMENTO
+  ON-CHAIN, TAPPE 1-2»). SUL VPS LA LEVA NON SI TOCCA: `ONCHAIN_ATTIVO`
+  resta spenta (nessuna riga nuova nel config), e a leva spenta le
+  rotte `/api/onchain/*` sono 404 prima di chiedere embit. Il codice
+  della tappa 2 parte anche SENZA embit (le rotte che fanno i conti
+  direbbero 503); il pacchetto si mette PRIMA della promozione perché
+  il pannello «⚙️ Stato delle leve» dica «Libreria del 2-di-3 (embit)»
+  accesa e il giorno della leva non ci sia un passo in più.
+  ⚠️ NON SI LANCIA FINCHÉ ANDREA NON LO DICE (sua regola, 20 ott 2026).
+  Un passo alla volta, ognuno col suo risultato incollato:
+  1) quale Python fa girare il servizio, in sola lettura:
+     `systemctl show -p ExecStart barattolo --no-pager`
+     — il primo percorso dopo `path=` è l'interprete (lo chiamo PY);
+  2) c'è già? `sudo -u barattolo PY -c "import embit; print('embit c è')"`
+     — se lo dice, ci si ferma qui;
+  3) di chi è l'ambiente (lo stesso calco del seguace del collaudo):
+     `stat -c %U "$(dirname "$(dirname PY)")"` — lo chiamo PADRONE;
+     poi la versione della lista, con QUELL'interprete e come QUEL
+     padrone (così i file nuovi restano suoi, come gli altri pacchetti
+     del servizio — le righe di coincurve, cryptography e pillow qui
+     sopra): `sudo -u PADRONE PY -m pip install embit==0.8.0`
+     — se pip risponde «externally-managed-environment» FERMATI e
+     riferisci: vuol dire che PY è il Python di sistema e la strada si
+     decide insieme, non con `--break-system-packages` a occhio;
+  4) il controllo: `sudo -u barattolo PY -c "from embit import bip32; from embit.descriptor import Descriptor; print('embit ok')"`.
+  NIENTE RIAVVIO: lo fa il deploy della promozione, e da quel momento il
+  pannello dice «Libreria del 2-di-3 (embit)» accesa. Il commit della
+  tappa tocca `.github/workflows/prove.yml` (la riga pip della CI): dopo
+  la promozione si guarda `git ls-remote origin refs/heads/pronto
+  refs/heads/main`, e se `pronto` resta indietro lo sposta Andrea.
+  TORNARE INDIETRO: `sudo -u PADRONE PY -m pip uninstall embit` (il
+  server riparte lo stesso, con le rotte on-chain a 503).
+
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026; perché in
   CANTIERI, «L'indirizzo della quota: swap@barattolo.store»; com'è fatto
   in ARCHITETTURA, «L'INDIRIZZO DELLA QUOTA»). Dove SATS Routing manda a
