@@ -883,6 +883,9 @@ def prove_anello():
     CHIAVE = "bb" * 32
     EV_NUOVO = "ab" * 32
 
+    async def _niente_da_ripubblicare(ids):
+        return 0
+
     def firma(azione, annuncio):
         """Il POST vero su un database di cartone. Torna (testa,
         autore, quante firme restano in coda per quell'annuncio)."""
@@ -918,6 +921,8 @@ def prove_anello():
                "RE_HEX_128": re.compile("[0-9a-f]{128}"),
                "ChiavePubblicaNostr": _ChiaveFinta,
                "chiave_nostr_provata": lambda u: CHIAVE,
+               "asyncio": asyncio,
+               "_ripubblica_col_nome_nostro": _niente_da_ripubblicare,
                "evento_non_firmato": lambda *a: {"id": EV_NUOVO},
                "db": lambda: _SenzaClose(c),
                "time": type("t", (), {"time": staticmethod(lambda: 1)})}
@@ -20611,6 +20616,7 @@ def prove_trasloco_nostr():
     exec(pezzo("npub_to_hex"), amb)
     exec(pezzo("hex_to_npub"), amb)
     exec(pezzo("chiave_nostr_provata"), amb)
+    exec(pezzo("annunci_sul_suo_profilo"), amb)   # la scelta (nostr-da-telefono)
     exec(pezzo("accoda_firma"), amb)
     exec("async " + pezzo("trasloca_annunci_nostr"), amb)
 
@@ -20792,6 +20798,7 @@ def prove_collega_npub_firma():
     exec(pezzo("npub_to_hex"), amb)
     exec(pezzo("hex_to_npub"), amb)
     exec(pezzo("accoda_firma"), amb)
+    exec(pezzo("annunci_sul_suo_profilo"), amb)   # la scelta (nostr-da-telefono)
     exec(pezzo("_accoda_trasloco_di"), amb)
     exec(pezzo("_spegni_badge_altrove"), amb)
     exec("async " + pezzo("collega_npub_firma"), amb)
@@ -21043,7 +21050,8 @@ def prove_npub_una_casa():
     i = _SORGENTE.index("SQL_CHIAVE_PROVATA = (")
     exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     for nome in ("_bech32_polymod", "npub_to_hex", "hex_to_npub",
-                 "accoda_firma", "_accoda_trasloco_di",
+                 "accoda_firma", "annunci_sul_suo_profilo",
+                 "_accoda_trasloco_di",
                  "_spegni_badge_altrove", "disabilita_accesso_nostr",
                  "tg_id_da_pubkey", "crea_utente_nostr",
                  "casa_della_chiave", "venditori_nostr_attivi"):
@@ -43993,8 +44001,11 @@ def prove_fogli_di_casa():
     # OTTANTANOVE (20 ott 2026, fusione-da-telegram): «Unire i due
     # account?» quando la chiave firmata da «Entra anche con Nostr» apre
     # gia' un account nato con Nostr (`proponiUnioneNostr`).
-    prova("i gesti che passano dalla domanda unica sono ottantanove",
-          89, solo_codice(mini).count("chiediConferma({"))
+    # NOVANTA (20 ott 2026, nostr-da-telefono): «I tuoi annunci anche sul
+    # tuo profilo Nostr?» dopo il collegamento, prima della coda delle
+    # firme (`domandaAnnunciSulProfilo`, decisione di Andrea).
+    prova("i gesti che passano dalla domanda unica sono novanta",
+          90, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -118795,6 +118806,10 @@ def _banco_nip46_js(mini):
         _riga_js(mini, "let motoreNip46 = null;"),
         _fn_js(mini, "function registraMotoreNip46(m){"),
         _fn_js(mini, "function chiudiAppuntamentoNip46(perche){"),
+        # la sala d'attesa detta (20 ott 2026, nostr-da-telefono): il
+        # motore la apre e la chiude a ogni attesa; qui il foglio non
+        # c'e' (`el` torna null), quindi non disegna niente
+        pezzo_js(mini, "const NIP46_RIPROVA_MS = 30000;"),
     ])
     # LA PAGINA DI CARTONE: `document` e `window` con gli ascoltatori
     # delle sveglie (il banco li puo' far scattare), un `fetch` che il
@@ -118804,7 +118819,7 @@ def _banco_nip46_js(mini):
 const vero = console.log;
 console.log = () => {};
 const el = () => null;
-let detti = [], ascoltatori = {}, cassettaPost = [], cassettaChiusure = [], cassettaGet = 0, posta = () => ({viva: true, eventi: [], n: 0});
+let detti = [], ascoltatori = {}, cassettaPost = [], cassettaChiusure = [], cassettaSpedite = [], cassettaGet = 0, posta = () => ({viva: true, eventi: [], n: 0});
 function bunkerDice(t){ detti.push(String(t)); }
 function apriAutorizzazioneBunker(){}
 async function caricaNostrTools(){}
@@ -118815,6 +118830,9 @@ globalThis.document = {visibilityState: 'visible',
 const finestra = {addEventListener(n, fn){ ascoltatori[n] = fn; }, removeEventListener(n, fn){ if (ascoltatori[n] === fn) delete ascoltatori[n]; }};
 globalThis.fetch = async (url, o) => {
   if (o && o.method === 'POST' && /chiudi/.test(String(url))) { cassettaChiusure.push({corpo: JSON.parse(o.body), keepalive: !!o.keepalive}); return {ok: true, json: async () => ({ok: true, chiusa: true})}; }
+  /* il secondo postino (20 ott 2026): la spedizione non e' un deposito,
+     e qui non la prende nessun relay — i casi del rifiuto restano quelli */
+  if (o && o.method === 'POST' && /spedisci/.test(String(url))) { cassettaSpedite.push(JSON.parse(o.body)); return {ok: true, json: async () => ({ok: true, presi: 0, relays: []})}; }
   if (o && o.method === 'POST') { cassettaPost.push(JSON.parse(o.body)); return {ok: true, json: async () => ({relays: JSON.parse(o.body).relays, biglietto: 'b1'})}; }
   cassettaGet++;
   const dopo = Number((String(url).match(/dopo=(\d+)/) || [0, 0])[1]);
@@ -120116,6 +120134,209 @@ console.log(JSON.stringify(out));
     prova("...e un motivo mai visto resta leggibile, col dettaglio da "
           "copiare", (True, True),
           (frasi["boh"].startswith("Non ha funzionato"), "copia il dettaglio" in d["boh"][1]))
+
+
+def prove_nostr_da_telefono():
+    """IL LOGIN NOSTR DAL TELEFONO E GLI ANNUNCI SUL PROPRIO PROFILO (20
+    ott 2026, cantiere nostr-da-telefono, ok di Andrea). Dal campo: Primal
+    sullo stesso telefono Android, con Orbot, InviZible o una VPN, e il
+    foglio fermo su «Collegato: entro…»; il journal del giorno, 50 sfide
+    e 14 ingressi. Qui la FORMA delle quattro cure — la sala d'attesa
+    detta con «Riprova» dopo 30 s, gli errori del server nel foglio, la
+    coda che col bunker non tiene ferma la porta, la cassetta che
+    spedisce — e il cartone in node della sala. Il giro VERO della
+    spedizione sta in `collaudo_cassetta_nip46`, quello della scelta
+    «anche sul mio profilo» in `collaudo_annunci_sul_profilo`."""
+    print("\n[nostr dal telefono]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # --- la cassetta che spedisce: il server non firma, non cifra ---
+    i = src.index("# LA CASSETTA CHE SPEDISCE (20 ott 2026")
+    blocco = src[i:src.index("\ndef _cassette_chiudi_tutto():", i)]
+    prova("la rotta della spedizione esiste", True,
+          '@app.post("/api/login/nostr/cassetta/spedisci")' in blocco)
+    prova("...col suo freno per IP, il biglietto del deposito e il tetto "
+          "per cassetta", (True, True, True),
+          ('_frena("cassetta_spedisci", ip)' in blocco,
+           "secrets.compare_digest(biglietto, c[\"biglietto\"])" in blocco,
+           "len(spediti) >= CASSETTA_SPEDITI_MAX" in blocco))
+    prova("...e il freno ha la sua riga in FRENI", True,
+          bool(re.search(r'"cassetta_spedisci": \(\d+, \d+\)', src)))
+    prova("il server NON firma e NON cifra niente: spedisce l'evento della "
+          "pagina, ricontrollato", (False, False, True, True),
+          ("firma_evento(" in codice(blocco), "sign_schnorr" in codice(blocco),
+           "def _spedizione_valida(" in blocco,
+           ".verify(\n            bytes.fromhex(sig)" in blocco))
+    prova("...solo 24133, della chiave della cassetta, verso UNA chiave",
+          (True, True, True),
+          ('ev.get("kind") != 24133' in blocco,
+           'ev.get("pubkey") != pub' in blocco, "len(tags) == 1" in blocco))
+    prova("...su una presa aperta a un indirizzo controllato, e in collaudo "
+          "verso un relay vero non si esce", (True, True),
+          ("_presa_esterna(relay)" in blocco, "if MODALITA_COLLAUDO:" in blocco))
+    prova("la cassetta resta senza database anche spedendo", (False, False),
+          ("con.execute" in codice(blocco), "db()" in codice(blocco)))
+
+    # --- il client: la stessa busta parte anche dal server ---
+    cas = pezzo_js(mini, "function cassettaNip46(pubLocale, relays, consegna, etichetta){",
+                   "\n}\n")
+    bun = pezzo_js(mini, "async function firmatarioBunker(uri, skHex, modoCifrario, opz){",
+                   "\n}\n")
+    prova("la cassetta del client sa spedire, dopo la sua apertura", (True, True),
+          ("/login/nostr/cassetta/spedisci" in cas, "await inApertura;" in cas))
+    prova("ogni richiesta del bunker parte ANCHE dal server", True,
+          "const dalServer = cassetta.spedisci(ev);" in bun)
+    prova("...e il rifiuto di tutti i relay del telefono non fa cadere "
+          "l'attesa se il server l'ha consegnata", True,
+          "dalServer.then(presi => {" in bun and "if (presi ||" in bun)
+    prova("la chiave pubblica si chiede UNA volta (era chiesta due volte di "
+          "fila al login)", (True, False),
+          ("if (!chiave) chiave = chiama('get_public_key', [])" in bun,
+           "pubkey: () => chiama('get_public_key', [])" in bun))
+    prova("il tetto dell'umano resta cinque minuti (decisione del 10 ott)",
+          True, "const NIP46_UMANO_MS = 300000;" in mini)
+    prova("«Riprova» arriva dopo trenta secondi", True,
+          "const NIP46_RIPROVA_MS = 30000;" in mini)
+    prova("la sala si apre a ogni attesa lunga e si chiude a ogni esito "
+          "(risposta, tempo scaduto, attese cadute, motore chiuso, rifiuto)",
+          (True, 4, True),
+          ("if (ms >= NIP46_SERVIZIO_MS) salaNip46Apri({id, metodo, params, ms," in bun,
+           bun.count("salaNip46Chiudi("),
+           "Object.keys(attese).forEach(salaNip46Chiudi);" in bun))
+    prova("il foglio ha il suo posto per la sala e il bottone «Riprova»",
+          (True, True), ('id="nostrAttesa"' in mini,
+                         'onclick="riprovaNip46()">🔄 Riprova</button>' in mini))
+
+    # --- gli errori del server nel foglio, la coda che non blocca ---
+    ent = pezzo_js(mini, "async function entraConNostr(firmatario){", "\n}\n")
+    prova("entraConNostr non chiude piu' un errore del server in un toast "
+          "e un return: lo lancia, e lo scrive il foglio", (False, 2),
+          ("toast(ds.detail" in ent or "toast(d.detail" in ent,
+           ent.count("throw new Error('il server: '")))
+    prova("...e chi entra col bunker non aspetta la coda degli annunci "
+          "(la firma dopo il reload firmatarioAutomatico)", True,
+          bool(re.search(r"if \(!firmatario\.sessione\) \{\s*try \{ await "
+                         r"svuotaFirmeNostr\(firmatario, true\); \}", ent)))
+    for nome in ("loginNostrEstensione", "loginNostrNsec"):
+        f = pezzo_js(mini, f"async function {nome}(){{", "\n}\n")
+        prova(f"{nome}: l'errore va anche nel foglio", True,
+              "bunkerErrore(e.message" in f)
+
+    # --- la scelta «anche sul mio profilo»: un giudice, quattro chiamanti ---
+    prova("la colonna nasce di serie a 1 (chi c'e' gia' non cambia)", True,
+          '"annunci_su_profilo_nostr INTEGER DEFAULT 1",' in src)
+    for chi in ("annuncio_su_nostr", "trasloca_annunci_nostr",
+                "_accoda_trasloco_di", "firme_nostr_da_fare"):
+        prova(f"{chi} chiede al giudice unico della scelta", True,
+              "annunci_sul_suo_profilo(con, " in pezzo(chi))
+    fd = pezzo("firme_nostr_da_fare")
+    prova("le cancellazioni sono UNA firma sola: un kind 5 con tutti gli "
+          "annunci, col suo tetto", (True, True, True),
+          ('"annuncio_ids": ids' in fd, "evento_non_firmato(\n            sua, 5, tags" in fd,
+           "MAX_RITIRI_IN_UNA_FIRMA" in fd))
+    prova("il messaggio onesto sulla NIP-09 e' quello chiesto da Andrea",
+          True, "Chiediamo ai relay di cancellarli, ma alcuni potrebbero "
+                "tenerne una copia." in mini)
+
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("la sala d'attesa gira sul cartone", "node non installato")
+        return
+    sala = pezzo_js(mini, "const NIP46_RIPROVA_MS = 30000;")
+    sp = pezzo_js(mini, "function spiegaNip46(motivo){")
+    _prog = r"""
+let ORA = 1000000;
+Date.now = () => ORA;
+const nodi = {};
+function nodo(){ return {style: {display: 'none'}, textContent: '',
+  classList: {contains: () => true}}; }
+for (const k of ['nostrSheet','nostrAttesa','nostrAttesaRiga','nostrAttesaCausa','nostrRiprovaBtn']) nodi[k] = nodo();
+const el = k => nodi[k];
+const toasts = [];
+const toast = t => toasts.push(t);
+let intervalli = 0;
+setInterval = () => ++intervalli;
+clearInterval = () => {};
+const NIP46_SERVIZIO_MS = 60000;
+""" + sala + "\n" + sp + r"""
+const out = {};
+out.cosa = [cosaAspettaNip46('connect', []), cosaAspettaNip46('get_public_key', []),
+  cosaAspettaNip46('sign_event', [JSON.stringify({kind: 22242})]),
+  cosaAspettaNip46('sign_event', [JSON.stringify({kind: 30402})]),
+  cosaAspettaNip46('sign_event', [JSON.stringify({kind: 5})]),
+  cosaAspettaNip46('nip44_encrypt', [])];
+out.cause = [causaProbabileNip46(0, false), causaProbabileNip46(0, true), causaProbabileNip46(2, true)];
+let rimandate = 0;
+salaNip46Apri({id: 'x1', metodo: 'sign_event', params: [JSON.stringify({kind: 22242})], ms: 300000,
+  rimanda(){ rimandate++; }, causa(){ return causaProbabileNip46(2, true); }});
+out.subito = [nodi.nostrAttesa.style.display, nodi.nostrAttesaRiga.textContent,
+  nodi.nostrAttesaCausa.style.display, nodi.nostrRiprovaBtn.style.display];
+ORA += 29000; salaNip46Disegna();
+out.a29 = [nodi.nostrRiprovaBtn.style.display, nodi.nostrAttesaRiga.textContent];
+ORA += 1000; salaNip46Disegna();
+out.a30 = [nodi.nostrRiprovaBtn.style.display, nodi.nostrAttesaCausa.style.display,
+  nodi.nostrAttesaCausa.textContent];
+riprovaNip46();
+out.riprova = [rimandate, nodi.nostrRiprovaBtn.style.display, toasts.length,
+  nodi.nostrAttesaRiga.textContent];
+salaNip46Chiudi('altro');
+out.altro = nodi.nostrAttesa.style.display;
+salaNip46Chiudi('x1');
+out.chiusa = [nodi.nostrAttesa.style.display, salaNip46 === null];
+nodi.nostrSheet.classList.contains = () => false;
+salaNip46Apri({id: 'x2', metodo: 'get_public_key', params: [], ms: 60000,
+  rimanda(){}, causa(){ return ''; }});
+out.chiusoIlFoglio = salaNip46 === null;
+const s = spiegaNip46('il server: Troppe richieste in poco tempo');
+out.server = [s.cosa, s.fare.length > 0, s.dettaglio];
+console.log(JSON.stringify(out));
+"""
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=30, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("la sala d'attesa gira sul cartone", "0",
+              f"{_r.returncode}: {_r.stderr[:400]}")
+        return
+    d = _js.loads(_r.stdout.strip().splitlines()[-1])   # sopra, i log della sala
+    prova("ogni attesa ha il suo nome: presentazione, chiave, firma "
+          "d'ingresso, di un annuncio, della cancellazione, cifratura",
+          ["che il firmatario accetti Barattolo", "la tua chiave pubblica",
+           "la firma d'ingresso", "la firma di un annuncio",
+           "la firma della cancellazione", "la cifratura"], d["cosa"])
+    prova("tre cause probabili diverse, e chi ha i relay chiusi sente "
+          "nominare Tor e la VPN", (3, True, True, True),
+          (len(set(d["cause"])), "Tor" in d["cause"][0] and "VPN" in d["cause"][0],
+           "nostro server" in d["cause"][1], "background" in d["cause"][2]))
+    prova("...ogni causa sta in una riga del foglio (non oltre 200 caratteri)",
+          True, all(len(c) <= 200 for c in d["cause"]))
+    prova("la sala si apre subito col nome e il conto alla rovescia; causa "
+          "e «Riprova» ancora nascosti",
+          ["", True, "none", "none"],
+          [d["subito"][0], "la firma d'ingresso" in d["subito"][1]
+           and "Ancora 5:00." in d["subito"][1], d["subito"][2], d["subito"][3]])
+    prova("a 29 secondi ancora niente «Riprova», e il conto scende",
+          ("none", True), (d["a29"][0], "Ancora 4:31." in d["a29"][1]))
+    prova("a 30 secondi la causa probabile e «Riprova»",
+          ("", "", True), (d["a30"][0], d["a30"][1], "background" in d["a30"][2]))
+    prova("«Riprova» rimanda la stessa richiesta, lo dice, e il prossimo "
+          "aiuto aspetta altri 30 secondi; il tetto non si sposta",
+          (1, "none", 1, True),
+          (d["riprova"][0], d["riprova"][1], d["riprova"][2],
+           "Ancora 4:30." in d["riprova"][3]))
+    prova("una risposta per un'ALTRA richiesta non chiude la sala", "",
+          d["altro"])
+    prova("...la sua si'", ["none", True], d["chiusa"])
+    prova("a foglio chiuso la sala non si apre (la coda che gira in "
+          "silenzio non ci scrive)", True, d["chiusoIlFoglio"])
+    prova("un errore del server si spiega nel foglio col suo dettaglio",
+          ["Barattolo non ha accettato l'ingresso.", True,
+           "il server: Troppe richieste in poco tempo"], d["server"])
 
 
 def prove_punti_barattolo():
@@ -145916,7 +146137,10 @@ def prove_freni():
            "zap": (20, 60), "zap_tutti": (120, 60),
            # l'on-chain della tappa 2 (20 ott 2026, numeri di Andrea):
            # la xpub dedicata 5 all'ora, un indirizzo di prova 20 all'ora
-           "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600)}, F)
+           "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
+           # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
+           # un login con la sua coda sta largo in 60 al minuto per IP
+           "cassetta_spedisci": (60, 60)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -177872,6 +178096,7 @@ def main():
               prove_bunker_muto,
               prove_login_qr,
               prove_cassetta_nip46,
+              prove_nostr_da_telefono,
               prove_profilo_sezioni,
               prove_profilo_elegante,
               prove_utenti_home,

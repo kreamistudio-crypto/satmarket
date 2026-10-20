@@ -15054,6 +15054,14 @@ document.getElementById('cartello')?.remove();</script>
       Dimostri di possedere la tua chiave firmando una sfida.
       La chiave privata <b>non viene mai inviata</b> a nessuno.
     </div>
+    <!-- LA SALA D'ATTESA DETTA (20 ott 2026, cantiere nostr-da-telefono):
+         cosa si aspetta dal firmatario e quanto manca; dopo 30 secondi
+         la causa probabile e «Riprova». La disegna salaNip46Disegna. -->
+    <div id="nostrAttesa" style="display:none;margin-top:10px;font-size:13px;color:var(--ink-soft);font-weight:600;line-height:1.5">
+      <div id="nostrAttesaRiga"></div>
+      <div id="nostrAttesaCausa" style="display:none;margin-top:6px"></div>
+      <button class="btn mini" id="nostrRiprovaBtn" style="display:none;margin-top:8px" onclick="riprovaNip46()">🔄 Riprova</button>
+    </div>
     <!-- IL TELEFONO PER PRIMO, e non e' un'opinione: qui dentro si
          entra quasi sempre da un telefono (Mini App, PWA), dove
          un'estensione del browser non esiste proprio — «consigliato»
@@ -32877,6 +32885,7 @@ function closeSheet(){
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
   chiudiAppuntamentoNip46('foglio chiuso');   // la cassetta non aspetta i suoi dieci minuti
+  salaNip46Chiudi();                          // e la sala d'attesa non resta appesa al foglio
   el('nostrGuidaSheet').classList.remove('open');
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
@@ -36635,6 +36644,7 @@ let myLivello = null;            // il grado DERIVATO dal server
 let myScalaLivelli = [];         // i gradini coi loro vantaggi (ott 2026)
 let myClassifica = false;        // la leva della classifica, dal server
 let myClassificaNascosta = false; // «Non mostrarmi in classifica», dal server
+let myAnnunciSulProfilo = true;  // «Pubblica i miei annunci anche sul mio profilo Nostr», dal server (di serie si')
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
@@ -38004,7 +38014,7 @@ function renderIdentita(){
      senza aspettare il promemoria settimanale. Vedi collegaNostrFirmato. */
   const btnFirma =
     `<button class="btn ghost" style="margin:0 0 8px" onclick="collegaNostrFirmato()">🔑 Entra anche con Nostr</button>` +
-    sub(`Firmi con bunker, estensione o nsec (mai inviata, resta solo su questo dispositivo): badge, verifica e accesso arrivano insieme, e i tuoi annunci passano a nome tuo.`);
+    sub(`Firmi con bunker, estensione o nsec (mai inviata, resta solo su questo dispositivo): badge, verifica e accesso arrivano insieme, e scegli se i tuoi annunci passano a nome tuo.`);
   /* LA PORTA A MANO DELLA CODA (ott 2026): compare solo quando ci sono
      annunci fermi e l'avvio non e' riuscito a firmarli da solo — cioe'
      senza bunker ne' estensione, tipicamente dopo un ingresso con la
@@ -38062,7 +38072,21 @@ function renderIdentita(){
         ${tgFotoOk ? pillFoto('telegram','✈️ Telegram') : ''}
         ${nostrFotoOk ? pillFoto('nostr', etichettaNostr('Nostr')) : ''}
         ${pillFoto('nessuna','Nessuna')}</div>`;
-  box.innerHTML = tgRiga + nsRiga + fotoRiga;
+  /* — riga «Pubblica i miei annunci anche sul mio profilo Nostr» (20 ott
+     2026, cantiere nostr-da-telefono): solo con una chiave provata, che
+     e' quando il bivio la usa. Due pillole e la frase che dice cosa
+     succede adesso; il gesto e' setAnnunciSulProfilo. */
+  const pillAnn = (si, nome) =>
+    `<button onclick="setAnnunciSulProfilo(${si})" aria-pressed="${myAnnunciSulProfilo===si}" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${myAnnunciSulProfilo===si?'var(--sats)':'var(--line)'};background:${myAnnunciSulProfilo===si?'var(--sats)':'transparent'};color:${myAnnunciSulProfilo===si?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${nome}</button>`;
+  const annRiga = nostrFotoOk
+    ? riga('📣', 'Pubblica i miei annunci anche sul mio profilo Nostr',
+        myAnnunciSulProfilo
+          ? 'Sì: escono firmati da te, sul tuo profilo Nostr.'
+          : 'No: escono col nome di Barattolo, senza legarli alla tua npub.')
+      + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">
+          ${pillAnn(true, 'Sì')}${pillAnn(false, 'No, tienili separati')}</div>`
+    : '';
+  box.innerHTML = tgRiga + nsRiga + annRiga + fotoRiga;
   renderConnettori();
   renderAvvisi();
   renderSpedizioniere();
@@ -38128,6 +38152,58 @@ let fotoInCorso = false;
 /* Il selettore della foto: il server valida la sorgente (esiste
    davvero?) e, se non e' «nessuna», rifa' il francobollo dal social
    scelto e ASPETTA di averlo prima di rispondere. */
+/* «Pubblica i miei annunci anche sul mio profilo Nostr» (20 ott 2026,
+   cantiere nostr-da-telefono, decisione di Andrea). Con «no» il server
+   accoda la cancellazione di quel che e' gia' sul suo profilo — UNA
+   firma per tutti — e la coda qui sotto prova a firmarla subito, se c'e'
+   una strada automatica; se no aspetta, e il Profilo la mostra. Il
+   toast dice onesto quel che la NIP-09 e'. `daCollegamento`: la domanda
+   del collegamento, che la coda la svuota da se'. */
+async function setAnnunciSulProfilo(si, daCollegamento){
+  haptic();
+  if (DEMO) { toast('In demo i tuoi annunci non escono su Nostr 🙂'); return false; }
+  if (si === myAnnunciSulProfilo && !daCollegamento) return true;
+  let d;
+  try {
+    const r = await fetch(`${API_BASE}/me/nostr/annunci-sul-profilo`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({si})});
+    d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return false; }
+  } catch(e) { toast('Rete assente: riprova'); return false; }
+  myAnnunciSulProfilo = !!d.si;
+  renderIdentita();
+  if (!d.si && d.da_ritirare)
+    toast('Chiediamo ai relay di cancellarli, ma alcuni potrebbero tenerne una copia. Serve una tua firma, una sola.', 9000);
+  else
+    toast(d.si ? '📣 I tuoi annunci escono sul tuo profilo Nostr'
+               : '📣 I tuoi annunci escono col nome di Barattolo', 4000);
+  if (!daCollegamento) svuotaFirmeNostr().catch(()=>{});
+  return true;
+}
+/* La domanda del collegamento: true (si'), false (no), null (foglio
+   chiuso senza rispondere). Il foglio di casa non avvisa chi l'ha
+   aperto quando lo si chiude dal fondo, quindi lo si guarda. */
+function domandaAnnunciSulProfilo(){
+  return new Promise(fatto => {
+    let detta = false;
+    const di = v => { if (!detta) { detta = true; fatto(v); } };
+    chiediConferma({
+      titolo: '📣 I tuoi annunci anche sul tuo profilo Nostr?',
+      corpo: 'Sì: escono firmati da te, e li vede chi ti segue su Nostr. '
+           + 'No: escono col nome di Barattolo, senza legarli alla tua npub. '
+           + 'Puoi cambiarlo dal Profilo.',
+      etichetta: 'Sì, anche sul mio profilo',
+      poi: () => di(true),
+      altra: {etichetta: 'No, tienili separati', poi: () => di(false)}});
+    const guarda = setInterval(() => {
+      if (el('confermaSheet')?.classList.contains('open')) return;
+      clearInterval(guarda);
+      setTimeout(() => di(null), 0);
+    }, 400);
+  });
+}
+
 async function setFotoScelta(scelta){
   haptic();
   if (DEMO) { toast('In demo non ci sono foto vere 🙂'); return; }
@@ -51306,7 +51382,7 @@ async function svuotaFirmeNostr(fPronto, alLogin){
                                      'Content-Type':'application/json'},
              body: JSON.stringify({biglietto: voce.biglietto,
                                    pubkey: pub, sig: firmato.sig})});
-          if (r.ok) { fatte++; resto = Math.max(0, resto - 1); }
+          if (r.ok) { fatte++; resto = Math.max(0, resto - (voce.quanti || 1)); }
           console.log(`🟪 [coda] #${voce.annuncio_id} (${voce.azione}) `
             + `firmato e in piazza`);
         } catch(e){ /* i relay ce l'hanno: il server si allinea al giro dopo */ }
@@ -51449,6 +51525,11 @@ async function eseguiCollegamentoFirmato(f){
      nessun bottone/passo in piu' da mostrare (set 2026, decisione di
      Andrea — «non metterli, li firma gia'»). */
   await firmaEConsegnaNip85(f, true);
+  /* LA DOMANDA, PRIMA DELLA CODA (20 ott 2026, cantiere nostr-da-
+     telefono): la coda qui sotto mette gli annunci sul SUO profilo, e
+     prima di farlo si chiede. Chi chiude il foglio senza rispondere
+     resta sul «si'» di serie, cambiabile dal Profilo. */
+  if (await domandaAnnunciSulProfilo() === false) await setAnnunciSulProfilo(false, true);
   await svuotaFirmeNostr(f);   // stessa firma, subito: non aspetta l'orologio
   await loadListings(); renderGrid();
   /* dopo un'unione il profilo e' cambiato tutto (affari, punti, negozio):
@@ -54184,7 +54265,9 @@ function ascoltoNip46(NT, coro, opz){
    giro col bunker puo' durare piu' di una cassetta. */
 function cassettaNip46(pubLocale, relays, consegna, etichetta){
   let n = 0, viva = null, timer = null, ferma = false, orecchi = {}, apertaA = 0, biglietto = '';
-  async function apri(){
+  let inApertura = null;   // l'apertura in corso: chi spedisce la aspetta
+  function apri(){ return (inApertura = apriOra()); }
+  async function apriOra(){
     if (ferma) return;
     apertaA = Date.now();          // da subito: un rinfresca() durante l'apertura non deve riaprire
     try {
@@ -54221,6 +54304,29 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
   function rinfresca(){
     if (viva !== false && Date.now() - apertaA > 240000) apri();
   }
+  /* IL SECONDO POSTINO (20 ott 2026, cantiere nostr-da-telefono): la
+     richiesta gia' cifrata e firmata qui va anche al server, che la
+     consegna ai relay della cassetta dalla SUA rete — quella che Tor e
+     le VPN del telefono non toccano (vedi server.py, «LA CASSETTA CHE
+     SPEDISCE»). Il server non vede niente che non veda un relay. Torna
+     quanti relay l'hanno presa (0 = niente, e si va avanti con le
+     websocket sole: e' una riserva, non un passaggio obbligato). */
+  async function spedisci(ev){
+    if (ferma) return 0;
+    try { await inApertura; } catch(e){}
+    if (!viva || !biglietto) return 0;
+    try {
+      const r = await fetch(`${API_BASE}/login/nostr/cassetta/spedisci`, {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pub: pubLocale, biglietto, evento: ev})});
+      const d = await r.json().catch(() => ({}));
+      console.log(`🟪 [${etichetta}] spedita dal server: ${r.ok ? (d.gia ? 'gia\' partita' : (d.presi || 0) + ' relay') : 'rifiutata: ' + (d.detail || r.status)}`);
+      return r.ok ? (d.presi || 0) : 0;
+    } catch(e){
+      console.log(`🟪 [${etichetta}] il server non spedisce: ${e?.message || e}`);
+      return 0;
+    }
+  }
   /* la stanza e' cambiata: si rideposita con i relay nuovi (il server
      li AGGIUNGE alla cassetta: i vecchi restano in ascolto, non costano) */
   function sposta(nuovi){
@@ -54246,7 +54352,7 @@ function cassettaNip46(pubLocale, relays, consegna, etichetta){
       console.log(`🟪 [${etichetta}] cassetta chiusa`);
     } catch(e){}
   }
-  return {apri, leggi, rinfresca, chiudi, sposta,
+  return {apri, leggi, rinfresca, chiudi, sposta, spedisci,
           get viva(){ return viva; }, get orecchi(){ return orecchi; },
           /* per i messaggi: quali orecchi del server ascoltano davvero */
           racconta(){
@@ -54315,6 +54421,7 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
       const at = attese[id];
       delete attese[id];
       clearTimeout(at.lingua);
+      salaNip46Chiudi(id);
       console.log(`🟪 [bunker] attesa ${id} caduta: ${motivo}`);
       at.no(new Error(motivo));
     }
@@ -54337,6 +54444,7 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
     console.log(`🟪 [bunker] ← risposta per id ${msg.id} via ${via}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
     delete attese[msg.id];
     clearTimeout(at.lingua);
+    salaNip46Chiudi(msg.id);
     if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
   }
   const ascolto = ascoltoNip46(NT, coro, {skLocale, pubLocale, suEvento,
@@ -54369,6 +54477,10 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
       content: cifra.scrivi(JSON.stringify({id, method: at.metodo, params: at.params}), null, modoForzato)},
       skLocale);
     console.log(`🟪 [bunker] → ${at.metodo} (id ${id}${modoForzato ? ', in ' + modoForzato : ''}) su ${voci.map(v => v.url).join(' · ') || 'nessun relay vivo: aspetto il riaggancio'}`);
+    /* ...E DAL SERVER, la stessa busta (cassetta.spedisci): se le
+       websocket del telefono non passano, passa lei. Lo stesso evento
+       sugli stessi relay e' una copia che il relay scarta da solo. */
+    const dalServer = cassetta.spedisci(ev);
     const rifiutata = [];
     voci.forEach(v => v.relay.publish(ev).catch(e=>{
       const motivo = e?.message || String(e);
@@ -54391,9 +54503,15 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
       console.log(`🟪 [bunker] ${v.url} ha rifiutato ${at.metodo}: ${motivo}`);
       rifiutata.push(`${v.url} → ${motivo}`);
       if (rifiutata.length >= voci.length && attese[id] && !at.rimandata) {
-        delete attese[id];
-        clearTimeout(at.lingua);
-        at.no(new Error(`ogni relay ha rifiutato la richiesta: ${rifiutata.join(' · ')}`));
+        /* si cade solo se nemmeno il server l'ha consegnata: un relay
+           che ha detto no al telefono (Tor, una VPN) puo' dire si' a lui */
+        dalServer.then(presi => {
+          if (presi || !attese[id] || at.rimandata) return;
+          delete attese[id];
+          clearTimeout(at.lingua);
+          salaNip46Chiudi(id);
+          at.no(new Error(`ogni relay ha rifiutato la richiesta: ${rifiutata.join(' · ')}`));
+        });
       }
     }));
     if (at.inviata) at.rimandata = true;
@@ -54421,8 +54539,17 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
          dispositivo, o sullo stesso cambiando app: NIP46_UMANO_MS. Le
          chiamate di servizio restano a NIP46_SERVIZIO_MS. */
       const ms = timeoutMs || NIP46_SERVIZIO_MS;
+      /* LA SALA D'ATTESA DETTA (vedi salaNip46Apri): cosa si aspetta,
+         quanto manca, e dopo NIP46_RIPROVA_MS la causa probabile e
+         «Riprova», che rimanda la STESSA richiesta (stesso id: chi
+         l'aveva gia' vista non la approva due volte). Le domande brevi
+         (switch_relays) non la aprono: finiscono prima di leggerla. */
+      if (ms >= NIP46_SERVIZIO_MS) salaNip46Apri({id, metodo, params, ms,
+        rimanda(){ invia(id, ascolto.vive()); },
+        causa(){ return causaProbabileNip46(ascolto.vive().length, cassetta.viva); }});
       setTimeout(()=>{ if (attese[id]) { const at = attese[id]; delete attese[id];
         clearTimeout(at.lingua);
+        salaNip46Chiudi(id);
         console.log(`🟪 [bunker] ⏱ ${metodo} senza risposta dopo ${ms/1000}s`);
         /* I NOMI DEI RELAY ANCHE QUI: «il bunker non risponde» non
            dice se a tacere è il bunker o la strada per arrivarci, e
@@ -54440,6 +54567,7 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
     if (motoreNip46 === motore) motoreNip46 = null;
     ascolto.chiudi();
     cassetta.chiudi();
+    Object.keys(attese).forEach(salaNip46Chiudi);
     if (perche && Object.keys(attese).length) saltano(perche);
   };
   const motore = {chiudi};
@@ -54507,8 +54635,20 @@ async function firmatarioBunker(uri, skHex, modoCifrario, opz){
   const uriSessione = !cambiata ? uri.trim()
     : 'bunker://' + bunkerPub + '?' + stanza.map(r => 'relay=' + encodeURIComponent(r)).join('&')
       + (par.get('secret') ? '&secret=' + encodeURIComponent(par.get('secret')) : '');
+  /* LA CHIAVE SI CHIEDE UNA VOLTA (20 ott 2026, cantiere nostr-da-
+     telefono): il login la chiedeva due volte di fila — per ricordare
+     la sessione e per guardare se l'account e' gia' aperto — e la
+     seconda partiva proprio quando chi firma sullo STESSO telefono e'
+     tornato a Barattolo e il firmatario sta in background: un minuto
+     di silenzio prima della firma vera. La risposta buona si tiene;
+     un errore no, cosi' la volta dopo si richiede. */
+  let chiave = null;
+  const pubkey = () => {
+    if (!chiave) chiave = chiama('get_public_key', []).catch(e => { chiave = null; throw e; });
+    return chiave;
+  };
   return {
-    pubkey: () => chiama('get_public_key', []),
+    pubkey,
     firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], NIP46_UMANO_MS)),
     /* la cifratura NIP-44 (11 ott 2026, la copia del profilo di
        scambio): il bunker risponde col testo cifrato, o con un rifiuto
@@ -54754,6 +54894,83 @@ function bunkerDice(testo){
   if (s) s.textContent = testo;
 }
 
+/* LA SALA D'ATTESA DETTA (20 ott 2026, cantiere nostr-da-telefono, ok di
+   Andrea). IL FATTO: un utente con Primal sullo stesso telefono Android,
+   con Orbot, InviZible o una VPN, restava su «Collegato: entro…» — e
+   quel giorno il journal diceva 50 sfide e 14 ingressi: gli altri fermi
+   alla FIRMA, non al server. Il foglio intanto taceva, fino a cinque
+   minuti (NIP46_UMANO_MS, che resta quello: e' il tempo di una persona).
+   Ora ogni richiesta che aspetta qualcuno dice COSA aspetta e QUANTO
+   manca; dopo NIP46_RIPROVA_MS di silenzio dice la causa probabile in
+   parole semplici e mostra «Riprova», che rimanda la stessa richiesta.
+   UNA SALA PER FOGLIO: la richiesta piu' recente, e solo se il foglio e'
+   aperto — la coda delle firme che gira in silenzio dopo il reload non
+   deve scriverci dentro. */
+const NIP46_RIPROVA_MS = 30000;
+let salaNip46 = null;
+function cosaAspettaNip46(metodo, params){
+  if (metodo === 'connect') return 'che il firmatario accetti Barattolo';
+  if (metodo === 'get_public_key') return 'la tua chiave pubblica';
+  if (metodo === 'sign_event') {
+    let kind = 0;
+    try { kind = JSON.parse(params[0]).kind; } catch(e){}
+    return ({22242: "la firma d'ingresso", 30402: 'la firma di un annuncio',
+             5: 'la firma della cancellazione', 30078: 'la firma del profilo di scambio'})[kind]
+      || 'una firma';
+  }
+  if (/^nip(04|44)_/.test(metodo)) return 'la cifratura';
+  return 'la risposta del firmatario';
+}
+/* LA CAUSA PROBABILE, da quel che il motore sa: quante voci sono vive
+   dal telefono e se la cassetta del server c'e'. Una frase per caso. */
+function causaProbabileNip46(vive, cassettaViva){
+  if (!vive && !cassettaViva)
+    return 'Da questa rete non raggiungo i relay della firma: con Tor o una VPN succede. Spegnili un momento e tocca Riprova.';
+  if (!vive)
+    return 'Da questa rete non raggiungo i relay (con Tor o una VPN succede): la richiesta passa dal nostro server. Apri l\'app che firma e approva.';
+  return 'Probabilmente l\'app che firma (Primal, Amber…) è in background e non l\'ha vista: aprila, approva e torna qui. Se lì non c\'è niente, tocca Riprova.';
+}
+function salaNip46Apri(o){
+  if (!el('nostrSheet')?.classList.contains('open')) return;
+  salaNip46Chiudi();
+  salaNip46 = {...o, nata: Date.now(), scade: Date.now() + o.ms,
+               timer: setInterval(salaNip46Disegna, 1000)};
+  salaNip46Disegna();
+}
+function salaNip46Chiudi(id){
+  if (!salaNip46 || (id && salaNip46.id !== id)) return;
+  clearInterval(salaNip46.timer);
+  salaNip46 = null;
+  const b = el('nostrAttesa');
+  if (b) b.style.display = 'none';
+}
+function salaNip46Disegna(){
+  const s = salaNip46, b = el('nostrAttesa');
+  if (!s || !b) return;
+  const resta = Math.max(0, Math.ceil((s.scade - Date.now()) / 1000));
+  const t = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, '0')}`;
+  el('nostrAttesaRiga').textContent =
+    `⏳ Aspetto ${cosaAspettaNip46(s.metodo, s.params)}: apri l'app che firma e approva. Ancora ${t}.`;
+  const tardi = Date.now() - s.nata >= NIP46_RIPROVA_MS;
+  const c = el('nostrAttesaCausa');
+  c.style.display = tardi ? '' : 'none';
+  if (tardi) c.textContent = s.causa();
+  el('nostrRiprovaBtn').style.display = tardi ? '' : 'none';
+  b.style.display = '';
+}
+/* «Riprova»: la stessa richiesta riparte, dal telefono e dal server.
+   Il tetto NON si sposta (cinque minuti dall'inizio, come prima):
+   ricomincia solo il conto dei trenta secondi prima del prossimo aiuto. */
+function riprovaNip46(){
+  const s = salaNip46;
+  if (!s) return;
+  console.log(`🟪 [bunker] Riprova: rimando ${s.metodo} (id ${s.id})`);
+  try { s.rimanda(); } catch(e){}
+  s.nata = Date.now();
+  salaNip46Disegna();
+  toast('Richiesta rimandata: approvala nell\'app che firma', 3500);
+}
+
 /* L'ERRORE SPIEGATO (10 ott 2026, dal campo: «mi dice che non ha
    funzionato»). Il motivo tecnico — quale relay, cosa ha risposto — e'
    la diagnosi, e resta; ma da solo non dice a chi legge COSA e' andato
@@ -54785,6 +55002,9 @@ function spiegaNip46(motivo){
     [/foglio chiuso|foglio riaperto|appuntamento chiuso|un altro appuntamento/i,
      'Accesso annullato.',
      'Hai chiuso il foglio: riapri «Entra con Nostr» quando vuoi.'],
+    [/^il server: /i,
+     'Barattolo non ha accettato l\'ingresso.',
+     'Riprova fra un momento; se succede ancora, copia il dettaglio qui sotto e scrivici.'],
     [/appuntamento non disponibile/i,
      'L\'appuntamento col firmatario non è disponibile.',
      'Ricarica l\'app e riprova.'],
@@ -54980,9 +55200,14 @@ function adottaContoAperto(r){
 }
 async function entraConNostr(firmatario){
   if (await giaApertoNostr(firmatario)) return;
+  /* GLI ERRORI DEL SERVER SI LANCIANO (20 ott 2026, cantiere nostr-da-
+     telefono): erano un toast e un `return`, e il foglio restava su
+     «Collegato: entro…» per sempre, col toast gia' sparito. Ora li
+     raccoglie chi ci ha chiamato e li scrive nel foglio (bunkerErrore),
+     come ogni altro guasto del login. */
   const rs = await fetch(`${API_BASE}/login/nostr/sfida`);
   const ds = await rs.json().catch(()=>({}));
-  if (!rs.ok) { toast(ds.detail || 'Login Nostr non disponibile', 6000); return; }
+  if (!rs.ok) throw new Error('il server: ' + (ds.detail || 'login Nostr non disponibile'));
   const evento = await firmatario.firma({
     kind: 22242, created_at: Math.floor(Date.now()/1000), content: '',
     tags: [['relay', location.origin], ['challenge', ds.sfida]]});
@@ -54993,7 +55218,7 @@ async function entraConNostr(firmatario){
     headers: intestaLoginMini({'Content-Type':'application/json'}),
     body: JSON.stringify(invito ? {evento, invito} : {evento})});
   const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail || 'Accesso non riuscito, riprova', 6000); return; }
+  if (!r.ok) throw new Error('il server: ' + (d.detail || 'accesso non riuscito'));
   /* dentro Telegram l'account appena entrato diventa lo scelto: da
      qui in giu' (la coda delle firme) le richieste sono sue */
   adottaContoAperto(r);
@@ -55016,7 +55241,15 @@ async function entraConNostr(firmatario){
      fermi in coda per sempre. Il cookie e' appena nato: fuori da
      Telegram l'identita' viaggia li', quindi WEB va acceso prima. */
   if (!tg?.initData) WEB = true;
-  try { await svuotaFirmeNostr(firmatario, true); } catch(e){}
+  /* ...MA NON COL BUNKER (20 ott 2026, cantiere nostr-da-telefono): li'
+     ogni annuncio in coda e' un'altra approvazione nell'app che firma —
+     fino a cinque minuti l'una — e l'ingresso, gia' riuscito, restava
+     fermo dietro di loro. La sessione bunker e' appena stata conservata
+     (ricordaBunker), quindi dopo il reload la coda la firma da sola
+     firmatarioAutomatico, senza tenere nessuno sulla porta. */
+  if (!firmatario.sessione) {
+    try { await svuotaFirmeNostr(firmatario, true); } catch(e){}
+  }
   /* IL FIRMATARIO SI CHIUDE QUI, prima del reload: il `finally` di chi
      ci ha chiamato arriverebbe a pagina gia' morta, e la cassetta sul
      server resterebbe aperta i suoi dieci minuti */
@@ -55071,7 +55304,10 @@ async function loginNostrEstensione(){
     return;
   }
   try { await consegnaFirmatario(firmatarioEstensione()); }
-  catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
+  catch(e){
+    bunkerErrore(e.message || 'non riuscito');   // nel foglio, che resta
+    toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000);
+  }
 }
 /* Il login col telefono: si mostra il codice e si aspetta che il
    firmatario chiami. Il GIRO serve perche' l'attesa dura minuti e nel
@@ -55143,7 +55379,10 @@ async function loginNostrNsec(){
   }
   let f = null;
   try { f = await firmatarioNsec(nsec); await consegnaFirmatario(f); }
-  catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
+  catch(e){
+    bunkerErrore(e.message || 'non riuscito');   // nel foglio, che resta
+    toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000);
+  }
   finally { if (f) f.chiudi(); }      // finito il gesto, la chiave non c'e' piu'
 }
 
@@ -86172,6 +86411,7 @@ async function avvia(){
        manda, e resta spenta) */
     piuAccount = !!me.piu_account;
     myClassificaNascosta = !!me.classifica_nascosta;
+    myAnnunciSulProfilo = me.annunci_su_profilo_nostr == null ? true : !!me.annunci_su_profilo_nostr;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';

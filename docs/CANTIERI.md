@@ -70843,3 +70843,148 @@ seguire per una difesa che il telefono fa già da sé.
 COSA RESTA. Se la #196 esce su npm in una versione nuova, si può
 tornarci con la ricetta di npm; la ricetta dal sorgente è in
 `vendor/swap-LICENZE.md`. Suite e collaudi: nel messaggio del commit.
+## Nostr dal telefono e gli annunci separati: la sala d'attesa con «Riprova», la cassetta che spedisce, «anche sul mio profilo Nostr» (20 ott 2026, cantiere nostr-da-telefono, ok di Andrea)
+
+**IL FATTO.** Un utente con Primal su Android (non Amber né Amethyst)
+scrive: su telefono e tablet con Orbot o InviZible Pro il login con
+Nostr, nell'app e su barattolo.store, si ferma a «Collegato: entro…»;
+il tablet con una VPN, dal browser, entra in un attimo; il telefono con
+la VPN si blocca lo stesso, app e browser; con Telegram tutto va. E
+chiede di non vedere sul suo account Nostr gli annunci che vende qui. Il
+journal di quel giorno, letto da Andrea col comando dei soli conteggi:
+50 `GET /api/login/nostr/sfida` con 200 e 14 `POST /api/login/nostr`
+con 200, nessun 429 né 400 sul POST; cassetta 1.968 GET, 160 depositi,
+106 chiusure, un GET con 400. Cioè ~36 ingressi su 50 fermi alla FIRMA,
+non al server.
+
+**LA DIAGNOSI (detta ad Andrea prima del codice, e confermata dal
+journal).** Primal su Android da Barattolo passa solo dal nostrconnect
+(il NIP-55 qui non c'è, l'estensione su Android neppure). «Collegato:
+entro…» si scrive quando il firmatario ha GIÀ risposto alla connect; da
+lì il foglio taceva mentre il motore aspettava, in fila, la chiave
+pubblica una seconda volta (60 s), la firma d'ingresso (fino a 5 minuti)
+e, prima del reload, la coda degli annunci (fino a 5 minuti l'uno). Il
+sospetto principale è lo STESSO DISPOSITIVO più della rete: tornato a
+Barattolo, Android congela Primal e la richiesta resta senza nessuno che
+la veda; sul tablet probabilmente si inquadra col telefono, dove Primal
+resta davanti (la conferma dell'utente non è ancora arrivata). Tor e le
+VPN aggravano: websocket lenti, relay che chiudono gli exit, e la
+richiesta che partiva SOLO dalle websocket del telefono. Due difetti
+nostri in più: un errore di sfida o d'ingresso era un toast e un
+`return` (il foglio restava su «entro…» per sempre), e la coda teneva
+ferma una porta già aperta.
+
+**LE DECISIONI DI ANDREA, e cosa è diventato codice.**
+- Punto 6, LA SALA D'ATTESA DETTA. Ogni `chiama` lunga apre nel foglio
+  `#nostrAttesa`: cosa aspetta (`cosaAspettaNip46`: la firma d'ingresso,
+  di un annuncio, della cancellazione, la chiave, la cifratura) e quanto
+  manca; dopo 30 s (`NIP46_RIPROVA_MS`) la causa probabile in parole
+  semplici (`causaProbabileNip46`: relay chiusi da Tor/VPN; solo il
+  server li raggiunge; l'app che firma in background) e «🔄 Riprova»,
+  che rimanda la STESSA richiesta (stesso id: chi l'aveva vista non
+  approva due volte). Il tetto di 5 minuti resta (decisione del 10 ott),
+  e il Riprova non lo sposta. Gli errori del server si lanciano e li
+  scrive `bunkerErrore` (famiglia «il server:» in `spiegaNip46`), anche
+  per l'estensione e la nsec. Col bunker (`firmatario.sessione`) la coda
+  degli annunci non si aspetta: la sessione è conservata e dopo il
+  reload la firma `firmatarioAutomatico`. In più, perché era la stessa
+  porta ferma: la chiave pubblica del bunker si chiede UNA volta.
+- Punto 7, LA CASSETTA CHE SPEDISCE. `POST /api/login/nostr/cassetta/
+  spedisci`: la pagina passa il 24133 già cifrato e firmato dalla sua
+  chiave effimera, il server lo consegna ai relay della cassetta dalla
+  sua rete. Il server non firma e non cifra niente (regola ferrea 2);
+  `_spedizione_valida` vuole un 24133 della chiave della cassetta verso
+  UNA chiave, nella vita della cassetta, con id e firma ricontrollati.
+  Freni: 60 al minuto per IP, 60 per cassetta (un tentativo di login),
+  un id non riparte due volte, biglietto del deposito. Nel client parte
+  a ogni `invia`, e se tutti i relay del telefono dicono no l'attesa non
+  cade finché il server non ha detto anche lui zero.
+- Punto 9, «PUBBLICA I MIEI ANNUNCI ANCHE SUL MIO PROFILO NOSTR». Colonna
+  `annunci_su_profilo_nostr` di serie 1 (chi c'è non cambia niente) e un
+  giudice solo, `annunci_sul_suo_profilo`, per il bivio, i due traslochi
+  e la coda. Con «no» l'annuncio esce col nostro nome; finché in piazza
+  c'è un evento firmato da lui non se ne fa nascere un secondo nostro.
+  La riga sta nel Profilo (Identità, solo con una chiave provata); la
+  domanda arriva dopo il collegamento, PRIMA della coda, e chi chiude
+  senza rispondere resta sul «sì».
+- Punto 10, LA CANCELLAZIONE. Con «no» i suoi eventi si accodano
+  'ritira' e la coda li chiede in UN kind 5 (un `e` e un `a` per
+  annuncio, al più 150): una firma in Primal invece di una per annuncio.
+  Firmata quella, `_ripubblica_col_nome_nostro` li rimette in piazza col
+  nostro nome. Il toast dice: «Chiediamo ai relay di cancellarli, ma
+  alcuni potrebbero tenerne una copia.»
+
+**LE STRADE SCARTATE.** Accorciare i 5 minuti: è il tempo di una persona
+che cambia app, deciso il 10 ott. Mettere i relay di Barattolo fra
+quelli dell'appuntamento come riserva: la loro whitelist non fa scrivere
+la chiave per-connessione di un firmatario, e la cassetta che spedisce
+arriva ai relay che il firmatario ascolta davvero. Un `d` nuovo per gli
+annunci tornati nostri, per scollegarli dal vecchio: rompeva la lapide
+(`_lapide_nostra`) e l'import, e non sarebbe bastato (vedi i limiti).
+Una cancellazione per annuncio: quaranta approvazioni in Primal.
+
+**I LIMITI, detti.** La NIP-09 è una richiesta: i relay che la
+rispettano cancellano, gli altri no, e cache dei client e copie su relay
+che non conosciamo restano. Senza la sua firma (Primal che non risponde)
+la cancellazione non parte, e i suoi eventi restano col loro stato
+vecchio. Chi ha visto l'annuncio sul suo profilo può riconoscerlo in
+quello nostro dal testo, dalle foto e dal `d` (`barattolo-<id>`, lo
+stesso della coordinata nella sua cancellazione): l'evento nostro non
+porta niente che porti alla sua npub, ma non si può far dimenticare chi
+ha già visto. Il caso raro scoperto per strada: un doppione ritirato a
+mano mentre era «sì», e firmato dopo un «no», rinascerebbe col nostro
+nome. Il «Riprova» non sveglia Primal: rimanda la richiesta, ed è la
+frase della causa a dire di aprirla.
+
+**COSA È PROVATO.** `prove_nostr_da_telefono` (sentinelle del server e
+del client, e la sala in node: nomi, cause, conto alla rovescia, i 30 s,
+Riprova, una sala per richiesta, nessuna sala a foglio chiuso).
+`collaudo_cassetta_nip46` porta il giro VERO della spedizione con un
+24133 firmato davvero (coincurve): l'evento arriva identico al relay di
+casa, quello pubblico in collaudo non si tocca, e no a: biglietto
+storto, altra chiave, id toccato, firma storta, due destinatari, kind 1,
+un'ora fa, testo troppo lungo, cassetta che non c'è; OK:false non conta;
+il tetto per cassetta e il freno per IP. Il collaudo nuovo
+`collaudo_annunci_sul_profilo` (server vero, chiavi vere, relay di
+cartone): il «sì» di serie, il «no» con un kind 5 solo per due eventi,
+il nostro nome dopo la firma, le due teste evitate, il ritorno al «sì»
+col trasloco, e la prova chiesta da Andrea — nessun tag `p`/`e`/`a`, né
+npub, chiave, nome, username, nip05 o link al profilo nell'evento col
+nostro nome, con un controllo che lo stesso setaccio la chiave la vede
+dove c'è. I banchi a mano che eseguono il bivio e i traslochi ricevono
+il giudice vero (`prove_trasloco_nostr`, `prove_collega_npub_firma`,
+`prove_npub_una_casa`) e `prove_anello` il niente per la ripubblicazione.
+IL GIRO DAL VIVO, a 360 px in chiaro e in scuro, dal server di una copia
+con relay morti e nsec segnaposto: la riga del Profilo (Sì di serie, il
+tocco su «No» la salva e la frase cambia; ricaricata, torna da
+`/api/me`), la domanda del collegamento (Sì, No, chiusa dal fondo →
+null), la sala nel foglio con 30 s veri, la causa e il tocco vero su
+«Riprova» (rimanda una volta, il conto non si sposta), l'errore del
+server nel foglio. Nessun `wss://` dal browser, nessun errore in console.
+Trovato nel giro e curato: `closeSheet` non chiudeva una sala rimasta
+senza motore.
+
+**DA GUARDARE.**
+- Sul telefono vero di chi ha scritto (Primal + Orbot/InviZible): se la
+  firma ora passa, e cosa dice la causa; e la sua risposta sul tablet.
+- Dopo il deploy, sul VPS, quante spedizioni e con che esito — solo
+  conteggi: `journalctl -u barattolo --since today -o cat | grep -oE
+  '"POST /api/login/nostr/cassetta/spedisci HTTP/[0-9.]+" [0-9]{3}' |
+  sort | uniq -c`; e il rapporto fra sfide e ingressi col comando di
+  oggi.
+- La riga «✍️ Firma i tuoi N annunci per Nostr» del Profilo conta anche
+  le cancellazioni e dice «restano solo qui»: per chi ha scelto «no» è
+  la frase sbagliata (non toccata: fuori dal chiesto).
+
+**IL GIRO.** Sopra `a799253` (develop, dopo il rebase: arrivati
+`ada9b91`, l'eccezione della sonda, e `a799253`, il bundle dello swap —
+nessuno dei simboli di qui, controllato per nome; conflitto solo in coda
+a questo file), col codice di questo commit: `PROVE_SEVERE=1 python
+prove.py` 26.112 passate, 3 fallite — le tre di `deploy.sh --avvisa` e di
+BACKUP-CADUTO in `prove_backup_database_occupato`, che su questo PC
+Windows falliscono uguali anche su develop pulito (provato su un albero
+di `a799253` senza questo cantiere): sono della macchina, non del
+cantiere, e il giudice resta la CI. I collaudi della CI
+(`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`): 98 verdi, 0
+rossi. I due passi dello scanner dei segreti sui file e sulle righe
+aggiunte: puliti.
