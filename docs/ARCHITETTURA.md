@@ -9304,6 +9304,14 @@
   doppioni) → account nativo nuovo (nome = npub abbreviata, badge
   🟣 da subito: la firma Schnorr dimostra il possesso). Un badge
   NON verificato non dà MAI accesso all'account che lo dichiara.
+  UNA CHIAVE, UNA CASA (20 ott 2026, Cantieri, voce omonima): la
+  stessa npub VERIFICATA su più account senza porta è un 409 che
+  dice come uscirne, mai un account nuovo; quando una chiave diventa
+  `npub_accesso` (`collega-firma`, `esegui_fusione`)
+  `_spegni_badge_altrove` spegne il suo badge sulle altre righe senza
+  porta; l'import serve una chiave a UNA riga sola
+  (`casa_della_chiave`: quella con la porta, o nessuna e una riga nel
+  journal).
   LA CASSETTA POSTALE DEL NIP-46 (10 ott 2026, Cantieri «Login col
   bunker e con Clave»): `POST /api/login/nostr/cassetta` {pub, relays}
   deposita la chiave EFFIMERA del client NIP-46 e i relay

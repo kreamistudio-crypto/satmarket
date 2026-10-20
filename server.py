@@ -11212,16 +11212,26 @@ def crea_utente_nostr(pubkey: str, npub: str) -> int:
     """Nuova riga nativa Nostr: stesso benvenuto di upsert_utente
     (registrato, codice negozio), nome = npub abbreviata. Il badge
     nasce gia' verificato: la firma Schnorr dimostra il possesso
-    ancora meglio della nota pubblica."""
+    ancora meglio della nota pubblica.
+    DUE PRIMI LOGIN INSIEME con la stessa chiave (20 ott 2026, cantiere
+    npub-una-casa): il secondo INSERT urta l'indice unico su
+    npub_accesso. Era un 500 con la connessione lasciata aperta; ora la
+    connessione si chiude comunque e si risponde «riprova» — al secondo
+    giro la riga c'e' e il login ci entra."""
     con = db()
-    tg_id = tg_id_da_pubkey(pubkey, con)
-    con.execute(
-        "INSERT INTO utenti(tg_id, nome, username, registrato, negozio, "
-        "npub, npub_verificata, npub_accesso) VALUES(?,?,?,?,?,?,1,?)",
-        (tg_id, npub[:10] + "…" + npub[-4:], "", int(time.time()),
-         nuovo_codice_negozio(con), npub, npub))
-    con.commit()
-    con.close()
+    try:
+        tg_id = tg_id_da_pubkey(pubkey, con)
+        con.execute(
+            "INSERT INTO utenti(tg_id, nome, username, registrato, negozio, "
+            "npub, npub_verificata, npub_accesso) VALUES(?,?,?,?,?,?,1,?)",
+            (tg_id, npub[:10] + "…" + npub[-4:], "", int(time.time()),
+             nuovo_codice_negozio(con), npub, npub))
+        con.commit()
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "Questa chiave sta entrando proprio ora "
+                                 "da un'altra finestra: riprova tra un attimo")
+    finally:
+        con.close()
     return tg_id
 
 
@@ -11289,6 +11299,16 @@ async def login_nostr(req: Request, response: Response,
         return {"collega": {"nome": righe[0]["nome"],
                             "username": righe[0]["username"],
                             "biglietto": biglietto}}
+    # LA STESSA CHIAVE VERIFICATA SU PIU' ACCOUNT (20 ott 2026, cantiere
+    # npub-una-casa): non sappiamo quale sia quello giusto, e prima si
+    # cadeva qui sotto — nasceva in silenzio un TERZO account. Si dice
+    # come uscirne: dall'account giusto, «Entra anche con Nostr», che
+    # spegne i badge rimasti sugli altri (`_spegni_badge_altrove`).
+    if righe:
+        raise HTTPException(409,
+            "Questa chiave Nostr e' verificata su piu' account Telegram: "
+            "apri il Barattolo da Telegram con quello giusto e usa "
+            "«Entra anche con Nostr» dal Profilo, poi rientra da qui")
     tg_id = crea_utente_nostr(pubkey, npub)
     apri_sessione(response, tg_id, barattolo_portachiavi, barattolo_sessione)
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
@@ -18665,6 +18685,9 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
         con.execute("DELETE FROM utenti WHERE tg_id=?", (id_nostr,))
+        # ...e gli altri badge verificati della stessa chiave si spengono
+        # (una chiave, una casa: vedi `_spegni_badge_altrove`)
+        _spegni_badge_altrove(con, n["npub_accesso"], id_telegram)
         con.execute(
             "UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso=?, "
             "verifica_codice='', verifica_scade=0, "
@@ -65350,6 +65373,23 @@ def _accoda_trasloco_di(con, tg_id: int) -> int:
     return len(righe)
 
 
+def _spegni_badge_altrove(con, npub: str, tg_id: int) -> int:
+    """UNA CHIAVE, UNA CASA (20 ott 2026, cantiere npub-una-casa): quando
+    `npub` diventa la chiave d'accesso di `tg_id`, il badge verificato
+    della stessa npub sulle ALTRE righe senza accesso si spegne. Il
+    giro che lo rendeva necessario: A collega X, disabilita l'accesso
+    (il badge resta), B collega X, disabilita — e il login con X
+    trovava due badge, e apriva in silenzio un terzo account.
+    Chi firma adesso ha in mano la chiave: e' lui a dire dove abita.
+    Le righe CON accesso non si toccano (quella chiave apre un'altra
+    porta, ed e' l'indice unico a giudicarla). Ritorna quante ne ha
+    spente. Gira dentro la scrittura di chi la chiama: niente commit."""
+    return con.execute(
+        "UPDATE utenti SET npub_verificata=0 WHERE npub=? AND tg_id<>? "
+        "AND npub_verificata=1 AND npub_accesso=''",
+        (npub, tg_id)).rowcount
+
+
 @app.post("/api/me/npub/collega-firma")
 async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
                              barattolo_sessione: str = Cookie("")):
@@ -65380,11 +65420,15 @@ async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
     try:
         # La condizione si ripete nella WHERE: tra la lettura sopra e
         # questa scrittura non deve essere cambiato nulla.
-        con.execute(
+        scritta = con.execute(
             "UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso=?, "
             "verifica_codice='', verifica_scade=0 "
             "WHERE tg_id=? AND npub_accesso=''",
-            (npub, npub, user["id"]))
+            (npub, npub, user["id"])).rowcount
+        # Solo se la chiave e' davvero entrata qui: gli altri badge si
+        # spengono per far posto a QUESTA casa, mai per nessuna
+        if scritta:
+            _spegni_badge_altrove(con, npub, user["id"])
     except sqlite3.IntegrityError:
         con.close()
         raise HTTPException(409,
@@ -78950,24 +78994,47 @@ async def suggerisci_funzioni():
             await asyncio.sleep(0.2)
 
 
-async def _accogli_venditore_nostr(hexkey: str) -> int:
+def casa_della_chiave(righe, npub: str):
+    """A chi vanno gli annunci di `npub`, fra le `righe` (tg_id,
+    npub_accesso) che la portano come chiave provata (20 ott 2026,
+    cantiere npub-una-casa). Una riga sola: quella. Piu' d'una: quella
+    che ci ENTRA (npub_accesso, unica per indice). Nessuna che ci entri:
+    None, e una riga nel journal — prima l'import le serviva tutte una
+    dopo l'altra, e l'UPDATE dell'annuncio (venditore_id=?) lo spostava
+    a ogni giro sull'ultima, cioe' magari su un account senza porta."""
+    if len(righe) == 1:
+        return righe[0]["tg_id"]
+    for r in righe:
+        if r["npub_accesso"] == npub:
+            return r["tg_id"]
+    if righe:
+        print(f"⚠️ Chiave Nostr {npub[:16]}… verificata su {len(righe)} "
+              "account e nessuno ci entra: i suoi annunci non si importano "
+              "finche' non sceglie la sua casa («Entra anche con Nostr»)")
+    return None
+
+
+async def _accogli_venditore_nostr(hexkey: str) -> int | None:
     """Da chiave Nostr a utente di Barattolo. Se e' gia' dei nostri
     ritorna il suo tg_id senza toccare nulla; se e' nuovo gli apre
     l'account nativo (la macchina del login Nostr: tg_id negativo,
     npub_accesso, badge 🟣 gia' verificato perche' la firma dimostra
     il possesso) e gli manda il DM di benvenuto.
+    Se la chiave sta gia' su piu' righe decide `casa_della_chiave`, e
+    None vuol dire nessuna: non si sceglie a caso e non se ne apre
+    un'altra.
 
     Il DM parte SOLO alla creazione, che e' un evento unico per
     costruzione: per questo non serve una colonna «benvenuto_il».
     """
     npub = hex_to_npub(hexkey)
     con = db()
-    riga = con.execute(
-        "SELECT tg_id FROM utenti WHERE npub_accesso=? "
-        "OR (npub=? AND npub_verificata=1)", (npub, npub)).fetchone()
+    righe = con.execute(
+        "SELECT tg_id, npub_accesso FROM utenti WHERE npub_accesso=? "
+        "OR (npub=? AND npub_verificata=1)", (npub, npub)).fetchall()
     con.close()
-    if riga:
-        return riga["tg_id"]
+    if righe:
+        return casa_della_chiave(righe, npub)
     tg_id = crea_utente_nostr(hexkey, npub)
     # Nome e faccia dal suo kind-0, subito: gli annunci di questo giro
     # devono nascere gia' firmati da come si chiama, non dalla npub.
@@ -79065,7 +79132,8 @@ def venditori_nostr_attivi() -> list:
     """
     con = db()
     righe = con.execute(
-        "SELECT tg_id, COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
+        "SELECT tg_id, npub_accesso, "
+        "COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
         "FROM utenti "
         f"WHERE {SQL_CHIAVE_PROVATA}"
     ).fetchall()
@@ -79074,8 +79142,19 @@ def venditori_nostr_attivi() -> list:
     # gia' una riga che la dichiara (ed esiste: la scoperta l'ha aperta
     # prima che ci fosse chiave_di_casa). Cosi' il tappo ferma il danno
     # al primo riavvio, senza aspettare la pulizia.
-    return [(r["chiave"], r["tg_id"]) for r in righe
-            if r["chiave"] and not chiave_di_casa(r["chiave"])]
+    per_chiave = {}
+    for r in righe:
+        if r["chiave"] and not chiave_di_casa(r["chiave"]):
+            per_chiave.setdefault(r["chiave"], []).append(r)
+    # UNA CHIAVE, UN VENDITORE (20 ott 2026, cantiere npub-una-casa): la
+    # stessa chiave su due righe era due giri d'import, e il secondo si
+    # prendeva gli annunci del primo. Decide `casa_della_chiave`.
+    coppie = []
+    for chiave, sue in per_chiave.items():
+        tg_id = casa_della_chiave(sue, chiave)
+        if tg_id is not None:
+            coppie.append((chiave, tg_id))
+    return coppie
 
 
 async def importa_nostr_periodico():
