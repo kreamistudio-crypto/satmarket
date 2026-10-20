@@ -4771,6 +4771,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
    · «📭 DM Nostr a …: 10050 non letto (relay muti), …»: nessuno dei
      nostri relay ha risposto alla domanda. Si spedisce alla riserva lo
      stesso, e si richiede fra cinque minuti.
+   · «📭 DM Nostr a …: 10050 senza relay raggiungibili, …» (dal 20 ott
+     2026, cantiere filtro-10050): il suo 10050 c'è ma contiene solo
+     indirizzi che il server non tocca — non wss://, localhost, una rete
+     privata, un .local, un .onion (es. il relay sul telefono di Citrine,
+     `ws://localhost:4869`). Si va alla riserva come senza 10050, e
+     all'ingresso gli compare il cartello. La riga di /api/me dice
+     «ha un 10050 coi soli relay che da qui non si raggiungono».
    · «📭 L'utente -N (solo Nostr) non pubblica un 10050: …»: l'ha visto
      la sua /api/me (al più una volta al giorno). Una riga quando lo si
      scopre, non a ogni apertura: è anche il momento in cui gli compare,
@@ -4784,6 +4791,12 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
    (o i relay non hanno risposto).
    `sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT COUNT(DISTINCT tg_id) AS persone, COUNT(*) AS avvisi, SUM(letto=0) AS non_letti FROM avvisi_app"`
    `journalctl -u barattolo --since "7 days ago" | grep -c "📭 DM Nostr a"`
+  I .ONION SI SCARTANO perché dal server i DM partono diretti (Tor sul
+  VPS serve al sito .onion in entrata). Se un giorno gli invii passassero
+  da Tor, il giudice `relay_esterno` va cambiato. Per guardare, in sola
+  lettura, che il servizio non abbia un proxy:
+  `systemctl show barattolo -p Environment`
+  — non deve comparire niente con `proxy` o `socks`.
   LA LEVA `DM_NIP04_RISERVA` (il vecchio DM NIP-04 di riserva) NASCE
   SPENTA, e un deploy non la accende. Accesa, a chi non ha il 10050
   parte ANCHE un DM kind 4 sugli stessi relay: Primal, Damus e altri lo

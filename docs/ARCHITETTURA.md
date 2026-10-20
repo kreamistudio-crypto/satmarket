@@ -33696,6 +33696,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `relay_dm_avvisato = 0`; quando compare il client chiama `POST
   /api/me/relay-dm/avvisato`, che scrive l'ora una volta sola. Resta per
   la sessione fino a «Ho capito»; dopo, la riga ferma nel cassetto.
+  4) IL GIUDICE DEI RELAY SCRITTI DALL'UTENTE (20 ott 2026, cantiere
+  filtro-10050): `relay_esterno(r)`, puro, vale per il 10050 e per il
+  10002, mai per i nostri. Passa solo un wss:// il cui host è un IP
+  globale (`is_global`, l'IPv4 mappato compreso) o un nome con un punto
+  e un dominio di lettere (`_FORMA_TLD`), che non sia localhost,
+  `*.localhost`, `*.local`, `*.onion`. Non risolve nomi. Il 10050 passa
+  da `relay_suoi_dm` (prima il filtro, poi i primi quattro, senza
+  doppioni); una lista dichiarata e tutta scartata dà lo stato `fuori`
+  di `relay_dm_dove`: riserva come `no`, riga 📭 sua, e per
+  `_controlla_relay_dm` vale `no`. Il 10002 resta «i primi quattro
+  scritti, poi il filtro» (dentro `relay_riserva_dm`). `relay_di_casa`,
+  il giudice delle letture in collaudo e del recinto, non cambia.
 - LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
   perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
   divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —

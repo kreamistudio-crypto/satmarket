@@ -69920,3 +69920,94 @@ tetto, risposto 429 invece di 404 — dicendo che la porta c'è.
   piatta guarderebbe le stesse liste che il freno cambia).
 - Suite intera e collaudi della CI sull'albero che va su develop: nel
   report della sessione.
+## Il filtro sui relay scritti dall'utente: il 10050 come il 10002, le reti private, .local e .onion (20 ott 2026, cantiere filtro-10050, decisione di Andrea)
+
+**IL PERCHÉ.** Nel cantiere avvisi-nostr-arrivano i relay del 10002
+passavano da un filtro (solo wss://, mai di casa), quelli del 10050 no:
+la lista la scrive chiunque, e il server ci bussa davvero. Un
+`ws://localhost:4869` (Citrine, il relay sul telefono, che qualcuno mette
+nel 10050) dal VPS diventa il VPS stesso; un 10.x o un 192.168.x, i
+vicini della sua rete. Andrea ha detto sì, con tre precisazioni.
+
+**COSA SI È DECISO.**
+- UN GIUDICE SOLO, `relay_esterno`, per i relay dell'utente nel 10050 e
+  nel 10002; i nostri passano come sono (sull'istanza di prova sono di
+  casa, e lì non cambia niente: i relay veri dell'utente li fermava già
+  il recinto). Passa solo un wss:// verso un IP GLOBALE o un nome di
+  internet. Fuori (precisazione 2): loopback e localhost, 10/8,
+  172.16/12, 192.168/16, 169.254/16, fc00::/7, fe80::/10 — e con
+  `is_global` anche le altre riservate (0.0.0.0, la CGNAT 100.64/10),
+  l'IPv4 mappato in IPv6 (`::ffff:10.0.0.1`) e lo scope id (`fe80::1%eth0`)
+  —, `*.localhost`, `*.local`. In più, perché sono 127.0.0.1 scritti in
+  un altro modo: un host fatto di numeri (`2130706433`, `0x7f.1`,
+  `127.1`) e un nome senza punto (si risolve coi domini di ricerca).
+- .ONION SCARTATO (precisazione 3): dal VPS gli invii dei DM NON passano
+  da Tor. `invia_evento_relay` e il postino (`_posta_connetti` =
+  `create_connection`) aprono la websocket senza `http_proxy_host` né
+  `proxy_type`, e le unit di sistema nel repo non mettono proxy; Tor sul
+  VPS serve al sito .onion in ENTRATA (Caddy). Letto nel codice e nel
+  repo, non sul VPS: il comando di sola lettura sta in PRODUZIONE.
+- PRIMA IL FILTRO, POI I PRIMI QUATTRO BUONI (precisazione 1), per il
+  10050 (`relay_suoi_dm`): quattro scartati in cima e il buono al quinto
+  posto, il buono resta.
+- UN 10050 DI SOLI SCARTATI vale come un 10050 assente: stato `fuori` di
+  `relay_dm_dove`, la riserva (relay di lettura del 10002 più i nostri),
+  la riga 📭 sua («10050 senza relay raggiungibili»), e all'ingresso
+  `relay_dm = 'no'`, cioè il cartello una volta, con la sua riga di
+  journal («ha un 10050 coi soli relay che da qui non si raggiungono»).
+
+**IL LIMITE, DETTO.** Il giudice non risolve nomi (un DNS è già una
+domanda fatta al mondo, la regola di `relay_di_casa`): un nome pubblico
+che punta a un indirizzo privato passa. Il 10002 tiene la sua regola di
+ieri sull'ordine («i primi quattro scritti, poi il filtro»): la
+precisazione 1 era per il 10050.
+
+**PROVATO.** `prove_filtro_10050`: il giudice su nove buoni (nomi,
+punycode, maiuscole, IP pubblici v4 e v6, IPv4 mappato pubblico, porta,
+percorso) e sette famiglie di scartati (non wss://, loopback e
+localhost, reti private, link-local, .local, .onion, riservati e
+trucchi); `relay_suoi_dm` (il buono al quinto posto, il tetto di
+quattro, i doppioni, le liste vuote); le sentinelle su `relay_dm_dove`,
+`relay_riserva_dm`, `manda_dm_nostr`, `_controlla_relay_dm`, e su
+`relay_di_casa` che resta del solo loopback.
+`collaudo_avvisi_nostr_arrivano` con due persone nuove: -505 col 10050
+misto (quattro irraggiungibili in cima, il buono al quinto) — la busta
+va al solo buono, stato `si`, journal muto; -506 coi soli irraggiungibili
+(localhost, loopback, rete privata, .local, .onion, link-local) — la
+riserva col suo 10002, mai un suo indirizzo, la riga 📭, e `no` in
+`utenti` con la sua riga. LA ROTTURA APPOSTA, cinque mutazioni, tutte
+rosse: il 10050 senza filtro (prove 1, collaudo 6), prima i quattro e
+poi il filtro (2 e 3), le reti private ammesse (5 e 6), .local e .onion
+ammessi (3 e 6), il 10002 col giudice vecchio (1, nelle prove).
+
+**IL GIRO.** Ribasato due volte. Prima su `2bc249b` (la percentuale
+senza segno: miniapp, prove e CANTIERI); poi, a giro finito, develop era
+corso ancora di cinque — `2468516`, `7bc39f6`, `b4168ca` (l'unione degli
+account in un tocco, che chiama `esegui_fusione`: lì sta la riga di
+`avvisi_app` del cantiere di ieri, e il loro `collaudo_fusione_da_telegram`
+la esercita), `8b893d9` e `9b2cad2` (lo swap). Nessuno dei commit arrivati
+nomina i simboli di qui — controllato per nome: `relay_esterno`,
+`relay_suoi_dm`, `relay_riserva_dm`, `relay_dm_dove`, `relay_di_casa`,
+`chiedi_relay_dm`, `manda_dm_nostr`, `_controlla_relay_dm`, `_FORMA_TLD`,
+`prove_filtro_10050`; il mio collaudo compare solo come riga vicina negli
+elenchi della CI. Conflitti solo in coda a questo file, tenute tutte le
+voci. Il giro intero, con `embit==0.8.0` come la CI (arrivato con la tappa
+2 on-chain; senza, la sua sezione si salta e PROVE_SEVERE la conta rossa),
+su `cf53a7d` (sopra `2bc249b`): PROVE_SEVERE=1 25.950 passate, 0 fallite,
+nessuna saltata; i collaudi della CI 94 verdi, 0 rossi. Su `f6c03d2`
+(sopra `9b2cad2`, stesso codice di quel che va su develop): PROVE_SEVERE=1
+25.973 passate, 0 fallite, nessuna saltata; i collaudi interi fermati a
+metà per la regola nuova di Andrea (dopo un rebase senza simboli toccati
+non si rigira tutto: la suite intera la fa la CI alla promozione), e al
+loro posto `collaudo_avvisi_nostr_arrivano` e `collaudo_fusione_da_telegram`
+(passa dalla riga di `avvisi_app` in `esegui_fusione`), 2 verdi. Dopo
+questo paragrafo, che tocca solo il verbale: le sezioni che leggono i
+documenti (65), `prove_filtro_10050`, `prove_avvisi_nostr_arrivano` e gli
+stessi due collaudi su `b56a5a6`: 4.247 passate, 0 fallite, 0 saltate, 2
+verdi. Poi un terzo rebase su `d484c33` (i ritocchi della tappa 2
+on-chain: nessuno dei simboli di qui), e sull'albero che va su develop:
+le sezioni che quel commit tocca (`prove_freni`,
+`prove_indirizzo_ordine_onchain` e le altre che le sue righe cambiano),
+quelle che leggono i documenti, le mie due, e `collaudo_onchain_indirizzo`
+coi miei due collaudi — i numeri nel rapporto ad Andrea, perché scriverli
+qui vorrebbe dire rigirarle ancora.
