@@ -37,6 +37,12 @@ import time
 import hashlib
 
 from websocket import create_connection
+
+# I CERTIFICATI DEI RELAY SI VERIFICANO (20 ott 2026, cantiere
+# certificati-relay, decisione di Andrea): sul nome del relay, con le CA
+# del sistema, come nel server (`SSLOPT_RELAY` di server.py, col perche').
+# Un certificato non valido e' un relay irraggiungibile; mai CERT_NONE.
+SSLOPT_RELAY = {"cert_reqs": ssl.CERT_REQUIRED}
 from coincurve import PrivateKey
 
 from config import NOSTR_NSEC_PIATTAFORMA, MODALITA_COLLAUDO
@@ -99,7 +105,7 @@ def chiedi_eventi(relay: str, filtro: dict) -> list:
     eventi = []
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "presenta", filtro]))
         inizio = time.time()
         while time.time() - inizio < 6:
@@ -109,6 +115,11 @@ def chiedi_eventi(relay: str, filtro: dict) -> list:
             elif msg[0] == "EOSE":
                 break
         ws.close()
+    except ssl.SSLCertVerificationError as e:
+        # (certificati-relay) l'unico silenzio che non si tiene: un
+        # certificato rifiutato si dice
+        print(f"   🔐 {relay}: certificato non valido "
+              f"({getattr(e, 'verify_message', '') or e}), non lo uso")
     except Exception:
         pass                  # relay muto o irraggiungibile: pazienza
     return eventi
@@ -125,7 +136,7 @@ def spedisci(evento: dict) -> int:
     for relay in RELAYS:
         try:
             ws = create_connection(relay, timeout=5,
-                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+                                   sslopt=SSLOPT_RELAY)
             ws.send(json.dumps(["EVENT", evento]))
             inizio = time.time()
             while time.time() - inizio < 6:

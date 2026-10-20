@@ -4808,6 +4808,35 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`payment_required`, `auth_required`); i tempi su tre giri. La
   riserva misurata quella notte: `wss://nostr.oxtr.dev`.
 
+- I CERTIFICATI DEI RELAY (20 ott 2026, cantiere certificati-relay;
+  perché in CANTIERI, «I certificati dei relay si verificano»). Ogni
+  websocket verso un relay — server e script — verifica il certificato
+  sul nome del relay, con le CA del sistema (`websocket-client` non usa
+  certifi: sul VPS serve il pacchetto `ca-certificates`, che c'è). Un
+  certificato non valido = relay irraggiungibile, come un relay muto.
+  NESSUN PASSO SUL VPS per il deploy. PRIMA DI UN RELAY NUOVO in
+  `RELAY_NOSTR`, `MOSTRO_RELAY`, `AVVISO_DM_NOSTR_RELAY` (sola lettura:
+  solo la stretta di mano TLS, nessun messaggio Nostr; il nome al posto
+  di RELAY):
+  `python3 -c 'import ssl,socket;h="RELAY";t=ssl.create_default_context().wrap_socket(socket.create_connection((h,443),timeout=8),server_hostname=h);print("OK",h,t.getpeercert()["notAfter"])'`
+  — «OK» e la scadenza; un errore vuol dire che il server non lo userà.
+  Il controllo del 20 ott 2026: `ca-certificates` installato, e tutti OK
+  (relay.barattolo.store scade il 5 dic 2026 e lo rinnova Caddy;
+  relay.primal.net, relay.nostr.net, nostr.oxtr.dev, nos.lol,
+  relay.mostro.network).
+  COSA DICE IL JOURNAL: «🔐 Relay <indirizzo>: certificato non valido
+  (<motivo>), non lo uso», al più una volta all'ora per relay. Il motivo
+  è quello di OpenSSL: «certificate has expired» (il relay non ha
+  rinnovato), «self-signed certificate», «Hostname mismatch» (il
+  certificato è per un altro nome), «unable to get local issuer
+  certificate» (sul VPS mancano le CA: `dpkg -s ca-certificates`). Se è
+  uno dei NOSTRI relay va guardato subito: per il server quel relay è
+  giù finché il certificato non torna valido. Su relay.barattolo.store:
+  il certificato lo prende Caddy (deploy/RIPRISTINO-RELAY.md).
+  Gli script (`importa_nostr.py`, `censimento_nostr.py`,
+  `presenta_release.py`) fanno lo stesso: un relay col certificato
+  rotto compare fra i «non raggiungibile», o con la riga 🔐.
+
 - GLI AVVISI A CHI NON HA UN 10050 (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
   arrivano»; com'è fatto in ARCHITETTURA, «GLI AVVISI A CHI ENTRA SOLO
