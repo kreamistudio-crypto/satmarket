@@ -38656,6 +38656,24 @@ def prove_onion():
     _cta = _cta[:_cta.find("}")]
     prova("il bottone del banner eredita il font di casa", True,
           "font:inherit" in _cta)
+    # LA SCRITTA SULLA PILLOLA BIANCA (20 ott 2026, cantiere
+    # onion-contrasto, richiesta di Andrea): la pillola resta bianca
+    # anche al buio, e `--sats-text` di sera e' #FFB25C — 1,78:1 sul
+    # bianco. La scritta prende un token che il tema scuro NON
+    # ridefinisce, e il contrasto si CALCOLA dal valore vero: almeno
+    # 4,5:1 (WCAG AA per il testo normale).
+    prova("la scritta delle pillole del banner usa l'arancio sulla carta", True,
+          "color:var(--sats-su-carta)" in _cta)
+    _carta = re.findall(r"--sats-su-carta:(#[0-9A-Fa-f]{6})", mini)
+    prova("...definito UNA volta, e il tema scuro non lo tocca", 1, len(_carta))
+
+    def _lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    if _carta:
+        prova("...e sul bianco fa almeno 4,5:1", True,
+              (1.05 / (_lum(_carta[0]) + .05)) >= 4.5)
     # e VIENE PRIMA dei due longhand, o la scorciatoia `font` li
     # azzererebbe: e' l'ordine che un riordino sposta senza vederlo
     prova("...prima del peso e del corpo, o li azzererebbe", True,
@@ -39224,7 +39242,7 @@ def _giudice_nostr(mini):
 def _cat_invito_onion(mini):
     """Il catalogo degli inviti su onion, ritagliato dal client."""
     cat = mini[mini.index("const INVITO_ONION = {"):]
-    _fine = "+ 'con la tua chiave Nostr.';"
+    _fine = "+ 'con la tua chiave Nostr o con Telegram.';"
     return cat[:cat.index(_fine) + len(_fine)]
 
 
@@ -110969,6 +110987,17 @@ const giri = {};
   invitoTelegram('testo del chiamante', 'compra'); invitoTelegram('testo del chiamante', 'compra');
   await portaBotPromessa; await null; giri.invitoDue = tgo.figli.length;
   await invita(false); giri.invitoChiusa = tgo.figli.length;
+  // il testo GENERICO (un gesto senza voce): con Telegram sotto li nomina tutti e due
+  const generico = async (aperta, chiave) => {
+    portaBotPromessa = Promise.resolve(aperta); invitoTelegram('testo del chiamante', chiave);
+    const prima = el('invitoTesto').textContent;
+    await portaBotPromessa; await null;
+    return [prima, el('invitoTesto').textContent];
+  };
+  giri.genericoBot = await generico(true);
+  giri.genericoChiuso = await generico(false);
+  giri.voceBot = (await generico(true, 'compra'))[1];
+  giri.genericoDopo = (await generico(false))[1];
   onion = false;
   // e fuori da onion niente di tutto questo
   giri.fuoriComposto = await componi(true);
@@ -111057,6 +111086,18 @@ const giri = {};
            [["invitoEntraBot", "btn mini", "Entra con Telegram", _riga_tg]]], g["invitoOnion"])
     prova("...aperto due volte di fila, una porta sola", 1, g["invitoDue"])
     prova("...a porta chiusa niente Telegram", 0, g["invitoChiusa"])
+    # IL GENERICO NOMINA TELEGRAM SOLO QUANDO C'E' (20 ott 2026, cantiere
+    # onion-contrasto, richiesta di Andrea)
+    _gen = ("Per comprare, offrire o vendere serve un account: da qui si entra "
+            "con la tua chiave Nostr.")
+    _gen_bot = ("Per comprare, offrire o vendere serve un account: da qui si entra "
+                "con la tua chiave Nostr o con Telegram.")
+    prova("il testo generico, con Telegram sotto: «…con la tua chiave Nostr o con Telegram»",
+          [_gen, _gen_bot], g["genericoBot"])
+    prova("...a porta chiusa resta quello di sempre", [_gen, _gen], g["genericoChiuso"])
+    prova("...le voci per gesto non cambiano", True,
+          g["voceBot"].startswith("Per comprare in sicurezza serve un account"))
+    prova("...e riaperto a porta chiusa torna quello di sempre", _gen, g["genericoDopo"])
     prova("...e fuori da onion il foglio di sempre, col posto vuoto",
           [0, "block", "btn ghost", "N …o entra con Nostr"], g["invitoFuori"])
 
