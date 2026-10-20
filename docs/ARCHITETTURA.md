@@ -9794,8 +9794,20 @@
   Doppia cittadinanza (lug 2026, poi set 2026): le due direzioni del
   collegamento. Telegram→Nostr: `POST /api/me/npub/collega-firma`
   (vedi «L'accesso Nostr firmato», qui sotto) è l'UNICA porta —
-  indice unico = giudice: 409 se la chiave apre già un altro account,
-  e il messaggio indirizza alla fusione; `disabilita-accesso` è il
+  indice unico = giudice: 409 se la chiave apre già un altro account.
+  LA TERZA PORTA (20 ott 2026, cantiere fusione-da-telegram): se
+  quell'altro è un account NATO CON NOSTR (id negativo), la firma
+  appena verificata è la stessa prova che serve per entrarci, e la
+  sessione prova il Telegram — quindi il 409 porta una PROPOSTA
+  d'unione (`detail.unione`: token, npub, nome, quanti annunci e
+  affari), dopo le `_guardie_fusione`. Il token sta in
+  `UNIONI_DAL_WEB` (in memoria, 5 minuti, uno vivo per account, legato
+  al tg_id di chi ha firmato) e `POST /api/me/unisci-nostr` lo incassa
+  con `esegui_fusione`, lo stesso atto del bot; poi trasloco degli
+  annunci, premi e avviso agli admin. Il client chiede prima
+  («Unire i due account?», `proponiUnioneNostr`). Se l'altro è un
+  account Telegram il 409 lo dice e basta: due Telegram non diventano
+  uno. `disabilita-accesso` è il
   contrario ma RIFIUTA i tg_id negativi (un nativo si chiuderebbe
   fuori); `salva_npub` (oggi richiamato solo per RIMUOVERE la npub,
   da «🗑 Rimuovi la npub dal profilo») azzera anche `npub_accesso` se

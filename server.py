@@ -10001,7 +10001,13 @@ def portachiavi_conti(raw: str) -> list:
         (*per_hash.keys(), int(time.time()))).fetchall()
     con.close()
     per_tg = {}
-    for r in righe:
+    # NELL'ORDINE DEL COOKIE, non in quello del database (20 ott 2026,
+    # cantiere fusione-da-telegram): le righe arrivano dalla SELECT in un
+    # ordine suo, e dopo una fusione «l'ultimo arrivato» era a caso — a
+    # volte vinceva il token vecchio, e il fratello qui sotto rimetteva
+    # in lista quello attivo: la stessa persona due volte nel menu.
+    posto = {hashlib.sha256(t.encode()).hexdigest(): i for i, t in enumerate(token)}
+    for r in sorted(righe, key=lambda r: posto[r["token_hash"]]):
         # L'ordine del cookie e' quello di aggiunta: l'ultimo arrivato
         # sovrascrive, cosi' un secondo login sullo stesso account
         # tiene la sessione fresca invece di quella vecchia.
@@ -10050,7 +10056,14 @@ def portachiavi_adottato(portachiavi: str, sessione: str) -> list:
     # A dire se quella sessione vale qualcosa e' `portachiavi_conti`,
     # come per ogni altro token: una morta o inventata non trova niente
     # e non entra nel mazzo.
-    return portachiavi_conti(sessione) + conti
+    attiva = portachiavi_conti(sessione)
+    # ...e se la sua PERSONA e' gia' nel mazzo con un altro token (dopo
+    # una fusione, 20 ott 2026) resta una voce sola, quella attiva:
+    # aggiungerla in testa farebbe la stessa persona due volte
+    if attiva and any(c["tg_id"] == attiva[0]["tg_id"] for c in conti):
+        return [attiva[0] if c["tg_id"] == attiva[0]["tg_id"] else c
+                for c in conti]
+    return attiva + conti
 
 
 def apri_sessione(response: Response, tg_id: int, portachiavi: str = "",
@@ -17876,13 +17889,18 @@ async def bot_api(metodo: str, dati: dict):
 # solo nella tastiera di conferma dentro la chat col bot.
 CODICI_FUSIONE: dict[str, tuple[int, int]] = {}       # codice -> (tg_id_nostr, scade)
 CONFERME_FUSIONE: dict[str, tuple[int, int, int]] = {}  # token -> (tg_telegram, tg_nostr, scade)
+# ...e LA TERZA PORTA, quella dal lato Telegram (20 ott 2026, cantiere
+# fusione-da-telegram): la proposta nata da «Entra anche con Nostr»
+# quando la chiave firmata apre gia' un account Nostr. Il token vive
+# solo nella risposta a chi ha firmato, ed e' legato al SUO tg_id.
+UNIONI_DAL_WEB: dict[str, tuple[int, int, int]] = {}   # token -> (tg_telegram, tg_nostr, scade)
 SECONDI_CODICE_FUSIONE = 300
 
 
 def _pulisci_fusioni():
     """Via i lasciapassare scaduti; il tetto tiene a bada i bot."""
     adesso = int(time.time())
-    for d in (CODICI_FUSIONE, CONFERME_FUSIONE):
+    for d in (CODICI_FUSIONE, CONFERME_FUSIONE, UNIONI_DAL_WEB):
         for k in [k for k, v in d.items() if v[-1] < adesso]:
             d.pop(k, None)
         while len(d) >= 1000:
@@ -65102,10 +65120,50 @@ async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
             "WHERE tg_id=? AND npub_accesso=''",
             (npub, npub, user["id"]))
     except sqlite3.IntegrityError:
+        # LA CHIAVE APRE GIA' UN ALTRO ACCOUNT (20 ott 2026, cantiere
+        # fusione-da-telegram, dal campo: entrato con Nostr da Tor, poi con
+        # Telegram, e «Entra anche con Nostr» diceva solo «gia' creato»).
+        # Se l'altro e' un account NATO CON NOSTR, la firma appena
+        # verificata e' la stessa prova che serve per entrarci, e questa
+        # sessione prova il Telegram: le due meta' sono della stessa
+        # persona, e si propone di unirle — l'atto e' `esegui_fusione`,
+        # lo stesso del bot, con le stesse guardie. Si CHIEDE prima (non
+        # si puo' annullare): qui nasce solo la proposta, col token che
+        # `/api/me/unisci-nostr` incassa. Se l'altro e' un account
+        # Telegram, no: due Telegram non diventano uno.
+        altro = con.execute("SELECT * FROM utenti WHERE npub_accesso=?",
+                            (npub,)).fetchone()
+        if not altro or altro["tg_id"] >= 0 or user["id"] < 0:
+            con.close()
+            raise HTTPException(409,
+                "Questa chiave e' gia' l'accesso Nostr di un altro account "
+                "Telegram: un account, una chiave")
+        io = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                         (user["id"],)).fetchone()
+        errore = _guardie_fusione(con, altro, io)
+        if errore:
+            con.close()
+            raise HTTPException(409, errore)
+        annunci = con.execute("SELECT COUNT(*) FROM annunci WHERE venditore_id=?",
+                              (altro["tg_id"],)).fetchone()[0]
+        ordini = con.execute("SELECT COUNT(*) FROM ordini WHERE compratore_id=? "
+                             "OR venditore_id=?",
+                             (altro["tg_id"], altro["tg_id"])).fetchone()[0]
         con.close()
-        raise HTTPException(409,
-            "Questa chiave apre gia' un altro account: se e' il tuo "
-            "account Nostr, entra dal web con Nostr e usa «Collega Telegram»")
+        _pulisci_fusioni()
+        # Una sola proposta viva per account, come gli inviti del bot
+        for t in [t for t, v in UNIONI_DAL_WEB.items() if v[0] == user["id"]]:
+            UNIONI_DAL_WEB.pop(t, None)
+        token = secrets.token_hex(16)
+        UNIONI_DAL_WEB[token] = (user["id"], altro["tg_id"],
+                                 int(time.time()) + SECONDI_CODICE_FUSIONE)
+        raise HTTPException(409, {
+            "messaggio": "Questa chiave apre gia' un tuo account Nostr: "
+                         "puoi unirlo a questo",
+            "unione": {"token": token, "npub": npub,
+                       "nome": altro["nome"] or "", "annunci": annunci,
+                       "ordini": ordini,
+                       "valida_secondi": SECONDI_CODICE_FUSIONE}})
     accodati = _accoda_trasloco_di(con, user["id"])
     con.commit()
     con.close()
@@ -65113,6 +65171,45 @@ async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
     await premia_reputazione_nostr(user["id"])
     return {"ok": True, "npub": npub, "npub_verificata": True,
             "npub_accesso": True, "annunci_in_coda": accodati}
+
+
+@app.post("/api/me/unisci-nostr")
+async def unisci_nostr(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Il «Si', unisci» della proposta nata in `collega_npub_firma`: fonde
+    l'account nato con Nostr in QUESTO account Telegram, con lo stesso
+    atto e le stesse guardie della porta del bot (`esegui_fusione`, che
+    le ricontrolla dentro la transazione). Il token e' monouso, dura
+    cinque minuti e vale solo per chi l'ha ricevuto firmando. `async`
+    come le altre rotte dei lasciapassare (`prove_dizionari_nel_loop`)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    dati = UNIONI_DAL_WEB.pop(str(d.get("token") or ""), None)
+    if not dati or dati[2] < int(time.time()) or dati[0] != user["id"]:
+        raise HTTPException(409, "⏳ La proposta e' scaduta: rifai «Entra "
+                                 "anche con Nostr» e firma di nuovo")
+    esito = esegui_fusione(dati[0], dati[1])
+    if isinstance(esito, str):
+        raise HTTPException(409, esito)
+    # Dopo la fusione la chiave e' provata su questo account: gli annunci
+    # pubblicati finora a nome della piattaforma passano alla sua firma,
+    # come dopo un collegamento normale
+    con = db()
+    try:
+        accodati = _accoda_trasloco_di(con, dati[0])
+        con.commit()
+        doppioni = len(trova_doppioni_nostr(con, dati[0]))
+    finally:
+        con.close()
+    await premia_distintivi(dati[0])
+    await premia_reputazione_nostr(dati[0])
+    await notifica_admin(f"🔗 Doppia cittadinanza dal web: "
+                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}",
+                         argomento="riepiloghi")
+    return {"ok": True, "npub": esito["npub"], "npub_verificata": True,
+            "npub_accesso": True, "annunci": esito["annunci"],
+            "ordini": esito["ordini"], "negozio": esito["negozio"],
+            "doppioni": doppioni, "annunci_in_coda": accodati}
 
 
 # --- Barattolo su Nostr: gli annunci in piazza -----------------------

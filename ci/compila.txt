@@ -155,3 +155,4 @@ collaudo_login_bot.py
 rifai_miniature.py
 collaudo_swap_preventivo.py
 cartone_satsrouting.py
+collaudo_fusione_da_telegram.py

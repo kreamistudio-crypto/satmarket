@@ -51101,17 +51101,77 @@ async function eseguiCollegamentoFirmato(f){
     method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({evento: firmato})});
   const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  /* LA CHIAVE APRE GIA' UN TUO ACCOUNT NOSTR (20 ott 2026, cantiere
+     fusione-da-telegram): il server non dice piu' solo «gia' creato»,
+     propone di unire i due. Si aspetta la risposta QUI dentro, perche'
+     dopo il si' la stessa firma deve ancora finire il resto (e chi ha
+     aperto il firmatario lo chiude solo quando questa funzione esce). */
+  if (!r.ok && d.detail && d.detail.unione) {
+    const fatto = await proponiUnioneNostr(d.detail.unione);
+    if (!fatto) return;
+    Object.assign(d, fatto);
+  } else if (!r.ok) {
+    toast((typeof d.detail === 'string' ? d.detail : d.detail?.messaggio)
+          || 'Non ci sono riuscito, riprova', 6000);
+    return;
+  }
   myNpub = d.npub; myNpubVerified = true; myNpubAccesso = d.npub;
   if (f.ricorda) f.ricorda();   // firma accettata: e' la sua chiave
   renderIdentita();
-  toast('🔑 Fatto! Badge verificato, accesso abilitato', 6000);
+  if (d.unione_fatta) {
+    const passati = [d.annunci ? `${d.annunci} annunci` : '',
+                     d.ordini ? `${d.ordini} affari` : ''].filter(Boolean).join(' e ');
+    toast('🎉 Fatto! I tuoi due account ora sono uno'
+          + (passati ? `: ${passati} sono passati di qua` : ''), 8000);
+    /* le sessioni dell'account Nostr ora aprono questo: il menu degli
+       account si rilegge, e l'altro non resta li' come un fantasma */
+    await caricaAccount();
+  } else
+    toast('🔑 Fatto! Badge verificato, accesso abilitato', 6000);
   /* La stessa firma finisce il resto in silenzio, nello stesso gesto:
      nessun bottone/passo in piu' da mostrare (set 2026, decisione di
      Andrea — «non metterli, li firma gia'»). */
   await firmaEConsegnaNip85(f, true);
   await svuotaFirmeNostr(f);   // stessa firma, subito: non aspetta l'orologio
   await loadListings(); renderGrid();
+  /* dopo un'unione il profilo e' cambiato tutto (affari, punti, negozio):
+     si rilegge da capo, restando dove si e', quando il toast si e' letto */
+  if (d.unione_fatta) setTimeout(() => ricaricaPerConto(true), 3000);
+}
+
+/* LA DOMANDA DELL'UNIONE (20 ott 2026, cantiere fusione-da-telegram):
+   risolve con la risposta del server se l'unione e' fatta, con null se
+   si rinuncia — col ripensamento, oppure lasciando scadere la proposta
+   (cinque minuti: chi chiude il foglio dal fondo non lascia il
+   firmatario aperto per sempre). */
+function proponiUnioneNostr(u){
+  return new Promise(risolvi => {
+    let chiusa = false;
+    const fine = (v) => { if (!chiusa) { chiusa = true; risolvi(v); } };
+    setTimeout(() => fine(null), (u.valida_secondi || 300) * 1000);
+    const cosa = [u.annunci ? `${u.annunci} annunci` : '',
+                  u.ordini ? `${u.ordini} affari` : ''].filter(Boolean).join(' e ');
+    chiediConferma({
+      titolo: 'Unire i due account?',
+      corpo: `Questa chiave apre già un tuo account Nostr`
+        + (u.nome ? ` («${u.nome}»)` : '')
+        + (cosa ? `, con ${cosa}` : '') + '. '
+        + 'Unendoli, tutto passa a questo account: annunci, affari, '
+        + 'recensioni, punti, distintivi e negozio. Poi entri con Telegram '
+        + 'o con Nostr ed è sempre lo stesso account. Non si può annullare.',
+      etichetta: '🔗 Unisci i due account',
+      poiNo: () => { toast('👌 Lasciati separati: non è cambiato nulla'); fine(null); },
+      poi: async () => {
+        try {
+          const r = await fetch(`${API_BASE}/me/unisci-nostr`, {
+            method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+            body: JSON.stringify({token: u.token})});
+          const d = await r.json().catch(()=>({}));
+          if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 7000); fine(null); return; }
+          fine({...d, unione_fatta: true});
+        } catch(e) { toast('Rete assente: riprova'); fine(null); }
+      }});
+  });
 }
 
 /* ---- La dichiarazione di fiducia NIP-85 (set 2026), SEMPRE dentro
