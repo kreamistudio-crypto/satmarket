@@ -8,7 +8,31 @@ il ritiro li fa `boltz-core`, la libreria che usa il server di SATS
 Routing (3.13.0, `^5.0.0`). Qui stanno le versioni esatte, la ricetta per
 rifarlo byte per byte e le licenze per esteso.
 
-## La ricetta di oggi (20 ott 2026, cantiere swap-lockup)
+## Perché la 5.0.0 di npm (20 ott 2026, cantiere swap-bundle-500, decisione di Andrea su consiglio di Massimo)
+
+Il bundle è di nuovo quello della tappa 3: `boltz-core` 5.0.0 com'è
+uscito su npm, la ricetta qui sotto. Ricostruito il 20 ott 2026 in una
+cartella nuova da npm: lo stesso sha256 di prima,
+`46306e34468e1647` `a42507221b40aa05` `a96623ecd28039e0` `0b31ee17ff31ad99`
+(a gruppi di sedici: lo scanner dei segreti).
+
+PERCHÉ. Per qualche ora (cantiere swap-lockup) il bundle è stato fatto
+dal sorgente di `boltz-core` al commit della PR #196, che non è mai
+uscita su npm. Massimo (SATS Routing) ha consigliato la 5.0.0: è il
+codice che il loro server usa e che gira da anni, mentre il commit è
+una costruzione nostra di un ramo che nessuno pubblica. La #196 rendeva
+più severo `detectSwap` (l'uscita del lockup legata a quella attesa);
+quella stessa difesa il telefono la fa già DA SÉ in `swapRitiro`
+(`swap/boltz.js`): l'uscita trovata deve essere byte per byte lo script
+atteso, sennò niente segreto. Restano anche gli altri controlli prima
+del segreto (l'importo, il lockup letto dalla rete) e il ritiro senza la
+loro API: sono solo rifiuti in più, non cambiano il protocollo. Con la
+5.0.0 la difesa sullo script è UNA, la nostra, e le prove lo dicono
+(`collaudo_swap_telefono`, il lockup «altro script»).
+
+## La strada provata e lasciata: boltz-core al commit della #196 (20 ott 2026, cantiere swap-lockup)
+
+Tenuta per la storia, se un giorno la #196 esce su npm.
 
 Dopo la chiusura di Boltz (3 ago 2026) `boltz-core` NON viene più dal
 pacchetto npm 5.0.0 ma dal SORGENTE del repo al commit
@@ -33,15 +57,13 @@ con esbuild 0.28.2, la cartella `boltz-core/` accanto a `ingresso.mjs` e
 l'ultimo blocco dell'ingresso qui sotto che finisce con
 `} from "./boltz-core/lib/Boltz.ts";` invece di `} from "boltz-core";`
 (esbuild impacchetta il TypeScript da sé; nessuno script dei pacchetti
-gira, nessuna compilazione Solidity serve). RIPRODUCIBILE: costruito due
+gira, nessuna compilazione Solidity serve). Era RIPRODUCIBILE: costruito due
 volte in due cartelle nuove, lo stesso sha256,
 `02b4184eff3d8a49` `9ac2597059c9c01a` `d1b107234629e4a3` `39ea83ade8370bd0`
 (a gruppi di sedici: lo scanner dei segreti), 378.091 byte; l'impronta
-intera è in `prove.py` (`IMPRONTA_SWAP`).
+intera stava in `prove.py` (`IMPRONTA_SWAP`).
 
-## La ricetta della prima versione (20 ott 2026, cantiere swap-telefono)
-
-Tenuta per la storia: il bundle fino al cantiere swap-lockup.
+## La ricetta (20 ott 2026, cantiere swap-telefono; quella in uso)
 
 ```
 npm install --ignore-scripts boltz-core@5.0.0 @scure/bip39@2.4.0 @scure/bip32@2.4.0 @scure/btc-signer@2.4.1
@@ -87,7 +109,7 @@ commit: se cambia di un byte, diventa rossa.
 
 | pacchetto | versione | licenza |
 |---|---|---|
-| `boltz-core` | sorgente al commit `a932d49c` (dopo la 5.0.0, con la PR #196) | MIT |
+| `boltz-core` | 5.0.0 | MIT |
 | `@scure/bip39` | 2.4.0 | MIT |
 | `@scure/bip32` | 2.4.0 | MIT |
 | `@scure/btc-signer` | 2.4.1 | MIT |
@@ -104,18 +126,16 @@ Il `package.json` di `boltz-core` 5.0.0 dice `"license": "AGPL-3.0"`, ma il
 change license to MIT»). La scritta AGPL era un avanzo: l'hanno corretta
 gli autori l'8 giu 2026 (commit `eceaa948`, «fix: license in
 package.json»), dopo l'uscita della 5.0.0 (22 mag 2026). Verificato il
-20 ott 2026 sul repo. Al commit `a932d49c` il `LICENSE` è ancora MIT,
-con «Copyright (c) 2026 Boltz» (nella 5.0.0 diceva 2024): il testo qui
-sotto è quello del commit.
+20 ott 2026 sul repo.
 
 ## Le licenze, per esteso
 
-### boltz-core (commit a932d49c)
+### boltz-core 5.0.0
 
 ```
 MIT License
 
-Copyright (c) 2026 Boltz
+Copyright (c) 2024 Boltz
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

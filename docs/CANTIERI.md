@@ -70789,3 +70789,57 @@ sonda, verde.
 **IL GIRO, mirato.** Sopra `3cbd5c8`: `prove_certificati_relay`,
 `prove_guardia_liquidita` e le sezioni che leggono i documenti — i numeri
 nel rapporto ad Andrea. Nessun collaudo tocca la sonda o la sentinella.
+
+## Il bundle dello swap torna a boltz-core 5.0.0 di npm (20 ott 2026, cantiere swap-bundle-500, decisione di Andrea su consiglio di Massimo)
+
+LA DECISIONE. Massimo (SATS Routing) ha consigliato la 5.0.0 ufficiale
+di npm: è il codice che usa il loro server e che gira da anni. Il bundle
+del cantiere swap-lockup era invece una costruzione nostra dal sorgente
+di un commit (`a932d49c`, la PR #196) che nessuno pubblica. Andrea:
+«torna a vendor/swap.bundle.js da boltz-core 5.0.0 ufficiale di npm,
+come prima. I tre controlli prima del segreto e il ritiro senza la loro
+API restano: sono solo rifiuti in più, non cambiano il protocollo.»
+
+COSA CAMBIA.
+- `vendor/swap.bundle.js` è di nuovo quello della tappa 3. Ricostruito da
+  npm in una cartella nuova (boltz-core 5.0.0 e le sue dipendenze, esbuild
+  0.28.2, l'ingresso della tappa 3): lo stesso sha256 di allora,
+  `46306e34…` (intero in `prove.py`, `IMPRONTA_SWAP`), byte per byte
+  uguale al file di `f3de463`.
+- La difesa sullo script è UNA, la nostra: in `swapRitiro` l'uscita
+  trovata da `detectSwap` deve essere byte per byte lo script atteso (il
+  p2tr della chiave MuSig con l'albero). Il `detectSwap` della 5.0.0
+  accetta quattro forme e ignora il terzo argomento; lo passiamo lo
+  stesso, per un bundle che un giorno porti la #196.
+- Restano tutti i rifiuti in più: l'importo non meno della promessa, il
+  lockup letto dalla rete, il ritiro senza la loro API, la spesa del
+  lockup.
+- `vendor/swap-LICENZE.md`: in testa il perché, la ricetta della 5.0.0
+  (quella in uso), la ricetta della #196 tenuta come storia. La licenza
+  di boltz-core 5.0.0 è MIT: il `LICENSE` del pacchetto è MIT dal 2024;
+  il campo `AGPL-3.0` del suo `package.json` era un avanzo, corretto dagli
+  autori l'8 giu 2026 (#194), già scritto nella sezione «La licenza di
+  boltz-core, chiarita». Ricontrollato il 20 ott sul pacchetto scaricato.
+
+LE PROVE CHE DICEVANO «OGNUNA DELLE DUE DIFESE BASTA DA SOLA». Ora la
+difesa è una, e le prove la provano da sola:
+- `prove_swap_telefono`, prova nuova nel banco in node: un lockup che
+  paga la stessa chiave in un'uscita p2sh. Il `detectSwap` della 5.0.0
+  lo ACCETTA (la prova lo pretende: così si sa che si sta provando la
+  difesa nostra e non quella del bundle); `swapRitiro` lo rifiuta («nel
+  lockup non c'e' il nostro swap»), e la firma non si chiede. Una prova
+  in più guarda il bundle: niente `expectedOutput` né `scriptForType`, il
+  `detectSwap` a due argomenti.
+- `collaudo_swap_telefono`: il lockup «altro script» del cartone resta
+  verde con la 5.0.0: niente ritiro, nessuna firma, nessuna trasmissione.
+- CONTROPROVA: senza il nostro confronto (`|| !swapUguali(...)` tolto)
+  sono rosse la prova nuova e quella del ritiro in `prove_swap_telefono`,
+  e in `collaudo_swap_telefono` il lockup «altro script» (il segreto
+  sarebbe uscito) più tre scene che ne seguono.
+
+SCARTATO. Tenere la #196 accanto alla 5.0.0 (due bundle): due codici da
+seguire per una difesa che il telefono fa già da sé.
+
+COSA RESTA. Se la #196 esce su npm in una versione nuova, si può
+tornarci con la ricetta di npm; la ricetta dal sorgente è in
+`vendor/swap-LICENZE.md`. Suite e collaudi: nel messaggio del commit.
