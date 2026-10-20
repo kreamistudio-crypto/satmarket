@@ -140,13 +140,20 @@ def figure_della_tastiera(msg):
             righe[1][0]["callback_data"])
 
 
+def tasto(d):
+    """Il testo del tasto che va toccato: la figura della pagina col suo
+    nome, come lo legge chi ha la pagina davanti (cantiere
+    figure-barattolo, 20 ott 2026)."""
+    return f"{d['figura']} {d['figura_nome']}"
+
+
 def entra(server, w, tel, chi, nome, username=""):
     """Il giro intero, da chi sa la figura: torna (risposta di stato,
     testo del bot dopo il tocco)."""
     d = w.post("/api/login/bot/inizia").json()
     msg = avvia_bot(tel, chi, nome, carico_dal_link(d["link"]), username)[0]
     figure, _ = figure_della_tastiera(msg)
-    giusta = [cb for f, cb in figure if f == d["figura"]][0]
+    giusta = [cb for f, cb in figure if f == tasto(d)][0]
     detto = tocca(tel, chi, giusta)
     return w.post("/api/login/bot/stato").json(), detto
 
@@ -181,8 +188,8 @@ def main():
     prova("l'ingresso nasce", 200, r.status_code)
     prova("...col link del bot e il prefisso suo", True,
           d["link"].startswith(server.LINK_BOT + "?start=entra_"))
-    prova("...una figura da cercare", True,
-          d["figura"] in server.FIGURE_INGRESSO)
+    prova("...una figura da cercare, col suo nome", True,
+          (d["figura"], d["figura_nome"]) in server.FIGURE_INGRESSO)
     prova("...e due minuti di tempo", 120, d["valida_secondi"])
     prova("il LEGAME sta in un cookie del browser...", True,
           bool(w.cookies.get("barattolo_ingresso")))
@@ -203,7 +210,10 @@ def main():
     prova("...e da dove viene la richiesta", True, "Te lo chiede un" in testo)
     figure, no = figure_della_tastiera(msgs[0])
     prova("tre figure, fra cui quella della pagina", (3, True),
-          (len(figure), d["figura"] in [f for f, _ in figure]))
+          (len(figure), tasto(d) in [f for f, _ in figure]))
+    prova("...ognuna col suo NOME sul tasto", True,
+          all(f in [f"{e} {n}" for e, n in server.FIGURE_INGRESSO]
+              for f, _ in figure))
     prova("...tre DIVERSE (una sola e' giusta)", 3,
           len({f for f, _ in figure}))
     prova("...e il «non sono stato io»", True, no.endswith(":x"))
@@ -217,7 +227,7 @@ def main():
     prova("il link e' MONOUSO: un altro Telegram lo trova gia' usato", True,
           "scaduto o è già stato usato" in altri[0]["text"]
           and "reply_markup" not in altri[0])
-    giusta = [cb for f, cb in figure if f == d["figura"]][0]
+    giusta = [cb for f, cb in figure if f == tasto(d)][0]
     prova("...e la tastiera non vale per un altro Telegram", True,
           "scaduto" in tocca(tel, 502, giusta))
     prova("...che non ha toccato niente: si aspetta ancora",
@@ -272,11 +282,11 @@ def main():
     d = furbo.post("/api/login/bot/inizia").json()
     msg = avvia_bot(tel, 504, "Vittima", carico_dal_link(d["link"]))[0]
     figure, no = figure_della_tastiera(msg)
-    sbagliata = [cb for f, cb in figure if f != d["figura"]][0]
+    sbagliata = [cb for f, cb in figure if f != tasto(d)][0]
     prova("la figura sbagliata annulla, e il bot lo dice", True,
           "Figura sbagliata" in tocca(tel, 504, sbagliata))
     prova("...e la giusta, dopo, non vale piu'", True, "scaduto" in tocca(
-        tel, 504, [cb for f, cb in figure if f == d["figura"]][0]))
+        tel, 504, [cb for f, cb in figure if f == tasto(d)][0]))
     prova("il browser di chi aveva inoltrato: annullato",
           {"stato": "annullato"}, furbo.post("/api/login/bot/stato").json())
     prova("...e NON e' entrato nell'account dell'altro", 401,
@@ -310,7 +320,7 @@ def main():
     prova("...e non ha sessioni", 401, b.get("/api/me").status_code)
     d = b.post("/api/login/bot/inizia").json()
     for v in server.INGRESSI_BOT.values():
-        if v["tg_id"] is None and v["figura"] == d["figura"]:
+        if v["tg_id"] is None and v["figura"][0] == d["figura"]:
             v["scade"] = 1
     prova("un link scaduto, all'Avvia, lo dice", True, "scaduto" in avvia_bot(
         tel, 505, "Zia", carico_dal_link(d["link"]))[0]["text"])
@@ -366,7 +376,7 @@ def main():
     prova("anche da Tor l'ingresso nasce", 200, r.status_code)
     s, _ = (lambda d: (avvia_bot(tel, 811, "DaTor", carico_dal_link(d["link"])), d))(r.json())
     figure, _ = figure_della_tastiera(s[0])
-    tocca(tel, 811, [cb for f, cb in figure if f == r.json()["figura"]][0])
+    tocca(tel, 811, [cb for f, cb in figure if f == tasto(r.json())][0])
     prova("...e il browser di Tor entra col Telegram che ha premuto Avvia",
           {"stato": "dentro", "nome": "DaTor"}, o.post("/api/login/bot/stato").json())
     prova("...e da li' /api/me e' lui", 811, o.get("/api/me").json()["tg_id"])

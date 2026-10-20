@@ -18784,9 +18784,18 @@ SECONDI_INGRESSO_BOT = 120
 COOKIE_INGRESSO = "barattolo_ingresso"
 PERCORSO_INGRESSO = "/api/login/bot"
 PREFISSO_INGRESSO = "entra_"
-# Figure facili da distinguere a colpo d'occhio, anche piccole.
-FIGURE_INGRESSO = ("🍐", "🍋", "🥕", "🍇", "🍒", "🥝", "🍄", "🌽",
-                   "🍉", "🥑", "🍓", "🥥")
+# Le figure sono cose da mercatino (20 ott 2026, cantiere
+# figure-barattolo, scelta di Andrea), ognuna col suo NOME: sulla pagina
+# e sui tasti del bot si cerca la parola oltre al disegno, cosi' anche
+# chi vede piccolo o ha un telefono che disegna l'emoji a modo suo trova
+# quella giusta. Forme e colori lontani fra loro, e solo emoji di
+# Unicode 11 o prima (2018), che anche un telefono vecchio sa disegnare;
+# niente 🫙, che e' dei preferiti. Il tasto del bot porta il POSTO della
+# figura nella riga, non la figura: il nome non tocca la sicurezza.
+FIGURE_INGRESSO = (("🍯", "Miele"), ("🚲", "Bici"), ("📚", "Libri"),
+                   ("🎸", "Chitarra"), ("⌚", "Orologio"), ("🧸", "Orsetto"),
+                   ("🎨", "Colori"), ("🧺", "Cesto"), ("📷", "Foto"),
+                   ("👟", "Scarpa"), ("🎧", "Cuffie"), ("⚽", "Pallone"))
 INGRESSI_BOT: dict[str, dict] = {}    # hash del legame -> l'ingresso
 CODICI_INGRESSO: dict[str, str] = {}  # codice del link -> hash del legame
 TOKEN_INGRESSO: dict[str, str] = {}   # token della tastiera -> hash del legame
@@ -18878,7 +18887,8 @@ async def inizia_login_bot(req: Request, response: Response,
         httponly=True, secure=cookie_sicuro(), samesite="lax",
         path=PERCORSO_INGRESSO)
     return {"link": f"{LINK_BOT}?start={PREFISSO_INGRESSO}{codice}",
-            "figura": figura, "valida_secondi": SECONDI_INGRESSO_BOT}
+            "figura": figura[0], "figura_nome": figura[1],
+            "valida_secondi": SECONDI_INGRESSO_BOT}
 
 
 @app.post("/api/login/bot/stato")
@@ -18944,8 +18954,8 @@ async def avvia_ingresso_bot(mittente: dict, codice: str):
                  "Non hai chiesto tu di entrare? Non toccare niente: il "
                  "link scade da solo fra due minuti."),
         "reply_markup": {"inline_keyboard": [
-            [{"text": f, "callback_data": f"entra:{t}:{n}"}
-             for n, f in enumerate(i["scelte"])],
+            [{"text": f"{f} {nome}", "callback_data": f"entra:{t}:{n}"}
+             for n, (f, nome) in enumerate(i["scelte"])],
             [{"text": "❌ Non sono stato io", "callback_data": f"entra:{t}:x"}],
         ]}})
 
