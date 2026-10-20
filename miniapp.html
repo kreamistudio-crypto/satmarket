@@ -55770,8 +55770,23 @@ function passaFiltroP2P(o, f){
     });
     if (!preso) return false;
   }
-  const p = Math.round(Number(o.premium) || 0);
-  if (p < f.premioDa || p > f.premioA) return false;
+  /* IL PREMIO E' QUELLO DELLA CARD (20 ott 2026, cantiere
+     ordina-per-convenienza, decisione di Andrea), lo stesso metro
+     dell'ordinamento: a un prezzo fisso `o.premium` e' sempre 0, e il
+     filtro lo giudicava «al prezzo di mercato» qualunque cosa dicesse
+     la card. A CAMBIO MUTO un prezzo fisso non ha un numero e NON SI
+     SCARTA: resta visibile, in fondo (lo mette li' `ordinaLibroP2P`).
+     ⚠️ GLI ESTREMI DEL CURSORE SONO APERTI: la convenienza vera di un
+     prezzo fisso non ha tetto («212%»), e con il cursore tutto a destra
+     un filtro acceso per un'altra leva (la valuta, il metodo) lo
+     avrebbe buttato fuori. Il capo in fondo al cursore vuol dire
+     «nessun limite da questa parte», com'e' gia' per il filtro spento. */
+  const pc = premioCardP2P(o);
+  if (pc === null) return true;
+  const p = Math.round(pc);
+  const v = filtroVuotoP2P();
+  if (f.premioDa > v.premioDa && p < f.premioDa) return false;
+  if (f.premioA < v.premioA && p > f.premioA) return false;
   return true;
 }
 /* LA REPUTAZIONE HA UN GIUDICE SUO, e non e' pulizia: dal set 2026 la
@@ -56337,7 +56352,8 @@ function scadeTestoP2P(scade){
 
    LA CONVENIENZA, che e' il primo dei quattro: in cima quel che
    conviene di piu' a chi sta guardando QUEL tab.
-   Il metro e' il PREMIO, e il verso si rovescia col lato per la
+   Il metro e' il PREMIO DELLA CARD (`premioCardP2P`), e il verso si
+   rovescia col lato per la
    ragione letta sui byte: `sats -= premium/100 * sats`, quindi un
    premio basso lascia piu' sats. Nel tab «Compra BTC» chi legge
    compra sats e vuole il premio PIU' BASSO (piu' sats per i suoi
@@ -56346,6 +56362,19 @@ function scadeTestoP2P(scade){
    A PARITA' IL PIU' RECENTE, che e' l'ordine di ieri: fra due offerte
    che valgono uguale, quella fresca ha piu' probabilita' di trovare
    ancora chi l'ha scritta.
+   ⚠️ IL METRO E' QUELLO CHE LA CARD MOSTRA, MAI `o.premium` NUDO (20
+   ott 2026, cantiere ordina-per-convenienza, decisione di Andrea): un
+   ordine a sats fissi — tutti i Barattozon a prezzo fisso e gli altri
+   prezzi fissi — porta sul filo premio 0 (il premio e' cotto nei sats),
+   e col metro nudo valeva «al prezzo di mercato» qualunque fosse la sua
+   convenienza vera. Nel tab «Compra BTC», dove gli altri hanno quasi
+   sempre un premio positivo, stava IN CIMA anche con la card che diceva
+   «8% meno conveniente». Ordinando per convenienza vale solo la
+   convenienza, per tutti: Barattozon si distingue col suo marchio sulla
+   card, mai con la posizione. Un prezzo fisso a CAMBIO MUTO non ha un
+   numero (`null`) e va IN FONDO, sotto tutti quelli che ce l'hanno, coi
+   suoi pari per data: mai in mezzo agli altri con un numero inventato.
+   Gli altri tre criteri il premio non lo guardano, e restano com'erano.
    PURA e con la COPIA (`slice`): il libro in memoria non si tocca —
    e' la stessa lista che serve ai due tab, e ordinarla sul posto
    vorrebbe dire riordinarla a ogni giro. */
@@ -56361,7 +56390,11 @@ function ordinaLibroP2P(righe, lato, criterio){
   const metro = c === 'recenti' ? () => 0
     : c === 'imp-giu' ? (a, b) => capoImportoP2P(b, true) - capoImportoP2P(a, true)
     : c === 'imp-su' ? (a, b) => capoImportoP2P(a, false) - capoImportoP2P(b, false)
-    : (a, b) => ((a.premium || 0) - (b.premium || 0)) * verso;
+    : (a, b) => {
+      const pa = premioCardP2P(a), pb = premioCardP2P(b);
+      if (pa === null || pb === null) return (pa === null) - (pb === null);
+      return (pa - pb) * verso;
+    };
   return righe.slice().sort((a, b) => metro(a, b) || recente(a, b));
 }
 /* IL VALORE VIVO sta nella `<select>` nascosta della vista, che e' il
@@ -57572,9 +57605,9 @@ function renderP2P(){
     }, copia ? renderP2P : () => {});
   }
   const k = P2P_LATO_K[p2pLato];
-  /* il criterio lo dice la pillola «Ordina» (predefinito: la
-     convenienza), e i quattro col loro perche' stanno in
-     ordinaLibroP2P */
+  /* il criterio lo dice la pillola «Ordina» (predefinito: «Piu'
+     recenti», `P2P_ORDINE_CASA`), e i quattro col loro perche' stanno
+     in ordinaLibroP2P */
   const vivi = ordinaLibroP2P(p2pLibro.ordini.filter(o => o.lato === k),
                               p2pLato, ordineLibroP2P());
   /* LA PILLOLA DEL FILTRO ha preso il posto della riga «N offerte di
