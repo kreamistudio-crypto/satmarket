@@ -34158,6 +34158,11 @@ def _censimento(acceso, dopo=None):
     amb["SWAP_TIPI"] = ("boltz",)
     amb["_SWAP_ID_FORNITORE"] = re.compile(r"^[a-z0-9]{2,20}$")
     amb["_SWAP_DETTO_STORTO"] = set()
+    # ...e il mempool del lockup (20 ott 2026, swap-lockup)
+    amb["SWAP_MEMPOOL_API"] = ""
+    amb["SWAP_MEMPOOL_DI_SERIE"] = {"bitcoin": "https://mempool.space/api",
+                                    "testnet": "https://mempool.space/testnet/api",
+                                    "regtest": ""}
     # le prese dalle 10 (9 ott 2026): il giudice dell'ora legge
     # l'orologio, e `time` da `__missing__` farebbe 7
     amb["time"] = time
@@ -34236,7 +34241,7 @@ def _censimento(acceso, dopo=None):
               # la rete dello swap (20 ott 2026): la sedicesima volta
               "swap_rete",
               # i fornitori dello swap (20 ott 2026): la diciassettesima
-              "swap_origine_api", "swap_fornitori",
+              "swap_origine_api", "swap_mempool_api", "swap_fornitori",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -60035,8 +60040,11 @@ EXPORT_SWAP = [
     "generateMnemonic", "hex", "mnemonicToSeedSync", "reverseSwapTree",
     "sha256", "targetFee", "validateMnemonic", "wordlist",
 ]
-IMPRONTA_SWAP = ("46306e34468e1647a42507221b40aa05"
-                 "a96623ecd28039e00b31ee17ff31ad99")
+# (20 ott 2026, cantiere swap-lockup) rifatto da boltz-core al commit
+# a932d49c (la PR #196, mai uscita su npm): ricetta in vendor/swap-LICENZE.md,
+# due costruzioni in cartelle nuove, la stessa impronta
+IMPRONTA_SWAP = ("02b4184eff3d8a499ac2597059c9c01a"
+                 "d1b107234629e4a339ea83ade8370bd0")
 VETTORE_SWAP_XPUB = ("xpub661MyMwAqRbcG5eD5Hh9EddaCEik4rxpJA1RDEsxjujXzGsJDg4kT7EX"
                      "C8GPM4ZZLVCoNA8fArGbjqKmo6M6khKTaTmYBJNTQXCFrejsgCi")
 VETTORE_SWAP_PRIV = ("cb9774710e1d1eaa747a38fff23b20cb"
@@ -175487,12 +175495,17 @@ def prove_swap_telefono():
           EXPORT_SWAP, sorted(re.findall(r"^\s{4}(\w+): \(\) =>", blocco, re.M)))
     prova("swap: un IIFE con un nome solo, non minimizzato", (True, True),
           (testo.startswith("var BarattoloSwap = (() => {"),
-           "// node_modules/boltz-core/" in testo))
+           "// boltz-core/lib/swap/SwapDetector.ts" in testo))
     lic = open(os.path.join("vendor", "swap-LICENZE.md"), encoding="utf-8").read()
     prova("swap: la ricetta per rifarlo e le licenze stanno accanto",
           (True, True, True),
           ("esbuild ingresso.mjs --bundle" in lic,
-           "boltz-core@5.0.0" in lic, "MIT" in lic))
+           "a932d49c4daaeae3d7940dc1519bf77ef92e6dc1" in lic, "MIT" in lic))
+    # (20 ott 2026, cantiere swap-lockup) la correzione #196 c'e' davvero
+    # nella parte che usiamo: `detectSwap` lega l'uscita a quella attesa
+    # (`detectPreimage` non lo esportiamo, ed esbuild lo toglie)
+    prova("swap: il bundle porta la correzione di boltz-core #196", (True, True),
+          ("expectedOutput" in testo, "scriptForType" in testo))
     attr = open(".gitattributes", encoding="utf-8").read()
     prova("swap: il bundle esce LF anche su Windows (l'impronta e' dei byte)",
           True, "\nvendor/swap.bundle.js text eol=lf" in attr)
@@ -175514,13 +175527,30 @@ def prove_swap_telefono():
           ("s.src = `${FOTO_BASE}/swap/${nome}.js?v=${SWAP_TELEFONO_VER}`;" in mini,
            "for (const nome of tipi.concat(['instradatore']))" in mini))
     prova("il telefono non parla col server di Barattolo, se non per il preventivo",
-          (0, 0, 0, 1, 0, 0, 0, 0),
+          (0, 0, 0, 2, 0, 0, 0, 0),
           (bz.count("/api/"), bz.count("API_BASE"), bz.count("authHdr"),
            bz.count("fetch("), js.count("/api/"), js.count("API_BASE"),
            js.count("authHdr"), js.count("fetch(")))
-    prova("...l'unica fetch del tipo va all'api del fornitore", True,
+    prova("...le due fetch del tipo: l'api del fornitore e il mempool della rete", True,
           "async function swapApiBoltz(base, percorso, corpo){" in bz
-          and "const api = (percorso, corpo) => swapApiBoltz(cfg.api, percorso, corpo);" in bz)
+          and "const api = (percorso, corpo) => swapApiBoltz(cfg.api, percorso, corpo);" in bz
+          and "const vista = await fetch(`${base}/tx/${txid}/hex`);" in bz
+          and "const base = String(cfg.mempool || '')" in bz)
+    # (20 ott 2026, cantiere swap-lockup) I TRE CONTROLLI PRIMA DEL SEGRETO:
+    # il lockup si legge dal mempool e il segreto parte solo dopo; nel
+    # ritiro l'uscita e' quella dello script atteso e l'importo non e' meno
+    # della promessa
+    i_rit = bz.index("async ritira(rec, parole){")
+    prova("il lockup si legge dal mempool PRIMA che il segreto possa uscire",
+          (True, True, True),
+          (bz.index("const vista = await fetch(", i_rit) < bz.index("const chiediFirma", i_rit),
+           "swapRitiro(S, rete, rec, chiavi, lockHex," in bz,
+           "lock.hex" not in bz))
+    prova("nel ritiro: l'uscita dello script atteso, e non meno della promessa",
+          (True, True, True),
+          ("const uscita = S.detectSwap(tweaked.aggPubkey, lockup, atteso);" in bz,
+           "if (uscita === undefined || !swapUguali(uscita.script, atteso))" in bz,
+           "if (!(Number(uscita.amount) >= Number(rec.onchainAmount)))" in bz))
     prova("...e il preventivo lo legge la pagina, per fornitore", True,
           "async function leggiPreventivoSwap(id, fornitore, hash){" in mini
           and "q.set('fornitore', fornitore);" in mini)
@@ -175640,7 +175670,7 @@ const lt = new S.Transaction({allowUnknownInputs: true, allowUnknownOutputs: tru
 lt.addInput({txid: S.sha256(new TextEncoder().encode('lockup')), index: 0});
 lt.addOutput({script: lockScript, amount: 47388n});
 ctx.__lh = h.encode(lt.unsignedTx);
-ctx.__rec = {refundPublicKey: R.refundPublicKey, swapTree: R.swapTree};
+ctx.__rec = {refundPublicKey: R.refundPublicKey, swapTree: R.swapTree, onchainAmount: 47388};
 ctx.__dest = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq';
 ctx.__firma = async (txHex, nonce) => {
   const tx = S.Transaction.fromRaw(h.decode(txHex), {allowUnknownOutputs: true});
@@ -176013,13 +176043,18 @@ def prove_swap_fornitori():
            "SWAP_TIPI": ("boltz",), "_SWAP_ID_FORNITORE": re.compile(r"^[a-z0-9]{2,20}$"),
            "_SWAP_DETTO_STORTO": set(), "SWAP_API_BASE": "https://api.satsrouting.exchange/",
            "SWAP_REFERRAL_ID": " barattolo ", "SWAP_RETE": "bitcoin",
-           "SWAP_FORNITORI_IN_PIU": []}
-    for f in ("swap_rete", "swap_origine_api", "swap_fornitori", "swap_fornitore"):
+           "SWAP_FORNITORI_IN_PIU": [], "SWAP_MEMPOOL_API": "",
+           "SWAP_MEMPOOL_DI_SERIE": {"bitcoin": "https://mempool.space/api",
+                                     "testnet": "https://mempool.space/testnet/api",
+                                     "regtest": ""}}
+    for f in ("swap_rete", "swap_origine_api", "swap_mempool_api", "swap_fornitori",
+              "swap_fornitore"):
         exec(pezzo(f), amb)
     prova("di serie un fornitore solo, SATS Routing, dalle leve di sempre",
           [{"id": "satsrouting", "nome": "SATS Routing", "tipo": "boltz",
             "api": "https://api.satsrouting.exchange", "referral": "barattolo",
-            "rete": "bitcoin"}], amb["swap_fornitori"]())
+            "rete": "bitcoin", "mempool": "https://mempool.space/api"}],
+          amb["swap_fornitori"]())
     buono = {"id": "cartone2", "nome": "Cartone Due", "tipo": "boltz",
              "api": "http://127.0.0.1:9078/", "rete": "regtest"}
     amb["SWAP_FORNITORI_IN_PIU"] = [
@@ -176031,6 +176066,7 @@ def prove_swap_fornitori():
         dict(buono, id="ftp", api="ftp://x"),      # api non http(s)
         dict(buono, id="rete", rete="marte"),      # rete sconosciuta
         dict(buono, id="senza", nome=""),          # senza nome
+        dict(buono, id="mempoolstorto", mempool="ftp://x"),  # mempool non http(s)
         "una stringa", None]
     import contextlib as _cl, io as _io
     voce = _io.StringIO()
@@ -176040,8 +176076,19 @@ def prove_swap_fornitori():
     prova("le voci buone in coda, le storte saltate",
           [("satsrouting", "https://api.satsrouting.exchange"),
            ("cartone2", "http://127.0.0.1:9078")], [(f["id"], f["api"]) for f in l])
-    prova("...e il journal dice quali, una volta sola", (9, True),
+    prova("...e il journal dice quali, una volta sola", (10, True),
           (voce.getvalue().count("SWAP_FORNITORI_IN_PIU"), "storta" in voce.getvalue()))
+    # (20 ott 2026, swap-lockup) il mempool: di serie quello della rete
+    # (vuoto per il regtest: senza, il telefono non ritira), sennò quello
+    # scritto; e la leva vale per SATS Routing
+    amb["SWAP_MEMPOOL_API"] = "http://127.0.0.1:4003/api/"
+    prova("il mempool di ogni fornitore: quello scritto, sennò quello della rete",
+          ("", "http://127.0.0.1:4003/api", "https://mempool.space/testnet/api",
+           "http://127.0.0.1:9078/esplora"),
+          (l[1]["mempool"], amb["swap_fornitori"]()[0]["mempool"],
+           amb["swap_mempool_api"]("testnet"),
+           amb["swap_mempool_api"]("bitcoin", "http://127.0.0.1:9078/esplora/")))
+    amb["SWAP_MEMPOOL_API"] = ""
     prova("un fornitore per id, o None", ("Cartone Due", None),
           ((amb["swap_fornitore"]("cartone2") or {}).get("nome"),
            amb["swap_fornitore"]("chissa")))

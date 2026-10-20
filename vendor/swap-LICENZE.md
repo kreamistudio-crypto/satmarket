@@ -8,7 +8,40 @@ il ritiro li fa `boltz-core`, la libreria che usa il server di SATS
 Routing (3.13.0, `^5.0.0`). Qui stanno le versioni esatte, la ricetta per
 rifarlo byte per byte e le licenze per esteso.
 
-## La ricetta (20 ott 2026, cantiere swap-telefono)
+## La ricetta di oggi (20 ott 2026, cantiere swap-lockup)
+
+Dopo la chiusura di Boltz (3 ago 2026) `boltz-core` NON viene più dal
+pacchetto npm 5.0.0 ma dal SORGENTE del repo al commit
+`a932d49c4daaeae3d7940dc1519bf77ef92e6dc1` (24 lug 2026, il merge della
+PR #196 «Harden scripts», l'ultimo del ramo `master`): la 5.0.0 è del 22
+mag e quella correzione non è mai uscita su npm. Cosa porta: `detectSwap`
+lega l'uscita del lockup al tipo o allo script ATTESO (la 5.0.0 ne
+accettava quattro forme insieme) e `detectPreimage` riconosce il segreto
+dalla sua impronta. Il resto è identico: stesse sette dipendenze, stesse
+versioni esatte, stesso esbuild, stesso ingresso tranne la riga di
+`boltz-core`.
+
+```
+git init boltz-core && cd boltz-core
+git fetch --depth 1 https://github.com/BoltzExchange/boltz-core.git a932d49c4daaeae3d7940dc1519bf77ef92e6dc1
+git checkout FETCH_HEAD && cd ..
+npm install --ignore-scripts @scure/bip39@2.4.0 @scure/bip32@2.4.0 @scure/btc-signer@2.4.1 @noble/curves@2.4.0 @noble/hashes@2.4.0 @scure/base@2.4.0 micro-packed@0.11.1
+esbuild ingresso.mjs --bundle --format=iife --global-name=BarattoloSwap --target=es2020 --legal-comments=none --outfile=swap.bundle.js
+```
+
+con esbuild 0.28.2, la cartella `boltz-core/` accanto a `ingresso.mjs` e
+l'ultimo blocco dell'ingresso qui sotto che finisce con
+`} from "./boltz-core/lib/Boltz.ts";` invece di `} from "boltz-core";`
+(esbuild impacchetta il TypeScript da sé; nessuno script dei pacchetti
+gira, nessuna compilazione Solidity serve). RIPRODUCIBILE: costruito due
+volte in due cartelle nuove, lo stesso sha256,
+`02b4184eff3d8a49` `9ac2597059c9c01a` `d1b107234629e4a3` `39ea83ade8370bd0`
+(a gruppi di sedici: lo scanner dei segreti), 378.091 byte; l'impronta
+intera è in `prove.py` (`IMPRONTA_SWAP`).
+
+## La ricetta della prima versione (20 ott 2026, cantiere swap-telefono)
+
+Tenuta per la storia: il bundle fino al cantiere swap-lockup.
 
 ```
 npm install --ignore-scripts boltz-core@5.0.0 @scure/bip39@2.4.0 @scure/bip32@2.4.0 @scure/btc-signer@2.4.1
@@ -54,7 +87,7 @@ commit: se cambia di un byte, diventa rossa.
 
 | pacchetto | versione | licenza |
 |---|---|---|
-| `boltz-core` | 5.0.0 | MIT |
+| `boltz-core` | sorgente al commit `a932d49c` (dopo la 5.0.0, con la PR #196) | MIT |
 | `@scure/bip39` | 2.4.0 | MIT |
 | `@scure/bip32` | 2.4.0 | MIT |
 | `@scure/btc-signer` | 2.4.1 | MIT |
@@ -71,16 +104,18 @@ Il `package.json` di `boltz-core` 5.0.0 dice `"license": "AGPL-3.0"`, ma il
 change license to MIT»). La scritta AGPL era un avanzo: l'hanno corretta
 gli autori l'8 giu 2026 (commit `eceaa948`, «fix: license in
 package.json»), dopo l'uscita della 5.0.0 (22 mag 2026). Verificato il
-20 ott 2026 sul repo.
+20 ott 2026 sul repo. Al commit `a932d49c` il `LICENSE` è ancora MIT,
+con «Copyright (c) 2026 Boltz» (nella 5.0.0 diceva 2024): il testo qui
+sotto è quello del commit.
 
 ## Le licenze, per esteso
 
-### boltz-core 5.0.0
+### boltz-core (commit a932d49c)
 
 ```
 MIT License
 
-Copyright (c) 2024 Boltz
+Copyright (c) 2026 Boltz
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

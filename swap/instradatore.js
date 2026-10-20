@@ -44,7 +44,7 @@ function swapFornitori(){
   const l = swapLeve || {};
   const voci = Array.isArray(l.fornitori) && l.fornitori.length ? l.fornitori
     : [{id: 'satsrouting', nome: 'SATS Routing', tipo: 'boltz',
-        api: l.api, referral: l.referral, rete: l.rete}];
+        api: l.api, referral: l.referral, rete: l.rete, mempool: l.mempool}];
   const tipi = window.SWAP_TIPI || {};
   swapFornitoriCopia = voci
     .filter(v => v && v.id && Object.prototype.hasOwnProperty.call(tipi, v.tipo))
