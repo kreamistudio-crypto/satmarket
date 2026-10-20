@@ -24,6 +24,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
+; il tetto (20 ott 2026): sulla VM gira anche il runner della CI
+MemoryMax=700M
 
 [Install]
 WantedBy=multi-user.target

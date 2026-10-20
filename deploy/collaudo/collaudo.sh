@@ -7,7 +7,8 @@
 #   sudo collaudo riprendi        torna a seguire develop (e toglie la pausa)
 #   sudo collaudo ramo <nome>     segue un altro ramo (es. cantiere/x) finche'
 #                                 non si da' `riprendi`
-#   sudo collaudo azzera          database e foto NUOVI, piu' la semina finta:
+#   sudo collaudo azzera          database e foto NUOVI, piu' la semina finta
+#                                 (semina_collaudo.py: venditori, annunci, ordini):
 #                                 i vecchi si spostano in azzerati/ (gli
 #                                 ultimi tre), niente si cancella a mano
 # Le variabili COLLAUDO_* servono solo alle prove; sulla VM non si toccano.
@@ -74,11 +75,11 @@ case "${1:-stato}" in
       | while read -r v; do rm -rf "$v"; done
     systemctl start "$SERVIZIO"
     for _ in $(seq 1 45); do curl -fsS -m 3 "$SALUTE" > /dev/null 2>&1 && break; sleep 1; done
-    (cd "$DIR" && "${COME[@]}" "$PY" semina_demo.py)
+    (cd "$DIR" && "${COME[@]}" "$PY" semina_collaudo.py)
     echo "🧹 azzerato ($ora): database e foto nuovi, semina fatta"
     ;;
   *)
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

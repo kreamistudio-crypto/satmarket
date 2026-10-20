@@ -1977,8 +1977,12 @@ PROVA_SOLO_IDS = []
 # (che non lascia mai il VPS): sotto ci sono le righe che cambiano,
 # tutto il resto resta com'e' in questo file. MAI una chiave vera — ne'
 # il BOT_TOKEN di produzione (ruberebbe il webhook), ne' una chiave
-# LNbits che paga sats veri, ne' una nsec.
+# LNbits che paga sats veri, ne' una nsec. Sulla vm-2050 i segreti NON
+# stanno nemmeno nel config: nascono sulla VM in /etc/barattolo-collaudo
+# (root:collaudo 640) e il config li legge da li' con una funzione
+# `_segreto(nome)` (docs/COLLAUDO.md, «Il config»).
 #   MODALITA_COLLAUDO = False          # identita' Telegram vere, col bot di prova
+#   DB = "dati/satmarket.db"
 #   URL_PUBBLICO = "https://collaudo.barattolo.store"
 #   LINK_BOT = "https://t.me/<bot di prova>"
 #   TELEGRAM_MINIAPP_LINK = "https://t.me/<bot di prova>"
@@ -2014,15 +2018,18 @@ PROVA_SOLO_IDS = []
 #   # in lista, ogni ordine al massimo P2P_MAX_SATS_PROVA, e sulla VM MAI
 #   # la chiave di moderatore/solver ne' altre chiavi Mostro di
 #   # produzione (le dispute degli ordini del collaudo si risolvono dal
-#   # Barattolo vero). I relay sono quelli del coordinatore, senza il
-#   # nostro (la riga del VPS dice quali: grep -n "^MOSTRO_RELAY").
+#   # Barattolo vero). I relay sono le STESSE righe della produzione,
+#   # relay.barattolo.store compreso (decisione di Andrea, 20 ott: i
+#   # relay veri solo per il P2P; annunci, post e DM restano nel
+#   # recinto). Le dice il VPS: grep -n "^MOSTRO_RELAY".
 #   SEGRETI_PROFILO_P2P = {1: "INCOLLA_QUI_UN_SEGRETO_NATO_SULLA_PROVA"}
 #   P2P_ATTIVO = True
 #   P2P_PROVA_IDS = [<gli stessi di PROVA_SOLO_IDS>]
 #   P2P_MAX_SATS_PROVA = 10_000
-#   MOSTRO_RELAY = ["INCOLLA_QUI_I_RELAY_DEL_COORDINATORE"]
-#   MOSTRO_RELAY_SPECCHIO = []
-#   MOSTRO_RELAY_CONFERMA = []
+#   MOSTRO_RELAY = [<le stesse della produzione>]
+#   MOSTRO_RELAY_SPECCHIO = [<le stesse della produzione>]
+#   MOSTRO_RELAY_CONFERMA = [<le stesse della produzione>]
+#   MERCATINO_CHAT_ORDINI = True       # la chat negli ordini, da provare
 #   AVVISO_DM_NOSTR = False
 #   AVVISO_DM_NOSTR_RELAY = []
 #   RONDA_RELAY_MOSTRO = False

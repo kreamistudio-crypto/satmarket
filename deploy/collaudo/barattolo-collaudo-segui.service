@@ -10,3 +10,6 @@ After=network-online.target
 Type=oneshot
 ExecStart=/usr/local/sbin/collaudo-segui
 TimeoutStartSec=300
+; il tetto (20 ott 2026): a un passo avanti fetch e compileall arrivano
+; sui 480 MB, e sulla VM gira anche il runner della CI
+MemoryMax=700M

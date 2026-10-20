@@ -176393,7 +176393,7 @@ def prove_collaudo_segue_develop():
           and "latest" not in codice_sh(lb))
     prova("il comando: azzera SPOSTA il database (non lo cancella) e tiene gli ultimi tre giri",
           True, 'mv "$DIR/$f" "$DIR/azzerati/' in com and "AZZERATI_TENUTI=3" in com
-          and "semina_demo.py" in com and "rm -f \"$DIR/dati" not in com)
+          and "semina_collaudo.py" in com and "rm -f \"$DIR/dati" not in com)
     doc = open(os.path.join(QUI, "docs", "COLLAUDO.md"), encoding="utf-8").read()
     prova("COLLAUDO.md dice il flusso, la deploy key senza scrittura, gli avanzi RGB, la strada A",
           [True] * 7,
@@ -176605,6 +176605,78 @@ def prove_collaudo_segue_develop():
                os.path.exists(os.path.join(stato, "requisiti"))))
     finally:
         shutil.rmtree(casa, ignore_errors=True)
+
+
+def prove_semina_collaudo():
+    """LA SEMINA DEL COLLAUDO (20 ott 2026, cantiere collaudo-ritocco,
+    richiesta di Andrea): `semina_collaudo.py` riempie il database della
+    vm-2050 con un mercatino FINTO (quattro venditori, quattordici annunci,
+    due ordini) e si ferma in tre casi: niente istanza di prova, URL_PUBBLICO
+    di produzione (o non dichiarato), database nella cartella della
+    produzione. Qui il giudice delle guardie e i dati, letti sul server; il
+    giro sullo schema VERO lo fa `collaudo_semina_collaudo.py`."""
+    print("\n[la semina del collaudo: le guardie e il mercatino finto]")
+    import importlib.util
+    percorso = os.path.join(QUI, "semina_collaudo.py")
+    spec = importlib.util.spec_from_file_location("semina_collaudo_prova", percorso)
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    g = sc.giudizio_semina
+    BUONO = {"PROVA_SOLO_IDS": [111], "URL_PUBBLICO": "https://collaudo.barattolo.store"}
+    DB = "/srv/collaudo/barattolo/dati/satmarket.db"
+    prova("l'istanza di prova col suo indirizzo e il suo database: si semina", "", g(BUONO, DB))
+    no = {
+        "lista vuota": ({**BUONO, "PROVA_SOLO_IDS": []}, DB),
+        "lista assente": ({"URL_PUBBLICO": BUONO["URL_PUBBLICO"]}, DB),
+        "lista scritta come testo": ({**BUONO, "PROVA_SOLO_IDS": "111"}, DB),
+        "URL non dichiarato (vale barattolo.store)": ({"PROVA_SOLO_IDS": [111]}, DB),
+        "URL di produzione": ({**BUONO, "URL_PUBBLICO": "https://barattolo.store"}, DB),
+        "URL di produzione col www": ({**BUONO, "URL_PUBBLICO": "https://www.barattolo.store/"}, DB),
+        "URL storto": ({**BUONO, "URL_PUBBLICO": "barattolo"}, DB),
+        "database della produzione": (BUONO, "/srv/barattolo/dati/satmarket.db"),
+        "il collegamento della produzione": (BUONO, "/srv/barattolo/satmarket.db"),
+    }
+    prova("...e si ferma, dicendo perche', in tutti i casi della regola",
+          {k: True for k in no}, {k: bool(g(*v)) for k, v in no.items()})
+    prova("in locale MODALITA_COLLAUDO vale come lista, ma l'indirizzo resta di rigore",
+          ["", True], [g({"MODALITA_COLLAUDO": True, "URL_PUBBLICO": "http://127.0.0.1:8080"},
+                         "satmarket.db"),
+                       bool(g({"MODALITA_COLLAUDO": True}, "satmarket.db"))])
+    prova("compra il primo id Telegram della lista (le chiavi Nostr e i refusi si saltano)",
+          [62716473, 111], sc.ids_compratori({"PROVA_SOLO_IDS": ["npub1x", 62716473, "111", -5, 111]}))
+    src = _SORGENTE
+    k = src.index("CATEGORIE = (")
+    amb = {}
+    exec(src[k:src.index("\n\n", k)], amb)
+    categorie = set(amb["CATEGORIE"])
+    k = src.index("CONDIZIONI = {")
+    exec(src[k:src.index("\n\n", k)], amb)
+    condizioni = set(amb["CONDIZIONI"])
+    vend = {v[0] for v in sc.VENDITORI}
+    prova("quattro venditori, quattordici annunci, due ordini", (4, 14, 2),
+          (len(sc.VENDITORI), len(sc.ANNUNCI), len(sc.ORDINI)))
+    prova("...in dodici categorie diverse, tutte del server, e condizioni del server",
+          (True, 12, set(), set()),
+          (len({a[2] for a in sc.ANNUNCI}) >= 10, len({a[2] for a in sc.ANNUNCI[:12]}),
+           {a[2] for a in sc.ANNUNCI} - categorie, {a[3] for a in sc.ANNUNCI} - condizioni))
+    prova("...ogni annuncio di un venditore di prova, con un prezzo e una consegna veri", [], [
+        a[1] for a in sc.ANNUNCI if a[0] not in vend or not (isinstance(a[4], int) and a[4] > 0)
+        or a[5] not in ("spedizione", "ritiro", "entrambe")])
+    prova("TUTTO dice di essere finto: i nomi, i titoli, la descrizione", (True, True, True),
+          (all("prova" in v[1].lower() for v in sc.VENDITORI),
+           all("prova" in a[1].lower() for a in sc.ANNUNCI), "DI PROVA" in sc.DESCRIZIONE))
+    prova("gli ordini: uno in corso e uno concluso, su due annunci che esistono",
+          [("locked", True), ("released", True)],
+          [(s, t in {a[1] for a in sc.ANNUNCI}) for t, s in sc.ORDINI])
+    testo = open(percorso, encoding="utf-8").read()
+    prova("niente import server e niente rete", (False, False, False),
+          (bool(re.search(r"^\s*(import|from)\s+server\b", testo, re.M)),
+           "urllib.request" in testo, "httpx" in testo))
+    prova("il comando collaudo la usa, e il collaudo sul server vero e' nella gabbia", [True, True, True],
+          ["semina_collaudo.py" in open(os.path.join(QUI, "deploy", "collaudo", "collaudo.sh"),
+                                        encoding="utf-8").read(),
+           "\ncollaudo_semina_collaudo\n" in "\n" + open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\nsemina_collaudo.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
 
 
 def main():
@@ -176956,6 +177028,7 @@ def main():
               prove_collaudo_segue_develop,
               prove_avvisi_nostr_arrivano,
               prove_filtro_10050,
+              prove_semina_collaudo,
               prove_config_esempio):
         try:
             f()
