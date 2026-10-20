@@ -31662,6 +31662,11 @@ def _leve_stato():
                           "config si può togliere"),
                   spento="nessun blocco: chi vede il libro prende e "
                          "annulla quando vuole"),
+            _leva("Tetto ordini P2P dal collaudo (sats)", "P2P_MAX_SATS_PROVA",
+                  tetto_sats_prova(),
+                  acceso="istanza di prova: nessun ordine dal collaudo "
+                         "oltre questi sats, nel pubblicare e nel prendere",
+                  spento="non è un'istanza di prova: il tetto non c'è"),
             _leva("Tetto ordini P2P (€)", "P2P_MAX_EURO", P2P_MAX_EURO,
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
@@ -48762,6 +48767,33 @@ except (TypeError, ValueError):
     P2P_MAX_EURO = 0
     print("[p2p] P2P_MAX_EURO non e' un numero intero: il tetto in "
           "euro resta SPENTO")
+# IL TETTO DEL COLLAUDO (20 ott 2026, decisione di Andrea con Alan): sul
+# collaudo il P2P parla col coordinatore VERO, quindi ordini e sats sono
+# veri; un ordine dal collaudo non supera P2P_MAX_SATS_PROVA sats, di
+# serie 10.000. VALE SOLO SULL'ISTANZA DI PROVA (`PROVA_SOLO_IDS` non
+# vuota): in produzione la busta dice 0 e il client non la vede. Viaggia
+# in busta come `maxSatsProva`, e il client la traduce in euro al cambio
+# vivo dentro `maxEuroP2P()` (vince il tetto piu' stretto) e la
+# ripete quando si PRENDE un ordine. Storta: resta 10.000 e si dice — sul
+# collaudo un refuso non deve togliere il tetto.
+P2P_MAX_SATS_PROVA_DI_SERIE = 10_000
+try:
+    from config import P2P_MAX_SATS_PROVA
+    P2P_MAX_SATS_PROVA = int(P2P_MAX_SATS_PROVA)
+    if P2P_MAX_SATS_PROVA <= 0:
+        raise ValueError("il tetto del collaudo non si spegne")
+except ImportError:
+    P2P_MAX_SATS_PROVA = P2P_MAX_SATS_PROVA_DI_SERIE
+except (TypeError, ValueError):
+    P2P_MAX_SATS_PROVA = P2P_MAX_SATS_PROVA_DI_SERIE
+    print("[p2p] P2P_MAX_SATS_PROVA non e' un intero positivo: sul "
+          "collaudo il tetto resta quello di serie", flush=True)
+
+
+def tetto_sats_prova() -> int:
+    """Il tetto in sats degli ordini P2P dal collaudo: 0 in produzione
+    (lista vuota), la leva sull'istanza di prova."""
+    return P2P_MAX_SATS_PROVA if PROVA_SOLO_IDS else 0
 # IL MINIMO DI BARATTOZON (30 set 2026, decisione di Andrea, che rovescia
 # il «nessun minimo oltre lo zero» del 23 set): un PayCode sotto i 25 €
 # non si pubblica, a mercato come a prezzo fisso. Come il tetto in euro
@@ -49216,6 +49248,8 @@ def _p2p_leve() -> dict:
             # CLIENT nel foglio Pubblica, 0 = spento. Viaggia sempre,
             # anche a zero: un'assenza direbbe «server di ieri»
             "maxEuro": int(P2P_MAX_EURO),
+            # il tetto del collaudo (20 ott 2026): 0 in produzione
+            "maxSatsProva": tetto_sats_prova(),
             # il minimo di Barattozon (30 set 2026): stessa regola,
             # lo giudica il client nel foglio, 0 = spento
             # il tetto del contanti di persona (30 set 2026): stessa

@@ -324,6 +324,15 @@ def main():
         S.PROVA_SOLO_IDS = set()
         S.MODALITA_COLLAUDO = True
 
+    print("\n[il tetto in sats del collaudo, nella busta P2P]")
+    S.PROVA_SOLO_IDS = set()
+    prova("in produzione la busta dice 0: il client non vede nessun tetto del collaudo",
+          0, S._p2p_leve()["maxSatsProva"])
+    S.PROVA_SOLO_IDS = {111}
+    prova("sull'istanza di prova dice 10.000 sats, di serie", 10_000,
+          S._p2p_leve()["maxSatsProva"])
+    S.PROVA_SOLO_IDS = set()
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)

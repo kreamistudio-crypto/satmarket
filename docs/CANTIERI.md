@@ -68380,3 +68380,44 @@ annota chi bussa, a lista vuota la scrittura bussa al nostro relay come
 sempre, sulla prova a nessuno dei tre relay veri, al relay di casa sì, e
 il libro P2P bussa a relay.mostro.network. La sentinella delle letture
 (`prove_letture_relay_collaudo`) conosce il giudice nuovo.
+
+## Il tetto in sats del collaudo: P2P_MAX_SATS_PROVA (20 ott 2026, cantiere collaudo-privato, commit 3 di 4, decisione di Andrea con Alan)
+
+**PERCHÉ.** Sul collaudo il P2P parla col coordinatore Mostro VERO:
+ordini e sats sono veri. I paletti di Andrea e Alan: solo gli id in
+lista (lo fanno già il collaudo privato e `P2P_PROVA_IDS`), sulla VM
+mai chiavi di moderatore o di Mostro di produzione (è config, sta
+nella sezione di prova), e un tetto per ordine con una leva, di serie
+10.000 sats.
+
+**COME È FATTO.**
+- La leva `P2P_MAX_SATS_PROVA`, di serie 10.000. Vale SOLO
+  sull'istanza di prova: `tetto_sats_prova()` dice 0 a lista vuota.
+  Non si spegne: zero, negativo o un refuso lasciano 10.000, e lo si
+  dice — sul collaudo i sats sono veri.
+- Viaggia nella busta P2P come `maxSatsProva` (diciotto chiavi). Il
+  client la traduce in euro al cambio vivo dentro `maxEuroP2P()`,
+  dove vince il tetto più stretto fra quello in euro e questo, così vale
+  dovunque si pubblica (il foglio, la tappa del PayCode, la scritta
+  sotto il campo, la riga del tetto). Senza cambio non si indovina:
+  1 €, cioè fermo. A busta di produzione (`maxSatsProva` assente o 0)
+  la funzione è quella di prima.
+- Per chi PRENDE: `giudiceTettoProvaP2P` in `confermaDettaglioP2P`,
+  prima di `eseguiPresaP2P` («Sul collaudo il massimo è 10000 sats
+  (circa 9 €)»), con un `typeof` davanti come `giudiceZonaP2P`, per i
+  banchi che fanno girare la funzione da sola.
+- Una riga nel pannello delle leve, gruppo P2P.
+- `config_esempio.py`: la leva, e la sezione di prova riscritta per il
+  P2P vero (P2P_ATTIVO, P2P_PROVA_IDS uguale alla lista, i relay del
+  coordinatore senza il nostro, il segreto del profilo P2P nuovo, mai
+  la chiave del moderatore). Il coordinatore NON conosce il tetto: lo
+  fa la Mini App del collaudo, come il tetto in euro di sempre.
+
+**PROVE.** `prove_istanza_prova` a 86: la leva (assente, buona, zero,
+storta, negativa), la funzione che dice 0 in produzione, la busta; in
+node `maxEuroP2P` e `giudiceTettoProvaP2P` con la busta di produzione
+(tutto come prima), col tetto del collaudo, col tetto più stretto e
+senza cambio; la presa che chiede il giudice prima di partire. La prova
+delle chiavi della busta passa a diciotto, e l'ambiente del pannello
+conosce `tetto_sats_prova`. `collaudo_istanza_prova` a 52: la busta
+vera dice 0 in produzione e 10.000 sulla prova.
