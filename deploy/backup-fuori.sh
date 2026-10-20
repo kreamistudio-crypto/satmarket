@@ -36,11 +36,80 @@ set -euo pipefail
 # `--prima-del-deploy <commit>`, prima del `git reset`. L'archivio e' lo
 # stesso del giornaliero, cambiano il nome (`-deploy-<commit>`) e la
 # didascalia: sul canale si vede quale versione stava per arrivare.
+#
+# `--copia <file>` (20 ott 2026, cantiere backup-database-occupato): la
+# copia del database l'ha gia' fatta deploy.sh, e l'archivio nasce da
+# QUELLA invece di rileggere il file vivo. Il 20 ott la seconda lettura,
+# fatta col `sqlite3` che non aspetta, e' caduta su «database is locked»
+# un attimo dopo che la prima era riuscita.
 PRIMA_DEL_DEPLOY=""
-if [ "${1:-}" = "--prima-del-deploy" ]; then
-    PRIMA_DEL_DEPLOY=$(printf '%s' "${2:-}" | tr -cd '0-9a-f' | cut -c1-8)
-    [ -n "$PRIMA_DEL_DEPLOY" ] || PRIMA_DEL_DEPLOY="senza-nome"
-fi
+COPIA_DATA=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --prima-del-deploy)
+            PRIMA_DEL_DEPLOY=$(printf '%s' "${2:-}" | tr -cd '0-9a-f' | cut -c1-8)
+            [ -n "$PRIMA_DEL_DEPLOY" ] || PRIMA_DEL_DEPLOY="senza-nome"
+            shift 2 || shift ;;
+        --copia)
+            COPIA_DATA="${2:-}"
+            shift 2 || shift ;;
+        *) shift ;;
+    esac
+done
+
+DIR_APP="${BARATTOLO_DIR:-/root/satmarket}"
+TMP=$(mktemp -d)
+
+# QUANDO IL GIORNALIERO CADE, LO DICE IL BOT (20 ott 2026). Prima un
+# backup delle 04:30 andato male parlava solo nel canale dei backup — e
+# non sempre: un `tar` o un `age` caduti a meta', o l'invio rifiutato,
+# restavano nel journal fino al terzo giorno. Adesso, all'uscita, se il
+# giornaliero non e' finito bene (o ha trovato il database rotto) parte
+# UN avviso nella stanza degli errori, come quelli del deploy, e dice lo
+# stato vero: la copia (integra / NON integra / non fatta) e l'archivio
+# (partito / resta sul VPS / non fatto). Prima del deploy tace: li'
+# parla deploy.sh, che sa anche come e' andato il resto.
+# L'avviso lo manda deploy.sh (`--avvisa`): la regola del gruppo e delle
+# stanze sta una volta sola. Si chiama da una copia, come fanno le unit,
+# e solo se quel deploy.sh conosce `--avvisa`: un deploy.sh di prima
+# prenderebbe l'argomento per niente e farebbe un deploy.
+STATO_COPIA=""          # integra | non-integra | "" (non fatta)
+MOTIVO_COPIA=""
+STATO_ARCHIVIO="non fatto"
+FERMO=""                # perche' ci si e' fermati prima della copia
+ATTENZIONE_LNBITS=""
+scappa() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+avvisa_admin() {
+    local d="$TMP/deploy-per-avvisare.sh"
+    if cp "$DIR_APP/deploy.sh" "$d" 2>/dev/null && grep -q -- '--avvisa' "$d"; then
+        BARATTOLO_DIR="$DIR_APP" timeout 60 bash "$d" --avvisa "$1" \
+            || echo "avviso agli admin non partito" >&2
+    else
+        echo "avviso agli admin non partito: $DIR_APP/deploy.sh non sa avvisare" >&2
+    fi
+}
+alla_fine() {
+    local codice=$?
+    if [ -z "$PRIMA_DEL_DEPLOY" ] && { [ "$codice" -ne 0 ] \
+            || [ "$STATO_COPIA" = "non-integra" ] || [ -n "$ATTENZIONE_LNBITS" ]; }; then
+        local guarda="Guardare <code>journalctl -u barattolo-backup -n 40</code>."
+        local testo
+        if [ -n "$FERMO" ]; then
+            testo="⚠️ <b>Il backup giornaliero non è partito</b>: $(scappa "$FERMO"). Nessuna copia e nessun archivio questa volta. $guarda"
+        elif [ -z "$STATO_COPIA" ]; then
+            testo="⚠️ <b>Il backup giornaliero non è riuscito</b>: la copia del database non si è fatta ($(scappa "${MOTIVO_COPIA:-motivo sconosciuto}")). Nessun archivio questa volta: gli archivi di prima restano nel canale. $guarda"
+        elif [ "$STATO_COPIA" = "non-integra" ]; then
+            testo="⚠️ <b>Il backup giornaliero: la copia del database NON è integra</b> ($(scappa "$MOTIVO_COPIA")). Vuol dire che è rotto il database vivo. Archivio: $STATO_ARCHIVIO. Prima di toccare qualcosa si chiede a Claude. $guarda"
+        elif [ "$STATO_ARCHIVIO" = "mandato" ]; then
+            testo="⚠️ <b>Il backup giornaliero è partito, ma il database di LNbits no</b>: $(scappa "$ATTENZIONE_LNBITS"). La copia del database del mercatino è integra. $guarda"
+        else
+            testo="⚠️ <b>Il backup giornaliero non è arrivato al canale</b> (codice $codice). La copia del database era integra (<code>integrity_check</code> ok); archivio: $STATO_ARCHIVIO. $guarda"
+        fi
+        avvisa_admin "$testo"
+    fi
+    rm -rf "$TMP"
+}
+trap alla_fine EXIT
 
 # Il file dell'ambiente si puo' spostare solo per le prove (il banco
 # di prove.py gira lo script vero con un ambiente finto): sul VPS e'
@@ -48,22 +117,24 @@ fi
 ENV_FILE="${BARATTOLO_BACKUP_ENV:-/etc/barattolo-backup.env}"
 if [ ! -f "$ENV_FILE" ]; then
     echo "manca $ENV_FILE: il backup non sa dove andare" >&2
+    FERMO="manca $ENV_FILE, il backup non sa dove andare"
     exit 1
 fi
 # shellcheck disable=SC1090
 . "$ENV_FILE"
-: "${BOT_TOKEN_BACKUP:?manca in $ENV_FILE}"
-: "${CHAT_ID_BACKUP:?manca in $ENV_FILE}"
-: "${AGE_PUBBLICA:?manca in $ENV_FILE}"
+for v in BOT_TOKEN_BACKUP CHAT_ID_BACKUP AGE_PUBBLICA; do
+    if [ -z "${!v:-}" ]; then
+        echo "manca $v in $ENV_FILE" >&2
+        FERMO="manca $v in $ENV_FILE"
+        exit 1
+    fi
+done
 
-DIR_APP="${BARATTOLO_DIR:-/root/satmarket}"
 DIR_OUT="$DIR_APP/backup/fuori"
 mkdir -p "$DIR_OUT"
 
 STAMP=$(date +%Y%m%d-%H%M)
 [ -z "$PRIMA_DEL_DEPLOY" ] || STAMP="$STAMP-deploy-$PRIMA_DEL_DEPLOY"
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
 
 # Una riga in chat, col bot dei backup. Fail-open: se Telegram e' giu'
 # parla il journal.
@@ -75,27 +146,40 @@ di_in_chat() {
          > /dev/null || true
 }
 
-# 0) IL DATABASE E' SANO? (19 ott 2026) Il 18 ottobre il file era rotto
-#    dalle 09:04 e lo ha detto solo il libro mastro, una volta al giorno.
-#    Da qui lo chiede ogni backup — quello delle 04:30 e quello prima di
-#    ogni deploy — e un «no» arriva SUBITO sul canale dei backup, anche
-#    quando la copia poi non si puo' fare. `quick_check` legge tutto il
-#    file ma non gli indici uno per uno: sui 40 MB di oggi, un secondo.
-SANO=$(sqlite3 "$DIR_APP/satmarket.db" "PRAGMA quick_check;" 2>&1 | head -3 | tr '\n' ' ' | sed 's/ *$//') || true
+# 0+1) IL DATABASE: UNA COPIA, CONTROLLATA (20 ott 2026, cantiere
+#    backup-database-occupato). La fa `deploy/copia-db.py`: l'API di
+#    backup di sqlite (atomica anche a server acceso, mai `cp` su un db
+#    vivo: copierebbe una pagina a meta' scrittura), 30 s di attesa sul
+#    lucchetto invece di zero, un tetto di 90 s, e `integrity_check`
+#    sulla COPIA. Quel controllo e' anche la domanda «il database e'
+#    sano?» del 19 ott (il 18 il file era rotto dalle 09:04 e lo ha
+#    detto solo il libro mastro): l'API copia le pagine tali e quali,
+#    quindi un vivo rotto da' una copia rotta, e il «no» arriva SUBITO
+#    sul canale dei backup — senza tenere il lucchetto del server per un
+#    `quick_check` in piu'. Prima del deploy la sorgente e' la copia che
+#    deploy.sh ha appena messo da parte (`--copia`): il vivo si legge
+#    una volta sola, e qui si ricontrolla un file fermo.
+SORGENTE="$DIR_APP/satmarket.db"
+[ -z "$COPIA_DATA" ] || SORGENTE="$COPIA_DATA"
+CODICE_COPIA=0
+MOTIVO_COPIA=$(python3 "$DIR_APP/deploy/copia-db.py" "$SORGENTE" "$TMP/satmarket.db") \
+    || CODICE_COPIA=$?
 ATTENZIONE_DB=""
-if [ "$SANO" != "ok" ]; then
-    ATTENZIONE_DB=" — ⚠️ DATABASE NON SANO"
-    echo "⚠️ il database NON e' sano: $SANO" >&2
-    di_in_chat "⚠️ Barattolo: il database NON e' sano (${SANO:0:200}). Prima di toccare qualcosa: si guarda la testata (od -A d -t u1 -N 100) e si chiede a Claude."
-fi
-
-# 1) Il database, con il backup vero di sqlite: atomico anche a server
-#    acceso. E' la stessa regola del pre-deploy di deploy.sh.
-if ! sqlite3 "$DIR_APP/satmarket.db" ".backup '$TMP/satmarket.db'"; then
-    echo "⚠️ copia del database NON riuscita: nessun archivio" >&2
-    di_in_chat "⚠️ Barattolo: la copia del database NON e' riuscita, nessun archivio questa volta. Gli archivi di prima restano nel canale."
-    exit 1
-fi
+case $CODICE_COPIA in
+    0) STATO_COPIA="integra" ;;
+    3) STATO_COPIA="non-integra"
+       ATTENZIONE_DB=" — ⚠️ DATABASE NON SANO"
+       echo "⚠️ il database NON e' sano: $MOTIVO_COPIA" >&2
+       di_in_chat "⚠️ Barattolo: il database NON e' sano (${MOTIVO_COPIA:0:200}). Prima di toccare qualcosa: si guarda la testata (od -A d -t u1 -N 100) e si chiede a Claude." ;;
+    4) echo "⚠️ copia del database NON riuscita ($MOTIVO_COPIA): nessun archivio" >&2
+       di_in_chat "⚠️ Barattolo: il database e' rimasto occupato oltre il tetto (${MOTIVO_COPIA:0:200}): la copia NON e' riuscita, nessun archivio questa volta. Gli archivi di prima restano nel canale."
+       exit 1 ;;
+    *) [ -n "$MOTIVO_COPIA" ] \
+           || MOTIVO_COPIA="nessuna risposta dalla copia (codice $CODICE_COPIA)"
+       echo "⚠️ copia del database NON riuscita ($MOTIVO_COPIA): nessun archivio" >&2
+       di_in_chat "⚠️ Barattolo: il database NON e' sano o non si copia (${MOTIVO_COPIA:0:200}): nessun archivio questa volta. Prima di toccare qualcosa: si guarda la testata (od -A d -t u1 -N 100) e si chiede a Claude."
+       exit 1 ;;
+esac
 
 # 2) Il resto. config.py contiene la nsec della piattaforma, la chiave
 #    dei contenuti e le chiavi LNbits: da qui in poi esiste solo dentro
@@ -155,8 +239,16 @@ if [ -d "$DIR_LNBITS" ]; then
     if [ -f "$DIR_LNBITS/data/database.sqlite3" ]; then
         # Sovrascrive la copia "a caldo" fatta dal cp -a con quella
         # atomica: e' questa che si apre, alle due di notte.
-        sqlite3 "$DIR_LNBITS/data/database.sqlite3" \
-            ".backup '$TMP/lnbits/data/database.sqlite3'" ||           echo "ATTENZIONE: database LNbits NON copiato in modo atomico - i sats sul nodo restano senza nomi in questo archivio" >&2
+        # La stessa copia del mercatino (attesa, tetto, integrity_check);
+        # se non riesce resta la copia a caldo del `cp -a`, com'era.
+        if ESITO_LNBITS=$(python3 "$DIR_APP/deploy/copia-db.py" \
+                "$DIR_LNBITS/data/database.sqlite3" \
+                "$TMP/lnbits/data/database.sqlite3" --anche-scrittura); then
+            :
+        else
+            ATTENZIONE_LNBITS="${ESITO_LNBITS:-copia non riuscita}"
+            echo "ATTENZIONE: database LNbits NON copiato in modo atomico o non integro ($ATTENZIONE_LNBITS) - i sats sul nodo restano senza nomi in questo archivio" >&2
+        fi
     fi
     cp /etc/systemd/system/lnd-ponte.service "$TMP/sistema/" 2>/dev/null || true
     # IL PONTE VIA WIREGUARD (21 set 2026): il piano B (il ponte di
@@ -206,6 +298,7 @@ if [ "${#PEZZI[@]}" -gt 20 ]; then
     echo "⚠️ archivio da $((DIM / 1024 / 1024)) MB: piu' di 20 parti, NON inviato — serve un'altra strada" >&2
     rm -f "$ARCHIVIO".parte-*
     di_in_chat "⚠️ Barattolo: l'archivio pesa $((DIM / 1024 / 1024)) MB, troppo per il canale. Resta sul VPS per il PC."
+    STATO_ARCHIVIO="troppo grande per il canale ($((DIM / 1024 / 1024)) MB), resta sul VPS in backup/fuori/ per il PC"
     exit 1
 fi
 
@@ -235,9 +328,11 @@ done
 rm -f "$ARCHIVIO".parte-*
 if [ "$INVIATI" -eq "${#PEZZI[@]}" ]; then
     date +%s > "$DIR_OUT/.ultimo-successo"
+    STATO_ARCHIVIO="mandato"
     echo "📦 backup inviato: $(basename "$ARCHIVIO") ($DIM byte, ${#PEZZI[@]} file)"
 else
     echo "⚠️ invio a Telegram non riuscito: l'archivio resta in $DIR_OUT" >&2
+    STATO_ARCHIVIO="non partito per il canale, resta sul VPS in backup/fuori/ (lo tira il PC)"
     # Tre giorni di silenzio non sono un singhiozzo: si prova almeno a
     # dirlo in chat (se Telegram e' giu' fallira' anche questo, e
     # allora parla il journal — e la gamba del PC).

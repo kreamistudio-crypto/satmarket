@@ -95910,8 +95910,8 @@ def prove_chat_scambio():
           (False, False, True, True, False, False),
           ("chat-scambi" in open("deploy.sh", encoding="utf-8").read(),
            "chat-scambi" in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
-           'sqlite3 "$DIR_APP/satmarket.db" ".backup' in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
-           "sorgente = sqlite3.connect(f\"file:{DB}?mode=ro\", uri=True)" in open("deploy.sh", encoding="utf-8").read(),
+           'SORGENTE="$DIR_APP/satmarket.db"' in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
+           'python3 deploy/copia-db.py "${DB_VIVO:-satmarket.db}"' in open("deploy.sh", encoding="utf-8").read(),
            "*.db" in codice(open("deploy/backup-fuori.sh", encoding="utf-8").read()),
            "DB_CHAT" in open("deploy.sh", encoding="utf-8").read()))
     prova("le rotte sono cinque, tutte POST col corpo: niente GET, niente dato nell'indirizzo",
@@ -164622,16 +164622,23 @@ def prove_deploy_nel_gruppo():
     # Il nono (19 ott 2026, cantiere backup-deploy, richiesta di Andrea):
     # il backup su Telegram prima del deploy che non parte. Aggiunto
     # apposta, nella stanza degli errori come gli altri.
-    OTTO = ["⛔ <b>Deploy rifiutato</b>", "⏳ <b>Deploy fermo</b> da",
+    # Il ramo `--avvisa` (20 ott 2026, cantiere backup-database-occupato)
+    # e' l'avviso del backup giornaliero, che lo prende in prestito; e
+    # l'avviso del backup prima del deploy e' diventato tre, uno per lo
+    # stato vero della copia (integra / NON integra / NON riuscita).
+    OTTO = ['${2:-}"', "⛔ <b>Deploy rifiutato</b>", "⏳ <b>Deploy fermo</b> da",
             "⚠️ <b>Il backup su Telegram prima del de",
+            "⚠️ <b>La copia del database prima del de",
+            "⚠️ <b>La copia del database prima del de",
             "❌ <b>Deploy fermo</b>: git reset",
             "❌ <b>Deploy annullato</b>: il codice",
             "❌ <b>Deploy</b>: il riavvio",
             "🚀 <b>Barattolo aggiornato</b>",
             "↩️ <b>Deploy annullato</b>: <code>", "🆘 <b>Barattolo e' GIU'</b>"]
-    prova("gli avvisi del deploy sono i nove di oggi (gli otto di ieri e "
-          "il backup su Telegram), nello stesso ordine e con le stesse "
-          "parole in testa: nessuno tolto, nessuno aggiunto", OTTO,
+    prova("gli avvisi del deploy sono i dodici di oggi (gli otto di ieri, "
+          "il prestito al giornaliero e i tre della copia), nello stesso "
+          "ordine e con le stesse parole in testa: nessuno tolto, nessuno "
+          "aggiunto", OTTO,
           [a if c.startswith(a) else c for c, a in zip(chiamate, OTTO)]
           + chiamate[len(OTTO):])
     prova("...e UNA sola dice una stanza: l'aggiornamento riuscito, nei "
@@ -171406,8 +171413,17 @@ def prove_backup_prima_del_deploy():
     e' sano e lo dice in chat se non lo e'; e un archivio oltre i 45 MB
     si spezza in parti invece di non partire (il 18 ott pesava 37 MB).
     Si guarda il testo dei due script, e si GIRA lo script vero su un
-    database finto: al posto di age, curl e sqlite3 tre comparse che
-    scrivono cosa avrebbero fatto. Su Windows gira nel WSL."""
+    database finto: al posto di age e curl due comparse che scrivono
+    cosa avrebbero fatto (sqlite3 non serve piu' dal 20 ott: la copia la
+    fa `deploy/copia-db.py`, che qui gira vero). Su Windows gira nel WSL.
+
+    DAL 20 OTT 2026 (cantiere backup-database-occupato: nel deploy delle
+    15:07 «Error: database is locked», e l'archivio non e' partito) anche
+    il database TENUTO OCCUPATO apposta da un altro processo — qualche
+    secondo, e la copia aspetta e riesce; oltre il tetto, e si arrende in
+    tempo e lo dice — il database rotto nelle pagine (la copia c'e' e
+    NON e' integra), l'invio che cade, e l'avviso del giornaliero che
+    arriva nella stanza degli errori dicendo lo stato vero."""
     print("\n[il backup prima di ogni deploy]")
     import shlex
     import shutil
@@ -171428,23 +171444,27 @@ def prove_backup_prima_del_deploy():
         i = dep.index(chiamata)
         prova("...DOPO la copia locale e PRIMA del reset (si salva quel "
               "che c'era, non quel che arriva)", True,
-              dep.index("sorgente.backup(destinazione)") < i
+              dep.index("python3 deploy/copia-db.py") < i
               < dep.index('git reset --hard --quiet "$LA"'))
         riga = dep[dep.rindex("\n", 0, i):dep.index("\n", i)]
         prova("...con un tetto di tempo, dentro i 600 secondi dell'unita'",
               True, "timeout 120 " in riga and "TimeoutStartSec=600" in unita)
-        ramo = dep[i:dep.index("\nfi\n", i)]
+        # (dal 20 ott l'avviso e' UNO, dopo copia e archivio: il case
+        # che dice lo stato vero di tutt'e due)
+        ramo = dep[i:dep.index("\nesac\n", dep.index("L'AVVISO DICE LA VERITA'"))]
         prova("...e se non parte NON ferma il deploy (una cura urgente "
               "deve poter arrivare) ma lo DICE in chat", (True, False),
               ("avvisa " in ramo, re.search(r"\bexit\b", ramo) is not None))
-    copia = dep[dep.index("sorgente.backup(destinazione)") - 600:
-                dep.index("sorgente.backup(destinazione)")]
+    copia = dep[dep.index("python3 deploy/copia-db.py"):
+                dep.index("\nesac\n", dep.index("L'AVVISO DICE LA VERITA'"))]
     prova("una copia locale non riuscita si dice in chat, non solo nel "
           "journal", True,
-          "copia del database non riuscita" in copia and "avvisa " in copia)
-    prova("il backup chiede a sqlite se il file e' sano PRIMA di copiarlo",
-          True, "PRAGMA quick_check" in bak
-          and bak.index("PRAGMA quick_check") < bak.index('".backup'))
+          "copia del database NON riuscita" in copia
+          and "avvisa \"⚠️ <b>La copia del database prima del deploy NON è riuscita" in copia)
+    prova("il backup chiede a sqlite se il file e' sano: integrity_check "
+          "sulla copia, nell'aiutante che fa la copia", (True, True),
+          ("deploy/copia-db.py" in bak,
+           'PRAGMA integrity_check' in open("deploy/copia-db.py", encoding="utf-8").read()))
     prova("...e il file della chat resta fuori (la decisione del 12 ott)",
           False, "chat-scambi" in bak)
 
@@ -171477,22 +171497,30 @@ def prove_backup_prima_del_deploy():
        "for a in \"$@\"; do case \"$a\" in document=@*) "
        "cp \"${a#document=@}\" \"$MANDATI/\";; esac; done\n"
        "echo '{\"ok\":true}'\n", True)
-    lf("finti/sqlite3", "#!/usr/bin/env python3\n"
-       "import re, sqlite3, sys\n"
-       "db, cmd = sys.argv[1], sys.argv[2]\n"
-       "try:\n"
-       "    c = sqlite3.connect(db)\n"
-       "    if cmd.startswith('.backup'):\n"
-       "        d = sqlite3.connect(re.search(r\"'(.*)'\", cmd).group(1))\n"
-       "        c.backup(d); d.close()\n"
-       "    else:\n"
-       "        for r in c.execute(cmd): print('|'.join(map(str, r)))\n"
-       "except Exception as e:\n"
-       "    print('Error:', e, file=sys.stderr); sys.exit(1)\n", True)
+    # il curl che porta l'archivio e non arriva (Telegram che rifiuta)
+    lf("finti-rotti/curl", "#!/bin/sh\n"
+       "printf '%s\\n' \"$*\" >> \"$REGISTRO\"\n"
+       "case \"$*\" in *sendDocument*) exit 22;; esac\n"
+       "echo '{\"ok\":true}'\n", True)
     lf("ambiente", "BOT_TOKEN_BACKUP=finto\nCHAT_ID_BACKUP=-1001\n"
        "AGE_PUBBLICA=age1finta\n")
+    aiutante = open(os.path.join("deploy", "copia-db.py"), encoding="utf-8").read()
+    # Il deploy.sh della cartella finta: conosce `--avvisa` e scrive nel
+    # registro quel che avrebbe mandato agli admin, nient'altro.
+    finto_deploy = ("#!/bin/bash\n# finto: --avvisa\n"
+                    "[ \"$1\" = --avvisa ] && printf 'AVVISA|%s\\n' \"$2\" >> \"$REGISTRO\"\n")
+    # chi tiene il database occupato: BEGIN EXCLUSIVE in un ALTRO processo,
+    # come il server che scrive, per i secondi che gli si dicono
+    lf("tieni.py", "import sqlite3, sys, time\n"
+       "c = sqlite3.connect(sys.argv[1], isolation_level=None)\n"
+       "c.execute('BEGIN EXCLUSIVE')\n"
+       "c.execute('INSERT INTO ordini(nota) VALUES(\\'di passaggio\\')')\n"
+       "print('preso', flush=True)\n"
+       "time.sleep(float(sys.argv[2]))\n"
+       "c.execute('COMMIT')\n")
 
-    def giro(nome, args="", rotto=False, grande=False):
+    def giro(nome, args="", rotto=False, grande=False, pagine_rotte=False,
+             occupato=0.0, ambiente="", curl_rotto=False, senza_env=False):
         app = os.path.join(base, nome, "app")
         os.makedirs(os.path.join(app, "buste"))
         os.makedirs(os.path.join(app, "contenuti"))
@@ -171516,18 +171544,38 @@ def prove_backup_prima_del_deploy():
                               164, 138, 68, 236, 70, 62, 132, 50, 66, 244,
                               231, 192, 140, 194])
             open(p, "wb").write(bytes(b))
+        if pagine_rotte:
+            # la testata sana e una pagina della tabella storta: il file si
+            # apre, la copia si fa, e integrity_check dice di no
+            p = os.path.join(app, "satmarket.db")
+            b = bytearray(open(p, "rb").read())
+            pag = 4096 if len(b) > 4096 else 1024
+            b[pag + 3:pag + 7] = b"\x7f\x7f\x00\x01"
+            open(p, "wb").write(bytes(b))
+        lf(f"{nome}/app/deploy/copia-db.py", aiutante)
+        lf(f"{nome}/app/deploy.sh", finto_deploy)
         L = lambda p: shlex.quote(nel_linux(os.path.join(base, p)))
-        script = (f"export PATH={L('finti')}:$PATH "
+        dentro = (lambda c: [wsl, "-e", "bash", "-c", c]) if wsl \
+            else (lambda c: ["bash", "-c", c])
+        tiene = None
+        if occupato:
+            tiene = subprocess.Popen(dentro(
+                f"python3 {L('tieni.py')} {L(nome + '/app/satmarket.db')} {occupato}"),
+                stdout=subprocess.PIPE, text=True)
+            tiene.stdout.readline()        # «preso»: il lucchetto e' suo
+        script = (f"export PATH={L('finti-rotti' if curl_rotto else 'finti')}:{L('finti')}:$PATH "
                   f"BARATTOLO_DIR={L(nome + '/app')} "
-                  f"BARATTOLO_BACKUP_ENV={L('ambiente')} "
-                  f"BARATTOLO_BACKUP_PARTE=200000 "
+                  f"BARATTOLO_BACKUP_ENV={L('manca' if senza_env else 'ambiente')} "
+                  f"BARATTOLO_BACKUP_PARTE=200000 {ambiente} "
                   f"REGISTRO={L(nome + '/registro')} "
                   f"MANDATI={L(nome + '/mandati')}; "
-                  f"bash {L('backup.sh')} {args} < /dev/null")
-        cmd = [wsl, "-e", "bash", "-c", script] if wsl \
-            else ["bash", "-c", script]
-        r = subprocess.run(cmd, capture_output=True, text=True,
+                  f"cd {L(nome + '/app')} && bash {L('backup.sh')} {args} < /dev/null")
+        t0 = time.monotonic()
+        r = subprocess.run(dentro(script), capture_output=True, text=True,
                            encoding="utf-8", timeout=120)
+        r.secondi = time.monotonic() - t0
+        if tiene:
+            tiene.wait(timeout=60)
         reg = os.path.join(base, nome, "registro")
         righe = open(reg, encoding="utf-8").read().splitlines() \
             if os.path.exists(reg) else []
@@ -171594,6 +171642,281 @@ def prove_backup_prima_del_deploy():
                sum("sendDocument" in x for x in righe), archivi))
         if r.returncode not in (0, 1):
             print('      ', r.stderr[-400:])
+        prova("...e prima del deploy NON avvisa gli admin da qui: li' parla "
+              "deploy.sh, che sa anche com'e' andato il resto", [],
+              [x for x in righe if x.startswith("AVVISA|")])
+
+        # d) IL 20 OTTOBRE: il database occupato da un altro processo per
+        #    qualche secondo. Il `sqlite3` di prima cadeva al primo colpo
+        #    («Error: database is locked»); adesso si aspetta e si copia.
+        r, righe, fuori, archivi = giro("occupato", occupato=3)
+        doc = [x for x in righe if "sendDocument" in x]
+        prova("IL DATABASE OCCUPATO 3 SECONDI (il 20 ottobre): il giornaliero "
+              "aspetta, copia, manda, e non avvisa nessuno",
+              (0, 1, True, []),
+              (r.returncode, len(doc), r.secondi >= 2,
+               [x for x in righe if x.startswith("AVVISA|") or "sendMessage" in x]))
+        if r.returncode != 0:
+            print('      ', r.stderr[-400:])
+
+        # e) occupato OLTRE il tetto (qui 2 s di tetto, 1 di attesa per
+        #    colpo, il lucchetto tenuto 8): si arrende IN TEMPO, niente
+        #    archivio, e lo dicono il canale dei backup e il bot degli admin
+        r, righe, fuori, archivi = giro(
+            "occupato-troppo", occupato=8,
+            ambiente="BARATTOLO_COPIA_TETTO=2 BARATTOLO_COPIA_ATTESA=1")
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        prova("OCCUPATO OLTRE IL TETTO: si arrende prima che il lucchetto "
+              "si apra, niente archivio, e lo dice in chiaro",
+              (1, True, [], True, 1, True),
+              (r.returncode, r.secondi < 7, archivi,
+               any("occupato oltre il tetto" in x for x in righe if "sendMessage" in x),
+               len(avv), bool(avv) and "non è riuscito" in avv[0]
+               and "occupato" in avv[0] and "Nessun archivio" in avv[0]))
+        if r.returncode != 1:
+            print('      ', r.stderr[-400:])
+
+        # f) rotto nelle pagine: la copia c'e', NON e' integra; l'archivio
+        #    parte lo stesso (meglio la prova del guasto che niente)
+        r, righe, fuori, archivi = giro("pagine", pagine_rotte=True)
+        doc = [x for x in righe if "sendDocument" in x]
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        prova("ROTTO NELLE PAGINE: l'archivio parte col marchio, il canale "
+              "lo dice, e il bot degli admin dice «NON è integra»",
+              (0, True, True, 1, True),
+              (r.returncode, bool(doc) and "DATABASE NON SANO" in doc[0],
+               any("NON e' sano" in x for x in righe if "sendMessage" in x),
+               len(avv), bool(avv) and "NON è integra" in avv[0]
+               and "Archivio: mandato" in avv[0]))
+
+        # g) la testata rotta, di notte: il bot degli admin lo sa
+        r, righe, fuori, archivi = giro("rotto-notte", rotto=True)
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        prova("IL GIORNALIERO COL DATABASE CHE NON SI APRE: il bot degli "
+              "admin dice che la copia non si e' fatta, e perche'",
+              (1, 1, True),
+              (r.returncode, len(avv), bool(avv) and "non è riuscito" in avv[0]
+               and "file is not a database" in avv[0]))
+
+        # h) l'invio che cade: la copia era integra, l'archivio resta qui
+        r, righe, fuori, archivi = giro("senza-telegram", curl_rotto=True)
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        prova("L'INVIO CHE CADE: l'archivio resta sul VPS, e il bot dice che "
+              "non e' arrivato e che la copia era integra",
+              (1, 1, 1, True),
+              (r.returncode, len(archivi), len(avv),
+               bool(avv) and "non è arrivato al canale" in avv[0]
+               and "era integra" in avv[0] and "resta sul VPS" in avv[0]))
+
+        # i) senza l'ambiente: non parte nemmeno, e lo si dice
+        r, righe, fuori, archivi = giro("senza-env", senza_env=True)
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        prova("IL GIORNALIERO SENZA /etc/barattolo-backup.env: il bot dice "
+              "che non e' partito", (1, 1, True),
+              (r.returncode, len(avv), bool(avv) and "non è partito" in avv[0]))
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+
+
+def prove_backup_database_occupato():
+    """IL BACKUP DEL DEPLOY CHE NON SI ARRENDE AL PRIMO LUCCHETTO (20 ott
+    2026, cantiere backup-database-occupato, richiesta di Andrea). Nel
+    deploy delle 15:07 (774f9466 → 431eb70e) la copia locale e' riuscita,
+    e un attimo dopo il `sqlite3 .backup` dell'archivio e' caduto su
+    «Error: database is locked»: aspettava zero secondi. Il bot ha poi
+    scritto «la copia locale c'è» senza averla guardata.
+
+    Adesso: UNA copia (`deploy/copia-db.py`: API di backup, 30 s di
+    attesa, tetto di 90, `integrity_check` sulla copia), l'archivio nasce
+    da quella (`--copia`), e UN avviso che dice lo stato vero. Qui gira il
+    pezzo VERO di deploy.sh — dalla copia all'avviso — in una cartella
+    finta, con `avvisa`, `dillo` e il backup-fuori di cartone; e il ramo
+    `--avvisa` che il giornaliero prende in prestito, che deve mandare e
+    andarsene senza un solo comando git."""
+    print("\n[il backup del deploy col database occupato]")
+    import shlex
+    import shutil
+    import sqlite3
+    import subprocess
+    import tempfile
+
+    dep = open("deploy.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    aiutante = open(os.path.join("deploy", "copia-db.py"), encoding="utf-8").read()
+    i = dep.find("mkdir -p backup\nchmod 700 backup")
+    j = dep.find("\nesac\n", dep.find("L'AVVISO DICE LA VERITA'"))
+    prova("il pezzo del deploy si trova: dalla copia all'avviso", True,
+          i > 0 and j > i)
+    if not (i > 0 and j > i):
+        return
+    pezzo_dep = dep[i:j + len("\nesac\n")]
+    prova("...e non ferma MAI il deploy: nessun exit dalla copia all'avviso",
+          None, re.search(r"\bexit\b", pezzo_dep) and "exit")
+    prova("l'aiutante ha l'attesa (30 s) e il tetto (90 s) chiesti, e il "
+          "deploy una cintura sopra il tetto, dentro i 600 s dell'unita'",
+          (True, True, True),
+          ('"BARATTOLO_COPIA_ATTESA", "30"' in aiutante,
+           '"BARATTOLO_COPIA_TETTO", "90"' in aiutante,
+           "timeout 150 python3 deploy/copia-db.py" in pezzo_dep))
+
+    if sys.platform == "win32":
+        wsl = shutil.which("wsl.exe")
+        if not wsl:
+            salta("il pezzo vero del deploy", "su Windows serve il WSL")
+            return
+    else:
+        wsl = None
+    base = tempfile.mkdtemp(prefix="prove-backup-occupato-")
+
+    def nel_linux(p):
+        if not wsl:
+            return p
+        p = p.replace("\\", "/")
+        return re.sub(r"^([A-Za-z]):", lambda m: "/mnt/" + m.group(1).lower(), p)
+
+    L = lambda p: shlex.quote(nel_linux(p))
+    dentro = (lambda c: [wsl, "-e", "bash", "-c", c]) if wsl \
+        else (lambda c: ["bash", "-c", c])
+
+    def scrivi(p, testo):
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8", newline="\n") as f:
+            f.write(testo)
+
+    def giro(nome, archivio_ok=True, con_env=True, pagine_rotte=False,
+             occupato=0.0, ambiente=""):
+        cart = os.path.join(base, nome)
+        scrivi(os.path.join(cart, "config.py"), "DB = 'satmarket.db'\n")
+        scrivi(os.path.join(cart, "deploy", "copia-db.py"), aiutante)
+        # il backup-fuori di cartone: scrive con che argomenti l'hanno
+        # chiamato e quante righe ha la copia che gli e' arrivata
+        scrivi(os.path.join(cart, "deploy", "backup-fuori.sh"),
+               "#!/bin/bash\n"
+               "printf 'ARCHIVIO|%s\\n' \"$*\" >> registro\n"
+               "[ \"$3\" = --copia ] && python3 -c \"import sqlite3,sys; "
+               "print('RIGHE|'+str(sqlite3.connect(sys.argv[1]).execute("
+               "'select count(*) from ordini').fetchone()[0]))\" \"$4\" >> registro\n"
+               + ("exit 0\n" if archivio_ok else "exit 1\n"))
+        if con_env:
+            scrivi(os.path.join(cart, "env"), "finto\n")
+        con = sqlite3.connect(os.path.join(cart, "satmarket.db"))
+        con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, nota)")
+        con.executemany("INSERT INTO ordini(nota) VALUES(?)",
+                        [(f"ordine {k}",) for k in range(300)])
+        con.commit()
+        con.close()
+        if pagine_rotte:
+            p = os.path.join(cart, "satmarket.db")
+            b = bytearray(open(p, "rb").read())
+            b[4096 + 3:4096 + 7] = b"\x7f\x7f\x00\x01"
+            open(p, "wb").write(bytes(b))
+        scrivi(os.path.join(cart, "pezzo.sh"),
+               "set -uo pipefail\n"
+               "QUI=aaaaaaaa11111111; LA=bbbbbbbb22222222; BACKUP_DA_TENERE=5\n"
+               "dillo() { printf 'DILLO|%s\\n' \"$*\" >> registro; }\n"
+               "avvisa() { printf 'AVVISA|%s\\n' \"$1\" >> registro; }\n"
+               "scappa() { sed 's/&/\\&amp;/g; s/</\\&lt;/g; s/>/\\&gt;/g' <<<\"$1\"; }\n"
+               "export BARATTOLO_BACKUP_ENV=env\n"
+               + pezzo_dep)
+        tiene = None
+        if occupato:
+            scrivi(os.path.join(base, "tieni.py"),
+                   "import sqlite3, sys, time\n"
+                   "c = sqlite3.connect(sys.argv[1], isolation_level=None)\n"
+                   "c.execute('BEGIN EXCLUSIVE')\n"
+                   "c.execute(\"INSERT INTO ordini(nota) VALUES('di passaggio')\")\n"
+                   "print('preso', flush=True)\n"
+                   "time.sleep(float(sys.argv[2]))\n"
+                   "c.execute('COMMIT')\n")
+            tiene = subprocess.Popen(dentro(
+                f"python3 {L(os.path.join(base, 'tieni.py'))} "
+                f"{L(os.path.join(cart, 'satmarket.db'))} {occupato}"),
+                stdout=subprocess.PIPE, text=True)
+            tiene.stdout.readline()
+        t0 = time.monotonic()
+        r = subprocess.run(dentro(f"cd {L(cart)} && {ambiente} bash pezzo.sh"),
+                           capture_output=True, text=True, encoding="utf-8",
+                           timeout=200)
+        secondi = time.monotonic() - t0
+        if tiene:
+            tiene.wait(timeout=60)
+        reg = os.path.join(cart, "registro")
+        righe = open(reg, encoding="utf-8").read().splitlines() \
+            if os.path.exists(reg) else []
+        copie = sorted(os.listdir(os.path.join(cart, "backup"))) \
+            if os.path.isdir(os.path.join(cart, "backup")) else []
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        arc = [x for x in righe if x.startswith("ARCHIVIO|")]
+        return r, righe, copie, avv, arc, secondi
+
+    try:
+        # 1) tutto bene, col database occupato 3 secondi
+        r, righe, copie, avv, arc, sec = giro("bene", occupato=3)
+        prova("OCCUPATO 3 SECONDI: la copia aspetta e riesce, integra; "
+              "l'archivio nasce DA QUELLA copia (--copia, 301 righe: anche "
+              "quella di chi teneva il lucchetto); nessun avviso",
+              (1, True, 1, True, ["RIGHE|301"], []),
+              (len(copie), sec >= 2, len(arc),
+               bool(arc) and "--copia backup/pre-deploy-" in arc[0],
+               [x for x in righe if x.startswith("RIGHE|")], avv))
+        if not copie:
+            print("      ", righe, r.stderr[-400:])
+        prova("...e il journal dice «integra», col nome della copia", True,
+              any(x.startswith("DILLO|💾 copia del database messa da parte, integra: backup/pre-deploy-")
+                  for x in righe))
+
+        # 2) la copia integra, l'archivio che non parte
+        r, righe, copie, avv, arc, sec = giro("senza-telegram", archivio_ok=False)
+        prova("L'ARCHIVIO NON PARTE: l'avviso dice che la copia locale c'e' "
+              "ED E' INTEGRA, e come si chiama", (1, True),
+              (len(avv), bool(avv) and "non è partito" in avv[0]
+               and "c'è ed è integra" in avv[0]
+               and "backup/pre-deploy-" in avv[0] and copie[0] in avv[0]))
+
+        # 3) occupato oltre il tetto: niente copia, niente archivio, e il
+        #    deploy va avanti in tempo
+        r, righe, copie, avv, arc, sec = giro(
+            "troppo", occupato=8,
+            ambiente="BARATTOLO_COPIA_TETTO=2 BARATTOLO_COPIA_ATTESA=1")
+        prova("OCCUPATO OLTRE IL TETTO: il deploy va avanti prima che il "
+              "lucchetto si apra, nessun file a meta' nella cartella, "
+              "l'archivio non si chiama, e l'avviso dice «NON è riuscita»",
+              (0, True, [], [], 1, True),
+              (r.returncode, sec < 7, copie, arc, len(avv),
+               bool(avv) and "NON è riuscita" in avv[0] and "occupato" in avv[0]
+               and "Nessuna copia locale nuova" in avv[0]))
+
+        # 4) rotto nelle pagine
+        r, righe, copie, avv, arc, sec = giro("rotto", pagine_rotte=True)
+        prova("ROTTO NELLE PAGINE: la copia resta (e' la prova), l'archivio "
+              "parte con quella, e l'avviso dice «NON è integra» e che "
+              "l'archivio e' partito", (1, 1, 1, True),
+              (len(copie), len(arc), len(avv),
+               bool(avv) and "NON è integra" in avv[0]
+               and "malformed" in avv[0] and "è partito lo stesso" in avv[0]))
+
+        # 5) senza l'env, copia integra: com'era, una riga nel journal
+        r, righe, copie, avv, arc, sec = giro("senza-env", con_env=False)
+        prova("SENZA /etc/barattolo-backup.env e copia integra: nessun "
+              "archivio, nessun avviso (com'era), la copia c'e'",
+              ([], [], 1), (arc, avv, len(copie)))
+
+        # 6) il ramo prestato: manda e se ne va, senza git
+        cart = os.path.join(base, "ramo")
+        os.makedirs(cart)
+        scrivi(os.path.join(base, "finti", "git"),
+               "#!/bin/sh\necho git \"$*\" >> \"$REGISTRO\"\nexit 1\n")
+        os.chmod(os.path.join(base, "finti", "git"), 0o755)
+        shutil.copy("deploy.sh", os.path.join(cart, "deploy.sh"))
+        r = subprocess.run(dentro(
+            f"export PATH={L(os.path.join(base, 'finti'))}:$PATH "
+            f"REGISTRO={L(os.path.join(cart, 'registro'))} "
+            f"BARATTOLO_DIR={L(cart)}; "
+            f"bash {L(os.path.join(cart, 'deploy.sh'))} --avvisa 'prova' < /dev/null"),
+            capture_output=True, text=True, encoding="utf-8", timeout=60)
+        reg = os.path.join(cart, "registro")
+        prova("deploy.sh --avvisa: esce pulito, e non chiama git nemmeno una "
+              "volta (niente fetch, niente reset)", (0, False),
+              (r.returncode, os.path.exists(reg)))
     finally:
         shutil.rmtree(base, ignore_errors=True)
 
@@ -172371,7 +172694,7 @@ def prove_pdf_allegati():
           (False, False, True, True),
           ("chat-scambi" in open("deploy.sh", encoding="utf-8").read(),
            "chat-scambi" in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
-           'sqlite3 "$DIR_APP/satmarket.db" ".backup' in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
+           'SORGENTE="$DIR_APP/satmarket.db"' in open("deploy/backup-fuori.sh", encoding="utf-8").read(),
            "from config import DB" in open("deploy.sh", encoding="utf-8").read()))
     dbc = pezzo("db_chat")
     prova("lo spazio torna al disco: il cassetto si prepara col vuoto incrementale PRIMA delle tabelle, "
@@ -177069,6 +177392,7 @@ def main():
               prove_libro_mastro, prove_leve, prove_canale_bot,
               prove_podio_riepilogo, prove_vetrina_negozio,
               prove_vetrina_canale, prove_relay_leva, prove_relay_di_barattolo, prove_posta_relay, prove_backup_prima_del_deploy,
+              prove_backup_database_occupato,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
               prove_punti_corrieri,

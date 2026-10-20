@@ -70697,3 +70697,122 @@ lo script di Telegram, fermato. Suite e collaudi: nel messaggio del
 commit.
 
 COSA RESTA. Niente di aperto da questo cantiere.
+
+## Il backup col database occupato: una copia sola che aspetta, l'archivio da quella, l'avviso che dice il vero (20 ott 2026, cantiere backup-database-occupato, richiesta di Andrea)
+
+IL FATTO. Deploy delle 15:07 UTC (774f9466 → 431eb70e): «💾 copia del
+database messa da parte», poi «Error: database is locked», «⚠️ copia del
+database NON riuscita: nessun archivio», «⚠️ archivio per il canale dei
+backup non riuscito: si va avanti». Il deploy è andato bene, l'archivio
+cifrato no, e il bot ha scritto «la copia locale c'è» senza guardarla.
+
+IL PERCHÉ. Erano due letture del database vivo. La prima (il python di
+deploy.sh, `sorgente.backup(...)`) riprova da sola ogni 250 ms e passa.
+La seconda (`sqlite3 satmarket.db ".backup ..."` in backup-fuori.sh)
+usa il comando `sqlite3`, che aspetta ZERO secondi: col rollback journal
+(niente WAL) un commit del server chiude la porta ai lettori per un
+attimo, e lei cade al primo colpo. Riprodotto qui con un altro processo
+in `BEGIN EXCLUSIVE` per 3 s: lo script vecchio stampa le stesse righe
+del VPS (più un falso «il database NON è sano: database is locked» del
+`quick_check`, stessa malattia); col `.timeout` passa. Lo stesso difetto
+lo aveva il giornaliero delle 04:30 (è lo stesso script) e la copia del
+database di LNbits. La copia di deploy.sh era consistente (API di
+backup, non `cp`), ma senza tetto e senza controllo.
+
+DECISO.
+- `deploy/copia-db.py`, UNA copia per tutti: API di backup in un passo
+  (`pages=-1`, una lettura sola), `busy_timeout` 30 s, tetto 90 s (il
+  callback di progresso lo fa rispettare: CPython lo chiama anche dopo
+  i passi in BUSY), il file nasce `.parziale` e prende il nome solo
+  finito, `integrity_check` sulla COPIA (non tiene il lucchetto del
+  server, e l'API copia le pagine tali e quali: un vivo rotto dà una
+  copia rotta). Codici: 0 integra, 3 NON integra (il file resta, è la
+  prova), 4 occupato oltre il tetto, 1 altro. Sorgente in `mode=ro`
+  come la copia di deploy.sh da sempre; `--anche-scrittura` solo per
+  LNbits (il suo journal_mode non è nostro, e un `ro` su un WAL senza
+  `-shm` può dire «unable to open»).
+- deploy.sh fa la copia con l'aiutante (cintura `timeout 150`) e passa
+  a backup-fuori.sh `--copia <file>`: l'archivio nasce da quella, il
+  vivo si legge una volta. Senza copia, niente archivio, e lo si dice.
+- UN avviso, dopo copia e archivio, con lo stato vero: «non è partito…
+  la copia locale c'è ed è integra: <file>», «NON è integra» (con
+  l'archivio partito o no), «NON è riuscita» (né copia né archivio).
+  Tutto a posto, o solo l'env che manca: zitto, com'era.
+- IL GIORNALIERO PARLA (domanda di Andrea: se cade alle 04:30 il bot lo
+  dice? Prima solo in parte: la copia fallita sul canale dei backup, un
+  `tar`/`age` caduto mai, l'invio rifiutato solo dopo tre giorni). Ora
+  una trappola d'uscita manda UN avviso nella stanza degli errori se il
+  giornaliero esce male, trova il database NON integro o perde la copia
+  di LNbits, con lo stato di copia e archivio. Lo manda `deploy.sh
+  --avvisa "<testo>"`, un ramo che parte prima di ogni git: la regola
+  del gruppo e delle stanze resta in UN posto. Si chiama da una copia
+  in `$TMP` e solo se quel deploy.sh conosce `--avvisa` (uno vecchio
+  prenderebbe l'argomento per niente e farebbe un deploy). Prima del
+  deploy il backup tace: parla deploy.sh.
+- Il `quick_check` sul vivo se ne va: lo sostituisce l'`integrity_check`
+  sulla copia (più severo, e senza il lucchetto del server).
+
+IL WAL (domanda di Andrea, dalla sessione del collaudo che vedeva
+`-wal`/`-shm` accanto al database della VM). Nel nostro codice NON si
+accende da nessuna parte: nessun `journal_mode` in server.py né negli
+script; ARCHITETTURA e PRODUZIONE lo dicono «valutato e non acceso».
+I `-wal`/`-shm` compaiono solo come file da spostare o da temere:
+`deploy/collaudo/collaudo.sh` (azzera: li sposta se ci sono, per
+prudenza) e `deploy/utente/cambio-utente.sh` (ALT se c'è un `-wal`);
+`collaudo_chat_mercatino.py` li cancella per il cassetto della chat.
+LNbits è codice di altri: il suo journal_mode non si legge da qui. Se
+sulla VM ci sono davvero `satmarket.db-wal`, li ha accesi qualcosa
+fuori dal repo (un comando a mano, uno strumento): da guardare con
+`sqlite3 dati/satmarket.db "PRAGMA journal_mode"` sulla VM. Questo
+cantiere non tocca il journal_mode.
+
+SCARTATO. Il solo `.timeout 30000` davanti ai due `sqlite3`: cura il
+sintomo, ma restano due letture del vivo, nessun tetto sul python e
+nessun controllo della copia. Un `quick_check` sul vivo con l'attesa:
+un lucchetto in più tenuto al server, quando la copia dice la stessa
+cosa. Una seconda copia di `avvisa` dentro backup-fuori.sh: una terza
+regola del gruppo da tenere uguale (le prime due sono server e
+deploy.sh). Un'unit `OnFailure=` per il giornaliero: vuole un gesto in
+`/etc` sul VPS, e non saprebbe dire lo stato di copia e archivio.
+
+COME ARRIVA. Solo su develop (regola della sessione cloud); sul VPS con
+main. Il timer ricopia deploy.sh a ogni giro, quindi la copia nuova
+vale dal deploy DOPO quello che la porta (il primo archivio lo fa
+ancora lo script vecchio, che gira prima del reset); il giornaliero
+dalla notte dopo. Niente da installare, niente config né env nuovi.
+
+PROVE.
+- `prove_backup_prima_del_deploy`, allargata: lo script vero su un
+  database tenuto OCCUPATO da un altro processo (3 s: aspetta, manda,
+  zitto; 8 s con tetto 2: si arrende in meno di 7, niente archivio, lo
+  dicono canale e bot), ROTTO nelle pagine (archivio col marchio, bot
+  «NON è integra»), rotto nella testata di notte (bot: «non è riuscito
+  … file is not a database»), l'invio che cade (bot: «non è arrivato al
+  canale… era integra… resta sul VPS»), l'env che manca; e prima del
+  deploy nessun avviso da lì.
+- `prove_backup_database_occupato`, nuova: il pezzo VERO di deploy.sh,
+  dal `mkdir -p backup` all'avviso, in una cartella finta: occupato 3 s
+  (copia integra, l'archivio riceve `--copia` e ci trova 301 righe,
+  anche quella di chi teneva il lucchetto), archivio che non parte
+  (l'avviso nomina la copia integra), oltre il tetto (nessun file a
+  metà, archivio non chiamato), pagine rotte, env mancante; e
+  `deploy.sh --avvisa` che esce pulito senza chiamare git.
+- La prova ha preso un mio errore di taglio (il pezzo partiva dopo il
+  `mkdir -p backup`): corretto il taglio, non il codice.
+- `prove_deploy_nel_gruppo`: l'elenco degli avvisi passa da nove a
+  dodici (il prestito e i tre della copia), le sentinelle del cassetto
+  guardano la forma nuova della copia.
+- Confronto a mano, `sqlite3` vero: stesso database occupato 3 s, lo
+  script vecchio «Error: database is locked… nessun archivio», il nuovo
+  «📦 backup inviato».
+
+COSA RESTA.
+- Prima del deploy backup-fuori.sh sta sotto `timeout 120`, e dentro
+  c'è anche la copia di LNbits col suo tetto: un LNbits occupato più di
+  ~100 s farebbe scadere l'archivio («non è partito», con la copia
+  locale integra detta). Prima cadeva subito; se capita si dà a LNbits
+  un tetto più corto prima del deploy.
+- `deploy/utente/cambio-utente.sh` ha ancora la sua copia python senza
+  tetto né controllo: è un gesto a mano a server fermo, non toccato.
+- L'intestazione di backup-fuori.sh chiede ancora `apt install sqlite3`:
+  non serve più, ma non fa male.

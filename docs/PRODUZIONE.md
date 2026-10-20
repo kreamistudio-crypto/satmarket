@@ -1309,12 +1309,33 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   deploy VA AVANTI e arriva «⚠️ Il backup su Telegram prima del deploy
   non è partito» nella stanza degli errori. In `backup/fuori/` ne
   restano le ultime 10 (il canale le tiene tutte). Ogni backup, anche
-  quello delle 04:30, chiede prima `PRAGMA quick_check`: un file non
-  sano lo dice SUBITO sul canale dei backup («⚠️ il database NON è
-  sano») e la didascalia porta «⚠️ DATABASE NON SANO». Oltre i 45 MB
+  quello delle 04:30, chiede se il file è sano (dal 20 ott con
+  `integrity_check` sulla copia, qui sotto): un file non sano lo dice
+  SUBITO sul canale dei backup («⚠️ il database NON è sano») e la
+  didascalia porta «⚠️ DATABASE NON SANO». Oltre i 45 MB
   l'archivio si spezza in parti da 45 («parte 1 di N»; si ricuciono
   con `cat`, deploy/RIPRISTINO.md). Anche la copia locale non riuscita
-  ora arriva in chat. L'UNITÀ VA RICOPIATA UNA VOLTA (il deploy non
+  ora arriva in chat.
+  UNA COPIA SOLA, CHE ASPETTA (20 ott 2026, cantiere
+  backup-database-occupato; perché in CANTIERI, «Il backup col database
+  occupato»). Tutte le copie del database — pre-deploy, giornaliero,
+  LNbits — le fa `deploy/copia-db.py`: API di backup in un passo, 30 s
+  di attesa sul lucchetto, TETTO 90 s (poi rinuncia), `integrity_check`
+  sulla copia. Prima del deploy l'archivio nasce dalla copia locale
+  (`--copia backup/pre-deploy-….db`): il vivo si legge una volta. Il
+  journal dice «💾 copia del database messa da parte, integra: <file>»;
+  l'avviso nella stanza degli errori dice lo stato vero: «non è partito
+  … la copia locale c'è ed è integra», «NON è integra» (database vivo
+  rotto: prima di toccare si chiede a Claude), «NON è riuscita» (nessuna
+  copia e nessun archivio). IL GIORNALIERO ORA PARLA NELLA STESSA
+  STANZA: se cade (copia, archivio, invio, env mancante) o trova il
+  database rotto, «⚠️ Il backup giornaliero …» arriva dal bot di
+  Barattolo, via `deploy.sh --avvisa`. Niente da installare: il
+  pre-deploy nuovo vale dal deploy DOPO quello che lo porta (il timer
+  ricopia `deploy.sh` a ogni giro; il primo archivio lo fa ancora lo
+  script vecchio), il giornaliero dalla notte dopo. LA PROVA: al
+  secondo deploy, `journalctl -u barattolo-deploy --since "15 min ago"
+  | grep -E "💾|📦"` — «integra» e «archivio cifrato mandato». L'UNITÀ VA RICOPIATA UNA VOLTA (il deploy non
   tocca `/etc`): `TimeoutStartSec` passa da 300 a 600 —
   `cp /srv/barattolo/deploy/barattolo-deploy.service /etc/systemd/system/ && systemctl daemon-reload`.
   LA PROVA, al primo deploy dopo questo: sul canale dei backup un
