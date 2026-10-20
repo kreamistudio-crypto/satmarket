@@ -70119,3 +70119,66 @@ terzo argomento, e il nostro ritiro gliela passa.
 **COSA RESTA.** Sulla VM col regtest di Boltz va scritta `SWAP_MEMPOOL_API`
 (l'esplora del regtest), o il telefono non ritira. KaleidoSwap (swap-sdk
 in Rust) va guardato con gli stessi occhi prima di costruirci sopra.
+
+## Comprare sats con USDT, l'aggiornamento: Boltz escluso, e cosa vuol dire per chi usa il suo codice (20 ott 2026, cantiere usdt-studio, decisione di Andrea con Alan; solo documenti)
+
+Aggiorna la voce «Comprare sats con USDT» qui sopra. DECISIONE: Boltz è
+escluso da ogni strada, come Liquid (chiuso dal 3 agosto 2026 per buchi
+trovati in serie, Decrypt del 4 ago:
+https://decrypt.co/374933/bitcoin-bridge-shuts-down-ai-finding-bugs-too-fast).
+Ma SATS Routing e KaleidoSwap girano sul codice di Boltz, e il nostro
+bundle aveva boltz-core 5.0.0: da qui le letture, tutte da fonti
+primarie, tutte di sola lettura.
+
+- BOLTZ NON COMPARE COME FORNITORE da nessuna parte del codice: nessun
+  indirizzo, nessun nome di servizio. «boltz» è il nome del TIPO di
+  protocollo (`swap/boltz.js`, quello che parla come SATS Routing).
+- boltz-core 5.0.0: uscita su npm il 22 maggio 2026
+  (https://registry.npmjs.org/boltz-core, campo `time`), più di due mesi
+  prima della chiusura; nessuna versione dopo, non deprecata, nessun
+  avviso di sicurezza pubblicato (le security advisories dei quattro repo
+  di BoltzExchange e il database globale di GitHub per `boltz-core`: zero).
+  Ma il 24 luglio è entrata nel repo una correzione MAI pubblicata su npm,
+  la PR #196 «Harden scripts» (https://github.com/BoltzExchange/boltz-core/pull/196):
+  `detectSwap` lega l'uscita del lockup al tipo o allo script atteso (la
+  5.0.0 ne accettava quattro forme), `detectPreimage` riconosce il segreto
+  dall'impronta e non dalla posizione.
+- COSA È STATO BUCATO: non si sa. L'avviso di Boltz nel suo repo (commit
+  `9cc7b2ab` di BoltzExchange/boltz-web-app, «swap service suspension
+  notice») parla di «automated, AI-assisted probing of our
+  infrastructure» e di «several exploits. Each was contained», senza
+  nominare il pezzo; i rimborsi unilaterali restano possibili. I
+  rattoppi fusi nei dieci giorni prima stanno nel backend (PR #1476
+  fatture assegnate due volte, #1477 lockup legati agli script
+  annunciati, #1478 segreto letto per impronta, #1480 webhook, #1483
+  race degli aggiornamenti) e in boltz-core (#196).
+- SATS ROUTING: il loro backend è un fork di boltz-backend 12 commit
+  avanti e 0 indietro rispetto al `master` di Boltz
+  (https://github.com/SatsRouting/boltz-backend, confronto GitHub): ha
+  tutti i rattoppi di luglio, più le correzioni dell'audit del 31 agosto.
+  Dipende però da `boltz-core ^5.0.0` da npm, cioè senza la #196. La loro
+  web app (19 commit avanti, 0 indietro) dichiara boltz-core in due modi
+  diversi in due punti del `package.json`: non chiarito.
+- KALEIDOSWAP swap-sdk: un altro codice (Rust, fork di boltz-rust di
+  SatoshiPortal, con un loro server). Sul lato bitcoin cerca l'uscita
+  sullo script atteso e per il ritiro pretende l'importo ESATTO
+  (`select_utxo` in `src/swaps/bitcoin.rs`, con lo stesso nostro
+  perché scritto nel commento); ma quando la sua catena non risponde
+  ripiega sulla transazione mandata dal fornitore
+  (`fetch_lockup_utxo_boltz`), e di serie su signet legge dal LORO esplora
+  (`esplora.signet.kaleidoswap.com`).
+- PER NOI: il nostro ritiro usava la ricerca larga della 5.0.0 e si fidava
+  del lockup mandato dal fornitore. Curato nel cantiere swap-lockup (voce
+  «Il ritiro indurito»): tre controlli prima del segreto e il bundle
+  rifatto da boltz-core al commit della #196.
+- DA CHIEDERE A MASSIMO: chi ha fatto l'audit, e se il rapporto si può
+  leggere; se hanno visto attacchi come quelli di Boltz; se pensano di
+  usare boltz-core con la #196; se la loro web app legge il lockup da una
+  fonte indipendente prima di mandare il segreto; per quanto l'API resta
+  su per i rimborsi se un giorno si fermano; un contatto per gli avvisi
+  di sicurezza.
+- DA CHIEDERE A KALEIDOSWAP (lo fa Alan con Walter): l'audit, la mainnet,
+  e se il ripiego sulla transazione del fornitore si può spegnere.
+
+Il resto dello studio non cambia: oggi la sola strada «compra sats con
+USDT» verificata con numeri veri è FixedFloat.
