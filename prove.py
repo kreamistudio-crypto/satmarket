@@ -175803,6 +175803,89 @@ ctx.__no = async () => { throw new Error('not eligible'); };
         prova("swap: ...e il giudice in Python dice no a una firma rotta", False,
               _cart.schnorr_verifica(bytes.fromhex(co["impronta"]),
                                      bytes.fromhex(co["chiave"]), bytes(rotta)))
+def prove_filtro_10050():
+    """IL FILTRO SUI RELAY SCRITTI DALL'UTENTE (20 ott 2026, cantiere
+    filtro-10050, decisione di Andrea). Il 10050 di una persona passava
+    com'era: un `ws://localhost:4869` (un relay sul telefono) o un
+    indirizzo di una rete privata facevano bussare il server a se stesso
+    o ai suoi vicini. Ora un giudice solo, `relay_esterno`, vale per i
+    relay dell'utente nel 10050 e nel 10002: solo wss://, mai un IP che
+    non sia globale (loopback, 10/8, 172.16/12, 192.168/16, 169.254/16,
+    fc00::/7, fe80::/10 e le altre riservate), mai localhost, *.localhost,
+    *.local, mai .onion (dal VPS gli invii non passano da Tor), mai un
+    nome senza un dominio di lettere. Nel 10050 PRIMA il filtro e POI i
+    primi quattro buoni (`relay_suoi_dm`); un 10050 di soli scartati vale
+    «fuori»: la riserva, la riga 📭 sua, e il cartello come per un «no».
+    I nostri relay non passano dal giudice. Il giro col server vero e'
+    in `collaudo_avvisi_nostr_arrivano`."""
+    print("\n[il filtro sui relay del 10050 e del 10002: solo wss:// di internet]")
+    import ipaddress as _ipa
+    from urllib.parse import urlparse as _urlparse
+    src = _SORGENTE
+    amb = {"urlparse": _urlparse, "ipaddress": _ipa, "re": re}
+    exec(re.search(r"\n(_FORMA_TLD = [^\n]*)\n", src).group(1), amb)
+    exec(pezzo("relay_esterno"), amb)
+    exec(pezzo("relay_suoi_dm"), amb)
+    giudice, suoi = amb["relay_esterno"], amb["relay_suoi_dm"]
+    BUONI = ["wss://nos.lol", "wss://relay.primal.net/", "wss://NOS.LOL",
+             "wss://relay.xn--mnchen-3ya.de", "wss://8.8.8.8",
+             "wss://[2606:4700::1111]", "wss://172.32.0.1",
+             "wss://[::ffff:8.8.8.8]", "wss://nos.lol:443/inbox"]
+    prova("passano i wss:// di internet: nomi (anche punycode e maiuscole), "
+          "IP pubblici v4 e v6, una porta, un percorso", [],
+          [r for r in BUONI if not giudice(r)])
+    FUORI = {
+        "non wss://": ["ws://nos.lol", "https://nos.lol", "nos.lol", ""],
+        "loopback e localhost": ["wss://127.0.0.1", "wss://127.8.9.1",
+                                 "wss://[::1]", "wss://localhost",
+                                 "wss://localhost:4869", "wss://a.localhost"],
+        "reti private": ["wss://10.1.2.3", "wss://172.16.0.1",
+                         "wss://172.31.255.1", "wss://192.168.1.2",
+                         "wss://[fc00::1]", "wss://[fd12:3456::1]",
+                         "wss://[::ffff:10.0.0.1]"],
+        "link-local": ["wss://169.254.1.1", "wss://[fe80::1]",
+                       "wss://[fe80::1%25eth0]"],
+        "nomi .local": ["wss://casa.local", "wss://CASA.LOCAL."],
+        ".onion (gli invii non passano da Tor)": [
+            "wss://abcdefghijklmnop.onion", "wss://x.y.onion/"],
+        "riservati e trucchi": ["wss://0.0.0.0", "wss://100.64.0.1",
+                                "wss://2130706433", "wss://0x7f.1",
+                                "wss://127.1", "wss://relay",
+                                "wss://relay.123", "wss://[::1", "wss://"]}
+    for famiglia, lista in FUORI.items():
+        prova(f"scartati: {famiglia}", [], [r for r in lista if giudice(r)])
+    prova("PRIMA IL FILTRO, POI I PRIMI QUATTRO BUONI: quattro scartati in "
+          "cima e il buono al quinto posto, il buono resta",
+          ["wss://buono.example"],
+          suoi(["ws://a.example", "wss://localhost", "wss://10.0.0.1",
+                "wss://x.onion", "wss://buono.example"]))
+    prova("...al piu' quattro, senza doppioni (maiuscole e barra finale)",
+          ["wss://b.example", "wss://c.example", "wss://d.example",
+           "wss://e.example"],
+          suoi(["wss://b.example", "wss://B.example/", "wss://c.example",
+                "wss://d.example", "wss://e.example", "wss://f.example"]))
+    prova("...un 10050 di soli scartati da' una lista vuota, e niente da' "
+          "niente", [[], [], []],
+          [suoi(["ws://localhost:4869", "wss://192.168.1.5"]), suoi([]),
+           suoi(None)])
+    dove = codice(pezzo("relay_dm_dove"))
+    prova("relay_dm_dove: il 10050 passa da relay_suoi_dm, e una lista "
+          "dichiarata ma tutta scartata e' «fuori»", [True, True],
+          ["relays = relay_suoi_dm(dichiarati)" in dove,
+           'stato = ("fuori" if dichiarati else' in dove])
+    prova("...il 10002 passa dallo stesso giudice (i nostri no)", True,
+          "if suo and not relay_esterno(r):" in codice(pezzo("relay_riserva_dm")))
+    prova("«fuori» ha la sua riga 📭, e per il cartello vale «no»",
+          [True, True],
+          ['"fuori": "10050 senza relay raggiungibili"' in codice(pezzo("manda_dm_nostr")),
+           'stato = "no" if irraggiungibili else stato'
+           in codice(pezzo("_controlla_relay_dm"))])
+    prova("il giudice di casa (lettura_simulata, il recinto) non si tocca: "
+          "dice ancora solo il loopback", True,
+          "is_loopback" in pezzo("relay_di_casa")
+          and "is_private" not in pezzo("relay_di_casa"))
+
+
 def prove_avvisi_nostr_arrivano():
     """GLI AVVISI NOSTR ARRIVANO (20 ott 2026, cantiere
     avvisi-nostr-arrivano, decisione di Andrea: «gli avvisi devono
@@ -175831,9 +175914,12 @@ def prove_avvisi_nostr_arrivano():
     esempio = open("config_esempio.py", encoding="utf-8").read()
 
     # --- 1) LA RISERVA DEI RELAY, eseguita ----------------------------
-    amb = {"urlparse": _urlparse, "ipaddress": _ipa,
+    amb = {"urlparse": _urlparse, "ipaddress": _ipa, "re": re,
            "DM_RISERVA_MAX_RELAY": 8}
     exec(pezzo("relay_di_casa"), amb)
+    # (cantiere filtro-10050) il giudice dei relay dell'utente
+    exec(re.search(r"\n(_FORMA_TLD = [^\n]*)\n", src).group(1), amb)
+    exec(pezzo("relay_esterno"), amb)
     exec(pezzo("relay_riserva_dm"), amb)
     ris = amb["relay_riserva_dm"]
     NOSTRI = ["wss://n1.example", "wss://n2.example", "wss://n3.example",
@@ -176841,6 +176927,7 @@ def main():
               prove_miniature_leggere,
               prove_collaudo_segue_develop,
               prove_avvisi_nostr_arrivano,
+              prove_filtro_10050,
               prove_config_esempio):
         try:
             f()

@@ -54,8 +54,14 @@ TELEGRAM = []     # (tg_id, testo, bottone) del trasporto di cartone
 BUSTE = []        # (relay, kind) di ogni evento «spedito»
 
 TG, CON_LISTA, SOLO_LETTURA, SENZA, MUTI = 111, -501, -502, -503, -504
+# (cantiere filtro-10050) due 10050 coi relay che da qui non si
+# raggiungono: MISTO ne ha quattro in cima e il buono al quinto posto,
+# SCARTATI ha solo quelli (e un 10002 buono)
+MISTO, SCARTATI = -505, -506
 HEX = {CON_LISTA: "a1" * 32, SOLO_LETTURA: "b2" * 32, SENZA: "c3" * 32,
-       MUTI: "d4" * 32}
+       MUTI: "d4" * 32, MISTO: "e5" * 32, SCARTATI: "f6" * 32}
+NON_RAGGIUNGIBILI = ["ws://localhost:4869", "wss://127.0.0.1:7777",
+                     "wss://192.168.1.20", "wss://telefono.local"]
 SUOI_DM = ["wss://dm.uno.example", "wss://dm.due.example",
            "wss://dm.tre.example", "wss://dm.quattro.example",
            "wss://dm.cinque.example"]
@@ -126,7 +132,11 @@ def avvio():
              (HEX[SOLO_LETTURA], 10050): [],
              (HEX[SOLO_LETTURA], 10002): SUOI_LETTURA,
              (HEX[SENZA], 10050): [], (HEX[SENZA], 10002): [],
-             (HEX[MUTI], 10050): None, (HEX[MUTI], 10002): None}
+             (HEX[MUTI], 10050): None, (HEX[MUTI], 10002): None,
+             (HEX[MISTO], 10050): NON_RAGGIUNGIBILI + ["wss://buono.example"],
+             (HEX[SCARTATI], 10050): NON_RAGGIUNGIBILI
+             + ["wss://abcdefghijklmnop.onion", "wss://[fe80::1]"],
+             (HEX[SCARTATI], 10002): ["wss://legge.sei.example"]}
     server._chiedi_vero = server.chiedi_relay_dm
     server.chiedi_relay_dm = lambda relay, hexkey, kind=10050: \
         liste.get((hexkey, kind))
@@ -148,7 +158,7 @@ def utenti():
     adesso = int(time.time())
     con.execute("INSERT INTO utenti(tg_id, nome, registrato) VALUES(?,?,?)",
                 (TG, "Telegrammo", adesso))
-    for tg in (CON_LISTA, SOLO_LETTURA, SENZA, MUTI):
+    for tg in (CON_LISTA, SOLO_LETTURA, SENZA, MUTI, MISTO, SCARTATI):
         con.execute("INSERT INTO utenti(tg_id, nome, registrato, npub_accesso) "
                     "VALUES(?,?,?,?)",
                     (tg, f"Nostr{-tg}", adesso, SRV.hex_to_npub(HEX[tg])))
@@ -273,7 +283,7 @@ def main():
     # ---- 2) DOVE VA IL DM -------------------------------------------------
     print("\n[2) relay_dm_dove: col 10050, col solo 10002, senza niente, muti]")
     dove = {tg: asyncio.run(SRV.relay_dm_dove(HEX[tg]))
-            for tg in (CON_LISTA, SOLO_LETTURA, SENZA, MUTI)}
+            for tg in (CON_LISTA, SOLO_LETTURA, SENZA, MUTI, MISTO, SCARTATI)}
     prova("col 10050: i suoi relay, i primi quattro", (SUOI_DM[:4], "si"),
           dove[CON_LISTA])
     prova("col solo 10002: prima i suoi di lettura (senza doppioni, ws:// e "
@@ -284,6 +294,14 @@ def main():
           dove[SENZA])
     prova("coi relay muti: la riserva lo stesso, ma «non si sa»",
           (SERIE[:4], "?"), dove[MUTI])
+    prova("IL 10050 MISTO (filtro-10050): quattro irraggiungibili in cima e "
+          "il buono al quinto posto — prima il filtro, poi i primi quattro: "
+          "resta il buono, e lo stato e' «si»",
+          (["wss://buono.example"], "si"), dove[MISTO])
+    prova("IL 10050 DI SOLI IRRAGGIUNGIBILI (localhost, loopback, rete "
+          "privata, .local, .onion, link-local): «fuori», e la riserva — il "
+          "suo 10002 buono, poi i nostri",
+          (["wss://legge.sei.example"] + SERIE[:4], "fuori"), dove[SCARTATI])
     prova("il tetto: mai piu' di otto relay", True,
           all(len(d[0]) <= SRV.DM_RISERVA_MAX_RELAY == 8 for d in dove.values()))
 
@@ -310,6 +328,16 @@ def main():
               len(righe) == 1 and righe[0].startswith(f"📭 DM Nostr a {HEX[SENZA][:16]}…")
               and "nessun 10050, busta NIP-17 su 4/4 relay di riserva" in righe[0]
               and "NIP-04" not in righe[0])
+        ok, buste, righe = manda(MISTO)
+        prova("10050 misto: la busta al solo relay buono, e il journal tace",
+              [True, [("wss://buono.example", 1059)], []], [ok, buste, righe])
+        ok, buste, righe = manda(SCARTATI)
+        prova("10050 di soli irraggiungibili: la busta alla riserva, mai a un "
+              "loro indirizzo, e la riga 📭 sua", [True, sorted(
+                  (r, 1059) for r in ["wss://legge.sei.example"] + SERIE[:4]),
+                  True],
+              [ok, buste, len(righe) == 1 and "10050 senza relay raggiungibili, "
+               "busta NIP-17 su 5/5 relay di riserva" in righe[0]])
         ok, buste, righe = manda(MUTI)
         prova("coi relay muti la riga dice «10050 non letto»", True,
               len(righe) == 1 and "10050 non letto (relay muti)" in righe[0])
@@ -403,15 +431,22 @@ def main():
     con.commit()
     con.close()
     prima = len(RIGHE)
-    for tg in (SENZA, CON_LISTA, MUTI):
+    for tg in (SENZA, CON_LISTA, MUTI, MISTO, SCARTATI):
         come(tg)
         asyncio.run(profilo())
-    prova("senza 10050: 'no'; col 10050: 'si'; relay muti: non si scrive niente",
-          ["no", "si", ""],
-          [riga_utente(tg)["relay_dm"] for tg in (SENZA, CON_LISTA, MUTI)])
+    prova("senza 10050: 'no'; col 10050: 'si'; relay muti: non si scrive "
+          "niente; 10050 misto: 'si'; 10050 di soli irraggiungibili: 'no' "
+          "(il cartello gli deve dire che i messaggi non gli arrivano)",
+          ["no", "si", "", "si", "no"],
+          [riga_utente(tg)["relay_dm"]
+           for tg in (SENZA, CON_LISTA, MUTI, MISTO, SCARTATI)])
     prova("...e il journal dice il 'no', una riga", 1,
           sum(1 for r in RIGHE[prima:]
               if r.startswith(f"📭 L'utente {SENZA} (solo Nostr) non pubblica un 10050")))
+    prova("...e per il 10050 di soli irraggiungibili lo dice cosi'", 1,
+          sum(1 for r in RIGHE[prima:]
+              if r.startswith(f"📭 L'utente {SCARTATI} (solo Nostr) ha un 10050 "
+                              "coi soli relay che da qui non si raggiungono")))
     come(SENZA)
     p = asyncio.run(profilo())
     prova("/api/me porta 'no' e il cartello mai visto; un secondo /api/me nello "

@@ -44800,6 +44800,10 @@ async def _controlla_relay_dm(tg_id: int, npub: str):
     """Guarda se il profilo pubblica un 10050 e lo scrive. Fail-open."""
     try:
         _r, stato = await relay_dm_dove(npub_to_hex(npub))
+        # un 10050 coi soli relay che da qui non si raggiungono vale «no»:
+        # i messaggi non gli arrivano, e il cartello glielo deve dire
+        irraggiungibili = stato == "fuori"
+        stato = "no" if irraggiungibili else stato
         if stato not in ("si", "no"):
             return
         con = db()
@@ -44812,8 +44816,11 @@ async def _controlla_relay_dm(tg_id: int, npub: str):
         finally:
             con.close()
         if stato == "no" and (not prima or prima["relay_dm"] != "no"):
-            print(f"📭 L'utente {tg_id} (solo Nostr) non pubblica un 10050: "
-                  "i DM degli avvisi vanno alla riserva, e restano in 📬")
+            print(f"📭 L'utente {tg_id} (solo Nostr) "
+                  + ("ha un 10050 coi soli relay che da qui non si "
+                     "raggiungono" if irraggiungibili
+                     else "non pubblica un 10050")
+                  + ": i DM degli avvisi vanno alla riserva, e restano in 📬")
     except Exception as e:
         print(f"⚠️ Relay dei messaggi non controllati per l'utente {tg_id}: {e}")
 
@@ -67014,6 +67021,9 @@ def chiedi_relay_dm(relay: str, hexkey: str, kind: int = 10050):
 # scrive chiunque, e un `ws://127.0.0.1:8080` la' dentro farebbe bussare
 # il server a se stesso. I nostri vengono dal config e passano come sono
 # (sull'istanza di prova sono proprio quelli di casa).
+# (stesso giorno, cantiere filtro-10050) IL GIUDICE E' `relay_esterno`,
+# e vale per i relay scritti dall'utente in TUTT'E DUE le liste, il 10002
+# e il 10050.
 DM_RISERVA_MAX_RELAY = 8
 # Quanto vale quel che si e' saputo dei relay di una persona: un'ora se
 # si sa (c'e' o non c'e'), cinque minuti se nessun relay ha risposto.
@@ -67021,9 +67031,76 @@ DM_RELAY_CACHE_S = 3600
 DM_RELAY_CACHE_IGNOTO_S = 300
 
 
+# IL GIUDICE DEI RELAY SCRITTI DA UN UTENTE (20 ott 2026, cantiere
+# filtro-10050, decisione di Andrea). Nel 10050 e nel 10002 c'e' quel che
+# ciascuno ci scrive, e il server ci bussa davvero: un indirizzo della
+# rete di CASA del VPS (il loopback, una rete privata, un nome .local)
+# farebbe parlare il server con se stesso o coi suoi vicini — e' la
+# stessa porta di un `ws://127.0.0.1:8080` del 10002. Quindi, per i soli
+# relay dell'utente (i nostri vengono dal config e passano come sono):
+# · SOLO wss://, cioe' cifrato e su internet;
+# · MAI un indirizzo IP che non sia «globale»: loopback, 10/8,
+#   172.16/12, 192.168/16, 169.254/16 (link-local), fc00::/7, fe80::/10,
+#   e con loro le altre riservate (0.0.0.0, la CGNAT 100.64/10, ...);
+# · MAI un nome locale: `localhost`, `*.localhost`, `*.local` (mDNS);
+# · MAI un .onion: dal VPS i DM partono DIRETTI — `invia_evento_relay`
+#   e il postino aprono la websocket senza proxy — quindi un onion non
+#   si raggiunge (Tor sul VPS serve solo al sito .onion in ENTRATA). Il
+#   giorno che gli invii passassero da Tor, questa riga va tolta;
+# · MAI un nome che non finisce con un dominio di lettere: `2130706433`
+#   o `0x7f.1` sono 127.0.0.1 scritti in un altro modo, e un nome senza
+#   punto si risolve coi domini di ricerca della macchina.
+# Senza risolvere niente (un DNS e' gia' una domanda fatta al mondo): un
+# nome pubblico che punta a un indirizzo privato passa, ed e' un limite
+# scritto nel verbale.
+_FORMA_TLD = re.compile(r"(?:xn--[a-z0-9-]+|[a-z]{2,63})")
+
+
+def relay_esterno(relay) -> bool:
+    """PURA: un relay SCRITTO DA UN UTENTE e' un indirizzo di internet a
+    cui il server puo' bussare? (wss://, non locale, non privato, non
+    .onion — il perche' sopra.) Nel dubbio, no."""
+    r = str(relay or "").strip()
+    if not r.lower().startswith("wss://"):
+        return False
+    try:
+        host = (urlparse(r).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    if not host:
+        return False
+    try:
+        ip = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        ip = None
+    if ip is not None:
+        mappato = getattr(ip, "ipv4_mapped", None)
+        return bool((mappato or ip).is_global)
+    if host == "localhost" or host.endswith((".localhost", ".local", ".onion")):
+        return False
+    if "." not in host:
+        return False
+    return bool(_FORMA_TLD.fullmatch(host.rsplit(".", 1)[1]))
+
+
+def relay_suoi_dm(lista) -> list:
+    """PURA: i relay del 10050 di una persona a cui si consegna — PRIMA il
+    filtro (`relay_esterno`), POI i primi quattro buoni, senza doppioni:
+    quattro scartati in cima non si mangiano il buono che viene dopo."""
+    fuori, visti = [], set()
+    for r in list(lista or []):
+        r = str(r or "").strip()
+        chiave = r.lower().rstrip("/")
+        if not relay_esterno(r) or chiave in visti:
+            continue
+        visti.add(chiave)
+        fuori.append(r)
+    return fuori[:4]
+
+
 def relay_riserva_dm(lettura, nostri) -> list:
     """PURA: i relay dove consegnare a chi NON pubblica un 10050 — i
-    primi quattro di lettura del suo 10002 (solo wss://, mai di casa),
+    primi quattro di lettura del suo 10002 (quelli di `relay_esterno`),
     poi i primi quattro di `nostri`, senza doppioni (la barra finale non
     fa un relay diverso), al piu' DM_RISERVA_MAX_RELAY."""
     fuori, visti = [], set()
@@ -67033,7 +67110,7 @@ def relay_riserva_dm(lettura, nostri) -> list:
         chiave = r.lower().rstrip("/")
         if not r.lower().startswith("ws") or chiave in visti:
             continue
-        if suo and (not r.lower().startswith("wss://") or relay_di_casa(r)):
+        if suo and not relay_esterno(r):
             continue
         visti.add(chiave)
         fuori.append(r)
@@ -67045,9 +67122,13 @@ _RELAY_DM_CACHE = {}   # hex destinatario -> (scadenza, lista relay, stato)
 
 async def relay_dm_dove(dest_hex: str) -> tuple:
     """`(relay, stato)`: dove consegnare il DM e che cosa si sa del suo
-    10050 — 'si' (lo pubblica: si va li', i primi 4), 'no' (almeno un
-    relay ha risposto e non c'e': la riserva di `relay_riserva_dm`), '?'
-    (nessun relay ha risposto: la riserva lo stesso, ma per poco). La
+    10050 — 'si' (lo pubblica: si va li', ai primi quattro buoni di
+    `relay_suoi_dm`), 'no' (almeno un relay ha risposto e non c'e': la
+    riserva di `relay_riserva_dm`), 'fuori' (c'e', ma nessuno dei suoi
+    relay si puo' raggiungere da qui — un relay sul telefono come
+    `ws://localhost:4869`, una rete privata: per la consegna e per il
+    cartello vale come 'no'), '?' (nessun relay ha risposto: la riserva
+    lo stesso, ma per poco). La
     specifica direbbe di NON inviare senza 10050, ma per una notifica un
     tentativo e' meglio di zero. Cache in memoria (uvicorn e'
     mono-processo)."""
@@ -67057,11 +67138,13 @@ async def relay_dm_dove(dest_hex: str) -> tuple:
     risposte = await asyncio.gather(*[
         asyncio.to_thread(chiedi_relay_dm, r, dest_hex)
         for r in RELAYS_VERIFICA])
-    relays = next((r for r in risposte if r), None)
+    dichiarati = next((r for r in risposte if r), None)
+    relays = relay_suoi_dm(dichiarati)
     if relays:
-        relays, stato = relays[:4], "si"
+        stato = "si"
     else:
-        stato = "no" if any(r is not None for r in risposte) else "?"
+        stato = ("fuori" if dichiarati else
+                 "no" if any(r is not None for r in risposte) else "?")
         lettura = await asyncio.gather(*[
             asyncio.to_thread(chiedi_relay_dm, r, dest_hex, 10002)
             for r in RELAYS_VERIFICA])
@@ -67124,8 +67207,9 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
                 for r in relays])
         if stato != "si":
             print(f"📭 DM Nostr a {dest_hex[:16]}…: "
-                  + ("nessun 10050" if stato == "no"
-                     else "10050 non letto (relay muti)")
+                  + {"no": "nessun 10050",
+                     "fuori": "10050 senza relay raggiungibili"}.get(
+                         stato, "10050 non letto (relay muti)")
                   + f", busta NIP-17 su {sum(esiti)}/{len(relays)} relay "
                   "di riserva"
                   + (f", NIP-04 su {sum(vecchi)}" if vecchi else "")
