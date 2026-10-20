@@ -10020,6 +10020,23 @@
     background:var(--chip-bg);border-color:var(--muted);
     color:var(--ink);font-weight:700;
   }
+  /* «📬 I TUOI AVVISI» (20 ott 2026): la fascia dell'apertura per chi
+     entra solo da Nostr — gli avvisi nuovi, e UNA volta il cartello dei
+     relay dei messaggi. La forma delle sorelle, i token neutri della
+     riga di Tor: e' un fatto da sapere, non un'occasione. */
+  #fasciaAvvisi{padding:12px var(--pad) 0;display:flex;flex-direction:column;gap:8px}
+  .fascia-relay-dm{
+    flex-direction:column;align-items:stretch;text-align:left;
+    background:var(--chip-bg);border-color:var(--muted);
+    color:var(--ink);font-weight:600;
+  }
+  .fascia-relay-dm .frd-bottoni{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .avv-app{padding:10px 0;border-bottom:1px solid var(--line)}
+  .avv-app:last-child{border-bottom:0}
+  .avv-app-quando{font-size:12px;color:var(--muted);font-weight:700}
+  .avv-app.nuovo .avv-app-quando b{color:var(--sats-text)}
+  .avv-app-testo{font-size:13.5px;line-height:1.45;margin-top:3px;word-break:break-word}
+  .avv-app-btn{display:inline-block;margin:8px 8px 0 0;text-decoration:none}
   button.fascia-test{cursor:pointer}
   button.fascia-test:active{transform:translateY(1px)}
   .fascia-test .ft-cta{text-decoration:underline;text-underline-offset:2px}
@@ -11492,6 +11509,10 @@ document.getElementById('cartello')?.remove();</script>
     <!-- La riga di chi arriva dal servizio nascosto: la riempie
          renderFasciaOnion(), e fuori da Tor non nasce mai. -->
     <div id="fasciaOnion" style="display:none"></div>
+    <!-- «📬 I tuoi avvisi» (20 ott 2026): la riempie renderFasciaAvvisi(),
+         solo per chi entra senza Telegram — gli avvisi nuovi, e una
+         volta il cartello dei relay dei messaggi. -->
+    <div id="fasciaAvvisi" style="display:none"></div>
     <!-- Banner «installa Barattolo» (PWA): riempito da
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
@@ -14383,6 +14404,16 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet" id="p2pAvvisiSheet" role="dialog" aria-modal="true" aria-label="Avvisi dei nuovi ordini P2P">
     <div class="grab"></div>
     <div id="p2pAvvisiCorpo"></div>
+  </div>
+
+  <!-- «📬 I TUOI AVVISI» (20 ott 2026, cantiere avvisi-nostr-arrivano):
+       a chi entra solo da Nostr ogni avviso resta anche qui, perche' il
+       DM puo' non arrivargli. Lo aprono la fascia dell'apertura e la
+       riga nel cassetto 🔔 Avvisi del Profilo (`apriAvvisiApp`). -->
+  <div class="sheet" id="avvisiAppSheet" role="dialog" aria-modal="true" aria-label="I tuoi avvisi">
+    <div class="grab"></div>
+    <h3>📬 I tuoi avvisi</h3>
+    <div id="avvisiAppCorpo"></div>
   </div>
 
   <!-- IL FILTRO DEI PROPRI SCAMBI (set 2026): stessa pelle del foglio
@@ -25970,6 +26001,128 @@ function renderFasciaOnion(){
        <span>🧅 Sei su Tor: quello che guardi resta fra te e Barattolo</span>
      </div>`;
 }
+
+/* «📬 I TUOI AVVISI» E I RELAY DEI MESSAGGI (20 ott 2026, cantiere
+   avvisi-nostr-arrivano, decisione di Andrea: «gli avvisi devono
+   arrivare»). A chi entra SOLO da Nostr gli avvisi arrivano come DM
+   cifrati, e se il suo profilo non dice dove riceverli (la lista dei
+   relay dei messaggi, kind 10050) il suo client non li trova. Quindi:
+   · ogni avviso resta anche qui, nel foglio «📬 I tuoi avvisi», e
+     all'apertura la fascia dice quanti sono nuovi;
+   · se il server ha VISTO che il 10050 manca (`relay_dm` = 'no'; un
+     relay muto non e' un no), il cartello lo dice UNA volta sola: il
+     server lo segna visto quando compare, e per il resto di questa
+     sessione resta finche' non si tocca «Ho capito». Dopo resta la riga
+     ferma nel cassetto 🔔 Avvisi.
+   A chi ha Telegram non compare niente: gli avvisi gli arrivano nel bot. */
+let myAvvisiAppNuovi = 0;
+let myRelayDm = '';            // 'si' | 'no' | '' = non si sa ancora
+let myRelayDmAvvisato = 0;     // quando il cartello e' comparso (0 = mai)
+let cartelloRelayDmQui = false;    // comparso in QUESTA sessione
+let cartelloRelayDmChiuso = false; // ...e chiuso con «Ho capito»
+const soloNostr = () => myTgId != null && myTgId < 0;
+const testoNuoviAvvisi = n => n === 1 ? 'Hai un avviso nuovo' : `Hai ${n} avvisi nuovi`;
+function renderFasciaAvvisi(){
+  const f = el('fasciaAvvisi'); if (!f) return;
+  const cartello = !DEMO && soloNostr() && myRelayDm === 'no' && !cartelloRelayDmChiuso
+    && (!myRelayDmAvvisato || cartelloRelayDmQui);
+  const nuovi = (!DEMO && soloNostr()) ? myAvvisiAppNuovi : 0;
+  if (!cartello && !nuovi) { f.style.display = 'none'; f.innerHTML = ''; return; }
+  f.style.display = '';
+  f.innerHTML = (cartello ? `<div class="fascia-test fascia-relay-dm" role="status">
+       <span>📭 <b>Non riceverai i messaggi su Nostr.</b> Il tuo profilo non dice
+       dove riceverli: imposta i <b>relay dei messaggi</b> nel tuo client (in
+       Amethyst è la voce «DM Inbox Relays» della pagina dei relay) oppure
+       collega Telegram. Intanto ogni avviso lo trovi anche qui, in 📬 I tuoi avvisi.</span>
+       <span class="frd-bottoni">
+         <button type="button" class="btn ghost" style="width:auto;margin:0" onclick="collegaTelegram()">✈️ Collega Telegram</button>
+         <button type="button" class="btn ghost" style="width:auto;margin:0" onclick="chiudiCartelloRelayDm()">Ho capito</button>
+       </span>
+     </div>` : '')
+    + (nuovi ? `<button type="button" class="fascia-test" onclick="apriAvvisiApp()">🔔 ${testoNuoviAvvisi(nuovi)} <span class="ft-cta">Leggi ›</span></button>` : '');
+  if (cartello && !cartelloRelayDmQui) {
+    cartelloRelayDmQui = true;
+    segnaCartelloRelayDm();
+  }
+}
+/* il cartello e' comparso: il server lo segna, e non ricompare piu' */
+async function segnaCartelloRelayDm(){
+  try {
+    await fetch(`${API_BASE}/me/relay-dm/avvisato`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    myRelayDmAvvisato = myRelayDmAvvisato || Math.floor(Date.now() / 1000);
+  } catch(e) {}
+}
+function chiudiCartelloRelayDm(){
+  haptic();
+  cartelloRelayDmChiuso = true;
+  renderFasciaAvvisi();
+}
+/* PURA: la data e l'ora di un avviso, l'anno solo se non e' questo */
+function quandoAvvisoApp(ts){
+  const n = Number(ts) || 0;
+  if (!n) return '';
+  const d = new Date(n * 1000);
+  const quest = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleString('it-IT', Object.assign({day:'numeric', month:'short',
+    hour:'2-digit', minute:'2-digit'}, quest ? {} : {year:'numeric'}));
+}
+/* PURA: la lista del foglio. Il testo e' testo (si scappa tutto), e un
+   bottone e' un link solo se e' un indirizzo web */
+function listaAvvisiApp(avvisi){
+  if (!avvisi || !avvisi.length)
+    return `<div class="hint">Nessun avviso, per ora. Quando succede qualcosa
+      ai tuoi ordini, alle tue chat o ai tuoi scambi lo trovi qui.</div>`;
+  return avvisi.map(a => `<div class="avv-app${a.letto ? '' : ' nuovo'}">
+      <div class="avv-app-quando">${a.letto ? '' : '<b>Nuovo</b> · '}${esc(quandoAvvisoApp(a.quando))}</div>
+      <div class="avv-app-testo">${esc(a.testo).replace(/\n/g, '<br>')}</div>
+      ${(Array.isArray(a.bottoni) ? a.bottoni : [])
+        .filter(b => Array.isArray(b) && /^https?:\/\//.test(String(b[1] || '')))
+        .map(b => `<a class="btn ghost avv-app-btn" style="width:auto" href="${esc(b[1])}">${esc(b[0])}</a>`).join('')}
+    </div>`).join('');
+}
+async function apriAvvisiApp(){
+  haptic();
+  const corpo = el('avvisiAppCorpo');
+  if (!corpo) return;
+  corpo.innerHTML = '<div class="hint">Carico gli avvisi…</div>';
+  el('sheetBg').classList.add('open');
+  el('avvisiAppSheet').classList.add('open');
+  if (DEMO) { corpo.innerHTML = '<div class="hint">In demo non ci sono avvisi veri 🙂</div>'; return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/avvisi`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { corpo.innerHTML = `<div class="hint">${esc(d.detail || 'Non ci sono riuscito, riprova')}</div>`; return; }
+    corpo.innerHTML = listaAvvisiApp(d.avvisi);
+    if (d.nuovi)
+      fetch(`${API_BASE}/me/avvisi/letti`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}}).catch(()=>{});
+  } catch(e) { corpo.innerHTML = '<div class="hint">Rete assente: riprova</div>'; return; }
+  myAvvisiAppNuovi = 0;
+  renderFasciaAvvisi();
+  if (el('avvisiBlocco')) renderAvvisi();
+}
+/* la riga del cassetto 🔔 Avvisi: la porta di sempre al foglio, e la
+   riga FERMA del 10050 mancante (il cartello passa una volta, questa resta
+   finche' e' vera) */
+const rigaAvvisiApp = () => !soloNostr() ? '' : `
+  <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13.5px;font-weight:800">📬 I tuoi avvisi</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+          Ogni avviso che ti mandiamo su Nostr resta anche qui.</div>
+      </div>
+      <button onclick="apriAvvisiApp()"
+        style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${myAvvisiAppNuovi?'var(--sats)':'var(--line)'};background:${myAvvisiAppNuovi?'var(--sats)':'transparent'};color:${myAvvisiAppNuovi?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+        ${myAvvisiAppNuovi ? esc(testoNuoviAvvisi(myAvvisiAppNuovi).replace('Hai ', '')) : 'Apri'}</button>
+    </div>
+    ${myRelayDm === 'no' ? `<div class="acq-nota" style="margin-top:10px">📭 <b>Il tuo profilo Nostr
+      non dice dove ricevere i messaggi</b> (la lista dei relay dei messaggi, kind
+      10050): i nostri DM possono non comparire nel tuo client. Impostala nel
+      client (in Amethyst: «DM Inbox Relays») oppure collega Telegram dal
+      blocco 🆔 Identità.</div>` : ''}
+  </div>`;
 
 /* IL CASSETTO «🧅 Sito Tor» (ago 2026). NON RISPIEGA NIENTE, ed e' la
    riga da non ammorbidire: cos'e' Tor, cosa cambia e fin DOVE arriva
@@ -37969,7 +38122,10 @@ function renderAvvisi(){
   } else {
     dentro = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:6px">
       Arrivano come DM Nostr cifrati alla tua npub: aprili col tuo
-      client (0xchat, Amethyst, Damus…).</div>`;
+      client (0xchat, Amethyst, Damus…).</div>`
+      /* «📬 I tuoi avvisi» (20 ott 2026): qui, sotto la riga del canale,
+         perche' e' QUESTO il ramo di chi non ha Telegram */
+      + rigaAvvisiApp();
   }
   /* Il titolo «🔔 Avvisi» sta nell'header del cassetto: qui dentro
      solo lo stato e le scelte */
@@ -85404,6 +85560,13 @@ async function avvia(){
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
     myBotAvviato = !!me.bot_avviato;
+    /* «📬 I tuoi avvisi» e il 10050 (20 ott 2026): solo per chi entra
+       senza Telegram; un server di ieri non manda le chiavi, e vale
+       «niente da dire» */
+    myAvvisiAppNuovi = Number(me.avvisi_app_nuovi) || 0;
+    myRelayDm = me.relay_dm || '';
+    myRelayDmAvvisato = Number(me.relay_dm_avvisato) || 0;
+    renderFasciaAvvisi();
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
     /* un server di ieri non manda la chiave: vale «accesi», il default */

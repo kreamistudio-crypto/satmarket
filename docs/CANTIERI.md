@@ -68807,3 +68807,162 @@ annunci, 0 ordini).
 - Il 409 del login si legge solo come toast: chi ha due account
   Telegram con la stessa chiave deve sapere quale dei due tenere.
   Oggi in produzione nessuno è in quel caso.
+
+## Gli avvisi Nostr arrivano: la riserva dei relay, «📬 I tuoi avvisi», il cartello del 10050 e il NIP-04 di riserva spento (20 ott 2026, cantiere avvisi-nostr-arrivano, decisione di Andrea)
+
+**IL CASO VERO.** IR Eyewear, entrato solo con Nostr, non riceveva
+NIENTE: né un ordine né un messaggio. Amethyst gli diceva «DM inbox
+relays not found». Agli account senza Telegram gli avvisi arrivano solo
+come DM NIP-17, e `relay_dm_di` li mandava ai relay del kind 10050 del
+destinatario o, se non lo pubblica, ai primi quattro di
+`RELAYS_VERIFICA`: relay che accettano la busta ma che il suo client
+non legge. Nessuna riga nel journal (c'era solo «nessun relay l'ha
+accettato», che qui non scatta), e l'esito di `notifica` («DM Nostr in
+volo») non lo guarda nessuno. Il buco era dichiarato dal 10 ott
+(«Amethyst sotto Tor, la tendina»: «chi non pubblica il 10050 e non
+legge i nostri quattro relay il pacco non lo vede»). Decisione di
+Andrea: gli avvisi devono arrivare, nessuno perso in silenzio, sempre
+cifrati, il messaggio all'utente una volta sola, e per chi ha Telegram
+non cambia niente.
+
+**COSA SI È DECISO (il piano in dieci righe, ok di Andrea: «sì a (a) + 4
++ 5»).**
+- (a) LA RISERVA PIÙ LARGA, sempre NIP-17. Senza 10050 la busta va ai
+  relay di LETTURA del suo kind 10002 (NIP-65: i tag `r` senza segno o
+  «read») — dove il suo client va a cercare quel che gli scrivono —
+  davanti ai nostri quattro, al più otto. Il 10002 si legge con la
+  STESSA porta del 10050 (`chiedi_relay_dm(..., kind=10002)`): stessa
+  guardia del collaudo, stesso recinto, stesso postino, nessuna
+  `create_connection` nuova da censire. Dei relay scritti DA LUI si
+  prendono solo wss:// e mai di casa: la lista la scrive chiunque, e un
+  `ws://127.0.0.1:8080` lì dentro farebbe bussare il server a se stesso.
+  I nostri passano come sono (sull'istanza di prova sono proprio quelli
+  di casa). Il giudice è puro, `relay_riserva_dm`.
+- «NIENTE» E «ZITTO» NON SONO PIÙ LA STESSA RISPOSTA: `chiedi_relay_dm`
+  torna `[]` se il relay ha risposto (EOSE) senza la lista, None se
+  tace o chiude senza EOSE (un «auth-required»). `relay_dm_dove` ne fa
+  uno stato: `si`, `no`, `?`. Serve al cartello: un relay muto non deve
+  dire a nessuno «non riceverai i messaggi». Il `?` resta in memoria
+  cinque minuti, il resto un'ora come prima.
+- LA RIGA 📭 nel journal a OGNI invio senza 10050 (o col 10050 non
+  letto), coi relay che l'hanno preso: «busta NIP-17 su N/M relay di
+  riserva: nel suo client potrebbe non comparire». È il «mai in
+  silenzio» della richiesta.
+- (4) «📬 I TUOI AVVISI»: `notifica`, per i soli `tg_id < 0`, scrive ogni
+  avviso anche nella tabella `avvisi_app` (testo spoglio dell'HTML, i
+  soli bottoni web), PRIMA del recapito e IN UN THREAD: chi chiama può
+  tenere una transazione aperta, e una scrittura nel loop la
+  aspetterebbe fermando tutto. Ne tiene 50 per persona e per 30 giorni.
+  All'apertura la fascia «🔔 Hai N avvisi nuovi» (sotto l'header,
+  accanto a quella di Tor); il foglio la mostra e la segna letta; nel
+  cassetto 🔔 Avvisi, ramo «solo Nostr», la riga «📬 I tuoi avvisi».
+  Le chat restano com'erano: l'avviso dice che c'è un messaggio, mai il
+  testo. Alla fusione con Telegram la lista della metà Nostr se ne va
+  (da lì gli avvisi arrivano nel bot): il censimento delle tabelle
+  figlie l'ha voluta nominata.
+- (5) IL CARTELLO, UNA VOLTA: /api/me di chi entra senza Telegram
+  guarda in sottofondo il suo 10050, al più una volta al giorno, e
+  scrive `utenti.relay_dm` solo se un relay ha risposto. Con `no` la
+  fascia mostra «📭 Non riceverai i messaggi su Nostr. … imposta i relay
+  dei messaggi nel tuo client (in Amethyst è la voce «DM Inbox Relays»
+  della pagina dei relay) oppure collega Telegram», coi bottoni
+  «✈️ Collega Telegram» e «Ho capito». Si segna visto QUANDO COMPARE e
+  non quando lo si chiude: «una volta sola, non a ogni apertura» vuol
+  dire anche chi chiude l'app senza toccarlo. Resta per la sessione;
+  dopo, una riga ferma nel cassetto finché è vero.
+- (b) IL NIP-04 DI RISERVA, LEVA SPENTA (`DM_NIP04_RISERVA = False`,
+  decisione di Andrea): accesa, a chi non ha il 10050 parte ANCHE un DM
+  kind 4 firmato da Barattolo, sugli stessi relay. Primal, Damus e altri
+  lo leggono senza la lista. **IL COSTO DI PRIVACY**, ed è il perché
+  dello spento: il testo è cifrato (AES-256-CBC con la X dell'ECDH), ma
+  la busta no. Sul relay resta in chiaro che la chiave di Barattolo ha
+  scritto a QUELLA npub, e quando (la data vera, non quella arretrata
+  del NIP-17): chiunque legga il relay sa che quella persona è un
+  cliente di Barattolo e quando ha un ordine o una chat che si muove, e
+  dalla frequenza può indovinare quanto compra o vende. In più il NIP-04
+  non ha padding (la lunghezza dice il tipo di avviso) e non ha
+  autenticazione del cifrato. La busta NIP-17 nasconde tutto questo.
+  La cifratura è stata provata contro nostr-tools 2.25.2: tre testi
+  (corto, multiplo esatto di 16, lungo con accenti ed emoji) cifrati
+  da `nip04_cifra` e decifrati da `nip04.decrypt`, firma verificata da
+  `verifyEvent`.
+
+**STRADE SCARTATE.** La campanella nell'header: la riga del brand è
+già piena (tema, classifica, profilo) e ha sentinelle sue; una fascia
+sotto l'header fa lo stesso lavoro, come quella di Tor, e sparisce
+quando non serve. Il segno del cartello alla chiusura: chi chiude l'app
+senza toccarlo lo rivedrebbe a ogni apertura. Il 10002 con una lettura
+sua: una porta in più nel censimento delle connessioni, per la stessa
+domanda. Il NIP-04 acceso di serie: no, il costo sopra.
+
+**PROSSIMI CANTIERI (NON qui, decisione di Andrea).**
+- WEB PUSH dalla PWA (`sw.js` c'è già): la strada più solida per chi
+  non ha Telegram, perché non dipende da nessun relay né client Nostr.
+  Vuole chiavi VAPID e le iscrizioni salvate sul server.
+- RELAY.BARATTOLO.STORE APERTO ALLE BUSTE 1059: oggi la policy di strfry
+  (`chi-scrive.py`) le rifiuta, perché le firma una chiave usa-e-getta.
+  Aprirle solo per le buste con `#p` di un nostro utente lo renderebbe
+  un relay di riserva nostro; è un gesto sulla macchina del relay
+  (Andrea), e va pesato contro lo spam.
+
+**PROVATO.** `prove_avvisi_nostr_arrivano`: la riserva eseguita (i
+suoi davanti, ws:// e di casa fuori, i doppioni con la barra, i suoi
+contati prima del filtro, il tetto, i nostri come sono), l'avviso in
+app su un database vero (testo spoglio, i soli bottoni web, tetto e
+scadenza per persona), `notifica` eseguita nei quattro casi (solo
+Nostr; Telegram; Telegram che ha scelto il DM; Nostr senza npub
+provata), le sentinelle (la leva spenta nel server e nel config
+d'esempio, il kind 4, la riga 📭, la fusione, lo sguardo solo per i
+tg negativi), la miniapp in node (Telegram non vede niente; il
+cartello e i nuovi; il segno visto UNA volta a due disegni; «Ho
+capito»; l'apertura dopo; col 10050 niente; in demo niente; la lista
+che scappa il testo, va a capo e tiene solo i link https).
+`collaudo_avvisi_nostr_arrivano`, sul server vero con le liste dei
+relay e gli invii di cartone: la lettura del 10050 e del 10002 (anche
+col postino: EOSE vuoto, chiusa senza EOSE, muto), dove va il DM nei
+quattro casi, la riga 📭, il NIP-04 a leva spenta e accesa, la
+`notifica` vera che salva per -503 e non per 111 (che riceve come
+sempre), la lista, i nuovi in /api/me, «letti», il tetto e la
+scadenza, il 10050 all'ingresso (`no`, `si`, muti = niente), il
+cartello segnato una volta, nessuno sguardo per chi ha Telegram.
+LA TORTURA: sei rotture apposta (l'avviso in app anche a Telegram, il
+segno del cartello a ogni disegno, la lista che prende ogni link, la
+riserva che prende ws:// e di casa, il relay muto che scrive «no», il
+NIP-04 anche a chi ha il 10050), tutte rosse; e la cura del postino
+tolta, rossa. Il collaudo era BALLERINO al primo giro: le buste partono
+da thread paralleli e l'ordine lo decide il sistema; ora si confrontano
+ordinate (dieci giri verdi di fila).
+
+**COSA RESTA DA GUARDARE.**
+- NON PROVATO DAL VIVO: che Amethyst (o un altro client) senza 10050
+  mostri una busta NIP-17 arrivata sui relay di lettura del suo 10002.
+  La specifica NIP-17 dice di cercarle nel 10050; la riserva alza le
+  probabilità, non le garantisce. Per questo c'è 📬, che invece è certo.
+- Il nome «DM Inbox Relays» nel cartello è quello che Amethyst mostra
+  nell'errore; la voce esatta del menu non l'ho vista coi miei occhi.
+- Il conto vero degli utenti toccati: i comandi in PRODUZIONE, «GLI
+  AVVISI A CHI NON HA UN 10050» (le colonne `relay_dm` si riempiono man
+  mano che gli utenti rientrano).
+
+**IL GIRO.** Prima su `d9a4e8d`: PROVE_SEVERE=1 25.787 passate, 0
+fallite, nessuna saltata (con nostr-tools 2.25.2 come in CI); i collaudi
+della CI 91 verdi, 0 rossi (i 90 di prima più
+`collaudo_avvisi_nostr_arrivano`), nella gabbia senza rete. Poi develop
+è corso (`f3de463` swap dal telefono tappa 3, `0dc4add` COLLAUDO.md,
+`299846a` le figure nel login dal bot, `417e175` una chiave una casa —
+quest'ultimo tocca la fusione, dove sta anche la mia riga di
+`avvisi_app`): rebase, conflitti solo di accodamento (l'elenco dei
+collaudi, le code di CANTIERI, ARCHITETTURA e prove.py), tenute tutte e
+due le parti. Sull'albero ribasato, codice identico a quello che va su
+develop: PROVE_SEVERE=1 25.852 passate, 0 fallite, nessuna saltata; i
+collaudi della CI 92 verdi, 0 rossi. Il primo giro della suite ha trovato cinque rosse, tutte
+mie e curate prima del commit: la sentinella dei relay di serie
+cercava `relays[:4]` in `relay_dm_di` (ora guarda `relay_dm_dove` e la
+riserva); tre banchi d'altri cantieri eseguono `notifica` in un mondo
+di cartone con un tg negativo, e il nome nuovo mancava — il pezzo in
+`notifica` è ora fail-open come il resto della funzione (prima si
+portava via anche il DM); e la sentinella del cassetto Avvisi vuole il
+blocco del mercatino in fondo, quindi la riga «📬» sta nel ramo «solo
+Nostr» invece che accodata. Rileggendo il diff: il postino, su una
+sottoscrizione chiusa senza EOSE, tornava «non ce l'ha» invece di «non
+si sa» (un cartello falso): curato, provato, controprova rossa.

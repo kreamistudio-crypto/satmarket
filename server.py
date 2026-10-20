@@ -100,6 +100,15 @@ try:
 except ImportError:
     Fernet = None
     Scrypt = None
+# AES-CBC (stesso pacchetto) serve SOLO al vecchio DM NIP-04 di riserva
+# (`DM_NIP04_RISERVA`, 20 ott 2026): se manca, la riserva tace e il
+# NIP-17 parte come sempre.
+try:
+    from cryptography.hazmat.primitives.ciphers.algorithms import AES as AesDM
+    from cryptography.hazmat.primitives.ciphers.modes import CBC as CbcDM
+except ImportError:
+    AesDM = None
+    CbcDM = None
 # Pillow serve a convertire in JPEG le foto nei formati che i browser
 # non sanno leggere (HEIC degli iPhone, e i PNG/WebP arrivati grezzi);
 # pillow-heif e' il suo occhio per HEIC/HEIF. Se mancano, le foto
@@ -6183,6 +6192,26 @@ def init_db():
         rif TEXT NOT NULL DEFAULT '',
         quando INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS avvisi_app(
+        -- «📬 I TUOI AVVISI» (20 ott 2026, cantiere avvisi-nostr-arrivano,
+        -- decisione di Andrea: «gli avvisi devono arrivare»). Chi entra
+        -- SOLO da Nostr riceve gli avvisi come DM cifrati, e se il suo
+        -- client non li trova (niente kind 10050) non sa niente di un
+        -- ordine o di un messaggio. Qui ogni suo avviso resta ANCHE
+        -- dentro Barattolo: lo scrive `notifica`, prima di spedire, per
+        -- i soli account senza Telegram (tg_id < 0). Il testo e' quello
+        -- del DM (spoglio dell'HTML, e di una chat MAI il messaggio: c'e'
+        -- solo «hai un messaggio»), i bottoni una lista JSON di coppie.
+        -- Se ne vanno da sole: oltre AVVISI_APP_MAX per persona, o dopo
+        -- AVVISI_APP_GIORNI.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        testo TEXT NOT NULL,
+        bottoni TEXT DEFAULT '',
+        quando INTEGER NOT NULL,
+        letto INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_avvisi_app_tg ON avvisi_app(tg_id, id);
     CREATE TABLE IF NOT EXISTS venditori_seguiti(
         -- «🔔 Segui» sulla pagina di un venditore (9 ott 2026,
         -- richiesta di Andrea): chi segue chi, una riga per coppia e
@@ -8197,7 +8226,19 @@ def init_db():
                     # gli arrivano: su onion il banner di chi e' dentro
                     # non deve dirgli che «non si possono attivare». Esce
                     # da /api/me col SELECT *, come le colonne sorelle.
-                    "bot_avviato INTEGER DEFAULT 0"):
+                    "bot_avviato INTEGER DEFAULT 0",
+                    # I RELAY DEI MESSAGGI (20 ott 2026, cantiere
+                    # avvisi-nostr-arrivano): per chi entra SOLO da Nostr,
+                    # se il suo profilo pubblica il kind 10050 — 'si',
+                    # 'no', '' = non si sa ancora — e quando lo si e'
+                    # guardato; `relay_dm_avvisato` e' l'ora in cui gli si
+                    # e' detto, UNA volta, che senza quella lista i
+                    # messaggi Nostr possono non arrivargli (0 = mai). Li
+                    # scrive `_controlla_relay_dm`, e il segno del banner
+                    # la sua rotta. Escono da /api/me col SELECT *.
+                    "relay_dm TEXT DEFAULT ''",
+                    "relay_dm_visto INTEGER DEFAULT 0",
+                    "relay_dm_avvisato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -17097,6 +17138,47 @@ async def _manda_telegram(tg_id: int, testo: str, bottone: tuple = None):
         return f"telegram {r.status_code}: NON arrivato — {r.text[:120]}"
 
 
+# «📬 I TUOI AVVISI» (20 ott 2026, cantiere avvisi-nostr-arrivano): vedi
+# la tabella `avvisi_app`. Quanti se ne tengono per persona, e per quanto.
+AVVISI_APP_MAX = 50
+AVVISI_APP_GIORNI = 30
+
+
+def _avviso_in_app(tg_id: int, testo: str, bottone=None):
+    """L'avviso resta anche DENTRO Barattolo, per chi entra solo da
+    Nostr: una riga in `avvisi_app`, col testo spoglio dell'HTML e i
+    bottoni che sono indirizzi web (gli altri non si saprebbero aprire).
+    Nella stessa scrittura si potano le righe oltre il tetto e quelle
+    troppo vecchie. Puo' alzare: chi la chiama la tiene in un try."""
+    bottoni = [[b[0][:80], b[1][:500]] for b in _bottoni_avviso(bottone)
+               if b[1].startswith(("https://", "http://"))]
+    adesso = int(time.time())
+    con = db()
+    try:
+        con.execute(
+            "INSERT INTO avvisi_app(tg_id, testo, bottoni, quando) "
+            "VALUES(?,?,?,?)",
+            (int(tg_id), spoglia_html(str(testo or ""))[:4000],
+             json.dumps(bottoni, ensure_ascii=False) if bottoni else "",
+             adesso))
+        con.execute(
+            "DELETE FROM avvisi_app WHERE tg_id=? AND (quando<? OR id NOT IN "
+            "(SELECT id FROM avvisi_app WHERE tg_id=? ORDER BY id DESC LIMIT ?))",
+            (int(tg_id), adesso - AVVISI_APP_GIORNI * 86400, int(tg_id),
+             AVVISI_APP_MAX))
+        con.commit()
+    finally:
+        con.close()
+
+
+async def _avviso_in_app_sottofondo(tg_id: int, testo: str, bottone=None):
+    """`_avviso_in_app` in un thread, con la sua riga se non riesce."""
+    try:
+        await asyncio.to_thread(_avviso_in_app, tg_id, testo, bottone)
+    except Exception as e:
+        print(f"⚠️ Avviso in app non salvato per l'utente {tg_id}: {e}")
+
+
 async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int,
                                 bottone: tuple = None):
     """Il ramo Nostr di notifica(), in sottofondo: prova il DM cifrato
@@ -17153,6 +17235,18 @@ async def notifica(tg_id: int, testo: str, bottone: tuple = None):
     via_telegram = canale in ("telegram", "entrambi") and tg_id > 0
     if canale == "nostr" and not via_nostr and tg_id > 0:
         via_telegram = True   # preferiva Nostr ma la npub non c'e' piu'
+    # L'AVVISO RESTA ANCHE DENTRO BARATTOLO (20 ott 2026, cantiere
+    # avvisi-nostr-arrivano) per chi non ha Telegram: il DM puo' non
+    # trovare un relay che il suo client legge, e allora questo e' il
+    # solo posto dove lo vede. In un thread e in sottofondo: chi chiama
+    # puo' avere una transazione aperta, e una scrittura qui nel loop la
+    # aspetterebbe fermando tutto. Mai un errore al chiamante. Chi ha
+    # Telegram non cambia di una riga.
+    if tg_id < 0:
+        try:
+            asyncio.create_task(_avviso_in_app_sottofondo(tg_id, testo, bottone))
+        except Exception as e:
+            print(f"⚠️ Avviso in app non salvato per l'utente {tg_id}: {e}")
     # L'ESITO, PER STRADA (17 set 2026): si restituisce e non si stampa
     # — i chiamanti sono decine e quasi nessuno lo guarda; il P2P si'.
     # ⚠️ La strada Nostr SENZA Telegram e' il caso che da fuori sembra
@@ -18254,6 +18348,10 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM avvisi_notificati WHERE tg_id=?",
                     (id_nostr,))
+        # «📬 I tuoi avvisi» (20 ott 2026) erano il ripiego di chi non
+        # aveva Telegram: da qui gli avvisi arrivano nel bot, e la lista
+        # della meta' che muore se ne va con lei
+        con.execute("DELETE FROM avvisi_app WHERE tg_id=?", (id_nostr,))
         # ...e la coda degli avvisi dei nuovi ordini P2P (9 ott 2026),
         # in unione come il dedup qui sopra: una riga per ordine basta
         con.execute("UPDATE OR IGNORE p2p_avvisi_nuovi SET tg_id=? "
@@ -44210,6 +44308,16 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
     # all'apertura lo legge da qui, senza aprire i relay
     profilo["p2p_tocca"] = p2p_tocca
+    # «📬 I TUOI AVVISI» E IL 10050 (20 ott 2026): solo per chi entra
+    # senza Telegram — il conto per la fascia dell'apertura, e lo sguardo
+    # in sottofondo ai suoi relay dei messaggi (vedi `_guarda_relay_dm`)
+    if user["id"] < 0:
+        _cn = db()
+        try:
+            profilo["avvisi_app_nuovi"] = _avvisi_app_nuovi(_cn, user["id"])
+        finally:
+            _cn.close()
+        _guarda_relay_dm(user["id"], u)
     # LO SCONTO FEDELTA' DEL P2P, per il conto di CHI LEGGE: lo stesso
     # giudice che risponde al coordinatore, dai fatti che qui sono gia'
     # in mano. E' una STIMA per lo schermo: la cifra vera la dice
@@ -44503,6 +44611,136 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True, "npub": npub, "npub_verificata": verificata,
             "accesso_revocato": accesso_revocato,
             "canale_azzerato": canale_azzerato}
+
+
+# ═══ «📬 I TUOI AVVISI» E I RELAY DEI MESSAGGI (20 ott 2026) ═══════
+# Cantiere avvisi-nostr-arrivano, decisione di Andrea: a chi entra SOLO
+# da Nostr gli avvisi arrivano come DM cifrati, e un profilo senza la
+# lista dei relay dei messaggi (kind 10050) non li vede — non sa di un
+# ordine, ne' di un messaggio. Due pezzi qui:
+# 1) LA LISTA DEGLI AVVISI dentro Barattolo (`avvisi_app`, la scrive
+#    `notifica`): la si legge da qui, e aprirla li segna letti. Un
+#    numero solo, `avvisi_app_nuovi` in /api/me, accende la fascia
+#    «🔔 Hai N avvisi nuovi» all'apertura.
+# 2) IL 10050 SI GUARDA ALL'INGRESSO, in sottofondo (`_guarda_relay_dm`
+#    da /api/me, al piu' una volta al giorno): 'si' o 'no' finiscono in
+#    `utenti.relay_dm`, e un 'no' accende UNA volta il cartello «Non
+#    riceverai i messaggi su Nostr…». Il cartello si segna visto quando
+#    compare (`/api/me/relay-dm/avvisato`), non quando lo si chiude: e'
+#    la promessa «una volta sola, non a ogni apertura». Poi resta una
+#    riga ferma nel cassetto 🔔 Avvisi del Profilo.
+# Un relay muto non e' un 'no': senza una risposta non si scrive niente
+# e il cartello non si accende (vedi `chiedi_relay_dm`).
+RELAY_DM_RICONTROLLO_S = 86400     # il 10050 si riguarda al piu' ogni giorno
+RELAY_DM_RIPROVA_S = 600           # ...e dopo un giro andato a vuoto, fra 10'
+_RELAY_DM_TENTATO = {}             # tg_id -> ultima volta che si e' guardato
+
+
+def _npub_avvisi(u) -> str:
+    """La npub a cui vanno i DM degli avvisi: lo stesso giudice di
+    `notifica` (credenziale d'accesso, o badge VERIFICATO)."""
+    if not u:
+        return ""
+    return u["npub_accesso"] or (u["npub"] if u["npub_verificata"] else "")
+
+
+async def _controlla_relay_dm(tg_id: int, npub: str):
+    """Guarda se il profilo pubblica un 10050 e lo scrive. Fail-open."""
+    try:
+        _r, stato = await relay_dm_dove(npub_to_hex(npub))
+        if stato not in ("si", "no"):
+            return
+        con = db()
+        try:
+            prima = con.execute("SELECT relay_dm FROM utenti WHERE tg_id=?",
+                                (int(tg_id),)).fetchone()
+            con.execute("UPDATE utenti SET relay_dm=?, relay_dm_visto=? "
+                        "WHERE tg_id=?", (stato, int(time.time()), int(tg_id)))
+            con.commit()
+        finally:
+            con.close()
+        if stato == "no" and (not prima or prima["relay_dm"] != "no"):
+            print(f"📭 L'utente {tg_id} (solo Nostr) non pubblica un 10050: "
+                  "i DM degli avvisi vanno alla riserva, e restano in 📬")
+    except Exception as e:
+        print(f"⚠️ Relay dei messaggi non controllati per l'utente {tg_id}: {e}")
+
+
+def _guarda_relay_dm(tg_id: int, u):
+    """Da /api/me: lancia `_controlla_relay_dm` se e' ora. Solo per chi
+    entra senza Telegram (tg_id < 0): a chi ha il bot non cambia niente."""
+    if tg_id >= 0 or not u:
+        return
+    npub = _npub_avvisi(u)
+    adesso = time.time()
+    if not npub or adesso - (u["relay_dm_visto"] or 0) < RELAY_DM_RICONTROLLO_S \
+            or adesso - _RELAY_DM_TENTATO.get(tg_id, 0) < RELAY_DM_RIPROVA_S:
+        return
+    if len(_RELAY_DM_TENTATO) > 5000:
+        _RELAY_DM_TENTATO.clear()
+    _RELAY_DM_TENTATO[tg_id] = adesso
+    asyncio.create_task(_controlla_relay_dm(tg_id, npub))
+
+
+def _avvisi_app_nuovi(con, tg_id: int) -> int:
+    """Quanti avvisi in app non ha ancora aperto."""
+    return int(con.execute("SELECT COUNT(*) FROM avvisi_app WHERE tg_id=? "
+                           "AND letto=0", (int(tg_id),)).fetchone()[0] or 0)
+
+
+@app.get("/api/me/avvisi")
+async def miei_avvisi_app(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """«📬 I tuoi avvisi»: gli ultimi, dal piu' nuovo. Non segna niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT id, testo, bottoni, quando, letto FROM avvisi_app "
+            "WHERE tg_id=? ORDER BY id DESC LIMIT ?",
+            (user["id"], AVVISI_APP_MAX)).fetchall()
+        nuovi = _avvisi_app_nuovi(con, user["id"])
+    finally:
+        con.close()
+    avvisi = []
+    for r in righe:
+        try:
+            bottoni = json.loads(r["bottoni"]) if r["bottoni"] else []
+        except ValueError:
+            bottoni = []
+        avvisi.append({"id": r["id"], "testo": r["testo"], "bottoni": bottoni,
+                       "quando": r["quando"], "letto": bool(r["letto"])})
+    return {"avvisi": avvisi, "nuovi": nuovi}
+
+
+@app.post("/api/me/avvisi/letti")
+async def avvisi_app_letti(x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Aperta la lista, gli avvisi sono letti: la fascia si spegne."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        con.execute("UPDATE avvisi_app SET letto=1 WHERE tg_id=? AND letto=0",
+                    (user["id"],))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "nuovi": 0}
+
+
+@app.post("/api/me/relay-dm/avvisato")
+async def relay_dm_avvisato(x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il cartello del 10050 mancante e' comparso: non ricompare piu'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        con.execute("UPDATE utenti SET relay_dm_avvisato=? WHERE tg_id=? "
+                    "AND relay_dm_avvisato=0", (int(time.time()), user["id"]))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
 
 
 @app.post("/api/me/canale-notifiche")
@@ -66387,6 +66625,38 @@ def nip44_cifra(sk_bytes: bytes, dest_hex: str, testo: str) -> str:
     return base64.b64encode(b"\x02" + nonce + cifrato + mac).decode()
 
 
+def nip04_cifra(sk_bytes: bytes, dest_hex: str, testo: str) -> str:
+    """Cifra un testo verso una chiave pubblica col vecchio NIP-04:
+    AES-256-CBC con la X NUDA del punto ECDH come chiave (la stessa
+    avvertenza di `nip44_cifra`), padding PKCS#7, e il contenuto nella
+    forma `<cifrato base64>?iv=<iv base64>`. Serve SOLO alla riserva di
+    chi non ha un 10050 (`DM_NIP04_RISERVA`): il testo e' cifrato, ma
+    chi scrive, a chi e quando restano in chiaro sul relay."""
+    punto = ChiavePubblicaCompleta(
+        b"\x02" + bytes.fromhex(dest_hex)).multiply(sk_bytes)
+    x_condivisa = punto.format(compressed=True)[1:33]
+    iv = secrets.token_bytes(16)
+    dati = testo.encode("utf-8")
+    manca = 16 - len(dati) % 16
+    cifratore = CifrarioDM(AesDM(x_condivisa), CbcDM(iv)).encryptor()
+    cifrato = cifratore.update(dati + bytes([manca]) * manca) \
+        + cifratore.finalize()
+    return (base64.b64encode(cifrato).decode() + "?iv="
+            + base64.b64encode(iv).decode())
+
+
+def impacchetta_dm_nip04(dest_hex: str, testo: str) -> dict:
+    """Il DM di riserva NIP-04 (kind 4), firmato dalla chiave della
+    piattaforma: a differenza del pacco NIP-17 qui la firma e' quella
+    vera di Barattolo e la data e' quella vera — e' il suo prezzo."""
+    sk, pubkey = _NOSTR
+    ev = evento_non_firmato(pubkey, 4, [["p", dest_hex]],
+                            nip04_cifra(sk.secret, dest_hex, testo),
+                            int(time.time()))
+    ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+    return ev
+
+
 def impacchetta_dm(dest_hex: str, testo: str) -> dict:
     """Confeziona un DM NIP-17 completo per il destinatario: rumor →
     sigillo → pacco regalo. Le date del sigillo e del pacco arretrano
@@ -66410,79 +66680,182 @@ def impacchetta_dm(dest_hex: str, testo: str) -> dict:
     return pacco
 
 
-def chiedi_relay_dm(relay: str, hexkey: str):
+def chiedi_relay_dm(relay: str, hexkey: str, kind: int = 10050):
     """Chiede a UN relay dove il destinatario vuole ricevere i DM
     (kind 10050, NIP-17). E' SINCRONA: va in asyncio.to_thread.
     La sua guardia sta QUI e non solo nel chiamante (23 set 2026): in
     collaudo `manda_dm_nostr` esce prima di arrivarci, ma la lettura
     resterebbe aperta al primo che la chiamasse da un'altra parte. Verso
-    un relay che non e' di casa torna None, «nessun relay DM»."""
-    if lettura_simulata(relay, f"dei relay DM (kind 10050) di {hexkey[:16]}…"):
+    un relay che non e' di casa torna None, «nessun relay DM».
+    IL KIND 10002 (20 ott 2026, cantiere avvisi-nostr-arrivano): con
+    `kind=10002` la stessa domanda chiede i relay di LETTURA del profilo
+    (NIP-65: i tag `r` senza segno o col segno «read»), che sono dove
+    consegnare a chi non ha un 10050. Una porta sola per le due liste:
+    la stessa guardia, lo stesso postino, nessuna connessione nuova.
+    NIENTE E ZITTO NON SONO LA STESSA RISPOSTA (stesso giorno): un relay
+    che risponde e non ha la lista torna `[]`, un relay muto torna None.
+    E' la differenza fra «non ce l'ha» e «non si sa», e il banner del
+    10050 mancante si accende solo sulla prima."""
+    di_lettura = kind == 10002
+    if lettura_simulata(relay, (f"dei relay di lettura (kind 10002) di {hexkey[:16]}…"
+                                if di_lettura else
+                                f"dei relay DM (kind 10050) di {hexkey[:16]}…")):
         return None
-    if fuori_dal_recinto(relay, "lettura dei relay DM (kind 10050)"):
+    if fuori_dal_recinto(relay, ("lettura dei relay di lettura (kind 10002)"
+                                 if di_lettura else
+                                 "lettura dei relay DM (kind 10050)")):
         return None
+
+    def _lista(tags):
+        if di_lettura:
+            return [t[1] for t in tags
+                    if len(t) > 1 and t[0] == "r"
+                    and str(t[1]).startswith("ws")
+                    and (len(t) == 2 or t[2] == "read")]
+        return [t[1] for t in tags
+                if len(t) > 1 and t[0] == "relay"
+                and str(t[1]).startswith("ws")]
     posta = _posta_per(relay)
     if posta is not None:
         try:
-            letto = posta.leggi({"kinds": [10050], "authors": [hexkey],
+            letto = posta.leggi({"kinds": [kind], "authors": [hexkey],
                                  "limit": 1})
-            trovati = None
-            for ev in (letto or ([], False))[0]:
-                lista = [t[1] for t in ev.get("tags", [])
-                         if len(t) > 1 and t[0] == "relay"
-                         and str(t[1]).startswith("ws")]
-                trovati = lista or trovati
-            return trovati
+            if letto is None:
+                return None
+            # chiusa senza EOSE (un «auth-required», un rifiuto) e senza
+            # niente in mano: non e' un «non ce l'ha», e' un «non si sa»
+            eventi, finito = letto
+            trovati = []
+            for ev in eventi:
+                trovati = _lista(ev.get("tags", [])) or trovati
+            return trovati if (finito or trovati) else None
         except Exception:
             return None
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
         ws.send(json.dumps(["REQ", "dm", {
-            "kinds": [10050], "authors": [hexkey], "limit": 1}]))
+            "kinds": [kind], "authors": [hexkey], "limit": 1}]))
         inizio = time.time()
-        trovati = None
+        trovati, finito = [], False
         while time.time() - inizio < 6:
             msg = json.loads(ws.recv())
             if msg[0] == "EVENT" and msg[1] == "dm":
-                lista = [t[1] for t in msg[2].get("tags", [])
-                         if len(t) > 1 and t[0] == "relay"
-                         and t[1].startswith("ws")]
-                trovati = lista or trovati
+                trovati = _lista(msg[2].get("tags", [])) or trovati
             elif msg[0] == "EOSE":
+                finito = True
                 break
         ws.close()
-        return trovati
+        return trovati if (finito or trovati) else None
     except Exception:
         return None               # relay muto o irraggiungibile: pazienza
 
 
-_RELAY_DM_CACHE = {}   # hex destinatario -> (scadenza, lista relay)
+# DOVE VA L'AVVISO A CHI NON HA UN 10050 (20 ott 2026, cantiere
+# avvisi-nostr-arrivano, decisione di Andrea: «gli avvisi devono
+# arrivare»). Fino a ieri andava ai primi quattro relay di serie, e
+# basta: relay che accettano la busta ma che il client di chi la deve
+# leggere non guarda (il caso vero: Amethyst, «DM inbox relays not
+# found»), cioe' un avviso perso in silenzio. Adesso alla lista si
+# aggiungono, DAVANTI, i relay di LETTURA del suo kind 10002 — quelli
+# dove il suo client va a cercare quel che gli scrivono — fino a
+# quattro, e il tetto totale e' DM_RISERVA_MAX_RELAY. Resta un NIP-17
+# cifrato: si allarga la strada, non si apre la busta.
+# SOLO wss:// E MAI UN RELAY DI CASA, PER QUELLI DEL 10002: la lista la
+# scrive chiunque, e un `ws://127.0.0.1:8080` la' dentro farebbe bussare
+# il server a se stesso. I nostri vengono dal config e passano come sono
+# (sull'istanza di prova sono proprio quelli di casa).
+DM_RISERVA_MAX_RELAY = 8
+# Quanto vale quel che si e' saputo dei relay di una persona: un'ora se
+# si sa (c'e' o non c'e'), cinque minuti se nessun relay ha risposto.
+DM_RELAY_CACHE_S = 3600
+DM_RELAY_CACHE_IGNOTO_S = 300
 
 
-async def relay_dm_di(dest_hex: str) -> list:
-    """I relay dove consegnare il DM: quelli dichiarati dal destinatario
-    (kind 10050) se li pubblica, altrimenti i nostri 4 standard — la
-    specifica direbbe di NON inviare, ma per una notifica un tentativo
-    e' meglio di zero. Cache in memoria 1h (uvicorn e' mono-processo)."""
+def relay_riserva_dm(lettura, nostri) -> list:
+    """PURA: i relay dove consegnare a chi NON pubblica un 10050 — i
+    primi quattro di lettura del suo 10002 (solo wss://, mai di casa),
+    poi i primi quattro di `nostri`, senza doppioni (la barra finale non
+    fa un relay diverso), al piu' DM_RISERVA_MAX_RELAY."""
+    fuori, visti = [], set()
+    suoi = [(r, True) for r in list(lettura or [])[:4]]
+    for r, suo in suoi + [(r, False) for r in list(nostri or [])[:4]]:
+        r = str(r or "").strip()
+        chiave = r.lower().rstrip("/")
+        if not r.lower().startswith("ws") or chiave in visti:
+            continue
+        if suo and (not r.lower().startswith("wss://") or relay_di_casa(r)):
+            continue
+        visti.add(chiave)
+        fuori.append(r)
+    return fuori[:DM_RISERVA_MAX_RELAY]
+
+
+_RELAY_DM_CACHE = {}   # hex destinatario -> (scadenza, lista relay, stato)
+
+
+async def relay_dm_dove(dest_hex: str) -> tuple:
+    """`(relay, stato)`: dove consegnare il DM e che cosa si sa del suo
+    10050 — 'si' (lo pubblica: si va li', i primi 4), 'no' (almeno un
+    relay ha risposto e non c'e': la riserva di `relay_riserva_dm`), '?'
+    (nessun relay ha risposto: la riserva lo stesso, ma per poco). La
+    specifica direbbe di NON inviare senza 10050, ma per una notifica un
+    tentativo e' meglio di zero. Cache in memoria (uvicorn e'
+    mono-processo)."""
     voce = _RELAY_DM_CACHE.get(dest_hex)
     if voce and voce[0] > time.time():
-        return voce[1]
+        return voce[1], voce[2]
     risposte = await asyncio.gather(*[
         asyncio.to_thread(chiedi_relay_dm, r, dest_hex)
         for r in RELAYS_VERIFICA])
     relays = next((r for r in risposte if r), None)
-    if not relays:
-        relays = RELAYS_VERIFICA
-    _RELAY_DM_CACHE[dest_hex] = (time.time() + 3600, relays[:4])
-    return relays[:4]
+    if relays:
+        relays, stato = relays[:4], "si"
+    else:
+        stato = "no" if any(r is not None for r in risposte) else "?"
+        lettura = await asyncio.gather(*[
+            asyncio.to_thread(chiedi_relay_dm, r, dest_hex, 10002)
+            for r in RELAYS_VERIFICA])
+        relays = relay_riserva_dm(next((r for r in lettura if r), None),
+                                  RELAYS_VERIFICA)
+    _RELAY_DM_CACHE[dest_hex] = (
+        time.time() + (DM_RELAY_CACHE_S if stato != "?"
+                       else DM_RELAY_CACHE_IGNOTO_S), relays, stato)
+    return relays, stato
+
+
+async def relay_dm_di(dest_hex: str) -> list:
+    """I relay dove consegnare il DM (vedi `relay_dm_dove`)."""
+    return (await relay_dm_dove(dest_hex))[0]
+
+
+# IL VECCHIO NIP-04 DI RISERVA (20 ott 2026, decisione di Andrea: «sì,
+# ma come leva spenta di serie, solo per chi non ha il 10050»). Accesa,
+# a chi non pubblica un 10050 parte ANCHE un DM kind 4, sugli stessi
+# relay della busta NIP-17: Primal, Damus e molti altri lo leggono dai
+# relay di sempre, senza bisogno della lista DM.
+# IL SUO PREZZO, ed e' il motivo per cui nasce spenta: il testo e'
+# cifrato, ma la busta NO. Sul relay resta scritto in chiaro che la
+# chiave di Barattolo ha scritto a QUELLA npub, e quando (la data vera):
+# chiunque legga il relay sa che quella persona e' un cliente di
+# Barattolo e quando ha un ordine o una chat che si muove. La busta
+# NIP-17 nasconde tutte e tre le cose. Verbale: CANTIERI, «Gli avvisi
+# Nostr arrivano».
+try:
+    from config import DM_NIP04_RISERVA
+except ImportError:
+    DM_NIP04_RISERVA = False
 
 
 async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
     """Recapita un DM NIP-17 al destinatario. Fail-open totale: ogni
     intoppo e' una riga in console, mai un errore al chiamante. Nel
     collaudo il pacco si confeziona davvero (cifratura compresa) ma
-    non esce nulla dal computer."""
+    non esce nulla dal computer.
+    (20 ott 2026) A chi non ha un 10050 la busta va alla riserva di
+    `relay_dm_dove`, e il journal lo dice SEMPRE con una riga 📭 — mai
+    piu' un avviso spedito dove nessuno legge senza che resti traccia.
+    A leva DM_NIP04_RISERVA accesa, a lui parte anche il NIP-04."""
     if not _NOSTR or ChaCha20DM is None:
         return False
     try:
@@ -66490,13 +66863,28 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
         if MODALITA_COLLAUDO:
             print(f"💌 [dm nostr simulato per {dest_hex[:16]}…] {testo}")
             return True
+        relays, stato = await relay_dm_dove(dest_hex)
         esiti = await asyncio.gather(*[
             asyncio.to_thread(invia_evento_relay, r, pacco)
-            for r in await relay_dm_di(dest_hex)])
-        if not sum(esiti):
+            for r in relays])
+        vecchi = []
+        if stato != "si" and DM_NIP04_RISERVA and AesDM is not None:
+            vecchio = impacchetta_dm_nip04(dest_hex, testo)
+            vecchi = await asyncio.gather(*[
+                asyncio.to_thread(invia_evento_relay, r, vecchio)
+                for r in relays])
+        if stato != "si":
+            print(f"📭 DM Nostr a {dest_hex[:16]}…: "
+                  + ("nessun 10050" if stato == "no"
+                     else "10050 non letto (relay muti)")
+                  + f", busta NIP-17 su {sum(esiti)}/{len(relays)} relay "
+                  "di riserva"
+                  + (f", NIP-04 su {sum(vecchi)}" if vecchi else "")
+                  + ": nel suo client potrebbe non comparire")
+        if not sum(esiti) and not sum(vecchi):
             print(f"⚠️ DM Nostr: nessun relay l'ha accettato "
                   f"({dest_hex[:16]}…)")
-        return bool(sum(esiti))
+        return bool(sum(esiti) or sum(vecchi))
     except Exception as e:
         print(f"⚠️ DM Nostr saltato ({dest_hex[:16]}…): {e}")
         return False

@@ -4703,6 +4703,57 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`payment_required`, `auth_required`); i tempi su tre giri. La
   riserva misurata quella notte: `wss://nostr.oxtr.dev`.
 
+- GLI AVVISI A CHI NON HA UN 10050 (20 ott 2026, cantiere
+  avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
+  arrivano»; com'è fatto in ARCHITETTURA, «GLI AVVISI A CHI ENTRA SOLO
+  DA NOSTR»). Chi entra SOLO da Nostr e non pubblica il kind 10050
+  riceve gli avvisi come busta NIP-17 sui relay di LETTURA del suo
+  10002 più i primi quattro di `RELAY_NOSTR`, e ognuno resta anche in
+  «📬 I tuoi avvisi» dentro Barattolo. NESSUN PASSO SUL VPS per il
+  deploy: la tabella `avvisi_app` e le tre colonne `relay_dm*` di
+  `utenti` nascono da sole all'avvio. Chi ha Telegram non vede niente
+  di nuovo.
+  COSA DICE IL JOURNAL:
+   · «📭 DM Nostr a <16 cifre>…: nessun 10050, busta NIP-17 su N/M relay
+     di riserva: nel suo client potrebbe non comparire»: un avviso a chi
+     non ha il 10050. È NORMALE, e c'è a ogni avviso: dice che il DM è
+     partito largo e che l'avviso sta anche in 📬. «su 0/M» vuol dire
+     che nessun relay l'ha preso (segue la ⚠️ di sempre, «nessun relay
+     l'ha accettato»): l'avviso c'è solo dentro Barattolo.
+   · «📭 DM Nostr a …: 10050 non letto (relay muti), …»: nessuno dei
+     nostri relay ha risposto alla domanda. Si spedisce alla riserva lo
+     stesso, e si richiede fra cinque minuti.
+   · «📭 L'utente -N (solo Nostr) non pubblica un 10050: …»: l'ha visto
+     la sua /api/me (al più una volta al giorno). Una riga quando lo si
+     scopre, non a ogni apertura: è anche il momento in cui gli compare,
+     UNA volta, il cartello «Non riceverai i messaggi su Nostr».
+   · «⚠️ Avviso in app non salvato per l'utente -N: …» e «⚠️ Relay dei
+     messaggi non controllati per l'utente -N: …»: un guasto (database
+     occupato, una npub storta). L'avviso Nostr parte lo stesso.
+  QUANTI SONO, in sola lettura (stampano solo numeri):
+   `sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT relay_dm, COUNT(*) FROM utenti WHERE tg_id<0 GROUP BY relay_dm"`
+   — `si`/`no` = guardato, vuoto = non è ancora entrato dopo il deploy
+   (o i relay non hanno risposto).
+   `sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT COUNT(DISTINCT tg_id) AS persone, COUNT(*) AS avvisi, SUM(letto=0) AS non_letti FROM avvisi_app"`
+   `journalctl -u barattolo --since "7 days ago" | grep -c "📭 DM Nostr a"`
+  LA LEVA `DM_NIP04_RISERVA` (il vecchio DM NIP-04 di riserva) NASCE
+  SPENTA, e un deploy non la accende. Accesa, a chi non ha il 10050
+  parte ANCHE un DM kind 4 sugli stessi relay: Primal, Damus e altri lo
+  leggono senza la lista. IL PREZZO: il testo è cifrato, ma sul relay
+  resta in chiaro che la chiave di Barattolo ha scritto a quella npub, e
+  quando — chiunque legga il relay sa che è un cliente di Barattolo e
+  quando ha un ordine o una chat che si muove. La busta NIP-17 nasconde
+  tutte e tre le cose. PER ACCENDERLA (decisione di Andrea, un comando
+  alla volta):
+  1) `grep -n "DM_NIP04_RISERVA" /srv/barattolo/config.py` — deve non
+     stampare niente (se c'è già, vince lei: si cambia quella).
+  2) si aggiunge in fondo a `/srv/barattolo/config.py` UNA riga:
+     `DM_NIP04_RISERVA = True`
+  3) `sudo systemctl restart barattolo`
+  4) al primo avviso a chi non ha il 10050 la riga 📭 porta in coda
+     «, NIP-04 su N»: `journalctl -u barattolo --since "1 hour ago" | grep "NIP-04 su"`
+  PER SPEGNERLA: la riga a `False` (o via) e lo stesso riavvio.
+
 - I RELAY DI BARATTOLO: LA LISTA (`RELAY_NOSTR`) E IL KIND 10002 (15
   ott 2026, cantiere relay-di-barattolo; perché in CANTIERI, «I relay
   di Barattolo»). La lista dei relay dove Barattolo pubblica e legge
