@@ -150666,7 +150666,7 @@ def prove_checksum_descrittore():
 
     # la forma: in BigInt, e il prodotto lo usa davvero
     i_c = mini.index("/* ============ IL CHECKSUM DEL DESCRITTORE")
-    blocco = mini[i_c:mini.index("/* Le TRE chiavi dell'ordine", i_c)]
+    blocco = mini[i_c:mini.index("/* ============ IL CONTO DEL 2-DI-3", i_c)]
     prova("il generatore e' in BigInt (a 32 bit il checksum sarebbe "
           "sbagliato ma dall'aria giusta)", [True, False],
           ["0xf5dee51989n" in blocco, "0xf5dee51989," in blocco])
@@ -150998,6 +150998,11 @@ def prove_banco_chiavi_onchain():
           [True, 1, True],
           ['\nONCHAIN_RETE = "signet"\n' in src,
            src.count("\nONCHAIN_RETE = "), '"rete": ONCHAIN_RETE,' in src])
+    prova("il conto del 2-di-3 e' BIP-48 di prova, e lo dice la rotta",
+          [True, True, False],
+          ["\nONCHAIN_STRADA_CONTO = \"m/48'/1'/0'/2'\"\n" in src,
+           '"strada": ONCHAIN_STRADA_CONTO,' in src,
+           '"strada": "m/0/0"' in src])
     prova("...e il foglio dice signet, non piu' testnet",
           [True, True, False],
           ["Rete <b>signet</b>, la rete di prova" in mini,
@@ -151041,20 +151046,19 @@ def prove_banco_chiavi_onchain():
     # dentro una funzione va benissimo, per ESEGUIRLA no): gliela si
     # rimette, o node dice «Unexpected end of input» e il banco muore
     # senza aver provato niente.
-    chiavi_js = pezzo_js(mini, "async function onchainChiavi(parole, srv){",
-                         "\n}\n") + "\n}"
-    # ...e col blocco del CHECKSUM davanti (17 ott 2026): `onchainChiavi`
-    # da quel giorno chiama `descrittoreConChecksum`, e un banco che
-    # estraesse la sola funzione morirebbe con un ReferenceError —
-    # l'ha fatto, il giorno in cui il checksum e' nato.
+    # IL BLOCCO INTERO, dal CHECKSUM all'attesa piccola (20 ott 2026,
+    # tappa 2): `onchainChiavi` chiama `descrittoreConChecksum` (17 ott)
+    # e da oggi anche il conto, la figlia e `onchainDaTre`. Estrarre la
+    # sola funzione faceva morire il banco con un ReferenceError — l'ha
+    # fatto il giorno in cui e' nato il checksum — e un elenco di pezzi
+    # da tenere in pari si dimentica: il blocco intero no.
     i_ck = mini.index("/* ============ IL CHECKSUM DEL DESCRITTORE")
-    chiavi_js = (mini[i_ck:mini.index("/* Le TRE chiavi dell'ordine", i_ck)]
-                 + chiavi_js)
+    chiavi_js = mini[i_ck:mini.index("/* L'attesa PICCOLA", i_ck)]
     vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
                           encoding="utf-8"))
     srv = {"xpub": vett["bip32"][0]["catene"][0]["xpub"],
            "xpub_venditore": vett["bip32"][1]["catene"][0]["xpub"],
-           "strada": "m/0/0"}
+           "strada": "m/48'/1'/0'/2'"}
     banco = """
 const fs = require('fs');
 const B = new Function(fs.readFileSync(process.argv[2], 'utf8')
@@ -151083,9 +151087,54 @@ __PEZZO__
     === JSON.stringify([...out.tre].sort());
   out.descrittore = k1.descrittore;
   out.scriptByte = k1.script.length / 2;
-  const bar = B.HDKey.fromExtendedKey(srv.xpub).derive(srv.strada);
+  const bar = B.HDKey.fromExtendedKey(srv.xpub).deriveChild(0).deriveChild(0);
   out.barattoloEQuellaDelServer =
     k1.barattolo === B.hex.encode(bar.publicKey);
+  /* LA TAPPA 2 (20 ott 2026): il conto BIP-48, la xpub dedicata, la
+     chiave per ordine e il telefono che rifa' l'indirizzo del server */
+  const conto = onchainConto(B, A, srv.strada);
+  const xpub = await onchainMiaXpub(A, srv);
+  out.xpubTpub = xpub.startsWith('tpub');
+  out.xpubProfondita = onchainLeggiXpub(B, xpub).depth;
+  out.xpubPrivata = /prv/.test(xpub);
+  /* dalla sola meta' pubblica si rifanno le STESSE chiavi del seme:
+     e' quel che fara' il server, che il seme non lo vede mai */
+  const daXpub = onchainLeggiXpub(B, xpub);
+  out.pubblicaComeSeme = [0, 1, 7, 1000].every(i =>
+    B.hex.encode(onchainFiglia(daXpub, i).publicKey)
+    === B.hex.encode(onchainFiglia(conto, i).publicKey));
+  out.numeriDiversiChiaviDiverse = new Set([0, 1, 2, 3].map(i =>
+    B.hex.encode(onchainFiglia(conto, i).publicKey))).size === 4;
+  out.fintoEIlNumeroZero =
+    k1.compratore === B.hex.encode(onchainFiglia(conto, 0).publicKey);
+  /* una riga «come la dice il server», fatta con la chiave numero 3 */
+  const ven = onchainFiglia(onchainLeggiXpub(B, srv.xpub_venditore), 5);
+  const tre = [onchainFiglia(conto, 3).publicKey, ven.publicKey, bar.publicKey];
+  const kr = onchainDaTre(B, tre);
+  const riga = {ruolo: 'compratore', mio_numero: 3,
+                chiavi: {compratore: kr.compratore, venditore: kr.venditore,
+                         barattolo: kr.barattolo},
+                descrittore: kr.descrittore, indirizzo: kr.indirizzo};
+  const v = await onchainVerificaRiga(A, srv, riga);
+  out.rigaBuona = [v.mia, v.uguale];
+  const v2 = await onchainVerificaRiga(A, srv, {...riga, mio_numero: 4});
+  out.numeroSbagliato = [v2.mia, v2.uguale];
+  const v3 = await onchainVerificaRiga(Z, srv, riga);
+  out.semeDiAltri = [v3.mia, v3.uguale];
+  const v4 = await onchainVerificaRiga(A, srv, {...riga,
+    indirizzo: k3.indirizzo});
+  out.indirizzoTruccato = [v4.mia, v4.uguale];
+  const v5 = await onchainVerificaRiga(A, srv, {...riga,
+    chiavi: {...riga.chiavi, barattolo: 'zz'}});
+  out.chiaveStorta = [v5.mia, v5.uguale];
+  /* da venditore: la mia chiave sta nel posto del venditore */
+  const tre2 = [ven.publicKey, onchainFiglia(conto, 9).publicKey, bar.publicKey];
+  const k9 = onchainDaTre(B, tre2);
+  const v6 = await onchainVerificaRiga(A, srv, {ruolo: 'venditore',
+    mio_numero: 9, chiavi: {compratore: k9.compratore,
+    venditore: k9.venditore, barattolo: k9.barattolo},
+    descrittore: k9.descrittore, indirizzo: k9.indirizzo});
+  out.daVenditore = [v6.mia, v6.uguale];
   console.log(JSON.stringify(out));
 })();
 """
@@ -151129,6 +151178,28 @@ __PEZZO__
           [o["descrittore"].startswith("wsh(sortedmulti(2,"),
            o["descrittore"].count(",")])
     prova("...e lo script e' il 2-di-3 da 105 byte", 105, o["scriptByte"])
+    # --- 3) la tappa 2: il conto, la xpub dedicata, la riga del server --
+    prova("la xpub dedicata e' una TPUB (signet), il conto BIP-48 a "
+          "profondita' 4, e mai una privata", [True, 4, False],
+          [o["xpubTpub"], o["xpubProfondita"], o["xpubPrivata"]])
+    prova("dalla sola xpub si rifanno le STESSE chiavi del seme (0, 1, 7, "
+          "1000): e' quel che fara' il server", True, o["pubblicaComeSeme"])
+    prova("...e numeri diversi danno chiavi diverse: una chiave per ordine",
+          True, o["numeriDiversiChiaviDiverse"])
+    prova("l'ordine finto del foglio e' il numero 0 del conto", True,
+          o["fintoEIlNumeroZero"])
+    prova("il telefono rifa' la riga del server: mia e uguale",
+          [True, True], o["rigaBuona"])
+    prova("...col numero sbagliato la chiave NON e' la mia",
+          [False, True], o["numeroSbagliato"])
+    prova("...con il seme di un altro nemmeno", [False, True],
+          o["semeDiAltri"])
+    prova("...un indirizzo truccato dal server NON combacia",
+          [True, False], o["indirizzoTruccato"])
+    prova("...una chiave storta: niente da mostrare", [False, False],
+          o["chiaveStorta"])
+    prova("...e da venditore la mia chiave sta al posto del venditore",
+          [True, True], o["daVenditore"])
 
 
 def prove_cancello_onchain():

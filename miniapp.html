@@ -52942,7 +52942,7 @@ async function onchainSemeAssicurato(){
    foglio, che legge `onchainCase` — e un backup che non c'e' va
    DETTO, non nascosto. */
 async function onchainMettiAlSicuro(parole){
-  const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || 'm/0/0'});
+  const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || "m/48'/1'/0'/2'"});
   try { onchainCase.nuvola = await cloudScrivi(ONCHAIN_CLOUD, corpo); }
   catch(e){ onchainCase.nuvola = false; }
   try { onchainCase.relay = await onchainSuiRelay(corpo); }
@@ -53089,24 +53089,59 @@ function descrittoreConChecksum(s){
   return c ? `${s}#${c}` : s;
 }
 
-/* Le TRE chiavi dell'ordine, calcolate qui e da nessun'altra parte.
-   `strada` la dice il server (m/0/0), cosi' due dispositivi dello
-   stesso conto fanno lo STESSO indirizzo — che e' esattamente quel che
-   la prova del ripristino deve poter confrontare. */
-async function onchainChiavi(parole, srv){
-  const B = await caricaBitcoin();
-  const rete = B.TEST_NETWORK;   // signet: le stesse forme di testnet (tb1)
+/* ============ IL CONTO DEL 2-DI-3 E LA CHIAVE PER ORDINE (20 ott 2026,
+   tappa 2) ============
+   Fino alla tappa 2a la chiave era UNA (`m/0/0` dal seme), e ogni
+   ordine avrebbe riusato la stessa: in catena due ordini della stessa
+   persona si sarebbero legati da soli. Adesso il seme ha un CONTO
+   dedicato al 2-di-3, `m/48'/1'/0'/2'` (BIP-48: scopo 48, coin type 1
+   delle reti di prova, conto 0, tipo 2 = p2wsh), e ogni ordine prende
+   la sua chiave `/0/i` da li', con un `i` che dice il SERVER (lo
+   assegna una volta sola, mai due volte lo stesso).
+   LA META' PUBBLICA DEL CONTO e' la «xpub dedicata»: va al server
+   quando la persona accende l'on-chain, e da lei il server ricava le
+   chiavi PUBBLICHE degli ordini anche quando il telefono e' spento.
+   Non e' mai quella del suo wallet, e con lei non si spende niente.
+   ⚠️ LE VERSIONI: signet usa le versioni BIP-32 di testnet (`tpub`).
+   `HDKey` di serie parla mainnet (`xpub`): per scrivere e per leggere
+   una `tpub` gliele si dice, sennò risponde «Version mismatch». Le
+   xpub di cartone dei vettori BIP-32 restano `xpub` e si leggono di
+   serie: il prefisso decide. */
+const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};
+
+function onchainLeggiXpub(B, s){
+  const t = String(s || '');
+  return t.startsWith('tpub')
+    ? B.HDKey.fromExtendedKey(t, ONCHAIN_VERSIONI_PROVA)
+    : B.HDKey.fromExtendedKey(t);
+}
+
+/* Il conto del 2-di-3 di questo seme: la radice con le versioni di
+   prova, poi la strada che dice il server (`strada`). */
+function onchainConto(B, parole, strada){
   const seme = B.mnemonicToSeedSync(parole, '');
-  const mia = B.HDKey.fromMasterSeed(seme).derive(srv.strada);
-  const ven = B.HDKey.fromExtendedKey(srv.xpub_venditore).derive(srv.strada);
-  const bar = B.HDKey.fromExtendedKey(srv.xpub).derive(srv.strada);
-  const tre = [mia.publicKey, ven.publicKey, bar.publicKey];
+  return B.HDKey.fromMasterSeed(seme, ONCHAIN_VERSIONI_PROVA).derive(strada);
+}
+
+/* La chiave PUBBLICA numero `i` di un conto (o di una xpub): `/0/i`,
+   la catena «ricevi» del BIP-44, mai indurita — e' quella che il
+   server sa rifare dalla sola meta' pubblica. */
+function onchainFiglia(conto, i){
+  return conto.deriveChild(0).deriveChild(Number(i));
+}
+
+/* IL 2-DI-3 DA TRE CHIAVI PUBBLICHE, nell'ordine compratore, venditore,
+   Barattolo. E' il cuore che il server rifa' con `embit` e che la prova
+   doppia confronta byte per byte: descrittore (con il checksum) e
+   indirizzo devono uscire IDENTICI dalle due parti. */
+function onchainDaTre(B, tre){
+  const rete = B.TEST_NETWORK;   // signet: le stesse forme di testnet (tb1)
   const w = B.sortedMultisig(2, tre, true, rete);
   const hex = (b)=>B.hex.encode(b);
   return {
-    compratore: hex(mia.publicKey),
-    venditore: hex(ven.publicKey),
-    barattolo: hex(bar.publicKey),
+    compratore: hex(tre[0]),
+    venditore: hex(tre[1]),
+    barattolo: hex(tre[2]),
     /* le chiavi ORDINATE come stanno nello script (BIP-67): e' l'ordine
        che conta per l'indirizzo, e vederlo spiega perche' l'indirizzo
        non cambia se le tre arrivano in un altro ordine */
@@ -53125,6 +53160,54 @@ async function onchainChiavi(parole, srv){
       `wsh(sortedmulti(2,${tre.map(hex).join(',')}))`),
     indirizzo: w.address,
     script: hex(w.witnessScript),
+  };
+}
+
+/* Le TRE chiavi dell'ORDINE FINTO del foglio, calcolate qui e da
+   nessun'altra parte: la mia dal mio conto, il venditore di cartone e
+   Barattolo dalle xpub che dice il server, tutte e tre col numero 0.
+   Due dispositivi dello stesso conto fanno lo STESSO indirizzo — che e'
+   esattamente quel che la prova del ripristino deve poter confrontare. */
+async function onchainChiavi(parole, srv){
+  const B = await caricaBitcoin();
+  const mia = onchainFiglia(onchainConto(B, parole, srv.strada), 0);
+  const ven = onchainFiglia(onchainLeggiXpub(B, srv.xpub_venditore), 0);
+  const bar = onchainFiglia(onchainLeggiXpub(B, srv.xpub), 0);
+  return onchainDaTre(B, [mia.publicKey, ven.publicKey, bar.publicKey]);
+}
+
+/* La mia xpub dedicata: la meta' pubblica del conto, una `tpub`. E'
+   l'unica cosa del seme che esce dal telefono, ed e' pubblica. */
+async function onchainMiaXpub(parole, srv){
+  const B = await caricaBitcoin();
+  return onchainConto(B, parole, srv.strada).publicExtendedKey;
+}
+
+/* IL TELEFONO RIFA' L'INDIRIZZO DEL SERVER (tappa 2): `riga` e' un
+   indirizzo d'ordine come lo dice il server — il mio ruolo, il mio
+   numero, le tre chiavi pubbliche, descrittore e indirizzo. Due domande,
+   e nessuna si fida del server:
+   - `mia`: la chiave del mio ruolo e' DAVVERO la mia, cioe' quella che
+     il mio conto da' a quel numero? Se no, quei sats non li firmerei;
+   - `uguale`: dalle tre chiavi il MIO codice fa lo stesso descrittore e
+     lo stesso indirizzo? Se no, il server ha sbagliato i conti (o
+     mente), e l'indirizzo non si mostra.
+   Le chiavi degli altri due non si possono rifare da qui (le loro xpub
+   al telefono non arrivano, apposta): le guarda ciascuno dal suo. */
+async function onchainVerificaRiga(parole, srv, riga){
+  const B = await caricaBitcoin();
+  const mia = B.hex.encode(onchainFiglia(
+    onchainConto(B, parole, srv.strada), riga.mio_numero).publicKey);
+  const chiavi = riga.chiavi || {};
+  const tre = [chiavi.compratore, chiavi.venditore, chiavi.barattolo];
+  if (tre.some(c => !/^0[23][0-9a-f]{64}$/.test(String(c || '')))) {
+    return {mia: false, uguale: false, k: null};
+  }
+  const k = onchainDaTre(B, tre.map(c => B.hex.decode(c)));
+  return {
+    mia: chiavi[riga.ruolo] === mia,
+    uguale: k.descrittore === riga.descrittore && k.indirizzo === riga.indirizzo,
+    k,
   };
 }
 
@@ -53506,7 +53589,7 @@ async function onchainEsporta(btn){
     <textarea class="mono" style="min-height:120px;font-size:11px" readonly
       >Barattolo — prova on-chain (signet)
 Dodici parole: ${parole}
-Strada: ${onchainSrv.strada}
+Strada: ${onchainSrv.strada}/0/0
 Descrittore: ${k.descrittore}
 Indirizzo: ${k.indirizzo}</textarea>`;
 }
