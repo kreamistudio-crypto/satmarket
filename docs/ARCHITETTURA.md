@@ -9676,9 +9676,18 @@
   porta del bot c'è, dietro la stessa leva, e il widget MAI: il bot non
   vuole il dominio di BotFather e non carica niente da telegram.org. Da
   Tor il link t.me può non aprirsi, quindi lì il foglio mostra SEMPRE il
-  QR (anche dal telefono) e lo dice; il banner nomina Telegram e Nostr,
-  e Nostr torna la seconda porta («…o entra con Nostr»). A porta chiusa
-  su onion non si monta niente, come prima. I DIZIONARI IN MEMORIA
+  QR (anche dal telefono) e lo dice. NOSTR PRIMA, SU ONION (20 ott 2026,
+  cantiere onion-nostr-prima, decisione di Andrea): il login resta doppio
+  — se il dominio venisse censurato chi usa Telegram deve rientrare
+  dall'onion — ma Nostr è la scelta principale, per chi cerca la massima
+  privacy. Nei tre siti (banner della vetrina, foglio «I tuoi account»,
+  foglio invito) «Entra con Nostr» sta in alto e pieno, senza «…o», e
+  sotto, piccolo e solo a porta aperta, «Entra con Telegram» con la riga
+  «Con Telegram, Telegram saprà che usi Barattolo (non da dove navighi)»:
+  un posto solo, `portaTelegramOnion`. Il banner nomina Nostr per primo.
+  A porta chiusa su onion c'è il solo Nostr, e MAI il widget (anche nel
+  foglio account, dove prima a porta chiusa si montava). Fuori da onion
+  non cambia niente. I DIZIONARI IN MEMORIA
   (ingressi e lasciapassare della fusione) li toccano solo rotte `async`
   e i gesti del bot, tutti nel loop: `prove_dizionari_nel_loop` le conta.
   CHI HA PREMUTO AVVIA (terzo giro): la colonna `utenti.bot_avviato`

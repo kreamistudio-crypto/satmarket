@@ -68966,3 +68966,91 @@ blocco del mercatino in fondo, quindi la riga «📬» sta nel ramo «solo
 Nostr» invece che accodata. Rileggendo il diff: il postino, su una
 sottoscrizione chiusa senza EOSE, tornava «non ce l'ha» invece di «non
 si sa» (un cartello falso): curato, provato, controprova rossa.
+
+## Su onion Nostr prima: «Entra con Nostr» grande in alto, Telegram piccolo sotto con la riga (20 ott 2026, cantiere onion-nostr-prima, decisione di Andrea)
+
+**LA DECISIONE.** Sul sito .onion il login resta doppio (Nostr e
+Telegram dal bot), ma Nostr è la scelta principale. Il perché è di
+Andrea: se il dominio venisse censurato, chi usa Telegram deve poter
+rientrare dall'onion; chi cerca la massima privacy va guidato su Nostr.
+
+**PRIMA.** Con `LOGIN_DAL_BOT` accesa, nel banner della vetrina su onion
+c'erano due pillole uguali: prima «Entra con Telegram», poi «…o entra con
+Nostr» (`bottoneLoginBot` riscriveva la porta Nostr in seconda), e la
+riga «entra con Telegram o con la tua chiave Nostr…». Nel foglio «I tuoi
+account» Telegram stava in alto e pieno, Nostr sotto in ghost. Il foglio
+invito su onion aveva solo Nostr. Il QR del bot compare nel foglio del
+bot, dopo il tocco.
+
+**ADESSO, SOLO SU ONION.** Nei tre siti «Entra con Nostr» sta in alto e
+pieno, senza «…o» (nel banner `demo-cta grande`, nei fogli `btn
+orange`); sotto, piccolo e solo a porta del bot aperta, «Entra con
+Telegram» (nel banner `demo-cta piccola`, una pillola vuota col bordo
+bianco; nei fogli `btn mini`) e la riga «Con Telegram, Telegram saprà che
+usi Barattolo (non da dove navighi)». Un posto solo, `portaTelegramOnion`
+(con «Aggiungi un altro Telegram» nel foglio account quando un Telegram
+è già aperto, preceduto da «Prima sceglilo nell'app Telegram.»). La riga
+del banner diventa «entra con la tua chiave Nostr (o con Telegram)…».
+L'ordine del banner lo dà `avviaVetrina` (su onion prima
+`bottoneLoginNostr`, poi il posto di Telegram), e `bottoneLoginBot` su
+onion non tocca più la porta Nostr. Nel foglio invito il Telegram piccolo
+sta in `#invitoTgOnion`, un `<div>` vuoto nell'HTML che riempie
+`invitoTelegram` dopo la risposta di `leggiPortaBot` (si svuota prima e
+dopo: due aperture in volo non fanno due porte). Niente handler né
+script inline nuovi (csp-fase-2): i bottoni nascono dal JS. Il foglio del
+bot col QR non cambia.
+
+**UN EFFETTO DA SAPERE.** Nel foglio account su onion, a porta CHIUSA
+(leva spenta), il codice di prima finiva nel ramo del widget di Telegram
+(`portaTelegram`, lo script da telegram.org), contro la regola «su onion
+MAI il widget» che vale per il banner. Il ramo nuovo di onion offre il
+solo Nostr: niente widget. Letto dal codice, non visto dal vivo (in
+collaudo quel ramo mostra il bottone 🍪, non il widget).
+
+**FUORI DA ONION NON CAMBIA NIENTE** (sito normale, PWA, APK, Mini App):
+provato coi banchi node e coi pixel, sotto.
+
+**PROVE.** `prove_login_dal_bot`: il banner COMPOSTO con la riga vera di
+`avviaVetrina` (a porta chiusa: Nostr grande e unico, il posto di
+Telegram vuoto; a porta aperta: Nostr grande sopra, Telegram piccolo
+sotto con la riga, la riga del banner nuova; fuori da onion: la vetrina
+di sempre); il foglio account su onion (porta aperta, un Telegram già
+aperto, porta chiusa senza widget); il foglio invito su onion (Nostr
+pieno, il bot di sempre nascosto, Telegram piccolo sotto, due aperture
+in volo = una porta, porta chiusa = niente) e fuori da onion (il posto
+vuoto). `prove_onion`: la nona chiamata a `etichettaNostr(` è ora la
+porta Nostr del foglio account su onion (il conto resta dieci), e
+`bottoneLoginBot` non riscrive più Nostr in «…o»; il banco dell'invito
+ha la porta del bot chiusa. `prove_account_doppio`: il suo banco del
+foglio è fuori da onion (`suOnion` falso), e due sentinelle guardano il
+ramo del widget per nome. CONTROPROVE sul file vero, poi ripristinato:
+otto mutanti, sette uccisi (Telegram prima di Nostr, Nostr non grande,
+Telegram grande, Telegram sopra Nostr nel foglio, due porte nell'invito —
+questo l'ha preso solo dopo aver rifatto il banco con le due aperture in
+volo, la prima versione apriva in fila —, senza la riga, il widget a
+porta chiusa); il mutante sopravvissuto («l'invito chiede la porta anche
+fuori da onion») è equivalente: la guardia `suOnion()` dentro la risposta
+regge lo stesso.
+
+**DAL VIVO** (Playwright e Chromium, 360×780 densità 2, chiaro e scuro):
+il server del giro con config finto (collaudo, relay morti, database
+usa-e-getta, `LOGIN_DAL_BOT` accesa, un `ONION_HOST` finto), la pagina
+servita all'indirizzo .onion finto con ogni richiesta girata al server
+con l'Host .onion (così il server toglie `telegram-web-app.js` come sul
+VPS), il resto abortito, le identità finte del collaudo tolte
+dall'header per vedere la vetrina anonima. Su onion: l'ordine nel DOM
+Nostr→Telegram, Nostr 328×36,5 px e Telegram 160×26, nessuno scorrimento
+orizzontale; il foglio invito e il foglio account (entrati col cookie
+come il Telegram 111) col Telegram piccolo sotto; il tocco sul Telegram
+piccolo apre il foglio del bot col QR. Zero errori di pagina, zero
+richieste fuori casa. Sul sito normale: le foto di banner, foglio invito
+e foglio account sono IDENTICHE BYTE PER BYTE a quelle di `origin/develop`
+(server del giro sullo stesso config, nei due temi); la pagina intera
+cambia sotto i 1036 px anche fra due giri dello stesso albero (le card).
+Copia del giro cancellata.
+
+**NOTATO, NON FATTO.** In tema scuro la scritta delle pillole bianche del
+banner (`demo-cta`, «Entra con Nostr» compresa) è arancio chiaro su
+bianco, poco contrastata: è il `--sats-text` scuro, identico sul sito
+normale e prima di questo cantiere. Ora che su onion quella pillola è la
+porta principale si vede di più.
