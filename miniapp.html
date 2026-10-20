@@ -10456,6 +10456,22 @@
     font:inherit;font-weight:800;font-size:13px;line-height:1.5;
     box-shadow:0 2px 0 var(--sats-deep);
   }
+  /* SU ONION NOSTR E' LA PORTA GRANDE, TELEGRAM LA PICCOLA (20 ott 2026,
+     cantiere onion-nostr-prima, decisione di Andrea): se il dominio
+     venisse censurato chi usa Telegram rientra dall'onion, ma chi cerca
+     la massima privacy va guidato su Nostr. La grande prende la riga
+     intera; la piccola e' una pillola vuota col bordo, e sotto la riga
+     che dice cosa sa Telegram. Fuori da onion nessuno le veste. */
+  .demo-cta.grande{display:block;width:100%;text-align:center;
+    font-size:15px;padding:7px 18px}
+  .demo-cta.piccola{margin-top:0;background:transparent;color:#fff;
+    box-shadow:none;border:1.5px solid rgba(255,255,255,.8);
+    font-size:12px;padding:2px 12px}
+  .porta-tg-onion{text-align:center;margin-top:10px}
+  .porta-tg-onion .btn.mini{margin:0}
+  .porta-tg-onion-riga{font-size:12px;font-weight:600;line-height:1.45;
+    color:var(--ink-soft);margin-top:5px}
+  .demo-banner .porta-tg-onion-riga{color:#fff;opacity:.92;font-size:11.5px}
 
   /* la croce di casa nella pillola da desktop corre col fondo della
      pillola (vedi LA CROCE BIANCA DEL + DI CASA, nella media qui sotto);
@@ -14972,6 +14988,9 @@ document.getElementById('cartello')?.remove();</script>
          chiave e ritrova l'annuncio autenticato (l'URL non cambia).
          SU ONION E' LA PRIMA E L'UNICA — vedi invitoTelegram(). -->
     <button class="btn ghost" id="invitoNostr" onclick="closeSheet();apriNostrSheet()">…o entra con Nostr</button>
+    <!-- Su onion, con la porta del bot aperta, qui sotto Telegram piccolo:
+         lo monta invitoTelegram() (20 ott 2026, cantiere onion-nostr-prima). -->
+    <div id="invitoTgOnion"></div>
     <button class="btn ghost" onclick="navIndietro()">Continua a guardare</button>
   </div>
 
@@ -32784,6 +32803,17 @@ function invitoTelegram(testo, chiave){
   nos.className = onion ? 'btn orange' : 'btn ghost';
   nos.innerHTML = etichettaNostr(onion ? 'Entra con Nostr'
                                         : '…o entra con Nostr');
+  /* ...E TELEGRAM SOTTO, PICCOLO (20 ott 2026, cantiere onion-nostr-prima,
+     decisione di Andrea): con la porta del bot aperta il login su onion
+     resta doppio, ma Nostr e' la scelta principale. Si svuota sempre e
+     si riempie dopo la risposta: due aperture di fila non fanno due
+     porte. Fuori da onion il posto resta vuoto. */
+  const tgo = el('invitoTgOnion');
+  tgo.innerHTML = '';
+  if (onion) leggiPortaBot().then(si => {
+    tgo.innerHTML = '';
+    if (si && suOnion()) tgo.appendChild(portaTelegramOnion('invitoEntraBot', 'btn mini'));
+  });
   el('sheetBg').classList.add('open');
   el('invitoSheet').classList.add('open');
 }
@@ -51670,8 +51700,9 @@ const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram
    qualcuno contro un muro. */
 const BANNER_VETRINA_ONION = '🛍️ Stai guardando la vetrina — entra con la tua chiave Nostr per comprare e vendere anche da qui';
 /* ...e con la porta del bot accesa (LOGIN_DAL_BOT) anche da Tor si
-   entra con Telegram, col QR: la riga li nomina tutti e due. */
-const BANNER_VETRINA_ONION_BOT = '🛍️ Stai guardando la vetrina — entra con Telegram o con la tua chiave Nostr per comprare e vendere anche da qui';
+   entra con Telegram, col QR: la riga li nomina tutti e due — Nostr
+   per primo, che su onion e' la porta principale (20 ott 2026). */
+const BANNER_VETRINA_ONION_BOT = '🛍️ Stai guardando la vetrina — entra con la tua chiave Nostr (o con Telegram) per comprare e vendere anche da qui';
 /* L'initData di Telegram dura 24 ore (ago 2026) e NON si rinfresca
    finché la Mini App resta aperta: solo riaprirla ne conia uno nuovo.
    Senza questa riga chi scade si ritroverebbe nella vetrina anonima
@@ -52093,6 +52124,20 @@ function montaPorteAccount(dai){
   eti.style.paddingTop = '6px';
   eti.textContent = 'Aggiungi un account';
   porte.appendChild(eti);
+  /* SU ONION NOSTR E' LA PORTA PIENA, IN ALTO (20 ott 2026, cantiere
+     onion-nostr-prima, decisione di Andrea), e Telegram le sta sotto,
+     piccolo, solo a porta del bot aperta — mai il widget, che vuole il
+     dominio di BotFather e uno script da telegram.org. */
+  if (suOnion() && !miniAccount()) {
+    const n = document.createElement('button');
+    n.className = 'btn orange';
+    n.innerHTML = etichettaNostr('Entra con Nostr');
+    n.onclick = () => { closeSheet(); apriNostrSheet(); };
+    porte.appendChild(n);
+    if (portaBotSi) porte.appendChild(portaTelegramOnion('accountEntraBot', 'btn mini',
+                                                         telegramNelPortachiavi()));
+    return;
+  }
   if (miniAccount()) {
     const riga = document.createElement('div');
     riga.className = 'hint';
@@ -52235,6 +52280,34 @@ function portaBot(altro){
     + 'line-height:1.5;text-align:center;margin:6px 0 2px';
   r.textContent = altro ? 'Prima sceglilo nell’app Telegram, poi tocca qui.'
                         : 'Entra l’account aperto ora nell’app Telegram.';
+  box.append(b, r);
+  return box;
+}
+
+/* LA PORTA TELEGRAM PICCOLA DELL'ONION (20 ott 2026, cantiere
+   onion-nostr-prima, decisione di Andrea): su onion il login resta
+   doppio, ma Nostr e' la scelta principale — se il dominio venisse
+   censurato chi usa Telegram deve poter rientrare da qui, e chi cerca
+   la massima privacy va guidato su Nostr. Un posto solo per i tre siti
+   (banner della vetrina, foglio account, foglio invito): il bottone
+   piccolo e la riga che dice ONESTAMENTE cosa sa Telegram — che usi
+   Barattolo (hai premuto Avvia nel bot), non da dove navighi (il
+   browser parla solo con l'onion). `vestito` e' la classe del posto. */
+const RIGA_TELEGRAM_ONION = 'Con Telegram, Telegram saprà che usi Barattolo (non da dove navighi)';
+function portaTelegramOnion(id, vestito, altro){
+  const box = document.createElement('div');
+  box.className = 'porta-tg-onion';
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.id = id;
+  b.className = vestito;
+  b.innerHTML = etichettaTelegram(altro ? 'Aggiungi un altro Telegram'
+                                        : 'Entra con Telegram');
+  b.onclick = () => { closeSheet(); apriIngressoBot(); };
+  const r = document.createElement('div');
+  r.className = 'porta-tg-onion-riga';
+  r.textContent = (altro ? 'Prima sceglilo nell’app Telegram. ' : '')
+    + RIGA_TELEGRAM_ONION;
   box.append(b, r);
   return box;
 }
@@ -52476,6 +52549,16 @@ function bottoneLoginTelegram(){
                                 : suOnion() ? null : widgetLoginTelegram(posto));
 }
 function bottoneLoginBot(posto){
+  /* SU ONION TELEGRAM E' LA PORTA PICCOLA (20 ott 2026, cantiere
+     onion-nostr-prima, decisione di Andrea): sotto «Entra con Nostr»,
+     che resta grande e senza «…o», con la riga che dice cosa sa
+     Telegram. La riga del banner nomina Nostr per primo. */
+  if (suOnion()) {
+    const riga = el('demoBanner').firstElementChild;
+    if (riga && riga.tagName === 'DIV') riga.textContent = BANNER_VETRINA_ONION_BOT;
+    posto.appendChild(portaTelegramOnion('vetrinaEntraBot', 'demo-cta piccola'));
+    return;
+  }
   const b = document.createElement('button');
   b.type = 'button';
   b.id = 'vetrinaEntraBot';
@@ -52484,16 +52567,6 @@ function bottoneLoginBot(posto){
   b.innerHTML = etichettaTelegram('Entra con Telegram');
   b.onclick = () => apriIngressoBot();
   posto.appendChild(b);
-  /* Su onion il banner parlava della sola chiave Nostr, e la porta
-     Nostr era l'unica («Entra con Nostr»): con Telegram accanto la riga
-     li nomina tutti e due, e Nostr torna la SECONDA porta, come sul
-     clearnet. */
-  if (suOnion()) {
-    const riga = el('demoBanner').firstElementChild;
-    if (riga && riga.tagName === 'DIV') riga.textContent = BANNER_VETRINA_ONION_BOT;
-    const n = el('vetrinaEntraNostr');
-    if (n) n.innerHTML = etichettaNostr('…o entra con Nostr');
-  }
 }
 function widgetLoginTelegram(posto){
   const s = document.createElement('script');
@@ -54861,13 +54934,15 @@ function apriLinkGuida(quale){
 function bottoneLoginNostr(){
   const btn = document.createElement('button');
   btn.id = 'vetrinaEntraNostr';
-  btn.className = 'demo-cta';
+  /* su onion e' la porta GRANDE (20 ott 2026, cantiere onion-nostr-prima) */
+  btn.className = suOnion() ? 'demo-cta grande' : 'demo-cta';
   btn.style.cssText = 'border:none;cursor:pointer;margin-top:8px';
   /* IL «...o» NOMINA UN'ALTERNATIVA, e su onion non c'e': li' questa
      e' l'unica porta, mentre sul clearnet e' la SECONDA — dopo il
      widget Telegram, che su onion non si monta. E' la stessa riga del
      foglio invito: cade il mezzo, resta la porta. Su onion con la porta
-     del bot accesa la riscrive `bottoneLoginBot`: li' torna SECONDA. */
+     del bot accesa resta la PRIMA (20 ott 2026, decisione di Andrea):
+     Telegram le arriva sotto, piccolo (`portaTelegramOnion`). */
   btn.innerHTML = etichettaNostr(suOnion() ? 'Entra con Nostr'
                                             : '…o entra con Nostr');
   btn.onclick = apriNostrSheet;
@@ -85441,12 +85516,13 @@ async function avviaVetrina(){
        LOGIN_DAL_BOT accesa: niente dominio, niente script da fuori, e il
        QR che si inquadra col telefono. La scelta la fa
        `bottoneLoginTelegram`: su onion, a porta chiusa, non monta niente. */
-    bottoneLoginTelegram();
     /* LA PORTA NOSTR LA METTE LUI, ed e' l'unica: `mostraBanner` su
        onion il suo CTA non lo disegna proprio, perche' porterebbe
        alla Mini App. Due mani che scrivono nello stesso banner: chi
-       ne tocca una guardi l'altra. */
-    bottoneLoginNostr();
+       ne tocca una guardi l'altra.
+       SU ONION NOSTR VIENE PRIMA (20 ott 2026, cantiere onion-nostr-prima,
+       decisione di Andrea): grande in alto, e il posto di Telegram sotto. */
+    if (suOnion()) { bottoneLoginNostr(); bottoneLoginTelegram(); } else { bottoneLoginTelegram(); bottoneLoginNostr(); }
     /* la fascia del rodaggio PRIMA delle card, come in avvia(): la
        risposta e' in volo dalla testa di avvia, l'attesa e' ~zero */
     /* le due strisce imparano rotellina e frecce (fuori da Telegram e

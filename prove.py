@@ -38855,6 +38855,10 @@ def prove_onion():
     # ⚠️ E SONO NOVE (19 ott 2026, cantiere account-doppio-bot): su onion,
     # con la porta del bot accesa, `bottoneLoginBot` riscrive la porta
     # Nostr della vetrina in «…o entra con Nostr» — dallo stesso giudice.
+    # ⚠️ E LA NONA HA CAMBIATO POSTO (20 ott 2026, cantiere
+    # onion-nostr-prima, decisione di Andrea): su onion Nostr resta la
+    # PRIMA porta anche col bot, quindi la riscrittura se n'e' andata; la
+    # nona e' ora la porta Nostr piena del foglio account su onion.
     # ⚠️ E SONO DIECI (20 ott 2026, cantiere collaudo-privato): la porta
     # Nostr della copertina «Collaudo privato» — dallo stesso giudice.
     prova("...e le chiamate al giudice sono DIECI", 10,
@@ -38862,8 +38866,12 @@ def prove_onion():
     prova("...la decima e' la porta Nostr della copertina del collaudo", True,
           "etichettaNostr('\u2026o entra con Nostr')" in
           pezzo_js(mini, "function mostraCollaudoPrivato(stato){", "\n}\n"))
-    prova("...la nona e' la porta Nostr della vetrina su onion, che torna seconda", True,
-          "if (n) n.innerHTML = etichettaNostr('\u2026o entra con Nostr');" in mini)
+    prova("...la nona e' la porta Nostr piena del foglio account su onion", True,
+          "n.innerHTML = etichettaNostr('Entra con Nostr');" in
+          _fn_js(mini, "function montaPorteAccount(dai){"))
+    prova("...e su onion la porta Nostr della vetrina non si riscrive piu' in «…o»", False,
+          "etichettaNostr('\u2026o entra con Nostr')" in
+          _fn_js(mini, "function bottoneLoginBot(posto){"))
     prova("...l'ottava e' il «Pubblica su Nostr» di un ordine P2P", True,
           "etichettaNostr('Pubblica su Nostr')" in mini)
     # ⚠️ IL CENSIMENTO HA CAMBIATO LATO (ago 2026, dal campo, e la
@@ -39204,6 +39212,13 @@ def _giudice_nostr(mini):
     return mini[i:mini.index(";", j) + 1]
 
 
+def _cat_invito_onion(mini):
+    """Il catalogo degli inviti su onion, ritagliato dal client."""
+    cat = mini[mini.index("const INVITO_ONION = {"):]
+    _fine = "+ 'con la tua chiave Nostr.';"
+    return cat[:cat.index(_fine) + len(_fine)]
+
+
 def _banco_invito(mini):
     """Fa GIRARE `invitoTelegram` nei due mondi su un DOM di cartone.
 
@@ -39223,13 +39238,16 @@ def _banco_invito(mini):
 const nodi = {};
 function el(id){
   if (!nodi[id]) nodi[id] = {textContent:'', className:'', style:{},
-                             innerHTML:'',
+                             innerHTML:'', appendChild(){},
                              classList:{add(){}, remove(){}}};
   return nodi[id];
 }
 let ONION = false;
 function suOnion(){ return ONION; }
 function invitoInAttesa(){ return ''; }
+// la porta del bot chiusa: qui si guarda il foglio di sempre; il
+// Telegram piccolo dell'onion lo guarda il banco di prove_login_dal_bot
+function leggiPortaBot(){ return Promise.resolve(false); }
 """ + cat + "\n" + _giudice_nostr(mini) + "\n" + fn + """
 const fuori = [];
 ONION = false;
@@ -110508,11 +110526,15 @@ def prove_account_doppio():
           True, "} else if (telegramNelPortachiavi() && !portaTelegramSvelata) {" in porte
           and "porte.appendChild(rigaAltroTelegram());" in porte
           and "porte.appendChild(portaTelegram());" in porte)
+    # il ramo di onion (20 ott 2026, cantiere onion-nostr-prima) nomina
+    # anche lui telegramNelPortachiavi(), e sta prima: si guarda il ramo
+    # del widget, che e' quello di cui parlano queste due righe
+    _widget = "telegramNelPortachiavi() && !portaTelegramSvelata"
     prova("...dentro la Mini App resta la riga di sempre, prima di tutto", True,
-          -1 < porte.find("if (miniAccount()) {") < porte.find("telegramNelPortachiavi()"))
+          -1 < porte.find("if (miniAccount()) {") < porte.find(_widget))
     prova("...«…o entra con Nostr» resta sempre", True,
           "'…o entra con Nostr'" in porte and porte.rfind("porte.appendChild(n);") >
-          porte.find("telegramNelPortachiavi()") > -1)
+          porte.find(_widget) > -1)
     prova("la scelta di svelarlo si azzera a ogni apertura del foglio", True,
           "portaTelegramSvelata = false;\n  renderAccountSheet();" in
           _fn_js(mini, "function apriAccountSheet("))
@@ -110529,6 +110551,7 @@ def prove_account_doppio():
 let collaudo = false, accountAperti = [], accountAttivoId = '', mini = false;
 let vivi = true, eventi = [];
 let portaBotSi = false;   // il mondo di prima: la porta del bot chiusa
+const suOnion = () => false;   // il foglio fuori da onion (quello di onion: prove_login_dal_bot)
 const miniAccount = () => mini, accountVivi = () => vivi;
 const etichettaNostr = t => 'N ' + t;
 const urlRitornoLogin = () => '/api/login/telegram/ritorno?da=%2F';
@@ -110834,14 +110857,24 @@ const el = id => (nodi[id] ||= nodo(id));
         "function fermaIngressoBot(){", "function dettaIngressoBot(testo, fine){",
         "async function apriIngressoBot(){", "async function bussaIngressoBot(){",
         "function bottoneLoginTelegram(){", "function bottoneLoginBot(posto){",
-        "function widgetLoginTelegram(posto){")) \
+        "function widgetLoginTelegram(posto){", "function bottoneLoginNostr(){",
+        "function portaTelegramOnion(id, vestito, altro){", "function invitoTelegram(testo, chiave){")) \
     .replace("function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n}\n",
              "function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }\n") \
     + _riga_js(mini, "let portaTelegramSvelata = false;") \
     + _riga_js(mini, "let portaBotSi = null;") + _riga_js(mini, "let portaBotPromessa = null;") \
     + pezzo_js(mini, "const etichettaTelegram = ", ";\n") + ";\n" \
-    + _riga_js(mini, "let ingressoBotTimer = null,") + r"""
+    + _riga_js(mini, "let ingressoBotTimer = null,") \
+    + _riga_js(mini, "const RIGA_TELEGRAM_ONION = ") \
+    + _cat_invito_onion(mini) + "\n" \
+    + "const ordineVetrina = () => { " \
+    + _riga_js(mini, "if (suOnion()) { bottoneLoginNostr();").strip() + " };\n" + r"""
+const invitoInAttesa = () => '';
 const porte = el('accountPorte');
+// le porte dell'onion, viste da vicino: il bottone, il suo vestito, il testo, la riga
+const vedi = f => f.className === 'porta-tg-onion'
+  ? [f.figli[0].id, f.figli[0].className, f.figli[0].innerHTML.replace(/<img[^>]*> /, ''), f.figli[1].textContent]
+  : [f.id || f.className, f.textContent || f.innerHTML];
 const cosa = () => porte.figli.map(f => f.tag === 'div' && f.figli[0]?.tag === 'script' ? 'widget'
   : f.figli[0]?.id ? f.figli.map(x => x.id + '|' + (x.textContent || x.innerHTML.replace(/<img[^>]*> /, ''))) : (f.id || f.textContent || f.innerHTML));
 const giri = {};
@@ -110897,13 +110930,42 @@ const giri = {};
   risposte = [{json: {link: 'L', figura: '⚽', figura_nome: 'Pallone'}}]; await apriIngressoBot();
   giri.onionFoglio = [el('botEntraQrBox').style.display, qr, el('botEntraSub').innerHTML.startsWith('Da Tor il link di Telegram pu\u00f2 non aprirsi: inquadra'),
     el('botEntraApri').innerHTML.replace(/<img[^>]*> /, '')];
-  const bo = el('demoBanner'); bo.figli = []; bo.appendChild(nodo('div'));
-  el('vetrinaEntraNostr').innerHTML = 'N Entra con Nostr';
-  portaBotPromessa = Promise.resolve(false); bottoneLoginTelegram(); await portaBotPromessa; await null;
-  giri.onionChiusa = [bo.figli.length, bo.figli[1].figli.length, el('vetrinaEntraNostr').innerHTML];
-  portaBotPromessa = Promise.resolve(true); bottoneLoginTelegram(); await portaBotPromessa; await null;
-  giri.onionAperta = [bo.figli[2].figli[0]?.id, bo.figli[0].textContent, el('vetrinaEntraNostr').innerHTML];
+  // il banner composto come lo compone avviaVetrina, con la sua riga vera
+  const bo = el('demoBanner');
+  const componi = async (aperta) => {
+    bo.figli = []; const t = nodo('div'); t.textContent = 'BANNER-ONION'; bo.appendChild(t);
+    portaBotPromessa = Promise.resolve(aperta); ordineVetrina(); await portaBotPromessa; await null;
+    return bo.figli.map(f => f.id === 'loginTelegram'
+      ? ['loginTelegram', f.figli.map(x => x.className === 'porta-tg-onion' ? vedi(x)
+          : [x.id, x.className, x.innerHTML.replace(/<img[^>]*> /, '')])]
+      : f.id ? [f.id, f.className, f.innerHTML] : f.textContent);
+  };
+  giri.onionChiusa = await componi(false);
+  giri.onionAperta = await componi(true);
+  // il foglio account su onion: Nostr pieno in alto, Telegram piccolo sotto, mai il widget
+  portaBotSi = true; accountAperti = [];   montaPorteAccount(true); giri.onionConto = porte.figli.map(vedi);
+  accountAperti = [{id: '11'}];            montaPorteAccount(true); giri.onionContoAltro = porte.figli.map(vedi);
+  portaBotSi = false; accountAperti = [];  montaPorteAccount(true); giri.onionContoChiusa = porte.figli.map(vedi);
+  // il foglio invito su onion: Telegram piccolo sotto Nostr, a porta aperta e una volta sola
+  const tgo = el('invitoTgOnion');
+  const invita = async (aperta) => {
+    portaBotPromessa = Promise.resolve(aperta); invitoTelegram('testo del chiamante', 'compra');
+    await portaBotPromessa; await null;
+  };
+  await invita(true);
+  giri.invitoOnion = [el('invitoNostr').className, el('invitoNostr').innerHTML, el('invitoTg').style.display,
+                      tgo.figli.map(vedi)];
+  // due aperture IN VOLO (la seconda prima che arrivi la risposta della prima)
+  portaBotPromessa = Promise.resolve(true);
+  invitoTelegram('testo del chiamante', 'compra'); invitoTelegram('testo del chiamante', 'compra');
+  await portaBotPromessa; await null; giri.invitoDue = tgo.figli.length;
+  await invita(false); giri.invitoChiusa = tgo.figli.length;
   onion = false;
+  // e fuori da onion niente di tutto questo
+  giri.fuoriComposto = await componi(true);
+  await invita(true);
+  giri.invitoFuori = [tgo.figli.length, el('invitoTg').style.display, el('invitoNostr').className,
+                      el('invitoNostr').innerHTML];
   console.log(JSON.stringify(giri));
 })().catch(e => console.error(e.stack));
 """
@@ -110956,11 +111018,38 @@ const giri = {};
           ["vetrinaEntraBot", "widget"], g["vetrina"])
     prova("su onion il QR c'e' anche dal telefono, e il foglio dice perche'",
           ["", 1, True, "Apri Telegram"], g["onionFoglio"])
-    prova("su onion, a porta chiusa: niente (MAI il widget), e Nostr resta l'unica porta",
-          [2, 0, "N Entra con Nostr"], g["onionChiusa"])
-    prova("su onion, a porta aperta: il bottone del bot, il banner che nomina tutti e due, "
-          "e Nostr torna seconda", ["vetrinaEntraBot", "BANNER-ONION-BOT", "N …o entra con Nostr"],
+    # SU ONION NOSTR PRIMA (20 ott 2026, cantiere onion-nostr-prima,
+    # decisione di Andrea): grande in alto, Telegram piccolo sotto con la
+    # riga che dice cosa sa Telegram. Il banner composto con la riga VERA
+    # di avviaVetrina, non con le due mani una alla volta.
+    _riga_tg = "Con Telegram, Telegram saprà che usi Barattolo (non da dove navighi)"
+    _nostr_grande = ["vetrinaEntraNostr", "demo-cta grande", "N Entra con Nostr"]
+    prova("su onion, a porta chiusa: Nostr grande e unico, il posto di Telegram vuoto (MAI il widget)",
+          ["BANNER-ONION", _nostr_grande, ["loginTelegram", []]], g["onionChiusa"])
+    prova("su onion, a porta aperta: Nostr grande in alto, Telegram piccolo sotto con la riga, "
+          "e il banner nomina Nostr per primo",
+          ["BANNER-ONION-BOT", _nostr_grande, ["loginTelegram", [
+            ["vetrinaEntraBot", "demo-cta piccola", "Entra con Telegram", _riga_tg]]]],
           g["onionAperta"])
+    prova("fuori da onion la vetrina e' quella di sempre: Telegram e poi «…o entra con Nostr»",
+          ["BANNER-ONION", ["loginTelegram", [["vetrinaEntraBot", "demo-cta", "Entra con Telegram"]]],
+           ["vetrinaEntraNostr", "demo-cta", "N …o entra con Nostr"]], g["fuoriComposto"])
+    prova("il foglio account su onion: Nostr pieno in alto, Telegram piccolo sotto",
+          [["section-label", "Aggiungi un account"], ["btn orange", "N Entra con Nostr"],
+           ["accountEntraBot", "btn mini", "Entra con Telegram", _riga_tg]], g["onionConto"])
+    prova("...con un Telegram aperto: «Aggiungi un altro Telegram», e come si fa",
+          ["accountEntraBot", "btn mini", "Aggiungi un altro Telegram",
+           "Prima sceglilo nell’app Telegram. " + _riga_tg], g["onionContoAltro"][2])
+    prova("...a porta chiusa solo Nostr, e MAI il widget",
+          [["section-label", "Aggiungi un account"], ["btn orange", "N Entra con Nostr"]],
+          g["onionContoChiusa"])
+    prova("il foglio invito su onion: Nostr pieno, il bot di sempre nascosto, Telegram piccolo sotto",
+          ["btn orange", "N Entra con Nostr", "none",
+           [["invitoEntraBot", "btn mini", "Entra con Telegram", _riga_tg]]], g["invitoOnion"])
+    prova("...aperto due volte di fila, una porta sola", 1, g["invitoDue"])
+    prova("...a porta chiusa niente Telegram", 0, g["invitoChiusa"])
+    prova("...e fuori da onion il foglio di sempre, col posto vuoto",
+          [0, "block", "btn ghost", "N …o entra con Nostr"], g["invitoFuori"])
 
 
 def prove_dizionari_nel_loop():
