@@ -21,6 +21,7 @@ Qui, una volta per tutti (deploy, giornaliero, LNbits):
     database rotto da' una copia rotta e il controllo lo vede.
 
 Uso:  copia-db.py <sorgente> <destinazione> [--anche-scrittura]
+                  [--tetto=SECONDI] [--attesa=SECONDI]
 Stampa UNA riga su stdout, ed esce con:
   0  copia fatta e integra
   3  copia fatta ma NON integra (il file resta: e' la prova del guasto)
@@ -36,7 +37,12 @@ per LNbits, il cui database non e' nostro: un `mode=ro` su un WAL senza
 `-shm` puo' dire «unable to open» (Cantieri, «IL WAL, VALUTATO E NON
 ACCESO»), e il `sqlite3` di prima lo apriva in scrittura.
 
-Le due misure si spostano dall'ambiente solo per il banco di prove.py.
+`--tetto=` e `--attesa=` (20 ott 2026, cantiere backup-ritocchi) le
+stringono per un giro solo: la copia di LNbits PRIMA DEL DEPLOY sta dentro
+i 120 s dell'archivio, e non puo' prenderseli tutti lei. L'attesa non
+supera mai il tetto: un passo bloccato aspetta al piu' quella, quindi il
+giro intero sta sotto tetto + attesa. Dall'ambiente le misure si
+spostano solo per il banco di prove.py.
 """
 import os
 import sqlite3
@@ -56,8 +62,11 @@ class Occupato(Exception):
     pass
 
 
-def copia(sorgente, destinazione, anche_scrittura=False):
+def copia(sorgente, destinazione, anche_scrittura=False, tetto=None,
+          attesa=None):
     """(codice, riga) — vedi in cima."""
+    tetto = TETTO if tetto is None else tetto
+    attesa = min(ATTESA if attesa is None else attesa, tetto)
     parziale = destinazione + ".parziale"
     try:
         os.remove(parziale)
@@ -71,13 +80,13 @@ def copia(sorgente, destinazione, anche_scrittura=False):
         # CPython chiama qui dopo OGNI passo, anche quelli finiti in
         # BUSY/LOCKED (poi dorme 250 ms e riprova): e' il solo punto da
         # cui si puo' fermare un giro che altrimenti non finirebbe mai.
-        if stato in OCCUPATO and time.monotonic() - inizio > TETTO:
+        if stato in OCCUPATO and time.monotonic() - inizio > tetto:
             raise Occupato()
 
     src = dst = None
     try:
         uri = f"file:{sorgente}" + ("" if anche_scrittura else "?mode=ro")
-        src = sqlite3.connect(uri, uri=True, timeout=ATTESA)
+        src = sqlite3.connect(uri, uri=True, timeout=attesa)
         dst = sqlite3.connect(parziale)
         src.backup(dst, pages=-1, progress=guarda_il_tetto)
         dst.close()
@@ -119,7 +128,16 @@ def main(argv):
     if len(pos) != 2:
         print("non riuscita: uso copia-db.py <sorgente> <destinazione>")
         return 1
-    codice, riga = copia(pos[0], pos[1], "--anche-scrittura" in argv)
+    misure = {}
+    for a in argv:
+        for nome in ("tetto", "attesa"):
+            if a.startswith(f"--{nome}="):
+                try:
+                    misure[nome] = float(a.split("=", 1)[1])
+                except ValueError:
+                    print(f"non riuscita: {a} non e' un numero")
+                    return 1
+    codice, riga = copia(pos[0], pos[1], "--anche-scrittura" in argv, **misure)
     if codice not in (0, 3):
         try:
             os.remove(pos[1] + ".parziale")

@@ -10,7 +10,9 @@
 # una sola: LA COPIA CHE CONTA E' QUELLA CHE STA FUORI.
 #
 # Cosa serve sul VPS (una volta sola, da root):
-#     apt install age sqlite3
+#     apt install age
+#     (il comando sqlite3 non serve piu' dal 20 ott 2026: le copie le fa
+#     deploy/copia-db.py, col python di sistema)
 #     cp deploy/barattolo-backup.* /etc/systemd/system/
 #     systemctl daemon-reload && systemctl enable --now barattolo-backup.timer
 # piu' il file /etc/barattolo-backup.env (chmod 600), MAI nel repo:
@@ -94,7 +96,12 @@ alla_fine() {
             || [ "$STATO_COPIA" = "non-integra" ] || [ -n "$ATTENZIONE_LNBITS" ]; }; then
         local guarda="Guardare <code>journalctl -u barattolo-backup -n 40</code>."
         local testo
-        if [ -n "$FERMO" ]; then
+        if [ "$codice" -eq 143 ] || [ "$codice" -eq 130 ]; then
+            local copia_detta="non ancora fatta"
+            [ -z "$STATO_COPIA" ] || copia_detta="$STATO_COPIA"
+            [ "$STATO_COPIA" != "integra" ] || copia_detta="integra (<code>integrity_check</code> ok)"
+            testo="⚠️ <b>Il backup giornaliero è stato fermato prima di finire</b> (un segnale: il tempo massimo della unit, o un arresto). Copia del database: $copia_detta; archivio: $STATO_ARCHIVIO. Se è stato fatto, l'archivio resta in <code>backup/fuori/</code>. $guarda"
+        elif [ -n "$FERMO" ]; then
             testo="⚠️ <b>Il backup giornaliero non è partito</b>: $(scappa "$FERMO"). Nessuna copia e nessun archivio questa volta. $guarda"
         elif [ -z "$STATO_COPIA" ]; then
             testo="⚠️ <b>Il backup giornaliero non è riuscito</b>: la copia del database non si è fatta ($(scappa "${MOTIVO_COPIA:-motivo sconosciuto}")). Nessun archivio questa volta: gli archivi di prima restano nel canale. $guarda"
@@ -106,10 +113,23 @@ alla_fine() {
             testo="⚠️ <b>Il backup giornaliero non è arrivato al canale</b> (codice $codice). La copia del database era integra (<code>integrity_check</code> ok); archivio: $STATO_ARCHIVIO. $guarda"
         fi
         avvisa_admin "$testo"
+        # il segno per l'ExecStopPost della unit (deploy/backup-caduto.sh):
+        # questo giro l'ha gia' detto, lui non lo ripete
+        mkdir -p "$DIR_APP/backup" 2>/dev/null \
+            && printf '%s\n' "${INVOCATION_ID:-a-mano}" > "$DIR_APP/backup/.giornaliero-avvisato" \
+            || true
     fi
     rm -rf "$TMP"
 }
 trap alla_fine EXIT
+# FERMATO DA FUORI (20 ott 2026, cantiere backup-ritocchi). Quando il
+# giornaliero supera i 600 s della unit, systemd manda SIGTERM a tutto il
+# gruppo; senza questa riga bash muore lì, la trappola qui sopra non
+# parte e nessuno lo sa (provato: con `trap 'exit 143' TERM` parte, col
+# codice 143). Se nemmeno questo basta — un SIGKILL, la memoria finita —
+# parla l'ExecStopPost della unit.
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 # Il file dell'ambiente si puo' spostare solo per le prove (il banco
 # di prove.py gira lo script vero con un ambiente finto): sul VPS e'
@@ -230,7 +250,8 @@ fi
 #     e l'unit del ponte socat. FUORI i log, che pesano e non servono.
 #     Il percorso e' un nome solo, qui: se un giorno LNbits trasloca,
 #     e' questa riga a seguirla.
-DIR_LNBITS=/opt/lnbits
+# (BARATTOLO_DIR_LNBITS sposta la cartella solo per il banco di prove.py)
+DIR_LNBITS="${BARATTOLO_DIR_LNBITS:-/opt/lnbits}"
 if [ -d "$DIR_LNBITS" ]; then
     mkdir -p "$TMP/lnbits"
     cp "$DIR_LNBITS/.env" "$DIR_LNBITS/docker-compose.yml" "$TMP/lnbits/" 2>/dev/null || true
@@ -241,12 +262,27 @@ if [ -d "$DIR_LNBITS" ]; then
         # atomica: e' questa che si apre, alle due di notte.
         # La stessa copia del mercatino (attesa, tetto, integrity_check);
         # se non riesce resta la copia a caldo del `cp -a`, com'era.
-        if ESITO_LNBITS=$(python3 "$DIR_APP/deploy/copia-db.py" \
+        # PRIMA DEL DEPLOY IL TETTO E' CORTO (20 ott 2026, cantiere
+        # backup-ritocchi): tutto lo script sta sotto i `timeout 120` di
+        # deploy.sh, e un LNbits occupato col tetto del giornaliero (90 +
+        # 30 s) se li sarebbe presi tutti, facendo cadere l'archivio del
+        # mercatino per colpa del suo. Qui al piu' 15 + 10 s, e la
+        # cintura di `timeout` a 30; di notte c'e' tempo, e resta il tetto
+        # pieno. Un giro troncato non lascia il suo `.parziale`
+        # nell'archivio.
+        if [ -n "$PRIMA_DEL_DEPLOY" ]; then
+            MISURE_LNBITS=(--tetto=15 --attesa=10); CINTURA_LNBITS=30
+        else
+            MISURE_LNBITS=(); CINTURA_LNBITS=150
+        fi
+        if ESITO_LNBITS=$(timeout "$CINTURA_LNBITS" python3 "$DIR_APP/deploy/copia-db.py" \
                 "$DIR_LNBITS/data/database.sqlite3" \
-                "$TMP/lnbits/data/database.sqlite3" --anche-scrittura); then
+                "$TMP/lnbits/data/database.sqlite3" --anche-scrittura \
+                ${MISURE_LNBITS[@]+"${MISURE_LNBITS[@]}"}); then
             :
         else
-            ATTENZIONE_LNBITS="${ESITO_LNBITS:-copia non riuscita}"
+            rm -f "$TMP/lnbits/data/database.sqlite3.parziale"
+            ATTENZIONE_LNBITS="${ESITO_LNBITS:-copia non riuscita, tetto di tempo}"
             echo "ATTENZIONE: database LNbits NON copiato in modo atomico o non integro ($ATTENZIONE_LNBITS) - i sats sul nodo restano senza nomi in questo archivio" >&2
         fi
     fi

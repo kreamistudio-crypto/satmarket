@@ -53046,8 +53046,9 @@ def prove_servizio_non_root():
     prova("lo script non dipende dal comando sqlite3", [],
           [r.strip() for r in sc.split("\n")
            if re.match(r"\s*sqlite3\s", r)])
-    prova("...la copia del database usa l'API di python", True,
-          "sorgente.backup(destinazione)" in sc
+    prova("...la copia del database usa l'API di python (dal 20 ott 2026 "
+          "la stessa di deploy.sh: deploy/copia-db.py)", True,
+          "python3 deploy/copia-db.py" in sc
           and 'copia_db "$qui"' in fai)
     torna = sc[sc.index("\ntorna() {"):sc.index("\nfallito() {")]
     prova("tornare a root: via il drop-in, reload, restart", True,
@@ -171528,8 +171529,15 @@ def prove_backup_prima_del_deploy():
        "time.sleep(float(sys.argv[2]))\n"
        "c.execute('COMMIT')\n")
 
+    # il curl che porta l'archivio e ci mette un'eternita' (per il SIGTERM)
+    lf("finti-lenti/curl", "#!/bin/sh\n"
+       "printf '%s\\n' \"$*\" >> \"$REGISTRO\"\n"
+       "case \"$*\" in *sendDocument*) sleep 30;; esac\n"
+       "echo '{\"ok\":true}'\n", True)
+
     def giro(nome, args="", rotto=False, grande=False, pagine_rotte=False,
-             occupato=0.0, ambiente="", curl_rotto=False, senza_env=False):
+             occupato=0.0, ambiente="", curl_rotto=False, senza_env=False,
+             lnbits_occupato=0.0, curl_lento=False, ferma_dopo=0.0):
         app = os.path.join(base, nome, "app")
         os.makedirs(os.path.join(app, "buste"))
         os.makedirs(os.path.join(app, "contenuti"))
@@ -171572,19 +171580,45 @@ def prove_backup_prima_del_deploy():
                 f"python3 {L('tieni.py')} {L(nome + '/app/satmarket.db')} {occupato}"),
                 stdout=subprocess.PIPE, text=True)
             tiene.stdout.readline()        # «preso»: il lucchetto e' suo
-        script = (f"export PATH={L('finti-rotti' if curl_rotto else 'finti')}:{L('finti')}:$PATH "
+        if lnbits_occupato:
+            # la cassaforte del nodo, finta, e qualcuno che la tiene
+            lnb = os.path.join(base, nome, "lnbits")
+            os.makedirs(os.path.join(lnb, "data"))
+            lf(f"{nome}/lnbits/.env", "LNBITS_FINTO=1\n")
+            lf(f"{nome}/lnbits/docker-compose.yml", "services: {}\n")
+            c = sqlite3.connect(os.path.join(lnb, "data", "database.sqlite3"))
+            c.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, nota)")
+            c.commit()
+            c.close()
+            ambiente += f" BARATTOLO_DIR_LNBITS={L(nome + '/lnbits')}"
+            tiene = subprocess.Popen(dentro(
+                f"python3 {L('tieni.py')} {L(nome + '/lnbits/data/database.sqlite3')} "
+                f"{lnbits_occupato}"), stdout=subprocess.PIPE, text=True)
+            tiene.stdout.readline()
+        curl = "finti-rotti" if curl_rotto else "finti-lenti" if curl_lento else "finti"
+        lancio = f"bash {L('backup.sh')} {args} < /dev/null"
+        if ferma_dopo:
+            # come systemd ai 600 s: SIGTERM a TUTTO il gruppo (set -m: il
+            # lavoro in fondo ha il suo gruppo, col numero del suo pid)
+            lancio = (f"set -m; ( exec {lancio} ) & P=$!; sleep {ferma_dopo}; "
+                      f"kill -TERM -- -$P; wait $P")
+        script = (f"export PATH={L(curl)}:{L('finti')}:$PATH "
                   f"BARATTOLO_DIR={L(nome + '/app')} "
                   f"BARATTOLO_BACKUP_ENV={L('manca' if senza_env else 'ambiente')} "
                   f"BARATTOLO_BACKUP_PARTE=200000 {ambiente} "
                   f"REGISTRO={L(nome + '/registro')} "
                   f"MANDATI={L(nome + '/mandati')}; "
-                  f"cd {L(nome + '/app')} && bash {L('backup.sh')} {args} < /dev/null")
+                  f"cd {L(nome + '/app')} && {lancio}")
         t0 = time.monotonic()
         r = subprocess.run(dentro(script), capture_output=True, text=True,
                            encoding="utf-8", timeout=120)
         r.secondi = time.monotonic() - t0
         if tiene:
-            tiene.wait(timeout=60)
+            try:
+                tiene.wait(timeout=60 if not lnbits_occupato else 0.1)
+            except subprocess.TimeoutExpired:
+                tiene.kill()
+                tiene.wait()
         reg = os.path.join(base, nome, "registro")
         righe = open(reg, encoding="utf-8").read().splitlines() \
             if os.path.exists(reg) else []
@@ -171723,6 +171757,49 @@ def prove_backup_prima_del_deploy():
         prova("IL GIORNALIERO SENZA /etc/barattolo-backup.env: il bot dice "
               "che non e' partito", (1, 1, True),
               (r.returncode, len(avv), bool(avv) and "non è partito" in avv[0]))
+
+        # j) LNBITS OCCUPATO PRIMA DEL DEPLOY (20 ott 2026, cantiere
+        #    backup-ritocchi): il lucchetto tenuto 60 s. Col tetto del
+        #    giornaliero (90 + 30) l'archivio sarebbe caduto nei 120 s di
+        #    deploy.sh; col tetto corto parte entro i 30, senza il
+        #    `.parziale` dentro, e il journal dice di LNbits
+        r, righe, fuori, archivi = giro(
+            "lnbits-occupato", "--prima-del-deploy abcdef12", lnbits_occupato=60)
+        doc = [x for x in righe if "sendDocument" in x]
+        nomi = []
+        if archivi:
+            with tarfile.open(os.path.join(fuori, archivi[0]), "r:gz") as t:
+                nomi = t.getnames()
+        prova("LNBITS OCCUPATO PRIMA DEL DEPLOY: l'archivio parte lo stesso, "
+              "in meno di 35 s (il tetto corto, 15 + 10), con la copia a caldo "
+              "di LNbits e senza un .parziale, e lo stderr dice di LNbits",
+              (0, 1, True, True, False, True),
+              (r.returncode, len(doc), r.secondi < 35,
+               "./lnbits/data/database.sqlite3" in nomi,
+               any(n.endswith(".parziale") for n in nomi),
+               "database LNbits NON copiato" in r.stderr))
+        if r.returncode != 0 or r.secondi >= 35:
+            print('      ', round(r.secondi, 1), r.stderr[-400:])
+
+        # k) FERMATO DA FUORI (il tempo massimo della unit): SIGTERM a tutto
+        #    il gruppo mentre l'archivio sta partendo. Prima bash moriva li'
+        #    e nessuno lo sapeva; adesso la trappola parte, avvisa, e lascia
+        #    il segno col numero del giro per l'ExecStopPost
+        r, righe, fuori, archivi = giro(
+            "fermato", curl_lento=True, ferma_dopo=3,
+            ambiente="INVOCATION_ID=giro-7")
+        avv = [x for x in righe if x.startswith("AVVISA|")]
+        segno = os.path.join(base, "fermato", "app", "backup", ".giornaliero-avvisato")
+        prova("FERMATO DAL SIGTERM DELLA UNIT: esce con 143, il bot dice "
+              "«fermato prima di finire» con la copia integra, e il segno "
+              "porta il numero del giro", (143, 1, True, "giro-7"),
+              (r.returncode, len(avv),
+               bool(avv) and "fermato prima di finire" in avv[0]
+               and "integra" in avv[0],
+               open(segno, encoding="utf-8").read().strip()
+               if os.path.exists(segno) else None))
+        if len(avv) != 1:
+            print('      ', r.returncode, righe[-5:], r.stderr[-400:])
     finally:
         shutil.rmtree(base, ignore_errors=True)
 
@@ -171926,6 +172003,160 @@ def prove_backup_database_occupato():
         prova("deploy.sh --avvisa: esce pulito, e non chiama git nemmeno una "
               "volta (niente fetch, niente reset)", (0, False),
               (r.returncode, os.path.exists(reg)))
+
+        # 7) L'AIUTANTE COI TETTI DA RIGA DI COMANDO (20 ott 2026, cantiere
+        #    backup-ritocchi): quelli che usa LNbits prima del deploy
+        cart = os.path.join(base, "tetti")
+        os.makedirs(cart)
+        scrivi(os.path.join(cart, "copia-db.py"), aiutante)
+        con = sqlite3.connect(os.path.join(cart, "x.db"))
+        con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, nota)")
+        con.commit()
+        con.close()
+        scrivi(os.path.join(base, "tieni.py"),
+               "import sqlite3, sys, time\n"
+               "c = sqlite3.connect(sys.argv[1], isolation_level=None)\n"
+               "c.execute('BEGIN EXCLUSIVE')\n"
+               "c.execute(\"INSERT INTO ordini(nota) VALUES('di passaggio')\")\n"
+               "print('preso', flush=True)\n"
+               "time.sleep(float(sys.argv[2]))\n"
+               "c.execute('COMMIT')\n")
+
+        def tenuto(db, secondi):
+            t = subprocess.Popen(dentro(
+                f"python3 {L(os.path.join(base, 'tieni.py'))} {L(db)} {secondi}"),
+                stdout=subprocess.PIPE, text=True)
+            t.stdout.readline()
+            return t
+
+        t = tenuto(os.path.join(cart, "x.db"), 12)
+        t0 = time.monotonic()
+        r = subprocess.run(dentro(
+            f"cd {L(cart)} && python3 copia-db.py x.db y.db --tetto=2 --attesa=10"),
+            capture_output=True, text=True, encoding="utf-8", timeout=60)
+        sec = time.monotonic() - t0
+        t.kill()
+        t.wait()
+        prova("copia-db.py --tetto=2 --attesa=10: l'attesa non supera il "
+              "tetto, e si arrende entro 5 s col codice dell'occupato",
+              (4, True, False),
+              (r.returncode, sec < 5, os.path.exists(os.path.join(cart, "y.db"))))
+
+        # 8) CAMBIO-UTENTE USA LA STESSA COPIA (20 ott 2026): la funzione
+        #    vera, ritagliata dallo script, su una cartella finta col
+        #    server che tiene il database 3 s; poi su un database rotto
+        sc = open(os.path.join("deploy", "utente", "cambio-utente.sh"),
+                  encoding="utf-8").read().replace("\r\n", "\n")
+        a = sc.index("\ncopia_db() {\n") + 1
+        funz = sc[a:sc.index("\n}\n", a) + 3]
+
+        def cambio(nome, occupato=0.0, rotto=False):
+            c = os.path.join(base, nome)
+            scrivi(os.path.join(c, "config.py"), "DB = 'satmarket.db'\n")
+            scrivi(os.path.join(c, "deploy", "copia-db.py"), aiutante)
+            con = sqlite3.connect(os.path.join(c, "satmarket.db"))
+            con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, nota)")
+            con.executemany("INSERT INTO ordini(nota) VALUES(?)",
+                            [(f"ordine {k}",) for k in range(300)])
+            con.commit()
+            con.close()
+            if rotto:
+                pp = os.path.join(c, "satmarket.db")
+                b = bytearray(open(pp, "rb").read())
+                b[4096 + 3:4096 + 7] = b"\x7f\x7f\x00\x01"
+                open(pp, "wb").write(bytes(b))
+            scrivi(os.path.join(c, "giro.sh"),
+                   "dillo() { echo \"$*\"; }\n" + funz
+                   + f'copia_db {shlex.quote(nel_linux(c))} '
+                     f'{shlex.quote(nel_linux(os.path.join(c, "copia.db")))}\n')
+            t = tenuto(os.path.join(c, "satmarket.db"), occupato) if occupato else None
+            t0 = time.monotonic()
+            r = subprocess.run(dentro(f"bash {L(os.path.join(c, 'giro.sh'))}"),
+                               capture_output=True, text=True, encoding="utf-8",
+                               timeout=200)
+            sec = time.monotonic() - t0
+            if t:
+                t.wait(timeout=60)
+            righe_copia = None
+            if os.path.exists(os.path.join(c, "copia.db")) and not rotto:
+                cc = sqlite3.connect(os.path.join(c, "copia.db"))
+                righe_copia = cc.execute("SELECT COUNT(*) FROM ordini").fetchone()[0]
+                cc.close()
+            return r, sec, righe_copia
+
+        r, sec, n = cambio("cambio-occupato", occupato=3)
+        prova("CAMBIO-UTENTE, SERVER CHE SCRIVE 3 S: copia_db aspetta e "
+              "riesce, integra, con la riga di chi teneva il lucchetto",
+              (0, True, 301, True),
+              (r.returncode, sec >= 2, n, "la copia: integra" in r.stdout))
+        r, sec, n = cambio("cambio-rotto", rotto=True)
+        prova("CAMBIO-UTENTE, DATABASE ROTTO: copia_db dice di no (e il "
+              "cambio non ferma niente), e la riga dice perche'",
+              (3, True), (r.returncode, "non integra" in r.stdout))
+
+        # 9) L'EXECSTOPPOST DEL GIORNALIERO: deploy/backup-caduto.sh con lo
+        #    stato che gli darebbe systemd
+        unita = open(os.path.join("deploy", "barattolo-backup.service"),
+                     encoding="utf-8").read()
+        prova("la unit del giornaliero chiama backup-caduto.sh a ogni stop",
+              True, "\nExecStopPost=/bin/bash /root/satmarket/deploy/backup-caduto.sh\n"
+              in unita)
+        caduto = open(os.path.join("deploy", "backup-caduto.sh"),
+                      encoding="utf-8").read().replace("\r\n", "\n")
+        prova("...e lo script e' tutto in una funzione, chiamata con exit "
+              "sulla stessa riga (un git reset a meta' non lo storce)", True,
+              caduto.rstrip().endswith('main "$@"; exit 0'))
+
+        def stop_post(nome, ambiente, segno=None, sa_avvisare=True):
+            c = os.path.join(base, nome)
+            os.makedirs(os.path.join(c, "backup"))
+            shutil.copy(os.path.join("deploy", "backup-caduto.sh"),
+                        os.path.join(c, "caduto.sh"))
+            scrivi(os.path.join(c, "deploy.sh"),
+                   ("#!/bin/bash\n# finto: --avvisa\n"
+                    "[ \"$1\" = --avvisa ] && printf 'AVVISA|%s\\n' \"$2\" >> \"$REGISTRO\"\n")
+                   if sa_avvisare else
+                   "#!/bin/bash\nprintf 'DEPLOY|%s\\n' \"$*\" >> \"$REGISTRO\"\n")
+            if segno is not None:
+                scrivi(os.path.join(c, "backup", ".giornaliero-avvisato"), segno + "\n")
+            r = subprocess.run(dentro(
+                f"export BARATTOLO_DIR={L(c)} REGISTRO={L(os.path.join(c, 'registro'))} "
+                f"{ambiente}; bash {L(os.path.join(c, 'caduto.sh'))}"),
+                capture_output=True, text=True, encoding="utf-8", timeout=60)
+            reg = os.path.join(c, "registro")
+            return r.returncode, (open(reg, encoding="utf-8").read().splitlines()
+                                  if os.path.exists(reg) else [])
+
+        casi = [
+            ("pp-bene", "SERVICE_RESULT=success INVOCATION_ID=g1", None, True, 0),
+            ("pp-fuori", "", None, True, 0),
+            ("pp-tempo", "SERVICE_RESULT=timeout INVOCATION_ID=g2", None, True, 1),
+            ("pp-tempo-detto", "SERVICE_RESULT=timeout INVOCATION_ID=g3", "g3", True, 0),
+            ("pp-tempo-vecchio", "SERVICE_RESULT=timeout INVOCATION_ID=g4", "g3", True, 1),
+            ("pp-ucciso", "SERVICE_RESULT=signal EXIT_STATUS=KILL INVOCATION_ID=g5", None, True, 1),
+            ("pp-codice", "SERVICE_RESULT=exit-code EXIT_STATUS=1 INVOCATION_ID=g6", "g6", True, 0),
+            ("pp-deploy-vecchio", "SERVICE_RESULT=timeout INVOCATION_ID=g7", None, False, 0),
+        ]
+        storti, testi = [], {}
+        for nome, amb, segno, sa, attesi in casi:
+            codice, righe = stop_post(nome, amb, segno, sa)
+            avv = [x for x in righe if x.startswith("AVVISA|")]
+            testi[nome] = avv[0] if avv else ""
+            if codice != 0 or len(avv) != attesi or any(x.startswith("DEPLOY|") for x in righe):
+                storti.append((nome, codice, righe))
+        prova("BACKUP-CADUTO: parla SOLO quando il giro e' finito male e il "
+              "backup non l'ha detto (otto casi: bene, fuori da systemd, "
+              "tempo scaduto, gia' detto, detto per un altro giro, SIGKILL, "
+              "codice gia' detto, deploy.sh senza --avvisa); esce sempre 0, "
+              "e un deploy.sh vecchio non lo lancia mai", [], storti)
+        prova("l'intestazione e la unit non chiedono piu' il comando sqlite3",
+              (False, False),
+              ("apt install age sqlite3" in open(os.path.join("deploy", "backup-fuori.sh"),
+                                                 encoding="utf-8").read(),
+               "apt install age sqlite3" in unita))
+        prova("...e dice il perche' giusto", (True, True),
+              ("tempo massimo della unit" in testi["pp-tempo"],
+               "ucciso da un segnale (KILL)" in testi["pp-ucciso"]))
     finally:
         shutil.rmtree(base, ignore_errors=True)
 
