@@ -9644,8 +9644,11 @@
   sulle sole rotte `/api/login/bot` (in memoria si tiene il suo hash);
   all'Avvia il bot brucia il codice (monouso), lega l'ingresso a chi ha
   premuto e mostra «Entri su Barattolo come Nome (@utente)?», da dove
-  viene la richiesta e TRE figure; la figura giusta rende l'ingresso
-  pronto, una sbagliata o «Non sono stato io» lo annullano; il browser
+  viene la richiesta e TRE figure, cose da mercatino col loro nome sul
+  tasto e sulla pagina («🍯 Miele», «🚲 Bici»…: dodici in
+  `FIGURE_INGRESSO`, solo emoji di Unicode 11 o prima, dal 20 ott 2026);
+  il tasto porta il POSTO della figura nella riga, non la figura; la
+  figura giusta rende l'ingresso pronto, una sbagliata o «Non sono stato io» lo annullano; il browser
   bussa ogni due secondi (e subito al ritorno in primo piano) con
   `POST /api/login/bot/stato`, e solo lui, col legame, incassa la
   sessione — da `apri_sessione`, quindi portachiavi, TETTO (esce il più

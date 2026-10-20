@@ -110230,6 +110230,26 @@ def prove_login_dal_bot():
     prova("...tre figure DIVERSE, una giusta, a caso vero", True,
           "secrets.SystemRandom().sample(FIGURE_INGRESSO, 3)" in ini
           and "secrets.choice(scelte)" in ini)
+    # LE FIGURE DEL MERCATINO (20 ott 2026, cantiere figure-barattolo):
+    # dodici, ognuna col suo nome, nessun doppione ne' di disegno ne' di
+    # parola, niente 🫙 (e' dei preferiti) e solo emoji che un telefono
+    # vecchio sa disegnare: Unicode 11 o prima. La tabella e' quella
+    # delle emoji usate qui, con l'anno della loro versione; una figura
+    # nuova che non c'e' fa fallire la prova, e la si aggiunge guardando.
+    import ast as _ast
+    _riga = re.search(r"\nFIGURE_INGRESSO = (\(.*?\))\n", src, re.S)
+    figure = _ast.literal_eval(_riga.group(1)) if _riga else ()
+    _versione = {"🍯": 6, "🚲": 6, "📚": 6, "🎸": 6, "⌚": 6, "🧸": 11,
+                 "🎨": 6, "🧺": 11, "📷": 6, "👟": 6, "🎧": 6, "⚽": 6}
+    prova("le figure dell'ingresso: dodici, ognuna col suo nome", (12, True),
+          (len(figure), all(len(f) == 2 and f[1].strip() for f in figure)))
+    prova("...tutte diverse, nel disegno e nel nome", (12, 12),
+          (len({f[0] for f in figure}), len({f[1].lower() for f in figure})))
+    prova("...niente 🫙 (e' dei preferiti)", False, any("🫙" in f[0] for f in figure))
+    prova("...solo emoji di Unicode 11 o prima", [],
+          [f[0] for f in figure if _versione.get(f[0], 99) > 11])
+    prova("...e il tasto del bot porta il POSTO, non la figura", True,
+          '[{"text": f"{f} {nome}", "callback_data": f"entra:{t}:{n}"}' in av)
     prova("il LEGAME sta in un cookie HttpOnly, sulle sole rotte della porta", True,
           "httponly=True" in ini and "path=PERCORSO_INGRESSO" in ini
           and 'PERCORSO_INGRESSO = "/api/login/bot"' in src)
@@ -110323,7 +110343,7 @@ console.log(JSON.stringify(giri));
     prova("closeSheet chiude anche il foglio del bot", True,
           "el('botEntraSheet').classList.remove('open');" in _fn_js(mini, "function closeSheet(){"))
     prova("il foglio ha la figura, il bottone, il QR e il «Riprova»", True,
-          all(f'id="{i}"' in mini for i in ("botEntraSheet", "botEntraEmoji", "botEntraApri",
+          all(f'id="{i}"' in mini for i in ("botEntraSheet", "botEntraEmoji", "botEntraNome", "botEntraApri",
                                              "botEntraQr", "botEntraStato", "botEntraRifai")))
     prova("Telegram si apre da un LINK vero (il tocco del dito, non uno script)", True,
           '<a class="btn primary" id="botEntraApri"' in mini)
@@ -110399,9 +110419,9 @@ const giri = {};
   giri.guasto = await leggiPortaBot();
   // il giro del foglio, dal telefono
   ricaricata = 0; chiamate = []; portaBotSi = true;
-  risposte = [{json: {link: 'https://t.me/ilbarattolobot?start=entra_abc', figura: '🍐', valida_secondi: 120}}];
+  risposte = [{json: {link: 'https://t.me/ilbarattolobot?start=entra_abc', figura: '🍯', figura_nome: 'Miele', valida_secondi: 120}}];
   await apriIngressoBot();
-  const f = () => [el('botEntraStato').textContent, el('botEntraEmoji').textContent,
+  const f = () => [el('botEntraStato').textContent, el('botEntraEmoji').textContent + '|' + el('botEntraNome').textContent,
     el('botEntraFigura').style.display, el('botEntraApri').style.display, el('botEntraRifai').style.display,
     el('botEntraQrBox').style.display];
   giri.telefono = [f(), el('botEntraApri').href, el('botEntraApri').innerHTML.replace(/<img[^>]*> /, ''), qr];
@@ -110413,14 +110433,14 @@ const giri = {};
   // scaduto, annullato, la leva spenta a meta' strada, la rete che balla
   for (const [k, r] of [['scaduto', {json: {stato: 'scaduto'}}], ['annullato', {json: {stato: 'annullato'}}],
                         ['spenta', {ok: false, status: 404}], ['rete', null]]) {
-    risposte = [{json: {link: 'L', figura: '🍋'}}]; await apriIngressoBot();
+    risposte = [{json: {link: 'L', figura: '📚', figura_nome: 'Libri'}}]; await apriIngressoBot();
     if (r) risposte = [r]; else risposte = [];
     try { await bussaIngressoBot(); } catch(e) {}
     giri[k] = f();
   }
   // dal computer: il QR e il bottone di Telegram Desktop
   ua = 'Mozilla/5.0 (Windows NT 10.0)'; qr = 0;
-  risposte = [{json: {link: 'L', figura: '🍇'}}]; await apriIngressoBot();
+  risposte = [{json: {link: 'L', figura: '🎸', figura_nome: 'Chitarra'}}]; await apriIngressoBot();
   giri.computer = [el('botEntraQrBox').style.display, qr, el('botEntraApri').innerHTML.replace(/<img[^>]*> /, '')];
   // il link non si prepara: si dice, e si puo' riprovare
   risposte = [{ok: false, status: 429}]; await apriIngressoBot(); giri.freno = f();
@@ -110431,7 +110451,7 @@ const giri = {};
   giri.vetrina = banner.figli.map(p => p.figli[0]?.tag === 'script' ? 'widget' : p.figli[0]?.id);
   // su onion: il QR sempre (anche dal telefono), mai il widget, e il banner nomina tutti e due
   onion = true; ua = 'Mozilla/5.0 (Android 14; Mobile; rv:128.0) Gecko/20100101 Firefox/128.0'; qr = 0;
-  risposte = [{json: {link: 'L', figura: '🍒'}}]; await apriIngressoBot();
+  risposte = [{json: {link: 'L', figura: '⚽', figura_nome: 'Pallone'}}]; await apriIngressoBot();
   giri.onionFoglio = [el('botEntraQrBox').style.display, qr, el('botEntraSub').innerHTML.startsWith('Da Tor il link di Telegram pu\u00f2 non aprirsi: inquadra'),
     el('botEntraApri').innerHTML.replace(/<img[^>]*> /, '')];
   const bo = el('demoBanner'); bo.figli = []; bo.appendChild(nodo('div'));
@@ -110467,22 +110487,23 @@ const giri = {};
     prova("la porta si chiede UNA volta", [True, True, ["GET /api/login/bot"]], g["leggi"])
     prova("...e dentro Telegram mai", [False, 0], g["dentroTelegram"])
     prova("...e un server che non risponde vuol dire widget", False, g["guasto"])
-    prova("dal telefono: la figura, «Apri Telegram» e niente QR",
-          [["Aspetto che tocchi Avvia nel bot…", "🍐", "", "", "none", "none"],
+    prova("dal telefono: la figura col suo nome, «Apri Telegram» e niente QR",
+          [["Aspetto che tocchi Avvia nel bot…", "🍯|Miele", "", "", "none", "none"],
            "https://t.me/ilbarattolobot?start=entra_abc", "Apri Telegram", 0], g["telefono"])
-    prova("dopo l'Avvia la pagina dice QUALE figura toccare", "Ora nel bot tocca 🍐", g["inChat"])
+    prova("dopo l'Avvia la pagina dice QUALE figura toccare, come sul tasto",
+          "Ora nel bot tocca 🍯 Miele", g["inChat"])
     prova("figura giusta: si e' dentro e la pagina si ricarica",
           ["✅ Sei dentro come Negozio", 1], g["dentro"])
     prova("si chiede una volta e si bussa con POST", ["POST /api/login/bot/inizia"]
           + ["POST /api/login/bot/stato"] * 3, g["chiamate"])
     prova("scaduto: si dice, e c'e' «Riprova» al posto della figura",
-          ["Il link è scaduto: riprova, ci vuole un attimo.", "🍋", "none", "none", "", "none"],
+          ["Il link è scaduto: riprova, ci vuole un attimo.", "📚|Libri", "none", "none", "", "none"],
           g["scaduto"])
     prova("annullato nel bot: lo stesso", "Ingresso annullato nel bot. Se eri tu, riprova.",
           g["annullato"][0])
     prova("...anche se la leva si spegne a meta' strada", g["annullato"], g["spenta"])
     prova("la rete che balla non chiude niente: si ribussa", ["Aspetto che tocchi Avvia nel bot…",
-          "🍋", "", "", "none", "none"], g["rete"])
+          "📚|Libri", "", "", "none", "none"], g["rete"])
     prova("dal computer: il QR e «Apri Telegram Desktop»", ["", 1, "Apri Telegram Desktop"],
           g["computer"])
     prova("troppi tentativi: si dice, e si puo' riprovare",

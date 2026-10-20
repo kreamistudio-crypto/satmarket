@@ -68439,3 +68439,76 @@ picco di memoria del servizio (`MemoryPeak`) col collaudo spento e poi
 acceso. Poi il ripiego: variabile vuota, lancio a mano, il giro su
 GitHub. La prova di isolamento da rifare quando nasce la deploy key del
 collaudo.
+
+## Le figure del mercatino nel login dal bot: 🍯 Miele, 🚲 Bici, 📚 Libri… col loro nome (20 ott 2026, cantiere figure-barattolo, decisione di Andrea)
+
+**COSA.** Nel giro di «Entra con Telegram» a leva `LOGIN_DAL_BOT`
+accesa (CANTIERI, «Entra dal bot») le dodici figure da toccare non sono
+più frutta e verdura ma cose da mercatino: 🍯 Miele, 🚲 Bici, 📚 Libri,
+🎸 Chitarra, ⌚ Orologio, 🧸 Orsetto, 🎨 Colori, 🧺 Cesto, 📷 Foto,
+👟 Scarpa, 🎧 Cuffie, ⚽ Pallone. E ognuna porta il suo NOME: sotto
+l'emoji grande del foglio `botEntraSheet` («Miele», 16 px), nella riga
+di stato («Ora nel bot tocca 🍯 Miele») e sui tasti del bot
+(«🍯 Miele»). Toccati `server.py` (`FIGURE_INGRESSO` diventa dodici
+coppie emoji-nome; `/api/login/bot/inizia` risponde anche `figura_nome`,
+`figura` resta la sola emoji; il testo del tasto), `miniapp.html` (il
+`botEntraNome` sotto l'emoji, `apriIngressoBot`), `prove.py`
+(`prove_login_dal_bot`) e `collaudo_login_bot.py`.
+
+**LE DECISIONI E I PERCHÉ.**
+- LE REGOLE DI SICUREZZA SONO QUELLE DI IERI, riga per riga: tre figure
+  diverse sorteggiate con `secrets.SystemRandom().sample`, la giusta con
+  `secrets.choice`; il tasto porta il POSTO nella riga
+  (`entra:<token>:0|1|2`) e non la figura, quindi il nome non entra
+  nella sicurezza; sbagliata o «Non sono stato io» annullano, il link
+  vale due minuti, una volta, per il solo Telegram che ha premuto
+  Avvia; il legame resta nel cookie HttpOnly. Il confronto
+  `i["scelte"][int(scelta)] != i["figura"]` è identico: ora confronta
+  due coppie invece di due emoji.
+- IL NOME SU TUTT'E DUE I LATI (sì di Andrea al piano): si cerca la
+  parola oltre al disegno, e chi vede piccolo, o ha un telefono che
+  disegna l'emoji a modo suo, trova quella giusta lo stesso. Sulla
+  pagina il lettore di schermo legge il nome (`aria-live` passato
+  dall'emoji al nome, l'emoji è `aria-hidden`): un'emoji si pronuncia in
+  modi diversi da un sistema all'altro.
+- SOLO UNICODE 11 O PRIMA (2018): 🧸 e 🧺 sono dell'11, le altre del 6 o
+  prima. Un telefono vecchio che non conosce un'emoji mostra un
+  quadratino, e tre quadratini uguali sono un ingresso impossibile.
+  Niente 🫙: è dei preferiti (regola ferrea 9).
+
+**SCARTATO.** Due tasti per riga per far posto a nomi lunghi: il nome
+più lungo, «🎸 Chitarra», sta largo in un terzo di riga a 360 px, e una
+riga sola tiene le tre figure sotto lo stesso sguardo. Il nome dentro
+il campo `figura` («🍯 Miele»): avrebbe cambiato il senso di un campo
+che il collaudo e il banco leggono come emoji.
+
+**PROVATO.** `prove_login_dal_bot` 71/0, con cinque prove nuove
+sull'elenco (dodici coppie, nessun doppione né di disegno né di parola
+— minuscole —, niente 🫙, nessuna emoji oltre l'Unicode 11 secondo una
+tabella scritta nella prova: una figura nuova fuori tabella fa
+fallire, e la si aggiunge guardando) e sul tasto che porta il posto;
+il banco node ora legge anche il nome (dal telefono, scaduto, rete).
+`collaudo_login_bot` verde nella gabbia, col tasto cercato come
+«emoji nome» e una prova che ogni tasto porti il nome. CONTROPROVE sul
+file vero, poi ripristinato: tasti senza nome → collaudo rosso e
+`prove.py` 1 rossa; 🫙 e 🪴 (Unicode 13) nell'elenco → 2 rosse; un nome
+doppio → 1 rossa; il nome non scritto sulla pagina → 3 rosse nel banco.
+DAL VIVO (Playwright e Chromium, 360×780 densità 2, server del giro da
+uno script nello scratchpad con config in memoria, leva accesa, relay
+morti, ogni richiesta fuori da 127.0.0.1 abortita, il bot simulato dal
+campanello): chiaro, «🍪 web», il foglio account, tocco vero su
+«Aggiungi un altro Telegram», il foglio con la figura e il nome, l'Avvia,
+«Ora nel bot tocca 👟 Scarpa», il tocco giusto e la pagina dentro come
+Andrea; scuro (col 🌙 vero), «🎸 Chitarra», il tocco sbagliato, «❌
+Figura sbagliata» nel bot e «Ingresso annullato nel bot. Se eri tu,
+riprova.» sulla pagina. Il messaggio del bot è riprodotto in un
+riquadro alla Telegram coi tasti veri usciti dal server; un campionario
+delle dodici a 44 e 16 px, chiaro e scuro. Nessun errore di pagina;
+fuori dal loopback solo `telegram-web-app.js`, fermato. Il foglio
+account si è aperto con `apriAccountSheet()` da script: in collaudo la
+pastiglia sta nel Profilo, e il gesto in prova era il foglio del bot.
+
+**DA GUARDARE.** 🎧 e ⚽ in Noto sono le più scure: sul fondo scuro si
+staccano meno delle altre (si leggono, e il nome c'è). Il disegno
+cambia da un telefono all'altro: la prova vera è il giro sul collaudo,
+su un iPhone e un Android, chiaro e scuro.

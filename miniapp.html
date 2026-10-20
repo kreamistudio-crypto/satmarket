@@ -14922,7 +14922,12 @@ document.getElementById('cartello')?.remove();</script>
     <div id="botEntraSub" style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.5"></div>
     <div id="botEntraFigura" style="display:none;text-align:center;margin:14px 0 4px">
       <div style="font-size:12.5px;color:var(--ink-soft);font-weight:700">Nel bot tocca questa figura</div>
-      <div id="botEntraEmoji" style="font-size:60px;line-height:1.25" aria-live="polite"></div>
+      <div id="botEntraEmoji" style="font-size:60px;line-height:1.25" aria-hidden="true"></div>
+      <!-- il NOME della figura, sotto: si cerca la parola oltre al
+           disegno, ed e' la stessa scritta del tasto nel bot (20 ott
+           2026, cantiere figure-barattolo). E' lui che parla al lettore
+           di schermo: l'emoji da sola si legge in modi diversi. -->
+      <div id="botEntraNome" style="font-size:16px;font-weight:800;color:var(--ink);margin-top:2px" aria-live="polite"></div>
     </div>
     <div id="botEntraQrBox" style="display:none;margin-bottom:6px">
       <div class="qr" id="botEntraQr"></div>
@@ -51993,8 +51998,10 @@ async function apriIngressoBot(){
     return;
   }
   if (!foglio.classList.contains('open')) return;   // chiuso nel frattempo
-  ingressoBotFigura = String(d.figura || '');
-  el('botEntraEmoji').textContent = ingressoBotFigura;
+  el('botEntraEmoji').textContent = String(d.figura || '');
+  el('botEntraNome').textContent = String(d.figura_nome || '');
+  /* nella riga di stato la figura e' quella del tasto: emoji e nome */
+  ingressoBotFigura = `${d.figura || ''} ${d.figura_nome || ''}`.trim();
   el('botEntraFigura').style.display = '';
   const apri = el('botEntraApri');
   apri.href = d.link;
