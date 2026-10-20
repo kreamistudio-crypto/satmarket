@@ -68589,3 +68589,14 @@ l'affare l'unione che passa. 28/0. Suite intera severa su questo albero
 
 **DA GUARDARE.** Il giro dal telefono e da Tor Browser con un account
 di prova vero: la domanda, il toast, il ricarico.
+
+**IL PRIMO GIRO DELLA CI ROSSO (lo stesso giorno).** Su `ee112c8` il job
+`prove` è caduto su `collaudo_fusione_da_telegram`: il runner non ha
+coincurve (il workflow installa il minimo, ed è voluto), e il collaudo
+usciva con 1 invece di saltare. Il server stesso, senza coincurve, non
+apre la porta Nostr: lì il giro non ha senso. Ora si SALTA contando,
+come `collaudo_consegna_firmata` («⊘ tutto il collaudo — SALTATA»), ed
+esce con 0; dove coincurve c'è (PC, VPS) gira intero. Provato in tutti
+e due i modi: 28/0 con coincurve, 0/0/1 saltata con un coincurve finto
+che non si importa. `pronto` era rimasto fermo, quindi niente deploy
+del commit rosso.

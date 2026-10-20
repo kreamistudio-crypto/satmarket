@@ -32,7 +32,7 @@ import time
 import types
 
 QUI = os.path.dirname(os.path.abspath(__file__))
-PASSATE = FALLITE = 0
+PASSATE = FALLITE = SALTATE = 0
 SRV = None
 
 
@@ -45,6 +45,16 @@ def prova(nome, atteso, avuto):
         FALLITE += 1
         print(f"  ✗ {nome}\n      atteso: {atteso!r}"
               f"\n      avuto:  {avuto!r}")
+
+
+def salta(nome, perche):
+    """Si salta CONTANDO, come collaudo_consegna_firmata: dove manca
+    coincurve (il runner della CI) il server non apre nemmeno la porta
+    Nostr, e una firma non si puo' fare. Il giro vero gira dove
+    coincurve c'e': il PC e il VPS."""
+    global SALTATE
+    SALTATE += 1
+    print(f"  ⊘ {nome} — SALTATA: {perche}")
 
 
 def avvio():
@@ -134,8 +144,10 @@ def main():
     try:
         from coincurve import PrivateKey
     except ImportError:
-        print("  · coincurve non c'e': il collaudo non si puo' girare")
-        return 1
+        salta("tutto il collaudo", "manca coincurve: non si puo' firmare, "
+              "e il server non apre la porta Nostr")
+        print(f"\n  {PASSATE} passate, {FALLITE} fallite, {SALTATE} saltate")
+        return 0
 
     print("=" * 58)
     print("  LA FUSIONE DAL LATO TELEGRAM")
@@ -266,7 +278,7 @@ def main():
     prova("chiuso l'affare, l'unione passa", 200, unisci(t4, un["token"]).status_code)
 
     print("\n" + "=" * 58)
-    print(f"  {PASSATE} passate, {FALLITE} fallite")
+    print(f"  {PASSATE} passate, {FALLITE} fallite, {SALTATE} saltate")
     print("=" * 58)
     return 1 if FALLITE else 0
 
