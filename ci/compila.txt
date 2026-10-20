@@ -159,3 +159,4 @@ collaudo_swap_instradatore.py
 collaudo_onchain_indirizzo.py
 cartone_satsrouting.py
 collaudo_avvisi_nostr_arrivano.py
+collaudo_fusione_da_telegram.py

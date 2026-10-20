@@ -69616,3 +69616,79 @@ il paracadute «(−5,4%)» e la modifica di massa «prezzo +10 %».
 dovesse sparire anche dai capi del cursore o dalla riga dei due
 numeri, lì servirebbe una parola al suo posto (decisione di Andrea,
 oggi no).
+## Unire l'account Nostr a quello Telegram anche dal lato Telegram: «Entra anche con Nostr» propone l'unione (20 ott 2026, cantiere fusione-da-telegram, dal campo, richiesta di Andrea)
+
+**IL CASO.** Un utente entra con Nostr da Tor, si accorge che voleva
+l'account Telegram ed entra con Telegram: nasce un secondo account. Da
+lì prova «Entra anche con Nostr» con la stessa chiave, e la risposta è
+solo «questa chiave apre già un altro account». La richiesta di
+Andrea: con un account Telegram e uno Nostr separati, entrando con
+tutti e due si devono unire — prodotti, catalogo, XP, recensioni.
+
+**PERCHÉ NON SUCCEDEVA.** La fusione c'era in una direzione sola: dal
+web, sull'account Nostr, «Collega Telegram» → link al bot → conferma
+sulla tastiera → `esegui_fusione`. Dal lato Telegram `collega-firma`
+diceva 409 e mandava a fare il giro dall'altra parte, che da Tor (il
+link t.me) è proprio il pezzo che non va.
+
+**COSA.** Quando la chiave firmata apre già un account NATO CON NOSTR,
+`collega_npub_firma` non risponde più col solo 409: dopo le
+`_guardie_fusione` il 409 porta una proposta (`detail.unione`: token,
+npub, nome, quanti annunci e affari passerebbero). La firma appena
+verificata dal giudice unico del login è la stessa prova che serve per
+entrare in quell'account, e la sessione prova il Telegram: è la stessa
+persona. Il client chiede «Unire i due account?» (`proponiUnioneNostr`,
+la domanda numero 89, con «Non si può annullare»), e il «Sì» va a
+`POST /api/me/unisci-nostr`, che incassa il token e chiama
+`esegui_fusione` — lo stesso atto del bot, con le guardie ricontrollate
+dentro la transazione — poi il trasloco degli annunci alla firma della
+chiave, distintivi, reputazione Nostr e l'avviso agli admin
+(«Doppia cittadinanza dal web»). Il token vive in `UNIONI_DAL_WEB`
+(memoria, 5 minuti, uno vivo per account, legato al tg_id di chi ha
+firmato: un altro account che lo presenta lo brucia e basta). Le due
+rotte sono `async` (`prove_dizionari_nel_loop`). Dopo il sì il client
+finisce con la stessa firma quel che fa un collegamento normale (NIP-85,
+coda delle firme), rilegge il menu degli account e riparte.
+
+**DUE TELEGRAM NON DIVENTANO UNO.** Se la chiave è già l'accesso di un
+altro account Telegram il 409 lo dice («un account, una chiave») e non
+propone niente: il vecchio messaggio, che rimandava a «Collega
+Telegram», lì era sbagliato — quel bottone c'è solo sugli account nati
+con Nostr.
+
+**IL DOPPIONE NEL MENU, che c'era già.** Il collaudo l'ha trovato: dopo
+una fusione nel portachiavi due token aprono la stessa persona, e
+`portachiavi_conti` teneva l'«ultimo arrivato» nell'ordine della
+SELECT, non in quello del cookie come diceva il suo commento — a volte
+vinceva il token vecchio, e `portachiavi_adottato` rimetteva in testa
+quello attivo: Mario due volte. Ora si scorre nell'ordine del cookie, e
+l'adozione, se la persona è già nel mazzo, sostituisce la voce invece
+di aggiungerla. Vale anche per la fusione dal bot.
+
+**SCARTATO.** Fondere in silenzio alla firma: è un gesto che non si
+annulla, e chi firma per «Entra anche con Nostr» non sa di avere un
+secondo account con della roba dentro — la domanda dice cosa passa di
+qua. Chiedere una seconda firma al «Sì»: la sfida è monouso e la prova
+c'è già; il token legato al tg_id basta, e dura quanto i lasciapassare
+del bot. Mandare anche qui la conferma sul bot: è proprio il passo che
+da Tor non funziona.
+
+**PROVATO.** `prove_collega_npub_firma` con i casi nuovi eseguibili
+(proposta e numeri, token legato a chi firma, una proposta viva, token
+monouso e bruciato da un altro account, il sì che fonde col giudice
+unico, i premi, il no della fusione con la sua frase, le guardie già
+alla proposta) e le sentinelle del client; `prove_dizionari_nel_loop`
+con le due rotte nuove; il censimento delle domande a 89 e quello degli
+avvisi admin a 86 punti. `collaudo_fusione_da_telegram` (nuovo, in CI):
+server vero e firme Schnorr vere, il caso del campo rifatto per intero
+— Nostr, poi Telegram nello stesso browser, la proposta, il token
+rubato, il sì, annunci, vendita, recensione e media, contatori, il menu
+con una voce sola, la chiave che da un browser nuovo apre l'account
+unito — più i no: chiave di un altro Telegram, affare aperto, e chiuso
+l'affare l'unione che passa. 28/0. Suite intera severa su questo albero
+25.740 verdi e 2 rosse, entrambe il censimento degli avvisi admin
+(un punto in più, quello di `unisci_nostr`): aggiornato a 86,
+`prove_canale_admin` rigirata 87/0. Collaudi della CI 91/0 nella gabbia.
+
+**DA GUARDARE.** Il giro dal telefono e da Tor Browser con un account
+di prova vero: la domanda, il toast, il ricarico.

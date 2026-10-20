@@ -20730,9 +20730,15 @@ def prove_collega_npub_firma():
     # 2. I due rifiuti dicono chi e perche', non solo "errore".
     prova("il 400 nomina l'accesso gia' attivo", True,
           "L'accesso con Nostr e' gia' attivo" in corpo)
-    prova("il 409 nomina la chiave gia' presa e indirizza alla fusione",
-          True, "Questa chiave apre gia' un altro account" in corpo
-          and "Collega Telegram" in corpo)
+    # (20 ott 2026, fusione-da-telegram) il 409 non rimanda piu' a
+    # «Collega Telegram»: se l'altro account e' nato con Nostr propone
+    # l'unione QUI, e se e' un Telegram lo dice
+    prova("il 409 della chiave gia' presa: l'unione col nativo, il no al Telegram",
+          (True, True, True, False),
+          ("_guardie_fusione(con, altro, io)" in corpo,
+           "UNIONI_DAL_WEB[token] = (user[\"id\"], altro[\"tg_id\"]," in corpo,
+           "gia' l'accesso Nostr di un altro account" in corpo,
+           "Collega Telegram" in corpo))
 
     # 3. La guardia si ripete nella WHERE: l'indice unico e' il giudice
     #    vero (una IntegrityError sui generis), non solo il controllo
@@ -20771,9 +20777,12 @@ def prove_collega_npub_firma():
     class _ReqFinta:
         headers = {"host": "barattolo.store"}
 
+    import secrets as _secrets
     amb = {"Header": lambda d="": d, "Cookie": lambda d="": d,
            "Request": object, "HTTPException": _HTTP,
-           "ChiavePubblicaNostr": object, "time": time, "sqlite3": sqlite3}
+           "ChiavePubblicaNostr": object, "time": time, "sqlite3": sqlite3,
+           "secrets": _secrets, "SECONDI_CODICE_FUSIONE": 300,
+           "CODICI_FUSIONE": {}, "CONFERME_FUSIONE": {}, "UNIONI_DAL_WEB": {}}
     # bech32 vero, lo stesso importato da prove_trasloco_nostr: una npub
     # finta a mano avrebbe potuto nascondere un bug nella codifica.
     i = _SORGENTE.index("CHARSET_BECH32 = ")
@@ -20785,6 +20794,9 @@ def prove_collega_npub_firma():
     exec(pezzo("_accoda_trasloco_di"), amb)
     exec(pezzo("_spegni_badge_altrove"), amb)
     exec("async " + pezzo("collega_npub_firma"), amb)
+    exec("async " + pezzo("unisci_nostr"), amb)
+    exec(pezzo("_pulisci_fusioni"), amb)
+    exec(pezzo("_guardie_fusione"), amb)
 
     esito_verifica = {"pubkey": ""}
     amb["verifica_evento_login"] = lambda evento, host: esito_verifica["pubkey"]
@@ -20809,7 +20821,10 @@ def prove_collega_npub_firma():
     con.executescript("""
         CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, npub TEXT DEFAULT '',
             npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '',
-            verifica_codice TEXT DEFAULT '', verifica_scade INTEGER DEFAULT 0);
+            verifica_codice TEXT DEFAULT '', verifica_scade INTEGER DEFAULT 0,
+            nome TEXT DEFAULT '');
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INTEGER,
+            venditore_id INTEGER, stato TEXT);
         CREATE UNIQUE INDEX idx_utenti_npub_accesso
             ON utenti(npub_accesso) WHERE npub_accesso != '';
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER,
@@ -20870,16 +20885,131 @@ def prove_collega_npub_firma():
         esito_c = (e.status_code, e.detail)
     prova("la chiave gia' presa altrove e' un 409, non uno strappo silenzioso",
           409, esito_c[0] if esito_c else None)
-    prova("...e indirizza alla fusione con la frase intera",
-          "Questa chiave apre gia' un altro account: se e' il tuo "
-          "account Nostr, entra dal web con Nostr e usa «Collega Telegram»",
+    prova("...e se l'altro e' un account Telegram lo dice, senza proporre "
+          "unioni: due Telegram non diventano uno",
+          "Questa chiave e' gia' l'accesso Nostr di un altro account "
+          "Telegram: un account, una chiave",
           esito_c[1] if esito_c else None)
+    prova("...e nessuna proposta e' nata", {}, amb["UNIONI_DAL_WEB"])
     riga3 = con.execute("SELECT npub, npub_accesso FROM utenti "
                         "WHERE tg_id=3").fetchone()
     prova("...e la riga del terzo utente resta intatta: niente scrittura "
           "parziale dietro il 409", ("", ""),
           (riga3["npub"], riga3["npub_accesso"]))
+
+    # --- D) LA TERZA PORTA (20 ott 2026, fusione-da-telegram): la chiave
+    #     apre un account NATO CON NOSTR (id negativo). Il 409 porta la
+    #     proposta, legata a chi ha firmato; il «Si'» la incassa una volta.
+    npub_n = amb["hex_to_npub"]("d" * 64)
+    con.execute("INSERT INTO utenti(tg_id, npub, npub_verificata, npub_accesso, "
+                "nome) VALUES(-77, ?, 1, ?, 'Mario')", (npub_n, npub_n))
+    con.executemany("INSERT INTO annunci(id, venditore_id) VALUES(?, -77)",
+                    [(30,), (31,)])
+    con.execute("INSERT INTO ordini(id, compratore_id, venditore_id, stato) "
+                "VALUES(40, -77, 9, 'released')")
+    con.commit()
+    esito_verifica["pubkey"] = "d" * 64
+    def _chiama(f, *a):
+        try:
+            return ("ok", asyncio.run(amb[f](*a)))
+        except _HTTP as e:
+            return (e.status_code, e.detail)
+    stato, det = _chiama("collega_npub_firma", _ReqFinta())
+    un = det.get("unione", {}) if isinstance(det, dict) else {}
+    prova("la chiave di un account nato con Nostr: 409 con la proposta "
+          "d'unione e quel che passerebbe di qua",
+          (409, npub_n, "Mario", 2, 1, 300),
+          (stato, un.get("npub"), un.get("nome"), un.get("annunci"),
+           un.get("ordini"), un.get("valida_secondi")))
+    prova("...il token e' legato a chi ha firmato e a quell'account",
+          (3, -77), amb["UNIONI_DAL_WEB"].get(un.get("token"), (0, 0, 0))[:2])
+    prova("...e senza il si' non cambia niente: la chiave resta dell'altro",
+          (npub_n, ""), (con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=-77").fetchone()[0],
+                         con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=3").fetchone()[0]))
+    _chiama("collega_npub_firma", _ReqFinta())
+    prova("una seconda firma brucia la proposta vecchia: una sola viva",
+          1, sum(1 for v in amb["UNIONI_DAL_WEB"].values() if v[0] == 3))
+    token = next(t for t, v in amb["UNIONI_DAL_WEB"].items() if v[0] == 3)
+
+    fusioni, premi_prima = [], len(premiati)
+    amb["esegui_fusione"] = lambda t, n: (fusioni.append((t, n)) or
+        {"annunci": 2, "ordini": 1, "npub": npub_n, "negozio": "mario-3"})
+    amb["trova_doppioni_nostr"] = lambda con, tg: []
+    admin = []
+    async def notifica_admin_finta(testo, **k):
+        admin.append(testo)
+    amb["notifica_admin"] = notifica_admin_finta
+    amb["_npub_breve"] = lambda n: n[:10]
+    async def json_col(t):
+        async def _j(req):
+            return {"token": t}
+        return _j
+    amb["leggi_json"] = asyncio.run(json_col(token))
+    utente_attivo["id"] = 1                       # un altro account: no
+    prova("il «Si'» da un altro account non vale, e brucia il token",
+          (409, []), (_chiama("unisci_nostr", _ReqFinta())[0], fusioni))
+    utente_attivo["id"] = 3
+    prova("...lo stesso token, ora dal suo account, e' gia' bruciato",
+          409, _chiama("unisci_nostr", _ReqFinta())[0])
+    esito_verifica["pubkey"] = "d" * 64
+    amb["leggi_json"] = json_finto
+    _chiama("collega_npub_firma", _ReqFinta())
+    token = next(t for t, v in amb["UNIONI_DAL_WEB"].items() if v[0] == 3)
+    amb["leggi_json"] = asyncio.run(json_col(token))
+    stato, ris = _chiama("unisci_nostr", _ReqFinta())
+    prova("il «Si'» di chi ha firmato fonde, col giudice unico della fusione",
+          ("ok", [(3, -77)], 2, 1, True),
+          (stato, fusioni, ris.get("annunci"), ris.get("ordini"),
+           ris.get("npub_accesso")))
+    prova("...poi i premi per l'account che resta, e l'avviso agli admin",
+          ([("distintivi", 3), ("reputazione", 3)], 1),
+          (premiati[premi_prima:], len(admin)))
+    prova("...e il token non si riusa", 409, _chiama("unisci_nostr", _ReqFinta())[0])
+    amb["esegui_fusione"] = lambda t, n: "⚖️ C'e' un affare ancora aperto"
+    amb["leggi_json"] = json_finto
+    _chiama("collega_npub_firma", _ReqFinta())
+    token = next(t for t, v in amb["UNIONI_DAL_WEB"].items() if v[0] == 3)
+    amb["leggi_json"] = asyncio.run(json_col(token))
+    prova("il no della fusione arriva com'e', con la sua frase",
+          (409, "⚖️ C'e' un affare ancora aperto"), _chiama("unisci_nostr", _ReqFinta()))
+
+    # --- E) le guardie della fusione dicono di no gia' alla proposta ----
+    con.execute("INSERT INTO ordini(id, compratore_id, venditore_id, stato) "
+                "VALUES(41, 3, -77, 'locked')")
+    con.commit()
+    amb["UNIONI_DAL_WEB"].clear()
+    amb["leggi_json"] = json_finto
+    stato, det = _chiama("collega_npub_firma", _ReqFinta())
+    prova("un affare aperto fra le due meta': 409 con la frase della guardia, "
+          "e nessuna proposta",
+          (409, True, {}), (stato, isinstance(det, str) and "affare ancora aperto" in det,
+                            amb["UNIONI_DAL_WEB"]))
     con.close()
+
+    # --- F) IL CLIENT: la proposta diventa una domanda, mai un toast ---
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ecf = pezzo_js(mini, "async function eseguiCollegamentoFirmato(", "\n}\n")
+    pun = pezzo_js(mini, "function proponiUnioneNostr(", "\n}\n")
+    prova("il collegamento firmato riconosce la proposta e la chiede",
+          (True, True), ("d.detail && d.detail.unione" in ecf,
+                         "await proponiUnioneNostr(d.detail.unione)" in ecf))
+    prova("...e un detail che e' un oggetto non finisce a schermo come "
+          "[object Object]", True,
+          "typeof d.detail === 'string' ? d.detail : d.detail?.messaggio" in ecf)
+    prova("la domanda: una sola, col titolo, l'azione e il ripensamento",
+          (1, True, True, True),
+          (pun.count("chiediConferma({"), "titolo: 'Unire i due account?'" in pun,
+           "poi: async () =>" in pun, "poiNo:" in pun))
+    prova("...dice che non si torna indietro", True, "Non si può annullare" in pun)
+    prova("...e il si' incassa il token alla rotta nuova", True,
+          "/me/unisci-nostr" in pun and "JSON.stringify({token: u.token})" in pun)
+    prova("...e chi chiude il foglio dal fondo non tiene il firmatario "
+          "aperto per sempre: la proposta scade", True,
+          "setTimeout(() => fine(null), (u.valida_secondi || 300) * 1000)" in pun)
+    prova("dopo l'unione il menu degli account si rilegge e la pagina "
+          "riparte", (True, True),
+          ("await caricaAccount();" in ecf,
+           "if (d.unione_fatta) setTimeout(() => ricaricaPerConto(true), 3000);" in ecf))
 
 
 def prove_npub_una_casa():
@@ -43854,8 +43984,11 @@ def prove_fogli_di_casa():
     # (`esciDaTutti`) chiede prima, e l'avviso del bot arrivato mentre e'
     # scelto un altro account chiede di passare al Telegram
     # (`avvisoPerAltroConto`).
-    prova("i gesti che passano dalla domanda unica sono ottantotto",
-          88, solo_codice(mini).count("chiediConferma({"))
+    # OTTANTANOVE (20 ott 2026, fusione-da-telegram): «Unire i due
+    # account?» quando la chiave firmata da «Entra anche con Nostr» apre
+    # gia' un account nato con Nostr (`proponiUnioneNostr`).
+    prova("i gesti che passano dalla domanda unica sono ottantanove",
+          89, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -110965,7 +111098,7 @@ def prove_dizionari_nel_loop():
     di server.py: ogni rotta che nomina quei dizionari, o le loro
     pulizie, e' `async def`."""
     print("\n[i dizionari in memoria, tutti nel loop]")
-    nomi = {"CODICI_FUSIONE", "CONFERME_FUSIONE", "_pulisci_fusioni",
+    nomi = {"CODICI_FUSIONE", "CONFERME_FUSIONE", "UNIONI_DAL_WEB", "_pulisci_fusioni",
             "INGRESSI_BOT", "CODICI_INGRESSO", "TOKEN_INGRESSO", "_pulisci_ingressi"}
     rotte = {}
     for f in ast.parse(_SORGENTE).body:
@@ -110977,8 +111110,11 @@ def prove_dizionari_nel_loop():
             continue
         if {n.id for n in ast.walk(f) if isinstance(n, ast.Name)} & nomi:
             rotte[f.name] = isinstance(f, ast.AsyncFunctionDef)
-    prova("le rotte che toccano lasciapassare e ingressi sono queste tre",
-          ["collega_telegram", "inizia_login_bot", "stato_login_bot"], sorted(rotte))
+    # (20 ott 2026, fusione-da-telegram) piu' le due della terza porta:
+    # la firma che propone l'unione e il «Si', unisci» che la incassa
+    prova("le rotte che toccano lasciapassare e ingressi sono queste cinque",
+          ["collega_npub_firma", "collega_telegram", "inizia_login_bot",
+           "stato_login_bot", "unisci_nostr"], sorted(rotte))
     prova("...e sono tutte async: nessun thread sui dizionari", [],
           [n for n, a in rotte.items() if not a])
     prova("...e i gesti del bot che li toccano sono async anche loro", True,
@@ -163032,11 +163168,14 @@ def prove_canale_admin():
     # (19 ott 2026, cantiere swap-indirizzo: un pagamento arrivato su
     # swap@, la quota di SATS Routing — UNO, nei riepiloghi: 75
     # chiamate, 85 punti.)
+    # (20 ott 2026, cantiere fusione-da-telegram: l'unione dei due account
+    # fatta dal web, `unisci_nostr`, gemella di quella dal bot — UNO, nei
+    # riepiloghi: 76 chiamate, 86 punti.)
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
           {"dispute": 2, "dm": 1, "errori": 33, "moderazione": 14,
-           "riepiloghi": 26}, per_stanza)
+           "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -163071,10 +163210,10 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "85 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "86 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
-          "ronda dei relay Nostr, il cassetto dei file della chat e la "
-          "quota arrivata su swap@)", 85,
+          "ronda dei relay Nostr, il cassetto dei file della chat, la "
+          "quota arrivata su swap@ e l'unione degli account dal web)", 86,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
