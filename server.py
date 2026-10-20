@@ -43447,6 +43447,8 @@ def _kind0_profilo(relay: str, hexkey: str):
     (vedi `lettura_simulata`): None, come un relay che tace."""
     if lettura_simulata(relay, f"del profilo (kind 0) di {hexkey[:16]}…"):
         return None
+    if fuori_dal_recinto(relay, "lettura del profilo (kind 0)"):
+        return None
     posta = _posta_per(relay)
     if posta is not None:
         try:
@@ -48330,6 +48332,12 @@ try:
     RELAYS_VERIFICA = [str(r) for r in RELAY_NOSTR if str(r).strip()]
 except ImportError:
     RELAYS_VERIFICA = list(RELAY_DI_SERIE)
+# quel che il config dice DAVVERO, prima del ripiego qui sotto: e' la
+# lista che il recinto dell'istanza di prova guarda (vedi
+# `fuori_dal_recinto`), dove vuota vuol dire nessuno
+_RELAY_NOSTR_DICHIARATI = (
+    [str(r) for r in RELAY_NOSTR if str(r).strip()]
+    if "RELAY_NOSTR" in globals() else [])
 # FAIL-SAFE VERSO IL MONDO DI IERI, e non e' pignoleria: una lista
 # vuota nel config non spegnerebbe Nostr con un messaggio — farebbe
 # uscire ogni pubblicazione con «0 relay» in SILENZIO, e il ritiro
@@ -48449,6 +48457,44 @@ def relay_di_casa(relay: str) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+# IL RECINTO DELL'ISTANZA DI PROVA (20 ott 2026, cantiere collaudo-privato,
+# richiesta di Andrea: «niente annunci ne' post del collaudo sui relay
+# veri; i relay veri solo per il P2P»). Con `PROVA_SOLO_IDS` non vuota il
+# server non parla con NESSUN relay che non sia di casa (il loopback),
+# tranne i due mondi che Andrea ha voluto veri: il P2P (Mostro: il
+# libro, l'ascolto, la copia del profilo sullo specchio) e il login col
+# bunker NIP-46 dei tester. Due cinture:
+# 1) LE LISTE: `RELAY_NOSTR` sulla prova vale solo per i relay di casa, e
+#    vuota vuol dire NESSUNO — non «quelli di serie», che e' il ripiego
+#    della produzione e su una prova sarebbe la fuga.
+# 2) LE PORTE: chi apre la connessione — `invia_evento_relay` (ogni
+#    scrittura), `_kind0_profilo`, `chiedi_relay_dm`, `_x_note_da_relay`
+#    — chiede `fuori_dal_recinto` PRIMA della rete, come chiede
+#    `lettura_simulata`: una dimenticanza nella lista non esce lo stesso.
+_RECINTO_DETTI: set = set()
+
+
+def fuori_dal_recinto(relay: str, cosa: str) -> bool:
+    """IL GIUDICE DEL RECINTO: True = questa connessione non si fa. Solo
+    sull'istanza di prova, e solo verso un relay che non e' di casa. Lo
+    dice una volta per (cosa, relay), come `lettura_simulata`."""
+    if not PROVA_SOLO_IDS or relay_di_casa(relay):
+        return False
+    if (cosa, relay) not in _RECINTO_DETTI:
+        if len(_RECINTO_DETTI) > 5000:
+            _RECINTO_DETTI.clear()
+        _RECINTO_DETTI.add((cosa, relay))
+        print(f"🧱 [recinto] {cosa} verso {relay}: sull'istanza di prova "
+              "solo i relay di casa", flush=True)
+    return True
+
+
+if PROVA_SOLO_IDS:
+    RELAYS_VERIFICA = [r for r in _RELAY_NOSTR_DICHIARATI if relay_di_casa(r)]
+    print(f"🧱 [recinto] istanza di prova: relay Nostr {RELAYS_VERIFICA or 'nessuno'}"
+          " (il P2P resta coi relay di Mostro)", flush=True)
 
 
 def lettura_simulata(relay: str, cosa: str) -> bool:
@@ -65589,7 +65635,9 @@ def tag_client() -> list:
     handler 31990; senza la chiave di piattaforma resta il nome nudo,
     che e' la sola posizione che le classifiche leggono davvero —
     fail-open nel verso giusto."""
-    if _NOSTR:
+    # (`and RELAYS_VERIFICA`: sull'istanza di prova la lista puo' essere
+    # vuota, e il primo relay non c'e'; in produzione non lo e' mai)
+    if _NOSTR and RELAYS_VERIFICA:
         return ["client", NOME_CLIENT_NOSTR,
                 f"31990:{_NOSTR[1]}:barattolo", RELAYS_VERIFICA[0]]
     return ["client", NOME_CLIENT_NOSTR]
@@ -65858,7 +65906,11 @@ def invia_evento_relay(relay: str, evento: dict) -> bool:
     """Consegna un evento firmato a UN relay e aspetta il suo "OK".
     E' SINCRONA (websocket-client): va chiamata in asyncio.to_thread.
     Per i relay di casa passa dal loro postino (LA POSTA DEI RELAY): una
-    connessione riusata invece di una nuova a ogni evento."""
+    connessione riusata invece di una nuova a ogni evento.
+    Sull'istanza di prova, verso un relay che non e' di casa, non parte
+    niente (`fuori_dal_recinto`): prima del postino e prima della rete."""
+    if fuori_dal_recinto(relay, "scrittura"):
+        return False
     posta = _posta_per(relay)
     if posta is not None:
         a = posta.pubblica(evento)
@@ -66340,6 +66392,8 @@ def chiedi_relay_dm(relay: str, hexkey: str):
     resterebbe aperta al primo che la chiamasse da un'altra parte. Verso
     un relay che non e' di casa torna None, «nessun relay DM»."""
     if lettura_simulata(relay, f"dei relay DM (kind 10050) di {hexkey[:16]}…"):
+        return None
+    if fuori_dal_recinto(relay, "lettura dei relay DM (kind 10050)"):
         return None
     posta = _posta_per(relay)
     if posta is not None:
@@ -69923,6 +69977,8 @@ def _x_note_da_relay(relay: str, hexkey: str, dal: int) -> list:
     if not create_connection:
         return None
     if lettura_simulata(relay, f"delle note di {hexkey[:12]}… per X"):
+        return None
+    if fuori_dal_recinto(relay, "lettura delle note per X"):
         return None
     posta = _posta_per(relay)
     if posta is not None:

@@ -17012,7 +17012,9 @@ def prove_foto_nostr_relay_muti():
            "ssl": _ssl,
            # LA POSTA DEI RELAY (15 ott 2026) ha la sua sezione: qui si
            # prova la connessione singola, quindi nessun postino
-           "_posta_per": lambda r: None}
+           "_posta_per": lambda r: None,
+           # il recinto dell'istanza di prova (20 ott 2026): spento
+           "fuori_dal_recinto": lambda relay, cosa: False}
     exec(pezzo("_kind0_profilo"), amb)
     k0 = amb["_kind0_profilo"]
     CH = "ab" * 32
@@ -101654,12 +101656,16 @@ def prove_letture_relay_collaudo():
                "create_connection": _connetti, "ssl": _ssl, "json": json,
                "time": time, "asyncio": _aio, "RELAYS_VERIFICA": list(SERIE),
                "_posta_per": lambda r: None,     # la posta ha la sua sezione
+               # il recinto dell'istanza di prova (20 ott 2026): spento,
+               # come in produzione — la sua sezione e' prove_istanza_prova
+               "PROVA_SOLO_IDS": set(), "_RECINTO_DETTI": set(),
                "print": lambda *a, **k: detto.append(
                    " ".join(str(x) for x in a))}
         amb.update(piu)
         j = _SORGENTE.index("CHARSET_BECH32 = ")
         exec(_SORGENTE[j:_SORGENTE.index("\n", j)], amb)
-        for f in ("relay_di_casa", "lettura_simulata", "_bech32_polymod",
+        for f in ("relay_di_casa", "lettura_simulata", "fuori_dal_recinto",
+                  "_bech32_polymod",
                   "npub_to_hex", "hex_to_npub", "_kind0_profilo",
                   "chiedi_relay_dm", "eventi_libro_da_relay",
                   "info_libro_da_relay"):
@@ -169581,7 +169587,8 @@ def prove_relay_di_barattolo():
     # --- invia_evento_relay VERO segna l'esito, e il suo ritorno non cambia
     amb_inv = {"create_connection": Ws, "json": json, "ssl": _ssl,
                "time": time, "_segna_scrittura_relay": segna,
-               "_posta_per": lambda r: None}   # la connessione singola
+               "_posta_per": lambda r: None,   # la connessione singola
+               "fuori_dal_recinto": lambda relay, cosa: False}   # (20 ott 2026)
     exec(pezzo("invia_evento_relay"), amb_inv)
     Ws.copioni = {A: lambda m: [["OK", m[1]["id"], False, "rate-limited: piano"]]
                   if m[0] == "EVENT" else [],
@@ -169840,8 +169847,11 @@ def prove_posta_relay():
                "MODALITA_COLLAUDO": False, "_LETTURE_SIMULATE": set(),
                "_NOSTR": (object(), PIATTA), "_SCRITTURE_RELAY": {},
                "_x_segna_di_casa": lambda i: None,
-               "RELAYS_VERIFICA": [FRENATO, LENTO, SVELTO, CADE, GIU]}
-        for f in ("relay_di_casa", "lettura_simulata", "_segna_scrittura_relay",
+               "RELAYS_VERIFICA": [FRENATO, LENTO, SVELTO, CADE, GIU],
+               # il recinto dell'istanza di prova (20 ott 2026): spento
+               "PROVA_SOLO_IDS": set(), "_RECINTO_DETTI": set()}
+        for f in ("relay_di_casa", "lettura_simulata", "fuori_dal_recinto",
+                  "_segna_scrittura_relay",
                   "invia_evento_relay", "_kind0_profilo", "chiedi_relay_dm",
                   "_x_note_da_relay"):
             exec(pezzo(f), amb)
@@ -173857,7 +173867,7 @@ def prove_istanza_prova():
           and "imposta_cookie_sessione" in src and '"barattolo_sessione", token' in src)
     prova("config_esempio porta la lista VUOTA, e la sezione della prova senza segreti", True,
           "\nPROVA_SOLO_IDS = []\n" in es and "#   MOSTRO_RELAY = [\"ws://127.0.0.1:9\"]" in es
-          and "#   RELAY_NOSTR = []" in es and "#   MODALITA_COLLAUDO = False" in es)
+          and '#   RELAY_NOSTR = ["ws://127.0.0.1:7777"]' in es and "#   MODALITA_COLLAUDO = False" in es)
     prova("il collaudo del server vero e' nella gabbia della CI", [True, True],
           ["\ncollaudo_istanza_prova\n" in "\n" + open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_istanza_prova.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
@@ -173978,6 +173988,76 @@ def prove_istanza_prova():
     prova("...e sta sotto i fogli (il login Nostr si apre sopra) e sopra la pagina", True,
           "#collaudoPrivato{display:none;position:fixed;inset:0;z-index:39;" in mini
           and ".sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;" in mini)
+
+    # ---------------- 10) il recinto dei relay (20 ott 2026) -----------
+    # «niente annunci ne' post del collaudo sui relay veri; i relay veri
+    # solo per il P2P» (e per il bunker dei tester)
+    amb = {"urlparse": __import__("urllib.parse").parse.urlparse,
+           "ipaddress": __import__("ipaddress")}
+    exec(pezzo("relay_di_casa"), amb)
+    k = src.index("_RECINTO_DETTI: set = set()")
+    exec(src[k:src.index("\n", k)], amb)
+    detti = []
+    amb["print"] = lambda *a, **k: detti.append(a)
+    exec(pezzo("fuori_dal_recinto"), amb)
+    fr = amb["fuori_dal_recinto"]
+    amb["PROVA_SOLO_IDS"] = set()
+    prova("a lista vuota (la produzione) il recinto non ferma niente", [False] * 3,
+          [fr(r, "x") for r in ("wss://relay.barattolo.store", "wss://nos.lol", "ws://127.0.0.1:9")])
+    amb["PROVA_SOLO_IDS"] = {111}
+    prova("sull'istanza di prova ferma ogni relay che non e' di casa, il nostro compreso",
+          [True, True, True, False, False],
+          [fr(r, "x") for r in ("wss://relay.barattolo.store", "wss://nos.lol",
+                                "wss://127.0.0.1.nip.io", "ws://127.0.0.1:7777", "ws://localhost:7777")])
+    prova("...e lo dice una volta per relay, non a ogni giro", 3,
+          (fr("wss://nos.lol", "x"), len(detti))[1])
+    porte = {"invia_evento_relay": "_posta_per(relay)", "_kind0_profilo": "create_connection(",
+             "chiedi_relay_dm": "create_connection(", "_x_note_da_relay": "create_connection("}
+    prova("le quattro porte non P2P chiedono il recinto PRIMA della rete (e del postino)",
+          {f: True for f in porte},
+          {f: "fuori_dal_recinto(relay," in pezzo(f)
+              and pezzo(f).index("fuori_dal_recinto(relay,") < pezzo(f).index(prima)
+           for f, prima in porte.items()})
+    p2p = ("_ascolto_p2p_filo", "eventi_libro_da_relay", "info_libro_da_relay",
+           "libro_intero_da_relay")
+    prova("...mentre il P2P (Mostro) e il bunker dei tester restano fuori dal recinto",
+          {f: False for f in p2p}, {f: "fuori_dal_recinto" in pezzo(f) for f in p2p})
+    i = src.index("\nif PROVA_SOLO_IDS:\n    RELAYS_VERIFICA = ")
+    prova("la lista: sulla prova solo i relay DICHIARATI e di casa, e vuota vuol dire nessuno",
+          True, "[r for r in _RELAY_NOSTR_DICHIARATI if relay_di_casa(r)]" in src[i:i + 120]
+          and src.index("def relay_di_casa(") < i)
+    prova("...e il tag client non legge il primo relay di una lista vuota", True,
+          "if _NOSTR and RELAYS_VERIFICA:" in src)
+    imp_src = open("importa_nostr.py", encoding="utf-8").read()
+    j = imp_src.index("RELAYS = list(dict.fromkeys(")
+    blocco_imp = imp_src[j:imp_src.index("\n\n# Quanti eventi", j)]
+
+    def relays_import(**cfg):
+        import types as _t
+        finto = _t.ModuleType("config")
+        for k_, v_ in cfg.items():
+            setattr(finto, k_, v_)
+        prima = sys.modules.get("config")
+        sys.modules["config"] = finto
+        try:
+            a_ = {"RELAY_NOSTR": cfg.get("RELAY_NOSTR", ["wss://relay.barattolo.store"]),
+                  "RELAY_NOSTR_IMPORT": ["wss://21milionidinostr.duckdns.org"],
+                  "RELAY_DI_SERIE": ["wss://nos.lol", "wss://relay.barattolo.store"],
+                  "urlparse": __import__("urllib.parse").parse.urlparse,
+                  "ipaddress": __import__("ipaddress")}
+            exec(blocco_imp, a_)
+            return a_["RELAYS"]
+        finally:
+            if prima is None:
+                del sys.modules["config"]
+            else:
+                sys.modules["config"] = prima
+    prova("l'import: in produzione i relay di sempre",
+          ["wss://relay.barattolo.store", "wss://21milionidinostr.duckdns.org"], relays_import())
+    prova("...sulla prova solo quelli di casa, e senza ripiego sui relay di serie",
+          [["ws://127.0.0.1:7777"], []],
+          [relays_import(PROVA_SOLO_IDS=[111], RELAY_NOSTR=["ws://127.0.0.1:7777", "wss://nos.lol"]),
+           relays_import(PROVA_SOLO_IDS=[111], RELAY_NOSTR=[])])
 
 
 def prove_miniature_leggere():
