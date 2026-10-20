@@ -70762,3 +70762,30 @@ legge). Rebase, conflitto solo in coda a questo file. Sull'albero che va
 su develop: la mia sezione, quelle che quel commit tocca, quelle che
 leggono i documenti, il mio collaudo e quello della fusione — i numeri
 nel rapporto ad Andrea.
+
+## L'eccezione della sonda legata al segno, non alla riga (20 ott 2026, cantiere eccezione-sonda, decisione di Andrea)
+
+**IL PERCHÉ.** La sentinella dei certificati (cantiere certificati-relay)
+esentava `deploy/nodo/sonda-rotte.py` per «file:27»: un ritocco alla sonda
+che spostava la riga l'avrebbe fatta arrossire per niente. Andrea: legarla
+al nome della funzione o a un segno nel file.
+
+**COSA SI È DECISO.** Il SEGNO, perché la chiamata
+(`TLS = ssl._create_unverified_context()`) sta a livello di modulo e una
+funzione non c'è: il commento `# certificati-relay: eccezione nominata`
+sulla STESSA riga, nella sonda, con due righe sopra che dicono perché. La
+sentinella esenta un trovato solo se il file è quello dell'eccezione E la
+sua riga porta il segno; e vuole che l'eccezione col suo segno ci sia
+ancora. La sonda cambia solo nei commenti: la copia sul nodo (Andrea la
+mette in /tmp quando serve) non ha bisogno di essere rifatta.
+
+**PROVATO.** `prove_certificati_relay` 19/0. Quattro casi a mano: via il
+segno dalla sonda → rossa (2); la riga spostata di tre in giù → VERDE (0,
+il punto del cantiere); il segno copiato su una chiamata in
+`censimento_nostr.py` → rossa (2); una seconda chiamata senza segno nella
+sonda → rossa (1). `prove_guardia_liquidita`, l'altra sezione che legge la
+sonda, verde.
+
+**IL GIRO, mirato.** Sopra `3cbd5c8`: `prove_certificati_relay`,
+`prove_guardia_liquidita` e le sezioni che leggono i documenti — i numeri
+nel rapporto ad Andrea. Nessun collaudo tocca la sonda o la sentinella.
