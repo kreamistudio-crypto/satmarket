@@ -118,6 +118,7 @@ collaudo_ordine_in_pausa
 collaudo_paracadute
 collaudo_piu_account
 collaudo_istanza_prova
+collaudo_semina_collaudo
 collaudo_login_bot
 collaudo_swap_preventivo
 collaudo_swap_telefono

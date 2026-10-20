@@ -62,6 +62,13 @@ sudo collaudo azzera           # database e foto nuovi + la semina finta
 
 `azzera` non cancella a mano: sposta il database e le foto vecchie in
 `/srv/collaudo/barattolo/azzerati/` e ne tiene gli ultimi tre giri.
+Poi semina il mercatino FINTO di `semina_collaudo.py`: quattro venditori
+di prova, quattordici annunci in dodici categorie con foto finte («FOTO
+DI PROVA»), e due ordini comprati dal primo id della lista (uno in
+corso, uno concluso), per provare liste, carrello, chat e «I miei
+ordini». La semina si ferma da sola se non e' un'istanza di prova, se
+`URL_PUBBLICO` e' barattolo.store (o non e' dichiarato) e se il database
+sta nella cartella della produzione.
 **Mai una copia del database vero sul collaudo.**
 
 Il journal: `journalctl -u barattolo-collaudo -n 50` (il server),
@@ -74,13 +81,14 @@ Il journal: `journalctl -u barattolo-collaudo -n 50` (il server),
 | L'utente | `collaudo` (di sistema, senza login), casa `/srv/collaudo` |
 | Il codice | `/srv/collaudo/barattolo` (clone con tutti i rami) |
 | Python | `/srv/collaudo/venv` (fastapi, uvicorn, httpx, anthropic, websocket-client, pillow, pillow-heif, cryptography, snowballstemmer, coincurve 21: la 19 non ha la ruota per il Python 3.13 della VM). Dal 20 ott 2026 la lista è `requirements.txt` e la installa il seguace (embit compreso); l'ultima installata è in `/srv/collaudo/stato/requisiti` (la sua impronta) |
-| Il config | `/srv/collaudo/barattolo/config.py`, root:collaudo 640, scritto DALLA sezione «L'istanza di prova» di `config_esempio.py`, mai copiato dal VPS |
-| I segreti | `/etc/barattolo-collaudo/` (root:collaudo 750): `bot_token` (il bot di prova), `avvisi_chat` (a chi il seguace scrive) |
-| Il servizio | `barattolo-collaudo.service` su 127.0.0.1:8090 (`deploy/collaudo/`) |
+| Il config | `/srv/collaudo/barattolo/config.py`, root:collaudo 640: `config_esempio.py` di develop con in fondo il blocco «IL COLLAUDO (vm-2050)», che NON contiene segreti — li legge dai file con `_segreto(nome)`. Mai copiato dal VPS |
+| I segreti | `/etc/barattolo-collaudo/` (root:collaudo 750, i file 640): `bot_token` (il bot di prova), `webhook_segreto`, `lnbits_invoice_key` e `lnbits_admin_key` (il wallet «Negozio collaudo»), `nostr_nsec` (la chiave NUOVA del collaudo), `profilo_p2p`, `chiave_contenuti`, `avvisi_chat` (a chi il seguace scrive). Nati sulla VM o arrivati con `read -s`, mai stampati |
+| Il servizio | `barattolo-collaudo.service` su 127.0.0.1:8090 (`deploy/collaudo/`), tetto `MemoryMax=700M` |
 | Il seguace | `/usr/local/sbin/collaudo-segui` (copia di `deploy/collaudo/segui.sh`) + `barattolo-collaudo-segui.timer` ogni minuto |
 | Il comando | `/usr/local/bin/collaudo` (copia di `deploy/collaudo/collaudo.sh`) |
 | Il sito | Caddy 2.6 con `deploy/collaudo/Caddyfile` (HTTPS da solo, X-Robots-Tag noindex) |
-| I pagamenti | LNbits FakeWallet in Docker, `deploy/collaudo/compose-lnbits.yaml`, solo 127.0.0.1:5001 |
+| I pagamenti | LNbits FakeWallet in Docker, `deploy/collaudo/compose-lnbits.yaml`, solo 127.0.0.1:5001, tetto 400 MB. Il super utente e' di Andrea (KeePass); i wallet «Negozio collaudo» (il server) e «Telefono collaudo» (paga le fatture finte). Il pannello dal PC sulla porta locale **5002**, mai la 5001 (che e' il tunnel verso il LNbits VERO del VPS): `ssh -i ~/.ssh/lnvps -N -L 5002:127.0.0.1:5001 debian@vm-2050.lnvps.cloud`, poi `http://127.0.0.1:5002` |
+| Il runner della CI | sulla stessa VM: `ci-runner-vm-2050` (utente `ci`, `MemoryMax` 2,5 GB). Il collaudo non tocca `/home/ci` ne' `/opt/hostedtoolcache` (`collaudo` non e' nel gruppo `ci`), e i suoi pezzi hanno un tetto di memoria apposta |
 | Il bot di prova | `@barattolo_collaudo_bot`; il canale «Vetrina · prova» è `-1003944008599` |
 | Il dominio | record A `collaudo.barattolo.store` → 185.18.221.42 (Register.it, TTL 300). Il DS e la zona non si toccano |
 
@@ -120,19 +128,24 @@ aggiunge, si toglie la vecchia da GitHub.
 - **I pagamenti del mercatino**: finti (LNbits FakeWallet: il «paga» si
   fa da un secondo wallet nel pannello, dal tunnel ssh).
 - **Nostr**: il server parla solo coi relay di casa della VM (il
-  recinto: `RELAY_NOSTR` col relay di prova su 127.0.0.1, o nessuno), con
-  una chiave NUOVA. Mai `relay.barattolo.store`, mai i relay pubblici.
+  recinto: `RELAY_NOSTR` col relay di prova su 127.0.0.1, o nessuno: dal
+  20 ott nessuno), con una chiave NUOVA. Annunci, post e DM mai su
+  `relay.barattolo.store` ne' sui relay pubblici.
 - **Il P2P**: VERO (decisione di Andrea con Alan): il coordinatore
   Mostro di produzione, ordini e sats veri, coi paletti — solo gli id in
   lista, ogni ordine al massimo `P2P_MAX_SATS_PROVA` (10.000 sats), sulla
   VM MAI la chiave del moderatore/solver né altre chiavi Mostro di
   produzione. Le dispute degli ordini fatti dal collaudo si risolvono
-  dal Barattolo vero.
+  dal Barattolo vero. I relay del P2P sono le STESSE righe della
+  produzione (`MOSTRO_RELAY`, `_SPECCHIO`, `_CONFERMA`),
+  `relay.barattolo.store` compreso (decisione di Andrea, 20 ott: i relay
+  veri solo per il P2P).
 - **On-chain**: signet (è una costante del codice, `ONCHAIN_RETE`; dal
   20 ott 2026, prima era testnet), solo admin; quando servirà la
   verifica dei pagamenti (tappa 4), l'API pubblica signet di
   mempool.space (`https://mempool.space/signet/api`), nessun nodo
-  nostro. Le monete di prova si chiedono a un faucet signet.
+  nostro. Le monete di prova si chiedono a un faucet signet
+  (la catena signet di RGB sulla VM resta spenta).
 - **Telegram**: il bot di prova e il solo canale «Vetrina · prova».
 - **Lo swap dei venditori** (regola di Andrea): ogni tappa
   si prova QUI col SATS Routing di cartone (`cartone_satsrouting.py`)
@@ -151,20 +164,34 @@ aggiunge, si toglie la vecchia da GitHub.
    spostato senza leggerlo (fatto il 20 ott).
 3. La deploy key (fatto il 20 ott).
 4. Il clone e il venv (fatto il 20 ott).
-5. LNbits FakeWallet: `compose-lnbits.yaml` in `/srv/collaudo/lnbits`,
-   `up -d`, poi `ss -tln` deve mostrare SOLO `127.0.0.1:5001`; i due
-   wallet (il negozio e «il telefono») dal pannello, dal tunnel
-   `ssh -N -L 5001:127.0.0.1:5001`.
-6. Il config dalla sezione di prova, i segreti nati sulla VM (la nsec
-   nuova, il segreto del webhook, la chiave dei contenuti, il segreto del
-   profilo P2P), e il relay di prova se lo si vuole.
-7. Il servizio, poi Caddy, poi `ufw allow 80,443/tcp`; Andrea in
-   BotFather: Configure Mini App e Menu Button su
-   `https://collaudo.barattolo.store`, `/setdomain` per il login dal
-   browser.
-8. Il seguace: le due copie, `systemctl enable --now
-   barattolo-collaudo-segui.timer`.
-9. Il comando e la prima semina.
+5. LNbits FakeWallet: `compose-lnbits.yaml` in `/srv/collaudo/lnbits`
+   (`docker compose -f … --project-directory /srv/collaudo/lnbits -p
+   collaudo-lnbits up -d`: `debian` non entra in quella cartella), poi
+   `ss -tln` deve mostrare SOLO `127.0.0.1:5001`; il super utente e i due
+   wallet dal pannello, dal tunnel sulla porta 5002 (fatto il 20 ott).
+6. Il config: i segreti nati sulla VM (la nsec nuova, il segreto del
+   webhook, la chiave dei contenuti, il segreto del profilo P2P) e le due
+   chiavi di LNbits arrivate con `read -s`; `config.py` col blocco che li
+   legge dai file; il controllo che si importi come `collaudo` (fatto il
+   20 ott; npub del collaudo `npub15vddg5h70wyg5sf32e5a5u8x46824f89c8zaeeldu4tawxsv8v0s59pac`).
+7. Il codice su develop, il servizio (col drop-in `memoria.conf`),
+   Caddy, `ufw allow 80/tcp` e `443/tcp`; Andrea in BotFather: Configure
+   Mini App e Menu Button su `https://collaudo.barattolo.store`,
+   `/setdomain`; poi `TELEGRAM_MINIAPP_LINK` acceso (fatto il 20 ott). Il
+   webhook lo registra il server da solo, sul BOT DI PROVA: un «SSL
+   error» in `getWebhookInfo` nei primi secondi e' di quando il
+   certificato non era ancora nato, e sparisce alla prima consegna.
+8. Il seguace: le due copie, la cartella `/srv/collaudo/stato`,
+   `avvisi_chat`, `systemctl enable --now barattolo-collaudo-segui.timer`
+   (fatto il 20 ott). IL RITORNO INDIETRO E' PROVATO dal vivo: dal
+   commit precedente di develop, una passata con la salute finta
+   (`sudo env COLLAUDO_SALUTE=http://127.0.0.1:9/finta COLLAUDO_ATTESA=5
+   /usr/local/sbin/collaudo-segui`) ha messo su la punta, non ha visto la
+   salute, e' tornata al commit di prima, ha timbrato il bocciato (non
+   riprovato al giro dopo) e ha scritto nel bot di prova; tolto il
+   timbro, e' tornata in punta. Subito dopo un ritorno la salute dice
+   000 per qualche secondo: il servizio si sta riavviando.
+9. Il comando e la prima semina (`sudo collaudo azzera`).
 
 ## 8. Spegnere
 

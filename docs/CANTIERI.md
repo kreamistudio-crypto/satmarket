@@ -70043,3 +70043,90 @@ per questo li' era verde.
 **NOTATO E NON TOCCATO.** Lo stesso `read -r -a` legge `COLLAUDO_COME` in
 `segui.sh` e in `collaudo.sh`, e `$RIAVVIA` gira senza virgolette per
 disegno: oggi nessuna prova ci mette un percorso, quindi non mordono.
+
+## Il collaudo acceso sulla vm-2050: la semina finta con due guardie, i tetti di memoria, i relay del P2P come la produzione (20 ott 2026, cantiere collaudo-ritocco, richiesta di Andrea)
+
+**DOVE SIAMO.** I gesti 5-8 di `docs/COLLAUDO.md` sono fatti sulla VM, uno
+alla volta col suo ok: LNbits FakeWallet solo su 127.0.0.1:5001 (il super
+utente e i due wallet, «Negozio collaudo» e «Telefono collaudo», li ha
+fatti Andrea dal tunnel sulla porta locale 5002); i segreti nati sulla VM
+o arrivati con `read -s` in `/etc/barattolo-collaudo` (mai stampati) e il
+config che li legge da li' con `_segreto(nome)`; il servizio, Caddy col
+`noindex`, il webhook registrato dal server sul BOT DI PROVA; il seguace
+col suo timer. Il gesto 9 (il comando e la prima semina) si era fermato
+qui: `semina_demo.py` vuole `MODALITA_COLLAUDO = True`, e sul collaudo e'
+False (identita' Telegram vere). Da li' questo ritocco.
+
+**LA SEMINA DEL COLLAUDO** (`semina_collaudo.py`, nuova). Non si e'
+allentata la guardia di `semina_demo.py`: quella resta del PC. La nuova ha
+la SUA, e Andrea ne ha chiesto una seconda: semina solo se (1) e'
+un'istanza di prova — `PROVA_SOLO_IDS` lista non vuota, o in locale
+`MODALITA_COLLAUDO = True` — E (2) `URL_PUBBLICO` e' dichiarato e non e'
+barattolo.store (col www o senza; non dichiarato vale come produzione,
+perche' quello e' il default del codice) E (3) il database, anche
+risolto dai collegamenti, non sta sotto `/srv/barattolo/`. Ogni rifiuto
+dice perche' e non scrive niente. Legge dal config SOLO le chiavi che il
+config dichiara, cosi' un default del codice non si spaccia per scelta.
+Cosa semina, tutto dichiaratamente finto: quattro venditori («Anna di
+prova», «Bottega di prova di Bruno», «Carla (prova)», «Mercatino di prova
+di Dario», id 9001-9004), quattordici annunci in dodici categorie con la
+descrizione «DI PROVA» e una foto finta per annuncio (il disegno della
+categoria da `assets/categorie/` su un fondo chiaro con la fascia
+arancione «FOTO DI PROVA», piu' la miniatura), e due ordini comprati dal
+primo id Telegram della lista: uno in corso (`locked`) e uno concluso
+(`released`), coi loro annunci segnati venduti. Si rigira senza doppioni.
+Lo chiama `collaudo azzera` al posto di `semina_demo.py`.
+
+**I TETTI DI MEMORIA.** La VM (3,8 GB piu' 2 di swap) ospita anche il
+runner della CI (`ci-runner-vm-2050`, 2,5 GB): il servizio del collaudo e
+il seguace hanno `MemoryMax=700M` (il picco visto e' sui 480 MB), LNbits
+400 MB nel compose. Sulla VM il tetto del servizio c'e' gia' come drop-in
+(`memoria.conf`); i file del repo lo portano per la prossima
+reinstallazione.
+
+**IL CONFIG D'ESEMPIO E COLLAUDO.MD.** La sezione di prova dice che sulla
+VM i segreti stanno fuori dal config, `DB = "dati/satmarket.db"`, i relay
+del P2P sono le STESSE righe della produzione con relay.barattolo.store
+(decisione di Andrea: i relay veri solo per il P2P; annunci, post e DM nel
+recinto) e la chat degli ordini da provare. COLLAUDO.md: la tabella coi
+segreti veri e i tetti, il runner accanto, la porta 5002 per il pannello
+di LNbits (la 5001 e' il tunnel al LNbits VERO), l'on-chain su SIGNET
+(decisione di Andrea: la costante del codice l'ha cambiata il cantiere
+onchain-tappa2, arrivato su develop durante questo; al rebase si e'
+tenuta la sua riga, con in coda la catena RGB della VM che resta
+spenta), i gesti 5-8
+coi loro inciampi (`debian` non entra in `/srv/collaudo/lnbits`: il
+compose con `--project-directory`; l'«SSL error» del webhook nato nello
+stesso secondo del certificato, sparito alla prima consegna).
+
+**IL RITORNO INDIETRO, PROVATO DAL VIVO** (gesto 8): dal commit precedente
+di develop, una passata del seguace con la salute finta ha messo su la
+punta, non l'ha vista sana, e' tornata indietro, ha timbrato il bocciato
+(non riprovato al giro dopo) e ha scritto nel bot di prova; tolto il
+timbro, e' tornata in punta. Subito dopo un ritorno la salute dice 000 per
+qualche secondo: e' il riavvio, non un guasto.
+
+**PROVATO.** `prove_semina_collaudo` (nuova: le guardie in tutti i casi, i
+dati contro le categorie e le condizioni del server, niente import del
+server ne' rete, il comando che la usa) e `collaudo_semina_collaudo`
+(nuovo, in gabbia: le guardie non scrivono niente; sul server vero gli
+annunci in `/api/listings`, le 28 foto a 200, i due ordini in
+`/api/orders` del compratore, la seconda semina senza doppioni).
+COSA E' GIRATO DOVE (develop correva: tre rebase). Sull'albero
+`2bc249b` + i due commit di questo cantiere (il pip con lo spazio e
+questo), con embit installato: la suite severa INTERA **25.952 verdi, 0
+rosse, nessuna saltata** e i collaudi della CI **95 verdi, 0 rossi**.
+Ribasato su `b4168ca` (l'unione degli account): le nove sezioni toccate
+dai due cantieri 271 verdi e i collaudi INTERI 96 verdi. Ribasato su
+`9b2cad2` (il ritiro dello swap indurito): le sette sezioni toccate 134
+verdi e i quattro collaudi vicini (questo, i due dello swap, l'on-chain)
+verdi. Ribasato su `d484c33` (i ritocchi della tappa 2 on-chain): le
+sei sezioni toccate 145 verdi, i due collaudi vicini verdi. Ribasato su
+`6643c53` (il filtro dei relay scritti dall'utente): sette sezioni 187
+verdi, tre collaudi vicini verdi (il recinto compreso). Lo scanner
+dei segreti, albero e storia, pulito su ogni albero.
+
+**RESTA DA GUARDARE.** Il gesto 9 sulla VM (reinstallare comando, seguace
+e unita' dal nuovo develop — il seguace non si aggiorna da solo — poi
+`sudo collaudo azzera`); le npub di Andrea in `PROVA_SOLO_IDS`; il giro
+dal telefono su liste, carrello, chat e «I miei ordini».
