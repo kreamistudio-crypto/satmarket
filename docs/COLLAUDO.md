@@ -119,9 +119,11 @@ aggiunge, si toglie la vecchia da GitHub.
   VM MAI la chiave del moderatore/solver né altre chiavi Mostro di
   produzione. Le dispute degli ordini fatti dal collaudo si risolvono
   dal Barattolo vero.
-- **On-chain**: testnet (è una costante del codice), solo admin; quando
-  servirà la verifica dei pagamenti, l'API pubblica testnet di
-  mempool.space, nessun nodo nostro.
+- **On-chain**: signet (è una costante del codice, `ONCHAIN_RETE`; dal
+  20 ott 2026, prima era testnet), solo admin; quando servirà la
+  verifica dei pagamenti (tappa 4), l'API pubblica signet di
+  mempool.space (`https://mempool.space/signet/api`), nessun nodo
+  nostro. Le monete di prova si chiedono a un faucet signet.
 - **Telegram**: il bot di prova e il solo canale «Vetrina · prova».
 - **Lo swap dei venditori** (regola di Andrea): ogni tappa
   si prova QUI col SATS Routing di cartone (`cartone_satsrouting.py`)

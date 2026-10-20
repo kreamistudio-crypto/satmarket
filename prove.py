@@ -150663,8 +150663,10 @@ def prove_banco_chiavi_onchain():
     che si rompe in silenzio:
     1. DETERMINISMO. Lo stesso seme deve dare lo stesso indirizzo, o la
        prova del ripristino direbbe «diverso» su un backup sano.
-    2. TESTNET E SOLO TESTNET (parola di Andrea: «in collaudo voglio
-       provare tutto in testnet»). Con una chiave di cartone dentro il
+    2. RETE DI PROVA E SOLO QUELLA (parola di Andrea: «in collaudo
+       voglio provare tutto in testnet», e dal 20 ott 2026 «rete di
+       prova: signet» — che ha le stesse forme, `tb1` e `tpub`). Con
+       una chiave di cartone dentro il
        2-di-3, un `bc1...` a schermo sarebbe un invito a mandarci sats
        veri che nessuno potrebbe piu' sbloccare.
     3. TRE CHIAVI DI TRE PERSONE. Derivare anche il venditore dal seme
@@ -150689,6 +150691,17 @@ def prove_banco_chiavi_onchain():
     prova("...e il bundle ha la sua rotta esplicita, mai uno StaticFiles",
           [True, False],
           ['@app.get("/vendor/btc.js")' in src, "app.mount(" in src])
+    # LA RETE E' SIGNET (20 ott 2026, decisione di Andrea): una costante
+    # sola, detta al foglio dalla rotta, e i testi che la nominano
+    prova("la rete e' SIGNET, una costante sola, detta dalla rotta",
+          [True, 1, True],
+          ['\nONCHAIN_RETE = "signet"\n' in src,
+           src.count("\nONCHAIN_RETE = "), '"rete": ONCHAIN_RETE,' in src])
+    prova("...e il foglio dice signet, non piu' testnet",
+          [True, True, False],
+          ["Rete <b>signet</b>, la rete di prova" in mini,
+           "prova on-chain (signet)" in mini,
+           "Rete <b>testnet</b>" in mini])
     prova("il client legge il CANCELLO dal server, non `isAdmin`",
           [True, True],
           ["myOnchain = !!me.onchain;" in mini,
@@ -150799,7 +150812,8 @@ __PEZZO__
           True, o["deterministico"])
     prova("...e un seme diverso un indirizzo diverso", True,
           o["semeDiversoIndirizzoDiverso"])
-    prova("l'indirizzo e' TESTNET (`tb1`), e di mainnet non si parla",
+    prova("l'indirizzo e' di SIGNET (`tb1`, le forme di testnet), e di "
+          "mainnet non si parla",
           [True, True],
           [o["indirizzo"].startswith("tb1q"),
            "B.NETWORK" not in chiavi_js])
