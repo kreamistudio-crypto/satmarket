@@ -9504,6 +9504,9 @@
     background:var(--sats-soft);color:var(--sats-text);font-weight:700;
     font-size:14px;line-height:1.45}
   .swap-prev .btn{margin-top:12px}
+  /* «eseguito da …» (20 ott 2026, l'instradatore): in piccolo, per la
+     trasparenza e per sapere dove recuperare */
+  .swap-da{margin-top:8px;font-size:12px;font-weight:600;color:var(--muted)}
   /* (20 ott 2026, tappa 3) le 12 parole a due colonne numerate PER
      COLONNA (1-6 a sinistra, 7-12 a destra: come si copiano su carta),
      con lo spazio per il «12.»; il campo dell'indirizzo a tutta riga, la
@@ -11838,7 +11841,7 @@ document.getElementById('cartello')?.remove();</script>
       <span id="swapVuoto" class="swap-vuoto"></span>
     </div>
     <!-- (20 ott 2026, tappa 3) gli swap di questo telefono, le 12 parole
-         e il recupero: li scrive renderSwapTelefono (swap-telefono.js) -->
+         e il recupero: li scrive renderSwapTelefono (swap/instradatore.js) -->
     <div id="swapTelefono" class="swap-telefono"></div>
   </div>
   <div class="view" id="view-astepresto">
@@ -17913,30 +17916,42 @@ function voceNav(view){
    martelletto. */
 let swapLeve = null;          // da /api/me.swap_leve: {attivo}
 const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
-/* LO SWAP DAL TELEFONO (20 ott 2026, tappa 3): le chiavi, la creazione,
-   la verifica, la sorveglianza e il ritiro stanno in un FILE SUO,
-   `swap-telefono.js` — niente script inline e niente onclick, per la fase
-   2 della CSP. Lo scarica solo chi ha lo swap acceso, all'arrivo della
-   leva; fino ad allora il pannello dell'incasso e' quello di sempre. La
-   versione e' l'inizio dello sha256 del file (righe LF): la controlla
-   `prove_swap_telefono`, cosi' un file cambiato non resta nella cache
-   vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '600380930a';
+/* LO SWAP DAL TELEFONO (20 ott 2026, tappa 3; diviso lo stesso giorno,
+   cantiere swap-instradatore): le chiavi, la creazione, la verifica, la
+   sorveglianza e il ritiro stanno in FILE LORO — `swap/<tipo>.js`, uno
+   per tipo di fornitore (oggi `boltz`: SATS Routing), e
+   `swap/instradatore.js`, che sceglie il fornitore — niente script
+   inline e niente onclick, per la fase 2 della CSP. Li scarica solo chi
+   ha lo swap acceso, all'arrivo della leva, prima i tipi e poi
+   l'instradatore; fino ad allora il pannello dell'incasso e' quello di
+   sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
+   la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
+   nella cache vecchia di un giorno. */
+const SWAP_TELEFONO_VER = 'acf2a8e0d6';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
+const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
-function caricaSwapTelefono(){
-  if (swapTelefonoPronto()) return Promise.resolve(true);
-  if (!swapTelefonoPromessa) swapTelefonoPromessa = new Promise(ok => {
+function caricaUnFileSwap(nome){
+  return new Promise(ok => {
     const s = document.createElement('script');
-    s.src = `${FOTO_BASE}/swap-telefono.js?v=${SWAP_TELEFONO_VER}`;
-    s.onload = () => {
-      ridisegnaIncassoSwap();
-      if (el('view-swap')?.classList.contains('active')) renderSwap();
-      ok(true);
-    };
-    s.onerror = () => { swapTelefonoPromessa = null; ok(false); };
+    s.src = `${FOTO_BASE}/swap/${nome}.js?v=${SWAP_TELEFONO_VER}`;
+    s.onload = () => ok(true);
+    s.onerror = () => ok(false);
     document.head.appendChild(s);
   });
+}
+function caricaSwapTelefono(){
+  if (swapTelefonoPronto()) return Promise.resolve(true);
+  if (!swapTelefonoPromessa) swapTelefonoPromessa = (async () => {
+    const voci = swapLeve && Array.isArray(swapLeve.fornitori) ? swapLeve.fornitori : [];
+    const tipi = SWAP_TIPI_FILE.filter(t => t === 'boltz' || voci.some(v => v && v.tipo === t));
+    for (const nome of tipi.concat(['instradatore'])) {
+      if (!(await caricaUnFileSwap(nome))) { swapTelefonoPromessa = null; return false; }
+    }
+    ridisegnaIncassoSwap();
+    if (el('view-swap')?.classList.contains('active')) renderSwap();
+    return true;
+  })();
   return swapTelefonoPromessa;
 }
 /* LA QUARTA CELLA, UNA SOLA (la regola della barra: mai una cella
@@ -17986,35 +18001,39 @@ const SWAP_TESTI = {
        testo: 'Qui troverai gli incassi che ricevi in bitcoin on-chain, con uno swap fatto dal tuo telefono.',
        vuoto: 'Per ora non hai nessuno swap.',
        scegli: 'Come ricevi i sats', onchain: 'On-chain (swap)',
-       carico: 'Leggo le tariffe di SATS Routing…',
+       carico: 'Leggo le tariffe dello swap…',
        titoloPrev: 'Preventivo dello swap', ricevi: 'Ricevi on-chain, circa',
-       valgonoOra: 'Tariffe di SATS Routing di adesso: si ricontrollano alla conferma.',
+       valgonoOra: 'Tariffe di {f} di adesso: si ricontrollano alla conferma.',
        conferma: 'Conferma lo swap', tornaLn: 'Incassa in Lightning',
        sottoMinimo: 'Sotto i {n} sats lo swap costa troppo: incassa in Lightning.',
        sopraTetto: 'Sopra i {n} sats, per ora, solo Lightning.',
        cambiata: 'Le tariffe sono cambiate: ecco il preventivo nuovo.',
-       nonRisponde: 'SATS Routing ora non risponde: incassa in Lightning.',
+       nonRisponde: '{f} ora non risponde: incassa in Lightning.',
        spento: 'Lo swap ora non è disponibile: incassa in Lightning.',
+       eseguitoDa: 'Eseguito da {n}',
+       ripiego: '{a} ha risposto con dati che non tornano: ecco il preventivo di {b}.',
        voci: {dovuto: 'Ti spettano', fee_barattolo: 'Commissione Barattolo ({p}\u00a0%)',
-              commissione: 'Commissione SATS Routing ({p}\u00a0%)',
-              rete_invio: 'Rete: invio di SATS Routing',
+              commissione: 'Commissione {f} ({p}\u00a0%)',
+              rete_invio: 'Rete: invio di {f}',
               rete_ritiro: 'Rete: il tuo ritiro (stima)'}},
   en: {titolo: 'Swap',
        testo: 'Here you will find the payouts you receive in on-chain bitcoin, through a swap made from your phone.',
        vuoto: 'No swaps yet.',
        scegli: 'How you receive the sats', onchain: 'On-chain (swap)',
-       carico: 'Reading SATS Routing rates…',
+       carico: 'Reading the swap rates…',
        titoloPrev: 'Swap quote', ricevi: 'You receive on-chain, about',
-       valgonoOra: 'Current SATS Routing rates: checked again when you confirm.',
+       valgonoOra: 'Current {f} rates: checked again when you confirm.',
        conferma: 'Confirm the swap', tornaLn: 'Receive via Lightning',
        sottoMinimo: 'Below {n} sats a swap costs too much: receive via Lightning.',
        sopraTetto: 'Above {n} sats, for now, Lightning only.',
        cambiata: 'The rates have changed: here is the new quote.',
-       nonRisponde: 'SATS Routing is not responding: receive via Lightning.',
+       nonRisponde: '{f} is not responding: receive via Lightning.',
        spento: 'Swaps are not available right now: receive via Lightning.',
+       eseguitoDa: 'Run by {n}',
+       ripiego: '{a} answered with data that does not add up: here is the {b} quote.',
        voci: {dovuto: 'You are owed', fee_barattolo: 'Barattolo fee ({p}%)',
-              commissione: 'SATS Routing fee ({p}%)',
-              rete_invio: 'Network: SATS Routing send',
+              commissione: '{f} fee ({p}%)',
+              rete_invio: 'Network: {f} send',
               rete_ritiro: 'Network: your claim (estimate)'}}};
 function linguaSwap(){
   let l = '';
@@ -18029,7 +18048,7 @@ function linguaSwap(){
    si mostra e basta. Il «Conferma lo swap» di questa tappa ricontrolla
    le tariffe con l'impronta di quelle mostrate: se sono cambiate lo
    dice, col preventivo nuovo. Dalla tappa 3 (20 ott 2026), se reggono, si
-   va avanti DAL TELEFONO: `swapAvanti` in swap-telefono.js (le parole,
+   va avanti DAL TELEFONO: `swapAvanti` in swap/instradatore.js (le parole,
    l'indirizzo, la creazione). I bottoni non hanno onclick: `data-swap`,
    e l'ascoltatore delegato sta in quel file. */
 let sceltaIncassoSwap = {};   // ordine -> 'ln' | 'swap'
@@ -18057,19 +18076,32 @@ function scegliIncassoSwap(id, s){
   if (s === 'swap' && vecchio) { caricaPreventivoSwap(id, false); return; }
   ridisegnaIncassoSwap();
 }
-async function caricaPreventivoSwap(id, ricontrolla){
-  const prima = preventiviSwap[id];
-  const hash = ricontrolla && prima && prima.dati && prima.dati.hash;
-  preventiviSwap[id] = Object.assign({}, prima, {stato: 'carico'});
-  ridisegnaIncassoSwap();
+/* LA LETTURA DI UN PREVENTIVO (20 ott 2026, l'instradatore): di un
+   ordine, di UN fornitore (vuoto = SATS Routing), con l'impronta delle
+   tariffe gia' mostrate se c'e'. Non tocca la pagina: la chiama
+   l'instradatore per ogni fornitore, e sceglie lui. */
+async function leggiPreventivoSwap(id, fornitore, hash){
   let d;
   try {
-    const q = hash ? `?hash=${encodeURIComponent(hash)}` : '';
-    const r = await fetch(`${API_BASE}/swap/preventivo/${Number(id)}${q}`,
+    const q = new URLSearchParams();
+    if (fornitore) q.set('fornitore', fornitore);
+    if (hash) q.set('hash', hash);
+    const qs = q.toString();
+    const r = await fetch(`${API_BASE}/swap/preventivo/${Number(id)}${qs ? '?' + qs : ''}`,
       {headers: {'X-Tg-Init-Data': authHdr()}});
     d = await r.json().catch(() => null);
     if (!r.ok || !d) d = {ok: false, motivo: r.status === 403 ? 'spento' : 'non_risponde'};
   } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
+  return d;
+}
+async function caricaPreventivoSwap(id, ricontrolla){
+  /* con l'instradatore arrivato decide lui (il migliore fra i fornitori) */
+  if (typeof swapInstradaPreventivo === 'function') return swapInstradaPreventivo(id, ricontrolla);
+  const prima = preventiviSwap[id];
+  const hash = ricontrolla && prima && prima.dati && prima.dati.hash;
+  preventiviSwap[id] = Object.assign({}, prima, {stato: 'carico'});
+  ridisegnaIncassoSwap();
+  const d = await leggiPreventivoSwap(id, '', hash);
   const nota = ricontrolla && d.cambiata ? 'cambiata' : '';
   preventiviSwap[id] = {stato: 'pronto', dati: d, quando: Date.now(), nota};
   if (currentOrder && Number(currentOrder.id) === Number(id)) ridisegnaIncassoSwap();
@@ -18078,8 +18110,11 @@ function percentoSwap(p){
   const s = String(Number(p) || 0);
   return linguaSwap() === 'it' ? s.replace('.', ',') : s;
 }
-function etichettaVoceSwap(r, t){
-  return (t.voci[r.voce] || r.voce).replace('{p}', percentoSwap(r.percento));
+/* `{f}` e' il fornitore del preventivo (20 ott 2026, l'instradatore: la
+   commissione e l'invio sono SUOI, non sempre di SATS Routing) */
+function etichettaVoceSwap(r, t, fornitore){
+  return (t.voci[r.voce] || r.voce).replace('{p}', percentoSwap(r.percento))
+    .replace('{f}', fornitore || 'SATS Routing');
 }
 function pannelloPreventivoSwap(o){
   const n = Number(o.id), t = testiSwap(), p = preventiviSwap[n];
@@ -18089,22 +18124,26 @@ function pannelloPreventivoSwap(o){
   if (!d.ok) {
     const testo = d.motivo === 'sotto_minimo' ? t.sottoMinimo.replace('{n}', fmt(d.minimo))
       : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
-      : d.motivo === 'spento' ? t.spento : t.nonRisponde;
+      : d.motivo === 'spento' ? t.spento
+      : t.nonRisponde.replace('{f}', d.fornitore_nome || 'SATS Routing');
     return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(testo)}</div>`
       + `<button class="btn ghost" type="button" data-swap="scegli" data-ordine="${n}" data-scelta="ln">⚡ ${esc(t.tornaLn)}</button></div>`;
   }
   const righe = (d.righe || []).map(r => `<div class="swap-riga${r.sats < 0 ? ' meno' : ''}">`
-    + `<span>${esc(etichettaVoceSwap(r, t))}</span>`
+    + `<span>${esc(etichettaVoceSwap(r, t, d.fornitore_nome))}</span>`
     + `<b>${r.sats < 0 ? '−' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
   const nota = p.nota === 'cambiata'
-      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>` : '';
+      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>`
+    : p.nota === 'ripiego'
+      ? `<div class="swap-rifiuto" role="status">${esc(t.ripiego.replace('{a}', p.ripiegoDa || '').replace('{b}', d.fornitore_nome || ''))}</div>` : '';
   return `<div class="swap-prev">
       <h4>₿ ${esc(t.titoloPrev)}</h4>
       ${nota}
       <div class="swap-righe">${righe}
         <div class="swap-riga totale"><span>${esc(t.ricevi)}</span><b>${fmt(d.ricevi)}<span class="unit">sats</span></b></div>
       </div>
-      <div class="hint">${esc(t.valgonoOra)}</div>
+      <div class="hint">${esc(t.valgonoOra.replace('{f}', d.fornitore_nome || 'SATS Routing'))}</div>
+      ${d.fornitore_nome ? `<div class="swap-da">${esc(t.eseguitoDa.replace('{n}', d.fornitore_nome))}</div>` : ''}
       <button class="btn orange" type="button" data-swap="avanti" data-ordine="${n}"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
     </div>`;
 }

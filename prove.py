@@ -34006,6 +34006,13 @@ def _censimento(acceso, dopo=None):
     # `swap_rete()`, che cerca la parola in SWAP_RETI — da `__missing__`
     # sarebbe un 7, e `in 7` esplode
     amb["SWAP_RETI"] = ("bitcoin", "testnet", "regtest")
+    # ...e i fornitori (20 ott 2026, l'instradatore): il pannello CHIAMA
+    # `swap_fornitori()`, che scorre SWAP_FORNITORI_IN_PIU — da
+    # `__missing__` un 7, e un 7 non si scorre
+    amb["SWAP_FORNITORI_IN_PIU"] = []
+    amb["SWAP_TIPI"] = ("boltz",)
+    amb["_SWAP_ID_FORNITORE"] = re.compile(r"^[a-z0-9]{2,20}$")
+    amb["_SWAP_DETTO_STORTO"] = set()
     # le prese dalle 10 (9 ott 2026): il giudice dell'ora legge
     # l'orologio, e `time` da `__missing__` farebbe 7
     amb["time"] = time
@@ -34083,6 +34090,8 @@ def _censimento(acceso, dopo=None):
               "_ronda_nostr_leve",
               # la rete dello swap (20 ott 2026): la sedicesima volta
               "swap_rete",
+              # i fornitori dello swap (20 ott 2026): la diciassettesima
+              "swap_origine_api", "swap_fornitori",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -174616,7 +174625,8 @@ def prove_swap_telefono():
     dello swap dei venditori). Le dodici parole, le chiavi, la verifica
     della risposta di SATS Routing e il ritiro nascono NEL TELEFONO (regola
     ferrea 2, vista dal lato dei soldi): il codice sta in
-    `swap-telefono.js`, la crittografia in `vendor/swap.bundle.js`
+    `swap/boltz.js` e `swap/instradatore.js` (fino al 20 ott 2026 un file
+    solo, `swap-telefono.js`), la crittografia in `vendor/swap.bundle.js`
     (boltz-core 5.0.0 + @scure, otto pacchetti, tutti MIT).
 
     QUATTRO GUARDIE:
@@ -174632,7 +174642,7 @@ def prove_swap_telefono():
        ritiro — cooperativo e dallo script — porta una firma che giudica
        un'aritmetica che non e' quella del bundle (BIP-340 in Python
        puro, `cartone_satsrouting.schnorr_verifica`).
-    3. IL TELEFONO NON PARLA COL SERVER: in `swap-telefono.js` nessuna
+    3. IL TELEFONO NON PARLA COL SERVER: nei file del telefono nessuna
        chiamata a /api, una sola `fetch` (verso SATS Routing), nessun
        onclick, un ascoltatore delegato che conosce ESATTAMENTE le azioni
        che il markup usa; le chiavi del cassetto portano il conto.
@@ -174666,45 +174676,62 @@ def prove_swap_telefono():
           True, "\nvendor/swap.bundle.js text eol=lf" in attr)
 
     # --- 3. e 4. il codice del telefono, letto ---
-    tel = open("swap-telefono.js", "rb").read().replace(b"\r\n", b"\n")
-    js = tel.decode("utf-8")
+    # (20 ott 2026, l'instradatore) due file: il tipo «boltz» (il motore,
+    # l'unica fetch, verso il fornitore) e l'instradatore (la scelta, il
+    # cassetto, il pannello, l'ascoltatore: nessuna fetch)
+    tipo = open(os.path.join("swap", "boltz.js"), "rb").read().replace(b"\r\n", b"\n")
+    strada = open(os.path.join("swap", "instradatore.js"), "rb").read().replace(b"\r\n", b"\n")
+    bz, js = tipo.decode("utf-8"), strada.decode("utf-8")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     src = open("server.py", encoding="utf-8").read()
     ver = re.search(r"const SWAP_TELEFONO_VER = '([0-9a-f]+)';", mini)
-    prova("la versione nella pagina e' l'impronta del file del telefono",
-          _hl.sha256(tel).hexdigest()[:10], ver and ver.group(1))
-    prova("...e la pagina lo chiama con quella versione", True,
-          "s.src = `${FOTO_BASE}/swap-telefono.js?v=${SWAP_TELEFONO_VER}`;" in mini)
-    prova("il telefono non parla col server di Barattolo",
-          (0, 0, 0, 1),
-          (js.count("/api/"), js.count("API_BASE"), js.count("authHdr"),
-           js.count("fetch(")))
-    prova("...e l'unica fetch va a SATS Routing (swapLeve.api)", True,
-          "const base = String((swapLeve && swapLeve.api) || '')" in js)
-    prova("nessun handler inline, nel file e nei pezzi dello swap della pagina",
-          (0, 0, 0),
-          (len(re.findall(r"\son[a-z]+=", js)),
+    prova("la versione nella pagina e' l'impronta dei due file del telefono",
+          _hl.sha256(tipo + strada).hexdigest()[:10], ver and ver.group(1))
+    prova("...e la pagina li chiama con quella versione, i tipi prima",
+          (True, True),
+          ("s.src = `${FOTO_BASE}/swap/${nome}.js?v=${SWAP_TELEFONO_VER}`;" in mini,
+           "for (const nome of tipi.concat(['instradatore']))" in mini))
+    prova("il telefono non parla col server di Barattolo, se non per il preventivo",
+          (0, 0, 0, 1, 0, 0, 0, 0),
+          (bz.count("/api/"), bz.count("API_BASE"), bz.count("authHdr"),
+           bz.count("fetch("), js.count("/api/"), js.count("API_BASE"),
+           js.count("authHdr"), js.count("fetch(")))
+    prova("...l'unica fetch del tipo va all'api del fornitore", True,
+          "async function swapApiBoltz(base, percorso, corpo){" in bz
+          and "const api = (percorso, corpo) => swapApiBoltz(cfg.api, percorso, corpo);" in bz)
+    prova("...e il preventivo lo legge la pagina, per fornitore", True,
+          "async function leggiPreventivoSwap(id, fornitore, hash){" in mini
+          and "q.set('fornitore', fornitore);" in mini)
+    prova("nessun handler inline, nei file e nei pezzi dello swap della pagina",
+          (0, 0, 0, 0),
+          (len(re.findall(r"\son[a-z]+=", js)), len(re.findall(r"\son[a-z]+=", bz)),
            mini.count("scegliIncassoSwap(${n}"), mini.count("confermaSwapProva")))
-    usate = set(re.findall(r'data-swap="([a-z-]+)"', js + mini))
+    usate = set(re.findall(r'data-swap="([a-z-]+)"', js + bz + mini))
     i = js.index("document.addEventListener('click'")
     ascoltate = set(re.findall(r"\ba === '([a-z-]+)'", js[i:]))
     prova("l'ascoltatore delegato conosce esattamente le azioni del markup",
           sorted(usate), sorted(ascoltate))
     prova("...e chiama solo funzioni scritte, mai window[nome]", 0,
           js[i:].count("window["))
-    prova("il cassetto delle parole e degli swap porta il conto", (True, True),
-          ("`barattolo_swap_${myTgId || 'x'}`" in js,
+    prova("il cassetto porta il conto, e per SATS Routing i nomi di prima",
+          (True, True, True),
+          ("? `barattolo_swap_${myTgId || 'x'}`" in js,
+           "`barattolo_swap_${fid}_${myTgId || 'x'}`" in js,
            "`barattolo_swap_lista_${myTgId || 'x'}`" in js))
     prova("l'indice della chiave si salva PRIMA di chiedere lo swap", True,
-          js.index("c.prossimo = indice + 1;") < js.index("swapApi('/v2/swap/reverse', corpo)"))
-    prova("il recupero riparte dopo l'indice piu' alto", True,
-          "prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);" in js)
-    prova("le due rotte esplicite dei file", (True, True),
-          ('@app.get("/swap-telefono.js")\ndef swap_telefono_js():' in src.replace("\r\n", "\n"),
+          js.index("c.prossimo = indice + 1;") < js.index("nuovo = await f.crea("))
+    prova("il recupero riparte dopo l'indice piu' alto", (True, True),
+          ("prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);" in bz,
+           "prossimo = Math.max(prossimo, Number(trovati.prossimo) || 0);" in js))
+    prova("le rotte esplicite dei file, con la lista chiusa", (True, True, True),
+          ('@app.get("/swap/{nome}.js")\ndef swap_file_telefono(nome: str):' in src.replace("\r\n", "\n"),
+           'SWAP_FILE_TELEFONO = ("boltz", "instradatore")' in src,
            '@app.get("/vendor/swap.js")\ndef vendor_swap():' in src.replace("\r\n", "\n")))
+    prova("...e la lista della pagina e' quella del server", True,
+          "const SWAP_TIPI_FILE = ['boltz'];" in mini)
     csp = pezzo("_csp_prova")
-    prova("la CSP apre l'origine di SATS Routing SOLO a swap acceso", True,
-          'origine = swap_origine_api() if SWAP_ATTIVO else ""' in csp)
+    prova("la CSP apre le origini dei fornitori SOLO a swap acceso", True,
+          "if SWAP_ATTIVO:\n        for f in swap_fornitori():" in csp.replace("\r\n", "\n"))
     esempio = open("config_esempio.py", encoding="utf-8").read()
     prova("la leva SWAP_RETE: d'esempio, di serie e nel pannello", (True, True, True),
           ('\nSWAP_RETE = "bitcoin"' in esempio,
@@ -174731,7 +174758,7 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('vendor/swap.bundle.js', 'utf8'), ctx);
 vm.runInContext(__BOLT11__, ctx);
 vm.runInContext("const FOTO_BASE = '';", ctx);
-vm.runInContext(fs.readFileSync('swap-telefono.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('swap/boltz.js', 'utf8'), ctx);
 const run = c => vm.runInContext(c, ctx);
 const S = ctx.BarattoloSwap;
 const h = S.hex;
@@ -175143,6 +175170,78 @@ def types_tempo(adesso):
 def types_ns(**k):
     import types as _t
     return _t.SimpleNamespace(**k)
+
+
+def prove_swap_fornitori():
+    """I FORNITORI DELLO SWAP (20 ott 2026, cantiere swap-instradatore,
+    decisione di Andrea: chi vende sceglie COSA, il telefono sceglie CHI).
+    Il server dice i fornitori (`swap_fornitori`): SATS Routing per primo,
+    dalle leve di sempre, poi quelli di `SWAP_FORNITORI_IN_PIU` ben
+    formati — una voce storta si salta. Qui il giudice ESEGUITO, e le
+    sentinelle sui tre posti che devono dire la stessa lista di tipi
+    (server, pagina, rotta dei file). La scelta del migliore, il ripiego
+    e il recupero per fornitore li prova `collaudo_swap_instradatore`,
+    con due cartoni veri."""
+    print("\n[i fornitori dello swap]")
+    from urllib.parse import urlparse as _up
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    amb = {"re": re, "urlparse": _up, "SWAP_RETI": ("bitcoin", "testnet", "regtest"),
+           "SWAP_TIPI": ("boltz",), "_SWAP_ID_FORNITORE": re.compile(r"^[a-z0-9]{2,20}$"),
+           "_SWAP_DETTO_STORTO": set(), "SWAP_API_BASE": "https://api.satsrouting.exchange/",
+           "SWAP_REFERRAL_ID": " barattolo ", "SWAP_RETE": "bitcoin",
+           "SWAP_FORNITORI_IN_PIU": []}
+    for f in ("swap_rete", "swap_origine_api", "swap_fornitori", "swap_fornitore"):
+        exec(pezzo(f), amb)
+    prova("di serie un fornitore solo, SATS Routing, dalle leve di sempre",
+          [{"id": "satsrouting", "nome": "SATS Routing", "tipo": "boltz",
+            "api": "https://api.satsrouting.exchange", "referral": "barattolo",
+            "rete": "bitcoin"}], amb["swap_fornitori"]())
+    buono = {"id": "cartone2", "nome": "Cartone Due", "tipo": "boltz",
+             "api": "http://127.0.0.1:9078/", "rete": "regtest"}
+    amb["SWAP_FORNITORI_IN_PIU"] = [
+        buono,
+        dict(buono, id="satsrouting"),            # doppione di SATS Routing
+        dict(buono),                               # doppione di se'
+        dict(buono, id="X"),                       # id fuori forma
+        dict(buono, id="kaleido", tipo="kaleido"),  # tipo che non c'e' ancora
+        dict(buono, id="ftp", api="ftp://x"),      # api non http(s)
+        dict(buono, id="rete", rete="marte"),      # rete sconosciuta
+        dict(buono, id="senza", nome=""),          # senza nome
+        "una stringa", None]
+    import contextlib as _cl, io as _io
+    voce = _io.StringIO()
+    with _cl.redirect_stdout(voce):
+        l = amb["swap_fornitori"]()
+        amb["swap_fornitori"]()             # la seconda volta tace
+    prova("le voci buone in coda, le storte saltate",
+          [("satsrouting", "https://api.satsrouting.exchange"),
+           ("cartone2", "http://127.0.0.1:9078")], [(f["id"], f["api"]) for f in l])
+    prova("...e il journal dice quali, una volta sola", (9, True),
+          (voce.getvalue().count("SWAP_FORNITORI_IN_PIU"), "storta" in voce.getvalue()))
+    prova("un fornitore per id, o None", ("Cartone Due", None),
+          ((amb["swap_fornitore"]("cartone2") or {}).get("nome"),
+           amb["swap_fornitore"]("chissa")))
+    prova("la leva nasce vuota, nel config d'esempio e nel server", (True, True),
+          ("\nSWAP_FORNITORI_IN_PIU = []" in esempio,
+           "    SWAP_FORNITORI_IN_PIU = []" in src))
+    prova("...e il pannello la mostra", True,
+          '"SWAP_FORNITORI_IN_PIU",' in pezzo("_leve_stato"))
+    prova("i tipi: server, pagina e rotta dei file dicono la stessa lista", True,
+          'SWAP_TIPI = ("boltz",)' in src
+          and "const SWAP_TIPI_FILE = ['boltz'];" in mini
+          and 'SWAP_FILE_TELEFONO = ("boltz", "instradatore")' in src)
+    rotta = pezzo("swap_preventivo")
+    prova("il preventivo e' per fornitore, e uno sconosciuto e' 404", (True, True, True),
+          ('fornitore: str = "satsrouting",' in rotta,
+           'raise HTTPException(404, "Fornitore sconosciuto")' in rotta,
+           'p["fornitore"], p["fornitore_nome"] = chi["id"], chi["nome"]' in rotta))
+    lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
+    compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
+    prova("il collaudo dell'instradatore sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_swap_instradatore" in "\n" + lista,
+           "collaudo_swap_instradatore.py" in compila))
 
 
 def prove_leve_mai_doppie():
@@ -175609,7 +175708,7 @@ def main():
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
-              prove_swap_telefono,
+              prove_swap_telefono, prove_swap_fornitori,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,

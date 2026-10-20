@@ -3,7 +3,8 @@
 LO SWAP, TAPPA 3: LO SWAP DAL TELEFONO (20 ott 2026, cantiere
 swap-telefono).
 
-Il codice VERO del telefono (`swap-telefono.js`, con la lettura delle
+Il codice VERO del telefono (`swap/boltz.js` e `swap/instradatore.js`
+dal 20 ott 2026, prima `swap-telefono.js`; con la lettura delle
 fatture di miniapp.html e la libreria `vendor/swap.bundle.js`) girato in
 node, pagina per pagina, contro il SATS ROUTING DI CARTONE acceso su una
 porta di questo computer: le chiamate passano davvero per HTTP, la
@@ -76,7 +77,9 @@ const fs = require('fs');
 const vm = require('vm');
 const D = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const BUNDLE = fs.readFileSync(D.bundle, 'utf8');
-const TELEFONO = fs.readFileSync(D.telefono, 'utf8');
+/* i file del telefono (20 ott 2026, divisi dall'instradatore): il tipo
+   del fornitore, poi l'instradatore, nell'ordine della pagina */
+const TELEFONO = D.telefono.map(f => fs.readFileSync(f, 'utf8'));
 const fetchVero = globalThis.fetch;
 const chiamate = [];          // ogni chiamata di ogni pagina
 const html = [];              // ogni markup scritto dal telefono
@@ -116,8 +119,10 @@ function payoutPanel(){ return ''; }
 let preventiviSwap = {}, sceltaIncassoSwap = {};
 let disegni = 0;
 function ridisegnaIncassoSwap(){ disegni++; }
-async function caricaPreventivoSwap(n){
-  preventiviSwap[n] = {stato: 'pronto', quando: Date.now(), nota: '', dati: ${JSON.stringify(D.preventivo)}};
+/* il preventivo del server, di cartone: con un fornitore solo, la sua
+   lettura e' quella di prima (l'instradatore la mette in preventiviSwap) */
+async function leggiPreventivoSwap(n, fornitore){
+  return Object.assign(${JSON.stringify(D.preventivo)}, {fornitore: fornitore || 'satsrouting', fornitore_nome: 'SATS Routing'});
 }
 function pannelloPreventivoSwap(){ return '<div>preventivo</div>'; }
 const scelte = [];
@@ -132,7 +137,7 @@ const document = {addEventListener: (t, f) => ascoltatori.push([t, f]),
 const setInterval = () => 1, clearInterval = () => {};
 `, Object.assign(ctx, {__memoria: memoria}));
   vm.runInContext(D.bolt11, ctx);
-  vm.runInContext(TELEFONO, ctx);
+  for (const codice of TELEFONO) vm.runInContext(codice, ctx);
   const run = codice => vm.runInContext(codice, ctx);
   return {ctx, run};
 }
@@ -349,7 +354,8 @@ def telefono(base):
         open(d, "w", encoding="utf-8").write(json.dumps({
             "base": base, "indirizzo": INDIRIZZO,
             "bundle": os.path.join(banco.QUI, "vendor", "swap.bundle.js"),
-            "telefono": os.path.join(banco.QUI, "swap-telefono.js"),
+            "telefono": [os.path.join(banco.QUI, "swap", "boltz.js"),
+                         os.path.join(banco.QUI, "swap", "instradatore.js")],
             "bolt11": pezzi_pagina(),
             "leve": {"attivo": True, "api": base, "rete": "bitcoin",
                      "referral": "barattolo", "minimo": 25_000, "massimo": 50_000},
@@ -400,11 +406,17 @@ def il_server(c, srv, base):
     srv.SWAP_API_BASE = "javascript:alert(1)"
     prova("...e una base che non e' http(s) non apre niente", "", srv.swap_origine_api())
     srv.SWAP_API_BASE = vero
-    r1, r2 = c.get("/swap-telefono.js"), c.get("/vendor/swap.js")
+    # (20 ott 2026, l'instradatore) i file del telefono stanno sotto
+    # /swap/, una lista chiusa di nomi
+    r1, r2 = c.get("/swap/instradatore.js"), c.get("/vendor/swap.js")
     prova("le due rotte dei file rispondono, javascript", (200, 200, True, True),
           (r1.status_code, r2.status_code,
            r1.headers.get("content-type", "").startswith("application/javascript"),
            "BarattoloSwap" in r2.text[:200]))
+    prova("...anche il file del tipo «boltz», e un nome fuori lista no",
+          (200, 404, 404),
+          (c.get("/swap/boltz.js").status_code, c.get("/swap/server.js").status_code,
+           c.get("/swap-telefono.js").status_code))
 
 
 def il_telefono(base):
