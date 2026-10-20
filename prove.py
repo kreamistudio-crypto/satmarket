@@ -65974,6 +65974,49 @@ out.ordImpSu = ordinaLibroP2P(mazzoImp, 'compro', 'imp-su').map(x => x.id).join(
 const pari = [imp('v', 50, 0, 100), imp('n', 50, 0, 300)];
 out.ordImpPari = ordinaLibroP2P(pari, 'compro', 'imp-giu').map(x => x.id).join('');
 out.ordImpNonTocca = mazzoImp.map(x => x.id).join('');
+/* BARATTOZON MENO CONVENIENTE NON STA IN CIMA (20 ott 2026, cantiere
+   ordina-per-convenienza): un prezzo fisso porta sul filo premio 0, e col
+   metro nudo `o.premium` passava davanti a tutti gli ordini col premio
+   positivo. Il cambio del banco e' 0,0005 euro per sat: 50 euro pieni
+   sono 100.000 sats, quindi 92.000 sats fissi valgono +8 (8% meno
+   conveniente per chi compra) e 104.000 valgono −4 (piu' conveniente). */
+const tabM = ['Contanti al tabacchino 50.00'];
+const fisso = (d, lato, sats, creato) => ({id: d, lato: lato, fiat: 'EUR', euro: 50, euroMax: 0,
+  sats: sats, premium: 0, metodi: tabM, creato: creato || 100});
+const merc = (d, lato, prem, creato) => ({id: d, lato: lato, fiat: 'EUR', euro: 50, euroMax: 0,
+  sats: 0, premium: prem, metodi: ['SEPA'], creato: creato || 100});
+const libroCompra = [fisso('B', 'sell', 92000), merc('x', 'sell', 2),
+                     merc('y', 'sell', 5), merc('z', 'sell', 10)];
+out.bzCompra = ordinaLibroP2P(libroCompra, 'compro', 'conv').map(x => x.id).join('');
+/* ...ed e' lo stesso numero che la card scrive */
+out.bzBadge = badgePremioP2P(libroCompra[0]);
+/* ...piu' conveniente di tutti sale in cima: il metro non lo punisce */
+out.bzCompraMeglio = ordinaLibroP2P([merc('x', 'sell', 2), fisso('B', 'sell', 104000),
+  merc('y', 'sell', 5)], 'compro', 'conv').map(x => x.id).join('');
+/* NEL TAB «VENDI BTC» il verso si rovescia: 108.000 sats fissi per 50
+   euro sono −8, cioe' l'8% meno conveniente per chi vende */
+const libroVendi = [fisso('F', 'buy', 108000), merc('p', 'buy', 3),
+                    merc('q', 'buy', -2), merc('r', 'buy', -10)];
+out.fissoVendi = ordinaLibroP2P(libroVendi, 'vendo', 'conv').map(x => x.id).join('');
+/* gli altri criteri il premio non lo guardano: Barattozon resta dove la
+   data lo mette */
+out.bzRecenti = ordinaLibroP2P([merc('x', 'sell', 2, 300), fisso('B', 'sell', 92000, 200),
+  merc('y', 'sell', 5, 400)], 'compro', 'recenti').map(x => x.id).join('');
+/* A CAMBIO MUTO il prezzo fisso non ha un numero: va in fondo, coi suoi
+   pari per data, e i prezzi a mercato restano in ordine */
+{
+  const vivo = cambioVivo;
+  cambioVivo = false;
+  out.bzMuto = ordinaLibroP2P([fisso('B', 'sell', 92000, 100), merc('z', 'sell', 10),
+    fisso('C', 'sell', 92000, 300), merc('x', 'sell', 2)], 'compro', 'conv')
+    .map(x => x.id).join('');
+  out.bzMutoVendi = ordinaLibroP2P([fisso('F', 'buy', 108000), merc('r', 'buy', -10),
+    merc('p', 'buy', 3)], 'vendo', 'conv').map(x => x.id).join('');
+  /* ...e il filtro non lo scarta: resta visibile */
+  out.filtroMuto = passaFiltroP2P(fisso('B', 'sell', 92000),
+    Object.assign(filtroVuotoP2P(), {premioDa: 0, premioA: 5}));
+  cambioVivo = vivo;
+}
 /* IL FILTRO DEL LIBRO (set 2026): le quattro leve, una per una, e
    soprattutto i due casi in cui e' facile sbagliare — il metodo che si
    confronta per CONTENIMENTO (sul libro arriva testo libero degli altri
@@ -66022,6 +66065,26 @@ out.repSenzaFacciaLibera = passaRepP2P(filtro({repA: 4}), null);
 out.repAlta = passaRepP2P(filtro({repDa: 4}), {media: 4.6, voti: 7});
 out.repBassa = passaRepP2P(filtro({repDa: 4}), {media: 3, voti: 2});
 out.repSulFilo = passaRepP2P(filtro({repDa: 4}), {media: 4, voti: 2});
+/* IL FILTRO PER PREMIO LEGGE LA CARD (20 ott 2026, cantiere
+   ordina-per-convenienza): lo stesso metro dell'ordinamento. Un
+   Barattozon a +8 non passa da un filtro «fino a 5», e passa da uno
+   «da 6 a 10» — col premio nudo (0) era il contrario. */
+out.filtroFissoFuori = passaFiltroP2P(fisso('B', 'sell', 92000), filtro({premioDa: 0, premioA: 5}));
+out.filtroFissoDentro = passaFiltroP2P(fisso('B', 'sell', 92000), filtro({premioDa: 6, premioA: 10}));
+/* GLI ESTREMI DEL CURSORE SONO APERTI: un prezzo fisso a +35 (65.000
+   sats per 50 euro) non si perde se il filtro e' acceso per il metodo e
+   il premio sta tutto aperto; un cursore stretto lo ferma */
+out.filtroFissoOltre = passaFiltroP2P(fisso('B', 'sell', 65000),
+  filtro({metodi: ['tabacchino']}));
+out.filtroFissoOltreStretto = passaFiltroP2P(fisso('B', 'sell', 65000),
+  filtro({premioA: 19}));
+out.filtroFissoSotto = passaFiltroP2P(fisso('F', 'buy', 130000), filtro({premioDa: -19}));
+out.filtroFissoSottoAperto = passaFiltroP2P(fisso('F', 'buy', 130000), filtro({valute: ['EUR']}));
+/* ...e vale per tutti: un premio a mercato oltre il cursore (un altro
+   client ne scrive anche fuori dal −20..+20 di casa) passa a cursore
+   aperto, e lo ferma il cursore stretto */
+out.filtroMercatoOltre = [passaFiltroP2P(con({premium: 25}), filtro({metodi: ['SEPA']})),
+                          passaFiltroP2P(con({premium: 25}), filtro({premioA: 19}))];
 
 /* L'ANELLO DELLA SCADENZA: il giudice puro sui casi che contano —
    l'orologio si passa, cosi' non dipende da quando gira il banco */
@@ -66517,6 +66580,28 @@ console.log(JSON.stringify(out));
           "mpg", out["ordImpNonTocca"])
     prova("...e la lista in memoria non si tocca", "abcd",
           out["ordNonTocca"])
+    # --- BARATTOZON NON STA IN CIMA APPOSTA (20 ott 2026, cantiere
+    # ordina-per-convenienza, decisione di Andrea): ordinando per
+    # convenienza vale solo la convenienza, per tutti. Il metro e' quello
+    # della card (`premioCardP2P`): a prezzo fisso il premio del filo e'
+    # sempre 0, e col metro nudo Barattozon passava davanti a tutti.
+    prova("Barattozon 8% meno conveniente scende sotto chi conviene di piu'",
+          "xyBz", out["bzCompra"])
+    prova("...ed e' lo stesso 8% che la sua card scrive", True,
+          "8%</b> meno conveniente" in out["bzBadge"])
+    prova("...e piu' conveniente di tutti sale in cima", "Bxy",
+          out["bzCompraMeglio"])
+    prova("nel tab Vendi un prezzo fisso a −8 va dopo il −2 e prima del −10",
+          "pqFr", out["fissoVendi"])
+    prova("«Piu' recenti» non guarda la convenienza: Barattozon sta dove "
+          "lo mette la data", "yxB", out["bzRecenti"])
+    prova("a cambio muto un prezzo fisso va in fondo, coi pari per data, "
+          "nei due versi", ["xzCB", "prF"],
+          [out["bzMuto"], out["bzMutoVendi"]])
+    prova("...e il filtro per premio non lo scarta", True, out["filtroMuto"])
+    _ord_js = pezzo_js(mini, "function ordinaLibroP2P(righe, lato, criterio){", "\n}\n")
+    prova("il metro della convenienza e' `premioCardP2P`, mai `premium` nudo",
+          [True, False], ["premioCardP2P(a)" in _ord_js, ".premium" in _ord_js])
 
     # --- 7b) L'ANELLO DELLA SCADENZA (set 2026) ---------------------
     # Il testo «scade fra 7 g» esce dalla card e diventa un anello che
@@ -66737,6 +66822,24 @@ console.log(JSON.stringify(out));
     prova("la fascia del premio comprende gli estremi",
           [True, True, False], [out["premioDentro"], out["premioSulFilo"],
                                 out["premioFuori"]])
+    # IL FILTRO LEGGE LA CARD (20 ott 2026, cantiere ordina-per-
+    # convenienza, decisione di Andrea): lo stesso metro dell'ordinamento,
+    # `premioCardP2P`. Col premio nudo un Barattozon a +8 valeva 0.
+    prova("un Barattozon a +8 resta fuori da «fino a 5» ed entra in «da 6 a 10»",
+          [False, True], [out["filtroFissoFuori"], out["filtroFissoDentro"]])
+    # ⚠️ GLI ESTREMI DEL CURSORE SONO APERTI: la convenienza vera di un
+    # prezzo fisso non ha tetto, e un filtro acceso per un'altra leva non
+    # deve buttar fuori un +35 o un −30 col premio lasciato tutto aperto.
+    prova("a cursore aperto un prezzo fisso oltre il ±20 resta, a cursore "
+          "stretto no", [True, False, True, False],
+          [out["filtroFissoOltre"], out["filtroFissoOltreStretto"],
+           out["filtroFissoSottoAperto"], out["filtroFissoSotto"]])
+    prova("...e lo stesso per un premio a mercato oltre il ±20", [True, False],
+          out["filtroMercatoOltre"])
+    _filtro_js = pezzo_js(mini, "function passaFiltroP2P(o, f){", "\n}\n")
+    prova("il metro del filtro e' `premioCardP2P`, mai `o.premium` nudo",
+          [True, False], ["premioCardP2P(o)" in _filtro_js,
+                          "Number(o.premium)" in _filtro_js])
     # ⚠️ CHI NON HA ANCORA VOTI non e' «scarso», e' «non si sa»: passa
     # col minimo a zero e sparisce appena si chiede una stella, perche'
     # chi la chiede sta chiedendo una PROVA. E' una scelta, non una

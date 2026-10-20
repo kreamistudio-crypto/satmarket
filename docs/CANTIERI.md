@@ -70313,3 +70313,75 @@ cosa aspettarsi; il VPS di produzione non toccato):
 
 **DA GUARDARE.** Il giro dal telefono (liste, carrello, chat, «I miei
 ordini», l'on-chain da admin); le npub di Andrea in `PROVA_SOLO_IDS`.
+
+## L'ordinamento per convenienza vale per tutti: Barattozon non sta più in cima (20 ott 2026, cantiere ordina-per-convenienza, decisione di Andrea)
+
+IL DIFETTO (segnalato da Andrea). Nel libro P2P, ordinando per
+convenienza, i Barattozon restavano in cima anche quando erano meno
+convenienti degli altri. La causa: `ordinaLibroP2P` (miniapp) aveva come
+metro `o.premium`, il premio scritto sul filo, e un ordine a sats fissi
+— ogni Barattozon a prezzo fisso e ogni altro prezzo fisso — porta sul
+filo premio 0 (il premio è cotto nei sats, bb65141a). Per l'ordinamento
+valeva quindi «al prezzo di mercato» qualunque cosa dicesse la sua card,
+e nel tab «Compra BTC», dove gli altri hanno quasi sempre un premio
+positivo, stava davanti a tutti. NON ERA VOLUTO: il metro è del 9 set
+(9ec8d4a, «il libro si ordina per convenienza di chi legge — premio piu'
+basso»), quando un prezzo fisso una convenienza da leggere non l'aveva;
+la convenienza vera è arrivata il 27 set (25b2124, voce «La convenienza
+vera negli ordini a sats fissi») e ha raggiunto badge, cartellino e
+dettaglio, non l'ordinamento. Il server il libro non lo ordina; gli
+avvisi dei nuovi ordini usavano già la convenienza vera
+(`_convenienza_nuovo_p2p`).
+
+LE DECISIONI (Andrea).
+- Ordinando per convenienza vale SOLO la convenienza, per tutti,
+  Barattozon compreso: il metro è `premioCardP2P`, lo stesso numero che
+  la card scrive (il premio a mercato, la convenienza di adesso a sats
+  fissi). Il verso resta quello del tab, a parità il più recente.
+- Barattozon si distingue col marchio sulla card, mai con la posizione.
+- A cambio muto un prezzo fisso non ha un numero (`null`): va IN FONDO,
+  sotto quelli che ce l'hanno, coi suoi pari per data.
+- Gli altri tre criteri («Più recenti», il predefinito, e l'importo nei
+  due versi) il premio non lo guardano: lì Barattozon non era in cima
+  apposta, niente da decidere.
+- IL FILTRO PER PREMIO (`passaFiltroP2P`) prende lo stesso metro: aveva
+  lo stesso difetto (un Barattozon a +8 passava da un «fino a 5»). A
+  cambio muto un prezzo fisso NON si scarta: resta visibile, in fondo.
+- GLI ESTREMI DEL CURSORE DEL PREMIO SONO APERTI. Necessario col metro
+  nuovo: la convenienza vera non ha tetto («212%»), e col confronto
+  chiuso un filtro acceso per un'altra leva (valuta, metodo) col premio
+  lasciato tutto aperto avrebbe buttato fuori un prezzo fisso a +35.
+  Il capo in fondo al cursore vuol dire «nessun limite da questa parte».
+  Lo stesso vale per un premio a mercato oltre il ±20 scritto da un
+  altro client: prima, a filtro acceso, spariva.
+- Il commento di `renderP2P` diceva «predefinito: la convenienza»: il
+  predefinito è «Più recenti» dal settembre 2026, corretto.
+
+SCARTATO. Ordinare i prezzi fissi a parte (in cima o in fondo come
+blocco): sarebbe la posizione che distingue, cioè il difetto. Il null
+come zero: rimetterebbe un numero inventato in mezzo agli altri.
+
+PROVE (`prove_p2p_libro`, sul banco di `ordinaLibroP2P`). Col cambio del
+banco (0,0005 €/sat) un Barattozon a 92.000 sats per 50 € vale +8: nel
+tab Compra va fra il +5 e il +10 («xyBz»), ed è lo stesso «8% meno
+conveniente» del badge; a 104.000 (−4) sale in cima; nel tab Vendi un
+prezzo fisso a −8 va dopo il −2 e prima del −10; «Più recenti» non lo
+sposta; a cambio muto va in fondo coi pari per data, nei due versi, e il
+filtro non lo scarta. Il filtro: +8 fuori da «fino a 5», dentro «da 6 a
+10»; +35 e −30 restano a cursore aperto e cadono a cursore stretto; lo
+stesso per un premio a mercato a 25. Due sentinelle sul codice (nessun
+`premium` nudo nei due giudici). LE ROTTURE APPOSTA, una alla volta sul
+file, ognuna ROSSA: il metro nudo nell'ordinamento (4 rosse), il premio
+nudo nel filtro (3), gli estremi chiusi (2), il muto in mezzo agli altri
+(1), il filtro che scarta il muto (1).
+DAL VIVO: server di collaudo nella gabbia dei collaudi (database
+usa-e-getta, relay del P2P, specchio e relay Nostr a `ws://127.0.0.1:9`,
+nsec segnaposto), Chromium a 360 px, chiaro e scuro, il libro posato
+nella pagina col cambio a 0,0005 €/sat; PRIMA col client di
+origin/develop (Barattozon all'8% in cima nel tab Compra, il prezzo
+fisso a −8 secondo nel tab Vendi), DOPO al loro posto nei due tab;
+nessuno scorrimento orizzontale; il browser ha bussato fuori solo per
+lo script di Telegram, fermato. Suite e collaudi: nel messaggio del
+commit.
+
+COSA RESTA. Niente di aperto da questo cantiere.
