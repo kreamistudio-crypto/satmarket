@@ -33784,7 +33784,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'importo `>= rec.onchainAmount`. Il server: `SWAP_MEMPOOL_API`,
   `SWAP_MEMPOOL_DI_SERIE`, `swap_mempool_api(rete, esplicita)`, la chiave
   `mempool` in ogni voce di `swap_fornitori()`, l'origine nella CSP solo
-  a swap acceso. Il bundle è boltz-core al commit `a932d49c` (la #196).
+  a swap acceso. Il bundle è boltz-core 5.0.0 di npm (dal 20 ott 2026,
+  cantiere swap-bundle-500: per qualche ora è stato il commit `a932d49c`
+  della #196): la difesa sullo script è SOLO il nostro confronto in
+  `swapRitiro`, provata da sola in `prove_swap_telefono`.
   Il cartone: `/esplora/tx/<id>/hex`, i modi `lockup_altro_script`,
   `lockup_meno`, `lockup_fantasma`, e `firme`/`tentate` in `/cartone/visto`.
 - LO SWAP, IL RITIRO SENZA LA LORO API (20 ott 2026, cantiere

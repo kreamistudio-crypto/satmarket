@@ -126,9 +126,11 @@ function swapVerifica(S, rete, r, chiavi, attesa){
    un fornitore che mente se lo farebbe dare senza aver bloccato davvero
    i bitcoin. Quindi: (1) l'uscita del lockup e' ESATTAMENTE quella dello
    script atteso — il p2tr della chiave MuSig con l'albero — e non una
-   delle altre tre forme che `detectSwap` della 5.0.0 accettava (la
-   correzione di boltz-core #196, che il bundle ora porta, e in piu' il
-   nostro confronto: le due difese si sommano); (2) l'importo non e' meno
+   delle altre tre forme che `detectSwap` della 5.0.0 accetta. La difesa
+   e' il NOSTRO confronto, e basta da sola: dal 20 ott 2026 (cantiere
+   swap-bundle-500, consiglio di Massimo) il bundle e' di nuovo la 5.0.0 di
+   npm, che ignora il terzo argomento di `detectSwap`; lo passiamo lo
+   stesso, per un bundle che un giorno porti la #196; (2) l'importo non e' meno
    di quello promesso alla nascita (`rec.onchainAmount`). Il terzo
    controllo — il lockup esiste davvero sulla rete — lo fa `ritira`,
    prima di arrivare qui. */

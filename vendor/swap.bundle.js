@@ -10781,7 +10781,7 @@ zoo`.split("\n"));
     }
   };
 
-  // boltz-core/lib/TargetFee.ts
+  // node_modules/boltz-core/dist/lib/TargetFee.js
   var targetFee = (satPerVbyte, constructTx, discountCT = false) => {
     const tx = constructTx(BigInt(1));
     const isITransaction = "ins" in tx;
@@ -10790,19 +10790,19 @@ zoo`.split("\n"));
     return constructTx(BigInt(Math.ceil((vsize + inputsLength) * satPerVbyte)));
   };
 
-  // boltz-core/lib/consts/Enums.ts
-  var OutputType = /* @__PURE__ */ ((OutputType2) => {
+  // node_modules/boltz-core/dist/lib/consts/Enums.js
+  var OutputType;
+  (function(OutputType2) {
     OutputType2[OutputType2["Bech32"] = 0] = "Bech32";
     OutputType2[OutputType2["Compatibility"] = 1] = "Compatibility";
     OutputType2[OutputType2["Legacy"] = 2] = "Legacy";
     OutputType2[OutputType2["Taproot"] = 3] = "Taproot";
-    return OutputType2;
-  })(OutputType || {});
+  })(OutputType || (OutputType = {}));
 
-  // boltz-core/lib/consts/Types.ts
+  // node_modules/boltz-core/dist/lib/consts/Types.js
   var isSwapTree = (tree) => "claimLeaf" in tree;
 
-  // boltz-core/lib/musig/Musig.ts
+  // node_modules/boltz-core/dist/lib/musig/Musig.js
   var Musig_exports = {};
   __export(Musig_exports, {
     MusigKeyAgg: () => MusigKeyAgg,
@@ -11167,7 +11167,7 @@ zoo`.split("\n"));
     }
   };
 
-  // boltz-core/lib/musig/Musig.ts
+  // node_modules/boltz-core/dist/lib/musig/Musig.js
   var assertParticipantIndex = (index, length) => {
     if (!Number.isInteger(index) || index < 0 || index >= length) {
       throw new Error("index out of range");
@@ -11208,21 +11208,20 @@ zoo`.split("\n"));
     }
     const index = findKeyIndex(publicKeys, publicKeyOrIndex);
     if (index === -1) {
-      throw new Error(
-        `could not find index of public key ${hex.encode(publicKeyOrIndex)}`
-      );
+      throw new Error(`could not find index of public key ${hex.encode(publicKeyOrIndex)}`);
     }
     return assertParticipantIndex(index, publicKeys.length);
   };
   var MusigBase = class {
     constructor(state) {
-      __publicField(this, "state", state);
+      __publicField(this, "state");
       __publicField(this, "hasPublicKey", (publicKey) => {
         return findKeyIndex(this.state.publicKeys, publicKey) !== -1;
       });
       __publicField(this, "indexOfPublicKey", (publicKey) => {
         return indexOfPublicKeyOrIndex(this.state.publicKeys, publicKey);
       });
+      this.state = state;
     }
     get aggPubkey() {
       return this.state.aggPubkey;
@@ -11260,24 +11259,14 @@ zoo`.split("\n"));
     constructor() {
       super(...arguments);
       __publicField(this, "verifyPartial", (publicKeyOrIndex, signature) => {
-        const index = indexOfPublicKeyOrIndex(
-          this.state.publicKeys,
-          publicKeyOrIndex
-        );
-        return this.state.session.partialSigVerify(
-          signature,
-          Array.from(this.state.pubNonces),
-          index
-        );
+        const index = indexOfPublicKeyOrIndex(this.state.publicKeys, publicKeyOrIndex);
+        return this.state.session.partialSigVerify(signature, Array.from(this.state.pubNonces), index);
       });
       __publicField(this, "addPartial", (publicKeyOrIndex, signature) => {
         if (!this.verifyPartial(publicKeyOrIndex, signature)) {
           throw new Error("invalid partial signature");
         }
-        const index = indexOfPublicKeyOrIndex(
-          this.state.publicKeys,
-          publicKeyOrIndex
-        );
+        const index = indexOfPublicKeyOrIndex(this.state.publicKeys, publicKeyOrIndex);
         this.state.partialSignatures[index] = signature;
         return this;
       });
@@ -11316,12 +11305,7 @@ zoo`.split("\n"));
     constructor() {
       super(...arguments);
       __publicField(this, "generateNonce", () => {
-        const nonce = nonceGen(
-          this.state.myPublicKey,
-          this.state.privateKey,
-          this.state.aggPubkey,
-          this.state.msg
-        );
+        const nonce = nonceGen(this.state.myPublicKey, this.state.privateKey, this.state.aggPubkey, this.state.msg);
         return new MusigWithNonce({ ...this.state, nonce });
       });
     }
@@ -11331,15 +11315,11 @@ zoo`.split("\n"));
       super(...arguments);
       __publicField(this, "aggregateNonces", (nonces) => {
         const noncesToUse = Array.from(nonces);
-        const ourNonceEntry = noncesToUse.find(
-          ([keyCmp]) => equalBytes3(this.state.myPublicKey, keyCmp)
-        );
+        const ourNonceEntry = noncesToUse.find(([keyCmp]) => equalBytes3(this.state.myPublicKey, keyCmp));
         if (ourNonceEntry === void 0) {
           noncesToUse.push([this.state.myPublicKey, this.publicNonce]);
         } else if (!equalBytes3(ourNonceEntry[1], this.publicNonce)) {
-          throw new Error(
-            "nonce for our public key does not match our generated nonce"
-          );
+          throw new Error("nonce for our public key does not match our generated nonce");
         }
         if (this.state.publicKeys.length !== noncesToUse.length) {
           throw new Error("number of nonces != number of public keys");
@@ -11356,9 +11336,7 @@ zoo`.split("\n"));
         for (const key of this.state.publicKeys) {
           const nonce = nonceByKey.get(hex.encode(key));
           if (nonce === void 0) {
-            throw new Error(
-              `could not find nonce for public key ${hex.encode(key)}`
-            );
+            throw new Error(`could not find nonce for public key ${hex.encode(key)}`);
           }
           ordered.push(nonce);
         }
@@ -11384,13 +11362,7 @@ zoo`.split("\n"));
     constructor() {
       super(...arguments);
       __publicField(this, "initializeSession", () => {
-        const session = new Session(
-          this.state.aggregatedNonce,
-          Array.from(this.state.publicKeys),
-          this.state.msg,
-          this.state.tweak ? [this.state.tweak] : [],
-          this.state.tweak ? [true] : []
-        );
+        const session = new Session(this.state.aggregatedNonce, Array.from(this.state.publicKeys), this.state.msg, this.state.tweak ? [this.state.tweak] : [], this.state.tweak ? [true] : []);
         return new MusigSession({
           ...this.state,
           session,
@@ -11403,11 +11375,7 @@ zoo`.split("\n"));
     constructor() {
       super(...arguments);
       __publicField(this, "signPartial", () => {
-        const sig = this.state.session.sign(
-          this.state.nonce.secret,
-          this.state.privateKey,
-          true
-        );
+        const sig = this.state.session.sign(this.state.nonce.secret, this.state.privateKey, true);
         const partialSignatures = [...this.state.partialSignatures];
         partialSignatures[this.state.myIndex] = sig;
         return new MusigSigned({
@@ -11431,9 +11399,7 @@ zoo`.split("\n"));
   };
   var aggregateKeys = (publicKeys, tweak) => {
     assertPublicKeys(publicKeys);
-    return keyAggExport(
-      keyAggregate([...publicKeys], tweak ? [tweak] : [], tweak ? [true] : [])
-    );
+    return keyAggExport(keyAggregate([...publicKeys], tweak ? [tweak] : [], tweak ? [true] : []));
   };
   var create = (privateKey, publicKeys) => {
     if (publicKeys.length < 2) {
@@ -11456,7 +11422,7 @@ zoo`.split("\n"));
     });
   };
 
-  // boltz-core/lib/swap/Bip69.ts
+  // node_modules/boltz-core/dist/lib/swap/Bip69.js
   var compareTxids = (a, b) => {
     const da = hex.decode(a);
     const db = hex.decode(b);
@@ -11469,12 +11435,12 @@ zoo`.split("\n"));
   };
   var compareInputs = (a, b) => compareTxids(a.transactionId, b.transactionId) || a.vout - b.vout;
 
-  // boltz-core/lib/consts/Errors.ts
+  // node_modules/boltz-core/dist/lib/consts/Errors.js
   var Errors = {
     claimRequiresClaimLeaf: "claim requires a swap tree with claim leaf"
   };
 
-  // boltz-core/lib/swap/TaprootUtils.ts
+  // node_modules/boltz-core/dist/lib/swap/TaprootUtils.js
   var TaprootUtils_exports = {};
   __export(TaprootUtils_exports, {
     TAP_LEAF_VERSION_LIQUID: () => TAP_LEAF_VERSION_LIQUID,
@@ -11492,9 +11458,7 @@ zoo`.split("\n"));
   var swapLeafsToTree = (claimLeaf, refundLeaf) => [claimLeaf, refundLeaf];
   var createControlBlock = (hashTree, leaf, internalKey) => {
     const paths = taprootAddPath(hashTree);
-    const path = taprootWalkTree(paths).find(
-      (path2) => equalBytes3(path2.script, leaf.output)
-    );
+    const path = taprootWalkTree(paths).find((path2) => equalBytes3(path2.script, leaf.output));
     if (path === void 0) {
       throw Error("leaf not in tree");
     }
@@ -11511,9 +11475,7 @@ zoo`.split("\n"));
   });
   var tweakMusig = (musig, tree) => {
     const tweak = taprootHashTree(tree).hash;
-    return musig.xonlyTweakAdd(
-      schnorr.utils.taggedHash("TapTweak", musig.aggPubkey, tweak)
-    );
+    return musig.xonlyTweakAdd(schnorr.utils.taggedHash("TapTweak", musig.aggPubkey, tweak));
   };
   var taprootHashTree = (tree) => {
     if (!Array.isArray(tree)) {
@@ -11527,7 +11489,8 @@ zoo`.split("\n"));
     const left = taprootHashTree(tree[0]);
     const right = taprootHashTree(tree[1]);
     let [lH, rH] = [left.hash, right.hash];
-    if (compareBytes(rH, lH) === -1) [lH, rH] = [rH, lH];
+    if (compareBytes(rH, lH) === -1)
+      [lH, rH] = [rH, lH];
     return {
       type: "branch",
       left,
@@ -11553,12 +11516,12 @@ zoo`.split("\n"));
     return [...taprootWalkTree(tree.left), ...taprootWalkTree(tree.right)];
   };
 
-  // boltz-core/lib/swap/Claim.ts
+  // node_modules/boltz-core/dist/lib/swap/Claim.js
   var LEGACY_SIGHASH = SigHash.ALL;
   var DUMMY_TAPROOT_SIGNATURE = new Uint8Array(64);
-  var isRelevantTaprootOutput = (utxo) => utxo.type === 3 /* Taproot */ && utxo.cooperative !== true;
+  var isRelevantTaprootOutput = (utxo) => utxo.type === OutputType.Taproot && utxo.cooperative !== true;
   var validateInputs = (utxos) => {
-    if (utxos.filter((utxo) => utxo.type !== 3 /* Taproot */).some((utxo) => utxo.redeemScript === void 0)) {
+    if (utxos.filter((utxo) => utxo.type !== OutputType.Taproot).some((utxo) => utxo.redeemScript === void 0)) {
       throw new Error("not all non Taproot inputs have a redeem script");
     }
     const relevantTaprootOutputs = utxos.filter(isRelevantTaprootOutput);
@@ -11583,10 +11546,7 @@ zoo`.split("\n"));
       version: 2,
       lockTime: timeoutBlockHeight
     });
-    const inputSum = sortedUtxos.reduce(
-      (acc, utxo) => acc + utxo.amount,
-      BigInt(0)
-    );
+    const inputSum = sortedUtxos.reduce((acc, utxo) => acc + utxo.amount, BigInt(0));
     tx.addOutput({
       amount: inputSum - fee,
       script: destinationScript
@@ -11600,12 +11560,8 @@ zoo`.split("\n"));
     }
     for (const [index, utxo] of sortedUtxos.entries()) {
       switch (utxo.type) {
-        case 2 /* Legacy */: {
-          const hash = tx["preimageLegacy"](
-            index,
-            utxo.redeemScript,
-            LEGACY_SIGHASH
-          );
+        case OutputType.Legacy: {
+          const hash = tx["preimageLegacy"](index, utxo.redeemScript, LEGACY_SIGHASH);
           tx.updateInput(index, {
             finalScriptSig: Script.encode([
               signLegacy(hash, utxo.privateKey),
@@ -11615,7 +11571,7 @@ zoo`.split("\n"));
           });
           break;
         }
-        case 1 /* Compatibility */: {
+        case OutputType.Compatibility: {
           tx.updateInput(index, {
             finalScriptSig: Script.encode([
               Script.encode(["OP_0", sha256(utxo.redeemScript)])
@@ -11624,7 +11580,7 @@ zoo`.split("\n"));
           break;
         }
       }
-      if (utxo.type === 3 /* Taproot */) {
+      if (utxo.type === OutputType.Taproot) {
         if (utxo.cooperative === true) {
           tx.updateInput(index, {
             finalScriptWitness: [DUMMY_TAPROOT_SIGNATURE]
@@ -11635,38 +11591,19 @@ zoo`.split("\n"));
           throw new Error("swap tree or internal key is undefined");
         }
         const tapLeaf = getTapLeaf(isRefund, utxo.swapTree);
-        const sigHash = tx.preimageWitnessV1(
-          index,
-          sortedUtxos.map((out) => out.script),
-          SigHash.DEFAULT,
-          sortedUtxos.map((out) => out.amount),
-          void 0,
-          tapLeaf.output,
-          tapLeaf.version
-        );
+        const sigHash = tx.preimageWitnessV1(index, sortedUtxos.map((out) => out.script), SigHash.DEFAULT, sortedUtxos.map((out) => out.amount), void 0, tapLeaf.output, tapLeaf.version);
         const signature = signSchnorr(sigHash, utxo.privateKey);
         const witness = [signature];
         if (!isRefund) {
           witness.push(utxo.preimage);
         }
         witness.push(tapLeaf.output);
-        witness.push(
-          createControlBlock(
-            taprootHashTree(utxo.swapTree.tree),
-            tapLeaf,
-            utxo.internalKey
-          )
-        );
+        witness.push(createControlBlock(taprootHashTree(utxo.swapTree.tree), tapLeaf, utxo.internalKey));
         tx.updateInput(index, {
           finalScriptWitness: witness
         });
-      } else if (utxo.type === 0 /* Bech32 */ || utxo.type === 1 /* Compatibility */) {
-        const sigHash = tx.preimageWitnessV0(
-          index,
-          utxo.redeemScript,
-          LEGACY_SIGHASH,
-          utxo.amount
-        );
+      } else if (utxo.type === OutputType.Bech32 || utxo.type === OutputType.Compatibility) {
+        const sigHash = tx.preimageWitnessV0(index, utxo.redeemScript, LEGACY_SIGHASH, utxo.amount);
         tx.updateInput(index, {
           finalScriptWitness: [
             signLegacy(sigHash, utxo.privateKey),
@@ -11679,16 +11616,13 @@ zoo`.split("\n"));
     return tx;
   };
   var signLegacy = (hash, privateKey) => {
-    return concatBytes(
-      signECDSA(hash, privateKey, true),
-      new Uint8Array([LEGACY_SIGHASH])
-    );
+    return concatBytes(signECDSA(hash, privateKey, true), new Uint8Array([LEGACY_SIGHASH]));
   };
 
-  // boltz-core/lib/swap/Refund.ts
+  // node_modules/boltz-core/dist/lib/swap/Refund.js
   var dummyPreimage = new Uint8Array(0);
 
-  // boltz-core/lib/swap/SwapTree.ts
+  // node_modules/boltz-core/dist/lib/swap/SwapTree.js
   var createRefundLeaf = (isLiquid, refundPublicKey, timeoutBlockHeight) => createLeaf(isLiquid, [
     toXOnly(refundPublicKey),
     "CHECKSIGVERIFY",
@@ -11696,7 +11630,7 @@ zoo`.split("\n"));
     "CHECKLOCKTIMEVERIFY"
   ]);
 
-  // boltz-core/lib/swap/ReverseSwapTree.ts
+  // node_modules/boltz-core/dist/lib/swap/ReverseSwapTree.js
   var reverseSwapTree = (isLiquid, preimageHash, claimPublicKey, refundPublicKey, timeoutBlockHeight) => {
     const claimLeaf = createLeaf(isLiquid, [
       "SIZE",
@@ -11708,11 +11642,7 @@ zoo`.split("\n"));
       toXOnly(claimPublicKey),
       "CHECKSIG"
     ]);
-    const refundLeaf = createRefundLeaf(
-      isLiquid,
-      refundPublicKey,
-      timeoutBlockHeight
-    );
+    const refundLeaf = createRefundLeaf(isLiquid, refundPublicKey, timeoutBlockHeight);
     return {
       claimLeaf,
       refundLeaf,
@@ -11721,7 +11651,7 @@ zoo`.split("\n"));
   };
   var ReverseSwapTree_default = reverseSwapTree;
 
-  // boltz-core/lib/swap/Scripts.ts
+  // node_modules/boltz-core/dist/lib/swap/Scripts.js
   var Scripts_exports = {};
   __export(Scripts_exports, {
     outputFunctionForType: () => outputFunctionForType,
@@ -11761,40 +11691,27 @@ zoo`.split("\n"));
   };
   var outputFunctionForType = (type) => {
     switch (type) {
-      case 3 /* Taproot */:
+      case OutputType.Taproot:
         return p2trOutput;
-      case 0 /* Bech32 */:
+      case OutputType.Bech32:
         return p2wshOutput;
-      case 1 /* Compatibility */:
+      case OutputType.Compatibility:
         return p2shP2wshOutput;
-      case 2 /* Legacy */:
+      case OutputType.Legacy:
         return p2shOutput;
     }
   };
 
-  // boltz-core/lib/swap/SwapDetector.ts
-  var scriptForType = {
-    [2 /* Legacy */]: p2shOutput,
-    [1 /* Compatibility */]: p2shP2wshOutput,
-    [0 /* Bech32 */]: p2wshOutput,
-    [3 /* Taproot */]: p2trOutput
-  };
-  var detectSwap = (redeemScriptOrTweakedKey, transaction, expectedOutput) => {
+  // node_modules/boltz-core/dist/lib/swap/SwapDetector.js
+  var detectSwap = (redeemScriptOrTweakedKey, transaction) => {
     const scripts = [
-      2 /* Legacy */,
-      1 /* Compatibility */,
-      0 /* Bech32 */,
-      3 /* Taproot */
-    ].map((type) => [
-      type,
-      scriptForType[type](redeemScriptOrTweakedKey)
-    ]).filter(
-      ([type, script]) => typeof expectedOutput === "number" ? type === expectedOutput : equalBytes3(script, expectedOutput)
-    );
+      [OutputType.Legacy, p2shOutput(redeemScriptOrTweakedKey)],
+      [OutputType.Compatibility, p2shP2wshOutput(redeemScriptOrTweakedKey)],
+      [OutputType.Bech32, p2wshOutput(redeemScriptOrTweakedKey)],
+      [OutputType.Taproot, p2trOutput(redeemScriptOrTweakedKey)]
+    ];
     const findMatch = (vout, output) => {
-      const scriptMatch = scripts.find(
-        ([, script]) => output.script !== void 0 && equalBytes3(script, output.script)
-      );
+      const scriptMatch = scripts.find(([, script]) => output.script !== void 0 && equalBytes3(script, output.script));
       if (scriptMatch) {
         return {
           ...output,
@@ -11822,7 +11739,7 @@ zoo`.split("\n"));
     return void 0;
   };
 
-  // boltz-core/lib/swap/SwapTreeCompare.ts
+  // node_modules/boltz-core/dist/lib/swap/SwapTreeCompare.js
   var compareLeaf = (leaf, compareLeaf2) => leaf.version === compareLeaf2.version && equalBytes3(leaf.output, compareLeaf2.output);
   var compareTree = (tree, compare) => {
     if (Array.isArray(tree) !== Array.isArray(compare)) {
@@ -11836,7 +11753,7 @@ zoo`.split("\n"));
   };
   var compareTrees = (tree, compare) => compareTree(tree.tree, compare.tree);
 
-  // boltz-core/lib/swap/SwapTreeSerializer.ts
+  // node_modules/boltz-core/dist/lib/swap/SwapTreeSerializer.js
   var SwapTreeSerializer_exports = {};
   __export(SwapTreeSerializer_exports, {
     deserializeFundingAddressTree: () => deserializeFundingAddressTree,
@@ -11845,7 +11762,7 @@ zoo`.split("\n"));
     serializeSwapTree: () => serializeSwapTree
   });
 
-  // boltz-core/lib/swap/TreeSort.ts
+  // node_modules/boltz-core/dist/lib/swap/TreeSort.js
   var subSortTree = (nodes) => {
     if (nodes.length === 1) {
       return nodes[0].value;
@@ -11894,7 +11811,7 @@ zoo`.split("\n"));
     ];
   };
 
-  // boltz-core/lib/swap/SwapTreeSerializer.ts
+  // node_modules/boltz-core/dist/lib/swap/SwapTreeSerializer.js
   var serializeLeaf = (leaf) => ({
     version: leaf.version,
     output: hex.encode(leaf.output)

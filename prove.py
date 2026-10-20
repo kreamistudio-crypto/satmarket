@@ -60045,11 +60045,13 @@ EXPORT_SWAP = [
     "generateMnemonic", "hex", "mnemonicToSeedSync", "reverseSwapTree",
     "sha256", "targetFee", "validateMnemonic", "wordlist",
 ]
-# (20 ott 2026, cantiere swap-lockup) rifatto da boltz-core al commit
-# a932d49c (la PR #196, mai uscita su npm): ricetta in vendor/swap-LICENZE.md,
-# due costruzioni in cartelle nuove, la stessa impronta
-IMPRONTA_SWAP = ("02b4184eff3d8a499ac2597059c9c01a"
-                 "d1b107234629e4a339ea83ade8370bd0")
+# boltz-core 5.0.0 di npm. (20 ott 2026: per qualche ora e' stato il
+# commit della #196, cantiere swap-lockup; tornato alla 5.0.0 nel cantiere
+# swap-bundle-500, su consiglio di Massimo: il perche' in
+# vendor/swap-LICENZE.md. Ricostruito da npm in una cartella nuova: la
+# stessa impronta della tappa 3.)
+IMPRONTA_SWAP = ("46306e34468e1647a42507221b40aa05"
+                 "a96623ecd28039e00b31ee17ff31ad99")
 VETTORE_SWAP_XPUB = ("xpub661MyMwAqRbcG5eD5Hh9EddaCEik4rxpJA1RDEsxjujXzGsJDg4kT7EX"
                      "C8GPM4ZZLVCoNA8fArGbjqKmo6M6khKTaTmYBJNTQXCFrejsgCi")
 VETTORE_SWAP_PRIV = ("cb9774710e1d1eaa747a38fff23b20cb"
@@ -176241,17 +176243,18 @@ def prove_swap_telefono():
           EXPORT_SWAP, sorted(re.findall(r"^\s{4}(\w+): \(\) =>", blocco, re.M)))
     prova("swap: un IIFE con un nome solo, non minimizzato", (True, True),
           (testo.startswith("var BarattoloSwap = (() => {"),
-           "// boltz-core/lib/swap/SwapDetector.ts" in testo))
+           "// node_modules/boltz-core/" in testo))
     lic = open(os.path.join("vendor", "swap-LICENZE.md"), encoding="utf-8").read()
     prova("swap: la ricetta per rifarlo e le licenze stanno accanto",
           (True, True, True),
           ("esbuild ingresso.mjs --bundle" in lic,
-           "a932d49c4daaeae3d7940dc1519bf77ef92e6dc1" in lic, "MIT" in lic))
-    # (20 ott 2026, cantiere swap-lockup) la correzione #196 c'e' davvero
-    # nella parte che usiamo: `detectSwap` lega l'uscita a quella attesa
-    # (`detectPreimage` non lo esportiamo, ed esbuild lo toglie)
-    prova("swap: il bundle porta la correzione di boltz-core #196", (True, True),
-          ("expectedOutput" in testo, "scriptForType" in testo))
+           "boltz-core@5.0.0" in lic, "MIT" in lic))
+    # (20 ott 2026, cantiere swap-bundle-500) la 5.0.0 di npm: `detectSwap`
+    # accetta quattro forme d'uscita, e la difesa sullo script e' SOLO la
+    # nostra (in `swapRitiro`); il banco in node qui sotto la prova da sola
+    prova("swap: il bundle e' la 5.0.0 di npm, senza la #196", (False, False, True),
+          ("expectedOutput" in testo, "scriptForType" in testo,
+           "var detectSwap = (redeemScriptOrTweakedKey, transaction) => {" in testo))
     attr = open(".gitattributes", encoding="utf-8").read()
     prova("swap: il bundle esce LF anche su Windows (l'impronta e' dei byte)",
           True, "\nvendor/swap.bundle.js text eol=lf" in attr)
@@ -176477,6 +176480,21 @@ ctx.__no = async () => { throw new Error('not eligible'); };
   };
   out.coop = await tira(ctx.__firma);
   out.script = await tira(ctx.__no);
+  /* (20 ott 2026, swap-bundle-500) LA DIFESA NOSTRA, DA SOLA: un lockup
+     che paga la stessa chiave in un'uscita p2sh. Il `detectSwap` della
+     5.0.0 lo accetta; `swapRitiro` no, e non chiede nessuna firma */
+  const lf = new S.Transaction({allowUnknownInputs: true, allowUnknownOutputs: true});
+  lf.addInput({txid: S.sha256(new TextEncoder().encode('lockup altro script')), index: 0});
+  lf.addOutput({script: S.Scripts.p2shOutput(agg.aggPubkey), amount: 47388n});
+  ctx.__lf = h.encode(lf.unsignedTx);
+  let chieste = 0;
+  ctx.__spia = async () => { chieste++; throw new Error('spia'); };
+  out.altroScript = {
+    bundle: S.detectSwap(agg.aggPubkey, S.Transaction.fromRaw(lf.unsignedTx,
+      {allowUnknownInputs: true, allowUnknownOutputs: true})) !== undefined,
+    telefono: await run('swapRitiro(__S, __S.NETWORK, __rec, __k, __lf, __dest, 47154, __spia)')
+      .then(() => 'passato', e => String(e && e.message)),
+    chieste: chieste};
   console.log(JSON.stringify(out));
 })().catch(e => { console.error(String(e && e.stack || e)); process.exit(1); });
 """
@@ -176514,6 +176532,10 @@ ctx.__no = async () => { throw new Error('not eligible'); };
     prova("swap: dallo script, quattro pezzi col segreto, la firma regge",
           (False, 4, 47154, True, True),
           (sc.get("cooperativo"), sc.get("pezzi"), sc.get("uscita"), sc.get("segreto"), giudica(sc)))
+    # (20 ott 2026, swap-bundle-500) la difesa sullo script e' solo nostra
+    prova("swap: un lockup p2sh della stessa chiave: la 5.0.0 lo accetta, il telefono no, nessuna firma chiesta",
+          {"bundle": True, "telefono": "nel lockup non c'e' il nostro swap", "chieste": 0},
+          r.get("altroScript"))
     if co.get("firma"):
         rotta = bytearray(bytes.fromhex(co["firma"]))
         rotta[7] ^= 1
