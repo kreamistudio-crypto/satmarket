@@ -1,0 +1,30 @@
+# LE DIPENDENZE PYTHON DEL SERVER (20 ott 2026, cantiere onchain-tappa2,
+# richiesta di Andrea: «embit va nella lista delle dipendenze del
+# progetto»). Prima di oggi una lista non c'era: i pacchetti stavano
+# scritti nel venv del collaudo (docs/COLLAUDO.md, «Le macchine e i
+# pezzi»), nelle procedure di PRODUZIONE e nelle righe pip della CI.
+#
+# CHI LA LEGGE:
+# - il COLLAUDO, da solo: `deploy/collaudo/segui.sh` la installa nel venv
+#   PRIMA di mettere su un commit che la cambia (pip install -r, senza -U:
+#   un pacchetto gia' presente non si aggiorna);
+# - la CI: embit lo prende da qui, con la sua versione (prove.yml);
+# - la PRODUZIONE NO: sul VPS si installa a mano, PRIMA della promozione,
+#   con la procedura di docs/PRODUZIONE.md — un deploy non installa
+#   niente da solo.
+#
+# Solo `embit` ha la versione inchiodata: e' quella che fa i conti degli
+# indirizzi on-chain, e la prova doppia (prove_indirizzo_ordine_onchain)
+# e' girata su questa. Gli altri sono quelli che il server importa, e
+# senza versione per non spostare niente di quel che gira gia'.
+fastapi
+uvicorn
+httpx
+anthropic
+websocket-client
+pillow
+pillow-heif
+cryptography
+snowballstemmer
+coincurve
+embit==0.8.0

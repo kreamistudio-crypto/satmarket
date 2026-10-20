@@ -29,6 +29,13 @@ PRIMA che arrivino in produzione. È privata: chi non è in
 - Il collaudo, entro un minuto, mette su la punta di `develop` (anche
   un commit non firmato) e la riavvia. Se non regge torna da solo al
   commit di prima e lo dice nel bot di prova.
+- **Le dipendenze arrivano da sole** (dal 20 ott 2026): se il commit
+  nuovo cambia `requirements.txt`, il seguace la installa nel venv
+  (`pip install -r`, senza `-U`, come il padrone del venv) PRIMA di
+  mettere su il codice. Se pip non ce la fa resta sul commit di prima
+  senza bocciarlo, lo dice una volta nel bot («📦 Collaudo: le
+  dipendenze di … non si installano») e riprova ogni minuto. Niente
+  `pip install` a mano sulla VM.
 - Andrea prova dal telefono. Quando approva, **una sessione sul suo PC
   fa la promozione**: rebase dei commit di `develop` su `main`,
   rifirma con `andrea-firma-barattolo`, **un solo push** su `main`
@@ -66,7 +73,7 @@ Il journal: `journalctl -u barattolo-collaudo -n 50` (il server),
 |---|---|
 | L'utente | `collaudo` (di sistema, senza login), casa `/srv/collaudo` |
 | Il codice | `/srv/collaudo/barattolo` (clone con tutti i rami) |
-| Python | `/srv/collaudo/venv` (fastapi, uvicorn, httpx, anthropic, websocket-client, pillow, pillow-heif, cryptography, snowballstemmer, coincurve 21: la 19 non ha la ruota per il Python 3.13 della VM) |
+| Python | `/srv/collaudo/venv` (fastapi, uvicorn, httpx, anthropic, websocket-client, pillow, pillow-heif, cryptography, snowballstemmer, coincurve 21: la 19 non ha la ruota per il Python 3.13 della VM). Dal 20 ott 2026 la lista è `requirements.txt` e la installa il seguace (embit compreso); l'ultima installata è in `/srv/collaudo/stato/requisiti` (la sua impronta) |
 | Il config | `/srv/collaudo/barattolo/config.py`, root:collaudo 640, scritto DALLA sezione «L'istanza di prova» di `config_esempio.py`, mai copiato dal VPS |
 | I segreti | `/etc/barattolo-collaudo/` (root:collaudo 750): `bot_token` (il bot di prova), `avvisi_chat` (a chi il seguace scrive) |
 | Il servizio | `barattolo-collaudo.service` su 127.0.0.1:8090 (`deploy/collaudo/`) |
@@ -79,7 +86,9 @@ Il journal: `journalctl -u barattolo-collaudo -n 50` (il server),
 
 Il seguace e il comando si posano a mano dal clone: una versione nuova
 di `segui.sh` non entra da sola (il giudice non si riscrive col commit
-che tira, come `deploy.sh`):
+che tira, come `deploy.sh`). ⚠️ Quella del 20 ott 2026 (le dipendenze
+prima del codice) va posata una volta: finché gira la vecchia, embit
+non arriva e il foglio on-chain dice «manca embit» (il resto vive):
 
 ```bash
 sudo install -m 755 /srv/collaudo/barattolo/deploy/collaudo/segui.sh /usr/local/sbin/collaudo-segui

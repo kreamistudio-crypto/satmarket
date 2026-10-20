@@ -22,6 +22,16 @@
 # che non si riprova finche' il ramo non va oltre. Una riga al bot di
 # prova, se in /etc/barattolo-collaudo c'e' a chi mandarla.
 #
+# LE DIPENDENZE PRIMA DEL CODICE (20 ott 2026, cantiere onchain-tappa2,
+# richiesta di Andrea: «sul collaudo si installa da solo col venv a ogni
+# aggiornamento»). Se il commit nuovo porta un `requirements.txt` diverso
+# dall'ultimo installato, il seguace lo installa nel venv PRIMA del
+# checkout, letto dal commit (git show) e non dalla cartella: se pip non
+# ce la fa (la rete, un pacchetto sparito) non e' colpa del commit, quindi
+# si resta sul codice di prima SENZA timbrare il bocciato e si riprova al
+# giro dopo, con una riga al bot sola per commit. pip gira come il
+# PADRONE del venv (chi l'ha fatto: i file nuovi restano suoi), senza -U.
+#
 # Le variabili COLLAUDO_* servono SOLO alle prove di prove.py, che fanno
 # girare questo script su un repo finto. Sulla VM non si impostano mai.
 set -uo pipefail
@@ -52,6 +62,13 @@ avvisa() {
            --data-urlencode "text=$1" > /dev/null || true
 }
 git_() { "${COME[@]}" git -C "$DIR" "$@"; }
+# pip: il padrone del venv (bin/python sta in <venv>/bin), o quel che
+# dicono le prove
+if [ -n "${COLLAUDO_PIP+x}" ]; then
+  read -r -a PIP <<< "$COLLAUDO_PIP"
+else
+  PIP=(runuser -u "$(stat -c %U "$(dirname "$(dirname "$PY")")")" -- "$PY" -m pip)
+fi
 
 mkdir -p "$STATO"
 [ -e "$STATO/pausa" ] && exit 0
@@ -65,8 +82,43 @@ git_ fetch -q --prune origin 2> /dev/null || { dillo "fetch non riuscito: riprov
 LA="$(git_ rev-parse --verify -q "refs/remotes/origin/$RAMO^{commit}")" \
   || { dillo "il ramo $RAMO non c'e' su origin: resto dove sono"; exit 0; }
 QUI="$(git_ rev-parse HEAD)"
-[ "$LA" = "$QUI" ] && exit 0
 [ "$LA" = "$(cat "$STATO/bocciato" 2> /dev/null)" ] && exit 0
+
+# le dipendenze si guardano ANCHE in pari: un seguace posato dopo il
+# commit che le ha cambiate deve installarle lo stesso (e riavviare)
+NUOVE=0
+REQ="$(git_ show "$LA:requirements.txt" 2> /dev/null)" || REQ=""
+if [ -n "$REQ" ]; then
+  IMPRONTA="$(printf '%s\n' "$REQ" | sha256sum | cut -d' ' -f1)"
+  if [ "$IMPRONTA" != "$(cat "$STATO/requisiti" 2> /dev/null)" ]; then
+    LISTA="$(mktemp)"
+    printf '%s\n' "$REQ" > "$LISTA"
+    chmod 644 "$LISTA"
+    dillo "requirements.txt cambiato: lo installo nel venv"
+    if "${PIP[@]}" install -q --disable-pip-version-check -r "$LISTA"; then
+      echo "$IMPRONTA" > "$STATO/requisiti"
+      rm -f "$LISTA" "$STATO/pip_fallito"
+      NUOVE=1
+    else
+      rm -f "$LISTA"
+      dillo "pip non ce l'ha fatta: resto su ${QUI:0:8} e riprovo al giro dopo"
+      if [ "$LA" != "$(cat "$STATO/pip_fallito" 2> /dev/null)" ]; then
+        echo "$LA" > "$STATO/pip_fallito"
+        avvisa "📦 Collaudo: le dipendenze di ${LA:0:8} ($RAMO) non si installano, resto su ${QUI:0:8} e riprovo ogni minuto"
+      fi
+      exit 1
+    fi
+  fi
+fi
+if [ "$LA" = "$QUI" ]; then
+  # in pari: se sono arrivate dipendenze nuove il server le prende solo
+  # ripartendo (un import si fa all'avvio)
+  if [ "$NUOVE" = 1 ]; then
+    $RIAVVIA || true
+    dillo "dipendenze installate in pari: riavviato ${QUI:0:8}"
+  fi
+  exit 0
+fi
 
 dillo "aggiorno: ${QUI:0:8} → ${LA:0:8} ($RAMO)"
 # --force e' quello di checkout (i file tracciati tornano quelli del
