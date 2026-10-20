@@ -68751,3 +68751,62 @@ sopra 1.500 il giorno dopo).
 della CI (`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`) 92
 verdi, 0 rossi, `collaudo_turtle` compreso. Lo stesso commit va su
 develop con un cherry-pick.
+
+## Il collaudo privato davvero: chi non è in lista non vede niente (20 ott 2026, cantiere collaudo-privato, commit 1 di 4, richiesta di Andrea)
+
+**PERCHÉ.** La vm-2050 diventa il collaudo che segue `develop` (CANTIERI,
+«L'istanza di prova», i due giri del 19). Andrea: «chi non è in
+PROVA_SOLO_IDS non vede NIENTE (né annunci, né libro P2P, né profili),
+solo una pagina «Collaudo privato» con il login; sito, Mini App e API;
+niente password HTTP di Caddy; noindex resta». Il primo giro lasciava
+LEGGERE chi non si faceva riconoscere (alcune chiamate del client
+partono senza identità): non basta più.
+
+**COME È FATTO.**
+- IL COOKIE D'AMMISSIONE (`barattolo_prova`, 30 giorni, HttpOnly,
+  Secure, SameSite=Lax): lo riceve chi DIMOSTRA un id in lista — firma
+  dell'initData o sessione web — e con lui passano anche le chiamate
+  senza identità (il cartello del rodaggio, il cambio). «id.scadenza.
+  firma», HMAC con una chiave che nasce dal BOT_TOKEN della prova: nessun
+  segreto nuovo da custodire, e se cambia il token cadono i cookie. La
+  lista si riguarda a ogni richiesta: chi esce dalla lista esce subito.
+- CHI NON È AMMESSO (`solo_chi_prova`): il GUSCIO sì — `/` servita come
+  `/miniapp.html`, cioè senza gli annunci nel corpo per i motori; gli
+  script, le icone, il manifest (`/assets/og/` no: porta le foto degli
+  annunci) —; le API 403 «Istanza di prova, privata», 401 se l'initData
+  c'è ma è rotto o scaduto (il client sa dire «sessione scaduta»); ogni
+  altra pagina 303 a `/`. Aperte a tutti: salute, campanello del bot,
+  `/api/login/*`.
+- LA COPERTINA: una terza riga gemella di `BOT_TG`, `const
+  ISTANZA_PRIVATA = false;`, che il server riscrive a true sulla prova
+  (`_privata_nella_pagina`; a lista vuota la pagina esce identica). La
+  Mini App accende «🧪 Collaudo privato» per prima cosa in `avvia()` e
+  la toglie solo quando /api/me risponde 200; chi non è ammesso si
+  ferma lì, prima della vetrina, del seme demo e del tour. Il testo
+  dice il caso: non sei in lista (403), la sessione è scaduta (401
+  dentro Telegram), entra (fuori da Telegram, con le porte Telegram e
+  Nostr). Sta a z-index 39: sopra la pagina, sotto i fogli (40-41),
+  così il login Nostr si apre sopra. Sul collaudo privato la seconda
+  sonda di /api/me (le identità finte del collaudo locale) si salta: il
+  suo 401 coprirebbe il 403.
+- LE CHIAVI NOSTR IN LISTA (ritocco di Andrea: il bunker resta acceso
+  per i tester): `PROVA_SOLO_IDS` accetta la npub (checksum bech32
+  VERIFICATO: un carattere sbagliato è un errore, non un'altra persona)
+  o i 64 esadecimali, e vale l'id dell'account nativo, con la formula di
+  `tg_id_da_pubkey`. I relay del bunker, che arrivano con la vetrina,
+  per chi deve ancora entrare li dà la porta del login,
+  `/api/login/nostr/relay`.
+
+**PROVE.** `prove_istanza_prova` a 66: la lista con la npub confrontata
+con le funzioni VERE del server (`npub_to_hex`, `tg_id_da_pubkey`) e
+l'esempio di NIP-19, le liste storte (checksum sbagliato compreso), il
+guscio, il cookie (buono, chiave altra, scaduto, toccato a mano, id
+negativo), la riga della copertina, gli agganci in `avvia()`.
+`collaudo_istanza_prova` a 46: a lista vuota la produzione identica
+(vetrina anonima, nessun cookie, la pagina byte per byte); a lista
+accesa 111 entra e col solo cookie passa, il cookie toccato no, il
+tester entrato con la npub sì; 222 riceve 403 e torna a `/`; 333 non
+viene scritto; l'initData rotto dà 401; e la PASSATA SU OGNI ROTTA GET
+del server da anonimo: il titolo dell'annuncio seminato non esce da
+nessuna, e fuori dal guscio è 403 o 303. Controprova: tolta la
+riscrittura di `/` il titolo esce (2 rosse).

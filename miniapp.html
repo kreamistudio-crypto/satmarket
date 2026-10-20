@@ -8619,6 +8619,15 @@
      l'app non arrivasse mai a quel gesto. */
   #copertura{display:none;position:fixed;inset:0;z-index:9998;
     background:var(--bg)}
+  /* IL COLLAUDO PRIVATO (20 ott 2026): sotto i fogli (il login Nostr
+     si apre SOPRA, a 40-41) e sopra tutta la pagina. Nasce spento: lo
+     accende solo `mostraCollaudoPrivato`, e solo con ISTANZA_PRIVATA. */
+  #collaudoPrivato{display:none;position:fixed;inset:0;z-index:39;
+    background:var(--bg);flex-direction:column;align-items:center;
+    justify-content:center;gap:10px;padding:24px 16px;text-align:center}
+  #collaudoPrivato h2{margin:0;font-size:20px}
+  #collaudoPrivatoTesto{color:var(--muted);font-weight:600;font-size:14px;
+    max-width:340px}
   html.copertura #copertura{display:block}
   /* ⚠️ E' IL BARATTOLO DELLO SPLASH, NON UNO CHE GLI SOMIGLIA (secondo
      giro della 1.5, dal video: nel guscio stava 3px piu' in basso ed era
@@ -14940,6 +14949,11 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ SHEET LOGIN NOSTR ============ -->
+  <div id="collaudoPrivato" role="dialog" aria-modal="true" aria-labelledby="collaudoPrivatoTitolo">
+    <h2 id="collaudoPrivatoTitolo">🧪 Collaudo privato</h2>
+    <div id="collaudoPrivatoTesto">Un attimo…</div>
+    <div id="collaudoPrivatoPorte"></div>
+  </div>
   <div class="sheet" id="nostrSheet">
     <div class="grab"></div>
     <h3 id="nostrSheetTitolo">Entra con Nostr</h3>
@@ -15130,6 +15144,11 @@ const BOT_TG = 'ilbarattolobot';
    («il tuo negozio è su barattolo.store/negozio/…»): lo riscrive
    `_dominio_nella_pagina`, dalla leva URL_PUBBLICO. */
 const DOMINIO_SITO = 'barattolo.store';
+/* IL COLLAUDO PRIVATO (20 ott 2026): sull'istanza di prova il server
+   la riscrive a true (`_privata_nella_pagina`) e la copertina «Collaudo
+   privato» copre tutto finché /api/me non risponde 200. In produzione
+   resta false e questa pagina è quella di sempre. */
+const ISTANZA_PRIVATA = false;
 
 /* ══ IL LINK DENTRO TELEGRAM (10 ott 2026) ═══════════════════════
    Un link `https://t.me/<bot>?startapp=<parametro>` toccato dentro
@@ -85225,7 +85244,49 @@ async function avviaVetrina(){
   }
 }
 
+/* LA COPERTINA DEL COLLAUDO PRIVATO (20 ott 2026, richiesta di Andrea:
+   «chi non è in lista non vede NIENTE»). Il server chiude già le API a
+   chi non è ammesso; la copertina fa sì che la pagina non mostri
+   nemmeno il catalogo di serie o un tour. `stato` è la risposta di
+   /api/me: 0 mentre si chiede, 403 = sei entrato ma non sei in lista,
+   401 dentro Telegram = la sessione è scaduta, il resto = devi entrare.
+   Le porte (Telegram e Nostr, bunker compreso) solo fuori da Telegram:
+   dentro, chi sei lo dice Telegram. */
+function mostraCollaudoPrivato(stato){
+  const c = el('collaudoPrivato');
+  if (!c) return;
+  c.style.display = 'flex';
+  el('collaudoPrivatoTesto').textContent = !stato ? 'Un attimo…'
+    : stato === 403 ? 'Questo account non è nella lista del collaudo.'
+    : (stato === 401 && tg?.initData) ? 'La sessione è scaduta: chiudi e riapri l’app.'
+    : 'Entra con un account della lista del collaudo.';
+  const porte = el('collaudoPrivatoPorte');
+  if (stato && stato !== 403 && !tg?.initData && !porte.dataset.montate) {
+    porte.dataset.montate = '1';
+    const posto = document.createElement('div');
+    porte.appendChild(posto);
+    leggiPortaBot().then(si => si ? bottoneLoginBot(posto) : widgetLoginTelegram(posto));
+    /* i relay del bunker arrivano di solito con la vetrina, che qui chi
+       non è entrato non vede: si chiedono alla porta del login */
+    fetch(`${API_BASE}/login/nostr/relay`).then(r => r.ok ? r.json() : {})
+      .then(j => { if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46; })
+      .catch(() => {});
+    const n = document.createElement('button');
+    n.type = 'button';
+    n.className = 'demo-cta';
+    n.style.cssText = 'border:none;cursor:pointer;margin-top:8px';
+    n.innerHTML = etichettaNostr('…o entra con Nostr');
+    n.onclick = apriNostrSheet;
+    porte.appendChild(n);
+  }
+  if (stato && typeof togliGuscio === 'function') togliGuscio();
+}
+function nascondiCollaudoPrivato(){
+  const c = el('collaudoPrivato');
+  if (c) c.style.display = 'none';
+}
 async function avvia(){
+  if (ISTANZA_PRIVATA) mostraCollaudoPrivato(0);
   /* LA VISTA GIUSTA PRIMA DEL PRIMO FETCH (ago 2026, dal campo:
      «toccando il link di una controproposta l'app va prima in home
      e poi salta»). Il deep-link si applicava in CODA all'avvio,
@@ -85275,7 +85336,9 @@ async function avvia(){
        sondaMe. Qui arriva solo una risposta VERA del server. */
     let {r, me} = await sondaMe(tg?.initData || '');
     WEB = !!(r.ok && !tg?.initData);
-    if (!r.ok && !tg?.initData) {
+    /* (sul collaudo privato no: le identità finte non esistono, e il
+       401 della seconda sonda coprirebbe il 403 «non sei in lista») */
+    if (!r.ok && !tg?.initData && !ISTANZA_PRIVATA) {
       /* Niente cookie: proviamo le identità finte del collaudo */
       ({r, me} = await sondaMe(authHdr()));
     }
@@ -85287,6 +85350,12 @@ async function avvia(){
        Telegram e la sessione è scaduta (24h). La vetrina resta —
        il mercatino si sfoglia lo stesso — ma il banner lo dice. */
     scaduta = (r.status === 401 && !!tg?.initData);
+    /* sul collaudo privato chi non è ammesso si ferma qui, sotto la
+       copertina: niente vetrina, niente tour, niente seme demo */
+    if (ISTANZA_PRIVATA) {
+      if (!r.ok || !me.tg_id) { mostraCollaudoPrivato(r.status || 401); return; }
+      nascondiCollaudoPrivato();
+    }
     if (!r.ok || !me.tg_id) throw ANONIMO;
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
     /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il

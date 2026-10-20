@@ -2337,53 +2337,168 @@ def rinfresca_cookie_rinnovati(risposta, cookie: dict, rinnovate: set):
 
 # L'ISTANZA DI PROVA E' PRIVATA (19 ott 2026, cantiere collaudo-vm,
 # richiesta di Andrea; il disegno e' STUDIO-ISTANZA-PROVA, §4). La leva
-# `PROVA_SOLO_IDS` e' la lista degli id Telegram che possono usarla.
+# `PROVA_SOLO_IDS` e' la lista di chi puo' usarla: id Telegram, e dal 20
+# ott anche le chiavi Nostr dei tester (npub o 64 esadecimali), che
+# valgono l'id del loro account nativo (`_id_nativo_nostr`).
 # NON DICHIARATA o VUOTA = nessun filtro: e' la produzione, byte per
 # byte, e il middleware qui sotto esce alla prima riga. SCRITTA MALE =
 # chiusa a tutti ({0}, un id che non esiste) e lo si dice: una lista
 # storta su una prova non deve aprirla al mondo. E' il calco di
 # P2P_PROVA_IDS, compresa la trappola della stringa.
+_BECH32_PROVA = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+
+def _npub_in_hex(npub: str) -> str:
+    """PURA: npub -> 64 esadecimali, col checksum di bech32 VERIFICATO:
+    un carattere battuto male deve essere un errore, non un'altra
+    persona ammessa al collaudo."""
+    s = str(npub).strip().lower()
+    if not s.startswith("npub1"):
+        raise ValueError("non e' una npub")
+    dati = [_BECH32_PROVA.find(c) for c in s[5:]]
+    if -1 in dati or len(dati) < 7:
+        raise ValueError("npub non valida")
+    gen = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+    chk = 1
+    for v in [ord(c) >> 5 for c in "npub"] + [0] + [ord(c) & 31 for c in "npub"] + dati:
+        alto = chk >> 25
+        chk = ((chk & 0x1ffffff) << 5) ^ v
+        for i in range(5):
+            if (alto >> i) & 1:
+                chk ^= gen[i]
+    if chk != 1:
+        raise ValueError("la npub ha il checksum sbagliato")
+    acc = bits = 0
+    fuori = bytearray()
+    for v in dati[:-6]:
+        acc = (acc << 5) | v
+        bits += 5
+        while bits >= 8:
+            bits -= 8
+            fuori.append((acc >> bits) & 0xff)
+    if len(fuori) != 32:
+        raise ValueError("la npub non porta 32 byte")
+    return fuori.hex()
+
+
+def _id_nativo_nostr(pubkey_hex: str) -> int:
+    """PURA: l'id dell'account nativo di quella chiave, la stessa formula
+    di `tg_id_da_pubkey` al primo tentativo (il sale serve solo a una
+    collisione su 2^63, che non capita)."""
+    n = int.from_bytes(hashlib.sha256(pubkey_hex.encode()).digest()[:8], "big")
+    return -(n >> 1) - 1
+
+
+def _prova_lista(voci) -> set:
+    """PURA: la leva come insieme di id. Un numero (anche scritto come
+    testo di cifre) e' un id Telegram; una npub o 64 esadecimali sono una
+    chiave Nostr. Qualunque altra cosa alza: la lista e' storta."""
+    if isinstance(voci, (str, bytes)):
+        raise TypeError("una stringa non e' una lista di id")
+    ids = set()
+    for v in voci:
+        if isinstance(v, bool):
+            raise TypeError("un vero/falso non e' un id")
+        if isinstance(v, int):
+            ids.add(v)
+            continue
+        s = str(v).strip()
+        if re.fullmatch(r"-?[0-9]{1,20}", s):
+            ids.add(int(s))
+        elif s.lower().startswith("npub1"):
+            ids.add(_id_nativo_nostr(_npub_in_hex(s)))
+        elif re.fullmatch(r"[0-9a-fA-F]{64}", s):
+            ids.add(_id_nativo_nostr(s.lower()))
+        else:
+            raise ValueError(f"{s[:12]}…: ne' un id ne' una chiave Nostr")
+    return ids
+
+
 try:
     from config import PROVA_SOLO_IDS
-    if isinstance(PROVA_SOLO_IDS, (str, bytes)):
-        raise TypeError("una stringa non e' una lista di id")
-    PROVA_SOLO_IDS = {int(i) for i in PROVA_SOLO_IDS}
+    PROVA_SOLO_IDS = _prova_lista(PROVA_SOLO_IDS)
 except ImportError:
     PROVA_SOLO_IDS = set()          # non dichiarata: nessun filtro
 except (TypeError, ValueError):
     PROVA_SOLO_IDS = {0}            # storta: chiusa a tutti, e si dice
-    print("[prova] PROVA_SOLO_IDS non e' una lista di numeri: l'istanza "
-          "resta CHIUSA a tutti (0 e' un id che non esiste)", flush=True)
+    print("[prova] PROVA_SOLO_IDS ha una voce che non e' un id ne' una "
+          "chiave Nostr: l'istanza resta CHIUSA a tutti (0 e' un id che non "
+          "esiste)", flush=True)
 
 # Le porte che restano aperte a chiunque: la salute (la guarda il
 # deploy), il campanello di Telegram (ha il suo segreto, e senza il bot
 # di prova sarebbe sordo) e il login (senza, nessuno potrebbe dire chi
-# e'). Per PREFISSO solo il login, che ha sei rotte sorelle.
+# e'). Per PREFISSO solo il login, che ha le sue rotte sorelle.
 PROVA_PORTE_APERTE = ("/api/salute", "/api/telegram/aggiornamenti")
 PROVA_PREFISSO_LOGIN = "/api/login/"
 MSG_PROVA_PRIVATA = "Istanza di prova, privata"
+# IL GUSCIO (20 ott 2026, «chi non e' in lista non vede NIENTE»): quel
+# che serve a disegnare la copertina «Collaudo privato» e il login, e
+# nient'altro — la pagina, gli script, le icone. La pagina `/` per chi
+# non e' ammesso esce come `/miniapp.html`, cioe' SENZA i dati per i
+# motori (gli annunci nel corpo). Le anteprime `/assets/og/` portano le
+# foto degli annunci: fuori dal guscio.
+PROVA_GUSCIO = ("/", "/miniapp.html", "/manifest.json", "/sw.js",
+                "/offline.html", "/robots.txt")
+PROVA_GUSCIO_PREFISSI = ("/assets/", "/vendor/")
+PROVA_GUSCIO_MAI = ("/assets/og/",)
+# IL COOKIE D'AMMISSIONE: chi ha dimostrato di essere in lista (firma
+# dell'initData o sessione web) lo riceve, e con lui passano anche le
+# chiamate del client che partono senza identita'. La chiave nasce dal
+# BOT_TOKEN della prova (nessun segreto nuovo da custodire: cambia il
+# token, cadono i cookie), la lista si riguarda a ogni richiesta.
+PROVA_COOKIE = "barattolo_prova"
+PROVA_COOKIE_GIORNI = 30
 
 
 def _prova_esente(percorso: str) -> bool:
-    """PURA: questa rotta resta aperta anche sulla prova privata?"""
+    """PURA: questa rotta resta aperta a tutti anche sulla prova?"""
     return (percorso in PROVA_PORTE_APERTE
             or percorso.startswith(PROVA_PREFISSO_LOGIN))
 
 
-def _prova_decide(chi, metodo: str, ammessi: set) -> bool:
-    """PURA: la richiesta passa? `chi` e' l'id Telegram che la richiesta
-    DIMOSTRA (firma dell'initData o cookie di sessione), None se non ne
-    dimostra nessuno.
-    - chi si e' fatto riconoscere passa solo se e' nella lista;
-    - chi non si e' fatto riconoscere LEGGE e basta: alcune chiamate del
-      client partono apposta senza identita' (il cartello del rodaggio,
-      il cambio), e una Mini App dove anche Andrea vedesse dei 403 non
-      sarebbe una prova. Senza identita' le rotte che contano danno gia'
-      401, e la vetrina della prova e' fatta di dati finti; un gesto
-      (POST, PUT, DELETE) senza identita' invece si ferma qui."""
-    if chi is not None:
-        return chi in ammessi
-    return metodo in ("GET", "HEAD", "OPTIONS")
+def _prova_guscio(percorso: str) -> bool:
+    """PURA: e' un pezzo del guscio (la pagina vuota e i suoi file)?"""
+    if percorso in PROVA_GUSCIO:
+        return True
+    return (percorso.startswith(PROVA_GUSCIO_PREFISSI)
+            and not percorso.startswith(PROVA_GUSCIO_MAI))
+
+
+def _prova_decide(chi, ammessi: set) -> bool:
+    """PURA: passa solo chi ha DIMOSTRATO un id che sta in lista. Senza
+    identita' non si passa (il guscio e le porte aperte li decide il
+    middleware prima di chiedere qui)."""
+    return chi is not None and chi in ammessi
+
+
+def _prova_chiave_cookie() -> bytes:
+    return hashlib.sha256(b"barattolo-prova-ammesso:"
+                          + str(BOT_TOKEN).encode()).digest()
+
+
+def _prova_cookie_nuovo(tg_id: int, ora: int, chiave: bytes) -> str:
+    """PURA: «id.scadenza.firma»."""
+    scade = int(ora) + PROVA_COOKIE_GIORNI * 86400
+    firma = hmac.new(chiave, f"{int(tg_id)}.{scade}".encode(),
+                     hashlib.sha256).hexdigest()[:32]
+    return f"{int(tg_id)}.{scade}.{firma}"
+
+
+def _prova_cookie_chi(valore: str, ora: int, chiave: bytes):
+    """PURA: l'id che il cookie porta, o None (forma storta, firma che non
+    torna — a tempo costante —, scaduto)."""
+    m = re.fullmatch(r"(-?[0-9]{1,20})\.([0-9]{1,12})\.([0-9a-f]{32})",
+                     str(valore or ""))
+    if not m:
+        return None
+    attesa = hmac.new(chiave, f"{m.group(1)}.{m.group(2)}".encode(),
+                      hashlib.sha256).hexdigest()[:32]
+    if not hmac.compare_digest(attesa, m.group(3)):
+        return None
+    if int(m.group(2)) <= int(ora):
+        return None
+    return int(m.group(1))
 
 
 def _prova_ignora_update(aggiornamento, ammessi: set) -> bool:
@@ -2409,38 +2524,71 @@ def _prova_ignora_update(aggiornamento, ammessi: set) -> bool:
     return True
 
 
-async def _prova_chi(request):
-    """L'id che la richiesta dimostra, o None. Lo stesso giudice delle
-    rotte (`_utente_da_initdata`: firma e freschezza, senza scrivere),
-    poi il cookie del login web. Una firma sbagliata o scaduta vale
-    «nessuno»: la rotta, dopo, dara' il suo 401 di sempre."""
+async def _prova_chi(request) -> tuple:
+    """(id, come, perche'): l'id che la richiesta DIMOSTRA e da dove.
+    `come`: 'firma' (initData, lo stesso giudice delle rotte, che non
+    scrive), 'sessione' (il cookie del login web), 'cookie' (quello
+    d'ammissione), '' (nessuno), 'rotta' (un initData presente ma
+    sbagliato o scaduto: `perche'` e' la frase del suo 401)."""
     init = request.headers.get("x-tg-init-data", "")
     if init:
         try:
-            return int(_utente_da_initdata(init)["id"])
+            return int(_utente_da_initdata(init)["id"]), "firma", ""
+        except HTTPException as e:
+            return None, "rotta", str(e.detail)
         except Exception:
-            return None
+            return None, "rotta", "Autenticazione Telegram non valida"
     token = request.cookies.get("barattolo_sessione", "")
     if token:
         try:
             u = await asyncio.to_thread(utente_da_sessione, token)
         except Exception:
             u = None
-        return int(u["id"]) if u else None
-    return None
+        if u:
+            return int(u["id"]), "sessione", ""
+    chi = _prova_cookie_chi(request.cookies.get(PROVA_COOKIE, ""),
+                            int(time.time()), _prova_chiave_cookie())
+    if chi is not None:
+        return chi, "cookie", ""
+    return None, "", ""
 
 
 @app.middleware("http")
 async def solo_chi_prova(request, call_next):
     """Registrato DOPO gli altri, quindi gira PRIMA di tutti: chi non e'
-    ammesso non arriva nemmeno a scrivere il suo utente nel database."""
+    ammesso non arriva nemmeno a scrivere il suo utente nel database.
+    Chi non e' ammesso: il guscio si', le API 403 (401 se l'initData e'
+    scaduto: il client lo sa dire), ogni altra pagina torna a `/`, dove
+    c'e' la copertina col login."""
     if not PROVA_SOLO_IDS or _prova_esente(request.url.path):
         return await call_next(request)
-    chi = await _prova_chi(request)
-    if _prova_decide(chi, request.method, PROVA_SOLO_IDS):
+    percorso = request.url.path
+    chi, come, perche = await _prova_chi(request)
+    if _prova_decide(chi, PROVA_SOLO_IDS):
+        risposta = await call_next(request)
+        if come in ("firma", "sessione"):
+            ora = int(time.time())
+            gia = _prova_cookie_chi(request.cookies.get(PROVA_COOKIE, ""),
+                                    ora, _prova_chiave_cookie())
+            if gia != chi:
+                risposta.set_cookie(
+                    PROVA_COOKIE,
+                    _prova_cookie_nuovo(chi, ora, _prova_chiave_cookie()),
+                    max_age=PROVA_COOKIE_GIORNI * 86400, httponly=True,
+                    secure=cookie_sicuro(), samesite="lax", path="/")
+        return risposta
+    no_cache = {"Cache-Control": "no-store"}
+    if _prova_guscio(percorso):
+        if percorso == "/":
+            request.scope["path"] = "/miniapp.html"
         return await call_next(request)
-    return JSONResponse({"detail": MSG_PROVA_PRIVATA}, status_code=403,
-                        headers={"Cache-Control": "no-store"})
+    if percorso.startswith("/api/"):
+        if come == "rotta":
+            return JSONResponse({"detail": perche}, status_code=401,
+                                headers=no_cache)
+        return JSONResponse({"detail": MSG_PROVA_PRIVATA}, status_code=403,
+                            headers=no_cache)
+    return RedirectResponse("/", status_code=303, headers=no_cache)
 
 
 def su_onion() -> bool:
@@ -11048,6 +11196,17 @@ def crea_utente_nostr(pubkey: str, npub: str) -> int:
     con.commit()
     con.close()
     return tg_id
+
+
+@app.get("/api/login/nostr/relay")
+def login_nostr_relay():
+    """I relay dove il firmatario NIP-46 si da' appuntamento, per chi deve
+    ancora entrare (20 ott 2026, collaudo privato). Di solito arrivano
+    con la vetrina (`/api/listings`), ma sull'istanza di prova chi non e'
+    entrato la vetrina non la vede, e il bottone «Col telefono» del login
+    sparirebbe. Sta sotto /api/login/ apposta: e' una porta del login, e
+    dice solo indirizzi pubblici scritti nel codice."""
+    return {"relay_nip46": RELAYS_NIP46}
 
 
 @app.get("/api/login/nostr/sfida")
@@ -83742,6 +83901,28 @@ def _dominio_nella_pagina(grezzo: bytes, dominio: str) -> bytes:
                           f"const DOMINIO_SITO = '{dominio}';".encode("ascii"))
 
 
+# LA COPERTINA DEL COLLAUDO PRIVATO (20 ott 2026): la terza riga gemella.
+# Sull'istanza di prova la Mini App accende «Collaudo privato» PRIMA di
+# qualunque dato, e la toglie solo quando /api/me risponde 200.
+_RIGA_PRIVATA_PAGINA = b"const ISTANZA_PRIVATA = false;"
+
+
+def _privata_nella_pagina(grezzo: bytes, privata: bool) -> bytes:
+    """PURA: a lista vuota (la produzione) la pagina esce IDENTICA, senza
+    nemmeno cercare. Una riga che manca non s'indovina: si dice, e la
+    pagina esce com'e' — ma sulla prova le API restano chiuse lo stesso,
+    e' il middleware a decidere, non la copertina."""
+    if not privata:
+        return grezzo
+    if grezzo.count(_RIGA_PRIVATA_PAGINA) != 1:
+        print("⚠️ [pagina] la riga «const ISTANZA_PRIVATA = false;» non c'e' "
+              "una volta sola in miniapp.html: la copertina del collaudo non "
+              "si accende (le API restano chiuse lo stesso)", flush=True)
+        return grezzo
+    return grezzo.replace(_RIGA_PRIVATA_PAGINA,
+                          b"const ISTANZA_PRIVATA = true;")
+
+
 def _spezza_pagina(grezzo: bytes) -> dict:
     """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
 
@@ -83825,6 +84006,7 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         # Il bot della leva LINK_BOT, anche lui una volta per rilettura
         grezzo = _bot_nella_pagina(grezzo, BOT_NOME)
         grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)
+        grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS))
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.

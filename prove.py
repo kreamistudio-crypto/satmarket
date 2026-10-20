@@ -37731,7 +37731,7 @@ def _amb_seo():
                  # il bot e il dominio nella pagina (19 ott 2026, collaudo-vm)
                  "LINK_BOT_DI_SERIE = ", "_FORMA_LINK_BOT = ",
                  "_RIGA_BOT_PAGINA = ", "URL_PUBBLICO_DI_SERIE = ",
-                 "_RIGA_DOMINIO_PAGINA = "):
+                 "_RIGA_DOMINIO_PAGINA = ", "_RIGA_PRIVATA_PAGINA = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     # multi-riga: vogliono il taglio alla riga VUOTA, non al primo \n
@@ -37763,12 +37763,13 @@ def _amb_seo():
               "_seo_negozio", "_seo_categoria", "_seo_home",
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
               "_hash_asset", "_timbra_asset_pagina", "_bot_nella_pagina",
-              "_dominio_nella_pagina",
+              "_dominio_nella_pagina", "_privata_nella_pagina",
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
     amb["BOT_NOME"] = "ilbarattolobot"     # le leve non dichiarate
     amb["DOMINIO_PUBBLICO"] = "barattolo.store"
+    amb["PROVA_SOLO_IDS"] = set()          # la produzione: nessuna copertina
     # IL GIUDICE DELLA COPERTINA (30 set 2026): `_seo_negozio` lo chiama,
     # e si monta VERO — nessuna pagina del server pubblicata, qui, quindi
     # solo il negozio di casa esce con la sua copertina (vedi
@@ -38594,8 +38595,13 @@ def prove_onion():
     # ⚠️ E SONO NOVE (19 ott 2026, cantiere account-doppio-bot): su onion,
     # con la porta del bot accesa, `bottoneLoginBot` riscrive la porta
     # Nostr della vetrina in «…o entra con Nostr» — dallo stesso giudice.
-    prova("...e le chiamate al giudice sono NOVE", 9,
+    # ⚠️ E SONO DIECI (20 ott 2026, cantiere collaudo-privato): la porta
+    # Nostr della copertina «Collaudo privato» — dallo stesso giudice.
+    prova("...e le chiamate al giudice sono DIECI", 10,
           mini.count("etichettaNostr("))
+    prova("...la decima e' la porta Nostr della copertina del collaudo", True,
+          "etichettaNostr('\u2026o entra con Nostr')" in
+          pezzo_js(mini, "function mostraCollaudoPrivato(stato){", "\n}\n"))
     prova("...la nona e' la porta Nostr della vetrina su onion, che torna seconda", True,
           "if (n) n.innerHTML = etichettaNostr('\u2026o entra con Nostr');" in mini)
     prova("...l'ottava e' il «Pubblica su Nostr» di un ordine P2P", True,
@@ -110902,6 +110908,7 @@ def prove_logout_apk():
         _fn_js(mini, "function avvisoRiprovo(acceso){"), _fn_js(mini, "function disegnaRiprovo(){"),
         av,
         _riga_js(mini, "const ANONIMO = "), _riga_js(mini, "const SONDA_ME_PAZIENZA_MS = "),
+        _riga_js(mini, "const ISTANZA_PRIVATA = "),   # (20 ott 2026) la produzione: false
         _riga_js(mini, "const SONDA_ME_TENTATIVO_MS = "), _riga_js(mini, "const SONDA_ME_ATTESE_MS = "),
         tm, _fn_js(mini, "async function sondaMe("), _riga_js(mini, "let riprovaAvvio = "),
         _fn_js(mini, "function aspettaRiprovaAvvio(){"), _fn_js(mini, "function avvisoAvvio(cosa, errore){")))
@@ -173740,39 +173747,99 @@ def prove_istanza_prova():
           < cm.index("_PAGINA_CACHE.update("))
 
     # ---------------- 4) PROVA_SOLO_IDS --------------------------------
-    i = src.index("try:\n    from config import PROVA_SOLO_IDS")
+    import hashlib
+    i = src.index("_BECH32_PROVA = ")
     blocco = src[i:src.index("\n\n# Le porte che restano aperte", i)]
+    blocco = "import hashlib\n" + blocco
     prova("la lista: non dichiarata = nessun filtro (la produzione), in silenzio",
           (set(), []), tuple(v if j else v["PROVA_SOLO_IDS"] for j, v in enumerate(con_config(blocco))))
     prova("...dichiarata vuota idem", set(), con_config(blocco, PROVA_SOLO_IDS=[])[0]["PROVA_SOLO_IDS"])
     prova("...con gli id (anche scritti come testo di cifre) e' l'insieme degli id",
-          {111, 222}, con_config(blocco, PROVA_SOLO_IDS=[111, "222"])[0]["PROVA_SOLO_IDS"])
-    storte = ["111", b"111", ["andrea"], 111, [None]]
+          {111, 222, -5}, con_config(blocco, PROVA_SOLO_IDS=[111, "222", " -5 "])[0]["PROVA_SOLO_IDS"])
+    # LE CHIAVI NOSTR DEI TESTER (20 ott 2026, il bunker resta acceso per
+    # chi e' in lista): la npub si decodifica col checksum, e l'id che ne
+    # esce e' quello dell'account nativo. Si confronta con le funzioni
+    # VERE del server — `npub_to_hex` e `tg_id_da_pubkey` — non con se'.
+    amb_s = {"re": re, "hashlib": hashlib, "HTTPException": Exception}
+    for r_ in ("CHARSET_BECH32 = ",):
+        k = src.index(r_)
+        exec(src[k:src.index("\n", k)], amb_s)
+    exec(pezzo("npub_to_hex"), amb_s)
+    exec(pezzo("tg_id_da_pubkey"), amb_s)
+
+    class _ConVuota:
+        def execute(self, *a):
+            class _R:
+                def fetchone(self):
+                    return None
+            return _R()
+    # l'esempio di NIP-19; l'esadecimale NON si scrive intero (64 cifre
+    # esadecimali nel repo fanno scattare lo scanner delle chiavi private):
+    # lo dice il decodificatore del server, e se ne controllano i due capi
+    NPUB = "npub10elfcs4fr0l0r8af98jlmgdh9c8tcxjvz9qkw038js35mp4dma8qzvjptg"
+    PK = amb_s["npub_to_hex"](NPUB)
+    atteso = amb_s["tg_id_da_pubkey"](PK, _ConVuota())
+    prova("la npub di un tester: il decodificatore del server da' l'esempio di NIP-19...",
+          (64, "7e7e9c42a91bfef1", "2794234d86addf4e"), (len(PK), PK[:16], PK[-16:]))
+    prova("...e il decodificatore della lista da' lo stesso esadecimale",
+          PK, con_config(blocco)[0]["_npub_in_hex"](NPUB))
+    lista = con_config(blocco, PROVA_SOLO_IDS=[NPUB])[0]["PROVA_SOLO_IDS"]
+    prova("...e in lista vale l'id del suo account nativo (lo stesso di tg_id_da_pubkey)",
+          ({atteso}, True), (lista, atteso < 0))
+    prova("...anche scritta in esadecimale, maiuscole comprese",
+          {atteso}, con_config(blocco, PROVA_SOLO_IDS=[PK.upper()])[0]["PROVA_SOLO_IDS"])
+    prova("...e insieme agli id Telegram", {111, atteso},
+          con_config(blocco, PROVA_SOLO_IDS=[111, NPUB])[0]["PROVA_SOLO_IDS"])
+    sbagliata = NPUB[:-1] + ("q" if NPUB[-1] != "q" else "p")
+    storte = ["111", b"111", ["andrea"], 111, [None], [True], [sbagliata],
+              ["npub1"], [PK[:-1]], ["nsec1qqq"]]
     esiti = [con_config(blocco, PROVA_SOLO_IDS=s) for s in storte]
-    prova("...scritta male e' CHIUSA a tutti ({0}), e lo dice",
+    prova("...scritta male (anche una npub col checksum sbagliato) e' CHIUSA a tutti ({0}), e lo dice",
           [({0}, 1)] * len(storte), [(a["PROVA_SOLO_IDS"], len(r)) for a, r in esiti])
-    amb = {}
-    for r_ in ("PROVA_PORTE_APERTE = ", "PROVA_PREFISSO_LOGIN = "):
+    amb = {"re": re, "hashlib": hashlib, "hmac": __import__("hmac")}
+    for r_ in ("PROVA_PORTE_APERTE = ", "PROVA_PREFISSO_LOGIN = ",
+               "PROVA_GUSCIO_PREFISSI = ", "PROVA_GUSCIO_MAI = ",
+               "PROVA_COOKIE_GIORNI = "):
         k = src.index(r_)
         exec(src[k:src.index("\n", k)], amb)
-    exec(pezzo("_prova_esente"), amb)
-    exec(pezzo("_prova_decide"), amb)
-    es_, dec = amb["_prova_esente"], amb["_prova_decide"]
-    prova("aperte a tutti: la salute, il campanello del bot, le rotte del login",
-          [True] * 5, [es_(p) for p in ("/api/salute", "/api/telegram/aggiornamenti",
+    k = src.index("PROVA_GUSCIO = (")
+    exec(src[k:src.index(")\n", k) + 1], amb)
+    for f in ("_prova_esente", "_prova_guscio", "_prova_decide",
+              "_prova_cookie_nuovo", "_prova_cookie_chi"):
+        exec(pezzo(f), amb)
+    es_, dec, gu = amb["_prova_esente"], amb["_prova_decide"], amb["_prova_guscio"]
+    prova("aperte a tutti: la salute, il campanello del bot, le rotte del login (relay del bunker compresi)",
+          [True] * 6, [es_(p) for p in ("/api/salute", "/api/telegram/aggiornamenti",
                                        "/api/login/telegram", "/api/login/nostr/sfida",
-                                       "/api/login/nostr/cassetta/chiudi")])
+                                       "/api/login/nostr/cassetta/chiudi", "/api/login/nostr/relay")])
     prova("...e nient'altro, nemmeno chi somiglia", [False] * 6,
           [es_(p) for p in ("/", "/api/me", "/api/salute/x", "/api/loginx",
                             "/api/telegram/aggiornamenti/", "/api/orders")])
+    prova("il guscio: la pagina, gli script, le icone, il manifest",
+          [True] * 9, [gu(p) for p in ("/", "/miniapp.html", "/manifest.json", "/sw.js",
+                                       "/offline.html", "/robots.txt", "/vendor/nostr.js",
+                                       "/assets/icona-192.png", "/assets/categorie/x.webp")])
+    prova("...e nient'altro: annunci, negozi, foto, anteprime degli annunci, NIP-05, sitemap, admin",
+          [False] * 10, [gu(p) for p in ("/annuncio/1", "/negozio/x", "/foto/a.jpg",
+                                        "/assets/og/1.jpg", "/.well-known/nostr.json",
+                                        "/sitemap.xml", "/admin", "/p2p", "/widget/negozio/x",
+                                        "/api/listings")])
     A = {111}
-    prova("chi si riconosce passa solo se e' in lista, qualunque sia il metodo",
-          [True, True, False, False],
-          [dec(111, "GET", A), dec(111, "POST", A), dec(222, "GET", A), dec(222, "DELETE", A)])
-    prova("chi non si riconosce legge e basta",
-          [True, True, True, False, False, False, False],
-          [dec(None, m, A) for m in ("GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE")])
-    prova("...e la lista {0} non apre a nessuno che si riconosca", False, dec(111, "GET", {0}))
+    prova("passa solo chi DIMOSTRA un id in lista; senza identita' nessuno",
+          [True, False, False, False], [dec(111, A), dec(222, A), dec(None, A), dec(111, {0})])
+    nuovo, chi_c = amb["_prova_cookie_nuovo"], amb["_prova_cookie_chi"]
+    K, K2 = b"k" * 32, b"j" * 32
+    c = nuovo(111, 1000, K)
+    prova("il cookie d'ammissione dice chi e', con la sua chiave e prima della scadenza",
+          [111, None, None], [chi_c(c, 1001, K), chi_c(c, 1001, K2),
+                              chi_c(c, 1000 + 30 * 86400, K)])
+    falsi = [c.replace("111.", "222.", 1), c[:-1] + ("0" if c[-1] != "0" else "1"),
+             "", "111", "111.9999999999.abc", None, c + "x"]
+    prova("...e uno toccato a mano non vale niente", [None] * len(falsi),
+          [chi_c(f, 1001, K) for f in falsi])
+    prova("...anche per un account nativo Nostr (id negativo)", atteso,
+          chi_c(nuovo(atteso, 5, K), 6, K))
+
 
     # ---------------- 5) il middleware: dove sta e cosa fa per primo ----
     mw = src[src.index("async def solo_chi_prova("):]
@@ -173860,6 +173927,57 @@ def prove_istanza_prova():
     prova("...e suona l'allarme per la prova aperta e per la lista storta", True,
           "URL_PUBBLICO != URL_PUBBLICO_DI_SERIE\n                           and not PROVA_SOLO_IDS" in ls
           and "allarme=PROVA_SOLO_IDS == {0}" in ls)
+
+    # ---------------- 9) il collaudo privato davvero (20 ott 2026) -----
+    # «chi non e' in lista non vede NIENTE»: il middleware chiude, la
+    # copertina copre, e a lista vuota tutto resta com'era.
+    prova("chi non e' ammesso: il guscio (la pagina / servita come /miniapp.html), "
+          "le API 403 o 401, ogni altra pagina torna a /", True,
+          'request.scope["path"] = "/miniapp.html"' in mw
+          and "if _prova_guscio(percorso):" in mw
+          and 'status_code=401' in mw and 'status_code=403' in mw
+          and 'RedirectResponse("/", status_code=303' in mw)
+    prova("...e chi lo e' riceve il cookie d'ammissione solo se l'ha dimostrato con firma o sessione",
+          True, 'if come in ("firma", "sessione"):' in mw and "httponly=True" in mw
+          and "secure=cookie_sicuro()" in mw)
+    pc = pezzo("_prova_chi")
+    prova("...e chi e' lo dice lo stesso giudice delle rotte, poi la sessione, poi il cookie",
+          True, pc.index("_utente_da_initdata(init)") < pc.index('"barattolo_sessione"')
+          < pc.index("PROVA_COOKIE"))
+    prova("la Mini App ha la riga della copertina, una volta sola, spenta", 1,
+          mini.count("const ISTANZA_PRIVATA = false;"))
+    amb = {}
+    k = src.index("_RIGA_PRIVATA_PAGINA = ")
+    exec(src[k:src.index("\n", k)], amb)
+    righe = []
+    amb["print"] = lambda *a, **k: righe.append(a)
+    exec(pezzo("_privata_nella_pagina"), amb)
+    pr = amb["_privata_nella_pagina"]
+    prova("a lista vuota la pagina esce IDENTICA (lo stesso oggetto)", True, pr(grezzo, False) is grezzo)
+    acc = pr(grezzo, True)
+    prova("...a lista accesa cambia la sola riga", (1, 0, len(grezzo) - 1),
+          (acc.count(b"const ISTANZA_PRIVATA = true;"),
+           acc.count(b"const ISTANZA_PRIVATA = false;"), len(acc)))
+    prova("...e una riga che manca non s'indovina, e lo si dice", (b"x", 1), (pr(b"x", True), len(righe)))
+    prova("la pagina la riscrive dopo il dominio", True,
+          cm.index("grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)")
+          < cm.index("grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS))")
+          < cm.index("_PAGINA_CACHE.update("))
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    prova("l'avvio accende la copertina per prima cosa, e solo sul collaudo privato", True,
+          av.startswith("async function avvia(){\n  if (ISTANZA_PRIVATA) mostraCollaudoPrivato(0);"))
+    prova("...e chi non e' ammesso si ferma sotto la copertina PRIMA della vetrina", True,
+          av.index("if (!r.ok || !me.tg_id) { mostraCollaudoPrivato(r.status || 401); return; }")
+          < av.index("if (!r.ok || !me.tg_id) throw ANONIMO;"))
+    prova("...e la seconda sonda (le identita' finte) non copre il 403", True,
+          "if (!r.ok && !tg?.initData && !ISTANZA_PRIVATA) {" in av)
+    mc = pezzo_js(mini, "function mostraCollaudoPrivato(stato){", "\n}\n")
+    prova("la copertina: le porte solo fuori da Telegram, col bunker che chiede i relay alla porta del login",
+          True, "!tg?.initData" in mc and "/login/nostr/relay" in mc
+          and "apriNostrSheet" in mc and "widgetLoginTelegram(posto)" in mc)
+    prova("...e sta sotto i fogli (il login Nostr si apre sopra) e sopra la pagina", True,
+          "#collaudoPrivato{display:none;position:fixed;inset:0;z-index:39;" in mini
+          and ".sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;" in mini)
 
 
 def prove_miniature_leggere():

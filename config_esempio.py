@@ -1918,14 +1918,19 @@ MODALITA_COLLAUDO = False
 # docs/STUDIO-ISTANZA-PROVA-2026-10-08.md.) Una copia di
 # Barattolo che gira come quella vera, su un'ALTRA macchina, col SUO bot,
 # per provare dal telefono i rami prima dell'ok al push.
-# CHI PUO' USARLA: gli id Telegram in lista; gli altri ricevono 403
-# «Istanza di prova, privata» (restano aperti solo la salute, il webhook
-# del bot e il login) e il bot non risponde loro, nemmeno al /start.
-# Il pannello «⚙️ Stato delle leve» dice QUANTI sono, mai quali.
-# Chi non si fa riconoscere puo' solo LEGGERE (la
-# vetrina della prova e' fatta di dati finti). VUOTA = nessun filtro, ed
-# e' la produzione: qui resta vuota. Una lista scritta male (una
-# stringa, un nome) chiude la prova a TUTTI, e il journal lo dice.
+# CHI PUO' USARLA: gli id Telegram in lista e le chiavi Nostr dei tester
+# (la npub, o i 64 esadecimali: valgono il loro account nativo, e il
+# login Nostr col bunker resta acceso per loro). Chi non e' in lista non
+# vede NIENTE: le API rispondono 403 «Istanza di prova, privata», ogni
+# altra pagina torna a `/`, dove la Mini App mostra la copertina
+# «Collaudo privato» col login; restano aperti solo la salute, il
+# webhook del bot, il login e il guscio della pagina (script e icone).
+# Il bot non risponde loro, nemmeno al /start. Chi e' entrato riceve un
+# cookie d'ammissione (30 giorni, firmato con una chiave che nasce dal
+# BOT_TOKEN). Il pannello «⚙️ Stato delle leve» dice QUANTI sono, mai
+# quali. VUOTA = nessun filtro, ed e' la produzione: qui resta vuota.
+# Una lista scritta male (una stringa, un nome, una npub col checksum
+# sbagliato) chiude la prova a TUTTI, e il journal lo dice.
 PROVA_SOLO_IDS = []
 # IL CONFIG DELLA PROVA si scrive DA QUI e non copiando quello del VPS
 # (che non lascia mai il VPS): sotto ci sono le righe che cambiano,
