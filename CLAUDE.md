@@ -88,7 +88,7 @@ modo in cui si rifà un errore già pagato.
 - IL VPS È FUORI DAL MIO PERIMETRO: niente ssh, niente query, nemmeno in
   sola lettura. I comandi li scrivo, li esegue Andrea e incolla il
   risultato. Il deploy è suo. Lo stesso vale per il nodo Mostro e per il
-  relay.
+  relay. La VM di collaudo no: un gesto alla volta, col suo ok (`docs/COLLAUDO.md`).
 - MAI RELAY VERI IN COLLAUDO E NEI GIRI DAL VIVO, mai eventi pubblicati:
   il server si ferma da solo (`lettura_simulata`, solo loopback), il
   BROWSER no — nel config del giro `MOSTRO_RELAY` e `MOSTRO_RELAY_SPECCHIO`

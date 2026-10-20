@@ -1,0 +1,12 @@
+; IL SEGUACE DEL COLLAUDO (20 ott 2026): una passata di segui.sh, dalla
+; sua COPIA in /usr/local/sbin (il giudice non si riscrive col commit che
+; tira). Lo chiama il timer ogni minuto; `collaudo riprendi` e `collaudo
+; ramo` lo chiamano subito. Da root: riavvia barattolo-collaudo.
+[Unit]
+Description=Il collaudo segue develop (una passata)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/collaudo-segui
+TimeoutStartSec=300

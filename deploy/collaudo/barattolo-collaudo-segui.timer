@@ -1,0 +1,11 @@
+; Ogni minuto il collaudo guarda se develop e' andato avanti (20 ott 2026).
+[Unit]
+Description=Il collaudo segue develop, ogni minuto
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

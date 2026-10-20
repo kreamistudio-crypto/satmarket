@@ -68421,3 +68421,62 @@ senza cambio; la presa che chiede il giudice prima di partire. La prova
 delle chiavi della busta passa a diciotto, e l'ambiente del pannello
 conosce `tetto_sats_prova`. `collaudo_istanza_prova` a 52: la busta
 vera dice 0 in produzione e 10.000 sulla prova.
+
+## Il collaudo segue develop: il seguace, il comando, i file della VM e COLLAUDO.md (20 ott 2026, cantiere collaudo-privato, commit 4 di 4, decisioni di Andrea)
+
+**PERCHÉ.** La specifica nuova di Andrea (20 ott), che sostituisce la
+strada B del 19: il ramo `develop`, nato da `pronto` (`5d7c3d4`, CI
+verde; i due commit di Alan del 20 mattina, PGP e CI rossa,
+rientreranno con la prima promozione quando main sarà verde). Le
+sessioni pushano su `develop` senza chiedere, a cantiere chiuso; il
+collaudo lo segue da solo, anche coi commit non firmati delle sessioni
+cloud; quando Andrea approva, una sessione sul suo PC porta `develop` su
+`main` (rebase, rifirma, un solo push, col suo ok) e poi rimette
+`develop` uguale a `main` con `--force-with-lease`, l'unico force
+ammesso. La CI resta solo su main: il workflow (`branches: [main]`, più
+il lancio a mano) non parte su `develop`, verificato il 20.
+
+**COME È FATTO** (`deploy/collaudo/`).
+- `segui.sh`: NON è `deploy.sh`, che è la produzione e resta com'è. Gira
+  ogni minuto dal timer, da root, da una COPIA in
+  `/usr/local/sbin/collaudo-segui` (il giudice non si riscrive col
+  commit che tira). Segue `develop` o il ramo scritto in
+  `stato/ramo` (nome controllato), sta fermo in pausa, accetta un
+  `develop` rimesso indietro; checkout `--force --detach` (i non
+  tracciati, config.py e dati/, restano), compileall, riavvio,
+  /api/salute entro 45 s, altrimenti torna al commit di prima e timbra
+  il bocciato, che non riprova. Una riga al bot di prova, col token letto
+  da curl sullo stdin e mai sulla riga di comando. Git gira come
+  `collaudo`, padrone del repo e della deploy key.
+- `collaudo.sh` (→ `/usr/local/bin/collaudo`): `stato`, `pausa`,
+  `riprendi`, `ramo <nome>`, `azzera` (database e foto SPOSTATI in
+  azzerati/, gli ultimi tre giri, poi la semina finta di
+  `semina_demo.py`).
+- `barattolo-collaudo.service` (utente `collaudo`, 127.0.0.1:8090,
+  NoNewPrivileges), `barattolo-collaudo-segui.service` + `.timer` (ogni
+  minuto), `Caddyfile` (il solo collaudo.barattolo.store, X-Robots-Tag
+  noindex, nessuna password HTTP), `compose-lnbits.yaml` (FakeWallet,
+  `lnbits/lnbits:v1.6.1` pinnato come la cassaforte, solo
+  127.0.0.1:5001; al gesto 5 si guarda con `ss -tln`).
+- `docs/COLLAUDO.md`: cos'è, il flusso develop → promozione → main, i
+  comandi, i pezzi sulla VM, la deploy key di sola lettura (decisione di
+  Andrea al posto del token GitHub), cosa è vero e cosa è finto, i gesti
+  per accendere e spegnere, gli avanzi RGB che restano, e come passare
+  alla strada A col ref `produzione`.
+- CLAUDE.md: la riga 89 riscritta SENZA aggiungere righe (273 su 273 su
+  develop): «La VM di collaudo no: un gesto alla volta, col suo ok». La
+  voce vera con le regole nuove (develop, la promozione, i relay del P2P)
+  è un commit separato, dopo che main torna verde.
+
+**PROVE.** `prove_collaudo_segue_develop` (21): i file e soltanto quelli;
+nessun relay, esadecimale da chiave o token; il seguace che non pusha e
+il cui solo --force è il checkout; il servizio, il timer, Caddy, LNbits,
+`azzera` che sposta; COLLAUDO.md e la riga di CLAUDE.md. E `segui.sh`
+FATTO GIRARE su un repo finto (bash e git; in Windows quella di Git, i
+`\r` tolti): in pari non fa niente, avanza, in pausa sta fermo, un
+commit che non regge torna indietro e viene timbrato e non riprovato,
+segue il ramo scelto, accetta develop rimesso indietro, un nome storto
+lo ferma, il config non tracciato resta. Controprova: tolta la riga del
+bocciato, «non lo riprova» diventa rossa.
+
+**IL GIRO, sull'albero che va su develop.** Ribasato su `5a55f3b` (develop portato a main per la tappa 3 dello swap: il piano DR spostato sul suo ramo, `SWAP_INDIRIZZO_MAX_SATS`, la sentinella delle leve doppie, che guarda anche le leve di questo cantiere ed e' verde). Le sezioni toccate su ognuno dei commit 1-3 (2.297, 2.306, 2.314 verdi) e `collaudo_istanza_prova` nella gabbia tre volte per commit; sull'ultimo PROVE_SEVERE=1 25.763 passate, 0 fallite, i collaudi della CI 90 verdi; lo scanner dei segreti del workflow pulito, anche sulla storia. Il giro ha trovato tre cose mie, curate dentro i commit a cui appartengono prima del push: i 64 esadecimali dell'esempio di NIP-19 scritti per intero (lo scanner li prende per una chiave privata: ora si ricavano dalla npub), i banchi d'altri cantieri che fanno girare pezzi toccati (la busta P2P, le porte verso i relay, la pagina, l'avvio; e i conti: le porte Nostr sono DIECI, e una cifra in sats scritta a mano nel journal e' tolta) e una prova BALLERINA: il cookie «toccato a mano» cambiava l'ultima cifra in 0, e una volta su sedici era gia' 0.
