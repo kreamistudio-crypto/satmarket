@@ -13,9 +13,19 @@ annunci, affari, recensioni, contatori. Dopo, la chiave Nostr apre
 l'account unito.
 
 Il server e' quello VERO, per HTTP con la TestClient, e la firma e' VERA
-(Schnorr con coincurve): passano di qui il login Nostr, il login
-Telegram di collaudo, la sfida, la verifica della firma, l'indice unico
-su npub_accesso e `esegui_fusione` col suo database usa-e-getta.
+(Schnorr BIP-340): passano di qui il login Nostr, il login Telegram di
+collaudo, la sfida, la verifica della firma, l'indice unico su
+npub_accesso e `esegui_fusione` col suo database usa-e-getta.
+
+LE FIRME LE FA `schnorr_puro`, e il collaudo gira SEMPRE (20 ott 2026,
+cantiere fusione-schnorr, decisione di Andrea): il client firma con la
+ricetta del BIP-340 del repo, e il server verifica col suo giudice VERO
+— con coincurve dove c'e' (il PC, il VPS), e in CI, dove non c'e', con
+`schnorr_puro.ChiaveXOnly` montato al posto di `ChiavePubblicaNostr`,
+come `collaudo_contanti_p2p`. Prima di montarlo si guarda che il server,
+da solo, non creda a niente (la porta Nostr risponde 503). Nessun salto:
+un collaudo che senza coincurve usciva con 0 senza aver girato sarebbe
+stato un verde finto.
 
 NON TOCCA NIENTE DI VERO: il `config` finto si installa PRIMA
 dell'import di server, nessuna rete, nessun LNbits.
@@ -32,7 +42,10 @@ import time
 import types
 
 QUI = os.path.dirname(os.path.abspath(__file__))
-PASSATE = FALLITE = SALTATE = 0
+sys.path.insert(0, QUI)
+import schnorr_puro  # noqa: E402
+
+PASSATE = FALLITE = 0
 SRV = None
 
 
@@ -47,14 +60,16 @@ def prova(nome, atteso, avuto):
               f"\n      avuto:  {avuto!r}")
 
 
-def salta(nome, perche):
-    """Si salta CONTANDO, come collaudo_consegna_firmata: dove manca
-    coincurve (il runner della CI) il server non apre nemmeno la porta
-    Nostr, e una firma non si puo' fare. Il giro vero gira dove
-    coincurve c'e': il PC e il VPS."""
-    global SALTATE
-    SALTATE += 1
-    print(f"  ⊘ {nome} — SALTATA: {perche}")
+def nuova_chiave() -> bytes:
+    """Una chiave privata usa-e-getta, 32 byte nella misura del BIP-340."""
+    while True:
+        sk = os.urandom(32)
+        if 1 <= int.from_bytes(sk, "big") < schnorr_puro.N:
+            return sk
+
+
+def pubblica_hex(sk: bytes) -> str:
+    return schnorr_puro.pubblica(sk).hex()
 
 
 def avvio():
@@ -89,7 +104,7 @@ def avvio():
 
 def evento_firmato(c, sk):
     """La sfida del login vero, firmata davvero con la chiave `sk`."""
-    pub = sk.public_key_xonly.format().hex()
+    pub = pubblica_hex(sk)
     sfida = c.get("/api/login/nostr/sfida").json()["sfida"]
     ev = {"pubkey": pub, "created_at": int(time.time()), "kind": 22242,
           "tags": [["relay", "http://testserver"], ["challenge", sfida]],
@@ -97,7 +112,7 @@ def evento_firmato(c, sk):
     ser = json.dumps([0, pub, ev["created_at"], 22242, ev["tags"], ""],
                      separators=(",", ":"), ensure_ascii=False)
     ev["id"] = hashlib.sha256(ser.encode()).hexdigest()
-    ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+    ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"]), os.urandom(32)).hex()
     return ev
 
 
@@ -141,23 +156,45 @@ def main():
     global SRV
     SRV = avvio()
     from fastapi.testclient import TestClient
-    try:
-        from coincurve import PrivateKey
-    except ImportError:
-        salta("tutto il collaudo", "manca coincurve: non si puo' firmare, "
-              "e il server non apre la porta Nostr")
-        print(f"\n  {PASSATE} passate, {FALLITE} fallite, {SALTATE} saltate")
-        return 0
 
     print("=" * 58)
     print("  LA FUSIONE DAL LATO TELEGRAM")
     print("=" * 58)
 
     # ------------------------------------------------------------------
+    print("\n[0) le firme: il patto del server, e il calco dove coincurve non c'e']")
+    if SRV.ChiavePubblicaNostr is None:
+        prova("senza coincurve il server non apre la porta Nostr (503)", 503,
+              TestClient(SRV.app).get("/api/login/nostr/sfida").status_code)
+        SRV.ChiavePubblicaNostr = schnorr_puro.ChiaveXOnly
+        print("   (coincurve assente: monto schnorr_puro.ChiaveXOnly, come in CI)")
+    else:
+        print("   (coincurve presente: il server verifica con libsecp256k1)")
+    sk0 = nuova_chiave()
+    ev0 = SRV.evento_non_firmato(pubblica_hex(sk0), 1, [], "prova", int(time.time()))
+    ev0["sig"] = schnorr_puro.firma(sk0, bytes.fromhex(ev0["id"]), os.urandom(32)).hex()
+    # si ritocca la FIRMA, non il contenuto: un contenuto cambiato cade
+    # gia' sull'id ricalcolato, e non direbbe niente del verificatore
+    sig = bytearray(bytes.fromhex(ev0["sig"]))
+    sig[40] ^= 1
+    altra = schnorr_puro.firma(nuova_chiave(), bytes.fromhex(ev0["id"]), os.urandom(32)).hex()
+    prova("una firma di schnorr_puro passa il giudice del server; ritoccata o "
+          "d'un'altra chiave no", [True, False, False],
+          [SRV.verifica_firma_nostr(ev0),
+           SRV.verifica_firma_nostr(dict(ev0, sig=bytes(sig).hex())),
+           SRV.verifica_firma_nostr(dict(ev0, sig=altra))])
+    # e lo stesso alla porta vera: un login con la firma storta non entra
+    storta = TestClient(SRV.app)
+    ev_s = evento_firmato(storta, nuova_chiave())
+    ev_s["sig"] = altra
+    prova("...e alla porta: un login firmato da un'altra chiave dice 401", 401,
+          storta.post("/api/login/nostr", json={"evento": ev_s}).status_code)
+
+    # ------------------------------------------------------------------
     print("\n[1) il caso dal campo: prima Nostr, poi Telegram, stesso browser]")
     b = TestClient(SRV.app)
-    chiave = PrivateKey()
-    npub = SRV.hex_to_npub(chiave.public_key_xonly.format().hex())
+    chiave = nuova_chiave()
+    npub = SRV.hex_to_npub(pubblica_hex(chiave))
     prova("entra con Nostr", 200, entra_nostr(b, chiave).status_code)
     nativo = b.get("/api/me").json()["tg_id"]
     prova("...ed e' un account nato con Nostr (id negativo)", True, nativo < 0)
@@ -245,7 +282,7 @@ def main():
     # ------------------------------------------------------------------
     print("\n[5) quando NON si unisce]")
     # a) la chiave e' gia' l'accesso di un ALTRO account Telegram
-    k2 = PrivateKey()
+    k2 = nuova_chiave()
     t2 = TestClient(SRV.app)
     entra_telegram(t2, 444, "Gianni")
     prova("Gianni collega la sua chiave", 200, collega(t2, k2).status_code)
@@ -258,7 +295,7 @@ def main():
                 "Telegram: un account, una chiave"),
           (r.status_code, r.json().get("detail")))
     # b) un affare ancora aperto fra le due meta'
-    k3 = PrivateKey()
+    k3 = nuova_chiave()
     t4 = TestClient(SRV.app)
     entra_nostr(t4, k3)
     nat3 = t4.get("/api/me").json()["tg_id"]
@@ -278,9 +315,10 @@ def main():
     prova("chiuso l'affare, l'unione passa", 200, unisci(t4, un["token"]).status_code)
 
     print("\n" + "=" * 58)
-    print(f"  {PASSATE} passate, {FALLITE} fallite, {SALTATE} saltate")
+    print(f"  {PASSATE} passate, {FALLITE} fallite")
     print("=" * 58)
-    return 1 if FALLITE else 0
+    # nessun salto: chi esce con 0 ha girato tutte le prove
+    return 1 if FALLITE or PASSATE == 0 else 0
 
 
 if __name__ == "__main__":

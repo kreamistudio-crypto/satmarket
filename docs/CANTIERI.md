@@ -68600,3 +68600,35 @@ esce con 0; dove coincurve c'è (PC, VPS) gira intero. Provato in tutti
 e due i modi: 28/0 con coincurve, 0/0/1 saltata con un coincurve finto
 che non si importa. `pronto` era rimasto fermo, quindi niente deploy
 del commit rosso.
+
+**LA CURA: IL COLLAUDO GIRA SEMPRE, CON `schnorr_puro` (20 ott 2026,
+cantiere fusione-schnorr, decisione di Andrea).** Il salto di `f9b01ed`
+(uscita 0 senza coincurve) era un verde finto: in CI, che coincurve non
+ce l'ha per scelta, la fusione non sarebbe stata provata MAI, e la CI
+l'avrebbe detta verde. Il giro di `f9b01ed` l'ha annullato Andrea prima
+che spostasse `pronto`. La controprova del rosso di `ee112c8` è girata su
+GitHub (lancio a mano dello stesso commit, `ubuntu-24.04`): stesso
+collaudo, stesso motivo, quindi non era la macchina nuova della CI.
+COSA SI È FATTO, sul calco di `collaudo_contanti_p2p`: il client firma
+con `schnorr_puro` (il BIP-340 in Python puro del repo, solo per i
+banchi, verificato contro coincurve); se coincurve manca, il collaudo
+prima guarda che il server da solo NON apra la porta Nostr (503 sulla
+sfida), poi monta `schnorr_puro.ChiaveXOnly` al posto di
+`ChiavePubblicaNostr`, e il giudice VERO del server verifica le firme
+vere. Con coincurve, verifica coincurve (e il collaudo prova anche che
+le firme di `schnorr_puro` le accetta). Il salto è TOLTO, e un giro che
+non ha fatto nessuna prova esce con 1. Due prove nuove in testa: la firma
+buona passa, la firma ritoccata e quella di un'altra chiave no (si
+ritocca la FIRMA: un contenuto cambiato cade già sull'id ricalcolato e
+non direbbe niente del verificatore — la prima stesura ritoccava il
+contenuto, e una mutazione l'ha presa); un login con la firma di
+un'altra chiave dice 401.
+PERCHÉ (a) E NON (b), coincurve nella CI: cambierebbe l'ambiente di
+tutti i collaudi e di `prove.py`, dove più di un giudice è provato
+apposta senza (il «fail-closed senza coincurve»); è una decisione a sé.
+In produzione la fusione usa coincurve davvero (login Nostr e
+collega-firma rispondono 503 senza), e sul VPS c'è.
+PROVATO: 30/0 con coincurve, 31/0 senza (venv usa-e-getta con le sole
+dipendenze della CI), verde anche nella gabbia di `collaudi_ci.py` nei
+due modi; le due mutazioni (calco tolto, verificatore che dice sempre sì)
+rosse. La suite intera e i collaudi della CI: nel verbale del commit.
