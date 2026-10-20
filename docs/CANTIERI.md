@@ -70973,3 +70973,104 @@ COSA RESTA.
   l'ExecStopPost usano al più 60 s ciascuno per l'avviso. Se Telegram
   non risponde, il SIGKILL arriva prima della fine della trappola, e
   allora parla (o prova a parlare) l'ExecStopPost.
+## I certificati dei relay si verificano: SSLOPT_RELAY ovunque, la riga 🔐, mai CERT_NONE (20 ott 2026, cantiere certificati-relay, decisione di Andrea)
+
+**IL PERCHÉ.** Ogni websocket verso un relay — 14 posti nel server, 5
+negli script — saliva con `cert_reqs: CERT_NONE`. Un motivo scritto non
+c'era: era nato col primo lettore della verifica npub, copiato da
+`importa_nostr.py`, ed era diventato «la convenzione di tutti i lettori
+di casa». Il commit d'origine non si ritrova (la storia del repo parte
+dal 16 ott 2026, compattata). Due cantieri l'avevano segnato come rischio
+e lasciato: il 23 set (il libro P2P: «chiunque in mezzo» poteva servire
+un 38383; la cura fu la firma, non il certificato) e l'11 ott
+(l'autenticazione NIP-42: chi sta in mezzo può mandare lui la sfida).
+Col cantiere relay-risolti l'IP dei relay dell'utente è controllato, e
+il passo dopo era questo.
+
+**IL CONTROLLO PRIMA, sul VPS (Andrea, 20 ott 2026).** Da questa sessione
+cloud i certificati veri non si vedono (niente rete diretta, e il proxy
+intercetta il TLS): li ha guardati Andrea con una stretta di mano TLS in
+sola lettura. `ca-certificates` installato; tutti OK: relay.barattolo.store
+(scade il 5 dic 2026, lo rinnova Caddy), relay.primal.net, relay.nostr.net,
+nostr.oxtr.dev, nos.lol, relay.mostro.network. `MOSTRO_RELAY` sul VPS:
+relay.mostro.network, relay.barattolo.store, nos.lol, tutti fra quelli
+provati. La regola era: un «NO» ferma il push.
+
+**COSA SI È DECISO.**
+- `SSLOPT_RELAY = {"cert_reqs": ssl.CERT_REQUIRED}` in ogni connessione
+  a un relay del server e degli script: verifica sul nome (lo SNI e il
+  controllo del nome li fa websocket-client dall'indirizzo), con le CA
+  del sistema — websocket-client non usa certifi (letto in
+  `_http._ssl_socket`, che senza CA dette carica quelle di serie).
+- UN CERTIFICATO NON VALIDO È UN RELAY IRRAGGIUNGIBILE: lo stesso ripiego
+  di un relay muto, che ogni lettore e scrittore ha già. Mai un ripiego a
+  CERT_NONE.
+- LA RIGA 🔐 la dice un posto solo: nel server `create_connection` è ora
+  l'involucro `_apri_websocket` sopra quello della libreria, che su
+  `ssl.SSLCertVerificationError` scrive «🔐 Relay <indirizzo>: certificato
+  non valido (<motivo>), non lo uso» — una volta all'ora per relay, sotto
+  un lucchetto perché chi bussa gira nei thread — e rialza l'errore. Le
+  chiamate restano `create_connection(`: il censimento delle connessioni
+  (`prove_letture_relay_collaudo`) le conta per nome, e cambiare quattordici
+  chiamate per dire una riga era il diff sbagliato. `_presa_esterna` (i
+  relay dell'utente) ora usa il contesto di serie (verificato, sul nome)
+  e dice la riga da sé.
+- GLI SCRIPT (sì di Andrea): `importa_nostr.py`, `censimento_nostr.py`,
+  `presenta_release.py` con la loro copia della costante; già stampavano
+  l'errore di un relay che non risponde, tranne `chiedi_eventi` di
+  `presenta_release.py`, che ora dice la riga 🔐 (il solo silenzio che
+  non si tiene).
+- L'ECCEZIONE NOMINATA: `deploy/nodo/sonda-rotte.py` usa un contesto non
+  verificato per la REST di LND sul nodo Mostro (certificato autofirmato
+  da LND, stessa macchina). Non è un relay e non è di questo cantiere: la
+  sentinella la nomina col suo perché.
+
+**PROVATO.** `prove_certificati_relay` (19): nessun `CERT_NONE`,
+`_create_unverified_context` o `check_hostname = False` nell'albero
+sintattico di ogni .py (fuori dall'eccezione nominata, e la sentinella
+vuole che l'eccezione sia ancora lì); in server e script ogni
+`create_connection` / `_posta_connetti` porta `sslopt=SSLOPT_RELAY` (o la
+presa già verificata, `socket=`); la costante è CERT_REQUIRED nei quattro
+file; l'involucro eseguito (un relay sano passa com'è, un certificato
+rifiutato rialza con la riga, una riga all'ora per relay, un relay muto
+nessuna riga). `prove_relay_risolti` aggiornata: il contesto resta quello
+di serie, e un certificato che non regge non dà presa e chiede la riga.
+`collaudo_certificati_relay` (7), con un relay `wss://` di cartone sul
+loopback e un certificato fatto in casa per il solo `localhost`: la
+lettura e la scrittura vere del server lo rifiutano, nessuna stretta di
+mano compiuta, una riga 🔐 a tre tentativi; LA CONTROPROVA, con quel
+certificato fra le CA fidate la stretta passa e la riga non c'è; SUL
+NOME, CA fidata ma bussando a 127.0.0.1 si rifiuta («IP address
+mismatch»). Cinque giri di fila verdi.
+LA ROTTURA APPOSTA, cinque mutazioni, tutte rosse: `chiedi_relay_dm`
+torna a CERT_NONE (prove 3, collaudo 2), la presa dell'utente con
+`check_hostname = False` (4), l'involucro zitto (prove 5, collaudo 3),
+l'involucro saltato (prove 1, collaudo 3), lo script d'import torna a
+CERT_NONE (3). Le prime stesure di due prove ESPLODEVANO su una lista
+vuota invece di dire «rossa» (in CI rosse lo stesso, ma per il motivo
+sbagliato): riscritte.
+I BANCHI D'ALTRI CANTIERI: otto mondi di cartone eseguono i lettori e gli
+scrittori veri (gli avvisi P2P, le foto dei nativi, le letture in
+collaudo, l'ascolto P2P, la posta, i relay di Barattolo, il relay per
+Mostro) e non conoscevano `SSLOPT_RELAY`: il lettore cadeva nel suo
+`except` e sembrava un relay muto (23 rosse e 4 esplose al primo giro).
+Ognuno riceve la costante accanto al suo `ssl`, una riga per banco. La
+strada scartata: la costante scritta per esteso nei quattordici posti
+(i banchi non si toccavano), contro la proposta approvata di una
+costante sola.
+
+**IL GIRO, mirato (regola di Andrea).** Sopra `6d76211`, col codice di
+questo commit: le sezioni che nominano i pezzi toccati (le connessioni ai
+relay, i 14 lettori e scrittori, gli script, l'involucro: 39) più quelle
+che leggono i documenti, 100 in tutto: 6.167 passate, 0 fallite, 0
+saltate; i collaudi che li usano (`ronda_relay`, `letture_relay`,
+`foto_obbligatorie`, `x_risonanza`, `istanza_prova`,
+`avvisi_nostr_arrivano`, `certificati_relay`) e quello della fusione: 8
+verdi.
+Poi develop è corso di uno (`c99079a`, i ritocchi del backup: deploy,
+`copia-db.py`, prove e documenti): nessuno dei simboli di qui (controllato
+per nome; il suo `deploy/copia-db.py` è un .py nuovo che la sentinella
+legge). Rebase, conflitto solo in coda a questo file. Sull'albero che va
+su develop: la mia sezione, quelle che quel commit tocca, quelle che
+leggono i documenti, il mio collaudo e quello della fusione — i numeri
+nel rapporto ad Andrea.

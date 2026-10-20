@@ -164,3 +164,4 @@ collaudo_fusione_da_telegram.py
 collaudo_avvisi_nostr_arrivano.py
 semina_collaudo.py
 collaudo_semina_collaudo.py
+collaudo_certificati_relay.py

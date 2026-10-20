@@ -33886,3 +33886,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_banco_chiavi_onchain`, `prove_chiave_che_nasce_da_sola`,
   `prove_checksum_descrittore`, `prove_indirizzo_ordine_onchain`,
   `prove_bundle_bitcoin`; il collaudo `collaudo_onchain_indirizzo`.
+
+- I CERTIFICATI DEI RELAY (20 ott 2026, cantiere certificati-relay;
+  perché in CANTIERI, «I certificati dei relay si verificano»; il journal
+  e il controllo in PRODUZIONE, «I CERTIFICATI DEI RELAY»). Una costante,
+  `SSLOPT_RELAY = {"cert_reqs": ssl.CERT_REQUIRED}`, in ogni
+  `create_connection` / `_posta_connetti` verso un relay del server (14
+  posti: le letture, le scritture, il postino, gli ascolti P2P e DM, il
+  libro, le ronde) e degli script (`importa_nostr.py`,
+  `censimento_nostr.py`, `presenta_release.py`, ognuno con la sua copia
+  della costante: gli script non dipendono dal server). Lo SNI e il
+  controllo del nome li fa `websocket-client` dall'indirizzo; le CA sono
+  quelle del sistema. Nel server `create_connection` è l'INVOLUCRO
+  `_apri_websocket` sopra quello della libreria (`_connessione_websocket`):
+  su `ssl.SSLCertVerificationError` chiama `_certificato_rifiutato` (la
+  riga 🔐, una volta ogni `CERT_RELAY_PAUSA_S` per relay, sotto
+  `_CERT_LUCCHETTO` perché chi bussa gira nei thread) e rialza: ogni
+  chiamante ha già il ripiego di un relay muto. Le chiamate restano
+  `create_connection(` — il censimento delle connessioni di prove.py le
+  conta per nome. `_presa_esterna` (i relay dell'utente) usa il contesto
+  di serie e chiama `_certificato_rifiutato` da sé. La sentinella
+  `prove_certificati_relay` fa rosso un `CERT_NONE`, un
+  `_create_unverified_context` o un `check_hostname = False` in qualunque
+  .py, con UNA eccezione nominata: `deploy/nodo/sonda-rotte.py`, che sul
+  nodo parla con la REST di LND (certificato autofirmato da LND).

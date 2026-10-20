@@ -66,9 +66,62 @@ from fastapi.responses import JSONResponse
 # websocket-client serve solo alla verifica npub: se manca il pacchetto
 # il server parte lo stesso e la verifica risponde con un errore chiaro.
 try:
-    from websocket import create_connection
+    from websocket import create_connection as _connessione_websocket
 except ImportError:
-    create_connection = None
+    _connessione_websocket = None
+
+# I CERTIFICATI DEI RELAY SI VERIFICANO (20 ott 2026, cantiere
+# certificati-relay, decisione di Andrea). Fino a oggi ogni websocket
+# verso un relay saliva con `cert_reqs: CERT_NONE`: un motivo scritto non
+# c'era — era nato col primo lettore, copiato da importa_nostr.py, ed era
+# diventato «la convenzione di tutti i lettori di casa» — e due cantieri
+# l'avevano segnato come rischio (23 set, il libro P2P: «chiunque in
+# mezzo»; 11 ott, l'autenticazione NIP-42). Adesso: il certificato si
+# verifica, e sul NOME del relay (lo SNI lo mette la libreria dal suo
+# indirizzo), con le CA del sistema (websocket-client non usa certifi:
+# sul VPS e' il pacchetto ca-certificates, guardato da Andrea il 20 ott
+# 2026, coi relay della lista e di MOSTRO_RELAY tutti validi).
+# UN CERTIFICATO NON VALIDO E' UN RELAY IRRAGGIUNGIBILE: lo stesso
+# ripiego di un relay muto, che ogni lettore e ogni scrittore ha gia'.
+# MAI un ripiego silenzioso a CERT_NONE, e mai in silenzio del tutto: una
+# riga 🔐 nel journal, una volta all'ora per relay. A dirla e' QUESTO
+# involucro, che ha il nome di sempre: le chiamate (e il censimento delle
+# connessioni in prove.py, che le conta per nome) restano quelle di ieri.
+# Lo stesso SSLOPT_RELAY vale per gli script che parlano coi relay
+# (importa_nostr.py, censimento_nostr.py, presenta_release.py), e una
+# sentinella fa rosso ogni CERT_NONE che ricompare.
+SSLOPT_RELAY = {"cert_reqs": ssl.CERT_REQUIRED}
+CERT_RELAY_PAUSA_S = 3600          # la riga 🔐 al piu' una volta all'ora per relay
+_CERT_RIFIUTATI = {}               # relay -> l'ultima volta che si e' detto
+_CERT_LUCCHETTO = threading.Lock()  # chi bussa ai relay gira nei thread
+
+
+def _certificato_rifiutato(relay: str, errore) -> None:
+    """La riga 🔐 di un certificato rifiutato, una volta all'ora per relay."""
+    adesso = time.time()
+    with _CERT_LUCCHETTO:
+        if adesso - _CERT_RIFIUTATI.get(relay, 0) < CERT_RELAY_PAUSA_S:
+            return
+        if len(_CERT_RIFIUTATI) > 5000:
+            _CERT_RIFIUTATI.clear()
+        _CERT_RIFIUTATI[relay] = adesso
+    motivo = getattr(errore, "verify_message", "") or str(errore)
+    print(f"🔐 Relay {relay}: certificato non valido ({str(motivo)[:120]}), "
+          "non lo uso", flush=True)
+
+
+def _apri_websocket(relay, *a, **k):
+    """`create_connection` di websocket-client, con la riga 🔐 quando il
+    certificato non regge. L'errore risale com'e': chi chiama ha gia' il
+    suo ripiego per un relay che non risponde."""
+    try:
+        return _connessione_websocket(relay, *a, **k)
+    except ssl.SSLCertVerificationError as e:
+        _certificato_rifiutato(relay, e)
+        raise
+
+
+create_connection = _apri_websocket if _connessione_websocket else None
 # coincurve serve a firmare gli annunci pubblicati verso Nostr e a
 # VERIFICARE le firme di chi entra col login Nostr: se manca, quelle
 # funzioni restano spente e il server parte lo stesso.
@@ -11746,7 +11799,7 @@ def _orecchio_filo(relay: str):
         ws = None
         try:
             ws = _cassetta_connetti(relay, timeout=10,
-                                    sslopt={"cert_reqs": ssl.CERT_NONE})
+                                    sslopt=SSLOPT_RELAY)
             ws.settimeout(CASSETTA_ORECCHIO_PASSO_S)
             since = int(time.time()) - CASSETTA_VITA_S
             filtro = list(pubs)
@@ -43762,7 +43815,7 @@ def _kind0_profilo(relay: str, hexkey: str):
             return None
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "av", {
             "kinds": [0], "authors": [hexkey], "limit": 1}]))
         profilo, inizio, finito = None, time.time(), False
@@ -57299,7 +57352,7 @@ def _firmato_dal_coordinatore(ev, mostro: str) -> bool:
     PERCHE': il filtro `authors` e' una DOMANDA al relay, non una
     prova. Fin qui il lettore del libro e l'ascolto si fidavano della
     risposta — un relay bucato, o chiunque in mezzo (il socket va su
-    con `CERT_NONE`), poteva servire un 38383 con la pubkey di mostrod
+    con `CERT_NONE` fino al 20 ott 2026), poteva servire un 38383 con la pubkey di mostrod
     e far partire dalla riserva un «preso» o un «concluso» a chi vuole:
     la stessa notizia non confermata che la cura di A1 (23 set 2026)
     ha tolto al telefono. Con la firma, quel che il libro dice l'ha
@@ -57508,7 +57561,7 @@ def _ascolto_p2p_filo(relay: str, mostro: str, loop, ferma):
         try:
             A["segno"] = inizio = time.time()
             ws = create_connection(relay, timeout=10,
-                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+                                   sslopt=SSLOPT_RELAY)
             ws.settimeout(5)
             # IL SOLO LIBRO (patch 0007, 18 set 2026): le buste cifrate
             # non si guardano piu', nemmeno per sapere che esistono
@@ -60635,7 +60688,7 @@ def eventi_libro_da_relay(relay: str, ids: list, since: int, mostro: str):
         filtro["since"] = int(since)
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "libro", filtro]))
         inizio = time.time()
         fuori = []
@@ -60669,7 +60722,7 @@ def info_libro_da_relay(relay: str, mostro: str):
         return None
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "info", {
             "kinds": [38385], "authors": [mostro], "limit": 1}]))
         inizio = time.time()
@@ -60747,7 +60800,7 @@ def libro_intero_da_relay(relay: str, mostro: str, since: int):
         return None
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "foto",
                             {"kinds": [38383], "authors": [mostro],
                              "since": int(since)},
@@ -66460,7 +66513,7 @@ def invia_evento_relay(relay: str, evento: dict, esterno: bool = False) -> bool:
             return a["preso"]
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
     except Exception:
         return False              # relay muto o irraggiungibile: pazienza
     return _consegna_ws(ws, relay, evento)
@@ -66624,7 +66677,7 @@ class _Postino:
             raise ConnectionError("relay in pausa dopo un'apertura fallita")
         try:
             ws = _posta_connetti(self.relay, timeout=POSTA_APRI_S,
-                                 sslopt={"cert_reqs": ssl.CERT_NONE})
+                                 sslopt=SSLOPT_RELAY)
         except Exception:
             self.cadute += 1
             self.fermo_fino = adesso + min(2 ** (self.cadute - 1),
@@ -67021,7 +67074,7 @@ def chiedi_relay_dm(relay: str, hexkey: str, kind: int = 10050):
             return None
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "dm", {
             "kinds": [kind], "authors": [hexkey], "limit": 1}]))
         inizio = time.time()
@@ -67160,9 +67213,9 @@ def relay_suoi_dm(lista) -> list:
 #    per l'intestazione Host della websocket (la mette la libreria
 #    dall'indirizzo, che non cambia).
 # Una risoluzione che fallisce, o che non da' niente: irraggiungibile.
-# Il certificato si tratta come per gli altri relay del server
-# (`cert_reqs: CERT_NONE`, la regola di sempre di `invia_evento_relay`):
-# qui cambia DOVE ci si connette, non come.
+# Il certificato si VERIFICA sul nome, come per tutti i relay dal
+# cantiere certificati-relay (vedi SSLOPT_RELAY): qui cambia DOVE ci si
+# connette, non come.
 # I nostri relay (dal config) non passano di qui: escono come sempre.
 def _risolvi_relay(host: str, porta: int) -> list:
     """La risoluzione del nome, in un posto solo (le prove la sostituiscono
@@ -67206,15 +67259,17 @@ def _presa_esterna(relay, tetto: float = 5):
     if not indirizzi:
         return None
     host = urlparse(str(relay).strip()).hostname
+    # il contesto di serie: certificato verificato, e sul NOME (SNI)
     contesto = ssl.create_default_context()
-    contesto.check_hostname = False
-    contesto.verify_mode = ssl.CERT_NONE
     for famiglia, indirizzo in indirizzi:
         grezza = socket.socket(famiglia, socket.SOCK_STREAM)
         grezza.settimeout(tetto)
         try:
             grezza.connect(indirizzo)
             return contesto.wrap_socket(grezza, server_hostname=host)
+        except ssl.SSLCertVerificationError as e:
+            grezza.close()
+            _certificato_rifiutato(relay, e)
         except Exception:
             grezza.close()
     return None
@@ -67917,7 +67972,7 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
         try:
             O["segno"] = inizio = time.time()
             ws = _dm_connetti(relay, timeout=10,
-                              sslopt={"cert_reqs": ssl.CERT_NONE})
+                              sslopt=SSLOPT_RELAY)
             ws.settimeout(5)
             richiesta = json.dumps(["REQ", "dm", *_dm_filtri(
                 nostra, inizio, O["vivo_fino"])])
@@ -70861,7 +70916,7 @@ def _x_note_da_relay(relay: str, hexkey: str, dal: int) -> list:
         return None if letto is None else letto[0]
     try:
         ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "x", {"kinds": [1], "authors": [hexkey],
                                          "since": int(dal), "limit": 100}]))
         inizio, fuori = time.time(), []
@@ -88252,7 +88307,7 @@ def _ronda_relay_leggi(relay: str, mostro: str) -> tuple:
     ws = None
     try:
         ws = _ronda_relay_connetti(relay, timeout=RONDA_RELAY_TETTO_S,
-                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+                                   sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["REQ", "ronda", {
             "kinds": [38383, 38385], "authors": [mostro], "limit": 1}]))
         inizio, ultimo = time.time(), 0
@@ -88312,7 +88367,7 @@ def _ronda_relay_canta(relay: str, mostro: str) -> tuple:
     try:
         ev = _ronda_relay_canarino(mostro, int(time.time()))
         ws = _ronda_relay_connetti(relay, timeout=RONDA_RELAY_TETTO_S,
-                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+                                   sslopt=SSLOPT_RELAY)
         ws.send(json.dumps(["EVENT", ev]))
         inizio = time.time()
         while time.time() - inizio < RONDA_RELAY_TETTO_S:
@@ -88585,7 +88640,7 @@ def _ronda_nostr_leggi(relay: str) -> str:
     ws = None
     try:
         ws = _ronda_nostr_connetti(relay, timeout=RONDA_NOSTR_TETTO_S,
-                                   sslopt={"cert_reqs": ssl.CERT_NONE})
+                                   sslopt=SSLOPT_RELAY)
         filtro = {"kinds": [10050], "limit": 1}
         if _NOSTR:
             filtro["authors"] = [_NOSTR[1]]

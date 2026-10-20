@@ -20,6 +20,12 @@ import time
 
 from websocket import create_connection
 
+# I CERTIFICATI DEI RELAY SI VERIFICANO (20 ott 2026, cantiere
+# certificati-relay, decisione di Andrea): sul nome del relay, con le CA
+# del sistema, come nel server (`SSLOPT_RELAY` di server.py, col perche').
+# Un certificato non valido e' un relay irraggiungibile; mai CERT_NONE.
+SSLOPT_RELAY = {"cert_reqs": ssl.CERT_REQUIRED}
+
 RELAYS = [
     "wss://relay.damus.io",
     "wss://nos.lol",
@@ -76,7 +82,7 @@ def interroga(relay):
     eventi = []
     try:
         ws = create_connection(relay, timeout=10,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
+                               sslopt=SSLOPT_RELAY)
         sub = "censimento"
         ws.send(json.dumps(["REQ", sub,
                             {"kinds": [30402, 30018], "limit": LIMITE}]))

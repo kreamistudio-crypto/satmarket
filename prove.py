@@ -17010,6 +17010,7 @@ def prove_foto_nostr_relay_muti():
     amb = {"lettura_simulata": lambda r, cosa: False,
            "create_connection": _connetti, "json": json, "time": time,
            "ssl": _ssl,
+           "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED},  # (certificati-relay)
            # LA POSTA DEI RELAY (15 ott 2026) ha la sua sezione: qui si
            # prova la connessione singola, quindi nessun postino
            "_posta_per": lambda r: None,
@@ -99525,6 +99526,7 @@ def prove_p2p_avvisi_in_ordine():
 
     def lettore(risposte):
         amb_l = {"json": json, "time": time, "ssl": _ssl,
+                 "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED},  # (certificati-relay)
                  "create_connection": lambda relay, timeout=0, sslopt=None: _WsCartone(risposte),
                  "lettura_simulata": lambda *a, **k: False,
                  "print": lambda *a, **k: detto_l.append(" ".join(str(x) for x in a)),
@@ -100843,6 +100845,7 @@ def prove_p2p_ascolto():
             return ws
 
         amb = {"asyncio": _aio, "time": time, "json": json, "ssl": _ssl,
+               "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED},  # (certificati-relay)
                "socket": _socket, "create_connection": _connetti,
                "print": lambda *a, **k: detto.append(" ".join(str(x) for x in a)),
                "P2P_MAZZETTO_S": 0.05, "P2P_ASCOLTO_POLSO_S": 0.15,
@@ -102106,7 +102109,8 @@ def prove_letture_relay_collaudo():
 
         amb = {"MODALITA_COLLAUDO": collaudo, "_LETTURE_SIMULATE": set(),
                "urlparse": _urlparse, "ipaddress": _ipaddress,
-               "create_connection": _connetti, "ssl": _ssl, "json": json,
+               "create_connection": _connetti, "ssl": _ssl,
+               "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED}, "json": json,  # (certificati-relay)
                "time": time, "asyncio": _aio, "RELAYS_VERIFICA": list(SERIE),
                "_posta_per": lambda r: None,     # la posta ha la sua sezione
                # il recinto dell'istanza di prova (20 ott 2026): spento,
@@ -167423,7 +167427,8 @@ def prove_relay_per_mostro():
                           "wss://relay.vero.example")
     amb = {"app": _App(), "create_connection": Ws, "asyncio": _aio,
            "base64": _b64, "hashlib": _hl, "html": _html, "json": json,
-           "secrets": _sec, "ssl": _ssl, "time": time,
+           "secrets": _sec, "ssl": _ssl,
+           "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED}, "time": time,  # (certificati-relay)
            "ipaddress": _ipa, "urlparse": _urlparse,
            "MOSTRO_HEX": MOSTRO, "MOSTRO_RELAY": [NOSTRO, LORO, VERO],
            "MOSTRO_RELAY_CONFERMA": [NOSTRO, LORO],
@@ -170617,7 +170622,8 @@ def prove_relay_di_barattolo():
     A, B, VERO = ("ws://127.0.0.1:7821", "ws://127.0.0.1:7822",
                   "wss://relay.vero.example")
     amb = {"app": _App(), "create_connection": Ws, "asyncio": _aio,
-           "html": _html, "json": json, "ssl": _ssl, "time": time,
+           "html": _html, "json": json, "ssl": _ssl,
+           "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED}, "time": time,  # (certificati-relay)
            "ipaddress": _ipa, "urlparse": _urlparse,
            "_NOSTR": (object(), PIATTA), "RELAYS_VERIFICA": [A, " " + B, A, ""],
            "MODALITA_COLLAUDO": False, "_LETTURE_SIMULATE": set(),
@@ -170690,6 +170696,7 @@ def prove_relay_di_barattolo():
 
     # --- invia_evento_relay VERO segna l'esito, e il suo ritorno non cambia
     amb_inv = {"create_connection": Ws, "json": json, "ssl": _ssl,
+               "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED},  # (certificati-relay)
                "time": time, "_segna_scrittura_relay": segna,
                "_posta_per": lambda r: None,   # la connessione singola
                "fuori_dal_recinto": lambda relay, cosa: False}   # (20 ott 2026)
@@ -170948,6 +170955,7 @@ def prove_posta_relay():
                       SVELTO: Relay(), CADE: Relay(chiudi_al=1),
                       GIU: Relay(giu=True), FUORI: Relay()})
         amb = {"create_connection": connetti, "json": json, "ssl": _ssl,
+               "SSLOPT_RELAY": {"cert_reqs": _ssl.CERT_REQUIRED},  # (certificati-relay)
                "socket": _so,
                "time": time, "threading": _th, "asyncio": _aio,
                "ipaddress": _ipa, "urlparse": _urlparse,
@@ -176512,6 +176520,144 @@ ctx.__no = async () => { throw new Error('not eligible'); };
         prova("swap: ...e il giudice in Python dice no a una firma rotta", False,
               _cart.schnorr_verifica(bytes.fromhex(co["impronta"]),
                                      bytes.fromhex(co["chiave"]), bytes(rotta)))
+def prove_certificati_relay():
+    """I CERTIFICATI DEI RELAY SI VERIFICANO (20 ott 2026, cantiere
+    certificati-relay, decisione di Andrea). Ogni websocket verso un relay
+    saliva con CERT_NONE, senza un motivo scritto. Adesso: SSLOPT_RELAY
+    (CERT_REQUIRED, sul nome, CA del sistema) in ogni connessione del
+    server e degli script; un certificato non valido e' un relay
+    irraggiungibile, con la riga 🔐 una volta all'ora per relay (la dice
+    `_apri_websocket`, che ha preso il nome `create_connection`); mai un
+    ripiego a CERT_NONE. Qui le sentinelle sull'albero sintattico di OGNI
+    .py e l'involucro eseguito; il relay di cartone col certificato fatto in
+    casa sta in `collaudo_certificati_relay`."""
+    print("\n[i certificati dei relay si verificano: SSLOPT_RELAY, la riga 🔐, mai CERT_NONE]")
+    import ast as _ast
+    import ssl as _ssl
+    import types as _t
+
+    # --- 1) NESSUN CERT_NONE, IN NESSUN .py (fuori di qui) -----------------
+    def _py():
+        for radice, cartelle, file in os.walk(QUI):
+            cartelle[:] = [c for c in cartelle if c not in (
+                ".git", "node_modules", "__pycache__", ".claude", "venv", ".venv")]
+            for f in file:
+                if f.endswith(".py") and f != "prove.py":
+                    yield os.path.join(radice, f)
+    trovati, letti = [], 0
+    for percorso in _py():
+        try:
+            albero = _ast.parse(open(percorso, encoding="utf-8").read())
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        letti += 1
+        nome = os.path.relpath(percorso, QUI)
+        for n in _ast.walk(albero):
+            if (isinstance(n, _ast.Attribute) and n.attr in (
+                    "CERT_NONE", "_create_unverified_context")) or (
+                    isinstance(n, _ast.Name) and n.id == "CERT_NONE"):
+                trovati.append(f"{nome}:{n.lineno} {getattr(n, 'attr', '') or n.id}")
+            if isinstance(n, _ast.Assign) and any(
+                    isinstance(b, _ast.Attribute) and b.attr == "check_hostname"
+                    for b in n.targets) and isinstance(n.value, _ast.Constant) \
+                    and n.value.value is False:
+                trovati.append(f"{nome}:{n.lineno} check_hostname = False")
+    prova("il censimento legge i .py del progetto (e non zero)", True, letti > 100)
+    # L'ECCEZIONE NOMINATA, e non e' un relay: la sonda delle rotte gira SUL
+    # NODO Mostro e parla con la REST di LND sulla stessa macchina, il cui
+    # certificato e' autofirmato da LND (11 ott 2026, cantiere
+    # allarme-liquidita). Una per una e col perche', come le lacune del
+    # censimento della fusione: la prossima entra rossa.
+    ECCEZIONI = {"deploy/nodo/sonda-rotte.py:27 _create_unverified_context"}
+    prova("NESSUN CERT_NONE, nessun contesto non verificato, nessun "
+          "check_hostname = False, in nessun .py (fuori dall'eccezione "
+          "nominata)", [], [x for x in trovati if x.replace(os.sep, "/")
+                            not in ECCEZIONI])
+    prova("...e l'eccezione e' ancora quella (se sparisce, va tolta di qui)",
+          ECCEZIONI, {x.replace(os.sep, "/") for x in trovati})
+
+    # --- 2) OGNI CONNESSIONE A UN RELAY PORTA SSLOPT_RELAY ------------------
+    PORTE = {"create_connection", "_posta_connetti", "_connessione_websocket"}
+    for f in ("server.py", "importa_nostr.py", "censimento_nostr.py",
+              "presenta_release.py"):
+        testo = open(f, encoding="utf-8").read()
+        albero = _ast.parse(testo)
+        senza = []
+        for fn in _ast.walk(albero):
+            if not isinstance(fn, (_ast.FunctionDef, _ast.AsyncFunctionDef)) \
+                    or fn.name == "_apri_websocket":
+                continue
+            for c in _ast.walk(fn):
+                if isinstance(c, _ast.Call) and isinstance(c.func, _ast.Name) \
+                        and c.func.id in PORTE:
+                    k = {x.arg: x.value for x in c.keywords}
+                    buona = (isinstance(k.get("sslopt"), _ast.Name)
+                             and k["sslopt"].id == "SSLOPT_RELAY") or "socket" in k
+                    if not buona:
+                        senza.append(f"{fn.name}:{c.lineno}")
+        prova(f"{f}: ogni connessione a un relay porta sslopt=SSLOPT_RELAY "
+              "(o una presa gia' verificata, `socket=`)", [], senza)
+        prova(f"{f}: SSLOPT_RELAY e' CERT_REQUIRED", True,
+              'SSLOPT_RELAY = {"cert_reqs": ssl.CERT_REQUIRED}' in testo)
+    src = _SORGENTE
+    prova("il server: create_connection E' l'involucro (le chiamate e il "
+          "censimento restano quelli di ieri)", True,
+          "create_connection = _apri_websocket if _connessione_websocket else None"
+          in src)
+    prova("la presa dei relay dell'utente usa il contesto di serie (verificato, "
+          "sul nome) e dice il certificato rifiutato", [False, True],
+          ["check_hostname" in codice(pezzo("_presa_esterna")),
+           "_certificato_rifiutato(relay, e)" in pezzo("_presa_esterna")])
+
+    # --- 3) L'INVOLUCRO, ESEGUITO -------------------------------------------
+    righe, adesso = [], [1_800_000_000.0]
+
+    def _apri_vero(relay, **k):
+        if "rotto" in relay:
+            raise _ssl.SSLCertVerificationError(
+                1, "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed")
+        if "muto" in relay:
+            raise OSError("connessione rifiutata")
+        return ("ws", relay, k)
+    amb = {"ssl": _ssl, "threading": __import__("threading"),
+           "time": _t.SimpleNamespace(time=lambda: adesso[0]),
+           "_connessione_websocket": _apri_vero, "CERT_RELAY_PAUSA_S": 3600,
+           "_CERT_RIFIUTATI": {}, "_CERT_LUCCHETTO": __import__("threading").Lock(),
+           "print": lambda *a, **k: righe.append(" ".join(str(x) for x in a))}
+    exec(pezzo("_certificato_rifiutato"), amb)
+    exec(pezzo("_apri_websocket"), amb)
+    apri = amb["_apri_websocket"]
+
+    def tenta(relay):
+        try:
+            return apri(relay, timeout=5, sslopt={"cert_reqs": _ssl.CERT_REQUIRED})
+        except Exception as e:
+            return type(e).__name__
+    prova("un relay sano: la connessione passa com'e', argomenti compresi",
+          ("ws", "wss://sano.example", {"timeout": 5,
+                                         "sslopt": {"cert_reqs": _ssl.CERT_REQUIRED}}),
+          tenta("wss://sano.example"))
+    prova("un certificato rifiutato: l'errore risale com'e' (il chiamante ha il "
+          "suo ripiego) e la riga 🔐 c'e'",
+          ["SSLCertVerificationError", 1], [tenta("wss://rotto.example"), len(righe)])
+    prova("...la riga dice il relay e che non si usa", True,
+          (righe[:1] or [""])[0].startswith(
+              "🔐 Relay wss://rotto.example: certificato non valido")
+          and (righe[:1] or [""])[0].endswith(", non lo uso"))
+    tenta("wss://rotto.example")
+    adesso[0] += 3599
+    tenta("wss://rotto.example")
+    prova("...UNA volta all'ora per relay: altre due prove nell'ora, nessuna riga",
+          1, len(righe))
+    tenta("wss://rotto-due.example")
+    adesso[0] += 2
+    tenta("wss://rotto.example")
+    prova("...un altro relay ha la sua riga, e passata l'ora torna quella del "
+          "primo", 3, len(righe))
+    prova("un relay muto (non e' il certificato): nessuna riga 🔐",
+          ["OSError", 3], [tenta("wss://muto.example"), len(righe)])
+
+
 def prove_relay_risolti():
     """IL NOME SI RISOLVE AL MOMENTO DI BUSSARE (20 ott 2026, cantiere
     relay-risolti, decisione di Andrea). `relay_esterno` guarda il nome, e
@@ -176554,19 +176700,28 @@ def prove_relay_risolti():
         def close(self):
             CHIUSE.append(self)
 
+    class _CertRotto(Exception):
+        verify_message = "self-signed certificate"
+    CERT_ROTTI, DETTI_CERT = set(), []
+
     class _Contesto:
         check_hostname = True
         verify_mode = "di serie"
 
         def wrap_socket(self, grezza, server_hostname=None):
             TLS.append((server_hostname, self.check_hostname, self.verify_mode))
+            if server_hostname in CERT_ROTTI:
+                raise _CertRotto("certificate verify failed")
             return ("tls", grezza, server_hostname)
 
     amb = {"urlparse": _urlparse, "ipaddress": _ipa, "re": re,
            "socket": _t.SimpleNamespace(AF_INET=2, AF_INET6=10, SOCK_STREAM=1,
                                         socket=_Presa),
-           "ssl": _t.SimpleNamespace(CERT_NONE="nessuno",
-                                     create_default_context=_Contesto),
+           # (certificati-relay) il contesto di serie, e l'errore del
+           # certificato che `_presa_esterna` riconosce
+           "ssl": _t.SimpleNamespace(create_default_context=_Contesto,
+                                     SSLCertVerificationError=_CertRotto),
+           "_certificato_rifiutato": lambda relay, e: DETTI_CERT.append(relay),
            "_risolvi_relay": _risolvi}
     exec(re.search(r"\n(_FORMA_TLD = [^\n]*)\n", src).group(1), amb)
     exec(re.search(r"\n(_NOMI_LOCALI = \([^)]*\))", src).group(1), amb)
@@ -176627,9 +176782,9 @@ def prove_relay_risolti():
     prova("NIENTE REBINDING: il nome si chiede UNA volta, e ci si connette "
           "all'indirizzo controllato (non di nuovo al nome)",
           [1, ["93.184.216.34"]], [len(CHIESTE), CONNESSIONI])
-    prova("...il TLS porta il NOME per lo SNI, col certificato trattato come "
-          "per gli altri relay", [("finto-rebind.example", False, "nessuno")],
-          TLS)
+    prova("...il TLS porta il NOME per lo SNI, e il contesto resta quello di "
+          "serie: certificato VERIFICATO, sul nome (certificati-relay)",
+          [("finto-rebind.example", True, "di serie")], TLS)
     prova("...e la presa resa e' quella TLS sopra la connessione all'IP",
           ("tls", "finto-rebind.example"), (p[0], p[2]))
     DNS["finto-due.example"] = ["1.1.1.1", "93.184.216.34"]
@@ -176644,6 +176799,13 @@ def prove_relay_risolti():
     prova("verso un nome che porta a casa: nessuna presa, nessuna connessione, "
           "nessun TLS", [None, [], []],
           [presa("wss://finto-casa.example"), CONNESSIONI, TLS])
+    DNS["finto-cert.example"] = ["93.184.216.34"]
+    CERT_ROTTI.add("finto-cert.example")
+    del CHIUSE[:], DETTI_CERT[:]
+    prova("(certificati-relay) un certificato che non regge: nessuna presa, la "
+          "connessione grezza chiusa, e la riga 🔐 chiesta per quel relay",
+          [None, 1, ["wss://finto-cert.example"]],
+          [presa("wss://finto-cert.example"), len(CHIUSE), DETTI_CERT])
 
     # --- 4) LA CONSEGNA: invia_evento_relay(..., esterno=True) ------------
     aperte, posta_chiesta = [], []
@@ -177929,6 +178091,7 @@ def main():
               prove_filtro_10050,
               prove_semina_collaudo,
               prove_relay_risolti,
+              prove_certificati_relay,
               prove_config_esempio):
         try:
             f()
