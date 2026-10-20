@@ -388,6 +388,62 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                            claim: chiamate.slice(gia16).filter(c => c.url.endsWith('/claim')).length};
   await modo('normale');
 
+  // --- (20 ott 2026, swap-spesa) LA RISPOSTA DEL RITIRO PERSA, a fornitore
+  // giu: la rete prende la trasmissione e il telefono non lo sa. Il giro
+  // dopo riconosce il suo ritiro nella spesa del lockup: concluso.
+  const frase = ordine => A.run(`frasestatoSwap(swapLista().find(r => r.ordine === ${ordine}))`);
+  A.run(`elementi.swapIndirizzo_17 = {value: '${D.indirizzo}'}`);
+  await A.run('swapAvanti(17)');
+  await A.run('swapCrea(17)');
+  const r17 = lista(memA).find(r => r.ordine === 17);
+  await modo('giu_rete_muta');
+  await stato(r17.id, 'transaction.mempool');
+  await A.run('swapGiro()');
+  const r17a = lista(memA).find(r => r.ordine === 17);
+  const presa = (await visto()).trasmesse.find(x => x.swap === r17.id) || {};
+  await A.run('swapGiro()');
+  const r17b = lista(memA).find(r => r.ordine === 17);
+  out.rispostaPersa = {
+    primo: [!!r17a.ritiro, !!r17a.errore, (r17a.firmati || []).includes(presa.txid),
+            (presa.strade || []).join(',')],
+    poi: {concluso: !!(r17b.ritiro && r17b.ritiro.concluso),
+          stessoTxid: !!r17b.ritiro && r17b.ritiro.txid === presa.txid,
+          sats: r17b.ritiro && r17b.ritiro.sats, errore: r17b.errore || '',
+          frase: frase(17).startsWith('Concluso: 47154 sats arrivati')},
+    unaVolta: (await visto()).trasmesse.filter(x => x.swap === r17.id).length};
+  /* ...e un telefono che quella transazione non l'ha firmata (le stesse
+     parole altrove): la riconosce dall'indirizzo di chi vende */
+  const l17 = lista(memA);
+  const s17 = l17.find(r => r.ordine === 17);
+  delete s17.ritiro;
+  delete s17.firmati;
+  memA.set('barattolo_swap_lista_222', JSON.stringify(l17));
+  await A.run('swapGiro()');
+  const r17c = lista(memA).find(r => r.ordine === 17);
+  out.dallIndirizzo = {concluso: !!(r17c.ritiro && r17c.ritiro.concluso),
+                       stessoTxid: !!r17c.ritiro && r17c.ritiro.txid === presa.txid,
+                       sats: r17c.ritiro && r17c.ritiro.sats, errore: r17c.errore || ''};
+  await modo('normale');
+  /* LO SPESO DA UN ALTRO: errore chiaro, nessuna firma chiesta, niente
+     trasmesso */
+  A.run(`elementi.swapIndirizzo_18 = {value: '${D.indirizzo}'}`);
+  await A.run('swapAvanti(18)');
+  await A.run('swapCrea(18)');
+  const r18 = lista(memA).find(r => r.ordine === 18);
+  await modo('giu');
+  await stato(r18.id, 'transaction.mempool');
+  await fetchVero(`${BASE}/cartone/spendi_altro?id=${r18.id}`);
+  const g18 = chiamate.length;
+  await A.run('swapGiro()');
+  const r18b = lista(memA).find(r => r.ordine === 18);
+  out.spesoDaAltri = {ritirato: !!r18b.ritiro, errore: r18b.errore || '',
+                      spesoDa: /^[0-9a-f]{64}$/.test(r18b.spesoDa || ''),
+                      claim: chiamate.slice(g18).filter(c => c.url.endsWith('/claim')).length,
+                      post: chiamate.slice(g18).filter(c => c.metodo === 'POST').length,
+                      frase: frase(18),
+                      riprovo: A.run('cartaSwap(swapLista().find(r => r.ordine === 18))').includes('riprovo da solo')};
+  await modo('normale');
+
   // --- LA SENTINELLA: dove sono andate le chiamate, e cosa portavano
   const priv = [];
   for (let i = 0; i < 12; i++) {
@@ -593,6 +649,24 @@ def il_telefono(base):
           r.get("spentaPrima"))
     prova("...e senza lockup sulla rete niente ritiro tentato, niente firma chiesta",
           {"ritirato": False, "errore": "", "claim": 0}, r.get("spentaSenzaLockup"))
+
+    print("\n[la spesa del lockup: chi l'ha speso]")
+    prova("la risposta del ritiro si perde a fornitore giu: errore, ma la transazione e' ricordata",
+          [False, True, True, "rete"], (r.get("rispostaPersa") or {}).get("primo"))
+    prova("...il giro dopo riconosce il suo ritiro nella spesa del lockup: concluso, coi sats arrivati",
+          {"concluso": True, "stessoTxid": True, "sats": 47_154, "errore": "", "frase": True},
+          (r.get("rispostaPersa") or {}).get("poi"))
+    prova("...e il ritiro sulla rete c'e' una volta sola", 1,
+          (r.get("rispostaPersa") or {}).get("unaVolta"))
+    prova("un telefono che non l'ha firmato lo riconosce dall'indirizzo di chi vende",
+          {"concluso": True, "stessoTxid": True, "sats": 47_154, "errore": ""},
+          r.get("dallIndirizzo"))
+    prova("lockup speso da un altro: errore chiaro, nessuna firma, niente trasmesso",
+          {"ritirato": False, "errore": "il lockup l'ha speso un'altra transazione",
+           "spesoDa": True, "claim": 0, "post": 0,
+           "frase": "I bitcoin dello swap li ha spesi un'altra transazione, non il tuo ritiro: scrivi a SATS Routing.",
+           "riprovo": False},
+          r.get("spesoDaAltri"))
 
     print("\n[la sentinella]")
     se = r["sentinella"]

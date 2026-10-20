@@ -33780,6 +33780,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `POST /esplora/tx`, `/esplora/v1/fees/recommended`), il modo
   `giu_dopo_firma`, e `strade` in ogni ritiro di `trasmesse` (contato una
   volta).
+- LO SWAP, LA SPESA DEL LOCKUP (20 ott 2026, cantiere swap-spesa; perché
+  in CANTIERI, «La spesa del lockup»). `swapSpesaDelLockup(base, rec,
+  destinazione)` in `swap/boltz.js`: il lockup fra le transazioni
+  dell'indirizzo (`/address/<a>/txs`), chi spende la sua uscita
+  (`/tx/<id>/outspend/<n>`), le uscite di chi spende (dalla stessa lista
+  o da `/tx/<id>`); `nostro` se l'id sta in `rec.firmati` (le ultime
+  quattro transazioni firmate qui, scritte PRIMA di trasmettere) o se
+  un'uscita paga lo script di `rec.indirizzo`. In `ritira`, quando la
+  ricerca per indirizzo non trova un lockup non speso e PRIMA del
+  fornitore: nostro → `{txid, concluso: true, sats}`; di un altro →
+  errore con `.tipo = 'speso'` e `.txid`. `lockupInRete` dice sì anche a
+  un lockup speso. In `swap/instradatore.js`: `rec.ritiro.concluso` e
+  `.sats` («Concluso: … sats arrivati»), `rec.spesoDa` (la frase
+  `spesoAltri`, e la carta non dice «riprovo da solo»). Il cartone: le
+  `spese` per lockup, `/esplora/address/<a>/txs`, `/esplora/tx/<id>`,
+  `/esplora/tx/<id>/outspend/<n>`, il modo `giu_rete_muta` (la rete
+  prende la trasmissione e risponde 502) e `/cartone/spendi_altro`.
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e

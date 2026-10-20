@@ -175906,6 +175906,22 @@ def prove_swap_telefono():
            "fee = Math.ceil(Number(f.fastestFee) * 160);" in rit,
            "try { inRete = await f.lockupInRete(rec); } catch(e){ inRete = false; }" in js,
            "if (inRete) await swapRitira(rec);" in js))
+    # (20 ott 2026, cantiere swap-spesa) LA SPESA DEL LOCKUP: se la rete
+    # non lo vede piu' come non speso, si chiede chi l'ha speso PRIMA di
+    # sentire il fornitore; il nostro ritiro (firmato qui, o che paga chi
+    # vende) e' «concluso», un altro e' un errore chiaro; le firmate si
+    # ricordano prima di trasmettere. I gesti: `collaudo_swap_telefono`.
+    prova("la spesa del lockup: chi l'ha speso, prima del fornitore, e le firmate ricordate",
+          (True, True, True, True, True, True),
+          (0 <= rit.find("const spesa = await swapSpesaDelLockup(base, rec, dest);")
+           < rit.find("/transaction`"),
+           "return {txid: spesa.txid, cooperativo: null, concluso: true," in rit,
+           "e.tipo = 'speso';" in rit,
+           0 <= rit.find("rec.firmati = (rec.firmati || [])") < rit.find("swapMempool(base, '/tx', fatto.hex),"),
+           "/tx/${t.txid}/outspend/${n}" in bz
+           and "return !!(await swapSpesaDelLockup(cfg.mempool, rec, ''));" in bz,
+           "if (e && e.tipo === 'speso') rec.spesoDa = String(e.txid || '');" in js
+           and "if (rec.ritiro && rec.ritiro.concluso)" in js))
     prova("nel ritiro: l'uscita dello script atteso, e non meno della promessa",
           (True, True, True),
           ("const uscita = S.detectSwap(tweaked.aggPubkey, lockup, atteso);" in bz,
