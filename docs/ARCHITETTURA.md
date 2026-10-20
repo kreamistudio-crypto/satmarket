@@ -33909,4 +33909,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_certificati_relay` fa rosso un `CERT_NONE`, un
   `_create_unverified_context` o un `check_hostname = False` in qualunque
   .py, con UNA eccezione nominata: `deploy/nodo/sonda-rotte.py`, che sul
-  nodo parla con la REST di LND (certificato autofirmato da LND).
+  nodo parla con la REST di LND (certificato autofirmato da LND). Dal
+  cantiere eccezione-sonda l'eccezione è legata al FILE e al SEGNO sulla
+  stessa riga della chiamata (`# certificati-relay: eccezione nominata`),
+  non al numero di riga: spostarla non cambia niente, il segno in un
+  altro file non esenta, la chiamata senza segno torna rossa.

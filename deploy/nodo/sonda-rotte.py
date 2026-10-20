@@ -24,7 +24,10 @@ import urllib.error, urllib.request
 NODO = os.path.expanduser("~/nodo")
 PREFISSO_ACINQ = "03864ef025fde8fb"      # come la ronda: il prefisso basta
 IMPORTI = [100_000, 300_000, 500_000, 1_000_000]
-TLS = ssl._create_unverified_context()   # si parla col LND di casa, in locale
+# Il certificato della REST di LND lo firma LND da se': non si verifica, e
+# la sentinella dei certificati di prove.py lo sa dal segno su questa riga
+# (cantiere certificati-relay: un'eccezione nominata, non un relay).
+TLS = ssl._create_unverified_context()   # certificati-relay: eccezione nominata — il LND di casa, in locale
 
 
 def tetto_phoenix(sats):

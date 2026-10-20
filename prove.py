@@ -176544,37 +176544,54 @@ def prove_certificati_relay():
             for f in file:
                 if f.endswith(".py") and f != "prove.py":
                     yield os.path.join(radice, f)
+    # (cantiere eccezione-sonda) ogni trovato porta anche il SEGNO: se la
+    # sua riga ha il marcatore dell'eccezione nominata, qui sotto
+    MARCATORE = "# certificati-relay: eccezione nominata"
     trovati, letti = [], 0
     for percorso in _py():
         try:
-            albero = _ast.parse(open(percorso, encoding="utf-8").read())
+            testo = open(percorso, encoding="utf-8").read()
+            albero = _ast.parse(testo)
         except (SyntaxError, UnicodeDecodeError):
             continue
         letti += 1
-        nome = os.path.relpath(percorso, QUI)
+        righe_src = testo.split("\n")
+        nome = os.path.relpath(percorso, QUI).replace(os.sep, "/")
+
+        def _trovato(n, cosa):
+            trovati.append((nome, n.lineno, cosa,
+                            MARCATORE in righe_src[n.lineno - 1]))
         for n in _ast.walk(albero):
             if (isinstance(n, _ast.Attribute) and n.attr in (
                     "CERT_NONE", "_create_unverified_context")) or (
                     isinstance(n, _ast.Name) and n.id == "CERT_NONE"):
-                trovati.append(f"{nome}:{n.lineno} {getattr(n, 'attr', '') or n.id}")
+                _trovato(n, getattr(n, "attr", "") or n.id)
             if isinstance(n, _ast.Assign) and any(
                     isinstance(b, _ast.Attribute) and b.attr == "check_hostname"
                     for b in n.targets) and isinstance(n.value, _ast.Constant) \
                     and n.value.value is False:
-                trovati.append(f"{nome}:{n.lineno} check_hostname = False")
+                _trovato(n, "check_hostname = False")
     prova("il censimento legge i .py del progetto (e non zero)", True, letti > 100)
     # L'ECCEZIONE NOMINATA, e non e' un relay: la sonda delle rotte gira SUL
     # NODO Mostro e parla con la REST di LND sulla stessa macchina, il cui
     # certificato e' autofirmato da LND (11 ott 2026, cantiere
     # allarme-liquidita). Una per una e col perche', come le lacune del
     # censimento della fusione: la prossima entra rossa.
-    ECCEZIONI = {"deploy/nodo/sonda-rotte.py:27 _create_unverified_context"}
+    # LEGATA AL SEGNO, NON AL NUMERO DI RIGA (20 ott 2026, cantiere
+    # eccezione-sonda, decisione di Andrea): vale il file E il marcatore
+    # sulla STESSA riga della chiamata. Un ritocco alla sonda che sposta la
+    # riga non tocca niente; il marcatore copiato in un altro file non
+    # esenta niente (il file deve essere questo); la chiamata senza il suo
+    # marcatore torna rossa.
+    ECCEZIONI = {("deploy/nodo/sonda-rotte.py", "_create_unverified_context")}
     prova("NESSUN CERT_NONE, nessun contesto non verificato, nessun "
           "check_hostname = False, in nessun .py (fuori dall'eccezione "
-          "nominata)", [], [x for x in trovati if x.replace(os.sep, "/")
-                            not in ECCEZIONI])
-    prova("...e l'eccezione e' ancora quella (se sparisce, va tolta di qui)",
-          ECCEZIONI, {x.replace(os.sep, "/") for x in trovati})
+          "nominata, col suo segno)", [],
+          [f"{f}:{r} {c}" for f, r, c, segno in trovati
+           if not (segno and (f, c) in ECCEZIONI)])
+    prova("...e l'eccezione e' ancora quella, col suo segno (se sparisce, va "
+          "tolta di qui)", ECCEZIONI,
+          {(f, c) for f, r, c, segno in trovati if segno})
 
     # --- 2) OGNI CONNESSIONE A UN RELAY PORTA SSLOPT_RELAY ------------------
     PORTE = {"create_connection", "_posta_connetti", "_connessione_websocket"}
