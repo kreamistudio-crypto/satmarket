@@ -191,7 +191,14 @@ aggiunge, si toglie la vecchia da GitHub.
    riprovato al giro dopo) e ha scritto nel bot di prova; tolto il
    timbro, e' tornata in punta. Subito dopo un ritorno la salute dice
    000 per qualche secondo: il servizio si sta riavviando.
-9. Il comando e la prima semina (`sudo collaudo azzera`).
+9. Il comando e la prima semina (`sudo collaudo azzera`), fatto il 20
+   ott: posati da develop il seguace nuovo (le dipendenze prima del
+   codice), il comando, le due unita' col tetto e il compose (le copie
+   di prima in `/root/prima-del-9`); il seguace ha installato
+   `requirements.txt` (embit 0.8.0) e riavviato in pari;
+   `ONCHAIN_ATTIVO` e' acceso (solo admin) e `MERCATINO_CHAT_ORDINI =
+   True` sta in fondo al config; la semina ha dato 4 venditori, 12
+   annunci attivi e 2 venduti, 2 ordini per il primo id della lista.
 
 ## 8. Spegnere
 
