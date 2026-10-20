@@ -70988,3 +70988,89 @@ cantiere, e il giudice resta la CI. I collaudi della CI
 (`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`): 98 verdi, 0
 rossi. I due passi dello scanner dei segreti sui file e sulle righe
 aggiunte: puliti.
+
+## KaleidoSwap «un tocco»: il percorso, e witnessReceive sempre (20 ott 2026, studio kaleido-un-tocco, decisioni di Andrea con Alan; solo documenti, nessun codice)
+
+LA REGOLA DI ANDREA, per OGNI swap (KaleidoSwap, SATS Routing,
+FixedFloat): UN tocco. L'utente preme «Compra» (o «Swap»), vede il prezzo
+vincolante, conferma: fine. Tutto il resto lo fa il telefono da solo.
+KaleidoSwap NON si costruisce ora: gli scambi atomici RGB sono in
+lavorazione e possono cambiare (Walter). Questo è il disegno, da
+riprendere quando la libreria è ferma.
+
+LA LIBRERIA (letta su GitHub il 20 ott). `kaleidoswap/rgb-lib-wasm`, MIT,
+fork di `UTEXO-Protocol/rgb-lib-wasm` (MIT). Gli scambi stanno solo nei
+rami `ks/*` (`ks/release/1.0.0-ks.1`, 14 commit avanti, da pubblicare su
+npm come `@kaleidorg/rgb-lib-wasm`, che oggi non c'è); ha le operazioni
+che lo SDK chiede (`psbtOpPrepare` con la scadenza, `psbtOpApply`,
+`psbtOpReconcile`, la richiesta di un lock altrui), `createUtxosBegin/End`,
+`witnessReceive`, `backup`/`restoreBackup` (un file cifrato con una
+password) e il VSS (`configureVssBackup`). Il wasm di Utexo pesa 13,7 MB
+non compresso: si carica solo quando si apre RGB. Copre RGB on-chain;
+USDT sui canali Lightning vuole un nodo RLN (metà 2027, Walter). Audit
+solo interni; esterni prima della mainnet.
+
+IL PERCORSO.
+- Le parole: il wallet RGB nasce dalle 12 parole dello swap già sul
+  telefono, su un ramo di chiavi rinforzato suo (da verificare su
+  rgb-lib: la radice pubblica che va a SATS Routing per il recupero non
+  deve vederlo); password del backup e chiave del VSS ricavate dalle
+  parole. Le parole diventano UNE per tutti i fornitori; «scrivile su
+  carta» solo la primissima volta.
+- Dopo la conferma, da solo: swap Lightning → on-chain verso il wallet
+  RGB, poi lo scambio USDT al prezzo vincolante (la differenza di rete
+  la paga il maker), con firme automatiche e una barra a tappe.
+- Il tocco unico regge se i sats vengono dall'incasso di Barattolo
+  (tappa 4 dello swap) o da un wallet NWC collegato; sennò resta il
+  pagamento della fattura nel wallet dell'utente (QR, «Apri nel wallet»).
+- I guasti, senza domande quando si può: prima del lockup la fattura non
+  si incassa; dopo, il ritiro anche senza la loro API («Il ritiro senza
+  la loro API», «La spesa del lockup»); scambio scaduto: rimborso
+  firmato dal telefono. Una sola domanda possibile: prezzo vincolante
+  scaduto → «Nuovo prezzo: confermi?» o «Riporta in Lightning».
+- Il telefono firma solo a Barattolo aperto: ad app chiusa la catena si
+  ferma e riparte alla riapertura.
+
+WITNESSRECEIVE SEMPRE (la decisione di questo studio). Tre strade per
+ricevere gli USDT: witnessReceive a ogni scambio, `createUtxos` una volta,
+o il misto. Walter: i ~3.000 sats di witnessReceive NON sono una fee:
+sono un'uscita dell'utente che porta gli USDT (es. 10 USDT = uno swap da
+13.000 sats: 10 USDT più 3.000 sats suoi, fermi sotto gli USDT, che
+tornano quando li spende). Col conto giusto:
+- witnessReceive: nessuna transazione in più, nessun blocco in più; la
+  sua uscita sta nella transazione dello scambio, la cui rete la paga il
+  maker. Costo vero quasi zero: la fee per spendere quell'uscita più
+  avanti (un'entrata, ~60 vbyte: ~120 sats a 2 sat/vB).
+- `createUtxos` (numero e taglia si scelgono; di serie in rgb-lib 5 da
+  1.000 sats): una transazione INTERA in più (da ~150 vbyte con un'uscita
+  a ~330 con cinque: 300-650 sats a 2 sat/vB, 1.500-3.300 a 10,
+  4.500-10.000 a 30), un blocco d'attesa la prima volta, e anche lì sats
+  fermi.
+- Il misto aggiunge la stessa transazione in sottofondo: nessuna delle
+  due batte witnessReceive.
+Quindi: witnessReceive SEMPRE, niente preparazione del wallet. Nel
+prezzo vincolante si dice chiaro: «13.000 sats = 10 USDT + 3.000 sats
+che restano tuoi». Unico limite: sats fermi sotto ogni acquisto, che si
+liberano spendendo gli USDT.
+
+IL BACKUP (da decidere, Andrea con Alan). Un file cifrato sul telefono,
+da aggiornare dopo ogni invio o ricezione RGB (le 12 parole recuperano
+solo i sats). Tutte e tre le strade sono a zero tocchi: il cloud di
+Telegram (~4 MB, fuori Nostr e APK); il VSS di KaleidoSwap (recupero
+legato a loro); un VSS nostro (`lightningdevkit/vss-server`,
+Apache-2.0: il più robusto, ma stato cifrato dei wallet sul nostro
+server, un'eccezione esplicita alla regola ferrea 2 come il segreto NWC
+respinto). Proposta: doppia copia automatica, un VSS più Telegram dove
+c'è. Da decidere anche il promemoria del bot ad app chiusa (il telefono
+direbbe al server solo «swap in corso, riavvisami fra X»).
+
+LA RIGA PER L'UTENTE, per le attese che non si tolgono: «Bitcoin sta
+confermando: circa un'ora. Puoi chiudere: quando riapri Barattolo
+continua da solo, e ti avvisiamo a fine.»
+
+PER GLI ALTRI FORNITORI. SATS Routing: un tocco salvando l'indirizzo
+dalla prima volta (o il wallet RGB come destinazione). FixedFloat: il
+nostro tocco c'è, l'invio degli USDT dal suo wallet resta un suo gesto.
+
+DA CHIEDERE A WALTER: se il maker accetta Lightning e consegna gli USDT
+on-chain con witnessReceive (la catena diventerebbe uno scambio solo).
