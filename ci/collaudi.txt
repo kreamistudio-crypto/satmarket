@@ -42,6 +42,7 @@ collaudo_lnbits_muto
 collaudo_fatture_scadute
 collaudo_rotte_metodi
 collaudo_cassetta_nip46
+collaudo_annunci_sul_profilo
 collaudo_avviso_dm_nostr
 collaudo_ronda_relay
 collaudo_pagamento_p2p

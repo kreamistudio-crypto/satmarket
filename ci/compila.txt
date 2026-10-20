@@ -12,6 +12,7 @@ censimento_scadenze.py
 collaudo_fatture_scadute.py
 collaudo_rotte_metodi.py
 collaudo_cassetta_nip46.py
+collaudo_annunci_sul_profilo.py
 collaudo_avviso_dm_nostr.py
 collaudo_ronda_relay.py
 collaudo_in_pagamento.py

@@ -7854,6 +7854,30 @@
   qualunque cosa su chi controlla un evento. Da quel momento la
   piattaforma NON tocca più quell'evento: anche il ritiro passa da una
   firma sua (azione 'ritira' = kind 5 dal suo browser).
+  ...SE LUI LO VUOLE (20 ott 2026, Cantieri «Nostr dal telefono e gli
+  annunci separati», decisione di Andrea): `utenti.annunci_su_profilo_nostr`
+  (di serie 1, chi c'era non cambia niente) e il giudice UNICO
+  `annunci_sul_suo_profilo(con, tg_id)`, che chiedono il bivio, i due
+  traslochi (`trasloca_annunci_nostr`, `_accoda_trasloco_di`) e la coda
+  (`firme_nostr_da_fare`). Con 0 l'annuncio esce col NOSTRO nome, e
+  l'evento non porta niente che arrivi alla sua npub (niente `p`/`e`/`a`,
+  né npub, nome, username o link al profilo: lo prova
+  `collaudo_annunci_sul_profilo`); ma finché in piazza c'è un evento
+  FIRMATO DA LUI il bivio non ne fa nascere un secondo nostro (due
+  teste). La scelta: `POST /api/me/nostr/annunci-sul-profilo` {si} —
+  con «no» la coda perde le pubblicazioni a nome suo (quelle nascono
+  subito col nostro nome) e i suoi eventi si accodano 'ritira'; con «sì»
+  le 'ritira' non firmate sugli annunci vivi si buttano e il trasloco
+  riporta a nome suo quel che è nostro. LE CANCELLAZIONI SONO UNA FIRMA
+  SOLA: `firme_nostr_da_fare` mette tutte le 'ritira' in un kind 5 (un
+  `e` e un `a` per annuncio, il `k`, al più `MAX_RITIRI_IN_UNA_FIRMA` =
+  150), col biglietto che porta `annuncio_ids`; firmato quello,
+  `_ripubblica_col_nome_nostro` rimette in piazza col nostro nome i
+  vivi di chi ha detto «no». Nel client: la riga del Profilo (cassetto
+  Identità, solo con una chiave provata), la domanda dopo il
+  collegamento (`domandaAnnunciSulProfilo`, prima della coda; chi
+  chiude senza rispondere resta sul «sì»), e il toast onesto sulla
+  NIP-09 («alcuni potrebbero tenerne una copia»).
   IL TAG `client` DICE CHI HA COMPOSTO, NON CHI FIRMA (ago 2026, il
   cantiere della classifica: eravamo probabilmente terzi per prodotti
   su Nostr e nella classifica dei marketplace di Nostrology non
@@ -9354,6 +9378,34 @@
   stanza (`ascolto.cambiaStanza`, `cassetta.sposta`, la sessione
   conservata porta la stanza nuova), con null/errore/silenzio resta
   (Cantieri «switch_relays dopo la connect»).
+  LA CASSETTA CHE SPEDISCE (20 ott 2026, Cantieri «Nostr dal telefono e
+  gli annunci separati»): `POST /api/login/nostr/cassetta/spedisci`
+  {pub, biglietto, evento} — la pagina passa il 24133 GIÀ CIFRATO E
+  FIRMATO dalla sua chiave effimera e il server lo consegna ai relay
+  della cassetta dalla sua rete (quella che Tor e le VPN del telefono non
+  toccano), su una presa `_presa_esterna`, e dice quanti l'hanno preso.
+  Il server non firma e non cifra niente; `_spedizione_valida` vuole un
+  24133 della chiave della cassetta, verso UNA chiave, entro la vita
+  della cassetta, con id ricalcolato e firma verificata. Freni:
+  `FRENI["cassetta_spedisci"]` 60/min per IP, `CASSETTA_SPEDITI_MAX` 60
+  per cassetta, un id non riparte due volte; in collaudo verso un relay
+  non di casa non si esce. Nel client `cassetta.spedisci(ev)` parte a
+  ogni `invia` del bunker, e il rifiuto di tutti i relay del telefono
+  non fa cadere l'attesa se il server l'ha consegnata.
+  LA SALA D'ATTESA DETTA (stesso cantiere): ogni `chiama` lunga (≥
+  `NIP46_SERVIZIO_MS`) apre `salaNip46Apri` nel foglio (`#nostrAttesa`):
+  cosa si aspetta (`cosaAspettaNip46`) e quanto manca; dopo
+  `NIP46_RIPROVA_MS` (30 s) la causa probabile (`causaProbabileNip46`:
+  relay chiusi da Tor/VPN, solo il server li raggiunge, firmatario in
+  background) e «Riprova» (`riprovaNip46`: la stessa richiesta, stesso
+  id, dal telefono e dal server; il tetto `NIP46_UMANO_MS` non si
+  sposta). Una sala per foglio, solo a foglio aperto; la chiudono la
+  risposta, il tempo, le attese cadute, il motore e `closeSheet`. La
+  chiave pubblica del bunker si chiede una volta sola (`pubkey`
+  memorizzata); `entraConNostr` lancia gli errori del server (il foglio
+  li scrive con `bunkerErrore`, famiglia «il server:») invece di un toast
+  e un `return`, e col bunker (`firmatario.sessione`) non aspetta la coda
+  degli annunci prima del reload.
   `hex_to_npub` (bech32 con checksum vero) è il gemello speculare di
   `npub_to_hex`. `vendor/nostr.bundle.js` = nostr-tools 2.23.12
   committato a versione bloccata e servito da `GET /vendor/nostr.js`

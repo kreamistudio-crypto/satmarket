@@ -2313,6 +2313,7 @@ FRENI = {
     "pagamento": (30, 60),      # verifica-pagamento (LNbits a ogni colpo), per persona
     "ln_address": (30, 60),     # il Lightning address (HTTP esterno + LNbits), per persona
     "login": (30, 60),          # le porte del login, per IP e solo in chiaro
+    "cassetta_spedisci": (60, 60),  # i 24133 che la cassetta spedisce per la pagina, per IP
     "canale": (1, 600),         # il post nel canale P2P, per persona (non un 429: si salta il post)
     "foto_recensione": (20, 3600),  # un feedback con foto (caricate su Blossom), per persona
     "carrello": (120, 60),      # il carrello salvato a ogni tocco, per persona (un dito non ci arriva)
@@ -8346,6 +8347,15 @@ def init_db():
                     # negli scambi. Di serie 0, come la classifica e'
                     # sempre stata. Lo legge `classifica_ora`.
                     "classifica_nascosta INTEGER DEFAULT 0",
+                    # «PUBBLICA I MIEI ANNUNCI ANCHE SUL MIO PROFILO
+                    # NOSTR» (20 ott 2026, cantiere nostr-da-telefono,
+                    # decisione di Andrea): 1 = il BIVIO di sempre, gli
+                    # annunci di chi ha una chiave provata li firma lui e
+                    # stanno sul suo profilo; 0 = escono col nome di
+                    # Barattolo, senza niente che porti alla sua npub. Di
+                    # serie 1: chi ce l'ha gia' non si vede cambiare niente
+                    # sotto i piedi. La legge `annunci_sul_suo_profilo`.
+                    "annunci_su_profilo_nostr INTEGER DEFAULT 1",
                     # IL COSTO DI SPEDIZIONE STANDARD DEL NEGOZIO (set
                     # 2026): la tariffa che il venditore scrive UNA volta
                     # in «📦 Come spedisci», e che il form di Vendi si
@@ -11994,6 +12004,159 @@ def login_nostr_cassetta_leggi(pub: str = "", dopo: int = 0):
         nuovi = [e for e in c["eventi"] if e["n"] > int(dopo or 0)]
         n = c["n"]
     return {**stato, "eventi": nuovi, "n": n}
+
+
+# LA CASSETTA CHE SPEDISCE (20 ott 2026, cantiere nostr-da-telefono, ok di
+# Andrea). IL FATTO, dal journal di quel giorno: 50 sfide di login Nostr,
+# 14 ingressi — gli altri 36 fermi alla FIRMA, con un utente che da Orbot,
+# InviZible o una VPN sul telefono restava su «Collegato: entro…». La
+# cassetta qui sopra fa gia' da secondo ORECCHIO; la richiesta pero'
+# partiva solo dalle websocket del telefono, e sono quelle che Tor e le
+# VPN rallentano o chiudono. Qui il server fa anche da secondo POSTINO:
+# la pagina gli passa il 24133 GIA' CIFRATO E GIA' FIRMATO con la sua
+# chiave effimera, e lui lo consegna ai relay della cassetta.
+# COSA VEDE IL SERVER: quel che vedrebbe il relay, niente di piu' — un
+# evento chiuso, firmato da una chiave che nasce e muore con un login.
+# Non firma niente, non cifra niente, non tiene niente: la regola ferrea
+# 2 e' intatta. E SPEDISCE SOLO QUELLO: un 24133 della chiave della
+# cassetta (biglietto del deposito alla mano), indirizzato a UNA chiave,
+# con l'id e la firma ricontrollati qui — non e' un relay aperto a
+# chiunque, ne' una porta per pubblicare altro a nome di nessuno.
+# I FRENI: FRENI["cassetta_spedisci"] per IP (solo in chiaro, come gli
+# altri) e CASSETTA_SPEDITI_MAX per cassetta, cioe' per tentativo di
+# login; i relay sono quelli gia' giudicati al deposito, aperti su un
+# indirizzo controllato (`_presa_esterna`). In collaudo verso un relay
+# che non e' di casa non si esce, come l'orecchio.
+CASSETTA_SPEDITI_MAX = 60         # 24133 spediti per cassetta: un login e la sua coda
+CASSETTA_SPEDISCI_BYTE = 100000   # il testo cifrato di un sign_event lungo ci sta
+CASSETTA_SPEDISCI_OK_S = 6        # quanto si aspetta l'OK di un relay
+_SPEDIZIONI_SIMULATE: set = set()  # i relay a cui in collaudo si e' gia' detto di no
+
+
+def _spedizione_valida(ev, pub: str) -> str:
+    """PURA: '' se `ev` e' un 24133 che la cassetta di `pub` puo'
+    spedire, altrimenti il motivo (per il 400). Ricalcola l'id e
+    verifica la firma: mai fidarsi di quel che arriva."""
+    if not isinstance(ev, dict) or ev.get("kind") != 24133:
+        return "serve un evento 24133"
+    if ev.get("pubkey") != pub:
+        return "l'evento non e' della chiave della cassetta"
+    tags, testo, creato = ev.get("tags"), ev.get("content"), ev.get("created_at")
+    ev_id, sig = ev.get("id"), ev.get("sig")
+    if not (isinstance(tags, list) and len(tags) == 1
+            and isinstance(tags[0], list) and len(tags[0]) == 2
+            and tags[0][0] == "p" and isinstance(tags[0][1], str)
+            and RE_HEX_64.fullmatch(tags[0][1])):
+        return "serve un solo destinatario"
+    if not isinstance(testo, str) or not testo \
+            or len(testo) > CASSETTA_SPEDISCI_BYTE:
+        return "testo assente o troppo lungo"
+    if not isinstance(creato, int) or isinstance(creato, bool) \
+            or abs(int(time.time()) - creato) > CASSETTA_VITA_S:
+        return "ora dell'evento fuori tempo"
+    if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)
+            and isinstance(sig, str) and RE_HEX_128.fullmatch(sig)):
+        return "id o firma malformati"
+    serial = json.dumps([0, pub, creato, 24133, tags, testo],
+                        separators=(",", ":"), ensure_ascii=False)
+    if hashlib.sha256(serial.encode("utf-8")).hexdigest() != ev_id:
+        return "id sbagliato"
+    try:
+        buona = ChiavePubblicaNostr(bytes.fromhex(pub)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev_id))
+    except Exception:
+        buona = False
+    return "" if buona else "firma non valida"
+
+
+def _cassetta_spedisci_a(relay: str, evento: dict) -> bool:
+    """Consegna UN 24133 a UN relay e aspetta l'OK. SINCRONA (in
+    asyncio.to_thread): la presa si apre e si chiude in questo thread.
+    Il relay e' di un utente (una URI bunker://), quindi la presa nasce
+    su un indirizzo gia' controllato; il ws:// di casa e' quello dei
+    collaudi. Niente `_segna_scrittura_relay`: non e' una scrittura
+    NOSTRA, e la ronda delle nostre non deve contarla."""
+    if not relay_di_casa(relay):
+        if MODALITA_COLLAUDO:
+            if relay not in _SPEDIZIONI_SIMULATE:   # una volta per relay
+                _SPEDIZIONI_SIMULATE.add(relay)
+                print(f"🟣 [nostr simulato] la cassetta non spedisce a {relay}: "
+                      "in collaudo non esce dal computer", flush=True)
+            return False
+        presa = None
+        try:
+            presa = _presa_esterna(relay)
+            if presa is None:
+                return False
+            ws = _cassetta_connetti(relay, timeout=5, socket=presa)
+        except Exception:
+            if presa is not None:
+                presa.close()
+            return False
+    else:
+        try:
+            ws = _cassetta_connetti(relay, timeout=5)
+        except Exception:
+            return False
+    preso = False
+    try:
+        ws.settimeout(CASSETTA_SPEDISCI_OK_S)
+        ws.send(json.dumps(["EVENT", evento]))
+        inizio = time.time()
+        while time.time() - inizio < CASSETTA_SPEDISCI_OK_S:
+            msg = json.loads(ws.recv())
+            if isinstance(msg, list) and len(msg) >= 3 \
+                    and msg[0] == "OK" and msg[1] == evento["id"]:
+                preso = bool(msg[2])
+                break
+    except Exception:
+        pass
+    try:
+        ws.close()
+    except Exception:
+        pass
+    return preso
+
+
+@app.post("/api/login/nostr/cassetta/spedisci")
+async def login_nostr_cassetta_spedisci(req: Request):
+    """La pagina passa un 24133 gia' cifrato e firmato dalla sua chiave
+    effimera: il server lo consegna ai relay della cassetta, in
+    parallelo, e dice quanti l'hanno preso. Vuole il biglietto del
+    deposito (la cassetta e' di chi l'ha aperta) e un evento che passi
+    `_spedizione_valida`. Un evento gia' spedito non riparte: le copie
+    le fa gia' la pagina, coi suoi rimandi."""
+    ip = _ip_di(req)
+    _frena("cassetta_spedisci", ip)
+    d = await leggi_json(req)
+    pub = str(d.get("pub") or "").strip().lower()
+    biglietto = str(d.get("biglietto") or "")
+    if not RE_HEX_64.fullmatch(pub):
+        raise HTTPException(400, "Chiave del client non valida")
+    ev = d.get("evento")
+    perche = _spedizione_valida(ev, pub)
+    if perche:
+        raise HTTPException(400, f"Evento non spedibile: {perche}")
+    with _CASSETTE_LOCK:
+        c = _cassette_vive().get(pub)
+        if not c:
+            raise HTTPException(404, "Cassetta chiusa o scaduta: riaprila")
+        if not secrets.compare_digest(biglietto, c["biglietto"]):
+            raise HTTPException(403, "Biglietto non valido")
+        spediti = c.setdefault("spediti", set())
+        if ev["id"] in spediti:
+            return {"ok": True, "presi": 0, "relays": [], "gia": True}
+        if len(spediti) >= CASSETTA_SPEDITI_MAX:
+            raise HTTPException(429, "Troppe richieste da questo accesso: "
+                                     "ricomincia il login")
+        spediti.add(ev["id"])
+        relays = sorted(c["relays"])
+    evento = {k: ev[k] for k in ("id", "pubkey", "created_at", "kind",
+                                 "tags", "content", "sig")}
+    esiti = await asyncio.gather(*[
+        asyncio.to_thread(_cassetta_spedisci_a, r, evento) for r in relays])
+    presi = [r for r, ok in zip(relays, esiti) if ok]
+    return {"ok": True, "presi": len(presi), "relays": presi}
 
 
 def _cassette_chiudi_tutto():
@@ -47904,6 +48067,7 @@ async def timbra_invito_corrieri(x_tg_init_data: str = Header(""),
 
 
 BIGLIETTI_FIRMA_NOSTR: dict[str, dict] = {}
+MAX_RITIRI_IN_UNA_FIRMA = 150   # eventi in un kind 5 solo (vedi firme_nostr_da_fare)
 
 
 @app.get("/api/me/firme-nostr")
@@ -47935,12 +48099,31 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
     con.execute("DELETE FROM firme_nostr WHERE tg_id=? AND azione<>'ritira' "
                 "AND annuncio_id IN (SELECT id FROM annunci "
                 "WHERE contatto_nostr<>'')", (user["id"],))
+    # E CON «NO» SUL SUO PROFILO (20 ott 2026, cantiere nostr-da-
+    # telefono) non resta niente da pubblicare a nome suo: in coda
+    # restano solo le cancellazioni.
+    if not annunci_sul_suo_profilo(con, user["id"]):
+        con.execute("DELETE FROM firme_nostr WHERE tg_id=? "
+                    "AND azione<>'ritira'", (user["id"],))
     con.commit()
     righe = con.execute(
         "SELECT f.annuncio_id, f.azione, a.* FROM firme_nostr f "
         "JOIN annunci a ON a.id=f.annuncio_id "
-        "WHERE f.tg_id=? ORDER BY f.creato LIMIT 20",
+        "WHERE f.tg_id=? AND f.azione<>'ritira' "
+        "ORDER BY f.creato LIMIT 20",
         (user["id"],)).fetchall()
+    # LE CANCELLAZIONI IN UNA FIRMA SOLA (20 ott 2026, cantiere nostr-da-
+    # telefono, decisione di Andrea): un kind 5 con dentro tutti gli
+    # eventi da ritirare, invece di uno per annuncio — chi sceglie «no»
+    # con quaranta annunci approva UNA volta nell'app che firma, non
+    # quaranta. Il tetto tiene l'evento sotto i limiti dei relay
+    # (~170 byte per annuncio); oltre, il resto al giro dopo.
+    ritiri = con.execute(
+        "SELECT a.id, a.titolo, a.nostr_event_id FROM firme_nostr f "
+        "JOIN annunci a ON a.id=f.annuncio_id "
+        "WHERE f.tg_id=? AND f.azione='ritira' AND a.nostr_event_id<>'' "
+        "ORDER BY f.creato LIMIT ?",
+        (user["id"], MAX_RITIRI_IN_UNA_FIRMA)).fetchall()
     # IL TOTALE, oltre ai 20 di questo giro (ott 2026): il client rigira
     # finche' la coda si svuota, e il Profilo dice «Firma i tuoi N
     # annunci» col numero vero, non col tetto del LIMIT.
@@ -47956,34 +48139,42 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         BIGLIETTI_FIRMA_NOSTR.pop(next(iter(BIGLIETTI_FIRMA_NOSTR)))
 
     fuori = []
+    if ritiri:
+        ids = [r["id"] for r in ritiri]
+        tags = ([["e", r["nostr_event_id"]] for r in ritiri]
+                + [["a", f"30402:{sua}:barattolo-{r['id']}"] for r in ritiri]
+                + [["k", "30402"]])
+        evento = evento_non_firmato(
+            sua, 5, tags, "Annuncio rimosso da Barattolo" if len(ids) == 1
+            else "Annunci rimossi da Barattolo", int(time.time()))
+        biglietto = secrets.token_urlsafe(32)
+        BIGLIETTI_FIRMA_NOSTR[biglietto] = {
+            "annuncio_id": ids[0], "annuncio_ids": ids, "tg_id": user["id"],
+            "azione": "ritira", "kind": 5, "tags": evento["tags"],
+            "content": evento["content"],
+            "created_at": evento["created_at"], "scade": adesso + 600}
+        fuori.append({"biglietto": biglietto, "annuncio_id": ids[0],
+                      "titolo": ritiri[0]["titolo"] if len(ids) == 1
+                      else f"{len(ids)} annunci", "azione": "ritira",
+                      "quanti": len(ids), "evento": evento})
     for r in righe:
         a = dict(r)
-        if a["azione"] == "ritira":
-            if not a["nostr_event_id"]:
-                continue     # non e' mai nato: non c'e' niente da ritirare
-            tags = [["e", a["nostr_event_id"]],
-                    ["a", f"30402:{sua}:barattolo-{a['id']}"],
-                    ["k", "30402"]]
-            evento = evento_non_firmato(sua, 5, tags,
-                                        "Annuncio rimosso da Barattolo",
-                                        int(time.time()))
-        else:
-            # 'pubblica' rilegge lo stato di ADESSO: fra l'accodamento
-            # e la firma l'annuncio puo' essere stato venduto, e
-            # nascere «attivo» sarebbe una bugia in piazza.
-            stato = a["azione"] if a["azione"] in ("sold", "active") else (
-                "sold" if a["stato"] == "venduto" else "active")
-            # Si riusa evento_annuncio per non avere DUE posti che
-            # costruiscono i tag NIP-99 di un annuncio (divergerebbero
-            # al primo campo nuovo, ed e' anche cio' che la sentinella
-            # del «punto» sorveglia). Firma con la chiave nostra e la
-            # firma si butta: qui servono solo tags e content, che poi
-            # l'utente firma con la SUA. Uno spreco dichiarato, in
-            # cambio di un posto solo — e la coda si riempie solo dopo
-            # il gate _NOSTR, quindi la chiave c'e' di sicuro.
-            base = evento_annuncio(a, stato)
-            evento = evento_non_firmato(sua, 30402, base["tags"],
-                                        base["content"], base["created_at"])
+        # 'pubblica' rilegge lo stato di ADESSO: fra l'accodamento
+        # e la firma l'annuncio puo' essere stato venduto, e
+        # nascere «attivo» sarebbe una bugia in piazza.
+        stato = a["azione"] if a["azione"] in ("sold", "active") else (
+            "sold" if a["stato"] == "venduto" else "active")
+        # Si riusa evento_annuncio per non avere DUE posti che
+        # costruiscono i tag NIP-99 di un annuncio (divergerebbero
+        # al primo campo nuovo, ed e' anche cio' che la sentinella
+        # del «punto» sorveglia). Firma con la chiave nostra e la
+        # firma si butta: qui servono solo tags e content, che poi
+        # l'utente firma con la SUA. Uno spreco dichiarato, in
+        # cambio di un posto solo — e la coda si riempie solo dopo
+        # il gate _NOSTR, quindi la chiave c'e' di sicuro.
+        base = evento_annuncio(a, stato)
+        evento = evento_non_firmato(sua, 30402, base["tags"],
+                                    base["content"], base["created_at"])
         biglietto = secrets.token_urlsafe(32)
         BIGLIETTI_FIRMA_NOSTR[biglietto] = {
             "annuncio_id": a["id"], "tg_id": user["id"],
@@ -48040,6 +48231,8 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
     imp = con.execute("SELECT contatto_nostr FROM annunci WHERE id=?",
                       (b["annuncio_id"],)).fetchone()
     vecchio = None       # il nostro evento da seppellire, se c'e'
+    # la cancellazione in una firma sola ne porta tanti (firme_nostr_da_fare)
+    ids = list(b.get("annuncio_ids") or [b["annuncio_id"]])
     if b["azione"] == "ritira":
         # Ritirato: la riga torna com'era prima di Nostr, e nessun
         # gancio la ripubblichera' piu' (sono tutti solo_aggiornamento).
@@ -48047,8 +48240,8 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
         # conta: ritirare TOGLIE una testa, non ne mette una — su una
         # riga diventata importata e' anzi una delle strade di
         # guarigione.
-        con.execute("UPDATE annunci SET nostr_event_id='', nostr_autore='' "
-                    "WHERE id=?", (b["annuncio_id"],))
+        con.executemany("UPDATE annunci SET nostr_event_id='', "
+                        "nostr_autore='' WHERE id=?", [(i,) for i in ids])
     elif imp and imp["contatto_nostr"]:
         # La riga e' diventata IMPORTATA mentre la firma era per strada
         # (ago 2026, la cintura del tappo delle «due teste»): scriverle
@@ -48078,10 +48271,14 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
             con.execute("UPDATE annunci SET nostr_event_vecchio=? "
                         "WHERE id=?",
                         (vecchio["nostr_event_id"], b["annuncio_id"]))
-    con.execute("DELETE FROM firme_nostr WHERE annuncio_id=?",
-                (b["annuncio_id"],))
+    con.executemany("DELETE FROM firme_nostr WHERE annuncio_id=?",
+                    [(i,) for i in ids])
     con.commit()
     con.close()
+    if b["azione"] == "ritira":
+        # Chi ha scelto «no» li ritrova col nome di Barattolo, ADESSO
+        # che il suo evento e' cancellato e non fanno due teste
+        asyncio.create_task(_ripubblica_col_nome_nostro(ids))
     if vecchio:
         # Subito, senza aspettare il giro dell'orologio: il doppione in
         # piazza dura quanto questa riga. Fail-open come ogni gancio
@@ -48089,6 +48286,90 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
         asyncio.create_task(_seppellisci_vecchio(
             b["annuncio_id"], vecchio["nostr_event_id"]))
     return {"ok": True, "evento": ev["id"]}
+
+
+async def _ripubblica_col_nome_nostro(ids) -> int:
+    """Dopo una cancellazione firmata dal venditore: gli annunci di chi
+    ha scelto «no» (annunci_sul_suo_profilo) tornano in piazza col nome
+    di Barattolo — solo quelli vivi (attivi o venduti), nati qui, e
+    senza piu' un evento. Un ritiro per un annuncio rimosso, o di chi
+    ha detto «si'», non ripubblica niente. Fail-open come ogni gancio
+    Nostr. Torna quanti ne ha mandati."""
+    fatti = 0
+    try:
+        con = db()
+        righe = con.execute(
+            "SELECT id, venditore_id, stato FROM annunci WHERE id IN (%s) "
+            "AND stato IN ('attivo','venduto') AND contatto_nostr='' "
+            "AND nostr_event_id=''" % ",".join("?" * len(ids)),
+            [int(i) for i in ids]).fetchall() if ids else []
+        da_fare = [(r["id"], "sold" if r["stato"] == "venduto" else "active")
+                   for r in righe
+                   if not annunci_sul_suo_profilo(con, r["venditore_id"])]
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Ripubblicazione col nome di Barattolo saltata: {e}")
+        return 0
+    for annuncio_id, status in da_fare:
+        await annuncio_su_nostr(annuncio_id, status)
+        fatti += 1
+    return fatti
+
+
+@app.post("/api/me/nostr/annunci-sul-profilo")
+async def scegli_annunci_sul_profilo(req: Request,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """«Pubblica i miei annunci anche sul mio profilo Nostr» (20 ott 2026,
+    cantiere nostr-da-telefono, decisione di Andrea).
+    SI': il bivio di sempre. Le cancellazioni accodate da un «no» di
+    prima e non ancora firmate su annunci vivi si buttano (cancellerebbero
+    un annuncio che lui ora vuole), e il trasloco porta a nome suo quel
+    che e' uscito col nostro.
+    NO: in coda non resta niente da pubblicare a nome suo; gli eventi
+    gia' FIRMATI DA LUI si accodano tutti per la cancellazione NIP-09,
+    che firma lui UNA volta (firme_nostr_da_fare li mette in un kind 5
+    solo); firmata quella, `_ripubblica_col_nome_nostro` li rimette in
+    piazza col nostro nome. Quelli che un evento non l'hanno ancora
+    escono col nostro nome subito. Si dice onesto quel che la NIP-09 e':
+    una richiesta ai relay, che possono tenerne una copia."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    si = 1 if d.get("si") else 0
+    con = db()
+    u = con.execute("SELECT npub, npub_verificata, npub_accesso "
+                    "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
+    sua = chiave_nostr_provata(u)
+    con.execute("UPDATE utenti SET annunci_su_profilo_nostr=? WHERE tg_id=?",
+                (si, user["id"]))
+    da_ritirare, subito, accodati = 0, [], 0
+    if si:
+        con.execute(
+            "DELETE FROM firme_nostr WHERE tg_id=? AND azione='ritira' "
+            "AND annuncio_id IN (SELECT id FROM annunci "
+            "WHERE stato IN ('attivo','venduto'))", (user["id"],))
+        accodati = _accoda_trasloco_di(con, user["id"]) if sua else 0
+    else:
+        # quelli che aspettavano di NASCERE a nome suo nascono col nostro
+        # (solo loro: un annuncio tolto da Nostr apposta, come il ritiro
+        # di un doppione, non ha una riga qui e non rinasce)
+        subito = [r["annuncio_id"] for r in con.execute(
+            "SELECT annuncio_id FROM firme_nostr WHERE tg_id=? "
+            "AND azione<>'ritira'", (user["id"],)).fetchall()]
+        con.execute("DELETE FROM firme_nostr WHERE tg_id=? "
+                    "AND azione<>'ritira'", (user["id"],))
+        for r in con.execute(
+                "SELECT id FROM annunci WHERE venditore_id=? "
+                "AND nostr_autore<>'' AND nostr_event_id<>'' "
+                "AND contatto_nostr=''", (user["id"],)).fetchall():
+            accoda_firma(con, r["id"], user["id"], "ritira")
+            da_ritirare += 1
+    con.commit()
+    con.close()
+    if subito:
+        asyncio.create_task(_ripubblica_col_nome_nostro(subito))
+    return {"ok": True, "si": bool(si), "da_ritirare": da_ritirare,
+            "accodati": accodati}
 
 
 @app.post("/api/me/titolo")
@@ -65829,7 +66110,11 @@ def _accoda_trasloco_di(con, tg_id: int) -> int:
     Le tre condizioni della WHERE sono quelle di trasloca_annunci_nostr,
     ripetute a mano apposta (estrarle vorrebbe dire toccare quella
     funzione, fuori da questo cantiere): prove_collega_npub_firma
-    confronta le due stringhe, cosi' se divergono la prova si accorge."""
+    confronta le due stringhe, cosi' se divergono la prova si accorge.
+    Con «no» (annunci_sul_suo_profilo) non si accoda niente: e' il
+    trasloco che quella scelta rifiuta."""
+    if not annunci_sul_suo_profilo(con, tg_id):
+        return 0
     righe = con.execute(
         "SELECT a.id FROM annunci a "
         "LEFT JOIN firme_nostr f ON f.annuncio_id=a.id "
@@ -68228,6 +68513,21 @@ SQL_CHIAVE_PROVATA = ("npub_accesso != '' "
                       "OR (npub != '' AND npub_verificata=1)")
 
 
+def annunci_sul_suo_profilo(con, tg_id) -> bool:
+    """«Pubblica i miei annunci anche sul mio profilo Nostr» (20 ott
+    2026, cantiere nostr-da-telefono): True = il BIVIO di sempre, gli
+    annunci di chi ha una chiave provata li firma lui; False = escono
+    col nome di Barattolo. E' il giudice UNICO della scelta: il bivio,
+    i due traslochi e la coda delle firme chiedono a lui. Una riga
+    senza la colonna (o senza utente) vale il di serie, 1."""
+    r = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    if not r or "annunci_su_profilo_nostr" not in r.keys():
+        return True
+    return r["annunci_su_profilo_nostr"] is None \
+        or bool(r["annunci_su_profilo_nostr"])
+
+
 def accoda_firma(con, annuncio_id: int, tg_id: int, azione: str):
     """Mette (o sostituisce) l'azione in sospeso su quell'annuncio.
     L'ultima vince: venduto e poi rimborsato fa 'active', e all'utente
@@ -68265,7 +68565,19 @@ async def annuncio_su_nostr(annuncio_id: int, status: str,
         # il browser alla prima apertura. Il bivio sta DENTRO il
         # funnel e non nei suoi chiamanti, cosi' prima pubblicazione e
         # aggiornamenti lo ereditano tutti senza toccarne nessuno.
-        if chiave_nostr_provata(u):
+        # ...SE LUI LO VUOLE (20 ott 2026, cantiere nostr-da-telefono):
+        # con «no» l'annuncio esce col nome nostro, qui sotto. Ma finche'
+        # in piazza c'e' ancora un evento FIRMATO DA LUI (la sua
+        # cancellazione aspetta la sua firma) non se ne fa nascere un
+        # secondo nostro accanto: due teste. Lo ripubblica col nostro
+        # nome `_ripubblica_col_nome_nostro`, appena la cancellazione
+        # e' firmata.
+        if chiave_nostr_provata(u) \
+                and not annunci_sul_suo_profilo(con, a["venditore_id"]):
+            if a["nostr_autore"]:
+                con.close()
+                return
+        elif chiave_nostr_provata(u):
             gia = con.execute("SELECT azione FROM firme_nostr "
                               "WHERE annuncio_id=?",
                               (annuncio_id,)).fetchone()
@@ -68470,7 +68782,9 @@ async def trasloca_annunci_nostr():
     # a chi si intesta un annuncio in piazza.
     accodati = 0
     for r in righe:
-        if not chiave_nostr_provata(r):
+        # chi ha scelto «no» (annunci_sul_suo_profilo) resta col nome nostro
+        if not chiave_nostr_provata(r) \
+                or not annunci_sul_suo_profilo(con, r["venditore_id"]):
             continue
         accoda_firma(con, r["id"], r["venditore_id"], "pubblica")
         accodati += 1

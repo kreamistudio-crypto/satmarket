@@ -69,6 +69,55 @@ class WsCartone:
         pass
 
 
+class WsPostino:
+    """IL SECONDO POSTINO DI CARTONE (20 ott 2026, cantiere nostr-da-
+    telefono): la connessione con cui la cassetta SPEDISCE un 24133. Non
+    pesca dalla coda dell'orecchio (gli ruberebbe la posta): tiene
+    l'EVENT mandato e risponde l'OK che il banco ha deciso."""
+    spediti = []
+    risposta = True
+    chiuse = 0
+
+    def __init__(self, relay, timeout=5):
+        self.relay = relay
+        self.ultimo = None
+
+    def settimeout(self, t):
+        pass
+
+    def send(self, s):
+        self.ultimo = json.loads(s)
+        WsPostino.spediti.append((self.relay, self.ultimo))
+
+    def recv(self):
+        return json.dumps(["OK", self.ultimo[1]["id"], WsPostino.risposta, ""])
+
+    def close(self):
+        WsPostino.chiuse += 1
+
+
+def connetti(relay, timeout=10, **kw):
+    """La porta del banco: l'orecchio passa `sslopt` e prende il cartone
+    della coda; la spedizione a un relay di casa no, e prende il postino."""
+    if "sslopt" in kw:
+        return WsCartone(relay, timeout, kw["sslopt"])
+    return WsPostino(relay, timeout)
+
+
+def ventiquattro(sk, verso, testo="cifrato", ora=None):
+    """Un 24133 FIRMATO DAVVERO dalla chiave effimera `sk` (coincurve):
+    la spedizione ricontrolla id e firma, e un evento finto non passa."""
+    import hashlib
+    pub = sk.public_key.format()[1:].hex()
+    ev = {"pubkey": pub, "created_at": int(ora or time.time()), "kind": 24133,
+          "tags": [["p", verso]], "content": testo}
+    serial = json.dumps([0, pub, ev["created_at"], 24133, ev["tags"], testo],
+                        separators=(",", ":"), ensure_ascii=False)
+    ev["id"] = hashlib.sha256(serial.encode("utf-8")).hexdigest()
+    ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+    return ev
+
+
 def evento(pub, ev_id, contenuto="cifrato"):
     return {"id": ev_id, "pubkey": "c" * 64, "created_at": int(time.time()),
             "kind": 24133, "tags": [["p", pub]], "content": contenuto,
@@ -100,7 +149,7 @@ def main():
     from fastapi.testclient import TestClient
     S = banco.SRV
     c = TestClient(S.app)
-    S._cassetta_connetti = WsCartone        # il cartone al posto del filo
+    S._cassetta_connetti = connetti         # il cartone al posto del filo
     S.CASSETTA_ORECCHIO_RIPOSO_S = 1        # senza cassette si chiude presto
 
     print("\n[la porta: cosa si accetta]")
@@ -268,6 +317,97 @@ def main():
           (r.status_code, r.json().get("chiusa")))
     prova("...una chiave storta si', un 400", 400,
           c.post(VIA + "/chiudi", json={"pub": "x", "biglietto": "b"}).status_code)
+
+    print("\n[il secondo postino: la cassetta spedisce]")
+    # LA CASSETTA CHE SPEDISCE (20 ott 2026, cantiere nostr-da-telefono):
+    # la pagina passa un 24133 gia' cifrato e firmato dalla sua chiave
+    # effimera, e il server lo consegna ai relay della cassetta.
+    from coincurve import PrivateKey
+    sk = PrivateKey()
+    mia = sk.public_key.format()[1:].hex()
+    FIRMATARIO = "9" * 64
+    SP = VIA + "/spedisci"
+    r = c.post(VIA, json={"pub": mia, "relays": [RELAY_CASA, "wss://relay.example"]})
+    big = r.json().get("biglietto")
+    prova("la cassetta della chiave effimera si apre", 200, r.status_code)
+    ev = ventiquattro(sk, FIRMATARIO)
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": ev})
+    prova("un 24133 firmato dalla chiave della cassetta parte: lo prende il "
+          "relay di casa, verso quello pubblico in collaudo non si esce",
+          (200, 1, [RELAY_CASA]),
+          (r.status_code, r.json().get("presi"), r.json().get("relays")))
+    ultimo = WsPostino.spediti[-1] if WsPostino.spediti else (None, [None, {}])
+    prova("...ed e' arrivato IDENTICO, col suo id e la sua firma: il server "
+          "non firma e non cifra niente",
+          (RELAY_CASA, "EVENT", ev["id"], ev["sig"], "cifrato"),
+          (ultimo[0], ultimo[1][0], ultimo[1][1].get("id"),
+           ultimo[1][1].get("sig"), ultimo[1][1].get("content")))
+    prova("...e la presa si e' chiusa", True, WsPostino.chiuse >= 1)
+    n = len(WsPostino.spediti)
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": ev})
+    prova("lo stesso evento due volte non riparte (le copie le fa gia' la "
+          "pagina)", (200, True, n),
+          (r.status_code, r.json().get("gia"), len(WsPostino.spediti)))
+    r = c.post(SP, json={"pub": mia, "biglietto": "sbagliato",
+                         "evento": ventiquattro(sk, FIRMATARIO, "altro")})
+    prova("senza il biglietto del deposito e' un 403", 403, r.status_code)
+    altra = PrivateKey()
+    r = c.post(SP, json={"pub": mia, "biglietto": big,
+                         "evento": ventiquattro(altra, FIRMATARIO)})
+    prova("un evento di un'ALTRA chiave non si spedisce: 400", 400, r.status_code)
+    falso = dict(ventiquattro(sk, FIRMATARIO, "terzo"), content="cambiato")
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": falso})
+    prova("un evento toccato dopo la firma (id sbagliato) e' un 400", 400,
+          r.status_code)
+    sfirmato = dict(ventiquattro(sk, FIRMATARIO, "quarto"), sig="0" * 128)
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": sfirmato})
+    prova("...e una firma che non torna pure", 400, r.status_code)
+    doppio = ventiquattro(sk, FIRMATARIO, "quinto")
+    doppio["tags"] = [["p", FIRMATARIO], ["p", "8" * 64]]
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": doppio})
+    prova("un evento verso due destinatari (o con altri tag) non si spedisce",
+          400, r.status_code)
+    r = c.post(SP, json={"pub": mia, "biglietto": big,
+                         "evento": dict(ventiquattro(sk, FIRMATARIO), kind=1)})
+    prova("solo 24133: una nota (kind 1) e' un 400", 400, r.status_code)
+    vecchio = ventiquattro(sk, FIRMATARIO, "sesto", ora=time.time() - 3600)
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": vecchio})
+    prova("un evento di un'ora fa e' un 400", 400, r.status_code)
+    lungo = ventiquattro(sk, FIRMATARIO, "x" * (S.CASSETTA_SPEDISCI_BYTE + 1))
+    r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": lungo})
+    prova("un testo oltre il tetto e' un 400", 400, r.status_code)
+    sk2 = PrivateKey()
+    r = c.post(SP, json={"pub": sk2.public_key.format()[1:].hex(),
+                         "biglietto": big,
+                         "evento": ventiquattro(sk2, FIRMATARIO)})
+    prova("senza una cassetta aperta per quella chiave e' un 404", 404,
+          r.status_code)
+    WsPostino.risposta = False
+    r = c.post(SP, json={"pub": mia, "biglietto": big,
+                         "evento": ventiquattro(sk, FIRMATARIO, "settimo")})
+    prova("un relay che dice OK:false non conta fra i presi", (200, 0),
+          (r.status_code, r.json().get("presi")))
+    WsPostino.risposta = True
+    tetto = S.CASSETTA_SPEDITI_MAX
+    with S._CASSETTE_LOCK:
+        S.CASSETTA_SPEDITI_MAX = len(S._CASSETTE[mia]["spediti"])
+    r = c.post(SP, json={"pub": mia, "biglietto": big,
+                         "evento": ventiquattro(sk, FIRMATARIO, "ottavo")})
+    prova("al tetto per cassetta (un tentativo di login) e' un 429 che lo dice",
+          (429, True), (r.status_code, "login" in r.json().get("detail", "")))
+    S.CASSETTA_SPEDITI_MAX = tetto
+    S._SECCHI.clear()
+    S.CASSETTA_SPEDITI_MAX = 1000       # qui si prova il freno per IP, non il tetto
+    esiti = [c.post(SP, json={"pub": mia, "biglietto": big,
+                              "evento": ventiquattro(sk, FIRMATARIO, f"giro {k}")},
+                    headers={"x-forwarded-for": "8.8.4.4"}).status_code
+             for k in range(61)]
+    prova("il freno per IP: sessanta al minuto, il sessantunesimo e' un 429",
+          (True, 429), (esiti[:60].count(429) == 0, esiti[-1]))
+    S._SECCHI.clear()
+    S.CASSETTA_SPEDITI_MAX = tetto
+    with S._CASSETTE_LOCK:
+        S._CASSETTE.pop(mia, None)
 
     print("\n[la scadenza: la cassetta muore, l'orecchio si chiude]")
     with S._CASSETTE_LOCK:
