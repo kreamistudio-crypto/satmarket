@@ -304,8 +304,9 @@ const O = D.ordini;
   for (const p of tutte) for (let i = 0; i < 6; i++)
     priv.push(S.hex.encode(S.HDKey.fromMasterSeed(S.mnemonicToSeedSync(p)).derive(`m/44/0/0/0/${i}`).privateKey));
   /* (20 ott 2026, swap-lockup) i due fornitori, e i loro finti mempool da
-     cui si legge il lockup: mai fuori dal computer */
-  out.sentinella = {fuori: chiamate.filter(c => ![B1 + '/v2/', B2 + '/v2/', B1 + '/esplora/tx/', B2 + '/esplora/tx/']
+     cui si legge il lockup e su cui si trasmette il ritiro (dal 20 ott,
+     swap-senza-api): mai fuori dal computer */
+  out.sentinella = {fuori: chiamate.filter(c => ![B1 + '/v2/', B2 + '/v2/', B1 + '/esplora/', B2 + '/esplora/']
                                              .some(b => c.url.startsWith(b))).length,
                     parole: tutte.some(p => p.split(' ').some(w => new RegExp('\\b' + w + '\\b').test(soloValori))),
                     privata: priv.some(k => soloValori.includes(k) || chiamate.some(c => c.url.includes(k)))};

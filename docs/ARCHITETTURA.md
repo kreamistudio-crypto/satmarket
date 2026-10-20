@@ -33770,6 +33770,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   a swap acceso. Il bundle è boltz-core al commit `a932d49c` (la #196).
   Il cartone: `/esplora/tx/<id>/hex`, i modi `lockup_altro_script`,
   `lockup_meno`, `lockup_fantasma`, e `firme`/`tentate` in `/cartone/visto`.
+- LO SWAP, IL RITIRO SENZA LA LORO API (20 ott 2026, cantiere
+  swap-senza-api; perché in CANTIERI, «Il ritiro senza la loro API»). Il
+  secondo canale del telefono è la RETE (`cfg.mempool`, la stessa origine
+  del ritiro indurito: niente CSP nuova), tutto in `swapMempool(base,
+  percorso, corpo)`, la seconda `fetch` di `swap/boltz.js`. In `ritira`:
+  l'id del lockup da `swapLockupPerIndirizzo` (`GET <mempool>/address/
+  <lockupAddress>/utxo`, l'uscita non spesa che porta almeno la promessa)
+  e SOLO se la rete tace dal fornitore; i byte sempre dalla rete; la fee
+  di uno swap recuperato, se il fornitore tace, da `/v1/fees/recommended`
+  (`fastestFee` × 160 vbyte); la trasmissione su tutte e due le strade
+  insieme (`POST <mempool>/tx` in testo semplice e `POST
+  /v2/chain/BTC/transaction`), basta che una la prenda. Nel tipo il
+  metodo facoltativo `lockupInRete(rec)`: `swapGiro` di
+  `swap/instradatore.js`, quando lo stato del fornitore non arriva,
+  ritira lo stesso se la rete vede il lockup. Il cartone fa da finto
+  mempool intero anche nel modo `giu` (`/esplora/address/<a>/utxo`,
+  `POST /esplora/tx`, `/esplora/v1/fees/recommended`), il modo
+  `giu_dopo_firma`, e `strade` in ogni ritiro di `trasmesse` (contato una
+  volta).
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e

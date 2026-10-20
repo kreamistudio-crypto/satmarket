@@ -54,10 +54,21 @@ I MODI, a comando (`GET /cartone/modo?m=...`):
     accettava), `lockup_meno` blocca 100 sats meno della promessa,
     `lockup_fantasma` da' al telefono una transazione che la «rete» non
     ha mai visto.
-IL FINTO MEMPOOL: `GET /esplora/tx/<id>/hex` risponde coi soli lockup
-«trasmessi» (tutti, tranne il fantasma), come l'API di mempool.space; e
-`/cartone/visto` conta le richieste di firma cooperativa (`firme`: lì
-arriva il segreto) e le trasmissioni tentate (`tentate`).
+  - (20 ott 2026, cantiere swap-senza-api) `giu_dopo_firma`: la richiesta
+    di firma cooperativa arriva (col segreto) e si conta, poi il cartone
+    si SPEGNE (503, e da li' in avanti il modo e' `giu`): il telefono deve
+    ritirare lo stesso, dallo script, trasmettendo sulla rete.
+IL FINTO MEMPOOL, come l'API di mempool.space, vivo anche nel modo `giu`
+(la rete non e' il fornitore): `GET /esplora/tx/<id>/hex` coi soli lockup
+«trasmessi» (tutti, tranne il fantasma); `GET /esplora/address/<a>/utxo`
+i lockup non ancora spesi che pagano quell'indirizzo (quello «altro
+script» paga un indirizzo diverso, e li' non compare); `POST /esplora/tx`
+la trasmissione del ritiro, in testo semplice, con le stesse regole di
+quella del fornitore; `GET /esplora/v1/fees/recommended` la fee del
+momento. `/cartone/visto` conta le richieste di firma cooperativa
+(`firme`: lì arriva il segreto) e le trasmissioni tentate (`tentate`);
+ogni ritiro accettato sta in `trasmesse` una volta sola, con le `strade`
+da cui e' arrivato («rete», «fornitore»).
 Lo stato di uno swap si sposta a comando come lo sposterebbe SATS Routing
 (`GET /cartone/stato?id=...&s=transaction.mempool`: a bitcoin bloccati
 nasce il lockup). `GET /cartone/visto` dice letture, l'ultima intestazione
@@ -102,7 +113,8 @@ CHIAVE = threading.Lock()
 MODI = ("normale", "cambiata", "giu", "storta",
         "mente_importo", "mente_impronta", "mente_albero",
         "mente_indirizzo", "mente_meno", "non_firma", "rifiuta_cooperativo",
-        "lockup_altro_script", "lockup_meno", "lockup_fantasma")
+        "lockup_altro_script", "lockup_meno", "lockup_fantasma",
+        "giu_dopo_firma")
 STATI = ("swap.created", "transaction.mempool", "transaction.confirmed",
          "invoice.settled", "invoice.expired", "swap.expired",
          "transaction.failed", "transaction.refunded")
@@ -281,6 +293,8 @@ def sposta(c, sid, stato):
                              - (100 if m == "lockup_meno" else 0),
                              variante="altro_script"
                              if m == "lockup_altro_script" else "")
+        s["lockup"]["valore"] = s["onchainAmount"] - (100 if m == "lockup_meno" else 0)
+        s["lockup"]["sull_indirizzo"] = m != "lockup_altro_script"
         # la «rete» lo vede, tranne il fantasma
         if m != "lockup_fantasma":
             c["rete"][s["lockup"]["id"]] = s["lockup"]["hex"]
@@ -291,6 +305,9 @@ def sposta(c, sid, stato):
 def firma_ritiro(c, s, corpo):
     # chi chiede la firma cooperativa manda il SEGRETO: si conta per swap
     c["stato"]["firme"].append(s["id"])
+    if c["stato"]["modo"] == "giu_dopo_firma":
+        c["stato"]["modo"] = "giu"
+        return 503, {"error": "cartone giu"}
     if c["stato"]["modo"] == "non_firma":
         return 400, {"error": "swap not eligible for a cooperative claim"}
     if not s["lockup"]:
@@ -309,9 +326,11 @@ def firma_ritiro(c, s, corpo):
                        pubNonce=str(corpo.get("pubNonce", "")))
 
 
-def trasmetti(c, corpo):
+def trasmetti(c, corpo, strada="fornitore"):
     """La trasmissione del ritiro: si accetta solo se spende il lockup di
-    uno swap del cartone e la firma regge."""
+    uno swap del cartone e la firma regge. `strada` = da dove arriva (la
+    «rete», cioe' il finto mempool, o il «fornitore»): lo stesso ritiro
+    trasmesso sulle due si conta una volta, con le due strade."""
     hex_ = str(corpo.get("hex", ""))
     c["stato"]["tentate"] += 1
     for s in c["swap"].values():
@@ -339,9 +358,16 @@ def trasmetti(c, corpo):
         if c["stato"]["modo"] == "rifiuta_cooperativo" and esito.get("via") == "cooperativo":
             return 400, {"error": "transazione rifiutata"}
         s["stato"] = "invoice.settled"
-        c["stato"]["trasmesse"].append({"swap": s["id"], "txid": esito["txid"],
-                                        "via": esito["via"],
-                                        "uscite": esito["uscite"]})
+        gia = next((x for x in c["stato"]["trasmesse"]
+                    if x["txid"] == esito["txid"]), None)
+        if gia:
+            if strada not in gia["strade"]:
+                gia["strade"].append(strada)
+        else:
+            c["stato"]["trasmesse"].append({"swap": s["id"], "txid": esito["txid"],
+                                            "via": esito["via"],
+                                            "uscite": esito["uscite"],
+                                            "strade": [strada]})
         return 201, {"id": esito["txid"]}
     return 400, {"error": "non spende nessun lockup conosciuto"}
 
@@ -433,6 +459,23 @@ class Sportello(BaseHTTPRequestHandler):
                 return self._rispondi(200 if ok else 400, {"ok": ok, "id": sid})
             if u.path == "/cartone/visto":
                 return self._rispondi(200, dict(c["stato"], swap=len(c["swap"])))
+            if (len(pezzi) == 4 and pezzi[0] == "esplora" and pezzi[1] == "address"
+                    and pezzi[3] == "utxo"):
+                # i lockup visti dalla rete, non ancora spesi, che pagano
+                # quell'indirizzo
+                spesi = {x["swap"] for x in c["stato"]["trasmesse"]}
+                return self._rispondi(200, [
+                    {"txid": s["lockup"]["id"], "vout": 0,
+                     "value": s["lockup"]["valore"],
+                     "status": {"confirmed": s["stato"] == "transaction.confirmed"}}
+                    for s in c["swap"].values()
+                    if s["lockup"] and s["lockup"]["id"] in c["rete"]
+                    and s["lockup"]["sull_indirizzo"]
+                    and s["lockupAddress"] == pezzi[2] and s["id"] not in spesi])
+            if u.path == "/esplora/v1/fees/recommended":
+                return self._rispondi(200, {"fastestFee": 2, "halfHourFee": 2,
+                                            "hourFee": 1, "economyFee": 1,
+                                            "minimumFee": 1})
             if (len(pezzi) == 4 and pezzi[0] == "esplora" and pezzi[1] == "tx"
                     and pezzi[3] == "hex"):
                 # il finto mempool: testo semplice, come mempool.space
@@ -455,8 +498,29 @@ class Sportello(BaseHTTPRequestHandler):
         pezzi = u.path.strip("/").split("/")
         try:
             n = int(self.headers.get("Content-Length") or 0)
-            corpo = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
+            grezzo = self.rfile.read(n).decode("utf-8")
         except (ValueError, UnicodeDecodeError):
+            return self._rispondi(400, {"error": "corpo storto"})
+        if u.path == "/esplora/tx":
+            # la trasmissione sulla «rete»: testo semplice, risponde l'id
+            # in testo, come mempool.space; vive anche a fornitore giu
+            with c["chiave"]:
+                try:
+                    codice, esito = trasmetti(c, {"hex": grezzo.strip()}, "rete")
+                except Exception as e:
+                    codice, esito = 500, {"error": str(e)[:200]}
+            dati = str(esito.get("id") if codice < 300 else
+                       "sendrawtransaction RPC error: " + esito.get("error", "")).encode("utf-8")
+            self.send_response(200 if codice < 300 else 400)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(dati)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(dati)
+            return
+        try:
+            corpo = json.loads(grezzo or "{}")
+        except ValueError:
             return self._rispondi(400, {"error": "json storto"})
         if not isinstance(corpo, dict):
             return self._rispondi(400, {"error": "json storto"})

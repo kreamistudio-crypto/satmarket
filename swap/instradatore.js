@@ -415,15 +415,26 @@ async function swapGiro(){
   for (const rec of aperti) {
     const f = swapFornitore(swapDiChi(rec));
     if (!f) continue;
-    let s;
+    let s, tace = false;
     try { s = await f.stato(rec); }
-    catch(e){ continue; }
+    catch(e){ tace = true; }
     if (s && s !== rec.stato) {
       rec.stato = s;
       swapSalvaRecord(rec);
       swapRidisegnaDove(rec);
     }
-    if (SWAP_FASI_RITIRO.has(swapFase(rec)) && !(rec.ritiro && rec.ritiro.txid))
+    const daRitirare = !(rec.ritiro && rec.ritiro.txid);
+    /* IL FORNITORE TACE (20 ott 2026, cantiere swap-senza-api): se la rete
+       vede i bitcoin bloccati, si ritira lo stesso, senza la sua API */
+    if (tace) {
+      let inRete = false;
+      if (daRitirare && f.lockupInRete) {
+        try { inRete = await f.lockupInRete(rec); } catch(e){ inRete = false; }
+      }
+      if (inRete) await swapRitira(rec);
+      continue;
+    }
+    if (SWAP_FASI_RITIRO.has(swapFase(rec)) && daRitirare)
       await swapRitira(rec);
   }
 }

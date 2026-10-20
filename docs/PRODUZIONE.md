@@ -4531,6 +4531,11 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   il telefono non ritira (il pannello «⚙️ Stato delle leve» lo dice:
   «Swap: dove si legge il lockup»). La CSP, a swap acceso, aggiunge
   quella sola origine.
+  DAL 20 OTT 2026 (swap-senza-api) da quella stessa origine il telefono
+  cerca anche il lockup per indirizzo (`/address/<a>/utxo`), la fee
+  (`/v1/fees/recommended`) e ci TRASMETTE il ritiro (`POST /tx`): l'esplora
+  del regtest sulla VM deve rispondere a tutte e quattro, e con
+  `Access-Control-Allow-Origin` (mempool.space dice `*`).
 
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo
