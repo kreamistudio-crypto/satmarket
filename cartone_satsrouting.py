@@ -58,6 +58,12 @@ I MODI, a comando (`GET /cartone/modo?m=...`):
     di firma cooperativa arriva (col segreto) e si conta, poi il cartone
     si SPEGNE (503, e da li' in avanti il modo e' `giu`): il telefono deve
     ritirare lo stesso, dallo script, trasmettendo sulla rete.
+  - (20 ott 2026, cantiere swap-spesa) `giu_rete_muta`: il fornitore e'
+    giu e la rete PRENDE la trasmissione ma la risposta si perde (502):
+    il giro dopo il telefono deve riconoscere il suo ritiro nella spesa
+    del lockup. E `GET /cartone/spendi_altro?id=...` fa spendere il
+    lockup a un'altra transazione (verso un altro script): il telefono
+    deve dirlo chiaro, senza mandare il segreto.
 IL FINTO MEMPOOL, come l'API di mempool.space, vivo anche nel modo `giu`
 (la rete non e' il fornitore): `GET /esplora/tx/<id>/hex` coi soli lockup
 «trasmessi» (tutti, tranne il fantasma); `GET /esplora/address/<a>/utxo`
@@ -65,7 +71,10 @@ i lockup non ancora spesi che pagano quell'indirizzo (quello «altro
 script» paga un indirizzo diverso, e li' non compare); `POST /esplora/tx`
 la trasmissione del ritiro, in testo semplice, con le stesse regole di
 quella del fornitore; `GET /esplora/v1/fees/recommended` la fee del
-momento. `/cartone/visto` conta le richieste di firma cooperativa
+momento; (dal 20 ott, swap-spesa) `GET /esplora/address/<a>/txs` le
+transazioni dell'indirizzo (il lockup e chi l'ha speso), `GET
+/esplora/tx/<id>` una transazione in JSON, `GET
+/esplora/tx/<id>/outspend/<n>` chi ha speso quell'uscita. `/cartone/visto` conta le richieste di firma cooperativa
 (`firme`: lì arriva il segreto) e le trasmissioni tentate (`tentate`);
 ogni ritiro accettato sta in `trasmesse` una volta sola, con le `strade`
 da cui e' arrivato («rete», «fornitore»).
@@ -114,7 +123,8 @@ MODI = ("normale", "cambiata", "giu", "storta",
         "mente_importo", "mente_impronta", "mente_albero",
         "mente_indirizzo", "mente_meno", "non_firma", "rifiuta_cooperativo",
         "lockup_altro_script", "lockup_meno", "lockup_fantasma",
-        "giu_dopo_firma")
+        "giu_dopo_firma", "giu_rete_muta")
+GIU = ("giu", "giu_rete_muta")     # i modi in cui il fornitore non risponde
 STATI = ("swap.created", "transaction.mempool", "transaction.confirmed",
          "invoice.settled", "invoice.expired", "swap.expired",
          "transaction.failed", "transaction.refunded")
@@ -123,12 +133,20 @@ CRIPTO = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "cartone_satsrouting_cripto.js")
 
 
+def spendi(c, s, txid, uscite):
+    """La «rete» registra chi ha speso il lockup di `s`: l'uscita 0 del
+    lockup va a `txid`, che paga `uscite` ([{sats, script}])."""
+    c["spese"][s["lockup"]["id"]] = {
+        "txid": txid,
+        "vout": [{"scriptpubkey": u["script"], "value": u["sats"]} for u in uscite]}
+
+
 def tariffe_del_modo(modo, percento=None):
     """La risposta di `/v2/swap/reverse` nel modo chiesto (None = giu).
     `percento` = la commissione di QUESTO cartone (20 ott 2026: il
     secondo fornitore delle prove dell'instradatore), con un'impronta
     che la dice; None = lo 0,6 % del 16 ott."""
-    if modo == "giu":
+    if modo in GIU:
         return None
     if modo == "storta":
         return {"BTC": {"BTC": {"hash": "x", "fees": "zero"}}}
@@ -358,6 +376,8 @@ def trasmetti(c, corpo, strada="fornitore"):
         if c["stato"]["modo"] == "rifiuta_cooperativo" and esito.get("via") == "cooperativo":
             return 400, {"error": "transazione rifiutata"}
         s["stato"] = "invoice.settled"
+        if s["lockup"]["id"] not in c["spese"]:
+            spendi(c, s, esito["txid"], esito["uscite"])
         gia = next((x for x in c["stato"]["trasmesse"]
                     if x["txid"] == esito["txid"]), None)
         if gia:
@@ -370,6 +390,23 @@ def trasmetti(c, corpo, strada="fornitore"):
                                             "strade": [strada]})
         return 201, {"id": esito["txid"]}
     return 400, {"error": "non spende nessun lockup conosciuto"}
+
+
+def tx_json(c, txid):
+    """Una transazione come la dice mempool.space (le parti che servono):
+    un lockup, o chi l'ha speso. None = la rete non la conosce."""
+    for s in c["swap"].values():
+        lk = s["lockup"]
+        if lk and lk["id"] == txid and txid in c["rete"]:
+            return {"txid": txid, "vin": [],
+                    "vout": [{"scriptpubkey_address": s["lockupAddress"]
+                              if lk["sull_indirizzo"] else "", "value": lk["valore"]}],
+                    "status": {"confirmed": s["stato"] == "transaction.confirmed"}}
+    for lockup, spesa in c["spese"].items():
+        if spesa["txid"] == txid:
+            return {"txid": txid, "vin": [{"txid": lockup, "vout": 0}],
+                    "vout": spesa["vout"], "status": {"confirmed": False}}
+    return None
 
 
 def recupera(c, corpo):
@@ -430,7 +467,7 @@ class Sportello(BaseHTTPRequestHandler):
                 if dati is None:
                     return self._rispondi(503, {"error": "cartone giu"})
                 return self._rispondi(200, dati)
-            if c["stato"]["modo"] == "giu" and u.path.startswith("/v2/"):
+            if c["stato"]["modo"] in GIU and u.path.startswith("/v2/"):
                 return self._rispondi(503, {"error": "cartone giu"})
             if len(pezzi) == 3 and pezzi[:2] == ["v2", "swap"]:
                 s = c["swap"].get(pezzi[2])
@@ -463,7 +500,9 @@ class Sportello(BaseHTTPRequestHandler):
                     and pezzi[3] == "utxo"):
                 # i lockup visti dalla rete, non ancora spesi, che pagano
                 # quell'indirizzo
-                spesi = {x["swap"] for x in c["stato"]["trasmesse"]}
+                spesi = {x["swap"] for x in c["stato"]["trasmesse"]} | {
+                    s["id"] for s in c["swap"].values()
+                    if s["lockup"] and s["lockup"]["id"] in c["spese"]}
                 return self._rispondi(200, [
                     {"txid": s["lockup"]["id"], "vout": 0,
                      "value": s["lockup"]["valore"],
@@ -472,6 +511,41 @@ class Sportello(BaseHTTPRequestHandler):
                     if s["lockup"] and s["lockup"]["id"] in c["rete"]
                     and s["lockup"]["sull_indirizzo"]
                     and s["lockupAddress"] == pezzi[2] and s["id"] not in spesi])
+            if (len(pezzi) == 4 and pezzi[0] == "esplora" and pezzi[1] == "address"
+                    and pezzi[3] == "txs"):
+                # le transazioni dell'indirizzo, le piu' nuove prima: chi
+                # ha speso il lockup, poi il lockup
+                out = []
+                for s in c["swap"].values():
+                    if not (s["lockup"] and s["lockup"]["id"] in c["rete"]
+                            and s["lockup"]["sull_indirizzo"]
+                            and s["lockupAddress"] == pezzi[2]):
+                        continue
+                    spesa = c["spese"].get(s["lockup"]["id"])
+                    if spesa:
+                        out.append(tx_json(c, spesa["txid"]))
+                    out.append(tx_json(c, s["lockup"]["id"]))
+                return self._rispondi(200, out)
+            if len(pezzi) == 3 and pezzi[0] == "esplora" and pezzi[1] == "tx":
+                j = tx_json(c, pezzi[2])
+                return self._rispondi(*((200, j) if j else (404, {"error": "Transaction not found"})))
+            if (len(pezzi) == 5 and pezzi[0] == "esplora" and pezzi[1] == "tx"
+                    and pezzi[3] == "outspend"):
+                if pezzi[2] not in c["rete"]:
+                    return self._rispondi(404, {"error": "Transaction not found"})
+                spesa = c["spese"].get(pezzi[2])
+                if pezzi[4] != "0" or not spesa:
+                    return self._rispondi(200, {"spent": False})
+                return self._rispondi(200, {"spent": True, "txid": spesa["txid"], "vin": 0,
+                                            "status": {"confirmed": False}})
+            if u.path == "/cartone/spendi_altro":
+                sid = (q.get("id") or [""])[0]
+                s = c["swap"].get(sid)
+                if not s or not s["lockup"]:
+                    return self._rispondi(400, {"ok": False})
+                spendi(c, s, secrets.token_hex(32),
+                       [{"sats": s["onchainAmount"] - 300, "script": "0014" + "11" * 20}])
+                return self._rispondi(200, {"ok": True})
             if u.path == "/esplora/v1/fees/recommended":
                 return self._rispondi(200, {"fastestFee": 2, "halfHourFee": 2,
                                             "hourFee": 1, "economyFee": 1,
@@ -509,6 +583,14 @@ class Sportello(BaseHTTPRequestHandler):
                     codice, esito = trasmetti(c, {"hex": grezzo.strip()}, "rete")
                 except Exception as e:
                     codice, esito = 500, {"error": str(e)[:200]}
+                muta = c["stato"]["modo"] == "giu_rete_muta"
+            if muta:
+                # presa, ma la risposta non arriva al telefono
+                self.send_response(502)
+                self.send_header("Content-Length", "0")
+                self._cors()
+                self.end_headers()
+                return
             dati = str(esito.get("id") if codice < 300 else
                        "sendrawtransaction RPC error: " + esito.get("error", "")).encode("utf-8")
             self.send_response(200 if codice < 300 else 400)
@@ -525,7 +607,7 @@ class Sportello(BaseHTTPRequestHandler):
         if not isinstance(corpo, dict):
             return self._rispondi(400, {"error": "json storto"})
         with c["chiave"]:
-            if c["stato"]["modo"] == "giu":
+            if c["stato"]["modo"] in GIU:
                 return self._rispondi(503, {"error": "cartone giu"})
             try:
                 if u.path == "/v2/swap/reverse":
@@ -554,7 +636,7 @@ def nuovo_cartone(rete="bitcoin", percento=None):
                       "rete": rete, "creazione": None, "trasmesse": [],
                       "firme": [], "tentate": 0},
             "swap": {}, "chiave": threading.Lock(), "percento": percento,
-            "rete": {}}
+            "rete": {}, "spese": {}}
 
 
 def avvia(porta=0, rete="bitcoin", percento=None):
@@ -579,7 +661,7 @@ def main(argv):
     srv = ThreadingHTTPServer(("127.0.0.1", porta), Sportello)
     STATO.update(firme=[], tentate=0)
     srv.cartone = {"stato": STATO, "swap": SWAP, "chiave": CHIAVE,
-                   "percento": percento, "rete": {}}
+                   "percento": percento, "rete": {}, "spese": {}}
     print(f"🧃 SATS Routing di cartone su http://127.0.0.1:{porta} "
           f"(rete «{STATO['rete']}», modo «{STATO['modo']}»; si cambia con "
           f"/cartone/modo?m=...)", flush=True)

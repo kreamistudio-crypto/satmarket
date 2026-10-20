@@ -4556,7 +4556,9 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   cerca anche il lockup per indirizzo (`/address/<a>/utxo`), la fee
   (`/v1/fees/recommended`) e ci TRASMETTE il ritiro (`POST /tx`): l'esplora
   del regtest sulla VM deve rispondere a tutte e quattro, e con
-  `Access-Control-Allow-Origin` (mempool.space dice `*`).
+  `Access-Control-Allow-Origin` (mempool.space dice `*`). Dal 20 ott
+  (swap-spesa) anche a `/address/<a>/txs`, `/tx/<id>` e
+  `/tx/<id>/outspend/<n>`: da lì il telefono sa chi ha speso il lockup.
 
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo

@@ -70832,3 +70832,63 @@ PROVATO, con un caso provvisorio (non nel commit) che arriva alla
 fascia: con la catena verde; senza `premioCardP2P` ReferenceError, e il
 banco si porta dietro ✗ di prove estranee con «avuto: None»; con la
 catena e il caso sbagliato apposta un ✗ solo, sulla prova giusta.
+
+## La spesa del lockup: il ritiro con la risposta persa è «concluso», quello di un altro è un errore chiaro (20 ott 2026, cantiere swap-spesa, decisione di Andrea)
+
+LA DOMANDA. Il caso lasciato aperto da «Il ritiro senza la loro API»: la
+rete prende la trasmissione del ritiro, la risposta si perde, e il
+fornitore è giù. Il giro dopo il lockup non c'è più fra le uscite non
+spese, il fornitore tace, e lo swap restava con «il lockup non si
+trova» anche coi sats arrivati. Andrea: si chiede a mempool.space chi
+l'ha speso; il nostro ritiro è «concluso», mai errore; un altro, errore
+chiaro.
+
+DECISO.
+- CHI L'HA SPESO: il lockup si trova fra le transazioni dell'indirizzo
+  dello swap (`/address/<a>/txs`, che porta anche le spese), e chi
+  spende la sua uscita lo dice `/tx/<id>/outspend/<n>`. Sempre la stessa
+  origine (`cfg.mempool`): niente CSP nuova.
+- NOSTRO È: un id fra le transazioni firmate su questo telefono
+  (`rec.firmati`, le ultime quattro, scritte PRIMA di trasmettere: è il
+  ricordo che sopravvive alla risposta persa), OPPURE una spesa con
+  un'uscita allo script dell'indirizzo di chi vende (il caso delle
+  stesse parole su un altro telefono, o di un cooperativo andato a buon
+  fine mentre il telefono firmava già quello dallo script). Nostro →
+  «Concluso: N sats arrivati (transazione …)», coi sats letti
+  dall'uscita.
+- DI UN ALTRO: errore chiaro («I bitcoin dello swap li ha spesi
+  un'altra transazione, non il tuo ritiro: scrivi a <fornitore>.»),
+  senza il «riprovo da solo» di sotto; nessuna firma chiesta, nessun
+  segreto, niente trasmesso. Il giro continua a guardare (una lettura
+  storta della rete non deve diventare definitiva).
+- L'ORDINE: la spesa si guarda appena la ricerca per indirizzo non trova
+  un lockup non speso, PRIMA di chiedere l'id al fornitore (che da su
+  ridarebbe il lockup e farebbe ritrasmettere una spesa doppia) e prima
+  della fee. Il giro a fornitore muto ritira anche se il lockup è già
+  speso: `ritira` dirà da chi.
+
+SCARTATO. Riconoscere il nostro ritiro dal solo txid: un altro telefono
+con le stesse parole, o il cooperativo partito davvero, avrebbero un id
+che questo telefono non conosce. Dal solo indirizzo: è il controllo più
+debole se chi vende usa lo stesso indirizzo per altro; i due insieme.
+
+PROVE.
+- `collaudo_swap_telefono` (56/0), tre scene nuove: la risposta del
+  ritiro persa a fornitore giù (modo nuovo `giu_rete_muta`: la rete
+  prende e risponde 502) → primo giro errore ma la transazione è in
+  `firmati`, il giro dopo «concluso» con lo stesso txid e 47.154 sats,
+  e sulla rete il ritiro c'è una volta; la stessa spesa vista da chi non
+  l'ha firmata → «concluso» dall'indirizzo; il lockup speso da un altro
+  (`/cartone/spendi_altro`) → errore chiaro, nessuna firma, nessuna
+  POST, la frase giusta e niente «riprovo».
+- LE MUTAZIONI, una alla volta, tutte ROSSE: il ritiro che non guarda la
+  spesa; il giro che non vede il lockup speso; le firmate non ricordate;
+  solo il txid e non l'indirizzo; ogni spesa nostra; lo speso da altri
+  detto come un errore qualunque.
+- `prove_swap_telefono`: la sentinella della spesa (prima del fornitore,
+  il concluso, l'errore `speso`, le firmate prima della trasmissione,
+  l'outspend, il giro), controprova: senza `rec.firmati` è rossa.
+
+COSA RESTA. Sulla VM l'esplora del regtest deve rispondere anche a
+`/address/<a>/txs`, `/tx/<id>` e `/tx/<id>/outspend/<n>` (PRODUZIONE,
+«DOVE SI LEGGE IL LOCKUP»). Suite e collaudi: nel messaggio del commit.

@@ -122,7 +122,9 @@ const SWAP_TESTI_T3 = {
       ripreso: n => `${n} si è ripreso i bitcoin: l'incasso torna disponibile.`},
     statoIgnoto: 'In corso.',
     ritirato: id => `Ritirato: transazione ${id}.`,
+    concluso: (sats, id) => `Concluso: ${sats} sats arrivati (transazione ${id}).`,
     ritiroErrore: 'Il ritiro non è ancora riuscito: riprovo da solo.',
+    spesoAltri: n => `I bitcoin dello swap li ha spesi un'altra transazione, non il tuo ritiro: scrivi a ${n}.`,
     lista: 'I tuoi swap',
     ordine: n => `Ordine #${n}`,
     recuperato: 'Recuperato',
@@ -167,7 +169,9 @@ const SWAP_TESTI_T3 = {
       ripreso: n => `${n} took the bitcoin back: the payout is available again.`},
     statoIgnoto: 'In progress.',
     ritirato: id => `Claimed: transaction ${id}.`,
+    concluso: (sats, id) => `Done: ${sats} sats arrived (transaction ${id}).`,
     ritiroErrore: 'The claim did not go through yet: retrying by itself.',
+    spesoAltri: n => `The swap's bitcoin were spent by another transaction, not by your claim: write to ${n}.`,
     lista: 'Your swaps',
     ordine: n => `Order #${n}`,
     recuperato: 'Recovered',
@@ -275,6 +279,10 @@ function pannelloSwapTelefono(o){
 }
 function frasestatoSwap(rec){
   const t = t3();
+  /* (20 ott 2026, swap-spesa) la spesa del lockup letta dalla rete */
+  if (rec.ritiro && rec.ritiro.concluso)
+    return t.concluso(fmt(rec.ritiro.sats || rec.ricevi || 0), swapCorto(rec.ritiro.txid, 8));
+  if (rec.spesoDa) return t.spesoAltri(swapNomeFornitore(swapDiChi(rec)));
   if (rec.ritiro && rec.ritiro.txid && swapFase(rec) !== 'fatto')
     return t.ritirato(swapCorto(rec.ritiro.txid, 8));
   const f = t.fasi[swapFase(rec)];
@@ -286,7 +294,7 @@ function cartaSwap(rec){
     <h4>₿ ${esc(t.tuoSwap)}</h4>
     <div class="swap-stato">${esc(frasestatoSwap(rec))}</div>
     ${rec.ricevi && rec.indirizzo ? `<div class="hint">${esc(t.ricevi(fmt(rec.ricevi)))} <span class="mono">${esc(swapCorto(rec.indirizzo, 8))}</span></div>` : ''}
-    ${rec.errore ? `<div class="hint">${esc(t.ritiroErrore)}</div>` : ''}
+    ${rec.errore && !rec.spesoDa ? `<div class="hint">${esc(t.ritiroErrore)}</div>` : ''}
     <div class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</div>
   </div>`;
 }
@@ -448,9 +456,14 @@ async function swapRitira(rec){
     if (!c || !c.parole) throw new Error('parole assenti');
     const fatto = await f.ritira(rec, c.parole);
     rec.ritiro = {txid: fatto.txid, cooperativo: fatto.cooperativo, quando: Date.now()};
+    if (fatto.concluso) Object.assign(rec.ritiro, {concluso: true, sats: Number(fatto.sats) || 0});
     delete rec.errore;
+    delete rec.spesoDa;
   } catch(e){
     rec.errore = String((e && e.message) || e).slice(0, 120);
+    /* (swap-spesa) speso da un altro: lo si dice chiaro, non «riprovo» */
+    if (e && e.tipo === 'speso') rec.spesoDa = String(e.txid || '');
+    else delete rec.spesoDa;
   } finally {
     swapRitirando.delete(rec.id);
     swapSalvaRecord(rec);
