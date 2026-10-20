@@ -70504,3 +70504,19 @@ COSA RESTA.
   tetto né controllo: è un gesto a mano a server fermo, non toccato.
 - L'intestazione di backup-fuori.sh chiede ancora `apt install sqlite3`:
   non serve più, ma non fa male.
+
+## Il banco della pausa porta la catena del premio della card (20 ott 2026, cantiere banchi-premio-card, richiesta di Andrea)
+
+Seguito di «ordina-per-convenienza»: `passaFiltroP2P` legge il premio
+con `premioCardP2P`, e il banco di `prove_ordine_in_pausa`, che il
+filtro lo fa GIRARE, non portava quella catena. Oggi nessun suo caso
+arriva alla fascia del premio, quindi era verde; il primo che ci
+arrivasse avrebbe fermato il banco con un ReferenceError. Adesso il
+banco porta `premioImplicitoTabacchinoP2P`, `convenienzaFissaP2P`,
+`metroFissoP2P`, `premioCardP2P` e le righe `eurPerSat`/`cambioVivo`
+dal client (il cambio di riserva, muto). `prove_paracadute_app` non
+c'entra: lì `passaFiltroP2P` si legge come testo, non gira.
+PROVATO, con un caso provvisorio (non nel commit) che arriva alla
+fascia: con la catena verde; senza `premioCardP2P` ReferenceError, e il
+banco si porta dietro ✗ di prove estranee con «avuto: None»; con la
+catena e il caso sbagliato apposta un ✗ solo, sulla prova giusta.
