@@ -69703,3 +69703,20 @@ esce con 0; dove coincurve c'è (PC, VPS) gira intero. Provato in tutti
 e due i modi: 28/0 con coincurve, 0/0/1 saltata con un coincurve finto
 che non si importa. `pronto` era rimasto fermo, quindi niente deploy
 del commit rosso.
+
+**SU DEVELOP, NON SU MAIN (lo stesso giorno, decisione di Andrea).** I
+due commit erano andati su main (`ee112c8`, `f9b01ed`) prima che il
+flusso develop → collaudo → promozione fosse quello di tutti: la CI di
+main è stata rossa (il primo) e annullata (il secondo), `pronto` è
+rimasto a `774f946` e la produzione non li ha mai presi. Andrea: «non
+pubblicare direttamente su main… prima sempre andare su collaudo in
+develop», e su main «solo se la CI è verde». Portati su develop con un
+cherry-pick (conflitti solo in coda a `ci/collaudi.txt`,
+`ci/compila.txt` e qui: tenute le due parti). Sull'albero develop
+`5493247` + i due: suite severa 25.936 verdi, 0 rosse, 1 saltata
+(`prove_indirizzo_ordine_onchain`, embit mancava nel venv: installato,
+la sezione rigirata 33/0); collaudi della CI 95/0. Develop poi e' corso
+(`2bc249b`, la percentuale senza segno, un'altra sessione): rebase,
+conflitto solo qui; sull'albero finale suite severa 25.959/0, nessuna
+saltata, e `collaudo_fusione_da_telegram`, `collaudo_account`,
+`collaudo_piu_account` 3/0.
