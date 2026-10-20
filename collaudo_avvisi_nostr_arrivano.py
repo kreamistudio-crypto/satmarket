@@ -52,6 +52,7 @@ SRV = None
 RIGHE = []        # quel che il server ha stampato
 TELEGRAM = []     # (tg_id, testo, bottone) del trasporto di cartone
 BUSTE = []        # (relay, kind) di ogni evento «spedito»
+ESTERNI = {}      # relay -> il segno «esterno» con cui e' stato spedito
 
 TG, CON_LISTA, SOLO_LETTURA, SENZA, MUTI = 111, -501, -502, -503, -504
 # (cantiere filtro-10050) due 10050 coi relay che da qui non si
@@ -141,9 +142,11 @@ def avvio():
     server.chiedi_relay_dm = lambda relay, hexkey, kind=10050: \
         liste.get((hexkey, kind))
 
-    def invia_finto(relay, evento):
+    def invia_finto(relay, evento, esterno=False):
         BUSTE.append((relay, evento.get("kind")))
+        ESTERNI[relay] = esterno
         return True
+    server._invia_vero = server.invia_evento_relay   # per la parte 7
     server.invia_evento_relay = invia_finto
     # la chiave della piattaforma e i pacchi: di cartone, che la busta
     # vera la prova prove.py (e coincurve in CI non c'e')
@@ -338,6 +341,10 @@ def main():
                   True],
               [ok, buste, len(righe) == 1 and "10050 senza relay raggiungibili, "
                "busta NIP-17 su 5/5 relay di riserva" in righe[0]])
+        prova("(relay-risolti) i relay scritti da lui escono «esterni», i nostri "
+              "no", [True, [False] * 4],
+              [ESTERNI.get("wss://legge.sei.example"),
+               [ESTERNI.get(r) for r in SERIE[:4]]])
         ok, buste, righe = manda(MUTI)
         prova("coi relay muti la riga dice «10050 non letto»", True,
               len(righe) == 1 and "10050 non letto (relay muti)" in righe[0])
@@ -353,7 +360,7 @@ def main():
               sorted((r, 1059) for r in SUOI_DM[:4]), buste)
         SRV.DM_NIP04_RISERVA = False
         rifiuta = SRV.invia_evento_relay
-        SRV.invia_evento_relay = lambda relay, ev: False
+        SRV.invia_evento_relay = lambda relay, ev, esterno=False: False
         ok, buste, righe = manda(SENZA)
         prova("nessun relay accetta: la 📭 e la ⚠️ di sempre, e l'esito falso",
               [False, True, True], [ok, any(r.startswith("📭") for r in righe),
@@ -463,6 +470,43 @@ def main():
     asyncio.run(profilo())
     prova("a chi ha Telegram nessuno sguardo ai relay", [False, ""],
           [TG in SRV._RELAY_DM_TENTATO, riga_utente(TG)["relay_dm"]])
+
+    # ---- 7) IL NOME SI RISOLVE PRIMA DI BUSSARE (relay-risolti) -----------
+    print("\n[7) i relay dell'utente: il nome risolto e controllato, l'IP e non il nome]")
+    dns = {"finto-casa.example": "127.0.0.1",
+           "finto-pubblico.example": "93.184.216.34"}
+    chiesti, aperte = [], []
+    vero_dns, vera_conn, vera_presa = (SRV._risolvi_relay, SRV.create_connection,
+                                       SRV._presa_esterna)
+
+    def dns_finto(host, porta):
+        chiesti.append(host)
+        return [(SRV.socket.AF_INET, SRV.socket.SOCK_STREAM, 6, "",
+                 (dns[host], porta))] if host in dns else []
+    SRV._risolvi_relay = dns_finto
+    SRV.create_connection = lambda relay, **k: aperte.append((relay, k))
+    try:
+        prova("un nome finto che risolve a 127.0.0.1: irraggiungibile, e la "
+              "consegna non apre niente", [[], False, []],
+              [SRV.indirizzi_esterni("wss://finto-casa.example"),
+               SRV._invia_vero("wss://finto-casa.example", {"id": "x"}, True),
+               aperte])
+        prova("un nome che risolve a un IP pubblico: passa, con quell'indirizzo",
+              [(SRV.socket.AF_INET, ("93.184.216.34", 443))],
+              SRV.indirizzi_esterni("wss://finto-pubblico.example"))
+        # la presa verso l'IP pubblico: nella gabbia la rete fuori non c'e',
+        # quindi la si fa finta e si guarda SOLO dove e con che nome si apre
+        prese = []
+        SRV._presa_esterna = lambda relay, tetto=5: prese.append(relay) or "presa"
+        SRV._invia_vero("wss://finto-pubblico.example", {"id": "x"}, True)
+        prova("...e la websocket nasce sulla presa gia' aperta, col nome "
+              "nell'indirizzo (per l'Host), senza un'altra risoluzione",
+              [["wss://finto-pubblico.example"],
+               [("wss://finto-pubblico.example", {"timeout": 5, "socket": "presa"})]],
+              [prese, aperte])
+    finally:
+        SRV._risolvi_relay, SRV.create_connection, SRV._presa_esterna = (
+            vero_dns, vera_conn, vera_presa)
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

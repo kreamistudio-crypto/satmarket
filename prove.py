@@ -170406,6 +170406,9 @@ def prove_relay_di_barattolo():
                "_posta_per": lambda r: None,   # la connessione singola
                "fuori_dal_recinto": lambda relay, cosa: False}   # (20 ott 2026)
     exec(pezzo("invia_evento_relay"), amb_inv)
+    # (cantiere relay-risolti) la consegna su una websocket aperta e'
+    # diventata un pezzo suo, che anche la strada dei relay dell'utente usa
+    exec(pezzo("_consegna_ws"), amb_inv)
     Ws.copioni = {A: lambda m: [["OK", m[1]["id"], False, "rate-limited: piano"]]
                   if m[0] == "EVENT" else [],
                   B: lambda m: [["OK", m[1]["id"], True, ""]] if m[0] == "EVENT" else []}
@@ -170669,6 +170672,8 @@ def prove_posta_relay():
         for f in ("relay_di_casa", "lettura_simulata", "fuori_dal_recinto",
                   "_segna_scrittura_relay",
                   "invia_evento_relay", "_kind0_profilo", "chiedi_relay_dm",
+                  # (cantiere relay-risolti) la consegna, un pezzo suo
+                  "_consegna_ws",
                   "_x_note_da_relay"):
             exec(pezzo(f), amb)
         i = src.find("# ---------- LA POSTA DEI RELAY")
@@ -175657,6 +175662,181 @@ ctx.__no = async () => { throw new Error('not eligible'); };
         prova("swap: ...e il giudice in Python dice no a una firma rotta", False,
               _cart.schnorr_verifica(bytes.fromhex(co["impronta"]),
                                      bytes.fromhex(co["chiave"]), bytes(rotta)))
+def prove_relay_risolti():
+    """IL NOME SI RISOLVE AL MOMENTO DI BUSSARE (20 ott 2026, cantiere
+    relay-risolti, decisione di Andrea). `relay_esterno` guarda il nome, e
+    un nome pubblico puo' puntare a casa nostra. Per i relay scritti da un
+    utente il server risolve il nome UNA volta, rifiuta il relay se anche
+    uno solo degli indirizzi non e' di internet (`ip_esterno`), si connette
+    all'indirizzo GIA' controllato (mai di nuovo al nome: niente rebinding)
+    e tiene il nome per lo SNI. Qui coi pezzi veri e un DNS, una presa e
+    un TLS di cartone: dove ci si connette, con che nome, e cosa non parte."""
+    print("\n[il nome dei relay dell'utente si risolve e si controlla prima di bussare]")
+    import ipaddress as _ipa
+    import types as _t
+    from urllib.parse import urlparse as _urlparse
+    src = _SORGENTE
+
+    DNS, CHIESTE, CONNESSIONI, TLS, CHIUSE, RIFIUTA = {}, [], [], [], [], set()
+
+    def _risolvi(host, porta):
+        CHIESTE.append((host, porta))
+        r = DNS.get(host)
+        if isinstance(r, Exception):
+            raise r
+        if callable(r):
+            r = r()
+        return [(10 if ":" in ip else 2, 1, 6, "", (ip, porta) if ":" not in ip
+                 else (ip, porta, 0, 0)) for ip in (r or [])]
+
+    class _Presa:
+        def __init__(self, fam, tipo):
+            self.fam = fam
+
+        def settimeout(self, t):
+            pass
+
+        def connect(self, a):
+            CONNESSIONI.append(a[0])
+            if a[0] in RIFIUTA:
+                raise OSError("rifiutata")
+
+        def close(self):
+            CHIUSE.append(self)
+
+    class _Contesto:
+        check_hostname = True
+        verify_mode = "di serie"
+
+        def wrap_socket(self, grezza, server_hostname=None):
+            TLS.append((server_hostname, self.check_hostname, self.verify_mode))
+            return ("tls", grezza, server_hostname)
+
+    amb = {"urlparse": _urlparse, "ipaddress": _ipa, "re": re,
+           "socket": _t.SimpleNamespace(AF_INET=2, AF_INET6=10, SOCK_STREAM=1,
+                                        socket=_Presa),
+           "ssl": _t.SimpleNamespace(CERT_NONE="nessuno",
+                                     create_default_context=_Contesto),
+           "_risolvi_relay": _risolvi}
+    exec(re.search(r"\n(_FORMA_TLD = [^\n]*)\n", src).group(1), amb)
+    exec(re.search(r"\n(_NOMI_LOCALI = \([^)]*\))", src).group(1), amb)
+    for f in ("ip_esterno", "relay_esterno", "indirizzi_esterni", "_presa_esterna"):
+        exec(pezzo(f), amb)
+    ipe, indirizzi, presa = (amb["ip_esterno"], amb["indirizzi_esterni"],
+                             amb["_presa_esterna"])
+
+    # --- 1) IL GIUDICE DEGLI IP ------------------------------------------
+    prova("ip_esterno: di internet solo gli IP globali", [True, True, True],
+          [ipe("93.184.216.34"), ipe("2606:4700::1111"), ipe("::ffff:8.8.8.8")])
+    prova("...mai loopback, privati, link-local, ULA, riservati, l'IPv4 "
+          "privato dentro un IPv6, ne' cio' che non e' un IP", [],
+          [x for x in ("127.0.0.1", "10.0.0.1", "172.16.5.5", "192.168.1.1",
+                       "169.254.1.1", "::1", "fd00::1", "fe80::1%eth0",
+                       "0.0.0.0", "100.64.0.1", "::ffff:192.168.1.1",
+                       "nos.lol", "", None) if ipe(x)])
+
+    # --- 2) LA RISOLUZIONE, TUTTO O NIENTE -------------------------------
+    DNS.update({"finto-casa.example": ["127.0.0.1"],
+                "finto-pubblico.example": ["93.184.216.34"],
+                "finto-misto.example": ["93.184.216.34", "10.0.0.7"],
+                "finto-v6.example": ["2606:4700::1111"],
+                "finto-mappato.example": ["::ffff:192.168.1.1"],
+                "finto-vuoto.example": [],
+                "finto-rotto.example": OSError("NXDOMAIN")})
+    prova("UN NOME FINTO CHE RISOLVE A 127.0.0.1: scartato", [],
+          indirizzi("wss://finto-casa.example"))
+    prova("UN NOME CHE RISOLVE A UN IP PUBBLICO: passa, con l'indirizzo "
+          "controllato e la sua porta",
+          [(2, ("93.184.216.34", 443))], indirizzi("wss://finto-pubblico.example"))
+    prova("...e la porta scritta e' quella chiesta al DNS e usata dopo",
+          [[(2, ("93.184.216.34", 7447))], ("finto-pubblico.example", 7447)],
+          [indirizzi("wss://finto-pubblico.example:7447/"), CHIESTE[-1]])
+    prova("un nome con un indirizzo buono e uno privato: scartato tutto", [],
+          indirizzi("wss://finto-misto.example"))
+    prova("IPv6 pubblico passa, l'IPv4 privato travestito da IPv6 no",
+          [[(10, ("2606:4700::1111", 443, 0, 0))], []],
+          [indirizzi("wss://finto-v6.example"),
+           indirizzi("wss://finto-mappato.example")])
+    prova("una risoluzione che fallisce o non da' niente: irraggiungibile",
+          [[], []], [indirizzi("wss://finto-rotto.example"),
+                     indirizzi("wss://finto-vuoto.example")])
+    del CHIESTE[:]
+    prova("un relay che il giudice del nome scarta non si chiede nemmeno al DNS",
+          [[], [], []], [indirizzi("wss://nas.home.arpa"),
+                         indirizzi("ws://finto-pubblico.example"), CHIESTE])
+
+    # --- 3) LA PRESA: ALL'INDIRIZZO CONTROLLATO, COL NOME PER LO SNI -----
+    giri = []
+
+    def _rebinding():
+        giri.append(1)
+        return ["93.184.216.34"] if len(giri) == 1 else ["127.0.0.1"]
+    DNS["finto-rebind.example"] = _rebinding
+    del CONNESSIONI[:], TLS[:], CHIESTE[:]
+    p = presa("wss://finto-rebind.example/inbox")
+    prova("NIENTE REBINDING: il nome si chiede UNA volta, e ci si connette "
+          "all'indirizzo controllato (non di nuovo al nome)",
+          [1, ["93.184.216.34"]], [len(CHIESTE), CONNESSIONI])
+    prova("...il TLS porta il NOME per lo SNI, col certificato trattato come "
+          "per gli altri relay", [("finto-rebind.example", False, "nessuno")],
+          TLS)
+    prova("...e la presa resa e' quella TLS sopra la connessione all'IP",
+          ("tls", "finto-rebind.example"), (p[0], p[2]))
+    DNS["finto-due.example"] = ["1.1.1.1", "93.184.216.34"]
+    RIFIUTA.add("1.1.1.1")
+    del CONNESSIONI[:], CHIUSE[:]
+    p = presa("wss://finto-due.example")
+    prova("il primo indirizzo rifiuta: si prova il secondo (controllato anche "
+          "lui), e la presa rifiutata si chiude",
+          [["1.1.1.1", "93.184.216.34"], 1, "finto-due.example"],
+          [CONNESSIONI, len(CHIUSE), p and p[2]])
+    del CONNESSIONI[:], TLS[:]
+    prova("verso un nome che porta a casa: nessuna presa, nessuna connessione, "
+          "nessun TLS", [None, [], []],
+          [presa("wss://finto-casa.example"), CONNESSIONI, TLS])
+
+    # --- 4) LA CONSEGNA: invia_evento_relay(..., esterno=True) ------------
+    aperte, posta_chiesta = [], []
+
+    class _Ws:
+        def send(self, m):
+            pass
+
+        def recv(self):
+            return json.dumps(["OK", "ev1", True, ""])
+
+        def close(self):
+            pass
+
+    def _apri(relay, **k):
+        aperte.append((relay, sorted(k)))
+        return _Ws()
+    amb2 = dict(amb)
+    amb2.update({"fuori_dal_recinto": lambda r, c: False,
+                 "_posta_per": lambda r: posta_chiesta.append(r),
+                 "create_connection": _apri, "json": json, "time": time,
+                 "_segna_scrittura_relay": lambda *a: None,
+                 "_presa_esterna": amb["_presa_esterna"]})
+    exec(pezzo("invia_evento_relay"), amb2)
+    exec(pezzo("_consegna_ws"), amb2)
+    invia = amb2["invia_evento_relay"]
+    esito = invia("wss://finto-pubblico.example", {"id": "ev1"}, True)
+    prova("un relay dell'utente buono: la websocket nasce sulla presa gia' "
+          "controllata (`socket=`), col nome nell'indirizzo per l'Host, e senza "
+          "postino", [True, [("wss://finto-pubblico.example",
+                              ["socket", "timeout"])], []],
+          [esito, aperte, posta_chiesta])
+    del aperte[:]
+    prova("un relay dell'utente il cui nome porta a 127.0.0.1: non parte "
+          "niente", [False, []],
+          [invia("wss://finto-casa.example", {"id": "ev1"}, True), aperte])
+    dm = codice(pezzo("manda_dm_nostr"))
+    prova("manda_dm_nostr segna «esterni» i relay che non sono nostri, per la "
+          "busta e per il NIP-04", 2,
+          dm.count("invia_evento_relay, r, pacco, r not in nostri)")
+          + dm.count("invia_evento_relay, r, vecchio, r not in nostri)"))
+
+
 def prove_filtro_10050():
     """IL FILTRO SUI RELAY SCRITTI DALL'UTENTE (20 ott 2026, cantiere
     filtro-10050, decisione di Andrea). Il 10050 di una persona passava
@@ -175678,10 +175858,14 @@ def prove_filtro_10050():
     src = _SORGENTE
     amb = {"urlparse": _urlparse, "ipaddress": _ipa, "re": re}
     exec(re.search(r"\n(_FORMA_TLD = [^\n]*)\n", src).group(1), amb)
+    # (cantiere relay-risolti) i nomi locali e il giudice degli IP
+    exec(re.search(r"\n(_NOMI_LOCALI = \([^)]*\))", src).group(1), amb)
+    exec(pezzo("ip_esterno"), amb)
     exec(pezzo("relay_esterno"), amb)
     exec(pezzo("relay_suoi_dm"), amb)
     giudice, suoi = amb["relay_esterno"], amb["relay_suoi_dm"]
     BUONI = ["wss://nos.lol", "wss://relay.primal.net/", "wss://NOS.LOL",
+             "wss://plan.example", "wss://arpa.example", "wss://lan.example",
              "wss://relay.xn--mnchen-3ya.de", "wss://8.8.8.8",
              "wss://[2606:4700::1111]", "wss://172.32.0.1",
              "wss://[::ffff:8.8.8.8]", "wss://nos.lol:443/inbox"]
@@ -175700,6 +175884,9 @@ def prove_filtro_10050():
         "link-local": ["wss://169.254.1.1", "wss://[fe80::1]",
                        "wss://[fe80::1%25eth0]"],
         "nomi .local": ["wss://casa.local", "wss://CASA.LOCAL."],
+        "nomi .lan, .internal, .home.arpa (cantiere relay-risolti)": [
+            "wss://router.lan", "wss://relay.corp.internal",
+            "wss://nas.home.arpa", "wss://home.arpa", "wss://X.LAN."],
         ".onion (gli invii non passano da Tor)": [
             "wss://abcdefghijklmnop.onion", "wss://x.y.onion/"],
         "riservati e trucchi": ["wss://0.0.0.0", "wss://100.64.0.1",
@@ -175773,7 +175960,11 @@ def prove_avvisi_nostr_arrivano():
     exec(pezzo("relay_di_casa"), amb)
     # (cantiere filtro-10050) il giudice dei relay dell'utente
     exec(re.search(r"\n(_FORMA_TLD = [^\n]*)\n", src).group(1), amb)
+    # (cantiere relay-risolti) i nomi locali e il giudice degli IP
+    exec(re.search(r"\n(_NOMI_LOCALI = \([^)]*\))", src).group(1), amb)
+    exec(pezzo("ip_esterno"), amb)
     exec(pezzo("relay_esterno"), amb)
+    exec(pezzo("relay_suoi_dm"), amb)
     exec(pezzo("relay_riserva_dm"), amb)
     ris = amb["relay_riserva_dm"]
     NOSTRI = ["wss://n1.example", "wss://n2.example", "wss://n3.example",
@@ -175783,16 +175974,19 @@ def prove_avvisi_nostr_arrivano():
           ["wss://suo.example"] + NOSTRI[:4], ris(["wss://suo.example"], NOSTRI))
     prova("dei suoi: mai un ws://, mai uno di casa, mai un doppione (la barra "
           "in fondo non fa un relay diverso), mai piu' di quattro",
-          [["wss://a.example"] + NOSTRI[:4],
+          # (cantiere relay-risolti) prima il filtro, poi i quattro: dei
+          # cinque scritti restano a e b
+          [["wss://a.example", "wss://b.example"] + NOSTRI[:4],
            ["wss://a.example", "wss://b.example", "wss://c.example",
             "wss://d.example"] + NOSTRI[:4]],
           [ris(["wss://127.0.0.1:7777", "wss://localhost", "wss://a.example",
                 "wss://A.example/", "wss://b.example"], NOSTRI),
            ris(["wss://a.example", "wss://b.example", "wss://c.example",
                 "wss://d.example", "wss://e.example"], NOSTRI)])
-    prova("...i suoi si contano PRIMA del filtro: quattro scritti, quattro "
-          "guardati (una lista lunga non si mangia i nostri)",
-          ["wss://a.example"] + NOSTRI[:4],
+    prova("...PRIMA IL FILTRO, POI I QUATTRO (cantiere relay-risolti, la "
+          "regola del 10050): tre scartati in cima non si mangiano i buoni "
+          "che vengono dopo, e i nostri restano",
+          ["wss://a.example", "wss://b.example"] + NOSTRI[:4],
           ris(["ws://x.example", "ws://y.example", "ws://z.example",
                "wss://a.example", "wss://b.example"], NOSTRI))
     prova("i nostri vengono dal config e passano come sono: anche di casa "
@@ -176882,6 +177076,7 @@ def main():
               prove_avvisi_nostr_arrivano,
               prove_filtro_10050,
               prove_semina_collaudo,
+              prove_relay_risolti,
               prove_config_esempio):
         try:
             f()

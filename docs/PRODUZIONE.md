@@ -4796,6 +4796,11 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
    (o i relay non hanno risposto).
    `sudo -u barattolo sqlite3 -readonly /srv/barattolo/dati/satmarket.db "SELECT COUNT(DISTINCT tg_id) AS persone, COUNT(*) AS avvisi, SUM(letto=0) AS non_letti FROM avvisi_app"`
    `journalctl -u barattolo --since "7 days ago" | grep -c "📭 DM Nostr a"`
+  I RELAY SCRITTI DA UN UTENTE SI RISOLVONO PRIMA DI BUSSARE (20 ott
+  2026, cantiere relay-risolti): il server chiede il nome al DNS una
+  volta, e se un indirizzo è locale o privato quel relay non si tocca (la
+  riga 📭 conta solo i relay che hanno preso la busta). Nessun passo sul
+  VPS, nessuna riga nuova nel journal.
   I .ONION SI SCARTANO perché dal server i DM partono diretti (Tor sul
   VPS serve al sito .onion in entrata). Se un giorno gli invii passassero
   da Tor, il giudice `relay_esterno` va cambiato. Per guardare, in sola
