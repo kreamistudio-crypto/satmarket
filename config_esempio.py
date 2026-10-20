@@ -1137,8 +1137,9 @@ ONCHAIN_SOLO_ADMIN = True
 # serve SOLO in disputa. Qui va la META' PUBBLICA e nient'altro: la
 # privata non entra su questa macchina (vivra' in un firmatario sul
 # nodo, mai sul VPS). Vuota: il server usa una xpub DI CARTONE, presa
-# dai vettori di prova del BIP-32 — pubblicata in uno standard, non e'
-# la chiave di nessuno — e lo DICE al foglio, che la mostra scritto.
+# dai vettori di prova del BIP-32 — pubblicata in uno standard col suo
+# seme, quindi CHIUNQUE ha la privata — e lo DICE al foglio, che la
+# mostra scritto: «non mandarci niente».
 # ⚠️ Nella tappa di prova la rete e' SEMPRE signet (dal 20 ott 2026;
 # testnet prima) e un indirizzo mainnet non si calcola da nessuna
 # parte: cosi' e' impossibile mandare sats veri a un 2-di-3 di cartone.

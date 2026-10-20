@@ -2265,6 +2265,11 @@ FRENI = {
     "carrello": (120, 60),      # il carrello salvato a ogni tocco, per persona (un dito non ci arriva)
     "zap": (20, 60),            # le fatture dell'indirizzo Lightning di casa, per IP (ognuna conia sul nodo)
     "zap_tutti": (120, 60),     # ...e per tutti insieme: copre anche chi un IP leggibile non ce l'ha
+    # l'on-chain della tappa 2 (20 ott 2026, numeri di Andrea): dare la
+    # xpub dedicata e un gesto di una volta, un indirizzo di prova
+    # scrive una riga e consuma tre numeri
+    "onchain_xpub": (5, 3600),        # «Accendi l'on-chain», per persona
+    "onchain_indirizzo": (20, 3600),  # un indirizzo di prova fra due ammessi, per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -49037,8 +49042,10 @@ except ImportError:
 # non entra su questa macchina (vivra' in un firmatario sul nodo), e da
 # un'xpub non si firma niente, si derivano solo altre meta' pubbliche.
 # VUOTA = XPUB DI CARTONE, e il foglio lo dice scritto: e' quella dei
-# vettori di prova del BIP-32, pubblicata in uno standard, che non e' la
-# chiave di nessuno. Serve a far VEDERE le tre chiavi e a provare il
+# vettori di prova del BIP-32, pubblicata in uno standard col suo SEME
+# — quindi chiunque ha la privata, e un sats mandato li' e' di chi
+# arriva prima (correzione del 20 ott 2026: prima qui c'era scritto
+# «la chiave di nessuno», che era falso). Serve a far VEDERE le tre chiavi e a provare il
 # ripristino prima che esista una chiave nostra da proteggere.
 XPUB_CARTONE = ("xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8Nqtwyb"
                 "GhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8")
@@ -86547,6 +86554,9 @@ async def onchain_xpub(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
+    # il freno DOPO il cancello (a leva spenta la porta non esiste, e
+    # non consuma niente) e prima di tutto il resto: anche un no conta
+    _frena("onchain_xpub", user["id"])
     _onchain_serve_embit()
     d = await leggi_json(req)
     xpub = str(d.get("xpub") or "").strip()
@@ -86583,6 +86593,7 @@ async def onchain_prova_indirizzo(req: Request,
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
+    _frena("onchain_indirizzo", user["id"])
     _onchain_serve_embit()
     d = await leggi_json(req)
     try:

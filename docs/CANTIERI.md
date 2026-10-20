@@ -69870,3 +69870,53 @@ primarie, tutte di sola lettura.
 
 Il resto dello studio non cambia: oggi la sola strada «compra sats con
 USDT» verificata con numeri veri è FixedFloat.
+
+
+## L'on-chain, i ritocchi della tappa 2: le chiavi di cartone dette come sono, il cloud che fuori da Telegram non c'è, il freno sulle due porte (20 ott 2026, cantiere onchain-ritocchi, richiesta di Andrea)
+
+**COSA HA CHIESTO ANDREA**, sullo stesso develop della tappa 2, prima di
+chiuderla: tre ritocchi e la suite intera sull'albero esatto.
+- **Le chiavi di cartone, dette come sono.** Il blocco 2 del foglio
+  diceva della terza chiave di cartone «nessuno ha la sua privata», ed
+  era FALSO: i vettori del BIP-32 pubblicano anche il seme, quindi
+  chiunque ha la privata. Adesso il venditore e Barattolo di cartone
+  dicono «una chiave di prova pubblica, chiunque ha la privata», sotto
+  le tre chiavi c'è in rosso «⚠️ Sono chiavi di prova pubbliche:
+  chiunque ha la privata, non mandarci niente» (nell'ordine finto due
+  chiavi su tre le firma chiunque), e la riga «Terza chiave di cartone»
+  degli indirizzi veri dice lo stesso. Corretti anche il commento di
+  `XPUB_CARTONE` nel server e quello di `ONCHAIN_XPUB` nel config
+  d'esempio, che dicevano «la chiave di nessuno».
+- **Fuori da Telegram il cloud non c'è.** Il blocco 1 diceva «☁️ Il
+  cloud di Telegram non ha risposto: qui non c'è copia» anche nel
+  browser, dove quel cloud non esiste: un guasto che non c'era. Adesso,
+  se `cloudTelegram()` è vuoto, dice «☁️ Il cloud di Telegram qui non
+  c'è: Barattolo è aperto fuori da Telegram, e la copia nel cloud si fa
+  solo da dentro», senza il rosso; l'avviso «⚠️ Nessun backup» sotto
+  resta, perché resta vero. Dentro Telegram un cloud muto dice ancora
+  «non ha risposto».
+- **Il freno anti-raffica sulle due porte nuove**, per persona, coi
+  numeri di Andrea e col meccanismo di sempre (`FRENI`, `_frena`):
+  `onchain_xpub` 5 all'ora, `onchain_indirizzo` 20 all'ora. Il freno
+  sta DOPO il cancello (a leva spenta la porta non esiste e non consuma
+  gettoni) e PRIMA di embit e del corpo (anche una xpub storta consuma).
+
+**STRADE SCARTATE.** Il freno prima del cancello: a leva spenta una
+porta che per il mondo non esiste avrebbe consumato gettoni e, oltre il
+tetto, risposto 429 invece di 404 — dicendo che la porta c'è.
+
+**COSA È STATO PROVATO.**
+- `prove_freni`: i numeri concordati coi due nuovi, i due freni appesi
+  alle loro rotte, e l'ordine cancello → freno → embit → corpo.
+- `prove_indirizzo_ordine_onchain` (+4): il foglio non dice più
+  «nessuno ha la sua privata» e dice le tre frasi nuove; server e config
+  d'esempio non dicono più «la chiave di nessuno»; `onchainDoveAbita`
+  VERA sotto node nei due mondi (fuori: «qui non c'è», niente «non ha
+  risposto», «Nessun backup» resta; dentro: «non ha risposto»).
+- `collaudo_onchain_indirizzo` (+7, 35): cinque xpub passano e la sesta
+  è un 429, una storta dopo i cinque è 429 e non 400, il secchio è per
+  persona; venti indirizzi e il ventunesimo 429, un altro ne fa ancora;
+  a leva spenta nessun gettone consumato (copia PROFONDA dei secchi: una
+  piatta guarderebbe le stesse liste che il freno cambia).
+- Suite intera e collaudi della CI sull'albero che va su develop: nel
+  report della sessione.

@@ -53308,11 +53308,19 @@ function onchainConSeme(parole, k, miaXpub, verifiche){
       ${onchainRigaChiave('🧍 Tu (compratore)', k.compratore,
         'dal tuo seme, qui nel telefono')}
       ${onchainRigaChiave('🏪 Il venditore', k.venditore,
-        'dalla sua xpub dedicata' + (onchainSrv.cartone ? ' — di cartone, dai vettori BIP-32' : ''))}
+        'dalla sua xpub dedicata' + (onchainSrv.cartone
+          ? ' — <b>di cartone</b>: una chiave di prova pubblica (i vettori del BIP-32), chiunque ha la privata'
+          : ''))}
       ${onchainRigaChiave('🫙 Barattolo', k.barattolo,
         onchainSrv.cartone
-          ? '<b>chiave di cartone</b>: è quella dei vettori di prova del BIP-32, pubblicata in uno standard. Non è una chiave nostra, e nessuno ha la sua privata'
+          ? '<b>chiave di cartone</b>: è una chiave di prova pubblica, presa dai vettori del BIP-32. Non è una chiave nostra, e i suoi semi sono pubblicati: <b>chiunque ha la privata, non mandarci niente</b>'
           : 'dalla nostra xpub; la privata non sta su questo server')}
+      ${onchainSrv.cartone
+        ? `<div class="hint" style="margin-top:8px;color:var(--danger)"><b>⚠️
+             Sono chiavi di prova pubbliche: chiunque ha la privata, non
+             mandarci niente.</b> Due chiavi su tre di questo indirizzo
+             le può firmare chiunque.</div>`
+        : ''}
       <div class="hint" style="margin-top:8px">Nello script le tre
         chiavi stanno <b>in ordine alfabetico</b> (BIP-67): per questo
         l'indirizzo è lo stesso qualunque sia l'ordine in cui
@@ -53493,7 +53501,7 @@ function onchainRigaIndirizzo(r, v){
   return `<div style="margin-top:10px">${testa}${nota}
     <div class="mono" style="word-break:break-all">${esc(r.indirizzo)}</div>
     <div class="mono" style="word-break:break-all;font-size:11px">${esc(r.descrittore)}</div>
-    ${r.cartone ? '<div class="hint">Terza chiave <b>di cartone</b>.</div>' : ''}
+    ${r.cartone ? '<div class="hint" style="color:var(--danger)">Terza chiave <b>di cartone</b>: una chiave di prova pubblica, chiunque ha la privata — non mandarci niente.</div>' : ''}
   </div>`;
 }
 
@@ -53566,6 +53574,14 @@ function onchainDoveAbita(){
   if (onchainCase.nuvola === true) {
     righe.push('<div>☁️ <b>Il cloud di Telegram</b> — copia fatta. '
              + 'Non è cifrato end-to-end: Telegram la può leggere</div>');
+  } else if (onchainCase.nuvola === false && !cloudTelegram()) {
+    /* FUORI DA TELEGRAM (20 ott 2026, richiesta di Andrea): il cloud
+       qui non esiste, e «non ha risposto» diceva un guasto che non
+       c'e'. Senza copia lo stesso: l'avviso «Nessun backup» sotto
+       resta quello di prima. */
+    righe.push('<div>☁️ Il cloud di Telegram <b>qui non c\'è</b>: '
+             + 'Barattolo è aperto fuori da Telegram, e la copia nel '
+             + 'cloud si fa solo da dentro</div>');
   } else if (onchainCase.nuvola === false) {
     righe.push('<div style="color:var(--danger)">☁️ Il cloud di Telegram '
              + '<b>non ha risposto</b>: qui non c\'è copia</div>');

@@ -33783,7 +33783,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `controparti` [{id, nome}], `indirizzi` gli ultimi cinque);
   `POST /api/onchain/xpub` ({xpub} → {ok}); `POST
   /api/onchain/prova/indirizzo` ({venditore_id} → la riga per chi
-  chiama, che è il compratore). Il pannello «⚙️ Stato delle leve», gruppo
+  chiama, che è il compratore). Le due POST hanno il freno per persona
+  (`FRENI`: `onchain_xpub` 5 all'ora, `onchain_indirizzo` 20 all'ora),
+  appeso DOPO il cancello e prima di embit e del corpo: a leva spenta
+  non consuma, e anche un no conta. Il pannello «⚙️ Stato delle leve», gruppo
   «⛓️ Pagamento on-chain»: le due leve, «Libreria del 2-di-3 (embit)» e
   «Terza chiave (Barattolo)» (vera o di cartone, mai stampata).
   LE DIPENDENZE: `requirements.txt` (embit==0.8.0); il collaudo la

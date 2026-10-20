@@ -145800,7 +145800,10 @@ def prove_freni():
            "foto_recensione": (20, 3600), "carrello": (120, 60),
            # l'indirizzo Lightning di casa (10 ott 2026): 20 fatture al
            # minuto per IP, 120 per tutti insieme
-           "zap": (20, 60), "zap_tutti": (120, 60)}, F)
+           "zap": (20, 60), "zap_tutti": (120, 60),
+           # l'on-chain della tappa 2 (20 ott 2026, numeri di Andrea):
+           # la xpub dedicata 5 all'ora, un indirizzo di prova 20 all'ora
+           "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600)}, F)
     prova("...e cinque ordini «creato» vivi per compratore", 5, amb["MAX_ORDINI_CREATO"])
 
     # --- il secchio, con l'orologio di cartone ----------------------------
@@ -145886,13 +145889,24 @@ def prove_freni():
                                ("sfida Nostr", "login_nostr_sfida", '_frena("login", _ip_di(req))'),
                                ("login Nostr", "login_nostr", '_frena("login", _ip_di(req))'),
                                ("login Telegram", "login_telegram", '_frena("login", _ip_di(req))'),
-                               ("ritorno del login", "login_telegram_ritorno", '_frena("login", _ip_di(req))')):
+                               ("ritorno del login", "login_telegram_ritorno", '_frena("login", _ip_di(req))'),
+                               ("accendi l'on-chain", "onchain_xpub", '_frena("onchain_xpub", user["id"])'),
+                               ("indirizzo on-chain di prova", "onchain_prova_indirizzo",
+                                '_frena("onchain_indirizzo", user["id"])')):
         prova(f"il freno di «{nome}» e' appeso alla sua rotta", True, freno in pezzo(rotta))
     # per PERSONA dove c'e', e il freno sta DOPO la sessione (chi non entra non consuma)
     for rotta in ("pubblica", "modifica_annuncio", "verifica_pagamento", "salva_ln_address", "anteprima_foto"):
         p = pezzo(rotta)
         prova(f"...e in «{rotta}» viene dopo verifica_utente", True,
               p.index("verifica_utente(") < p.index("_frena("))
+    # l'on-chain: DOPO il cancello (a leva spenta la porta non esiste e
+    # non consuma) e PRIMA di embit e del corpo (anche un no conta)
+    for rotta in ("onchain_xpub", "onchain_prova_indirizzo"):
+        p = pezzo(rotta)
+        prova(f"...in «{rotta}» il freno sta fra il cancello e tutto il resto",
+              True, p.index("if not onchain_ammesso(user[\"id\"]):")
+              < p.index("_frena(") < p.index("_onchain_serve_embit()")
+              < p.index("await leggi_json(req)"))
     # gli ordini: il tetto sta PRIMA della fattura, nei due rami
     for rotta in ("compra", "_compra_set"):
         p = pezzo(rotta)
@@ -151145,6 +151159,55 @@ def prove_indirizzo_ordine_onchain():
            "<h4>6. Il backup, che si fa da sé</h4>" in mini,
            "<h4>7. La prova del ripristino</h4>" in mini,
            "<h4>8. Esporta</h4>" in mini])
+    # LE CHIAVI DI CARTONE DETTE COME SONO (20 ott 2026, correzione di
+    # Andrea): i semi dei vettori del BIP-32 sono pubblicati, quindi
+    # chiunque ha la privata. «Nessuno ha la sua privata» era falso
+    prova("il foglio dice il vero sulle chiavi di cartone, e non piu' "
+          "«nessuno ha la sua privata»", [False, True, True, True],
+          ["nessuno ha la sua privata" in mini,
+           "Sono chiavi di prova pubbliche: chiunque ha la privata, non\n"
+           "             mandarci niente." in mini,
+           "chiunque ha la privata, non mandarci niente</b>'" in mini,
+           "chiunque ha la privata — non mandarci niente." in mini])
+    prova("...e il server e il config d'esempio non dicono piu' «la chiave "
+          "di nessuno»", [False, False],
+          ["vettori di prova del BIP-32, pubblicata in uno standard, che non "
+           "e' la\n# chiave di nessuno" in src,
+           "la chiave di nessuno" in open(os.path.join(QUI, "config_esempio.py"),
+                                          encoding="utf-8").read()])
+    # FUORI DA TELEGRAM IL CLOUD NON C'E' (20 ott 2026, richiesta di
+    # Andrea): `onchainDoveAbita` VERA sotto node, nei due mondi
+    _node = _sh.which("node")
+    if _node:
+        dove = pezzo_js(mini, "function onchainDoveAbita(){", "\n}\n") + "\n}"
+        banco_dove = '''
+let onchainCase = {nuvola: false, relay: null}, onchainNato = 'nuovo';
+let TG = null;
+const cloudTelegram = () => TG;
+__DOVE__
+const fuori = onchainDoveAbita();
+TG = {};
+const dentro = onchainDoveAbita();
+console.log(JSON.stringify({
+  fuori: [/qui non c'è/.test(fuori), /non ha risposto/.test(fuori),
+          /Nessun backup/.test(fuori)],
+  dentro: [/qui non c'è<.b>: Barattolo/.test(dentro),
+           /non ha risposto/.test(dentro), /Nessun backup/.test(dentro)]}));
+'''.replace("__DOVE__", dove)
+        r = _sp.run([_node, "-e", banco_dove], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=60)
+        try:
+            o = json.loads(r.stdout.strip().splitlines()[-1])
+        except Exception:
+            print(r.stderr[-600:])
+            o = {}
+        prova("fuori da Telegram: «il cloud qui non c'è», non «non ha "
+              "risposto», e l'avviso «Nessun backup» resta",
+              [True, False, True], o.get("fuori"))
+        prova("...dentro Telegram un cloud muto dice ancora «non ha risposto»",
+              [False, True, True], o.get("dentro"))
+    else:
+        salta("il cloud fuori da Telegram, sotto node", "node non installato")
     req = open(os.path.join(QUI, "requirements.txt"), encoding="utf-8").read()
     prova("embit sta in requirements.txt, con la versione inchiodata", True,
           bool(re.search(r"(?m)^embit==\d+\.\d+\.\d+$", req)))
