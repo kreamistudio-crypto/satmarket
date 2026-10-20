@@ -68952,3 +68952,176 @@ lo ferma, il config non tracciato resta. Controprova: tolta la riga del
 bocciato, «non lo riprova» diventa rossa.
 
 **IL GIRO, sull'albero che va su develop.** Ribasato su `5a55f3b` (develop portato a main per la tappa 3 dello swap: il piano DR spostato sul suo ramo, `SWAP_INDIRIZZO_MAX_SATS`, la sentinella delle leve doppie, che guarda anche le leve di questo cantiere ed e' verde). Le sezioni toccate su ognuno dei commit 1-3 (2.297, 2.306, 2.314 verdi) e `collaudo_istanza_prova` nella gabbia tre volte per commit; sull'ultimo PROVE_SEVERE=1 25.763 passate, 0 fallite, i collaudi della CI 90 verdi; lo scanner dei segreti del workflow pulito, anche sulla storia. Il giro ha trovato tre cose mie, curate dentro i commit a cui appartengono prima del push: i 64 esadecimali dell'esempio di NIP-19 scritti per intero (lo scanner li prende per una chiave privata: ora si ricavano dalla npub), i banchi d'altri cantieri che fanno girare pezzi toccati (la busta P2P, le porte verso i relay, la pagina, l'avvio; e i conti: le porte Nostr sono DIECI, e una cifra in sats scritta a mano nel journal e' tolta) e una prova BALLERINA: il cookie «toccato a mano» cambiava l'ultima cifra in 0, e una volta su sedici era gia' 0.
+## Lo swap dal telefono, tappa 3: le parole, la creazione, la verifica, il ritiro, il recupero (20 ott 2026, cantiere swap-telefono, piano approvato da Andrea)
+
+**COSA FA.** A ordine confermato, chi vende sceglie «₿ On-chain (swap)»,
+vede il preventivo della tappa 2 e lo conferma; da qui in poi tutto
+succede NEL TELEFONO. La prima volta nascono le 12 parole (passo
+obbligato: si va avanti solo con la spunta «Le ho scritte su
+carta»); poi l'indirizzo bitcoin; poi il telefono chiede lo swap a SATS
+Routing DIRETTAMENTE, col codice partner (`referralId`), e prima di
+fidarsi VERIFICA la risposta; lo salva nel suo cassetto, lo sorveglia
+ogni 5 secondi ad app aperta e, a bitcoin bloccati, lo ritira da solo:
+cooperativo (MuSig2 a due) e, se SATS Routing non collabora, dallo
+script. Riaprendo l'app riprende da dove era. Dalla pagina «Swap» si
+vedono gli swap, si mostrano le parole a richiesta e si RECUPERA tutto
+da 12 parole su un telefono nuovo. IN QUESTA TAPPA BARATTOLO NON PAGA
+LA FATTURA DELLO SWAP (tappa 4, coi tetti dei pagamenti appesi): lo
+swap nasce verificato e resta «Pronto e verificato», nessun sats si
+muove. `SWAP_ATTIVO` resta SPENTA in produzione.
+
+**LE DECISIONI, coi perché.**
+- LE CHIAVI SONO DEL TELEFONO (regola ferrea 2 dal lato dei soldi): al
+  server di Barattolo non arriva niente di questo — nessuna parola,
+  nessuna chiave, nemmeno l'impronta. A SATS Routing solo parti
+  pubbliche: impronta del segreto, chiave pubblica, e la xpub di radice
+  SOLO al recupero. Il cassetto sta nel localStorage sotto il conto
+  (`barattolo_swap_<tg_id>`, `barattolo_swap_lista_<tg_id>`), la
+  lezione di `MOSTRO_CHIAVE`: due account sullo stesso telefono sono
+  due persone.
+- LO SCHEMA È IL LORO: dodici parole BIP-39, chiave dello swap i in
+  `m/44/0/0/0/i`, segreto = sha256(chiave privata), come il sito di
+  SATS Routing (boltz-web-app `004f4077`, `rescueFile.ts` e
+  `rescueDerivation.ts`). Così uno swap nato qui si ritrova anche dalla
+  loro pagina «Rescue». Provato contro i LORO vettori
+  (`rescueDerivation.spec.ts`): le loro parole danno la loro xpub di
+  radice, la loro chiave il loro segreto.
+- L'INDICE SI PRENOTA PRIMA DI CHIEDERE: il contatore (`prossimo`) si
+  salva prima della chiamata, così un telefono spento a metà non riusa
+  mai un segreto; al recupero riparte da max(indice trovato)+1.
+- LA VERIFICA È IL CALCO DI `validateReverse` del loro sito, più una
+  riga nostra: la fattura porta l'importo del preventivo e l'impronta
+  del NOSTRO segreto (letta dal tag p: `leggiBolt11` ora la restituisce
+  come `hash`); l'albero è quello che rifacciamo da soli
+  (`reverseSwapTree` + `compareTrees`); l'indirizzo del lockup è quello
+  che danno l'albero e le due chiavi (la loro PER PRIMA nel MuSig, come
+  il loro `createMusig`); on-chain non meno del preventivo. Una bugia
+  qualsiasi: «SATS Routing ha risposto con dati che non tornano», niente
+  salvato.
+- IL RITIRO: la fee è la differenza fra il lockup e il «ricevi» del
+  preventivo (il calco di `createAdjustedClaim`). Cooperativo prima;
+  se la loro firma non arriva, dallo script. Se un ritiro cooperativo
+  viene RIFIUTATO alla trasmissione (`coopRifiutato`), il giro dopo va
+  dallo script e non ripete la stessa strada all'infinito — nato dalla
+  controprova «firma rotta».
+- UN FILE SUO, `swap-telefono.js`, e non un pezzo del grande `<script>`
+  inline: arriva la fase 2 della CSP che toglie `'unsafe-inline'`, e
+  questo codice non va rifatto. Niente `onclick`: i bottoni portano
+  `data-swap="…"` e li ascolta UN ascoltatore delegato con la sua
+  lista chiusa (mai `window[nome]`); anche i tre bottoni della tappa 2
+  sono passati alla delega (`confermaSwapProva` non c'è più: «Conferma
+  lo swap» porta a `swapAvanti`). Lo scarica solo chi ha lo swap acceso,
+  all'arrivo della leva; la scelta compare quando è arrivato
+  (`swapTelefonoPronto`). La versione `?v=` è l'inizio dello sha256 del
+  file (`SWAP_TELEFONO_VER`, provata): un file cambiato non resta nella
+  cache di un giorno.
+- LA LIBRERIA: `vendor/swap.bundle.js`, boltz-core 5.0.0 + @scure
+  (bip39 2.4.0, bip32 2.4.0, btc-signer 2.4.1) e le loro @noble, otto
+  pacchetti, ventitre nomi esportati, IIFE `BarattoloSwap`, non
+  minimizzato, LF anche su Windows (`.gitattributes`), impronta in
+  `prove.py`, ricetta e licenze in `vendor/swap-LICENZE.md`; rotta
+  esplicita `/vendor/swap.js`, scaricata pigra. LA LICENZA: il
+  `package.json` di boltz-core 5.0.0 dice AGPL-3.0, ma il repo è MIT
+  dal `1be98d54` (31 gen 2024, file LICENSE) e il `package.json` è
+  stato corretto upstream in `eceaa948` (8 giu 2026): vale MIT, e la
+  nota sta nelle licenze.
+- LA CSP: a `SWAP_ATTIVO` acceso `connect-src` ammette la SOLA origine
+  di `SWAP_API_BASE` (schema e casa, senza percorso; una base non
+  http/https non apre niente), a leva spenta nessuna: in produzione,
+  oggi, la CSP non cambia. Si calcola all'avvio: cambiare la leva vuole
+  il riavvio, come ogni leva. Il SATS Routing VERO risponde al browser
+  da un'altra origine (CORS `*`, GET/POST, `Content-Type` e `Referral`):
+  letto il 20 ott 2026 con una GET delle tariffe e un OPTIONS, nessuno
+  swap.
+- UNA LEVA NUOVA, `SWAP_RETE` (`bitcoin` di serie; `testnet`;
+  `regtest` per la VM col regtest di Boltz, indirizzi `bcrt1`): il
+  telefono controlla da sé gli indirizzi, e ogni rete ha i suoi
+  prefissi. Una parola sconosciuta vale `bitcoin`. Arriva in
+  `/api/me` (`swap_leve.rete`, con `swap_leve.api`), sta nel pannello.
+- IL SERVICE WORKER NON LI METTE IN DISPENSA: né `/vendor/swap.js` né
+  `/swap-telefono.js` (servirebbe un cambio di `VERSIONE` a ogni
+  ritocco); la cache HTTP di un giorno con la versione nell'indirizzo
+  basta.
+
+**STRADE SCARTATE.** Il codice dentro il `<script>` della pagina (da
+rifare con la fase 2); un registro globale delle azioni (la fase 2 lo
+farà per tutta la pagina: qui una lista chiusa sua); le parole o la
+xpub al server, anche cifrate (regola ferrea 2); la sorveglianza dal
+server (vorrebbe sapere gli swap di chi vende: resta nel telefono, ad
+app aperta); il polling a websocket di SATS Routing (5 s di GET bastano
+e non chiedono CSP in più); le @noble a parte nel cartone (il cartone
+usa lo stesso bundle, e la firma la giudica Python).
+
+**IL CARTONE E LE PROVE.**
+- `cartone_satsrouting.py` ora fa anche la creazione, lo stato, il
+  lockup, la sua metà della firma, la trasmissione, il recupero, e
+  risponde al CORS del browser. La crittografia la fa
+  `cartone_satsrouting_cripto.js` (node, lo stesso bundle, chiavi a
+  caso a ogni swap, nessun esadecimale da 64); la firma del ritiro la
+  giudica il cartone in BIP-340 PURO (`schnorr_verifica`), non con la
+  libreria del telefono. Modi nuovi: `mente_importo`, `mente_impronta`,
+  `mente_albero`, `mente_indirizzo`, `mente_meno`, `non_firma`,
+  `rifiuta_cooperativo`; lo stato si sposta da `/cartone/stato`.
+- `collaudo_swap_telefono` (43 verdi, nella gabbia e negli elenchi
+  della CI): il codice VERO del telefono in node, pagina per pagina,
+  contro il cartone per HTTP — le parole e la spunta, l'indirizzo
+  sbagliato (nessuna chiamata, nessun indice speso, il campo che non si
+  svuota), le cinque bugie, lo swap col codice partner e solo parti
+  pubbliche, il ritiro cooperativo e quello dallo script, il
+  cooperativo rifiutato, la ripresa alla riapertura, il recupero su un
+  telefono vuoto (8 swap, contatore a 8, parole maiuscole e spazi
+  doppi ripuliti), le altre parole che non si sostituiscono, LA
+  SENTINELLA (nessuna chiamata al server, in nessun corpo le parole o
+  una chiave privata, la xpub solo al recupero), nessun onclick.
+  CONTROPROVA, tre mutazioni del file del telefono: verifica spenta,
+  parole nel corpo, firma rotta — tutte e tre rosse.
+- `prove_swap_telefono` (in `prove.py`): impronta, nomi, IIFE e
+  licenze del bundle; i loro vettori; uno swap intero con un SATS
+  Routing simulato coi pezzi veri (la risposta onesta passa, ogni
+  bugia ha il suo nome, il ritiro cooperativo e dallo script con la
+  firma giudicata in Python, e una firma rotta detta no); il telefono
+  che non parla col server (nessun `/api/`, una sola `fetch`); nessun
+  handler inline, nemmeno nei pezzi dello swap della pagina;
+  l'ascoltatore che conosce ESATTAMENTE le azioni del markup; la
+  versione, le rotte, la CSP, la leva, la CI. Aggiornate
+  `prove_swap_preventivo` (la delega, la scelta solo col file del
+  telefono arrivato), `prove_swap_cella` (la busta ha due chiavi in
+  più) e `prove_csp_prova` (il suo banco esegue `_csp_prova`, che ora
+  guarda la leva dello swap).
+- IL GIRO DAL VIVO (copia del worktree, config di cartone con lo swap
+  acceso per i moderatori e i relay morti, database nuovo, server sulla
+  8191 e cartone sulla 9077, 360×780, tocchi veri, il 999 su due ordini
+  confermati da 48.000 e 49.000): la scelta e il preventivo con la
+  delega; le parole; senza spunta «Prima spunta…»; l'indirizzo col
+  checksum sbagliato; lo swap creato DAL BROWSER attraverso la CSP
+  accesa (il cartone ha visto `referralId: barattolo`); il cartone a
+  «bitcoin bloccati» e il telefono che ritira da solo, cooperativo, in
+  meno di 10 secondi, «Fatto: i bitcoin sono tuoi.» (scuro); la pagina
+  Swap e il recupero su un cassetto svuotato (scuro); l'ordine da
+  49.000 col cartone che mente sull'indirizzo, rifiutato (chiaro).
+  Console senza errori, nessuna segnalazione CSP, nel journal del
+  server nessuna parola e nessuna xpub. QUATTRO DIFETTI PRESI DAL GIRO
+  e corretti: le parole numerate per righe e il «11.» fuori dal bordo
+  (ora per colonne, 1-6 e 7-12, come si copiano su carta); il campo
+  dell'indirizzo che si svuotava a ogni avviso; la riga «Ricevi circa
+  … sats a …» coi puntini (ora «a questo indirizzo.»); la frase del
+  recupero cancellata dal ridisegno della pagina (ora resta, e dice
+  «Recuperato 1 swap.» al singolare); e in scuro il campo del recupero
+  grigio di serie (ora il vestito del campo della fattura). Copia del
+  giro cancellata.
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA DA GUARDARE.**
+- Lo swap INTERO sul regtest di Boltz sulla VM di collaudo (regola di
+  Andrea), prima di accendere `SWAP_ATTIVO` altrove: `SWAP_RETE =
+  "regtest"`, `SWAP_API_BASE` sull'API del regtest. Il browser la
+  chiama DIRETTAMENTE, quindi l'API va raggiunta dal telefono (con
+  HTTPS e CORS) e non solo dal server; e in `MODALITA_COLLAUDO` il
+  server legge le tariffe solo da 127.0.0.1: la stessa base deve
+  servire tutt'e due. Da decidere sulla VM.
+- Tappa 4: il server paga la fattura dello swap (tetti per swap e
+  totali, liquidità). Fino ad allora la carta «In pagamento al
+  venditore» sopra il pannello dice ancora «via Lightning» anche con
+  uno swap pronto.
+- Un ritiro con le tariffe di ADESSO per uno swap recuperato (che il
+  preventivo non l'ha): provato solo nel collaudo col cartone.

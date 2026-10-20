@@ -1538,6 +1538,38 @@ try:
     from config import SWAP_API_BASE
 except ImportError:
     SWAP_API_BASE = "https://api.satsrouting.exchange"
+# LA RETE DELLO SWAP (20 ott 2026, tappa 3): il telefono controlla da se'
+# gli indirizzi (quello dove SATS Routing blocca i bitcoin e quello di chi
+# vende), e ogni rete ha i suoi prefissi. «bitcoin» in produzione;
+# «regtest» sulla VM di collaudo, col regtest di Boltz (indirizzi bcrt1…).
+# Una parola che non e' una delle tre vale «bitcoin».
+try:
+    from config import SWAP_RETE
+except ImportError:
+    SWAP_RETE = "bitcoin"
+SWAP_RETI = ("bitcoin", "testnet", "regtest")
+
+
+def swap_rete() -> str:
+    """La rete dello swap, ripulita: una delle tre, sennò «bitcoin»."""
+    r = str(SWAP_RETE or "").strip().lower()
+    return r if r in SWAP_RETI else "bitcoin"
+
+
+def swap_origine_api(base=None) -> str:
+    """L'ORIGINE (schema://host[:porta]) di SWAP_API_BASE, per la CSP: il
+    telefono parla direttamente con SATS Routing, e la pagina ammette
+    quella sola casa. Vuota se la base non e' http/https."""
+    try:
+        u = urlparse(str(SWAP_API_BASE if base is None else base).strip())
+    except Exception:
+        return ""
+    if u.scheme not in ("http", "https") or not u.hostname:
+        return ""
+    porta = f":{u.port}" if u.port else ""
+    return f"{u.scheme}://{u.hostname}{porta}"
+
+
 
 # la copia delle tariffe: 30 secondi bastano a non bussare a ogni tocco,
 # e sono meno del minuto che il preventivo dichiara di valere
@@ -1945,6 +1977,14 @@ def _csp_prova(collaudo: bool = MODALITA_COLLAUDO) -> str:
     d = list(DIRETTIVE_CSP_PROVA)
     if collaudo:
         d = [x + " ws:" if x.startswith("connect-src") else x for x in d]
+    # LO SWAP (20 ott 2026, tappa 3): il telefono parla DIRETTAMENTE con
+    # SATS Routing (le chiavi non passano dal server), quindi a swap
+    # acceso `connect-src` ammette la sola origine di SWAP_API_BASE — e a
+    # swap spento nessuna: in produzione, oggi, la CSP non cambia.
+    origine = swap_origine_api() if SWAP_ATTIVO else ""
+    if origine:
+        d = [x + " " + origine if x.startswith("connect-src") else x
+             for x in d]
     return "; ".join(d)
 
 
@@ -31114,6 +31154,7 @@ def _leve_stato():
                          "del 10 % della commissione di SATS Routing"),
             _leva("Swap: dove si leggono le tariffe", "SWAP_API_BASE",
                   str(SWAP_API_BASE or "")),
+            _leva("Swap: la rete", "SWAP_RETE", swap_rete()),
             _leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",
                   str(SWAP_REFERRAL_ID or "").strip(),
                   spento="vuoto: gli swap partirebbero senza il nostro "
@@ -44141,7 +44182,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                             "massimo": int(SWAP_MAX_SATS or 0),
                             # il codice partner, per le chiamate che il
                             # telefono fara' a SATS Routing (vuoto = niente)
-                            "referral": str(SWAP_REFERRAL_ID or "").strip()}
+                            "referral": str(SWAP_REFERRAL_ID or "").strip(),
+                            # (20 ott 2026, tappa 3) dove il telefono parla
+                            # con SATS Routing, e su quale rete
+                            "api": str(SWAP_API_BASE or "").strip().rstrip("/"),
+                            "rete": swap_rete()}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
@@ -85596,6 +85641,34 @@ def vendor_btc():
     334 KB a ogni apertura per una funzione che quasi nessuno usa
     sarebbero un regalo a nessuno."""
     return FileResponse("vendor/btc.bundle.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/swap-telefono.js")
+def swap_telefono_js():
+    """Il codice dello swap dal telefono (20 ott 2026, tappa 3): le dodici
+    parole, la creazione, la verifica, la sorveglianza e il ritiro, in un
+    file suo e non nel grande <script> della pagina (fase 2 della CSP,
+    niente inline). Codice nostro e pubblico; la pagina lo chiama con
+    `?v=` uguale all'inizio del suo sha256 (`SWAP_TELEFONO_VER`, provato in
+    `prove_swap_telefono`), quindi la cache di un giorno non trattiene mai
+    una versione vecchia."""
+    return FileResponse("swap-telefono.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/vendor/swap.js")
+def vendor_swap():
+    """Il bundle dello swap (20 ott 2026, tappa 3): le dodici parole, le
+    chiavi, la verifica e il ritiro di uno swap Lightning -> on-chain di
+    SATS Routing, NEL TELEFONO di chi vende. Stesso patto di /vendor/btc.js:
+    rotta esplicita (regola ferrea 3), codice pubblico, otto pacchetti npm
+    tutti MIT (boltz-core 5.0.0 e @scure), ricetta e licenze in
+    `vendor/swap-LICENZE.md`, impronta in `prove.py`. Il caricatore e'
+    pigro: lo scarica solo chi apre lo swap."""
+    return FileResponse("vendor/swap.bundle.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 

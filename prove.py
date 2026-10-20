@@ -33898,6 +33898,10 @@ def _censimento(acceso, dopo=None):
     # `cassaforte_nuova`, stessa trappola dei tre qui sopra — e i due
     # nomi delle cassaforti vanno scritti, o `__missing__` li fa 7.
     amb["CASSAFORTE_SAAS"], amb["CASSAFORTE_NODO"] = "saas", "nodo"
+    # la rete dello swap (20 ott 2026, tappa 3): il pannello CHIAMA
+    # `swap_rete()`, che cerca la parola in SWAP_RETI — da `__missing__`
+    # sarebbe un 7, e `in 7` esplode
+    amb["SWAP_RETI"] = ("bitcoin", "testnet", "regtest")
     # le prese dalle 10 (9 ott 2026): il giudice dell'ora legge
     # l'orologio, e `time` da `__missing__` farebbe 7
     amb["time"] = time
@@ -33973,6 +33977,8 @@ def _censimento(acceso, dopo=None):
               # stesse sei esplosioni lontane
               "ronda_nostr_viva", "_ronda_nostr_guardati",
               "_ronda_nostr_leve",
+              # la rete dello swap (20 ott 2026): la sedicesima volta
+              "swap_rete",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -59722,6 +59728,27 @@ EXPORT_BTC = [
 # `CARTONE_HEX`: la storia non si riscrive.
 IMPRONTA_BTC = ("e8e936915bc05165904e99bdc784ce07"
                 "1831c700f440106fd765c416710d68af")
+
+
+# LO SWAP DAL TELEFONO (20 ott 2026, tappa 3): i ventitre nomi del bundle,
+# la sua impronta (spezzata in due come IMPRONTA_BTC: lo scanner dei
+# segreti cerca 64 esadecimali di fila) e i vettori di SATS Routing
+# (boltz-web-app `004f4077`, tests/utils/rescueDerivation.spec.ts).
+EXPORT_SWAP = [
+    "Address", "HDKey", "Musig", "NETWORK", "OutScript", "OutputType",
+    "Scripts", "SigHash", "SwapTreeSerializer", "TEST_NETWORK", "TaprootUtils",
+    "Transaction", "compareTrees", "constructClaimTransaction", "detectSwap",
+    "generateMnemonic", "hex", "mnemonicToSeedSync", "reverseSwapTree",
+    "sha256", "targetFee", "validateMnemonic", "wordlist",
+]
+IMPRONTA_SWAP = ("46306e34468e1647a42507221b40aa05"
+                 "a96623ecd28039e00b31ee17ff31ad99")
+VETTORE_SWAP_XPUB = ("xpub661MyMwAqRbcG5eD5Hh9EddaCEik4rxpJA1RDEsxjujXzGsJDg4kT7EX"
+                     "C8GPM4ZZLVCoNA8fArGbjqKmo6M6khKTaTmYBJNTQXCFrejsgCi")
+VETTORE_SWAP_PRIV = ("cb9774710e1d1eaa747a38fff23b20cb"
+                     "b5847e1586e97ebdca36489f3a0105d8")
+VETTORE_SWAP_SEGRETO = ("44789b9c9813e523f0acfa300b8aeff3"
+                        "83d21b9aaab6847b6bd6676c6a10518d")
 
 
 def prove_bundle_bitcoin():
@@ -144396,7 +144423,10 @@ def prove_csp_prova():
     # dalla leva CSP_ATTIVA (10 ott 2026), che sta subito sopra le cinture
     i = _SORGENTE.index("try:\n    from config import CSP_ATTIVA")
     j = _SORGENTE.index('@app.middleware("http")\nasync def cinture_http(')
-    amb = {"MODALITA_COLLAUDO": False, "re": re}
+    # (20 ott 2026, tappa 3 dello swap) a swap spento, come in
+    # produzione: l'origine di SATS Routing la prova collaudo_swap_telefono
+    amb = {"MODALITA_COLLAUDO": False, "re": re, "SWAP_ATTIVO": False,
+           "swap_origine_api": lambda: ""}
     exec(_SORGENTE[i:j], amb)
     csp = amb["_csp_prova"](False)
     direttive = dict(d.split(" ", 1) for d in csp.split("; "))
@@ -171559,7 +171589,7 @@ def prove_swap_cella():
           ('    SWAP_REFERRAL_ID = ""          # vuoto' in src,
            '\nSWAP_REFERRAL_ID = ""' in esempio))
     prova("...arriva al telefono con la leva, ripulito",
-          True, '"referral": str(SWAP_REFERRAL_ID or "").strip()}' in src)
+          True, '"referral": str(SWAP_REFERRAL_ID or "").strip(),' in src)
     prova("...e il pannello lo mostra", True,
           '_leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",'
           in src)
@@ -174460,6 +174490,13 @@ function leggiBolt11(){ return null; }
 function nettoVenditore(o){ return o.listing.price; }
 let myLnAddress = '', currentOrder = null, swapLeve = null;
 const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
+/* (20 ott 2026, tappa 3) lo swap si fa dal telefono: il file suo e'
+   arrivato, nessuno swap ancora su quest'ordine, e il suo pannello
+   comincia dal preventivo della tappa 2 */
+let telefono = true;
+const swapTelefonoPronto = () => telefono;
+function swapDiOrdine(){ return null; }
+function pannelloSwapTelefono(o){ return pannelloPreventivoSwap(o); }
 let tg = {initDataUnsafe: {user: {language_code: 'it'}}};
 __TESTI__
 __LINGUA__
@@ -174470,8 +174507,11 @@ const out = {};
 out.spento = payoutPanel(o).includes('scelta-incasso');
 swapLeve = {attivo: true};
 const ln = payoutPanel(o);
-out.ln = [ln.includes('scelta-incasso'), ln.includes('aria-checked="true" class="on" onclick="scegliIncassoSwap(7,\'ln\')"'),
+out.ln = [ln.includes('scelta-incasso'), ln.includes('aria-checked="true" class="on" data-swap="scegli" data-ordine="7" data-scelta="ln"'),
           ln.includes('Incassa subito'), ln.includes('id="payoutIncasso"')];
+telefono = false;
+out.senzaTelefono = payoutPanel(o).includes('scelta-incasso');
+telefono = true;
 out.prima = payoutPanel(Object.assign({}, o, {state: 'shipped'})).includes('scelta-incasso');
 out.tocca = payoutPanel(Object.assign({}, o, {state: 'shipped', pagamento: {gesto_venditore: true}})).includes('scelta-incasso');
 sceltaIncassoSwap[7] = 'swap';
@@ -174482,7 +174522,7 @@ preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash
 const sw = payoutPanel(o);
 out.swap = [sw.includes('Commissione SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
             sw.includes('Ricevi on-chain, circa'), sw.includes('47154'),
-            sw.includes('sellerInvoice'), sw.includes('confermaSwapProva(7)')];
+            sw.includes('sellerInvoice'), sw.includes('data-swap="avanti" data-ordine="7"')];
 preventiviSwap[7].nota = 'cambiata';
 out.cambiata = payoutPanel(o).includes('Le tariffe sono cambiate');
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: false, motivo: 'sotto_minimo', minimo: 25000}};
@@ -174491,12 +174531,13 @@ preventiviSwap[7].dati = {ok: false, motivo: 'sopra_tetto', massimo: 50000};
 out.sopra = payoutPanel(o).includes('Sopra i 50000 sats, per ora, solo Lightning');
 preventiviSwap[7].dati = {ok: false, motivo: 'non_risponde'};
 const giu = payoutPanel(o);
-out.giu = [giu.includes('SATS Routing ora non risponde'), giu.includes("scegliIncassoSwap(7,'ln')")];
+out.giu = [giu.includes('SATS Routing ora non risponde'), giu.includes('data-swap="scegli" data-ordine="7" data-scelta="ln"')];
 tg.initDataUnsafe.user.language_code = 'en';
-preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: 'prossima', dati: {ok: true, hash: 'h', ricevi: 1,
+preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 1,
   righe: [{voce: 'commissione', sats: -288, percento: 0.6}]}};
 const en = payoutPanel(o);
-out.en = [en.includes('SATS Routing fee (0.6%)'), en.includes('The real swap comes with the next version')];
+out.en = [en.includes('SATS Routing fee (0.6%)'), en.includes('Confirm the swap')];
+out.onclick = [sw, giu, en].filter(x => /\son[a-z]+=/.test(x)).length;
 console.log(JSON.stringify(out));
 """.replace("__TESTI__", testi).replace("__LINGUA__", lingua).replace(
         "__MOTORE__", motore).replace("__PANNELLO__", pannello)
@@ -174507,6 +174548,10 @@ console.log(JSON.stringify(out));
     prova("senza leva la scelta non compare", False, r.get("spento"))
     prova("con la leva compare in cima, Lightning gia' scelto, e il pannello di sempre",
           [True, True, True, True], r.get("ln"))
+    # (20 ott 2026, tappa 3) lo swap si fa dal telefono: finche' il suo
+    # file non e' arrivato la scelta non si offre
+    prova("...ma solo col file del telefono arrivato", False, r.get("senzaTelefono"))
+    prova("nessun onclick nel pannello dello swap: data-swap", 0, r.get("onclick"))
     # ...anche quando il ramo «tocca a lui» si apre PRIMA della conferma
     # (la fattura nuova chiesta da un moderatore, «altra cassaforte»):
     # li' lo swap non c'e' (trovato dalla tortura del 19 ott)
@@ -174525,6 +174570,258 @@ console.log(JSON.stringify(out));
                          testi.count("titoloPrev: 'Preventivo dello swap'"),
                          testi.count("titoloPrev: 'Swap quote'"),
                          testi.count("titolo: 'Swap',\n       testo: 'Here")))
+
+
+def prove_swap_telefono():
+    """LO SWAP DAL TELEFONO (20 ott 2026, cantiere swap-telefono, tappa 3
+    dello swap dei venditori). Le dodici parole, le chiavi, la verifica
+    della risposta di SATS Routing e il ritiro nascono NEL TELEFONO (regola
+    ferrea 2, vista dal lato dei soldi): il codice sta in
+    `swap-telefono.js`, la crittografia in `vendor/swap.bundle.js`
+    (boltz-core 5.0.0 + @scure, otto pacchetti, tutti MIT).
+
+    QUATTRO GUARDIE:
+    1. IL BUNDLE: l'impronta del file servito, i ventitre nomi
+       dell'ingresso e non uno di piu', l'IIFE, la ricetta e le licenze —
+       il calco di `prove_bundle_bitcoin`.
+    2. I LORO VETTORI: lo schema delle chiavi e' quello del sito di SATS
+       Routing (boltz-web-app `004f4077`, `rescueDerivation.spec.ts`), e
+       uno swap nato qui deve ritrovarsi dalla loro pagina «Rescue»: le
+       loro parole danno la loro xpub di radice, la loro chiave il loro
+       segreto. Poi uno swap intero con un SATS Routing simulato coi
+       pezzi veri: la risposta onesta passa, le cinque bugie no, e il
+       ritiro — cooperativo e dallo script — porta una firma che giudica
+       un'aritmetica che non e' quella del bundle (BIP-340 in Python
+       puro, `cartone_satsrouting.schnorr_verifica`).
+    3. IL TELEFONO NON PARLA COL SERVER: in `swap-telefono.js` nessuna
+       chiamata a /api, una sola `fetch` (verso SATS Routing), nessun
+       onclick, un ascoltatore delegato che conosce ESATTAMENTE le azioni
+       che il markup usa; le chiavi del cassetto portano il conto.
+    4. IL CONTORNO: la versione nella pagina e' l'impronta del file, le
+       due rotte esplicite, la CSP che apre la sola origine a swap
+       acceso, la leva SWAP_RETE, il collaudo negli elenchi della CI.
+    La storia per HTTP contro il cartone (ripresa, recupero, stati) e'
+    `collaudo_swap_telefono`."""
+    print("\n[lo swap dal telefono]")
+    import hashlib as _hl
+
+    # --- 1. il bundle ---
+    grezzo = open(os.path.join("vendor", "swap.bundle.js"), "rb").read()
+    prova("swap: l'impronta del bundle servito e' quella scritta",
+          IMPRONTA_SWAP, _hl.sha256(grezzo).hexdigest())
+    testo = grezzo.decode("utf-8")
+    blocco = testo[testo.index("__export(ingresso_exports, {"):]
+    blocco = blocco[:blocco.index("});")]
+    prova("swap: esporta i ventitre nomi dell'ingresso, e nient'altro",
+          EXPORT_SWAP, sorted(re.findall(r"^\s{4}(\w+): \(\) =>", blocco, re.M)))
+    prova("swap: un IIFE con un nome solo, non minimizzato", (True, True),
+          (testo.startswith("var BarattoloSwap = (() => {"),
+           "// node_modules/boltz-core/" in testo))
+    lic = open(os.path.join("vendor", "swap-LICENZE.md"), encoding="utf-8").read()
+    prova("swap: la ricetta per rifarlo e le licenze stanno accanto",
+          (True, True, True),
+          ("esbuild ingresso.mjs --bundle" in lic,
+           "boltz-core@5.0.0" in lic, "MIT" in lic))
+    attr = open(".gitattributes", encoding="utf-8").read()
+    prova("swap: il bundle esce LF anche su Windows (l'impronta e' dei byte)",
+          True, "\nvendor/swap.bundle.js text eol=lf" in attr)
+
+    # --- 3. e 4. il codice del telefono, letto ---
+    tel = open("swap-telefono.js", "rb").read().replace(b"\r\n", b"\n")
+    js = tel.decode("utf-8")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    src = open("server.py", encoding="utf-8").read()
+    ver = re.search(r"const SWAP_TELEFONO_VER = '([0-9a-f]+)';", mini)
+    prova("la versione nella pagina e' l'impronta del file del telefono",
+          _hl.sha256(tel).hexdigest()[:10], ver and ver.group(1))
+    prova("...e la pagina lo chiama con quella versione", True,
+          "s.src = `${FOTO_BASE}/swap-telefono.js?v=${SWAP_TELEFONO_VER}`;" in mini)
+    prova("il telefono non parla col server di Barattolo",
+          (0, 0, 0, 1),
+          (js.count("/api/"), js.count("API_BASE"), js.count("authHdr"),
+           js.count("fetch(")))
+    prova("...e l'unica fetch va a SATS Routing (swapLeve.api)", True,
+          "const base = String((swapLeve && swapLeve.api) || '')" in js)
+    prova("nessun handler inline, nel file e nei pezzi dello swap della pagina",
+          (0, 0, 0),
+          (len(re.findall(r"\son[a-z]+=", js)),
+           mini.count("scegliIncassoSwap(${n}"), mini.count("confermaSwapProva")))
+    usate = set(re.findall(r'data-swap="([a-z-]+)"', js + mini))
+    i = js.index("document.addEventListener('click'")
+    ascoltate = set(re.findall(r"\ba === '([a-z-]+)'", js[i:]))
+    prova("l'ascoltatore delegato conosce esattamente le azioni del markup",
+          sorted(usate), sorted(ascoltate))
+    prova("...e chiama solo funzioni scritte, mai window[nome]", 0,
+          js[i:].count("window["))
+    prova("il cassetto delle parole e degli swap porta il conto", (True, True),
+          ("`barattolo_swap_${myTgId || 'x'}`" in js,
+           "`barattolo_swap_lista_${myTgId || 'x'}`" in js))
+    prova("l'indice della chiave si salva PRIMA di chiedere lo swap", True,
+          js.index("c.prossimo = indice + 1;") < js.index("swapApi('/v2/swap/reverse', corpo)"))
+    prova("il recupero riparte dopo l'indice piu' alto", True,
+          "prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);" in js)
+    prova("le due rotte esplicite dei file", (True, True),
+          ('@app.get("/swap-telefono.js")\ndef swap_telefono_js():' in src.replace("\r\n", "\n"),
+           '@app.get("/vendor/swap.js")\ndef vendor_swap():' in src.replace("\r\n", "\n")))
+    csp = pezzo("_csp_prova")
+    prova("la CSP apre l'origine di SATS Routing SOLO a swap acceso", True,
+          'origine = swap_origine_api() if SWAP_ATTIVO else ""' in csp)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("la leva SWAP_RETE: d'esempio, di serie e nel pannello", (True, True, True),
+          ('\nSWAP_RETE = "bitcoin"' in esempio,
+           '    SWAP_RETE = "bitcoin"' in src,
+           '"SWAP_RETE", swap_rete())' in pezzo("_leve_stato")))
+    lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
+    compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
+    prova("il collaudo nuovo sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_swap_telefono" in "\n" + lista,
+           "collaudo_swap_telefono.py" in compila))
+    cripto = open("cartone_satsrouting_cripto.js", encoding="utf-8").read()
+    cart = open("cartone_satsrouting.py", encoding="utf-8").read()
+    prova("il cartone e il suo aiutante: nessun esadecimale da 64", (0, 0),
+          (len(re.findall(r"\b[0-9a-f]{64}\b", cripto)),
+           len(re.findall(r"\b[0-9a-f]{64}\b", cart))))
+
+    # --- 2. i loro vettori e uno swap intero, in node ---
+    banco = r"""
+const fs = require('fs');
+const vm = require('vm');
+const ctx = {console, crypto: globalThis.crypto, TextEncoder, TextDecoder, Uint8Array, BigInt};
+ctx.window = ctx;
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('vendor/swap.bundle.js', 'utf8'), ctx);
+vm.runInContext(__BOLT11__, ctx);
+vm.runInContext("const FOTO_BASE = '';", ctx);
+vm.runInContext(fs.readFileSync('swap-telefono.js', 'utf8'), ctx);
+const run = c => vm.runInContext(c, ctx);
+const S = ctx.BarattoloSwap;
+const h = S.hex;
+const out = {};
+/* i loro vettori (rescueDerivation.spec.ts @004f4077) */
+ctx.__M = 'invite smile evidence shield frost source truly ball odor unfold example nuclear';
+out.xpub = run('swapXpub(BarattoloSwap, __M)');
+out.segreto = h.encode(S.sha256(h.decode(__PRIV__)));
+const k0 = run('swapChiavi(BarattoloSwap, __M, 0)');
+const radice = S.HDKey.fromMasterSeed(S.mnemonicToSeedSync(ctx.__M));
+out.chiave0 = [h.encode(k0.privata) === h.encode(radice.derive('m/44/0/0/0/0').privateKey),
+               h.encode(k0.segreto) === h.encode(S.sha256(k0.privata)),
+               h.encode(k0.impronta) === h.encode(S.sha256(k0.segreto)),
+               h.encode(run('swapChiavi(BarattoloSwap, __M, 1)').privata) !== h.encode(k0.privata)];
+/* uno swap intero con un SATS Routing simulato coi pezzi veri */
+const ALF = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+function chk(hrp, dati){
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  const v = []; for (const c of hrp) v.push(c.charCodeAt(0) >> 5); v.push(0);
+  for (const c of hrp) v.push(c.charCodeAt(0) & 31); v.push(...dati, 0, 0, 0, 0, 0, 0);
+  let x = 1; for (const y of v) { const b = x >>> 25; x = ((x & 0x1ffffff) << 5) ^ y;
+    for (let i = 0; i < 5; i++) if ((b >> i) & 1) x ^= GEN[i]; }
+  x ^= 1; const o = []; for (let i = 0; i < 6; i++) o.push((x >> (5 * (5 - i))) & 31); return o;
+}
+function a5(b){ let acc = 0, bit = 0; const o = []; for (const y of b) { acc = (acc << 8) | y; bit += 8;
+  while (bit >= 5) { bit -= 5; o.push((acc >> bit) & 31); } } if (bit) o.push((acc << (5 - bit)) & 31); return o; }
+function n5(n, l){ const o = []; for (let i = l - 1; i >= 0; i--) o.push(Math.floor(n / 32 ** i) % 32); return o; }
+function fattura(sats, imp){
+  const hrp = 'lnbc' + sats * 10 + 'n'; const p = a5(imp);
+  const d = [...n5(1760000000, 7), 1, ...n5(p.length, 2), ...p, ...Array(104).fill(0)];
+  return hrp + '1' + [...d, ...chk(hrp, d)].map(x => ALF[x]).join('');
+}
+const k = run('swapChiavi(BarattoloSwap, __M, 3)');
+const sPriv = S.HDKey.fromMasterSeed(S.sha256(new TextEncoder().encode('cartone del banco'))).privateKey;
+const sPub = new S.HDKey({privateKey: sPriv}).publicKey;
+const albero = S.reverseSwapTree(false, k.impronta, k.pubblica, sPub, 900000);
+const agg = S.TaprootUtils.tweakMusig(S.Musig.create(sPriv, [sPub, k.pubblica]), albero.tree);
+const lockScript = S.Scripts.p2trOutput(agg.aggPubkey);
+const ind = a => S.Address(S.NETWORK).encode(S.OutScript.decode(a));
+const R = {id: 'x', invoice: fattura(48000, k.impronta), swapTree: S.SwapTreeSerializer.serializeSwapTree(albero),
+           lockupAddress: ind(lockScript), refundPublicKey: h.encode(sPub), timeoutBlockHeight: 900000, onchainAmount: 47388};
+ctx.__k = k; ctx.__S = S;
+const v = r => { ctx.__r = r; return run('swapVerifica(__S, __S.NETWORK, __r, __k, {sats: 48000, onchainMin: 47388})'); };
+const altro = S.HDKey.fromMasterSeed(S.sha256(new TextEncoder().encode('un altro'))).publicKey;
+const aggFinto = S.TaprootUtils.tweakMusig(S.Musig.create(sPriv, [sPub, altro]), albero.tree);
+out.verifica = {
+  buona: v(R),
+  importo: v(Object.assign({}, R, {invoice: fattura(47000, k.impronta)})),
+  impronta: v(Object.assign({}, R, {invoice: fattura(48000, S.sha256(k.impronta))})),
+  albero: v(Object.assign({}, R, {swapTree: S.SwapTreeSerializer.serializeSwapTree(
+            S.reverseSwapTree(false, k.impronta, k.pubblica, sPub, 900001))})),
+  indirizzo: v(Object.assign({}, R, {lockupAddress: ind(S.Scripts.p2trOutput(aggFinto.aggPubkey))})),
+  meno: v(Object.assign({}, R, {onchainAmount: 47000})),
+  risposta: v({invoice: 3}),
+  fattura: v(Object.assign({}, R, {invoice: 'lnbc1storta'}))};
+const lt = new S.Transaction({allowUnknownInputs: true, allowUnknownOutputs: true});
+lt.addInput({txid: S.sha256(new TextEncoder().encode('lockup')), index: 0});
+lt.addOutput({script: lockScript, amount: 47388n});
+ctx.__lh = h.encode(lt.unsignedTx);
+ctx.__rec = {refundPublicKey: R.refundPublicKey, swapTree: R.swapTree};
+ctx.__dest = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq';
+ctx.__firma = async (txHex, nonce) => {
+  const tx = S.Transaction.fromRaw(h.decode(txHex), {allowUnknownOutputs: true});
+  const sh = tx.preimageWitnessV1(0, [lockScript], S.SigHash.DEFAULT, [47388n]);
+  const m = agg.message(sh).generateNonce();
+  const f = m.aggregateNonces([[k.pubblica, h.decode(nonce)]]).initializeSession().signPartial();
+  return {pubNonce: h.encode(m.publicNonce), partialSignature: h.encode(f.ourPartialSignature)};
+};
+ctx.__no = async () => { throw new Error('not eligible'); };
+(async () => {
+  const tira = async (firma) => {
+    ctx.__f = firma;
+    const r = await run('swapRitiro(__S, __S.NETWORK, __rec, __k, __lh, __dest, 47154, __f)');
+    const tx = S.Transaction.fromRaw(h.decode(r.hex), {allowUnknownOutputs: true});
+    const w = tx.getInput(0).finalScriptWitness;
+    const coop = w.length === 1;
+    const sh = coop ? tx.preimageWitnessV1(0, [lockScript], S.SigHash.DEFAULT, [47388n])
+                    : tx.preimageWitnessV1(0, [lockScript], S.SigHash.DEFAULT, [47388n], -1, albero.claimLeaf.output, 0xc0);
+    const x = coop ? (agg.aggPubkey.length === 33 ? agg.aggPubkey.slice(1) : agg.aggPubkey) : k.pubblica.slice(1);
+    return {cooperativo: r.cooperativo, pezzi: w.length, uscita: Number(tx.getOutput(0).amount),
+            dest: h.encode(tx.getOutput(0).script) === h.encode(S.OutScript.encode(S.Address(S.NETWORK).decode(ctx.__dest))),
+            segreto: coop ? null : h.encode(w[1]) === h.encode(k.segreto),
+            impronta: h.encode(sh), chiave: h.encode(x), firma: h.encode(w[0])};
+  };
+  out.coop = await tira(ctx.__firma);
+  out.script = await tira(ctx.__no);
+  console.log(JSON.stringify(out));
+})().catch(e => { console.error(String(e && e.stack || e)); process.exit(1); });
+"""
+    i = mini.index("function importoBolt11(pr){")
+    bolt = mini[i:mini.index("\n}\n", i) + 3]
+    i = mini.index("function leggiBolt11(pr){")
+    bolt += mini[i:mini.index("\n}\n", i) + 3]
+    r = _node_banco(banco.replace("__BOLT11__", json.dumps(bolt)).replace(
+        "__PRIV__", json.dumps(VETTORE_SWAP_PRIV)))
+    if r is None:
+        salta("swap: i loro vettori e uno swap intero", "node non c'e'")
+        return
+    prova("swap: le loro 12 parole danno la loro xpub di radice", VETTORE_SWAP_XPUB,
+          r.get("xpub"))
+    prova("swap: la loro chiave da' il loro segreto (sha256 della privata)",
+          VETTORE_SWAP_SEGRETO, r.get("segreto"))
+    prova("swap: la chiave i sta in m/44/0/0/0/i, segreto e impronta a catena",
+          [True, True, True, True], r.get("chiave0"))
+    prova("swap: la risposta onesta passa, ogni bugia ha il suo nome",
+          {"buona": None, "importo": "importo", "impronta": "impronta",
+           "albero": "albero", "indirizzo": "indirizzo", "meno": "meno",
+           "risposta": "risposta", "fattura": "fattura"}, r.get("verifica"))
+    import cartone_satsrouting as _cart
+
+    def giudica(t):
+        if not t:
+            return None
+        return _cart.schnorr_verifica(bytes.fromhex(t["impronta"]),
+                                      bytes.fromhex(t["chiave"]),
+                                      bytes.fromhex(t["firma"]))
+    co, sc = r.get("coop") or {}, r.get("script") or {}
+    prova("swap: il ritiro cooperativo, un pezzo di testimone, la firma regge",
+          (True, 1, 47154, True, True),
+          (co.get("cooperativo"), co.get("pezzi"), co.get("uscita"), co.get("dest"), giudica(co)))
+    prova("swap: dallo script, quattro pezzi col segreto, la firma regge",
+          (False, 4, 47154, True, True),
+          (sc.get("cooperativo"), sc.get("pezzi"), sc.get("uscita"), sc.get("segreto"), giudica(sc)))
+    if co.get("firma"):
+        rotta = bytearray(bytes.fromhex(co["firma"]))
+        rotta[7] ^= 1
+        prova("swap: ...e il giudice in Python dice no a una firma rotta", False,
+              _cart.schnorr_verifica(bytes.fromhex(co["impronta"]),
+                                     bytes.fromhex(co["chiave"]), bytes(rotta)))
 
 
 def prove_leve_mai_doppie():
@@ -174990,6 +175287,7 @@ def main():
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
+              prove_swap_telefono,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,

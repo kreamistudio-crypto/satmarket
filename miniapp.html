@@ -9503,9 +9503,39 @@
   .swap-rifiuto{padding:10px 12px;border-radius:10px;margin:4px 0 12px;
     background:var(--sats-soft);color:var(--sats-text);font-weight:700;
     font-size:14px;line-height:1.45}
-  .swap-rifiuto.prossima{background:none;border:1.5px dashed var(--line);
-    color:var(--ink)}
   .swap-prev .btn{margin-top:12px}
+  /* (20 ott 2026, tappa 3) le 12 parole a due colonne numerate PER
+     COLONNA (1-6 a sinistra, 7-12 a destra: come si copiano su carta),
+     con lo spazio per il «12.»; il campo dell'indirizzo a tutta riga, la
+     lista degli swap della pagina Swap */
+  .swap-parole{display:grid;grid-template-columns:1fr 1fr;
+    grid-template-rows:repeat(6,auto);grid-auto-flow:column;gap:6px 14px;
+    margin:12px 0;padding:12px 12px 12px 44px;border:1.5px solid var(--line);
+    border-radius:12px;font:700 15px/1.3 'JetBrains Mono',monospace;
+    color:var(--ink)}
+  .swap-spunta{display:flex;gap:8px;align-items:center;margin-top:6px;
+    font-weight:700;font-size:14px;color:var(--ink)}
+  .swap-spunta input{width:20px;height:20px}
+  /* i due campi dello swap hanno il vestito del campo della fattura
+     (.payout textarea): fondo della pagina dentro la carta, fondo della
+     carta sulla pagina Swap; in scuro il grigio di serie non resta */
+  .swap-indirizzo{width:100%;box-sizing:border-box;margin-top:10px;
+    padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    background:var(--bg);color:var(--ink);outline:none;
+    font:600 14px/1.3 'JetBrains Mono',monospace}
+  .swap-indirizzo:focus,.swap-telefono textarea:focus{border-color:var(--sats)}
+  .swap-stato{font-weight:700;font-size:14px;line-height:1.45;
+    color:var(--ink);margin:6px 0}
+  .swap-telefono{padding:0 16px 24px}
+  .swap-telefono h4{font-size:14.5px;margin:18px 0 6px;color:var(--ink)}
+  .swap-telefono textarea{width:100%;box-sizing:border-box;margin-top:8px;
+    padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+    background:var(--card);color:var(--ink);outline:none;resize:vertical;
+    font:600 14px/1.4 'JetBrains Mono',monospace}
+  .swap-telefono .btn{margin-top:10px}
+  .swap-riga-lista{display:flex;flex-direction:column;gap:3px;
+    padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;
+    color:var(--ink)}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5}
   /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
@@ -11770,6 +11800,9 @@ document.getElementById('cartello')?.remove();</script>
       <span id="swapTesto"></span>
       <span id="swapVuoto" class="swap-vuoto"></span>
     </div>
+    <!-- (20 ott 2026, tappa 3) gli swap di questo telefono, le 12 parole
+         e il recupero: li scrive renderSwapTelefono (swap-telefono.js) -->
+    <div id="swapTelefono" class="swap-telefono"></div>
   </div>
   <div class="view" id="view-astepresto">
     <div class="empty" style="padding-top:34px">
@@ -17830,6 +17863,32 @@ function voceNav(view){
    martelletto. */
 let swapLeve = null;          // da /api/me.swap_leve: {attivo}
 const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
+/* LO SWAP DAL TELEFONO (20 ott 2026, tappa 3): le chiavi, la creazione,
+   la verifica, la sorveglianza e il ritiro stanno in un FILE SUO,
+   `swap-telefono.js` — niente script inline e niente onclick, per la fase
+   2 della CSP. Lo scarica solo chi ha lo swap acceso, all'arrivo della
+   leva; fino ad allora il pannello dell'incasso e' quello di sempre. La
+   versione e' l'inizio dello sha256 del file (righe LF): la controlla
+   `prove_swap_telefono`, cosi' un file cambiato non resta nella cache
+   vecchia di un giorno. */
+const SWAP_TELEFONO_VER = '600380930a';
+const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
+let swapTelefonoPromessa = null;
+function caricaSwapTelefono(){
+  if (swapTelefonoPronto()) return Promise.resolve(true);
+  if (!swapTelefonoPromessa) swapTelefonoPromessa = new Promise(ok => {
+    const s = document.createElement('script');
+    s.src = `${FOTO_BASE}/swap-telefono.js?v=${SWAP_TELEFONO_VER}`;
+    s.onload = () => {
+      ridisegnaIncassoSwap();
+      if (el('view-swap')?.classList.contains('active')) renderSwap();
+      ok(true);
+    };
+    s.onerror = () => { swapTelefonoPromessa = null; ok(false); };
+    document.head.appendChild(s);
+  });
+  return swapTelefonoPromessa;
+}
 /* LA QUARTA CELLA, UNA SOLA (la regola della barra: mai una cella
    accesa e spenta a runtime, era il posto dove il + si scentrava). A
    leva accesa la stessa cella cambia VESTITO — icona ed etichetta —
@@ -17886,7 +17945,6 @@ const SWAP_TESTI = {
        cambiata: 'Le tariffe sono cambiate: ecco il preventivo nuovo.',
        nonRisponde: 'SATS Routing ora non risponde: incassa in Lightning.',
        spento: 'Lo swap ora non è disponibile: incassa in Lightning.',
-       prossima: 'Lo swap vero arriva con la prossima versione: per ora nessun sats si muove.',
        voci: {dovuto: 'Ti spettano', fee_barattolo: 'Commissione Barattolo ({p}\u00a0%)',
               commissione: 'Commissione SATS Routing ({p}\u00a0%)',
               rete_invio: 'Rete: invio di SATS Routing',
@@ -17904,7 +17962,6 @@ const SWAP_TESTI = {
        cambiata: 'The rates have changed: here is the new quote.',
        nonRisponde: 'SATS Routing is not responding: receive via Lightning.',
        spento: 'Swaps are not available right now: receive via Lightning.',
-       prossima: 'The real swap comes with the next version: no sats move for now.',
        voci: {dovuto: 'You are owed', fee_barattolo: 'Barattolo fee ({p}%)',
               commissione: 'SATS Routing fee ({p}%)',
               rete_invio: 'Network: SATS Routing send',
@@ -17921,8 +17978,10 @@ function linguaSwap(){
    legge le tariffe di SATS Routing e fa il conto con le loro regole; qui
    si mostra e basta. Il «Conferma lo swap» di questa tappa ricontrolla
    le tariffe con l'impronta di quelle mostrate: se sono cambiate lo
-   dice, col preventivo nuovo; se no dice che lo swap vero arriva con la
-   prossima versione. Nessuno swap, nessun sats. */
+   dice, col preventivo nuovo. Dalla tappa 3 (20 ott 2026), se reggono, si
+   va avanti DAL TELEFONO: `swapAvanti` in swap-telefono.js (le parole,
+   l'indirizzo, la creazione). I bottoni non hanno onclick: `data-swap`,
+   e l'ascoltatore delegato sta in quel file. */
 let sceltaIncassoSwap = {};   // ordine -> 'ln' | 'swap'
 let preventiviSwap = {};      // ordine -> {stato, dati, quando, nota}
 function testiSwap(){ return SWAP_TESTI[linguaSwap()]; }
@@ -17930,7 +17989,7 @@ function selettoreIncassoSwap(id, scelta){
   const t = testiSwap(), n = Number(id);
   const tasto = (s, testo) => `<button type="button" role="radio" `
     + `aria-checked="${scelta === s}" class="${scelta === s ? 'on' : ''}" `
-    + `onclick="scegliIncassoSwap(${n},'${s}')">${testo}</button>`;
+    + `data-swap="scegli" data-ordine="${n}" data-scelta="${s}">${testo}</button>`;
   return `<div class="scelta-incasso" role="radiogroup" aria-label="${esc(t.scegli)}">`
     + tasto('ln', '⚡ Lightning') + tasto('swap', '₿ ' + esc(t.onchain)) + `</div>`;
 }
@@ -17961,13 +18020,9 @@ async function caricaPreventivoSwap(id, ricontrolla){
     d = await r.json().catch(() => null);
     if (!r.ok || !d) d = {ok: false, motivo: r.status === 403 ? 'spento' : 'non_risponde'};
   } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
-  const nota = !ricontrolla ? '' : (d.cambiata ? 'cambiata' : (d.ok ? 'prossima' : ''));
+  const nota = ricontrolla && d.cambiata ? 'cambiata' : '';
   preventiviSwap[id] = {stato: 'pronto', dati: d, quando: Date.now(), nota};
   if (currentOrder && Number(currentOrder.id) === Number(id)) ridisegnaIncassoSwap();
-}
-function confermaSwapProva(id){
-  haptic();
-  caricaPreventivoSwap(id, true);
 }
 function percentoSwap(p){
   const s = String(Number(p) || 0);
@@ -17986,15 +18041,13 @@ function pannelloPreventivoSwap(o){
       : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
       : d.motivo === 'spento' ? t.spento : t.nonRisponde;
     return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(testo)}</div>`
-      + `<button class="btn ghost" onclick="scegliIncassoSwap(${n},'ln')">⚡ ${esc(t.tornaLn)}</button></div>`;
+      + `<button class="btn ghost" type="button" data-swap="scegli" data-ordine="${n}" data-scelta="ln">⚡ ${esc(t.tornaLn)}</button></div>`;
   }
   const righe = (d.righe || []).map(r => `<div class="swap-riga${r.sats < 0 ? ' meno' : ''}">`
     + `<span>${esc(etichettaVoceSwap(r, t))}</span>`
     + `<b>${r.sats < 0 ? '−' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
   const nota = p.nota === 'cambiata'
-      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>`
-    : p.nota === 'prossima'
-      ? `<div class="swap-rifiuto prossima" role="status">${esc(t.prossima)}</div>` : '';
+      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>` : '';
   return `<div class="swap-prev">
       <h4>₿ ${esc(t.titoloPrev)}</h4>
       ${nota}
@@ -18002,7 +18055,7 @@ function pannelloPreventivoSwap(o){
         <div class="swap-riga totale"><span>${esc(t.ricevi)}</span><b>${fmt(d.ricevi)}<span class="unit">sats</span></b></div>
       </div>
       <div class="hint">${esc(t.valgonoOra)}</div>
-      <button class="btn orange" onclick="confermaSwapProva(${n})"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
+      <button class="btn orange" type="button" data-swap="avanti" data-ordine="${n}"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
     </div>`;
 }
 function renderSwap(){
@@ -18010,6 +18063,7 @@ function renderSwap(){
   if (el('swapTitolo')) el('swapTitolo').textContent = t.titolo;
   if (el('swapTesto')) el('swapTesto').textContent = t.testo;
   if (el('swapVuoto')) el('swapVuoto').textContent = t.vuoto;
+  if (typeof renderSwapTelefono === 'function') renderSwapTelefono();
 }
 function vaiAste(){
   haptic();
@@ -36091,11 +36145,15 @@ function payoutPanel(o){
      serie e il pannello di sempre; lo swap mostra il preventivo. Il
      riquadro ha un id suo perche' la scelta lo ridisegna da solo,
      senza rifare la pagina dell'ordine. */
-  const swapQui = swapAcceso() && o.state === 'confirmed';
-  const sceltaSwap = swapQui ? (sceltaIncassoSwap[Number(o.id)] || 'ln') : 'ln';
+  /* (20 ott 2026, tappa 3) lo swap si fa DAL TELEFONO: la scelta compare
+     quando il suo file e' arrivato (`swapTelefonoPronto`), e se su
+     quest'ordine c'e' gia' uno swap la scelta di serie e' lui */
+  const swapQui = swapAcceso() && swapTelefonoPronto() && o.state === 'confirmed';
+  const sceltaSwap = !swapQui ? 'ln'
+    : (sceltaIncassoSwap[Number(o.id)] || (swapDiOrdine(o.id) ? 'swap' : 'ln'));
   const selettoreSwap = swapQui ? selettoreIncassoSwap(o.id, sceltaSwap) : '';
   if (sceltaSwap === 'swap') return `
-    <div class="payout" id="payoutIncasso">${selettoreSwap}${pannelloPreventivoSwap(o)}</div>`;
+    <div class="payout" id="payoutIncasso">${selettoreSwap}${pannelloSwapTelefono(o)}</div>`;
   return `
     <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}" id="payoutIncasso">
       ${selettoreSwap}
@@ -63097,15 +63155,28 @@ function leggiBolt11(pr){
   const num = a => a.reduce((n, x) => n * 32 + x, 0);
   const quando = num(d.slice(0, 7));
   let scadenza = 3600, cltv = 18;      /* i default di BOLT-11 */
+  /* l'impronta del pagamento (tag p, 52 gruppi da 5 bit = 32 byte), in
+     esadecimale (20 ott 2026, tappa 3 dello swap: il telefono la
+     confronta con quella del SUO segreto prima di fidarsi della fattura) */
+  let hash = null;
   const fine = d.length - 104;
   for (let i = 7; i + 3 <= fine;) {
     const t = d[i], l = d[i + 1] * 32 + d[i + 2];
     if (i + 3 + l > fine) break;
     if (t === 6) scadenza = num(d.slice(i + 3, i + 3 + l));
     if (t === 24) cltv = num(d.slice(i + 3, i + 3 + l));
+    if (t === 1 && l === 52 && hash === null) {
+      let acc = 0, bit = 0, h = '';
+      for (const x of d.slice(i + 3, i + 3 + l)) {
+        acc = ((acc << 5) | x) & 0xfff;
+        bit += 5;
+        if (bit >= 8) { bit -= 8; h += ((acc >> bit) & 255).toString(16).padStart(2, '0'); }
+      }
+      hash = h.slice(0, 64);
+    }
     i += 3 + l;
   }
-  return {sats: sats, quando: quando, scadenza: scadenza, scade: quando + scadenza, cltv: cltv};
+  return {sats: sats, quando: quando, scadenza: scadenza, scade: quando + scadenza, cltv: cltv, hash: hash};
 }
 
 /* ═══ IL DIARIO E LA DIAGNOSI (17 set 2026, sera) ═══════════════════
@@ -85521,6 +85592,7 @@ async function avvia(){
        accende la porta delle aste in Esplora */
     swapLeve = me.swap_leve || null;
     vestiCellaAste();
+    if (swapAcceso()) caricaSwapTelefono();
     /* la leva dello scambio P2P per chi e' dentro: la prima delle due
        fonti di p2pAcceso, il calco di astaLeve */
     p2pLeve = me.p2p_leve || null;

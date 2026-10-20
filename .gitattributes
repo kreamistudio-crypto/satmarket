@@ -48,3 +48,7 @@
 # si fida rifa' sul file che il VPS gli manda, e deve tornare la stessa
 # su ogni macchina. Un file solo, per nome: gli altri restano come sono.
 vendor/btc.bundle.js text eol=lf
+# Lo stesso, e per la stessa ragione, il bundle dello swap dal telefono
+# (20 ott 2026, tappa 3): `prove_swap_telefono` confronta il suo sha256
+# con `IMPRONTA_SWAP`.
+vendor/swap.bundle.js text eol=lf

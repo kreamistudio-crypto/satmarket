@@ -122,6 +122,7 @@ collaudo_login_bot
 collaudo_swap_preventivo
 collaudo_fusione_da_telegram
 collaudo_turtle
+collaudo_swap_telefono
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:
