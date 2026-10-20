@@ -1579,6 +1579,33 @@ def swap_origine_api(base=None) -> str:
     return f"{u.scheme}://{u.hostname}{porta}"
 
 
+# LA RETE DA CUI IL TELEFONO LEGGE IL LOCKUP (20 ott 2026, cantiere
+# swap-lockup, dopo la chiusura di Boltz): prima di mandare il segreto, il
+# telefono si fa dare dal fornitore solo l'id della transazione che blocca
+# i bitcoin, e i suoi byte li legge da mempool. Di serie mempool.space,
+# la stessa origine che l'on-chain ha scelto (`ONCHAIN_RETE`: l'API signet
+# `https://mempool.space/signet/api`), cosi' la CSP apre una cosa sola.
+# Il regtest non ha un mempool pubblico: li' (la VM, il collaudo) la leva
+# dice dove sta. Vuota = quello di serie della rete.
+try:
+    from config import SWAP_MEMPOOL_API
+except ImportError:
+    SWAP_MEMPOOL_API = ""
+SWAP_MEMPOOL_DI_SERIE = {"bitcoin": "https://mempool.space/api",
+                         "testnet": "https://mempool.space/testnet/api",
+                         "regtest": ""}
+
+
+def swap_mempool_api(rete: str, esplicita=None) -> str:
+    """L'API mempool di una rete: quella scritta (se e' http/https),
+    sennò quella di serie (vuota per il regtest: senza, il telefono non
+    ritira)."""
+    e = str(esplicita or "").strip().rstrip("/")
+    if e and swap_origine_api(e):
+        return e
+    return SWAP_MEMPOOL_DI_SERIE.get(rete, "")
+
+
 # I FORNITORI DELLO SWAP (20 ott 2026, cantiere swap-instradatore,
 # decisione di Andrea): chi vende sceglie COSA vuole, non CHI lo fa; il
 # telefono sceglie il fornitore col preventivo migliore. SATS Routing
@@ -1600,11 +1627,13 @@ _SWAP_DETTO_STORTO = set()
 def swap_fornitori() -> list:
     """I fornitori dello swap, nell'ordine in cui si confrontano: SATS
     Routing per primo, poi quelli in piu' ben formati. Solo dati pubblici:
-    nome, tipo, indirizzo dell'API, codice partner, rete."""
+    nome, tipo, indirizzo dell'API, codice partner, rete, e (20 ott 2026)
+    l'API mempool da cui il telefono legge il lockup."""
     out = [{"id": "satsrouting", "nome": "SATS Routing", "tipo": "boltz",
             "api": str(SWAP_API_BASE or "").strip().rstrip("/"),
             "referral": str(SWAP_REFERRAL_ID or "").strip(),
-            "rete": swap_rete()}]
+            "rete": swap_rete(),
+            "mempool": swap_mempool_api(swap_rete(), SWAP_MEMPOOL_API)}]
     visti = {"satsrouting"}
     for v in (SWAP_FORNITORI_IN_PIU or []):
         try:
@@ -1614,11 +1643,13 @@ def swap_fornitori() -> list:
             api = str(v["api"]).strip().rstrip("/")
             rete = str(v.get("rete", "bitcoin")).strip().lower()
             referral = str(v.get("referral", "") or "").strip()[:40]
+            mempool = str(v.get("mempool", "") or "").strip()
         except (KeyError, TypeError, AttributeError):
             fid = ""
         buono = (fid and _SWAP_ID_FORNITORE.match(fid) and fid not in visti
                  and nome and tipo in SWAP_TIPI and swap_origine_api(api)
-                 and rete in SWAP_RETI)
+                 and rete in SWAP_RETI
+                 and (not mempool or swap_origine_api(mempool)))
         if not buono:
             chiave = repr(v)[:80]
             if chiave not in _SWAP_DETTO_STORTO:
@@ -1628,7 +1659,8 @@ def swap_fornitori() -> list:
             continue
         visti.add(fid)
         out.append({"id": fid, "nome": nome, "tipo": tipo, "api": api,
-                    "referral": referral, "rete": rete})
+                    "referral": referral, "rete": rete,
+                    "mempool": swap_mempool_api(rete, mempool)})
     return out
 
 
@@ -2059,9 +2091,12 @@ def _csp_prova(collaudo: bool = MODALITA_COLLAUDO) -> str:
     origini = []
     if SWAP_ATTIVO:
         for f in swap_fornitori():
-            o = swap_origine_api(f["api"])
-            if o and o not in origini:
-                origini.append(o)
+            # (20 ott 2026, swap-lockup) e l'API mempool di ciascuno: di
+            # serie mempool.space, una sola origine per tutti
+            for o in (swap_origine_api(f["api"]),
+                      swap_origine_api(f["mempool"]) if f["mempool"] else ""):
+                if o and o not in origini:
+                    origini.append(o)
     if origini:
         d = [x + " " + " ".join(origini) if x.startswith("connect-src")
              else x for x in d]
@@ -31347,6 +31382,9 @@ def _leve_stato():
             _leva("Swap: dove si leggono le tariffe", "SWAP_API_BASE",
                   str(SWAP_API_BASE or "")),
             _leva("Swap: la rete", "SWAP_RETE", swap_rete()),
+            _leva("Swap: dove si legge il lockup", "SWAP_MEMPOOL_API",
+                  swap_mempool_api(swap_rete(), SWAP_MEMPOOL_API)
+                  or "nessuno (il telefono non ritira)"),
             _leva("Swap: gli altri fornitori", "SWAP_FORNITORI_IN_PIU",
                   ", ".join(f["id"] for f in swap_fornitori()[1:])
                   or "nessuno"),

@@ -33720,6 +33720,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   della tappa 2 dicono il fornitore (`{f}`) e la nota `ripiego`. Il
   cartone ha lo stato per istanza (`nuovo_cartone`, `avvia(porta, rete,
   percento)`). Il collaudo è `collaudo_swap_instradatore`.
+- LO SWAP, IL RITIRO INDURITO (20 ott 2026, cantiere swap-lockup; perché
+  in CANTIERI, «Il ritiro indurito»). In `ritira` di `swap/boltz.js` il
+  lockup si legge da `cfg.mempool` (`GET <mempool>/tx/<id>/hex`, l'id dal
+  fornitore, i byte dalla rete) PRIMA di qualunque segreto; in
+  `swapRitiro` l'uscita è `detectSwap(chiave, lockup, atteso)` con
+  `atteso = Scripts.p2trOutput(chiave)` più il nostro confronto, e
+  l'importo `>= rec.onchainAmount`. Il server: `SWAP_MEMPOOL_API`,
+  `SWAP_MEMPOOL_DI_SERIE`, `swap_mempool_api(rete, esplicita)`, la chiave
+  `mempool` in ogni voce di `swap_fornitori()`, l'origine nella CSP solo
+  a swap acceso. Il bundle è boltz-core al commit `a932d49c` (la #196).
+  Il cartone: `/esplora/tx/<id>/hex`, i modi `lockup_altro_script`,
+  `lockup_meno`, `lockup_fantasma`, e `firme`/`tentate` in `/cartone/visto`.
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e

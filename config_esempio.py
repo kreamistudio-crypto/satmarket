@@ -753,6 +753,12 @@ SWAP_RETE = "bitcoin"
 #  "api": "http://127.0.0.1:9078", "referral": "", "rete": "bitcoin"}.
 # Vuota di serie.
 SWAP_FORNITORI_IN_PIU = []
+# Da dove il telefono legge il lockup di uno swap prima di mandare il
+# segreto (mai dal fornitore): vuota = mempool.space della rete
+# (`https://mempool.space/api` per bitcoin). Va scritta solo sul regtest
+# (la VM di collaudo), dove un mempool pubblico non c'e'. Una voce di
+# SWAP_FORNITORI_IN_PIU puo' portare la sua chiave "mempool".
+SWAP_MEMPOOL_API = ""
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

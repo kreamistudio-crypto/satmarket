@@ -69720,3 +69720,90 @@ la sezione rigirata 33/0); collaudi della CI 95/0. Develop poi e' corso
 conflitto solo qui; sull'albero finale suite severa 25.959/0, nessuna
 saltata, e `collaudo_fusione_da_telegram`, `collaudo_account`,
 `collaudo_piu_account` 3/0.
+
+## Il ritiro indurito: tre controlli prima del segreto, e boltz-core al commit della #196 (20 ott 2026, cantiere swap-lockup, decisione di Andrea con Alan)
+
+**PERCHÉ.** Boltz è chiuso dal 3 agosto 2026: nel suo avviso, «sondaggi
+automatici assistiti dall'IA» e «diversi exploit, ciascuno contenuto»,
+senza dire quale pezzo (CANTIERI, «Comprare sats con USDT»; il testo è nel
+commit `9cc7b2ab` di BoltzExchange/boltz-web-app). Nei dieci giorni prima
+della chiusura erano entrati rattoppi nel backend (lockup legati allo
+script annunciato, segreto riconosciuto dall'impronta, race) e in
+boltz-core (PR #196, «Harden scripts», 24 lug), mai pubblicata su npm: la
+5.0.0 che avevamo nel bundle è del 22 mag. Guardando il nostro ritiro
+con quegli occhi: il segreto esce dal telefono (nella richiesta della
+firma cooperativa, o nella transazione dallo script), e prima di farlo
+si fidava della transazione di lockup che mandava il FORNITORE e
+cercava l'uscita fra quattro forme di script. Un fornitore che mente
+poteva farsi dare il segreto — cioè incassare la fattura — senza aver
+bloccato davvero i bitcoin. Oggi non costava niente (Barattolo non paga
+ancora la fattura dello swap: tappa 4); da lì in poi sì.
+
+**I TRE CONTROLLI, prima che il segreto possa uscire** (`swap/boltz.js`):
+1. L'USCITA È QUELLA DELLO SCRIPT ATTESO: il p2tr della chiave MuSig con
+   l'albero dello swap. `detectSwap` la cerca con l'uscita attesa (la
+   correzione #196) e poi la confrontiamo noi byte per byte: le due
+   difese si sommano.
+2. L'IMPORTO NON È MENO DELLA PROMESSA: `uscita.amount >=
+   rec.onchainAmount`, la cifra verificata alla nascita dello swap (prima
+   si guardava solo che superasse quel che chi vende riceve).
+3. LA TRANSAZIONE È VERA: dal fornitore si prende solo l'id del lockup; i
+   byte si leggono da mempool (`GET <mempool>/tx/<id>/hex`), si controlla
+   che l'id torni, e il ritiro usa QUELLI. Se la rete non la conosce,
+   niente ritiro e niente segreto: si riprova al giro dopo. Senza un
+   indirizzo di mempool il telefono non ritira affatto.
+
+**DA DOVE SI LEGGE.** La stessa origine che l'on-chain ha scelto
+(`ONCHAIN_RETE`: l'API signet di mempool.space): `https://mempool.space`,
+con `/api` per bitcoin e `/testnet/api` per testnet; ogni fornitore la
+porta in `swap_leve.fornitori` (`mempool`). La CSP la apre, una volta
+sola, SOLO a swap acceso. Leva nuova `SWAP_MEMPOOL_API` (vuota = quella
+di serie della rete) per il regtest della VM e per il collaudo, dove un
+mempool pubblico non c'è; una voce di `SWAP_FORNITORI_IN_PIU` può portare
+il suo `mempool`. mempool.space risponde ai browser da qualunque origine
+(CORS `*`, letto il 20 ott).
+
+**IL BUNDLE RIFATTO** (`vendor/swap.bundle.js`): boltz-core dal SORGENTE
+al commit `a932d49c4daaeae3d7940dc1519bf77ef92e6dc1` (il merge della #196,
+24 lug 2026, l'ultimo di `master`), licenza MIT («Copyright (c) 2026
+Boltz»); le altre sette dipendenze alle stesse versioni esatte di prima,
+esbuild 0.28.2, nessuno script dei pacchetti eseguito (esbuild impacchetta
+il TypeScript da sé). RIPRODUCIBILE: due costruzioni in due cartelle
+nuove, lo stesso file, 378.091 byte, sha256 `02b4184eff3d8a49`
+`9ac2597059c9c01a` `d1b107234629e4a3` `39ea83ade8370bd0` (a gruppi di
+sedici per lo scanner; intero in `prove.py`, `IMPRONTA_SWAP`). Gli stessi
+ventitré nomi esportati. La ricetta esatta in `vendor/swap-LICENZE.md`.
+Effetto collaterale voluto: `detectSwap` vuole ora l'uscita attesa come
+terzo argomento, e il nostro ritiro gliela passa.
+
+**LE PROVE.**
+- `collaudo_swap_telefono` 48/0: le scene di prima con le stesse attese,
+  più tre lockup bugiardi del cartone — su un'uscita p2sh della stessa
+  chiave (una delle forme che la 5.0.0 accettava), 100 sats meno della
+  promessa, una transazione che la «rete» non ha mai visto — e per
+  ciascuno: niente ritiro, il perché giusto, NESSUNA richiesta di firma
+  (lì arriverebbe il segreto) e NESSUNA trasmissione. Il cartone ha un
+  finto mempool (`/esplora/tx/<id>/hex`) e conta firme e trasmissioni.
+  Due prove della CSP adeguate: ora dice SATS Routing e mempool.space.
+- `collaudo_swap_instradatore` 26/0, coi finti mempool dei due cartoni:
+  al primo giro senza, il telefono era andato a leggere un id inventato
+  dal mempool.space VERO (sola lettura, ma in collaudo non si esce dal
+  computer): ora la sentinella lo vieta.
+- CONTROPROVA sul collaudo: solo il bundle (tolto il nostro confronto)
+  verde; solo il nostro confronto (bundle riportato alla 5.0.0, quattro
+  forme) verde; nessuna delle due → rossa la scena dell'altro script;
+  senza il controllo dell'importo → rossa; lockup preso dal fornitore →
+  rossa la scena del fantasma.
+- `prove_swap_telefono`: l'impronta nuova, la ricetta col commit, la
+  correzione #196 nel bundle, le due `fetch` del tipo, il mempool letto
+  PRIMA che il segreto possa uscire, i due controlli nel ritiro; il banco
+  dei vettori con la promessa on-chain. `prove_swap_fornitori`: il
+  mempool di ogni fornitore (quello scritto, sennò quello della rete;
+  vuoto per il regtest), una voce col mempool storto saltata. Il banco
+  del pannello delle leve vuole `swap_mempool_api`.
+- Nessun giro grafico: A non cambia niente di quel che si vede.
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Sulla VM col regtest di Boltz va scritta `SWAP_MEMPOOL_API`
+(l'esplora del regtest), o il telefono non ritira. KaleidoSwap (swap-sdk
+in Rust) va guardato con gli stessi occhi prima di costruirci sopra.

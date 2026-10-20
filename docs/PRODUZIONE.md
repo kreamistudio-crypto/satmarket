@@ -4455,6 +4455,12 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   cartone_satsrouting.py --porta 9078 --percento 0.3`), e riavvio.
   I file del telefono ora stanno sotto `/swap/` (`boltz.js`,
   `instradatore.js`): `/swap-telefono.js` non c'è più.
+  DOVE SI LEGGE IL LOCKUP (20 ott 2026, swap-lockup): `SWAP_MEMPOOL_API`
+  NON si aggiunge al config del VPS (vuota: mempool.space della rete).
+  Sulla VM col regtest di Boltz VA scritta, con l'esplora del regtest, o
+  il telefono non ritira (il pannello «⚙️ Stato delle leve» lo dice:
+  «Swap: dove si legge il lockup»). La CSP, a swap acceso, aggiunge
+  quella sola origine.
 
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo

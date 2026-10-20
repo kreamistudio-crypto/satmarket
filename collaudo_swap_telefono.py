@@ -313,6 +313,29 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                            (v5.trasmesse[v5.trasmesse.length - 1] || {}).via]};
   await modo('normale');
 
+  // --- (20 ott 2026, swap-lockup) TRE LOCKUP BUGIARDI: il telefono non
+  // manda il segreto a nessuno — niente firma chiesta, niente trasmissione
+  out.lockup = {};
+  let ord = 11;
+  for (const m of ['lockup_altro_script', 'lockup_meno', 'lockup_fantasma']) {
+    A.run(`elementi.swapIndirizzo_${ord} = {value: '${D.indirizzo}'}`);
+    await A.run(`swapAvanti(${ord})`);
+    await A.run(`swapCrea(${ord})`);
+    const rL = lista(memA).find(r => r.ordine === ord);
+    await modo(m);
+    const vPrima = await visto();
+    await stato(rL.id, 'transaction.mempool');
+    await A.run('swapGiro()');
+    await A.run('swapGiro()');
+    const rL2 = lista(memA).find(r => r.ordine === ord);
+    const vDopo = await visto();
+    out.lockup[m] = {ritirato: !!(rL2.ritiro && rL2.ritiro.txid), errore: rL2.errore || '',
+                     firme: vDopo.firme.filter(id => id === rL.id).length,
+                     tentate: vDopo.tentate - vPrima.tentate};
+    await modo('normale');
+    ord++;
+  }
+
   // --- LA SENTINELLA: dove sono andate le chiamate, e cosa portavano
   const priv = [];
   for (let i = 0; i < 12; i++) {
@@ -328,7 +351,11 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   const tutto = (valori.join('\n') + '\n' + chiamate.map(c => c.url).join('\n')).toLowerCase();
   const soloValori = valori.join('\n').toLowerCase();
   out.sentinella = {chiamate: chiamate.length,
-                    fuori: chiamate.filter(c => !c.url.startsWith(BASE + '/v2/')).map(c => c.url),
+                    /* (20 ott 2026) il fornitore, e il finto mempool da cui si
+                       legge il lockup */
+                    fuori: chiamate.filter(c => !c.url.startsWith(BASE + '/v2/')
+                                             && !c.url.startsWith(BASE + '/esplora/tx/')).map(c => c.url),
+                    mempool: chiamate.filter(c => c.url.startsWith(BASE + '/esplora/tx/')).length,
                     api: chiamate.filter(c => c.url.includes('/api/')).length,
                     parole: tutto.includes(parole)
                       || parole.split(' ').some(p => new RegExp('\\b' + p + '\\b').test(soloValori)),
@@ -358,7 +385,9 @@ def telefono(base):
                          os.path.join(banco.QUI, "swap", "instradatore.js")],
             "bolt11": pezzi_pagina(),
             "leve": {"attivo": True, "api": base, "rete": "bitcoin",
-                     "referral": "barattolo", "minimo": 25_000, "massimo": 50_000},
+                     "referral": "barattolo", "minimo": 25_000, "massimo": 50_000,
+                     # (20 ott 2026) il finto mempool del cartone
+                     "mempool": base + "/esplora"},
             "preventivo": {"ok": True, "hash": "cartone-tariffa-16ott", "dovuto": 48_000,
                            "fattura": 48_000, "onchain": 47_388, "ricevi": 47_154,
                            "valido_s": 60, "righe": []}}))
@@ -391,8 +420,11 @@ def il_server(c, srv, base):
     srv.SWAP_RETE = "bitcoin"
     csp = srv._csp_prova(True)
     connect = next(x for x in csp.split("; ") if x.startswith("connect-src"))
-    prova("a swap acceso la CSP ammette la sola origine di SATS Routing",
-          (True, 1), (connect.endswith(" " + base), connect.count("127.0.0.1")))
+    # (20 ott 2026, swap-lockup) e l'origine del mempool da cui il telefono
+    # legge il lockup: di serie mempool.space, la stessa dell'on-chain
+    prova("a swap acceso la CSP ammette l'origine di SATS Routing e quella del mempool",
+          (True, 1, True), (connect.endswith(" " + base + " https://mempool.space"),
+                            connect.count("127.0.0.1"), "mempool.space/" not in connect))
     srv.SWAP_ATTIVO = False
     prova("...a swap spento nessuna", False, base in srv._csp_prova(True))
     srv.SWAP_ATTIVO = True
@@ -401,7 +433,7 @@ def il_server(c, srv, base):
     connect = next(x for x in srv._csp_prova(True).split("; ")
                    if x.startswith("connect-src"))
     prova("...l'origine e' solo schema e casa, senza percorso",
-          (True, False), (connect.endswith(" https://api.satsrouting.exchange"),
+          (True, False), (connect.endswith(" https://api.satsrouting.exchange https://mempool.space"),
                           "qualcosa" in connect))
     srv.SWAP_API_BASE = "javascript:alert(1)"
     prova("...e una base che non e' http(s) non apre niente", "", srv.swap_origine_api())
@@ -488,9 +520,19 @@ def il_telefono(base):
     prova("un ritiro cooperativo rifiutato alla trasmissione: il giro dopo dallo script",
           {"primo": [False, True, True], "poi": [True, False, "script"]}, r.get("rifiutoCoop"))
 
+    print("\n[i lockup bugiardi: nessun segreto esce]")
+    for m, motivo in (("lockup_altro_script", "nel lockup non c'e' il nostro swap"),
+                      ("lockup_meno", "il lockup porta meno di quanto promesso"),
+                      ("lockup_fantasma", "il lockup non si vede sulla rete")):
+        prova(f"{m}: niente ritiro, il perche', nessuna firma chiesta, nessuna trasmissione",
+              {"ritirato": False, "errore": motivo, "firme": 0, "tentate": 0},
+              (r.get("lockup") or {}).get(m))
+
     print("\n[la sentinella]")
     se = r["sentinella"]
-    prova("ogni chiamata del telefono va a SATS Routing, nessuna al server",
+    prova("il lockup si legge dal mempool, non solo dal fornitore", True,
+          (se.get("mempool") or 0) >= 4)
+    prova("ogni chiamata del telefono va a SATS Routing o al mempool, nessuna al server",
           (True, [], 0), ((se.get("chiamate") or 0) > 10, se.get("fuori"), se.get("api")))
     prova("...in nessuna le 12 parole o una chiave privata", (False, False),
           (se.get("parole"), se.get("privata")))

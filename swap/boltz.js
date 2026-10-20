@@ -8,8 +8,10 @@
    fornitore vanno solo le parti pubbliche (l'impronta del segreto, la
    chiave pubblica, la xpub al recupero), al server di Barattolo NIENTE di
    questo file. Il telefono parla DIRETTAMENTE col fornitore (`api` della
-   sua voce in `swapLeve.fornitori`): la CSP della pagina, a swap acceso,
-   ammette le sole origini dei fornitori (server.py, `_csp_prova`).
+   sua voce in `swapLeve.fornitori`) e con la rete (`mempool`, per leggere
+   il lockup da una fonte che non e' il fornitore): la CSP della pagina, a
+   swap acceso, ammette le sole origini di quei due (server.py,
+   `_csp_prova`).
 
    L'INTERFACCIA che l'instradatore (swap/instradatore.js) chiede a ogni
    fornitore, qualunque sia il tipo:
@@ -110,7 +112,19 @@ function swapVerifica(S, rete, r, chiavi, attesa){
    `createAdjustedClaim`). COOPERATIVO prima — una firma MuSig2 a due, il
    fornitore manda la sua parte (`chiediFirma`) — e se non collabora
    DALLO SCRIPT, con la sola chiave nostra e il segreto: il loro permesso
-   non serve. Torna {hex, id, cooperativo}. */
+   non serve. Torna {hex, id, cooperativo}.
+   I DUE CONTROLLI SUL LOCKUP PRIMA DI QUALUNQUE SEGRETO (20 ott 2026,
+   cantiere swap-lockup, dopo la chiusura di Boltz): il segreto esce di
+   qui (nella richiesta della firma, o nella transazione dallo script), e
+   un fornitore che mente se lo farebbe dare senza aver bloccato davvero
+   i bitcoin. Quindi: (1) l'uscita del lockup e' ESATTAMENTE quella dello
+   script atteso — il p2tr della chiave MuSig con l'albero — e non una
+   delle altre tre forme che `detectSwap` della 5.0.0 accettava (la
+   correzione di boltz-core #196, che il bundle ora porta, e in piu' il
+   nostro confronto: le due difese si sommano); (2) l'importo non e' meno
+   di quello promesso alla nascita (`rec.onchainAmount`). Il terzo
+   controllo — il lockup esiste davvero sulla rete — lo fa `ritira`,
+   prima di arrivare qui. */
 async function swapRitiro(S, rete, rec, chiavi, lockupHex, destinazione, ricevi, chiediFirma, cooperativo){
   if (cooperativo === undefined) cooperativo = true;
   const loro = S.hex.decode(String(rec.refundPublicKey || ''));
@@ -119,8 +133,12 @@ async function swapRitiro(S, rete, rec, chiavi, lockupHex, destinazione, ricevi,
   const tweaked = S.TaprootUtils.tweakMusig(keyAgg, albero.tree);
   const lockup = S.Transaction.fromRaw(S.hex.decode(String(lockupHex || '')),
     {allowUnknownOutputs: true, allowUnknownInputs: true});
-  const uscita = S.detectSwap(tweaked.aggPubkey, lockup);
-  if (uscita === undefined) throw new Error('nel lockup non c\'e\' il nostro swap');
+  const atteso = S.Scripts.p2trOutput(tweaked.aggPubkey);
+  const uscita = S.detectSwap(tweaked.aggPubkey, lockup, atteso);
+  if (uscita === undefined || !swapUguali(uscita.script, atteso))
+    throw new Error('nel lockup non c\'e\' il nostro swap');
+  if (!(Number(uscita.amount) >= Number(rec.onchainAmount)))
+    throw new Error('il lockup porta meno di quanto promesso');
   const budget = Number(uscita.amount) - Number(ricevi);
   if (!(budget > 0)) throw new Error('il lockup non copre quel che il preventivo promette');
   const script = swapScriptIndirizzo(S, rete, destinazione);
@@ -175,8 +193,9 @@ function caricaBundleSwap(){
 }
 
 /* ─── 3. IL FORNITORE, direttamente ─────────────────────────────────────
-   L'unica `fetch` di questo file: verso l'`api` del fornitore, mai verso
-   il server di Barattolo. */
+   Una delle due `fetch` di questo file: verso l'`api` del fornitore (la
+   seconda, in `ritira`, legge il lockup da mempool), mai verso il server
+   di Barattolo. */
 async function swapApiBoltz(base, percorso, corpo){
   base = String(base || '').replace(/\/+$/, '');
   if (!base) throw new Error('fornitore senza indirizzo');
@@ -261,11 +280,28 @@ window.SWAP_TIPI.boltz = function(cfg){
         const tar = await api('/v2/swap/reverse');
         ricevi = Number(rec.onchainAmount) - Number(tar.BTC.BTC.fees.minerFees.claim);
       }
+      /* IL TERZO CONTROLLO (20 ott 2026, cantiere swap-lockup): il lockup
+         si legge dalla RETE, non dal fornitore. Dal fornitore si prende
+         solo l'id della transazione; i suoi byte li da' mempool (l'API
+         della rete del fornitore, `cfg.mempool`, la stessa scelta per
+         l'on-chain). Se la rete non la conosce, o la conosce diversa,
+         niente ritiro e niente segreto: si riprova al giro dopo. Senza un
+         indirizzo di mempool non si ritira affatto. */
       const lock = await api(`/v2/swap/reverse/${id(rec.id)}/transaction`);
+      const base = String(cfg.mempool || '').replace(/\/+$/, '');
+      if (!base) throw new Error('nessuna rete da cui leggere il lockup');
+      const txid = String((lock && lock.id) || '');
+      if (!/^[0-9a-f]{64}$/.test(txid)) throw new Error('il lockup non ha un id');
+      const vista = await fetch(`${base}/tx/${txid}/hex`);
+      const lockHex = vista.ok ? String(await vista.text()).trim() : '';
+      if (!lockHex) throw new Error('il lockup non si vede sulla rete');
+      if (S.Transaction.fromRaw(S.hex.decode(lockHex),
+            {allowUnknownOutputs: true, allowUnknownInputs: true}).id !== txid)
+        throw new Error('la rete risponde con un altro lockup');
       const chiediFirma = (txHex, nonce) => api(
         `/v2/swap/reverse/${id(rec.id)}/claim`,
         {index: 0, preimage: S.hex.encode(chiavi.segreto), pubNonce: nonce, transaction: txHex});
-      const fatto = await swapRitiro(S, rete, rec, chiavi, lock.hex, rec.indirizzo, ricevi,
+      const fatto = await swapRitiro(S, rete, rec, chiavi, lockHex, rec.indirizzo, ricevi,
                                      chiediFirma, !rec.coopRifiutato);
       try {
         const inviata = await api('/v2/chain/BTC/transaction', {hex: fatto.hex});

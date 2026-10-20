@@ -131,7 +131,11 @@ const OP = {
     const p = pezzi(d);
     const tx = new S.Transaction({allowUnknownInputs: true, allowUnknownOutputs: true});
     tx.addInput({txid: randomBytes(32), index: 0});
-    tx.addOutput({script: p.script, amount: BigInt(d.onchainAmount)});
+    /* (20 ott 2026, swap-lockup) la variante bugiarda: la stessa chiave
+       MuSig, ma in un'uscita p2sh — una delle forme che `detectSwap` della
+       5.0.0 accettava */
+    const script = d.variante === 'altro_script' ? S.Scripts.p2shOutput(p.agg.aggPubkey) : p.script;
+    tx.addOutput({script: script, amount: BigInt(d.onchainAmount)});
     const hex = h.encode(tx.unsignedTx);
     return {hex: hex, id: S.Transaction.fromRaw(tx.unsignedTx, {allowUnknownInputs: true, allowUnknownOutputs: true}).id};
   },

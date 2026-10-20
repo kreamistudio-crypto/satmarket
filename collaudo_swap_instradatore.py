@@ -303,7 +303,10 @@ const O = D.ordini;
   const priv = [];
   for (const p of tutte) for (let i = 0; i < 6; i++)
     priv.push(S.hex.encode(S.HDKey.fromMasterSeed(S.mnemonicToSeedSync(p)).derive(`m/44/0/0/0/${i}`).privateKey));
-  out.sentinella = {fuori: chiamate.filter(c => !c.url.startsWith(B1 + '/v2/') && !c.url.startsWith(B2 + '/v2/')).length,
+  /* (20 ott 2026, swap-lockup) i due fornitori, e i loro finti mempool da
+     cui si legge il lockup: mai fuori dal computer */
+  out.sentinella = {fuori: chiamate.filter(c => ![B1 + '/v2/', B2 + '/v2/', B1 + '/esplora/tx/', B2 + '/esplora/tx/']
+                                             .some(b => c.url.startsWith(b))).length,
                     parole: tutte.some(p => p.split(' ').some(w => new RegExp('\\b' + w + '\\b').test(soloValori))),
                     privata: priv.some(k => soloValori.includes(k) || chiamate.some(c => c.url.includes(k)))};
   out.onclick = html.filter(h => /\son[a-z]+=/i.test(h)).length;
@@ -449,9 +452,13 @@ def main():
     srv.SWAP_API_BASE = basi["satsrouting"]
     srv.SWAP_REFERRAL_ID = "barattolo"
     srv.SWAP_RETE = "bitcoin"
+    # (20 ott 2026, swap-lockup) il lockup si legge dal finto mempool di
+    # ogni cartone: in collaudo mai il mempool.space vero
+    srv.SWAP_MEMPOOL_API = basi["satsrouting"] + "/esplora"
     srv.SWAP_FORNITORI_IN_PIU = [{"id": "cartone2", "nome": "Cartone Due",
                                   "tipo": "boltz", "api": basi["cartone2"],
-                                  "referral": "", "rete": "bitcoin"}]
+                                  "referral": "", "rete": "bitcoin",
+                                  "mempool": basi["cartone2"] + "/esplora"}]
     c = TestClient(srv.app)
     ordini = semina()
     il_server(c, srv, basi, ordini)

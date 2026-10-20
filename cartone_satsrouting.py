@@ -46,7 +46,18 @@ I MODI, a comando (`GET /cartone/modo?m=...`):
     ritirare dallo script;
   - `rifiuta_cooperativo` la firma a due c'e', ma la trasmissione di un
     ritiro cooperativo e' rifiutata (come una rete che non lo accetta):
-    il giro dopo il telefono deve ritirare dallo script.
+    il giro dopo il telefono deve ritirare dallo script;
+  - (20 ott 2026, cantiere swap-lockup) tre LOCKUP BUGIARDI, che il
+    telefono deve rifiutare PRIMA di mandare il segreto:
+    `lockup_altro_script` blocca i bitcoin su un'uscita p2sh della stessa
+    chiave (una delle quattro forme che `detectSwap` della 5.0.0
+    accettava), `lockup_meno` blocca 100 sats meno della promessa,
+    `lockup_fantasma` da' al telefono una transazione che la «rete» non
+    ha mai visto.
+IL FINTO MEMPOOL: `GET /esplora/tx/<id>/hex` risponde coi soli lockup
+«trasmessi» (tutti, tranne il fantasma), come l'API di mempool.space; e
+`/cartone/visto` conta le richieste di firma cooperativa (`firme`: lì
+arriva il segreto) e le trasmissioni tentate (`tentate`).
 Lo stato di uno swap si sposta a comando come lo sposterebbe SATS Routing
 (`GET /cartone/stato?id=...&s=transaction.mempool`: a bitcoin bloccati
 nasce il lockup). `GET /cartone/visto` dice letture, l'ultima intestazione
@@ -90,7 +101,8 @@ SWAP = {}           # id -> lo swap come lo ricorda il cartone
 CHIAVE = threading.Lock()
 MODI = ("normale", "cambiata", "giu", "storta",
         "mente_importo", "mente_impronta", "mente_albero",
-        "mente_indirizzo", "mente_meno", "non_firma", "rifiuta_cooperativo")
+        "mente_indirizzo", "mente_meno", "non_firma", "rifiuta_cooperativo",
+        "lockup_altro_script", "lockup_meno", "lockup_fantasma")
 STATI = ("swap.created", "transaction.mempool", "transaction.confirmed",
          "invoice.settled", "invoice.expired", "swap.expired",
          "transaction.failed", "transaction.refunded")
@@ -261,15 +273,24 @@ def sposta(c, sid, stato):
     if not s or stato not in STATI:
         return False
     if stato in ("transaction.mempool", "transaction.confirmed") and not s["lockup"]:
+        m = c["stato"]["modo"]
         s["lockup"] = cripto("lockup", serverPriv=s["serverPriv"],
                              claimPublicKey=s["claimPublicKey"],
                              swapTree=s["swapTree"],
-                             onchainAmount=s["onchainAmount"])
+                             onchainAmount=s["onchainAmount"]
+                             - (100 if m == "lockup_meno" else 0),
+                             variante="altro_script"
+                             if m == "lockup_altro_script" else "")
+        # la «rete» lo vede, tranne il fantasma
+        if m != "lockup_fantasma":
+            c["rete"][s["lockup"]["id"]] = s["lockup"]["hex"]
     s["stato"] = stato
     return True
 
 
 def firma_ritiro(c, s, corpo):
+    # chi chiede la firma cooperativa manda il SEGRETO: si conta per swap
+    c["stato"]["firme"].append(s["id"])
     if c["stato"]["modo"] == "non_firma":
         return 400, {"error": "swap not eligible for a cooperative claim"}
     if not s["lockup"]:
@@ -292,6 +313,7 @@ def trasmetti(c, corpo):
     """La trasmissione del ritiro: si accetta solo se spende il lockup di
     uno swap del cartone e la firma regge."""
     hex_ = str(corpo.get("hex", ""))
+    c["stato"]["tentate"] += 1
     for s in c["swap"].values():
         if not s["lockup"]:
             continue
@@ -411,6 +433,20 @@ class Sportello(BaseHTTPRequestHandler):
                 return self._rispondi(200 if ok else 400, {"ok": ok, "id": sid})
             if u.path == "/cartone/visto":
                 return self._rispondi(200, dict(c["stato"], swap=len(c["swap"])))
+            if (len(pezzi) == 4 and pezzi[0] == "esplora" and pezzi[1] == "tx"
+                    and pezzi[3] == "hex"):
+                # il finto mempool: testo semplice, come mempool.space
+                hex_ = c["rete"].get(pezzi[2])
+                if hex_ is None:
+                    return self._rispondi(404, {"error": "Transaction not found"})
+                dati = hex_.encode("ascii")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(dati)))
+                self._cors()
+                self.end_headers()
+                self.wfile.write(dati)
+                return
         return self._rispondi(404, {"error": "non c'e'"})
 
     def do_POST(self):
@@ -451,8 +487,10 @@ def nuovo_cartone(rete="bitcoin", percento=None):
     commissione (20 ott 2026: due cartoni nello stesso collaudo sono due
     fornitori diversi)."""
     return {"stato": {"modo": "normale", "letture": 0, "referral": None,
-                      "rete": rete, "creazione": None, "trasmesse": []},
-            "swap": {}, "chiave": threading.Lock(), "percento": percento}
+                      "rete": rete, "creazione": None, "trasmesse": [],
+                      "firme": [], "tentate": 0},
+            "swap": {}, "chiave": threading.Lock(), "percento": percento,
+            "rete": {}}
 
 
 def avvia(porta=0, rete="bitcoin", percento=None):
@@ -475,8 +513,9 @@ def main(argv):
     if "--percento" in argv:
         percento = float(argv[argv.index("--percento") + 1])
     srv = ThreadingHTTPServer(("127.0.0.1", porta), Sportello)
+    STATO.update(firme=[], tentate=0)
     srv.cartone = {"stato": STATO, "swap": SWAP, "chiave": CHIAVE,
-                   "percento": percento}
+                   "percento": percento, "rete": {}}
     print(f"🧃 SATS Routing di cartone su http://127.0.0.1:{porta} "
           f"(rete «{STATO['rete']}», modo «{STATO['modo']}»; si cambia con "
           f"/cartone/modo?m=...)", flush=True)
