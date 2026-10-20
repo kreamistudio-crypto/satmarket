@@ -4442,6 +4442,8 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   swap@barattolo.store, <giorno> alle <ora>». Nel codice nasce SPENTO:
   finché non lo si accende,
   `https://barattolo.store/.well-known/lnurlp/swap` risponde 404.
+  STATO: sul VPS è ACCESO dal 20 ott 2026, e provato quel giorno con
+  una fattura vera da 21 sats (parola di Andrea).
   PER ACCENDERLO, DOPO IL DEPLOY, in quest'ordine:
   1) IL WALLET «swap», SUL PC: il pannello di LNbits del nodo come per
      zap@ (`ssh -N -L 5001:127.0.0.1:5001 root@VPS` in un terminale,
@@ -4451,16 +4453,41 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
      and API docs»: si copia la «Invoice/read key» del wallet «swap» —
      SOLO quella, e NON quella del wallet «zap» (con la stessa chiave
      l'indirizzo vale spento, ed è voluto). La «Admin key» non si copia.
-  2) IL CONFIG, SUL VPS, da `barattolo`: prima si guarda che le righe
-     non ci siano già — `grep -n "^SWAP_" /srv/barattolo/config.py`
-     (possono esserci `SWAP_ATTIVO` e `SWAP_REFERRAL_ID`: sono la cella
-     «Swap» dei venditori, un'altra cosa, e non si toccano) —
-     poi si aggiungono in fondo a `/srv/barattolo/config.py` due righe:
-     `SWAP_LNBITS_INVOICE_KEY` uguale alla invoice key copiata (fra
-     virgolette) e `SWAP_INDIRIZZO_ATTIVO = True`. Nient'altro: il
-     tetto di serie è 2.000.000 (`SWAP_INDIRIZZO_MAX_SATS = …` solo per
-     cambiarlo), l'indirizzo di LNbits è quello del nodo. La invoice
-     key non si scrive mai in chat, su GitHub o in un log.
+  2) IL CONFIG, SUL VPS, UN COMANDO ALLA VOLTA, col `read -s` come le
+     chiavi del codice partner (qui sotto, «LE CHIAVI DEL CODICE PARTNER
+     DI SATS ROUTING»; riscritto il 20 ott 2026): la invoice key la
+     chiede il terminale SENZA mostrarla, non finisce nella history (il
+     comando contiene solo il nome della variabile) e non sta negli
+     argomenti di nessun processo (`printf` è un comando interno di
+     bash, e il testo arriva a `sudo tee` dallo stdin).
+     a) la copia di riserva:
+        `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-swap-indirizzo`
+     b) le due righe non ci sono già (deve dire `0`):
+        `sudo grep -c "^SWAP_LNBITS_INVOICE_KEY\|^SWAP_INDIRIZZO_ATTIVO" /srv/barattolo/config.py`
+        (le altre righe `SWAP_` — `SWAP_ATTIVO`, `SWAP_REFERRAL_ID`… —
+        sono lo swap dei venditori, un'altra cosa: non si toccano e qui
+        non si guardano nemmeno, si contano solo queste due)
+     c) la invoice key del wallet «swap», in una riga sola (chiede prima
+        la password di sudo, poi la chiave, che non si vede mentre si
+        incolla):
+        `sudo -v && read -rsp "Invoice key del wallet swap: " K && echo && if [ -z "$K" ]; then echo "Vuota: non scrivo niente"; elif [[ "$K" == *'"'* || "$K" == *"'"* || "$K" == *'\'* ]]; then echo "Contiene virgolette o barre: non scrivo niente, chiedi a Claude"; else printf '\nSWAP_LNBITS_INVOICE_KEY = %s%s%s\n' '"' "$K" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && echo "Scritta"; fi; unset K`
+        Deve dire «Scritta». (Il formato compone le virgolette a parte
+        apposta: una riga di documento col nome della chiave, l'uguale
+        e una virgoletta attaccata è la forma che lo scanner dei segreti
+        della CI prende per una chiave vera.)
+     d) la leva:
+        `printf 'SWAP_INDIRIZZO_ATTIVO = True\n' | sudo tee -a /srv/barattolo/config.py > /dev/null`
+     e) il file si legge ancora (deve dire `ok`):
+        `sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"`
+     f) le due righe ci sono, senza mostrarle (deve dire `2`):
+        `sudo grep -c "^SWAP_LNBITS_INVOICE_KEY\|^SWAP_INDIRIZZO_ATTIVO" /srv/barattolo/config.py`
+     Nient'altro: il tetto di serie è 2.000.000 (`SWAP_INDIRIZZO_MAX_SATS
+     = …` solo per cambiarlo), l'indirizzo di LNbits è quello del nodo.
+     Una chiave incollata male: la copia di riserva al suo posto
+     (`sudo cp -p /root/config.py.prima-swap-indirizzo /srv/barattolo/config.py`)
+     e si rifà dal passo b). La invoice key non si scrive MAI in chat
+     (nemmeno con Claude), su GitHub o in un log; mai `cat`, `sed -n` o
+     `grep -A/-B/-C` sul config.
   3) IL RIAVVIO: `sudo systemctl restart barattolo`.
   4) IL JOURNAL, subito dopo:
      `journalctl -u barattolo -n 120 --no-pager | grep "Indirizzo della quota"`
@@ -5321,7 +5348,7 @@ e cercarli là non dà risposta.
      `printf '\nSWAP_REFERRAL_ID = "barattolo"\n' | sudo tee -a /srv/barattolo/config.py > /dev/null`
   4) le due chiavi, in una riga sola (chiede prima la password di sudo,
      poi le due chiavi, che non si vedono mentre si incollano):
-     `sudo -v && read -rsp "API key di SATS Routing: " K && echo && read -rsp "API secret di SATS Routing: " S && echo && if [ -z "$K" ] || [ -z "$S" ]; then echo "Una e' vuota: non scrivo niente"; elif [[ "$K$S" == *[\"\'\\]* ]]; then echo "Contengono virgolette o barre: non scrivo niente, chiedi a Claude"; else printf 'SWAP_REFERRAL_API_KEY = %s%s%s\nSWAP_REFERRAL_API_SECRET = %s%s%s\n' '"' "$K" '"' '"' "$S" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && echo "Scritte"; fi; unset K S`
+     `sudo -v && read -rsp "API key di SATS Routing: " K && echo && read -rsp "API secret di SATS Routing: " S && echo && if [ -z "$K" ] || [ -z "$S" ]; then echo "Una e' vuota: non scrivo niente"; elif [[ "$K$S" == *'"'* || "$K$S" == *"'"* || "$K$S" == *'\'* ]]; then echo "Contengono virgolette o barre: non scrivo niente, chiedi a Claude"; else printf 'SWAP_REFERRAL_API_KEY = %s%s%s\nSWAP_REFERRAL_API_SECRET = %s%s%s\n' '"' "$K" '"' '"' "$S" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && echo "Scritte"; fi; unset K S`
      Deve dire «Scritte». (Il formato compone le virgolette a parte
      apposta: una riga di documento col nome della chiave, l'uguale e
      una virgoletta attaccata è la forma che lo scanner dei segreti della

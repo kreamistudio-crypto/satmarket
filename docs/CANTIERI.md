@@ -68250,3 +68250,32 @@ non solo i conflitti che git mostra.
 **PROVATO.** `prove_leve_mai_doppie`, `prove_indirizzo_swap`,
 `prove_swap_preventivo`, `prove_swap_cella`, `prove_config_esempio`,
 `prove_leve`: 223 verdi. Suite e collaudi: nel messaggio del commit.
+
+## La procedura di swap@ col read -s, e swap@ acceso (20 ott 2026, cantiere leve-doppie, secondo commit, richiesta di Andrea)
+
+Il passo 2 di PRODUZIONE, «L'INDIRIZZO DELLA QUOTA», diceva di
+aggiungere a mano la invoice key del wallet «swap» nel config del VPS:
+riscritto col `read -s`, sul calco delle chiavi del codice partner —
+copia di riserva in `/root/config.py.prima-swap-indirizzo`, il conto delle
+due righe che deve dire 0, la chiave chiesta da `read -rsp` e scritta
+con `printf | sudo tee` (mai mostrata, mai nella history, mai negli
+argomenti di un processo, virgolette composte a parte perché la riga
+del documento non abbia la forma che lo scanner prende per una chiave),
+la leva, il file che si legge ancora (`ast`), il conto che deve dire 2.
+E lo stato: swap@barattolo.store è ACCESO sul VPS dal 20 ott 2026,
+provato quel giorno con una fattura vera da 21 sats (parola di Andrea).
+UN DIFETTO MIO, preso provando il comando prima di consegnarlo: la
+guardia contro virgolette e barre, `[[ "$K" == *[\"\'\\]* ]]`, NON
+PRENDEVA NIENTE — la barra finale proteggeva la `]`, la classe non si
+chiudeva, e una chiave con una virgoletta sarebbe stata scritta e
+avrebbe rotto il config. Era identica nella procedura delle chiavi del
+codice partner (19 ott, già su main, MAI lanciata: si usa con la tappa
+6). Corrette tutt'e due con tre confronti semplici (`*'"'*`, `*"'"*`,
+`*'\'*`). Provati i due comandi COME SONO SCRITTI nel documento, con la
+tastiera e `sudo tee` sostituiti da valori finti e `cat`: una chiave
+normale si scrive, una con virgolette, apostrofo o barra no, una vuota
+no. (Il primo banco mentiva: da Python a bash su Windows l'apostrofo
+di un argomento si perde per strada — il valore va passato in una
+variabile d'ambiente.) E `bash -n` sui tre comandi del passo 2.
+Solo documenti. Provato anche: le sezioni di `prove.py` che leggono i
+documenti e lo scanner dei segreti sulle righe nuove.
