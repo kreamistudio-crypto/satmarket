@@ -169637,7 +169637,12 @@ def prove_relay_di_barattolo():
     prova("...ed e' cosi' che il server li usa: il 31990 prende il primo, "
           "il ripiego dei DM i primi quattro", (True, True),
           ("RELAYS_VERIFICA[0]]" in codice(pezzo("tag_client")),
-           "relays[:4]" in codice(pezzo("relay_dm_di"))))
+           # (20 ott 2026, avvisi-nostr-arrivano) la scelta sta in
+           # `relay_dm_dove`, e la riserva di chi non ha un 10050 prende
+           # i primi quattro della lista dietro i suoi relay di lettura
+           "relay_riserva_dm(" in codice(pezzo("relay_dm_dove"))
+           and "RELAYS_VERIFICA)" in codice(pezzo("relay_dm_dove"))
+           and "list(nostri or [])[:4]" in codice(pezzo("relay_riserva_dm"))))
 
     # ================================================================
     # 2) LO SCRIPT DELLA 10002
@@ -175071,6 +175076,288 @@ ctx.__no = async () => { throw new Error('not eligible'); };
         prova("swap: ...e il giudice in Python dice no a una firma rotta", False,
               _cart.schnorr_verifica(bytes.fromhex(co["impronta"]),
                                      bytes.fromhex(co["chiave"]), bytes(rotta)))
+def prove_avvisi_nostr_arrivano():
+    """GLI AVVISI NOSTR ARRIVANO (20 ott 2026, cantiere
+    avvisi-nostr-arrivano, decisione di Andrea: «gli avvisi devono
+    arrivare»). Chi entra SOLO da Nostr e non pubblica il kind 10050
+    riceveva gli avvisi su quattro relay che il suo client non legge, e
+    nessuno lo sapeva. Qui i pezzi puri e le sentinelle; il giro col
+    server vero e' `collaudo_avvisi_nostr_arrivano`:
+     · la riserva dei relay (`relay_riserva_dm`), eseguita;
+     · l'avviso in app (`_avviso_in_app`) su un database vero: testo
+       spoglio, i soli bottoni web, il tetto e la scadenza;
+     · `notifica` lo chiede SOLO per chi non ha Telegram (eseguita);
+     · le sentinelle: il NIP-04 dietro la sua leva spenta, la fusione,
+       lo sguardo al 10050 solo per i tg_id negativi;
+     · la miniapp in node: la fascia, il cartello UNA volta, la lista
+       che scappa il testo e tiene i soli link web."""
+    print("\n[gli avvisi Nostr arrivano: riserva, avvisi in app, cartello]")
+    import asyncio as _aio
+    import ipaddress as _ipa
+    import sqlite3 as _sq
+    import tempfile as _tf
+    import html as _html
+    from urllib.parse import urlparse as _urlparse
+
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) LA RISERVA DEI RELAY, eseguita ----------------------------
+    amb = {"urlparse": _urlparse, "ipaddress": _ipa,
+           "DM_RISERVA_MAX_RELAY": 8}
+    exec(pezzo("relay_di_casa"), amb)
+    exec(pezzo("relay_riserva_dm"), amb)
+    ris = amb["relay_riserva_dm"]
+    NOSTRI = ["wss://n1.example", "wss://n2.example", "wss://n3.example",
+              "wss://n4.example", "wss://n5.example"]
+    prova("senza 10002: i nostri primi quattro", NOSTRI[:4], ris(None, NOSTRI))
+    prova("col 10002: i suoi di lettura DAVANTI, poi i nostri",
+          ["wss://suo.example"] + NOSTRI[:4], ris(["wss://suo.example"], NOSTRI))
+    prova("dei suoi: mai un ws://, mai uno di casa, mai un doppione (la barra "
+          "in fondo non fa un relay diverso), mai piu' di quattro",
+          [["wss://a.example"] + NOSTRI[:4],
+           ["wss://a.example", "wss://b.example", "wss://c.example",
+            "wss://d.example"] + NOSTRI[:4]],
+          [ris(["wss://127.0.0.1:7777", "wss://localhost", "wss://a.example",
+                "wss://A.example/", "wss://b.example"], NOSTRI),
+           ris(["wss://a.example", "wss://b.example", "wss://c.example",
+                "wss://d.example", "wss://e.example"], NOSTRI)])
+    prova("...i suoi si contano PRIMA del filtro: quattro scritti, quattro "
+          "guardati (una lista lunga non si mangia i nostri)",
+          ["wss://a.example"] + NOSTRI[:4],
+          ris(["ws://x.example", "ws://y.example", "ws://z.example",
+               "wss://a.example", "wss://b.example"], NOSTRI))
+    prova("i nostri vengono dal config e passano come sono: anche di casa "
+          "(l'istanza di prova) e anche ws://",
+          ["ws://127.0.0.1:7777"], ris([], ["ws://127.0.0.1:7777"]))
+    prova("un doppione fra i suoi e i nostri vale una volta (resta il suo, "
+          "davanti)", ["wss://N1.example/"] + NOSTRI[1:4],
+          ris(["wss://N1.example/"], NOSTRI))
+    prova("il tetto e' otto, e la lista vuota resta vuota", [8, []],
+          [len(ris(["wss://%d.example" % i for i in range(9)], NOSTRI)),
+           ris([], [])])
+
+    # --- 2) L'AVVISO IN APP, su un database vero -----------------------
+    cartella = _tf.mkdtemp(prefix="prove-avvisi-app-")
+    percorso = os.path.join(cartella, "a.db")
+    schema = re.search(r"    CREATE TABLE IF NOT EXISTS avvisi_app\(.*?\n    \);",
+                       src, re.S).group(0)
+    c0 = _sq.connect(percorso)
+    c0.executescript(schema)
+    c0.close()
+
+    def _db():
+        c = _sq.connect(percorso)
+        c.row_factory = _sq.Row
+        return c
+    adesso = [1_800_000_000]
+    amb2 = {"db": _db, "json": json, "re": re, "html": _html,
+            "time": types_tempo(adesso),
+            "AVVISI_APP_MAX": 3, "AVVISI_APP_GIORNI": 30}
+    exec(pezzo("spoglia_html"), amb2)
+    exec(pezzo("_bottoni_avviso"), amb2)
+    exec(pezzo("_avviso_in_app"), amb2)
+    amb2["_avviso_in_app"](-5, "📦 <b>Ordine #7</b> &amp; partito",
+                           [("⚡ Apri", "https://barattolo.store/x"),
+                            ("🤖 Bot", "tg://resolve?domain=b"),
+                            ("☠️", "javascript:alert(1)")])
+    amb2["_avviso_in_app"](-5, "senza bottoni")
+    righe = [dict(r) for r in _db().execute(
+        "SELECT tg_id, testo, bottoni, quando, letto FROM avvisi_app ORDER BY id")]
+    prova("l'avviso: testo spoglio dell'HTML, i soli bottoni web, nuovo",
+          {"tg_id": -5, "testo": "📦 Ordine #7 & partito",
+           "bottoni": '[["⚡ Apri", "https://barattolo.store/x"]]',
+           "quando": adesso[0], "letto": 0}, righe[0])
+    prova("...senza bottoni la colonna resta vuota", "", righe[1]["bottoni"])
+    adesso[0] += 31 * 86400
+    for i in range(4):
+        amb2["_avviso_in_app"](-5, f"n{i}")
+    amb2["_avviso_in_app"](-6, "di un altro")
+    prova("il tetto per persona (qui 3) e la scadenza: restano i piu' nuovi, e "
+          "quelli di oltre trenta giorni se ne vanno; l'altra persona non si tocca",
+          [["n1", "n2", "n3"], ["di un altro"]],
+          [[r[0] for r in _db().execute(
+              "SELECT testo FROM avvisi_app WHERE tg_id=-5 ORDER BY id")],
+           [r[0] for r in _db().execute(
+               "SELECT testo FROM avvisi_app WHERE tg_id=-6")]])
+
+    # --- 3) NOTIFICA LO CHIEDE SOLO PER CHI NON HA TELEGRAM -------------
+    creati, telegram = [], []
+
+    class _Con:
+        def __init__(self, riga):
+            self.riga = riga
+
+        def execute(self, *a):
+            return self
+
+        def fetchone(self):
+            return self.riga
+
+        def close(self):
+            pass
+
+    def _crea(coro):
+        creati.append(coro.cr_code.co_name)
+        coro.close()
+
+    async def _tg(tg, testo, *b):
+        telegram.append(tg)
+        return "ok"
+
+    async def _dm_nostr_con_ripiego(*a, **k):
+        return None
+
+    async def _avviso_in_app_sottofondo(*a, **k):
+        return None
+
+    def esegui(tg, riga):
+        del creati[:], telegram[:]
+        a = {"db": lambda: _Con(riga), "_manda_telegram": _tg,
+             "_dm_nostr_con_ripiego": _dm_nostr_con_ripiego,
+             "_avviso_in_app_sottofondo": _avviso_in_app_sottofondo,
+             "asyncio": types_ns(create_task=_crea),
+             "MODALITA_COLLAUDO": False, "print": lambda *a, **k: None}
+        exec("async " + pezzo("notifica"), a)
+        _aio.run(a["notifica"](tg, "ciao"))
+        return sorted(creati), list(telegram)
+    NOSTR = {"canale_notifiche": "", "npub": "", "npub_verificata": 0,
+             "npub_accesso": "npub1x"}
+    TELE = {"canale_notifiche": "", "npub": "", "npub_verificata": 0,
+            "npub_accesso": ""}
+    prova("chi entra senza Telegram: il DM in volo E l'avviso in app",
+          (["_avviso_in_app_sottofondo", "_dm_nostr_con_ripiego"], []),
+          esegui(-5, NOSTR))
+    prova("chi ha Telegram: il bot, e nessun avviso in app (nemmeno se ha "
+          "scelto il DM Nostr)", [([], [555]),
+                                  (["_dm_nostr_con_ripiego"], [])],
+          [esegui(555, TELE),
+           esegui(555, dict(NOSTR, canale_notifiche="nostr"))])
+    prova("...e un account Nostr senza npub provata l'avviso in app ce l'ha "
+          "lo stesso: e' l'unico posto dove lo vede",
+          (["_avviso_in_app_sottofondo"], []),
+          esegui(-7, dict(NOSTR, npub_accesso="")))
+    prova("l'avviso in app si scrive IN UN THREAD (chi chiama puo' tenere una "
+          "transazione aperta)", True,
+          "await asyncio.to_thread(_avviso_in_app, tg_id, testo, bottone)"
+          in pezzo("_avviso_in_app_sottofondo"))
+
+    # --- 4) LE SENTINELLE ------------------------------------------------
+    dm = codice(pezzo("manda_dm_nostr"))
+    prova("IL NIP-04 STA DIETRO LA SUA LEVA, solo per chi non ha il 10050, e "
+          "la leva nasce spenta nel server e nel config d'esempio",
+          [True, True, True],
+          ['if stato != "si" and DM_NIP04_RISERVA and AesDM is not None:' in dm,
+           "    from config import DM_NIP04_RISERVA\nexcept ImportError:\n"
+           "    DM_NIP04_RISERVA = False\n" in src,
+           "\nDM_NIP04_RISERVA = False\n" in esempio])
+    prova("il NIP-04 e' un kind 4 firmato da Barattolo, cifrato col suo giudice",
+          [True, True], ["evento_non_firmato(pubkey, 4, [[\"p\", dest_hex]]" in
+                         pezzo("impacchetta_dm_nip04"),
+                         "nip04_cifra(sk.secret, dest_hex, testo)" in
+                         pezzo("impacchetta_dm_nip04")])
+    prova("LA RIGA 📭: a chi non ha il 10050 il journal lo dice sempre", True,
+          'if stato != "si":\n            print(f"📭 DM Nostr a' in dm)
+    prova("la fusione si porta via la lista della meta' che muore", True,
+          'con.execute("DELETE FROM avvisi_app WHERE tg_id=?", (id_nostr,))'
+          in codice(pezzo("esegui_fusione")))
+    guarda = codice(pezzo("_guarda_relay_dm"))
+    prova("lo sguardo al 10050 e' SOLO per chi non ha Telegram, e un relay muto "
+          "non scrive niente", [True, True],
+          ["if tg_id >= 0 or not u:\n        return" in guarda,
+           'if stato not in ("si", "no"):\n            return'
+           in pezzo("_controlla_relay_dm")])
+    prova("/api/me lo chiede (e conta i nuovi) solo per i tg_id negativi", True,
+          'if user["id"] < 0:\n        _cn = db()' in pezzo("mio_profilo"))
+
+    # --- 5) LA MINIAPP, in node --------------------------------------------
+    blocco = pezzo_js(mini, "/* «📬 I TUOI AVVISI» E I RELAY DEI MESSAGGI",
+                      "/* IL CASSETTO «🧅 Sito Tor»")
+    i_esc = mini.index("const esc = ")
+    js = (mini[i_esc:mini.index("));\n", i_esc) + 4] + r"""
+const NODI = {};
+const el = id => NODI[id] || (NODI[id] = {id, style:{}, innerHTML:''});
+let DEMO = false, myTgId = 111;
+const API_BASE = '/api';
+const authHdr = () => '';
+const haptic = () => {};
+const collegaTelegram = () => {};
+const renderAvvisi = () => {};
+const CHIAMATE = [];
+const fetch = async (url, o) => { CHIAMATE.push(url); return {ok:true, json: async () => ({})}; };
+""" + blocco + r"""
+(async () => {
+  const fuori = {};
+  renderFasciaAvvisi();
+  fuori.tg = [el('fasciaAvvisi').style.display, CHIAMATE.length, rigaAvvisiApp()];
+  myTgId = -5; myRelayDm = 'no'; myRelayDmAvvisato = 0; myAvvisiAppNuovi = 2;
+  renderFasciaAvvisi(); await null;
+  const h1 = el('fasciaAvvisi').innerHTML;
+  renderFasciaAvvisi(); await null;
+  fuori.primo = [el('fasciaAvvisi').style.display, h1.includes('Non riceverai i messaggi su Nostr'),
+                 h1.includes('Hai 2 avvisi nuovi'), CHIAMATE.slice(),
+                 el('fasciaAvvisi').innerHTML.includes('Non riceverai')];
+  chiudiCartelloRelayDm();
+  fuori.chiuso = [el('fasciaAvvisi').innerHTML.includes('Non riceverai'),
+                  el('fasciaAvvisi').innerHTML.includes('Hai 2 avvisi nuovi')];
+  cartelloRelayDmQui = false; cartelloRelayDmChiuso = false; myRelayDmAvvisato = 1700000000;
+  myAvvisiAppNuovi = 0;
+  renderFasciaAvvisi();
+  fuori.dopo = [el('fasciaAvvisi').style.display, CHIAMATE.length];
+  myRelayDmAvvisato = 0; myRelayDm = 'si'; myAvvisiAppNuovi = 1;
+  renderFasciaAvvisi();
+  fuori.si = [el('fasciaAvvisi').innerHTML.includes('Non riceverai'),
+              el('fasciaAvvisi').innerHTML.includes('Hai un avviso nuovo')];
+  DEMO = true; renderFasciaAvvisi();
+  fuori.demo = el('fasciaAvvisi').style.display;
+  DEMO = false;
+  const l = listaAvvisiApp([{testo: '<img src=x onerror=alert(1)>\nriga due', letto: false,
+    quando: 1700000000, bottoni: [['Apri', 'https://barattolo.store/x'],
+      ['Male', 'javascript:alert(1)'], ['Bot', 'tg://x'], 'storto']}]);
+  fuori.lista = [l.includes('&lt;img src=x'), l.includes('<img'), l.includes('<br>'),
+                 (l.match(/<a /g) || []).length, l.includes('href="https://barattolo.store/x"'),
+                 l.includes('javascript:'), l.includes('<b>Nuovo</b>')];
+  fuori.vuota = listaAvvisiApp([]).includes('Nessun avviso');
+  myRelayDm = 'no';
+  fuori.riga = [rigaAvvisiApp().includes('📬 I tuoi avvisi'), rigaAvvisiApp().includes('DM Inbox Relays')];
+  console.log(JSON.stringify(fuori));
+})();
+""")
+    out = _node_banco(js)
+    if out is None:
+        salta("la miniapp degli avvisi in app, in node", "node non c'e'")
+        return
+    prova("CHI HA TELEGRAM: nessuna fascia, nessuna chiamata, nessuna riga nel "
+          "cassetto", ["none", 0, ""], out.get("tg"))
+    prova("senza 10050, mai avvisato: il cartello E la fascia dei nuovi; il "
+          "segno «visto» parte UNA volta anche a due disegni, e il cartello resta "
+          "per la sessione", ["", True, True, ["/api/me/relay-dm/avvisato"], True],
+          out.get("primo"))
+    prova("«Ho capito» toglie il cartello e lascia i nuovi", [False, True],
+          out.get("chiuso"))
+    prova("all'apertura dopo (cartello gia' visto, niente di nuovo): niente, e "
+          "nessun altro segno", ["none", 1], out.get("dopo"))
+    prova("col 10050 niente cartello; un avviso nuovo al singolare",
+          [False, True], out.get("si"))
+    prova("in demo niente", "none", out.get("demo"))
+    prova("LA LISTA: il testo si scappa, le righe vanno a capo, un link solo "
+          "(https), mai javascript:, il «Nuovo»",
+          [True, False, True, 1, True, False, True], out.get("lista"))
+    prova("...vuota dice che non c'e' niente", True, out.get("vuota"))
+    prova("il cassetto: la riga 📬 e, senza 10050, la riga ferma", [True, True],
+          out.get("riga"))
+
+
+def types_tempo(adesso):
+    """Un orologio fermo per i banchi: `time.time()` dice `adesso[0]`."""
+    import types as _t
+    return _t.SimpleNamespace(time=lambda: adesso[0])
+
+
+def types_ns(**k):
+    import types as _t
+    return _t.SimpleNamespace(**k)
 
 
 def prove_leve_mai_doppie():
@@ -175656,6 +175943,7 @@ def main():
               prove_istanza_prova,
               prove_miniature_leggere,
               prove_collaudo_segue_develop,
+              prove_avvisi_nostr_arrivano,
               prove_config_esempio):
         try:
             f()

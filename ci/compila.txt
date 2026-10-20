@@ -158,3 +158,4 @@ collaudo_swap_preventivo.py
 collaudo_swap_telefono.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py
+collaudo_avvisi_nostr_arrivano.py

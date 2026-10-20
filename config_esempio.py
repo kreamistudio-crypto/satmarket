@@ -1704,6 +1704,17 @@ AVVISO_DM_NOSTR_RELAY = [
     "wss://relay.primal.net",
 ]
 
+# Il vecchio DM NIP-04 di riserva (20 ott 2026): a chi entra con Nostr e
+# NON pubblica la lista dei relay dei messaggi (kind 10050) gli avvisi
+# partono come DM NIP-17 verso i relay di lettura del suo profilo e i
+# nostri, e restano in «📬 I tuoi avvisi» dentro Barattolo. Con True a
+# lui parte ANCHE un DM NIP-04 (kind 4), che Primal, Damus e altri
+# leggono senza la lista. IL PREZZO: il testo e' cifrato, ma sul relay
+# resta in chiaro che Barattolo ha scritto a quella npub, e quando —
+# chiunque vede che e' un cliente e quando ha un ordine o una chat che
+# si muove. Nasce SPENTA: True e riavvia per accenderla.
+DM_NIP04_RISERVA = False
+
 # La ronda dei relay di Mostro (12 ott 2026): ogni dieci minuti il
 # server chiede ai relay che confermano (MOSTRO_RELAY_CONFERMA; senza,
 # a tutto MOSTRO_RELAY) se rispondono e se il coordinatore ci scrive

@@ -33660,3 +33660,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Python per giudicare la firma), coi modi `mente_*`, `non_firma`,
   `rifiuta_cooperativo` e `/cartone/stato`. Il collaudo è
   `collaudo_swap_telefono`.
+
+- GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
+  avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
+  arrivano»; il journal e la leva in PRODUZIONE, «GLI AVVISI A CHI NON
+  HA UN 10050»). Tre pezzi, tutti per i soli `tg_id < 0`: chi ha
+  Telegram non cambia di una riga.
+  1) DOVE VA IL DM: `relay_dm_dove(hex)` → `(relay, stato)`. Chiede il
+  10050 ai relay di `RELAYS_VERIFICA` (`chiedi_relay_dm`, che dal 20
+  ott distingue `[]` = «ha risposto, non ce l'ha» da None = «muto»):
+  trovato → i suoi primi quattro, stato `si`; altrimenti chiede il 10002
+  con la STESSA porta (`chiedi_relay_dm(..., kind=10002)`: tag `r` senza
+  segno o «read») e la riserva la decide `relay_riserva_dm` (pura): i
+  primi quattro di lettura del 10002, solo wss:// e mai di casa, poi i
+  primi quattro di `RELAYS_VERIFICA` (che passano come sono: sull'istanza
+  di prova sono quelli di casa), senza doppioni, al più
+  `DM_RISERVA_MAX_RELAY` (8); stato `no`, o `?` se nessun relay ha
+  risposto. Cache in memoria `_RELAY_DM_CACHE`: un'ora, cinque minuti
+  per `?`. `relay_dm_di` resta come scorciatoia. `manda_dm_nostr`
+  scrive la riga 📭 a ogni invio con stato diverso da `si`, e a leva
+  `DM_NIP04_RISERVA` manda anche `impacchetta_dm_nip04` (kind 4 firmato
+  da Barattolo, `nip04_cifra`: AES-256-CBC con la X nuda dell'ECDH,
+  PKCS#7, `<b64>?iv=<b64>`; verificato contro nostr-tools 2.25.2).
+  2) «📬 I TUOI AVVISI»: la tabella `avvisi_app` (id, tg_id, testo,
+  bottoni JSON, quando, letto). La scrive `notifica` per i `tg_id < 0`,
+  PRIMA del recapito e in un thread (`_avviso_in_app_sottofondo` →
+  `_avviso_in_app`: chi chiama può tenere una transazione aperta), con
+  `spoglia_html` e i soli bottoni http(s); pota oltre `AVVISI_APP_MAX`
+  (50) per persona e dopo `AVVISI_APP_GIORNI` (30). Le rotte: `GET
+  /api/me/avvisi` (gli ultimi, non segna), `POST /api/me/avvisi/letti`.
+  /api/me porta `avvisi_app_nuovi` ai soli `tg_id < 0`. La fusione con
+  Telegram cancella la lista della metà Nostr (da lì gli avvisi vanno
+  nel bot). Nella miniapp: la fascia `#fasciaAvvisi` sotto l'header
+  («🔔 Hai N avvisi nuovi»), il foglio `avvisiAppSheet`
+  (`apriAvvisiApp`, `listaAvvisiApp`: il testo si scappa, un bottone è
+  un link solo se è http(s)), e la riga `rigaAvvisiApp` nel ramo «solo
+  Nostr» del cassetto 🔔 Avvisi.
+  3) IL 10050 ALL'INGRESSO: `_guarda_relay_dm` da /api/me (al più ogni
+  `RELAY_DM_RICONTROLLO_S`, un giorno; dopo un giro a vuoto fra
+  `RELAY_DM_RIPROVA_S`, dieci minuti) lancia `_controlla_relay_dm`, che
+  scrive `utenti.relay_dm` (`si`/`no`) e `relay_dm_visto` solo se un
+  relay ha risposto. Il cartello «Non riceverai i messaggi su Nostr»
+  (`renderFasciaAvvisi`) compare se `relay_dm = 'no'` e
+  `relay_dm_avvisato = 0`; quando compare il client chiama `POST
+  /api/me/relay-dm/avvisato`, che scrive l'ora una volta sola. Resta per
+  la sessione fino a «Ho capito»; dopo, la riga ferma nel cassetto.
