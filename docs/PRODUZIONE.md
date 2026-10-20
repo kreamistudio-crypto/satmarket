@@ -1364,6 +1364,66 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   ogni altra modifica a `.github/workflows/` (una action aggiornata, un
   passo nuovo, una forma in più fra le `FORME` dei segreti): lì si
   guarda come sempre, e `pronto` si sposta a mano col via di Andrea.
+- IL RUNNER DELLA CI SULLA VM-2050 (20 ott 2026, cantiere runner-vm;
+  perché e limiti in CANTIERI, «Il runner della CI sulla vm-2050»). Il
+  job `prove` di main può girare sulla VM di collaudo
+  (`vm-2050.lnvps.cloud`) invece che su GitHub: zero minuti. `segreti` e
+  `pronto` restano su GitHub. I gesti sulla VM li scrive la sessione e
+  li fa uno alla volta col via di Andrea (come per il collaudo).
+  LA LEVA è la variabile del repo `RUNNER_PROVE`, in GitHub → Settings →
+  Secrets and variables → Actions → Variables: `vm-2050` = sulla VM,
+  vuota o cancellata = su GitHub. Si cambia SENZA commit, e vale dal
+  giro che parte dopo. Un lancio a mano su un ramo va sempre su GitHub.
+  LA VM SPENTA (o il runner offline): il giro resta «Queued» e la coda
+  tiene fermi i push dopo di lui; il giudice del VPS dice «aspetta» e
+  non deploya niente. Si svuota `RUNNER_PROVE`, si annulla il giro
+  appeso (Actions → il giro → Cancel workflow), e quello in coda parte
+  su GitHub; oppure, senza giri in coda, un push nuovo o un «Re-run all
+  jobs». Riaccesa la VM, si rimette `vm-2050`.
+  COSA C'È SULLA VM (tutto fuori dal collaudo, che non si tocca):
+  l'utente `ci` (senza password, senza sudo, fuori da `docker` e
+  `collaudo`); il runner in `/home/ci/actions-runner` (registrato SOLO su
+  questo repo, nome ed etichetta `vm-2050`, niente etichette di serie,
+  si aggiorna da solo); la dispensa in `/opt/hostedtoolcache` (`ci:ci`
+  750; Python 3.12.15 e Node 22.23.3, le stesse build di GitHub, nello
+  stesso percorso: il Python di GitHub cerca le sue librerie lì); la
+  guardia `/opt/ci-guardia/solo-main.sh` (`root:root` 755, copia di
+  `deploy/ci-vm/solo-main.sh`); il servizio
+  `/etc/systemd/system/ci-runner-vm-2050.service` e il suo drop-in
+  `ci-runner-vm-2050.service.d/guardia-e-limiti.conf` (copie di
+  `deploy/ci-vm/`, `root:root` 644: la guardia in `Environment=`, i tetti
+  2 GB / 2,5 GB / 1 GB di swap, le cartelle del collaudo nascoste); lo
+  swap `/swapfile` da 2 GB con `vm.swappiness=10`
+  (`/etc/sysctl.d/90-swap-ci.conf`); LLMNR spento
+  (`/etc/systemd/resolved.conf.d/90-niente-llmnr.conf`).
+  I FILE DEL REPO E QUELLI DELLA VM si confrontano così, dal PC (a
+  capo Unix, i checkout Windows sono CRLF):
+  `tr -d '\r' < deploy/ci-vm/solo-main.sh | sha256sum` contro
+  `sha256sum /opt/ci-guardia/solo-main.sh` sulla VM; lo stesso per i
+  due file di systemd. Si copiano con `tr -d '\r'`, mai a mano.
+  IL `.env` DEL RUNNER È DI ROOT E IMMUTABILE (`chattr +i`): il runner lo
+  legge all'avvio e ogni sua riga vince sull'ambiente di systemd, anche
+  per cancellare la guardia; la cartella è di `ci`, e senza `+i` potrebbe
+  cancellarlo e rifarlo. Quando serve toccarlo (un aggiornamento che
+  chiede una riga nuova, la rimozione del runner), e SOLO per quel gesto:
+  `sudo chattr -i /home/ci/actions-runner/.env`, il gesto, e SUBITO
+  `sudo chown root:root /home/ci/actions-runner/.env && sudo chmod 644
+  /home/ci/actions-runner/.env && sudo chattr +i
+  /home/ci/actions-runner/.env`, poi `sudo lsattr` (deve mostrare la `i`)
+  e `sudo systemctl restart ci-runner-vm-2050`. Gli aggiornamenti
+  normali del runner il `.env` non lo toccano.
+  TOGLIERE IL RUNNER: GitHub → Settings → Actions → Runners → `vm-2050`
+  → Remove (dà il comando col token di rimozione), poi sulla VM
+  `sudo systemctl disable --now ci-runner-vm-2050`, `chattr -i` sul
+  `.env` come sopra e, come `ci`, `./config.sh remove` col token letto
+  da `read -rsp` (mai in chat). Il rimedio d'urgenza, se si sospetta
+  la chiave del runner copiata: Remove da GitHub e basta, la chiave
+  muore lì.
+  LA PROVA DI ISOLAMENTO SI RIFÀ quando nasce qualcosa di nuovo del
+  collaudo (la deploy key, un servizio): come `ci`, `cat` e `ls` sui
+  file nuovi devono dire «Permission denied», e
+  `sudo -u ci find / -xdev \( -user collaudo -o -group collaudo \)
+  -readable 2>/dev/null` deve uscire vuoto.
 - IL RIAVVIO DOLCE (1 ott 2026): un deploy non deve far vedere un 502.
   DUE PEZZI SUL VPS, tutt'e due fuori dalla repo come il resto della
   macchina (il drop-in ha la sua copia in `deploy/utente/`):

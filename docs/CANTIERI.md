@@ -68279,3 +68279,163 @@ di un argomento si perde per strada — il valore va passato in una
 variabile d'ambiente.) E `bash -n` sui tre comandi del passo 2.
 Solo documenti. Provato anche: le sezioni di `prove.py` che leggono i
 documenti e lo scanner dei segreti sulle righe nuove.
+
+## Il runner della CI sulla vm-2050: il job `prove` su una macchina nostra, `segreti` e `pronto` su GitHub (20 ott 2026, cantiere runner-vm, decisione di Andrea)
+
+**PERCHÉ.** Andrea paga minuti extra di GitHub Actions. Misurati in sola
+lettura dai giri (la fattura vera vuole un permesso del token che non si
+è chiesto): 19 set - 19 ott 2026, 559 giri, ~7.340 minuti fatturati
+(ogni job arrotondato al minuto), ~8.400 al mese al ritmo dopo la CI
+leggera. Un giro su main costa 19 minuti: `prove` 16 (prove.py 6,6,
+collaudi 8,5), `segreti` 2, `pronto` 1. Le leve rimaste su GitHub erano
+piccole: la cache di pip e npm risparmia ~10 secondi su 16 minuti (già
+scartata il 16 ott, rimisurata: le installazioni durano 15 secondi), e
+`cancel-in-progress: true` resta scartato per il motivo della CI leggera
+(`pronto` fermo per ore). La leva grossa è la macchina: il job `prove`
+su un runner nostro costa zero minuti, cioè ~16 dei 19.
+
+**COSA SI È DECISO (Andrea, punto per punto).**
+- Sulla VM di collaudo `vm-2050` (LNVPS, Debian 13, 2 vCPU, 3,8 GB),
+  SOLO il job `prove`. `segreti` e `pronto` restano su GitHub: chi cerca
+  i segreti e chi alza la bandierina non stanno su una macchina nostra.
+  Il giudice del VPS non cambia (legge nomi ed esiti dei job).
+- La macchina da una variabile del repo, `RUNNER_PROVE`: il ripiego su
+  GitHub è un gesto in Settings, senza commit. Un lancio a mano su un
+  RAMO gira sempre su GitHub (sulla VM passa solo codice già su main).
+- Utente `ci` separato: senza password, senza sudo, fuori da `docker`
+  (che vale root) e da `collaudo`. Provato con la prova che nega.
+- Python e Node alla versione della CI di oggi, non quelli di Debian:
+  3.12.15 e 22.23.3, le STESSE build che GitHub mette sulle sue macchine.
+- 2 GB di swap per il collaudo e il runner insieme.
+- I gesti sulla VM uno alla volta, scritti prima e col via di Andrea;
+  niente di quel che è del collaudo (utenti, cartelle, servizi) toccato.
+- STRADA A per il runner (vedi i limiti, sotto): la cartella del runner
+  resta di `ci` e si aggiorna da solo; la guardia sta nel drop-in di
+  systemd e il `.env` è di root e immutabile.
+- Strada mia approvata: LLMNR di systemd-resolved spento (la 5355
+  ascoltava su 0.0.0.0), nello stesso gesto dello swap.
+
+**COM'È FATTO** (i gesti, in ordine; le procedure in PRODUZIONE, «IL
+RUNNER DELLA CI SULLA VM-2050»).
+1. Sola lettura: 494 MB usati, nessuno swap, 26 GB liberi; il collaudo
+   non ancora acceso; le sue cartelle già chiuse (`/etc/barattolo-collaudo`
+   `root:collaudo` 750 col `bot_token` 640, `/srv/collaudo` 750,
+   `/home/debian` 700, gruppo `collaudo` vuoto).
+2. Swap `/swapfile` 2 GB, `swappiness` 10; LLMNR spento, 5355 chiusa, DNS
+   che risponde. Da fuori resta solo ssh.
+3. L'utente `ci` e la prova che NEGA, eseguita come `ci`: il token del
+   bot di prova, `/etc/barattolo-collaudo`, `/srv/collaudo`,
+   `/home/debian`, `docker ps`, `sudo -n` — tutti «Permission denied» (o
+   «a password is required»); il `find` dei file di `collaudo` leggibili
+   da `ci` vuoto (9 in tutto, visti da root).
+4. Il runner v2.338.0 come `ci`, sha256 controllato su due fonti di
+   GitHub (testo della release e `digest` dell'asset); le librerie da apt
+   e non dallo script del pacchetto, che root avrebbe eseguito dalla
+   cartella di `ci`.
+5. LA DISPENSA IN `/opt/hostedtoolcache`, ed è il pezzo da non spostare:
+   la build di Python di GitHub porta scritto dentro il binario dove
+   cercare la sua libreria (`RUNPATH /opt/hostedtoolcache/Python/3.12.15/x64/lib`).
+   Nella dispensa di serie del runner (`_work/_tool`) `setup.sh` si
+   fermava a pip e il segno `x64.complete` non nasceva; con
+   `LD_LIBRARY_PATH` sarebbe andato, ma un sottoprocesso con l'ambiente
+   ripulito l'avrebbe perso. Nello stesso percorso di GitHub i percorsi
+   interni sono identici alla CI. `ci:ci` 750, niente scrivibile da
+   altri. Verificato SENZA `LD_LIBRARY_PATH`: le due versioni, nessuna
+   libreria mancante (salvo `_tkinter`, che nessuno usa), `ssl` e
+   `sqlite3`, e un venv usa-e-getta con le due liste di pip della CI.
+   `setup.sh` letto prima di eseguirlo (niente sudo, scrive solo nella
+   dispensa). `RUNNER_TOOL_CACHE` nel `.env` del runner.
+6. La guardia `deploy/ci-vm/solo-main.sh` in `/opt/ci-guardia`, di
+   root: prima di ogni job, solo repo giusto + `refs/heads/main` + il
+   `prove.yml` di main + push o lancio a mano + job `prove`; una
+   variabile vuota è un no. 9 casi su 9 sulla VM, e `ci` non la scrive
+   né la cancella.
+7. Andrea registra il runner col token incollato da `read -rsp` (mai in
+   chat): nome ed etichetta `vm-2050`, `--no-default-labels` (niente
+   `self-hosted`: nessun workflow lo prende per caso).
+8. Il servizio scritto a mano dal modello della v2.338.0 (root non
+   esegue `svc.sh` dalla cartella di `ci`; il solo passo suo rifatto a
+   mano: `bin/runsvc.sh` copiato nella radice, come `ci`). Il drop-in:
+   la guardia in `Environment=`, `MemoryHigh` 2 GB, `MemoryMax` 2,5 GB,
+   `MemorySwapMax` 1 GB, CPU e disco in seconda fila, `/tmp` privato,
+   `NoNewPrivileges`, e le cartelle del collaudo `InaccessiblePaths`
+   (viste da dentro il servizio: `d---------`). Il `.env` `root:root`
+   644 con `chattr +i`: come `ci`, scriverci, cancellarlo, rinominarlo e
+   togliere il flag danno «Operation not permitted». Il runner online.
+9. Il workflow: la riga `runs-on` di `prove`
+   (`github.ref == 'refs/heads/main' && vars.RUNNER_PROVE || 'ubuntu-24.04'`)
+   e il passo «Un ambiente usa-e-getta» (venv e `TMPDIR` in
+   `$RUNNER_TEMP`, prima di ogni pip e di prove.py: sulla VM fastapi dei
+   collaudi sarebbe rimasto per il prove.py del giro dopo, che deve
+   girare senza). Nient'altro.
+
+**IL `.env` VINCE SU SYSTEMD, ed è il perché del `chattr +i`.** Letto
+nel sorgente della v2.338.0 (`LoadAndSetEnv` in `Runner.Listener/Program.cs`):
+all'avvio il runner fa `SetEnvironmentVariable` per ogni riga del
+`.env`, sopra l'ambiente che gli dà systemd — una riga
+`ACTIONS_RUNNER_HOOK_JOB_STARTED=` vuota CANCELLA la guardia. Il runner
+il `.env` non lo riscrive mentre gira (lo scrive solo `env.sh` alla
+registrazione, aggiungendo righe che mancano). Renderlo di root non
+bastava: la cartella è di `ci`, che può cancellare un file altrui e
+rifarlo; `chattr +i` lo impedisce anche a lei. Come si toglie e si
+rimette quando serve: PRODUZIONE.
+
+**I LIMITI, DICHIARATI E ACCETTATI DA ANDREA (strada A).** È la VM di
+collaudo, senza produzione né segreti veri.
+- `runsvc.sh` e `bin/` stanno nella cartella di `ci` (il runner si
+  aggiorna da solo): un job di MAIN può riscriverli e togliere la
+  guardia per i giri dopo. Un ramo no: la guardia lo ferma prima che
+  esegua una riga. Chi pusha su main può già far verde la CI cambiando
+  prove.py: il perimetro non si allarga.
+- La chiave del runner (`.credentials_rsaparams`) è leggibile da `ci`,
+  cioè dai job: un job di main potrebbe copiarla e far girare altrove un
+  runner finto che prende i job di `prove`. Rimedio: Remove del runner
+  da GitHub, e la chiave muore.
+- SE IL REPO DIVENTA PUBBLICO SI PASSA ALLA STRADA B, scartata oggi per
+  il suo costo: cartella del runner di root (leggibile da `ci`, che
+  scrive solo `_work` e `_diag`), registrazione con `--disableupdate` e
+  aggiornamenti a mano, col gesto prima che GitHub smetta di mandare job
+  a un runner troppo vecchio (circa 30 giorni dopo una release, da
+  rileggere nella documentazione quel giorno).
+- Git, grep, sed e bash sono quelli di Debian 13, non dell'immagine
+  ubuntu-24.04: identici solo Python e Node. Il primo giro sulla VM lo
+  dirà; un rosso che c'è solo lì si guarda prima di dare la colpa al
+  codice.
+
+**STRADE SCARTATE.** La cache di pip e npm (~10 secondi). Interrompere
+il giro che corre. Il Python di Debian (3.13: un'altra versione da
+quella della CI). `setup-python` che scarica da sé (sulla Debian non
+trova una build sua). La dispensa di serie del runner più
+`LD_LIBRARY_PATH` (vedi il gesto 5). La guardia come riga del `.env`
+(si cancella da un'altra riga). `svc.sh install` da root. Il runner su
+un'etichetta `self-hosted` generica. La strada B (vedi sopra).
+
+**PROVATO.**
+- Sulla VM, ogni gesto con la sua verifica (sopra).
+- `prove_runner_vm` (nuova, 14): la riga della macchina di `prove`;
+  `segreti` e `pronto` col numero, mai `vars.`, e nessun `self-hosted` o
+  `vm-2050` scritto nel workflow; il passo usa-e-getta, una volta, dopo
+  setup-python e prima di ogni pip e di prove.py; il servizio come `ci`;
+  il drop-in con la guardia, i tetti, le cartelle nascoste, niente
+  privilegi; la guardia coi nomi veri (job, file, il repo dall'origin
+  del checkout) ed ESEGUITA con bash su dieci casi (due sì, otto no: c'è
+  anche il ramo che porta il file di main, che altrimenti lasciava viva
+  la mutazione «la guardia non guarda il ramo»).
+- `prove_runner_fisso` accetta per `prove` solo quella forma, col
+  ripiego sulla stessa immagine degli altri; `prove_ci_solo_main`
+  permette `github.ref ==` nella sola riga della macchina.
+- LA TORTURA, sulla copia intera del worktree: undici mutazioni
+  (`segreti` sulla variabile, venv tolto, `TMPDIR` tolto, i rami sulla
+  VM, il ripiego su un'altra immagine, `User=root`, la guardia tolta dal
+  drop-in, le cartelle del collaudo visibili, la guardia che non guarda
+  il ramo, che apre alle PR, che dice sì quando dice no), undici morte.
+- La suite intera e i collaudi della CI: nel verbale del commit.
+
+**DA GUARDARE (gesto 10, dopo il push).** Andrea mette
+`RUNNER_PROVE=vm-2050` e lancia a mano su main (non sposta `pronto`): la
+riga «guardia vm-2050: ok» nel log (che le variabili `GITHUB_*` arrivino
+davvero alla guardia), la durata contro i ~15,5 minuti di GitHub, il
+picco di memoria del servizio (`MemoryPeak`) col collaudo spento e poi
+acceso. Poi il ripiego: variabile vuota, lancio a mano, il giro su
+GitHub. La prova di isolamento da rifare quando nasce la deploy key del
+collaudo.

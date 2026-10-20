@@ -52258,9 +52258,18 @@ def prove_ci_solo_main():
           1, job_pronto.count(
               "if: github.ref == 'refs/heads/main' && github.event_name == 'push'"))
     prima_di_pronto = wf[:wf.index("\n  pronto:")]
+    # L'UNICA ECCEZIONE (20 ott 2026, cantiere runner-vm): la riga
+    # `runs-on` di `prove` guarda il ramo per scegliere la MACCHINA (sui
+    # rami sempre GitHub), mai per saltare il job. Si toglie quella riga,
+    # esatta, e il resto deve restare senza condizioni come prima.
+    riga_macchina = "    runs-on: " + RUNS_ON_PROVE
+    resto = "\n".join(r for r in prima_di_pronto.splitlines()
+                      if not _re.fullmatch(riga_macchina, r))
     prova("...e prove e segreti non guardano ne' il ramo ne' l'evento: a mano provano tutto",
           [False, False],
-          ["github.event_name" in prima_di_pronto, "github.ref ==" in prima_di_pronto])
+          ["github.event_name" in resto, "github.ref ==" in resto])
+    prova("...salvo la riga che sceglie la macchina di `prove`, una e sola", 1,
+          sum(1 for r in prima_di_pronto.splitlines() if _re.fullmatch(riga_macchina, r)))
     prova("il salto dei soli documenti resta, contro `pronto`", 1,
           senza_commenti.count("--salvo-solo-documenti-da pronto"))
     claude = open("CLAUDE.md", encoding="utf-8").read().replace("\r\n", "\n")
@@ -144803,6 +144812,14 @@ def prove_quattro_piccole():
           all(re.search(r"@[0-9a-f]{40}\s+# v\d", r) for r in wf.splitlines() if "uses:" in r))
 
 
+# LA RIGA `runs-on` DEL JOB `prove` (20 ott 2026, cantiere runner-vm):
+# su main la variabile del repo RUNNER_PROVE (vuota = GitHub), sui rami
+# sempre GitHub; il gruppo e' l'immagine del ripiego. La guardano in
+# tre: prove_runner_fisso, prove_ci_solo_main, prove_runner_vm.
+RUNS_ON_PROVE = (r"\$\{\{ github\.ref == 'refs/heads/main' && vars\.RUNNER_PROVE"
+                 r" \|\| '(ubuntu-\d\d\.\d\d)' \}\}")
+
+
 def prove_runner_fisso():
     """IL RUNNER DELLA CI COL NUMERO (12 ott 2026, cantiere runner-fisso,
     richiesta di Andrea). `runs-on: ubuntu-latest` e' un'etichetta mobile
@@ -144813,7 +144830,12 @@ def prove_runner_fisso():
     verde; rossa diventa se torna un `-latest`, se un job nuovo nasce
     senza numero, o se i job finiscono su immagini diverse (il verde di
     `prove` e quello di `segreti` devono parlare della stessa macchina).
-    Si leggono TUTTI i workflow della cartella, non il solo prove.yml."""
+    Si leggono TUTTI i workflow della cartella, non il solo prove.yml.
+    DAL 20 OTT 2026 (cantiere runner-vm) `prove` sceglie la macchina da
+    una variabile del repo, col ripiego su GitHub: per lui vale UNA
+    forma sola, quella scritta in RUNS_ON_PROVE, e l'immagine che conta
+    e' il ripiego, che deve essere la stessa degli altri job. Il resto
+    del runner nostro lo guarda `prove_runner_vm`."""
     print("\n[il runner della CI col numero]")
     cartella = os.path.join(".github", "workflows")
     runner, lavori = [], 0
@@ -144828,11 +144850,139 @@ def prove_runner_fisso():
                    re.findall(r"(?m)^\s*runs-on:\s*(.*?)\s*$", testo)]
     prova("ogni job di ogni workflow dichiara il suo runner", True,
           lavori >= 3 and len(runner) == lavori)
+    # la forma della variabile vale per un job solo, `prove`: al suo
+    # posto si guarda l'immagine del ripiego
+    con_variabile = [(n, r) for n, r in runner
+                     if re.fullmatch(RUNS_ON_PROVE, r)]
+    wf = open(os.path.join(cartella, "prove.yml"), encoding="utf-8").read()
+    job_prove = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    prova("la macchina da una variabile: UNA riga sola, quella del job `prove`",
+          [1, True], [len(con_variabile),
+                      re.search(r"(?m)^    runs-on: (.*?)\s*$", job_prove) is not None
+                      and re.fullmatch(RUNS_ON_PROVE, re.search(
+                          r"(?m)^    runs-on: (.*?)\s*$", job_prove)[1]) is not None])
+    immagini = [(n, re.fullmatch(RUNS_ON_PROVE, r)[1]
+                 if re.fullmatch(RUNS_ON_PROVE, r) else r) for n, r in runner]
     prova("nessun runner e' un'etichetta mobile: tutti `ubuntu-NN.NN`", [],
-          [r for r in runner
+          [r for r in immagini
            if not re.fullmatch(r"ubuntu-\d\d\.\d\d", r[1])])
-    prova("...e tutti i job girano sulla stessa immagine", 1,
-          len({r[1] for r in runner}))
+    prova("...e tutti i job girano sulla stessa immagine (per `prove`, il ripiego)", 1,
+          len({r[1] for r in immagini}))
+
+
+def prove_runner_vm():
+    """IL RUNNER DELLA CI SULLA VM-2050 (20 ott 2026, cantiere runner-vm,
+    decisione di Andrea: meno minuti di GitHub). Solo il job `prove` puo'
+    girare sulla macchina nostra, e solo su main: la riga `runs-on` lo
+    sceglie dalla variabile RUNNER_PROVE (vuota = GitHub), `segreti` e
+    `pronto` restano su GitHub per esteso. Sulla VM la dispensa e /tmp
+    restano da un giro all'altro, quindi ogni pip del job va in un venv
+    usa-e-getta, PRIMA di ogni pip e di prove.py. E i tre file della VM
+    in deploy/ci-vm: il servizio gira come `ci`; il drop-in porta la
+    guardia (fuori dal .env, che vincerebbe su systemd), i tetti e le
+    cartelle del collaudo nascoste; la guardia si esegue DAL VERO, coi
+    nove casi del gesto sulla VM. Il perche': docs/CANTIERI.md, «Il
+    runner della CI sulla vm-2050»."""
+    print("\n[il runner della CI sulla vm-2050]")
+    import shutil
+    import subprocess
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read().replace("\r\n", "\n")
+    vivo = "\n".join(r for r in wf.splitlines() if not r.lstrip().startswith("#"))
+    job_prove = vivo[vivo.index("\n  prove:"):vivo.index("\n  segreti:")]
+    job_segreti = vivo[vivo.index("\n  segreti:"):vivo.index("\n  pronto:")]
+    job_pronto = vivo[vivo.index("\n  pronto:"):]
+    macchina = lambda j: (re.search(r"(?m)^    runs-on: (.*?)\s*$", j) or [None, None])[1]
+    prova("`prove`: su main la variabile, sennò e sui rami GitHub", True,
+          re.fullmatch(RUNS_ON_PROVE, macchina(job_prove) or "") is not None)
+    prova("`segreti` e `pronto` su GitHub col numero, mai la variabile", [True, True, False, False],
+          [bool(re.fullmatch(r"ubuntu-\d\d\.\d\d", macchina(job_segreti) or "")),
+           bool(re.fullmatch(r"ubuntu-\d\d\.\d\d", macchina(job_pronto) or "")),
+           "vars." in job_segreti, "vars." in job_pronto])
+    prova("...e da nessuna parte un'etichetta della macchina nostra scritta a mano",
+          [False, False], ["self-hosted" in vivo, "vm-2050" in vivo])
+    # L'AMBIENTE USA-E-GETTA: prima di ogni pip e di prove.py
+    passo = re.search(r"- name: Un ambiente usa-e-getta\n((?:        .*\n)+)", job_prove + "\n")
+    corpo = passo.group(1) if passo else ""
+    prova("il passo dell'ambiente usa-e-getta: venv, PATH e TMPDIR in $RUNNER_TEMP", [True, True, True, False],
+          ['python -m venv "$RUNNER_TEMP/venv"' in corpo,
+           'echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"' in corpo,
+           'echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"' in corpo,
+           "if:" in corpo])
+    dopo = [job_prove.find(s) for s in ("actions/setup-python@",)]
+    prima = [m.start() for m in re.finditer(r"pip install", job_prove)] \
+        + [job_prove.find("run: python prove.py")]
+    prova("...dopo setup-python e PRIMA di ogni pip e di prove.py", True,
+          bool(passo) and all(0 <= d < passo.start() for d in dopo)
+          and len(prima) >= 3 and all(passo.start() < p for p in prima))
+    prova("...una volta sola", 1, job_prove.count("- name: Un ambiente usa-e-getta"))
+
+    # I FILE DELLA VM
+    cartella = os.path.join("deploy", "ci-vm")
+    leggi = lambda f: open(os.path.join(cartella, f), encoding="utf-8").read().replace("\r\n", "\n")
+    unit, dropin, guardia = (leggi("ci-runner-vm-2050.service"),
+                             leggi("guardia-e-limiti.conf"), leggi("solo-main.sh"))
+    attivo = lambda t: [r.strip() for r in t.splitlines()
+                        if r.strip() and not r.lstrip().startswith("#")]
+    u, d = attivo(unit), attivo(dropin)
+    prova("il servizio gira come `ci`, mai come root, e lancia il runner", [True, False, True],
+          ["User=ci" in u, any(r.startswith("User=") and r != "User=ci" for r in u + d),
+           "ExecStart=/home/ci/actions-runner/runsvc.sh" in u])
+    prova("il drop-in porta la guardia (non il .env, che vincerebbe su systemd)", True,
+          "Environment=ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/ci-guardia/solo-main.sh" in d)
+    nascoste = next((r for r in d if r.startswith("InaccessiblePaths=")), "=").split("=", 1)[1]
+    prova("...i tetti, le cartelle del collaudo nascoste, niente privilegi in piu'",
+          [True, True, True, True, True, True],
+          [any(r.startswith("MemoryMax=") for r in d), any(r.startswith("MemoryHigh=") for r in d),
+           "-/etc/barattolo-collaudo" in nascoste.split(), "-/srv/collaudo" in nascoste.split(),
+           "NoNewPrivileges=yes" in d, "PrivateTmp=yes" in d])
+    # la guardia chiede i nomi VERI: il job e il file del workflow
+    prova("la guardia chiede il job `prove` e il file prove.yml di main", [True, True, True],
+          ['[ "${GITHUB_JOB:-}" = "prove" ]' in guardia,
+           'WORKFLOW_ATTESO="$REPO_ATTESO/.github/workflows/prove.yml@refs/heads/main"' in guardia,
+           "\n  prove:" in vivo])
+    origine = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True,
+                             text=True, encoding="utf-8").stdout.strip()
+    repo = (re.search(r'(?m)^REPO_ATTESO="([^"]+)"$', guardia) or [None, None])[1]
+    if origine:
+        prova("...e il repo e' questo (dall'origin del checkout)", True,
+              bool(repo) and re.sub(r"\.git$", "", origine).endswith("/" + repo))
+    else:
+        salta("il repo della guardia contro l'origin", "nessun origin in questo checkout")
+    # DAL VERO: la guardia eseguita con bash, coi nove casi
+    bash = shutil.which("bash")
+    if not bash:
+        salta("la guardia dal vero", "bash non c'e'")
+        return
+    R = "kreamistudio-crypto/satmarket"
+    W = R + "/.github/workflows/prove.yml@refs/heads/main"
+    buono = {"GITHUB_REPOSITORY": R, "GITHUB_REF": "refs/heads/main",
+             "GITHUB_EVENT_NAME": "push", "GITHUB_JOB": "prove", "GITHUB_WORKFLOW_REF": W}
+    casi = [("push su main", buono),
+            ("lancio a mano su main", dict(buono, GITHUB_EVENT_NAME="workflow_dispatch")),
+            ("un ramo", dict(buono, GITHUB_REF="refs/heads/cantiere/x",
+                             GITHUB_WORKFLOW_REF=R + "/.github/workflows/prove.yml@refs/heads/cantiere/x")),
+            ("una pull request", dict(buono, GITHUB_EVENT_NAME="pull_request")),
+            ("un altro repo", dict(buono, GITHUB_REPOSITORY="altro/satmarket",
+                                   GITHUB_WORKFLOW_REF="altro/satmarket/.github/workflows/prove.yml@refs/heads/main")),
+            ("il workflow di un ramo", dict(buono, GITHUB_WORKFLOW_REF=R + "/.github/workflows/prove.yml@refs/heads/x")),
+            # i due controlli si tengono ognuno da solo: un ramo che
+            # porta il file di main, e main col file di un ramo
+            ("un ramo col workflow di main", dict(buono, GITHUB_REF="refs/heads/cantiere/x")),
+            ("il job segreti", dict(buono, GITHUB_JOB="segreti")),
+            ("un evento orario", dict(buono, GITHUB_EVENT_NAME="schedule")),
+            ("l'ambiente vuoto", {})]
+    base = {k: v for k, v in os.environ.items()
+            if not k.startswith("GITHUB_") and k in ("PATH", "SYSTEMROOT", "TEMP", "TMP", "HOME", "LANG")}
+    esiti = []
+    for nome, amb in casi:
+        r = subprocess.run([bash, "-s"], input=guardia, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", env=dict(base, **amb), timeout=30)
+        esiti.append((nome, r.returncode == 0, "guardia vm-2050: ok" in r.stdout))
+    prova("dal vero: push e lancio a mano su main passano", [("push su main", True, True),
+          ("lancio a mano su main", True, True)], esiti[:2])
+    prova("...ramo, PR, altro repo, workflow di un ramo e viceversa, job segreti, orario, vuoto: fermati",
+          [(n, False, False) for n, _ in casi[2:]], esiti[2:])
 
 
 def prove_node_fisso():
@@ -174282,6 +174432,7 @@ def main():
               prove_foto_anomala,
               prove_quattro_piccole,
               prove_runner_fisso,
+              prove_runner_vm,
               prove_node_fisso,
               prove_chiavi_p2p_firmate,
               prove_rotte_p2p_riverificate,

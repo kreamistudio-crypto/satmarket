@@ -65,7 +65,21 @@ jobs:
     # e una sentinella di prove.py (`prove_runner_fisso`) lo tiene.
     # Quando e come salire a Ubuntu 26.04, con una prova su un ramo
     # prima: docs/CANTIERI.md, "Il runner della CI col numero".
-    runs-on: ubuntu-24.04
+    #
+    # LA MACCHINA DI QUESTO JOB, DA UNA VARIABILE (20 ott 2026, cantiere
+    # runner-vm, decisione di Andrea): su main `prove` gira dove dice la
+    # variabile del repo RUNNER_PROVE — `vm-2050`, il runner nostro sulla
+    # VM di collaudo, che costa zero minuti — e se e' vuota sull'immagine
+    # di GitHub qui in fondo. Il ripiego e' un gesto in Settings → Variables,
+    # SENZA commit: VM spenta, si svuota la variabile e la CI torna qui.
+    # Sui rami (i lanci a mano) gira SEMPRE su GitHub: sulla VM passa solo
+    # codice gia' su main, e la guardia della VM (deploy/ci-vm/solo-main.sh)
+    # lo pretende anche se un ramo riscrive questa riga. `segreti` e
+    # `pronto` restano su GitHub col numero scritto per esteso: chi
+    # cerca i segreti e chi alza la bandierina non stanno su una macchina
+    # nostra (`prove_runner_vm`). Come si sposta e come si torna:
+    # docs/PRODUZIONE.md, «IL RUNNER DELLA CI SULLA VM-2050».
+    runs-on: ${{ github.ref == 'refs/heads/main' && vars.RUNNER_PROVE || 'ubuntu-24.04' }}
     # IL TETTO DEL GIRO (16 ott 2026, ci-leggera): di serie GitHub ne
     # aspetta 360, e un giro appeso li paga tutti mentre la coda qui
     # sopra tiene fermi i push dopo di lui. Oggi il job ne dura ~20 (in
@@ -101,6 +115,20 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+
+      # L'AMBIENTE USA-E-GETTA (20 ott 2026, cantiere runner-vm). Sulla
+      # macchina nostra la dispensa di Python e /tmp restano da un giro
+      # all'altro: senza questo passo fastapi, che i collaudi installano
+      # in fondo, sarebbe gia' li' per il prove.py del giro DOPO, che
+      # deve girare apposta senza. Quindi ogni pip di questo job va in un
+      # venv dentro $RUNNER_TEMP, che il runner svuota a ogni job, e
+      # TMPDIR punta li' (i file temporanei delle prove muoiono col
+      # giro). Su GitHub non cambia niente: tre secondi.
+      - name: Un ambiente usa-e-getta
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
 
       # Solo quelle che servono ALLE PROVE: websocket-client perche'
       # importa_nostr la importa in cima, Pillow per il controllo del

@@ -27673,6 +27673,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   solo per due domande diverse. Provato rompendo `prove.py` di
   proposito su un ramo usa-e-getta: `prove` fallito, `segreti` riuscito
   che dice «pulito». Entrambi `permissions: contents: read`.
+  DOVE GIRA OGNI JOB (20 ott 2026, cantiere runner-vm): `segreti` e
+  `pronto` sempre sulle macchine di GitHub (`ubuntu-24.04` per esteso);
+  `prove` su main dove dice la variabile del repo `RUNNER_PROVE` — oggi
+  `vm-2050`, il runner nostro sulla VM di collaudo, zero minuti — e se è
+  vuota, o il giro è su un ramo, su GitHub. Chi cerca i segreti e chi
+  alza la bandierina non stanno su una macchina nostra; il giudice del
+  VPS legge i NOMI dei job e il loro esito, non la macchina, e non è
+  cambiato. Sulla VM il lucchetto è la guardia `deploy/ci-vm/solo-main.sh`
+  (solo il `prove` di main, push o a mano), non il workflow, che un ramo
+  può riscrivere. Ogni `pip` del job va in un venv dentro `$RUNNER_TEMP`
+  (la macchina nostra non si azzera fra un giro e l'altro). Procedure:
+  PRODUZIONE, «IL RUNNER DELLA CI SULLA VM-2050»; perché e limiti:
+  CANTIERI, «Il runner della CI sulla vm-2050».
   GLI SCRIPT «PURI» NON CHIEDONO IL CONFIG ALL'IMPORT, ed è LA regola
   che impedisce il bis. Chi importa un modulo per una costante non deve
   ritrovarsi il processo chiuso in faccia per una chiave che non gli

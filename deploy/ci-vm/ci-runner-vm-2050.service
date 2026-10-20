@@ -1,0 +1,23 @@
+# IL RUNNER DELLA CI SULLA VM-2050 (ott 2026, cantiere runner-vm).
+# E' il servizio che `svc.sh install` scriverebbe dal modello del
+# runner (actions.runner.service.template della v2.338.0), scritto qui
+# a mano invece di far eseguire a root uno script che sta nella
+# cartella di `ci`. Gira come `ci`, mai come root.
+# Sulla VM: /etc/systemd/system/ci-runner-vm-2050.service, root:root 644.
+# La guardia, i tetti e le cartelle nascoste stanno nel drop-in accanto,
+# ci-runner-vm-2050.service.d/guardia-e-limiti.conf.
+[Unit]
+Description=Runner GitHub Actions della CI di Barattolo (vm-2050, solo il job prove di main)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/home/ci/actions-runner/runsvc.sh
+User=ci
+WorkingDirectory=/home/ci/actions-runner
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=multi-user.target
