@@ -52,7 +52,12 @@ Lo stato di uno swap si sposta a comando come lo sposterebbe SATS Routing
 nasce il lockup). `GET /cartone/visto` dice letture, l'ultima intestazione
 `Referral`, l'ultima richiesta di creazione e le trasmissioni.
 
-USO:  python cartone_satsrouting.py [--porta 9077] [--rete regtest]
+USO:  python cartone_satsrouting.py [--porta 9077] [--rete regtest] [--percento 0.3]
+
+DUE CARTONI (20 ott 2026, cantiere swap-instradatore): ogni `avvia()` e'
+un cartone NUOVO, col suo stato; `percento` gli da' una commissione sua
+(e un'impronta delle tariffe che la dice). E' il secondo fornitore delle
+prove dell'instradatore.
 """
 import hashlib
 import json
@@ -94,8 +99,11 @@ CRIPTO = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "cartone_satsrouting_cripto.js")
 
 
-def tariffe_del_modo(modo):
-    """La risposta di `/v2/swap/reverse` nel modo chiesto (None = giu)."""
+def tariffe_del_modo(modo, percento=None):
+    """La risposta di `/v2/swap/reverse` nel modo chiesto (None = giu).
+    `percento` = la commissione di QUESTO cartone (20 ott 2026: il
+    secondo fornitore delle prove dell'instradatore), con un'impronta
+    che la dice; None = lo 0,6 % del 16 ott."""
     if modo == "giu":
         return None
     if modo == "storta":
@@ -105,6 +113,10 @@ def tariffe_del_modo(modo):
         c = dati["BTC"]["BTC"]
         c["hash"] = "cartone-tariffa-cambiata"
         c["fees"]["percentage"] = 0.7
+    if percento is not None and modo != "cambiata":
+        coppia = dati["BTC"]["BTC"]
+        coppia["hash"] = f"cartone-tariffa-p{percento}"
+        coppia["fees"]["percentage"] = float(percento)
     return dati
 
 
@@ -187,10 +199,10 @@ def onchain_di(importo, tariffa):
             - f["minerFees"]["lockup"])
 
 
-def crea_swap(corpo):
+def crea_swap(c, corpo):
     """La nascita di uno swap: (codice, risposta)."""
-    tariffa = tariffe_del_modo("cambiata" if STATO["modo"] == "cambiata"
-                               else "normale")["BTC"]["BTC"]
+    tariffa = tariffe_del_modo("cambiata" if c["stato"]["modo"] == "cambiata"
+                               else "normale", c["percento"])["BTC"]["BTC"]
     try:
         importo = int(corpo["invoiceAmount"])
         impronta = str(corpo["preimageHash"])
@@ -208,7 +220,7 @@ def crea_swap(corpo):
     lim = tariffa["limits"]
     if not lim["minimal"] <= importo <= lim["maximal"]:
         return 400, {"error": "importo fuori dai limiti"}
-    rete = STATO["rete"]
+    rete = c["stato"]["rete"]
     pezzi = cripto("crea", rete=rete, preimageHash=impronta,
                    claimPublicKey=chiave, invoiceAmount=importo,
                    timeoutBlockHeight=SCADENZA_BLOCCO)
@@ -219,12 +231,12 @@ def crea_swap(corpo):
             "lockupAddress": pezzi["lockupAddress"],
             "refundPublicKey": pezzi["refundPublicKey"],
             "timeoutBlockHeight": SCADENZA_BLOCCO, "onchainAmount": onchain}
-    SWAP[sid] = dict(vero, serverPriv=pezzi["serverPriv"],
-                     claimPublicKey=chiave, preimageHash=impronta,
-                     stato="swap.created", creato=int(time.time()),
-                     referral=corpo.get("referralId"), lockup=None)
+    c["swap"][sid] = dict(vero, serverPriv=pezzi["serverPriv"],
+                          claimPublicKey=chiave, preimageHash=impronta,
+                          stato="swap.created", creato=int(time.time()),
+                          referral=corpo.get("referralId"), lockup=None)
     risposta = dict(vero)
-    m = STATO["modo"]
+    m = c["stato"]["modo"]
     base = dict(serverPriv=pezzi["serverPriv"], claimPublicKey=chiave,
                 swapTree=pezzi["swapTree"], preimageHash=impronta,
                 timeoutBlockHeight=SCADENZA_BLOCCO, rete=rete)
@@ -242,10 +254,10 @@ def crea_swap(corpo):
     return 201, risposta
 
 
-def sposta(sid, stato):
+def sposta(c, sid, stato):
     """Lo stato di uno swap, spostato come lo sposterebbe SATS Routing: a
     bitcoin bloccati nasce il lockup."""
-    s = SWAP.get(sid)
+    s = c["swap"].get(sid)
     if not s or stato not in STATI:
         return False
     if stato in ("transaction.mempool", "transaction.confirmed") and not s["lockup"]:
@@ -257,8 +269,8 @@ def sposta(sid, stato):
     return True
 
 
-def firma_ritiro(s, corpo):
-    if STATO["modo"] == "non_firma":
+def firma_ritiro(c, s, corpo):
+    if c["stato"]["modo"] == "non_firma":
         return 400, {"error": "swap not eligible for a cooperative claim"}
     if not s["lockup"]:
         return 400, {"error": "nessun lockup"}
@@ -276,46 +288,47 @@ def firma_ritiro(s, corpo):
                        pubNonce=str(corpo.get("pubNonce", "")))
 
 
-def trasmetti(corpo):
+def trasmetti(c, corpo):
     """La trasmissione del ritiro: si accetta solo se spende il lockup di
     uno swap del cartone e la firma regge."""
     hex_ = str(corpo.get("hex", ""))
-    for s in SWAP.values():
+    for s in c["swap"].values():
         if not s["lockup"]:
             continue
         try:
-            c = cripto("controlla", serverPriv=s["serverPriv"],
-                       claimPublicKey=s["claimPublicKey"],
-                       swapTree=s["swapTree"],
-                       onchainAmount=s["onchainAmount"],
-                       lockupHex=s["lockup"]["hex"], hex=hex_)
+            esito = cripto("controlla", serverPriv=s["serverPriv"],
+                           claimPublicKey=s["claimPublicKey"],
+                           swapTree=s["swapTree"],
+                           onchainAmount=s["onchainAmount"],
+                           lockupHex=s["lockup"]["hex"], hex=hex_)
         except Exception:
             continue
-        if not c.get("spende"):
+        if not esito.get("spende"):
             continue
-        buona = c.get("via") in ("cooperativo", "script") and schnorr_verifica(
-            bytes.fromhex(c["impronta"]), bytes.fromhex(c["chiave"]),
-            bytes.fromhex(c["firma"]))
-        if c.get("via") == "script":
-            buona = buona and c.get("foglia") and (
-                hashlib.sha256(bytes.fromhex(c["segreto"])).hexdigest()
+        buona = esito.get("via") in ("cooperativo", "script") and schnorr_verifica(
+            bytes.fromhex(esito["impronta"]), bytes.fromhex(esito["chiave"]),
+            bytes.fromhex(esito["firma"]))
+        if esito.get("via") == "script":
+            buona = buona and esito.get("foglia") and (
+                hashlib.sha256(bytes.fromhex(esito["segreto"])).hexdigest()
                 == s["preimageHash"])
         if not buona:
             return 400, {"error": "firma non valida"}
-        if STATO["modo"] == "rifiuta_cooperativo" and c.get("via") == "cooperativo":
+        if c["stato"]["modo"] == "rifiuta_cooperativo" and esito.get("via") == "cooperativo":
             return 400, {"error": "transazione rifiutata"}
         s["stato"] = "invoice.settled"
-        STATO["trasmesse"].append({"swap": s["id"], "txid": c["txid"],
-                                   "via": c["via"], "uscite": c["uscite"]})
-        return 201, {"id": c["txid"]}
+        c["stato"]["trasmesse"].append({"swap": s["id"], "txid": esito["txid"],
+                                        "via": esito["via"],
+                                        "uscite": esito["uscite"]})
+        return 201, {"id": esito["txid"]}
     return 400, {"error": "non spende nessun lockup conosciuto"}
 
 
-def recupera(corpo):
+def recupera(c, corpo):
     chiavi = cripto("chiavi_xpub", xpub=str(corpo.get("xpub", "")),
                     quante=20)["chiavi"]
     out = []
-    for s in SWAP.values():
+    for s in c["swap"].values():
         if s["claimPublicKey"] not in chiavi:
             continue
         out.append({"id": s["id"], "type": "reverse", "status": s["stato"],
@@ -357,27 +370,28 @@ class Sportello(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        c = self.server.cartone
         u = urlparse(self.path)
         q = parse_qs(u.query)
         pezzi = u.path.strip("/").split("/")
-        with CHIAVE:
+        with c["chiave"]:
             if u.path == "/v2/swap/reverse":
-                STATO["letture"] += 1
-                STATO["referral"] = self.headers.get("Referral")
-                dati = tariffe_del_modo(STATO["modo"])
+                c["stato"]["letture"] += 1
+                c["stato"]["referral"] = self.headers.get("Referral")
+                dati = tariffe_del_modo(c["stato"]["modo"], c["percento"])
                 if dati is None:
                     return self._rispondi(503, {"error": "cartone giu"})
                 return self._rispondi(200, dati)
-            if STATO["modo"] == "giu" and u.path.startswith("/v2/"):
+            if c["stato"]["modo"] == "giu" and u.path.startswith("/v2/"):
                 return self._rispondi(503, {"error": "cartone giu"})
             if len(pezzi) == 3 and pezzi[:2] == ["v2", "swap"]:
-                s = SWAP.get(pezzi[2])
+                s = c["swap"].get(pezzi[2])
                 if not s:
                     return self._rispondi(404, {"error": "swap sconosciuto"})
                 return self._rispondi(200, {"status": s["stato"]})
             if (len(pezzi) == 5 and pezzi[:3] == ["v2", "swap", "reverse"]
                     and pezzi[4] == "transaction"):
-                s = SWAP.get(pezzi[3])
+                s = c["swap"].get(pezzi[3])
                 if not s or not s["lockup"]:
                     return self._rispondi(404, {"error": "nessun lockup"})
                 return self._rispondi(200, {
@@ -387,19 +401,20 @@ class Sportello(BaseHTTPRequestHandler):
                 m = (q.get("m") or [""])[0]
                 if m not in MODI:
                     return self._rispondi(400, {"modi": list(MODI)})
-                STATO["modo"] = m
+                c["stato"]["modo"] = m
                 return self._rispondi(200, {"modo": m})
             if u.path == "/cartone/stato":
                 sid = (q.get("id") or [""])[0]
-                if sid == "ultimo" and SWAP:
-                    sid = max(SWAP.values(), key=lambda s: s["creato"])["id"]
-                ok = sposta(sid, (q.get("s") or [""])[0])
+                if sid == "ultimo" and c["swap"]:
+                    sid = max(c["swap"].values(), key=lambda s: s["creato"])["id"]
+                ok = sposta(c, sid, (q.get("s") or [""])[0])
                 return self._rispondi(200 if ok else 400, {"ok": ok, "id": sid})
             if u.path == "/cartone/visto":
-                return self._rispondi(200, dict(STATO, swap=len(SWAP)))
+                return self._rispondi(200, dict(c["stato"], swap=len(c["swap"])))
         return self._rispondi(404, {"error": "non c'e'"})
 
     def do_POST(self):
+        c = self.server.cartone
         u = urlparse(self.path)
         pezzi = u.path.strip("/").split("/")
         try:
@@ -409,33 +424,43 @@ class Sportello(BaseHTTPRequestHandler):
             return self._rispondi(400, {"error": "json storto"})
         if not isinstance(corpo, dict):
             return self._rispondi(400, {"error": "json storto"})
-        with CHIAVE:
-            if STATO["modo"] == "giu":
+        with c["chiave"]:
+            if c["stato"]["modo"] == "giu":
                 return self._rispondi(503, {"error": "cartone giu"})
             try:
                 if u.path == "/v2/swap/reverse":
-                    STATO["creazione"] = corpo
-                    return self._rispondi(*crea_swap(corpo))
+                    c["stato"]["creazione"] = corpo
+                    return self._rispondi(*crea_swap(c, corpo))
                 if (len(pezzi) == 5 and pezzi[:3] == ["v2", "swap", "reverse"]
                         and pezzi[4] == "claim"):
-                    s = SWAP.get(pezzi[3])
+                    s = c["swap"].get(pezzi[3])
                     if not s:
                         return self._rispondi(404, {"error": "swap sconosciuto"})
-                    return self._rispondi(*firma_ritiro(s, corpo))
+                    return self._rispondi(*firma_ritiro(c, s, corpo))
                 if u.path == "/v2/chain/BTC/transaction":
-                    return self._rispondi(*trasmetti(corpo))
+                    return self._rispondi(*trasmetti(c, corpo))
                 if u.path == "/v2/swap/restore":
-                    return self._rispondi(*recupera(corpo))
+                    return self._rispondi(*recupera(c, corpo))
             except Exception as e:      # il cartone non muore per una domanda
                 return self._rispondi(500, {"error": str(e)[:200]})
         return self._rispondi(404, {"error": "non c'e'"})
 
 
-def avvia(porta=0, rete="bitcoin"):
-    """Accende il cartone in un filo suo, su 127.0.0.1. Torna (server,
-    porta): porta 0 = la sceglie il sistema, e il collaudo la legge."""
-    STATO["rete"] = rete
+def nuovo_cartone(rete="bitcoin", percento=None):
+    """Lo stato di UN cartone: i suoi swap, il suo modo, la sua
+    commissione (20 ott 2026: due cartoni nello stesso collaudo sono due
+    fornitori diversi)."""
+    return {"stato": {"modo": "normale", "letture": 0, "referral": None,
+                      "rete": rete, "creazione": None, "trasmesse": []},
+            "swap": {}, "chiave": threading.Lock(), "percento": percento}
+
+
+def avvia(porta=0, rete="bitcoin", percento=None):
+    """Accende un cartone NUOVO in un filo suo, su 127.0.0.1. Torna
+    (server, porta): porta 0 = la sceglie il sistema, e il collaudo la
+    legge. `percento` = la sua commissione (None = lo 0,6 % del 16 ott)."""
     srv = ThreadingHTTPServer(("127.0.0.1", int(porta)), Sportello)
+    srv.cartone = nuovo_cartone(rete, percento)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, srv.server_address[1]
 
@@ -446,7 +471,12 @@ def main(argv):
         porta = int(argv[argv.index("--porta") + 1])
     if "--rete" in argv:
         STATO["rete"] = argv[argv.index("--rete") + 1]
+    percento = None
+    if "--percento" in argv:
+        percento = float(argv[argv.index("--percento") + 1])
     srv = ThreadingHTTPServer(("127.0.0.1", porta), Sportello)
+    srv.cartone = {"stato": STATO, "swap": SWAP, "chiave": CHIAVE,
+                   "percento": percento}
     print(f"🧃 SATS Routing di cartone su http://127.0.0.1:{porta} "
           f"(rete «{STATO['rete']}», modo «{STATO['modo']}»; si cambia con "
           f"/cartone/modo?m=...)", flush=True)

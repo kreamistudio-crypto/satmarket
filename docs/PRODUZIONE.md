@@ -4504,7 +4504,7 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   CANTIERI, «Lo swap dal telefono, tappa 3»; com'è fatto in
   ARCHITETTURA, «LO SWAP, TAPPA 3»). SUL VPS NON CAMBIA NIENTE:
   `SWAP_ATTIVO` resta spenta, e a leva spenta la CSP è quella di
-  sempre e la pagina non scarica né `/swap-telefono.js` né
+  sempre e la pagina non scarica né i file di `/swap/` né
   `/vendor/swap.js`. La leva nuova `SWAP_RETE` NON si aggiunge al config
   del VPS: il default del codice è `bitcoin`. Le rotte nuove sono due
   file del repo: niente da copiare a mano.
@@ -4518,6 +4518,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   regga tutt'e due. Il controllo, in sola lettura: `grep -n
   "^SWAP_RETE\|^SWAP_API_BASE\|^SWAP_ATTIVO" /srv/barattolo/config.py`
   (la sola riga, mai le vicine).
+  GLI ALTRI FORNITORI (20 ott 2026, l'instradatore): `SWAP_FORNITORI_IN_PIU`
+  NON si aggiunge al config del VPS (vuota di serie: SATS Routing basta).
+  Sulla VM, per provare la scelta fra due fornitori, una voce come quella
+  di `config_esempio.py` puntata a un secondo cartone (`python
+  cartone_satsrouting.py --porta 9078 --percento 0.3`), e riavvio.
+  I file del telefono ora stanno sotto `/swap/` (`boltz.js`,
+  `instradatore.js`): `/swap-telefono.js` non c'è più.
 
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026; perché in
   CANTIERI, «L'indirizzo della quota: swap@barattolo.store»; com'è fatto

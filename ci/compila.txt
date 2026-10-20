@@ -156,6 +156,7 @@ collaudo_login_bot.py
 rifai_miniature.py
 collaudo_swap_preventivo.py
 collaudo_swap_telefono.py
+collaudo_swap_instradatore.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py
 collaudo_avvisi_nostr_arrivano.py

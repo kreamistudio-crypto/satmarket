@@ -746,6 +746,13 @@ SWAP_API_BASE = "https://api.satsrouting.exchange"
 # La rete dello swap: "bitcoin" in produzione, "regtest" sulla VM di
 # collaudo col regtest di Boltz (il telefono controlla da se' gli indirizzi).
 SWAP_RETE = "bitcoin"
+# Gli ALTRI fornitori dello swap oltre a SATS Routing (che resta sulle tre
+# leve qui sopra): il telefono chiede il preventivo a tutti e sceglie il
+# migliore. Una voce per fornitore, solo dati pubblici, per esempio
+# {"id": "cartone2", "nome": "Cartone Due", "tipo": "boltz",
+#  "api": "http://127.0.0.1:9078", "referral": "", "rete": "bitcoin"}.
+# Vuota di serie.
+SWAP_FORNITORI_IN_PIU = []
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

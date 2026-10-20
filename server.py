@@ -1579,12 +1579,72 @@ def swap_origine_api(base=None) -> str:
     return f"{u.scheme}://{u.hostname}{porta}"
 
 
+# I FORNITORI DELLO SWAP (20 ott 2026, cantiere swap-instradatore,
+# decisione di Andrea): chi vende sceglie COSA vuole, non CHI lo fa; il
+# telefono sceglie il fornitore col preventivo migliore. SATS Routing
+# viene dalle leve di sempre (SWAP_API_BASE, SWAP_REFERRAL_ID, SWAP_RETE:
+# il config del VPS non si tocca). Gli ALTRI, se un giorno ci sono, da
+# questa lista: una voce per fornitore, {"id", "nome", "tipo", "api",
+# "referral", "rete"} — il tipo dice che protocollo parla (oggi solo
+# «boltz»: SATS Routing e chi parla come lui). Vuota di serie. Una voce
+# storta si salta, e il journal lo dice.
+try:
+    from config import SWAP_FORNITORI_IN_PIU
+except ImportError:
+    SWAP_FORNITORI_IN_PIU = []
+SWAP_TIPI = ("boltz",)
+_SWAP_ID_FORNITORE = re.compile(r"^[a-z0-9]{2,20}$")
+_SWAP_DETTO_STORTO = set()
+
+
+def swap_fornitori() -> list:
+    """I fornitori dello swap, nell'ordine in cui si confrontano: SATS
+    Routing per primo, poi quelli in piu' ben formati. Solo dati pubblici:
+    nome, tipo, indirizzo dell'API, codice partner, rete."""
+    out = [{"id": "satsrouting", "nome": "SATS Routing", "tipo": "boltz",
+            "api": str(SWAP_API_BASE or "").strip().rstrip("/"),
+            "referral": str(SWAP_REFERRAL_ID or "").strip(),
+            "rete": swap_rete()}]
+    visti = {"satsrouting"}
+    for v in (SWAP_FORNITORI_IN_PIU or []):
+        try:
+            fid = str(v["id"]).strip()
+            nome = str(v["nome"]).strip()[:40]
+            tipo = str(v["tipo"]).strip()
+            api = str(v["api"]).strip().rstrip("/")
+            rete = str(v.get("rete", "bitcoin")).strip().lower()
+            referral = str(v.get("referral", "") or "").strip()[:40]
+        except (KeyError, TypeError, AttributeError):
+            fid = ""
+        buono = (fid and _SWAP_ID_FORNITORE.match(fid) and fid not in visti
+                 and nome and tipo in SWAP_TIPI and swap_origine_api(api)
+                 and rete in SWAP_RETI)
+        if not buono:
+            chiave = repr(v)[:80]
+            if chiave not in _SWAP_DETTO_STORTO:
+                _SWAP_DETTO_STORTO.add(chiave)
+                print(f"⚠️ Swap: una voce di SWAP_FORNITORI_IN_PIU e' storta "
+                      f"e si salta: {chiave}", flush=True)
+            continue
+        visti.add(fid)
+        out.append({"id": fid, "nome": nome, "tipo": tipo, "api": api,
+                    "referral": referral, "rete": rete})
+    return out
+
+
+def swap_fornitore(fid: str) -> dict | None:
+    """Un fornitore per id, o None."""
+    return next((f for f in swap_fornitori() if f["id"] == fid), None)
+
 
 # la copia delle tariffe: 30 secondi bastano a non bussare a ogni tocco,
 # e sono meno del minuto che il preventivo dichiara di valere
 SWAP_TARIFFE_COPIA_S = 30
 SWAP_PREVENTIVO_VALE_S = 60
 _TARIFFE_SWAP = {"quando": 0.0, "dati": None}
+# ...e quella degli altri fornitori, una per id (20 ott 2026): quella di
+# SATS Routing resta `_TARIFFE_SWAP`, che i collaudi svuotano per nome
+_TARIFFE_SWAP_ALTRI = {}
 _SWAP_DETTO_SIMULATO = set()
 
 
@@ -1645,20 +1705,24 @@ def tariffa_swap_da_risposta(dati) -> dict | None:
     return tariffa
 
 
-async def leggi_tariffa_swap() -> dict | None:
-    """Le tariffe di adesso, con la copia di 30 secondi. Il codice
-    partner va in OGNI lettura (l'intestazione `Referral`, la loro
-    `docs/pro.md`), cosi' SATS Routing sa da chi arriva. None = SATS
-    Routing non risponde (o in collaudo si e' fermato da solo)."""
+async def leggi_tariffa_swap(fornitore: dict | None = None) -> dict | None:
+    """Le tariffe di adesso di UN fornitore (di serie SATS Routing), con la
+    copia di 30 secondi. Il codice partner va in OGNI lettura
+    (l'intestazione `Referral`, la loro `docs/pro.md`), cosi' il fornitore
+    sa da chi arriva. None = non risponde (o in collaudo si e' fermato da
+    solo)."""
+    f = fornitore or swap_fornitori()[0]
+    copia = _TARIFFE_SWAP if f["id"] == "satsrouting" else \
+        _TARIFFE_SWAP_ALTRI.setdefault(f["id"], {"quando": 0.0, "dati": None})
     adesso = time.time()
-    if _TARIFFE_SWAP["dati"] is not None \
-            and adesso - _TARIFFE_SWAP["quando"] < SWAP_TARIFFE_COPIA_S:
-        return _TARIFFE_SWAP["dati"]
-    base = str(SWAP_API_BASE or "").rstrip("/")
+    if copia["dati"] is not None \
+            and adesso - copia["quando"] < SWAP_TARIFFE_COPIA_S:
+        return copia["dati"]
+    base = str(f["api"] or "").rstrip("/")
     if not base or swap_lettura_simulata(base):
         return None
     intestazioni = {}
-    codice = str(SWAP_REFERRAL_ID or "").strip()
+    codice = str(f["referral"] or "").strip()
     if codice:
         intestazioni["Referral"] = codice
     try:
@@ -1668,11 +1732,11 @@ async def leggi_tariffa_swap() -> dict | None:
             return None
         tariffa = tariffa_swap_da_risposta(r.json())
     except Exception as e:
-        print(f"⚠️ Swap: le tariffe di SATS Routing non arrivano ({e})",
+        print(f"⚠️ Swap: le tariffe di {f['nome']} non arrivano ({e})",
               flush=True)
         return None
     if tariffa is not None:
-        _TARIFFE_SWAP.update(quando=adesso, dati=tariffa)
+        copia.update(quando=adesso, dati=tariffa)
     return tariffa
 
 
@@ -1990,10 +2054,17 @@ def _csp_prova(collaudo: bool = MODALITA_COLLAUDO) -> str:
     # SATS Routing (le chiavi non passano dal server), quindi a swap
     # acceso `connect-src` ammette la sola origine di SWAP_API_BASE — e a
     # swap spento nessuna: in produzione, oggi, la CSP non cambia.
-    origine = swap_origine_api() if SWAP_ATTIVO else ""
-    if origine:
-        d = [x + " " + origine if x.startswith("connect-src") else x
-             for x in d]
+    # (20 ott 2026, l'instradatore) e le origini di TUTTI i fornitori, una
+    # volta sola ciascuna
+    origini = []
+    if SWAP_ATTIVO:
+        for f in swap_fornitori():
+            o = swap_origine_api(f["api"])
+            if o and o not in origini:
+                origini.append(o)
+    if origini:
+        d = [x + " " + " ".join(origini) if x.startswith("connect-src")
+             else x for x in d]
     return "; ".join(d)
 
 
@@ -31276,6 +31347,9 @@ def _leve_stato():
             _leva("Swap: dove si leggono le tariffe", "SWAP_API_BASE",
                   str(SWAP_API_BASE or "")),
             _leva("Swap: la rete", "SWAP_RETE", swap_rete()),
+            _leva("Swap: gli altri fornitori", "SWAP_FORNITORI_IN_PIU",
+                  ", ".join(f["id"] for f in swap_fornitori()[1:])
+                  or "nessuno"),
             _leva("Codice partner di SATS Routing", "SWAP_REFERRAL_ID",
                   str(SWAP_REFERRAL_ID or "").strip(),
                   spento="vuoto: gli swap partirebbero senza il nostro "
@@ -44307,7 +44381,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                             # (20 ott 2026, tappa 3) dove il telefono parla
                             # con SATS Routing, e su quale rete
                             "api": str(SWAP_API_BASE or "").strip().rstrip("/"),
-                            "rete": swap_rete()}
+                            "rete": swap_rete(),
+                            # (20 ott 2026, l'instradatore) tutti i
+                            # fornitori, SATS Routing per primo: solo dati
+                            # pubblici
+                            "fornitori": swap_fornitori()}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
@@ -71817,6 +71895,7 @@ async def promo_rimuovi(annuncio_id: int):
 
 @app.get("/api/swap/preventivo/{ordine_id}")
 async def swap_preventivo(ordine_id: int, hash: str = "",
+                          fornitore: str = "satsrouting",
                           x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie("")):
     """IL PREVENTIVO DELLO SWAP (19 ott 2026, tappa 2): per il venditore
@@ -71826,10 +71905,17 @@ async def swap_preventivo(ordine_id: int, hash: str = "",
     `hash` = l'impronta del preventivo che il client ha gia' mostrato:
     se le tariffe nel frattempo sono cambiate la risposta lo dice
     (`cambiata`), col preventivo nuovo — e' il rifiuto «tariffa
-    cambiata» che la tappa 3 usera' alla conferma vera."""
+    cambiata» che la tappa 3 usera' alla conferma vera.
+    `fornitore` (20 ott 2026, l'instradatore) = di quale fornitore: il
+    telefono li chiede tutti e sceglie il migliore; di serie SATS Routing.
+    La risposta dice chi (`fornitore`, `fornitore_nome`): il preventivo lo
+    mostra in piccolo, «eseguito da …»."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not swap_per(user["id"]):
         raise HTTPException(403, "Lo swap non e' disponibile")
+    chi = swap_fornitore(str(fornitore or ""))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=?",
                     (ordine_id,)).fetchone()
@@ -71840,13 +71926,15 @@ async def swap_preventivo(ordine_id: int, hash: str = "",
         raise HTTPException(409, "Lo swap si sceglie quando i sats "
                                  "sono da incassare")
     dovuto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
-    tariffa = await leggi_tariffa_swap()
+    tariffa = await leggi_tariffa_swap(chi)
     if tariffa is None:
-        return {"ok": False, "motivo": "non_risponde", "dovuto": dovuto}
+        return {"ok": False, "motivo": "non_risponde", "dovuto": dovuto,
+                "fornitore": chi["id"], "fornitore_nome": chi["nome"]}
     p = preventivo_swap(dovuto, tariffa, SWAP_FEE_PERCENTO,
                         SWAP_MIN_SATS, SWAP_MAX_SATS)
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
     p["valido_s"] = SWAP_PREVENTIVO_VALE_S
+    p["fornitore"], p["fornitore_nome"] = chi["id"], chi["nome"]
     return p
 
 
@@ -86112,16 +86200,26 @@ def vendor_btc():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/swap-telefono.js")
-def swap_telefono_js():
-    """Il codice dello swap dal telefono (20 ott 2026, tappa 3): le dodici
-    parole, la creazione, la verifica, la sorveglianza e il ritiro, in un
-    file suo e non nel grande <script> della pagina (fase 2 della CSP,
-    niente inline). Codice nostro e pubblico; la pagina lo chiama con
-    `?v=` uguale all'inizio del suo sha256 (`SWAP_TELEFONO_VER`, provato in
+# I FILE DELLO SWAP DAL TELEFONO (20 ott 2026, l'instradatore): una lista
+# CHIUSA di nomi (regola ferrea 3: il nome arriva dal client), uno per
+# tipo di fornitore piu' l'instradatore
+SWAP_FILE_TELEFONO = ("boltz", "instradatore")
+
+
+@app.get("/swap/{nome}.js")
+def swap_file_telefono(nome: str):
+    """Il codice dello swap dal telefono (tappa 3, diviso il 20 ott 2026):
+    `instradatore` (le strade, la scelta del fornitore, il cassetto, il
+    pannello, la sorveglianza, la pagina Swap) e un file per TIPO di
+    fornitore (`boltz`: SATS Routing e chi parla come lui). Fuori dal
+    grande <script> della pagina (fase 2 della CSP, niente inline). Codice
+    nostro e pubblico; la pagina li chiama con `?v=` uguale all'inizio
+    dello sha256 di tutti e due (`SWAP_TELEFONO_VER`, provato in
     `prove_swap_telefono`), quindi la cache di un giorno non trattiene mai
     una versione vecchia."""
-    return FileResponse("swap-telefono.js",
+    if nome not in SWAP_FILE_TELEFONO:
+        raise HTTPException(404, "Non trovato")
+    return FileResponse(f"swap/{nome}.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 

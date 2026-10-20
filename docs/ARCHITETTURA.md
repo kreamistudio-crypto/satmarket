@@ -30890,9 +30890,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    nell'iframe di un estraneo — tutte le altre lo vietano con
    `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
-   `/vendor/swap.js` e `/swap-telefono.js` (20 ott 2026, la tappa 3
-   dello swap: la libreria e il codice dello swap dal telefono, scaricati
-   solo a swap acceso; vedi «LO SWAP, TAPPA 3»),
+   `/vendor/swap.js` e `/swap/{nome}.js` (20 ott 2026, la tappa 3
+   dello swap e l'instradatore: la libreria e il codice dello swap dal
+   telefono, lista chiusa `SWAP_FILE_TELEFONO`, scaricati solo a swap
+   acceso; vedi «LO SWAP, TAPPA 3» e «LO SWAP, L'INSTRADATORE»),
    `/vendor/pdf.mjs` e `/vendor/pdf.worker.mjs` (16 ott 2026: pdf.js
    4.10.38, per disegnare i PDF della chat; vedi «GLI ALLEGATI»),
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
@@ -33617,7 +33618,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Da qui la frase della tappa 2 «il client non parla mai con SATS
   Routing» non vale più: ci parla il TELEFONO, direttamente, e il
   server di Barattolo non vede niente dello swap.
-  I FILE: `swap-telefono.js` (rotta esplicita `/swap-telefono.js`,
+  I FILE (dal 20 ott 2026 divisi in `swap/boltz.js` e
+  `swap/instradatore.js`: vedi «LO SWAP, L'INSTRADATORE»): `swap-telefono.js` (rotta esplicita `/swap-telefono.js`,
   chiamato con `?v=SWAP_TELEFONO_VER`, l'inizio del suo sha256) e
   `vendor/swap.bundle.js` (rotta `/vendor/swap.js`, `?v=5.0.0-bar1`,
   global `BarattoloSwap`). La pagina scarica il primo con
@@ -33714,3 +33716,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `relay_dm_avvisato = 0`; quando compare il client chiama `POST
   /api/me/relay-dm/avvisato`, che scrive l'ora una volta sola. Resta per
   la sessione fino a «Ho capito»; dopo, la riga ferma nel cassetto.
+- LO SWAP, L'INSTRADATORE (20 ott 2026, cantiere swap-instradatore;
+  perché in CANTIERI, «Lo swap, l'instradatore»). La tappa 3 qui sopra è
+  divisa: `swap/boltz.js` (il TIPO «boltz»: il motore della tappa 3 —
+  `swapChiavi`, `swapVerifica`, `swapRitiro`, `swapXpub` — e la fabbrica
+  `window.SWAP_TIPI.boltz(cfg)`, con l'interfaccia comune scritta in
+  testa al file) e `swap/instradatore.js` (le strade — oggi `ln-btc` —,
+  `swapFornitori()` dalle voci di `swapLeve.fornitori`,
+  `swapInstradaPreventivo` che chiede `leggiPreventivoSwap(ordine,
+  fornitore, hash)` a ogni fornitore e tiene chi fa RICEVERE di più,
+  `swapRipiega` col fuori-gioco per ordine in `swapEsclusi`, il cassetto
+  per fornitore — `swapCasaParole(fid)`: SATS Routing coi nomi della
+  tappa 3 —, `swapFase(rec)`, la pagina Swap per fornitore,
+  l'ascoltatore con `data-fornitore`). Rotta `/swap/{nome}.js`, lista
+  chiusa `SWAP_FILE_TELEFONO = ("boltz", "instradatore")`; nella pagina
+  `SWAP_TIPI_FILE` e `caricaSwapTelefono()` (prima i tipi, poi
+  l'instradatore). Il server: `swap_fornitori()` (SATS Routing dalle leve
+  di sempre, poi `SWAP_FORNITORI_IN_PIU`, `SWAP_TIPI = ("boltz",)`),
+  `swap_fornitore(id)`, `leggi_tariffa_swap(fornitore)` con la copia per
+  id (`_TARIFFE_SWAP` per SATS Routing, `_TARIFFE_SWAP_ALTRI` per gli
+  altri), il preventivo con `?fornitore=` e `fornitore`/`fornitore_nome`
+  nella risposta, la CSP con le origini di tutti. I testi del preventivo
+  della tappa 2 dicono il fornitore (`{f}`) e la nota `ripiego`. Il
+  cartone ha lo stato per istanza (`nuovo_cartone`, `avvia(porta, rete,
+  percento)`). Il collaudo è `collaudo_swap_instradatore`.

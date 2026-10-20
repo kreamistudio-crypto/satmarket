@@ -69453,3 +69453,128 @@ banner (`demo-cta`, «Entra con Nostr» compresa) è arancio chiaro su
 bianco, poco contrastata: è il `--sats-text` scuro, identico sul sito
 normale e prima di questo cantiere. Ora che su onion quella pillola è la
 porta principale si vede di più.
+
+## Lo swap, l'instradatore: chi vende sceglie cosa, il telefono sceglie chi (20 ott 2026, cantiere swap-instradatore, piano approvato da Andrea)
+
+**LA DECISIONE DI ANDREA.** Chi vende sceglie solo COSA vuole — oggi
+ricevere bitcoin on-chain, domani anche USDT o pagare con USDT — e non CHI
+lo fa. Il frontend sceglie il fornitore; se più fornitori fanno la stessa
+strada, quello col preventivo migliore. Oggi un fornitore solo, SATS
+Routing; domani per esempio KaleidoSwap (lo studio viene dopo, col suo
+ok). Il punto 5 del piano, deciso da Andrea: col fornitore che mente si
+ripiega sul secondo MOSTRANDO il suo preventivo e chiedendo una nuova
+conferma; se non ce n'è un altro, ci si ferma con un messaggio chiaro.
+
+**PRIMA DI PARTIRE**, su richiesta di Andrea, la suite severa INTERA
+sull'albero di develop di allora (`299846a`, che portava anche le figure
+del login dal bot di un'altra sessione): **25.797 verdi, 0 rosse**.
+
+**COM'È DIVISO** (il piano in 10 righe, approvato):
+- `swap-telefono.js` della tappa 3 diventa due file sotto `swap/`, serviti
+  da UNA rotta con una lista chiusa (`/swap/{nome}.js`,
+  `SWAP_FILE_TELEFONO`, regola ferrea 3): `swap/boltz.js`, il TIPO di
+  fornitore che parla il protocollo di Boltz v2 (SATS Routing e chi parla
+  come lui: il motore della tappa 3 intatto, l'unica `fetch`, verso
+  l'`api` del fornitore) e `swap/instradatore.js` (le strade, la scelta,
+  il cassetto, il pannello, la sorveglianza, la pagina Swap,
+  l'ascoltatore; nessuna `fetch`). La pagina scarica prima i tipi, poi
+  l'instradatore; la versione è l'impronta dei due file insieme.
+- L'INTERFACCIA di ogni fornitore (scritta in testa a `swap/boltz.js`):
+  id, nome, tipo, strade; `fase(stato)` (lo stato suo nel vocabolario
+  dell'instradatore: creato, bloccato, confermato, fatto, scaduto,
+  fallito, ripreso); `nuoveParole`, `paroleValide`, `indirizzoValido`;
+  `crea` (un errore `mente` o `giu`), `stato`, `ritira`, `recupera`. Il
+  tipo registra una fabbrica in `window.SWAP_TIPI`; l'instradatore crea
+  i fornitori dalle voci del server.
+- IL PREVENTIVO resta del server (la tappa 2), ora PER FORNITORE
+  (`?fornitore=<id>`, 404 a uno sconosciuto) e la risposta dice chi
+  (`fornitore`, `fornitore_nome`); la pagina ha `leggiPreventivoSwap`,
+  e l'instradatore li chiede tutti e sceglie chi fa RICEVERE di più (a
+  pari, il primo dell'elenco; nessuno buono: il rifiuto del primo).
+- IL RIPIEGO: un fornitore che risponde con dati che non tornano esce
+  dalla gara PER QUELL'ORDINE (`swapEsclusi`); se un altro fa la stessa
+  strada, il pannello torna al preventivo con il SUO conto, «X ha
+  risposto con dati che non tornano: ecco il preventivo di Y.» e il
+  bottone di conferma; se non ce n'è un altro, ci si ferma come nella
+  tappa 3 («X ha risposto con dati che non tornano: lo swap non parte,
+  nessun sats si è mosso.»), e lo stesso fornitore resta riprovabile (un
+  secondo tentativo usa comunque una chiave nuova).
+- LE CHIAVI PER FORNITORE: dodici parole per ognuno, la prima volta col
+  passo «Le tue 12 parole per X». Per SATS Routing il cassetto ha i nomi
+  della tappa 3 (`barattolo_swap_<tg_id>`): gli swap già nati non si
+  perdono; gli altri `barattolo_swap_<id>_<tg_id>`. Ogni swap porta il suo
+  fornitore. Nella pagina Swap le parole e il recupero sono per
+  fornitore: un campo solo, un bottone per fornitore, e la xpub va SOLO a
+  quello toccato.
+- LA TRASPARENZA: «Eseguito da X» in piccolo nel preventivo, al passo
+  dell'indirizzo e sulla carta dello swap.
+- LE LEVE PER FORNITORE: SATS Routing resta sulle leve di sempre
+  (`SWAP_API_BASE`, `SWAP_REFERRAL_ID`, `SWAP_RETE`: il config del VPS non
+  si tocca); gli altri in `SWAP_FORNITORI_IN_PIU` (vuota di serie: una
+  voce per fornitore con id, nome, tipo, api, codice partner, rete; una
+  storta si salta e il journal lo dice una volta). `swap_fornitori()` li
+  mette in fila, `/api/me` li porta in `swap_leve.fornitori` (solo dati
+  pubblici), la CSP apre le origini di TUTTI, una volta ciascuna, solo a
+  swap acceso; il pannello delle leve dice gli altri.
+- IL CARTONE ha lo stato PER ISTANZA: ogni `avvia()` è un cartone nuovo,
+  e `percento` gli dà una commissione sua (e un'impronta delle tariffe
+  che la dice). Due cartoni nello stesso collaudo sono due fornitori.
+
+**DUE DIFETTI PRESI DAL GIRO, corretti.** Con Cartone Due scelto, il
+preventivo della tappa 2 diceva ancora «Commissione SATS Routing», «Rete:
+invio di SATS Routing» e «Tariffe di SATS Routing di adesso»: il nome era
+scritto fisso nei testi. Ora `{f}` è il fornitore del preventivo (anche
+nel «non risponde»), e «Leggo le tariffe dello swap…» mentre carica.
+
+**LE PROVE.**
+- `collaudo_swap_instradatore` (26 verdi, negli elenchi della CI): due
+  cartoni veri (SATS Routing allo 0,6 %, Cartone Due allo 0,3 %), il
+  server vero per i preventivi, il codice vero del telefono in node. Il
+  server: i due fornitori in /api/me, il preventivo per fornitore (47.154
+  contro 47.298), il codice partner solo dove c'è, 404 al fornitore
+  sconosciuto, la CSP con le due origini, le voci storte saltate. Il
+  telefono: chiede a tutt'e due e sceglie Cartone Due, con «Eseguito da» e
+  la commissione SUA; le parole sono di Cartone Due; lo swap nasce lì e
+  lì si ritira; Cartone Due che mente → il preventivo di SATS Routing con
+  la nuova conferma, niente salvato, poi le parole e lo swap di SATS
+  Routing; mentono tutt'e due → ci si ferma col perché; il fuori-gioco
+  vale per quell'ordine; con Cartone Due giù vince SATS Routing; il
+  recupero di Cartone Due ritrova i SUOI 3 swap e la xpub va solo a lui;
+  la sentinella (nessuna chiamata fuori dai due fornitori, nessuna parola
+  né chiave privata). CONTROPROVA, quattro mutazioni — sceglie il primo
+  invece del migliore, nessun fuori-gioco, parole uguali per tutti, CSP di
+  un fornitore solo — tutte rosse.
+- `collaudo_swap_telefono` (la tappa 3) VERDE CON LE STESSE ATTESE sui
+  file divisi: cambiano solo il caricamento (due file), la finta del
+  preventivo (`leggiPreventivoSwap`) e la prova delle rotte, che ora
+  bussa a `/swap/instradatore.js`, `/swap/boltz.js`, a un nome fuori
+  lista e al vecchio `/swap-telefono.js` (404): 44/0.
+- `prove_swap_fornitori` (nuova): il giudice dei fornitori ESEGUITO, con
+  nove voci storte; la leva, il pannello, la stessa lista dei tipi in tre
+  posti, il preventivo per fornitore. `prove_swap_telefono` sui due file
+  (l'unica fetch nel tipo, nessuna nell'instradatore, il preventivo letto
+  dalla pagina, la versione dei due file). Il banco del pannello delle
+  leve (`_censimento`) vuole `swap_origine_api` e `swap_fornitori`.
+- IL GIRO DAL VIVO (copia del worktree, config di cartone, relay morti,
+  due cartoni sulla 9077 e sulla 9078, server sulla 8191, 360×780, tocchi
+  veri): il preventivo di Cartone Due (chiaro), le parole «per Cartone
+  Due», lo swap nato lì con «Eseguito da Cartone Due»; Cartone Due che
+  mente sull'ordine da 49.000 → il preventivo di SATS Routing con la nota
+  e la conferma (scuro); la pagina Swap con le parole e il recupero per
+  fornitore (scuro). Console senza errori, nessuna segnalazione CSP; il
+  journal mostra i preventivi chiesti per fornitore. Copia cancellata.
+- Suite e collaudi: nel messaggio del commit.
+
+**STRADE SCARTATE.** Il preventivo calcolato nel telefono (la tappa 2 lo
+ha messo sul server, con un giudice solo del conto); un registro globale
+delle azioni (arriverà con la fase 2 della CSP per tutta la pagina); le
+stesse dodici parole per tutti i fornitori (Andrea: chiave di ritiro e
+recupero PER FORNITORE); la xpub mandata a tutti al recupero (rivelerebbe
+a un fornitore la chiave pubblica di radice usata con un altro); il
+ripiego silenzioso sul secondo (il prezzo è diverso: mai cambiato di
+nascosto); KaleidoSwap scritto adesso (Andrea: prima la forma, poi lo
+studio in 10 righe col suo ok).
+
+**COSA RESTA.** Lo studio KaleidoSwap (10 righe, poi l'ok di Andrea); le
+VM col regtest di Boltz; la tappa 4 (il server paga la fattura dello
+swap del fornitore scelto).
