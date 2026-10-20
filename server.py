@@ -49000,6 +49000,15 @@ except ImportError:
 # all'API signet di mempool.space (`https://mempool.space/signet/api`),
 # e un pagamento mandato da un wallet testnet li' non si vede.
 ONCHAIN_RETE = "signet"
+# IL CONTO DEL 2-DI-3 (20 ott 2026, tappa 2): la strada BIP-48 dal seme
+# di ciascuno alla sua «xpub dedicata» — scopo 48 (multisig), coin
+# type 1 (le reti di prova: signet), conto 0, tipo 2 (p2wsh). Da li'
+# ogni ordine prende la chiave `/0/i`, con l'`i` assegnato qui una
+# volta sola. La dice il server al telefono, cosi' il telefono non
+# inventa strade sue e due dispositivi dello stesso seme fanno la
+# STESSA xpub. Il giorno della mainnet il coin type diventa 0: e' un
+# altro conto, apposta.
+ONCHAIN_STRADA_CONTO = "m/48'/1'/0'/2'"
 
 
 def onchain_ammesso(tg_id) -> bool:
@@ -86067,11 +86076,12 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
         # sapere che quella terza chiave non e' di nessuno
         "cartone": cartone,
         "rete": ONCHAIN_RETE,
-        # il percorso dell'ordine finto, cosi' il client non inventa
-        # numeri suoi e due dispositivi dello stesso conto fanno lo
-        # STESSO indirizzo — che e' esattamente quel che la prova del
-        # ripristino deve poter confrontare
-        "strada": "m/0/0",
+        # la strada del CONTO del 2-di-3 (BIP-48), cosi' il client non
+        # inventa numeri suoi e due dispositivi dello stesso seme fanno
+        # lo STESSO indirizzo — che e' esattamente quel che la prova del
+        # ripristino deve poter confrontare. L'ordine finto e' il numero
+        # 0 di quel conto (`/0/0`), dalla tappa 2 (prima: `m/0/0`)
+        "strada": ONCHAIN_STRADA_CONTO,
     }
 
 
