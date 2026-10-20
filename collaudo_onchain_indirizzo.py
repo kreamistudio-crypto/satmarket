@@ -181,7 +181,36 @@ def main():
           "firme)", (400, True),
           (r.status_code, "stessa chiave" in r.json()["detail"]))
 
-    # ---- 4) embit che manca, la terza chiave storta ---------------------
+    # ---- 4) il freno anti-raffica (20 ott 2026, numeri di Andrea) -------
+    print("\n[il freno: la xpub 5 all'ora, un indirizzo 20 all'ora, per persona]")
+    prova("i numeri: 5 e 20 all'ora", ((5, 3600), (20, 3600)),
+          (SRV.FRENI["onchain_xpub"], SRV.FRENI["onchain_indirizzo"]))
+    SRV._SECCHI.clear()
+    esiti = [dai(999, x999).status_code for _ in range(6)]
+    prova("la xpub: cinque passano, la sesta e' un 429", [200] * 5 + [429],
+          esiti)
+    prova("...anche un no consuma (una storta, dopo i cinque: 429, non 400)",
+          429, dai(999, "tpubNONSONOUNACHIAVE").status_code)
+    prova("...e il secchio e' per PERSONA: Alan passa", 200,
+          dai(888, x888).status_code)
+    esiti = [fai(888, 999).status_code for _ in range(21)]
+    prova("un indirizzo: venti passano, il ventunesimo e' un 429",
+          [200] * 20 + [429], esiti)
+    prova("...e Andrea, che ne ha fatti pochi, ne fa ancora", 200,
+          fai(999, 888).status_code)
+    SRV.ONCHAIN_ATTIVO = False
+    # copia PROFONDA: i secchi sono liste, e una copia piatta guarderebbe
+    # le stesse liste che il freno sta cambiando
+    gettoni = lambda: {k: list(v) for k, v in SRV._SECCHI.items()}
+    prima = gettoni()
+    leggi(888), dai(888, x888), fai(888, 999)
+    prova("a leva spenta la porta non esiste e non consuma gettoni",
+          prima, gettoni())
+    SRV.ONCHAIN_ATTIVO = True
+    # i secchi pieni non devono decidere le scene che vengono dopo
+    SRV._SECCHI.clear()
+
+    # ---- 5) embit che manca, la terza chiave storta ---------------------
     print("\n[embit che manca, la terza chiave, il pannello]")
     SRV.EMBIT = False
     prova("senza embit: le due porte che fanno i conti dicono 503, la "
@@ -209,7 +238,7 @@ def main():
            SRV.ONCHAIN_XPUB[:20] in json.dumps(voci)))
     SRV.ONCHAIN_XPUB = ""
 
-    # ---- 5) la leva rispenta --------------------------------------------
+    # ---- 6) la leva rispenta --------------------------------------------
     SRV.ONCHAIN_ATTIVO = False
     prova("rispenta: tutto torna 404, anche con gli indirizzi nel database",
           [404, 404, 404],
