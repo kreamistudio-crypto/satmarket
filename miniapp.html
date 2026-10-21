@@ -48850,10 +48850,38 @@ async function decidiRevisione(id, esito){
 }
 
 /* Il pallino sul tappo del Profilo: c'e' qualcosa da moderare.
-   Acceso da /api/me al login e da loadAdminStats a ogni giro. */
+   Acceso da /api/me al login e da loadAdminStats a ogni giro.
+   Dal 21 ott 2026 lo stesso pallino lo accendono anche gli altri
+   account aperti (vedi accendiTappoDot): il numero dei moderatori si
+   tiene qui, cosi' una delle due ragioni non spegne l'altra. */
+let admDotN = 0;
 function aggiornaAdmDot(n){
+  admDotN = n > 0 ? n : 0;
+  accendiTappoDot();
+}
+
+/* IL PALLINO DEGLI ALTRI ACCOUNT (21 ott 2026, richiesta di Andrea:
+   «vedere se c'e' qualcosa da fare al volo in uno degli account senza
+   doverci entrare in ognuno»). Il giudice non e' nuovo: e' il «⚡ N ti
+   aspetta» che il server mette gia' su ogni riga del menu degli
+   account (`_quanto_aspetta`: gli scambi P2P dove tocca a lui — una
+   presa dal libro compresa — e gli ordini pagati da spedire). Qui si
+   somma, SOLO per gli account diversi da quello in uso: quello in uso
+   ha gia' i suoi pallini su Ordini e su P2P.
+   VESTE IL PALLINO CHE C'E' GIA' sul tappo, quello dei moderatori:
+   il tappo e' la porta del menu degli account, ed e' li' che il dito
+   va per cambiare. Nessun posto nuovo e nessun numero, come gli altri. */
+function quantiAspettanoAltri(){
+  if (!piuAccount) return 0;
+  return accountAperti.reduce((s, c) => {
+    const n = Number(c.aspetta) || 0;
+    return idConto(c) !== accountAttivoId && n > 0 ? s + n : s;
+  }, 0);
+}
+function accendiTappoDot(){
+  const acceso = admDotN > 0 || quantiAspettanoAltri() > 0;
   document.querySelectorAll('.avatar-btn .off-dot').forEach(d=>
-    d.classList.toggle('on', n>0));
+    d.classList.toggle('on', acceso));
 }
 
 /* «Trattami da nuovo»: il pulsante del collaudo dal vivo, solo per
@@ -51936,7 +51964,7 @@ function miniAccount(){ return !!tg?.initData && piuAccount && !DEMO && !VETRINA
 function idConto(c){ return c && c.id != null ? String(c.id) : String(c?.tg_id ?? ''); }
 
 async function caricaAccount(){
-  if (!accountVivi()) { accountAperti = []; return; }
+  if (!accountVivi()) { accountAperti = []; accendiTappoDot(); return; }
   try {
     /* dentro Telegram la firma va mandata: e' lei che dice al server
        quale portachiavi guardare */
@@ -51954,8 +51982,11 @@ async function caricaAccount(){
     /* Un server di ieri non ha questa rotta: si resta col solo account
        di adesso, che e' un'ASSENZA e mai una bugia. */
     accountAperti = [];
+    accendiTappoDot();
     return;
   }
+  /* il pallino degli altri account segue OGNI lettura del menu */
+  accendiTappoDot();
   /* La scelta che il server non riconosce piu' (sessione chiusa
      altrove) non resta appesa: si torna al Telegram, e si dice. */
   if (miniAccount() && CONTO_MINI && accountAttivoId !== CONTO_MINI) {
@@ -52547,6 +52578,15 @@ async function bussaIngressoBot(){
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && ingressoBotTimer) bussaIngressoBot();
+});
+/* IL PALLINO DEGLI ALTRI ACCOUNT AL RITORNO (21 ott 2026): chi torna
+   nell'app dopo un avviso deve trovarlo vero. Una lettura sola, al
+   ritorno in primo piano e solo per chi ha piu' account aperti:
+   nessun orologio, come il pallino degli scambi. */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && piuAccount && accountAperti.length > 1)
+    caricaAccount().then(() => { if (el('accountSheet')?.classList.contains('open'))
+      renderAccountSheet(); });
 });
 
 /* Il menu si apre coi dati che si hanno e li RILEGGE: una sessione
