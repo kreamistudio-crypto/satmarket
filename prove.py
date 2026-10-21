@@ -111876,6 +111876,125 @@ const pausa = () => new Promise(res => setTimeout(res, 0));
           rr.stdout.strip().splitlines()[-1] if rr.stdout.strip() else rr.stderr[-300:])
 
 
+def prove_pallino_altri_account():
+    """IL PALLINO DEGLI ALTRI ACCOUNT (21 ott 2026, richiesta di Andrea:
+    «vedere se c'e' qualcosa da fare al volo in uno degli account senza
+    doverci entrare in ognuno»). Il pallino del tappo — quello dei
+    moderatori — si accende anche quando un account aperto DIVERSO da
+    quello in uso ha un «⚡ ti aspetta» (`_quanto_aspetta`: scambi P2P
+    dove tocca a lui, presa dal libro compresa, e ordini pagati da
+    spedire). Il banco ESEGUE le funzioni vere su un DOM di cartone."""
+    print("\n[il pallino degli altri account]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # --- il giudice del server: una presa e un ordine pagato contano ---
+    import sqlite3 as _s
+    amb = {"time": time, "_quanti_tocca_p2p": lambda con, t, a: 2 if t == 731 else 0}
+    for n in ("_tocca_a_me_p2p", "_quanto_aspetta"):
+        exec(pezzo(n), amb)
+    con = _s.connect(":memory:")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER, stato TEXT)")
+    con.executemany("INSERT INTO ordini(venditore_id, stato) VALUES(?,?)",
+                    [(731, "locked"), (731, "creato"), (731, "shipped"), (732, "locked")])
+    prova("aspettano: gli scambi dove tocca a lui piu' gli ordini pagati da spedire",
+          (3, 1), (amb["_quanto_aspetta"](con, 731), amb["_quanto_aspetta"](con, 732)))
+    prova("una presa dal libro e' un «tocca a te» di chi ha pubblicato",
+          (True, True), (amb["_tocca_a_me_p2p"]("attesa_mia_hold", "vendo", False),
+                         amb["_tocca_a_me_p2p"]("attesa_mia_fattura", "compro", False)))
+    con.close()
+    # --- il banco del client ---
+    _pz = pezzo_js(mini, "let admDotN = 0;", "\n}\n") + "\n}\n"
+    for f in ("function quantiAspettanoAltri(){", "function accendiTappoDot(){",
+              "function idConto(c){", "async function caricaAccount(){"):
+        _pz += pezzo_js(mini, f, "\n}\n") + "\n}\n"
+    banco = r"""
+let piuAccount = true, accountAperti = [], accountAttivo = null, accountAttivoId = '',
+    accountTelegramId = '', accountMax = 0, CONTO_MINI = '', vivi = true;
+const tg = null, API_BASE = '/api';
+function accountVivi(){ return vivi; }
+function miniAccount(){ return false; }
+function authHdr(){ return ''; }
+function toast(){}
+const dots = [0, 1, 2].map(() => ({on: false,
+  classList: {toggle(c, v){ if (c === 'on') dots.__last = v; }}}));
+dots.forEach(d => d.classList.toggle = function(c, v){ if (c === 'on') d.on = !!v; });
+const document = {querySelectorAll: s => s === '.avatar-btn .off-dot' ? dots : []};
+let risposta = null;
+async function fetch(){ if (!risposta) throw new Error('rete'); return {ok: true, json: async () => risposta}; }
+const acceso = () => dots.every(d => d.on);
+const spento = () => dots.every(d => !d.on);
+""" + _pz + r"""
+(async () => {
+  const out = {};
+  risposta = {attivo_id: '710', conti: [{id: '710', aspetta: 2}, {id: '711', aspetta: 0}]};
+  await caricaAccount();
+  out.soloIo = spento();
+  risposta.conti[1].aspetta = 1;
+  await caricaAccount();
+  out.altro = acceso();
+  out.somma = quantiAspettanoAltri();
+  aggiornaAdmDot(0);
+  out.admNonSpegne = acceso();
+  risposta.conti[1].aspetta = 0;
+  await caricaAccount();
+  out.spentoDopo = spento();
+  aggiornaAdmDot(3);
+  out.adm = acceso();
+  await caricaAccount();
+  out.accountNonSpegneAdm = acceso();
+  aggiornaAdmDot(0);
+  risposta.conti[1].aspetta = 4;
+  piuAccount = false;
+  await caricaAccount();
+  out.levaSpenta = spento();
+  piuAccount = true;
+  risposta = null;
+  await caricaAccount();
+  out.reteRotta = spento();
+  risposta = {attivo_id: '711', conti: [{id: '710', aspetta: 1}, {id: '711', aspetta: 5}]};
+  vivi = false;
+  await caricaAccount();
+  out.nonVivi = spento();
+  vivi = true;
+  await caricaAccount();
+  out.seguiAttivo = [acceso(), quantiAspettanoAltri()];
+  console.log(JSON.stringify(out));
+})();
+"""
+    v = _node_banco(banco)
+    if v is None:
+        salta("il pallino degli altri account, girato per davvero", "node non installato")
+    else:
+        prova("con un solo account che aspetta, ed e' quello in uso: spento",
+              True, v.get("soloIo"))
+        prova("un ALTRO account che aspetta accende il tappo", True, v.get("altro"))
+        prova("...e si contano solo gli altri", 1, v.get("somma"))
+        prova("il pallino dei moderatori a zero non lo spegne", True, v.get("admNonSpegne"))
+        prova("fatto il gesto, alla rilettura si spegne", True, v.get("spentoDopo"))
+        prova("i moderatori lo accendono come prima", True, v.get("adm"))
+        prova("...e gli account senza niente non lo spengono", True,
+              v.get("accountNonSpegneAdm"))
+        prova("a leva spenta gli account non lo accendono", True, v.get("levaSpenta"))
+        prova("un server di ieri o la rete rotta: spento, mai acceso a caso",
+              True, v.get("reteRotta"))
+        prova("in demo e in vetrina: spento", True, v.get("nonVivi"))
+        prova("cambiato account, il giudice segue quello in uso",
+              [True, 1], v.get("seguiAttivo"))
+    # --- le righe che un riordino toglierebbe senza rompere niente ---
+    chiamate = [r for r in mini.split("\n") if "accendiTappoDot()" in r
+                and "function accendiTappoDot" not in r]
+    prova("ogni lettura del menu passa dal pallino (tre uscite + i moderatori)",
+          4, len(chiamate))
+    i = mini.find("/* IL PALLINO DEGLI ALTRI ACCOUNT AL RITORNO")
+    asc = mini[i:mini.find("});", i)] if i > 0 else ""
+    prova("al ritorno in primo piano si rilegge, solo con piu' account",
+          True, "piuAccount && accountAperti.length > 1" in asc
+          and "caricaAccount()" in asc and "!document.hidden" in asc)
+    corpo = pezzo_js(mini, "function accendiTappoDot(){", "\n}\n") \
+        + pezzo_js(mini, "function quantiAspettanoAltri(){", "\n}\n")
+    prova("il pallino non fa domande sue: niente fetch, niente orologi", True,
+          all(x not in corpo for x in ("fetch(", "setInterval", "setTimeout")))
+
+
 def prove_piu_account_ovunque():
     """PIU' ACCOUNT OVUNQUE (16 ott 2026, richiesta di Andrea): il
     selettore anche DENTRO la Mini App (il Telegram + account Nostr, un
@@ -177854,7 +177973,7 @@ def main():
               prove_annullo, prove_annullo_venditore, prove_spunta_rimborso,
               prove_abbandonati, prove_pagamenti_non_arrivati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop, prove_logout_apk, prove_logout_apk_due,
+              prove_initdata, prove_portachiavi, prove_piu_account_ovunque, prove_pallino_altri_account, prove_account_doppio, prove_login_dal_bot, prove_dizionari_nel_loop, prove_logout_apk, prove_logout_apk_due,
               prove_foto, prove_foto_scarti, prove_fotocamera_pagina,
               prove_tela_bugiarda,
               prove_duplica_annuncio, prove_avatar,

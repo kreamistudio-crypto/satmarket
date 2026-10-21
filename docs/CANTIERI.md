@@ -71074,3 +71074,68 @@ nostro tocco c'è, l'invio degli USDT dal suo wallet resta un suo gesto.
 
 DA CHIEDERE A WALTER: se il maker accetta Lightning e consegna gli USDT
 on-chain con witnessReceive (la catena diventerebbe uno scambio solo).
+
+## Il pallino degli altri account: il tappo si accende se un altro account ha qualcosa da fare (21 ott 2026, cantiere puntino-account, richiesta di Andrea)
+
+**COSA.** Dalla lista di Andrea del 18 ott: «sarebbe bello vedere se
+c'è qualcosa da fare al volo in uno degli account senza doverci entrare
+in ognuno, con un puntino come quello sul bottone degli scambi P2P —
+specialmente se ricevo un nuovo ordine mercatino o una presa di un
+ordine dal libro P2P». Adesso il pallino arancio sul TAPPO (la propria
+foto: testata di Esplora, Profilo, barra) si accende anche quando un
+account aperto DIVERSO da quello in uso ha qualcosa che lo aspetta.
+
+**IL GIUDICE NON È NUOVO.** Il server lo diceva già, riga per riga, nel
+menu degli account: «⚡ N ti aspetta» (`_quanto_aspetta`, leva
+`PIU_ACCOUNT_OVUNQUE`): gli scambi P2P dove tocca a lui — e una presa
+dal libro lo è: chi vende deve bloccare (`attesa_mia_hold`), chi compra
+dare la fattura (`attesa_mia_fattura`) — più gli ordini del mercatino
+pagati da spedire (`locked`). Il client lo SOMMA (`quantiAspettanoAltri`)
+solo per gli account diversi da quello in uso: quello in uso ha già i
+suoi pallini su Ordini e su P2P. Nessuna rotta nuova, nessuna domanda
+nuova al server.
+
+**UN PALLINO SOLO, DUE RAGIONI.** Il tappo aveva già un `.off-dot`,
+quello dei moderatori (`aggiornaAdmDot`). Si veste quello: il tappo è
+la porta del menu degli account, ed è lì che il dito va per cambiare.
+Il numero dei moderatori si tiene in `admDotN`, e `accendiTappoDot`
+accende se c'è l'una O l'altra ragione — così una lettura del menu
+senza niente non spegne la coda da moderare, e viceversa. I chiamanti
+di `aggiornaAdmDot` restano due (la sentinella di `prove_ordini_fermi` li
+conta). Senza numero, come gli altri pallini.
+
+**QUANDO SI RILEGGE.** `caricaAccount` accende il pallino a OGNI
+uscita (leva spenta o demo, server di ieri o rete rotta, lettura
+riuscita): all'apertura, entrando nel Profilo, aprendo il menu. In più,
+al ritorno in primo piano, una lettura sola — e solo per chi ha più
+account aperti (`piuAccount && accountAperti.length > 1`): chi torna
+nell'app dopo l'avviso del bot deve trovarlo vero. Niente orologi, come
+il pallino degli scambi.
+
+**IL LIMITE, DETTO.** Il P2P conta quel che il server sa (gli stati che
+mostrod gli manda, patch 0007): un recapito arrivato solo sul telefono
+dell'altro account non si vede da qui. Per gli ordini del mercatino il
+server sa tutto. A leva `PIU_ACCOUNT_OVUNQUE` spenta il server non manda
+`aspetta`, e dentro Telegram il pallino tace (sul web pure: è lo stesso
+campo).
+
+**LE STRADE SCARTATE.** 1) Il numero sul tappo: nessun altro pallino
+lo porta. 2) Un pallino accanto alla pastiglia del Profilo: il tappo
+del Profilo c'è già e veste lo stesso `.off-dot`, sarebbe un secondo
+posto. 3) Un polling per tenerlo fresco ad app aperta: la regola dei
+pallini è nessun orologio.
+
+**PROVATO.** `prove_pallino_altri_account`, 16 prove: il giudice del
+server su un database di cartone (scambi più ordini pagati, il creato e
+lo spedito no; la presa è «tocca a te» per i due lati), e un banco node
+che ESEGUE `aggiornaAdmDot`, `quantiAspettanoAltri`, `accendiTappoDot`,
+`idConto` e `caricaAccount` veri su un DOM di cartone: spento se aspetta
+solo quello in uso, acceso per un altro, i moderatori e gli account che
+non si spengono a vicenda, leva spenta, rete rotta, demo, e il giudice
+che segue l'account in uso. Due mutazioni, due uccise (contare anche
+quello in uso; dimenticare i moderatori).
+
+**DA GUARDARE SUL CAMPO.** Con due account aperti nella Mini App:
+ricevere un ordine pagato (o una presa P2P) sull'altro account e vedere
+il pallino sul tappo dopo il ritorno in primo piano; fare il gesto e
+vederlo spegnersi alla lettura dopo.
