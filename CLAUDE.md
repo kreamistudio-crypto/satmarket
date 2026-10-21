@@ -93,6 +93,8 @@ modo in cui si rifà un errore già pagato.
   sola lettura. I comandi li scrivo, li esegue Andrea e incolla il
   risultato. Il deploy è suo. Lo stesso vale per il nodo Mostro e per il
   relay. La VM di collaudo no: un gesto alla volta, col suo ok (`docs/COLLAUDO.md`).
+  Quel che resta da fare là si scrive in `docs/DA-FARE-ANDREA.md`, coi
+  comandi pronti: la sessione di Andrea lo legge per prima (21 ott 2026).
 - MAI RELAY VERI IN COLLAUDO E NEI GIRI DAL VIVO, mai eventi pubblicati:
   il server si ferma da solo (`lettura_simulata`, solo loopback), il
   BROWSER no — nel config del giro `MOSTRO_RELAY` e `MOSTRO_RELAY_SPECCHIO`

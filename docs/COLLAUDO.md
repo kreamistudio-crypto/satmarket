@@ -36,6 +36,10 @@ PRIMA che arrivino in produzione. È privata: chi non è in
   senza bocciarlo, lo dice una volta nel bot («📦 Collaudo: le
   dipendenze di … non si installano») e riprova ogni minuto. Niente
   `pip install` a mano sulla VM.
+- Quel che un cantiere lascia da fare sul VPS, sul nodo o sul relay
+  (leve del config, comandi `lncli`, BotFather) non arriva col push: sta
+  in `docs/DA-FARE-ANDREA.md`, coi comandi pronti. La sessione della
+  promozione lo legge prima di promuovere.
 - Andrea prova dal telefono. Quando approva, **una sessione sul suo PC
   fa la promozione**: rebase dei commit di `develop` su `main`,
   rifirma con `andrea-firma-barattolo`, **un solo push** su `main`

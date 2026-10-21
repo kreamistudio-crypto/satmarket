@@ -54348,7 +54348,7 @@ def prove_script_nel_workflow():
     prova("nessuna prova e' definita e mai eseguita", [], orfane)
 
 
-TETTO_CLAUDE_MD = 279   # misurato: 518 righe il giorno del taglio, piu' 20;
+TETTO_CLAUDE_MD = 281   # misurato: 518 righe il giorno del taglio, piu' 20;
                         # 271 il 19 ott 2026: +8 per due regole nuove di
                         # Andrea (il backup prima di ogni deploy, il socket
                         # chiuso solo dal suo thread); 273 lo stesso giorno:
@@ -54357,7 +54357,9 @@ TETTO_CLAUDE_MD = 279   # misurato: 518 righe il giorno del taglio, piu' 20;
                         # aspettano sul ramo); 279 il 20 ott 2026: +6 per
                         # develop e la promozione su main, e il P2P coi
                         # relay veri solo sulla VM di collaudo (cantiere
-                        # collaudo-vm, decisioni di Andrea);
+                        # collaudo-vm, decisioni di Andrea); 281 il 21 ott
+                        # 2026: +2 per la lista dei gesti da fare sul VPS,
+                        # docs/DA-FARE-ANDREA.md (cantiere puntino-account);
                         # salito a 539 col doppio wallet e a 545 col
                         # namespace prestato del nodo; SCESO a 262 il 30 set
                         # 2026 (242 righe + 20): il nodo Mostro e' andato in
