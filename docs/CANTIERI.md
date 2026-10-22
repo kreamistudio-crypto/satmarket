@@ -71139,3 +71139,56 @@ quello in uso; dimenticare i moderatori).
 ricevere un ordine pagato (o una presa P2P) sull'altro account e vedere
 il pallino sul tappo dopo il ritorno in primo piano; fare il gesto e
 vederlo spegnersi alla lettura dopo.
+
+## Mercato e Lavoro: i due tasti in cima alla vetrina, alla Subito.it (22 ott 2026, cantiere mercato-lavoro, richiesta di Alan, su develop per il collaudo)
+
+**COSA.** Fra il marchio e il campo Cerca, due tasti a tutta larghezza:
+«🛍️ Mercato» e «💼 Lavoro». Un tocco separa le due vetrine, come le
+schede di Subito.it. Lavoro tiene SOLO i servizi, Mercato tutto il
+resto; insieme fanno la vetrina intera, nessun annuncio sta in tutte e due
+né in nessuna.
+
+**CHI È LAVORO.** La strada `consegna='servizio'` (il «📅 È un
+servizio» del form) OPPURE la categoria «Lavoro e servizi». La sola
+strada lascerebbe nel Mercato gli annunci di ieri della categoria,
+nati prima della strada; la sola categoria lascerebbe fuori una lezione
+dichiarata servizio in «Lezioni e corsi». Il giudice vive in due
+gemelli: la WHERE di `/api/listings` (`sezione`, col COALESCE perché un
+NULL dentro un NOT farebbe sparire l'annuncio da tutte e due) e
+`annuncioDiLavoro()` nel client, che serve solo alla DEMO.
+
+**IL FILTRO LO FA IL SERVER.** La vetrina è paginata: filtrare nel
+client darebbe pagine mezze vuote e un totale falso. `paramsVetrina`
+manda sempre `sezione`; un server di ieri la ignora (nessun filtro), e
+anche un valore sconosciuto non filtra, mai un 400.
+
+**IN LAVORO SI SPENGONO** le categorie, «Da scoprire», le pillole e la
+fila P2P: parlano tutte del mercato. Le spegne il CSS su
+`#app[data-sez]`, non una classe della vista (quella la guarda l'occhio
+della cronologia), con `!important` perché quelle sezioni si accendono
+con lo style in linea. `vetrinaNudaP2P` dice no fuori dal Mercato, così
+la fila non chiede nemmeno la fotografia.
+
+**LA CATEGORIA DEL LAVORO È UNA PORTA.** Dal Mercato la card «Lavoro e
+servizi» sarebbe sempre vuota: `setCat` la gira in `setSezione('lavoro')`.
+Passando a Lavoro con una categoria accesa si torna a Tutto.
+
+**LE STRADE SCARTATE.** 1) Una terza scheda nella nav in basso: la nav è
+già piena e il gesto chiesto è «in alto, alla Subito». 2) Ricordare la
+sezione fra un'apertura e l'altra: nessuno l'ha chiesto, si vede al
+collaudo. 3) Togliere «Lavoro e servizi» dalla striscia del Mercato: la
+porta costa meno e non lascia vuoto un posto che la gente conosce.
+
+**PROVATO.** `collaudo_ricerca` sulla rotta vera, 5 prove nuove: Lavoro
+prende il servizio per strada e quello per categoria, Mercato il resto,
+la somma fa la vetrina, il totale segue la sezione, una sezione
+sconosciuta non filtra. Il banco node delle card P2P in vetrina ha la
+variabile nuova fra i suoi finti. `PROVE_SEVERE=1 python prove.py`
+verde (la sola saltata è la tappa 2 dell'on-chain, che vuole `embit`
+nel venv).
+
+**DA GUARDARE AL COLLAUDO.** Su collaudo.barattolo.store: i due tasti a
+320 px e in tema scuro; Lavoro coi soli servizi, il ritorno al
+Mercato con la vetrina intera; la card «Lavoro e servizi» che porta a
+Lavoro; l'altezza dell'header (cresce di una riga) con le pillole
+appese sotto.

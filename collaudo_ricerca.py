@@ -288,6 +288,33 @@ def main():
                       barattolo_sessione="")
     prova("...e con la busta dice che l'AI non c'è", False, busta["ai"])
 
+    print("\n[Mercato e Lavoro: i due tasti in cima alla vetrina]")
+    # un servizio dichiarato (la strada) e uno di ieri che lo dice solo
+    # con la categoria: tutti e due sono Lavoro, e nient'altro lo e'
+    con = SRV.db()
+    for tit, cat, via in (("Lezioni di chitarra", "Lezioni e corsi", "servizio"),
+                          ("Imbianchino a domicilio", "Lavoro e servizi", "ritiro")):
+        con.execute(
+            "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+            "categoria,zona,stato,creato,consegna,quantita,valuta) "
+            "VALUES(222,?,'',1000,?,'Milano','attivo',900,?,1,'sats')",
+            (tit, cat, via))
+    con.commit()
+    con.close()
+    lavoro = titoli(cerca(limit=100, sezione="lavoro"))
+    mercato = titoli(cerca(limit=100, sezione="mercato"))
+    tutto = titoli(cerca(limit=100))
+    prova("Lavoro tiene solo i servizi, strada o categoria",
+          ["Imbianchino a domicilio", "Lezioni di chitarra"], sorted(lavoro))
+    prova("...Mercato tutto il resto", sorted(set(tutto) - set(lavoro)),
+          sorted(mercato))
+    prova("...e insieme fanno la vetrina intera", len(tutto),
+          len(lavoro) + len(mercato))
+    prova("il totale segue la sezione", 2,
+          cerca(limit=100, sezione="lavoro")["totale"])
+    prova("una sezione sconosciuta non filtra", sorted(tutto),
+          sorted(titoli(cerca(limit=100, sezione="boh"))))
+
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
     print("=" * 58)

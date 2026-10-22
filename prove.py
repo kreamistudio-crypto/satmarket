@@ -62642,7 +62642,8 @@ let p2pCambiPub = {};
 let DEMO = false, VETRINA = false, myTgId = 111, ACCESO = true;
 function p2pAcceso(){ return ACCESO; }
 let ramoVetrina = 'esplora', activeCat = 'Tutto', vistaBarattolo = false,
-    barattoloOspite = null, ultimaRicercaAI = false, ORDINE = '';
+    barattoloOspite = null, ultimaRicercaAI = false, ORDINE = '',
+    sezioneVetrina = 'mercato';
 let filtroPrezzo = null, filtroSped = false, filtroRitiro = false, filtroDig = false,
     filtroLampo = false, filtroSpedGratis = false, filtroSconto = false,
     filtroAsta = false, filtroCond = '', filtroReg = '';
