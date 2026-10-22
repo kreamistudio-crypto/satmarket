@@ -25505,6 +25505,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         solo_asta: int = 0, solo_sped_gratis: int = 0,
                         solo_sconto: int = 0,
                         condizione: str = "", regione: str = "",
+                        sezione: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -25517,6 +25518,18 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     if cat and cat != "Tutto":
         dove += " AND a.categoria=?"
         par.append(cat)
+    if sezione in ("mercato", "lavoro"):
+        # MERCATO E LAVORO (22 ott 2026, i due tasti in cima alla
+        # vetrina, alla Subito.it): Lavoro tiene SOLO i servizi, Mercato
+        # tutto il resto. Servizio e' la strada 'servizio' o la categoria
+        # che lo dice, cosi' anche un annuncio di ieri senza la strada
+        # finisce dalla parte giusta — gemello di annuncioDiLavoro() nel
+        # client. Il COALESCE perche' un NULL dentro un NOT farebbe
+        # sparire l'annuncio da tutte e due. Valore sconosciuto o
+        # assente (client di ieri) = nessun filtro, mai un 400.
+        _lavoro = ("(COALESCE(a.consegna,'')='servizio'"
+                   " OR COALESCE(a.categoria,'')='Lavoro e servizi')")
+        dove += " AND " + ("" if sezione == "lavoro" else "NOT ") + _lavoro
     if solo_spedizione:
         # Il filtro promette un costo di spedizione DICHIARATO: gli
         # annunci storici ('') restano fuori finche' il venditore non
