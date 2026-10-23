@@ -151539,6 +151539,50 @@ __PEZZO__
           [True, True], o["daVenditore"])
 
 
+def prove_ripristino_visibile():
+    """LA PROVA DEL RIPRISTINO SI VEDE (23 ott 2026, cantiere
+    onchain-ripristino, richiesta di Alan). Dopo «Dimentica» il foglio
+    ritrovava da solo le parole dal cloud al primo ridisegno: chi aveva
+    appena dimenticato le rivedeva con «Mostra», e la prova non provava
+    niente. Ora il dispositivo resta VUOTO, e lo dice, finche' non si
+    tocca «Ripristina dal cloud». E il cloud ha un nome: quello di
+    Telegram, il CloudStorage della Mini App, cifrato con MTProto."""
+    print("\n♻️ La prova del ripristino si vede")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
+    prova("dopo «Dimentica» il foglio mostra il vuoto PRIMA di cercare nelle "
+          "case", True,
+          rendi.index("if (onchainDimenticato && !onchainSemeLocale()) {")
+          < rendi.index("onchainVuotoDopoDimentica()")
+          < rendi.index("await onchainSemeAssicurato()"))
+    dim = pezzo_js(mini, "function onchainDimentica(){", "\n}\n")
+    prova("«Dimentica» cancella e ACCENDE il vuoto", [True, True],
+          ["localStorage.removeItem(onchainChiave())" in dim,
+           "onchainDimenticato = true;" in dim])
+    rip = pezzo_js(mini, "async function onchainRipristina(btn){", "\n}\n")
+    prova("«Ripristina» spegne il vuoto prima di cercare", True,
+          rip.index("onchainDimenticato = false;")
+          < rip.index("await onchainSemeAssicurato();"))
+    vuoto = pezzo_js(mini, "function onchainVuotoDopoDimentica(){", "\n}\n")
+    prova("il vuoto ha il bottone che ripristina, e dice dove sono le parole",
+          [True, True, True],
+          ['onclick="onchainRipristina(this)">♻️ Ripristina dal cloud<' in vuoto,
+           "cloud di Telegram" in vuoto, "MTProto" in vuoto])
+    dove = pezzo_js(mini, "function onchainDoveAbita(){", "\n}\n")
+    guarda = pezzo_js(mini, "async function onchainGuarda(btn){", "\n}\n")
+    prova("il cloud ha un nome: il CloudStorage di Telegram, cifrato con "
+          "MTProto, in nessuna chat", [True, True, True, True],
+          ["<b>CloudStorage</b>" in dove, "cifrata con MTProto" in dove,
+           "Non la trovi in nessuna chat" in dove,
+           "il CloudStorage della Mini App, cifrato con MTProto" in guarda])
+    prova("...e non si promette l'end-to-end", False,
+          "end-to-end" in dove.lower().replace("non e' end-to-end", ""))
+    prova("la prova e' detta in tre passi", [True, True, True],
+          ["1. <b>📏 Prendi il metro</b>" in mini,
+           "2. <b>🧹 Dimentica</b>" in mini,
+           "3. <b>♻️ Ripristina dal cloud</b>" in mini])
+
+
 def prove_ordine_onchain():
     """L'ORDINE ON-CHAIN (23 ott 2026, cantiere onchain-tappa3): la cassa
     che al posto della fattura da' un indirizzo 2-di-3, la sorveglianza
@@ -178400,6 +178444,7 @@ def main():
     prove_banco_chiavi_onchain,
     prove_indirizzo_ordine_onchain,
     prove_ordine_onchain,
+    prove_ripristino_visibile,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,

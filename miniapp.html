@@ -53470,6 +53470,12 @@ function onchainAttesa(btn, testo){
 }
 
 let onchainSrv = null;         // quel che il server dice (xpub, strada)
+/* LA PROVA DEL RIPRISTINO SI VEDE (23 ott 2026, richiesta di Alan): dopo
+   «Dimentica» la pagina NON ritrova da sola le parole — prima lo faceva
+   al ridisegno, e chi aveva appena dimenticato le rivedeva subito, senza
+   capire dove fossero finite. Finche' questo e' vero e il dispositivo e'
+   vuoto, il foglio mostra il vuoto e il bottone «Ripristina dal cloud». */
+let onchainDimenticato = false;
 let onchainParoleViste = false;  // le dodici parole si mostrano a richiesta
 
 /* IL FOGLIO. Si ridisegna intero a ogni gesto: e' una pagina di prova
@@ -53494,6 +53500,11 @@ async function renderOnchain(){
       if (!r.ok) throw new Error('il server non risponde');
       onchainSrv = await r.json();
     }
+    if (onchainDimenticato && !onchainSemeLocale()) {
+      box.innerHTML = onchainVuotoDopoDimentica();
+      return;
+    }
+    onchainDimenticato = false;
     /* LA CHIAVE C'E' GIA' QUANDO APRI: se non l'aveva, nasce qui — in
        silenzio, cercandola prima nelle sue case. Nessuna schermata di
        creazione, che e' il punto della tappa 1c. */
@@ -53622,16 +53633,22 @@ function onchainConSeme(parole, k, miaXpub, verifiche){
 
     <div class="payout" style="border-color:var(--danger)">
       <h4>7. La prova del ripristino</h4>
-      <div class="hint">Il punto di tutto: <b>dimentica</b> il seme su
-        questo dispositivo, poi <b>ripristina</b> dal cloud — e
-        Barattolo confronta da sé l'indirizzo di prima con quello di
-        dopo. Se tornano identici, il backup regge.</div>
+      <div class="hint">Il punto di tutto: se perdi questo telefono,
+        le dodici parole si recuperano dal cloud. Si prova in tre passi:
+        <br>1. <b>📏 Prendi il metro</b>: ricordo l'indirizzo che fanno le
+        tue parole di adesso;
+        <br>2. <b>🧹 Dimentica</b>: le cancello da questo dispositivo, e il
+        foglio resta vuoto;
+        <br>3. <b>♻️ Ripristina dal cloud</b>: le riprendo da Telegram e
+        confronto l'indirizzo con quello del metro.</div>
       ${prima
         ? `<div class="hint">Metro preso: <span class="mono">${esc(prima.indirizzo)}</span></div>`
         : `<div class="hint">Nessun metro ancora: premi «Prendi il metro» prima di dimenticare.</div>`}
       ${uguale
         ? `<div class="hint" style="color:var(--ok)"><b>✅ Il ripristino
-             funziona</b>: indirizzo e descrittore sono identici a prima.</div>`
+             funziona</b>: indirizzo e descrittore sono identici a prima${
+             onchainNato === 'nuvola' ? ', e le parole sono tornate dal cloud di Telegram'
+             : onchainNato === 'relay' ? ', e le parole sono tornate dai relay Nostr' : ''}.</div>`
         : prima
         ? `<div class="hint" style="color:var(--danger)"><b>⚠️ Diverso da
              prima</b>: questo seme non è quello di cui hai preso il
@@ -54170,6 +54187,13 @@ function onchainDoveAbita(){
   if (onchainCase.nuvola === true) {
     righe.push('<div>☁️ <b>Il cloud di Telegram</b> — copia fatta: la '
              + 'ritrovi da ogni dispositivo dove entri con Telegram</div>');
+    righe.push('<div class="hint" style="line-height:1.5;margin:-2px 0 4px 22px">'
+             + 'Non la trovi in nessuna chat: sta nel <b>CloudStorage</b>, '
+             + 'lo spazio che Telegram dà a ogni Mini App sui suoi server, '
+             + 'legato al tuo account e a Barattolo. Viaggia e resta '
+             + '<b>cifrata con MTProto</b>, il protocollo di Telegram, e '
+             + 'la legge solo la Mini App di Barattolo aperta col tuo '
+             + 'account.</div>');
   } else if (onchainCase.nuvola === false && !cloudTelegram()) {
     /* FUORI DA TELEGRAM (20 ott 2026, richiesta di Andrea): il cloud
        qui non esiste, e «non ha risposto» diceva un guasto che non
@@ -54261,11 +54285,14 @@ async function onchainGuarda(btn){
   } else if (!r.testo) {
     righe.push('☁️ Nel cloud di Telegram non c\'è niente.');
   } else {
-    let quante = 0;
-    try { quante = (JSON.parse(r.testo).parole || '').split(' ').length; }
-    catch(e){ quante = 0; }
+    let quante = 0, strada = '';
+    try {
+      const c = JSON.parse(r.testo);
+      quante = (c.parole || '').split(' ').length;
+      strada = c.strada || '';
+    } catch(e){ quante = 0; }
     righe.push(quante
-      ? `☁️ Nel cloud ci sono <b>${quante} parole</b> e la strada dell'ordine.`
+      ? `☁️ Nel cloud di Telegram (il CloudStorage della Mini App, cifrato con MTProto) ci sono <b>${quante} parole</b> e la strada del conto (<span class="mono">${esc(strada)}</span>).`
       : '☁️ Nel cloud c\'è qualcosa, ma non è nella forma che aspetto.');
   }
   righe.push(suiRelay
@@ -54323,17 +54350,36 @@ function onchainDimentica(){
      c'era un `confirm`, e la prova l'ha preso. */
   chiediConferma({
     titolo: 'Dimentico il seme qui?',
-    corpo: 'Cancello le dodici parole da QUESTO dispositivo. Il backup '
-         + 'nel cloud di Telegram resta, ed è quello che serve a '
-         + 'ritrovarle: è proprio la prova da fare.',
+    corpo: 'Cancello le dodici parole dalla memoria di QUESTO browser, '
+         + 'come se avessi perso il telefono. La copia nel cloud di '
+         + 'Telegram (e sui relay, se ce l\'hai) resta: è da lì che le '
+         + 'riprendi col ripristino.',
     etichetta: '🧹 Dimentica qui',
     poi: ()=>{
       try { localStorage.removeItem(onchainChiave()); } catch(e){}
       onchainParoleViste = false;
-      toast('🧹 Dimenticato qui. Ora prova «Ripristina dal cloud».');
+      onchainDimenticato = true;
+      toast('🧹 Le parole non sono più su questo dispositivo');
       renderOnchain();
     },
   });
+}
+
+/* Il foglio dopo «Dimentica»: il dispositivo e' vuoto, e lo si vede. */
+function onchainVuotoDopoDimentica(){
+  const prima = onchainPrimaLetta();
+  return `<div class="payout" style="border-color:var(--danger)">
+      <h4>🧹 Su questo dispositivo le parole non ci sono più</h4>
+      <div class="hint">Le ho cancellate dalla memoria di questo browser:
+        «Mostra le dodici parole» non ha più niente da mostrare, e da qui
+        non si firma niente. È il telefono perso della prova.</div>
+      <div class="hint" style="margin-top:8px">Restano nelle case:
+        <b>☁️ il cloud di Telegram</b> (il CloudStorage della Mini App,
+        cifrato con MTProto) e, se hai collegato Nostr, <b>🟣 i relay</b>.
+        ${prima ? 'Il metro c\'è: dopo il ripristino ti dico se sono le stesse di prima.'
+                : 'Non hai preso il metro: il ripristino funziona lo stesso, ma non avrò niente con cui confrontarle.'}</div>
+      <button class="btn orange" onclick="onchainRipristina(this)">♻️ Ripristina dal cloud</button>
+    </div>`;
 }
 
 /* IL RIPRISTINO NON E' PIU' UN BOTTONE SOLO SUO: dopo il «dimentica»
@@ -54347,6 +54393,7 @@ async function onchainRipristina(btn){
   try {
     const prima = onchainNato;
     onchainNato = '';
+    onchainDimenticato = false;
     await onchainSemeAssicurato();
     rip();
     toast(onchainNato === 'nuvola' ? '♻️ Ritrovata nel cloud di Telegram'

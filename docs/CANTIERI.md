@@ -71342,3 +71342,25 @@ cancello (oggi due admin). Il venditore apre Profilo → Amministrazione →
 oggetto. Chi compra sceglie ⛓️ alla cassa, paga dal suo wallet signet
 (un faucet signet dà i sats), e dopo una conferma tocca «Libera i sats».
 Il venditore riapre la Mini App: i sats partono da soli.
+
+## La prova del ripristino si vede, e il cloud ha un nome (23 ott 2026, cantiere onchain-ripristino, richiesta di Alan, su develop)
+
+**COSA.** Nel foglio «⛓️ On-chain (prova)»:
+- **«Dimentica» resta dimenticato.** Prima la pagina, ridisegnandosi
+  subito dopo, ritrovava da sola le parole dal cloud: «Mostra le dodici
+  parole» le rimostrava e non si capiva dove fossero state buttate. Ora
+  il foglio dice «🧹 Su questo dispositivo le parole non ci sono più»,
+  spiega dove restano, e ha «♻️ Ripristina dal cloud». Il ripristino le
+  riprende e il blocco 7 dice se sono le stesse del metro, e da dove sono
+  tornate.
+- **La prova in tre passi**, scritta: 📏 Prendi il metro, 🧹 Dimentica,
+  ♻️ Ripristina dal cloud.
+- **Il cloud ha un nome.** È il CloudStorage che Telegram dà a ogni Mini
+  App sui suoi server, legato all'account e a Barattolo, cifrato con
+  MTProto; non sta in nessuna chat, e lo legge solo la Mini App di
+  Barattolo aperta con quell'account. «Guarda cosa c'è nelle case» lo dice
+  e mostra la strada del conto. Non si promette l'end-to-end, che il
+  CloudStorage non è: per questo Nostr resta la casa consigliata.
+
+**PROVATO.** `prove_ripristino_visibile` (7 nuove); suite e collaudi
+della CI nel messaggio del commit.
