@@ -6148,6 +6148,20 @@ def init_db():
         azione TEXT NOT NULL,     -- pubblica | sold | active | ritira
         creato INTEGER
     );
+    CREATE TABLE IF NOT EXISTS ritiri_per_scelta(
+        -- LE CANCELLAZIONI NATE DAL «NO» (23 ott 2026, cantiere firme-
+        -- giuste, decisione di Andrea). Un 'ritira' in coda non dice
+        -- PERCHE' c'e': l'annuncio e' stato tolto, e' un doppione ritirato
+        -- a mano, oppure il venditore ha scelto «Pubblica i miei annunci
+        -- anche sul mio profilo Nostr: no». Solo nell'ultimo caso, firmata
+        -- la cancellazione, l'annuncio torna in piazza col nome di
+        -- Barattolo (`_ripubblica_col_nome_nostro`), e solo quelle
+        -- cancellazioni un «si'» successivo butta via. Qui c'e' l'elenco:
+        -- lo scrive il «no», lo consuma la ripubblicazione, lo svuota il
+        -- «si'». Niente tg_id: il padrone e' quello dell'annuncio.
+        annuncio_id INTEGER PRIMARY KEY,
+        creato INTEGER
+    );
     CREATE TABLE IF NOT EXISTS xp_eventi(
         -- IL REGISTRO DEGLI XP, ed e' append-only per una ragione che
         -- vale la pena scrivere: distintivi e rating si RICALCOLANO
@@ -48212,8 +48226,18 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
     # IL TOTALE, oltre ai 20 di questo giro (ott 2026): il client rigira
     # finche' la coda si svuota, e il Profilo dice «Firma i tuoi N
     # annunci» col numero vero, non col tetto del LIMIT.
-    totale = con.execute("SELECT COUNT(*) FROM firme_nostr WHERE tg_id=?",
+    # ...E LE CANCELLAZIONI A PARTE (23 ott 2026, cantiere firme-giuste,
+    # decisione di Andrea): «Firma i tuoi N annunci» contava anche i
+    # ritiri, e a chi ha scelto «no» diceva che restano solo qui. Il
+    # totale sono le PUBBLICAZIONI; i ritiri che si possono firmare
+    # (con un evento da cancellare) hanno il loro numero e la loro frase.
+    totale = con.execute("SELECT COUNT(*) FROM firme_nostr WHERE tg_id=? "
+                         "AND azione<>'ritira'",
                          (user["id"],)).fetchone()[0]
+    ritiri_in_coda = con.execute(
+        "SELECT COUNT(*) FROM firme_nostr f JOIN annunci a "
+        "ON a.id=f.annuncio_id WHERE f.tg_id=? AND f.azione='ritira' "
+        "AND a.nostr_event_id<>''", (user["id"],)).fetchone()[0]
     con.close()
 
     adesso = time.time()
@@ -48269,7 +48293,8 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         fuori.append({"biglietto": biglietto, "annuncio_id": a["id"],
                       "titolo": a["titolo"], "azione": a["azione"],
                       "evento": evento})
-    return {"firme": fuori, "totale": totale, "relays": _relays_import(),
+    return {"firme": fuori, "totale": totale, "ritiri": ritiri_in_coda,
+            "relays": _relays_import(),
             "collaudo": MODALITA_COLLAUDO}
 
 
@@ -48363,7 +48388,7 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
     if b["azione"] == "ritira":
         # Chi ha scelto «no» li ritrova col nome di Barattolo, ADESSO
         # che il suo evento e' cancellato e non fanno due teste
-        asyncio.create_task(_ripubblica_col_nome_nostro(ids))
+        asyncio.create_task(_ripubblica_col_nome_nostro(ids, dopo_ritiro=True))
     if vecchio:
         # Subito, senza aspettare il giro dell'orologio: il doppione in
         # piazza dura quanto questa riga. Fail-open come ogni gancio
@@ -48373,24 +48398,35 @@ async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True, "evento": ev["id"]}
 
 
-async def _ripubblica_col_nome_nostro(ids) -> int:
-    """Dopo una cancellazione firmata dal venditore: gli annunci di chi
-    ha scelto «no» (annunci_sul_suo_profilo) tornano in piazza col nome
-    di Barattolo — solo quelli vivi (attivi o venduti), nati qui, e
-    senza piu' un evento. Un ritiro per un annuncio rimosso, o di chi
-    ha detto «si'», non ripubblica niente. Fail-open come ogni gancio
-    Nostr. Torna quanti ne ha mandati."""
+async def _ripubblica_col_nome_nostro(ids, dopo_ritiro: bool = False) -> int:
+    """Gli annunci di chi ha scelto «no» (annunci_sul_suo_profilo)
+    tornano in piazza col nome di Barattolo — solo quelli vivi (attivi o
+    venduti), nati qui, e senza piu' un evento. Di chi ha detto «si'»
+    non si ripubblica niente. Fail-open come ogni gancio Nostr. Torna
+    quanti ne ha mandati.
+    `dopo_ritiro` (23 ott 2026, firme-giuste): la chiamata dopo una
+    cancellazione firmata. Allora rinascono SOLO quelli che il «no» ha
+    accodato (`ritiri_per_scelta`), e l'elenco si consuma: un doppione
+    ritirato a mano col «si'» e firmato dopo un «no» resta fuori dalla
+    piazza, come il suo padrone aveva chiesto."""
     fatti = 0
     try:
         con = db()
+        segni = ",".join("?" * len(ids))
+        filtro = (" AND id IN (SELECT annuncio_id FROM ritiri_per_scelta)"
+                  if dopo_ritiro else "")
         righe = con.execute(
             "SELECT id, venditore_id, stato FROM annunci WHERE id IN (%s) "
             "AND stato IN ('attivo','venduto') AND contatto_nostr='' "
-            "AND nostr_event_id=''" % ",".join("?" * len(ids)),
+            "AND nostr_event_id=''%s" % (segni, filtro),
             [int(i) for i in ids]).fetchall() if ids else []
         da_fare = [(r["id"], "sold" if r["stato"] == "venduto" else "active")
                    for r in righe
                    if not annunci_sul_suo_profilo(con, r["venditore_id"])]
+        if dopo_ritiro and ids:
+            con.execute("DELETE FROM ritiri_per_scelta WHERE annuncio_id "
+                        "IN (%s)" % segni, [int(i) for i in ids])
+            con.commit()
         con.close()
     except Exception as e:
         print(f"⚠️ Ripubblicazione col nome di Barattolo saltata: {e}")
@@ -48429,10 +48465,15 @@ async def scegli_annunci_sul_profilo(req: Request,
                 (si, user["id"]))
     da_ritirare, subito, accodati = 0, [], 0
     if si:
+        # solo le cancellazioni che il «no» aveva accodato: un doppione
+        # ritirato a mano, o un annuncio tolto, resta da cancellare
         con.execute(
             "DELETE FROM firme_nostr WHERE tg_id=? AND azione='ritira' "
-            "AND annuncio_id IN (SELECT id FROM annunci "
-            "WHERE stato IN ('attivo','venduto'))", (user["id"],))
+            "AND annuncio_id IN (SELECT annuncio_id FROM ritiri_per_scelta)",
+            (user["id"],))
+        con.execute(
+            "DELETE FROM ritiri_per_scelta WHERE annuncio_id IN "
+            "(SELECT id FROM annunci WHERE venditore_id=?)", (user["id"],))
         accodati = _accoda_trasloco_di(con, user["id"]) if sua else 0
     else:
         # quelli che aspettavano di NASCERE a nome suo nascono col nostro
@@ -48444,11 +48485,19 @@ async def scegli_annunci_sul_profilo(req: Request,
         con.execute("DELETE FROM firme_nostr WHERE tg_id=? "
                     "AND azione<>'ritira'", (user["id"],))
         for r in con.execute(
-                "SELECT id FROM annunci WHERE venditore_id=? "
-                "AND nostr_autore<>'' AND nostr_event_id<>'' "
-                "AND contatto_nostr=''", (user["id"],)).fetchall():
-            accoda_firma(con, r["id"], user["id"], "ritira")
+                "SELECT a.id, f.azione FROM annunci a "
+                "LEFT JOIN firme_nostr f ON f.annuncio_id=a.id "
+                "WHERE a.venditore_id=? AND a.nostr_autore<>'' "
+                "AND a.nostr_event_id<>'' AND a.contatto_nostr=''",
+                (user["id"],)).fetchall():
             da_ritirare += 1
+            if r["azione"] == "ritira":
+                continue     # gia' da cancellare per un'altra ragione:
+                             # non e' del «no», e non rinascera'
+            accoda_firma(con, r["id"], user["id"], "ritira")
+            con.execute("INSERT OR IGNORE INTO ritiri_per_scelta"
+                        "(annuncio_id, creato) VALUES(?,?)",
+                        (r["id"], int(time.time())))
     con.commit()
     con.close()
     if subito:

@@ -71699,3 +71699,66 @@ lista vuota.
 
 **PROVATO.** `prove_istanza_prova`, sezione «9 bis» (5 nuove); suite e
 collaudi della CI nel messaggio del commit.
+
+## Le firme giuste: le cancellazioni contate a parte, e il doppione ritirato che non rinasce col nome di Barattolo (23 ott 2026, cantiere firme-giuste, decisione di Andrea)
+
+**IL FATTO.** Due cose notate chiudendo «Nostr dal telefono e gli annunci
+separati» (`2cee853`), e Andrea ha detto sì a tutte e due.
+1) La riga del Profilo «✍️ Firma i tuoi N annunci per Nostr» contava
+   anche le cancellazioni e diceva «finché non li firmi restano solo
+   qui»: a chi ha scelto «no» diceva il falso, perché i suoi annunci sono
+   ancora sul suo profilo Nostr e la firma serve a toglierli.
+2) Un doppione ritirato a mano col «sì» (la cancellazione aspetta la sua
+   firma) e firmato dopo un «no» rinasceva col nome di Barattolo; e un
+   «sì» successivo buttava via ANCHE quella cancellazione, lasciando il
+   doppione sul suo profilo.
+
+**LE DECISIONI.**
+- La coda dice due numeri: `totale` (le sole pubblicazioni) e `ritiri`
+  (le cancellazioni con un evento da cancellare). Nel Profilo la riga
+  delle pubblicazioni conta le prime; le cancellazioni hanno la loro
+  riga, «✍️ Togli i tuoi N annunci dal tuo profilo Nostr», con la frase
+  del caso: con «no» «Hai scelto di tenerli separati: con una tua firma
+  chiediamo ai relay di cancellarli dal tuo profilo Nostr, poi escono
+  col nome di Barattolo»; con «sì» «Sono ancora sul tuo profilo Nostr:
+  con una tua firma chiediamo ai relay di cancellarli». Il gesto a mano
+  (`firmaCodaAMano('ritiri')`) dice nel foglio e nell'avviso finale
+  quel che fa davvero, non «sono su Nostr a nome tuo».
+- `ritiri_per_scelta`: l'elenco delle cancellazioni nate dal «no». Il
+  «no» ci scrive solo quelle che accoda lui; una cancellazione già in
+  coda per un'altra ragione resta fuori. Firmata la cancellazione,
+  rinascono col nostro nome SOLO quelle dell'elenco, che si consuma; il
+  «sì» butta solo quelle. Niente `tg_id` nella tabella (il padrone è
+  quello dell'annuncio): così non entra nel censimento della fusione.
+
+**LE STRADE SCARTATE.** Un'azione nuova in `firme_nostr` (per esempio
+«ritira-scelta»): ogni filtro `azione<>'ritira'` la leggerebbe come una
+pubblicazione. Una colonna su `annunci`: i banchi a mano che eseguono la
+firma creano `annunci` con quattro colonne e sarebbero esplosi.
+Riconoscere il doppione dalla coppia (importato, nativo): una seconda
+lettura della deduplica, che un giorno direbbe un'altra cosa.
+
+**COSA È PROVATO.** `collaudo_annunci_sul_profilo` (server vero, chiavi
+vere): la coda conta 0 pubblicazioni e 1 cancellazione col doppione in
+coda; il «no» segna le altre tre e non il doppione; un «sì» prima di
+firmare butta solo quelle del «no»; di nuovo «no», una firma per quattro,
+e firmata tornano col nostro nome le tre del «no» e il doppione resta
+fuori dalla piazza; l'elenco si consuma. LA ROTTURA APPOSTA, su una copia:
+togliere il filtro della ripubblicazione (2 rosse), segnare anche il
+doppione nel «no» (4 rosse), rimettere il «sì» di ieri che butta tutto
+(3 rosse) — ognuna fa rosso il collaudo. In `prove_nostr_da_telefono` le
+sentinelle dei due conti, delle due frasi e dell'elenco. Il giro dal vivo
+a 360 px, chiaro e scuro, con un «no» e due cancellazioni seminate: la
+riga dice «Togli i tuoi 2 annunci dal tuo profilo Nostr» con la frase
+dei separati, e niente «restano solo qui»; col «sì» la frase sua.
+
+**DA GUARDARE.** Il promemoria settimanale (`sollecita_firme_nostr`)
+conta anche lui le cancellazioni e dice «per finire su Nostr a nome
+TUO»: stesso difetto, non toccato (fuori dal chiesto).
+
+**IL GIRO.** Sopra `b50fb1f` (develop, fermo durante il cantiere: nessun
+rebase), col codice di questo commit: `PROVE_SEVERE=1 python prove.py`
+26.173 passate, 3 fallite — le tre di `deploy.sh --avvisa` e
+BACKUP-CADUTO, che su questo PC Windows falliscono uguali su develop
+pulito (verbale di ieri, «Nostr dal telefono»): della macchina, non del
+cantiere. I collaudi della CI: 99 verdi, 0 rossi.

@@ -214,17 +214,69 @@ async def scenario():
     a4 = annuncio(S, "Tavolo")
     await S.annuncio_su_nostr(a4, "active")
     con = S.db()
+    # una cancellazione NATA DAL «NO» e non ancora firmata: in coda e
+    # nell'elenco del «no», come la scrive scegli_annunci_sul_profilo
     con.execute("INSERT INTO firme_nostr(annuncio_id, tg_id, azione, creato) "
                 "VALUES(?,?,?,?)", (a4, LUI, "ritira", int(time.time())))
+    con.execute("INSERT INTO ritiri_per_scelta(annuncio_id, creato) "
+                "VALUES(?,?)", (a4, int(time.time())))
     con.commit()
     con.close()
     await json_di({"si": True})
     r = await S.scegli_annunci_sul_profilo(None, "", "")
-    prova("una cancellazione non firmata su un annuncio vivo si butta, e "
+    prova("una cancellazione del «no» non firmata si butta, e "
           "i nostri quattro eventi si accodano per la sua firma",
           (True, [(a1, "pubblica"), (a2, "pubblica"), (a3, "pubblica"),
                   (a4, "pubblica")]),
           (r["si"], coda(S)))
+
+    print("\n[il doppione ritirato col «si'» non rinasce dopo un «no»]")
+    # IL CASO RARO (23 ott 2026, cantiere firme-giuste, decisione di
+    # Andrea): col «si'» il venditore ritira a mano un doppione — e' suo,
+    # quindi la cancellazione aspetta la sua firma. Poi sceglie «no». La
+    # cancellazione del doppione non e' del «no»: firmata, il doppione
+    # deve restare FUORI dalla piazza, non tornarci col nome di Barattolo.
+    await firma_la_coda()
+    prova("firmati: i quattro sono di nuovo suoi in piazza",
+          [sua] * 4, [riga(S, a)[1] for a in (a1, a2, a3, a4)])
+    await S.ritira_da_nostr(a4)            # la strada vera del doppione
+    prova("il doppione si accoda per la SUA cancellazione",
+          [(a4, "ritira")], coda(S))
+    d = await S.firme_nostr_da_fare("", "")
+    prova("la coda conta le cancellazioni a parte: zero annunci da "
+          "pubblicare, una cancellazione", (0, 1),
+          (d.get("totale"), d.get("ritiri")))
+    await json_di({"si": False})
+    r = await S.scegli_annunci_sul_profilo(None, "", "")
+    con = S.db()
+    segnati = sorted(x[0] for x in con.execute(
+        "SELECT annuncio_id FROM ritiri_per_scelta").fetchall())
+    con.close()
+    prova("il «no» accoda le altre tre e le segna come sue; il doppione "
+          "resta da cancellare ma NON e' del «no»",
+          (4, sorted([a1, a2, a3]), [(a, "ritira") for a in (a1, a2, a3, a4)]),
+          (r["da_ritirare"], segnati, coda(S)))
+    await json_di({"si": True})
+    await S.scegli_annunci_sul_profilo(None, "", "")
+    prova("un «si'» prima di firmare butta solo le cancellazioni del «no»: "
+          "quella del doppione resta", [(a4, "ritira")], coda(S))
+    await json_di({"si": False})
+    await S.scegli_annunci_sul_profilo(None, "", "")
+    d = await S.firme_nostr_da_fare("", "")
+    prova("di nuovo «no»: una firma sola per le quattro cancellazioni, e "
+          "nessun annuncio da pubblicare", (0, 4, 1),
+          (d.get("totale"), d.get("ritiri"), len(d["firme"])))
+    SPEDITI.clear()
+    await firma_la_coda()
+    nati = sorted(next(t[1] for t in e["tags"] if t[0] == "d")
+                  for e in SPEDITI if e["kind"] == 30402)
+    prova("firmata: le tre del «no» tornano col nome di Barattolo, il "
+          "doppione NO", sorted(f"barattolo-{a}" for a in (a1, a2, a3)), nati)
+    prova("...il doppione resta fuori dalla piazza", ("", ""), riga(S, a4))
+    con = S.db()
+    resti = con.execute("SELECT COUNT(*) FROM ritiri_per_scelta").fetchone()[0]
+    con.close()
+    prova("...e l'elenco del «no» si e' consumato", 0, resti)
 
 
 def main():

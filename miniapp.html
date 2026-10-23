@@ -38143,10 +38143,24 @@ function renderIdentita(){
      annunci fermi e l'avvio non e' riuscito a firmarli da solo — cioe'
      senza bunker ne' estensione, tipicamente dopo un ingresso con la
      nsec, che non si conserva. */
-  const btnCoda = (myNpubVerified && firmeInAttesa > 0)
-    ? `<button class="btn" style="margin:0 0 8px" onclick="firmaCodaAMano()">✍️ Firma ${firmeInAttesa === 1 ? 'il tuo annuncio' : `i tuoi ${firmeInAttesa} annunci`} per Nostr</button>` +
+  /* LE CANCELLAZIONI A PARTE (23 ott 2026, cantiere firme-giuste,
+     decisione di Andrea): «Firma i tuoi N annunci» le contava, e a chi
+     ha scelto di tenerli separati diceva «restano solo qui», che per lui
+     e' falso — sono ancora sul suo profilo Nostr. La riga delle
+     pubblicazioni conta solo quelle; le cancellazioni hanno la loro, con
+     la frase del suo caso. */
+  const quanti = n => n === 1 ? 'il tuo annuncio' : `i tuoi ${n} annunci`;
+  const btnPubbl = (myNpubVerified && firmeInAttesa > 0)
+    ? `<button class="btn" style="margin:0 0 8px" onclick="firmaCodaAMano()">✍️ Firma ${quanti(firmeInAttesa)} per Nostr</button>` +
       sub(`Finché non li firmi restano solo qui, non sul tuo profilo Nostr. Incolla la nsec una volta: resta solo su questo dispositivo, e da lì firma da sola.`)
     : '';
+  const btnRitiri = (myNpubVerified && ritiriInAttesa > 0)
+    ? `<button class="btn" style="margin:0 0 8px" onclick="firmaCodaAMano('ritiri')">✍️ Togli ${quanti(ritiriInAttesa)} dal tuo profilo Nostr</button>` +
+      sub(myAnnunciSulProfilo
+        ? `Sono ancora sul tuo profilo Nostr: con una tua firma chiediamo ai relay di cancellarli.`
+        : `Hai scelto di tenerli separati: con una tua firma chiediamo ai relay di cancellarli dal tuo profilo Nostr, poi escono col nome di Barattolo.`)
+    : '';
+  const btnCoda = btnPubbl + btnRitiri;
   let nsRiga;
   if (!myNpub) {
     nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo.', btnFirma);
@@ -51446,6 +51460,11 @@ async function firmatarioAutomatico(){
 /* Quante firme aspettano ancora, dall'ultimo giro: la riga «Firma i
    tuoi annunci» del Profilo legge questo. -1 = non ancora chiesto. */
 let firmeInAttesa = -1;
+/* ...e quante CANCELLAZIONI (23 ott 2026, cantiere firme-giuste,
+   decisione di Andrea): non sono annunci da mettere su Nostr ma annunci
+   da TOGLIERE dal suo profilo, e hanno la loro riga e la loro frase
+   (vedi renderIdentita). Le conta il server a parte (`ritiri`). */
+let ritiriInAttesa = -1;
 
 async function svuotaFirmeNostr(fPronto, alLogin){
   /* fPronto: un firmatario gia' in mano (appena usato per collegare la
@@ -51456,7 +51475,7 @@ async function svuotaFirmeNostr(fPronto, alLogin){
      TORNA quante firme restano (0 = tutto in piazza). */
   if (DEMO) return 0;
   if (!alLogin && (VETRINA || !(myNpubAccesso || myNpubVerified))) return 0;
-  let auto = null, pub = '', resto = 0;
+  let auto = null, pub = '', resto = 0, pubbl = 0, canc = 0;
   try {
     /* TUTTI I GIRI, non uno (ott 2026): il server ne prepara 20 alla
        volta, e chi ne ha 25 restava con 5 in coda fino all'apertura
@@ -51470,8 +51489,10 @@ async function svuotaFirmeNostr(fPronto, alLogin){
         if (!r.ok) return resto;
         d = await r.json();
       } catch(e){ return resto; }
-      resto = d.totale ?? (d.firme || []).length;
-      if (!d.firme || !d.firme.length) { resto = 0; break; }
+      pubbl = d.totale ?? (d.firme || []).filter(v => v.azione !== 'ritira').length;
+      canc = d.ritiri ?? 0;
+      resto = pubbl + canc;
+      if (!d.firme || !d.firme.length) { resto = pubbl = canc = 0; break; }
       if (!auto) {
         auto = fPronto ? {f: fPronto, chiudi: false} : await firmatarioAutomatico();
         if (!auto) {
@@ -51534,7 +51555,12 @@ async function svuotaFirmeNostr(fPronto, alLogin){
                                      'Content-Type':'application/json'},
              body: JSON.stringify({biglietto: voce.biglietto,
                                    pubkey: pub, sig: firmato.sig})});
-          if (r.ok) { fatte++; resto = Math.max(0, resto - (voce.quanti || 1)); }
+          if (r.ok) {
+            fatte++;
+            if (voce.azione === 'ritira') canc = Math.max(0, canc - (voce.quanti || 1));
+            else pubbl = Math.max(0, pubbl - 1);
+            resto = pubbl + canc;
+          }
           console.log(`🟪 [coda] #${voce.annuncio_id} (${voce.azione}) `
             + `firmato e in piazza`);
         } catch(e){ /* i relay ce l'hanno: il server si allinea al giro dopo */ }
@@ -51543,8 +51569,9 @@ async function svuotaFirmeNostr(fPronto, alLogin){
     }
   } finally {
     if (auto && auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
-    if (!alLogin && firmeInAttesa !== resto) {
-      firmeInAttesa = resto;
+    if (!alLogin && (firmeInAttesa !== pubbl || ritiriInAttesa !== canc)) {
+      firmeInAttesa = pubbl;
+      ritiriInAttesa = canc;
       if (typeof renderIdentita === 'function') { try { renderIdentita(); } catch(e){} }
     }
   }
@@ -51556,11 +51583,16 @@ async function svuotaFirmeNostr(fPronto, alLogin){
    nsec, che non si conserva (regola ferrea 2). La si incolla qui, firma
    tutta la coda nello stesso gesto e se ne va. Un gesto dell'utente,
    mai all'avvio: aprire il foglio da solo sarebbe l'imboscata. */
-async function firmaCodaAMano(){
+async function firmaCodaAMano(cosa){
   haptic();
   if (DEMO) { toast('In demo non c\'è niente da firmare 🙂'); return; }
+  /* `cosa` = 'ritiri' (23 ott 2026, firme-giuste): la firma che TOGLIE
+     gli annunci dal suo profilo — dire «sono su Nostr a nome tuo» a chi
+     li sta togliendo sarebbe il contrario del vero */
+  const ritiri = cosa === 'ritiri';
   const finito = (resto) => toast(resto
     ? `🟣 Ne restano ${resto} da firmare: riprova fra poco`
+    : ritiri ? '🟣 Fatto: abbiamo chiesto ai relay di cancellarli, ma alcuni potrebbero tenerne una copia'
     : '🟣 Fatto: i tuoi annunci sono su Nostr a nome tuo', 6000);
   const auto = await firmatarioAutomatico();
   if (auto) {
@@ -51573,9 +51605,12 @@ async function firmaCodaAMano(){
     await ricordaNsecSeMia(f);   // la prima e l'ultima volta a mano
     finito(await svuotaFirmeNostr(f));
   });
-  el('nostrSheetSub').innerHTML =
-    'I tuoi annunci vanno su Nostr a nome tuo: serve la firma della tua '
-    + 'chiave, una volta sola. La chiave privata <b>non viene mai '
+  el('nostrSheetSub').innerHTML = (ritiri
+    ? 'Per togliere i tuoi annunci dal tuo profilo Nostr serve la firma '
+      + 'della tua chiave, una volta sola.'
+    : 'I tuoi annunci vanno su Nostr a nome tuo: serve la firma della tua '
+      + 'chiave, una volta sola.')
+    + ' La chiave privata <b>non viene mai '
     + 'inviata</b>: resta su questo dispositivo, e da qui le prossime '
     + 'firme partono da sole.';
 }

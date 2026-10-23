@@ -898,7 +898,7 @@ def prove_anello():
     CHIAVE = "bb" * 32
     EV_NUOVO = "ab" * 32
 
-    async def _niente_da_ripubblicare(ids):
+    async def _niente_da_ripubblicare(ids, dopo_ritiro=False):
         return 0
 
     def firma(azione, annuncio):
@@ -120392,6 +120392,42 @@ def prove_nostr_da_telefono():
     prova("il messaggio onesto sulla NIP-09 e' quello chiesto da Andrea",
           True, "Chiediamo ai relay di cancellarli, ma alcuni potrebbero "
                 "tenerne una copia." in mini)
+
+    # --- I DUE RITOCCHI (23 ott 2026, cantiere firme-giuste) ---
+    # 1) le cancellazioni non sono «annunci da firmare per Nostr»
+    prova("il totale della coda conta solo le pubblicazioni, le "
+          "cancellazioni hanno il loro numero", (True, True),
+          ("\"AND azione<>'ritira'\"," in fd, '"ritiri": ritiri_in_coda' in fd))
+    ide = pezzo_js(mini, "function renderIdentita(){", "\n}\n")
+    i = ide.index("const btnRitiri =")
+    rit = ide[i:ide.index("const btnCoda = btnPubbl + btnRitiri;", i)]
+    prova("la riga delle cancellazioni e' sua, col suo gesto, e non dice "
+          "«restano solo qui»", (True, True, False),
+          ("ritiriInAttesa > 0" in rit, "firmaCodaAMano('ritiri')" in rit,
+           "restano solo qui" in rit))
+    prova("...e ha la frase del suo caso: separati («no») o no", (True, True),
+          ("Hai scelto di tenerli separati" in rit, "myAnnunciSulProfilo" in rit))
+    prova("la riga delle pubblicazioni conta solo quelle", True,
+          "const btnPubbl = (myNpubVerified && firmeInAttesa > 0)" in ide)
+    cm = pezzo_js(mini, "async function firmaCodaAMano(cosa){", "\n}\n")
+    prova("...e il gesto a mano dice il vero a chi cancella", True,
+          "abbiamo chiesto ai relay di cancellarli" in cm)
+    # 2) il doppione ritirato col «si'» non rinasce dopo un «no»
+    prova("le cancellazioni del «no» hanno il loro elenco, senza tg_id "
+          "(il padrone e' quello dell'annuncio)", (True, False),
+          ("CREATE TABLE IF NOT EXISTS ritiri_per_scelta(" in src,
+           # le COLONNE, non i commenti: la parola sta nel commento che
+           # spiega perche' la colonna non c'e'
+           bool(re.search(r"^\s*tg_id\b", re.search(
+               r"CREATE TABLE IF NOT EXISTS ritiri_per_scelta\((.*?)\n    \);",
+               src, re.S).group(1), re.M))))
+    rip = pezzo("_ripubblica_col_nome_nostro")
+    prova("dopo una firma rinascono solo quelle del «no», e l'elenco si "
+          "consuma", (True, True, True),
+          ("SELECT annuncio_id FROM ritiri_per_scelta" in rip,
+           "DELETE FROM ritiri_per_scelta WHERE annuncio_id" in rip,
+           "_ripubblica_col_nome_nostro(ids, dopo_ritiro=True)"
+           in pezzo("firma_nostr_fatta")))
 
     import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
     _node = _sh.which("node")

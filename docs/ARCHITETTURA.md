@@ -7878,6 +7878,18 @@
   collegamento (`domandaAnnunciSulProfilo`, prima della coda; chi
   chiude senza rispondere resta sul «sì»), e il toast onesto sulla
   NIP-09 («alcuni potrebbero tenerne una copia»).
+  LE CANCELLAZIONI DEL «NO» HANNO IL LORO ELENCO (23 ott 2026, Cantieri
+  «Le firme giuste»): `ritiri_per_scelta` (annuncio_id, creato; niente
+  tg_id, il padrone è quello dell'annuncio). Lo scrive il «no» per i
+  'ritira' che accoda LUI (non per quelli già in coda: un doppione
+  ritirato, un annuncio tolto); `_ripubblica_col_nome_nostro(ids,
+  dopo_ritiro=True)`, la chiamata di `firma_nostr_fatta`, rimette in
+  piazza SOLO quelli e consuma l'elenco; il «sì» butta solo quelle
+  cancellazioni. La coda (`GET /api/me/firme-nostr`) dice `totale` =
+  le sole pubblicazioni e `ritiri` = le cancellazioni firmabili; nel
+  Profilo «✍️ Firma i tuoi N annunci per Nostr» conta le prime e «✍️
+  Togli i tuoi N annunci dal tuo profilo Nostr» le seconde, con la frase
+  del suo caso; `firmaCodaAMano('ritiri')` dice il vero a chi cancella.
   IL TAG `client` DICE CHI HA COMPOSTO, NON CHI FIRMA (ago 2026, il
   cantiere della classifica: eravamo probabilmente terzi per prodotti
   su Nostr e nella classifica dei marketplace di Nostrology non
