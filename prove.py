@@ -175973,7 +175973,7 @@ def prove_istanza_prova():
           src[ultimo:].startswith('@app.middleware("http")\nasync def solo_chi_prova('))
     prova("...e a lista vuota esce alla prima riga (la produzione non paga niente)", True,
           codice(mw).split('"""')[-1].lstrip().startswith(
-              "if not PROVA_SOLO_IDS or _prova_esente(request.url.path):\n"
+              "if not PROVA_SOLO_IDS or PROVA_APERTA or _prova_esente(request.url.path):\n"
               "        return await call_next(request)"))
     pc = pezzo("_prova_chi")
     prova("chi e' lo dice lo stesso giudice delle rotte, poi il cookie del login", True,
@@ -176085,7 +176085,7 @@ def prove_istanza_prova():
     prova("...e una riga che manca non s'indovina, e lo si dice", (b"x", 1), (pr(b"x", True), len(righe)))
     prova("la pagina la riscrive dopo il dominio", True,
           cm.index("grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)")
-          < cm.index("grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS))")
+          < cm.index("grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS) and not PROVA_APERTA)")
           < cm.index("_PAGINA_CACHE.update("))
     av = pezzo_js(mini, "async function avvia(){", "\n}\n")
     prova("l'avvio accende la copertina per prima cosa, e solo sul collaudo privato", True,
@@ -176102,6 +176102,43 @@ def prove_istanza_prova():
     prova("...e sta sotto i fogli (il login Nostr si apre sopra) e sopra la pagina", True,
           "#collaudoPrivato{display:none;position:fixed;inset:0;z-index:39;" in mini
           and ".sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;" in mini)
+
+    # ---------------- 9 bis) la prova aperta a tutti (23 ott 2026) -----
+    # apre le tre porte della lista e nient'altro: la lista resta piena
+    # perche' e' lei a dire «prova» al recinto, al tetto P2P e alla semina
+    amb = {}
+    k = src.index("try:\n    from config import PROVA_APERTA\n")
+    blocco_aperta = src[k:src.index("\n\n", k)]
+    def aperta(**cfg):
+        mod = type(sys)("config")
+        mod.__dict__.update(cfg)
+        vecchio = sys.modules.get("config")
+        sys.modules["config"] = mod
+        try:
+            amb = {}
+            exec(blocco_aperta, amb)
+            return amb["PROVA_APERTA"]
+        finally:
+            if vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+    prova("la leva: non dichiarata e' chiusa, True apre, qualunque altra cosa resta chiusa",
+          [False, True, False, False, False],
+          [aperta(), aperta(PROVA_APERTA=True), aperta(PROVA_APERTA=False),
+           aperta(PROVA_APERTA="False"), aperta(PROVA_APERTA=1)])
+    prova("apre le tre porte: il middleware, il bot, la copertina", [1, 1, 1],
+          [mw.count("if not PROVA_SOLO_IDS or PROVA_APERTA or _prova_esente("),
+           ta.count("if PROVA_APERTA or not _prova_ignora_update(aggiornamento, PROVA_SOLO_IDS):"),
+           cm.count("_privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS) and not PROVA_APERTA)")])
+    prova("...e non tocca chi dice «prova»: recinto, tetto P2P e import non la leggono", [0, 0, 0],
+          [pezzo("fuori_dal_recinto").count("PROVA_APERTA"),
+           pezzo("tetto_sats_prova").count("PROVA_APERTA"),
+           open("importa_nostr.py", encoding="utf-8").read().count("PROVA_APERTA")])
+    prova("il pannello la mostra, con l'allarme per la leva accesa a lista vuota", True,
+          '"PROVA_APERTA",\n                  PROVA_APERTA,' in ls
+          and "allarme=PROVA_APERTA and not PROVA_SOLO_IDS" in ls)
+    prova("config_esempio la porta spenta", True, "\nPROVA_APERTA = False\n" in es)
 
     # ---------------- 10) il recinto dei relay (20 ott 2026) -----------
     # «niente annunci ne' post del collaudo sui relay veri; i relay veri

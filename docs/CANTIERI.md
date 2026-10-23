@@ -71364,3 +71364,26 @@ Il venditore riapre la Mini App: i sats partono da soli.
 
 **PROVATO.** `prove_ripristino_visibile` (7 nuove); suite e collaudi
 della CI nel messaggio del commit.
+
+## Il collaudo si apre a tutti senza perdere il recinto (23 ott 2026, cantiere collaudo-aperto, richiesta di Alan, su develop)
+
+**COSA.** Una leva nuova, `PROVA_APERTA` (spenta di serie): accesa,
+sull'istanza di prova entra chiunque — le API rispondono, il bot
+risponde anche a chi non è in lista, la copertina «🧪 Collaudo privato»
+non si accende. La lista `PROVA_SOLO_IDS` resta piena.
+
+**PERCHÉ NON SVUOTARE LA LISTA.** Era il gesto ovvio, ed era sbagliato:
+la lista piena è anche il segno «questa è una prova». Ne dipendono il
+recinto dei relay (annunci, post e DM solo sul relay di casa), il tetto
+in sats degli ordini P2P (che lì sono veri) e la semina dei dati finti.
+Vuota, la VM si sarebbe creduta la produzione. La leva apre solo le tre
+porte della lista e lascia alla lista il resto; il P2P resta di
+`P2P_PROVA_IDS`. Letta con `is True`: una stringa «False» non apre.
+Il pannello «⚙️ Stato delle leve» la mostra, con l'allarme se è accesa a
+lista vuota.
+
+**SULLA VM** (la fa chi ha le chiavi): `PROVA_APERTA = True` nel
+`config.py` del collaudo, e il riavvio di `barattolo-collaudo`.
+
+**PROVATO.** `prove_istanza_prova`, sezione «9 bis» (5 nuove); suite e
+collaudi della CI nel messaggio del commit.

@@ -1977,6 +1977,13 @@ MODALITA_COLLAUDO = False
 # Una lista scritta male (una stringa, un nome, una npub col checksum
 # sbagliato) chiude la prova a TUTTI, e il journal lo dice.
 PROVA_SOLO_IDS = []
+# APRIRE LA PROVA A TUTTI (23 ott 2026): True e chiunque entra — le API
+# rispondono, il bot risponde, niente copertina. La lista NON si
+# svuota: resta il segno che questa e' una prova, e da lei dipendono il
+# recinto dei relay (annunci e post mai sui relay veri), il tetto degli
+# ordini P2P e la semina. Il P2P resta comunque di P2P_PROVA_IDS. In
+# produzione non ha effetto (lista vuota = gia' aperta); qui False.
+PROVA_APERTA = False
 # IL CONFIG DELLA PROVA si scrive DA QUI e non copiando quello del VPS
 # (che non lascia mai il VPS): sotto ci sono le righe che cambiano,
 # tutto il resto resta com'e' in questo file. MAI una chiave vera — ne'

@@ -2643,6 +2643,19 @@ except (TypeError, ValueError):
           "chiave Nostr: l'istanza resta CHIUSA a tutti (0 e' un id che non "
           "esiste)", flush=True)
 
+# LA PROVA APERTA A TUTTI (23 ott 2026, richiesta di Alan). Non basta
+# svuotare la lista: la lista piena e' anche il segno «questa e' una
+# prova», e da lei dipendono il recinto dei relay, il tetto P2P e la
+# semina — vuota, la VM si crederebbe la produzione. Questa leva apre
+# SOLO le tre porte della lista (le API, il bot, la copertina) e lascia
+# alla lista il resto. `is True` e non bool(): una stringa «False»
+# scritta per sbaglio non apre niente.
+try:
+    from config import PROVA_APERTA
+    PROVA_APERTA = PROVA_APERTA is True
+except ImportError:
+    PROVA_APERTA = False
+
 # Le porte che restano aperte a chiunque: la salute (la guarda il
 # deploy), il campanello di Telegram (ha il suo segreto, e senza il bot
 # di prova sarebbe sordo) e il login (senza, nessuno potrebbe dire chi
@@ -2778,7 +2791,7 @@ async def solo_chi_prova(request, call_next):
     Chi non e' ammesso: il guscio si', le API 403 (401 se l'initData e'
     scaduto: il client lo sa dire), ogni altra pagina torna a `/`, dove
     c'e' la copertina col login."""
-    if not PROVA_SOLO_IDS or _prova_esente(request.url.path):
+    if not PROVA_SOLO_IDS or PROVA_APERTA or _prova_esente(request.url.path):
         return await call_next(request)
     percorso = request.url.path
     chi, come, perche = await _prova_chi(request)
@@ -20619,7 +20632,7 @@ async def telegram_aggiornamenti(req: Request):
         aggiornamento = await req.json()
         # sull'istanza di prova il bot non risponde a chi non e' in
         # lista: nemmeno al /start (vedi `_prova_ignora_update`)
-        if not _prova_ignora_update(aggiornamento, PROVA_SOLO_IDS):
+        if PROVA_APERTA or not _prova_ignora_update(aggiornamento, PROVA_SOLO_IDS):
             await gestisci_update(aggiornamento)
     except Exception as e:
         print(f"⚠️ Update Telegram indigesto: {e}")
@@ -31296,6 +31309,15 @@ def _leve_stato():
                          "altri ricevono 403 e il bot non risponde loro",
                   spento="nessun filtro, come in produzione",
                   allarme=PROVA_SOLO_IDS == {0}),
+            # aperta senza lista non apre niente: la lista vuota e' gia'
+            # aperta, e in piu' toglie il recinto — l'allarme lo dice
+            _leva("Istanza di prova: aperta a tutti", "PROVA_APERTA",
+                  PROVA_APERTA,
+                  acceso="entra chiunque (API, bot, niente copertina); la "
+                         "lista resta il segno della prova: recinto dei "
+                         "relay, tetto P2P e semina",
+                  spento="entra solo chi è in PROVA_SOLO_IDS",
+                  allarme=PROVA_APERTA and not PROVA_SOLO_IDS),
             _leva("Scadenza dell'initData (ore)", "ORE_INITDATA",
                   ORE_INITDATA, allarme=not ORE_INITDATA,
                   spento="un initData catturato apre quell'account per "
@@ -85406,7 +85428,7 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         # Il bot della leva LINK_BOT, anche lui una volta per rilettura
         grezzo = _bot_nella_pagina(grezzo, BOT_NOME)
         grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)
-        grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS))
+        grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS) and not PROVA_APERTA)
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.
