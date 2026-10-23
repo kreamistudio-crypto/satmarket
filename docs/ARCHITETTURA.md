@@ -26101,6 +26101,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   a vederle. Adottare invece FONDE due identità in silenzio e porta via
   il bottone. `IS NULL` e non `=''` secco: chi non ha una testa deve
   restare adottabile, è il caso legacy per cui quel match esiste.
+  ...MA SOLO SE È GIÀ IMPORTATO (23 ott 2026, Cantieri «Il Turtle»,
+  decisione di Andrea): il match per titolo, nell'aggiornamento e nel
+  ramo «venduto», vuole `contatto_nostr<>''`. Il caso legacy sono le
+  righe importate prima del `d`, che `contatto_nostr` ce l'hanno; una
+  riga NATIVA senza testa (l'annuncio rifatto qui che aspetta la firma
+  del BIVIO) non si adotta più, ed era la strada con cui un vecchio
+  30402 omonimo le ricopriva il testo. E UN EVENTO PIÙ VECCHIO DELLA
+  RIGA NON LA TOCCA: `created_at` < `annunci.modificato` (la data
+  dell'ultimo contenuto scritto) e l'import la lascia — niente
+  aggiornamento, niente «venduto». Il filtro della moderazione
+  (`_da_giudicare`) cerca per titolo PRIMA la riga importata, come
+  l'import. La descrizione importata ha il tetto
+  `DESCRIZIONE_IMPORT_MAX` (10.000, erano 1.500), in `importa_nostr.py`.
   MAI SUL MATCH PER `d`, ed è la riga da non ammorbidire: una riga
   nativa non ha MAI `nostr_origine_d` (lo scrive solo l'import), quindi
   da lì le due teste non possono nascere — mentre guardarlo

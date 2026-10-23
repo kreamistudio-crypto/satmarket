@@ -492,10 +492,17 @@ def prove_testo_evento():
     # I troncamenti sono quelli con cui l'annuncio finisce nel
     # database: se qui fossero piu' larghi, il confronto direbbe
     # «cambiato» per sempre su ogni testo lungo.
-    lungo = {"kind": 30402, "content": "d" * 2000,
+    # IL TETTO DELLA DESCRIZIONE (23 ott 2026, cantiere adozione-titolo,
+    # decisione di Andrea): erano 1.500, e tagliavano a meta' le
+    # descrizioni lunghe nate qui; ora DESCRIZIONE_IMPORT_MAX, uno solo.
+    lungo = {"kind": 30402, "content": "d" * 12000,
              "tags": [["title", "t" * 200]]}
     prova("titolo troncato a 120", 120, len(imp.testo_evento(lungo)[0]))
-    prova("descrizione troncata a 1500", 1500, len(imp.testo_evento(lungo)[1]))
+    prova("descrizione troncata al tetto, che e' diecimila", (10000, 10000),
+          (imp.DESCRIZIONE_IMPORT_MAX, len(imp.testo_evento(lungo)[1])))
+    medio = {"kind": 30402, "content": "d" * 3000, "tags": [["title", "t"]]}
+    prova("...e una descrizione di tremila caratteri entra intera", 3000,
+          len(imp.testo_evento(medio)[1]))
 
 
 # ====================================================================
@@ -830,12 +837,15 @@ def prove_anello():
     con_i.executescript("""
     CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, stato TEXT,
       venditore_id INT, contatto_nostr TEXT, nostr_origine_d TEXT,
-      nostr_origine_foto TEXT, foto TEXT, nostr_event_id TEXT);
-    INSERT INTO annunci VALUES
+      nostr_origine_foto TEXT, foto TEXT, nostr_event_id TEXT,
+      modificato INTEGER DEFAULT 0);
+    INSERT INTO annunci(id,titolo,stato,venditore_id,contatto_nostr,
+      nostr_origine_d,nostr_origine_foto,foto,nostr_event_id) VALUES
       (208,'con testa','attivo',955,'','','','','ev208'),
       (300,'legacy importato','attivo',955,'npub1lui','','','',''),
       (301,'nativo nudo','attivo',955,'','','','',''),
-      (302,'testa NULL','attivo',955,'','','','',NULL);
+      (302,'testa NULL','attivo',955,'','','','',NULL),
+      (303,'importato testa NULL','attivo',955,'npub1lui','','','',NULL);
     """)
 
     def adotta(titolo):
@@ -849,10 +859,15 @@ def prove_anello():
           adotta("con testa"))
     prova("...ma l'importato di ieri senza testa si', come sempre",
           300, adotta("legacy importato"))
-    prova("...e il nativo senza testa pure (non e' una riga a due teste)",
-          301, adotta("nativo nudo"))
-    prova("...e una testa a NULL non e' una testa", 302,
-          adotta("testa NULL"))
+    # IL TURTLE (23 ott 2026, cantiere adozione-titolo, decisione di
+    # Andrea): il nativo senza testa NON si adotta piu' — e' l'annuncio
+    # rifatto qui che aspetta una firma, e il vecchio evento omonimo gli
+    # ricopriva il testo. Il caso legacy (l'importato prima del `d`) si'.
+    prova("...e il nativo senza testa NEMMENO: e' una riga nata qui",
+          None, adotta("nativo nudo"))
+    prova("...ne' quello con la testa a NULL", None, adotta("testa NULL"))
+    prova("...e per un importato una testa a NULL non e' una testa", 303,
+          adotta("importato testa NULL"))
     # La riga da non ammorbidire: guardare ANCHE il match per `d`
     # smetterebbe di ritrovare le righe gia' adottate, e l'import ne
     # creerebbe copie nuove.
@@ -989,7 +1004,7 @@ def prove_anello():
           None, spegne("con testa"))
     prova("...ma spegne ancora l'importato di ieri senza testa",
           300, spegne("legacy importato"))
-    prova("...e il nativo senza testa, come sempre", 301,
+    prova("...ma il nativo senza testa NO (il Turtle, 23 ott 2026)", None,
           spegne("nativo nudo"))
     prova("anche qui il match per `d` resta senza clausola", False,
           "nostr_event_id" in sql_sold_d)

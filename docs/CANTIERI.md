@@ -68667,3 +68667,87 @@ PROVATO: 30/0 con coincurve, 31/0 senza (venv usa-e-getta con le sole
 dipendenze della CI), verde anche nella gabbia di `collaudi_ci.py` nei
 due modi; le due mutazioni (calco tolto, verificatore che dice sempre sì)
 rosse. La suite intera e i collaudi della CI: nel verbale del commit.
+
+## Il Turtle: l'import non adotta più una riga nativa per titolo, un evento più vecchio non ricopre, la descrizione fino a 10.000 caratteri (23 ott 2026, cantiere adozione-titolo, decisione di Andrea)
+
+**IL FATTO.** Un venditore con la npub collegata (Primal su Android)
+ha il suo «Turtle (marrone)», l'unico dei quattro col pallino 🟣: la
+descrizione esce tagliata a metà, e per modificarla Barattolo gli chiede
+la firma Nostr anche quando entra con Telegram. Lo cancella e lo rifà,
+ed è di nuovo uguale. Lo ripubblica da Telegram con la descrizione lunga,
+e dopo circa 25 minuti torna da solo corto.
+
+**LA DIAGNOSI (in sola lettura, sul codice di `431eb70`).** Sui relay c'è
+un suo vecchio 30402 con lo stesso titolo. L'import non lo riconosce come
+specchio di una riga nata qui (`e_riflesso` vuole la riga nominata dal
+`d`, nativa e firmata da lui), e non trovandolo per `d` lo cerca per
+TITOLO: `WHERE titolo=? AND stato='attivo' … AND (nostr_event_id='' OR
+… IS NULL)`. Lì c'è il Turtle rifatto da Telegram, nativo e senza
+evento, perché col BIVIO aspetta una firma che dal telefono non arriva.
+L'import se lo prende: `contatto_nostr` (il 🟣, e da lì la Modifica
+firmata), e il testo del vecchio evento al posto del nuovo, tagliato a
+1.500 caratteri da `testo_evento` (footer di Barattolo compreso). I 25
+minuti sono il giro d'import, ogni ora. Nessuna data confrontata: un
+evento più vecchio ricopriva un testo più nuovo.
+
+**LE DECISIONI DI ANDREA.**
+- L'adozione per titolo, nell'aggiornamento e nel ramo «venduto», non
+  prende mai una riga nativa: `contatto_nostr<>''`. Il caso legacy per
+  cui quel match esiste (le righe importate prima del `d`) resta, perché
+  quelle `contatto_nostr` ce l'hanno. La riga nativa resta sua; se
+  l'importato vecchio è stato cancellato lo scudo anti-resurrezione non
+  lo fa rinascere, altrimenti nasce una riga importata NUOVA accanto, e
+  la deduplica vede la coppia (le due restano due, come per le righe con
+  la testa).
+- Un evento più vecchio della riga non la ricopre mai: `created_at` <
+  `annunci.modificato`, e l'import la lascia (aggiornamento e «venduto»).
+- Il tetto della descrizione importata: alzato da 1.500 a 10.000
+  (`DESCRIZIONE_IMPORT_MAX`), non tolto. Il form di Barattolo non ha
+  tetto; un evento altrui sconosciuto non deve poter riempire il
+  database; diecimila caratteri stanno larghi in una descrizione vera e
+  dentro il tetto degli eventi dei relay (64 KiB di serie su strfry: un
+  evento che lo supera i relay non lo tengono nemmeno).
+- Trovato strada facendo e curato perché la cura lo rendeva un costo: il
+  filtro della moderazione (`_da_giudicare`) cercava per titolo una riga
+  qualunque. Con le native escluse, il vecchio evento del Turtle avrebbe
+  trovato la nativa col testo diverso e pagato l'AI a ogni giro per un
+  annuncio che lo scudo salta. Ora preferisce la riga importata.
+
+**COSA SUCCEDE AL DEPLOY.** Gli annunci già importati con più di 1.500
+caratteri si allungano al primo giro, e la moderazione AI li rivede UNA
+volta (il testo «è cambiato»). Le righe già adottate restano adottate: la
+cura impedisce le prossime, non sgancia quelle di ieri (il Turtle di
+oggi si cura dall'app: rimuovere la npub, cancellare il 🟣, rifarlo).
+
+**LE STRADE SCARTATE.** Togliere il tetto: un evento enorme di uno
+sconosciuto finirebbe nel database. Confrontare la data con `creato`:
+per gli importati `creato` è l'ora dell'import, non dell'evento, e
+avrebbe fermato aggiornamenti veri. Guardare il titolo con una
+somiglianza invece dell'uguaglianza: un secondo giudice di «è lo stesso
+annuncio», che un giorno direbbe un'altra cosa della deduplica.
+
+**COSA È PROVATO.** `collaudo_turtle` (nuovo, in CI) fa girare l'import
+VERO su un database usa-e-getta: il Turtle ricostruito con due varianti
+del vecchio evento (la coordinata di una riga che non c'è più, un `d` del
+suo client) — la nativa resta sua, lunga, attiva, e l'evento nasce come
+riga nuova accanto; con l'importato cancellato non risorge niente; un
+omonimo «venduto» non la spegne; la versione di ieri non ricopre quella
+di oggi, quella di domani sì, un «venduto» vecchio non spegne; il tetto;
+la moderazione che non ripaga l'AI. LA ROTTURA APPOSTA, su una copia:
+sei mutazioni (il match per titolo dell'aggiornamento: 8 rosse; quello
+del «venduto»: 1; la data nell'aggiornamento: 1; la data nel «venduto»:
+1; il tetto tornato a 1.500: 3; il filtro della moderazione senza
+preferenza: 1) e il codice di main com'era, che riproduce il difetto (11
+rosse). In `prove.py` le due sentinelle che fissavano il comportamento di
+ieri dicono quello nuovo (`prove_testo_evento`, `prove_anello`).
+
+**DA GUARDARE.** Dopo il deploy, il Turtle: che resti lungo e senza 🟣
+dopo un giro d'import (il comando di sola lettura sta nel rapporto ad
+Andrea). E quante righe importate si allungano (`length(descrizione)`
+sopra 1.500 il giorno dopo).
+
+**IL GIRO.** Sopra `431eb70` (main), col codice di questo commit:
+`PROVE_SEVERE=1 python prove.py` 25.744 passate, 0 fallite; i collaudi
+della CI (`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`) 92
+verdi, 0 rossi, `collaudo_turtle` compreso. Lo stesso commit va su
+develop con un cherry-pick.

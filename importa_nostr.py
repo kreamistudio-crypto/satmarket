@@ -545,6 +545,20 @@ def estrai_commercio(e):
     return fuori
 
 
+# IL TETTO DELLA DESCRIZIONE IMPORTATA (23 ott 2026, cantiere adozione-
+# titolo, decisione di Andrea). Erano 1.500 caratteri, e il form di
+# Barattolo non ne ha nessuno: un annuncio nato qui con una descrizione
+# lunga, firmato dal venditore col BIVIO e riletto dai relay, tornava
+# TAGLIATO A META' (il «Turtle», 23 ott 2026: footer di Barattolo
+# compreso nei 1.500). Non si toglie: un evento altrui sconosciuto non
+# deve poter riempire il database. Diecimila caratteri stanno larghi in
+# qualunque descrizione vera e ben dentro il tetto degli eventi dei
+# relay (64 KiB di serie su strfry): un evento che li supera i relay non
+# lo tengono nemmeno. Lo legge anche il server per giudicare «il testo e'
+# cambiato?» — e' per questo che vive in un posto solo.
+DESCRIZIONE_IMPORT_MAX = 10000
+
+
 def testo_evento(e):
     """Titolo e descrizione di un evento, TRONCATI esattamente come
     finiranno nel database. Cuore condiviso: lo usa estrai_annuncio
@@ -566,7 +580,8 @@ def testo_evento(e):
         desc = c.get("description", "") or ""
     # il titolo senza HTML ne' entita' (8 ott 2026), come per i negozi
     # collegati: spogliato PRIMA di troncare
-    return spoglia_titolo(titolo)[:120], (desc or "—").strip()[:1500]
+    return (spoglia_titolo(titolo)[:120],
+            (desc or "—").strip()[:DESCRIZIONE_IMPORT_MAX])
 
 
 def foto_evento(e) -> list:
@@ -1046,7 +1061,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             morto = None
             if dt:
                 morto = con.execute(
-                    "SELECT id, titolo FROM annunci "
+                    "SELECT id, titolo, modificato FROM annunci "
                     "WHERE nostr_origine_d=? AND stato='attivo' "
                     "AND (venditore_id=? OR contatto_nostr=?)",
                     (dt[1], venditore_id, npub)).fetchone()
@@ -1061,15 +1076,28 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 # (`quantita=0 WHERE stato='venduto'`).
                 # Il match per `d` qui sopra resta senza guardia, ed e'
                 # giusto: quella E' la riga di questo evento.
+                # ...E MAI UNA RIGA NATIVA (23 ott 2026, adozione-titolo,
+                # decisione di Andrea): `contatto_nostr<>''`. Una riga
+                # nata qui, anche senza testa (la firma del BIVIO che
+                # non e' mai arrivata), non e' la riga di un evento dei
+                # relay: un omonimo venduto sui relay non la spegne.
                 morto = con.execute(
-                    "SELECT id, titolo FROM annunci WHERE titolo=? "
-                    "AND stato='attivo' "
+                    "SELECT id, titolo, modificato FROM annunci WHERE titolo=? "
+                    "AND stato='attivo' AND contatto_nostr<>'' "
                     "AND (venditore_id=? OR contatto_nostr=?) "
                     "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
                     "     OR nostr_origine_d=?) "
                     "AND (nostr_event_id='' OR nostr_event_id IS NULL)",
                     (tt[1].strip()[:120], venditore_id, npub,
                      dt[1] if dt else "")).fetchone()
+            # UN EVENTO PIU' VECCHIO DELLA RIGA NON LA TOCCA (23 ott 2026,
+            # adozione-titolo): la riga e' gia' stata scritta da qualcosa
+            # di piu' recente, e un relay rimasto indietro non la spegne
+            if morto and e.get("created_at") and (morto[2] or 0) \
+                    and e["created_at"] < morto[2]:
+                print(f"  ⏮️ «venduto» piu' vecchio della riga: lasciato "
+                      f"«{morto[1][:50]}»")
+                morto = None
             if morto:
                 spegni_annuncio(con, morto[0], "venduto")
                 print(f"  🏷️ venduto sui relay: spento «{morto[1][:50]}»")
@@ -1092,7 +1120,8 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
         gia = None
         if a["origine_d"]:
             gia = con.execute(
-                "SELECT id, foto, nostr_origine_foto FROM annunci "
+                "SELECT id, foto, nostr_origine_foto, modificato, titolo "
+                "FROM annunci "
                 "WHERE nostr_origine_d=? AND stato='attivo' "
                 "AND (venditore_id=? OR contatto_nostr=?)",
                 (a["origine_d"], venditore_id, npub)).fetchone()
@@ -1123,9 +1152,21 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             # `IS NULL` e non `nostr_event_id=''` secco: chi non ha una
             # testa DEVE restare adottabile — e' il caso legacy per cui
             # questo match per titolo esiste.
+            #
+            # ...MA SOLO UNA RIGA GIA' IMPORTATA (23 ott 2026, cantiere
+            # adozione-titolo, decisione di Andrea): `contatto_nostr<>''`.
+            # Il caso legacy sono le righe importate prima del tag `d`,
+            # che `contatto_nostr` ce l'hanno. Una riga NATIVA senza testa
+            # — l'annuncio rifatto da Telegram che aspetta una firma che
+            # non arriva — veniva adottata dal vecchio 30402 omonimo: il
+            # testo nuovo ricoperto da quello vecchio (tagliato), il 🟣, e
+            # la Modifica che chiede la firma (il «Turtle», 23 ott 2026).
+            # Non adottandola nasce una riga nuova, e la deduplica vede
+            # la coppia come per le righe con la testa.
             gia = con.execute(
-                "SELECT id, foto, nostr_origine_foto FROM annunci "
-                "WHERE titolo=? AND stato='attivo' "
+                "SELECT id, foto, nostr_origine_foto, modificato, titolo "
+                "FROM annunci "
+                "WHERE titolo=? AND stato='attivo' AND contatto_nostr<>'' "
                 "AND (venditore_id=? OR contatto_nostr=?) "
                 "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
                 "     OR nostr_origine_d=?) "
@@ -1161,6 +1202,17 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 print(f"  ⛔ non risuscitato (qui e' '{spento[1]}'): "
                       f"{a['titolo'][:50]}")
                 continue
+        # UN EVENTO PIU' VECCHIO DELLA RIGA NON LA RICOPRE MAI (23 ott
+        # 2026, cantiere adozione-titolo, decisione di Andrea): `modificato`
+        # e' la data dell'ultimo contenuto scritto (l'evento importato, o
+        # la modifica firmata), e un relay rimasto indietro con la
+        # versione di prima non deve riportarla in vetrina.
+        if gia and a.get("evento_ts") and (gia[3] or 0) \
+                and a["evento_ts"] < gia[3]:
+            saltati += 1
+            print(f"  ⏮️ evento piu' vecchio della riga: lasciata "
+                  f"«{(gia[4] or '')[:50]}»")
+            continue
         if gia:
             # Gia' presente: aggiorna TUTTO il contenuto (l'evento sui
             # relay e' la fonte di verita', anche dopo una modifica

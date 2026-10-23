@@ -78428,9 +78428,16 @@ def _da_giudicare(prodotti: list, npub: str, venditore_id: int):
                 "AND (venditore_id=? OR contatto_nostr=?)",
                 (d, venditore_id, npub)).fetchone()
         if riga is None and titolo:
+            # PRIMA LA RIGA IMPORTATA (23 ott 2026, cantiere adozione-
+            # titolo): l'import per titolo non adotta piu' una riga nativa,
+            # quindi e' quella importata a dire cosa succedera' — senza,
+            # un vecchio evento omonimo di una riga nativa col testo
+            # nuovo sembrerebbe «cambiato» a ogni giro, e l'AI si
+            # ripagherebbe ogni ora per un annuncio che lo scudo salta.
             riga = con.execute(
                 "SELECT stato, titolo, descrizione FROM annunci "
-                "WHERE titolo=? AND (venditore_id=? OR contatto_nostr=?)",
+                "WHERE titolo=? AND (venditore_id=? OR contatto_nostr=?) "
+                "ORDER BY (contatto_nostr<>'') DESC",
                 (titolo, venditore_id, npub)).fetchone()
         if riga is None:
             # MAI VISTO E SENZA FOTO (11 ott 2026, cantiere
