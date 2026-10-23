@@ -78041,6 +78041,30 @@ except ImportError:
     SOLLECITO_FIRME_MAX = 3         # poi silenzio
 
 
+def testo_sollecito_ritiri(ritiri: int, sul_profilo: bool,
+                           breve: bool = False) -> str:
+    """Il promemoria delle CANCELLAZIONI (23 ott 2026, cantiere
+    promemoria-firme): gli annunci che sono ancora sul suo profilo Nostr
+    e che una sua firma chiede ai relay di togliere. La frase del suo
+    caso, come la riga «✍️ Togli i tuoi N annunci» del Profilo: chi ha
+    scelto di tenerli separati sa che poi escono col nome di Barattolo.
+    `breve`: la riga in coda al promemoria delle pubblicazioni."""
+    chi = ("Un tuo annuncio è ancora" if ritiri == 1
+           else f"{ritiri} tuoi annunci sono ancora")
+    perche = ("Hai scelto di tenerli separati: con una tua firma chiediamo "
+              "ai relay di cancellarli dal tuo profilo, poi escono col "
+              "nome di Barattolo." if not sul_profilo else
+              "Con una tua firma chiediamo ai relay di cancellarli, ma "
+              "alcuni potrebbero tenerne una copia.")
+    if breve:
+        return f"🟣 {chi} sul tuo profilo Nostr da togliere. {perche}"
+    return (f"🟣 <b>{chi} sul tuo profilo Nostr.</b>\n{perche}\n\n"
+            f"Se hai collegato un bunker o hai un'estensione Nostr, apri "
+            f"Barattolo da lì: la firma parte da sola. Se usi la nsec, vai "
+            f"nel Profilo e tocca «✍️ Togli i tuoi annunci dal tuo profilo "
+            f"Nostr».")
+
+
 async def sollecita_firme_nostr():
     """«Hai annunci che aspettano la tua firma»: il promemoria a chi ha
     una chiave Nostr ma non l'ha a portata di mano — bunker spento,
@@ -78074,10 +78098,21 @@ async def sollecita_firme_nostr():
     adesso = int(time.time())
     soglia = adesso - SOLLECITO_FIRME_GIORNI * 86400
     con = db()
+    # LE CANCELLAZIONI A PARTE (23 ott 2026, cantiere promemoria-firme,
+    # decisione di Andrea): la stessa correzione della riga del Profilo.
+    # Il conto contava anche i ritiri e diceva a tutti «per finire su
+    # Nostr a nome TUO» — a chi ha scelto di tenere separati i suoi
+    # annunci, il contrario del vero. `quanti` sono le pubblicazioni,
+    # `ritiri` le cancellazioni che si possono firmare (con un evento).
     righe = con.execute(
-        "SELECT f.tg_id, COUNT(*) AS quanti, MIN(f.creato) AS primo, "
+        "SELECT f.tg_id, "
+        "SUM(CASE WHEN f.azione<>'ritira' THEN 1 ELSE 0 END) AS quanti, "
+        "SUM(CASE WHEN f.azione='ritira' AND a.nostr_event_id<>'' "
+        "    THEN 1 ELSE 0 END) AS ritiri, "
+        "MIN(f.creato) AS primo, "
         "u.sollecito_firme_il AS timbro, u.solleciti_firme AS conta "
         "FROM firme_nostr f JOIN utenti u ON u.tg_id=f.tg_id "
+        "LEFT JOIN annunci a ON a.id=f.annuncio_id "
         "WHERE u.suggerimenti_annunci=1 "
         "GROUP BY f.tg_id").fetchall()
     da_avvisare = []
@@ -78087,15 +78122,20 @@ async def sollecita_firme_nostr():
         # L'attesa riparte dall'ultimo squillo, o dalla nascita della
         # coda se non ce n'e' mai stato uno
         da = max(r["primo"] or 0, r["timbro"] or 0)
-        if da <= soglia:
-            da_avvisare.append((r["tg_id"], r["quanti"]))
-    for tg, quanti in da_avvisare:
+        if da <= soglia and ((r["quanti"] or 0) or (r["ritiri"] or 0)):
+            da_avvisare.append((r["tg_id"], r["quanti"] or 0,
+                                r["ritiri"] or 0,
+                                annunci_sul_suo_profilo(con, r["tg_id"])))
+    for tg, *_ in da_avvisare:
         con.execute("UPDATE utenti SET sollecito_firme_il=?, "
                     "solleciti_firme=solleciti_firme+1 WHERE tg_id=?",
                     (adesso, tg))
     con.commit()
     con.close()
-    for tg, quanti in da_avvisare:
+    for tg, quanti, ritiri, sul_profilo in da_avvisare:
+        if not quanti:
+            await notifica(tg, testo_sollecito_ritiri(ritiri, sul_profilo))
+            continue
         oggetto = ("Un tuo annuncio aspetta" if quanti == 1
                    else f"{quanti} tuoi annunci aspettano")
         await notifica(tg,
@@ -78114,7 +78154,9 @@ async def sollecita_firme_nostr():
             f"la incolli una volta, resta solo sul tuo dispositivo, e "
             f"da lì firma da sola.\n\n"
             f"Finché non succede l'annuncio vive qui e si vende "
-            f"normalmente — gli manca solo la piazza.")
+            f"normalmente — gli manca solo la piazza."
+            + ("\n\n" + testo_sollecito_ritiri(ritiri, sul_profilo, breve=True)
+               if ritiri else ""))
     if da_avvisare:
         print(f"🟣 Solleciti firme Nostr: {len(da_avvisare)}")
 

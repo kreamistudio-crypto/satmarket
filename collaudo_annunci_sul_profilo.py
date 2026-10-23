@@ -278,6 +278,53 @@ async def scenario():
     con.close()
     prova("...e l'elenco del «no» si e' consumato", 0, resti)
 
+    print("\n[il promemoria settimanale dice il vero]")
+    # LA STESSA CORREZIONE DELLA RIGA DEL PROFILO (23 ott 2026, cantiere
+    # promemoria-firme, decisione di Andrea): sollecita_firme_nostr VERO,
+    # con le notifiche di cartone del banco. Prima diceva a tutti «per
+    # finire su Nostr a nome TUO», contando anche le cancellazioni.
+    S.SOLLECITO_FIRME_GIORNI = 1
+    vecchio = int(time.time()) - 3 * 86400
+    con = S.db()
+    con.execute("UPDATE utenti SET suggerimenti_annunci=1, "
+                "sollecito_firme_il=0, solleciti_firme=0 WHERE tg_id=?",
+                (LUI,))
+    con.execute("UPDATE annunci SET nostr_event_id=?, nostr_autore=? "
+                "WHERE id IN (?,?)", ("ee" * 32, sua, a1, a2))
+    con.execute("DELETE FROM firme_nostr")
+    con.executemany("INSERT INTO firme_nostr(annuncio_id, tg_id, azione, "
+                    "creato) VALUES(?,?,?,?)",
+                    [(a1, LUI, "ritira", vecchio), (a2, LUI, "ritira", vecchio)])
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    await S.sollecita_firme_nostr()
+    detto = [t for chi, t in banco.DETTO if chi == LUI]
+    prova("col «no» e due cancellazioni: UN promemoria, che le chiama "
+          "per nome e dice la frase dei separati",
+          (1, True, True, False),
+          (len(detto), bool(detto) and "2 tuoi annunci sono ancora" in detto[0],
+           bool(detto) and "tenerli separati" in detto[0],
+           bool(detto) and "a nome TUO" in detto[0]))
+    con = S.db()
+    con.execute("UPDATE utenti SET annunci_su_profilo_nostr=1, "
+                "sollecito_firme_il=0, solleciti_firme=0 WHERE tg_id=?",
+                (LUI,))
+    con.execute("INSERT INTO firme_nostr(annuncio_id, tg_id, azione, creato) "
+                "VALUES(?,?,?,?)", (a3, LUI, "pubblica", vecchio))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    await S.sollecita_firme_nostr()
+    detto = [t for chi, t in banco.DETTO if chi == LUI]
+    prova("col «si'», una pubblicazione e due cancellazioni: si contano le "
+          "pubblicazioni, e le cancellazioni hanno la loro riga",
+          (1, True, True, False),
+          (len(detto), bool(detto) and "Un tuo annuncio aspetta" in detto[0],
+           bool(detto) and "2 tuoi annunci sono ancora sul tuo profilo "
+                           "Nostr da togliere" in detto[0],
+           bool(detto) and "3 tuoi annunci" in detto[0]))
+
 
 def main():
     print("=" * 58)

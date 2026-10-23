@@ -71762,3 +71762,36 @@ rebase), col codice di questo commit: `PROVE_SEVERE=1 python prove.py`
 BACKUP-CADUTO, che su questo PC Windows falliscono uguali su develop
 pulito (verbale di ieri, «Nostr dal telefono»): della macchina, non del
 cantiere. I collaudi della CI: 99 verdi, 0 rossi.
+
+## Il promemoria delle firme dice il vero: le cancellazioni a parte, la frase del caso (23 ott 2026, cantiere promemoria-firme, decisione di Andrea)
+
+**IL FATTO.** Notato chiudendo «Le firme giuste» (`dcd2d7f`): il
+promemoria settimanale `sollecita_firme_nostr` contava anche le
+cancellazioni e diceva a tutti «per finire su Nostr a nome TUO». A chi ha
+scelto di tenere separati i suoi annunci, il contrario del vero.
+
+**LA DECISIONE.** La stessa correzione della riga del Profilo. La query
+conta a parte le pubblicazioni (`quanti`) e le cancellazioni con un
+evento da cancellare (`ritiri`). Con sole cancellazioni il messaggio è
+loro (`testo_sollecito_ritiri`): «N tuoi annunci sono ancora sul tuo
+profilo Nostr», con la frase del suo caso — separati: «con una tua firma
+chiediamo ai relay di cancellarli dal tuo profilo, poi escono col nome di
+Barattolo»; altrimenti «…ma alcuni potrebbero tenerne una copia» — e la
+strada vera per firmarle (bunker o estensione; con la nsec, «✍️ Togli i
+tuoi annunci dal tuo profilo Nostr» nel Profilo). Con pubblicazioni e
+cancellazioni insieme il messaggio di sempre conta le sole pubblicazioni,
+e le cancellazioni hanno una riga in coda. Il timbro e il tetto dei
+solleciti non cambiano: un messaggio per utente, una volta a settimana.
+
+**COSA È PROVATO.** In coda a `collaudo_annunci_sul_profilo`, il
+`sollecita_firme_nostr` VERO con le notifiche di cartone del banco: col
+«no» e due cancellazioni un messaggio solo, coi numeri e la frase dei
+separati, senza «a nome TUO»; col «sì», una pubblicazione e due
+cancellazioni, «Un tuo annuncio aspetta» e la riga delle cancellazioni,
+mai «3 tuoi annunci». LA ROTTURA APPOSTA: rimesso il conto di ieri
+(`COUNT(*)`) su una copia, le due righe diventano rosse.
+
+**IL GIRO.** Sopra `dcd2d7f` (develop, fermo durante il cantiere), col
+codice di questo commit: `PROVE_SEVERE=1 python prove.py` 26.173
+passate, 3 fallite — le tre di `deploy.sh` che su questo PC Windows
+falliscono uguali su develop pulito; i collaudi della CI 99 verdi, 0 rossi.
