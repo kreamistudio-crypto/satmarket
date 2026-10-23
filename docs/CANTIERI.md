@@ -71558,3 +71558,28 @@ con tre. `PROVE_SEVERE=1 python prove.py` verde.
 (`sudo collaudo azzera`, oppure `python semina_collaudo.py`, che
 aggiunge senza toccare il resto). Per pubblicarne di nuovi dal form
 serve `SERVIZI_ATTIVI = True` nel config della VM.
+
+## Il backup delle parole on-chain detto col consiglio: Nostr è la casa più sicura (23 ott 2026, cantiere onchain-testo-backup, richiesta di Alan, su develop)
+
+**COSA.** Nel blocco 1 del foglio «⛓️ On-chain (prova)», la riga del
+cloud di Telegram diceva «Non è cifrato end-to-end: Telegram la può
+leggere». Alan: le parole si recuperano da Telegram O da Nostr, e la
+cosa da dire è che con Nostr la copia è più sicura perché sta cifrata
+sui relay. Ora:
+- ☁️ cloud di Telegram: «copia fatta: la ritrovi da ogni dispositivo
+  dove entri con Telegram»;
+- 🟣 relay Nostr: «copia cifrata con la tua chiave sui relay: la apri
+  solo tu, noi no. È la casa più sicura»;
+- a chi ha SOLO la copia nel cloud, una riga in più: «🔐 Per più
+  sicurezza collega una chiave Nostr: lì la copia sta cifrata sui relay,
+  e la apre solo la tua chiave».
+
+**IL FATTO NON CAMBIA.** Il CloudStorage di Telegram resta non
+end-to-end: è la ragione per cui Nostr è la casa consigliata, e il
+commento delle due case lo dice ancora. Cambia come lo dice il foglio:
+un consiglio verso la casa migliore, non un allarme sulla casa che uno
+ha.
+
+**PROVATO.** Le sezioni on-chain di `prove.py` (82/0), compreso il
+banco node che esegue `onchainDoveAbita` nei due mondi; suite intera e
+collaudi della CI nel messaggio del commit.
