@@ -53110,7 +53110,8 @@ function onchainScriviLocale(parole){
 
    LE DUE CASE, e nessuna e' la nostra:
    - dentro Telegram → il CloudStorage (client → cloud di Telegram, mai
-     il nostro server). Non e' end-to-end, e il foglio lo dice;
+     il nostro server). Non e' end-to-end: il foglio non lo grida, consiglia
+     Nostr a chi ha solo questa copia (23 ott 2026, vedi onchainDoveAbita);
    - nativo Nostr → la CASSETTA SUI RELAY che esiste gia' per il profilo
      di scambio: NIP-78 (kind 30078) cifrata NIP-44 verso la PROPRIA
      pubkey, con un `d` suo. Il testo lo apre solo la sua chiave, che
@@ -53813,8 +53814,8 @@ function onchainDoveAbita(){
   const righe = [];
   righe.push('<div>📱 <b>Questo dispositivo</b> — sempre</div>');
   if (onchainCase.nuvola === true) {
-    righe.push('<div>☁️ <b>Il cloud di Telegram</b> — copia fatta. '
-             + 'Non è cifrato end-to-end: Telegram la può leggere</div>');
+    righe.push('<div>☁️ <b>Il cloud di Telegram</b> — copia fatta: la '
+             + 'ritrovi da ogni dispositivo dove entri con Telegram</div>');
   } else if (onchainCase.nuvola === false && !cloudTelegram()) {
     /* FUORI DA TELEGRAM (20 ott 2026, richiesta di Andrea): il cloud
        qui non esiste, e «non ha risposto» diceva un guasto che non
@@ -53829,10 +53830,21 @@ function onchainDoveAbita(){
   }
   if (onchainCase.relay === true) {
     righe.push('<div>🟣 <b>I relay Nostr</b> — copia cifrata con la tua '
-             + 'chiave: la apri solo tu, noi no</div>');
+             + 'chiave sui relay: la apri solo tu, noi no. È la casa più '
+             + 'sicura</div>');
   } else if (onchainCase.relay === false) {
     righe.push('<div style="color:var(--danger)">🟣 I relay <b>non hanno '
              + 'ridato la copia</b>: qui non c\'è copia</div>');
+  }
+  /* LA SICUREZZA SI DICE COL CONSIGLIO (23 ott 2026, richiesta di
+     Alan): invece di «Telegram la può leggere», a chi ha solo la copia
+     nel cloud si dice dove ce n'e' una piu' sicura. Il fatto resta: il
+     CloudStorage non e' end-to-end, ed e' per questo che Nostr e' la
+     casa consigliata. */
+  if (onchainCase.nuvola === true && onchainCase.relay !== true) {
+    righe.push('<div>🔐 <b>Per più sicurezza</b> collega una chiave '
+             + 'Nostr: lì la copia sta cifrata sui relay, e la apre solo '
+             + 'la tua chiave</div>');
   }
   if (onchainCase.nuvola === null && onchainCase.relay === null) {
     righe.push('<div class="hint">Nessun\'altra casa provata in questa '
