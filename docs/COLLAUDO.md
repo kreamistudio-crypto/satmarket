@@ -68,7 +68,8 @@ sudo collaudo azzera           # database e foto nuovi + la semina finta
 `/srv/collaudo/barattolo/azzerati/` e ne tiene gli ultimi tre giri.
 Poi semina il mercatino FINTO di `semina_collaudo.py`: quattro venditori
 di prova, quattordici annunci in dodici categorie con foto finte («FOTO
-DI PROVA»), e due ordini comprati dal primo id della lista (uno in
+DI PROVA»), due venditori di servizi con undici lavori di prova (uno per
+ogni card della sezione Lavoro), e due ordini comprati dal primo id della lista (uno in
 corso, uno concluso), per provare liste, carrello, chat e «I miei
 ordini». La semina si ferma da sola se non e' un'istanza di prova, se
 `URL_PUBBLICO` e' barattolo.store (o non e' dichiarato) e se il database

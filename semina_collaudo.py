@@ -4,8 +4,9 @@
 richiesta di Andrea; procedura: docs/COLLAUDO.md). Il database dell'istanza
 di prova (la vm-2050) riceve un mercatino FINTO abbastanza pieno da provare
 davvero le liste, il carrello, la chat e «I miei ordini»: quattro venditori
-di prova, quattordici annunci in dodici categorie con le loro foto finte, e
-due ordini comprati dal primo id della lista del collaudo — uno in corso e
+di prova, quattordici annunci in dodici categorie con le loro foto finte,
+due venditori di servizi con undici lavori (dal 23 ott 2026, la sezione
+Lavoro: almeno uno per card), e due ordini comprati dal primo id della lista del collaudo — uno in corso e
 uno concluso. Tutto dice di essere finto: nomi, titoli, testi e foto.
 
 E' LA GEMELLA DI `semina_demo.py`, che resta com'e' (il negozio della demo
@@ -70,6 +71,33 @@ ANNUNCI = (
     (9002, "Mouse senza fili di prova (venduto)", "Elettronica", "come_nuovo", 7_000, "ritiro"),
     (9003, "Tazza dipinta di prova (venduta)", "Arte e artigianato", "nuovo", 11_000, "ritiro"),
 )
+# --- IL LAVORO (23 ott 2026, per i tasti Mercato/Lavoro): due venditori
+# loro, cosi' i conti del mercatino qui sopra restano quelli, e almeno un
+# servizio per ogni card della sezione Lavoro.
+VENDITORI_LAVORO = (
+    (9005, "Studio di prova di Elena", "Milano (MI)"),
+    (9006, "Franco tuttofare (prova)", "Firenze (FI)"),
+)
+# (venditore, titolo, categoria, sottocategoria, sats, dove, minuti)
+SERVIZI = (
+    (9005, "Logo per la tua attività (prova)", "Lavoro e servizi", "grafica-design", 40_000, "online", 120),
+    (9005, "Sito vetrina in una settimana (prova)", "Lavoro e servizi", "siti-e-app", 250_000, "online", 0),
+    (9006, "Traduzione inglese-italiano di prova, a pagina", "Lavoro e servizi", "traduzioni", 8_000, "online", 0),
+    (9006, "Testi per il tuo negozio online (prova)", "Lavoro e servizi", "scrittura-testi", 15_000, "online", 0),
+    (9005, "Consulenza fiscale di prova, mezz'ora", "Lavoro e servizi", "consulenze", 20_000, "online", 30),
+    (9006, "Riparazione biciclette di prova", "Lavoro e servizi", "riparazioni", 25_000, "presenza", 60),
+    (9006, "Imbianchino di prova, a stanza", "Lavoro e servizi", "casa-manutenzione", 90_000, "presenza", 240),
+    (9005, "Fotografo di prova per eventi", "Lavoro e servizi", "foto-video-servizi", 120_000, "presenza", 180),
+    (9005, "Lezione di inglese di prova", "Lezioni e corsi", "lingue", 18_000, "online", 60),
+    (9006, "Corso di prova: il primo wallet Bitcoin", "Lezioni e corsi", "bitcoin-corsi", 10_000, "presenza", 90),
+    (9006, "Lezione di chitarra di prova", "Lezioni e corsi", "musica-lezioni", 20_000, "presenza", 60),
+)
+DESCRIZIONE_SERVIZIO = ("Servizio DI PROVA del collaudo di Barattolo: nessuno "
+                        "viene davvero a lavorare. Serve a provare la sezione "
+                        "Lavoro e le sue card.")
+# il tetto con cui un servizio nasce e resta (MAX_QUANTITA_ANNUNCIO nel
+# server): non e' uno stock, un servizio non si esaurisce
+QUANTITA_SERVIZIO = 999999
 DESCRIZIONE = ("Annuncio DI PROVA del collaudo di Barattolo: l'oggetto non "
                "esiste e niente viene spedito. Serve a provare le liste, il "
                "carrello, la chat e gli ordini.")
@@ -161,7 +189,7 @@ def _foto_finta(cartella_foto: str, nome_base: str, categoria: str) -> list:
 
 def semina_venditori(con, adesso: int) -> int:
     nuovi = 0
-    for tg_id, nome, _zona in VENDITORI:
+    for tg_id, nome, _zona in VENDITORI + VENDITORI_LAVORO:
         if con.execute("SELECT 1 FROM utenti WHERE tg_id=?", (tg_id,)).fetchone():
             continue
         con.execute("INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
@@ -195,6 +223,31 @@ def semina_annunci(con, cartella_foto: str, adesso: int) -> dict:
         ids[titolo] = aid
         nuovi += 1
     return {"ids": ids, "nuovi": nuovi}
+
+
+def semina_servizi(con, cartella_foto: str, adesso: int) -> int:
+    """I servizi di prova, come semina_annunci: per venditore e titolo."""
+    zone = {v[0]: v[2] for v in VENDITORI_LAVORO}
+    nuovi = 0
+    for i, (vend, titolo, cat, sotto, sats, dove, minuti) in enumerate(SERVIZI):
+        if con.execute("SELECT 1 FROM annunci WHERE venditore_id=? AND titolo=?",
+                       (vend, titolo)).fetchone():
+            continue
+        con.execute(
+            "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+            "sottocategoria,prezzo_sats,zona,valuta,prezzo_eur,consegna,"
+            "paese_domestico,condizione,quantita,quantita_max,stato,creato,"
+            "servizio_dove,durata_min) "
+            "VALUES(?,?,?,?,?,?,?,'sats',0,'servizio','IT','',?,?,'attivo',?,?,?)",
+            (vend, titolo, DESCRIZIONE_SERVIZIO, cat, sotto, sats, zone[vend],
+             QUANTITA_SERVIZIO, QUANTITA_SERVIZIO,
+             adesso - 1800 * (len(SERVIZI) - i), dove, minuti))
+        aid = con.execute("SELECT last_insert_rowid()").fetchone()[0]
+        foto = _foto_finta(cartella_foto, f"a{aid}_0", cat)
+        if foto:
+            con.execute("UPDATE annunci SET foto=? WHERE id=?", (json.dumps(foto), aid))
+        nuovi += 1
+    return nuovi
 
 
 def semina_ordini(con, ids: dict, compratore: int, adesso: int) -> int:
@@ -293,11 +346,13 @@ def main(argv=None) -> int:
                              or os.path.join(QUI, "foto"))
             v = semina_venditori(con, adesso)
             a = semina_annunci(con, cartella_foto, adesso)
+            s = semina_servizi(con, cartella_foto, adesso)
             o = semina_ordini(con, a["ids"], compratori[0], adesso) if compratori else 0
             con.commit()
             print(f"🌱 Semina del collaudo su {percorso}: {v} venditori nuovi "
-                  f"(su {len(VENDITORI)}), {a['nuovi']} annunci nuovi (su "
-                  f"{len(ANNUNCI)}), {o} ordini nuovi"
+                  f"(su {len(VENDITORI) + len(VENDITORI_LAVORO)}), {a['nuovi']} "
+                  f"annunci nuovi (su {len(ANNUNCI)}), {s} servizi nuovi (su "
+                  f"{len(SERVIZI)}), {o} ordini nuovi"
                   + (f" per l'id {compratori[0]}" if compratori else
                      " (nessun id Telegram in lista: niente ordini)")
                   + f"; le foto in {cartella_foto}. Rilanciabile: niente doppioni.")
