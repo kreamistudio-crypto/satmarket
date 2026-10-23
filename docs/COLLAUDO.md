@@ -129,6 +129,11 @@ aggiunge, si toglie la vecchia da GitHub.
   propria chiave Nostr, bunker compreso) e solo se si è in
   `PROVA_SOLO_IDS`. Chi non c'è: 403 sulle API, la copertina sulle
   pagine, il bot non gli risponde.
+  **Per aprirla a tutti** (23 ott 2026): `PROVA_APERTA = True` nel config
+  e il riavvio, con la lista che RESTA piena. Mai svuotarla per aprire:
+  la lista è anche il segno «questa è una prova», e senza di lei cadono
+  il recinto dei relay (annunci e post finirebbero sui relay veri), il
+  tetto degli ordini P2P e la semina. Il P2P resta di `P2P_PROVA_IDS`.
 - **I dati del mercatino**: finti (la semina), database nuovo.
 - **I pagamenti del mercatino**: finti (LNbits FakeWallet: il «paga» si
   fa da un secondo wallet nel pannello, dal tunnel ssh).
