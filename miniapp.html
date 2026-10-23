@@ -844,6 +844,10 @@
      della cronologia (navRiflette). `!important` perche' quelle
      sezioni si accendono a mano con lo style in linea. */
   #app[data-sez="lavoro"] :is(#catSez,#scoprireSez,#chips,#p2pVetrinaSez,#p2pVetrinaVia){display:none!important}
+  #app:not([data-sez="lavoro"]) #lavSez{display:none}
+  /* le card del lavoro non hanno un'illustrazione loro: l'emoji fa da
+     figura, un filo piu' grande di quella di ripiego delle categorie */
+  #lavStrip .cat-quad .cat-emoji{font-size:36px}
   /* il campo Cerca vive in un wrapper relativo: la lente a sinistra
      e il selettore valuta a destra gli stanno DENTRO */
   .q-wrap{position:relative;flex:1;display:flex}
@@ -11597,6 +11601,20 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('catStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
+    <!-- LE CARD DEL LAVORO (23 ott 2026): al posto delle categorie del
+         mercato, che in Lavoro si spengono, gli scaffali dei servizi.
+         Le disegna renderLavoro(); si vedono SOLO in Lavoro (il CSS su
+         #app[data-sez], come lo spegnimento delle altre). -->
+    <div id="lavSez">
+      <div class="section-label">Esplora il lavoro</div>
+      <div class="strip-wrap">
+        <div class="cat-strip" id="lavStrip"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('lavStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('lavStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
     <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
          filtri dell'occasione — oggi due fisse (offerte a tempo,
          sconti dei negozi), domani la lista arrivera' dal server per
@@ -17181,6 +17199,11 @@ function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
   if (activeCat !== 'Tutto') p.set('cat', activeCat);
   p.set('sezione', sezioneVetrina);
+  const sc = sezioneVetrina === 'lavoro' && SCAFFALI_LAVORO[scaffaleLavoro];
+  if (sc && sc.cat) {
+    p.set('cat', sc.cat);
+    if (sc.sotto) p.set('sottocategoria', sc.sotto);
+  }
   /* LA RICERCA E' DI TUTTI (ago 2026): vive qui dentro, quindi vale
      per gli anonimi come per chi è dentro Telegram — prima questa
      riga era `if (VETRINA)`, perché di là il campo Cerca parlava con
@@ -17735,11 +17758,52 @@ let ramoVetrina = 'esplora';
    tasti in cima. Il giudice di cosa e' lavoro e' questo, gemello della
    WHERE di /api/listings: la strada 'servizio' o la categoria. */
 let sezioneVetrina = 'mercato';
+/* GLI SCAFFALI DEL LAVORO (23 ott 2026): le voci di SOTTOCATEGORIE di
+   «Lavoro e servizi» nel server (lo slug e' il suo, una prova li
+   confronta), piu' «Lezioni e corsi» intera. La prima e' «tutto il
+   lavoro», cioe' nessun filtro oltre la sezione. */
+const SCAFFALI_LAVORO = [
+  {nome: 'Tutto il lavoro', e: '💼'},
+  {nome: 'Grafica e design', e: '🎨', cat: 'Lavoro e servizi', sotto: 'grafica-design'},
+  {nome: 'Siti web e app', e: '💻', cat: 'Lavoro e servizi', sotto: 'siti-e-app'},
+  {nome: 'Traduzioni', e: '🌍', cat: 'Lavoro e servizi', sotto: 'traduzioni'},
+  {nome: 'Scrittura e testi', e: '✍️', cat: 'Lavoro e servizi', sotto: 'scrittura-testi'},
+  {nome: 'Consulenze', e: '🤝', cat: 'Lavoro e servizi', sotto: 'consulenze'},
+  {nome: 'Riparazioni', e: '🔧', cat: 'Lavoro e servizi', sotto: 'riparazioni'},
+  {nome: 'Casa e manutenzione', e: '🧰', cat: 'Lavoro e servizi', sotto: 'casa-manutenzione'},
+  {nome: 'Foto e video', e: '📷', cat: 'Lavoro e servizi', sotto: 'foto-video-servizi'},
+  {nome: 'Lezioni e corsi', e: '🎓', cat: 'Lezioni e corsi'},
+];
+let scaffaleLavoro = 0;
+function renderLavoro(){
+  el('lavStrip').innerHTML = SCAFFALI_LAVORO.map((v, i) => `
+    <a class="cat-cella${i === scaffaleLavoro ? ' attiva' : ''}" role="button" tabindex="0"
+       aria-pressed="${i === scaffaleLavoro}" onclick="setScaffaleLavoro(${i})"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setScaffaleLavoro(${i})}">
+      <span class="cat-quad"><span class="cat-emoji" aria-hidden="true">${v.e}</span></span>
+      <span class="cat-eti">${v.nome}</span>
+    </a>`).join('');
+  aggiornaFrecce('lavStrip');
+  /* la card accesa si porta in vista, come quella delle categorie: una
+     card in fondo alla fila accesa fuori dallo schermo non dice niente */
+  setTimeout(() => centraNellaFila(
+    el('lavStrip'), el('lavStrip').querySelector('.cat-cella.attiva')), 0);
+}
+function setScaffaleLavoro(i){
+  if (i === scaffaleLavoro) return;
+  scaffaleLavoro = i;
+  renderLavoro(); haptic();
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+}
 const annuncioDiLavoro = l => l.consegna === 'servizio' || l.cat === 'Lavoro e servizi';
 function setSezione(s){
   if (s === sezioneVetrina) return;
   sezioneVetrina = s;
   el('app').dataset.sez = s;
+  /* si entra in Lavoro sempre da «tutto il lavoro» */
+  scaffaleLavoro = 0;
+  if (s === 'lavoro') renderLavoro();
   document.querySelectorAll('#sezSeg button').forEach(b => {
     const on = b.dataset.sez === s;
     b.classList.toggle('active', on);
@@ -21918,6 +21982,8 @@ function renderGrid(items){
   let data = items || vetrina.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
     (!DEMO || annuncioDiLavoro(l) === (sezioneVetrina === 'lavoro')) &&
+    (!DEMO || sezioneVetrina !== 'lavoro' || !SCAFFALI_LAVORO[scaffaleLavoro].cat
+      || l.cat === SCAFFALI_LAVORO[scaffaleLavoro].cat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
   /* In DEMO ordinamento e filtro prezzo vivono qui, sui dati finti
      (coi dati vivi li applica il server, riapplicarli mentirebbe:
@@ -86227,6 +86293,7 @@ async function avviaVetrina(){
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
+    armaFila('lavStrip');
     await fasciaPrima();
     renderGrid();
     /* la pagina ricordata PRIMA dei link d'arrivo (che li' tacciono) */
@@ -86617,6 +86684,7 @@ async function avvia(){
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
+    armaFila('lavStrip');
     await fasciaPrima();
     renderGrid();
     /* IL CARRELLO SALVATO (6 ott 2026) parte qui, in volo insieme a

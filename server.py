@@ -25505,7 +25505,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         solo_asta: int = 0, solo_sped_gratis: int = 0,
                         solo_sconto: int = 0,
                         condizione: str = "", regione: str = "",
-                        sezione: str = "",
+                        sezione: str = "", sottocategoria: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -25530,6 +25530,13 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         _lavoro = ("(COALESCE(a.consegna,'')='servizio'"
                    " OR COALESCE(a.categoria,'')='Lavoro e servizi')")
         dove += " AND " + ("" if sezione == "lavoro" else "NOT ") + _lavoro
+    if sottocategoria and cat and cat != "Tutto":
+        # le card del Lavoro (23 ott 2026): lo scaffale dentro la
+        # categoria, la voce di SOTTOCATEGORIE. Solo con la categoria,
+        # perche' lo stesso slug e' un'etichetta di QUELLA categoria;
+        # una voce che non esiste da' una vetrina vuota, mai un 400.
+        dove += " AND a.sottocategoria=?"
+        par.append(sottocategoria)
     if solo_spedizione:
         # Il filtro promette un costo di spedizione DICHIARATO: gli
         # annunci storici ('') restano fuori finche' il venditore non

@@ -111,6 +111,35 @@ def main():
               (r.status_code, "Mouse senza fili di prova" in r.text,
                "Tazza dipinta di prova" in r.text))
 
+        print("\n[il lavoro: i servizi di prova e le card della sezione]")
+        con = sqlite3.connect(db)
+        try:
+            servizi = con.execute(
+                "SELECT COUNT(*), SUM(consegna='servizio'), SUM(quantita=?) FROM annunci "
+                "WHERE venditore_id IN (9005,9006) AND stato='attivo'",
+                (sc.QUANTITA_SERVIZIO,)).fetchone()
+        finally:
+            con.close()
+        prova("undici servizi attivi, tutti servizi e senza scorte", (11, 11, 11), servizi)
+        lav = c.get("/api/listings?limit=100&sezione=lavoro", headers=COMPRATORE).json()
+        mer = c.get("/api/listings?limit=100&sezione=mercato", headers=COMPRATORE).json()
+        tit_lav = {a["titolo"] for a in lav["annunci"]}
+        prova("la sezione Lavoro li mostra tutti, e il Mercato nessuno",
+              (set(), set()), ({x[1] for x in sc.SERVIZI} - tit_lav,
+                               {x[1] for x in sc.SERVIZI} & {a["titolo"] for a in mer["annunci"]}))
+        r = c.get("/api/listings?limit=100&sezione=lavoro&cat=Lavoro%20e%20servizi"
+                  "&sottocategoria=traduzioni", headers=COMPRATORE).json()
+        prova("una card del Lavoro filtra il suo scaffale",
+              ["Traduzione inglese-italiano di prova, a pagina"],
+              [a["titolo"] for a in r["annunci"]])
+        r = c.get("/api/listings?limit=100&sezione=lavoro&cat=Lezioni%20e%20corsi",
+                  headers=COMPRATORE).json()
+        prova("...e «Lezioni e corsi» le sue tre lezioni", 3, len(r["annunci"]))
+        r = c.get("/api/listings?limit=100&sottocategoria=traduzioni",
+                  headers=COMPRATORE).json()
+        prova("lo scaffale senza la categoria non filtra", len(lav["annunci"]) + len(mer["annunci"]),
+              len(r["annunci"]))
+
         print("\n[rilanciata: niente doppioni]")
         prima = conta(db)
         prova("la seconda semina riesce", 0, sc.main(["--db", db]))

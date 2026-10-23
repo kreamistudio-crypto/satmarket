@@ -53993,7 +53993,8 @@ def prove_strisce_web():
     # strisce con le frecce sono TRE, c'e' anche la fila «Scambi P2P».
     # Il guscio si cerca risalendo dalla striscia, non piu' come «il
     # primo» e «l'ultimo»: col terzo l'ultimo era diventato il suo.
-    for _id in ("catStrip", "scoprireStrip", "p2pVetrinaFila"):
+    # (23 ott 2026) la quarta fila e' quella delle card del Lavoro
+    for _id in ("catStrip", "scoprireStrip", "p2pVetrinaFila", "lavStrip"):
         # la striscia sta DENTRO il wrapper, o le frecce non avrebbero
         # niente rispetto a cui posizionarsi (`position:relative` e'
         # suo) e finirebbero ancorate alla pagina
@@ -54011,7 +54012,7 @@ def prove_strisce_web():
     # tenerle via e' `.off`, che il render poi toglie se c'e' davvero
     # da scorrere. Nate accese, la prima cosa che si vedrebbe
     # all'apertura sono due frecce inerti.
-    prova("le sei frecce nascono spente", 6,
+    prova("le otto frecce nascono spente", 8,
           mini.count('class="strip-frec sx off"')
           + mini.count('class="strip-frec dx off"'))
     # ...e sul telefono non esistono affatto: `display:none` nella base
@@ -54035,7 +54036,7 @@ def prove_strisce_web():
     # «semplifica» rimetterebbe un trattino al posto di una freccia.
     _bott = [_r for _r in mini.split(chr(10))
              if "onclick" in _r and "scorriFila(" in _r]
-    prova("...e la freccia e' un disegno, mai un carattere", (6, 6),
+    prova("...e la freccia e' un disegno, mai un carattere", (8, 8),
           (len(_bott), sum(1 for _r in _bott if "<svg" in _r)))
     # LA ROTELLINA SI ARMA SOLO FUORI DA TELEGRAM, e col giudice GIA'
     # deciso: `FUORI_TG` LEGGE la classe che l'anti-flash ha messo, mai
@@ -177948,6 +177949,31 @@ def prove_semina_collaudo():
     prova("gli ordini: uno in corso e uno concluso, su due annunci che esistono",
           [("locked", True), ("released", True)],
           [(s, t in {a[1] for a in sc.ANNUNCI}) for t, s in sc.ORDINI])
+    # IL LAVORO (23 ott 2026): i servizi di prova stanno sugli scaffali
+    # VERI del server, e ogni card della sezione Lavoro ne ha almeno uno
+    k = src.index("SOTTOCATEGORIE = {")
+    exec(src[k:src.index("\n}\n", k) + 3], amb)
+    sotto = {c: {v[0] for v in voci} for c, voci in amb["SOTTOCATEGORIE"].items()}
+    prova("i servizi: venditori loro, scaffali del server, prezzo, dove e durata veri", [], [
+        x[1] for x in sc.SERVIZI
+        if x[0] not in {v[0] for v in sc.VENDITORI_LAVORO} or x[2] not in categorie
+        or x[3] not in sotto.get(x[2], ()) or not (isinstance(x[4], int) and x[4] > 0)
+        or x[5] not in ("online", "presenza") or x[6] < 0])
+    prova("...due venditori nuovi, e i conti del mercatino restano quelli",
+          (2, set()), (len(sc.VENDITORI_LAVORO),
+                       {v[0] for v in sc.VENDITORI} & {v[0] for v in sc.VENDITORI_LAVORO}))
+    prova("...e dicono di essere finti", (True, True, True),
+          (all("prova" in v[1].lower() for v in sc.VENDITORI_LAVORO),
+           all("prova" in x[1].lower() for x in sc.SERVIZI), "DI PROVA" in sc.DESCRIZIONE_SERVIZIO))
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    k = mini.index("const SCAFFALI_LAVORO = [")
+    scaffali = re.findall(r"cat: '([^']+)'(?:, sotto: '([^']+)')?", mini[k:mini.index("];", k)])
+    prova("le card del Lavoro: ogni slug e' una voce del server per la sua categoria",
+          [], [(c, v) for c, v in scaffali if c not in categorie
+               or (v and v not in sotto.get(c, ()))])
+    prova("...e ognuna ha almeno un servizio di prova", [], [
+        (c, v) for c, v in scaffali
+        if not any(x[2] == c and (not v or x[3] == v) for x in sc.SERVIZI)])
     testo = open(percorso, encoding="utf-8").read()
     prova("niente import server e niente rete", (False, False, False),
           (bool(re.search(r"^\s*(import|from)\s+server\b", testo, re.M)),

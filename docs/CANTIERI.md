@@ -71192,3 +71192,57 @@ nel venv).
 Mercato con la vetrina intera; la card «Lavoro e servizi» che porta a
 Lavoro; l'altezza dell'header (cresce di una riga) con le pillole
 appese sotto.
+
+## Le card del Lavoro e i lavori di prova del collaudo (23 ott 2026, cantiere mercato-lavoro, richiesta di Alan, su develop)
+
+**COSA.** In Lavoro, al posto delle categorie del mercato (spente dal
+cantiere di ieri), una fila «Esplora il lavoro» con le stesse card della
+striscia delle categorie (`.cat-cella`), l'emoji al posto
+dell'illustrazione: «Tutto il lavoro», le otto voci di SOTTOCATEGORIE di
+«Lavoro e servizi» (grafica, siti e app, traduzioni, testi, consulenze,
+riparazioni, casa e manutenzione, foto e video) e «Lezioni e corsi»
+intera. Un tocco filtra la vetrina; entrando in Lavoro si riparte sempre
+da «Tutto il lavoro». La card accesa si porta in vista (`centraNellaFila`,
+come le categorie): al primo giro «Riparazioni» si accendeva fuori
+schermo.
+
+**IL FILTRO.** `/api/listings` impara `sottocategoria`, che vale SOLO con
+una categoria: lo slug è un'etichetta di quella categoria. Una voce che
+non esiste dà una vetrina vuota, mai un 400. Le sottocategorie le
+assegna già il server alla pubblicazione (`sottocategoria_indovina`),
+quindi il filtro vale anche sui servizi veri, non solo sulla semina.
+L'elenco del client (`SCAFFALI_LAVORO`) copia gli slug del server: una
+prova li confronta.
+
+**I LAVORI DI PROVA.** `semina_collaudo.py` aggiunge due venditori
+(9005, 9006) e undici servizi, almeno uno per card, con dove, durata e
+la quantità al tetto dei servizi (`MAX_QUANTITA_ANNUNCIO`). Venditori a
+parte apposta: i conti del mercatino seminato (4 venditori, 14 annunci,
+2 ordini) restano quelli, e le prove che li contano non cambiano.
+Rilanciabile come prima: niente doppioni.
+
+**I DUE RITOCCHI CHE LE SENTINELLE HANNO CHIESTO.** La 🏠 è dei soli
+punti Barattolo (`prove_spedizione_indirizzo`): «Casa e manutenzione»
+porta 🧰. E le frecce delle file passano da sei a otto, con `lavStrip`
+nell'elenco delle file che la prova controlla.
+
+**LE STRADE SCARTATE.** 1) Le sottocategorie di «Lezioni e corsi» come
+card: diciassette card sono troppe, e le lezioni sono una famiglia sola
+per chi cerca. 2) Il numero di annunci su ogni card: i conteggi del
+server sono per categoria, non per scaffale, e un numero falso è peggio
+di nessuno.
+
+**PROVATO.** `prove_semina_collaudo` (5 nuove: servizi su scaffali veri,
+venditori nuovi e conti invariati, tutto dice «prova», ogni slug del
+client è del server, ogni card ha un servizio). `collaudo_semina_collaudo`
+sullo schema vero (5 nuove: undici servizi senza scorte, Lavoro li
+mostra e il Mercato no, una card filtra il suo scaffale, «Lezioni e
+corsi» ne ha tre, lo scaffale senza categoria non filtra). Dal vivo in
+Chrome a 390 e 320 px su un server usa-e-getta con la semina: i due
+tasti, la fila, «Riparazioni» con il suo annuncio, «Lezioni e corsi»
+con tre. `PROVE_SEVERE=1 python prove.py` verde.
+
+**SUL COLLAUDO.** I lavori compaiono solo dopo una nuova semina sulla VM
+(`sudo collaudo azzera`, oppure `python semina_collaudo.py`, che
+aggiunge senza toccare il resto). Per pubblicarne di nuovi dal form
+serve `SERVIZI_ATTIVI = True` nel config della VM.
