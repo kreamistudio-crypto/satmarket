@@ -1150,6 +1150,10 @@ ONCHAIN_SOLO_ADMIN = True
 # libreria `embit` (requirements.txt): se manca, le rotte on-chain
 # rispondono 503 e il resto vive.
 ONCHAIN_XPUB = ""
+# L'API mempool che guarda i pagamenti degli ordini on-chain (tappa 4) e
+# trasmette le transazioni d'uscita. Vuota = quella di serie della rete
+# (signet: https://mempool.space/signet/api).
+ONCHAIN_MEMPOOL_API = ""
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

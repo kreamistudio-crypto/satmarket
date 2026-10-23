@@ -71583,3 +71583,74 @@ ha.
 **PROVATO.** Le sezioni on-chain di `prove.py` (82/0), compreso il
 banco node che esegue `onchainDoveAbita` nei due mondi; suite intera e
 collaudi della CI nel messaggio del commit.
+
+## L'ordine on-chain: pagare, vedere arrivare, liberare con due firme (23 ott 2026, cantiere onchain-tappa3, richiesta di Alan: «implementiamo tutto, poi faccio i test», su develop)
+
+**COSA.** Le tappe 3, 4 e 5 dello studio in un giro solo, sul collaudo e
+in signet, dietro lo stesso cancello (`onchain_ammesso`: oggi solo gli
+admin).
+- **La cassa (tappa 3).** A chi passa il cancello la pagina d'acquisto di
+  un oggetto singolo mostra «Come paghi: ⚡ Lightning / ⛓️ On-chain
+  (prova)». Scegliendo ⛓️ la cassa chiede prima se il venditore riceve
+  on-chain (`/api/onchain/pronto/{id}`: deve aver acceso l'on-chain dal
+  suo foglio). «⛓️ Paga on-chain» fa nascere la chiave di chi compra se
+  non c'è (coi suoi backup), manda la sua xpub dedicata, e chiama la
+  stessa `/api/orders` con `metodo: onchain`: tutti i controlli della
+  cassa sono quelli di sempre, e solo in fondo, al posto della fattura,
+  nasce l'indirizzo 2-di-3 della tappa 2. Il prezzo è quello del
+  Lightning più un **margine per la rete** (3 × tariffa di mezz'ora ×
+  180 vbyte, mai meno di 1000 sats). Si finisce nel foglio On-chain, con
+  QR `bitcoin:…?amount=`, l'indirizzo, «Ho pagato, controlla» e
+  «Annulla l'ordine».
+- **La sorveglianza (tappa 4).** Ogni due minuti (e subito, col bottone)
+  il server chiede a mempool.space signet le monete dell'indirizzo. Con
+  **una conferma** e almeno l'importo l'ordine è 'pagato': lo stock
+  scala, le due parti ricevono la notifica. Le monete non confermate
+  si mostrano ma non contano. Un indirizzo vive 24 ore e intanto
+  prenota lo stock; scaduto senza un sats diventa 'scaduto'.
+- **Le due firme (tappa 5).** Chi compra, quando ha l'oggetto, tocca
+  «🔓 Libera i sats»: il telefono firma un PSBT con il prezzo al
+  venditore e il resto del margine a sé. Chi vende può fare il
+  contrario, «↩️ Rimborsa». La **seconda firma è automatica**: appena
+  l'altra parte apre la Mini App (o il foglio On-chain), il suo telefono
+  rilegge monete, uscite e commissione, firma solo se i sats vanno a una
+  chiave del SUO seme, e manda la transazione completa; il server
+  controlla che sia proprio quella proposta (stesso txid) e la
+  trasmette.
+
+**DOVE ARRIVANO I SATS.** Nessuno incolla un indirizzo: ciascuno incassa
+su `/1/n` del suo conto del 2-di-3 (la catena «resto», col numero
+dell'ordine), a una firma. Il server lo ricava dalla xpub, il telefono
+lo rifà dal seme prima di firmare. Per spenderli fuori da Barattolo
+basta il seme in Sparrow (`wpkh` sul conto `m/48'/1'/0'/2'`, catena 1).
+
+**PERCHÉ UNA TABELLA SUA.** L'ordine on-chain vive in `onchain_ordini` e
+non in `ordini`: le ronde del Lightning (la fattura che scade,
+l'auto-sblocco a 10 giorni, il payout verso una bolt11) su un ordine
+senza fattura né cassaforte farebbero la cosa sbagliata, e lo studio
+dice «niente ibridi». Il prezzo è che questo ordine non passa ancora da
+spedito/consegnato e non compare fra gli Ordini di sempre: si segue dal
+foglio On-chain.
+
+**NON C'È ANCORA.** La disputa con la chiave di Barattolo (tappa 6: il
+firmatario sul nodo), la commissione (tappa 7), il carrello, gli accordi
+e i codici sconto (on-chain si paga il listino), e RBF/CPFP se una
+transazione d'uscita resta ferma (a 2 sat/vB su signet non succede).
+
+**PROVATO.** `collaudo_onchain_ordine.py` (42/0): la storia col server
+vero e il telefono fatto con embit — la cassa e i suoi no, lo stock
+prenotato, il Lightning invariato, visti/confermati/meno del dovuto, i
+PSBT storti (prezzo, uscita estranea, polvere, margine, firma mancante),
+la seconda firma di chi ha proposto, il rimborso, l'annullo, la
+scadenza, la leva spenta. `prove_ordine_onchain`: la forma, e la PROVA
+DOPPIA delle firme — il codice vero del telefono sotto node col bundle
+vero firma un PSBT che embit legge, e co-firma una transazione che embit
+ritrova identica; un incasso storto o un seme sbagliato non si firmano.
+Suite e collaudi della CI nel messaggio del commit.
+
+**PER PROVARLO SUL COLLAUDO.** Servono due account che passano il
+cancello (oggi due admin). Il venditore apre Profilo → Amministrazione →
+«⛓️ On-chain (prova)» e tocca «Accendi l'on-chain»; mette in vendita un
+oggetto. Chi compra sceglie ⛓️ alla cassa, paga dal suo wallet signet
+(un faucet signet dà i sats), e dopo una conferma tocca «Libera i sats».
+Il venditore riapre la Mini App: i sats partono da soli.

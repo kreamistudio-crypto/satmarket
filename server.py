@@ -2324,6 +2324,10 @@ FRENI = {
     # scrive una riga e consuma tre numeri
     "onchain_xpub": (5, 3600),        # «Accendi l'on-chain», per persona
     "onchain_indirizzo": (20, 3600),  # un indirizzo di prova fra due ammessi, per persona
+    # la tappa 3 (23 ott 2026): il «controlla adesso» chiede a mempool,
+    # e una proposta firmata e' un PSBT da leggere con embit
+    "onchain_controlla": (60, 3600),  # «ho pagato, guarda» di un ordine on-chain, per persona
+    "onchain_firma": (30, 3600),      # proposte e co-firme on-chain, per persona
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -37586,7 +37590,19 @@ def _riservati(con, annuncio_id: int) -> int:
         "JOIN ordini o ON o.id=r.ordine_id "
         "WHERE r.annuncio_id=? AND o.stato='creato' AND o.creato>=?",
         (annuncio_id, soglia)).fetchone()["n"]
-    return mono + nei_set
+    # ...e l'on-chain (23 ott 2026): un indirizzo in attesa prenota come
+    # una fattura viva, per tutta la sua finestra. La tabella nasce col
+    # primo gesto on-chain: dove non c'e', non c'e' niente da contare.
+    try:
+        oc = con.execute(
+            "SELECT COALESCE(SUM(quantita),0) AS n FROM onchain_ordini "
+            "WHERE annuncio_id=? AND stato='attesa' AND scade>?",
+            (annuncio_id, int(time.time()))).fetchone()["n"]
+    except Exception as e:
+        if "no such table" not in str(e):
+            raise
+        oc = 0
+    return mono + nei_set + oc
 
 
 
@@ -39716,6 +39732,16 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     """L'acquirente avvia l'acquisto: creiamo la invoice escrow."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
+    # L'ON-CHAIN (23 ott 2026, tappa 3): stessa cassa, stessi controlli,
+    # e solo in fondo, al posto della fattura, nasce l'indirizzo 2-di-3
+    # (`_onchain_compra`). Un oggetto alla volta: il set ha una testata
+    # e N righe, e il 2-di-3 per ora sa tenere una cosa sola.
+    onchain = d.get("metodo") == "onchain"
+    if onchain:
+        _onchain_compra_ammesso(user["id"])
+        if not d.get("annuncio_id"):
+            raise HTTPException(400, "On-chain per ora si compra un "
+                                     "oggetto alla volta")
     # Il SET (lug 2026): col body a righe si passa dal ramo dedicato;
     # con annuncio_id tutto e' l'acquisto di sempre, byte per byte.
     if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
@@ -39975,7 +40001,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "SELECT * FROM ordini WHERE annuncio_id=? AND compratore_id=? "
         "AND stato='creato' ORDER BY id DESC LIMIT 1",
         (a["id"], user["id"])).fetchone()
-    if mio:
+    # la ripresa e' di una FATTURA: chi sceglie l'on-chain non ne vuole
+    # una, e la sua di prima muore da sola fra pochi minuti
+    if mio and not onchain:
         legame = con.execute("SELECT id FROM offerte WHERE ordine_id=?",
                              (mio["id"],)).fetchone()
         stessa = (mio["quantita"] == richiesti
@@ -40468,6 +40496,21 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     if _troppi_ordini_aperti(con, user["id"]):
         con.close()
         raise HTTPException(429, MSG_ORDINI_APERTI)
+    if onchain:
+        con.close()
+        if off or cod_id:
+            raise HTTPException(400, "On-chain per ora si paga il prezzo "
+                                     "di listino: accordi e codici sconto "
+                                     "restano col Lightning")
+        return await _onchain_compra(user, a, richiesti, totale, {
+            "consegna": scelta, "punto_ritiro": punto,
+            "via_punto": via_punto, "rete_punto": rete, "tipo_punto": tipo,
+            "punto_barattolo": pid,
+            "zona": zona if scelta == "spedizione" else "",
+            "paese": paese if scelta == "spedizione" else "",
+            "nota": nota, "indirizzo": ind,
+            "articolo_sats": conto["netto"], "spedizione_sats": sped,
+            "protezione_sats": prot})
     cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}",
@@ -87227,6 +87270,641 @@ async def onchain_prova_indirizzo(req: Request,
                                 _onchain_nome(con, venditore))
     finally:
         con.close()
+
+
+# ============ L'ORDINE ON-CHAIN: PAGARE, VEDERE, LIBERARE (23 ott 2026,
+# cantiere onchain-tappa3, richiesta di Alan: «implementiamo tutto, poi
+# faccio i test») ============
+# Le tappe 3, 4 e 5 dello studio in un giro solo, sul collaudo e in
+# signet. L'ordine on-chain vive in una tabella SUA (`onchain_ordini`) e
+# non in `ordini`: le ronde del Lightning — la fattura che scade, l'auto-
+# sblocco a 10 giorni, il payout verso una bolt11 — su un ordine che non
+# ha ne' fattura ne' cassaforte farebbero la cosa sbagliata, e il
+# principio dello studio e' «niente ibridi». Il prezzo d'uscita e' che
+# questo ordine non passa (ancora) da spedito/consegnato: si paga, i
+# sats restano nel 2-di-3, e si liberano con due firme.
+# IL GIRO: la cassa crea l'indirizzo (le tre chiavi della tappa 2) e il
+# prezzo piu' un margine per la rete; la ronda chiede a mempool se i
+# sats sono arrivati con una conferma (→ 'pagato', lo stock scala); chi
+# compra firma nel telefono «Libera i sats» (un PSBT verso l'incasso del
+# venditore, il resto del margine torna a lui), e il telefono del
+# venditore CO-FIRMA da solo appena si apre, dopo aver controllato che
+# i sats vadano davvero a una chiave sua. Il rimborso e' lo stesso gesto
+# a parti invertite. Il server non firma niente: legge, controlla e
+# trasmette.
+# GLI INCASSI NON SI CHIEDONO A NESSUNO: ciascuno riceve su una chiave
+# del suo stesso seme, `/1/n` del conto del 2-di-3 (la catena «resto»,
+# col numero dell'ordine). Il server la ricava dalla xpub, il telefono
+# di chi incassa la rifa' dal seme prima di firmare: un indirizzo che
+# non e' suo non lo co-firma.
+try:
+    from config import ONCHAIN_MEMPOOL_API
+except ImportError:
+    ONCHAIN_MEMPOOL_API = ""
+ONCHAIN_MEMPOOL_DI_SERIE = {"signet": "https://mempool.space/signet/api"}
+# quanto vive un indirizzo che aspetta i sats: un bonifico on-chain non
+# e' un tocco, e un giorno copre chi paga da un wallet che non ha sotto
+# mano. Prenota lo stock per tutto quel tempo (`_riservati`).
+ONCHAIN_ORE_ATTESA = 24
+# IL MARGINE PER LA RETE: chi compra manda il prezzo PIU' questo, e
+# all'uscita la commissione di rete si paga da qui; quel che avanza
+# torna a lui nella stessa transazione. Tre volte la tariffa di
+# mezz'ora su una transazione d'uscita tipica (un ingresso 2-di-3, due
+# uscite: ~180 vbyte), mai meno del pavimento.
+ONCHAIN_VBYTE_USCITA = 180
+ONCHAIN_MARGINE_X = 3
+ONCHAIN_MARGINE_MIN_SATS = 1000
+ONCHAIN_POLVERE = 546       # sotto, un'uscita costa piu' di quel che porta
+_ONCHAIN_TARIFFA = {"sat_vb": 0.0, "quando": 0.0}
+
+
+def onchain_mempool_api() -> str:
+    e = str(ONCHAIN_MEMPOOL_API or "").strip().rstrip("/")
+    return e or ONCHAIN_MEMPOOL_DI_SERIE.get(ONCHAIN_RETE, "")
+
+
+async def onchain_mempool_utxo(indirizzo: str) -> list:
+    """Le monete di un indirizzo, come le dice mempool: [{txid, vout,
+    value, status: {confirmed, ...}}]. Solleva se la rete non risponde:
+    chi chiama decide cosa dire."""
+    async with httpx.AsyncClient(timeout=10) as cl:
+        r = await cl.get(f"{onchain_mempool_api()}/address/{indirizzo}/utxo")
+        r.raise_for_status()
+        return r.json()
+
+
+async def onchain_mempool_tariffa() -> float:
+    """sat/vbyte per entrare in mezz'ora, tenuta dieci minuti. Muta → 2:
+    signet e' quasi sempre vuota, e un margine si calcola lo stesso."""
+    adesso = time.time()
+    if _ONCHAIN_TARIFFA["sat_vb"] and adesso - _ONCHAIN_TARIFFA["quando"] < 600:
+        return _ONCHAIN_TARIFFA["sat_vb"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as cl:
+            r = await cl.get(f"{onchain_mempool_api()}/v1/fees/recommended")
+            r.raise_for_status()
+            v = float(r.json().get("halfHourFee") or 0)
+    except Exception:
+        v = 0
+    v = min(max(v, 1.0), 500.0) if v else 2.0
+    _ONCHAIN_TARIFFA.update(sat_vb=v, quando=adesso)
+    return v
+
+
+async def onchain_mempool_invia(tx_hex: str) -> str:
+    """Trasmette una transazione firmata; torna il txid. Il rifiuto della
+    rete torna come ValueError col testo di mempool, che dice il perche'
+    (commissione, firma, moneta gia' spesa)."""
+    async with httpx.AsyncClient(timeout=15) as cl:
+        r = await cl.post(f"{onchain_mempool_api()}/tx", content=tx_hex)
+        if r.status_code >= 300:
+            raise ValueError((r.text or "rifiutata")[:200])
+        return r.text.strip()
+
+
+def onchain_margine(sat_vb: float) -> int:
+    return max(ONCHAIN_MARGINE_MIN_SATS,
+               math.ceil(sat_vb * ONCHAIN_VBYTE_USCITA * ONCHAIN_MARGINE_X))
+
+
+def onchain_incasso(xpub: str, numero: int) -> str:
+    """L'indirizzo d'incasso di una persona per un ordine: `/1/numero`
+    della sua xpub dedicata, a una firma (p2wpkh). Il telefono lo rifa'
+    dal seme con la stessa strada (`onchainIncassoMio`)."""
+    from embit.script import p2wpkh
+    k = _embit_bip32.HDKey.from_string(xpub).derive([1, int(numero)])
+    return p2wpkh(k.key).address(_EMBIT_RETI[ONCHAIN_RETE])
+
+
+def _onchain_prepara_ordini(con):
+    """L'ordine on-chain: la cassa (prezzo, margine, importo), l'indirizzo
+    (riga di `onchain_indirizzi`), i due incassi, le monete viste, la
+    proposta d'uscita firmata da una parte e la transazione che chiude.
+    `dettagli` e' la fotografia della consegna scelta alla cassa (JSON),
+    come le colonne gemelle di `ordini`."""
+    con.execute("""CREATE TABLE IF NOT EXISTS onchain_ordini(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        indirizzo_id INTEGER NOT NULL UNIQUE,
+        annuncio_id INTEGER NOT NULL,
+        compratore_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        quantita INTEGER NOT NULL DEFAULT 1,
+        titolo TEXT NOT NULL DEFAULT '',
+        prezzo_sats INTEGER NOT NULL,
+        margine_sats INTEGER NOT NULL,
+        importo_sats INTEGER NOT NULL,
+        incasso TEXT NOT NULL,
+        rimborso TEXT NOT NULL,
+        dettagli TEXT NOT NULL DEFAULT '{}',
+        stato TEXT NOT NULL DEFAULT 'attesa',
+        -- attesa | pagato | rilasciato | rimborsato | scaduto | annullato
+        visti_sats INTEGER DEFAULT 0,
+        ricevuti_sats INTEGER DEFAULT 0,
+        utxo TEXT DEFAULT '[]',
+        pagato_il INTEGER DEFAULT 0,
+        proposta_verso TEXT DEFAULT '',
+        proposta_psbt TEXT DEFAULT '',
+        proposta_da INTEGER DEFAULT 0,
+        proposta_il INTEGER DEFAULT 0,
+        txid_uscita TEXT DEFAULT '',
+        chiuso_il INTEGER DEFAULT 0,
+        scade INTEGER NOT NULL,
+        creato INTEGER NOT NULL,
+        aggiornato INTEGER NOT NULL)""")
+
+
+def _onchain_db_ordini():
+    con = _onchain_db()
+    _onchain_prepara_ordini(con)
+    return con
+
+
+def _onchain_compra_ammesso(tg_id):
+    """Il cancello della cassa: per chi compra si guarda qui, per chi
+    vende quando si sa chi e' (`_onchain_compra`). 400 e non 404: la
+    cassa esiste per tutti, e' la via on-chain che non c'e'."""
+    if not onchain_ammesso(tg_id):
+        raise HTTPException(400, "Il pagamento on-chain non è disponibile")
+    _onchain_serve_embit()
+
+
+async def _onchain_compra(user, a, richiesti: int, prezzo: int,
+                          dettagli: dict) -> dict:
+    """La coda della cassa on-chain: tutti i conti e i no di `compra`
+    sono gia' passati, `prezzo` e' il totale che col Lightning sarebbe
+    stato la fattura. Qui nascono l'indirizzo e l'ordine."""
+    venditore = a["venditore_id"]
+    if not onchain_ammesso(venditore):
+        raise HTTPException(400, "Questo venditore non riceve on-chain")
+    try:
+        onchain_xpub_barattolo()
+    except ValueError as e:
+        raise HTTPException(503, str(e))
+    # l'unico await, PRIMA di ogni scrittura: da qui all'ultimo commit
+    # il blocco e' atomico, come nella cassa del Lightning
+    margine = onchain_margine(await onchain_mempool_tariffa())
+    adesso = int(time.time())
+    con = _onchain_db_ordini()
+    try:
+        r = con.execute("SELECT stato, quantita, titolo FROM annunci "
+                        "WHERE id=?", (a["id"],)).fetchone()
+        if (not r or r["stato"] != "attivo"
+                or richiesti > r["quantita"] - _riservati(con, a["id"])):
+            raise HTTPException(409, "Qualcun altro ti ha preceduto su "
+                                     "questo annuncio: riprova tra poco")
+        try:
+            ind_id = onchain_nuovo_indirizzo(con, user["id"], venditore,
+                                             adesso)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (ind_id,)).fetchone()
+        cur = con.execute(
+            "INSERT INTO onchain_ordini(indirizzo_id, annuncio_id,"
+            " compratore_id, venditore_id, quantita, titolo, prezzo_sats,"
+            " margine_sats, importo_sats, incasso, rimborso, dettagli,"
+            " scade, creato, aggiornato)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (ind_id, a["id"], user["id"], venditore, richiesti,
+             r["titolo"] or "", prezzo, margine, prezzo + margine,
+             onchain_incasso(ind["xpub_venditore"], ind["numero_venditore"]),
+             onchain_incasso(ind["xpub_compratore"],
+                             ind["numero_compratore"]),
+             json.dumps(dettagli, ensure_ascii=False),
+             adesso + ONCHAIN_ORE_ATTESA * 3600, adesso, adesso))
+        con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
+                    (cur.lastrowid, ind_id))
+        con.commit()
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (cur.lastrowid,)).fetchone()
+        return {"onchain": _onchain_ordine_per(con, o, user["id"])}
+    finally:
+        con.close()
+
+
+def _onchain_ordine_per(con, o, tg_id: int) -> dict:
+    """Un ordine on-chain come lo vede UNA delle due parti. L'indirizzo
+    passa da `onchain_riga_per` (niente xpub), e la proposta c'e' intera:
+    chi deve co-firmare ha bisogno del PSBT, chi l'ha proposta di sapere
+    che aspetta."""
+    ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                      (o["indirizzo_id"],)).fetchone()
+    da_compratore = int(o["compratore_id"]) == int(tg_id)
+    altro = o["venditore_id"] if da_compratore else o["compratore_id"]
+    proposta = None
+    if o["proposta_psbt"]:
+        proposta = {"verso": o["proposta_verso"], "psbt": o["proposta_psbt"],
+                    "mia": int(o["proposta_da"]) == int(tg_id),
+                    "il": o["proposta_il"]}
+    return {
+        "id": o["id"], "annuncio_id": o["annuncio_id"], "titolo": o["titolo"],
+        "ruolo": "compratore" if da_compratore else "venditore",
+        "stato": o["stato"], "quantita": o["quantita"],
+        "prezzo_sats": o["prezzo_sats"], "margine_sats": o["margine_sats"],
+        "importo_sats": o["importo_sats"],
+        "visti_sats": o["visti_sats"], "ricevuti_sats": o["ricevuti_sats"],
+        "utxo": json.loads(o["utxo"] or "[]"),
+        "incasso": o["incasso"], "rimborso": o["rimborso"],
+        "dettagli": json.loads(o["dettagli"] or "{}"),
+        "indirizzo": onchain_riga_per(ind, tg_id, _onchain_nome(con, altro)),
+        "proposta": proposta, "txid_uscita": o["txid_uscita"],
+        "scade": o["scade"], "creato": o["creato"],
+        "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
+        "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
+        "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
+    }
+
+
+async def onchain_controlla(oid: int) -> str:
+    """LA SORVEGLIANZA (tappa 4): chiede a mempool le monete
+    dell'indirizzo di un ordine in attesa. Con una conferma e almeno
+    l'importo → 'pagato' (lo stock scala, le due parti lo sanno). Scaduto
+    senza aver visto niente → 'scaduto' e lo stock torna libero. Visto
+    ma non ancora confermato, o arrivato meno del dovuto: si aspetta, e
+    lo si dice. Torna lo stato. Le monete NON confermate non contano
+    mai: in mempool una transazione si puo' ancora sostituire."""
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT o.*, i.indirizzo AS dove FROM onchain_ordini o"
+                        " JOIN onchain_indirizzi i ON i.id=o.indirizzo_id"
+                        " WHERE o.id=?", (int(oid),)).fetchone()
+    finally:
+        con.close()
+    if not o or o["stato"] != "attesa":
+        return o["stato"] if o else ""
+    utxo = await onchain_mempool_utxo(o["dove"])
+    buone = [{"txid": str(u["txid"]), "vout": int(u["vout"]),
+              "value": int(u["value"])}
+             for u in utxo if (u.get("status") or {}).get("confirmed")]
+    visti = sum(int(u["value"]) for u in utxo)
+    ricevuti = sum(u["value"] for u in buone)
+    adesso = int(time.time())
+    notifiche = []
+    con = _onchain_db_ordini()
+    try:
+        con.execute("UPDATE onchain_ordini SET visti_sats=?, ricevuti_sats=?,"
+                    " utxo=?, aggiornato=? WHERE id=? AND stato='attesa'",
+                    (visti, ricevuti, json.dumps(buone), adesso, o["id"]))
+        stato = "attesa"
+        if ricevuti >= o["importo_sats"]:
+            cur = con.execute("UPDATE onchain_ordini SET stato='pagato',"
+                              " pagato_il=? WHERE id=? AND stato='attesa'",
+                              (adesso, o["id"]))
+            if cur.rowcount:
+                stato = "pagato"
+                # lo stock scala come nell'incasso del Lightning, con lo
+                # stesso MAX e la stessa regola dell'ultimo pezzo
+                con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
+                            "WHERE id=?", (o["quantita"], o["annuncio_id"]))
+                con.execute("UPDATE annunci SET stato='venduto' WHERE id=? "
+                            "AND quantita<=0", (o["annuncio_id"],))
+                tit = html.escape(o["titolo"][:40])
+                notifiche = [
+                    (o["venditore_id"], f"⛓️ <b>Venduto on-chain:</b> {tit}. "
+                     "I sats sono arrivati nel 2-di-3 e restano li' finche' "
+                     "chi compra non li libera. Prepara l'oggetto."),
+                    (o["compratore_id"], f"⛓️ <b>Pagamento on-chain "
+                     f"confermato:</b> {tit}. Quando hai l'oggetto, apri "
+                     "Profilo → On-chain e tocca «Libera i sats».")]
+        elif not utxo and adesso > o["scade"]:
+            cur = con.execute("UPDATE onchain_ordini SET stato='scaduto',"
+                              " chiuso_il=? WHERE id=? AND stato='attesa'",
+                              (adesso, o["id"]))
+            stato = "scaduto" if cur.rowcount else stato
+        con.commit()
+    finally:
+        con.close()
+    for chi, testo in notifiche:
+        await notifica(chi, testo)
+    return stato
+
+
+def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
+                          chiave_firmatario: str) -> None:
+    """Il server legge la proposta prima di passarla all'altro, e dice di
+    no se non e' l'uscita che l'ordine permette. Non e' l'unica guardia —
+    il telefono di chi co-firma rifa' gli stessi conti — ma e' quella che
+    non lascia arrivare a nessuno un PSBT storto. ValueError col motivo.
+    - spende ESATTAMENTE le monete dell'ordine;
+    - verso il venditore: a lui il prezzo esatto, il resto solo al
+      rimborso di chi compra; verso chi compra: tutto al suo rimborso;
+    - nessuna uscita sotto la polvere, e la commissione di rete sta
+      dentro il margine;
+    - chi propone ha gia' firmato ogni ingresso."""
+    from embit.psbt import PSBT
+    try:
+        p = PSBT.from_string(psbt_b64)
+    except Exception:
+        raise ValueError("la transazione proposta non si legge")
+    monete = json.loads(o["utxo"] or "[]")
+    if sorted((v.txid.hex(), v.vout) for v in p.tx.vin) != sorted(
+            (m["txid"], m["vout"]) for m in monete):
+        raise ValueError("non spende esattamente i sats dell'ordine")
+    rete = _EMBIT_RETI[ONCHAIN_RETE]
+    uscite = [(u.script_pubkey.address(rete), u.value) for u in p.tx.vout]
+    if verso == "venditore":
+        if [v for d, v in uscite if d == o["incasso"]] != [o["prezzo_sats"]]:
+            raise ValueError("al venditore deve andare esattamente il prezzo")
+        permessi = (o["incasso"], o["rimborso"])
+    else:
+        permessi = (o["rimborso"],)
+    if not uscite or any(d not in permessi for d, _ in uscite):
+        raise ValueError("c'è un'uscita verso un indirizzo che l'ordine "
+                         "non conosce")
+    if any(v < ONCHAIN_POLVERE for _, v in uscite):
+        # la rete non trasmette uscite sotto la polvere: meglio dirlo qui
+        # che dopo la seconda firma
+        raise ValueError("un'uscita è troppo piccola (polvere): lasciala "
+                         "alla commissione")
+    rete_sats = sum(m["value"] for m in monete) - sum(v for _, v in uscite)
+    if not 0 < rete_sats <= o["margine_sats"]:
+        raise ValueError("la commissione di rete non sta nel margine")
+    for i in p.inputs:
+        if chiave_firmatario not in {k.sec().hex() for k in i.partial_sigs}:
+            raise ValueError("manca la tua firma")
+
+
+def _onchain_parte(o, tg_id) -> str:
+    if int(o["compratore_id"]) == int(tg_id):
+        return "compratore"
+    if int(o["venditore_id"]) == int(tg_id):
+        return "venditore"
+    # 404 e non 403, come altrove: chi non c'entra non sa nemmeno che c'e'
+    raise HTTPException(404, "Ordine non trovato")
+
+
+@app.get("/api/onchain/ordini")
+async def onchain_ordini(x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """I miei ordini on-chain, da compratore e da venditore, gli ultimi
+    trenta. Si legge senza embit: i conti sono nelle righe."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = _onchain_db_ordini()
+    try:
+        righe = con.execute(
+            "SELECT * FROM onchain_ordini WHERE compratore_id=? OR "
+            "venditore_id=? ORDER BY id DESC LIMIT 30",
+            (user["id"], user["id"])).fetchall()
+        return {"ordini": [_onchain_ordine_per(con, o, user["id"])
+                           for o in righe]}
+    finally:
+        con.close()
+
+
+@app.get("/api/onchain/pronto/{venditore_id}")
+async def onchain_pronto(venditore_id: int, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """La cassa chiede se a QUESTO venditore si puo' pagare on-chain,
+    prima di mostrare la scelta: si o no, e il perche' a parole. Non
+    dice la xpub di nessuno, solo se c'e'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    if not EMBIT:
+        return {"pronto": False, "motivo": "manca la libreria embit"}
+    if not onchain_ammesso(venditore_id):
+        return {"pronto": False, "motivo": "questo venditore non riceve on-chain"}
+    con = _onchain_db()
+    try:
+        x = {r["tg_id"] for r in con.execute(
+            "SELECT tg_id FROM onchain_xpub WHERE tg_id IN (?,?)",
+            (user["id"], int(venditore_id)))}
+    finally:
+        con.close()
+    if int(venditore_id) not in x:
+        return {"pronto": False,
+                "motivo": "il venditore non ha ancora acceso l'on-chain"}
+    return {"pronto": True, "motivo": "", "io_acceso": user["id"] in x}
+
+
+@app.post("/api/onchain/ordini/{oid}/controlla")
+async def onchain_ordine_controlla(oid: int, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """«Ho pagato, guarda adesso»: la stessa domanda della ronda, subito.
+    La rete muta non e' un errore dell'ordine: 503 e si riprova."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_controlla", user["id"])
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        _onchain_parte(o, user["id"])
+    finally:
+        con.close()
+    try:
+        await onchain_controlla(oid)
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        return _onchain_ordine_per(con, o, user["id"])
+    finally:
+        con.close()
+
+
+@app.post("/api/onchain/ordini/{oid}/annulla")
+async def onchain_ordine_annulla(oid: int, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """Chi compra ci ripensa PRIMA di pagare: l'ordine si chiude e lo
+    stock torna libero. Se mempool ha gia' visto anche un sats, no: quei
+    sats sono nel 2-di-3 e ne escono solo con un rimborso."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        if _onchain_parte(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Lo annulla chi compra")
+        cur = con.execute(
+            "UPDATE onchain_ordini SET stato='annullato', chiuso_il=?,"
+            " aggiornato=? WHERE id=? AND stato='attesa' AND visti_sats=0",
+            (int(time.time()), int(time.time()), oid))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Ci sono già dei sats su questo "
+                                     "indirizzo: ora si esce solo con un "
+                                     "rimborso")
+        return {"ok": True}
+    finally:
+        con.close()
+
+
+@app.post("/api/onchain/ordini/{oid}/proposta")
+async def onchain_ordine_proposta(oid: int, req: Request,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """LA PRIMA FIRMA (tappa 5): un PSBT gia' firmato da chi propone.
+    `verso: venditore` lo manda chi compra («Libera i sats»), `verso:
+    compratore` lo manda chi vende (il rimborso). Il server lo giudica
+    (`_onchain_psbt_giudica`), lo conserva, e avvisa l'altro: sara' il
+    suo telefono a co-firmare. Una proposta nuova prende il posto della
+    vecchia — nessuno dei due spende da solo, quindi l'ultima parola e'
+    sempre di chi co-firma."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_firma", user["id"])
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    verso = str(d.get("verso") or "")
+    psbt_b64 = str(d.get("psbt") or "").strip()
+    if verso not in ("venditore", "compratore") or not psbt_b64:
+        raise HTTPException(400, "Proposta incompleta")
+    if len(psbt_b64) > 20000:
+        raise HTTPException(400, "Proposta troppo grande")
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        parte = _onchain_parte(o, user["id"])
+        if verso == "venditore" and parte != "compratore":
+            raise HTTPException(403, "I sats al venditore li libera chi compra")
+        if verso == "compratore" and parte != "venditore":
+            raise HTTPException(403, "Il rimborso lo propone chi vende")
+        if o["stato"] != "pagato" and not (
+                verso == "compratore" and o["stato"] == "attesa"
+                and o["ricevuti_sats"] > 0 and time.time() > o["scade"]):
+            raise HTTPException(409, "Su questo ordine non c'è niente da "
+                                     "liberare adesso")
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+        try:
+            _onchain_psbt_giudica(o, verso, psbt_b64,
+                                  ind["chiave_" + parte])
+        except ValueError as e:
+            raise HTTPException(400, f"Proposta rifiutata: {e}")
+        adesso = int(time.time())
+        con.execute("UPDATE onchain_ordini SET proposta_verso=?,"
+                    " proposta_psbt=?, proposta_da=?, proposta_il=?,"
+                    " aggiornato=? WHERE id=?",
+                    (verso, psbt_b64, user["id"], adesso, adesso, oid))
+        con.commit()
+        altro = o["venditore_id"] if parte == "compratore" else o["compratore_id"]
+        tit = html.escape(o["titolo"][:40])
+    finally:
+        con.close()
+    await notifica(altro, (
+        f"⛓️ <b>Sats liberati:</b> {tit}. Apri la Mini App: il tuo "
+        "telefono mette la seconda firma e i sats partono."
+        if verso == "venditore" else
+        f"⛓️ <b>Rimborso proposto:</b> {tit}. Apri la Mini App: il tuo "
+        "telefono mette la seconda firma e i sats tornano a te."))
+    return {"ok": True}
+
+
+@app.post("/api/onchain/ordini/{oid}/firma")
+async def onchain_ordine_firma(oid: int, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """LA SECONDA FIRMA: l'altra parte manda la transazione COMPLETA
+    (hex), firmata e finalizzata nel suo telefono. Il server controlla
+    che sia proprio quella proposta — stesso txid, che in segwit non
+    dipende dalle firme — e la trasmette. Mai chi ha proposto: le due
+    firme devono essere di due persone."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_firma", user["id"])
+    _onchain_serve_embit()
+    from embit.psbt import PSBT
+    from embit.transaction import Transaction
+    d = await leggi_json(req)
+    tx_hex = str(d.get("tx") or "").strip()
+    if not tx_hex or len(tx_hex) > 40000:
+        raise HTTPException(400, "Manca la transazione")
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        _onchain_parte(o, user["id"])
+        if not o["proposta_psbt"] or o["stato"] not in ("pagato", "attesa"):
+            raise HTTPException(409, "Non c'è niente da co-firmare")
+        if int(o["proposta_da"]) == int(user["id"]):
+            raise HTTPException(409, "La seconda firma è dell'altra parte")
+        try:
+            atteso = PSBT.from_string(o["proposta_psbt"]).tx.txid().hex()
+            arrivato = Transaction.from_string(tx_hex).txid().hex()
+        except Exception:
+            raise HTTPException(400, "La transazione non si legge")
+        if atteso != arrivato:
+            raise HTTPException(400, "Non è la transazione proposta")
+        verso = o["proposta_verso"]
+    finally:
+        con.close()
+    try:
+        txid = await onchain_mempool_invia(tx_hex)
+    except ValueError as e:
+        raise HTTPException(400, f"La rete l'ha rifiutata: {e}")
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    stato = "rilasciato" if verso == "venditore" else "rimborsato"
+    adesso = int(time.time())
+    con = _onchain_db_ordini()
+    try:
+        con.execute("UPDATE onchain_ordini SET stato=?, txid_uscita=?,"
+                    " chiuso_il=?, aggiornato=? WHERE id=?",
+                    (stato, txid or arrivato, adesso, adesso, oid))
+        con.commit()
+    finally:
+        con.close()
+    tit = html.escape(o["titolo"][:40])
+    testo = (f"⛓️ <b>Sats partiti:</b> {tit} — "
+             + ("al venditore." if verso == "venditore" else "rimborso a chi ha comprato.")
+             + f" Transazione {(txid or arrivato)[:12]}…")
+    for chi in (o["compratore_id"], o["venditore_id"]):
+        await notifica(chi, testo)
+    return {"ok": True, "stato": stato, "txid": txid or arrivato}
+
+
+_TASK_ONCHAIN = None   # stesso patto di _TASK_CAMBIO: il riferimento tiene vivo il task
+
+
+async def orologio_onchain():
+    """La ronda della tappa 4: ogni due minuti, gli ordini in attesa.
+    A leva spenta dorme e basta; un ordine che fallisce non ferma gli
+    altri."""
+    while True:
+        await asyncio.sleep(120)
+        if not ONCHAIN_ATTIVO:
+            continue
+        try:
+            con = _onchain_db_ordini()
+            try:
+                ids = [r["id"] for r in con.execute(
+                    "SELECT id FROM onchain_ordini WHERE stato='attesa' "
+                    "ORDER BY id LIMIT 50")]
+            finally:
+                con.close()
+            for oid in ids:
+                try:
+                    await onchain_controlla(oid)
+                except Exception as e:
+                    print(f"⚠️ On-chain: ordine {oid} non controllato: {e}",
+                          flush=True)
+        except Exception as e:
+            print(f"⚠️ On-chain: ronda saltata: {e}", flush=True)
+
+
+@app.on_event("startup")
+async def avvia_onchain():
+    global _TASK_ONCHAIN
+    _TASK_ONCHAIN = asyncio.create_task(orologio_onchain())
 
 
 @app.get("/vendor/btc.js")
