@@ -126,6 +126,7 @@ collaudo_swap_telefono
 collaudo_avvisi_nostr_arrivano
 collaudo_swap_instradatore
 collaudo_onchain_indirizzo
+collaudo_onchain_ordine
 collaudo_fusione_da_telegram
 collaudo_certificati_relay
 

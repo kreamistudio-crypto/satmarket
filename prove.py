@@ -12237,13 +12237,16 @@ def prove_nota_compratore():
     # i varchi che POSTano sono TRE (startBuy, startBuySet e il ⚡ NWC):
     # sparsa a mano, il terzo la dimentica — e nessun collaudo lo
     # esercita, perche' in locale un wallet non c'e'
-    prova("client: i chiamanti di corpoConsegna restano tre", 3,
+    # ...QUATTRO dal 23 ott 2026: la cassa on-chain (startBuyOnchain)
+    prova("client: i chiamanti di corpoConsegna sono quattro", 4,
           mini.count("...corpoConsegna()"))
     prova("client: ...e nessuno dei tre la aggiunge per conto suo", [],
           [n for n, f in (("startBuy", "async function startBuy(){"),
                           ("startBuySet", "async function startBuySet(){"),
                           ("compraSubito",
-                           "async function confermaCompraSubito(btn){"))
+                           "async function confermaCompraSubito(btn){"),
+                          ("startBuyOnchain",
+                           "async function startBuyOnchain(btn){"))
            if "nota_compratore" in pezzo_js(mini, f)])
     prova("client: la nota sopravvive all'annuncio storico (via '')",
           True, "if (!v) return extra;" in mini)
@@ -22157,9 +22160,10 @@ def prove_zone_spedizione():
     # sorveglia — se un giorno uno dei quattro si mettesse a scrivere
     # la zona su un ritiro, la ricevuta e la contabilita' direbbero
     # una destinazione che nessuno ha scelto.
-    prova("...e mai fuori dalla spedizione", 4,
+    # (cinque dal 23 ott 2026: la fotografia della cassa on-chain)
+    prova("...e mai fuori dalla spedizione", 5,
           src.count('zona if scelta == "spedizione" else ""'))
-    prova("...e il paese la segue, sempre e solo con lei", 4,
+    prova("...e il paese la segue, sempre e solo con lei", 5,
           src.count('paese if scelta == "spedizione" else ""'))
     # LA CORREZIONE DELL'INDIRIZZO legge il paese DALL'ORDINE
     prova("correggere l'indirizzo non sposta la destinazione", True,
@@ -29034,8 +29038,9 @@ def prove_pagina_acquisto():
     prova("consegnaEsplicita non si scrive piu'", False,
           "consegnaEsplicita =" in mini)
     # l'ordine nasce solo dai varchi noti: startBuy, startBuySet e
-    # confermaCompraSubito — piu' l'UNICO lettore del preventivo
-    prova("tre POST /orders (i varchi di sempre)", 3,
+    # confermaCompraSubito — piu' l'UNICO lettore del preventivo; dal
+    # 23 ott 2026 anche startBuyOnchain, la stessa cassa con `metodo`
+    prova("quattro POST /orders (i varchi di sempre, piu' l'on-chain)", 4,
           mini.count("fetch(`${API_BASE}/orders`"))
     # UN CONTO SOLO (ago 2026, il cantiere della cassa): i lettori del
     # preventivo erano DUE — caricaPreventivo e caricaPreventivoPacco,
@@ -44004,8 +44009,10 @@ def prove_fogli_di_casa():
     # NOVANTA (20 ott 2026, nostr-da-telefono): «I tuoi annunci anche sul
     # tuo profilo Nostr?» dopo il collegamento, prima della coda delle
     # firme (`domandaAnnunciSulProfilo`, decisione di Andrea).
-    prova("i gesti che passano dalla domanda unica sono novanta",
-          90, solo_codice(mini).count("chiediConferma({"))
+    # NOVANTUNO (23 ott 2026, onchain-tappa3): «Annullare l'ordine
+    # on-chain?» prima di pagarlo (`onchainAnnullaOrdine`).
+    prova("i gesti che passano dalla domanda unica sono novantuno",
+          91, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -146261,6 +146268,9 @@ def prove_freni():
            # l'on-chain della tappa 2 (20 ott 2026, numeri di Andrea):
            # la xpub dedicata 5 all'ora, un indirizzo di prova 20 all'ora
            "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
+           # la tappa 3 (23 ott 2026): «controlla adesso» 60 all'ora,
+           # proposte e co-firme 30 all'ora
+           "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
            "cassetta_spedisci": (60, 60)}, F)
@@ -151529,6 +151539,214 @@ __PEZZO__
           [True, True], o["daVenditore"])
 
 
+def prove_ordine_onchain():
+    """L'ORDINE ON-CHAIN (23 ott 2026, cantiere onchain-tappa3): la cassa
+    che al posto della fattura da' un indirizzo 2-di-3, la sorveglianza
+    su mempool, e le due firme che liberano i sats. La storia intera col
+    server vero sta in `collaudo_onchain_ordine.py` (dove il telefono e'
+    embit); qui si guarda la forma, e soprattutto la PROVA DOPPIA delle
+    firme: il codice VERO del telefono, sotto node col bundle vero,
+    firma un PSBT che embit deve leggere — e co-firma una transazione
+    che embit deve ritrovare identica. Due librerie che non si capiscono
+    sono sats fermi in un 2-di-3 che nessuno sa piu' spendere.
+    In mezzo, quel che si rompe in silenzio:
+    1. UN ORDINE ON-CHAIN NELLE RONDE DEL LIGHTNING: vive in una tabella
+       sua, e la cassa esce PRIMA della fattura.
+    2. IL TELEFONO CHE CO-FIRMA ALLA CIECA: rilegge uscite, monete e
+       commissione prima di `signIdx`, e un PSBT storto non lo firma.
+    3. LE PAROLE CHE ESCONO: dal telefono partono una xpub, un PSBT e
+       una transazione — mai il seme."""
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    print("\n⛓️ L'ordine on-chain (tappe 3-5)")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) la forma ---------------------------------------------------
+    cassa = pezzo("compra")
+    prova("la cassa esce verso l'on-chain DOPO i controlli e PRIMA della "
+          "fattura", True,
+          cassa.index("if _troppi_ordini_aperti(con, user[\"id\"]):")
+          < cassa.index("return await _onchain_compra(")
+          < cassa.index("inv = await crea_invoice_escrow("))
+    prova("...e la ripresa di una fattura non vale per chi sceglie l'on-chain",
+          True, "if mio and not onchain:" in cassa)
+    prova("l'ordine on-chain vive in una tabella sua, e nessuna riga di "
+          "`ordini` nasce dalla sua cassa", (True, False),
+          ("CREATE TABLE IF NOT EXISTS onchain_ordini(" in src,
+           "INSERT INTO ordini" in pezzo("_onchain_compra")))
+    prova("lo stock: un indirizzo in attesa prenota come una fattura viva",
+          True, "FROM onchain_ordini " in pezzo("_riservati"))
+    giudica = pezzo("_onchain_psbt_giudica")
+    prova("il server giudica la proposta: monete, uscite, polvere, margine, "
+          "firma", [True] * 5,
+          ["non spende esattamente i sats dell'ordine" in giudica,
+           "non conosce" in giudica, "polvere" in giudica,
+           "non sta nel margine" in giudica, "manca la tua firma" in giudica])
+    firma = src[src.index('"/api/onchain/ordini/{oid}/firma"'):]
+    firma = firma[:firma.index("\n@app.")]
+    prova("la seconda firma: stesso txid della proposta, e mai di chi ha "
+          "proposto", [True, True],
+          ["if atteso != arrivato:" in firma,
+           'if int(o["proposta_da"]) == int(user["id"]):' in firma])
+    compra_js = pezzo_js(mini, "async function startBuyOnchain(btn){", "\n}\n")
+    prova("la cassa del telefono manda `metodo: onchain` e la sola xpub, "
+          "mai le parole", [True, True, False],
+          ["metodo: 'onchain'" in compra_js,
+           "body: JSON.stringify({xpub: miaXpub})" in compra_js,
+           "parole}" in compra_js or "parole," in compra_js.split("body:")[-1]])
+    cofirma_js = pezzo_js(mini, "async function onchainCofirma(o, parole){",
+                          "\n}\n")
+    prova("il telefono rilegge tutto PRIMA di mettere la seconda firma",
+          True, max(cofirma_js.index(x) for x in (
+              "non spende i sats dell", "non ti arriva il prezzo",
+              "c\\'è un\\'uscita estranea", "la commissione esce dal margine"))
+          < cofirma_js.index("tx.signIdx("))
+    rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
+    prova("ogni indirizzo d'ordine passa da onchainVerificaRiga prima del "
+          "foglio", True,
+          rendi.index("onchainVerificaRiga(parole, onchainSrv, o.indirizzo)")
+          < rendi.index("box.innerHTML = onchainBloccoOrdini("))
+    blocco = pezzo_js(mini, "function onchainBloccoOrdini(verifiche, esiti){",
+                      "\n}\n")
+    prova("...e il QR da pagare si disegna solo se il telefono l'ha "
+          "ritrovato", True,
+          blocco.index("const buono = v.mia && v.uguale;")
+          < blocco.index("ocQr${o.id}"))
+    sotto = pezzo_js(mini, "async function onchainCofirmeInSottofondo(){",
+                     "\n}\n")
+    prova("in sottofondo si co-firma col seme che c'e', senza farne uno "
+          "nuovo", [True, False],
+          ["onchainSemeLocale()" in sotto, "onchainSemeAssicurato" in sotto])
+
+    # --- 2) la prova doppia: il telefono firma, embit legge -------------
+    node = _sh.which("node")
+    try:
+        from embit import bip32 as E32, bip39 as E39, script as ESC
+        from embit.ec import PublicKey as EPub
+        from embit.networks import NETWORKS as ERETI
+        from embit.psbt import PSBT as EPSBT
+        from embit.transaction import Transaction as ETx
+    except ImportError:
+        salta("onchain tappa 3: la prova doppia delle firme",
+              "embit non installato (pip install -r requirements.txt)")
+        return
+    if not node:
+        salta("onchain tappa 3: la prova doppia delle firme",
+              "node non installato")
+        return
+    N = ERETI["signet"]
+    vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
+                          encoding="utf-8"))
+    semi = [v["parole"] for v in vett["bip39_english"][:3]]
+
+    def chiave(p, catena, n):
+        return E32.HDKey.from_seed(E39.mnemonic_to_seed(p), version=N["xprv"]
+                                   ).derive(f"m/48h/1h/0h/2h/{catena}/{n}"
+                                            ).key.get_public_key()
+
+    tre = [chiave(semi[i], 0, 3) for i in range(3)]
+    ws = ESC.multisig(2, sorted(tre, key=lambda k: k.sec()))
+    incasso = ESC.p2wpkh(chiave(semi[1], 1, 3)).address(N)
+    rimborso = ESC.p2wpkh(chiave(semi[0], 1, 3)).address(N)
+
+    def ordine(ruolo, mia):
+        return {"id": 7, "ruolo": ruolo, "stato": "pagato",
+                "prezzo_sats": 50000, "margine_sats": 1080,
+                "importo_sats": 51080, "tariffa": 2,
+                "utxo": [{"txid": "ab" * 32, "vout": 1, "value": 51080}],
+                "incasso": incasso, "rimborso": rimborso,
+                "indirizzo": {"mio_numero": 3, "indirizzo":
+                              ESC.p2wsh(ws).address(N),
+                              "chiavi": {"compratore": tre[0].sec().hex(),
+                                         "venditore": tre[1].sec().hex(),
+                                         "barattolo": tre[2].sec().hex()}},
+                "proposta": mia}
+
+    pezzi = "\n".join([
+        "const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};",
+        pezzo_js(mini, "function onchainConto(B, parole, strada){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
+        cofirma_js + "\n}"])
+    banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + '''
+const B = BarattoloBTC;
+const API_BASE = '/api', ONCHAIN_POLVERE = 546;
+let onchainSrv = null, onchainOrdini = [], PAROLE = '', MANDATI = [];
+const caricaBitcoin = async () => B, haptic = () => {}, toast = () => {},
+      renderOnchain = () => {}, authHdr = () => '',
+      onchainAttesa = () => () => {}, onchainSemeLocale = () => PAROLE;
+const fetch = async (url, o) => { MANDATI.push([url, JSON.parse(o.body)]);
+  return {ok: true, json: async () => ({ok: true})}; };
+__PEZZI__
+(async () => {
+  const D = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
+  PAROLE = D.semi[0]; onchainOrdini = [D.compratore];
+  await onchainProponi(null, 7);
+  const proposta = MANDATI.pop();
+  PAROLE = D.semi[1];
+  const o = {...D.venditore, proposta: {verso: 'venditore', mia: false,
+                                        psbt: proposta[1].psbt}};
+  const no = await onchainCofirma(o, PAROLE);
+  const firmata = MANDATI.pop();
+  const storto = {...o, incasso: D.altro};
+  const noStorto = await onchainCofirma(storto, PAROLE);
+  const dopoStorto = MANDATI.length;
+  const noSeme = await onchainCofirma(o, D.semi[2]);
+  console.log(JSON.stringify({proposta, no, firmata, noStorto, dopoStorto,
+                              noSeme}));
+})().catch(e => console.log(JSON.stringify({errore: String(e)})));
+'''.replace("__PEZZI__", pezzi)
+    casa = _tf.mkdtemp(prefix="onchain-tappa3-")
+    try:
+        f_js = os.path.join(casa, "banco.js")
+        f_dati = os.path.join(casa, "dati.json")
+        open(f_js, "w", encoding="utf-8").write(banco)
+        json.dump({"semi": semi, "compratore": ordine("compratore", None),
+                   "venditore": ordine("venditore", None),
+                   "altro": ESC.p2wpkh(chiave(semi[2], 1, 0)).address(N)},
+                  open(f_dati, "w", encoding="utf-8"))
+        r = _sp.run([node, f_js, f_dati], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=120)
+    finally:
+        _sh.rmtree(casa, ignore_errors=True)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-800:])
+        o = {}
+    prova("il banco gira senza errori", None, o.get("errore"))
+    url, corpo = (o.get("proposta") or ["", {}])
+    prova("«Libera i sats» manda la proposta verso il venditore",
+          ("/api/onchain/ordini/7/proposta", "venditore"),
+          (url, corpo.get("verso")))
+    if not corpo.get("psbt"):
+        prova("il telefono ha firmato un PSBT", True, False)
+        return
+    p = EPSBT.from_string(corpo["psbt"])
+    uscite = [(u.script_pubkey.address(N), u.value) for u in p.tx.vout]
+    prova("...embit legge il PSBT del telefono: la moneta dell'ordine, il "
+          "prezzo al venditore, il resto a chi compra (51080-50000-356)",
+          ([("ab" * 32, 1)], [(incasso, 50000), (rimborso, 724)]),
+          ([(v.txid.hex(), v.vout) for v in p.tx.vin], uscite))
+    prova("...e c'e' la firma di chi compra, sola", [[tre[0].sec().hex()]],
+          [[k.sec().hex() for k in i.partial_sigs] for i in p.inputs])
+    prova("il telefono del venditore co-firma senza obiezioni", "",
+          o.get("no"))
+    url, corpo = (o.get("firmata") or ["", {}])
+    t = ETx.from_string(corpo.get("tx") or "00" * 10) if corpo.get("tx") else None
+    prova("...embit ritrova la STESSA transazione, con due firme e lo script",
+          (True, 4), (bool(t) and t.txid() == p.tx.txid(),
+                      len(t.vin[0].witness.items) if t else 0))
+    prova("un incasso che non e' del seme del venditore: non co-firma, e non "
+          "manda niente", ("non è il tuo incasso", 0),
+          (o.get("noStorto"), o.get("dopoStorto")))
+    prova("...e un seme che non e' quello dell'ordine nemmeno",
+          "la chiave dell'ordine non è del tuo seme", o.get("noSeme"))
+
+
 def prove_indirizzo_ordine_onchain():
     """L'INDIRIZZO DELL'ORDINE ON-CHAIN (20 ott 2026, cantiere
     onchain-tappa2, piano approvato da Andrea). La tappa 2 dello studio:
@@ -151606,8 +151824,7 @@ def prove_indirizzo_ordine_onchain():
     prova("ogni indirizzo del server passa da onchainVerificaRiga prima del "
           "foglio", True,
           rendi.index("onchainVerificaRiga(parole, onchainSrv, r)")
-          < rendi.index("box.innerHTML = onchainConSeme(parole, k, miaXpub, "
-                        "verifiche);"))
+          < rendi.index("+ onchainConSeme(parole, k, miaXpub, verifiche);"))
     riga_js = pezzo_js(mini, "function onchainRigaIndirizzo(r, v){", "\n}\n")
     prova("...e uno che non combacia esce PRIMA di scrivere l'indirizzo",
           True, riga_js.index("if (!v.uguale) {")
@@ -152055,9 +152272,15 @@ def prove_cancello_onchain():
     # ...e la tappa 2 (20 ott 2026) ne ha aperte altre due, contate qui
     # per nome: una porta nuova che non si aggiunge a questa lista e'
     # una porta che nessuno ha guardato.
+    # ...e la tappa 3 (23 ott 2026) le sei dell'ordine on-chain
     prova("le rotte /api/onchain/* esistono e si contano",
           ["/api/onchain/prova", "/api/onchain/xpub",
-           "/api/onchain/prova/indirizzo"], rotte)
+           "/api/onchain/prova/indirizzo", "/api/onchain/ordini",
+           "/api/onchain/pronto/{venditore_id}",
+           "/api/onchain/ordini/{oid}/controlla",
+           "/api/onchain/ordini/{oid}/annulla",
+           "/api/onchain/ordini/{oid}/proposta",
+           "/api/onchain/ordini/{oid}/firma"], rotte)
     # il conto che conta: ogni rotta on-chain deve nominare il cancello
     # nel suo corpo.
     senza = []
@@ -178176,6 +178399,7 @@ def main():
     prove_cancello_onchain,
     prove_banco_chiavi_onchain,
     prove_indirizzo_ordine_onchain,
+    prove_ordine_onchain,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,
