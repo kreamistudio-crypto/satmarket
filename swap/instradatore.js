@@ -26,12 +26,16 @@
    i bottoni portano `data-swap="…"` e li ascolta UN solo ascoltatore
    delegato, in fondo, con la sua lista chiusa.
 
-   IN QUESTA TAPPA BARATTOLO NON PAGA LA FATTURA DELLO SWAP (tappa 4).
+   DALLA TAPPA 4 (24 ott 2026) BARATTOLO PAGA LA FATTURA DELLO SWAP: nato e
+   verificato lo swap, il telefono manda al server le sole parti pubbliche
+   (`pagaSwapAlServer` della pagina) e il server la paga coi sats
+   dell'ordine. Il segreto resta qui, e esce solo per il ritiro, dopo i
+   tre controlli sul lockup (swap/boltz.js).
 
    Usa dalla pagina: swapLeve, swapAcceso, myTgId, el, esc, fmt, haptic,
    toast, currentOrder, preventiviSwap, scegliIncassoSwap,
    leggiPreventivoSwap, pannelloPreventivoSwap, ridisegnaIncassoSwap,
-   linguaSwap. */
+   linguaSwap, pagaSwapAlServer, statoPagamentoSwap. */
 
 /* ─── 1. LE STRADE E I FORNITORI ────────────────────────────────────── */
 /* la sola strada di oggi: i sats dell'incasso, ricevuti in bitcoin on-chain */
@@ -82,9 +86,17 @@ function swapSalvaRecord(rec){
   l.push(rec);
   return swapScrivi(swapCasaLista(), l);
 }
+/* (tappa 4) uno swap che Barattolo NON ha pagato — rifiutato prima di
+   partire, o fallito senza che uscisse niente — non tiene piu' l'incasso:
+   chi vende sceglie di nuovo. Resta nella lista, e sorvegliato: se il
+   fornitore bloccasse comunque i bitcoin, il telefono li ritira. */
+function swapNonPagato(rec){
+  return !!rec && ['rifiutato', 'fallito'].includes(rec.pagamento) && swapFase(rec) === 'creato';
+}
 function swapDiOrdine(ordine){
   const n = Number(ordine);
-  return swapLista().filter(x => Number(x.ordine) === n).pop() || null;
+  const r = swapLista().filter(x => Number(x.ordine) === n).pop() || null;
+  return swapNonPagato(r) ? null : r;
 }
 function swapFase(rec){
   const f = swapFornitore(swapDiChi(rec));
@@ -113,7 +125,7 @@ const SWAP_TESTI_T3 = {
     ricevi: n => `Ricevi circa ${n} sats a`,
     riceviQui: n => `Ricevi circa ${n} sats a questo indirizzo.`,
     fasi: {
-      creato: () => 'Pronto e verificato. Il pagamento da Barattolo arriva con la prossima versione: per ora nessun sats si muove.',
+      creato: n => `Barattolo sta pagando lo swap: poi ${n} blocca i bitcoin e li ritiro.`,
       bloccato: n => `${n} ha bloccato i bitcoin: ritiro in corso.`,
       confermato: () => 'Bitcoin bloccati e confermati: ritiro in corso.',
       fatto: () => 'Fatto: i bitcoin sono tuoi.',
@@ -121,6 +133,15 @@ const SWAP_TESTI_T3 = {
       fallito: () => 'Non riuscito: l\'incasso torna disponibile.',
       ripreso: n => `${n} si è ripreso i bitcoin: l'incasso torna disponibile.`},
     statoIgnoto: 'In corso.',
+    /* (tappa 4) il pagamento della fattura, finche' i bitcoin non sono bloccati */
+    pagamento: {
+      pagato: n => `Pagato: aspetto che ${n} blocchi i bitcoin.`,
+      da_verificare: () => 'Pagamento da verificare: ci stiamo lavorando noi. I tuoi sats non si perdono.',
+      fallito: () => 'Il pagamento non è partito: nessun sats si è mosso. Scegli di nuovo come incassare.',
+      tetto_utente: () => 'Per oggi hai raggiunto il tetto degli swap: incassa via Lightning.',
+      tetto_giorno: () => 'Oggi lo swap è al completo: incassa via Lightning.',
+      cambiata: () => 'Le tariffe sono cambiate: nessun sats si è mosso. Scegli di nuovo come incassare.',
+      rifiutato: () => 'Barattolo non paga questo swap: nessun sats si è mosso. Scegli di nuovo come incassare.'},
     ritirato: id => `Ritirato: transazione ${id}.`,
     concluso: (sats, id) => `Concluso: ${sats} sats arrivati (transazione ${id}).`,
     ritiroErrore: 'Il ritiro non è ancora riuscito: riprovo da solo.',
@@ -160,7 +181,7 @@ const SWAP_TESTI_T3 = {
     ricevi: n => `You receive about ${n} sats at`,
     riceviQui: n => `You receive about ${n} sats at this address.`,
     fasi: {
-      creato: () => 'Ready and verified. The payment from Barattolo comes with the next version: no sats move for now.',
+      creato: n => `Barattolo is paying the swap: then ${n} locks the bitcoin and I claim them.`,
       bloccato: n => `${n} locked the bitcoin: claiming.`,
       confermato: () => 'Bitcoin locked and confirmed: claiming.',
       fatto: () => 'Done: the bitcoin are yours.',
@@ -168,6 +189,14 @@ const SWAP_TESTI_T3 = {
       fallito: () => 'Failed: the payout is available again.',
       ripreso: n => `${n} took the bitcoin back: the payout is available again.`},
     statoIgnoto: 'In progress.',
+    pagamento: {
+      pagato: n => `Paid: waiting for ${n} to lock the bitcoin.`,
+      da_verificare: () => 'Payment being checked: we are on it. Your sats are not lost.',
+      fallito: () => 'The payment did not go out: no sats moved. Choose again how to receive.',
+      tetto_utente: () => 'You reached the swap limit for today: receive via Lightning.',
+      tetto_giorno: () => 'Swaps are full for today: receive via Lightning.',
+      cambiata: () => 'The fees changed: no sats moved. Choose again how to receive.',
+      rifiutato: () => 'Barattolo does not pay this swap: no sats moved. Choose again how to receive.'},
     ritirato: id => `Claimed: transaction ${id}.`,
     concluso: (sats, id) => `Done: ${sats} sats arrived (transaction ${id}).`,
     ritiroErrore: 'The claim did not go through yet: retrying by itself.',
@@ -285,6 +314,13 @@ function frasestatoSwap(rec){
   if (rec.spesoDa) return t.spesoAltri(swapNomeFornitore(swapDiChi(rec)));
   if (rec.ritiro && rec.ritiro.txid && swapFase(rec) !== 'fatto')
     return t.ritirato(swapCorto(rec.ritiro.txid, 8));
+  /* (tappa 4) prima del lockup parla il pagamento della fattura */
+  if (swapFase(rec) === 'creato') {
+    const tiene = k => Object.prototype.hasOwnProperty.call(t.pagamento, k);
+    const chiave = rec.pagamento === 'rifiutato'
+      ? (tiene(rec.motivo) ? rec.motivo : 'rifiutato') : rec.pagamento;
+    if (tiene(chiave)) return t.pagamento[chiave](swapNomeFornitore(swapDiChi(rec)));
+  }
   const f = t.fasi[swapFase(rec)];
   return f ? f(swapNomeFornitore(swapDiChi(rec))) : t.statoIgnoto;
 }
@@ -370,11 +406,56 @@ async function swapCrea(n){
     swapErrori[n] = t.nonRisponde(f.nome);
     return ridisegnaIncassoSwap();
   }
-  swapSalvaRecord(Object.assign(nuovo, {fornitore: fid, ordine: n, indice: indice,
-    indirizzo: indirizzo, creato: Date.now()}));
+  const rec = Object.assign(nuovo, {fornitore: fid, ordine: n, indice: indice,
+    indirizzo: indirizzo, creato: Date.now(), pagamento: ''});
+  swapSalvaRecord(rec);
   delete swapPassi[n];
   ridisegnaIncassoSwap();
+  await swapPaga(rec);
   swapSorveglia();
+}
+/* ─── 6b. IL PAGAMENTO DELLA FATTURA (tappa 4) ────────────────────────
+   Lo swap nato e verificato si salva PRIMA di chiedere il pagamento:
+   chiudere l'app a meta' non perde niente, e al giro dopo si richiede.
+   Il server e' idempotente sulla stessa fattura (la riconosce dalla sua
+   impronta), quindi richiedere non paga mai due volte. Un «non risponde»
+   del server, o della rete che il server legge, si riprova da solo, al
+   massimo una volta al minuto; ogni altro no e' definitivo. */
+const SWAP_PAGA_OGNI_MS = 60000;
+const SWAP_NO_DI_PASSAGGIO = new Set(['mempool', 'non_risponde']);
+const swapPagando = new Set();
+const swapPagatoIl = {};
+async function swapPaga(rec){
+  if (!rec || !rec.ordine || swapPagando.has(rec.id)) return;
+  swapPagando.add(rec.id);
+  swapPagatoIl[rec.id] = Date.now();
+  try {
+    const d = await pagaSwapAlServer(rec);
+    if (!d) return;
+    if (d.ok) { rec.pagamento = String(d.stato || ''); delete rec.motivo; }
+    else if (SWAP_NO_DI_PASSAGGIO.has(d.motivo)) { rec.pagamento = ''; rec.motivo = String(d.motivo); }
+    else { rec.pagamento = 'rifiutato'; rec.motivo = String(d.motivo || ''); }
+    swapSalvaRecord(rec);
+    swapRidisegnaDove(rec);
+  } finally { swapPagando.delete(rec.id); }
+}
+/* il giro del pagamento: prima del lockup si chiede al server a che punto
+   e'; se il server non lo conosce (la richiesta non era arrivata) e non
+   l'ha rifiutato, si richiede */
+async function swapGiroPagamento(rec){
+  if (!rec.ordine || swapFase(rec) !== 'creato' || swapNonPagato(rec)) return;
+  let s;
+  if (['', 'registrato'].includes(rec.pagamento || '')) {
+    if (Date.now() - (swapPagatoIl[rec.id] || 0) < SWAP_PAGA_OGNI_MS) return;
+    s = await statoPagamentoSwap(rec.ordine);
+    if (s === '' || s === 'registrato') return swapPaga(rec);
+  } else if (['in_volo', 'da_verificare'].includes(rec.pagamento)) {
+    s = await statoPagamentoSwap(rec.ordine);
+  } else return;
+  if (!s || s === rec.pagamento) return;
+  rec.pagamento = s;
+  swapSalvaRecord(rec);
+  swapRidisegnaDove(rec);
 }
 /* IL RIPIEGO: il fornitore ha risposto con dati che non tornano. Se
    un altro fa la stessa strada, si mostra il SUO preventivo e si chiede
@@ -431,6 +512,7 @@ async function swapGiro(){
       swapSalvaRecord(rec);
       swapRidisegnaDove(rec);
     }
+    await swapGiroPagamento(rec);
     const daRitirare = !(rec.ritiro && rec.ritiro.txid);
     /* IL FORNITORE TACE (20 ott 2026, cantiere swap-senza-api): se la rete
        vede i bitcoin bloccati, si ritira lo stesso, senza la sua API */

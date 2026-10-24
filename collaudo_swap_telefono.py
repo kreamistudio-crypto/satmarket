@@ -121,6 +121,11 @@ let disegni = 0;
 function ridisegnaIncassoSwap(){ disegni++; }
 /* il preventivo del server, di cartone: con un fornitore solo, la sua
    lettura e' quella di prima (l'instradatore la mette in preventiviSwap) */
+/* (24 ott 2026, tappa 4) il pagamento della fattura lo prova
+   collaudo_swap_pagamento: qui il server non c'e', e il telefono non lo
+   raggiunge (null = non si e' potuto chiedere) */
+async function pagaSwapAlServer(){ return null; }
+async function statoPagamentoSwap(){ return null; }
 async function leggiPreventivoSwap(n, fornitore){
   return Object.assign(${JSON.stringify(D.preventivo)}, {fornitore: fornitore || 'satsrouting', fornitore_nome: 'SATS Routing'});
 }
@@ -201,7 +206,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                 chiaviCorpo: v1.creazione ? Object.keys(v1.creazione).sort() : []};
   const carta = A.run('pannelloSwapTelefono({id: 7})');
   html.push(carta);
-  out.carta = carta.includes('Pronto e verificato');
+  out.carta = carta.includes('Barattolo sta pagando lo swap');
 
   // --- gli stati e il ritiro cooperativo
   await A.run('swapGiro()');

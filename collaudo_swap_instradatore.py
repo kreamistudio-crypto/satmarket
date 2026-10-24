@@ -162,6 +162,9 @@ function linguaSwap(){ return 'it'; }
 function testiSwap(){ return SWAP_TESTI.it; }
 function scegliIncassoSwap(){}
 const PREVENTIVI = ${JSON.stringify(D.preventivi)};
+/* (24 ott 2026, tappa 4) il pagamento lo prova collaudo_swap_pagamento */
+async function pagaSwapAlServer(){ return null; }
+async function statoPagamentoSwap(){ return null; }
 async function leggiPreventivoSwap(n, fornitore){
   __letti.push([Number(n), fornitore]);
   return JSON.parse(JSON.stringify(PREVENTIVI[n][fornitore]));

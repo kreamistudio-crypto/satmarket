@@ -33940,6 +33940,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `spese` per lockup, `/esplora/address/<a>/txs`, `/esplora/tx/<id>`,
   `/esplora/tx/<id>/outspend/<n>`, il modo `giu_rete_muta` (la rete
   prende la trasmissione e risponde 502) e `/cartone/spendi_altro`.
+- LO SWAP, TAPPA 4: IL SERVER PAGA LA FATTURA (24 ott 2026, cantiere
+  swap-tappa-4; perché in CANTIERI, «Lo swap, tappa 4»). La rotta
+  `POST /api/swap/paga/{ordine_id}` (chi vende, a `swap_per`) prende le
+  sette parti pubbliche (`_swap_parti`: fornitore, swap_id, invoice,
+  impronta, indirizzo, scade_blocco, onchain) e chiama
+  `swap_registra_pagamento`: i controlli prima di pagare (l'importo da
+  `importo_bolt11` uguale a `netto_venditore`, `rete_bolt11`, l'impronta
+  da `leggi_bolt11(con_hash=True)`, `rifiuto_scadenza`, `preventivo_swap`
+  con le tariffe di adesso e l'on-chain non meno, `swap_indirizzo_p2tr`
+  — bech32m, versione 1, 32 byte, `SWAP_HRP` per rete —, il mempool del
+  fornitore via `_swap_mempool_leggi` — `/blocks/tip/height` e
+  `/address/<a>/txs` vuoto, in collaudo solo da casa —, almeno
+  `SWAP_MARGINE_BLOCCHI`); poi, sotto `_lucchetto_swap_pagamenti`, la
+  stessa fattura rifatta (idempotente), uno swap vivo per ordine, i tetti
+  del giorno (`_swap_pag_somme`, `SWAP_MAX_SATS_UTENTE_GIORNO`,
+  `SWAP_MAX_SATS_GIORNO`), l'INSERT in `swap_pagamenti` e la fattura in
+  `ordini.invoice_venditore` nella stessa transazione (condizionata:
+  ordine confermato, colonna vuota, nessun volo); infine `_sblocca_sats`,
+  la porta di ogni incasso. Lo stato si deriva (`_swap_pag_stato`, dalle
+  colonne `payout_hash`, `payout_stato`, `invoice_venditore` e `stato`
+  dell'ordine), si scrive e si racconta in `_swap_pag_aggiorna`; lo
+  rileggono `_swap_pag_dell_ordine` (tutte le righe dell'ordine, dopo il
+  pagamento e a ogni `GET /api/swap/pagamento/{ordine_id}`) e
+  `swap_pagamenti_ripassa` (le righe non finite, nel battito di
+  `orologio_pagamenti`). La ronda `risolvi_pagamenti_in_volo` chiede il
+  limite del volo a `_limite_in_volo` (la `vola_fino` della riga di swap
+  con quell'hash, sennò `IN_VOLO_LIMITE_S`). Nel telefono:
+  `pagaSwapAlServer` e `statoPagamentoSwap` stanno nella PAGINA (accanto
+  a `leggiPreventivoSwap`: l'instradatore non ha fetch), lo swap nato
+  porta `impronta`, il record porta `pagamento` e `motivo`,
+  `swapPaga`/`swapGiroPagamento` in `swap/instradatore.js`, e
+  `swapNonPagato` libera l'incasso dopo un no. Il cartone: l'altezza
+  (`/esplora/blocks/tip/height`, `/cartone/cima`).
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e

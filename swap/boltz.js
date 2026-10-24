@@ -332,6 +332,9 @@ window.SWAP_TIPI.boltz = function(cfg){
         lockupAddress: r.lockupAddress, refundPublicKey: r.refundPublicKey,
         swapTree: r.swapTree, timeoutBlockHeight: Number(r.timeoutBlockHeight),
         onchainAmount: Number(r.onchainAmount), ricevi: Number(preventivo.ricevi),
+        /* (tappa 4) l'impronta del NOSTRO segreto, gia' confrontata con la
+           fattura: al server va lei, per il suo controllo prima di pagare */
+        impronta: S.hex.encode(chiavi.impronta),
         stato: 'swap.created'};
     },
     async stato(rec){

@@ -72029,3 +72029,149 @@ gli script storti nella copia di lavoro.
 **DA GUARDARE.** Altri banchi node di `prove.py` corrono sui timer veri con
 attese corte: questi due sono quelli che la suite ha mostrato. Se un'altra
 sezione cade solo a PC carico, la cura è la stessa riga in testa al banco.
+
+## Lo swap, tappa 4: Barattolo paga la fattura dello swap (24 ott 2026, cantiere swap-tappa-4, piano approvato da Andrea)
+
+**COSA FA.** Chi vende sceglie «₿ On-chain (swap)», il telefono crea lo
+swap e lo verifica (tappa 3), e adesso manda al server le sole parti
+PUBBLICHE: la fattura, l'impronta del segreto, l'indirizzo dove il
+fornitore blocchera' i bitcoin, quanto ci blocchera', a che blocco scade,
+l'id dello swap e il fornitore. Il server fa i suoi controlli, registra
+il pagamento e paga la fattura con i sats dell'ordine. Il fornitore
+blocca i bitcoin, il telefono li ritira col segreto (dopo i tre controlli
+sul lockup della tappa 3), la fattura si chiude e l'ordine si chiude come
+pagato. `SWAP_ATTIVO` resta SPENTA in produzione; niente grafica nuova
+(solo le frasi della carta dello swap).
+
+**LE DECISIONI DI ANDREA (24 ott), coi perché.**
+- DA QUALE WALLET (proposta A): dalla cassaforte DELL'ORDINE, per la
+  porta di sempre (`_sblocca_sats` -> `paga_venditore`, con la riga
+  dell'ordine). Il prompt diceva «dal wallet swap@ (tetto 2.000.000)»:
+  letto il codice, swap@ ha la sola chiave per incassare, riceve la quota
+  di SATS Routing, e i 2.000.000 sono il tetto di quel che ENTRA in swap@
+  (`SWAP_INDIRIZZO_MAX_SATS`), non di uno swap. I sats di chi vende
+  stanno nella cassaforte dell'ordine: pagare da li' vuol dire avere
+  gratis tutta la difesa contro il doppio pagamento dei payout (la mano
+  presa prima di chiamare LNbits, gli hash gia' tentati della riga
+  chiesti a LNbits e a LND, il volo, i 🧊). swap@ resta solo per
+  incassare.
+- QUANDO I CONTROLLI (proposta B): in uno swap Lightning -> on-chain il
+  lockup arriva DOPO il pagamento (la fattura e' «trattenuta», e il
+  fornitore blocca i bitcoin quando vede arrivare il pagamento): prima di
+  pagare non si puo' leggere. Quindi PRIMA del pagamento il server guarda
+  quel che si puo': l'importo (letto dalla fattura, senza chiederlo a
+  nessuno) e' quel che spetta a chi vende; la fattura e' della rete giusta
+  e porta l'impronta che il telefono dichiara; non scade fra poco; le
+  tariffe di adesso, coi tetti dello swap, e l'on-chain non meno di
+  quanto dicono; l'indirizzo e' un TAPROOT della rete giusta (bech32m
+  vero, col checksum) e su mempool e' ancora VUOTO; allo swap restano
+  almeno 36 blocchi (`SWAP_MARGINE_BLOCCHI`, circa sei ore). I tre
+  controlli sul lockup restano nel telefono, prima che il segreto esca:
+  se il lockup mente il segreto non esce, la fattura non si chiude, e
+  alla scadenza i sats tornano nella cassaforte.
+- I TETTI: per swap quelli di sempre (25.000-50.000, `SWAP_MIN_SATS` e
+  `SWAP_MAX_SATS`); in piu' `SWAP_MAX_SATS_UTENTE_GIORNO` (100.000) e
+  `SWAP_MAX_SATS_GIORNO` (200.000), sulle ultime 24 ore, contando ogni
+  pagamento registrato che non e' fallito (in volo, da verificare,
+  pagato). Si contano e si superano dentro UN lucchetto.
+- UN PAGAMENTO PER SWAP, REGISTRATO PRIMA DI PARTIRE: la tabella
+  `swap_pagamenti` (una riga per fattura, `hash` unico, `(fornitore,
+  swap_id)` unico), scritta insieme alla fattura nella colonna
+  dell'ordine, in una transazione sola, prima di chiamare la porta dei
+  pagamenti. UNO swap vivo per ordine. LO STATO SI DERIVA DALL'ORDINE
+  (`_swap_pag_stato`), come lo stadio del pagamento: registrato, in volo,
+  pagato, da verificare, fallito; la colonna e' l'ultimo stato visto, e
+  il journal dice ogni cambio. «Fallito» non e' per sempre: un pagamento
+  fallito che poi risulta uscito (pagato a mano) torna «pagato» alla
+  rilettura di tutte le righe dell'ordine.
+- IN DUBBIO NON SI RIPAGA: la fattura di uno swap resta in volo finche'
+  il telefono non ritira, ed e' normale. Il limite del volo per lei e' la
+  scadenza dello swap (`vola_fino`, scritto alla registrazione: i blocchi
+  che restano × 600 s + un'ora), non la mezz'ora di `IN_VOLO_LIMITE_S`:
+  `_limite_in_volo` nella ronda. Oltre, o se non si sa, il ramo di
+  sempre: «🧊 Pagamenti da verificare», mai un ritentativo da solo.
+- IL CASO DEL #241 (22 ott, parola di Andrea: fallito con zero
+  tentativi, poi ripagato a mano; nei documenti non c'e'): dopo un
+  fallimento niente riparte da solo, chi vende sceglie di nuovo, e uno
+  swap nuovo dello stesso ordine passa dalla porta che chiede la verita'
+  su OGNI hash gia' tentato per quella riga: se uno e' uscito l'ordine si
+  chiude con quello, e la fattura nuova non si paga.
+- IL DOPPIO TOCCO: la stessa fattura due volte e' lo stesso pagamento
+  (la rotta e' idempotente sull'impronta), e il controllo e' rifatto
+  DENTRO il lucchetto: due richieste insieme danno un pagamento solo.
+- IL TELEFONO: lo swap nato si salva PRIMA di chiedere il pagamento, e il
+  giro della sorveglianza, prima del lockup, chiede al server a che punto
+  e' (`statoPagamentoSwap`) e richiede se il server non lo conosce. Un
+  «non risponde» del server o del mempool si riprova da solo, al massimo
+  una volta al minuto; ogni altro no e' definitivo, e l'incasso torna
+  libero (`swapNonPagato`: chi vende sceglie di nuovo; lo swap resta in
+  lista e sorvegliato). Le frasi della carta: «Barattolo sta pagando lo
+  swap: poi SATS Routing blocca i bitcoin e li ritiro.», «Pagamento da
+  verificare: ci stiamo lavorando noi. I tuoi sats non si perdono.», «Il
+  pagamento non è partito: nessun sats si è mosso. Scegli di nuovo come
+  incassare.», i due tetti, le tariffe cambiate, il no generico.
+- IL JOURNAL: una riga per passo («controlli passati», «registrato»,
+  ogni cambio di stato, ogni no col suo motivo), coi soli pezzi pubblici
+  accorciati: mai la fattura intera, mai l'indirizzo intero, mai niente
+  delle parole.
+
+**STRADE SCARTATE.** swap@ come wallet che paga (sopra); i controlli sul
+lockup prima di pagare (impossibili: il lockup nasce dal pagamento); lo
+stato della riga scritto a mano a ogni ramo della porta dei pagamenti
+(dieci punti da toccare, e il primo dimenticato mente: si deriva); il
+pagamento in sottofondo con la risposta subito al telefono (un compito
+asyncio che muore col processo; la porta di sempre risponde al piu' in
+un minuto anche con la fattura trattenuta, perche' la richiesta a LNbits
+scade a 60 s e il volo lo segue la ronda); la nostra fee sullo swap: con
+`SWAP_FEE_PERCENTO` sopra 0 la fattura e' meno di quel che spetta a chi
+vende e la porta paga solo l'esatto — la tappa 4 a fee accesa NON paga
+(«fee» nel journal), da decidere col parere legale.
+
+**LE PROVE.**
+- `collaudo_swap_pagamento` (42 verdi, negli elenchi della CI): il codice
+  vero del telefono in node, il server vero dietro un ponte HTTP, il
+  cartone di SATS Routing col finto mempool (dal 24 ott anche l'altezza,
+  `/esplora/blocks/tip/height` e `/cartone/cima`), un LNbits di cartone
+  con la fattura trattenuta. Lo swap intero fino a «Fatto» con un
+  pagamento solo; il nodo che non risponde (in volo, la riapertura che
+  richiede senza pagare, mezz'ora senza 🧊, la scadenza col 🧊 e la frase
+  giusta); il #241; dieci no prima di pagare senza un sats uscito ne' una
+  riga nata (forma, impronta, indirizzo di un altro tipo, checksum,
+  importo, on-chain meno, scadenza, fee, tariffe giu, lockup gia' usato)
+  piu' il mempool giu e la leva spenta; i due tetti e il tetto alzato; il
+  doppio tocco; il journal; la sentinella (al server solo le sette parti
+  pubbliche, in nessuna chiamata le parole).
+- `prove_swap_pagamento` (in `prove.py`): il taproot contro un
+  codificatore bech32m scritto nella prova e il vettore del BIP-350, otto
+  no; la tabella della verita' dello stato derivato; la forma; il limite
+  del volo e le somme del giorno su un database vero; le sentinelle
+  (registrazione prima del pagamento e dopo i controlli, nessun
+  `paga_venditore` diretto, nessuna fattura nel journal, swap@ fuori, la
+  ronda col limite nuovo, le leve in tre posti, la leva dello swap spenta,
+  il corpo della pagina con le sette chiavi, nessuna fetch
+  nell'instradatore, gli elenchi della CI).
+- Ritoccati: `collaudo_swap_telefono` e `collaudo_swap_instradatore` (la
+  pagina finta ha le due funzioni nuove, che li' non raggiungono nessun
+  server; la carta dice «Barattolo sta pagando lo swap»),
+  `SWAP_TELEFONO_VER` (l'impronta dei due file).
+- CONTROPROVE: le mutazioni e i loro esiti, nel messaggio del commit.
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA DA GUARDARE.**
+- LO SWAP INTERO SUL REGTEST DI BOLTZ, sulla VM, prima di accendere
+  `SWAP_ATTIVO` altrove (regola di Andrea): i passi, da fare insieme, in
+  COLLAUDO.md §6. Tre cose da decidere la': la memoria (il regtest non
+  sta accanto al runner della CI), chi paga (il LNbits della VM e' un
+  FakeWallet, e una fattura di regtest la paga solo un LND di regtest), e
+  la lettura delle tariffe e del mempool in `MODALITA_COLLAUDO`, che il
+  server fa solo da 127.0.0.1.
+- L'avviso di Telegram a chi vende dopo un pagamento di swap fallito
+  parla ancora di «fattura» (il testo dei payout Lightning): la carta
+  dello swap dice il giusto, il messaggio no.
+- La linea del tempo dell'ordine dice «ci stiamo lavorando noi» dopo
+  mezz'ora in volo (`IN_PAGAMENTO_LUNGO_S`) anche per la fattura di uno
+  swap, che vola per sua natura: lo stadio non sa ancora dello swap.
+- La fee nostra sullo swap: a fee accesa la tappa 4 non paga.
+- Come risponde il LNbits VERO alla richiesta di pagare una fattura
+  trattenuta (subito «in corso», o tiene la richiesta fino ai 60 s): il
+  collaudo prova tutt'e due le strade, il regtest dira' quale e'.

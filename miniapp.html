@@ -18074,7 +18074,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '492a815947';
+const SWAP_TELEFONO_VER = 'ad07f568f1';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18240,6 +18240,33 @@ async function leggiPreventivoSwap(id, fornitore, hash){
     if (!r.ok || !d) d = {ok: false, motivo: r.status === 403 ? 'spento' : 'non_risponde'};
   } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
   return d;
+}
+/* LA TAPPA 4 (24 ott 2026): Barattolo paga la fattura dello swap. Al
+   server vanno SOLO le parti pubbliche dello swap creato e verificato dal
+   telefono — fattura, impronta del segreto, indirizzo del lockup, quanto,
+   la scadenza — mai le parole o una chiave. null = non si e' potuto
+   chiedere (si riprova); sennò {ok, stato} o {ok: false, motivo}. */
+async function pagaSwapAlServer(rec){
+  try {
+    const r = await fetch(`${API_BASE}/swap/paga/${Number(rec.ordine)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({fornitore: rec.fornitore || '', swap_id: rec.id,
+        invoice: rec.invoice, impronta: rec.impronta, indirizzo: rec.lockupAddress,
+        scade_blocco: rec.timeoutBlockHeight, onchain: rec.onchainAmount})});
+    const d = await r.json().catch(() => null);
+    return r.ok && d ? d : null;
+  } catch(e) { return null; }
+}
+/* a che punto e' quel pagamento: '' = il server non lo conosce, null =
+   non risponde */
+async function statoPagamentoSwap(ordine){
+  try {
+    const r = await fetch(`${API_BASE}/swap/pagamento/${Number(ordine)}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => null);
+    return r.ok && d ? String(d.stato || '') : null;
+  } catch(e) { return null; }
 }
 async function caricaPreventivoSwap(id, ricontrolla){
   /* con l'instradatore arrivato decide lui (il migliore fra i fornitori) */

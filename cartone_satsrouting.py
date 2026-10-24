@@ -74,7 +74,9 @@ quella del fornitore; `GET /esplora/v1/fees/recommended` la fee del
 momento; (dal 20 ott, swap-spesa) `GET /esplora/address/<a>/txs` le
 transazioni dell'indirizzo (il lockup e chi l'ha speso), `GET
 /esplora/tx/<id>` una transazione in JSON, `GET
-/esplora/tx/<id>/outspend/<n>` chi ha speso quell'uscita. `/cartone/visto` conta le richieste di firma cooperativa
+/esplora/tx/<id>/outspend/<n>` chi ha speso quell'uscita; (dal 24 ott,
+swap tappa 4) `GET /esplora/blocks/tip/height` l'altezza della rete, che
+`GET /cartone/cima?h=...` sposta. `/cartone/visto` conta le richieste di firma cooperativa
 (`firme`: lì arriva il segreto) e le trasmissioni tentate (`tentate`);
 ogni ritiro accettato sta in `trasmesse` una volta sola, con le `strade`
 da cui e' arrivato («rete», «fornitore»).
@@ -494,6 +496,20 @@ class Sportello(BaseHTTPRequestHandler):
                     sid = max(c["swap"].values(), key=lambda s: s["creato"])["id"]
                 ok = sposta(c, sid, (q.get("s") or [""])[0])
                 return self._rispondi(200 if ok else 400, {"ok": ok, "id": sid})
+            if u.path == "/cartone/cima":
+                # (tappa 4) l'altezza della rete, a comando
+                c["stato"]["cima"] = int((q.get("h") or ["0"])[0])
+                return self._rispondi(200, {"cima": c["stato"]["cima"]})
+            if u.path == "/esplora/blocks/tip/height":
+                # come mempool.space: un numero in testo semplice
+                dati = str(c["stato"]["cima"]).encode("ascii")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(dati)))
+                self._cors()
+                self.end_headers()
+                self.wfile.write(dati)
+                return
             if u.path == "/cartone/visto":
                 return self._rispondi(200, dict(c["stato"], swap=len(c["swap"])))
             if (len(pezzi) == 4 and pezzi[0] == "esplora" and pezzi[1] == "address"
@@ -634,7 +650,10 @@ def nuovo_cartone(rete="bitcoin", percento=None):
     fornitori diversi)."""
     return {"stato": {"modo": "normale", "letture": 0, "referral": None,
                       "rete": rete, "creazione": None, "trasmesse": [],
-                      "firme": [], "tentate": 0},
+                      "firme": [], "tentate": 0,
+                      # (24 ott 2026, swap tappa 4) l'altezza della rete:
+                      # 144 blocchi prima della scadenza degli swap
+                      "cima": SCADENZA_BLOCCO - 144},
             "swap": {}, "chiave": threading.Lock(), "percento": percento,
             "rete": {}, "spese": {}}
 
