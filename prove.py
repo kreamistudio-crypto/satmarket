@@ -5225,7 +5225,13 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
     # ...e i quattro di «paga da un'altra cassaforte» (21 set 2026), che
     # stanno dentro le stesse funzioni d'uscita: chi monta questi monta
     # anche quelli, o `_sblocca_sats` e la ronda esplodono un cantiere dopo
+    # ...e il limite del volo (24 ott 2026, swap tappa 4), che la ronda
+    # chiede a `_limite_in_volo`: sui banchi una riga di swap non c'e', e
+    # il limite e' quello di sempre. Quello vero, con la riga di swap, lo
+    # esegue `prove_swap_pagamento` su un database vero.
     return {**{n: p[n] for n in NOMI_IN_PAGAMENTO},
+            "_limite_in_volo": lambda tab, rid, h, quando:
+                int(quando or 0) + p["IN_VOLO_LIMITE_S"],
             **ambiente_altra_cassaforte()}
 
 
@@ -178204,6 +178210,219 @@ def prove_swap_fornitori():
            "collaudo_swap_instradatore.py" in compila))
 
 
+def prove_swap_pagamento():
+    """LA TAPPA 4 DELLO SWAP: BARATTOLO PAGA LA FATTURA (24 ott 2026,
+    cantiere swap-tappa-4, piano approvato da Andrea). Il telefono manda le
+    sole parti pubbliche dello swap creato e verificato; il server fa i
+    controlli che si possono fare PRIMA (importo, impronta, indirizzo
+    taproot ancora vuoto su mempool, scadenza, tetti), registra la riga e
+    paga dalla cassaforte dell'ordine per la porta di sempre. Qui i giudici
+    ESEGUITI (l'indirizzo, lo stato derivato, la forma, il limite del volo,
+    le somme del giorno) e le sentinelle sulla forma; lo swap intero, coi
+    pezzi veri e le controprove, lo gira `collaudo_swap_pagamento`."""
+    print("\n[lo swap, tappa 4: il pagamento della fattura]")
+    import sqlite3 as _sq
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    instr = open("swap/instradatore.js", encoding="utf-8").read()
+    boltz = open("swap/boltz.js", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- l'indirizzo taproot: contro un codificatore bech32m SCRITTO QUI,
+    # non quello del server (BIP-350), e i vettori del BIP
+    alfa = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+    def _poly(v):
+        gen = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+        c = 1
+        for x in v:
+            b = c >> 25
+            c = ((c & 0x1ffffff) << 5) ^ x
+            for i in range(5):
+                c ^= gen[i] if (b >> i) & 1 else 0
+        return c
+
+    def _taproot(hrp, programma, versione=1, costante=0x2bc830a3):
+        dati, acc, bits = [versione], 0, 0
+        for byte in programma:
+            acc = (acc << 8) | byte
+            bits += 8
+            while bits >= 5:
+                bits -= 5
+                dati.append((acc >> bits) & 31)
+        if bits:
+            dati.append((acc << (5 - bits)) & 31)
+        esp = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+        p = _poly(esp + dati + [0] * 6) ^ costante
+        return hrp + "1" + "".join(alfa[d] for d in dati + [(p >> 5 * (5 - i)) & 31
+                                                           for i in range(6)])
+
+    amb = {"_BECH32_ALFABETO": alfa,
+           "SWAP_HRP": {"bitcoin": "bc", "testnet": "tb", "regtest": "bcrt"},
+           "_SWAP_BECH32M": 0x2bc830a3}
+    exec(pezzo("_bech32_polymod"), amb)
+    exec(pezzo("swap_indirizzo_p2tr"), amb)
+    p2tr = amb["swap_indirizzo_p2tr"]
+    bip = "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0"
+    reg = _taproot("bcrt", bytes(range(1, 33)))
+    prova("indirizzo taproot: il vettore del BIP-350, maiuscolo, regtest e testnet",
+          [True, True, True, True],
+          [p2tr(bip, "bitcoin"), p2tr(bip.upper(), "bitcoin"), p2tr(reg, "regtest"),
+           p2tr(_taproot("tb", bytes(32)), "testnet")])
+    rotto = bip[:-1] + ("q" if bip[-1] != "q" else "p")
+    prova("...e i no: checksum rotto, rete sbagliata, p2wpkh, bech32 (non m), "
+          "20 byte, versione 2, misto, vuoto",
+          [False] * 8,
+          [p2tr(rotto, "bitcoin"), p2tr(bip, "regtest"),
+           p2tr("bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", "bitcoin"),
+           p2tr(_taproot("bc", bytes(32), costante=1), "bitcoin"),
+           p2tr(_taproot("bc", bytes(20)), "bitcoin"),
+           p2tr(_taproot("bc", bytes(32), versione=2), "bitcoin"),
+           p2tr(bip[:10] + bip[10:].upper(), "bitcoin"), p2tr("", "bitcoin")])
+
+    # --- lo stato derivato dall'ordine: la tabella della verita'
+    st = {"SWAP_PAG_REGISTRATO": "registrato", "SWAP_PAG_IN_VOLO": "in_volo",
+          "SWAP_PAG_PAGATO": "pagato", "SWAP_PAG_DA_VERIFICARE": "da_verificare",
+          "SWAP_PAG_FALLITO": "fallito"}
+    amb = dict(st)
+    exec(pezzo("_swap_pag_stato"), amb)
+    riga = {"hash": "H", "bolt11": "lnbc1"}
+
+    def o(stato="confirmed", ps="", ph="", inv=""):
+        return {"stato": stato, "payout_stato": ps, "payout_hash": ph,
+                "invoice_venditore": inv}
+    casi = [(o(inv="lnbc1"), "registrato"),
+            (o(ps="in_volo", ph="H", inv="lnbc1"), "in_volo"),
+            (o(ps="incerto", ph="H", inv="lnbc1"), "da_verificare"),
+            (o("released", ph="H"), "pagato"),
+            (o(ps="uscito", ph="H", inv="lnbc1"), "pagato"),
+            (o(ph="H"), "fallito"),                     # fallito: fattura tolta
+            (o("released", ph="ALTRO", inv="lnbc1"), "fallito"),  # chiuso da un altro
+            (o(ps="in_volo", ph="ALTRO", inv="lnbc2"), "fallito"),
+            (None, "fallito")]
+    prova("lo stato del pagamento si DERIVA dall'ordine, caso per caso",
+          [c[1] for c in casi], [amb["_swap_pag_stato"](riga, c[0]) for c in casi])
+
+    # --- la forma delle parti pubbliche
+    amb = {"re": re, "_SWAP_ID_FORMA": re.compile(r"^[A-Za-z0-9_-]{4,80}$"),
+           "_SWAP_IMPRONTA_FORMA": re.compile(r"^[0-9a-f]{64}$")}
+    exec(pezzo("_swap_parti"), amb)
+    buono = {"swap_id": "abcDEF12", "invoice": "LNBC300U1xyz", "impronta": "ab" * 32,
+             "indirizzo": bip, "scade_blocco": "900144", "onchain": 29_500}
+    letto = amb["_swap_parti"](buono)
+    prova("le parti pubbliche ripulite: la fattura minuscola, i numeri interi",
+          ("lnbc300u1xyz", 900_144, 29_500, "ab" * 32),
+          (letto["bolt11"], letto["scade_blocco"], letto["onchain"], letto["impronta"]))
+    storti = [dict(buono, impronta="ab" * 31), dict(buono, impronta="zz" * 32),
+              dict(buono, swap_id="a b"), dict(buono, invoice="bc1qnonfattura"),
+              dict(buono, indirizzo=""), dict(buono, scade_blocco="dopo"),
+              dict(buono, onchain=0), {}]
+    prova("...e ogni forma storta e' un no", [None] * len(storti),
+          [amb["_swap_parti"](d) for d in storti])
+
+    # --- il limite del volo e le somme del giorno, su un database vero
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "payout_stato TEXT, payout_hash TEXT, invoice_venditore TEXT)")
+
+    class _Con:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+    amb = dict(st, db=_Con, time=__import__("time"), IN_VOLO_LIMITE_S=1800,
+               print=lambda *a, **k: None,
+               SWAP_PAG_FINALI=("pagato", "fallito"))
+    for f in ("_swap_pag_prepara", "_swap_pag_db", "_swap_pag_stato",
+              "_swap_pag_aggiorna", "_limite_in_volo", "_swap_pag_somme"):
+        exec(pezzo(f), amb)
+    amb["_swap_pag_prepara"](con)
+    adesso = 1_000_000
+    righe = [(1, 999, "H1", "lnbc1", 30_000, adesso + 90_000, adesso - 100),
+             (2, 999, "H2", "lnbc2", 30_000, 0, adesso - 100),
+             (3, 222, "H3", "lnbc3", 40_000, 0, adesso - 100),
+             (4, 999, "H4", "lnbc4", 50_000, 0, adesso - 90_000)]
+    for oid, chi, h, b, sats, vola, creato in righe:
+        con.execute("INSERT INTO swap_pagamenti(ordine_id, venditore_id, "
+                    "fornitore, swap_id, hash, bolt11, sats, vola_fino, "
+                    "creato) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (oid, chi, "satsrouting", f"s{oid}", h, b, sats, vola, creato))
+    con.execute("INSERT INTO ordini VALUES(1,'confirmed','in_volo','H1','lnbc1')")
+    con.execute("INSERT INTO ordini VALUES(2,'confirmed','','H2','')")      # fallito
+    con.execute("INSERT INTO ordini VALUES(3,'released','uscito','H3','lnbc3')")
+    con.execute("INSERT INTO ordini VALUES(4,'released','uscito','H4','lnbc4')")
+    lim = amb["_limite_in_volo"]
+    prova("il limite del volo: la fattura di uno swap vola fino alla sua scadenza, "
+          "le altre mezz'ora",
+          [adesso + 90_000, adesso + 1800, adesso + 1800, adesso + 1800],
+          [lim("ordini", 1, "H1", adesso), lim("ordini", 1, "ALTRO", adesso),
+           lim("pagamenti", 1, "H1", adesso), lim("ordini", 9, "H9", adesso)])
+    prova("le somme del giorno: il fallito non conta, quello di ieri nemmeno",
+          (30_000, 70_000), amb["_swap_pag_somme"](con, 999, adesso))
+
+    # --- LE SENTINELLE SULLA FORMA
+    i = src.index("async def swap_registra_pagamento(")
+    reg = codice(src[i:src.index("\ndef _swap_pag_dell_ordine(", i)])
+    paga = reg.index("await _sblocca_sats(ordine_id)\n    return")
+    prova("la riga si registra PRIMA di pagare, e si paga per la porta di sempre",
+          (True, True, False, False),
+          (reg.index("INSERT INTO swap_pagamenti") < paga,
+           reg.index("UPDATE ordini SET invoice_venditore=?") < paga,
+           "paga_venditore(" in reg, "/api/v1/payments" in reg))
+    prima = reg[:reg.index("INSERT INTO swap_pagamenti")]
+    prova("...dopo i controlli: importo, impronta, scadenza, tariffe, taproot, "
+          "mempool vuoto, blocchi, tetti",
+          [True] * 9,
+          [x in prima for x in ("importo_bolt11(s[\"bolt11\"]) != dovuto",
+                                "letta.get(\"hash\") != s[\"impronta\"]",
+                                "rifiuto_scadenza(s[\"bolt11\"])",
+                                "preventivo_swap(dovuto", "swap_indirizzo_p2tr(",
+                                "/address/", "/blocks/tip/height",
+                                "SWAP_MAX_SATS_UTENTE_GIORNO",
+                                "SWAP_MAX_SATS_GIORNO")])
+    blocco = src[src.index("# --- LA TAPPA 4 DELLO SWAP"):
+                 src.index('@app.post("/api/orders/{ordine_id}/invoice")')]
+    stampe = re.findall(r"print\((.*?)flush=True\)", blocco, re.S)
+    prova("nel journal mai la fattura intera, mai l'indirizzo intero",
+          (True, [], []),
+          (len(stampe) >= 6,
+           [x for x in stampe if "bolt11" in x],
+           [x for x in stampe if "s['indirizzo']}" in x]))
+    prova("swap@ non paga niente: nessuna chiave da pagamento sua, il blocco non "
+          "tocca il suo wallet", (False, False),
+          ("SWAP_LNBITS_ADMIN" in src, "swap_wallet(" in blocco))
+    prova("la ronda chiede il limite del volo a `_limite_in_volo`", True,
+          "adesso > _limite_in_volo(\n                    tab, riga_id, phash, quando)"
+          in pezzo("risolvi_pagamenti_in_volo"))
+    prova("le leve dei tetti: nel server, nel config d'esempio, nel pannello",
+          [True] * 6,
+          ["SWAP_MAX_SATS_UTENTE_GIORNO = 100_000" in src,
+           "SWAP_MAX_SATS_GIORNO = 200_000" in src,
+           "\nSWAP_MAX_SATS_UTENTE_GIORNO = 100_000\n" in esempio,
+           "\nSWAP_MAX_SATS_GIORNO = 200_000\n" in esempio,
+           '"SWAP_MAX_SATS_UTENTE_GIORNO",' in src,
+           '"SWAP_MAX_SATS_GIORNO", int(' in src])
+    prova("...e la leva dello swap resta spenta di serie", (True, True),
+          ("    SWAP_ATTIVO = False" in src, "\nSWAP_ATTIVO = False" in esempio))
+    j = mini.index("async function pagaSwapAlServer(rec){")
+    corpo = mini[j:mini.index("\n}\n", j)]
+    chiavi = re.findall(r"(\w+): rec\.", corpo[corpo.index("JSON.stringify({"):])
+    prova("la pagina manda al server SOLO le sette parti pubbliche",
+          ["fornitore", "impronta", "indirizzo", "invoice", "onchain",
+           "scade_blocco", "swap_id"], sorted(chiavi))
+    prova("il telefono non parla col server da se': nell'instradatore nessuna fetch, "
+          "il pagamento passa dalla pagina", (0, True, True),
+          (instr.count("fetch("), "await pagaSwapAlServer(rec)" in instr,
+           "statoPagamentoSwap(rec.ordine)" in instr))
+    prova("...e lo swap nato porta l'impronta del NOSTRO segreto", True,
+          "impronta: S.hex.encode(chiavi.impronta)," in boltz)
+    prova("il collaudo dello swap intero sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_swap_pagamento\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
 def prove_leve_mai_doppie():
     """UNA LEVA, UN POSTO (20 ott 2026, cantiere leve-doppie, richiesta di
     Andrea). Il 19 ott il tetto di swap@barattolo.store (2.000.000) e il
@@ -178926,7 +179145,7 @@ def main():
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
-              prove_swap_telefono, prove_swap_fornitori,
+              prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,

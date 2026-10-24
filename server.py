@@ -1584,6 +1584,26 @@ try:
     from config import SWAP_MAX_SATS
 except ImportError:
     SWAP_MAX_SATS = 50_000
+# I TETTI DEI PAGAMENTI DELLO SWAP (24 ott 2026, tappa 4, decisione di
+# Andrea): da qui Barattolo PAGA la fattura dello swap con i sats
+# dell'ordine, e oltre al tetto di uno swap ce ne sono due sul giorno —
+# le ultime 24 ore, contando ogni pagamento registrato che non e' fallito
+# (in volo, da verificare, pagato). Uno per chi vende, uno per tutti: un
+# difetto nostro che si ripete, o un fornitore che mente in serie, non
+# puo' portar via piu' di cosi' in un giorno.
+try:
+    from config import SWAP_MAX_SATS_UTENTE_GIORNO
+except ImportError:
+    SWAP_MAX_SATS_UTENTE_GIORNO = 100_000
+try:
+    from config import SWAP_MAX_SATS_GIORNO
+except ImportError:
+    SWAP_MAX_SATS_GIORNO = 200_000
+# QUANTI BLOCCHI DEVONO RESTARE allo swap quando lo paghiamo: dopo il
+# pagamento il fornitore blocca i bitcoin e il telefono li ritira, e se
+# lo swap scade prima il fornitore se li riprende (e il pagamento torna
+# indietro). 36 blocchi sono circa sei ore.
+SWAP_MARGINE_BLOCCHI = 36
 # LA NOSTRA FEE sullo swap, in percentuale: 0 di serie e SPENTA finche'
 # non ci sono la risposta di Massimo e il parere legale. La strada del
 # guadagno e' la quota del 10 % della loro commissione, che non costa
@@ -31674,6 +31694,11 @@ def _leve_stato():
             _leva("Swap: massimo per swap (sats)", "SWAP_MAX_SATS",
                   int(SWAP_MAX_SATS or 0),
                   spento="a 0 vale solo il massimo di SATS Routing"),
+            _leva("Swap: pagati per venditore in 24 ore (sats)",
+                  "SWAP_MAX_SATS_UTENTE_GIORNO",
+                  int(SWAP_MAX_SATS_UTENTE_GIORNO or 0)),
+            _leva("Swap: pagati in tutto in 24 ore (sats)",
+                  "SWAP_MAX_SATS_GIORNO", int(SWAP_MAX_SATS_GIORNO or 0)),
             _leva("Swap: la nostra fee (%)", "SWAP_FEE_PERCENTO",
                   float(SWAP_FEE_PERCENTO or 0),
                   acceso="chi vende la vede come riga sua nel preventivo",
@@ -72755,6 +72780,492 @@ async def swap_preventivo(ordine_id: int, hash: str = "",
     return p
 
 
+# --- LA TAPPA 4 DELLO SWAP: BARATTOLO PAGA LA FATTURA (24 ott 2026) -----
+# Il telefono di chi vende ha creato lo swap e l'ha verificato (tappa 3);
+# adesso manda qui le sole parti PUBBLICHE — la fattura, l'impronta del
+# segreto, l'indirizzo dove il fornitore blocchera' i bitcoin, quanto ci
+# blocchera', a che blocco scade — e il server paga la fattura con i sats
+# dell'ordine, dalla SUA cassaforte, per la porta di sempre
+# (`_sblocca_sats` -> `paga_venditore`, con la riga dell'ordine): la
+# stessa difesa contro il doppio pagamento di ogni incasso, e i
+# 🧊 Pagamenti da verificare quando non si sa com'e' andata. swap@ NON
+# paga niente: incassa solo la quota (decisione di Andrea, 24 ott).
+#
+# PRIMA DI PAGARE, i controlli che si possono fare prima (il lockup
+# arriva solo DOPO il pagamento: in uno swap Lightning -> on-chain la
+# fattura e' «trattenuta», e il fornitore blocca i bitcoin quando vede il
+# pagamento arrivare): l'importo e' quel che spetta a chi vende, la
+# fattura porta l'impronta che il telefono dichiara, l'indirizzo e' un
+# taproot della rete giusta e su mempool e' ancora VUOTO, lo swap ha
+# ancora tempo davanti. I tre controlli sul lockup (lo script atteso,
+# l'importo, la transazione letta da mempool) restano nel telefono,
+# prima del segreto: se il lockup mente il segreto non esce, la fattura
+# non si chiude, e alla scadenza i sats tornano nella cassaforte.
+#
+# UN PAGAMENTO PER SWAP, registrato PRIMA di partire (`swap_pagamenti`),
+# e UNO swap vivo per ordine. Lo stato della riga si DERIVA dall'ordine
+# (`_swap_pag_stato`), come lo stadio del pagamento: la colonna e'
+# l'ultimo stato visto, che il journal racconta quando cambia.
+SWAP_PAG_REGISTRATO = "registrato"     # scritto, non ancora partito
+SWAP_PAG_IN_VOLO = "in_volo"           # partito: aspetta il ritiro
+SWAP_PAG_PAGATO = "pagato"             # la fattura si e' chiusa
+SWAP_PAG_DA_VERIFICARE = "da_verificare"   # 🧊: decide una persona
+SWAP_PAG_FALLITO = "fallito"           # non e' uscito niente
+SWAP_PAG_FINALI = (SWAP_PAG_PAGATO, SWAP_PAG_FALLITO)
+# il prefisso degli indirizzi e delle fatture di ogni rete
+SWAP_HRP = {"bitcoin": "bc", "testnet": "tb", "regtest": "bcrt"}
+_SWAP_ID_FORMA = re.compile(r"^[A-Za-z0-9_-]{4,80}$")
+_SWAP_IMPRONTA_FORMA = re.compile(r"^[0-9a-f]{64}$")
+_SWAP_BECH32M = 0x2bc830a3
+# un lucchetto solo per le registrazioni: i tetti del giorno si contano e
+# si superano dentro, e due richieste insieme non li passano tutt'e due
+_lucchetto_swap_pagamenti = asyncio.Lock()
+_SWAP_MEMPOOL_DETTO = set()
+
+
+def _swap_pag_prepara(con):
+    """`swap_pagamenti`: una riga per fattura di swap che Barattolo paga."""
+    con.execute("""CREATE TABLE IF NOT EXISTS swap_pagamenti(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        fornitore TEXT NOT NULL,
+        swap_id TEXT NOT NULL,
+        hash TEXT NOT NULL UNIQUE,
+        bolt11 TEXT NOT NULL,
+        sats INTEGER NOT NULL,
+        onchain INTEGER DEFAULT 0,
+        indirizzo TEXT DEFAULT '',
+        scade_blocco INTEGER DEFAULT 0,
+        vola_fino INTEGER DEFAULT 0,
+        stato TEXT DEFAULT 'registrato',
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0,
+        UNIQUE(fornitore, swap_id))""")
+
+
+def _swap_pag_db():
+    con = db()
+    _swap_pag_prepara(con)
+    return con
+
+
+def swap_indirizzo_p2tr(indirizzo: str, rete: str) -> bool:
+    """E' un indirizzo TAPROOT di questa rete? Gli swap Lightning ->
+    on-chain bloccano i bitcoin in un p2tr (la chiave MuSig con l'albero
+    dello swap): bech32m (BIP-350), versione 1, 32 byte. Il checksum si
+    verifica davvero: un carattere sbagliato e' un no."""
+    s = str(indirizzo or "").strip()
+    if s != s.lower() and s != s.upper():
+        return False
+    s = s.lower()
+    hrp = SWAP_HRP.get(rete, "bc")
+    if not s.startswith(hrp + "1"):
+        return False
+    try:
+        v = [_BECH32_ALFABETO.index(c) for c in s[len(hrp) + 1:]]
+    except ValueError:
+        return False
+    if len(v) < 7:
+        return False
+    espanso = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+    if _bech32_polymod(espanso + v) != _SWAP_BECH32M:
+        return False
+    dati = v[:-6]
+    if dati[0] != 1:
+        return False
+    programma, acc, bits = [], 0, 0
+    for g in dati[1:]:
+        acc = (acc << 5) | g
+        bits += 5
+        if bits >= 8:
+            bits -= 8
+            programma.append((acc >> bits) & 0xff)
+    if bits >= 5 or (acc & ((1 << bits) - 1)):
+        return False
+    return len(programma) == 32
+
+
+async def _swap_mempool_leggi(base: str, percorso: str) -> str | None:
+    """Una lettura dal mempool (sola lettura, dati pubblici). None = non
+    risponde. IN COLLAUDO NON SI ESCE DAL COMPUTER, come per le tariffe:
+    una base che non e' di casa non si legge."""
+    base = str(base or "").rstrip("/")
+    if not base:
+        return None
+    if MODALITA_COLLAUDO and not _swap_base_di_casa(base):
+        if base not in _SWAP_MEMPOOL_DETTO:
+            _SWAP_MEMPOOL_DETTO.add(base)
+            print(f"🟣 [swap simulato] il mempool {base}: in collaudo non si "
+                  "esce dal computer (punta SWAP_MEMPOOL_API al cartone)",
+                  flush=True)
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"{base}{percorso}")
+        if r.status_code != 200:
+            return None
+        return r.text
+    except Exception as e:
+        print(f"⚠️ Swap: il mempool non risponde ({type(e).__name__})",
+              flush=True)
+        return None
+
+
+def _swap_pag_stato(r, o) -> str:
+    """LO STATO DI UN PAGAMENTO DI SWAP, derivato dall'ordine: l'ordine e'
+    la verita' (lo scrive la porta dei pagamenti), la riga dice solo di
+    QUALE fattura si parla."""
+    if not o:
+        return SWAP_PAG_FALLITO
+    if (o["payout_hash"] or "") == r["hash"]:
+        if o["stato"] == "released" or o["payout_stato"] == "uscito":
+            return SWAP_PAG_PAGATO
+        if o["payout_stato"] == "in_volo":
+            return SWAP_PAG_IN_VOLO
+        if o["payout_stato"] == "incerto":
+            return SWAP_PAG_DA_VERIFICARE
+    if (o["invoice_venditore"] or "") == r["bolt11"] \
+            and o["stato"] == "confirmed":
+        return SWAP_PAG_REGISTRATO
+    return SWAP_PAG_FALLITO
+
+
+def _swap_pag_aggiorna(con, r) -> str:
+    """Rilegge lo stato di una riga dall'ordine, e se e' cambiato lo
+    scrive e lo dice nel journal. Torna lo stato di adesso."""
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (r["ordine_id"],)).fetchone()
+    nuovo = _swap_pag_stato(r, o)
+    if nuovo != r["stato"]:
+        con.execute("UPDATE swap_pagamenti SET stato=?, aggiornato=? "
+                    "WHERE id=?", (nuovo, int(time.time()), r["id"]))
+        con.commit()
+        print(f"🔄 Swap dell'ordine #{r['ordine_id']}: il pagamento passa "
+              f"da «{r['stato']}» a «{nuovo}» ({r['hash'][:12]}…)",
+              flush=True)
+    return nuovo
+
+
+def swap_pagamenti_ripassa() -> int:
+    """Rilegge le righe non ancora finite: il journal dice ogni passo
+    anche quando a chiuderlo e' stata la ronda o un moderatore."""
+    con = _swap_pag_db()
+    try:
+        righe = con.execute("SELECT * FROM swap_pagamenti WHERE stato NOT IN "
+                            "(?, ?)", SWAP_PAG_FINALI).fetchall()
+        for r in righe:
+            _swap_pag_aggiorna(con, r)
+        return len(righe)
+    finally:
+        con.close()
+
+
+def _limite_in_volo(tabella: str, riga_id: int, phash: str,
+                    quando: int) -> int:
+    """FINO A QUANDO un pagamento in volo e' normale. Di serie
+    `IN_VOLO_LIMITE_S` dopo la partenza; la fattura di uno swap invece e'
+    trattenuta finche' il telefono di chi vende non ritira i bitcoin, e
+    puo' restare in volo fino alla scadenza dello swap (`vola_fino`,
+    scritto alla registrazione): prima di allora non e' una stranezza."""
+    base = int(quando or 0) + IN_VOLO_LIMITE_S
+    if tabella != "ordini" or not phash:
+        return base
+    try:
+        con = _swap_pag_db()
+        try:
+            r = con.execute("SELECT vola_fino FROM swap_pagamenti WHERE "
+                            "ordine_id=? AND hash=?",
+                            (riga_id, phash)).fetchone()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Il limite del volo di {tabella}#{riga_id} non si legge "
+              f"({e}): vale quello di serie", flush=True)
+        return base
+    return max(base, int(r[0] or 0)) if r else base
+
+
+def _swap_pag_somme(con, venditore_id: int, adesso: int) -> tuple:
+    """Quanto e' gia' impegnato nelle ultime 24 ore: (di chi vende, di
+    tutti). Contano le righe non fallite, rilette dall'ordine."""
+    mio = tutti = 0
+    for r in con.execute("SELECT * FROM swap_pagamenti WHERE creato>?",
+                         (adesso - 86_400,)).fetchall():
+        if _swap_pag_aggiorna(con, r) == SWAP_PAG_FALLITO:
+            continue
+        tutti += int(r["sats"])
+        if int(r["venditore_id"]) == int(venditore_id):
+            mio += int(r["sats"])
+    return mio, tutti
+
+
+def _swap_pag_no(ordine_id: int, motivo: str, detto: str = "") -> dict:
+    """Un rifiuto PRIMA di pagare: niente e' partito, e il journal lo dice."""
+    print(f"🔄 Swap dell'ordine #{ordine_id}: non si paga — {motivo}"
+          + (f" ({detto})" if detto else "") + ". Niente e' partito.",
+          flush=True)
+    return {"ok": False, "motivo": motivo}
+
+
+async def swap_registra_pagamento(venditore_id: int, ordine_id: int,
+                                  chi: dict, s: dict) -> dict:
+    """I CONTROLLI, LA REGISTRAZIONE, IL PAGAMENTO. `s` sono le parti
+    pubbliche dello swap, gia' ripulite nella forma dalla rotta."""
+    con = _swap_pag_db()
+    try:
+        o = con.execute("SELECT * FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        if not o or o["venditore_id"] != venditore_id:
+            return {"ok": False, "motivo": "ordine", "non_trovato": True}
+        stessa = con.execute("SELECT * FROM swap_pagamenti WHERE hash=?",
+                             (s["impronta"],)).fetchone()
+        if stessa and int(stessa["ordine_id"]) != ordine_id:
+            return _swap_pag_no(ordine_id, "usato",
+                                "la fattura e' di un altro ordine")
+        if stessa:
+            # LA STESSA FATTURA UNA SECONDA VOLTA (un telefono che ripete,
+            # una risposta persa): niente di nuovo si registra, e se e'
+            # ancora ferma si ripassa dalla porta di sempre, che sa da
+            # sola se qualcosa e' gia' partito
+            if _swap_pag_aggiorna(con, stessa) != SWAP_PAG_REGISTRATO:
+                return {"ok": True, "stato": _swap_pag_aggiorna(con, stessa)}
+            con.close()
+            await _sblocca_sats(ordine_id)
+            con = _swap_pag_db()
+            stessa = con.execute("SELECT * FROM swap_pagamenti WHERE id=?",
+                                 (stessa["id"],)).fetchone()
+            return {"ok": True, "stato": _swap_pag_aggiorna(con, stessa)}
+        for r in con.execute("SELECT * FROM swap_pagamenti WHERE ordine_id=?",
+                             (ordine_id,)).fetchall():
+            if _swap_pag_aggiorna(con, r) != SWAP_PAG_FALLITO:
+                return _swap_pag_no(ordine_id, "occupato",
+                                    "c'e' gia' uno swap vivo")
+        if o["stato"] != "confirmed":
+            return _swap_pag_no(ordine_id, "ordine", f"stato {o['stato']}")
+        if (o["payout_stato"] or "") in ("in_volo", "incerto", "uscito") \
+                or (o["invoice_venditore"] or "") \
+                or int(_campo(o, "spese_rese_sats", 0) or 0) > 0:
+            return _swap_pag_no(ordine_id, "occupato",
+                                "c'e' gia' un incasso in corso")
+    finally:
+        con.close()
+    rete = chi["rete"]
+    dovuto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+    # LA NOSTRA FEE: la porta dei pagamenti paga ESATTAMENTE quel che spetta
+    # a chi vende, e con la fee accesa la fattura dello swap e' meno. Finche'
+    # la fee e' spenta (lo e', e lo resta fino al parere legale) e' uguale.
+    if float(SWAP_FEE_PERCENTO or 0) > 0:
+        return _swap_pag_no(ordine_id, "fee",
+                            "con SWAP_FEE_PERCENTO accesa la tappa 4 non paga")
+    # 1. L'IMPORTO, letto dalla fattura e non chiesto a nessuno
+    if importo_bolt11(s["bolt11"]) != dovuto:
+        return _swap_pag_no(ordine_id, "importo",
+                            f"la fattura non chiede {_fmt_sats(dovuto)} sats")
+    if rete_bolt11(s["bolt11"]) != SWAP_HRP.get(rete, "bc"):
+        return _swap_pag_no(ordine_id, "rete", "fattura di un'altra rete")
+    # 2. L'IMPRONTA: la fattura porta quella del segreto del telefono
+    letta = leggi_bolt11(s["bolt11"], con_hash=True)
+    if not letta or letta.get("hash") != s["impronta"]:
+        return _swap_pag_no(ordine_id, "impronta",
+                            "la fattura non porta l'impronta dichiarata")
+    no = rifiuto_scadenza(s["bolt11"])
+    if no:
+        return _swap_pag_no(ordine_id, "scadenza", "fattura in scadenza")
+    # 3. I TETTI DI UNO SWAP e le tariffe di adesso: il fornitore non si
+    #    tiene piu' di quel che ha dichiarato
+    tariffa = await leggi_tariffa_swap(chi)
+    if tariffa is None:
+        return _swap_pag_no(ordine_id, "non_risponde",
+                            f"le tariffe di {chi['nome']} non arrivano")
+    p = preventivo_swap(dovuto, tariffa, 0, SWAP_MIN_SATS, SWAP_MAX_SATS)
+    if not p["ok"]:
+        return _swap_pag_no(ordine_id, p["motivo"])
+    if not (p["onchain"] <= s["onchain"] < dovuto):
+        return _swap_pag_no(ordine_id, "cambiata",
+                            f"on-chain {s['onchain']}, il preventivo dice "
+                            f"{p['onchain']}")
+    # 4. L'INDIRIZZO: taproot della rete giusta, e su mempool ancora vuoto
+    if not swap_indirizzo_p2tr(s["indirizzo"], rete):
+        return _swap_pag_no(ordine_id, "indirizzo",
+                            "non e' un taproot di questa rete")
+    base = chi.get("mempool") or ""
+    cima = await _swap_mempool_leggi(base, "/blocks/tip/height")
+    movimenti = await _swap_mempool_leggi(
+        base, f"/address/{s['indirizzo']}/txs") if cima else None
+    try:
+        cima = int(str(cima).strip())
+        movimenti = json.loads(movimenti)
+    except (TypeError, ValueError):
+        return _swap_pag_no(ordine_id, "mempool", "il mempool non risponde")
+    if not isinstance(movimenti, list):
+        return _swap_pag_no(ordine_id, "mempool", "risposta storta")
+    if movimenti:
+        return _swap_pag_no(ordine_id, "usato",
+                            "sull'indirizzo del lockup c'e' gia' qualcosa")
+    # 5. LA SCADENZA DELLO SWAP: tempo per bloccare e per ritirare
+    blocchi = s["scade_blocco"] - cima
+    if not (SWAP_MARGINE_BLOCCHI <= blocchi <= 10_000):
+        return _swap_pag_no(ordine_id, "scadenza",
+                            f"allo swap restano {blocchi} blocchi")
+    print(f"🔄 Swap dell'ordine #{ordine_id}: controlli passati — "
+          f"{_fmt_sats(dovuto)} sats a {chi['nome']} (swap {s['swap_id'][:12]}, "
+          f"{s['impronta'][:12]}…), lockup {s['indirizzo'][:10]}…"
+          f"{s['indirizzo'][-6:]} vuoto, scade fra {blocchi} blocchi",
+          flush=True)
+    # 6. I TETTI DEL GIORNO E LA REGISTRAZIONE, sotto un lucchetto solo
+    async with _lucchetto_swap_pagamenti:
+        con = _swap_pag_db()
+        try:
+            adesso = int(time.time())
+            # LE DUE DOMANDE DI PRIMA, RIFATTE DENTRO IL LUCCHETTO: due
+            # richieste insieme (un doppio tocco, un telefono che ripete
+            # mentre la prima e' ancora per strada) passano tutt'e due i
+            # controlli, ma qui ne entra una alla volta. La stessa fattura
+            # e' lo stesso pagamento; un altro swap vivo e' un no.
+            stessa = con.execute("SELECT * FROM swap_pagamenti WHERE hash=?",
+                                 (s["impronta"],)).fetchone()
+            if stessa and int(stessa["ordine_id"]) == ordine_id:
+                return {"ok": True, "stato": _swap_pag_aggiorna(con, stessa)}
+            if stessa:
+                return _swap_pag_no(ordine_id, "usato",
+                                    "la fattura e' di un altro ordine")
+            for r in con.execute("SELECT * FROM swap_pagamenti WHERE "
+                                 "ordine_id=?", (ordine_id,)).fetchall():
+                if _swap_pag_aggiorna(con, r) != SWAP_PAG_FALLITO:
+                    return _swap_pag_no(ordine_id, "occupato",
+                                        "c'e' gia' uno swap vivo")
+            mio, tutti = _swap_pag_somme(con, venditore_id, adesso)
+            if SWAP_MAX_SATS_UTENTE_GIORNO > 0 \
+                    and mio + dovuto > SWAP_MAX_SATS_UTENTE_GIORNO:
+                return _swap_pag_no(ordine_id, "tetto_utente",
+                                    f"{mio} + {dovuto} in 24 ore")
+            if SWAP_MAX_SATS_GIORNO > 0 \
+                    and tutti + dovuto > SWAP_MAX_SATS_GIORNO:
+                return _swap_pag_no(ordine_id, "tetto_giorno",
+                                    f"{tutti} + {dovuto} in 24 ore")
+            # la scadenza in secondi, con un'ora di margine: fino ad
+            # allora il volo di questa fattura e' normale
+            vola_fino = adesso + blocchi * 600 + 3600
+            try:
+                cur = con.execute(
+                    "INSERT INTO swap_pagamenti(ordine_id, venditore_id, "
+                    "fornitore, swap_id, hash, bolt11, sats, onchain, "
+                    "indirizzo, scade_blocco, vola_fino, stato, creato, "
+                    "aggiornato) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (ordine_id, venditore_id, chi["id"], s["swap_id"],
+                     s["impronta"], s["bolt11"], dovuto, s["onchain"],
+                     s["indirizzo"], s["scade_blocco"], vola_fino,
+                     SWAP_PAG_REGISTRATO, adesso, adesso))
+            except sqlite3.IntegrityError:
+                con.rollback()
+                return _swap_pag_no(ordine_id, "usato", "swap gia' visto")
+            messa = con.execute(
+                "UPDATE ordini SET invoice_venditore=?, aggiornato=? "
+                "WHERE id=? AND stato='confirmed' "
+                "AND COALESCE(invoice_venditore,'')='' "
+                "AND COALESCE(payout_stato,'') NOT IN "
+                "('in_volo','incerto','uscito')",
+                (s["bolt11"], adesso, ordine_id)).rowcount
+            if not messa:
+                con.rollback()
+                return _swap_pag_no(ordine_id, "occupato",
+                                    "l'ordine e' cambiato intanto")
+            con.commit()
+            riga_id = cur.lastrowid
+        finally:
+            con.close()
+    print(f"🔄 Swap dell'ordine #{ordine_id}: registrato (pagamento "
+          f"#{riga_id}), parte il pagamento della fattura", flush=True)
+    # 7. IL PAGAMENTO, per la porta di sempre
+    await _sblocca_sats(ordine_id)
+    return {"ok": True, "stato": _swap_pag_dell_ordine(ordine_id, riga_id)}
+
+
+def _swap_pag_dell_ordine(ordine_id: int, riga_id: int = 0) -> str:
+    """Rilegge TUTTE le righe di un ordine — anche una «fallita»: un
+    pagamento fallito che poi risulta uscito (pagato a mano, il caso del
+    #241) lo si scopre proprio qui — e torna lo stato di `riga_id` (di
+    serie l'ultima)."""
+    con = _swap_pag_db()
+    try:
+        stati = {r["id"]: _swap_pag_aggiorna(con, r) for r in con.execute(
+            "SELECT * FROM swap_pagamenti WHERE ordine_id=? ORDER BY id",
+            (ordine_id,)).fetchall()}
+    finally:
+        con.close()
+    if not stati:
+        return ""
+    return stati.get(riga_id) or stati[max(stati)]
+
+
+def _swap_parti(d: dict) -> dict | None:
+    """Le parti pubbliche dello swap dal corpo, ripulite nella forma; None
+    se una non ha la forma giusta. Nessuna chiave privata, nessuna parola:
+    se ne arrivasse una non avrebbe dove stare."""
+    try:
+        s = {"swap_id": str(d.get("swap_id") or "").strip(),
+             "bolt11": str(d.get("invoice") or "").strip().lower(),
+             "impronta": str(d.get("impronta") or "").strip().lower(),
+             "indirizzo": str(d.get("indirizzo") or "").strip(),
+             "scade_blocco": int(d.get("scade_blocco") or 0),
+             "onchain": int(d.get("onchain") or 0)}
+    except (TypeError, ValueError, AttributeError):
+        return None
+    if not (_SWAP_ID_FORMA.match(s["swap_id"])
+            and s["bolt11"].startswith("ln") and len(s["bolt11"]) < 2000
+            and _SWAP_IMPRONTA_FORMA.match(s["impronta"])
+            and 0 < len(s["indirizzo"]) <= 100
+            and s["scade_blocco"] > 0 and s["onchain"] > 0):
+        return None
+    return s
+
+
+@app.post("/api/swap/paga/{ordine_id}")
+async def swap_paga(ordine_id: int, req: Request,
+                    x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """IL PAGAMENTO DELLO SWAP (24 ott 2026, tappa 4): chi vende manda le
+    parti pubbliche dello swap che il suo telefono ha creato e verificato,
+    e Barattolo paga la fattura con i sats dell'ordine. La risposta dice
+    `ok` e lo `stato` del pagamento, o il `motivo` per cui non parte."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not swap_per(user["id"]):
+        raise HTTPException(403, "Lo swap non e' disponibile")
+    d = await leggi_json(req)
+    chi = swap_fornitore(str(d.get("fornitore") or "satsrouting"))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
+    s = _swap_parti(d)
+    if s is None:
+        return _swap_pag_no(ordine_id, "forma")
+    esito = await swap_registra_pagamento(int(user["id"]), int(ordine_id),
+                                          chi, s)
+    if esito.pop("non_trovato", False):
+        raise HTTPException(404, "Ordine non trovato")
+    return esito
+
+
+@app.get("/api/swap/pagamento/{ordine_id}")
+async def swap_pagamento_stato(ordine_id: int,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """A che punto e' il pagamento dello swap di un ordine (per la carta
+    dello swap nel telefono di chi vende). `stato` vuoto: nessuno."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _swap_pag_db()
+    try:
+        r = con.execute("SELECT * FROM swap_pagamenti WHERE ordine_id=? "
+                        "AND venditore_id=? ORDER BY id DESC LIMIT 1",
+                        (ordine_id, int(user["id"]))).fetchone()
+    finally:
+        con.close()
+    if not r:
+        return {"stato": "", "swap_id": ""}
+    return {"stato": _swap_pag_dell_ordine(ordine_id, r["id"]),
+            "swap_id": r["swap_id"]}
+
+
 @app.post("/api/orders/{ordine_id}/invoice")
 async def deposita_invoice(ordine_id: int, req: Request,
                            x_tg_init_data: str = Header(""),
@@ -79327,7 +79838,10 @@ async def risolvi_pagamenti_in_volo(solo_in_volo: bool = False):
                   "battito dopo.")
             break
         if v["verdetto"] in (IN_VOLO, IGNOTO):
-            if stato == "in_volo" and adesso - quando > IN_VOLO_LIMITE_S:
+            # (24 ott 2026, swap tappa 4) la fattura di uno swap e'
+            # trattenuta fino al ritiro: il suo limite e' la scadenza
+            if stato == "in_volo" and adesso > _limite_in_volo(
+                    tab, riga_id, phash, quando):
                 await _arrenditi_in_volo(
                     tab, riga_id, phash, quando,
                     f"LNbits dice «{v['lnbits']}», LND dice «{v['lnd']}»")
@@ -79572,6 +80086,8 @@ async def orologio_pagamenti():
             async with _giro_pagamenti:
                 await risolvi_pagamenti_in_volo(solo_in_volo=True)
                 await riprova_pagamenti_sospesi()
+                # il journal dei pagamenti di swap, a ogni passo
+                swap_pagamenti_ripassa()
         except Exception as e:
             print(f"⚠️ Battito dei pagamenti saltato: {e}")
 
