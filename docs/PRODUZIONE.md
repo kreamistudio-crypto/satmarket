@@ -4609,6 +4609,16 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (swap-spesa) anche a `/address/<a>/txs`, `/tx/<id>` e
   `/tx/<id>/outspend/<n>`: da lì il telefono sa chi ha speso il lockup.
 
+- LO SWAP, TAPPA 4: LE LEVE (24 ott 2026; perché in CANTIERI, «Lo
+  swap, tappa 4»; com'è fatto in ARCHITETTURA, «LO SWAP, TAPPA 4»). SUL
+  VPS NON CAMBIA NIENTE: `SWAP_ATTIVO` resta spenta, e a leva spenta la
+  rotta che paga risponde 403 prima di leggere il corpo. Le due leve
+  nuove, `SWAP_MAX_SATS_UTENTE_GIORNO` (100.000) e `SWAP_MAX_SATS_GIORNO`
+  (200.000), NON si aggiungono al config del VPS: valgono i default del
+  codice, e il pannello «⚙️ Stato delle leve» le dice. La tabella
+  `swap_pagamenti` nasce da sola alla prima lettura. swap@ non paga:
+  nessuna chiave nuova. Sulla VM, la prova sul regtest: COLLAUDO.md §6.
+
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo
   dell'ordine on-chain»; com'è fatto in ARCHITETTURA, «IL PAGAMENTO

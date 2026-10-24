@@ -128,6 +128,7 @@ collaudo_swap_telefono
 collaudo_avvisi_nostr_arrivano
 collaudo_swap_instradatore
 collaudo_margine_cassaforte
+collaudo_swap_pagamento
 collaudo_onchain_indirizzo
 collaudo_onchain_ordine
 collaudo_certificati_relay

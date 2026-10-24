@@ -192,6 +192,48 @@ aggiunge, si toglie la vecchia da GitHub.
   base la chiamano il server (le tariffe) e il BROWSER del telefono (lo
   swap, con CORS): va scelta perché regga tutt'e due (PRODUZIONE, «LO
   SWAP DAL TELEFONO: LE LEVE»). Mai SATS Routing vero da qui.
+  DALLA TAPPA 4 (24 ott 2026, il server PAGA la fattura dello swap: CANTIERI,
+  «Lo swap, tappa 4») la prova sul regtest e' lo swap INTERO, coi sats
+  di regtest che si muovono davvero. I passi, ognuno scritto per intero e
+  col sì di Andrea prima di farlo:
+  1. LA MEMORIA. Il regtest di Boltz (bitcoind, i nodi Lightning,
+     l'esplora, il backend, il suo database) non sta nei 3,8 GB accanto
+     al runner della CI (2,5 GB): per la durata della prova il runner si
+     ferma e `RUNNER_PROVE` torna vuota (la CI va su GitHub), oppure il
+     regtest gira su un'altra macchina raggiunta in tunnel. Si decide
+     prima, guardando `free -m`.
+  2. IL REGTEST. Il repo `BoltzExchange/regtest` a un commit scelto e
+     scritto qui, letto prima il suo README (porte, nomi dei nodi,
+     comandi di `bitcoin-cli` e `lncli`); su, e si guarda che l'API del
+     backend dica le tariffe (`/v2/swap/reverse`) e l'esplora l'altezza
+     (`/blocks/tip/height`).
+  3. CHI PAGA. Il LNbits della VM e' un FakeWallet: una fattura di
+     regtest la paga solo un LND di regtest. Un nodo del regtest diventa
+     la fonte di un LNbits di prova (o del LNbits della VM per la durata
+     della prova), con un canale verso il nodo di Boltz e liquidita' in
+     uscita; chi compra paga con `lncli` di un altro nodo.
+  4. LE BASI. Il server legge tariffe e mempool, il BROWSER del telefono
+     chiama le stesse basi con CORS: si sceglie come le raggiungono
+     tutt'e due (HTTPS per il telefono). Prima si guarda, sola riga,
+     `grep -n "^MODALITA_COLLAUDO" config.py`: in collaudo il server
+     legge solo da 127.0.0.1, e con basi fuori casa preventivo e
+     pagamento direbbero «non risponde» — da decidere li'.
+  5. IL CONFIG DELLA VM, in fondo: `SWAP_ATTIVO = True`, `SWAP_RETE =
+     "regtest"`, `SWAP_API_BASE` e `SWAP_MEMPOOL_API` sulle basi del
+     punto 4, `SWAP_REFERRAL_ID = ""` (il codice partner e' di SATS
+     Routing vero), riavvio; il pannello «⚙️ Stato delle leve» li dice.
+  6. IL GIRO. Un ordine confermato del moderatore, «₿ On-chain (swap)»,
+     le parole, l'indirizzo bcrt1 di un wallet di regtest; nel journal
+     «controlli passati», «registrato», «in_volo»; Boltz blocca, il
+     telefono ritira, un blocco minato, la fattura si chiude, «pagato» e
+     l'ordine chiuso; l'indirizzo riceve i sats (`bitcoin-cli`).
+  7. LE ROTTURE. Il telefono chiuso prima del ritiro: il pagamento resta
+     in volo, senza 🧊, finche' i blocchi minati non passano la scadenza;
+     poi Boltz si riprende i bitcoin e il pagamento torna indietro
+     («fallito», l'incasso di nuovo libero). LNbits fermato a meta'
+     pagamento: in volo o 🧊, mai un secondo pagamento. Un tetto basso
+     nel config: il no, e la frase sul telefono.
+  8. LA PULIZIA. Il config com'era, il regtest giu', il runner su.
 
 ## 7. Accendere da zero (i gesti, uno alla volta col sì di Andrea)
 

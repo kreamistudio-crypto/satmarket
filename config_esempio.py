@@ -750,6 +750,11 @@ SWAP_SOLO_MODERATORI = True
 # limite di SATS Routing: vince il piu' stretto). 0 nel massimo = solo il loro.
 SWAP_MIN_SATS = 25_000
 SWAP_MAX_SATS = 50_000
+# LA TAPPA 4 (24 ott 2026): Barattolo paga la fattura dello swap coi sats
+# dell'ordine. I tetti sul giorno (ultime 24 ore, ogni pagamento non
+# fallito): per chi vende e per tutti insieme.
+SWAP_MAX_SATS_UTENTE_GIORNO = 100_000
+SWAP_MAX_SATS_GIORNO = 200_000
 # La nostra fee sullo swap, in percentuale: 0 = spenta (la quota del 10 %
 # della loro commissione non costa niente a chi vende).
 SWAP_FEE_PERCENTO = 0
