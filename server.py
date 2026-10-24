@@ -25526,6 +25526,22 @@ def _where_sped_gratis(cambio: float, adesso: int):
     return (strada + f" AND ({piena} OR (a.asta_base_sats=0 AND{sg}))"), sgp
 
 
+# MERCATO E LAVORO DIETRO UNA LEVA (24 ott 2026, decisione di Andrea): le
+# due schede della vetrina («🛍️ Mercato» e «💼 Lavoro», 22-23 ott) non
+# vanno online accese. Spenta di serie: il server ignora `sezione` e
+# `sottocategoria` come un server di ieri, e la vetrina e' quella di
+# 89cc2a9, coi servizi dove stavano. Si accende SOLO con un True scritto
+# nel config (il collaudo la tiene accesa).
+try:
+    from config import MERCATO_LAVORO
+    if not isinstance(MERCATO_LAVORO, bool):
+        print("[vetrina] MERCATO_LAVORO non e' True/False: Mercato e "
+              "Lavoro restano spenti")
+    MERCATO_LAVORO = MERCATO_LAVORO is True
+except ImportError:
+    MERCATO_LAVORO = False
+
+
 @app.get("/api/listings")
 async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         cursore: str = "", ordina: str = "",
@@ -25549,7 +25565,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     if cat and cat != "Tutto":
         dove += " AND a.categoria=?"
         par.append(cat)
-    if sezione in ("mercato", "lavoro"):
+    if MERCATO_LAVORO and sezione in ("mercato", "lavoro"):
         # MERCATO E LAVORO (22 ott 2026, i due tasti in cima alla
         # vetrina, alla Subito.it): Lavoro tiene SOLO i servizi, Mercato
         # tutto il resto. Servizio e' la strada 'servizio' o la categoria
@@ -25561,7 +25577,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         _lavoro = ("(COALESCE(a.consegna,'')='servizio'"
                    " OR COALESCE(a.categoria,'')='Lavoro e servizi')")
         dove += " AND " + ("" if sezione == "lavoro" else "NOT ") + _lavoro
-    if sottocategoria and cat and cat != "Tutto":
+    if MERCATO_LAVORO and sottocategoria and cat and cat != "Tutto":
         # le card del Lavoro (23 ott 2026): lo scaffale dentro la
         # categoria, la voce di SOTTOCATEGORIE. Solo con la categoria,
         # perche' lo stesso slug e' un'etichetta di QUELLA categoria;
@@ -25856,6 +25872,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ACCESE — cioe' una bugia. Era l'imperfezione dichiarata di
         # aggiornaAstaVisibilita, e questa e' la riga che la chiude.
         risposta["asta_abilitata"] = bool(ASTA_ABILITATA)
+        # ...e la leva di Mercato e Lavoro (24 ott 2026), per la stessa
+        # ragione: la vetrina la vede anche chi /api/me non ce l'ha
+        risposta["mercato_lavoro"] = bool(MERCATO_LAVORO)
         # QUANTI ASPETTANO LE FUNZIONI IN ARRIVO (ago 2026): il
         # numero che le due pagine «Qualcosa di nuovo e' in arrivo»
         # mostrano sotto il bottone. Viaggia qui e non in /api/me per
@@ -32022,6 +32041,13 @@ def _leve_stato():
                   "MAX_TARIFFA_CONNETTORE_SATS", MAX_TARIFFA_CONNETTORE_SATS),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
+            _leva("Mercato e Lavoro in vetrina", "MERCATO_LAVORO",
+                  MERCATO_LAVORO,
+                  acceso="in cima alla vetrina due schede, «🛍️ Mercato» e "
+                         "«💼 Lavoro»: i servizi stanno solo in Lavoro, coi "
+                         "loro scaffali",
+                  spento="la vetrina di sempre: niente schede, i servizi "
+                         "in «Tutto» e nella loro categoria"),
             # LA MODIFICA DI PIU' ANNUNCI INSIEME (16 ott 2026): spenta
             # di serie finche' Andrea non l'ha provata
             _leva("Modifica di più annunci insieme",

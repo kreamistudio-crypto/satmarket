@@ -121,6 +121,8 @@ def main():
         finally:
             con.close()
         prova("undici servizi attivi, tutti servizi e senza scorte", (11, 11, 11), servizi)
+        # sul collaudo la leva di Mercato e Lavoro e' accesa (24 ott 2026)
+        SRV.MERCATO_LAVORO = True
         lav = c.get("/api/listings?limit=100&sezione=lavoro", headers=COMPRATORE).json()
         mer = c.get("/api/listings?limit=100&sezione=mercato", headers=COMPRATORE).json()
         tit_lav = {a["titolo"] for a in lav["annunci"]}

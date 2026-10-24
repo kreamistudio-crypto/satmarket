@@ -71873,3 +71873,63 @@ come quello che `dbc0d8b` aveva già tolto.
   rossa sulla riga 325.
 
 **DA GUARDARE.** Che la CI di main torni verde col runner vero.
+
+## Mercato e Lavoro dietro una leva: MERCATO_LAVORO, spenta di serie (24 ott 2026, cantiere leva-mercato-lavoro, decisione di Andrea)
+
+**LA DECISIONE.** Le due schede della vetrina, «🛍️ Mercato» e «💼 Lavoro»
+(`b5ee697` e `684f358`, 22-23 ott, richiesta di Alan), sono arrivate su main
+con la promozione del 24 ott e NON devono andare online accese. Andrea: una
+leva `MERCATO_LAVORO`, False nel codice e nel config d'esempio; spenta, la
+vetrina uguale a quella di oggi in produzione (`89cc2a9`), coi servizi dove
+stanno; accesa, quella nuova. Niente altro cambia. Sul collaudo resta accesa.
+
+**DOVE SI SDOPPIA.** Nel server, `/api/listings`: i filtri `sezione` e
+`sottocategoria` valgono SOLO a leva accesa; spenta il server li ignora come
+uno di ieri, e la query è quella di `89cc2a9`. La leva viaggia nella busta
+della prima pagina (`mercato_lavoro`), come `asta_abilitata`, perché la
+vetrina la vede anche chi `/api/me` non ce l'ha; e ha la sua riga nel
+pannello «⚙️ Stato delle leve» («🏷️ Vetrina e limiti»). Nella pagina: le
+schede (`#sezSeg`) nascono nascoste e le accende solo la busta
+(`aggiornaMercatoLavoro`); la card «Lavoro e servizi» porta in Lavoro solo a
+leva accesa, spenta è la categoria di sempre; il filtro della sezione in
+DEMO vale solo a leva accesa; una leva spenta mentre si era in Lavoro
+riporta in Mercato e toglie `data-sez`, quindi le regole CSS di Lavoro non
+valgono. La pagina manda `sezione` lo stesso: così, a leva accesa, la
+prima pagina è già giusta senza un secondo caricamento.
+
+**IL DATABASE NON SI TOCCA.** Nessuna colonna e nessuna migrazione: le
+sottocategorie di «Lavoro e servizi» e la colonna `sottocategoria` c'erano
+già su `89cc2a9`, e «Lavoro» non sposta niente, è un filtro sulla query
+(strada «servizio» o quella categoria). Gli undici servizi di prova esistono
+solo sulla VM del collaudo (`semina_collaudo.py`, con le sue guardie).
+
+**COSA È PROVATO.**
+- IL GIRO A DUE SERVER (tre, in realtà): l'albero esatto di `89cc2a9`, il
+  nuovo a leva spenta e il nuovo a leva accesa, ognuno con la sua copia
+  dello stesso database seminato (dieci annunci: sei oggetti, tre servizi
+  per strada o categoria, una lezione), config nati da `config_esempio.py`
+  coi relay e LNbits sul relay morto. L'API, quattro domande uguali
+  (nessun filtro, `sezione=mercato`, `sezione=lavoro`, lo scaffale
+  «traduzioni»): a leva spenta gli STESSI id di `89cc2a9` in tutte e
+  quattro; accesa, 6, 4 e 1 (la controprova).
+- La pagina con Playwright e il Chrome installato, a 360 px, chiaro e scuro,
+  dentro Telegram (initData vero dall'hash, tema scuro dai
+  `tgWebAppThemeParams`, come fa Telegram) e come anonimo dal web: dodici
+  giri, nessuna richiesta fuori dal PC oltre lo script di Telegram. A leva
+  spenta schede, sezioni visibili, categorie, pillole e griglia UGUALI a
+  `89cc2a9` nelle quattro combinazioni, prima e dopo il tocco su «Lavoro e
+  servizi». Pixel per pixel l'unica differenza è dentro la card animata
+  «Scambio P2P – In arrivo» (uno scatto prende un fotogramma diverso delle
+  scintille). Accesa: le schede, sei oggetti in Mercato, e il tocco porta
+  in Lavoro. Il foglio degli scatti è stato mandato ad Andrea.
+- `prove_leva_mercato_lavoro` 10/0, sui cinque punti dello sdoppiamento;
+  tolta la condizione nel server, o quella sulla card, rossa.
+- `collaudo_ricerca`: la leva spenta di serie, la sezione e lo scaffale che
+  non filtrano, la busta che lo dice; accesa, i filtri di prima. 41/0.
+  `collaudo_semina_collaudo` la accende, come il collaudo vero: 18/0.
+
+**DA FARE (Andrea, sulla VM).** Il config del collaudo non sta nel repo e
+non si aggiorna da solo: la riga `MERCATO_LAVORO = True` la aggiunge Andrea
+a mano, col comando che gli è stato scritto nel rapporto (copia di riserva,
+la riga in coda, riavvio). Finché non c'è, anche il collaudo mostra la
+vetrina di sempre. Per sua scelta il comando non sta in DA-FARE-ANDREA.

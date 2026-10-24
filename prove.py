@@ -178563,6 +178563,55 @@ def prove_semina_collaudo():
            "\nsemina_collaudo.py\n" in "\n" + open("ci/compila.txt", encoding="utf-8").read()])
 
 
+def prove_leva_mercato_lavoro():
+    """MERCATO E LAVORO DIETRO UNA LEVA (24 ott 2026, decisione di Andrea:
+    «non deve andare online acceso»). Spenta di serie, nel codice e nel
+    config d'esempio; spenta, la vetrina e' quella di 89cc2a9. La prova
+    vera e' il giro a due server (CANTIERI, «Mercato e Lavoro dietro una
+    leva»); qui si tengono i cinque punti in cui la vetrina si sdoppia."""
+    print("\n[Mercato e Lavoro dietro la leva MERCATO_LAVORO]")
+    src = open(os.path.join(QUI, "server.py"), encoding="utf-8").read()
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    es = open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read()
+    prova("spenta di serie: nel codice e nel config d'esempio, e accesa "
+          "solo nel blocco del collaudo", (True, True, True),
+          ("except ImportError:\n    MERCATO_LAVORO = False" in src,
+           "\nMERCATO_LAVORO = False\n" in es,
+           "\n#   MERCATO_LAVORO = True" in es))
+    prova("solo True accende: una stringa resta spenta", True,
+          "MERCATO_LAVORO = MERCATO_LAVORO is True" in src)
+    k = src.index("async def lista_annunci(")
+    corpo = src[k:src.index("\n@app.", k)]
+    prova("il server: sezione e scaffale filtrano SOLO a leva accesa",
+          (True, True, 0, 0),
+          ('if MERCATO_LAVORO and sezione in ("mercato", "lavoro"):' in corpo,
+           "if MERCATO_LAVORO and sottocategoria and cat" in corpo,
+           corpo.count('\n    if sezione in ("mercato", "lavoro"):'),
+           corpo.count("\n    if sottocategoria and cat")))
+    prova("...e la busta lo dice alla pagina, anche agli anonimi", True,
+          'risposta["mercato_lavoro"] = bool(MERCATO_LAVORO)' in corpo)
+    prova("...e il pannello delle leve la nomina", True,
+          '_leva("Mercato e Lavoro in vetrina", "MERCATO_LAVORO"' in src)
+    prova("la pagina: le schede nascono nascoste", True,
+          'id="sezSeg" role="tablist" aria-label="Sezione" style="display:none"' in mini)
+    prova("...le accende solo la busta del server", True,
+          "if (j.mercato_lavoro !== undefined) aggiornaMercatoLavoro(j.mercato_lavoro === true);"
+          in mini)
+    sc = pezzo_js(mini, "function setCat(c){", "\n}\n")
+    prova("...la card «Lavoro e servizi» porta in Lavoro solo a leva "
+          "accesa (spenta e' la categoria di sempre)", True,
+          "if (mercatoLavoro && c === 'Lavoro e servizi') {" in sc)
+    prova("...e in DEMO il filtro della sezione vale solo a leva accesa",
+          True, "(!DEMO || !mercatoLavoro || annuncioDiLavoro(l) === "
+                "(sezioneVetrina === 'lavoro'))" in mini)
+    # e il giudice della pagina, girato: spenta torna in Mercato e nasconde
+    am = pezzo_js(mini, "function aggiornaMercatoLavoro(acceso){", "\n}\n")
+    prova("...spenta mentre si era in Lavoro, si torna alla vetrina di "
+          "sempre", (True, True),
+          ("delete el('app').dataset.sez;" in am,
+           "el('sezSeg').style.display = mercatoLavoro ? '' : 'none';" in am))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -178916,7 +178965,7 @@ def main():
               prove_collaudo_segue_develop,
               prove_avvisi_nostr_arrivano,
               prove_filtro_10050,
-              prove_semina_collaudo,
+              prove_semina_collaudo, prove_leva_mercato_lavoro,
               prove_relay_risolti,
               prove_certificati_relay,
               prove_config_esempio):

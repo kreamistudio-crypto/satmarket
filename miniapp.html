@@ -11505,7 +11505,7 @@ document.getElementById('cartello')?.remove();</script>
            Subito.it): un tocco separa le due vetrine. Lavoro tiene solo
            i servizi, Mercato tutto il resto — chi giudica e' il server
            (`sezione` in /api/listings), qui si sceglie e basta. -->
-      <div class="sez-seg" id="sezSeg" role="tablist" aria-label="Sezione">
+      <div class="sez-seg" id="sezSeg" role="tablist" aria-label="Sezione" style="display:none">
         <button type="button" role="tab" data-sez="mercato" class="active" aria-selected="true" onclick="setSezione('mercato')">🛍️ Mercato</button>
         <button type="button" role="tab" data-sez="lavoro" aria-selected="false" onclick="setSezione('lavoro')">💼 Lavoro</button>
       </div>
@@ -17557,6 +17557,8 @@ async function loadListings(anonimo){
     astaLevaPubblica = !!j.asta_abilitata;
     aggiornaAstaVisibilita();
   }
+  /* ...e quella di Mercato e Lavoro: chiave assente = spenta */
+  if (j.mercato_lavoro !== undefined) aggiornaMercatoLavoro(j.mercato_lavoro === true);
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -17758,6 +17760,27 @@ let ramoVetrina = 'esplora';
    tasti in cima. Il giudice di cosa e' lavoro e' questo, gemello della
    WHERE di /api/listings: la strada 'servizio' o la categoria. */
 let sezioneVetrina = 'mercato';
+/* LA LEVA MERCATO_LAVORO (24 ott 2026, decisione di Andrea): le due
+   schede si vedono SOLO se il server la dice accesa, nella busta di
+   /api/listings. Spenta (o assente: server di ieri, DEMO) la vetrina
+   e' quella di sempre: niente schede, la card «Lavoro e servizi» e'
+   una categoria come le altre, i servizi stanno in «Tutto». La
+   `sezione` si manda lo stesso: a leva spenta il server la ignora. */
+let mercatoLavoro = false;
+function aggiornaMercatoLavoro(acceso){
+  mercatoLavoro = acceso === true;
+  el('sezSeg').style.display = mercatoLavoro ? '' : 'none';
+  if (!mercatoLavoro && sezioneVetrina !== 'mercato') {
+    /* spenta mentre si era in Lavoro: si torna alla vetrina di sempre */
+    sezioneVetrina = 'mercato';
+    delete el('app').dataset.sez;
+    document.querySelectorAll('#sezSeg button').forEach(b => {
+      const on = b.dataset.sez === 'mercato';
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+}
 /* GLI SCAFFALI DEL LAVORO (23 ott 2026): le voci di SOTTOCATEGORIE di
    «Lavoro e servizi» nel server (lo slug e' il suo, una prova li
    confronta), piu' «Lezioni e corsi» intera. La prima e' «tutto il
@@ -20485,8 +20508,9 @@ function renderChips(){
 function setCat(c){
   /* la card «Lavoro e servizi» dal Mercato e' la porta dell'altra
      sezione: li' dentro c'e' tutto quel che la categoria prometteva,
-     mentre il Mercato la darebbe sempre vuota */
-  if (c === 'Lavoro e servizi') {
+     mentre il Mercato la darebbe sempre vuota (solo a leva accesa:
+     spenta, e' la categoria di sempre) */
+  if (mercatoLavoro && c === 'Lavoro e servizi') {
     setSezione('lavoro');
     if (activeCat === 'Tutto') return;   // setSezione ha gia' ricaricato
     c = 'Tutto';
@@ -21981,7 +22005,7 @@ function renderGrid(items){
   const q = DEMO ? el('q').value.trim().toLowerCase() : '';
   let data = items || vetrina.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
-    (!DEMO || annuncioDiLavoro(l) === (sezioneVetrina === 'lavoro')) &&
+    (!DEMO || !mercatoLavoro || annuncioDiLavoro(l) === (sezioneVetrina === 'lavoro')) &&
     (!DEMO || sezioneVetrina !== 'lavoro' || !SCAFFALI_LAVORO[scaffaleLavoro].cat
       || l.cat === SCAFFALI_LAVORO[scaffaleLavoro].cat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));

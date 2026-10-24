@@ -301,9 +301,26 @@ def main():
             (tit, cat, via))
     con.commit()
     con.close()
+    # LA LEVA (24 ott 2026, decisione di Andrea): spenta di serie, e
+    # spenta il server fa come quello di ieri — la sezione non filtra, e
+    # la busta lo dice alla pagina
+    tutto = titoli(cerca(limit=100))
+    spenta = cerca(limit=100, sezione="lavoro")
+    prova("leva spenta (di serie): la sezione non filtra, come ieri",
+          (False, sorted(tutto), sorted(tutto)),
+          (SRV.MERCATO_LAVORO, sorted(titoli(spenta)),
+           sorted(titoli(cerca(limit=100, sezione="mercato")))))
+    prova("...e la busta dice alla pagina che la leva e' spenta", False,
+          spenta.get("mercato_lavoro"))
+    prova("...e lo scaffale non filtra nemmeno lui",
+          sorted(titoli(cerca(limit=100, cat="Lavoro e servizi"))),
+          sorted(titoli(cerca(limit=100, cat="Lavoro e servizi",
+                              sottocategoria="traduzioni"))))
+    SRV.MERCATO_LAVORO = True
     lavoro = titoli(cerca(limit=100, sezione="lavoro"))
     mercato = titoli(cerca(limit=100, sezione="mercato"))
-    tutto = titoli(cerca(limit=100))
+    prova("leva accesa: la busta lo dice", True,
+          cerca(limit=100, sezione="mercato").get("mercato_lavoro"))
     prova("Lavoro tiene solo i servizi, strada o categoria",
           ["Imbianchino a domicilio", "Lezioni di chitarra"], sorted(lavoro))
     prova("...Mercato tutto il resto", sorted(set(tutto) - set(lavoro)),

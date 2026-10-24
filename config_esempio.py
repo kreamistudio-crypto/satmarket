@@ -328,6 +328,14 @@ MAX_PREFERITI = 10           # quanti annunci ATTIVI stanno «nel tuo
 # Solo True accende: una stringa o un numero restano spenti.
 MODIFICA_MASSIVA_ATTIVA = False
 
+# MERCATO E LAVORO (24 ott 2026, decisione di Andrea): in cima alla
+# vetrina due schede, «🛍️ Mercato» e «💼 Lavoro», alla Subito.it; i
+# servizi stanno solo in Lavoro, coi loro scaffali. Nasce SPENTA:
+# spenta, la vetrina e' quella di sempre (niente schede, i servizi in
+# «Tutto» e nella loro categoria). Sul collaudo e' accesa. Solo True
+# accende.
+MERCATO_LAVORO = False
+
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un
 # campo dedicato dell'ordine, il compratore lo rivela con un tocco
@@ -2041,6 +2049,7 @@ PROVA_APERTA = False
 #   MOSTRO_RELAY_SPECCHIO = [<le stesse della produzione>]
 #   MOSTRO_RELAY_CONFERMA = [<le stesse della produzione>]
 #   MERCATINO_CHAT_ORDINI = True       # la chat negli ordini, da provare
+#   MERCATO_LAVORO = True              # le schede Mercato e Lavoro, da provare
 #   AVVISO_DM_NOSTR = False
 #   AVVISO_DM_NOSTR_RELAY = []
 #   RONDA_RELAY_MOSTRO = False
