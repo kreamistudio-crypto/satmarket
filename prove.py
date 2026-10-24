@@ -111220,10 +111220,22 @@ const giri = {};
     await portaBotPromessa; await null;
     return [prima, el('invitoTesto').textContent];
   };
+  // il TITOLO (24 ott 2026, cantiere titolo-invito-onion): prima della
+  // risposta quello della chiave, dopo «Entra nel Barattolo» solo con Telegram
+  const titolo = async (aperta, chiave) => {
+    portaBotPromessa = Promise.resolve(aperta); invitoTelegram('testo del chiamante', chiave);
+    const prima = el('invitoTit').textContent;
+    await portaBotPromessa; await null;
+    return [prima, el('invitoTit').textContent];
+  };
+  giri.titoloBot = await titolo(true);
+  giri.titoloVoceBot = (await titolo(true, 'compra'))[1];
+  giri.titoloChiuso = await titolo(false);
   giri.genericoBot = await generico(true);
   giri.genericoChiuso = await generico(false);
   giri.voceBot = (await generico(true, 'compra'))[1];
   giri.genericoDopo = (await generico(false))[1];
+  onion = false; giri.titoloFuori = await titolo(true); onion = true;
   onion = false;
   // e fuori da onion niente di tutto questo
   giri.fuoriComposto = await componi(true);
@@ -111324,6 +111336,16 @@ const giri = {};
     prova("...le voci per gesto non cambiano", True,
           g["voceBot"].startswith("Per comprare in sicurezza serve un account"))
     prova("...e riaperto a porta chiusa torna quello di sempre", _gen, g["genericoDopo"])
+    # IL TITOLO SEGUE LE PORTE (24 ott 2026, cantiere titolo-invito-onion,
+    # richiesta di Andrea): con Telegram sotto «🧅 Entra nel Barattolo»,
+    # senza resta «🧅 Entra con la tua chiave».
+    prova("il titolo su onion con Telegram sotto: «Entra nel Barattolo»",
+          ["🧅 Entra con la tua chiave", "🧅 Entra nel Barattolo"], g["titoloBot"])
+    prova("...anche per una voce del catalogo", "🧅 Entra nel Barattolo", g["titoloVoceBot"])
+    prova("...a porta chiusa (riaperto dopo) resta quello della chiave",
+          ["🧅 Entra con la tua chiave", "🧅 Entra con la tua chiave"], g["titoloChiuso"])
+    prova("...e fuori da onion il titolo di sempre",
+          ["🫙 Ti aspettiamo su Telegram", "🫙 Ti aspettiamo su Telegram"], g["titoloFuori"])
     prova("...e fuori da onion il foglio di sempre, col posto vuoto",
           [0, "block", "btn ghost", "N …o entra con Nostr"], g["invitoFuori"])
 

@@ -71933,3 +71933,32 @@ non si aggiorna da solo: la riga `MERCATO_LAVORO = True` la aggiunge Andrea
 a mano, col comando che gli è stato scritto nel rapporto (copia di riserva,
 la riga in coda, riavvio). Finché non c'è, anche il collaudo mostra la
 vetrina di sempre. Per sua scelta il comando non sta in DA-FARE-ANDREA.
+
+## Il titolo del foglio invito su onion: «🧅 Entra nel Barattolo» quando sotto c'è Telegram (24 ott 2026, cantiere titolo-invito-onion, richiesta di Andrea)
+
+**COSA.** Sull'onion, con la porta del bot aperta (`LOGIN_DAL_BOT`), il
+foglio invito ha sotto il Telegram piccolo, ma il titolo diceva ancora
+«🧅 Entra con la tua chiave». Ora, nello stesso punto in cui si monta il
+Telegram piccolo (la risposta di `leggiPortaBot` in `invitoTelegram`),
+il titolo diventa «🧅 Entra nel Barattolo». Ogni apertura riparte dal
+titolo della chiave, quindi senza Telegram (leva spenta, o server che
+non risponde) resta com'è; fuori da onion «🫙 Ti aspettiamo su
+Telegram», come sempre. Solo testo: niente CSS, niente HTML, niente
+handler.
+
+**PROVE.** Nel banco del foglio invito di `prove_login_dal_bot`: con
+Telegram il titolo prima della risposta è quello della chiave e dopo
+«Entra nel Barattolo», anche per una voce del catalogo; riaperto a
+porta chiusa resta quello della chiave; fuori da onion quello di
+sempre. CONTROPROVE sul file vero, poi ripristinato: tre mutanti, tre
+uccisi (il titolo nuovo mai, anche senza Telegram, subito prima della
+risposta).
+
+**DAL VIVO** (Playwright e Chromium, 360×780 densità 2, chiaro e scuro,
+onion finto, server del giro con config finto e relay morti): PRIMA
+(`origin/develop`, con Telegram) «🧅 Entra con la tua chiave»; DOPO con
+Telegram «🧅 Entra nel Barattolo», sia col testo generico sia con
+«compra»; DOPO senza Telegram (leva spenta) «🧅 Entra con la tua
+chiave» e nessun Telegram piccolo. Zero errori di pagina, nessuna
+richiesta fuori casa, nessuno scorrimento orizzontale. Copia del giro
+cancellata.

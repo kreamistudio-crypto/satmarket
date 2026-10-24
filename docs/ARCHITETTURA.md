@@ -9754,7 +9754,9 @@
   non cambia niente. Nel foglio invito, con Telegram sotto, il testo
   GENERICO (un gesto senza voce nel catalogo) dice «…con la tua chiave
   Nostr o con Telegram» (`INVITO_ONION_GENERICO_BOT`); le voci per gesto
-  non nominano il mezzo. LA SCRITTA DELLE PILLOLE BIANCHE del banner
+  non nominano il mezzo. E il titolo, con Telegram sotto, diventa «🧅
+  Entra nel Barattolo» (24 ott 2026); senza resta «🧅 Entra con la tua
+  chiave». LA SCRITTA DELLE PILLOLE BIANCHE del banner
   (`.demo-cta`, onion e sito normale) usa `--sats-su-carta` (#B45309,
   5,02:1 sul bianco), che il tema scuro NON ridefinisce: la pillola
   resta bianca anche al buio, mentre `--sats-text` di sera si schiarisce. I DIZIONARI IN MEMORIA

@@ -33023,6 +33023,11 @@ function invitoTelegram(testo, chiave){
     if (!si || !suOnion()) return;
     tgo.appendChild(portaTelegramOnion('invitoEntraBot', 'btn mini'));
     if (!INVITO_ONION[chiave]) el('invitoTesto').textContent = INVITO_ONION_GENERICO_BOT;
+    /* ...e il titolo non parla piu' della sola chiave (24 ott 2026,
+       cantiere titolo-invito-onion, richiesta di Andrea): con Telegram
+       sotto si entra nel Barattolo, da una porta o dall'altra. Ogni
+       apertura riparte dal titolo della chiave, qui sopra. */
+    el('invitoTit').textContent = '🧅 Entra nel Barattolo';
   });
   el('sheetBg').classList.add('open');
   el('invitoSheet').classList.add('open');
