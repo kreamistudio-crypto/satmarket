@@ -21,15 +21,25 @@ stato lo dice, e la pagina lo legge.
 
 NESSUNA RETE: il relay e' una coda in memoria.
 
+LE FIRME LE FA `schnorr_puro` (24 ott 2026, cantiere
+collaudi-senza-coincurve): la chiave effimera della pagina firma con la
+ricetta BIP-340 del repo, e il server verifica col suo giudice VERO —
+coincurve dove c'e' (il PC, il VPS), e in CI, dove non c'e',
+`schnorr_puro.ChiaveXOnly` montato al posto di `ChiavePubblicaNostr`,
+come `collaudo_fusione_da_telegram`. Prima di montarlo si guarda che il
+server, da solo, non spedisca niente.
+
 USO:  python collaudo_cassetta_nip46.py
 """
 
 import json
+import os
 import queue
 import threading
 import time
 
 import collaudo_lnbits_muto as banco
+import schnorr_puro
 
 prova = banco.prova
 VIA = "/api/login/nostr/cassetta"
@@ -104,17 +114,30 @@ def connetti(relay, timeout=10, **kw):
     return WsPostino(relay, timeout)
 
 
+def nuova_chiave() -> bytes:
+    """Una chiave effimera usa-e-getta, 32 byte nella misura del BIP-340."""
+    while True:
+        sk = os.urandom(32)
+        if 1 <= int.from_bytes(sk, "big") < schnorr_puro.N:
+            return sk
+
+
+def pubblica_hex(sk: bytes) -> str:
+    return schnorr_puro.pubblica(sk).hex()
+
+
 def ventiquattro(sk, verso, testo="cifrato", ora=None):
-    """Un 24133 FIRMATO DAVVERO dalla chiave effimera `sk` (coincurve):
+    """Un 24133 FIRMATO DAVVERO dalla chiave effimera `sk` (schnorr_puro):
     la spedizione ricontrolla id e firma, e un evento finto non passa."""
     import hashlib
-    pub = sk.public_key.format()[1:].hex()
+    pub = pubblica_hex(sk)
     ev = {"pubkey": pub, "created_at": int(ora or time.time()), "kind": 24133,
           "tags": [["p", verso]], "content": testo}
     serial = json.dumps([0, pub, ev["created_at"], 24133, ev["tags"], testo],
                         separators=(",", ":"), ensure_ascii=False)
     ev["id"] = hashlib.sha256(serial.encode("utf-8")).hexdigest()
-    ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+    ev["sig"] = schnorr_puro.firma(sk, bytes.fromhex(ev["id"]),
+                                   os.urandom(32)).hex()
     return ev
 
 
@@ -322,14 +345,26 @@ def main():
     # LA CASSETTA CHE SPEDISCE (20 ott 2026, cantiere nostr-da-telefono):
     # la pagina passa un 24133 gia' cifrato e firmato dalla sua chiave
     # effimera, e il server lo consegna ai relay della cassetta.
-    from coincurve import PrivateKey
-    sk = PrivateKey()
-    mia = sk.public_key.format()[1:].hex()
+    sk = nuova_chiave()
+    mia = pubblica_hex(sk)
     FIRMATARIO = "9" * 64
     SP = VIA + "/spedisci"
     r = c.post(VIA, json={"pub": mia, "relays": [RELAY_CASA, "wss://relay.example"]})
     big = r.json().get("biglietto")
     prova("la cassetta della chiave effimera si apre", 200, r.status_code)
+    if S.ChiavePubblicaNostr is None:
+        # il patto del server senza coincurve: non crede a nessuna firma,
+        # nemmeno a una giusta — e solo dopo averlo visto si monta il calco
+        n = len(WsPostino.spediti)
+        r = c.post(SP, json={"pub": mia, "biglietto": big,
+                             "evento": ventiquattro(sk, FIRMATARIO, "senza")})
+        prova("senza coincurve il server non spedisce niente, nemmeno un "
+              "24133 firmato giusto (400)", (400, n),
+              (r.status_code, len(WsPostino.spediti)))
+        S.ChiavePubblicaNostr = schnorr_puro.ChiaveXOnly
+        print("   (coincurve assente: monto schnorr_puro.ChiaveXOnly, come in CI)")
+    else:
+        print("   (coincurve presente: il server verifica con libsecp256k1)")
     ev = ventiquattro(sk, FIRMATARIO)
     r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": ev})
     prova("un 24133 firmato dalla chiave della cassetta parte: lo prende il "
@@ -351,7 +386,7 @@ def main():
     r = c.post(SP, json={"pub": mia, "biglietto": "sbagliato",
                          "evento": ventiquattro(sk, FIRMATARIO, "altro")})
     prova("senza il biglietto del deposito e' un 403", 403, r.status_code)
-    altra = PrivateKey()
+    altra = nuova_chiave()
     r = c.post(SP, json={"pub": mia, "biglietto": big,
                          "evento": ventiquattro(altra, FIRMATARIO)})
     prova("un evento di un'ALTRA chiave non si spedisce: 400", 400, r.status_code)
@@ -376,8 +411,8 @@ def main():
     lungo = ventiquattro(sk, FIRMATARIO, "x" * (S.CASSETTA_SPEDISCI_BYTE + 1))
     r = c.post(SP, json={"pub": mia, "biglietto": big, "evento": lungo})
     prova("un testo oltre il tetto e' un 400", 400, r.status_code)
-    sk2 = PrivateKey()
-    r = c.post(SP, json={"pub": sk2.public_key.format()[1:].hex(),
+    sk2 = nuova_chiave()
+    r = c.post(SP, json={"pub": pubblica_hex(sk2),
                          "biglietto": big,
                          "evento": ventiquattro(sk2, FIRMATARIO)})
     prova("senza una cassetta aperta per quella chiave e' un 404", 404,

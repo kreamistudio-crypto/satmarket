@@ -582,7 +582,36 @@ def main():
     prova("il pannello delle leve dice chi e' rifiutato", True,
           "127.0.0.1:7805: rifiutato"
           in voci["AVVISO_DM_NOSTR_RELAY"]["valore"])
-    firme = [m[1]["sig"] for r, m in list(WsCartone.mandate) if m[0] == "AUTH"]
+
+    # LA FIRMA LENTA NON SI MANGIA L'ATTESA DELL'OK (24 ott 2026, cantiere
+    # collaudi-senza-coincurve). In CI, senza coincurve, la firma la fa
+    # il calco di schnorr_puro, e su una macchina carica puo' durare piu'
+    # dell'attesa dell'OK: l'orologio partiva PRIMA della firma, il filo
+    # dava l'OK per perso, «si prova lo stesso», e il NO del relay gia'
+    # arrivato restava senza risposta (tre richieste, il perche' sbagliato).
+    # Qui la firma dura apposta piu' dell'attesa: e' il caso da
+    # provocare, non un sonno per farlo passare. La guardia dei fili
+    # fermi e' tornata al suo valore di serie: non c'entra.
+    print("\n[NIP-42: una firma lenta non si mangia l'attesa dell'OK]")
+    S.AVVISO_DM_AUTH_OK_S = 0.3
+    vera = S._NOSTR[0]
+
+    class _Lenta:
+        secret = getattr(vera, "secret", sk_noi)
+
+        def sign_schnorr(self, msg):
+            time.sleep(0.5)
+            return vera.sign_schnorr(msg)
+    S._NOSTR = (_Lenta(), NOI)
+    RELAY_L = aggiungi(7810, "auth-no")
+    prova("una firma piu' lenta dell'attesa e un relay che la respinge: "
+          "«rifiutato» col perche' giusto, una richiesta e una firma",
+          (True, True, 1, 1),
+          (aspetta(lambda: stato(RELAY_L) == "rifiutato", 5000),
+           "autenticazione respinta" in S._DM_ASCOLTO[RELAY_L]["perche"],
+           len(di(RELAY_L, "REQ", "dm")), len(di(RELAY_L, "AUTH"))))
+    S._NOSTR = (vera, NOI)
+    firme =[m[1]["sig"] for r, m in list(WsCartone.mandate) if m[0] == "AUTH"]
 
     # --- si spegne tutto ---
     orologio.cancel()

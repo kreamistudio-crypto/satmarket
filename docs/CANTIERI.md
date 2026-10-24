@@ -71795,3 +71795,81 @@ mai «3 tuoi annunci». LA ROTTURA APPOSTA: rimesso il conto di ieri
 codice di questo commit: `PROVE_SEVERE=1 python prove.py` 26.173
 passate, 3 fallite — le tre di `deploy.sh` che su questo PC Windows
 falliscono uguali su develop pulito; i collaudi della CI 99 verdi, 0 rossi.
+
+## I collaudi della CI girano senza coincurve, e una firma lenta non si mangia l'attesa dell'OK (24 ott 2026, cantiere collaudi-senza-coincurve, decisione di Andrea)
+
+**IL CASO.** La promozione di develop del 24 ott (`b1f3ab6`, 49 commit) ha
+fatto rossa la CI di main: `prove` 97 verdi e 3 rossi, `pronto` fermo a
+`89cc2a9`, quindi niente deploy. Due rossi erano
+`collaudo_cassetta_nip46` e `collaudo_annunci_sul_profilo`, arrivati con
+`2cee853` (nostr-da-telefono): importavano coincurve nudo, e il runner
+della CI coincurve non ce l'ha per scelta. Sul PC, dove c'è, erano verdi:
+develop non passa dalla CI (`branches: [main]`), e nessuno li aveva girati
+in un ambiente come il suo. Il terzo, `collaudo_avviso_dm_nostr`, un caso
+su 53: «un relay che RESPINGE la firma» con tre richieste invece di una e
+il perché sbagliato; al rilancio del solo job fallito è passato.
+
+**LA CAUSA DEL TERZO, trovata e non supposta.** Il collaudo sostituisce la
+connessione col suo relay di cartone (`S._dm_connetti = WsCartone`): DNS,
+SNI e certificati non c'entrano, e dei commit della promozione l'unica
+differenza nel filo dei DM è il valore di `sslopt`, che il cartone ignora.
+Il difetto era in `_dm_filo`: l'orologio dell'attesa dell'OK all'AUTH
+partiva da `adesso`, cioè PRIMA della firma. Il collaudo tiene
+`AVVISO_DM_AUTH_OK_S = 0.3` dal caso «ok-muto» in poi; in CI la firma la fa
+il calco di `schnorr_puro`, e su una macchina carica può durare più di
+0,3 s: il filo dava l'OK per perso, «si prova lo stesso», e il NO del relay
+già in coda restava senza risposta. La riga della CI lo dice («sottoscrizione
+rifiutata anche dopo l'autenticazione: auth-required»), e una firma
+rallentata apposta a 0,35 s la rifà identica, `(True, False, 3)`.
+
+**LA CURA.** In `server.py` l'attesa dell'OK parte dopo il `ws.send`
+dell'AUTH (`time.time()`), non da `adesso`. In produzione oggi è innocua
+(coincurve firma in microsecondi, l'attesa è di 10 s), ma il difetto è
+vero. I due collaudi firmano con `schnorr_puro`, come
+`collaudo_fusione_da_telegram` (`dbc0d8b`): la chiave dell'utente e quella
+effimera della pagina col BIP-340 del repo, la chiave della piattaforma
+come un piccolo calco con `secret` e `sign_schnorr`, e il giudice del
+server che resta quello VERO — coincurve dove c'è, `ChiaveXOnly` montato
+al posto di `ChiavePubblicaNostr` dove manca, solo DOPO aver visto che il
+server da solo non crede a nessuna firma (la cassetta: un 24133 firmato
+giusto non parte, 400; gli annunci: `verifica_firma_nostr` dice False).
+
+**PERCHÉ NON RICAPITI.** `prove_collaudi_senza_coincurve`: un collaudo di
+`ci/collaudi.txt` che importa coincurve fuori da un `try ... except
+ImportError` è rosso sul PC, il giorno stesso (il giudice legge l'albero
+con `ast`, vede anche l'import dentro una funzione, e un riparo che prende
+un'altra eccezione non vale). La prova vera resta il giro dei collaudi in
+un venv con le SOLE dipendenze del workflow: la ricetta sta in
+`docs/COLLAUDO.md`, «Prima di una promozione, i collaudi della CI senza
+coincurve». La CI anche su develop col runner della vm-2050: proposta,
+Andrea ha detto «per ora no».
+
+**SCARTATO.** Allungare l'attesa del collaudo, o rimettere
+`AVVISO_DM_AUTH_OK_S` a 10 s dopo il caso «ok-muto»: il caso sarebbe
+passato tenendosi il difetto (regola di Andrea: niente sonni allungati né
+ritentativi per far passare). Il revert della promozione: 49 commit tolti
+per tre collaudi. Saltare i due collaudi senza coincurve: un verde finto,
+come quello che `dbc0d8b` aveva già tolto.
+
+**COSA È PROVATO.**
+- `collaudo_avviso_dm_nostr` con la cura: 54/0 tre volte nel venv senza
+  coincurve, 55/0 tre volte con coincurve. Il caso nuovo in coda (un relay
+  che respinge, la firma della piattaforma lenta 0,5 s contro un'attesa di
+  0,3 s, la guardia dei fili fermi al suo valore di serie): una richiesta,
+  una firma, «autenticazione respinta». CONTROPROVA, cura tolta: il caso
+  nuovo rosso con `(True, False, 3, 1)` in tutti e due gli ambienti, e
+  nient'altro.
+- I tre rossi della prima prova a firma rallentata (il relay 7805, che
+  accetta e poi chiude) erano del rallentamento, non della cura: sono la
+  guardia dei fili fermi (`AVVISO_DM_FERMO_S` 0,4 s in quel caso) contro
+  una firma da 0,35 s. Sedici giri rallentati, metà con la cura e metà
+  senza: la guardia scatta in tutt'e due (1 su 8 con, 2 su 8 senza); il
+  caso del NO è rosso 8 su 8 senza la cura e 0 su 8 con.
+- `collaudo_cassetta_nip46`: 56/0 senza coincurve, 55/0 con (55 anche la
+  versione di prima con coincurve). `collaudo_annunci_sul_profilo`: 35/0 e
+  34/0 (34 prima). Le due prove nuove del «il server da solo non ci crede»
+  diventano rosse col calco montato prima.
+- `prove_collaudi_senza_coincurve` 5/0; rimessa la cassetta di prima,
+  rossa sulla riga 325.
+
+**DA GUARDARE.** Che la CI di main torni verde col runner vero.

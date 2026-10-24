@@ -52515,6 +52515,79 @@ def prove_elenco_dei_collaudi():
           "`ci/collaudi.txt`" in regole and "`ci/compila.txt`" in regole)
 
 
+def _coincurve_senza_riparo(sorgente):
+    """Le righe che importano coincurve FUORI da un `try` che prende
+    l'ImportError: in CI coincurve non c'e', e li' quell'import e' un
+    collaudo rosso (24 ott 2026). None se il file non si legge."""
+    import ast
+    try:
+        albero = ast.parse(sorgente)
+    except SyntaxError:
+        return None
+    riparate = set()
+    for nodo in ast.walk(albero):
+        if isinstance(nodo, ast.Try) and any(
+                h.type is None or "ImportError" in ast.unparse(h.type)
+                or "ModuleNotFoundError" in ast.unparse(h.type)
+                for h in nodo.handlers):
+            for dentro in nodo.body:
+                for n in ast.walk(dentro):
+                    riparate.add(id(n))
+    scoperte = []
+    for nodo in ast.walk(albero):
+        nomi = ([a.name for a in nodo.names] if isinstance(nodo, ast.Import)
+                else [nodo.module or ""] if isinstance(nodo, ast.ImportFrom)
+                else [])
+        if any(n.split(".")[0] == "coincurve" for n in nomi) \
+                and id(nodo) not in riparate:
+            scoperte.append(nodo.lineno)
+    return scoperte
+
+
+def prove_collaudi_senza_coincurve():
+    """I COLLAUDI DELLA CI GIRANO SENZA COINCURVE (24 ott 2026, cantiere
+    collaudi-senza-coincurve). Il runner non ha coincurve, ed e' una
+    scelta (il workflow installa il minimo). Il 24 ott la promozione di
+    develop ha portato due collaudi che lo importavano nudo:
+    `collaudo_cassetta_nip46` e `collaudo_annunci_sul_profilo`, verdi sul
+    PC (dove c'e') e rossi in CI, `pronto` fermo. La strada e' quella di
+    `collaudo_fusione_da_telegram`: le firme con `schnorr_puro`, e
+    `ChiaveXOnly` al posto del giudice del server dove coincurve manca.
+    Qui si guarda la FORMA, sul PC, prima della CI: un collaudo
+    dell'elenco che importa coincurve fuori da un `try ... except
+    ImportError` e' rosso il giorno stesso. La prova vera resta il giro
+    dei collaudi in un venv senza coincurve (docs/COLLAUDO.md, «Prima di
+    una promozione»)."""
+    print("\n[i collaudi della CI girano senza coincurve]")
+    nudi = {}
+    for nome in _collaudi_della_ci():
+        f = os.path.join(QUI, nome + ".py")
+        if not os.path.exists(f):
+            continue
+        scoperte = _coincurve_senza_riparo(open(f, encoding="utf-8").read())
+        if scoperte is None or scoperte:
+            nudi[nome] = scoperte
+    prova("nessun collaudo della CI importa coincurve senza riparo", {}, nudi)
+    # il giudice stesso: un import nudo si vede, anche dentro una
+    # funzione; uno riparato no
+    prova("...il giudice vede l'import nudo, in cima e dentro una funzione",
+          ([1], [2]), (_coincurve_senza_riparo("from coincurve import PrivateKey\n"),
+                       _coincurve_senza_riparo("def f():\n    import coincurve\n")))
+    prova("...e lascia passare quello col riparo", [],
+          _coincurve_senza_riparo(
+              "try:\n    from coincurve import PrivateKey\n"
+              "except ImportError:\n    PrivateKey = None\n"))
+    prova("...un riparo che prende un'altra eccezione non vale", [2],
+          _coincurve_senza_riparo(
+              "try:\n    import coincurve\nexcept KeyError:\n    pass\n"))
+    ricetta = open(os.path.join(QUI, "docs", "COLLAUDO.md"),
+                   encoding="utf-8").read()
+    prova("COLLAUDO.md dice come si girano i collaudi senza coincurve "
+          "prima di una promozione", True,
+          "Prima di una promozione" in ricetta
+          and "ci/collaudi.txt" in ricetta and "coincurve" in ricetta)
+
+
 def prove_collaudi_in_ci():
     """I COLLAUDI IN CI (22 set 2026). Lo step che li gira sta nel job
     `prove` — non in un job suo, perche' il giudice del VPS chiede il
@@ -178620,7 +178693,7 @@ def main():
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci, prove_ci_leggera,
               prove_ci_solo_main,
-              prove_elenco_dei_collaudi,
+              prove_elenco_dei_collaudi, prove_collaudi_senza_coincurve,
               prove_servizio_non_root,
               prove_guardiano_ponte,
               prove_guardia_liquidita, prove_canale_admin, prove_gruppo_admin_coda,

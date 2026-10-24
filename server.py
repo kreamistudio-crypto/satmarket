@@ -68421,8 +68421,11 @@ def _dm_filo(relay: str, nostra: str, loop, ferma):
                         risposta = None if (autenticato or auth_id) \
                             else _dm_auth(relay, msg[1])
                         if risposta:
-                            auth_id, auth_da = risposta["id"], adesso
                             ws.send(json.dumps(["AUTH", risposta]))
+                            # l'attesa dell'OK parte da QUI, non da
+                            # `adesso`: una firma lenta (la macchina
+                            # carica) non si mangia il tempo del relay
+                            auth_id, auth_da = risposta["id"], time.time()
                     elif msg[0] == "OK" and auth_id and msg[1] == auth_id:
                         if len(msg) < 3 or msg[2] is not True:
                             raise DmRifiutato(

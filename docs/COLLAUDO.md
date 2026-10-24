@@ -46,6 +46,16 @@ PRIMA che arrivino in produzione. È privata: chi non è in
   (solo col suo ok e la sua frase completa), poi la CI fino al verde e
   `pronto` come oggi. La produzione segue `pronto` su `main`, solo
   commit firmati: non cambia niente.
+- **Prima di una promozione, i collaudi della CI senza coincurve** (24
+  ott 2026, cantiere collaudi-senza-coincurve). Il runner della CI non
+  ha coincurve, il PC sì: un collaudo che lo usa nudo è verde qui e
+  rosso là, e `pronto` resta fermo (successo con la promozione del 24
+  ott). Sull'albero rebasato, un venv con le SOLE dipendenze del
+  workflow (le righe `pip install` di `prove.yml`), e lì dentro:
+  `python -c "import coincurve"` deve dire ModuleNotFoundError, poi
+  `python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`.
+  `prove_collaudi_senza_coincurve` guarda la forma (nessun import nudo
+  di coincurve nei collaudi dell'elenco); il giro nel venv è la prova.
 - **Dopo ogni promozione `develop` si rimette uguale a `main`**:
   `git push --force-with-lease origin origin/main:develop`. È l'unico
   force ammesso, solo su `develop` e solo dalla sessione della

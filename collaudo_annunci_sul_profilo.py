@@ -25,7 +25,13 @@ QUI GIRA IL SERVER VERO col banco di `collaudo_lnbits_muto` (config
 finto, database usa-e-getta, MODALITA_COLLAUDO), con una chiave di
 piattaforma usa-e-getta e i relay di cartone: `_spedisci_ai_relay`
 tiene gli eventi invece di spedirli. Le firme dell'utente sono VERE
-(coincurve), come le farebbe il suo firmatario.
+(`schnorr_puro`, la ricetta BIP-340 del repo), come le farebbe il suo
+firmatario. Il server le verifica col suo giudice vero: coincurve dove
+c'e', e in CI, dove non c'e', `schnorr_puro.ChiaveXOnly` montato al
+posto di `ChiavePubblicaNostr` — solo dopo aver visto che il server,
+da solo, non ci crede (24 ott 2026, cantiere collaudi-senza-coincurve,
+come `collaudo_fusione_da_telegram`). La chiave della piattaforma e'
+quella di coincurve dove c'e', se no un calco che firma con schnorr_puro.
 
 NESSUNA RETE.
 
@@ -35,24 +41,47 @@ USO:  python collaudo_annunci_sul_profilo.py
 import asyncio
 import hashlib
 import json
+import os
 import time
 
 import collaudo_lnbits_muto as banco
+import schnorr_puro
 
 prova = banco.prova
 LUI = 4242
 SPEDITI = []          # gli eventi che sarebbero andati ai relay
 
 
+def nuova_chiave() -> bytes:
+    """Una chiave usa-e-getta, 32 byte nella misura del BIP-340."""
+    while True:
+        sk = os.urandom(32)
+        if 1 <= int.from_bytes(sk, "big") < schnorr_puro.N:
+            return sk
+
+
+class ChiaveDiCalco:
+    """La chiave della piattaforma dove coincurve non c'e': quel che il
+    server le chiede, `secret` e `sign_schnorr`, fatto con schnorr_puro
+    (lo stesso calco di `collaudo_avviso_dm_nostr`)."""
+
+    def __init__(self, sk: bytes):
+        self.secret = sk
+
+    def sign_schnorr(self, msg: bytes) -> bytes:
+        return schnorr_puro.firma(self.secret, msg, os.urandom(32))
+
+
 def firma_sua(sk, ev):
     """Firma l'evento preparato dal server con la chiave dell'utente,
     come farebbe il suo firmatario (NIP-01: id ricalcolato, Schnorr)."""
-    pub = sk.public_key.format()[1:].hex()
+    pub = schnorr_puro.pubblica(sk).hex()
     serial = json.dumps([0, pub, ev["created_at"], ev["kind"], ev["tags"],
                          ev["content"]], separators=(",", ":"),
                         ensure_ascii=False)
     ev_id = hashlib.sha256(serial.encode("utf-8")).hexdigest()
-    return pub, ev_id, sk.sign_schnorr(bytes.fromhex(ev_id)).hex()
+    return pub, ev_id, schnorr_puro.firma(sk, bytes.fromhex(ev_id),
+                                          os.urandom(32)).hex()
 
 
 def annuncio(S, titolo, stato="attivo"):
@@ -87,18 +116,35 @@ def coda(S):
 
 async def scenario():
     S = banco.SRV
-    from coincurve import PrivateKey
-    piattaforma = PrivateKey()
-    S._NOSTR = (piattaforma, piattaforma.public_key.format()[1:].hex())
+    sk_noi = nuova_chiave()
+    if S.ChiavePrivataNostr is not None:
+        piattaforma = S.ChiavePrivataNostr(sk_noi)
+    else:
+        piattaforma = ChiaveDiCalco(sk_noi)
+    S._NOSTR = (piattaforma, schnorr_puro.pubblica(sk_noi).hex())
     nostra = S._NOSTR[1]
+
+    print("\n[le firme: il patto del server, e il calco dove coincurve non c'e']")
+    if S.ChiavePubblicaNostr is None:
+        sk0 = nuova_chiave()
+        ev0 = S.evento_non_firmato(schnorr_puro.pubblica(sk0).hex(), 1, [],
+                                   "prova", int(time.time()))
+        ev0["sig"] = schnorr_puro.firma(sk0, bytes.fromhex(ev0["id"]),
+                                        os.urandom(32)).hex()
+        prova("senza coincurve il server non crede a nessuna firma, nemmeno "
+              "a una giusta", False, S.verifica_firma_nostr(ev0))
+        S.ChiavePubblicaNostr = schnorr_puro.ChiaveXOnly
+        print("   (coincurve assente: monto schnorr_puro.ChiaveXOnly, come in CI)")
+    else:
+        print("   (coincurve presente: il server verifica con libsecp256k1)")
 
     async def spedisci_finto(evento, relays=None):
         SPEDITI.append(evento)
         return 1
     S._spedisci_ai_relay = spedisci_finto
 
-    sk = PrivateKey()
-    sua = sk.public_key.format()[1:].hex()
+    sk = nuova_chiave()
+    sua = schnorr_puro.pubblica(sk).hex()
     npub = S.hex_to_npub(sua)
     con = S.db()
     con.execute("INSERT INTO utenti(tg_id, nome, username, npub, "
