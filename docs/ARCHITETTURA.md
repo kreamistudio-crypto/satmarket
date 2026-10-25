@@ -850,7 +850,7 @@
   l'unico esito della moderazione a non indicarne nessuna — la
   revisione dice quanto aspettare, i servizi cosa riscrivere, e il no
   secco era un muro da sei secondi. Adesso porta «riscrivilo più
-  chiaro e ripubblica» e, se il canale c'è, dove protestare.
+  chiaro e ripubblica» e dove protestare.
   LA FRASE AMMETTE CHE L'ERRORE PUÒ ESSERE NOSTRO, e non è cortesia:
   un venditore onesto bloccato per una parola oggi non sa di poter
   protestare, quindi non protesta, quindi NON LO SCOPRIAMO — l'unica
@@ -864,10 +864,33 @@
   progetto toglie (la lezione della coda «nel conto»). C'è la prova
   che quel ramo tenga la sua coda diversa, o il primo riordino la
   uniforma per simmetria.
-  IL CONTATTO SI PROMETTE SOLO SE C'È (`BANNER_TEST_LINK`, col calco
-  del messaggio dei moderatori — `startswith("http")`, così il
-  segnaposto del config non diventa un recapito): un «scrivici» dove
-  non c'è nessun canale è una porta su un muro.
+  IL CONTATTO C'È SEMPRE ED È PRIVATO (25 ott 2026, decisione di
+  Andrea, cantiere filtro-animali-falso-positivo): `CONTATTO_PRIVATO`,
+  la chat privata del canale (`https://t.me/barattolostore?direct`),
+  la stessa porta di «Scrivici per i tuoi dati» (`CONTATTO_DATI` della
+  Mini App, che una prova tiene uguale). Fino ad allora era
+  `BANNER_TEST_LINK`, il canale del feedback, promesso solo se c'era:
+  senza quella riga nel config lo «scrivici» spariva proprio a chi era
+  stato fermato per sbaglio. Un rifiuto parla dell'annuncio di UNA
+  persona, quindi la risposta è privata come quella sui dati.
+  DAL FILTRO PAROLE IL RIFIUTO DICE ANCHE LA PAROLA (stesso cantiere):
+  «A fermarlo è stata la parola «avorio».» — la parola del NOSTRO
+  catalogo, mai un pezzo del testo di chi scrive. Il giudice è
+  `termine_vietato` (categoria e parola, una lettura sola della lista);
+  `controlla_vietato` ne dà la categoria ai suoi nove chiamanti, e i
+  cinque che bloccano chiedono la parola a `parola_vietata`. Il
+  registro scrive `motivo_parole`: «animali protetti: avorio» invece
+  della sola categoria, perché la descrizione di un annuncio mai nato
+  non si salva da nessuna parte, e senza la parola nel registro la
+  domanda «che cosa l'ha fermato?» non aveva risposta.
+  LE LETTURE INNOCENTI DI UNA PAROLA VIETATA (`CONTESTI_INNOCENTI`):
+  «avorio» resta in lista (la statuetta in avorio è proprio quel che
+  non si vende), ma prima del confronto si tolgono le FRASI INTERE che
+  non parlano di zanne — il colore, la carta, le imitazioni, la Costa
+  d'Avorio, la torre d'avorio. Solo per quel termine e solo la frase:
+  un «avorio» che resta fuori blocca come prima, anche nello stesso
+  annuncio. Le frasi si tolgono con le lookaround, che non consumano
+  gli spazi (due frasi attaccate cadono tutte e due).
   IMPERFEZIONE DICHIARATA: nel toast il link NON è toccabile
   (`toast` scrive col `textContent`, ed è giusto così — quel testo
   arriva dal server). Chi vuole scrivere passa dalla fascia 🚧 in

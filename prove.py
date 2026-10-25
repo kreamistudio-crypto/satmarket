@@ -36628,8 +36628,10 @@ def prove_impersonazione():
         i = _SORGENTE.index(ancora)
         exec(_SORGENTE[i:_SORGENTE.index(chr(10) * 3, i)], amb2)
     for costante in ("MSG_RIFIUTO = (", "MSG_RIFIUTO_DIVIETO = (",
+                     "MSG_RIFIUTO_PAROLA = ",
                      "MSG_RIFIUTO_RISCRIVI = (",
                      "MSG_RIFIUTO_SCRIVICI = (",
+                     "CONTATTO_PRIVATO = ",
                      "MSG_RIFIUTO_SERVIZI = (",
                      "MSG_RIFIUTO_IMPERSONAZIONE = (",
                      "PAROLE_IMPERSONAZIONE = ("):
@@ -36643,14 +36645,18 @@ def prove_impersonazione():
     # a chi protestare. Restano UGUAGLIANZE ESATTE, che e'
     # l'affermazione piu' forte: cosi' provano in un colpo il
     # messaggio giusto E che la strada e' appesa a tutti.
+    # LA PORTA E' LA CHAT PRIVATA, sempre (25 ott 2026, cantiere
+    # filtro-animali-falso-positivo): il canale finto qui sopra resta
+    # apposta, e una coda che lo pescasse ancora lo direbbe.
+    porta = amb2["CONTATTO_PRIVATO"]
     coda = (amb2["MSG_RIFIUTO_RISCRIVI"] + amb2["MSG_RIFIUTO_SCRIVICI"]
-            + "https://t.me/prova")
+            + porta)
     # ...e i servizi il riscrivi NON lo prendono: la loro frase la
     # dice gia' («Riscrivi… e ripubblica!»), e la stessa cosa due
     # volte a due righe di distanza e' il registro che questo
     # progetto toglie. E' l'unico ramo con una coda diversa: se un
     # domani gliela si uniforma per simmetria, questa riga lo dice.
-    coda_serv = amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova"
+    coda_serv = amb2["MSG_RIFIUTO_SCRIVICI"] + porta
     prova("chi si e' spacciato per noi ha il messaggio suo",
           amb2["MSG_RIFIUTO_IMPERSONAZIONE"] + coda,
           rifiuto("impersonazione della piattaforma"))
@@ -36723,21 +36729,33 @@ def prove_impersonazione():
     prova("...che si puo' riscrivere e ripubblicare", True,
           "ripubblica" in detto)
     prova("...e a chi scrivere se l'errore e' nostro", True,
-          "https://t.me/prova" in detto)
-    # E IL CANALE SI PROMETTE SOLO SE C'E': un contatto scritto
-    # dove non c'e' nessun canale e' una porta su un muro.
-    amb3 = dict(amb2, BANNER_TEST_LINK="")
-    exec(pezzo("messaggio_rifiuto"), amb3)
-    muto = amb3["messaggio_rifiuto"]("arma da fuoco")
-    prova("senza canale non si promette nessun contatto", True,
-          "scrivici" not in muto and "armi" in muto
-          and "ripubblica" in muto)
-    # ...e nemmeno un segnaposto vale per un canale: e' la stessa
-    # riga del messaggio dei moderatori (startswith("http")).
-    amb4 = dict(amb2, BANNER_TEST_LINK="INCOLLA_QUI_IL_LINK")
-    exec(pezzo("messaggio_rifiuto"), amb4)
-    prova("...nemmeno col segnaposto nel config", True,
-          "scrivici" not in amb4["messaggio_rifiuto"]("arma da fuoco"))
+          porta in detto and "https://t.me/prova" not in detto)
+    # HANNO CAMBIATO LATO (25 ott 2026, decisione di Andrea): dicevano
+    # «senza canale nessun contatto», e cosi' chi era fermato per
+    # sbaglio su un'istanza senza BANNER_TEST_LINK restava senza
+    # nessuno a cui dirlo. La porta adesso e' un indirizzo NOSTRO, e
+    # c'e' col canale vuoto come col segnaposto: il config non la tocca.
+    for canale in ("", "INCOLLA_QUI_IL_LINK"):
+        amb3 = dict(amb2, BANNER_TEST_LINK=canale)
+        exec(pezzo("messaggio_rifiuto"), amb3)
+        muto = amb3["messaggio_rifiuto"]("arma da fuoco")
+        prova(f"col canale «{canale}» lo «scrivici» resta", True,
+              "scrivici: " + porta in muto and "armi" in muto
+              and "ripubblica" in muto)
+    # ...ed e' un indirizzo di Telegram vero, non un segnaposto che
+    # nessuno ha riempito
+    prova("...e la porta e' la chat privata di un t.me", True,
+          porta.startswith("https://t.me/") and porta.endswith("?direct"))
+    # LA PAROLA CHE HA FERMATO, sul ramo del filtro: c'e' quando la
+    # si passa, e senza resta il messaggio di prima byte per byte
+    # (i chiamanti dell'AI non ne hanno una).
+    prova("il filtro parole dice anche la parola",
+          amb2["MSG_RIFIUTO_DIVIETO"].format(divieto="animali protetti")
+          + " A fermarlo è stata la parola «avorio»." + coda,
+          rifiuto(divieto="animali protetti", parola="avorio"))
+    prova("...e senza parola il messaggio non si muove",
+          col_divieto("animali protetti"),
+          rifiuto(divieto="animali protetti", parola=""))
 
 
 # ====================================================================
@@ -42199,14 +42217,15 @@ def prove_sat_non_e_barattolo():
         i = src.index(ancora)
         exec(src[i:src.index(chr(10) * 3, i)], amb2)
     for n in ("MSG_RIFIUTO", "MSG_RIFIUTO_SERVIZI",
-              "MSG_RIFIUTO_IMPERSONAZIONE", "PAROLE_IMPERSONAZIONE"):
+              "MSG_RIFIUTO_IMPERSONAZIONE", "PAROLE_IMPERSONAZIONE",
+              "CONTATTO_PRIVATO"):
         j = src.index(f"{n} = ")
         exec(src[j:src.index("\n\n\n", j)], amb2)
     exec(pezzo("messaggio_rifiuto"), amb2)
     msg = amb2["messaggio_rifiuto"]
     imperson = (amb2["MSG_RIFIUTO_IMPERSONAZIONE"]
                 + amb2["MSG_RIFIUTO_RISCRIVI"]
-                + amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova")
+                + amb2["MSG_RIFIUTO_SCRIVICI"] + amb2["CONTATTO_PRIVATO"])
     prova("«confondere»: il messaggio dell'impersonazione, non le armi",
           imperson,
           msg('il nome appare progettato per confondere con Barattolo'))
@@ -42218,14 +42237,14 @@ def prove_sat_non_e_barattolo():
               msg(motivo))
     prova("un servizio resta un servizio",
           amb2["MSG_RIFIUTO_SERVIZI"] + amb2["MSG_RIFIUTO_SCRIVICI"]
-          + "https://t.me/prova",
+          + amb2["CONTATTO_PRIVATO"],
           msg("servizio di riparazione su commissione"))
     # HA CAMBIATO LATO (ago 2026): chiedeva la lista dei nove, e
     # adesso il rifiuto dice QUALE divieto e' scattato.
     prova("e un'arma dice «armi»",
           amb2["MSG_RIFIUTO_DIVIETO"].format(divieto="armi")
           + amb2["MSG_RIFIUTO_RISCRIVI"]
-          + amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova",
+          + amb2["MSG_RIFIUTO_SCRIVICI"] + amb2["CONTATTO_PRIVATO"],
           msg("arma da fuoco funzionante"))
 
     # 5. il collaudo col MODELLO tiene il caso come REGRESSIONE
@@ -42580,7 +42599,7 @@ def prove_piani_condivisi():
     # lasci passare l'annuncio che deve passare.
     amb3 = {"re": re, "unicodedata": _u}
     for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
-                   "def controlla_vietato("):
+                   "def controlla_vietato(", "def termine_vietato("):
         j = src.index(ancora)
         exec(src[j:src.index("\n\n\n", j)], amb3)
     filtro = amb3["controlla_vietato"]
@@ -42650,6 +42669,133 @@ def prove_piani_condivisi():
         k = col.index(nome)
         prova(f"...ed e' atteso {atteso}", True,
               f'"{atteso}"' in col[k:k + 420])
+
+
+def prove_filtro_avorio():
+    """L'AVORIO CHE NON E' UNA ZANNA (25 ott 2026, cantiere
+    filtro-animali-falso-positivo, da un caso VERO: una collezione
+    d'arte sacra in edizione di lusso fermata due volte come «animali
+    protetti»). Il filtro parole fermava «avorio» anche quando era un
+    colore, una carta, un'imitazione o un paese. La cura toglie SOLO
+    quelle frasi intere; queste prove dicono le due meta' — nessuna
+    zanna passa, nessun libro si ferma — e le controprove rompono la
+    regola apposta per vedere che le prove se ne accorgono."""
+    import unicodedata as _u
+    src = _SORGENTE
+
+    def filtro_da(sorgente):
+        amb = {"re": re, "unicodedata": _u}
+        for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
+                       "def termine_vietato("):
+            j = sorgente.index(ancora)
+            exec(sorgente[j:sorgente.index("\n\n\n", j)], amb)
+        return amb["termine_vietato"]
+
+    # --- 1) I VERI: restano fermi, e dicono la parola ---------------
+    zanna = ("animali protetti", "avorio")
+    veri = (
+        ("Statuetta in avorio", "", zanna),
+        ("Zanna d'avorio intagliata", "Pezzo unico.", zanna),
+        ("Netsuke giapponese", "Avorio intagliato a mano, fine '800.",
+         zanna),
+        ("Collana", "Grani di avorio di elefante.", zanna),
+        ("Avorio antico", "Da collezione privata.", zanna),
+        # lo stesso annuncio con una frase innocente E una vera: la
+        # frase innocente non deve fare da lasciapassare all'altra
+        ("Statuetta avorio", "Con base in legno color avorio.", zanna),
+        ("Statuetta", "Colore avorio, in vero avorio massiccio.", zanna),
+        # e le altre voci della categoria non si sono mosse
+        ("Corno di rinoceronte", "", ("animali protetti",
+                                      "corno di rinoceronte")),
+        ("Tappeto", "Vera pelle di tigre.", ("animali protetti",
+                                             "pelle di tigre")),
+    )
+    # --- 2) I FALSI: passano lo strato 1 -----------------------------
+    falsi = (
+        # il caso vero, col titolo come e' arrivato ai moderatori
+        ("Collezione d'Arte Religiosa SAIE – Società San Paolo "
+         "(1978-1981) Edizioni di lusso",
+         "Volumi rilegati, carta avorio, in ottimo stato."),
+        ("Collezione d'Arte Religiosa SAIE", "Pagine color avorio."),
+        ("Abito da sposa", "Colore avorio, taglia 42."),
+        ("Bomboniere", "Confetti bianco avorio, 50 pezzi."),
+        ("Maschera tradizionale", "Dalla Costa d'Avorio."),
+        ("Maschera", "Costa D’Avorio, apostrofo tipografico."),
+        ("Pianola", "Tasti effetto avorio, funziona."),
+        ("Bottoni", "In avorio vegetale (corozo), 20 pezzi."),
+        ("La torre d'avorio", "Romanzo, prima edizione."),
+        ("Pettine", "Finto avorio, anni '60."),
+        # due frasi attaccate, che condividono lo spazio di mezzo
+        ("Set di carta da lettere", "Carta avorio, colore avorio."),
+    )
+    filtro = filtro_da(src)
+    for titolo, descr, atteso in veri:
+        prova(f"resta fermo: «{titolo[:24]} {descr[:20]}»", atteso,
+              filtro(titolo, descr))
+    for titolo, descr in falsi:
+        prova(f"passa: «{titolo[:24]} {descr[:20]}»", None,
+              filtro(titolo, descr))
+
+    def regge(f):
+        """True se la tabella intera dice il giusto con quel filtro."""
+        return (all(f(t, d) == a for t, d, a in veri)
+                and all(f(t, d) is None for t, d in falsi))
+    prova("la tabella regge col filtro vero", True, regge(filtro))
+
+    # --- 3) LE CONTROPROVE: si rompe la regola, la tabella se ne
+    # accorge. Ognuna e' un modo plausibile di sbagliare la cura.
+    def rotto(*coppie):
+        mutato = src
+        for vecchio, nuovo in coppie:
+            prova(f"...la mutazione trova «{vecchio[:30]}»", 1,
+                  mutato.count(vecchio))
+            mutato = mutato.replace(vecchio, nuovo)
+        return filtro_da(mutato)
+    # a) la cura pigra: «avorio» tolto dalla lista
+    prova("controprova: senza «avorio» in lista la statuetta passerebbe",
+          False, regge(rotto(('"animali protetti": ("avorio", ',
+                              '"animali protetti": ('))))
+    # b) la frase innocente larga: «avorio» da solo fra gli innocenti
+    prova("controprova: un innocente che mangia la parola nuda", False,
+          regge(rotto(('"color avorio", ', '"avorio", "color avorio", '))))
+    # c) gli spazi ai lati CONSUMATI invece che guardati: due frasi
+    #    attaccate ne lasciano una, e il set di carta si ferma
+    prova("controprova: la frase che consuma gli spazi", False,
+          regge(rotto(('r"(?<= )(?:"', 'r" (?:"'),
+                      ('r")(?= )")', 'r") ")'))))
+
+    # --- 4) LA PAROLA ARRIVA A CHI RIFIUTA --------------------------
+    # i tre siti che rispondono al venditore la passano al messaggio,
+    # e i cinque che scrivono il registro ci mettono la parola
+    prova("i tre rifiuti del filtro passano la parola", 3,
+          len(re.findall(r"messaggio_rifiuto\(divieto=\w+,\s*parola=parola\)",
+                         codice(src))))
+    prova("...e i cinque registri dello strato 1 scrivono la parola", 5,
+          len(re.findall(r'registra_moderazione\(\s*"parole", "vietato",'
+                         r"\s*motivo_parole\(", codice(src))))
+    prova("...e nessuno scrive piu' la sola categoria", 0,
+          len(re.findall(r'registra_moderazione\(\s*"parole", "vietato",'
+                         r"\s*(?=\S)(?!motivo_parole\()", codice(src))))
+    amb = {"re": re, "unicodedata": _u}
+    for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
+                   "def termine_vietato(", "def motivo_parole("):
+        j = src.index(ancora)
+        exec(src[j:src.index("\n\n\n", j)], amb)
+    prova("il motivo del registro: categoria e parola",
+          "animali protetti: avorio",
+          amb["motivo_parole"]("animali protetti", "avorio"))
+    prova("...e senza parola la categoria di sempre", "armi",
+          amb["motivo_parole"]("armi", ""))
+
+    # --- 5) LA PORTA PRIVATA E' UNA SOLA ---------------------------
+    # Il server la scrive nel rifiuto, la Mini App la apre da «Scrivici
+    # per i tuoi dati»: due copie dello stesso indirizzo, tenute pari
+    # da questa riga invece che dalla memoria di chi le cambia.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    j = src.index('CONTATTO_PRIVATO = "')
+    porta = src[j:src.index("\n", j)].split('"')[1]
+    prova("CONTATTO_PRIVATO e' lo stesso CONTATTO_DATI della Mini App",
+          1, mini.count(f"const CONTATTO_DATI = '{porta}';"))
 
 
 def prove_link_offerte():
@@ -147311,7 +147457,14 @@ def prove_negozi_grandi():
              "_salva_foto_connettore": lambda *a: None}
         g.update(leve)
         exec(blocco_msg, g)
-        for nome in ("_righe_da_giudicare", "_nuovi_per_giro", "_segno_varianti"):
+        # LA PAROLA DEL REGISTRO (25 ott 2026, cantiere
+        # filtro-animali-falso-positivo): chi ferma ne chiede la parola a
+        # `parola_vietata`, di cartone come il filtro, e la scrive con
+        # `motivo_parole`, quella vera
+        g["parola_vietata"] = lambda t, d: (
+            "fucile" if vietato_finto(t, d) else "")
+        for nome in ("_righe_da_giudicare", "_nuovi_per_giro", "_segno_varianti",
+                     "motivo_parole"):
             exec(pezzo(nome), g)
         for nome in ("_modera_righe_negozio", "_un_connettore"):
             exec("async " + pezzo(nome), g)
@@ -179010,7 +179163,7 @@ def main():
               prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
-              prove_piani_condivisi,
+              prove_piani_condivisi, prove_filtro_avorio,
               prove_obiezione_punto,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
