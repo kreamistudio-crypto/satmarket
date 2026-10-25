@@ -71962,3 +71962,70 @@ Telegram «🧅 Entra nel Barattolo», sia col testo generico sia con
 chiave» e nessun Telegram piccolo. Zero errori di pagina, nessuna
 richiesta fuori casa, nessuno scorrimento orizzontale. Copia del giro
 cancellata.
+
+## Le prove che cadevano solo nella suite intera: l'orologio finto nei banchi node, e gli script .sh sempre LF (25 ott 2026, cantiere prove-stabili, richiesta di Andrea)
+
+**I DUE PROBLEMI** (dai giri del 24 ott). Uno: quattro prove cadevano solo
+nella suite intera severa, mai da sole (47/0 e 45/0), anche su main pulito:
+in `prove_dopo_gesto_p2p` «LA GARANZIA PAGATA DAL WALLET», «...con la
+fattura di chi compra ancora da arrivare» e «IL "GIA' FATTO"»; in
+`prove_annulla_riallinea` «2) risposta IN RITARDO». Sulla CI avrebbero
+fermato una promozione. Due: `prove_backup_database_occupato` dava tre
+rosse su ogni checkout Windows con `core.autocrlf=true`.
+
+**LA CAUSA DELLE QUATTRO, riprodotta.** Non stato condiviso fra sezioni, né
+porte o file temporanei: il TEMPO. I due banchi node facevano correre le
+funzioni vere della pagina sui timer veri, con attese da 3, 5, 20, 30 ms, e
+chiedevano chi arriva prima (per esempio la `pausa()` di 30 ms contro
+riallineo da 3 + spunta da 5 su timer che ne valgono 16 l'uno). Su Windows
+un `setTimeout` scatta a grani di circa 16 ms (misurato: 3 ms ne valgono
+15,5-16,6); col PC carico il pareggio gira dall'altra parte. Riprodotte da
+sole con un carico su tutti i core: le stesse righe, lo stesso «avuto»
+(`[0, [], '']`). «Solo nella suite» voleva dire «solo col PC occupato».
+
+**LA CURA.** `OROLOGIO_FINTO_JS` in `prove.py`, in testa ai due banchi:
+`setTimeout` mette il timer in una coda per scadenza, il primo scatta solo
+quando la pagina ha finito tutto quello che poteva fare (`setImmediate`,
+che node chiama a coda dei microtask vuota), e `Date.now` dice l'ora di
+quel timer. Le funzioni di `miniapp.html` restano quelle vere; i numeri del
+banco decidono l'ordine su ogni macchina, e le due sezioni passano da circa
+7 secondi a 0,4. Una sentinella per banco dice che l'orologio c'è.
+
+**IL CRLF.** La prova copia `deploy.sh` e `deploy/backup-caduto.sh` dal disco
+e li fa girare nel WSL: coi CRLF bash esce 2. In `.gitattributes`
+`*.sh text eol=lf`, come per i due bundle. Nei checkout che già ci sono non
+cambia niente da solo (`git status` pulito, provato su un clone): un `.sh`
+torna LF in un worktree nuovo, o cancellandolo e rifacendone il checkout.
+VPS, nodo, VM e CI sono Linux: per loro non cambia niente.
+
+**NOSTR-TOOLS SUL PC** (chiesto da Andrea con l'ok alla cura). La suite
+severa sul PC aveva una saltata, `prove_annuncio_identita` senza
+nostr-tools. Installato come fa il workflow, 2.25.2, fuori dal repo in
+`C:\Users\Andrea\barattolo-prove\nostr-tools`, con la variabile utente
+`IDENTITA_NODE_MODULES`. Dove sta e come si rifà: `docs/COLLAUDO.md`, «La
+suite severa sul PC senza saltate».
+
+**SCARTATO.** Allungare le attese o ritentare (regola di Andrea: si cura la
+causa). Saltare i banchi su Windows: un verde finto. Una libreria di timer
+finti: un banco node qui non ha npm. Normalizzare i CRLF dentro la prova
+invece della riga in `.gitattributes`: avrebbe curato la prova e lasciato
+gli script storti nella copia di lavoro.
+
+**COSA È PROVATO** (albero develop `2599f76` più questo cantiere).
+- CONTROPROVA sotto carico a priorità sopra la normale su tutti i core:
+  coi timer veri rimessi (copia fuori dal repo) 9 giri su 10 rossi sulle
+  righe storiche, più «3) risposta PERSA», che misura anch'essa il tempo
+  vero; con l'orologio finto 10 su 10 verdi (94/0). A carico normale 10
+  su 10 verdi.
+- `prove_backup_database_occupato` 18/0 e `prove_backup_prima_del_deploy`
+  21/0 con gli `.sh` rimaterializzati LF; prima, coi CRLF, 15/3.
+- Suite intera severa due volte di fila col Python del PC, 26.214/0 senza
+  saltate; due volte di fila nel venv con le sole dipendenze del workflow,
+  senza coincurve, 26.209/0. I primi giri dei due ambienti in parallelo,
+  cioè col PC carico.
+- I collaudi della CI (`ci/collaudi.txt`) nel venv senza coincurve,
+  `--paralleli 2`: 100 verdi, 0 rossi.
+
+**DA GUARDARE.** Altri banchi node di `prove.py` corrono sui timer veri con
+attese corte: questi due sono quelli che la suite ha mostrato. Se un'altra
+sezione cade solo a PC carico, la cura è la stessa riga in testa al banco.
