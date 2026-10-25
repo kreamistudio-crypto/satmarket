@@ -52,3 +52,17 @@ vendor/btc.bundle.js text eol=lf
 # (20 ott 2026, tappa 3): `prove_swap_telefono` confronta il suo sha256
 # con `IMPRONTA_SWAP`.
 vendor/swap.bundle.js text eol=lf
+
+# GLI SCRIPT .sh ESCONO LF ANCHE SU WINDOWS (25 ott 2026, cantiere
+# prove-stabili, richiesta di Andrea). Sono scritti per bash — sul VPS,
+# sul nodo, sulla vm-2050 — e bash non tollera il CR: `set -uo
+# pipefail\r` e' un'opzione che non esiste. Con `core.autocrlf=true`
+# il checkout li riscriveva coi CRLF, e `prove_backup_database_occupato`,
+# che fa girare nel WSL `deploy.sh` e `deploy/backup-caduto.sh` COPIATI
+# dal disco, cadeva tre volte su ogni PC Windows (bash esce 2). Qui il
+# fine-riga fa parte del contenuto, come per i due bundle qui sopra.
+# NEI CHECKOUT CHE GIA' CI SONO non cambia niente da solo (`git status`
+# resta pulito, provato su un clone): un .sh torna LF quando nasce un
+# worktree nuovo, o a mano cancellando il file e rifacendone il
+# checkout (`git checkout -- deploy.sh`): gesto di chi ci lavora.
+*.sh text eol=lf

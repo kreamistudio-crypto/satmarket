@@ -71963,218 +71963,69 @@ chiave» e nessun Telegram piccolo. Zero errori di pagina, nessuna
 richiesta fuori casa, nessuno scorrimento orizzontale. Copia del giro
 cancellata.
 
-## L'avorio che non è una zanna: il filtro parole impara il colore, il rifiuto dice la parola e la porta privata c'è sempre (25 ott 2026, cantiere filtro-animali-falso-positivo, richiesta di Andrea)
+## Le prove che cadevano solo nella suite intera: l'orologio finto nei banchi node, e gli script .sh sempre LF (25 ott 2026, cantiere prove-stabili, richiesta di Andrea)
 
-**IL CASO.** Il 25 ott alle 23:19 e alle 23:20 il filtro parole ha fermato
-due volte «Collezione d'Arte Religiosa SAIE – Società San Paolo
-(1978-1981) Edizioni di lus…» di Arwen come «animali protetti». Il verdetto
-non poteva venire dall'AI: «animali protetti» non è fra le quattro famiglie
-di `DIVIETI_BLOCCANTI`, e un VIETATO dell'AI su quel tema va in revisione,
-non in rifiuto. È lo strato 1, e in quella categoria l'unica voce che un
-libro d'arte può contenere è «avorio» da sola: carta avorio, pagine color
-avorio. Il registro però non poteva dirlo: salvava la sola categoria, e la
-descrizione di un annuncio mai nato non si salva da nessuna parte. Per
-saperlo serve chiedere ad Arwen o guardare il titolo nel registro (il
-comando di sola lettura dato ad Andrea dice se la parola è nel titolo,
-senza stampare il testo).
+**I DUE PROBLEMI** (dai giri del 24 ott). Uno: quattro prove cadevano solo
+nella suite intera severa, mai da sole (47/0 e 45/0), anche su main pulito:
+in `prove_dopo_gesto_p2p` «LA GARANZIA PAGATA DAL WALLET», «...con la
+fattura di chi compra ancora da arrivare» e «IL "GIA' FATTO"»; in
+`prove_annulla_riallinea` «2) risposta IN RITARDO». Sulla CI avrebbero
+fermato una promozione. Due: `prove_backup_database_occupato` dava tre
+rosse su ogni checkout Windows con `core.autocrlf=true`.
 
-**LA CURA, in tre pezzi.**
-- `CONTESTI_INNOCENTI`: «avorio» RESTA nella lista, ma prima del
-  confronto si tolgono le frasi intere che non parlano di zanne — il colore
-  («color avorio», «bianco avorio», «tonalità avorio»...), la carta
-  («carta avorio», «cartoncino avorio»), le imitazioni («finto avorio»,
-  «effetto avorio», «avorio vegetale»...), il paese e il modo di dire
-  («Costa d'Avorio», che fermava anche chi vende una maschera africana,
-  «torre d'avorio»). Solo per quel termine e solo la frase: un «avorio»
-  rimasto fuori blocca come prima, anche nello stesso annuncio
-  («statuetta avorio, base color avorio» resta ferma). Il giudice diventa
-  `termine_vietato`, che dà categoria E parola; `controlla_vietato` ne dà
-  la categoria ai suoi nove chiamanti, invariati.
-- IL RIFIUTO DICE LA PAROLA: «A fermarlo è stata la parola «avorio».»,
-  dopo il divieto. È la parola del nostro catalogo, mai un pezzo del testo.
-  I tre siti che rispondono al venditore (pubblica, modifica, modifica
-  firmata) la passano a `messaggio_rifiuto`; i cinque che scrivono il
-  registro (quei tre e i due import Nostr) scrivono `motivo_parole`,
-  «animali protetti: avorio». Anche l'avviso ai moderatori la dice.
-- LA PORTA C'È SEMPRE (decisione di Andrea, «sempre la porta privata»):
-  lo «scrivici» chiudeva il rifiuto solo se `BANNER_TEST_LINK` stava nel
-  config, e senza spariva proprio a chi era fermato per sbaglio. Adesso è
-  `CONTATTO_PRIVATO`, `https://t.me/barattolostore?direct`, la chat privata
-  che la Mini App usa già per «Scrivici per i tuoi dati» (`CONTATTO_DATI`):
-  una prova tiene uguali le due copie. Il bot è stato scartato: chi gli
-  scrive testo libero non arriva a nessun moderatore, prende il benvenuto.
+**LA CAUSA DELLE QUATTRO, riprodotta.** Non stato condiviso fra sezioni, né
+porte o file temporanei: il TEMPO. I due banchi node facevano correre le
+funzioni vere della pagina sui timer veri, con attese da 3, 5, 20, 30 ms, e
+chiedevano chi arriva prima (per esempio la `pausa()` di 30 ms contro
+riallineo da 3 + spunta da 5 su timer che ne valgono 16 l'uno). Su Windows
+un `setTimeout` scatta a grani di circa 16 ms (misurato: 3 ms ne valgono
+15,5-16,6); col PC carico il pareggio gira dall'altra parte. Riprodotte da
+sole con un carico su tutti i core: le stesse righe, lo stesso «avuto»
+(`[0, [], '']`). «Solo nella suite» voleva dire «solo col PC occupato».
 
-**SCARTATO.** Togliere «avorio» dalla lista: passerebbe la statuetta vera.
-Mandare «avorio» in revisione invece di bloccarlo: cinque siti da cambiare
-e una coda in più per un caso che una lista di frasi chiude. Uno sblocco da
-admin per l'annuncio di Arwen: l'annuncio non è mai nato (`annuncio_id 0`
-nel registro), quindi non c'è niente da sbloccare, e un bottone che fa
-passare un testo saltando il filtro sarebbe un buco per tutti. La strada
-subito è che Arwen ripubblichi (con «color crema» al posto di «avorio»
-prima del deploy, col testo di prima dopo). Il link del canale come
-riserva della porta privata: il rifiuto parla di UNA persona.
+**LA CURA.** `OROLOGIO_FINTO_JS` in `prove.py`, in testa ai due banchi:
+`setTimeout` mette il timer in una coda per scadenza, il primo scatta solo
+quando la pagina ha finito tutto quello che poteva fare (`setImmediate`,
+che node chiama a coda dei microtask vuota), e `Date.now` dice l'ora di
+quel timer. Le funzioni di `miniapp.html` restano quelle vere; i numeri del
+banco decidono l'ordine su ogni macchina, e le due sezioni passano da circa
+7 secondi a 0,4. Una sentinella per banco dice che l'orologio c'è.
 
-**IMPERFEZIONE DICHIARATA.** Chi volesse spacciare avorio vero per «color
-avorio» passa lo strato 1 e trova l'AI, che legge il contesto; chi aggira
-davvero scrive «ivory» o «osso», e la lista non lo vede comunque. Il link
-nel toast resta testo non toccabile (ARCHITETTURA, «IMPERFEZIONE
-DICHIARATA: nel toast il link NON è toccabile»): si legge, non si tocca.
+**IL CRLF.** La prova copia `deploy.sh` e `deploy/backup-caduto.sh` dal disco
+e li fa girare nel WSL: coi CRLF bash esce 2. In `.gitattributes`
+`*.sh text eol=lf`, come per i due bundle. Nei checkout che già ci sono non
+cambia niente da solo (`git status` pulito, provato su un clone): un `.sh`
+torna LF in un worktree nuovo, o cancellandolo e rifacendone il checkout.
+VPS, nodo, VM e CI sono Linux: per loro non cambia niente.
 
-**COSA È PROVATO** (albero develop `53da99a` più questo cantiere).
-- `prove_filtro_avorio`, nuova: 9 annunci veri che restano fermi con la
-  parola giusta (fra cui «Zanna d'avorio», «Netsuke… avorio intagliato»,
-  la statuetta con la base color avorio, corno di rinoceronte e pelle di
-  tigre), 11 innocenti che passano (il titolo di Arwen con carta e pagine
-  avorio, l'abito color avorio, la Costa d'Avorio con l'apostrofo dritto e
-  con quello tipografico, i tasti effetto avorio, i bottoni in avorio
-  vegetale, due frasi attaccate). Tre controprove che rompono la regola
-  e fanno cadere la tabella: «avorio» tolto dalla lista, «avorio» nudo fra
-  gli innocenti, le lookaround che consumano gli spazi.
-- Tortura a mano su sei mutazioni del server (la coda torna al canale del
-  config, la parola non entra nel messaggio, la pubblicazione non la
-  passa, un import torna alla sola categoria, la porta cambia solo nel
-  server, il giudice ignora gli innocenti): tutte e sei rosse.
-- `collaudo_filtro_avorio`, nuovo, sulle rotte vere e senza
-  `BANNER_TEST_LINK`: il libro si pubblica ed è in vetrina, la statuetta
-  è un 400 con divieto, parola, «ripubblica» e porta privata, registro e
-  avviso dicono «animali protetti: avorio», la modifica che infila una
-  zanna è ferma col numero dell'annuncio. Sull'albero di develop senza la
-  cura lo stesso collaudo cade su 10 righe, e la prima è il libro fermato:
-  riproduce il caso vero. In `ci/collaudi.txt` e `ci/compila.txt`.
-- Le prove del messaggio di rifiuto (`prove_impersonazione`,
-  `prove_sat_non_e_barattolo`) hanno CAMBIATO LATO dove dicevano «senza
-  canale nessun contatto»: adesso chiedono la porta con il canale vuoto e
-  col segnaposto.
-- Il banco del giro dei connettori (`prove_negozi_grandi`) finge
-  `controlla_vietato` e non conosceva `parola_vietata`: la prima suite
-  intera l'ha detto (26.245/1, «quaranta fermati dalle parole»), e il banco
-  ha avuto la sua `parola_vietata` di cartone e la `motivo_parole` vera.
-- Sull'albero ribasato su develop `fb453a0` (lo swap, tappa 4: nessun
-  simbolo in comune, controllato per nome), nel venv con le SOLE
-  dipendenze del workflow e senza coincurve: suite severa 26.264/0 senza
-  saltate, collaudi della CI `--paralleli 2` 102 verdi, 0 rossi. La suite
-  severa col Python del PC gira per ultima, su quest'albero col verbale.
+**NOSTR-TOOLS SUL PC** (chiesto da Andrea con l'ok alla cura). La suite
+severa sul PC aveva una saltata, `prove_annuncio_identita` senza
+nostr-tools. Installato come fa il workflow, 2.25.2, fuori dal repo in
+`C:\Users\Andrea\barattolo-prove\nostr-tools`, con la variabile utente
+`IDENTITA_NODE_MODULES`. Dove sta e come si rifà: `docs/COLLAUDO.md`, «La
+suite severa sul PC senza saltate».
 
-**DA GUARDARE.** Il comando di sola lettura sul VPS dice se «avorio» era
-nel titolo di Arwen; se la parola era un'altra (o «avorio» in un contesto
-non in elenco, tipo «rilegatura avorio»), si aggiunge la frase a
-`CONTESTI_INNOCENTI` col caso nelle prove. Sul VPS: dopo il deploy il
-motivo dei blocchi dello strato 1 nel registro e nelle statistiche admin
-porta la parola, quindi le statistiche per motivo si dividono per parola.
+**SCARTATO.** Allungare le attese o ritentare (regola di Andrea: si cura la
+causa). Saltare i banchi su Windows: un verde finto. Una libreria di timer
+finti: un banco node qui non ha npm. Normalizzare i CRLF dentro la prova
+invece della riga in `.gitattributes`: avrebbe curato la prova e lasciato
+gli script storti nella copia di lavoro.
 
-**IL SEGUITO, LE FRASI DEL LIBRO E DELL'OGGETTO** (26 ott 2026, decisione di
-Andrea, commit piccolo su develop prima del cherry-pick su main). Il colore
-detto senza «color» davanti: «rilegatura avorio», «copertina avorio»,
-«pagine avorio», «fogli avorio», «carta color avorio», «tela avorio»,
-«finitura avorio», «smalto avorio», «laccato avorio». «Copertina IN
-avorio» e «tasti in avorio» restano fermi: fra le due parole c'è «in», e
-la frase non combacia — due righe nuove fra i veri lo dicono. Ogni frase
-ha il suo caso fra gli innocenti e la sua controprova (la frase tolta, il
-suo caso si ferma), più quella che le toglie tutte insieme; «carta color
-avorio» è l'unica senza controprova sua, perché «color avorio» la copre
-già da sola, e lo si dichiara invece di provarla a vuoto. Il libro del
-collaudo sulle rotte vere porta anche rilegatura, copertina e tela.
+**COSA È PROVATO** (albero develop `2599f76` più questo cantiere).
+- CONTROPROVA sotto carico a priorità sopra la normale su tutti i core:
+  coi timer veri rimessi (copia fuori dal repo) 9 giri su 10 rossi sulle
+  righe storiche, più «3) risposta PERSA», che misura anch'essa il tempo
+  vero; con l'orologio finto 10 su 10 verdi (94/0). A carico normale 10
+  su 10 verdi.
+- `prove_backup_database_occupato` 18/0 e `prove_backup_prima_del_deploy`
+  21/0 con gli `.sh` rimaterializzati LF; prima, coi CRLF, 15/3.
+- Suite intera severa due volte di fila col Python del PC, 26.214/0 senza
+  saltate; due volte di fila nel venv con le sole dipendenze del workflow,
+  senza coincurve, 26.209/0. I primi giri dei due ambienti in parallelo,
+  cioè col PC carico.
+- I collaudi della CI (`ci/collaudi.txt`) nel venv senza coincurve,
+  `--paralleli 2`: 100 verdi, 0 rossi.
 
-## Il margine della cassaforte: la domanda del saldo prima della mano, e la sesta domanda della guardia (27 ott 2026, cantiere margine-cassaforte, decisione di Andrea)
-
-**DA DOVE.** Il giro sul regtest (26 ott, «Lo swap intero sul regtest di
-Boltz») ha mostrato il 520 di LNbits «You must reserve at least … to
-cover potential routing fees»: LNbits non paga se nel wallet, oltre al
-pagamento, non resta l'1 % (minimo 2 sats) per le commissioni di rete,
-e rifiuta PRIMA di toccare LND, senza scrivere niente per quell'hash.
-Nel nostro codice non c'era nessun controllo del margine: il 520
-passava per «ignoto» e «fattura bruciata» (curato il 26 ott col motivo
-`riserva`), e chi vende si sentiva chiedere una fattura nuova per un
-guasto NOSTRO. I NUMERI VERI DEL VPS, letti da Andrea il 27 ott col
-comando di sola lettura: cassaforte nodo saldo 503.786 sats, 470.727 in
-attesa su 9 ordini, margine 33.059 (7,0 %); SaaS saldo 425.820, 341.570
-in attesa su 4 ordini, margine 84.250 (24,7 %). Il wallet è MISTO
-(l'escrow di tutti più il capitale nostro, `capitale_cassa.py`) e ogni
-pagamento riuscito si porta via le sue commissioni di rete dal saldo:
-senza capitale il margine si consuma da solo.
-
-**LA CURA, in due pezzi (decisione di Andrea).**
-1. IN `paga_venditore`, PRIMA DI PRENDERE LA MANO (dopo il ponte, con la
-   riga): il saldo della cassaforte con la SOLA chiave di lettura
-   (`_saldo_cassaforte`, `GET /api/v1/wallet`); se è meno di importo +
-   riserva (`_riserva_lnbits`: l'1 % per eccesso, mai meno di 2 sats —
-   i numeri di LNbits, `lnbits_reserve_fee_percent` e
-   `lnbits_reserve_fee_min`), è il QUARTO VERBO: `NON_CHIESTO` col
-   motivo `riserva`, niente parte, la fattura resta buona, la riga «da
-   riprovare» e il ritentativo da soli con `BACKOFF_NOSTRO` (`riserva`
-   sta in `MOTIVI_NOSTRI`: lo stadio dice «un problema del nostro
-   nodo», col prossimo tentativo). Ai moderatori UN avviso per
-   cassaforte ogni sei ore (`_avvisa_margine`, timbro
-   `avviso_margine_<cassaforte>`, stanza 💧 Liquidità): «manca margine
-   nella cassaforte X», saldo, dovuto, quanto serve con la riserva, cosa
-   fare. Un saldo che NON si legge non ferma niente (fail-open
-   dichiarato: il comportamento di ieri, e un LNbits muto lo ferma
-   comunque la chiamata che paga).
-2. NELLA GUARDIA DELLA LIQUIDITÀ, LA SESTA DOMANDA, per ciascuna
-   cassaforte configurata (`_voci_margine`, in coda alle altre in
-   `_quadro_liquidita`, quindi anche in `/canali`): saldo del wallet
-   meno gli incassi in attesa (`_incassi_in_attesa`: gli ordini del
-   mercatino con i sats ancora dentro — locked, shipped, delivered,
-   confirmed, dispute, return_pending, return_shipped, refund — e
-   `payout_stato` non «uscito», per cassaforte, al prezzo pieno) sopra
-   `LIQUIDITA_MARGINE_PERCENTO` (1) del totale in attesa più
-   `LIQUIDITA_MARGINE_MIN_SATS` (10.000). Una voce buona, cattiva o
-   «non misurata» (saldo non letto), nel vocabolario di sempre della
-   guardia: allarme al primo passaggio in cattiva, promemoria, rientro.
-   Coi numeri veri: nodo, margine 33.059 contro una soglia di 14.707,
-   buona. Tutt'e due le leve a 0 spengono la domanda.
-
-**STRADE SCARTATE.** Abbassare la riserva di LNbits (è una protezione
-loro, e la teniamo); contare anche rimborsi d'asta e pagamenti P2P negli
-incassi in attesa (hanno i loro registri, e un numero mescolato non
-combacerebbe con nessun wallet: la lezione del polso 23 del libro
-mastro); un avviso per ogni incasso fermo (dieci incassi fermi sullo
-stesso wallet sono UN problema); fermare il pagamento quando il saldo
-non si legge (romperebbe gli incassi per un guasto della sola domanda).
-
-**UN DIFETTO PRESO DAL COLLAUDO, prima del commit:** la pausa
-dell'avviso era `0 < adesso - ultimo`, e due incassi fermi nello stesso
-secondo facevano due avvisi. Ora `ultimo and adesso - ultimo < pausa`.
-
-**PROVATO.**
-- `collaudo_margine_cassaforte` (21 verdi, negli elenchi della CI): il
-  server vero col LNbits di cartone del banco dei pagamenti, che da oggi
-  dichiara anche il saldo (`NODO["saldo"]`, grande di serie; None = non
-  risponde). Il saldo che copre l'importo ma non la riserva (non chiesto,
-  da riprovare, la fattura al suo posto, lo stato di prima, UN avviso coi
-  numeri, lo stadio nostro col prossimo tentativo, nessuna richiesta di
-  fattura nuova a chi vende); il secondo incasso fermo senza secondo
-  avviso; il giro dei sospesi a saldo corto; il margine rimesso e il
-  giro che paga da solo con la stessa fattura; il limite al sat
-  (importo + riserva passa, un sat sotto no); il wallet che non risponde
-  (si paga come ieri); passate le sei ore l'avviso torna; la sesta
-  domanda sul server vero (incassi in attesa dal database, la cassaforte
-  con la chiave segnaposto non si conta, voce buona al limite, cattiva
-  un sat sotto, non misurata, e la sua frase dentro l'allarme della
-  guardia; le leve a 0 la spengono).
-- `prove_margine_cassaforte` (in `prove.py`): la riserva (1 % per
-  eccesso, minimo 2, la percentuale è una leva), il saldo con un httpx di
-  cartone (la chiave di lettura, i «non so»), l'avviso (uno per
-  cassaforte, la pausa, la stanza, i numeri), gli incassi in attesa su un
-  database vero (gli stati, gli usciti esclusi), il giudizio coi numeri
-  veri del VPS e ai limiti, le sentinelle (la domanda dopo il ponte e
-  prima della mano, col quarto verbo; il fail-open; `riserva` fra i
-  guasti nostri e nella pagina; la sesta domanda in coda; le leve nei
-  tre posti; gli elenchi della CI). L'ambiente condiviso dei banchi
-  (`ambiente_altra_cassaforte`) monta i nomi nuovi con un saldo che non
-  si legge: i banchi di ieri non cambiano.
-- CONTROPROVE, 9 su 9 rosse: niente domanda del saldo; la riserva non
-  sommata; l'avviso a ogni incasso fermo; il saldo illeggibile che
-  ferma il pagamento; la sesta domanda senza il database (nel
-  collaudo); `riserva` tolto dai guasti nostri; la riserva senza il
-  minimo di 2; gli incassi in attesa che contano gli usciti; la guardia
-  senza la sesta domanda (nelle prove). Due di loro al primo giro
-  facevano ESPLODERE il collaudo invece di arrossarlo (una lista di
-  avvisi vuota): il collaudo ora legge il primo avviso con `primo_avviso`.
-- Suite e collaudi: nel messaggio del commit.
-
-**COSA RESTA.** Il margine vero sul VPS si legge col comando di sola
-lettura dato ad Andrea il 26 ott (saldo per cassaforte e incassi in
-attesa dal database): quando la guardia è accesa lo dice lei, in
-`/canali` e negli avvisi. Da decidere con Andrea quanto capitale tenere
-nella cassaforte nodo oltre la soglia (oggi 33.059 contro 14.707).
+**DA GUARDARE.** Altri banchi node di `prove.py` corrono sui timer veri con
+attese corte: questi due sono quelli che la suite ha mostrato. Se un'altra
+sezione cade solo a PC carico, la cura è la stessa riga in testa al banco.
