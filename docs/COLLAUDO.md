@@ -56,6 +56,23 @@ PRIMA che arrivino in produzione. È privata: chi non è in
   `python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`.
   `prove_collaudi_senza_coincurve` guarda la forma (nessun import nudo
   di coincurve nei collaudi dell'elenco); il giro nel venv è la prova.
+- **La suite severa sul PC senza saltate: nostr-tools fuori dal repo**
+  (25 ott 2026, cantiere prove-stabili). `prove_annuncio_identita` fa
+  girare `deploy/rgb/identita.mjs`, che importa nostr-tools: senza, la
+  sezione si salta e con `PROVE_SEVERE=1` una saltata è rossa. Sul PC
+  fisso sta in `C:\Users\Andrea\barattolo-prove\nostr-tools` (fuori
+  dal repo: Barattolo non è un progetto npm), installato come fa il
+  workflow, alla stessa versione, e la variabile utente
+  `IDENTITA_NODE_MODULES` gli punta (la stessa che il workflow dà alla
+  prova). Si rifà così, da PowerShell (la cartella prima: npm non la crea):
+  `New-Item -ItemType Directory -Force "$env:USERPROFILE\barattolo-prove\nostr-tools"`,
+  poi `npm install --no-save --no-package-lock --no-audit --no-fund --prefix "$env:USERPROFILE\barattolo-prove\nostr-tools" nostr-tools@2.25.2`
+  e poi
+  `[Environment]::SetEnvironmentVariable('IDENTITA_NODE_MODULES', "$env:USERPROFILE\barattolo-prove\nostr-tools", 'User')`.
+  La variabile la vedono i terminali e le sessioni aperti DOPO; se il
+  workflow sale di versione (la riga `nostr-tools@` di `prove.yml`) si
+  rifà `npm install` con la versione nuova. Si toglie cancellando la
+  cartella e la variabile (`...SetEnvironmentVariable('IDENTITA_NODE_MODULES', $null, 'User')`).
 - **Dopo ogni promozione `develop` si rimette uguale a `main`**:
   `git push --force-with-lease origin origin/main:develop`. È l'unico
   force ammesso, solo su `develop` e solo dalla sessione della

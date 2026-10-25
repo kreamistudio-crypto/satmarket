@@ -136894,6 +136894,56 @@ process.stdout.write(JSON.stringify(out));
     prova("...ogni altro errore resta un errore", [False, False, False], o["altri"])
 
 
+# L'OROLOGIO FINTO DEI BANCHI NODE (25 ott 2026, cantiere prove-stabili,
+# richiesta di Andrea). Due banchi — l'annullo che rilegge e il ritorno
+# dopo il gesto — facevano correre le funzioni VERE della pagina sui
+# timer veri di node, con attese da 3, 5, 20, 30 ms, e chiedevano chi
+# arriva prima. Su Windows un `setTimeout` scatta a grani di ~16 ms
+# (misurato: 1 ms ne vale 1,5-8,6; 3 ms ne valgono 15,5-16,6), e col PC
+# carico — la suite intera, un'altra sessione, i collaudi — il pareggio
+# girava dall'altra parte: quattro rosse che da sole non si vedevano mai
+# (riprodotte con un carico su tutti i core: le stesse quattro righe,
+# lo stesso «avuto»). Non era stato condiviso fra le sezioni.
+#
+# LA CURA, NON IL SONNO LUNGO: qui il tempo non passa da solo. Ogni
+# `setTimeout` va in una coda per scadenza; il primo scatta quando la
+# pagina ha finito tutto quello che poteva fare (lo dice `setImmediate`,
+# che node chiama solo a coda dei microtask vuota), e `Date.now` dice
+# l'ora di quel timer. Le promesse che un timer sveglia finiscono TUTTE
+# prima del timer dopo: lo stesso ordine che i numeri del banco
+# promettono, su ogni macchina e con qualunque carico, e i secondi di
+# attesa vera spariscono. SCARTATI: allungare le attese o ritentare
+# (regola di Andrea: niente sonni allungati ne' ritentativi per far
+# passare una prova), e le librerie di timer finti (un banco node qui
+# non ha npm).
+OROLOGIO_FINTO_JS = r"""/* ---- l'orologio finto del banco: il tempo passa solo a pagina ferma ---- */
+(() => {
+  const vero = {setImmediate: globalThis.setImmediate, now: Date.now};
+  const inizio = vero.now();
+  let adesso = 0, numero = 0, acceso = false;
+  const coda = [];
+  function accendi(){ if (!acceso && coda.length) { acceso = true; vero.setImmediate(scatta); } }
+  function scatta(){
+    acceso = false;
+    if (!coda.length) return;
+    coda.sort((a, b) => a.quando - b.quando || a.n - b.n);
+    const t = coda.shift();
+    adesso = Math.max(adesso, t.quando);
+    accendi();
+    t.fn(...t.args);
+  }
+  globalThis.setTimeout = (fn, ms, ...args) => {
+    const t = {n: ++numero, quando: adesso + Math.max(0, Number(ms) || 0), fn, args,
+               ref(){ return t; }, unref(){ return t; }};
+    coda.push(t); accendi(); return t;
+  };
+  globalThis.clearTimeout = t => { const i = coda.indexOf(t); if (i >= 0) coda.splice(i, 1); };
+  globalThis.setInterval = () => { throw new Error("l'orologio finto non ha setInterval"); };
+  Date.now = () => inizio + adesso;
+})();
+"""
+
+
 def prove_annulla_riallinea():
     """«ANNULLA» DICE NON RIUSCITO MA ANNULLA (26 set 2026, dal campo).
     Andrea entra in un suo ordine pubblicato e tocca «Annulla»: il velo
@@ -137114,6 +137164,11 @@ const foto = (t0) => ({toasts: toasts.slice(), riallinei: riallinei.slice(), sta
   process.stdout.write(JSON.stringify(out));
 })();
 """
+    # IN TESTA L'OROLOGIO FINTO: le corse di questo banco si decidono sui
+    # numeri scritti qui, non sui grani del timer della macchina
+    b1 = OROLOGIO_FINTO_JS + b1
+    prova("il banco dei gesti gira sull'orologio finto (le sue corse non dipendono dal carico)",
+          True, b1.startswith(OROLOGIO_FINTO_JS) and "OROLOGIO_FINTO" not in b1[len(OROLOGIO_FINTO_JS):])
     p1 = _os.path.join(cart, "gesti.js")
     open(p1, "w", encoding="utf-8").write(b1)
     r1 = _sp.run([node, p1], capture_output=True, text=True, timeout=120, encoding="utf-8")
@@ -142395,6 +142450,12 @@ const R = (id, lato, stato, piu) => Object.assign({id, lato, stato, peer: 'P'}, 
   console.log(JSON.stringify(out));
 })().catch(e => { console.error('ESPLOSO: ' + (e && e.stack || e)); process.exit(1); });
 """
+    # IN TESTA L'OROLOGIO FINTO: «al giro dopo», «dopo la spunta», «dopo il
+    # riallineo» sono corse fra timer da pochi ms, e a PC carico i grani
+    # da ~16 ms di Windows le giravano (le tre rosse della suite intera)
+    pezzi = OROLOGIO_FINTO_JS + pezzi
+    prova("il banco del ritorno gira sull'orologio finto (le sue corse non dipendono dal carico)",
+          True, pezzi.startswith(OROLOGIO_FINTO_JS))
     cart = _tf.mkdtemp(prefix="dopo_gesto_")
     pb = os.path.join(cart, "banco.js")
     open(pb, "w", encoding="utf-8").write(pezzi)
