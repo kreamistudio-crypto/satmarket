@@ -130,6 +130,7 @@ collaudo_swap_instradatore
 collaudo_onchain_indirizzo
 collaudo_onchain_ordine
 collaudo_certificati_relay
+collaudo_filtro_avorio
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:

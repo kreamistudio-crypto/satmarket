@@ -21899,6 +21899,48 @@ PAROLE_VIETATE = {
                          "specie protette"),
 }
 
+# LE LETTURE INNOCENTI DI UNA PAROLA VIETATA (25 ott 2026, cantiere
+# filtro-animali-falso-positivo, da un caso VERO: una collezione d'arte
+# sacra in edizione di lusso fermata due volte come «animali protetti»).
+# «avorio» da solo e' rimasto nella lista, perche' «statuetta in
+# avorio» e' esattamente quel che non si vende; ma e' anche un COLORE,
+# una CARTA, un'IMITAZIONE e un PAESE — e su quelle letture il filtro
+# fermava gente onesta senza che nessuno lo sapesse. Qui dentro si
+# toglie dal testo SOLO la frase intera che non parla di zanne: un
+# «avorio» che resta fuori da queste frasi blocca come prima, anche
+# nello stesso annuncio («statuetta avorio, base color avorio» resta
+# fermo). Le frasi sono GIA' normalizzate (l'apostrofo e' uno spazio).
+# STRADE SCARTATE: togliere «avorio» dalla lista (passerebbe la
+# statuetta vera) e mandarlo in revisione invece di bloccarlo (cinque
+# siti da cambiare per un caso che una lista di frasi chiude). Chi
+# volesse spacciare avorio vero per «color avorio» passa questo strato
+# ma non l'AI, che legge il contesto: imperfezione dichiarata, e
+# comunque chi aggira scrive «ivory» o «osso» e la lista non lo vede.
+CONTESTI_INNOCENTI = {
+    "avorio": (
+        # il colore
+        "color avorio", "colore avorio", "colori avorio",
+        "colorazione avorio", "bianco avorio", "bianca avorio",
+        "bianchi avorio", "bianche avorio", "tinta avorio",
+        "tono avorio", "toni avorio", "tonalita avorio",
+        "sfumatura avorio", "sfumature avorio",
+        # la carta (rilegature, inviti, edizioni)
+        "carta avorio", "cartoncino avorio",
+        # le imitazioni, che sono il contrario dell'avorio vero
+        "finto avorio", "simil avorio", "effetto avorio",
+        "imitazione avorio", "tipo avorio", "avorio finto",
+        "avorio sintetico", "avorio artificiale", "avorio vegetale",
+        # il paese e il modo di dire
+        "costa d avorio", "torre d avorio", "torre di avorio"),
+}
+# Le lookaround NON consumano gli spazi: due frasi attaccate
+# («color avorio color avorio») cadono tutte e due.
+_CONTESTI_INNOCENTI_RE = {
+    termine: re.compile(r"(?<= )(?:"
+                        + "|".join(re.escape(f) for f in frasi)
+                        + r")(?= )")
+    for termine, frasi in CONTESTI_INNOCENTI.items()}
+
 MSG_RIFIUTO = ("Questo annuncio non rispetta le regole del mercatino: "
                "su Barattolo è vietato vendere armi, droghe, servizi "
                "sessuali, refurtiva, contraffazioni, documenti, dati "
@@ -21914,6 +21956,11 @@ MSG_RIFIUTO = ("Questo annuncio non rispetta le regole del mercatino: "
 # mostrato a chi lo subisce.
 MSG_RIFIUTO_DIVIETO = ("Questo annuncio sembra rientrare tra le cose "
                        "che su Barattolo non si vendono: {divieto}.")
+# E DAL FILTRO PAROLE DICE ANCHE QUALE PAROLA (25 ott 2026, cantiere
+# filtro-animali-falso-positivo): «animali protetti» a chi vende un
+# libro d'arte non dice cosa cambiare, «avorio» si'. La parola e'
+# quella del NOSTRO catalogo, non un pezzo del testo di chi scrive.
+MSG_RIFIUTO_PAROLA = " A fermarlo è stata la parola «{parola}»."
 
 # E DICE ANCHE LA STRADA, che è la metà che mancava: il rifiuto era
 # l'unico esito della moderazione a non indicarne nessuna — la
@@ -21931,6 +21978,14 @@ MSG_RIFIUTO_RISCRIVI = (" Se il tuo annuncio parlava d'altro, "
                         "sbagliare.")
 MSG_RIFIUTO_SCRIVICI = (" Se invece pensi che l'errore sia nostro, "
                         "scrivici: ")
+# LA PORTA C'E' SEMPRE, ed e' PRIVATA (25 ott 2026, decisione di
+# Andrea). Prima il contatto era BANNER_TEST_LINK, il canale del
+# feedback: senza quella riga nel config la frase spariva, e chi era
+# fermato per sbaglio restava senza nessuno a cui dirlo. Un rifiuto
+# parla dell'annuncio di UNA persona, quindi la porta e' la chat
+# privata con noi — la stessa di «Scrivici per i tuoi dati» nella
+# Mini App (CONTATTO_DATI, che una prova tiene uguale a questa).
+CONTATTO_PRIVATO = "https://t.me/barattolostore?direct"
 
 # Chi prova a vendere una prestazione non merita la lista dei divieti
 # gravi: il no e' di prodotto, non di condotta.
@@ -22052,7 +22107,8 @@ def promette_recupero_wallet(titolo: str, descrizione: str = "") -> bool:
 
 
 
-def messaggio_rifiuto(motivo: str = "", divieto: str = "") -> str:
+def messaggio_rifiuto(motivo: str = "", divieto: str = "",
+                      parola: str = "") -> str:
     """Il messaggio giusto per un no: a chi si e' spacciato per noi il
     confine, ai servizi il garbo, a tutto il resto QUALE divieto e'
     scattato — piu' la strada per rimediare, che e' comune a tutti e
@@ -22071,22 +22127,25 @@ def messaggio_rifiuto(motivo: str = "", divieto: str = "") -> str:
     # La coda si compone qui e in nessun altro posto: i siti che
     # rifiutano sono SEI (tre funzioni per due strati), e una coda
     # appesa da loro sarebbe sei posti da tenere in pari — col
-    # settimo di domani che se ne dimentica. Il contatto si scrive
-    # solo se il canale c'è davvero (il patto di casa: mai promettere
-    # una porta che non si apre), col calco del messaggio dei
-    # moderatori — startswith("http"), non un valore qualunque.
+    # settimo di domani che se ne dimentica. Il contatto c'è SEMPRE
+    # (25 ott 2026, decisione di Andrea): è la chat privata con noi,
+    # un indirizzo nostro che non dipende da nessuna riga del config
+    # — prima era il canale BANNER_TEST_LINK, e senza quello la frase
+    # spariva proprio a chi era stato fermato per sbaglio.
     def coda(riscrivi: bool = True) -> str:
         c = MSG_RIFIUTO_RISCRIVI if riscrivi else ""
-        if (BANNER_TEST_LINK or "").startswith("http"):
-            c += MSG_RIFIUTO_SCRIVICI + BANNER_TEST_LINK
-        return c
+        return c + MSG_RIFIUTO_SCRIVICI + CONTATTO_PRIVATO
 
     # IL DIVIETO PASSATO VINCE, e non è un caso particolare: è il
     # filtro parole, che la sua categoria ce l'ha già in mano e più
     # precisa della nostra (nove voci contro quattro). Chi la passa
-    # non ha nemmeno un motivo da leggere.
+    # non ha nemmeno un motivo da leggere — e ha la PAROLA, che dice
+    # a chi vende cosa riscrivere.
     if divieto:
-        return MSG_RIFIUTO_DIVIETO.format(divieto=divieto) + coda()
+        testa = MSG_RIFIUTO_DIVIETO.format(divieto=divieto)
+        if parola:
+            testa += MSG_RIFIUTO_PAROLA.format(parola=parola)
+        return testa + coda()
     m = (motivo or "").lower()
     if any(p in m for p in PAROLE_IMPERSONAZIONE):
         return MSG_RIFIUTO_IMPERSONAZIONE + coda()
@@ -22109,12 +22168,45 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
     """Strato 1: il filtro parole. Ritorna la categoria violata,
     oppure None se il testo e' pulito. Il confronto e' a parole
     intere: con gli spazi ai lati, 'erbario' non contiene ' erba '."""
+    trovato = termine_vietato(titolo, descrizione)
+    return trovato[0] if trovato else None
+
+
+def termine_vietato(titolo: str, descrizione: str) -> tuple[str, str] | None:
+    """Il giudice vero dello strato 1: (categoria, parola del catalogo)
+    o None. controlla_vietato ne restituisce la categoria e basta, che
+    e' la domanda dei suoi nove chiamanti; la PAROLA serve a chi rifiuta
+    (la dice al venditore e la scrive nel registro, `parola_vietata`).
+    Una lettura sola della lista: due giri paralleli, prima o poi,
+    direbbero due cose diverse sullo stesso annuncio.
+
+    Prima del confronto si tolgono le LETTURE INNOCENTI del termine
+    (CONTESTI_INNOCENTI): solo per quel termine, e solo la frase
+    intera — «color avorio» cade, «statuetta avorio» resta."""
     testo = f" {normalizza(titolo)} {normalizza(descrizione)} "
     for categoria, termini in PAROLE_VIETATE.items():
         for t in termini:
-            if f" {t} " in testo:
-                return categoria
+            innocenti = _CONTESTI_INNOCENTI_RE.get(t)
+            dove = innocenti.sub("", testo) if innocenti else testo
+            if f" {t} " in dove:
+                return categoria, t
     return None
+
+
+def parola_vietata(titolo: str, descrizione: str) -> str:
+    """La parola del catalogo che ha fermato l'annuncio, o '' (chi
+    chiama ha già la categoria in mano: un '' qui vuol dire solo che
+    non la si sa dire, e il rifiuto resta quello di prima)."""
+    trovato = termine_vietato(titolo, descrizione)
+    return trovato[1] if trovato else ""
+
+
+def motivo_parole(categoria: str, parola: str) -> str:
+    """Il motivo del registro per lo strato 1: «animali protetti:
+    avorio». Prima c'era la sola categoria, e la domanda «quale parola
+    l'ha fermato?» non aveva risposta da nessuna parte — la descrizione
+    di un annuncio mai nato non si salva."""
+    return f"{categoria}: {parola}" if parola else categoria
 
 
 # ---------------------------------------------------------------
@@ -26020,13 +26112,17 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if categoria:
-        registra_moderazione("parole", "vietato", categoria,
+        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        registra_moderazione("parole", "vietato",
+                             motivo_parole(categoria, parola),
                              d["titolo"], venditore_id=user["id"])
         await notifica_admin(
-            f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
+            f"🚫 <b>Annuncio bloccato dal filtro</b> "
+            f"({motivo_parole(categoria, parola)})\n"
             f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})",
             argomento="moderazione")
-        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
+        raise HTTPException(400, messaggio_rifiuto(divieto=categoria,
+                                                   parola=parola))
 
     # --- Strato 2: parere dell'AI. Il vietato netto blocca come
     # sempre; il DUBBIO non blocca piu' (lug 2026): l'annuncio nasce
@@ -28060,13 +28156,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # --- Stessa moderazione di una pubblicazione nuova ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if categoria:
-        registra_moderazione("parole", "vietato", categoria, d["titolo"],
+        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        registra_moderazione("parole", "vietato",
+                             motivo_parole(categoria, parola), d["titolo"],
                              annuncio_id, user["id"])
         await notifica_admin(
-            f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
+            f"🚫 <b>Modifica bloccata dal filtro</b> "
+            f"({motivo_parole(categoria, parola)})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})", argomento="moderazione")
-        raise HTTPException(400, messaggio_rifiuto(divieto=categoria))
+        raise HTTPException(400, messaggio_rifiuto(divieto=categoria,
+                                                   parola=parola))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
     if verdetto and verdetto[0] == "vietato":
         registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
@@ -28385,13 +28485,17 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
     # riga nel registro dice ai moderatori cosa e' successo. ---
     cat_vietata = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if cat_vietata:
-        registra_moderazione("parole", "vietato", cat_vietata, d["titolo"],
+        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        registra_moderazione("parole", "vietato",
+                             motivo_parole(cat_vietata, parola), d["titolo"],
                              annuncio_id, user["id"])
         await notifica_admin(
-            f"🚫 <b>Modifica firmata bloccata dal filtro</b> ({cat_vietata})\n"
+            f"🚫 <b>Modifica firmata bloccata dal filtro</b> "
+            f"({motivo_parole(cat_vietata, parola)})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})", argomento="moderazione")
-        raise HTTPException(400, messaggio_rifiuto(divieto=cat_vietata))
+        raise HTTPException(400, messaggio_rifiuto(divieto=cat_vietata,
+                                                   parola=parola))
     verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
     if verdetto:
         esito, motivo = verdetto
@@ -80030,7 +80134,10 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
         titolo, descrizione = importa_nostr.testo_evento(e)
         vietato = controlla_vietato(titolo, descrizione)
         if vietato:
-            registra_moderazione("parole", "vietato", vietato, titolo)
+            registra_moderazione(
+                "parole", "vietato",
+                motivo_parole(vietato, parola_vietata(titolo, descrizione)),
+                titolo)
             print(f"  🚫 parole vietate ({vietato}): {titolo[:44]}")
             continue
         numero = len(voci) + 1
@@ -81509,7 +81616,11 @@ async def _modera_righe_negozio(righe: list) -> tuple[list, dict]:
     for r in righe:
         vietato = controlla_vietato(r["titolo"], r["descrizione"])
         if vietato:
-            registra_moderazione("parole", "vietato", vietato, r["titolo"])
+            registra_moderazione(
+                "parole", "vietato",
+                motivo_parole(vietato, parola_vietata(r["titolo"],
+                                                      r["descrizione"])),
+                r["titolo"])
             print(f"    ⛔ fermato dal filtro parole: {r['titolo'][:40]}")
             continue
         ammesse.append(r)
