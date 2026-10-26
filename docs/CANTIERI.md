@@ -72331,3 +72331,80 @@ collaudi: nel messaggio del commit.
 del tempo di un payout fallito (i motivi «bruciata», «scaduta») non
 sono state guardate per lo swap: le dice lo stadio, e chi vende ha la
 carta dello swap.
+
+## L'orologio finto dove serve: il bunker muto e il PayCode fermo, e l'orologio impara setInterval (26 ott 2026, cantiere orologio-finto-ovunque, richiesta di Andrea)
+
+**LA DOMANDA** (il «da guardare» di prove-stabili). Quali altri banchi node
+di `prove.py` corrono sui timer veri con attese sotto i 100 ms, quali
+rischiano la stessa gara, e se l'orologio si può mettere in un pezzo
+condiviso invece di copiarlo. Prima il censimento e le dieci righe, poi
+l'ok di Andrea.
+
+**IL CENSIMENTO, FATTO GIRARE.** 68 sezioni fanno girare un banco node con
+`setTimeout`, `setInterval` o `Date.now`; leggere chi «vince la corsa» non
+basta, e ognuna è stata girata col carico di prove-stabili (busy loop a
+priorità sopra la normale su tutti i 32 core), in-process (prove.py si
+compila una volta: da sola costa 10 s a sezione). Il carico è tarato: ai
+due banchi già curati coi timer veri rimessi, in una copia fuori dal
+repo, 10 giri rossi su 10 sulle righe storiche. Senza carico 68 su 68
+verdi. Sotto carico, 4 giri a testa: cadono due sezioni nuove. Poi, con
+l'ok, 10 giri sotto carico sulle 22 con attese sotto i 100 ms: tutte
+verdi, 10 su 10. Un buco nel primo censimento: i banchi scritti come
+costante di modulo (`BANCO_X = r"""…"""`) finivano contati alla funzione
+di prima, e `prove_paycode_ripresa` (stessa forma del PayCode fermo) non
+c'era. Rifatto contando le costanti: sei sezioni in più
+(`paycode_ripresa`, `moderazione_p2p`, `contanti_zona`, `allegati_chat`,
+`chiave_moderatore_portatile`, `chat_dalla_notifica`), più `chat_scambio`
+e `p2p_chat` che usano le stesse costanti: 10 giri sotto carico, tutte
+verdi.
+
+**LE DUE CHE CADEVANO.** `prove_bunker_muto`, «LA SOCKET CADE»: il
+riaggancio da 120 ms, le risposte del cartone da 0-10 e il cane da guardia
+a 900 sono corse, e a PC carico il caso finiva «ANCORA IN ATTESA».
+`prove_paycode_riconosciuto`: l'autoinvio a 0 e le tre attese da 5 ms in
+catena (`P2P_RICONOSCI_ATTESE_MS`) contro `attesa(40)`; con grani da 16 ms
+la catena vale ~64 ms, e cadeva ogni volta una riga diversa («rete giu'»,
+«senza sessione nemmeno», «sempre ignoto»...). Tutte e due sono cartone
+puro (relay e server finti, crittografia sincrona): l'orologio ci sta.
+
+**LA CURA.** La stessa di prove-stabili: `OROLOGIO_FINTO_JS` in testa ai due
+banchi, con la sentinella che dice che c'è. Il pezzo condiviso c'era già —
+è una costante sola — e resta quello: per banco si ripetono solo la riga
+che lo mette in testa e la sentinella. Il banco del bunker porta con sé la
+cassetta della pagina, che chiede con `setInterval(leggi, 40)`, e
+l'orologio di ieri lo rifiutava con un errore: ora `setInterval` e
+`clearInterval` ci sono, per scadenza come i timer. L'intervallo si
+rimette in coda PRIMA di scattare (un `clearInterval` nel suo stesso giro
+lo toglie davvero), e da 0 ms vale 1, come in node, o il tempo non
+passerebbe mai. Provato a parte: intervallo da 40 e timer da 100 escono a
+40, 80, 100, 120 e il terzo giro si toglie da sé. `setTimeout` e
+`clearTimeout` non cambiano: i due banchi già curati danno gli stessi
+conti di prima (46 e 48). Il bunker passa da circa 6 s a 0,5.
+
+**SCARTATO.** Allungare le attese o ritentare (regola di Andrea). Un
+`banco_node()` condiviso che scrive, lancia e legge: tocca decine di
+banchi che vanno, un refactoring non chiesto. L'orologio su tutti i banchi
+coi timer: dove ci sono rete vera, `crypto.subtle` (le foto della chat) o
+file letti in asincrono, un timer finto scatta prima della risposta vera.
+Va solo dove tutto è cartone, e lo dice il commento sopra la costante.
+
+**COSA È PROVATO** (albero develop `53da99a` più questo cantiere).
+- CONTROPROVA sotto carico. Bunker: coi timer veri (copia fuori dal repo)
+  10 giri rossi su 10 su «LA SOCKET CADE»; con l'orologio 10 verdi su 10.
+  PayCode: coi timer veri 11 giri rossi su 40 sulle righe della gara; con
+  l'orologio 0 su 40. I due banchi già curati, con l'orologio allargato,
+  10 verdi su 10.
+- Suite intera severa due volte di fila col Python del PC, 26.216/0 senza
+  saltate (le 26.214 di ieri più le due sentinelle); due volte di fila nel
+  venv con le sole dipendenze del workflow, senza coincurve, 26.211/0. I
+  due ambienti ogni volta in parallelo, cioè col PC carico.
+- I collaudi della CI (`ci/collaudi.txt`) nel venv senza coincurve,
+  `--paralleli 2`: 100 verdi, 0 rossi.
+- DOPO IL REBASE su develop `3401b66` (quattro commit nuovi: swap tappa 4,
+  swap-frasi, filtro avorio; nessuno tocca i nomi di qui): le sezioni che
+  hanno toccato, i quattro banchi con l'orologio e le prove dei documenti,
+  804/0 col Python del PC e nel venv; i collaudi nel venv 102/0.
+
+**DA GUARDARE.** Dieci giri dicono «sotto il 10% non l'ho vista», non «non
+c'è». Se un'altra sezione cade solo a PC carico, la cura è la stessa riga
+in testa al banco, se il banco è tutto cartone.
