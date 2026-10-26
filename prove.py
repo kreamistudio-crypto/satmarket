@@ -5187,7 +5187,10 @@ NOMI_IN_PAGAMENTO = (
     # (26 ott 2026, swap tappa 4) il volo degli swap nello stadio, e le
     # parole a chi vende quando la fattura era quella di uno swap: sui
     # banchi la tabella degli swap non c'e', e i tre dicono «niente»
-    "_swap_voli", "_fattura_di_swap", "_msg_swap_non_andato")
+    "_swap_voli", "_fattura_di_swap", "_msg_swap_non_andato",
+    # (26 ott 2026) le parole di fine swap: sui banchi non c'e' la
+    # tabella, e la funzione dice «niente» (il messaggio di sempre)
+    "_msg_swap_arrivato")
 
 
 def ambiente_in_pagamento(notifica=None, commissione=0):
@@ -5223,8 +5226,10 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], p)
     for nome in ("netto_venditore", "_quando_ritentare") + tuple(
             n for n in NOMI_IN_PAGAMENTO if n[0] == "_" or n[0].islower()):
-        # `pezzo` taglia dal `def`: all'unica asincrona l'`async` va rimesso
-        exec(("async " if nome == "_avvisa_in_pagamento" else "")
+        # `pezzo` taglia dal `def`: alle asincrone l'`async` va rimesso
+        # (dal 26 ott 2026 sono due: anche le parole di fine swap)
+        exec(("async " if nome in ("_avvisa_in_pagamento",
+                                   "_msg_swap_arrivato") else "")
              + pezzo(nome), p)
     # ...e i quattro di «paga da un'altra cassaforte» (21 set 2026), che
     # stanno dentro le stesse funzioni d'uscita: chi monta questi monta
@@ -178510,6 +178515,119 @@ def prove_swap_pagamento():
           ("⚠️ NON VA ACCESA: sopra 0 Barattolo NON paga" in src,
            "LA FEE NOSTRA RESTA 0 (26 ott 2026" in prod,
            'return _swap_pag_no(ordine_id, "fee",' in src))
+    # --- (26 ott 2026) LE TRE CURE DEL GIRO SUL REGTEST
+    import asyncio
+    # 1. fallito resta fallito: puo' solo diventare pagato
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "payout_stato TEXT, payout_hash TEXT, invoice_venditore TEXT)")
+    amb = dict(st, time=__import__("time"), print=lambda *a, **k: None)
+    for f in ("_swap_pag_prepara", "_swap_pag_stato", "_swap_pag_aggiorna"):
+        exec(pezzo(f), amb)
+    amb["_swap_pag_prepara"](con)
+    con.execute("INSERT INTO swap_pagamenti(ordine_id, venditore_id, fornitore, "
+                "swap_id, hash, bolt11, sats, stato) VALUES(1, 999, 'satsrouting', "
+                "'s1', 'VECCHIO', 'lnbc-vecchia', 30000, 'fallito')")
+    riga1 = lambda: con.execute("SELECT * FROM swap_pagamenti WHERE id=1").fetchone()
+    esiti = []
+    for o in (("confirmed", "in_volo", "VECCHIO", "lnbc-nuova"),
+              ("confirmed", "incerto", "VECCHIO", "lnbc-nuova"),
+              ("confirmed", "", "", "lnbc-vecchia"),
+              ("released", "uscito", "VECCHIO", "lnbc-nuova")):
+        con.execute("DELETE FROM ordini")
+        con.execute("INSERT INTO ordini VALUES(1,?,?,?,?)", o)
+        esiti.append(amb["_swap_pag_aggiorna"](con, riga1()))
+    prova("uno swap visto fallito resta fallito (la ronda che tiene il suo nome "
+          "non lo rimette in volo), e diventa solo pagato",
+          ["fallito", "fallito", "fallito", "pagato"], esiti)
+    # 2. il 520 del margine: il suo motivo, le sue parole, e niente «bruciata»
+    amb = {"vita_fattura": lambda b: 3600, "_ponte": {"stato": "ok"},
+           "_MOTIVI_LND": {}}
+    k = src.index("\nMOTIVO_SCADUTA, MOTIVO_STRADA, ") + 1
+    exec(src[k:src.index("\n\n\ndef _motivo_payout(", k)], amb)
+    exec(pezzo("_motivo_payout"), amb)
+    prova("il 520 «reserve at least … routing fees» di LNbits ha il suo motivo",
+          ("riserva", "saldo"),
+          (amb["_motivo_payout"]("lnbc1", "You must reserve at least (550  sat) "
+                                 "to cover potential routing fees."),
+           amb["_motivo_payout"]("lnbc1", "insufficient balance")))
+    detti = []
+
+    async def _admin(t, **k):
+        detti.append(t)
+    amb.update(notifica_admin=_admin, _fmt_sats=reale("_fmt_sats"),
+               html=__import__("html"))
+    exec("async " + pezzo("_avvisa_payout_fallito"), amb)
+    for m in ("riserva", "nessuna_strada"):
+        asyncio.run(amb["_avvisa_payout_fallito"](
+            {"motivo": m, "etichetta": "Incasso", "hash": "h"}, 55_000))
+    prova("...ai moderatori: manca il margine e la fattura NON e' bruciata; "
+          "per gli altri motivi la frase di sempre",
+          [(True, True, False), (False, False, True)],
+          [("manca il margine" in t, "non è bruciata" in t,
+            "non si può ripagare" in t) for t in detti])
+    prova("...e la pagina ha la parola del motivo nuovo", True,
+          "  riserva:        'un problema del nostro nodo'," in mini)
+    # 3. il messaggio di fine swap: l'importo on-chain vero e le conferme
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+
+    class _C:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+    lett = {"txs": "[]"}
+
+    async def _mempool(base, percorso):
+        return lett["txs"]
+    amb = {"_swap_pag_db": _C, "json": __import__("json"),
+           "swap_fornitore": lambda f: {"mempool": "http://m"},
+           "_swap_mempool_leggi": _mempool, "_fmt_sats": reale("_fmt_sats")}
+    exec(pezzo("_swap_pag_prepara"), amb)
+    amb["_swap_pag_prepara"](con)
+    con.execute("INSERT INTO swap_pagamenti(ordine_id, venditore_id, fornitore, "
+                "swap_id, hash, bolt11, sats, onchain, indirizzo) VALUES(1, 999, "
+                "'satsrouting', 's1', 'H', 'lnbcrt1x', 55000, 54571, 'bcrt1pLOCK')")
+    exec("async " + pezzo("_msg_swap_arrivato"), amb)
+    msg = lambda b="lnbcrt1x": asyncio.run(amb["_msg_swap_arrivato"](1, b, "⭐"))
+    lockup = {"txid": "L" * 8 + "x" * 8, "vin": [],
+              "vout": [{"scriptpubkey_address": "bcrt1pLOCK", "value": 54571}],
+              "status": {"confirmed": True}}
+
+    def spesa(conf, prevout=True):
+        return {"txid": "abcdefgh12345678", "status": {"confirmed": conf},
+                "vin": [{"txid": lockup["txid"], "vout": 0,
+                         **({"prevout": {"scriptpubkey_address": "bcrt1pLOCK"}}
+                            if prevout else {})}],
+                "vout": [{"value": 54460}]}
+    json_ = __import__("json")
+    lett["txs"] = json_.dumps([spesa(False), lockup])
+    in_attesa = msg()
+    lett["txs"] = json_.dumps([spesa(True, prevout=False), lockup])
+    confermato = msg()
+    lett["txs"] = json_.dumps([lockup])
+    senza = msg()
+    lett["txs"] = None
+    giu = msg()
+    prova("fine swap: il ritiro con l'importo on-chain vero, in attesa di "
+          "conferma; confermato (anche senza prevout); senza ritiro o mempool "
+          "giu', i sats bloccati e il telefono che ritira",
+          [(True, True, False), (True, True, False), (True, False, False),
+           (True, False, False)],
+          [("54.460 sats" in in_attesa, "aspetta la prima conferma" in in_attesa,
+            "nel tuo wallet" in in_attesa),
+           ("54.460 sats" in confermato, "già confermato" in confermato,
+            "nel tuo wallet" in confermato),
+           ("54.571 sats" in senza, "54.460" in senza, "nel tuo wallet" in senza),
+           ("54.571 sats" in giu, "54.460" in giu, "nel tuo wallet" in giu)])
+    prova("...e una fattura che non e' di uno swap non cambia niente", "",
+          msg("lnbc-altra"))
+    sb = codice(pezzo("_sblocca_sats"))
+    prova("...in tutti e quattro i rami riusciti, a chi vende", 4,
+          sb.count('await notifica(o["venditore_id"], fine_swap or'))
     prova("il collaudo dello swap intero sta negli elenchi della CI", (True, True),
           ("\ncollaudo_swap_pagamento\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))

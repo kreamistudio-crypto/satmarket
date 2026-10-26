@@ -406,7 +406,14 @@ def tx_json(c, txid):
                     "status": {"confirmed": s["stato"] == "transaction.confirmed"}}
     for lockup, spesa in c["spese"].items():
         if spesa["txid"] == txid:
-            return {"txid": txid, "vin": [{"txid": lockup, "vout": 0}],
+            # (26 ott 2026) come mempool.space: l'ingresso porta l'uscita
+            # che spende (`prevout`), col suo indirizzo e il suo valore
+            s = next((x for x in c["swap"].values()
+                      if x["lockup"] and x["lockup"]["id"] == lockup), None)
+            prevout = ({"scriptpubkey_address": s["lockupAddress"],
+                        "value": s["lockup"]["valore"]} if s else {})
+            return {"txid": txid,
+                    "vin": [{"txid": lockup, "vout": 0, "prevout": prevout}],
                     "vout": spesa["vout"], "status": {"confirmed": False}}
     return None
 
