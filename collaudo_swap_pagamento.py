@@ -224,6 +224,11 @@ def _controllo(cosa, q):
         con = SRV.db()
         con.execute("UPDATE ordini SET payout_ultimo=payout_ultimo-7200 "
                     "WHERE id=?", (int(a["ordine"]),))
+        # (26 ott 2026) anche la linea del tempo, da cui lo stadio legge
+        # da quanto si sta pagando
+        con.execute("UPDATE payout_passi SET quando=quando-7200, "
+                    "ultimo=ultimo-7200 WHERE tabella='ordini' AND riga_id=?",
+                    (int(a["ordine"]),))
         if a.get("cosa") == "scadenza":
             con.execute("UPDATE swap_pagamenti SET vola_fino=1 WHERE "
                         "ordine_id=?", (int(a["ordine"]),))
@@ -235,6 +240,19 @@ def _controllo(cosa, q):
     if cosa == "tariffe_via":
         SRV._TARIFFE_SWAP.update(quando=0.0, dati=None)
         return {"ok": True}
+    if cosa == "stadio":
+        # lo stadio «in pagamento» come lo legge la pagina dell'ordine
+        con = SRV.db()
+        con.row_factory = __import__("sqlite3").Row
+        r = dict(con.execute("SELECT * FROM ordini WHERE id=?",
+                             (int(a["id"]),)).fetchone())
+        st = SRV._stadi_ordini(con, [r]).get(r["id"]) or {}
+        con.close()
+        return {"passo": st.get("passo"), "lungo": st.get("lungo")}
+    if cosa == "detto":
+        # l'ultimo messaggio Telegram a una persona
+        a_lui = [t for chi, t in banco.DETTO if int(chi) == int(a["chi"])]
+        return {"ultimo": a_lui[-1] if a_lui else "", "quanti": len(a_lui)}
     if cosa == "avvisi":
         return {"ghiaccio": sum("🧊" in t for t in banco.AVVISI)}
     return {"sconosciuto": cosa}
@@ -427,12 +445,14 @@ const setInterval = () => 1, clearInterval = () => {};
   await ctl(`invecchia?ordine=${O.volo}`);
   await ctl('ronda');
   out.voloMezzora = {ordine: await ctl(`ordine?id=${O.volo}`),
-                     ghiaccio: (await ctl('avvisi')).ghiaccio};
+                     ghiaccio: (await ctl('avvisi')).ghiaccio,
+                     stadio: await ctl(`stadio?id=${O.volo}`)};
   await ctl(`invecchia?ordine=${O.volo}&cosa=scadenza`);
   await ctl('ronda');
   out.voloScaduto = {ordine: await ctl(`ordine?id=${O.volo}`),
                      righe: await ctl(`righe?ordine=${O.volo}`),
-                     ghiaccio: (await ctl('avvisi')).ghiaccio};
+                     ghiaccio: (await ctl('avvisi')).ghiaccio,
+                     stadio: await ctl(`stadio?id=${O.volo}`)};
   await A.run('swapGiro()');
   out.voloTelefono = {pagamento: ultimo(O.volo).pagamento, frase: frase(O.volo)};
   out.voloDiNuovo = await paga(O.volo);
@@ -444,7 +464,8 @@ const setInterval = () => 1, clearInterval = () => {};
   out.fallito = {pagamento: r3.pagamento, frase: frase(O.caso241),
                  scegliDiNuovo: A.run(`swapDiOrdine(${O.caso241}) === null`),
                  ordine: await ctl(`ordine?id=${O.caso241}`),
-                 righe: await ctl(`righe?ordine=${O.caso241}`)};
+                 righe: await ctl(`righe?ordine=${O.caso241}`),
+                 avviso: (await ctl('detto?chi=999')).ultimo};
   await ctl(`lnbits?h=${r3.impronta}&s=success`);     // pagato a mano
   await ctl('post?esito=pending');
   const r3b = await nuovoSwap(A, O.caso241);
@@ -634,10 +655,14 @@ def il_giro(r, ordini, tee):
     prova("mezz'ora passata: la fattura di uno swap vola ancora, nessun 🧊",
           ("in_volo", 0), (r["voloMezzora"]["ordine"]["payout_stato"],
                            r["voloMezzora"]["ghiaccio"]))
+    prova("...e la storia dell'ordine NON dice «ci stiamo lavorando noi»",
+          {"passo": "in_volo", "lungo": False}, r["voloMezzora"]["stadio"])
     vs = r["voloScaduto"]
     prova("passata la scadenza dello swap: 🧊 Pagamenti da verificare",
           ("incerto", "da_verificare", 1),
           (vs["ordine"]["payout_stato"], primo(vs["righe"]), vs["ghiaccio"]))
+    prova("...e adesso la storia dell'ordine lo dice", True,
+          r["voloScaduto"]["stadio"]["lungo"])
     prova("...il telefono lo dice",
           ("da_verificare", "Pagamento da verificare: ci stiamo lavorando noi. "
                             "I tuoi sats non si perdono."),
@@ -655,6 +680,12 @@ def il_giro(r, ordini, tee):
     prova("...il telefono lo dice e chi vende sceglie di nuovo",
           ("Il pagamento non è partito: nessun sats si è mosso. Scegli di nuovo "
            "come incassare.", True), (f["frase"], f["scegliDiNuovo"]))
+    av = f.get("avviso") or ""
+    prova("...e su Telegram chi vende legge che lo swap non e' andato, "
+          "senza «fattura»: sceglie di nuovo",
+          (True, False, True, True),
+          ("Lo swap non è andato" in av, "fattura" in av.lower(),
+           "scegli di nuovo come incassare" in av, "30.000 sats" in av))
     m = r["aMano"]
     prova("pagato a mano, poi uno swap nuovo: NON si paga, nessuna uscita per lui",
           (True, 0, 1), (m["nuovo"], m["usciteNuovo"], m["usciteVecchio"]))

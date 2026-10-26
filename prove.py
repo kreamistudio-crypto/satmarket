@@ -5183,7 +5183,11 @@ NOMI_IN_PAGAMENTO = (
     "_segna_passo", "_segna_deciso", "_ultimo_passo", "_conta_guasti",
     "_gia_detto", "_quando_ritentare_nostro", "_tocca_riprovare", "_campo",
     "_in_pagamento", "_rifiuto_in_pagamento", "stadio_pagamento",
-    "_stadi_ordini", "_avvisa_in_pagamento")
+    "_stadi_ordini", "_avvisa_in_pagamento",
+    # (26 ott 2026, swap tappa 4) il volo degli swap nello stadio, e le
+    # parole a chi vende quando la fattura era quella di uno swap: sui
+    # banchi la tabella degli swap non c'e', e i tre dicono «niente»
+    "_swap_voli", "_fattura_di_swap", "_msg_swap_non_andato")
 
 
 def ambiente_in_pagamento(notifica=None, commissione=0):
@@ -178801,6 +178805,62 @@ def prove_swap_pagamento():
            "statoPagamentoSwap(rec.ordine)" in instr))
     prova("...e lo swap nato porta l'impronta del NOSTRO segreto", True,
           "impronta: S.hex.encode(chiavi.impronta)," in boltz)
+    # --- (26 ott 2026) LE DUE FRASI: la storia dell'ordine e l'avviso
+    amb = {"time": __import__("time"), "_campo": lambda o, k, d=None: o.get(k, d),
+           "_in_pagamento": lambda o: o.get("stato") == "confirmed",
+           "netto_venditore": lambda p: p, "_conta_guasti": lambda passi: (0, 0),
+           "_quando_ritentare": lambda *a: 0,
+           "_quando_ritentare_nostro": lambda *a: 0}
+    amb.update(PASSO_DECISO="deciso", PASSO_PARTITO="partito",
+               PASSO_IN_VOLO="in_volo", PASSO_IN_VERIFICA="in_verifica",
+               PASSO_GUASTO="guasto_nostro", PASSO_FALLITO="fallito",
+               PASSO_SERVE="serve_fattura", PASSO_ARRIVATO="arrivato",
+               PASSO_RIPARTE="riparte", IN_PAGAMENTO_LUNGO_S=1800,
+               VIA_LIGHTNING="lightning",
+               MOTIVO_ALTRA_CASSAFORTE="altra_cassaforte", MOTIVI_NOSTRI=())
+    exec(pezzo("stadio_pagamento"), amb)
+    stp = amb["stadio_pagamento"]
+    adesso = 2_000_000
+    passi = [{"passo": "deciso", "motivo": "", "quando": adesso - 7200,
+              "ultimo": adesso - 7200, "volte": 1}]
+
+    def ordine(ps):
+        return {"stato": "confirmed", "payout_stato": ps, "prezzo_sats": 30_000,
+                "protezione_sats": 0}
+    prova("la storia dell'ordine: dopo mezz'ora in volo «lungo», ma non per la "
+          "fattura di uno swap ancora nella sua scadenza; dopo, si'; il 🧊 sempre",
+          [True, False, True, True, True],
+          [stp(ordine("in_volo"), passi, (), adesso)["lungo"],
+           stp(ordine("in_volo"), passi, (), adesso, adesso + 600)["lungo"],
+           stp(ordine("in_volo"), passi, (), adesso, adesso - 1)["lungo"],
+           stp(ordine("incerto"), passi, (), adesso, adesso + 600)["lungo"],
+           stp(ordine("in_volo"), passi, (), adesso, 0)["lungo"]])
+    prova("...e nei primi minuti non e' lungo per nessuno", False,
+          stp(ordine("in_volo"), [dict(passi[0], quando=adesso - 60)], (),
+              adesso)["lungo"])
+    amb = {"_fmt_sats": reale("_fmt_sats")}
+    exec(pezzo("_msg_swap_non_andato"), amb)
+    m = amb["_msg_swap_non_andato"](30_000)
+    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura», i "
+          "sats al sicuro, si sceglie di nuovo",
+          (False, True, True, True),
+          ("fattura" in m.lower(), "30.000 sats" in m,
+           "deposito di garanzia" in m, "scegli di nuovo come incassare" in m))
+    sb = codice(pezzo("_sblocca_sats"))
+    prova("...e parte PRIMA delle parole di una fattura bruciata, solo se la "
+          "fattura e' di uno swap", (True, True),
+          (sb.index("_fattura_di_swap(ordine_id, bolt11)")
+           < sb.index("msg = _msg_fattura_nuova(netto, taccuino)"),
+           "elif bolt11 and _fattura_di_swap(ordine_id, bolt11):" in sb))
+    prova("lo stadio della lista legge il volo degli swap", True,
+          "voli.get((r[\"id\"], r.get(\"payout_hash\") or \"\")" in
+          pezzo("_stadi_ordini"))
+    prod = open(os.path.join("docs", "PRODUZIONE.md"), encoding="utf-8").read()
+    prova("la fee nostra resta 0: scritto nel pannello e in PRODUZIONE",
+          (True, True, True),
+          ("⚠️ NON VA ACCESA: sopra 0 Barattolo NON paga" in src,
+           "LA FEE NOSTRA RESTA 0 (26 ott 2026" in prod,
+           'return _swap_pag_no(ordine_id, "fee",' in src))
     prova("il collaudo dello swap intero sta negli elenchi della CI", (True, True),
           ("\ncollaudo_swap_pagamento\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
