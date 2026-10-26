@@ -157,7 +157,8 @@ def main():
     libro = chiama(SRV.pubblica, corpo(
         "Collezione d'Arte Religiosa SAIE – Società San Paolo "
         "(1978-1981) Edizioni di lusso",
-        "Volumi rilegati, carta avorio, pagine color avorio."))
+        "Volumi rilegati, carta avorio, pagine color avorio. "
+        "Rilegatura avorio, copertina avorio, tela avorio sul dorso."))
     prova("nasce, con un numero", True, bool(libro.get("id")))
     con = SRV.db()
     stato = con.execute("SELECT stato FROM annunci WHERE id=?",

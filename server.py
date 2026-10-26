@@ -21926,6 +21926,12 @@ CONTESTI_INNOCENTI = {
         "sfumatura avorio", "sfumature avorio",
         # la carta (rilegature, inviti, edizioni)
         "carta avorio", "cartoncino avorio",
+        # il libro e l'oggetto (26 ott 2026, decisione di Andrea): il
+        # colore detto senza «color» davanti. «copertina IN avorio» resta
+        # ferma — fra le due parole c'e' «in», e la frase non combacia
+        "rilegatura avorio", "copertina avorio", "pagine avorio",
+        "fogli avorio", "carta color avorio", "tela avorio",
+        "finitura avorio", "smalto avorio", "laccato avorio",
         # le imitazioni, che sono il contrario dell'avorio vero
         "finto avorio", "simil avorio", "effetto avorio",
         "imitazione avorio", "tipo avorio", "avorio finto",

@@ -72061,3 +72061,16 @@ non in elenco, tipo «rilegatura avorio»), si aggiunge la frase a
 `CONTESTI_INNOCENTI` col caso nelle prove. Sul VPS: dopo il deploy il
 motivo dei blocchi dello strato 1 nel registro e nelle statistiche admin
 porta la parola, quindi le statistiche per motivo si dividono per parola.
+
+**IL SEGUITO, LE FRASI DEL LIBRO E DELL'OGGETTO** (26 ott 2026, decisione di
+Andrea, commit piccolo su develop prima del cherry-pick su main). Il colore
+detto senza «color» davanti: «rilegatura avorio», «copertina avorio»,
+«pagine avorio», «fogli avorio», «carta color avorio», «tela avorio»,
+«finitura avorio», «smalto avorio», «laccato avorio». «Copertina IN
+avorio» e «tasti in avorio» restano fermi: fra le due parole c'è «in», e
+la frase non combacia — due righe nuove fra i veri lo dicono. Ogni frase
+ha il suo caso fra gli innocenti e la sua controprova (la frase tolta, il
+suo caso si ferma), più quella che le toglie tutte insieme; «carta color
+avorio» è l'unica senza controprova sua, perché «color avorio» la copre
+già da sola, e lo si dichiara invece di provarla a vuoto. Il libro del
+collaudo sulle rotte vere porta anche rilegatura, copertina e tela.
