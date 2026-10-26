@@ -33953,6 +33953,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   vola_fino)` e `_swap_voli` in `_stadi_ordini` (una fattura di swap in
   volo non e' «lunga» prima della scadenza). L'avviso: `_fattura_di_swap`
   e `_msg_swap_non_andato` nel ramo del fallimento di `_sblocca_sats`.
+  (26 ott 2026, cantiere regtest-swap, dal giro sul regtest) In
+  `_swap_pag_aggiorna` una riga «fallito» resta fallita e passa solo a
+  «pagato». Il motivo `MOTIVO_RISERVA` («reserve at least» di LNbits,
+  prima delle altre spie) con le sue parole in `PAROLE_MOTIVO` e in
+  `MOTIVI_PAGAMENTO` della pagina; in `_avvisa_payout_fallito` per quel
+  motivo la fattura NON è bruciata. `_msg_swap_arrivato(ordine_id,
+  bolt11, invito)`: dal mempool del fornitore la transazione che spende
+  il lockup (`vin.prevout.scriptpubkey_address` o l'id del lockup),
+  importo on-chain vero e conferme; sui quattro rami riusciti di
+  `_sblocca_sats` al posto delle parole di Lightning. Il cartone mette
+  il `prevout` nella spesa, come mempool.space.
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e

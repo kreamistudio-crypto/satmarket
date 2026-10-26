@@ -13137,6 +13137,10 @@ MOTIVO_SCADUTA, MOTIVO_STRADA, MOTIVO_SALDO, MOTIVO_PONTE = (
     "scaduta", "nessuna_strada", "saldo", "ponte")
 MOTIVO_TEMPO, MOTIVO_RIFIUTATA, MOTIVO_BRUCIATA, MOTIVO_IGNOTO = (
     "tempo", "rifiutata", "bruciata", "ignoto")
+# (26 ott 2026, il giro sul regtest) il nono: LNbits non paga se nella
+# cassaforte, oltre al pagamento, non resta il margine per le commissioni
+# (l'1 %); e si ferma PRIMA, senza scrivere niente per quell'hash
+MOTIVO_RISERVA = "riserva"
 
 PAROLE_MOTIVO = {
     MOTIVO_SCADUTA: (
@@ -13169,6 +13173,11 @@ PAROLE_MOTIVO = {
     MOTIVO_IGNOTO: (
         "il motivo <b>non si è potuto leggere</b>: né LND né LNbits lo "
         "dicono in una forma che conosciamo (la riga grezza è qui sotto)"),
+    MOTIVO_RISERVA: (
+        "<b>nella cassaforte manca il margine</b>: LNbits vuole tenere da "
+        "parte circa l'1 % del pagamento per le commissioni di "
+        "instradamento, e oltre a questo pagamento il saldo non basta. "
+        "Non è colpa di chi riceve: va aggiunto margine alla cassaforte"),
 }
 
 # Come LND chiama i suoi fallimenti (`failure_reason` di `track`)...
@@ -13183,6 +13192,7 @@ _MOTIVI_LND = {
 # decidono niente — scelgono una frase — e quel che non riconoscono
 # resta «ignoto», con la riga grezza accanto.
 _SPIE_LNBITS = (
+    (("reserve at least", "cover potential routing fees"), MOTIVO_RISERVA),
     (("expired", "scadut"), MOTIVO_SCADUTA),
     (("insufficient", "not enough", "balance"), MOTIVO_SALDO),
     (("no_route", "no route", "unable to find a path", "find a route",
@@ -13276,10 +13286,16 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
             f"<b>Perché:</b> "
             f"{PAROLE_MOTIVO[motivo].format(quando=quando)}.\n\n"
             f"I sats <b>non sono usciti</b> e restano nel deposito di "
-            f"garanzia. Quella fattura non si può ripagare: LNbits tiene "
-            f"una riga per payment hash e a una seconda richiesta "
-            f"restituisce la vecchia senza ritentare nulla. Ne serve una "
-            f"<b>nuova</b>."
+            f"garanzia. "
+            + (f"LNbits si è fermata <b>prima</b> di pagare e non ha "
+               f"scritto niente per questa fattura: non è bruciata. La "
+               f"ronda dei pagamenti la darà per «mai partita» fra un "
+               f"quarto d'ora; prima, va rimesso margine nella cassaforte."
+               if motivo == MOTIVO_RISERVA else
+               f"Quella fattura non si può ripagare: LNbits tiene "
+               f"una riga per payment hash e a una seconda richiesta "
+               f"restituisce la vecchia senza ritentare nulla. Ne serve una "
+               f"<b>nuova</b>.")
             + (f"\n<code>{taccuino.get('hash')}</code>"
                if taccuino.get("hash") else "")
             + (f"\n{html.escape(str(taccuino.get('errore')))}"
@@ -13798,6 +13814,66 @@ def _fattura_di_swap(ordine_id: int, bolt11: str) -> bool:
             con.close()
     except Exception:
         return False
+
+
+async def _msg_swap_arrivato(ordine_id: int, bolt11: str,
+                             invito: str = "") -> str:
+    """LE PAROLE DI CHI VENDE a swap concluso (26 ott 2026, il giro sul
+    regtest): l'importo ON-CHAIN VERO e lo stato delle conferme, letti dal
+    mempool (dati pubblici: la transazione che spende il lockup). Il
+    server non sa l'indirizzo di chi vende — sta nel suo telefono — ma
+    il ritiro e' l'unica uscita del lockup. Se il mempool non risponde, o
+    il ritiro non c'e' ancora, si dice quel che si sa: i sats bloccati per
+    lui, e che il telefono li ritira. '' se la fattura non e' di uno swap."""
+    try:
+        con = _swap_pag_db()
+        try:
+            r = con.execute("SELECT * FROM swap_pagamenti WHERE ordine_id=? "
+                            "AND bolt11=?",
+                            (ordine_id, str(bolt11 or "").strip().lower())
+                            ).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        return ""
+    if not r:
+        return ""
+    chi = swap_fornitore(r["fornitore"]) or {}
+    preso = None
+    try:
+        movimenti = json.loads(await _swap_mempool_leggi(
+            chi.get("mempool") or "", f"/address/{r['indirizzo']}/txs")
+            or "[]")
+        movimenti = movimenti if isinstance(movimenti, list) else []
+        # il lockup: chi paga l'indirizzo; il ritiro: chi lo spende (dal
+        # `prevout`, o dall'id del lockup se il mempool non lo dice)
+        lockup = {str(t.get("txid") or "") for t in movimenti
+                  if any((u or {}).get("scriptpubkey_address") == r["indirizzo"]
+                         for u in t.get("vout") or [])} - {""}
+        for t in movimenti:
+            if any(((v or {}).get("prevout") or {}).get("scriptpubkey_address")
+                   == r["indirizzo"] or str((v or {}).get("txid") or "") in lockup
+                   for v in t.get("vin") or []):
+                preso = (sum(int((u or {}).get("value") or 0)
+                             for u in t.get("vout") or []),
+                         str(t.get("txid") or ""),
+                         bool((t.get("status") or {}).get("confirmed")))
+                break
+    except Exception:
+        preso = None
+    coda = f" Affare concluso! ⚡ {invito}".rstrip()
+    if preso and preso[0] > 0:
+        sats, txid, confermata = preso
+        return (f"₿ <b>Swap concluso.</b> Il ritiro on-chain ti porta "
+                f"<b>{_fmt_sats(sats)} sats</b> (transazione "
+                f"<code>{txid[:8]}…{txid[-8:]}</code>): "
+                + ("<b>già confermato</b>." if confermata else
+                   "<b>aspetta la prima conferma</b> della rete, di solito "
+                   "una decina di minuti.") + coda)
+    return (f"₿ <b>Swap concluso.</b> Barattolo ha pagato lo swap: "
+            f"<b>{_fmt_sats(int(r['onchain']))} sats</b> sono bloccati "
+            f"on-chain per te, e il tuo telefono li ritira (meno la rete del "
+            f"ritiro). Le conferme le vedi nella pagina Swap." + coda)
 
 
 def _msg_swap_non_andato(sats: int) -> str:
@@ -73113,6 +73189,15 @@ def _swap_pag_aggiorna(con, r) -> str:
     o = con.execute("SELECT * FROM ordini WHERE id=?",
                     (r["ordine_id"],)).fetchone()
     nuovo = _swap_pag_stato(r, o)
+    # FALLITO RESTA FALLITO (26 ott 2026, il giro sul regtest): dopo un
+    # fallimento che LNbits non aveva nemmeno registrato, la porta dei
+    # pagamenti tiene sull'ordine il NOME di quel pagamento per 15 minuti
+    # (finche' non lo crede «mai partito»), e la riga sembrava tornata in
+    # volo — col journal che lo diceva e i tetti del giorno che contavano
+    # due volte i sats dello stesso ordine. Una riga vista fallita puo'
+    # solo diventare pagata: il pagamento fatto a mano (il caso del #241).
+    if r["stato"] == SWAP_PAG_FALLITO and nuovo != SWAP_PAG_PAGATO:
+        nuovo = SWAP_PAG_FALLITO
     if nuovo != r["stato"]:
         con.execute("UPDATE swap_pagamenti SET stato=?, aggiornato=? "
                     "WHERE id=?", (nuovo, int(time.time()), r["id"]))
@@ -73756,8 +73841,14 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             con.close()
             invito = ("⭐ Com'è andata? Apri l'ordine nella Mini App "
                       "e lascia un feedback.")
+            # (26 ott 2026, il giro sul regtest) SE ERA LA FATTURA DI UNO
+            # SWAP i sats non arrivano «nel wallet» in Lightning: arrivano
+            # on-chain, meno la rete del ritiro, e confermati o no. A chi
+            # vende si dice quello; a chi compra non cambia niente.
+            fine_swap = await _msg_swap_arrivato(
+                ordine_id, o["invoice_venditore"] or bolt11, invito)
             if automatico:
-                await notifica(o["venditore_id"],
+                await notifica(o["venditore_id"], fine_swap or
                                f"🔓 <b>Sats sbloccati automaticamente!</b> Il tempo di "
                                f"conferma è scaduto senza problemi segnalati: "
                                f"<b>{_fmt_sats(netto)} sats</b> sono in arrivo nel tuo wallet. ⚡ "
@@ -73770,7 +73861,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             elif o["disputata"]:
                 # Lo sblocco arriva da una disputa decisa al venditore:
                 # il messaggio dice la verita', non «ha confermato».
-                await notifica(o["venditore_id"],
+                await notifica(o["venditore_id"], fine_swap or
                                f"⚖️ <b>La disputa è stata decisa a tuo favore:</b> "
                                f"<b>{_fmt_sats(netto)} sats</b> sono in arrivo nel tuo wallet. "
                                f"Affare concluso! ⚡ {invito}")
@@ -73783,7 +73874,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 # «sono in arrivo» (o aspettava da un giro precedente),
                 # quindi qui non gli si ridice che l'acquirente ha
                 # confermato: gli si dice la sola cosa nuova.
-                await notifica(o["venditore_id"],
+                await notifica(o["venditore_id"], fine_swap or
                                f"✅ <b>Arrivati ✓</b> I tuoi "
                                f"<b>{_fmt_sats(netto)} sats</b> sono nel tuo "
                                f"wallet. Affare concluso! ⚡ {invito}")
@@ -73792,7 +73883,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                                f"I sats sono arrivati al venditore. "
                                f"Grazie per aver usato Barattolo 🫙 {invito}")
             else:
-                await notifica(o["venditore_id"],
+                await notifica(o["venditore_id"], fine_swap or
                                f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
                                f"ricezione: <b>{_fmt_sats(netto)} sats</b> sono in arrivo nel tuo "
                                f"wallet. Affare concluso! ⚡ {invito}")
