@@ -72175,3 +72175,146 @@ vende e la porta paga solo l'esatto — la tappa 4 a fee accesa NON paga
 - Come risponde il LNbits VERO alla richiesta di pagare una fattura
   trattenuta (subito «in corso», o tiene la richiesta fino ai 60 s): il
   collaudo prova tutt'e due le strade, il regtest dira' quale e'.
+
+## L'avorio che non è una zanna: il filtro parole impara il colore, il rifiuto dice la parola e la porta privata c'è sempre (25 ott 2026, cantiere filtro-animali-falso-positivo, richiesta di Andrea)
+
+**IL CASO.** Il 25 ott alle 23:19 e alle 23:20 il filtro parole ha fermato
+due volte «Collezione d'Arte Religiosa SAIE – Società San Paolo
+(1978-1981) Edizioni di lus…» di Arwen come «animali protetti». Il verdetto
+non poteva venire dall'AI: «animali protetti» non è fra le quattro famiglie
+di `DIVIETI_BLOCCANTI`, e un VIETATO dell'AI su quel tema va in revisione,
+non in rifiuto. È lo strato 1, e in quella categoria l'unica voce che un
+libro d'arte può contenere è «avorio» da sola: carta avorio, pagine color
+avorio. Il registro però non poteva dirlo: salvava la sola categoria, e la
+descrizione di un annuncio mai nato non si salva da nessuna parte. Per
+saperlo serve chiedere ad Arwen o guardare il titolo nel registro (il
+comando di sola lettura dato ad Andrea dice se la parola è nel titolo,
+senza stampare il testo).
+
+**LA CURA, in tre pezzi.**
+- `CONTESTI_INNOCENTI`: «avorio» RESTA nella lista, ma prima del
+  confronto si tolgono le frasi intere che non parlano di zanne — il colore
+  («color avorio», «bianco avorio», «tonalità avorio»...), la carta
+  («carta avorio», «cartoncino avorio»), le imitazioni («finto avorio»,
+  «effetto avorio», «avorio vegetale»...), il paese e il modo di dire
+  («Costa d'Avorio», che fermava anche chi vende una maschera africana,
+  «torre d'avorio»). Solo per quel termine e solo la frase: un «avorio»
+  rimasto fuori blocca come prima, anche nello stesso annuncio
+  («statuetta avorio, base color avorio» resta ferma). Il giudice diventa
+  `termine_vietato`, che dà categoria E parola; `controlla_vietato` ne dà
+  la categoria ai suoi nove chiamanti, invariati.
+- IL RIFIUTO DICE LA PAROLA: «A fermarlo è stata la parola «avorio».»,
+  dopo il divieto. È la parola del nostro catalogo, mai un pezzo del testo.
+  I tre siti che rispondono al venditore (pubblica, modifica, modifica
+  firmata) la passano a `messaggio_rifiuto`; i cinque che scrivono il
+  registro (quei tre e i due import Nostr) scrivono `motivo_parole`,
+  «animali protetti: avorio». Anche l'avviso ai moderatori la dice.
+- LA PORTA C'È SEMPRE (decisione di Andrea, «sempre la porta privata»):
+  lo «scrivici» chiudeva il rifiuto solo se `BANNER_TEST_LINK` stava nel
+  config, e senza spariva proprio a chi era fermato per sbaglio. Adesso è
+  `CONTATTO_PRIVATO`, `https://t.me/barattolostore?direct`, la chat privata
+  che la Mini App usa già per «Scrivici per i tuoi dati» (`CONTATTO_DATI`):
+  una prova tiene uguali le due copie. Il bot è stato scartato: chi gli
+  scrive testo libero non arriva a nessun moderatore, prende il benvenuto.
+
+**SCARTATO.** Togliere «avorio» dalla lista: passerebbe la statuetta vera.
+Mandare «avorio» in revisione invece di bloccarlo: cinque siti da cambiare
+e una coda in più per un caso che una lista di frasi chiude. Uno sblocco da
+admin per l'annuncio di Arwen: l'annuncio non è mai nato (`annuncio_id 0`
+nel registro), quindi non c'è niente da sbloccare, e un bottone che fa
+passare un testo saltando il filtro sarebbe un buco per tutti. La strada
+subito è che Arwen ripubblichi (con «color crema» al posto di «avorio»
+prima del deploy, col testo di prima dopo). Il link del canale come
+riserva della porta privata: il rifiuto parla di UNA persona.
+
+**IMPERFEZIONE DICHIARATA.** Chi volesse spacciare avorio vero per «color
+avorio» passa lo strato 1 e trova l'AI, che legge il contesto; chi aggira
+davvero scrive «ivory» o «osso», e la lista non lo vede comunque. Il link
+nel toast resta testo non toccabile (ARCHITETTURA, «IMPERFEZIONE
+DICHIARATA: nel toast il link NON è toccabile»): si legge, non si tocca.
+
+**COSA È PROVATO** (albero develop `53da99a` più questo cantiere).
+- `prove_filtro_avorio`, nuova: 9 annunci veri che restano fermi con la
+  parola giusta (fra cui «Zanna d'avorio», «Netsuke… avorio intagliato»,
+  la statuetta con la base color avorio, corno di rinoceronte e pelle di
+  tigre), 11 innocenti che passano (il titolo di Arwen con carta e pagine
+  avorio, l'abito color avorio, la Costa d'Avorio con l'apostrofo dritto e
+  con quello tipografico, i tasti effetto avorio, i bottoni in avorio
+  vegetale, due frasi attaccate). Tre controprove che rompono la regola
+  e fanno cadere la tabella: «avorio» tolto dalla lista, «avorio» nudo fra
+  gli innocenti, le lookaround che consumano gli spazi.
+- Tortura a mano su sei mutazioni del server (la coda torna al canale del
+  config, la parola non entra nel messaggio, la pubblicazione non la
+  passa, un import torna alla sola categoria, la porta cambia solo nel
+  server, il giudice ignora gli innocenti): tutte e sei rosse.
+- `collaudo_filtro_avorio`, nuovo, sulle rotte vere e senza
+  `BANNER_TEST_LINK`: il libro si pubblica ed è in vetrina, la statuetta
+  è un 400 con divieto, parola, «ripubblica» e porta privata, registro e
+  avviso dicono «animali protetti: avorio», la modifica che infila una
+  zanna è ferma col numero dell'annuncio. Sull'albero di develop senza la
+  cura lo stesso collaudo cade su 10 righe, e la prima è il libro fermato:
+  riproduce il caso vero. In `ci/collaudi.txt` e `ci/compila.txt`.
+- Le prove del messaggio di rifiuto (`prove_impersonazione`,
+  `prove_sat_non_e_barattolo`) hanno CAMBIATO LATO dove dicevano «senza
+  canale nessun contatto»: adesso chiedono la porta con il canale vuoto e
+  col segnaposto.
+- Il banco del giro dei connettori (`prove_negozi_grandi`) finge
+  `controlla_vietato` e non conosceva `parola_vietata`: la prima suite
+  intera l'ha detto (26.245/1, «quaranta fermati dalle parole»), e il banco
+  ha avuto la sua `parola_vietata` di cartone e la `motivo_parole` vera.
+- Sull'albero ribasato su develop `fb453a0` (lo swap, tappa 4: nessun
+  simbolo in comune, controllato per nome), nel venv con le SOLE
+  dipendenze del workflow e senza coincurve: suite severa 26.264/0 senza
+  saltate, collaudi della CI `--paralleli 2` 102 verdi, 0 rossi. La suite
+  severa col Python del PC gira per ultima, su quest'albero col verbale.
+
+**DA GUARDARE.** Il comando di sola lettura sul VPS dice se «avorio» era
+nel titolo di Arwen; se la parola era un'altra (o «avorio» in un contesto
+non in elenco, tipo «rilegatura avorio»), si aggiunge la frase a
+`CONTESTI_INNOCENTI` col caso nelle prove. Sul VPS: dopo il deploy il
+motivo dei blocchi dello strato 1 nel registro e nelle statistiche admin
+porta la parola, quindi le statistiche per motivo si dividono per parola.
+
+## Lo swap, le due frasi e la fee che resta 0 (26 ott 2026, cantiere swap-frasi, richiesta di Andrea)
+
+**LE DUE FRASI** (notate a fine tappa 4, «Lo swap, tappa 4»).
+- L'AVVISO TELEGRAM A CHI VENDE dopo un pagamento di swap fallito usava
+  le parole di una fattura Lightning bruciata (`_msg_fattura_nuova`:
+  «incolla una fattura nuova»): chi vende non aveva incollato niente, la
+  fattura l'aveva fatta lo swap. Ora `_sblocca_sats`, se la fattura che
+  ha appena fallito sta in `swap_pagamenti` per quell'ordine
+  (`_fattura_di_swap`), manda `_msg_swap_non_andato`: «Lo swap non è
+  andato», i sats al sicuro nel deposito di garanzia, «scegli di nuovo
+  come incassare: in Lightning o con uno swap nuovo». Il ramo sta dopo
+  quello del ritentativo e prima di tutti quelli di una fattura.
+- LA STORIA DELL'ORDINE diceva «Ci sta mettendo più del solito: ci
+  stiamo lavorando noi» dopo mezz'ora in volo (`IN_PAGAMENTO_LUNGO_S`)
+  anche per la fattura di uno swap, che vola per sua natura finche' chi
+  vende non ritira. Ora `stadio_pagamento` ha `vola_fino` (di serie 0:
+  per tutto il resto non cambia niente): in volo e prima di quell'ora non
+  e' «lungo». `_stadi_ordini` lo legge per (ordine, hash) da
+  `swap_pagamenti` (`_swap_voli`, vuoto se la tabella non c'e'). Passata
+  la scadenza la ronda congela, e il «ci stiamo lavorando noi» torna,
+  vero.
+
+**LA FEE RESTA 0** (decisione di Andrea, 26 ott): `SWAP_FEE_PERCENTO`
+sopra 0 e la tappa 4 non paga (il no «fee», gia' nel codice): scritto
+nel pannello delle leve («⚠️ NON VA ACCESA») e in PRODUZIONE («LO SWAP,
+TAPPA 4: LE LEVE», col controllo di sola riga sul VPS).
+
+**PROVATO.** `collaudo_swap_pagamento` 45/0 (tre scene nuove: lo stadio
+a mezz'ora in volo non e' lungo, a scadenza passata si'; il messaggio
+Telegram dopo il fallimento del #241, senza «fattura» e coi 30.000 sats);
+`prove_swap_pagamento` con lo stadio puro (sei casi), il messaggio, la
+posizione del ramo, la leva in pannello e PRODUZIONE. I tre nomi nuovi
+stanno in `NOMI_IN_PAGAMENTO`, montati nei banchi che girano
+`_sblocca_sats` e lo stadio. CONTROPROVE, 7 su 7 rosse: il ramo dello
+swap tolto, `swap_in_tempo` sempre falso (nel collaudo e nelle prove),
+lo stadio che non legge i voli, la fattura di swap non riconosciuta, la
+riga del pannello tolta, l'avviso che torna a dire «fattura». Suite e
+collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Niente di questo cantiere. Le altre parole della linea
+del tempo di un payout fallito (i motivi «bruciata», «scaduta») non
+sono state guardate per lo swap: le dice lo stadio, e chi vende ha la
+carta dello swap.
