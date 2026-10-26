@@ -159,6 +159,7 @@ rifai_miniature.py
 collaudo_swap_preventivo.py
 collaudo_swap_telefono.py
 collaudo_swap_instradatore.py
+collaudo_margine_cassaforte.py
 collaudo_onchain_indirizzo.py
 collaudo_onchain_ordine.py
 cartone_satsrouting.py

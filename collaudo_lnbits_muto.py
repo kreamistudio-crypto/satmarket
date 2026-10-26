@@ -72,7 +72,11 @@ USCITE = []         # ogni POST verso la chiave che paga
 # leva a se': un nodo che prende la richiesta e poi non consegna e' il
 # caso vero del 14 settembre, e prima di quella data qui non si poteva
 # nemmeno mettere in scena.
-NODO = {"codice": 200, "sats": 50_000, "esito": "success"}
+NODO = {"codice": 200, "sats": 50_000, "esito": "success",
+        # (27 ott 2026, margine-cassaforte) il saldo che `/api/v1/wallet`
+        # dichiara, in sats: grande di serie, cosi' la domanda del margine
+        # non ferma i banchi di ieri; None = il wallet non risponde
+        "saldo": 100_000_000}
 
 # IL REGISTRO DEI PAGAMENTI, hash per hash. Non e' un vezzo del banco:
 # e' LA proprieta' di LNbits che ci e' costata un ordine — tiene UNA
@@ -150,6 +154,11 @@ class _FintoHttpx:
                                    "status": NODO["esito"]})
 
         async def get(self, url, **kw):
+            if url.endswith("/api/v1/wallet"):
+                # la domanda del margine (27 ott 2026): il saldo in msat
+                if NODO.get("saldo") is None:
+                    return _Risposta(500, {})
+                return _Risposta(200, {"balance": int(NODO["saldo"]) * 1000})
             h = url.rsplit("/", 1)[-1]
             if h not in PAGAMENTI:
                 return _Risposta(404, {})   # mai visto: si puo' pagare

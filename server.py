@@ -13117,6 +13117,23 @@ MOTIVO_SCADUTA, MOTIVO_STRADA, MOTIVO_SALDO, MOTIVO_PONTE = (
     "scaduta", "nessuna_strada", "saldo", "ponte")
 MOTIVO_TEMPO, MOTIVO_RIFIUTATA, MOTIVO_BRUCIATA, MOTIVO_IGNOTO = (
     "tempo", "rifiutata", "bruciata", "ignoto")
+# (26 ott 2026, il giro sul regtest) il nono: LNbits non paga se nella
+# cassaforte, oltre al pagamento, non resta il margine per le commissioni
+# (l'1 %); e si ferma PRIMA, senza scrivere niente per quell'hash
+MOTIVO_RISERVA = "riserva"
+# IL MARGINE CHE LNBITS VUOLE (27 ott 2026, cantiere margine-cassaforte,
+# decisione di Andrea dopo i numeri veri del VPS): prima di pagare, LNbits
+# pretende che nel wallet resti l'1 % del pagamento (minimo 2 sats) per le
+# commissioni di rete, e sennò rifiuta con quel 520 PRIMA di toccare LND.
+# Da qui la domanda la facciamo NOI, prima della mano: con la sola chiave
+# di lettura, e se non basta è il quarto verbo (non chiesto, si riprova
+# da soli con `BACKOFF_NOSTRO`) e un avviso ai moderatori, al più uno ogni
+# `MARGINE_AVVISO_PAUSA_S` per cassaforte. I numeri sono quelli di LNbits
+# (`lnbits_reserve_fee_percent`, `lnbits_reserve_fee_min` in msat).
+RISERVA_LNBITS_PERCENTO = 1.0
+RISERVA_LNBITS_MIN_SATS = 2
+MARGINE_AVVISO_PAUSA_S = 6 * 3600
+TIMBRO_MARGINE = "avviso_margine"
 
 PAROLE_MOTIVO = {
     MOTIVO_SCADUTA: (
@@ -13149,6 +13166,11 @@ PAROLE_MOTIVO = {
     MOTIVO_IGNOTO: (
         "il motivo <b>non si è potuto leggere</b>: né LND né LNbits lo "
         "dicono in una forma che conosciamo (la riga grezza è qui sotto)"),
+    MOTIVO_RISERVA: (
+        "<b>nella cassaforte manca il margine</b>: LNbits vuole tenere da "
+        "parte circa l'1 % del pagamento per le commissioni di "
+        "instradamento, e oltre a questo pagamento il saldo non basta. "
+        "Non è colpa di chi riceve: va aggiunto margine alla cassaforte"),
 }
 
 # Come LND chiama i suoi fallimenti (`failure_reason` di `track`)...
@@ -13163,6 +13185,7 @@ _MOTIVI_LND = {
 # decidono niente — scelgono una frase — e quel che non riconoscono
 # resta «ignoto», con la riga grezza accanto.
 _SPIE_LNBITS = (
+    (("reserve at least", "cover potential routing fees"), MOTIVO_RISERVA),
     (("expired", "scadut"), MOTIVO_SCADUTA),
     (("insufficient", "not enough", "balance"), MOTIVO_SALDO),
     (("no_route", "no route", "unable to find a path", "find a route",
@@ -13256,10 +13279,16 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
             f"<b>Perché:</b> "
             f"{PAROLE_MOTIVO[motivo].format(quando=quando)}.\n\n"
             f"I sats <b>non sono usciti</b> e restano nel deposito di "
-            f"garanzia. Quella fattura non si può ripagare: LNbits tiene "
-            f"una riga per payment hash e a una seconda richiesta "
-            f"restituisce la vecchia senza ritentare nulla. Ne serve una "
-            f"<b>nuova</b>."
+            f"garanzia. "
+            + (f"LNbits si è fermata <b>prima</b> di pagare e non ha "
+               f"scritto niente per questa fattura: non è bruciata. La "
+               f"ronda dei pagamenti la darà per «mai partita» fra un "
+               f"quarto d'ora; prima, va rimesso margine nella cassaforte."
+               if motivo == MOTIVO_RISERVA else
+               f"Quella fattura non si può ripagare: LNbits tiene "
+               f"una riga per payment hash e a una seconda richiesta "
+               f"restituisce la vecchia senza ritentare nulla. Ne serve una "
+               f"<b>nuova</b>.")
             + (f"\n<code>{taccuino.get('hash')}</code>"
                if taccuino.get("hash") else "")
             + (f"\n{html.escape(str(taccuino.get('errore')))}"
@@ -13325,6 +13354,66 @@ def _quando_ritentare(tentativi: int, ultimo: int) -> int:
     passo = BACKOFF_PAYOUT[min(max(tentativi - 1, 0),
                                len(BACKOFF_PAYOUT) - 1)]
     return ultimo + passo
+
+
+def _riserva_lnbits(sats: int) -> int:
+    """Quanti sats LNbits vuole in piu' del pagamento, per eccesso: la
+    percentuale, e mai meno del minimo. PURA."""
+    riserva = -(-int(sats) * round(RISERVA_LNBITS_PERCENTO * 1000) // 100_000)
+    return max(riserva, RISERVA_LNBITS_MIN_SATS)
+
+
+async def _saldo_cassaforte(cf) -> int | None:
+    """Il saldo di una cassaforte in sats, con la SOLA chiave di lettura
+    (`/api/v1/wallet` di LNbits). None = non si e' potuto leggere: chi
+    chiama tira dritto come ieri, che un wallet muto lo ferma comunque
+    la prima chiamata che paga."""
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"{cf.LNBITS_URL}/api/v1/wallet",
+                            headers={"X-Api-Key": cf.LNBITS_INVOICE_KEY})
+        if r.status_code != 200:
+            return None
+        return int(r.json().get("balance") or 0) // 1000
+    except Exception:
+        return None
+
+
+async def _avvisa_margine(cassaforte: str, saldo: int, dovuto: int,
+                          chi: str):
+    """L'avviso ai moderatori: manca il margine nella cassaforte. Al piu'
+    uno ogni `MARGINE_AVVISO_PAUSA_S` PER CASSAFORTE (il timbro si scrive
+    prima di mandare): dieci incassi fermi sullo stesso wallet sono UN
+    problema, non dieci. Sotto try: un avviso non rompe mai un'uscita."""
+    try:
+        adesso = int(time.time())
+        nome = f"{TIMBRO_MARGINE}_{cassaforte}"
+        try:
+            ultimo = int(float(timbro_letto(nome) or 0))
+        except (TypeError, ValueError):
+            ultimo = 0
+        # `ultimo` c'e' e la pausa non e' passata: zitti. (Non «0 <»: due
+        # incassi fermi nello stesso secondo facevano due avvisi.)
+        if ultimo and adesso - ultimo < MARGINE_AVVISO_PAUSA_S:
+            return
+        timbro_scrivi(nome, str(adesso))
+        serve = dovuto + _riserva_lnbits(dovuto)
+        await notifica_admin(
+            f"💧 <b>Manca margine nella cassaforte {cassaforte}.</b> "
+            f"Saldo <b>{_fmt_sats(saldo)} sats</b>; per pagare {chi} "
+            f"servono <b>{_fmt_sats(dovuto)}</b> più la riserva che LNbits "
+            f"tiene per le commissioni di rete "
+            f"({_fmt_sats(serve - dovuto)}): <b>{_fmt_sats(serve)}</b>.\n\n"
+            f"Nessun sat è uscito e la fattura resta buona: si riprova da "
+            f"soli (1, 5, 15, 30 minuti, poi ogni ora). Per sbloccare, "
+            f"aggiungi margine alla cassaforte (è il capitale nostro: ogni "
+            f"pagamento riuscito si porta via le sue commissioni di rete, e "
+            f"il margine si consuma da solo).\n\n"
+            f"<i>Questo avviso non si ripete prima di "
+            f"{MARGINE_AVVISO_PAUSA_S // 3600} ore per questa cassaforte.</i>",
+            argomento="liquidita")
+    except Exception as e:
+        print(f"⚠️ Avviso del margine non partito: {e}", flush=True)
 
 
 async def paga_venditore(invoice: str, atteso_sats: int,
@@ -13605,6 +13694,34 @@ async def paga_venditore(invoice: str, atteso_sats: int,
             print(f"🔁 Pagamento NON CHIESTO: il ponte verso LND e' giu' "
                   f"({tabella}#{riga_id}). Niente e' partito, la fattura "
                   f"resta buona: si riprova da soli.", flush=True)
+            return NON_CHIESTO
+        # 2d. IL MARGINE DELLA CASSAFORTE (27 ott 2026, cantiere
+        #    margine-cassaforte). LNbits non paga se nel wallet, oltre al
+        #    pagamento, non resta la sua riserva per le commissioni: e
+        #    rifiuta PRIMA di toccare LND, senza scrivere niente per
+        #    quell'hash. Sul regtest (26 ott) quel 520 passava per
+        #    «ignoto» e «fattura bruciata», e chi vende si sentiva chiedere
+        #    una fattura nuova per un guasto NOSTRO. Qui la domanda si fa
+        #    prima: con la sola chiave di lettura, e se il saldo non basta
+        #    e' il quarto verbo — niente parte, la fattura resta buona, si
+        #    riprova da soli (`BACKOFF_NOSTRO`) e i moderatori lo sanno
+        #    (uno per cassaforte ogni sei ore). Un saldo che NON si legge
+        #    non ferma niente: e' il comportamento di ieri, e un LNbits
+        #    muto lo ferma comunque la chiamata che paga. STA PRIMA DELLA
+        #    MANO, come il ponte: la riga non ha ancora un nome in volo.
+        saldo = await _saldo_cassaforte(cf)
+        serve = atteso_sats + _riserva_lnbits(atteso_sats)
+        if saldo is not None and saldo < serve:
+            taccuino["motivo"] = MOTIVO_RISERVA
+            if phash not in miei:
+                taccuino.pop("hash", None)
+            print(f"🔁 Pagamento NON CHIESTO: nella cassaforte {cf.nome} "
+                  f"manca il margine ({tabella}#{riga_id}: saldo {saldo}, "
+                  f"servono {serve} con la riserva di LNbits). Niente e' "
+                  f"partito, la fattura resta buona: si riprova da soli.",
+                  flush=True)
+            await _avvisa_margine(cf.nome, saldo, atteso_sats,
+                                  f"{tabella}#{riga_id}")
             return NON_CHIESTO
         # 3. LA MANO. Da qui in poi la riga dice 'in_volo' col nome di
         #    questo pagamento, PRIMA che LNbits senta qualcosa.
@@ -14045,7 +14162,8 @@ MOTIVO_LNBITS_MUTO = "lnbits_muto"
 # la riga che chi vende scrive incollandola
 MOTIVO_ALTRA_CASSAFORTE = "altra_cassaforte"
 MOTIVO_FATTURA_NUOVA = "fattura_nuova"
-MOTIVI_NOSTRI = (MOTIVO_SALDO, MOTIVO_PONTE, MOTIVO_LNBITS_MUTO)
+MOTIVI_NOSTRI = (MOTIVO_SALDO, MOTIVO_PONTE, MOTIVO_LNBITS_MUTO,
+                 MOTIVO_RISERVA)
 (PASSO_DECISO, PASSO_PARTITO, PASSO_IN_VOLO, PASSO_IN_VERIFICA,
  PASSO_GUASTO, PASSO_FALLITO, PASSO_SERVE, PASSO_ARRIVATO,
  PASSO_RIPARTE, PASSO_CONFERME) = (
@@ -31584,6 +31702,20 @@ def _leve_stato():
                          "l'entrata, la strada di Phoenix o l'uscita "
                          "diventano un problema, quando tornano a posto, e "
                          "in mezzo al massimo una volta al giorno"),
+            _leva("Margine delle casseforti: percentuale (%)",
+                  "LIQUIDITA_MARGINE_PERCENTO",
+                  float(LIQUIDITA_MARGINE_PERCENTO or 0),
+                  acceso="la guardia avvisa quando saldo meno incassi in "
+                         "attesa scende sotto questa percentuale del totale "
+                         "in attesa più i sats fissi (una voce per "
+                         "cassaforte); prima di ogni pagamento si chiede "
+                         "comunque il saldo, e senza l'1 % di LNbits non "
+                         "parte niente",
+                  spento="con la percentuale e i sats fissi a 0 la sesta "
+                         "domanda della guardia è spenta"),
+            _leva("Margine delle casseforti: sats fissi",
+                  "LIQUIDITA_MARGINE_MIN_SATS",
+                  int(LIQUIDITA_MARGINE_MIN_SATS or 0)),
             # Allarme se c'e' un nodo e nessuno guarda il suo ponte: e'
             # il mondo del 18 set 2026, nove ore di acquisti falliti.
             _leva("Guardiano del ponte verso LND", "GUARDIANO_PONTE",
@@ -74765,6 +74897,26 @@ try:
     from config import LIQUIDITA_ACINQ_TETTO
 except ImportError:
     LIQUIDITA_ACINQ_TETTO = False     # la quinta domanda: spenta
+# LA SESTA DOMANDA (27 ott 2026, cantiere margine-cassaforte, decisione di
+# Andrea coi numeri veri: nodo 503.786 di saldo contro 470.727 in attesa,
+# 7 %; SaaS 24,7 %): per OGNI cassaforte configurata, il saldo del wallet
+# meno gli incassi in attesa (gli ordini del mercatino coi sats ancora
+# dentro) deve restare sopra `LIQUIDITA_MARGINE_PERCENTO` del totale in
+# attesa piu' `LIQUIDITA_MARGINE_MIN_SATS`. Sotto, LNbits comincia a
+# rifiutare i pagamenti per la sua riserva dell'1 %. Le due leve a 0
+# spengono la domanda.
+try:
+    from config import LIQUIDITA_MARGINE_PERCENTO
+except ImportError:
+    LIQUIDITA_MARGINE_PERCENTO = 1
+try:
+    from config import LIQUIDITA_MARGINE_MIN_SATS
+except ImportError:
+    LIQUIDITA_MARGINE_MIN_SATS = 10_000
+# gli stati in cui i sats di un ordine stanno ancora in cassaforte
+STATI_SATS_IN_CASSAFORTE = ("locked", "shipped", "delivered", "confirmed",
+                            "dispute", "return_pending", "return_shipped",
+                            "refund")
 try:
     from config import LIQUIDITA_PROMEMORIA_S
 except ImportError:
@@ -75241,6 +75393,88 @@ async def _tetto_p2p_in_sats() -> dict:
             "tetto_p2p_sats": round(P2P_MAX_EURO * 100_000_000 / cambio)}
 
 
+def _incassi_in_attesa(con) -> dict:
+    """Per cassaforte: quanti ordini del mercatino hanno ancora i sats
+    dentro, e quanti sats (il prezzo pieno: il massimo che puo' uscire).
+    Conta SOLO `ordini`: rimborsi d'asta e pagamenti P2P hanno i loro
+    registri, e un numero che li mescolasse non combacerebbe con nessun
+    wallet (la lezione del polso 23 del libro mastro)."""
+    seg = ",".join("?" * len(STATI_SATS_IN_CASSAFORTE))
+    out = {}
+    for r in con.execute(
+            f"SELECT cassaforte, COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) "
+            f"AS sats FROM ordini WHERE stato IN ({seg}) AND "
+            "COALESCE(payout_stato,'')<>'uscito' GROUP BY cassaforte",
+            STATI_SATS_IN_CASSAFORTE):
+        out[r["cassaforte"] or ""] = {"n": int(r["n"]), "sats": int(r["sats"])}
+    return out
+
+
+def _giudizio_margine(nome: str, saldo, attesa: dict) -> tuple:
+    """La voce della sesta domanda per UNA cassaforte: (chiave, esito,
+    testo). PURA. `saldo` None = non letto: ne' allarma ne' rassicura."""
+    n, sats = int(attesa.get("n") or 0), int(attesa.get("sats") or 0)
+    soglia = (sats * round(float(LIQUIDITA_MARGINE_PERCENTO or 0) * 1000)
+              // 100_000) + int(LIQUIDITA_MARGINE_MIN_SATS or 0)
+    chiave = f"margine_{nome}"
+    attesa_t = (f"{_fmt_sats(sats)} sats in attesa su {n} "
+                f"{'ordine' if n == 1 else 'ordini'}")
+    if saldo is None:
+        return (chiave, None,
+                f"❔ Margine {nome}: il saldo non si è potuto leggere "
+                f"({attesa_t}).")
+    margine = int(saldo) - sats
+    if margine >= soglia:
+        return (chiave, True,
+                f"✅ Margine {nome}: {_fmt_sats(margine)} sats (saldo "
+                f"{_fmt_sats(saldo)}, {attesa_t}; la soglia è "
+                f"{_fmt_sats(soglia)}).")
+    return (chiave, False,
+            f"⚠️ Margine {nome}: solo {_fmt_sats(margine)} sats (saldo "
+            f"{_fmt_sats(saldo)}, {attesa_t}; la soglia è "
+            f"{_fmt_sats(soglia)}). LNbits tiene l'1 % per le commissioni: "
+            f"gli incassi possono fermarsi. Aggiungi margine alla cassaforte.")
+
+
+def _cassaforte_configurata(cf) -> bool:
+    """URL e chiave di lettura ci sono davvero (non vuoti, non il
+    segnaposto): il calco di `_nodo_configurato`, per una cassaforte
+    qualunque e senza la chiave che paga, che qui non serve."""
+    return bool(cf.LNBITS_URL and str(cf.LNBITS_URL).startswith("http")
+                and cf.LNBITS_INVOICE_KEY
+                and "INCOLLA_QUI" not in str(cf.LNBITS_INVOICE_KEY))
+
+
+async def _voci_margine() -> list:
+    """La sesta domanda, per ogni cassaforte configurata: il saldo con la
+    chiave di lettura, gli incassi in attesa dal database. Spenta con le
+    due leve a 0. Fail-open: un errore e' una voce «non misurata», mai un
+    giro saltato."""
+    if not (LIQUIDITA_MARGINE_PERCENTO or LIQUIDITA_MARGINE_MIN_SATS):
+        return []
+    voci = []
+    try:
+        con = db()
+        try:
+            attese = _incassi_in_attesa(con)
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Margine: gli incassi in attesa non si leggono ({e})",
+              flush=True)
+        attese = None
+    for nome in CASSAFORTI:
+        try:
+            cf = _chiavi_cassaforte(nome)
+        except ValueError:
+            continue
+        if not _cassaforte_configurata(cf):
+            continue
+        saldo = await _saldo_cassaforte(cf) if attese is not None else None
+        voci.append(_giudizio_margine(nome, saldo, (attese or {}).get(nome, {})))
+    return voci
+
+
 async def _quadro_liquidita() -> tuple:
     """Canali, numeri e giudizio, letti ADESSO dal nodo. Torna (stato,
     canali, voci): con uno stato diverso da 'ok' i canali non si sono
@@ -75262,7 +75496,8 @@ async def _quadro_liquidita() -> tuple:
         and n["acinq_posto"] < LIQUIDITA_PHOENIX_MIN)
     if LIQUIDITA_PHOENIX_MIN and serve_strada:
         strada = await _strada_phoenix(canali, LIQUIDITA_PHOENIX_MIN)
-    return "ok", canali, _giudizio_liquidita(n, strada)
+    # (27 ott 2026) la sesta domanda, per cassaforte, in coda alle altre
+    return "ok", canali, _giudizio_liquidita(n, strada) + await _voci_margine()
 
 
 async def _giro_guardia_liquidita() -> str:

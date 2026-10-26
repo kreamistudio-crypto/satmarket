@@ -72074,3 +72074,107 @@ suo caso si ferma), più quella che le toglie tutte insieme; «carta color
 avorio» è l'unica senza controprova sua, perché «color avorio» la copre
 già da sola, e lo si dichiara invece di provarla a vuoto. Il libro del
 collaudo sulle rotte vere porta anche rilegatura, copertina e tela.
+
+## Il margine della cassaforte: la domanda del saldo prima della mano, e la sesta domanda della guardia (27 ott 2026, cantiere margine-cassaforte, decisione di Andrea)
+
+**DA DOVE.** Il giro sul regtest (26 ott, «Lo swap intero sul regtest di
+Boltz») ha mostrato il 520 di LNbits «You must reserve at least … to
+cover potential routing fees»: LNbits non paga se nel wallet, oltre al
+pagamento, non resta l'1 % (minimo 2 sats) per le commissioni di rete,
+e rifiuta PRIMA di toccare LND, senza scrivere niente per quell'hash.
+Nel nostro codice non c'era nessun controllo del margine: il 520
+passava per «ignoto» e «fattura bruciata» (curato il 26 ott col motivo
+`riserva`), e chi vende si sentiva chiedere una fattura nuova per un
+guasto NOSTRO. I NUMERI VERI DEL VPS, letti da Andrea il 27 ott col
+comando di sola lettura: cassaforte nodo saldo 503.786 sats, 470.727 in
+attesa su 9 ordini, margine 33.059 (7,0 %); SaaS saldo 425.820, 341.570
+in attesa su 4 ordini, margine 84.250 (24,7 %). Il wallet è MISTO
+(l'escrow di tutti più il capitale nostro, `capitale_cassa.py`) e ogni
+pagamento riuscito si porta via le sue commissioni di rete dal saldo:
+senza capitale il margine si consuma da solo.
+
+**LA CURA, in due pezzi (decisione di Andrea).**
+1. IN `paga_venditore`, PRIMA DI PRENDERE LA MANO (dopo il ponte, con la
+   riga): il saldo della cassaforte con la SOLA chiave di lettura
+   (`_saldo_cassaforte`, `GET /api/v1/wallet`); se è meno di importo +
+   riserva (`_riserva_lnbits`: l'1 % per eccesso, mai meno di 2 sats —
+   i numeri di LNbits, `lnbits_reserve_fee_percent` e
+   `lnbits_reserve_fee_min`), è il QUARTO VERBO: `NON_CHIESTO` col
+   motivo `riserva`, niente parte, la fattura resta buona, la riga «da
+   riprovare» e il ritentativo da soli con `BACKOFF_NOSTRO` (`riserva`
+   sta in `MOTIVI_NOSTRI`: lo stadio dice «un problema del nostro
+   nodo», col prossimo tentativo). Ai moderatori UN avviso per
+   cassaforte ogni sei ore (`_avvisa_margine`, timbro
+   `avviso_margine_<cassaforte>`, stanza 💧 Liquidità): «manca margine
+   nella cassaforte X», saldo, dovuto, quanto serve con la riserva, cosa
+   fare. Un saldo che NON si legge non ferma niente (fail-open
+   dichiarato: il comportamento di ieri, e un LNbits muto lo ferma
+   comunque la chiamata che paga).
+2. NELLA GUARDIA DELLA LIQUIDITÀ, LA SESTA DOMANDA, per ciascuna
+   cassaforte configurata (`_voci_margine`, in coda alle altre in
+   `_quadro_liquidita`, quindi anche in `/canali`): saldo del wallet
+   meno gli incassi in attesa (`_incassi_in_attesa`: gli ordini del
+   mercatino con i sats ancora dentro — locked, shipped, delivered,
+   confirmed, dispute, return_pending, return_shipped, refund — e
+   `payout_stato` non «uscito», per cassaforte, al prezzo pieno) sopra
+   `LIQUIDITA_MARGINE_PERCENTO` (1) del totale in attesa più
+   `LIQUIDITA_MARGINE_MIN_SATS` (10.000). Una voce buona, cattiva o
+   «non misurata» (saldo non letto), nel vocabolario di sempre della
+   guardia: allarme al primo passaggio in cattiva, promemoria, rientro.
+   Coi numeri veri: nodo, margine 33.059 contro una soglia di 14.707,
+   buona. Tutt'e due le leve a 0 spengono la domanda.
+
+**STRADE SCARTATE.** Abbassare la riserva di LNbits (è una protezione
+loro, e la teniamo); contare anche rimborsi d'asta e pagamenti P2P negli
+incassi in attesa (hanno i loro registri, e un numero mescolato non
+combacerebbe con nessun wallet: la lezione del polso 23 del libro
+mastro); un avviso per ogni incasso fermo (dieci incassi fermi sullo
+stesso wallet sono UN problema); fermare il pagamento quando il saldo
+non si legge (romperebbe gli incassi per un guasto della sola domanda).
+
+**UN DIFETTO PRESO DAL COLLAUDO, prima del commit:** la pausa
+dell'avviso era `0 < adesso - ultimo`, e due incassi fermi nello stesso
+secondo facevano due avvisi. Ora `ultimo and adesso - ultimo < pausa`.
+
+**PROVATO.**
+- `collaudo_margine_cassaforte` (21 verdi, negli elenchi della CI): il
+  server vero col LNbits di cartone del banco dei pagamenti, che da oggi
+  dichiara anche il saldo (`NODO["saldo"]`, grande di serie; None = non
+  risponde). Il saldo che copre l'importo ma non la riserva (non chiesto,
+  da riprovare, la fattura al suo posto, lo stato di prima, UN avviso coi
+  numeri, lo stadio nostro col prossimo tentativo, nessuna richiesta di
+  fattura nuova a chi vende); il secondo incasso fermo senza secondo
+  avviso; il giro dei sospesi a saldo corto; il margine rimesso e il
+  giro che paga da solo con la stessa fattura; il limite al sat
+  (importo + riserva passa, un sat sotto no); il wallet che non risponde
+  (si paga come ieri); passate le sei ore l'avviso torna; la sesta
+  domanda sul server vero (incassi in attesa dal database, la cassaforte
+  con la chiave segnaposto non si conta, voce buona al limite, cattiva
+  un sat sotto, non misurata, e la sua frase dentro l'allarme della
+  guardia; le leve a 0 la spengono).
+- `prove_margine_cassaforte` (in `prove.py`): la riserva (1 % per
+  eccesso, minimo 2, la percentuale è una leva), il saldo con un httpx di
+  cartone (la chiave di lettura, i «non so»), l'avviso (uno per
+  cassaforte, la pausa, la stanza, i numeri), gli incassi in attesa su un
+  database vero (gli stati, gli usciti esclusi), il giudizio coi numeri
+  veri del VPS e ai limiti, le sentinelle (la domanda dopo il ponte e
+  prima della mano, col quarto verbo; il fail-open; `riserva` fra i
+  guasti nostri e nella pagina; la sesta domanda in coda; le leve nei
+  tre posti; gli elenchi della CI). L'ambiente condiviso dei banchi
+  (`ambiente_altra_cassaforte`) monta i nomi nuovi con un saldo che non
+  si legge: i banchi di ieri non cambiano.
+- CONTROPROVE, 9 su 9 rosse: niente domanda del saldo; la riserva non
+  sommata; l'avviso a ogni incasso fermo; il saldo illeggibile che
+  ferma il pagamento; la sesta domanda senza il database (nel
+  collaudo); `riserva` tolto dai guasti nostri; la riserva senza il
+  minimo di 2; gli incassi in attesa che contano gli usciti; la guardia
+  senza la sesta domanda (nelle prove). Due di loro al primo giro
+  facevano ESPLODERE il collaudo invece di arrossarlo (una lista di
+  avvisi vuota): il collaudo ora legge il primo avviso con `primo_avviso`.
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Il margine vero sul VPS si legge col comando di sola
+lettura dato ad Andrea il 26 ott (saldo per cassaforte e incassi in
+attesa dal database): quando la guardia è accesa lo dice lei, in
+`/canali` e negli avvisi. Da decidere con Andrea quanto capitale tenere
+nella cassaforte nodo oltre la soglia (oggi 33.059 contro 14.707).

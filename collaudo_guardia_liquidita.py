@@ -207,6 +207,9 @@ def main():
             fatti.append("timbro")
             timbri[nome] = valore
 
+        async def _senza_margine():
+            return []
+
         amb = {**costanti(), **costanti_guardia(),
                "ssl": ssl, "httpx": httpx, "json": json, "re": re,
                "asyncio": asyncio, "base64": base64, "html": html,
@@ -230,6 +233,9 @@ def main():
                "e_admin_bot": lambda m: m.get("id") == 999,
                "timbro_letto": lambda nome: timbri.get(nome, ""),
                "timbro_scrivi": timbro_scrivi,
+               # (27 ott 2026) la sesta domanda, per cassaforte, qui tace:
+               # la prova il collaudo del margine, sul server vero
+               "_voci_margine": _senza_margine,
                "print": lambda *a, **k: detto.append(" ".join(map(str, a)))}
         for nome in ("_lnd_configurato", "_fmt_sats", "_destinatari_ponte",
                      "_lnd_rest", "_sats_canale", "_taglia_canale",
