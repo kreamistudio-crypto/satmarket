@@ -42713,6 +42713,10 @@ def prove_filtro_avorio():
                                       "corno di rinoceronte")),
         ("Tappeto", "Vera pelle di tigre.", ("animali protetti",
                                              "pelle di tigre")),
+        # il libro e l'oggetto IN avorio (26 ott 2026): la frase del
+        # colore non combacia, e la copertina vera resta ferma
+        ("Libro d'ore", "Copertina in avorio intagliato.", zanna),
+        ("Pianoforte antico", "Tasti in avorio.", zanna),
     )
     # --- 2) I FALSI: passano lo strato 1 -----------------------------
     falsi = (
@@ -42731,6 +42735,18 @@ def prove_filtro_avorio():
         ("Pettine", "Finto avorio, anni '60."),
         # due frasi attaccate, che condividono lo spazio di mezzo
         ("Set di carta da lettere", "Carta avorio, colore avorio."),
+        # il libro e l'oggetto (26 ott 2026, decisione di Andrea): una
+        # riga per frase, e ognuna senza «color» o «carta» davanti, che
+        # la farebbero passare per la frase di ieri
+        ("Messale romano", "Rilegatura avorio con fregi in oro."),
+        ("Agenda", "Copertina avorio, mai usata."),
+        ("Quaderno", "Pagine avorio a righe."),
+        ("Blocco da disegno", "50 fogli avorio, 200 g."),
+        ("Partecipazioni", "Stampate su carta color avorio."),
+        ("Divano", "Tela avorio, sfoderabile."),
+        ("Lavello", "Finitura avorio opaca."),
+        ("Vasca da bagno", "Smalto avorio, anni '70."),
+        ("Comodino", "Laccato avorio, due cassetti."),
     )
     filtro = filtro_da(src)
     for titolo, descr, atteso in veri:
@@ -42767,6 +42783,23 @@ def prove_filtro_avorio():
     prova("controprova: la frase che consuma gli spazi", False,
           regge(rotto(('r"(?<= )(?:"', 'r" (?:"'),
                       ('r")(?= )")', 'r") ")'))))
+    # d) le frasi del libro e dell'oggetto tolte (26 ott 2026): il
+    #    messale, l'agenda, il divano e il comodino tornano fermi
+    prova("controprova: senza le frasi del libro e dell'oggetto", False,
+          regge(rotto(('        "rilegatura avorio", "copertina avorio", '
+                       '"pagine avorio",\n', ""),
+                      ('        "fogli avorio", "carta color avorio", '
+                       '"tela avorio",\n', ""),
+                      ('        "finitura avorio", "smalto avorio", '
+                       '"laccato avorio",\n', ""))))
+    # ...e una frase per volta: ognuna ha il suo caso, che senza di lei
+    #    si ferma (tranne «carta color avorio», che «color avorio»
+    #    copre gia' da sola: si dichiara invece di provarla a vuoto)
+    for frase in ("rilegatura avorio", "copertina avorio", "pagine avorio",
+                  "fogli avorio", "tela avorio", "finitura avorio",
+                  "smalto avorio", "laccato avorio"):
+        prova(f"controprova: senza «{frase}» la tabella cade", False,
+              regge(rotto((f'"{frase}",', ''))))
 
     # --- 4) LA PAROLA ARRIVA A CHI RIFIUTA --------------------------
     # i tre siti che rispondono al venditore la passano al messaggio,

@@ -886,7 +886,8 @@
   LE LETTURE INNOCENTI DI UNA PAROLA VIETATA (`CONTESTI_INNOCENTI`):
   «avorio» resta in lista (la statuetta in avorio è proprio quel che
   non si vende), ma prima del confronto si tolgono le FRASI INTERE che
-  non parlano di zanne — il colore, la carta, le imitazioni, la Costa
+  non parlano di zanne — il colore, la carta, il libro e l'oggetto
+  («rilegatura avorio», «laccato avorio»), le imitazioni, la Costa
   d'Avorio, la torre d'avorio. Solo per quel termine e solo la frase:
   un «avorio» che resta fuori blocca come prima, anche nello stesso
   annuncio. Le frasi si tolgono con le lookaround, che non consumano
