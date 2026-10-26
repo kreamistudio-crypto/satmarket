@@ -72610,3 +72610,201 @@ Va solo dove tutto è cartone, e lo dice il commento sopra la costante.
 **DA GUARDARE.** Dieci giri dicono «sotto il 10% non l'ho vista», non «non
 c'è». Se un'altra sezione cade solo a PC carico, la cura è la stessa riga
 in testa al banco, se il banco è tutto cartone.
+
+## Lo swap intero sul regtest di Boltz, sul PC di Andrea: tre rotture, tre cure (26 ott 2026, cantiere regtest-swap, richiesta di Andrea)
+
+**COSA SI VOLEVA.** La prova della tappa 4 con sats che si muovono
+davvero (di regtest), decisa da Andrea NON sulla VM ma sul suo PC,
+tutto in locale: il regtest di BoltzExchange a un commit preciso, un
+nodo Lightning di regtest con un canale verso Boltz, un LNbits di prova,
+il server di Barattolo dal worktree con `SWAP_RETE = "regtest"`. Prima
+le cifre (RAM, disco, cosa si scarica), poi il suo ok. Niente chiavi
+vere, niente mainnet, niente `config.py` vero.
+
+**I LIMITI VERI DI SATS ROUTING** (letti dall'API pubblica il 26 ott,
+sola lettura, `GET /v2/swap/reverse` con `Referral: barattolo`): da
+2.000 a 5.000.000 sats per swap Lightning → on-chain, commissione 0,6 %,
+rete 154 (lockup) + 111 (ritiro). I nostri `SWAP_MIN_SATS` 25.000 e
+`SWAP_MAX_SATS` 50.000 ci stanno dentro: niente da cambiare. A 25.000
+lo swap costa circa 415 sats (1,7 %), a 50.000 circa 565 (1,1 %).
+
+**COSA È GIRATO, DOVE.** Una distro WSL nuova, `barattolo-regtest`,
+copia di `noble-pulita` importata su `D:\wsl-barattolo-regtest`, con
+Docker 29.1.3 e compose 2.40.3 dai pacchetti di Ubuntu 24.04. Il repo
+`BoltzExchange/regtest` al commit `ae600ed3190a7f1f8859d2dc6da0c8c85a245a59`
+(28 lug 2026, MIT). Le immagini, tutte `latest` nel loro `.env`, con
+le impronte lette dopo il pull:
+- boltz/bitcoin-core `b225dff8e72701eb b15f67cb9f75ae8c 4997bd08da392569 d47245e99e6fc27c` (146 MB)
+- boltz/boltz `8d495425bcf8083e 842a54daa7d92328 bccda8d0e6ec4742 384428289bd40fb7` (171 MB)
+- boltz/boltz-client `fc578e8e9d8259c6 52456de9988cec02 a20810952185a356 40caefe43de88748` (79 MB)
+- boltz/c-lightning-plugins `25883773e0488261 388820369fff7644 a7fe568f2a36ec1f ec39f7de0c345e76` (146 MB)
+- boltz/electrs `51f0305390aaf377 1b7eb17452b94862 7559926726203920 d09209c48469b582` (45 MB)
+- boltz/elements `237653218d7d7c9f db1f0d2af9eaecc1 60b8d62f848ec988 110ed239bbc8a3fb` (158 MB)
+- boltz/esplora `a4ad5a933077b20d f9cd03a3dc7d18c1 1330e470db9451e3 c42107400b0054c5` (30 MB)
+- boltz/foundry `516fea88ba420532 30612e26e38d5ead dae7ba949c13794f fe2dd6544f52b8a3` (234 MB)
+- boltz/lnd `a012d7a63e9622b5 05ec1c288f445431 1b80cd2429d5a90f 2ee482cac8010428` (109 MB)
+- boltz/scripts `47f8682a2a4e698f 0539e1bd11b36319 27b415886719be5f dc8d4a0344375dba` (137 MB)
+- boltz/web-app `f84388fa0448e4c3 efa27d7b0ced4c6c 451638e881f92219 03b44fc581fbc86a` (44 MB)
+- nginx:alpine `a3554c0d0b48177b 1413c26e01f69533 4428020d9df01243 fbae3e11cfd17417` (26 MB)
+- otterscan/otterscan `7636f835fcdfc550 c205a78876013d6e 54c95846f3566e59 cc71bc6136c80cc9` (70 MB)
+- postgres:18-alpine `10a5c69a83035ab5 239f5620d708520e 8b28f5aa1f2b2014 3e6024532edadfb5` (120 MB)
+- lnbits/lnbits:v1.6.2 `284b9c2a0df9a1f8 67b4c52b694699fc cade513c09368879 922ff90bc7bf850e` (279 MB)
+(le impronte sono gli `sha256:` dei `RepoDigests`, scritte a gruppi di
+sedici perché lo scanner della CI prende 64 esadecimali di fila per una
+chiave privata; per confrontarle si tolgono gli spazi.)
+Il LNbits di prova appoggiato a `lnd-1` del regtest (il nodo «client»:
+quattro canali da 24.000.000, uno verso `lnd-2` di Boltz), con
+`LndRestWallet` e il volume `boltz-lnd1-data` montato in sola lettura.
+Il server di Barattolo dal worktree, sulla 8192, con un config di prova
+costruito dal config d'esempio più le righe del giro (relay morti,
+`SWAP_ATTIVO`, `SWAP_RETE = "regtest"`, `SWAP_API_BASE` sulla 9001,
+`SWAP_MEMPOOL_API` su un passaggio locale, `SWAP_MAX_SATS = 60_000`
+perché il regtest di Boltz vuole almeno 50.000 per swap). Il BROWSER:
+la Mini App vera nel pannello, 375×812, come moderatore 999.
+
+**DUE INTOPPI DEL REGTEST, NON NOSTRI.**
+- Il DNS del router di casa risponde a QUALUNQUE nome: `getent hosts
+  anvil-arb` e `fulmine` trovavano un indirizzo, e l'entrypoint del
+  backend di Boltz accodava la sezione `[arbitrum]` (un nodo che
+  copierebbe la mainnet di Arbitrum). Il backend restava «unhealthy» e
+  nginx, client e web-app non partivano. Cura senza toccare il loro
+  repo: `docker-compose.override.yml` con `dns_search: [localdomain]` per
+  il solo `boltz-backend`. Nessun contatto con una mainnet.
+- Un secondo `docker compose up -d` dopo il primo rifà partire `bitcoind`
+  e i nodi Lightning perdono il cookie dell'RPC: cln e lnd in restart.
+  Si fa UN `up` solo (`start.sh` fa così).
+- L'esplora del regtest (electrs sulla 3002) non manda
+  `Access-Control-Allow-Origin`: il telefono non potrebbe leggere il
+  lockup. Davanti, un passaggio locale di 40 righe (`ponte_cors.py`,
+  solo loopback) che inoltra e aggiunge la sola intestazione.
+
+**IL GIRO.** Ordine #1: il 111 ha pagato DAVVERO 55.000 sats da `cln-1`
+alla fattura del LNbits di prova; «locked» (con `verifica-pagamento`,
+come fa la pagina di chi compra), poi «confirmed». Il 999 nella Mini
+App: «₿ On-chain (swap)», il preventivo dal Boltz di regtest (55.000,
+−275 allo 0,5 %, −154, −111, ricevi circa 54.460), le 12 parole, un
+indirizzo `bcrt1q…` del wallet «client», «Crea lo swap».
+- PRIMO TENTATIVO: controlli passati, riga registrata, LNbits risponde
+  520 «You must reserve at least (550 sat) to cover potential routing
+  fees»: il wallet aveva SOLO i sats di quell'ordine, e LNbits vuole
+  l'1 % di margine. Niente uscito, riga «fallito», a chi vende «Lo swap
+  non è andato… scegli di nuovo» (la frase del 26 ott, giusta).
+- 20.000 sats di margine al wallet di prova (da `cln-1`), swap nuovo dal
+  telefono: i controlli passano, ma la porta dei pagamenti NON paga
+  subito — l'hash di prima risulta «assente» su LNbits e la regola di
+  sempre lo crede «mai partito» solo dopo `MAI_PARTITO_DOPO_S` (15
+  minuti). Poi la ronda paga la fattura nuova; Boltz blocca 54.571 sats
+  (`transaction.mempool`); il telefono, a scheda aperta, ritira da solo
+  in cooperativa (`69611eaa…c4d7d3d4`); la fattura si chiude
+  (`invoice.settled`), l'ordine «released», «Fatto: i bitcoin sono
+  tuoi.», un pagamento solo per lo swap nuovo.
+
+**IL DIFETTO TROVATO DAL GIRO, e la cura (1).** In quei 15 minuti lo swap
+fallito tornava «in_volo» e poi di nuovo «fallito»: la porta tiene
+sull'ordine il NOME del pagamento vecchio finché non è chiarito, e lo
+stato derivato gli credeva. Chi modera leggeva il falso, e i tetti del
+giorno contavano DUE volte i sats dello stesso ordine (110.000 invece
+di 55.000): un terzo swap legittimo sarebbe stato rifiutato. Nessun
+doppio pagamento, né possibile. Fermato e detto ad Andrea prima di
+correggere (sua regola). Cura: in `_swap_pag_aggiorna` una riga vista
+«fallito» resta fallita e può solo diventare «pagato» (il #241).
+
+**LE ALTRE DUE CURE, chieste da Andrea.** (2) Il 520 del margine ha il
+suo motivo, `MOTIVO_RISERVA` («nella cassaforte manca il margine»), con
+la spia «reserve at least / cover potential routing fees» PRIMA delle
+altre, e l'avviso ai moderatori dice che LNbits si è fermata prima e la
+fattura NON è bruciata (prima: «motivo non leggibile» e «ne serve una
+nuova», tutt'e due falsi). La pagina ha la parola del motivo nuovo. (3)
+Il messaggio di fine swap a chi vende: `_msg_swap_arrivato` legge dal
+mempool la transazione che spende il lockup (l'unica uscita: il ritiro)
+e dice l'importo on-chain VERO e le conferme («aspetta la prima
+conferma» / «già confermato»); senza ritiro o mempool giù, i sats
+bloccati e il telefono che ritira. Sui quattro rami riusciti di
+`_sblocca_sats`, al posto di «sono nel tuo wallet». Il cartone, nella
+spesa, ora porta il `prevout` come mempool.space; il server riconosce il
+ritiro anche dal solo id del lockup.
+
+**LE TRE ROTTURE, col codice nuovo** (dopo il riavvio del server; i
+tetti per chi vende spenti nel config di prova dopo la terza).
+- TETTO BASSO (ordine #2, prima che spegnessi il tetto): 55.000 già
+  impegnati più 55.000 → «non si paga — tetto_utente», niente registrato;
+  il telefono: «Per oggi hai raggiunto il tetto degli swap: incassa via
+  Lightning.» e la scelta torna libera.
+- TELEFONO CHIUSO PRIMA DEL RITIRO (ordine #2): swap creato, pagina
+  chiusa 1,5 s dopo la richiesta. Server: registrato, in volo (hold
+  invoice: `lnd-1` dice IN_FLIGHT); Boltz blocca i bitcoin; la storia
+  dell'ordine NON dice «ci stiamo lavorando noi» (`lungo: false`). Minati
+  150 blocchi oltre la scadenza (346): Boltz trasmette il rimborso
+  (`fe1212ab…`), e alla PRIMA CONFERMA del rimborso annulla la fattura
+  trattenuta: su `lnd-1` il pagamento è FAILED / `FAILURE_REASON_TIMEOUT`,
+  su LNbits «failed». La ronda: «era in_volo, la verità è fallito → si
+  ritenta»; a chi vende «Lo swap non è andato»; la riga «fallito»; il
+  telefono riaperto: `transaction.refunded`, «SATS Routing si è ripreso i
+  bitcoin: l'incasso torna disponibile.» Nessun sats perso.
+- LNBITS FERMATO A METÀ (ordine #3): `docker stop` di LNbits due secondi
+  dopo «registrato». Il server: «Pagamento INCERTO (RemoteProtocolError):
+  non si ritenta», in volo col nome. Il pagamento era partito davvero
+  (`lnd-1`: SUCCEEDED, Boltz blocca, il telefono ritira `9ea2dc78…`,
+  «Fatto»). LNbits riacceso: la ronda legge «success», chiude l'ordine
+  come pagato e a chi vende arriva il messaggio nuovo: «Swap concluso. Il
+  ritiro on-chain ti porta 54.671 sats (transazione 9ea2dc78…f1c9161c):
+  aspetta la prima conferma della rete». Un pagamento solo.
+
+**COSE NOTATE, NON TOCCATE** (aspettano un sì):
+- Dopo uno swap `ripreso` (rimborsato da Boltz) il pannello mostra la
+  carta dello swap e chi vende può incassare solo via Lightning: uno
+  swap NUOVO sullo stesso ordine non parte dal pannello (`swapDiOrdine`
+  libera solo `rifiutato`/`fallito` in fase `creato`; `ripreso` è una
+  fase finale della tappa 3).
+- Con una fattura trattenuta in volo, LNbits v1.6.2 risponde a `GET
+  /api/v1/payments/<hash>` in ~30 secondi (va a chiedere alla fonte e
+  aspetta): il nostro `_stato_pagamento` scade a 15 e la ronda dice
+  «LNbits=muto, tacciono tutte le fonti» a ogni battito per tutta la
+  durata dello swap. In produzione la seconda fonte è LND (il ponte), e
+  decide lui; qui LND era `n/a`. Da guardare: un timeout più lungo solo
+  per la ronda, o non richiedere a LNbits un hash che sa già in volo.
+- IL MARGINE DELL'1 % DI LNBITS (non si tocca codice, decisione di
+  Andrea): oggi la produzione paga chi vende dalla cassaforte dell'ordine
+  (`_cassaforte_uscita`: «nodo», il LNbits del nodo, con la sua admin
+  key); nel nostro codice NON c'è un controllo del margine prima di
+  pagare; se manca, LNbits rifiuta con quel 520 PRIMA di toccare LND,
+  niente esce, e fino a oggi l'avviso diceva «ignoto» e «fattura
+  bruciata» (falso: ora dice «manca il margine»), con `ritentabile` e il
+  ritentativo da solo solo per chi ha il Lightning address. Il wallet è
+  misto (escrow di tutti più il capitale nostro, `capitale_cassa.py`),
+  e ogni pagamento riuscito porta via le sue fee di rete dal saldo:
+  senza capitale il margine si consuma da solo. La cura proposta, in
+  due pezzi: (a) una domanda in `paga_venditore` PRIMA della mano —
+  saldo del wallet (invoice key, sola lettura) ≥ importo + 1 % + 2
+  sats —, e se non basta il quarto verbo (`NON_CHIESTO`, motivo nuovo
+  `riserva`, si riprova da soli con `BACKOFF_NOSTRO`) e un avviso ai
+  moderatori «manca margine nella cassaforte X», invece di un
+  fallimento e della richiesta di una fattura nuova; (b) una domanda in
+  più nella guardia della liquidità: saldo del wallet nodo meno gli
+  incassi in attesa ≥ `LIQUIDITA_MARGINE_MIN` (per esempio 1 % del
+  totale in attesa più 10.000 sats), con l'avviso quando scende sotto.
+  Il comando di sola lettura per leggere il margine vero sul VPS sta
+  nel rapporto ad Andrea (saldo per cassaforte e somma degli ordini
+  aperti dal database).
+
+**PROVATO.** `collaudo_swap_pagamento` 51/0 (nuove: il 520 del margine
+con l'avviso giusto, lo swap nuovo che aspetta la ronda con la riga
+vecchia che RESTA fallita e i tetti che contano una volta, il journal
+senza «da fallito a in_volo», il messaggio di fine swap con l'importo
+on-chain del ritiro); `prove_swap_pagamento` con la tabella «fallito
+resta fallito», il motivo e le parole del 520, il messaggio di fine swap
+in quattro casi (in attesa, confermato anche senza `prevout`, senza
+ritiro, mempool giù), i quattro rami. CONTROPROVE, 7 su 7 rosse (la
+guardia tolta, nel collaudo e nelle prove; la spia del 520 tolta; il
+ramo «non è bruciata» spento; il messaggio di fine swap non usato;
+«già confermato» sempre; il ritiro cercato solo dal `prevout`). Suite e
+collaudi: nel messaggio del commit.
+
+**COSA RESTA SUL DISCO DI ANDREA.** La distro `barattolo-regtest` è
+cancellata (`wsl --unregister`: via il disco da 20 GB con le immagini
+Docker e i volumi). Resta `D:\wsl-barattolo-regtest` con l'export di
+`noble-pulita` (`noble-pulita.tar`, 8,5 GB) e cinque script di pochi
+byte: la cancella Andrea (la rimozione di una cartella intera è
+bloccata dal tool). Nel suo spazio temporaneo della sessione restano il
+config di prova, il database del giro e i tre journal: spariscono con la
+sessione. Niente nel repo, niente sul VPS, niente sul nodo.

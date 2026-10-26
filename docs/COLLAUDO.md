@@ -192,48 +192,46 @@ aggiunge, si toglie la vecchia da GitHub.
   base la chiamano il server (le tariffe) e il BROWSER del telefono (lo
   swap, con CORS): va scelta perché regga tutt'e due (PRODUZIONE, «LO
   SWAP DAL TELEFONO: LE LEVE»). Mai SATS Routing vero da qui.
-  DALLA TAPPA 4 (24 ott 2026, il server PAGA la fattura dello swap: CANTIERI,
-  «Lo swap, tappa 4») la prova sul regtest e' lo swap INTERO, coi sats
-  di regtest che si muovono davvero. I passi, ognuno scritto per intero e
-  col sì di Andrea prima di farlo:
-  1. LA MEMORIA. Il regtest di Boltz (bitcoind, i nodi Lightning,
-     l'esplora, il backend, il suo database) non sta nei 3,8 GB accanto
-     al runner della CI (2,5 GB): per la durata della prova il runner si
-     ferma e `RUNNER_PROVE` torna vuota (la CI va su GitHub), oppure il
-     regtest gira su un'altra macchina raggiunta in tunnel. Si decide
-     prima, guardando `free -m`.
-  2. IL REGTEST. Il repo `BoltzExchange/regtest` a un commit scelto e
-     scritto qui, letto prima il suo README (porte, nomi dei nodi,
-     comandi di `bitcoin-cli` e `lncli`); su, e si guarda che l'API del
-     backend dica le tariffe (`/v2/swap/reverse`) e l'esplora l'altezza
-     (`/blocks/tip/height`).
-  3. CHI PAGA. Il LNbits della VM e' un FakeWallet: una fattura di
-     regtest la paga solo un LND di regtest. Un nodo del regtest diventa
-     la fonte di un LNbits di prova (o del LNbits della VM per la durata
-     della prova), con un canale verso il nodo di Boltz e liquidita' in
-     uscita; chi compra paga con `lncli` di un altro nodo.
-  4. LE BASI. Il server legge tariffe e mempool, il BROWSER del telefono
-     chiama le stesse basi con CORS: si sceglie come le raggiungono
-     tutt'e due (HTTPS per il telefono). Prima si guarda, sola riga,
-     `grep -n "^MODALITA_COLLAUDO" config.py`: in collaudo il server
-     legge solo da 127.0.0.1, e con basi fuori casa preventivo e
-     pagamento direbbero «non risponde» — da decidere li'.
-  5. IL CONFIG DELLA VM, in fondo: `SWAP_ATTIVO = True`, `SWAP_RETE =
-     "regtest"`, `SWAP_API_BASE` e `SWAP_MEMPOOL_API` sulle basi del
-     punto 4, `SWAP_REFERRAL_ID = ""` (il codice partner e' di SATS
-     Routing vero), riavvio; il pannello «⚙️ Stato delle leve» li dice.
-  6. IL GIRO. Un ordine confermato del moderatore, «₿ On-chain (swap)»,
-     le parole, l'indirizzo bcrt1 di un wallet di regtest; nel journal
-     «controlli passati», «registrato», «in_volo»; Boltz blocca, il
-     telefono ritira, un blocco minato, la fattura si chiude, «pagato» e
-     l'ordine chiuso; l'indirizzo riceve i sats (`bitcoin-cli`).
-  7. LE ROTTURE. Il telefono chiuso prima del ritiro: il pagamento resta
-     in volo, senza 🧊, finche' i blocchi minati non passano la scadenza;
-     poi Boltz si riprende i bitcoin e il pagamento torna indietro
-     («fallito», l'incasso di nuovo libero). LNbits fermato a meta'
-     pagamento: in volo o 🧊, mai un secondo pagamento. Un tetto basso
-     nel config: il no, e la frase sul telefono.
-  8. LA PULIZIA. Il config com'era, il regtest giu', il runner su.
+  LA PROVA SUL REGTEST È STATA FATTA IL 26 OTT 2026, SUL PC DI ANDREA (non
+  sulla VM: sua decisione; il verbale, con le impronte delle immagini e
+  le tre rotture, in CANTIERI «Lo swap intero sul regtest di Boltz, sul
+  PC di Andrea»). Lo swap intero con sats di regtest è arrivato in fondo
+  (pagato, bloccato, ritirato dal telefono, ordine chiuso), e con lui le
+  tre rotture: telefono chiuso prima del ritiro (Boltz si riprende i
+  bitcoin, la fattura trattenuta fallisce, l'incasso torna libero),
+  LNbits fermato a metà (in volo, poi chiuso come pagato alla
+  riaccensione) e il tetto basso. LA RICETTA, se si rifà (sul PC o sulla
+  VM):
+  1. Una distro WSL a parte con Docker (o la VM, fermando il runner
+     della CI: non ci stanno insieme), il repo `BoltzExchange/regtest` a
+     un commit scritto nel verbale (`ae600ed`), `docker compose up -d`
+     UNA volta sola (un secondo `up` fa ripartire bitcoind e i nodi
+     perdono il cookie). Col DNS di casa che risponde a ogni nome serve
+     un override per il backend (`dns_search: [localdomain]`), o crede di
+     avere Arbitrum e non parte.
+  2. Chi paga: LNbits `v1.6.2` con `LndRestWallet` su `lnd-1` (il nodo
+     «client», canali verso Boltz), volume `boltz-lnd1-data` in sola
+     lettura; un wallet di prova dall'API; il compratore paga da `cln-1`
+     (`lightning-cli-sim-client pay`). IL MARGINE: LNbits vuole l'1 % in
+     più del pagamento, sennò 520 «reserve at least»: al wallet di prova
+     si mettono sats oltre gli ordini.
+  3. Le basi: `SWAP_API_BASE` sulla 9001 (nginx del backend, con CORS);
+     l'esplora (electrs, 3002) NON manda CORS: davanti un passaggio locale
+     che aggiunge `Access-Control-Allow-Origin: *`, e `SWAP_MEMPOOL_API`
+     su quello. In `MODALITA_COLLAUDO` il server legge solo da 127.0.0.1.
+  4. Il config di prova dal config d'esempio più le righe del giro
+     (relay morti, `SWAP_ATTIVO`, `SWAP_RETE = "regtest"`,
+     `SWAP_MAX_SATS = 60_000`: il regtest di Boltz vuole almeno 50.000).
+  5. L'ordine: dopo il pagamento di chi compra si chiama
+     `POST /api/orders/<id>/verifica-pagamento` come fa la pagina, poi la
+     conferma. Il moderatore 999 nella Mini App dal pannello, 375×812.
+  6. La scadenza: `bitcoin-cli-sim-client -generate 150`; Boltz rimborsa
+     e annulla la fattura alla PRIMA CONFERMA del rimborso (un blocco in
+     più), poi la ronda vede «failed» entro un minuto.
+  7. Alla fine: `docker compose down --volumes`, via il container di
+     LNbits, `wsl --unregister` della distro, e la cartella dell'export.
+  RESTA DA FARE SULLA VM, se si vuole: niente di obbligato per la tappa 4;
+  la VM resta per il collaudo del resto, col SATS Routing di cartone.
 
 ## 7. Accendere da zero (i gesti, uno alla volta col sì di Andrea)
 

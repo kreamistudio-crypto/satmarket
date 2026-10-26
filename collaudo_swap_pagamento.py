@@ -97,6 +97,10 @@ def _lnbits_post(url, kw):
     h = letta.get("hash", "")
     USCITE.append(h)
     esito = ESITO["prossimo"]
+    if esito == "riserva":
+        return _Risposta(520, {"detail": "You must reserve at least (300  "
+                                         "sat) to cover potential routing "
+                                         "fees."})
     if esito == "timeout":
         PAGAMENTI[h] = "pending"
         raise _VERO.ReadTimeout("il nodo di cartone non risponde")
@@ -253,6 +257,16 @@ def _controllo(cosa, q):
         # l'ultimo messaggio Telegram a una persona
         a_lui = [t for chi, t in banco.DETTO if int(chi) == int(a["chi"])]
         return {"ultimo": a_lui[-1] if a_lui else "", "quanti": len(a_lui)}
+    if cosa == "somme":
+        # i tetti del giorno come li conta il server (chi vende e tutti)
+        con = SRV._swap_pag_db()
+        try:
+            mio, tutti = SRV._swap_pag_somme(con, 999, int(__import__("time").time()))
+        finally:
+            con.close()
+        return {"mio": mio, "tutti": tutti}
+    if cosa == "avviso":
+        return {"testo": banco.AVVISI[-1] if banco.AVVISI else ""}
     if cosa == "avvisi":
         return {"ghiaccio": sum("🧊" in t for t in banco.AVVISI)}
     return {"sconosciuto": cosa}
@@ -427,7 +441,8 @@ const setInterval = () => 1, clearInterval = () => {};
   await stato(r1.id, 'invoice.settled');
   await ctl('ronda');
   await A.run('swapGiro()');
-  out.chiuso = {ordine: await ctl(`ordine?id=${O.intero}`),
+  out.chiuso = {avviso: (await ctl('detto?chi=999')).ultimo,
+                ordine: await ctl(`ordine?id=${O.intero}`),
                 righe: await ctl(`righe?ordine=${O.intero}`),
                 fase: A.run(`swapFase(swapLista().filter(r => r.ordine === ${O.intero}).pop())`),
                 frase: frase(O.intero),
@@ -475,6 +490,22 @@ const setInterval = () => 1, clearInterval = () => {};
                usciteNuovo: (await ctl(`uscite?h=${r3b.impronta}`)).per,
                usciteVecchio: (await ctl(`uscite?h=${r3.impronta}`)).per,
                vecchio: r3.impronta};
+
+  // ─── C2. IL 520 DEL MARGINE, POI UNO SWAP NUOVO (26 ott 2026, il giro
+  // sul regtest): LNbits si ferma prima e non scrive niente; lo swap nuovo
+  // aspetta che la ronda creda «mai partito» il vecchio, che resta fallito
+  await ctl('leva?nome=SWAP_MAX_SATS_UTENTE_GIORNO&v=0');
+  await ctl('post?esito=riserva');
+  const r6 = await nuovoSwap(A, O.riserva);
+  const somme0 = await ctl('somme');
+  out.riserva1 = {pagamento: r6.pagamento, righe: await ctl(`righe?ordine=${O.riserva}`),
+                  avviso: (await ctl('avviso')).testo};
+  await ctl('post?esito=pending');
+  const r6b = await nuovoSwap(A, O.riserva);
+  out.riserva2 = {pagamento: r6b.pagamento, righe: await ctl(`righe?ordine=${O.riserva}`),
+                  ordine: await ctl(`ordine?id=${O.riserva}`), vecchio: r6.impronta,
+                  somme0: somme0, somme1: await ctl('somme')};
+  await ctl('leva?nome=SWAP_MAX_SATS_UTENTE_GIORNO&v=100000');
 
   // ─── D. I CONTROLLI PRIMA DI PAGARE ──────────────────────────────
   await ctl(`leva?nome=SWAP_MEMPOOL_API&v=http://127.0.0.1:9`);
@@ -560,7 +591,8 @@ def semina():
                     (tg, nome, f"neg{tg}0000"))
     ids = {}
     for nome, prezzo in (("intero", 30_000), ("volo", 30_000),
-                         ("caso241", 30_000), ("controlli", 30_000),
+                         ("caso241", 30_000), ("riserva", 30_000),
+                         ("controlli", 30_000),
                          ("altroPrezzo", 31_000), ("tetti", 30_000),
                          ("doppio", 30_000)):
         cur = con.execute(
@@ -641,6 +673,13 @@ def il_giro(r, ordini, tee):
     prova("la fattura si chiude: la ronda chiude l'ordine come pagato",
           ("released", "uscito"),
           (c["ordine"]["stato"], c["ordine"]["payout_stato"]))
+    av = c.get("avviso") or ""
+    prova("a chi vende: lo swap concluso con l'importo ON-CHAIN del ritiro e "
+          "le conferme, non «nel tuo wallet»",
+          (True, True, False, False),
+          ("Il ritiro on-chain ti porta <b>" in av,
+           "aspetta la prima conferma" in av, "nel tuo wallet" in av,
+           "<b>30.000 sats</b>" in av))
     prova("...la riga dice pagato, la carta «Fatto», sempre un pagamento solo",
           ("pagato", "fatto", "Fatto: i bitcoin sono tuoi.", 1),
           (primo(c["righe"]), c["fase"], c["frase"], c["uscite"]))
@@ -694,6 +733,26 @@ def il_giro(r, ordini, tee):
           (m["ordine"]["stato"], m["ordine"]["payout_hash"]))
     prova("...la riga vecchia dice pagato, la nuova fallito",
           ["pagato", "fallito"], [x["stato"] for x in m["righe"]])
+
+    print("\n[il 520 del margine, poi uno swap nuovo]")
+    r1 = r["riserva1"]
+    prova("LNbits non paga per il margine: fallito, niente uscito",
+          ("fallito", ["fallito"]), (r1["pagamento"], [x["stato"] for x in r1["righe"]]))
+    prova("...ai moderatori: manca il margine, e la fattura NON e' bruciata",
+          (True, True, False),
+          ("manca il margine" in r1["avviso"], "non è bruciata" in r1["avviso"],
+           "non si può ripagare" in r1["avviso"]))
+    r2 = r["riserva2"]
+    prova("lo swap nuovo aspetta la ronda: l'ordine porta ancora il nome del "
+          "vecchio, ma la riga vecchia RESTA fallita",
+          ("in_volo", r2["vecchio"], ["fallito", "registrato"]),
+          (r2["ordine"]["payout_stato"], r2["ordine"]["payout_hash"],
+           [x["stato"] for x in r2["righe"]]))
+    prova("...e i tetti del giorno contano quei sats UNA volta",
+          30_000, r2["somme1"]["mio"] - r2["somme0"]["mio"])
+    testo = "".join(tee.righe)
+    prova("...e il journal non dice mai che lo swap fallito torna in volo",
+          False, "da «fallito» a «in_volo»" in testo)
 
     print("\n[i controlli prima di pagare]")
     prova("mempool giu: non si paga, niente registrato, il telefono riprovera'",
