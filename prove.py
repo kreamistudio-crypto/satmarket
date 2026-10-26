@@ -97514,6 +97514,12 @@ def prove_paycode_riconosciuto():
     prelude = BANCO_CHAT[:BANCO_CHAT.index("__PEZZI__")].replace(
         "async function parteRiconosciutaP2P(o){ return 'riconosciuta'; }\n", "")
     banco = prelude + BANCO_PAYCODE.replace("__PEZZI__", pezzi)
+    # IN TESTA L'OROLOGIO FINTO (26 ott 2026, cantiere orologio-finto-ovunque):
+    # l'autoinvio e le tre attese da 5 ms in catena corrono contro
+    # `attesa(40)` e `attesa(120)`, e a PC carico i grani da ~16 ms le giravano
+    banco = OROLOGIO_FINTO_JS + banco
+    prova("il banco del PayCode fermo gira sull'orologio finto (le sue corse non dipendono dal carico)",
+          True, banco.startswith(OROLOGIO_FINTO_JS) and "OROLOGIO_FINTO" not in banco[len(OROLOGIO_FINTO_JS):])
     with _tf.TemporaryDirectory() as d:
         f = os.path.join(d, "paycode.js")
         with open(f, "w", encoding="utf-8") as fh:
@@ -119590,6 +119596,12 @@ const muto = () => new Promise(() => {});
   process.exit(0);   // i timeout umani terrebbero vivo node
 })();
 """
+    # IN TESTA L'OROLOGIO FINTO (26 ott 2026, cantiere orologio-finto-ovunque):
+    # il riaggancio da 120 ms, le risposte da 0-10 e il cane da 900 sono
+    # corse, e a PC carico la caduta della socket finiva «ANCORA IN ATTESA»
+    _prog = OROLOGIO_FINTO_JS + _prog
+    prova("il banco del bunker gira sull'orologio finto (le sue corse non dipendono dal carico)",
+          True, _prog.startswith(OROLOGIO_FINTO_JS) and "OROLOGIO_FINTO" not in _prog[len(OROLOGIO_FINTO_JS):])
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                encoding="utf-8")
     _f.write(_prog)
@@ -136730,6 +136742,18 @@ process.stdout.write(JSON.stringify(out));
 # (regola di Andrea: niente sonni allungati ne' ritentativi per far
 # passare una prova), e le librerie di timer finti (un banco node qui
 # non ha npm).
+#
+# ALLARGATO (26 ott 2026, cantiere orologio-finto-ovunque, richiesta di
+# Andrea). Un carico alto su tutti i core, dieci giri per banco, ne ha
+# trovati altri due: il bunker muto (riaggancio a 120 ms contro risposte
+# a 0-10 e il cane da guardia a 900: coi timer veri 10 giri rossi su 10)
+# e il PayCode fermo (autoinvio e tre attese da 5 in catena contro
+# `attesa(40)`: 11 su 40). Con l'orologio, 0 rossi.
+# Il bunker porta con se' la cassetta della pagina, che chiede con
+# `setInterval`: l'orologio ora ha anche quello, per scadenza come i
+# timer, e `clearInterval`. VA SOLO DOVE E' TUTTO CARTONE: con la rete
+# vera, `crypto.subtle` o un file letto in asincrono, un timer finto
+# scatterebbe prima della risposta vera.
 OROLOGIO_FINTO_JS = r"""/* ---- l'orologio finto del banco: il tempo passa solo a pagina ferma ---- */
 (() => {
   const vero = {setImmediate: globalThis.setImmediate, now: Date.now};
@@ -136743,16 +136767,24 @@ OROLOGIO_FINTO_JS = r"""/* ---- l'orologio finto del banco: il tempo passa solo 
     coda.sort((a, b) => a.quando - b.quando || a.n - b.n);
     const t = coda.shift();
     adesso = Math.max(adesso, t.quando);
+    /* l'intervallo si rimette in coda PRIMA di scattare: cosi' un
+       clearInterval dentro il suo giro lo toglie davvero */
+    if (t.ogni) { t.n = ++numero; t.quando = adesso + t.ogni; coda.push(t); }
     accendi();
     t.fn(...t.args);
   }
-  globalThis.setTimeout = (fn, ms, ...args) => {
-    const t = {n: ++numero, quando: adesso + Math.max(0, Number(ms) || 0), fn, args,
+  function timer(fn, ms, args, ogni){
+    const t = {n: ++numero, quando: adesso + Math.max(ogni ? 1 : 0, Number(ms) || 0), fn, args, ogni: 0,
                ref(){ return t; }, unref(){ return t; }};
+    /* come node: un intervallo da 0 ms vale 1, o il tempo non passerebbe mai */
+    if (ogni) t.ogni = t.quando - adesso;
     coda.push(t); accendi(); return t;
-  };
-  globalThis.clearTimeout = t => { const i = coda.indexOf(t); if (i >= 0) coda.splice(i, 1); };
-  globalThis.setInterval = () => { throw new Error("l'orologio finto non ha setInterval"); };
+  }
+  const togli = t => { const i = coda.indexOf(t); if (i >= 0) coda.splice(i, 1); };
+  globalThis.setTimeout = (fn, ms, ...args) => timer(fn, ms, args, false);
+  globalThis.setInterval = (fn, ms, ...args) => timer(fn, ms, args, true);
+  globalThis.clearTimeout = togli;
+  globalThis.clearInterval = togli;
   Date.now = () => inizio + adesso;
 })();
 """
