@@ -5245,7 +5245,10 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
 
 
 NOMI_ALTRA_CASSAFORTE = ("DEVIATO", "_dove_tentati", "_cassaforte_tentata",
-                         "_cassaforte_uscita")
+                         "_cassaforte_uscita", "_riserva_lnbits",
+                         "_saldo_cassaforte", "_avvisa_margine",
+                         "MOTIVO_RISERVA", "RISERVA_LNBITS_PERCENTO",
+                         "RISERVA_LNBITS_MIN_SATS")
 
 
 def ambiente_altra_cassaforte():
@@ -5265,8 +5268,22 @@ def ambiente_altra_cassaforte():
     i = _SORGENTE.index("\nDEVIATO = ") + 1
     exec(_SORGENTE[i:_SORGENTE.index("\n", i)], p)
     for nome in ("_campo", "_dove_tentati", "_cassaforte_tentata",
-                 "_cassaforte_uscita"):
+                 "_cassaforte_uscita", "_riserva_lnbits"):
         exec(pezzo(nome), p)
+    # (27 ott 2026, margine-cassaforte) la domanda del saldo prima della
+    # mano: sui banchi di ieri il saldo NON si legge (None) e l'avviso
+    # tace — il fail-open dichiarato, cioe' il comportamento di ieri. Chi
+    # vuole la domanda vera monta i suoi (prove_margine_cassaforte e il
+    # collaudo sul server vero).
+
+    async def _saldo_ignoto(cf):
+        return None
+
+    async def _zitto(*a, **k):
+        return None
+    p.update(_saldo_cassaforte=_saldo_ignoto, _avvisa_margine=_zitto,
+             MOTIVO_RISERVA="riserva", RISERVA_LNBITS_PERCENTO=1.0,
+             RISERVA_LNBITS_MIN_SATS=2)
     return {n: p[n] for n in NOMI_ALTRA_CASSAFORTE}
 
 
@@ -6867,8 +6884,8 @@ def prove_in_pagamento():
           qn(50, 1000) - 1000)
     prova("«ci stiamo lavorando» scatta quando scatta il 🧊: un numero solo",
           True, "\nIN_PAGAMENTO_LUNGO_S = IN_VOLO_LIMITE_S\n" in src)
-    prova("i guasti di casa sono tre: saldo, ponte, LNbits muta",
-          ("saldo", "ponte", "lnbits_muto"), P["MOTIVI_NOSTRI"])
+    prova("i guasti di casa sono quattro: saldo, ponte, LNbits muta, e dal 27 ott 2026 il margine (riserva)",
+          ("saldo", "ponte", "lnbits_muto", "riserva"), P["MOTIVI_NOSTRI"])
 
     # --- 1. IL GIUDICE, riga per riga --------------------------------
     # (un «non e' in pagamento» torna come stadio VUOTO: a guardia rotta
@@ -164562,8 +164579,10 @@ def prove_canale_admin():
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 33, "moderazione": 14,
-           "riepiloghi": 27}, per_stanza)
+          # (27 ott 2026, margine-cassaforte) «manca margine nella
+          # cassaforte» va nella stanza della liquidita', come la guardia
+          {"dispute": 2, "dm": 1, "errori": 33, "liquidita": 1,
+           "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -164598,10 +164617,11 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "86 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "87 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
-          "quota arrivata su swap@ e l'unione degli account dal web)", 86,
+          "quota arrivata su swap@, l'unione degli account dal web e il "
+          "margine della cassaforte)", 87,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -178819,6 +178839,185 @@ def prove_swap_pagamento():
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
+def prove_margine_cassaforte():
+    """IL MARGINE DELLA CASSAFORTE (27 ott 2026, cantiere
+    margine-cassaforte, decisione di Andrea coi numeri veri del VPS: nodo
+    7 % di margine, SaaS 24,7 %). LNbits tiene l'1 % del pagamento (minimo
+    2 sats) per le commissioni di rete e rifiuta PRIMA di toccare LND se
+    non c'e'. Due pezzi: in `paga_venditore`, prima della mano, la domanda
+    del saldo con la sola chiave di lettura (quarto verbo col motivo
+    «riserva», ritentativo da soli, un avviso per cassaforte ogni sei
+    ore); nella guardia della liquidita' la sesta domanda, per cassaforte:
+    saldo meno incassi in attesa sopra l'1 % del totale piu' 10.000. Qui i
+    giudici ESEGUITI e le sentinelle; la storia sul server vero la gira
+    `collaudo_margine_cassaforte`."""
+    print("\n[il margine della cassaforte]")
+    import asyncio
+    import sqlite3 as _sq
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    amb = {"RISERVA_LNBITS_PERCENTO": 1.0, "RISERVA_LNBITS_MIN_SATS": 2}
+    exec(pezzo("_riserva_lnbits"), amb)
+    ris = amb["_riserva_lnbits"]
+    prova("la riserva di LNbits: l'1 % per eccesso, mai meno di 2 sats",
+          [500, 2, 2, 3, 2, 1_000_000], [ris(50_000), ris(100), ris(199),
+                                          ris(201), ris(0), ris(100_000_000)])
+    amb["RISERVA_LNBITS_PERCENTO"] = 0.5
+    prova("...e la percentuale e' una leva", 250, ris(50_000))
+    amb["RISERVA_LNBITS_PERCENTO"] = 1.0
+
+    # il saldo, con un httpx di cartone
+    class _R:
+        def __init__(self, codice, corpo):
+            self.status_code, self._c = codice, corpo
+
+        def json(self):
+            return self._c
+
+    class _H:
+        risposta = _R(200, {"balance": 123_456_789})
+
+        class AsyncClient:
+            def __init__(self, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, **k):
+                _H.ultimo = (url, k.get("headers"))
+                if isinstance(_H.risposta, Exception):
+                    raise _H.risposta
+                return _H.risposta
+    amb = {"httpx": _H}
+    exec("async " + pezzo("_saldo_cassaforte"), amb)
+    from collections import namedtuple
+    _Cf = namedtuple("_Cf", "nome LNBITS_URL LNBITS_INVOICE_KEY LNBITS_ADMIN_KEY")
+    cf = _Cf("nodo", "http://lnbits.nodo", "chiave-di-lettura", "ADMIN")
+    saldo = lambda: asyncio.run(amb["_saldo_cassaforte"](cf))
+    prova("il saldo si legge da /api/v1/wallet con la SOLA chiave di lettura, "
+          "in sats", (123_456, "http://lnbits.nodo/api/v1/wallet",
+                      {"X-Api-Key": "chiave-di-lettura"}),
+          (saldo(), _H.ultimo[0], _H.ultimo[1]))
+    _H.risposta = _R(500, {})
+    s500 = saldo()
+    _H.risposta = RuntimeError("giu")
+    sgiu = saldo()
+    _H.risposta = _R(200, {})
+    svuoto = saldo()
+    prova("...un 500 o un errore di rete sono «non so»; un corpo senza "
+          "balance vale 0", (None, None, 0), (s500, sgiu, svuoto))
+
+    # l'avviso: uno per cassaforte ogni sei ore
+    timbri, detti = {}, []
+
+    async def _admin(t, **k):
+        detti.append((k.get("argomento"), t))
+    ora = [1_800_000_000]
+    amb = {"time": type("T", (), {"time": staticmethod(lambda: ora[0])}),
+           "TIMBRO_MARGINE": "avviso_margine", "MARGINE_AVVISO_PAUSA_S": 21_600,
+           "timbro_letto": lambda n: timbri.get(n, ""),
+           "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+           "notifica_admin": _admin, "_fmt_sats": reale("_fmt_sats"),
+           "_riserva_lnbits": ris, "RISERVA_LNBITS_PERCENTO": 1.0,
+           "RISERVA_LNBITS_MIN_SATS": 2, "print": lambda *a, **k: None}
+    exec("async " + pezzo("_avvisa_margine"), amb)
+    av = lambda cf="nodo", s=1000, d=50_000: asyncio.run(
+        amb["_avvisa_margine"](cf, s, d, "ordini#7"))
+    av()
+    av()
+    ora[0] += 21_599
+    av()
+    av("saas")
+    ora[0] += 2
+    av()
+    prova("l'avviso: uno per cassaforte, poi silenzio per sei ore, poi di "
+          "nuovo; l'altra cassaforte ha il suo",
+          (["nodo", "saas", "nodo"], {"avviso_margine_nodo", "avviso_margine_saas"}),
+          ([("nodo" if "cassaforte nodo" in t else "saas") for _, t in detti],
+           set(timbri)))
+    prova("...nella stanza della liquidità, col saldo, il dovuto e la somma "
+          "con la riserva", ("liquidita", True, True, True),
+          (detti[0][0], "<b>1.000 sats</b>" in detti[0][1],
+           "<b>50.000</b>" in detti[0][1], "<b>50.500</b>" in detti[0][1]))
+
+    # la sesta domanda: gli incassi in attesa e il giudizio
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "payout_stato TEXT, prezzo_sats INTEGER, cassaforte TEXT)")
+    righe = [("locked", "", 10_000, "nodo"), ("confirmed", "", 20_000, "nodo"),
+             ("confirmed", "uscito", 99_000, "nodo"),   # gia' pagato
+             ("released", "uscito", 99_000, "nodo"), ("creato", "", 99_000, "nodo"),
+             ("refund", "", 5_000, "saas"), ("return_shipped", "", 6_000, "saas"),
+             ("annullato", "", 99_000, "saas"), ("refunded", "", 99_000, "saas"),
+             ("dispute", "incerto", 7_000, "saas")]
+    con.executemany("INSERT INTO ordini(stato, payout_stato, prezzo_sats, "
+                    "cassaforte) VALUES(?,?,?,?)", righe)
+    amb = {"STATI_SATS_IN_CASSAFORTE": (
+        "locked", "shipped", "delivered", "confirmed", "dispute",
+        "return_pending", "return_shipped", "refund")}
+    exec(pezzo("_incassi_in_attesa"), amb)
+    prova("gli incassi in attesa: solo gli stati coi sats dentro e non "
+          "ancora usciti, per cassaforte",
+          {"nodo": {"n": 2, "sats": 30_000}, "saas": {"n": 3, "sats": 18_000}},
+          amb["_incassi_in_attesa"](con))
+    amb = {"LIQUIDITA_MARGINE_PERCENTO": 1, "LIQUIDITA_MARGINE_MIN_SATS": 10_000,
+           "_fmt_sats": reale("_fmt_sats")}
+    exec(pezzo("_giudizio_margine"), amb)
+    g = amb["_giudizio_margine"]
+    att = {"n": 9, "sats": 470_727}
+    prova("il giudizio coi numeri veri del VPS (27 ott): saldo 503.786 contro "
+          "470.727 in attesa = 33.059 di margine, soglia 14.707: buona",
+          ("margine_nodo", True), g("nodo", 503_786, att)[:2])
+    prova("...al limite (470.727 + 14.707) buona, un sat sotto cattiva, "
+          "saldo None non misurata",
+          [True, False, None],
+          [g("nodo", 485_434, att)[1], g("nodo", 485_433, att)[1],
+           g("nodo", None, att)[1]])
+    prova("...e le parole dicono soglia, saldo e attesa", True,
+          "la soglia è 14.707" in g("nodo", 485_433, att)[2]
+          and "470.727 sats in attesa su 9 ordini" in g("nodo", 485_433, att)[2])
+    amb["LIQUIDITA_MARGINE_PERCENTO"], amb["LIQUIDITA_MARGINE_MIN_SATS"] = 0, 10_000
+    prova("...la percentuale a 0: restano i sats fissi", (True, False),
+          (g("nodo", 480_727, att)[1], g("nodo", 480_726, att)[1]))
+
+    # LE SENTINELLE
+    pv = codice(pezzo("paga_venditore"))
+    i_ponte = pv.index('cf.nome == CASSAFORTE_NODO and _ponte.get("stato") == "giu"')
+    i_saldo = pv.index("saldo = await _saldo_cassaforte(cf)")
+    i_mano = pv.index("if not _prendi_la_mano(")
+    prova("la domanda del saldo sta DOPO il ponte e PRIMA della mano, e "
+          "risponde col quarto verbo", (True, True),
+          (i_ponte < i_saldo < i_mano,
+           "return NON_CHIESTO" in pv[i_saldo:i_mano]))
+    prova("...senza saldo letto non ferma niente", True,
+          "if saldo is not None and saldo < serve:" in pv)
+    prova("il motivo «riserva» e' un guasto NOSTRO (si riprova con "
+          "BACKOFF_NOSTRO, lo stadio dice nostro)", True,
+          "MOTIVO_RISERVA" in src[src.index("\nMOTIVI_NOSTRI = ("):
+                                        src.index(")\n", src.index("\nMOTIVI_NOSTRI = ("))]
+          and "  riserva:        'un problema del nostro nodo'," in mini)
+    prova("la guardia fa la sesta domanda in coda alle altre", True,
+          "_giudizio_liquidita(n, strada) + await _voci_margine()"
+          in pezzo("_quadro_liquidita"))
+    prova("le due leve: server, config d'esempio, pannello", [True] * 6,
+          ["    LIQUIDITA_MARGINE_PERCENTO = 1\n" in src,
+           "    LIQUIDITA_MARGINE_MIN_SATS = 10_000\n" in src,
+           "\nLIQUIDITA_MARGINE_PERCENTO = 1\n" in esempio,
+           "\nLIQUIDITA_MARGINE_MIN_SATS = 10000\n" in esempio,
+           '"LIQUIDITA_MARGINE_PERCENTO",' in src,
+           '"LIQUIDITA_MARGINE_MIN_SATS",' in src])
+    prova("il collaudo della cassaforte senza margine sta negli elenchi della CI",
+          (True, True),
+          ("\ncollaudo_margine_cassaforte\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_margine_cassaforte.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
 def prove_leve_mai_doppie():
     """UNA LEVA, UN POSTO (20 ott 2026, cantiere leve-doppie, richiesta di
     Andrea). Il 19 ott il tetto di swap@barattolo.store (2.000.000) e il
@@ -179542,6 +179741,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
+              prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,

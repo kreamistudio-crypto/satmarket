@@ -30817,6 +30817,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   LIQUIDITÀ»). `deploy/nodo/sonda-rotte.py` è la sonda a mano, in sola
   lettura, che fa le stesse domande dal nodo. Il perché: CANTIERI,
   «La guardia della liquidità».
+- IL MARGINE DELLA CASSAFORTE (27 ott 2026, cantiere margine-cassaforte;
+  perché in CANTIERI, «Il margine della cassaforte»). Due pezzi. (1) In
+  `paga_venditore`, con la riga, DOPO il controllo del ponte e PRIMA di
+  `_prendi_la_mano`: `_saldo_cassaforte(cf)` (`GET /api/v1/wallet` con
+  la sola `LNBITS_INVOICE_KEY` della cassaforte della riga, None = non
+  letto) contro `atteso_sats + _riserva_lnbits(atteso_sats)` (l'1 % per
+  eccesso, minimo 2: `RISERVA_LNBITS_PERCENTO`, `RISERVA_LNBITS_MIN_SATS`,
+  i numeri di LNbits); se manca → `taccuino["motivo"] = MOTIVO_RISERVA`,
+  `_avvisa_margine` (un avviso per cassaforte ogni `MARGINE_AVVISO_PAUSA_S`,
+  timbro `avviso_margine_<nome>`, stanza «liquidita») e `NON_CHIESTO`.
+  `MOTIVO_RISERVA` sta in `MOTIVI_NOSTRI`: il quarto verbo lo sospende con
+  `_sospendi_pagamento` e lo riprova `riprova_pagamenti_sospesi` con
+  `BACKOFF_NOSTRO`; lo stadio dice `nostro`. Un saldo non letto non ferma
+  niente. (2) La sesta domanda della guardia: `_voci_margine()` in coda a
+  `_giudizio_liquidita` dentro `_quadro_liquidita` (quindi anche in
+  `/canali`): per ogni cassaforte di `CASSAFORTI` configurata
+  (`_cassaforte_configurata`), `_giudizio_margine(nome, saldo, attesa)`
+  (PURA) con `attesa` da `_incassi_in_attesa(con)` (gli `ordini` in
+  `STATI_SATS_IN_CASSAFORTE` con `payout_stato` ≠ «uscito», per
+  `cassaforte`, al prezzo pieno) e la soglia `LIQUIDITA_MARGINE_PERCENTO`
+  % del totale + `LIQUIDITA_MARGINE_MIN_SATS`; chiave `margine_<nome>`,
+  esito True/False/None. Tutt'e due le leve a 0 = domanda spenta. Il
+  LNbits di cartone del banco dei pagamenti (`collaudo_lnbits_muto`)
+  risponde a `/api/v1/wallet` con `NODO["saldo"]`.
 - IL SERVER CHE SI RIAVVIA (30 set 2026): nel client un portinaio
   solo attorno a `fetch`, `fetchCheRiprova` in cima allo script
   dell'app, montato PRIMA di ogni chiamata. Riprova da solo, con

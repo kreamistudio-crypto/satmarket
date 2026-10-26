@@ -147,6 +147,12 @@ LIQUIDITA_USCITA_CANALE = False    # True = il canale con piu' uscita
 LIQUIDITA_ACINQ_TETTO = False      # True = il tetto degli appesi di
                                    # ACINQ (450k sul canale da 1M) lascia
                                    # entrare LIQUIDITA_PHOENIX_MIN?
+# La sesta domanda (27 ott 2026): per ogni cassaforte, saldo del wallet
+# meno gli incassi in attesa sopra questa percentuale del totale in attesa
+# più i sats fissi (LNbits tiene l'1 % per le commissioni, sennò i
+# pagamenti si fermano). Tutt'e due a 0 = domanda spenta.
+LIQUIDITA_MARGINE_PERCENTO = 1
+LIQUIDITA_MARGINE_MIN_SATS = 10000
 LIQUIDITA_PROMEMORIA_S = 86400     # fra un promemoria e l'altro
 LIQUIDITA_OGNI_S = 3600            # ogni quanto guarda
 

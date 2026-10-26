@@ -1036,6 +1036,26 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Phoenix, più grosso dell'entrata ACINQ del momento, e poi
   `lncli lookupinvoice <r_hash>` sul nodo per leggere da quale canale
   sono arrivati i pezzi (la lista `htlcs`).
+- IL MARGINE DELLA CASSAFORTE (27 ott 2026, cantiere margine-cassaforte;
+  perché in CANTIERI, «Il margine della cassaforte»; com'è fatto in
+  ARCHITETTURA). SUL VPS NON SI AGGIUNGE NIENTE: la domanda del saldo
+  prima di ogni pagamento è sempre accesa (usa la invoice key che il
+  config ha già), e le due leve della sesta domanda della guardia,
+  `LIQUIDITA_MARGINE_PERCENTO = 1` e `LIQUIDITA_MARGINE_MIN_SATS = 10000`,
+  valgono i default del codice; la sesta domanda parla solo a guardia
+  accesa (`GUARDIA_LIQUIDITA`), e in `/canali` anche a guardia spenta.
+  COSA SI VEDE: un incasso che si ferma per il margine è nel journal
+  «🔁 Pagamento NON CHIESTO: nella cassaforte nodo manca il margine
+  (ordini#N: saldo …, servono … con la riserva di LNbits)», e nella
+  stanza 💧 Liquidità «Manca margine nella cassaforte nodo» (uno ogni sei
+  ore per cassaforte); l'incasso riparte da solo (1, 5, 15, 30 minuti,
+  poi ogni ora) appena il margine c'è. COSA SI FA: si aggiunge capitale
+  alla cassaforte (il wallet è misto: escrow di tutti più il nostro).
+  I NUMERI VIVI, sola lettura, dal VPS (`cd /srv/barattolo`, come
+  `barattolo`): saldo per cassaforte e incassi in attesa dal database —
+  il comando sta nel rapporto del 26 ott (CANTIERI, «Lo swap intero sul
+  regtest di Boltz», il margine dell'1 %). Il 27 ott: nodo 503.786 di
+  saldo, 470.727 in attesa, margine 33.059 (soglia 14.707); SaaS 84.250.
 - LA QUINTA DOMANDA DELLA RONDA, OGNI GIORNO: `ronda-tor.sh` +
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org
