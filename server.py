@@ -13784,6 +13784,33 @@ def _msg_ritentiamo(sats: int, taccuino: dict | None = None) -> str:
             f"aperta un momento aiuta.")
 
 
+def _fattura_di_swap(ordine_id: int, bolt11: str) -> bool:
+    """Questa fattura dell'ordine e' quella di uno swap che Barattolo ha
+    registrato (`swap_pagamenti`, tappa 4)? False se la tabella non c'e'
+    o non si legge: allora le parole sono quelle di sempre."""
+    try:
+        con = db()
+        try:
+            return bool(con.execute(
+                "SELECT 1 FROM swap_pagamenti WHERE ordine_id=? AND bolt11=?",
+                (ordine_id, str(bolt11 or "").strip().lower())).fetchone())
+        finally:
+            con.close()
+    except Exception:
+        return False
+
+
+def _msg_swap_non_andato(sats: int) -> str:
+    """LE PAROLE DI CHI VENDE quando il pagamento dello swap non e' andato
+    (26 ott 2026, swap tappa 4): la fattura l'aveva fatta lo swap, non
+    lui. Niente «fattura nuova»: si sceglie di nuovo come incassare."""
+    return ("⚠️ <b>Lo swap non è andato.</b> Il pagamento dello swap non "
+            "è arrivato a destinazione, e i tuoi "
+            f"<b>{_fmt_sats(sats)} sats</b> sono al sicuro nel deposito di "
+            "garanzia. Apri l'ordine nella Mini App e scegli di nuovo come "
+            "incassare: in Lightning o con uno swap nuovo.")
+
+
 def _msg_fattura_nuova(sats: int, taccuino: dict) -> str:
     """LE PAROLE PER CHI DEVE DARCI UNA FATTURA NUOVA (20 set 2026).
 
@@ -14289,7 +14316,8 @@ def _rifiuto_in_pagamento(o, gesto: str) -> str:
             f"dell'ordine.")
 
 
-def stadio_pagamento(o, passi=(), tentati=(), adesso: int = 0):
+def stadio_pagamento(o, passi=(), tentati=(), adesso: int = 0,
+                     vola_fino: int = 0):
     """IL GIUDICE UNICO DELLO STADIO «💸 In pagamento al venditore».
     PURO: niente rete, niente database, l'ora arriva da fuori. Lo
     leggono la pagina dell'ordine, la lista, il pannello dei moderatori
@@ -14304,7 +14332,13 @@ def stadio_pagamento(o, passi=(), tentati=(), adesso: int = 0):
     `IN_PAGAMENTO_LUNGO_S` (solo quando la palla e' NOSTRA: chi vende
     che non ci da' un metodo non e' «ci stiamo lavorando»), `prossimo`
     = quando si riprova, `via` = lightning (domani onchain), e `linea`
-    = la linea del tempo, coi passi uguali di fila gia' compressi."""
+    = la linea del tempo, coi passi uguali di fila gia' compressi.
+    `vola_fino` (26 ott 2026, swap tappa 4): se il pagamento in volo e'
+    la fattura di uno swap, fin quando il suo volo e' normale (la
+    scadenza dello swap, scritta in `swap_pagamenti`). Prima di allora
+    non e' «lungo»: la fattura di uno swap resta in volo finche' chi
+    vende non ritira i bitcoin, e «ci stiamo lavorando noi» sarebbe
+    falso. Dopo, la ronda la congela e lo stadio torna quello di sempre."""
     stato = _campo(o, "stato")
     passi = list(passi or ())
     arrivato = stato == "released"
@@ -14343,8 +14377,10 @@ def stadio_pagamento(o, passi=(), tentati=(), adesso: int = 0):
     da = int((deciso or (passi[0] if passi else {})).get("quando")
              or _campo(o, "aggiornato", 0) or 0)
     nostra = passo in (PASSO_IN_VOLO, PASSO_IN_VERIFICA, PASSO_RIPARTE)
+    swap_in_tempo = ps == "in_volo" and int(vola_fino or 0) > adesso
     lungo = bool(nostra and (ps == "incerto"
-                             or (da and adesso - da > IN_PAGAMENTO_LUNGO_S)))
+                             or (da and adesso - da > IN_PAGAMENTO_LUNGO_S
+                                 and not swap_in_tempo)))
     prossimo = 0
     if passo == PASSO_RIPARTE:
         volte, ultimo = _conta_guasti(passi)
@@ -14380,6 +14416,24 @@ def stadio_pagamento(o, passi=(), tentati=(), adesso: int = 0):
     }
 
 
+def _swap_voli(con, ids: list) -> dict:
+    """(ordine, hash) -> `vola_fino` delle fatture di swap di questi
+    ordini. Vuoto se la tabella non c'e' ancora (nessuno swap e' mai
+    stato pagato) o non si legge: lo stadio resta quello di sempre."""
+    voli = {}
+    try:
+        for i in range(0, len(ids), 500):
+            pezzo = ids[i:i + 500]
+            seg = ",".join("?" * len(pezzo))
+            for v in con.execute(
+                    "SELECT ordine_id, hash, vola_fino FROM swap_pagamenti "
+                    f"WHERE ordine_id IN ({seg})", pezzo):
+                voli[(v[0], v[1])] = int(v[2] or 0)
+    except Exception:
+        return {}
+    return voli
+
+
 def _stadi_ordini(con, righe: list) -> dict:
     """Lo stadio di ogni ordine della lista che ne ha uno: DUE query per
     tutti, non due per ordine. `righe` sono dict con le colonne di
@@ -14409,12 +14463,17 @@ def _stadi_ordini(con, righe: list) -> dict:
                 tentati.setdefault(t[0], []).append((t[1], t[2], t[3]))
     except Exception as e:
         print(f"⚠️ Linea del tempo dei pagamenti non letta: {e}")
+    # (26 ott 2026, swap tappa 4) fin quando vola la fattura di uno swap,
+    # per hash: la tabella puo' non esserci ancora, e allora non vola niente
+    voli = _swap_voli(con, ids)
     adesso = int(time.time())
     stadi = {}
     for r in righe:
         if r["id"] in ids:
             s = stadio_pagamento(r, passi.get(r["id"]), tentati.get(r["id"]),
-                                 adesso)
+                                 adesso,
+                                 voli.get((r["id"], r.get("payout_hash") or ""),
+                                          0))
             if s:
                 stadi[r["id"]] = s
     return stadi
@@ -31803,11 +31862,18 @@ def _leve_stato():
                   int(SWAP_MAX_SATS_UTENTE_GIORNO or 0)),
             _leva("Swap: pagati in tutto in 24 ore (sats)",
                   "SWAP_MAX_SATS_GIORNO", int(SWAP_MAX_SATS_GIORNO or 0)),
+            # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
+            # fattura dello swap e' meno di quel che spetta a chi vende, e
+            # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
             _leva("Swap: la nostra fee (%)", "SWAP_FEE_PERCENTO",
                   float(SWAP_FEE_PERCENTO or 0),
-                  acceso="chi vende la vede come riga sua nel preventivo",
-                  spento="nessuna fee nostra: il guadagno e' la quota "
-                         "del 10 % della commissione di SATS Routing"),
+                  acceso="⚠️ NON VA ACCESA: sopra 0 Barattolo NON paga "
+                         "la fattura dello swap (tappa 4), e ogni swap si "
+                         "ferma col no «fee». Resta 0 per decisione di "
+                         "Andrea",
+                  spento="nessuna fee nostra (deve restare 0: sopra 0 "
+                         "Barattolo non paga gli swap). Il guadagno e' la "
+                         "quota del 10 % della commissione di SATS Routing"),
             _leva("Swap: dove si leggono le tariffe", "SWAP_API_BASE",
                   str(SWAP_API_BASE or "")),
             _leva("Swap: la rete", "SWAP_RETE", swap_rete()),
@@ -73843,6 +73909,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 f"può ancora decidere.")
         if ritenta:
             msg = _msg_ritentiamo(netto, taccuino)
+        elif bolt11 and _fattura_di_swap(ordine_id, bolt11):
+            # (26 ott 2026, swap tappa 4) LA FATTURA ERA QUELLA DELLO SWAP:
+            # chi vende non ha incollato niente, e «dacci una fattura nuova»
+            # sarebbe un gesto che non ha mai fatto. Si sceglie di nuovo.
+            msg = _msg_swap_non_andato(netto)
         elif taccuino.get("ritentabile") and v and v["ln_address"]:
             # LA RESA: si e' provato e riprovato, e la strada non c'e'.
             # Adesso l'invito ad agire e' giusto, perche' da soli non

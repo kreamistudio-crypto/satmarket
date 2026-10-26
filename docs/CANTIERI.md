@@ -72274,3 +72274,47 @@ non in elenco, tipo «rilegatura avorio»), si aggiunge la frase a
 `CONTESTI_INNOCENTI` col caso nelle prove. Sul VPS: dopo il deploy il
 motivo dei blocchi dello strato 1 nel registro e nelle statistiche admin
 porta la parola, quindi le statistiche per motivo si dividono per parola.
+
+## Lo swap, le due frasi e la fee che resta 0 (26 ott 2026, cantiere swap-frasi, richiesta di Andrea)
+
+**LE DUE FRASI** (notate a fine tappa 4, «Lo swap, tappa 4»).
+- L'AVVISO TELEGRAM A CHI VENDE dopo un pagamento di swap fallito usava
+  le parole di una fattura Lightning bruciata (`_msg_fattura_nuova`:
+  «incolla una fattura nuova»): chi vende non aveva incollato niente, la
+  fattura l'aveva fatta lo swap. Ora `_sblocca_sats`, se la fattura che
+  ha appena fallito sta in `swap_pagamenti` per quell'ordine
+  (`_fattura_di_swap`), manda `_msg_swap_non_andato`: «Lo swap non è
+  andato», i sats al sicuro nel deposito di garanzia, «scegli di nuovo
+  come incassare: in Lightning o con uno swap nuovo». Il ramo sta dopo
+  quello del ritentativo e prima di tutti quelli di una fattura.
+- LA STORIA DELL'ORDINE diceva «Ci sta mettendo più del solito: ci
+  stiamo lavorando noi» dopo mezz'ora in volo (`IN_PAGAMENTO_LUNGO_S`)
+  anche per la fattura di uno swap, che vola per sua natura finche' chi
+  vende non ritira. Ora `stadio_pagamento` ha `vola_fino` (di serie 0:
+  per tutto il resto non cambia niente): in volo e prima di quell'ora non
+  e' «lungo». `_stadi_ordini` lo legge per (ordine, hash) da
+  `swap_pagamenti` (`_swap_voli`, vuoto se la tabella non c'e'). Passata
+  la scadenza la ronda congela, e il «ci stiamo lavorando noi» torna,
+  vero.
+
+**LA FEE RESTA 0** (decisione di Andrea, 26 ott): `SWAP_FEE_PERCENTO`
+sopra 0 e la tappa 4 non paga (il no «fee», gia' nel codice): scritto
+nel pannello delle leve («⚠️ NON VA ACCESA») e in PRODUZIONE («LO SWAP,
+TAPPA 4: LE LEVE», col controllo di sola riga sul VPS).
+
+**PROVATO.** `collaudo_swap_pagamento` 45/0 (tre scene nuove: lo stadio
+a mezz'ora in volo non e' lungo, a scadenza passata si'; il messaggio
+Telegram dopo il fallimento del #241, senza «fattura» e coi 30.000 sats);
+`prove_swap_pagamento` con lo stadio puro (sei casi), il messaggio, la
+posizione del ramo, la leva in pannello e PRODUZIONE. I tre nomi nuovi
+stanno in `NOMI_IN_PAGAMENTO`, montati nei banchi che girano
+`_sblocca_sats` e lo stadio. CONTROPROVE, 7 su 7 rosse: il ramo dello
+swap tolto, `swap_in_tempo` sempre falso (nel collaudo e nelle prove),
+lo stadio che non legge i voli, la fattura di swap non riconosciuta, la
+riga del pannello tolta, l'avviso che torna a dire «fattura». Suite e
+collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Niente di questo cantiere. Le altre parole della linea
+del tempo di un payout fallito (i motivi «bruciata», «scaduta») non
+sono state guardate per lo swap: le dice lo stadio, e chi vende ha la
+carta dello swap.

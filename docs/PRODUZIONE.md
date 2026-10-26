@@ -4598,6 +4598,14 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   codice, e il pannello «⚙️ Stato delle leve» le dice. La tabella
   `swap_pagamenti` nasce da sola alla prima lettura. swap@ non paga:
   nessuna chiave nuova. Sulla VM, la prova sul regtest: COLLAUDO.md §6.
+  LA FEE NOSTRA RESTA 0 (26 ott 2026, decisione di Andrea):
+  `SWAP_FEE_PERCENTO` NON si aggiunge al config del VPS, e se un giorno
+  ci fosse va lasciata a 0. Sopra 0 la fattura dello swap e' meno di
+  quel che spetta a chi vende, la porta dei pagamenti paga solo l'esatto,
+  e la tappa 4 NON PAGA: ogni swap si ferma col no «fee» (nel journal
+  «non si paga — fee»). Il pannello «⚙️ Stato delle leve» lo dice sulla
+  riga «Swap: la nostra fee (%)». Controllo, sola riga: `grep -n
+  "^SWAP_FEE_PERCENTO" /srv/barattolo/config.py` (atteso: niente, o `= 0`).
 
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo

@@ -33948,6 +33948,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swapPaga`/`swapGiroPagamento` in `swap/instradatore.js`, e
   `swapNonPagato` libera l'incasso dopo un no. Il cartone: l'altezza
   (`/esplora/blocks/tip/height`, `/cartone/cima`).
+  (26 ott 2026, cantiere swap-frasi) Lo stadio: `stadio_pagamento(...,
+  vola_fino)` e `_swap_voli` in `_stadi_ordini` (una fattura di swap in
+  volo non e' «lunga» prima della scadenza). L'avviso: `_fattura_di_swap`
+  e `_msg_swap_non_andato` nel ramo del fallimento di `_sblocca_sats`.
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e
