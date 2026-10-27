@@ -15,6 +15,13 @@ prove_ordine_onchain. MEMPOOL E' DI CARTONE: le monete di un indirizzo,
 la tariffa e la trasmissione sono tre funzioni sostituite. Nessuna rete,
 nessun sats.
 
+DAL 27 OTT 2026 (cantiere onchain-ordini, la strada A di Andrea: «gli
+step devono essere uguali, cambia solo il metodo di pagamento») quando i
+sats arrivano nasce l'ORDINE DI SEMPRE in `ordini`, cassaforte 'onchain':
+qui si prova che e' in «Ordini», che lo chiude per la porta di sempre la
+seconda firma, che il rimborso passa da «Annulla la vendita», e che dal
+Lightning non esce niente.
+
 USO:  python collaudo_onchain_ordine.py
 """
 import json
@@ -227,11 +234,45 @@ def main():
     con = SRV.db()
     a = con.execute("SELECT quantita, stato FROM annunci WHERE id=?",
                     (annunci[0],)).fetchone()
+    nato = con.execute("SELECT o.* FROM ordini o JOIN onchain_ordini c "
+                       "ON c.ordine_id=o.id WHERE c.id=?", (oid,)).fetchone()
     con.close()
     prova("...lo stock e' sceso e l'annuncio e' venduto", (0, "venduto"),
           (a["quantita"], a["stato"]))
-    prova("...e lo sanno tutti e due", [888, 999],
-          sorted(chi for chi, t in banco.DETTO if "⛓️" in t))
+    # LA STRADA A: l'ordine di sempre, passato a 'locked' da _incassa_ordine
+    prova("...ed e' nato l'ordine di sempre: locked, cassaforte onchain, "
+          "senza fattura", ("locked", "onchain", "", 999, 888, 50000, "ritiro"),
+          (nato["stato"], nato["cassaforte"], nato["payment_hash"],
+           nato["compratore_id"], nato["venditore_id"], nato["prezzo_sats"],
+           nato["consegna_scelta"]))
+    ord_id = nato["id"]
+    prova("...e lo sanno tutti e due, con gli avvisi del Lightning "
+          "(«Hai venduto»)", ([888, 999], True),
+          (sorted({chi for chi, _ in banco.DETTO}),
+           any("Hai venduto" in t for chi, t in banco.DETTO if chi == 888)))
+    come(999)
+    mio = next((x for x in c.get("/api/orders").json() if x["id"] == ord_id), {})
+    prova("in «Ordini» di chi compra, col riassunto della sua cassaforte",
+          ("locked", oid, "pagato", None),
+          (mio.get("stato"), (mio.get("onchain") or {}).get("id"),
+           (mio.get("onchain") or {}).get("stato"),
+           (mio.get("onchain") or {}).get("proposta")))
+    come(888)
+    prova("...e in quelli di chi vende", True,
+          any(x["id"] == ord_id for x in c.get("/api/orders").json()))
+    prova("il foglio On-chain dice l'ordine di sempre", ord_id,
+          ordine(999, oid)["ordine_id"])
+    prova("un secondo «controlla» non fa nascere un secondo ordine", 1,
+          (controlla(999, oid), SRV.db().execute(
+              "SELECT COUNT(*) FROM ordini WHERE cassaforte='onchain' "
+              "AND annuncio_id=?", (annunci[0],)).fetchone()[0])[1])
+    come(999)
+    r = c.post(f"/api/orders/{ord_id}/conferma")
+    prova("«conferma» per la porta del Lightning: niente esce, e lo dice",
+          (200, True, "locked"),
+          (r.status_code, r.json().get("onchain"),
+           SRV.db().execute("SELECT stato FROM ordini WHERE id=?",
+                            (ord_id,)).fetchone()[0]))
     come(777)
     prova("chi non c'entra: 404", 404,
           c.post(f"/api/onchain/ordini/{oid}/controlla").status_code)
@@ -261,6 +302,11 @@ def main():
     r = proponi(999, oid, "venditore", psbt_di(o, giusto, 999))
     prova("la proposta giusta: 200, e il venditore e' avvisato", (200, [888]),
           (r.status_code, [chi for chi, _ in banco.DETTO]))
+    come(999)
+    mio = next(x for x in c.get("/api/orders").json() if x["id"] == ord_id)
+    prova("...e in «Ordini» chi compra vede la sua firma", {"verso": "venditore",
+                                                          "mia": True},
+          mio["onchain"]["proposta"])
 
     # ---- 4) la seconda firma ------------------------------------------------
     print("\n[la seconda firma e la trasmissione]")
@@ -274,6 +320,24 @@ def main():
     prova("la transazione completa, mandata da chi ha proposto: 409 (le "
           "due firme sono di due persone)", 409,
           firma(999, oid, pronta).status_code)
+    # una disputa aperta fra le due firme ferma la seconda
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='dispute' WHERE id=?", (ord_id,))
+    con.commit()
+    con.close()
+    prova("a disputa aperta la seconda firma non passa: 409", 409,
+          firma(888, oid, pronta).status_code)
+    come(777)
+    r = c.post(f"/api/admin/orders/{ord_id}/risolvi", json={"esito": "venditore"})
+    prova("...e il moderatore non la decide coi sats: 409 col perche' (manca "
+          "la chiave di Barattolo)", (409, True, "dispute"),
+          (r.status_code, "chiave di Barattolo" in r.json().get("detail", ""),
+           SRV.db().execute("SELECT stato FROM ordini WHERE id=?",
+                            (ord_id,)).fetchone()[0]))
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='locked' WHERE id=?", (ord_id,))
+    con.commit()
+    con.close()
     altra = psbt_di(o8, [(o["incasso"], 50000), (o["rimborso"], 700)], 888)
     altra.sign_with(radice(999).derive(
         f"m/48h/1h/0h/2h/0/{o9['indirizzo']['mio_numero']}").key)
@@ -289,6 +353,16 @@ def main():
           [(u.script_pubkey.address(N), u.value) for u in t.vout])
     prova("...e l'ordine porta il txid", r.json()["txid"],
           ordine(999, oid)["txid_uscita"])
+    con = SRV.db()
+    chiuso = con.execute("SELECT stato, payout_stato FROM ordini WHERE id=?",
+                         (ord_id,)).fetchone()
+    conti = [con.execute(f"SELECT {k} FROM utenti WHERE tg_id=?",
+                         (tg,)).fetchone()[0]
+             for k, tg in (("vendite_ok", 888), ("acquisti_ok", 999))]
+    con.close()
+    prova("l'ordine di sempre si chiude per la sua porta: released, coi "
+          "conti delle due parti", ("released", "uscito", [1, 1]),
+          (chiuso["stato"], chiuso["payout_stato"], conti))
 
     # ---- 5) il rimborso -------------------------------------------------
     print("\n[il rimborso: lo stesso gesto a parti invertite]")
@@ -301,7 +375,20 @@ def main():
     paga(o)
     controlla(999, o["id"])
     o8 = ordine(888, o["id"])
+    ord2 = o8["ordine_id"]
     indietro = [(o8["rimborso"], o8["importo_sats"] - 400)]
+    prova("il rimborso non si propone a ordine vivo: parte da «Annulla la "
+          "vendita»", (409, True),
+          (lambda r: (r.status_code, "Annulla" in r.json()["detail"]))(
+              proponi(888, o["id"], "compratore", psbt_di(o8, indietro, 888))))
+    banco.DETTO.clear()
+    come(888)
+    r = c.post(f"/api/orders/{ord2}/annulla-vendita", json={"motivo": "spedizione"})
+    prova("«Annulla la vendita»: refund, il Lightning non paga, e chi "
+          "compra sa che firma il suo telefono", (200, "refund", True, True),
+          (r.status_code, r.json().get("stato"),
+           (r.json().get("rimborso") or {}).get("onchain"),
+           any("seconda firma" in t for chi, t in banco.DETTO if chi == 999)))
     prova("chi compra non si propone il rimborso da solo: 403", 403,
           proponi(999, o["id"], "compratore",
                   psbt_di(ordine(999, o["id"]), indietro, 999)).status_code)
@@ -320,6 +407,11 @@ def main():
             for u in Transaction.from_string(INVIATE[-1]).vout]))
     prova("...i due ordini hanno chiavi nuove (numeri 1, non 0)", (1, 1),
           (o9["indirizzo"]["mio_numero"], o8["indirizzo"]["mio_numero"]))
+    con = SRV.db()
+    prova("...e l'ordine di sempre e' refunded", "refunded",
+          con.execute("SELECT stato FROM ordini WHERE id=?",
+                      (ord2,)).fetchone()[0])
+    con.close()
 
     # ---- 6) annullare, scadere ---------------------------------------------
     print("\n[annullare prima di pagare, e la scadenza]")

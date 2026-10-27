@@ -41839,7 +41839,16 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "paese": paese if scelta == "spedizione" else "",
             "nota": nota, "indirizzo": ind,
             "articolo_sats": conto["netto"], "spedizione_sats": sped,
-            "protezione_sats": prot})
+            "protezione_sats": prot,
+            # il resto della riga di `ordini` che nascera' al pagamento
+            # (27 ott 2026, strada A): quel che la cassa del Lightning
+            # scrive subito, qui si fotografa e si scrive dopo
+            "domestico": _domestico(a) if scelta == "spedizione" else "",
+            "email_corriere": mail, "indirizzo_atteso": ind_atteso,
+            "indirizzo_confermato_il": (int(time.time())
+                                        if _indirizzo_confermato(d, ind)
+                                        else 0),
+            "cambio_ordine": cambio_misura or cambio_noto_ora()})
     cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}",
@@ -74981,6 +74990,21 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             con.close()   # un pagamento in volo di cui non sappiamo l'esito:
             #               finche' non si sa com'e' finito, qui non si paga
             return {"ok": False, "stato": o["stato"], "incerto": True}
+        # L'ON-CHAIN (27 ott 2026, strada A): qui non si paga niente. I
+        # sats escono dal 2-di-3 solo con le due firme dei telefoni, e a
+        # transazione partita `onchain_ordine_firma` torna qui: allora
+        # si chiude l'ordine come un Lightning riuscito (stato, conti,
+        # XP, avvisi). Prima di allora — un timer, un moderatore, un
+        # Lightning address appena salvato — si esce senza toccare
+        # niente, e lo si dice.
+        # (il letterale e non CASSAFORTE_ONCHAIN: i banchi di prove.py
+        # eseguono questa funzione da sola, e sul Lightning il giudice
+        # on-chain non deve nemmeno essere nominato)
+        oc = (_onchain_uscita_fatta(con, o, "venditore")
+              if (_campo(o, "cassaforte") or "") == "onchain" else None)
+        if oc is False:
+            con.close()
+            return {"ok": False, "stato": o["stato"], "onchain": True}
         # LO STADIO «IN PAGAMENTO» COMINCIA QUI (set 2026): la decisione
         # e' presa — una conferma, un timer, un moderatore — e da questa
         # riga in giu' consegnare i sats tocca a noi. `primo_passo` e'
@@ -74992,6 +75016,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # compratore resta in cassaforte, alla piattaforma. Sugli
         # ordini di ieri la quota e' 0 e non cambia nulla.
         netto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+        if oc:
+            # on-chain al venditore e' andato il prezzo dell'ordine, quello
+            # che la transazione firmata dice (`_onchain_psbt_giudica`)
+            netto = oc["prezzo_sats"]
         # LA PORTA DEL TIMER: il timbro di questo giro, 0 se a chiamare
         # e' stata una persona. Si scrive in TUTTI E DUE i rami qui
         # sotto — anche in quello riuscito, dove non apre niente — o il
@@ -75007,11 +75035,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         taccuino = {"etichetta": f"Incasso del venditore sull'ordine "
                                  f"#{ordine_id}"}
         try:
-            if o["payout_stato"] != "uscito":
+            if o["payout_stato"] != "uscito" and not oc:
                 bolt11 = o["invoice_venditore"]
                 if not bolt11 and v and v["ln_address"]:
                     bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
-            esito = (PAGATO if o["payout_stato"] == "uscito"
+            esito = (PAGATO if o["payout_stato"] == "uscito" or oc
                      else await paga_venditore(bolt11, netto, taccuino,
                                                cassaforte=_cassaforte_uscita(o),
                                                riga=("ordini", ordine_id,
@@ -75556,6 +75584,13 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if o["payout_stato"] in ("incerto", "in_volo"):
             con.close()          # gemello di _sblocca_sats: mai due uscite
             return {"ok": False, "stato": o["stato"], "incerto": True}
+        # l'on-chain, gemello di `_sblocca_sats`: si chiude solo a
+        # rimborso gia' partito con le due firme
+        oc = (_onchain_uscita_fatta(con, o, "compratore")
+              if (_campo(o, "cassaforte") or "") == "onchain" else None)
+        if oc is False:
+            con.close()
+            return {"ok": False, "stato": o["stato"], "onchain": True}
         c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                                (o["compratore_id"],)).fetchone()
         # L'ANNULLO DEL VENDITORE (1 ott 2026): se a chiudere l'ordine
@@ -75591,12 +75626,12 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         taccuino = {"etichetta": f"Rimborso al compratore sull'ordine "
                                  f"#{ordine_id}"}
         try:
-            if o["payout_stato"] != "uscito":
+            if o["payout_stato"] != "uscito" and not oc:
                 bolt11 = o["invoice_rimborso"]
                 if not bolt11 and c_utente and c_utente["ln_address"]:
                     bolt11 = await invoice_da_ln_address(c_utente["ln_address"],
                                                          importo)
-            esito = (PAGATO if o["payout_stato"] == "uscito"
+            esito = (PAGATO if o["payout_stato"] == "uscito" or oc
                      else await paga_venditore(bolt11, importo, taccuino,
                                                cassaforte=_cassaforte_uscita(o),
                                                riga=("ordini", ordine_id,
@@ -75862,6 +75897,14 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     ann = int(_campo(o, "annullato_venditore_il", 0) or 0)
     if ann and ann >= int(_campo(o, "creato", 0) or 0):
         raise HTTPException(400, MSG_ANNULLO_NON_DISPUTA)
+    # L'ON-CHAIN (27 ott 2026, strada A): una decisione che muove sats
+    # vuole la terza firma, quella di Barattolo, che sta sul nodo e non
+    # e' ancora collegata. Meglio un no che un «deciso» che non paga.
+    if (_campo(o, "cassaforte") or "") == "onchain" and esito != "reso":
+        raise HTTPException(409, "Ordine on-chain: la decisione si firma "
+                                 "con la chiave di Barattolo, che non è "
+                                 "ancora collegata. Per ora i sats si "
+                                 "muovono solo se le due parti firmano")
     stato = o["stato"]
     # IL QUARTO ESITO E' DEFINITIVO APPENA PRESO (13 ott 2026), ed e' la
     # riga da non ammorbidire: dopo «meno le spese» l'ordine sta in
@@ -78268,9 +78311,13 @@ async def annulla_vendita(ordine_id: int, req: Request,
         o["compratore_id"],
         f"✖️ <b>Il venditore ha annullato il tuo ordine «{titolo}»</b> — "
         f"motivo: {motivo_testo}. I tuoi <b>{_fmt_sats(importo)} sats</b> "
-        f"tornano per intero, spedizione compresa: se hai un Lightning "
-        f"address arrivano da soli, altrimenti apri l'ordine nella Mini "
-        f"App e scegli come riceverli.")
+        + ("tornano per intero, spedizione compresa: il venditore firma "
+           "il rimborso dal suo telefono, e appena apri la Mini App il "
+           "tuo mette la seconda firma e i sats partono verso di te."
+           if (_campo(o, "cassaforte") or "") == "onchain" else
+           "tornano per intero, spedizione compresa: se hai un Lightning "
+           "address arrivano da soli, altrimenti apri l'ordine nella Mini "
+           "App e scegli come riceverli."))
     # IL POLSO DICE IL CONTO, e alla soglia parte l'allarme: e' cosi' che
     # un venditore che annulla spesso si vede, senza toccare la
     # reputazione da soli
@@ -78631,6 +78678,28 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
             e_admin(user["id"]), MERCATINO_CHAT_ORDINI,
             _chat_mercatino_ferma(r["stato"], r.get("disputata"),
                                   r.get("sbloccato_auto_il")))
+    # L'ON-CHAIN DENTRO L'ORDINE (27 ott 2026, strada A): a un ordine con
+    # cassaforte 'onchain' si attacca il riassunto della sua cassaforte
+    # — quale ordine on-chain, a che punto sono le firme — perche' il
+    # bottone di sempre sappia di dover firmare col telefono. Il resto
+    # (chiavi, PSBT) lo legge il telefono da /api/onchain/ordini.
+    if any((r.get("cassaforte") or "") == "onchain" for r in righe):
+        con = _onchain_db_ordini()
+        try:
+            for r in righe:
+                if (r.get("cassaforte") or "") != CASSAFORTE_ONCHAIN:
+                    continue
+                oc = _onchain_di_ordine(con, r["id"])
+                r["onchain"] = ({
+                    "id": oc["id"], "stato": oc["stato"],
+                    "proposta": ({"verso": oc["proposta_verso"],
+                                  "mia": int(oc["proposta_da"]) == int(user["id"])}
+                                 if oc["proposta_psbt"] else None),
+                    "txid_uscita": oc["txid_uscita"] or "",
+                    "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
+                } if oc else None)
+        finally:
+            con.close()
     return righe
 
 
@@ -89845,9 +89914,99 @@ def _onchain_prepara_ordini(con):
                       ("incasso_firma", "TEXT DEFAULT ''"),
                       ("incasso_indice", "INTEGER DEFAULT 0"),
                       ("quota_sats", "INTEGER DEFAULT 0"),
-                      ("quota_indirizzo", "TEXT DEFAULT ''")):
+                      ("quota_indirizzo", "TEXT DEFAULT ''"),
+                      # 27 ott 2026, la strada A: l'ordine di sempre in
+                      # `ordini` che nasce quando i sats arrivano (0 =
+                      # un ordine on-chain di prima, che vive solo qui)
+                      ("ordine_id", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
+
+
+# ------------- L'ORDINE ON-CHAIN E' UN ORDINE DI SEMPRE -------------
+# (27 ott 2026, cantiere onchain-ordini, la strada A scelta da Andrea:
+# «il concetto e' deposito sats, LN o on-chain… gli step devono essere
+# uguali, cambia solo il metodo di pagamento: per l'utente e' un QR».)
+# Rovescia «PERCHE' UNA TABELLA SUA» della tappa 3, ma a meta': la
+# tabella `onchain_ordini` resta, ed e' la CASSAFORTE dell'ordine — il
+# suo indirizzo, le sue monete, le sue firme — come LNbits lo e' per il
+# Lightning. Quando i sats arrivano nasce la riga in `ordini` con
+# cassaforte 'onchain', e da li' l'ordine fa la strada di tutti:
+# `_incassa_ordine` (stock, avvisi, offerte, carrello), «Ordini», la
+# spedizione, la chat, il feedback.
+# 'onchain' NON sta in CASSAFORTI, apposta: ogni tubo del Lightning che
+# provasse a pagare da qui alza in `_chiavi_cassaforte` (fail-closed).
+# Le due uscite di sempre, `_sblocca_sats` e `_rimborsa_compratore`, lo
+# riconoscono prima e aspettano le due firme (`_onchain_uscita_fatta`).
+# PERCHE' L'ORDINE NASCE AL PAGAMENTO E NON ALLA CASSA: un indirizzo
+# vive 24 ore, una fattura 15 minuti, e sulla riga 'creato' di `ordini`
+# lavorano il reaper, la prenotazione dello stock e la ripresa della
+# fattura, tutti col tempo del Lightning. Fino al pagamento l'ordine si
+# segue dalla pagina On-chain, col suo QR.
+CASSAFORTE_ONCHAIN = "onchain"
+
+
+def _onchain_nasce_ordine(con, o) -> int:
+    """La riga di `ordini` di un ordine on-chain appena pagato, ancora
+    'creato': la passa a 'locked' `_incassa_ordine`, come per il
+    Lightning. Stessa transazione dello 'pagato' (il chiamante
+    committa). Le colonne sono quelle della cassa (`compra`), dai
+    `dettagli` fotografati all'acquisto; la fattura non c'e'."""
+    d = json.loads(o["dettagli"] or "{}")
+    adesso = int(time.time())
+    ind = d.get("indirizzo") or ""
+    con.execute(
+        "INSERT INTO ordini(cassaforte,annuncio_id,compratore_id,venditore_id,"
+        "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
+        "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
+        "tipo_punto,punto_barattolo,zona_sped,paese_sped,domestico_sped,"
+        "nota_compratore,email_corriere,email_corriere_il,indirizzo,"
+        "indirizzo_il,indirizzo_atteso,spedizione_sats,protezione_sats,"
+        "quantita) "
+        "VALUES(?,?,?,?,?,'creato','','',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (CASSAFORTE_ONCHAIN, o["annuncio_id"], o["compratore_id"],
+         o["venditore_id"], o["prezzo_sats"], o["creato"], adesso,
+         int(d.get("cambio_ordine") or 0) or cambio_noto_ora(),
+         d.get("consegna") or "", d.get("punto_ritiro") or "",
+         int(d.get("via_punto") or 0), d.get("rete_punto") or "",
+         d.get("tipo_punto") or "", d.get("punto_barattolo") or "",
+         d.get("zona") or "", d.get("paese") or "", d.get("domestico") or "",
+         d.get("nota") or "", d.get("email_corriere") or "",
+         o["creato"] if d.get("email_corriere") else 0,
+         ind, o["creato"] if ind else 0, int(d.get("indirizzo_atteso") or 0),
+         int(d.get("spedizione_sats") or 0), int(d.get("protezione_sats") or 0),
+         o["quantita"] or 1))
+    oid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    if d.get("indirizzo_confermato_il"):
+        con.execute("UPDATE ordini SET indirizzo_confermato_il=? WHERE id=?",
+                    (int(d["indirizzo_confermato_il"]), oid))
+    con.execute("UPDATE onchain_ordini SET ordine_id=? WHERE id=?",
+                (oid, o["id"]))
+    return oid
+
+
+def _onchain_di_ordine(con, ordine_id: int):
+    """La cassaforte on-chain di un ordine di sempre, o None. La tabella
+    nasce col primo gesto on-chain: dove non c'e', non c'e' niente."""
+    try:
+        return con.execute("SELECT * FROM onchain_ordini WHERE ordine_id=? "
+                           "AND ordine_id>0", (int(ordine_id),)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+
+
+def _onchain_uscita_fatta(con, o, verso: str):
+    """Il giudice delle due uscite per un ordine con cassaforte
+    'onchain': None se l'ordine non e' on-chain (si va per il
+    Lightning); altrimenti la riga on-chain se la transazione di quel
+    verso e' gia' partita con le due firme, o False se no — e allora
+    non si paga niente da nessuna parte: i sats escono solo dai due
+    telefoni."""
+    if (o["cassaforte"] or "") != CASSAFORTE_ONCHAIN:
+        return None
+    oc = _onchain_di_ordine(con, o["id"])
+    fatto = "rilasciato" if verso == "venditore" else "rimborsato"
+    return oc if oc and oc["stato"] == fatto else False
 
 
 def _onchain_db_ordini():
@@ -89979,6 +90138,8 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "dettagli": json.loads(o["dettagli"] or "{}"),
         "indirizzo": onchain_riga_per(ind, tg_id, _onchain_nome(con, altro)),
         "proposta": proposta, "txid_uscita": o["txid_uscita"],
+        # l'ordine di sempre, dalla strada A (0 = un ordine di prima)
+        "ordine_id": int(o["ordine_id"] or 0),
         "scade": o["scade"], "creato": o["creato"],
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
@@ -90010,7 +90171,7 @@ async def onchain_controlla(oid: int) -> str:
     visti = sum(int(u["value"]) for u in utxo)
     ricevuti = sum(u["value"] for u in buone)
     adesso = int(time.time())
-    notifiche = []
+    nuovo_ordine = 0
     con = _onchain_db_ordini()
     try:
         con.execute("UPDATE onchain_ordini SET visti_sats=?, ricevuti_sats=?,"
@@ -90023,20 +90184,12 @@ async def onchain_controlla(oid: int) -> str:
                               (adesso, o["id"]))
             if cur.rowcount:
                 stato = "pagato"
-                # lo stock scala come nell'incasso del Lightning, con lo
-                # stesso MAX e la stessa regola dell'ultimo pezzo
-                con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
-                            "WHERE id=?", (o["quantita"], o["annuncio_id"]))
-                con.execute("UPDATE annunci SET stato='venduto' WHERE id=? "
-                            "AND quantita<=0", (o["annuncio_id"],))
-                tit = html.escape(o["titolo"][:40])
-                notifiche = [
-                    (o["venditore_id"], f"⛓️ <b>Venduto on-chain:</b> {tit}. "
-                     "I sats sono arrivati nel 2-di-3 e restano li' finche' "
-                     "chi compra non li libera. Prepara l'oggetto."),
-                    (o["compratore_id"], f"⛓️ <b>Pagamento on-chain "
-                     f"confermato:</b> {tit}. Quando hai l'oggetto, apri "
-                     "Profilo → On-chain e tocca «Libera i sats».")]
+                # LA STRADA A (27 ott 2026): nasce l'ordine di sempre, e
+                # da qui lo stock, le offerte, il carrello e gli avvisi
+                # li fa `_incassa_ordine`, come per il Lightning. Lo
+                # stock scalato qui e i due avvisi «⛓️ Venduto on-chain»
+                # di prima sono morti con lui: sarebbero stati doppi.
+                nuovo_ordine = _onchain_nasce_ordine(con, o)
         elif not utxo and adesso > o["scade"]:
             cur = con.execute("UPDATE onchain_ordini SET stato='scaduto',"
                               " chiuso_il=? WHERE id=? AND stato='attesa'",
@@ -90045,8 +90198,12 @@ async def onchain_controlla(oid: int) -> str:
         con.commit()
     finally:
         con.close()
-    for chi, testo in notifiche:
-        await notifica(chi, testo)
+    if nuovo_ordine:
+        # niente await fra il commit qui sopra e il CAS di
+        # `_incassa_ordine`: la riga 'creato' non resta a meta'. Se
+        # qualcosa la' dentro si rompe, la ronda la riprende
+        # (`_onchain_riprendi_incassi`).
+        await _incassa_ordine(nuovo_ordine)
     return stato
 
 
@@ -90102,6 +90259,27 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
     for i in p.inputs:
         if chiave_firmatario not in {k.sec().hex() for k in i.partial_sigs}:
             raise ValueError("manca la tua firma")
+
+
+def _onchain_ordine_permette(con, o, verso: str) -> None:
+    """Un ordine on-chain nato in `ordini` (strada A) segue le regole
+    dell'ordine di sempre: i sats al venditore si liberano negli stati
+    in cui chi compra puo' confermare (`conferma_ricezione`), il
+    rimborso dopo «Annulla la vendita» ('refund'). Una disputa ferma
+    tutt'e due: la decide un moderatore. Gli ordini on-chain di prima
+    (senza `ordine_id`) restano con le regole di prima."""
+    if not o["ordine_id"]:
+        return
+    r = con.execute("SELECT stato FROM ordini WHERE id=?",
+                    (o["ordine_id"],)).fetchone()
+    stato = r["stato"] if r else ""
+    if verso == "venditore" and stato not in ("locked", "shipped",
+                                              "delivered"):
+        raise HTTPException(409, "Su questo ordine i sats adesso non si "
+                                 "liberano (" + (stato or "?") + ")")
+    if verso == "compratore" and stato != "refund":
+        raise HTTPException(409, "Il rimborso on-chain parte da «Annulla "
+                                 "la vendita», nell'ordine")
 
 
 def _onchain_parte(o, tg_id) -> str:
@@ -90267,6 +90445,7 @@ async def onchain_ordine_proposta(oid: int, req: Request,
                 and o["ricevuti_sats"] > 0 and time.time() > o["scade"]):
             raise HTTPException(409, "Su questo ordine non c'è niente da "
                                      "liberare adesso")
+        _onchain_ordine_permette(con, o, verso)
         ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                           (o["indirizzo_id"],)).fetchone()
         try:
@@ -90324,6 +90503,9 @@ async def onchain_ordine_firma(oid: int, req: Request,
             raise HTTPException(409, "Non c'è niente da co-firmare")
         if int(o["proposta_da"]) == int(user["id"]):
             raise HTTPException(409, "La seconda firma è dell'altra parte")
+        # l'ordine di sempre puo' essere cambiato fra le due firme (una
+        # disputa aperta dopo «Libera i sats»): si ricontrolla qui
+        _onchain_ordine_permette(con, o, o["proposta_verso"])
         try:
             atteso = PSBT.from_string(o["proposta_psbt"]).tx.txid().hex()
             arrivato = Transaction.from_string(tx_hex).txid().hex()
@@ -90350,6 +90532,16 @@ async def onchain_ordine_firma(oid: int, req: Request,
         con.commit()
     finally:
         con.close()
+    if o["ordine_id"]:
+        # LA STRADA A: l'ordine di sempre si chiude per la porta di
+        # sempre, che adesso trova la transazione partita e fa conti,
+        # XP e avvisi come per un Lightning riuscito
+        if verso == "venditore":
+            await _sblocca_sats(int(o["ordine_id"]))
+        else:
+            await _rimborsa_compratore(int(o["ordine_id"]))
+        return {"ok": True, "stato": stato, "txid": txid or arrivato,
+                "ordine_id": int(o["ordine_id"])}
     tit = html.escape(o["titolo"][:40])
     testo = (f"⛓️ <b>Sats partiti:</b> {tit} — "
              + ("al venditore." if verso == "venditore" else "rimborso a chi ha comprato.")
@@ -90357,6 +90549,27 @@ async def onchain_ordine_firma(oid: int, req: Request,
     for chi in (o["compratore_id"], o["venditore_id"]):
         await notifica(chi, testo)
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
+
+
+async def _onchain_riprendi_incassi():
+    """La cintura della nascita (strada A): un ordine on-chain 'pagato'
+    la cui riga di `ordini` e' rimasta 'creato' — `_incassa_ordine` si e'
+    rotto a meta', o il processo e' caduto fra il commit e lui — si
+    rincassa qui. `_incassa_ordine` e' idempotente (vince il CAS)."""
+    con = _onchain_db_ordini()
+    try:
+        ids = [r["id"] for r in con.execute(
+            "SELECT o.id FROM ordini o JOIN onchain_ordini c "
+            "ON c.ordine_id=o.id WHERE o.stato='creato' "
+            "AND o.cassaforte=? AND c.stato='pagato' LIMIT 20",
+            (CASSAFORTE_ONCHAIN,))]
+    finally:
+        con.close()
+    for oid in ids:
+        try:
+            await _incassa_ordine(oid)
+        except Exception as e:
+            print(f"⚠️ On-chain: ordine #{oid} non incassato: {e}", flush=True)
 
 
 _TASK_ONCHAIN = None   # stesso patto di _TASK_CAMBIO: il riferimento tiene vivo il task
@@ -90384,6 +90597,7 @@ async def orologio_onchain():
                 except Exception as e:
                     print(f"⚠️ On-chain: ordine {oid} non controllato: {e}",
                           flush=True)
+            await _onchain_riprendi_incassi()
         except Exception as e:
             print(f"⚠️ On-chain: ronda saltata: {e}", flush=True)
 
