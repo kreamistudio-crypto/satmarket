@@ -34382,10 +34382,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`caricaOnchainDaPagare` in `loadOrders`), card `cardOnchainDaPagare` in
   testa a `renderOrders`, che riaprono `payRiapriOnchain`. La pagina
   On-chain ha tre schede (Info di serie, Impostazioni, Tecnico).
-  Server: `_onchain_compra` vuole `_onchain_destinazione_viva` prima di
-  `onchain_nuovo_indirizzo` (sennò 400 `ONCHAIN_MSG_SENZA_DESTINAZIONE`;
-  il `/1/n` di chi vende non è più un incasso); `pronto` dice no senza
-  destinazione; `POST /api/onchain/incasso/controlla` {tipo, valore} →
+  Server: `_onchain_compra` legge `_onchain_destinazione_viva`; il `/1/n`
+  di chi vende non è più un incasso, e SENZA destinazione l'ordine nasce
+  lo stesso con `incasso` vuoto (correzione della stessa sera: CANTIERI,
+  «La destinazione dopo»; `pronto` non dice più no per questo); `POST /api/onchain/incasso/controlla` {tipo, valore} →
   {ok, motivo, usato (None = mempool muto), tx} via
   `onchain_mempool_indirizzo`, freno `onchain_incasso_guarda`, non scrive;
   `/api/me` ha `onchain_incasso` (`_onchain_incasso_mio`); `GET /api/orders`
@@ -34395,6 +34395,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `accOnchainIncasso` in `renderChecklist`, modulo `onchainModuloIncasso(pref)`
   con `onchainTipoIncollato`, `onchainSembraSegreto`,
   `onchainIncassoGuarda(Presto)`, `onchainIncassoSalva(btn, pref)`.
+- LA DESTINAZIONE DOPO (27 ott 2026, cantiere onchain-dopo; perché in
+  CANTIERI, «La destinazione dopo»). Un ordine on-chain con `incasso`
+  vuoto è un 2-di-3 normale da cui verso chi vende non esce niente: la
+  proposta `verso: venditore` è 409 `ONCHAIN_MSG_SENZA_DESTINAZIONE`,
+  `_onchain_psbt_giudica` e `_onchain_psbt_barattolo` dicono di no, la
+  disputa decisa per chi vende è 409. `onchain_controlla` lo dice a chi
+  vende appena pagato. Il salvataggio `POST /api/onchain/incasso` chiama
+  `_onchain_riempi_incassi(con, venditore)`: riempie `incasso`,
+  `incasso_tipo/valore/firma/indice` degli ordini 'attesa'/'pagato' senza
+  incasso e senza proposta (xpub: `_onchain_prossimo_esterno`), avvisa chi
+  aveva già confermato, e torna `ordini_aggiornati`. Colonna nuova
+  `rilascio_chiesto_il` (migrazione in `_onchain_prepara_ordini`), scritta
+  da `POST /api/onchain/ordini/{oid}/rilascio-chiesto` (solo chi compra,
+  'pagato', incasso vuoto, niente proposta, `_onchain_ordine_permette`).
+  `/api/orders` porta `onchain.incasso_scelto` e `onchain.rilascio_chiesto`.
+  Client: `onchainLiberaDallOrdine` chiama rilascio-chiesto se l'incasso
+  manca; `onchainRilascioDaFirmare(o)` e `onchainCofirmeInAttesa` firmano
+  la proposta da soli dopo la scelta; `pannelloOnchainOrdine` dice a chi
+  vende «non hai ancora scelto» col bottone al cassetto `accOnchainIncasso`.
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
   tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,

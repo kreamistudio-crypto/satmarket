@@ -37362,7 +37362,7 @@ function renderChecklist(){
      cui dovrebbe essergli suggerito durante la fase di completezza del
      profilo»): solo per chi l'on-chain lo vede */
   if (myOnchain)
-    voci.push({ok: !!myOnchainIncasso, em:'⛓️', txt:'Dove ricevi on-chain: senza, i tuoi annunci si pagano solo in ⚡', acc:'accOnchainIncasso'});
+    voci.push({ok: !!myOnchainIncasso, em:'⛓️', txt:'Dove ricevi on-chain: senza, i sats delle vendite on-chain aspettano nel 2-di-3', acc:'accOnchainIncasso'});
   const fatte = voci.filter(v=>v.ok).length;
   if (fatte === voci.length) { box.innerHTML = ''; return; }
   /* Alla PRIMA visita in assoluto del Profilo (per dispositivo) con
@@ -42947,10 +42947,23 @@ async function onchainLiberaDallOrdine(btn, o){
     /* le monete e le firme si rileggono adesso: una copia vecchia di
        pochi minuti firmerebbe una transazione che il server rifiuta */
     await onchainLeggiOrdini();
-    await onchainFirmaProposta(o.onchain.id);
-    toast(o.role === 'buyer'
-      ? '🔓 Hai firmato: i sats partono appena il venditore apre la Mini App'
-      : '↩️ Hai firmato il rimborso: parte appena l\'acquirente apre la Mini App', 7000);
+    const oc = onchainOrdini.find(x => x.id === o.onchain.id);
+    /* L'USCITA SCELTA DOPO (27 ott 2026): chi vende non ha ancora detto
+       dove ricevere, e una firma deve dire a chi vanno i sats. La
+       conferma si scrive, chi vende viene avvisato, e questo telefono
+       firma da solo alla prima apertura dopo la sua scelta */
+    if (o.role === 'buyer' && oc && !oc.incasso) {
+      const r = await fetch(`${API_BASE}/onchain/ordini/${oc.id}/rilascio-chiesto`,
+        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || 'conferma non salvata');
+      toast('✅ Confermato. Chi vende deve ancora scegliere dove ricevere: l\'abbiamo avvisato, e appena lo fa il tuo telefono firma da solo quando apri la Mini App', 9000);
+    } else {
+      await onchainFirmaProposta(o.onchain.id);
+      toast(o.role === 'buyer'
+        ? '🔓 Hai firmato: i sats partono appena il venditore apre la Mini App'
+        : '↩️ Hai firmato il rimborso: parte appena l\'acquirente apre la Mini App', 7000);
+    }
   } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
   finally { rip(); }
   try { await loadOrders(); renderOrders(); } catch(e) {}
@@ -43013,8 +43026,18 @@ function pannelloOnchainOrdine(o, s){
   }
   const tx = oc.txid_uscita
     ? ` <a href="${esc(oc.esploratore)}/tx/${esc(oc.txid_uscita)}" target="_blank" rel="noopener">Vedi la transazione</a>` : '';
-  const dove = o.role === 'seller'
+  /* LA DESTINAZIONE DOPO (27 ott 2026, Andrea): il 2-di-3 nasce con le
+     tre chiavi di sempre, e dove escono i sats chi vende lo sceglie anche
+     dopo il pagamento; fino ad allora restano nel 2-di-3 */
+  const senzaDove = o.role === 'seller' && oc.incasso_scelto === false;
+  let dove = o.role === 'seller'
     ? ' I sats arrivano dove hai scelto in Profilo → «Incassi on-chain».' : '';
+  if (senzaDove) {
+    dove = ' ⚠️ <b>Non hai ancora scelto dove ricevere:</b> i sats restano al sicuro nel 2-di-3, ed escono appena lo scegli.';
+    if (!gesto) gesto = `<button class="btn orange" onclick="apriCassettoProfilo('accOnchainIncasso')">⛓️ Scegli dove ricevere</button>`;
+  } else if (o.role === 'buyer' && oc.rilascio_chiesto && !p) {
+    dove = ' ✅ <b>Hai confermato:</b> i sats partono appena chi vende sceglie dove riceverli, e il tuo telefono firma da solo.';
+  }
   /* «Com'è fatto» sta QUI, piegato (27 ott 2026): la pagina On-chain
      non ha piu' una scheda Ordini — l'ordine e' uno solo, in «Ordini» */
   const fatto = (oc.indirizzo && oc.indirizzo.indirizzo)
@@ -54881,10 +54904,12 @@ let onchainIncassoMio = null;
    venditore non deve mai ricevere i fondi nel wallet autogenerato da
    barattolo»; «deve poter incollare un indirizzo, con controllo che
    indichi se va bene e se non è già stato usato, o xpub»).
-   - IL CONTO DI BARATTOLO NON E' PIU' UNA STRADA: senza una scelta i
-     tuoi annunci si pagano solo in ⚡ (il server lo fa valere alla cassa,
-     `_onchain_compra`), e il bottone «Torna al conto di Barattolo» e'
-     morto;
+   - IL CONTO DI BARATTOLO NON E' PIU' UNA STRADA: il bottone «Torna al
+     conto di Barattolo» e' morto. Senza una scelta chi compra paga lo
+     stesso on-chain (terzo giro, Andrea: «l'importante è che il multisig
+     si crei con i 3 wallet già predefiniti»): i sats aspettano nel
+     2-di-3 finche' chi vende non sceglie, e la proposta verso di lui il
+     server la rifiuta (`_onchain_riempi_incassi`, «rilascio-chiesto»);
    - SI INCOLLA E BASTA: il tipo lo dice quel che incolli (tb1… e' un
      indirizzo, vpub/tpub una chiave di conto), e il controllo parte
      da solo mezzo secondo dopo. Il server dice se e' buono (lo stesso
@@ -54978,9 +55003,9 @@ function onchainBloccoIncasso(miaXpub){
   let stato;
   if (!d) {
     stato = `<div class="hint"><b>Non hai ancora scelto dove ricevere.</b>
-      Finché non lo fai, chi compra i tuoi annunci paga solo con ⚡
-      Lightning: i sats on-chain non finiscono mai in un conto di
-      Barattolo.</div>`;
+      Chi compra può pagarti on-chain lo stesso: i sats restano al
+      sicuro nel 2-di-3 ed escono appena scegli. Non finiscono mai in un
+      conto di Barattolo.</div>`;
   } else if (onchainIncassoMio) {
     stato = `<div class="hint" style="color:var(--ok)"><b>✅ Ricevi nel
       tuo wallet</b>: ${d.tipo === 'xpub'
@@ -54991,8 +55016,8 @@ function onchainBloccoIncasso(miaXpub){
   } else {
     stato = `<div class="hint" style="color:var(--danger)"><b>⚠️ La scelta
       salvata non è firmata da questo seme</b> (un altro telefono, o un
-      seme di prima): finché non la rifai da qui, i tuoi annunci si pagano
-      solo con ⚡ Lightning.</div>`;
+      seme di prima): finché non la rifai da qui, i sats delle vendite
+      on-chain aspettano nel 2-di-3.</div>`;
   }
   return `
     <div class="payout">
@@ -55001,7 +55026,8 @@ function onchainBloccoIncasso(miaXpub){
       ${acceso && srv.embit ? onchainModuloIncasso('ocImp')
         : '<div class="hint">Prima accendi l\'on-chain (qui sopra).</div>'}
       <div class="hint" style="margin-top:8px">Vale dalle prossime
-        vendite: gli ordini già nati tengono la destinazione di
+        vendite, e per quelle già pagate che aspettavano una scelta;
+        gli ordini nati con una destinazione tengono quella di
         allora.</div>
     </div>`;
 }
@@ -55016,8 +55042,8 @@ function renderIncassoOnchainProfilo(){
          (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}).
          Per cambiarlo, incolla qui sotto.</div>`
     : `<div class="hint" style="margin-top:10px"><b>Non hai ancora scelto dove ricevere on-chain.</b>
-         Finché non lo fai, chi compra i tuoi annunci paga solo con ⚡ Lightning:
-         i sats on-chain non finiscono mai in un conto di Barattolo.</div>`)
+         Chi compra può pagarti on-chain lo stesso: i sats restano al sicuro
+         nel 2-di-3 ed escono appena scegli. Non finiscono mai in un conto di Barattolo.</div>`)
     + onchainModuloIncasso('ocProf')
     + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button>`;
 }
@@ -55045,7 +55071,9 @@ async function onchainIncassoSalva(btn, pref){
       body: JSON.stringify({tipo, valore, firma})});
     const x = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(x.detail || 'non salvato');
-    toast('✅ Salvato: dalle prossime vendite ricevi nel tuo wallet', 5000);
+    toast(x.ordini_aggiornati
+      ? `✅ Salvato: ricevi nel tuo wallet, anche per ${x.ordini_aggiornati === 1 ? 'la vendita che aspettava' : x.ordini_aggiornati + ' vendite che aspettavano'}`
+      : '✅ Salvato: dalle prossime vendite ricevi nel tuo wallet', 5000);
     myOnchainIncasso = tipo;
     onchainSrv = null;
     renderIncassoOnchainProfilo();
@@ -55705,6 +55733,17 @@ async function onchainCofirma(o, parole){
    (all'avvio) un seme nuovo sarebbe un seme sbagliato. */
 async function onchainCofirmeInAttesa(parole){
   const fatte = [];
+  /* il rilascio confermato quando chi vende non aveva ancora scelto dove
+     ricevere (27 ott 2026): ora l'uscita c'e', e la prima firma la mette
+     questo telefono, come se si toccasse adesso «Ho ricevuto» */
+  for (const o of onchainOrdini) {
+    if (!onchainRilascioDaFirmare(o)) continue;
+    try {
+      await onchainFirmaProposta(o.id);
+      fatte.push(`🔓 #${o.id}: firmato il rilascio che avevi confermato`);
+    } catch(e) { fatte.push(`⚠️ #${o.id}: ${e.message || 'errore'}`); }
+  }
+  if (fatte.length) await onchainLeggiOrdini();
   for (const o of onchainOrdini) {
     if (o.stato !== 'pagato' && o.stato !== 'attesa') continue;
     if (!o.proposta || o.proposta.mia) continue;
@@ -55719,6 +55758,11 @@ async function onchainCofirmeInAttesa(parole){
     } catch(e) { fatte.push(`⚠️ #${o.id}: ${e.message || 'errore'}`); }
   }
   return fatte;
+}
+
+function onchainRilascioDaFirmare(o){
+  return o.ruolo === 'compratore' && o.stato === 'pagato' && o.rilascio_chiesto_il
+    && o.incasso && !o.proposta;
 }
 
 async function onchainLeggiOrdini(){
@@ -55759,8 +55803,9 @@ async function onchainCofirmeInSottofondo(){
     const parole = onchainSemeLocale();
     if (!parole) return;
     const ordini = await onchainLeggiOrdini();
-    if (!ordini.some(o => o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
-                          && (o.stato === 'pagato' || o.stato === 'attesa'))) return;
+    if (!ordini.some(o => onchainRilascioDaFirmare(o)
+                          || (o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
+                              && (o.stato === 'pagato' || o.stato === 'attesa')))) return;
     const fatte = await onchainCofirmeInAttesa(parole);
     if (fatte.length) {
       toast('⛓️ ' + fatte.join(' · '), 7000);

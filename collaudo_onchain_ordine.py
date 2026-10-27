@@ -203,15 +203,11 @@ def main():
         come(tg)
         c.post("/api/onchain/xpub", json={"xpub": conto(tg)})
     come(999)
-    prova("accesi tutti e due, ma chi vende non ha scelto dove ricevere: "
-          "non pronto", (False, "il venditore non ha ancora scelto dove "
-                                "ricevere on-chain"),
-          tuple(c.get("/api/onchain/pronto/888").json()[k]
-                for k in ("pronto", "motivo")))
-    r = compra(999, annunci[0], metodo="onchain")
-    prova("...e chi prova lo stesso: 400, mai sul conto di Barattolo",
-          (400, SRV.ONCHAIN_MSG_SENZA_DESTINAZIONE),
-          (r.status_code, r.json().get("detail")))
+    # chi vende non ha ancora scelto dove ricevere: si paga lo stesso
+    # (27 ott 2026, terzo giro), e il giro intero sta in
+    # collaudo_onchain_incasso; qui si sceglie subito
+    prova("accesi tutti e due, anche senza la scelta di dove ricevere: "
+          "pronto", True, c.get("/api/onchain/pronto/888").json()["pronto"])
     come(888)
     prova("chi vende sceglie il suo wallet, firmato dal suo seme", 200,
           c.post("/api/onchain/incasso", json={

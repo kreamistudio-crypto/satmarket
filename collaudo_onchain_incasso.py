@@ -104,7 +104,7 @@ def main():
                     "registrato,ln_address) VALUES(?,?,?,1,'')",
                     (tg, nome, f"neg{tg}{tg}"))
     annunci = []
-    for n in range(4):
+    for n in range(5):
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
             "categoria,zona,stato,creato,consegna,quantita,valuta,condizione)"
@@ -295,32 +295,77 @@ def main():
     prova("...e la vendita arriva li'", dal_wallet(7), o3.get("incasso"))
     prova("togliere la scelta: 200, senza firme", 200,
           scegli(888, tipo="barattolo").status_code)
-    # MAI NEL CONTO DI BARATTOLO (27 ott 2026, Andrea: «finché non
-    # inserisce un indirizzo o xpub non riceve nessun fondo»): senza una
-    # destinazione l'on-chain per i suoi annunci non c'e', e lo si dice
-    # prima, alla cassa
-    come(999)
-    prova("...e la cassa lo sa prima: non pronto, col perche'",
-          (False, "il venditore non ha ancora scelto dove ricevere on-chain"),
-          tuple(c.get("/api/onchain/pronto/888").json()[k]
-                for k in ("pronto", "motivo")))
-    def quanti():
-        con = SRV._onchain_db_ordini()
-        try:
-            return (con.execute("SELECT COUNT(*) FROM onchain_ordini").fetchone()[0],
-                    con.execute("SELECT COUNT(*) FROM onchain_indirizzi").fetchone()[0])
-        finally:
-            con.close()
-    prima = quanti()
-    r = compra(999, annunci[3])
-    prova("...e chi prova lo stesso: 400, e nessun /1/n del seme",
-          (400, SRV.ONCHAIN_MSG_SENZA_DESTINAZIONE),
-          (r.status_code, r.json().get("detail")))
-    prova("...e nessun ordine e nessun indirizzo restano a meta'",
-          prima, quanti())
     come(888)
     prova("...e il profilo lo dice: dove ricevo = ''", "",
           c.get("/api/me").json().get("onchain_incasso"))
+    # MAI NEL CONTO DI BARATTOLO, MA SI PAGA LO STESSO (27 ott 2026,
+    # Andrea: «un utente paga [...] quello è solo l'output finale ma può
+    # definirlo in un secondo momento, l'importante è che il multisig si
+    # crei con i 3 wallet già predefiniti»): il 2-di-3 nasce, l'incasso
+    # resta VUOTO, e verso chi vende non esce niente finche' non sceglie
+    print("\n[chi vende sceglie dove ricevere DOPO il pagamento]")
+    come(999)
+    prova("la cassa: pronto anche senza destinazione", True,
+          c.get("/api/onchain/pronto/888").json()["pronto"])
+    r = compra(999, annunci[4])
+    o5 = r.json().get("onchain") or {}
+    prova("l'ordine nasce: 200, 2-di-3 vero, incasso vuoto, nessuna "
+          "destinazione", (200, True, "", None),
+          (r.status_code, o5.get("indirizzo", {}).get("indirizzo", "").startswith("tb1q"),
+           o5.get("incasso"), o5.get("destinazione")))
+    oid5 = o5["id"]
+    MONETE[o5["indirizzo"]["indirizzo"]] = [{
+        "txid": "dd" * 32, "vout": 0, "value": o5["importo_sats"],
+        "status": {"confirmed": True}}]
+    come(999)
+    c.post(f"/api/onchain/ordini/{oid5}/controlla")
+    come(999)
+    o5 = next(x for x in c.get("/api/onchain/ordini").json()["ordini"]
+              if x["id"] == oid5)
+    prova("pagato, e nato in «Ordini»", ("pagato", True),
+          (o5["stato"], bool(o5.get("ordine_id"))))
+    come(888)
+    riass = next(x["onchain"] for x in c.get("/api/orders").json()
+                 if (x.get("onchain") or {}).get("id") == oid5)
+    prova("...e chi vende lo vede nell'ordine: incasso non scelto", False,
+          riass.get("incasso_scelto"))
+    come(999)
+    prova("una proposta verso chi vende senza incasso: 409 col perche'",
+          (409, SRV.ONCHAIN_MSG_SENZA_DESTINAZIONE),
+          (lambda r: (r.status_code, r.json().get("detail")))(
+              c.post(f"/api/onchain/ordini/{oid5}/proposta",
+                     json={"verso": "venditore", "psbt": "cHNidP8="})))
+    come(888)
+    prova("«ho ricevuto» lo dice solo chi compra: 403", 403,
+          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto").status_code)
+    come(999)
+    prova("chi compra conferma: 200, la conferma resta scritta", 200,
+          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto").status_code)
+    fisso9 = dal_wallet(9)
+    r = scegli(888, tipo="indirizzo", valore=fisso9,
+               firma=firma_dest(888, "indirizzo", fisso9))
+    prova("chi vende sceglie adesso: 200, e l'ordine che aspettava si "
+          "aggiorna", (200, 1), (r.status_code, r.json().get("ordini_aggiornati")))
+    come(999)
+    o5 = next(x for x in c.get("/api/onchain/ordini").json()["ordini"]
+              if x["id"] == oid5)
+    prova("...l'incasso e' quello scelto, con la firma del suo seme",
+          (fisso9, "indirizzo", True),
+          (o5["incasso"], (o5.get("destinazione") or {}).get("tipo"),
+           bool(o5.get("rilascio_chiesto_il"))))
+    q5 = int(o5.get("quota_sats") or 0)
+    uscite5 = [(o5["incasso"], 50000)]
+    if q5:
+        uscite5.append((o5["quota_indirizzo"], q5))
+    uscite5.append((o5["rimborso"], o5["importo_sats"] - 50000 - q5 - 400))
+    come(999)
+    r = c.post(f"/api/onchain/ordini/{oid5}/proposta",
+               json={"verso": "venditore",
+                     "psbt": psbt_di(o5, uscite5, 999).to_string()})
+    prova("...e la firma di chi compra verso quell'incasso passa: 200", 200,
+          r.status_code)
+    r = scegli(888, tipo="barattolo")
+    prova("di nuovo senza scelta (per il resto del giro)", 200, r.status_code)
 
     # IL CONTROLLO DI QUEL CHE SI INCOLLA (27 ott 2026)
     print("\n[il controllo di un indirizzo incollato: buono? gia' usato?]")

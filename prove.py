@@ -152048,12 +152048,18 @@ def prove_banco_chiavi_onchain():
           [True, True], ['onclick="onchainApriIncassi()"' in mini,
                          "onchainTab = 'impostazioni';\n  go('onchain');" in mini])
     # MAI IL CONTO DI BARATTOLO (27 ott 2026): il bottone per tornarci e'
-    # morto, e la cassa del server dice di no senza destinazione
-    prova("niente piu' «Torna al conto di Barattolo», e la cassa vuole "
-          "una destinazione", [False, True, False],
+    # morto. Senza destinazione si paga LO STESSO (terzo giro, Andrea:
+    # «può definirlo in un secondo momento»): l'incasso resta vuoto, mai
+    # il `/1/n` di serie, e verso chi vende non esce niente finche' sceglie
+    prova("niente piu' «Torna al conto di Barattolo», la cassa non chiede "
+          "la destinazione e non ripiega sul conto di serie",
+          [False, False, False, True, True, True],
           ["onchainIncassoSalva(this, 'barattolo')" in mini,
            "raise HTTPException(400, ONCHAIN_MSG_SENZA_DESTINAZIONE)" in pezzo("_onchain_compra"),
-           "onchain_incasso(ind[\"xpub_venditore\"]" in pezzo("_onchain_compra")])
+           "onchain_incasso(ind[\"xpub_venditore\"]" in pezzo("_onchain_compra"),
+           'd_tipo = d_valore = d_firma = incasso = ""' in pezzo("_onchain_compra"),
+           "raise HTTPException(409, ONCHAIN_MSG_SENZA_DESTINAZIONE)" in _SORGENTE,
+           "_onchain_riempi_incassi(con, user[\"id\"])" in _SORGENTE])
     prova("il caricatore e' PIGRO e timbrato col suo ?v=", [True, True],
           ["if (window.BarattoloBTC) return Promise.resolve(window.BarattoloBTC);"
            in mini,
@@ -153510,6 +153516,7 @@ def prove_cancello_onchain():
            "/api/onchain/pronto/{venditore_id}",
            "/api/onchain/ordini/{oid}/controlla",
            "/api/onchain/ordini/{oid}/annulla",
+           "/api/onchain/ordini/{oid}/rilascio-chiesto",
            "/api/onchain/ordini/{oid}/proposta",
            "/api/onchain/ordini/{oid}/firma"], rotte)
     # il conto che conta: ogni rotta on-chain deve nominare il cancello
