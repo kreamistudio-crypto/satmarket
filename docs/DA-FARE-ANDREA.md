@@ -63,3 +63,45 @@ docker compose exec lnd lncli updatechanpolicy --base_fee_msat 1000 --fee_rate_p
 ```
 Poi di nuovo `feereport` per vedere che ha preso. Il risultato e il
 perché vanno in `docs/NODO-MOSTRO.md`, e questa voce si cancella.
+
+## 3. Il cambio libero sul collaudo, col cartone (27 ott 2026, cantiere cambio-libero: T1 23462f4, T2 9a473b2, T3 2af2b2b su develop)
+
+**Perché.** Il cambio libero (pagina «Cambio», tasto «🔁 Cambia») è su
+develop dietro leve spente: sul collaudo si guarda la grafica e il giro
+col SATS Routing di cartone (regola di Andrea: mai quello vero). In
+produzione NON si accende niente per ora (`SWAP_ATTIVO` è spenta, e
+`CAMBIO_BTC_LN_ATTIVO` aspetta la risposta di Massimo su quota partner e
+limiti di chiamate). Un gesto alla volta, col sì di Andrea (COLLAUDO.md).
+
+**Sola lettura** (sulla VM): il cartone è vivo? e le righe dello swap
+ci sono già (dal 27 ott 08:07)?
+```
+systemctl status cartone-swap --no-pager | head -5; curl -s http://127.0.0.1:9077/v2/swap/submarine | head -c 200
+```
+```
+grep -n "^SWAP_ATTIVO\|^SWAP_API_BASE\|^SWAP_SOLO_MODERATORI\|^CAMBIO_" /srv/collaudo/barattolo/config.py
+```
+Se il cartone non risponde (la VM si è riavviata: l'unità è
+transitoria), si rilancia come il 27 ott (il comando sta nel thread
+«Accendere lo swap sul collaudo»; in breve: `systemd-run --unit=cartone-swap`
+sul `python cartone_satsrouting.py --porta 9077` del venv del collaudo).
+
+**Scrive** (copia di riserva prima, poi le due righe in fondo, poi riavvio):
+```
+sudo cp /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-cambio
+```
+```
+printf '\nCAMBIO_LIBERO_ATTIVO = True\nCAMBIO_BTC_LN_ATTIVO = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 3 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi, da moderatore, la pagina «Cambio»: il tasto «🔁
+Cambia», le due pillole, 100.000 sats → preventivo (98.842 da ricevere
+sulla strada Lightning → bitcoin; 100.818 da mandare su quella
+rovesciata), «Incolla», le 12 parole la prima volta, «Conferma». Quel
+che si vede va nel verbale (CANTIERI, «Il cambio libero, tappa 3»,
+«COSA RESTA») e questa voce si cancella. ATTENZIONE alle copie vecchie
+del config: `config.py.prima-prova-aperta` (23 ott) e
+`config.py.prima-swap` (27 ott) NON hanno queste righe.
+
