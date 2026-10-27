@@ -34216,7 +34216,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (la prova doppia telefono-server); il collaudo `collaudo_onchain_incasso`.
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
-  tetto), la tabella `leve_pannello` (chiave, valore, chi, quando),
+  tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,
+  e `ONCHAIN_QUOTA_FISSA_SATS`), la tabella `leve_pannello` (chiave, valore, chi, quando),
   `leva_scrivibile(chiave)` (pannello se c'è e il giudice lo accetta,
   sennò config/codice), `leva_origine` ('pannello'|'config'|'codice'),
   `_leva_scrivibile_riga` (aggiunge `scrivibile` alla riga del

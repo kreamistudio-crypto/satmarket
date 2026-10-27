@@ -73223,3 +73223,23 @@ con la fattura pagata dall'utente). Per accendere: `CAMBIO_LIBERO_ATTIVO
 = True` nel config (con `SWAP_ATTIVO`), e ricordare che a
 `SWAP_SOLO_MODERATORI = True` il cambio lo vedono solo i moderatori
 anche a `CAMBIO_LIBERO_SOLO_MODERATORI = False`.
+
+## «Solo gli admin» dell'on-chain si cambia dal pannello (27 ott 2026, cantiere onchain-per-tutti, richiesta di Andrea: «non ho accesso alla vm, posso modificare il file di config dal pannello amministrazione?»)
+
+**COSA.** La seconda leva scrivibile: `ONCHAIN_SOLO_ADMIN`, sì/no
+(`_giudice_si_no`). Dal cassetto «⚙️ Stato delle leve» un admin la
+spegne («Spegni» → «Conferma») e l'on-chain si apre a chiunque, sul
+collaudo dove `ONCHAIN_ATTIVO` è già acceso. `onchain_ammesso` la chiede
+a `leva_scrivibile` e non più alla costante. Il cassetto disegna le leve
+sì/no con due bottoni invece del campo numerico (`scrivibile.tipo`).
+
+**PERCHÉ SÌ, ANCHE SE È UNA PORTA.** Nello studio delle leve le porte
+stanno fra le «decidi tu», ed è Andrea che l'ha decisa, per provare
+l'on-chain con un utente che non è admin senza entrare nella VM. La
+leva madre `ONCHAIN_ATTIVO` resta del VPS: a madre spenta questa non
+apre niente, quindi in produzione il pannello non può accendere
+l'on-chain.
+
+**PROVATO.** `collaudo_onchain_incasso` (37/0): chi non è admin non
+vede l'on-chain, una parola storta è 400, l'admin la spegne, chi non è
+admin lo vede, «Torna al config» lo richiude.

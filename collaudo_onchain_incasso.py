@@ -11,7 +11,8 @@ SERVER VERO, per HTTP (TestClient, la app vera):
   nuovo della vpub a ogni vendita), e la quota fissa entra nell'importo;
 - la quota si cambia dal pannello (solo admin, pavimento e tetto, una
   riga nel registro), e il pannello vince sul config;
-- il rilascio: il PSBT deve portare la quota esatta a Barattolo.
+- il rilascio: il PSBT deve portare la quota esatta a Barattolo;
+- «Solo gli admin» si spegne dal pannello, e torna al config.
 
 IL «TELEFONO» QUI E' EMBIT, come negli altri collaudi on-chain: che il
 telefono vero (il bundle) firmi destinazioni che il server legge lo dice
@@ -305,7 +306,28 @@ def main():
     prova("un seme nuovo: la destinazione firmata dal vecchio si cancella",
           None, c.get("/api/onchain/prova").json()["incasso"])
 
-    # ---- 6) la leva torna al config -----------------------------------------
+    # ---- 6) la porticina dal pannello (27 ott 2026) ----------------------
+    print("\n[«Solo gli admin» dal pannello]")
+    come(111)
+    prova("chi non e' admin: l'on-chain non esiste", 404,
+          c.get("/api/onchain/prova").status_code)
+    come(999)
+    r = c.post("/api/admin/leve/ONCHAIN_SOLO_ADMIN", json={"valore": "forse"})
+    prova("una parola che non e' si' o no: 400", 400, r.status_code)
+    r = c.post("/api/admin/leve/ONCHAIN_SOLO_ADMIN", json={"valore": False})
+    prova("l'admin la spegne dal pannello: 200, dal pannello",
+          (200, False, "pannello"),
+          (r.status_code, r.json().get("valore"), r.json().get("origine")))
+    come(111)
+    prova("...e chi non e' admin vede l'on-chain", 200,
+          c.get("/api/onchain/prova").status_code)
+    come(999)
+    c.post("/api/admin/leve/ONCHAIN_SOLO_ADMIN", json={"torna_al_config": True})
+    come(111)
+    prova("«Torna al config»: di nuovo solo gli admin", 404,
+          c.get("/api/onchain/prova").status_code)
+
+    # ---- 7) la leva torna al config -----------------------------------------
     r = leva(999, torna_al_config=True)
     prova("«Torna al config»: 0, dal codice", (200, 0, "codice"),
           (r.status_code, r.json().get("valore"), r.json().get("origine")))

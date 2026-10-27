@@ -34165,7 +34165,9 @@ def _censimento(acceso, dopo=None):
     # giudice, che APRE IL DATABASE (`leve_pannello`) — stessa trappola
     # della fee dinamica qui sopra, quinta occorrenza: senza stub
     # `__missing__` da' un 7 e il pannello lo chiama.
-    amb["leva_scrivibile"] = (lambda k: 600) if acceso else (lambda k: 0)
+    amb["leva_scrivibile"] = (
+        (lambda k: {"ONCHAIN_SOLO_ADMIN": True}.get(k, 600)) if acceso
+        else (lambda k: {"ONCHAIN_SOLO_ADMIN": False}.get(k, 0)))
     amb["_leva_scrivibile_riga"] = lambda r: {
         **r, "scrivibile": {"pavimento": 0, "tetto": 5000,
                             "origine": "pannello" if acceso else "codice"}}
@@ -152279,8 +152281,8 @@ def prove_incasso_esterno_onchain():
           < cofirma_js.index("tx.signIdx("))
     leve = src[src.index("LEVE_SCRIVIBILI = {"):]
     leve = leve[:leve.index("\n}\n")]
-    prova("dal pannello si cambia UNA leva sola, la quota on-chain",
-          ['"ONCHAIN_QUOTA_FISSA_SATS"'],
+    prova("dal pannello si cambiano due leve sole: la porticina e la quota "
+          "on-chain", ['"ONCHAIN_SOLO_ADMIN"', '"ONCHAIN_QUOTA_FISSA_SATS"'],
           re.findall(r'^    ("[A-Z_]+"): \{', leve, re.M))
 
     # --- 2) il giudice della quota, eseguito --------------------------

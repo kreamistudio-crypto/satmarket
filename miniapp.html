@@ -48913,9 +48913,17 @@ function rigaLevaScrivibile(v){
     return `<div class="leva-nota" style="margin:-4px 0 8px">✏️ Valore ${esc(origine)} ·
       <a href="#" onclick="levaInModifica='${esc(v.chiave)}';levaDaConfermare=null;loadAdminStats();return false">cambia</a></div>`;
   }
+  /* una leva sì/no: due bottoni, e il secondo tocco conferma come per i numeri */
+  if (w.tipo === 'si_no' && levaDaConfermare === null) {
+    return `<div class="leva-nota" style="margin:-4px 0 8px">
+      <button class="btn" onclick="levaDaConfermare=${v.valore ? 'false' : 'true'};loadAdminStats()">${v.valore ? 'Spegni' : 'Accendi'}</button>
+      ${w.origine === 'pannello' ? `<button class="btn ghost" onclick="levaScrivi(this, '${esc(v.chiave)}', true)">Torna al config</button>` : ''}
+      <button class="btn ghost" onclick="levaInModifica='';loadAdminStats()">Lascia stare</button></div>`;
+  }
   if (levaDaConfermare !== null) {
-    return `<div class="leva-nota" style="margin:-4px 0 8px">Da <b>${esc(String(v.valore))}</b> a
-      <b>${esc(String(levaDaConfermare))}</b>: vale subito, per tutti.
+    const detto = (x) => typeof x === 'boolean' ? (x ? 'Acceso' : 'Spento') : String(x);
+    return `<div class="leva-nota" style="margin:-4px 0 8px">Da <b>${esc(detto(v.valore))}</b> a
+      <b>${esc(detto(levaDaConfermare))}</b>: vale subito, per tutti.
       <button class="btn" onclick="levaScrivi(this, '${esc(v.chiave)}')">Conferma</button>
       <button class="btn ghost" onclick="levaInModifica='';levaDaConfermare=null;loadAdminStats()">Lascia stare</button></div>`;
   }
