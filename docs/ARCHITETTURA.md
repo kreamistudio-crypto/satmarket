@@ -33825,6 +33825,56 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (un telefono di cartone in node contro il cartone acceso nel processo).
   Nessun telefono e nessuna rotta del server ancora: quelli sono le
   tappe 2 e 3 del cantiere.
+  IL CAMBIO LIBERO, TAPPA 2: LIGHTNING → IL TUO INDIRIZZO (27 ott 2026,
+  cantiere cambio-libero; perché in CANTIERI, «Il cambio libero, tappa
+  2»). Dalla pagina «Cambio» (prima «Ricevi in bitcoin»: il nome vale
+  per le due direzioni, chiesto da Andrea; cella in basso `CELLA_SWAP`,
+  `SWAP_TESTI.titolo`, in inglese «Exchange») chi ha la leva vede il
+  tasto «🔁 Cambia»: la direzione (per ora una sola), la cifra in sats,
+  «Vedi quanto ricevi»; poi il pannello di sempre (preventivo, indirizzo
+  con «Incolla»/QR, le 12 parole la prima volta, «Conferma») e una CARTA
+  col QR della fattura, «Copia» e «Apri nel wallet» (`fatturaCambio` in
+  `cartaSwap`): LA FATTURA LA PAGA L'UTENTE COL SUO WALLET, la
+  cassaforte non c'entra, Barattolo non paga mai (`swapPaga` non si
+  chiama per l'ordine 0). SUL TELEFONO È L'«ORDINE 0» dell'instradatore
+  (`swap/instradatore.js`, sezione 7b: `renderSwapCambio`,
+  `swapCambioApri/Chiudi/Calcola/Copia`, il riquadro `#swapCambio` in
+  cima alla pagina): stesso preventivo, stesso indirizzo, stesse parole,
+  stessa creazione (`swapCreaDentro`), stessa sorveglianza e stesso
+  ritiro del reverse degli incassi; `swapDiOrdine(0)` è il solo cambio
+  APERTO (nato e non ancora finito), così a cambio finito il riquadro
+  torna al tasto. Le frasi dello stato sono sue (`pagaTu`,
+  `cambioScaduto`, `cambioFallito`, `cambioRipreso`), e il «non
+  risponde» dell'ordine 0 non dice «incassa in Lightning»
+  (`swapNonRisponde`). IL SERVER TIENE SOLO IL BIGLIETTO (tabella
+  `cambi_liberi`: tg_id, direzione, sats, fornitore, swap_id, impronta,
+  indirizzo del lockup, onchain, stato `chiesto`/`nato`/`annullato`;
+  indice unico fornitore+swap_id): il telefono lo chiede PRIMA di
+  chiedere lo swap al fornitore (`POST /api/swap/cambio` → `{ok, id,
+  oggi}` o `{ok: false, motivo}`), dopo la nascita porta le sole parti
+  pubbliche (`POST /api/swap/cambio/{id}/nato`: swap_id, impronta,
+  indirizzo, onchain — mai parole o chiavi, forme controllate,
+  idempotente sullo stesso swap, «doppio» su un secondo biglietto), e
+  se il fornitore non risponde dopo il biglietto lo annulla (`POST
+  …/annulla`, solo da `chiesto`). Nascita e annullo NON hanno cancello
+  (un biglietto nato prima di una leva spenta deve poter finire), ma
+  sono solo del proprietario (404 altrimenti). Il preventivo è `GET
+  /api/swap/cambio/preventivo?sats=&direzione=&fornitore=&hash=`: il
+  conto di `preventivo_swap` coi tetti DEL CAMBIO (`SWAP_MIN_SATS`,
+  `CAMBIO_LIBERO_MAX_SATS`), più la busta del giorno (`oggi`,
+  `al_giorno`); i motivi in più: `cifra`, `tetto_giorno`. IL CONTO DEL
+  GIORNO (`cambi_oggi`): nelle ultime 24 ore i biglietti `nato` e i
+  `chiesto` ancora freschi (`CAMBIO_CHIESTO_VALE_S`, 900 s: un telefono
+  spento a metà non brucia un posto per sempre); gli annullati non
+  contano. LE LEVE (config, spente di serie): `CAMBIO_LIBERO_ATTIVO`
+  (vuole `SWAP_ATTIVO`: il cancello `cambio_libero_per` sta SOPRA
+  `swap_per`), `CAMBIO_LIBERO_SOLO_MODERATORI` (True),
+  `CAMBIO_LIBERO_MAX_SATS` (500.000), `CAMBIO_LIBERO_MAX_AL_GIORNO` (5);
+  il client le legge in `/api/me` → `swap_leve.cambio` (`cambio_leve`:
+  attivo, minimo, massimo, al_giorno, oggi, strade). `CAMBIO_STRADE` è
+  `("ln-btc",)`: la strada bitcoin → Lightning è la tappa 3. Le
+  sentinelle: `prove_cambio_libero`; il giro vero, server e telefono in
+  node contro il cartone, `collaudo_cambio_libero`.
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr

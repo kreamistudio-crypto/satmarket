@@ -778,6 +778,20 @@ SWAP_FORNITORI_IN_PIU = []
 # (la VM di collaudo), dove un mempool pubblico non c'e'. Una voce di
 # SWAP_FORNITORI_IN_PIU puo' portare la sua chiave "mempool".
 SWAP_MEMPOOL_API = ""
+# IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero, decisione di
+# Andrea): dalla pagina «Cambio» chi passa il cancello cambia i SUOI sats
+# senza un ordine di mezzo — Lightning -> il suo indirizzo bitcoin (e,
+# dalla tappa 3, bitcoin -> Lightning). I sats non passano MAI dalla
+# cassaforte: partono e arrivano dal suo wallet, e Barattolo registra
+# solo il biglietto (quando, quanto, con chi). Vuole SWAP_ATTIVO acceso.
+# Nasce SPENTO; a leva accesa, di serie lo vedono solo i moderatori.
+CAMBIO_LIBERO_ATTIVO = False
+CAMBIO_LIBERO_SOLO_MODERATORI = True
+# I tetti del cambio libero (decisione di Andrea): il massimo per cambio
+# (il minimo e' SWAP_MIN_SATS) e quanti cambi al giorno per persona (le
+# ultime 24 ore, contando i cambi nati e i biglietti ancora freschi).
+CAMBIO_LIBERO_MAX_SATS = 500_000
+CAMBIO_LIBERO_MAX_AL_GIORNO = 5
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

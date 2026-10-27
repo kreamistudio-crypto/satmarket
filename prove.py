@@ -174387,7 +174387,7 @@ ramoVetrina = 'esplora';
 swapLeve = {attivo: true};
 vestiCellaAste();
 toccaCellaAste();
-out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span><span class="eti-ricevi">Ricevi in bitcoin</span>'),
+out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span><span class="eti-ricevi">Cambio</span>'),
               ELS['nav-aste'].dataset.vestito,
               ELS['portaAste'].style.display, aste, viste.slice()];
 out.voceAcceso = [voceNav('swap'), voceNav('astepresto'),
@@ -174425,9 +174425,10 @@ console.log(JSON.stringify(out));
           [True, "none", 1, 0], r.get("spento"))
     prova("...e la nav accende le aste come sempre",
           ["aste", "aste", "aste"], r.get("voceSpento"))
-    # (27 ott 2026, cantiere grafica-swap) il vestito si chiama «Ricevi in
-    # bitcoin», nome scelto da Andrea
-    prova("a leva accesa la STESSA cella si veste da «Ricevi in bitcoin» e apre la pagina",
+    # (27 ott 2026, cantiere grafica-swap) il vestito si chiamava «Ricevi in
+    # bitcoin»; dal cantiere cambio-libero (stesso giorno) «Cambio», un nome
+    # per le due direzioni, chiesto da Andrea
+    prova("a leva accesa la STESSA cella si veste da «Cambio» e apre la pagina",
           [True, "swap", "", 1, ["swap"]], r.get("acceso"))
     prova("...e le aste, raggiunte dalla porta, accendono Esplora",
           ["aste", "esplora", "esplora"], r.get("voceAcceso"))
@@ -174436,10 +174437,10 @@ console.log(JSON.stringify(out));
     prova("...e chi era sulla pagina «Swap» esce su Esplora",
           (["esplora"], 0), (r.get("uscita"), r.get("ferma")))
     prova("i testi in inglese per Telegram in un'altra lingua",
-          ["Receive in bitcoin", "No payouts to your bitcoin address yet."], r.get("en"))
+          ["Exchange", "No exchanges and no payouts to your bitcoin address yet."], r.get("en"))
     prova("...in italiano per l'italiano e senza Telegram",
-          ["Per ora nessun incasso al tuo indirizzo bitcoin.",
-           "Per ora nessun incasso al tuo indirizzo bitcoin."],
+          ["Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin.",
+           "Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin."],
           [r.get("it"), r.get("senza")])
 
 
@@ -177292,10 +177293,10 @@ console.log(JSON.stringify(out));
     # (19 ott: il titolo del preventivo si chiamava `titolo` come quello
     # della pagina Swap, e nell'oggetto dei testi lo sovrascriveva)
     prova("il titolo della pagina e quello del preventivo sono due chiavi",
-          (1, 1, 1, 1), (testi.count("titolo: 'Ricevi in bitcoin',"),
+          (1, 1, 1, 1), (testi.count("titolo: 'Cambio',"),
                          testi.count("titoloPrev: 'Quanto ricevi al tuo indirizzo'"),
                          testi.count("titoloPrev: 'What you receive at your address'"),
-                         testi.count("titolo: 'Receive in bitcoin',\n       testo: 'Here")))
+                         testi.count("titolo: 'Exchange',\n       testo: 'Here")))
 
 
 def prove_swap_telefono():
@@ -179014,9 +179015,9 @@ def prove_swap_pagamento():
     # (27 ott 2026, cantiere grafica-swap) le parole di tutti: in nessuno
     # dei quattro messaggi la parola «swap», e il nome della pagina giusto
     prova("...e nessuno dei quattro dice «swap»; senza ritiro, la pagina "
-          "«Ricevi in bitcoin»", (0, True),
+          "«Cambio»", (0, True),
           (sum("swap" in m.lower() for m in (in_attesa, confermato, senza, giu)),
-           "«Ricevi in bitcoin»" in senza))
+           "«Cambio»" in senza))
     prova("...e una fattura che non e' di uno swap non cambia niente", "",
           msg("lnbc-altra"))
     sb = codice(pezzo("_sblocca_sats"))
@@ -179092,7 +179093,9 @@ def prove_cartone_submarine():
     prova("submarine: il cartone legge la fattura (sats, impronta), e dice no a rete e forma sbagliate",
           ((60000, "11" * 32), None, None, None),
           (_cart.leggi_fattura(letta), _cart.leggi_fattura(letta, "regtest"),
-           _cart.leggi_fattura("lnbc1storta"), _cart.leggi_fattura(letta[:-1] + "q")))
+           _cart.leggi_fattura("lnbc1storta"),
+           # l'ultimo carattere cambiato DAVVERO (una volta su 32 era gia' «q»)
+           _cart.leggi_fattura(letta[:-1] + ("q" if letta[-1] != "q" else "p"))))
 
     if not _sh.which("node"):
         salta("submarine: il telefono di cartone contro il cartone", "node non c'e'")
@@ -179354,13 +179357,146 @@ async function rotta(hexTx){
 """
 
 
+def prove_cambio_libero():
+    """IL CAMBIO LIBERO, TAPPA 2 (27 ott 2026, cantiere cambio-libero, piano
+    approvato da Andrea): dalla pagina «Cambio» si cambiano i PROPRI sats
+    da Lightning a un indirizzo bitcoin, senza un ordine. Sul telefono e'
+    l'«ordine 0» dell'instradatore (stesso preventivo, indirizzo, parole,
+    creazione, sorveglianza e ritiro); la fattura la paga l'utente col suo
+    wallet, mai Barattolo; il server tiene solo il BIGLIETTO (quanti cambi
+    oggi: 5, 500.000 sats per cambio, all'inizio solo moderatori). Il giro
+    vero, server e telefono contro il cartone, e' `collaudo_cambio_libero`;
+    qui le sentinelle e i pezzi puri."""
+    print("\n[il cambio libero, tappa 2: il biglietto e l'«ordine 0»]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    esempio = open("config_esempio.py", encoding="utf-8").read().replace("\r\n", "\n")
+    pannello = pezzo("_leve_stato")
+
+    # --- le quattro leve: d'esempio, di serie, nel pannello
+    for nome, valore in (("CAMBIO_LIBERO_ATTIVO", "False"),
+                         ("CAMBIO_LIBERO_SOLO_MODERATORI", "True"),
+                         ("CAMBIO_LIBERO_MAX_SATS", "500_000"),
+                         ("CAMBIO_LIBERO_MAX_AL_GIORNO", "5")):
+        prova(f"la leva {nome}: d'esempio, di serie e nel pannello", (1, 1, 1),
+              (esempio.count(f"\n{nome} = {valore}\n"),
+               src.count(f"    {nome} = {valore}\n"),
+               pannello.count(f'"{nome}"')))
+    prova("di serie SPENTA, e nasce sopra il cancello dello swap", (True, True),
+          ("    if not swap_per(tg_id) or not CAMBIO_LIBERO_ATTIVO:\n        return False"
+           in pezzo("cambio_libero_per"),
+           '"cambio": cambio_leve(user["id"])' in src))
+
+    # --- le rotte, e i loro cancelli
+    for rotta in ('@app.get("/api/swap/cambio/preventivo")', '@app.post("/api/swap/cambio")',
+                  '@app.post("/api/swap/cambio/{cid}/nato")',
+                  '@app.post("/api/swap/cambio/{cid}/annulla")'):
+        prova(f"la rotta {rotta[9:-1]} c'e', una volta", 1, src.count(rotta))
+    prev, big = codice(pezzo("cambio_preventivo")), codice(pezzo("cambio_biglietto"))
+    prova("preventivo e biglietto passano dal cancello del cambio, non da quello "
+          "dello swap", (1, 1, 0, 0),
+          (prev.count('if not cambio_libero_per(user["id"]):'),
+           big.count('if not cambio_libero_per(user["id"]):'),
+           prev.count("swap_per("), big.count("swap_per(")))
+    prova("il preventivo del cambio usa i tetti del CAMBIO (non quelli dell'incasso)",
+          (True, 0), ("SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)" in prev,
+                      prev.count("SWAP_MAX_SATS)")))
+    prova("il biglietto nasce dentro il lucchetto, dopo il conto del giorno", True,
+          big.index("async with _lucchetto_cambi:") < big.index("oggi = cambi_oggi(con,")
+          < big.index("if _cambio_tetto_giorno(oggi):") < big.index("INSERT INTO cambi_liberi"))
+    nato = codice(pezzo("cambio_nato"))
+    prova("la nascita porta le sole parti pubbliche, con la forma controllata, e "
+          "lo stesso swap due volte e' «doppio»", (True, True, True),
+          ("_SWAP_ID_FORMA.match(swap_id)" in nato and "_SWAP_IMPRONTA_FORMA.match(impronta)" in nato,
+           '"motivo": "doppio"' in nato and "except sqlite3.IntegrityError:" in nato,
+           "UNIQUE INDEX IF NOT EXISTS cambi_liberi_swap ON" in pezzo("_cambi_prepara")))
+    prova("...e nel biglietto non si scrive mai una parola o una chiave", 0,
+          sum(nato.count(k) for k in ("parole", "mnemonic", "privata", "xpub", "preimage")))
+
+    # --- i pezzi puri
+    amb = {"CAMBIO_CHIESTO_VALE_S": 900, "CAMBIO_LIBERO_MAX_AL_GIORNO": 5}
+    for nome in ("_cambio_sats", "_cambio_tetto_giorno", "cambi_oggi", "_cambi_prepara"):
+        exec(pezzo(nome), amb)
+    prova("la cifra: interi, coi punti e gli spazi; 0, negativi, lettere e cifre "
+          "assurde valgono 0",
+          [100000, 100000, 100000, 0, 0, 0, 0, 0, 2_100_000_000_000_000],
+          [amb["_cambio_sats"](v) for v in ("100000", "100.000", " 100 000 ", "0", "-5",
+                                            "cento", None, "1e5", "2100000000000000")])
+    prova("il tetto del giorno: a 5 il quinto ferma, a 0 nessun tetto",
+          [False, True, True, False],
+          [amb["_cambio_tetto_giorno"](4), amb["_cambio_tetto_giorno"](5),
+           amb["_cambio_tetto_giorno"](9),
+           (amb.__setitem__("CAMBIO_LIBERO_MAX_AL_GIORNO", 0), amb["_cambio_tetto_giorno"](9))[1]])
+    import sqlite3 as _sq
+    con = _sq.connect(":memory:")
+    amb["_cambi_prepara"](con)
+    ora = 1_800_000_000
+    righe = [  # (tg, stato, creato)
+        (7, "nato", ora - 100), (7, "nato", ora - 86_000),        # oggi: 2 nati
+        (7, "nato", ora - 86_500),                                # ieri: no
+        (7, "chiesto", ora - 100), (7, "chiesto", ora - 1_000),  # fresco si', vecchio no
+        (7, "annullato", ora - 50),                               # annullato: no
+        (8, "nato", ora - 10)]                                    # un altro: no
+    con.executemany("INSERT INTO cambi_liberi(tg_id,direzione,sats,fornitore,stato,"
+                    "creato,aggiornato) VALUES(?,'ln-btc',100000,'satsrouting',?,?,?)",
+                    [(t, st, c, c) for t, st, c in righe])
+    prova("il conto del giorno: i nati delle ultime 24 ore e i chiesti freschi; "
+          "fuori gli annullati, i vecchi e quelli degli altri", (3, 1, 0),
+          (amb["cambi_oggi"](con, 7, ora), amb["cambi_oggi"](con, 8, ora),
+           amb["cambi_oggi"](con, 9, ora)))
+    con.close()
+
+    # --- il telefono: l'«ordine 0», il biglietto prima dello swap, la fattura sua
+    crea = js[js.index("async function swapCreaDentro(n){"):js.index("/* ─── 6a.")]
+    prova("nell'instradatore l'ordine 0 chiede il biglietto PRIMA dello swap, e a "
+          "un no annulla; poi la nascita al server, mai il pagamento di Barattolo",
+          (True, True, True, True),
+          (crea.index("biglietto = await chiediBigliettoCambio(") < crea.index("nuovo = await f.crea("),
+           "if (biglietto) { try { await liberaBigliettoCambio(biglietto.id); } catch(e2){} }" in crea,
+           "try { await natoCambioAlServer(rec.cambio, rec); } catch(e){}" in crea,
+           "} else await swapPaga(rec);" in crea))
+    prova("la pagina manda l'ordine 0 alla rotta del cambio, con la cifra scritta",
+          (True, True, True),
+          ("rotta = '/swap/cambio/preventivo';" in mini,
+           "q.set('sats', String(typeof swapCambioCifra === 'function' ? swapCambioCifra() : 0));" in mini,
+           "if (typeof renderSwapCambio === 'function' && el('swapCambio')) renderSwapCambio();" in mini))
+    for nome in ("chiediBigliettoCambio", "natoCambioAlServer", "liberaBigliettoCambio"):
+        prova(f"...e {nome} sta nella pagina (le tre chiamate al server), non nei file dello swap",
+              (1, 0), (mini.count(f"async function {nome}("), js.count(f"function {nome}(")))
+    prova("la nascita manda le sole parti pubbliche", True,
+          "body: JSON.stringify({swap_id: rec.id, impronta: rec.impronta,\n"
+          "        indirizzo: rec.lockupAddress, onchain: rec.onchainAmount})" in mini)
+    prova("la fattura del cambio: QR, «Copia», «Apri nel wallet»", (True, True, True, True),
+          ('id="swapCambioQr"' in js, 'data-swap="cambio-copia"' in js,
+           'id="swapCambioWallet" href="lightning:${esc(rec.invoice)}"' in js,
+           "disegnaQr(q, ('lightning:' + String(vivo.invoice).trim()).toUpperCase(), 'Alphanumeric');" in js))
+    prova("nel riquadro del cambio il «non risponde» non dice «incassa in Lightning»",
+          (True, 5), ("function swapNonRisponde(n, nome){ return n === 0 ? t3().cambioNonRisponde(nome) : t3().nonRisponde(nome); }" in js,
+                      js.count("swapNonRisponde(n, ")))   # la definizione e i quattro usi
+    testi = pezzo_js(mini, "const SWAP_TESTI = {", "function linguaSwap(){")
+    chiavi = ("SottoMinimo", "SopraTetto", "TettoGiorno", "Cifra", "NonRisponde", "Spento")
+    prova("i sei rifiuti del cambio nella pagina, in due lingue, senza «incassa in Lightning»",
+          ([2] * 6, 0), ([testi.count(f"cambio{k}:") for k in chiavi],
+                         sum("lightning" in r.lower() for r in testi.split("\n")
+                             if any(f"cambio{k}:" in r for k in chiavi))))
+    prova("la cella in basso e la pagina: «Cambio» / «Exchange»", (1, 1, 1),
+          (mini.count("""+ '<span class="eti-ricevi">Cambio</span>';"""),
+           testi.count("titolo: 'Cambio',"), testi.count("titolo: 'Exchange',")))
+    lista = open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read()
+    compila = open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()
+    prova("il collaudo nuovo sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_cambio_libero\n" in "\n" + lista + "\n",
+           "collaudo_cambio_libero.py" in compila))
+
+
 def prove_grafica_swap():
     """LA GRAFICA DELLO SWAP PER TUTTI (27 ott 2026, cantiere grafica-swap,
     piano approvato da Andrea con tre modifiche). Le regole: al piu' TRE
     tocchi dopo «Conferma»; niente parole tecniche (swap, HTLC, RGB,
     fornitore, e con loro lockup e on-chain); le 12 parole spiegate con
     calma e solo la prima volta; «Incolla» e QR per l'indirizzo; la pagina
-    e il tasto in basso «Ricevi in bitcoin». Il giro coi gesti, contro il
+    e il tasto in basso «Cambio» (prima «Ricevi in bitcoin»). Il giro, contro il
     SATS Routing di cartone, e' `collaudo_swap_telefono` (la prima volta,
     la seconda, il doppio tocco); qui le sentinelle e i pezzi puri."""
     print("\n[la grafica dello swap per tutti]")
@@ -179394,11 +179530,13 @@ console.log(JSON.stringify(fuori));
     prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
           "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
           (trovate, len(frasi) > 150))
-    prova("il tasto in basso e la pagina si chiamano «Ricevi in bitcoin»",
+    # (cambio-libero, 27 ott 2026) «Ricevi in bitcoin» e' diventato «Cambio»:
+    # un nome che valga per le due direzioni, chiesto da Andrea
+    prova("il tasto in basso e la pagina si chiamano «Cambio»",
           (True, False, 1, 1),
-          (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Ricevi in bitcoin</span>';"),
-           "Swap';" in cella, testi.count("titolo: 'Ricevi in bitcoin',"),
-           testi.count("titolo: 'Receive in bitcoin',")))
+          (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Cambio</span>';"),
+           "Swap';" in cella, testi.count("titolo: 'Cambio',"),
+           testi.count("titolo: 'Exchange',")))
     prova("...un punto piu' piccola e un filo stretta: ci sta su una riga da 360 px",
           True, "nav .eti-ricevi{display:block;font-size:9.5px;line-height:1.3;"
           "letter-spacing:-.15px;" in mini)
@@ -179411,7 +179549,7 @@ console.log(JSON.stringify(fuori));
            "anche da un altro telefono." in it,
            it[it.index("paroleRegole: ["):it.index("],", it.index("paroleRegole: ["))].count("',") + 1,
            "paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.'," in it,
-           "le ritrovi nella pagina «Ricevi in bitcoin»." in it))
+           "le ritrovi nella pagina «Cambio»." in it))
     avanti = js[js.index("async function swapAvantiDentro(n){"):js.index("/* «Continua» delle parole")]
     prova("...e solo la prima volta: il passo «parole» c'e' solo con le parole "
           "non ancora copiate, sennò lo swap parte subito",
@@ -180407,7 +180545,7 @@ def main():
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_grafica_swap, prove_cartone_submarine,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero,
               prove_margine_cassaforte,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
               prove_quantita_servizi,

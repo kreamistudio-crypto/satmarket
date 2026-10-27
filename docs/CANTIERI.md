@@ -73177,3 +73177,251 @@ parole) — NON si accende finché Massimo non risponde sulla quota e sui
 limiti. Le leve, spente di serie: `CAMBIO_LIBERO_ATTIVO`,
 `CAMBIO_LIBERO_SOLO_MODERATORI` (True), `CAMBIO_LIBERO_MAX_SATS`
 (500.000), `CAMBIO_LIBERO_MAX_AL_GIORNO` (5). T5: i documenti.
+
+## L'on-chain incassa dove vuoi tu: la destinazione firmata dal seme, la quota fissa di Barattolo, e la prima leva che si cambia dal pannello (27 ott 2026, cantiere onchain-incasso-esterno, piano approvato da Andrea: «vai con tutto»)
+
+**COSA.** Tre pezzi sopra l'ordine on-chain del 23 ott, sempre in signet
+e dietro lo stesso cancello (oggi solo gli admin), più due documenti.
+- **Dove ricevi i sats quando vendi.** Nel foglio «⛓️ On-chain (prova)»
+  il blocco nuovo «4b»: chi vende sceglie fra il conto di Barattolo (di
+  serie, `/1/n` del suo seme, com'era), **la chiave del conto del suo
+  wallet** (una `vpub`/`tpub` BIP-84 come la dà Sparrow, un indirizzo
+  nuovo `/0/i` a ogni vendita, con una fila sua) o **un indirizzo
+  fisso** (con l'avviso: tutte le vendite nello stesso posto si legano
+  fra loro). Vale dalle vendite dopo; gli ordini già nati tengono la
+  destinazione di allora, fotografata alla cassa.
+- **La quota fissa di Barattolo.** `ONCHAIN_QUOTA_FISSA_SATS`, 0 nel
+  codice («0 commissione sul mercatino al momento, al massimo metterei
+  500 sats fissi solamente per coprire le spese di rete»). La paga chi
+  compra (regola 10), la vede alla cassa prima di pagare, e all'uscita
+  va a `/1/n` della xpub di Barattolo nella stessa transazione che
+  libera i sats; col rimborso torna a lui. Il margine per la rete resta
+  com'era: i miner si pagano da lì e l'avanzo torna a chi ha comprato.
+- **Le leve dal pannello.** Il cassetto «⚙️ Stato delle leve» resta in
+  sola lettura, tranne le leve che il server apre una per una
+  (`LEVE_SCRIVIBILI`): oggi solo la quota. ✏️ «cambia» → «Salva» →
+  «Conferma»; il valore vive nel database e vince sul config del VPS;
+  «Torna al config» lo cancella; ogni cambio è una riga nel registro
+  della moderazione (strato «leva»).
+- **I due studi** (passi 4 e 5 del piano): `docs/STUDIO-ONCHAIN-P2P-2026-10-27.md`
+  (lo stesso metodo nel P2P, accanto a Mostro e non dentro) e
+  `docs/STUDIO-LEVE-DAL-PANNELLO-2026-10-27.md` (le 231 leve in tre
+  classi, con la proposta per ognuna).
+
+**PERCHÉ LA FIRMA DEL SEME.** Il 23 ott si era scelto «nessuno incolla
+un indirizzo» proprio per questo: un incasso che il seme di chi vende
+sa rifare è un incasso che un server manomesso non può cambiare, perché
+il telefono co-firma solo verso una chiave sua. Un indirizzo esterno il
+seme non lo sa rifare. La cura: la scelta si **firma** col seme
+(chiave `/2/0` del conto del 2-di-3, una catena che non serve ad
+altro), il server la verifica con la xpub dedicata che ha già, e
+soprattutto il telefono di chi vende **la rilegge col suo seme prima
+della seconda firma**. Chi non ha il seme non sa firmare una
+destinazione, e funziona su qualunque telefono che abbia le dodici
+parole (non serve una copia locale della scelta). Un seme nuovo
+cancella la scelta del vecchio.
+
+**STRADE SCARTATE.** Tenere la scelta in una copia nel telefono (nel
+backup del seme) invece che firmarla: un secondo telefono o un
+ripristino vecchio non l'avrebbero, e il telefono dovrebbe chiedere
+«è tuo questo indirizzo?» a ogni rilascio. Una quota sotto i 546 sats:
+la rete non trasmette un'uscita così piccola, quindi il giudice dice 0
+oppure 546-5000 — **i 500 sats di Andrea non si possono**, il minimo è
+546. Aprire tutte le leve del pannello in un colpo: no, per le due
+ragioni scritte nello studio (molte si leggono all'avvio, e le porte e i
+soldi restano un gesto sul VPS).
+
+**PROVATO.** `prove_incasso_esterno_onchain`, la prova doppia: il
+telefono vero (node col bundle vero) firma la destinazione e le funzioni
+del server con embit la verificano; dalla vpub telefono e server fanno
+lo stesso indirizzo; «Libera i sats» mette prezzo al wallet, quota a
+Barattolo e resto a chi compra, e il server la giudica buona; il
+telefono di chi vende co-firma, e non co-firma una destinazione firmata
+da un altro seme, una quota diversa da quella dell'ordine o sopra il
+tetto. `collaudo_onchain_incasso` (32/0) col server vero: le firme
+storte, la dedicata al posto del wallet, l'indirizzo mainnet, il
+maiuscolo dei QR, la quota dal pannello coi suoi no (non admin, leva
+non aperta, 500, 5001) e il registro, l'importo, le due vendite su
+`/0/0` e `/0/1`, il rilascio senza quota o con una quota più grossa, la
+seconda firma, l'indirizzo fisso, il ritorno al conto di serie, il seme
+nuovo, «Torna al config». `prove_leve`: la sentinella «nessuna rotta che
+scrive» diventa «una sola, e le tre spente di serie non ci entrano».
+
+**PER PROVARLO SUL COLLAUDO.** Come il 23 ott, con due admin. Chi vende
+apre «⛓️ On-chain (prova)», blocco 4b, «🔑 La chiave del conto del mio
+wallet», incolla la vpub di Sparrow (signet) e «✍️ Firma e salva». Dal
+pannello admin, «⚙️ Stato delle leve» → «Quota fissa di Barattolo» →
+cambia → 600 → Salva → Conferma. Chi compra vede la quota alla cassa,
+paga, libera: i sats arrivano nel wallet Sparrow.
+
+**COSA RESTA.** Niente di questo cantiere. Notato strada facendo: la
+quota va a `/1/n` della xpub di Barattolo, che oggi sul collaudo è di
+cartone (la privata è pubblica): finché `ONCHAIN_XPUB` non è vera quei
+sats li può prendere chiunque, come tutto il 2-di-3 di prova.
+
+## Il cambio libero, tappa 2: il tasto «🔁 Cambia», la pagina si chiama «Cambio», e la fattura la paga l'utente (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea)
+
+**LA RICHIESTA** (Andrea, 27 ott): «un tastino di swap dove premo e
+dico voglio passare da Lightning a chain o da chain a Lightning, mi
+mostra le fee, confermo, fine». L'ok al piano corretto: T1, T2, T3, T5
+(T4, il compratore che paga on-chain, resta ad Alan nel suo 2-di-3). Le
+sue decisioni: il tasto DENTRO la pagina, niente cella nuova; un nome
+che valga per le due direzioni, da proporre PRIMA dei testi; 500.000
+sats per cambio, 5 cambi al giorno; all'inizio solo moderatori; sul
+collaudo solo col cartone; la domanda a Massimo (quota partner sul
+submarine, limiti di chiamate) la fa lui, e LA T3 NON SI ACCENDE FINCHÉ
+MASSIMO NON RISPONDE; push su develop, mai su main.
+
+**IL NOME.** Proposto «Cambio» per la pagina e la cella in basso, «🔁
+Cambia» per il tasto (vale per tutte e due le direzioni, e «il cambio»
+era già la parola del 27 ott per quel che fa SATS Routing); in inglese
+«Exchange». Andrea non ha fermato la proposta, e si è andati avanti
+con quella: «Ricevi in bitcoin» (grafica-swap, stesso giorno) resta
+solo nel verbale e nei commenti. Il testo Telegram del pagamento (il
+«Come va lo vedi nella pagina …») e le sentinelle di `prove_swap_cella`,
+`prove_swap_preventivo`, `prove_swap_pagamento` e `prove_grafica_swap`
+seguono.
+
+**COSA SI È FATTO, E PERCHÉ COSÌ.**
+- SUL TELEFONO IL CAMBIO È L'«ORDINE 0» dell'instradatore: lo stesso
+  preventivo, lo stesso campo dell'indirizzo con «Incolla» e QR, le
+  stesse 12 parole (una volta sola, nello stesso cassetto), la stessa
+  creazione, la stessa sorveglianza, lo stesso ritiro e lo stesso
+  recupero del reverse degli incassi. Niente seconda copia del motore:
+  un cambio è uno swap senza ordine, e il numero 0 lo dice. Le
+  differenze stanno in tre punti: `swapDiOrdine(0)` è il solo cambio
+  APERTO (nato e non finito), così a cambio finito il riquadro torna al
+  tasto e un secondo cambio può partire; la fattura la paga l'UTENTE col
+  suo wallet (carta con QR alfanumerico `LIGHTNING:…`, «Copia», «Apri nel
+  wallet» con `portaWallet`, «Vale fino alle …» letto dalla fattura), e
+  `swapPaga` non si chiama; le frasi dello stato sono sue.
+- IL SERVER TIENE SOLO IL BIGLIETTO. Il tetto «5 al giorno» non può
+  stare nel telefono (un cassetto svuotato lo azzera), quindi il telefono
+  chiede un biglietto PRIMA di chiedere lo swap al fornitore, e il server
+  lo conta dentro un lucchetto. Poi porta le sole parti pubbliche
+  (swap_id, impronta, indirizzo del lockup, onchain: le stesse di
+  `pagaSwapAlServer`, mai parole o chiavi), e se il fornitore non
+  risponde DOPO il biglietto lo annulla, così un no del fornitore non
+  brucia un posto. Un biglietto «chiesto» e mai nato conta 15 minuti
+  (`CAMBIO_CHIESTO_VALE_S`): un telefono spento a metà non lo brucia per
+  sempre, ma un giro di «chiedo e non creo» non fa dieci cambi.
+- L'INDICE DELLA CHIAVE SI PRENOTA ANCHE SE IL BIGLIETTO DICE NO: resta
+  bruciato (la regola «mai un segreto riusato» viene prima di un indice
+  risparmiato; il recupero dalle parole lo salta come un buco).
+- LE TRE CHIAMATE AL SERVER STANNO NELLA PAGINA (`chiediBigliettoCambio`,
+  `natoCambioAlServer`, `liberaBigliettoCambio`), non nei file dello
+  swap: la sentinella «il telefono non parla col server di Barattolo»
+  (due sole `fetch` nel tipo, zero nell'instradatore) resta vera.
+- IL CANCELLO STA SOPRA QUELLO DELLO SWAP: `cambio_libero_per` vuole
+  `swap_per` (senza lo swap non ci sono i file del telefono che fanno il
+  cambio). Quindi «cambio per tutti» con lo swap ancora solo-moderatori
+  non apre niente: lo dice il collaudo, e va ricordato il giorno
+  dell'accensione.
+- NASCITA E ANNULLO NON HANNO CANCELLO: un biglietto nato prima di una
+  leva spenta deve poter finire. Sono solo del proprietario (404).
+- I RIFIUTI DEL CAMBIO HANNO PAROLE LORO: «incassa in Lightning» nel
+  cambio non vuol dire niente (non c'è un incasso), quindi
+  `pannelloPreventivoSwap` per l'ordine 0 dice «Il cambio parte da…»,
+  «Per ora si cambiano al più…», «Per oggi hai fatto i 5 cambi
+  possibili», «Scrivi quanti sats vuoi cambiare», e al posto di
+  «Incassa in Lightning» c'è «Ricalcola»; la prima riga dice «Cambi»,
+  non «Ti spettano». Nell'instradatore `swapNonRisponde(n, nome)` fa lo
+  stesso per il «non risponde».
+- `SWAP_TELEFONO_VER` rifatta (`d0e1dfab1c`).
+- UN NOME CHE NON SI PUÒ USARE: la terza chiamata si chiamava
+  `annullaBigliettoCambio`, e la sentinella di `prove_fogli_di_casa`
+  («startBuy azzera lo sblocco del giro prima») taglia la pagina da
+  `startBuy` alla PRIMA `async function ann…` del file, che con quel
+  nome stava 14.000 righe prima: fetta vuota, rossa. Ora si chiama
+  `liberaBigliettoCambio` (libera il posto del giorno: è anche più
+  giusto).
+
+**STRADE SCARTATE.** Un secondo instradatore per il cambio (doppione del
+motore, da tenere allineato); il conto del giorno nel telefono (si
+azzera svuotando il cassetto); il server che paga la fattura anche nel
+cambio (sarebbe la cassaforte a cambiare i sats dell'utente: no, i sats
+sono i suoi e li manda lui); il biglietto DOPO la creazione (un no del
+server lascerebbe uno swap vivo da pagare); contare anche gli annullati
+(un fornitore giù non deve costare un posto); la pagina con due nomi
+(«Ricevi in bitcoin» per gli incassi e «Cambio» per il cambio: due
+voci in basso per la stessa pagina).
+
+**PROVATO** (albero: develop 23462f4 più questo cantiere, nel worktree;
+venv senza coincurve, come la CI).
+- `collaudo_cambio_libero` (64/0): IL SERVER (TestClient contro il
+  cartone): il cancello (999 sì con tetti e strade, 222 no, 403 alle due
+  porte); il preventivo di 100.000 (le righe, 98.842, la busta del
+  giorno, i punti nella cifra); i rifiuti (`cifra`, `sopra_tetto`
+  500.000, `sotto_minimo`, direzione 400, fornitore 404, giù); cinque
+  biglietti e il sesto `tetto_giorno` (anche dal preventivo e da
+  `/api/me`); l'annullo libera il posto, non due volte, non quello di
+  un altro; la nascita con le sole parti pubbliche, idempotente,
+  «doppio», «forma» su id e impronta, un annullato non nasce, un nato
+  non si annulla; aperto a tutti ma swap solo-moderatori = niente,
+  aperti entrambi = sì, il conto del 222 è suo; cambio spento 403 e lo
+  swap resta; senza swap niente cambio; zero pagamenti LNbits, zero
+  swap al cartone. IL TELEFONO (il codice vero del tipo e
+  dell'instradatore coi pezzi veri della pagina — `SWAP_TESTI`,
+  `pannelloPreventivoSwap`, `leggiBolt11` — in node contro il cartone):
+  a leva spenta niente, accesa il tasto; aperto la cifra, una pillola,
+  «Da 25000 a 500000 sats · Oggi: 0 di 5», «Chiudi»; senza cifra lo
+  dice e non chiede niente; 100.000 coi punti → la rotta del cambio,
+  «Cambi» e non «Ti spettano», ricevi 98842, niente «Incassa in
+  Lightning»; «Conferma» senza indirizzo lo dice e al server non va
+  niente; con l'indirizzo le 12 parole (che citano la pagina «Cambio»);
+  «Continua» → PRIMA il biglietto (direzione, cifra, fornitore,
+  impronta), POI lo swap al cartone (referral, 100.000), POI la nascita
+  (parti pubbliche, biglietto 41, onchain 99.076), MAI il pagamento di
+  Barattolo; il record è dell'ordine 0 col biglietto; la carta («🔁
+  Cambio», «Paga questa richiesta col tuo wallet Lightning», QR
+  `LIGHTNING:LN…` Alphanumeric, wallet, «Vale fino alle»); «Copia» negli
+  appunti; la lista lo chiama «Cambio»; un secondo cambio mentre il primo
+  aspetta mostra il primo; finito, torna il tasto; biglietto rifiutato
+  (tetto del giorno): la frase, passo «preventivo», zero swap, l'indice
+  bruciato (2); fornitore giù dopo il biglietto: `annulla:42`, «SATS
+  Routing ora non risponde: riprova fra poco.», niente in lista; la
+  sentinella: solo il cartone, zero `paga`.
+- `prove_cambio_libero` (28/0): le quattro leve d'esempio, di serie e
+  nel pannello; il cancello sopra `swap_per`; le quattro rotte una
+  volta; preventivo e biglietto col cancello del cambio; i tetti del
+  cambio; il lucchetto prima del conto prima dell'INSERT; la nascita
+  (forme, «doppio», indice unico, nessuna parola); i pezzi puri
+  (`_cambio_sats` su nove forme, `_cambio_tetto_giorno`, `cambi_oggi`
+  su un sqlite in memoria: 3 su 7 righe); nell'instradatore il
+  biglietto prima di `f.crea`, l'annullo, la nascita, `swapPaga` solo
+  per gli ordini veri; le tre chiamate nella pagina e non nei file dello
+  swap; le parti pubbliche; QR/Copia/wallet; `swapNonRisponde`; i sei
+  rifiuti in due lingue senza «Lightning»; «Cambio»/«Exchange»; il
+  collaudo negli elenchi della CI.
+- Le sezioni swap (cella, preventivo, telefono, fornitori, pagamento,
+  grafica, submarine) più `prove_leve_mai_doppie`: 215/0.
+- CONTROPROVE (rotto apposta, poi rimesso byte per byte): via il
+  cancello dal preventivo del cambio → rossa la sentinella e rosse tre
+  scene del collaudo; `cambi_oggi` senza i «nato» → rossa la prova pura
+  (il collaudo NO, e si dice: i suoi cinque biglietti sono «chiesti»
+  freschi, che contano lo stesso; la scena coi nati vecchi di ore
+  vorrebbe l'orologio finto del server, da aggiungere se serve); il
+  telefono che salta il biglietto → rossa la scena «PRIMA il biglietto».
+- DI PASSAGGIO, UNA MIA: la prova della tappa 1 sul checksum rotto
+  (`letta[:-1] + "q"`) era rossa una volta su 32, quando l'ultimo
+  carattere era già «q» (successo qui, al secondo giro): ora cambia
+  davvero il carattere.
+- La suite severa e tutti i collaudi: nel messaggio del commit. Intanto
+  su develop era arrivato l'on-chain «incassa dove vuoi tu» (251f12a e
+  73b48d5, cantiere onchain-incasso-esterno): rebase sopra (un solo
+  conflitto, le due voci in coda a questo file, tenute tutte e due), e
+  SULL'ALBERO REBASATO le sezioni toccate 374/0, la suite severa
+  26412/0 (con nostr-tools) e tutti i collaudi della CI 105/0.
+
+**COSA RESTA.** T3: la direzione bitcoin → Lightning nel telefono
+(incolla la fattura, indirizzo + cifra col QR, una conferma, il
+rimborso con le parole) e `"btc-ln"` in `CAMBIO_STRADE` — NON SI
+ACCENDE FINCHÉ MASSIMO NON RISPONDE (quota partner sul submarine, limiti
+di chiamate). Da guardare sul collaudo prima dell'accensione: il QR
+della fattura sul telefono vero, «Apri nel wallet» dentro Telegram, il
+cambio che finisce da solo a fattura pagata (la sorveglianza è quella
+del reverse: provata nel collaudo del telefono della tappa 3, non qui
+con la fattura pagata dall'utente). Per accendere: `CAMBIO_LIBERO_ATTIVO
+= True` nel config (con `SWAP_ATTIVO`), e ricordare che a
+`SWAP_SOLO_MODERATORI = True` il cambio lo vedono solo i moderatori
+anche a `CAMBIO_LIBERO_SOLO_MODERATORI = False`.

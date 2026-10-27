@@ -1599,6 +1599,27 @@ try:
     from config import SWAP_MAX_SATS_GIORNO
 except ImportError:
     SWAP_MAX_SATS_GIORNO = 200_000
+# IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero, decisione di
+# Andrea): i SUOI sats, senza un ordine, dalla pagina «Cambio». I sats non
+# passano dalla cassaforte: il server da' il preventivo, stacca il
+# biglietto e conta i cambi del giorno; la fattura la paga lui col suo
+# wallet e i bitcoin li ritira il suo telefono. Vuole SWAP_ATTIVO.
+try:
+    from config import CAMBIO_LIBERO_ATTIVO
+except ImportError:
+    CAMBIO_LIBERO_ATTIVO = False
+try:
+    from config import CAMBIO_LIBERO_SOLO_MODERATORI
+except ImportError:
+    CAMBIO_LIBERO_SOLO_MODERATORI = True
+try:
+    from config import CAMBIO_LIBERO_MAX_SATS
+except ImportError:
+    CAMBIO_LIBERO_MAX_SATS = 500_000
+try:
+    from config import CAMBIO_LIBERO_MAX_AL_GIORNO
+except ImportError:
+    CAMBIO_LIBERO_MAX_AL_GIORNO = 5
 # QUANTI BLOCCHI DEVONO RESTARE allo swap quando lo paghiamo: dopo il
 # pagamento il fornitore blocca i bitcoin e il telefono li ritira, e se
 # lo swap scade prima il fornitore se li riprende (e il pagamento torna
@@ -1761,6 +1782,18 @@ def swap_per(tg_id: int) -> bool:
     if not SWAP_ATTIVO:
         return False
     if SWAP_SOLO_MODERATORI:
+        return e_admin(int(tg_id or 0))
+    return True
+
+
+def cambio_libero_per(tg_id: int) -> bool:
+    """IL CAMBIO LIBERO C'E' PER QUESTA PERSONA? Sopra il cancello dello
+    swap (`swap_per`: senza lo swap non c'e' il telefono che lo fa), la
+    sua leva e il suo solo-moderatori. Decide il server, a ogni richiesta:
+    il client lo legge in `swap_leve.cambio.attivo`."""
+    if not swap_per(tg_id) or not CAMBIO_LIBERO_ATTIVO:
+        return False
+    if CAMBIO_LIBERO_SOLO_MODERATORI:
         return e_admin(int(tg_id or 0))
     return True
 
@@ -13974,7 +14007,7 @@ async def _msg_swap_arrivato(ordine_id: int, bolt11: str,
     return (f"₿ <b>Bitcoin in arrivo.</b> Barattolo ha pagato il cambio: "
             f"<b>{_fmt_sats(int(r['onchain']))} sats</b> ti aspettano, e il "
             f"tuo telefono li manda al tuo indirizzo (meno il costo della "
-            f"rete). Come va lo vedi nella pagina «Ricevi in bitcoin»." + coda)
+            f"rete). Come va lo vedi nella pagina «Cambio»." + coda)
 
 
 def _msg_swap_non_andato(sats: int) -> str:
@@ -32062,6 +32095,26 @@ def _leve_stato():
                   int(SWAP_MAX_SATS_UTENTE_GIORNO or 0)),
             _leva("Swap: pagati in tutto in 24 ore (sats)",
                   "SWAP_MAX_SATS_GIORNO", int(SWAP_MAX_SATS_GIORNO or 0)),
+            # (27 ott 2026, cambio-libero) il cambio dei propri sats senza
+            # ordine, dalla pagina «Cambio»: vuole lo swap acceso
+            _leva("Cambio libero: acceso", "CAMBIO_LIBERO_ATTIVO",
+                  bool(CAMBIO_LIBERO_ATTIVO),
+                  acceso="dalla pagina «Cambio» si cambiano i propri sats "
+                         "senza un ordine (col proprio wallet: la "
+                         "cassaforte non c'entra); vuole SWAP_ATTIVO",
+                  spento="il tasto «Cambia» non c'e'"),
+            _leva("Cambio libero: solo moderatori",
+                  "CAMBIO_LIBERO_SOLO_MODERATORI",
+                  bool(CAMBIO_LIBERO_SOLO_MODERATORI),
+                  acceso="a cambio libero acceso lo vedono solo i moderatori",
+                  spento="a cambio libero acceso lo vedono TUTTI"),
+            _leva("Cambio libero: massimo per cambio (sats)",
+                  "CAMBIO_LIBERO_MAX_SATS", int(CAMBIO_LIBERO_MAX_SATS or 0),
+                  spento="a 0 vale solo il massimo del fornitore"),
+            _leva("Cambio libero: cambi al giorno per persona",
+                  "CAMBIO_LIBERO_MAX_AL_GIORNO",
+                  int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0),
+                  spento="a 0 nessun tetto sul numero"),
             # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
             # fattura dello swap e' meno di quel che spetta a chi vende, e
             # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
@@ -45177,7 +45230,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                             # (20 ott 2026, l'instradatore) tutti i
                             # fornitori, SATS Routing per primo: solo dati
                             # pubblici
-                            "fornitori": swap_fornitori()}
+                            "fornitori": swap_fornitori(),
+                            # (27 ott 2026, cambio-libero) il cambio dei
+                            # suoi sats senza ordine: il cancello, i tetti,
+                            # quanti ne ha fatti oggi
+                            "cambio": cambio_leve(user["id"])}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
@@ -73643,6 +73700,247 @@ async def swap_pagamento_stato(ordine_id: int,
         return {"stato": "", "swap_id": ""}
     return {"stato": _swap_pag_dell_ordine(ordine_id, r["id"]),
             "swap_id": r["swap_id"]}
+
+
+# --- IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero) ---------------
+# I SUOI sats, senza un ordine: dalla pagina «Cambio» chi passa il
+# cancello sceglie la direzione e la cifra, vede il preventivo, conferma,
+# e il suo telefono fa il cambio con SATS Routing come per un incasso —
+# ma la fattura la paga LUI col suo wallet, e i bitcoin arrivano al suo
+# indirizzo. La cassaforte non c'entra: qui il server da' il preventivo
+# (lo stesso conto del preventivo dell'incasso, sulla cifra chiesta),
+# stacca un BIGLIETTO prima che il telefono chieda lo swap al fornitore,
+# e conta i biglietti del giorno (decisione di Andrea: 500.000 sats per
+# cambio, 5 cambi in 24 ore per persona). Il biglietto e' una riga di
+# `cambi_liberi`: «chiesto» quando si stacca, «nato» quando il telefono
+# dice che lo swap c'e' (le sole parti pubbliche), «annullato» se la
+# nascita non e' andata; un «chiesto» vecchio di un quarto d'ora non
+# conta piu' (il telefono si e' spento a meta'). Un telefono manomesso
+# puo' saltare il biglietto: non c'e' un sats di Barattolo in gioco, e
+# il tetto e' una regola della casa, non una cassaforte.
+CAMBIO_STRADE = ("ln-btc",)          # dalla tappa 3 anche "btc-ln"
+CAMBIO_CHIESTO_VALE_S = 900
+CAMBIO_STATI = ("chiesto", "nato", "annullato")
+_lucchetto_cambi = asyncio.Lock()
+
+
+def _cambi_prepara(con):
+    """`cambi_liberi`: un biglietto per cambio."""
+    con.execute("""CREATE TABLE IF NOT EXISTS cambi_liberi(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        direzione TEXT NOT NULL,
+        sats INTEGER NOT NULL,
+        fornitore TEXT NOT NULL,
+        swap_id TEXT DEFAULT '',
+        impronta TEXT DEFAULT '',
+        indirizzo TEXT DEFAULT '',
+        onchain INTEGER DEFAULT 0,
+        stato TEXT DEFAULT 'chiesto',
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS cambi_liberi_chi ON "
+                "cambi_liberi(tg_id, creato)")
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS cambi_liberi_swap ON "
+                "cambi_liberi(fornitore, swap_id) WHERE swap_id <> ''")
+
+
+def _cambi_db():
+    con = db()
+    _cambi_prepara(con)
+    return con
+
+
+def cambi_oggi(con, tg_id: int, adesso: int) -> int:
+    """QUANTI CAMBI HA FATTO OGGI questa persona: nelle ultime 24 ore, i
+    biglietti «nati» e quelli «chiesti» ancora freschi (un quarto d'ora).
+    Un cambio annullato prima di nascere non conta."""
+    r = con.execute(
+        "SELECT COUNT(*) FROM cambi_liberi WHERE tg_id=? AND creato>? AND "
+        "(stato='nato' OR (stato='chiesto' AND creato>?))",
+        (int(tg_id), int(adesso) - 86400,
+         int(adesso) - CAMBIO_CHIESTO_VALE_S)).fetchone()
+    return int(r[0] if r else 0)
+
+
+def cambio_leve(tg_id: int) -> dict:
+    """La busta del cambio libero per `/api/me`: il cancello, i tetti, le
+    strade che il server sa, quanti cambi oggi."""
+    attivo = cambio_libero_per(tg_id)
+    oggi = 0
+    if attivo:
+        con = _cambi_db()
+        try:
+            oggi = cambi_oggi(con, tg_id, int(time.time()))
+        finally:
+            con.close()
+    return {"attivo": attivo, "minimo": int(SWAP_MIN_SATS or 0),
+            "massimo": int(CAMBIO_LIBERO_MAX_SATS or 0),
+            "al_giorno": int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0),
+            "oggi": oggi, "strade": list(CAMBIO_STRADE)}
+
+
+def _cambio_tetto_giorno(oggi: int) -> bool:
+    """Il tetto dei cambi al giorno e' raggiunto? (0 = nessun tetto)"""
+    tetto = int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0)
+    return tetto > 0 and int(oggi) >= tetto
+
+
+def _cambio_sats(valore) -> int:
+    """La cifra chiesta, in sats interi; 0 se non e' un numero buono."""
+    try:
+        n = int(str(valore or "0").strip().replace(".", "").replace(" ", ""))
+    except ValueError:
+        return 0
+    return n if 0 < n <= 21_000_000 * 100_000_000 else 0
+
+
+@app.get("/api/swap/cambio/preventivo")
+async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
+                            fornitore: str = "satsrouting", hash: str = "",
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """IL PREVENTIVO DEL CAMBIO LIBERO: quanto riceverebbe al suo indirizzo
+    chi cambia `sats` in Lightning, con le regole e i tetti del cambio
+    (non quelli dell'incasso). Non crea niente. `hash` e `fornitore` come
+    nel preventivo dell'incasso; `oggi` e `al_giorno` dicono dove sta col
+    tetto del giorno, e a tetto raggiunto il motivo e' `tetto_giorno`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not cambio_libero_per(user["id"]):
+        raise HTTPException(403, "Il cambio non e' disponibile")
+    if direzione not in CAMBIO_STRADE:
+        raise HTTPException(400, "Direzione sconosciuta")
+    chi = swap_fornitore(str(fornitore or ""))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
+    cifra = _cambio_sats(sats)
+    con = _cambi_db()
+    try:
+        oggi = cambi_oggi(con, user["id"], int(time.time()))
+    finally:
+        con.close()
+    busta = {"dovuto": cifra, "direzione": direzione, "oggi": oggi,
+             "al_giorno": int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0),
+             "fornitore": chi["id"], "fornitore_nome": chi["nome"]}
+    if not cifra:
+        return dict(busta, ok=False, motivo="cifra")
+    if _cambio_tetto_giorno(oggi):
+        return dict(busta, ok=False, motivo="tetto_giorno")
+    tariffa = await leggi_tariffa_swap(chi)
+    if tariffa is None:
+        return dict(busta, ok=False, motivo="non_risponde")
+    p = preventivo_swap(cifra, tariffa, SWAP_FEE_PERCENTO,
+                        SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
+    p["cambiata"] = bool(hash) and hash != tariffa["hash"]
+    p["valido_s"] = SWAP_PREVENTIVO_VALE_S
+    return dict(busta, **p)
+
+
+@app.post("/api/swap/cambio")
+async def cambio_biglietto(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """IL BIGLIETTO: il telefono lo chiede PRIMA di chiedere lo swap al
+    fornitore. Dentro un lucchetto: il cancello, la direzione, la cifra
+    nei tetti, il tetto del giorno. Risponde {ok, id} o {ok: false,
+    motivo}; a tetto raggiunto `tetto_giorno`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not cambio_libero_per(user["id"]):
+        raise HTTPException(403, "Il cambio non e' disponibile")
+    d = await leggi_json(req)
+    direzione = str(d.get("direzione") or "ln-btc")
+    if direzione not in CAMBIO_STRADE:
+        return {"ok": False, "motivo": "direzione"}
+    chi = swap_fornitore(str(d.get("fornitore") or "satsrouting"))
+    if chi is None:
+        return {"ok": False, "motivo": "fornitore"}
+    cifra = _cambio_sats(d.get("sats"))
+    if not cifra or cifra < int(SWAP_MIN_SATS or 0):
+        return {"ok": False, "motivo": "sotto_minimo"}
+    if int(CAMBIO_LIBERO_MAX_SATS or 0) and cifra > int(CAMBIO_LIBERO_MAX_SATS):
+        return {"ok": False, "motivo": "sopra_tetto"}
+    adesso = int(time.time())
+    async with _lucchetto_cambi:
+        con = _cambi_db()
+        try:
+            oggi = cambi_oggi(con, user["id"], adesso)
+            if _cambio_tetto_giorno(oggi):
+                return {"ok": False, "motivo": "tetto_giorno", "oggi": oggi}
+            cur = con.execute(
+                "INSERT INTO cambi_liberi(tg_id,direzione,sats,fornitore,"
+                "stato,creato,aggiornato) VALUES(?,?,?,?,'chiesto',?,?)",
+                (int(user["id"]), direzione, cifra, chi["id"], adesso, adesso))
+            con.commit()
+            cid = int(cur.lastrowid)
+        finally:
+            con.close()
+    return {"ok": True, "id": cid, "oggi": oggi + 1}
+
+
+def _cambio_mio(con, cid: int, tg_id: int):
+    r = con.execute("SELECT * FROM cambi_liberi WHERE id=? AND tg_id=?",
+                    (int(cid), int(tg_id))).fetchone()
+    return r
+
+
+@app.post("/api/swap/cambio/{cid}/nato")
+async def cambio_nato(cid: int, req: Request, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """LO SWAP C'E': il telefono porta le sole parti pubbliche (l'id dello
+    swap, l'impronta del segreto, l'indirizzo dove il fornitore blocca i
+    bitcoin, quanto). Il biglietto passa a «nato». Idempotente sullo
+    stesso swap; un biglietto di un altro e' 404."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    swap_id = str(d.get("swap_id") or "").strip()
+    impronta = str(d.get("impronta") or "").strip().lower()
+    if not _SWAP_ID_FORMA.match(swap_id) or (
+            impronta and not _SWAP_IMPRONTA_FORMA.match(impronta)):
+        return {"ok": False, "motivo": "forma"}
+    adesso = int(time.time())
+    async with _lucchetto_cambi:
+        con = _cambi_db()
+        try:
+            r = _cambio_mio(con, cid, user["id"])
+            if not r:
+                raise HTTPException(404, "Biglietto non trovato")
+            if r["stato"] == "nato":
+                return {"ok": r["swap_id"] == swap_id, "stato": "nato"}
+            if r["stato"] != "chiesto":
+                return {"ok": False, "motivo": r["stato"]}
+            try:
+                con.execute(
+                    "UPDATE cambi_liberi SET stato='nato', swap_id=?, impronta=?,"
+                    " indirizzo=?, onchain=?, aggiornato=? WHERE id=?",
+                    (swap_id, impronta, str(d.get("indirizzo") or "")[:120],
+                     int(d.get("onchain") or 0), adesso, int(cid)))
+                con.commit()
+            except sqlite3.IntegrityError:
+                return {"ok": False, "motivo": "doppio"}
+        finally:
+            con.close()
+    return {"ok": True, "stato": "nato"}
+
+
+@app.post("/api/swap/cambio/{cid}/annulla")
+async def cambio_annulla(cid: int, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """LA NASCITA NON E' ANDATA (il fornitore non risponde, o mente): il
+    biglietto torna libero e non conta. Solo un «chiesto»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    async with _lucchetto_cambi:
+        con = _cambi_db()
+        try:
+            r = _cambio_mio(con, cid, user["id"])
+            if not r:
+                raise HTTPException(404, "Biglietto non trovato")
+            if r["stato"] != "chiesto":
+                return {"ok": False, "motivo": r["stato"]}
+            con.execute("UPDATE cambi_liberi SET stato='annullato', aggiornato=? "
+                        "WHERE id=?", (int(time.time()), int(cid)))
+            con.commit()
+        finally:
+            con.close()
+    return {"ok": True, "stato": "annullato"}
 
 
 @app.post("/api/orders/{ordine_id}/invoice")

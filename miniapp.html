@@ -9579,6 +9579,12 @@
      punto e'» (raggiunti pieni d'arancio, quello di adesso ad anello) */
   .swap-campo{margin-top:16px}
   .swap-attrezzi{display:flex;gap:8px;margin-top:8px}
+  /* (cambio-libero) la fattura da pagare: il QR col vestito del foglio
+     di pagamento (.qr), e l'etichetta della cifra sopra il campo */
+  .swap-fattura .qr{margin:12px auto 4px}
+  .swap-cifra-et{display:block;margin-top:12px;font-size:12px;font-weight:800;
+    letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+  .swap-cambio .consegna-scelta{margin-top:10px}
   .swap-prev .swap-attrezzi .btn,#orderContent .swap-attrezzi .btn{flex:1 1 0;
     min-width:0;margin-top:0}
   .swap-calma{margin:6px 0;font-size:14px;font-weight:600;line-height:1.5;
@@ -18128,7 +18134,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'f916983397';
+const SWAP_TELEFONO_VER = 'd0e1dfab1c';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18166,7 +18172,7 @@ let cellaAsteMarkup = null;
 const CELLA_SWAP = '<span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true">'
   + '<path d="M18.6 9.4A7 7 0 0 0 6.3 7.6"/><path d="M5.4 14.6a7 7 0 0 0 12.3 1.8"/>'
   + '<path d="M6.3 3.8v3.8h3.8"/><path d="M17.7 20.2v-3.8h-3.8"/></svg></span>'
-  + '<span class="eti-ricevi">Ricevi in bitcoin</span>';
+  + '<span class="eti-ricevi">Cambio</span>';
 function vestiCellaAste(){
   const b = el('nav-aste');
   if (!b) return;
@@ -18203,11 +18209,13 @@ const SWAP_TESTI = {
      Andrea): niente «swap», «on-chain», «fornitore», «lockup». Chi vende
      sceglie di ricevere «al tuo indirizzo bitcoin»; quel che fa SATS
      Routing e' «il cambio». La pagina e il tasto in basso si chiamano
-     «Ricevi in bitcoin», per non confonderli con la cassa on-chain che
-     arrivera'. Le chiavi interne (onchain, conferma...) restano quelle. */
-  it: {titolo: 'Ricevi in bitcoin',
-       testo: 'Qui trovi gli incassi che mandi al tuo indirizzo bitcoin, e le tue 12 parole di riserva.',
-       vuoto: 'Per ora nessun incasso al tuo indirizzo bitcoin.',
+     «Cambio» (27 ott 2026, cantiere cambio-libero: un nome che valga per
+     le due direzioni, chiesto da Andrea; prima «Ricevi in bitcoin»), per
+     non confonderli con la cassa on-chain che arrivera'. Le chiavi
+     interne (onchain, conferma...) restano quelle. */
+  it: {titolo: 'Cambio',
+       testo: 'Qui cambi i tuoi sats fra Lightning e il tuo indirizzo bitcoin, trovi gli incassi mandati là e le tue 12 parole di riserva.',
+       vuoto: 'Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin.',
        scegli: 'Come ricevi i sats', onchain: 'Al tuo indirizzo bitcoin',
        carico: 'Calcolo quanto ricevi…',
        titoloPrev: 'Quanto ricevi al tuo indirizzo', ricevi: 'Ricevi circa',
@@ -18220,13 +18228,22 @@ const SWAP_TESTI = {
        spento: 'Ora non si può ricevere a un indirizzo bitcoin: incassa in Lightning.',
        eseguitoDa: 'Il cambio lo fa {n}',
        ripiego: '{a} ha dato cifre che non tornano: ecco quelle di {b}.',
-       voci: {dovuto: 'Ti spettano', fee_barattolo: 'Commissione Barattolo ({p} %)',
+       /* (cambio-libero) i rifiuti del cambio libero: niente «incassa in
+          Lightning», che li' non c'e' nessun incasso */
+       cambioSottoMinimo: 'Il cambio parte da {n} sats.',
+       cambioSopraTetto: 'Per ora si cambiano al più {n} sats alla volta.',
+       cambioTettoGiorno: 'Per oggi hai fatto i {n} cambi possibili: riprova domani.',
+       cambioCifra: 'Scrivi quanti sats vuoi cambiare.',
+       cambioNonRisponde: '{f} ora non risponde: riprova fra poco.',
+       cambioSpento: 'Ora il cambio non si può fare.',
+       ricalcola: 'Ricalcola',
+       voci: {dovuto: 'Ti spettano', cambi: 'Cambi', fee_barattolo: 'Commissione Barattolo ({p} %)',
               commissione: 'Costo del cambio, {f} ({p} %)',
               rete_invio: 'Rete bitcoin: partenza',
               rete_ritiro: 'Rete bitcoin: arrivo a te (stima)'}},
-  en: {titolo: 'Receive in bitcoin',
-       testo: 'Here you find the payouts you send to your bitcoin address, and your 12 backup words.',
-       vuoto: 'No payouts to your bitcoin address yet.',
+  en: {titolo: 'Exchange',
+       testo: 'Here you exchange your sats between Lightning and your bitcoin address, find the payouts sent there and your 12 backup words.',
+       vuoto: 'No exchanges and no payouts to your bitcoin address yet.',
        scegli: 'How you receive the sats', onchain: 'To your bitcoin address',
        carico: 'Working out how much you receive…',
        titoloPrev: 'What you receive at your address', ricevi: 'You receive about',
@@ -18239,7 +18256,14 @@ const SWAP_TESTI = {
        spento: 'Receiving to a bitcoin address is not available right now: receive via Lightning.',
        eseguitoDa: 'The exchange is done by {n}',
        ripiego: '{a} gave figures that do not add up: here are the {b} ones.',
-       voci: {dovuto: 'You are owed', fee_barattolo: 'Barattolo fee ({p}%)',
+       cambioSottoMinimo: 'The exchange starts from {n} sats.',
+       cambioSopraTetto: 'For now you can exchange at most {n} sats at a time.',
+       cambioTettoGiorno: 'You made the {n} exchanges allowed for today: try again tomorrow.',
+       cambioCifra: 'Write how many sats you want to exchange.',
+       cambioNonRisponde: '{f} is not responding: try again shortly.',
+       cambioSpento: 'The exchange is not available right now.',
+       ricalcola: 'Recalculate',
+       voci: {dovuto: 'You are owed', cambi: 'You exchange', fee_barattolo: 'Barattolo fee ({p}%)',
               commissione: 'Exchange fee, {f} ({p}%)',
               rete_invio: 'Bitcoin network: departure',
               rete_ritiro: 'Bitcoin network: arrival to you (estimate)'}}};
@@ -18273,6 +18297,9 @@ function selettoreIncassoSwap(id, scelta){
 function ridisegnaIncassoSwap(){
   const box = el('payoutIncasso');
   if (box && currentOrder) box.outerHTML = payoutPanel(currentOrder);
+  /* (cambio-libero) l'«ordine 0» vive nella pagina «Cambio»: l'instradatore
+     chiama questa a ogni passo, e il riquadro del cambio si ridisegna qui */
+  if (typeof renderSwapCambio === 'function' && el('swapCambio')) renderSwapCambio();
 }
 function scegliIncassoSwap(id, s){
   haptic();
@@ -18294,8 +18321,17 @@ async function leggiPreventivoSwap(id, fornitore, hash){
     const q = new URLSearchParams();
     if (fornitore) q.set('fornitore', fornitore);
     if (hash) q.set('hash', hash);
+    /* (cambio-libero) l'«ordine 0» e' il cambio libero: la cifra la
+       scrive l'utente, e la rotta e' la sua (tetti del cambio, conto del
+       giorno). La direzione la dice l'instradatore (`SWAP_STRADA`). */
+    let rotta = `/swap/preventivo/${Number(id)}`;
+    if (Number(id) === 0) {
+      rotta = '/swap/cambio/preventivo';
+      q.set('sats', String(typeof swapCambioCifra === 'function' ? swapCambioCifra() : 0));
+      q.set('direzione', typeof SWAP_STRADA === 'string' ? SWAP_STRADA : 'ln-btc');
+    }
     const qs = q.toString();
-    const r = await fetch(`${API_BASE}/swap/preventivo/${Number(id)}${qs ? '?' + qs : ''}`,
+    const r = await fetch(`${API_BASE}${rotta}${qs ? '?' + qs : ''}`,
       {headers: {'X-Tg-Init-Data': authHdr()}});
     d = await r.json().catch(() => null);
     if (!r.ok || !d) d = {ok: false, motivo: r.status === 403 ? 'spento' : 'non_risponde'};
@@ -18317,6 +18353,43 @@ async function pagaSwapAlServer(rec){
         scade_blocco: rec.timeoutBlockHeight, onchain: rec.onchainAmount})});
     const d = await r.json().catch(() => null);
     return r.ok && d ? d : null;
+  } catch(e) { return null; }
+}
+/* IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero): il BIGLIETTO
+   si chiede al server PRIMA di chiedere lo swap al fornitore, cosi' il
+   server conta i cambi del giorno (5, poi si vedra'); {ok, id} o
+   {ok: false, motivo}; null = non si e' potuto chiedere. Poi la nascita
+   porta le sole parti pubbliche (come `pagaSwapAlServer`), mai parole o
+   chiavi: la fattura la paga l'utente col SUO wallet, non Barattolo. */
+async function chiediBigliettoCambio(d){
+  try {
+    const r = await fetch(`${API_BASE}/swap/cambio`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({direzione: d.direzione || 'ln-btc', sats: Number(d.sats) || 0,
+        fornitore: d.fornitore || '', hash: d.hash || ''})});
+    const j = await r.json().catch(() => null);
+    if (r.status === 403) return {ok: false, motivo: 'spento'};
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+async function natoCambioAlServer(id, rec){
+  try {
+    const r = await fetch(`${API_BASE}/swap/cambio/${Number(id)}/nato`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({swap_id: rec.id, impronta: rec.impronta,
+        indirizzo: rec.lockupAddress, onchain: rec.onchainAmount})});
+    const j = await r.json().catch(() => null);
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+async function liberaBigliettoCambio(id){
+  try {
+    const r = await fetch(`${API_BASE}/swap/cambio/${Number(id)}/annulla`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const j = await r.json().catch(() => null);
+    return r.ok && j ? j : null;
   } catch(e) { return null; }
 }
 /* a che punto e' quel pagamento: '' = il server non lo conosce, null =
@@ -18359,16 +18432,31 @@ function pannelloPreventivoSwap(o, campo){
   if (!p || !p.dati)
     return `<div class="swap-prev"><div class="hint">${esc(t.carico)}</div></div>`;
   const d = p.dati;
+  /* (cambio-libero) l'ordine 0 e' il cambio libero: i suoi rifiuti non
+     dicono «incassa in Lightning» (non c'e' nessun incasso), la prima
+     riga dice «Cambi» e non «Ti spettano», e al posto del ritorno a
+     Lightning c'e' «Ricalcola» */
+  const cambio = n === 0;
   if (!d.ok) {
-    const testo = d.motivo === 'sotto_minimo' ? t.sottoMinimo.replace('{n}', fmt(d.minimo))
-      : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
-      : d.motivo === 'spento' ? t.spento
-      : t.nonRisponde.replace('{f}', d.fornitore_nome || 'SATS Routing');
-    return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(testo)}</div>`
-      + `<button class="btn ghost" type="button" data-swap="scegli" data-ordine="${n}" data-scelta="ln">⚡ ${esc(t.tornaLn)}</button></div>`;
+    const f = d.fornitore_nome || 'SATS Routing';
+    const testo = cambio
+      ? (d.motivo === 'sotto_minimo' ? t.cambioSottoMinimo.replace('{n}', fmt(d.minimo))
+        : d.motivo === 'sopra_tetto' ? t.cambioSopraTetto.replace('{n}', fmt(d.massimo))
+        : d.motivo === 'tetto_giorno' ? t.cambioTettoGiorno.replace('{n}', fmt(d.al_giorno || 0))
+        : d.motivo === 'cifra' ? t.cambioCifra
+        : d.motivo === 'spento' ? t.cambioSpento
+        : t.cambioNonRisponde.replace('{f}', f))
+      : (d.motivo === 'sotto_minimo' ? t.sottoMinimo.replace('{n}', fmt(d.minimo))
+        : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
+        : d.motivo === 'spento' ? t.spento
+        : t.nonRisponde.replace('{f}', f));
+    const tasto = cambio
+      ? `<button class="btn ghost" type="button" data-swap="cambio-calcola">${esc(t.ricalcola)}</button>`
+      : `<button class="btn ghost" type="button" data-swap="scegli" data-ordine="${n}" data-scelta="ln">⚡ ${esc(t.tornaLn)}</button>`;
+    return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(testo)}</div>${tasto}</div>`;
   }
   const righe = (d.righe || []).map(r => `<div class="swap-riga${r.sats < 0 ? ' meno' : ''}">`
-    + `<span>${esc(etichettaVoceSwap(r, t, d.fornitore_nome))}</span>`
+    + `<span>${esc(etichettaVoceSwap(cambio && r.voce === 'dovuto' ? Object.assign({}, r, {voce: 'cambi'}) : r, t, d.fornitore_nome))}</span>`
     + `<b>${r.sats < 0 ? '−' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
   const nota = p.nota === 'cambiata'
       ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>`
