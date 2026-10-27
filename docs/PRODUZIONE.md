@@ -4680,6 +4680,26 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   annullo del biglietto non hanno cancello, il ritiro e il rimborso
   sono del telefono con le 12 parole).
 
+- LA CHIAVE DI BARATTOLO DELL'ON-CHAIN (27 ott 2026, cantiere
+  onchain-disputa; com'è fatta in ARCHITETTURA, «LA DISPUTA ON-CHAIN E
+  LA CHIAVE DI BARATTOLO SUL VPS»). NASCE DAL PANNELLO, MAI DA UN
+  DEPLOY: un admin preme «⛓️ Crea la chiave di Barattolo» nel cassetto
+  omonimo, e sul VPS compare `chiavi/onchain-barattolo.json` accanto a `satmarket.db` (la cartella di `BARATTOLO_DIR`, `/root/satmarket`)
+  (0600, dell'utente `barattolo`). NIENTE `ONCHAIN_XPUB` nel config
+  insieme al file: sarebbero due terze chiavi e il server si ferma.
+  IL BACKUP: `deploy/backup-fuori.sh` copia `chiavi/` nell'archivio age
+  (pre-deploy e 04:30); il cassetto dice «È nel backup fuori sede del…»
+  appena un archivio riuscito viene dopo la nascita. Fino ad allora la
+  copia è UNA: il giorno della creazione conviene un backup a mano
+  (o un deploy). Verifica in sola lettura, la lancia Andrea:
+  `sudo ls -l /root/satmarket/chiavi/` (deve dire `-rw-------`).
+  IL RIPRISTINO: dall'archivio (`age -d`), il file `chiavi/` torna
+  accanto al database, proprietario `barattolo`, e il server lo rilegge
+  da solo. Per firmare A MANO (server perso): le dodici parole del
+  file in Sparrow come terzo firmatario di un multisig 2-di-3, strada
+  `m/48'/1'/0'/2'`, coi descrittori degli ordini. Mai in chiaro su
+  Telegram o in chat: le parole firmano le dispute.
+
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo
   dell'ordine on-chain»; com'è fatto in ARCHITETTURA, «IL PAGAMENTO

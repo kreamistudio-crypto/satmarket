@@ -207,6 +207,15 @@ esac
 cp "$DIR_APP/config.py" "$TMP/"
 [ -d "$DIR_APP/buste" ]     && cp -r "$DIR_APP/buste"     "$TMP/"
 [ -d "$DIR_APP/contenuti" ] && cp -r "$DIR_APP/contenuti" "$TMP/"
+#    La chiave di Barattolo dell'on-chain (27 ott 2026, cantiere
+#    onchain-disputa): la terza chiave dei 2-di-3, nata dal pannello
+#    (`chiavi/onchain-barattolo.json`). Le sue dodici parole esistono
+#    SOLO li' e qui dentro: un archivio senza di lei e' un archivio che
+#    non ridecide nessuna disputa, quindi si dice forte. `cp -a`: i
+#    permessi 0700/0600 viaggiano con lei.
+if [ -d "$DIR_APP/chiavi" ]; then
+    cp -a "$DIR_APP/chiavi" "$TMP/chiavi" ||       echo "ATTENZIONE: chiave di Barattolo NON copiata da $DIR_APP/chiavi - le dispute on-chain non si ridecidono da questo archivio" >&2
+fi
 mkdir -p "$TMP/sistema"
 cp /etc/caddy/Caddyfile "$TMP/sistema/" 2>/dev/null || true
 cp /etc/systemd/system/barattolo*.service \

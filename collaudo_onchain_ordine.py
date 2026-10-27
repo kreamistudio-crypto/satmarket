@@ -90,7 +90,7 @@ def main():
                     "registrato,ln_address) VALUES(?,?,?,1,'')",
                     (tg, nome, f"neg{tg}{tg}"))
     annunci = []
-    for n in range(4):
+    for n in range(6):
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
             "categoria,zona,stato,creato,consegna,quantita,valuta,condizione)"
@@ -305,7 +305,8 @@ def main():
     come(999)
     mio = next(x for x in c.get("/api/orders").json() if x["id"] == ord_id)
     prova("...e in «Ordini» chi compra vede la sua firma", {"verso": "venditore",
-                                                          "mia": True},
+                                                          "mia": True,
+                                                          "barattolo": ""},
           mio["onchain"]["proposta"])
 
     # ---- 4) la seconda firma ------------------------------------------------
@@ -327,13 +328,6 @@ def main():
     con.close()
     prova("a disputa aperta la seconda firma non passa: 409", 409,
           firma(888, oid, pronta).status_code)
-    come(777)
-    r = c.post(f"/api/admin/orders/{ord_id}/risolvi", json={"esito": "venditore"})
-    prova("...e il moderatore non la decide coi sats: 409 col perche' (manca "
-          "la chiave di Barattolo)", (409, True, "dispute"),
-          (r.status_code, "chiave di Barattolo" in r.json().get("detail", ""),
-           SRV.db().execute("SELECT stato FROM ordini WHERE id=?",
-                            (ord_id,)).fetchone()[0]))
     con = SRV.db()
     con.execute("UPDATE ordini SET stato='locked' WHERE id=?", (ord_id,))
     con.commit()
@@ -412,6 +406,187 @@ def main():
           con.execute("SELECT stato FROM ordini WHERE id=?",
                       (ord2,)).fetchone()[0])
     con.close()
+
+    # ---- 5b) la disputa: decide un moderatore, firma Barattolo --------------
+    # (27 ott 2026, cantiere onchain-disputa). Finche' la chiave sul VPS
+    # non nasce, firma quella di cartone (vettori BIP-32, privata nota):
+    # e' la stessa strada, con una chiave che tutti conoscono.
+    print("\n[la disputa: il moderatore decide, Barattolo firma, chi vince co-firma]")
+    from embit.ec import PublicKey
+
+    def nuovo_pagato(aid):
+        con = SRV.db()
+        con.execute("UPDATE annunci SET stato='attivo', quantita=1 WHERE id=?",
+                    (aid,))
+        con.commit()
+        con.close()
+        o = compra(999, aid, metodo="onchain").json()["onchain"]
+        paga(o)
+        controlla(999, o["id"])
+        return o["id"], ordine(999, o["id"])["ordine_id"]
+
+    def risolvi(tg, ord_id, esito):
+        come(tg)
+        return c.post(f"/api/admin/orders/{ord_id}/risolvi", json={"esito": esito})
+
+    def firmata_da_barattolo(o):
+        p = PSBT.from_string(o["proposta"]["psbt"])
+        k = o["indirizzo"]["chiavi"]["barattolo"]
+        return all(k in {x.sec().hex() for x in i.partial_sigs} for i in p.inputs)
+
+    def stato_di(ord_id):
+        return SRV.db().execute("SELECT stato FROM ordini WHERE id=?",
+                                (ord_id,)).fetchone()[0]
+
+    oc3, ord3 = nuovo_pagato(annunci[4])
+    come(999)
+    prova("chi compra apre la disputa, come sul Lightning", 200,
+          c.post(f"/api/orders/{ord3}/disputa").status_code)
+    r = risolvi(999, ord3, "rimborso")
+    prova("un moderatore che e' parte dell'ordine non lo decide: 403", 403,
+          r.status_code)
+    r = risolvi(777, ord3, "meno_spese")
+    prova("«meno le spese» on-chain non c'e' ancora: 409 col perche'", (409, True),
+          (r.status_code, "meno le spese" in r.json().get("detail", "")))
+    banco.DETTO.clear()
+    banco.AVVISI.clear()
+    r = risolvi(777, ord3, "rimborso")
+    prova("il moderatore da' ragione a chi compra: Barattolo firma, l'ordine "
+          "resta in disputa", (200, True, "compratore", "dispute"),
+          (r.status_code, r.json().get("onchain"), r.json().get("attesa_firma"),
+           stato_di(ord3)))
+    prova("...lo sanno le due parti e gli admin", ([888, 999], 1),
+          (sorted({chi for chi, _ in banco.DETTO}),
+           sum("Barattolo ha firmato" in t for t in banco.AVVISI)))
+    o9 = ordine(999, oc3)
+    prova("...la proposta e' di Barattolo, verso chi compra, con la sua firma",
+          ("compratore", "disputa", False, True),
+          (o9["proposta"]["verso"], o9["proposta"]["barattolo"],
+           o9["proposta"]["mia"], firmata_da_barattolo(o9)))
+    prova("...e tutto va al rimborso di chi compra, la rete dentro il margine",
+          (True, True),
+          (lambda t: (all(u.script_pubkey.address(N) == o9["rimborso"] for u in t.vout),
+                      0 < o9["importo_sats"] - sum(u.value for u in t.vout)
+                      <= o9["margine_sats"]))(PSBT.from_string(o9["proposta"]["psbt"]).tx))
+    come(999)
+    mio = next(x for x in c.get("/api/orders").json() if x["id"] == ord3)
+    prova("...in «Ordini» si vede che manca la firma di chi vince",
+          {"verso": "compratore", "mia": False, "barattolo": "disputa"},
+          mio["onchain"]["proposta"])
+    r = risolvi(777, ord3, "venditore")
+    prova("una firma data non si ritira: dare poi ragione all'altro e' 409",
+          (409, True), (r.status_code, "non si ritira" in r.json().get("detail", "")))
+    prova("...la stessa decisione due volte non firma di nuovo", (200, True),
+          (lambda r: (r.status_code, r.json().get("gia_firmata")))(
+              risolvi(777, ord3, "rimborso")))
+    o8 = ordine(888, oc3)
+    prova("chi vende non sostituisce la proposta di Barattolo: 409", 409,
+          proponi(888, oc3, "compratore",
+                  psbt_di(o8, [(o8["rimborso"], o8["importo_sats"] - 400)],
+                          888)).status_code)
+    r = firma(999, oc3, cofirma(999, o9))
+    prova("chi compra co-firma: rimborsato, e l'ordine di sempre e' refunded",
+          (200, "rimborsato", "refunded"),
+          (r.status_code, r.json().get("stato"), stato_di(ord3)))
+
+    # a favore di chi vende, con la quota fissa di Barattolo nel conto
+    SRV.ONCHAIN_QUOTA_FISSA_SATS = 1000
+    oc4, ord4 = nuovo_pagato(annunci[5])
+    SRV.ONCHAIN_QUOTA_FISSA_SATS = 0
+    come(999)
+    c.post(f"/api/orders/{ord4}/disputa")
+    r = risolvi(777, ord4, "venditore")
+    o8 = ordine(888, oc4)
+    uscite = [(u.script_pubkey.address(N), u.value)
+              for u in PSBT.from_string(o8["proposta"]["psbt"]).tx.vout]
+    prova("ragione a chi vende: il prezzo a lui, la quota a Barattolo, il "
+          "resto a chi compra", (200, [(o8["incasso"], 50000),
+                                       (o8["quota_indirizzo"], 1000)], True),
+          (r.status_code, uscite[:2],
+           len(uscite) == 2 or uscite[2][0] == o8["rimborso"]))
+    r = firma(888, oc4, cofirma(888, o8))
+    prova("chi vende co-firma: rilasciato, e l'ordine e' released",
+          (200, "rilasciato", "released"),
+          (r.status_code, r.json().get("stato"), stato_di(ord4)))
+
+    # ---- 5c) la chiave sul VPS, e il reso ------------------------------------
+    print("\n[la chiave di Barattolo sul VPS, e il reso]")
+    come(888)
+    prova("la chiave la vede e la crea solo un moderatore... (888 lo e')", 200,
+          c.get("/api/admin/onchain/chiave").status_code)
+    come(111)
+    prova("...chi non lo e': 403", (403, 403),
+          (c.get("/api/admin/onchain/chiave").status_code,
+           c.post("/api/admin/onchain/chiave").status_code))
+    come(777)
+    prova("prima del gesto la terza chiave e' di cartone", "cartone",
+          c.get("/api/admin/onchain/chiave").json()["dove"])
+    r = c.post("/api/admin/onchain/chiave")
+    k = r.json()
+    f = SRV._onchain_file_chiave()
+    prova("«Crea la chiave»: sul VPS, tpub, impronta, non ancora nel backup",
+          (200, "vps", True, 8, False),
+          (r.status_code, k.get("dove"), k.get("xpub", "").startswith("tpub"),
+           len(k.get("impronta", "")), k.get("nel_backup")))
+    parole = json.load(open(f, encoding="utf-8"))["parole"]
+    prova("...le dodici parole stanno nel file 0600, e nella risposta no",
+          (12, "0o600", False),
+          (len(parole.split()), oct(os.stat(f).st_mode & 0o777),
+           parole.split()[0] in r.text and parole in r.text))
+    prova("...si crea una volta sola: 409", 409,
+          c.post("/api/admin/onchain/chiave").status_code)
+    prova("...e la terza chiave nuova e' lei", k["xpub"],
+          SRV.onchain_xpub_barattolo()[0])
+    SRV.ONCHAIN_XPUB = conto(999)
+    try:
+        SRV.onchain_xpub_barattolo()
+        due = False
+    except ValueError:
+        due = True
+    SRV.ONCHAIN_XPUB = ""
+    prova("...una ONCHAIN_XPUB diversa nel config: due terze chiavi, si ferma",
+          True, due)
+    fuori = os.path.join(os.path.dirname(os.path.abspath(SRV.DB)), "backup", "fuori")
+    os.makedirs(fuori, exist_ok=True)
+    with open(os.path.join(fuori, ".ultimo-successo"), "w") as h:
+        h.write(str(int(time.time()) + 1))
+    come(777)
+    prova("...dopo un backup fuori sede riuscito, il pannello dice che c'e'",
+          True, c.get("/api/admin/onchain/chiave").json()["nel_backup"])
+
+    con = SRV.db()
+    con.execute("UPDATE annunci SET stato='attivo', quantita=1 WHERE id=?",
+                (annunci[4],))
+    con.commit()
+    con.close()
+    oc5, ord5 = nuovo_pagato(annunci[4])
+    o9 = ordine(999, oc5)
+    prova("l'ordine nuovo ha la chiave del VPS come terza", k["xpub"],
+          SRV.db().execute("SELECT i.xpub_barattolo FROM onchain_indirizzi i "
+                           "JOIN onchain_ordini o ON o.indirizzo_id=i.id "
+                           "WHERE o.id=?", (oc5,)).fetchone()[0])
+    come(999)
+    c.post(f"/api/orders/{ord5}/disputa")
+    r = risolvi(777, ord5, "reso")
+    prova("il reso on-chain fa la strada di sempre: return_pending", (200, "return_pending"),
+          (r.status_code, stato_di(ord5)))
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='return_shipped' WHERE id=?", (ord5,))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    come(888)
+    r = c.post(f"/api/orders/{ord5}/reso-ricevuto")
+    o9 = ordine(999, oc5)
+    prova("chi vende riceve il reso: Barattolo (dal VPS) firma il rimborso",
+          (200, True, "compratore", "reso", True, [999]),
+          (r.status_code, r.json().get("onchain"), o9["proposta"]["verso"],
+           o9["proposta"]["barattolo"], firmata_da_barattolo(o9),
+           [chi for chi, _ in banco.DETTO]))
+    r = firma(999, oc5, cofirma(999, o9))
+    prova("...chi compra co-firma: refunded", (200, "refunded"),
+          (r.status_code, stato_di(ord5)))
+    os.remove(f)
 
     # ---- 6) annullare, scadere ---------------------------------------------
     print("\n[annullare prima di pagare, e la scadenza]")

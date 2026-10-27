@@ -73714,3 +73714,58 @@ nel messaggio del commit.
 
 **DA GUARDARE SUL COLLAUDO.** Un giro vero su signet: pagare, spedire,
 liberare, aprire l'app da venditore e vedere l'ordine «concluso».
+
+## La disputa on-chain la decide un moderatore, e firma Barattolo dal VPS (27 ott 2026, cantiere onchain-disputa, richiesta e decisione di Andrea)
+
+**LA RICHIESTA.** Andrea: «un admin deve poter decidere se rilasciare i
+sats verso il venditore o verso il compratore. Se scelgo il compratore,
+questo aprendo Barattolo potrà firmare a favore suo, idem il venditore».
+E sulla chiave: «barattolo deve stare su vps con un backup che gli admin
+possono vedere chiaramente; concettualmente quella chiave può stare solo
+nella vps, altrimenti noi admin possiamo già dare 2 firme e di fatto
+vincere ogni causa in autonomia».
+
+**COSA SI È DECISO.** Il moderatore preme gli stessi bottoni del
+Lightning; on-chain «venditore» e «rimborso» fanno scrivere al server il
+PSBT d'uscita, con la firma di Barattolo, e la seconda la mette il
+telefono di chi vince quando apre l'app (lo stesso co-firmatore di
+sempre, che rifà i conti). Il reso: firma Barattolo quando chi vende lo
+riceve. Le guardie: un moderatore che è parte non decide; una firma data
+non si ritira; «meno le spese» on-chain non c'è ancora; ogni firma di
+Barattolo si dice agli admin.
+
+**PERCHÉ LA CHIAVE SUL VPS** (rovescia lo studio, «privata solo nel
+firmatario sul nodo, mai sul VPS»): il motivo di Andrea è che una chiave
+in tasca a un admin che è anche parte fa due firme da solo. Sul VPS
+firma solo il codice, dopo una decisione scritta, verso una parte. Il
+prezzo dichiarato: chi prende il VPS ha la terza chiave, e da sola non
+sposta niente. Nasce con un gesto (bottone del pannello), una volta, in
+un file 0600 fuori da git, ed entra nell'archivio age del backup. Le
+parole non le vede nessuno dal pannello: vederle sarebbe tenerle, cioè
+proprio quel che Andrea non vuole. Il pannello dice cosa c'è e se il
+backup la contiene.
+
+**STRADE SCARTATE.** La chiave nel telefono dell'admin (veloce, ma è il
+caso delle due firme); il firmatario sul nodo con bitcoind (lo studio:
+il nodo è mainnet pruned, signet vorrebbe un secondo bitcoind, e il nodo
+è fuori dal perimetro); firmare in Sparrow a mano (lento, e il server
+non saprebbe cosa è stato firmato). Ridecidere dopo la firma: no, perché
+il PSBT firmato è già in mano a chi ha vinto, che può trasmetterlo anche
+senza di noi.
+
+**PROVATO.** `collaudo_onchain_ordine` (82/0): disputa decisa a favore
+di chi compra (403 al moderatore parte, 409 a «meno le spese», la firma
+di Barattolo nel PSBT, tutto al rimborso, la firma che non si ritira,
+la proposta che non si sostituisce, la co-firma che chiude refunded);
+a favore di chi vende con la quota (prezzo, quota, resto; released); la
+chiave creata dal pannello (0600, una volta, mai nella risposta, la
+xpub doppia che ferma, il backup che la contiene) e il reso firmato con
+lei (refunded). `prove_onchain_disputa`: le serrature del sorgente.
+Suite e collaudi della CI nel messaggio del commit.
+
+**DA GUARDARE.** Sul collaudo: una disputa vera su signet, col telefono
+di chi vince che firma da solo. Prima dei sats veri: creare la chiave
+sul VPS e controllare che il primo backup la contenga. Il ponte verso la
+transazione trasmessa senza di noi (chi vince la finisce in Sparrow): la
+ronda oggi non se ne accorge, e l'ordine resterebbe in disputa.
+

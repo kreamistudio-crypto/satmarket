@@ -34333,6 +34333,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   on-chain. Gli ordini on-chain di prima (`ordine_id` 0) restano col giro
   di prima. Le prove: `prove_onchain_nell_ordine`; il collaudo
   `collaudo_onchain_ordine`.
+- LA DISPUTA ON-CHAIN E LA CHIAVE DI BARATTOLO SUL VPS (27 ott 2026,
+  cantiere onchain-disputa; il perché in CANTIERI, «La disputa on-chain
+  la decide un moderatore»). In disputa il moderatore sceglie come sul
+  Lightning (`risolvi_disputa`): «venditore» o «rimborso» on-chain
+  diventano `_onchain_decide`, che fa scrivere al server il PSBT
+  d'uscita (`_onchain_psbt_barattolo`: le uscite che l'ordine conosce,
+  la rete dalla tariffa dentro il margine, il giudice delle proposte),
+  ci mette la firma di Barattolo e lo lascia come proposta
+  (`proposta_da` 0, `decisione_da/_il/_perche` in `onchain_ordini`). La
+  seconda firma è del telefono di chi vince, da sola all'apertura
+  (`onchainCofirmeInAttesa` co-firma SOLO le proposte verso il proprio
+  ruolo), e `/firma` chiude per la porta di sempre. Il reso: quando chi
+  vende lo riceve (`reso_ricevuto`) Barattolo firma il rimborso. Regole:
+  un moderatore che è parte dell'ordine non decide (403); una firma
+  data non si ritira (un verso diverso è 409, perché il PSBT firmato è
+  già in mano a chi vince); «meno le spese» on-chain non c'è (409, e il
+  bottone non si mostra); ogni firma di Barattolo va agli admin.
+  LA CHIAVE: `chiavi/onchain-barattolo.json` accanto al database (0600,
+  fuori da git), nata dal bottone «⛓️ Crea la chiave di Barattolo» del
+  pannello admin (`POST /api/admin/onchain/chiave`, una volta sola,
+  O_EXCL); dodici parole BIP-39, conto `m/48'/1'/0'/2'`. Vince su
+  `ONCHAIN_XPUB` (le due insieme e diverse: il server si ferma).
+  Finché non nasce la terza chiave è quella di cartone, che il server
+  sa firmare. Il pannello (`GET`) mostra xpub, impronta, data e se
+  l'ultimo backup fuori sede (`backup/fuori/.ultimo-successo`) è
+  venuto dopo; le parole non escono mai. `backup-fuori.sh` copia
+  `chiavi/` nell'archivio age. Prove: `prove_onchain_disputa`; il
+  collaudo `collaudo_onchain_ordine` (sezioni 5b e 5c).
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
   tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,
