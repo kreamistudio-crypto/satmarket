@@ -32,10 +32,22 @@
    dell'ordine. Il segreto resta qui, e esce solo per il ritiro, dopo i
    tre controlli sul lockup (swap/boltz.js).
 
+   IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero, tappa 2): dalla
+   pagina «Cambio» chi passa il cancello cambia i SUOI sats senza un
+   ordine. E' «l'ordine numero 0»: gli stessi passi dell'incasso
+   (preventivo, indirizzo, parole la prima volta, nascita, sorveglianza,
+   ritiro) con tre differenze — la cifra la scrive lui; prima di chiedere
+   lo swap al fornitore si stacca un BIGLIETTO al server (i tetti del
+   giorno: `chiediBigliettoCambio` della pagina); e la fattura la paga LUI
+   col suo wallet (QR, «Copia», «Apri nel wallet»), non Barattolo. I sats
+   non passano mai dalla cassaforte.
+
    Usa dalla pagina: swapLeve, swapAcceso, myTgId, tg, el, esc, fmt, haptic,
    toast, currentOrder, preventiviSwap, scegliIncassoSwap,
    leggiPreventivoSwap, pannelloPreventivoSwap, ridisegnaIncassoSwap,
-   linguaSwap, pagaSwapAlServer, statoPagamentoSwap. */
+   linguaSwap, pagaSwapAlServer, statoPagamentoSwap, chiediBigliettoCambio,
+   natoCambioAlServer, liberaBigliettoCambio, disegnaQr, portaWallet,
+   leggiBolt11. */
 
 /* ─── 1. LE STRADE E I FORNITORI ────────────────────────────────────── */
 /* la sola strada di oggi: i sats dell'incasso, ricevuti in bitcoin on-chain */
@@ -95,9 +107,13 @@ function swapNonPagato(rec){
 }
 function swapDiOrdine(ordine){
   const n = Number(ordine);
+  /* (cambio-libero) l'ordine 0 e' il cambio libero: conta solo quello
+     ancora VIVO, cosi' finito uno se ne puo' fare un altro */
+  if (n === 0) return swapLista().filter(x => Number(x.ordine) === 0 && !SWAP_FASI_FINALI.has(swapFase(x))).pop() || null;
   const r = swapLista().filter(x => Number(x.ordine) === n).pop() || null;
   return swapNonPagato(r) ? null : r;
 }
+function swapECambio(rec){ return !!rec && Number(rec.ordine) === 0; }
 function swapFase(rec){
   const f = swapFornitore(swapDiChi(rec));
   return f ? f.fase(rec.stato) : 'ignoto';
@@ -115,7 +131,7 @@ const SWAP_TESTI_T3 = {
     paroleSpiega: 'Servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche da un altro telefono.',
     paroleRegole: ['Scrivile su carta, in ordine.',
                    'Non fotografarle e non darle a nessuno, nemmeno a noi.',
-                   'Te le chiediamo una volta sola: le ritrovi nella pagina «Ricevi in bitcoin».'],
+                   'Te le chiediamo una volta sola: le ritrovi nella pagina «Cambio».'],
     paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.',
     paroleSpunta: 'Le ho scritte su carta',
     paroleFatto: 'Continua',
@@ -177,14 +193,34 @@ const SWAP_TESTI_T3 = {
     recuperaAltre: 'Su questo telefono ci sono già altre parole in uso: non le sostituisco.',
     recuperaFatto: n => n === 0 ? 'Nessun incasso legato a queste parole.'
       : n === 1 ? 'Recuperato 1 incasso.' : `Recuperati ${n} incassi.`,
-    ritiraA: 'Manda a questo indirizzo'},
+    ritiraA: 'Manda a questo indirizzo',
+    /* (cambio-libero) il cambio dei propri sats, senza ordine */
+    cambio: 'Cambio',
+    cambia: 'Cambia',
+    cambiaTit: 'Cambia i tuoi sats',
+    cambiaSpiega: 'Scegli quanti sats cambiare: vedi prima quanto ricevi, poi paghi col tuo wallet Lightning e i bitcoin arrivano al tuo indirizzo.',
+    direzioni: {'ln-btc': '⚡ → ₿ Da Lightning a bitcoin', 'btc-ln': '₿ → ⚡ Da bitcoin a Lightning'},
+    cifraEt: 'Quanti sats cambi',
+    cifraTra: (a, b) => `Da ${a} a ${b} sats`,
+    oggi: (n, m) => `Oggi: ${n} di ${m}`,
+    calcola: 'Vedi quanto ricevi',
+    cifraNo: 'Scrivi quanti sats vuoi cambiare.',
+    tettoGiorno: m => `Per oggi hai fatto i ${m} cambi possibili: riprova domani.`,
+    cambioNonRisponde: n => `${n} ora non risponde: riprova fra poco.`,
+    chiudi: 'Chiudi',
+    pagaTu: n => `Paga questa richiesta col tuo wallet Lightning: appena ${n} la vede, i bitcoin partono verso il tuo indirizzo.`,
+    copia: 'Copia', copiata: 'Copiata', apriWallet: 'Apri nel wallet',
+    valeFino: h => `Vale fino alle ${h}`,
+    cambioScaduto: 'Scaduto: nessun sats si è mosso. Puoi fare un cambio nuovo.',
+    cambioFallito: 'Non riuscito: nessun sats si è mosso. Puoi fare un cambio nuovo.',
+    cambioRipreso: n => `${n} si è ripreso i bitcoin, e il tuo pagamento torna al tuo wallet.`},
   en: {
     paroleTit: 'Your 12 backup words',
     paroleDi: n => `Your 12 backup words for ${n}`,
     paroleSpiega: 'You need them only if something goes wrong: with them you get your bitcoin back, even from another phone.',
     paroleRegole: ['Write them on paper, in order.',
                    'Do not photograph them and do not give them to anyone, not even to us.',
-                   'We ask you only once: you find them again on the «Receive in bitcoin» page.'],
+                   'We ask you only once: you find them again on the «Exchange» page.'],
     paroleNessuno: 'Without these words nobody can recover them, not even us.',
     paroleSpunta: 'I wrote them on paper',
     paroleFatto: 'Continue',
@@ -244,8 +280,30 @@ const SWAP_TESTI_T3 = {
     recuperaAltre: 'This phone already has other words in use: I will not replace them.',
     recuperaFatto: n => n === 0 ? 'No payouts tied to these words.'
       : n === 1 ? 'Recovered 1 payout.' : `Recovered ${n} payouts.`,
-    ritiraA: 'Send to this address'}};
+    ritiraA: 'Send to this address',
+    cambio: 'Exchange',
+    cambia: 'Exchange',
+    cambiaTit: 'Exchange your sats',
+    cambiaSpiega: 'Choose how many sats to exchange: you see first what you receive, then you pay with your Lightning wallet and the bitcoin arrive at your address.',
+    direzioni: {'ln-btc': '⚡ → ₿ From Lightning to bitcoin', 'btc-ln': '₿ → ⚡ From bitcoin to Lightning'},
+    cifraEt: 'How many sats you exchange',
+    cifraTra: (a, b) => `From ${a} to ${b} sats`,
+    oggi: (n, m) => `Today: ${n} of ${m}`,
+    calcola: 'See what you receive',
+    cifraNo: 'Write how many sats you want to exchange.',
+    tettoGiorno: m => `You made the ${m} exchanges allowed for today: try again tomorrow.`,
+    cambioNonRisponde: n => `${n} is not responding: try again shortly.`,
+    chiudi: 'Close',
+    pagaTu: n => `Pay this request with your Lightning wallet: as soon as ${n} sees it, the bitcoin leave for your address.`,
+    copia: 'Copy', copiata: 'Copied', apriWallet: 'Open in wallet',
+    valeFino: h => `Valid until ${h}`,
+    cambioScaduto: 'Expired: no sats moved. You can start a new exchange.',
+    cambioFallito: 'Failed: no sats moved. You can start a new exchange.',
+    cambioRipreso: n => `${n} took the bitcoin back, and your payment returns to your wallet.`}};
 function t3(){ return SWAP_TESTI_T3[linguaSwap()]; }
+/* (cambio-libero) «non risponde» dell'ordine 0 non dice «incassa in
+   Lightning»: nel cambio non c'e' nessun incasso */
+function swapNonRisponde(n, nome){ return n === 0 ? t3().cambioNonRisponde(nome) : t3().nonRisponde(nome); }
 function swapCorto(s, n){ s = String(s || ''); return s.length > 2 * n + 1 ? `${s.slice(0, n)}…${s.slice(-n)}` : s; }
 function swapPiuFornitori(){ return swapFornitori().length > 1; }
 
@@ -408,6 +466,14 @@ function frasestatoSwap(rec){
   if (rec.spesoDa) return t.spesoAltri(swapNomeFornitore(swapDiChi(rec)));
   if (rec.ritiro && rec.ritiro.txid && swapFase(rec) !== 'fatto')
     return t.ritirato(swapCorto(rec.ritiro.txid, 8));
+  /* (cambio-libero) nel cambio la fattura la paga lui: le frasi sono sue */
+  if (swapECambio(rec)) {
+    const fase = swapFase(rec), n = swapNomeFornitore(swapDiChi(rec));
+    if (fase === 'creato') return t.pagaTu(n);
+    if (fase === 'scaduto') return t.cambioScaduto;
+    if (fase === 'fallito') return t.cambioFallito;
+    if (fase === 'ripreso') return t.cambioRipreso(n);
+  }
   /* (tappa 4) prima del lockup parla il pagamento della fattura */
   if (swapFase(rec) === 'creato') {
     const tiene = k => Object.prototype.hasOwnProperty.call(t.pagamento, k);
@@ -418,12 +484,33 @@ function frasestatoSwap(rec){
   const f = t.fasi[swapFase(rec)];
   return f ? f(swapNomeFornitore(swapDiChi(rec))) : t.statoIgnoto;
 }
+/* LA FATTURA DA PAGARE (cambio-libero): QR, «Copia» e «Apri nel wallet»,
+   finche' il fornitore non vede il pagamento. Il QR lo disegna la pagina
+   dopo il ridisegno (`disegnaQr`), come nel foglio di pagamento. */
+function fatturaCambio(rec){
+  const t = t3();
+  if (!swapECambio(rec) || swapFase(rec) !== 'creato' || !rec.invoice) return '';
+  let fino = '';
+  try {
+    const b = typeof leggiBolt11 === 'function' ? leggiBolt11(rec.invoice) : null;
+    if (b && b.scade) fino = new Date(b.scade * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  } catch(e){ fino = ''; }
+  return `<div class="swap-fattura">
+    <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
+    <div class="swap-attrezzi">
+      <button class="btn ghost" type="button" data-swap="cambio-copia" data-id="${esc(rec.id)}">📋 ${esc(t.copia)}</button>
+      <a class="btn orange" id="swapCambioWallet" href="lightning:${esc(rec.invoice)}">⚡ ${esc(t.apriWallet)}</a>
+    </div>
+    ${fino ? `<div class="hint">${esc(t.valeFino(fino))}</div>` : ''}
+  </div>`;
+}
 function cartaSwap(rec){
   const t = t3();
   return `<div class="swap-prev swap-carta" data-swap-id="${esc(rec.id)}">
-    <h4>₿ ${esc(t.tuoSwap)}</h4>
+    <h4>${swapECambio(rec) ? '🔁 ' + esc(t.cambio) : '₿ ' + esc(t.tuoSwap)}</h4>
     ${passiSwap(swapTappa(rec))}
     <div class="swap-stato" role="status">${esc(frasestatoSwap(rec))}</div>
+    ${fatturaCambio(rec)}
     ${rec.ricevi && rec.indirizzo ? `<div class="hint">${esc(t.ricevi(fmt(rec.ricevi)))} <span class="mono">${esc(swapCorto(rec.indirizzo, 8))}</span></div>` : ''}
     ${rec.errore && !rec.spesoDa ? `<div class="hint">${esc(t.ritiroErrore)}</div>` : ''}
     <div class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</div>
@@ -457,7 +544,7 @@ async function swapAvantiDentro(n){
   if (prima) {
     let valido;
     try { valido = await prima.indirizzoValido(indirizzo); }
-    catch(e){ swapErrori[n] = t.nonRisponde(prima.nome); return ridisegnaIncassoSwap(); }
+    catch(e){ swapErrori[n] = swapNonRisponde(n, prima.nome); return ridisegnaIncassoSwap(); }
     if (!valido) { swapErrori[n] = t.indirizzoNo; return ridisegnaIncassoSwap(); }
   }
   await swapInstradaPreventivo(n, true);
@@ -470,7 +557,7 @@ async function swapAvantiDentro(n){
     if (!c || !c.parole) {
       let parole;
       try { parole = await f.nuoveParole(); }
-      catch(e){ swapErrori[n] = t.nonRisponde(f.nome); return ridisegnaIncassoSwap(); }
+      catch(e){ swapErrori[n] = swapNonRisponde(n, f.nome); return ridisegnaIncassoSwap(); }
       const nuovo = {parole: parole, prossimo: 0, copiata: false};
       if (!swapScrivi(swapCasaParole(fid), nuovo)) { swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
     }
@@ -509,7 +596,7 @@ async function swapCreaDentro(n){
   if (!f) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
   let valido;
   try { valido = !!indirizzo && await f.indirizzoValido(indirizzo); }
-  catch(e){ swapPassi[n] = 'preventivo'; swapErrori[n] = t.nonRisponde(f.nome); return ridisegnaIncassoSwap(); }
+  catch(e){ swapPassi[n] = 'preventivo'; swapErrori[n] = swapNonRisponde(n, f.nome); return ridisegnaIncassoSwap(); }
   if (!valido) { swapPassi[n] = 'preventivo'; swapErrori[n] = indirizzo ? t.indirizzoNo : t.indirizzoManca; return ridisegnaIncassoSwap(); }
   if (!p.ok || !p.hash) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
   const c = swapCassetto(fid);
@@ -522,20 +609,40 @@ async function swapCreaDentro(n){
   swapPassi[n] = 'creo';
   delete swapErrori[n];
   ridisegnaIncassoSwap();
+  /* (cambio-libero) IL BIGLIETTO, prima di chiedere lo swap: il server
+     conta i cambi del giorno. Un no si dice col suo perche' e non parte
+     niente (l'indice prenotato resta bruciato: mai un segreto riusato) */
+  let biglietto = null;
+  if (n === 0) {
+    try { biglietto = await chiediBigliettoCambio({direzione: SWAP_STRADA, sats: swapCambioCifra(), fornitore: fid, hash: p.hash}); }
+    catch(e){ biglietto = null; }
+    if (!biglietto || !biglietto.ok) {
+      swapPassi[n] = 'preventivo';
+      swapErrori[n] = biglietto && biglietto.motivo === 'tetto_giorno'
+        ? t.tettoGiorno(swapCambioLeve().al_giorno || 0) : t.cambioNonRisponde('Barattolo');
+      return ridisegnaIncassoSwap();
+    }
+  }
   let nuovo;
   try { nuovo = await f.crea({parole: c.parole, indice: indice, preventivo: p, indirizzo: indirizzo}); }
   catch(e){
+    if (biglietto) { try { await liberaBigliettoCambio(biglietto.id); } catch(e2){} }
     if (e && e.tipo === 'mente') return swapRipiega(n, f);
     swapPassi[n] = 'preventivo';
-    swapErrori[n] = t.nonRisponde(f.nome);
+    swapErrori[n] = swapNonRisponde(n, f.nome);
     return ridisegnaIncassoSwap();
   }
   const rec = Object.assign(nuovo, {fornitore: fid, ordine: n, indice: indice,
     indirizzo: indirizzo, creato: Date.now(), pagamento: ''});
+  if (biglietto) rec.cambio = Number(biglietto.id) || 0;
   swapSalvaRecord(rec);
   delete swapPassi[n];
   ridisegnaIncassoSwap();
-  await swapPaga(rec);
+  if (n === 0) {
+    /* il server sa che lo swap c'e' (le sole parti pubbliche): se non
+       risponde, il biglietto resta «chiesto» e conta lo stesso per oggi */
+    try { await natoCambioAlServer(rec.cambio, rec); } catch(e){}
+  } else await swapPaga(rec);
   swapSorveglia();
 }
 /* ─── 6a. «INCOLLA» E IL QR ───────────────────────────────────────────
@@ -785,9 +892,92 @@ async function swapRitira(rec){
 }
 function swapRiprendi(){ if (swapAcceso()) swapSorveglia(); }
 function swapRidisegnaDove(rec){
+  if (swapECambio(rec)) renderSwapCambio();
   if (currentOrder && Number(currentOrder.id) === Number(rec.ordine)
       && el('payoutIncasso')) ridisegnaIncassoSwap();
   if (el('view-swap') && el('view-swap').classList.contains('active')) renderSwapTelefono();
+}
+
+/* ─── 7b. IL CAMBIO LIBERO: il riquadro in cima alla pagina ─────────────
+   Chiuso: il tasto «🔁 Cambia». Aperto: la direzione, la cifra e «Vedi
+   quanto ricevi»; poi il pannello dell'«ordine 0» (preventivo, indirizzo,
+   parole la prima volta, nascita) e la carta col QR da pagare. */
+let swapCambioAperto = false;
+let swapCambioScritta = '';
+function swapCambioLeve(){ return (swapLeve && swapLeve.cambio) || {}; }
+function swapCambioAcceso(){ return !!swapCambioLeve().attivo; }
+function swapCambioCifra(){
+  const n = parseInt(String(swapCambioScritta || '').replace(/[^0-9]/g, ''), 10);
+  return n > 0 ? n : 0;
+}
+function renderSwapCambio(){
+  const box = el('swapCambio');
+  if (!box) return;
+  if (!swapCambioAcceso()) { box.innerHTML = ''; return; }
+  const t = t3(), l = swapCambioLeve();
+  const vivo = swapDiOrdine(0);
+  if (vivo) {
+    box.innerHTML = cartaSwap(vivo);
+    const q = el('swapCambioQr');
+    if (q && typeof disegnaQr === 'function')
+      disegnaQr(q, ('lightning:' + String(vivo.invoice).trim()).toUpperCase(), 'Alphanumeric');
+    const a = el('swapCambioWallet');
+    if (a && typeof portaWallet === 'function') portaWallet(a, vivo.invoice);
+    return;
+  }
+  if (!swapCambioAperto) {
+    box.innerHTML = `<button class="btn orange" type="button" data-swap="cambia">🔁 ${esc(t.cambia)}</button>`;
+    return;
+  }
+  const strade = Array.isArray(l.strade) && l.strade.length ? l.strade : [SWAP_STRADA];
+  const pillole = strade.map(s => `<button type="button" class="consegna-pill${s === SWAP_STRADA ? ' attiva' : ''}" data-swap="cambio-strada" data-strada="${esc(s)}">${esc(t.direzioni[s] || s)}</button>`).join('');
+  const p = preventiviSwap[0];
+  const dopo = p && p.dati ? pannelloSwapTelefono({id: 0}) : '';
+  const errore = !dopo && swapErrori[0] ? `<div class="swap-rifiuto" role="status">${esc(swapErrori[0])}</div>` : '';
+  box.innerHTML = `<div class="swap-prev swap-cambio">
+    <h4>🔁 ${esc(t.cambiaTit)}</h4>
+    <p class="swap-calma">${esc(t.cambiaSpiega)}</p>
+    <div class="consegna-scelta">${pillole}</div>
+    <label class="swap-cifra-et" for="swapCambioCifra_0">${esc(t.cifraEt)}</label>
+    <input class="swap-indirizzo" id="swapCambioCifra_0" type="text" inputmode="numeric" autocomplete="off" placeholder="${fmt(l.minimo || 0)}" value="${esc(swapCambioScritta)}">
+    <div class="hint">${esc(t.cifraTra(fmt(l.minimo || 0), fmt(l.massimo || 0)))}${l.al_giorno ? ' · ' + esc(t.oggi(l.oggi || 0, l.al_giorno)) : ''}</div>
+    ${errore}
+    ${dopo ? '' : `<button class="btn orange" type="button" data-swap="cambio-calcola">${esc(t.calcola)}</button>`}
+    ${dopo}
+    <button class="btn ghost" type="button" data-swap="cambio-chiudi">${esc(t.chiudi)}</button>
+  </div>`;
+}
+function swapCambioApri(){
+  haptic();
+  swapCambioAperto = true;
+  delete preventiviSwap[0];
+  delete swapErrori[0];
+  delete swapPassi[0];
+  renderSwapCambio();
+}
+function swapCambioChiudi(){
+  haptic();
+  swapCambioAperto = false;
+  delete preventiviSwap[0];
+  delete swapErrori[0];
+  delete swapPassi[0];
+  renderSwapCambio();
+}
+async function swapCambioCalcola(){
+  haptic();
+  const c = el('swapCambioCifra_0');
+  if (c) swapCambioScritta = String(c.value || '');
+  delete swapErrori[0];
+  if (!swapCambioCifra()) { swapErrori[0] = t3().cifraNo; return renderSwapCambio(); }
+  await swapInstradaPreventivo(0, false);
+  renderSwapCambio();
+}
+async function swapCambioCopia(id){
+  haptic();
+  const rec = swapLista().find(r => r.id === id);
+  if (!rec || !rec.invoice) return;
+  try { await navigator.clipboard.writeText(String(rec.invoice)); toast(t3().copiata); }
+  catch(e){ toast(t3().appuntiChiusi); }
 }
 
 /* ─── 8. LA PAGINA «SWAP» ───────────────────────────────────────────────
@@ -802,7 +992,7 @@ function renderSwapTelefono(){
   /* con degli swap in lista, il «per ora nessuno» della tappa 1 tace */
   if (el('swapVuoto')) el('swapVuoto').style.display = lista.length ? 'none' : '';
   const righe = lista.map(rec => `<div class="swap-riga-lista">
-      <b>${esc(rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+      <b>${esc(swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
       <span>${esc(frasestatoSwap(rec))}</span>
       ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
       ${!rec.indirizzo && SWAP_FASI_RITIRO.has(swapFase(rec)) ? `
@@ -821,6 +1011,7 @@ function renderSwapTelefono(){
   const bottoni = swapFornitori().map(f =>
     `<button class="btn orange" type="button" data-swap="recupera" data-fornitore="${esc(f.id)}">${esc(piu ? t.recuperaDa(f.nome) : t.recupera)}</button>`).join('');
   box.innerHTML = `
+    <div id="swapCambio"></div>
     ${lista.length ? `<h4>${esc(t.lista)}</h4>${righe}` : ''}
     ${parole}
     <h4>${esc(t.recuperaTit)}</h4>
@@ -828,6 +1019,7 @@ function renderSwapTelefono(){
     <textarea id="swapRecupero" rows="3" autocomplete="off" spellcheck="false"></textarea>
     <div id="swapRecuperoNota" class="hint" role="status">${esc(swapNotaRecupero.testo)}</div>
     ${bottoni}`;
+  renderSwapCambio();
 }
 /* la frase del recupero sopravvive al ridisegno della pagina (presa dal
    giro dal vivo: la pagina si riscrive subito dopo, e la cancellava) */
@@ -901,6 +1093,11 @@ if (typeof document !== 'undefined') {
     else if (a === 'mostra-parole') { haptic(); swapParoleViste[fid] = !swapParoleViste[fid]; renderSwapTelefono(); }
     else if (a === 'recupera') swapRecupera(fid);
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
+    else if (a === 'cambia') swapCambioApri();
+    else if (a === 'cambio-chiudi') swapCambioChiudi();
+    else if (a === 'cambio-calcola') swapCambioCalcola();
+    else if (a === 'cambio-copia') swapCambioCopia(String(b.dataset.id || ''));
+    else if (a === 'cambio-strada') haptic();   /* una strada sola, oggi */
   });
   /* il campo dell'indirizzo si ricorda a ogni lettera: il preventivo si
      ridisegna anche da solo, e un bc1 lungo non si riscrive */
@@ -908,6 +1105,7 @@ if (typeof document !== 'undefined') {
     const c = ev.target;
     if (c && typeof c.id === 'string' && c.id.startsWith('swapIndirizzo_'))
       swapIndirizziScritti[Number(c.id.slice(14))] = String(c.value || '');
+    if (c && c.id === 'swapCambioCifra_0') swapCambioScritta = String(c.value || '');
   });
   /* la fotocamera non resta accesa ad app in secondo piano */
   document.addEventListener('visibilitychange', () => {
