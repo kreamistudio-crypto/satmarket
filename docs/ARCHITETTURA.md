@@ -17333,7 +17333,8 @@
   GLOBALI del modulo, cioè il valore già risolto fra la riga del
   config e il default del codice: un elenco dei default sarebbe una
   seconda bugia da leggere, ed è la trappola di MAX_PREFERITI.
-  SI GUARDA E BASTA — nessuna rotta che scrive, e non è pigrizia:
+  SI GUARDA E BASTA (salvo le leve scrivibili, aperte una per una dal
+  27 ott 2026: «LE LEVE SCRIVIBILI DAL PANNELLO») — nessuna rotta che scrive, e non è pigrizia:
   ASTA_ABILITATA, IMPORT_NOSTR_APERTO e AUTO_SBLOCCO_ATTIVO nascono
   spente nel codice perché accenderle costi un gesto, e una leva che
   si accende da un telefono è una leva che si accende per sbaglio.
@@ -34125,6 +34126,54 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_banco_chiavi_onchain`, `prove_chiave_che_nasce_da_sola`,
   `prove_checksum_descrittore`, `prove_indirizzo_ordine_onchain`,
   `prove_bundle_bitcoin`; il collaudo `collaudo_onchain_indirizzo`.
+- IL PAGAMENTO ON-CHAIN: L'INCASSO SU UN WALLET PROPRIO E LA QUOTA DI
+  BARATTOLO (27 ott 2026, cantiere onchain-incasso-esterno; perché in
+  CANTIERI, «L'on-chain incassa dove vuoi tu»). Sopra l'ordine on-chain
+  della tappa 3 (`onchain_ordini`, CANTIERI «L'ordine on-chain»).
+  DOVE RICEVE CHI VENDE: di serie `/1/n` del suo conto (`onchain_incasso`);
+  oppure una riga di `onchain_incasso` (tabella: tg_id, tipo
+  `indirizzo`|`xpub`, valore, firma) scritta da `POST /api/onchain/incasso`
+  ({tipo, valore, firma}; {tipo: 'barattolo'} la cancella; freno
+  `onchain_incasso`). LA FIRMA: il telefono firma
+  `onchain_messaggio_destinazione` («barattolo/onchain/incasso/v1», rete,
+  tipo, valore) con la chiave `/2/0` del conto del 2-di-3
+  (`onchainFirmaDestinazione`, r||s di @scure/bip32); il server la verifica
+  con la xpub dedicata (`onchain_firma_valida`, ricompone il DER per
+  embit), e il telefono di chi vende la rilegge PRIMA della seconda firma
+  (`onchainIncassoAtteso` dentro `onchainCofirma`): un incasso che il suo
+  seme non ha firmato non si co-firma. `onchain_destinazione_motivo`: un
+  indirizzo di signet (bech32 normalizzato minuscolo), o una vpub/tpub di
+  profondità 3 (BIP-84, `m/84'/1'/0'`), mai privata, mai la dedicata.
+  `onchain_indirizzo_esterno`: l'indirizzo, o `/0/i` p2wpkh della chiave
+  (lo stesso `onchainIndirizzoEsterno` nel telefono), con `i` dalla fila
+  sua (`_onchain_prossimo_esterno`, MAX+1 degli ordini del venditore con
+  quella chiave). Alla cassa `_onchain_destinazione_viva` ricontrolla la
+  firma con la xpub di adesso; un `POST /api/onchain/xpub` con un seme
+  nuovo cancella la riga. Le colonne nuove di `onchain_ordini`:
+  `incasso_tipo/valore/firma/indice` (fotografia della scelta) e
+  `quota_sats`, `quota_indirizzo`; la vista dell'ordine le dà come
+  `destinazione` (o null) e `quota_*`. Il foglio: blocco «4b. Dove ricevi
+  i sats quando vendi» (`onchainBloccoIncasso`, `onchainIncassoSalva`).
+  LA QUOTA: `onchain_quota_sats()` (leva scrivibile
+  `ONCHAIN_QUOTA_FISSA_SATS`, 0 nel codice; 0 oppure 546-5000,
+  `_giudice_quota_onchain`). `importo = prezzo + quota + margine`;
+  `/api/onchain/pronto` e `/api/onchain/prova` la dicono (`quota_sats`), la
+  cassa la scrive (`acqQuotaOnchain`). All'uscita verso il venditore una
+  uscita esatta a `quota_indirizzo` = `/1/numero_barattolo` della xpub di
+  Barattolo (`_onchain_psbt_giudica`; nel telefono `onchainProponi` e
+  `onchainCofirma`, con il tetto `ONCHAIN_QUOTA_TETTO` anche lì); col
+  rimborso torna a chi ha comprato. Le prove: `prove_incasso_esterno_onchain`
+  (la prova doppia telefono-server); il collaudo `collaudo_onchain_incasso`.
+- LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
+  `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
+  tetto), la tabella `leve_pannello` (chiave, valore, chi, quando),
+  `leva_scrivibile(chiave)` (pannello se c'è e il giudice lo accetta,
+  sennò config/codice), `leva_origine` ('pannello'|'config'|'codice'),
+  `_leva_scrivibile_riga` (aggiunge `scrivibile` alla riga del
+  censimento). `POST /api/admin/leve/{chiave}` (solo `e_admin`; {valore}
+  o {torna_al_config: true}; 404 per una chiave non aperta; freno
+  `leva_pannello`; una riga in `moderazione_log`, strato «leva»). Nel
+  cassetto: `rigaLevaScrivibile`, `levaScrivi` (Salva → Conferma).
 
 - I CERTIFICATI DEI RELAY (20 ott 2026, cantiere certificati-relay;
   perché in CANTIERI, «I certificati dei relay si verificano»; il journal

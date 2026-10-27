@@ -1173,6 +1173,14 @@ ONCHAIN_XPUB = ""
 # trasmette le transazioni d'uscita. Vuota = quella di serie della rete
 # (signet: https://mempool.space/signet/api).
 ONCHAIN_MEMPOOL_API = ""
+# LA QUOTA FISSA DI BARATTOLO SULL'ON-CHAIN (27 ott 2026): sats che chi
+# COMPRA aggiunge al conto (li vede prima di pagare) e che vanno a un
+# indirizzo di Barattolo quando i sats vengono liberati; col rimborso
+# tornano a lui. 0 = nessuna quota (il valore del codice); altrimenti
+# fra 546 (sotto, polvere: la rete non trasmette) e 5000. SI CAMBIA
+# ANCHE DAL PANNELLO («⚙️ Stato delle leve», ✏️), e il pannello vince su
+# questa riga: qui c'e' solo il valore di partenza.
+ONCHAIN_QUOTA_FISSA_SATS = 0
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

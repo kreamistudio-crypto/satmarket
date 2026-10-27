@@ -72975,3 +72975,84 @@ parole) — NON si accende finché Massimo non risponde sulla quota e sui
 limiti. Le leve, spente di serie: `CAMBIO_LIBERO_ATTIVO`,
 `CAMBIO_LIBERO_SOLO_MODERATORI` (True), `CAMBIO_LIBERO_MAX_SATS`
 (500.000), `CAMBIO_LIBERO_MAX_AL_GIORNO` (5). T5: i documenti.
+
+## L'on-chain incassa dove vuoi tu: la destinazione firmata dal seme, la quota fissa di Barattolo, e la prima leva che si cambia dal pannello (27 ott 2026, cantiere onchain-incasso-esterno, piano approvato da Andrea: «vai con tutto»)
+
+**COSA.** Tre pezzi sopra l'ordine on-chain del 23 ott, sempre in signet
+e dietro lo stesso cancello (oggi solo gli admin), più due documenti.
+- **Dove ricevi i sats quando vendi.** Nel foglio «⛓️ On-chain (prova)»
+  il blocco nuovo «4b»: chi vende sceglie fra il conto di Barattolo (di
+  serie, `/1/n` del suo seme, com'era), **la chiave del conto del suo
+  wallet** (una `vpub`/`tpub` BIP-84 come la dà Sparrow, un indirizzo
+  nuovo `/0/i` a ogni vendita, con una fila sua) o **un indirizzo
+  fisso** (con l'avviso: tutte le vendite nello stesso posto si legano
+  fra loro). Vale dalle vendite dopo; gli ordini già nati tengono la
+  destinazione di allora, fotografata alla cassa.
+- **La quota fissa di Barattolo.** `ONCHAIN_QUOTA_FISSA_SATS`, 0 nel
+  codice («0 commissione sul mercatino al momento, al massimo metterei
+  500 sats fissi solamente per coprire le spese di rete»). La paga chi
+  compra (regola 10), la vede alla cassa prima di pagare, e all'uscita
+  va a `/1/n` della xpub di Barattolo nella stessa transazione che
+  libera i sats; col rimborso torna a lui. Il margine per la rete resta
+  com'era: i miner si pagano da lì e l'avanzo torna a chi ha comprato.
+- **Le leve dal pannello.** Il cassetto «⚙️ Stato delle leve» resta in
+  sola lettura, tranne le leve che il server apre una per una
+  (`LEVE_SCRIVIBILI`): oggi solo la quota. ✏️ «cambia» → «Salva» →
+  «Conferma»; il valore vive nel database e vince sul config del VPS;
+  «Torna al config» lo cancella; ogni cambio è una riga nel registro
+  della moderazione (strato «leva»).
+- **I due studi** (passi 4 e 5 del piano): `docs/STUDIO-ONCHAIN-P2P-2026-10-27.md`
+  (lo stesso metodo nel P2P, accanto a Mostro e non dentro) e
+  `docs/STUDIO-LEVE-DAL-PANNELLO-2026-10-27.md` (le 231 leve in tre
+  classi, con la proposta per ognuna).
+
+**PERCHÉ LA FIRMA DEL SEME.** Il 23 ott si era scelto «nessuno incolla
+un indirizzo» proprio per questo: un incasso che il seme di chi vende
+sa rifare è un incasso che un server manomesso non può cambiare, perché
+il telefono co-firma solo verso una chiave sua. Un indirizzo esterno il
+seme non lo sa rifare. La cura: la scelta si **firma** col seme
+(chiave `/2/0` del conto del 2-di-3, una catena che non serve ad
+altro), il server la verifica con la xpub dedicata che ha già, e
+soprattutto il telefono di chi vende **la rilegge col suo seme prima
+della seconda firma**. Chi non ha il seme non sa firmare una
+destinazione, e funziona su qualunque telefono che abbia le dodici
+parole (non serve una copia locale della scelta). Un seme nuovo
+cancella la scelta del vecchio.
+
+**STRADE SCARTATE.** Tenere la scelta in una copia nel telefono (nel
+backup del seme) invece che firmarla: un secondo telefono o un
+ripristino vecchio non l'avrebbero, e il telefono dovrebbe chiedere
+«è tuo questo indirizzo?» a ogni rilascio. Una quota sotto i 546 sats:
+la rete non trasmette un'uscita così piccola, quindi il giudice dice 0
+oppure 546-5000 — **i 500 sats di Andrea non si possono**, il minimo è
+546. Aprire tutte le leve del pannello in un colpo: no, per le due
+ragioni scritte nello studio (molte si leggono all'avvio, e le porte e i
+soldi restano un gesto sul VPS).
+
+**PROVATO.** `prove_incasso_esterno_onchain`, la prova doppia: il
+telefono vero (node col bundle vero) firma la destinazione e le funzioni
+del server con embit la verificano; dalla vpub telefono e server fanno
+lo stesso indirizzo; «Libera i sats» mette prezzo al wallet, quota a
+Barattolo e resto a chi compra, e il server la giudica buona; il
+telefono di chi vende co-firma, e non co-firma una destinazione firmata
+da un altro seme, una quota diversa da quella dell'ordine o sopra il
+tetto. `collaudo_onchain_incasso` (32/0) col server vero: le firme
+storte, la dedicata al posto del wallet, l'indirizzo mainnet, il
+maiuscolo dei QR, la quota dal pannello coi suoi no (non admin, leva
+non aperta, 500, 5001) e il registro, l'importo, le due vendite su
+`/0/0` e `/0/1`, il rilascio senza quota o con una quota più grossa, la
+seconda firma, l'indirizzo fisso, il ritorno al conto di serie, il seme
+nuovo, «Torna al config». `prove_leve`: la sentinella «nessuna rotta che
+scrive» diventa «una sola, e le tre spente di serie non ci entrano».
+
+**PER PROVARLO SUL COLLAUDO.** Come il 23 ott, con due admin. Chi vende
+apre «⛓️ On-chain (prova)», blocco 4b, «🔑 La chiave del conto del mio
+wallet», incolla la vpub di Sparrow (signet) e «✍️ Firma e salva». Dal
+pannello admin, «⚙️ Stato delle leve» → «Quota fissa di Barattolo» →
+cambia → 600 → Salva → Conferma. Chi compra vede la quota alla cassa,
+paga, libera: i sats arrivano nel wallet Sparrow.
+
+**COSA RESTA.** Niente di questo cantiere. Notato strada facendo: la
+quota va a `/1/n` della xpub di Barattolo, che oggi sul collaudo è di
+cartone (la privata è pubblica): finché `ONCHAIN_XPUB` non è vera quei
+sats li può prendere chiunque, come tutto il 2-di-3 di prova.

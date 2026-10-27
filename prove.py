@@ -34161,6 +34161,14 @@ def _censimento(acceso, dopo=None):
         (lambda: "compratore 3,0% · venditore 2,0% "
                  "(punteggio 60/100, 2026-09-14)") if acceso
         else (lambda: "mai calcolata: neutro di default (2,5% / 2,5%)"))
+    # LE LEVE SCRIVIBILI (27 ott 2026): il pannello chiede il valore al
+    # giudice, che APRE IL DATABASE (`leve_pannello`) — stessa trappola
+    # della fee dinamica qui sopra, quinta occorrenza: senza stub
+    # `__missing__` da' un 7 e il pannello lo chiama.
+    amb["leva_scrivibile"] = (lambda k: 600) if acceso else (lambda k: 0)
+    amb["_leva_scrivibile_riga"] = lambda r: {
+        **r, "scrivibile": {"pavimento": 0, "tetto": 5000,
+                            "origine": "pannello" if acceso else "codice"}}
     amb["SPIEGA_RITMO"] = {"giorno": "uno al giorno per venditore"}
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
@@ -36027,9 +36035,20 @@ def prove_leve():
     # Una leva che si accende da un telefono e' una leva che si
     # accende per sbaglio: le tre che nascono spente nel codice
     # vogliono un gesto sul VPS, e qui non deve nascere una scorciatoia.
-    prova("nessuna rotta che SCRIVE le leve", True,
-          '@app.post("/api/admin/leve' not in _SORGENTE
-          and '@app.put("/api/admin/leve' not in _SORGENTE)
+    # DAL 27 OTT 2026 (decisione di Andrea, «il config deve anche poter
+    # essere modificato dal pannello») UNA porta scrive, e apre SOLO le
+    # leve elencate in LEVE_SCRIVIBILI, una per una: la sentinella
+    # guarda che resti una, e che le tre spente di serie non ci entrino.
+    prova("una sola rotta che SCRIVE le leve, quella delle scrivibili",
+          (1, 0), (_SORGENTE.count('@app.post("/api/admin/leve'),
+                   _SORGENTE.count('@app.put("/api/admin/leve')))
+    scrivibili = _SORGENTE[_SORGENTE.index("LEVE_SCRIVIBILI = {"):]
+    scrivibili = scrivibili[:scrivibili.index("\n}\n")]
+    prova("...e le tre leve spente di serie non si accendono da li'",
+          [False, False, False],
+          [f'"{k}"' in scrivibili for k in ("ASTA_ABILITATA",
+                                             "IMPORT_NOSTR_APERTO",
+                                             "AUTO_SBLOCCO_ATTIVO")])
     i = _SORGENTE.index("def leve_admin(")
     corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
     prova("la rotta e' riservata ai moderatori", True,
@@ -146873,6 +146892,9 @@ def prove_freni():
            # la tappa 3 (23 ott 2026): «controlla adesso» 60 all'ora,
            # proposte e co-firme 30 all'ora
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
+           # 27 ott 2026: «Dove ricevi i sats» 10 all'ora, una leva
+           # cambiata dal pannello 20 all'ora per admin
+           "onchain_incasso": (10, 3600), "leva_pannello": (20, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
            "cassetta_spedisci": (60, 60)}, F)
@@ -152192,6 +152214,265 @@ def prove_ripristino_visibile():
            "3. <b>♻️ Ripristina dal cloud</b>" in mini])
 
 
+def _pezzi_incasso_js(mini):
+    """I pezzi del telefono per la destinazione firmata e la quota (27
+    ott 2026), da mettere nei banchi node che fanno girare proponi e
+    co-firma: senza, il codice vero non gira."""
+    return "\n".join([
+        "const ONCHAIN_VERSIONI_VPUB = {private: 0x045f18bc, public: 0x045f1cf6};",
+        "const ONCHAIN_QUOTA_TETTO = 5000;",
+        pezzo_js(mini, "function onchainLeggiXpub(B, s){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainMessaggioDestinazione(tipo, valore){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainNormaDestinazione(tipo, valore){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainChiaveDestinazione(B, parole){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainFirmaDestinazione(B, parole, tipo, valore){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainDestinazioneMia(B, parole, d){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainIndirizzoEsterno(B, d){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainIncassoAtteso(B, parole, o, io){", "\n}\n") + "\n}"])
+
+
+def prove_incasso_esterno_onchain():
+    """L'INCASSO SU UN WALLET PROPRIO E LA QUOTA DI BARATTOLO (27 ott
+    2026, cantiere onchain-incasso-esterno, richiesta di Andrea). Chi
+    vende puo' ricevere su un indirizzo suo o su un indirizzo nuovo per
+    vendita da una vpub del suo wallet; la scelta la firma il suo seme
+    (chiave `/2/0` del conto del 2-di-3), e il suo telefono la rilegge
+    prima di co-firmare. Chi compra paga anche la quota fissa, che va a
+    Barattolo nella stessa transazione.
+    LA PROVA DOPPIA, come per le firme dei PSBT: il telefono VERO (node
+    col bundle vero) firma la destinazione e il SERVER (le sue funzioni,
+    con embit) la verifica; l'indirizzo che il telefono ricava dalla
+    vpub e' quello che ricava il server. Poi i no: una destinazione
+    firmata da un altro seme non si co-firma, una quota diversa da
+    quella dell'ordine nemmeno, e il server la giudica allo stesso modo."""
+    import hashlib as _hl
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    print("\n⛓️ L'incasso su un wallet proprio e la quota di Barattolo")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) la forma ---------------------------------------------------
+    compra = pezzo("_onchain_compra")
+    prova("la cassa: destinazione viva (firma ricontrollata) e quota "
+          "nell'importo", [True, True, True],
+          ["_onchain_destinazione_viva(con, venditore," in compra,
+           "prezzo + quota + margine" in compra,
+           "quota = onchain_quota_sats()" in compra])
+    xp = src[src.index('"/api/onchain/xpub"'):]
+    xp = xp[:xp.index("\n@app.")]
+    prova("un seme nuovo cancella la destinazione firmata dal vecchio", True,
+          "DELETE FROM onchain_incasso WHERE tg_id=?" in xp)
+    inc = src[src.index('"/api/onchain/incasso"'):]
+    inc = inc[:inc.index("\n@app.")]
+    prova("«Dove ricevi»: passa dal cancello, dal freno, e vuole la firma",
+          [True, True, True],
+          ['onchain_ammesso(user["id"])' in inc,
+           '_frena("onchain_incasso"' in inc,
+           'onchain_firma_valida(r["xpub"], tipo, valore, firma)' in inc])
+    cofirma_js = pezzo_js(mini, "async function onchainCofirma(o, parole){",
+                          "\n}\n")
+    prova("il telefono di chi vende ricontrolla la destinazione PRIMA della "
+          "firma", True,
+          cofirma_js.index("onchainIncassoAtteso(B, parole, o, io)")
+          < cofirma_js.index("tx.signIdx("))
+    leve = src[src.index("LEVE_SCRIVIBILI = {"):]
+    leve = leve[:leve.index("\n}\n")]
+    prova("dal pannello si cambia UNA leva sola, la quota on-chain",
+          ['"ONCHAIN_QUOTA_FISSA_SATS"'],
+          re.findall(r'^    ("[A-Z_]+"): \{', leve, re.M))
+
+    # --- 2) il giudice della quota, eseguito --------------------------
+    ns = {"ONCHAIN_QUOTA_TETTO": 5000, "ONCHAIN_POLVERE": 546,
+          "_fmt_sats": lambda n: f"{n:,}".replace(",", ".")}
+    exec(pezzo("_giudice_quota_onchain"), ns)
+    g = ns["_giudice_quota_onchain"]
+    prova("quota: 0 e 546-5000 si', 500 no (polvere), 5001 no, testo no",
+          [(0, ""), (546, ""), (5000, ""), None, None, None],
+          [g("0"), g(546), g("5000"), g(500)[0], g(5001)[0], g("tanti")[0]])
+
+    # --- 3) la prova doppia: telefono e server ------------------------
+    node = _sh.which("node")
+    try:
+        from embit import bip32 as E32, bip39 as E39, script as ESC
+        from embit.networks import NETWORKS as ERETI
+        from embit.psbt import PSBT as EPSBT
+    except ImportError:
+        salta("onchain incasso esterno: la prova doppia",
+              "embit non installato (pip install -r requirements.txt)")
+        return
+    if not node:
+        salta("onchain incasso esterno: la prova doppia", "node non installato")
+        return
+    N = ERETI["signet"]
+    vett = json.load(open(os.path.join("vendor", "vettori-bip.json"),
+                          encoding="utf-8"))
+    semi = [v["parole"] for v in vett["bip39_english"][:3]]
+    srv = {"hashlib": _hl, "json": json, "_embit_bip32": E32,
+           "_EMBIT_RETI": ERETI, "ONCHAIN_RETE": "signet",
+           "ONCHAIN_NUMERO_MAX": 2 ** 31 - 1, "ONCHAIN_DESTINAZIONE_MAX": 120,
+           "ONCHAIN_POLVERE": 546, "_ONCHAIN_VPUB_PROVA": b"\x04\x5f\x1c\xf6",
+           "_onchain_sembra_privata": lambda x: x[1:4].lower() == "prv"}
+    for nome in ("onchain_messaggio_destinazione", "onchain_firma_valida",
+                 "onchain_destinazione_motivo", "onchain_indirizzo_esterno",
+                 "_onchain_psbt_giudica"):
+        exec(pezzo(nome), srv)
+
+    def radice(p, versione):
+        return E32.HDKey.from_seed(E39.mnemonic_to_seed(p), version=versione)
+
+    def chiave(p, catena, n):
+        return radice(p, N["xprv"]).derive(
+            f"m/48h/1h/0h/2h/{catena}/{n}").key.get_public_key()
+
+    def dedicata(p):
+        return radice(p, N["xprv"]).derive("m/48h/1h/0h/2h").to_public().to_base58()
+
+    # il wallet del venditore fuori da Barattolo: una vpub BIP-84 di un
+    # altro seme, come la darebbe Sparrow
+    vpub = radice(semi[2], b"\x04\x5f\x18\xbc").derive(
+        "m/84h/1h/0h").to_public().to_base58()
+    motivo = srv["onchain_destinazione_motivo"]
+    prova("la vpub del wallet va bene per «Dove ricevi», la dedicata no",
+          ["", "questa è la chiave del 2-di-3, non quella di un tuo wallet"],
+          [motivo("xpub", vpub, dedicata(semi[1])),
+           motivo("xpub", dedicata(semi[1]), dedicata(semi[1]))])
+    prova("un indirizzo mainnet o una privata non passano", [True, True],
+          [bool(motivo("indirizzo",
+                       "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4")),
+           "PRIVATA" in motivo("xpub", "vprv" + "x" * 100)])
+    indice = 4
+    esterno = srv["onchain_indirizzo_esterno"]("xpub", vpub, indice)
+    tre = [chiave(semi[i], 0, 3) for i in range(3)]
+    ws = ESC.multisig(2, sorted(tre, key=lambda k: k.sec()))
+    rimborso = ESC.p2wpkh(chiave(semi[0], 1, 3)).address(N)
+    quota_dove = ESC.p2wpkh(chiave(semi[2], 1, 9)).address(N)
+    quota = 600
+
+    def ordine(ruolo):
+        return {"id": 8, "ruolo": ruolo, "stato": "pagato",
+                "prezzo_sats": 50000, "margine_sats": 1200,
+                "importo_sats": 51200 + quota, "tariffa": 2,
+                "utxo": [{"txid": "cd" * 32, "vout": 0,
+                          "value": 51200 + quota}],
+                "incasso": esterno, "rimborso": rimborso,
+                "quota_sats": quota, "quota_indirizzo": quota_dove,
+                "indirizzo": {"mio_numero": 3, "indirizzo":
+                              ESC.p2wsh(ws).address(N),
+                              "chiavi": {"compratore": tre[0].sec().hex(),
+                                         "venditore": tre[1].sec().hex(),
+                                         "barattolo": tre[2].sec().hex()}},
+                "proposta": None}
+
+    pezzi = "\n".join([
+        "const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};",
+        _pezzi_incasso_js(mini),
+        pezzo_js(mini, "function onchainConto(B, parole, strada){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
+        cofirma_js + "\n}"])
+    banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + """
+const B = BarattoloBTC;
+const API_BASE = '/api', ONCHAIN_POLVERE = 546;
+let onchainSrv = null, onchainOrdini = [], PAROLE = '', MANDATI = [];
+const caricaBitcoin = async () => B, haptic = () => {}, toast = () => {},
+      renderOnchain = () => {}, authHdr = () => '',
+      onchainAttesa = () => () => {}, onchainSemeLocale = () => PAROLE;
+const fetch = async (url, o) => { MANDATI.push([url, JSON.parse(o.body)]);
+  return {ok: true, json: async () => ({ok: true})}; };
+__PEZZI__
+(async () => {
+  const D = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf8'));
+  /* il venditore firma la sua destinazione: la vpub del suo wallet */
+  const firma = await onchainFirmaDestinazione(B, D.semi[1], 'xpub', D.vpub);
+  const firmaAltro = await onchainFirmaDestinazione(B, D.semi[2], 'xpub', D.vpub);
+  const dest = {tipo: 'xpub', valore: D.vpub, firma, indice: D.indice};
+  const esternoTel = onchainIndirizzoEsterno(B, dest);
+  /* chi compra libera, con la quota */
+  PAROLE = D.semi[0];
+  onchainOrdini = [{...D.compratore, destinazione: dest}];
+  await onchainProponi(null, 8);
+  const proposta = MANDATI.pop();
+  const ven = {...D.venditore, destinazione: dest,
+               proposta: {verso: 'venditore', mia: false, psbt: proposta[1].psbt}};
+  const noFalsa = await onchainCofirma({...ven, destinazione: {...dest, firma: firmaAltro}}, D.semi[1]);
+  const noQuota = await onchainCofirma({...ven, quota_sats: D.quota + 1}, D.semi[1]);
+  const noTetto = await onchainCofirma({...ven, quota_sats: 6000}, D.semi[1]);
+  const dopo = MANDATI.length;
+  const no = await onchainCofirma(ven, D.semi[1]);
+  const firmata = MANDATI.pop();
+  console.log(JSON.stringify({firma, esternoTel, proposta, no, firmata,
+                              noFalsa, noQuota, noTetto, dopo}));
+})().catch(e => console.log(JSON.stringify({errore: String(e)})));
+""".replace("__PEZZI__", pezzi)
+    casa = _tf.mkdtemp(prefix="onchain-incasso-")
+    try:
+        f_js = os.path.join(casa, "banco.js")
+        f_dati = os.path.join(casa, "dati.json")
+        open(f_js, "w", encoding="utf-8").write(banco)
+        json.dump({"semi": semi, "vpub": vpub, "indice": indice,
+                   "quota": quota, "compratore": ordine("compratore"),
+                   "venditore": ordine("venditore")},
+                  open(f_dati, "w", encoding="utf-8"))
+        r = _sp.run([node, f_js, f_dati], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=120)
+    finally:
+        _sh.rmtree(casa, ignore_errors=True)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        print(r.stderr[-800:])
+        o = {}
+    prova("il banco gira senza errori", None, o.get("errore"))
+    valida = srv["onchain_firma_valida"]
+    prova("la firma del telefono la verifica il server con la xpub dedicata",
+          True, valida(dedicata(semi[1]), "xpub", vpub, o.get("firma", "")))
+    prova("...e non vale per un'altra destinazione, ne' con un'altra xpub",
+          [False, False],
+          [valida(dedicata(semi[1]), "indirizzo", rimborso, o.get("firma", "")),
+           valida(dedicata(semi[0]), "xpub", vpub, o.get("firma", ""))])
+    prova("dalla vpub telefono e server ricavano lo stesso indirizzo",
+          esterno, o.get("esternoTel"))
+    url, corpo = (o.get("proposta") or ["", {}])
+    if not corpo.get("psbt"):
+        prova("il telefono ha firmato un PSBT", True, False)
+        return
+    p = EPSBT.from_string(corpo["psbt"])
+    uscite = [(u.script_pubkey.address(N), u.value) for u in p.tx.vout]
+    prova("«Libera i sats»: il prezzo al wallet del venditore, la quota a "
+          "Barattolo, il resto a chi compra (51800-50000-600-418)",
+          [(esterno, 50000), (quota_dove, 600), (rimborso, 782)], uscite)
+    giu = {"utxo": json.dumps([{"txid": "cd" * 32, "vout": 0,
+                                "value": 51200 + quota}]),
+           "incasso": esterno, "rimborso": rimborso, "prezzo_sats": 50000,
+           "margine_sats": 1200, "quota_sats": quota,
+           "quota_indirizzo": quota_dove}
+
+    def giudica(o_):
+        try:
+            srv["_onchain_psbt_giudica"](o_, "venditore", corpo["psbt"],
+                                         tre[0].sec().hex())
+            return ""
+        except ValueError as e:
+            return str(e)
+    prova("...il server la giudica buona, ma non con un'altra quota",
+          ["", "a Barattolo deve andare esattamente la quota dell'ordine"],
+          [giudica(giu), giudica({**giu, "quota_sats": 700})])
+    prova("una destinazione firmata da un altro seme: non co-firma",
+          "la destinazione non è firmata dal tuo seme", o.get("noFalsa"))
+    prova("una quota diversa da quella dell'ordine, o sopra il tetto: no",
+          ["la quota di Barattolo non è quella dell'ordine",
+           "la quota di Barattolo supera il tetto"],
+          [o.get("noQuota"), o.get("noTetto")])
+    prova("...e dopo i no non e' partito niente", 0, o.get("dopo"))
+    prova("il telefono di chi vende co-firma verso il suo wallet", "",
+          o.get("no"))
+    prova("...e manda la transazione finita", "/api/onchain/ordini/8/firma",
+          (o.get("firmata") or [""])[0])
+
+
 def prove_ordine_onchain():
     """L'ORDINE ON-CHAIN (23 ott 2026, cantiere onchain-tappa3): la cassa
     che al posto della fattura da' un indirizzo 2-di-3, la sorveglianza
@@ -152319,6 +152600,7 @@ def prove_ordine_onchain():
 
     pezzi = "\n".join([
         "const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};",
+        _pezzi_incasso_js(mini),
         pezzo_js(mini, "function onchainConto(B, parole, strada){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
@@ -152926,9 +153208,10 @@ def prove_cancello_onchain():
     # per nome: una porta nuova che non si aggiunge a questa lista e'
     # una porta che nessuno ha guardato.
     # ...e la tappa 3 (23 ott 2026) le sei dell'ordine on-chain
+    # ...e il 27 ott 2026 «Dove ricevi i sats» (onchain-incasso-esterno)
     prova("le rotte /api/onchain/* esistono e si contano",
           ["/api/onchain/prova", "/api/onchain/xpub",
-           "/api/onchain/prova/indirizzo", "/api/onchain/ordini",
+           "/api/onchain/incasso", "/api/onchain/prova/indirizzo", "/api/onchain/ordini",
            "/api/onchain/pronto/{venditore_id}",
            "/api/onchain/ordini/{oid}/controlla",
            "/api/onchain/ordini/{oid}/annulla",
@@ -180188,7 +180471,7 @@ def main():
     prove_cancello_onchain,
     prove_banco_chiavi_onchain,
     prove_indirizzo_ordine_onchain,
-    prove_ordine_onchain,
+    prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_ripristino_visibile,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
