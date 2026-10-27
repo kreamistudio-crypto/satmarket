@@ -32,7 +32,7 @@
    dell'ordine. Il segreto resta qui, e esce solo per il ritiro, dopo i
    tre controlli sul lockup (swap/boltz.js).
 
-   Usa dalla pagina: swapLeve, swapAcceso, myTgId, el, esc, fmt, haptic,
+   Usa dalla pagina: swapLeve, swapAcceso, myTgId, tg, el, esc, fmt, haptic,
    toast, currentOrder, preventiviSwap, scegliIncassoSwap,
    leggiPreventivoSwap, pannelloPreventivoSwap, ridisegnaIncassoSwap,
    linguaSwap, pagaSwapAlServer, statoPagamentoSwap. */
@@ -103,119 +103,148 @@ function swapFase(rec){
   return f ? f.fase(rec.stato) : 'ignoto';
 }
 
-/* ─── 3. I TESTI, in italiano e in inglese ───────────────────────────── */
+/* ─── 3. I TESTI, in italiano e in inglese ─────────────────────────────
+   (27 ott 2026, cantiere grafica-swap, regola di Andrea) niente parole
+   tecniche: niente «swap», «fornitore», «lockup», «on-chain». Quel che fa
+   SATS Routing e' «il cambio»; le 12 parole sono «di riserva» e si
+   spiegano con calma UNA volta, alla prima (il passo 'parole'). */
 const SWAP_TESTI_T3 = {
   it: {
-    paroleTit: 'Le tue 12 parole',
-    paroleDi: n => `Le tue 12 parole per ${n}`,
-    paroleSpiega: 'Sono la chiave dei tuoi swap e stanno solo su questo telefono. Scrivile su carta: servono a recuperare uno swap se cambi telefono.',
+    paroleTit: 'Le tue 12 parole di riserva',
+    paroleDi: n => `Le tue 12 parole di riserva per ${n}`,
+    paroleSpiega: 'Servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche da un altro telefono.',
+    paroleRegole: ['Scrivile su carta, in ordine.',
+                   'Non fotografarle e non darle a nessuno, nemmeno a noi.',
+                   'Te le chiediamo una volta sola: le ritrovi nella pagina «Ricevi in bitcoin».'],
+    paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.',
     paroleSpunta: 'Le ho scritte su carta',
-    paroleFatto: 'Ho salvato le parole',
+    paroleFatto: 'Continua',
     paroleSpuntaPrima: 'Prima spunta «Le ho scritte su carta».',
-    indirizzoTit: 'Dove ricevi i bitcoin',
-    indirizzoSpiega: 'Un indirizzo bitcoin del tuo wallet.',
-    indirizzoNo: 'Questo non è un indirizzo valido per questa rete.',
-    crea: 'Crea lo swap',
-    creo: n => `Creo lo swap e controllo la risposta di ${n}…`,
-    nienteCasa: 'Questo telefono non riesce a conservare le chiavi: lo swap non si può fare da qui.',
-    rifiuto: n => `${n} ha risposto con dati che non tornano: lo swap non parte, nessun sats si è mosso.`,
+    indirizzoTit: 'Il tuo indirizzo bitcoin',
+    indirizzoSpiega: 'Lo trovi nel tuo wallet, alla voce «Ricevi».',
+    indirizzoManca: 'Prima metti il tuo indirizzo bitcoin: tocca «Incolla».',
+    indirizzoNo: 'Questo non è un indirizzo bitcoin valido.',
+    incolla: 'Incolla', qr: 'QR',
+    appuntiChiusi: 'Non riesco a leggere gli appunti: tieni premuto sul campo e scegli «Incolla».',
+    appuntiNo: 'Negli appunti non c\'è un indirizzo bitcoin valido: copialo dal tuo wallet.',
+    qrTesto: 'Inquadra il QR del tuo indirizzo bitcoin',
+    qrNo: 'Questo QR non è un indirizzo bitcoin valido.',
+    qrCamera: 'Non riesco ad aprire la fotocamera: incolla l\'indirizzo.',
+    qrChiudi: 'Chiudi',
+    creo: n => `Preparo il cambio con ${n} e controllo la sua risposta…`,
+    nienteCasa: 'Questo telefono non riesce a conservare le 12 parole: da qui si incassa solo in Lightning.',
+    rifiuto: n => `${n} ha risposto con dati che non tornano: non parte niente, nessun sats si è mosso.`,
     nonRisponde: n => `${n} ora non risponde: riprova, o incassa in Lightning.`,
-    tuoSwap: 'Il tuo swap',
-    eseguitoDa: n => `Eseguito da ${n}`,
+    tuoSwap: 'Il tuo incasso in bitcoin',
+    eseguitoDa: n => `Il cambio lo fa ${n}`,
     ricevi: n => `Ricevi circa ${n} sats a`,
-    riceviQui: n => `Ricevi circa ${n} sats a questo indirizzo.`,
+    /* i tre pallini della carta: a che punto e' */
+    passi: ['Pagato', 'In arrivo', 'Arrivato'],
+    passiEt: 'A che punto è',
     fasi: {
-      creato: n => `Barattolo sta pagando lo swap: poi ${n} blocca i bitcoin e li ritiro.`,
-      bloccato: n => `${n} ha bloccato i bitcoin: ritiro in corso.`,
-      confermato: () => 'Bitcoin bloccati e confermati: ritiro in corso.',
-      fatto: () => 'Fatto: i bitcoin sono tuoi.',
+      creato: () => 'Barattolo sta pagando il cambio: poi i bitcoin partono verso il tuo indirizzo.',
+      bloccato: n => `${n} ha preparato i tuoi bitcoin: li sto mandando al tuo indirizzo.`,
+      confermato: () => 'I tuoi bitcoin sono pronti: li sto mandando al tuo indirizzo.',
+      fatto: () => 'Fatto: i bitcoin sono al tuo indirizzo.',
       scaduto: () => 'Scaduto: nessun sats si è mosso, l\'incasso torna disponibile.',
       fallito: () => 'Non riuscito: l\'incasso torna disponibile.',
       ripreso: n => `${n} si è ripreso i bitcoin: l'incasso torna disponibile.`},
     statoIgnoto: 'In corso.',
-    /* (tappa 4) il pagamento della fattura, finche' i bitcoin non sono bloccati */
+    /* (tappa 4) il pagamento della fattura, finche' i bitcoin non sono pronti */
     pagamento: {
-      pagato: n => `Pagato: aspetto che ${n} blocchi i bitcoin.`,
+      pagato: n => `Pagato: aspetto che ${n} prepari i tuoi bitcoin.`,
       da_verificare: () => 'Pagamento da verificare: ci stiamo lavorando noi. I tuoi sats non si perdono.',
       fallito: () => 'Il pagamento non è partito: nessun sats si è mosso. Scegli di nuovo come incassare.',
-      tetto_utente: () => 'Per oggi hai raggiunto il tetto degli swap: incassa via Lightning.',
-      tetto_giorno: () => 'Oggi lo swap è al completo: incassa via Lightning.',
-      cambiata: () => 'Le tariffe sono cambiate: nessun sats si è mosso. Scegli di nuovo come incassare.',
-      rifiutato: () => 'Barattolo non paga questo swap: nessun sats si è mosso. Scegli di nuovo come incassare.'},
-    ritirato: id => `Ritirato: transazione ${id}.`,
+      tetto_utente: () => 'Per oggi hai raggiunto il tetto degli incassi in bitcoin: incassa via Lightning.',
+      tetto_giorno: () => 'Per oggi gli incassi in bitcoin sono al completo: incassa via Lightning.',
+      cambiata: () => 'Le cifre sono cambiate: nessun sats si è mosso. Scegli di nuovo come incassare.',
+      rifiutato: () => 'Barattolo non paga questo cambio: nessun sats si è mosso. Scegli di nuovo come incassare.'},
+    ritirato: id => `Partiti verso il tuo indirizzo: transazione ${id}.`,
     concluso: (sats, id) => `Concluso: ${sats} sats arrivati (transazione ${id}).`,
-    ritiroErrore: 'Il ritiro non è ancora riuscito: riprovo da solo.',
-    spesoAltri: n => `I bitcoin dello swap li ha spesi un'altra transazione, non il tuo ritiro: scrivi a ${n}.`,
-    lista: 'I tuoi swap',
+    ritiroErrore: 'L\'invio al tuo indirizzo non è ancora riuscito: riprovo da solo.',
+    spesoAltri: n => `Quei bitcoin li ha spesi un'altra transazione, non il tuo invio: scrivi a ${n}.`,
+    lista: 'I tuoi incassi in bitcoin',
     ordine: n => `Ordine #${n}`,
     recuperato: 'Recuperato',
     mostra: 'Mostra le 12 parole',
     nascondi: 'Nascondi',
-    nessunaParola: 'Non hai ancora le parole: nascono col primo swap.',
+    nessunaParola: 'Non hai ancora le parole: nascono col primo incasso in bitcoin.',
     recuperaTit: 'Recupera da 12 parole',
-    recuperaSpiega: 'Se avevi già degli swap su un altro telefono, incolla qui le tue 12 parole.',
+    recuperaSpiega: 'Se avevi già degli incassi in bitcoin su un altro telefono, incolla qui le tue 12 parole.',
     recupera: 'Recupera',
     recuperaDa: n => `Recupera da ${n}`,
     recuperaNo: 'Queste non sono 12 parole valide.',
-    recuperaAltre: 'Su questo telefono ci sono già altre parole con degli swap: non le sostituisco.',
-    recuperaFatto: n => n === 0 ? 'Nessuno swap legato a queste parole.'
-      : n === 1 ? 'Recuperato 1 swap.' : `Recuperati ${n} swap.`,
-    ritiraA: 'Ritira a questo indirizzo'},
+    recuperaAltre: 'Su questo telefono ci sono già altre parole in uso: non le sostituisco.',
+    recuperaFatto: n => n === 0 ? 'Nessun incasso legato a queste parole.'
+      : n === 1 ? 'Recuperato 1 incasso.' : `Recuperati ${n} incassi.`,
+    ritiraA: 'Manda a questo indirizzo'},
   en: {
-    paroleTit: 'Your 12 words',
-    paroleDi: n => `Your 12 words for ${n}`,
-    paroleSpiega: 'They are the key to your swaps and live only on this phone. Write them on paper: they recover a swap if you change phone.',
+    paroleTit: 'Your 12 backup words',
+    paroleDi: n => `Your 12 backup words for ${n}`,
+    paroleSpiega: 'You need them only if something goes wrong: with them you get your bitcoin back, even from another phone.',
+    paroleRegole: ['Write them on paper, in order.',
+                   'Do not photograph them and do not give them to anyone, not even to us.',
+                   'We ask you only once: you find them again on the «Receive in bitcoin» page.'],
+    paroleNessuno: 'Without these words nobody can recover them, not even us.',
     paroleSpunta: 'I wrote them on paper',
-    paroleFatto: 'I saved the words',
+    paroleFatto: 'Continue',
     paroleSpuntaPrima: 'First tick «I wrote them on paper».',
-    indirizzoTit: 'Where you receive the bitcoin',
-    indirizzoSpiega: 'A bitcoin address of your wallet.',
-    indirizzoNo: 'This is not a valid address for this network.',
-    crea: 'Create the swap',
-    creo: n => `Creating the swap and checking the ${n} answer…`,
-    nienteCasa: 'This phone cannot keep the keys: the swap cannot be done from here.',
-    rifiuto: n => `${n} answered with data that does not add up: the swap does not start, no sats moved.`,
+    indirizzoTit: 'Your bitcoin address',
+    indirizzoSpiega: 'You find it in your wallet, under «Receive».',
+    indirizzoManca: 'First add your bitcoin address: tap «Paste».',
+    indirizzoNo: 'This is not a valid bitcoin address.',
+    incolla: 'Paste', qr: 'QR',
+    appuntiChiusi: 'I cannot read the clipboard: press and hold the field and choose «Paste».',
+    appuntiNo: 'The clipboard holds no valid bitcoin address: copy it from your wallet.',
+    qrTesto: 'Frame the QR of your bitcoin address',
+    qrNo: 'This QR is not a valid bitcoin address.',
+    qrCamera: 'I cannot open the camera: paste the address.',
+    qrChiudi: 'Close',
+    creo: n => `Preparing the exchange with ${n} and checking its answer…`,
+    nienteCasa: 'This phone cannot keep the 12 words: from here you can only receive via Lightning.',
+    rifiuto: n => `${n} answered with data that does not add up: nothing starts, no sats moved.`,
     nonRisponde: n => `${n} is not responding: try again, or receive via Lightning.`,
-    tuoSwap: 'Your swap',
-    eseguitoDa: n => `Run by ${n}`,
+    tuoSwap: 'Your payout in bitcoin',
+    eseguitoDa: n => `The exchange is done by ${n}`,
     ricevi: n => `You receive about ${n} sats at`,
-    riceviQui: n => `You receive about ${n} sats at this address.`,
+    passi: ['Paid', 'On its way', 'Arrived'],
+    passiEt: 'Where it is',
     fasi: {
-      creato: n => `Barattolo is paying the swap: then ${n} locks the bitcoin and I claim them.`,
-      bloccato: n => `${n} locked the bitcoin: claiming.`,
-      confermato: () => 'Bitcoin locked and confirmed: claiming.',
-      fatto: () => 'Done: the bitcoin are yours.',
+      creato: () => 'Barattolo is paying the exchange: then the bitcoin leave for your address.',
+      bloccato: n => `${n} prepared your bitcoin: sending them to your address.`,
+      confermato: () => 'Your bitcoin are ready: sending them to your address.',
+      fatto: () => 'Done: the bitcoin are at your address.',
       scaduto: () => 'Expired: no sats moved, the payout is available again.',
       fallito: () => 'Failed: the payout is available again.',
       ripreso: n => `${n} took the bitcoin back: the payout is available again.`},
     statoIgnoto: 'In progress.',
     pagamento: {
-      pagato: n => `Paid: waiting for ${n} to lock the bitcoin.`,
+      pagato: n => `Paid: waiting for ${n} to prepare your bitcoin.`,
       da_verificare: () => 'Payment being checked: we are on it. Your sats are not lost.',
       fallito: () => 'The payment did not go out: no sats moved. Choose again how to receive.',
-      tetto_utente: () => 'You reached the swap limit for today: receive via Lightning.',
-      tetto_giorno: () => 'Swaps are full for today: receive via Lightning.',
-      cambiata: () => 'The fees changed: no sats moved. Choose again how to receive.',
-      rifiutato: () => 'Barattolo does not pay this swap: no sats moved. Choose again how to receive.'},
-    ritirato: id => `Claimed: transaction ${id}.`,
+      tetto_utente: () => 'You reached the limit of bitcoin payouts for today: receive via Lightning.',
+      tetto_giorno: () => 'Bitcoin payouts are full for today: receive via Lightning.',
+      cambiata: () => 'The figures changed: no sats moved. Choose again how to receive.',
+      rifiutato: () => 'Barattolo does not pay this exchange: no sats moved. Choose again how to receive.'},
+    ritirato: id => `On their way to your address: transaction ${id}.`,
     concluso: (sats, id) => `Done: ${sats} sats arrived (transaction ${id}).`,
-    ritiroErrore: 'The claim did not go through yet: retrying by itself.',
-    spesoAltri: n => `The swap's bitcoin were spent by another transaction, not by your claim: write to ${n}.`,
-    lista: 'Your swaps',
+    ritiroErrore: 'Sending to your address did not go through yet: retrying by itself.',
+    spesoAltri: n => `Those bitcoin were spent by another transaction, not by your sending: write to ${n}.`,
+    lista: 'Your bitcoin payouts',
     ordine: n => `Order #${n}`,
     recuperato: 'Recovered',
     mostra: 'Show the 12 words',
     nascondi: 'Hide',
-    nessunaParola: 'You have no words yet: they are born with the first swap.',
+    nessunaParola: 'You have no words yet: they are born with the first bitcoin payout.',
     recuperaTit: 'Recover from 12 words',
-    recuperaSpiega: 'If you had swaps on another phone, paste your 12 words here.',
+    recuperaSpiega: 'If you had bitcoin payouts on another phone, paste your 12 words here.',
     recupera: 'Recover',
     recuperaDa: n => `Recover from ${n}`,
     recuperaNo: 'These are not 12 valid words.',
-    recuperaAltre: 'This phone already has other words with swaps: I will not replace them.',
-    recuperaFatto: n => n === 0 ? 'No swaps tied to these words.'
-      : n === 1 ? 'Recovered 1 swap.' : `Recovered ${n} swaps.`,
-    ritiraA: 'Claim to this address'}};
+    recuperaAltre: 'This phone already has other words in use: I will not replace them.',
+    recuperaFatto: n => n === 0 ? 'No payouts tied to these words.'
+      : n === 1 ? 'Recovered 1 payout.' : `Recovered ${n} payouts.`,
+    ritiraA: 'Send to this address'}};
 function t3(){ return SWAP_TESTI_T3[linguaSwap()]; }
 function swapCorto(s, n){ s = String(s || ''); return s.length > 2 * n + 1 ? `${s.slice(0, n)}…${s.slice(-n)}` : s; }
 function swapPiuFornitori(){ return swapFornitori().length > 1; }
@@ -258,18 +287,68 @@ async function swapInstradaPreventivo(n, ricontrolla){
 }
 
 /* ─── 5. IL PANNELLO DELL'INCASSO, ramo swap ────────────────────────────
-   I passi di un ordine: 'preventivo' (la tappa 2) -> 'parole' (la prima
-   volta con QUEL fornitore) -> 'indirizzo' -> 'creo'. Poi c'e' lo swap,
-   e il pannello mostra il suo stato. */
+   I passi di un ordine: 'preventivo' (le cifre, e sotto il campo
+   dell'indirizzo) -> 'parole' (la prima volta con QUEL fornitore) ->
+   'creo'. Poi c'e' lo swap, e il pannello mostra il suo stato.
+   I TOCCHI (27 ott 2026, cantiere grafica-swap, regola di Andrea: al piu'
+   tre dopo la conferma): l'indirizzo si mette PRIMA di «Conferma», con
+   «Incolla» o col QR; dopo la conferma chi ha gia' le parole non tocca
+   piu' niente, e la prima volta tocca la spunta e «Continua». Il passo
+   'indirizzo' di ieri non c'e' piu': chi lo avesse in memoria torna al
+   preventivo, che ha il campo. */
 const swapPassi = {};      // ordine -> passo
 const swapErrori = {};     // ordine -> frase
 /* l'indirizzo scritto, per ordine: un avviso ridisegna il pannello, e un
-   bc1 lungo non si fa riscrivere da capo (preso dal giro dal vivo) */
+   bc1 lungo non si fa riscrivere da capo (preso dal giro dal vivo). Lo
+   tiene aggiornato l'ascoltatore dell'input, in fondo: il preventivo si
+   ridisegna anche da solo (le cifre che si rileggono) */
 const swapIndirizziScritti = {};
 const swapParoleViste = {};   // fornitore -> true quando si vedono
 function swapScelto(n){
   const d = ((preventiviSwap[n] || {}).dati) || {};
   return d.fornitore || 'satsrouting';
+}
+/* L'INDIRIZZO DA QUEL CHE ARRIVA: incollato, inquadrato o scritto, anche
+   nella forma «bitcoin:bc1…?amount=…» dei wallet; un bech32 tutto
+   maiuscolo (i QR lo fanno per stare piccoli) torna minuscolo. Il
+   giudice resta `indirizzoValido` del fornitore, con la sua rete. */
+function swapEstraiIndirizzo(testo){
+  let s = String(testo || '').trim();
+  if (/^bitcoin:/i.test(s)) s = s.slice(8);
+  s = s.split('?')[0].replace(/\s+/g, '');
+  if (/^(bc1|tb1|bcrt1)/i.test(s) && s === s.toUpperCase()) s = s.toLowerCase();
+  return s.slice(0, 120);
+}
+/* IL QR: dentro Telegram, sul telefono, lo scanner di Telegram; fuori, la
+   fotocamera della pagina SOLO se il browser sa leggere i QR da se'
+   (BarcodeDetector: niente librerie nuove, decisione di Andrea). Dove non
+   c'e' nessuno dei due il bottone non compare, e resta «Incolla». */
+function swapQrTelegram(){
+  try {
+    return !!(typeof tg !== 'undefined' && tg && tg.initData
+      && typeof tg.showScanQrPopup === 'function'
+      && (!tg.isVersionAtLeast || tg.isVersionAtLeast('6.4'))
+      && ['android', 'android_x', 'ios'].includes(String(tg.platform || '')));
+  } catch(e){ return false; }
+}
+function swapQrBrowser(){
+  return typeof window !== 'undefined' && 'BarcodeDetector' in window
+    && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+function swapQrPossibile(){ return swapQrTelegram() || swapQrBrowser(); }
+function campoIndirizzoSwap(n, errore){
+  const t = t3();
+  return `<div class="swap-campo">
+      <h4>₿ ${esc(t.indirizzoTit)}</h4>
+      <div class="hint">${esc(t.indirizzoSpiega)}</div>
+      ${errore}
+      <input class="swap-indirizzo" id="swapIndirizzo_${n}" type="text" autocomplete="off"
+        spellcheck="false" placeholder="bc1…" inputmode="text" value="${esc(swapIndirizziScritti[n] || '')}">
+      <div class="swap-attrezzi">
+        <button class="btn ghost" type="button" data-swap="incolla" data-ordine="${n}">📋 ${esc(t.incolla)}</button>
+        ${swapQrPossibile() ? `<button class="btn ghost" type="button" data-swap="qr" data-ordine="${n}">📷 ${esc(t.qr)}</button>` : ''}
+      </div>
+    </div>`;
 }
 function pannelloSwapTelefono(o){
   const n = Number(o.id), t = t3();
@@ -280,31 +359,46 @@ function pannelloSwapTelefono(o){
   const errore = swapErrori[n]
     ? `<div class="swap-rifiuto" role="status">${esc(swapErrori[n])}</div>` : '';
   if (passo === 'parole') {
+    /* LE 12 PAROLE, UNA VOLTA SOLA E CON CALMA: a cosa servono, le tre
+       regole, chi puo' recuperare senza (nessuno). Poi le parole, la
+       spunta e «Continua», che fa partire tutto da solo. */
     const c = swapCassetto(fid);
     const parole = c && c.parole ? String(c.parole).split(' ') : [];
-    return `<div class="swap-prev">
+    return `<div class="swap-prev swap-prima-volta">
       <h4>🔑 ${esc(swapPiuFornitori() ? t.paroleDi(nome) : t.paroleTit)}</h4>
-      <div class="hint">${esc(t.paroleSpiega)}</div>
+      <p class="swap-calma">${esc(t.paroleSpiega)}</p>
+      <ol class="swap-regole">${t.paroleRegole.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
+      <p class="swap-calma forte">${esc(t.paroleNessuno)}</p>
       ${errore}
       <ol class="swap-parole">${parole.map(p => `<li>${esc(p)}</li>`).join('')}</ol>
       <label class="swap-spunta"><input type="checkbox" id="swapSpunta_${n}"> ${esc(t.paroleSpunta)}</label>
       <button class="btn orange" type="button" data-swap="parole-fatte" data-ordine="${n}">${esc(t.paroleFatto)}</button>
     </div>`;
   }
-  if (passo === 'indirizzo' || passo === 'creo') {
-    const p = (preventiviSwap[n] || {}).dati || {};
-    return `<div class="swap-prev">
-      <h4>₿ ${esc(t.indirizzoTit)}</h4>
-      <div class="hint">${esc(t.indirizzoSpiega)}</div>
-      ${errore}
-      <input class="swap-indirizzo" id="swapIndirizzo_${n}" type="text" autocomplete="off"
-        spellcheck="false" placeholder="bc1…" inputmode="text" value="${esc(swapIndirizziScritti[n] || '')}">
-      ${p.ricevi ? `<div class="hint">${esc(t.riceviQui(fmt(p.ricevi)))}</div>` : ''}
-      <button class="btn orange" type="button" data-swap="crea" data-ordine="${n}"${passo === 'creo' ? ' disabled' : ''}>${esc(passo === 'creo' ? t.creo(nome) : t.crea)}</button>
-      <div class="swap-da">${esc(t.eseguitoDa(nome))}</div>
+  if (passo === 'creo') return `<div class="swap-prev">
+      <h4>₿ ${esc(t.tuoSwap)}</h4>
+      ${passiSwap(0)}
+      <div class="swap-stato" role="status">${esc(t.creo(nome))}</div>
     </div>`;
-  }
-  return pannelloPreventivoSwap(o);
+  return pannelloPreventivoSwap(o, campoIndirizzoSwap(n, errore));
+}
+/* I TRE PALLINI (27 ott 2026): quanti passi sono stati raggiunti fra
+   «Pagato», «In arrivo» e «Arrivato»; -1 quando lo swap non va avanti
+   (scaduto, non riuscito, rifiutato, speso da altri) e parla la frase
+   da sola */
+function swapTappa(rec){
+  const fase = swapFase(rec);
+  if (rec.spesoDa || ['scaduto', 'fallito', 'ripreso'].includes(fase)) return -1;
+  if ((rec.ritiro && rec.ritiro.concluso) || fase === 'fatto') return 3;
+  if ((rec.ritiro && rec.ritiro.txid) || SWAP_FASI_RITIRO.has(fase)) return 2;
+  if (fase !== 'creato' || ['fallito', 'rifiutato'].includes(rec.pagamento)) return -1;
+  return ['in_volo', 'pagato'].includes(rec.pagamento) ? 1 : 0;
+}
+function passiSwap(quanti){
+  if (quanti < 0) return '';
+  const t = t3();
+  return `<ol class="swap-passi" aria-label="${esc(t.passiEt)}">${t.passi.map((p, i) =>
+    `<li class="${i < quanti ? 'fatto' : i === quanti ? 'ora' : ''}"${i === quanti ? ' aria-current="step"' : ''}>${esc(p)}</li>`).join('')}</ol>`;
 }
 function frasestatoSwap(rec){
   const t = t3();
@@ -328,7 +422,8 @@ function cartaSwap(rec){
   const t = t3();
   return `<div class="swap-prev swap-carta" data-swap-id="${esc(rec.id)}">
     <h4>₿ ${esc(t.tuoSwap)}</h4>
-    <div class="swap-stato">${esc(frasestatoSwap(rec))}</div>
+    ${passiSwap(swapTappa(rec))}
+    <div class="swap-stato" role="status">${esc(frasestatoSwap(rec))}</div>
     ${rec.ricevi && rec.indirizzo ? `<div class="hint">${esc(t.ricevi(fmt(rec.ricevi)))} <span class="mono">${esc(swapCorto(rec.indirizzo, 8))}</span></div>` : ''}
     ${rec.errore && !rec.spesoDa ? `<div class="hint">${esc(t.ritiroErrore)}</div>` : ''}
     <div class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</div>
@@ -336,12 +431,35 @@ function cartaSwap(rec){
 }
 
 /* ─── 6. LE AZIONI ──────────────────────────────────────────────────── */
-/* «Conferma lo swap» del preventivo: si ricontrollano le tariffe del
-   fornitore scelto con l'impronta di quelle mostrate (la tappa 2); se
-   reggono, la prima volta con quel fornitore le parole, poi l'indirizzo */
+/* «Conferma» del preventivo: l'indirizzo prima (si guarda in casa, senza
+   rete), poi si ricontrollano le tariffe del fornitore scelto con
+   l'impronta di quelle mostrate (la tappa 2); se reggono, la prima volta
+   con quel fornitore le parole, sennò lo swap parte subito */
+/* UN GIRO ALLA VOLTA PER ORDINE: da quando «Conferma» non ha piu' un
+   secondo bottone dopo, un doppio tocco farebbe nascere due swap. Chi
+   arriva mentre l'altro lavora, o quando lo swap c'e' gia', non fa niente. */
+const swapInCorso = new Set();
 async function swapAvanti(n){
   haptic();
+  if (swapInCorso.has(n) || swapDiOrdine(n)) return;
+  swapInCorso.add(n);
+  try { await swapAvantiDentro(n); } finally { swapInCorso.delete(n); }
+}
+async function swapAvantiDentro(n){
   delete swapErrori[n];
+  const t = t3();
+  const campo = el(`swapIndirizzo_${n}`);
+  if (campo) swapIndirizziScritti[n] = String(campo.value || '');
+  const indirizzo = swapEstraiIndirizzo(swapIndirizziScritti[n]);
+  if (!indirizzo) { swapErrori[n] = t.indirizzoManca; return ridisegnaIncassoSwap(); }
+  swapIndirizziScritti[n] = indirizzo;
+  const prima = swapFornitore(swapScelto(n));
+  if (prima) {
+    let valido;
+    try { valido = await prima.indirizzoValido(indirizzo); }
+    catch(e){ swapErrori[n] = t.nonRisponde(prima.nome); return ridisegnaIncassoSwap(); }
+    if (!valido) { swapErrori[n] = t.indirizzoNo; return ridisegnaIncassoSwap(); }
+  }
   await swapInstradaPreventivo(n, true);
   const p = preventiviSwap[n] || {};
   if (!p.dati || !p.dati.ok || p.nota === 'cambiata') return;
@@ -352,18 +470,20 @@ async function swapAvanti(n){
     if (!c || !c.parole) {
       let parole;
       try { parole = await f.nuoveParole(); }
-      catch(e){ swapErrori[n] = t3().nonRisponde(f.nome); return ridisegnaIncassoSwap(); }
+      catch(e){ swapErrori[n] = t.nonRisponde(f.nome); return ridisegnaIncassoSwap(); }
       const nuovo = {parole: parole, prossimo: 0, copiata: false};
-      if (!swapScrivi(swapCasaParole(fid), nuovo)) { swapErrori[n] = t3().nienteCasa; return ridisegnaIncassoSwap(); }
+      if (!swapScrivi(swapCasaParole(fid), nuovo)) { swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
     }
     swapPassi[n] = 'parole';
-  } else {
-    swapPassi[n] = 'indirizzo';
+    return ridisegnaIncassoSwap();
   }
-  ridisegnaIncassoSwap();
+  return swapCreaDentro(n);
 }
+/* «Continua» delle parole: segnate come copiate, lo swap parte da solo
+   con l'indirizzo gia' messo (niente terzo passo da toccare) */
 function swapParoleFatte(n){
   haptic();
+  if (swapInCorso.has(n) || swapDiOrdine(n)) return;
   const spunta = el(`swapSpunta_${n}`);
   if (!spunta || !spunta.checked) { swapErrori[n] = t3().paroleSpuntaPrima; return ridisegnaIncassoSwap(); }
   const fid = swapScelto(n);
@@ -372,21 +492,25 @@ function swapParoleFatte(n){
   c.copiata = true;
   if (!swapScrivi(swapCasaParole(fid), c)) { swapErrori[n] = t3().nienteCasa; return ridisegnaIncassoSwap(); }
   delete swapErrori[n];
-  swapPassi[n] = 'indirizzo';
-  ridisegnaIncassoSwap();
+  return swapCrea(n);
 }
+/* LA NASCITA, senza tocco suo: la chiamano «Conferma» e «Continua». Ogni
+   no riporta al preventivo col suo perche', e l'indirizzo resta nel campo */
 async function swapCrea(n){
-  haptic();
+  if (swapInCorso.has(n) || swapDiOrdine(n)) return;
+  swapInCorso.add(n);
+  try { await swapCreaDentro(n); } finally { swapInCorso.delete(n); }
+}
+async function swapCreaDentro(n){
   const t = t3();
-  const indirizzo = String((el(`swapIndirizzo_${n}`) || {}).value || '').trim();
-  swapIndirizziScritti[n] = indirizzo;
+  const indirizzo = swapEstraiIndirizzo(swapIndirizziScritti[n]);
   const p = ((preventiviSwap[n] || {}).dati) || {};
   const fid = swapScelto(n), f = swapFornitore(fid);
   if (!f) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
   let valido;
-  try { valido = await f.indirizzoValido(indirizzo); }
-  catch(e){ swapErrori[n] = t.nonRisponde(f.nome); return ridisegnaIncassoSwap(); }
-  if (!valido) { swapErrori[n] = t.indirizzoNo; return ridisegnaIncassoSwap(); }
+  try { valido = !!indirizzo && await f.indirizzoValido(indirizzo); }
+  catch(e){ swapPassi[n] = 'preventivo'; swapErrori[n] = t.nonRisponde(f.nome); return ridisegnaIncassoSwap(); }
+  if (!valido) { swapPassi[n] = 'preventivo'; swapErrori[n] = indirizzo ? t.indirizzoNo : t.indirizzoManca; return ridisegnaIncassoSwap(); }
   if (!p.ok || !p.hash) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
   const c = swapCassetto(fid);
   if (!c || !c.parole || !c.copiata) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
@@ -394,7 +518,7 @@ async function swapCrea(n){
      al giro dopo si usa il successivo, mai lo stesso */
   const indice = Number(c.prossimo) || 0;
   c.prossimo = indice + 1;
-  if (!swapScrivi(swapCasaParole(fid), c)) { swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
+  if (!swapScrivi(swapCasaParole(fid), c)) { swapPassi[n] = 'preventivo'; swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
   swapPassi[n] = 'creo';
   delete swapErrori[n];
   ridisegnaIncassoSwap();
@@ -402,7 +526,7 @@ async function swapCrea(n){
   try { nuovo = await f.crea({parole: c.parole, indice: indice, preventivo: p, indirizzo: indirizzo}); }
   catch(e){
     if (e && e.tipo === 'mente') return swapRipiega(n, f);
-    swapPassi[n] = 'indirizzo';
+    swapPassi[n] = 'preventivo';
     swapErrori[n] = t.nonRisponde(f.nome);
     return ridisegnaIncassoSwap();
   }
@@ -413,6 +537,113 @@ async function swapCrea(n){
   ridisegnaIncassoSwap();
   await swapPaga(rec);
   swapSorveglia();
+}
+/* ─── 6a. «INCOLLA» E IL QR ───────────────────────────────────────────
+   Quel che arriva si guarda subito col giudice del fornitore: buono, va
+   nel campo; storto, lo si dice sopra il campo e il campo resta com'era. */
+async function swapIndirizzoArrivato(n, testo, da){
+  const t = t3();
+  const indirizzo = swapEstraiIndirizzo(testo);
+  const f = swapFornitore(swapScelto(n));
+  let valido = false;
+  try { valido = !!indirizzo && !!f && await f.indirizzoValido(indirizzo); }
+  catch(e){ valido = false; }
+  if (!valido) { swapErrori[n] = da === 'qr' ? t.qrNo : t.appuntiNo; return ridisegnaIncassoSwap(); }
+  swapIndirizziScritti[n] = indirizzo;
+  delete swapErrori[n];
+  ridisegnaIncassoSwap();
+}
+/* dove il browser non lascia leggere gli appunti (certe WebView) lo dice,
+   e mette il fuoco nel campo per il tieni-premuto-e-incolla (la strada
+   del PayCode) */
+async function swapIncolla(n){
+  haptic();
+  let testo = null;
+  try { testo = await navigator.clipboard.readText(); } catch(e){ testo = null; }
+  if (testo == null) {
+    toast(t3().appuntiChiusi);
+    const c = el(`swapIndirizzo_${n}`);
+    if (c) try { c.focus(); } catch(e){}
+    return;
+  }
+  return swapIndirizzoArrivato(n, testo, 'appunti');
+}
+/* LA FOTOCAMERA DELLA PAGINA, fuori da Telegram: uno strato a tutto
+   schermo col video e «Chiudi». Il flusso si spegne SEMPRE alla chiusura
+   (la lucina non resta accesa), e `swapQrGiro` numera le aperture: una
+   risposta che arriva a strato chiuso spegne quel che ha avuto e tace
+   (la lezione della fotocamera delle foto). */
+let swapQrFlusso = null, swapQrGiro = 0, swapQrTimer = null;
+function swapQr(n){
+  haptic();
+  const t = t3();
+  if (swapQrTelegram()) {
+    try {
+      tg.showScanQrPopup({text: t.qrTesto}, testo => {
+        swapIndirizzoArrivato(n, testo, 'qr');
+        return true;
+      });
+      return;
+    } catch(e){ /* questo Telegram non lo apre: si prova la pagina */ }
+  }
+  if (!swapQrBrowser()) { toast(t.qrCamera); return; }
+  swapQrApri(n);
+}
+function swapQrStrato(){
+  let s = el('swapQrStrato');
+  if (s) return s;
+  s = document.createElement('div');
+  s.id = 'swapQrStrato';
+  s.className = 'swap-qr-strato';
+  s.setAttribute('role', 'dialog');
+  s.setAttribute('aria-modal', 'true');
+  document.body.appendChild(s);
+  return s;
+}
+async function swapQrApri(n){
+  const t = t3(), giro = ++swapQrGiro;
+  const s = swapQrStrato();
+  s.setAttribute('aria-label', t.qrTesto);
+  s.innerHTML = `<video id="swapQrVideo" playsinline muted autoplay></video>
+    <div class="swap-qr-mirino" aria-hidden="true"></div>
+    <div class="swap-qr-piede">
+      <div class="swap-qr-testo" role="status">${esc(t.qrTesto)}</div>
+      <button class="swap-qr-btn" type="button" data-swap="qr-chiudi">✕ ${esc(t.qrChiudi)}</button>
+    </div>`;
+  s.classList.add('open');
+  let flusso, lettore;
+  try {
+    lettore = new window.BarcodeDetector({formats: ['qr_code']});
+    flusso = await navigator.mediaDevices.getUserMedia({audio: false,
+      video: {facingMode: {ideal: 'environment'}}});
+  } catch(e){
+    if (giro === swapQrGiro) { swapQrChiudi(); toast(t.qrCamera); }
+    return;
+  }
+  if (giro !== swapQrGiro) { flusso.getTracks().forEach(k => { try { k.stop(); } catch(e){} }); return; }
+  swapQrFlusso = flusso;
+  const v = el('swapQrVideo');
+  v.srcObject = flusso;
+  try { await v.play(); } catch(e){}
+  const guarda = async () => {
+    if (giro !== swapQrGiro) return;
+    let letti = [];
+    try { if (v.readyState >= 2) letti = await lettore.detect(v); } catch(e){ letti = []; }
+    if (giro !== swapQrGiro) return;
+    const primo = letti.find(x => x && x.rawValue);
+    if (primo) { swapQrChiudi(); swapIndirizzoArrivato(n, primo.rawValue, 'qr'); return; }
+    swapQrTimer = setTimeout(guarda, 250);
+  };
+  guarda();
+}
+function swapQrChiudi(){
+  swapQrGiro++;
+  clearTimeout(swapQrTimer);
+  swapQrTimer = null;
+  if (swapQrFlusso) swapQrFlusso.getTracks().forEach(k => { try { k.stop(); } catch(e){} });
+  swapQrFlusso = null;
+  const s = el('swapQrStrato');
+  if (s) { s.classList.remove('open'); s.innerHTML = ''; }
 }
 /* ─── 6b. IL PAGAMENTO DELLA FATTURA (tappa 4) ────────────────────────
    Lo swap nato e verificato si salva PRIMA di chiedere il pagamento:
@@ -469,7 +700,7 @@ async function swapRipiega(n, f){
     /* nessun altro: ci si ferma, e il fornitore resta riprovabile (un
        secondo tentativo usa comunque una chiave nuova) */
     fuori.delete(f.id);
-    swapPassi[n] = 'indirizzo';
+    swapPassi[n] = 'preventivo';
     swapErrori[n] = t.rifiuto(f.nome);
     return ridisegnaIncassoSwap();
   }
@@ -479,7 +710,7 @@ async function swapRipiega(n, f){
   p.nota = 'ripiego';
   p.ripiegoDa = f.nome;
   if (!p.dati || !p.dati.ok) {
-    swapPassi[n] = 'indirizzo';
+    swapPassi[n] = 'preventivo';
     swapErrori[n] = t.rifiuto(f.nome);
   }
   ridisegnaIncassoSwap();
@@ -664,10 +895,23 @@ if (typeof document !== 'undefined') {
     if (a === 'scegli') scegliIncassoSwap(n, b.dataset.scelta === 'swap' ? 'swap' : 'ln');
     else if (a === 'avanti') swapAvanti(n);
     else if (a === 'parole-fatte') swapParoleFatte(n);
-    else if (a === 'crea') swapCrea(n);
+    else if (a === 'incolla') swapIncolla(n);
+    else if (a === 'qr') swapQr(n);
+    else if (a === 'qr-chiudi') { haptic(); swapQrChiudi(); }
     else if (a === 'mostra-parole') { haptic(); swapParoleViste[fid] = !swapParoleViste[fid]; renderSwapTelefono(); }
     else if (a === 'recupera') swapRecupera(fid);
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
+  });
+  /* il campo dell'indirizzo si ricorda a ogni lettera: il preventivo si
+     ridisegna anche da solo, e un bc1 lungo non si riscrive */
+  document.addEventListener('input', ev => {
+    const c = ev.target;
+    if (c && typeof c.id === 'string' && c.id.startsWith('swapIndirizzo_'))
+      swapIndirizziScritti[Number(c.id.slice(14))] = String(c.value || '');
+  });
+  /* la fotocamera non resta accesa ad app in secondo piano */
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && swapQrFlusso) swapQrChiudi();
   });
   swapRiprendi();
 }

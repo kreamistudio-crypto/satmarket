@@ -5245,7 +5245,10 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
 
 
 NOMI_ALTRA_CASSAFORTE = ("DEVIATO", "_dove_tentati", "_cassaforte_tentata",
-                         "_cassaforte_uscita")
+                         "_cassaforte_uscita", "_riserva_lnbits",
+                         "_saldo_cassaforte", "_avvisa_margine",
+                         "MOTIVO_RISERVA", "RISERVA_LNBITS_PERCENTO",
+                         "RISERVA_LNBITS_MIN_SATS")
 
 
 def ambiente_altra_cassaforte():
@@ -5265,8 +5268,22 @@ def ambiente_altra_cassaforte():
     i = _SORGENTE.index("\nDEVIATO = ") + 1
     exec(_SORGENTE[i:_SORGENTE.index("\n", i)], p)
     for nome in ("_campo", "_dove_tentati", "_cassaforte_tentata",
-                 "_cassaforte_uscita"):
+                 "_cassaforte_uscita", "_riserva_lnbits"):
         exec(pezzo(nome), p)
+    # (27 ott 2026, margine-cassaforte) la domanda del saldo prima della
+    # mano: sui banchi di ieri il saldo NON si legge (None) e l'avviso
+    # tace — il fail-open dichiarato, cioe' il comportamento di ieri. Chi
+    # vuole la domanda vera monta i suoi (prove_margine_cassaforte e il
+    # collaudo sul server vero).
+
+    async def _saldo_ignoto(cf):
+        return None
+
+    async def _zitto(*a, **k):
+        return None
+    p.update(_saldo_cassaforte=_saldo_ignoto, _avvisa_margine=_zitto,
+             MOTIVO_RISERVA="riserva", RISERVA_LNBITS_PERCENTO=1.0,
+             RISERVA_LNBITS_MIN_SATS=2)
     return {n: p[n] for n in NOMI_ALTRA_CASSAFORTE}
 
 
@@ -6867,8 +6884,8 @@ def prove_in_pagamento():
           qn(50, 1000) - 1000)
     prova("«ci stiamo lavorando» scatta quando scatta il 🧊: un numero solo",
           True, "\nIN_PAGAMENTO_LUNGO_S = IN_VOLO_LIMITE_S\n" in src)
-    prova("i guasti di casa sono tre: saldo, ponte, LNbits muta",
-          ("saldo", "ponte", "lnbits_muto"), P["MOTIVI_NOSTRI"])
+    prova("i guasti di casa sono quattro: saldo, ponte, LNbits muta, e dal 27 ott 2026 il margine (riserva)",
+          ("saldo", "ponte", "lnbits_muto", "riserva"), P["MOTIVI_NOSTRI"])
 
     # --- 1. IL GIUDICE, riga per riga --------------------------------
     # (un «non e' in pagamento» torna come stadio VUOTO: a guardia rotta
@@ -36637,8 +36654,10 @@ def prove_impersonazione():
         i = _SORGENTE.index(ancora)
         exec(_SORGENTE[i:_SORGENTE.index(chr(10) * 3, i)], amb2)
     for costante in ("MSG_RIFIUTO = (", "MSG_RIFIUTO_DIVIETO = (",
+                     "MSG_RIFIUTO_PAROLA = ",
                      "MSG_RIFIUTO_RISCRIVI = (",
                      "MSG_RIFIUTO_SCRIVICI = (",
+                     "CONTATTO_PRIVATO = ",
                      "MSG_RIFIUTO_SERVIZI = (",
                      "MSG_RIFIUTO_IMPERSONAZIONE = (",
                      "PAROLE_IMPERSONAZIONE = ("):
@@ -36652,14 +36671,18 @@ def prove_impersonazione():
     # a chi protestare. Restano UGUAGLIANZE ESATTE, che e'
     # l'affermazione piu' forte: cosi' provano in un colpo il
     # messaggio giusto E che la strada e' appesa a tutti.
+    # LA PORTA E' LA CHAT PRIVATA, sempre (25 ott 2026, cantiere
+    # filtro-animali-falso-positivo): il canale finto qui sopra resta
+    # apposta, e una coda che lo pescasse ancora lo direbbe.
+    porta = amb2["CONTATTO_PRIVATO"]
     coda = (amb2["MSG_RIFIUTO_RISCRIVI"] + amb2["MSG_RIFIUTO_SCRIVICI"]
-            + "https://t.me/prova")
+            + porta)
     # ...e i servizi il riscrivi NON lo prendono: la loro frase la
     # dice gia' («Riscrivi… e ripubblica!»), e la stessa cosa due
     # volte a due righe di distanza e' il registro che questo
     # progetto toglie. E' l'unico ramo con una coda diversa: se un
     # domani gliela si uniforma per simmetria, questa riga lo dice.
-    coda_serv = amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova"
+    coda_serv = amb2["MSG_RIFIUTO_SCRIVICI"] + porta
     prova("chi si e' spacciato per noi ha il messaggio suo",
           amb2["MSG_RIFIUTO_IMPERSONAZIONE"] + coda,
           rifiuto("impersonazione della piattaforma"))
@@ -36732,21 +36755,33 @@ def prove_impersonazione():
     prova("...che si puo' riscrivere e ripubblicare", True,
           "ripubblica" in detto)
     prova("...e a chi scrivere se l'errore e' nostro", True,
-          "https://t.me/prova" in detto)
-    # E IL CANALE SI PROMETTE SOLO SE C'E': un contatto scritto
-    # dove non c'e' nessun canale e' una porta su un muro.
-    amb3 = dict(amb2, BANNER_TEST_LINK="")
-    exec(pezzo("messaggio_rifiuto"), amb3)
-    muto = amb3["messaggio_rifiuto"]("arma da fuoco")
-    prova("senza canale non si promette nessun contatto", True,
-          "scrivici" not in muto and "armi" in muto
-          and "ripubblica" in muto)
-    # ...e nemmeno un segnaposto vale per un canale: e' la stessa
-    # riga del messaggio dei moderatori (startswith("http")).
-    amb4 = dict(amb2, BANNER_TEST_LINK="INCOLLA_QUI_IL_LINK")
-    exec(pezzo("messaggio_rifiuto"), amb4)
-    prova("...nemmeno col segnaposto nel config", True,
-          "scrivici" not in amb4["messaggio_rifiuto"]("arma da fuoco"))
+          porta in detto and "https://t.me/prova" not in detto)
+    # HANNO CAMBIATO LATO (25 ott 2026, decisione di Andrea): dicevano
+    # «senza canale nessun contatto», e cosi' chi era fermato per
+    # sbaglio su un'istanza senza BANNER_TEST_LINK restava senza
+    # nessuno a cui dirlo. La porta adesso e' un indirizzo NOSTRO, e
+    # c'e' col canale vuoto come col segnaposto: il config non la tocca.
+    for canale in ("", "INCOLLA_QUI_IL_LINK"):
+        amb3 = dict(amb2, BANNER_TEST_LINK=canale)
+        exec(pezzo("messaggio_rifiuto"), amb3)
+        muto = amb3["messaggio_rifiuto"]("arma da fuoco")
+        prova(f"col canale «{canale}» lo «scrivici» resta", True,
+              "scrivici: " + porta in muto and "armi" in muto
+              and "ripubblica" in muto)
+    # ...ed e' un indirizzo di Telegram vero, non un segnaposto che
+    # nessuno ha riempito
+    prova("...e la porta e' la chat privata di un t.me", True,
+          porta.startswith("https://t.me/") and porta.endswith("?direct"))
+    # LA PAROLA CHE HA FERMATO, sul ramo del filtro: c'e' quando la
+    # si passa, e senza resta il messaggio di prima byte per byte
+    # (i chiamanti dell'AI non ne hanno una).
+    prova("il filtro parole dice anche la parola",
+          amb2["MSG_RIFIUTO_DIVIETO"].format(divieto="animali protetti")
+          + " A fermarlo è stata la parola «avorio»." + coda,
+          rifiuto(divieto="animali protetti", parola="avorio"))
+    prova("...e senza parola il messaggio non si muove",
+          col_divieto("animali protetti"),
+          rifiuto(divieto="animali protetti", parola=""))
 
 
 # ====================================================================
@@ -42208,14 +42243,15 @@ def prove_sat_non_e_barattolo():
         i = src.index(ancora)
         exec(src[i:src.index(chr(10) * 3, i)], amb2)
     for n in ("MSG_RIFIUTO", "MSG_RIFIUTO_SERVIZI",
-              "MSG_RIFIUTO_IMPERSONAZIONE", "PAROLE_IMPERSONAZIONE"):
+              "MSG_RIFIUTO_IMPERSONAZIONE", "PAROLE_IMPERSONAZIONE",
+              "CONTATTO_PRIVATO"):
         j = src.index(f"{n} = ")
         exec(src[j:src.index("\n\n\n", j)], amb2)
     exec(pezzo("messaggio_rifiuto"), amb2)
     msg = amb2["messaggio_rifiuto"]
     imperson = (amb2["MSG_RIFIUTO_IMPERSONAZIONE"]
                 + amb2["MSG_RIFIUTO_RISCRIVI"]
-                + amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova")
+                + amb2["MSG_RIFIUTO_SCRIVICI"] + amb2["CONTATTO_PRIVATO"])
     prova("«confondere»: il messaggio dell'impersonazione, non le armi",
           imperson,
           msg('il nome appare progettato per confondere con Barattolo'))
@@ -42227,14 +42263,14 @@ def prove_sat_non_e_barattolo():
               msg(motivo))
     prova("un servizio resta un servizio",
           amb2["MSG_RIFIUTO_SERVIZI"] + amb2["MSG_RIFIUTO_SCRIVICI"]
-          + "https://t.me/prova",
+          + amb2["CONTATTO_PRIVATO"],
           msg("servizio di riparazione su commissione"))
     # HA CAMBIATO LATO (ago 2026): chiedeva la lista dei nove, e
     # adesso il rifiuto dice QUALE divieto e' scattato.
     prova("e un'arma dice «armi»",
           amb2["MSG_RIFIUTO_DIVIETO"].format(divieto="armi")
           + amb2["MSG_RIFIUTO_RISCRIVI"]
-          + amb2["MSG_RIFIUTO_SCRIVICI"] + "https://t.me/prova",
+          + amb2["MSG_RIFIUTO_SCRIVICI"] + amb2["CONTATTO_PRIVATO"],
           msg("arma da fuoco funzionante"))
 
     # 5. il collaudo col MODELLO tiene il caso come REGRESSIONE
@@ -42589,7 +42625,7 @@ def prove_piani_condivisi():
     # lasci passare l'annuncio che deve passare.
     amb3 = {"re": re, "unicodedata": _u}
     for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
-                   "def controlla_vietato("):
+                   "def controlla_vietato(", "def termine_vietato("):
         j = src.index(ancora)
         exec(src[j:src.index("\n\n\n", j)], amb3)
     filtro = amb3["controlla_vietato"]
@@ -42659,6 +42695,166 @@ def prove_piani_condivisi():
         k = col.index(nome)
         prova(f"...ed e' atteso {atteso}", True,
               f'"{atteso}"' in col[k:k + 420])
+
+
+def prove_filtro_avorio():
+    """L'AVORIO CHE NON E' UNA ZANNA (25 ott 2026, cantiere
+    filtro-animali-falso-positivo, da un caso VERO: una collezione
+    d'arte sacra in edizione di lusso fermata due volte come «animali
+    protetti»). Il filtro parole fermava «avorio» anche quando era un
+    colore, una carta, un'imitazione o un paese. La cura toglie SOLO
+    quelle frasi intere; queste prove dicono le due meta' — nessuna
+    zanna passa, nessun libro si ferma — e le controprove rompono la
+    regola apposta per vedere che le prove se ne accorgono."""
+    import unicodedata as _u
+    src = _SORGENTE
+
+    def filtro_da(sorgente):
+        amb = {"re": re, "unicodedata": _u}
+        for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
+                       "def termine_vietato("):
+            j = sorgente.index(ancora)
+            exec(sorgente[j:sorgente.index("\n\n\n", j)], amb)
+        return amb["termine_vietato"]
+
+    # --- 1) I VERI: restano fermi, e dicono la parola ---------------
+    zanna = ("animali protetti", "avorio")
+    veri = (
+        ("Statuetta in avorio", "", zanna),
+        ("Zanna d'avorio intagliata", "Pezzo unico.", zanna),
+        ("Netsuke giapponese", "Avorio intagliato a mano, fine '800.",
+         zanna),
+        ("Collana", "Grani di avorio di elefante.", zanna),
+        ("Avorio antico", "Da collezione privata.", zanna),
+        # lo stesso annuncio con una frase innocente E una vera: la
+        # frase innocente non deve fare da lasciapassare all'altra
+        ("Statuetta avorio", "Con base in legno color avorio.", zanna),
+        ("Statuetta", "Colore avorio, in vero avorio massiccio.", zanna),
+        # e le altre voci della categoria non si sono mosse
+        ("Corno di rinoceronte", "", ("animali protetti",
+                                      "corno di rinoceronte")),
+        ("Tappeto", "Vera pelle di tigre.", ("animali protetti",
+                                             "pelle di tigre")),
+        # il libro e l'oggetto IN avorio (26 ott 2026): la frase del
+        # colore non combacia, e la copertina vera resta ferma
+        ("Libro d'ore", "Copertina in avorio intagliato.", zanna),
+        ("Pianoforte antico", "Tasti in avorio.", zanna),
+    )
+    # --- 2) I FALSI: passano lo strato 1 -----------------------------
+    falsi = (
+        # il caso vero, col titolo come e' arrivato ai moderatori
+        ("Collezione d'Arte Religiosa SAIE – Società San Paolo "
+         "(1978-1981) Edizioni di lusso",
+         "Volumi rilegati, carta avorio, in ottimo stato."),
+        ("Collezione d'Arte Religiosa SAIE", "Pagine color avorio."),
+        ("Abito da sposa", "Colore avorio, taglia 42."),
+        ("Bomboniere", "Confetti bianco avorio, 50 pezzi."),
+        ("Maschera tradizionale", "Dalla Costa d'Avorio."),
+        ("Maschera", "Costa D’Avorio, apostrofo tipografico."),
+        ("Pianola", "Tasti effetto avorio, funziona."),
+        ("Bottoni", "In avorio vegetale (corozo), 20 pezzi."),
+        ("La torre d'avorio", "Romanzo, prima edizione."),
+        ("Pettine", "Finto avorio, anni '60."),
+        # due frasi attaccate, che condividono lo spazio di mezzo
+        ("Set di carta da lettere", "Carta avorio, colore avorio."),
+        # il libro e l'oggetto (26 ott 2026, decisione di Andrea): una
+        # riga per frase, e ognuna senza «color» o «carta» davanti, che
+        # la farebbero passare per la frase di ieri
+        ("Messale romano", "Rilegatura avorio con fregi in oro."),
+        ("Agenda", "Copertina avorio, mai usata."),
+        ("Quaderno", "Pagine avorio a righe."),
+        ("Blocco da disegno", "50 fogli avorio, 200 g."),
+        ("Partecipazioni", "Stampate su carta color avorio."),
+        ("Divano", "Tela avorio, sfoderabile."),
+        ("Lavello", "Finitura avorio opaca."),
+        ("Vasca da bagno", "Smalto avorio, anni '70."),
+        ("Comodino", "Laccato avorio, due cassetti."),
+    )
+    filtro = filtro_da(src)
+    for titolo, descr, atteso in veri:
+        prova(f"resta fermo: «{titolo[:24]} {descr[:20]}»", atteso,
+              filtro(titolo, descr))
+    for titolo, descr in falsi:
+        prova(f"passa: «{titolo[:24]} {descr[:20]}»", None,
+              filtro(titolo, descr))
+
+    def regge(f):
+        """True se la tabella intera dice il giusto con quel filtro."""
+        return (all(f(t, d) == a for t, d, a in veri)
+                and all(f(t, d) is None for t, d in falsi))
+    prova("la tabella regge col filtro vero", True, regge(filtro))
+
+    # --- 3) LE CONTROPROVE: si rompe la regola, la tabella se ne
+    # accorge. Ognuna e' un modo plausibile di sbagliare la cura.
+    def rotto(*coppie):
+        mutato = src
+        for vecchio, nuovo in coppie:
+            prova(f"...la mutazione trova «{vecchio[:30]}»", 1,
+                  mutato.count(vecchio))
+            mutato = mutato.replace(vecchio, nuovo)
+        return filtro_da(mutato)
+    # a) la cura pigra: «avorio» tolto dalla lista
+    prova("controprova: senza «avorio» in lista la statuetta passerebbe",
+          False, regge(rotto(('"animali protetti": ("avorio", ',
+                              '"animali protetti": ('))))
+    # b) la frase innocente larga: «avorio» da solo fra gli innocenti
+    prova("controprova: un innocente che mangia la parola nuda", False,
+          regge(rotto(('"color avorio", ', '"avorio", "color avorio", '))))
+    # c) gli spazi ai lati CONSUMATI invece che guardati: due frasi
+    #    attaccate ne lasciano una, e il set di carta si ferma
+    prova("controprova: la frase che consuma gli spazi", False,
+          regge(rotto(('r"(?<= )(?:"', 'r" (?:"'),
+                      ('r")(?= )")', 'r") ")'))))
+    # d) le frasi del libro e dell'oggetto tolte (26 ott 2026): il
+    #    messale, l'agenda, il divano e il comodino tornano fermi
+    prova("controprova: senza le frasi del libro e dell'oggetto", False,
+          regge(rotto(('        "rilegatura avorio", "copertina avorio", '
+                       '"pagine avorio",\n', ""),
+                      ('        "fogli avorio", "carta color avorio", '
+                       '"tela avorio",\n', ""),
+                      ('        "finitura avorio", "smalto avorio", '
+                       '"laccato avorio",\n', ""))))
+    # ...e una frase per volta: ognuna ha il suo caso, che senza di lei
+    #    si ferma (tranne «carta color avorio», che «color avorio»
+    #    copre gia' da sola: si dichiara invece di provarla a vuoto)
+    for frase in ("rilegatura avorio", "copertina avorio", "pagine avorio",
+                  "fogli avorio", "tela avorio", "finitura avorio",
+                  "smalto avorio", "laccato avorio"):
+        prova(f"controprova: senza «{frase}» la tabella cade", False,
+              regge(rotto((f'"{frase}",', ''))))
+
+    # --- 4) LA PAROLA ARRIVA A CHI RIFIUTA --------------------------
+    # i tre siti che rispondono al venditore la passano al messaggio,
+    # e i cinque che scrivono il registro ci mettono la parola
+    prova("i tre rifiuti del filtro passano la parola", 3,
+          len(re.findall(r"messaggio_rifiuto\(divieto=\w+,\s*parola=parola\)",
+                         codice(src))))
+    prova("...e i cinque registri dello strato 1 scrivono la parola", 5,
+          len(re.findall(r'registra_moderazione\(\s*"parole", "vietato",'
+                         r"\s*motivo_parole\(", codice(src))))
+    prova("...e nessuno scrive piu' la sola categoria", 0,
+          len(re.findall(r'registra_moderazione\(\s*"parole", "vietato",'
+                         r"\s*(?=\S)(?!motivo_parole\()", codice(src))))
+    amb = {"re": re, "unicodedata": _u}
+    for ancora in ("def normalizza(", "PAROLE_VIETATE = ",
+                   "def termine_vietato(", "def motivo_parole("):
+        j = src.index(ancora)
+        exec(src[j:src.index("\n\n\n", j)], amb)
+    prova("il motivo del registro: categoria e parola",
+          "animali protetti: avorio",
+          amb["motivo_parole"]("animali protetti", "avorio"))
+    prova("...e senza parola la categoria di sempre", "armi",
+          amb["motivo_parole"]("armi", ""))
+
+    # --- 5) LA PORTA PRIVATA E' UNA SOLA ---------------------------
+    # Il server la scrive nel rifiuto, la Mini App la apre da «Scrivici
+    # per i tuoi dati»: due copie dello stesso indirizzo, tenute pari
+    # da questa riga invece che dalla memoria di chi le cambia.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    j = src.index('CONTATTO_PRIVATO = "')
+    porta = src[j:src.index("\n", j)].split('"')[1]
+    prova("CONTATTO_PRIVATO e' lo stesso CONTATTO_DATI della Mini App",
+          1, mini.count(f"const CONTATTO_DATI = '{porta}';"))
 
 
 def prove_link_offerte():
@@ -147352,7 +147548,14 @@ def prove_negozi_grandi():
              "_salva_foto_connettore": lambda *a: None}
         g.update(leve)
         exec(blocco_msg, g)
-        for nome in ("_righe_da_giudicare", "_nuovi_per_giro", "_segno_varianti"):
+        # LA PAROLA DEL REGISTRO (25 ott 2026, cantiere
+        # filtro-animali-falso-positivo): chi ferma ne chiede la parola a
+        # `parola_vietata`, di cartone come il filtro, e la scrive con
+        # `motivo_parole`, quella vera
+        g["parola_vietata"] = lambda t, d: (
+            "fucile" if vietato_finto(t, d) else "")
+        for nome in ("_righe_da_giudicare", "_nuovi_per_giro", "_segno_varianti",
+                     "motivo_parole"):
             exec(pezzo(nome), g)
         for nome in ("_modera_righe_negozio", "_un_connettore"):
             exec("async " + pezzo(nome), g)
@@ -164376,8 +164579,10 @@ def prove_canale_admin():
     prova("censimento: le 69 chiamate a notifica_admin di prima ci sono "
           "tutte, piu' la disputa del mercatino (che era un ciclo suo), e "
           "OGNUNA dice la sua stanza",
-          {"dispute": 2, "dm": 1, "errori": 33, "moderazione": 14,
-           "riepiloghi": 27}, per_stanza)
+          # (27 ott 2026, margine-cassaforte) «manca margine nella
+          # cassaforte» va nella stanza della liquidita', come la guardia
+          {"dispute": 2, "dm": 1, "errori": 33, "liquidita": 1,
+           "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -164412,10 +164617,11 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "86 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "87 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
-          "quota arrivata su swap@ e l'unione degli account dal web)", 86,
+          "quota arrivata su swap@, l'unione degli account dal web e il "
+          "margine della cassaforte)", 87,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -174179,7 +174385,7 @@ ramoVetrina = 'esplora';
 swapLeve = {attivo: true};
 vestiCellaAste();
 toccaCellaAste();
-out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span>Swap'),
+out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span><span class="eti-ricevi">Ricevi in bitcoin</span>'),
               ELS['nav-aste'].dataset.vestito,
               ELS['portaAste'].style.display, aste, viste.slice()];
 out.voceAcceso = [voceNav('swap'), voceNav('astepresto'),
@@ -174217,7 +174423,9 @@ console.log(JSON.stringify(out));
           [True, "none", 1, 0], r.get("spento"))
     prova("...e la nav accende le aste come sempre",
           ["aste", "aste", "aste"], r.get("voceSpento"))
-    prova("a leva accesa la STESSA cella si veste da Swap e apre la pagina",
+    # (27 ott 2026, cantiere grafica-swap) il vestito si chiama «Ricevi in
+    # bitcoin», nome scelto da Andrea
+    prova("a leva accesa la STESSA cella si veste da «Ricevi in bitcoin» e apre la pagina",
           [True, "swap", "", 1, ["swap"]], r.get("acceso"))
     prova("...e le aste, raggiunte dalla porta, accendono Esplora",
           ["aste", "esplora", "esplora"], r.get("voceAcceso"))
@@ -174226,9 +174434,10 @@ console.log(JSON.stringify(out));
     prova("...e chi era sulla pagina «Swap» esce su Esplora",
           (["esplora"], 0), (r.get("uscita"), r.get("ferma")))
     prova("i testi in inglese per Telegram in un'altra lingua",
-          ["Swap", "No swaps yet."], r.get("en"))
+          ["Receive in bitcoin", "No payouts to your bitcoin address yet."], r.get("en"))
     prova("...in italiano per l'italiano e senza Telegram",
-          ["Per ora non hai nessuno swap.", "Per ora non hai nessuno swap."],
+          ["Per ora nessun incasso al tuo indirizzo bitcoin.",
+           "Per ora nessun incasso al tuo indirizzo bitcoin."],
           [r.get("it"), r.get("senza")])
 
 
@@ -177030,18 +177239,18 @@ telefono = true;
 out.prima = payoutPanel(Object.assign({}, o, {state: 'shipped'})).includes('scelta-incasso');
 out.tocca = payoutPanel(Object.assign({}, o, {state: 'shipped', pagamento: {gesto_venditore: true}})).includes('scelta-incasso');
 sceltaIncassoSwap[7] = 'swap';
-out.carico = payoutPanel(o).includes('Leggo le tariffe');
+out.carico = payoutPanel(o).includes('Calcolo quanto ricevi');
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 47154,
   righe: [{voce: 'dovuto', sats: 48000}, {voce: 'commissione', sats: -288, percento: 0.6},
           {voce: 'rete_invio', sats: -324}, {voce: 'rete_ritiro', sats: -234}]}};
 const sw = payoutPanel(o);
-out.swap = [sw.includes('Commissione SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
-            sw.includes('Ricevi on-chain, circa'), sw.includes('47154'),
+out.swap = [sw.includes('Costo del cambio, SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
+            sw.includes('Ricevi circa'), sw.includes('47154'),
             sw.includes('sellerInvoice'), sw.includes('data-swap="avanti" data-ordine="7"')];
 preventiviSwap[7].nota = 'cambiata';
-out.cambiata = payoutPanel(o).includes('Le tariffe sono cambiate');
+out.cambiata = payoutPanel(o).includes('Le cifre sono cambiate');
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: false, motivo: 'sotto_minimo', minimo: 25000}};
-out.sotto = payoutPanel(o).includes('Sotto i 25000 sats lo swap costa troppo');
+out.sotto = payoutPanel(o).includes('Sotto i 25000 sats mandarli a un indirizzo costa troppo');
 preventiviSwap[7].dati = {ok: false, motivo: 'sopra_tetto', massimo: 50000};
 out.sopra = payoutPanel(o).includes('Sopra i 50000 sats, per ora, solo Lightning');
 preventiviSwap[7].dati = {ok: false, motivo: 'non_risponde'};
@@ -177051,7 +177260,7 @@ tg.initDataUnsafe.user.language_code = 'en';
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 1,
   righe: [{voce: 'commissione', sats: -288, percento: 0.6}]}};
 const en = payoutPanel(o);
-out.en = [en.includes('SATS Routing fee (0.6%)'), en.includes('Confirm the swap')];
+out.en = [en.includes('Exchange fee, SATS Routing (0.6%)'), en.includes('>Confirm<')];
 out.onclick = [sw, giu, en].filter(x => /\son[a-z]+=/.test(x)).length;
 console.log(JSON.stringify(out));
 """.replace("__TESTI__", testi).replace("__LINGUA__", lingua).replace(
@@ -177081,10 +177290,10 @@ console.log(JSON.stringify(out));
     # (19 ott: il titolo del preventivo si chiamava `titolo` come quello
     # della pagina Swap, e nell'oggetto dei testi lo sovrascriveva)
     prova("il titolo della pagina e quello del preventivo sono due chiavi",
-          (2, 1, 1, 1), (testi.count("titolo: 'Swap',"),
-                         testi.count("titoloPrev: 'Preventivo dello swap'"),
-                         testi.count("titoloPrev: 'Swap quote'"),
-                         testi.count("titolo: 'Swap',\n       testo: 'Here")))
+          (1, 1, 1, 1), (testi.count("titolo: 'Ricevi in bitcoin',"),
+                         testi.count("titoloPrev: 'Quanto ricevi al tuo indirizzo'"),
+                         testi.count("titoloPrev: 'What you receive at your address'"),
+                         testi.count("titolo: 'Receive in bitcoin',\n       testo: 'Here")))
 
 
 def prove_swap_telefono():
@@ -178495,10 +178704,10 @@ def prove_swap_pagamento():
     amb = {"_fmt_sats": reale("_fmt_sats")}
     exec(pezzo("_msg_swap_non_andato"), amb)
     m = amb["_msg_swap_non_andato"](30_000)
-    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura», i "
-          "sats al sicuro, si sceglie di nuovo",
-          (False, True, True, True),
-          ("fattura" in m.lower(), "30.000 sats" in m,
+    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura» ne' "
+          "«swap», i sats al sicuro, si sceglie di nuovo",
+          (False, False, True, True, True),
+          ("fattura" in m.lower(), "swap" in m.lower(), "30.000 sats" in m,
            "deposito di garanzia" in m, "scegli di nuovo come incassare" in m))
     sb = codice(pezzo("_sblocca_sats"))
     prova("...e parte PRIMA delle parole di una fattura bruciata, solo se la "
@@ -178617,12 +178826,18 @@ def prove_swap_pagamento():
           "giu', i sats bloccati e il telefono che ritira",
           [(True, True, False), (True, True, False), (True, False, False),
            (True, False, False)],
-          [("54.460 sats" in in_attesa, "aspetta la prima conferma" in in_attesa,
+          [("54.460 sats" in in_attesa, "aspettano la prima conferma" in in_attesa,
             "nel tuo wallet" in in_attesa),
-           ("54.460 sats" in confermato, "già confermato" in confermato,
+           ("54.460 sats" in confermato, "già confermati" in confermato,
             "nel tuo wallet" in confermato),
            ("54.571 sats" in senza, "54.460" in senza, "nel tuo wallet" in senza),
            ("54.571 sats" in giu, "54.460" in giu, "nel tuo wallet" in giu)])
+    # (27 ott 2026, cantiere grafica-swap) le parole di tutti: in nessuno
+    # dei quattro messaggi la parola «swap», e il nome della pagina giusto
+    prova("...e nessuno dei quattro dice «swap»; senza ritiro, la pagina "
+          "«Ricevi in bitcoin»", (0, True),
+          (sum("swap" in m.lower() for m in (in_attesa, confermato, senza, giu)),
+           "«Ricevi in bitcoin»" in senza))
     prova("...e una fattura che non e' di uno swap non cambia niente", "",
           msg("lnbc-altra"))
     sb = codice(pezzo("_sblocca_sats"))
@@ -178631,6 +178846,335 @@ def prove_swap_pagamento():
     prova("il collaudo dello swap intero sta negli elenchi della CI", (True, True),
           ("\ncollaudo_swap_pagamento\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
+def prove_grafica_swap():
+    """LA GRAFICA DELLO SWAP PER TUTTI (27 ott 2026, cantiere grafica-swap,
+    piano approvato da Andrea con tre modifiche). Le regole: al piu' TRE
+    tocchi dopo «Conferma»; niente parole tecniche (swap, HTLC, RGB,
+    fornitore, e con loro lockup e on-chain); le 12 parole spiegate con
+    calma e solo la prima volta; «Incolla» e QR per l'indirizzo; la pagina
+    e il tasto in basso «Ricevi in bitcoin». Il giro coi gesti, contro il
+    SATS Routing di cartone, e' `collaudo_swap_telefono` (la prima volta,
+    la seconda, il doppio tocco); qui le sentinelle e i pezzi puri."""
+    print("\n[la grafica dello swap per tutti]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    testi = pezzo_js(mini, "const SWAP_TESTI = {", "function linguaSwap(){")
+    t3 = pezzo_js(js, "const SWAP_TESTI_T3 = {", "function t3(){")
+    cella = pezzo_js(mini, "const CELLA_SWAP = ", "function vestiCellaAste(){")
+
+    # --- le parole che si leggono: ogni stringa dei due vocabolari, con le
+    # funzioni chiamate su un nome di prova, in tutte e due le lingue
+    banco = r"""
+__TESTI__
+__T3__
+const fuori = [];
+const raccogli = v => {
+  if (typeof v === 'string') fuori.push(v);
+  else if (typeof v === 'function') { for (const x of [0, 1, 2]) fuori.push(String(v(x === 0 ? 'Nome' : x, 'abc'))); }
+  else if (Array.isArray(v)) v.forEach(raccogli);
+  else if (v && typeof v === 'object') Object.values(v).forEach(raccogli);
+};
+raccogli(SWAP_TESTI); raccogli(SWAP_TESTI_T3);
+console.log(JSON.stringify(fuori));
+""".replace("__TESTI__", testi).replace("__T3__", t3)
+    frasi = _node_banco(banco)
+    if frasi is None:
+        salta("le parole della grafica dello swap", "node non c'e'")
+        return
+    vietate = ("swap", "htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
+    trovate = sorted({p for f in frasi for p in vietate if p in f.lower()})
+    prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
+          "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
+          (trovate, len(frasi) > 150))
+    prova("il tasto in basso e la pagina si chiamano «Ricevi in bitcoin»",
+          (True, False, 1, 1),
+          (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Ricevi in bitcoin</span>';"),
+           "Swap';" in cella, testi.count("titolo: 'Ricevi in bitcoin',"),
+           testi.count("titolo: 'Receive in bitcoin',")))
+    prova("...un punto piu' piccola e un filo stretta: ci sta su una riga da 360 px",
+          True, "nav .eti-ricevi{display:block;font-size:9.5px;line-height:1.3;"
+          "letter-spacing:-.15px;" in mini)
+
+    # --- le 12 parole: con calma, e la frase di Andrea alla fine
+    it = t3[:t3.index("\n  en: {")]
+    prova("le 12 parole: a cosa servono, le tre regole, la frase di Andrea",
+          (True, 3, True, True),
+          ("Servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin "
+           "anche da un altro telefono." in it,
+           it[it.index("paroleRegole: ["):it.index("],", it.index("paroleRegole: ["))].count("',") + 1,
+           "paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.'," in it,
+           "le ritrovi nella pagina «Ricevi in bitcoin»." in it))
+    avanti = js[js.index("async function swapAvantiDentro(n){"):js.index("/* «Continua» delle parole")]
+    prova("...e solo la prima volta: il passo «parole» c'e' solo con le parole "
+          "non ancora copiate, sennò lo swap parte subito",
+          (True, True),
+          ("if (!c || !c.parole || !c.copiata) {" in avanti
+           and "swapPassi[n] = 'parole';" in avanti,
+           avanti.rstrip().endswith("return swapCreaDentro(n);\n}")))
+
+    # --- i tocchi: l'indirizzo PRIMA di «Conferma», niente bottone dopo
+    prev = pezzo_js(mini, "function pannelloPreventivoSwap(o, campo){", "\nfunction renderSwap(){")
+    prova("il campo dell'indirizzo sta nel preventivo, prima di «Conferma»", True,
+          0 <= prev.find("${campo || ''}") < prev.find('data-swap="avanti"'))
+    pann = js[js.index("function campoIndirizzoSwap(n, errore){"):js.index("function swapTappa(rec){")]
+    prova("...col campo, «Incolla» e il QR (se c'e' chi lo legge)", (True, True, True, True),
+          ('id="swapIndirizzo_${n}"' in pann, 'data-swap="incolla"' in pann,
+           "${swapQrPossibile() ? `<button" in pann and 'data-swap="qr"' in pann,
+           "return pannelloPreventivoSwap(o, campoIndirizzoSwap(n, errore));" in pann))
+    prova("dopo «Conferma» nessun bottone «Crea»: «Continua» fa partire da solo",
+          (0, True, True),
+          (js.count('data-swap="crea"'),
+           "  delete swapErrori[n];\n  return swapCrea(n);\n}" in js,
+           "else if (a === 'crea')" not in js))
+    prova("un doppio tocco non fa due swap: un giro alla volta per ordine", 3,
+          js.count("if (swapInCorso.has(n) || swapDiOrdine(n)) return;"))
+
+    # --- l'indirizzo da quel che arriva, e chi legge il QR: eseguiti
+    estrai = pezzo_js(js, "function swapEstraiIndirizzo(testo){", "\n}\n") + "\n}\n"
+    qr = js[js.index("function swapQrTelegram(){"):js.index("function campoIndirizzoSwap(")]
+    banco = r"""
+__ESTRAI__
+let tg, window = {}, navigator = {};
+__QR__
+const out = {};
+out.estrai = ['bitcoin:BC1QAR0SRRR7XFKVY5L643LYDNW9RE59GTZZWF5MDQ?amount=0.0004&label=x',
+              '  bc1qar0srrr7 xfkvy5l643lydnw9re59gtzzwf5mdq\n', 'BITCOIN:3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy',
+              'bcrt1qabc', '', null].map(swapEstraiIndirizzo);
+const giro = (t, w, n) => { tg = t; window = w; navigator = n; return [swapQrTelegram(), swapQrBrowser(), swapQrPossibile()]; };
+const tgOk = p => ({initData: 'x', platform: p, showScanQrPopup(){}, isVersionAtLeast: v => v === '6.4'});
+out.qr = {android: giro(tgOk('android'), {}, {}), ios: giro(tgOk('ios'), {}, {}),
+          desktop: giro(tgOk('tdesktop'), {}, {}),
+          vecchio: giro(Object.assign(tgOk('android'), {isVersionAtLeast: () => false}), {}, {}),
+          browser: giro(undefined, {BarcodeDetector: function(){}}, {mediaDevices: {getUserMedia(){}}}),
+          senzaCamera: giro(undefined, {BarcodeDetector: function(){}}, {}),
+          niente: giro(undefined, {}, {mediaDevices: {getUserMedia(){}}})};
+console.log(JSON.stringify(out));
+""".replace("__ESTRAI__", estrai).replace("__QR__", qr)
+    r = _node_banco(banco)
+    if r is None:
+        salta("l'indirizzo e il QR dello swap", "node non c'e'")
+        return
+    prova("l'indirizzo da un QR o dagli appunti: «bitcoin:» e il resto via, il "
+          "bech32 maiuscolo torna minuscolo, gli altri come sono",
+          ["bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+           "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+           "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", "bcrt1qabc", "", ""], r.get("estrai"))
+    prova("il QR: lo scanner di Telegram sul telefono; fuori, la fotocamera solo "
+          "se il browser legge i QR da se'; sennò niente bottone",
+          {"android": [True, False, True], "ios": [True, False, True],
+           "desktop": [False, False, False], "vecchio": [False, False, False],
+           "browser": [False, True, True], "senzaCamera": [False, False, False],
+           "niente": [False, False, False]}, r.get("qr"))
+    # (vendor/qrcode.js c'era gia': DISEGNA i QR, non li legge)
+    prova("...niente librerie nuove: il telefono non carica script, nessun "
+          "lettore di QR in vendor, la fotocamera si spegne alla chiusura e ad "
+          "app nascosta", (False, [], True, True),
+          ("createElement('script')" in js,
+           [f for f in os.listdir("vendor") if any(k in f.lower() for k in ("jsqr", "scan", "zxing", "lettore"))],
+           "if (swapQrFlusso) swapQrFlusso.getTracks().forEach(k => { try { k.stop(); } catch(e){} });" in js,
+           "if (document.hidden && swapQrFlusso) swapQrChiudi();" in js))
+
+    # --- i tre pallini
+    tappa = pezzo_js(js, "function swapTappa(rec){", "\n}\n") + "\n}\n"
+    banco = r"""
+const SWAP_FASI_RITIRO = new Set(['bloccato', 'confermato']);
+let fase = 'creato';
+function swapFase(){ return fase; }
+__TAPPA__
+const casi = [['creato', {pagamento: ''}], ['creato', {pagamento: 'in_volo'}],
+  ['creato', {pagamento: 'pagato'}], ['bloccato', {}], ['creato', {ritiro: {txid: 't'}}],
+  ['fatto', {}], ['bloccato', {ritiro: {txid: 't', concluso: true}}],
+  ['scaduto', {}], ['creato', {pagamento: 'rifiutato'}], ['bloccato', {spesoDa: 'x'}], ['ignoto', {}]];
+console.log(JSON.stringify(casi.map(([f, r]) => { fase = f; return swapTappa(r); })));
+""".replace("__TAPPA__", tappa)
+    prova("i tre pallini: pagato, in arrivo, arrivato; niente pallini quando "
+          "non va avanti", [0, 1, 1, 2, 2, 3, 3, -1, -1, -1, -1], _node_banco(banco))
+
+    # --- il collaudo coi gesti negli elenchi della CI
+    prova("il collaudo dei gesti dello swap sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_swap_telefono\n" in open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read(),
+           "\ncollaudo_swap_telefono.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
+
+
+def prove_margine_cassaforte():
+    """IL MARGINE DELLA CASSAFORTE (27 ott 2026, cantiere
+    margine-cassaforte, decisione di Andrea coi numeri veri del VPS: nodo
+    7 % di margine, SaaS 24,7 %). LNbits tiene l'1 % del pagamento (minimo
+    2 sats) per le commissioni di rete e rifiuta PRIMA di toccare LND se
+    non c'e'. Due pezzi: in `paga_venditore`, prima della mano, la domanda
+    del saldo con la sola chiave di lettura (quarto verbo col motivo
+    «riserva», ritentativo da soli, un avviso per cassaforte ogni sei
+    ore); nella guardia della liquidita' la sesta domanda, per cassaforte:
+    saldo meno incassi in attesa sopra l'1 % del totale piu' 10.000. Qui i
+    giudici ESEGUITI e le sentinelle; la storia sul server vero la gira
+    `collaudo_margine_cassaforte`."""
+    print("\n[il margine della cassaforte]")
+    import asyncio
+    import sqlite3 as _sq
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    amb = {"RISERVA_LNBITS_PERCENTO": 1.0, "RISERVA_LNBITS_MIN_SATS": 2}
+    exec(pezzo("_riserva_lnbits"), amb)
+    ris = amb["_riserva_lnbits"]
+    prova("la riserva di LNbits: l'1 % per eccesso, mai meno di 2 sats",
+          [500, 2, 2, 3, 2, 1_000_000], [ris(50_000), ris(100), ris(199),
+                                          ris(201), ris(0), ris(100_000_000)])
+    amb["RISERVA_LNBITS_PERCENTO"] = 0.5
+    prova("...e la percentuale e' una leva", 250, ris(50_000))
+    amb["RISERVA_LNBITS_PERCENTO"] = 1.0
+
+    # il saldo, con un httpx di cartone
+    class _R:
+        def __init__(self, codice, corpo):
+            self.status_code, self._c = codice, corpo
+
+        def json(self):
+            return self._c
+
+    class _H:
+        risposta = _R(200, {"balance": 123_456_789})
+
+        class AsyncClient:
+            def __init__(self, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, **k):
+                _H.ultimo = (url, k.get("headers"))
+                if isinstance(_H.risposta, Exception):
+                    raise _H.risposta
+                return _H.risposta
+    amb = {"httpx": _H}
+    exec("async " + pezzo("_saldo_cassaforte"), amb)
+    from collections import namedtuple
+    _Cf = namedtuple("_Cf", "nome LNBITS_URL LNBITS_INVOICE_KEY LNBITS_ADMIN_KEY")
+    cf = _Cf("nodo", "http://lnbits.nodo", "chiave-di-lettura", "ADMIN")
+    saldo = lambda: asyncio.run(amb["_saldo_cassaforte"](cf))
+    prova("il saldo si legge da /api/v1/wallet con la SOLA chiave di lettura, "
+          "in sats", (123_456, "http://lnbits.nodo/api/v1/wallet",
+                      {"X-Api-Key": "chiave-di-lettura"}),
+          (saldo(), _H.ultimo[0], _H.ultimo[1]))
+    _H.risposta = _R(500, {})
+    s500 = saldo()
+    _H.risposta = RuntimeError("giu")
+    sgiu = saldo()
+    _H.risposta = _R(200, {})
+    svuoto = saldo()
+    prova("...un 500 o un errore di rete sono «non so»; un corpo senza "
+          "balance vale 0", (None, None, 0), (s500, sgiu, svuoto))
+
+    # l'avviso: uno per cassaforte ogni sei ore
+    timbri, detti = {}, []
+
+    async def _admin(t, **k):
+        detti.append((k.get("argomento"), t))
+    ora = [1_800_000_000]
+    amb = {"time": type("T", (), {"time": staticmethod(lambda: ora[0])}),
+           "TIMBRO_MARGINE": "avviso_margine", "MARGINE_AVVISO_PAUSA_S": 21_600,
+           "timbro_letto": lambda n: timbri.get(n, ""),
+           "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+           "notifica_admin": _admin, "_fmt_sats": reale("_fmt_sats"),
+           "_riserva_lnbits": ris, "RISERVA_LNBITS_PERCENTO": 1.0,
+           "RISERVA_LNBITS_MIN_SATS": 2, "print": lambda *a, **k: None}
+    exec("async " + pezzo("_avvisa_margine"), amb)
+    av = lambda cf="nodo", s=1000, d=50_000: asyncio.run(
+        amb["_avvisa_margine"](cf, s, d, "ordini#7"))
+    av()
+    av()
+    ora[0] += 21_599
+    av()
+    av("saas")
+    ora[0] += 2
+    av()
+    prova("l'avviso: uno per cassaforte, poi silenzio per sei ore, poi di "
+          "nuovo; l'altra cassaforte ha il suo",
+          (["nodo", "saas", "nodo"], {"avviso_margine_nodo", "avviso_margine_saas"}),
+          ([("nodo" if "cassaforte nodo" in t else "saas") for _, t in detti],
+           set(timbri)))
+    prova("...nella stanza della liquidità, col saldo, il dovuto e la somma "
+          "con la riserva", ("liquidita", True, True, True),
+          (detti[0][0], "<b>1.000 sats</b>" in detti[0][1],
+           "<b>50.000</b>" in detti[0][1], "<b>50.500</b>" in detti[0][1]))
+
+    # la sesta domanda: gli incassi in attesa e il giudizio
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "payout_stato TEXT, prezzo_sats INTEGER, cassaforte TEXT)")
+    righe = [("locked", "", 10_000, "nodo"), ("confirmed", "", 20_000, "nodo"),
+             ("confirmed", "uscito", 99_000, "nodo"),   # gia' pagato
+             ("released", "uscito", 99_000, "nodo"), ("creato", "", 99_000, "nodo"),
+             ("refund", "", 5_000, "saas"), ("return_shipped", "", 6_000, "saas"),
+             ("annullato", "", 99_000, "saas"), ("refunded", "", 99_000, "saas"),
+             ("dispute", "incerto", 7_000, "saas")]
+    con.executemany("INSERT INTO ordini(stato, payout_stato, prezzo_sats, "
+                    "cassaforte) VALUES(?,?,?,?)", righe)
+    amb = {"STATI_SATS_IN_CASSAFORTE": (
+        "locked", "shipped", "delivered", "confirmed", "dispute",
+        "return_pending", "return_shipped", "refund")}
+    exec(pezzo("_incassi_in_attesa"), amb)
+    prova("gli incassi in attesa: solo gli stati coi sats dentro e non "
+          "ancora usciti, per cassaforte",
+          {"nodo": {"n": 2, "sats": 30_000}, "saas": {"n": 3, "sats": 18_000}},
+          amb["_incassi_in_attesa"](con))
+    amb = {"LIQUIDITA_MARGINE_PERCENTO": 1, "LIQUIDITA_MARGINE_MIN_SATS": 10_000,
+           "_fmt_sats": reale("_fmt_sats")}
+    exec(pezzo("_giudizio_margine"), amb)
+    g = amb["_giudizio_margine"]
+    att = {"n": 9, "sats": 470_727}
+    prova("il giudizio coi numeri veri del VPS (27 ott): saldo 503.786 contro "
+          "470.727 in attesa = 33.059 di margine, soglia 14.707: buona",
+          ("margine_nodo", True), g("nodo", 503_786, att)[:2])
+    prova("...al limite (470.727 + 14.707) buona, un sat sotto cattiva, "
+          "saldo None non misurata",
+          [True, False, None],
+          [g("nodo", 485_434, att)[1], g("nodo", 485_433, att)[1],
+           g("nodo", None, att)[1]])
+    prova("...e le parole dicono soglia, saldo e attesa", True,
+          "la soglia è 14.707" in g("nodo", 485_433, att)[2]
+          and "470.727 sats in attesa su 9 ordini" in g("nodo", 485_433, att)[2])
+    amb["LIQUIDITA_MARGINE_PERCENTO"], amb["LIQUIDITA_MARGINE_MIN_SATS"] = 0, 10_000
+    prova("...la percentuale a 0: restano i sats fissi", (True, False),
+          (g("nodo", 480_727, att)[1], g("nodo", 480_726, att)[1]))
+
+    # LE SENTINELLE
+    pv = codice(pezzo("paga_venditore"))
+    i_ponte = pv.index('cf.nome == CASSAFORTE_NODO and _ponte.get("stato") == "giu"')
+    i_saldo = pv.index("saldo = await _saldo_cassaforte(cf)")
+    i_mano = pv.index("if not _prendi_la_mano(")
+    prova("la domanda del saldo sta DOPO il ponte e PRIMA della mano, e "
+          "risponde col quarto verbo", (True, True),
+          (i_ponte < i_saldo < i_mano,
+           "return NON_CHIESTO" in pv[i_saldo:i_mano]))
+    prova("...senza saldo letto non ferma niente", True,
+          "if saldo is not None and saldo < serve:" in pv)
+    prova("il motivo «riserva» e' un guasto NOSTRO (si riprova con "
+          "BACKOFF_NOSTRO, lo stadio dice nostro)", True,
+          "MOTIVO_RISERVA" in src[src.index("\nMOTIVI_NOSTRI = ("):
+                                        src.index(")\n", src.index("\nMOTIVI_NOSTRI = ("))]
+          and "  riserva:        'un problema del nostro nodo'," in mini)
+    prova("la guardia fa la sesta domanda in coda alle altre", True,
+          "_giudizio_liquidita(n, strada) + await _voci_margine()"
+          in pezzo("_quadro_liquidita"))
+    prova("le due leve: server, config d'esempio, pannello", [True] * 6,
+          ["    LIQUIDITA_MARGINE_PERCENTO = 1\n" in src,
+           "    LIQUIDITA_MARGINE_MIN_SATS = 10_000\n" in src,
+           "\nLIQUIDITA_MARGINE_PERCENTO = 1\n" in esempio,
+           "\nLIQUIDITA_MARGINE_MIN_SATS = 10000\n" in esempio,
+           '"LIQUIDITA_MARGINE_PERCENTO",' in src,
+           '"LIQUIDITA_MARGINE_MIN_SATS",' in src])
+    prova("il collaudo della cassaforte senza margine sta negli elenchi della CI",
+          (True, True),
+          ("\ncollaudo_margine_cassaforte\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_margine_cassaforte.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
 def prove_leve_mai_doppie():
@@ -179220,7 +179764,7 @@ def main():
               prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
-              prove_piani_condivisi,
+              prove_piani_condivisi, prove_filtro_avorio,
               prove_obiezione_punto,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
@@ -179356,6 +179900,8 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
+              prove_grafica_swap,
+              prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,
