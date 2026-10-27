@@ -65,6 +65,14 @@ intera stava in `prove.py` (`IMPRONTA_SWAP`).
 
 ## La ricetta (20 ott 2026, cantiere swap-telefono; quella in uso)
 
+Dal 27 ott 2026 (cantiere cambio-libero, tappa 1) l'ingresso esporta un
+nome in più, `swapTree`: l'albero del submarine (bitcoin → Lightning) di
+boltz-core, che serve al cambio libero in quella direzione. Stessa
+ricetta, stesse versioni, stesso esbuild 0.28.2: rifatto PRIMA senza la
+riga nuova dava byte per byte lo sha256 di prima (`46306e34…`), poi con
+la riga nuova dà quello scritto in `prove.py` (`adb1090c…`, 378.064
+byte, due costruzioni uguali). Ventiquattro nomi.
+
 ```
 npm install --ignore-scripts boltz-core@5.0.0 @scure/bip39@2.4.0 @scure/bip32@2.4.0 @scure/btc-signer@2.4.1
 esbuild ingresso.mjs --bundle --format=iife         --global-name=BarattoloSwap --target=es2020 --legal-comments=none         --outfile=swap.bundle.js
@@ -88,6 +96,7 @@ export {
     TaprootUtils,
     SwapTreeSerializer,
     reverseSwapTree,
+    swapTree,
     compareTrees,
     detectSwap,
     constructClaimTransaction,

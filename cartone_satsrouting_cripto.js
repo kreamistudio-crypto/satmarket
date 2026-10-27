@@ -16,7 +16,18 @@
 
    La firma della transazione di ritiro NON la giudica questo file: torna
    l'impronta firmata, la chiave e la firma, e il cartone le verifica in
-   Python puro (BIP-340), con un'aritmetica che non e' quella del bundle. */
+   Python puro (BIP-340), con un'aritmetica che non e' quella del bundle.
+
+   IL SUBMARINE (27 ott 2026, cantiere cambio-libero, tappa 1): la strada
+   bitcoin -> Lightning. Qui le parti sono ROVESCIATE: il cartone e' chi
+   RITIRA (la chiave di ritiro, `claimPublicKey`, e' sua) e il telefono e'
+   chi puo' RIPRENDERSI i bitcoin (`refundPublicKey`). L'albero e'
+   `swapTree` di boltz-core (foglia del ritiro con l'impronta e la chiave
+   del cartone, foglia del rimborso con la chiave del telefono e la
+   scadenza); l'ordine delle chiavi nel MuSig e' lo stesso del reverse,
+   prima la chiave del cartone. `loroChiave` e' il nome unico della chiave
+   DELL'ALTRO in ogni chiamata (nel reverse la sua chiave di ritiro, nel
+   submarine la sua chiave di rimborso). */
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -80,7 +91,7 @@ function fattura(rete, sats, impronta){
 /* ─── i pezzi di uno swap, rifatti dai dati che il cartone conserva */
 function pezzi(d){
   const loro = h.decode(d.serverPriv);
-  const lui = h.decode(d.claimPublicKey);
+  const lui = h.decode(d.loroChiave || d.claimPublicKey);
   const albero = S.SwapTreeSerializer.deserializeSwapTree(d.swapTree);
   const agg = S.TaprootUtils.tweakMusig(
     S.Musig.create(loro, [pubDa(loro), lui]),
@@ -126,6 +137,63 @@ const OP = {
     const rete = RETI[d.rete] ? d.rete : 'bitcoin';
     return {lockupAddress: S.Address(RETI[rete]).encode(S.OutScript.decode(S.Scripts.p2trOutput(agg.aggPubkey)))};
   },
+  /* ─── il submarine (27 ott 2026, cambio-libero): la nascita, con la
+     chiave di RITIRO del cartone e la chiave di RIMBORSO del telefono */
+  crea_sub(d){
+    const rete = RETI[d.rete] ? d.rete : 'bitcoin';
+    const priv = randomBytes(32);
+    const pub = pubDa(priv);
+    const impronta = h.decode(d.preimageHash);
+    const lui = h.decode(d.refundPublicKey);
+    const scadenza = Number(d.timeoutBlockHeight);
+    const albero = S.swapTree(false, impronta, pub, lui, scadenza);
+    const agg = S.TaprootUtils.tweakMusig(S.Musig.create(priv, [pub, lui]), albero.tree);
+    return {serverPriv: h.encode(priv), claimPublicKey: h.encode(pub),
+            swapTree: S.SwapTreeSerializer.serializeSwapTree(albero),
+            address: S.Address(RETI[rete]).encode(S.OutScript.decode(S.Scripts.p2trOutput(agg.aggPubkey)))};
+  },
+  /* la bugia dell'albero, versione submarine: un'altra scadenza */
+  albero_altro_sub(d){
+    const p = pezzi(d);
+    const altro = S.swapTree(false, h.decode(d.preimageHash), pubDa(p.loro), p.lui,
+                             Number(d.timeoutBlockHeight) + 1);
+    return {swapTree: S.SwapTreeSerializer.serializeSwapTree(altro)};
+  },
+  /* IL RITIRO DEL CARTONE, a due (la strada cooperativa di Boltz: `GET
+     /claim` da' al telefono l'impronta da firmare e il nonce del cartone,
+     `POST /claim` porta la sua meta'). Due chiamate, due processi: il
+     nonce segreto torna al cartone, che lo riporta alla seconda. La
+     transazione paga un indirizzo qualunque del cartone. */
+  ritiro_sub_inizio(d){
+    const p = pezzi(d);
+    const lock = S.Transaction.fromRaw(h.decode(d.lockupHex), {allowUnknownInputs: true, allowUnknownOutputs: true});
+    const tx = new S.Transaction({allowUnknownInputs: true, allowUnknownOutputs: true});
+    tx.addInput({txid: h.decode(lock.id), index: 0, sequence: 0xfffffffd});
+    tx.addOutput({script: h.decode('0014' + h.encode(randomBytes(20))), amount: BigInt(d.onchainAmount) - 300n});
+    const hex = h.encode(tx.unsignedTx);
+    const sh = tx.preimageWitnessV1(0, [p.script], S.SigHash.DEFAULT, [BigInt(d.onchainAmount)]);
+    const m = p.agg.message(sh).generateNonce();
+    return {hex: hex, transactionHash: h.encode(sh), pubNonce: h.encode(m.publicNonce),
+            nonce: {secret: h.encode(m.state.nonce.secret), public: h.encode(m.state.nonce.public)}};
+  },
+  ritiro_sub_fine(d){
+    const p = pezzi(d);
+    const tx = S.Transaction.fromRaw(h.decode(d.hex), {allowUnknownInputs: true, allowUnknownOutputs: true});
+    const sh = tx.preimageWitnessV1(0, [p.script], S.SigHash.DEFAULT, [BigInt(d.onchainAmount)]);
+    const m = p.agg.message(sh).generateNonce();
+    m.state.nonce = {secret: h.decode(d.nonce.secret), public: h.decode(d.nonce.public)};
+    const firma = m.aggregateNonces([[p.lui, h.decode(d.pubNonceLui)]])
+      .initializeSession().signPartial()
+      .addPartial(p.lui, h.decode(d.partialLui)).aggregatePartials();
+    tx.updateInput(0, {finalScriptWitness: [firma]});
+    const uscite = [];
+    for (let i = 0; i < tx.outputsLength; i++) {
+      const u = tx.getOutput(i);
+      uscite.push({sats: Number(u.amount), script: h.encode(u.script)});
+    }
+    const x = p.agg.aggPubkey.length === 33 ? p.agg.aggPubkey.slice(1) : p.agg.aggPubkey;
+    return {txid: tx.id, impronta: h.encode(sh), chiave: h.encode(x), firma: h.encode(firma), uscite: uscite};
+  },
   /* il lockup: una transazione che paga l'indirizzo dello swap */
   lockup(d){
     const p = pezzi(d);
@@ -161,7 +229,8 @@ const OP = {
       const u = tx.getOutput(i);
       uscite.push({sats: Number(u.amount), script: h.encode(u.script)});
     }
-    const base = {txid: tx.id, ingressi: tx.inputsLength,
+    const base = {txid: tx.id, ingressi: tx.inputsLength, locktime: Number(tx.lockTime || 0),
+                  sequenza: Number(ing.sequence),
                   spende: h.encode(ing.txid) === lock.id && ing.index === 0, uscite: uscite};
     const quanto = BigInt(d.onchainAmount);
     if (testimone.length === 1) {
@@ -169,6 +238,15 @@ const OP = {
       const x = p.agg.aggPubkey.length === 33 ? p.agg.aggPubkey.slice(1) : p.agg.aggPubkey;
       return Object.assign(base, {via: 'cooperativo', impronta: h.encode(sh),
         chiave: h.encode(x), firma: h.encode(testimone[0])});
+    }
+    /* (cambio-libero) il RIMBORSO dallo script di un submarine: tre
+       pezzi, firma, foglia del rimborso e control block, nessun segreto */
+    if (testimone.length === 3) {
+      const foglia = p.albero.refundLeaf.output;
+      const sh = tx.preimageWitnessV1(0, [p.script], S.SigHash.DEFAULT, [quanto], -1, foglia, 0xc0);
+      return Object.assign(base, {via: 'rimborso', impronta: h.encode(sh),
+        chiave: h.encode(p.lui.slice(1)), firma: h.encode(testimone[0]),
+        foglia: h.encode(testimone[1]) === h.encode(foglia)});
     }
     if (testimone.length === 4) {
       const foglia = p.albero.claimLeaf.output;

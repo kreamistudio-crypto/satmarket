@@ -33741,7 +33741,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   I FILE (dal 20 ott 2026 divisi in `swap/boltz.js` e
   `swap/instradatore.js`: vedi «LO SWAP, L'INSTRADATORE»): `swap-telefono.js` (rotta esplicita `/swap-telefono.js`,
   chiamato con `?v=SWAP_TELEFONO_VER`, l'inizio del suo sha256) e
-  `vendor/swap.bundle.js` (rotta `/vendor/swap.js`, `?v=5.0.0-bar1`,
+  `vendor/swap.bundle.js` (rotta `/vendor/swap.js`, `?v=5.0.0-bar2` dal 27 ott 2026,
   global `BarattoloSwap`). La pagina scarica il primo con
   `caricaSwapTelefono()` all'arrivo di `swap_leve` se `swapAcceso()`;
   il file scarica il bundle con `caricaBundleSwap()` quando serve.
@@ -33792,6 +33792,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Python per giudicare la firma), coi modi `mente_*`, `non_firma`,
   `rifiuta_cooperativo` e `/cartone/stato`. Il collaudo è
   `collaudo_swap_telefono`.
+  IL CARTONE, LA STRADA BITCOIN → LIGHTNING (27 ott 2026, cantiere
+  cambio-libero, tappa 1; perché in CANTIERI, «Il cambio libero, tappa
+  1»). Il «submarine» di Boltz v2, col calco dei loro documenti: `GET
+  /v2/swap/submarine` (0,5 % + 318, da 50.000, `maximalZeroConf` 0),
+  `POST /v2/swap/submarine` (la fattura DEL TELEFONO e la sua chiave di
+  RIMBORSO; risponde la chiave di RITIRO del cartone, l'albero
+  `swapTree`, l'indirizzo, `expectedAmount` = fattura + commissione +
+  rete, `bip21`), `.../<id>/transaction`, `.../<id>/preimage` (solo a
+  fattura pagata), `GET`+`POST .../<id>/claim` (il ritiro A DUE del
+  cartone: il nonce segreto va e torna fra due processi dell'aiutante,
+  `ritiro_sub_inizio`/`ritiro_sub_fine`, e la firma intera la giudica
+  il BIP-340 in Python), `POST .../<id>/refund` (la metà del cartone
+  per il rimborso cooperativo, solo negli stati `RIMBORSABILI`), e
+  `/v2/swap/restore` con `refundDetails`. La fattura la legge il
+  cartone da sé (`leggi_fattura`: importo, impronta, rete). Il rimborso
+  dallo script passa dalla trasmissione di sempre: tre pezzi di
+  testimone (firma, foglia del rimborso, control block: `via:
+  'rimborso'` in `controlla`), e il cartone lo accetta solo col
+  locktime alla scadenza, la cima della rete arrivata lì e la sequenza
+  non finale («non-final», come bitcoind). Le parti sono rovesciate
+  rispetto al reverse, e l'aiutante lo sa da `loroChiave` (la chiave
+  DELL'ALTRO, qualunque sia il tipo). Comandi: `/cartone/stato?s=
+  transaction.mempool` fa vedere alla rete i bitcoin del telefono
+  (`lockup_meno` → `transaction.lockupFailed`), `s=invoice.paid&preimage=`
+  è il suo wallet che si fa pagare (solo col segreto giusto),
+  `s=invoice.failedToPay` la fattura che non va; `mente_importo`,
+  `mente_albero`, `mente_indirizzo`, `non_firma` valgono anche qui;
+  `/cartone/visto` conta `letture_sub`, `rimborsi`, `ritiri`. Il bundle
+  esporta un nome in più, `swapTree` (`5.0.0-bar2`, ventiquattro nomi,
+  ricetta invariata e riproducibile). La prova è `prove_cartone_submarine`
+  (un telefono di cartone in node contro il cartone acceso nel processo).
+  Nessun telefono e nessuna rotta del server ancora: quelli sono le
+  tappe 2 e 3 del cantiere.
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
