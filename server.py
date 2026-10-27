@@ -89499,8 +89499,12 @@ async def onchain_pronto(venditore_id: int, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     if int(venditore_id) not in x:
+        # si accende da solo all'apertura dell'app (27 ott 2026): chi
+        # non ce l'ha e' chi non l'ha ancora aperta da allora
         return {"pronto": False,
-                "motivo": "il venditore non ha ancora acceso l'on-chain"}
+                "motivo": "il venditore non ha ancora aperto Barattolo da "
+                          "quando l'on-chain c'e': si accende da solo appena "
+                          "lo apre"}
     # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea
     # 10): la cassa la scrive accanto al margine per la rete
     return {"pronto": True, "motivo": "", "io_acceso": user["id"] in x,

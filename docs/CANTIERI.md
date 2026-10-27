@@ -73444,3 +73444,23 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## L'on-chain si accende da solo (27 ott 2026, cantiere leve-tutte, Andrea: «con un profilo non admin dice "il venditore non ha acceso l'on-chain", ma invece deve essere sempre acceso»)
+
+**COSA.** All'apertura dell'app, a chi l'on-chain è ammesso,
+`onchainAccendiDaSolo` chiede `/api/onchain/prova`: se il server ha già
+la chiave pubblica non fa niente; se no il seme si ritrova (telefono,
+nuvola di Telegram, relay) o nasce coi suoi backup
+(`onchainSemeAssicurato`, la strada di chi compra) e la xpub dedicata
+parte. In sottofondo si tace; il bottone «Accendi» del foglio resta.
+
+**PERCHÉ NON DAL SERVER.** Il seme nasce nel telefono (regola ferrea 2),
+quindi il server non può accendere nessuno: un venditore che non ha
+mai aperto l'app dopo l'aggiornamento resta spento. Il motivo della
+cassa adesso lo dice: «il venditore non ha ancora aperto Barattolo da
+quando l'on-chain c'è: si accende da solo appena lo apre».
+
+**PROVATO.** Le sentinelle in `prove_ordine_onchain` (accensione
+all'avvio, nessun seme nuovo se il server ha la chiave);
+`collaudo_onchain_ordine` col nuovo motivo. Da guardare sul telefono
+vero: il venditore apre l'app, chi compra vede «⛓️ On-chain».

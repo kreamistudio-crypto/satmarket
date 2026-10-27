@@ -164,7 +164,8 @@ def main():
           (r.status_code, "non è disponibile" in r.json()["detail"]))
     come(999)
     prova("la cassa chiede se il venditore e' pronto: non ancora",
-          (False, "il venditore non ha ancora acceso l'on-chain"),
+          (False, "il venditore non ha ancora aperto Barattolo da "
+                  "quando l'on-chain c'e': si accende da solo appena lo apre"),
           tuple(c.get("/api/onchain/pronto/888").json()[k]
                 for k in ("pronto", "motivo")))
     r = compra(999, annunci[0], metodo="onchain")
