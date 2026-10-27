@@ -73623,3 +73623,94 @@ Suite severa e collaudi on-chain: nel messaggio del commit.
 
 **DA GUARDARE.** Sul telefono di Andrea: che le quattro schede stiano
 su una riga anche sui telefoni più stretti di 390 px.
+
+## L'ordine on-chain entra in «Ordini», coi passi del Lightning (27 ott 2026, cantiere onchain-ordini, Andrea: «il concetto è deposito sats, LN o on-chain… gli step devono essere uguali, cambia solo il metodo di pagamento: per l'utente è un QR»)
+
+Andrea aveva pagato on-chain, e né lui né il venditore vedevano l'ordine
+in «Ordini». Sul biglietto A/B ha scelto la **strada A**, cioè l'ordine
+on-chain come ordine di sempre. Questo rovescia «PERCHÉ UNA TABELLA SUA»
+della tappa 3, ma solo a metà.
+
+**LA TABELLA SUA RESTA, E DIVENTA LA CASSAFORTE.** `onchain_ordini`
+tiene l'indirizzo, le monete e le firme, come LNbits tiene la fattura.
+Quando i sats arrivano con una conferma, nasce la riga di `ordini` con
+cassaforte `'onchain'`, e la passa a 'locked' `_incassa_ordine`, la
+stessa del Lightning: stock, offerte, carrello, negozi collegati e gli
+avvisi «🔒 Hai venduto». Da lì l'ordine sta in «Ordini» e fa i passi di
+tutti: spedizione, tracciamento, chat, promemoria, feedback. Lo stock
+scalato a mano in `onchain_controlla` e i due avvisi «⛓️ Venduto
+on-chain» sono morti con lui, perché sarebbero stati doppi.
+
+**PERCHÉ L'ORDINE NASCE AL PAGAMENTO E NON ALLA CASSA.** Sulla riga
+'creato' di `ordini` lavorano il reaper, la prenotazione dello stock a
+30 minuti (`_riservati`), la ripresa della fattura e l'annullo che
+interroga LNbits, tutti col tempo del Lightning (fattura da 15 minuti).
+Un indirizzo on-chain vive 24 ore, e prenota già dalla sua tabella.
+Fino al pagamento l'ordine si segue dalla pagina On-chain, col suo QR;
+poi la pagina dice «🧾 Apri l'ordine». SCARTATO far nascere la riga alla
+cassa: voleva dire insegnare a cinque ronde a saltarla.
+
+**DAL LIGHTNING NON ESCE NIENTE, PER COSTRUZIONE.** `'onchain'` non sta
+in `CASSAFORTI`, e `_chiavi_cassaforte` alza su un nome fuori catalogo.
+Le due uscite di sempre lo riconoscono prima, con
+`_onchain_uscita_fatta`: finché la transazione di quel verso non è
+partita con le due firme, escono con `{"onchain": True}` e non toccano
+niente. Vale per chiunque le chiami: la conferma, i timer del digitale,
+un Lightning address appena salvato, un moderatore. Quando `/firma`
+trasmette la transazione, richiama la porta di sempre, e l'ordine si
+chiude come un Lightning riuscito, coi conti, gli XP e gli avvisi.
+
+**I GESTI SONO QUELLI DI SEMPRE.**
+- «Ho ricevuto l'oggetto — libera i sats» su un ordine on-chain firma
+  col telefono (`onchainLiberaDallOrdine`) e non chiama `/conferma`.
+- La seconda firma la mette il telefono del venditore da solo, quando
+  apre la Mini App. Nell'ordine c'è anche «✍️ Metti la seconda firma».
+- «Annulla l'ordine» di chi vende porta a 'refund' come sempre, poi
+  chiede subito la firma del rimborso. Se non riesce, resta «✍️ Firma il
+  rimborso». Chi compra co-firma aprendo l'app.
+- Il riquadro ⛓️ dice a che punto sono le firme e porta a «Com'è fatto».
+  `refundPanel` e `payoutPanel`, cioè «incolla una fattura» e il
+  Lightning address, on-chain tacciono. Lo stepper dice «nel 2-di-3»
+  invece di «custodito dalla piattaforma».
+
+**LE FIRME SEGUONO L'ORDINE** (`_onchain_ordine_permette`). I sats al
+venditore si liberano solo dagli stati in cui si può confermare. Il
+rimborso parte solo da 'refund', e una proposta di rimborso a ordine
+vivo dice «parte da Annulla la vendita». Una disputa aperta fra le due
+firme ferma la seconda (409).
+
+Andrea ha anche detto che la co-firma che chiede di aprire l'app gli
+piace, perché «dimostra che le chiavi stanno fisicamente sul
+dispositivo». Resta così.
+
+**NON C'È ANCORA.**
+- **La disputa decisa da un moderatore.** «Dai i sats al venditore»,
+  «Rimborsa» e «meno le spese» su un ordine on-chain rispondono 409 col
+  perché (`risolvi_disputa`): meglio un no che un «deciso» che non paga.
+  Il reso si può ancora chiedere, perché cambia solo lo stato. Serve la terza firma, quella di Barattolo, che sta
+  sul nodo e non esiste ancora (la tappa 6 del piano). Finché manca, una
+  disputa on-chain si chiude solo se le due parti firmano.
+- **Il reso** (return_pending → refunded): passa da `_rimborsa_compratore`,
+  quindi aspetta le firme come l'annullo, ma il gesto del venditore che
+  firma il rimborso del reso non ha ancora il suo bottone.
+- Il carrello, gli accordi e i codici sconto on-chain (si paga il
+  listino, com'era).
+
+**PROVATO.** `collaudo_onchain_ordine` (55/0, prima 42), col server vero:
+- l'ordine di sempre nasce locked, cassaforte onchain, senza fattura,
+  ed è in «Ordini» di tutti e due;
+- un secondo «controlla» non ne fa un secondo, e `/conferma` per la porta
+  del Lightning non muove niente;
+- la proposta si vede in «Ordini», e a disputa aperta la seconda firma
+  dà 409;
+- l'ordine si chiude released coi conti delle due parti;
+- il rimborso a ordine vivo dà 409, e «Annulla la vendita» porta a
+  'refund' col testo nuovo e poi a refunded.
+
+`prove_onchain_nell_ordine` (nuova) mette le serrature del sorgente. A
+390 px in Chromium: i quattro casi del riquadro (pagato, firmato da chi
+compra, seconda firma, «Firma il rimborso»). Suite severa e collaudi:
+nel messaggio del commit.
+
+**DA GUARDARE SUL COLLAUDO.** Un giro vero su signet: pagare, spedire,
+liberare, aprire l'app da venditore e vedere l'ordine «concluso».

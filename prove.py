@@ -7423,7 +7423,10 @@ def prove_in_pagamento():
     ordine = mini[mini.index("function openOrder(id){"):]
     ordine = ordine[:ordine.index("/* ---- feedback reciproco")]
     for nome, spia in (
+            # (27 ott 2026) ...e on-chain nemmeno a firma gia' messa
             ("«libera i sats»", "o.role==='buyer' && !inPagamento(o) && "
+                                "!(o.onchain && o.onchain.proposta && "
+                                "o.onchain.proposta.mia) && "
                                 "(['delivered'].includes(s)"),
             ("«apri disputa»", "['locked','shipped','delivered'].includes(s)"
                                " && !inPagamento(o) ? `<button class=\"btn "
@@ -13232,8 +13235,10 @@ def prove_dettaglio_ordine():
           and "o.role==='seller' ? 'Hai depositato" not in det)
     prova("...e il moderatore, che guarda da fuori, resta neutro", True,
           "'Sats nel deposito di garanzia'" in det)
+    # (27 ott 2026) ...e on-chain dice dove stanno davvero: nel 2-di-3
     prova("la riga sotto resta vera per tutti e due", True,
-          "d: 'Il pagamento è custodito dalla piattaforma'" in det)
+          "d: o.onchain ? 'I sats sono on-chain, in un 2-di-3: nessuno li muove da solo'\n"
+          "                 : 'Il pagamento è custodito dalla piattaforma'" in det)
     # TRE dal 1 ott 2026: la storia dell'annullo del venditore (dentro il
     # ramo della disputa, che sostituisce) comincia dallo stesso passo
     prova("e la dicono ENTRAMBI i rami del riquadro (disputa compresa)",
@@ -22196,9 +22201,11 @@ def prove_zone_spedizione():
           '"zona_non_offerta": True' in _sp)
     # I DUE INSERT scrivono la zona, e solo sulla spedizione
     teste = [m.start() for m in re.finditer(r"INSERT INTO ordini", src)]
-    prova("gli INSERT che creano un ordine sono sempre tre", 3,
+    # QUATTRO dal 27 ott 2026: l'ordine on-chain che nasce al pagamento
+    # (`_onchain_nasce_ordine`, la strada A), che e' un acquisto anche lui
+    prova("gli INSERT che creano un ordine sono sempre quattro", 4,
           len(teste))
-    prova("...e i due dell'acquisto scrivono la zona", 2,
+    prova("...e i tre dell'acquisto scrivono la zona", 3,
           sum("zona_sped" in src[i:src.index("VALUES", i)]
               for i in teste))
     # QUATTRO: i due INSERT, piu' le due RISPOSTE (mono e set) che la
@@ -24448,12 +24455,14 @@ def prove_sped_gratis():
     # si vede solo mesi dopo, guardando un ordine che non sa dire
     # quanto valeva.
     teste = [m.start() for m in re.finditer(r"INSERT INTO ordini", _SORGENTE)]
-    prova("le strade che creano un ordine sono tre", 3, len(teste))
+    # (quattro dal 27 ott 2026: l'ordine on-chain nato al pagamento, che
+    # il cambio lo porta dalla fotografia della cassa)
+    prova("le strade che creano un ordine sono quattro", 4, len(teste))
     # si guarda l'ELENCO DELLE COLONNE, non «i primi N caratteri»: con
     # la finestra a caratteri togliere la colonna lasciava la riga
     # verde, perche' `cambio_ordine` ricompare poco sotto nella tupla
     # dei valori — l'ha detto la mutazione, non la rilettura.
-    prova("...e tutte e tre scrivono il cambio del giorno", 3,
+    prova("...e tutte e quattro scrivono il cambio del giorno", 4,
           sum("cambio_ordine" in _SORGENTE[i:_SORGENTE.index("VALUES", i)]
               for i in teste))
 
@@ -25175,7 +25184,8 @@ def prove_reti_corriere():
     # chiede a chi ha una rete di terzi, mai a chi ha la nostra.
     prova("...ma sulla rete di casa lo dice il catalogo, nei due rami",
           [1, 1], [c.count("TIPO_PUNTO_BARATTOLO if pid") for c in rami])
-    prova("...e finisce in colonna nei due INSERT", 2,
+    # (tre dal 27 ott 2026: l'ordine on-chain lo copia dalla fotografia)
+    prova("...e finisce in colonna nei tre INSERT", 3,
           codice(src).count("tipo_punto,"))
     # la correzione dentro l'ordine, che e' la rete di sicurezza degli
     # ordini nati senza: chiave ASSENTE = si CONSERVA (patto dello stock)
@@ -152332,6 +152342,51 @@ console.log(JSON.stringify(out));
     prova("senza ordini la scheda dice come si paga on-chain", True, o["vuoto"])
 
 
+def prove_onchain_nell_ordine():
+    """L'ORDINE ON-CHAIN E' UN ORDINE DI SEMPRE (27 ott 2026, cantiere
+    onchain-ordini, la strada A di Andrea: «gli step devono essere uguali,
+    cambia solo il metodo di pagamento»). Il giro col server vero sta in
+    collaudo_onchain_ordine; qui le serrature del sorgente: dal Lightning
+    non esce niente, e nell'ordine il gesto di sempre firma col telefono."""
+    print("\n⛓️ L'ordine on-chain dentro «Ordini»")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("'onchain' NON e' una cassaforte del Lightning (fail-closed)",
+          [True, False],
+          ['CASSAFORTE_ONCHAIN = "onchain"' in _SORGENTE,
+           "CASSAFORTE_ONCHAIN" in pezzo("_chiavi_cassaforte")])
+    for f, verso in (("_sblocca_sats", "venditore"),
+                     ("_rimborsa_compratore", "compratore")):
+        c = pezzo(f)
+        prova(f"{f}: on-chain esce PRIMA di ogni pagamento Lightning", True,
+              c.index(f'_onchain_uscita_fatta(con, o, "{verso}")')
+              < c.index("if oc is False:") < c.index("paga_venditore("))
+    nasce = pezzo("onchain_controlla")
+    prova("al pagamento nasce l'ordine di sempre, e lo incassa la porta del "
+          "Lightning (lo stock non si scala piu' qui)", [True, True, False],
+          ["nuovo_ordine = _onchain_nasce_ordine(con, o)" in nasce,
+           "await _incassa_ordine(nuovo_ordine)" in nasce,
+           "UPDATE annunci SET quantita" in nasce])
+    firma = pezzo("onchain_ordine_firma")
+    prova("a transazione partita l'ordine si chiude per la porta di sempre",
+          [True, True, True],
+          ["await _sblocca_sats(int(o[\"ordine_id\"]))" in firma,
+           "await _rimborsa_compratore(int(o[\"ordine_id\"]))" in firma,
+           "_onchain_ordine_permette(con, o, o[\"proposta_verso\"])" in firma])
+    conferma = pezzo_js(mini, "async function confirmReceived(btn){", "\n}\n")
+    prova("nell'ordine «libera i sats» on-chain firma col telefono, e non "
+          "chiama /conferma", True,
+          conferma.index("if (o.onchain) return onchainLiberaDallOrdine(btn, o);")
+          < conferma.index("/orders/${o.id}/conferma"))
+    prova("...il pannello Lightning del rimborso e dell'incasso tacciono "
+          "on-chain, e c'e' il riquadro ⛓️", [True, True, True],
+          ["s==='refund' && !o.onchain ? refundPanel(o)" in mini,
+           "o.role==='seller' && !o.onchain && ['locked','shipped','delivered','confirmed']" in mini,
+           "${pannelloOnchainOrdine(o, s)}" in mini])
+    prova("...e dopo l'annullo del venditore on-chain si firma il rimborso",
+          True, "if (oc && oc.onchain) return onchainLiberaDallOrdine(null, oc);"
+          in pezzo_js(mini, "async function inviaAnnullaVendita(id, corpo){", "\n}\n"))
+
+
 def _pezzi_incasso_js(mini):
     """I pezzi del telefono per la destinazione firmata e la quota (27
     ott 2026), da mettere nei banchi node che fanno girare proponi e
@@ -152490,6 +152545,7 @@ def prove_incasso_esterno_onchain():
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainFirmaProposta(oid){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
     banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + """
 const B = BarattoloBTC;
@@ -152737,6 +152793,7 @@ def prove_ordine_onchain():
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainFirmaProposta(oid){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
     banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + '''
 const B = BarattoloBTC;
@@ -180849,6 +180906,7 @@ def main():
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_ripristino_visibile,
     prove_onchain_pagina,
+    prove_onchain_nell_ordine,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,

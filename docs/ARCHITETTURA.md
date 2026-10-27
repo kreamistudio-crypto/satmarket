@@ -34304,6 +34304,35 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `onchainCofirma`, con il tetto `ONCHAIN_QUOTA_TETTO` anche lì); col
   rimborso torna a chi ha comprato. Le prove: `prove_incasso_esterno_onchain`
   (la prova doppia telefono-server); il collaudo `collaudo_onchain_incasso`.
+- L'ORDINE ON-CHAIN È UN ORDINE DI SEMPRE (27 ott 2026, cantiere
+  onchain-ordini, la strada A di Andrea; perché in CANTIERI, «L'ordine
+  on-chain entra in "Ordini"»). `onchain_ordini` resta la CASSAFORTE
+  dell'ordine (indirizzo, monete, PSBT); la colonna `ordine_id` la lega
+  alla riga di `ordini` che nasce al PAGAMENTO, non alla cassa:
+  `onchain_controlla` → `_onchain_nasce_ordine` (cassaforte
+  `CASSAFORTE_ONCHAIN = "onchain"`, payment_hash e invoice vuoti, le
+  colonne della cassa dai `dettagli` fotografati da `compra`) →
+  `_incassa_ordine` (locked, stock, offerte, carrello, avvisi). La
+  cintura: `_onchain_riprendi_incassi` nella ronda. 'onchain' NON sta in
+  CASSAFORTI: `_chiavi_cassaforte` alza su ogni tubo Lightning. Le due
+  uscite: `_sblocca_sats` e `_rimborsa_compratore` chiedono a
+  `_onchain_uscita_fatta` (None = Lightning; False = niente, ritorno
+  `{"onchain": True}`; la riga = la transazione di quel verso è partita,
+  e si chiude come un PAGATO). Le firme: `POST
+  /api/onchain/ordini/{oid}/proposta` e `/firma` passano da
+  `_onchain_ordine_permette` (al venditore da locked/shipped/delivered,
+  il rimborso solo a 'refund', cioè dopo «Annulla la vendita»; una
+  disputa le ferma); a trasmissione fatta `/firma` chiama la porta di
+  sempre. `GET /api/orders` attacca `onchain` {id, stato, proposta
+  {verso, mia}, txid_uscita, esploratore} alle righe 'onchain'; la vista
+  dell'ordine on-chain ha `ordine_id`. Il client: `mapOrder.onchain`,
+  `pannelloOnchainOrdine`, `onchainLiberaDallOrdine` (dietro
+  `confirmReceived` e dopo `inviaAnnullaVendita`),
+  `onchainSecondaFirmaDallOrdine`, `onchainFirmaProposta` (la prima
+  firma, comune al foglio On-chain); `refundPanel` e `payoutPanel` tacciono
+  on-chain. Gli ordini on-chain di prima (`ordine_id` 0) restano col giro
+  di prima. Le prove: `prove_onchain_nell_ordine`; il collaudo
+  `collaudo_onchain_ordine`.
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
   tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,

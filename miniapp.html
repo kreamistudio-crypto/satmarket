@@ -16975,6 +16975,11 @@ function mapOrder(o){
        e i rari casi di cambio muto): li' l'euro non si mostra. */
     cambioOrdine:o.cambio_ordine||0,
     sellerInvoice:o.invoice_venditore||'',
+    /* L'ON-CHAIN (27 ott 2026, strada A): un ordine pagato on-chain e'
+       un ordine di sempre, e qui c'e' il riassunto della sua cassaforte
+       — quale ordine on-chain, a che punto sono le firme. null = il
+       Lightning di sempre. */
+    onchain:o.cassaforte==='onchain' ? (o.onchain || null) : null,
     /* LA FATTURA DI CHI COMPRA, finche' l'ordine aspetta il pagamento
        (24 set 2026, «Paga ora»): il server la manda da sempre nella
        riga, e qui non la leggeva nessuno — cosi' chi chiudeva per
@@ -35677,7 +35682,9 @@ function openOrder(id){
     t: o.role==='buyer'  ? 'Hai depositato i sats'
      : o.role==='seller' ? 'Hai il pagamento in garanzia'
      :                     'Sats nel deposito di garanzia',
-    d: 'Il pagamento è custodito dalla piattaforma'};
+    /* on-chain i sats non li custodisce nessuno: stanno nel 2-di-3 */
+    d: o.onchain ? 'I sats sono on-chain, in un 2-di-3: nessuno li muove da solo'
+                 : 'Il pagamento è custodito dalla piattaforma'};
   /* IL TRACCIAMENTO E' UNA PROVA, e la riga che lo scrive e' UNA per
      tutti i rami dello stepper: in disputa serve piu' che altrove —
      e' quello che dice se il pacco e' partito e dov'e' finito — e due
@@ -35898,6 +35905,9 @@ function openOrder(id){
       d:annullataPagata(o)
         ? (o.role==='buyer' ? 'Hai pagato una fattura annullata: scegli qui sotto come riavere i tuoi sats'
                             : 'Fattura annullata pagata: i sats tornano a chi ha pagato')
+       :annulloVenditore(o) && o.onchain
+        ? (o.role==='buyer' ? 'Il venditore ha annullato: i sats tornano a te con le due firme, la sua e quella del tuo telefono'
+                            : 'Hai annullato l\'ordine: i sats tornano all\'acquirente con la tua firma e la sua')
        :annulloVenditore(o)
         ? (o.role==='buyer' ? 'Il venditore ha annullato: scegli qui sotto come ricevere i tuoi sats'
                             : 'Hai annullato l\'ordine: i sats tornano all\'acquirente')
@@ -36099,7 +36109,7 @@ function openOrder(id){
         </div>`:''}
       ${isAdmin ? pannelloResoAdmin(o, s) + pannelloSpeseReseAdmin(o, s) : ''}
       ${pannelloSpeseVenditore(o)}
-      ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
+      ${o.role==='buyer' && s==='refund' && !o.onchain ? refundPanel(o) : ''}
       ${o.role==='buyer' && s==='refunded' && o.speseReseSats ? `<div class="trust-note">↩️ <span>Disputa decisa: il <b>rimborso meno le spese di spedizione</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='refunded' && !o.speseReseSats ? `<div class="trust-note">↩️ <span>${annullataPagata(o) ? 'Hai pagato una fattura annullata' : annulloVenditore(o) ? 'Il venditore ha annullato l\'ordine' : 'Disputa risolta a tuo favore'}: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
       ${o.role==='buyer' && s==='return_pending' ? `
@@ -36122,7 +36132,10 @@ function openOrder(id){
       ${/* a payout in corso il pannello dell'incasso TACE (set 2026):
             direbbe «appena l'acquirente conferma…» a conferma gia' data.
             Torna — in evidenza — solo se serve un gesto di chi vende. */''}
-      ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s)
+      ${/* on-chain il pannello del Lightning address non c'entra: chi
+            vende riceve dove ha scelto in Profilo → «Incassi on-chain»,
+            e il riquadro ⛓️ qui sopra lo dice */''}
+      ${o.role==='seller' && !o.onchain && ['locked','shipped','delivered','confirmed'].includes(s)
           && !(inPagamento(o) && !o.pagamento.gesto_venditore) ? payoutPanel(o) : ''}
       ${o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta ? `
         <div class="payout">
@@ -36256,7 +36269,8 @@ function openOrder(id){
             «libera i sats» qui, «apri disputa» in fondo — restavano
             davanti a chi aveva gia' confermato. Il server li rifiuta
             comunque (409): qui semplicemente non si offrono. */''}
-      ${o.role==='buyer' && !inPagamento(o) && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
+      ${pannelloOnchainOrdine(o, s)}
+      ${o.role==='buyer' && !inPagamento(o) && !(o.onchain && o.onchain.proposta && o.onchain.proposta.mia) && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${/* A 'confirmed' ci si arriva in TRE modi, e la riga ne
             raccontava uno solo: «Hai confermato… per te e' tutto
             fatto!», che a chi l'affare l'ha chiuso un TIMER dice
@@ -42786,6 +42800,10 @@ async function confirmReceived(btn){
       if (DEMO) {
         currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); openOrder(currentOrder.id); return;
       }
+      /* ON-CHAIN (strada A): lo stesso gesto, ma i sats li libera la
+         FIRMA di questo telefono — il server non puo' — e partono con
+         la seconda, quella del venditore, appena apre la Mini App */
+      if (o.onchain) return onchainLiberaDallOrdine(btn, o);
       const ripristina = bottoneInAttesa(btn);
       const r = await fetch(`${API_BASE}/orders/${o.id}/conferma`, {
         method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
@@ -42816,6 +42834,69 @@ async function confirmReceived(btn){
       ridisegnaOrdine(o);
     }});
 }
+/* I DUE GESTI DELL'ORDINE ON-CHAIN (27 ott 2026, strada A): la prima
+   firma da qui, poi l'ordine si rilegge. La seconda firma la mette il
+   telefono dell'altra parte da solo, quando apre la Mini App
+   (`onchainCofirmeInSottofondo`): Andrea, 27 ott, «dimostra che le
+   chiavi stanno fisicamente sul dispositivo». */
+async function onchainLiberaDallOrdine(btn, o){
+  const rip = onchainAttesa(btn, 'Firmo…');
+  try {
+    /* le monete e le firme si rileggono adesso: una copia vecchia di
+       pochi minuti firmerebbe una transazione che il server rifiuta */
+    await onchainLeggiOrdini();
+    await onchainFirmaProposta(o.onchain.id);
+    toast(o.role === 'buyer'
+      ? '🔓 Hai firmato: i sats partono appena il venditore apre la Mini App'
+      : '↩️ Hai firmato il rimborso: parte appena l\'acquirente apre la Mini App', 7000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  finally { rip(); }
+  try { await loadOrders(); renderOrders(); } catch(e) {}
+  openOrder(o.id);
+}
+
+async function onchainSecondaFirmaDallOrdine(btn, o){
+  const rip = onchainAttesa(btn, 'Firmo…');
+  await onchainCofirmeInSottofondo();
+  rip();
+  try { await loadOrders(); renderOrders(); } catch(e) {}
+  openOrder(o.id);
+}
+
+/* Il riquadro on-chain dentro l'ordine: a che punto sono le firme, e
+   il gesto che manca. '' sul Lightning di sempre. */
+function pannelloOnchainOrdine(o, s){
+  const oc = o.onchain;
+  if (!oc) return '';
+  const p = oc.proposta;
+  const io = o.role === 'buyer' ? 'compratore' : 'venditore';
+  let riga = '', gesto = '';
+  if (p && p.verso === 'venditore' && ['locked','shipped','delivered'].includes(s)) {
+    riga = p.mia
+      ? '🔓 <b>Hai liberato i sats</b> con la firma del tuo telefono: partono appena il venditore apre la Mini App, e il suo telefono mette la seconda.'
+      : '🔓 <b>L\'acquirente ha liberato i sats.</b> Manca la seconda firma, quella del tuo telefono: si mette da sola quando apri la Mini App.';
+    if (!p.mia) gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
+  } else if (s === 'refund') {
+    if (!p && io === 'venditore') {
+      riga = '↩️ Per rimandare i sats all\'acquirente serve <b>la firma del tuo telefono</b>.';
+      gesto = `<button class="btn orange" onclick="onchainLiberaDallOrdine(this, currentOrder)">✍️ Firma il rimborso</button>`;
+    } else if (!p) {
+      riga = '↩️ Il venditore deve ancora firmare il rimborso dal suo telefono: appena lo fa, il tuo mette la seconda firma e i sats tornano a te.';
+    } else if (p.mia) {
+      riga = '↩️ <b>Hai firmato il rimborso</b>: parte appena l\'acquirente apre la Mini App.';
+    } else {
+      riga = '↩️ <b>Il venditore ha firmato il rimborso.</b> Manca la seconda firma, quella del tuo telefono: si mette da sola quando apri la Mini App.';
+      gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
+    }
+  }
+  const tx = oc.txid_uscita
+    ? ` · <a href="${esc(oc.esploratore)}/tx/${esc(oc.txid_uscita)}" target="_blank" rel="noopener">la transazione</a>` : '';
+  const dove = o.role === 'seller'
+    ? ' I sats arrivano dove hai scelto in Profilo → «Incassi on-chain».' : '';
+  return `<div class="trust-note">⛓️ <span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}
+      <a href="#" onclick="event.preventDefault();onchainSoloOrdine=${Number(oc.id)};onchainTab='ordini';go('onchain')">Com'è fatto</a>${tx}</span></div>${gesto}`;
+}
+
 async function annullaOrdine(){
   haptic();
   chiediConferma({
@@ -42990,6 +43071,10 @@ async function inviaAnnullaVendita(id, corpo){
     /* la lapide di un ordine mai pagato non si vede in lista: si torna
        agli ordini, come fa l'annullo di chi compra */
     if (d.stato === 'annullato') { toast('✖️ Ordine annullato: l\'acquirente è avvisato'); go('affari'); return; }
+    /* on-chain il rimborso parte dalla firma di chi vende: la si chiede
+       subito, e se non riesce resta il bottone «Firma il rimborso» */
+    const oc = orders.find(x => x.id === id);
+    if (oc && oc.onchain) return onchainLiberaDallOrdine(null, oc);
     openOrder(id);
     toast(d.stato === 'refunded'
       ? '✖️ Ordine annullato: i sats sono tornati all\'acquirente'
@@ -54975,53 +55060,63 @@ async function onchainIncassoAtteso(B, parole, o, io){
    misura di una transazione 2-di-3. */
 async function onchainProponi(btn, oid){
   haptic();
-  const o = onchainOrdini.find(x => x.id === oid);
-  if (!o) return;
   const rip = onchainAttesa(btn, 'Firmo…');
   try {
-    const B = await caricaBitcoin();
-    const parole = onchainSemeLocale();
-    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
-    const io = onchainMieChiavi(B, parole, o);
-    if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi[o.ruolo])
-      throw new Error('la chiave dell\'ordine non è del tuo seme');
-    const w = onchainScriptOrdine(B, o);
-    const verso = o.ruolo === 'compratore' ? 'venditore' : 'compratore';
-    if (verso === 'venditore' && o.rimborso !== io.incasso)
-      throw new Error('il resto non tornerebbe a una tua chiave');
-    const tot = o.utxo.reduce((s, u) => s + u.value, 0);
-    const vb = (k) => 11 + 105 * o.utxo.length + 31 * k;
-    const tar = Math.max(1, Number(o.tariffa) || 2);
-    let uscite;
-    if (verso === 'venditore') {
-      /* la quota fissa di Barattolo, se l'ordine ne ha una: la paga chi
-         compra, e qui si controlla che non superi il tetto */
-      const quota = Number(o.quota_sats) || 0;
-      if (quota > ONCHAIN_QUOTA_TETTO) throw new Error('la quota di Barattolo supera il tetto');
-      const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
-      uscite = [[o.incasso, o.prezzo_sats]];
-      if (quota) uscite.push([o.quota_indirizzo, quota]);
-      if (resto >= ONCHAIN_POLVERE) uscite.push([o.rimborso, resto]);
-    } else {
-      uscite = [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
-    }
-    const tx = new B.Transaction();
-    for (const u of o.utxo) tx.addInput({txid: u.txid, index: u.vout,
-      witnessUtxo: {script: w.script, amount: BigInt(u.value)},
-      witnessScript: w.witnessScript});
-    for (const [a, v] of uscite) tx.addOutputAddress(a, BigInt(v), B.TEST_NETWORK);
-    for (let i = 0; i < o.utxo.length; i++) tx.signIdx(io.firma.privateKey, i);
-    const r = await fetch(`${API_BASE}/onchain/ordini/${oid}/proposta`, {method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({verso, psbt: B.base64.encode(tx.toPSBT())})});
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || 'proposta rifiutata');
+    const verso = await onchainFirmaProposta(oid);
     toast(verso === 'venditore'
       ? '🔓 Firmato: i sats partono appena il venditore apre la Mini App'
       : '↩️ Firmato: il rimborso parte appena chi ha comprato apre la Mini App', 6000);
   } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
   renderOnchain();
+}
+
+/* LA PRIMA FIRMA, senza bottoni attorno: la usa il foglio On-chain e,
+   dalla strada A (27 ott 2026), l'ordine di sempre — «Ho ricevuto
+   l'oggetto — libera i sats» e «Annulla l'ordine» su un ordine pagato
+   on-chain passano da qui. Torna il verso firmato, o alza col motivo. */
+async function onchainFirmaProposta(oid){
+  let o = onchainOrdini.find(x => x.id === oid);
+  if (!o) o = (await onchainLeggiOrdini()).find(x => x.id === oid);
+  if (!o) throw new Error('ordine on-chain non trovato');
+  const B = await caricaBitcoin();
+  const parole = onchainSemeLocale();
+  if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+  const io = onchainMieChiavi(B, parole, o);
+  if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi[o.ruolo])
+    throw new Error('la chiave dell\'ordine non è del tuo seme');
+  const w = onchainScriptOrdine(B, o);
+  const verso = o.ruolo === 'compratore' ? 'venditore' : 'compratore';
+  if (verso === 'venditore' && o.rimborso !== io.incasso)
+    throw new Error('il resto non tornerebbe a una tua chiave');
+  const tot = o.utxo.reduce((s, u) => s + u.value, 0);
+  const vb = (k) => 11 + 105 * o.utxo.length + 31 * k;
+  const tar = Math.max(1, Number(o.tariffa) || 2);
+  let uscite;
+  if (verso === 'venditore') {
+    /* la quota fissa di Barattolo, se l'ordine ne ha una: la paga chi
+       compra, e qui si controlla che non superi il tetto */
+    const quota = Number(o.quota_sats) || 0;
+    if (quota > ONCHAIN_QUOTA_TETTO) throw new Error('la quota di Barattolo supera il tetto');
+    const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
+    uscite = [[o.incasso, o.prezzo_sats]];
+    if (quota) uscite.push([o.quota_indirizzo, quota]);
+    if (resto >= ONCHAIN_POLVERE) uscite.push([o.rimborso, resto]);
+  } else {
+    uscite = [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
+  }
+  const tx = new B.Transaction();
+  for (const u of o.utxo) tx.addInput({txid: u.txid, index: u.vout,
+    witnessUtxo: {script: w.script, amount: BigInt(u.value)},
+    witnessScript: w.witnessScript});
+  for (const [a, v] of uscite) tx.addOutputAddress(a, BigInt(v), B.TEST_NETWORK);
+  for (let i = 0; i < o.utxo.length; i++) tx.signIdx(io.firma.privateKey, i);
+  const r = await fetch(`${API_BASE}/onchain/ordini/${oid}/proposta`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({verso, psbt: B.base64.encode(tx.toPSBT())})});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || 'proposta rifiutata');
+  return verso;
 }
 
 /* LA SECONDA FIRMA, senza domande ma non alla cieca: torna il motivo
@@ -55134,7 +55229,11 @@ async function onchainCofirmeInSottofondo(){
     if (!ordini.some(o => o.proposta && !o.proposta.mia
                           && (o.stato === 'pagato' || o.stato === 'attesa'))) return;
     const fatte = await onchainCofirmeInAttesa(parole);
-    if (fatte.length) toast('⛓️ ' + fatte.join(' · '), 7000);
+    if (fatte.length) {
+      toast('⛓️ ' + fatte.join(' · '), 7000);
+      /* l'ordine di sempre si e' chiuso sul server: «Ordini» lo dice */
+      try { await loadOrders(); renderOrders(); } catch(e) {}
+    }
   } catch(e) { /* in sottofondo si tace: il foglio On-chain lo ridice */ }
 }
 
@@ -55213,6 +55312,13 @@ function onchainBloccoOrdini(verifiche, esiti){
              l'indirizzo del server: non pagare, e avvisa Barattolo.</div>`;
     } else if (o.stato === 'attesa') {
       corpo = `<div class="hint">Chi compra deve ancora pagare.</div>`;
+    } else if (o.stato === 'pagato' && o.ordine_id && !o.proposta) {
+      /* LA STRADA A (27 ott 2026): pagato, l'ordine e' uno di sempre e
+         i suoi passi stanno in «Ordini» — la spedizione, «Ho ricevuto
+         l'oggetto — libera i sats», l'annullo */
+      corpo = `<div class="hint">I sats sono nel 2-di-3. Ora l'ordine si segue in
+          <b>«Ordini»</b>, coi passi di sempre.</div>
+        <button class="btn" onclick="apriOrdinePerId(${Number(o.ordine_id)})">🧾 Apri l'ordine</button>`;
     } else if (o.stato === 'pagato') {
       const p = o.proposta;
       if (p && p.mia) {
