@@ -13965,27 +13965,29 @@ async def _msg_swap_arrivato(ordine_id: int, bolt11: str,
     coda = f" Affare concluso! ⚡ {invito}".rstrip()
     if preso and preso[0] > 0:
         sats, txid, confermata = preso
-        return (f"₿ <b>Swap concluso.</b> Il ritiro on-chain ti porta "
+        return (f"₿ <b>Bitcoin arrivati.</b> Al tuo indirizzo sono arrivati "
                 f"<b>{_fmt_sats(sats)} sats</b> (transazione "
                 f"<code>{txid[:8]}…{txid[-8:]}</code>): "
-                + ("<b>già confermato</b>." if confermata else
-                   "<b>aspetta la prima conferma</b> della rete, di solito "
+                + ("<b>già confermati</b>." if confermata else
+                   "<b>aspettano la prima conferma</b> della rete, di solito "
                    "una decina di minuti.") + coda)
-    return (f"₿ <b>Swap concluso.</b> Barattolo ha pagato lo swap: "
-            f"<b>{_fmt_sats(int(r['onchain']))} sats</b> sono bloccati "
-            f"on-chain per te, e il tuo telefono li ritira (meno la rete del "
-            f"ritiro). Le conferme le vedi nella pagina Swap." + coda)
+    return (f"₿ <b>Bitcoin in arrivo.</b> Barattolo ha pagato il cambio: "
+            f"<b>{_fmt_sats(int(r['onchain']))} sats</b> ti aspettano, e il "
+            f"tuo telefono li manda al tuo indirizzo (meno il costo della "
+            f"rete). Come va lo vedi nella pagina «Ricevi in bitcoin»." + coda)
 
 
 def _msg_swap_non_andato(sats: int) -> str:
     """LE PAROLE DI CHI VENDE quando il pagamento dello swap non e' andato
     (26 ott 2026, swap tappa 4): la fattura l'aveva fatta lo swap, non
     lui. Niente «fattura nuova»: si sceglie di nuovo come incassare."""
-    return ("⚠️ <b>Lo swap non è andato.</b> Il pagamento dello swap non "
-            "è arrivato a destinazione, e i tuoi "
+    # (27 ott 2026, cantiere grafica-swap) le parole di tutti: niente
+    # «swap», il cambio in bitcoin come lo chiama la pagina
+    return ("⚠️ <b>Il cambio in bitcoin non è andato.</b> Il pagamento del "
+            "cambio non è arrivato a destinazione, e i tuoi "
             f"<b>{_fmt_sats(sats)} sats</b> sono al sicuro nel deposito di "
             "garanzia. Apri l'ordine nella Mini App e scegli di nuovo come "
-            "incassare: in Lightning o con uno swap nuovo.")
+            "incassare: in Lightning o al tuo indirizzo bitcoin.")
 
 
 def _msg_fattura_nuova(sats: int, taccuino: dict) -> str:

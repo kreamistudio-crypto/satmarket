@@ -72710,3 +72710,139 @@ lettura dato ad Andrea il 26 ott (saldo per cassaforte e incassi in
 attesa dal database): quando la guardia è accesa lo dice lei, in
 `/canali` e negli avvisi. Da decidere con Andrea quanto capitale tenere
 nella cassaforte nodo oltre la soglia (oggi 33.059 contro 14.707).
+
+## La grafica dello swap per tutti: «Ricevi in bitcoin», l'indirizzo prima di «Conferma», le 12 parole con calma (27 ott 2026, cantiere grafica-swap, piano approvato da Andrea con tre modifiche)
+
+**DA DOVE.** Ultimo passo prima della promozione intera e dell'accensione
+di `SWAP_ATTIVO` (decisione di Andrea: la grafica PER ULTIMA). Le regole
+UX raccolte nei giorni prima: al più TRE tocchi dopo la conferma;
+niente parole tecniche (swap, HTLC, RGB, fornitore); le 12 parole
+spiegate con calma e solo la prima volta; «Incolla» e QR per
+l'indirizzo. Com'era su develop (98e7b65): dopo «Conferma lo swap», la
+prima volta spunta, «Ho salvato le parole», l'indirizzo SCRITTO A MANO e
+«Crea lo swap» (quattro gesti più la tastiera); «swap» in quasi ogni
+frase, «On-chain (swap)» nella scelta, «Swap» nella barra.
+
+**LE TRE MODIFICHE DI ANDREA AL PIANO (27 ott, 00:30).** 1) La pagina e
+il tasto in basso si chiamano «Ricevi in bitcoin» (non «Bitcoin»), per
+non confonderli con la cassa on-chain che arriverà. 2) In fondo al
+testo delle parole: «Senza queste parole nessuno può recuperarli,
+nemmeno noi.» 3) Fuori da Telegram il QR solo se la fotocamera del
+browser si usa SENZA librerie nuove, sennò solo «Incolla» (vedi sotto:
+fatto con `BarcodeDetector`).
+
+**COSA FA.**
+- LE PAROLE. Nei testi per chi vende (pagina, telefono, i due messaggi
+  Telegram) niente «swap», «fornitore», «lockup», «on-chain». La scelta
+  è «⚡ Lightning / ₿ Al tuo indirizzo bitcoin»; il preventivo è
+  «Quanto ricevi al tuo indirizzo», con «Costo del cambio, SATS Routing
+  (0,6 %)», «Rete bitcoin: partenza», «Rete bitcoin: arrivo a te
+  (stima)», «Ricevi circa»; sotto, «Il cambio lo fa SATS Routing» (il
+  NOME resta, per trasparenza e per sapere dove recuperare). Il
+  bottone è «Conferma». Su Telegram: «⚠️ Il cambio in bitcoin non è
+  andato…» e «₿ Bitcoin arrivati / Bitcoin in arrivo…». L'inglese
+  segue l'italiano.
+- I TOCCHI. Il campo dell'indirizzo, con «📋 Incolla» e «📷 QR», sta nel
+  preventivo, PRIMA di «Conferma». «Conferma» guarda l'indirizzo (vuoto
+  o storto: lo dice e si ferma, senza spendere niente), ricontrolla le
+  cifre e, se le parole sono già copiate, fa nascere lo swap da sola:
+  ZERO tocchi dopo la conferma. La prima volta: la spunta e «Continua»,
+  e lo swap parte da solo: DUE tocchi. Il passo `indirizzo` e il
+  bottone «Crea» non ci sono più. Un doppio tocco su «Conferma» non fa
+  due swap (`swapInCorso` più lo swap già nato sull'ordine: prima non
+  serviva, c'era il secondo bottone che si spegneva).
+- LE 12 PAROLE, la prima volta sola (il passo `parole` c'è solo con le
+  parole non ancora copiate): «Le tue 12 parole di riserva», «Servono
+  solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche
+  da un altro telefono.», le tre regole numerate (su carta in ordine;
+  niente foto e a nessuno, nemmeno a noi; le chiediamo una volta, le
+  ritrovi nella pagina «Ricevi in bitcoin»), la frase di Andrea in
+  grassetto, poi le parole a due colonne di sempre.
+- INCOLLA E QR. Quel che arriva si ripulisce (`swapEstraiIndirizzo`:
+  «bitcoin:», la coda «?amount=…», gli spazi; un bech32 tutto maiuscolo
+  dei QR torna minuscolo) e lo giudica `indirizzoValido` del fornitore,
+  con la sua rete: buono va nel campo, storto lo si dice sopra il campo.
+  «Incolla» dove gli appunti non si leggono dice di tenere premuto (la
+  strada del PayCode). Il QR dentro Telegram, su Android e iPhone, è lo
+  scanner di Telegram (`showScanQrPopup`, versione 6.4); fuori, uno
+  strato con la fotocamera della pagina SOLO se il browser ha
+  `BarcodeDetector` (Chrome su Android sì; Safari, Firefox e Chrome sul
+  PC no): niente librerie, la fotocamera si spegne alla chiusura e ad
+  app nascosta. Dove non c'è nessuno dei due il bottone QR non compare.
+  Telegram sul PC è escluso apposta: lì lo scanner non si apre, e un
+  bottone che non fa niente è peggio di nessun bottone.
+- I TRE PALLINI nella carta: «Pagato → In arrivo → Arrivato» (pagato
+  anche «in volo», perché la fattura di uno swap vola finché non si
+  ritira), con la frase sotto; spariscono quando lo swap non va avanti
+  (scaduto, rifiutato, speso da altri), e parla la frase sola.
+- LA BARRA. «Ricevi in bitcoin» è lunga per una cella da 72 px: a 9,5
+  px (un punto meno delle altre) e −0,15 px di spaziatura sta su una
+  riga da 360 px in su; a 320 va su due righe dentro l'altezza che la
+  barra ha già lì (76 px anche con «Aste»). Misurato dal vivo a 414,
+  375, 360 e 320: barra alta come con «Aste» (61 px; 76 a 320), il +
+  al centro al mezzo pixel (206,99/187,5/180/160).
+
+**STRADE SCARTATE.** L'indirizzo DOPO la conferma, come prima (con
+«Incolla» e «Continua» la prima volta erano quattro tocchi, oltre il
+tetto); far partire lo swap da solo appena l'indirizzo incollato è
+buono (nessun momento per rileggere le cifre e l'indirizzo insieme);
+una sola spunta-bottone «Le ho scritte, continua» (la spunta separata è
+la decisione della tappa 3, e stiamo comunque in due tocchi); ricordare
+l'ultimo indirizzo per la volta dopo (riusare un indirizzo bitcoin è
+una cattiva abitudine per la privacy: non proposto); una libreria per
+leggere i QR nel browser (no di Andrea); «Bitcoin» come nome della
+pagina (modifica 1).
+
+**PROVATO** (albero: develop 98e7b65 più questo cantiere, nel worktree;
+config del giro copiato dal config d'esempio, cancellato prima del
+commit).
+- DAL VIVO, server del worktree in collaudo (porta 8191) col SATS
+  Routing di cartone (porta 9077), Chromium a 375×812, chiaro e scuro,
+  identità 222 con un Telegram finto (piattaforma android): la barra
+  (sopra), la scelta, il preventivo col campo, «Conferma» senza
+  indirizzo (la frase), «Incolla» con «bitcoin:BC1Q…?amount=» dagli
+  appunti (nel campo minuscolo e senza coda), le parole con calma, «Continua»
+  senza spunta (la frase), spunta e «Continua» (la carta coi pallini,
+  lo swap nato dal cartone), il secondo ordine (indirizzo e «Conferma»:
+  lo swap nasce senza altri passi), lo scanner di Telegram (la frase
+  «Inquadra il QR…», il campo riempito, un QR storto detto), la pagina
+  «Ricevi in bitcoin». Fuori da Telegram, con un `BarcodeDetector` e una
+  fotocamera FINTI (una tela): lo strato, «Chiudi» che spegne la
+  fotocamera, la lettura che chiude lo strato e riempie il campo.
+- `prove_grafica_swap` (nuova, 14): ogni frase dei due vocabolari, in
+  due lingue e con le funzioni chiamate, senza parole tecniche; il nome
+  della cella e della pagina; lo stile dell'etichetta; le 12 parole con
+  la frase di Andrea, solo la prima volta; il campo prima di
+  «Conferma», «Incolla» e QR; nessun «Crea»; la guardia del doppio
+  tocco; `swapEstraiIndirizzo` eseguito su sei casi; chi legge il QR su
+  sette telefoni finti; nessuno script caricato e nessun lettore in
+  `vendor`; i pallini su undici casi. In `prove_swap_pagamento` i
+  quattro messaggi dei bitcoin arrivati e l'avviso del cambio non
+  andato senza «swap».
+- I collaudi dello swap riscritti sul giro nuovo: `collaudo_swap_telefono`
+  58/0 (in più: «Conferma» senza indirizzo, le parole con calma, la
+  seconda volta senza passi e il doppio tocco senza secondo swap),
+  `collaudo_swap_instradatore` 26/0, `collaudo_swap_pagamento` 51/0
+  (anche: nessun «swap» nei due messaggi Telegram),
+  `collaudo_swap_preventivo` 23/0, `collaudo_indirizzo_swap` 60/0.
+- CONTROPROVE, 13 su 13 rosse: «swap» rimesso in un testo; il campo
+  dopo «Conferma»; l'etichetta senza il suo stile; il bech32 maiuscolo
+  che resta maiuscolo; lo scanner di Telegram anche sul PC; «in volo»
+  che non conta come pagato; la frase di Andrea tolta; «swap» rimesso
+  nei due messaggi Telegram (due mutazioni); la guardia del doppio
+  tocco tolta da `swapCrea` (il collaudo vede il secondo swap); le
+  parole chieste ogni volta; «Continua» che non fa partire; «Conferma»
+  che parte senza indirizzo.
+- Suite e collaudi della CI: nel messaggio del commit.
+
+**NON PROVATO DAL VIVO.** Lo scanner vero di Telegram su un telefono
+vero, e la fotocamera vera con `BarcodeDetector` su Chrome Android (qui
+erano finti: il protocollo è quello documentato, il gesto no). La
+lettura degli appunti dentro la WebView di Telegram (dove non si
+legge, c'è il ripiego del tieni-premuto). Da guardare sulla VM di
+collaudo o sul telefono di Andrea prima di accendere `SWAP_ATTIVO`.
+
+**COSA RESTA.** Niente di questo cantiere. Fuori da qui, notati
+strada facendo: la carta di stato dell'ordine sopra il pannello dice
+ancora «via Lightning ⚡» anche quando si è scelto l'indirizzo bitcoin
+(è la riga dello stadio del pagamento, non dello swap: non toccata).

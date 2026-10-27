@@ -129,7 +129,7 @@ async function statoPagamentoSwap(){ return null; }
 async function leggiPreventivoSwap(n, fornitore){
   return Object.assign(${JSON.stringify(D.preventivo)}, {fornitore: fornitore || 'satsrouting', fornitore_nome: 'SATS Routing'});
 }
-function pannelloPreventivoSwap(){ return '<div>preventivo</div>'; }
+function pannelloPreventivoSwap(o, campo){ return '<div>preventivo</div>' + (campo || ''); }
 const scelte = [];
 function scegliIncassoSwap(n, s){ scelte.push([n, s]); }
 function linguaSwap(){ return 'it'; }
@@ -156,7 +156,13 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   const lista = mem => JSON.parse(mem.get('barattolo_swap_lista_222') || '[]');
   out.ascoltatori = A.run('ascoltatori.map(a => a[0])');
 
-  // --- la prima volta: le parole
+  // --- (27 ott 2026, grafica-swap) «Conferma» senza indirizzo non va
+  // avanti: lo dice, e le parole non nascono
+  await A.run('swapAvanti(7)');
+  out.senzaIndirizzo = [A.run('swapErrori[7] || ""'), cassetto(), A.run('swapPassi[7] || ""')];
+
+  // --- la prima volta: le parole (l'indirizzo sta sopra «Conferma»)
+  A.run(`elementi.swapIndirizzo_7 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(7)');
   const c0 = cassetto();
   out.parole = {quante: c0 && c0.parole.split(' ').length,
@@ -165,19 +171,29 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                 passo: A.run('swapPassi[7]')};
   const p0 = A.run('pannelloSwapTelefono({id: 7})');
   html.push(p0);
-  out.parolePannello = (p0.match(/<li>/g) || []).length;
+  /* le parole sole: sopra ci sono le tre regole, anche loro in lista */
+  const elenco0 = (p0.split('class="swap-parole"')[1] || '').split('</ol>')[0];
+  out.parolePannello = (elenco0.match(/<li>/g) || []).length;
+  out.paroleCalma = [p0.includes('Servono solo se qualcosa va storto'),
+                     (p0.match(/class="swap-regole"/g) || []).length,
+                     p0.includes('Senza queste parole nessuno può recuperarli, nemmeno noi.'),
+                     p0.includes('>Continua<')];
   A.run("elementi.swapSpunta_7 = {checked: false}");
   A.run('swapParoleFatte(7)');
   out.senzaSpunta = [A.run('swapPassi[7]'), A.run('swapErrori[7]'), cassetto().copiata];
+  /* «Continua» fa partire lo swap da solo: qui con un indirizzo storto,
+     che lo ferma al preventivo col suo perche' (le bugie, sotto, vogliono
+     lo swap ancora da fare) */
+  A.run("swapIndirizziScritti[7] = 'bc1qnonvalido'");
   A.run("elementi.swapSpunta_7 = {checked: true}");
-  A.run('swapParoleFatte(7)');
-  out.conSpunta = [A.run('swapPassi[7]'), cassetto().copiata];
+  await A.run('swapParoleFatte(7)');
+  out.conSpunta = [A.run('swapPassi[7]'), cassetto().copiata, A.run('swapErrori[7] || ""')];
   html.push(A.run('pannelloSwapTelefono({id: 7})'));
 
   // --- un indirizzo sbagliato non chiede niente
   const primaCh = chiamate.length;
   A.run("elementi.swapIndirizzo_7 = {value: 'bc1qnonvalido'}");
-  await A.run('swapCrea(7)');
+  await A.run('swapAvanti(7)');
   out.indirizzoNo = [A.run('swapErrori[7]'), chiamate.length - primaCh, cassetto().prossimo,
                      /* ...e il campo, ridisegnato, ricorda quel che c'era scritto */
                      A.run('pannelloSwapTelefono({id: 7})').includes('value="bc1qnonvalido"')];
@@ -187,14 +203,14 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   out.bugie = {};
   for (const m of ['mente_importo', 'mente_impronta', 'mente_albero', 'mente_indirizzo', 'mente_meno']) {
     await modo(m);
-    await A.run('swapCrea(7)');
+    await A.run('swapAvanti(7)');
     out.bugie[m] = [A.run('swapErrori[7] || ""'), lista(memA).length, A.run('swapPassi[7]')];
   }
   out.dopoBugie = cassetto().prossimo;
   await modo('normale');
 
   // --- lo swap vero
-  await A.run('swapCrea(7)');
+  await A.run('swapAvanti(7)');
   const v1 = await visto();
   const l1 = lista(memA);
   out.creato = {quanti: l1.length, ordine: l1[0] && l1[0].ordine, indice: l1[0] && l1[0].indice,
@@ -206,7 +222,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                 chiaviCorpo: v1.creazione ? Object.keys(v1.creazione).sort() : []};
   const carta = A.run('pannelloSwapTelefono({id: 7})');
   html.push(carta);
-  out.carta = carta.includes('Barattolo sta pagando lo swap');
+  out.carta = carta.includes('Barattolo sta pagando il cambio');
 
   // --- gli stati e il ritiro cooperativo
   await A.run('swapGiro()');
@@ -229,8 +245,13 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   // --- SATS Routing che non firma: dallo script
   A.run(`elementi.swapIndirizzo_8 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(8)');
-  out.secondaVolta = A.run('swapPassi[8]');
+  /* la seconda volta «Conferma» fa nascere lo swap e basta: nessun passo
+     dopo; e un secondo tocco (o un giro rientrato) non ne fa un altro */
+  const quanti8 = lista(memA).length;
+  await A.run('swapAvanti(8)');
   await A.run('swapCrea(8)');
+  out.secondaVolta = [A.run('swapPassi[8] || ""'), !!A.run('swapDiOrdine(8)'),
+                      lista(memA).length - quanti8];
   const r8 = lista(memA).find(r => r.ordine === 8);
   await modo('non_firma');
   await stato(r8.id, 'transaction.confirmed');
@@ -247,7 +268,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   // si bloccano, la pagina si riapre (stesso cassetto) e ritira da sola
   A.run(`elementi.swapIndirizzo_9 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(9)');
-  await A.run('swapCrea(9)');
   const r9 = lista(memA).find(r => r.ordine === 9);
   await stato(r9.id, 'transaction.mempool');
   const B = pagina(memA);
@@ -304,7 +324,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   // si ritira dallo script, non si riprova all'infinito la stessa strada
   A.run(`elementi.swapIndirizzo_10 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(10)');
-  await A.run('swapCrea(10)');
   const r10 = lista(memA).find(r => r.ordine === 10);
   await modo('rifiuta_cooperativo');
   await stato(r10.id, 'transaction.mempool');
@@ -325,7 +344,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   for (const m of ['lockup_altro_script', 'lockup_meno', 'lockup_fantasma']) {
     A.run(`elementi.swapIndirizzo_${ord} = {value: '${D.indirizzo}'}`);
     await A.run(`swapAvanti(${ord})`);
-    await A.run(`swapCrea(${ord})`);
     const rL = lista(memA).find(r => r.ordine === ord);
     await modo(m);
     const vPrima = await visto();
@@ -347,7 +365,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   const spenta = async (ordine, prima) => {
     A.run(`elementi.swapIndirizzo_${ordine} = {value: '${D.indirizzo}'}`);
     await A.run(`swapAvanti(${ordine})`);
-    await A.run(`swapCrea(${ordine})`);
     const rS = lista(memA).find(r => r.ordine === ordine);
     const vPrima = await visto();
     await prima(rS);
@@ -384,7 +401,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
      niente ritiro tentato, niente firma chiesta */
   A.run(`elementi.swapIndirizzo_16 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(16)');
-  await A.run('swapCrea(16)');
   await modo('giu');
   const gia16 = chiamate.length;
   await A.run('swapGiro()');
@@ -399,7 +415,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   const frase = ordine => A.run(`frasestatoSwap(swapLista().find(r => r.ordine === ${ordine}))`);
   A.run(`elementi.swapIndirizzo_17 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(17)');
-  await A.run('swapCrea(17)');
   const r17 = lista(memA).find(r => r.ordine === 17);
   await modo('giu_rete_muta');
   await stato(r17.id, 'transaction.mempool');
@@ -433,7 +448,6 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
      trasmesso */
   A.run(`elementi.swapIndirizzo_18 = {value: '${D.indirizzo}'}`);
   await A.run('swapAvanti(18)');
-  await A.run('swapCrea(18)');
   const r18 = lista(memA).find(r => r.ordine === 18);
   await modo('giu');
   await stato(r18.id, 'transaction.mempool');
@@ -570,23 +584,33 @@ def il_telefono(base):
         prova("il banco del telefono gira", "", r["ERRORE"])
         return
     print("\n[la prima volta: le 12 parole]")
-    prova("un solo ascoltatore, delegato, sui click", ["click"], r["ascoltatori"])
+    # (27 ott 2026, grafica-swap) tre ascoltatori: i click, l'input del campo
+    # dell'indirizzo, la fotocamera spenta ad app in secondo piano
+    prova("un ascoltatore delegato sui click, piu' l'input e la visibilita'",
+          ["click", "input", "visibilitychange"], r["ascoltatori"])
+    prova("«Conferma» senza indirizzo: lo dice, e le parole non nascono",
+          ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", None, ""],
+          r["senzaIndirizzo"])
     prova("nascono 12 parole valide, non ancora copiate, dal passo «parole»",
           {"quante": 12, "valide": True, "copiata": False, "prossimo": 0, "passo": "parole"},
           r["parole"])
     prova("...e il pannello le mostra tutte", 12, r["parolePannello"])
+    prova("...spiegate con calma: a cosa servono, le tre regole, nessuno senza, "
+          "e «Continua»", [True, 1, True, True], r["paroleCalma"])
     prova("senza la spunta non si va avanti", ["parole", "Prima spunta «Le ho scritte su carta».", False],
           r["senzaSpunta"])
-    prova("...con la spunta si passa all'indirizzo", ["indirizzo", True], r["conSpunta"])
+    prova("...con la spunta lo swap parte da solo: qui l'indirizzo storto lo "
+          "ferma al preventivo, col perche'",
+          ["preventivo", True, "Questo non è un indirizzo bitcoin valido."], r["conSpunta"])
 
     print("\n[l'indirizzo e le bugie]")
     prova("un indirizzo sbagliato: lo dice, nessuna chiamata, nessun indice speso, "
           "e il campo non si svuota",
-          ["Questo non è un indirizzo valido per questa rete.", 0, 0, True], r["indirizzoNo"])
-    rifiuto = "SATS Routing ha risposto con dati che non tornano: lo swap non parte, nessun sats si è mosso."
+          ["Questo non è un indirizzo bitcoin valido.", 0, 0, True], r["indirizzoNo"])
+    rifiuto = "SATS Routing ha risposto con dati che non tornano: non parte niente, nessun sats si è mosso."
     for m in ("mente_importo", "mente_impronta", "mente_albero", "mente_indirizzo", "mente_meno"):
         prova(f"SATS Routing che mente ({m.split('_')[1]}): rifiutato, niente salvato",
-              [rifiuto, 0, "indirizzo"], r.get("bugie", {}).get(m))
+              [rifiuto, 0, "preventivo"], r.get("bugie", {}).get(m))
     prova("...e ogni tentativo ha speso il suo indice (mai un segreto riusato)", 5, r["dopoBugie"])
 
     print("\n[lo swap vero]")
@@ -609,7 +633,8 @@ def il_telefono(base):
     prova("...un'uscita sola, all'indirizzo di chi vende, coi sats del preventivo",
           (1, 47_154, True, True), (co.get("uscite"), co.get("sats"), co.get("dest"), co.get("uguale")))
     prova("...poi «fatto», e niente piu' da sorvegliare", ["invoice.settled", 0], r["fatto"])
-    prova("la seconda volta le parole non si richiedono", "indirizzo", r["secondaVolta"])
+    prova("la seconda volta «Conferma» fa nascere lo swap, senza altri passi; "
+          "un secondo tocco non ne fa un altro", ["", True, 0], r["secondaVolta"])
     sc = r["script"]
     prova("SATS Routing che non firma: si ritira dallo script, e la firma regge",
           (True, False, "script", 47_154, ""), (sc.get("txid"), sc.get("coop"), sc.get("via"), sc.get("sats"), sc.get("errore")))
@@ -620,11 +645,11 @@ def il_telefono(base):
     prova("12 parole storte: lo dice", "Queste non sono 12 parole valide.", r["recuperoNo"])
     rc = r["recupero"]
     prova("su un telefono vuoto le 12 parole ritrovano tutti gli swap",
-          ("Recuperati 8 swap.", 8, list(range(8))), (rc.get("nota"), rc.get("quanti"), rc.get("indici")))
+          ("Recuperati 8 incassi.", 8, list(range(8))), (rc.get("nota"), rc.get("quanti"), rc.get("indici")))
     prova("...il contatore riparte dopo il piu' alto, come sul telefono di prima",
           (8, 8, True, True), (rc.get("prossimoA"), rc.get("prossimoC"), rc.get("parole"), rc.get("copiata")))
     prova("un telefono con ALTRE parole e i suoi swap non le cambia",
-          ["Su questo telefono ci sono già altre parole con degli swap: non le sostituisco.", True],
+          ["Su questo telefono ci sono già altre parole in uso: non le sostituisco.", True],
           r["recuperoAltre"])
     prova("le parole nella pagina Swap: nascoste, poi mostrate col tocco",
           (True, True), (r["paroleNascoste"], r["paroleMostrate"]))
@@ -669,7 +694,7 @@ def il_telefono(base):
     prova("lockup speso da un altro: errore chiaro, nessuna firma, niente trasmesso",
           {"ritirato": False, "errore": "il lockup l'ha speso un'altra transazione",
            "spesoDa": True, "claim": 0, "post": 0,
-           "frase": "I bitcoin dello swap li ha spesi un'altra transazione, non il tuo ritiro: scrivi a SATS Routing.",
+           "frase": "Quei bitcoin li ha spesi un'altra transazione, non il tuo invio: scrivi a SATS Routing.",
            "riprovo": False},
           r.get("spesoDaAltri"))
 

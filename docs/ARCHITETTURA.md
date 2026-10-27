@@ -33781,7 +33781,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `POST /v2/swap/restore` dalla pagina Swap.
   I PASSI del pannello (`swapPassi[ordine]`): `preventivo` →
   `parole` (solo se le parole non sono `copiata`) → `indirizzo` →
-  `creo`; poi `cartaSwap`. La pagina Swap ha `#swapTelefono`, scritto
+  `creo`; poi `cartaSwap` (dal 27 ott 2026 senza `indirizzo`: vedi «LA
+  GRAFICA DELLO SWAP PER TUTTI»). La pagina Swap ha `#swapTelefono`, scritto
   da `renderSwapTelefono` (chiamata da `renderSwap`): lista, parole a
   richiesta, recupero. L'ASCOLTATORE è uno, delegato sul `click` del
   document, e conosce `scegli`, `avanti`, `parole-fatte`, `crea`,
@@ -33988,6 +33989,46 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   importo on-chain vero e conferme; sui quattro rami riusciti di
   `_sblocca_sats` al posto delle parole di Lightning. Il cartone mette
   il `prevout` nella spesa, come mempool.space.
+- LA GRAFICA DELLO SWAP PER TUTTI (27 ott 2026, cantiere grafica-swap;
+  perché in CANTIERI, «La grafica dello swap per tutti»). Cambia le
+  parole e i passi, non la sostanza: chiavi, verifica, pagamento e
+  ritiro sono quelli delle tappe 3-4.
+  LE PAROLE: nei testi per chi vende (`SWAP_TESTI` della pagina,
+  `SWAP_TESTI_T3` di `swap/instradatore.js`, i due messaggi Telegram
+  `_msg_swap_arrivato` e `_msg_swap_non_andato`) niente «swap»,
+  «fornitore», «lockup», «on-chain»: la scelta è «₿ Al tuo indirizzo
+  bitcoin», quel che fa SATS Routing è «il cambio», le 12 parole sono
+  «di riserva». Il vestito della quarta cella (`CELLA_SWAP`) e il titolo
+  della pagina si chiamano «Ricevi in bitcoin» (Andrea: per non
+  confonderli con la cassa on-chain); l'etichetta ha la classe
+  `eti-ricevi` (9,5 px, una riga da 360 px in su). Gli id interni
+  (`view-swap`, `nav-aste`, `data-swap`, le chiavi dei testi) non
+  cambiano.
+  I PASSI (`swapPassi[ordine]`): `preventivo` → `parole` (solo con le
+  parole non ancora `copiata`) → `creo`; il passo `indirizzo` non c'è
+  più. Il campo dell'indirizzo (`campoIndirizzoSwap`: `#swapIndirizzo_<n>`,
+  «📋 Incolla», «📷 QR») sta DENTRO il preventivo, prima di «Conferma»
+  (`pannelloPreventivoSwap(o, campo)`). «Conferma» (`swapAvanti`)
+  guarda l'indirizzo, ricontrolla le tariffe e, con le parole già
+  copiate, chiama `swapCreaDentro` da sola; «Continua» delle parole
+  (`swapParoleFatte`) chiama `swapCrea`. Il bottone «Crea» e l'azione
+  `crea` non ci sono più. `swapInCorso` (un Set per ordine) e
+  `swapDiOrdine(n)` fermano un secondo giro sullo stesso ordine.
+  L'INDIRIZZO: `swapEstraiIndirizzo` toglie «bitcoin:», la coda «?…» e
+  gli spazi, e riporta minuscolo un bech32 tutto maiuscolo; il giudice
+  resta `indirizzoValido` del fornitore. `swapIndirizziScritti[n]` lo
+  aggiorna l'ascoltatore `input` del document (oltre al `click` e a
+  `visibilitychange`). «Incolla» = `navigator.clipboard.readText`, col
+  ripiego del tieni-premuto. IL QR: `swapQrTelegram()` (Telegram ≥ 6.4
+  su android/ios: `tg.showScanQrPopup`), sennò `swapQrBrowser()`
+  (`BarcodeDetector` + `getUserMedia`, nessuna libreria): lo strato
+  `#swapQrStrato` creato al primo uso, il video, `detect` ogni 250 ms,
+  il flusso spento a ogni chiusura e ad app nascosta. Senza nessuno dei
+  due il bottone QR non c'è.
+  LA CARTA: `passiSwap(swapTappa(rec))`, tre pallini «Pagato → In arrivo
+  → Arrivato» (`in_volo`/`pagato` = pagato; bloccato o ritiro trasmesso
+  = in arrivo; concluso o `fatto` = arrivato; -1 = niente pallini).
+  Le prove: `prove_grafica_swap`; i gesti: `collaudo_swap_telefono`.
 - IL PAGAMENTO ON-CHAIN, TAPPE 1-2: LE CHIAVI E L'INDIRIZZO DELL'ORDINE
   (16-20 ott 2026, cantieri pagamento-onchain di Alan e onchain-tappa2;
   perché in CANTIERI, «Il pagamento on-chain come opzione» e

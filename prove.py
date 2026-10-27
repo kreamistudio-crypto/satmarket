@@ -174385,7 +174385,7 @@ ramoVetrina = 'esplora';
 swapLeve = {attivo: true};
 vestiCellaAste();
 toccaCellaAste();
-out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span>Swap'),
+out.acceso = [ELS['nav-aste'].innerHTML.endsWith('</svg></span><span class="eti-ricevi">Ricevi in bitcoin</span>'),
               ELS['nav-aste'].dataset.vestito,
               ELS['portaAste'].style.display, aste, viste.slice()];
 out.voceAcceso = [voceNav('swap'), voceNav('astepresto'),
@@ -174423,7 +174423,9 @@ console.log(JSON.stringify(out));
           [True, "none", 1, 0], r.get("spento"))
     prova("...e la nav accende le aste come sempre",
           ["aste", "aste", "aste"], r.get("voceSpento"))
-    prova("a leva accesa la STESSA cella si veste da Swap e apre la pagina",
+    # (27 ott 2026, cantiere grafica-swap) il vestito si chiama «Ricevi in
+    # bitcoin», nome scelto da Andrea
+    prova("a leva accesa la STESSA cella si veste da «Ricevi in bitcoin» e apre la pagina",
           [True, "swap", "", 1, ["swap"]], r.get("acceso"))
     prova("...e le aste, raggiunte dalla porta, accendono Esplora",
           ["aste", "esplora", "esplora"], r.get("voceAcceso"))
@@ -174432,9 +174434,10 @@ console.log(JSON.stringify(out));
     prova("...e chi era sulla pagina «Swap» esce su Esplora",
           (["esplora"], 0), (r.get("uscita"), r.get("ferma")))
     prova("i testi in inglese per Telegram in un'altra lingua",
-          ["Swap", "No swaps yet."], r.get("en"))
+          ["Receive in bitcoin", "No payouts to your bitcoin address yet."], r.get("en"))
     prova("...in italiano per l'italiano e senza Telegram",
-          ["Per ora non hai nessuno swap.", "Per ora non hai nessuno swap."],
+          ["Per ora nessun incasso al tuo indirizzo bitcoin.",
+           "Per ora nessun incasso al tuo indirizzo bitcoin."],
           [r.get("it"), r.get("senza")])
 
 
@@ -177236,18 +177239,18 @@ telefono = true;
 out.prima = payoutPanel(Object.assign({}, o, {state: 'shipped'})).includes('scelta-incasso');
 out.tocca = payoutPanel(Object.assign({}, o, {state: 'shipped', pagamento: {gesto_venditore: true}})).includes('scelta-incasso');
 sceltaIncassoSwap[7] = 'swap';
-out.carico = payoutPanel(o).includes('Leggo le tariffe');
+out.carico = payoutPanel(o).includes('Calcolo quanto ricevi');
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 47154,
   righe: [{voce: 'dovuto', sats: 48000}, {voce: 'commissione', sats: -288, percento: 0.6},
           {voce: 'rete_invio', sats: -324}, {voce: 'rete_ritiro', sats: -234}]}};
 const sw = payoutPanel(o);
-out.swap = [sw.includes('Commissione SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
-            sw.includes('Ricevi on-chain, circa'), sw.includes('47154'),
+out.swap = [sw.includes('Costo del cambio, SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
+            sw.includes('Ricevi circa'), sw.includes('47154'),
             sw.includes('sellerInvoice'), sw.includes('data-swap="avanti" data-ordine="7"')];
 preventiviSwap[7].nota = 'cambiata';
-out.cambiata = payoutPanel(o).includes('Le tariffe sono cambiate');
+out.cambiata = payoutPanel(o).includes('Le cifre sono cambiate');
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: false, motivo: 'sotto_minimo', minimo: 25000}};
-out.sotto = payoutPanel(o).includes('Sotto i 25000 sats lo swap costa troppo');
+out.sotto = payoutPanel(o).includes('Sotto i 25000 sats mandarli a un indirizzo costa troppo');
 preventiviSwap[7].dati = {ok: false, motivo: 'sopra_tetto', massimo: 50000};
 out.sopra = payoutPanel(o).includes('Sopra i 50000 sats, per ora, solo Lightning');
 preventiviSwap[7].dati = {ok: false, motivo: 'non_risponde'};
@@ -177257,7 +177260,7 @@ tg.initDataUnsafe.user.language_code = 'en';
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: true, hash: 'h', ricevi: 1,
   righe: [{voce: 'commissione', sats: -288, percento: 0.6}]}};
 const en = payoutPanel(o);
-out.en = [en.includes('SATS Routing fee (0.6%)'), en.includes('Confirm the swap')];
+out.en = [en.includes('Exchange fee, SATS Routing (0.6%)'), en.includes('>Confirm<')];
 out.onclick = [sw, giu, en].filter(x => /\son[a-z]+=/.test(x)).length;
 console.log(JSON.stringify(out));
 """.replace("__TESTI__", testi).replace("__LINGUA__", lingua).replace(
@@ -177287,10 +177290,10 @@ console.log(JSON.stringify(out));
     # (19 ott: il titolo del preventivo si chiamava `titolo` come quello
     # della pagina Swap, e nell'oggetto dei testi lo sovrascriveva)
     prova("il titolo della pagina e quello del preventivo sono due chiavi",
-          (2, 1, 1, 1), (testi.count("titolo: 'Swap',"),
-                         testi.count("titoloPrev: 'Preventivo dello swap'"),
-                         testi.count("titoloPrev: 'Swap quote'"),
-                         testi.count("titolo: 'Swap',\n       testo: 'Here")))
+          (1, 1, 1, 1), (testi.count("titolo: 'Ricevi in bitcoin',"),
+                         testi.count("titoloPrev: 'Quanto ricevi al tuo indirizzo'"),
+                         testi.count("titoloPrev: 'What you receive at your address'"),
+                         testi.count("titolo: 'Receive in bitcoin',\n       testo: 'Here")))
 
 
 def prove_swap_telefono():
@@ -178701,10 +178704,10 @@ def prove_swap_pagamento():
     amb = {"_fmt_sats": reale("_fmt_sats")}
     exec(pezzo("_msg_swap_non_andato"), amb)
     m = amb["_msg_swap_non_andato"](30_000)
-    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura», i "
-          "sats al sicuro, si sceglie di nuovo",
-          (False, True, True, True),
-          ("fattura" in m.lower(), "30.000 sats" in m,
+    prova("l'avviso a chi vende dopo uno swap non andato: niente «fattura» ne' "
+          "«swap», i sats al sicuro, si sceglie di nuovo",
+          (False, False, True, True, True),
+          ("fattura" in m.lower(), "swap" in m.lower(), "30.000 sats" in m,
            "deposito di garanzia" in m, "scegli di nuovo come incassare" in m))
     sb = codice(pezzo("_sblocca_sats"))
     prova("...e parte PRIMA delle parole di una fattura bruciata, solo se la "
@@ -178823,12 +178826,18 @@ def prove_swap_pagamento():
           "giu', i sats bloccati e il telefono che ritira",
           [(True, True, False), (True, True, False), (True, False, False),
            (True, False, False)],
-          [("54.460 sats" in in_attesa, "aspetta la prima conferma" in in_attesa,
+          [("54.460 sats" in in_attesa, "aspettano la prima conferma" in in_attesa,
             "nel tuo wallet" in in_attesa),
-           ("54.460 sats" in confermato, "già confermato" in confermato,
+           ("54.460 sats" in confermato, "già confermati" in confermato,
             "nel tuo wallet" in confermato),
            ("54.571 sats" in senza, "54.460" in senza, "nel tuo wallet" in senza),
            ("54.571 sats" in giu, "54.460" in giu, "nel tuo wallet" in giu)])
+    # (27 ott 2026, cantiere grafica-swap) le parole di tutti: in nessuno
+    # dei quattro messaggi la parola «swap», e il nome della pagina giusto
+    prova("...e nessuno dei quattro dice «swap»; senza ritiro, la pagina "
+          "«Ricevi in bitcoin»", (0, True),
+          (sum("swap" in m.lower() for m in (in_attesa, confermato, senza, giu)),
+           "«Ricevi in bitcoin»" in senza))
     prova("...e una fattura che non e' di uno swap non cambia niente", "",
           msg("lnbc-altra"))
     sb = codice(pezzo("_sblocca_sats"))
@@ -178837,6 +178846,156 @@ def prove_swap_pagamento():
     prova("il collaudo dello swap intero sta negli elenchi della CI", (True, True),
           ("\ncollaudo_swap_pagamento\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
+def prove_grafica_swap():
+    """LA GRAFICA DELLO SWAP PER TUTTI (27 ott 2026, cantiere grafica-swap,
+    piano approvato da Andrea con tre modifiche). Le regole: al piu' TRE
+    tocchi dopo «Conferma»; niente parole tecniche (swap, HTLC, RGB,
+    fornitore, e con loro lockup e on-chain); le 12 parole spiegate con
+    calma e solo la prima volta; «Incolla» e QR per l'indirizzo; la pagina
+    e il tasto in basso «Ricevi in bitcoin». Il giro coi gesti, contro il
+    SATS Routing di cartone, e' `collaudo_swap_telefono` (la prima volta,
+    la seconda, il doppio tocco); qui le sentinelle e i pezzi puri."""
+    print("\n[la grafica dello swap per tutti]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    testi = pezzo_js(mini, "const SWAP_TESTI = {", "function linguaSwap(){")
+    t3 = pezzo_js(js, "const SWAP_TESTI_T3 = {", "function t3(){")
+    cella = pezzo_js(mini, "const CELLA_SWAP = ", "function vestiCellaAste(){")
+
+    # --- le parole che si leggono: ogni stringa dei due vocabolari, con le
+    # funzioni chiamate su un nome di prova, in tutte e due le lingue
+    banco = r"""
+__TESTI__
+__T3__
+const fuori = [];
+const raccogli = v => {
+  if (typeof v === 'string') fuori.push(v);
+  else if (typeof v === 'function') { for (const x of [0, 1, 2]) fuori.push(String(v(x === 0 ? 'Nome' : x, 'abc'))); }
+  else if (Array.isArray(v)) v.forEach(raccogli);
+  else if (v && typeof v === 'object') Object.values(v).forEach(raccogli);
+};
+raccogli(SWAP_TESTI); raccogli(SWAP_TESTI_T3);
+console.log(JSON.stringify(fuori));
+""".replace("__TESTI__", testi).replace("__T3__", t3)
+    frasi = _node_banco(banco)
+    if frasi is None:
+        salta("le parole della grafica dello swap", "node non c'e'")
+        return
+    vietate = ("swap", "htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
+    trovate = sorted({p for f in frasi for p in vietate if p in f.lower()})
+    prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
+          "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
+          (trovate, len(frasi) > 150))
+    prova("il tasto in basso e la pagina si chiamano «Ricevi in bitcoin»",
+          (True, False, 1, 1),
+          (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Ricevi in bitcoin</span>';"),
+           "Swap';" in cella, testi.count("titolo: 'Ricevi in bitcoin',"),
+           testi.count("titolo: 'Receive in bitcoin',")))
+    prova("...un punto piu' piccola e un filo stretta: ci sta su una riga da 360 px",
+          True, "nav .eti-ricevi{display:block;font-size:9.5px;line-height:1.3;"
+          "letter-spacing:-.15px;" in mini)
+
+    # --- le 12 parole: con calma, e la frase di Andrea alla fine
+    it = t3[:t3.index("\n  en: {")]
+    prova("le 12 parole: a cosa servono, le tre regole, la frase di Andrea",
+          (True, 3, True, True),
+          ("Servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin "
+           "anche da un altro telefono." in it,
+           it[it.index("paroleRegole: ["):it.index("],", it.index("paroleRegole: ["))].count("',") + 1,
+           "paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.'," in it,
+           "le ritrovi nella pagina «Ricevi in bitcoin»." in it))
+    avanti = js[js.index("async function swapAvantiDentro(n){"):js.index("/* «Continua» delle parole")]
+    prova("...e solo la prima volta: il passo «parole» c'e' solo con le parole "
+          "non ancora copiate, sennò lo swap parte subito",
+          (True, True),
+          ("if (!c || !c.parole || !c.copiata) {" in avanti
+           and "swapPassi[n] = 'parole';" in avanti,
+           avanti.rstrip().endswith("return swapCreaDentro(n);\n}")))
+
+    # --- i tocchi: l'indirizzo PRIMA di «Conferma», niente bottone dopo
+    prev = pezzo_js(mini, "function pannelloPreventivoSwap(o, campo){", "\nfunction renderSwap(){")
+    prova("il campo dell'indirizzo sta nel preventivo, prima di «Conferma»", True,
+          0 <= prev.find("${campo || ''}") < prev.find('data-swap="avanti"'))
+    pann = js[js.index("function campoIndirizzoSwap(n, errore){"):js.index("function swapTappa(rec){")]
+    prova("...col campo, «Incolla» e il QR (se c'e' chi lo legge)", (True, True, True, True),
+          ('id="swapIndirizzo_${n}"' in pann, 'data-swap="incolla"' in pann,
+           "${swapQrPossibile() ? `<button" in pann and 'data-swap="qr"' in pann,
+           "return pannelloPreventivoSwap(o, campoIndirizzoSwap(n, errore));" in pann))
+    prova("dopo «Conferma» nessun bottone «Crea»: «Continua» fa partire da solo",
+          (0, True, True),
+          (js.count('data-swap="crea"'),
+           "  delete swapErrori[n];\n  return swapCrea(n);\n}" in js,
+           "else if (a === 'crea')" not in js))
+    prova("un doppio tocco non fa due swap: un giro alla volta per ordine", 3,
+          js.count("if (swapInCorso.has(n) || swapDiOrdine(n)) return;"))
+
+    # --- l'indirizzo da quel che arriva, e chi legge il QR: eseguiti
+    estrai = pezzo_js(js, "function swapEstraiIndirizzo(testo){", "\n}\n") + "\n}\n"
+    qr = js[js.index("function swapQrTelegram(){"):js.index("function campoIndirizzoSwap(")]
+    banco = r"""
+__ESTRAI__
+let tg, window = {}, navigator = {};
+__QR__
+const out = {};
+out.estrai = ['bitcoin:BC1QAR0SRRR7XFKVY5L643LYDNW9RE59GTZZWF5MDQ?amount=0.0004&label=x',
+              '  bc1qar0srrr7 xfkvy5l643lydnw9re59gtzzwf5mdq\n', 'BITCOIN:3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy',
+              'bcrt1qabc', '', null].map(swapEstraiIndirizzo);
+const giro = (t, w, n) => { tg = t; window = w; navigator = n; return [swapQrTelegram(), swapQrBrowser(), swapQrPossibile()]; };
+const tgOk = p => ({initData: 'x', platform: p, showScanQrPopup(){}, isVersionAtLeast: v => v === '6.4'});
+out.qr = {android: giro(tgOk('android'), {}, {}), ios: giro(tgOk('ios'), {}, {}),
+          desktop: giro(tgOk('tdesktop'), {}, {}),
+          vecchio: giro(Object.assign(tgOk('android'), {isVersionAtLeast: () => false}), {}, {}),
+          browser: giro(undefined, {BarcodeDetector: function(){}}, {mediaDevices: {getUserMedia(){}}}),
+          senzaCamera: giro(undefined, {BarcodeDetector: function(){}}, {}),
+          niente: giro(undefined, {}, {mediaDevices: {getUserMedia(){}}})};
+console.log(JSON.stringify(out));
+""".replace("__ESTRAI__", estrai).replace("__QR__", qr)
+    r = _node_banco(banco)
+    if r is None:
+        salta("l'indirizzo e il QR dello swap", "node non c'e'")
+        return
+    prova("l'indirizzo da un QR o dagli appunti: «bitcoin:» e il resto via, il "
+          "bech32 maiuscolo torna minuscolo, gli altri come sono",
+          ["bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+           "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+           "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", "bcrt1qabc", "", ""], r.get("estrai"))
+    prova("il QR: lo scanner di Telegram sul telefono; fuori, la fotocamera solo "
+          "se il browser legge i QR da se'; sennò niente bottone",
+          {"android": [True, False, True], "ios": [True, False, True],
+           "desktop": [False, False, False], "vecchio": [False, False, False],
+           "browser": [False, True, True], "senzaCamera": [False, False, False],
+           "niente": [False, False, False]}, r.get("qr"))
+    # (vendor/qrcode.js c'era gia': DISEGNA i QR, non li legge)
+    prova("...niente librerie nuove: il telefono non carica script, nessun "
+          "lettore di QR in vendor, la fotocamera si spegne alla chiusura e ad "
+          "app nascosta", (False, [], True, True),
+          ("createElement('script')" in js,
+           [f for f in os.listdir("vendor") if any(k in f.lower() for k in ("jsqr", "scan", "zxing", "lettore"))],
+           "if (swapQrFlusso) swapQrFlusso.getTracks().forEach(k => { try { k.stop(); } catch(e){} });" in js,
+           "if (document.hidden && swapQrFlusso) swapQrChiudi();" in js))
+
+    # --- i tre pallini
+    tappa = pezzo_js(js, "function swapTappa(rec){", "\n}\n") + "\n}\n"
+    banco = r"""
+const SWAP_FASI_RITIRO = new Set(['bloccato', 'confermato']);
+let fase = 'creato';
+function swapFase(){ return fase; }
+__TAPPA__
+const casi = [['creato', {pagamento: ''}], ['creato', {pagamento: 'in_volo'}],
+  ['creato', {pagamento: 'pagato'}], ['bloccato', {}], ['creato', {ritiro: {txid: 't'}}],
+  ['fatto', {}], ['bloccato', {ritiro: {txid: 't', concluso: true}}],
+  ['scaduto', {}], ['creato', {pagamento: 'rifiutato'}], ['bloccato', {spesoDa: 'x'}], ['ignoto', {}]];
+console.log(JSON.stringify(casi.map(([f, r]) => { fase = f; return swapTappa(r); })));
+""".replace("__TAPPA__", tappa)
+    prova("i tre pallini: pagato, in arrivo, arrivato; niente pallini quando "
+          "non va avanti", [0, 1, 1, 2, 2, 3, 3, -1, -1, -1, -1], _node_banco(banco))
+
+    # --- il collaudo coi gesti negli elenchi della CI
+    prova("il collaudo dei gesti dello swap sta negli elenchi della CI", (True, True),
+          ("\ncollaudo_swap_telefono\n" in open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read(),
+           "\ncollaudo_swap_telefono.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
 
 
 def prove_margine_cassaforte():
@@ -179741,6 +179900,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
+              prove_grafica_swap,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,

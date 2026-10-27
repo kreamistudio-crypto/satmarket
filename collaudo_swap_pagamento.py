@@ -410,11 +410,12 @@ const setInterval = () => 1, clearInterval = () => {};
   async function nuovoSwap(P, n){
     P.run(`elementi.swapIndirizzo_${n} = {value: '${D.indirizzo}'}`);
     await P.run(`swapAvanti(${n})`);
+    /* (27 ott 2026, grafica-swap) «Conferma» fa nascere lo swap; la prima
+       volta lo fa «Continua», dopo le parole */
     if (P.run(`swapPassi[${n}]`) === 'parole') {
       P.run(`elementi.swapSpunta_${n} = {checked: true}`);
-      P.run(`swapParoleFatte(${n})`);
+      await P.run(`swapParoleFatte(${n})`);
     }
-    await P.run(`swapCrea(${n})`);
     return ultimo(n);
   }
   const paga = (n, varia) => A.run(
@@ -652,7 +653,7 @@ def il_giro(r, ordini, tee):
     if "ERRORE" in r:
         prova("il banco del telefono gira", "", r["ERRORE"])
         return
-    P = "Barattolo sta pagando lo swap: poi SATS Routing blocca i bitcoin e li ritiro."
+    P = "Barattolo sta pagando il cambio: poi i bitcoin partono verso il tuo indirizzo."
     print("\n[lo swap intero]")
     i = r["intero"]
     prova("lo swap nasce col segreto del telefono e il server lo paga: in volo",
@@ -674,14 +675,15 @@ def il_giro(r, ordini, tee):
           ("released", "uscito"),
           (c["ordine"]["stato"], c["ordine"]["payout_stato"]))
     av = c.get("avviso") or ""
-    prova("a chi vende: lo swap concluso con l'importo ON-CHAIN del ritiro e "
-          "le conferme, non «nel tuo wallet»",
-          (True, True, False, False),
-          ("Il ritiro on-chain ti porta <b>" in av,
-           "aspetta la prima conferma" in av, "nel tuo wallet" in av,
-           "<b>30.000 sats</b>" in av))
+    # (27 ott 2026, grafica-swap) le parole di tutti: niente «swap»
+    prova("a chi vende: i bitcoin arrivati con l'importo ON-CHAIN del ritiro e "
+          "le conferme, non «nel tuo wallet», senza «swap»",
+          (True, True, False, False, False),
+          ("Al tuo indirizzo sono arrivati <b>" in av,
+           "aspettano la prima conferma" in av, "nel tuo wallet" in av,
+           "<b>30.000 sats</b>" in av, "swap" in av.lower()))
     prova("...la riga dice pagato, la carta «Fatto», sempre un pagamento solo",
-          ("pagato", "fatto", "Fatto: i bitcoin sono tuoi.", 1),
+          ("pagato", "fatto", "Fatto: i bitcoin sono al tuo indirizzo.", 1),
           (primo(c["righe"]), c["fase"], c["frase"], c["uscite"]))
 
     print("\n[la risposta del nodo mancata]")
@@ -721,10 +723,11 @@ def il_giro(r, ordini, tee):
            "come incassare.", True), (f["frase"], f["scegliDiNuovo"]))
     av = f.get("avviso") or ""
     prova("...e su Telegram chi vende legge che lo swap non e' andato, "
-          "senza «fattura»: sceglie di nuovo",
-          (True, False, True, True),
-          ("Lo swap non è andato" in av, "fattura" in av.lower(),
-           "scegli di nuovo come incassare" in av, "30.000 sats" in av))
+          "senza «fattura» e senza «swap»: sceglie di nuovo",
+          (True, False, True, True, False),
+          ("Il cambio in bitcoin non è andato" in av, "fattura" in av.lower(),
+           "scegli di nuovo come incassare" in av, "30.000 sats" in av,
+           "swap" in av.lower()))
     m = r["aMano"]
     prova("pagato a mano, poi uno swap nuovo: NON si paga, nessuna uscita per lui",
           (True, 0, 1), (m["nuovo"], m["usciteNuovo"], m["usciteVecchio"]))
@@ -771,11 +774,11 @@ def il_giro(r, ordini, tee):
     print("\n[i tetti]")
     prova("oltre i 100.000 di chi vende in 24 ore: no, lo dice, e si sceglie di nuovo",
           {"pagamento": "rifiutato", "motivo": "tetto_utente",
-           "frase": "Per oggi hai raggiunto il tetto degli swap: incassa via Lightning.",
+           "frase": "Per oggi hai raggiunto il tetto degli incassi in bitcoin: incassa via Lightning.",
            "scegliDiNuovo": True}, r["tettoUtente"])
     prova("oltre il tetto di tutti: no, lo dice",
           {"pagamento": "rifiutato", "motivo": "tetto_giorno",
-           "frase": "Oggi lo swap è al completo: incassa via Lightning."},
+           "frase": "Per oggi gli incassi in bitcoin sono al completo: incassa via Lightning."},
           r["tettoGiorno"])
     prova("a tetto alzato lo stesso ordine passa: in volo, un'uscita",
           ("in_volo", "in_volo", 1),

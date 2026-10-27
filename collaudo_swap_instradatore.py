@@ -201,25 +201,26 @@ const O = D.ordini;
   html.push(pann1);
   out.migliore = {chi: p1.dati.fornitore, ricevi: p1.dati.ricevi,
                   chiesti: letti.filter(l => l[0] === o1).map(l => l[1]).sort(),
-                  eseguito: pann1.includes('Eseguito da Cartone Due'),
-                  voce: pann1.includes('Commissione Cartone Due (0,3\u00a0%)')};
+                  eseguito: pann1.includes('Il cambio lo fa Cartone Due'),
+                  voce: pann1.includes('Costo del cambio, Cartone Due (0,3\u00a0%)')};
+  /* (27 ott 2026, grafica-swap) l'indirizzo sta sopra «Conferma» */
+  A.run(`elementi.swapIndirizzo_${o1} = {value: '${D.indirizzo}'}`);
   await A.run(`swapAvanti(${o1})`);
   out.paroleSue = [A.run(`swapPassi[${o1}]`), !!cass(mem, 'barattolo_swap_cartone2_222'),
                    !!cass(mem, 'barattolo_swap_222')];
   const pp = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(pp);
-  out.titoloParole = pp.includes('Le tue 12 parole per Cartone Due');
+  out.titoloParole = pp.includes('Le tue 12 parole di riserva per Cartone Due');
   A.run(`elementi.swapSpunta_${o1} = {checked: true}`);
-  A.run(`swapParoleFatte(${o1})`);
-  A.run(`elementi.swapIndirizzo_${o1} = {value: '${D.indirizzo}'}`);
-  await A.run(`swapCrea(${o1})`);
+  /* «Continua» fa nascere lo swap da solo */
+  await A.run(`swapParoleFatte(${o1})`);
   const r1 = lista(mem).find(r => r.ordine === o1) || {};
   const v2 = await visto(B2), v1 = await visto(B1);
   out.nato = {fornitore: r1.fornitore, ricevi: r1.ricevi, errore: A.run(`swapErrori[${o1}] || ''`),
               daDue: v2.swap, daUno: v1.swap};
   const carta = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(carta);
-  out.carta = carta.includes('Eseguito da Cartone Due');
+  out.carta = carta.includes('Il cambio lo fa Cartone Due');
   await stato(B2, r1.id, 'transaction.mempool');
   await A.run('swapGiro()');
   await A.run('swapGiro()');
@@ -233,22 +234,20 @@ const O = D.ordini;
   await modo(B2, 'mente_indirizzo');
   await A.run(`swapInstradaPreventivo(${o2}, false)`);
   out.ripiegoPrima = A.run(`preventiviSwap[${o2}].dati.fornitore`);
-  await A.run(`swapAvanti(${o2})`);
   A.run(`elementi.swapIndirizzo_${o2} = {value: '${D.indirizzo}'}`);
-  await A.run(`swapCrea(${o2})`);
+  await A.run(`swapAvanti(${o2})`);
   const p2 = A.run(`preventiviSwap[${o2}]`);
   const pann2 = A.run(`pannelloSwapTelefono({id: ${o2}})`);
   html.push(pann2);
   out.ripiego = {passo: A.run(`swapPassi[${o2}]`), nota: p2.nota, chi: p2.dati.fornitore,
                  ricevi: p2.dati.ricevi, salvati: lista(mem).filter(r => r.ordine === o2).length,
-                 frase: pann2.includes('Cartone Due ha risposto con dati che non tornano: ecco il preventivo di SATS Routing.'),
-                 eseguito: pann2.includes('Eseguito da SATS Routing'),
+                 frase: pann2.includes('Cartone Due ha dato cifre che non tornano: ecco quelle di SATS Routing.'),
+                 eseguito: pann2.includes('Il cambio lo fa SATS Routing'),
                  conferma: pann2.includes('data-swap="avanti"')};
   await A.run(`swapAvanti(${o2})`);
   out.ripiegoParole = [A.run(`swapPassi[${o2}]`), !!cass(mem, 'barattolo_swap_222')];
   A.run(`elementi.swapSpunta_${o2} = {checked: true}`);
-  A.run(`swapParoleFatte(${o2})`);
-  await A.run(`swapCrea(${o2})`);
+  await A.run(`swapParoleFatte(${o2})`);
   const r2 = lista(mem).find(r => r.ordine === o2) || {};
   out.ripiegoNato = {fornitore: r2.fornitore, ricevi: r2.ricevi, errore: A.run(`swapErrori[${o2}] || ''`),
                      daUno: (await visto(B1)).swap};
@@ -257,12 +256,10 @@ const O = D.ordini;
   const o3 = O[2];
   await modo(B1, 'mente_importo');
   await A.run(`swapInstradaPreventivo(${o3}, false)`);
-  await A.run(`swapAvanti(${o3})`);
   A.run(`elementi.swapIndirizzo_${o3} = {value: '${D.indirizzo}'}`);
-  await A.run(`swapCrea(${o3})`);
+  await A.run(`swapAvanti(${o3})`);
   out.tuttiPrimo = [A.run(`preventiviSwap[${o3}].nota`), A.run(`preventiviSwap[${o3}].dati.fornitore`)];
   await A.run(`swapAvanti(${o3})`);
-  await A.run(`swapCrea(${o3})`);
   out.tutti = {passo: A.run(`swapPassi[${o3}]`), errore: A.run(`swapErrori[${o3}] || ''`),
                salvati: lista(mem).filter(r => r.ordine === o3).length};
   await modo(B1, 'normale');
@@ -280,7 +277,7 @@ const O = D.ordini;
   A.run('renderSwapTelefono()');
   const pag = A.run('elementi.swapTelefono.innerHTML');
   html.push(pag);
-  out.pagina = [pag.includes('Le tue 12 parole per SATS Routing'), pag.includes('Le tue 12 parole per Cartone Due'),
+  out.pagina = [pag.includes('Le tue 12 parole di riserva per SATS Routing'), pag.includes('Le tue 12 parole di riserva per Cartone Due'),
                 pag.includes('Recupera da SATS Routing'), pag.includes('Recupera da Cartone Due'),
                 pag.includes('data-fornitore="cartone2"')];
   const paroleDue = cass(mem, 'barattolo_swap_cartone2_222').parole;
@@ -413,8 +410,8 @@ def il_telefono(dati):
     print("\n[mentono tutt'e due]")
     prova("il primo ripiego c'e'", ["ripiego", "satsrouting"], r["tuttiPrimo"])
     prova("poi ci si ferma col perche', niente salvato",
-          {"passo": "indirizzo",
-           "errore": "SATS Routing ha risposto con dati che non tornano: lo swap non parte, nessun sats si è mosso.",
+          {"passo": "preventivo",
+           "errore": "SATS Routing ha risposto con dati che non tornano: non parte niente, nessun sats si è mosso.",
            "salvati": 0}, r["tutti"])
     prova("il fuori-gioco vale per quell'ordine: su un altro Cartone Due torna in gara",
           "cartone2", r["nuovoOrdine"])
@@ -424,7 +421,7 @@ def il_telefono(dati):
     prova("le parole e il recupero, uno per fornitore", [True] * 5, r["pagina"])
     rc = r["recupero"]
     prova("le parole di Cartone Due ritrovano i SUOI swap, e la xpub va solo a lui",
-          {"nota": "Recuperati 3 swap.", "fornitori": ["cartone2"], "prossimo": 3,
+          {"nota": "Recuperati 3 incassi.", "fornitori": ["cartone2"], "prossimo": 3,
            "sats": False, "dove": [True]}, rc)
 
     print("\n[la sentinella]")
