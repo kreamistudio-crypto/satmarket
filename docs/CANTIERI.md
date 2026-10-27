@@ -71963,221 +71963,6 @@ chiave» e nessun Telegram piccolo. Zero errori di pagina, nessuna
 richiesta fuori casa, nessuno scorrimento orizzontale. Copia del giro
 cancellata.
 
-## L'avorio che non è una zanna: il filtro parole impara il colore, il rifiuto dice la parola e la porta privata c'è sempre (25 ott 2026, cantiere filtro-animali-falso-positivo, richiesta di Andrea)
-
-**IL CASO.** Il 25 ott alle 23:19 e alle 23:20 il filtro parole ha fermato
-due volte «Collezione d'Arte Religiosa SAIE – Società San Paolo
-(1978-1981) Edizioni di lus…» di Arwen come «animali protetti». Il verdetto
-non poteva venire dall'AI: «animali protetti» non è fra le quattro famiglie
-di `DIVIETI_BLOCCANTI`, e un VIETATO dell'AI su quel tema va in revisione,
-non in rifiuto. È lo strato 1, e in quella categoria l'unica voce che un
-libro d'arte può contenere è «avorio» da sola: carta avorio, pagine color
-avorio. Il registro però non poteva dirlo: salvava la sola categoria, e la
-descrizione di un annuncio mai nato non si salva da nessuna parte. Per
-saperlo serve chiedere ad Arwen o guardare il titolo nel registro (il
-comando di sola lettura dato ad Andrea dice se la parola è nel titolo,
-senza stampare il testo).
-
-**LA CURA, in tre pezzi.**
-- `CONTESTI_INNOCENTI`: «avorio» RESTA nella lista, ma prima del
-  confronto si tolgono le frasi intere che non parlano di zanne — il colore
-  («color avorio», «bianco avorio», «tonalità avorio»...), la carta
-  («carta avorio», «cartoncino avorio»), le imitazioni («finto avorio»,
-  «effetto avorio», «avorio vegetale»...), il paese e il modo di dire
-  («Costa d'Avorio», che fermava anche chi vende una maschera africana,
-  «torre d'avorio»). Solo per quel termine e solo la frase: un «avorio»
-  rimasto fuori blocca come prima, anche nello stesso annuncio
-  («statuetta avorio, base color avorio» resta ferma). Il giudice diventa
-  `termine_vietato`, che dà categoria E parola; `controlla_vietato` ne dà
-  la categoria ai suoi nove chiamanti, invariati.
-- IL RIFIUTO DICE LA PAROLA: «A fermarlo è stata la parola «avorio».»,
-  dopo il divieto. È la parola del nostro catalogo, mai un pezzo del testo.
-  I tre siti che rispondono al venditore (pubblica, modifica, modifica
-  firmata) la passano a `messaggio_rifiuto`; i cinque che scrivono il
-  registro (quei tre e i due import Nostr) scrivono `motivo_parole`,
-  «animali protetti: avorio». Anche l'avviso ai moderatori la dice.
-- LA PORTA C'È SEMPRE (decisione di Andrea, «sempre la porta privata»):
-  lo «scrivici» chiudeva il rifiuto solo se `BANNER_TEST_LINK` stava nel
-  config, e senza spariva proprio a chi era fermato per sbaglio. Adesso è
-  `CONTATTO_PRIVATO`, `https://t.me/barattolostore?direct`, la chat privata
-  che la Mini App usa già per «Scrivici per i tuoi dati» (`CONTATTO_DATI`):
-  una prova tiene uguali le due copie. Il bot è stato scartato: chi gli
-  scrive testo libero non arriva a nessun moderatore, prende il benvenuto.
-
-**SCARTATO.** Togliere «avorio» dalla lista: passerebbe la statuetta vera.
-Mandare «avorio» in revisione invece di bloccarlo: cinque siti da cambiare
-e una coda in più per un caso che una lista di frasi chiude. Uno sblocco da
-admin per l'annuncio di Arwen: l'annuncio non è mai nato (`annuncio_id 0`
-nel registro), quindi non c'è niente da sbloccare, e un bottone che fa
-passare un testo saltando il filtro sarebbe un buco per tutti. La strada
-subito è che Arwen ripubblichi (con «color crema» al posto di «avorio»
-prima del deploy, col testo di prima dopo). Il link del canale come
-riserva della porta privata: il rifiuto parla di UNA persona.
-
-**IMPERFEZIONE DICHIARATA.** Chi volesse spacciare avorio vero per «color
-avorio» passa lo strato 1 e trova l'AI, che legge il contesto; chi aggira
-davvero scrive «ivory» o «osso», e la lista non lo vede comunque. Il link
-nel toast resta testo non toccabile (ARCHITETTURA, «IMPERFEZIONE
-DICHIARATA: nel toast il link NON è toccabile»): si legge, non si tocca.
-
-**COSA È PROVATO** (albero develop `53da99a` più questo cantiere).
-- `prove_filtro_avorio`, nuova: 9 annunci veri che restano fermi con la
-  parola giusta (fra cui «Zanna d'avorio», «Netsuke… avorio intagliato»,
-  la statuetta con la base color avorio, corno di rinoceronte e pelle di
-  tigre), 11 innocenti che passano (il titolo di Arwen con carta e pagine
-  avorio, l'abito color avorio, la Costa d'Avorio con l'apostrofo dritto e
-  con quello tipografico, i tasti effetto avorio, i bottoni in avorio
-  vegetale, due frasi attaccate). Tre controprove che rompono la regola
-  e fanno cadere la tabella: «avorio» tolto dalla lista, «avorio» nudo fra
-  gli innocenti, le lookaround che consumano gli spazi.
-- Tortura a mano su sei mutazioni del server (la coda torna al canale del
-  config, la parola non entra nel messaggio, la pubblicazione non la
-  passa, un import torna alla sola categoria, la porta cambia solo nel
-  server, il giudice ignora gli innocenti): tutte e sei rosse.
-- `collaudo_filtro_avorio`, nuovo, sulle rotte vere e senza
-  `BANNER_TEST_LINK`: il libro si pubblica ed è in vetrina, la statuetta
-  è un 400 con divieto, parola, «ripubblica» e porta privata, registro e
-  avviso dicono «animali protetti: avorio», la modifica che infila una
-  zanna è ferma col numero dell'annuncio. Sull'albero di develop senza la
-  cura lo stesso collaudo cade su 10 righe, e la prima è il libro fermato:
-  riproduce il caso vero. In `ci/collaudi.txt` e `ci/compila.txt`.
-- Le prove del messaggio di rifiuto (`prove_impersonazione`,
-  `prove_sat_non_e_barattolo`) hanno CAMBIATO LATO dove dicevano «senza
-  canale nessun contatto»: adesso chiedono la porta con il canale vuoto e
-  col segnaposto.
-- Il banco del giro dei connettori (`prove_negozi_grandi`) finge
-  `controlla_vietato` e non conosceva `parola_vietata`: la prima suite
-  intera l'ha detto (26.245/1, «quaranta fermati dalle parole»), e il banco
-  ha avuto la sua `parola_vietata` di cartone e la `motivo_parole` vera.
-- Sull'albero ribasato su develop `fb453a0` (lo swap, tappa 4: nessun
-  simbolo in comune, controllato per nome), nel venv con le SOLE
-  dipendenze del workflow e senza coincurve: suite severa 26.264/0 senza
-  saltate, collaudi della CI `--paralleli 2` 102 verdi, 0 rossi. La suite
-  severa col Python del PC gira per ultima, su quest'albero col verbale.
-
-**DA GUARDARE.** Il comando di sola lettura sul VPS dice se «avorio» era
-nel titolo di Arwen; se la parola era un'altra (o «avorio» in un contesto
-non in elenco, tipo «rilegatura avorio»), si aggiunge la frase a
-`CONTESTI_INNOCENTI` col caso nelle prove. Sul VPS: dopo il deploy il
-motivo dei blocchi dello strato 1 nel registro e nelle statistiche admin
-porta la parola, quindi le statistiche per motivo si dividono per parola.
-
-**IL SEGUITO, LE FRASI DEL LIBRO E DELL'OGGETTO** (26 ott 2026, decisione di
-Andrea, commit piccolo su develop prima del cherry-pick su main). Il colore
-detto senza «color» davanti: «rilegatura avorio», «copertina avorio»,
-«pagine avorio», «fogli avorio», «carta color avorio», «tela avorio»,
-«finitura avorio», «smalto avorio», «laccato avorio». «Copertina IN
-avorio» e «tasti in avorio» restano fermi: fra le due parole c'è «in», e
-la frase non combacia — due righe nuove fra i veri lo dicono. Ogni frase
-ha il suo caso fra gli innocenti e la sua controprova (la frase tolta, il
-suo caso si ferma), più quella che le toglie tutte insieme; «carta color
-avorio» è l'unica senza controprova sua, perché «color avorio» la copre
-già da sola, e lo si dichiara invece di provarla a vuoto. Il libro del
-collaudo sulle rotte vere porta anche rilegatura, copertina e tela.
-
-## Il margine della cassaforte: la domanda del saldo prima della mano, e la sesta domanda della guardia (27 ott 2026, cantiere margine-cassaforte, decisione di Andrea)
-
-**DA DOVE.** Il giro sul regtest (26 ott, «Lo swap intero sul regtest di
-Boltz») ha mostrato il 520 di LNbits «You must reserve at least … to
-cover potential routing fees»: LNbits non paga se nel wallet, oltre al
-pagamento, non resta l'1 % (minimo 2 sats) per le commissioni di rete,
-e rifiuta PRIMA di toccare LND, senza scrivere niente per quell'hash.
-Nel nostro codice non c'era nessun controllo del margine: il 520
-passava per «ignoto» e «fattura bruciata» (curato il 26 ott col motivo
-`riserva`), e chi vende si sentiva chiedere una fattura nuova per un
-guasto NOSTRO. I NUMERI VERI DEL VPS, letti da Andrea il 27 ott col
-comando di sola lettura: cassaforte nodo saldo 503.786 sats, 470.727 in
-attesa su 9 ordini, margine 33.059 (7,0 %); SaaS saldo 425.820, 341.570
-in attesa su 4 ordini, margine 84.250 (24,7 %). Il wallet è MISTO
-(l'escrow di tutti più il capitale nostro, `capitale_cassa.py`) e ogni
-pagamento riuscito si porta via le sue commissioni di rete dal saldo:
-senza capitale il margine si consuma da solo.
-
-**LA CURA, in due pezzi (decisione di Andrea).**
-1. IN `paga_venditore`, PRIMA DI PRENDERE LA MANO (dopo il ponte, con la
-   riga): il saldo della cassaforte con la SOLA chiave di lettura
-   (`_saldo_cassaforte`, `GET /api/v1/wallet`); se è meno di importo +
-   riserva (`_riserva_lnbits`: l'1 % per eccesso, mai meno di 2 sats —
-   i numeri di LNbits, `lnbits_reserve_fee_percent` e
-   `lnbits_reserve_fee_min`), è il QUARTO VERBO: `NON_CHIESTO` col
-   motivo `riserva`, niente parte, la fattura resta buona, la riga «da
-   riprovare» e il ritentativo da soli con `BACKOFF_NOSTRO` (`riserva`
-   sta in `MOTIVI_NOSTRI`: lo stadio dice «un problema del nostro
-   nodo», col prossimo tentativo). Ai moderatori UN avviso per
-   cassaforte ogni sei ore (`_avvisa_margine`, timbro
-   `avviso_margine_<cassaforte>`, stanza 💧 Liquidità): «manca margine
-   nella cassaforte X», saldo, dovuto, quanto serve con la riserva, cosa
-   fare. Un saldo che NON si legge non ferma niente (fail-open
-   dichiarato: il comportamento di ieri, e un LNbits muto lo ferma
-   comunque la chiamata che paga).
-2. NELLA GUARDIA DELLA LIQUIDITÀ, LA SESTA DOMANDA, per ciascuna
-   cassaforte configurata (`_voci_margine`, in coda alle altre in
-   `_quadro_liquidita`, quindi anche in `/canali`): saldo del wallet
-   meno gli incassi in attesa (`_incassi_in_attesa`: gli ordini del
-   mercatino con i sats ancora dentro — locked, shipped, delivered,
-   confirmed, dispute, return_pending, return_shipped, refund — e
-   `payout_stato` non «uscito», per cassaforte, al prezzo pieno) sopra
-   `LIQUIDITA_MARGINE_PERCENTO` (1) del totale in attesa più
-   `LIQUIDITA_MARGINE_MIN_SATS` (10.000). Una voce buona, cattiva o
-   «non misurata» (saldo non letto), nel vocabolario di sempre della
-   guardia: allarme al primo passaggio in cattiva, promemoria, rientro.
-   Coi numeri veri: nodo, margine 33.059 contro una soglia di 14.707,
-   buona. Tutt'e due le leve a 0 spengono la domanda.
-
-**STRADE SCARTATE.** Abbassare la riserva di LNbits (è una protezione
-loro, e la teniamo); contare anche rimborsi d'asta e pagamenti P2P negli
-incassi in attesa (hanno i loro registri, e un numero mescolato non
-combacerebbe con nessun wallet: la lezione del polso 23 del libro
-mastro); un avviso per ogni incasso fermo (dieci incassi fermi sullo
-stesso wallet sono UN problema); fermare il pagamento quando il saldo
-non si legge (romperebbe gli incassi per un guasto della sola domanda).
-
-**UN DIFETTO PRESO DAL COLLAUDO, prima del commit:** la pausa
-dell'avviso era `0 < adesso - ultimo`, e due incassi fermi nello stesso
-secondo facevano due avvisi. Ora `ultimo and adesso - ultimo < pausa`.
-
-**PROVATO.**
-- `collaudo_margine_cassaforte` (21 verdi, negli elenchi della CI): il
-  server vero col LNbits di cartone del banco dei pagamenti, che da oggi
-  dichiara anche il saldo (`NODO["saldo"]`, grande di serie; None = non
-  risponde). Il saldo che copre l'importo ma non la riserva (non chiesto,
-  da riprovare, la fattura al suo posto, lo stato di prima, UN avviso coi
-  numeri, lo stadio nostro col prossimo tentativo, nessuna richiesta di
-  fattura nuova a chi vende); il secondo incasso fermo senza secondo
-  avviso; il giro dei sospesi a saldo corto; il margine rimesso e il
-  giro che paga da solo con la stessa fattura; il limite al sat
-  (importo + riserva passa, un sat sotto no); il wallet che non risponde
-  (si paga come ieri); passate le sei ore l'avviso torna; la sesta
-  domanda sul server vero (incassi in attesa dal database, la cassaforte
-  con la chiave segnaposto non si conta, voce buona al limite, cattiva
-  un sat sotto, non misurata, e la sua frase dentro l'allarme della
-  guardia; le leve a 0 la spengono).
-- `prove_margine_cassaforte` (in `prove.py`): la riserva (1 % per
-  eccesso, minimo 2, la percentuale è una leva), il saldo con un httpx di
-  cartone (la chiave di lettura, i «non so»), l'avviso (uno per
-  cassaforte, la pausa, la stanza, i numeri), gli incassi in attesa su un
-  database vero (gli stati, gli usciti esclusi), il giudizio coi numeri
-  veri del VPS e ai limiti, le sentinelle (la domanda dopo il ponte e
-  prima della mano, col quarto verbo; il fail-open; `riserva` fra i
-  guasti nostri e nella pagina; la sesta domanda in coda; le leve nei
-  tre posti; gli elenchi della CI). L'ambiente condiviso dei banchi
-  (`ambiente_altra_cassaforte`) monta i nomi nuovi con un saldo che non
-  si legge: i banchi di ieri non cambiano.
-- CONTROPROVE, 9 su 9 rosse: niente domanda del saldo; la riserva non
-  sommata; l'avviso a ogni incasso fermo; il saldo illeggibile che
-  ferma il pagamento; la sesta domanda senza il database (nel
-  collaudo); `riserva` tolto dai guasti nostri; la riserva senza il
-  minimo di 2; gli incassi in attesa che contano gli usciti; la guardia
-  senza la sesta domanda (nelle prove). Due di loro al primo giro
-  facevano ESPLODERE il collaudo invece di arrossarlo (una lista di
-  avvisi vuota): il collaudo ora legge il primo avviso con `primo_avviso`.
-- Suite e collaudi: nel messaggio del commit.
-
-**COSA RESTA.** Il margine vero sul VPS si legge col comando di sola
-lettura dato ad Andrea il 26 ott (saldo per cassaforte e incassi in
-attesa dal database): quando la guardia è accesa lo dice lei, in
-`/canali` e negli avvisi. Da decidere con Andrea quanto capitale tenere
-nella cassaforte nodo oltre la soglia (oggi 33.059 contro 14.707).
 ## Le prove che cadevano solo nella suite intera: l'orologio finto nei banchi node, e gli script .sh sempre LF (25 ott 2026, cantiere prove-stabili, richiesta di Andrea)
 
 **I DUE PROBLEMI** (dai giri del 24 ott). Uno: quattro prove cadevano solo
@@ -72533,6 +72318,19 @@ collaudi: nel messaggio del commit.
 del tempo di un payout fallito (i motivi «bruciata», «scaduta») non
 sono state guardate per lo swap: le dice lo stadio, e chi vende ha la
 carta dello swap.
+
+**IL SEGUITO, LE FRASI DEL LIBRO E DELL'OGGETTO** (26 ott 2026, decisione di
+Andrea, commit piccolo su develop prima del cherry-pick su main). Il colore
+detto senza «color» davanti: «rilegatura avorio», «copertina avorio»,
+«pagine avorio», «fogli avorio», «carta color avorio», «tela avorio»,
+«finitura avorio», «smalto avorio», «laccato avorio». «Copertina IN
+avorio» e «tasti in avorio» restano fermi: fra le due parole c'è «in», e
+la frase non combacia — due righe nuove fra i veri lo dicono. Ogni frase
+ha il suo caso fra gli innocenti e la sua controprova (la frase tolta, il
+suo caso si ferma), più quella che le toglie tutte insieme; «carta color
+avorio» è l'unica senza controprova sua, perché «color avorio» la copre
+già da sola, e lo si dichiara invece di provarla a vuoto. Il libro del
+collaudo sulle rotte vere porta anche rilegatura, copertina e tela.
 
 ## L'orologio finto dove serve: il bunker muto e il PayCode fermo, e l'orologio impara setInterval (26 ott 2026, cantiere orologio-finto-ovunque, richiesta di Andrea)
 
@@ -73178,87 +72976,6 @@ limiti. Le leve, spente di serie: `CAMBIO_LIBERO_ATTIVO`,
 `CAMBIO_LIBERO_SOLO_MODERATORI` (True), `CAMBIO_LIBERO_MAX_SATS`
 (500.000), `CAMBIO_LIBERO_MAX_AL_GIORNO` (5). T5: i documenti.
 
-## L'on-chain incassa dove vuoi tu: la destinazione firmata dal seme, la quota fissa di Barattolo, e la prima leva che si cambia dal pannello (27 ott 2026, cantiere onchain-incasso-esterno, piano approvato da Andrea: «vai con tutto»)
-
-**COSA.** Tre pezzi sopra l'ordine on-chain del 23 ott, sempre in signet
-e dietro lo stesso cancello (oggi solo gli admin), più due documenti.
-- **Dove ricevi i sats quando vendi.** Nel foglio «⛓️ On-chain (prova)»
-  il blocco nuovo «4b»: chi vende sceglie fra il conto di Barattolo (di
-  serie, `/1/n` del suo seme, com'era), **la chiave del conto del suo
-  wallet** (una `vpub`/`tpub` BIP-84 come la dà Sparrow, un indirizzo
-  nuovo `/0/i` a ogni vendita, con una fila sua) o **un indirizzo
-  fisso** (con l'avviso: tutte le vendite nello stesso posto si legano
-  fra loro). Vale dalle vendite dopo; gli ordini già nati tengono la
-  destinazione di allora, fotografata alla cassa.
-- **La quota fissa di Barattolo.** `ONCHAIN_QUOTA_FISSA_SATS`, 0 nel
-  codice («0 commissione sul mercatino al momento, al massimo metterei
-  500 sats fissi solamente per coprire le spese di rete»). La paga chi
-  compra (regola 10), la vede alla cassa prima di pagare, e all'uscita
-  va a `/1/n` della xpub di Barattolo nella stessa transazione che
-  libera i sats; col rimborso torna a lui. Il margine per la rete resta
-  com'era: i miner si pagano da lì e l'avanzo torna a chi ha comprato.
-- **Le leve dal pannello.** Il cassetto «⚙️ Stato delle leve» resta in
-  sola lettura, tranne le leve che il server apre una per una
-  (`LEVE_SCRIVIBILI`): oggi solo la quota. ✏️ «cambia» → «Salva» →
-  «Conferma»; il valore vive nel database e vince sul config del VPS;
-  «Torna al config» lo cancella; ogni cambio è una riga nel registro
-  della moderazione (strato «leva»).
-- **I due studi** (passi 4 e 5 del piano): `docs/STUDIO-ONCHAIN-P2P-2026-10-27.md`
-  (lo stesso metodo nel P2P, accanto a Mostro e non dentro) e
-  `docs/STUDIO-LEVE-DAL-PANNELLO-2026-10-27.md` (le 231 leve in tre
-  classi, con la proposta per ognuna).
-
-**PERCHÉ LA FIRMA DEL SEME.** Il 23 ott si era scelto «nessuno incolla
-un indirizzo» proprio per questo: un incasso che il seme di chi vende
-sa rifare è un incasso che un server manomesso non può cambiare, perché
-il telefono co-firma solo verso una chiave sua. Un indirizzo esterno il
-seme non lo sa rifare. La cura: la scelta si **firma** col seme
-(chiave `/2/0` del conto del 2-di-3, una catena che non serve ad
-altro), il server la verifica con la xpub dedicata che ha già, e
-soprattutto il telefono di chi vende **la rilegge col suo seme prima
-della seconda firma**. Chi non ha il seme non sa firmare una
-destinazione, e funziona su qualunque telefono che abbia le dodici
-parole (non serve una copia locale della scelta). Un seme nuovo
-cancella la scelta del vecchio.
-
-**STRADE SCARTATE.** Tenere la scelta in una copia nel telefono (nel
-backup del seme) invece che firmarla: un secondo telefono o un
-ripristino vecchio non l'avrebbero, e il telefono dovrebbe chiedere
-«è tuo questo indirizzo?» a ogni rilascio. Una quota sotto i 546 sats:
-la rete non trasmette un'uscita così piccola, quindi il giudice dice 0
-oppure 546-5000 — **i 500 sats di Andrea non si possono**, il minimo è
-546. Aprire tutte le leve del pannello in un colpo: no, per le due
-ragioni scritte nello studio (molte si leggono all'avvio, e le porte e i
-soldi restano un gesto sul VPS).
-
-**PROVATO.** `prove_incasso_esterno_onchain`, la prova doppia: il
-telefono vero (node col bundle vero) firma la destinazione e le funzioni
-del server con embit la verificano; dalla vpub telefono e server fanno
-lo stesso indirizzo; «Libera i sats» mette prezzo al wallet, quota a
-Barattolo e resto a chi compra, e il server la giudica buona; il
-telefono di chi vende co-firma, e non co-firma una destinazione firmata
-da un altro seme, una quota diversa da quella dell'ordine o sopra il
-tetto. `collaudo_onchain_incasso` (32/0) col server vero: le firme
-storte, la dedicata al posto del wallet, l'indirizzo mainnet, il
-maiuscolo dei QR, la quota dal pannello coi suoi no (non admin, leva
-non aperta, 500, 5001) e il registro, l'importo, le due vendite su
-`/0/0` e `/0/1`, il rilascio senza quota o con una quota più grossa, la
-seconda firma, l'indirizzo fisso, il ritorno al conto di serie, il seme
-nuovo, «Torna al config». `prove_leve`: la sentinella «nessuna rotta che
-scrive» diventa «una sola, e le tre spente di serie non ci entrano».
-
-**PER PROVARLO SUL COLLAUDO.** Come il 23 ott, con due admin. Chi vende
-apre «⛓️ On-chain (prova)», blocco 4b, «🔑 La chiave del conto del mio
-wallet», incolla la vpub di Sparrow (signet) e «✍️ Firma e salva». Dal
-pannello admin, «⚙️ Stato delle leve» → «Quota fissa di Barattolo» →
-cambia → 600 → Salva → Conferma. Chi compra vede la quota alla cassa,
-paga, libera: i sats arrivano nel wallet Sparrow.
-
-**COSA RESTA.** Niente di questo cantiere. Notato strada facendo: la
-quota va a `/1/n` della xpub di Barattolo, che oggi sul collaudo è di
-cartone (la privata è pubblica): finché `ONCHAIN_XPUB` non è vera quei
-sats li può prendere chiunque, come tutto il 2-di-3 di prova.
-
 ## Il cambio libero, tappa 2: il tasto «🔁 Cambia», la pagina si chiama «Cambio», e la fattura la paga l'utente (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea)
 
 **LA RICHIESTA** (Andrea, 27 ott): «un tastino di swap dove premo e
@@ -73425,59 +73142,6 @@ con la fattura pagata dall'utente). Per accendere: `CAMBIO_LIBERO_ATTIVO
 = True` nel config (con `SWAP_ATTIVO`), e ricordare che a
 `SWAP_SOLO_MODERATORI = True` il cambio lo vedono solo i moderatori
 anche a `CAMBIO_LIBERO_SOLO_MODERATORI = False`.
-
-## «Solo gli admin» dell'on-chain si cambia dal pannello (27 ott 2026, cantiere onchain-per-tutti, richiesta di Andrea: «non ho accesso alla vm, posso modificare il file di config dal pannello amministrazione?»)
-
-**COSA.** La seconda leva scrivibile: `ONCHAIN_SOLO_ADMIN`, sì/no
-(`_giudice_si_no`). Dal cassetto «⚙️ Stato delle leve» un admin la
-spegne («Spegni» → «Conferma») e l'on-chain si apre a chiunque, sul
-collaudo dove `ONCHAIN_ATTIVO` è già acceso. `onchain_ammesso` la chiede
-a `leva_scrivibile` e non più alla costante. Il cassetto disegna le leve
-sì/no con due bottoni invece del campo numerico (`scrivibile.tipo`).
-
-**PERCHÉ SÌ, ANCHE SE È UNA PORTA.** Nello studio delle leve le porte
-stanno fra le «decidi tu», ed è Andrea che l'ha decisa, per provare
-l'on-chain con un utente che non è admin senza entrare nella VM. La
-leva madre `ONCHAIN_ATTIVO` resta del VPS: a madre spenta questa non
-apre niente, quindi in produzione il pannello non può accendere
-l'on-chain.
-
-**PROVATO.** `collaudo_onchain_incasso` (37/0): chi non è admin non
-vede l'on-chain, una parola storta è 400, l'admin la spegne, chi non è
-admin lo vede, «Torna al config» lo richiude.
-
-## «Stato delle leve» diventa una pagina vera (27 ott 2026, cantiere pagina-leve, Andrea: «non si capisce niente, stato delle leve deve essere una pagina con cui posso davvero interagire con più facilità»)
-
-**COSA.** Il cassetto «⚙️ Stato delle leve» del pannello admin non
-mostra più 255 righe fitte: ha la conta, gli allarmi e il bottone «⚙️
-Apri la pagina delle leve». La pagina (`leveSheet`, un foglio a pieno
-schermo come il dettaglio P2P, quindi l'indietro di Telegram la chiude
-da solo) ha in cima le leve che si cambiano da qui come SCHEDE grandi:
-l'interruttore vero per le sì/no, la casella e «Cambia» per i numeri, da
-dove arriva il valore («Valore di serie», «Dal config del VPS», «Deciso
-da questa pagina») e «Torna al config». Sotto, la ricerca su nome,
-chiave e nota, tre filtri (✏️ Da qui, ⚠️ Da guardare, Tutte) e i gruppi
-in sola lettura, chiusi, col lucchetto che dice dove si cambiano.
-
-**L'EFFETTO IN PAROLE.** «Solo gli admin: Acceso» costringeva a
-tradurre. `EFFETTO_LEVA` dice per ogni verso cosa succede («Solo gli
-admin possono pagare on-chain.» / «Tutti possono pagare on-chain.»), e
-il foglio di conferma dice «Adesso: … Dopo: … Vale subito, per tutti.»
-A `ONCHAIN_ATTIVO` spento la frase lo dice invece di promettere un
-«tutti» falso. Una leva scrivibile nuova senza la sua frase mostra il
-valore e basta. `AIUTO_LEVA` dice prima quel che il giudice accetta
-(la quota: 0, oppure da 546 a 5.000).
-
-**NON ANCORA.** Le stesse leve nel cruscotto `/admin` (admin.html,
-quello che si apre anche dal browser del PC): sarebbe una seconda copia
-del disegno da tenere in pari, e Andrea il pannello lo apre dalla Mini
-App. Si fa se lo chiede. Il server non cambia: stessa rotta, stesso
-giudice, stessa riga nel registro.
-
-**PROVATO.** Chromium a 390 px coi dati veri di `/api/admin/leve` del
-server di collaudo: le schede, l'interruttore che apre la conferma
-«Spegni», il filtro «Tutte», la ricerca «quota». Suite severa e
-collaudi on-chain: nel messaggio del commit.
 
 ## Il cambio libero, tappa 3: bitcoin → Lightning dal telefono, dietro una leva che resta spenta finché Massimo non risponde (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea)
 

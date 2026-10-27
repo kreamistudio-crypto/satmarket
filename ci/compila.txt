@@ -162,7 +162,6 @@ collaudo_swap_instradatore.py
 collaudo_swap_pagamento.py
 collaudo_cambio_libero.py
 collaudo_margine_cassaforte.py
-collaudo_swap_pagamento.py
 collaudo_onchain_indirizzo.py
 collaudo_onchain_ordine.py
 cartone_satsrouting.py
