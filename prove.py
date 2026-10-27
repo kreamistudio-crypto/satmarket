@@ -12111,7 +12111,9 @@ def prove_email_corriere():
     prova("client: l'avviso e' UN giudice con TRE chiamanti", (1, 3),
           (mini.count("function avvisaEmailNonSalvata("),
            mini.count("avvisaEmailNonSalvata(d);")))
-    for f in ("async function startBuy(", "async function startBuySet(",
+    # (la fattura di startBuy nasce in payCreaFattura dal 27 ott 2026:
+    # la chiama anche il ritorno da ⛓️ a ⚡ nel foglio)
+    for f in ("async function payCreaFattura(", "async function startBuySet(",
               "async function confermaCompraSubito("):
         prova(f"client: ...e {f[15:-1]} lo chiama", True,
               "avvisaEmailNonSalvata(d)" in pezzo_js(mini, f, "\n}\n"))
@@ -12287,7 +12289,8 @@ def prove_nota_compratore():
     # i varchi che POSTano sono TRE (startBuy, startBuySet e il ⚡ NWC):
     # sparsa a mano, il terzo la dimentica — e nessun collaudo lo
     # esercita, perche' in locale un wallet non c'e'
-    # ...QUATTRO dal 23 ott 2026: la cassa on-chain (startBuyOnchain)
+    # ...QUATTRO dal 23 ott 2026: la cassa on-chain (dal 27 ott
+    # onchainOrdineDallaCassa, chiamata dal foglio del pagamento)
     prova("client: i chiamanti di corpoConsegna sono quattro", 4,
           mini.count("...corpoConsegna()"))
     prova("client: ...e nessuno dei tre la aggiunge per conto suo", [],
@@ -12295,8 +12298,8 @@ def prove_nota_compratore():
                           ("startBuySet", "async function startBuySet(){"),
                           ("compraSubito",
                            "async function confermaCompraSubito(btn){"),
-                          ("startBuyOnchain",
-                           "async function startBuyOnchain(btn){"))
+                          ("onchainOrdineDallaCassa",
+                           "async function onchainOrdineDallaCassa(){"))
            if "nota_compratore" in pezzo_js(mini, f)])
     prova("client: la nota sopravvive all'annuncio storico (via '')",
           True, "if (!v) return extra;" in mini)
@@ -12805,7 +12808,7 @@ def prove_lista_ordini():
           "const nNascosti = vivi.filter(" in ro)
     prova("«ancora nessun ordine» guarda i vivi: un checkout "
           "abbandonato non e' un filtro acceso", True,
-          "if (!vivi.length)" in ro and "if (!orders.length)" not in ro)
+          "if (!vivi.length" in ro and "if (!orders.length)" not in ro)
 
     # ---- 5-7: il database e la scopa non si toccano ----
     pf = pezzo("pulisci_ordini_fantasma")
@@ -26597,6 +26600,9 @@ const document = {
 /* ---- lo stato della pagina che il gesto legge ---- */
 let STORIA = true;
 const DEMO = false, VETRINA = false, API_BASE = '/api', tg = null;
+/* le due porte del foglio (27 ott 2026): qui il foglio sta sempre su ⚡ */
+let payOc = null;
+function payMetodoSpegni(){ payOc = null; }
 const location = {href: 'https://barattolo.store/'};
 let navApplicando = false, navRicordata = null, navGiuInVolo = 0, navUltimo = 0;
 let navSpingi = false, navSostituisci = false, navLasciaFoglio = null;
@@ -118976,7 +118982,7 @@ def prove_profilo_elegante():
                        "accCodici", "accBanner", "accSlugNegozio", "accFerie"],
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
                       "vocSicurezza"],
-        "grpIncassi": ["accLnAddress", "vocOnchain", "accNwc", "vocEsporta"],
+        "grpIncassi": ["accLnAddress", "accOnchainIncasso", "accNwc", "vocEsporta"],
         "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
         "grpPrivacy": ["accIdentita", "vocPrivacy", "accTor"],
@@ -135808,6 +135814,7 @@ globalThis.CONCLUSI = ['released','refunded','annullato'];
 globalThis.NASCONDIBILI = ['released','refunded'];
 globalThis.ordiniRuolo = ''; globalThis.ordiniSoloAttivi = false;
 globalThis.ordiniMostraNascosti = false; globalThis.DEMO = false;
+globalThis.ordiniOnchainDaPagare = [];   // gli on-chain da pagare (27 ott 2026)
 const P = new Proxy({}, {
   has: (t, k) => k !== Symbol.unscopables,
   get: (t, k) => k === Symbol.unscopables ? undefined
@@ -146940,7 +146947,7 @@ def prove_freni():
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
            # 27 ott 2026: «Dove ricevi i sats» 10 all'ora, una leva
            # cambiata dal pannello 20 all'ora per admin
-           "onchain_incasso": (10, 3600), "leva_pannello": (20, 3600),
+           "onchain_incasso": (10, 3600), "onchain_incasso_guarda": (40, 3600), "leva_pannello": (20, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
            "cassetta_spedisci": (60, 60)}, F)
@@ -152028,12 +152035,25 @@ def prove_banco_chiavi_onchain():
            "el('admOnchain').style.display = myOnchain ? '' : 'none';" in mini])
     # GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea): la porta sta
     # in «Incassi e pagamenti», per chi passa il cancello, non solo per
-    # gli admin, e porta dritta alla scheda della scelta
+    # gli admin; dalla sera e' un cassetto col campo dentro, e la voce di
+    # «Completa il profilo» lo apre
     prova("«⛓️ Incassi on-chain» nel Profilo, col cancello e mai in DEMO, "
-          "dritto alla scheda Impostazioni", [True, True, True],
-          ["el('vocOnchain').style.display = (myOnchain && !DEMO) ? '' : 'none';" in mini,
-           'onclick="onchainApriIncassi()"' in mini,
-           "onchainTab = 'impostazioni';\n  go('onchain');" in mini])
+          "col campo dentro e la voce in «Completa il profilo»",
+          [True, True, True, True],
+          ["el('accOnchainIncasso').style.display = (myOnchain && !DEMO) ? '' : 'none';" in mini,
+           '<div class="acc-b"><div id="onchainIncassoProfilo"></div></div>' in mini,
+           "onchainModuloIncasso('ocProf')" in mini,
+           "acc:'accOnchainIncasso'});" in pezzo_js(mini, "function renderChecklist(){", "\n}\n")])
+    prova("...e la porta alla scheda Impostazioni resta, per i dettagli",
+          [True, True], ['onclick="onchainApriIncassi()"' in mini,
+                         "onchainTab = 'impostazioni';\n  go('onchain');" in mini])
+    # MAI IL CONTO DI BARATTOLO (27 ott 2026): il bottone per tornarci e'
+    # morto, e la cassa del server dice di no senza destinazione
+    prova("niente piu' «Torna al conto di Barattolo», e la cassa vuole "
+          "una destinazione", [False, True, False],
+          ["onchainIncassoSalva(this, 'barattolo')" in mini,
+           "raise HTTPException(400, ONCHAIN_MSG_SENZA_DESTINAZIONE)" in pezzo("_onchain_compra"),
+           "onchain_incasso(ind[\"xpub_venditore\"]" in pezzo("_onchain_compra")])
     prova("il caricatore e' PIGRO e timbrato col suo ?v=", [True, True],
           ["if (window.BarattoloBTC) return Promise.resolve(window.BarattoloBTC);"
            in mini,
@@ -152268,18 +152288,27 @@ def prove_onchain_pagina():
     onchain-pagina, richieste di Andrea): «quando pago on-chain non devo
     vedere le vecchie transazioni», «invece del pippone un tab Info»,
     «come si puo' dimostrare che quello e' un multisig 2-di-3?», «tutti i
-    tecnicismi in una sezione dedicata o nelle info della transazione»."""
-    print("\n⛓️ La pagina on-chain in quattro schede")
+    tecnicismi in una sezione dedicata o nelle info della transazione».
+    TRE dal 27 ott 2026 sera: la scheda Ordini e' morta («la sezione
+    ordini è unica»), e «Com'è fatto» sta dentro l'ordine."""
+    print("\n⛓️ La pagina on-chain in tre schede")
     import shutil
     import subprocess
     mini = open("miniapp.html", encoding="utf-8").read()
     rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
-    prova("una scheda alla volta: Ordini di serie, poi Info, Impostazioni, "
-          "Tecnico", [True] * 4,
-          ["if (onchainTab === 'info') corpo = onchainSchedaInfo();" in rendi,
-           "else if (onchainTab === 'impostazioni') corpo = onchainSchedaImpostazioni(miaXpub);" in rendi,
+    schede = pezzo_js(mini, "function onchainSchede(){", "\n}\n")
+    # TRE SCHEDE dal 27 ott 2026 (Andrea: «la sezione onchain non deve
+    # avere la sua sezione ordini, la sezione ordini è unica»)
+    prova("tre schede, Info di serie: la scheda Ordini non c'e' piu'",
+          [True, True, True, False, False],
+          ["if (onchainTab === 'impostazioni') corpo = onchainSchedaImpostazioni(miaXpub);" in rendi,
            "else if (onchainTab === 'tecnico') corpo = onchainSchedaTecnico(" in rendi,
-           "else corpo = onchainBloccoOrdini(verOrdini, esiti);" in rendi])
+           "else corpo = onchainSchedaInfo();" in rendi,
+           "'ordini'" in schede, "function onchainBloccoOrdini(" in mini])
+    prova("...e nessuno ci porta piu': l'ordine on-chain si segue in «Ordini»",
+          [False, False, True],
+          ["onchainTab='ordini'" in mini, "onchainSoloOrdine" in mini,
+           "let onchainTab = 'info';" in mini])
     tec = pezzo_js(mini, "function onchainSchedaTecnico(parole, k, miaXpub, verifiche){",
                    "\n}\n")
     prova("le dodici parole stanno SOLO in Tecnico, dietro un bottone",
@@ -152293,63 +152322,43 @@ def prove_onchain_pagina():
            "relay Nostr</b>" in info, "deposito di garanzia</b>" in info])
     prova("...e il lessico: mai «assicurato», mai «escrow» per chi compra",
           [False, False], ["assicurat" in info.lower(), "escrow" in info.lower()])
-    # arrivando dalla cassa: SOLO quell'ordine
-    compra = mini[mini.index("onchainOrdineAperto = x.onchain.id;") - 200:
-                  mini.index("go('onchain');", mini.index("onchainOrdineAperto = x.onchain.id;"))]
-    prova("la cassa apre la pagina sull'ordine appena nato, da solo",
-          [True, True],
-          ["onchainSoloOrdine = x.onchain.id;" in compra,
-           "onchainTab = 'ordini';" in compra])
-    prova("...e dal profilo si torna a vederli tutti", True,
-          "onclick=\"onchainSoloOrdine=0;onchainTab='ordini';go('onchain')\">⛓️ On-chain</button>" in mini)
-    blocco = pezzo_js(mini, "function onchainBloccoOrdini(verifiche, esiti){", "\n}\n")
+    # «Com'è fatto» sta DENTRO l'ordine (27 ott 2026)
+    pannello = pezzo_js(mini, "function pannelloOnchainOrdine(o, s){", "\n}\n")
     fatto = pezzo_js(mini, "function onchainComeEFatto(o, v){", "\n}\n")
-    prova("ogni ordine porta «Com'è fatto questo 2-di-3» col descrittore "
-          "da copiare e la verifica fuori", [True, True, True, True],
-          ["${onchainComeEFatto(o, v)}" in blocco, "📋 Copia il descrittore" in fatto,
+    prova("ogni ordine on-chain porta «Com'è fatto questo 2-di-3» col "
+          "descrittore da copiare e la verifica fuori", [True, True, True, True],
+          ["onchainComeEFatto(Object.assign({}, oc," in pannello,
+           "📋 Copia il descrittore" in fatto,
            "deriveaddresses" in fatto, "OP_CHECKMULTISIG" in fatto])
+    prova("...e il server gliene da' le chiavi PUBBLICHE, mai le xpub",
+          True, '"indirizzo": _onchain_indirizzo_pubblico(con, oc),' in
+          open("server.py", encoding="utf-8").read())
     node = shutil.which("node")
     if not node:
-        print("   (node assente: il giro vero della scheda Ordini salta)")
+        print("   (node assente: il giro vero del riconoscitore salta)")
         return
-    banco = r"""
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => String(n);
-let onchainOrdineAperto = 0;
-const ONCHAIN_STATI = {attesa: 'attesa', pagato: 'pagato', rilasciato: 'rilasciato', scaduto: 'scaduto'};
-""" + pezzo_js(mini, "const ONCHAIN_CHIUSI =", "\n") + "\n" + blocco + "\n}\n" + fatto + "\n}\n" + r"""
-let onchainSoloOrdine = 0;
-const ind = {indirizzo: 'tb1qxyz', descrittore: "wsh(sortedmulti(2,02aa,02bb,02cc))#abcdefgh",
-             chiavi: {compratore: '02aa', venditore: '02bb', barattolo: '02cc'}};
-let onchainOrdini = [
-  {id: 7, titolo: 'Nuovo', ruolo: 'compratore', stato: 'attesa', prezzo_sats: 1000, importo_sats: 1200, margine_sats: 200, quota_sats: 0, scade: 1, indirizzo: ind, esploratore: 'https://m'},
-  {id: 5, titolo: 'Vecchio', ruolo: 'compratore', stato: 'rilasciato', prezzo_sats: 9, indirizzo: ind, esploratore: 'https://m'},
-  {id: 3, titolo: 'Scaduto', ruolo: 'venditore', stato: 'scaduto', prezzo_sats: 9, indirizzo: ind, esploratore: 'https://m'}];
-const v = {7: {mia: true, uguale: true}, 5: {mia: true, uguale: true}, 3: {mia: true, uguale: true}};
-const out = {};
-onchainSoloOrdine = 7;
-let h = onchainBloccoOrdini(v, []);
-out.solo = [h.includes('#7 · Nuovo'), h.includes('Vecchio'), h.includes('Tutti gli ordini on-chain (2 altri)')];
-onchainSoloOrdine = 0;
-h = onchainBloccoOrdini(v, []);
-out.tutti = [h.indexOf('#7 · Nuovo') < h.indexOf('Ordini chiusi (2)'), h.indexOf('Ordini chiusi (2)') < h.indexOf('Vecchio')];
-out.copia = h.includes("copiaLink(&quot;wsh(sortedmulti(2,02aa,02bb,02cc))#abcdefgh&quot;, 'Descrittore copiato')");
-onchainOrdini = [];
-out.vuoto = onchainBloccoOrdini(v, []).includes('scegli <b>⛓️ On-chain</b>');
+    banco = (pezzo_js(mini, "function onchainTipoIncollato(t){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function onchainSembraSegreto(t){", "\n}\n") + "\n}\n" + r"""
+const out = {
+  tipi: ['tb1qxyz', 'TB1QXYZ', 'vpub5abc', 'tpubDabc', 'bc1qxyz', 'xpub6abc', ''].map(onchainTipoIncollato),
+  segreti: ['tprv8Zabc', 'vprv9abc', 'xprv9abc',
+            'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+            'tb1qxyz', 'vpub5abc'].map(onchainSembraSegreto),
+};
 console.log(JSON.stringify(out));
-"""
+""")
     r = subprocess.run([node, "-e", banco], capture_output=True, text=True, timeout=30)
     try:
         o = json.loads(r.stdout.strip().splitlines()[-1])
     except Exception:
-        prova("il banco node della scheda Ordini gira", "", r.stderr[-400:])
+        prova("il banco node del riconoscitore gira", "", r.stderr[-400:])
         return
-    prova("dalla cassa: c'e' solo l'ordine nuovo, e un link per gli altri",
-          [True, False, True], o["solo"])
-    prova("dal profilo: gli aperti in cima, i chiusi piegati sotto",
-          [True, True], o["tutti"])
-    prova("il descrittore si copia intero dal bottone", True, o["copia"])
-    prova("senza ordini la scheda dice come si paga on-chain", True, o["vuoto"])
+    prova("quel che si incolla dice da se' il tipo: tb1 indirizzo, vpub/tpub "
+          "chiave, il resto niente",
+          ["indirizzo", "indirizzo", "xpub", "xpub", "", "", ""], o["tipi"])
+    prova("...e una chiave privata o le dodici parole il telefono le "
+          "riconosce PRIMA di mandarle", [True, True, True, True, False, False],
+          o["segreti"])
 
 
 def prove_onchain_nell_ordine():
@@ -152773,12 +152782,12 @@ def prove_ordine_onchain():
           "proposto", [True, True],
           ["if atteso != arrivato:" in firma,
            'if int(o["proposta_da"]) == int(user["id"]):' in firma])
-    compra_js = pezzo_js(mini, "async function startBuyOnchain(btn){", "\n}\n")
+    compra_js = pezzo_js(mini, "async function onchainOrdineDallaCassa(){", "\n}\n")
     prova("la cassa del telefono manda `metodo: onchain` e la sola xpub, "
           "mai le parole", [True, True, False],
           ["metodo: 'onchain'" in compra_js,
            "body: JSON.stringify({xpub: miaXpub})" in compra_js,
-           "parole}" in compra_js or "parole," in compra_js.split("body:")[-1]])
+           any("parole" in b.split("})")[0] for b in compra_js.split("JSON.stringify(")[1:])])
     cofirma_js = pezzo_js(mini, "async function onchainCofirma(o, parole){",
                           "\n}\n")
     prova("il telefono rilegge tutto PRIMA di mettere la seconda firma",
@@ -152786,18 +152795,21 @@ def prove_ordine_onchain():
               "non spende i sats dell", "non ti arriva il prezzo",
               "c\\'è un\\'uscita estranea", "la commissione esce dal margine"))
           < cofirma_js.index("tx.signIdx("))
-    rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
+    # dal 27 ott 2026 l'indirizzo si paga nel foglio del pagamento: la
+    # stessa serratura, li'
+    mostra = pezzo_js(mini, "async function payMostraOnchain(){", "\n}\n")
+    riapri = pezzo_js(mini, "async function payRiapriOnchain(oid){", "\n}\n")
+    disegna = pezzo_js(mini, "async function payDisegnaOnchain(){", "\n}\n")
     prova("ogni indirizzo d'ordine passa da onchainVerificaRiga prima del "
-          "foglio", True,
-          rendi.index("onchainVerificaRiga(parole, onchainSrv, o.indirizzo)")
-          < rendi.index("else corpo = onchainBloccoOrdini(verOrdini, esiti);")
-          < rendi.index("box.innerHTML = onchainSchede() + corpo;"))
-    blocco = pezzo_js(mini, "function onchainBloccoOrdini(verifiche, esiti){",
-                      "\n}\n")
+          "foglio, dalla cassa e da «Ordini»", [True, True],
+          [mostra.index("onchainVerificaRiga(parole, srv, o.indirizzo)")
+           < mostra.index("await payDisegnaOnchain();"),
+           riapri.index("onchainVerificaRiga(parole, srv, o.indirizzo)")
+           < riapri.index("await payDisegnaOnchain();")])
     prova("...e il QR da pagare si disegna solo se il telefono l'ha "
           "ritrovato", True,
-          blocco.index("const buono = v.mia && v.uguale;")
-          < blocco.index("ocQr${o.id}"))
+          disegna.index("if (!payOc.ok) {")
+          < disegna.index("disegnaQr(el('payQr'), onchainUriPagamento(o)"))
     sotto = pezzo_js(mini, "async function onchainCofirmeInSottofondo(){",
                      "\n}\n")
     prova("in sottofondo si co-firma col seme che c'e', senza farne uno "
@@ -153030,10 +153042,11 @@ def prove_indirizzo_ordine_onchain():
           < riga_js.index("esc(r.indirizzo)"))
     # LE QUATTRO SCHEDE (27 ott 2026, onchain-pagina): gli otto blocchi
     # numerati non ci sono piu', e l'indirizzo di prova dice cosa fa
-    prova("il foglio ha le quattro schede, e niente blocchi numerati",
+    # ...TRE dal 27 ott 2026 sera: la scheda Ordini e' morta
+    prova("il foglio ha le tre schede, e niente blocchi numerati",
           [True, True, True, True, False, False],
-          ["['ordini', 'Ordini'], ['info', 'Info']" in mini,
-           "['impostazioni', 'Impostazioni'], ['tecnico', 'Tecnico']" in mini,
+          ["const schede = [['info', 'Info'], ['impostazioni', 'Impostazioni'],\n                  ['tecnico', 'Tecnico']];" in mini,
+           "['ordini', 'Ordini']" not in mini,
            "<h4>⛓️ L'on-chain non è ancora acceso</h4>" in mini,
            "<b>🧪 Un indirizzo di prova con un'altra persona</b>" in mini,
            "<h4>5. Un indirizzo vero, con un altro admin</h4>" in mini,
@@ -153493,7 +153506,7 @@ def prove_cancello_onchain():
     # ...e il 27 ott 2026 «Dove ricevi i sats» (onchain-incasso-esterno)
     prova("le rotte /api/onchain/* esistono e si contano",
           ["/api/onchain/prova", "/api/onchain/xpub",
-           "/api/onchain/incasso", "/api/onchain/prova/indirizzo", "/api/onchain/ordini",
+           "/api/onchain/incasso", "/api/onchain/incasso/controlla", "/api/onchain/prova/indirizzo", "/api/onchain/ordini",
            "/api/onchain/pronto/{venditore_id}",
            "/api/onchain/ordini/{oid}/controlla",
            "/api/onchain/ordini/{oid}/annulla",

@@ -2616,6 +2616,7 @@ FRENI = {
     "onchain_firma": (30, 3600),      # proposte e co-firme on-chain, per persona
     # l'incasso su un wallet proprio e le leve dal pannello (27 ott 2026)
     "onchain_incasso": (10, 3600),    # «Dove ricevi i sats», per persona
+    "onchain_incasso_guarda": (40, 3600),  # il controllo di un indirizzo incollato (mempool), per persona
     "leva_pannello": (20, 3600),      # una leva cambiata dal pannello, per admin
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
@@ -45759,6 +45760,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # allarga questa riga e' gia' giusta. A leva spenta e' False per
     # tutti, moderatori compresi, e il bottone non compare a nessuno.
     profilo["onchain"] = onchain_ammesso(user["id"])
+    # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
+    # niente on-chain per i miei annunci): la voce di «Completa il
+    # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
+    profilo["onchain_incasso"] = (_onchain_incasso_mio(user["id"])
+                                  if profilo["onchain"] else "")
     profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
     profilo["offerte_da_agire"] = da_agire
@@ -78758,6 +78764,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                                  if oc["proposta_psbt"] else None),
                     "txid_uscita": oc["txid_uscita"] or "",
                     "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
+                    # «Com'è fatto questo 2-di-3» dentro l'ordine (27 ott
+                    # 2026: la pagina On-chain non ha piu' gli ordini).
+                    # Solo le chiavi PUBBLICHE dell'ordine, mai le xpub
+                    "indirizzo": _onchain_indirizzo_pubblico(con, oc),
                 } if oc else None)
         finally:
             con.close()
@@ -89608,6 +89618,21 @@ def onchain_riga_per(riga, tg_id: int, nome_altro: str = "") -> dict:
     }
 
 
+def _onchain_indirizzo_pubblico(con, o) -> dict:
+    """L'indirizzo di un ordine on-chain com'e' scritto in catena: tre
+    chiavi pubbliche, descrittore, indirizzo. Lo vede chiunque veda
+    l'ordine (anche il moderatore): e' quel che l'explorer gia' mostra
+    quando i sats escono."""
+    i = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                    (o["indirizzo_id"],)).fetchone()
+    if not i:
+        return {}
+    return {"indirizzo": i["indirizzo"], "descrittore": i["descrittore"],
+            "chiavi": {"compratore": i["chiave_compratore"],
+                       "venditore": i["chiave_venditore"],
+                       "barattolo": i["chiave_barattolo"]}}
+
+
 def _onchain_nome(con, tg_id) -> str:
     r = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
                     (int(tg_id),)).fetchone()
@@ -89801,6 +89826,49 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True}
 
 
+@app.post("/api/onchain/incasso/controlla")
+async def onchain_incasso_controlla(req: Request,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """IL CONTROLLO DI QUEL CHE SI INCOLLA (27 ott 2026, Andrea: «con
+    controllo che indichi se va bene e se non è già stato usato»). Due
+    domande, prima di firmare: e' una destinazione buona (lo stesso
+    giudice del salvataggio, `onchain_destinazione_motivo`)? E, se e' un
+    indirizzo, la rete l'ha gia' visto passare? Un indirizzo usato non e'
+    un no — funziona — ma riusarlo lega le vendite fra loro agli occhi
+    di chiunque guardi l'explorer, e va detto. Una chiave di conto
+    (xpub) da' un indirizzo nuovo a ogni vendita: li' la domanda non
+    c'e'. `usato` None = mempool muto, si dice «non so». Non scrive
+    niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_incasso_guarda", user["id"])
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    tipo = str(d.get("tipo") or "")
+    valore = str(d.get("valore") or "").strip()
+    con = _onchain_db()
+    try:
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    finally:
+        con.close()
+    motivo = onchain_destinazione_motivo(tipo, valore, r["xpub"] if r else "")
+    if motivo:
+        return {"ok": False, "motivo": motivo, "usato": None, "tx": 0}
+    if tipo != "indirizzo":
+        return {"ok": True, "motivo": "", "usato": False, "tx": 0}
+    dove = onchain_indirizzo_esterno(tipo, valore, 0)
+    try:
+        j = await onchain_mempool_indirizzo(dove)
+        tx = (int((j.get("chain_stats") or {}).get("tx_count") or 0)
+              + int((j.get("mempool_stats") or {}).get("tx_count") or 0))
+    except Exception:
+        return {"ok": True, "motivo": "", "usato": None, "tx": 0}
+    return {"ok": True, "motivo": "", "usato": tx > 0, "tx": tx}
+
+
 @app.post("/api/onchain/prova/indirizzo")
 async def onchain_prova_indirizzo(req: Request,
                                   x_tg_init_data: str = Header(""),
@@ -89906,6 +89974,15 @@ async def onchain_mempool_utxo(indirizzo: str) -> list:
     chi chiama decide cosa dire."""
     async with httpx.AsyncClient(timeout=10) as cl:
         r = await cl.get(f"{onchain_mempool_api()}/address/{indirizzo}/utxo")
+        r.raise_for_status()
+        return r.json()
+
+
+async def onchain_mempool_indirizzo(indirizzo: str) -> dict:
+    """La scheda di un indirizzo, come la dice mempool: chain_stats e
+    mempool_stats, con tx_count. Solleva se la rete non risponde."""
+    async with httpx.AsyncClient(timeout=10) as cl:
+        r = await cl.get(f"{onchain_mempool_api()}/address/{indirizzo}")
         r.raise_for_status()
         return r.json()
 
@@ -90079,6 +90156,31 @@ def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
                     "venditore_id=? AND incasso_tipo='xpub' AND "
                     "incasso_valore=?", (int(venditore_id), valore)).fetchone()
     return 0 if r[0] is None else int(r[0]) + 1
+
+
+def _onchain_incasso_mio(tg_id: int) -> str:
+    """'indirizzo' | 'xpub' se chi vende ha una destinazione viva (firmata
+    dal seme di adesso), sennò ''. Muto sui guasti: e' una voce del
+    profilo, non un giudizio — quello lo da' la cassa."""
+    if not EMBIT:
+        return ""
+    try:
+        con = _onchain_db()
+        try:
+            r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                            (int(tg_id),)).fetchone()
+            dest = (_onchain_destinazione_viva(con, tg_id, r["xpub"])
+                    if r else None)
+        finally:
+            con.close()
+    except Exception:
+        return ""
+    return dest["tipo"] if dest else ""
+
+
+ONCHAIN_MSG_SENZA_DESTINAZIONE = (
+    "Chi vende non ha ancora scelto dove ricevere on-chain: per questo "
+    "oggetto paga con ⚡ Lightning")
 
 
 def onchain_quota_sats() -> int:
@@ -90281,6 +90383,13 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
                 or richiesti > r["quantita"] - _riservati(con, a["id"])):
             raise HTTPException(409, "Qualcun altro ti ha preceduto su "
                                      "questo annuncio: riprova tra poco")
+        # SENZA UNA DESTINAZIONE SUA, NO (27 ott 2026): PRIMA di coniare
+        # l'indirizzo, che consuma tre numeri e scrive una riga. Chi non
+        # ha nemmeno acceso l'on-chain lo dice `onchain_nuovo_indirizzo`
+        xv = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                         (int(venditore),)).fetchone()
+        if xv and not _onchain_destinazione_viva(con, venditore, xv["xpub"]):
+            raise HTTPException(400, ONCHAIN_MSG_SENZA_DESTINAZIONE)
         try:
             ind_id = onchain_nuovo_indirizzo(con, user["id"], venditore,
                                              adesso)
@@ -90288,20 +90397,22 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             raise HTTPException(400, str(e))
         ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                           (ind_id,)).fetchone()
-        # DOVE RICEVE CHI VENDE: il wallet suo, se l'ha scelto e la firma
-        # del suo seme vale ancora; sennò il suo conto di Barattolo
+        # DOVE RICEVE CHI VENDE: SOLO il wallet suo, scelto e firmato dal
+        # suo seme (27 ott 2026, Andrea: «il venditore non deve mai
+        # ricevere i fondi nel wallet autogenerato da barattolo, finché
+        # non inserisce un indirizzo o xpub non riceve nessun fondo»).
+        # Il conto `/1/n` di serie non e' piu' una strada: senza una
+        # destinazione viva l'on-chain per i suoi annunci non c'e', e
+        # `/api/onchain/pronto` l'ha gia' detto alla cassa, e il no vero
+        # e' scattato prima dell'indirizzo; questo e' la cintura.
         dest = _onchain_destinazione_viva(con, venditore,
                                           ind["xpub_venditore"])
-        if dest:
-            d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
-            d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
-                        if d_tipo == "xpub" else 0)
-            incasso = onchain_indirizzo_esterno(d_tipo, d_valore, d_indice)
-        else:
-            d_tipo = d_valore = d_firma = ""
-            d_indice = 0
-            incasso = onchain_incasso(ind["xpub_venditore"],
-                                      ind["numero_venditore"])
+        if not dest:
+            raise HTTPException(400, ONCHAIN_MSG_SENZA_DESTINAZIONE)
+        d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
+        d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
+                    if d_tipo == "xpub" else 0)
+        incasso = onchain_indirizzo_esterno(d_tipo, d_valore, d_indice)
         # la quota va a Barattolo su `/1/n` della SUA xpub, col numero di
         # Barattolo di questo ordine: una fila che non si ripete mai
         quota_dove = (onchain_incasso(ind["xpub_barattolo"],
@@ -90694,7 +90805,8 @@ async def onchain_ordini(x_tg_init_data: str = Header(""),
 
 
 @app.get("/api/onchain/pronto/{venditore_id}")
-async def onchain_pronto(venditore_id: int, x_tg_init_data: str = Header(""),
+async def onchain_pronto(venditore_id: int, sats: int = 0,
+                         x_tg_init_data: str = Header(""),
                          barattolo_sessione: str = Cookie("")):
     """La cassa chiede se a QUESTO venditore si puo' pagare on-chain,
     prima di mostrare la scelta: si o no, e il perche' a parole. Non
@@ -90708,9 +90820,13 @@ async def onchain_pronto(venditore_id: int, x_tg_init_data: str = Header(""),
         return {"pronto": False, "motivo": "questo venditore non riceve on-chain"}
     con = _onchain_db()
     try:
-        x = {r["tg_id"] for r in con.execute(
-            "SELECT tg_id FROM onchain_xpub WHERE tg_id IN (?,?)",
+        x = {r["tg_id"]: r["xpub"] for r in con.execute(
+            "SELECT tg_id, xpub FROM onchain_xpub WHERE tg_id IN (?,?)",
             (user["id"], int(venditore_id)))}
+        dest = None
+        if int(venditore_id) in x:
+            dest = _onchain_destinazione_viva(con, int(venditore_id),
+                                              x[int(venditore_id)])
     finally:
         con.close()
     if int(venditore_id) not in x:
@@ -90720,6 +90836,19 @@ async def onchain_pronto(venditore_id: int, x_tg_init_data: str = Header(""),
                 "motivo": "il venditore non ha ancora aperto Barattolo da "
                           "quando l'on-chain c'e': si accende da solo appena "
                           "lo apre"}
+    # e riceve SOLO su un wallet suo (27 ott 2026): senza, niente
+    # on-chain per i suoi annunci, e la cassa lo dice prima
+    if not dest:
+        return {"pronto": False,
+                "motivo": "il venditore non ha ancora scelto dove ricevere "
+                          "on-chain"}
+    # e il tetto della beta, se la cassa dice la cifra (`sats`, il totale
+    # che col Lightning sarebbe la fattura): la porta ⛓️ si spegne PRIMA
+    # del tocco, invece di chiudere la fattura e poi dire di no
+    if sats > 0:
+        troppo = onchain_sopra_il_tetto(int(sats), await cambio_btc_eur())
+        if troppo:
+            return {"pronto": False, "motivo": troppo}
     # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea
     # 10): la cassa la scrive accanto al margine per la rete
     return {"pronto": True, "motivo": "", "io_acceso": user["id"] in x,
@@ -90774,12 +90903,34 @@ async def onchain_ordine_annulla(oid: int, x_tg_init_data: str = Header(""),
             raise HTTPException(404, "Ordine non trovato")
         if _onchain_parte(o, user["id"]) != "compratore":
             raise HTTPException(403, "Lo annulla chi compra")
+    finally:
+        con.close()
+    # PRIMA SI GUARDA LA RETE (27 ott 2026, la cassa che passa da ⛓️ a
+    # ⚡): `visti_sats` lo scrive la ronda ogni due minuti, e chi ha
+    # appena mandato i sats e poi tocca ⚡ non deve trovarsi l'ordine
+    # chiuso coi sats in viaggio. Rete muta = non si annulla alla cieca.
+    if o["stato"] == "attesa":
+        try:
+            await onchain_controlla(oid)
+        except Exception:
+            raise HTTPException(503, "mempool non risponde: non annullo alla "
+                                     "cieca, riprova fra poco")
+    con = _onchain_db_ordini()
+    try:
         cur = con.execute(
             "UPDATE onchain_ordini SET stato='annullato', chiuso_il=?,"
             " aggiornato=? WHERE id=? AND stato='attesa' AND visti_sats=0",
             (int(time.time()), int(time.time()), oid))
         con.commit()
         if not cur.rowcount:
+            ora = con.execute("SELECT stato FROM onchain_ordini WHERE id=?",
+                              (oid,)).fetchone()
+            if ora and ora["stato"] in ("annullato", "scaduto"):
+                return {"ok": True}
+            if ora and ora["stato"] == "pagato":
+                raise HTTPException(409, "Il pagamento on-chain è arrivato: "
+                                         "l'ordine è andato avanti, lo trovi "
+                                         "nei tuoi Ordini")
             raise HTTPException(409, "Ci sono già dei sats su questo "
                                      "indirizzo: ora si esce solo con un "
                                      "rimborso")

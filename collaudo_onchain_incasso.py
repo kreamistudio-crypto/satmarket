@@ -293,13 +293,79 @@ def main():
           r.status_code)
     o3 = compra(999, annunci[2]).json().get("onchain") or {}
     prova("...e la vendita arriva li'", dal_wallet(7), o3.get("incasso"))
-    prova("torna al conto di Barattolo: 200, senza firme", 200,
+    prova("togliere la scelta: 200, senza firme", 200,
           scegli(888, tipo="barattolo").status_code)
+    # MAI NEL CONTO DI BARATTOLO (27 ott 2026, Andrea: «finché non
+    # inserisce un indirizzo o xpub non riceve nessun fondo»): senza una
+    # destinazione l'on-chain per i suoi annunci non c'e', e lo si dice
+    # prima, alla cassa
+    come(999)
+    prova("...e la cassa lo sa prima: non pronto, col perche'",
+          (False, "il venditore non ha ancora scelto dove ricevere on-chain"),
+          tuple(c.get("/api/onchain/pronto/888").json()[k]
+                for k in ("pronto", "motivo")))
+    def quanti():
+        con = SRV._onchain_db_ordini()
+        try:
+            return (con.execute("SELECT COUNT(*) FROM onchain_ordini").fetchone()[0],
+                    con.execute("SELECT COUNT(*) FROM onchain_indirizzi").fetchone()[0])
+        finally:
+            con.close()
+    prima = quanti()
+    r = compra(999, annunci[3])
+    prova("...e chi prova lo stesso: 400, e nessun /1/n del seme",
+          (400, SRV.ONCHAIN_MSG_SENZA_DESTINAZIONE),
+          (r.status_code, r.json().get("detail")))
+    prova("...e nessun ordine e nessun indirizzo restano a meta'",
+          prima, quanti())
+    come(888)
+    prova("...e il profilo lo dice: dove ricevo = ''", "",
+          c.get("/api/me").json().get("onchain_incasso"))
+
+    # IL CONTROLLO DI QUEL CHE SI INCOLLA (27 ott 2026)
+    print("\n[il controllo di un indirizzo incollato: buono? gia' usato?]")
+    SCHEDE = {}
+
+    async def scheda_finta(indirizzo):
+        if indirizzo not in SCHEDE:
+            raise RuntimeError("mempool muto")
+        return SCHEDE[indirizzo]
+
+    SRV.onchain_mempool_indirizzo = scheda_finta
+
+    def guarda(**corpo):
+        come(888)
+        return c.post("/api/onchain/incasso/controlla", json=corpo).json()
+
+    nuovo, usato = dal_wallet(20), dal_wallet(21)
+    SCHEDE[nuovo] = {"chain_stats": {"tx_count": 0}, "mempool_stats": {"tx_count": 0}}
+    SCHEDE[usato] = {"chain_stats": {"tx_count": 2}, "mempool_stats": {"tx_count": 1}}
+    prova("un indirizzo mai usato: buono, non usato", (True, False, 0),
+          tuple(guarda(tipo="indirizzo", valore=nuovo)[k] for k in ("ok", "usato", "tx")))
+    prova("uno gia' passato in rete: buono, ma usato (3 tx)", (True, True, 3),
+          tuple(guarda(tipo="indirizzo", valore=usato.upper())[k]
+                for k in ("ok", "usato", "tx")))
+    prova("mempool muto: buono, e «non so»", (True, None),
+          tuple(guarda(tipo="indirizzo", valore=dal_wallet(22))[k] for k in ("ok", "usato")))
+    x = guarda(tipo="indirizzo", valore="bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4")
+    prova("un indirizzo mainnet: no, col perche'", (False, True),
+          (x["ok"], "tb1" in x["motivo"]))
+    prova("la vpub del wallet: buona (la domanda «usato» non c'e')",
+          (True, False), tuple(guarda(tipo="xpub", valore=vpub)[k] for k in ("ok", "usato")))
+    x = guarda(tipo="xpub", valore=radice("wallet").derive("m/84h/1h/0h").to_base58())
+    prova("una chiave PRIVATA: no, e lo dice", (False, True),
+          (x["ok"], "PRIVATA" in x["motivo"]))
+    prova("...e il controllo non scrive niente", None,
+          (lambda: (come(888), c.get("/api/onchain/prova").json()["incasso"])[1])())
+
+    r = scegli(888, tipo="xpub", valore=vpub, firma=firma_dest(888, "xpub", vpub))
+    come(888)
+    prova("di nuovo la vpub: il profilo dice «xpub»", (200, "xpub"),
+          (r.status_code, c.get("/api/me").json().get("onchain_incasso")))
     o4 = compra(999, annunci[3]).json().get("onchain") or {}
-    prova("...e la vendita dopo incassa su /1/n del suo seme", (True, None),
-          (o4.get("incasso") == SRV.onchain_incasso(
-              conto(888), o4["indirizzo"]["mio_numero"]),
-           o4.get("destinazione")))
+    prova("...e la vendita torna a nascere, sul wallet", (True, "xpub"),
+          (o4.get("incasso", "").startswith("tb1"),
+           (o4.get("destinazione") or {}).get("tipo")))
     scegli(888, tipo="xpub", valore=vpub, firma=firma_dest(888, "xpub", vpub))
     semi[888] = semi["nuovo"]
     come(888)

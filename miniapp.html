@@ -7733,6 +7733,25 @@
     font-size:13px;cursor:pointer;color:var(--ink)}
   .consegna-scelta .consegna-pill.attiva{border-color:var(--sats);
     background:var(--sats-soft);color:var(--sats-text)}
+  /* LE DUE PORTE DEL PAGAMENTO (27 ott 2026, Andrea: «un flag
+     selezionabile tra il fulmine lightning in giallo, e onchain con la
+     sua catena e un segno di robustezza»; «nel mentre clicco LN o
+     onchain già deve dare il QR, esperienza simile a btcpayserver»).
+     Il giallo del fulmine e' FISSO nei due temi, con la scritta scura
+     sopra: e' un cartellino, come le pillole di carta del banner. La
+     catena veste l'inchiostro, la tinta della cosa solida. */
+  .pay-metodo{display:flex;gap:8px;margin:4px 0 10px}
+  .pay-metodo button{flex:1;padding:10px 8px;border-radius:12px;
+    border:1.5px solid var(--line);background:var(--card);font-weight:800;
+    font-size:14px;cursor:pointer;color:var(--ink);line-height:1.2}
+  .pay-metodo button small{display:block;font-size:11px;font-weight:700;
+    color:var(--muted);margin-top:2px}
+  .pay-metodo button.ln.attiva{background:#FFD43B;border-color:#E0B100;color:#2A2200}
+  .pay-metodo button.ln.attiva small{color:#5A4A00}
+  .pay-metodo button.oc.attiva{background:var(--ink);border-color:var(--ink);color:var(--card)}
+  .pay-metodo button.oc.attiva small{color:var(--card);opacity:.8}
+  .pay-metodo button.spento{opacity:.55}
+  .pay-metodo button[aria-busy="true"]{cursor:progress}
   /* nel foglio puntata le chip vestono il blu dell'asta */
   #puntaSheet .consegna-pill.attiva{border-color:var(--asta);
     background:none;color:var(--asta-text)}
@@ -13870,14 +13889,17 @@ document.getElementById('cartello')?.remove();</script>
 
       <!-- ⛓️ GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea: «il
            venditore deve poter configurare nel profilo dove ricevere i
-           fondi, un indirizzo o una xpub»). La scelta esiste dal mattino
-           (`onchainBloccoIncasso`) ma stava nella pagina On-chain, la cui
-           porta era in «Amministrazione»: chi vende non la trovava. Qui
-           c'e' la porta, accanto al Lightning address; la scelta resta
-           una sola, firmata dal seme, nella scheda Impostazioni. Si
+           fondi, un indirizzo o una xpub»). Era una porta verso la
+           pagina On-chain; dal secondo giro della stessa sera e' un
+           CASSETTO col campo dentro (Andrea: «nello stesso posto deve
+           poter incollare un indirizzo, con controllo che indichi se va
+           bene e se non è già stato usato, o xpub»): la voce di
+           «Completa il profilo» apre questo. La scelta resta una sola,
+           firmata dal seme, la stessa della scheda Impostazioni. Si
            accende col CANCELLO (`myOnchain`), come il resto dell'on-chain. -->
-      <div class="acc voce-porta" id="vocOnchain" style="display:none">
-        <button type="button" class="acc-h" onclick="onchainApriIncassi()"><span class="em">⛓️</span><span class="tit2">Incassi on-chain<small>Un tuo indirizzo, o la xpub del tuo wallet per un indirizzo nuovo a ogni vendita.</small></span><span class="fr">›</span></button>
+      <div class="acc" id="accOnchainIncasso" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em">⛓️</span>Incassi on-chain<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="onchainIncassoProfilo"></div></div>
       </div>
 
       <div class="acc" id="accNwc">
@@ -14027,7 +14049,7 @@ document.getElementById('cartello')?.remove();</script>
            diverse: a leva spenta questo bottone non compare a nessuno,
            moderatori compresi. -->
       <button type="button" class="btn ghost" id="admOnchain" style="display:none"
-              onclick="onchainSoloOrdine=0;onchainTab='ordini';go('onchain')">⛓️ On-chain</button>
+              onclick="onchainTab='info';go('onchain')">⛓️ On-chain</button>
       <div id="adminStats"></div>
         </div>
       </div>
@@ -14352,6 +14374,11 @@ document.getElementById('cartello')?.remove();</script>
          una vuota. -->
     <div class="conto-in-vista" data-conto-in-vista style="display:none"></div>
     <h3 id="payTitolo">Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
+    <!-- ⚡ o ⛓️ (27 ott 2026): solo sull'acquisto di un oggetto, e solo
+         per chi l'on-chain lo vede; in cima, come le schede di BTCPay; lo accende payMetodoPrepara, lo
+         spegne payMetodoSpegni a foglio chiuso -->
+    <div class="pay-metodo" id="payMetodo" role="tablist" aria-label="Come paghi" style="display:none"></div>
+    <div id="payMetodoNota" class="escrow-note" style="display:none;margin:0 0 8px"></div>
     <!-- Il conto scomposto (articolo/spedizione/protezione): compare
          solo quando c'e' qualcosa oltre all'articolo -->
     <div class="conto-scomposto" id="payScomposto" style="margin-bottom:8px"></div>
@@ -14361,7 +14388,7 @@ document.getElementById('cartello')?.remove();</script>
     </div>
     <div class="qr" id="payQr"></div>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
-    <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
+    <div id="payQrNota" style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
     <!-- LA SCADENZA E LA PORTA DEL WALLET (24 set 2026, «Paga ora»):
          una riga sola, accesa da mostraQr per OGNI flusso che apre il
          foglio. A sinistra il conto alla rovescia letto dalla bolt11;
@@ -16155,6 +16182,7 @@ let myTgId = null, isAdmin = false;
    SERVER in /api/me, e non si deduce da `isAdmin` — a leva spenta e'
    falso anche per i moderatori. */
 let myOnchain = false;
+let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
 /* Ha premuto Avvia per entrare dal bot (19 ott 2026, ENTRA DAL BOT):
    gli avvisi in chat gli arrivano, e su onion il banner glielo dice
    invece di «non si possono attivare». Da /api/me, `bot_avviato`. */
@@ -17756,7 +17784,39 @@ async function loadOrders(ordine){
   const r = await fetch(`${API_BASE}/orders${ordine?`?ordine=${+ordine}`:''}`,
     {headers:{'X-Tg-Init-Data': authHdr()}});
   orders = (await r.json()).map(mapOrder);
+  await caricaOnchainDaPagare();
 }
+
+/* GLI ORDINI ON-CHAIN DA PAGARE STANNO IN «ORDINI» (27 ott 2026, Andrea:
+   «la sezione ordini è unica e tiene sia quelli ln che quelli onchain»).
+   Da pagato un ordine on-chain e' gia' una riga di `orders` (strada A);
+   PRIMA vive solo in /onchain/ordini, e senza questa lettura chi chiude
+   il foglio del pagamento non lo ritroverebbe piu'. Non entra in
+   `orders` (openOrder e i gesti ci contano sopra righe di sempre):
+   ha le sue card, che riaprono il foglio sul suo indirizzo. Muta sui
+   guasti: la lista di sempre non aspetta l'on-chain. */
+let ordiniOnchainDaPagare = [];
+async function caricaOnchainDaPagare(){
+  if (!myOnchain || DEMO || VETRINA) { ordiniOnchainDaPagare = []; return; }
+  try {
+    const tutti = await onchainLeggiOrdini();
+    ordiniOnchainDaPagare = tutti.filter(o => o.stato === 'attesa' && o.ruolo === 'compratore');
+  } catch(e) { ordiniOnchainDaPagare = []; }
+}
+function cardOnchainDaPagare(o){
+  return `<div class="order" onclick="payRiapriOnchain(${Number(o.id)})">
+      <div class="ord-card">
+        <span class="order-ic ord-foto">⛓️</span>
+        <div class="order-main">
+          <b class="ord-titolo">${esc(o.titolo)}</b>
+          <div class="ord-verbo">⛓️ Compri on-chain · ${fmt(o.importo_sats)} sats</div>
+        </div>
+        <span class="badge dapagare">${STATES.creato.label}</span>
+        <div class="ord-foto-data">${new Date(o.creato * 1000).toLocaleDateString('it-IT')}</div>
+      </div>
+    </div>`;
+}
+
 /* I FATTI CHE IL SERVER HA APPENA DETTO, SCRITTI DOVE LA PAGINA LI
    RILEGGE (12-13 ott 2026, cantiere gesti-subito, richieste di Andrea).
    Un gesto dell'ordine finisce con `openOrder`, che ridisegna dalla riga
@@ -19597,6 +19657,7 @@ function navChiudiStrato(s){
   el(s.k)?.classList.remove('open');
   if (!document.querySelector('.sheet.open')) el('sheetBg').classList.remove('open');
   if (s.k==='paySheet' && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (s.k==='paySheet') payMetodoSpegni();
 }
 
 /* ...e la sua rovescia, per i soli strati che la entry sa rifare: 'si'
@@ -27299,7 +27360,6 @@ function ctrlChiediInfo(){
    dichiarata, la stima della DEMO. Le strade arrivano gia' coi
    totali, quindi cambiare pillola non rifa' la rete. */
 let acqDati = null;
-let acqMetodo = 'ln';   // ⚡ o ⛓️ alla cassa (on-chain: tappa 3, 23 ott 2026)
 /* {tipo:'mono'|'set', annuncioId, qta, offertaId,
     preventivo:null|risposta del server, via:'', punto:'',
     puntoAperto:false, errore:''} — puntoAperto e' lo stato del
@@ -29142,8 +29202,7 @@ function renderAcquisto(){
   /* --- il fondo: ⚡ NWC (solo mono, col wallet), Paga, e i due
      secondari del carrello (sul singolo non ci sono: l'offerta ce
      l'ha la scheda, col suo bottone in barra) --- */
-  const nwc = (viaOk && d.tipo==='mono' && !DEMO && !VETRINA && walletNwcPaga()
-               && acqMetodo !== 'onchain')
+  const nwc = (viaOk && d.tipo==='mono' && !DEMO && !VETRINA && walletNwcPaga())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
   const secondari = d.tipo==='set'
@@ -29162,7 +29221,7 @@ function renderAcquisto(){
   box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoNota}${cassettoCodice}
     <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
-    <div class="ctrl-fondo">${bloccoMetodoAcquisto(d)}${nwc}
+    <div class="ctrl-fondo">${nwc}
       ${/* A CONTO CHIUSO «PAGA» E' SPENTO, e come nello scheletro
             NON porta l'id acqCompra: quello e' il bottone che paga. */
         viaOk ? `<button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>`
@@ -29942,8 +30001,8 @@ function ctaAcquisto(){
      (13 ott 2026). DOPO la guardia dell'indirizzo: quando scatta
      questa la casella e' in pagina per costruzione. */
   if (mancaConfermaIndirizzo(d)) return;
-  /* la via on-chain esce qui, dopo le stesse guardie (tappa 3) */
-  if (d.tipo!=='set' && acqMetodo==='onchain' && myOnchain) { startBuyOnchain(el('acqCompra')); return; }
+  /* (la via on-chain non esce piu' di qui: dal 27 ott 2026 ⚡ o ⛓️ si
+     sceglie DENTRO il foglio del pagamento, `payPassaA`) */
   if (d.tipo==='set') startBuySet(); else startBuy();
 }
 /* ---------------- la pagina del pacco (ago 2026) ----------------
@@ -32324,12 +32383,20 @@ async function startBuy(){
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
   aggiornaPayHint();
+  payMetodoPrepara(l, offAcc, totS);
   if (DEMO) {
     el('payInvoice').textContent =
       'lnbc'+l.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
     mostraQr('');            /* stringa finta: niente QR bugiardo */
     return;
   }
+  await payCreaFattura(l, offAcc);
+}
+
+/* La fattura dell'acquisto di un oggetto, e il suo controllo ogni 4
+   secondi. Staccata da startBuy (27 ott 2026) perche' la chiama anche
+   il ritorno da ⛓️ a ⚡ nel foglio (`payPassaA`). */
+async function payCreaFattura(l, offAcc){
   el('payInvoice').textContent = 'creazione invoice…';
   mostraQr('');
   const r = await fetch(`${API_BASE}/orders`, {
@@ -32944,6 +33011,8 @@ async function confermaCompraSubito(btn){
 function copiaInvoice(){
   const t = el('payInvoice').textContent;
   if (t.startsWith('ln')) copiaLink(t, '📋 Invoice copiata');
+  else if (payOc && payOc.ok && t === payOc.o.indirizzo.indirizzo)
+    copiaLink(t, '📋 Indirizzo copiato');
 }
 
 /* ---------------- il QR vero della invoice (ago 2026) ----------------
@@ -33073,6 +33142,7 @@ async function disegnaQr(box, testo, modo){
    pagamenti: l'ordine di sempre e la fattura di puntata (rilancio). */
 async function annullaPagamento(){
   if (DEMO || VETRINA) { navIndietro(); return; }
+  if (payOc) { payOcAnnulla(); return; }   /* il foglio sta su ⛓️ */
   const ril = rilancioCorrente, oid = currentOrderId,
         pag = pagamentoCorrente;
   if (!ril && !oid && !pag) { navIndietro(); return; }
@@ -33140,6 +33210,7 @@ let ordineAnnullatoQui = 0;         // l'ordine annullato da questo foglio
 const PAY_CINTURA_MS = 1200;
 function chiudiFoglioFattura(){
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  payMetodoSpegni();
   const aperto = () => el('paySheet').classList.contains('open');
   if (!aperto()) return;
   el('payQr').innerHTML = '';
@@ -33320,6 +33391,7 @@ function invitoTelegram(testo, chiave){
 function closeSheet(){
   el('sheetBg').classList.remove('open');
   el('paySheet').classList.remove('open');
+  payMetodoSpegni();   /* le due porte e il controllo on-chain non restano */
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
   chiudiAppuntamentoNip46('foglio chiuso');   // la cassetta non aspetta i suoi dieci minuti
@@ -33545,6 +33617,7 @@ Object.keys(PICKER).forEach(aggiornaPicker);
 
 function sheetPaid(){
   if (DEMO) return simulatePaid();
+  if (payOc) { payOcControlla(); return; }   /* il foglio sta su ⛓️ */
   toast('Verifico il pagamento…');
   /* il paySheet serve TRE pagamenti: l'ordine di sempre, la fattura
      di puntata e lo sblocco del banner — a dirlo e' la variabile
@@ -35566,6 +35639,10 @@ function renderOrders(){
   const vivi = orders.filter(o => o.state !== 'annullato');
   const vista = vivi.filter(o => filtri(o) &&
     (!o.nascosto || ordiniMostraNascosti));
+  /* gli on-chain da pagare: in cima, come ogni «Da pagare» appena nato,
+     e solo dove si vedono gli acquisti */
+  const daPagareOc = (!ordiniRuolo || ordiniRuolo === 'buyer')
+    ? ordiniOnchainDaPagare.map(cardOnchainDaPagare).join('') : '';
   /* il conteggio dice i nascosti che i filtri correnti coprirebbero:
      con «solo attivi» acceso i nascosti (tutti conclusi) non ci sono
      e la riga non compare */
@@ -35577,18 +35654,18 @@ function renderOrders(){
            : `${nNascosti} ordin${nNascosti===1?'e nascosto':'i nascosti'} — mostrali`}</button>
        </div>`
     : '';
-  if (!vivi.length) {
+  if (!vivi.length && !ordiniOnchainDaPagare.length) {
     el('ordersList').innerHTML = `<div class="empty"><div class="big">🤝</div>Ancora nessun ordine.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
     return;
   }
-  if (!vista.length) {
+  if (!vista.length && !daPagareOc) {
     /* c'e' qualcosa ma i filtri non lasciano passare niente: un
        messaggio SUO, distinto dall'«ancora nessun ordine» */
     el('ordersList').innerHTML =
       `<div class="empty"><div class="big">🔍</div>Niente qui con questi filtri.</div>` + rigaNascosti;
     return;
   }
-  el('ordersList').innerHTML = vista.map(o=>{
+  el('ordersList').innerHTML = daPagareOc + vista.map(o=>{
     const puoNascondere = !DEMO && o.role!=='admin' && NASCONDIBILI.includes(o.state);
     const x = !puoNascondere ? ''
       : o.nascosto
@@ -36936,7 +37013,8 @@ function renderLnAddress(){
      spegne da solo (aggiornaGruppiProfilo) */
   const vociIncassi = ['accLnAddress', 'accNwc', 'vocEsporta'];
   vociIncassi.forEach(id => { if (el(id)) el(id).style.display = DEMO ? 'none' : ''; });
-  if (el('vocOnchain')) el('vocOnchain').style.display = (myOnchain && !DEMO) ? '' : 'none';
+  if (el('accOnchainIncasso')) el('accOnchainIncasso').style.display = (myOnchain && !DEMO) ? '' : 'none';
+  renderIncassoOnchainProfilo();
   if (DEMO) return;
   if (myLnAddress && !lnAddrModifica) {
     box.innerHTML = `
@@ -37279,6 +37357,12 @@ function renderChecklist(){
   ];
   if (myTgId != null && myTgId < 0)
     voci.push({ok:false, em:'✈️', txt:'Telegram collegato: gli avvisi in chat', acc:'accIdentita'});
+  /* DOVE RICEVI ON-CHAIN (27 ott 2026, Andrea: «finché non inserisce un
+     indirizzo o xpub non riceve nessun fondo semplicemente, motivo per
+     cui dovrebbe essergli suggerito durante la fase di completezza del
+     profilo»): solo per chi l'on-chain lo vede */
+  if (myOnchain)
+    voci.push({ok: !!myOnchainIncasso, em:'⛓️', txt:'Dove ricevi on-chain: senza, i tuoi annunci si pagano solo in ⚡', acc:'accOnchainIncasso'});
   const fatte = voci.filter(v=>v.ok).length;
   if (fatte === voci.length) { box.innerHTML = ''; return; }
   /* Alla PRIMA visita in assoluto del Profilo (per dispositivo) con
@@ -42928,11 +43012,15 @@ function pannelloOnchainOrdine(o, s){
     }
   }
   const tx = oc.txid_uscita
-    ? ` · <a href="${esc(oc.esploratore)}/tx/${esc(oc.txid_uscita)}" target="_blank" rel="noopener">la transazione</a>` : '';
+    ? ` <a href="${esc(oc.esploratore)}/tx/${esc(oc.txid_uscita)}" target="_blank" rel="noopener">Vedi la transazione</a>` : '';
   const dove = o.role === 'seller'
     ? ' I sats arrivano dove hai scelto in Profilo → «Incassi on-chain».' : '';
-  return `<div class="trust-note">⛓️ <span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}
-      <a href="#" onclick="event.preventDefault();onchainSoloOrdine=${Number(oc.id)};onchainTab='ordini';go('onchain')">Com'è fatto</a>${tx}</span></div>${gesto}`;
+  /* «Com'è fatto» sta QUI, piegato (27 ott 2026): la pagina On-chain
+     non ha piu' una scheda Ordini — l'ordine e' uno solo, in «Ordini» */
+  const fatto = (oc.indirizzo && oc.indirizzo.indirizzo)
+    ? onchainComeEFatto(Object.assign({}, oc, {ruolo: o.role === 'buyer' ? 'compratore' : o.role === 'seller' ? 'venditore' : ''}), {})
+    : '';
+  return `<div class="trust-note">⛓️ <span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${fatto}${gesto}`;
 }
 
 async function annullaOrdine(){
@@ -54461,8 +54549,11 @@ let onchainSrv = null;         // quel che il server dice (xpub, strada)
    tecnicismi si devono vedere in una sezione dedicata o nelle info
    della transazione»). Il foglio era un banco di prova in otto blocchi
    numerati, e chi pagava un ordine se li trovava tutti sotto. Ora:
-   - 🧾 Ordini: gli ordini, e arrivando dalla cassa SOLO quello che stai
-     pagando (`onchainSoloOrdine`); i chiusi stanno piegati in fondo;
+   - (🧾 Ordini c'era, ed e' MORTA il 27 ott 2026 — Andrea: «la sezione
+     onchain non deve avere la sua sezione ordini, la sezione ordini è
+     unica e tiene sia quelli ln che quelli onchain». Si paga nel foglio
+     del pagamento, quelli da pagare stanno in «Ordini» come card loro,
+     e «Com'è fatto questo 2-di-3» sta dentro l'ordine);
    - ℹ️ Info: com'e' fatto, in parole, senza una sigla;
    - ⚙️ Impostazioni: dove ricevi quando vendi, e il backup;
    - 🔧 Tecnico: le dodici parole, il descrittore, come importarli,
@@ -54473,13 +54564,11 @@ let onchainSrv = null;         // quel che il server dice (xpub, strada)
    backup» (`onchainGuarda`), che legge le copie e le confronta con la
    chiave di qui SENZA cancellare niente: la stessa domanda — il backup
    ridà la mia chiave? — senza il gesto che faceva paura. */
-let onchainTab = 'ordini';       // 'ordini' | 'info' | 'impostazioni' | 'tecnico'
-let onchainSoloOrdine = 0;       // arrivando dalla cassa si vede solo quello
+let onchainTab = 'info';         // 'info' | 'impostazioni' | 'tecnico'
 let onchainParoleViste = false;  // le dodici parole si mostrano a richiesta
 
 /* la porta del Profilo: dritta alla scheda dove si sceglie */
 function onchainApriIncassi(){
-  onchainSoloOrdine = 0;
   onchainTab = 'impostazioni';
   go('onchain');
 }
@@ -54491,8 +54580,8 @@ function onchainVaiTab(t){
 }
 
 function onchainSchede(){
-  const schede = [['ordini', 'Ordini'], ['info', 'Info'],
-                  ['impostazioni', 'Impostazioni'], ['tecnico', 'Tecnico']];
+  const schede = [['info', 'Info'], ['impostazioni', 'Impostazioni'],
+                  ['tecnico', 'Tecnico']];
   return `<div class="sez-seg oc-seg" role="tablist" aria-label="On-chain">${schede.map(([id, nome]) =>
     `<button type="button" role="tab" class="${onchainTab === id ? 'active' : ''}"
        aria-selected="${onchainTab === id}" onclick="onchainVaiTab('${id}')">${nome}</button>`).join('')}</div>`;
@@ -54541,17 +54630,14 @@ async function renderOnchain(){
     onchainIncassoMio = onchainSrv.incasso
       ? await onchainDestinazioneMia(await caricaBitcoin(), parole, onchainSrv.incasso)
       : null;
-    const verOrdini = {};
-    for (const o of onchainOrdini) {
-      verOrdini[o.id] = await onchainVerificaRiga(parole, onchainSrv, o.indirizzo);
-    }
     let corpo;
-    if (onchainTab === 'info') corpo = onchainSchedaInfo();
-    else if (onchainTab === 'impostazioni') corpo = onchainSchedaImpostazioni(miaXpub);
+    if (onchainTab === 'impostazioni') corpo = onchainSchedaImpostazioni(miaXpub);
     else if (onchainTab === 'tecnico') corpo = onchainSchedaTecnico(parole, k, miaXpub, verifiche);
-    else corpo = onchainBloccoOrdini(verOrdini, esiti);
+    else corpo = onchainSchedaInfo();
+    /* le co-firme fatte qui sopra si dicono comunque: la scheda degli
+       ordini che le mostrava non c'e' piu' */
+    if (esiti.length) toast('⛓️ ' + esiti.join(' · '), 7000);
     box.innerHTML = onchainSchede() + corpo;
-    if (onchainTab === 'ordini') onchainDisegnaQrOrdini(verOrdini);
   } catch(e) {
     box.innerHTML = `<div class="hint">Non sono riuscito a preparare la
       pagina: ${esc(e.message || 'errore')}.</div>
@@ -54790,7 +54876,100 @@ function onchainBloccoAccendi(miaXpub){
    null = conto di serie, true = la scelta e' firmata da questo seme,
    false = firmata da un altro (un seme di prima): non vale. */
 let onchainIncassoMio = null;
-let onchainIncassoTipo = '';     // il modulo aperto: '', 'indirizzo', 'xpub'
+
+/* DOVE RICEVI, UN CAMPO SOLO (27 ott 2026, secondo giro, Andrea: «il
+   venditore non deve mai ricevere i fondi nel wallet autogenerato da
+   barattolo»; «deve poter incollare un indirizzo, con controllo che
+   indichi se va bene e se non è già stato usato, o xpub»).
+   - IL CONTO DI BARATTOLO NON E' PIU' UNA STRADA: senza una scelta i
+     tuoi annunci si pagano solo in ⚡ (il server lo fa valere alla cassa,
+     `_onchain_compra`), e il bottone «Torna al conto di Barattolo» e'
+     morto;
+   - SI INCOLLA E BASTA: il tipo lo dice quel che incolli (tb1… e' un
+     indirizzo, vpub/tpub una chiave di conto), e il controllo parte
+     da solo mezzo secondo dopo. Il server dice se e' buono (lo stesso
+     giudice del salvataggio) e se l'indirizzo la rete l'ha gia' visto;
+   - UNA CHIAVE PRIVATA O DELLE PAROLE NON PARTONO MAI: le riconosce il
+     telefono, prima di qualunque richiesta;
+   - lo stesso modulo vive in due posti — il cassetto del Profilo
+     (`ocProf`) e la scheda Impostazioni della pagina On-chain (`ocImp`)
+     — col prefisso degli id che li tiene separati. */
+function onchainTipoIncollato(t){
+  const v = String(t || '').trim();
+  if (/^tb1/i.test(v)) return 'indirizzo';
+  if (/^(vpub|tpub)/.test(v)) return 'xpub';
+  return '';
+}
+function onchainSembraSegreto(t){
+  const v = String(t || '').trim();
+  return /^(tprv|vprv|uprv|xprv|yprv|zprv)/i.test(v) || /^[a-z]+( +[a-z]+){11,}$/i.test(v);
+}
+
+function onchainModuloIncasso(pref){
+  return `
+    <div class="field" style="margin:12px 0 4px"><label>Il tuo indirizzo o la chiave del conto</label>
+      <input id="${pref}Valore" class="mono" autocomplete="off" spellcheck="false"
+        placeholder="tb1…  oppure  vpub… / tpub…" oninput="onchainIncassoGuardaPresto('${pref}')"></div>
+    <div id="${pref}Esito" class="hint" style="min-height:1.2em"></div>
+    <button class="btn" id="${pref}Salva" disabled onclick="onchainIncassoSalva(this, '${pref}')">✍️ Firma e salva</button>
+    <div class="hint" style="margin-top:8px;line-height:1.5">Incolla <b>un tuo indirizzo</b>
+      (<span class="mono">tb1…</span>) oppure, meglio, <b>la chiave pubblica del conto</b>
+      del tuo wallet (<span class="mono">vpub…</span>: in Sparrow, Impostazioni → Keystore,
+      strada <span class="mono">m/84'/1'/0'</span>): con la chiave ogni vendita arriva a
+      un indirizzo nuovo, e con lei non si spende niente. Signet, rete di prova.</div>`;
+}
+
+const onchainIncassoTimer = {};
+let onchainIncassoGiro = 0;
+function onchainIncassoGuardaPresto(pref){
+  clearTimeout(onchainIncassoTimer[pref]);
+  const b = el(pref + 'Salva'); if (b) b.disabled = true;
+  onchainIncassoTimer[pref] = setTimeout(() => onchainIncassoGuarda(pref), 500);
+}
+
+async function onchainIncassoGuarda(pref){
+  const campo = el(pref + 'Valore'), esito = el(pref + 'Esito'), salva = el(pref + 'Salva');
+  if (!campo || !esito) return;
+  if (salva) salva.disabled = true;
+  const v = campo.value.trim();
+  const dici = (html, colore) => { esito.innerHTML = html; esito.style.color = colore || ''; };
+  if (!v) return dici('');
+  if (onchainSembraSegreto(v)) {
+    campo.value = '';
+    return dici('⛔ Questa è una chiave <b>privata</b> (o le parole del seme): non incollarla da nessuna parte. L\'ho tolta dal campo, e non è partita.', 'var(--danger)');
+  }
+  const tipo = onchainTipoIncollato(v);
+  if (!tipo) return dici('Incolla un indirizzo <span class="mono">tb1…</span> o una chiave <span class="mono">vpub…</span> / <span class="mono">tpub…</span>.');
+  const valore = onchainNormaDestinazione(tipo, v);
+  const giro = ++onchainIncassoGiro;
+  dici('Controllo…');
+  try {
+    const r = await fetch(`${API_BASE}/onchain/incasso/controlla`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({tipo, valore})});
+    const x = await r.json().catch(() => ({}));
+    if (giro !== onchainIncassoGiro || campo.value.trim() !== v) return;
+    if (!r.ok) return dici('⚠️ ' + esc(x.detail || 'non riesco a controllare: riprova'), 'var(--danger)');
+    if (!x.ok) return dici('❌ ' + esc(x.motivo || 'non va bene'), 'var(--danger)');
+    if (tipo === 'xpub') {
+      /* il telefono la rilegge da se' e dice il primo indirizzo: chi
+         ce l'ha in Sparrow lo ritrova in cima alla lista «Ricevi» */
+      let primo = '';
+      try { primo = onchainIndirizzoEsterno(await caricaBitcoin(), {tipo, valore, indice: 0}); } catch(e) {}
+      if (!primo) return dici('❌ Questa chiave non si legge su questo telefono', 'var(--danger)');
+      dici(`✅ <b>Chiave del conto valida</b>: ogni vendita arriva a un indirizzo nuovo del tuo wallet. Il primo sarà <span class="mono" style="word-break:break-all">${esc(primo)}</span>.`, 'var(--ok)');
+    } else if (x.usato === true) {
+      dici(`⚠️ <b>Indirizzo valido, ma già usato</b> (${fmt(x.tx)} transazion${x.tx === 1 ? 'e' : 'i'}): funziona, però chi guarda la blockchain lega le tue vendite fra loro. Meglio un indirizzo nuovo, o la chiave del conto.`, 'var(--sats-text)');
+    } else if (x.usato === null) {
+      dici('✅ <b>Indirizzo valido.</b> Se sia già stato usato non lo so: la rete adesso non risponde.', 'var(--ok)');
+    } else {
+      dici('✅ <b>Indirizzo valido, e mai usato.</b>', 'var(--ok)');
+    }
+    if (salva) salva.disabled = false;
+  } catch(e) {
+    if (giro === onchainIncassoGiro) dici('⚠️ Rete assente: riprova', 'var(--danger)');
+  }
+}
 
 function onchainBloccoIncasso(miaXpub){
   const srv = onchainSrv || {};
@@ -54798,44 +54977,28 @@ function onchainBloccoIncasso(miaXpub){
   const d = srv.incasso;
   let stato;
   if (!d) {
-    stato = `<div class="hint">Adesso ricevi nel <b>tuo conto di
-      Barattolo</b>: un indirizzo nuovo a ogni vendita, dalle tue dodici
-      parole. Per spenderli fuori da qui basta il seme in Sparrow.</div>`;
+    stato = `<div class="hint"><b>Non hai ancora scelto dove ricevere.</b>
+      Finché non lo fai, chi compra i tuoi annunci paga solo con ⚡
+      Lightning: i sats on-chain non finiscono mai in un conto di
+      Barattolo.</div>`;
   } else if (onchainIncassoMio) {
     stato = `<div class="hint" style="color:var(--ok)"><b>✅ Ricevi nel
       tuo wallet</b>: ${d.tipo === 'xpub'
         ? `un indirizzo nuovo a ogni vendita dalla chiave che finisce in <span class="mono">…${esc(onchainCoda(d.valore))}</span>`
         : `sempre a <span class="mono" style="word-break:break-all">${esc(d.valore)}</span>`}.
       La scelta è firmata dal tuo seme: il tuo telefono la ricontrolla
-      prima di ogni seconda firma.</div>`;
+      prima di ogni seconda firma. Per cambiarla, incolla qui sotto.</div>`;
   } else {
     stato = `<div class="hint" style="color:var(--danger)"><b>⚠️ La scelta
       salvata non è firmata da questo seme</b> (un altro telefono, o un
-      seme di prima): finché non la rifai da qui, il tuo telefono non
-      firma rilasci verso quel wallet.</div>`;
+      seme di prima): finché non la rifai da qui, i tuoi annunci si pagano
+      solo con ⚡ Lightning.</div>`;
   }
-  const modulo = onchainIncassoTipo ? `
-    <input id="onchainIncassoValore" class="mono" autocomplete="off" style="width:100%;box-sizing:border-box;margin:6px 0"
-      placeholder="${onchainIncassoTipo === 'xpub' ? 'vpub… (o tpub…)' : 'tb1…'}">
-    ${onchainIncassoTipo === 'indirizzo'
-      ? `<div class="hint">⚠️ Con un indirizzo fisso <b>tutte le vendite
-           arrivano nello stesso posto</b>, e chi guarda la blockchain le
-           lega insieme. Se il tuo wallet te la dà, è meglio la chiave del
-           conto.</div>`
-      : `<div class="hint">La chiave <b>pubblica</b> del conto del tuo
-           wallet: in Sparrow, Impostazioni → Keystore, la riga
-           <span class="mono">vpub</span> (strada <span class="mono">m/84'/1'/0'</span>).
-           Con lei non si spende niente.</div>`}
-    <button class="btn" onclick="onchainIncassoSalva(this)">✍️ Firma e salva</button>
-    <button class="btn ghost" onclick="onchainIncassoTipo='';renderOnchain()">Lascia stare</button>` : `
-    <button class="btn ghost" onclick="onchainIncassoTipo='xpub';renderOnchain()">🔑 La chiave del conto del mio wallet</button>
-    <button class="btn ghost" onclick="onchainIncassoTipo='indirizzo';renderOnchain()">📮 Un mio indirizzo</button>
-    ${d ? `<button class="btn ghost" onclick="onchainIncassoSalva(this, 'barattolo')">🫙 Torna al conto di Barattolo</button>` : ''}`;
   return `
     <div class="payout">
       <h4>Dove ricevi i sats quando vendi</h4>
       ${stato}
-      ${acceso && srv.embit ? modulo
+      ${acceso && srv.embit ? onchainModuloIncasso('ocImp')
         : '<div class="hint">Prima accendi l\'on-chain (qui sopra).</div>'}
       <div class="hint" style="margin-top:8px">Vale dalle prossime
         vendite: gli ordini già nati tengono la destinazione di
@@ -54843,33 +55006,54 @@ function onchainBloccoIncasso(miaXpub){
     </div>`;
 }
 
-async function onchainIncassoSalva(btn, tipoForzato){
+/* il cassetto del Profilo: lo stato in una riga (da /api/me) e lo
+   stesso modulo; i dettagli stanno nella pagina On-chain */
+function renderIncassoOnchainProfilo(){
+  const box = el('onchainIncassoProfilo');
+  if (!box || !myOnchain || DEMO) return;
+  box.innerHTML = (myOnchainIncasso
+    ? `<div class="hint" style="color:var(--ok);margin-top:10px"><b>✅ Ricevi nel tuo wallet</b>
+         (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}).
+         Per cambiarlo, incolla qui sotto.</div>`
+    : `<div class="hint" style="margin-top:10px"><b>Non hai ancora scelto dove ricevere on-chain.</b>
+         Finché non lo fai, chi compra i tuoi annunci paga solo con ⚡ Lightning:
+         i sats on-chain non finiscono mai in un conto di Barattolo.</div>`)
+    + onchainModuloIncasso('ocProf')
+    + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button>`;
+}
+
+async function onchainIncassoSalva(btn, pref){
   haptic();
-  const tipo = tipoForzato || onchainIncassoTipo;
-  const campo = el('onchainIncassoValore');
-  const valore = tipo === 'barattolo' ? ''
-    : onchainNormaDestinazione(tipo, campo ? campo.value : '');
-  if (tipo !== 'barattolo' && !valore) return toast('⚠️ Incolla prima l\'indirizzo o la chiave');
+  const campo = el(pref + 'Valore');
+  const grezzo = campo ? campo.value.trim() : '';
+  if (onchainSembraSegreto(grezzo)) { if (campo) campo.value = ''; return toast('⛔ Una chiave privata non si incolla qui'); }
+  const tipo = onchainTipoIncollato(grezzo);
+  const valore = tipo ? onchainNormaDestinazione(tipo, grezzo) : '';
+  if (!valore) return toast('⚠️ Incolla prima l\'indirizzo o la chiave');
   const rip = onchainAttesa(btn, 'Firmo…');
   try {
+    /* la chiave del 2-di-3 c'e' gia' quasi sempre (si accende da sola
+       all'apertura); se no nasce adesso, coi suoi backup */
+    await onchainAccendiDaSolo();
     const parole = onchainSemeLocale();
     if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
     const B = await caricaBitcoin();
     if (tipo === 'xpub') onchainIndirizzoEsterno(B, {tipo, valore, indice: 0});
-    const firma = tipo === 'barattolo' ? '' : await onchainFirmaDestinazione(B, parole, tipo, valore);
+    const firma = await onchainFirmaDestinazione(B, parole, tipo, valore);
     const r = await fetch(`${API_BASE}/onchain/incasso`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
       body: JSON.stringify({tipo, valore, firma})});
     const x = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(x.detail || 'non salvato');
-    toast(tipo === 'barattolo' ? '🫙 Ricevi di nuovo nel conto di Barattolo'
-                               : '✅ Salvato: dalle prossime vendite ricevi nel tuo wallet', 5000);
-    onchainIncassoTipo = '';
+    toast('✅ Salvato: dalle prossime vendite ricevi nel tuo wallet', 5000);
+    myOnchainIncasso = tipo;
     onchainSrv = null;
+    renderIncassoOnchainProfilo();
+    renderChecklist();
+    if (el('view-onchain') && el('view-onchain').classList.contains('active')) renderOnchain();
   } catch(e) {
     toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'chiave non leggibile'), 6000);
   } finally { rip(); }
-  renderOnchain();
 }
 
 /* L'INDIRIZZO DI PROVA, DETTO IN CHIARO (27 ott 2026, correzione di
@@ -54989,91 +55173,327 @@ async function onchainNuovoIndirizzo(btn, altro){
    fatto niente e che niente gli e' stato chiesto. */
 /* ============ L'ORDINE ON-CHAIN (23 ott 2026, cantiere onchain-tappa3)
    ============
-   La cassa sceglie ⚡ o ⛓️; con ⛓️ il server crea un ordine SUO
-   (`/api/onchain/ordini`) con l'indirizzo 2-di-3, e il pagamento si
-   segue qui, nel foglio On-chain, non nel paySheet del Lightning: un
-   bonifico on-chain dura un blocco, non quindici minuti, e il foglio
-   dell'ordine e' il posto dove poi si liberano i sats.
+   Con ⛓️ il server crea un ordine SUO (`/api/onchain/ordini`) con
+   l'indirizzo 2-di-3. Dal 27 ott 2026 si paga nello STESSO foglio del
+   Lightning (`payPassaA`, qui sotto), e una volta pagato l'ordine e'
+   uno di sempre, in «Ordini»: e' li' che poi si liberano i sats.
    TUTTE LE FIRME NASCONO QUI DENTRO: chi propone firma un PSBT, chi
    co-firma lo rilegge prima — monete, uscite, commissione — e firma
    solo se i sats vanno a una chiave del SUO seme. Il server controlla
    le stesse cose, ma il telefono non si fida di lui. */
 let onchainOrdini = [];          // l'ultima lettura di /onchain/ordini
-let onchainOrdineAperto = 0;     // quello appena nato dalla cassa
 const ONCHAIN_POLVERE = 546;
-let acqQuotaOnchain = 0;          // la quota fissa detta da /onchain/pronto
 
-function setMetodoAcquisto(m){
-  haptic();
-  if (m !== 'onchain') { acqMetodo = 'ln'; renderAcquisto(); return; }
-  const d = acqDati;
-  const l = d && (listings.find(x => x.id === d.annuncioId)
-                  || myListings.find(x => x.id === d.annuncioId));
-  if (!l) return;
-  /* la cassa chiede PRIMA se questo venditore riceve on-chain: una
-     scelta che poi il server rifiuta e' un giro a vuoto */
-  fetch(`${API_BASE}/onchain/pronto/${l.sellerId}`,
-        {headers: {'X-Tg-Init-Data': authHdr()}})
-    .then(r => r.json()).then(x => {
-      if (!x.pronto) { toast('⛓️ On-chain non disponibile: ' + (x.motivo || ''), 6000); return; }
-      acqQuotaOnchain = Number(x.quota_sats) || 0;
-      acqMetodo = 'onchain'; renderAcquisto();
-    }).catch(() => toast('Rete assente: riprova'));
+/* ============ ⚡ O ⛓️ NEL FOGLIO DEL PAGAMENTO (27 ott 2026, cantiere
+   onchain-cassa, Andrea: «un flag selezionabile tra il fulmine lightning
+   in giallo, e onchain con la sua catena e un segno di robustezza»;
+   «nel mentre clicco LN o onchain già deve dare il QR, esperienza
+   simile a btcpayserver») ============
+   La scelta non sta piu' nella cassa: sta DENTRO il foglio, sopra il
+   QR. Si apre su ⚡ con la sua fattura, come sempre; un tocco su ⛓️ e
+   al posto della fattura c'e' l'indirizzo 2-di-3 col suo QR, nello
+   stesso foglio. UN PAGAMENTO VIVO ALLA VOLTA: passando da una porta
+   all'altra quella di prima si chiude (la fattura con l'annullo di
+   sempre, l'indirizzo con il suo), e il server dice di no se i sats
+   sono gia' arrivati — o in viaggio, per l'on-chain, che guarda la
+   rete prima di chiudere. Due pagamenti vivi sullo stesso oggetto
+   sarebbero due prenotazioni dello stock, e un doppio pagamento a un
+   tocco di distanza.
+   La porta ⛓️ c'e' solo per chi l'on-chain lo vede, su un oggetto solo,
+   al prezzo di listino (accordi e codici restano col Lightning, come
+   dice il server); se chi vende non riceve on-chain si vede SPENTA, e
+   il tocco dice perche'. L'indirizzo si mostra solo se questo telefono
+   l'ha rifatto uguale dalle tre chiavi (`onchainVerificaRiga`): il
+   telefono non si fida del server. */
+let acqMetodo = 'ln';            // l'ultima porta accesa nel foglio
+let payOc = null;                // {o, ok}: l'ordine on-chain del foglio
+let payOcPronto = null;          // null = chiesto, sennò /onchain/pronto
+let payOcTimer = null;
+let payMetodoAcceso = false;     // il foglio di adesso ha le due porte
+let payMetodoOccupato = false;   // un passaggio e' in corso
+let payNotaLn = null;            // la nota del Lightning, per il ritorno
+let payOffAcc = null;            // l'accordo del foglio (qui sempre nessuno), per il ritorno
+
+function payMetodoSpegni(){
+  if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
+  if (payOc && el('payQrNota'))
+    el('payQrNota').textContent = 'inquadra il QR col wallet, o tocca la invoice per copiarla';
+  payOc = null; payOcPronto = null; payMetodoAcceso = false;
+  acqMetodo = 'ln';
+  const box = el('payMetodo'), nota = el('payMetodoNota');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  if (nota) { nota.style.display = 'none'; nota.innerHTML = ''; }
 }
 
-function bloccoMetodoAcquisto(d){
-  if (d.tipo !== 'mono' || !myOnchain || DEMO || VETRINA) return '';
-  const pill = (m, t) => `<button type="button" class="consegna-pill${(acqMetodo === m) ? ' attiva' : ''}" onclick="setMetodoAcquisto('${m}')">${t}</button>`;
-  return `<div class="section-label">Come paghi</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">${pill('ln', '⚡ Lightning')}${pill('onchain', '⛓️ On-chain (prova)')}</div>
-    ${acqMetodo === 'onchain' ? `<div class="escrow-note" style="margin:0 0 8px">Signet, rete di prova: i sats
-      vanno in un 2-di-3 fra te, il venditore e Barattolo. Mandi il conto
-      più un piccolo margine per la rete; quel che avanza torna a te
-      quando liberi i sats.${acqQuotaOnchain
-        ? ` In più paghi <b>${fmt(acqQuotaOnchain)} sats</b> fissi a Barattolo
-            per le spese di rete: vanno a noi quando liberi i sats, e
-            tornano a te se l'ordine viene rimborsato.`
-        : ''}</div>` : ''}`;
+function payMetodoPrepara(l, offAcc, sats){
+  payMetodoSpegni();
+  if (!myOnchain || DEMO || VETRINA || !acqDati || acqDati.tipo !== 'mono'
+      || offAcc || corpoCodiceSconto().codice_sconto || !l) return;
+  payMetodoAcceso = true;
+  payOffAcc = offAcc || null;
+  payNotaLn = {mostra: el('payEurNota').style.display,
+               testo: el('payEurNota').textContent};
+  renderPayMetodo();
+  fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
+    .then(r => r.ok ? r.json() : {pronto: false, motivo: 'on-chain spento su questo server'})
+    .then(x => { if (payMetodoAcceso) { payOcPronto = x; renderPayMetodo(); } })
+    .catch(() => { if (payMetodoAcceso) { payOcPronto = {pronto: false, motivo: 'rete assente'}; renderPayMetodo(); } });
 }
 
-async function startBuyOnchain(btn){
+function renderPayMetodo(){
+  const box = el('payMetodo');
+  if (!box || !payMetodoAcceso) return;
+  const ocSi = payOcPronto && payOcPronto.pronto;
+  const porta = (m, cls, titolo, sotto, spento) =>
+    `<button type="button" role="tab" class="${cls}${acqMetodo === m ? ' attiva' : ''}${spento ? ' spento' : ''}"
+       aria-selected="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
+       onclick="payPassaA('${m}')">${titolo}<small>${sotto}</small></button>`;
+  box.innerHTML = porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', false)
+    + porta('onchain', 'oc', '⛓️ On-chain 🛡️', ocSi ? '2-di-3, una conferma' : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
+  box.style.display = 'flex';
+}
+
+function payMetodoNota(html){
+  const n = el('payMetodoNota');
+  if (!n) return;
+  n.innerHTML = html || '';
+  n.style.display = html ? 'block' : 'none';
+}
+
+async function payPassaA(m){
+  if (!payMetodoAcceso || payMetodoOccupato || m === acqMetodo) return;
   haptic();
-  const d = acqDati;
-  if (!d || d.tipo !== 'mono') return;
-  const rip = onchainAttesa(btn, '⛓️ Preparo l\'indirizzo…');
+  if (m === 'onchain' && !(payOcPronto && payOcPronto.pronto)) {
+    payMetodoNota(payOcPronto
+      ? '⛓️ On-chain non disponibile: ' + esc(payOcPronto.motivo || '')
+      : '⛓️ Sto chiedendo se questo venditore riceve on-chain…');
+    return;
+  }
+  payMetodoOccupato = true; renderPayMetodo();
   try {
-    if (!onchainSrv) {
-      const r = await fetch(`${API_BASE}/onchain/prova`, {headers: {'X-Tg-Init-Data': authHdr()}});
-      if (!r.ok) throw new Error('on-chain spento su questo server');
-      onchainSrv = await r.json();
+    if (m === 'onchain') {
+      /* la fattura di prima si chiude, se non e' stata pagata: il
+         controllo si ferma PRIMA, cosi' il suo «annullato» non arriva
+         come un annullo da fuori */
+      const oid = currentOrderId;
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (oid) {
+        const r = await fetch(`${API_BASE}/orders/${oid}/annulla`,
+          {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          toast(d.detail || 'La fattura non si chiude: resto sul Lightning', 6000);
+          pollTimer = setInterval(() => verificaOrdine(oid), 4000);
+          return;
+        }
+        ordineAnnullatoQui = oid;
+        currentOrderId = null;
+      }
+      acqMetodo = 'onchain'; renderPayMetodo(); payMetodoNota('');
+      await payMostraOnchain();
+      /* l'indirizzo non e' nato (un no del server, la rete): la fattura
+         di prima e' gia' chiusa, quindi se ne fa una nuova — il foglio
+         non resta mai senza niente da pagare */
+      if (!payOc) {
+        acqMetodo = 'ln'; renderPayMetodo();
+        await payCreaFattura(currentListing, payOffAcc);
+      }
+    } else {
+      if (payOc && payOc.o.stato === 'attesa') {
+        const r = await fetch(`${API_BASE}/onchain/ordini/${payOc.o.id}/annulla`,
+          {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          toast('⛓️ ' + (d.detail || 'L\'indirizzo non si chiude: resto on-chain'), 7000);
+          return;
+        }
+      }
+      if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
+      payOc = null;
+      el('payQrNota').textContent = 'inquadra il QR col wallet, o tocca la invoice per copiarla';
+      aggiornaPayHint();
+      acqMetodo = 'ln'; renderPayMetodo(); payMetodoNota('');
+      el('payAmount').textContent = '…';
+      el('payScomposto').innerHTML = '';
+      if (payNotaLn) {
+        el('payEurNota').style.display = payNotaLn.mostra;
+        el('payEurNota').textContent = payNotaLn.testo;
+      }
+      await payCreaFattura(currentListing, payOffAcc);
     }
-    /* la chiave c'e' gia' o nasce adesso (con i suoi backup), e la sua
-       meta' pubblica va al server se non ce l'ha: per chi compra
-       accendere l'on-chain E' scegliere di pagare on-chain */
-    const parole = await onchainSemeAssicurato();
-    const miaXpub = await onchainMiaXpub(parole, onchainSrv);
-    if (onchainSrv.mia_xpub !== miaXpub) {
-      const q = await fetch(`${API_BASE}/onchain/xpub`, {method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-        body: JSON.stringify({xpub: miaXpub})});
-      if (!q.ok) throw new Error((await q.json().catch(() => ({}))).detail || 'chiave non accettata');
-    }
-    const r = await fetch(`${API_BASE}/orders`, {method: 'POST',
+  } finally {
+    payMetodoOccupato = false; renderPayMetodo();
+  }
+}
+
+/* L'ordine on-chain della cassa: la chiave c'e' gia' o nasce adesso (coi
+   suoi backup), la sua meta' pubblica va al server se non ce l'ha, e
+   l'ordine nasce con `metodo: onchain`. Torna {o, srv, parole}. */
+async function onchainOrdineDallaCassa(){
+  const d = acqDati;
+  let srv = onchainSrv;
+  if (!srv) {
+    const r = await fetch(`${API_BASE}/onchain/prova`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) throw new Error('on-chain spento su questo server');
+    srv = await r.json();
+  }
+  const parole = await onchainSemeAssicurato();
+  const miaXpub = await onchainMiaXpub(parole, srv);
+  if (srv.mia_xpub !== miaXpub) {
+    const q = await fetch(`${API_BASE}/onchain/xpub`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({annuncio_id: d.annuncioId, quantita: d.qta || qtaScelta,
-                            offerta_id: 0, metodo: 'onchain',
-                            ...corpoConsegna(), ...corpoCodiceSconto()})});
-    const x = await r.json().catch(() => ({}));
-    if (!r.ok || !x.onchain) throw new Error(x.detail || 'ordine non creato');
-    onchainSrv = null;
-    onchainOrdineAperto = x.onchain.id;
-    onchainSoloOrdine = x.onchain.id;
-    onchainTab = 'ordini';
-    acqMetodo = 'ln';
-    go('onchain');
+      body: JSON.stringify({xpub: miaXpub})});
+    if (!q.ok) throw new Error((await q.json().catch(() => ({}))).detail || 'chiave non accettata');
+  }
+  const r = await fetch(`${API_BASE}/orders`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({annuncio_id: d.annuncioId, quantita: d.qta || qtaScelta,
+                          offerta_id: 0, metodo: 'onchain',
+                          ...corpoConsegna(), ...corpoCodiceSconto()})});
+  const x = await r.json().catch(() => ({}));
+  if (!r.ok || !x.onchain) throw new Error(x.detail || 'ordine non creato');
+  onchainSrv = null;   /* la pagina On-chain rilegge: c'e' un indirizzo in piu' */
+  return {o: x.onchain, srv, parole};
+}
+
+async function payMostraOnchain(){
+  el('payInvoice').textContent = '⛓️ Preparo l\'indirizzo…';
+  mostraQr('');
+  try {
+    const {o, srv, parole} = await onchainOrdineDallaCassa();
+    const v = await onchainVerificaRiga(parole, srv, o.indirizzo);
+    payOc = {o, ok: !!(v.mia && v.uguale)};
+    await payDisegnaOnchain();
+    if (payOcTimer) clearInterval(payOcTimer);
+    payOcTimer = setInterval(payOcGuarda, 15000);
   } catch(e) {
-    toast('⛓️ ' + (e.message || 'errore'), 6000);
-  } finally { rip(); }
+    payOc = null;
+    el('payInvoice').textContent = '';
+    payMetodoNota('⛓️ On-chain non disponibile: ' + esc(e.message || 'errore') + '. Qui sotto c\'è di nuovo la fattura ⚡.');
+  }
+}
+
+/* Il foglio vestito da on-chain: la cifra da mandare, le sue tre parti,
+   il patto in parole, il QR `bitcoin:` e l'indirizzo da copiare. */
+async function payDisegnaOnchain(){
+  const o = payOc && payOc.o;
+  if (!o) return;
+  const riga = (n, t, b) => `<div style="display:flex;justify-content:space-between;gap:12px${b ? ';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px' : ''}"><span>${t}</span><span class="mono">${fmt(n)} sats</span></div>`;
+  el('payAmount').textContent = fmt(o.importo_sats);
+  el('payScomposto').innerHTML = riga(o.prezzo_sats, 'Prezzo')
+    + (o.quota_sats ? riga(o.quota_sats, 'Quota fissa a Barattolo (spese di rete)') : '')
+    + riga(o.margine_sats, 'Margine di rete (l\'avanzo torna a te)')
+    + riga(o.importo_sats, 'Da mandare', true);
+  el('payEurNota').style.display = 'block';
+  el('payEurNota').textContent = `Signet, rete di prova. L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
+  el('payPatto').innerHTML = 'Paga con un wallet Bitcoin. I sats vanno in un <b style="color:var(--trust)">2-di-3</b> fra te, chi vende e Barattolo: escono solo con due firme, e al venditore arrivano quando confermi di aver ricevuto l\'oggetto. Serve una conferma, circa dieci minuti.'
+    + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>, confermati ${fmt(o.ricevuti_sats)}.` : '');
+  el('payScadeRiga').style.display = 'none';
+  el('payQrNota').textContent = 'inquadra il QR col wallet Bitcoin, o tocca l\'indirizzo per copiarlo';
+  el('payHint').innerHTML = '';   /* il wallet NWC e' Lightning: qui non c'entra */
+  const hoPagato = el('payHoPagato');
+  if (hoPagato) { hoPagato.disabled = false; hoPagato.removeAttribute('aria-busy'); }
+  if (!payOc.ok) {
+    el('payQr').innerHTML = ''; el('payQr').classList.remove('pronto');
+    el('payInvoice').textContent = '⚠️ Questo telefono non ritrova l\'indirizzo del server: non pagare, e avvisa Barattolo.';
+    return;
+  }
+  el('payInvoice').textContent = o.indirizzo.indirizzo;
+  await disegnaQr(el('payQr'), onchainUriPagamento(o), 'Byte');
+}
+
+/* Il controllo del foglio on-chain: legge la riga (la ronda del server
+   chiede a mempool ogni due minuti), e al pagato apre l'ordine di
+   sempre in «Ordini». Il «controlla adesso» ha il suo freno sul server:
+   lo chiede solo chi tocca «Ho pagato». */
+async function payOcGuarda(){
+  if (!payOc || !el('paySheet').classList.contains('open')) return;
+  try {
+    const tutti = await onchainLeggiOrdini();
+    const o = tutti.find(x => x.id === payOc.o.id);
+    if (o) await payOcAggiorna(o);
+  } catch(e) { /* al prossimo giro */ }
+}
+
+async function payOcAggiorna(o){
+  if (!payOc || payOc.o.id !== o.id) return;
+  const prima = payOc.o.visti_sats;
+  payOc.o = o;
+  if (o.stato === 'pagato') return payOcPagato(o);
+  if (o.stato !== 'attesa') {
+    payMetodoSpegni();
+    closeSheet();
+    toast(o.stato === 'scaduto' ? '⌛ L\'indirizzo è scaduto senza pagamento' : '✖️ Ordine on-chain chiuso', 6000);
+    return;
+  }
+  if (o.visti_sats !== prima) await payDisegnaOnchain();
+}
+
+async function payOcPagato(o){
+  payMetodoSpegni();
+  closeSheet();
+  acqDati = null;
+  await loadOrders(); renderOrders();
+  if (o.ordine_id) setTimeout(() => openOrder(o.ordine_id), 400);
+  else toast('✅ Pagamento on-chain confermato');
+}
+
+async function payOcControlla(){
+  if (!payOc) return;
+  toast('Guardo la rete…');
+  try {
+    const r = await fetch(`${API_BASE}/onchain/ordini/${payOc.o.id}/controlla`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non riesco a guardare');
+    if (d.stato === 'attesa') toast(d.visti_sats ? '⏳ Visti in rete, aspetto una conferma (circa dieci minuti)'
+                                                : '⏳ Ancora niente sull\'indirizzo', 5000);
+    await payOcAggiorna(d);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore')); }
+}
+
+function payOcAnnulla(){
+  const o = payOc && payOc.o;
+  if (!o) return;
+  chiediConferma({
+    titolo: 'Annulli questo ordine on-chain?',
+    corpo: 'Se hai già mandato i sats, NON annullare: aspetta la conferma.',
+    etichetta: 'Sì, annulla',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/onchain/ordini/${o.id}/annulla`,
+        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { toast('⛓️ ' + (d.detail || 'Non annullato'), 7000); return; }
+      payMetodoSpegni();
+      chiudiFoglioFattura();
+      toast('✖️ Ordine annullato');
+      await loadOrders(); renderOrders();
+    }});
+}
+
+/* IL FOGLIO RIAPERTO DA «ORDINI» (27 ott 2026): un ordine on-chain da
+   pagare sta in «Ordini» con gli altri, e toccarlo riapre questo foglio
+   sul suo indirizzo — senza le due porte: il metodo e' gia' scelto, e
+   chi vuole il Lightning annulla e ricompra. */
+async function payRiapriOnchain(oid){
+  haptic();
+  try {
+    const srv = onchainSrv || await (await fetch(`${API_BASE}/onchain/prova`,
+      {headers: {'X-Tg-Init-Data': authHdr()}})).json();
+    const parole = await onchainSemeAssicurato();
+    const o = (await onchainLeggiOrdini()).find(x => x.id === Number(oid));
+    if (!o || o.stato !== 'attesa') { await loadOrders(); renderOrders(); return; }
+    rilancioCorrente = null; pagamentoCorrente = null; currentOrderId = null;
+    payMetodoSpegni();
+    acqMetodo = 'onchain';
+    const v = await onchainVerificaRiga(parole, srv, o.indirizzo);
+    payOc = {o, ok: !!(v.mia && v.uguale)};
+    el('sheetBg').classList.add('open');
+    el('paySheet').classList.add('open');
+    mostraQr('');            /* il vestito del deposito, da mostraQr come tutti */
+    await payDisegnaOnchain();
+    payOcTimer = setInterval(payOcGuarda, 15000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
 }
 
 /* La mia chiave per firmare e il mio incasso, per l'ordine `o`: lo
@@ -55350,140 +55770,15 @@ async function onchainCofirmeInSottofondo(){
   } catch(e) { /* in sottofondo si tace: il foglio On-chain lo ridice */ }
 }
 
-async function onchainControllaOrdine(btn, oid){
-  haptic();
-  const rip = onchainAttesa(btn, 'Guardo…');
-  try {
-    const r = await fetch(`${API_BASE}/onchain/ordini/${oid}/controlla`,
-      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.detail || 'non riesco a guardare');
-    toast(d.stato === 'pagato' ? '✅ Pagamento confermato'
-      : d.visti_sats ? '⏳ Visti in rete, aspetto una conferma'
-      : '⏳ Ancora niente sull\'indirizzo');
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore')); }
-  finally { rip(); }
-  renderOnchain();
-}
 
-function onchainAnnullaOrdine(oid){
-  chiediConferma({
-    titolo: 'Annullare l\'ordine on-chain?',
-    corpo: 'Solo se non hai ancora mandato niente: l\'oggetto torna in vendita.',
-    etichetta: 'Annulla l\'ordine',
-    poi: async () => {
-      const r = await fetch(`${API_BASE}/onchain/ordini/${oid}/annulla`,
-        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
-      const d = await r.json().catch(() => ({}));
-      toast(r.ok ? 'Ordine annullato' : (d.detail || 'Non annullato'), 6000);
-      renderOnchain();
-    }});
-}
-
-const ONCHAIN_STATI = {attesa: '⏳ In attesa del pagamento', pagato: '🔒 Pagato, sats nel 2-di-3',
-  rilasciato: '✅ Sats al venditore', rimborsato: '↩️ Rimborsato',
-  scaduto: '⌛ Scaduto senza pagamento', annullato: '✖️ Annullato'};
 
 function onchainUriPagamento(o){
   return `bitcoin:${o.indirizzo.indirizzo}?amount=${(o.importo_sats / 1e8).toFixed(8)}`;
 }
 
-/* La scheda degli ordini. L'indirizzo da pagare si mostra solo se
-   questo telefono l'ha rifatto uguale (`verifiche`).
-   SOLO L'ORDINE CHE STAI PAGANDO (27 ott 2026, richiesta di Andrea:
-   «quando pago on-chain non devo vedere anche le vecchie transazioni»):
-   arrivando dalla cassa c'e' quello e basta, con un link per gli altri;
-   arrivando dal profilo, quelli aperti in cima e i chiusi piegati. */
-const ONCHAIN_CHIUSI = ['rilasciato', 'rimborsato', 'scaduto', 'annullato'];
-
-function onchainBloccoOrdini(verifiche, esiti){
-  const solo = onchainSoloOrdine
-    && onchainOrdini.find(o => o.id === onchainSoloOrdine);
-  if (!onchainOrdini.length) {
-    return `<div class="hint">Nessun ordine on-chain, per ora. Per pagare
-      on-chain, alla cassa di un annuncio scegli <b>⛓️ On-chain</b> al
-      posto di ⚡ Lightning.</div>`;
-  }
-  const riga = (o) => {
-    const v = verifiche[o.id] || {};
-    const buono = v.mia && v.uguale;
-    const io = o.ruolo === 'compratore';
-    let corpo = '';
-    if (o.stato === 'attesa' && io) {
-      corpo = buono
-        ? `<div class="hint">Manda <b class="mono">${fmt(o.importo_sats)}</b> sats
-             (${fmt(o.prezzo_sats)}${o.quota_sats ? ` + ${fmt(o.quota_sats)} di quota a Barattolo` : ''} + ${fmt(o.margine_sats)} di margine per la rete) a:</div>
-           <div class="qr" id="ocQr${o.id}"></div>
-           <div class="mono" style="word-break:break-all;font-size:12px;cursor:pointer"
-                onclick="copiaLink('${esc(o.indirizzo.indirizzo)}', 'Indirizzo copiato')">${esc(o.indirizzo.indirizzo)}</div>
-           <div class="hint">Signet. Serve una conferma (circa dieci minuti);
-             l'indirizzo resta valido fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.
-             ${o.visti_sats ? `<br>Visti in rete: <b>${fmt(o.visti_sats)}</b> sats, confermati ${fmt(o.ricevuti_sats)}.` : ''}</div>
-           <button class="btn" onclick="onchainControllaOrdine(this, ${o.id})">🔍 Ho pagato, controlla</button>
-           ${o.visti_sats ? '' : `<button class="btn ghost" onclick="onchainAnnullaOrdine(${o.id})">Annulla l'ordine</button>`}`
-        : `<div class="hint" style="color:var(--danger)">⚠️ Questo telefono non ritrova
-             l'indirizzo del server: non pagare, e avvisa Barattolo.</div>`;
-    } else if (o.stato === 'attesa') {
-      corpo = `<div class="hint">Chi compra deve ancora pagare.</div>`;
-    } else if (o.stato === 'pagato' && o.ordine_id && !o.proposta) {
-      /* LA STRADA A (27 ott 2026): pagato, l'ordine e' uno di sempre e
-         i suoi passi stanno in «Ordini» — la spedizione, «Ho ricevuto
-         l'oggetto — libera i sats», l'annullo */
-      corpo = `<div class="hint">I sats sono nel 2-di-3. Ora l'ordine si segue in
-          <b>«Ordini»</b>, coi passi di sempre.</div>
-        <button class="btn" onclick="apriOrdinePerId(${Number(o.ordine_id)})">🧾 Apri l'ordine</button>`;
-    } else if (o.stato === 'pagato') {
-      const p = o.proposta;
-      if (p && p.mia) {
-        corpo = `<div class="hint">Hai firmato ${p.verso === 'venditore' ? 'il rilascio' : 'il rimborso'}:
-          aspetta la seconda firma, che parte da sola quando l'altra parte apre la Mini App.</div>`;
-      } else if (p && p.verso !== o.ruolo) {
-        /* la firma di Barattolo verso l'altra parte (27 ott 2026): qui
-           non c'e' niente da co-firmare */
-        corpo = `<div class="hint">La disputa è stata decisa a favore dell'altra parte, e
-          Barattolo ha firmato: i sats partono quando l'altra parte apre la Mini App.</div>`;
-      } else if (p) {
-        corpo = `<div class="hint">C'è una proposta da co-firmare: questo telefono la
-          firma da solo se torna tutto.</div>`;
-      } else if (io) {
-        corpo = `<div class="hint">Quando hai l'oggetto, libera i sats: al venditore
-            ${fmt(o.prezzo_sats)} sats${o.quota_sats ? `, a Barattolo la quota di ${fmt(o.quota_sats)}` : ''}, il resto del margine torna a te.</div>
-          <button class="btn orange" onclick="onchainProponi(this, ${o.id})">🔓 Libera i sats</button>`;
-      } else {
-        corpo = `<div class="hint">I sats sono nel 2-di-3: li libera chi compra quando
-            riceve l'oggetto. Se l'affare salta, puoi rimborsarlo.</div>
-          <button class="btn ghost" onclick="onchainProponi(this, ${o.id})">↩️ Rimborsa chi ha comprato</button>`;
-      }
-    } else if (o.txid_uscita) {
-      corpo = `<div class="hint">Transazione:
-        <a href="${esc(o.esploratore)}/tx/${esc(o.txid_uscita)}" target="_blank" rel="noopener"
-           class="mono">${esc(o.txid_uscita.slice(0, 16))}…</a></div>`;
-    }
-    return `<div class="payout"${o.id === onchainOrdineAperto ? ' id="ocAperto"' : ''}>
-      <h4>#${o.id} · ${esc(o.titolo)}</h4>
-      <div class="hint">${io ? 'Compri' : 'Vendi'} — ${ONCHAIN_STATI[o.stato] || esc(o.stato)} ·
-        ${fmt(o.prezzo_sats)} sats</div>
-      ${corpo}
-      ${onchainComeEFatto(o, v)}
-    </div>`;
-  };
-  const avvisi = (esiti || []).map(t => `<div class="hint">${esc(t)}</div>`).join('');
-  if (solo) {
-    const altri = onchainOrdini.length - 1;
-    return avvisi + riga(solo) + (altri
-      ? `<button class="btn ghost" onclick="onchainSoloOrdine=0;renderOnchain()">🧾 Tutti gli ordini on-chain (${altri} altri)</button>`
-      : '');
-  }
-  const aperti = onchainOrdini.filter(o => !ONCHAIN_CHIUSI.includes(o.stato));
-  const chiusi = onchainOrdini.filter(o => ONCHAIN_CHIUSI.includes(o.stato));
-  return avvisi
-    + (aperti.length ? aperti.map(riga).join('')
-       : '<div class="hint">Nessun ordine on-chain in corso.</div>')
-    + (chiusi.length
-       ? `<details style="margin-top:10px"><summary><b>Ordini chiusi (${chiusi.length})</b></summary>
-            ${chiusi.map(riga).join('')}</details>`
-       : '');
-}
+/* (La scheda degli ordini on-chain, `onchainBloccoOrdini`, e' morta il
+   27 ott 2026 con la sua scheda: l'indirizzo da pagare si mostra nel
+   foglio del pagamento, sempre dopo `onchainVerificaRiga`.) */
 
 /* COM'E' FATTO QUESTO 2-DI-3 (27 ott 2026, Andrea: «come si puo'
    dimostrare che quello e' un multisig 2-di-3?»). Piegato in fondo a
@@ -55521,15 +55816,6 @@ function onchainComeEFatto(o, v){
   </details>`;
 }
 
-async function onchainDisegnaQrOrdini(verifiche){
-  for (const o of onchainOrdini) {
-    const v = verifiche[o.id] || {};
-    if (o.stato === 'attesa' && o.ruolo === 'compratore' && v.mia && v.uguale)
-      await disegnaQr(el(`ocQr${o.id}`), onchainUriPagamento(o), 'Byte');
-  }
-  const a = el('ocAperto');
-  if (a) { a.scrollIntoView({block: 'start'}); onchainOrdineAperto = 0; }
-}
 
 function onchainComEnata(){
   if (onchainNato === 'nuovo') {
@@ -88133,6 +88419,7 @@ async function avvia(){
     /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
+    myOnchainIncasso = me.onchain_incasso || '';
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */
     if (myOnchain) setTimeout(onchainCofirmeInSottofondo, 3000);
     /* ...e l'on-chain si accende da solo (27 ott 2026) */

@@ -73785,3 +73785,86 @@ Resta da decidere il tetto TOTALE in catena dello studio. PROVATO:
 `prove_onchain_tetto` (il giudice eseguito) e `collaudo_onchain_ordine`
 (84/0: sopra il tetto 400 e nessun ordine, a tetto spento passa).
 
+
+## La cassa a due porte e l'incasso on-chain solo su un wallet tuo (27 ott 2026, cantiere onchain-cassa, Andrea: «un flag selezionabile tra il fulmine lightning in giallo, e onchain con la sua catena e un segno di robustezza», «il venditore non deve mai ricevere i fondi nel wallet autogenerato da barattolo», «la sezione ordini è unica», «nel mentre clicco LN o onchain già deve dare il QR, esperienza simile a btcpayserver»)
+
+Quattro richieste della stessa sera, un cantiere.
+
+**LA CASSA A DUE PORTE.** La scelta ⚡/⛓️ non sta più nella pagina
+d'acquisto (le due pillole e `startBuyOnchain` sono morte): sta DENTRO
+il foglio del pagamento, in cima, come le schede di BTCPay. ⚡ Lightning
+è giallo (fisso nei due temi, scritta scura), ⛓️ On-chain 🛡️ veste
+l'inchiostro. Il foglio si apre su ⚡ con la sua fattura; un tocco su ⛓️
+e al posto della fattura c'è l'indirizzo 2-di-3 col QR `bitcoin:`, la
+cifra in tre righe (prezzo, quota, margine) e il patto in parole. UN
+PAGAMENTO VIVO ALLA VOLTA: passando di porta si chiude quello di prima
+(la fattura con l'annullo di sempre, l'indirizzo col suo), e il server
+dice di no se i sats sono arrivati. Perché non tutti e due vivi come in
+BTCPay: qui sono due ordini, e due ordini vivi sullo stesso oggetto sono
+due prenotazioni dello stock (con un pezzo solo il secondo trovava 409)
+e un doppio pagamento a un tocco di distanza. L'annullo on-chain guarda
+la rete PRIMA di chiudere (`visti_sats` la scrive la ronda ogni due
+minuti, e chi ha appena mandato i sats e tocca ⚡ non deve trovarsi
+l'ordine chiuso coi sats in viaggio); rete muta = 503, non si annulla
+alla cieca. La porta ⛓️ c'è solo per chi l'on-chain lo vede, su un
+oggetto, al listino; spenta (col perché al tocco) se chi vende non
+riceve on-chain o se la cifra sta sopra il tetto: `/api/onchain/pronto`
+prende `?sats=` e lo dice prima. Se l'indirizzo non nasce, il foglio
+rifà da solo la fattura ⚡: non resta mai senza niente da pagare. Il
+controllo del foglio legge la riga ogni 15 secondi (la ronda chiede a
+mempool); «Ho pagato» chiede a mempool subito, col suo freno.
+
+**MAI NEL CONTO DI BARATTOLO.** Il `/1/n` del seme di Barattolo non è
+più dove riceve chi vende: senza una destinazione sua (indirizzo o
+chiave di conto, firmata dal suo seme) la cassa dice 400
+(`ONCHAIN_MSG_SENZA_DESTINAZIONE`) PRIMA di coniare l'indirizzo, e
+`pronto` dice «il venditore non ha ancora scelto dove ricevere
+on-chain». Il bottone «Torna al conto di Barattolo» è morto (il server
+accetta ancora `tipo: barattolo`, che ora vuol dire «togli la scelta»).
+Gli ordini già nati col conto di serie tengono il loro incasso: il
+telefono lo sa ancora co-firmare (`onchainIncassoAtteso`).
+
+**IL CAMPO NEL PROFILO.** «Completa il profilo» ha la voce ⛓️ «Dove
+ricevi on-chain» (solo col cancello), che apre il cassetto «Incassi
+on-chain» — da porta è diventato cassetto, col campo dentro. Si incolla
+e basta: il tipo lo dice quel che incolli (tb1 indirizzo, vpub/tpub
+chiave), il controllo parte da solo mezzo secondo dopo
+(`/api/onchain/incasso/controlla`: lo stesso giudice del salvataggio, e
+per un indirizzo il tx_count di mempool). Un indirizzo già usato non è un
+no — funziona — ma si dice in arancio, col perché (lega le vendite fra
+loro). Per una chiave di conto il telefono dice il primo indirizzo, da
+ritrovare in Sparrow. Una chiave privata o dodici parole il telefono le
+riconosce e le toglie dal campo PRIMA di qualunque richiesta. Lo stesso
+modulo vive nella scheda Impostazioni. `/api/me` porta `onchain_incasso`.
+
+**ORDINI UNICO.** La scheda Ordini della pagina On-chain è morta (con
+`onchainBloccoOrdini` e i suoi attrezzi). Gli on-chain da pagare stanno
+in «Ordini» come card loro («Da pagare», ⛓️), che riaprono il foglio
+sull'indirizzo, senza le due porte; da pagati sono già righe di sempre
+(strada A). «Com'è fatto questo 2-di-3» sta dentro l'ordine: `/api/orders`
+porta le chiavi PUBBLICHE e il descrittore (`_onchain_indirizzo_pubblico`),
+mai le xpub. Le co-firme fatte aprendo la pagina si dicono in un toast.
+
+**STRADE SCARTATE.** Due pagamenti vivi insieme (sopra). La scelta nella
+pagina d'acquisto (era il primo giro: Andrea l'ha voluta dove compare il
+QR). Il conto di Barattolo come ripiego «finché non scegli» (è proprio
+quel che Andrea non vuole). Un selettore indirizzo/chiave prima del
+campo (il tipo lo dice il testo).
+
+**PROVATO.** `collaudo_onchain_ordine` e `collaudo_onchain_incasso`
+(chi vende senza scelta: non pronto, 400, nessun ordine e nessun
+indirizzo a metà, il profilo dice ''; il controllo: mai usato, usato 3
+tx, mempool muto, mainnet, chiave privata, non scrive niente; il tetto
+detto da `pronto`). Nel browser (Playwright, API finte, la libreria vera):
+⚡ → ⛓️ → ⚡ col QR che cambia, l'annullo di chi lascia, la fattura nuova;
+nel Profilo l'indirizzo usato in arancio e la chiave privata tolta dal
+campo senza partire. `prove_onchain_pagina` e le sentinelle aggiornate.
+
+**DA GUARDARE.** Il giro dal vivo su signet col bot di collaudo (Andrea
+da Sparrow). Residuo noto: una fattura ⚡ chiusa passando a ⛓️ e pagata
+DOPO da un wallet che l'aveva già letta resta riacciuffabile («chi paga
+ha comprato»), e con l'on-chain pagato anche lui l'oggetto avrebbe due
+pagamenti: il finestrino è di secondi e il QR sparisce al tocco. I
+rimborsi e il resto del margine a chi compra vanno ancora al `/1/n` del
+SUO seme (non è il caso di Andrea, che parlava di chi vende): da
+decidere se anche lì serve un wallet suo.

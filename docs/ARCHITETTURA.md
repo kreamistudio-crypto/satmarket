@@ -34298,7 +34298,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `ONCHAIN_QUOTA_FISSA_SATS`, 0 nel codice; 0 oppure 546-5000,
   `_giudice_quota_onchain`). `importo = prezzo + quota + margine`;
   `/api/onchain/pronto` e `/api/onchain/prova` la dicono (`quota_sats`), la
-  cassa la scrive (`acqQuotaOnchain`). All'uscita verso il venditore una
+  cassa la scrive (dal 27 ott sera nel foglio, `payDisegnaOnchain`). All'uscita verso il venditore una
   uscita esatta a `quota_indirizzo` = `/1/numero_barattolo` della xpub di
   Barattolo (`_onchain_psbt_giudica`; nel telefono `onchainProponi` e
   `onchainCofirma`, con il tetto `ONCHAIN_QUOTA_TETTO` anche lì); col
@@ -34365,6 +34365,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `ONCHAIN_MAX_EURO` (250 nel codice, 0 = spento) sul prezzo dell'ordine,
   col cambio del momento; `onchain_sopra_il_tetto` lo giudica e la cassa
   (`_onchain_compra`) lo chiama prima di scrivere. Senza cambio: no.
+  `GET /api/onchain/pronto/{venditore}?sats=N` lo dice prima del tocco.
+- LA CASSA A DUE PORTE E L'INCASSO SOLO SU UN WALLET TUO (27 ott 2026,
+  cantiere onchain-cassa; perché in CANTIERI, «La cassa a due porte»).
+  Il foglio del pagamento (`#paySheet`) ha in cima `#payMetodo` (⚡ giallo
+  / ⛓️ 🛡️) e `#payMetodoNota`: li accende `payMetodoPrepara` da
+  `startBuy` (mono, `myOnchain`, niente accordo né codice), li spegne
+  `payMetodoSpegni` (closeSheet, chiudiFoglioFattura, la chiusura dello
+  strato). `payPassaA` chiude il pagamento di prima (`/orders/{id}/annulla`
+  o `/onchain/ordini/{id}/annulla`, che ora guarda mempool prima) e fa
+  l'altro (`payCreaFattura`, staccata da startBuy; `payMostraOnchain` →
+  `onchainOrdineDallaCassa` → `onchainVerificaRiga` → `payDisegnaOnchain`).
+  Stato: `acqMetodo`, `payOc` {o, ok}, `payOcPronto`, `payOcTimer` (15 s,
+  `payOcGuarda` legge `/onchain/ordini`); `sheetPaid` e `annullaPagamento`
+  hanno il ramo `payOc`. Gli on-chain da pagare: `ordiniOnchainDaPagare`
+  (`caricaOnchainDaPagare` in `loadOrders`), card `cardOnchainDaPagare` in
+  testa a `renderOrders`, che riaprono `payRiapriOnchain`. La pagina
+  On-chain ha tre schede (Info di serie, Impostazioni, Tecnico).
+  Server: `_onchain_compra` vuole `_onchain_destinazione_viva` prima di
+  `onchain_nuovo_indirizzo` (sennò 400 `ONCHAIN_MSG_SENZA_DESTINAZIONE`;
+  il `/1/n` di chi vende non è più un incasso); `pronto` dice no senza
+  destinazione; `POST /api/onchain/incasso/controlla` {tipo, valore} →
+  {ok, motivo, usato (None = mempool muto), tx} via
+  `onchain_mempool_indirizzo`, freno `onchain_incasso_guarda`, non scrive;
+  `/api/me` ha `onchain_incasso` (`_onchain_incasso_mio`); `GET /api/orders`
+  aggiunge `onchain.indirizzo` (`_onchain_indirizzo_pubblico`: chiavi
+  pubbliche, descrittore, indirizzo). Client del profilo: cassetto
+  `accOnchainIncasso` (`renderIncassoOnchainProfilo`), voce
+  `accOnchainIncasso` in `renderChecklist`, modulo `onchainModuloIncasso(pref)`
+  con `onchainTipoIncollato`, `onchainSembraSegreto`,
+  `onchainIncassoGuarda(Presto)`, `onchainIncassoSalva(btn, pref)`.
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
   tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,

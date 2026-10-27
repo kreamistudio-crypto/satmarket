@@ -24,6 +24,7 @@ Lightning non esce niente.
 
 USO:  python collaudo_onchain_ordine.py
 """
+import hashlib
 import json
 import os
 import sys
@@ -52,7 +53,10 @@ def main():
     vett = json.load(open(os.path.join(banco.QUI, "vendor",
                                        "vettori-bip.json"), encoding="utf-8"))
     semi = {999: vett["bip39_english"][0]["parole"],
-            888: vett["bip39_english"][1]["parole"]}
+            888: vett["bip39_english"][1]["parole"],
+            # il wallet di chi vende, FUORI da Barattolo (27 ott 2026: il
+            # conto `/1/n` di serie non riceve piu')
+            "wallet": vett["bip39_english"][2]["parole"]}
 
     def radice(tg):
         return bip32.HDKey.from_seed(bip39.mnemonic_to_seed(semi[tg]),
@@ -65,6 +69,23 @@ def main():
     def incasso_mio(tg, n):
         k = radice(tg).derive(f"m/48h/1h/0h/2h/1/{n}")
         return script.p2wpkh(k.key.get_public_key()).address(N)
+
+    vpub = bip32.HDKey.from_seed(bip39.mnemonic_to_seed(semi["wallet"]),
+                                 version=b"\x04\x5f\x18\xbc").derive(
+        "m/84h/1h/0h").to_public().to_base58()
+
+    def dal_wallet(i):
+        k = radice("wallet").derive(f"m/84h/1h/0h/0/{i}")
+        return script.p2wpkh(k.key.get_public_key()).address(N)
+
+    def firma_dest(tg, tipo, valore):
+        """La firma della destinazione come la fa il telefono (r||s)."""
+        msg = SRV.onchain_messaggio_destinazione(tipo, valore)
+        der = radice(tg).derive("m/48h/1h/0h/2h/2/0").key.sign(
+            hashlib.sha256(msg).digest()).serialize()
+        lr = der[3]
+        r, s_ = der[4:4 + lr], der[6 + lr:]
+        return (r[-32:].rjust(32, b"\0") + s_[-32:].rjust(32, b"\0")).hex()
 
     # --- mempool di cartone ------------------------------------------
     MONETE, INVIATE = {}, []
@@ -182,8 +203,25 @@ def main():
         come(tg)
         c.post("/api/onchain/xpub", json={"xpub": conto(tg)})
     come(999)
-    prova("accesi tutti e due: pronto", True,
+    prova("accesi tutti e due, ma chi vende non ha scelto dove ricevere: "
+          "non pronto", (False, "il venditore non ha ancora scelto dove "
+                                "ricevere on-chain"),
+          tuple(c.get("/api/onchain/pronto/888").json()[k]
+                for k in ("pronto", "motivo")))
+    r = compra(999, annunci[0], metodo="onchain")
+    prova("...e chi prova lo stesso: 400, mai sul conto di Barattolo",
+          (400, SRV.ONCHAIN_MSG_SENZA_DESTINAZIONE),
+          (r.status_code, r.json().get("detail")))
+    come(888)
+    prova("chi vende sceglie il suo wallet, firmato dal suo seme", 200,
+          c.post("/api/onchain/incasso", json={
+              "tipo": "xpub", "valore": vpub,
+              "firma": firma_dest(888, "xpub", vpub)}).status_code)
+    come(999)
+    prova("ora si': pronto", True,
           c.get("/api/onchain/pronto/888").json()["pronto"])
+    prova("...e la cassa che dice la cifra sotto il tetto resta pronta",
+          True, c.get("/api/onchain/pronto/888?sats=50000").json()["pronto"])
     r = compra(999, annunci[0], metodo="onchain", offerta_id=0)
     o = r.json().get("onchain") or {}
     prova("l'ordine on-chain nasce: 200, in attesa, niente fattura", (200, "attesa", False),
@@ -195,8 +233,8 @@ def main():
           "compratore", (True, "compratore"),
           (o["indirizzo"]["indirizzo"].startswith("tb1q"),
            o["indirizzo"]["ruolo"]))
-    prova("...gli incassi sono chiavi dei LORO semi, al numero dell'ordine",
-          (incasso_mio(888, 0), incasso_mio(999, 0)),
+    prova("...chi vende incassa sul SUO wallet, chi compra riprende sul "
+          "suo seme", (dal_wallet(0), incasso_mio(999, 0)),
           (o["incasso"], o["rimborso"]))
     prova("...e nessuna xpub esce", [False, False],
           [conto(888) in r.text, conto(999) in r.text])
@@ -315,8 +353,8 @@ def main():
     prova("la proposta la vedono tutti e due, ciascuno dal suo lato",
           (True, False, "venditore"),
           (o9["proposta"]["mia"], o8["proposta"]["mia"], o8["ruolo"]))
-    prova("...e il venditore ritrova il suo incasso dal suo seme",
-          incasso_mio(888, o8["indirizzo"]["mio_numero"]), o8["incasso"])
+    prova("...e il venditore ritrova il suo incasso nel suo wallet",
+          dal_wallet(o8["destinazione"]["indice"]), o8["incasso"])
     pronta = cofirma(888, o8)
     prova("la transazione completa, mandata da chi ha proposto: 409 (le "
           "due firme sono di due persone)", 409,
@@ -627,6 +665,11 @@ def main():
         "'attivo',1,'ritiro',1,'sats','nuovo')").lastrowid
     con.commit()
     con.close()
+    come(999)
+    x = c.get("/api/onchain/pronto/888?sats=300000").json()
+    prova("la cassa che dice la cifra lo sa PRIMA: la porta ⛓️ e' spenta, "
+          "col perche'", (False, True),
+          (x["pronto"], "fino a 250 €" in x.get("motivo", "")))
     r = compra(999, caro, metodo="onchain")
     prova("sopra i 250 € della beta: 400 col perche', e nessun ordine nasce",
           (400, True, 0),
