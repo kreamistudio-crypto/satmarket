@@ -33877,10 +33877,93 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swap_per`), `CAMBIO_LIBERO_SOLO_MODERATORI` (True),
   `CAMBIO_LIBERO_MAX_SATS` (500.000), `CAMBIO_LIBERO_MAX_AL_GIORNO` (5);
   il client le legge in `/api/me` → `swap_leve.cambio` (`cambio_leve`:
-  attivo, minimo, massimo, al_giorno, oggi, strade). `CAMBIO_STRADE` è
-  `("ln-btc",)`: la strada bitcoin → Lightning è la tappa 3. Le
-  sentinelle: `prove_cambio_libero`; il giro vero, server e telefono in
-  node contro il cartone, `collaudo_cambio_libero`.
+  attivo, minimo, massimo, al_giorno, oggi, strade). Le strade le dà
+  `cambio_strade()`: `("ln-btc",)` finché `CAMBIO_BTC_LN_ATTIVO` è
+  spenta (la tappa 3, sotto). Le sentinelle: `prove_cambio_libero`; il
+  giro vero, server e telefono in node contro il cartone,
+  `collaudo_cambio_libero`.
+
+  IL CAMBIO LIBERO, TAPPA 3: IL TUO INDIRIZZO → LIGHTNING, DIETRO UNA
+  LEVA SPENTA (27 ott 2026, cantiere cambio-libero; perché in CANTIERI,
+  «Il cambio libero, tappa 3»). La strada rovesciata è il «submarine»
+  del fornitore: l'utente MANDA i bitcoin all'indirizzo del fornitore
+  (un taproot con l'albero di `swapTree`: la foglia del ritiro del
+  fornitore con l'impronta della fattura, la foglia del nostro rimborso
+  alla scadenza) e il fornitore paga la richiesta Lightning DELL'UTENTE;
+  fallito o scaduto coi bitcoin già mandati, l'utente si rimborsa da
+  solo col suo telefono e le 12 parole. LA LEVA `CAMBIO_BTC_LN_ATTIVO`
+  (config, False di serie, nel pannello delle leve con la sua riga
+  «resta spenta finché Massimo non risponde»): a leva spenta
+  `cambio_strade()` dice solo `ln-btc`, il preventivo risponde 400 e il
+  biglietto «direzione», il telefono non mostra la seconda pillola.
+  NON SI ACCENDE FINCHÉ MASSIMO NON RISPONDE sulla quota partner del
+  submarine e sui limiti di chiamate (la domanda la fa Andrea).
+  IL SERVER: `leggi_tariffa_sub` legge `GET /v2/swap/submarine` del
+  fornitore (header `Referral`, copia di 30 s, `swap_lettura_simulata`
+  come il reverse) e `tariffa_sub_da_risposta` ne tiene percentuale,
+  `minerFees` (un numero solo: la rete del LORO ritiro), limiti e
+  impronta; `preventivo_sub(ricevi, tariffa, minimo, massimo)` è il
+  conto puro di quanto MANDARE: ricevi + percentuale per eccesso + rete
+  (il calco di `expectedAmount`; 100.000 → 100.818 con lo 0,5 % + 318
+  del 16 ott), righe `ricevi_ln`, `commissione` e `rete_loro` col segno
+  `piu`, `mandi`; il minimo è il più alto tra il nostro e il loro
+  (50.000 oggi), il tetto il più basso tra il loro e
+  `CAMBIO_LIBERO_MAX_SATS`. Nessuna fee di Barattolo: non c'è una
+  fattura nostra da cui toglierla. `cambio_preventivo` sceglie il ramo
+  da `direzione=btc-ln`; il biglietto è lo stesso della tappa 2 con la
+  direzione sua. IL TELEFONO (`swap/boltz.js`, il tipo): `SWAP_FASI_SUB`
+  (invoice.set → creato, transaction.mempool → bloccato,
+  transaction.confirmed/invoice.pending → confermato, invoice.paid →
+  pagata, transaction.claimed → fatto, invoice.failedToPay e
+  transaction.lockupFailed → fallito, swap.expired → scaduto; col
+  rimborso trasmesso, «ripreso»); `fatturaValida(fattura, sats)` legge
+  la richiesta incollata con `leggiBolt11` della pagina (forma, rete del
+  fornitore, importo esatto, non scaduta né in scadenza entro 10 minuti:
+  i bitcoin vogliono una conferma); `creaSub` manda la fattura e la
+  NOSTRA chiave di rimborso (`refundPublicKey`, m/44/0/0/0/i come il
+  reverse), poi `swapVerificaSub` rifà l'albero da sola con l'impronta
+  della fattura e le due chiavi, ricava l'indirizzo e lo confronta con
+  quello risposto, e controlla che `expectedAmount` non superi il
+  `mandi` del preventivo: solo allora il record (`tipo: 'sub'`,
+  `lockupAddress`, `onchainAmount`, `bip21`, `impronta`, `claimPublicKey`
+  del fornitore, `timeoutBlockHeight`). `aiutaRitiro`: a fattura pagata
+  il fornitore chiede la nostra metà del ritiro a due (`GET …/claim` →
+  preimage, transactionHash, pubNonce); la firma parziale parte SOLO se
+  sha256(preimage) è l'impronta della fattura — è la prova che ha pagato
+  davvero — e senza la nostra metà lui ritira lo stesso dallo script:
+  non è un problema nostro. `rimborsa(rec, parole)`: il lockup dalla
+  rete o da `GET …/transaction`; se è già speso da noi, fine; la fee da
+  `/v1/fees/recommended` (×160 vB, sennò 1000); prima il rimborso A DUE
+  (`POST …/refund` con la nostra pubNonce, la firma parziale del
+  fornitore: un pezzo di testimone), e solo se rifiuta — o se
+  `coopRifiutato` — quello DALLO SCRIPT con la foglia del rimborso
+  (locktime ≥ timeoutBlockHeight), che la rete accetta solo alla
+  scadenza: prima, `swapErrore('presto')` e il telefono aspetta
+  (`aspettaScadenza`); la trasmissione va al mempool e all'api del
+  fornitore come il ritiro del reverse. `recupera` dalla xpub ritrova
+  anche i submarine (`/v2/swap/restore` → `refundDetails`), col lockup
+  segnato `bloccato`. L'INSTRADATORE (`swap/instradatore.js`): la
+  scelta della strada (`swapCambioStrada`, pillole «Lightning →
+  bitcoin» / «bitcoin → Lightning» da `strade` del server; con la strada
+  rovesciata la cifra è QUANTO RICEVERE), il campo della richiesta
+  Lightning al posto dell'indirizzo (`campoFatturaSwap`, «Incolla» che
+  toglie `lightning:` davanti, i quattro no: `fatturaManca`,
+  `fatturaNo`, `fatturaImporto`, `fatturaRete`/`fatturaScaduta`), la
+  carta «Manda esattamente N sats a questo indirizzo» con l'indirizzo
+  in chiaro, «Copia l'indirizzo», il QR e il link `bitcoin:` con la
+  cifra (`bitcoinDaMandare`), i passi Mandati → Confermati → Pagato
+  (`passiSub`), e il giro suo (`swapGiroSub`: a `pagata` la nostra metà
+  una volta sola, a `fallito`/`scaduto` coi bitcoin mandati
+  (`swapDaRimborsare`) il campo «Rimanda a questo indirizzo» nella
+  lista e, scritto l'indirizzo, `swapRimborsa`; il record resta in
+  sorveglianza solo con l'indirizzo scritto o con `aspettaScadenza`).
+  LA PAGINA: `direzione` nel preventivo da `swapCambioStradaScelta()`,
+  il titolo «Quanto mandi in bitcoin», le righe col «+», il totale
+  «Mandi all'indirizzo» (`titoloPrevSub`, `mandi`, voci `ricevi_ln` e
+  `rete_loro`). Il cartone del collaudo è quello della tappa 1 (porta
+  9077); il giro vero, server e telefono in node, sta in
+  `collaudo_cambio_libero` (le scene «tappa 3»), le sentinelle in
+  `prove_cambio_libero`.
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr

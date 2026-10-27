@@ -177462,7 +177462,9 @@ def prove_swap_preventivo():
           "swap_lettura_simulata(base)" in lettura)
     # (solo le stringhe del codice: i commenti che citano la rotta non
     # sono strade)
-    prova("nessun'altra strada verso SATS Routing nel server", 1,
+    # (cambio-libero, tappa 3: la seconda e' la lettura delle tariffe del
+    # submarine, `leggi_tariffa_sub`, con le stesse regole)
+    prova("nessun'altra strada verso SATS Routing nel server (le due letture delle tariffe)", 2,
           len(re.findall(r"[\"']\S*/v2/swap/", src)))
     prova("le leve della tappa nascono come da piano", (True,) * 5,
           ("\nSWAP_SOLO_MODERATORI = True" in esempio,
@@ -177748,7 +177750,7 @@ def prove_swap_telefono():
            "`barattolo_swap_${fid}_${myTgId || 'x'}`" in js,
            "`barattolo_swap_lista_${myTgId || 'x'}`" in js))
     prova("l'indice della chiave si salva PRIMA di chiedere lo swap", True,
-          js.index("c.prossimo = indice + 1;") < js.index("nuovo = await f.crea("))
+          js.index("c.prossimo = indice + 1;") < js.index("await f.crea({parole: c.parole"))
     prova("il recupero riparte dopo l'indice piu' alto", (True, True),
           ("prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);" in bz,
            "prossimo = Math.max(prossimo, Number(trovati.prossimo) || 0);" in js))
@@ -179481,7 +179483,12 @@ def prove_cambio_libero():
     wallet, mai Barattolo; il server tiene solo il BIGLIETTO (quanti cambi
     oggi: 5, 500.000 sats per cambio, all'inizio solo moderatori). Il giro
     vero, server e telefono contro il cartone, e' `collaudo_cambio_libero`;
-    qui le sentinelle e i pezzi puri."""
+    qui le sentinelle e i pezzi puri. LA TAPPA 3 (stesso giorno) aggiunge
+    la strada rovesciata, bitcoin → Lightning (il «submarine»: l'utente
+    manda i bitcoin all'indirizzo del fornitore e incassa la SUA richiesta
+    Lightning; fallito, si rimborsa da solo con le 12 parole), dietro la
+    leva CAMBIO_BTC_LN_ATTIVO che resta SPENTA finche' Massimo non
+    risponde sulla quota partner e sui limiti di chiamate."""
     print("\n[il cambio libero, tappa 2: il biglietto e l'«ordine 0»]")
     src = _SORGENTE.replace("\r\n", "\n")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
@@ -179567,7 +179574,7 @@ def prove_cambio_libero():
     prova("nell'instradatore l'ordine 0 chiede il biglietto PRIMA dello swap, e a "
           "un no annulla; poi la nascita al server, mai il pagamento di Barattolo",
           (True, True, True, True),
-          (crea.index("biglietto = await chiediBigliettoCambio(") < crea.index("nuovo = await f.crea("),
+          (crea.index("biglietto = await chiediBigliettoCambio(") < crea.index("await f.crea({parole: c.parole"),
            "if (biglietto) { try { await liberaBigliettoCambio(biglietto.id); } catch(e2){} }" in crea,
            "try { await natoCambioAlServer(rec.cambio, rec); } catch(e){}" in crea,
            "} else await swapPaga(rec);" in crea))
@@ -179603,6 +179610,85 @@ def prove_cambio_libero():
     prova("il collaudo nuovo sta negli elenchi della CI", (True, True),
           ("\ncollaudo_cambio_libero\n" in "\n" + lista + "\n",
            "collaudo_cambio_libero.py" in compila))
+
+    # ─── LA TAPPA 3: bitcoin → Lightning (il «submarine»), dietro una leva
+    # che resta SPENTA finche' Massimo non risponde (quota partner, limiti)
+    print("\n[il cambio libero, tappa 3: bitcoin → Lightning, dietro la leva]")
+    bz = open(os.path.join("swap", "boltz.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    prova("la leva CAMBIO_BTC_LN_ATTIVO: d'esempio SPENTA, di serie e nel pannello", (1, 1, 1),
+          (esempio.count("\nCAMBIO_BTC_LN_ATTIVO = False\n"),
+           src.count("    CAMBIO_BTC_LN_ATTIVO = False\n"),
+           pannello.count('"CAMBIO_BTC_LN_ATTIVO"')))
+    prova("...e il pannello dice perche' e' spenta (Massimo)", True,
+          "spenta finche' Massimo non risponde" in pannello)
+    amb3 = {"CAMBIO_BTC_LN_ATTIVO": False}
+    for nome in ("cambio_strade", "preventivo_sub", "tariffa_sub_da_risposta"):
+        exec(pezzo(nome), amb3)
+    prova("le strade: a leva spenta solo Lightning → indirizzo; accesa, tutte e due",
+          (("ln-btc",), ("ln-btc", "btc-ln")),
+          (amb3["cambio_strade"](),
+           (amb3.__setitem__("CAMBIO_BTC_LN_ATTIVO", True), amb3["cambio_strade"]())[1]))
+    prova("strade, preventivo e biglietto leggono le strade dalla funzione, mai da una tupla fissa",
+          (0, True, True), (src.count("CAMBIO_STRADE"),
+                            "cambio_strade()" in codice(pezzo("cambio_leve")),
+                            "cambio_strade()" in prev and "cambio_strade()" in big))
+    prova("il preventivo della strada rovesciata legge le tariffe del submarine", True,
+          'if direzione == "btc-ln":' in prev and "tariffa = await leggi_tariffa_sub(chi)" in prev
+          and "p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)" in prev)
+    tar = amb3["tariffa_sub_da_risposta"]({"BTC": {"BTC": {
+        "hash": "h1", "fees": {"percentage": 0.5, "minerFees": 318},
+        "limits": {"minimal": 50_000, "maximal": 25_000_000}}}})
+    prova("le tariffe del submarine: percentuale, la rete del LORO ritiro (un numero), i limiti",
+          {"hash": "h1", "percento": 0.5, "rete": 318, "minimo": 50_000, "massimo": 25_000_000}, tar)
+    prova("...una risposta storta vale None", [None, None, None],
+          [amb3["tariffa_sub_da_risposta"](x) for x in
+           ({"BTC": {"BTC": {"hash": "x", "fees": "zero"}}}, {}, None)])
+    p3 = amb3["preventivo_sub"](100_000, tar, 25_000, 500_000)
+    prova("quanto MANDI per ricevere 100.000: +0,5 % per eccesso +318 = 100.818, le righe col «+»",
+          (True, 100_000, 100_818, [("ricevi_ln", 100_000, False), ("commissione", 500, True),
+                                     ("rete_loro", 318, True)]),
+          (p3["ok"], p3["ricevi"], p3["mandi"],
+           [(r["voce"], r["sats"], bool(r.get("piu"))) for r in p3["righe"]]))
+    prova("...per eccesso: 100.001 → 501; il minimo e' il piu' alto dei due (50.000), "
+          "il tetto il piu' basso (500.000)",
+          (501, "sotto_minimo", 50_000, "sopra_tetto", 500_000),
+          (amb3["preventivo_sub"](100_001, tar)["righe"][1]["sats"],
+           amb3["preventivo_sub"](40_000, tar, 25_000, 500_000)["motivo"],
+           amb3["preventivo_sub"](40_000, tar, 25_000, 500_000)["minimo"],
+           amb3["preventivo_sub"](600_000, tar, 25_000, 500_000)["motivo"],
+           amb3["preventivo_sub"](600_000, tar, 25_000, 500_000)["massimo"]))
+    prova("il tipo: le fasi del submarine, la nascita rovesciata, il ritiro a due, il rimborso",
+          (True, True, True, True, True),
+          ("const SWAP_FASI_SUB = {" in bz and "'invoice.failedToPay': 'fallito'" in bz
+           and "'swap.expired': 'scaduto'" in bz,
+           "async creaSub({parole, indice, preventivo, fattura}){" in bz,
+           "async aiutaRitiro(rec, parole){" in bz, "async rimborsa(rec, parole){" in bz,
+           "strade: ['ln-btc', 'btc-ln']," in bz))
+    prova("la nascita rovesciata si fida solo dopo la verifica (albero, indirizzo, cifra)", True,
+          "swapVerificaSub(S, rete, r, chiavi," in bz[bz.index("async creaSub("):bz.index("async aiutaRitiro(")])
+    prova("il ritiro a due: la nostra meta' SOLO se il segreto e' quello della fattura", True,
+          "S.hex.encode(S.sha256(segreto)) !== String(rec.impronta || '')" in bz)
+    rimb = bz[bz.index("async rimborsa(rec, parole){"):bz.index("async recupera(")]
+    prova("il rimborso: prima a due, poi dallo script SOLO alla scadenza della rete «presto» prima", True,
+          "if (!rec.coopRifiutato)" in rimb and "swapErrore('presto'" in rimb
+          and "cima >= Number(rec.timeoutBlockHeight)" in rimb)
+    prova("la richiesta Lightning dell'utente: forma, rete, importo esatto, scadenza (10 minuti)",
+          True, "fatturaValida(fattura, sats){" in bz and "if (b.sats !== Number(sats)) return 'importo';" in bz
+          and "if (b.scade < Date.now() / 1000 + 600) return 'scaduta';" in bz)
+    prova("il telefono non ha preso altre strade verso fuori (le due fetch del tipo)", 2, bz.count("fetch("))
+    prova("l'instradatore: la scelta della strada, il campo della richiesta, i tre gesti nuovi",
+          (True, True, True, True, True),
+          ("function swapCambioStradaScelta()" in js, 'id="swapFattura_${n}"' in js,
+           "else if (a === 'cambio-copia-indirizzo')" in js,
+           "else if (a === 'cambio-strada')" in js, "else if (a === 'incolla-fattura')" in js))
+    prova("...il giro del submarine: a fattura pagata la nostra meta', fallito con l'indirizzo il rimborso",
+          True, "async function swapGiroSub(rec, f){" in js
+          and "if (swapESub(rec)) { await swapGiroSub(rec, f); continue; }" in js
+          and "if (swapDaRimborsare(rec) && rec.indirizzo) await swapRimborsa(rec);" in js)
+    prova("la pagina manda la strada scelta al preventivo, e sa dire «Quanto mandi in bitcoin»",
+          (True, 1, 1),
+          ("q.set('direzione', typeof swapCambioStradaScelta === 'function' ? swapCambioStradaScelta() : 'ln-btc')" in mini,
+           mini.count("titoloPrevSub: 'Quanto mandi in bitcoin'"), mini.count("titoloPrevSub: 'What you send in bitcoin'")))
 
 
 def prove_grafica_swap():
@@ -179741,15 +179827,21 @@ console.log(JSON.stringify(out));
 const SWAP_FASI_RITIRO = new Set(['bloccato', 'confermato']);
 let fase = 'creato';
 function swapFase(){ return fase; }
+function swapESub(rec){ return !!rec && rec.tipo === 'sub'; }
 __TAPPA__
 const casi = [['creato', {pagamento: ''}], ['creato', {pagamento: 'in_volo'}],
   ['creato', {pagamento: 'pagato'}], ['bloccato', {}], ['creato', {ritiro: {txid: 't'}}],
   ['fatto', {}], ['bloccato', {ritiro: {txid: 't', concluso: true}}],
-  ['scaduto', {}], ['creato', {pagamento: 'rifiutato'}], ['bloccato', {spesoDa: 'x'}], ['ignoto', {}]];
+  ['scaduto', {}], ['creato', {pagamento: 'rifiutato'}], ['bloccato', {spesoDa: 'x'}], ['ignoto', {}],
+  /* (tappa 3) il submarine: mandati, confermati, pagato; niente pallini a fallito, scaduto, ripreso */
+  ['creato', {tipo: 'sub'}], ['bloccato', {tipo: 'sub'}], ['confermato', {tipo: 'sub'}],
+  ['pagata', {tipo: 'sub'}], ['fatto', {tipo: 'sub'}], ['fallito', {tipo: 'sub'}],
+  ['scaduto', {tipo: 'sub'}], ['ripreso', {tipo: 'sub'}]];
 console.log(JSON.stringify(casi.map(([f, r]) => { fase = f; return swapTappa(r); })));
 """.replace("__TAPPA__", tappa)
     prova("i tre pallini: pagato, in arrivo, arrivato; niente pallini quando "
-          "non va avanti", [0, 1, 1, 2, 2, 3, 3, -1, -1, -1, -1], _node_banco(banco))
+          "non va avanti; il submarine coi suoi tre",
+          [0, 1, 1, 2, 2, 3, 3, -1, -1, -1, -1, 0, 1, 2, 3, 3, -1, -1, -1], _node_banco(banco))
 
     # --- il collaudo coi gesti negli elenchi della CI
     prova("il collaudo dei gesti dello swap sta negli elenchi della CI", (True, True),

@@ -792,6 +792,12 @@ CAMBIO_LIBERO_SOLO_MODERATORI = True
 # ultime 24 ore, contando i cambi nati e i biglietti ancora freschi).
 CAMBIO_LIBERO_MAX_SATS = 500_000
 CAMBIO_LIBERO_MAX_AL_GIORNO = 5
+# La strada bitcoin → Lightning del cambio libero (tappa 3, 27 ott 2026):
+# chi la sceglie manda bitcoin all'indirizzo del fornitore e riceve la
+# sua richiesta Lightning pagata. Nasce SPENTA e resta spenta finche'
+# Massimo (SATS Routing) non risponde sulla quota partner del submarine
+# e sui limiti di chiamate: decisione di Andrea.
+CAMBIO_BTC_LN_ATTIVO = False
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa
