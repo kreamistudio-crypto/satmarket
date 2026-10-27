@@ -328,7 +328,11 @@ let liste = 0;
 function renderOrders(){ liste++; }
 function trackingDaControllare(){ return true; }
 let stellaScelta = 0, fbFoto = [], myLnAddress = '', bustaDoc = null, bustaLetta = {}, bustaDocVisto = {};
+/* gli on-chain da pagare (27 ott 2026): qui l'on-chain e' spento */
+let myOnchain = false;
 """ + js("function mapOrder(o){") + js("async function loadOrders(ordine){") \
+        + riga_js("let ordiniOnchainDaPagare = [];") \
+        + js("async function caricaOnchainDaPagare(){") \
         + js("function segnaOrdine(o, campi){") + js("function ridisegnaOrdine(o){") \
         + riga_js("let appuntamentoCambiato = ") + js("function dataAppuntamento(ts){") \
         + js("function pannelloServizioCompratore(o){") + "".join(js(f) for f in GESTI) \
