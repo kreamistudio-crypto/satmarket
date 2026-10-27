@@ -7,7 +7,7 @@ dover entrare nella vps per forza»; sul biglietto delle scelte:
 «Entrambe le cose», cioè subito la quota on-chain e poi le altre leve
 **decise una per una**). Il meccanismo c'è già, da oggi; qui c'è il
 censimento delle 231 leve del cassetto «⚙️ Stato delle leve», con la mia
-proposta per ognuna. Non è aperta nessuna leva oltre alla quota: ogni
+proposta per ognuna. Non è aperta nessuna leva oltre alla quota e a «Solo gli admin» dell'on-chain: ogni
 riga diventa scrivibile col suo sì.*
 
 ## Come funziona già (e perché una alla volta)
@@ -46,7 +46,8 @@ Non si possono aprire tutte con un colpo solo, per due ragioni:
   funzione) e i numeri che muovono soldi o tetti (commissioni, tetti del
   P2P, limiti dello swap, prezzi dei banner). Qui la mia proposta è
   «no», salvo quelle che tu indichi una per una.
-- **✏️ fatta** (1): la quota fissa on-chain.
+- **✏️ fatte** (2): la quota fissa on-chain e, lo stesso giorno, «Solo gli
+  admin» dell'on-chain (Andrea non ha accesso alla VM).
 
 ## La proposta, se vuoi partire
 
@@ -367,7 +368,7 @@ canale** e **🏷️ la vetrina**. Dimmi quali gruppi o quali righe, e li apro.
 | leva | chiave | proposta |
 |---|---|---|
 | Pagamento on-chain | `ONCHAIN_ATTIVO` | ⚖️ decidi tu |
-| Solo gli admin | `ONCHAIN_SOLO_ADMIN` | 🔒 mai |
+| Solo gli admin | `ONCHAIN_SOLO_ADMIN` | ✏️ fatta (27 ott, richiesta di Andrea) |
 | Libreria del 2-di-3 (embit) | `pip install embit` | 🔒 mai |
 | Terza chiave (Barattolo) | `ONCHAIN_XPUB` | 🔒 mai |
 | Quota fissa di Barattolo (sats) | `ONCHAIN_QUOTA_FISSA_SATS` | ✏️ fatta |

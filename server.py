@@ -32782,12 +32782,12 @@ def _leve_stato():
                          "«₿ On-chain» compare (a chi è ammesso)",
                   spento="esiste solo Lightning, come ieri: nessuna rotta "
                          "on-chain, nessun foglio, nemmeno per gli admin"),
-            _leva("Solo gli admin", "ONCHAIN_SOLO_ADMIN",
-                  bool(ONCHAIN_SOLO_ADMIN),
+            _leva_scrivibile_riga(_leva("Solo gli admin", "ONCHAIN_SOLO_ADMIN",
+                  bool(leva_scrivibile("ONCHAIN_SOLO_ADMIN")),
                   acceso="l'on-chain lo vedono solo i moderatori "
                          "(ADMIN_IDS): è la beta chiusa di Andrea e Alan",
                   spento="appena ONCHAIN_ATTIVO si accende vale per "
-                         "chiunque: è il gesto che allarga la beta"),
+                         "chiunque: è il gesto che allarga la beta")),
             # LA TAPPA 2 (20 ott 2026): la libreria che fa i conti degli
             # indirizzi, e la terza chiave — detta per quel che E', mai
             # stampata (una xpub non e' un segreto, ma non si sparge)
@@ -32975,7 +32975,29 @@ def _giudice_quota_onchain(valore):
     return v, ""
 
 
+def _giudice_si_no(valore):
+    """(True/False, '') per una leva sì/no: accetta booleani, 1/0 e le
+    parole che il pannello manda."""
+    t = str(valore).strip().lower()
+    if t in ("true", "1", "si", "sì", "acceso", "on"):
+        return True, ""
+    if t in ("false", "0", "no", "spento", "off"):
+        return False, ""
+    return None, "serve sì o no"
+
+
 LEVE_SCRIVIBILI = {
+    # LA PORTICINA DELL'ON-CHAIN (27 ott 2026, richiesta di Andrea: «non
+    # ho accesso alla vm, posso modificare il file di config dal pannello
+    # amministrazione?»). Allarga la beta da Andrea e Alan a chiunque,
+    # ma SOLO dove ONCHAIN_ATTIVO e' gia' acceso: la leva madre resta
+    # del VPS, e a madre spenta questa non apre niente.
+    "ONCHAIN_SOLO_ADMIN": {
+        "giudice": _giudice_si_no,
+        "di_serie": lambda: bool(ONCHAIN_SOLO_ADMIN),
+        "dal_config": lambda: ONCHAIN_SOLO_ADMIN_DAL_CONFIG,
+        "pavimento": lambda: 0, "tetto": lambda: 1, "tipo": "si_no",
+    },
     "ONCHAIN_QUOTA_FISSA_SATS": {
         "giudice": _giudice_quota_onchain,
         "di_serie": lambda: ONCHAIN_QUOTA_FISSA_SATS,
@@ -33038,6 +33060,7 @@ def _leva_scrivibile_riga(riga: dict) -> dict:
     """Aggiunge a una riga del censimento quel che serve per cambiarla."""
     l = LEVE_SCRIVIBILI[riga["chiave"]]
     riga["scrivibile"] = {"pavimento": l["pavimento"](), "tetto": l["tetto"](),
+                          "tipo": l.get("tipo", "intero"),
                           "origine": leva_origine(riga["chiave"])}
     return riga
 
@@ -50027,8 +50050,10 @@ except ImportError:
 # VPS che non dichiara la riga non apre a nessuno per distrazione.
 try:
     from config import ONCHAIN_SOLO_ADMIN
+    ONCHAIN_SOLO_ADMIN_DAL_CONFIG = True
 except ImportError:
     ONCHAIN_SOLO_ADMIN = True
+    ONCHAIN_SOLO_ADMIN_DAL_CONFIG = False
 # L'XPUB DI BARATTOLO: la TERZA chiave del 2-di-3, quella che serve solo
 # in disputa. Qui ne sta la META' PUBBLICA e nient'altro — la privata
 # non entra su questa macchina (vivra' in un firmatario sul nodo), e da
@@ -50122,7 +50147,9 @@ def onchain_ammesso(tg_id) -> bool:
     nasce senza passare da lui."""
     if not ONCHAIN_ATTIVO:
         return False
-    if ONCHAIN_SOLO_ADMIN:
+    # dal 27 ott 2026 la porticina si cambia anche dal pannello
+    # (LEVE_SCRIVIBILI): si chiede al giudice, non alla costante
+    if leva_scrivibile("ONCHAIN_SOLO_ADMIN"):
         return e_admin(tg_id)
     return True
 
