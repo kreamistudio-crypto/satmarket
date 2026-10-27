@@ -162,6 +162,7 @@ collaudo_swap_instradatore.py
 collaudo_swap_pagamento.py
 collaudo_onchain_indirizzo.py
 collaudo_onchain_ordine.py
+collaudo_onchain_incasso.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py
 collaudo_avvisi_nostr_arrivano.py

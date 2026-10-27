@@ -48774,7 +48774,9 @@ function registroModerazione(mod){
    ricordare male. Qui c'e' il valore con cui il server sta girando
    ADESSO — mai il default del codice, mai un segreto (dove il segreto
    E' l'interruttore esce il solo fatto: acceso o spento).
-   SI GUARDA E BASTA: si cambia dal VPS e con un riavvio.
+   SI GUARDA E BASTA: si cambia dal VPS e con un riavvio. Tranne le
+   leve che il server apre UNA PER UNA (`LEVE_SCRIVIBILI`, dal 27 ott
+   2026): quelle hanno la riga ✏️ sotto (`rigaLevaScrivibile`).
    L'ALLARME ESCE ANCHE DAL CASSETTO CHIUSO, ed e' il motivo per cui la
    conta non dice sempre lo stesso: un cartello «modalità collaudo
    accesa» che si vede solo aprendo un cassetto e' un cartello che non
@@ -48798,14 +48800,56 @@ function boxLeve(gruppi){
             ${v.nota?`<div class="leva-nota">${esc(v.nota)}</div>`:''}
           </div>
           <div class="leva-val">${val}</div>
-        </div>`;
+        </div>${v.scrivibile ? rigaLevaScrivibile(v) : ''}`;
     }).join('');
     return `<div class="leva-gruppo">${esc(g.gruppo)}</div>${righe}`;
   }).join('');
   return cassettoAdm('accAdmLeve', '⚙️', 'Stato delle leve',
     allarmi ? `⚠️ ${allarmi} da guardare` : `${quante} leve`, `
-    <div class="sub">Il valore con cui il server sta girando <b>adesso</b>. Si guarda e basta: si cambia nel <b>config del VPS</b>, poi un riavvio.</div>
+    <div class="sub">Il valore con cui il server sta girando <b>adesso</b>. Quasi tutte si guardano e basta: si cambiano nel <b>config del VPS</b>, poi un riavvio. Quelle con <b>✏️</b> si cambiano anche da qui, e il pannello vince sul config.</div>
     ${corpo}`);
+}
+
+/* ---- ✏️ Le leve che si cambiano da qui (27 ott 2026) ----
+   Una leva alla volta, aperta dal server (`LEVE_SCRIVIBILI`): le altre
+   restano in sola lettura, per la ragione scritta sopra. Il gesto ha
+   due tocchi — «Salva» dice da quanto a quanto, «Conferma» scrive — e
+   lascia una riga nel registro della moderazione. «Torna al config»
+   cancella il valore del pannello. */
+let levaInModifica = '', levaDaConfermare = null;
+
+function rigaLevaScrivibile(v){
+  const w = v.scrivibile;
+  const origine = {pannello: 'dal pannello', config: 'dal config del VPS', codice: 'dal codice'}[w.origine] || w.origine;
+  if (levaInModifica !== v.chiave) {
+    return `<div class="leva-nota" style="margin:-4px 0 8px">✏️ Valore ${esc(origine)} ·
+      <a href="#" onclick="levaInModifica='${esc(v.chiave)}';levaDaConfermare=null;loadAdminStats();return false">cambia</a></div>`;
+  }
+  if (levaDaConfermare !== null) {
+    return `<div class="leva-nota" style="margin:-4px 0 8px">Da <b>${esc(String(v.valore))}</b> a
+      <b>${esc(String(levaDaConfermare))}</b>: vale subito, per tutti.
+      <button class="btn" onclick="levaScrivi(this, '${esc(v.chiave)}')">Conferma</button>
+      <button class="btn ghost" onclick="levaInModifica='';levaDaConfermare=null;loadAdminStats()">Lascia stare</button></div>`;
+  }
+  return `<div class="leva-nota" style="margin:-4px 0 8px">
+    <input id="levaNuovo" inputmode="numeric" value="${esc(String(v.valore))}" style="width:120px">
+    <span>(${fmt(w.pavimento)}–${fmt(w.tetto)})</span>
+    <button class="btn" onclick="levaDaConfermare=(el('levaNuovo')||{}).value||'';loadAdminStats()">Salva</button>
+    ${w.origine === 'pannello' ? `<button class="btn ghost" onclick="levaScrivi(this, '${esc(v.chiave)}', true)">Torna al config</button>` : ''}
+    <button class="btn ghost" onclick="levaInModifica='';loadAdminStats()">Lascia stare</button></div>`;
+}
+
+async function levaScrivi(btn, chiave, alConfig){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/leve/${encodeURIComponent(chiave)}`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify(alConfig ? {torna_al_config: true} : {valore: levaDaConfermare})});
+    const x = await r.json().catch(() => ({}));
+    if (!r.ok) { toast('⚠️ ' + (x.detail || 'non cambiata'), 6000); levaDaConfermare = null; }
+    else { toast(`⚙️ ${chiave}: ${x.valore} (${x.origine})`, 5000); levaInModifica = ''; levaDaConfermare = null; }
+  } catch(e) { toast('Rete assente: riprova'); }
+  loadAdminStats();
 }
 
 /* --- Badge Nostr NIP-58 delle live (set 2026) -----------------------
@@ -53680,6 +53724,10 @@ async function renderOnchain(){
     await onchainLeggiOrdini();
     const esiti = await onchainCofirmeInAttesa(parole);
     if (esiti.length) await onchainLeggiOrdini();
+    /* la destinazione scelta, riletta col MIO seme prima di dirla attiva */
+    onchainIncassoMio = onchainSrv.incasso
+      ? await onchainDestinazioneMia(await caricaBitcoin(), parole, onchainSrv.incasso)
+      : null;
     const verOrdini = {};
     for (const o of onchainOrdini) {
       verOrdini[o.id] = await onchainVerificaRiga(parole, onchainSrv, o.indirizzo);
@@ -53771,6 +53819,8 @@ function onchainConSeme(parole, k, miaXpub, verifiche){
     </div>
 
     ${onchainBloccoAccendi(miaXpub)}
+
+    ${onchainBloccoIncasso(miaXpub)}
 
     ${onchainBloccoIndirizzi(miaXpub, verifiche || [])}
 
@@ -53873,6 +53923,92 @@ function onchainBloccoAccendi(miaXpub){
         prenderà da lì una chiave sua, mai usata prima.</div>
       ${stato}
     </div>`;
+}
+
+/* Il blocco «Dove ricevi i sats quando vendi». `onchainIncassoMio`:
+   null = conto di serie, true = la scelta e' firmata da questo seme,
+   false = firmata da un altro (un seme di prima): non vale. */
+let onchainIncassoMio = null;
+let onchainIncassoTipo = '';     // il modulo aperto: '', 'indirizzo', 'xpub'
+
+function onchainBloccoIncasso(miaXpub){
+  const srv = onchainSrv || {};
+  const acceso = srv.mia_xpub && srv.mia_xpub === miaXpub;
+  const d = srv.incasso;
+  let stato;
+  if (!d) {
+    stato = `<div class="hint">Adesso ricevi nel <b>tuo conto di
+      Barattolo</b>: un indirizzo nuovo a ogni vendita, dalle tue dodici
+      parole. Per spenderli fuori da qui basta il seme in Sparrow.</div>`;
+  } else if (onchainIncassoMio) {
+    stato = `<div class="hint" style="color:var(--ok)"><b>✅ Ricevi nel
+      tuo wallet</b>: ${d.tipo === 'xpub'
+        ? `un indirizzo nuovo a ogni vendita dalla chiave che finisce in <span class="mono">…${esc(onchainCoda(d.valore))}</span>`
+        : `sempre a <span class="mono" style="word-break:break-all">${esc(d.valore)}</span>`}.
+      La scelta è firmata dal tuo seme: il tuo telefono la ricontrolla
+      prima di ogni seconda firma.</div>`;
+  } else {
+    stato = `<div class="hint" style="color:var(--danger)"><b>⚠️ La scelta
+      salvata non è firmata da questo seme</b> (un altro telefono, o un
+      seme di prima): finché non la rifai da qui, il tuo telefono non
+      firma rilasci verso quel wallet.</div>`;
+  }
+  const modulo = onchainIncassoTipo ? `
+    <input id="onchainIncassoValore" class="mono" autocomplete="off" style="width:100%;box-sizing:border-box;margin:6px 0"
+      placeholder="${onchainIncassoTipo === 'xpub' ? 'vpub… (o tpub…)' : 'tb1…'}">
+    ${onchainIncassoTipo === 'indirizzo'
+      ? `<div class="hint">⚠️ Con un indirizzo fisso <b>tutte le vendite
+           arrivano nello stesso posto</b>, e chi guarda la blockchain le
+           lega insieme. Se il tuo wallet te la dà, è meglio la chiave del
+           conto.</div>`
+      : `<div class="hint">La chiave <b>pubblica</b> del conto del tuo
+           wallet: in Sparrow, Impostazioni → Keystore, la riga
+           <span class="mono">vpub</span> (strada <span class="mono">m/84'/1'/0'</span>).
+           Con lei non si spende niente.</div>`}
+    <button class="btn" onclick="onchainIncassoSalva(this)">✍️ Firma e salva</button>
+    <button class="btn ghost" onclick="onchainIncassoTipo='';renderOnchain()">Lascia stare</button>` : `
+    <button class="btn ghost" onclick="onchainIncassoTipo='xpub';renderOnchain()">🔑 La chiave del conto del mio wallet</button>
+    <button class="btn ghost" onclick="onchainIncassoTipo='indirizzo';renderOnchain()">📮 Un mio indirizzo</button>
+    ${d ? `<button class="btn ghost" onclick="onchainIncassoSalva(this, 'barattolo')">🫙 Torna al conto di Barattolo</button>` : ''}`;
+  return `
+    <div class="payout">
+      <h4>4b. Dove ricevi i sats quando vendi</h4>
+      ${stato}
+      ${acceso && srv.embit ? modulo
+        : '<div class="hint">Prima accendi l\'on-chain (blocco 4).</div>'}
+      <div class="hint" style="margin-top:8px">Vale dalle prossime
+        vendite: gli ordini già nati tengono la destinazione di
+        allora.</div>
+    </div>`;
+}
+
+async function onchainIncassoSalva(btn, tipoForzato){
+  haptic();
+  const tipo = tipoForzato || onchainIncassoTipo;
+  const campo = el('onchainIncassoValore');
+  const valore = tipo === 'barattolo' ? ''
+    : onchainNormaDestinazione(tipo, campo ? campo.value : '');
+  if (tipo !== 'barattolo' && !valore) return toast('⚠️ Incolla prima l\'indirizzo o la chiave');
+  const rip = onchainAttesa(btn, 'Firmo…');
+  try {
+    const parole = onchainSemeLocale();
+    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+    const B = await caricaBitcoin();
+    if (tipo === 'xpub') onchainIndirizzoEsterno(B, {tipo, valore, indice: 0});
+    const firma = tipo === 'barattolo' ? '' : await onchainFirmaDestinazione(B, parole, tipo, valore);
+    const r = await fetch(`${API_BASE}/onchain/incasso`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({tipo, valore, firma})});
+    const x = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(x.detail || 'non salvato');
+    toast(tipo === 'barattolo' ? '🫙 Ricevi di nuovo nel conto di Barattolo'
+                               : '✅ Salvato: dalle prossime vendite ricevi nel tuo wallet', 5000);
+    onchainIncassoTipo = '';
+    onchainSrv = null;
+  } catch(e) {
+    toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'chiave non leggibile'), 6000);
+  } finally { rip(); }
+  renderOnchain();
 }
 
 function onchainBloccoIndirizzi(miaXpub, verifiche){
@@ -53996,6 +54132,7 @@ async function onchainNuovoIndirizzo(btn, altro){
 let onchainOrdini = [];          // l'ultima lettura di /onchain/ordini
 let onchainOrdineAperto = 0;     // quello appena nato dalla cassa
 const ONCHAIN_POLVERE = 546;
+let acqQuotaOnchain = 0;          // la quota fissa detta da /onchain/pronto
 
 function setMetodoAcquisto(m){
   haptic();
@@ -54010,6 +54147,7 @@ function setMetodoAcquisto(m){
         {headers: {'X-Tg-Init-Data': authHdr()}})
     .then(r => r.json()).then(x => {
       if (!x.pronto) { toast('⛓️ On-chain non disponibile: ' + (x.motivo || ''), 6000); return; }
+      acqQuotaOnchain = Number(x.quota_sats) || 0;
       acqMetodo = 'onchain'; renderAcquisto();
     }).catch(() => toast('Rete assente: riprova'));
 }
@@ -54022,7 +54160,11 @@ function bloccoMetodoAcquisto(d){
     ${acqMetodo === 'onchain' ? `<div class="escrow-note" style="margin:0 0 8px">Signet, rete di prova: i sats
       vanno in un 2-di-3 fra te, il venditore e Barattolo. Mandi il conto
       più un piccolo margine per la rete; quel che avanza torna a te
-      quando liberi i sats.</div>` : ''}`;
+      quando liberi i sats.${acqQuotaOnchain
+        ? ` In più paghi <b>${fmt(acqQuotaOnchain)} sats</b> fissi a Barattolo
+            per le spese di rete: vanno a noi quando liberi i sats, e
+            tornano a te se l'ordine viene rimborsato.`
+        : ''}</div>` : ''}`;
 }
 
 async function startBuyOnchain(btn){
@@ -54084,6 +54226,72 @@ function onchainScriptOrdine(B, o){
   return w;
 }
 
+/* ============ DOVE RICEVI I SATS QUANDO VENDI (27 ott 2026, cantiere
+   onchain-incasso-esterno, richiesta di Andrea) ============
+   Di serie chi vende incassa su `/1/n` del suo conto (`onchainMieChiavi`),
+   che il seme rifa' da se'. Ora puo' scegliere un wallet SUO: un
+   indirizzo fisso, o la chiave pubblica del conto del suo wallet (vpub
+   o tpub, BIP-84), da cui ogni vendita prende un indirizzo nuovo.
+   LA SCELTA SI FIRMA COL SEME, con la chiave `/2/0` del conto del 2-di-3
+   (una catena che non serve ad altro): un indirizzo che il seme non sa
+   rifare e' un indirizzo che un server manomesso potrebbe cambiare, e
+   la seconda firma partirebbe verso il ladro. Prima di co-firmare un
+   rilascio il telefono rilegge la firma con la chiave che rifa' da se':
+   se non e' sua, non firma. Lo stesso testo byte per byte del server
+   (`onchain_messaggio_destinazione`). */
+const ONCHAIN_VERSIONI_VPUB = {private: 0x045f18bc, public: 0x045f1cf6};
+const ONCHAIN_QUOTA_TETTO = 5000;   // come ONCHAIN_QUOTA_TETTO del server
+
+function onchainMessaggioDestinazione(tipo, valore){
+  return new TextEncoder().encode(
+    `barattolo/onchain/incasso/v1\nsignet\n${tipo}\n${valore}`);
+}
+
+function onchainNormaDestinazione(tipo, valore){
+  const v = String(valore || '').trim();
+  return (tipo === 'indirizzo' && v.slice(0, 3).toLowerCase() === 'tb1') ? v.toLowerCase() : v;
+}
+
+function onchainChiaveDestinazione(B, parole){
+  const conto = onchainConto(B, parole, (onchainSrv || {}).strada || "m/48'/1'/0'/2'");
+  return conto.deriveChild(2).deriveChild(0);
+}
+
+async function onchainFirmaDestinazione(B, parole, tipo, valore){
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256',
+    onchainMessaggioDestinazione(tipo, valore)));
+  return B.hex.encode(onchainChiaveDestinazione(B, parole).sign(h));
+}
+
+/* La destinazione `d` ({tipo, valore, firma}) l'ha scelta il MIO seme? */
+async function onchainDestinazioneMia(B, parole, d){
+  try {
+    const h = new Uint8Array(await crypto.subtle.digest('SHA-256',
+      onchainMessaggioDestinazione(d.tipo, d.valore)));
+    return onchainChiaveDestinazione(B, parole).verify(h, B.hex.decode(String(d.firma || '')));
+  } catch(e) { return false; }
+}
+
+/* L'indirizzo d'incasso di una destinazione: l'indirizzo stesso, o
+   `/0/indice` della chiave del conto (p2wpkh), come
+   `onchain_indirizzo_esterno` del server. */
+function onchainIndirizzoEsterno(B, d){
+  if (d.tipo === 'indirizzo') return onchainNormaDestinazione('indirizzo', d.valore);
+  const t = String(d.valore || '');
+  const k = t.startsWith('vpub') ? B.HDKey.fromExtendedKey(t, ONCHAIN_VERSIONI_VPUB)
+                                 : onchainLeggiXpub(B, t);
+  return B.p2wpkh(k.deriveChild(0).deriveChild(Number(d.indice)).publicKey,
+                  B.TEST_NETWORK).address;
+}
+
+/* Dove deve arrivare il MIO incasso in questo ordine: '' se la
+   destinazione non e' firmata dal mio seme (e allora non si firma). */
+async function onchainIncassoAtteso(B, parole, o, io){
+  if (!o.destinazione) return io.incasso;
+  if (!(await onchainDestinazioneMia(B, parole, o.destinazione))) return '';
+  try { return onchainIndirizzoEsterno(B, o.destinazione); } catch(e) { return ''; }
+}
+
 /* LA PRIMA FIRMA: chi compra libera (verso il venditore: il prezzo a
    lui, il resto del margine a se'), chi vende rimborsa (tutto a chi ha
    comprato). La commissione dalla tariffa che dice il server, con la
@@ -54109,8 +54317,13 @@ async function onchainProponi(btn, oid){
     const tar = Math.max(1, Number(o.tariffa) || 2);
     let uscite;
     if (verso === 'venditore') {
-      const resto = tot - o.prezzo_sats - Math.ceil(vb(2) * tar);
+      /* la quota fissa di Barattolo, se l'ordine ne ha una: la paga chi
+         compra, e qui si controlla che non superi il tetto */
+      const quota = Number(o.quota_sats) || 0;
+      if (quota > ONCHAIN_QUOTA_TETTO) throw new Error('la quota di Barattolo supera il tetto');
+      const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
       uscite = [[o.incasso, o.prezzo_sats]];
+      if (quota) uscite.push([o.quota_indirizzo, quota]);
       if (resto >= ONCHAIN_POLVERE) uscite.push([o.rimborso, resto]);
     } else {
       uscite = [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
@@ -54158,10 +54371,19 @@ async function onchainCofirma(o, parole){
     uscite.push([B.Address(B.TEST_NETWORK).encode(B.OutScript.decode(x.script)), Number(x.amount)]);
   }
   if (o.proposta.verso === 'venditore') {
-    if (o.ruolo !== 'venditore' || o.incasso !== io.incasso) return 'non è il tuo incasso';
-    if (uscite.filter(([a]) => a === io.incasso).map(([, v]) => v).join() !== String(o.prezzo_sats))
+    /* il mio incasso: il conto di serie, o il wallet che il MIO seme ha
+       firmato come destinazione — mai un indirizzo detto dal solo server */
+    const atteso = await onchainIncassoAtteso(B, parole, o, io);
+    if (o.destinazione && !atteso) return 'la destinazione non è firmata dal tuo seme';
+    if (o.ruolo !== 'venditore' || o.incasso !== atteso) return 'non è il tuo incasso';
+    if (uscite.filter(([a]) => a === atteso).map(([, v]) => v).join() !== String(o.prezzo_sats))
       return 'non ti arriva il prezzo';
-    if (uscite.some(([a]) => a !== io.incasso && a !== o.rimborso)) return 'c\'è un\'uscita estranea';
+    const quota = Number(o.quota_sats) || 0;
+    if (quota > ONCHAIN_QUOTA_TETTO) return 'la quota di Barattolo supera il tetto';
+    if (quota && uscite.filter(([a]) => a === o.quota_indirizzo).map(([, v]) => v).join() !== String(quota))
+      return 'la quota di Barattolo non è quella dell\'ordine';
+    if (uscite.some(([a]) => a !== atteso && a !== o.rimborso
+                             && !(quota && a === o.quota_indirizzo))) return 'c\'è un\'uscita estranea';
   } else {
     if (o.ruolo !== 'compratore' || o.rimborso !== io.incasso) return 'non è il tuo rimborso';
     if (uscite.some(([a]) => a !== io.incasso)) return 'c\'è un\'uscita estranea';
@@ -54263,7 +54485,7 @@ function onchainBloccoOrdini(verifiche, esiti){
     if (o.stato === 'attesa' && io) {
       corpo = buono
         ? `<div class="hint">Manda <b class="mono">${fmt(o.importo_sats)}</b> sats
-             (${fmt(o.prezzo_sats)} + ${fmt(o.margine_sats)} di margine per la rete) a:</div>
+             (${fmt(o.prezzo_sats)}${o.quota_sats ? ` + ${fmt(o.quota_sats)} di quota a Barattolo` : ''} + ${fmt(o.margine_sats)} di margine per la rete) a:</div>
            <div class="qr" id="ocQr${o.id}"></div>
            <div class="mono" style="word-break:break-all;font-size:12px;cursor:pointer"
                 onclick="copiaLink('${esc(o.indirizzo.indirizzo)}', 'Indirizzo copiato')">${esc(o.indirizzo.indirizzo)}</div>
@@ -54286,7 +54508,7 @@ function onchainBloccoOrdini(verifiche, esiti){
           firma da solo se torna tutto.</div>`;
       } else if (io) {
         corpo = `<div class="hint">Quando hai l'oggetto, libera i sats: al venditore
-            ${fmt(o.prezzo_sats)} sats, il resto del margine torna a te.</div>
+            ${fmt(o.prezzo_sats)} sats${o.quota_sats ? `, a Barattolo la quota di ${fmt(o.quota_sats)}` : ''}, il resto del margine torna a te.</div>
           <button class="btn orange" onclick="onchainProponi(this, ${o.id})">🔓 Libera i sats</button>`;
       } else {
         corpo = `<div class="hint">I sats sono nel 2-di-3: li libera chi compra quando

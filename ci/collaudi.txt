@@ -130,6 +130,7 @@ collaudo_swap_instradatore
 collaudo_swap_pagamento
 collaudo_onchain_indirizzo
 collaudo_onchain_ordine
+collaudo_onchain_incasso
 collaudo_certificati_relay
 
 # ---- FUORI DALLA CI ---------------------------------------------------

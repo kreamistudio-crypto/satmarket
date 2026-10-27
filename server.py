@@ -2348,6 +2348,9 @@ FRENI = {
     # e una proposta firmata e' un PSBT da leggere con embit
     "onchain_controlla": (60, 3600),  # «ho pagato, guarda» di un ordine on-chain, per persona
     "onchain_firma": (30, 3600),      # proposte e co-firme on-chain, per persona
+    # l'incasso su un wallet proprio e le leve dal pannello (27 ott 2026)
+    "onchain_incasso": (10, 3600),    # «Dove ricevi i sats», per persona
+    "leva_pannello": (20, 3600),      # una leva cambiata dal pannello, per admin
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
 MSG_FRENO = "Troppe richieste in poco tempo: riprova fra qualche minuto"
@@ -31540,6 +31543,9 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
 # AUTO_SBLOCCO_ATTIVO nascono spente nel CODICE proprio perche' il
 # gesto costi qualcosa. Si cambia sul VPS e si riavvia, che e' anche il
 # momento in cui si rilegge il commento della leva.
+# L'ECCEZIONE (27 ott 2026, richiesta di Andrea): le leve che il server
+# apre UNA PER UNA in `LEVE_SCRIVIBILI`, ciascuna con il suo giudice,
+# dopo una decisione su quella leva. Oggi una sola, la quota on-chain.
 #
 # I SEGRETI NON ESCONO MAI, ed e' la regola da non ammorbidire: non le
 # chiavi LNbits, non il token del bot, non la nsec, non il segreto del
@@ -32742,6 +32748,15 @@ def _leve_stato():
             _leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",
                   "vera (tpub)" if str(ONCHAIN_XPUB or "").strip()
                   else "di cartone (vettori BIP-32: la privata è pubblica)"),
+            # la prima leva che si cambia anche da qui (27 ott 2026)
+            _leva_scrivibile_riga(_leva(
+                "Quota fissa di Barattolo (sats)", "ONCHAIN_QUOTA_FISSA_SATS",
+                leva_scrivibile("ONCHAIN_QUOTA_FISSA_SATS"),
+                acceso="chi compra on-chain la aggiunge al conto e la vede "
+                       "prima di pagare; va a Barattolo quando i sats "
+                       "vengono liberati, torna a lui col rimborso",
+                spento="nessuna quota: chi compra paga il prezzo più il "
+                       "solo margine per la rete")),
         ]},
         {"gruppo": "🪙 Punti e dollari su RGB (hackathon)", "voci": [
             # IL CANCELLO DELL'HACKATHON (ott 2026): la riga chiede al
@@ -32873,6 +32888,146 @@ def leve_admin(x_tg_init_data: str = Header(""),
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     return {"gruppi": _leve_stato()}
+
+
+# ============ LE LEVE CHE SI CAMBIANO DAL PANNELLO (27 ott 2026,
+# cantiere onchain-incasso-esterno, richiesta di Andrea: «il config deve
+# anche poter essere modificato dal pannello amministrazione da un
+# admin, di modo di non dover entrare nella vps per forza») ============
+# Il cassetto «⚙️ Stato delle leve» nasce in sola lettura, e il perche'
+# resta vero: una leva che si accende da un telefono e' una leva che si
+# accende per sbaglio. Per questo NON si apre tutto: si apre UNA leva
+# alla volta, scritta qui con il suo giudice (tipo, pavimento, tetto),
+# dopo una decisione di Andrea su quella leva. Le altre restano del VPS.
+# IL PANNELLO VINCE SUL CONFIG: il valore scritto da qui sta nel
+# database (`leve_pannello`) e sopravvive ai riavvii e ai deploy; la
+# riga del config resta il valore di partenza, e il pannello dice da
+# dove arriva quello di adesso (pannello, config o codice). «Torna al
+# config» cancella la riga del database.
+# OGNI CAMBIO LASCIA UNA RIGA nel registro della moderazione (strato
+# «leva»): chi, quando, da quanto a quanto.
+def _giudice_quota_onchain(valore):
+    """(sats, '') se va bene, (None, perche') se no: un intero, 0 oppure
+    fra la polvere e il tetto. 1-545 non si trasmette (polvere)."""
+    try:
+        v = int(str(valore).strip())
+    except (TypeError, ValueError):
+        return None, "serve un numero intero di sats"
+    if v < 0 or v > ONCHAIN_QUOTA_TETTO:
+        return None, f"fra 0 e {_fmt_sats(ONCHAIN_QUOTA_TETTO)} sats"
+    if 0 < v < ONCHAIN_POLVERE:
+        return None, (f"sotto {_fmt_sats(ONCHAIN_POLVERE)} sats la rete non "
+                      "trasmette l'uscita (polvere): 0, oppure almeno "
+                      f"{_fmt_sats(ONCHAIN_POLVERE)}")
+    return v, ""
+
+
+LEVE_SCRIVIBILI = {
+    "ONCHAIN_QUOTA_FISSA_SATS": {
+        "giudice": _giudice_quota_onchain,
+        "di_serie": lambda: ONCHAIN_QUOTA_FISSA_SATS,
+        "dal_config": lambda: ONCHAIN_QUOTA_DAL_CONFIG,
+        # letti al bisogno: le costanti on-chain stanno piu' sotto nel file
+        "pavimento": lambda: 0, "tetto": lambda: ONCHAIN_QUOTA_TETTO,
+    },
+}
+
+
+def _leve_pannello_tabella(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS leve_pannello(
+        chiave TEXT PRIMARY KEY,
+        valore TEXT NOT NULL,
+        chi INTEGER NOT NULL,
+        quando INTEGER NOT NULL)""")
+
+
+def leva_scrivibile(chiave: str):
+    """Il valore VIVO di una leva scrivibile: quello del pannello se
+    c'e' e il suo giudice lo accetta ancora, sennò config/codice. Un
+    database che non risponde non ferma niente: vale il config."""
+    l = LEVE_SCRIVIBILI[chiave]
+    try:
+        con = db()
+        try:
+            _leve_pannello_tabella(con)
+            r = con.execute("SELECT valore FROM leve_pannello WHERE chiave=?",
+                            (chiave,)).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        r = None
+    if r is not None:
+        v, motivo = l["giudice"](r["valore"])
+        if not motivo:
+            return v
+    return l["di_serie"]()
+
+
+def leva_origine(chiave: str) -> str:
+    """'pannello', 'config' o 'codice': da dove arriva il valore vivo."""
+    l = LEVE_SCRIVIBILI[chiave]
+    try:
+        con = db()
+        try:
+            _leve_pannello_tabella(con)
+            r = con.execute("SELECT valore FROM leve_pannello WHERE chiave=?",
+                            (chiave,)).fetchone()
+        finally:
+            con.close()
+        if r is not None and not l["giudice"](r["valore"])[1]:
+            return "pannello"
+    except Exception:
+        pass
+    return "config" if l["dal_config"]() else "codice"
+
+
+def _leva_scrivibile_riga(riga: dict) -> dict:
+    """Aggiunge a una riga del censimento quel che serve per cambiarla."""
+    l = LEVE_SCRIVIBILI[riga["chiave"]]
+    riga["scrivibile"] = {"pavimento": l["pavimento"](), "tetto": l["tetto"](),
+                          "origine": leva_origine(riga["chiave"])}
+    return riga
+
+
+@app.post("/api/admin/leve/{chiave}")
+async def leva_admin_cambia(chiave: str, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: cambia UNA leva scrivibile. {valore} la scrive,
+    {torna_al_config: true} cancella la riga del pannello. Una chiave
+    che non sta in LEVE_SCRIVIBILI e' 404: dal pannello non si apre
+    niente che qualcuno non abbia deciso di aprire."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if chiave not in LEVE_SCRIVIBILI:
+        raise HTTPException(404, "Questa leva si cambia solo dal VPS")
+    _frena("leva_pannello", user["id"])
+    d = await leggi_json(req)
+    prima = leva_scrivibile(chiave)
+    con = db()
+    try:
+        _leve_pannello_tabella(con)
+        if d.get("torna_al_config"):
+            con.execute("DELETE FROM leve_pannello WHERE chiave=?", (chiave,))
+        else:
+            v, motivo = LEVE_SCRIVIBILI[chiave]["giudice"](d.get("valore"))
+            if motivo:
+                raise HTTPException(400, motivo)
+            con.execute(
+                "INSERT INTO leve_pannello(chiave, valore, chi, quando) "
+                "VALUES (?,?,?,?) ON CONFLICT(chiave) DO UPDATE SET "
+                "valore=excluded.valore, chi=excluded.chi, "
+                "quando=excluded.quando",
+                (chiave, str(v), user["id"], int(time.time())))
+        con.commit()
+    finally:
+        con.close()
+    dopo = leva_scrivibile(chiave)
+    registra_moderazione("leva", "cambiata",
+                         f"{chiave}: {prima} → {dopo} ({leva_origine(chiave)})",
+                         deciso_da=user["id"])
+    return {"ok": True, "valore": dopo, "origine": leva_origine(chiave)}
 
 
 @app.post("/api/admin/utenti/{tg_id}/messaggio")
@@ -49865,6 +50020,26 @@ ONCHAIN_RETE = "signet"
 # STESSA xpub. Il giorno della mainnet il coin type diventa 0: e' un
 # altro conto, apposta.
 ONCHAIN_STRADA_CONTO = "m/48'/1'/0'/2'"
+# LA QUOTA FISSA DI BARATTOLO SULL'ON-CHAIN (27 ott 2026, decisione di
+# Andrea: «0 commissione sul mercatino al momento, al massimo metterei
+# 500 sats fissi solamente per coprire le spese di rete»). Una cifra in
+# sats che chi COMPRA aggiunge al conto, vede prima di pagare (regola
+# ferrea 10: mai al venditore), e che all'uscita va a un indirizzo di
+# Barattolo nella stessa transazione che libera i sats. Col rimborso
+# torna a chi ha comprato: niente vendita, niente quota.
+# 0 = nessuna quota, ed e' il valore del codice. SI CAMBIA ANCHE DAL
+# PANNELLO (leve scrivibili, `leva_scrivibile`), e il pannello vince
+# sul config: la riga del VPS resta il valore di partenza.
+# Il tetto e il pavimento non sono leve: sopra ONCHAIN_QUOTA_TETTO e'
+# una commissione vera e propria (e va decisa come tale), sotto la
+# polvere la rete non trasmette l'uscita (ONCHAIN_POLVERE).
+try:
+    from config import ONCHAIN_QUOTA_FISSA_SATS
+    ONCHAIN_QUOTA_DAL_CONFIG = True
+except ImportError:
+    ONCHAIN_QUOTA_FISSA_SATS = 0
+    ONCHAIN_QUOTA_DAL_CONFIG = False
+ONCHAIN_QUOTA_TETTO = 5000
 
 
 def onchain_ammesso(tg_id) -> bool:
@@ -87937,6 +88112,16 @@ def _onchain_prepara_tabelle(con):
         UNIQUE(xpub_compratore, numero_compratore),
         UNIQUE(xpub_venditore, numero_venditore),
         UNIQUE(xpub_barattolo, numero_barattolo))""")
+    # DOVE RICEVE CHI VENDE (27 ott 2026): una riga per chi ha scelto un
+    # wallet suo invece del conto di Barattolo. `firma` e' la prova che
+    # la scelta l'ha fatta il SUO seme (`onchain_firma_destinazione`).
+    con.execute("""CREATE TABLE IF NOT EXISTS onchain_incasso(
+        tg_id INTEGER PRIMARY KEY,
+        tipo TEXT NOT NULL,
+        valore TEXT NOT NULL,
+        firma TEXT NOT NULL,
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
 
 
 def _onchain_db():
@@ -88086,6 +88271,12 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
         r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
                         (user["id"],)).fetchone()
         mia_xpub = r["xpub"] if r else ""
+        # dove ricevo quando vendo (27 ott 2026): la riga com'e', firma
+        # compresa — il telefono la rilegge col suo seme prima di dirla
+        # «attiva», e una firma che non torna la dice vecchia
+        d = con.execute("SELECT tipo, valore, firma FROM onchain_incasso "
+                        "WHERE tg_id=?", (user["id"],)).fetchone()
+        incasso = dict(d) if d else None
         controparti = [
             {"id": x["tg_id"], "nome": _onchain_nome(con, x["tg_id"])}
             for x in con.execute("SELECT tg_id FROM onchain_xpub "
@@ -88121,6 +88312,8 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
         # la tappa 2: senza embit il foglio lo dice, e i gesti nuovi no
         "embit": EMBIT,
         "mia_xpub": mia_xpub,
+        "incasso": incasso,
+        "quota_sats": onchain_quota_sats(),
         "controparti": controparti,
         "indirizzi": indirizzi,
     }
@@ -88160,6 +88353,66 @@ async def onchain_xpub(req: Request, x_tg_init_data: str = Header(""),
             "VALUES (?,?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
             "xpub=excluded.xpub, aggiornato=excluded.aggiornato",
             (user["id"], xpub, adesso, adesso))
+        # un seme nuovo non sa piu' firmare la destinazione di quello
+        # vecchio: la scelta si rifa' (fino ad allora, il conto di serie)
+        d = con.execute("SELECT * FROM onchain_incasso WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if d and not onchain_firma_valida(xpub, d["tipo"], d["valore"],
+                                          d["firma"]):
+            con.execute("DELETE FROM onchain_incasso WHERE tg_id=?",
+                        (user["id"],))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
+
+
+@app.post("/api/onchain/incasso")
+async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """«DOVE RICEVI I SATS» (27 ott 2026): chi vende sceglie un wallet
+    suo. {tipo: 'indirizzo'|'xpub', valore, firma} lo scrive; {tipo:
+    'barattolo'} torna al conto di serie (`/1/n` del 2-di-3), che il seme
+    rifa' da se' e non ha bisogno di firme. La firma e' del seme del
+    venditore (chiave `/2/0` del conto) e il server la controlla con la
+    xpub dedicata: senza l'on-chain acceso non c'e' niente con cui
+    controllarla. Gli ordini gia' nati tengono la destinazione di
+    allora (fotografata alla cassa): vale dai prossimi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_incasso", user["id"])
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    tipo = str(d.get("tipo") or "")
+    valore = str(d.get("valore") or "").strip()
+    firma = str(d.get("firma") or "").strip().lower()
+    con = _onchain_db()
+    try:
+        if tipo == "barattolo":
+            con.execute("DELETE FROM onchain_incasso WHERE tg_id=?",
+                        (user["id"],))
+            con.commit()
+            return {"ok": True}
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not r:
+            raise HTTPException(400, "Prima accendi l'on-chain")
+        motivo = onchain_destinazione_motivo(tipo, valore, r["xpub"])
+        if motivo:
+            raise HTTPException(400, motivo)
+        if tipo == "indirizzo":
+            valore = onchain_indirizzo_esterno(tipo, valore, 0)
+        if not onchain_firma_valida(r["xpub"], tipo, valore, firma):
+            raise HTTPException(400, "La scelta non è firmata dal tuo seme: "
+                                     "rifalla da questo telefono")
+        adesso = int(time.time())
+        con.execute(
+            "INSERT INTO onchain_incasso(tg_id, tipo, valore, firma, creato,"
+            " aggiornato) VALUES (?,?,?,?,?,?) ON CONFLICT(tg_id) DO UPDATE "
+            "SET tipo=excluded.tipo, valore=excluded.valore, "
+            "firma=excluded.firma, aggiornato=excluded.aggiornato",
+            (user["id"], tipo, valore, firma, adesso, adesso))
         con.commit()
     finally:
         con.close()
@@ -88236,6 +88489,9 @@ async def onchain_prova_indirizzo(req: Request,
 # col numero dell'ordine). Il server la ricava dalla xpub, il telefono
 # di chi incassa la rifa' dal seme prima di firmare: un indirizzo che
 # non e' suo non lo co-firma.
+# DAL 27 OTT 2026 chi vende puo' scegliere un wallet SUO (una vpub o un
+# indirizzo): la scelta e' firmata dal suo seme e il suo telefono la
+# rilegge prima di co-firmare («L'INCASSO SU UN WALLET PROPRIO», sotto).
 try:
     from config import ONCHAIN_MEMPOOL_API
 except ImportError:
@@ -88315,6 +88571,139 @@ def onchain_incasso(xpub: str, numero: int) -> str:
     return p2wpkh(k.key).address(_EMBIT_RETI[ONCHAIN_RETE])
 
 
+# ============ L'INCASSO SU UN WALLET PROPRIO (27 ott 2026, cantiere
+# onchain-incasso-esterno, richiesta di Andrea: «il venditore può
+# comunque definire una xpub dalle impostazioni o inserire un indirizzo
+# di un proprio wallet in cui ricevere») ============
+# Di serie chi vende incassa su `/1/n` del suo conto di Barattolo
+# (`onchain_incasso`), e il suo telefono lo rifa' dal seme prima di
+# co-firmare. Ora puo' scegliere un wallet SUO: un indirizzo fisso, o la
+# chiave pubblica di un conto (una `vpub` o `tpub` di Sparrow, BIP-84,
+# profondita' 3), da cui ogni vendita prende un indirizzo nuovo `/0/i`.
+# IL PERICOLO NUOVO, e la sua cura: un indirizzo che il seme non sa
+# rifare e' un indirizzo che un server manomesso potrebbe cambiare, e il
+# telefono co-firmerebbe un rilascio verso il ladro. Per questo la
+# scelta si FIRMA col seme del venditore, con la chiave `/2/0` del conto
+# del 2-di-3 (una catena che non serve a nient'altro): il server la
+# verifica con la xpub dedicata che ha gia', e soprattutto la verifica
+# il telefono del venditore prima della seconda firma, con la chiave che
+# rifa' da se'. Chi non ha il seme non sa firmare una destinazione.
+ONCHAIN_DESTINAZIONE_MAX = 120
+_ONCHAIN_VPUB_PROVA = b"\x04\x5f\x1c\xf6"   # vpub: zpub delle reti di prova
+
+
+def onchain_messaggio_destinazione(tipo: str, valore: str) -> bytes:
+    """Il testo che il seme firma, lo stesso byte per byte nel telefono
+    (`onchainMessaggioDestinazione`). La rete dentro: una firma di
+    signet non vale il giorno della mainnet."""
+    return (f"barattolo/onchain/incasso/v1\n{ONCHAIN_RETE}\n{tipo}\n"
+            f"{valore}").encode("utf-8")
+
+
+def onchain_firma_valida(xpub_dedicata: str, tipo: str, valore: str,
+                         firma_hex: str) -> bool:
+    """La firma (64 byte, r||s, quella di @scure/bip32) e' della chiave
+    `/2/0` della xpub dedicata? embit vuole il DER: lo si compone qui."""
+    from embit import ec
+    try:
+        grezza = bytes.fromhex(str(firma_hex or ""))
+        if len(grezza) != 64:
+            return False
+
+        def intero(b):
+            b = b.lstrip(b"\x00") or b"\x00"
+            return b"\x00" + b if b[0] & 0x80 else b
+        r, s = intero(grezza[:32]), intero(grezza[32:])
+        der = (b"\x30" + bytes([len(r) + len(s) + 4]) + b"\x02"
+               + bytes([len(r)]) + r + b"\x02" + bytes([len(s)]) + s)
+        chiave = _embit_bip32.HDKey.from_string(xpub_dedicata).derive([2, 0]).key
+        h = hashlib.sha256(onchain_messaggio_destinazione(tipo, valore)).digest()
+        return bool(chiave.verify(ec.Signature.parse(der), h))
+    except Exception:
+        return False
+
+
+def onchain_destinazione_motivo(tipo: str, valore: str,
+                                xpub_dedicata: str = "") -> str:
+    """'' se la destinazione e' buona, sennò il perche' a parole. Mai
+    con la chiave dentro (come `onchain_xpub_motivo`)."""
+    s = str(valore or "").strip()
+    if not s or len(s) > ONCHAIN_DESTINAZIONE_MAX:
+        return "manca l'indirizzo o la chiave"
+    rete = _EMBIT_RETI[ONCHAIN_RETE]
+    if tipo == "indirizzo":
+        from embit.script import address_to_scriptpubkey
+        # un bech32 si puo' scrivere tutto maiuscolo (i QR lo fanno):
+        # embit lo vuole minuscolo, e minuscolo si firma e si salva
+        s = s.lower() if s[:3].lower() == "tb1" else s
+        try:
+            if address_to_scriptpubkey(s).address(rete) != s:
+                raise ValueError
+        except Exception:
+            return f"non è un indirizzo di {ONCHAIN_RETE} (comincia per tb1)"
+        return ""
+    if tipo != "xpub":
+        return "tipo di destinazione sconosciuto"
+    if _onchain_sembra_privata(s):
+        return "questa è una chiave PRIVATA: qui non entra, e non va data a nessuno"
+    try:
+        k = _embit_bip32.HDKey.from_string(s)
+    except Exception:
+        return "non è una chiave estesa leggibile"
+    if k.is_private:
+        return "questa è una chiave PRIVATA: qui non entra, e non va data a nessuno"
+    if k.version not in (rete["xpub"], _ONCHAIN_VPUB_PROVA):
+        return f"non è una chiave di {ONCHAIN_RETE} (deve cominciare per vpub o tpub)"
+    if xpub_dedicata and s == xpub_dedicata:
+        return "questa è la chiave del 2-di-3, non quella di un tuo wallet"
+    if k.depth != 3:
+        return ("serve la chiave del CONTO del tuo wallet (in Sparrow: "
+                "Impostazioni → «Keystore», m/84'/1'/0')")
+    return ""
+
+
+def onchain_indirizzo_esterno(tipo: str, valore: str, indice: int) -> str:
+    """L'indirizzo d'incasso da una destinazione scelta: l'indirizzo
+    stesso, oppure `/0/indice` della chiave del conto (p2wpkh, BIP-84)."""
+    if tipo == "indirizzo":
+        s = str(valore).strip()
+        return s.lower() if s[:3].lower() == "tb1" else s
+    from embit.script import p2wpkh
+    if not 0 <= int(indice) <= ONCHAIN_NUMERO_MAX:
+        raise ValueError("numero fuori misura")
+    k = _embit_bip32.HDKey.from_string(valore).derive([0, int(indice)])
+    return p2wpkh(k.key).address(_EMBIT_RETI[ONCHAIN_RETE])
+
+
+def _onchain_destinazione_viva(con, tg_id: int, xpub_dedicata: str):
+    """La riga della destinazione di chi vende, SOLO se la sua firma
+    vale ancora con la xpub dedicata di adesso (un seme nuovo la rende
+    vecchia: si torna al conto di Barattolo). None = il conto di serie."""
+    r = con.execute("SELECT * FROM onchain_incasso WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    if not r or not onchain_firma_valida(xpub_dedicata, r["tipo"],
+                                         r["valore"], r["firma"]):
+        return None
+    return r
+
+
+def _onchain_prossimo_esterno(con, venditore_id: int, valore: str) -> int:
+    """Il prossimo `/0/i` di una chiave di conto esterna: uno dopo il
+    piu' alto gia' dato a un ordine di questo venditore con quella
+    chiave. Una fila sua, staccata dai numeri del 2-di-3: cosi' i buchi
+    restano pochi e il wallet ritrova le vendite (il limite di 20
+    indirizzi vuoti di fila dei wallet)."""
+    r = con.execute("SELECT MAX(incasso_indice) FROM onchain_ordini WHERE "
+                    "venditore_id=? AND incasso_tipo='xpub' AND "
+                    "incasso_valore=?", (int(venditore_id), valore)).fetchone()
+    return 0 if r[0] is None else int(r[0]) + 1
+
+
+def onchain_quota_sats() -> int:
+    """La quota fissa viva: pannello, sennò config, sennò codice."""
+    return int(leva_scrivibile("ONCHAIN_QUOTA_FISSA_SATS") or 0)
+
+
 def _onchain_prepara_ordini(con):
     """L'ordine on-chain: la cassa (prezzo, margine, importo), l'indirizzo
     (riga di `onchain_indirizzi`), i due incassi, le monete viste, la
@@ -88350,6 +88739,19 @@ def _onchain_prepara_ordini(con):
         scade INTEGER NOT NULL,
         creato INTEGER NOT NULL,
         aggiornato INTEGER NOT NULL)""")
+    # 27 ott 2026: la destinazione scelta dal venditore, fotografata
+    # alla cassa (vuota = il suo conto di Barattolo, `/1/n`), e la quota
+    # fissa di Barattolo col suo indirizzo. Le colonne si aggiungono a
+    # una tabella che esiste gia' dal 23 ott.
+    gia = {r[1] for r in con.execute("PRAGMA table_info(onchain_ordini)")}
+    for col, tipo in (("incasso_tipo", "TEXT DEFAULT ''"),
+                      ("incasso_valore", "TEXT DEFAULT ''"),
+                      ("incasso_firma", "TEXT DEFAULT ''"),
+                      ("incasso_indice", "INTEGER DEFAULT 0"),
+                      ("quota_sats", "INTEGER DEFAULT 0"),
+                      ("quota_indirizzo", "TEXT DEFAULT ''")):
+        if col not in gia:
+            con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
 
 def _onchain_db_ordini():
@@ -88382,6 +88784,9 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
     # l'unico await, PRIMA di ogni scrittura: da qui all'ultimo commit
     # il blocco e' atomico, come nella cassa del Lightning
     margine = onchain_margine(await onchain_mempool_tariffa())
+    # la quota fissa di Barattolo (0 di serie): la paga chi compra, e
+    # l'ha vista alla cassa (`/api/onchain/pronto`)
+    quota = onchain_quota_sats()
     adesso = int(time.time())
     con = _onchain_db_ordini()
     try:
@@ -88398,19 +88803,40 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             raise HTTPException(400, str(e))
         ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                           (ind_id,)).fetchone()
+        # DOVE RICEVE CHI VENDE: il wallet suo, se l'ha scelto e la firma
+        # del suo seme vale ancora; sennò il suo conto di Barattolo
+        dest = _onchain_destinazione_viva(con, venditore,
+                                          ind["xpub_venditore"])
+        if dest:
+            d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
+            d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
+                        if d_tipo == "xpub" else 0)
+            incasso = onchain_indirizzo_esterno(d_tipo, d_valore, d_indice)
+        else:
+            d_tipo = d_valore = d_firma = ""
+            d_indice = 0
+            incasso = onchain_incasso(ind["xpub_venditore"],
+                                      ind["numero_venditore"])
+        # la quota va a Barattolo su `/1/n` della SUA xpub, col numero di
+        # Barattolo di questo ordine: una fila che non si ripete mai
+        quota_dove = (onchain_incasso(ind["xpub_barattolo"],
+                                      ind["numero_barattolo"])
+                      if quota else "")
         cur = con.execute(
             "INSERT INTO onchain_ordini(indirizzo_id, annuncio_id,"
             " compratore_id, venditore_id, quantita, titolo, prezzo_sats,"
             " margine_sats, importo_sats, incasso, rimborso, dettagli,"
-            " scade, creato, aggiornato)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " scade, creato, aggiornato, incasso_tipo, incasso_valore,"
+            " incasso_firma, incasso_indice, quota_sats, quota_indirizzo)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ind_id, a["id"], user["id"], venditore, richiesti,
-             r["titolo"] or "", prezzo, margine, prezzo + margine,
-             onchain_incasso(ind["xpub_venditore"], ind["numero_venditore"]),
+             r["titolo"] or "", prezzo, margine, prezzo + quota + margine,
+             incasso,
              onchain_incasso(ind["xpub_compratore"],
                              ind["numero_compratore"]),
              json.dumps(dettagli, ensure_ascii=False),
-             adesso + ONCHAIN_ORE_ATTESA * 3600, adesso, adesso))
+             adesso + ONCHAIN_ORE_ATTESA * 3600, adesso, adesso,
+             d_tipo, d_valore, d_firma, d_indice, quota, quota_dove))
         con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
                     (cur.lastrowid, ind_id))
         con.commit()
@@ -88444,6 +88870,16 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "visti_sats": o["visti_sats"], "ricevuti_sats": o["ricevuti_sats"],
         "utxo": json.loads(o["utxo"] or "[]"),
         "incasso": o["incasso"], "rimborso": o["rimborso"],
+        # la destinazione scelta da chi vende, con la firma del suo seme:
+        # il suo telefono la rilegge prima della seconda firma. Vuota =
+        # il conto di Barattolo (`/1/n`), che il seme rifa' da se'
+        "destinazione": ({"tipo": o["incasso_tipo"],
+                          "valore": o["incasso_valore"],
+                          "firma": o["incasso_firma"],
+                          "indice": o["incasso_indice"]}
+                         if o["incasso_tipo"] else None),
+        "quota_sats": o["quota_sats"] or 0,
+        "quota_indirizzo": o["quota_indirizzo"] or "",
         "dettagli": json.loads(o["dettagli"] or "{}"),
         "indirizzo": onchain_riga_per(ind, tg_id, _onchain_nome(con, altro)),
         "proposta": proposta, "txid_uscita": o["txid_uscita"],
@@ -88545,6 +88981,13 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
         if [v for d, v in uscite if d == o["incasso"]] != [o["prezzo_sats"]]:
             raise ValueError("al venditore deve andare esattamente il prezzo")
         permessi = (o["incasso"], o["rimborso"])
+        # la quota di Barattolo, se l'ordine ne ha una: esatta, una volta
+        quota = int(o["quota_sats"] or 0)
+        if quota:
+            if [v for d, v in uscite if d == o["quota_indirizzo"]] != [quota]:
+                raise ValueError("a Barattolo deve andare esattamente la "
+                                 "quota dell'ordine")
+            permessi += (o["quota_indirizzo"],)
     else:
         permessi = (o["rimborso"],)
     if not uscite or any(d not in permessi for d, _ in uscite):
@@ -88556,6 +88999,8 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
         raise ValueError("un'uscita è troppo piccola (polvere): lasciala "
                          "alla commissione")
     rete_sats = sum(m["value"] for m in monete) - sum(v for _, v in uscite)
+    # la commissione di rete sta nel margine; col rimborso la quota torna
+    # a chi ha comprato insieme al resto, e dal margine non si tocca
     if not 0 < rete_sats <= o["margine_sats"]:
         raise ValueError("la commissione di rete non sta nel margine")
     for i in p.inputs:
@@ -88615,7 +89060,10 @@ async def onchain_pronto(venditore_id: int, x_tg_init_data: str = Header(""),
     if int(venditore_id) not in x:
         return {"pronto": False,
                 "motivo": "il venditore non ha ancora acceso l'on-chain"}
-    return {"pronto": True, "motivo": "", "io_acceso": user["id"] in x}
+    # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea
+    # 10): la cassa la scrive accanto al margine per la rete
+    return {"pronto": True, "motivo": "", "io_acceso": user["id"] in x,
+            "quota_sats": onchain_quota_sats()}
 
 
 @app.post("/api/onchain/ordini/{oid}/controlla")
