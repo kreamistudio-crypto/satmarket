@@ -60339,7 +60339,9 @@ IMPRONTA_BTC = ("e8e936915bc05165904e99bdc784ce07"
                 "1831c700f440106fd765c416710d68af")
 
 
-# LO SWAP DAL TELEFONO (20 ott 2026, tappa 3): i ventitre nomi del bundle,
+# LO SWAP DAL TELEFONO (20 ott 2026, tappa 3): i ventiquattro nomi del bundle
+# (ventitre fino al 27 ott 2026: `swapTree`, l'albero del submarine, e' del
+# cantiere cambio-libero),
 # la sua impronta (spezzata in due come IMPRONTA_BTC: lo scanner dei
 # segreti cerca 64 esadecimali di fila) e i vettori di SATS Routing
 # (boltz-web-app `004f4077`, tests/utils/rescueDerivation.spec.ts).
@@ -60348,15 +60350,15 @@ EXPORT_SWAP = [
     "Scripts", "SigHash", "SwapTreeSerializer", "TEST_NETWORK", "TaprootUtils",
     "Transaction", "compareTrees", "constructClaimTransaction", "detectSwap",
     "generateMnemonic", "hex", "mnemonicToSeedSync", "reverseSwapTree",
-    "sha256", "targetFee", "validateMnemonic", "wordlist",
+    "sha256", "swapTree", "targetFee", "validateMnemonic", "wordlist",
 ]
 # boltz-core 5.0.0 di npm. (20 ott 2026: per qualche ora e' stato il
 # commit della #196, cantiere swap-lockup; tornato alla 5.0.0 nel cantiere
 # swap-bundle-500, su consiglio di Massimo: il perche' in
 # vendor/swap-LICENZE.md. Ricostruito da npm in una cartella nuova: la
 # stessa impronta della tappa 3.)
-IMPRONTA_SWAP = ("46306e34468e1647a42507221b40aa05"
-                 "a96623ecd28039e00b31ee17ff31ad99")
+IMPRONTA_SWAP = ("adb1090ca1f966a63151204c8fef4010"
+                 "b45b646184e65c14364095b1ff76ef62")
 VETTORE_SWAP_XPUB = ("xpub661MyMwAqRbcG5eD5Hh9EddaCEik4rxpJA1RDEsxjujXzGsJDg4kT7EX"
                      "C8GPM4ZZLVCoNA8fArGbjqKmo6M6khKTaTmYBJNTQXCFrejsgCi")
 VETTORE_SWAP_PRIV = ("cb9774710e1d1eaa747a38fff23b20cb"
@@ -177306,7 +177308,7 @@ def prove_swap_telefono():
     (boltz-core 5.0.0 + @scure, otto pacchetti, tutti MIT).
 
     QUATTRO GUARDIE:
-    1. IL BUNDLE: l'impronta del file servito, i ventitre nomi
+    1. IL BUNDLE: l'impronta del file servito, i ventiquattro nomi
        dell'ingresso e non uno di piu', l'IIFE, la ricetta e le licenze —
        il calco di `prove_bundle_bitcoin`.
     2. I LORO VETTORI: lo schema delle chiavi e' quello del sito di SATS
@@ -177338,7 +177340,7 @@ def prove_swap_telefono():
     testo = grezzo.decode("utf-8")
     blocco = testo[testo.index("__export(ingresso_exports, {"):]
     blocco = blocco[:blocco.index("});")]
-    prova("swap: esporta i ventitre nomi dell'ingresso, e nient'altro",
+    prova("swap: esporta i ventiquattro nomi dell'ingresso, e nient'altro",
           EXPORT_SWAP, sorted(re.findall(r"^\s{4}(\w+): \(\) =>", blocco, re.M)))
     prova("swap: un IIFE con un nome solo, non minimizzato", (True, True),
           (testo.startswith("var BarattoloSwap = (() => {"),
@@ -179025,6 +179027,333 @@ def prove_swap_pagamento():
            "\ncollaudo_swap_pagamento.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
+def prove_cartone_submarine():
+    """IL SATS ROUTING DI CARTONE, LA STRADA BITCOIN -> LIGHTNING (27 ott
+    2026, cantiere cambio-libero, tappa 1; piano approvato da Andrea).
+    Il cambio libero vuole anche la direzione che il cartone non sapeva:
+    il «submarine» di Boltz v2 — il telefono manda la SUA fattura e la sua
+    chiave di rimborso, manda i bitcoin a un indirizzo del fornitore, e il
+    fornitore paga la fattura. Qui si prova il CARTONE da solo, prima che
+    nasca il telefono (tappa 3): un telefono di cartone in node fa tutto
+    quel che fara' quello vero, contro il cartone acceso in questo
+    processo.
+    1. IL BUNDLE: un nome in piu', `swapTree` (l'albero del submarine di
+       boltz-core), ventiquattro nomi; la ricetta non cambia, e rifatto
+       senza la riga nuova dava lo stesso sha256 di prima (riproducibile).
+    2. LA NASCITA: la risposta onesta passa la verifica del telefono
+       (l'albero rifatto dai suoi pezzi con `swapTree`, l'indirizzo dato
+       dalle due chiavi e dall'albero, `expectedAmount` non piu' del
+       conto: fattura + 0,5 % + 318); le tre bugie hanno il loro nome;
+       una fattura storta, sotto il minimo, gia' usata, o un pairHash
+       vecchio sono un no.
+    3. LA STRADA FELICE: i bitcoin visti dalla rete, la conferma, il
+       segreto solo a fattura pagata (e solo col segreto GIUSTO), il
+       ritiro A DUE del cartone (la meta' del telefono rotta e' un no, la
+       buona e' spesa sulla rete).
+    4. IL RIMBORSO: cooperativo solo a swap fallito (prima no, nel modo
+       `non_firma` no, dopo il ritiro no); dallo script col CLTV: prima
+       della scadenza «non-final» su tutte e due le strade, alla cima
+       giusta passa.
+    5. I bitcoin mandati in meno: `transaction.lockupFailed`. Il recupero
+       dalla xpub ritrova i submarine con `refundDetails`."""
+    print("\n[il cartone, la strada bitcoin -> Lightning (submarine)]")
+    import hashlib as _hl
+    import secrets as _sec
+    import shutil as _sh
+    import subprocess as _sp
+    import cartone_satsrouting as _cart
+
+    # --- 1. il bundle, il cartone e il suo aiutante, letti ---
+    cart = open("cartone_satsrouting.py", encoding="utf-8").read()
+    cripto = open("cartone_satsrouting_cripto.js", encoding="utf-8").read()
+    prova("submarine: le tariffe del 16 ott nel cartone (0,5 %, 318, da 50.000)",
+          (True, True, True),
+          ('"percentage": 0.5, "minerFees": 318' in cart,
+           '"minimal": 50_000' in cart and '"maximalZeroConf": 0' in cart,
+           '"hash": "cartone-sub-16ott"' in cart))
+    prova("submarine: le sette porte del cartone, e il rimborso solo a swap fallito",
+          (True, True, True, True, True),
+          ('u.path == "/v2/swap/submarine"' in cart,
+           all(f'pezzi[4] == "{x}"' in cart for x in ("transaction", "preimage", "claim", "refund")),
+           'RIMBORSABILI = ("invoice.failedToPay", "swap.expired", "transaction.lockupFailed")' in cart,
+           '{"error": "non-final"}' in cart,
+           "refundDetails" in cart))
+    prova("submarine: l'aiutante fa l'albero con `swapTree` e il ritiro a due in due processi",
+          (True, True, True, True),
+          ("S.swapTree(false, impronta, pub, lui, scadenza)" in cripto,
+           "ritiro_sub_inizio(d){" in cripto and "ritiro_sub_fine(d){" in cripto,
+           "via: 'rimborso'" in cripto,
+           "d.loroChiave || d.claimPublicKey" in cripto))
+    prova("submarine: nel cartone e nell'aiutante nessun esadecimale da 64", (0, 0),
+          (len(re.findall(r"\b[0-9a-f]{64}\b", cripto)),
+           len(re.findall(r"\b[0-9a-f]{64}\b", cart))))
+    # la fattura la legge il cartone da se': importo, impronta, rete
+    letta = _cart.cripto("fattura", rete="bitcoin", sats=60000, impronta="11" * 32)["invoice"]
+    prova("submarine: il cartone legge la fattura (sats, impronta), e dice no a rete e forma sbagliate",
+          ((60000, "11" * 32), None, None, None),
+          (_cart.leggi_fattura(letta), _cart.leggi_fattura(letta, "regtest"),
+           _cart.leggi_fattura("lnbc1storta"), _cart.leggi_fattura(letta[:-1] + "q")))
+
+    if not _sh.which("node"):
+        salta("submarine: il telefono di cartone contro il cartone", "node non c'e'")
+        return
+    # --- 2.-5. il telefono di cartone, in node, contro il cartone acceso qui ---
+    srv, porta = _cart.avvia(0)
+    try:
+        fatture = []
+        for sats in (60000, 70000, 40000, 80000, 90000, 61000, 62000, 63000):
+            pre = _sec.token_bytes(32)
+            imp = _hl.sha256(pre).hexdigest()
+            inv = _cart.cripto("fattura", rete="bitcoin", sats=sats, impronta=imp)["invoice"]
+            fatture.append({"invoice": inv, "preimage": pre.hex(), "impronta": imp,
+                            "attesoMax": sats + -(-sats * 5 // 1000) + 318})
+        dati = {"parole": "invite smile evidence shield frost source truly ball odor unfold example nuclear",
+                "fatture": fatture, "dest": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"}
+        js = BANCO_SUBMARINE.replace("__BASE__", json.dumps(f"http://127.0.0.1:{porta}")).replace(
+            "__IN__", json.dumps(dati))
+        r = _sp.run(["node", "-e", js], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace", timeout=240)
+        try:
+            out = json.loads(r.stdout.strip().splitlines()[-1])
+        except Exception:
+            print(r.stderr[-1200:])
+            out = {}
+    finally:
+        srv.shutdown()
+    g = lambda *k: _pesca(out, *k)
+    prova("submarine: le tariffe si leggono, con l'impronta e lo zero-conf a 0",
+          ("cartone-sub-16ott", 0.5, 318, 0),
+          (g("tariffe", "BTC", "BTC", "hash"), g("tariffe", "BTC", "BTC", "fees", "percentage"),
+           g("tariffe", "BTC", "BTC", "fees", "minerFees"), g("tariffe", "BTC", "BTC", "limits", "maximalZeroConf")))
+    prova("submarine: la nascita onesta passa la verifica del telefono: 60.000 + 300 + 318, bip21, niente zero-conf",
+          {"codice": 201, "perche": None, "atteso": 60618, "zeroConf": False, "bip21": True}, g("nascita"))
+    prova("submarine: le tre bugie hanno il loro nome",
+          {"importo": "importo", "albero": "albero", "indirizzo": "indirizzo"}, g("bugie"))
+    prova("submarine: la stessa fattura due volte, una storta, sotto il minimo, un pairHash vecchio: 400",
+          (400, 400, 400, 400), (g("doppia"), g("storta"), g("piccola"), g("pairHash")))
+    prova("submarine: prima dei bitcoin niente lockup (404); mandati, la rete li vede, non confermati",
+          (404, {"visto": True, "valore": 60618, "confermato": False}), (g("primaDeiBitcoin"), g("lockup")))
+    prova("submarine: confermati; il segreto e il ritiro a due solo a fattura pagata",
+          ("transaction.confirmed", 404, 400), (g("stato1"), g("preimagePrima"), g("claimPrima")))
+    prova("submarine: «pagata» con un segreto che non e' quello della fattura non passa; con quello giusto il segreto si legge",
+          (False, True), (g("pagataStorta"), g("preimage")))
+    prova("submarine: il ritiro a due: segreto, chiave e nonce del cartone; la meta' rotta e' un no, la buona spende i bitcoin",
+          ({"preimage": True, "chiave": True, "nonce": True}, 400, 200, "transaction.claimed", True),
+          (g("claim"), g("claimRotta"), g("claimOk"), g("stato2"), g("spesa")))
+    prova("submarine: il rimborso cooperativo: no dopo il ritiro, no prima del fallimento, no nel modo non_firma",
+          (400, 400, 400), (g("rimborsoDopoRitiro"), g("rimborsoPresto"), g("rimborsoNegato")))
+    prova("submarine: a fattura non pagata lo stato lo dice, e il rimborso a due passa su tutte e due le strade (un pezzo di testimone, locktime 0)",
+          ("invoice.failedToPay", 1, 0, True, 201, True),
+          (g("stato3", "status"), g("rimborsoCoop", "pezzi"), g("rimborsoCoop", "locktime"),
+           g("rimborsoCoop", "rete", "ok"), g("rimborsoCoop", "fornitore", "codice"), g("spesa2", "spent")))
+    prova("submarine: il rimborso dallo script prima della scadenza e' «non-final» su rete e fornitore",
+          (3, 900144, False, "sendrawtransaction RPC error: non-final", 400),
+          (g("scriptPresto", "pezzi"), g("scriptPresto", "locktime"), g("scriptPresto", "rete", "ok"),
+           g("scriptPresto", "rete", "testo"), g("scriptPresto", "fornitore", "codice")))
+    prova("submarine: ...e alla cima della scadenza passa, con lo stesso id su tutte e due le strade",
+          (True, 201, True),
+          (g("scriptMaturo", "rete", "ok"), g("scriptMaturo", "fornitore", "codice"),
+           g("scriptMaturo", "rete", "testo") == g("scriptMaturo", "id")))
+    prova("submarine: la firma rovesciata di un byte, cooperativa o dallo script, e' un no del giudice BIP-340 su tutte e due le strade",
+          ("sendrawtransaction RPC error: firma non valida", "400 firma non valida",
+           "sendrawtransaction RPC error: firma non valida", "400 firma non valida"),
+          (g("rimborsoCoopRotto", "rete"), g("rimborsoCoopRotto", "fornitore"),
+           g("scriptRotto", "rete"), g("scriptRotto", "fornitore")))
+    prova("submarine: bitcoin mandati in meno: transaction.lockupFailed", "transaction.lockupFailed", g("meno"))
+    prova("submarine: il recupero dalla xpub ritrova i submarine coi loro indici, stati e refundDetails",
+          [[0, "transaction.claimed", 66, True], [10, "invoice.set", 66, True],
+           [11, "invoice.set", 66, True], [12, "invoice.set", 66, True],
+           [2, "invoice.failedToPay", 66, True], [3, "swap.expired", 66, True],
+           [4, "transaction.lockupFailed", 66, True]], g("recupero"))
+    prova("submarine: il cartone conta le letture, i rimborsi chiesti e le meta' portate; i reverse non si toccano",
+          (1, 4, 2, 0, []),
+          (g("visto", "letture_sub"), len(g("visto", "rimborsi") or []), len(g("visto", "ritiri") or []),
+           g("visto", "letture"), g("visto", "firme")))
+
+
+def _pesca(d, *chiavi):
+    """Un valore in fondo a un dizionario annidato, o None."""
+    for k in chiavi:
+        if not isinstance(d, dict):
+            return None
+        d = d.get(k)
+    return d
+
+
+BANCO_SUBMARINE = r"""/* IL TELEFONO DI CARTONE del submarine: parla col cartone per HTTP e fa
+   tutto quel che fara' il telefono vero (T3): le chiavi, la verifica
+   della risposta, il ritiro a due, il rimborso cooperativo e dallo script.
+   Stampa un JSON di esiti; il giudice e' Python. */
+const fs = require('fs');
+const vm = require('vm');
+const S = vm.runInThisContext(fs.readFileSync('vendor/swap.bundle.js', 'utf8') + ';BarattoloSwap');
+const h = S.hex;
+const BASE = __BASE__;
+const IN = __IN__;
+const out = {};
+const api = async (p, corpo, metodo) => {
+  const r = await fetch(BASE + p, corpo === undefined ? {method: metodo || 'GET'}
+    : {method: 'POST', headers: {'Content-Type': 'application/json', 'Referral': 'barattolo'}, body: JSON.stringify(corpo)});
+  const d = await r.json().catch(() => ({}));
+  return {ok: r.ok, codice: r.status, d};
+};
+const comando = (p) => fetch(BASE + p).then(r => r.json());
+const rete = async (p, corpo) => {
+  const r = await fetch(BASE + '/esplora' + p, corpo === undefined ? {} : {method: 'POST', body: corpo});
+  return {ok: r.ok, testo: (await r.text()).trim()};
+};
+const radice = S.HDKey.fromMasterSeed(S.mnemonicToSeedSync(IN.parole));
+const chiavi = i => { const k = radice.derive(`m/44/0/0/0/${i}`); return {priv: k.privateKey, pub: k.publicKey}; };
+/* la verifica della risposta, il calco di quel che fara' il telefono */
+function verifica(r, k, impronta, attesoMax){
+  if (!r || typeof r !== 'object') return 'risposta';
+  const scadenza = Number(r.timeoutBlockHeight);
+  let loro, albero, atteso, agg;
+  try {
+    loro = h.decode(String(r.claimPublicKey || ''));
+    albero = S.SwapTreeSerializer.deserializeSwapTree(r.swapTree);
+    atteso = S.swapTree(false, impronta, loro, k.pub, scadenza);
+  } catch(e){ return 'albero'; }
+  if (!S.compareTrees(albero, atteso)) return 'albero';
+  try { agg = S.TaprootUtils.tweakMusig(S.Musig.create(k.priv, [loro, k.pub]), albero.tree); }
+  catch(e){ return 'indirizzo'; }
+  const script = S.OutScript.encode(S.Address(S.NETWORK).decode(String(r.address)));
+  if (h.encode(S.Scripts.p2trOutput(agg.aggPubkey)) !== h.encode(script)) return 'indirizzo';
+  if (!(Number(r.expectedAmount) <= attesoMax)) return 'importo';
+  return null;
+}
+async function nascita(i, f, modo){
+  await comando('/cartone/modo?m=' + modo);
+  const k = chiavi(i);
+  const r = await api('/v2/swap/submarine', {from: 'BTC', to: 'BTC', invoice: f.invoice,
+    refundPublicKey: h.encode(k.pub), pairHash: 'cartone-sub-16ott', referralId: 'barattolo'});
+  await comando('/cartone/modo?m=normale');
+  return {k: k, r: r, perche: r.ok ? verifica(r.d, k, h.decode(f.impronta), f.attesoMax) : 'http'};
+}
+/* il rimborso: la transazione del telefono che si riprende i bitcoin */
+async function rimborso(sw, dest, cooperativo){
+  const lkr = await api(`/v2/swap/submarine/${sw.r.d.id}/transaction`);
+  if (!lkr.ok) return {firma: lkr.codice, errore: lkr.d.error, dove: "transaction"};
+  const lockHex = lkr.d.hex;
+  const lock = S.Transaction.fromRaw(h.decode(lockHex), {allowUnknownInputs: true, allowUnknownOutputs: true});
+  const loro = h.decode(sw.r.d.claimPublicKey);
+  const albero = S.SwapTreeSerializer.deserializeSwapTree(sw.r.d.swapTree);
+  const keyAgg = S.Musig.create(sw.k.priv, [loro, sw.k.pub]);
+  const tweaked = S.TaprootUtils.tweakMusig(keyAgg, albero.tree);
+  const uscita = S.detectSwap(tweaked.aggPubkey, lock);
+  const script = S.OutScript.encode(S.Address(S.NETWORK).decode(dest));
+  const tx = S.constructClaimTransaction([Object.assign({}, uscita, {
+    cooperative: cooperativo, swapTree: albero, privateKey: sw.k.priv, type: S.OutputType.Taproot,
+    transactionId: lock.id, internalKey: keyAgg.aggPubkey, preimage: new Uint8Array(0)})],
+    script, 500n, true, cooperativo ? undefined : Number(sw.r.d.timeoutBlockHeight), true);
+  if (cooperativo) {
+    const sh = tx.preimageWitnessV1(0, [uscita.script], S.SigHash.DEFAULT, [uscita.amount]);
+    const m = tweaked.message(sh).generateNonce();
+    const r = await api(`/v2/swap/submarine/${sw.r.d.id}/refund`, {index: 0, pubNonce: h.encode(m.publicNonce), transaction: tx.hex});
+    if (!r.ok) return {firma: r.codice, errore: r.d.error};
+    const firma = m.aggregateNonces([[loro, h.decode(r.d.pubNonce)]]).initializeSession()
+      .signPartial().addPartial(loro, h.decode(r.d.partialSignature)).aggregatePartials();
+    tx.updateInput(0, {finalScriptWitness: [firma]});
+  }
+  const pezzi = tx.getInput(0).finalScriptWitness.length;
+  const viaRete = await rete('/tx', tx.hex);
+  const viaFornitore = await api('/v2/chain/BTC/transaction', {hex: tx.hex});
+  return {pezzi: pezzi, locktime: Number(tx.lockTime), id: tx.id, rete: viaRete, fornitore: viaFornitore, hex: tx.hex};
+}
+/* la stessa transazione con un byte della firma rovesciato: il giudice
+   BIP-340 in Python del cartone deve dire no su tutte e due le strade */
+async function rotta(hexTx){
+  const tx = S.Transaction.fromRaw(h.decode(hexTx), {allowUnknownInputs: true, allowUnknownOutputs: true});
+  const w = tx.getInput(0).finalScriptWitness.map(x => new Uint8Array(x));
+  w[0][9] ^= 1;
+  tx.updateInput(0, {finalScriptWitness: w});
+  const viaRete = await rete('/tx', tx.hex);
+  const viaFornitore = await api('/v2/chain/BTC/transaction', {hex: tx.hex});
+  return {rete: viaRete.testo, fornitore: viaFornitore.codice + ' ' + viaFornitore.d.error};
+}
+(async () => {
+  out.tariffe = (await api('/v2/swap/submarine')).d;
+  /* 1. la nascita onesta e le bugie */
+  const F = IN.fatture;
+  const buona = await nascita(0, F[0], 'normale');
+  out.nascita = {codice: buona.r.codice, perche: buona.perche, atteso: buona.r.d.expectedAmount,
+                 zeroConf: buona.r.d.acceptZeroConf, bip21: String(buona.r.d.bip21 || '').startsWith('bitcoin:' + buona.r.d.address + '?amount=0.00060618')};
+  out.bugie = {};
+  for (const [n, m, f] of [['importo', 'mente_importo', 5], ['albero', 'mente_albero', 6], ['indirizzo', 'mente_indirizzo', 7]]) {
+    const b = await nascita(10 + Object.keys(out.bugie).length, F[f], m);
+    out.bugie[n] = b.r.ok ? b.perche : ('http ' + b.r.codice + ' ' + b.r.d.error);
+  }
+  out.doppia = (await nascita(1, F[0], 'normale')).r.codice;          // la stessa fattura due volte
+  out.storta = (await api('/v2/swap/submarine', {from: 'BTC', to: 'BTC', invoice: 'lnbc1storta', refundPublicKey: h.encode(chiavi(1).pub)})).codice;
+  out.piccola = (await nascita(1, F[2], 'normale')).r.codice;         // sotto il minimo
+  out.pairHash = (await api('/v2/swap/submarine', {from: 'BTC', to: 'BTC', invoice: F[1].invoice, refundPublicKey: h.encode(chiavi(1).pub), pairHash: 'altra'})).codice;
+  /* 2. la strada felice: i bitcoin, la conferma, la fattura pagata, il ritiro a due */
+  const id = buona.r.d.id;
+  out.primaDeiBitcoin = (await api(`/v2/swap/submarine/${id}/transaction`)).codice;
+  await comando(`/cartone/stato?id=${id}&s=transaction.mempool`);
+  const lk = (await api(`/v2/swap/submarine/${id}/transaction`)).d;
+  const utxo = JSON.parse((await rete(`/address/${buona.r.d.address}/utxo`)).testo);
+  out.lockup = {visto: !!lk.hex, valore: utxo.length === 1 ? utxo[0].value : null, confermato: utxo[0] && utxo[0].status.confirmed};
+  await comando(`/cartone/stato?id=${id}&s=transaction.confirmed`);
+  out.stato1 = (await api(`/v2/swap/${id}`)).d.status;
+  out.preimagePrima = (await api(`/v2/swap/submarine/${id}/preimage`)).codice;
+  out.claimPrima = (await api(`/v2/swap/submarine/${id}/claim`)).codice;
+  out.pagataStorta = (await comando(`/cartone/stato?id=${id}&s=invoice.paid&preimage=${'ab'.repeat(32)}`)).ok;
+  await comando(`/cartone/stato?id=${id}&s=invoice.paid&preimage=${F[0].preimage}`);
+  out.preimage = (await api(`/v2/swap/submarine/${id}/preimage`)).d.preimage === F[0].preimage;
+  const det = (await api(`/v2/swap/submarine/${id}/claim`)).d;
+  out.claim = {preimage: det.preimage === F[0].preimage, chiave: det.publicKey === buona.r.d.claimPublicKey, nonce: String(det.pubNonce || '').length === 132};
+  {
+    const loro = h.decode(buona.r.d.claimPublicKey);
+    const albero = S.SwapTreeSerializer.deserializeSwapTree(buona.r.d.swapTree);
+    const tweaked = S.TaprootUtils.tweakMusig(S.Musig.create(buona.k.priv, [loro, buona.k.pub]), albero.tree);
+    const m = tweaked.message(h.decode(det.transactionHash)).generateNonce();
+    const s = m.aggregateNonces([[loro, h.decode(det.pubNonce)]]).initializeSession().signPartial();
+    const rotta = new Uint8Array(s.ourPartialSignature); rotta[5] ^= 1;
+    out.claimRotta = (await api(`/v2/swap/submarine/${id}/claim`, {pubNonce: h.encode(m.publicNonce), partialSignature: h.encode(rotta)})).codice;
+    out.claimOk = (await api(`/v2/swap/submarine/${id}/claim`, {pubNonce: h.encode(m.publicNonce), partialSignature: h.encode(s.ourPartialSignature)})).codice;
+  }
+  out.stato2 = (await api(`/v2/swap/${id}`)).d.status;
+  out.spesa = JSON.parse((await rete(`/tx/${lk.id}/outspend/0`)).testo).spent;
+  out.rimborsoDopoRitiro = (await rimborso(buona, IN.dest, true)).firma;
+  /* 3. il rimborso cooperativo a fattura non pagata */
+  const sw2 = await nascita(2, F[1], 'normale');
+  const id2 = sw2.r.d.id;
+  await comando(`/cartone/stato?id=${id2}&s=transaction.mempool`);
+  out.rimborsoPresto = (await rimborso(sw2, IN.dest, true)).firma;     // non ancora fallito
+  await comando(`/cartone/stato?id=${id2}&s=invoice.failedToPay`);
+  out.stato3 = (await api(`/v2/swap/${id2}`)).d;
+  await comando('/cartone/modo?m=non_firma');
+  out.rimborsoNegato = (await rimborso(sw2, IN.dest, true)).firma;
+  await comando('/cartone/modo?m=normale');
+  out.rimborsoCoop = await rimborso(sw2, IN.dest, true);
+  out.rimborsoCoopRotto = await rotta(out.rimborsoCoop.hex);
+  out.spesa2 = JSON.parse((await rete(`/tx/${(await api(`/v2/swap/submarine/${id2}/transaction`)).d.id}/outspend/0`)).testo);
+  /* 4. il rimborso dallo script: prima della scadenza no, poi si' */
+  const sw3 = await nascita(3, F[3], 'normale');
+  const id3 = sw3.r.d.id;
+  await comando(`/cartone/stato?id=${id3}&s=transaction.mempool`);
+  await comando(`/cartone/stato?id=${id3}&s=swap.expired`);
+  out.scriptPresto = await rimborso(sw3, IN.dest, false);
+  await comando(`/cartone/cima?h=${sw3.r.d.timeoutBlockHeight}`);
+  out.scriptMaturo = await rimborso(sw3, IN.dest, false);
+  out.scriptRotto = await rotta(out.scriptMaturo.hex);
+  /* 5. i bitcoin mandati in meno */
+  await comando('/cartone/modo?m=lockup_meno');
+  const sw4 = await nascita(4, F[4], 'normale');
+  await comando('/cartone/modo?m=lockup_meno');
+  await comando(`/cartone/stato?id=${sw4.r.d.id}&s=transaction.mempool`);
+  await comando('/cartone/modo?m=normale');
+  out.meno = (await api(`/v2/swap/${sw4.r.d.id}`)).d.status;
+  /* 6. il recupero dalla xpub */
+  const trovati = (await api('/v2/swap/restore', {xpub: radice.publicExtendedKey})).d;
+  out.recupero = trovati.filter(s => s.type === 'submarine').map(s => [s.refundDetails.keyIndex, s.status, s.refundDetails.serverPublicKey.length, !!s.refundDetails.tree]).sort();
+  out.visto = await comando('/cartone/visto');
+  console.log(JSON.stringify(out));
+})().catch(e => { console.error(String(e && e.stack || e)); process.exit(1); });
+"""
+
+
 def prove_grafica_swap():
     """LA GRAFICA DELLO SWAP PER TUTTI (27 ott 2026, cantiere grafica-swap,
     piano approvato da Andrea con tre modifiche). Le regole: al piu' TRE
@@ -180078,7 +180407,7 @@ def main():
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_grafica_swap,
+              prove_grafica_swap, prove_cartone_submarine,
               prove_margine_cassaforte,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
               prove_quantita_servizi,

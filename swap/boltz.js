@@ -182,7 +182,8 @@ const SWAP_FASI_BOLTZ = {
   'transaction.failed': 'fallito', 'transaction.refunded': 'ripreso'};
 
 /* ─── 2. LA LIBRERIA, pigra ──────────────────────────────────────────── */
-const SWAP_BUNDLE_VER = '5.0.0-bar1';
+/* -bar2 (27 ott 2026, cantiere cambio-libero): un nome in piu', `swapTree` */
+const SWAP_BUNDLE_VER = '5.0.0-bar2';
 let swapBundlePromessa = null;
 function caricaBundleSwap(){
   if (window.BarattoloSwap) return Promise.resolve(window.BarattoloSwap);
