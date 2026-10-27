@@ -72846,3 +72846,132 @@ collaudo o sul telefono di Andrea prima di accendere `SWAP_ATTIVO`.
 strada facendo: la carta di stato dell'ordine sopra il pannello dice
 ancora «via Lightning ⚡» anche quando si è scelto l'indirizzo bitcoin
 (è la riga dello stadio del pagamento, non dello swap: non toccata).
+
+## Il cambio libero, tappa 1: il cartone impara la strada bitcoin → Lightning, e il bundle l'albero del submarine (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea)
+
+**DA DOVE.** Andrea, sul collaudo, ha visto lo swap della tappa 4 e ha
+detto che lo vuole «solo così»: un tastino, scelgo la direzione
+(Lightning → indirizzo bitcoin, o indirizzo → Lightning), vedo le fee,
+confermo, fine — senza un ordine di mezzo. E negli ordini: chi compra
+sceglie come pagare, chi vende come ricevere, e se le scelte sono
+diverse il cambio parte da solo col costo scritto. Il piano, in dieci
+righe, e le decisioni (27 ott, 08:25): il tasto sta DENTRO la pagina,
+niente cella nuova (il nome di pagina e tasto si propone prima dei
+testi); tetti 500.000 sats per cambio e 5 cambi al giorno; all'inizio
+solo i moderatori; sul collaudo solo col cartone, mai il SATS Routing
+vero; la domanda a Massimo (la submarine passa dal nostro codice
+partner e conta la quota? i limiti di chiamate?) la fa Andrea, e LA
+TAPPA 3 (indirizzo → Lightning) NON SI ACCENDE FINCHÉ MASSIMO NON
+RISPONDE. La risposta di Alan ha tolto dal piano la cassa dell'ordine in
+bitcoin: chi compra on-chain resta nel suo cantiere (il 2-di-3 non
+custodial, `onchain_ordini`), niente cambio sulla fattura della
+cassaforte; quando il suo on-chain arriverà, chi riceve dal 2-di-3
+potrà scegliere di cambiare in Lightning, ma è un cantiere a parte. Le
+tappe restate: T1 il cartone submarine (questa), T2 il cambio libero
+Lightning → indirizzo, T3 indirizzo → Lightning, T5 i documenti.
+
+**LA SCELTA DI FONDO: il cambio libero NON passa dalla cassaforte.** I
+sats partono e arrivano SOLO dal wallet dell'utente: nella direzione
+Lightning → indirizzo paga lui la fattura dello swap col suo wallet e
+il suo telefono ritira i bitcoin (il motore della tappa 3, già fatto);
+nella direzione indirizzo → Lightning incolla la fattura del suo wallet,
+manda i bitcoin lui, e il suo telefono si riprende i bitcoin con le 12
+parole se il cambio non va. Barattolo non tiene mai niente: niente
+doppi pagamenti, niente 🧊, niente margine della cassaforte. Si
+guadagna solo la quota del 10 % di SATS Routing (`SWAP_FEE_PERCENTO`
+resta 0).
+
+**COSA FA LA TAPPA 1.** Il cartone sapeva solo il reverse (Lightning →
+indirizzo). Adesso sa anche il «submarine» di Boltz v2, col calco dei
+loro documenti: le tariffe (`GET /v2/swap/submarine`: 0,5 % + 318, da
+50.000 a 5.000.000, zero-conf a 0, i numeri del 16 ott), la nascita
+(`POST`: il telefono manda la SUA fattura e la sua chiave di RIMBORSO;
+il cartone legge la fattura da sé — importo, impronta, rete —, fa la
+sua chiave di RITIRO, l'albero `swapTree`, l'indirizzo, e dice quanto
+mandare: fattura + commissione per eccesso + rete), i bitcoin del
+telefono visti dalla rete (`.../transaction`, e il finto mempool di
+sempre), il segreto a fattura pagata (`.../preimage`), il ritiro A DUE
+del cartone (`GET`+`POST .../claim`: l'impronta da firmare e il nonce
+del cartone, poi la metà del telefono; il nonce segreto va e torna fra
+due processi dell'aiutante, perché una chiamata è un processo), il
+rimborso cooperativo (`POST .../refund`, solo a swap fallito:
+`invoice.failedToPay`, `swap.expired`, `transaction.lockupFailed`), il
+rimborso dallo script (tre pezzi di testimone con la foglia del
+rimborso; accettato SOLO col locktime alla scadenza, la cima della rete
+arrivata lì e la sequenza non finale — «non-final» altrimenti, come
+bitcoind), e il recupero dalla xpub con `refundDetails`. Le parti sono
+ROVESCIATE rispetto al reverse (qui il cartone ritira e il telefono
+rimborsa): l'aiutante lo sa da `loroChiave`, la chiave dell'altro
+qualunque sia il tipo, e il resto della crittografia (lockup, firma a
+due, controllo) è lo stesso codice. Le bugie `mente_importo`
+(`expectedAmount` più alto), `mente_albero`, `mente_indirizzo` e
+`non_firma` valgono anche qui; `lockup_meno` fa `transaction.lockupFailed`.
+IL BUNDLE: `swapTree` (l'albero del submarine di boltz-core) non era
+esportato. Rifatto con la STESSA ricetta: prima senza la riga nuova,
+byte per byte lo sha256 di prima (riproducibile, 20 ott → 27 ott); poi
+con la riga, `adb1090c…`, 378.064 byte, due costruzioni uguali.
+Ventiquattro nomi, `?v=5.0.0-bar2`, `SWAP_TELEFONO_VER` rifatta. Di
+passaggio: il cartone lanciato da riga di comando (`main`) non aveva
+`cima` nello stato, e `/esplora/blocks/tip/height` lì esplodeva prima
+di un `/cartone/cima`: ora nasce come in `nuovo_cartone`.
+
+**STRADE SCARTATE.** Costruire l'albero del submarine a mano in
+JavaScript con i soli nomi già esportati (ripemd160 e lo script non
+c'erano: sarebbe stata una copia a mano di boltz-core, da tenere
+allineata); un nonce deterministico per il ritiro a due (la libreria lo
+fa a caso: si porta il segreto fra i due processi, che è quel che fa un
+server vero con la sua memoria); far pagare al cartone la fattura del
+telefono (non ha il segreto: lo porta il comando, come il wallet).
+
+**PROVATO** (albero: develop 3ee09a9 più questo cantiere, nel worktree;
+venv senza coincurve, come la CI).
+- `prove_cartone_submarine` (21/0, 13 s): le sentinelle sul cartone e
+  sull'aiutante (porte, `RIMBORSABILI`, «non-final», nessun esadecimale
+  da 64), la lettura della fattura (sats e impronta; rete sbagliata,
+  forma storta e checksum rotto sono None), e poi UN TELEFONO DI
+  CARTONE IN NODE contro il cartone acceso nel processo: tariffe; la
+  nascita onesta passa la verifica che farà il telefono (albero rifatto
+  con `swapTree` dai suoi pezzi, indirizzo dalle due chiavi e
+  dall'albero, `expectedAmount` non più del conto: 60.000 → 60.618,
+  `bip21`, niente zero-conf); le tre bugie col loro nome; la stessa
+  fattura due volte, una storta, sotto il minimo, un pairHash vecchio:
+  400; prima dei bitcoin 404, poi la rete li vede non confermati; il
+  segreto e il ritiro a due solo a fattura pagata, e «pagata» con un
+  segreto che non è quello della fattura non passa; il ritiro a due con
+  la metà rotta è 400, con la buona i bitcoin sono spesi
+  (`transaction.claimed`, `outspend` spent); il rimborso cooperativo è
+  no dopo il ritiro, no prima del fallimento, no nel modo `non_firma`,
+  sì a `invoice.failedToPay` (un pezzo di testimone, locktime 0, su
+  rete e fornitore); il rimborso dallo script è «non-final» prima della
+  scadenza su tutte e due le strade e passa alla cima giusta con lo
+  stesso id; la firma rovesciata di un byte, cooperativa o dallo
+  script, è «firma non valida» del giudice BIP-340 su tutte e due le
+  strade; `lockup_meno` → `transaction.lockupFailed`; il recupero
+  ritrova i submarine con indici, stati e `refundDetails`; i contatori;
+  i reverse non si toccano (zero letture e firme del reverse).
+- Le sezioni swap di prima (`prove_swap_cella`, `_preventivo`,
+  `_telefono`, `_fornitori`, `_pagamento`, `prove_grafica_swap`) con la
+  nuova: 180/0 — il reverse passa ancora da `pezzi`, `firma`,
+  `controlla` e `trasmetti` cambiati.
+- CONTROPROVE (il cartone rotto apposta, poi rimesso): senza la cima
+  della rete nel controllo del locktime → rossa la «non-final»; il
+  rimborso ammesso anche a swap vivo → rosse due (la sentinella e il
+  «no prima del fallimento»); «pagata» con qualunque segreto → rossa;
+  la bugia dell'importo non detta → rossa; la trasmissione senza il
+  giudice BIP-340 → rossa la firma rovesciata. UNA NON È ANDATA ROSSA,
+  e si dice: togliere il giudice Python dal ritiro a due (`POST /claim`)
+  resta verde, perché la metà rotta la boccia PRIMA `addPartial` di
+  boltz-core (`verifyPartial`) nell'aiutante; il giudice Python lì è la
+  seconda cintura, non la prima.
+- I collaudi dello swap e la suite: nel messaggio del commit.
+
+**COSA RESTA (le tappe dopo).** T2: il tasto del cambio nella pagina,
+la direzione Lightning → indirizzo col motore della tappa 3 ma la
+fattura la paga l'utente col suo wallet (QR, «Apri nel wallet»); il
+nome di pagina e tasto da proporre ad Andrea PRIMA dei testi. T3: la
+direzione indirizzo → Lightning nel telefono (incolla la fattura,
+indirizzo + cifra col QR, una conferma, fatto; il rimborso con le
+parole) — NON si accende finché Massimo non risponde sulla quota e sui
+limiti. Le leve, spente di serie: `CAMBIO_LIBERO_ATTIVO`,
+`CAMBIO_LIBERO_SOLO_MODERATORI` (True), `CAMBIO_LIBERO_MAX_SATS`
+(500.000), `CAMBIO_LIBERO_MAX_AL_GIORNO` (5). T5: i documenti.

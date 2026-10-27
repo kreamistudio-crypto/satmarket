@@ -42,6 +42,7 @@ var BarattoloSwap = (() => {
     mnemonicToSeedSync: () => mnemonicToSeedSync,
     reverseSwapTree: () => ReverseSwapTree_default,
     sha256: () => sha256,
+    swapTree: () => SwapTree_default,
     targetFee: () => targetFee,
     validateMnemonic: () => validateMnemonic,
     wordlist: () => wordlist
@@ -11532,13 +11533,13 @@ zoo`.split("\n"));
       throw new Error("not all Taproot inputs have an internal key");
     }
   };
-  var getClaimLeaf = (swapTree) => {
-    if (!isSwapTree(swapTree)) {
+  var getClaimLeaf = (swapTree2) => {
+    if (!isSwapTree(swapTree2)) {
       throw new Error(Errors.claimRequiresClaimLeaf);
     }
-    return swapTree.claimLeaf;
+    return swapTree2.claimLeaf;
   };
-  var getTapLeaf = (isRefund, swapTree) => isRefund ? swapTree.refundLeaf : getClaimLeaf(swapTree);
+  var getTapLeaf = (isRefund, swapTree2) => isRefund ? swapTree2.refundLeaf : getClaimLeaf(swapTree2);
   var constructClaimTransaction = (utxos, destinationScript, fee, isRbf = true, timeoutBlockHeight, isRefund = false) => {
     validateInputs(utxos);
     const sortedUtxos = [...utxos].sort(compareInputs);
@@ -11629,6 +11630,22 @@ zoo`.split("\n"));
     timeoutBlockHeight,
     "CHECKLOCKTIMEVERIFY"
   ]);
+  var swapTree = (isLiquid, preimageHash, claimPublicKey, refundPublicKey, timeoutBlockHeight) => {
+    const claimLeaf = createLeaf(isLiquid, [
+      "HASH160",
+      ripemd160(preimageHash),
+      "EQUALVERIFY",
+      toXOnly(claimPublicKey),
+      "CHECKSIG"
+    ]);
+    const refundLeaf = createRefundLeaf(isLiquid, refundPublicKey, timeoutBlockHeight);
+    return {
+      claimLeaf,
+      refundLeaf,
+      tree: swapLeafsToTree(claimLeaf, refundLeaf)
+    };
+  };
+  var SwapTree_default = swapTree;
 
   // node_modules/boltz-core/dist/lib/swap/ReverseSwapTree.js
   var reverseSwapTree = (isLiquid, preimageHash, claimPublicKey, refundPublicKey, timeoutBlockHeight) => {
