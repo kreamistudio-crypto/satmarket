@@ -44275,8 +44275,12 @@ def prove_fogli_di_casa():
     # NOVANTAQUATTRO (27 ott 2026, leve-tutte): «Annulla» un cambio della
     # storia delle leve (`storiaAnnullaChiedi`) e il ripristino di un
     # backup (`backupRipristinaChiedi`).
-    prova("i gesti che passano dalla domanda unica sono novantaquattro",
-          94, solo_codice(mini).count("chiediConferma({"))
+    # NOVANTATRE (27 ott 2026, onchain-pagina): MORTA l'ottantasei, il
+    # «dimentica il seme» della prova del ripristino — Andrea: «fuorviante,
+    # posso recuperarla su Telegram». Al suo posto «Controlla il backup»,
+    # che non cancella niente e quindi non chiede niente.
+    prova("i gesti che passano dalla domanda unica sono novantatre",
+          93, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -118952,7 +118956,7 @@ def prove_profilo_elegante():
                        "accCodici", "accBanner", "accSlugNegozio", "accFerie"],
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
                       "vocSicurezza"],
-        "grpIncassi": ["accLnAddress", "accNwc", "vocEsporta"],
+        "grpIncassi": ["accLnAddress", "vocOnchain", "accNwc", "vocEsporta"],
         "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
         "grpAspetto": ["accAvvisi", "accAspetto"],
         "grpPrivacy": ["accIdentita", "vocPrivacy", "accTor"],
@@ -152002,6 +152006,14 @@ def prove_banco_chiavi_onchain():
           [True, True],
           ["myOnchain = !!me.onchain;" in mini,
            "el('admOnchain').style.display = myOnchain ? '' : 'none';" in mini])
+    # GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea): la porta sta
+    # in «Incassi e pagamenti», per chi passa il cancello, non solo per
+    # gli admin, e porta dritta alla scheda della scelta
+    prova("«⛓️ Incassi on-chain» nel Profilo, col cancello e mai in DEMO, "
+          "dritto alla scheda Impostazioni", [True, True, True],
+          ["el('vocOnchain').style.display = (myOnchain && !DEMO) ? '' : 'none';" in mini,
+           'onclick="onchainApriIncassi()"' in mini,
+           "onchainTab = 'impostazioni';\n  go('onchain');" in mini])
     prova("il caricatore e' PIGRO e timbrato col suo ?v=", [True, True],
           ["if (window.BarattoloBTC) return Promise.resolve(window.BarattoloBTC);"
            in mini,
@@ -152019,8 +152031,10 @@ def prove_banco_chiavi_onchain():
     prova("nel blocco del seme non c'e' NESSUNA fetch: le dodici parole "
           "non escono dal telefono", [0, 0],
           [blocco.count("fetch("), blocco.count("XMLHttpRequest")])
-    prova("il «dimentica» tocca il dispositivo e NON la nuvola",
-          [True, False],
+    # dal 27 ott 2026 il «dimentica» non c'e' piu' (Andrea: fuorviante):
+    # nessun gesto della pagina cancella il seme, ne' qui ne' nella nuvola
+    prova("nessun gesto cancella il seme: ne' dal dispositivo ne' dalla "
+          "nuvola", [False, False],
           ["localStorage.removeItem(onchainChiave());" in mini,
            "cloudCancella(ONCHAIN_CLOUD)" in mini])
     prova("il seme sta sotto il CONTO, come il mazzo del P2P", True,
@@ -152193,36 +152207,33 @@ __PEZZO__
 
 
 def prove_ripristino_visibile():
-    """LA PROVA DEL RIPRISTINO SI VEDE (23 ott 2026, cantiere
-    onchain-ripristino, richiesta di Alan). Dopo «Dimentica» il foglio
-    ritrovava da solo le parole dal cloud al primo ridisegno: chi aveva
-    appena dimenticato le rivedeva con «Mostra», e la prova non provava
-    niente. Ora il dispositivo resta VUOTO, e lo dice, finche' non si
-    tocca «Ripristina dal cloud». E il cloud ha un nome: quello di
-    Telegram, il CloudStorage della Mini App, cifrato con MTProto."""
-    print("\n♻️ La prova del ripristino si vede")
+    """IL BACKUP SI CONTROLLA, NON SI DISTRUGGE (27 ott 2026, cantiere
+    onchain-pagina, correzione di Andrea). Dal 23 ott (richiesta di Alan)
+    c'era la prova del ripristino in tre passi — metro, «Dimentica»,
+    «Ripristina dal cloud» — e Andrea: «non si capisce, "dimentica su
+    questo dispositivo" e' fuorviante dato che posso recuperarla su
+    Telegram». La domanda resta — il backup ridà la mia chiave? — e la
+    risponde «🔍 Controlla il backup», che legge le copie e le confronta
+    con la chiave di qui senza cancellare niente. E il cloud ha sempre
+    un nome: quello di Telegram, il CloudStorage, cifrato con MTProto."""
+    print("\n♻️ Il backup si controlla, non si distrugge")
     mini = open("miniapp.html", encoding="utf-8").read()
-    rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
-    prova("dopo «Dimentica» il foglio mostra il vuoto PRIMA di cercare nelle "
-          "case", True,
-          rendi.index("if (onchainDimenticato && !onchainSemeLocale()) {")
-          < rendi.index("onchainVuotoDopoDimentica()")
-          < rendi.index("await onchainSemeAssicurato()"))
-    dim = pezzo_js(mini, "function onchainDimentica(){", "\n}\n")
-    prova("«Dimentica» cancella e ACCENDE il vuoto", [True, True],
-          ["localStorage.removeItem(onchainChiave())" in dim,
-           "onchainDimenticato = true;" in dim])
-    rip = pezzo_js(mini, "async function onchainRipristina(btn){", "\n}\n")
-    prova("«Ripristina» spegne il vuoto prima di cercare", True,
-          rip.index("onchainDimenticato = false;")
-          < rip.index("await onchainSemeAssicurato();"))
-    vuoto = pezzo_js(mini, "function onchainVuotoDopoDimentica(){", "\n}\n")
-    prova("il vuoto ha il bottone che ripristina, e dice dove sono le parole",
+    prova("il metro, il «Dimentica» e il «Ripristina» sono morti",
+          [False] * 6,
+          ["function onchainDimentica(" in mini, "function onchainMetro(" in mini,
+           "function onchainRipristina(" in mini, "onchainDimenticato" in mini,
+           "Prendi il metro" in mini, "Dimentica su questo dispositivo" in mini])
+    imp = pezzo_js(mini, "function onchainSchedaImpostazioni(miaXpub){", "\n}\n")
+    prova("in Impostazioni c'e' «Controlla il backup», e dice che non cancella",
           [True, True, True],
-          ['onclick="onchainRipristina(this)">♻️ Ripristina dal cloud<' in vuoto,
-           "cloud di Telegram" in vuoto, "MTProto" in vuoto])
-    dove = pezzo_js(mini, "function onchainDoveAbita(){", "\n}\n")
+          ['onclick="onchainGuarda(this)">🔍 Controlla il backup<' in imp,
+           "Non cancella niente." in imp, "${onchainDoveAbita()}" in imp])
     guarda = pezzo_js(mini, "async function onchainGuarda(btn){", "\n}\n")
+    prova("il controllo confronta le copie con la chiave di qui, senza "
+          "toccare il localStorage", [True, True, False],
+          [".every(x => x === qui)" in guarda,
+           "la ritrovi da sola" in guarda, "localStorage" in guarda])
+    dove = pezzo_js(mini, "function onchainDoveAbita(){", "\n}\n")
     prova("il cloud ha un nome: il CloudStorage di Telegram, cifrato con "
           "MTProto, in nessuna chat", [True, True, True, True],
           ["<b>CloudStorage</b>" in dove, "cifrata con MTProto" in dove,
@@ -152230,10 +152241,95 @@ def prove_ripristino_visibile():
            "il CloudStorage della Mini App, cifrato con MTProto" in guarda])
     prova("...e non si promette l'end-to-end", False,
           "end-to-end" in dove.lower().replace("non e' end-to-end", ""))
-    prova("la prova e' detta in tre passi", [True, True, True],
-          ["1. <b>📏 Prendi il metro</b>" in mini,
-           "2. <b>🧹 Dimentica</b>" in mini,
-           "3. <b>♻️ Ripristina dal cloud</b>" in mini])
+
+
+def prove_onchain_pagina():
+    """LA PAGINA ON-CHAIN IN QUATTRO SCHEDE (27 ott 2026, cantiere
+    onchain-pagina, richieste di Andrea): «quando pago on-chain non devo
+    vedere le vecchie transazioni», «invece del pippone un tab Info»,
+    «come si puo' dimostrare che quello e' un multisig 2-di-3?», «tutti i
+    tecnicismi in una sezione dedicata o nelle info della transazione»."""
+    print("\n⛓️ La pagina on-chain in quattro schede")
+    import shutil
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rendi = pezzo_js(mini, "async function renderOnchain(){", "\n}\n")
+    prova("una scheda alla volta: Ordini di serie, poi Info, Impostazioni, "
+          "Tecnico", [True] * 4,
+          ["if (onchainTab === 'info') corpo = onchainSchedaInfo();" in rendi,
+           "else if (onchainTab === 'impostazioni') corpo = onchainSchedaImpostazioni(miaXpub);" in rendi,
+           "else if (onchainTab === 'tecnico') corpo = onchainSchedaTecnico(" in rendi,
+           "else corpo = onchainBloccoOrdini(verOrdini, esiti);" in rendi])
+    tec = pezzo_js(mini, "function onchainSchedaTecnico(parole, k, miaXpub, verifiche){",
+                   "\n}\n")
+    prova("le dodici parole stanno SOLO in Tecnico, dietro un bottone",
+          [1, True],
+          [mini.count("👁 Mostra le dodici parole"),
+           "👁 Mostra le dodici parole" in tec])
+    info = pezzo_js(mini, "function onchainSchedaInfo(){", "\n}\n")
+    prova("Info dice le tre chiavi, chi firma, e dove vive la mia chiave "
+          "(Telegram, Nostr)", [True, True, True, True],
+          ["ne servono <b>due</b>" in info, "account Telegram</b>" in info,
+           "relay Nostr</b>" in info, "deposito di garanzia</b>" in info])
+    prova("...e il lessico: mai «assicurato», mai «escrow» per chi compra",
+          [False, False], ["assicurat" in info.lower(), "escrow" in info.lower()])
+    # arrivando dalla cassa: SOLO quell'ordine
+    compra = mini[mini.index("onchainOrdineAperto = x.onchain.id;") - 200:
+                  mini.index("go('onchain');", mini.index("onchainOrdineAperto = x.onchain.id;"))]
+    prova("la cassa apre la pagina sull'ordine appena nato, da solo",
+          [True, True],
+          ["onchainSoloOrdine = x.onchain.id;" in compra,
+           "onchainTab = 'ordini';" in compra])
+    prova("...e dal profilo si torna a vederli tutti", True,
+          "onclick=\"onchainSoloOrdine=0;onchainTab='ordini';go('onchain')\">⛓️ On-chain</button>" in mini)
+    blocco = pezzo_js(mini, "function onchainBloccoOrdini(verifiche, esiti){", "\n}\n")
+    fatto = pezzo_js(mini, "function onchainComeEFatto(o, v){", "\n}\n")
+    prova("ogni ordine porta «Com'è fatto questo 2-di-3» col descrittore "
+          "da copiare e la verifica fuori", [True, True, True, True],
+          ["${onchainComeEFatto(o, v)}" in blocco, "📋 Copia il descrittore" in fatto,
+           "deriveaddresses" in fatto, "OP_CHECKMULTISIG" in fatto])
+    node = shutil.which("node")
+    if not node:
+        print("   (node assente: il giro vero della scheda Ordini salta)")
+        return
+    banco = r"""
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => String(n);
+let onchainOrdineAperto = 0;
+const ONCHAIN_STATI = {attesa: 'attesa', pagato: 'pagato', rilasciato: 'rilasciato', scaduto: 'scaduto'};
+""" + pezzo_js(mini, "const ONCHAIN_CHIUSI =", "\n") + "\n" + blocco + "\n}\n" + fatto + "\n}\n" + r"""
+let onchainSoloOrdine = 0;
+const ind = {indirizzo: 'tb1qxyz', descrittore: "wsh(sortedmulti(2,02aa,02bb,02cc))#abcdefgh",
+             chiavi: {compratore: '02aa', venditore: '02bb', barattolo: '02cc'}};
+let onchainOrdini = [
+  {id: 7, titolo: 'Nuovo', ruolo: 'compratore', stato: 'attesa', prezzo_sats: 1000, importo_sats: 1200, margine_sats: 200, quota_sats: 0, scade: 1, indirizzo: ind, esploratore: 'https://m'},
+  {id: 5, titolo: 'Vecchio', ruolo: 'compratore', stato: 'rilasciato', prezzo_sats: 9, indirizzo: ind, esploratore: 'https://m'},
+  {id: 3, titolo: 'Scaduto', ruolo: 'venditore', stato: 'scaduto', prezzo_sats: 9, indirizzo: ind, esploratore: 'https://m'}];
+const v = {7: {mia: true, uguale: true}, 5: {mia: true, uguale: true}, 3: {mia: true, uguale: true}};
+const out = {};
+onchainSoloOrdine = 7;
+let h = onchainBloccoOrdini(v, []);
+out.solo = [h.includes('#7 · Nuovo'), h.includes('Vecchio'), h.includes('Tutti gli ordini on-chain (2 altri)')];
+onchainSoloOrdine = 0;
+h = onchainBloccoOrdini(v, []);
+out.tutti = [h.indexOf('#7 · Nuovo') < h.indexOf('Ordini chiusi (2)'), h.indexOf('Ordini chiusi (2)') < h.indexOf('Vecchio')];
+out.copia = h.includes("copiaLink(&quot;wsh(sortedmulti(2,02aa,02bb,02cc))#abcdefgh&quot;, 'Descrittore copiato')");
+onchainOrdini = [];
+out.vuoto = onchainBloccoOrdini(v, []).includes('scegli <b>⛓️ On-chain</b>');
+console.log(JSON.stringify(out));
+"""
+    r = subprocess.run([node, "-e", banco], capture_output=True, text=True, timeout=30)
+    try:
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        prova("il banco node della scheda Ordini gira", "", r.stderr[-400:])
+        return
+    prova("dalla cassa: c'e' solo l'ordine nuovo, e un link per gli altri",
+          [True, False, True], o["solo"])
+    prova("dal profilo: gli aperti in cima, i chiusi piegati sotto",
+          [True, True], o["tutti"])
+    prova("il descrittore si copia intero dal bottone", True, o["copia"])
+    prova("senza ordini la scheda dice come si paga on-chain", True, o["vuoto"])
 
 
 def _pezzi_incasso_js(mini):
@@ -152563,7 +152659,8 @@ def prove_ordine_onchain():
     prova("ogni indirizzo d'ordine passa da onchainVerificaRiga prima del "
           "foglio", True,
           rendi.index("onchainVerificaRiga(parole, onchainSrv, o.indirizzo)")
-          < rendi.index("box.innerHTML = onchainBloccoOrdini("))
+          < rendi.index("else corpo = onchainBloccoOrdini(verOrdini, esiti);")
+          < rendi.index("box.innerHTML = onchainSchede() + corpo;"))
     blocco = pezzo_js(mini, "function onchainBloccoOrdini(verifiche, esiti){",
                       "\n}\n")
     prova("...e il QR da pagare si disegna solo se il telefono l'ha "
@@ -152794,18 +152891,27 @@ def prove_indirizzo_ordine_onchain():
     prova("ogni indirizzo del server passa da onchainVerificaRiga prima del "
           "foglio", True,
           rendi.index("onchainVerificaRiga(parole, onchainSrv, r)")
-          < rendi.index("+ onchainConSeme(parole, k, miaXpub, verifiche);"))
+          < rendi.index("onchainSchedaTecnico(parole, k, miaXpub, verifiche)"))
     riga_js = pezzo_js(mini, "function onchainRigaIndirizzo(r, v){", "\n}\n")
     prova("...e uno che non combacia esce PRIMA di scrivere l'indirizzo",
           True, riga_js.index("if (!v.uguale) {")
           < riga_js.index("esc(r.indirizzo)"))
-    prova("i blocchi del foglio: 4 accendi, 5 indirizzo vero, e i vecchi "
-          "rinumerati", [True] * 5,
-          ["<h4>4. Accendi l'on-chain</h4>" in mini,
+    # LE QUATTRO SCHEDE (27 ott 2026, onchain-pagina): gli otto blocchi
+    # numerati non ci sono piu', e l'indirizzo di prova dice cosa fa
+    prova("il foglio ha le quattro schede, e niente blocchi numerati",
+          [True, True, True, True, False, False],
+          ["['ordini', 'Ordini'], ['info', 'Info']" in mini,
+           "['impostazioni', 'Impostazioni'], ['tecnico', 'Tecnico']" in mini,
+           "<h4>⛓️ L'on-chain non è ancora acceso</h4>" in mini,
+           "<b>🧪 Un indirizzo di prova con un'altra persona</b>" in mini,
            "<h4>5. Un indirizzo vero, con un altro admin</h4>" in mini,
-           "<h4>6. Il backup, che si fa da sé</h4>" in mini,
-           "<h4>7. La prova del ripristino</h4>" in mini,
-           "<h4>8. Esporta</h4>" in mini])
+           "<h4>7. La prova del ripristino</h4>" in mini])
+    ind_js = pezzo_js(mini, "function onchainBloccoIndirizzi(miaXpub, verifiche){",
+                      "\n}\n")
+    prova("...e il bottone dell'indirizzo di prova dice chi fa cosa, non "
+          "piu' «Con Sam»", [True, False],
+          [">➕ Tu compri da\n      ${esc(a.nome)}</button>" in ind_js,
+           ">➕ Con\n      ${esc(a.nome)}" in ind_js])
     # LE CHIAVI DI CARTONE DETTE COME SONO (20 ott 2026, correzione di
     # Andrea): i semi dei vettori del BIP-32 sono pubblicati, quindi
     # chiunque ha la privata. «Nessuno ha la sua privata» era falso
@@ -180742,6 +180848,7 @@ def main():
     prove_indirizzo_ordine_onchain,
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_ripristino_visibile,
+    prove_onchain_pagina,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,

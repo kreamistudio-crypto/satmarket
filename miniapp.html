@@ -838,6 +838,11 @@
     border-radius:999px;font-weight:800;font-size:15px;
     color:var(--muted);cursor:pointer}
   .sez-seg button.active{background:var(--ink);color:var(--on-ink)}
+  /* le quattro schede della pagina On-chain: stessa pillola, piu'
+     piccola perche' in quattro stiano su un telefono stretto */
+  .sez-seg.oc-seg button{flex:auto;white-space:nowrap;font-size:13px;
+    padding:8px 6px;color:var(--ink-soft)}
+  .sez-seg.oc-seg button.active{color:var(--on-ink)}
   /* In Lavoro le categorie, «Da scoprire», le pillole e la fila P2P
      parlano tutte del mercato: si spengono. Su un attributo di #app e
      non su una classe della vista, che e' quel che guarda l'occhio
@@ -13863,6 +13868,18 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="lnAddrBlocco"></div></div>
       </div>
 
+      <!-- ⛓️ GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea: «il
+           venditore deve poter configurare nel profilo dove ricevere i
+           fondi, un indirizzo o una xpub»). La scelta esiste dal mattino
+           (`onchainBloccoIncasso`) ma stava nella pagina On-chain, la cui
+           porta era in «Amministrazione»: chi vende non la trovava. Qui
+           c'e' la porta, accanto al Lightning address; la scelta resta
+           una sola, firmata dal seme, nella scheda Impostazioni. Si
+           accende col CANCELLO (`myOnchain`), come il resto dell'on-chain. -->
+      <div class="acc voce-porta" id="vocOnchain" style="display:none">
+        <button type="button" class="acc-h" onclick="onchainApriIncassi()"><span class="em">⛓️</span><span class="tit2">Incassi on-chain<small>Un tuo indirizzo, o la xpub del tuo wallet per un indirizzo nuovo a ogni vendita.</small></span><span class="fr">›</span></button>
+      </div>
+
       <div class="acc" id="accNwc">
         <button class="acc-h" onclick="toggleAcc('accNwc')"><span class="em">👛</span>Wallet NWC (facoltativo)<span class="fr">▾</span></button>
         <div class="acc-b">
@@ -14010,7 +14027,7 @@ document.getElementById('cartello')?.remove();</script>
            diverse: a leva spenta questo bottone non compare a nessuno,
            moderatori compresi. -->
       <button type="button" class="btn ghost" id="admOnchain" style="display:none"
-              onclick="go('onchain')">⛓️ On-chain (prova)</button>
+              onclick="onchainSoloOrdine=0;onchainTab='ordini';go('onchain')">⛓️ On-chain</button>
       <div id="adminStats"></div>
         </div>
       </div>
@@ -14054,7 +14071,7 @@ document.getElementById('cartello')?.remove();</script>
        un ridisegno non debba ricostruire la pagina. -->
   <div class="view" id="view-onchain">
     <div class="form">
-      <h2 class="profilo-tit">⛓️ On-chain (prova)</h2>
+      <h2 class="profilo-tit">⛓️ On-chain</h2>
       <div id="onchainCorpo"></div>
     </div>
   </div>
@@ -36902,6 +36919,7 @@ function renderLnAddress(){
      spegne da solo (aggiornaGruppiProfilo) */
   const vociIncassi = ['accLnAddress', 'accNwc', 'vocEsporta'];
   vociIncassi.forEach(id => { if (el(id)) el(id).style.display = DEMO ? 'none' : ''; });
+  if (el('vocOnchain')) el('vocOnchain').style.display = (myOnchain && !DEMO) ? '' : 'none';
   if (DEMO) return;
   if (myLnAddress && !lnAddrModifica) {
     box.innerHTML = `
@@ -53848,11 +53866,10 @@ function caricaBitcoin(){
   });
   return btcPromessa;
 }
-/* La cassetta di questo conto. `prima` NON si cancella col «dimentica»:
-   e' il metro del confronto, e senza di lei la prova del ripristino
-   chiederebbe di guardare due stringhe a occhio. */
+/* La cassetta di questo conto. (La sua sorella `_prima`, il «metro»
+   della prova del ripristino, e' morta col gesto il 27 ott 2026: chi la
+   ha ancora nel browser ha una riga che nessuno legge.) */
 function onchainChiave(){ return `barattolo_onchain_${myTgId || 'x'}`; }
-function onchainChiavePrima(){ return `${onchainChiave()}_prima`; }
 const ONCHAIN_CLOUD = 'barattolo_onchain';   // la nuvola e' per conto
 function onchainSemeLocale(){
   try { return localStorage.getItem(onchainChiave()) || ''; }
@@ -54245,17 +54262,50 @@ function onchainAttesa(btn, testo){
 }
 
 let onchainSrv = null;         // quel che il server dice (xpub, strada)
-/* LA PROVA DEL RIPRISTINO SI VEDE (23 ott 2026, richiesta di Alan): dopo
-   «Dimentica» la pagina NON ritrova da sola le parole — prima lo faceva
-   al ridisegno, e chi aveva appena dimenticato le rivedeva subito, senza
-   capire dove fossero finite. Finche' questo e' vero e il dispositivo e'
-   vuoto, il foglio mostra il vuoto e il bottone «Ripristina dal cloud». */
-let onchainDimenticato = false;
+/* LE QUATTRO SCHEDE (27 ott 2026, cantiere onchain-pagina, richiesta di
+   Andrea: «invece del pippone ci deve essere un tab Info», «tutti i
+   tecnicismi si devono vedere in una sezione dedicata o nelle info
+   della transazione»). Il foglio era un banco di prova in otto blocchi
+   numerati, e chi pagava un ordine se li trovava tutti sotto. Ora:
+   - 🧾 Ordini: gli ordini, e arrivando dalla cassa SOLO quello che stai
+     pagando (`onchainSoloOrdine`); i chiusi stanno piegati in fondo;
+   - ℹ️ Info: com'e' fatto, in parole, senza una sigla;
+   - ⚙️ Impostazioni: dove ricevi quando vendi, e il backup;
+   - 🔧 Tecnico: le dodici parole, il descrittore, come importarli,
+     l'esempio di cartone e l'indirizzo di prova.
+   LA PROVA DEL RIPRISTINO E' MORTA QUI (correzione di Andrea: «non si
+   capisce, "dimentica su questo dispositivo" e' fuorviante dato che
+   posso recuperarla su Telegram»). Al suo posto «🔍 Controlla il
+   backup» (`onchainGuarda`), che legge le copie e le confronta con la
+   chiave di qui SENZA cancellare niente: la stessa domanda — il backup
+   ridà la mia chiave? — senza il gesto che faceva paura. */
+let onchainTab = 'ordini';       // 'ordini' | 'info' | 'impostazioni' | 'tecnico'
+let onchainSoloOrdine = 0;       // arrivando dalla cassa si vede solo quello
 let onchainParoleViste = false;  // le dodici parole si mostrano a richiesta
 
-/* IL FOGLIO. Si ridisegna intero a ogni gesto: e' una pagina di prova
-   per due persone, e la semplicita' vale piu' di un aggiornamento
-   chirurgico. */
+/* la porta del Profilo: dritta alla scheda dove si sceglie */
+function onchainApriIncassi(){
+  onchainSoloOrdine = 0;
+  onchainTab = 'impostazioni';
+  go('onchain');
+}
+
+function onchainVaiTab(t){
+  haptic();
+  onchainTab = t;
+  renderOnchain();
+}
+
+function onchainSchede(){
+  const schede = [['ordini', 'Ordini'], ['info', 'Info'],
+                  ['impostazioni', 'Impostazioni'], ['tecnico', 'Tecnico']];
+  return `<div class="sez-seg oc-seg" role="tablist" aria-label="On-chain">${schede.map(([id, nome]) =>
+    `<button type="button" role="tab" class="${onchainTab === id ? 'active' : ''}"
+       aria-selected="${onchainTab === id}" onclick="onchainVaiTab('${id}')">${nome}</button>`).join('')}</div>`;
+}
+
+/* IL FOGLIO. Si ridisegna intero a ogni gesto: la semplicita' vale piu'
+   di un aggiornamento chirurgico. */
 async function renderOnchain(){
   const box = el('onchainCorpo');
   if (!box) return;
@@ -54269,17 +54319,12 @@ async function renderOnchain(){
            dice invece di girare a vuoto */
         box.innerHTML = `<div class="hint">Il pagamento on-chain è
           <b>spento</b> su questo server (<span class="mono">ONCHAIN_ATTIVO</span>).
-          Si accende con una riga nel config del VPS.</div>`;
+          Si accende dal pannello «⚙️ Stato delle leve».</div>`;
         return;
       }
       if (!r.ok) throw new Error('il server non risponde');
       onchainSrv = await r.json();
     }
-    if (onchainDimenticato && !onchainSemeLocale()) {
-      box.innerHTML = onchainVuotoDopoDimentica();
-      return;
-    }
-    onchainDimenticato = false;
     /* LA CHIAVE C'E' GIA' QUANDO APRI: se non l'aveva, nasce qui — in
        silenzio, cercandola prima nelle sue case. Nessuna schermata di
        creazione, che e' il punto della tappa 1c. */
@@ -54292,9 +54337,9 @@ async function renderOnchain(){
     for (const r of (onchainSrv.indirizzi || [])) {
       verifiche.push(await onchainVerificaRiga(parole, onchainSrv, r));
     }
-    /* LA TAPPA 3 (23 ott 2026): gli ordini on-chain in cima, le
-       co-firme che aspettano me fatte prima di disegnarli, e ogni
-       indirizzo d'ordine rifatto qui come quelli di prova */
+    /* LA TAPPA 3 (23 ott 2026): gli ordini on-chain, le co-firme che
+       aspettano me fatte prima di disegnarli, e ogni indirizzo d'ordine
+       rifatto qui come quelli di prova */
     await onchainLeggiOrdini();
     const esiti = await onchainCofirmeInAttesa(parole);
     if (esiti.length) await onchainLeggiOrdini();
@@ -54306,12 +54351,16 @@ async function renderOnchain(){
     for (const o of onchainOrdini) {
       verOrdini[o.id] = await onchainVerificaRiga(parole, onchainSrv, o.indirizzo);
     }
-    box.innerHTML = onchainBloccoOrdini(verOrdini, esiti)
-      + onchainConSeme(parole, k, miaXpub, verifiche);
-    onchainDisegnaQrOrdini(verOrdini);
+    let corpo;
+    if (onchainTab === 'info') corpo = onchainSchedaInfo();
+    else if (onchainTab === 'impostazioni') corpo = onchainSchedaImpostazioni(miaXpub);
+    else if (onchainTab === 'tecnico') corpo = onchainSchedaTecnico(parole, k, miaXpub, verifiche);
+    else corpo = onchainBloccoOrdini(verOrdini, esiti);
+    box.innerHTML = onchainSchede() + corpo;
+    if (onchainTab === 'ordini') onchainDisegnaQrOrdini(verOrdini);
   } catch(e) {
-    box.innerHTML = `<div class="hint">Non sono riuscito a preparare il
-      banco: ${esc(e.message || 'errore')}.</div>
+    box.innerHTML = `<div class="hint">Non sono riuscito a preparare la
+      pagina: ${esc(e.message || 'errore')}.</div>
       <button class="btn ghost" onclick="onchainSrv=null;renderOnchain()">Riprova</button>`;
   }
 }
@@ -54321,38 +54370,154 @@ async function renderOnchain(){
    crearlo — la chiave c'e' gia' quando apri, e se non c'era e' nata
    mentre aprivi. Chi cercasse qui la schermata di creazione: era
    quella, ed e' stata togliere apposta.) */
-function onchainConSeme(parole, k, miaXpub, verifiche){
-  const prima = onchainPrimaLetta();
-  const uguale = prima && prima.indirizzo === k.indirizzo
-                 && prima.descrittore === k.descrittore;
+
+/* ℹ️ INFO: tutto quel che serve per fidarsi, in parole. Il come si
+   verifica a mano sta in Tecnico e in ogni ordine («Com'è fatto questo
+   2-di-3»): qui si dice che si puo', e dove. */
+function onchainSchedaInfo(){
   return `
-    <div class="hint">Rete <b>signet</b>, la rete di prova: gli
-      indirizzi cominciano per <span class="mono">tb1</span> (come su
-      testnet), i sats non valgono niente, e un indirizzo mainnet qui
-      non si calcola da nessuna parte.</div>
+    <div class="payout">
+      <h4>Pagare on-chain, in breve</h4>
+      <div class="hint">È lo stesso <b>deposito di garanzia</b> del
+        Lightning: paghi con un QR, i sats restano fermi finché
+        l'oggetto non ti arriva, e quando lo ricevi li liberi tu al
+        venditore. Cambia solo <b>dove</b> stanno i sats nel
+        frattempo.</div>
+      <div class="hint" style="margin-top:8px">Col Lightning li tiene
+        Barattolo. On-chain stanno su un <b>indirizzo Bitcoin fatto
+        apposta per il tuo ordine</b>, che nessuno può svuotare da
+        solo: nemmeno noi.</div>
+    </div>
 
     <div class="payout">
-      <h4>1. La tua chiave, che è nata da sé</h4>
-      <div class="hint">${onchainComEnata()}
-        Non c'è nessun wallet da creare: sei già entrato con il tuo
-        profilo, e la chiave è venuta dietro.</div>
+      <h4>Tre chiavi, ne servono due</h4>
+      <div class="hint">L'indirizzo dell'ordine è chiuso da <b>tre
+        chiavi</b>: la tua, quella del venditore e quella di Barattolo.
+        Per spostare i sats ne servono <b>due</b> (si chiama
+        «multisig 2-di-3»).</div>
+      <div class="hint" style="margin-top:8px;line-height:1.7">
+        🤝 Va tutto bene: firmate <b>tu e il venditore</b>, e Barattolo non serve.<br>
+        ⚖️ C'è una disputa: Barattolo decide e firma con <b>uno dei due</b>.<br>
+        🫙 Barattolo sparisce: <b>tu e il venditore</b> bastate lo stesso.</div>
+    </div>
+
+    <div class="payout">
+      <h4>La tua chiave</h4>
+      <div class="hint">È nata <b>a caso, dentro il tuo telefono</b>, la
+        prima volta che hai aperto Barattolo: non hai dovuto fare niente,
+        e noi non l'abbiamo mai vista.</div>
+      <div class="hint" style="margin-top:8px">Una copia sta nel tuo
+        <b>account Telegram</b> (lo spazio che Telegram dà a ogni Mini
+        App) e, se hai collegato Nostr, una copia cifrata con la tua
+        chiave sui <b>relay Nostr</b>. Se cambi telefono, la ritrovi da
+        sola entrando con lo stesso account.</div>
+      <div class="hint" style="margin-top:8px">Al server diamo solo la
+        <b>metà pubblica</b>: serve a calcolare l'indirizzo di ogni
+        ordine, e con lei non si spende niente.</div>
+    </div>
+
+    <div class="payout">
+      <h4>Tempi e costi</h4>
+      <div class="hint">Il pagamento vale dopo <b>una conferma</b> della
+        rete, di solito una decina di minuti. All'importo si aggiunge un
+        piccolo <b>margine per la commissione di rete</b> dell'ultimo
+        passaggio: quel che non si spende torna a te quando liberi i
+        sats.</div>
+    </div>
+
+    <div class="payout">
+      <h4>Vuoi controllare da solo?</h4>
+      <div class="hint">Ogni ordine ha «🔍 Com'è fatto questo 2-di-3»: le
+        tre chiavi, la ricetta dell'indirizzo (il <i>descrittore</i>) e
+        come verificarla con un nodo Bitcoin o un block explorer. Le tue
+        dodici parole e come portarle in un altro wallet stanno in
+        <a href="#" onclick="event.preventDefault();onchainVaiTab('tecnico')">Tecnico</a>.</div>
+      <div class="hint" style="margin-top:8px">Il codice di questa pagina
+        arriva dal nostro server a ogni apertura: chi preferisce non
+        fidarsi può firmare fuori, in Sparrow, con le sue parole e il
+        descrittore.</div>
+    </div>`;
+}
+
+/* ⚙️ IMPOSTAZIONI: le due cose che una persona puo' voler cambiare, e
+   lo stato del backup. L'accensione si fa da sola all'apertura
+   (`onchainAccendiDaSolo`): il suo blocco compare solo se qualcosa non
+   torna, e allora ha il bottone. */
+function onchainSchedaImpostazioni(miaXpub){
+  const srv = onchainSrv || {};
+  const acceso = srv.embit && srv.mia_xpub && srv.mia_xpub === miaXpub;
+  return `
+    ${acceso ? '' : onchainBloccoAccendi(miaXpub)}
+    ${onchainBloccoIncasso(miaXpub)}
+    <div class="payout">
+      <h4>Il backup della tua chiave</h4>
+      <div class="hint">${onchainComEnata()} Il backup si fa da solo.</div>
       ${onchainDoveAbita()}
-      <div class="hint" style="margin-top:8px">Dietro c'è una frase di
-        dodici parole inglesi — è la forma che ogni wallet legge, e
-        serve solo se un giorno vuoi portarti le chiavi fuori da
-        qui.</div>
+      <div class="hint" style="margin-top:8px">«Controlla» legge le copie
+        e ti dice se ridanno <b>la stessa chiave</b> di questo telefono.
+        Non cancella niente.</div>
+      <button class="btn ghost" onclick="onchainGuarda(this)">🔍 Controlla il backup</button>
+      <button class="btn ghost" onclick="onchainBackup(this)">Rifai il backup adesso</button>
+      <div id="onchainCloud" class="hint"></div>
+    </div>`;
+}
+
+/* 🔧 TECNICO: per chi vuole sapere esattamente cosa c'e' sotto. Qui e
+   solo qui le dodici parole, la strada del conto, l'esempio di cartone
+   e l'indirizzo di prova. */
+function onchainSchedaTecnico(parole, k, miaXpub, verifiche){
+  return `
+    <div class="hint">Rete <b>signet</b>, la rete di prova: gli
+      indirizzi cominciano per <span class="mono">tb1</span>, i sats non
+      valgono niente, e un indirizzo mainnet qui non si calcola da
+      nessuna parte.</div>
+
+    <div class="payout">
+      <h4>Le dodici parole</h4>
+      <div class="hint">Dietro la tua chiave c'è una frase di dodici
+        parole inglesi (BIP-39): è la forma che ogni wallet legge. Chi le
+        ha <b>firma al posto tuo</b>: non mandarle a nessuno, nemmeno a
+        noi.</div>
       ${onchainParoleViste
         ? `<div class="mono" style="word-break:break-word;line-height:1.7">${esc(parole)}</div>
            <button class="btn ghost" onclick="onchainParoleViste=false;renderOnchain()">🙈 Nascondi</button>`
         : `<button class="btn ghost" onclick="onchainParoleViste=true;renderOnchain()">👁 Mostra le dodici parole</button>`}
+      <div class="hint" style="margin-top:8px">Il conto è il
+        <b>BIP-48</b> multisig, strada <span class="mono">${esc(onchainSrv.strada || '')}</span>:
+        ogni ordine prende la chiave <span class="mono">/0/n</span>, mai
+        usata prima. La metà pubblica che ha il server finisce in
+        <span class="mono">…${esc(onchainCoda(miaXpub))}</span>.</div>
     </div>
 
     <div class="payout">
-      <h4>2. Le tre chiavi di un ordine finto</h4>
-      <div class="hint">Un ordine on-chain ha <b>un indirizzo suo</b>,
-        chiuso da tre chiavi: ne servono <b>due</b> per spendere. Nel
-        giro normale firmano compratore e venditore; la nostra serve
-        <b>solo in disputa</b>.</div>
+      <h4>Dove si importano</h4>
+      <div class="hint" style="line-height:1.7">
+        <b>Le parole da sole non aprono un 2-di-3</b>: un wallet deve
+        sapere anche quali sono le altre due chiavi. Quelle sono nel
+        <b>descrittore</b> di ogni ordine, una riga così:<br>
+        <span class="mono" style="font-size:11px;word-break:break-all">wsh(sortedmulti(2,chiave1,chiave2,chiave3))#controllo</span><br>
+        Si legge: «uno script con <b>2</b> firme su <b>3</b> chiavi»
+        (in ordine alfabetico, BIP-67). Le otto lettere dopo il
+        <span class="mono">#</span> sono il controllo del BIP-380.</div>
+      <div class="hint" style="margin-top:8px;line-height:1.7">
+        • <b>Bitcoin Core</b> (signet): <span class="mono">deriveaddresses "descrittore"</span>
+        ti ridà l'indirizzo dell'ordine; <span class="mono">importdescriptors</span>
+        lo mette in un wallet da guardare.<br>
+        • <b>Sparrow</b> (signet): un wallet nuovo con le dodici parole e
+        la strada qui sopra ti dà la tua chiave per firmare; il
+        descrittore dell'ordine dice con chi.<br>
+        Il descrittore di ogni ordine si copia da «🔍 Com'è fatto questo
+        2-di-3», nella scheda Ordini.</div>
+      <button class="btn ghost" onclick="onchainEsporta(this)">📤 Mostra tutto da copiare</button>
+      <div id="onchainExport"></div>
+    </div>
+
+    <details class="payout">
+      <summary><b>🧪 Un esempio senza soldi</b></summary>
+      <div class="hint" style="margin-top:8px">Un ordine finto, per vedere
+        come tre chiavi diventano un indirizzo. Nel giro normale firmano
+        compratore e venditore; la chiave di Barattolo serve <b>solo in
+        disputa</b>.</div>
       ${onchainRigaChiave('🧍 Tu (compratore)', k.compratore,
         'dal tuo seme, qui nel telefono')}
       ${onchainRigaChiave('🏪 Il venditore', k.venditore,
@@ -54369,85 +54534,13 @@ function onchainConSeme(parole, k, miaXpub, verifiche){
              mandarci niente.</b> Due chiavi su tre di questo indirizzo
              le può firmare chiunque.</div>`
         : ''}
-      <div class="hint" style="margin-top:8px">Nello script le tre
-        chiavi stanno <b>in ordine alfabetico</b> (BIP-67): per questo
-        l'indirizzo è lo stesso qualunque sia l'ordine in cui
-        arrivano.</div>
-    </div>
-
-    <div class="payout">
-      <h4>3. L'indirizzo e il descrittore</h4>
-      <div class="hint">L'indirizzo è dove andrebbero i sats. Il
-        descrittore è la <b>ricetta</b> per ricostruirlo: senza di lui
-        le dodici parole da sole <b>non aprono niente</b>, e per questo
-        viaggia in ogni backup.</div>
-      <div><b>Indirizzo</b> (signet)</div>
+      <div style="margin-top:8px"><b>Indirizzo</b> (signet)</div>
       <div class="mono" style="word-break:break-all">${esc(k.indirizzo)}</div>
       <div style="margin-top:8px"><b>Descrittore</b></div>
       <div class="mono" style="word-break:break-all;font-size:11px">${esc(k.descrittore)}</div>
-      <div class="hint">Le <b>otto lettere dopo il <span class="mono">#</span></b>
-        sono il codice di controllo del BIP-380: senza di loro un nodo
-        Bitcoin rifiuta di importarlo, e un descrittore che un nodo non
-        importa non è un backup. Puoi incollarlo in Sparrow o in
-        <span class="mono">importdescriptors</span> così com'è.</div>
-    </div>
+    </details>
 
-    ${onchainBloccoAccendi(miaXpub)}
-
-    ${onchainBloccoIncasso(miaXpub)}
-
-    ${onchainBloccoIndirizzi(miaXpub, verifiche || [])}
-
-    <div class="payout">
-      <h4>6. Il backup, che si fa da sé</h4>
-      <div class="hint">Alla nascita la chiave è andata <b>da sola</b>
-        dove hai una casa: il cloud di Telegram se sei dentro Telegram,
-        e i relay Nostr — cifrata con la <b>tua</b> chiave, che noi non
-        abbiamo — se hai collegato Nostr. Lo stato è scritto nel
-        blocco 1. Qui ci sono i due gesti per <b>rifarlo a mano</b> e
-        per <b>guardare cosa c'è</b>, che su un banco di prova
-        servono.</div>
-      <button class="btn ghost" onclick="onchainBackup(this)">Rifai il backup adesso</button>
-      <button class="btn ghost" onclick="onchainGuarda(this)">🔍 Guarda cosa c'è nelle case</button>
-      <div id="onchainCloud" class="hint"></div>
-    </div>
-
-    <div class="payout" style="border-color:var(--danger)">
-      <h4>7. La prova del ripristino</h4>
-      <div class="hint">Il punto di tutto: se perdi questo telefono,
-        le dodici parole si recuperano dal cloud. Si prova in tre passi:
-        <br>1. <b>📏 Prendi il metro</b>: ricordo l'indirizzo che fanno le
-        tue parole di adesso;
-        <br>2. <b>🧹 Dimentica</b>: le cancello da questo dispositivo, e il
-        foglio resta vuoto;
-        <br>3. <b>♻️ Ripristina dal cloud</b>: le riprendo da Telegram e
-        confronto l'indirizzo con quello del metro.</div>
-      ${prima
-        ? `<div class="hint">Metro preso: <span class="mono">${esc(prima.indirizzo)}</span></div>`
-        : `<div class="hint">Nessun metro ancora: premi «Prendi il metro» prima di dimenticare.</div>`}
-      ${uguale
-        ? `<div class="hint" style="color:var(--ok)"><b>✅ Il ripristino
-             funziona</b>: indirizzo e descrittore sono identici a prima${
-             onchainNato === 'nuvola' ? ', e le parole sono tornate dal cloud di Telegram'
-             : onchainNato === 'relay' ? ', e le parole sono tornate dai relay Nostr' : ''}.</div>`
-        : prima
-        ? `<div class="hint" style="color:var(--danger)"><b>⚠️ Diverso da
-             prima</b>: questo seme non è quello di cui hai preso il
-             metro.</div>`
-        : ''}
-      <button class="btn ghost" onclick="onchainMetro(this)">📏 Prendi il metro</button>
-      <button class="btn ghost" onclick="onchainDimentica(this)">🧹 Dimentica su questo dispositivo</button>
-      <button class="btn ghost" onclick="onchainMetroVia(this)">🗑 Butta il metro</button>
-    </div>
-
-    <div class="payout">
-      <h4>8. Esporta</h4>
-      <div class="hint">Le dodici parole <b>e</b> il descrittore: è
-        quello che serve per ritrovare gli stessi sats in Sparrow
-        <b>senza Barattolo</b>.</div>
-      <button class="btn ghost" onclick="onchainEsporta(this)">📤 Mostra tutto da copiare</button>
-      <div id="onchainExport"></div>
-    </div>`;
+    ${onchainBloccoIndirizzi(miaXpub, verifiche || [])}`;
 }
 
 /* ============ ACCENDI L'ON-CHAIN, E UN INDIRIZZO VERO (20 ott 2026,
@@ -54487,7 +54580,7 @@ function onchainBloccoAccendi(miaXpub){
   }
   return `
     <div class="payout">
-      <h4>4. Accendi l'on-chain</h4>
+      <h4>⛓️ L'on-chain non è ancora acceso</h4>
       <div class="hint">Per pagare e ricevere on-chain, Barattolo deve
         poter calcolare l'indirizzo di ogni ordine anche quando il tuo
         telefono è spento. Per questo gli dai la <b>metà pubblica</b> di
@@ -54546,10 +54639,10 @@ function onchainBloccoIncasso(miaXpub){
     ${d ? `<button class="btn ghost" onclick="onchainIncassoSalva(this, 'barattolo')">🫙 Torna al conto di Barattolo</button>` : ''}`;
   return `
     <div class="payout">
-      <h4>4b. Dove ricevi i sats quando vendi</h4>
+      <h4>Dove ricevi i sats quando vendi</h4>
       ${stato}
       ${acceso && srv.embit ? modulo
-        : '<div class="hint">Prima accendi l\'on-chain (blocco 4).</div>'}
+        : '<div class="hint">Prima accendi l\'on-chain (qui sopra).</div>'}
       <div class="hint" style="margin-top:8px">Vale dalle prossime
         vendite: gli ordini già nati tengono la destinazione di
         allora.</div>
@@ -54585,39 +54678,47 @@ async function onchainIncassoSalva(btn, tipoForzato){
   renderOnchain();
 }
 
+/* L'INDIRIZZO DI PROVA, DETTO IN CHIARO (27 ott 2026, correzione di
+   Andrea: «"Con Sam, Con AndreAI" che vuol dire? cliccandoli cosa
+   dovrebbe succedere?»). Era il blocco 5, «un indirizzo vero con un
+   altro admin», nato quando l'ordine on-chain non esisteva ancora. Ora
+   c'e' l'ordine vero, e questo resta in Tecnico, piegato, con il bottone
+   che dice cosa fa: «Tu compri da Sam» calcola l'indirizzo 2-di-3 fra te
+   e Sam, senza ordine e senza sats. */
 function onchainBloccoIndirizzi(miaXpub, verifiche){
   const srv = onchainSrv || {};
   const acceso = srv.mia_xpub && srv.mia_xpub === miaXpub;
   const altri = srv.controparti || [];
   let gesti;
   if (!acceso) {
-    gesti = '<div class="hint">Prima accendi l\'on-chain (blocco 4).</div>';
+    gesti = '<div class="hint">Prima l\'on-chain deve essere acceso (Impostazioni).</div>';
   } else if (!srv.embit) {
     gesti = '';
   } else if (!altri.length) {
-    gesti = `<div class="hint">Nessun altro admin ha ancora acceso
-      l'on-chain: quando lo fa, compare qui.</div>`;
+    gesti = `<div class="hint">Non c'è ancora nessun altro con
+      l'on-chain acceso con cui provare.</div>`;
   } else {
     gesti = altri.map(a => `<button class="btn ghost"
-      onclick="onchainNuovoIndirizzo(this, ${Number(a.id)})">➕ Con
+      onclick="onchainNuovoIndirizzo(this, ${Number(a.id)})">➕ Tu compri da
       ${esc(a.nome)}</button>`).join(' ');
   }
   const righe = (srv.indirizzi || []).map((r, n) =>
     onchainRigaIndirizzo(r, verifiche[n] || {})).join('');
   return `
-    <div class="payout">
-      <h4>5. Un indirizzo vero, con un altro admin</h4>
-      <div class="hint">Tu fai da compratore, l'altro da venditore, e
-        Barattolo è la terza chiave. Il server calcola l'indirizzo, e
-        <b>questo telefono lo rifà da solo</b> con le sue chiavi: lo vedi
-        solo se i due conti tornano identici. Non c'è nessun ordine
-        dietro, e la rete è signet: i sats non valgono niente.</div>
+    <details class="payout">
+      <summary><b>🧪 Un indirizzo di prova con un'altra persona</b></summary>
+      <div class="hint" style="margin-top:8px">Tocca un nome: il server
+        calcola l'indirizzo 2-di-3 fra <b>te</b> (come compratore),
+        <b>quella persona</b> (come venditore) e <b>Barattolo</b>, con le
+        vostre chiavi vere. Poi <b>questo telefono lo rifà da solo</b>, e
+        l'indirizzo compare qui sotto solo se i due conti tornano
+        identici. Non nasce nessun ordine e non si paga niente.</div>
       ${gesti}
       ${righe
-        ? `<div style="margin-top:10px"><b>I tuoi indirizzi</b> (gli
+        ? `<div style="margin-top:10px"><b>I tuoi indirizzi di prova</b> (gli
              ultimi cinque)</div>${righe}`
         : ''}
-    </div>`;
+    </details>`;
 }
 
 function onchainRigaIndirizzo(r, v){
@@ -54772,6 +54873,8 @@ async function startBuyOnchain(btn){
     if (!r.ok || !x.onchain) throw new Error(x.detail || 'ordine non creato');
     onchainSrv = null;
     onchainOrdineAperto = x.onchain.id;
+    onchainSoloOrdine = x.onchain.id;
+    onchainTab = 'ordini';
     acqMetodo = 'ln';
     go('onchain');
   } catch(e) {
@@ -55073,10 +55176,22 @@ function onchainUriPagamento(o){
   return `bitcoin:${o.indirizzo.indirizzo}?amount=${(o.importo_sats / 1e8).toFixed(8)}`;
 }
 
-/* Il blocco degli ordini, in cima al foglio. L'indirizzo da pagare si
-   mostra solo se questo telefono l'ha rifatto uguale (`verifiche`). */
+/* La scheda degli ordini. L'indirizzo da pagare si mostra solo se
+   questo telefono l'ha rifatto uguale (`verifiche`).
+   SOLO L'ORDINE CHE STAI PAGANDO (27 ott 2026, richiesta di Andrea:
+   «quando pago on-chain non devo vedere anche le vecchie transazioni»):
+   arrivando dalla cassa c'e' quello e basta, con un link per gli altri;
+   arrivando dal profilo, quelli aperti in cima e i chiusi piegati. */
+const ONCHAIN_CHIUSI = ['rilasciato', 'rimborsato', 'scaduto', 'annullato'];
+
 function onchainBloccoOrdini(verifiche, esiti){
-  if (!onchainOrdini.length) return '';
+  const solo = onchainSoloOrdine
+    && onchainOrdini.find(o => o.id === onchainSoloOrdine);
+  if (!onchainOrdini.length) {
+    return `<div class="hint">Nessun ordine on-chain, per ora. Per pagare
+      on-chain, alla cassa di un annuncio scegli <b>⛓️ On-chain</b> al
+      posto di ⚡ Lightning.</div>`;
+  }
   const riga = (o) => {
     const v = verifiche[o.id] || {};
     const buono = v.mia && v.uguale;
@@ -55125,11 +55240,61 @@ function onchainBloccoOrdini(verifiche, esiti){
       <div class="hint">${io ? 'Compri' : 'Vendi'} — ${ONCHAIN_STATI[o.stato] || esc(o.stato)} ·
         ${fmt(o.prezzo_sats)} sats</div>
       ${corpo}
+      ${onchainComeEFatto(o, v)}
     </div>`;
   };
-  return `<div class="section-label">🧾 Ordini on-chain</div>
-    ${(esiti || []).map(t => `<div class="hint">${esc(t)}</div>`).join('')}
-    ${onchainOrdini.map(riga).join('')}`;
+  const avvisi = (esiti || []).map(t => `<div class="hint">${esc(t)}</div>`).join('');
+  if (solo) {
+    const altri = onchainOrdini.length - 1;
+    return avvisi + riga(solo) + (altri
+      ? `<button class="btn ghost" onclick="onchainSoloOrdine=0;renderOnchain()">🧾 Tutti gli ordini on-chain (${altri} altri)</button>`
+      : '');
+  }
+  const aperti = onchainOrdini.filter(o => !ONCHAIN_CHIUSI.includes(o.stato));
+  const chiusi = onchainOrdini.filter(o => ONCHAIN_CHIUSI.includes(o.stato));
+  return avvisi
+    + (aperti.length ? aperti.map(riga).join('')
+       : '<div class="hint">Nessun ordine on-chain in corso.</div>')
+    + (chiusi.length
+       ? `<details style="margin-top:10px"><summary><b>Ordini chiusi (${chiusi.length})</b></summary>
+            ${chiusi.map(riga).join('')}</details>`
+       : '');
+}
+
+/* COM'E' FATTO QUESTO 2-DI-3 (27 ott 2026, Andrea: «come si puo'
+   dimostrare che quello e' un multisig 2-di-3?»). Piegato in fondo a
+   ogni ordine: le tre chiavi con chi le ha, il descrittore da copiare,
+   e i due modi di verificarlo da fuori — un nodo che rifa' l'indirizzo
+   dal descrittore, e l'explorer che, quando i sats si muovono, mostra
+   lo script con OP_2 … OP_3 OP_CHECKMULTISIG. Il terzo modo l'ha gia'
+   fatto il telefono (`onchainVerificaRiga`), e lo si dice. */
+function onchainComeEFatto(o, v){
+  const ind = o.indirizzo || {};
+  const c = ind.chiavi || {};
+  const io = o.ruolo;
+  const chi = (ruolo, nome) => `<div style="margin-top:8px"><b>${nome}${ruolo === io ? ' (tu)' : ''}</b></div>
+    <div class="mono" style="word-break:break-all;font-size:11px">${esc(c[ruolo] || '')}</div>`;
+  return `<details style="margin-top:10px">
+    <summary>🔍 Com'è fatto questo 2-di-3</summary>
+    <div class="hint" style="margin-top:8px">L'indirizzo
+      <span class="mono" style="word-break:break-all">${esc(ind.indirizzo || '')}</span>
+      è chiuso da tre chiavi pubbliche, e ne servono <b>due</b>:</div>
+    ${chi('compratore', '🧍 Chi compra')}
+    ${chi('venditore', '🏪 Chi vende')}
+    ${chi('barattolo', '🫙 Barattolo')}
+    <div style="margin-top:8px"><b>Descrittore</b></div>
+    <div class="mono" style="word-break:break-all;font-size:11px">${esc(ind.descrittore || '')}</div>
+    <button class="btn ghost" onclick="copiaLink(${esc(JSON.stringify(ind.descrittore || ''))}, 'Descrittore copiato')">📋 Copia il descrittore</button>
+    <div class="hint" style="margin-top:8px;line-height:1.7">
+      ${v.uguale ? '✅ <b>Il tuo telefono l\'ha già rifatto</b> da queste tre chiavi: torna lo stesso indirizzo.<br>' : ''}
+      <span class="mono">sortedmulti(2,…)</span> vuol dire «2 firme su queste
+      chiavi»: è la regola scritta nell'indirizzo, non una promessa.<br>
+      • Con un nodo Bitcoin (signet): <span class="mono">deriveaddresses "descrittore"</span>
+      deve ridare l'indirizzo qui sopra.<br>
+      • Sull'explorer, quando i sats escono, la transazione mostra lo
+      script <span class="mono">OP_2 &lt;3 chiavi&gt; OP_3 OP_CHECKMULTISIG</span>.
+      <a href="${esc(o.esploratore || '')}/address/${esc(ind.indirizzo || '')}" target="_blank" rel="noopener">Apri l'indirizzo</a></div>
+  </details>`;
 }
 
 async function onchainDisegnaQrOrdini(verifiche){
@@ -55227,11 +55392,6 @@ function onchainRigaChiave(chi, chiave, nota){
     </div>`;
 }
 
-function onchainPrimaLetta(){
-  try { return JSON.parse(localStorage.getItem(onchainChiavePrima()) || 'null'); }
-  catch(e){ return null; }
-}
-
 async function onchainBackup(btn){
   haptic();
   const rip = onchainAttesa(btn, 'Salvo…');
@@ -55287,104 +55447,12 @@ async function onchainGuarda(btn){
                      .every(x => x === qui);
   if (qui && (dalCloud || suiRelay)) {
     righe.push(combaciano
-      ? '✅ Le copie dicono <b>la stessa chiave</b> di questo dispositivo.'
+      ? '✅ Le copie dicono <b>la stessa chiave</b> di questo dispositivo: '
+        + 'se cambi telefono, entrando con lo stesso account la ritrovi da sola.'
       : '⚠️ Una copia dice una chiave <b>diversa</b> da questa: '
         + 'fermati e dimmelo, è il caso che non deve succedere.');
   }
   box.innerHTML = righe.join('<br>');
-}
-
-function onchainMetro(btn){
-  haptic();
-  const parole = onchainSemeLocale();
-  if (!parole) return toast('⚠️ Non c\'è nessun seme da misurare');
-  caricaBitcoin()
-    .then(()=>onchainChiavi(parole, onchainSrv))
-    .then(k=>{
-      try {
-        localStorage.setItem(onchainChiavePrima(), JSON.stringify(
-          {indirizzo: k.indirizzo, descrittore: k.descrittore}));
-      } catch(e){}
-      toast('📏 Metro preso: ora puoi dimenticare');
-      renderOnchain();
-    })
-    .catch(e=>toast(`⚠️ ${e.message || 'non riuscito'}`));
-}
-
-function onchainMetroVia(){
-  haptic();
-  try { localStorage.removeItem(onchainChiavePrima()); } catch(e){}
-  toast('🗑 Metro buttato');
-  renderOnchain();
-}
-
-/* IL «DIMENTICA» TOCCA SOLO QUESTO DISPOSITIVO, e non la nuvola: è il
-   caso vero da provare (telefono perso, cache svuotata), e cancellare
-   anche il backup renderebbe la prova impossibile invece che utile.
-   Il metro resta: è lui che dirà se il ripristino ha funzionato. */
-function onchainDimentica(){
-  /* `chiediConferma` e non il `confirm()` di sistema: nel client i
-     dialoghi del browser sono a ZERO da ago 2026 (ventinove convertiti
-     in un cantiere, e una sentinella che non li fa rinascere). Qui
-     c'era un `confirm`, e la prova l'ha preso. */
-  chiediConferma({
-    titolo: 'Dimentico il seme qui?',
-    corpo: 'Cancello le dodici parole dalla memoria di QUESTO browser, '
-         + 'come se avessi perso il telefono. La copia nel cloud di '
-         + 'Telegram (e sui relay, se ce l\'hai) resta: è da lì che le '
-         + 'riprendi col ripristino.',
-    etichetta: '🧹 Dimentica qui',
-    poi: ()=>{
-      try { localStorage.removeItem(onchainChiave()); } catch(e){}
-      onchainParoleViste = false;
-      onchainDimenticato = true;
-      toast('🧹 Le parole non sono più su questo dispositivo');
-      renderOnchain();
-    },
-  });
-}
-
-/* Il foglio dopo «Dimentica»: il dispositivo e' vuoto, e lo si vede. */
-function onchainVuotoDopoDimentica(){
-  const prima = onchainPrimaLetta();
-  return `<div class="payout" style="border-color:var(--danger)">
-      <h4>🧹 Su questo dispositivo le parole non ci sono più</h4>
-      <div class="hint">Le ho cancellate dalla memoria di questo browser:
-        «Mostra le dodici parole» non ha più niente da mostrare, e da qui
-        non si firma niente. È il telefono perso della prova.</div>
-      <div class="hint" style="margin-top:8px">Restano nelle case:
-        <b>☁️ il cloud di Telegram</b> (il CloudStorage della Mini App,
-        cifrato con MTProto) e, se hai collegato Nostr, <b>🟣 i relay</b>.
-        ${prima ? 'Il metro c\'è: dopo il ripristino ti dico se sono le stesse di prima.'
-                : 'Non hai preso il metro: il ripristino funziona lo stesso, ma non avrò niente con cui confrontarle.'}</div>
-      <button class="btn orange" onclick="onchainRipristina(this)">♻️ Ripristina dal cloud</button>
-    </div>`;
-}
-
-/* IL RIPRISTINO NON E' PIU' UN BOTTONE SOLO SUO: dopo il «dimentica»
-   la pagina ritrova la chiave DA SE', cercandola nelle case —
-   `onchainSemeAssicurato` fa quello, e il blocco 1 racconta dove l'ha
-   trovata. Questo gesto resta per il banco: forza il giro adesso e
-   dice cosa ha trovato, invece di far ricaricare la pagina. */
-async function onchainRipristina(btn){
-  haptic();
-  const rip = onchainAttesa(btn, 'Cerco nelle case…');
-  try {
-    const prima = onchainNato;
-    onchainNato = '';
-    onchainDimenticato = false;
-    await onchainSemeAssicurato();
-    rip();
-    toast(onchainNato === 'nuvola' ? '♻️ Ritrovata nel cloud di Telegram'
-        : onchainNato === 'relay' ? '♻️ Ritrovata sui relay, cifrata'
-        : onchainNato === 'nuovo' ? '🎲 Non c\'era in nessuna casa: ne è nata una nuova'
-        : '📱 Era già qui su questo dispositivo');
-    if (!onchainNato) onchainNato = prima;
-  } catch(e) {
-    rip();
-    toast(`⚠️ ${e.message || 'non riuscito'}`);
-  }
-  renderOnchain();
 }
 
 async function onchainEsporta(btn){

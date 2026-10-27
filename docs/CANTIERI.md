@@ -73535,3 +73535,91 @@ con l'anteprima. Suite severa: nel messaggio del commit.
 sendDocument non l'ho potuto provare dal vivo) e «📂 Scegli il file»
 dentro Telegram. In produzione, prima del deploy: chi legge il config
 del VPS per capire una leva deve guardare anche la pagina.
+
+## La pagina On-chain in quattro schede, e la prova del ripristino diventa «Controlla il backup» (27 ott 2026, cantiere onchain-pagina, Andrea: «invece del pippone ci deve essere un tab Info», «tutti i tecnicismi si devono vedere in una sezione dedicata o nelle info della transazione»)
+
+Andrea ha pagato un ordine on-chain e si è trovato sotto il QR gli otto
+blocchi numerati del banco di prova: le dodici parole, l'ordine finto
+di cartone, «5. Un indirizzo vero, con un altro admin» coi bottoni «Con
+Sam», «Con AndreAI», la prova del ripristino col metro. Nessuno serve a
+chi paga, e due erano incomprensibili.
+
+**QUATTRO SCHEDE, UNA ALLA VOLTA.** Ordini (di serie), Info,
+Impostazioni, Tecnico, con la pillola delle sezioni (`.sez-seg`). Le
+etichette sono senza emoji: con l'emoji «Impostazioni» andava a capo a
+390 px.
+- **Ordini.** Dalla cassa (`startBuyOnchain`) si vede SOLO l'ordine
+  appena nato (`onchainSoloOrdine`), con un bottone per gli altri. Dal
+  profilo si vedono gli aperti in cima e i chiusi piegati sotto. In fondo
+  a ogni ordine, piegato, c'è «🔍 Com'è fatto questo 2-di-3»: le tre
+  chiavi con chi le ha, il descrittore con «📋 Copia» e i due modi di
+  verificarlo da fuori. Il primo è `deriveaddresses` su un nodo signet,
+  che deve ridare l'indirizzo. Il secondo è l'explorer, dove lo script
+  `OP_2 … OP_3 OP_CHECKMULTISIG` si vede solo quando i sats escono:
+  prima l'indirizzo è un hash, e lo si dice. Il terzo modo l'ha già
+  fatto il telefono (`onchainVerificaRiga`), e la scheda lo scrive.
+- **Info.** In parole: è lo stesso deposito di garanzia, cambia dove
+  stanno i sats; tre chiavi e ne servono due; la tua chiave è nata a
+  caso nel telefono, con una copia nell'account Telegram (CloudStorage)
+  e, se c'è Nostr, cifrata sui relay; tempi e margine. Più la riga
+  onesta prevista dal disegno del 16 ott: il codice arriva dal nostro
+  server a ogni apertura.
+- **Impostazioni.** Dove ricevi quando vendi e il backup. Il blocco
+  «Accendi» compare solo se l'on-chain non è acceso (di solito lo
+  accende `onchainAccendiDaSolo`).
+- **Tecnico.** Le dodici parole dietro un bottone, il conto BIP-48 e
+  la coda della xpub, e «Dove si importano», col perché le parole da
+  sole non aprono un 2-di-3. Poi l'esempio di cartone piegato, l'export
+  e l'indirizzo di prova.
+
+**L'INDIRIZZO DI PROVA DICE COSA FA.** Il bottone è «➕ Tu compri da
+Sam», sotto un titolo che spiega il gesto: il server calcola il 2-di-3
+fra te, quella persona e Barattolo, il telefono lo rifà, e non nasce
+nessun ordine. È piegato in Tecnico: con l'ordine vero non serve più a
+chi prova il giro.
+
+**LA PROVA DEL RIPRISTINO È MORTA** (era la richiesta di Alan del 23
+ott). Andrea: «non si capisce», e «"dimentica su questo dispositivo" è
+fuorviante dato che posso recuperarla su Telegram». La domanda che
+faceva («il backup ridà la mia chiave?») la risponde «🔍 Controlla il
+backup» (`onchainGuarda`): legge il CloudStorage e i relay e li
+confronta con la chiave di qui, senza cancellare niente. Via
+`onchainMetro`, `onchainMetroVia`, `onchainDimentica`,
+`onchainVuotoDopoDimentica`, `onchainRipristina` e la chiave `_prima`
+del localStorage, che nei browser resta come riga che nessuno legge.
+Le domande uniche scendono da 94 a 93. SCARTATO tenerla in Tecnico: un
+gesto che cancella la chiave dal telefono non è un tecnicismo da
+guardare, è un rischio da spiegare, e il controllo fa lo stesso lavoro.
+
+**GLI INCASSI ON-CHAIN NEL PROFILO.** Andrea: «il venditore deve poter
+configurare nel profilo dove ricevere i fondi, un indirizzo o una
+xpub». La scelta esisteva dal mattino (`onchainBloccoIncasso`), ma la
+porta della pagina On-chain stava in «Amministrazione», e chi vendeva
+non la trovava. Ora in «Incassi e pagamenti», accanto al Lightning
+address, c'è la voce-porta «⛓️ Incassi on-chain» (`vocOnchain`), che si
+accende col cancello `myOnchain` e mai in DEMO, e porta dritta alla
+scheda Impostazioni. La scelta resta una sola, firmata dal seme: un
+secondo modulo nel Profilo sarebbe stato lo stesso giudice in due
+posti. Andrea, nello stesso messaggio: la co-firma che chiede di aprire
+l'app gli piace, perché «dimostra che le chiavi stanno fisicamente sul
+dispositivo». Resta com'è.
+
+**LA STRADA A.** Nello stesso giro Andrea ha detto come vuole l'ordine
+on-chain: «il concetto è deposito sats, LN o on-chain… gli step devono
+essere uguali, cambia solo il metodo di pagamento: per l'utente è un
+QR». È la strada A del biglietto: l'ordine on-chain diventa un ordine
+normale in `ordini`, e rovescia «PERCHÉ UNA TABELLA SUA» della tappa 3.
+È il cantiere che segue, a tappe. Quando sarà fatto, la scheda Ordini di
+questa pagina diventerà un rimando all'ordine in «Ordini», e «Com'è
+fatto questo 2-di-3» passerà nel dettaglio dell'ordine.
+
+**PROVATO.** `prove_onchain_pagina` (nuova, con un banco node sul
+blocco vero degli ordini: solo quello dalla cassa, aperti e chiusi
+piegati, il descrittore copiato intero, la scheda vuota) e
+`prove_ripristino_visibile`, riscritta sul controllo. In Chromium a
+390 px, con btc.js vero e un ordine costruito con le chiavi del
+telefono: il QR, «Com'è fatto» col ✅ del telefono, le quattro schede.
+Suite severa e collaudi on-chain: nel messaggio del commit.
+
+**DA GUARDARE.** Sul telefono di Andrea: che le quattro schede stiano
+su una riga anche sui telefoni più stretti di 390 px.
