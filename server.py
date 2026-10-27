@@ -33155,8 +33155,7 @@ def _leve_stato():
                          "rispondono 503 (pip install -r requirements.txt)",
                   allarme=bool(ONCHAIN_ATTIVO) and not EMBIT),
             _leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",
-                  "vera (tpub)" if str(ONCHAIN_XPUB or "").strip()
-                  else "di cartone (vettori BIP-32: la privata è pubblica)"),
+                  _onchain_terza_chiave_a_parole()),
             # la prima leva che si cambia anche da qui (27 ott 2026)
             _leva_scrivibile_riga(_leva(
                 "Quota fissa di Barattolo (sats)", "ONCHAIN_QUOTA_FISSA_SATS",
@@ -76013,14 +76012,6 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     ann = int(_campo(o, "annullato_venditore_il", 0) or 0)
     if ann and ann >= int(_campo(o, "creato", 0) or 0):
         raise HTTPException(400, MSG_ANNULLO_NON_DISPUTA)
-    # L'ON-CHAIN (27 ott 2026, strada A): una decisione che muove sats
-    # vuole la terza firma, quella di Barattolo, che sta sul nodo e non
-    # e' ancora collegata. Meglio un no che un «deciso» che non paga.
-    if (_campo(o, "cassaforte") or "") == "onchain" and esito != "reso":
-        raise HTTPException(409, "Ordine on-chain: la decisione si firma "
-                                 "con la chiave di Barattolo, che non è "
-                                 "ancora collegata. Per ora i sats si "
-                                 "muovono solo se le due parti firmano")
     stato = o["stato"]
     # IL QUARTO ESITO E' DEFINITIVO APPENA PRESO (13 ott 2026), ed e' la
     # riga da non ammorbidire: dopo «meno le spese» l'ordine sta in
@@ -76032,6 +76023,29 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     # per ogni esito.
     if int(_campo(o, "spese_rese_sats", 0) or 0) > 0:
         raise HTTPException(400, MSG_MENO_SPESE_DECISO)
+    # L'ON-CHAIN (27 ott 2026, cantiere onchain-disputa): la decisione
+    # che muove sats E' la firma di Barattolo (`_onchain_decide`), e la
+    # seconda la mette il telefono di chi vince. Il reso fa la strada di
+    # sempre: la firma arriva quando chi vende lo riceve.
+    # UN MODERATORE NON DECIDE UN ORDINE IN CUI E' PARTE, ed e' il
+    # perche' di Andrea per tenere la chiave sul VPS («altrimenti noi
+    # admin possiamo gia' dare 2 firme e vincere ogni causa»): la sua
+    # chiave di parte e quella di Barattolo, decisa da lui, sarebbero
+    # proprio le due firme. Decide un altro moderatore.
+    if (_campo(o, "cassaforte") or "") == "onchain":
+        if int(user["id"]) in (int(o["compratore_id"]), int(o["venditore_id"])):
+            raise HTTPException(403, "Su un ordine on-chain in cui sei una "
+                                     "delle parti decide un altro moderatore")
+        if esito == "meno_spese":
+            raise HTTPException(409, "Ordine on-chain: «meno le spese» non "
+                                     "c'è ancora. Scegli il rimborso, il reso "
+                                     "o i sats al venditore")
+        if esito in ("venditore", "rimborso"):
+            if o["stato"] not in ("dispute", "return_pending", "return_shipped"):
+                raise HTTPException(400, "Questa disputa non esiste o è già chiusa")
+            return await _onchain_decide(
+                ordine_id, "venditore" if esito == "venditore" else "compratore",
+                user["id"], "disputa")
     # ...e si prende solo dalla disputa aperta o dal reso in corso
     # (decisione di Andrea): non da un caso gia' deciso e incagliato,
     # che il ramo qui sotto riaprirebbe.
@@ -76376,6 +76390,11 @@ async def reso_ricevuto(ordine_id: int, x_tg_init_data: str = Header(""),
     con.close()
     if not o:
         raise HTTPException(400, "Operazione non permessa")
+    if (_campo(o, "cassaforte") or "") == "onchain":
+        # l'on-chain (27 ott 2026): il reso l'ha deciso un moderatore, e
+        # chi vende che lo riceve e' il via — Barattolo firma il rimborso,
+        # la seconda firma e' del telefono di chi ha comprato
+        return await _onchain_decide(ordine_id, "compratore", user["id"], "reso")
     return await _poi_chat_mercatino(ordine_id, _rimborsa_compratore(ordine_id))
 
 
@@ -78912,7 +78931,9 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                 r["onchain"] = ({
                     "id": oc["id"], "stato": oc["stato"],
                     "proposta": ({"verso": oc["proposta_verso"],
-                                  "mia": int(oc["proposta_da"]) == int(user["id"])}
+                                  "mia": int(oc["proposta_da"]) == int(user["id"]),
+                                  "barattolo": (oc["decisione_perche"] or "disputa")
+                                               if oc["decisione_da"] else ""}
                                  if oc["proposta_psbt"] else None),
                     "txid_uscita": oc["txid_uscita"] or "",
                     "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
@@ -89415,8 +89436,19 @@ def onchain_xpub_barattolo() -> tuple:
     dei vettori BIP-32. Piena → deve essere una `tpub` PUBBLICA di
     signet: una `xpub` di mainnet finche' la rete e' di prova e' un
     errore di chi ha scritto il config, e si dice (ValueError) invece di
-    calcolare indirizzi che mischiano due reti."""
+    calcolare indirizzi che mischiano due reti.
+    DAL 27 OTT 2026 VINCE LA CHIAVE SUL VPS (`_onchain_chiave_vps`), se
+    un admin l'ha creata: e se nel config c'e' anche una ONCHAIN_XPUB
+    diversa, le terze chiavi sarebbero due — si dice, e non si calcola
+    niente."""
     s = (ONCHAIN_XPUB or "").strip()
+    vps = _onchain_chiave_vps()
+    if vps:
+        if s and s != vps["xpub"]:
+            raise ValueError("ONCHAIN_XPUB nel config non e' la chiave di "
+                             "Barattolo sul VPS: le terze chiavi sarebbero "
+                             "due. Va tolta la riga dal config")
+        return vps["xpub"], False
     if not s:
         return XPUB_CARTONE, True
     if _onchain_sembra_privata(s):
@@ -89432,6 +89464,151 @@ def onchain_xpub_barattolo() -> tuple:
     if k.version != _EMBIT_RETI[ONCHAIN_RETE]["xpub"]:
         raise ValueError(f"ONCHAIN_XPUB non e' di {ONCHAIN_RETE} (una tpub)")
     return s, False
+
+
+# ------------- LA CHIAVE DI BARATTOLO STA SUL VPS (27 ott 2026) -------------
+# Decisione di Andrea, cantiere onchain-disputa: «barattolo deve stare su
+# vps con un backup che gli admin possono vedere chiaramente;
+# concettualmente quella chiave puo' stare solo nella vps, altrimenti noi
+# admin possiamo gia' dare 2 firme e di fatto vincere ogni causa in
+# autonomia». Rovescia lo studio («privata solo nel firmatario sul
+# nodo, mai sul VPS»), e il perche' e' quello: una chiave in tasca a un
+# admin che e' anche parte di un ordine fa due firme da solo; sul VPS
+# firma SOLO il codice, e solo dopo una decisione scritta
+# (`_onchain_decide`), verso una delle due parti, coi conti di
+# `_onchain_psbt_giudica`. Il prezzo, dichiarato: chi prende il VPS ha
+# la terza chiave — e da sola non sposta niente, serve ancora una parte.
+# LA NASCITA E' UN GESTO: un admin preme «Crea la chiave di Barattolo»
+# nel pannello (mai al deploy, mai da sola); il file nasce una volta e
+# non si sovrascrive. Le dodici parole stanno solo nel file (0600, in
+# `chiavi/` accanto al database, fuori da git) e nell'archivio age del
+# backup fuori sede: nessuna risposta le ripete, nemmeno agli admin —
+# vederle sarebbe tenerle. Il pannello mostra cosa c'e' (xpub,
+# impronta, data) e se l'ultimo backup la contiene.
+# Finche' non nasce, la terza chiave e' quella DI CARTONE dei vettori
+# BIP-32 (signet: niente di vero), la cui privata e' pubblica: con lei
+# il server firma lo stesso, ed e' cosi' che il collaudo prova tutto.
+ONCHAIN_SEME_CARTONE = "000102030405060708090a0b0c0d0e0f"   # BIP-32, vettore 1
+
+
+def _onchain_file_chiave() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(DB)), "chiavi",
+                        "onchain-barattolo.json")
+
+
+def _onchain_chiave_vps():
+    """Il file della chiave di Barattolo letto, o None se non e' nato.
+    Un file che c'e' e non si legge NON e' None: alza, perche' tornare
+    alla chiave di cartone in silenzio farebbe nascere indirizzi nuovi
+    su una chiave che tutti conoscono."""
+    f = _onchain_file_chiave()
+    if not os.path.exists(f):
+        return None
+    with open(f, encoding="utf-8") as h:
+        d = json.load(h)
+    if not d.get("parole") or not d.get("xpub"):
+        raise ValueError("il file della chiave di Barattolo e' monco")
+    return d
+
+
+def _onchain_radice_barattolo(parole: str):
+    from embit import bip39
+    return _embit_bip32.HDKey.from_seed(
+        bip39.mnemonic_to_seed(parole),
+        version=_EMBIT_RETI[ONCHAIN_RETE]["xprv"])
+
+
+def onchain_crea_chiave_barattolo(admin_id: int) -> dict:
+    """Il gesto dell'admin: dodici parole nuove (os.urandom), il conto
+    del 2-di-3, il file. Una volta sola: se c'e' gia', o se il config
+    dice un'altra xpub, no (ValueError). Torna solo la parte pubblica."""
+    if (ONCHAIN_XPUB or "").strip():
+        raise ValueError("nel config c'e' gia' una ONCHAIN_XPUB: la terza "
+                         "chiave e' quella")
+    f = _onchain_file_chiave()
+    if os.path.exists(f):
+        raise ValueError("la chiave di Barattolo c'e' gia': non si rifà")
+    from embit import bip39
+    parole = bip39.mnemonic_from_bytes(os.urandom(16))
+    radice = _onchain_radice_barattolo(parole)
+    xpub = radice.derive(ONCHAIN_STRADA_CONTO).to_public().to_string(
+        version=_EMBIT_RETI[ONCHAIN_RETE]["xpub"])
+    d = {"parole": parole, "strada": ONCHAIN_STRADA_CONTO,
+         "rete": ONCHAIN_RETE, "xpub": xpub,
+         "impronta": radice.my_fingerprint.hex(),
+         "creata_il": int(time.time()), "creata_da": int(admin_id)}
+    os.makedirs(os.path.dirname(f), mode=0o700, exist_ok=True)
+    # O_EXCL: due admin che premono insieme non fanno due chiavi
+    fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as h:
+        json.dump(d, h)
+    return {k: d[k] for k in ("xpub", "impronta", "creata_il", "strada")}
+
+
+def onchain_stato_chiave_barattolo() -> dict:
+    """Quel che il pannello mostra della terza chiave, mai le parole:
+    di cartone, sul VPS, o solo pubblica dal config (e allora qui non si
+    firma). Col backup: l'ultimo archivio fuori sede riuscito
+    (`backup-fuori.sh` scrive `.ultimo-successo`) e se e' venuto dopo
+    la nascita della chiave, cioe' se la contiene."""
+    try:
+        vps = _onchain_chiave_vps()
+    except Exception as e:
+        return {"dove": "rotta", "motivo": str(e)[:200]}
+    ultimo = 0
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(DB)), "backup",
+                               "fuori", ".ultimo-successo")) as h:
+            ultimo = int(h.read().strip() or 0)
+    except Exception:
+        pass
+    if vps:
+        return {"dove": "vps", "xpub": vps["xpub"],
+                "impronta": vps.get("impronta", ""),
+                "strada": vps.get("strada", ONCHAIN_STRADA_CONTO),
+                "creata_il": int(vps.get("creata_il") or 0),
+                "file": _onchain_file_chiave(),
+                "backup_ultimo": ultimo,
+                "nel_backup": ultimo >= int(vps.get("creata_il") or 0) > 0}
+    if (ONCHAIN_XPUB or "").strip():
+        return {"dove": "config", "xpub": ONCHAIN_XPUB.strip()}
+    return {"dove": "cartone", "xpub": XPUB_CARTONE}
+
+
+def _onchain_terza_chiave_a_parole() -> str:
+    """La riga del pannello delle leve: dove sta la terza chiave."""
+    try:
+        st = onchain_stato_chiave_barattolo()
+    except Exception:
+        return "illeggibile"
+    if st["dove"] == "vps":
+        return ("sul VPS (impronta " + st.get("impronta", "?") + ")"
+                + ("" if st.get("nel_backup") else
+                   " — ⚠️ non ancora in un backup fuori sede"))
+    if st["dove"] == "config":
+        return "vera (tpub), solo pubblica dal config: qui non firma"
+    if st["dove"] == "rotta":
+        return "⚠️ file illeggibile: " + st.get("motivo", "")
+    return "di cartone (vettori BIP-32: la privata è pubblica)"
+
+
+def _onchain_privata_barattolo(xpub: str):
+    """La chiave estesa PRIVATA che sta dietro `xpub` (quella fotografata
+    nell'indirizzo dell'ordine), o ValueError: di cartone, o quella del
+    file — e allora la si ricontrolla, perche' firmare con una chiave
+    che non e' quella dell'ordine non servirebbe a niente."""
+    if xpub == XPUB_CARTONE:
+        return _embit_bip32.HDKey.from_seed(bytes.fromhex(ONCHAIN_SEME_CARTONE))
+    vps = _onchain_chiave_vps()
+    if not vps or vps["xpub"] != xpub:
+        raise ValueError("la chiave di Barattolo di questo ordine non sta "
+                         "su questo server")
+    conto = _onchain_radice_barattolo(vps["parole"]).derive(
+        vps.get("strada") or ONCHAIN_STRADA_CONTO)
+    if conto.to_public().to_string(
+            version=_EMBIT_RETI[ONCHAIN_RETE]["xpub"]) != xpub:
+        raise ValueError("le parole del file non danno la sua xpub")
+    return conto
 
 
 def onchain_chiave(xpub: str, numero: int) -> str:
@@ -90137,7 +90314,15 @@ def _onchain_prepara_ordini(con):
                       # 27 ott 2026, la strada A: l'ordine di sempre in
                       # `ordini` che nasce quando i sats arrivano (0 =
                       # un ordine on-chain di prima, che vive solo qui)
-                      ("ordine_id", "INTEGER DEFAULT 0")):
+                      ("ordine_id", "INTEGER DEFAULT 0"),
+                      # 27 ott 2026, cantiere onchain-disputa: chi ha
+                      # deciso che Barattolo firmasse (un moderatore, o
+                      # chi vende ricevendo il reso), quando e perche'
+                      # ('disputa' | 'reso'). Con la decisione la
+                      # proposta e' di Barattolo: `proposta_da` resta 0
+                      ("decisione_da", "INTEGER DEFAULT 0"),
+                      ("decisione_il", "INTEGER DEFAULT 0"),
+                      ("decisione_perche", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -90334,7 +90519,11 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
     if o["proposta_psbt"]:
         proposta = {"verso": o["proposta_verso"], "psbt": o["proposta_psbt"],
                     "mia": int(o["proposta_da"]) == int(tg_id),
-                    "il": o["proposta_il"]}
+                    "il": o["proposta_il"],
+                    # firmata da Barattolo dopo una decisione: 'disputa' o
+                    # 'reso' ('' = la proposta di una delle due parti)
+                    "barattolo": (o["decisione_perche"] or "disputa")
+                                 if o["decisione_da"] else ""}
     return {
         "id": o["id"], "annuncio_id": o["annuncio_id"], "titolo": o["titolo"],
         "ruolo": "compratore" if da_compratore else "venditore",
@@ -90501,6 +90690,154 @@ def _onchain_ordine_permette(con, o, verso: str) -> None:
                                  "la vendita», nell'ordine")
 
 
+# ------------- LA DISPUTA ON-CHAIN: DECIDE UN MODERATORE, FIRMA BARATTOLO -------------
+# (27 ott 2026, cantiere onchain-disputa, Andrea: «un admin deve poter
+# decidere se rilasciare i sats verso il venditore o verso il
+# compratore. Se scelgo il compratore, questo aprendo Barattolo potra'
+# firmare a favore suo, idem il caso del venditore».)
+# Il 2-di-3 vuole due firme: una la mette QUI la chiave di Barattolo
+# (sul VPS, vedi «LA CHIAVE DI BARATTOLO STA SUL VPS»), l'altra il
+# telefono di chi ha vinto, da solo quando apre l'app — la stessa
+# seconda firma di sempre, col suo telefono che rifa' i conti
+# (`onchainCofirma`) e firma solo se gli arriva quel che gli spetta.
+# Il PSBT lo scrive il server: le uscite sono quelle che l'ordine
+# conosce (il prezzo a chi vende col resto e la quota, o tutto a chi
+# compra), la commissione dalla tariffa del momento dentro il margine,
+# e prima di conservarlo passa dallo stesso giudice delle proposte.
+# UNA FIRMA DATA NON SI RITIRA, ed e' la riga da non ammorbidire: chi
+# ha vinto ha in mano un PSBT con la firma di Barattolo, e puo'
+# finirlo e trasmetterlo anche senza di noi (con Sparrow). Quindi una
+# decisione on-chain e' definitiva davvero, e una seconda di verso
+# diverso si rifiuta — ridecidere vorrebbe dire due firme di Barattolo
+# in giro, una per parte.
+def _onchain_psbt_barattolo(con, oc, verso: str) -> str:
+    """Il PSBT d'uscita di `oc` verso `verso`, firmato dalla chiave di
+    Barattolo e gia' giudicato; base64. ValueError col motivo."""
+    from embit import script
+    from embit.ec import PublicKey
+    from embit.psbt import PSBT
+    from embit.transaction import (Transaction, TransactionInput,
+                                   TransactionOutput)
+    ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                      (oc["indirizzo_id"],)).fetchone()
+    figlia = _onchain_privata_barattolo(ind["xpub_barattolo"]).derive(
+        [0, int(ind["numero_barattolo"])])
+    if figlia.key.get_public_key().sec().hex() != ind["chiave_barattolo"]:
+        raise ValueError("la chiave di Barattolo non e' quella dell'indirizzo")
+    pubs = sorted((PublicKey.parse(bytes.fromhex(ind["chiave_" + k]))
+                   for k in ("compratore", "venditore", "barattolo")),
+                  key=lambda k: k.sec())
+    ws = script.multisig(2, pubs)
+    monete = json.loads(oc["utxo"] or "[]")
+    if not monete:
+        raise ValueError("l'ordine non ha monete")
+    tot = sum(int(m["value"]) for m in monete)
+    tariffa = max(1.0, float(_ONCHAIN_TARIFFA["sat_vb"] or 2.0))
+
+    def rete(uscite):
+        # la misura di `onchainProponi`, e mai oltre il margine
+        return min(int(oc["margine_sats"]),
+                   math.ceil((11 + 105 * len(monete) + 31 * uscite) * tariffa))
+
+    if verso == "venditore":
+        quota = int(oc["quota_sats"] or 0)
+        uscite = [(oc["incasso"], int(oc["prezzo_sats"]))]
+        if quota:
+            uscite.append((oc["quota_indirizzo"], quota))
+        resto = tot - int(oc["prezzo_sats"]) - quota - rete(3 if quota else 2)
+        if resto >= ONCHAIN_POLVERE:
+            uscite.append((oc["rimborso"], resto))
+    else:
+        uscite = [(oc["rimborso"], tot - rete(1))]
+    tx = Transaction(
+        vin=[TransactionInput(bytes.fromhex(m["txid"]), int(m["vout"]))
+             for m in monete],
+        vout=[TransactionOutput(v, script.address_to_scriptpubkey(d))
+              for d, v in uscite])
+    p = PSBT(tx)
+    for i, m in zip(p.inputs, monete):
+        i.witness_utxo = TransactionOutput(int(m["value"]), script.p2wsh(ws))
+        i.witness_script = ws
+    if p.sign_with(figlia.key) < len(monete):
+        raise ValueError("la chiave di Barattolo non firma queste monete")
+    b64 = p.to_string()
+    _onchain_psbt_giudica(oc, verso, b64, ind["chiave_barattolo"])
+    return b64
+
+
+async def _onchain_decide(ordine_id: int, verso: str, chi_id: int,
+                          perche: str) -> dict:
+    """Barattolo mette la sua firma sull'uscita `verso` ('venditore' o
+    'compratore') dell'ordine di sempre `ordine_id`, e la lascia come
+    proposta: la seconda e' del telefono di chi vince. Torna la risposta
+    per il moderatore (o per chi vende, dal reso). Rifirmare lo stesso
+    verso non fa niente; un verso diverso e' un 409 (la firma non si
+    ritira)."""
+    _onchain_serve_embit()
+    con = _onchain_db_ordini()
+    try:
+        oc = _onchain_di_ordine(con, ordine_id)
+        if not oc or oc["stato"] != "pagato":
+            raise HTTPException(409, "Nella cassaforte on-chain di questo "
+                                     "ordine non ci sono sats da muovere")
+        if oc["decisione_da"]:
+            if oc["proposta_verso"] == verso:
+                return {"ok": True, "stato": "dispute", "onchain": True,
+                        "attesa_firma": verso, "gia_firmata": True}
+            raise HTTPException(409, "Barattolo ha già firmato questa "
+                                     "decisione a favore " + (
+                                         "del venditore" if oc["proposta_verso"] == "venditore"
+                                         else "di chi ha comprato")
+                                     + ": una firma data non si ritira")
+        try:
+            psbt = _onchain_psbt_barattolo(con, oc, verso)
+        except ValueError as e:
+            raise HTTPException(409, f"Barattolo non può firmare: {e}")
+        adesso = int(time.time())
+        cur = con.execute("UPDATE onchain_ordini SET proposta_verso=?,"
+                          " proposta_psbt=?, proposta_da=0, proposta_il=?,"
+                          " decisione_da=?, decisione_il=?, decisione_perche=?,"
+                          " aggiornato=? WHERE id=? AND decisione_da=0",
+                          (verso, psbt, adesso, int(chi_id), adesso, perche,
+                           adesso, oc["id"]))
+        con.commit()
+        if not cur.rowcount:
+            # due moderatori nello stesso istante: vince il primo, e la
+            # firma del secondo non esce da qui
+            raise HTTPException(409, "Un altro moderatore ha appena deciso: "
+                                     "riapri l'ordine")
+        r = con.execute("SELECT stato FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        stato = r["stato"] if r else "dispute"
+        tit = html.escape(oc["titolo"][:40])
+        vince = oc["venditore_id"] if verso == "venditore" else oc["compratore_id"]
+        perde = oc["compratore_id"] if verso == "venditore" else oc["venditore_id"]
+    finally:
+        con.close()
+    if perche == "reso":
+        await notifica(vince, f"↩️ <b>Reso ricevuto:</b> {tit}. Barattolo ha "
+                              "firmato il tuo rimborso on-chain: apri la Mini "
+                              "App e il tuo telefono mette la seconda firma.")
+    else:
+        await notifica(vince, f"⚖️ <b>Disputa decisa a tuo favore:</b> {tit}. "
+                              "Barattolo ha firmato: apri la Mini App e il tuo "
+                              "telefono mette la seconda firma, poi i sats "
+                              "partono.")
+        await notifica(perde, f"⚖️ <b>Disputa decisa:</b> {tit}. Il moderatore "
+                              "ha dato ragione all'altra parte, e Barattolo ha "
+                              "firmato. Se pensi che ci sia un errore, scrivi "
+                              "ai moderatori.")
+    # la trasparenza di Andrea: ogni firma di Barattolo si dice agli admin,
+    # con chi l'ha decisa
+    await notifica_admin(argomento="dispute", testo=
+        f"⛓️ <b>Barattolo ha firmato</b> l'ordine on-chain #{ordine_id} "
+        f"({tit}) a favore " + ("del venditore" if verso == "venditore"
+                                else "di chi ha comprato")
+        + (f", dal reso ricevuto da {int(chi_id)}" if perche == "reso"
+           else f", deciso dal moderatore {int(chi_id)}") + ".")
+    return {"ok": True, "stato": stato, "onchain": True, "attesa_firma": verso}
+
+
 def _onchain_parte(o, tg_id) -> str:
     if int(o["compratore_id"]) == int(tg_id):
         return "compratore"
@@ -90665,6 +91002,10 @@ async def onchain_ordine_proposta(oid: int, req: Request,
             raise HTTPException(409, "Su questo ordine non c'è niente da "
                                      "liberare adesso")
         _onchain_ordine_permette(con, o, verso)
+        if o["decisione_da"]:
+            # la proposta di Barattolo non si sostituisce: e' la decisione
+            raise HTTPException(409, "Su questo ordine ha già firmato "
+                                     "Barattolo: manca solo la seconda firma")
         ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
                           (o["indirizzo_id"],)).fetchone()
         try:
@@ -90723,8 +91064,17 @@ async def onchain_ordine_firma(oid: int, req: Request,
         if int(o["proposta_da"]) == int(user["id"]):
             raise HTTPException(409, "La seconda firma è dell'altra parte")
         # l'ordine di sempre puo' essere cambiato fra le due firme (una
-        # disputa aperta dopo «Libera i sats»): si ricontrolla qui
-        _onchain_ordine_permette(con, o, o["proposta_verso"])
+        # disputa aperta dopo «Libera i sats»): si ricontrolla qui. Sulla
+        # proposta di Barattolo, invece, la disputa e' il posto giusto:
+        # e' lei che l'ha decisa
+        if o["decisione_da"]:
+            r = con.execute("SELECT stato FROM ordini WHERE id=?",
+                            (o["ordine_id"],)).fetchone()
+            if not r or r["stato"] not in ("dispute", "return_pending",
+                                           "return_shipped"):
+                raise HTTPException(409, "Non c'è niente da co-firmare")
+        else:
+            _onchain_ordine_permette(con, o, o["proposta_verso"])
         try:
             atteso = PSBT.from_string(o["proposta_psbt"]).tx.txid().hex()
             arrivato = Transaction.from_string(tx_hex).txid().hex()
@@ -90768,6 +91118,44 @@ async def onchain_ordine_firma(oid: int, req: Request,
     for chi in (o["compratore_id"], o["venditore_id"]):
         await notifica(chi, testo)
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
+
+
+@app.get("/api/admin/onchain/chiave")
+async def onchain_chiave_barattolo_vedi(x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la terza chiave com'e' adesso — di cartone, sul VPS
+    o solo pubblica dal config — e il suo backup. Mai le parole."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _onchain_serve_embit()
+    return onchain_stato_chiave_barattolo()
+
+
+@app.post("/api/admin/onchain/chiave")
+async def onchain_chiave_barattolo_crea(x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: «Crea la chiave di Barattolo», una volta sola (vedi
+    «LA CHIAVE DI BARATTOLO STA SUL VPS»). Dal prossimo ordine on-chain
+    la terza chiave e' lei; quelli gia' nati restano sulla loro, che
+    l'indirizzo ha fotografato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _onchain_serve_embit()
+    try:
+        d = onchain_crea_chiave_barattolo(user["id"])
+    except FileExistsError:
+        raise HTTPException(409, "La chiave di Barattolo c'è già: non si rifà")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    print(f"⛓️ Chiave di Barattolo creata da {user['id']}: {d['xpub'][:16]}…",
+          flush=True)
+    await notifica_admin(argomento="liquidita", testo=
+        f"⛓️ <b>Nata la chiave di Barattolo</b> (impronta {d['impronta']}), "
+        f"creata dal moderatore {int(user['id'])}. Sta solo sul VPS ed entra "
+        "nel prossimo backup fuori sede: fino ad allora non c'è una copia.")
+    return onchain_stato_chiave_barattolo()
 
 
 async def _onchain_riprendi_incassi():

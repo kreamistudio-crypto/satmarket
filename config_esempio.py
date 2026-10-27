@@ -1173,9 +1173,13 @@ ONCHAIN_ATTIVO = False
 # beta si allarga: due leve perche' sono due decisioni.
 ONCHAIN_SOLO_ADMIN = True
 # L'XPUB DI BARATTOLO, cioe' la TERZA chiave del 2-di-3 — quella che
-# serve SOLO in disputa. Qui va la META' PUBBLICA e nient'altro: la
-# privata non entra su questa macchina (vivra' in un firmatario sul
-# nodo, mai sul VPS). Vuota: il server usa una xpub DI CARTONE, presa
+# serve SOLO in disputa. Qui va la META' PUBBLICA e nient'altro.
+# ⚠️ DAL 27 OTT 2026 DI SOLITO QUESTA RIGA RESTA VUOTA: la chiave di
+# Barattolo nasce SUL VPS col bottone «Crea la chiave di Barattolo» del
+# pannello admin (decisione di Andrea, cantiere onchain-disputa), vive
+# in `chiavi/onchain-barattolo.json` ed entra nel backup fuori sede.
+# Una xpub scritta qui E il file insieme sono due terze chiavi, e il
+# server si ferma. Vuota e senza file: il server usa una xpub DI CARTONE, presa
 # dai vettori di prova del BIP-32 — pubblicata in uno standard col suo
 # seme, quindi CHIUNQUE ha la privata — e lo DICE al foglio, che la
 # mostra scritto: «non mandarci niente».

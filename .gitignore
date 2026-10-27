@@ -17,6 +17,9 @@ buste/
 # Le foto del contenuto digitale: cifrate sul disco, e quel file E' il
 # bene comprato (il codice a barre di un buono). Stessa regola.
 contenuti/
+# La chiave di Barattolo dell'on-chain (27 ott 2026): dodici parole che
+# firmano le dispute. Vive sul VPS e nell'archivio age, mai su git
+chiavi/
 
 # Python
 __pycache__/

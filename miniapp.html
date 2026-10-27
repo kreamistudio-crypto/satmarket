@@ -36093,7 +36093,10 @@ function openOrder(id){
             due meta' puo' essere gia' uscita, e il server rifiuta ogni
             altra decisione. Un bottone che risponde sempre di no non si
             mostra: al suo posto il pannello delle due meta', sotto. */''}
-      ${isAdmin && !o.speseReseSats && (s==='dispute' ||
+      ${/* ON-CHAIN, DOPO LA FIRMA DI BARATTOLO (27 ott 2026) i bottoni
+           spariscono: la firma non si ritira, e il riquadro on-chain
+           qui sopra dice a chi manca la seconda */''}
+      ${isAdmin && !o.speseReseSats && !(o.onchain && o.onchain.proposta && o.onchain.proposta.barattolo) && (s==='dispute' ||
           decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto)) ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
@@ -36122,7 +36125,7 @@ function openOrder(id){
           <div class="hint avviso-tracking" id="resoAvviso" style="display:none"></div>
           <button class="btn orange" onclick="resoSpedito()">↩️ Ho rispedito l'oggetto</button>
         </div>`:''}
-      ${o.role==='seller' && s==='return_shipped' ? `
+      ${o.role==='seller' && s==='return_shipped' && !(o.onchain && o.onchain.proposta && o.onchain.proposta.barattolo) ? `
         <div class="payout">
           <h4>↩️ Reso in arrivo</h4>
           <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${esc(o.corriereReso)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.trackingReso)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.${rigaCorretto(o.trackingResoCorretto)}${filaTracking(o, true)}`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
@@ -42465,6 +42468,9 @@ const STATI_MENO_SPESE = ['dispute', 'return_pending', 'return_shipped'];
    dove la domanda non si pone (ritiro a mano, digitale, altri stati). */
 function bottoneMenoSpese(o, s){
   if (!STATI_MENO_SPESE.includes(s) || o.consegnaScelta !== 'spedizione') return '';
+  /* on-chain (27 ott 2026) il quarto esito non c'e' ancora: il server
+     direbbe di no, e un bottone che porta a un muro non si mostra */
+  if (o.onchain) return '';
   if (!speseTrattenibili(o)) return `<div class="hint" style="margin-top:10px">${
     (Number(o.spedSats) || 0) > 0
       ? 'Rimborso meno le spese: non si può, la spedizione vale quanto il totale.'
@@ -42710,7 +42716,12 @@ async function adminResolve(esito, btn){
     : esito==='meno_spese'
     ? ['Rimborso meno le spese di spedizione?', corpoMenoSpese(o)]
     : ['Consegni i sats al venditore?', 'La decisione è definitiva.'];
-  chiediConferma({titolo, corpo, etichetta: 'Decidi così',
+  /* on-chain la decisione E' la firma di Barattolo: chi vince la finisce
+     col suo telefono, e una firma data non si ritira */
+  const corpoOc = o.onchain && esito !== 'reso'
+    ? corpo.split('\n\nLa decisione è definitiva.')[0] + '\n\n⛓️ Ordine on-chain: Barattolo firma adesso, e i sats partono quando chi vince apre l\'app. La firma non si ritira.'
+    : corpo;
+  chiediConferma({titolo, corpo: corpoOc, etichetta: 'Decidi così',
     poi: async () => {
       if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
       const ripristina = bottoneInAttesa(btn);
@@ -42726,8 +42737,15 @@ async function adminResolve(esito, btn){
          della decisione nel ridisegno qui sotto */
       segnaOrdine(o, Object.assign({state: d.stato || 'dispute'},
         d.meno_spese ? {speseReseSats: d.spese_sats || 0,
-          speseRigaStato: d.venditore_pagato ? 'riscosso' : 'da_riscuotere'} : {}));
-      toast(d.meno_spese
+          speseRigaStato: d.venditore_pagato ? 'riscosso' : 'da_riscuotere'} : {},
+        /* on-chain la firma di Barattolo va nel riassunto dell'ordine:
+           il riquadro la dice e i bottoni spariscono */
+        d.onchain && d.attesa_firma ? {onchain: onchainFirmatoDaBarattolo(o, d.attesa_firma, 'disputa')} : {}));
+      toast(d.onchain && d.attesa_firma
+            ? (d.attesa_firma === 'venditore'
+                ? '⛓️ Firmato da Barattolo: i sats partono quando il venditore apre l\'app'
+                : '⛓️ Firmato da Barattolo: il rimborso parte quando l\'acquirente apre l\'app')
+          : d.meno_spese
             ? (d.compratore_pagato && d.venditore_pagato
                 ? '⚖️ Deciso: acquirente rimborsato, spese rese al venditore'
                 : '⚖️ Deciso: rimborso meno le spese. Qui sotto vedi a che punto sono i due pagamenti')
@@ -42855,6 +42873,13 @@ async function onchainLiberaDallOrdine(btn, o){
   openOrder(o.id);
 }
 
+/* PURA: il riassunto on-chain dell'ordine dopo la firma di Barattolo,
+   come lo rimanderebbe il server (27 ott 2026) */
+function onchainFirmatoDaBarattolo(o, verso, perche){
+  return Object.assign({}, o.onchain || {},
+    {proposta: {verso, mia: false, barattolo: perche}});
+}
+
 async function onchainSecondaFirmaDallOrdine(btn, o){
   const rip = onchainAttesa(btn, 'Firmo…');
   await onchainCofirmeInSottofondo();
@@ -42871,7 +42896,20 @@ function pannelloOnchainOrdine(o, s){
   const p = oc.proposta;
   const io = o.role === 'buyer' ? 'compratore' : 'venditore';
   let riga = '', gesto = '';
-  if (p && p.verso === 'venditore' && ['locked','shipped','delivered'].includes(s)) {
+  if (p && p.barattolo) {
+    /* LA FIRMA DI BARATTOLO (27 ott 2026): un moderatore ha deciso (o
+       chi vende ha ricevuto il reso), e manca la firma di chi vince */
+    const perMe = p.verso === io;
+    const parte = o.role === 'buyer' || o.role === 'seller';
+    riga = !parte
+      ? `⚖️ <b>Barattolo ha firmato</b> a favore ${p.verso === 'venditore' ? 'del venditore' : 'di chi ha comprato'}: manca la seconda firma, quella del telefono di chi vince.`
+      : p.barattolo === 'reso'
+      ? (perMe ? '↩️ <b>Il venditore ha ricevuto il reso</b> e Barattolo ha firmato il tuo rimborso. Manca la seconda firma, quella del tuo telefono: si mette da sola quando apri la Mini App.'
+               : '↩️ <b>Reso ricevuto:</b> Barattolo ha firmato il rimborso. Parte appena l\'acquirente apre la Mini App.')
+      : (perMe ? '⚖️ <b>Disputa decisa a tuo favore.</b> Barattolo ha firmato; manca la seconda firma, quella del tuo telefono: si mette da sola quando apri la Mini App.'
+               : '⚖️ <b>Disputa decisa a favore dell\'altra parte.</b> Barattolo ha firmato, e i sats partono appena l\'altra parte apre la Mini App.');
+    if (parte && perMe) gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
+  } else if (p && p.verso === 'venditore' && ['locked','shipped','delivered'].includes(s)) {
     riga = p.mia
       ? '🔓 <b>Hai liberato i sats</b> con la firma del tuo telefono: partono appena il venditore apre la Mini App, e il suo telefono mette la seconda.'
       : '🔓 <b>L\'acquirente ha liberato i sats.</b> Manca la seconda firma, quella del tuo telefono: si mette da sola quando apri la Mini App.';
@@ -46316,8 +46354,10 @@ async function resoRicevuto(btn){
       const d = await r.json().catch(()=>({}));
       ripristina();
       if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-      segnaOrdine(o, {state: d.stato || 'refund'});
-      toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
+      segnaOrdine(o, Object.assign({state: d.stato || 'refund'},
+        d.onchain && d.attesa_firma ? {onchain: onchainFirmatoDaBarattolo(o, d.attesa_firma, 'reso')} : {}));
+      toast(d.onchain ? '⛓️ Barattolo ha firmato il rimborso: parte quando l\'acquirente apre l\'app'
+            : d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
       ridisegnaOrdine(o);
     }});
 }
@@ -47947,6 +47987,14 @@ async function loadAdminStats(){
     } catch(e) {}
     admLeve = leve;
     if (el('leveSheet')?.classList.contains('open')) renderListaLeve();
+    /* la chiave di Barattolo (27 ott 2026): solo dove l'on-chain e'
+       ammesso, come il suo banco */
+    admChiaveOc = null;
+    if (myOnchain) try {
+      const rk = await fetch(`${API_BASE}/admin/onchain/chiave`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rk.ok) admChiaveOc = await rk.json();
+    } catch(e) {}
     /* i badge Nostr NIP-58 delle live: solo l'elenco coi conteggi qui
        (interroga una tabella minuscola), il dettaglio di uno solo
        (partecipanti, challenge attive) si carica al bisogno quando lo
@@ -48084,6 +48132,7 @@ async function loadAdminStats(){
         <button class="btn ghost" style="margin-top:8px" onclick="pulisciFotoRetroattivo()">🧹 Controlla le foto</button>
       </div>
       ${boxLeve(leve)}
+      ${boxChiaveBarattolo()}
       ${boxBadgeLive()}
       ${boxPersonalizzazioniPreview()}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
@@ -49042,6 +49091,66 @@ function registroModerazione(mod){
           <span style="color:var(--muted);font-weight:600"> — ${esc(v.esito)}${v.motivo?` (${esc(v.motivo)})`:''} · ${v.strato}${v.deciso_da?` · admin ${v.deciso_da}`:''} · ${new Date(v.creato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>
         </div>`).join('')}
     </div>`);
+}
+
+/* ---- ⛓️ LA CHIAVE DI BARATTOLO (27 ott 2026, cantiere onchain-disputa) ----
+   La terza chiave del 2-di-3 sta sul VPS (Andrea: «concettualmente quella
+   chiave può stare solo nella VPS, altrimenti noi admin possiamo già dare
+   2 firme»), e qui si vede com'è fatta e se il backup la contiene. Le
+   dodici parole NON arrivano mai qui: vederle sarebbe tenerle. Nasce con
+   un gesto, una volta sola. */
+let admChiaveOc = null;
+function dataOraBreve(t){
+  return t ? new Date(t * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short',
+    year: 'numeric', hour: '2-digit', minute: '2-digit'}) : '—';
+}
+function boxChiaveBarattolo(){
+  const k = admChiaveOc;
+  if (!k) return '';
+  const firma = 'Firma da sola SOLO quando un moderatore decide una disputa on-chain (mai una in cui è parte) o chi vende riceve un reso; ogni sua firma arriva agli admin.';
+  let conta, dentro;
+  if (k.dove === 'vps') {
+    conta = k.nel_backup ? 'sul VPS' : '⚠️ senza backup';
+    dentro = `<div class="sub">La terza chiave del 2-di-3 sta <b>solo sul VPS</b>. ${firma}</div>
+      <div class="hint" style="margin-top:8px">Impronta <b>${esc(k.impronta)}</b> · nata il ${dataOraBreve(k.creata_il)} · strada ${esc(k.strada)}</div>
+      <div class="hint" style="word-break:break-all">Chiave pubblica: <code>${esc(k.xpub)}</code></div>
+      <div class="hint">${k.nel_backup
+        ? `✅ <b>È nel backup fuori sede</b> del ${dataOraBreve(k.backup_ultimo)}: l'archivio age su Telegram, che si apre solo con la chiave age del PC.`
+        : '⚠️ <b>Non è ancora in un backup fuori sede</b>: entra nel prossimo (alle 04:30, o al prossimo deploy). Fino ad allora la copia è una sola.'}</div>
+      <div class="hint">Le dodici parole non escono da qui. Per ripristinarla si prendono dall'archivio (<code>chiavi/onchain-barattolo.json</code>) e in Sparrow si importano come terzo firmatario, sulla strada ${esc(k.strada)}.</div>`;
+  } else if (k.dove === 'config') {
+    conta = 'solo pubblica';
+    dentro = `<div class="sub">Nel config c'è una <b>ONCHAIN_XPUB</b>: la terza chiave è quella, e la sua privata non sta su questo server. Le dispute on-chain non si possono firmare da qui.</div>`;
+  } else if (k.dove === 'rotta') {
+    conta = '⚠️ illeggibile';
+    dentro = `<div class="sub">⚠️ Il file della chiave c'è ma non si legge (${esc(k.motivo || '')}). Non si ricrea da qui: va guardato sul VPS, dall'archivio.</div>`;
+  } else {
+    conta = 'di cartone';
+    dentro = `<div class="sub">Oggi la terza chiave è <b>di cartone</b>: quella dei vettori di prova del BIP-32, la cui privata è pubblica. Va bene su signet; prima dei sats veri serve la chiave vera. ${firma}</div>
+      <button class="btn orange" style="margin-top:10px" onclick="creaChiaveBarattolo(this)">⛓️ Crea la chiave di Barattolo</button>`;
+  }
+  return cassettoAdm('accAdmChiaveOc', '⛓️', 'Chiave di Barattolo', conta, dentro);
+}
+function creaChiaveBarattolo(btn){
+  haptic();
+  chiediConferma({
+    titolo: 'Crei la chiave di Barattolo?',
+    corpo: 'Nascono dodici parole nuove, solo sul VPS. Da qui in poi ogni ordine on-chain nuovo la usa come terza chiave; quelli già nati restano sulla loro.\n\nSi crea una volta sola e non si rifà. Entra nel prossimo backup fuori sede.',
+    etichetta: 'Crea la chiave',
+    poi: async () => {
+      const rip = bottoneInAttesa(btn, 'Creo la chiave…');
+      try {
+        const r = await fetch(`${API_BASE}/admin/onchain/chiave`,
+          {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || 'non creata');
+        admChiaveOc = d;
+        accAdmAperti.add('accAdmChiaveOc');
+        toast('⛓️ Chiave di Barattolo creata, impronta ' + (d.impronta || '?'), 6000);
+        loadAdminStats();
+      } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+      finally { rip(); }
+    }});
 }
 
 /* ---- ⚙️ Stato delle leve (ago 2026) ----
@@ -55179,6 +55288,10 @@ async function onchainCofirmeInAttesa(parole){
   for (const o of onchainOrdini) {
     if (o.stato !== 'pagato' && o.stato !== 'attesa') continue;
     if (!o.proposta || o.proposta.mia) continue;
+    /* si co-firma solo quel che va a ME: con la firma di Barattolo
+       (27 ott 2026) anche chi ha perso la disputa vede la proposta, e
+       il suo telefono non ha niente da metterci */
+    if (o.proposta.verso !== o.ruolo) continue;
     try {
       const no = await onchainCofirma(o, parole);
       fatte.push(no ? `⚠️ #${o.id}: non co-firmato — ${no}`
@@ -55226,7 +55339,7 @@ async function onchainCofirmeInSottofondo(){
     const parole = onchainSemeLocale();
     if (!parole) return;
     const ordini = await onchainLeggiOrdini();
-    if (!ordini.some(o => o.proposta && !o.proposta.mia
+    if (!ordini.some(o => o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
                           && (o.stato === 'pagato' || o.stato === 'attesa'))) return;
     const fatte = await onchainCofirmeInAttesa(parole);
     if (fatte.length) {
@@ -55324,6 +55437,11 @@ function onchainBloccoOrdini(verifiche, esiti){
       if (p && p.mia) {
         corpo = `<div class="hint">Hai firmato ${p.verso === 'venditore' ? 'il rilascio' : 'il rimborso'}:
           aspetta la seconda firma, che parte da sola quando l'altra parte apre la Mini App.</div>`;
+      } else if (p && p.verso !== o.ruolo) {
+        /* la firma di Barattolo verso l'altra parte (27 ott 2026): qui
+           non c'e' niente da co-firmare */
+        corpo = `<div class="hint">La disputa è stata decisa a favore dell'altra parte, e
+          Barattolo ha firmato: i sats partono quando l'altra parte apre la Mini App.</div>`;
       } else if (p) {
         corpo = `<div class="hint">C'è una proposta da co-firmare: questo telefono la
           firma da solo se torna tutto.</div>`;

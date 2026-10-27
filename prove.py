@@ -26243,7 +26243,9 @@ def prove_rimborso_meno_spese():
           "    speseRigaId:o.spese_riga_id||0, "
           "speseRigaStato:o.spese_riga_stato||''," in mini)
     prova("a decisione presa i bottoni del moderatore spariscono", 1,
-          mini.count("${isAdmin && !o.speseReseSats && (s==='dispute' ||\n"
+          mini.count("${isAdmin && !o.speseReseSats && !(o.onchain && "
+                     "o.onchain.proposta && o.onchain.proposta.barattolo) && "
+                     "(s==='dispute' ||\n"
                      "          decidibileDalModeratore(s, o.disputata, "
                      "o.sbloccatoAuto)) ? `"))
     i_v = mini.find("onclick=\"adminResolve('venditore', this)\"")
@@ -34182,6 +34184,11 @@ def _censimento(acceso, dopo=None):
         **r, "scrivibile": {"pavimento": 0, "tetto": 5000,
                             "origine": "pannello" if acceso else "codice"}}
     amb["SPIEGA_RITMO"] = {"giorno": "uno al giorno per venditore"}
+    # la riga della terza chiave on-chain (27 ott 2026) legge un file:
+    # qui la sua frase, sesta occorrenza della trappola del 7
+    amb["_onchain_terza_chiave_a_parole"] = (
+        (lambda: "sul VPS (impronta 3442193e)") if acceso
+        else (lambda: "di cartone (vettori BIP-32: la privata è pubblica)"))
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
     amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
@@ -44289,8 +44296,10 @@ def prove_fogli_di_casa():
     # «dimentica il seme» della prova del ripristino — Andrea: «fuorviante,
     # posso recuperarla su Telegram». Al suo posto «Controlla il backup»,
     # che non cancella niente e quindi non chiede niente.
-    prova("i gesti che passano dalla domanda unica sono novantatre",
-          93, solo_codice(mini).count("chiediConferma({"))
+    # (27 ott 2026, cantiere onchain-disputa: «Crea la chiave di
+    # Barattolo», il novantaquattresimo)
+    prova("i gesti che passano dalla domanda unica sono novantaquattro",
+          94, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -45799,7 +45808,8 @@ def prove_ordini_fermi():
     # gia' deciso — `!o.speseReseSats` — perche' li' il server non
     # riapre piu' niente: prove_rimborso_meno_spese)
     prova("...e ora il client offre i bottoni", True,
-          "isAdmin && !o.speseReseSats && (s==='dispute' ||" in mini
+          "isAdmin && !o.speseReseSats && !(o.onchain && o.onchain.proposta "
+          "&& o.onchain.proposta.barattolo) && (s==='dispute' ||" in mini
           and "decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto))"
           in mini
           and "['confirmed','refund'].includes(stato)" in pezzo_js(
@@ -152387,6 +152397,48 @@ def prove_onchain_nell_ordine():
           in pezzo_js(mini, "async function inviaAnnullaVendita(id, corpo){", "\n}\n"))
 
 
+def prove_onchain_disputa():
+    """LA DISPUTA ON-CHAIN (27 ott 2026, cantiere onchain-disputa): decide
+    un moderatore, firma la chiave di Barattolo, che sta SUL VPS (Andrea:
+    «altrimenti noi admin possiamo gia' dare 2 firme»), e la seconda la
+    mette il telefono di chi vince. Il giro col server vero sta in
+    collaudo_onchain_ordine; qui le serrature del sorgente."""
+    print("\n⛓️ La disputa on-chain e la chiave di Barattolo")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    crea = pezzo("onchain_crea_chiave_barattolo")
+    prova("la chiave nasce una volta (O_EXCL), 0600, da os.urandom, e "
+          "fuori torna solo la parte pubblica", [True, True, True, True],
+          ["os.O_EXCL" in crea, "0o600" in crea, "os.urandom(16)" in crea,
+           'return {k: d[k] for k in ("xpub", "impronta", "creata_il", "strada")}'
+           in crea])
+    stato = pezzo("onchain_stato_chiave_barattolo")
+    prova("il pannello non vede mai le parole", False, '"parole"' in stato)
+    ris = pezzo("risolvi_disputa")
+    prova("un moderatore che e' parte non decide un ordine on-chain, e il "
+          "no viene PRIMA della firma", True,
+          ris.index("decide un altro moderatore")
+          < ris.index("return await _onchain_decide("))
+    dec = pezzo("_onchain_decide")
+    prova("una firma di Barattolo sola per ordine, e si dice agli admin",
+          [True, True, True],
+          ["AND decisione_da=0" in dec, "non si ritira" in dec,
+           "await notifica_admin(" in dec])
+    prova("il PSBT di Barattolo passa dal giudice delle proposte", True,
+          "_onchain_psbt_giudica(oc, verso, b64" in pezzo("_onchain_psbt_barattolo"))
+    prova("una proposta di parte non prende il posto di quella di Barattolo",
+          True, 'if o["decisione_da"]:' in pezzo("onchain_ordine_proposta"))
+    prova("il reso ricevuto on-chain fa firmare Barattolo verso chi compra",
+          True, '_onchain_decide(ordine_id, "compratore", user["id"], "reso")'
+          in pezzo("reso_ricevuto"))
+    prova("il telefono co-firma solo quel che va a lui (chi ha perso salta)",
+          True, "if (o.proposta.verso !== o.ruolo) continue;" in
+          pezzo_js(mini, "async function onchainCofirmeInAttesa(parole){", "\n}\n"))
+    bk = open("deploy/backup-fuori.sh", encoding="utf-8").read()
+    prova("la chiave entra nel backup fuori sede, e fuori da git", [True, True],
+          ['cp -a "$DIR_APP/chiavi" "$TMP/chiavi"' in bk,
+           "\nchiavi/\n" in open(".gitignore", encoding="utf-8").read()])
+
+
 def _pezzi_incasso_js(mini):
     """I pezzi del telefono per la destinazione firmata e la quota (27
     ott 2026), da mettere nei banchi node che fanno girare proponi e
@@ -153045,7 +153097,12 @@ console.log(JSON.stringify({
                "ONCHAIN_RETE": "signet",
                "ONCHAIN_STRADA_CONTO": "m/48'/1'/0'/2'",
                "ONCHAIN_XPUB": xpub_barattolo,
-               "XPUB_CARTONE": vett["bip32"][0]["catene"][0]["xpub"]}
+               "XPUB_CARTONE": vett["bip32"][0]["catene"][0]["xpub"],
+               # la chiave di Barattolo sul VPS (27 ott 2026) si cerca in
+               # un file accanto al database: qui un posto vuoto, quindi
+               # nessun file e la strada di sempre
+               "os": os, "json": json, "time": time,
+               "DB": os.path.join(__import__("tempfile").mkdtemp(), "x.db")}
         exec(cod, amb)
         return amb
 
@@ -165068,7 +165125,9 @@ def prove_canale_admin():
           "OGNUNA dice la sua stanza",
           # (27 ott 2026, margine-cassaforte) «manca margine nella
           # cassaforte» va nella stanza della liquidita', come la guardia
-          {"dispute": 2, "dm": 1, "errori": 33, "liquidita": 1,
+          # (27 ott 2026, onchain-disputa) la firma di Barattolo nelle
+          # dispute, la nascita della sua chiave nella liquidita'
+          {"dispute": 3, "dm": 1, "errori": 33, "liquidita": 2,
            "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -165104,11 +165163,12 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "87 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "89 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
-          "quota arrivata su swap@, l'unione degli account dal web e il "
-          "margine della cassaforte)", 87,
+          "quota arrivata su swap@, l'unione degli account dal web, il "
+          "margine della cassaforte, e dall'on-chain la firma di Barattolo "
+          "e la nascita della sua chiave)", 89,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -180907,6 +180967,7 @@ def main():
     prove_ripristino_visibile,
     prove_onchain_pagina,
     prove_onchain_nell_ordine,
+    prove_onchain_disputa,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,
