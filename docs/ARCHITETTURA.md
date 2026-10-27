@@ -34361,6 +34361,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   venuto dopo; le parole non escono mai. `backup-fuori.sh` copia
   `chiavi/` nell'archivio age. Prove: `prove_onchain_disputa`; il
   collaudo `collaudo_onchain_ordine` (sezioni 5b e 5c).
+- IL TETTO DELLA BETA ON-CHAIN (27 ott 2026, cantiere onchain-tetto):
+  `ONCHAIN_MAX_EURO` (250 nel codice, 0 = spento) sul prezzo dell'ordine,
+  col cambio del momento; `onchain_sopra_il_tetto` lo giudica e la cassa
+  (`_onchain_compra`) lo chiama prima di scrivere. Senza cambio: no.
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
   tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,

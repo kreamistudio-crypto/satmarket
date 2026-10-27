@@ -1205,6 +1205,12 @@ ONCHAIN_MEMPOOL_API = ""
 # ANCHE DAL PANNELLO («⚙️ Stato delle leve», ✏️), e il pannello vince su
 # questa riga: qui c'e' solo il valore di partenza.
 ONCHAIN_QUOTA_FISSA_SATS = 0
+# IL TETTO DELLA BETA ON-CHAIN (27 ott 2026, decisione di Andrea: «il
+# tetto rimane di 250 euro per un certo periodo ancora»): un ordine
+# on-chain sopra questa cifra in euro (sul prezzo, senza il margine per
+# la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
+# Il valore del codice e' gia' 250: la riga serve il giorno che sale.
+ONCHAIN_MAX_EURO = 250
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

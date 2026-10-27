@@ -42,6 +42,10 @@ ordine on-chain può valere qualunque cifra. Su signet non conta.
 
 **DECISIONE**: metterli prima di mainnet (consiglio: sì, come il P2P),
 con le leve nel pannello.
+**DECISO** (Andrea, 27 ott 2026): «il tetto rimane di 250 euro per un
+certo periodo ancora». Fatto lo stesso giorno: `ONCHAIN_MAX_EURO`, 250
+nel codice, sul prezzo dell'ordine (cantiere onchain-tetto). Il tetto
+TOTALE in catena resta da decidere.
 
 ## 3. «Pagato» lo dice una sola fonte (mempool.space)
 
