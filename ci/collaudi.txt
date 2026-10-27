@@ -133,6 +133,7 @@ collaudo_margine_cassaforte
 collaudo_onchain_indirizzo
 collaudo_onchain_ordine
 collaudo_onchain_incasso
+collaudo_leve_pannello
 collaudo_certificati_relay
 collaudo_filtro_avorio
 

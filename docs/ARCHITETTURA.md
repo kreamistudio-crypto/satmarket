@@ -17338,8 +17338,10 @@
   GLOBALI del modulo, cioè il valore già risolto fra la riga del
   config e il default del codice: un elenco dei default sarebbe una
   seconda bugia da leggere, ed è la trappola di MAX_PREFERITI.
-  SI GUARDA E BASTA (salvo le leve scrivibili, aperte una per una dal
-  27 ott 2026: «LE LEVE SCRIVIBILI DAL PANNELLO») — nessuna rotta che scrive, e non è pigrizia:
+  SI GUARDA E BASTA (fino al 27 ott 2026: quel giorno si aprono prima
+  due leve, «LE LEVE SCRIVIBILI DAL PANNELLO», poi tutte tranne le 58
+  «mai», «TUTTE LE LEVE DAL PANNELLO»; la regola qui sotto vale ancora
+  per le «mai») — nessuna rotta che scrive, e non è pigrizia:
   ASTA_ABILITATA, IMPORT_NOSTR_APERTO e AUTO_SBLOCCO_ATTIVO nascono
   spente nel codice perché accenderle costi un gesto, e una leva che
   si accende da un telefono è una leva che si accende per sbaglio.
@@ -34313,6 +34315,47 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   o {torna_al_config: true}; 404 per una chiave non aperta; freno
   `leva_pannello`; una riga in `moderazione_log`, strato «leva»). Nel
   cassetto: `rigaLevaScrivibile`, `levaScrivi` (Salva → Conferma).
+- TUTTE LE LEVE DAL PANNELLO (27 ott 2026, cantiere leve-tutte; perché
+  in CANTIERI, «Tutte le leve dalla pagina»). Le altre si aprono da sole
+  col giudice del loro tipo: `_leva_generica(riga)` dice sì se il nome
+  passa `_leva_apribile_di_nome` (fuori `LEVE_MAI_DAL_PANNELLO`, le 58
+  dello studio più i segreti di testa, e chi ha la forma di un segreto
+  o di un indirizzo, `_LEVA_DI_NOME_CHIUSO`), se il server la chiede al
+  config, se `_tipo_leva` la sa giudicare (si_no, intero, decimale,
+  testo, lista di scalari, dizionario a chiavi di testo) e se la riga
+  del censimento mostra proprio quel valore (o il suo `_elenco`/conteggio).
+  `_giudice_per_tipo(rif, valore)`: lo stesso tipo di oggi, numeri non
+  negativi se oggi non lo sono, al più 500 voci/caratteri.
+  `_leve_lette_dal_codice()` legge il sorgente PER GETTONI (tokenize,
+  mai l'albero: 280 MB) una volta per processo: i nomi letti fuori da
+  ogni funzione (esclusi i blocchi di testa che riscrivono la leva, cioè
+  le guardie `X = int(X)`), le leve `from config import`, i valori di
+  serie dei rami `except ImportError`. Letta fuori → `subito: false`.
+  IL GESTO UNICO `_leva_scrivi(chiave, valore, al_config, chi, come)`:
+  giudice, tabella `leve_pannello` (JSON col tipo, `_leva_in_json` /
+  `_leva_da_json`; le due di prima restano `str(v)`), `_leva_metti_viva`
+  (globale e modulo config; il valore di prima in `_VALORE_SENZA_PANNELLO`
+  per «Torna al config»), storia `leve_pannello_storia` (prima, dopo,
+  prima_dal_pannello, come: cambio|annulla|ripristino), riga nel registro.
+  ALL'AVVIO `_leve_pannello_sopra_il_config()`, PRIMA del primo `from
+  config import`: legge la tabella dal `DB` del config e posa i valori
+  sul modulo config, così valgono anche dove il codice li legge una
+  volta sola. Il freno a mano: `LEVE_PANNELLO_SPENTE = True` nel config
+  (`_LEVE_PANNELLO_SPENTE`, i cambi generici diventano 409).
+  Rotte: `GET /api/admin/leve` (con `spente`), `POST /api/admin/leve/{chiave}`,
+  `GET /api/admin/leve-storia`, `POST /api/admin/leve-storia/{id}/annulla`,
+  `GET /api/admin/leve-backup` ({barattolo_leve: 1, sito, creato, leve}),
+  `POST /api/admin/leve-backup/telegram` (sendDocument nella chat di chi
+  chiede), `POST /api/admin/leve-ripristina` ({backup, applica}: senza
+  applica l'anteprima; il pannello diventa UGUALE al backup, quel che il
+  backup non ha torna al config). Tutte solo `e_admin`, freno
+  `leva_pannello`. Nella Mini App: `leveSheet` con le viste `sezioni`
+  (piastrelle per gruppo, «⚠️ Da guardare», «✏️ Cambiate da qui»),
+  `gruppo:<i>`, `storia`, `backup`; `schedaLevaCambiabile`,
+  `levaDaCasella`, `levaChiedi` (Adesso/Dopo, salto grande in rosso),
+  `storiaAnnullaChiedi`, `backupControlla`/`backupRipristinaChiedi`.
+  Collaudo: `collaudo_leve_pannello` (anche il riavvio in un secondo
+  processo, e il freno a mano).
 
 - I CERTIFICATI DEI RELAY (20 ott 2026, cantiere certificati-relay;
   perché in CANTIERI, «I certificati dei relay si verificano»; il journal
