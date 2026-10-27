@@ -153168,6 +153168,10 @@ def prove_cancello_onchain():
         amb = {"__builtins__": __builtins__,
                # di cartone: conosce solo il 999, come il collaudo
                "e_admin": lambda tg_id: tg_id == 999}
+        # dal 27 ott 2026 «Solo gli admin» si legge da `leva_scrivibile`
+        # (pannello > config > codice): qui senza pannello, quindi il
+        # valore e' quello che il config di cartone ha messo nel blocco
+        amb["leva_scrivibile"] = lambda chiave: amb[chiave]
         try:
             exec(cod, amb)
         finally:
