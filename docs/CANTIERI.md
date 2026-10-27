@@ -73769,3 +73769,19 @@ sul VPS e controllare che il primo backup la contenga. Il ponte verso la
 transazione trasmessa senza di noi (chi vince la finisce in Sparrow): la
 ronda oggi non se ne accorge, e l'ordine resterebbe in disputa.
 
+## Il tetto della beta on-chain: 250 € sul prezzo (27 ott 2026, cantiere onchain-tetto, decisione di Andrea)
+
+Andrea, sulla seconda decisione dell'audit 3: «il tetto rimane di 250
+euro per un certo periodo ancora». Lo studio l'aveva fissato e il
+codice non l'aveva. `ONCHAIN_MAX_EURO` (250 nel codice, 0 = spento, una
+riga storta resta 250: qui un refuso che spegne vorrebbe dire sats senza
+limite) si giudica in `onchain_sopra_il_tetto` sul PREZZO dell'ordine,
+cioè quel che col Lightning sarebbe la fattura, senza il margine per la
+rete. Il cambio è quello del momento; senza cambio si dice di no invece
+di indovinare. La cassa lo chiede prima di scrivere qualunque cosa, e
+sopra il tetto risponde «per questo ordine paga con Lightning». Scartato:
+il tetto in sats (dipenderebbe dal cambio del giorno in cui si scrive).
+Resta da decidere il tetto TOTALE in catena dello studio. PROVATO:
+`prove_onchain_tetto` (il giudice eseguito) e `collaudo_onchain_ordine`
+(84/0: sopra il tetto 400 e nessun ordine, a tetto spento passa).
+

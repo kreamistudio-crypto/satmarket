@@ -617,6 +617,29 @@ def main():
     prova("scaduto senza un sats: scaduto", "scaduto",
           controlla(999, o["id"]).json()["stato"])
 
+    # il tetto della beta (27 ott 2026, cantiere onchain-tetto): 250 € sul
+    # prezzo; qui il cambio finto e' 100.000 €/BTC, quindi 250.000 sats
+    con = SRV.db()
+    caro = con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+        "categoria,zona,stato,creato,consegna,quantita,valuta,condizione)"
+        " VALUES(888,'Cosa cara','una cosa',300000,'Altro','Pavia (PV)',"
+        "'attivo',1,'ritiro',1,'sats','nuovo')").lastrowid
+    con.commit()
+    con.close()
+    r = compra(999, caro, metodo="onchain")
+    prova("sopra i 250 € della beta: 400 col perche', e nessun ordine nasce",
+          (400, True, 0),
+          (r.status_code, "fino a 250 €" in r.json().get("detail", ""),
+           SRV.db().execute("SELECT COUNT(*) FROM onchain_ordini WHERE "
+                            "annuncio_id=?", (caro,)).fetchone()[0]))
+    SRV.ONCHAIN_MAX_EURO = 0
+    prova("...a tetto spento si paga on-chain anche la cosa cara", 200,
+          compra(999, caro, metodo="onchain").status_code)
+    SRV.ONCHAIN_MAX_EURO = 250
+    prova("...e senza cambio, a tetto acceso, l'on-chain dice di no",
+          True, "non sappiamo il cambio" in SRV.onchain_sopra_il_tetto(1000, 0))
+
     # ---- 7) la leva ---------------------------------------------------------
     SRV.ONCHAIN_ATTIVO = False
     come(999)

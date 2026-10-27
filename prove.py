@@ -152439,6 +152439,29 @@ def prove_onchain_disputa():
            "\nchiavi/\n" in open(".gitignore", encoding="utf-8").read()])
 
 
+def prove_onchain_tetto():
+    """IL TETTO DELLA BETA ON-CHAIN (27 ott 2026, cantiere onchain-tetto,
+    Andrea: «il tetto rimane di 250 euro per un certo periodo ancora»).
+    Il giudice ESEGUITO, e la cassa che lo chiama prima di scrivere."""
+    print("\n⛓️ Il tetto della beta on-chain")
+    amb = {"ONCHAIN_MAX_EURO": 250}
+    exec(pezzo("onchain_sopra_il_tetto"), amb)
+    t = amb["onchain_sopra_il_tetto"]
+    prova("a 100.000 €/BTC: 250.000 sats si', 250.001 no; senza cambio no",
+          [True, False, False],
+          [t(250_000, 100_000.0) == "", t(250_001, 100_000.0) == "",
+           t(1000, 0) == ""])
+    amb["ONCHAIN_MAX_EURO"] = 0
+    prova("...a tetto 0 nessun no, nemmeno senza cambio", ["", ""],
+          [t(10**9, 100_000.0), t(10**9, 0)])
+    compra = pezzo("_onchain_compra")
+    prova("la cassa giudica il tetto PRIMA di aprire il database", True,
+          compra.index("onchain_sopra_il_tetto(prezzo, await cambio_btc_eur())")
+          < compra.index("con = _onchain_db_ordini()"))
+    prova("il codice dice 250, anche con una riga storta", 2,
+          _SORGENTE.count("    ONCHAIN_MAX_EURO = 250\n"))
+
+
 def _pezzi_incasso_js(mini):
     """I pezzi del telefono per la destinazione firmata e la quota (27
     ott 2026), da mettere nei banchi node che fanno girare proponi e
@@ -180968,6 +180991,7 @@ def main():
     prove_onchain_pagina,
     prove_onchain_nell_ordine,
     prove_onchain_disputa,
+    prove_onchain_tetto,
     prove_chiave_che_nasce_da_sola,
     prove_checksum_descrittore,
     prove_leva_rgb,

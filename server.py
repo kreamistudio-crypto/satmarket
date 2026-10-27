@@ -33040,6 +33040,11 @@ def _leve_stato():
                   allarme=bool(ONCHAIN_ATTIVO) and not EMBIT),
             _leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",
                   _onchain_terza_chiave_a_parole()),
+            _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
+                  ONCHAIN_MAX_EURO,
+                  acceso="un ordine on-chain sopra questa cifra non si "
+                         "paga on-chain: resta il Lightning",
+                  spento="nessun tetto: l'on-chain vale per qualunque cifra"),
             # la prima leva che si cambia anche da qui (27 ott 2026)
             _leva_scrivibile_riga(_leva(
                 "Quota fissa di Barattolo (sats)", "ONCHAIN_QUOTA_FISSA_SATS",
@@ -50887,6 +50892,41 @@ except ImportError:
     ONCHAIN_QUOTA_FISSA_SATS = 0
     ONCHAIN_QUOTA_DAL_CONFIG = False
 ONCHAIN_QUOTA_TETTO = 5000
+# IL TETTO DELLA BETA ON-CHAIN (27 ott 2026, cantiere onchain-tetto): lo
+# studio diceva 250 €, come il P2P, e il codice non l'aveva (l'audit 3,
+# punto 2). Andrea: «il tetto rimane di 250 euro per un certo periodo
+# ancora». In EURO sul prezzo dell'ordine (quel che col Lightning sarebbe
+# la fattura: articolo, spedizione, protezione), senza il margine per la
+# rete. Il cambio e' quello del momento: se non c'e', l'on-chain dice di
+# no invece di indovinare. 0 = nessun tetto; storta = 250, mai spento da
+# un refuso (qui un refuso che spegne vorrebbe dire sats senza limite).
+try:
+    from config import ONCHAIN_MAX_EURO
+    ONCHAIN_MAX_EURO = int(ONCHAIN_MAX_EURO)
+    if ONCHAIN_MAX_EURO < 0:
+        raise ValueError("un tetto negativo non e' un tetto")
+except ImportError:
+    ONCHAIN_MAX_EURO = 250
+except (TypeError, ValueError):
+    ONCHAIN_MAX_EURO = 250
+    print("[onchain] ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
+          "resta 250 €")
+
+
+def onchain_sopra_il_tetto(prezzo_sats: int, cambio_eur: float) -> str:
+    """'' se l'ordine sta sotto il tetto della beta, sennò il perche' da
+    dire a chi compra. Senza cambio non si sa: no, e lo si dice."""
+    tetto = int(ONCHAIN_MAX_EURO or 0)
+    if not tetto:
+        return ""
+    if not cambio_eur or cambio_eur <= 0:
+        return ("Adesso non sappiamo il cambio, e senza non possiamo "
+                "controllare il tetto dell'on-chain: riprova fra poco, o "
+                "paga con Lightning")
+    if int(prezzo_sats) * cambio_eur / 100_000_000 > tetto:
+        return (f"In questa fase l'on-chain arriva fino a {tetto} €: per "
+                "questo ordine paga con Lightning")
+    return ""
 
 
 def onchain_ammesso(tg_id) -> bool:
@@ -90224,6 +90264,11 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
     # l'unico await, PRIMA di ogni scrittura: da qui all'ultimo commit
     # il blocco e' atomico, come nella cassa del Lightning
     margine = onchain_margine(await onchain_mempool_tariffa())
+    # il tetto della beta, sul prezzo (27 ott 2026): prima di ogni
+    # scrittura, come il resto dei no
+    troppo = onchain_sopra_il_tetto(prezzo, await cambio_btc_eur())
+    if troppo:
+        raise HTTPException(400, troppo)
     # la quota fissa di Barattolo (0 di serie): la paga chi compra, e
     # l'ha vista alla cassa (`/api/onchain/pronto`)
     quota = onchain_quota_sats()
