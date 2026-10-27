@@ -34,6 +34,27 @@
                                      un errore con `.tipo` = 'speso' (e
                                      `.txid`) se l'ha speso un altro
      recupera(parole)                -> {swap: [...], prossimo}
+   LA STRADA ROVESCIATA, bitcoin -> Lightning (`btc-ln`, lo swap
+   «submarine»; 27 ott 2026, cantiere cambio-libero, tappa 3; si accende
+   solo dalla leva del server, CAMBIO_BTC_LN_ATTIVO). I record di questa
+   strada portano `tipo: 'sub'`:
+     fatturaValida(fattura, sats)    la richiesta Lightning dell'utente:
+                                     null se buona, sennò il perche'
+                                     ('fattura' | 'importo' | 'rete' |
+                                     'scaduta')
+     creaSub({parole, indice, preventivo, fattura}) -> lo swap da salvare
+                                     (dove MANDARE i bitcoin e quanti)
+     fase(stato, rec)                per un `rec.tipo === 'sub'` le fasi
+                                     sue: creato (aspetta i bitcoin) |
+                                     bloccato | confermato | pagata |
+                                     fatto | fallito | scaduto | ripreso
+     aiutaRitiro(rec, parole)        la nostra meta' della firma per il
+                                     ritiro a due del fornitore, SOLO col
+                                     segreto che prova la fattura pagata
+     rimborsa(rec, parole)           i bitcoin tornano a `rec.indirizzo`:
+                                     cooperativo, o dallo script dopo la
+                                     scadenza (`.tipo` = 'presto' se la
+                                     rete non e' ancora arrivata li')
    Il PREVENTIVO non sta qui: lo fa il server di Barattolo per fornitore
    (la rotta del preventivo della tappa 2, con `?fornitore=<id>`), e
    l'instradatore sceglie il migliore.
@@ -180,6 +201,73 @@ const SWAP_FASI_BOLTZ = {
   'transaction.confirmed': 'confermato', 'invoice.settled': 'fatto',
   'swap.expired': 'scaduto', 'invoice.expired': 'scaduto',
   'transaction.failed': 'fallito', 'transaction.refunded': 'ripreso'};
+/* (tappa 3) gli stati del submarine: «creato» aspetta i bitcoin
+   dell'utente; «pagata» e' la fattura pagata, il fornitore chiede la
+   nostra meta' per ritirare; «fatto» quando ha ritirato */
+const SWAP_FASI_SUB = {
+  'invoice.set': 'creato', 'transaction.mempool': 'bloccato',
+  'transaction.confirmed': 'confermato', 'invoice.pending': 'confermato',
+  'invoice.paid': 'pagata', 'transaction.claimed': 'fatto',
+  'invoice.failedToPay': 'fallito', 'transaction.lockupFailed': 'fallito',
+  'swap.expired': 'scaduto'};
+/* la rete di una fattura dal suo prefisso (BOLT-11) */
+function swapReteFattura(fattura){
+  const f = String(fattura || '').trim().toLowerCase();
+  return f.startsWith('lnbcrt') ? 'regtest' : f.startsWith('lntb') ? 'testnet'
+       : f.startsWith('lnbc') ? 'bitcoin' : '';
+}
+/* LA VERIFICA DELLA RISPOSTA DEL SUBMARINE (il calco di `validateSubmarine`
+   del loro sito, rovesciato: qui il fornitore RITIRA con la sua chiave e
+   noi RIMBORSIAMO con la nostra): l'albero rifatto da soli con l'impronta
+   DELLA FATTURA, l'indirizzo dalle due chiavi e dall'albero, e quanto
+   mandare non piu' del preventivo. null = tutto torna, sennò la ragione. */
+function swapVerificaSub(S, rete, r, chiavi, impronta, mandiMax){
+  if (!r || typeof r !== 'object' || typeof r.address !== 'string') return 'risposta';
+  let loro, albero, atteso, agg;
+  const scadenza = Number(r.timeoutBlockHeight);
+  if (!(scadenza > 0)) return 'albero';
+  try {
+    loro = S.hex.decode(String(r.claimPublicKey || ''));
+    albero = S.SwapTreeSerializer.deserializeSwapTree(r.swapTree);
+    atteso = S.swapTree(false, impronta, loro, chiavi.pubblica, scadenza);
+  } catch(e){ return 'albero'; }
+  if (!S.compareTrees(albero, atteso)) return 'albero';
+  try {
+    agg = S.TaprootUtils.tweakMusig(S.Musig.create(chiavi.privata, [loro, chiavi.pubblica]), albero.tree);
+  } catch(e){ return 'indirizzo'; }
+  if (!swapUguali(S.Scripts.p2trOutput(agg.aggPubkey),
+                  swapScriptIndirizzo(S, rete, r.address))) return 'indirizzo';
+  if (!(Number(r.expectedAmount) > 0 && Number(r.expectedAmount) <= Number(mandiMax))) return 'importo';
+  return null;
+}
+/* IL RIMBORSO DEL SUBMARINE: la transazione che riporta i bitcoin
+   dell'utente dal lockup al SUO indirizzo. Cooperativo (la meta' del
+   fornitore, `chiediFirma`) se lo swap e' fallito; dallo script, con la
+   sola chiave nostra, dopo la scadenza (`cima` >= timeoutBlockHeight). Il
+   lockup e' quello che la rete ci da' in byte: si controlla che porti il
+   NOSTRO script. `fee` in sats. Torna {hex, id, cooperativo}. */
+function swapRimborsoSub(S, rete, rec, chiavi, lockupHex, destinazione, fee, cooperativo){
+  const loro = S.hex.decode(String(rec.claimPublicKey || ''));
+  const albero = S.SwapTreeSerializer.deserializeSwapTree(rec.swapTree);
+  const keyAgg = S.Musig.create(chiavi.privata, [loro, chiavi.pubblica]);
+  const tweaked = S.TaprootUtils.tweakMusig(keyAgg, albero.tree);
+  const lockup = S.Transaction.fromRaw(S.hex.decode(String(lockupHex || '')),
+    {allowUnknownOutputs: true, allowUnknownInputs: true});
+  const atteso = S.Scripts.p2trOutput(tweaked.aggPubkey);
+  const uscita = S.detectSwap(tweaked.aggPubkey, lockup, atteso);
+  if (uscita === undefined || !swapUguali(uscita.script, atteso))
+    throw new Error('nel lockup non c\'e\' il nostro swap');
+  const script = swapScriptIndirizzo(S, rete, destinazione);
+  if (!script) throw new Error('indirizzo di destinazione non valido');
+  if (!(Number(uscita.amount) > Number(fee))) throw new Error('il lockup non copre la fee del rimborso');
+  const dettagli = [Object.assign({}, uscita, {
+    cooperative: cooperativo, swapTree: albero, privateKey: chiavi.privata,
+    type: S.OutputType.Taproot, transactionId: lockup.id,
+    internalKey: keyAgg.aggPubkey, preimage: new Uint8Array(0)})];
+  const tx = S.constructClaimTransaction(dettagli, script, BigInt(Number(fee)), true,
+    cooperativo ? undefined : Number(rec.timeoutBlockHeight), true);
+  return {tx: tx, uscita: uscita, tweaked: tweaked, loro: loro};
+}
 
 /* ─── 2. LA LIBRERIA, pigra ──────────────────────────────────────────── */
 /* -bar2 (27 ott 2026, cantiere cambio-libero): un nome in piu', `swapTree` */
@@ -296,8 +384,129 @@ window.SWAP_TIPI.boltz = function(cfg){
   const api = (percorso, corpo) => swapApiBoltz(cfg.api, percorso, corpo);
   const id = encodeURIComponent;
   return {
-    id: cfg.id, nome: cfg.nome, tipo: 'boltz', strade: ['ln-btc'],
-    fase: stato => SWAP_FASI_BOLTZ[stato] || 'ignoto',
+    id: cfg.id, nome: cfg.nome, tipo: 'boltz', strade: ['ln-btc', 'btc-ln'],
+    /* (tappa 3) un record del submarine (`tipo: 'sub'`) ha le fasi sue; un
+       rimborso trasmesso e' «ripreso» qualunque cosa dica il fornitore */
+    fase: (stato, rec) => rec && rec.tipo === 'sub'
+      ? ((rec.rimborso && rec.rimborso.txid) ? 'ripreso' : (SWAP_FASI_SUB[stato] || 'ignoto'))
+      : (SWAP_FASI_BOLTZ[stato] || 'ignoto'),
+    /* LA RICHIESTA LIGHTNING DELL'UTENTE (tappa 3): si legge qui, senza
+       rete; deve portare ESATTAMENTE la cifra, la rete del fornitore, e
+       non essere scaduta (ne' scadere entro dieci minuti: i bitcoin
+       vogliono una conferma) */
+    fatturaValida(fattura, sats){
+      const b = leggiBolt11(fattura);
+      if (!b || !b.hash) return 'fattura';
+      if (swapReteFattura(fattura) !== (cfg.rete || 'bitcoin')) return 'rete';
+      if (b.sats !== Number(sats)) return 'importo';
+      if (b.scade < Date.now() / 1000 + 600) return 'scaduta';
+      return null;
+    },
+    /* LA NASCITA ROVESCIATA (tappa 3): la richiesta dell'utente e la
+       nostra chiave di RIMBORSO; torna dove mandare i bitcoin e quanti,
+       verificato prima di fidarsi */
+    async creaSub({parole, indice, preventivo, fattura}){
+      let S;
+      try { S = await caricaBundleSwap(); }
+      catch(e){ throw swapErrore('giu', e.message); }
+      const rete = swapRete(S, cfg.rete);
+      const chiavi = swapChiavi(S, parole, indice);
+      const b = leggiBolt11(fattura);
+      if (!b || !b.hash) throw swapErrore('mente', 'fattura');
+      const corpo = {from: 'BTC', to: 'BTC', invoice: String(fattura).trim(),
+                     refundPublicKey: S.hex.encode(chiavi.pubblica), pairHash: preventivo.hash};
+      const codice = String(cfg.referral || '').trim();
+      if (codice) corpo.referralId = codice;
+      let r;
+      try { r = await api('/v2/swap/submarine', corpo); }
+      catch(e){ throw swapErrore('giu', e.message); }
+      const perche = swapVerificaSub(S, rete, r, chiavi, S.hex.decode(b.hash), preventivo.mandi);
+      if (perche) throw swapErrore('mente', perche);
+      return {id: String(r.id), tipo: 'sub', fattura: String(fattura).trim(),
+        lockupAddress: r.address, claimPublicKey: r.claimPublicKey,
+        swapTree: r.swapTree, timeoutBlockHeight: Number(r.timeoutBlockHeight),
+        onchainAmount: Number(r.expectedAmount), mandi: Number(r.expectedAmount),
+        ricevi: Number(preventivo.ricevi), bip21: String(r.bip21 || ''),
+        impronta: b.hash, stato: 'invoice.set'};
+    },
+    /* LA NOSTRA META' PER IL RITIRO A DUE (tappa 3): il fornitore ha
+       pagato la fattura e vuole ritirare i bitcoin senza lo script; noi
+       firmiamo SOLO se il segreto che ci mostra e' quello della fattura
+       (sha256 = l'impronta): la prova che ha pagato davvero */
+    async aiutaRitiro(rec, parole){
+      const S = await caricaBundleSwap();
+      const chiavi = swapChiavi(S, parole, rec.indice);
+      const det = await api(`/v2/swap/submarine/${id(rec.id)}/claim`);
+      const segreto = S.hex.decode(String((det && det.preimage) || ''));
+      if (segreto.length !== 32 || S.hex.encode(S.sha256(segreto)) !== String(rec.impronta || ''))
+        throw new Error('il segreto non e\' quello della fattura');
+      const loro = S.hex.decode(String(rec.claimPublicKey || ''));
+      const albero = S.SwapTreeSerializer.deserializeSwapTree(rec.swapTree);
+      const tweaked = S.TaprootUtils.tweakMusig(S.Musig.create(chiavi.privata, [loro, chiavi.pubblica]), albero.tree);
+      const m = tweaked.message(S.hex.decode(String(det.transactionHash || ''))).generateNonce();
+      const sessione = m.aggregateNonces([[loro, S.hex.decode(String(det.pubNonce || ''))]])
+        .initializeSession().signPartial();
+      await api(`/v2/swap/submarine/${id(rec.id)}/claim`,
+        {pubNonce: S.hex.encode(m.publicNonce), partialSignature: S.hex.encode(sessione.ourPartialSignature)});
+      return {cooperativo: true};
+    },
+    /* IL RIMBORSO (tappa 3): i bitcoin tornano a `rec.indirizzo`. Il
+       lockup si legge dalla rete (per indirizzo), i byte pure; la fee dal
+       mempool del momento. Cooperativo prima; dallo script solo quando la
+       rete e' arrivata alla scadenza (`.tipo` = 'presto' prima). */
+    async rimborsa(rec, parole){
+      const S = await caricaBundleSwap();
+      const rete = swapRete(S, cfg.rete);
+      const chiavi = swapChiavi(S, parole, rec.indice);
+      const base = String(cfg.mempool || '').replace(/\/+$/, '');
+      if (!base) throw new Error('nessuna rete da cui leggere il lockup');
+      if (!rec.indirizzo) throw new Error('manca l\'indirizzo del rimborso');
+      let txid = await swapLockupPerIndirizzo(base, rec.lockupAddress, 0);
+      if (!txid) {
+        const spesa = await swapSpesaDelLockup(base, rec, '');
+        if (spesa && spesa.nostro) return {txid: spesa.txid, cooperativo: null, concluso: true};
+        if (spesa) { const e = new Error('il lockup l\'ha speso un\'altra transazione'); e.tipo = 'speso'; e.txid = spesa.txid; throw e; }
+        try { txid = String(((await api(`/v2/swap/submarine/${id(rec.id)}/transaction`)) || {}).id || ''); }
+        catch(e){ txid = ''; }
+      }
+      if (!/^[0-9a-f]{64}$/.test(txid)) throw new Error('il lockup non si trova');
+      let lockHex = '';
+      try { lockHex = await swapMempool(base, `/tx/${txid}/hex`); } catch(e){ lockHex = ''; }
+      if (!lockHex) throw new Error('il lockup non si vede sulla rete');
+      let fee = 0;
+      try { fee = Math.ceil(Number(JSON.parse(await swapMempool(base, '/v1/fees/recommended')).fastestFee) * 160); }
+      catch(e){ fee = 0; }
+      if (!(fee > 0)) fee = 1000;
+      const firma = async (coop) => {
+        const p = swapRimborsoSub(S, rete, rec, chiavi, lockHex, rec.indirizzo, fee, coop);
+        if (!coop) return {hex: p.tx.hex, id: p.tx.id, cooperativo: false};
+        const sighash = p.tx.preimageWitnessV1(0, [p.uscita.script], S.SigHash.DEFAULT, [p.uscita.amount]);
+        const m = p.tweaked.message(sighash).generateNonce();
+        const r = await api(`/v2/swap/submarine/${id(rec.id)}/refund`,
+          {index: 0, pubNonce: S.hex.encode(m.publicNonce), transaction: p.tx.hex});
+        const sig = m.aggregateNonces([[p.loro, S.hex.decode(String(r.pubNonce))]])
+          .initializeSession().signPartial()
+          .addPartial(p.loro, S.hex.decode(String(r.partialSignature))).aggregatePartials();
+        p.tx.updateInput(0, {finalScriptWitness: [sig]});
+        return {hex: p.tx.hex, id: p.tx.id, cooperativo: true};
+      };
+      let fatto = null;
+      if (!rec.coopRifiutato) { try { fatto = await firma(true); } catch(e){ fatto = null; } }
+      if (!fatto) {
+        let cima = 0;
+        try { cima = Number(await swapMempool(base, '/blocks/tip/height')); } catch(e){ cima = 0; }
+        if (!(cima >= Number(rec.timeoutBlockHeight))) throw swapErrore('presto', 'la rete non e\' ancora alla scadenza');
+        fatto = await firma(false);
+      }
+      rec.firmati = (rec.firmati || []).filter(x => x !== fatto.id).concat(fatto.id).slice(-4);
+      const esiti = await Promise.allSettled([
+        swapMempool(base, '/tx', fatto.hex),
+        api('/v2/chain/BTC/transaction', {hex: fatto.hex})]);
+      if (esiti.some(e => e.status === 'fulfilled'))
+        return {txid: fatto.id, cooperativo: fatto.cooperativo};
+      if (fatto.cooperativo) rec.coopRifiutato = true;
+      throw esiti[0].reason || esiti[1].reason;
+    },
     async nuoveParole(){
       const S = await caricaBundleSwap();
       return S.generateMnemonic(S.wordlist);
@@ -438,6 +647,18 @@ window.SWAP_TIPI.boltz = function(cfg){
       let prossimo = 0;
       const swap = [];
       for (const s of (Array.isArray(trovati) ? trovati : [])) {
+        /* (tappa 3) i submarine, con la chiave di rimborso: da rimborsare
+           se falliti, con l'indirizzo che l'utente scrivera' */
+        const rd = s && s.type === 'submarine' && s.refundDetails;
+        if (rd && s.from === 'BTC' && s.to === 'BTC') {
+          prossimo = Math.max(prossimo, Number(rd.keyIndex) + 1);
+          swap.push({id: String(s.id), tipo: 'sub', indice: Number(rd.keyIndex),
+            lockupAddress: rd.lockupAddress, claimPublicKey: rd.serverPublicKey,
+            swapTree: rd.tree, timeoutBlockHeight: Number(rd.timeoutBlockHeight),
+            onchainAmount: Number(rd.amount) || 0, ricevi: null, bloccato: true,
+            stato: String(s.status || ''), creato: (Number(s.createdAt) || 0) * 1000});
+          continue;
+        }
         const d = s && s.claimDetails;
         if (!d || s.type !== 'reverse' || s.from !== 'BTC' || s.to !== 'BTC') continue;
         prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);

@@ -378,9 +378,11 @@ def il_telefono(dati):
         prova("il banco del telefono gira", "", r["ERRORE"])
         return
     print("\n[il migliore]")
-    prova("il telefono conosce i due fornitori, la stessa strada",
-          [["satsrouting", "SATS Routing", "boltz", ["ln-btc"]],
-           ["cartone2", "Cartone Due", "boltz", ["ln-btc"]]], r["fornitori"])
+    # (cambio-libero, tappa 3: il tipo sa le due strade; quali si offrono
+    # lo dice il server con le sue leve)
+    prova("il telefono conosce i due fornitori, le stesse strade",
+          [["satsrouting", "SATS Routing", "boltz", ["ln-btc", "btc-ln"]],
+           ["cartone2", "Cartone Due", "boltz", ["ln-btc", "btc-ln"]]], r["fornitori"])
     m = r["migliore"]
     prova("chiede il preventivo a tutt'e due e sceglie chi fa ricevere di piu'",
           ("cartone2", 47_298, ["cartone2", "satsrouting"], True, True),
