@@ -5650,6 +5650,14 @@
   nav button.active{color:var(--sats-deep)}
   html[data-tema="scuro"] nav button.active{color:var(--sats-text)}
   nav button .ic{display:flex;line-height:0;padding:0}
+  /* «RICEVI IN BITCOIN» (27 ott 2026, cantiere grafica-swap, nome scelto
+     da Andrea): la sola etichetta lunga. Un punto piu' piccola delle
+     altre e un filo piu' stretta, ci sta su una riga da 360 px in su,
+     e la barra resta alta com'era con «Aste»; a 320 va su due righe,
+     dentro l'altezza che la barra ha gia' li'. Il + resta al centro:
+     la cella e' flex:1 come le altre (misurato dal vivo, CANTIERI) */
+  nav .eti-ricevi{display:block;font-size:9.5px;line-height:1.3;letter-spacing:-.15px;
+    text-align:center}
   /* LE ICONE DELLA NAV sono SVG di casa (lug 2026): le emoji 🛍️🗂️🤝
      cambiavano forma da un telefono all'altro, non seguivano i token
      del tema e nessuna era davvero nostra. Queste sono disegnate sulla
@@ -9565,6 +9573,52 @@
   .swap-riga-lista{display:flex;flex-direction:column;gap:3px;
     padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;
     color:var(--ink)}
+  /* LA GRAFICA PER TUTTI (27 ott 2026, cantiere grafica-swap): il campo
+     dell'indirizzo sotto le cifre, con «Incolla» e «QR» affiancati; le 12
+     parole spiegate con calma, a frasi intere; i tre pallini di «a che
+     punto e'» (raggiunti pieni d'arancio, quello di adesso ad anello) */
+  .swap-campo{margin-top:16px}
+  .swap-attrezzi{display:flex;gap:8px;margin-top:8px}
+  .swap-prev .swap-attrezzi .btn,#orderContent .swap-attrezzi .btn{flex:1 1 0;
+    min-width:0;margin-top:0}
+  .swap-calma{margin:6px 0;font-size:14px;font-weight:600;line-height:1.5;
+    color:var(--ink)}
+  .swap-calma.forte{font-weight:800}
+  .swap-regole{margin:8px 0;padding-left:22px;font-size:14px;font-weight:600;
+    line-height:1.5;color:var(--ink)}
+  .swap-regole li{margin:4px 0}
+  .swap-passi{display:grid;grid-template-columns:repeat(3,1fr);list-style:none;
+    margin:12px 0 8px;padding:0}
+  .swap-passi li{position:relative;padding-top:22px;text-align:center;
+    font-size:12px;font-weight:700;color:var(--muted)}
+  .swap-passi li::before{content:'';position:absolute;z-index:1;top:2px;left:50%;
+    width:14px;height:14px;margin-left:-7px;border-radius:50%;
+    box-sizing:border-box;background:var(--line)}
+  .swap-passi li::after{content:'';position:absolute;top:8px;left:-50%;
+    width:100%;height:2px;background:var(--line)}
+  .swap-passi li:first-child::after{display:none}
+  .swap-passi li.fatto,.swap-passi li.ora{color:var(--ink)}
+  .swap-passi li.fatto::before{background:var(--sats)}
+  .swap-passi li.ora::before{background:var(--card);border:3px solid var(--sats)}
+  .swap-passi li.fatto::after,.swap-passi li.ora::after{background:var(--sats)}
+  /* lo strato del QR fuori da Telegram: il vestito della fotocamera
+     delle foto (#fotocamera), col mirino al centro */
+  .swap-qr-strato{position:fixed;inset:0;z-index:75;background:#000;color:#fff;display:none}
+  .swap-qr-strato.open{display:block}
+  .swap-qr-strato video{position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;background:#000}
+  .swap-qr-mirino{position:absolute;top:42%;left:50%;width:min(64vw,260px);
+    aspect-ratio:1;transform:translate(-50%,-50%);border:3px solid #fff;
+    border-radius:18px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35)}
+  .swap-qr-piede{position:absolute;left:0;right:0;bottom:0;display:flex;
+    flex-direction:column;align-items:center;gap:12px;
+    padding:28px 16px calc(18px + env(safe-area-inset-bottom));
+    background:linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.7) 40%)}
+  .swap-qr-testo{max-width:420px;text-align:center;font-size:14.5px;
+    font-weight:700;line-height:1.45}
+  .swap-qr-btn{width:100%;max-width:420px;min-height:48px;border-radius:var(--b-r);
+    border:1.5px solid rgba(255,255,255,.75);background:rgba(0,0,0,.35);color:#fff;
+    font:inherit;font-weight:800;font-size:15px;padding:10px 12px;cursor:pointer}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5}
   /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
@@ -18074,7 +18128,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'ad07f568f1';
+const SWAP_TELEFONO_VER = 'b57f8f57a6';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18111,7 +18165,8 @@ function caricaSwapTelefono(){
 let cellaAsteMarkup = null;
 const CELLA_SWAP = '<span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true">'
   + '<path d="M18.6 9.4A7 7 0 0 0 6.3 7.6"/><path d="M5.4 14.6a7 7 0 0 0 12.3 1.8"/>'
-  + '<path d="M6.3 3.8v3.8h3.8"/><path d="M17.7 20.2v-3.8h-3.8"/></svg></span>Swap';
+  + '<path d="M6.3 3.8v3.8h3.8"/><path d="M17.7 20.2v-3.8h-3.8"/></svg></span>'
+  + '<span class="eti-ricevi">Ricevi in bitcoin</span>';
 function vestiCellaAste(){
   const b = el('nav-aste');
   if (!b) return;
@@ -18144,44 +18199,50 @@ function vaiSwap(){
    l'inglese per chi ha Telegram in un'altra lingua. Corti, una frase
    per gesto (la regola dei riquadri). */
 const SWAP_TESTI = {
-  it: {titolo: 'Swap',
-       testo: 'Qui troverai gli incassi che ricevi in bitcoin on-chain, con uno swap fatto dal tuo telefono.',
-       vuoto: 'Per ora non hai nessuno swap.',
-       scegli: 'Come ricevi i sats', onchain: 'On-chain (swap)',
-       carico: 'Leggo le tariffe dello swap…',
-       titoloPrev: 'Preventivo dello swap', ricevi: 'Ricevi on-chain, circa',
-       valgonoOra: 'Tariffe di {f} di adesso: si ricontrollano alla conferma.',
-       conferma: 'Conferma lo swap', tornaLn: 'Incassa in Lightning',
-       sottoMinimo: 'Sotto i {n} sats lo swap costa troppo: incassa in Lightning.',
+  /* LE PAROLE DI TUTTI (27 ott 2026, cantiere grafica-swap, regola di
+     Andrea): niente «swap», «on-chain», «fornitore», «lockup». Chi vende
+     sceglie di ricevere «al tuo indirizzo bitcoin»; quel che fa SATS
+     Routing e' «il cambio». La pagina e il tasto in basso si chiamano
+     «Ricevi in bitcoin», per non confonderli con la cassa on-chain che
+     arrivera'. Le chiavi interne (onchain, conferma...) restano quelle. */
+  it: {titolo: 'Ricevi in bitcoin',
+       testo: 'Qui trovi gli incassi che mandi al tuo indirizzo bitcoin, e le tue 12 parole di riserva.',
+       vuoto: 'Per ora nessun incasso al tuo indirizzo bitcoin.',
+       scegli: 'Come ricevi i sats', onchain: 'Al tuo indirizzo bitcoin',
+       carico: 'Calcolo quanto ricevi…',
+       titoloPrev: 'Quanto ricevi al tuo indirizzo', ricevi: 'Ricevi circa',
+       valgonoOra: 'Cifre di adesso: si ricontrollano quando confermi.',
+       conferma: 'Conferma', tornaLn: 'Incassa in Lightning',
+       sottoMinimo: 'Sotto i {n} sats mandarli a un indirizzo costa troppo: incassa in Lightning.',
        sopraTetto: 'Sopra i {n} sats, per ora, solo Lightning.',
-       cambiata: 'Le tariffe sono cambiate: ecco il preventivo nuovo.',
+       cambiata: 'Le cifre sono cambiate: ecco quelle nuove.',
        nonRisponde: '{f} ora non risponde: incassa in Lightning.',
-       spento: 'Lo swap ora non è disponibile: incassa in Lightning.',
-       eseguitoDa: 'Eseguito da {n}',
-       ripiego: '{a} ha risposto con dati che non tornano: ecco il preventivo di {b}.',
-       voci: {dovuto: 'Ti spettano', fee_barattolo: 'Commissione Barattolo ({p}\u00a0%)',
-              commissione: 'Commissione {f} ({p}\u00a0%)',
-              rete_invio: 'Rete: invio di {f}',
-              rete_ritiro: 'Rete: il tuo ritiro (stima)'}},
-  en: {titolo: 'Swap',
-       testo: 'Here you will find the payouts you receive in on-chain bitcoin, through a swap made from your phone.',
-       vuoto: 'No swaps yet.',
-       scegli: 'How you receive the sats', onchain: 'On-chain (swap)',
-       carico: 'Reading the swap rates…',
-       titoloPrev: 'Swap quote', ricevi: 'You receive on-chain, about',
-       valgonoOra: 'Current {f} rates: checked again when you confirm.',
-       conferma: 'Confirm the swap', tornaLn: 'Receive via Lightning',
-       sottoMinimo: 'Below {n} sats a swap costs too much: receive via Lightning.',
+       spento: 'Ora non si può ricevere a un indirizzo bitcoin: incassa in Lightning.',
+       eseguitoDa: 'Il cambio lo fa {n}',
+       ripiego: '{a} ha dato cifre che non tornano: ecco quelle di {b}.',
+       voci: {dovuto: 'Ti spettano', fee_barattolo: 'Commissione Barattolo ({p} %)',
+              commissione: 'Costo del cambio, {f} ({p} %)',
+              rete_invio: 'Rete bitcoin: partenza',
+              rete_ritiro: 'Rete bitcoin: arrivo a te (stima)'}},
+  en: {titolo: 'Receive in bitcoin',
+       testo: 'Here you find the payouts you send to your bitcoin address, and your 12 backup words.',
+       vuoto: 'No payouts to your bitcoin address yet.',
+       scegli: 'How you receive the sats', onchain: 'To your bitcoin address',
+       carico: 'Working out how much you receive…',
+       titoloPrev: 'What you receive at your address', ricevi: 'You receive about',
+       valgonoOra: 'Current figures: checked again when you confirm.',
+       conferma: 'Confirm', tornaLn: 'Receive via Lightning',
+       sottoMinimo: 'Below {n} sats sending them to an address costs too much: receive via Lightning.',
        sopraTetto: 'Above {n} sats, for now, Lightning only.',
-       cambiata: 'The rates have changed: here is the new quote.',
+       cambiata: 'The figures have changed: here are the new ones.',
        nonRisponde: '{f} is not responding: receive via Lightning.',
-       spento: 'Swaps are not available right now: receive via Lightning.',
-       eseguitoDa: 'Run by {n}',
-       ripiego: '{a} answered with data that does not add up: here is the {b} quote.',
+       spento: 'Receiving to a bitcoin address is not available right now: receive via Lightning.',
+       eseguitoDa: 'The exchange is done by {n}',
+       ripiego: '{a} gave figures that do not add up: here are the {b} ones.',
        voci: {dovuto: 'You are owed', fee_barattolo: 'Barattolo fee ({p}%)',
-              commissione: '{f} fee ({p}%)',
-              rete_invio: 'Network: {f} send',
-              rete_ritiro: 'Network: your claim (estimate)'}}};
+              commissione: 'Exchange fee, {f} ({p}%)',
+              rete_invio: 'Bitcoin network: departure',
+              rete_ritiro: 'Bitcoin network: arrival to you (estimate)'}}};
 function linguaSwap(){
   let l = '';
   try { l = String(tg?.initDataUnsafe?.user?.language_code || ''); } catch(e){}
@@ -18290,7 +18351,10 @@ function etichettaVoceSwap(r, t, fornitore){
   return (t.voci[r.voce] || r.voce).replace('{p}', percentoSwap(r.percento))
     .replace('{f}', fornitore || 'SATS Routing');
 }
-function pannelloPreventivoSwap(o){
+/* (27 ott 2026, cantiere grafica-swap) `campo` e' il campo dell'indirizzo
+   con «Incolla» e «QR», che scrive l'instradatore: sta PRIMA di
+   «Conferma», cosi' dopo la conferma non resta niente da scrivere */
+function pannelloPreventivoSwap(o, campo){
   const n = Number(o.id), t = testiSwap(), p = preventiviSwap[n];
   if (!p || !p.dati)
     return `<div class="swap-prev"><div class="hint">${esc(t.carico)}</div></div>`;
@@ -18318,6 +18382,7 @@ function pannelloPreventivoSwap(o){
       </div>
       <div class="hint">${esc(t.valgonoOra.replace('{f}', d.fornitore_nome || 'SATS Routing'))}</div>
       ${d.fornitore_nome ? `<div class="swap-da">${esc(t.eseguitoDa.replace('{n}', d.fornitore_nome))}</div>` : ''}
+      ${campo || ''}
       <button class="btn orange" type="button" data-swap="avanti" data-ordine="${n}"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
     </div>`;
 }

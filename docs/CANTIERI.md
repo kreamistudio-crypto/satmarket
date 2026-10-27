@@ -72808,3 +72808,243 @@ byte: la cancella Andrea (la rimozione di una cartella intera è
 bloccata dal tool). Nel suo spazio temporaneo della sessione restano il
 config di prova, il database del giro e i tre journal: spariscono con la
 sessione. Niente nel repo, niente sul VPS, niente sul nodo.
+
+## Il margine della cassaforte: la domanda del saldo prima della mano, e la sesta domanda della guardia (27 ott 2026, cantiere margine-cassaforte, decisione di Andrea)
+
+**DA DOVE.** Il giro sul regtest (26 ott, «Lo swap intero sul regtest di
+Boltz») ha mostrato il 520 di LNbits «You must reserve at least … to
+cover potential routing fees»: LNbits non paga se nel wallet, oltre al
+pagamento, non resta l'1 % (minimo 2 sats) per le commissioni di rete,
+e rifiuta PRIMA di toccare LND, senza scrivere niente per quell'hash.
+Nel nostro codice non c'era nessun controllo del margine: il 520
+passava per «ignoto» e «fattura bruciata» (curato il 26 ott col motivo
+`riserva`), e chi vende si sentiva chiedere una fattura nuova per un
+guasto NOSTRO. I NUMERI VERI DEL VPS, letti da Andrea il 27 ott col
+comando di sola lettura: cassaforte nodo saldo 503.786 sats, 470.727 in
+attesa su 9 ordini, margine 33.059 (7,0 %); SaaS saldo 425.820, 341.570
+in attesa su 4 ordini, margine 84.250 (24,7 %). Il wallet è MISTO
+(l'escrow di tutti più il capitale nostro, `capitale_cassa.py`) e ogni
+pagamento riuscito si porta via le sue commissioni di rete dal saldo:
+senza capitale il margine si consuma da solo.
+
+**LA CURA, in due pezzi (decisione di Andrea).**
+1. IN `paga_venditore`, PRIMA DI PRENDERE LA MANO (dopo il ponte, con la
+   riga): il saldo della cassaforte con la SOLA chiave di lettura
+   (`_saldo_cassaforte`, `GET /api/v1/wallet`); se è meno di importo +
+   riserva (`_riserva_lnbits`: l'1 % per eccesso, mai meno di 2 sats —
+   i numeri di LNbits, `lnbits_reserve_fee_percent` e
+   `lnbits_reserve_fee_min`), è il QUARTO VERBO: `NON_CHIESTO` col
+   motivo `riserva`, niente parte, la fattura resta buona, la riga «da
+   riprovare» e il ritentativo da soli con `BACKOFF_NOSTRO` (`riserva`
+   sta in `MOTIVI_NOSTRI`: lo stadio dice «un problema del nostro
+   nodo», col prossimo tentativo). Ai moderatori UN avviso per
+   cassaforte ogni sei ore (`_avvisa_margine`, timbro
+   `avviso_margine_<cassaforte>`, stanza 💧 Liquidità): «manca margine
+   nella cassaforte X», saldo, dovuto, quanto serve con la riserva, cosa
+   fare. Un saldo che NON si legge non ferma niente (fail-open
+   dichiarato: il comportamento di ieri, e un LNbits muto lo ferma
+   comunque la chiamata che paga).
+2. NELLA GUARDIA DELLA LIQUIDITÀ, LA SESTA DOMANDA, per ciascuna
+   cassaforte configurata (`_voci_margine`, in coda alle altre in
+   `_quadro_liquidita`, quindi anche in `/canali`): saldo del wallet
+   meno gli incassi in attesa (`_incassi_in_attesa`: gli ordini del
+   mercatino con i sats ancora dentro — locked, shipped, delivered,
+   confirmed, dispute, return_pending, return_shipped, refund — e
+   `payout_stato` non «uscito», per cassaforte, al prezzo pieno) sopra
+   `LIQUIDITA_MARGINE_PERCENTO` (1) del totale in attesa più
+   `LIQUIDITA_MARGINE_MIN_SATS` (10.000). Una voce buona, cattiva o
+   «non misurata» (saldo non letto), nel vocabolario di sempre della
+   guardia: allarme al primo passaggio in cattiva, promemoria, rientro.
+   Coi numeri veri: nodo, margine 33.059 contro una soglia di 14.707,
+   buona. Tutt'e due le leve a 0 spengono la domanda.
+
+**STRADE SCARTATE.** Abbassare la riserva di LNbits (è una protezione
+loro, e la teniamo); contare anche rimborsi d'asta e pagamenti P2P negli
+incassi in attesa (hanno i loro registri, e un numero mescolato non
+combacerebbe con nessun wallet: la lezione del polso 23 del libro
+mastro); un avviso per ogni incasso fermo (dieci incassi fermi sullo
+stesso wallet sono UN problema); fermare il pagamento quando il saldo
+non si legge (romperebbe gli incassi per un guasto della sola domanda).
+
+**UN DIFETTO PRESO DAL COLLAUDO, prima del commit:** la pausa
+dell'avviso era `0 < adesso - ultimo`, e due incassi fermi nello stesso
+secondo facevano due avvisi. Ora `ultimo and adesso - ultimo < pausa`.
+
+**PROVATO.**
+- `collaudo_margine_cassaforte` (21 verdi, negli elenchi della CI): il
+  server vero col LNbits di cartone del banco dei pagamenti, che da oggi
+  dichiara anche il saldo (`NODO["saldo"]`, grande di serie; None = non
+  risponde). Il saldo che copre l'importo ma non la riserva (non chiesto,
+  da riprovare, la fattura al suo posto, lo stato di prima, UN avviso coi
+  numeri, lo stadio nostro col prossimo tentativo, nessuna richiesta di
+  fattura nuova a chi vende); il secondo incasso fermo senza secondo
+  avviso; il giro dei sospesi a saldo corto; il margine rimesso e il
+  giro che paga da solo con la stessa fattura; il limite al sat
+  (importo + riserva passa, un sat sotto no); il wallet che non risponde
+  (si paga come ieri); passate le sei ore l'avviso torna; la sesta
+  domanda sul server vero (incassi in attesa dal database, la cassaforte
+  con la chiave segnaposto non si conta, voce buona al limite, cattiva
+  un sat sotto, non misurata, e la sua frase dentro l'allarme della
+  guardia; le leve a 0 la spengono).
+- `prove_margine_cassaforte` (in `prove.py`): la riserva (1 % per
+  eccesso, minimo 2, la percentuale è una leva), il saldo con un httpx di
+  cartone (la chiave di lettura, i «non so»), l'avviso (uno per
+  cassaforte, la pausa, la stanza, i numeri), gli incassi in attesa su un
+  database vero (gli stati, gli usciti esclusi), il giudizio coi numeri
+  veri del VPS e ai limiti, le sentinelle (la domanda dopo il ponte e
+  prima della mano, col quarto verbo; il fail-open; `riserva` fra i
+  guasti nostri e nella pagina; la sesta domanda in coda; le leve nei
+  tre posti; gli elenchi della CI). L'ambiente condiviso dei banchi
+  (`ambiente_altra_cassaforte`) monta i nomi nuovi con un saldo che non
+  si legge: i banchi di ieri non cambiano.
+- CONTROPROVE, 9 su 9 rosse: niente domanda del saldo; la riserva non
+  sommata; l'avviso a ogni incasso fermo; il saldo illeggibile che
+  ferma il pagamento; la sesta domanda senza il database (nel
+  collaudo); `riserva` tolto dai guasti nostri; la riserva senza il
+  minimo di 2; gli incassi in attesa che contano gli usciti; la guardia
+  senza la sesta domanda (nelle prove). Due di loro al primo giro
+  facevano ESPLODERE il collaudo invece di arrossarlo (una lista di
+  avvisi vuota): il collaudo ora legge il primo avviso con `primo_avviso`.
+- Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Il margine vero sul VPS si legge col comando di sola
+lettura dato ad Andrea il 26 ott (saldo per cassaforte e incassi in
+attesa dal database): quando la guardia è accesa lo dice lei, in
+`/canali` e negli avvisi. Da decidere con Andrea quanto capitale tenere
+nella cassaforte nodo oltre la soglia (oggi 33.059 contro 14.707).
+
+## La grafica dello swap per tutti: «Ricevi in bitcoin», l'indirizzo prima di «Conferma», le 12 parole con calma (27 ott 2026, cantiere grafica-swap, piano approvato da Andrea con tre modifiche)
+
+**DA DOVE.** Ultimo passo prima della promozione intera e dell'accensione
+di `SWAP_ATTIVO` (decisione di Andrea: la grafica PER ULTIMA). Le regole
+UX raccolte nei giorni prima: al più TRE tocchi dopo la conferma;
+niente parole tecniche (swap, HTLC, RGB, fornitore); le 12 parole
+spiegate con calma e solo la prima volta; «Incolla» e QR per
+l'indirizzo. Com'era su develop (98e7b65): dopo «Conferma lo swap», la
+prima volta spunta, «Ho salvato le parole», l'indirizzo SCRITTO A MANO e
+«Crea lo swap» (quattro gesti più la tastiera); «swap» in quasi ogni
+frase, «On-chain (swap)» nella scelta, «Swap» nella barra.
+
+**LE TRE MODIFICHE DI ANDREA AL PIANO (27 ott, 00:30).** 1) La pagina e
+il tasto in basso si chiamano «Ricevi in bitcoin» (non «Bitcoin»), per
+non confonderli con la cassa on-chain che arriverà. 2) In fondo al
+testo delle parole: «Senza queste parole nessuno può recuperarli,
+nemmeno noi.» 3) Fuori da Telegram il QR solo se la fotocamera del
+browser si usa SENZA librerie nuove, sennò solo «Incolla» (vedi sotto:
+fatto con `BarcodeDetector`).
+
+**COSA FA.**
+- LE PAROLE. Nei testi per chi vende (pagina, telefono, i due messaggi
+  Telegram) niente «swap», «fornitore», «lockup», «on-chain». La scelta
+  è «⚡ Lightning / ₿ Al tuo indirizzo bitcoin»; il preventivo è
+  «Quanto ricevi al tuo indirizzo», con «Costo del cambio, SATS Routing
+  (0,6 %)», «Rete bitcoin: partenza», «Rete bitcoin: arrivo a te
+  (stima)», «Ricevi circa»; sotto, «Il cambio lo fa SATS Routing» (il
+  NOME resta, per trasparenza e per sapere dove recuperare). Il
+  bottone è «Conferma». Su Telegram: «⚠️ Il cambio in bitcoin non è
+  andato…» e «₿ Bitcoin arrivati / Bitcoin in arrivo…». L'inglese
+  segue l'italiano.
+- I TOCCHI. Il campo dell'indirizzo, con «📋 Incolla» e «📷 QR», sta nel
+  preventivo, PRIMA di «Conferma». «Conferma» guarda l'indirizzo (vuoto
+  o storto: lo dice e si ferma, senza spendere niente), ricontrolla le
+  cifre e, se le parole sono già copiate, fa nascere lo swap da sola:
+  ZERO tocchi dopo la conferma. La prima volta: la spunta e «Continua»,
+  e lo swap parte da solo: DUE tocchi. Il passo `indirizzo` e il
+  bottone «Crea» non ci sono più. Un doppio tocco su «Conferma» non fa
+  due swap (`swapInCorso` più lo swap già nato sull'ordine: prima non
+  serviva, c'era il secondo bottone che si spegneva).
+- LE 12 PAROLE, la prima volta sola (il passo `parole` c'è solo con le
+  parole non ancora copiate): «Le tue 12 parole di riserva», «Servono
+  solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche
+  da un altro telefono.», le tre regole numerate (su carta in ordine;
+  niente foto e a nessuno, nemmeno a noi; le chiediamo una volta, le
+  ritrovi nella pagina «Ricevi in bitcoin»), la frase di Andrea in
+  grassetto, poi le parole a due colonne di sempre.
+- INCOLLA E QR. Quel che arriva si ripulisce (`swapEstraiIndirizzo`:
+  «bitcoin:», la coda «?amount=…», gli spazi; un bech32 tutto maiuscolo
+  dei QR torna minuscolo) e lo giudica `indirizzoValido` del fornitore,
+  con la sua rete: buono va nel campo, storto lo si dice sopra il campo.
+  «Incolla» dove gli appunti non si leggono dice di tenere premuto (la
+  strada del PayCode). Il QR dentro Telegram, su Android e iPhone, è lo
+  scanner di Telegram (`showScanQrPopup`, versione 6.4); fuori, uno
+  strato con la fotocamera della pagina SOLO se il browser ha
+  `BarcodeDetector` (Chrome su Android sì; Safari, Firefox e Chrome sul
+  PC no): niente librerie, la fotocamera si spegne alla chiusura e ad
+  app nascosta. Dove non c'è nessuno dei due il bottone QR non compare.
+  Telegram sul PC è escluso apposta: lì lo scanner non si apre, e un
+  bottone che non fa niente è peggio di nessun bottone.
+- I TRE PALLINI nella carta: «Pagato → In arrivo → Arrivato» (pagato
+  anche «in volo», perché la fattura di uno swap vola finché non si
+  ritira), con la frase sotto; spariscono quando lo swap non va avanti
+  (scaduto, rifiutato, speso da altri), e parla la frase sola.
+- LA BARRA. «Ricevi in bitcoin» è lunga per una cella da 72 px: a 9,5
+  px (un punto meno delle altre) e −0,15 px di spaziatura sta su una
+  riga da 360 px in su; a 320 va su due righe dentro l'altezza che la
+  barra ha già lì (76 px anche con «Aste»). Misurato dal vivo a 414,
+  375, 360 e 320: barra alta come con «Aste» (61 px; 76 a 320), il +
+  al centro al mezzo pixel (206,99/187,5/180/160).
+
+**STRADE SCARTATE.** L'indirizzo DOPO la conferma, come prima (con
+«Incolla» e «Continua» la prima volta erano quattro tocchi, oltre il
+tetto); far partire lo swap da solo appena l'indirizzo incollato è
+buono (nessun momento per rileggere le cifre e l'indirizzo insieme);
+una sola spunta-bottone «Le ho scritte, continua» (la spunta separata è
+la decisione della tappa 3, e stiamo comunque in due tocchi); ricordare
+l'ultimo indirizzo per la volta dopo (riusare un indirizzo bitcoin è
+una cattiva abitudine per la privacy: non proposto); una libreria per
+leggere i QR nel browser (no di Andrea); «Bitcoin» come nome della
+pagina (modifica 1).
+
+**PROVATO** (albero: develop 98e7b65 più questo cantiere, nel worktree;
+config del giro copiato dal config d'esempio, cancellato prima del
+commit).
+- DAL VIVO, server del worktree in collaudo (porta 8191) col SATS
+  Routing di cartone (porta 9077), Chromium a 375×812, chiaro e scuro,
+  identità 222 con un Telegram finto (piattaforma android): la barra
+  (sopra), la scelta, il preventivo col campo, «Conferma» senza
+  indirizzo (la frase), «Incolla» con «bitcoin:BC1Q…?amount=» dagli
+  appunti (nel campo minuscolo e senza coda), le parole con calma, «Continua»
+  senza spunta (la frase), spunta e «Continua» (la carta coi pallini,
+  lo swap nato dal cartone), il secondo ordine (indirizzo e «Conferma»:
+  lo swap nasce senza altri passi), lo scanner di Telegram (la frase
+  «Inquadra il QR…», il campo riempito, un QR storto detto), la pagina
+  «Ricevi in bitcoin». Fuori da Telegram, con un `BarcodeDetector` e una
+  fotocamera FINTI (una tela): lo strato, «Chiudi» che spegne la
+  fotocamera, la lettura che chiude lo strato e riempie il campo.
+- `prove_grafica_swap` (nuova, 14): ogni frase dei due vocabolari, in
+  due lingue e con le funzioni chiamate, senza parole tecniche; il nome
+  della cella e della pagina; lo stile dell'etichetta; le 12 parole con
+  la frase di Andrea, solo la prima volta; il campo prima di
+  «Conferma», «Incolla» e QR; nessun «Crea»; la guardia del doppio
+  tocco; `swapEstraiIndirizzo` eseguito su sei casi; chi legge il QR su
+  sette telefoni finti; nessuno script caricato e nessun lettore in
+  `vendor`; i pallini su undici casi. In `prove_swap_pagamento` i
+  quattro messaggi dei bitcoin arrivati e l'avviso del cambio non
+  andato senza «swap».
+- I collaudi dello swap riscritti sul giro nuovo: `collaudo_swap_telefono`
+  58/0 (in più: «Conferma» senza indirizzo, le parole con calma, la
+  seconda volta senza passi e il doppio tocco senza secondo swap),
+  `collaudo_swap_instradatore` 26/0, `collaudo_swap_pagamento` 51/0
+  (anche: nessun «swap» nei due messaggi Telegram),
+  `collaudo_swap_preventivo` 23/0, `collaudo_indirizzo_swap` 60/0.
+- CONTROPROVE, 13 su 13 rosse: «swap» rimesso in un testo; il campo
+  dopo «Conferma»; l'etichetta senza il suo stile; il bech32 maiuscolo
+  che resta maiuscolo; lo scanner di Telegram anche sul PC; «in volo»
+  che non conta come pagato; la frase di Andrea tolta; «swap» rimesso
+  nei due messaggi Telegram (due mutazioni); la guardia del doppio
+  tocco tolta da `swapCrea` (il collaudo vede il secondo swap); le
+  parole chieste ogni volta; «Continua» che non fa partire; «Conferma»
+  che parte senza indirizzo.
+- Suite e collaudi della CI: nel messaggio del commit.
+
+**NON PROVATO DAL VIVO.** Lo scanner vero di Telegram su un telefono
+vero, e la fotocamera vera con `BarcodeDetector` su Chrome Android (qui
+erano finti: il protocollo è quello documentato, il gesto no). La
+lettura degli appunti dentro la WebView di Telegram (dove non si
+legge, c'è il ripiego del tieni-premuto). Da guardare sulla VM di
+collaudo o sul telefono di Andrea prima di accendere `SWAP_ATTIVO`.
+
+**COSA RESTA.** Niente di questo cantiere. Fuori da qui, notati
+strada facendo: la carta di stato dell'ordine sopra il pannello dice
+ancora «via Lightning ⚡» anche quando si è scelto l'indirizzo bitcoin
+(è la riga dello stadio del pagamento, non dello swap: non toccata).
