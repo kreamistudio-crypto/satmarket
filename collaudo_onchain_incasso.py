@@ -176,8 +176,9 @@ def main():
     print("\n[la quota fissa: dal pannello, con i suoi no]")
     prova("chi non e' admin: 403", 403, leva(111, valore=600).status_code)
     come(999)
-    prova("una leva non aperta dal server: 404", 404,
-          c.post("/api/admin/leve/ONCHAIN_ATTIVO", json={"valore": 1}).status_code)
+    # dal 27 ott 2026 si aprono quasi tutte: la terza chiave e' una «mai»
+    prova("una leva che resta del VPS: 404", 404,
+          c.post("/api/admin/leve/ONCHAIN_XPUB", json={"valore": "x"}).status_code)
     r = leva(999, valore=500)
     prova("500 sats: 400, sotto la polvere la rete non trasmette", (400, True),
           (r.status_code, "polvere" in r.json()["detail"]))

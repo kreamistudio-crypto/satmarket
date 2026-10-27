@@ -73464,3 +73464,74 @@ quando l'on-chain c'è: si accende da solo appena lo apre».
 all'avvio, nessun seme nuovo se il server ha la chiave);
 `collaudo_onchain_ordine` col nuovo motivo. Da guardare sul telefono
 vero: il venditore apre l'app, chi compra vede «⛓️ On-chain».
+
+## Tutte le leve dalla pagina (27 ott 2026, cantiere leve-tutte, Andrea: «tutto devo poter configurare da lì, però suddividilo bene in sezioni di modo che sia tutto fruibile e ogni configurazione richieda una conferma prima di essere cambiata e che possa esistere un backup»)
+
+**COSA.** 182 leve su 256 si cambiano dalla pagina «⚙️ Le leve». La
+prima vista è l'indice delle SEZIONI (una piastrella per gruppo, con
+quante leve, quante da qui, quante già cambiate), più «⚠️ Da guardare»
+e «✏️ Cambiate da qui». Dentro una sezione: le schede (interruttore per
+i sì/no, casella e «Cambia» per numeri, testi e liste, JSON per i
+dizionari), sotto le leve «🔒 Solo dal VPS». Ogni gesto passa dal
+foglio «Adesso / Dopo»; un salto di dieci volte, o a zero, è rosso.
+🕘 Storia: gli ultimi cento cambi, ognuno con «Annulla». 💾 Backup: il
+file dal bot nella chat di chi lo chiede, o il testo da copiare; il
+ripristino prima mostra ogni cambio, poi conferma, e rende il pannello
+UGUALE al backup.
+
+**LA DECISIONE SULLE «MAI».** Il biglietto: «No, le "mai" restano sul
+VPS». Le 58 dello studio (segreti, indirizzi, serrature come
+`MODALITA_COLLAUDO`, `ADMIN_IDS`, la CSP) stanno in
+`LEVE_MAI_DAL_PANNELLO`, e una rete sul nome (`_LEVA_DI_NOME_CHIUSO`:
+TOKEN, SEGRET, NSEC, URL, RELAY, _IDS…) tiene fuori anche una leva
+NUOVA che ne abbia la forma, prima che qualcuno la scriva nella lista.
+Il perché: con il telefono di un admin rubato una serratura basta per
+prendersi il server; il resto, al peggio, si annulla dalla storia.
+
+**UN GIUDICE PER TIPO, NON 180 GIUDICI.** Lo studio diceva «aprirle una
+per una, col pavimento e il tetto di ognuna». Con «tutto» la strada è
+il tipo di oggi: un intero resta intero (e non negativo se oggi non lo
+è), una lista resta una lista dello stesso genere, un sì/no resta
+sì/no. Tetti per leva non ci sono: c'è la conferma che dice il prima e
+il dopo, il salto grande in rosso e «Annulla».
+
+**VALE ANCHE DOVE IL CODICE LEGGE UNA VOLTA SOLA.** Un cambio si posa sul
+globale e vale subito dove il codice lo rilegge; all'avvio
+`_leve_pannello_sopra_il_config()` posa tutta la tabella sul modulo
+config PRIMA del primo `from config import`, così vale anche nei freni
+e nelle rotte costruiti al caricamento. Quali leve sono «dal riavvio»
+lo dice la lettura del sorgente per gettoni (4 oggi:
+`CAMBIO_RINFRESCO_S`, `SCONTO_PACCO_ATTIVO`, `SPED_GRATIS_ATTIVO`,
+`P2P_ATTIVO`), e la scheda lo scrive. SCARTATO l'albero sintattico:
+2 secondi e 280 MB in più nel processo del server.
+
+**IL FRENO A MANO.** Se un valore della pagina impedisse al server di
+partire, `LEVE_PANNELLO_SPENTE = True` nel config lo fa partire col
+solo config (Produzione, «LE LEVE DALLA PAGINA»). È l'unico gesto che
+resta da fare sul VPS, e solo nel guasto.
+
+**RESTANO IN SOLA LETTURA, E PERCHÉ.** Le righe del censimento che
+mostrano un fatto e non la costante (il ritmo del canale, che decide
+`/vetrina`; le liste mostrate col conteggio; `BANNER_SCONTI_LIVELLO`,
+`SOGLIA_AGGREGA`, `P2P_PRESE_DA`, `P2P_MAX_SATS_PROVA`, `X_PROVA`):
+scrivere la costante non cambierebbe quel che si vede. ATTENZIONE alle
+leve gemelle del nodo: `P2P_COMMISSIONE_PERCENTO` e i tetti P2P stanno
+anche nel `settings.toml` di Mostro, e la pagina cambia solo il lato di
+Barattolo.
+
+**PROVATO.** `collaudo_leve_pannello` (31/0): le «mai» 404, un tipo alla
+volta col suo no, il cambio che vale subito sul globale, «Torna al
+config» che rimette il 72 del config, «Annulla» in tutti e due i versi,
+il registro, il backup (solo il deciso dal pannello, niente segreti),
+l'anteprima del ripristino che non tocca niente e poi l'applicazione
+(con la «mai» saltata), il file dal bot che in collaudo si ferma
+prima di Telegram (il patto degli altri sette indirizzi). E IL RIAVVIO: un secondo processo sullo stesso database vede i
+valori della pagina, anche `CAMBIO_TTL` che ne deriva all'avvio; col
+freno a mano vede il solo config. In Chromium a 390 px coi dati veri
+del server: l'indice, una sezione, la conferma, la storia, il backup
+con l'anteprima. Suite severa: nel messaggio del commit.
+
+**DA GUARDARE.** Sul telefono vero: «📨 Mandamelo su Telegram» (il
+sendDocument non l'ho potuto provare dal vivo) e «📂 Scegli il file»
+dentro Telegram. In produzione, prima del deploy: chi legge il config
+del VPS per capire una leva deve guardare anche la pagina.

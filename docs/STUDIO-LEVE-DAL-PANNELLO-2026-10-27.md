@@ -10,6 +10,17 @@ censimento delle 231 leve del cassetto «⚙️ Stato delle leve», con la mia
 proposta per ognuna. Non è aperta nessuna leva oltre alla quota e a «Solo gli admin» dell'on-chain: ogni
 riga diventa scrivibile col suo sì.*
 
+> **Aggiornamento, stesso giorno (cantiere leve-tutte).** Andrea: «tutto
+> devo poter configurare da lì, però suddividilo bene in sezioni, ogni
+> configurazione richieda una conferma e che possa esistere un backup»;
+> sul biglietto: «No, le "mai" restano sul VPS». Quindi le «✅ si può» e
+> le «⚖️ decidi tu» sono APERTE tutte insieme, col giudice del loro tipo
+> (Architettura, «TUTTE LE LEVE DAL PANNELLO»); le «🔒 mai» restano
+> chiuse. Le due ragioni qui sotto restano vere e hanno la loro
+> risposta: la prima è la lettura del sorgente che dice «subito» o «dal
+> riavvio», più i valori posati sul config all'avvio; la seconda è la
+> conferma «Adesso / Dopo», la storia con «Annulla» e il backup.
+
 ## Come funziona già (e perché una alla volta)
 
 Una leva scrivibile è una riga in `LEVE_SCRIVIBILI` (server.py) con il

@@ -36039,18 +36039,29 @@ def prove_leve():
     # vogliono un gesto sul VPS, e qui non deve nascere una scorciatoia.
     # DAL 27 OTT 2026 (decisione di Andrea, «il config deve anche poter
     # essere modificato dal pannello») UNA porta scrive, e apre SOLO le
-    # leve elencate in LEVE_SCRIVIBILI, una per una: la sentinella
-    # guarda che resti una, e che le tre spente di serie non ci entrino.
-    prova("una sola rotta che SCRIVE le leve, quella delle scrivibili",
-          (1, 0), (_SORGENTE.count('@app.post("/api/admin/leve'),
-                   _SORGENTE.count('@app.put("/api/admin/leve')))
-    scrivibili = _SORGENTE[_SORGENTE.index("LEVE_SCRIVIBILI = {"):]
-    scrivibili = scrivibili[:scrivibili.index("\n}\n")]
-    prova("...e le tre leve spente di serie non si accendono da li'",
-          [False, False, False],
-          [f'"{k}"' in scrivibili for k in ("ASTA_ABILITATA",
-                                             "IMPORT_NOSTR_APERTO",
-                                             "AUTO_SBLOCCO_ATTIVO")])
+    # leve elencate in LEVE_SCRIVIBILI, una per una.
+    # LO STESSO GIORNO, «tutto devo poter configurare da lì» (cantiere
+    # leve-tutte): si aprono tutte tranne le «mai» (sul biglietto: «No, le
+    # "mai" restano sul VPS»), e alla porta si aggiungono la storia, il
+    # backup e il ripristino. La sentinella guarda che le porte che
+    # scrivono restino QUATTRO, ognuna solo per gli admin col suo freno,
+    # e che le serrature restino nella lista delle «mai».
+    prova("quattro rotte che SCRIVONO le leve: una leva, annulla, il file "
+          "del backup, il ripristino", (4, 0),
+          (_SORGENTE.count('@app.post("/api/admin/leve'),
+           _SORGENTE.count('@app.put("/api/admin/leve')))
+    porte = [_SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+             for i in [m.start() for m in re.finditer(
+                 r'@app\.post\("/api/admin/leve', _SORGENTE)]]
+    prova("...ognuna solo per gli admin, col freno del pannello", [True] * 4,
+          ['if not e_admin(user["id"]):' in p and '_frena("leva_pannello"' in p
+           for p in porte])
+    mai = _SORGENTE[_SORGENTE.index("LEVE_MAI_DAL_PANNELLO = frozenset({"):]
+    mai = mai[:mai.index("})")]
+    prova("...e le serrature non si aprono mai da li'", [True] * 6,
+          [f'"{k}"' in mai for k in ("MODALITA_COLLAUDO", "ADMIN_IDS",
+                                     "CSP_ATTIVA", "ORE_INITDATA",
+                                     "PROVA_SOLO_IDS", "NOSTR_NSEC_PIATTAFORMA")])
     i = _SORGENTE.index("def leve_admin(")
     corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
     prova("la rotta e' riservata ai moderatori", True,
@@ -44261,8 +44272,11 @@ def prove_fogli_di_casa():
     # NOVANTADUE (27 ott 2026, pagina-leve): cambiare una leva dalla
     # pagina delle leve (`levaChiedi`) dice «Adesso… Dopo…» prima di
     # scrivere.
-    prova("i gesti che passano dalla domanda unica sono novantadue",
-          92, solo_codice(mini).count("chiediConferma({"))
+    # NOVANTAQUATTRO (27 ott 2026, leve-tutte): «Annulla» un cambio della
+    # storia delle leve (`storiaAnnullaChiedi`) e il ripristino di un
+    # backup (`backupRipristinaChiedi`).
+    prova("i gesti che passano dalla domanda unica sono novantaquattro",
+          94, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -102186,9 +102200,12 @@ def prove_telegram_simulato_collaudo():
     # solo, e chi bussa sta in un posto solo.
     # ...E SEI dal 12 ott 2026: `_posta_gruppo_admin`, il trasporto verso
     # il gruppo degli admin. Ha la sua guardia in cima, come gli altri.
-    prova("il censimento trova i sei indirizzi di oggi",
+    # ...E SETTE dal 27 ott 2026: `leve_backup_telegram`, il backup delle
+    # leve come file dal bot (sendDocument). Anche lui si ferma in collaudo.
+    prova("il censimento trova i sette indirizzi di oggi",
           ["_foto_profilo_telegram", "_getme_telegram", "_manda_telegram",
-           "_posta_gruppo_admin", "_registra", "bot_api"], sorted(trovati))
+           "_posta_gruppo_admin", "_registra", "bot_api",
+           "leve_backup_telegram"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
 

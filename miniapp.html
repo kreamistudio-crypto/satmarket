@@ -5521,12 +5521,31 @@
      In cima le schede di quelle che si cambiano da qui, grandi e con
      l'interruttore vero; sotto i gruppi in sola lettura, chiusi. */
   /* le due caselle col vestito dei campi di casa (.field input) */
-  .leve-cerca,.leva-numero input{box-sizing:border-box;border:1.5px solid var(--field-line);
+  .leva-numero.alto{flex-direction:column}
+  .leva-numero textarea{font:600 12px 'JetBrains Mono',monospace;width:100%}
+  .leve-cerca,.leva-numero input,.leva-numero textarea{box-sizing:border-box;border:1.5px solid var(--field-line);
     background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;
     font-weight:600;outline:none;color:var(--ink)}
-  .leve-cerca:focus,.leva-numero input:focus{border-color:var(--ink)}
+  .leve-cerca:focus,.leva-numero input:focus,.leva-numero textarea:focus{border-color:var(--ink)}
   .leve-cerca{width:100%;margin:4px 0 10px}
-  .leve-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  /* l'indice delle sezioni: piastrelle due per riga */
+  .leve-azioni{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+  .leve-azioni .btn{width:auto;flex:1 1 auto;padding:10px 14px}
+  .leve-griglia{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .leve-piastrella{position:relative;text-align:left;background:var(--card);
+    border:1.5px solid var(--line);border-radius:16px;padding:12px;
+    font:inherit;color:var(--ink);cursor:pointer;display:flex;
+    flex-direction:column;gap:4px;min-height:78px}
+  .leve-piastrella-tit{font-size:14px;font-weight:800;line-height:1.25;padding-right:22px}
+  .leve-piastrella-sotto{font-size:12px;font-weight:700;color:var(--ink-soft)}
+  .leve-piastrella-segno{position:absolute;top:10px;right:10px;font:800 11.5px 'Nunito',sans-serif}
+  .leve-avviso{background:var(--warn-bg);color:var(--danger);border-radius:14px;
+    padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:10px}
+  .leve-indietro{display:block;margin:0 0 4px}
+  .leve-sezione-tit{font:800 18px 'Nunito',sans-serif;margin:2px 0 12px}
+  .leve-backup-testo{width:100%;box-sizing:border-box;margin-top:10px;
+    font:600 12px 'JetBrains Mono',monospace;border:1.5px solid var(--field-line);
+    border-radius:14px;padding:10px;background:var(--card);color:var(--ink)}
   .leve-titolo{font:800 12px 'Nunito',sans-serif;color:var(--muted);
     text-transform:uppercase;letter-spacing:.4px;margin:18px 0 8px}
   .leve-spiega{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:0 0 8px}
@@ -5556,10 +5575,6 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
   .leva-interruttore.su{background:var(--sats)}
   .leva-interruttore.su span{transform:translateX(24px)}
-  .leve-gruppo{border-bottom:1px solid var(--line-soft)}
-  .leve-gruppo summary{font:800 13px 'Nunito',sans-serif;padding:12px 0;
-    cursor:pointer;display:flex;justify-content:space-between}
-  .leve-gruppo summary span{color:var(--muted)}
 
   /* ---- 🖼 Anteprima personalizzazioni livello (mockup, set 2026) ----
      SOLO PER DECIDERE IL VERSO: cornici e temi colore finti, prezzo
@@ -47825,7 +47840,7 @@ async function loadAdminStats(){
     try {
       const rl = await fetch(`${API_BASE}/admin/leve`,
         {headers:{'X-Tg-Init-Data':authHdr()}});
-      if (rl.ok) leve = (await rl.json()).gruppi || [];
+      if (rl.ok) { const dl = await rl.json(); leve = dl.gruppi || []; leveSpente = !!dl.spente; }
     } catch(e) {}
     admLeve = leve;
     if (el('leveSheet')?.classList.contains('open')) renderListaLeve();
@@ -48944,7 +48959,8 @@ function registroModerazione(mod){
    duecento righe fitte in un cassetto, con un «cambia» piccolo in
    mezzo, nascondevano proprio le due che si toccano. Nel cassetto resta
    il bottone che apre la pagina, e gli allarmi. */
-let admLeve = [], leveFiltro = 'cambiabili', leveCerca = '';
+let admLeve = [], leveVista = 'sezioni', leveCerca = '', leveSpente = false;
+let leveStoria = [], leveRipristino = null;
 
 function boxLeve(gruppi){
   if (!gruppi || !gruppi.length) return '';
@@ -48953,27 +48969,30 @@ function boxLeve(gruppi){
   const cambiabili = tutte.filter(v => v.scrivibile).length;
   return cassettoAdm('accAdmLeve', '⚙️', 'Stato delle leve',
     allarmi.length ? `⚠️ ${allarmi.length} da guardare` : `${tutte.length} leve`, `
-    <div class="sub">Come sta girando il server <b>adesso</b>. ${cambiabili ? `${cambiabili === 1 ? 'Una si cambia' : `${cambiabili} si cambiano`} da qui, con un interruttore.` : ''}</div>
+    <div class="sub">Come sta girando il server <b>adesso</b>. ${cambiabili} su ${tutte.length} si cambiano da qui, divise in sezioni, ognuna con la sua conferma.</div>
     <button class="btn orange" style="margin-top:10px" onclick="apriPaginaLeve()">⚙️ Apri la pagina delle leve</button>
     ${allarmi.map(rigaLevaSoloLettura).join('')}`);
 }
 
 /* il valore detto come si legge, uguale per righe e conferme */
 function valoreLeva(v){
+  if (v === null || v === undefined) return '—';
   if (typeof v === 'boolean') return v ? 'Acceso' : 'Spento';
   if (typeof v === 'number' && Number.isInteger(v)) return fmt(v);
-  return String(v);
+  if (Array.isArray(v)) return v.length ? v.map(x => valoreLeva(x)).join(', ') : '(vuota)';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v) === '' ? '(vuoto)' : String(v);
 }
 
 /* COSA SUCCEDE DAVVERO, in parole (27 ott 2026): «Solo gli admin:
    Acceso» costringeva a tradurre. Per le leve che si cambiano da qui la
-   pagina dice l'effetto di ogni verso; una leva nuova senza la sua
-   frase mostra il valore e basta, mai una frase sbagliata. */
+   pagina dice l'effetto di ogni verso; una leva senza la sua frase
+   mostra il valore e la nota del server, mai una frase sbagliata. */
 const EFFETTO_LEVA = {
-  /* a leva madre spenta (ONCHAIN_ATTIVO, solo dal VPS) questa non apre
-     niente, e la frase lo deve dire: «tutti possono» sarebbe falso */
+  /* a leva madre spenta (ONCHAIN_ATTIVO) questa non apre niente, e la
+     frase lo deve dire: «tutti possono» sarebbe falso */
   ONCHAIN_SOLO_ADMIN: x => valoreLevaDi('ONCHAIN_ATTIVO') === false
-    ? 'L\'on-chain è spento nel config del VPS: finché resta spento non lo usa nessuno.'
+    ? 'L\'on-chain è spento (leva «Pagamento on-chain»): finché resta spento non lo usa nessuno.'
     : x ? 'Solo gli admin possono pagare on-chain.'
         : 'Tutti possono pagare on-chain.',
   ONCHAIN_QUOTA_FISSA_SATS: x => Number(x) > 0
@@ -48981,18 +49000,27 @@ const EFFETTO_LEVA = {
     : 'Nessuna quota: chi compra on-chain paga il prezzo e la rete, niente a Barattolo.',
 };
 const effettoLeva = (chiave, x) => EFFETTO_LEVA[chiave] ? EFFETTO_LEVA[chiave](x) : '';
-const valoreLevaDi = chiave => (admLeve.flatMap(g => g.voci || []).find(v => v.chiave === chiave) || {}).valore;
+const tutteLeLeve = () => admLeve.flatMap(g => g.voci || []);
+const levaDi = chiave => tutteLeLeve().find(v => v.chiave === chiave);
+const valoreLevaDi = chiave => (levaDi(chiave) || {}).valore;
+/* il valore VERO di una leva che si cambia: per quelle aperte col
+   giudice del tipo e' `attuale`, perche' la riga ne mostra un riassunto */
+const valoreVeroLeva = v => (v.scrivibile && 'attuale' in v.scrivibile) ? v.scrivibile.attuale : v.valore;
 /* quel che il giudice del server accetta, detto prima di sbagliare */
 const AIUTO_LEVA = {
   ONCHAIN_QUOTA_FISSA_SATS: '0 per nessuna quota, oppure da 546 a 5.000 sats: sotto i 546 la rete non li accetta.',
 };
-
+const AIUTO_TIPO = {
+  intero: 'Un numero intero.', decimale: 'Un numero, anche con la virgola.',
+  testo: 'Un testo, al massimo 500 caratteri.',
+  lista: 'Le voci separate da virgole.', dizionario: 'Il testo JSON, come lo vedi.',
+};
 const ORIGINE_LEVA = {pannello: 'Deciso da questa pagina',
                       config: 'Dal config del VPS', codice: 'Valore di serie'};
 
 function apriPaginaLeve(){
   haptic();
-  leveCerca = '';
+  leveCerca = ''; leveVista = 'sezioni'; leveRipristino = null;
   renderPaginaLeve(true);
   el('sheetBg').classList.add('open');
   el('leveSheet').classList.add('open');
@@ -49000,7 +49028,7 @@ function apriPaginaLeve(){
 
 /* La casella della ricerca si scrive UNA volta per apertura: sotto le
    dita non si rifa' mai, o il telefono chiuderebbe la tastiera a ogni
-   lettera. Si rifa' solo l'elenco. */
+   lettera. Si rifa' solo quel che sta sotto. */
 function renderPaginaLeve(daCapo){
   const corpo = el('leveCorpo');
   if (!corpo) return;
@@ -49013,31 +49041,87 @@ function renderPaginaLeve(daCapo){
   renderListaLeve();
 }
 
+function vaiLeve(vista){
+  haptic();
+  leveVista = vista; leveCerca = ''; leveRipristino = null;
+  const c = el('leveCerca'); if (c) c.value = '';
+  if (vista === 'storia') caricaStoriaLeve();
+  renderListaLeve();
+  el('leveCorpo')?.scrollTo?.(0, 0);
+}
+
+/* LE SEZIONI (27 ott 2026, Andrea: «suddividilo bene in sezioni, di modo
+   che sia tutto fruibile»): la prima vista e' l'indice — una piastrella
+   per gruppo, con quante leve ha, quante si cambiano da qui e quante il
+   pannello ha gia' cambiato. Dentro una sezione, le schede. */
 function renderListaLeve(){
   const posto = el('leveLista');
   if (!posto) return;
-  const tutte = admLeve.flatMap(g => g.voci || []);
-  const conta = {cambiabili: tutte.filter(v => v.scrivibile).length,
-                 allarmi: tutte.filter(v => v.allarme).length, tutte: tutte.length};
   const q = leveCerca.trim().toLowerCase();
-  const passa = v => (!q || [v.nome, v.chiave, v.nota].some(t => String(t || '').toLowerCase().includes(q)))
-    && (q || leveFiltro === 'tutte' || (leveFiltro === 'cambiabili' ? v.scrivibile : v.allarme));
-  const chip = (k, testo) => `<button class="chip${leveFiltro === k && !q ? ' active' : ''}"
-    onclick="leveFiltro='${k}';leveCerca='';(el('leveCerca')||{}).value='';renderListaLeve()">${testo} · ${conta[k]}</button>`;
-  const schede = tutte.filter(v => v.scrivibile && passa(v)).map(schedaLevaCambiabile).join('');
-  const gruppi = admLeve.map(g => {
-    const righe = (g.voci || []).filter(v => !v.scrivibile && passa(v));
-    if (!righe.length) return '';
-    return `<details class="leve-gruppo"${q || leveFiltro !== 'tutte' ? ' open' : ''}>
-      <summary>${esc(g.gruppo)} <span>${righe.length}</span></summary>
-      ${righe.map(rigaLevaSoloLettura).join('')}</details>`;
-  }).join('');
+  if (q) {
+    const trovate = tutteLeLeve().filter(v => [v.nome, v.chiave, v.nota]
+      .some(t => String(t || '').toLowerCase().includes(q)));
+    posto.innerHTML = trovate.length
+      ? trovate.map(v => v.scrivibile ? schedaLevaCambiabile(v) : rigaLevaSoloLettura(v)).join('')
+      : '<div class="leve-spiega">Nessuna leva con questo nome.</div>';
+    return;
+  }
+  if (leveVista === 'storia') { posto.innerHTML = vistaStoriaLeve(); return; }
+  if (leveVista === 'backup') { posto.innerHTML = vistaBackupLeve(); return; }
+  if (leveVista.startsWith('gruppo:') || leveVista === 'cambiate' || leveVista === 'allarmi') {
+    posto.innerHTML = vistaGruppoLeve(); return;
+  }
+  const tutte = tutteLeLeve();
+  const cambiate = tutte.filter(v => v.scrivibile && v.scrivibile.origine === 'pannello').length;
+  const allarmi = tutte.filter(v => v.allarme).length;
+  const piastrella = (vista, titolo, sotto, segno) => `
+    <button class="leve-piastrella" onclick="vaiLeve('${vista}')">
+      <span class="leve-piastrella-tit">${titolo}</span>
+      <span class="leve-piastrella-sotto">${sotto}</span>
+      ${segno ? `<span class="leve-piastrella-segno">${segno}</span>` : ''}
+    </button>`;
   posto.innerHTML = `
-    <div class="leve-chips">${chip('cambiabili', '✏️ Da qui')}${chip('allarmi', '⚠️ Da guardare')}${chip('tutte', 'Tutte')}</div>
-    ${schede ? `<div class="leve-titolo">Si cambiano da qui</div>${schede}` : ''}
-    ${gruppi ? `<div class="leve-titolo">Si guardano e basta</div>
-      <div class="leve-spiega">🔒 Queste si cambiano solo nel config del VPS, con un riavvio.</div>${gruppi}` : ''}
-    ${!schede && !gruppi ? `<div class="leve-spiega">${q ? 'Nessuna leva con questo nome.' : leveFiltro === 'allarmi' ? '✅ Niente da guardare: tutto in ordine.' : 'Nessuna leva qui.'}</div>` : ''}`;
+    ${leveSpente ? '<div class="leve-avviso">⛔ Le leve dal pannello sono <b>spente nel config del VPS</b> (LEVE_PANNELLO_SPENTE): qui si guarda e basta.</div>' : ''}
+    <div class="leve-azioni">
+      <button class="btn ghost" onclick="vaiLeve('storia')">🕘 Storia dei cambi</button>
+      <button class="btn ghost" onclick="vaiLeve('backup')">💾 Backup</button>
+    </div>
+    <div class="leve-griglia">
+      ${allarmi ? piastrella('allarmi', '⚠️ Da guardare', `${allarmi} ${allarmi === 1 ? 'leva' : 'leve'}`, '') : ''}
+      ${cambiate ? piastrella('cambiate', '✏️ Cambiate da qui', `${cambiate} ${cambiate === 1 ? 'leva' : 'leve'}`, '') : ''}
+      ${admLeve.map((g, i) => {
+        const voci = g.voci || [];
+        const qui = voci.filter(v => v.scrivibile).length;
+        const mie = voci.filter(v => v.scrivibile && v.scrivibile.origine === 'pannello').length;
+        const gridano = voci.filter(v => v.allarme).length;
+        return piastrella(`gruppo:${i}`, esc(g.gruppo),
+          `${voci.length} ${voci.length === 1 ? 'leva' : 'leve'} · ${qui ? `${qui} da qui` : 'solo dal VPS'}`,
+          gridano ? '⚠️' : mie ? `✏️ ${mie}` : '');
+      }).join('')}
+    </div>`;
+}
+
+function vistaGruppoLeve(){
+  let titolo, voci;
+  if (leveVista === 'cambiate') {
+    titolo = '✏️ Cambiate da qui';
+    voci = tutteLeLeve().filter(v => v.scrivibile && v.scrivibile.origine === 'pannello');
+  } else if (leveVista === 'allarmi') {
+    titolo = '⚠️ Da guardare';
+    voci = tutteLeLeve().filter(v => v.allarme);
+  } else {
+    const g = admLeve[Number(leveVista.slice(7))] || {gruppo: '', voci: []};
+    titolo = esc(g.gruppo); voci = g.voci || [];
+  }
+  const qui = voci.filter(v => v.scrivibile), solo = voci.filter(v => !v.scrivibile);
+  return `
+    <button class="leva-link leve-indietro" onclick="vaiLeve('sezioni')">← Tutte le sezioni</button>
+    <div class="leve-sezione-tit">${titolo}</div>
+    ${qui.map(schedaLevaCambiabile).join('')}
+    ${solo.length ? `<div class="leve-titolo">🔒 Solo dal VPS</div>
+      <div class="leve-spiega">Segreti, indirizzi e serrature: si cambiano nel config del VPS, con un riavvio.</div>
+      ${solo.map(rigaLevaSoloLettura).join('')}` : ''}
+    ${!voci.length ? '<div class="leve-spiega">Niente qui.</div>' : ''}`;
 }
 
 function rigaLevaSoloLettura(v){
@@ -49055,36 +49139,47 @@ function rigaLevaSoloLettura(v){
     </div>`;
 }
 
-/* ---- ✏️ Le leve che si cambiano da qui (27 ott 2026) ----
-   Una leva alla volta, aperta dal server (`LEVE_SCRIVIBILI`): le altre
-   restano in sola lettura, per la ragione scritta sopra. Ogni gesto
-   passa dal foglio di conferma, che dice ADESSO e DOPO in parole, e
-   lascia una riga nel registro della moderazione. «Torna al config»
-   cancella il valore della pagina. */
+/* ---- ✏️ Le schede delle leve che si cambiano (27 ott 2026) ----
+   Ogni gesto passa dal foglio di conferma, che dice ADESSO e DOPO in
+   parole, e lascia una riga nella storia e nel registro della
+   moderazione. «Torna al config» cancella il valore della pagina. */
+const idLeva = k => 'levaNum_' + String(k).replace(/[^A-Z0-9_]/g, '');
+
 function schedaLevaCambiabile(v){
   const w = v.scrivibile, k = esc(v.chiave);
-  const effetto = effettoLeva(v.chiave, v.valore);
-  const comando = w.tipo === 'si_no'
-    ? `<button class="leva-interruttore${v.valore ? ' su' : ''}" role="switch" aria-checked="${v.valore ? 'true' : 'false'}"
-         aria-label="${esc(v.nome)}" onclick="levaChiedi('${k}', ${v.valore ? 'false' : 'true'})"><span></span></button>`
-    : `<div class="leva-scheda-val">${esc(valoreLeva(v.valore))}</div>`;
-  const numero = w.tipo === 'si_no' ? '' : `
-      <div class="leva-numero">
-        <input id="levaNum_${k}" inputmode="numeric" placeholder="${esc(String(v.valore))}">
-        <button class="btn orange" onclick="levaChiedi('${k}', (el('levaNum_${k}')||{}).value)">Cambia</button>
+  const vero = valoreVeroLeva(v);
+  const effetto = effettoLeva(v.chiave, vero);
+  const tipo = w.tipo || 'intero';
+  const comando = tipo === 'si_no'
+    ? `<button class="leva-interruttore${vero ? ' su' : ''}" role="switch" aria-checked="${vero ? 'true' : 'false'}"
+         aria-label="${esc(v.nome)}" onclick="levaChiedi('${k}', ${vero ? 'false' : 'true'})"><span></span></button>`
+    : (tipo === 'intero' || tipo === 'decimale')
+      ? `<div class="leva-scheda-val">${esc(valoreLeva(vero))}</div>` : '';
+  const testoCasella = tipo === 'lista' ? (vero || []).join(', ')
+    : tipo === 'dizionario' ? JSON.stringify(vero, null, 1) : String(vero ?? '');
+  const casella = tipo === 'si_no' ? '' : `
+      <div class="leva-numero${tipo === 'dizionario' ? ' alto' : ''}">
+        ${tipo === 'dizionario'
+          ? `<textarea id="${idLeva(v.chiave)}" rows="4">${esc(testoCasella)}</textarea>`
+          : `<input id="${idLeva(v.chiave)}" ${tipo === 'intero' || tipo === 'decimale' ? 'inputmode="decimal"' : ''}
+               value="${esc(testoCasella)}">`}
+        <button class="btn orange" onclick="levaChiedi('${k}', (el('${idLeva(v.chiave)}')||{}).value)">Cambia</button>
       </div>
-      <div class="leva-nota">${esc(AIUTO_LEVA[v.chiave] || `Da ${fmt(w.pavimento)} a ${fmt(w.tetto)}.`)}</div>`;
+      <div class="leva-nota">${esc(AIUTO_LEVA[v.chiave] || (w.pavimento !== undefined
+        ? `Da ${fmt(w.pavimento)} a ${fmt(w.tetto)}.` : AIUTO_TIPO[tipo] || ''))}</div>`;
   return `
     <div class="leva-scheda">
       <div class="leva-scheda-testa">
         <div class="leva-testo">
           <div class="leva-scheda-nome">${esc(v.nome)}</div>
+          <div class="leva-chiave">${k}</div>
           ${effetto ? `<div class="leva-effetto">${esc(effetto)}</div>` : ''}
         </div>
         ${comando}
       </div>
-      ${numero}
+      ${casella}
       ${v.nota && !effetto ? `<div class="leva-nota">${esc(v.nota)}</div>` : ''}
+      ${w.subito === false ? '<div class="leva-nota">⏳ Il server la legge anche all\'avvio: vale del tutto dal prossimo riavvio (il prossimo aggiornamento).</div>' : ''}
       <div class="leva-scheda-piede">
         <span class="leva-origine${w.origine === 'pannello' ? ' pannello' : ''}">${esc(ORIGINE_LEVA[w.origine] || w.origine)}</span>
         ${w.origine === 'pannello' ? `<button class="leva-link" onclick="levaChiedi('${k}', null, true)">Torna al config</button>` : ''}
@@ -49092,22 +49187,52 @@ function schedaLevaCambiabile(v){
     </div>`;
 }
 
-function levaChiedi(chiave, valore, alConfig){
-  const v = admLeve.flatMap(g => g.voci || []).find(x => x.chiave === chiave);
-  if (!v) return;
-  if (!alConfig && v.scrivibile.tipo !== 'si_no') {
-    valore = String(valore ?? '').replace(/[.\s]/g, '');
-    if (!/^\d+$/.test(valore)) { toast('Scrivi un numero intero'); return; }
-    valore = Number(valore);
-    if (valore === v.valore) { toast('È già questo il valore'); return; }
+/* Dal testo della casella al valore del tipo giusto. null = non va. */
+function levaDaCasella(v, testo){
+  const tipo = v.scrivibile.tipo || 'intero';
+  const t = String(testo ?? '').trim();
+  if (tipo === 'intero') {
+    const n = t.replace(/[.\s]/g, '');
+    return /^-?\d+$/.test(n) ? Number(n) : null;
   }
-  const prima = effettoLeva(chiave, v.valore) || valoreLeva(v.valore);
-  const dopo = alConfig ? 'Il valore scritto nel config del VPS (o quello di serie).'
-                        : (effettoLeva(chiave, valore) || valoreLeva(valore));
+  if (tipo === 'decimale') {
+    const n = t.replace(/\s/g, '').replace(',', '.');
+    return /^-?\d+(\.\d+)?$/.test(n) ? Number(n) : null;
+  }
+  if (tipo === 'testo') return t;
+  if (tipo === 'lista') {
+    const voci = t ? t.split(',').map(x => x.trim()).filter(x => x !== '') : [];
+    const prima = valoreVeroLeva(v) || [];
+    const numeri = prima.length ? prima.every(x => typeof x === 'number')
+                                : voci.every(x => /^-?\d+(\.\d+)?$/.test(x));
+    if (!numeri) return voci;
+    return voci.every(x => /^-?\d+(\.\d+)?$/.test(x)) ? voci.map(Number) : null;
+  }
+  if (tipo === 'dizionario') { try { return JSON.parse(t); } catch(e) { return null; } }
+  return null;
+}
+
+function levaChiedi(chiave, valore, alConfig){
+  const v = levaDi(chiave);
+  if (!v || !v.scrivibile) return;
+  const prima = valoreVeroLeva(v);
+  if (!alConfig && v.scrivibile.tipo !== 'si_no') {
+    valore = levaDaCasella(v, valore);
+    if (valore === null) { toast('⚠️ ' + (AIUTO_TIPO[v.scrivibile.tipo] || 'Valore non valido')); return; }
+    if (JSON.stringify(valore) === JSON.stringify(prima)) { toast('È già questo il valore'); return; }
+  }
+  const detto = x => effettoLeva(chiave, x) || valoreLeva(x);
+  const dopo = alConfig ? 'Il valore scritto nel config del VPS (o quello di serie).' : detto(valore);
+  /* un salto grande si dice: dieci volte tanto, o a zero da acceso */
+  const salto = typeof valore === 'number' && typeof prima === 'number' && prima > 0
+    && (valore >= prima * 10 || valore === 0);
   chiediConferma({
     titolo: `⚙️ ${v.nome}`,
-    corpo: `Adesso: ${prima}\nDopo: ${dopo}\n\nVale subito, per tutti.`,
+    corpo: `Adesso: ${detto(prima)}\nDopo: ${dopo}\n\n`
+      + (salto ? '⚠️ È un salto grande: controlla il numero.\n\n' : '')
+      + (v.scrivibile.subito === false ? 'Vale del tutto dal prossimo riavvio.' : 'Vale subito, per tutti.'),
     etichetta: alConfig ? 'Torna al config' : (typeof valore === 'boolean' ? (valore ? 'Accendi' : 'Spegni') : 'Cambia'),
+    vestito: salto ? 'allarme' : undefined,
     poi: () => levaScrivi(chiave, valore, alConfig)});
 }
 
@@ -49119,7 +49244,8 @@ async function levaScrivi(chiave, valore, alConfig){
       body: JSON.stringify(alConfig ? {torna_al_config: true} : {valore})});
     const x = await r.json().catch(() => ({}));
     if (!r.ok) toast('⚠️ ' + (x.detail || 'non cambiata'), 6000);
-    else toast('✅ Fatto: ' + (effettoLeva(chiave, x.valore) || `${chiave} = ${valoreLeva(x.valore)}`), 5000);
+    else toast('✅ Fatto: ' + (effettoLeva(chiave, x.valore) || `${(levaDi(chiave) || {}).nome || chiave}: ${valoreLeva(x.valore)}`)
+               + (x.subito === false ? ' (del tutto dal prossimo riavvio)' : ''), 5000);
   } catch(e) { toast('Rete assente: riprova'); }
   await ricaricaLeve();
   loadAdminStats();
@@ -49128,9 +49254,176 @@ async function levaScrivi(chiave, valore, alConfig){
 async function ricaricaLeve(){
   try {
     const r = await fetch(`${API_BASE}/admin/leve`, {headers: {'X-Tg-Init-Data': authHdr()}});
-    if (r.ok) admLeve = (await r.json()).gruppi || [];
+    if (r.ok) { const d = await r.json(); admLeve = d.gruppi || []; leveSpente = !!d.spente; }
   } catch(e) {}
   if (el('leveSheet')?.classList.contains('open')) renderListaLeve();
+}
+
+/* ---- 🕘 La storia dei cambi (27 ott 2026) ----
+   Gli ultimi cento, il piu' nuovo in cima. «Annulla» rimette la leva
+   com'era PRIMA di quel cambio — e se prima veniva dal config, la
+   rimanda al config —, passando dalla stessa conferma di ogni gesto. */
+async function caricaStoriaLeve(){
+  leveStoria = null;
+  try {
+    const r = await fetch(`${API_BASE}/admin/leve-storia`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    leveStoria = r.ok ? ((await r.json()).storia || []) : [];
+  } catch(e) { leveStoria = []; }
+  if (leveVista === 'storia') renderListaLeve();
+}
+
+const COME_LEVA = {cambio: '', annulla: ' · annullato', ripristino: ' · dal backup'};
+
+function vistaStoriaLeve(){
+  const righe = leveStoria === null ? '<div class="leve-spiega">Carico…</div>'
+    : !leveStoria.length ? '<div class="leve-spiega">Nessun cambio ancora.</div>'
+    : leveStoria.map(s => `
+      <div class="leva-riga">
+        <div class="leva-testo">
+          <div class="leva-nome">${esc((levaDi(s.chiave) || {}).nome || s.chiave)}</div>
+          <div class="leva-nota">${esc(valoreLeva(s.prima))} → <b>${esc(valoreLeva(s.dopo))}</b></div>
+          <div class="leva-chiave">${new Date(s.quando * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})} · admin ${esc(String(s.chi))}${COME_LEVA[s.come] || ''}</div>
+        </div>
+        <button class="leva-link" onclick="storiaAnnullaChiedi(${Number(s.id)})">Annulla</button>
+      </div>`).join('');
+  return `<button class="leva-link leve-indietro" onclick="vaiLeve('sezioni')">← Tutte le sezioni</button>
+    <div class="leve-sezione-tit">🕘 Storia dei cambi</div>${righe}`;
+}
+
+function storiaAnnullaChiedi(id){
+  const s = (leveStoria || []).find(x => x.id === id);
+  if (!s) return;
+  const v = levaDi(s.chiave) || {nome: s.chiave};
+  chiediConferma({
+    titolo: `↩️ ${v.nome}`,
+    corpo: `Torna com'era prima di questo cambio: `
+      + (s.prima_dal_pannello ? valoreLeva(s.prima) : 'il valore del config del VPS')
+      + `.\n\nVale per tutti.`,
+    etichetta: 'Annulla il cambio', indietro: 'Lascia com\'è',
+    poi: () => storiaAnnulla(id)});
+}
+
+async function storiaAnnulla(id){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/leve-storia/${id}/annulla`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const x = await r.json().catch(() => ({}));
+    toast(r.ok ? '↩️ Fatto: ' + valoreLeva(x.valore) : '⚠️ ' + (x.detail || 'non riuscito'), 5000);
+  } catch(e) { toast('Rete assente: riprova'); }
+  await ricaricaLeve();
+  caricaStoriaLeve();
+}
+
+/* ---- 💾 Il backup (27 ott 2026, Andrea: «che possa esistere un backup») ----
+   Il backup e' quel che il pannello ha deciso sopra il config. Esce dal
+   bot come file nella tua chat, o come testo da copiare; rientra
+   incollato o scelto dal telefono, con l'anteprima di ogni cambio e poi
+   la conferma. Le leve stanno anche nel backup cifrato del database di
+   ogni notte e di prima di ogni aggiornamento. */
+function vistaBackupLeve(){
+  const ant = leveRipristino;
+  const anteprima = !ant ? '' : `
+    <div class="leva-scheda">
+      <div class="leva-scheda-nome">${ant.cambi.length ? `Cambierebbero ${ant.cambi.length} ${ant.cambi.length === 1 ? 'leva' : 'leve'}` : 'Niente da cambiare: è già tutto così'}</div>
+      ${ant.cambi.map(c => `<div class="leva-nota">• <b>${esc((levaDi(c.chiave) || {}).nome || c.chiave)}</b>: ${esc(valoreLeva(c.adesso))} → ${c.al_config ? 'torna al config' : esc(valoreLeva(c.dopo))}</div>`).join('')}
+      ${ant.saltate.length ? `<div class="leva-nota" style="margin-top:8px">Saltate (${ant.saltate.length}): ${ant.saltate.map(s => `${esc(s.chiave)} (${esc(s.motivo)})`).join(', ')}</div>` : ''}
+      ${ant.cambi.length ? '<button class="btn orange" style="margin-top:12px" onclick="backupRipristinaChiedi()">Ripristina</button>' : ''}
+    </div>`;
+  return `<button class="leva-link leve-indietro" onclick="vaiLeve('sezioni')">← Tutte le sezioni</button>
+    <div class="leve-sezione-tit">💾 Backup delle leve</div>
+    <div class="leva-scheda">
+      <div class="leva-scheda-nome">Fai un backup</div>
+      <div class="leva-nota">Dentro c'è tutto quel che hai deciso da questa pagina. Il resto sta nel config del VPS.</div>
+      <div class="leve-azioni">
+        <button class="btn orange" onclick="backupTelegram(this)">📨 Mandamelo su Telegram</button>
+        <button class="btn ghost" onclick="backupCopia()">📋 Copia il testo</button>
+      </div>
+      <textarea id="leveBackupTesto" class="leve-backup-testo" rows="5" readonly hidden></textarea>
+    </div>
+    <div class="leva-scheda">
+      <div class="leva-scheda-nome">Rimetti un backup</div>
+      <div class="leva-nota">Incolla il testo, o scegli il file che ti ha mandato il bot. Prima vedi cosa cambierebbe, poi confermi.</div>
+      <textarea id="leveRipristinoTesto" class="leve-backup-testo" rows="5" placeholder="{ &quot;barattolo_leve&quot;: 1, … }">${esc(ant ? ant.testo : '')}</textarea>
+      <div class="leve-azioni">
+        <label class="btn ghost">📂 Scegli il file<input type="file" accept=".json,application/json" hidden onchange="backupDaFile(this)"></label>
+        <button class="btn orange" onclick="backupControlla()">Controlla</button>
+      </div>
+    </div>
+    ${anteprima}
+    <div class="leve-spiega">Le leve stanno anche nel backup cifrato del database, ogni notte e prima di ogni aggiornamento.</div>`;
+}
+
+async function backupTelegram(btn){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/leve-backup/telegram`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const x = await r.json().catch(() => ({}));
+    toast(!r.ok ? '⚠️ ' + (x.detail || 'non riuscito')
+      : x.collaudo ? '🧪 In modalità collaudo il bot non manda file: usa «Copia il testo»'
+      : `📨 Mandato: guarda la chat col bot (${x.leve} leve)`, 6000);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+async function backupCopia(){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/leve-backup`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) { toast('⚠️ Backup non riuscito'); return; }
+    const testo = JSON.stringify(await r.json(), null, 1);
+    const box = el('leveBackupTesto');
+    if (box) { box.value = testo; box.hidden = false; box.select(); }
+    try { await navigator.clipboard.writeText(testo); toast('📋 Copiato: incollalo dove vuoi tenerlo'); }
+    catch(e) { toast('Tieni premuto sul testo qui sotto e copialo'); }
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function backupDaFile(inp){
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { const t = el('leveRipristinoTesto'); if (t) t.value = String(r.result || ''); backupControlla(); };
+  r.readAsText(f);
+}
+
+async function backupInvia(applica){
+  let b;
+  try { b = JSON.parse((el('leveRipristinoTesto') || {}).value || leveRipristino?.testo || ''); }
+  catch(e) { toast('⚠️ Non è un testo di backup (JSON)'); return null; }
+  const r = await fetch(`${API_BASE}/admin/leve-ripristina`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({backup: b, applica})});
+  const x = await r.json().catch(() => ({}));
+  if (!r.ok) { toast('⚠️ ' + (x.detail || 'non riuscito'), 6000); return null; }
+  return Object.assign(x, {testo: JSON.stringify(b)});
+}
+
+async function backupControlla(){
+  haptic();
+  try {
+    const x = await backupInvia(false);
+    if (x) { leveRipristino = x; renderListaLeve(); }
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function backupRipristinaChiedi(){
+  const n = (leveRipristino || {cambi: []}).cambi.length;
+  chiediConferma({
+    titolo: '💾 Rimettere il backup?',
+    corpo: `Cambiano ${n} ${n === 1 ? 'leva' : 'leve'}, come nell'elenco. Ogni cambio resta nella storia e si può annullare.\n\nVale per tutti.`,
+    etichetta: 'Ripristina', poi: backupRipristina});
+}
+
+async function backupRipristina(){
+  haptic();
+  try {
+    const x = await backupInvia(true);
+    if (x) toast(`💾 Ripristinato${x.saltate.length ? `, ${x.saltate.length} saltate` : ''}`, 5000);
+    leveRipristino = null;
+  } catch(e) { toast('Rete assente: riprova'); }
+  await ricaricaLeve();
+  loadAdminStats();
 }
 
 /* --- Badge Nostr NIP-58 delle live (set 2026) -----------------------

@@ -200,6 +200,144 @@ for _canale in (sys.stdout, sys.stderr):
 # Prima volta? Copia config_esempio.py, rinominalo config.py e
 # compila i campi.
 
+# ===== IL PANNELLO SOPRA IL CONFIG, GIA' ALL'AVVIO (27 ott 2026,
+# cantiere leve-tutte, Andrea: «tutto devo poter configurare da lì, però
+# suddividilo bene in sezioni, ogni configurazione richieda una conferma
+# e che possa esistere un backup») =====
+# Le leve scritte dalla pagina «⚙️ Le leve» stanno nella tabella
+# `leve_pannello` del database e VINCONO sul config del VPS. Perche'
+# valgano anche dove il codice le legge una volta sola (i freni, le
+# rotte che nascono o no, i testi fatti all'avvio) si posano SUL MODULO
+# config prima di ogni `from config import`: cosi' ogni riga del file le
+# vede come se fossero scritte nel config. Durante la vita del processo
+# un cambio si posa anche sui globali (`_leva_metti_viva`), e vale subito
+# dove il codice la rilegge a ogni giro.
+# MAI DAL PANNELLO (decisione di Andrea, 27 ott 2026, sul biglietto: «No,
+# le "mai" restano sul VPS»): segreti, indirizzi e serrature. Sono le 58
+# dello studio (docs/STUDIO-LEVE-DAL-PANNELLO-2026-10-27.md); in piu' la
+# rete di `_LEVA_DI_NOME_CHIUSO` tiene fuori una leva NUOVA che abbia la
+# forma di un segreto o di un indirizzo, anche se nessuno l'ha scritta qui.
+# IL FRENO A MANO: `LEVE_PANNELLO_SPENTE = True` nel config del VPS fa
+# partire il server ignorando la tabella (un valore che rompesse l'avvio
+# si toglie cosi', senza toccare il database).
+LEVE_MAI_DAL_PANNELLO = frozenset({
+    # 🚦 sicurezza
+    "MODALITA_COLLAUDO", "URL_PUBBLICO", "LINK_BOT", "PROVA_SOLO_IDS",
+    "PROVA_APERTA", "ORE_INITDATA", "PROTEGGI_IFRAME", "CSP_ATTIVA",
+    "ONION_HOST", "ONION_SEGNALE", "CONNETTORI_NEGOZIO_APERTI",
+    "CONNETTORI_NEGOZIO_PER_TUTTI", "TELEGRAM_WEBHOOK_SEGRETO",
+    "RELAY_CHIAVI_TOKEN", "ADMIN_IDS", "ADMIN_CANALE_ID", "GRUPPO_ADMIN_CODA",
+    # 🔒 le guardie dei soldi
+    "CASSAFORTE_NUOVA", "GUARDIA_LIQUIDITA", "GUARDIANO_PONTE",
+    "CHIAVE_CONTENUTI_DIGITALI", "CONTROLLO_LIBRO_MASTRO", "RICONCILIA_PAYOUT",
+    "CODA_FERMI_GIORNI",
+    # 🔄 swap: segreti e indirizzi del fornitore
+    "SWAP_REFERRAL_API_SECRET", "SWAP_API_BASE", "SWAP_RETE",
+    "SWAP_MEMPOOL_API", "SWAP_FORNITORI_IN_PIU", "SWAP_REFERRAL_ID",
+    # 🏷️ link e relay
+    "BANNER_LINK_VIETATI", "LINK_DESCRIZIONE_AMMESSI", "RELAY_NOSTR",
+    "RELAY_NOSTR_IMPORT", "NOSTR_NSEC_PIATTAFORMA", "TELEGRAM_CANALE_ID",
+    "MAX_LINK_NEGOZIO", "BANNER_TEST_LINK",
+    # 🔁 il coordinator e i suoi segreti
+    "MOSTRO_NPUB", "P2P_PROVA_IDS", "P2P_STATISTICHE_IDS", "MOSTRO_RELAY",
+    "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
+    "P2P_EVENTI_SEGRETO", "SEGRETI_PROFILO_P2P", "SEGRETO_PROFILO_P2P_VIVA",
+    "MOSTRO_RELAY_SPECCHIO", "MOSTRO_RELAY_CONFERMA",
+    # ⛓️ 🪙 🔔 chiavi e liste di persone
+    "ONCHAIN_XPUB", "RGB_PROVA_IDS", "NIP05_NOMI", "AVVISI_ORDINI_ADMIN",
+    # quelle che il server legge prima di tutto, e il freno a mano stesso
+    "BOT_TOKEN", "ANTHROPIC_API_KEY", "LNBITS_URL", "LNBITS_INVOICE_KEY",
+    "LNBITS_ADMIN_KEY", "MODELLO_RICERCA", "DB", "LEVE_PANNELLO_SPENTE",
+})
+_LEVA_DI_NOME_CHIUSO = re.compile(
+    r"TOKEN|SEGRET|SECRET|NSEC|MACAROON|_KEY$|PASSWORD|CHIAVE|URL|RELAY"
+    r"|NPUB|XPUB|_API|LINK|_IDS?$|ONION|WEBHOOK|DB$")
+# le due nate prima, col giudice loro (LEVE_SCRIVIBILI): non passano di qui
+_LEVE_COL_GIUDICE_LORO = frozenset({"ONCHAIN_SOLO_ADMIN",
+                                    "ONCHAIN_QUOTA_FISSA_SATS"})
+
+
+def _leva_apribile_di_nome(chiave: str) -> bool:
+    """Il primo filtro, solo sul nome: fuori le «mai» e chi ne ha la forma."""
+    return (bool(re.fullmatch(r"[A-Z][A-Z0-9_]*", chiave or ""))
+            and chiave not in LEVE_MAI_DAL_PANNELLO
+            and not _LEVA_DI_NOME_CHIUSO.search(chiave))
+
+
+def _leva_in_json(v) -> str:
+    """Il valore come si scrive nella tabella: JSON col suo tipo, perche'
+    un insieme torni insieme e una tupla tupla."""
+    if isinstance(v, (set, frozenset)):
+        return json.dumps({"t": type(v).__name__,
+                           "v": sorted(v, key=lambda x: (str(type(x)), x))},
+                          ensure_ascii=False)
+    if isinstance(v, tuple):
+        return json.dumps({"t": "tuple", "v": list(v)}, ensure_ascii=False)
+    return json.dumps({"t": "=", "v": v}, ensure_ascii=False)
+
+
+def _leva_da_json(testo: str):
+    """Il rovescio di `_leva_in_json`; ValueError se non e' dei nostri."""
+    try:
+        d = json.loads(testo)
+    except (TypeError, ValueError):
+        raise ValueError("non e' JSON")
+    if not isinstance(d, dict) or set(d) != {"t", "v"}:
+        raise ValueError("non e' una leva del pannello")
+    t, v = d["t"], d["v"]
+    if t == "=":
+        return v
+    if t in ("set", "frozenset", "tuple") and isinstance(v, list):
+        return {"set": set, "frozenset": frozenset, "tuple": tuple}[t](v)
+    raise ValueError("tipo sconosciuto")
+
+
+_CHIAVI_DEL_CONFIG = set()      # cosa c'era scritto nel config.py, all'avvio
+_CONFIG_DEL_FILE = {}           # ...e il suo valore, per le leve che il pannello copre
+_LEVE_POSATE_ALL_AVVIO = {}     # quel che il pannello ha posato sul config
+_LEVE_PANNELLO_SPENTE = []      # non vuota: il freno a mano del config e' tirato
+
+
+def _leve_pannello_sopra_il_config():
+    try:
+        import config as _c
+    except ImportError:
+        return
+    _CHIAVI_DEL_CONFIG.update(k for k in dir(_c) if not k.startswith("_"))
+    if getattr(_c, "LEVE_PANNELLO_SPENTE", False):
+        print("⚙️ Leve dal pannello SPENTE dal config: vale solo il config")
+        _LEVE_PANNELLO_SPENTE.append(True)
+        return
+    percorso = getattr(_c, "DB", "")
+    if not isinstance(percorso, str) or not percorso or not os.path.exists(percorso):
+        return
+    try:
+        con = sqlite3.connect(percorso, timeout=5)
+        try:
+            righe = con.execute("SELECT chiave, valore FROM leve_pannello").fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return          # la tabella non c'e' ancora: nessuna leva posata
+    for chiave, testo in righe:
+        if chiave in _LEVE_COL_GIUDICE_LORO or not _leva_apribile_di_nome(chiave):
+            continue
+        try:
+            v = _leva_da_json(testo)
+        except ValueError:
+            print(f"⚠️ Leva dal pannello illeggibile, ignorata: {chiave}")
+            continue
+        if hasattr(_c, chiave):
+            _CONFIG_DEL_FILE[chiave] = getattr(_c, chiave)
+        setattr(_c, chiave, v)
+        _LEVE_POSATE_ALL_AVVIO[chiave] = v
+    if _LEVE_POSATE_ALL_AVVIO:
+        print(f"⚙️ Leve dal pannello: {len(_LEVE_POSATE_ALL_AVVIO)} sopra il "
+              f"config ({', '.join(sorted(_LEVE_POSATE_ALL_AVVIO))})")
+
+
+_leve_pannello_sopra_il_config()
+
 try:
     from config import (BOT_TOKEN, ANTHROPIC_API_KEY, LNBITS_URL,
                         LNBITS_INVOICE_KEY, LNBITS_ADMIN_KEY,
@@ -33158,7 +33296,16 @@ def leve_admin(x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
-    return {"gruppi": _leve_stato()}
+    gruppi = _leve_stato()
+    # tutte le altre che si aprono (27 ott 2026): il giudice del tipo
+    for g in gruppi:
+        for r in g["voci"]:
+            if "scrivibile" not in r:
+                w = _leva_generica(r)
+                if w:
+                    r["scrivibile"] = w
+    return {"gruppi": gruppi,
+            "spente": bool(_LEVE_PANNELLO_SPENTE)}
 
 
 # ============ LE LEVE CHE SI CAMBIANO DAL PANNELLO (27 ott 2026,
@@ -33279,49 +33426,557 @@ def _leva_scrivibile_riga(riga: dict) -> dict:
     l = LEVE_SCRIVIBILI[riga["chiave"]]
     riga["scrivibile"] = {"pavimento": l["pavimento"](), "tetto": l["tetto"](),
                           "tipo": l.get("tipo", "intero"),
-                          "origine": leva_origine(riga["chiave"])}
+                          "origine": leva_origine(riga["chiave"]),
+                          "subito": True}
     return riga
+
+
+# ============ TUTTE LE ALTRE, COL GIUDICE DEL LORO TIPO (27 ott 2026,
+# cantiere leve-tutte, Andrea: «tutto devo poter configurare da lì»;
+# sul biglietto: «No, le "mai" restano sul VPS») ============
+# Una leva si apre da sola se: il nome passa `_leva_apribile_di_nome`
+# (fuori le «mai» e chi ne ha la forma), il server la chiede davvero al
+# config, il suo valore e' di un tipo che si sa giudicare (sì/no,
+# intero, decimale, testo, lista, dizionario a chiavi di testo), e il
+# censimento mostra PROPRIO quel valore — una riga che mostra un fatto
+# derivato (un conteggio, il ritmo del canale che decide `/vetrina`)
+# resta in sola lettura: scriverne la costante non cambierebbe quel che
+# si vede.
+# SUBITO O DAL RIAVVIO: dove il codice rilegge la leva a ogni giro il
+# cambio vale subito; dove la legge anche fuori da ogni funzione (una
+# rotta che nasce o no, un freno costruito al caricamento) vale del
+# tutto dal prossimo riavvio, cioe' dal prossimo deploy. Lo dice la
+# lettura del sorgente per gettoni, non una lista a mano.
+_LEVE_LETTE = None
+
+
+def _leve_lette_dal_codice() -> dict:
+    """Una volta per processo, e senza costruire l'albero sintattico (su
+    questo file costa 280 MB): i nomi LETTI fuori da ogni funzione, le
+    leve che il server chiede al config e i valori di serie scritti nei
+    rami `except ImportError`."""
+    global _LEVE_LETTE
+    if _LEVE_LETTE is not None:
+        return _LEVE_LETTE
+    import ast
+    import io
+    import tokenize
+    try:
+        sorgente = open(os.path.abspath(__file__), encoding="utf-8").read()
+    except OSError:
+        sorgente = ""
+    letti = {}                # nome -> righe dove si legge fuori dalle funzioni
+    pila = []                 # "f" un corpo di funzione, "b" ogni altro blocco
+    def_in_attesa = False     # una `def` aperta: il prossimo blocco e' suo
+    a_inizio = True           # il gettone e' il primo della riga logica
+    riga_import = False
+    in_sospeso = None         # un NOME fuori dalle funzioni, in attesa del seguito
+    try:
+        for g in tokenize.generate_tokens(io.StringIO(sorgente).readline):
+            if g.type in (tokenize.NL, tokenize.COMMENT):
+                continue
+            if in_sospeso is not None:
+                nome, primo, riga = in_sospeso
+                in_sospeso = None
+                # `X = ...` a inizio riga e' una scrittura (il ramo di serie)
+                if not (primo and g.type == tokenize.OP and g.string == "="):
+                    letti.setdefault(nome, []).append(riga)
+            if g.type == tokenize.INDENT:
+                pila.append("f" if def_in_attesa else "b")
+                def_in_attesa = False
+                continue
+            if g.type == tokenize.DEDENT:
+                if pila:
+                    pila.pop()
+                continue
+            if g.type == tokenize.NEWLINE:
+                a_inizio, riga_import = True, False
+                continue
+            if g.type == tokenize.NAME and "f" not in pila:
+                if g.string == "def":
+                    def_in_attesa = True
+                elif a_inizio and g.string in ("from", "import"):
+                    riga_import = True
+                elif (not riga_import
+                      and re.fullmatch(r"[A-Z][A-Z0-9_]*", g.string)):
+                    in_sospeso = (g.string, a_inizio, g.start[0])
+            a_inizio = False
+    except (tokenize.TokenError, SyntaxError, IndentationError):
+        pass
+    dal_config = set()
+    for m in re.finditer(r"from config import (?:\(([^)]*)\)|([^\n]+))", sorgente):
+        for nome in re.split(r"[,\s]+", m.group(1) or m.group(2) or ""):
+            if re.fullmatch(r"[A-Z][A-Z0-9_]*", nome):
+                dal_config.add(nome)
+    di_serie = {}
+    for m in re.finditer(r"except ImportError:\n((?:[ \t]+[^\n]*\n|[ \t]*\n)+)", sorgente):
+        blocco = m.group(1)
+        for n in re.finditer(r"^[ \t]+([A-Z][A-Z0-9_]*) = (.*)$", blocco, re.M):
+            if n.group(1) in di_serie:
+                continue
+            resto = blocco[n.end():].split("\n")
+            for i in range(0, min(len(resto), 60) + 1):
+                try:
+                    di_serie[n.group(1)] = ast.literal_eval(
+                        "\n".join([n.group(2)] + resto[:i]).strip())
+                    break
+                except (ValueError, SyntaxError, MemoryError, RecursionError):
+                    continue
+    # LA GUARDIA NON E' UNA LETTURA: il blocco di testa che controlla la
+    # leva e la riscrive (`try: X = int(X)`, `if X < 0: X = 0`) la legge
+    # fuori dalle funzioni, ma solo per metterla in forma — e un cambio
+    # dal pannello arriva gia' giudicato. Conta come «dal riavvio» solo
+    # la lettura che sta in un blocco di testa che NON riscrive la leva.
+    righe = sorgente.split("\n")
+    testa = [i + 1 for i, r in enumerate(righe)
+             if r[:1] not in ("", " ", "\t", "#", ")", "]", "}")]
+    import bisect
+    all_avvio = set()
+    for nome, dove in letti.items():
+        scrive = re.compile(r"^[ \t]*" + re.escape(nome) + r" = ")
+        for n in dove:
+            i = bisect.bisect_right(testa, n) - 1
+            da = testa[i] if i >= 0 else 1
+            a = testa[i + 1] if i + 1 < len(testa) else len(righe) + 1
+            if not any(scrive.match(r) for r in righe[da - 1:a - 1]):
+                all_avvio.add(nome)
+                break
+    _LEVE_LETTE = {"all_avvio": all_avvio, "dal_config": dal_config,
+                   "di_serie": di_serie}
+    return _LEVE_LETTE
+
+
+def _tipo_leva(v) -> str:
+    """Il tipo di una leva, come lo sa giudicare il pannello ('' se no)."""
+    scalare = (bool, int, float, str)
+    if isinstance(v, bool):
+        return "si_no"
+    if isinstance(v, int):
+        return "intero"
+    if isinstance(v, float):
+        return "decimale"
+    if isinstance(v, str):
+        return "testo"
+    if isinstance(v, (list, tuple, set, frozenset)):
+        return "lista" if all(isinstance(x, scalare) for x in v) else ""
+    if isinstance(v, dict):
+        return "dizionario" if all(isinstance(k, str) for k in v) else ""
+    return ""
+
+
+def _leva_leggibile(v):
+    """Il valore come esce in JSON: gli insiemi diventano liste ordinate."""
+    if isinstance(v, (set, frozenset)):
+        return sorted(v, key=lambda x: (str(type(x)), x))
+    if isinstance(v, tuple):
+        return list(v)
+    return v
+
+
+def _giudice_per_tipo(rif, valore):
+    """(valore, '') se va bene per una leva che oggi vale `rif`, (None,
+    perche') se no. Lo stesso tipo di prima, sempre: una lista resta una
+    lista dello stesso genere, un numero non diventa testo."""
+    tipo = _tipo_leva(rif)
+    if tipo == "si_no":
+        return _giudice_si_no(valore)
+    if tipo in ("intero", "decimale"):
+        try:
+            t = str(valore).strip().replace(" ", "")
+            v = int(t) if tipo == "intero" else float(t.replace(",", "."))
+        except (TypeError, ValueError):
+            return None, ("serve un numero intero" if tipo == "intero"
+                          else "serve un numero")
+        if v != v or abs(v) > 10 ** 12:
+            return None, "numero fuori misura"
+        if rif >= 0 and v < 0:
+            return None, "non può essere negativo"
+        return v, ""
+    if tipo == "testo":
+        if not isinstance(valore, str):
+            return None, "serve un testo"
+        if len(valore) > 500:
+            return None, "al massimo 500 caratteri"
+        return valore.strip(), ""
+    if tipo == "lista":
+        if not isinstance(valore, list) or len(valore) > 500:
+            return None, "serve un elenco (al massimo 500 voci)"
+        generi = {type(x) for x in rif} or {str, int, float}
+        fuori = [x for x in valore
+                 if type(x) not in generi and not (
+                     float in generi and type(x) is int)]
+        if fuori:
+            return None, f"voce di un tipo diverso: {fuori[0]!r}"
+        return type(rif)(valore), ""
+    if tipo == "dizionario":
+        if not isinstance(valore, dict) or len(valore) > 200:
+            return None, "serve un dizionario"
+        for k, x in valore.items():
+            modello = rif.get(k, next(iter(rif.values()), x))
+            if _tipo_leva(x) != _tipo_leva(modello) and not (
+                    isinstance(x, (int, float)) and not isinstance(x, bool)
+                    and _tipo_leva(modello) in ("intero", "decimale")):
+                return None, f"«{k}»: tipo diverso da prima"
+        return dict(valore), ""
+    return None, "questa leva non si cambia da qui"
+
+
+_VALORE_SENZA_PANNELLO = {}   # chiave -> il valore che c'era prima del pannello
+
+
+def _leva_generica(riga: dict):
+    """Il «si cambia da qui» di una riga del censimento, o None."""
+    k = riga.get("chiave", "")
+    if k in LEVE_SCRIVIBILI or not _leva_apribile_di_nome(k):
+        return None
+    lette = _leve_lette_dal_codice()
+    if k not in lette["dal_config"] or k not in globals():
+        return None
+    rif = globals()[k]
+    tipo = _tipo_leva(rif)
+    if not tipo:
+        return None
+    mostrato = riga.get("valore")
+    coerente = (mostrato == _leva_leggibile(rif) or mostrato == rif
+                or (tipo == "lista" and mostrato in (len(rif), _elenco(rif)))
+                or (tipo == "dizionario" and mostrato == len(rif)))
+    if not coerente:
+        return None
+    return {"tipo": tipo, "attuale": _leva_leggibile(rif),
+            "origine": _leva_generica_origine(k),
+            "subito": k not in lette["all_avvio"]}
+
+
+def _leva_generica_origine(k: str) -> str:
+    try:
+        con = db()
+        try:
+            _leve_pannello_tabella(con)
+            r = con.execute("SELECT valore FROM leve_pannello WHERE chiave=?",
+                            (k,)).fetchone()
+        finally:
+            con.close()
+        if r is not None:
+            _leva_da_json(r["valore"])
+            return "pannello"
+    except Exception:
+        pass
+    return "config" if k in _CHIAVI_DEL_CONFIG else "codice"
+
+
+def _leva_metti_viva(k: str, v):
+    """Il cambio vale da adesso: sul globale e sul modulo config."""
+    if k not in _VALORE_SENZA_PANNELLO:
+        if k in _LEVE_POSATE_ALL_AVVIO:
+            # posata all'avvio: sotto c'era il config, o il valore di serie
+            if k in _CONFIG_DEL_FILE:
+                _VALORE_SENZA_PANNELLO[k] = _CONFIG_DEL_FILE[k]
+            elif k in _leve_lette_dal_codice()["di_serie"]:
+                _VALORE_SENZA_PANNELLO[k] = _leve_lette_dal_codice()["di_serie"][k]
+        else:
+            _VALORE_SENZA_PANNELLO[k] = globals().get(k)
+    globals()[k] = v
+    try:
+        import config as _c
+        setattr(_c, k, v)
+    except ImportError:
+        pass
+
+
+def _leve_storia_tabella(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS leve_pannello_storia(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chiave TEXT NOT NULL,
+        prima TEXT NOT NULL,
+        dopo TEXT NOT NULL,
+        prima_dal_pannello INTEGER NOT NULL,
+        come TEXT NOT NULL,
+        chi INTEGER NOT NULL,
+        quando INTEGER NOT NULL)""")
+
+
+def _leva_valore_vivo(chiave: str):
+    if chiave in LEVE_SCRIVIBILI:
+        return leva_scrivibile(chiave)
+    return globals().get(chiave)
+
+
+def _leva_origine_viva(chiave: str) -> str:
+    if chiave in LEVE_SCRIVIBILI:
+        return leva_origine(chiave)
+    return _leva_generica_origine(chiave)
+
+
+def _leva_scrivi(chiave: str, valore=None, al_config=False, chi=0,
+                 come="cambio") -> dict:
+    """IL GESTO UNICO: lo usano la rotta di una leva, «Annulla» della
+    storia e il ripristino di un backup. ValueError col perche' se il
+    valore non passa il giudice; KeyError se la leva non si apre."""
+    if chiave in LEVE_SCRIVIBILI:
+        giudice = LEVE_SCRIVIBILI[chiave]["giudice"]
+    elif _leva_apribile_di_nome(chiave) and chiave in globals() \
+            and chiave in _leve_lette_dal_codice()["dal_config"] \
+            and _tipo_leva(globals()[chiave]):
+        rif = globals()[chiave]
+        giudice = lambda x: _giudice_per_tipo(rif, x)
+    else:
+        raise KeyError(chiave)
+    if _LEVE_PANNELLO_SPENTE and chiave not in LEVE_SCRIVIBILI:
+        raise ValueError("le leve dal pannello sono spente nel config del VPS")
+    prima = _leva_valore_vivo(chiave)
+    prima_dal_pannello = _leva_origine_viva(chiave) == "pannello"
+    v = None
+    if not al_config:
+        v, motivo = giudice(valore)
+        if motivo:
+            raise ValueError(motivo)
+    subito = True
+    con = db()
+    try:
+        _leve_pannello_tabella(con)
+        _leve_storia_tabella(con)
+        if al_config:
+            con.execute("DELETE FROM leve_pannello WHERE chiave=?", (chiave,))
+        else:
+            con.execute(
+                "INSERT INTO leve_pannello(chiave, valore, chi, quando) "
+                "VALUES (?,?,?,?) ON CONFLICT(chiave) DO UPDATE SET "
+                "valore=excluded.valore, chi=excluded.chi, "
+                "quando=excluded.quando",
+                (chiave, str(v) if chiave in LEVE_SCRIVIBILI else _leva_in_json(v),
+                 chi, int(time.time())))
+        con.commit()
+    finally:
+        con.close()
+    if chiave not in LEVE_SCRIVIBILI:
+        subito = chiave not in _leve_lette_dal_codice()["all_avvio"]
+        if al_config:
+            if chiave in _VALORE_SENZA_PANNELLO or chiave not in _LEVE_POSATE_ALL_AVVIO:
+                _leva_metti_viva(chiave, _VALORE_SENZA_PANNELLO.get(chiave, prima))
+            else:
+                subito = False   # sotto c'era un valore che non si sa: dal riavvio
+        else:
+            _leva_metti_viva(chiave, v)
+    dopo = _leva_valore_vivo(chiave)
+    con = db()
+    try:
+        _leve_storia_tabella(con)
+        con.execute(
+            "INSERT INTO leve_pannello_storia(chiave, prima, dopo, "
+            "prima_dal_pannello, come, chi, quando) VALUES (?,?,?,?,?,?,?)",
+            (chiave, _leva_in_json(prima), _leva_in_json(dopo),
+             int(prima_dal_pannello), come, chi, int(time.time())))
+        con.commit()
+    finally:
+        con.close()
+    origine = _leva_origine_viva(chiave)
+    registra_moderazione("leva", "cambiata",
+                         f"{chiave}: {_leva_leggibile(prima)} → "
+                         f"{_leva_leggibile(dopo)} ({origine}"
+                         + (f", {come})" if come != "cambio" else ")"),
+                         deciso_da=chi)
+    return {"ok": True, "valore": _leva_leggibile(dopo), "origine": origine,
+            "subito": subito}
 
 
 @app.post("/api/admin/leve/{chiave}")
 async def leva_admin_cambia(chiave: str, req: Request,
                             x_tg_init_data: str = Header(""),
                             barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: cambia UNA leva scrivibile. {valore} la scrive,
-    {torna_al_config: true} cancella la riga del pannello. Una chiave
-    che non sta in LEVE_SCRIVIBILI e' 404: dal pannello non si apre
-    niente che qualcuno non abbia deciso di aprire."""
+    """SOLO ADMIN: cambia UNA leva. {valore} la scrive, {torna_al_config:
+    true} cancella la riga del pannello. Una leva che non si apre (le
+    «mai», i segreti, chi non ha un tipo che si sa giudicare) e' 404."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
-    if chiave not in LEVE_SCRIVIBILI:
+    if chiave not in LEVE_SCRIVIBILI and not _leva_apribile_di_nome(chiave):
         raise HTTPException(404, "Questa leva si cambia solo dal VPS")
+    if _LEVE_PANNELLO_SPENTE and chiave not in LEVE_SCRIVIBILI:
+        raise HTTPException(409, "Le leve dal pannello sono spente nel config del VPS")
     _frena("leva_pannello", user["id"])
     d = await leggi_json(req)
-    prima = leva_scrivibile(chiave)
+    try:
+        return _leva_scrivi(chiave, d.get("valore"),
+                            al_config=bool(d.get("torna_al_config")),
+                            chi=user["id"])
+    except KeyError:
+        raise HTTPException(404, "Questa leva si cambia solo dal VPS")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/admin/leve-storia")
+def leve_storia_admin(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: gli ultimi cento cambi, il piu' nuovo per primo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        _leve_storia_tabella(con)
+        righe = con.execute("SELECT * FROM leve_pannello_storia "
+                            "ORDER BY id DESC LIMIT 100").fetchall()
+    finally:
+        con.close()
+    fuori = []
+    for r in righe:
+        try:
+            prima, dopo = _leva_da_json(r["prima"]), _leva_da_json(r["dopo"])
+        except ValueError:
+            continue
+        fuori.append({"id": r["id"], "chiave": r["chiave"],
+                      "prima": _leva_leggibile(prima), "dopo": _leva_leggibile(dopo),
+                      "come": r["come"], "chi": r["chi"], "quando": r["quando"],
+                      "prima_dal_pannello": bool(r["prima_dal_pannello"])})
+    return {"storia": fuori}
+
+
+@app.post("/api/admin/leve-storia/{sid}/annulla")
+async def leve_storia_annulla(sid: int, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: rimette una leva com'era PRIMA di quel cambio. Se prima
+    veniva dal config, «annullare» e' tornare al config."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _frena("leva_pannello", user["id"])
+    con = db()
+    try:
+        _leve_storia_tabella(con)
+        r = con.execute("SELECT * FROM leve_pannello_storia WHERE id=?",
+                        (sid,)).fetchone()
+    finally:
+        con.close()
+    if not r:
+        raise HTTPException(404, "Cambio non trovato")
+    try:
+        if r["prima_dal_pannello"]:
+            return _leva_scrivi(r["chiave"], _leva_leggibile(_leva_da_json(r["prima"])),
+                                chi=user["id"], come="annulla")
+        return _leva_scrivi(r["chiave"], al_config=True, chi=user["id"],
+                            come="annulla")
+    except KeyError:
+        raise HTTPException(404, "Questa leva si cambia solo dal VPS")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ============ IL BACKUP DELLE LEVE (27 ott 2026, stesso cantiere) ============
+# Il backup e' la tabella `leve_pannello` com'e' adesso: la fotografia di
+# tutto quel che il pannello ha deciso sopra il config. Esce in due modi
+# — come testo da copiare, e come file mandato dal bot nella chat di chi
+# lo chiede, che e' il posto dove dal telefono un file resta —, e
+# rientra col ripristino: prima un'anteprima di ogni cambio, poi la
+# conferma. Rimettere un backup vuol dire rendere il pannello UGUALE a
+# lui: le leve che il pannello ha cambiato dopo e che il backup non
+# conosce tornano al config. La tabella sta anche dentro il backup
+# cifrato del database, di ogni notte e di prima di ogni deploy.
+def _leve_backup() -> dict:
     con = db()
     try:
         _leve_pannello_tabella(con)
-        if d.get("torna_al_config"):
-            con.execute("DELETE FROM leve_pannello WHERE chiave=?", (chiave,))
-        else:
-            v, motivo = LEVE_SCRIVIBILI[chiave]["giudice"](d.get("valore"))
-            if motivo:
-                raise HTTPException(400, motivo)
-            con.execute(
-                "INSERT INTO leve_pannello(chiave, valore, chi, quando) "
-                "VALUES (?,?,?,?) ON CONFLICT(chiave) DO UPDATE SET "
-                "valore=excluded.valore, chi=excluded.chi, "
-                "quando=excluded.quando",
-                (chiave, str(v), user["id"], int(time.time())))
-        con.commit()
+        righe = con.execute("SELECT chiave, valore FROM leve_pannello "
+                            "ORDER BY chiave").fetchall()
     finally:
         con.close()
-    dopo = leva_scrivibile(chiave)
-    registra_moderazione("leva", "cambiata",
-                         f"{chiave}: {prima} → {dopo} ({leva_origine(chiave)})",
-                         deciso_da=user["id"])
-    return {"ok": True, "valore": dopo, "origine": leva_origine(chiave)}
+    leve = {}
+    for r in righe:
+        if r["chiave"] in LEVE_SCRIVIBILI:
+            leve[r["chiave"]] = _leva_leggibile(leva_scrivibile(r["chiave"]))
+        else:
+            try:
+                leve[r["chiave"]] = _leva_leggibile(_leva_da_json(r["valore"]))
+            except ValueError:
+                continue
+    return {"barattolo_leve": 1, "sito": URL_PUBBLICO,
+            "creato": int(time.time()), "leve": leve}
+
+
+@app.get("/api/admin/leve-backup")
+def leve_backup_admin(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    return _leve_backup()
+
+
+@app.post("/api/admin/leve-backup/telegram")
+async def leve_backup_telegram(x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: il backup come file, dal bot, nella chat di chi lo chiede."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _frena("leva_pannello", user["id"])
+    b = _leve_backup()
+    # in collaudo il bot non e' il bot vero: niente Telegram (il patto
+    # degli altri indirizzi, vedi prove «in collaudo si ferma prima»)
+    if MODALITA_COLLAUDO:
+        return {"ok": False, "collaudo": True, "leve": len(b["leve"])}
+    nome = time.strftime("leve-barattolo-%Y-%m-%d-%H%M.json", time.localtime(b["creato"]))
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
+                             data={"chat_id": str(user["id"]),
+                                   "caption": f"⚙️ Backup delle leve: {len(b['leve'])} "
+                                              "decise dal pannello. Per rimetterlo: "
+                                              "pagina delle leve → 💾 Backup → Ripristina."},
+                             files={"document": (nome, json.dumps(
+                                 b, ensure_ascii=False, indent=1).encode("utf-8"),
+                                 "application/json")})
+        ok = r.status_code == 200 and r.json().get("ok")
+    except Exception:
+        ok = False
+    if not ok:
+        raise HTTPException(502, "Telegram non ha preso il file: usa «Copia il testo»")
+    return {"ok": True, "leve": len(b["leve"])}
+
+
+@app.post("/api/admin/leve-ripristina")
+async def leve_ripristina_admin(req: Request, x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: {backup, applica}. Senza `applica` dice e basta cosa
+    cambierebbe; con `applica` lo fa. Una leva del backup che oggi non
+    si apre, o che il giudice non accetta, si salta e si dice."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    b = d.get("backup")
+    if not isinstance(b, dict) or b.get("barattolo_leve") != 1 \
+            or not isinstance(b.get("leve"), dict):
+        raise HTTPException(400, "Non è un backup delle leve di Barattolo")
+    adesso = _leve_backup()["leve"]
+    cambi, saltate = [], []
+    for k, v in b["leve"].items():
+        if k in LEVE_SCRIVIBILI:
+            motivo = LEVE_SCRIVIBILI[k]["giudice"](v)[1]
+        elif (_leva_apribile_di_nome(k) and k in globals()
+              and k in _leve_lette_dal_codice()["dal_config"]
+              and _tipo_leva(globals()[k])):
+            motivo = _giudice_per_tipo(globals()[k], v)[1]
+        else:
+            motivo = "si cambia solo dal VPS"
+        if motivo:
+            saltate.append({"chiave": k, "motivo": motivo})
+        elif adesso.get(k, None) != v or k not in adesso:
+            cambi.append({"chiave": k, "adesso": _leva_leggibile(_leva_valore_vivo(k)),
+                          "dopo": v, "al_config": False})
+    for k in adesso:
+        if k not in b["leve"]:
+            cambi.append({"chiave": k, "adesso": adesso[k], "dopo": None,
+                          "al_config": True})
+    if d.get("applica"):
+        _frena("leva_pannello", user["id"])
+        for c in cambi:
+            try:
+                _leva_scrivi(c["chiave"], c["dopo"], al_config=c["al_config"],
+                             chi=user["id"], come="ripristino")
+            except (KeyError, ValueError) as e:
+                saltate.append({"chiave": c["chiave"], "motivo": str(e)})
+    return {"cambi": cambi, "saltate": saltate, "applicato": bool(d.get("applica"))}
 
 
 @app.post("/api/admin/utenti/{tg_id}/messaggio")

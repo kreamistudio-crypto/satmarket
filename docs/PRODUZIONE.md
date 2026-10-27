@@ -276,6 +276,21 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   spenta resta il multi-account del web d'agosto, coi due guasti curati
   (la pastiglia nel Profilo e lo switch verso gli account nati con
   Nostr). Coi perché: Architettura, «PIÙ ACCOUNT OVUNQUE».
+- LE LEVE DALLA PAGINA (27 ott 2026, cantiere leve-tutte): 182 leve su
+  256 si cambiano dal pannello admin («⚙️ Apri la pagina delle leve»),
+  e il valore scritto da lì VINCE sul `config.py` del VPS, anche dopo
+  un riavvio e un deploy: chi legge il config per capire con che leve
+  gira il server guarda anche la pagina (le piastrelle «✏️ Cambiate da
+  qui»), o in sola lettura `sqlite3 /srv/barattolo/satmarket.db "SELECT
+  chiave, valore FROM leve_pannello"`. Le 58 «mai» (segreti, indirizzi,
+  serrature) restano SOLO nel config. IL FRENO A MANO, se un valore
+  della pagina impedisse al server di partire: una riga
+  `LEVE_PANNELLO_SPENTE = True` nel `config.py`, poi `sudo systemctl
+  restart barattolo` — il server parte col solo config e la pagina dice
+  che è spenta; si toglie la riga quando il valore storto è sistemato
+  (dalla pagina, con «Torna al config»). Il backup delle leve è nella
+  pagina (💾, file dal bot o testo) e dentro il backup cifrato del
+  database. Coi perché: Cantieri, «Tutte le leve dalla pagina».
 - ENTRA DAL BOT (19 ott 2026, cantiere account-doppio-bot): la leva
   `LOGIN_DAL_BOT` nasce SPENTA nel codice e si AGGIUNGE al config del VPS
   quando Andrea la vuole provare. Prima si guarda, in sola lettura, la
