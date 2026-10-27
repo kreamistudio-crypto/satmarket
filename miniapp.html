@@ -54703,6 +54703,32 @@ async function onchainLeggiOrdini(){
   return onchainOrdini;
 }
 
+/* L'ON-CHAIN ACCESO DA SOLO (27 ott 2026, Andrea: «con un profilo non
+   admin dice "il venditore non ha acceso l'on-chain", ma invece deve
+   essere sempre acceso»). Il seme nasce nel telefono di ognuno (regola
+   ferrea 2: il server non lo vede mai), quindi il server non puo'
+   accenderlo al posto di nessuno: lo fa l'app, alla prima apertura in
+   cui l'on-chain e' ammesso. Se il server ha gia' la mia chiave
+   pubblica non si fa niente (nemmeno si carica la libreria); se non ce
+   l'ha, il seme si ritrova o nasce coi suoi backup (`onchainSemeAssicurato`,
+   la stessa strada di chi compra) e la sua meta' pubblica parte. In
+   sottofondo si tace: il bottone «Accendi» del foglio resta, e lo ridice. */
+async function onchainAccendiDaSolo(){
+  if (!myOnchain || DEMO || VETRINA) return;
+  try {
+    const r = await fetch(`${API_BASE}/onchain/prova`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) return;
+    const srv = await r.json();
+    if (srv.mia_xpub) return;
+    const parole = await onchainSemeAssicurato();
+    const xpub = await onchainMiaXpub(parole, srv);
+    const q = await fetch(`${API_BASE}/onchain/xpub`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({xpub})});
+    if (q.ok) onchainSrv = null;
+  } catch(e) { /* in sottofondo si tace */ }
+}
+
 async function onchainCofirmeInSottofondo(){
   if (!myOnchain || DEMO || VETRINA) return;
   try {
@@ -87524,6 +87550,8 @@ async function avvia(){
     myOnchain = !!me.onchain;
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */
     if (myOnchain) setTimeout(onchainCofirmeInSottofondo, 3000);
+    /* ...e l'on-chain si accende da solo (27 ott 2026) */
+    if (myOnchain) setTimeout(onchainAccendiDaSolo, 4000);
     allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;

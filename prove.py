@@ -152558,6 +152558,19 @@ def prove_ordine_onchain():
     prova("in sottofondo si co-firma col seme che c'e', senza farne uno "
           "nuovo", [True, False],
           ["onchainSemeLocale()" in sotto, "onchainSemeAssicurato" in sotto])
+    # L'ON-CHAIN ACCESO DA SOLO (27 ott 2026, «deve essere sempre acceso»):
+    # all'apertura, a chi e' ammesso, e senza toccare niente se il server
+    # ha gia' la chiave pubblica — mai un seme nuovo sopra uno che c'e'
+    solo = pezzo_js(mini, "async function onchainAccendiDaSolo(){", "\n}\n")
+    prova("l'on-chain si accende da solo all'apertura, a chi e' ammesso", True,
+          "if (myOnchain) setTimeout(onchainAccendiDaSolo, 4000);" in mini
+          and solo.index("if (!myOnchain || DEMO || VETRINA) return;")
+          < solo.index("/onchain/prova"))
+    prova("...e se il server ha gia' la mia chiave non fa niente; se no il "
+          "seme passa dalla strada coi backup", True,
+          solo.index("if (srv.mia_xpub) return;")
+          < solo.index("onchainSemeAssicurato()")
+          < solo.index("/onchain/xpub"))
 
     # --- 2) la prova doppia: il telefono firma, embit legge -------------
     node = _sh.which("node")
