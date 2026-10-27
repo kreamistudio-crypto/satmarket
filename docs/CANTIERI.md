@@ -73611,3 +73611,38 @@ bitcoin dal link `bitcoin:` dentro Telegram, la richiesta incollata
 dalla WebView, il rimborso dallo script su una rete vera (qui solo il
 cartone, che giudica locktime e cima come bitcoind). La T5 (i documenti
 del cantiere intero) è la prossima tappa.
+
+## Il cambio libero, tappa 5: i documenti, e il cantiere si chiude con due leve spente (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea)
+
+**COSA C'È.** Le tre tappe di codice sono su develop (T1 23462f4, T2
+9a473b2, T3 2af2b2b); questa mette a posto i documenti e chiude il
+cantiere. PRODUZIONE, «IL CAMBIO LIBERO: LE LEVE»: le cinque leve
+spente di serie, che NON compaiono da sole nel config del VPS; l'ordine
+di accensione (prima `SWAP_ATTIVO`, poi `CAMBIO_LIBERO_ATTIVO`, solo
+moderatori, a tutti solo dopo il parere MiCA); `CAMBIO_BTC_LN_ATTIVO`
+che NON SI ACCENDE FINCHÉ MASSIMO NON RISPONDE; come si spegne.
+COLLAUDO.md §6: il cambio sulla VM solo col cartone della 9077 (unità
+transitoria: si rilancia a ogni riavvio), le due leve in fondo al
+config, cosa guardare sul telefono vero. DA-FARE-ANDREA, voce 3: i
+comandi pronti per la VM (sola lettura prima, copia di riserva, le due
+righe, riavvio, salute), con l'avviso sulle copie vecchie del config
+che non hanno le righe dello swap. ARCHITETTURA ha già i suoi due
+paragrafi (tappa 2 e tappa 3), CANTIERI le tre voci sopra.
+
+**LE DECISIONI DEL CANTIERE, IN UNA RIGA CIASCUNA** (per chi arriva
+dopo): il tasto DENTRO la pagina, che si chiama «Cambio» (en
+«Exchange») e il tasto «🔁 Cambia»; il cambio libero non passa dalla
+cassaforte (wallet dell'utente, 12 parole nel suo browser, mai sul
+server: regola 2); il compratore che paga in bitcoin NON è qui (resta
+nel 2-di-3 di Alan, risposta sua del 27 ott); tetti 500.000 sats per
+cambio e 5 al giorno, all'inizio solo moderatori; nessuna fee di
+Barattolo (`SWAP_FEE_PERCENTO` 0, si guadagna con la quota partner);
+sul collaudo solo il cartone, mai SATS Routing vero.
+
+**COSA RESTA** (fuori dal cantiere, segnato): la risposta di Massimo
+(quota partner sul submarine, limiti di chiamate: la chiede Andrea) e
+solo dopo `CAMBIO_BTC_LN_ATTIVO`; il parere MiCA prima di aprire il
+cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
+parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
+Lightning (stessa strada rovesciata, un ordine vero al posto
+dell'ordine 0).

@@ -232,6 +232,23 @@ aggiunge, si toglie la vecchia da GitHub.
      LNbits, `wsl --unregister` della distro, e la cartella dell'export.
   RESTA DA FARE SULLA VM, se si vuole: niente di obbligato per la tappa 4;
   la VM resta per il collaudo del resto, col SATS Routing di cartone.
+- **Il cambio libero** (27 ott 2026, cantiere cambio-libero, regola di
+  Andrea: sul collaudo SOLO col cartone, mai SATS Routing vero). Il
+  cartone sulla 9077 (dal 27 ott 08:07 UTC un'unità transitoria
+  `cartone-swap` di systemd-run: NON sopravvive al riavvio della VM, si
+  rilancia) sa anche il submarine. Nel config in fondo, oltre a
+  `SWAP_ATTIVO = True` e `SWAP_API_BASE = "http://127.0.0.1:9077"`:
+  `CAMBIO_LIBERO_ATTIVO = True` (il tasto «🔁 Cambia» nella pagina
+  «Cambio», solo moderatori) e, SOLO QUI, `CAMBIO_BTC_LN_ATTIVO = True`
+  per vedere la strada rovesciata contro il cartone (in produzione
+  resta spenta finché Massimo non risponde). Da guardare sul telefono
+  vero: il QR della fattura e «Apri nel wallet» dentro Telegram (strada
+  Lightning → bitcoin), «Incolla» della richiesta e il link `bitcoin:`
+  dentro Telegram (strada rovesciata). Col cartone nessun sat si muove:
+  la fattura del cartone non è pagabile da un wallet vero, e i bitcoin
+  «mandati» si simulano con `/cartone/stato?id=&s=transaction.mempool`
+  (la lista delle mosse in `cartone_satsrouting.py`, in cima). La
+  procedura coi comandi: DA-FARE-ANDREA, voce 3.
 
 ## 7. Accendere da zero (i gesti, uno alla volta col sì di Andrea)
 

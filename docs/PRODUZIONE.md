@@ -4627,6 +4627,44 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   riga «Swap: la nostra fee (%)». Controllo, sola riga: `grep -n
   "^SWAP_FEE_PERCENTO" /srv/barattolo/config.py` (atteso: niente, o `= 0`).
 
+- IL CAMBIO LIBERO: LE LEVE (27 ott 2026, cantiere cambio-libero;
+  perché in CANTIERI, «Il cambio libero, tappa 1/2/3»; com'è fatto in
+  ARCHITETTURA, «IL CAMBIO LIBERO, TAPPA 2» e «TAPPA 3»). SUL VPS NON
+  CAMBIA NIENTE finché Andrea non decide: le cinque leve sono SPENTE di
+  serie e NON compaiono da sole nel config (`CAMBIO_LIBERO_ATTIVO`
+  False, `CAMBIO_LIBERO_SOLO_MODERATORI` True, `CAMBIO_LIBERO_MAX_SATS`
+  500.000, `CAMBIO_LIBERO_MAX_AL_GIORNO` 5, `CAMBIO_BTC_LN_ATTIVO`
+  False); a `CAMBIO_LIBERO_ATTIVO` spenta la pagina «Cambio» non ha il
+  tasto, e le rotte `/api/swap/cambio/*` rispondono 403. Il cancello sta
+  SOPRA quello dello swap: senza `SWAP_ATTIVO` (oggi spenta in
+  produzione) il cambio non c'è comunque, e a `SWAP_SOLO_MODERATORI =
+  True` lo vedono solo i moderatori anche con
+  `CAMBIO_LIBERO_SOLO_MODERATORI = False`. La tabella `cambi_liberi`
+  nasce da sola alla prima chiamata. I file del telefono sono quelli
+  dello swap (`/swap/boltz.js`, `/swap/instradatore.js`, versione
+  `SWAP_TELEFONO_VER`): niente da copiare a mano.
+  PER ACCENDERE (decisione di Andrea, in quest'ordine): prima
+  `SWAP_ATTIVO = True` con le sue regole (sopra, «LO SWAP DAL
+  TELEFONO: LE LEVE»), poi `CAMBIO_LIBERO_ATTIVO = True` nel config del
+  VPS e riavvio; all'inizio si lascia `CAMBIO_LIBERO_SOLO_MODERATORI`
+  a True (Andrea e Alan, cifre piccole), e si apre a tutti SOLO dopo
+  il parere MiCA. Il controllo, sola riga: `grep -n "^CAMBIO_"
+  /srv/barattolo/config.py` (atteso oggi: niente). Lo stato VIVO sta
+  nel pannello «⚙️ Stato delle leve», gruppo dello swap, righe «Cambio
+  libero: …».
+  ⚠️ `CAMBIO_BTC_LN_ATTIVO` (la strada bitcoin → Lightning) NON SI
+  ACCENDE FINCHÉ MASSIMO NON RISPONDE sulla quota partner del
+  submarine e sui limiti di chiamate (la domanda la fa Andrea, 27 ott
+  2026): il pannello lo dice sulla sua riga. Prima dell'accensione,
+  sul collaudo: il submarine di SATS Routing vero non è mai stato
+  chiamato (solo il cartone), un wallet vero che manda dal link
+  `bitcoin:` dentro Telegram, la richiesta incollata dalla WebView, il
+  rimborso dallo script su una rete vera (COLLAUDO.md §6).
+  PER SPEGNERE: `CAMBIO_LIBERO_ATTIVO = False` (o via la riga) e
+  riavvio; i cambi già nati finiscono lo stesso dal telefono (nascita e
+  annullo del biglietto non hanno cancello, il ritiro e il rimborso
+  sono del telefono con le 12 parole).
+
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo
   dell'ordine on-chain»; com'è fatto in ARCHITETTURA, «IL PAGAMENTO
