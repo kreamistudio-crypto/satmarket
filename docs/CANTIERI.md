@@ -73243,3 +73243,36 @@ l'on-chain.
 **PROVATO.** `collaudo_onchain_incasso` (37/0): chi non è admin non
 vede l'on-chain, una parola storta è 400, l'admin la spegne, chi non è
 admin lo vede, «Torna al config» lo richiude.
+
+## «Stato delle leve» diventa una pagina vera (27 ott 2026, cantiere pagina-leve, Andrea: «non si capisce niente, stato delle leve deve essere una pagina con cui posso davvero interagire con più facilità»)
+
+**COSA.** Il cassetto «⚙️ Stato delle leve» del pannello admin non
+mostra più 255 righe fitte: ha la conta, gli allarmi e il bottone «⚙️
+Apri la pagina delle leve». La pagina (`leveSheet`, un foglio a pieno
+schermo come il dettaglio P2P, quindi l'indietro di Telegram la chiude
+da solo) ha in cima le leve che si cambiano da qui come SCHEDE grandi:
+l'interruttore vero per le sì/no, la casella e «Cambia» per i numeri, da
+dove arriva il valore («Valore di serie», «Dal config del VPS», «Deciso
+da questa pagina») e «Torna al config». Sotto, la ricerca su nome,
+chiave e nota, tre filtri (✏️ Da qui, ⚠️ Da guardare, Tutte) e i gruppi
+in sola lettura, chiusi, col lucchetto che dice dove si cambiano.
+
+**L'EFFETTO IN PAROLE.** «Solo gli admin: Acceso» costringeva a
+tradurre. `EFFETTO_LEVA` dice per ogni verso cosa succede («Solo gli
+admin possono pagare on-chain.» / «Tutti possono pagare on-chain.»), e
+il foglio di conferma dice «Adesso: … Dopo: … Vale subito, per tutti.»
+A `ONCHAIN_ATTIVO` spento la frase lo dice invece di promettere un
+«tutti» falso. Una leva scrivibile nuova senza la sua frase mostra il
+valore e basta. `AIUTO_LEVA` dice prima quel che il giudice accetta
+(la quota: 0, oppure da 546 a 5.000).
+
+**NON ANCORA.** Le stesse leve nel cruscotto `/admin` (admin.html,
+quello che si apre anche dal browser del PC): sarebbe una seconda copia
+del disegno da tenere in pari, e Andrea il pannello lo apre dalla Mini
+App. Si fa se lo chiede. Il server non cambia: stessa rotta, stesso
+giudice, stessa riga nel registro.
+
+**PROVATO.** Chromium a 390 px coi dati veri di `/api/admin/leve` del
+server di collaudo: le schede, l'interruttore che apre la conferma
+«Spegni», il filtro «Tutte», la ricerca «quota». Suite severa e
+collaudi on-chain: nel messaggio del commit.

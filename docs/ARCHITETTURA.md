@@ -17329,7 +17329,12 @@
   LO STATO DELLE LEVE (ago 2026, nato da «è già successo di ricordare
   male»): `GET /api/admin/leve` (solo moderatori) + cassetto
   «⚙️ Stato delle leve» in fondo al pannello — 69 leve in 12 gruppi
-  col valore con cui il processo sta girando ADESSO. Si leggono i
+  col valore con cui il processo sta girando ADESSO. Dal 27 ott 2026
+  il cassetto ha solo il bottone e gli allarmi: le leve stanno nella
+  PAGINA A PIENO SCHERMO `leveSheet` (`renderPaginaLeve`), con le
+  scrivibili in cima come schede (interruttore vero per le sì/no, la
+  frase dell'effetto in `EFFETTO_LEVA`, conferma «Adesso/Dopo»), poi
+  ricerca, filtri e i gruppi in sola lettura chiusi. Si leggono i
   GLOBALI del modulo, cioè il valore già risolto fra la riga del
   config e il default del codice: un elenco dei default sarebbe una
   seconda bugia da leggere, ed è la trappola di MAX_PREFERITI.

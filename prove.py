@@ -44258,8 +44258,11 @@ def prove_fogli_di_casa():
     # firme (`domandaAnnunciSulProfilo`, decisione di Andrea).
     # NOVANTUNO (23 ott 2026, onchain-tappa3): «Annullare l'ordine
     # on-chain?» prima di pagarlo (`onchainAnnullaOrdine`).
-    prova("i gesti che passano dalla domanda unica sono novantuno",
-          91, solo_codice(mini).count("chiediConferma({"))
+    # NOVANTADUE (27 ott 2026, pagina-leve): cambiare una leva dalla
+    # pagina delle leve (`levaChiedi`) dice «Adesso… Dopo…» prima di
+    # scrivere.
+    prova("i gesti che passano dalla domanda unica sono novantadue",
+          92, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
