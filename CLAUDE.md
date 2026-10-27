@@ -20,18 +20,18 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
   audit, timer, sonda, dev fee, coi perché.
 - Gli audit `docs/AUDIT-PAGAMENTI-2026-09-19.md` e
   `docs/AUDIT-2-CLIENT-MOSTRO-2026-09-23.md`; gli studi
-  `docs/STUDIO-BOLT-CARD-2026-09-24.md`,
-  `docs/STUDIO-RISTORANTI-2026-09-24.md`,
+  `docs/STUDIO-BOLT-CARD-2026-09-24.md`, `docs/STUDIO-RISTORANTI-2026-09-24.md`,
   `docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md`,
   `docs/STUDIO-MOSTRO-0190-2026-09-30.md` (la salita alla 0.19.0),
-  `docs/STUDIO-HACKATHON-RGB-2026-10.md` (Torino, 17-18 ott 2026; il
-  setup fatto e la scaletta: `docs/HACKATHON-SETUP.md`),
+  `docs/STUDIO-HACKATHON-RGB-2026-10.md` (Torino; `docs/HACKATHON-SETUP.md`),
   `docs/STUDIO-LIQUIDITA-NODO-2026-10-01.md` (sweep e canale da 5M),
   `docs/STUDIO-INSTRADAMENTO-NODO-2026-10-05.md` (chi paghiamo, tariffe),
   `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md` (dal 19 ott),
   `docs/STUDIO-MERCATINI-BAZAR-2026-10-06.md` (lo stato 🎪, gli eventi),
-  `docs/STUDIO-REGALO-2026-10-06.md` (il regalo a un iscritto, decisioni) e
-  `docs/STUDIO-ISTANZA-PROVA-2026-10-08.md` (la prova privata, il gesto).
+  `docs/STUDIO-REGALO-2026-10-06.md` (il regalo a un iscritto, decisioni),
+  `docs/STUDIO-ISTANZA-PROVA-2026-10-08.md` (la prova privata, il gesto),
+  `docs/STUDIO-ONCHAIN-P2P-2026-10-27.md` (il 2-di-3 nel P2P) e
+  `docs/STUDIO-LEVE-DAL-PANNELLO-2026-10-27.md` (le leve dal pannello).
 - `docs/GUIDA-P2P-PASSI.md` — i percorsi del P2P passo per passo coi
   testi esatti di bottoni e avvisi, per i tutorial video (7 ott 2026).
 
