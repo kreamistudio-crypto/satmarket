@@ -78768,6 +78768,11 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                     # 2026: la pagina On-chain non ha piu' gli ordini).
                     # Solo le chiavi PUBBLICHE dell'ordine, mai le xpub
                     "indirizzo": _onchain_indirizzo_pubblico(con, oc),
+                    # l'incasso scelto dopo (27 ott 2026): '' = chi vende
+                    # deve ancora dire dove, e chi compra puo' aver gia'
+                    # confermato
+                    "incasso_scelto": bool(oc["incasso"]),
+                    "rilascio_chiesto": bool(oc["rilascio_chiesto_il"]),
                 } if oc else None)
         finally:
             con.close()
@@ -89821,9 +89826,20 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
             "firma=excluded.firma, aggiornato=excluded.aggiornato",
             (user["id"], tipo, valore, firma, adesso, adesso))
         con.commit()
+        # le vendite gia' fatte senza destinazione la prendono adesso
+        # (27 ott 2026): l'ordine e' nato col 2-di-3, l'uscita si sceglie qui
+        _onchain_prepara_ordini(con)
+        riempiti = _onchain_riempi_incassi(con, user["id"])
+        con.commit()
     finally:
         con.close()
-    return {"ok": True}
+    for o in riempiti:
+        if o["rilascio_chiesto_il"]:
+            await notifica(o["compratore_id"],
+                f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha "
+                "scelto dove ricevere. Apri la Mini App: il tuo telefono firma "
+                "il rilascio che avevi confermato, e i sats partono.")
+    return {"ok": True, "ordini_aggiornati": len(riempiti)}
 
 
 @app.post("/api/onchain/incasso/controlla")
@@ -90179,8 +90195,39 @@ def _onchain_incasso_mio(tg_id: int) -> str:
 
 
 ONCHAIN_MSG_SENZA_DESTINAZIONE = (
-    "Chi vende non ha ancora scelto dove ricevere on-chain: per questo "
-    "oggetto paga con ⚡ Lightning")
+    "Chi vende non ha ancora scelto dove ricevere on-chain: i sats restano "
+    "al sicuro nel 2-di-3, ed escono appena lo fa")
+
+
+def _onchain_riempi_incassi(con, venditore_id: int) -> list:
+    """L'INCASSO SCELTO DOPO (27 ott 2026): gli ordini on-chain di chi vende
+    nati senza destinazione (incasso vuoto), ancora in attesa o pagati e
+    senza proposta, prendono quella viva di adesso — con la sua firma,
+    che il telefono di chi vende rilegge prima della seconda firma. Torna
+    le righe riempite (per gli avvisi). Senza destinazione viva: niente."""
+    r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                    (int(venditore_id),)).fetchone()
+    dest = _onchain_destinazione_viva(con, venditore_id, r["xpub"]) if r else None
+    if not dest:
+        return []
+    righe = con.execute(
+        "SELECT * FROM onchain_ordini WHERE venditore_id=? AND incasso='' "
+        "AND stato IN ('attesa','pagato') AND proposta_psbt='' ORDER BY id",
+        (int(venditore_id),)).fetchall()
+    fatti = []
+    for o in righe:
+        indice = (_onchain_prossimo_esterno(con, venditore_id, dest["valore"])
+                  if dest["tipo"] == "xpub" else 0)
+        cur = con.execute(
+            "UPDATE onchain_ordini SET incasso=?, incasso_tipo=?,"
+            " incasso_valore=?, incasso_firma=?, incasso_indice=?,"
+            " aggiornato=? WHERE id=? AND incasso='' AND proposta_psbt=''",
+            (onchain_indirizzo_esterno(dest["tipo"], dest["valore"], indice),
+             dest["tipo"], dest["valore"], dest["firma"], indice,
+             int(time.time()), o["id"]))
+        if cur.rowcount:
+            fatti.append(o)
+    return fatti
 
 
 def onchain_quota_sats() -> int:
@@ -90245,7 +90292,11 @@ def _onchain_prepara_ordini(con):
                       # proposta e' di Barattolo: `proposta_da` resta 0
                       ("decisione_da", "INTEGER DEFAULT 0"),
                       ("decisione_il", "INTEGER DEFAULT 0"),
-                      ("decisione_perche", "TEXT DEFAULT ''")):
+                      ("decisione_perche", "TEXT DEFAULT ''"),
+                      # 27 ott 2026 sera: chi compra ha confermato quando
+                      # chi vende non aveva ancora scelto dove ricevere;
+                      # il suo telefono firma appena l'incasso c'e'
+                      ("rilascio_chiesto_il", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -90383,13 +90434,6 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
                 or richiesti > r["quantita"] - _riservati(con, a["id"])):
             raise HTTPException(409, "Qualcun altro ti ha preceduto su "
                                      "questo annuncio: riprova tra poco")
-        # SENZA UNA DESTINAZIONE SUA, NO (27 ott 2026): PRIMA di coniare
-        # l'indirizzo, che consuma tre numeri e scrive una riga. Chi non
-        # ha nemmeno acceso l'on-chain lo dice `onchain_nuovo_indirizzo`
-        xv = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
-                         (int(venditore),)).fetchone()
-        if xv and not _onchain_destinazione_viva(con, venditore, xv["xpub"]):
-            raise HTTPException(400, ONCHAIN_MSG_SENZA_DESTINAZIONE)
         try:
             ind_id = onchain_nuovo_indirizzo(con, user["id"], venditore,
                                              adesso)
@@ -90399,20 +90443,25 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
                           (ind_id,)).fetchone()
         # DOVE RICEVE CHI VENDE: SOLO il wallet suo, scelto e firmato dal
         # suo seme (27 ott 2026, Andrea: «il venditore non deve mai
-        # ricevere i fondi nel wallet autogenerato da barattolo, finché
-        # non inserisce un indirizzo o xpub non riceve nessun fondo»).
-        # Il conto `/1/n` di serie non e' piu' una strada: senza una
-        # destinazione viva l'on-chain per i suoi annunci non c'e', e
-        # `/api/onchain/pronto` l'ha gia' detto alla cassa, e il no vero
-        # e' scattato prima dell'indirizzo; questo e' la cintura.
+        # ricevere i fondi nel wallet autogenerato da barattolo»). MA SI
+        # PAGA LO STESSO (stessa sera, Andrea: «un utente paga, perché
+        # chi riceve deve prima aver settato il wallet? quello è solo
+        # l'output finale, può definirlo in un secondo momento»): il
+        # 2-di-3 nasce con le tre chiavi di sempre, e l'incasso resta
+        # VUOTO finche' chi vende non sceglie. Vuoto vuol dire che verso
+        # di lui non esce niente — nessuna proposta, nessuna firma di
+        # Barattolo — e alla scelta `_onchain_riempi_incassi` lo scrive.
+        # Il conto `/1/n` di serie non e' piu' una strada.
         dest = _onchain_destinazione_viva(con, venditore,
                                           ind["xpub_venditore"])
-        if not dest:
-            raise HTTPException(400, ONCHAIN_MSG_SENZA_DESTINAZIONE)
-        d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
-        d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
-                    if d_tipo == "xpub" else 0)
-        incasso = onchain_indirizzo_esterno(d_tipo, d_valore, d_indice)
+        if dest:
+            d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
+            d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
+                        if d_tipo == "xpub" else 0)
+            incasso = onchain_indirizzo_esterno(d_tipo, d_valore, d_indice)
+        else:
+            d_tipo = d_valore = d_firma = incasso = ""
+            d_indice = 0
         # la quota va a Barattolo su `/1/n` della SUA xpub, col numero di
         # Barattolo di questo ordine: una fila che non si ripete mai
         quota_dove = (onchain_incasso(ind["xpub_barattolo"],
@@ -90485,6 +90534,8 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "proposta": proposta, "txid_uscita": o["txid_uscita"],
         # l'ordine di sempre, dalla strada A (0 = un ordine di prima)
         "ordine_id": int(o["ordine_id"] or 0),
+        # chi compra ha confermato, e aspetta la scelta di chi vende
+        "rilascio_chiesto_il": int(o["rilascio_chiesto_il"] or 0),
         "scade": o["scade"], "creato": o["creato"],
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
@@ -90549,6 +90600,15 @@ async def onchain_controlla(oid: int) -> str:
         # qualcosa la' dentro si rompe, la ronda la riprende
         # (`_onchain_riprendi_incassi`).
         await _incassa_ordine(nuovo_ordine)
+        # venduto senza aver detto dove ricevere (27 ott 2026): i sats
+        # sono al sicuro nel 2-di-3, e chi vende lo sa subito
+        if not o["incasso"]:
+            await notifica(o["venditore_id"],
+                f"⛓️ <b>Hai venduto on-chain:</b> {html.escape(o['titolo'][:40])}. "
+                "I sats sono al sicuro nel 2-di-3. Scegli dove riceverli "
+                "(Profilo → «Incassi on-chain»: un tuo indirizzo o la chiave "
+                "del conto del tuo wallet): senza, al momento del rilascio non "
+                "possono uscire.")
     return stato
 
 
@@ -90677,6 +90737,9 @@ def _onchain_psbt_barattolo(con, oc, verso: str) -> str:
                    math.ceil((11 + 105 * len(monete) + 31 * uscite) * tariffa))
 
     if verso == "venditore":
+        if not oc["incasso"]:
+            raise ValueError("chi vende non ha ancora scelto dove ricevere: "
+                             "decidi di nuovo quando l'ha fatto")
         quota = int(oc["quota_sats"] or 0)
         uscite = [(oc["incasso"], int(oc["prezzo_sats"]))]
         if quota:
@@ -90820,13 +90883,9 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
         return {"pronto": False, "motivo": "questo venditore non riceve on-chain"}
     con = _onchain_db()
     try:
-        x = {r["tg_id"]: r["xpub"] for r in con.execute(
-            "SELECT tg_id, xpub FROM onchain_xpub WHERE tg_id IN (?,?)",
+        x = {r["tg_id"] for r in con.execute(
+            "SELECT tg_id FROM onchain_xpub WHERE tg_id IN (?,?)",
             (user["id"], int(venditore_id)))}
-        dest = None
-        if int(venditore_id) in x:
-            dest = _onchain_destinazione_viva(con, int(venditore_id),
-                                              x[int(venditore_id)])
     finally:
         con.close()
     if int(venditore_id) not in x:
@@ -90836,12 +90895,8 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
                 "motivo": "il venditore non ha ancora aperto Barattolo da "
                           "quando l'on-chain c'e': si accende da solo appena "
                           "lo apre"}
-    # e riceve SOLO su un wallet suo (27 ott 2026): senza, niente
-    # on-chain per i suoi annunci, e la cassa lo dice prima
-    if not dest:
-        return {"pronto": False,
-                "motivo": "il venditore non ha ancora scelto dove ricevere "
-                          "on-chain"}
+    # (chi vende senza un wallet suo si paga lo stesso, 27 ott 2026: la
+    # scelta serve solo all'uscita, e la fa dopo)
     # e il tetto della beta, se la cassa dice la cifra (`sats`, il totale
     # che col Lightning sarebbe la fattura): la porta ⛓️ si spegne PRIMA
     # del tocco, invece di chiudere la fattura e poi dire di no
@@ -90939,6 +90994,45 @@ async def onchain_ordine_annulla(oid: int, x_tg_init_data: str = Header(""),
         con.close()
 
 
+@app.post("/api/onchain/ordini/{oid}/rilascio-chiesto")
+async def onchain_rilascio_chiesto(oid: int, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """«HO RICEVUTO» PRIMA CHE CHI VENDE ABBIA SCELTO DOVE RICEVERE (27 ott
+    2026). La firma di chi compra deve dire a CHI vanno i sats, e l'uscita
+    non c'e' ancora: si scrive la sua conferma, si avvisa chi vende, e il
+    telefono di chi compra firma da solo alla prima apertura dopo la
+    scelta (`onchainCofirmeInAttesa`). Nessuna firma di Barattolo: la
+    regola delle due firme resta delle due parti."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        if _onchain_parte(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Lo conferma chi compra")
+        if o["stato"] != "pagato" or o["incasso"] or o["proposta_psbt"]:
+            raise HTTPException(409, "Su questo ordine non c'è niente da "
+                                     "mettere in attesa")
+        _onchain_ordine_permette(con, o, "venditore")
+        gia = bool(o["rilascio_chiesto_il"])
+        con.execute("UPDATE onchain_ordini SET rilascio_chiesto_il=?,"
+                    " aggiornato=? WHERE id=? AND rilascio_chiesto_il=0",
+                    (int(time.time()), int(time.time()), oid))
+        con.commit()
+    finally:
+        con.close()
+    if not gia:
+        await notifica(o["venditore_id"],
+            f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi ha comprato ha "
+            "confermato di averlo ricevuto. Scegli dove ricevere i sats "
+            "(Profilo → «Incassi on-chain») e partono.")
+    return {"ok": True}
+
+
 @app.post("/api/onchain/ordini/{oid}/proposta")
 async def onchain_ordine_proposta(oid: int, req: Request,
                                   x_tg_init_data: str = Header(""),
@@ -90979,6 +91073,8 @@ async def onchain_ordine_proposta(oid: int, req: Request,
             raise HTTPException(409, "Su questo ordine non c'è niente da "
                                      "liberare adesso")
         _onchain_ordine_permette(con, o, verso)
+        if verso == "venditore" and not o["incasso"]:
+            raise HTTPException(409, ONCHAIN_MSG_SENZA_DESTINAZIONE)
         if o["decisione_da"]:
             # la proposta di Barattolo non si sostituisce: e' la decisione
             raise HTTPException(409, "Su questo ordine ha già firmato "

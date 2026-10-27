@@ -73868,3 +73868,60 @@ pagamenti: il finestrino è di secondi e il QR sparisce al tocco. I
 rimborsi e il resto del margine a chi compra vanno ancora al `/1/n` del
 SUO seme (non è il caso di Andrea, che parlava di chi vende): da
 decidere se anche lì serve un wallet suo.
+
+## La destinazione dopo: si paga on-chain anche se chi vende non ha ancora scelto dove ricevere (27 ott 2026, cantiere onchain-dopo, Andrea: «un utente paga. perchè chi riceve deve prima aver settato il wallet onchain, sempre bitcoin sono. quello è solo l'output finale ma può definirlo in un secondo momento, l'importante è che il multisig si crei con i 3 wallet già predefiniti»)
+
+Corregge un pezzo della voce di prima («La cassa a due porte», **MAI NEL
+CONTO DI BARATTOLO**): là, senza una destinazione di chi vende, la cassa
+diceva 400 e la porta ⛓️ era spenta. Andrea ha ragione che è un cancello
+messo nel posto sbagliato. Il 2-di-3 dipende solo dalle tre chiavi
+(chi compra, chi vende, Barattolo), che ci sono già; dove escono i sats
+conta solo al rilascio.
+
+**COSA FA ADESSO.** La cassa crea l'ordine lo stesso, con `incasso`
+vuoto e nessuna destinazione. Mai il `/1/n` di serie: la regola «mai nel
+wallet autogenerato» resta intera. Vuoto vuol dire che verso chi vende
+non esce niente. La proposta verso di lui è 409 col perché, e il server
+non la passa nemmeno se arriva storta (`_onchain_psbt_giudica`: nessuna
+uscita è uguale a ''). Barattolo non firma nemmeno una disputa vinta da
+chi vende. Chi vende lo sa in tre posti: la notifica appena pagato,
+l'ordine (⚠️ e il bottone «⛓️ Scegli dove ricevere» che apre il
+cassetto del Profilo) e la voce di «Completa il profilo». Quando salva la
+scelta, `_onchain_riempi_incassi` la scrive sugli ordini che aspettavano.
+Per una chiave di conto prende un indirizzo nuovo per ordine, come alla
+cassa. Restano esclusi gli ordini con una proposta, perché un PSBT
+firmato non si cambia sotto i piedi.
+
+**IL «HO RICEVUTO» CHE ARRIVA PRIMA.** La firma di chi compra dice a CHI
+vanno i sats, e l'uscita ancora non c'è. Quindi non si firma: si scrive
+la conferma (`rilascio_chiesto_il`) e si avvisa chi vende. Alla prima
+apertura dopo la scelta, il telefono di chi compra firma da solo
+(`onchainRilascioDaFirmare` dentro `onchainCofirmeInAttesa`), e poi chi
+vende co-firma come sempre. Chi compra riceve una notifica quando la
+scelta arriva.
+
+**STRADE SCARTATE.**
+- La firma di Barattolo al posto di quella di chi compra, per non farlo
+  riaprire l'app: farebbe firmare Barattolo nei rilasci di tutti i
+  giorni, e Barattolo firma solo per un moderatore o per il reso.
+- Un PSBT firmato «a vuoto» da chi compra: non esiste, perché l'uscita
+  fa parte di quel che si firma.
+- Tenere il cancello e spiegarlo meglio: è proprio quel che Andrea non
+  vuole.
+
+**PROVATO.** `collaudo_onchain_incasso`, nella sezione nuova «chi vende
+sceglie dove ricevere DOPO il pagamento»: pronto senza scelta; l'ordine
+nasce con un 2-di-3 vero e incasso vuoto; pagato e nato in «Ordini»;
+`incasso_scelto` falso nell'ordine; la proposta verso chi vende dà 409; la
+conferma la può dare solo chi compra (403 per chi vende) e dà 200; la
+scelta dà `ordini_aggiornati` 1, con l'incasso e la firma giusti; poi la
+proposta di chi compra verso quell'incasso passa. `collaudo_onchain_ordine`
+è aggiornato (pronto senza scelta). La sentinella di prove.py ora dice
+che la cassa non chiede la destinazione e non ripiega sul conto di serie.
+
+**DA GUARDARE.** Il giro dal vivo su signet. Il caso di chi vende che
+non sceglie mai: oggi i sats restano nel 2-di-3, chi compra non può
+riprenderseli da solo, e serve un moderatore (rimborso col reso o con la
+disputa). Un promemoria a chi vende dopo qualche giorno sarebbe la cosa
+giusta, ma non è stato chiesto. Resta aperta, come prima, la domanda sui
+rimborsi a chi compra (il `/1/n` del SUO seme).
