@@ -18,8 +18,8 @@ I documenti in `docs/` NON sono import: si aprono quando servono.
 - `docs/PRODUZIONE.md` — la macchina, la catena del deploy, le procedure.
 - `docs/NODO-MOSTRO.md` — il coordinator P2P su un'ALTRA macchina:
   audit, timer, sonda, dev fee, coi perché.
-- Gli audit `docs/AUDIT-PAGAMENTI-2026-09-19.md` e
-  `docs/AUDIT-2-CLIENT-MOSTRO-2026-09-23.md`; gli studi
+- Gli audit `docs/AUDIT-PAGAMENTI-2026-09-19.md`, `docs/AUDIT-2-CLIENT-MOSTRO-2026-09-23.md`
+  e `docs/AUDIT-3-ONCHAIN-2026-10-27.md` (il 2-di-3, le decisioni); gli studi
   `docs/STUDIO-BOLT-CARD-2026-09-24.md`, `docs/STUDIO-RISTORANTI-2026-09-24.md`,
   `docs/STUDIO-CONTANTI-A-MANO-2026-09-25.md`,
   `docs/STUDIO-MOSTRO-0190-2026-09-30.md` (la salita alla 0.19.0),
