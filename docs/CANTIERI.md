@@ -73276,3 +73276,136 @@ giudice, stessa riga nel registro.
 server di collaudo: le schede, l'interruttore che apre la conferma
 «Spegni», il filtro «Tutte», la ricerca «quota». Suite severa e
 collaudi on-chain: nel messaggio del commit.
+
+## Il cambio libero, tappa 3: bitcoin → Lightning dal telefono, dietro una leva che resta spenta finché Massimo non risponde (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea)
+
+**LA TAPPA.** La strada rovesciata del cambio: l'utente manda i
+bitcoin dal suo wallet all'indirizzo del fornitore e incassa la SUA
+richiesta Lightning; è il «submarine» di SATS Routing, imparato dal
+cartone nella tappa 1. Andrea (27 ott, 08:25): «tu vai avanti, ma
+scrivi nel verbale che la T3 non si accende finché Massimo non
+risponde». Quindi: LA STRADA NON SI ACCENDE FINCHÉ MASSIMO NON RISPONDE
+(quota partner sul submarine, limiti di chiamate; la domanda la fa
+Andrea). Il codice c'è tutto, dietro `CAMBIO_BTC_LN_ATTIVO = False`
+(config, pannello delle leve con la riga «resta spenta finché Massimo
+non risponde»); a leva spenta `cambio_strade()` dice solo `ln-btc`, il
+preventivo risponde 400 e il biglietto «direzione», e il telefono non
+mostra la seconda pillola. Il come sta in ARCHITETTURA, «IL CAMBIO
+LIBERO, TAPPA 3».
+
+**LE DECISIONI.**
+- LA CIFRA È QUANTO RICEVERE, non quanto mandare: l'utente incolla una
+  richiesta Lightning del suo wallet, e quella ha un importo esatto;
+  il preventivo dice quanto MANDARE (ricevi + 0,5 % per eccesso + la
+  rete del loro ritiro, 318: il calco di `expectedAmount`, 100.000 →
+  100.818). L'altra strada, «scrivi quanto mandi e ti diciamo quanto
+  ricevi», avrebbe voluto una fattura che l'utente crea DOPO il conto,
+  con un importo strano da ricopiare: scartata.
+- LA RICHIESTA LA CONTROLLA IL TELEFONO prima di spendere un biglietto
+  (`fatturaValida`: forma, rete del fornitore, importo esatto, non in
+  scadenza entro 10 minuti perché i bitcoin vogliono una conferma); il
+  server NON la vede mai: nel biglietto viaggiano solo direzione, cifra,
+  fornitore e impronta delle tariffe, e alla nascita le parti pubbliche
+  di sempre (l'indirizzo del lockup, quanto mandare, l'impronta).
+- NESSUNA FEE DI BARATTOLO sulla strada rovesciata: non c'è una
+  fattura nostra da cui toglierla, e `SWAP_FEE_PERCENTO` resta 0 di
+  decisione (26 ott). Si guadagna con la quota partner, se Massimo la
+  conferma: è proprio la domanda aperta.
+- IL RIMBORSO È DELL'UTENTE, DAL SUO TELEFONO: fallito o scaduto coi
+  bitcoin mandati, nella lista compare «Rimanda a questo indirizzo»;
+  scritto l'indirizzo parte il rimborso A DUE (la firma parziale del
+  fornitore: una transazione da un pezzo di testimone), e se il
+  fornitore non firma quello DALLO SCRIPT, che la rete accetta solo alla
+  scadenza (`timeoutBlockHeight`): prima il telefono dice «I bitcoin
+  tornano a te alla scadenza: ci penso io, apri l'app ogni tanto» e
+  riprova a ogni giro. Scartato: un indirizzo di rimborso chiesto PRIMA
+  (una domanda in più a chi, nel 99 % dei casi, non ne avrà bisogno) e
+  il rimborso da un wallet nostro (regola 2: mai chiavi altrui sul
+  server, e il lockup è dell'utente).
+- LA NOSTRA METÀ DEL RITIRO A DUE si dà SOLO se sha256(preimage) è
+  l'impronta della fattura: è la prova che il fornitore ha pagato
+  davvero. Senza la nostra metà ritira lo stesso dallo script (ha il
+  segreto): non è un problema nostro, e la fase resta «fatto».
+- IL BUNDLE NON CAMBIA: `swapTree(false, …)` e la verifica dell'albero
+  c'erano già dalla tappa 1 (5.0.0-bar2).
+- `SWAP_TELEFONO_VER` ricalcolata (1d9599709a): i due file del telefono
+  sono cambiati.
+
+**COSA HA FATTO FATICA.**
+- Il 999 arriva alla tappa 3 del collaudo coi suoi cinque biglietti del
+  giorno già spesi: le scene del server girano col 222 coi due cancelli
+  aperti per lui, e li richiudono.
+- `swapRitiraA` sul submarine NON aspetta il rimborso (parte e mette in
+  sorveglianza): la scena aspettava 300 ms fissi e una volta su tre
+  trovava la firma chiesta ma la transazione non ancora trasmessa. Ora
+  aspetta finché il record ha un txid, un `aspettaScadenza` o un
+  errore (`finche`, tetto 5 s).
+- Il riquadro del cambio a cambio finito: il pannello aperto resta
+  aperto (è la stessa cosa della tappa 2), e la scena chiude il pannello
+  prima di guardare che sia tornato il tasto.
+- Tre sentinelle vecchie si sono mosse per la tappa, e sono state
+  aggiornate dicendo perché: «l'indice della chiave si salva PRIMA di
+  chiedere lo swap» ancorava `nuovo = await f.crea(` (ora è un
+  ternario con `creaSub`); il banco dei tre pallini non aveva
+  `swapESub`, che `swapTappa` ora usa (e il banco prova anche i pallini
+  del submarine); «nessun'altra strada verso SATS Routing nel server»
+  passa da 1 a 2: la seconda è la lettura delle tariffe del submarine.
+  E nel collaudo dell'instradatore «i due fornitori, la stessa strada»
+  aspettava `["ln-btc"]` per tipo: ora il tipo sa le due strade, e quali
+  si offrono lo dice il server con le sue leve (uscito rosso nel giro
+  dei collaudi della CI, 104/1, poi 26/0 da solo e verde nel giro
+  intero sotto).
+
+**PROVATO.**
+- `collaudo_cambio_libero` 89/0 (due giri di fila): sul server, a leva
+  spenta strade `["ln-btc"]`, 400 e «direzione»; accesa, le due strade,
+  il preventivo 100.000 → 100.818 letto dalle tariffe del cartone col
+  codice partner, il sotto-minimo a 50.000, il biglietto `btc-ln`;
+  sul telefono (node contro il cartone): le due pillole, la cifra come
+  «quanto ricevere», il preventivo col «+» e il campo della richiesta,
+  i quattro no della richiesta (manca, storta, importo, rete) senza
+  niente al server, «Incolla» che toglie `lightning:`, la nascita
+  (biglietto → swap → nascita, record `sub` dell'ordine 0), la carta
+  («Manda esattamente 100818 sats…», QR `bitcoin:`, «Copia
+  l'indirizzo», link col wallet, passi), bloccato → confermato → la
+  nostra metà del ritiro (una volta) → il cartone ritira e il lockup è
+  speso → «Fatto: i sats sono nel tuo wallet Lightning»; il fallito coi
+  bitcoin mandati e il rimborso a due all'indirizzo scritto (sulle due
+  strade, alla destinazione, «ripreso»); lo scaduto col fornitore che
+  non firma: «ci penso io» prima della scadenza, il rimborso dalla
+  foglia dello script dopo; lo scaduto senza bitcoin: niente da fare;
+  il recupero dalla xpub che ritrova i quattro submarine; la sentinella
+  (il telefono parla solo col cartone, Barattolo non paga mai).
+- `prove_cambio_libero` (le sentinelle della tappa 3: leva d'esempio,
+  di serie e nel pannello col perché; `cambio_strade()` nelle due
+  posizioni e mai una tupla fissa; `tariffa_sub_da_risposta` e
+  `preventivo_sub` puri, per eccesso, coi due minimi e i due tetti; il
+  tipo, il controllo del segreto, il «presto», la richiesta; i tre gesti
+  nuovi; la pagina) dentro la suite severa: 26430/0 con nostr-tools.
+- TRE CONTROPROVE, tutte rosse come devono: il ritiro a due senza il
+  controllo del segreto → rossa la sentinella; la leva spenta ma le due
+  strade sempre → rosse tre scene del collaudo (strade, direzione
+  sconosciuta 200, biglietto); il rimborso dallo script senza aspettare
+  la scadenza → rossa la scena «ci penso io» (il cartone risponde
+  `non-final` come bitcoind, e il telefono dice «scaduto, scrivi dove»
+  invece di aspettare).
+- Sul MIO albero (sopra 9a473b2): suite severa 26430/0, collaudi della
+  CI 105/0 (dopo la cura del collaudo dell'instradatore). Intanto su
+  develop erano arrivati 973dbf2 e 9317a14 (cantiere onchain-per-tutti,
+  «Solo gli admin» dal pannello): rebase sopra (un solo conflitto, le
+  due voci in coda a questo file, tenute tutte e due), e SULL'ALBERO
+  REBASATO di nuovo la suite severa 26430/0 (con nostr-tools, venv
+  senza coincurve) e tutti i collaudi della CI 105/0. Poi è arrivato
+  anche 501ee6e (cantiere pagina-leve, lo «Stato delle leve» come
+  pagina): secondo rebase (stesso conflitto in coda qui, tenute tutte e
+  due), e sull'albero sopra 501ee6e ancora la suite severa e tutti i
+  collaudi della CI: i numeri nel messaggio del commit.
+
+**COSA RESTA.** NON PROVATO DAL VIVO, e da guardare sul collaudo
+PRIMA di accendere `CAMBIO_BTC_LN_ATTIVO` (e comunque non prima della
+risposta di Massimo): il submarine di SATS Routing vero (tariffe, forma
+delle risposte, `/claim` a due, `/refund`), un wallet vero che manda i
+bitcoin dal link `bitcoin:` dentro Telegram, la richiesta incollata
+dalla WebView, il rimborso dallo script su una rete vera (qui solo il
+cartone, che giudica locktime e cima come bitcoind). La T5 (i documenti
+del cantiere intero) è la prossima tappa.

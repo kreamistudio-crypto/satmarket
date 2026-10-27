@@ -52,6 +52,12 @@
 /* ─── 1. LE STRADE E I FORNITORI ────────────────────────────────────── */
 /* la sola strada di oggi: i sats dell'incasso, ricevuti in bitcoin on-chain */
 const SWAP_STRADA = 'ln-btc';
+/* (tappa 3, cambio-libero) la direzione scelta nel riquadro del cambio;
+   gli ordini veri vanno sempre per SWAP_STRADA */
+let swapCambioStrada = 'ln-btc';
+function swapCambioStradaScelta(){ return swapCambioStrada; }
+function swapStradaDi(n){ return Number(n) === 0 ? swapCambioStrada : SWAP_STRADA; }
+function swapESub(rec){ return !!rec && rec.tipo === 'sub'; }
 const SWAP_FASI_FINALI = new Set(['fatto', 'scaduto', 'fallito', 'ripreso']);
 const SWAP_FASI_RITIRO = new Set(['bloccato', 'confermato']);
 let swapFornitoriCopia = null, swapFornitoriDa = null;
@@ -116,7 +122,7 @@ function swapDiOrdine(ordine){
 function swapECambio(rec){ return !!rec && Number(rec.ordine) === 0; }
 function swapFase(rec){
   const f = swapFornitore(swapDiChi(rec));
-  return f ? f.fase(rec.stato) : 'ignoto';
+  return f ? f.fase(rec.stato, rec) : 'ignoto';
 }
 
 /* ─── 3. I TESTI, in italiano e in inglese ─────────────────────────────
@@ -213,7 +219,29 @@ const SWAP_TESTI_T3 = {
     valeFino: h => `Vale fino alle ${h}`,
     cambioScaduto: 'Scaduto: nessun sats si è mosso. Puoi fare un cambio nuovo.',
     cambioFallito: 'Non riuscito: nessun sats si è mosso. Puoi fare un cambio nuovo.',
-    cambioRipreso: n => `${n} si è ripreso i bitcoin, e il tuo pagamento torna al tuo wallet.`},
+    cambioRipreso: n => `${n} si è ripreso i bitcoin, e il tuo pagamento torna al tuo wallet.`,
+    /* (tappa 3) la strada rovesciata: bitcoin → Lightning */
+    cifraEtSub: 'Quanti sats vuoi ricevere in Lightning',
+    fatturaTit: 'La tua richiesta Lightning',
+    fatturaSpiega: n => `Dal tuo wallet Lightning crea una richiesta di ${n} sats esatti e incollala qui.`,
+    fatturaManca: 'Prima incolla la richiesta del tuo wallet Lightning: tocca «Incolla».',
+    fatturaNo: 'Questa non sembra una richiesta Lightning: ricontrollala.',
+    fatturaImporto: n => `La richiesta deve essere di ${n} sats esatti.`,
+    fatturaRete: 'Questa richiesta è di un\'altra rete.',
+    fatturaScaduta: 'Questa richiesta scade troppo presto: creane una nuova.',
+    mandaTu: (sats, n) => `Manda esattamente ${sats} sats a questo indirizzo, dal tuo wallet bitcoin: quando la rete li conferma, ${n} paga la tua richiesta.`,
+    copiaIndirizzo: 'Copia l\'indirizzo',
+    subBloccato: 'Bitcoin visti: aspetto la conferma della rete, di solito una decina di minuti.',
+    subConfermato: n => `Confermati: ${n} sta pagando la tua richiesta.`,
+    subPagata: 'Pagata: i sats sono nel tuo wallet Lightning.',
+    subFatto: 'Fatto: i sats sono nel tuo wallet Lightning.',
+    subFallito: 'Non riuscito: i tuoi bitcoin tornano a te. Scrivi sotto dove rimandarli.',
+    subScaduto: 'Scaduto: i tuoi bitcoin tornano a te. Scrivi sotto dove rimandarli.',
+    subScadutoNiente: 'Scaduto: nessun bitcoin si è mosso. Puoi fare un cambio nuovo.',
+    subPresto: 'I bitcoin tornano a te alla scadenza: ci penso io, apri l\'app ogni tanto.',
+    subRipreso: id => `Ripresi: i bitcoin sono tornati al tuo indirizzo (${id}).`,
+    rimborsaA: 'Rimanda a questo indirizzo',
+    passiSub: ['Mandati', 'Confermati', 'Pagato']},
   en: {
     paroleTit: 'Your 12 backup words',
     paroleDi: n => `Your 12 backup words for ${n}`,
@@ -299,7 +327,28 @@ const SWAP_TESTI_T3 = {
     valeFino: h => `Valid until ${h}`,
     cambioScaduto: 'Expired: no sats moved. You can start a new exchange.',
     cambioFallito: 'Failed: no sats moved. You can start a new exchange.',
-    cambioRipreso: n => `${n} took the bitcoin back, and your payment returns to your wallet.`}};
+    cambioRipreso: n => `${n} took the bitcoin back, and your payment returns to your wallet.`,
+    cifraEtSub: 'How many sats you want to receive on Lightning',
+    fatturaTit: 'Your Lightning request',
+    fatturaSpiega: n => `From your Lightning wallet create a request for exactly ${n} sats and paste it here.`,
+    fatturaManca: 'First paste the request from your Lightning wallet: tap «Paste».',
+    fatturaNo: 'This does not look like a Lightning request: check it again.',
+    fatturaImporto: n => `The request must be for exactly ${n} sats.`,
+    fatturaRete: 'This request belongs to another network.',
+    fatturaScaduta: 'This request expires too soon: create a new one.',
+    mandaTu: (sats, n) => `Send exactly ${sats} sats to this address, from your bitcoin wallet: once the network confirms them, ${n} pays your request.`,
+    copiaIndirizzo: 'Copy the address',
+    subBloccato: 'Bitcoin seen: waiting for the network to confirm, usually about ten minutes.',
+    subConfermato: n => `Confirmed: ${n} is paying your request.`,
+    subPagata: 'Paid: the sats are in your Lightning wallet.',
+    subFatto: 'Done: the sats are in your Lightning wallet.',
+    subFallito: 'Failed: your bitcoin come back to you. Write below where to send them.',
+    subScaduto: 'Expired: your bitcoin come back to you. Write below where to send them.',
+    subScadutoNiente: 'Expired: no bitcoin moved. You can start a new exchange.',
+    subPresto: 'The bitcoin come back to you after the expiry: I take care of it, open the app now and then.',
+    subRipreso: id => `Taken back: the bitcoin returned to your address (${id}).`,
+    rimborsaA: 'Send back to this address',
+    passiSub: ['Sent', 'Confirmed', 'Paid']}};
 function t3(){ return SWAP_TESTI_T3[linguaSwap()]; }
 /* (cambio-libero) «non risponde» dell'ordine 0 non dice «incassa in
    Lightning»: nel cambio non c'e' nessun incasso */
@@ -317,7 +366,7 @@ function swapPiuFornitori(){ return swapFornitori().length > 1; }
 const swapEsclusi = {};    // ordine -> Set di id
 function swapCandidati(n){
   const fuori = swapEsclusi[n] || new Set();
-  return swapFornitori().filter(f => f.strade.includes(SWAP_STRADA) && !fuori.has(f.id));
+  return swapFornitori().filter(f => f.strade.includes(swapStradaDi(n)) && !fuori.has(f.id));
 }
 function swapMigliore(letti){
   const buoni = letti.filter(d => d && d.ok && Number(d.ricevi) > 0);
@@ -408,6 +457,23 @@ function campoIndirizzoSwap(n, errore){
       </div>
     </div>`;
 }
+/* (tappa 3) IL CAMPO DELLA RICHIESTA LIGHTNING, al posto dell'indirizzo
+   nella strada bitcoin → Lightning: la crea il suo wallet per la cifra
+   scritta, e qui si incolla */
+const swapFattureScritte = {};
+function campoFatturaSwap(n, errore){
+  const t = t3();
+  return `<div class="swap-campo">
+      <h4>⚡ ${esc(t.fatturaTit)}</h4>
+      <div class="hint">${esc(t.fatturaSpiega(fmt(swapCambioCifra())))}</div>
+      ${errore}
+      <textarea class="swap-indirizzo" id="swapFattura_${n}" rows="3" autocomplete="off"
+        spellcheck="false" placeholder="lnbc…">${esc(swapFattureScritte[n] || '')}</textarea>
+      <div class="swap-attrezzi">
+        <button class="btn ghost" type="button" data-swap="incolla-fattura" data-ordine="${n}">📋 ${esc(t.incolla)}</button>
+      </div>
+    </div>`;
+}
 function pannelloSwapTelefono(o){
   const n = Number(o.id), t = t3();
   const rec = swapDiOrdine(n);
@@ -435,9 +501,10 @@ function pannelloSwapTelefono(o){
   }
   if (passo === 'creo') return `<div class="swap-prev">
       <h4>₿ ${esc(t.tuoSwap)}</h4>
-      ${passiSwap(0)}
+      ${passiSwap(0, swapStradaDi(n) === 'btc-ln' ? {tipo: 'sub'} : null)}
       <div class="swap-stato" role="status">${esc(t.creo(nome))}</div>
     </div>`;
+  if (swapStradaDi(n) === 'btc-ln') return pannelloPreventivoSwap(o, campoFatturaSwap(n, errore));
   return pannelloPreventivoSwap(o, campoIndirizzoSwap(n, errore));
 }
 /* I TRE PALLINI (27 ott 2026): quanti passi sono stati raggiunti fra
@@ -446,20 +513,46 @@ function pannelloSwapTelefono(o){
    da sola */
 function swapTappa(rec){
   const fase = swapFase(rec);
+  /* (tappa 3) il submarine: mandati -> confermati -> pagato */
+  if (swapESub(rec)) {
+    if (rec.spesoDa || ['scaduto', 'fallito', 'ripreso', 'ignoto'].includes(fase)) return -1;
+    return fase === 'fatto' || fase === 'pagata' ? 3 : fase === 'confermato' ? 2
+         : fase === 'bloccato' ? 1 : 0;
+  }
   if (rec.spesoDa || ['scaduto', 'fallito', 'ripreso'].includes(fase)) return -1;
   if ((rec.ritiro && rec.ritiro.concluso) || fase === 'fatto') return 3;
   if ((rec.ritiro && rec.ritiro.txid) || SWAP_FASI_RITIRO.has(fase)) return 2;
   if (fase !== 'creato' || ['fallito', 'rifiutato'].includes(rec.pagamento)) return -1;
   return ['in_volo', 'pagato'].includes(rec.pagamento) ? 1 : 0;
 }
-function passiSwap(quanti){
+function passiSwap(quanti, rec){
   if (quanti < 0) return '';
   const t = t3();
-  return `<ol class="swap-passi" aria-label="${esc(t.passiEt)}">${t.passi.map((p, i) =>
+  const passi = swapESub(rec) ? t.passiSub : t.passi;
+  return `<ol class="swap-passi" aria-label="${esc(t.passiEt)}">${passi.map((p, i) =>
     `<li class="${i < quanti ? 'fatto' : i === quanti ? 'ora' : ''}"${i === quanti ? ' aria-current="step"' : ''}>${esc(p)}</li>`).join('')}</ol>`;
+}
+/* (tappa 3) il submarine fallito coi bitcoin gia' mandati aspetta un
+   indirizzo dove rimandarli; senza bitcoin mandati non c'e' niente da fare */
+function swapDaRimborsare(rec){
+  return swapESub(rec) && !!rec.bloccato && !(rec.rimborso && rec.rimborso.txid)
+    && ['fallito', 'scaduto'].includes(swapFase(rec));
 }
 function frasestatoSwap(rec){
   const t = t3();
+  if (swapESub(rec)) {
+    const fase = swapFase(rec), n = swapNomeFornitore(swapDiChi(rec));
+    if (rec.spesoDa) return t.spesoAltri(n);
+    if (fase === 'ripreso') return t.subRipreso(swapCorto(rec.rimborso.txid, 8));
+    if (fase === 'creato') return t.mandaTu(fmt(rec.mandi || rec.onchainAmount || 0), n);
+    if (fase === 'bloccato') return t.subBloccato;
+    if (fase === 'confermato') return t.subConfermato(n);
+    if (fase === 'pagata') return t.subPagata;
+    if (fase === 'fatto') return t.subFatto;
+    if (fase === 'fallito') return rec.aspettaScadenza ? t.subPresto : t.subFallito;
+    if (fase === 'scaduto') return !rec.bloccato ? t.subScadutoNiente : rec.aspettaScadenza ? t.subPresto : t.subScaduto;
+    return t.statoIgnoto;
+  }
   /* (20 ott 2026, swap-spesa) la spesa del lockup letta dalla rete */
   if (rec.ritiro && rec.ritiro.concluso)
     return t.concluso(fmt(rec.ritiro.sats || rec.ricevi || 0), swapCorto(rec.ritiro.txid, 8));
@@ -504,13 +597,30 @@ function fatturaCambio(rec){
     ${fino ? `<div class="hint">${esc(t.valeFino(fino))}</div>` : ''}
   </div>`;
 }
+/* (tappa 3) I BITCOIN DA MANDARE: il QR del link bitcoin: (lo disegna la
+   pagina), l'indirizzo in chiaro con «Copia», «Apri nel wallet» (il link
+   bitcoin: nudo: `portaWallet` e' solo per Lightning) */
+function bitcoinDaMandare(rec){
+  const t = t3();
+  if (!swapESub(rec) || swapFase(rec) !== 'creato' || !rec.lockupAddress) return '';
+  const link = rec.bip21 || `bitcoin:${rec.lockupAddress}?amount=${(Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8)}`;
+  return `<div class="swap-fattura">
+    <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
+    <div class="mono swap-indirizzo-chiaro">${esc(rec.lockupAddress)}</div>
+    <div class="swap-attrezzi">
+      <button class="btn ghost" type="button" data-swap="cambio-copia-indirizzo" data-id="${esc(rec.id)}">📋 ${esc(t.copiaIndirizzo)}</button>
+      <a class="btn orange" id="swapCambioWallet" href="${esc(link)}">₿ ${esc(t.apriWallet)}</a>
+    </div>
+  </div>`;
+}
 function cartaSwap(rec){
   const t = t3();
   return `<div class="swap-prev swap-carta" data-swap-id="${esc(rec.id)}">
     <h4>${swapECambio(rec) ? '🔁 ' + esc(t.cambio) : '₿ ' + esc(t.tuoSwap)}</h4>
-    ${passiSwap(swapTappa(rec))}
+    ${passiSwap(swapTappa(rec), rec)}
     <div class="swap-stato" role="status">${esc(frasestatoSwap(rec))}</div>
     ${fatturaCambio(rec)}
+    ${bitcoinDaMandare(rec)}
     ${rec.ricevi && rec.indirizzo ? `<div class="hint">${esc(t.ricevi(fmt(rec.ricevi)))} <span class="mono">${esc(swapCorto(rec.indirizzo, 8))}</span></div>` : ''}
     ${rec.errore && !rec.spesoDa ? `<div class="hint">${esc(t.ritiroErrore)}</div>` : ''}
     <div class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</div>
@@ -532,20 +642,42 @@ async function swapAvanti(n){
   swapInCorso.add(n);
   try { await swapAvantiDentro(n); } finally { swapInCorso.delete(n); }
 }
+/* (tappa 3) la richiesta Lightning scritta nel campo, pulita; '' se manca */
+function swapFatturaScritta(n){
+  const campo = el(`swapFattura_${n}`);
+  if (campo) swapFattureScritte[n] = String(campo.value || '');
+  return String(swapFattureScritte[n] || '').trim().replace(/^lightning:/i, '').trim();
+}
+/* il no del giudice della richiesta, nelle parole dell'utente */
+function swapFatturaPerche(perche){
+  const t = t3();
+  return perche === 'importo' ? t.fatturaImporto(fmt(swapCambioCifra()))
+       : perche === 'rete' ? t.fatturaRete : perche === 'scaduta' ? t.fatturaScaduta : t.fatturaNo;
+}
 async function swapAvantiDentro(n){
   delete swapErrori[n];
   const t = t3();
-  const campo = el(`swapIndirizzo_${n}`);
-  if (campo) swapIndirizziScritti[n] = String(campo.value || '');
-  const indirizzo = swapEstraiIndirizzo(swapIndirizziScritti[n]);
-  if (!indirizzo) { swapErrori[n] = t.indirizzoManca; return ridisegnaIncassoSwap(); }
-  swapIndirizziScritti[n] = indirizzo;
   const prima = swapFornitore(swapScelto(n));
-  if (prima) {
-    let valido;
-    try { valido = await prima.indirizzoValido(indirizzo); }
-    catch(e){ swapErrori[n] = swapNonRisponde(n, prima.nome); return ridisegnaIncassoSwap(); }
-    if (!valido) { swapErrori[n] = t.indirizzoNo; return ridisegnaIncassoSwap(); }
+  if (swapStradaDi(n) === 'btc-ln') {
+    /* la strada rovesciata: al posto dell'indirizzo, la richiesta
+       Lightning del suo wallet, per la cifra scritta */
+    const fattura = swapFatturaScritta(n);
+    if (!fattura) { swapErrori[n] = t.fatturaManca; return ridisegnaIncassoSwap(); }
+    swapFattureScritte[n] = fattura;
+    const perche = prima && prima.fatturaValida ? prima.fatturaValida(fattura, swapCambioCifra()) : 'fattura';
+    if (perche) { swapErrori[n] = swapFatturaPerche(perche); return ridisegnaIncassoSwap(); }
+  } else {
+    const campo = el(`swapIndirizzo_${n}`);
+    if (campo) swapIndirizziScritti[n] = String(campo.value || '');
+    const indirizzo = swapEstraiIndirizzo(swapIndirizziScritti[n]);
+    if (!indirizzo) { swapErrori[n] = t.indirizzoManca; return ridisegnaIncassoSwap(); }
+    swapIndirizziScritti[n] = indirizzo;
+    if (prima) {
+      let valido;
+      try { valido = await prima.indirizzoValido(indirizzo); }
+      catch(e){ swapErrori[n] = swapNonRisponde(n, prima.nome); return ridisegnaIncassoSwap(); }
+      if (!valido) { swapErrori[n] = t.indirizzoNo; return ridisegnaIncassoSwap(); }
+    }
   }
   await swapInstradaPreventivo(n, true);
   const p = preventiviSwap[n] || {};
@@ -590,14 +722,21 @@ async function swapCrea(n){
 }
 async function swapCreaDentro(n){
   const t = t3();
-  const indirizzo = swapEstraiIndirizzo(swapIndirizziScritti[n]);
+  const sub = swapStradaDi(n) === 'btc-ln';
+  const indirizzo = sub ? '' : swapEstraiIndirizzo(swapIndirizziScritti[n]);
+  const fattura = sub ? swapFatturaScritta(n) : '';
   const p = ((preventiviSwap[n] || {}).dati) || {};
   const fid = swapScelto(n), f = swapFornitore(fid);
   if (!f) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
-  let valido;
-  try { valido = !!indirizzo && await f.indirizzoValido(indirizzo); }
-  catch(e){ swapPassi[n] = 'preventivo'; swapErrori[n] = swapNonRisponde(n, f.nome); return ridisegnaIncassoSwap(); }
-  if (!valido) { swapPassi[n] = 'preventivo'; swapErrori[n] = indirizzo ? t.indirizzoNo : t.indirizzoManca; return ridisegnaIncassoSwap(); }
+  if (sub) {
+    const perche = !fattura ? 'manca' : (f.fatturaValida ? f.fatturaValida(fattura, swapCambioCifra()) : 'fattura');
+    if (perche) { swapPassi[n] = 'preventivo'; swapErrori[n] = perche === 'manca' ? t.fatturaManca : swapFatturaPerche(perche); return ridisegnaIncassoSwap(); }
+  } else {
+    let valido;
+    try { valido = !!indirizzo && await f.indirizzoValido(indirizzo); }
+    catch(e){ swapPassi[n] = 'preventivo'; swapErrori[n] = swapNonRisponde(n, f.nome); return ridisegnaIncassoSwap(); }
+    if (!valido) { swapPassi[n] = 'preventivo'; swapErrori[n] = indirizzo ? t.indirizzoNo : t.indirizzoManca; return ridisegnaIncassoSwap(); }
+  }
   if (!p.ok || !p.hash) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
   const c = swapCassetto(fid);
   if (!c || !c.parole || !c.copiata) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
@@ -614,7 +753,7 @@ async function swapCreaDentro(n){
      niente (l'indice prenotato resta bruciato: mai un segreto riusato) */
   let biglietto = null;
   if (n === 0) {
-    try { biglietto = await chiediBigliettoCambio({direzione: SWAP_STRADA, sats: swapCambioCifra(), fornitore: fid, hash: p.hash}); }
+    try { biglietto = await chiediBigliettoCambio({direzione: swapCambioStrada, sats: swapCambioCifra(), fornitore: fid, hash: p.hash}); }
     catch(e){ biglietto = null; }
     if (!biglietto || !biglietto.ok) {
       swapPassi[n] = 'preventivo';
@@ -624,7 +763,10 @@ async function swapCreaDentro(n){
     }
   }
   let nuovo;
-  try { nuovo = await f.crea({parole: c.parole, indice: indice, preventivo: p, indirizzo: indirizzo}); }
+  try {
+    nuovo = sub ? await f.creaSub({parole: c.parole, indice: indice, preventivo: p, fattura: fattura})
+                : await f.crea({parole: c.parole, indice: indice, preventivo: p, indirizzo: indirizzo});
+  }
   catch(e){
     if (biglietto) { try { await liberaBigliettoCambio(biglietto.id); } catch(e2){} }
     if (e && e.tipo === 'mente') return swapRipiega(n, f);
@@ -830,7 +972,11 @@ async function swapRipiega(n, f){
    l'app a meta' non perde niente. */
 let swapTimer = null;
 const swapRitirando = new Set();
-function swapAperti(){ return swapLista().filter(r => !SWAP_FASI_FINALI.has(swapFase(r))); }
+/* (tappa 3) un submarine fallito coi bitcoin mandati resta aperto
+   finche' l'utente non dice dove rimandarli e il rimborso non parte */
+function swapAperti(){
+  return swapLista().filter(r => !SWAP_FASI_FINALI.has(swapFase(r)) || (swapDaRimborsare(r) && r.indirizzo));
+}
 function swapSorveglia(){
   if (swapTimer || !swapAperti().length) return;
   swapTimer = setInterval(swapGiro, 5000);
@@ -847,9 +993,14 @@ async function swapGiro(){
     catch(e){ tace = true; }
     if (s && s !== rec.stato) {
       rec.stato = s;
+      /* (tappa 3) i bitcoin del submarine sono stati mandati: da qui in
+         poi un fallimento vuole il rimborso */
+      if (swapESub(rec) && ['transaction.mempool', 'transaction.confirmed', 'invoice.pending',
+          'invoice.paid', 'transaction.claimed', 'transaction.lockupFailed'].includes(s)) rec.bloccato = true;
       swapSalvaRecord(rec);
       swapRidisegnaDove(rec);
     }
+    if (swapESub(rec)) { await swapGiroSub(rec, f); continue; }
     await swapGiroPagamento(rec);
     const daRitirare = !(rec.ritiro && rec.ritiro.txid);
     /* IL FORNITORE TACE (20 ott 2026, cantiere swap-senza-api): se la rete
@@ -864,6 +1015,53 @@ async function swapGiro(){
     }
     if (SWAP_FASI_RITIRO.has(swapFase(rec)) && daRitirare)
       await swapRitira(rec);
+  }
+}
+/* (tappa 3) IL GIRO DEL SUBMARINE: a fattura pagata la nostra meta' per
+   il ritiro a due del fornitore (una volta); fallito coi bitcoin mandati
+   e con l'indirizzo scritto, il rimborso */
+async function swapGiroSub(rec, f){
+  const fase = swapFase(rec);
+  if (fase === 'pagata' && !rec.ritiro && f.aiutaRitiro) {
+    const c = swapCassetto(swapDiChi(rec));
+    try {
+      if (!c || !c.parole) throw new Error('parole assenti');
+      const fatto = await f.aiutaRitiro(rec, c.parole);
+      rec.ritiro = {cooperativo: !!fatto.cooperativo, quando: Date.now()};
+      delete rec.errore;
+      swapSalvaRecord(rec);
+      swapRidisegnaDove(rec);
+    } catch(e){
+      /* il fornitore ritira lo stesso dallo script: non e' un problema nostro */
+      rec.errore = String((e && e.message) || e).slice(0, 120);
+      swapSalvaRecord(rec);
+    }
+    return;
+  }
+  if (swapDaRimborsare(rec) && rec.indirizzo) await swapRimborsa(rec);
+}
+async function swapRimborsa(rec){
+  if (swapRitirando.has(rec.id) || !rec.indirizzo) return;
+  swapRitirando.add(rec.id);
+  try {
+    const fid = swapDiChi(rec), f = swapFornitore(fid);
+    const c = swapCassetto(fid);
+    if (!f || !f.rimborsa) throw new Error('fornitore assente');
+    if (!c || !c.parole) throw new Error('parole assenti');
+    const fatto = await f.rimborsa(rec, c.parole);
+    rec.rimborso = {txid: fatto.txid, cooperativo: fatto.cooperativo, quando: Date.now()};
+    delete rec.errore;
+    delete rec.spesoDa;
+    delete rec.aspettaScadenza;
+  } catch(e){
+    rec.errore = String((e && e.message) || e).slice(0, 120);
+    rec.aspettaScadenza = !!(e && e.tipo === 'presto');
+    if (e && e.tipo === 'speso') rec.spesoDa = String(e.txid || '');
+    else delete rec.spesoDa;
+  } finally {
+    swapRitirando.delete(rec.id);
+    swapSalvaRecord(rec);
+    swapRidisegnaDove(rec);
   }
 }
 async function swapRitira(rec){
@@ -919,10 +1117,13 @@ function renderSwapCambio(){
   if (vivo) {
     box.innerHTML = cartaSwap(vivo);
     const q = el('swapCambioQr');
-    if (q && typeof disegnaQr === 'function')
+    if (q && typeof disegnaQr === 'function' && !swapESub(vivo))
       disegnaQr(q, ('lightning:' + String(vivo.invoice).trim()).toUpperCase(), 'Alphanumeric');
     const a = el('swapCambioWallet');
-    if (a && typeof portaWallet === 'function') portaWallet(a, vivo.invoice);
+    if (a && typeof portaWallet === 'function' && !swapESub(vivo)) portaWallet(a, vivo.invoice);
+    /* (tappa 3) il QR del submarine e' il link bitcoin: (byte, com'e') */
+    if (q && swapESub(vivo) && typeof disegnaQr === 'function')
+      disegnaQr(q, vivo.bip21 || `bitcoin:${vivo.lockupAddress}`, 'Byte');
     return;
   }
   if (!swapCambioAperto) {
@@ -930,7 +1131,9 @@ function renderSwapCambio(){
     return;
   }
   const strade = Array.isArray(l.strade) && l.strade.length ? l.strade : [SWAP_STRADA];
-  const pillole = strade.map(s => `<button type="button" class="consegna-pill${s === SWAP_STRADA ? ' attiva' : ''}" data-swap="cambio-strada" data-strada="${esc(s)}">${esc(t.direzioni[s] || s)}</button>`).join('');
+  if (!strade.includes(swapCambioStrada)) swapCambioStrada = strade[0];
+  const sub = swapCambioStrada === 'btc-ln';
+  const pillole = strade.map(s => `<button type="button" class="consegna-pill${s === swapCambioStrada ? ' attiva' : ''}" data-swap="cambio-strada" data-strada="${esc(s)}">${esc(t.direzioni[s] || s)}</button>`).join('');
   const p = preventiviSwap[0];
   const dopo = p && p.dati ? pannelloSwapTelefono({id: 0}) : '';
   const errore = !dopo && swapErrori[0] ? `<div class="swap-rifiuto" role="status">${esc(swapErrori[0])}</div>` : '';
@@ -938,7 +1141,7 @@ function renderSwapCambio(){
     <h4>🔁 ${esc(t.cambiaTit)}</h4>
     <p class="swap-calma">${esc(t.cambiaSpiega)}</p>
     <div class="consegna-scelta">${pillole}</div>
-    <label class="swap-cifra-et" for="swapCambioCifra_0">${esc(t.cifraEt)}</label>
+    <label class="swap-cifra-et" for="swapCambioCifra_0">${esc(sub ? t.cifraEtSub : t.cifraEt)}</label>
     <input class="swap-indirizzo" id="swapCambioCifra_0" type="text" inputmode="numeric" autocomplete="off" placeholder="${fmt(l.minimo || 0)}" value="${esc(swapCambioScritta)}">
     <div class="hint">${esc(t.cifraTra(fmt(l.minimo || 0), fmt(l.massimo || 0)))}${l.al_giorno ? ' · ' + esc(t.oggi(l.oggi || 0, l.al_giorno)) : ''}</div>
     ${errore}
@@ -972,12 +1175,41 @@ async function swapCambioCalcola(){
   await swapInstradaPreventivo(0, false);
   renderSwapCambio();
 }
-async function swapCambioCopia(id){
+async function swapCambioCopia(id, cosa){
   haptic();
   const rec = swapLista().find(r => r.id === id);
-  if (!rec || !rec.invoice) return;
-  try { await navigator.clipboard.writeText(String(rec.invoice)); toast(t3().copiata); }
+  const testo = cosa === 'indirizzo' ? (rec && rec.lockupAddress) : (rec && rec.invoice);
+  if (!testo) return;
+  try { await navigator.clipboard.writeText(String(testo)); toast(t3().copiata); }
   catch(e){ toast(t3().appuntiChiusi); }
+}
+/* (tappa 3) la pillola della direzione: cambiarla azzera preventivo ed errori */
+function swapCambioScegliStrada(strada){
+  haptic();
+  if (strada === swapCambioStrada) return;
+  swapCambioStrada = strada;
+  delete preventiviSwap[0];
+  delete swapErrori[0];
+  delete swapPassi[0];
+  renderSwapCambio();
+}
+/* «Incolla» della richiesta Lightning: quel che arriva va nel campo
+   com'e' (il giudice parla a «Conferma»), senza «lightning:» davanti */
+async function swapIncollaFattura(n){
+  haptic();
+  let testo = null;
+  try { testo = await navigator.clipboard.readText(); } catch(e){ testo = null; }
+  if (testo == null) {
+    toast(t3().appuntiChiusi);
+    const c = el(`swapFattura_${n}`);
+    if (c) try { c.focus(); } catch(e){}
+    return;
+  }
+  swapFattureScritte[n] = String(testo || '').trim().replace(/^lightning:/i, '');
+  const c = el(`swapFattura_${n}`);
+  if (c) c.value = swapFattureScritte[n];
+  delete swapErrori[n];
+  if (Number(n) === 0) renderSwapCambio(); else ridisegnaIncassoSwap();
 }
 
 /* ─── 8. LA PAGINA «SWAP» ───────────────────────────────────────────────
@@ -995,9 +1227,9 @@ function renderSwapTelefono(){
       <b>${esc(swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
       <span>${esc(frasestatoSwap(rec))}</span>
       ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
-      ${!rec.indirizzo && SWAP_FASI_RITIRO.has(swapFase(rec)) ? `
+      ${(!rec.indirizzo && SWAP_FASI_RITIRO.has(swapFase(rec)) && !swapESub(rec)) || (swapDaRimborsare(rec) && !rec.indirizzo) ? `
         <input class="swap-indirizzo" id="swapIndirizzoR_${esc(rec.id)}" type="text" autocomplete="off" spellcheck="false" placeholder="bc1…">
-        <button class="btn ghost" type="button" data-swap="ritira-a" data-id="${esc(rec.id)}">${esc(t.ritiraA)}</button>` : ''}
+        <button class="btn ghost" type="button" data-swap="ritira-a" data-id="${esc(rec.id)}">${esc(swapESub(rec) ? t.rimborsaA : t.ritiraA)}</button>` : ''}
     </div>`).join('');
   const parole = swapFornitori().map(f => {
     const c = swapCassetto(f.id), viste = !!swapParoleViste[f.id];
@@ -1072,7 +1304,8 @@ function swapRitiraA(id){
     rec.indirizzo = v;
     swapSalvaRecord(rec);
     renderSwapTelefono();
-    swapRitira(rec);
+    /* (tappa 3) per un submarine l'indirizzo e' quello del rimborso */
+    if (swapESub(rec)) { swapRimborsa(rec); swapSorveglia(); } else swapRitira(rec);
   }).catch(() => toast(t3().nonRisponde(f.nome)));
 }
 
@@ -1097,7 +1330,9 @@ if (typeof document !== 'undefined') {
     else if (a === 'cambio-chiudi') swapCambioChiudi();
     else if (a === 'cambio-calcola') swapCambioCalcola();
     else if (a === 'cambio-copia') swapCambioCopia(String(b.dataset.id || ''));
-    else if (a === 'cambio-strada') haptic();   /* una strada sola, oggi */
+    else if (a === 'cambio-copia-indirizzo') swapCambioCopia(String(b.dataset.id || ''), 'indirizzo');
+    else if (a === 'cambio-strada') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
+    else if (a === 'incolla-fattura') swapIncollaFattura(n);
   });
   /* il campo dell'indirizzo si ricorda a ogni lettera: il preventivo si
      ridisegna anche da solo, e un bc1 lungo non si riscrive */
@@ -1106,6 +1341,8 @@ if (typeof document !== 'undefined') {
     if (c && typeof c.id === 'string' && c.id.startsWith('swapIndirizzo_'))
       swapIndirizziScritti[Number(c.id.slice(14))] = String(c.value || '');
     if (c && c.id === 'swapCambioCifra_0') swapCambioScritta = String(c.value || '');
+    if (c && typeof c.id === 'string' && c.id.startsWith('swapFattura_'))
+      swapFattureScritte[Number(c.id.slice(12))] = String(c.value || '');
   });
   /* la fotocamera non resta accesa ad app in secondo piano */
   document.addEventListener('visibilitychange', () => {

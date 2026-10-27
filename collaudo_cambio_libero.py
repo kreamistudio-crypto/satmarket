@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-IL CAMBIO LIBERO, TAPPA 2: IL BIGLIETTO E IL PREVENTIVO, SUL SERVER VERO
-(27 ott 2026, cantiere cambio-libero, piano approvato da Andrea).
+IL CAMBIO LIBERO, TAPPE 2 E 3: IL BIGLIETTO E IL PREVENTIVO, SUL SERVER
+VERO (27 ott 2026, cantiere cambio-libero, piano approvato da Andrea).
 
 `prove.py` gira i pezzi puri (la cifra, il conto del giorno, il tetto).
 Qui la STORIA per HTTP (TestClient, la app vera) contro il SATS ROUTING
@@ -22,7 +22,16 @@ LE SCENE:
     stesso swap su due biglietti e' «doppio», il biglietto di un altro
     e' 404, un biglietto annullato non nasce;
   - le leve: aperta a tutti, spenta (403 e `attivo: False`), e senza lo
-    swap sotto non c'e' il cambio.
+    swap sotto non c'e' il cambio;
+  - (tappa 3) LA STRADA BITCOIN → LIGHTNING: a leva spenta non c'e'
+    (strade, 400, «direzione»); accesa, il preventivo di quanto MANDARE
+    (ricevi + 0,5 % + 318), il minimo del submarine, il biglietto.
+  Poi IL TELEFONO (il codice vero in node contro il cartone): la strada
+  rovesciata con la richiesta Lightning al posto dell'indirizzo, la
+  nascita verificata, i bitcoin visti → confermati → pagata (la nostra
+  meta' del ritiro a due, col segreto che prova la fattura) → fatto; un
+  cambio fallito rimborsato a due all'indirizzo scritto; uno scaduto
+  rimborsato dallo script alla scadenza; uno scaduto senza bitcoin.
 
 NON TOCCA NIENTE DI VERO: config di cartone e database usa-e-getta dal
 banco dei pagamenti PRIMA dell'import del server; nessuna rete fuori da
@@ -248,6 +257,38 @@ def giro(c):
     srv.CAMBIO_LIBERO_SOLO_MODERATORI = True
     srv.SWAP_SOLO_MODERATORI = True
 
+    print("\n[la strada bitcoin → Lightning (tappa 3)]")
+    # (il 999 ha gia' i suoi cinque biglietti del giorno: qui si cambia
+    # col 222, coi due cancelli aperti per lui)
+    srv.CAMBIO_LIBERO_SOLO_MODERATORI = False
+    srv.SWAP_SOLO_MODERATORI = False
+    prova("a leva spenta la strada non c'e': strade, preventivo 400, biglietto «direzione»",
+          (["ln-btc"], 400, "direzione"),
+          (leve(c, 222).get("strade"), preventivo(c, 222, 100_000, direzione="btc-ln")[0],
+           biglietto(c, 222, 100_000, direzione="btc-ln")[1].get("motivo")))
+    srv.CAMBIO_BTC_LN_ATTIVO = True
+    prova("...accesa, le due strade in /api/me", ["ln-btc", "btc-ln"], leve(c, 222).get("strade"))
+    prima_sub = cartone("/cartone/visto").get("letture_sub", 0)
+    codice, p = preventivo(c, 222, 100_000, direzione="btc-ln")
+    prova("il preventivo di quanto MANDARE per ricevere 100.000: +0,5 % +318 = 100.818",
+          (200, True, "btc-ln", 100_000, 100_818, "cartone-sub-16ott",
+           [("ricevi_ln", 100_000, False), ("commissione", 500, True), ("rete_loro", 318, True)]),
+          (codice, p.get("ok"), p.get("direzione"), p.get("ricevi"), p.get("mandi"), p.get("hash"),
+           [(r["voce"], r["sats"], bool(r.get("piu"))) for r in p.get("righe", [])]))
+    prova("...letto dalle tariffe del submarine del cartone, col codice partner",
+          (1, "barattolo"), (cartone("/cartone/visto").get("letture_sub", 0) - prima_sub,
+                             cartone("/cartone/visto").get("referral")))
+    _, sub = preventivo(c, 222, 40_000, direzione="btc-ln")
+    prova("...sotto il minimo del submarine (50.000, piu' alto del nostro)",
+          (False, "sotto_minimo", 50_000), (sub.get("ok"), sub.get("motivo"), sub.get("minimo")))
+    codice, b = biglietto(c, 222, 100_000, direzione="btc-ln")
+    prova("il biglietto della strada rovesciata", (200, True), (codice, b.get("ok")))
+    liberato = annulla(c, 222, b.get("id"))[1].get("ok")
+    prova("...liberato subito (non conta per le scene dopo)", True, liberato)
+    srv.CAMBIO_BTC_LN_ATTIVO = False
+    srv.CAMBIO_LIBERO_SOLO_MODERATORI = True
+    srv.SWAP_SOLO_MODERATORI = True
+
     print("\n[le leve]")
     srv.CAMBIO_LIBERO_ATTIVO = False
     prova("cambio spento: nessuno, nemmeno il moderatore, e lo swap resta",
@@ -308,6 +349,9 @@ const chiamate = [];
 const BASE = D.base;
 const modo = m => fetchVero(`${BASE}/cartone/modo?m=${m}`).then(r => r.json());
 const visto = () => fetchVero(`${BASE}/cartone/visto`).then(r => r.json());
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const finche = async (f, ms = 5000) => { const t0 = Date.now(); while (!f() && Date.now() - t0 < ms) await sleep(100); };
+const stato = (id, s) => fetchVero(`${BASE}/cartone/stato?id=${id}&s=${s}`).then(r => r.json());
 const memoria = new Map();
 const ctx = {console, crypto: globalThis.crypto, TextEncoder, TextDecoder, URL,
   Uint8Array, BigInt, setTimeout, clearTimeout, Promise, JSON, Date, Math,
@@ -349,9 +393,19 @@ async function statoPagamentoSwap(){ return null; }
 const preventivi = [];
 async function leggiPreventivoSwap(n, fornitore, hash){
   const sats = Number(n) === 0 ? swapCambioCifra() : 48000;
-  preventivi.push({n, fornitore, hash, sats});
+  const strada = Number(n) === 0 ? swapCambioStradaScelta() : 'ln-btc';
+  preventivi.push({n, fornitore, hash, sats, strada});
   if (Number(n) === 0 && !sats) return {ok: false, motivo: 'cifra', oggi: 1, al_giorno: 5};
   if (Number(n) === 0 && tettoGiornoFinto) return {ok: false, motivo: 'tetto_giorno', oggi: 5, al_giorno: 5, fornitore_nome: 'SATS Routing'};
+  if (strada === 'btc-ln') {
+    /* il conto del server per la strada rovesciata (preventivo_sub) */
+    const comm = Math.ceil(sats * 5 / 1000), mandi = sats + comm + 318;
+    return {ok: true, hash: 'cartone-sub-16ott', dovuto: sats, fattura: sats, ricevi: sats, mandi,
+            valido_s: 60, oggi: 1, al_giorno: 5, direzione: 'btc-ln',
+            fornitore: fornitore || 'satsrouting', fornitore_nome: 'SATS Routing',
+            righe: [{voce: 'ricevi_ln', sats}, {voce: 'commissione', sats: comm, piu: true, percento: 0.5},
+                    {voce: 'rete_loro', sats: 318, piu: true}]};
+  }
   const comm = Math.ceil(sats * 6 / 1000), onchain = sats - comm - 324;
   return {ok: true, hash: 'cartone-tariffa-16ott', dovuto: sats, fattura: sats, onchain,
           ricevi: onchain - 234, valido_s: 60, oggi: 1, al_giorno: 5, direzione: 'ln-btc',
@@ -467,6 +521,147 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   out.annullo = {server: server().slice(sPrima3).map(s => s[0] + (s[0] === 'annulla' ? ':' + s[1] : '')), errore: run("swapErrori[0] || ''"),
                  quanti: lista().length};
   await modo('normale');
+  // ═══ LA STRADA BITCOIN → LIGHTNING (tappa 3) ═══
+  run("bigliettoRisposta = {ok: true, id: 51, oggi: 1}; swapLeve.cambio.strade = ['ln-btc', 'btc-ln']");
+  const sub = {};
+  const F = D.fattureSub;
+  run('swapCambioChiudi(); swapCambioApri()');
+  sub.pillole = (box().match(/data-swap="cambio-strada"/g) || []).length;
+  run("swapCambioScegliStrada('btc-ln')");
+  const fs1 = box();
+  sub.scelta = [fs1.includes('data-strada="btc-ln">') && fs1.includes('class="consegna-pill attiva" data-swap="cambio-strada" data-strada="btc-ln"'),
+                fs1.includes('Quanti sats vuoi ricevere in Lightning')];
+  run("elementi.swapCambioCifra_0 = {value: '100000'}");
+  await run('swapCambioCalcola()');
+  const fs2 = box();
+  sub.preventivo = {strada: preventivi()[preventivi().length - 1].strada,
+                    titolo: fs2.includes('Quanto mandi in bitcoin'), piu: fs2.includes('<b>+500</b>') && fs2.includes('<b>+318</b>'),
+                    mandi: fs2.includes('<span>Mandi all\'indirizzo</span><b>100818<span class="unit">sats</span></b>'),
+                    riceviLn: fs2.includes('<span>Ricevi in Lightning</span><b>100000</b>'),
+                    campoFattura: fs2.includes('id="swapFattura_0"') && fs2.includes('data-swap="incolla-fattura"'),
+                    campoIndirizzo: fs2.includes('id="swapIndirizzo_0"'),
+                    spiega: fs2.includes('crea una richiesta di 100000 sats esatti')};
+  /* «Conferma» coi no della richiesta: manca, storta, importo, rete */
+  const noFattura = async v => { run(`elementi.swapFattura_0 = {value: ${JSON.stringify(v)}}`); await run('swapAvanti(0)'); return run("swapErrori[0] || ''"); };
+  const sPrimaSub = server().length;
+  sub.fatturaNo = [await noFattura(''), await noFattura('lnbc1storta'), await noFattura(F.importo.invoice), await noFattura(F.regtest.invoice),
+                   server().length - sPrimaSub];
+  /* «Incolla» con «lightning:» davanti */
+  run("navigator = {clipboard: {readText: async () => 'lightning:' + " + JSON.stringify(F.buona.invoice) + ", writeText: async t => { avvisi.push('APPUNTI:' + t.slice(0, 4)); }}}");
+  await run('swapIncollaFattura(0)');
+  sub.incollata = run('swapFattureScritte[0]') === F.buona.invoice;
+  /* la nascita rovesciata (le parole sono gia' copiate: stesso cassetto) */
+  const vS1 = await visto();
+  await run('swapAvanti(0)');
+  const vS2 = await visto();
+  const rS = lista().find(r => r.tipo === 'sub') || {};
+  const nascita = server().filter(s => s[0] === 'nato').pop();
+  sub.nata = {ordini: server().slice(sPrimaSub).map(s => s[0]), biglietto: (server().slice(sPrimaSub).find(s => s[0] === 'biglietto') || [])[1],
+              swap: vS2.swap - vS1.swap, ordine: rS.ordine, tipo: rS.tipo, cambio: rS.cambio, mandi: rS.mandi, ricevi: rS.ricevi,
+              impronta: rS.impronta === F.buona.impronta, indirizzoDelRimborso: rS.indirizzo, fattura: rS.fattura === F.buona.invoice,
+              lockup: /^bc1p[0-9a-z]{58}$/.test(String(rS.lockupAddress || '')),
+              nato: nascita && nascita[2] && [nascita[2].indirizzo === rS.lockupAddress, nascita[2].onchain, nascita[2].impronta === F.buona.impronta],
+              fase: run('swapFase(swapLista().find(r => r.tipo === "sub"))'), errore: run("swapErrori[0] || ''")};
+  const cS = box();
+  sub.carta = {manda: cS.includes('Manda esattamente 100818 sats a questo indirizzo'), indirizzo: cS.includes(rS.lockupAddress),
+               copia: cS.includes('data-swap="cambio-copia-indirizzo"'), wallet: cS.includes('href="bitcoin:' + rS.lockupAddress + '?amount=0.00100818'),
+               passi: cS.includes('>Mandati<') && cS.includes('>Pagato<'), fatturaLn: cS.includes('data-swap="cambio-copia"'),
+               qr: qr()[qr().length - 1]};
+  /* «Copia l'indirizzo» */
+  await run(`swapCambioCopia(${JSON.stringify(rS.id)}, 'indirizzo')`);
+  sub.copiaIndirizzo = run('avvisi.slice(-2)');
+  /* i bitcoin: visti, confermati, la fattura pagata, il ritiro a due, fatto */
+  const frase = () => run('frasestatoSwap(swapLista().find(r => r.id === ' + JSON.stringify(rS.id) + '))');
+  const rec = () => lista().find(r => r.id === rS.id);
+  await stato(rS.id, 'transaction.mempool');
+  await run('swapGiro()');
+  sub.visti = [run('swapFase(swapLista().find(r => r.id === ' + JSON.stringify(rS.id) + '))'), rec().bloccato, frase()];
+  await stato(rS.id, 'transaction.confirmed');
+  await run('swapGiro()');
+  sub.confermati = frase();
+  const vP = await visto();
+  await stato(rS.id, 'invoice.paid&preimage=' + F.buona.preimage);
+  await run('swapGiro()');
+  const vD = await visto();
+  sub.pagata = {ritiri: vD.ritiri.filter(x => x === rS.id).length - vP.ritiri.filter(x => x === rS.id).length,
+                ritiro: rec().ritiro && rec().ritiro.cooperativo, stato: (await fetchVero(`${BASE}/v2/swap/${rS.id}`).then(r => r.json())).status,
+                spesa: (await fetchVero(`${BASE}/esplora/tx/${(await fetchVero(`${BASE}/v2/swap/submarine/${rS.id}/transaction`).then(r => r.json())).id}/outspend/0`).then(r => r.json())).spent};
+  await run('swapGiro()');
+  run('swapCambioChiudi()');
+  sub.fatto = [frase(), box().includes('data-swap="cambia"'), rec().stato];
+  run('renderSwapTelefono()');
+  sub.lista = run('elementi.swapTelefono.innerHTML').includes('<b>Cambio</b>');
+  /* IL CAMBIO FALLITO: i bitcoin tornano a due, all'indirizzo scritto */
+  const nuovoSub = async f => {
+    run("bigliettoRisposta = {ok: true, id: bigliettoRisposta.id + 1, oggi: 1}");
+    run('swapCambioApri(); swapCambioScegliStrada("btc-ln")');
+    run("elementi.swapCambioCifra_0 = {value: '100000'}");
+    await run('swapCambioCalcola()');
+    run(`elementi.swapFattura_0 = {value: ${JSON.stringify(f.invoice)}}`);
+    await run('swapAvanti(0)');
+    return lista().filter(r => r.tipo === 'sub').pop();
+  };
+  const r2 = await nuovoSub(F.fallita);
+  await stato(r2.id, 'transaction.mempool');
+  await run('swapGiro()');
+  await stato(r2.id, 'invoice.failedToPay');
+  await run('swapGiro()');
+  const rec2 = () => lista().find(r => r.id === r2.id);
+  const frase2 = () => run('frasestatoSwap(swapLista().find(r => r.id === ' + JSON.stringify(r2.id) + '))');
+  run('renderSwapTelefono()');
+  const pag2 = run('elementi.swapTelefono.innerHTML');
+  sub.fallito = {fase: run('swapFase(swapLista().find(r => r.id === ' + JSON.stringify(r2.id) + '))'), frase: frase2(),
+                 daRimborsare: run('swapDaRimborsare(swapLista().find(r => r.id === ' + JSON.stringify(r2.id) + '))'),
+                 campo: pag2.includes(`id="swapIndirizzoR_${r2.id}"`) && pag2.includes('>Rimanda a questo indirizzo<'),
+                 riquadro: (run('swapCambioChiudi()'), box().includes('data-swap="cambia"')), aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r2.id) + ')')};
+  run(`elementi.swapIndirizzoR_${r2.id} = {value: '${D.indirizzo}'}`);
+  const scriptDest = run(`(() => { const S = window.BarattoloSwap; return S.hex.encode(S.OutScript.encode(S.Address(S.NETWORK).decode(${JSON.stringify(D.indirizzo)}))); })()`);
+  const vR1 = await visto();
+  await run(`swapRitiraA(${JSON.stringify(r2.id)})`);
+  await finche(() => (rec2().rimborso || {}).txid || rec2().errore);
+  const vR2 = await visto();
+  const tR = vR2.trasmesse.find(x => rec2().rimborso && x.txid === rec2().rimborso.txid) || {};
+  sub.rimborsato = {indirizzo: rec2().indirizzo, txid: /^[0-9a-f]{64}$/.test(String((rec2().rimborso || {}).txid || '')),
+                    cooperativo: (rec2().rimborso || {}).cooperativo, firme: vR2.rimborsi.filter(x => x === r2.id).length - vR1.rimborsi.filter(x => x === r2.id).length,
+                    errore: rec2().errore || '', via: tR.via, strade: (tR.strade || []).slice().sort(), aDest: !!(tR.uscite && tR.uscite[0] && tR.uscite[0].script === scriptDest),
+                    fase: run('swapFase(swapLista().find(r => r.id === ' + JSON.stringify(r2.id) + '))'), frase: frase2(),
+                    aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r2.id) + ')')};
+  /* LO SCADUTO coi bitcoin mandati e il fornitore che non firma: dallo
+     script, alla scadenza */
+  const r3 = await nuovoSub(F.scaduta);
+  await stato(r3.id, 'transaction.mempool');
+  await run('swapGiro()');
+  await stato(r3.id, 'swap.expired');
+  await run('swapGiro()');
+  await modo('non_firma');
+  run(`elementi.swapIndirizzoR_${r3.id} = {value: '${D.indirizzo}'}`);
+  const rec3 = () => lista().find(r => r.id === r3.id);
+  await run(`swapRitiraA(${JSON.stringify(r3.id)})`);
+  await finche(() => rec3().aspettaScadenza || rec3().rimborso || rec3().errore);
+  const frase3 = () => run('frasestatoSwap(swapLista().find(r => r.id === ' + JSON.stringify(r3.id) + '))');
+  sub.presto = {rimborso: !!rec3().rimborso, aspetta: rec3().aspettaScadenza, frase: frase3(),
+                aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r3.id) + ')')};
+  await fetchVero(`${BASE}/cartone/cima?h=${r3.timeoutBlockHeight}`).then(r => r.json());
+  await run('swapGiro()');
+  const vR3 = await visto();
+  const tR3 = vR3.trasmesse.find(x => rec3().rimborso && x.txid === rec3().rimborso.txid) || {};
+  sub.script = {txid: /^[0-9a-f]{64}$/.test(String((rec3().rimborso || {}).txid || '')), cooperativo: (rec3().rimborso || {}).cooperativo,
+                via: tR3.via, strade: (tR3.strade || []).slice().sort(), aDest: !!(tR3.uscite && tR3.uscite[0] && tR3.uscite[0].script === scriptDest), fase: run('swapFase(swapLista().find(r => r.id === ' + JSON.stringify(r3.id) + '))'), frase: frase3()};
+  await modo('normale');
+  /* LO SCADUTO SENZA BITCOIN: niente da rimborsare */
+  const r4 = await nuovoSub(F.vuota);
+  await stato(r4.id, 'swap.expired');
+  await run('swapGiro()');
+  run('renderSwapTelefono()');
+  sub.vuoto = {frase: run('frasestatoSwap(swapLista().find(r => r.id === ' + JSON.stringify(r4.id) + '))'),
+               daRimborsare: run('swapDaRimborsare(swapLista().find(r => r.id === ' + JSON.stringify(r4.id) + '))'),
+               campo: run('elementi.swapTelefono.innerHTML').includes(`id="swapIndirizzoR_${r4.id}"`),
+               aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r4.id) + ')')};
+  /* il recupero dalla xpub ritrova anche i submarine, con la chiave di rimborso */
+  const trovati = await fetchVero(`${BASE}/v2/swap/restore`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({xpub: run('(() => { const S = window.BarattoloSwap; return swapXpub(S, swapCassetto("satsrouting").parole); })()')})}).then(r => r.json());
+  sub.recupero = trovati.filter(s => s.type === 'submarine').length;
+  out.sub = sub;
   // --- la sentinella: il telefono ha chiamato solo il cartone
   out.sentinella = {fuori: chiamate.filter(c => !c.url.startsWith(BASE + '/v2/') && !c.url.startsWith(BASE + '/esplora/')).map(c => c.url),
                     paga: server().filter(s => s[0] === 'paga').length};
@@ -474,6 +669,22 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   process.exit(0);
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
 """
+
+
+def fatture_sub():
+    """Le richieste Lightning «del wallet dell'utente» per la strada
+    rovesciata: fatte dal cartone, col segreto che conosce il banco."""
+    import hashlib
+    import secrets
+    out = {}
+    for nome, sats, rete in (("buona", 100_000, "bitcoin"), ("fallita", 100_000, "bitcoin"),
+                             ("scaduta", 100_000, "bitcoin"), ("vuota", 100_000, "bitcoin"),
+                             ("importo", 99_000, "bitcoin"), ("regtest", 100_000, "regtest")):
+        pre = secrets.token_bytes(32)
+        imp = hashlib.sha256(pre).hexdigest()
+        inv = cartone_satsrouting.cripto("fattura", rete=rete, sats=sats, impronta=imp)["invoice"]
+        out[nome] = {"invoice": inv, "preimage": pre.hex(), "impronta": imp}
+    return out
 
 
 def telefono(base, tetto_giorno=False):
@@ -491,6 +702,7 @@ def telefono(base, tetto_giorno=False):
             "telefono": [os.path.join(banco.QUI, "swap", "boltz.js"),
                          os.path.join(banco.QUI, "swap", "instradatore.js")],
             "pagina": pezzi_pagina(),
+            "fattureSub": fatture_sub(),
             "leve": {"attivo": True, "api": base, "rete": "bitcoin",
                      "referral": "barattolo", "minimo": 25_000, "massimo": 50_000,
                      "mempool": base + "/esplora",
@@ -519,7 +731,7 @@ def il_telefono(base):
     prova("senza cifra: lo dice e non chiede niente", [True, 0], r["senzaCifra"])
     prova("100.000 (coi punti): la rotta del cambio, la riga «Cambi» e non «Ti spettano», "
           "ricevi 98.842, niente «Incassa in Lightning», l'indirizzo e «Conferma»",
-          {"letto": {"n": 0, "fornitore": "satsrouting", "hash": "", "sats": 100_000},
+          {"letto": {"n": 0, "fornitore": "satsrouting", "hash": "", "sats": 100_000, "strada": "ln-btc"},
            "cambi": True, "spettano": False, "ricevi": True, "incassaLn": False,
            "campo": True, "conferma": True, "calcola": False}, r["preventivo"])
     prova("«Conferma» senza indirizzo: lo dice, e al server non va niente",
@@ -568,10 +780,74 @@ def il_telefono(base):
     prova("la sentinella: il telefono parla solo col cartone, e Barattolo non paga mai",
           {"fuori": [], "paga": 0}, r["sentinella"])
 
+    print("\n[il telefono, la strada bitcoin → Lightning (tappa 3)]")
+    s = r.get("sub") or {}
+    prova("con le due strade dal server, due pillole; scelta «bitcoin → Lightning», "
+          "la cifra e' quanto RICEVERE", (2, [True, True]), (s.get("pillole"), s.get("scelta")))
+    prova("il preventivo della strada rovesciata: quanto mandi, i costi col +, "
+          "il campo della richiesta Lightning al posto dell'indirizzo",
+          {"strada": "btc-ln", "titolo": True, "piu": True, "mandi": True, "riceviLn": True,
+           "campoFattura": True, "campoIndirizzo": False, "spiega": True}, s.get("preventivo"))
+    prova("«Conferma» coi no della richiesta: manca, storta, importo sbagliato, altra "
+          "rete; al server non va niente",
+          ["Prima incolla la richiesta del tuo wallet Lightning: tocca «Incolla».",
+           "Questa non sembra una richiesta Lightning: ricontrollala.",
+           "La richiesta deve essere di 100000 sats esatti.",
+           "Questa richiesta è di un'altra rete.", 0], s.get("fatturaNo"))
+    prova("«Incolla» toglie «lightning:» davanti", True, s.get("incollata"))
+    n = s.get("nata") or {}
+    prova("la nascita rovesciata: biglietto (btc-ln), swap al cartone, nascita con "
+          "l'indirizzo del lockup e quanto mandare; il record e' un «sub» dell'ordine 0",
+          (["biglietto", "nato"], "btc-ln", 1, 0, "sub", 51, 100_818, 100_000, True, "", True, True,
+           [True, 100_818, True], "creato", ""),
+          (n.get("ordini"), (n.get("biglietto") or {}).get("direzione"), n.get("swap"), n.get("ordine"),
+           n.get("tipo"), n.get("cambio"), n.get("mandi"), n.get("ricevi"), n.get("impronta"),
+           n.get("indirizzoDelRimborso"), n.get("fattura"), n.get("lockup"), n.get("nato"),
+           n.get("fase"), n.get("errore")))
+    prova("la carta: «Manda esattamente 100818 sats…», l'indirizzo in chiaro, «Copia "
+          "l'indirizzo», il link bitcoin: con la cifra, i passi Mandati → Pagato, niente "
+          "fattura da pagare; il QR e' il link bitcoin: (byte)",
+          {"manda": True, "indirizzo": True, "copia": True, "wallet": True, "passi": True,
+           "fatturaLn": False, "qr": ["swapCambioQr", "bitcoin:bc1p", "Byte"]}, s.get("carta"))
+    prova("«Copia l'indirizzo» negli appunti", ["APPUNTI:bc1p", "Copiata"], s.get("copiaIndirizzo"))
+    prova("i bitcoin visti: «bloccato», il record lo ricorda, la frase", 
+          ["bloccato", True, "Bitcoin visti: aspetto la conferma della rete, di solito una decina di minuti."],
+          s.get("visti"))
+    prova("confermati: «SATS Routing sta pagando la tua richiesta»",
+          "Confermati: SATS Routing sta pagando la tua richiesta.", s.get("confermati"))
+    prova("la fattura pagata: la nostra meta' del ritiro a due (una volta), il cartone "
+          "ritira (transaction.claimed) e il lockup e' speso",
+          {"ritiri": 1, "ritiro": True, "stato": "transaction.claimed", "spesa": True}, s.get("pagata"))
+    prova("fatto: la frase, il riquadro torna al tasto, lo stato",
+          ["Fatto: i sats sono nel tuo wallet Lightning.", True, "transaction.claimed"], s.get("fatto"))
+    prova("...e nella lista si chiama «Cambio»", True, s.get("lista"))
+    prova("un cambio fallito coi bitcoin mandati: «fallito», la frase chiede dove rimandarli, "
+          "il campo nella lista, il riquadro libero, e NON e' in sorveglianza senza indirizzo",
+          {"fase": "fallito", "frase": "Non riuscito: i tuoi bitcoin tornano a te. Scrivi sotto dove rimandarli.",
+           "daRimborsare": True, "campo": True, "riquadro": True, "aperto": False}, s.get("fallito"))
+    prova("l'indirizzo scritto: il rimborso a due parte subito (sulle due strade, "
+          "alla destinazione), «ripreso», e lo swap esce dalla sorveglianza",
+          {"indirizzo": INDIRIZZO, "txid": True, "cooperativo": True, "firme": 1, "via": "cooperativo",
+           "errore": "", "strade": ["fornitore", "rete"], "aDest": True, "fase": "ripreso", "frase": True, "aperto": False},
+          dict(s.get("rimborsato") or {}, frase=str((s.get("rimborsato") or {}).get("frase", "")).startswith("Ripresi: i bitcoin sono tornati al tuo indirizzo (")))
+    prova("lo scaduto col fornitore che non firma: prima della scadenza «ci penso io», "
+          "resta in sorveglianza",
+          {"rimborso": False, "aspetta": True,
+           "frase": "I bitcoin tornano a te alla scadenza: ci penso io, apri l'app ogni tanto.", "aperto": True},
+          s.get("presto"))
+    prova("...alla scadenza il rimborso dalla foglia dello script, alla destinazione, «ripreso»",
+          {"txid": True, "cooperativo": False, "via": "rimborso", "strade": ["fornitore", "rete"], "aDest": True,
+           "fase": "ripreso", "frase": True},
+          dict(s.get("script") or {}, frase=str((s.get("script") or {}).get("frase", "")).startswith("Ripresi:")))
+    prova("lo scaduto senza bitcoin mandati: niente da rimborsare, nessun campo, fuori dalla sorveglianza",
+          {"frase": "Scaduto: nessun bitcoin si è mosso. Puoi fare un cambio nuovo.", "daRimborsare": False,
+           "campo": False, "aperto": False}, s.get("vuoto"))
+    prova("il recupero dalla xpub ritrova anche i quattro submarine", 4, s.get("recupero"))
+
 def main():
     global PORTA
     print("=" * 58)
-    print("  🔁 IL CAMBIO LIBERO, TAPPA 2 — il biglietto, il giro vero")
+    print("  🔁 IL CAMBIO LIBERO, TAPPE 2 E 3 — il biglietto, il giro vero")
     print("=" * 58)
     banco.avvio()
     import httpx

@@ -1620,6 +1620,14 @@ try:
     from config import CAMBIO_LIBERO_MAX_AL_GIORNO
 except ImportError:
     CAMBIO_LIBERO_MAX_AL_GIORNO = 5
+# La strada bitcoin → Lightning (tappa 3): SPENTA finche' Massimo non
+# risponde sulla quota partner del submarine e sui limiti di chiamate
+# (decisione di Andrea, 27 ott 2026). A leva spenta la direzione non
+# compare nel telefono e il server la rifiuta.
+try:
+    from config import CAMBIO_BTC_LN_ATTIVO
+except ImportError:
+    CAMBIO_BTC_LN_ATTIVO = False
 # QUANTI BLOCCHI DEVONO RESTARE allo swap quando lo paghiamo: dopo il
 # pagamento il fornitore blocca i bitcoin e il telefono li ritira, e se
 # lo swap scade prima il fornitore se li riprende (e il pagamento torna
@@ -1819,6 +1827,93 @@ def swap_lettura_simulata(base: str) -> bool:
               "si esce dal computer (punta SWAP_API_BASE al cartone)",
               flush=True)
     return True
+
+
+def tariffa_sub_da_risposta(dati) -> dict | None:
+    """(tappa 3, cambio-libero) Dalla risposta di `/v2/swap/submarine` la
+    coppia BTC/BTC: la percentuale, la rete del LORO ritiro (`minerFees`,
+    un numero solo), i limiti. None se la forma non torna."""
+    try:
+        c = dati["BTC"]["BTC"]
+        tariffa = {
+            "hash": str(c["hash"]),
+            "percento": float(c["fees"]["percentage"]),
+            "rete": int(c["fees"]["minerFees"]),
+            "minimo": int(c["limits"]["minimal"]),
+            "massimo": int(c["limits"]["maximal"])}
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not tariffa["hash"] or tariffa["percento"] < 0 \
+            or min(tariffa["rete"], tariffa["minimo"], tariffa["massimo"]) < 0:
+        return None
+    return tariffa
+
+
+_TARIFFE_SUB = {}      # fornitore -> {quando, dati}: la copia di 30 s
+
+
+async def leggi_tariffa_sub(fornitore: dict | None = None) -> dict | None:
+    """Le tariffe di adesso del submarine (bitcoin → Lightning) di UN
+    fornitore, con la copia di 30 secondi e il codice partner, come
+    `leggi_tariffa_swap`. None = non risponde, o in collaudo si e'
+    fermato da solo."""
+    f = fornitore or swap_fornitori()[0]
+    copia = _TARIFFE_SUB.setdefault(f["id"], {"quando": 0.0, "dati": None})
+    adesso = time.time()
+    if copia["dati"] is not None \
+            and adesso - copia["quando"] < SWAP_TARIFFE_COPIA_S:
+        return copia["dati"]
+    base = str(f["api"] or "").rstrip("/")
+    if not base or swap_lettura_simulata(base):
+        return None
+    intestazioni = {}
+    codice = str(f["referral"] or "").strip()
+    if codice:
+        intestazioni["Referral"] = codice
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"{base}/v2/swap/submarine", headers=intestazioni)
+        if r.status_code != 200:
+            return None
+        tariffa = tariffa_sub_da_risposta(r.json())
+    except Exception as e:
+        print(f"⚠️ Swap: le tariffe del submarine di {f['nome']} non arrivano "
+              f"({e})", flush=True)
+        return None
+    if tariffa is not None:
+        copia.update(quando=adesso, dati=tariffa)
+    return tariffa
+
+
+def preventivo_sub(ricevi: int, tariffa: dict, minimo=0, massimo=0) -> dict:
+    """IL CONTO DEL CAMBIO BITCOIN → LIGHTNING, puro. `ricevi` e' quel che
+    arriva nel wallet Lightning (la richiesta che l'utente incolla); si
+    MANDA all'indirizzo del fornitore ricevi + la loro percentuale per
+    eccesso + la rete del loro ritiro (il calco di `expectedAmount`). La
+    rete della transazione che manda e' del suo wallet, e non sta qui.
+    Nessuna fee di Barattolo (SWAP_FEE_PERCENTO resta 0, e qui non c'e'
+    una fattura nostra da cui toglierla). I tetti come nel reverse."""
+    ricevi = int(ricevi)
+    soglia_min = max(int(minimo or 0), int(tariffa["minimo"]))
+    soglia_max = int(tariffa["massimo"])
+    if int(massimo or 0) > 0:
+        soglia_max = min(soglia_max, int(massimo))
+    base = {"dovuto": ricevi, "hash": tariffa["hash"],
+            "minimo": soglia_min, "massimo": soglia_max}
+    if ricevi < soglia_min:
+        return dict(base, ok=False, motivo="sotto_minimo")
+    if ricevi > soglia_max:
+        return dict(base, ok=False, motivo="sopra_tetto")
+    millesimi = round(float(tariffa["percento"]) * 1000)
+    commissione = -(-ricevi * millesimi // 100_000)
+    rete = int(tariffa["rete"])
+    mandi = ricevi + commissione + rete
+    righe = [{"voce": "ricevi_ln", "sats": ricevi},
+             {"voce": "commissione", "sats": commissione, "piu": True,
+              "percento": tariffa["percento"]},
+             {"voce": "rete_loro", "sats": rete, "piu": True}]
+    return dict(base, ok=True, righe=righe, fattura=ricevi, ricevi=ricevi,
+                mandi=mandi)
 
 
 def tariffa_swap_da_risposta(dati) -> dict | None:
@@ -32121,6 +32216,13 @@ def _leve_stato():
                   "CAMBIO_LIBERO_MAX_AL_GIORNO",
                   int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0),
                   spento="a 0 nessun tetto sul numero"),
+            _leva("Cambio libero: anche bitcoin → Lightning",
+                  "CAMBIO_BTC_LN_ATTIVO", bool(CAMBIO_BTC_LN_ATTIVO),
+                  acceso="la seconda strada del cambio: bitcoin "
+                         "all'indirizzo del fornitore, la richiesta "
+                         "Lightning pagata",
+                  spento="solo Lightning → indirizzo bitcoin; resta "
+                         "spenta finche' Massimo non risponde"),
             # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
             # fattura dello swap e' meno di quel che spetta a chi vende, e
             # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
@@ -73920,7 +74022,13 @@ async def swap_pagamento_stato(ordine_id: int,
 # conta piu' (il telefono si e' spento a meta'). Un telefono manomesso
 # puo' saltare il biglietto: non c'e' un sats di Barattolo in gioco, e
 # il tetto e' una regola della casa, non una cassaforte.
-CAMBIO_STRADE = ("ln-btc",)          # dalla tappa 3 anche "btc-ln"
+def cambio_strade() -> tuple:
+    """Le direzioni del cambio: Lightning → indirizzo sempre; bitcoin →
+    Lightning solo a `CAMBIO_BTC_LN_ATTIVO` (spenta finche' Massimo non
+    risponde)."""
+    return ("ln-btc", "btc-ln") if CAMBIO_BTC_LN_ATTIVO else ("ln-btc",)
+
+
 CAMBIO_CHIESTO_VALE_S = 900
 CAMBIO_STATI = ("chiesto", "nato", "annullato")
 _lucchetto_cambi = asyncio.Lock()
@@ -73979,7 +74087,7 @@ def cambio_leve(tg_id: int) -> dict:
     return {"attivo": attivo, "minimo": int(SWAP_MIN_SATS or 0),
             "massimo": int(CAMBIO_LIBERO_MAX_SATS or 0),
             "al_giorno": int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0),
-            "oggi": oggi, "strade": list(CAMBIO_STRADE)}
+            "oggi": oggi, "strade": list(cambio_strade())}
 
 
 def _cambio_tetto_giorno(oggi: int) -> bool:
@@ -74010,7 +74118,7 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not cambio_libero_per(user["id"]):
         raise HTTPException(403, "Il cambio non e' disponibile")
-    if direzione not in CAMBIO_STRADE:
+    if direzione not in cambio_strade():
         raise HTTPException(400, "Direzione sconosciuta")
     chi = swap_fornitore(str(fornitore or ""))
     if chi is None:
@@ -74028,11 +74136,19 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
         return dict(busta, ok=False, motivo="cifra")
     if _cambio_tetto_giorno(oggi):
         return dict(busta, ok=False, motivo="tetto_giorno")
-    tariffa = await leggi_tariffa_swap(chi)
-    if tariffa is None:
-        return dict(busta, ok=False, motivo="non_risponde")
-    p = preventivo_swap(cifra, tariffa, SWAP_FEE_PERCENTO,
-                        SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
+    if direzione == "btc-ln":
+        # (tappa 3) la strada rovesciata: le tariffe del submarine, e il
+        # conto di quanto MANDARE all'indirizzo del fornitore
+        tariffa = await leggi_tariffa_sub(chi)
+        if tariffa is None:
+            return dict(busta, ok=False, motivo="non_risponde")
+        p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
+    else:
+        tariffa = await leggi_tariffa_swap(chi)
+        if tariffa is None:
+            return dict(busta, ok=False, motivo="non_risponde")
+        p = preventivo_swap(cifra, tariffa, SWAP_FEE_PERCENTO,
+                            SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
     p["valido_s"] = SWAP_PREVENTIVO_VALE_S
     return dict(busta, **p)
@@ -74050,7 +74166,7 @@ async def cambio_biglietto(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(403, "Il cambio non e' disponibile")
     d = await leggi_json(req)
     direzione = str(d.get("direzione") or "ln-btc")
-    if direzione not in CAMBIO_STRADE:
+    if direzione not in cambio_strade():
         return {"ok": False, "motivo": "direzione"}
     chi = swap_fornitore(str(d.get("fornitore") or "satsrouting"))
     if chi is None:
