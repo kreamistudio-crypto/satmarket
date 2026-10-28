@@ -634,6 +634,18 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   /* scegliere la rete che c'e' gia' chiude e basta */
   run("swapCambioScegliStrada('ln-btc')");
   sub.tendina.stessa = [run('swapCambioTendina'), run('swapCambioStradaScelta()'), box().includes('role="listbox"')];
+  /* (euro-ordine) IL TASTO «onion» accanto al selettore: c'e' solo con
+     l'indirizzo dal server e non a chi e' gia' su Tor; toccato, apre */
+  const onionB = () => (box().match(/<\/div><button type="button" class="cambio-onion" data-swap="cambio-onion">onion<\/button>/g) || []).length;
+  sub.onion = {senza: onionB()};
+  run("var onionHost = 'barattoloprova.onion', suOnioneFinto = false; function suOnion(){ return suOnioneFinto; } var aperture = 0; function apriSitoOnion(){ aperture++; }");
+  run('swapCambioRidisegna()');
+  sub.onion.con = onionB();
+  tocco({closest: () => ({dataset: {swap: 'cambio-onion'}})});
+  sub.onion.aperto = run('aperture');
+  run('suOnioneFinto = true; swapCambioRidisegna()');
+  sub.onion.suTor = onionB();
+  run("onionHost = ''; suOnioneFinto = false; swapCambioRidisegna()");
   /* il tondo gira la strada; la cifra scritta resta, e il conto si rifa' da solo */
   const pGira = preventivi().length;
   await run("swapCambioScegliStrada('btc-ln')");
@@ -957,6 +969,9 @@ def il_telefono(base):
           "LN quella rovesciata; la rete che c'e' gia' chiude e basta",
           {"pillole": 2, "menu": 2, "ln": True, "btc": True, "aperta": True, "chiusaFuori": True,
            "ricevi": [True, True], "stessa": [None, "ln-btc", False]}, s.get("tendina"))
+    prova("(euro-ordine) il tasto «onion» subito dopo il selettore ₿ / sats: solo con "
+          "l'indirizzo .onion dal server, mai a chi e' gia' su Tor; toccato, apre il sito Tor",
+          {"senza": 0, "con": 1, "aperto": 1, "suTor": 0}, s.get("onion"))
     prova("...un sat in piu', mai in meno: scritti 100.015 da mandare, ne servono "
           "100.016; uscendo dal campo si vede la cifra vera, e il conto resta buono",
           ["100016", 100_016, 99_201, True, 0], s.get("unSatInPiu"))

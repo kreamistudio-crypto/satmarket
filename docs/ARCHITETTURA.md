@@ -34022,6 +34022,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   span `swapCambioEuroMandi`/`swapCambioEuroRicevi` stanno dentro
   `.cambio-cifra` e il ridisegno a pezzi li aggiorna senza toccare il
   campo. `vaiSwap` richiede il cambio se ha più di `CAMBIO_LIBRO_MS`.
+  Anche nei riquadri dell'ordine (`pannelloPreventivoSwap`, cantiere
+  euro-ordine): stessa `euroSwap` (con `typeof`: sta nel file del
+  telefono), e `scegliIncassoSwap(id, 'swap')` richiede il cambio vecchio.
+  IL TASTO «onion» (stesso cantiere): `.cambio-onion` dopo `.cambio-unita`,
+  `data-swap="cambio-onion"` → `apriSitoOnion()` (miniapp, accanto a
+  `copiaOnion`): `http://` + `onionHost` del server, `tg.openLink` dentro
+  Telegram. Non nasce senza `onionHost` né su `suOnion()`.
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
