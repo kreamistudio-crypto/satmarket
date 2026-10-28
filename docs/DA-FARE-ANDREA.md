@@ -63,3 +63,62 @@ docker compose exec lnd lncli updatechanpolicy --base_fee_msat 1000 --fee_rate_p
 ```
 Poi di nuovo `feereport` per vedere che ha preso. Il risultato e il
 perché vanno in `docs/NODO-MOSTRO.md`, e questa voce si cancella.
+
+## 3. L'assistente del bot, prima sul collaudo (28 ott 2026, cantiere bot-assistente)
+
+**Perché.** Andrea ha chiesto un bot che risponda come un assistente AI,
+dichiarato come tale, con una persona vera dietro un bottone; ha scelto
+l'API di Claude con una chiave separata. Il codice è su `develop`,
+spento e senza chiave: sul collaudo non si vede finché non si accende.
+Il perché di tutto: CANTIERI, «L'assistente del bot».
+
+**Prima, dal PC (nessun comando):** nella Console di Anthropic un
+workspace «barattolo-bot» col suo limite di spesa mensile (10-20 $ per
+cominciare) e dentro una chiave nuova. La stessa chiave può servire
+collaudo e produzione; due chiavi separate dicono quanto spende ognuno.
+In KeePass, mai in chat.
+
+**Sola lettura** (sulla VM del collaudo). Le righe non ci sono già
+(deve dire `0`), e il config legge i segreti dai file con `_segreto`
+(deve dire `1`):
+```
+sudo grep -c "^ASSISTENTE_" /srv/collaudo/barattolo/config.py
+```
+```
+sudo grep -c "def _segreto" /srv/collaudo/barattolo/config.py
+```
+
+**Scrive**, un comando alla volta. Sul collaudo i segreti stanno in
+`/etc/barattolo-collaudo/`, uno per file, e il config li legge (COLLAUDO
+§4): la chiave va in un file suo, e nel config solo la riga che lo legge.
+La copia di riserva:
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-assistente
+```
+La chiave nel suo file (chiede la password di sudo, poi la chiave, che
+non si vede mentre si incolla; deve dire «Scritta»):
+```
+sudo -v && read -rsp "Chiave dell'assistente: " K && echo && if [ -z "$K" ]; then echo "Vuota: non scrivo niente"; else printf '%s' "$K" | sudo tee /etc/barattolo-collaudo/assistente_api_key > /dev/null && sudo chown root:collaudo /etc/barattolo-collaudo/assistente_api_key && sudo chmod 640 /etc/barattolo-collaudo/assistente_api_key && echo "Scritta"; fi; unset K
+```
+Le due righe del config (la chiave dal file, e la leva, che resta solo
+per i moderatori):
+```
+printf '\nASSISTENTE_API_KEY = _segreto("assistente_api_key")\nASSISTENTE_AI_ATTIVO = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+Il file si legge ancora (deve dire `ok`), poi il riavvio:
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi, da admin, a @barattolo_collaudo_bot: tre o quattro domande
+vere («come funziona il deposito di garanzia?», «quanto costa
+vendere?», «dov'è il mio ordine?», una fuori tema) e il bottone «🙋
+Parla con una persona». Quel che si vede va nel verbale (CANTIERI,
+«L'assistente del bot», «COSA RESTA»). In produzione si accende DOPO la
+promozione, con la procedura sua (PRODUZIONE, «L'ASSISTENTE DEL BOT:
+LA CHIAVE E LE LEVE»: là la chiave sta nel config); a tutti, quando Andrea
+decide, `ASSISTENTE_SOLO_MODERATORI` a False dal pannello. ATTENZIONE
+alle copie vecchie del config del collaudo: quelle di prima di oggi non
+hanno queste righe.

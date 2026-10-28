@@ -92,6 +92,26 @@ LINK_BOT = "https://t.me/ilbarattolobot"
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
 MODELLO_RICERCA = "claude-haiku-4-5"
 
+# --- L'assistente del bot (28 ott 2026, cantiere bot-assistente) -----
+# Chi scrive una domanda al bot riceve la risposta di Claude, che si
+# presenta come assistente automatico, sa solo il libro del sapere
+# (assistente/sapere.md, testi pubblici) e i numeri pubblici delle leve,
+# non vede ne' nomi ne' ordini, e non fa niente: risponde a parole. Sotto
+# ogni risposta c'e' «🙋 Parla con una persona» (la porta privata, e un
+# avviso ai moderatori nell'argomento «assistenza»). SPENTO di serie.
+ASSISTENTE_AI_ATTIVO = False
+# a leva accesa, risponde solo agli admin: la prova in casa prima di
+# aprirlo a tutti (False = a tutti)
+ASSISTENTE_SOLO_MODERATORI = True
+# LA SUA chiave, separata da quella della moderazione: nella Console di
+# Anthropic le si da' un LIMITE DI SPESA, che e' il freno vero dei soldi.
+# Sul VPS si scrive col read -s (PRODUZIONE), mai a mano in un editor.
+ASSISTENTE_API_KEY = "INCOLLA_QUI_LA_API_KEY"
+ASSISTENTE_MODELLO = "claude-sonnet-5-5"
+ASSISTENTE_MAX_AL_GIORNO = 30    # domande al giorno per persona
+ASSISTENTE_TETTO_GIORNO = 300    # domande al giorno in tutto (RAM: un
+                                 # riavvio li azzera, il limite di spesa no)
+
 # --- LNbits: la "cassaforte" escrow ----------------------------------
 # Usa un wallet DEDICATO a SatMarket, non quello personale!
 LNBITS_URL = "https://TUA-ISTANZA-LNBITS.com"
@@ -1738,18 +1758,19 @@ AVVISI_ORDINI_ADMIN = True
 # lo si viene a sapere una volta.
 ADMIN_CANALE_ID = 0
 # ...e i suoi argomenti: per ogni nome il numero che dice /dove scritto
-# DENTRO quell'argomento. I nomi sono questi sei e non altri:
+# DENTRO quell'argomento. I nomi sono questi sette e non altri:
 #   "dispute"      ⚖️ dispute del mercatino e del P2P, garanzie ferme
 #   "liquidita"    💧 liquidita' del nodo e guardiano del ponte
 #   "errori"       ⚠️ pagamenti falliti o da verificare, ordini fermi
 #   "moderazione"  🛡️ revisioni e banner coi ✅/❌, filtri, annunci nuovi
 #   "dm"           📩 «e' arrivato un DM su Nostr» (mai il testo)
 #   "riepiloghi"   📊 polso degli ordini, nuovi iscritti, registro comandi
+#   "assistenza"   🙋 chi chiede una persona all'assistente del bot
 # Un nome che manca va nell'argomento Generale. (La 🔔 dei nuovi ordini
 # del libro P2P non e' fra questi: e' una notifica da utente, e resta
 # in privato a chi l'ha accesa.)
 # Es.: {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,
-#       "dm": 10, "riepiloghi": 12}
+#       "dm": 10, "riepiloghi": 12, "assistenza": 14}
 ADMIN_CANALE_ARGOMENTI = {}
 # ...e la sua CODA (16 ott 2026): un avviso che il gruppo non prende (la
 # rete che cade, Telegram che chiede di aspettare, il bot tolto) non

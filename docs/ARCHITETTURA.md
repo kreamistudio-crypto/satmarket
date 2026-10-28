@@ -34520,3 +34520,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   stessa riga della chiamata (`# certificati-relay: eccezione nominata`),
   non al numero di riga: spostarla non cambia niente, il segno in un
   altro file non esenta, la chiamata senza segno torna rossa.
+- L'ASSISTENTE DEL BOT (28 ott 2026, cantiere bot-assistente; perché in
+  CANTIERI, «L'assistente del bot»). Una frase che non è un comando, in
+  chat privata col bot, va a `domanda_all_assistente` se
+  `assistente_per(chat)` (leva `ASSISTENTE_AI_ATTIVO`, chiave
+  `ASSISTENTE_API_KEY`, il libro `assistente/sapere.md` letto una volta,
+  e di serie `ASSISTENTE_SOLO_MODERATORI`). La risposta gira DOPO il 200
+  del campanello: `telegram_aggiornamenti` riceve i `BackgroundTasks` e
+  li posa nella contextvar `_DOPO_LA_RISPOSTA`. `rispondi_assistente`
+  mette i freni (uno alla volta, `_secchio_passa` a sei al minuto, tetto
+  a persona e totale del giorno, contati prima della chiamata), poi
+  `_risposta_di_claude`: UNA `messages.create` senza `tools`, il system
+  in due blocchi (istruzioni + libro con `cache_control`, poi
+  `numeri_assistente()` dalle leve vive viste da `tg_id 0`), le ultime
+  tre battute della persona dalla memoria in RAM (`_ASSISTENTE`,
+  mezz'ora). Mai tg id o nome nella richiesta, mai la domanda nel
+  journal. Il testo esce SENZA `parse_mode`, con
+  `PRESENTAZIONE_ASSISTENTE` davanti alla prima risposta e la tastiera
+  con «🙋 Parla con una persona» (`CALLBACK_PERSONA`, `ass:persona` in
+  `gestisci_callback`): `callback_persona_assistente` dà la porta
+  `CONTATTO_PRIVATO` e avvisa i moderatori nell'argomento `assistenza`
+  di `ADMIN_ARGOMENTI` (il settimo, non urgente), una volta ogni dieci
+  minuti a persona, anche a leva spenta. Il client è
+  `_cliente_assistente()` (chiave sua, un retry, 40 s), ed è il punto
+  dove prove e collaudo mettono il cartone.
