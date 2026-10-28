@@ -180325,18 +180325,15 @@ console.log(JSON.stringify(fuori));
         salta("le parole della grafica dello swap", "node non c'e'")
         return
     vietate = ("swap", "htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
-    # (28 ott 2026, cambio-due-riquadri) UN'ECCEZIONE, chiesta da Andrea:
-    # il nome della rete nel riquadro e' «On-chain» («ricevi circa bitcoin
-    # suona male metti ricevi circa on chain»). Solo quell'etichetta, nuda:
-    # nelle frasi la parola resta vietata
-    trovate = sorted({p for f in frasi if f != "On-chain"
-                      for p in vietate if p in f.lower()})
+    trovate = sorted({p for f in frasi for p in vietate if p in f.lower()})
     prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
           "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
           (trovate, len(frasi) > 150))
-    prova("...e «On-chain» c'e' solo come nome della rete nei riquadri",
-          (2, 2), (frasi.count("On-chain"),
-                   testi.count("reti: {ln: 'Lightning', btc: 'On-chain'}")))
+    # (28 ott 2026, unita-tendine, Andrea: «usa esattamente queste unità di
+    # misura e stessi loghi e tendine») le pillole dei riquadri dicono le
+    # sigle di SATS Routing, «LN» e «BTC»; l'«On-chain» del giro prima e' via
+    prova("...e nelle pillole dei riquadri le sigle «LN» e «BTC»",
+          (2, 0), (testi.count("reti: {ln: 'LN', btc: 'BTC'}"), frasi.count("On-chain")))
     # (cambio-libero, 27 ott 2026) «Ricevi in bitcoin» e' diventato «Cambio»:
     # un nome che valga per le due direzioni, chiesto da Andrea
     prova("il tasto in basso e la pagina si chiamano «Cambio»",

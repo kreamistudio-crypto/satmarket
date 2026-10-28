@@ -74504,3 +74504,53 @@ chiusi: la riga è alta 20 px (prima 39 a 360 px); la sentinella sta in
 rossa e la misura a 360 px torna a 39. NOTATO, non toccato: a 320 px
 (telefoni piccolissimi) in BTC la cifra dei riquadri tocca l'etichetta
 della rete.
+
+## Le unità e le tendine del Cambio come SATS Routing, e il caso dei 320 px (28 ott 2026, cantiere unita-tendine con btc-320, Andrea: «Usa esattamente queste unità di misura e stessi loghi e tendine perché si capisce meglio così», «ottimo l'interfaccia che hai fatto va benissimo solo le unita di misura che le voglio cosi con le tendine»; il 320 px chiesto dal coordinatore sul «notato» di costo-una-riga)
+
+Andrea ha mandato due schermate di SATS Routing e ha chiesto quelle
+unità, quei loghi e quelle tendine; il resto della pagina resta com'è.
+In ogni riquadro, sotto «Mandi» / «Ricevi circa», ora c'è una PILLOLA
+col logo e la sigla: il fulmine giallo e «LN», la moneta arancione con
+la ₿ e «BTC». Con due strade dal server la pillola ha la freccina ed è
+una TENDINA: si apre un menu con LN e BTC (quella di adesso segnata),
+e scegliere l'altra rete gira la strada (in «Mandi» LN = la strada di
+sempre, BTC = quella rovesciata; in «Ricevi» al contrario). Scegliere
+la rete che c'è già chiude e basta; un tocco fuori la chiude. Con una
+strada sola la pillola è ferma, senza freccina. Il selettore dell'unità
+sotto i riquadri è ora una pillola bordata con due tasti: la ₿ e il
+segno dei sats a tre righe, quello scelto in arancione. Le cifre
+restano quelle di prima («1 000» sats, «0,00000464» BTC).
+
+DUE DECISIONI DI IERI ROVESCIATE da Andrea stesso, e va scritto perché
+nessuno le rimetta: (1) «On-chain» come nome della rete nel riquadro
+(eccezione alla regola delle parole tecniche, cantiere
+cambio-due-riquadri) è sparito: ora le sigle sono «LN» e «BTC», e la
+prova delle parole tecniche non ha più eccezioni; (2) il selettore
+fulmine/₿ è diventato ₿/sats come su SATS Routing. Il segno dei sats
+è DISEGNATO da noi (`SWAP_ICONE.sats`, tre righe e i due trattini),
+non preso da loro, come aveva chiesto Andrea per l'icona sats.
+
+IL CASO DEI 320 px: la cifra in BTC dei riquadri ha una sua regola
+(`.cambio-cifra-campo.btc`, 18 px) e sotto i 350 px scende a 16 px con
+meno spazio interno. Misurato col Chromium del container a 320 px, in
+BTC con 0,00123456: fra pillola e cifra 35 e 26 px, niente tagliato,
+niente fuori dal riquadro. Onestà: con le sigle corte «LN»/«BTC» al
+posto di «Lightning»/«On-chain» il tocco sparisce già da solo; senza la
+regola dei 350 px lo spazio scende a 18 e 11 px (controprova fatta
+togliendo la regola dalla pagina viva). La regola resta come margine.
+
+STRADA SCARTATA: un `<select>` nativo, che non può mostrare il logo
+dentro le voci (e Andrea ha chiesto «stessi loghi e tendine»).
+
+PROVATO: le prove del cambio (710, 0 fallite: le sezioni dello swap più
+`prove_in_pagamento` e `prove_introduzioni_leggibili`), la suite severa,
+i 108 collaudi della CI nel venv senza coincurve; `collaudo_cambio_libero`
+ha la scena nuova `sub.tendina` (apri, due voci, LN segnata, tocco fuori,
+la mappatura di «Ricevi», la stessa rete chiude). Dal vivo col Chromium:
+tendina, cambio di strada, unità BTC, foto a 375 chiaro e scuro e a 320
+in `/mnt/project-files/grafica-cambio/unita-*.png`. CONTROPROVE: la
+mappatura fissa, il tocco fuori tolto e le icone del selettore tolte
+fanno rosso `collaudo_cambio_libero`; le sigle rimesse a
+«Lightning»/«On-chain» fanno rossi `prove_grafica_swap` e il collaudo.
+DA GUARDARE: dal telefono, in Telegram, che la tendina si apra sopra il
+riquadro di sotto senza essere tagliata.
