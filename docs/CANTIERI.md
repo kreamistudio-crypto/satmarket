@@ -74415,3 +74415,78 @@ compra, `/firma`) prima della promozione. Gli ordini confermati prima di
 oggi non hanno la conferma firmata: chi compra può ridarla («Ho
 ricevuto» di nuovo), e stavolta si firma. A leva rispenta, un ordine rimasto senza incasso torna a
 «scegli dove ricevere» del 27 ott (si riempie salvando il wallet).
+
+## I due riquadri del Cambio si scrivono tutti e due, e il selettore sats/BTC (28 ott 2026, cantiere cambio-due-riquadri, Andrea: «dovrei essere libero di compilare qualsisi campo poi lui fa i suoi calcoli», «si voglio che sia scrivibile in tutti e due i riquadri», «diamo la possibilita di selezionare sats o btc»)
+
+**DA DOVE.** Andrea ha guardato la pagina nuova del cantiere
+grafica-cambio (4200c96): gli piace, ma si scriveva solo nel riquadro del
+`dovuto` del server («Mandi» verso l'indirizzo, «Ricevi» verso
+Lightning). Su SATS Routing si scrive dove si vuole. Ha chiesto anche un
+selettore sats/BTC sotto i riquadri, poi tre ritocchi: la moneta
+disegnata da noi e non il simbolo di SATS Routing, «senza scritte solo
+selettore» (il fulmine per i sats, la ₿ per i BTC), e «Ricevi circa
+On-chain» al posto di «Bitcoin» («suona male»).
+
+**IL CONTO AL CONTRARIO, sul server.** `preventivo_swap` e
+`preventivo_sub` vanno in un verso solo, dal `dovuto` a quel che esce.
+Due funzioni pure trovano il `dovuto` dall'altra parte:
+`swap_dovuto_per_ricevere` (scritto «Ricevi» verso l'indirizzo) e
+`sub_ricevi_per_mandare` (scritto «Mandi» verso Lightning), con una
+ricerca a metà (quel che esce cresce o sta fermo col dovuto). LA REGOLA:
+MAI SOTTO la cifra scritta, il dovuto più piccolo che ci arriva. Verso
+l'indirizzo i conti non saltano, e la cifra torna esatta. Verso
+Lightning la commissione per eccesso salta di due a ogni scalino: 100.015
+da mandare non si può, ne servono 100.016. Poi il conto si fa coi
+giudici di sempre, tetti compresi (sulla cifra vera: 600.000 da ricevere
+è sopra il tetto). La rotta prende `lato` (`mandi`/`ricevi`; vuoto = il
+lato del dovuto, come prima, 400 per altro) e la busta ripete `lato` e
+`scritta`: il telefono butta le risposte vecchie con quelli, e il
+biglietto e la nascita partono dal `dovuto` del conto
+(`swapCambioDovuto`), mai dalla cifra scritta. Il cambio che nasce è lo
+stesso di prima.
+
+**IL TELEFONO.** Due campi, `swapCambioMandi` e `swapCambioRicevi`
+(`data-lato`); `swapCambioLato` dice dove si è scritto. Il riquadro dove
+si scrive non si ridisegna mai (la tastiera); l'altro prende la cifra del
+conto, «…» come segnaposto mentre si aspetta. Uscendo dal campo, se il
+conto ha dato un sat in più, si vede la cifra vera (e il conto resta di
+adesso: è lo stesso dovuto).
+
+**IL SELETTORE sats/BTC.** Due tondi sotto i riquadri, a sinistra, con le
+monete della pagina (fulmine = sats, ₿ = BTC), quella scelta accesa; le
+parole stanno solo per chi legge lo schermo (`aria-label`). In BTC tutte
+le cifre del cambio hanno otto decimali, esatte al sat: i riquadri, il
+costo, «Dettagli», i tetti, i no del minimo e del massimo (`numSwap`,
+`unitaSwap`; gli ordini restano in sats). Si scrive anche in BTC, con
+virgola o punto, al più otto decimali (`swapCambioLeggi`). La frase della
+richiesta Lightning resta in sats (i wallet chiedono quelli), coi BTC
+accanto. La scelta resta sul telefono (`barattolo_cambio_unita`).
+
+**«ON-CHAIN».** Il 27 ott (grafica-swap) la pagina non doveva avere
+parole tecniche, «on-chain» compresa; Andrea ha chiesto questa
+eccezione, e vale SOLO per il nome della rete nel riquadro
+(`reti.btc`). La prova delle parole la lascia passare nuda, e conta che
+compaia solo lì.
+
+**PROVATO.** `prove_cambio_libero`: il conto al contrario a forza bruta
+(1.208 conti, fee 0 e 0,25 %, il dovuto più piccolo e mai sotto), le cifre
+note (98.842 ↔ 100.000, 100.818 ↔ 100.000), le sentinelle della rotta.
+`prove_grafica_swap`: «On-chain» solo come nome della rete.
+`collaudo_cambio_libero` (103): la rotta vera col lato (98.842, 98.000 →
+99.153, 600.000 sopra il tetto, lato storto 400, 100.818 da mandare);
+il telefono che scrive in «Ricevi» (un preventivo col lato, «Mandi» da
+solo, il dovuto del cambio), la risposta dell'altro riquadro buttata, il
+selettore (le cifre in BTC, la tastiera coi decimali, la scelta salvata,
+nessun preventivo in più), le cifre scritte in BTC, il sat in più che
+compare uscendo dal campo. Giro col Chromium del container a 375 px,
+chiaro e scuro, contro il cartone. Controprove, tutte rosse: un sat di
+troppo nel conto, il lato ignorato dal server, la risposta dell'altro
+riquadro presa per buona, il cambio che nasce con la cifra scritta,
+l'unità non salvata, la cifra vera che non compare, i decimali non
+tagliati a otto, «Bitcoin» rimesso, i dettagli in sats col selettore su
+BTC. Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Dal telefono dentro Telegram: la tastiera coi decimali
+in BTC, il passaggio da un riquadro all'altro col dito. In BTC la riga
+del costo può andare a capo a 375 px («SATS Routing» sotto): si legge,
+non si è toccato.

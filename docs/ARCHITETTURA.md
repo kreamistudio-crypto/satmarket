@@ -33992,6 +33992,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.cambio-*`. `pannelloPagamento` dice «via il cambio, al tuo
   indirizzo bitcoin» quando `swapDiOrdine(o.id)` c'è (solo il telefono
   di chi vende lo sa).
+  I DUE RIQUADRI SCRIVIBILI E IL SELETTORE sats/BTC (28 ott 2026,
+  cantiere cambio-due-riquadri; perché in CANTIERI, «I due riquadri del
+  Cambio si scrivono tutti e due»). Due campi, `swapCambioMandi` e
+  `swapCambioRicevi` (`data-lato`), `swapCambioLato` dice dove si è
+  scritto; il preventivo porta `lato` e il server, dall'altro lato del
+  suo `dovuto`, lo trova col conto al contrario (`swap_dovuto_per_ricevere`,
+  `sub_ricevi_per_mandare`: il dovuto più piccolo che non dà mai meno
+  della cifra scritta), poi i giudici di sempre. La busta ripete `lato` e
+  `scritta` (`swapCambioDiAdesso`); biglietto e nascita usano
+  `swapCambioDovuto()`. L'unità: `swapCambioUnita` ('sats'/'btc', in
+  `localStorage` `barattolo_cambio_unita`), `swapCambioLeggi`,
+  `swapCambioNum`; nella pagina `numSwap`/`unitaSwap` (solo l'ordine 0),
+  il selettore `.cambio-unita` con `data-swap="cambio-unita"`. Il nome
+  della rete nel riquadro è «On-chain» (`reti.btc`), eccezione chiesta
+  da Andrea alla regola delle parole tecniche.
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
