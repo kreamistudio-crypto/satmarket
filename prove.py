@@ -180192,7 +180192,7 @@ def prove_cambio_libero():
                             "cambio_strade()" in prev and "cambio_strade()" in big))
     prova("il preventivo della strada rovesciata legge le tariffe del submarine", True,
           'if direzione == "btc-ln":' in prev and "tariffa = await leggi_tariffa_sub(chi)" in prev
-          and "p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)" in prev)
+          and "p = preventivo_sub(dovuto, tariffa, SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)" in prev)
     tar = amb3["tariffa_sub_da_risposta"]({"BTC": {"BTC": {
         "hash": "h1", "fees": {"percentage": 0.5, "minerFees": 318},
         "limits": {"minimal": 50_000, "maximal": 25_000_000}}}})
@@ -180215,6 +180215,46 @@ def prove_cambio_libero():
            amb3["preventivo_sub"](40_000, tar, 25_000, 500_000)["minimo"],
            amb3["preventivo_sub"](600_000, tar, 25_000, 500_000)["motivo"],
            amb3["preventivo_sub"](600_000, tar, 25_000, 500_000)["massimo"]))
+
+    # IL CONTO AL CONTRARIO (28 ott 2026, cantiere cambio-due-riquadri,
+    # Andrea: «voglio che sia scrivibile in tutti e due i riquadri»): dalla
+    # cifra scritta nell'altro riquadro, il dovuto PIU' PICCOLO che non da'
+    # mai meno di quella. Si prova a forza bruta su tante cifre, coi conti
+    # veri, e anche con la fee nostra accesa
+    for nome in ("preventivo_swap", "_swap_ricevi_di", "swap_dovuto_per_ricevere",
+                 "sub_ricevi_per_mandare"):
+        exec(pezzo(nome), amb3)
+    T16 = {"hash": "h16", "percento": 0.6, "lockup": 324, "claim": 234,
+           "minimo": 2142, "massimo": 5_000_000}
+    pv3, dpr, rpm = (amb3["preventivo_swap"], amb3["swap_dovuto_per_ricevere"],
+                     amb3["sub_ricevi_per_mandare"])
+    storti = []
+    for fee in (0, 0.25):
+        for voluto in list(range(25_000, 25_400)) + [98_842, 98_000, 499_999]:
+            d = dpr(voluto, T16, fee)
+            if not (pv3(d, T16, fee)["ricevi"] >= voluto
+                    and pv3(d - 1, T16, fee)["ricevi"] < voluto):
+                storti.append(("swap", fee, voluto, d))
+    tar1 = dict(tar, minimo=1)   # senza il minimo, per leggere ogni conto
+    for voluto in list(range(25_000, 25_400)) + [100_818, 100_000]:
+        r = rpm(voluto, tar1)
+        if not (amb3["preventivo_sub"](r, tar1)["mandi"] >= voluto
+                and (r == 1 or amb3["preventivo_sub"](r - 1, tar1)["mandi"] < voluto)):
+            storti.append(("sub", voluto, r))
+    prova("il conto al contrario: mai sotto la cifra scritta, e col dovuto piu' "
+          "piccolo (a forza bruta, fee 0 e 0,25 %)", [], storti)
+    prova("...le cifre di prima tornano: ricevere 98.842 vuol dire cambiarne "
+          "100.000, mandarne 100.818 riceverne 100.000",
+          (100_000, 100_000), (dpr(98_842, T16, 0), rpm(100_818, tar)))
+    prova("...e una percentuale che si mangia tutto non da' un dovuto (0)", 0,
+          dpr(1000, dict(T16, percento=100), 0))
+    prova("la rotta: `lato` mandi/ricevi, il dovuto dal conto al contrario "
+          "dall'altro lato, e la busta ripete lato e cifra scritta",
+          (True, True, True, True),
+          ('if lato not in ("", "mandi", "ricevi"):' in prev,
+           "else sub_ricevi_per_mandare(cifra, tariffa)" in prev,
+           "else swap_dovuto_per_ricevere(cifra, tariffa, SWAP_FEE_PERCENTO)" in prev,
+           '"lato": lato, "scritta": cifra,' in prev))
     prova("il tipo: le fasi del submarine, la nascita rovesciata, il ritiro a due, il rimborso",
           (True, True, True, True, True),
           ("const SWAP_FASI_SUB = {" in bz and "'invoice.failedToPay': 'fallito'" in bz
@@ -180285,10 +180325,18 @@ console.log(JSON.stringify(fuori));
         salta("le parole della grafica dello swap", "node non c'e'")
         return
     vietate = ("swap", "htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
-    trovate = sorted({p for f in frasi for p in vietate if p in f.lower()})
+    # (28 ott 2026, cambio-due-riquadri) UN'ECCEZIONE, chiesta da Andrea:
+    # il nome della rete nel riquadro e' «On-chain» («ricevi circa bitcoin
+    # suona male metti ricevi circa on chain»). Solo quell'etichetta, nuda:
+    # nelle frasi la parola resta vietata
+    trovate = sorted({p for f in frasi if f != "On-chain"
+                      for p in vietate if p in f.lower()})
     prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
           "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
           (trovate, len(frasi) > 150))
+    prova("...e «On-chain» c'e' solo come nome della rete nei riquadri",
+          (2, 2), (frasi.count("On-chain"),
+                   testi.count("reti: {ln: 'Lightning', btc: 'On-chain'}")))
     # (cambio-libero, 27 ott 2026) «Ricevi in bitcoin» e' diventato «Cambio»:
     # un nome che valga per le due direzioni, chiesto da Andrea
     prova("il tasto in basso e la pagina si chiamano «Cambio»",

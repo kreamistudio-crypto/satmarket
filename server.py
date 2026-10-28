@@ -2176,6 +2176,63 @@ def preventivo_swap(dovuto: int, tariffa: dict, fee_percento=0,
                 onchain=onchain, ricevi=ricevi)
 
 
+# IL CONTO AL CONTRARIO (28 ott 2026, cantiere cambio-due-riquadri, Andrea:
+# «voglio che sia scrivibile in tutti e due i riquadri»). Sulla pagina
+# «Cambio» si scrive in «Mandi» o in «Ricevi», come su SATS Routing; i due
+# conti qui sopra sanno andare in un verso solo (dalla cifra `dovuto` a
+# quel che esce), e queste due funzioni trovano il `dovuto` che da' la
+# cifra scritta dall'altra parte. La regola: MAI SOTTO quel che si e'
+# scritto. Gli arrotondamenti al sat possono dare un sat in piu', mai uno
+# in meno. Poi il conto si fa coi giudici di sempre, tetti compresi.
+
+def _swap_ricevi_di(dovuto: int, tariffa: dict, fee_mill: int) -> int:
+    """Quel che arriva all'indirizzo da `dovuto`, coi conti di
+    `preventivo_swap` ma senza i tetti (serve alla ricerca qui sotto)."""
+    fee_nostra = -(-dovuto * fee_mill // 100_000) if fee_mill > 0 else 0
+    fattura = dovuto - fee_nostra
+    millesimi = round(float(tariffa["percento"]) * 1000)
+    commissione = -(-fattura * millesimi // 100_000)
+    return fattura - commissione - int(tariffa["lockup"]) - int(tariffa["claim"])
+
+
+def swap_dovuto_per_ricevere(ricevi: int, tariffa: dict,
+                             fee_percento=0) -> int:
+    """Lightning → indirizzo, scritta la cifra da RICEVERE: il dovuto piu'
+    piccolo che ne fa arrivare almeno tanta. Quel che arriva cresce (o sta
+    fermo) col dovuto, quindi basta una ricerca a meta'. 0 se non c'e'
+    (una percentuale che si mangia tutto)."""
+    ricevi = int(ricevi)
+    fee_mill = round(float(fee_percento or 0) * 1000)
+    basso, alto = 1, 21_000_000 * 100_000_000
+    if _swap_ricevi_di(alto, tariffa, fee_mill) < ricevi:
+        return 0
+    while basso < alto:
+        meta = (basso + alto) // 2
+        if _swap_ricevi_di(meta, tariffa, fee_mill) >= ricevi:
+            alto = meta
+        else:
+            basso = meta + 1
+    return basso
+
+
+def sub_ricevi_per_mandare(mandi: int, tariffa: dict) -> int:
+    """Indirizzo → Lightning, scritta la cifra da MANDARE: il `ricevi` piu'
+    piccolo per cui si manda almeno tanto (`preventivo_sub`: ricevi + la
+    percentuale per eccesso + la rete del loro ritiro, che cresce sempre
+    col ricevi). Almeno 1: sotto, ci pensa il minimo a dire di no."""
+    mandi = int(mandi)
+    millesimi = round(float(tariffa["percento"]) * 1000)
+    rete = int(tariffa["rete"])
+    basso, alto = 1, max(1, mandi)
+    while basso < alto:
+        meta = (basso + alto) // 2
+        if meta + -(-meta * millesimi // 100_000) + rete >= mandi:
+            alto = meta
+        else:
+            basso = meta + 1
+    return basso
+
+
 # I SERVIZI (ago 2026): la vendita di prestazioni DEFINITE — un'ora di
 # lezione, una consulenza — con un appuntamento concordato dentro
 # l'ordine. Nasce SPENTA come ASTA_ABILITATA e IMPORT_NOSTR_APERTO, e
@@ -75282,13 +75339,19 @@ def _cambio_sats(valore) -> int:
 @app.get("/api/swap/cambio/preventivo")
 async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
                             fornitore: str = "satsrouting", hash: str = "",
+                            lato: str = "",
                             x_tg_init_data: str = Header(""),
                             barattolo_sessione: str = Cookie("")):
     """IL PREVENTIVO DEL CAMBIO LIBERO: quanto riceverebbe al suo indirizzo
     chi cambia `sats` in Lightning, con le regole e i tetti del cambio
     (non quelli dell'incasso). Non crea niente. `hash` e `fornitore` come
     nel preventivo dell'incasso; `oggi` e `al_giorno` dicono dove sta col
-    tetto del giorno, e a tetto raggiunto il motivo e' `tetto_giorno`."""
+    tetto del giorno, e a tetto raggiunto il motivo e' `tetto_giorno`.
+    (28 ott 2026, cambio-due-riquadri) `lato` dice dove si e' scritta la
+    cifra, `mandi` o `ricevi`; vuoto = il lato del `dovuto` (mandi verso
+    l'indirizzo, ricevi verso Lightning). Dall'altro lato il dovuto si
+    trova col conto al contrario. La busta ripete `lato` e la cifra
+    scritta (`scritta`): il telefono butta le risposte vecchie con quelle."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not cambio_libero_per(user["id"]):
         raise HTTPException(403, "Il cambio non e' disponibile")
@@ -75297,6 +75360,10 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
     chi = swap_fornitore(str(fornitore or ""))
     if chi is None:
         raise HTTPException(404, "Fornitore sconosciuto")
+    if lato not in ("", "mandi", "ricevi"):
+        raise HTTPException(400, "Lato sconosciuto")
+    lato_dovuto = "ricevi" if direzione == "btc-ln" else "mandi"
+    lato = lato or lato_dovuto
     cifra = _cambio_sats(sats)
     con = _cambi_db()
     try:
@@ -75304,6 +75371,7 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
     finally:
         con.close()
     busta = {"dovuto": cifra, "direzione": direzione, "oggi": oggi,
+             "lato": lato, "scritta": cifra,
              "al_giorno": int(CAMBIO_LIBERO_MAX_AL_GIORNO or 0),
              "fornitore": chi["id"], "fornitore_nome": chi["nome"]}
     if not cifra:
@@ -75316,12 +75384,18 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
         tariffa = await leggi_tariffa_sub(chi)
         if tariffa is None:
             return dict(busta, ok=False, motivo="non_risponde")
-        p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
+        dovuto = cifra if lato == lato_dovuto \
+            else sub_ricevi_per_mandare(cifra, tariffa)
+        p = preventivo_sub(dovuto, tariffa, SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
     else:
         tariffa = await leggi_tariffa_swap(chi)
         if tariffa is None:
             return dict(busta, ok=False, motivo="non_risponde")
-        p = preventivo_swap(cifra, tariffa, SWAP_FEE_PERCENTO,
+        dovuto = cifra if lato == lato_dovuto \
+            else swap_dovuto_per_ricevere(cifra, tariffa, SWAP_FEE_PERCENTO)
+        if not dovuto:
+            return dict(busta, ok=False, motivo="cifra")
+        p = preventivo_swap(dovuto, tariffa, SWAP_FEE_PERCENTO,
                             SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
     p["valido_s"] = SWAP_PREVENTIVO_VALE_S
