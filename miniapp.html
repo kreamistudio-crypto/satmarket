@@ -9770,7 +9770,12 @@
   .cambio-costo{display:flex;justify-content:space-between;align-items:center;gap:10px;
     padding:10px 8px 6px;font-size:13.5px;font-weight:600;color:var(--muted)}
   .cambio-costo b{color:var(--ink)}
-  .cambio-dettagli{border:0;background:none;padding:6px 2px;cursor:pointer;
+  /* (28 ott 2026, cantiere costo-una-riga) in BTC la cifra e' lunga e, su
+     un telefono da 360 px, «SATS Routing» andava a capo: la riga resta UNA,
+     il nome di chi cambia si accorcia coi puntini (intero in «Dettagli»),
+     la cifra e «Dettagli» non si toccano mai */
+  .cambio-costo>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cambio-dettagli{flex:0 0 auto;border:0;background:none;padding:6px 2px;cursor:pointer;
     font:800 13.5px/1 'Nunito',sans-serif;color:var(--sats-text)}
   .cambio-voci{margin:2px 6px 6px;padding:2px 12px 8px;border-radius:12px;background:var(--bg)}
   .cambio-voci[hidden]{display:none}
