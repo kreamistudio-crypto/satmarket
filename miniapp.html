@@ -11082,6 +11082,49 @@
   html.arrivo-secco *,html.arrivo-secco *::before,html.arrivo-secco *::after{
     transition:none!important}
 
+  /* ---------- IL VESTITO DEL COLLAUDO (28 ott 2026) ----------
+     Da quando il collaudo si apre a tutti (PROVA_APERTA) chi ci entra
+     deve capire al primo sguardo che non e' il mercatino vero. La
+     classe `istanza-prova` su <html> la scrive il SERVER, e solo dove
+     la lista PROVA_SOLO_IDS e' piena (`_prova_nella_pagina`): in
+     produzione questo blocco non si accende mai.
+     DUE SEGNI, scelti da Andrea fra quattro: il FONDO AZZURRO al posto
+     del crema (lo seguono la testata e, da applicaTema, la barra di
+     Telegram) e la BANDA «🧪 COLLAUDO» fissa in cima. Il bianco e nero
+     intero e' stato scartato: spegneva proprio i colori che sul
+     collaudo si vengono a guardare. Il fondo bianco pure: le schede
+     sono gia' bianche, la pagina sarebbe diventata un foglio piatto.
+     Si cambia SOLO --bg: carta, inchiostro e bottoni restano quelli
+     veri, cosi' quel che si giudica qui e' quel che va online.
+     STA DOPO LA SERA E DOPO LA MEDIA QUERY DA DESKTOP apposta: a
+     parita' di peso vince l'ultimo. E PRIMA dello SCHERMO LARGO, che
+     dev'essere l'ultimo blocco del foglio (lo sorveglia
+     prove_schermo_largo) e non tocca niente di quel che si sposta qui. */
+  html.istanza-prova{--bg:#E3EEF9}
+  html.istanza-prova[data-tema="scuro"]{--bg:#12202E}
+  /* La banda non si tocca e non si sceglie: pointer-events:none, e
+     sopra testata, nav e fogli (z 20-50) ma sotto lightbox,
+     fotocamera e tour, che sono schermi interi coi loro bottoni. */
+  html.istanza-prova body::before{
+    content:"🧪 COLLAUDO · non è il mercatino vero";
+    position:fixed;top:0;left:0;right:0;z-index:60;height:20px;
+    display:flex;align-items:center;justify-content:center;
+    background:#1D5FA8;color:#fff;pointer-events:none;
+    font:800 11px/1 'Nunito',system-ui,sans-serif;letter-spacing:.04em;
+    white-space:nowrap;overflow:hidden;
+  }
+  /* ...e la pagina scende di quei 20px: il corpo, e chi si appiccica
+     in cima (la testata, la pillola del P2P, il pacco, «Altri
+     oggetti»), cosi' la banda non copre niente. */
+  html.istanza-prova body{padding-top:20px}
+  html.istanza-prova header,html.istanza-prova .p2p-sticky,
+  html.istanza-prova .pacco-appiccicato,html.istanza-prova .altri-azione{top:20px}
+  @media (min-width:768px){
+    html.istanza-prova nav{top:20px}
+    html.istanza-prova header,html.istanza-prova .pacco-appiccicato,
+    html.istanza-prova .altri-azione{top:80px}
+  }
+
   /* ==================== LO SCHERMO LARGO (16 ott 2026) ====================
      Cantiere schermo-largo, decisione di Andrea: dal computer la pagina
      usa TUTTO lo schermo, a qualunque larghezza (anche 21:9, 2560 e
@@ -25797,7 +25840,10 @@ function applicaTema(){
   if (scuro) document.documentElement.dataset.tema = 'scuro';
   else delete document.documentElement.dataset.tema;
   /* la barra del browser e l'header di Telegram seguono il fondo */
-  const sfondo = scuro ? '#211A10' : '#FAF4E4';
+  /* sul collaudo il fondo e' azzurro (IL VESTITO DEL COLLAUDO, in
+     fondo al foglio): la barra e Telegram seguono lui */
+  const sfondo = document.documentElement.classList.contains('istanza-prova')
+    ? (scuro ? '#12202E' : '#E3EEF9') : (scuro ? '#211A10' : '#FAF4E4');
   /* ...ma nell'APK, finche' il guscio e' in vista, la barra resta del
      SUO arancio (l'ha accesa l'head): questo colore glielo porta
      `togliGuscio`, che richiama questa funzione subito dopo averlo tolto.

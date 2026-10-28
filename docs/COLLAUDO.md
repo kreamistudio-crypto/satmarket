@@ -161,6 +161,11 @@ aggiunge, si toglie la vecchia da GitHub.
   la lista è anche il segno «questa è una prova», e senza di lei cadono
   il recinto dei relay (annunci e post finirebbero sui relay veri), il
   tetto degli ordini P2P e la semina. Il P2P resta di `P2P_PROVA_IDS`.
+  **Il vestito** (28 ott 2026): a lista piena, aperta o chiusa, la
+  pagina esce col fondo azzurro e la banda «🧪 COLLAUDO · non è il
+  mercatino vero» in cima (Mini App e sito). Lo accende il server da
+  solo (`_prova_nella_pagina`): nessuna riga nel config. Un'altra
+  ragione per non svuotare mai la lista.
 - **I dati del mercatino**: finti (la semina), database nuovo.
 - **I pagamenti del mercatino**: finti (LNbits FakeWallet: il «paga» si
   fa da un secondo wallet nel pannello, dal tunnel ssh).

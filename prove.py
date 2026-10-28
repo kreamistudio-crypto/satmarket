@@ -38124,7 +38124,9 @@ def _amb_seo():
                  # il bot e il dominio nella pagina (19 ott 2026, collaudo-vm)
                  "LINK_BOT_DI_SERIE = ", "_FORMA_LINK_BOT = ",
                  "_RIGA_BOT_PAGINA = ", "URL_PUBBLICO_DI_SERIE = ",
-                 "_RIGA_DOMINIO_PAGINA = ", "_RIGA_PRIVATA_PAGINA = "):
+                 "_RIGA_DOMINIO_PAGINA = ", "_RIGA_PRIVATA_PAGINA = ",
+                 # il vestito del collaudo (28 ott 2026)
+                 "_RIGA_PROVA_PAGINA = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     # multi-riga: vogliono il taglio alla riga VUOTA, non al primo \n
@@ -38157,6 +38159,7 @@ def _amb_seo():
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
               "_hash_asset", "_timbra_asset_pagina", "_bot_nella_pagina",
               "_dominio_nella_pagina", "_privata_nella_pagina",
+              "_prova_nella_pagina",
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
@@ -129535,7 +129538,7 @@ def prove_guscio_apertura():
     prova("...detto DOPO aver tolto guscio e copertura", True,
           -1 not in _i.values() and sorted(_i.values()) == list(_i.values()))
     prova("...e i due colori che Telegram riceve sono il FONDO dell'app",
-          True, "const sfondo = scuro ? '#211A10' : '#FAF4E4';" in js
+          True, "? (scuro ? '#12202E' : '#E3EEF9') : (scuro ? '#211A10' : '#FAF4E4');" in js
           and "tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo);"
           in js)
 
@@ -177353,6 +177356,76 @@ def prove_istanza_prova():
           '"PROVA_APERTA",\n                  PROVA_APERTA,' in ls
           and "allarme=PROVA_APERTA and not PROVA_SOLO_IDS" in ls)
     prova("config_esempio la porta spenta", True, "\nPROVA_APERTA = False\n" in es)
+
+    # ---------------- 9 ter) il vestito del collaudo (28 ott 2026) -----
+    # «si deve capire subito che quello e' il collaudo» (Andrea): fondo
+    # azzurro e banda in cima, accesi dal server con la sola lista piena
+    prova("la Mini App ha la riga del vestito, una volta sola, senza classe", 1,
+          mini.count('<html lang="it">'))
+    amb = {}
+    k = src.index("_RIGA_PROVA_PAGINA = ")
+    exec(src[k:src.index("\n", k)], amb)
+    righe = []
+    amb["print"] = lambda *a, **k: righe.append(a)
+    exec(pezzo("_prova_nella_pagina"), amb)
+    pv = amb["_prova_nella_pagina"]
+    prova("a lista vuota (la produzione) la pagina esce IDENTICA (lo stesso oggetto)",
+          True, pv(grezzo, False) is grezzo)
+    vest = pv(grezzo, True)
+    prova("...a lista piena cambia la sola riga: la classe su <html>, e basta",
+          (1, 0, len(grezzo) + len(' class="istanza-prova"')),
+          (vest.count(b'<html lang="it" class="istanza-prova">'),
+           vest.count(b'<html lang="it">'), len(vest)))
+    prova("...e una riga che manca non s'indovina, e lo si dice", (b"x", 1),
+          (pv(b"x", True), len(righe)))
+    prova("il segnale e' la LISTA, aperta o chiusa: PROVA_APERTA non lo spegne", True,
+          "grezzo = _prova_nella_pagina(grezzo, bool(PROVA_SOLO_IDS))\n" in cm
+          and pezzo("_prova_nella_pagina").count("PROVA_APERTA") == 0)
+    prova("...e la pagina la riscrive dopo la copertina, prima di tagliarla", True,
+          cm.index("grezzo = _privata_nella_pagina(")
+          < cm.index("grezzo = _prova_nella_pagina(")
+          < cm.index("_PAGINA_CACHE.update("))
+    _i_vest = mini.index("/* ---------- IL VESTITO DEL COLLAUDO")
+    # il blocco SENZA i commenti: i perche' nominano --bg e i filtri scartati
+    vcss = re.sub(r"/\*.*?\*/", "", mini[_i_vest:mini.index("/* ==================== LO SCHERMO LARGO")],
+                  flags=re.S)
+    _i_largo = mini.index("/* ==================== LO SCHERMO LARGO")
+    prova("il CSS del vestito sta dopo la sera e la media da desktop (vince a parita' "
+          "di peso), subito prima dello SCHERMO LARGO", True,
+          mini.index('html[data-tema="scuro"]{') < _i_vest
+          and mini.index("@media (min-width:768px){\n    #app{max-width:960px;") < _i_vest
+          and mini.index("\n  /* ====", _i_vest) == _i_largo - 3)
+    prova("...cambia il solo fondo, di giorno e di sera", True,
+          "html.istanza-prova{--bg:#E3EEF9}" in vcss
+          and 'html.istanza-prova[data-tema="scuro"]{--bg:#12202E}' in vcss
+          and vcss.count("--bg:") == 2 and "--card:" not in vcss and "--ink:" not in vcss)
+    prova("...nessun filtro: i colori dei bottoni restano quelli veri", False,
+          "filter" in vcss or "grayscale" in vcss)
+    _banda = vcss[vcss.index("html.istanza-prova body::before{"):]
+    _banda = _banda[:_banda.index("}")]
+    _z = int(re.search(r"z-index:(\d+)", _banda).group(1))
+    prova("la banda: fissa in cima, intoccabile, alta 20px", True,
+          "position:fixed;top:0;" in _banda and "pointer-events:none" in _banda
+          and "height:20px" in _banda)
+    prova("...sopra testata, nav e fogli, sotto lightbox, fotocamera e tour", True,
+          "position:sticky;top:0;z-index:20;" in mini
+          and "#attesaOverlay{position:fixed;inset:0;z-index:50;" in mini
+          and 50 < _z < 70
+          and "#lightbox{position:fixed;inset:0;z-index:70;" in mini)
+    prova("...e la pagina scende di 20px: corpo e appiccicati, telefono e desktop", True,
+          "html.istanza-prova body{padding-top:20px}" in vcss
+          and "html.istanza-prova .altri-azione{top:20px}" in vcss
+          and "html.istanza-prova nav{top:20px}" in vcss
+          and "html.istanza-prova .altri-azione{top:80px}" in vcss
+          and "nav{\n      top:0;bottom:auto;max-width:none;margin:0;height:60px;" in mini
+          and "header{top:60px}" in mini and ".altri-azione{top:60px;" in mini)
+    at_v = pezzo_js(mini, "function applicaTema(){", "\n}\n")
+    prova("applicaTema porta il fondo azzurro anche alla barra e a Telegram, "
+          "gli stessi due del CSS", True,
+          "document.documentElement.classList.contains('istanza-prova')" in at_v
+          and "? (scuro ? '#12202E' : '#E3EEF9')" in at_v)
+    prova("...e la classe non la scrive nessun altro: il JS la legge e basta", 0,
+          len(re.findall(r"classList\.(?:add|toggle|remove)\('istanza-prova'", mini)))
 
     # ---------------- 10) il recinto dei relay (20 ott 2026) -----------
     # «niente annunci ne' post del collaudo sui relay veri; i relay veri
