@@ -335,12 +335,27 @@ def main():
           (lambda r: (r.status_code, r.json().get("detail")))(
               c.post(f"/api/onchain/ordini/{oid5}/proposta",
                      json={"verso": "venditore", "psbt": "cHNidP8="})))
+    # la conferma si firma col seme di chi compra (28 ott 2026)
+    ricevuto5 = firma_compatta(
+        radice(999).derive("m/48h/1h/0h/2h/2/0").key,
+        SRV.onchain_messaggio_ricevuto(oid5, o5["indirizzo"]["indirizzo"]))
     come(888)
     prova("«ho ricevuto» lo dice solo chi compra: 403", 403,
-          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto").status_code)
+          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto",
+                 json={"firma": ricevuto5}).status_code)
     come(999)
+    prova("...una conferma senza la firma del suo seme: 400", 400,
+          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto",
+                 json={}).status_code)
+    prova("...una firma d'un altro seme: 400", 400,
+          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto",
+                 json={"firma": firma_compatta(
+                     radice(888).derive("m/48h/1h/0h/2h/2/0").key,
+                     SRV.onchain_messaggio_ricevuto(
+                         oid5, o5["indirizzo"]["indirizzo"]))}).status_code)
     prova("chi compra conferma: 200, la conferma resta scritta", 200,
-          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto").status_code)
+          c.post(f"/api/onchain/ordini/{oid5}/rilascio-chiesto",
+                 json={"firma": ricevuto5}).status_code)
     fisso9 = dal_wallet(9)
     r = scegli(888, tipo="indirizzo", valore=fisso9,
                firma=firma_dest(888, "indirizzo", fisso9))

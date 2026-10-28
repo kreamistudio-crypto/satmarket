@@ -34222,6 +34222,9 @@ def _censimento(acceso, dopo=None):
     amb["_onchain_terza_chiave_a_parole"] = (
         (lambda: "sul VPS (impronta 3442193e)") if acceso
         else (lambda: "di cartone (vettori BIP-32: la privata è pubblica)"))
+    # ...e la riga del cambio in Lightning (28 ott 2026) CHIAMA il giudice
+    # delle reti: settima occorrenza della trappola del 7
+    amb["onchain_ln_rete_ok"] = lambda fornitore=None: bool(acceso)
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
     amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
@@ -146978,6 +146981,9 @@ def prove_freni():
            # 27 ott 2026: «Dove ricevi i sats» 10 all'ora, una leva
            # cambiata dal pannello 20 all'ora per admin
            "onchain_incasso": (10, 3600), "onchain_incasso_guarda": (40, 3600), "leva_pannello": (20, 3600),
+           # 28 ott 2026: il cambio in Lightning di chi vende (preventivo,
+           # fattura, nascita) 40 all'ora
+           "onchain_cambio": (40, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
            "cassetta_spedisci": (60, 60)}, F)
@@ -152475,9 +152481,15 @@ def prove_onchain_disputa():
     prova("il reso ricevuto on-chain fa firmare Barattolo verso chi compra",
           True, '_onchain_decide(ordine_id, "compratore", user["id"], "reso")'
           in pezzo("reso_ricevuto"))
+    # (dal 28 ott, cantiere onchain-verso-lightning, l'unica eccezione e'
+    # la vendita che chi compra ha confermato con la sua firma: chi vende
+    # firma per primo, e il telefono di chi compra la verifica in
+    # `onchainCofirma` prima di aggiungere la sua — collaudo_onchain_verso_lightning)
     prova("il telefono co-firma solo quel che va a lui (chi ha perso salta)",
-          True, "if (o.proposta.verso !== o.ruolo) continue;" in
-          pezzo_js(mini, "async function onchainCofirmeInAttesa(parole){", "\n}\n"))
+          [True, True], ["if (o.proposta.verso !== o.ruolo && !onchainPrimaDiChiVende(o)) continue;" in
+          pezzo_js(mini, "async function onchainCofirmeInAttesa(parole){", "\n}\n"),
+          "o.ruolo === 'compratore' && !!o.proposta && o.proposta.verso === 'venditore'" in
+          pezzo_js(mini, "function onchainPrimaDiChiVende(o){", "\n}\n")])
     bk = open("deploy/backup-fuori.sh", encoding="utf-8").read()
     prova("la chiave entra nel backup fuori sede, e fuori da git", [True, True],
           ['cp -a "$DIR_APP/chiavi" "$TMP/chiavi"' in bk,
@@ -152531,7 +152543,102 @@ def _pezzi_incasso_js(mini):
         pezzo_js(mini, "async function onchainFirmaDestinazione(B, parole, tipo, valore){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainDestinazioneMia(B, parole, d){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainIndirizzoEsterno(B, d){", "\n}\n") + "\n}",
-        pezzo_js(mini, "async function onchainIncassoAtteso(B, parole, o, io){", "\n}\n") + "\n}"])
+        pezzo_js(mini, "async function onchainIncassoAtteso(B, parole, o, io){", "\n}\n") + "\n}",
+        # (28 ott 2026, onchain-verso-lightning) la conferma firmata, la
+        # prima firma di chi vende, le uscite condivise del rilascio
+        _pezzi_verso_lightning_js(mini)])
+
+
+def _pezzi_verso_lightning_js(mini):
+    """I pezzi del telefono del cantiere onchain-verso-lightning (28 ott
+    2026): «Ho ricevuto» firmato, la prima firma di chi vende verificata
+    da chi compra, le uscite del rilascio, la PSBT firmata."""
+    firme = ("function onchainMessaggioRicevuto(oid, indirizzo){",
+             "async function onchainFirmaRicevuto(B, parole, oc){",
+             "async function onchainRicevutoMio(B, parole, oc){",
+             "function onchainPrimaDiChiVende(o){",
+             "function onchainDerACompatta(der){",
+             "function onchainFirmataDaChiVende(B, tx, o, w){",
+             "function onchainUsciteVersoVenditore(o, incasso, piuVb){",
+             "function onchainPsbtFirmata(B, o, io, w, uscite){")
+    return "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in firme)
+
+
+def prove_onchain_verso_lightning():
+    """CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
+    onchain-verso-lightning, piano approvato da Andrea). Il giro vero
+    (server, cartone e telefono in node) sta in
+    collaudo_onchain_verso_lightning; qui le sentinelle di forma e il
+    conto puro: la leva nasce spenta e la strada resta ferma finche' le
+    reti non combaciano; il conto rovesciato del cambio; il telefono di
+    chi compra verifica la prima firma di chi vende PRIMA della sua; il
+    server chiede se il cambio e' vivo PRIMA di trasmettere."""
+    print("\n⚡ Chi vende on-chain riceve in Lightning")
+    src = _SORGENTE
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la leva nasce spenta, nel config d'esempio e nel codice",
+          (True, True),
+          ("\nONCHAIN_INCASSO_LN_ATTIVO = False" in esempio,
+           "    ONCHAIN_INCASSO_LN_ATTIVO = False" in src))
+    reti = {"signet": "testnet", "testnet": "testnet", "bitcoin": "bitcoin"}
+    amb = {"ONCHAIN_RETE_DEL_CAMBIO": reti, "ONCHAIN_RETE": "signet",
+           "swap_fornitori": lambda: [{"rete": "bitcoin"}]}
+    exec(pezzo("onchain_ln_rete_ok"), amb)
+    oggi = amb["onchain_ln_rete_ok"]()
+    amb["ONCHAIN_RETE"] = "bitcoin"
+    mainnet = amb["onchain_ln_rete_ok"]()
+    prova("oggi (on-chain su signet, SATS Routing su bitcoin) la strada e' "
+          "ferma; il giorno della mainnet si apre", (False, True), (oggi, mainnet))
+    prova("...e la rete e' nel giudice per persona", True,
+          "and onchain_ln_rete_ok())" in pezzo("onchain_ln_per"))
+    # il conto rovesciato, puro: il prezzo nel 2-di-3, quanto arriva
+    amb = {}
+    exec(pezzo("preventivo_sub"), amb)
+    exec(pezzo("preventivo_sub_da_mandare"), amb)
+    t = {"percento": 0.5, "rete": 318, "minimo": 50_000, "massimo": 5_000_000,
+         "hash": "x"}
+    p = amb["preventivo_sub_da_mandare"](100_000, t, 25_000)
+    prova("100.000 sats nel 2-di-3: 99.186 in Lightning, 814 di cambio, "
+          "avanzo 0", (True, 99_186, 100_000, 814, 0),
+          (p["ok"], p["ricevi"], p["mandi"], p["costo"], p["avanzo"]))
+    # a 99.001 la commissione per eccesso salta di un sat: 99.814 nel
+    # 2-di-3 non si spendono tutti, e quel sat resta nell'uscita
+    p = amb["preventivo_sub_da_mandare"](99_814, t, 25_000)
+    prova("...con un sat che non si divide: resta nell'uscita (avanzo 1)",
+          (99_000, 99_813, 1, 814), (p["ricevi"], p["mandi"], p["avanzo"], p["costo"]))
+    prova("...ed e' il massimo: un sat in piu' a chi vende sforerebbe", True,
+          amb["preventivo_sub"](99_001, t)["mandi"] > 99_814)
+    prova("sotto il minimo del fornitore: no, col motivo", (False, "sotto_minimo"),
+          (lambda q: (q["ok"], q["motivo"]))(
+              amb["preventivo_sub_da_mandare"](40_000, t, 25_000)))
+    # il telefono di chi compra
+    cof = pezzo_js(mini, "async function onchainCofirma(o, parole){", "\n}\n")
+    prova("chi compra rilegge la SUA conferma e la firma di chi vende prima "
+          "della seconda firma", True,
+          cof.index("onchainRicevutoMio(B, parole, o)")
+          < cof.index("onchainFirmataDaChiVende(B, tx, o, w)")
+          < cof.index("tx.signIdx("))
+    # il server: vivo prima di trasmettere
+    firma = src[src.index('"/api/onchain/ordini/{oid}/firma"'):]
+    firma = firma[:firma.index("\n@app.")]
+    prova("il server chiede se il cambio e' vivo PRIMA di trasmettere", True,
+          firma.index("onchain_cambio_perche_morto(o)")
+          < firma.index("onchain_mempool_invia("))
+    prova("...e il fornitore muto non e' un si' (503)", True,
+          "if perche is None:\n            raise HTTPException(503" in firma)
+    rc = src[src.index('"/api/onchain/ordini/{oid}/rilascio-chiesto"'):]
+    rc = rc[:rc.index("\n@app.")]
+    prova("«Ho ricevuto» prima dell'uscita vuole la firma del seme di chi compra",
+          True, "onchain_messaggio_ricevuto(o[\"id\"], ind[\"indirizzo\"]), firma)" in rc)
+    # le parole per chi legge: un cambio, mai «swap»
+    blocco = pezzo_js(mini, "function onchainCambioBlocco(o){", "\n}\n")
+    prova("il riquadro dice «È un cambio, fatto da …» e il costo, e non dice "
+          "«swap» a nessuno", (True, True, False),
+          ("È un cambio, fatto da ${esc(nome)}</b>: costa" in blocco,
+           "deve poter ricevere" in blocco,
+           re.search(r"\bswap\b", re.sub(r"<[^>]*>|swap[A-Z]\w*", "", blocco),
+                     re.I) is not None))
 
 
 def prove_incasso_esterno_onchain():
@@ -152618,6 +152725,7 @@ def prove_incasso_esterno_onchain():
            "ONCHAIN_POLVERE": 546, "_ONCHAIN_VPUB_PROVA": b"\x04\x5f\x1c\xf6",
            "_onchain_sembra_privata": lambda x: x[1:4].lower() == "prv"}
     for nome in ("onchain_messaggio_destinazione", "onchain_firma_valida",
+                 "onchain_firma_valida_testo",
                  "onchain_destinazione_motivo", "onchain_indirizzo_esterno",
                  "_onchain_psbt_giudica"):
         exec(pezzo(nome), srv)
@@ -152675,7 +152783,7 @@ def prove_incasso_esterno_onchain():
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
-        pezzo_js(mini, "async function onchainFirmaProposta(oid){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
     banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + """
 const B = BarattoloBTC;
@@ -152926,7 +153034,7 @@ def prove_ordine_onchain():
         pezzo_js(mini, "function onchainMieChiavi(B, parole, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainScriptOrdine(B, o){", "\n}\n") + "\n}",
         pezzo_js(mini, "async function onchainProponi(btn, oid){", "\n}\n") + "\n}",
-        pezzo_js(mini, "async function onchainFirmaProposta(oid){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n") + "\n}",
         cofirma_js + "\n}"])
     banco = open("vendor/btc.bundle.js", encoding="utf-8").read() + '''
 const B = BarattoloBTC;
@@ -153550,6 +153658,8 @@ def prove_cancello_onchain():
     # una porta che nessuno ha guardato.
     # ...e la tappa 3 (23 ott 2026) le sei dell'ordine on-chain
     # ...e il 27 ott 2026 «Dove ricevi i sats» (onchain-incasso-esterno)
+    # ...e il 28 ott 2026 le sette di chi vende in Lightning
+    # (onchain-verso-lightning)
     prova("le rotte /api/onchain/* esistono e si contano",
           ["/api/onchain/prova", "/api/onchain/xpub",
            "/api/onchain/incasso", "/api/onchain/incasso/controlla", "/api/onchain/prova/indirizzo", "/api/onchain/ordini",
@@ -153558,7 +153668,13 @@ def prove_cancello_onchain():
            "/api/onchain/ordini/{oid}/annulla",
            "/api/onchain/ordini/{oid}/rilascio-chiesto",
            "/api/onchain/ordini/{oid}/proposta",
-           "/api/onchain/ordini/{oid}/firma"], rotte)
+           "/api/onchain/ordini/{oid}/firma",
+           "/api/onchain/incasso/modo", "/api/onchain/cambio/esempio",
+           "/api/onchain/ordini/{oid}/cambio/preventivo",
+           "/api/onchain/ordini/{oid}/cambio/fattura",
+           "/api/onchain/ordini/{oid}/cambio",
+           "/api/onchain/ordini/{oid}/cambio/togli",
+           "/api/onchain/ordini/{oid}/incasso-ora"], rotte)
     # il conto che conta: ogni rotta on-chain deve nominare il cancello
     # nel suo corpo.
     senza = []
@@ -153566,10 +153682,16 @@ def prove_cancello_onchain():
         i_r = src.index(f'"{r}"')
         resto = src[i_r:]
         corpo = resto[:resto.index("\n@app.")] if "\n@app." in resto else resto
-        if "onchain_ammesso" not in corpo:
+        # (28 ott 2026) le rotte del cambio in Lightning passano da
+        # `onchain_ln_per`, che il cancello lo chiama per primo (qui sotto)
+        if "onchain_ammesso" not in corpo and "onchain_ln_per(user" not in corpo:
             senza.append(r)
     prova("...e ogni rotta on-chain di domani passa da `onchain_ammesso`",
           [], senza)
+    i_ln = src.index("def onchain_ln_per(tg_id) -> bool:")
+    prova("...e `onchain_ln_per` comincia dal cancello dell'on-chain", True,
+          "ONCHAIN_INCASSO_LN_ATTIVO and onchain_ammesso(tg_id)"
+          in src[i_ln:i_ln + 600])
     # il giudice e' UNO: due `onchain_ammesso` sarebbero due regole, e
     # la seconda la aggiornerebbe qualcuno un giorno e l'altra no.
     # L'ancora della lezione e' una frase CORTA, che sta su una riga
@@ -177888,8 +178010,14 @@ def prove_swap_preventivo():
     # sono strade)
     # (cambio-libero, tappa 3: la seconda e' la lettura delle tariffe del
     # submarine, `leggi_tariffa_sub`, con le stesse regole)
-    prova("nessun'altra strada verso SATS Routing nel server (le due letture delle tariffe)", 2,
+    # (28 ott 2026, onchain-verso-lightning: la terza e' la sola LETTURA
+    # dello stato di un cambio prima di trasmettere, `swap_stato_di`, che
+    # passa dal giudice del collaudo come le altre)
+    prova("nessun'altra strada verso SATS Routing nel server (le due letture delle tariffe e lo stato)", 3,
           len(re.findall(r"[\"']\S*/v2/swap/", src)))
+    stato_di = pezzo("swap_stato_di")
+    prova("...e lo stato si legge e basta, dal giudice del collaudo", (True, False),
+          ("swap_lettura_simulata(base)" in stato_di, ".post(" in stato_di))
     prova("le leve della tappa nascono come da piano", (True,) * 5,
           ("\nSWAP_SOLO_MODERATORI = True" in esempio,
            "\nSWAP_MIN_SATS = 25_000" in esempio,
@@ -181541,6 +181669,7 @@ def main():
     prove_banco_chiavi_onchain,
     prove_indirizzo_ordine_onchain,
     prove_ordine_onchain, prove_incasso_esterno_onchain,
+    prove_onchain_verso_lightning,
     prove_ripristino_visibile,
     prove_onchain_pagina,
     prove_onchain_nell_ordine,

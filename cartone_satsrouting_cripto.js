@@ -78,12 +78,15 @@ function num5(n, quanti){
   for (let i = quanti - 1; i >= 0; i--) out.push(Math.floor(n / 32 ** i) % 32);
   return out;
 }
-function fattura(rete, sats, impronta){
+function fattura(rete, sats, impronta, scadenza){
   const hrp = (PREFISSO_FATTURA[rete] || 'lnbc') + (Number(sats) * 10) + 'n';
   const p = a5(impronta);
+  /* la scadenza: un'ora di serie; (28 ott 2026, onchain-verso-lightning)
+     a richiesta anche un giorno, che in tre cifre da 5 bit non sta */
+  const vita = Number(scadenza) || 3600, cifre = vita < 32768 ? 3 : 4;
   const dati = [...num5(Math.floor(Date.now() / 1000), 7),
                 1, ...num5(p.length, 2), ...p,
-                6, ...num5(3, 2), ...num5(3600, 3),
+                6, ...num5(cifre, 2), ...num5(vita, cifre),
                 ...Array(104).fill(0)];
   return hrp + '1' + [...dati, ...controllo(hrp, dati)].map(x => ALF[x]).join('');
 }
@@ -123,7 +126,7 @@ const OP = {
   },
   /* i pezzi d'appoggio per le bugie: una fattura qualsiasi, un albero con
      un'altra scadenza, un indirizzo di un'altra chiave */
-  fattura(d){ return {invoice: fattura(d.rete, d.sats, d.impronta ? h.decode(d.impronta) : randomBytes(32))}; },
+  fattura(d){ return {invoice: fattura(d.rete, d.sats, d.impronta ? h.decode(d.impronta) : randomBytes(32), d.scadenza)}; },
   albero_altro(d){
     const p = pezzi(d);
     const altro = S.reverseSwapTree(false, h.decode(d.preimageHash), p.lui, pubDa(p.loro),

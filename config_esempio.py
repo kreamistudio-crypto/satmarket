@@ -818,6 +818,14 @@ CAMBIO_LIBERO_MAX_AL_GIORNO = 5
 # Massimo (SATS Routing) non risponde sulla quota partner del submarine
 # e sui limiti di chiamate: decisione di Andrea.
 CAMBIO_BTC_LN_ATTIVO = False
+# Chi vende on-chain riceve in Lightning (28 ott 2026, cantiere
+# onchain-verso-lightning): allo sblocco i bitcoin del 2-di-3 vanno a un
+# cambio bitcoin → Lightning di SATS Routing, con la fattura di chi
+# vende; nel Profilo sceglie «sempre on-chain», «sempre Lightning» o
+# «ogni volta». Nasce SPENTA; vuole CAMBIO_BTC_LN_ATTIVO accesa, e resta
+# ferma da sola finche' l'on-chain (oggi signet) e il fornitore (bitcoin)
+# non stanno sulla stessa rete.
+ONCHAIN_INCASSO_LN_ATTIVO = False
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

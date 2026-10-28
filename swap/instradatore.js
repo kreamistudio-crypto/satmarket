@@ -228,6 +228,9 @@ const SWAP_TESTI_T3 = {
     fatturaRete: 'Questa richiesta è di un\'altra rete.',
     fatturaScaduta: 'Questa richiesta scade troppo presto: creane una nuova.',
     mandaTu: (sats, n) => `Manda esattamente ${sats} sats a questo indirizzo, dal tuo wallet bitcoin: quando la rete li conferma, ${n} paga la tua richiesta.`,
+    /* (28 ott 2026, onchain-verso-lightning) il cambio di una vendita
+       pagata on-chain: i bitcoin li manda il deposito di garanzia */
+    subDaOrdine: n => `I bitcoin partono dal deposito di garanzia appena chi ha comprato mette la seconda firma: poi ${n} paga la tua richiesta Lightning.`,
     copiaIndirizzo: 'Copia l\'indirizzo',
     subBloccato: 'Bitcoin visti: aspetto la conferma della rete, di solito una decina di minuti.',
     subConfermato: n => `Confermati: ${n} sta pagando la tua richiesta.`,
@@ -330,6 +333,7 @@ const SWAP_TESTI_T3 = {
     fatturaRete: 'This request belongs to another network.',
     fatturaScaduta: 'This request expires too soon: create a new one.',
     mandaTu: (sats, n) => `Send exactly ${sats} sats to this address, from your bitcoin wallet: once the network confirms them, ${n} pays your request.`,
+    subDaOrdine: n => `The bitcoin leave the escrow deposit as soon as the buyer adds the second signature: then ${n} pays your Lightning request.`,
     copiaIndirizzo: 'Copy the address',
     subBloccato: 'Bitcoin seen: waiting for the network to confirm, usually about ten minutes.',
     subConfermato: n => `Confirmed: ${n} is paying your request.`,
@@ -569,7 +573,7 @@ function frasestatoSwap(rec){
     const fase = swapFase(rec), n = swapNomeFornitore(swapDiChi(rec));
     if (rec.spesoDa) return t.spesoAltri(n);
     if (fase === 'ripreso') return t.subRipreso(swapCorto(rec.rimborso.txid, 8));
-    if (fase === 'creato') return t.mandaTu(fmt(rec.mandi || rec.onchainAmount || 0), n);
+    if (fase === 'creato') return rec.onchain ? t.subDaOrdine(n) : t.mandaTu(fmt(rec.mandi || rec.onchainAmount || 0), n);
     if (fase === 'bloccato') return t.subBloccato;
     if (fase === 'confermato') return t.subConfermato(n);
     if (fase === 'pagata') return t.subPagata;
@@ -627,7 +631,9 @@ function fatturaCambio(rec){
    bitcoin: nudo: `portaWallet` e' solo per Lightning) */
 function bitcoinDaMandare(rec){
   const t = t3();
-  if (!swapESub(rec) || swapFase(rec) !== 'creato' || !rec.lockupAddress) return '';
+  /* (onchain-verso-lightning) il cambio d'una vendita on-chain non si
+     paga da qui: i bitcoin li manda il deposito di garanzia */
+  if (!swapESub(rec) || rec.onchain || swapFase(rec) !== 'creato' || !rec.lockupAddress) return '';
   const link = rec.bip21 || `bitcoin:${rec.lockupAddress}?amount=${(Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8)}`;
   return `<div class="swap-fattura">
     <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
@@ -997,6 +1003,60 @@ async function swapRipiega(n, f){
     swapErrori[n] = t.rifiuto(f.nome);
   }
   ridisegnaIncassoSwap();
+}
+
+/* ─── 6c. IL CAMBIO DI UNA VENDITA ON-CHAIN (28 ott 2026, cantiere
+   onchain-verso-lightning, richiesta di Alan e Andrea) ─────────────────
+   Chi ha venduto con un pagamento on-chain vuole i sats in Lightning: i
+   bitcoin non li manda il suo wallet ma il deposito di garanzia 2-di-3,
+   con la prima firma di chi vende e la seconda di chi compra. Qui nasce
+   SOLO il cambio — la chiave di rimborso dalle 12 parole (un indice
+   nuovo, prenotato prima di chiedere), la richiesta Lightning letta, la
+   risposta del fornitore verificata (`creaSub`) — e il record entra
+   nella lista con `onchain` (il numero dell'ordine on-chain), sorvegliato
+   come gli altri: a fattura pagata la meta' del ritiro a due, a cambio
+   fallito coi bitcoin mandati il rimborso dalla pagina «Cambio». Le firme
+   e il server li fa la pagina (`onchainCambioConferma`): qui niente fetch.
+   Alza con `.tipo`: 'parole' (prima le 12 parole), 'fattura' (il perche'
+   in `.perche`), 'casa', 'giu', 'mente'. */
+function swapNoOnchain(tipo){ const e = new Error(tipo); e.tipo = tipo; return e; }
+/* le 12 parole del fornitore, nate adesso se mancano (si mostrano una
+   volta, e il cambio parte solo dopo la spunta: `swapCopiatePerOnchain`) */
+async function swapParolePerOnchain(fid){
+  const f = swapFornitore(fid);
+  if (!f) throw swapNoOnchain('giu');
+  let c = swapCassetto(f.id);
+  if (!c || !c.parole) {
+    let parole;
+    try { parole = await f.nuoveParole(); }
+    catch(e){ throw swapNoOnchain('giu'); }
+    c = {parole: parole, prossimo: 0, copiata: false};
+    if (!swapScrivi(swapCasaParole(f.id), c)) throw swapNoOnchain('casa');
+  }
+  return c;
+}
+function swapCopiatePerOnchain(fid){
+  const c = swapCassetto(fid);
+  if (!c || !c.parole) return false;
+  c.copiata = true;
+  return swapScrivi(swapCasaParole(fid), c);
+}
+async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo}){
+  const f = swapFornitore(preventivo && preventivo.fornitore);
+  if (!f || !f.creaSub) throw swapNoOnchain('giu');
+  const perche = f.fatturaValida(fattura, Number(preventivo.ricevi));
+  if (perche) { const e = swapNoOnchain('fattura'); e.perche = perche; throw e; }
+  const c = swapCassetto(f.id);
+  if (!c || !c.parole || !c.copiata) throw swapNoOnchain('parole');
+  const indice = Number(c.prossimo) || 0;
+  c.prossimo = indice + 1;
+  if (!swapScrivi(swapCasaParole(f.id), c)) throw swapNoOnchain('casa');
+  const nuovo = await f.creaSub({parole: c.parole, indice: indice, preventivo: preventivo, fattura: fattura});
+  const rec = Object.assign(nuovo, {fornitore: f.id, ordine: Number(ordine) || null,
+    onchain: Number(onchain), indice: indice, indirizzo: '', creato: Date.now(), pagamento: ''});
+  swapSalvaRecord(rec);
+  swapSorveglia();
+  return rec;
 }
 
 /* ─── 7. LA SORVEGLIANZA E IL RITIRO ──────────────────────────────────

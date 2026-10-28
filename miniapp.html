@@ -16347,6 +16347,8 @@ let myTgId = null, isAdmin = false;
    falso anche per i moderatori. */
 let myOnchain = false;
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
+/* come ricevo quando vendo on-chain (28 ott 2026): {attivo, modo, minimo} */
+let myOnchainLn = {attivo: false};
 /* Ha premuto Avvia per entrare dal bot (19 ott 2026, ENTRA DAL BOT):
    gli avvisi in chat gli arrivano, e su onion il banner glielo dice
    invece di «non si possono attivare». Da /api/me, `bot_avviato`. */
@@ -18455,7 +18457,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'f09dfa9c1f';
+const SWAP_TELEFONO_VER = '6136161d86';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -43176,11 +43178,20 @@ async function onchainLiberaDallOrdine(btn, o){
        conferma si scrive, chi vende viene avvisato, e questo telefono
        firma da solo alla prima apertura dopo la sua scelta */
     if (o.role === 'buyer' && oc && !oc.incasso) {
+      /* (28 ott 2026) la conferma la firma il mio seme: il server la
+         controlla, e il mio telefono la rilegge prima di firmare da solo */
+      const parole = onchainSemeLocale();
+      if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+      const B = await caricaBitcoin();
+      const firma = await onchainFirmaRicevuto(B, parole, oc);
       const r = await fetch(`${API_BASE}/onchain/ordini/${oc.id}/rilascio-chiesto`,
-        {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+        {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+         body: JSON.stringify({firma})});
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || 'conferma non salvata');
-      toast('✅ Confermato. Chi vende deve ancora scegliere dove ricevere: l\'abbiamo avvisato, e appena lo fa il tuo telefono firma da solo quando apri la Mini App', 9000);
+      toast(oc.modo_venditore && oc.modo_venditore !== 'onchain'
+        ? '✅ Confermato. Chi vende riceve in Lightning: l\'abbiamo avvisato, e appena prepara il cambio il tuo telefono mette la seconda firma da solo quando apri la Mini App'
+        : '✅ Confermato. Chi vende deve ancora scegliere dove ricevere: l\'abbiamo avvisato, e appena lo fa il tuo telefono firma da solo quando apri la Mini App', 9000);
     } else {
       await onchainFirmaProposta(o.onchain.id);
       toast(o.role === 'buyer'
@@ -43208,6 +43219,244 @@ async function onchainSecondaFirmaDallOrdine(btn, o){
   openOrder(o.id);
 }
 
+/* ============ CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026,
+   cantiere onchain-verso-lightning, richiesta di Alan e Andrea) ============
+   Chi ha scelto in Profilo «sempre Lightning» o «scelgo ogni volta»,
+   dopo la conferma FIRMATA di chi compra, vede qui quanto costa il
+   cambio (lo fa SATS Routing, ed e' detto come un cambio: mai di
+   nascosto), l'avviso sulla capienza del suo wallet Lightning, e la
+   richiesta da incollare — o presa dal suo Lightning address, con
+   «sempre Lightning». A «Conferma» il SUO telefono fa nascere il cambio
+   (le 12 parole di riserva la prima volta: `swapCreaPerOnchain`), firma
+   col seme l'indirizzo del cambio come destinazione e mette la PRIMA
+   firma del rilascio verso di lui; la seconda la mette il telefono di
+   chi compra quando apre la Mini App (`onchainCofirma`). Il server, prima
+   di trasmettere, chiede al fornitore se il cambio e' ancora vivo. */
+const onchainCambi = {};   // ordine on-chain -> {stato, p, fattura, daAddress, errore}
+function onchainNomeCambio(p){
+  return (p && p.fornitore_nome) || 'SATS Routing';
+}
+/* la richiesta Lightning che non va, nelle parole dell'utente */
+function onchainFatturaPerche(perche, p){
+  return perche === 'importo' ? `La richiesta deve essere di ${fmt(Number(p.ricevi) || 0)} sats esatti.`
+       : perche === 'rete' ? 'Questa richiesta è di un\'altra rete.'
+       : perche === 'scaduta' ? 'Questa richiesta scade troppo presto: creane una nuova.'
+       : 'Questa non sembra una richiesta Lightning: ricontrollala.';
+}
+function onchainCambioRidisegna(o){
+  const b = o && o.onchain ? el(`onchainCambio_${Number(o.onchain.id)}`) : null;
+  if (b) b.innerHTML = onchainCambioBlocco(o);
+}
+function onchainCambioBlocco(o){
+  const oc = o.onchain, st = onchainCambi[oc.id];
+  const sceglie = oc.modo_venditore === 'ogni_volta';
+  const suOnchain = `<button class="btn ghost" onclick="onchainRiceviOnchainOra(this, currentOrder)">⛓️ Ricevi on-chain</button>`;
+  if (!st) return `<button class="btn orange" onclick="onchainCambioApri(this, currentOrder)">⚡ Vedi quanto ricevi in Lightning</button>${sceglie ? suOnchain : ''}`;
+  if (st.stato === 'carico') return '<div class="hint">Chiedo il prezzo del cambio…</div>';
+  const p = st.p || {}, nome = onchainNomeCambio(p);
+  const errore = st.errore ? `<div class="swap-rifiuto" role="status">${esc(st.errore)}</div>` : '';
+  if (!p.ok) {
+    /* SOTTO IL MINIMO (o sopra il tetto) la vendita arriva on-chain, e
+       lo si dice prima: il Profilo lo scrive accanto alla scelta */
+    const perche = p.motivo === 'sotto_minimo'
+      ? `Il cambio in Lightning parte da ${fmt(Number(p.minimo) || 0)} sats ricevuti: questa vendita la ricevi on-chain.`
+      : p.motivo === 'sopra_tetto'
+      ? `Il cambio in Lightning arriva al massimo a ${fmt(Number(p.massimo) || 0)} sats: questa vendita la ricevi on-chain.`
+      : `${nome} ora non risponde: riprova fra poco, o ricevi on-chain.`;
+    return `<div class="payout">${errore}<div class="hint">${esc(perche)}</div>
+      ${p.motivo === 'non_risponde' ? `<button class="btn orange" onclick="onchainCambioApri(this, currentOrder)">🔄 Riprova</button>` : ''}
+      ${suOnchain}</div>`;
+  }
+  let parole = '';
+  if (st.stato === 'parole' && typeof t3 === 'function') {
+    const t = t3();
+    const c = typeof swapCassetto === 'function' ? swapCassetto(p.fornitore) : null;
+    parole = `<div class="swap-prev swap-prima-volta">
+      <h4>🔑 ${esc(t.paroleTit)}</h4>
+      <p class="swap-calma">${esc(t.paroleSpiega)}</p>
+      <ol class="swap-regole">${t.paroleRegole.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
+      <p class="swap-calma forte">${esc(t.paroleNessuno)}</p>
+      <ol class="swap-parole">${(c && c.parole ? String(c.parole).split(' ') : []).map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+      <label class="swap-spunta"><input type="checkbox" id="ocCambioSpunta_${Number(oc.id)}"> ${esc(t.paroleSpunta)}</label>
+    </div>`;
+  }
+  const ore = Math.round((Number(p.vita_incollata_s) || 82800) / 3600);
+  return `<div class="payout">
+    <h4>⚡ Ricevi in Lightning</h4>
+    <div class="hint"><b>È un cambio, fatto da ${esc(nome)}</b>: costa ${fmt(Number(p.costo) || 0)} sats.
+      Ricevi <b>${fmt(Number(p.ricevi) || 0)} sats in Lightning</b> invece di ${fmt(Number(p.prezzo) || 0)} on-chain.</div>
+    <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve poter ricevere ${fmt(Number(p.ricevi) || 0)} sats in una volta:</b>
+      se è nuovo o piccolo, controlla prima che abbia abbastanza capienza (alcuni wallet la
+      chiamano «liquidità in entrata»). Se la richiesta non si riesce a pagare, i bitcoin
+      tornano a te dalla pagina «Cambio», con le tue 12 parole di riserva.</div>
+    ${parole}
+    <h4 style="margin-top:10px">La tua richiesta Lightning</h4>
+    <div class="hint">Dal tuo wallet Lightning crea una richiesta di <b>${fmt(Number(p.ricevi) || 0)} sats esatti</b>
+      che valga almeno ${ore} ore (chi ha comprato può aprire l'app domani), e incollala qui.</div>
+    ${p.ln_address ? `<button class="btn ghost" onclick="onchainCambioPrendiFattura(this, currentOrder)">⚡ Prendila dal mio Lightning address</button>` : ''}
+    <textarea class="swap-indirizzo" id="ocCambioFattura_${Number(oc.id)}" rows="3" autocomplete="off"
+      spellcheck="false" placeholder="lnbc…">${esc(st.fattura || '')}</textarea>
+    ${errore}
+    <button class="btn orange" onclick="onchainCambioConferma(this, currentOrder)">✅ Conferma il cambio</button>
+    ${sceglie ? suOnchain : ''}
+  </div>`;
+}
+function onchainCambioLeggiCampo(oc){
+  const st = onchainCambi[oc.id], campo = el(`ocCambioFattura_${Number(oc.id)}`);
+  if (st && campo) st.fattura = String(campo.value || '').trim().replace(/^lightning:/i, '').trim();
+}
+async function onchainCambioApri(btn, o){
+  haptic();
+  const oc = o.onchain;
+  onchainCambi[oc.id] = {stato: 'carico'};
+  onchainCambioRidisegna(o);
+  const st = onchainCambi[oc.id];
+  try {
+    const r = await fetch(`${API_BASE}/onchain/ordini/${Number(oc.id)}/cambio/preventivo`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'preventivo non arrivato');
+    st.p = d;
+    st.stato = 'pronto';
+  } catch(e) {
+    delete onchainCambi[oc.id];
+    toast('⚡ ' + (e.message || 'errore'), 6000);
+    return onchainCambioRidisegna(o);
+  }
+  onchainCambioRidisegna(o);
+  /* «SEMPRE LIGHTNING» col Lightning address nel profilo: la richiesta
+     la chiede il server, e chi vende vede il costo e conferma lo stesso */
+  if (st.p.ok && st.p.modo === 'lightning' && st.p.ln_address) await onchainCambioPrendiFattura(null, o);
+}
+async function onchainCambioPrendiFattura(btn, o){
+  if (btn) haptic();
+  const oc = o.onchain, st = onchainCambi[oc.id];
+  if (!st || !st.p || !st.p.ok) return;
+  const rip = onchainAttesa(btn, 'La chiedo…');
+  try {
+    const r = await fetch(`${API_BASE}/onchain/ordini/${Number(oc.id)}/cambio/fattura`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({sats: Number(st.p.ricevi)})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.fattura) throw new Error(d.detail || 'richiesta non arrivata');
+    st.fattura = st.daAddress = String(d.fattura).trim();
+    delete st.errore;
+  } catch(e) { st.errore = e.message || 'errore'; }
+  finally { rip(); }
+  onchainCambioRidisegna(o);
+}
+async function onchainCambioConferma(btn, o){
+  haptic();
+  const oc0 = o.onchain, st = onchainCambi[oc0.id];
+  if (!st || !st.p || !st.p.ok || st.stato === 'creo') return;
+  onchainCambioLeggiCampo(oc0);
+  delete st.errore;
+  const p = st.p, nome = onchainNomeCambio(p), fattura = st.fattura || '';
+  const b = fattura ? leggiBolt11(fattura) : null;
+  /* la vita della richiesta, prima di toccare niente: i bitcoin partono
+     quando chi compra apre l'app, e il cambio va pagato dopo una conferma */
+  const daAddress = !!st.daAddress && st.daAddress === fattura;
+  const vita = Number(daAddress ? p.vita_address_s : p.vita_incollata_s) || 0;
+  if (!fattura) st.errore = 'Prima incolla la richiesta del tuo wallet Lightning.';
+  else if (!b || !b.hash) st.errore = onchainFatturaPerche('fattura', p);
+  else if (b.scade - Date.now() / 1000 < vita)
+    st.errore = `Questa richiesta scade fra meno di ${Math.round(vita / 3600)} ore: creane una che duri di più.`;
+  if (st.errore) return onchainCambioRidisegna(o);
+  const rip = onchainAttesa(btn, 'Preparo il cambio…');
+  let finito = false;
+  try {
+    if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare il cambio: riprova');
+    /* LE 12 PAROLE DI RISERVA, la prima volta: si mostrano qui, e il
+       cambio parte solo dopo la spunta */
+    const c = await swapParolePerOnchain(p.fornitore);
+    if (!c.copiata && st.stato !== 'parole') { st.stato = 'parole'; return; }
+    if (!c.copiata) {
+      const spunta = el(`ocCambioSpunta_${Number(oc0.id)}`);
+      if (!spunta || !spunta.checked) { st.errore = t3().paroleSpuntaPrima; return; }
+      if (!swapCopiatePerOnchain(p.fornitore)) throw Object.assign(new Error('casa'), {tipo: 'casa'});
+    }
+    st.stato = 'creo';
+    await onchainLeggiOrdini();
+    const oc = onchainOrdini.find(x => x.id === Number(oc0.id));
+    if (!oc || oc.stato !== 'pagato' || oc.incasso || oc.proposta) throw new Error('l\'ordine è cambiato: riaprilo');
+    const B = await caricaBitcoin();
+    const parole = onchainSemeLocale();
+    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+    const io = onchainMieChiavi(B, parole, oc);
+    if (B.hex.encode(io.firma.publicKey) !== oc.indirizzo.chiavi.venditore)
+      throw new Error('la chiave dell\'ordine non è del tuo seme');
+    const w = onchainScriptOrdine(B, oc);
+    const rec = await swapCreaPerOnchain({ordine: o.id, onchain: oc.id, fattura: fattura, preventivo: p});
+    let dove = null;
+    try { dove = B.Address(B.TEST_NETWORK).decode(rec.lockupAddress); } catch(e) { dove = null; }
+    if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo del cambio non è della rete giusta');
+    if (!(rec.mandi > 0 && rec.mandi <= oc.prezzo_sats)) throw new Error('le cifre del cambio non tornano');
+    const firma = await onchainFirmaDestinazione(B, parole, 'cambio', `${oc.id}:${rec.lockupAddress}`);
+    const psbt = onchainPsbtFirmata(B, oc, io, w, onchainUsciteVersoVenditore(oc, rec.lockupAddress, 12));
+    const r = await fetch(`${API_BASE}/onchain/ordini/${Number(oc.id)}/cambio`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({cambio: {fornitore: rec.fornitore, id: rec.id, lockup: rec.lockupAddress,
+        ricevi: rec.ricevi, mandi: rec.mandi, scade_fattura: b.scade, timeout: rec.timeoutBlockHeight},
+        firma, psbt})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'cambio rifiutato');
+    delete onchainCambi[oc0.id];
+    finito = true;
+    toast('⚡ Fatto: hai messo la prima firma. I bitcoin partono verso il cambio appena chi ha comprato apre la Mini App', 8000);
+  } catch(e) {
+    st.stato = 'pronto';
+    st.errore = e && e.tipo === 'fattura' ? onchainFatturaPerche(e.perche, p)
+      : e && e.tipo === 'mente' ? `${nome} ha risposto con dati che non tornano: non è partito niente.`
+      : e && e.tipo === 'giu' ? `${nome} ora non risponde: riprova fra poco.`
+      : e && e.tipo === 'casa' ? t3().nienteCasa
+      : (e && e.message) || 'errore';
+  } finally {
+    rip();
+    if (!finito) onchainCambioRidisegna(o);
+  }
+  if (finito) { try { await loadOrders(); renderOrders(); } catch(e) {} openOrder(o.id); }
+}
+/* «RICEVI ON-CHAIN» ALLO SBLOCCO: chi sceglie ogni volta, o chi sta sotto
+   il minimo del cambio, prende per questo ordine il suo wallet on-chain
+   (la scelta firmata dal seme) e firma per primo verso di lui */
+async function onchainRiceviOnchainOra(btn, o){
+  haptic();
+  const rip = onchainAttesa(btn, 'Firmo…');
+  let fatto = false;
+  try {
+    const r = await fetch(`${API_BASE}/onchain/ordini/${Number(o.onchain.id)}/incasso-ora`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 409 && /Profilo/.test(String(d.detail || ''))) {
+      toast('⛓️ ' + d.detail, 7000);
+      rip();
+      return apriCassettoProfilo('accOnchainIncasso');
+    }
+    if (!r.ok) throw new Error(d.detail || 'non riuscito');
+    await onchainLeggiOrdini();
+    await onchainFirmaProposta(Number(o.onchain.id), 'venditore');
+    delete onchainCambi[o.onchain.id];
+    fatto = true;
+    toast('⛓️ Hai firmato: i sats partono verso il tuo wallet appena chi ha comprato apre la Mini App', 7000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  finally { rip(); }
+  if (fatto) { try { await loadOrders(); renderOrders(); } catch(e) {} openOrder(o.id); }
+}
+async function onchainCambioTogli(btn, o){
+  haptic();
+  const rip = onchainAttesa(btn, 'Tolgo…');
+  try {
+    const r = await fetch(`${API_BASE}/onchain/ordini/${Number(o.onchain.id)}/cambio/togli`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non riuscito');
+    toast('✖️ Cambio tolto: non si è mosso niente. Puoi rifarlo, o ricevere on-chain', 6000);
+  } catch(e) { toast('⚡ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  try { await loadOrders(); renderOrders(); } catch(e) {}
+  openOrder(o.id);
+}
+
 /* Il riquadro on-chain dentro l'ordine: a che punto sono le firme, e
    il gesto che manca. '' sul Lightning di sempre. */
 function pannelloOnchainOrdine(o, s){
@@ -43229,6 +43478,30 @@ function pannelloOnchainOrdine(o, s){
       : (perMe ? '⚖️ <b>Disputa decisa a tuo favore.</b> Barattolo ha firmato; manca la seconda firma, quella del tuo telefono: si mette da sola quando apri la Mini App.'
                : '⚖️ <b>Disputa decisa a favore dell\'altra parte.</b> Barattolo ha firmato, e i sats partono appena l\'altra parte apre la Mini App.');
     if (parte && perMe) gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
+  } else if (oc.incasso_tipo === 'cambio' && (p || oc.txid_uscita)) {
+    /* IL CAMBIO IN LIGHTNING (28 ott 2026): chi vende ha firmato per
+       primo verso il cambio di SATS Routing; manca la firma di chi compra */
+    const c = oc.cambio || {};
+    if (oc.txid_uscita) {
+      riga = io === 'venditore'
+        ? `⚡ <b>I bitcoin sono partiti verso il cambio</b>: ${esc(onchainNomeCambio(c))} paga la tua richiesta Lightning di ${fmt(c.ricevi || 0)} sats appena la rete li conferma. Lo segui nella pagina «Cambio».`
+        : '🔓 <b>I sats sono partiti</b> verso chi vende.';
+    } else if (io === 'venditore') {
+      riga = `⚡ <b>Hai preparato il cambio</b>: ricevi ${fmt(c.ricevi || 0)} sats in Lightning (il cambio lo fa ${esc(onchainNomeCambio(c))}). I bitcoin partono appena chi ha comprato apre la Mini App e il suo telefono mette la seconda firma.`;
+      gesto = `<button class="btn ghost" onclick="onchainCambioTogli(this, currentOrder)">✖️ Togli il cambio</button>`;
+    } else {
+      riga = '🔓 <b>Chi vende ha messo la prima firma</b> (riceve in Lightning). Manca la seconda, quella del tuo telefono: si mette da sola quando apri la Mini App.';
+      gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
+    }
+  } else if (p && p.verso === 'venditore' && io === 'venditore' && p.mia
+             && ['locked','shipped','delivered'].includes(s)) {
+    /* (28 ott 2026) chi sceglie ogni volta ha preso l'on-chain allo
+       sblocco, e ha firmato per primo verso il suo wallet */
+    riga = '⛓️ <b>Hai messo la prima firma</b> verso il tuo wallet on-chain: i sats partono appena chi ha comprato apre la Mini App, e il suo telefono mette la seconda.';
+  } else if (p && p.verso === 'venditore' && io === 'compratore' && !p.mia
+             && ['locked','shipped','delivered'].includes(s)) {
+    riga = '🔓 <b>Chi vende ha messo la prima firma.</b> Manca la seconda, quella del tuo telefono: si mette da sola quando apri la Mini App.';
+    gesto = `<button class="btn orange" onclick="onchainSecondaFirmaDallOrdine(this, currentOrder)">✍️ Metti la seconda firma</button>`;
   } else if (p && p.verso === 'venditore' && ['locked','shipped','delivered'].includes(s)) {
     riga = p.mia
       ? '🔓 <b>Hai liberato i sats</b> con la firma del tuo telefono: partono appena il venditore apre la Mini App, e il suo telefono mette la seconda.'
@@ -43253,20 +43526,33 @@ function pannelloOnchainOrdine(o, s){
      tre chiavi di sempre, e dove escono i sats chi vende lo sceglie anche
      dopo il pagamento; fino ad allora restano nel 2-di-3 */
   const senzaDove = o.role === 'seller' && oc.incasso_scelto === false;
+  /* (28 ott 2026) chi riceve in Lightning, o sceglie ogni volta, decide
+     allo sblocco: dopo la conferma di chi compra, qui sotto */
+  const allaFine = o.role === 'seller' && oc.modo_venditore && oc.modo_venditore !== 'onchain';
   let dove = o.role === 'seller'
     ? ' I sats arrivano dove hai scelto in Profilo → «Incassi on-chain».' : '';
-  if (senzaDove) {
+  let cambio = '';
+  if (senzaDove && allaFine && !p && !oc.txid_uscita) {
+    dove = oc.rilascio_chiesto
+      ? ' ✅ <b>Chi ha comprato ha confermato di averlo ricevuto.</b> Scegli qui sotto come ricevere.'
+      : (oc.modo_venditore === 'lightning'
+        ? ' ⚡ Ricevi in Lightning: quando chi ha comprato conferma di averlo ricevuto, qui vedi quanto costa il cambio e confermi.'
+        : ' 🤔 Quando chi ha comprato conferma di averlo ricevuto, qui scegli se ricevere on-chain o in Lightning.');
+    if (oc.rilascio_chiesto) cambio = `<div id="onchainCambio_${Number(oc.id)}">${onchainCambioBlocco(o)}</div>`;
+  } else if (senzaDove) {
     dove = ' ⚠️ <b>Non hai ancora scelto dove ricevere:</b> i sats restano al sicuro nel 2-di-3, ed escono appena lo scegli.';
     if (!gesto) gesto = `<button class="btn orange" onclick="apriCassettoProfilo('accOnchainIncasso')">⛓️ Scegli dove ricevere</button>`;
   } else if (o.role === 'buyer' && oc.rilascio_chiesto && !p) {
-    dove = ' ✅ <b>Hai confermato:</b> i sats partono appena chi vende sceglie dove riceverli, e il tuo telefono firma da solo.';
+    dove = oc.modo_venditore && oc.modo_venditore !== 'onchain'
+      ? ' ✅ <b>Hai confermato:</b> chi vende sceglie adesso come ricevere, e appena mette la prima firma il tuo telefono mette la seconda da solo.'
+      : ' ✅ <b>Hai confermato:</b> i sats partono appena chi vende sceglie dove riceverli, e il tuo telefono firma da solo.';
   }
   /* «Com'è fatto» sta QUI, piegato (27 ott 2026): la pagina On-chain
      non ha piu' una scheda Ordini — l'ordine e' uno solo, in «Ordini» */
   const fatto = (oc.indirizzo && oc.indirizzo.indirizzo)
     ? onchainComeEFatto(Object.assign({}, oc, {ruolo: o.role === 'buyer' ? 'compratore' : o.role === 'seller' ? 'venditore' : ''}), {})
     : '';
-  return `<div class="trust-note">⛓️ <span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${fatto}${gesto}`;
+  return `<div class="trust-note">⛓️ <span>${riga ? riga + '<br>' : ''}Pagato <b>on-chain</b>, in un 2-di-3: tu, l'altra parte e Barattolo.${dove}${tx}</span></div>${cambio}${fatto}${gesto}`;
 }
 
 async function annullaOrdine(){
@@ -55258,10 +55544,76 @@ function onchainBloccoIncasso(miaXpub){
 
 /* il cassetto del Profilo: lo stato in una riga (da /api/me) e lo
    stesso modulo; i dettagli stanno nella pagina On-chain */
+/* COME RICEVI QUANDO VENDI ON-CHAIN (28 ott 2026, cantiere
+   onchain-verso-lightning, richiesta di Alan): sempre on-chain (di
+   serie), sempre Lightning, o scelgo ogni volta. In Lightning e' un
+   CAMBIO, fatto da SATS Routing, e lo si dice con un esempio vero (il
+   preventivo di adesso su 100.000 sats); la cifra esatta si vede
+   sempre prima di confermare, nell'ordine. Sotto il minimo del cambio
+   la vendita arriva on-chain: per questo il wallet qui sotto serve
+   anche a chi riceve in Lightning. Si vede solo a leva accesa. */
+let onchainEsempioCambio = null;
+const ONCHAIN_MODI_TESTI = {onchain: '⛓️ Sempre on-chain', lightning: '⚡ Sempre Lightning',
+                            ogni_volta: '🤔 Scelgo ogni volta'};
+function onchainModoBlocco(){
+  if (!myOnchainLn || !myOnchainLn.attivo) return '';
+  const modo = myOnchainLn.modo || 'onchain';
+  const pillole = Object.keys(ONCHAIN_MODI_TESTI).map(m =>
+    `<button type="button" class="consegna-pill${m === modo ? ' attiva' : ''}" onclick="onchainModoScegli(this, '${m}')">${ONCHAIN_MODI_TESTI[m]}</button>`).join('');
+  if (modo === 'onchain') return `<div class="payout"><h4>Come ricevi quando vendi on-chain</h4>
+    <div class="consegna-scelta">${pillole}</div>
+    <div class="hint">I sats arrivano al tuo wallet on-chain, quello qui sotto.</div></div>`;
+  if (!onchainEsempioCambio) onchainEsempioCarica();
+  const e = onchainEsempioCambio || {};
+  const nome = esc(e.fornitore_nome || myOnchainLn.fornitore || 'SATS Routing');
+  const esempio = e.ok
+    ? `Per esempio: su ${fmt(Number(e.prezzo) || 0)} sats venduti ne ricevi circa <b>${fmt(Number(e.ricevi) || 0)} in Lightning</b>.
+       È un cambio, fatto da ${nome}: costa ${fmt(Number(e.costo) || 0)} sats, e la cifra esatta la vedi nell'ordine prima di confermare.`
+    : e.carico ? 'Calcolo un esempio…'
+    : `È un cambio, fatto da ${nome}, e ha un costo: ora non risponde, ma la cifra esatta la vedi nell'ordine prima di confermare.`;
+  const minimo = Number(e.minimo || myOnchainLn.minimo) || 0;
+  const come = modo === 'lightning'
+    ? (myLnAddress ? 'Quando chi compra conferma di averlo ricevuto, la richiesta la prendiamo dal tuo Lightning address: tu vedi il costo e confermi.'
+                   : 'Quando chi compra conferma di averlo ricevuto, incolli la richiesta del tuo wallet Lightning, vedi il costo e confermi.')
+    : 'Quando chi compra conferma di averlo ricevuto, scegli nell\'ordine se ricevere on-chain o in Lightning.';
+  return `<div class="payout"><h4>Come ricevi quando vendi on-chain</h4>
+    <div class="consegna-scelta">${pillole}</div>
+    <div class="hint">${esempio}</div>
+    <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve avere la capienza</b> per ricevere la cifra intera.
+      ${minimo ? `Sotto i ${fmt(minimo)} sats il cambio non si fa: quella vendita arriva on-chain, al wallet qui sotto.` : ''}</div>
+    <div class="hint" style="margin-top:6px">${come}</div></div>`;
+}
+async function onchainEsempioCarica(){
+  onchainEsempioCambio = {carico: true};
+  try {
+    const r = await fetch(`${API_BASE}/onchain/cambio/esempio?sats=100000`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    onchainEsempioCambio = r.ok ? await r.json() : {ok: false};
+  } catch(e) { onchainEsempioCambio = {ok: false}; }
+  renderIncassoOnchainProfilo();
+}
+async function onchainModoScegli(btn, modo){
+  haptic();
+  if (!myOnchainLn || modo === (myOnchainLn.modo || 'onchain')) return;
+  const rip = onchainAttesa(btn, '…');
+  try {
+    const r = await fetch(`${API_BASE}/onchain/incasso/modo`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({modo})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non salvato');
+    myOnchainLn.modo = modo;
+    toast(modo === 'onchain' ? '⛓️ Salvato: ricevi on-chain'
+      : modo === 'lightning' ? '⚡ Salvato: dalle prossime vendite ricevi in Lightning, col cambio'
+      : '🤔 Salvato: a ogni vendita scegli tu come ricevere', 5000);
+  } catch(e) { toast('⚠️ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  renderIncassoOnchainProfilo();
+}
+
 function renderIncassoOnchainProfilo(){
   const box = el('onchainIncassoProfilo');
   if (!box || !myOnchain || DEMO) return;
-  box.innerHTML = (myOnchainIncasso
+  box.innerHTML = onchainModoBlocco() + (myOnchainIncasso
     ? `<div class="hint" style="color:var(--ok);margin-top:10px"><b>✅ Ricevi nel tuo wallet</b>
          (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}).
          Per cambiarlo, incolla qui sotto.</div>`
@@ -55835,6 +56187,114 @@ async function onchainIncassoAtteso(B, parole, o, io){
   try { return onchainIndirizzoEsterno(B, o.destinazione); } catch(e) { return ''; }
 }
 
+/* «HO RICEVUTO», FIRMATO (28 ott 2026, cantiere onchain-verso-lightning).
+   Quando chi compra conferma prima che l'uscita ci sia, la conferma la
+   firma il SUO seme (la stessa chiave `/2/0` delle destinazioni, su un
+   testo suo): il server la controlla, e questo telefono la rilegge
+   prima di firmare da solo. Lo stesso testo byte per byte del server
+   (`onchain_messaggio_ricevuto`); la rete e' scritta come in
+   `onchainMessaggioDestinazione`. */
+function onchainMessaggioRicevuto(oid, indirizzo){
+  return new TextEncoder().encode(
+    `barattolo/onchain/ricevuto/v1\nsignet\n${Number(oid)}\n${indirizzo}`);
+}
+
+async function onchainFirmaRicevuto(B, parole, oc){
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256',
+    onchainMessaggioRicevuto(oc.id, oc.indirizzo.indirizzo)));
+  return B.hex.encode(onchainChiaveDestinazione(B, parole).sign(h));
+}
+
+/* la conferma scritta sull'ordine l'ha firmata il MIO seme? */
+async function onchainRicevutoMio(B, parole, oc){
+  try {
+    const h = new Uint8Array(await crypto.subtle.digest('SHA-256',
+      onchainMessaggioRicevuto(oc.id, oc.indirizzo.indirizzo)));
+    return onchainChiaveDestinazione(B, parole).verify(h, B.hex.decode(String(oc.rilascio_firma || '')));
+  } catch(e) { return false; }
+}
+
+/* LA PRIMA FIRMA DI CHI VENDE (28 ott 2026): chi riceve in Lightning, o
+   sceglie ogni volta, firma per primo verso di se' dopo la conferma
+   firmata di chi compra; il telefono di chi compra mette la seconda da
+   solo. Questa e' la proposta che il MIO telefono (da compratore)
+   aspetta: di chi vende, non di Barattolo, su un ordine che ho
+   confermato io. */
+function onchainPrimaDiChiVende(o){
+  return o.ruolo === 'compratore' && !!o.proposta && o.proposta.verso === 'venditore'
+    && !o.proposta.mia && !o.proposta.barattolo && !!o.rilascio_chiesto_il
+    && !!o.rilascio_firma && (o.stato === 'pagato');
+}
+
+/* La firma DER di una PSBT nella forma r||s (64 byte) che vuole la
+   verifica di @scure/bip32; null se non si legge. */
+function onchainDerACompatta(der){
+  try {
+    if (der[0] !== 0x30 || der[2] !== 0x02) return null;
+    const lr = der[3], r = der.slice(4, 4 + lr);
+    if (der[4 + lr] !== 0x02) return null;
+    const ls = der[5 + lr], sv = der.slice(6 + lr, 6 + lr + ls);
+    const fuori = new Uint8Array(64);
+    const r32 = r.slice(-32), s32 = sv.slice(-32);
+    fuori.set(r32, 32 - r32.length);
+    fuori.set(s32, 64 - s32.length);
+    return fuori;
+  } catch(e) { return null; }
+}
+
+/* OGNI moneta della proposta porta una firma VALIDA della chiave di chi
+   vende in questo ordine? Senza, la mia seconda firma potrebbe finire
+   accanto a quella della sola chiave di Barattolo: due su tre senza chi
+   vende. Si rifà l'impronta della transazione da sola (SIGHASH_ALL) e
+   si verifica con la chiave pubblica dell'ordine. */
+function onchainFirmataDaChiVende(B, tx, o, w){
+  const sua = B.hex.decode(o.indirizzo.chiavi.venditore);
+  const chiave = new B.HDKey({publicKey: sua});
+  for (let i = 0; i < tx.inputsLength; i++) {
+    const x = tx.getInput(i);
+    const u = o.utxo.find(m => m.txid === B.hex.encode(x.txid) && m.vout === x.index);
+    if (!u) return false;
+    const voce = (x.partialSig || []).find(([k]) => B.hex.encode(k) === o.indirizzo.chiavi.venditore);
+    if (!voce) return false;
+    const firma = voce[1];
+    if (firma[firma.length - 1] !== B.SigHash.ALL) return false;
+    const rs = onchainDerACompatta(firma.slice(0, -1));
+    if (!rs) return false;
+    const h = tx.preimageWitnessV0(i, w.witnessScript, B.SigHash.ALL, BigInt(u.value));
+    if (!chiave.verify(h, rs)) return false;
+  }
+  return true;
+}
+
+/* LE USCITE DI UN RILASCIO verso chi vende, le stesse per chi firma per
+   primo (compratore o venditore): il prezzo all'incasso, la quota fissa
+   di Barattolo se c'e', il resto del margine a chi ha comprato.
+   `piuVb` = i byte in piu' di un'uscita che non e' p2wpkh (12 per il
+   taproot del cambio). */
+function onchainUsciteVersoVenditore(o, incasso, piuVb){
+  const tot = o.utxo.reduce((s, u) => s + u.value, 0);
+  const vb = (k) => 11 + 105 * o.utxo.length + 31 * k + (Number(piuVb) || 0);
+  const tar = Math.max(1, Number(o.tariffa) || 2);
+  const quota = Number(o.quota_sats) || 0;
+  if (quota > ONCHAIN_QUOTA_TETTO) throw new Error('la quota di Barattolo supera il tetto');
+  const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
+  const uscite = [[incasso, o.prezzo_sats]];
+  if (quota) uscite.push([o.quota_indirizzo, quota]);
+  if (resto >= ONCHAIN_POLVERE) uscite.push([o.rimborso, resto]);
+  return uscite;
+}
+
+/* la transazione delle `uscite`, con la MIA firma su ogni moneta, in PSBT */
+function onchainPsbtFirmata(B, o, io, w, uscite){
+  const tx = new B.Transaction();
+  for (const u of o.utxo) tx.addInput({txid: u.txid, index: u.vout,
+    witnessUtxo: {script: w.script, amount: BigInt(u.value)},
+    witnessScript: w.witnessScript});
+  for (const [a, v] of uscite) tx.addOutputAddress(a, BigInt(v), B.TEST_NETWORK);
+  for (let i = 0; i < o.utxo.length; i++) tx.signIdx(io.firma.privateKey, i);
+  return B.base64.encode(tx.toPSBT());
+}
+
 /* LA PRIMA FIRMA: chi compra libera (verso il venditore: il prezzo a
    lui, il resto del margine a se'), chi vende rimborsa (tutto a chi ha
    comprato). La commissione dalla tariffa che dice il server, con la
@@ -55856,7 +56316,7 @@ async function onchainProponi(btn, oid){
    dalla strada A (27 ott 2026), l'ordine di sempre — «Ho ricevuto
    l'oggetto — libera i sats» e «Annulla l'ordine» su un ordine pagato
    on-chain passano da qui. Torna il verso firmato, o alza col motivo. */
-async function onchainFirmaProposta(oid){
+async function onchainFirmaProposta(oid, verso){
   let o = onchainOrdini.find(x => x.id === oid);
   if (!o) o = (await onchainLeggiOrdini()).find(x => x.id === oid);
   if (!o) throw new Error('ordine on-chain non trovato');
@@ -55867,34 +56327,27 @@ async function onchainFirmaProposta(oid){
   if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi[o.ruolo])
     throw new Error('la chiave dell\'ordine non è del tuo seme');
   const w = onchainScriptOrdine(B, o);
-  const verso = o.ruolo === 'compratore' ? 'venditore' : 'compratore';
-  if (verso === 'venditore' && o.rimborso !== io.incasso)
+  /* di serie chi compra libera e chi vende rimborsa; (28 ott 2026) chi
+     vende puo' anche firmare per primo verso di se' — chi sceglie ogni
+     volta e prende l'on-chain allo sblocco — e allora l'incasso deve
+     essere quello che il SUO seme ha firmato */
+  verso = verso || (o.ruolo === 'compratore' ? 'venditore' : 'compratore');
+  if (verso === 'venditore' && o.ruolo === 'compratore' && o.rimborso !== io.incasso)
     throw new Error('il resto non tornerebbe a una tua chiave');
+  if (verso === 'venditore' && o.ruolo === 'venditore') {
+    const atteso = await onchainIncassoAtteso(B, parole, o, io);
+    if (!atteso || o.incasso !== atteso) throw new Error('l\'incasso non è firmato dal tuo seme');
+  }
   const tot = o.utxo.reduce((s, u) => s + u.value, 0);
   const vb = (k) => 11 + 105 * o.utxo.length + 31 * k;
   const tar = Math.max(1, Number(o.tariffa) || 2);
-  let uscite;
-  if (verso === 'venditore') {
-    /* la quota fissa di Barattolo, se l'ordine ne ha una: la paga chi
-       compra, e qui si controlla che non superi il tetto */
-    const quota = Number(o.quota_sats) || 0;
-    if (quota > ONCHAIN_QUOTA_TETTO) throw new Error('la quota di Barattolo supera il tetto');
-    const resto = tot - o.prezzo_sats - quota - Math.ceil(vb(quota ? 3 : 2) * tar);
-    uscite = [[o.incasso, o.prezzo_sats]];
-    if (quota) uscite.push([o.quota_indirizzo, quota]);
-    if (resto >= ONCHAIN_POLVERE) uscite.push([o.rimborso, resto]);
-  } else {
-    uscite = [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
-  }
-  const tx = new B.Transaction();
-  for (const u of o.utxo) tx.addInput({txid: u.txid, index: u.vout,
-    witnessUtxo: {script: w.script, amount: BigInt(u.value)},
-    witnessScript: w.witnessScript});
-  for (const [a, v] of uscite) tx.addOutputAddress(a, BigInt(v), B.TEST_NETWORK);
-  for (let i = 0; i < o.utxo.length; i++) tx.signIdx(io.firma.privateKey, i);
+  /* la quota fissa di Barattolo, se l'ordine ne ha una: la paga chi
+     compra, e `onchainUsciteVersoVenditore` controlla il tetto */
+  const uscite = verso === 'venditore' ? onchainUsciteVersoVenditore(o, o.incasso, 0)
+    : [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
   const r = await fetch(`${API_BASE}/onchain/ordini/${oid}/proposta`, {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-    body: JSON.stringify({verso, psbt: B.base64.encode(tx.toPSBT())})});
+    body: JSON.stringify({verso, psbt: onchainPsbtFirmata(B, o, io, w, uscite)})});
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.detail || 'proposta rifiutata');
   return verso;
@@ -55909,7 +56362,7 @@ async function onchainCofirma(o, parole){
   const io = onchainMieChiavi(B, parole, o);
   if (B.hex.encode(io.firma.publicKey) !== o.indirizzo.chiavi[o.ruolo])
     return 'la chiave dell\'ordine non è del tuo seme';
-  onchainScriptOrdine(B, o);
+  const w = onchainScriptOrdine(B, o);
   const tx = B.Transaction.fromPSBT(B.base64.decode(o.proposta.psbt));
   const ingressi = [];
   for (let i = 0; i < tx.inputsLength; i++) {
@@ -55923,7 +56376,25 @@ async function onchainCofirma(o, parole){
     const x = tx.getOutput(i);
     uscite.push([B.Address(B.TEST_NETWORK).encode(B.OutScript.decode(x.script)), Number(x.amount)]);
   }
-  if (o.proposta.verso === 'venditore') {
+  if (o.proposta.verso === 'venditore' && o.ruolo === 'compratore') {
+    /* LA PRIMA FIRMA DI CHI VENDE (28 ott 2026): co-firmo da solo solo
+       quel che ho confermato IO, col mio seme, e solo se la prima firma
+       e' davvero di chi vende; il prezzo all'incasso dell'ordine, la
+       quota esatta, il resto del margine a una MIA chiave */
+    if (!onchainPrimaDiChiVende(o) || !(await onchainRicevutoMio(B, parole, o)))
+      return 'non hai confermato tu di averlo ricevuto';
+    if (o.rimborso !== io.incasso) return 'il resto non tornerebbe a una tua chiave';
+    if (!o.incasso) return 'chi vende non ha un incasso';
+    if (!onchainFirmataDaChiVende(B, tx, o, w)) return 'la prima firma non è di chi vende';
+    if (uscite.filter(([a]) => a === o.incasso).map(([, v]) => v).join() !== String(o.prezzo_sats))
+      return 'a chi vende non arriva il prezzo';
+    const quota = Number(o.quota_sats) || 0;
+    if (quota > ONCHAIN_QUOTA_TETTO) return 'la quota di Barattolo supera il tetto';
+    if (quota && uscite.filter(([a]) => a === o.quota_indirizzo).map(([, v]) => v).join() !== String(quota))
+      return 'la quota di Barattolo non è quella dell\'ordine';
+    if (uscite.some(([a]) => a !== o.incasso && a !== o.rimborso
+                             && !(quota && a === o.quota_indirizzo))) return 'c\'è un\'uscita estranea';
+  } else if (o.proposta.verso === 'venditore') {
     /* il mio incasso: il conto di serie, o il wallet che il MIO seme ha
        firmato come destinazione — mai un indirizzo detto dal solo server */
     const atteso = await onchainIncassoAtteso(B, parole, o, io);
@@ -55974,7 +56445,7 @@ async function onchainCofirmeInAttesa(parole){
     /* si co-firma solo quel che va a ME: con la firma di Barattolo
        (27 ott 2026) anche chi ha perso la disputa vede la proposta, e
        il suo telefono non ha niente da metterci */
-    if (o.proposta.verso !== o.ruolo) continue;
+    if (o.proposta.verso !== o.ruolo && !onchainPrimaDiChiVende(o)) continue;
     try {
       const no = await onchainCofirma(o, parole);
       fatte.push(no ? `⚠️ #${o.id}: non co-firmato — ${no}`
@@ -56027,7 +56498,7 @@ async function onchainCofirmeInSottofondo(){
     const parole = onchainSemeLocale();
     if (!parole) return;
     const ordini = await onchainLeggiOrdini();
-    if (!ordini.some(o => onchainRilascioDaFirmare(o)
+    if (!ordini.some(o => onchainRilascioDaFirmare(o) || onchainPrimaDiChiVende(o)
                           || (o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
                               && (o.stato === 'pagato' || o.stato === 'attesa')))) return;
     const fatte = await onchainCofirmeInAttesa(parole);
@@ -88689,6 +89160,7 @@ async function avvia(){
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
     myOnchainIncasso = me.onchain_incasso || '';
+    myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */
     if (myOnchain) setTimeout(onchainCofirmeInSottofondo, 3000);
     /* ...e l'on-chain si accende da solo (27 ott 2026) */

@@ -1770,6 +1770,18 @@ try:
     from config import CAMBIO_BTC_LN_ATTIVO
 except ImportError:
     CAMBIO_BTC_LN_ATTIVO = False
+# CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
+# onchain-verso-lightning, via di Alan e piano approvato da Andrea): allo
+# sblocco i bitcoin del 2-di-3 vanno a un cambio bitcoin → Lightning di
+# SATS Routing, creato dal telefono di chi vende con la SUA fattura.
+# SPENTA di serie. Vale solo sopra CAMBIO_BTC_LN_ATTIVO (lo stesso
+# submarine) e solo se la rete dell'on-chain e quella del fornitore sono
+# la stessa (`onchain_ln_rete_ok`): con l'on-chain su signet e SATS
+# Routing su bitcoin la strada resta ferma da sola, anche accesa.
+try:
+    from config import ONCHAIN_INCASSO_LN_ATTIVO
+except ImportError:
+    ONCHAIN_INCASSO_LN_ATTIVO = False
 # QUANTI BLOCCHI DEVONO RESTARE allo swap quando lo paghiamo: dopo il
 # pagamento il fornitore blocca i bitcoin e il telefono li ritira, e se
 # lo swap scade prima il fornitore se li riprende (e il pagamento torna
@@ -2621,6 +2633,10 @@ FRENI = {
     # l'incasso su un wallet proprio e le leve dal pannello (27 ott 2026)
     "onchain_incasso": (10, 3600),    # «Dove ricevi i sats», per persona
     "onchain_incasso_guarda": (40, 3600),  # il controllo di un indirizzo incollato (mempool), per persona
+    # (28 ott 2026) il cambio in Lightning di un ordine on-chain: il
+    # preventivo legge le tariffe del fornitore, la fattura bussa al
+    # Lightning address, la nascita legge un PSBT
+    "onchain_cambio": (40, 3600),     # preventivo, fattura e cambio di un ordine, per persona
     "leva_pannello": (20, 3600),      # una leva cambiata dal pannello, per admin
 }
 MAX_ORDINI_CREATO = 5           # ordini «creato» vivi per compratore: ognuno prenota lo stock
@@ -33567,6 +33583,24 @@ def _leve_stato():
                        "vengono liberati, torna a lui col rimborso",
                 spento="nessuna quota: chi compra paga il prezzo più il "
                        "solo margine per la rete")),
+            # (28 ott 2026, cantiere onchain-verso-lightning) chi vende
+            # riceve in Lightning con un cambio di SATS Routing; la riga
+            # dice il fatto (la rete), non la sola costante
+            _leva("Chi vende riceve in Lightning (cambio)",
+                  "ONCHAIN_INCASSO_LN_ATTIVO",
+                  bool(ONCHAIN_INCASSO_LN_ATTIVO),
+                  acceso=("nel Profilo chi vende sceglie sempre on-chain, "
+                          "sempre Lightning o ogni volta; allo sblocco i "
+                          "bitcoin vanno al cambio di SATS Routing e lui "
+                          "riceve la sua fattura" if onchain_ln_rete_ok() else
+                          "⚠️ accesa ma FERMA: l'on-chain sta su "
+                          f"{ONCHAIN_RETE} e il fornitore su {swap_rete()}, "
+                          "e dei bitcoin di prova non si cambiano in "
+                          "Lightning vero. Parte il giorno della mainnet"),
+                  spento="chi vende riceve on-chain e basta, come ieri; "
+                         "vuole anche CAMBIO_BTC_LN_ATTIVO",
+                  allarme=bool(ONCHAIN_INCASSO_LN_ATTIVO)
+                  and not onchain_ln_rete_ok()),
         ]},
         {"gruppo": "🪙 Punti e dollari su RGB (hackathon)", "voci": [
             # IL CANCELLO DELL'HACKATHON (ott 2026): la riga chiede al
@@ -46308,6 +46342,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
     profilo["onchain_incasso"] = (_onchain_incasso_mio(user["id"])
                                   if profilo["onchain"] else "")
+    # (28 ott 2026) come ricevo quando vendo on-chain: la busta del cambio
+    # in Lightning (il cancello per me, il modo scelto, il minimo)
+    profilo["onchain_ln"] = (onchain_ln_busta(user["id"])
+                             if profilo["onchain"] else {"attivo": False})
     profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
     profilo["offerte_da_agire"] = da_agire
@@ -79419,6 +79457,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                     # confermato
                     "incasso_scelto": bool(oc["incasso"]),
                     "rilascio_chiesto": bool(oc["rilascio_chiesto_il"]),
+                    # (28 ott 2026) il cambio in Lightning: come riceve chi
+                    # vende, e il cambio nato (le parti pubbliche)
+                    "incasso_tipo": oc["incasso_tipo"] or "",
+                    "modo_venditore": onchain_modo_vivo(con, oc["venditore_id"]),
+                    "cambio": _onchain_cambio_letto(oc),
+                    "prezzo_sats": int(oc["prezzo_sats"]),
                 } if oc else None)
         finally:
             con.close()
@@ -90198,6 +90242,14 @@ def _onchain_prepara_tabelle(con):
         firma TEXT NOT NULL,
         creato INTEGER DEFAULT 0,
         aggiornato INTEGER DEFAULT 0)""")
+    # COME RICEVE CHI VENDE (28 ott 2026, cantiere onchain-verso-lightning):
+    # «onchain» (di serie, nessuna riga), «lightning» o «ogni_volta». Non
+    # e' un segreto e non sposta sats da solo: la destinazione vera la
+    # firma sempre il seme di chi vende, al momento.
+    con.execute("""CREATE TABLE IF NOT EXISTS onchain_modo(
+        tg_id INTEGER PRIMARY KEY,
+        modo TEXT NOT NULL,
+        aggiornato INTEGER DEFAULT 0)""")
 
 
 def _onchain_db():
@@ -90761,7 +90813,25 @@ def onchain_messaggio_destinazione(tipo: str, valore: str) -> bytes:
 def onchain_firma_valida(xpub_dedicata: str, tipo: str, valore: str,
                          firma_hex: str) -> bool:
     """La firma (64 byte, r||s, quella di @scure/bip32) e' della chiave
-    `/2/0` della xpub dedicata? embit vuole il DER: lo si compone qui."""
+    `/2/0` della xpub dedicata? Il testo e' quello della destinazione."""
+    return onchain_firma_valida_testo(
+        xpub_dedicata, onchain_messaggio_destinazione(tipo, valore), firma_hex)
+
+
+def onchain_messaggio_ricevuto(oid: int, indirizzo: str) -> bytes:
+    """«HO RICEVUTO», FIRMATO (28 ott 2026, cantiere onchain-verso-lightning):
+    il testo che il seme di chi compra firma quando conferma prima che
+    l'uscita ci sia. Il suo telefono lo rilegge prima di firmare DA SOLO
+    il rilascio: una riga del server da sola non basta piu'. Lo stesso
+    byte per byte nel telefono (`onchainMessaggioRicevuto`)."""
+    return (f"barattolo/onchain/ricevuto/v1\n{ONCHAIN_RETE}\n{int(oid)}\n"
+            f"{indirizzo}").encode("utf-8")
+
+
+def onchain_firma_valida_testo(xpub_dedicata: str, messaggio: bytes,
+                               firma_hex: str) -> bool:
+    """La firma di `messaggio` (64 byte, r||s) e' della chiave `/2/0` della
+    xpub dedicata? embit vuole il DER: lo si compone qui."""
     from embit import ec
     try:
         grezza = bytes.fromhex(str(firma_hex or ""))
@@ -90775,7 +90845,7 @@ def onchain_firma_valida(xpub_dedicata: str, tipo: str, valore: str,
         der = (b"\x30" + bytes([len(r) + len(s) + 4]) + b"\x02"
                + bytes([len(r)]) + r + b"\x02" + bytes([len(s)]) + s)
         chiave = _embit_bip32.HDKey.from_string(xpub_dedicata).derive([2, 0]).key
-        h = hashlib.sha256(onchain_messaggio_destinazione(tipo, valore)).digest()
+        h = hashlib.sha256(messaggio).digest()
         return bool(chiave.verify(ec.Signature.parse(der), h))
     except Exception:
         return False
@@ -90891,7 +90961,9 @@ def _onchain_riempi_incassi(con, venditore_id: int) -> list:
     r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
                     (int(venditore_id),)).fetchone()
     dest = _onchain_destinazione_viva(con, venditore_id, r["xpub"]) if r else None
-    if not dest:
+    # (28 ott 2026) chi riceve in Lightning, o sceglie ogni volta, decide
+    # ordine per ordine allo sblocco: niente incassi riempiti da soli
+    if not dest or onchain_modo_vivo(con, venditore_id) != "onchain":
         return []
     righe = con.execute(
         "SELECT * FROM onchain_ordini WHERE venditore_id=? AND incasso='' "
@@ -90979,7 +91051,14 @@ def _onchain_prepara_ordini(con):
                       # 27 ott 2026 sera: chi compra ha confermato quando
                       # chi vende non aveva ancora scelto dove ricevere;
                       # il suo telefono firma appena l'incasso c'e'
-                      ("rilascio_chiesto_il", "INTEGER DEFAULT 0")):
+                      ("rilascio_chiesto_il", "INTEGER DEFAULT 0"),
+                      # 28 ott 2026, cantiere onchain-verso-lightning: la
+                      # conferma firmata dal seme di chi compra
+                      # (`onchain_messaggio_ricevuto`), e il cambio in
+                      # Lightning di chi vende (JSON delle parti pubbliche:
+                      # fornitore, id, quanto, la scadenza della fattura)
+                      ("rilascio_firma", "TEXT DEFAULT ''"),
+                      ("cambio", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -91137,6 +91216,10 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
         # Il conto `/1/n` di serie non e' piu' una strada.
         dest = _onchain_destinazione_viva(con, venditore,
                                           ind["xpub_venditore"])
+        # (28 ott 2026) chi vende in Lightning, o che sceglie ogni volta,
+        # decide allo sblocco: l'incasso resta vuoto anche se ha un wallet
+        if onchain_modo_vivo(con, venditore) != "onchain":
+            dest = None
         if dest:
             d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
             d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
@@ -91219,6 +91302,12 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "ordine_id": int(o["ordine_id"] or 0),
         # chi compra ha confermato, e aspetta la scelta di chi vende
         "rilascio_chiesto_il": int(o["rilascio_chiesto_il"] or 0),
+        # (28 ott 2026) la conferma firmata dal seme di chi compra: il suo
+        # telefono la rilegge prima di firmare da solo; e il cambio in
+        # Lightning di chi vende (le sole parti pubbliche), e come riceve
+        "rilascio_firma": o["rilascio_firma"] or "",
+        "cambio": _onchain_cambio_letto(o),
+        "modo_venditore": onchain_modo_vivo(con, o["venditore_id"]),
         "scade": o["scade"], "creato": o["creato"],
         "pagato_il": o["pagato_il"], "chiuso_il": o["chiuso_il"],
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
@@ -91678,17 +91767,28 @@ async def onchain_ordine_annulla(oid: int, x_tg_init_data: str = Header(""),
 
 
 @app.post("/api/onchain/ordini/{oid}/rilascio-chiesto")
-async def onchain_rilascio_chiesto(oid: int, x_tg_init_data: str = Header(""),
+async def onchain_rilascio_chiesto(oid: int, req: Request,
+                                   x_tg_init_data: str = Header(""),
                                    barattolo_sessione: str = Cookie("")):
     """«HO RICEVUTO» PRIMA CHE CHI VENDE ABBIA SCELTO DOVE RICEVERE (27 ott
     2026). La firma di chi compra deve dire a CHI vanno i sats, e l'uscita
     non c'e' ancora: si scrive la sua conferma, si avvisa chi vende, e il
     telefono di chi compra firma da solo alla prima apertura dopo la
     scelta (`onchainCofirmeInAttesa`). Nessuna firma di Barattolo: la
-    regola delle due firme resta delle due parti."""
+    regola delle due firme resta delle due parti.
+    LA CONFERMA SI FIRMA (28 ott 2026, cantiere onchain-verso-lightning):
+    `firma` e' la chiave `/2/0` del seme di chi compra sul testo
+    `onchain_messaggio_ricevuto`. Il server la controlla con la sua xpub
+    dedicata, e il SUO telefono la rilegge prima di firmare da solo: cosi'
+    una riga scritta da un server manomesso non libera niente. E con
+    chi vende in Lightning e' anche il permesso alla PRIMA firma di chi
+    vende (il cambio nasce adesso, e la fattura scade)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    firma = str(d.get("firma") or "").strip().lower()
     con = _onchain_db_ordini()
     try:
         o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
@@ -91701,18 +91801,34 @@ async def onchain_rilascio_chiesto(oid: int, x_tg_init_data: str = Header(""),
             raise HTTPException(409, "Su questo ordine non c'è niente da "
                                      "mettere in attesa")
         _onchain_ordine_permette(con, o, "venditore")
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+        if not onchain_firma_valida_testo(
+                ind["xpub_compratore"],
+                onchain_messaggio_ricevuto(o["id"], ind["indirizzo"]), firma):
+            raise HTTPException(400, "La conferma non è firmata dal tuo seme: "
+                                     "rifalla da questo telefono")
         gia = bool(o["rilascio_chiesto_il"])
-        con.execute("UPDATE onchain_ordini SET rilascio_chiesto_il=?,"
-                    " aggiornato=? WHERE id=? AND rilascio_chiesto_il=0",
-                    (int(time.time()), int(time.time()), oid))
+        # una conferma di prima, senza firma, si puo' ridare: stavolta firmata
+        con.execute("UPDATE onchain_ordini SET rilascio_chiesto_il=CASE WHEN"
+                    " rilascio_chiesto_il=0 THEN ? ELSE rilascio_chiesto_il"
+                    " END, rilascio_firma=?, aggiornato=? WHERE id=? AND"
+                    " (rilascio_chiesto_il=0 OR rilascio_firma='')",
+                    (int(time.time()), firma, int(time.time()), oid))
         con.commit()
+        modo = onchain_modo_vivo(con, o["venditore_id"])
     finally:
         con.close()
     if not gia:
+        tit = html.escape(o['titolo'][:40])
         await notifica(o["venditore_id"],
-            f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi ha comprato ha "
-            "confermato di averlo ricevuto. Scegli dove ricevere i sats "
-            "(Profilo → «Incassi on-chain») e partono.")
+            f"⛓️ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
+            "ricevuto. Scegli dove ricevere i sats (Profilo → «Incassi "
+            "on-chain») e partono." if modo == "onchain" else
+            f"⚡ <b>{tit}:</b> chi ha comprato ha confermato di averlo "
+            "ricevuto. Apri l'ordine: ti mostriamo quanto costa il cambio "
+            "in Lightning e, se confermi, i sats partono."
+            + (" Puoi anche riceverli on-chain." if modo == "ogni_volta" else ""))
     return {"ok": True}
 
 
@@ -91746,7 +91862,17 @@ async def onchain_ordine_proposta(oid: int, req: Request,
         if not o:
             raise HTTPException(404, "Ordine non trovato")
         parte = _onchain_parte(o, user["id"])
-        if verso == "venditore" and parte != "compratore":
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+        # (28 ott 2026) LA PRIMA FIRMA DI CHI VENDE: solo dopo la conferma
+        # FIRMATA di chi compra, e solo per chi sceglie allo sblocco (la
+        # sua strada on-chain dell'«ogni volta»; il cambio in Lightning ha
+        # la sua porta, `onchain_cambio_nasce`)
+        prima_di_chi_vende = (verso == "venditore" and parte == "venditore"
+                              and o["incasso_tipo"] != "cambio"
+                              and _onchain_puo_firmare_prima(con, o, ind))
+        if verso == "venditore" and parte != "compratore" \
+                and not prima_di_chi_vende:
             raise HTTPException(403, "I sats al venditore li libera chi compra")
         if verso == "compratore" and parte != "venditore":
             raise HTTPException(403, "Il rimborso lo propone chi vende")
@@ -91758,12 +91884,15 @@ async def onchain_ordine_proposta(oid: int, req: Request,
         _onchain_ordine_permette(con, o, verso)
         if verso == "venditore" and not o["incasso"]:
             raise HTTPException(409, ONCHAIN_MSG_SENZA_DESTINAZIONE)
+        if verso == "venditore" and o["incasso_tipo"] == "cambio":
+            # il cambio in Lightning ha gia' la prima firma, quella di chi
+            # vende: un'altra proposta verso di lui non lo sostituisce
+            raise HTTPException(409, "Chi vende ha già firmato il cambio in "
+                                     "Lightning: manca solo la seconda firma")
         if o["decisione_da"]:
             # la proposta di Barattolo non si sostituisce: e' la decisione
             raise HTTPException(409, "Su questo ordine ha già firmato "
                                      "Barattolo: manca solo la seconda firma")
-        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
-                          (o["indirizzo_id"],)).fetchone()
         try:
             _onchain_psbt_giudica(o, verso, psbt_b64,
                                   ind["chiave_" + parte])
@@ -91780,6 +91909,10 @@ async def onchain_ordine_proposta(oid: int, req: Request,
     finally:
         con.close()
     await notifica(altro, (
+        f"⛓️ <b>{tit}:</b> chi vende ha scelto dove ricevere. Apri la Mini "
+        "App: il tuo telefono firma il rilascio che avevi confermato, e i "
+        "sats partono."
+        if prima_di_chi_vende else
         f"⛓️ <b>Sats liberati:</b> {tit}. Apri la Mini App: il tuo "
         "telefono mette la seconda firma e i sats partono."
         if verso == "venditore" else
@@ -91841,6 +91974,21 @@ async def onchain_ordine_firma(oid: int, req: Request,
         verso = o["proposta_verso"]
     finally:
         con.close()
+    if verso == "venditore" and o["incasso_tipo"] == "cambio":
+        # (28 ott 2026) IL CAMBIO E' ANCORA VIVO? Prima di mandare i bitcoin
+        # al fornitore: lo swap aspetta ancora i bitcoin e la fattura di
+        # chi vende ha davanti il tempo di una conferma. Sennò non parte
+        # niente, il cambio si toglie e chi vende lo rifa'. Il fornitore
+        # muto non e' un si': non si manda alla cieca.
+        perche = await onchain_cambio_perche_morto(o)
+        if perche is None:
+            raise HTTPException(503, "SATS Routing ora non risponde: riprova "
+                                     "fra poco, non è partito niente")
+        if perche:
+            await _onchain_cambio_togli(o, perche)
+            raise HTTPException(409, "Il cambio di chi vende è scaduto prima "
+                                     "che partissero i sats: gli abbiamo "
+                                     "chiesto di rifarlo. Non è partito niente")
     try:
         txid = await onchain_mempool_invia(tx_hex)
     except ValueError as e:
@@ -91874,6 +92022,526 @@ async def onchain_ordine_firma(oid: int, req: Request,
     for chi in (o["compratore_id"], o["venditore_id"]):
         await notifica(chi, testo)
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
+
+
+# ============ CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026,
+# cantiere onchain-verso-lightning; la via di Alan: «quando il compratore
+# paga on chain, se il venditore li vuole LN, internamente dobbiamo
+# direzionare l'invio verso satsrouting, il venditore deve impostare
+# solamente una invoice LN»; piano in dieci righe approvato da Andrea)
+# ============
+# Il 2-di-3 non cambia: chi compra paga lo stesso indirizzo, e allo
+# sblocco il prezzo esce verso UN'ALTRA uscita, l'indirizzo del cambio
+# bitcoin → Lightning («submarine») di SATS Routing. Il cambio lo crea il
+# TELEFONO DI CHI VENDE, con la SUA fattura e la SUA chiave di rimborso
+# (le 12 parole di riserva della pagina «Cambio», tappa 3): il fornitore
+# paga la fattura quando vede i bitcoin, e se non la paga i bitcoin
+# tornano a chi vende dal suo telefono. Il server non vede mai chiavi.
+# L'ORDINE DEI GESTI, ed e' la riga che conta: la fattura scade, quindi
+# il cambio nasce il piu' tardi possibile — DOPO la conferma di chi
+# compra, che e' FIRMATA dal suo seme (`onchain_messaggio_ricevuto`).
+# Chi vende crea il cambio, lo firma come destinazione col seme e mette
+# la PRIMA firma; il telefono di chi compra mette la seconda alla prima
+# apertura, dopo aver riletto la sua conferma. Prima di trasmettere il
+# server chiede al fornitore se il cambio e' ancora vivo: sennò non parte
+# niente e chi vende lo rifa'.
+# LE TRE SCELTE di chi vende (Profilo → «Incassi on-chain»): «onchain»
+# (di serie, il mondo di ieri), «lightning» (la fattura dal suo
+# Lightning address), «ogni_volta» (allo sblocco sceglie lui, e la
+# fattura la incolla). La parola «swap» all'utente non si dice: e' «il
+# cambio, fatto da SATS Routing», col costo scritto prima.
+ONCHAIN_MODI = ("onchain", "lightning", "ogni_volta")
+# La rete del fornitore che va bene per ogni rete dell'on-chain: signet
+# ha le forme di testnet (tb1…, lntb…), e la mainnet vuole bitcoin.
+ONCHAIN_RETE_DEL_CAMBIO = {"signet": "testnet", "testnet": "testnet",
+                           "bitcoin": "bitcoin"}
+# Quanto deve restare alla fattura di chi vende quando i bitcoin partono:
+# il fornitore paga dopo una conferma, e una conferma puo' metterci ore.
+ONCHAIN_CAMBIO_VITA_MIN_S = 2 * 3600
+# ...e quanto le si chiede alla nascita: la incollata deve durare un
+# giorno (chi compra puo' aprire l'app domani, come nel P2P), quella del
+# Lightning address almeno tre ore.
+ONCHAIN_CAMBIO_VITA_INCOLLATA_S = 23 * 3600
+ONCHAIN_CAMBIO_VITA_ADDRESS_S = 3 * 3600
+
+
+def onchain_ln_rete_ok(fornitore: dict | None = None) -> bool:
+    """La rete dell'on-chain e quella del fornitore sono la stessa? Oggi
+    no (signet e bitcoin), e la strada resta ferma anche a leva accesa:
+    dei bitcoin di prova non si cambiano in Lightning vero."""
+    f = fornitore or swap_fornitori()[0]
+    return ONCHAIN_RETE_DEL_CAMBIO.get(ONCHAIN_RETE) == f.get("rete")
+
+
+def onchain_ln_per(tg_id) -> bool:
+    """IL CAMBIO IN LIGHTNING C'E' PER CHI VENDE? La leva, sopra il
+    cancello dell'on-chain e quello dello swap (il telefono che fa il
+    cambio), la strada bitcoin → Lightning accesa, e le reti giuste."""
+    return bool(ONCHAIN_INCASSO_LN_ATTIVO and onchain_ammesso(tg_id)
+                and swap_per(tg_id) and "btc-ln" in cambio_strade()
+                and onchain_ln_rete_ok())
+
+
+def _onchain_modo_salvato(con, tg_id: int) -> str:
+    r = con.execute("SELECT modo FROM onchain_modo WHERE tg_id=?",
+                    (int(tg_id),)).fetchone()
+    return r["modo"] if r and r["modo"] in ONCHAIN_MODI else "onchain"
+
+
+def onchain_modo_vivo(con, tg_id: int) -> str:
+    """Come riceve ADESSO chi vende: la sua scelta, ma solo se il cambio
+    c'e' per lui; a leva spenta tutti tornano «onchain», come ieri."""
+    if not onchain_ln_per(tg_id):
+        return "onchain"
+    return _onchain_modo_salvato(con, tg_id)
+
+
+def onchain_ln_busta(tg_id: int) -> dict:
+    """La busta di `/api/me`: il cancello, il modo scelto, il minimo."""
+    attivo = onchain_ln_per(tg_id)
+    modo = "onchain"
+    if attivo:
+        con = _onchain_db()
+        try:
+            modo = _onchain_modo_salvato(con, tg_id)
+        finally:
+            con.close()
+    return {"attivo": attivo, "modo": modo,
+            "minimo": int(SWAP_MIN_SATS or 0), "fornitore": "SATS Routing"}
+
+
+def _onchain_cambio_letto(o) -> dict | None:
+    """Il cambio di un ordine (le sole parti pubbliche), o None."""
+    try:
+        c = json.loads(o["cambio"] or "{}")
+    except (ValueError, TypeError, IndexError, KeyError):
+        return None
+    if not isinstance(c, dict) or not c.get("id"):
+        return None
+    return {k: c.get(k) for k in ("fornitore", "id", "lockup", "ricevi",
+                                  "mandi", "scade_fattura", "timeout", "il")}
+
+
+def preventivo_sub_da_mandare(mandi: int, tariffa: dict, minimo=0,
+                              massimo=0) -> dict:
+    """IL CONTO ROVESCIATO DI `preventivo_sub`, puro: chi vende ha `mandi`
+    sats nel 2-di-3 (il prezzo dell'ordine), e riceve in Lightning il
+    massimo `ricevi` per cui il fornitore chiede di mandare non piu' di
+    `mandi`. L'avanzo dell'arrotondamento (0 o 1 sat) resta nella stessa
+    uscita, che porta sempre il prezzo esatto (il giudice delle proposte
+    non cambia). Sotto il minimo o sopra il tetto: ok False col motivo."""
+    mandi = int(mandi)
+    millesimi = round(float(tariffa["percento"]) * 1000)
+    rete = int(tariffa["rete"])
+
+    def costo(r):
+        return r + -(-r * millesimi // 100_000) + rete
+    ricevi = max(0, (mandi - rete) * 100_000 // (100_000 + millesimi))
+    while ricevi > 0 and costo(ricevi) > mandi:
+        ricevi -= 1
+    while costo(ricevi + 1) <= mandi:
+        ricevi += 1
+    p = preventivo_sub(ricevi, tariffa, minimo, massimo)
+    p["prezzo"] = mandi
+    if p.get("ok"):
+        p["avanzo"] = mandi - p["mandi"]
+        p["costo"] = mandi - ricevi
+    return p
+
+
+def _onchain_puo_firmare_prima(con, o, ind) -> bool:
+    """CHI VENDE PUO' METTERE LA PRIMA FIRMA verso di se'? Solo dopo la
+    conferma di chi compra FIRMATA dal suo seme, su un ordine pagato e
+    senza decisioni di Barattolo, e solo se chi vende sceglie allo
+    sblocco (Lightning, o ogni volta)."""
+    return bool(
+        o["stato"] == "pagato" and o["rilascio_chiesto_il"]
+        and o["rilascio_firma"] and not o["decisione_da"]
+        and onchain_modo_vivo(con, o["venditore_id"]) != "onchain"
+        and onchain_firma_valida_testo(
+            ind["xpub_compratore"],
+            onchain_messaggio_ricevuto(o["id"], ind["indirizzo"]),
+            o["rilascio_firma"]))
+
+
+def _onchain_da_sbloccare(con, oid: int, tg_id: int):
+    """L'ordine su cui chi vende sceglie adesso come ricevere: suo, pagato,
+    confermato da chi compra con la firma, senza uscita ne' proposta.
+    Torna (riga, indirizzo) o alza col perche'."""
+    o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                    (int(oid),)).fetchone()
+    if not o:
+        raise HTTPException(404, "Ordine non trovato")
+    if _onchain_parte(o, tg_id) != "venditore":
+        raise HTTPException(403, "Come ricevere lo sceglie chi vende")
+    if o["stato"] != "pagato" or o["incasso"] or o["proposta_psbt"]:
+        raise HTTPException(409, "Su questo ordine non c'è niente da "
+                                 "scegliere adesso")
+    _onchain_ordine_permette(con, o, "venditore")
+    ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                      (o["indirizzo_id"],)).fetchone()
+    if not _onchain_puo_firmare_prima(con, o, ind):
+        raise HTTPException(409, "Chi compra non ha ancora confermato di "
+                                 "averlo ricevuto")
+    return o, ind
+
+
+async def swap_stato_di(fornitore: dict, swap_id: str) -> str | None:
+    """Lo stato di uno swap come lo dice il fornitore (`GET /v2/swap/<id>`).
+    None = non risponde (o in collaudo non si esce dal computer); uno
+    swap che il fornitore non conosce e' «swap.sconosciuto»."""
+    base = str(fornitore.get("api") or "").rstrip("/")
+    if not base or not _SWAP_ID_FORMA.match(str(swap_id or "")) \
+            or swap_lettura_simulata(base):
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"{base}/v2/swap/{swap_id}")
+        if r.status_code == 404:
+            return "swap.sconosciuto"
+        if r.status_code != 200:
+            return None
+        return str((r.json() or {}).get("status") or "") or None
+    except Exception:
+        return None
+
+
+async def onchain_cambio_perche_morto(o) -> str | None:
+    """'' se il cambio di un ordine e' vivo (aspetta i bitcoin, e la
+    fattura ha davanti almeno due ore), sennò il perche'; None se il
+    fornitore non risponde e non si sa."""
+    c = _onchain_cambio_letto(o) or {}
+    if not c.get("id"):
+        return "manca il cambio"
+    if int(c.get("scade_fattura") or 0) - time.time() < ONCHAIN_CAMBIO_VITA_MIN_S:
+        return "la fattura scade troppo presto"
+    f = swap_fornitore(str(c.get("fornitore") or "satsrouting"))
+    if f is None:
+        return "fornitore sconosciuto"
+    stato = await swap_stato_di(f, str(c["id"]))
+    if stato is None:
+        return None
+    if stato != "invoice.set":
+        return f"il cambio è «{stato}»"
+    return ""
+
+
+async def _onchain_cambio_togli(o, perche: str, avvisa: bool = True) -> bool:
+    """Il cambio di un ordine se ne va prima che partano i sats: l'uscita e
+    la proposta tornano vuote, e chi vende lo rifa' dall'ordine (o sceglie
+    l'on-chain). Torna True se c'era da togliere."""
+    con = _onchain_db_ordini()
+    try:
+        cur = con.execute(
+            "UPDATE onchain_ordini SET incasso='', incasso_tipo='',"
+            " incasso_valore='', incasso_firma='', incasso_indice=0,"
+            " cambio='', proposta_verso='', proposta_psbt='', proposta_da=0,"
+            " proposta_il=0, aggiornato=? WHERE id=? AND incasso_tipo='cambio'"
+            " AND stato='pagato'", (int(time.time()), o["id"]))
+        con.commit()
+        tolto = bool(cur.rowcount)
+    finally:
+        con.close()
+    if tolto and avvisa:
+        await notifica(o["venditore_id"],
+            f"⚡ <b>{html.escape(o['titolo'][:40])}:</b> il cambio in "
+            f"Lightning non è partito ({html.escape(perche)}). Non si è "
+            "mosso niente: apri l'ordine e rifallo, o ricevi on-chain.")
+    return tolto
+
+
+@app.post("/api/onchain/incasso/modo")
+async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """«COME RICEVI QUANDO VENDI ON-CHAIN» (28 ott 2026): {modo: 'onchain' |
+    'lightning' | 'ogni_volta'}. Vale dalle vendite dopo, e per quelle che
+    aspettano ancora la scelta; tornando a «onchain» le vendite senza
+    uscita prendono il wallet scelto, come quando lo si salva."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_incasso", user["id"])
+    d = await leggi_json(req)
+    modo = str(d.get("modo") or "")
+    if modo not in ONCHAIN_MODI:
+        raise HTTPException(400, "Scelta sconosciuta")
+    if modo != "onchain" and not onchain_ln_per(user["id"]):
+        raise HTTPException(403, "Il cambio in Lightning non è disponibile")
+    riempiti = []
+    con = _onchain_db()
+    try:
+        if modo == "onchain":
+            con.execute("DELETE FROM onchain_modo WHERE tg_id=?", (user["id"],))
+        else:
+            con.execute("INSERT INTO onchain_modo(tg_id, modo, aggiornato) "
+                        "VALUES (?,?,?) ON CONFLICT(tg_id) DO UPDATE SET "
+                        "modo=excluded.modo, aggiornato=excluded.aggiornato",
+                        (user["id"], modo, int(time.time())))
+        con.commit()
+        if modo == "onchain":
+            _onchain_prepara_ordini(con)
+            riempiti = _onchain_riempi_incassi(con, user["id"])
+            con.commit()
+    finally:
+        con.close()
+    for o in riempiti:
+        if o["rilascio_chiesto_il"]:
+            await notifica(o["compratore_id"],
+                f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha "
+                "scelto dove ricevere. Apri la Mini App: il tuo telefono firma "
+                "il rilascio che avevi confermato, e i sats partono.")
+    return {"ok": True, "modo": modo, "ordini_aggiornati": len(riempiti)}
+
+
+async def _onchain_preventivo_cambio(sats: int) -> dict:
+    """Il preventivo del cambio per `sats` nel 2-di-3, col primo fornitore."""
+    f = swap_fornitori()[0]
+    busta = {"fornitore": f["id"], "fornitore_nome": f["nome"],
+             "prezzo": int(sats)}
+    tariffa = await leggi_tariffa_sub(f)
+    if tariffa is None:
+        return dict(busta, ok=False, motivo="non_risponde")
+    # il tetto e' solo quello del fornitore: SWAP_MAX_SATS guarda i sats
+    # che Barattolo paga dalla cassaforte, e qui la cassaforte non c'e'
+    return dict(busta, **preventivo_sub_da_mandare(sats, tariffa, SWAP_MIN_SATS))
+
+
+@app.get("/api/onchain/cambio/esempio")
+async def onchain_cambio_esempio(sats: int = 100_000,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """L'esempio del Profilo: su `sats` venduti on-chain, quanti ne
+    arriverebbero in Lightning col cambio di adesso. Non crea niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    return await _onchain_preventivo_cambio(max(1, min(int(sats), 21_000_000 * 100_000_000)))
+
+
+@app.get("/api/onchain/ordini/{oid}/cambio/preventivo")
+async def onchain_cambio_preventivo(oid: int, x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """IL PREVENTIVO DEL CAMBIO DI UN ORDINE, per chi vende: il prezzo
+    esce tutto verso il fornitore, e in Lightning arriva `ricevi`. Con le
+    soglie della fattura e il suo Lightning address, se c'e'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    _onchain_serve_embit()
+    con = _onchain_db_ordini()
+    try:
+        o, _ = _onchain_da_sbloccare(con, oid, user["id"])
+        modo = onchain_modo_vivo(con, user["id"])
+        u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    finally:
+        con.close()
+    p = await _onchain_preventivo_cambio(o["prezzo_sats"])
+    return dict(p, modo=modo, ln_address=bool(u and (u["ln_address"] or "").strip()),
+                vita_incollata_s=ONCHAIN_CAMBIO_VITA_INCOLLATA_S,
+                vita_address_s=ONCHAIN_CAMBIO_VITA_ADDRESS_S)
+
+
+@app.post("/api/onchain/ordini/{oid}/cambio/fattura")
+async def onchain_cambio_fattura(oid: int, req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """LA FATTURA DAL LIGHTNING ADDRESS DI CHI VENDE («sempre Lightning»):
+    la chiede il server, come per gli incassi Lightning di sempre
+    (`invoice_da_ln_address`). LIMITE DICHIARATO nel piano: un server
+    manomesso potrebbe dare una fattura sua; con la fattura incollata
+    no. Il telefono la rilegge (importo, rete, scadenza) prima del cambio."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    _frena("ln_address", user["id"])
+    d = await leggi_json(req)
+    try:
+        sats = int(d.get("sats") or 0)
+    except (TypeError, ValueError):
+        sats = 0
+    con = _onchain_db_ordini()
+    try:
+        o, _ = _onchain_da_sbloccare(con, oid, user["id"])
+        u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    finally:
+        con.close()
+    if not 0 < sats < int(o["prezzo_sats"]):
+        raise HTTPException(400, "Cifra della fattura fuori misura")
+    ln = (u["ln_address"] if u else "") or ""
+    if not ln.strip():
+        raise HTTPException(409, "Nel tuo profilo non c'è un Lightning "
+                                 "address: incolla una fattura")
+    try:
+        pr = await invoice_da_ln_address(ln, sats)
+    except LnbitsMuto:
+        raise HTTPException(503, "Adesso non riusciamo a leggere la fattura: "
+                                 "riprova fra poco, o incollane una")
+    if not pr:
+        raise HTTPException(409, f"Il tuo Lightning address non ha dato una "
+                                 f"fattura da {_fmt_sats(sats)} sats: "
+                                 "incollane una")
+    return {"ok": True, "fattura": pr}
+
+
+@app.post("/api/onchain/ordini/{oid}/cambio")
+async def onchain_cambio_nasce(oid: int, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """IL CAMBIO NASCE SULL'ORDINE: il telefono di chi vende porta le parti
+    pubbliche del cambio (fornitore, id, l'indirizzo dove mandare, quanto,
+    la scadenza della fattura), la firma del SUO seme su quell'indirizzo
+    (`onchain_firma_valida`, tipo «cambio», valore «<ordine>:<indirizzo>»)
+    e la PRIMA firma del rilascio verso quell'indirizzo, col prezzo
+    esatto. Il server giudica tutto con le regole di sempre e lo scrive in
+    un colpo solo; chi compra mette la seconda firma quando apre l'app."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    _frena("onchain_firma", user["id"])
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    c = d.get("cambio") if isinstance(d.get("cambio"), dict) else {}
+    firma = str(d.get("firma") or "").strip().lower()
+    psbt_b64 = str(d.get("psbt") or "").strip()
+    if not psbt_b64 or len(psbt_b64) > 20000:
+        raise HTTPException(400, "Manca la prima firma")
+    lockup = str(c.get("lockup") or "").strip()
+    swap_id = str(c.get("id") or "").strip()
+    try:
+        ricevi, mandi = int(c.get("ricevi") or 0), int(c.get("mandi") or 0)
+        scade = int(c.get("scade_fattura") or 0)
+        timeout = int(c.get("timeout") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Il cambio non si legge")
+    fornitore = swap_fornitore(str(c.get("fornitore") or "satsrouting"))
+    if fornitore is None or not onchain_ln_rete_ok(fornitore):
+        raise HTTPException(400, "Fornitore sconosciuto")
+    if not _SWAP_ID_FORMA.match(swap_id) or timeout <= 0:
+        raise HTTPException(400, "Il cambio non si legge")
+    # l'indirizzo del cambio: un taproot della rete dell'on-chain
+    from embit.script import address_to_scriptpubkey
+    rete = _EMBIT_RETI[ONCHAIN_RETE]
+    try:
+        sc = address_to_scriptpubkey(lockup)
+        buono = sc.script_type() == "p2tr" and sc.address(rete) == lockup
+    except Exception:
+        buono = False
+    if not buono:
+        raise HTTPException(400, "L'indirizzo del cambio non è della rete "
+                                 "giusta")
+    if scade - time.time() < ONCHAIN_CAMBIO_VITA_MIN_S:
+        raise HTTPException(400, "La fattura scade troppo presto: creane "
+                                 "una che duri di più")
+    con = _onchain_db_ordini()
+    try:
+        o, ind = _onchain_da_sbloccare(con, oid, user["id"])
+        if not 0 < ricevi < mandi <= int(o["prezzo_sats"]):
+            raise HTTPException(400, "Le cifre del cambio non tornano col "
+                                     "prezzo dell'ordine")
+        valore = f"{o['id']}:{lockup}"
+        if not onchain_firma_valida(ind["xpub_venditore"], "cambio", valore,
+                                    firma):
+            raise HTTPException(400, "Il cambio non è firmato dal tuo seme: "
+                                     "rifallo da questo telefono")
+        giudicato = dict(o)
+        giudicato["incasso"] = lockup
+        try:
+            _onchain_psbt_giudica(giudicato, "venditore", psbt_b64,
+                                  ind["chiave_venditore"])
+        except ValueError as e:
+            raise HTTPException(400, f"Proposta rifiutata: {e}")
+        adesso = int(time.time())
+        cambio = json.dumps({"fornitore": fornitore["id"], "id": swap_id,
+                             "lockup": lockup, "ricevi": ricevi,
+                             "mandi": mandi, "scade_fattura": scade,
+                             "timeout": timeout, "il": adesso})
+        cur = con.execute(
+            "UPDATE onchain_ordini SET incasso=?, incasso_tipo='cambio',"
+            " incasso_valore=?, incasso_firma=?, incasso_indice=0, cambio=?,"
+            " proposta_verso='venditore', proposta_psbt=?, proposta_da=?,"
+            " proposta_il=?, aggiornato=? WHERE id=? AND incasso='' AND"
+            " proposta_psbt='' AND stato='pagato'",
+            (lockup, valore, firma, cambio, psbt_b64, user["id"], adesso,
+             adesso, o["id"]))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "L'ordine è cambiato nel frattempo: "
+                                     "riaprilo")
+    finally:
+        con.close()
+    await notifica(o["compratore_id"],
+        f"⛓️ <b>{html.escape(o['titolo'][:40])}:</b> chi vende ha scelto di "
+        "ricevere in Lightning. Apri la Mini App: il tuo telefono firma il "
+        "rilascio che avevi confermato, e i sats partono.")
+    return {"ok": True}
+
+
+@app.post("/api/onchain/ordini/{oid}/cambio/togli")
+async def onchain_cambio_togli(oid: int, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Chi vende toglie il suo cambio prima che partano i sats (per
+    rifarlo, o per ricevere on-chain)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = _onchain_db_ordini()
+    try:
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (oid,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        if _onchain_parte(o, user["id"]) != "venditore":
+            raise HTTPException(403, "Il cambio lo toglie chi vende")
+    finally:
+        con.close()
+    if not await _onchain_cambio_togli(o, "tolto da chi vende", avvisa=False):
+        raise HTTPException(409, "Su questo ordine non c'è un cambio da togliere")
+    return {"ok": True}
+
+
+@app.post("/api/onchain/ordini/{oid}/incasso-ora")
+async def onchain_incasso_ora(oid: int, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """«RICEVI ON-CHAIN» ALLO SBLOCCO (28 ott 2026): chi sceglie ogni volta,
+    o chi sta sotto il minimo del cambio, prende per QUESTO ordine il suo
+    wallet on-chain (la destinazione firmata dal seme, come alla cassa).
+    Torna l'ordine: il suo telefono rilegge la destinazione e mette la
+    prima firma (`/proposta`), chi compra la seconda."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _onchain_serve_embit()
+    con = _onchain_db_ordini()
+    try:
+        o, ind = _onchain_da_sbloccare(con, oid, user["id"])
+        dest = _onchain_destinazione_viva(con, user["id"], ind["xpub_venditore"])
+        if not dest:
+            raise HTTPException(409, "Prima scegli dove ricevere on-chain "
+                                     "(Profilo → «Incassi on-chain»)")
+        indice = (_onchain_prossimo_esterno(con, user["id"], dest["valore"])
+                  if dest["tipo"] == "xpub" else 0)
+        cur = con.execute(
+            "UPDATE onchain_ordini SET incasso=?, incasso_tipo=?,"
+            " incasso_valore=?, incasso_firma=?, incasso_indice=?,"
+            " aggiornato=? WHERE id=? AND incasso='' AND proposta_psbt=''",
+            (onchain_indirizzo_esterno(dest["tipo"], dest["valore"], indice),
+             dest["tipo"], dest["valore"], dest["firma"], indice,
+             int(time.time()), o["id"]))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "L'ordine è cambiato nel frattempo: "
+                                     "riaprilo")
+        o = con.execute("SELECT * FROM onchain_ordini WHERE id=?",
+                        (o["id"],)).fetchone()
+        return {"ok": True, "onchain": _onchain_ordine_per(con, o, user["id"])}
+    finally:
+        con.close()
 
 
 @app.get("/api/admin/onchain/chiave")
