@@ -34012,6 +34012,9 @@ _SEGRETI_FINTI = {
     # la invoice key del wallet «swap» (19 ott 2026, swap@): nel
     # pannello esce il fatto che c'e', mai lei
     "SWAP_LNBITS_INVOICE_KEY": "SEGRETO-invoice-key-swap",
+    # la chiave dell'assistente del bot (28 ott 2026): nel pannello
+    # esce il FATTO che c'e', mai lei
+    "ASSISTENTE_API_KEY": "SEGRETO-chiave-assistente",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -164718,9 +164721,11 @@ def prove_canale_admin():
     i = _SORGENTE.index("ADMIN_ARGOMENTI = {")
     K = {}
     exec(_SORGENTE[i:_SORGENTE.index("try:\n    from config import ADMIN_CANALE_ID", i)], K)
+    # il settimo, «assistenza», col piano dell'assistente del bot (28 ott
+    # 2026, approvato da Andrea): chi chiede una persona
     NOMI = ("dispute", "liquidita", "errori", "moderazione", "dm",
-            "riepiloghi")
-    prova("sei argomenti, coi nomi decisi da Andrea",
+            "riepiloghi", "assistenza")
+    prova("sette argomenti, coi nomi decisi da Andrea",
           (NOMI, "📩 DM Nostr", "⚖️ Dispute"),
           (tuple(K["ADMIN_ARGOMENTI"]), K["ADMIN_ARGOMENTI"]["dm"],
            K["ADMIN_ARGOMENTI"]["dispute"]))
@@ -164735,11 +164740,11 @@ def prove_canale_admin():
                   if isinstance(n, _ast.Assign)
                   and getattr(n.targets[0], "id", "") == nome))
     esempio = open("config_esempio.py", encoding="utf-8").read()
-    prova("il config d'esempio nomina tutti e sei gli argomenti, e la "
-          "riga d'esempio li porta tutti e sei", ([], True),
+    prova("il config d'esempio nomina tutti e sette gli argomenti, e la "
+          "riga d'esempio li porta tutti e sette", ([], True),
           ([n for n in NOMI if f'#   "{n}"' not in esempio],
            '# Es.: {"dispute": 2, "liquidita": 4, "errori": 6, "moderazione": 8,\n'
-           '#       "dm": 10, "riepiloghi": 12}\n' in esempio))
+           '#       "dm": 10, "riepiloghi": 12, "assistenza": 14}\n' in esempio))
 
     leggi = reale("_leggi_gruppo_admin", {"ADMIN_ARGOMENTI": K["ADMIN_ARGOMENTI"]})
     GRUPPO = -1001234567890
@@ -165207,8 +165212,10 @@ def prove_canale_admin():
           # cassaforte» va nella stanza della liquidita', come la guardia
           # (27 ott 2026, onchain-disputa) la firma di Barattolo nelle
           # dispute, la nascita della sua chiave nella liquidita'
-          {"dispute": 3, "dm": 1, "errori": 33, "liquidita": 2,
-           "moderazione": 14, "riepiloghi": 27}, per_stanza)
+          # (28 ott 2026, bot-assistente) «🙋 Parla con una persona»
+          # nella stanza sua, l'assistenza
+          {"assistenza": 1, "dispute": 3, "dm": 1, "errori": 33,
+           "liquidita": 2, "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -165243,12 +165250,13 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "89 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "90 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
-          "margine della cassaforte, e dall'on-chain la firma di Barattolo "
-          "e la nascita della sua chiave)", 89,
+          "margine della cassaforte, dall'on-chain la firma di Barattolo "
+          "e la nascita della sua chiave, e chi chiede una persona "
+          "all'assistente del bot)", 90,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -180941,6 +180949,406 @@ def prove_leva_mercato_lavoro():
            "el('sezSeg').style.display = mercatoLavoro ? '' : 'none';" in am))
 
 
+def _banco_assistente(**leve):
+    """Il blocco VERO dell'assistente del bot, eseguito in un ambiente
+    finto: il bot e i moderatori si segnano cosa avrebbero detto, Claude
+    e' un cartone che risponde a comando, l'orologio e' finto. I pezzi
+    che il blocco chiama sono quelli veri (`tastiera_bot`, `_riga_webapp`,
+    `_secchio_passa`); finti solo il mondo di fuori e le leve vicine."""
+    import asyncio as _aio
+    import html as _html
+    import types as _types
+    import contextvars as _cv
+
+    T = [1_800_000_000.0]
+    orologio = _types.SimpleNamespace(
+        time=lambda: T[0], strftime=time.strftime, gmtime=time.gmtime)
+    DETTI, AVVISI, CHIAMATE = [], [], []
+    CLAUDE = {"testo": "Si paga in sats, con una fattura Lightning.",
+              "stop": "end_turn", "esplodi": None}
+
+    class _Messaggi:
+        def create(self, **kw):
+            CHIAMATE.append(kw)
+            if CLAUDE["esplodi"]:
+                raise CLAUDE["esplodi"]
+            return _types.SimpleNamespace(
+                content=[_types.SimpleNamespace(type="thinking", text=""),
+                         _types.SimpleNamespace(type="text",
+                                                text=CLAUDE["testo"])],
+                stop_reason=CLAUDE["stop"],
+                usage=_types.SimpleNamespace(input_tokens=12,
+                                             cache_read_input_tokens=6000,
+                                             output_tokens=80))
+
+    async def bot_api(metodo, dati):
+        DETTI.append((metodo, dati))
+        return {"ok": True}
+
+    async def notifica_admin(testo, bottone=None, argomento=""):
+        AVVISI.append((testo, argomento))
+
+    src = _SORGENTE
+    i = src.index("# L'ASSISTENTE DEL BOT (28 ott 2026")
+    j = src.index("async def gestisci_update(update: dict):", i)
+    k = src.index('CONTATTO_PRIVATO = "')
+    amb = {"__builtins__": __builtins__, "__file__": os.path.join(QUI, "server.py"),
+           "asyncio": _aio, "html": _html, "os": os, "time": orologio,
+           "contextvars": _cv, "anthropic": _types.SimpleNamespace(),
+           "bot_api": bot_api, "notifica_admin": notifica_admin,
+           "e_admin": lambda t: t == 999,
+           "_link_casa_telegram": lambda: "https://barattolo.store",
+           "_SECCHI": {},
+           # le leve vicine che i NUMERI DI OGGI leggono
+           "COMMISSIONE_PERCENTO": 0, "PROTEZIONE_PERCENTO": 0,
+           "INVOICE_EXPIRY": 900, "ORE_CONFERMA": 72,
+           "AUTO_SBLOCCO_ATTIVO": False, "ORE_CONFERMA_DIGITALE": 24,
+           "ORE_SILENZIO_DIGITALE": 48, "P2P_MAX_EURO": 250,
+           "P2P_CONTANTI_MAX_EURO": 250, "ASTA_ABILITATA": True,
+           "MERCATO_LAVORO": False,
+           "_p2p_leve": lambda: {"attivo": True}}
+    CHI_GUARDA = []
+    for nome in ("cambio_libero_per", "swap_per", "onchain_ammesso"):
+        amb[nome] = (lambda n: lambda t: CHI_GUARDA.append((n, t)) or False)(nome)
+    exec(src[k:src.index("\n", k)], amb)
+    for nome in ("_riga_webapp", "tastiera_bot", "_secchio_passa"):
+        exec(pezzo(nome), amb)
+    exec(src[i:j], amb)
+    amb.update(leve)
+    # il journal del blocco si raccoglie invece di stamparlo: tiene pulita
+    # l'uscita della suite, e la prova degli errori lo legge
+    amb["_STAMPATE"] = []
+    amb["print"] = lambda *a, **k: amb["_STAMPATE"].append(" ".join(map(str, a)))
+    amb["_cliente_assistente"] = lambda: _types.SimpleNamespace(
+        messages=_Messaggi())
+    return amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA
+
+
+def prove_assistente_bot():
+    """L'ASSISTENTE DEL BOT (28 ott 2026, cantiere bot-assistente,
+    richiesta di Andrea). A leva accesa chi scrive una domanda al bot
+    riceve la risposta di Claude. Si provano le QUATTRO PROMESSE scritte
+    sopra il blocco — dice chi e', non vede niente di tuo, non fa niente,
+    una persona c'e' sempre — piu' i freni, la memoria di mezz'ora e la
+    leva spenta di serie, che a spenta lascia il bot di ieri."""
+    print("\n[l'assistente del bot]")
+    import asyncio as _aio
+    import ast as _ast
+    import types as _types
+    gira = _aio.run
+
+    # --- 0) SPENTO DI SERIE, nel codice e nel config d'esempio ---------
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente()
+    prova("di serie: leva spenta, solo moderatori, nessuna chiave, Sonnet 5.5",
+          (False, True, "", "claude-sonnet-5-5", 30, 300),
+          (amb["ASSISTENTE_AI_ATTIVO"], amb["ASSISTENTE_SOLO_MODERATORI"],
+           amb["ASSISTENTE_API_KEY"], amb["ASSISTENTE_MODELLO"],
+           amb["ASSISTENTE_MAX_AL_GIORNO"], amb["ASSISTENTE_TETTO_GIORNO"]))
+    esempio = open(os.path.join(QUI, "config_esempio.py"), encoding="utf-8").read()
+    prova("...e il config d'esempio dice lo stesso", (True, True),
+          ("\nASSISTENTE_AI_ATTIVO = False\n" in esempio,
+           "\nASSISTENTE_SOLO_MODERATORI = True\n" in esempio))
+    prova("a leva spenta non risponde a nessuno, nemmeno a un admin",
+          (False, False), (amb["assistente_per"](999), amb["assistente_per"](5)))
+
+    # --- 1) CHI RISPONDE: leva, chiave e libro, tutti e tre -------------
+    CHIAVE = "chiave-finta-per-la-prova"
+    amb, *_ = _banco_assistente(ASSISTENTE_AI_ATTIVO=True,
+                                ASSISTENTE_API_KEY=CHIAVE)
+    prova("accesa con la chiave: di serie solo agli admin",
+          (True, False), (amb["assistente_per"](999), amb["assistente_per"](5)))
+    amb["ASSISTENTE_SOLO_MODERATORI"] = False
+    prova("...e a solo-moderatori spento, a tutti", True,
+          amb["assistente_per"](5))
+    amb["ASSISTENTE_API_KEY"] = "INCOLLA_QUI_LA_API_KEY"
+    prova("il segnaposto del config d'esempio non e' una chiave", False,
+          amb["assistente_per"](5))
+    amb["ASSISTENTE_API_KEY"] = CHIAVE
+    amb["_ASSISTENTE"]["sapere"] = ""
+    prova("senza libro del sapere non risponde (risponderebbe a memoria)",
+          False, amb["assistente_per"](5))
+
+    # --- 2) IL LIBRO: c'e', e dice solo cose pubbliche ------------------
+    amb["_ASSISTENTE"]["sapere"] = None
+    libro = amb["sapere_assistente"]()
+    prova("il libro del sapere si legge dal suo file", True, len(libro) > 5000)
+    spie = ("46.62.", "185.18.", "nsec1", "macaroon", "ssh ", "config.py",
+            "ADMIN_IDS", "vm-19", "vm-20", "lnvps", "INCOLLA_QUI", "sk-ant")
+    prova("...e non contiene niente di interno (IP, chiavi, macchine)", [],
+          [s_ for s_ in spie if s_.lower() in libro.lower()])
+    prova("...col lessico di Barattolo: deposito di garanzia, mai «assicurato»",
+          (True, False), ("deposito di garanzia" in libro,
+                          "assicurat" in libro.lower()))
+    prova("...e la porta per una persona", True,
+          "🙋 Parla con una persona" in libro
+          and "t.me/barattolostore?direct" in libro)
+
+    # --- 3) LA RISPOSTA: si presenta, testo semplice, bottone sotto -----
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente(
+        ASSISTENTE_AI_ATTIVO=True, ASSISTENTE_API_KEY=CHIAVE,
+        ASSISTENTE_SOLO_MODERATORI=False)
+    CHI = 987654321
+    gira(amb["rispondi_assistente"](CHI, "Come si paga?"))
+    mandati = [d for m, d in DETTI if m == "sendMessage"]
+    prova("una domanda, una chiamata, una risposta", (1, 1),
+          (len(CHIAMATE), len(mandati)))
+    prova("...preceduta da «sta scrivendo»", "sendChatAction", DETTI[0][0])
+    r = mandati[-1]
+    prova("PROMESSA 1: la prima risposta dice chi e'", True,
+          r["text"].startswith(amb["PRESENTAZIONE_ASSISTENTE"])
+          and "intelligenza artificiale" in r["text"]
+          and "posso sbagliare" in r["text"])
+    prova("...e porta il testo del modello", True,
+          r["text"].endswith(CLAUDE["testo"]))
+    prova("...in testo SEMPLICE: niente parse_mode", False, "parse_mode" in r)
+    righe_t = r["reply_markup"]["inline_keyboard"]
+    prova("PROMESSA 4: sotto c'e' «Parla con una persona», con Barattolo in "
+          "cima", ("🫙 Apri Barattolo", "🙋 Parla con una persona", "ass:persona"),
+          (righe_t[0][0]["text"], righe_t[-1][0]["text"],
+           righe_t[-1][0]["callback_data"]))
+    kw = CHIAMATE[0]
+    prova("PROMESSA 3: nessuno strumento nella chiamata", [],
+          [c_ for c_ in ("tools", "tool_choice", "mcp_servers") if c_ in kw])
+    prova("...il modello e' quello della leva", "claude-sonnet-5-5", kw["model"])
+    prova("...il libro nel primo blocco, in cache; i numeri nel secondo",
+          (True, {"type": "ephemeral"}, True, False),
+          (libro[:200] in kw["system"][0]["text"],
+           kw["system"][0].get("cache_control"),
+           kw["system"][1]["text"].startswith("NUMERI DI OGGI"),
+           "cache_control" in kw["system"][1]))
+    prova("...e l'effort basso viaggia in extra_body", {"effort": "low"},
+          kw.get("extra_body", {}).get("output_config"))
+    prova("PROMESSA 2: nella richiesta non c'e' chi scrive", False,
+          str(CHI) in repr(kw))
+    prova("...ne' altro che la domanda, come messaggio",
+          [{"role": "user", "content": "Come si paga?"}], kw["messages"])
+    prova("nel journal i soli conteggi dei token, mai la domanda", (True, False),
+          (any("6000 dalla cache" in r_ for r_ in amb["_STAMPATE"]),
+           any("Come si paga" in r_ for r_ in amb["_STAMPATE"])))
+
+    # --- 4) LA MEMORIA: mezz'ora, tre battute, poi si ricomincia --------
+    T[0] += 600
+    CLAUDE["testo"] = "Dalla scheda «Ordini»."
+    gira(amb["rispondi_assistente"](CHI, "E dove lo vedo?"))
+    kw = CHIAMATE[-1]
+    prova("dieci minuti dopo ricorda la battuta di prima",
+          ["Come si paga?", "Si paga in sats, con una fattura Lightning.",
+           "E dove lo vedo?"], [m_["content"] for m_ in kw["messages"]])
+    ultimo = [d for m, d in DETTI if m == "sendMessage"][-1]["text"]
+    prova("...e non si ripresenta a meta' conversazione", True,
+          ultimo == "Dalla scheda «Ordini».")
+    for n_ in range(3):
+        T[0] += 60
+        gira(amb["rispondi_assistente"](CHI, f"domanda {n_}"))
+    prova("ricorda al massimo tre battute", 7, len(CHIAMATE[-1]["messages"]))
+    T[0] += 31 * 60
+    gira(amb["rispondi_assistente"](CHI, "Ciao di nuovo"))
+    prova("dopo mezz'ora di silenzio ricomincia da zero, e si ripresenta",
+          (1, True), (len(CHIAMATE[-1]["messages"]),
+                      [d for m, d in DETTI if m == "sendMessage"][-1]["text"]
+                      .startswith(amb["PRESENTAZIONE_ASSISTENTE"])))
+    amb["_ASSISTENTE"]["memoria"][CHI]["quando"] -= 3600
+    amb["_assistente_memoria"](12345, T[0])
+    prova("...e le memorie scadute degli altri si puliscono", False,
+          CHI in amb["_ASSISTENTE"]["memoria"])
+
+    # --- 5) I FRENI: prima della chiamata, che e' quel che costa --------
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente(
+        ASSISTENTE_AI_ATTIVO=True, ASSISTENTE_API_KEY=CHIAVE,
+        ASSISTENTE_SOLO_MODERATORI=False, ASSISTENTE_MAX_AL_GIORNO=2,
+        ASSISTENTE_TETTO_GIORNO=3)
+    for _ in range(3):
+        T[0] += 120
+        gira(amb["rispondi_assistente"](1, "domanda"))
+    prova("al tetto della persona: niente chiamata, e la porta per una persona",
+          (2, True), (len(CHIAMATE), "Per oggi ho risposto" in
+                      [d for m, d in DETTI if m == "sendMessage"][-1]["text"]))
+    T[0] += 120
+    gira(amb["rispondi_assistente"](2, "domanda"))
+    T[0] += 120
+    gira(amb["rispondi_assistente"](3, "domanda"))
+    prova("al tetto di tutti: «in pausa», niente chiamata", (3, True),
+          (len(CHIAMATE), "in pausa" in
+           [d for m, d in DETTI if m == "sendMessage"][-1]["text"]))
+    T[0] += 86400
+    gira(amb["rispondi_assistente"](3, "domanda"))
+    prova("...e il giorno dopo si riparte", 4, len(CHIAMATE))
+    amb["ASSISTENTE_MAX_AL_GIORNO"] = amb["ASSISTENTE_TETTO_GIORNO"] = 99
+    for _ in range(8):
+        gira(amb["rispondi_assistente"](4, "a raffica"))
+    prova("sei domande in un minuto, poi «piano»", (10, True),
+          (len(CHIAMATE), "Troppe domande" in
+           [d for m, d in DETTI if m == "sendMessage"][-1]["text"]))
+    amb["_ASSISTENTE"]["in_corso"].add(5)
+    gira(amb["rispondi_assistente"](5, "e adesso?"))
+    prova("mentre risponde, una seconda domanda aspetta senza chiamare", 10,
+          len(CHIAMATE))
+
+    # --- 6) GLI ERRORI DIVENTANO UNA FRASE, mai un silenzio -------------
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente(
+        ASSISTENTE_AI_ATTIVO=True, ASSISTENTE_API_KEY=CHIAVE,
+        ASSISTENTE_SOLO_MODERATORI=False)
+    CLAUDE["esplodi"] = RuntimeError("rete giu', con dentro la domanda")
+    gira(amb["rispondi_assistente"](6, "domanda"))
+    r = [d for m, d in DETTI if m == "sendMessage"][-1]
+    prova("l'API che esplode: frase gentile e bottone, nessuna eccezione",
+          (True, "ass:persona"), ("non riesco a rispondere" in r["text"],
+                                  r["reply_markup"]["inline_keyboard"][-1][0]
+                                  ["callback_data"]))
+    prova("...e il «sta rispondendo» si libera", False,
+          6 in amb["_ASSISTENTE"]["in_corso"])
+    prova("...e nel journal il NOME dell'errore, mai il suo testo",
+          (True, False), (any("RuntimeError" in r_ for r_ in amb["_STAMPATE"]),
+                          any("rete giu'" in r_ for r_ in amb["_STAMPATE"])))
+    CLAUDE["esplodi"] = None
+    CLAUDE["stop"] = "refusal"
+    T[0] += 120
+    gira(amb["rispondi_assistente"](6, "domanda"))
+    prova("un rifiuto del modello: «non posso», e una persona", True,
+          "non posso risponderti" in
+          [d for m, d in DETTI if m == "sendMessage"][-1]["text"])
+    prova("...e non resta in memoria", False, 6 in amb["_ASSISTENTE"]["memoria"])
+    CLAUDE["stop"] = "end_turn"
+    CLAUDE["testo"] = "**Grassetto** " + "x" * 5000
+    T[0] += 120
+    gira(amb["rispondi_assistente"](7, "y" * 4000))
+    r = [d for m, d in DETTI if m == "sendMessage"][-1]["text"]
+    prova("il Markdown scappato si toglie, e la risposta lunga si taglia",
+          (False, True), ("**" in r, len(r) <= amb["ASSISTENTE_RISPOSTA_MAX"]
+                          + len(amb["PRESENTAZIONE_ASSISTENTE"]) + 1))
+    prova("...e una domanda lunghissima arriva tagliata", 1500,
+          len(CHIAMATE[-1]["messages"][-1]["content"]))
+
+    # --- 7) «🙋 PARLA CON UNA PERSONA» -----------------------------------
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente(
+        ASSISTENTE_AI_ATTIVO=True, ASSISTENTE_API_KEY=CHIAVE,
+        ASSISTENTE_SOLO_MODERATORI=False)
+    gira(amb["rispondi_assistente"](8, "Il mio <b>ordine</b> e' fermo"))
+    tocco = {"id": "x", "data": "ass:persona",
+             "from": {"id": 8, "first_name": "Ada <3", "username": "ada_b"},
+             "message": {"chat": {"id": 8}}}
+    gira(amb["callback_persona_assistente"](tocco))
+    prova("un avviso ai moderatori, nell'argomento «assistenza»",
+          (1, "assistenza"), (len(AVVISI), AVVISI[-1][1] if AVVISI else ""))
+    prova("...con chi e la sua ultima domanda, scappata", (True, True, True),
+          ("@ada_b" in AVVISI[-1][0], "(tg <code>8</code>)" in AVVISI[-1][0],
+           "Il mio &lt;b&gt;ordine&lt;/b&gt;" in AVVISI[-1][0]))
+    r = [d for m, d in DETTI if m == "sendMessage"][-1]
+    prova("a chi l'ha toccato: la porta privata, e lo sa che la domanda e' "
+          "passata", (amb["CONTATTO_PRIVATO"], True),
+          (r["reply_markup"]["inline_keyboard"][0][0]["url"],
+           "ultima domanda" in r["text"]))
+    T[0] += 60
+    gira(amb["callback_persona_assistente"](tocco))
+    prova("un dito che insiste riceve la porta, i moderatori no", (1, 2),
+          (len(AVVISI), sum(1 for m, d in DETTI if m == "sendMessage"
+                            and "Ti passo a una persona" in d["text"])))
+    T[0] += 601
+    gira(amb["callback_persona_assistente"](tocco))
+    prova("...dieci minuti dopo l'avviso riparte", 2, len(AVVISI))
+    amb["ASSISTENTE_AI_ATTIVO"] = False
+    T[0] += 601
+    gira(amb["callback_persona_assistente"](tocco))
+    prova("il bottone funziona anche a leva spenta", 3, len(AVVISI))
+
+    # --- 8) DOPO IL 200: la risposta non tiene fermo il campanello ------
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente(
+        ASSISTENTE_AI_ATTIVO=True, ASSISTENTE_API_KEY=CHIAVE,
+        ASSISTENTE_SOLO_MODERATORI=False)
+    posati = []
+    dopo = _types.SimpleNamespace(add_task=lambda f, *a: posati.append((f, a)))
+    gettone = amb["_DOPO_LA_RISPOSTA"].set(dopo)
+    gira(amb["domanda_all_assistente"](9, "domanda"))
+    amb["_DOPO_LA_RISPOSTA"].reset(gettone)
+    prova("dal campanello la risposta si posa per DOPO, senza chiamare adesso",
+          (1, 0, (9, "domanda")), (len(posati), len(CHIAMATE),
+                                   posati[0][1] if posati else None))
+    gira(posati[0][0](*posati[0][1]))
+    prova("...e il lavoro posato e' la risposta vera", 1, len(CHIAMATE))
+    ta = codice(pezzo("telegram_aggiornamenti"))
+    prova("il campanello da' dove posare e lo riprende, attorno a "
+          "gestisci_update", True,
+          "dopo: BackgroundTasks" in ta
+          and ta.index("_DOPO_LA_RISPOSTA.set(dopo)")
+          < ta.index("await gestisci_update(aggiornamento)")
+          < ta.index("_DOPO_LA_RISPOSTA.reset(gettone)")
+          and "finally:" in ta)
+
+    # --- 9) DENTRO gestisci_update: dopo i comandi, prima dei bottoni ---
+    gu = codice(pezzo("gestisci_update"))
+    i_gruppo = gu.index('if tipo != "private":')
+    i_ass = gu.index("assistente_per(chat)")
+    prova("i gruppi non arrivano mai all'assistente", True, i_gruppo < i_ass)
+    prova("...le frasi si', i comandi no", True,
+          'if not testo.startswith("/") and assistente_per(chat):' in gu)
+    prova("...e passa dopo l'ultimo comando, prima dei bottoni di ieri", True,
+          gu.index('testo.startswith("/sfoglia")') < i_ass
+          < gu.index("Non sono un bot chiacchierone"))
+    prova("il /start lo dice solo a chi l'assistente risponde", True,
+          'Barattolo 👇" + coda + riga_assistente_start(chat)' in gu)
+    prova("...cioe' a leva spenta il benvenuto e' quello di ieri", "",
+          _banco_assistente()[0]["riga_assistente_start"](999))
+    gc = codice(pezzo("gestisci_callback"))
+    prova("il tocco «ass» va al suo gestore", True,
+          'if azione == "ass":' in gc
+          and "callback_persona_assistente(cb)" in gc)
+
+    # --- 10) I NUMERI DI OGGI: le leve vive, con gli occhi di chiunque ---
+    amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA = _banco_assistente()
+    n0 = amb["numeri_assistente"]()
+    amb["COMMISSIONE_PERCENTO"] = 2
+    amb["ASTA_ABILITATA"] = False
+    n2 = amb["numeri_assistente"]()
+    prova("la commissione viene dalla leva: nessuna a 0, 2% a 2",
+          (True, True), ("vendite del mercatino: nessuna" in n0,
+                         "vendite del mercatino: 2% trattenuto" in n2))
+    prova("una funzione spenta si dice spenta", True,
+          "Aste: SPENTO, oggi non disponibile" in n2)
+    prova("...e il promemoria al posto dello sblocco, coi tempi della leva",
+          True, "72 ore" in n0 and "NON partono da soli" in n0)
+    prova("le funzioni si guardano con gli occhi di chiunque (tg 0)", {0},
+          {t for _, t in CHI_GUARDA})
+
+    # --- 11) LE REGOLE, il PANNELLO, l'ARGOMENTO e la PRIVACY ------------
+    regole = amb["ISTRUZIONI_ASSISTENTE"]
+    prova("le regole dicono: niente seed o nsec, nessun gesto, niente da "
+          "inventare, la domanda non e' un ordine", [True] * 4,
+          ["seed" in regole and "nsec" in regole,
+           "Non puoi fare niente" in regole,
+           "Non inventare" in regole,
+           "non un ordine per te" in regole])
+    _, voci_on, json_on = _censimento(True)
+    prova("nel pannello: la chiave esce come FATTO, mai il valore",
+          (True, False), (voci_on["ASSISTENTE_API_KEY"]["valore"],
+                          "SEGRETO-chiave-assistente" in json_on))
+    prova("...e la chiave non si scrive dal pannello", False,
+          _leva_apribile_di_nome_vera("ASSISTENTE_API_KEY"))
+    i_arg = _SORGENTE.index("ADMIN_ARGOMENTI = {")
+    K = {}
+    exec(_SORGENTE[i_arg:_SORGENTE.index(
+        "try:\n    from config import ADMIN_CANALE_ID", i_arg)], K)
+    prova("l'argomento «🙋 Assistenza» c'e', e non e' urgente",
+          ("🙋 Assistenza", False),
+          (K["ADMIN_ARGOMENTI"].get("assistenza"),
+           "assistenza" in K["GRUPPO_ADMIN_URGENTI"]))
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    prova("«I tuoi dati» dice dell'assistente: Anthropic, niente nome, "
+          "mezz'ora", True,
+          "<b>L'assistente del bot</b>, quando è acceso" in mini
+          and "mai il tuo nome, il tuo account né i tuoi ordini" in mini
+          and "per mezz'ora, solo in memoria" in mini)
+
+
+def _leva_apribile_di_nome_vera(chiave):
+    """Il primo filtro VERO del pannello sulle leve, sul solo nome."""
+    src = _SORGENTE
+    amb = {"re": re}
+    i = src.index("LEVE_MAI_DAL_PANNELLO = frozenset({")
+    exec(src[i:src.index("def _leva_apribile_di_nome(", i)], amb)
+    exec(pezzo("_leva_apribile_di_nome"), amb)
+    return amb["_leva_apribile_di_nome"](chiave)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -181301,6 +181709,7 @@ def main():
               prove_avvisi_nostr_arrivano,
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,
+              prove_assistente_bot,
               prove_relay_risolti,
               prove_certificati_relay,
               prove_config_esempio):

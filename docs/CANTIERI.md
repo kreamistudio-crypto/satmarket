@@ -74167,3 +74167,128 @@ dell'incasso di un ordine col cambio non è stato fotografato (lo
 coprono i collaudi). Notato, non toccato: in `swapCreaDentro` il
 controllo «parole non copiate» è un secondo cancello che nessun collaudo
 prova da solo (il primo, in `swapAvantiDentro`, è provato).
+
+## L'assistente del bot: una persona automatica che risponde, e una persona vera dietro un bottone (28 ott 2026, cantiere bot-assistente, Andrea: «il barattolo bot può proprio diventare un agente AI che ti risponde [...] tale che sia trasparente il fatto che comunque è un agente che risponde e nel caso in cui un utente ancora non abbia trovato la risposta allora può contattare un admin»)
+
+**LE TRE STRADE, E QUELLA SCELTA.** Andrea ha chiesto prima se
+l'assistente potesse essere «questa chat», cioè Claude dentro il
+progetto, senza l'API. No: un bot Telegram risponde da un server, e il
+server parla con un modello solo con una chiave. Le strade messe sulla
+scheda: (a) l'API di Claude con una chiave SEPARATA e il suo limite di
+spesa; (b) niente AI, risposte pronte coi bottoni (una FAQ navigabile);
+(c) un modello aperto su una macchina nostra. Andrea ha scelto (a). La
+(b) costa zero ma non capisce una domanda scritta come viene; la (c)
+chiede una macchina con la GPU che non abbiamo, e risponde peggio.
+
+**LE QUATTRO PROMESSE** (scritte in testa al blocco in `server.py`, e
+ognuna ha la sua prova):
+1. TRASPARENTE. La prima risposta di ogni conversazione comincia con «🤖
+   Sono l'assistente automatico di Barattolo, un'intelligenza
+   artificiale: posso sbagliare. Per soldi e ordini fa fede quello che
+   vedi nella Mini App.» La aggiunge il codice, non il modello: un modello
+   può dimenticarla, il codice no.
+2. NON SA CHI SEI. Alla richiesta va la domanda e basta: niente tg id,
+   niente nome, niente username, niente ordini, niente database. Le
+   ultime tre domande (con le risposte) restano in memoria per mezz'ora,
+   solo in RAM, per capire «e se scade?». Il «Cosa esce da qui» di «I tuoi
+   dati» lo dice.
+3. NON PUÒ FARE NIENTE. Nessuno strumento (`tools`) nella chiamata: il
+   modello può solo scrivere. Non sblocca, non annulla, non rimborsa,
+   non apre dispute: lo dicono le istruzioni E lo dice l'assenza degli
+   strumenti, che vale più delle istruzioni.
+4. UNA PERSONA C'È SEMPRE. Sotto ogni risposta il bottone «🙋 Parla con
+   una persona»: chi lo tocca riceve la porta privata di sempre
+   (`CONTATTO_PRIVATO`), e i moderatori un avviso con il nome e l'ultima
+   domanda, nel nuovo argomento «🙋 Assistenza» del gruppo degli admin
+   (il settimo; non urgente). Un avviso ogni dieci minuti a persona. Il
+   bottone funziona anche a leva spenta: uno già mandato non resta muto.
+
+**IL SAPERE.** Non c'è un «allenamento» (Andrea diceva «allenato con
+tutto quello che abbiamo»): il modello legge a ogni domanda un libro
+scritto apposta, `assistente/sapere.md` (~18 KB, ~3.000 parole), coi
+testi PUBBLICI di Barattolo: comprare, il deposito di garanzia, vendere,
+spedire, il P2P, Nostr, i dati, le truffe, «Parlare con una persona».
+Niente di interno: una prova cerca nel libro IP, macchine, nomi di
+chiavi e del config. I NUMERI DI OGGI (commissione, protezione, durata
+della fattura, ore di conferma, P2P acceso e il suo tetto, aste, cambio,
+swap, on-chain, Mercato/Lavoro) li scrive il codice a ogni domanda dalle
+leve vive, e valgono più del libro: una leva girata vale subito. Le
+funzioni si guardano con gli occhi di un utente qualunque (`tg_id 0`):
+una cosa accesa ai soli moderatori, per chi chiede, è spenta. Il libro
+sta nel PRIMO blocco del prompt con la cache di Anthropic (un decimo del
+prezzo dalla seconda domanda in cinque minuti), i numeri nel secondo,
+così il libro resta uguale byte per byte. Senza il file, l'assistente
+resta spento: rispondere senza libro vorrebbe dire inventare.
+
+**IL MODELLO E IL COSTO.** `claude-sonnet-5-5` ($2/$10 per milione di
+token; letture dalla cache $0,20), effort basso, nessun ragionamento
+esteso, `max_tokens` 3000, un solo retry, 40 secondi. Una domanda costa
+circa mezzo centesimo di dollaro con la cache calda, poco più di due
+senza. Haiku 5.5 costerebbe venti volte meno ma sbaglia di più sulle
+regole di soldi; Opus il doppio senza bisogno. Il modello è una leva
+(`ASSISTENTE_MODELLO`). L'`effort` viaggia in `extra_body` e non come
+argomento: il pacchetto `anthropic` del VPS si aggiorna a mano, e un
+argomento che la sua versione non conosce farebbe saltare ogni risposta.
+
+**I FRENI** (tutti PRIMA della chiamata, che è l'unica cosa che costa):
+una domanda alla volta per persona; sei in un minuto, poi «riprova fra
+un minuto»; `ASSISTENTE_MAX_AL_GIORNO` (30) a persona;
+`ASSISTENTE_TETTO_GIORNO` (300) per tutti, poi «in pausa, parla con una
+persona»; si conta prima della chiamata, anche una finita in errore. Il
+tetto di spesa VERO sta nella Console di Anthropic, sulla chiave
+separata: questi freni sono la cintura, quello le bretelle.
+
+**DOPO IL 200.** Una risposta chiede da tre a venti secondi, e Telegram
+riprova se il campanello non dice 200 in fretta: lo stesso messaggio
+arriverebbe due volte. `telegram_aggiornamenti` riceve i
+`BackgroundTasks` di FastAPI e li posa in una contextvar
+(`_DOPO_LA_RISPOSTA`); `domanda_all_assistente` ci mette la risposta,
+che parte quando il 200 è già uscito. Un chiamante che non è il
+campanello aspetta lì (nessuno, oggi).
+
+**CHI LA VEDE.** Tre leve: `ASSISTENTE_AI_ATTIVO` (False di serie),
+`ASSISTENTE_API_KEY` (vuota: senza chiave non risponde, e il segnaposto
+`INCOLLA…` vale come vuota), `ASSISTENTE_SOLO_MODERATORI` (True di
+serie: risponde solo agli admin, la prova in casa come lo swap; un
+passo in più del piano, segnalato ad Andrea). Una frase che non è un
+comando va all'assistente; un comando sconosciuto resta ai bottoni di
+ieri; i gruppi non c'entrano. Il /start guadagna una riga solo per chi
+l'assistente risponde: a leva spenta il benvenuto è quello di ieri,
+carattere per carattere. Il pannello «⚙️ Stato delle leve» ha il gruppo
+«🤖 Assistente del bot»: l'interruttore si gira da lì, della chiave dice
+solo se c'è (il nome finisce in `_KEY`, chiuso al pannello per forma).
+
+**IL GIORNALE.** Solo i conteggi dei token («🤖 Assistente del bot: una
+risposta (token: …)») e, per un errore, il SOLO nome dell'eccezione: il
+messaggio di un errore dell'API può contenere pezzi della richiesta.
+Le domande non si scrivono da nessuna parte.
+
+**SCARTATE.** Lo streaming verso Telegram (modificare il messaggio a
+ogni pezzo): più chiamate a Telegram e un messaggio che cambia sotto gli
+occhi, per una risposta di dieci righe. La ricerca nei documenti del
+repo (ARCHITETTURA, CANTIERI): sono pieni di cose interne, e un
+assistente pubblico che li legge prima o poi le racconta. I dati
+dell'ordine di chi scrive («dov'è il mio pacco?»): era la cosa più
+utile e la più pericolosa; per ora l'assistente spiega DOVE guardare
+nella Mini App e passa a una persona. Il Markdown di Telegram: il testo
+del modello non passa mai da un parser (`parse_mode` assente), e gli
+asterischi che scappassero si tolgono.
+
+**PROVATO.** `prove_assistente_bot` in `prove.py` (undici parti: le
+leve di serie, chi risponde, il libro senza niente di interno, le
+quattro promesse, la memoria, i freni, gli errori, il rifiuto, il
+bottone della persona, il 200, i numeri, il pannello, l'argomento, la
+privacy), sul codice vero della regione con un client di cartone.
+`collaudo_assistente_bot.py` (nuovo, in `ci/collaudi.txt`): il server
+vero, il campanello suonato a mano, 37 prove. Controprove, tutte rosse:
+il tg id nella richiesta, la presentazione tolta, gli strumenti
+aggiunti, solo-moderatori ignorato, la risposta in attesa invece che
+dopo il 200, l'avviso ai moderatori a ogni tocco, e le altre di prove.py.
+Nessuna chiamata vera ad Anthropic: la chiave non c'è, ed è giusto così.
+
+**COSA RESTA.** Sul collaudo o in produzione, i gesti di Andrea in
+DA-FARE-ANDREA (la chiave nella Console col suo limite, il `read -s`,
+la leva, il numero dell'argomento «assistenza»); la prima conversazione
+VERA da un admin, e il verbale qui. Rileggere `assistente/sapere.md` con
+gli occhi di Andrea: ogni frase sbagliata lì è una risposta sbagliata.
+Quando una funzione cambia, il libro si aggiorna nello stesso cantiere.

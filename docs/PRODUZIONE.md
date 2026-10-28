@@ -5805,3 +5805,63 @@ dicono niente. «riavvii» è quante volte un deploy ha fermato il server:
 è il momento in cui, prima di questo cantiere, una riapertura dell'app
 poteva finire nella vetrina anonima (il falso logout) e un login Nostr
 a metà perdeva la sfida.
+
+L'ASSISTENTE DEL BOT: LA CHIAVE E LE LEVE (28 ott 2026, cantiere
+bot-assistente; perché in CANTIERI, «L'assistente del bot»). Di serie è
+SPENTO e senza chiave: dopo il deploy il bot è quello di ieri. Per
+accenderlo, in quest'ordine, UN COMANDO ALLA VOLTA:
+  1) LA CHIAVE, NELLA CONSOLE DI ANTHROPIC (dal PC, nel browser):
+     un workspace apposta («barattolo-bot») col suo LIMITE DI SPESA
+     mensile (per cominciare 10-20 $), e dentro una chiave nuova
+     («assistente-bot»). Una chiave SOLO per l'assistente: si revoca da
+     sola senza toccare la moderazione (`ANTHROPIC_API_KEY`), e la
+     Console dice quanto spende lei. La chiave si copia una volta e va
+     in KeePass; MAI in chat (nemmeno con Claude), su GitHub o in un log.
+  2) IL CONFIG, SUL VPS, col `read -s` come le chiavi di SATS Routing
+     (qui sopra, «LE CHIAVI DEL CODICE PARTNER DI SATS ROUTING»):
+     a) la copia di riserva:
+        `sudo cp -p /srv/barattolo/config.py /root/config.py.prima-assistente`
+     b) le righe non ci sono già (deve dire `0`):
+        `sudo grep -c "^ASSISTENTE_" /srv/barattolo/config.py`
+     c) la chiave, in una riga sola (chiede prima la password di sudo,
+        poi la chiave, che non si vede mentre si incolla):
+        `sudo -v && read -rsp "Chiave dell'assistente: " K && echo && if [ -z "$K" ]; then echo "Vuota: non scrivo niente"; elif [[ "$K" == *'"'* || "$K" == *"'"* || "$K" == *'\'* ]]; then echo "Contiene virgolette o barre: non scrivo niente, chiedi a Claude"; else printf '\nASSISTENTE_API_KEY = %s%s%s\n' '"' "$K" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && echo "Scritta"; fi; unset K`
+        Deve dire «Scritta».
+     d) la leva (resta a solo-moderatori, di serie):
+        `printf 'ASSISTENTE_AI_ATTIVO = True\n' | sudo tee -a /srv/barattolo/config.py > /dev/null`
+     e) il file si legge ancora (deve dire `ok`):
+        `sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"`
+     f) le due righe ci sono, senza mostrarle (deve dire `2`):
+        `sudo grep -c "^ASSISTENTE_" /srv/barattolo/config.py`
+  3) IL RIAVVIO: `sudo systemctl restart barattolo`.
+  4) LA PROVA, da admin: una frase qualunque al bot («come funziona il
+     deposito di garanzia?»). Risponde con «🤖 Sono l'assistente
+     automatico…» e il bottone «🙋 Parla con una persona». Nel journal
+     una riga «🤖 Assistente del bot: una risposta (token: …)», mai la
+     domanda: `journalctl -u barattolo --since "5 min ago" | grep -c "Assistente del bot"`.
+     Un utente qualunque, finché solo-moderatori è acceso, ha ancora il
+     bot di ieri.
+  5) A TUTTI, quando Andrea decide: `ASSISTENTE_SOLO_MODERATORI` a
+     False dal pannello «⚙️ Stato delle leve», gruppo «🤖 Assistente del
+     bot» (o una riga nel config). Dallo stesso gruppo si spegne
+     l'assistente in un tocco; la chiave da lì non si vede né si scrive.
+  L'ARGOMENTO «🙋 ASSISTENZA» NEL GRUPPO DEGLI ADMIN: senza il suo numero
+  gli avvisi «Chiede una persona» vanno nel Generale (funziona, ma si
+  mescolano). Per dargli la sua stanza: nel gruppo un argomento nuovo
+  «🙋 Assistenza», dentro `/dove` per il numero. Sul VPS la copia di
+  riserva, poi la riga di oggi (non è un segreto, sono numeri):
+  `grep -n "^ADMIN_CANALE_ARGOMENTI" /srv/barattolo/config.py`
+  e in fondo una riga NUOVA intera, coi numeri di quella più
+  `"assistenza": N` (l'ultima riga vince, la vecchia può restare):
+  `printf '\nADMIN_CANALE_ARGOMENTI = {…i numeri di prima…, "assistenza": N}\n' | sudo tee -a /srv/barattolo/config.py > /dev/null`
+  Poi `ast.parse` come al passo 2e e il riavvio; il journal all'avvio
+  dice «[admin] … 7 argomenti su 7» (procedura del gruppo qui sopra,
+  «IL GRUPPO DEGLI ADMIN»).
+  IL LIBRO DEL SAPERE è `assistente/sapere.md` nel repo, e viaggia col
+  deploy: si corregge con un commit, non sul VPS. Senza il file
+  l'assistente resta spento da solo (riga «⚠️ Assistente del bot: il
+  libro del sapere non si legge» nel journal).
+  SE QUALCOSA VA STORTO: l'interruttore dal pannello, o
+  `printf 'ASSISTENTE_AI_ATTIVO = False\n' | sudo tee -a /srv/barattolo/config.py > /dev/null`
+  e riavvio (l'ultima riga vince). Una chiave esposta si REVOCA dalla
+  Console e se ne fa un'altra (regola ferrea 1).

@@ -136,6 +136,7 @@ collaudo_onchain_incasso
 collaudo_leve_pannello
 collaudo_certificati_relay
 collaudo_filtro_avorio
+collaudo_assistente_bot
 
 # ---- FUORI DALLA CI ---------------------------------------------------
 # Erano fuori anche quando l'elenco stava nel workflow, e fuori restano:
