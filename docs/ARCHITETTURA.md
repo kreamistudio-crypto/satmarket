@@ -33969,6 +33969,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   9077); il giro vero, server e telefono in node, sta in
   `collaudo_cambio_libero` (le scene «tappa 3»), le sentinelle in
   `prove_cambio_libero`.
+  LA GRAFICA DELLA PAGINA «CAMBIO» (28 ott 2026, cantiere
+  grafica-cambio; perché in CANTIERI, «La pagina "Cambio" più pulita»).
+  Quel che sopra si chiama tasto «🔁 Cambia», pillole della strada e
+  «Vedi quanto ricevi» non c'è più: il riquadro `#swapCambio` sta nel
+  markup di `#view-swap`, fisso, sopra `#swapTelefono`, e il cambio è
+  sempre aperto. Una carta `.cambio-carta` con due riquadri (`latoSwap`
+  in miniapp.html: moneta, rete, cifra) e il tondo `cambio-gira` che
+  chiama `swapCambioScegliStrada` (solo con due strade). La cifra:
+  `swapCambioScrive` a ogni tasto, il preventivo dopo
+  `SWAP_CAMBIO_ATTESA_MS` (800) dall'ultimo (`swapCambioCalcola(true)`),
+  ridisegno PARZIALE di `swapCambioAltra`/`Costo`/`Avviso`/`Vai` per
+  non togliere il fuoco al campo, risposta vecchia buttata da
+  `swapCambioDiAdesso` (confronta `dovuto` e `direzione` del server); il
+  `focusout` rimette i puntini. Il costo in una riga con «Dettagli»
+  (`costoSwap`, `vociSwap`, stato in `dettagliSwap[n]`), pezzi comuni
+  col pannello dell'incasso (`pannelloPreventivoSwap`). Le 12 parole e il
+  recupero in una riga chiusa (`swapRiservaAperta`, azione `riserva`);
+  la prima volta la schermata delle parole resta obbligatoria
+  (`swapAvantiDentro`). Le icone sono SVG nel file (`SWAP_ICONE`,
+  `swapIcona`, `swapMoneta`, `iconaSwap` dal lato della pagina), stili
+  `.cambio-*`. `pannelloPagamento` dice «via il cambio, al tuo
+  indirizzo bitcoin» quando `swapDiOrdine(o.id)` c'è (solo il telefono
+  di chi vende lo sa).
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr

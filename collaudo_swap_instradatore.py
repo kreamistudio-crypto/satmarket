@@ -275,6 +275,12 @@ const O = D.ordini;
   // --- la pagina Swap con due fornitori, e il recupero per fornitore
   A.run(`elementi.swapTelefono = {innerHTML: ''}; elementi.swapVuoto = {style: {}}`);
   A.run('renderSwapTelefono()');
+  // (28 ott 2026, grafica-cambio) la riga delle 12 parole sta chiusa in fondo:
+  // si apre col tocco, e solo allora parole e recupero si vedono
+  const chiusa = A.run('elementi.swapTelefono.innerHTML');
+  out.chiusa = [chiusa.includes('Le 12 parole e il recupero'), chiusa.includes('data-swap="riserva"'),
+                chiusa.includes('Recupera da'), chiusa.includes('Le tue 12 parole di riserva')];
+  A.run('swapRiservaAperta = true; renderSwapTelefono()');
   const pag = A.run('elementi.swapTelefono.innerHTML');
   html.push(pag);
   out.pagina = [pag.includes('Le tue 12 parole di riserva per SATS Routing'), pag.includes('Le tue 12 parole di riserva per Cartone Due'),
@@ -420,6 +426,8 @@ def il_telefono(dati):
     prova("...e con Cartone Due giu' vince SATS Routing", "satsrouting", r["dueGiu"])
 
     print("\n[la pagina Swap e il recupero per fornitore]")
+    prova("le 12 parole stanno in una riga chiusa, che si apre col tocco",
+          [True, True, False, False], r["chiusa"])
     prova("le parole e il recupero, uno per fornitore", [True] * 5, r["pagina"])
     rc = r["recupero"]
     prova("le parole di Cartone Due ritrovano i SUOI swap, e la xpub va solo a lui",

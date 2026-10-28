@@ -334,6 +334,8 @@ def pezzi_pagina():
         tra("const SWAP_TESTI = {", fino_a="function linguaSwap(){"),
         tra("function testiSwap(){", "\n"), tra("function percentoSwap(p){"),
         tra("function etichettaVoceSwap(r, t, fornitore){"),
+        # (28 ott 2026, grafica-cambio) i riquadri, il costo, i rifiuti
+        tra("let dettagliSwap = {};", fino_a="/* (27 ott 2026, cantiere grafica-swap) `campo`"),
         tra("function pannelloPreventivoSwap(o, campo){"),
         tra("function ridisegnaIncassoSwap(){")])
 
@@ -434,30 +436,49 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   const out = {};
   const server = () => run('server'), preventivi = () => run('preventivi'), qr = () => run('qr'), wallet = () => run('wallet');
   run("elementi.swapCambio = {innerHTML: ''}; elementi.swapTelefono = {innerHTML: ''}; elementi.swapVuoto = {style: {}};");
-  // --- a leva del cambio spenta: niente, nemmeno il tasto
+  // --- a leva del cambio spenta: niente
   run('swapLeve.cambio.attivo = false'); run('renderSwapCambio()');
   out.spento = box();
+  // --- (28 ott 2026, grafica-cambio) accesa: SUBITO APERTO, i due riquadri
   run('swapLeve.cambio.attivo = true'); run('renderSwapCambio()');
-  out.chiuso = box();
-  // --- aperto: la direzione, la cifra, i tetti del giorno
-  run('swapCambioApri()');
   const f1 = box();
-  out.aperto = {tasto: f1.includes('data-swap="cambio-calcola"'), campo: f1.includes('id="swapCambioCifra_0"'),
-                pillole: (f1.match(/data-swap="cambio-strada"/g) || []).length,
-                tra: f1.includes('Da 25000 a 500000 sats') , oggi: f1.includes('Oggi: 0 di 5'),
-                chiudi: f1.includes('data-swap="cambio-chiudi"'), titolo: f1.includes('Cambia i tuoi sats')};
+  const senzaSvg = f1.replace(/<svg[\s\S]*?<\/svg>/g, '');
+  out.aperto = {campo: f1.includes('id="swapCambioCifra_0"'), mandi: f1.includes('<span class="cambio-eti">Mandi</span><span class="cambio-rete">Lightning</span>'),
+                ricevi: f1.includes('<span class="cambio-eti">Ricevi circa</span><span class="cambio-rete">Bitcoin</span>'),
+                gira: (f1.match(/data-swap="cambio-gira"/g) || []).length,
+                tra: f1.includes('Da 25000 a 500000 sats · oggi 0 di 5'),
+                tessere: (f1.match(/<li><span class="cambio-tessera-ico"><svg/g) || []).length,
+                indirizzo: f1.includes('id="swapIndirizzo_0"'),
+                fermo: f1.includes('id="swapCambioVai" type="button" data-swap="avanti" data-ordine="0" disabled'),
+                vecchi: ['data-swap="cambia"', 'cambio-chiudi', 'data-swap="cambio-calcola"', 'Cambia i tuoi sats'].filter(x => f1.includes(x)),
+                emoji: (senzaSvg.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}₿]/gu) || [])};
   // --- senza cifra non si chiede niente
   run("elementi.swapCambioCifra_0 = {value: ''}");
   await run('swapCambioCalcola()');
   out.senzaCifra = [box().includes('Scrivi quanti sats vuoi cambiare.'), preventivi().length];
-  // --- 100.000: il preventivo del cambio, con le parole del cambio
-  run("elementi.swapCambioCifra_0 = {value: '100.000'}");
-  await run('swapCambioCalcola()');
+  // --- 100.000 scritto tasto per tasto: UN preventivo solo, quando si
+  // smette di scrivere (modifica 1 di Andrea), e intanto «…»
+  run('delete elementi.swapCambioCifra_0');
+  for (const v of ['1', '10', '100', '1000', '10.000', '100.000']) run(`swapCambioScrive('${v}')`);
+  out.attesa = {subito: preventivi().length, puntini: box().includes('<span id="swapCambioAltra">…</span>'),
+                fermo: box().includes('data-ordine="0" disabled')};
+  await sleep(1500);
+  await finche(() => run('!swapCambioTimer && (preventiviSwap[0] || {}).stato === "pronto"'));
+  out.attesa.dopo = preventivi().length;
   const f2 = box();
   out.preventivo = {letto: preventivi()[0], cambi: f2.includes('<span>Cambi</span><b>100000</b>'),
-                    spettano: f2.includes('Ti spettano'), ricevi: f2.includes('<b>98842<span class="unit">sats</span></b>'),
+                    spettano: f2.includes('Ti spettano'), ricevi: f2.includes('<span id="swapCambioAltra">98842</span><small>sats</small>'),
+                    costo: f2.includes('Costo <b>1158 sats</b> · SATS Routing'), chiuse: f2.includes('<div class="cambio-voci" hidden>'),
                     incassaLn: f2.includes('Incassa in Lightning'), campo: f2.includes('id="swapIndirizzo_0"'),
-                    conferma: f2.includes('data-swap="avanti" data-ordine="0"'), calcola: f2.includes('data-swap="cambio-calcola"')};
+                    conferma: f2.includes('data-swap="avanti" data-ordine="0">Conferma'), calcola: f2.includes('data-swap="cambio-calcola"')};
+  run('dettagliSwap[0] = true; renderSwapCambio()');
+  out.dettagli = [box().includes('aria-expanded="true">Nascondi'), box().includes('<div class="cambio-voci" hidden>'),
+                  box().includes('Cifre di adesso: si ricontrollano quando confermi. Il cambio lo fa SATS Routing.')];
+  run('dettagliSwap[0] = false');
+  // --- una risposta VECCHIA (di un'altra cifra) non si mostra e non si conferma
+  run('preventiviSwap[0].dati.dovuto = 50000; renderSwapCambio()');
+  out.vecchia = [box().includes('<span id="swapCambioAltra">…</span>'), box().includes('data-ordine="0" disabled')];
+  run('preventiviSwap[0].dati.dovuto = 100000; renderSwapCambio()');
   // --- «Conferma» senza indirizzo: lo dice, niente biglietto
   await run('swapAvanti(0)');
   out.senzaIndirizzo = [run("swapErrori[0] || ''"), server().length];
@@ -479,7 +500,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   // --- la carta: QR, «Copia», «Apri nel wallet», la fattura la paga lui
   const f3 = box();
   out.carta = {qr: qr()[0], wallet: wallet()[0], copia: f3.includes('data-swap="cambio-copia"'),
-               paghi: f3.includes('Paga questa richiesta col tuo wallet Lightning'), cambio: f3.includes('<h4>🔁 Cambio</h4>'),
+               paghi: f3.includes('Paga questa richiesta col tuo wallet Lightning'), cambio: /<h4 class="cambio-tit"><svg[^]*?<\/svg>Cambio<\/h4>/.test(f3),
                apri: f3.includes('href="lightning:lnbc'), vale: f3.includes('Vale fino alle')};
   run("elementi.swapCambioQr = {id: 'swapCambioQr', classList: {add(){}}}; elementi.swapCambioWallet = {id: 'swapCambioWallet'}");
   run('renderSwapCambio()');
@@ -494,16 +515,17 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   out.pagina = {cambio: pag.includes('<b>Cambio</b>'), frase: run('frasestatoSwap(swapLista()[0])'),
                 vuotoNascosto: run("elementi.swapVuoto.style.display")};
   // --- un secondo cambio mentre il primo e' vivo: il riquadro mostra il primo
-  run('swapCambioApri()');
+  run('renderSwapCambio()');
   out.secondoMentreVivo = box().includes('data-swap="cambio-copia"');
   // --- a cambio pagato e finito, il riquadro torna al tasto
   const l2 = lista(); l2[0].stato = 'invoice.settled'; l2[0].ritiro = {txid: 'a'.repeat(64), concluso: true, sats: 98842};
   memoria.set('barattolo_swap_lista_999', JSON.stringify(l2));
-  run('swapCambioChiudi()');
-  out.finito = box().includes('data-swap="cambia"');
+  run('renderSwapCambio()');
+  /* ...e riparte PULITO: la cifra e l'indirizzo del cambio di prima non restano */
+  out.finito = [box().includes('id="swapCambioCifra_0"'), box().includes('id="swapCambioCifra_0" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Cambi" value=""'),
+                box().includes('id="swapIndirizzo_0"') && !box().includes(D.indirizzo)];
   // --- il biglietto rifiutato (tetto del giorno): niente swap chiesto
   run('bigliettoRisposta = {ok: false, motivo: "tetto_giorno"}');
-  run('swapCambioApri()');
   run("elementi.swapCambioCifra_0 = {value: '100000'}");
   await run('swapCambioCalcola()');
   run(`elementi.swapIndirizzo_0 = {value: '${D.indirizzo}'}`);
@@ -525,18 +547,22 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   run("bigliettoRisposta = {ok: true, id: 51, oggi: 1}; swapLeve.cambio.strade = ['ln-btc', 'btc-ln']");
   const sub = {};
   const F = D.fattureSub;
-  run('swapCambioChiudi(); swapCambioApri()');
-  sub.pillole = (box().match(/data-swap="cambio-strada"/g) || []).length;
-  run("swapCambioScegliStrada('btc-ln')");
+  run('renderSwapCambio()');
+  sub.pillole = [(box().match(/data-swap="cambio-gira" data-strada="btc-ln"/g) || []).length, box().includes('aria-label="Da bitcoin a Lightning"')];
+  /* il tondo gira la strada; la cifra scritta resta, e il conto si rifa' da solo */
+  const pGira = preventivi().length;
+  await run("swapCambioScegliStrada('btc-ln')");
   const fs1 = box();
-  sub.scelta = [fs1.includes('data-strada="btc-ln">') && fs1.includes('class="consegna-pill attiva" data-swap="cambio-strada" data-strada="btc-ln"'),
-                fs1.includes('Quanti sats vuoi ricevere in Lightning')];
+  sub.scelta = [fs1.includes('data-swap="cambio-gira" data-strada="ln-btc"'),
+                fs1.indexOf('<div class="cambio-lato arriva scritto"><span class="cambio-moneta ln">') >= 0
+                  && fs1.indexOf('<span class="cambio-eti">Ricevi</span>') < fs1.indexOf('id="swapCambioCifra_0"'),
+                preventivi().length - pGira, preventivi()[preventivi().length - 1].strada];
   run("elementi.swapCambioCifra_0 = {value: '100000'}");
   await run('swapCambioCalcola()');
   const fs2 = box();
   sub.preventivo = {strada: preventivi()[preventivi().length - 1].strada,
-                    titolo: fs2.includes('Quanto mandi in bitcoin'), piu: fs2.includes('<b>+500</b>') && fs2.includes('<b>+318</b>'),
-                    mandi: fs2.includes('<span>Mandi all\'indirizzo</span><b>100818<span class="unit">sats</span></b>'),
+                    titolo: fs2.includes('aria-label="Quanto mandi in bitcoin"'), piu: fs2.includes('<b>+500</b>') && fs2.includes('<b>+318</b>'),
+                    mandi: fs2.includes('<span class="cambio-eti">Mandi</span><span class="cambio-rete">Bitcoin</span></span><span class="cambio-cifra"><span id="swapCambioAltra">100818</span>'),
                     riceviLn: fs2.includes('<span>Ricevi in Lightning</span><b>100000</b>'),
                     campoFattura: fs2.includes('id="swapFattura_0"') && fs2.includes('data-swap="incolla-fattura"'),
                     campoIndirizzo: fs2.includes('id="swapIndirizzo_0"'),
@@ -587,14 +613,14 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
                 ritiro: rec().ritiro && rec().ritiro.cooperativo, stato: (await fetchVero(`${BASE}/v2/swap/${rS.id}`).then(r => r.json())).status,
                 spesa: (await fetchVero(`${BASE}/esplora/tx/${(await fetchVero(`${BASE}/v2/swap/submarine/${rS.id}/transaction`).then(r => r.json())).id}/outspend/0`).then(r => r.json())).spent};
   await run('swapGiro()');
-  run('swapCambioChiudi()');
-  sub.fatto = [frase(), box().includes('data-swap="cambia"'), rec().stato];
+  run('renderSwapCambio()');
+  sub.fatto = [frase(), box().includes('id="swapCambioCifra_0"'), rec().stato];
   run('renderSwapTelefono()');
   sub.lista = run('elementi.swapTelefono.innerHTML').includes('<b>Cambio</b>');
   /* IL CAMBIO FALLITO: i bitcoin tornano a due, all'indirizzo scritto */
   const nuovoSub = async f => {
     run("bigliettoRisposta = {ok: true, id: bigliettoRisposta.id + 1, oggi: 1}");
-    run('swapCambioApri(); swapCambioScegliStrada("btc-ln")');
+    run('renderSwapCambio()');
     run("elementi.swapCambioCifra_0 = {value: '100000'}");
     await run('swapCambioCalcola()');
     run(`elementi.swapFattura_0 = {value: ${JSON.stringify(f.invoice)}}`);
@@ -613,7 +639,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   sub.fallito = {fase: run('swapFase(swapLista().find(r => r.id === ' + JSON.stringify(r2.id) + '))'), frase: frase2(),
                  daRimborsare: run('swapDaRimborsare(swapLista().find(r => r.id === ' + JSON.stringify(r2.id) + '))'),
                  campo: pag2.includes(`id="swapIndirizzoR_${r2.id}"`) && pag2.includes('>Rimanda a questo indirizzo<'),
-                 riquadro: (run('swapCambioChiudi()'), box().includes('data-swap="cambia"')), aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r2.id) + ')')};
+                 riquadro: (run('renderSwapCambio()'), box().includes('id="swapCambioCifra_0"')), aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r2.id) + ')')};
   run(`elementi.swapIndirizzoR_${r2.id} = {value: '${D.indirizzo}'}`);
   const scriptDest = run(`(() => { const S = window.BarattoloSwap; return S.hex.encode(S.OutScript.encode(S.Address(S.NETWORK).decode(${JSON.stringify(D.indirizzo)}))); })()`);
   const vR1 = await visto();
@@ -723,17 +749,27 @@ def il_telefono(base):
     if "ERRORE" in r:
         prova("il banco del telefono gira", "", r["ERRORE"])
         return
-    prova("a leva del cambio spenta il riquadro e' vuoto; accesa, il tasto «🔁 Cambia»",
-          ("", True), (r["spento"], r["chiuso"].endswith('data-swap="cambia">🔁 Cambia</button>')))
-    prova("aperto: la cifra, una direzione sola (per ora), i tetti e il conto del giorno, «Chiudi»",
-          {"tasto": True, "campo": True, "pillole": 1, "tra": True, "oggi": True,
-           "chiudi": True, "titolo": True}, r["aperto"])
+    # (28 ott 2026, cantiere grafica-cambio) niente piu' tasto «🔁 Cambia»
+    # ne' «Chiudi»: a leva accesa il riquadro e' gia' aperto
+    prova("a leva del cambio spenta il riquadro e' vuoto", "", r["spento"])
+    prova("accesa, SUBITO APERTO: «Mandi / Lightning» col campo, «Ricevi circa / Bitcoin», "
+          "una strada sola (nessun tondo), i tetti, tre tesserine, l'indirizzo e «Conferma» "
+          "spento; niente tasti di ieri, niente emoji fuori dalle icone disegnate",
+          {"campo": True, "mandi": True, "ricevi": True, "gira": 0, "tra": True, "tessere": 3,
+           "indirizzo": True, "fermo": True, "vecchi": [], "emoji": []}, r["aperto"])
     prova("senza cifra: lo dice e non chiede niente", [True, 0], r["senzaCifra"])
-    prova("100.000 (coi punti): la rotta del cambio, la riga «Cambi» e non «Ti spettano», "
-          "ricevi 98.842, niente «Incassa in Lightning», l'indirizzo e «Conferma»",
+    prova("la cifra scritta tasto per tasto: intanto «…» e «Conferma» spento, nessun "
+          "preventivo; UNO solo quando si smette di scrivere",
+          {"subito": 0, "puntini": True, "fermo": True, "dopo": 1}, r["attesa"])
+    prova("100.000 (coi punti): la rotta del cambio, «Ricevi circa» 98.842, il costo in "
+          "una riga (1.158 · SATS Routing) e le voci chiuse (dentro «Cambi», non «Ti "
+          "spettano»), niente «Incassa in Lightning», l'indirizzo e «Conferma» acceso",
           {"letto": {"n": 0, "fornitore": "satsrouting", "hash": "", "sats": 100_000, "strada": "ln-btc"},
-           "cambi": True, "spettano": False, "ricevi": True, "incassaLn": False,
-           "campo": True, "conferma": True, "calcola": False}, r["preventivo"])
+           "cambi": True, "spettano": False, "ricevi": True, "costo": True, "chiuse": True,
+           "incassaLn": False, "campo": True, "conferma": True, "calcola": False}, r["preventivo"])
+    prova("«Dettagli» apre le voci, con le due frasi piccole", [True, False, True], r["dettagli"])
+    prova("una risposta vecchia (di un'altra cifra) non si mostra e non si conferma",
+          [True, True], r["vecchia"])
     prova("«Conferma» senza indirizzo: lo dice, e al server non va niente",
           ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", 0], r["senzaIndirizzo"])
     prova("con l'indirizzo, la prima volta le 12 parole (che citano la pagina «Cambio»)",
@@ -756,7 +792,7 @@ def il_telefono(base):
     prova("...e il record e' dell'«ordine 0», col biglietto, senza pagamento",
           {"ordine": 0, "cambio": 41, "indice": 0, "pagamento": ""}, n["record"])
     c = r["carta"]
-    prova("la carta: «🔁 Cambio», la fattura da pagare col SUO wallet, «Copia», "
+    prova("la carta: «Cambio» con l'icona disegnata, la fattura da pagare col SUO wallet, «Copia», "
           "«Apri nel wallet», «Vale fino alle»",
           (True, True, True, True, True), (c["cambio"], c["paghi"], c["copia"], c["apri"], c["vale"]))
     prova("...il QR della fattura (alfanumerico, LIGHTNING: maiuscolo) e il wallet",
@@ -768,7 +804,8 @@ def il_telefono(base):
                                  r["pagina"]["frase"].startswith("Paga questa richiesta col tuo wallet Lightning"),
                                  r["pagina"]["vuotoNascosto"]))
     prova("un secondo cambio mentre il primo aspetta: si vede il primo", True, r["secondoMentreVivo"])
-    prova("a cambio finito il riquadro torna al tasto", True, r["finito"])
+    prova("a cambio finito il riquadro torna aperto e PULITO: niente cifra ne' indirizzo di prima",
+          [True, True, True], r["finito"])
     t = r["tettoGiorno"]
     prova("il biglietto rifiutato (tetto del giorno): lo dice, niente swap chiesto, "
           "l'indice della chiave resta bruciato",
@@ -782,8 +819,10 @@ def il_telefono(base):
 
     print("\n[il telefono, la strada bitcoin → Lightning (tappa 3)]")
     s = r.get("sub") or {}
-    prova("con le due strade dal server, due pillole; scelta «bitcoin → Lightning», "
-          "la cifra e' quanto RICEVERE", (2, [True, True]), (s.get("pillole"), s.get("scelta")))
+    prova("con le due strade dal server, il tondo fra i riquadri (dice dove porta); "
+          "girato: il campo sta in «Ricevi / Lightning» (la cifra e' quanto RICEVERE), il "
+          "tondo riporta indietro, e il conto si rifa' da solo per la strada nuova",
+          ([1, True], [True, True, 1, "btc-ln"]), (s.get("pillole"), s.get("scelta")))
     prova("il preventivo della strada rovesciata: quanto mandi, i costi col +, "
           "il campo della richiesta Lightning al posto dell'indirizzo",
           {"strada": "btc-ln", "titolo": True, "piu": True, "mandi": True, "riceviLn": True,
@@ -818,7 +857,7 @@ def il_telefono(base):
     prova("la fattura pagata: la nostra meta' del ritiro a due (una volta), il cartone "
           "ritira (transaction.claimed) e il lockup e' speso",
           {"ritiri": 1, "ritiro": True, "stato": "transaction.claimed", "spesa": True}, s.get("pagata"))
-    prova("fatto: la frase, il riquadro torna al tasto, lo stato",
+    prova("fatto: la frase, il riquadro torna aperto, lo stato",
           ["Fatto: i sats sono nel tuo wallet Lightning.", True, "transaction.claimed"], s.get("fatto"))
     prova("...e nella lista si chiama «Cambio»", True, s.get("lista"))
     prova("un cambio fallito coi bitcoin mandati: «fallito», la frase chiede dove rimandarli, "

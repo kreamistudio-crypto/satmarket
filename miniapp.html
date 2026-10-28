@@ -9663,11 +9663,8 @@
   .swap-campo{margin-top:16px}
   .swap-attrezzi{display:flex;gap:8px;margin-top:8px}
   /* (cambio-libero) la fattura da pagare: il QR col vestito del foglio
-     di pagamento (.qr), e l'etichetta della cifra sopra il campo */
+     di pagamento (.qr) */
   .swap-fattura .qr{margin:12px auto 4px}
-  .swap-cifra-et{display:block;margin-top:12px;font-size:12px;font-weight:800;
-    letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
-  .swap-cambio .consegna-scelta{margin-top:10px}
   /* (tappa 3) l'indirizzo dove mandare i bitcoin, in chiaro e copiabile */
   .swap-indirizzo-chiaro{font-size:12px;word-break:break-all;line-height:1.4;
     text-align:center;margin:6px 0;color:var(--ink)}
@@ -9711,6 +9708,111 @@
   .swap-qr-btn{width:100%;max-width:420px;min-height:48px;border-radius:var(--b-r);
     border:1.5px solid rgba(255,255,255,.75);background:rgba(0,0,0,.35);color:#fff;
     font:inherit;font-weight:800;font-size:15px;padding:10px 12px;cursor:pointer}
+  /* LA PAGINA «CAMBIO» RIDISEGNATA (28 ott 2026, cantiere grafica-cambio,
+     Andrea: «non mi piacciono le icone e ci sono troppi testi», con la
+     pagina di SATS Routing come esempio). La testa a sinistra; la carta
+     coi due riquadri (quel che parte, quel che arriva) e il tondo in
+     mezzo; il costo in una riga; il campo con le due icone dentro il
+     bordo; le tesserine; la riga chiusa delle parole. Le icone sono SVG
+     a tratto (currentColor): stanno giuste col tema scuro da sole. */
+  .cambio-testa{padding:20px 16px 12px}
+  .cambio-titolo{margin:0;font:800 28px/1.1 'Baloo 2','Nunito',sans-serif;color:var(--ink)}
+  .cambio-testa p{margin:4px 0 0;font-size:14.5px;font-weight:600;color:var(--muted)}
+  .cambio-testa .swap-vuoto{margin-top:10px;font-weight:700}
+  .cambio-svg{width:20px;height:20px;flex:0 0 auto;fill:none;stroke:currentColor;
+    stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-4px}
+  .cambio-svg .pieno{fill:currentColor}
+  .btn .cambio-svg{width:18px;height:18px;margin-right:6px;vertical-align:-3px}
+  .scelta-incasso .cambio-svg{width:17px;height:17px;margin-right:5px;vertical-align:-3px}
+  .cambio-tit{display:flex;align-items:center;gap:8px}
+  .cambio-carta{background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:6px;margin:4px 0 0;box-shadow:var(--shadow-card)}
+  .payout .cambio-carta{box-shadow:none}
+  .cambio-lato{display:flex;align-items:center;gap:12px;min-height:72px;
+    padding:12px;border-radius:15px;background:var(--bg)}
+  .cambio-moneta{flex:0 0 auto;width:42px;height:42px;border-radius:50%;
+    display:grid;place-items:center}
+  .cambio-moneta .cambio-svg{width:23px;height:23px;vertical-align:0}
+  .cambio-moneta.ln{background:#23282C;color:#FFC83D}
+  .cambio-moneta.btc{background:#F7931A;color:#FFFFFF}
+  .cambio-moneta.btc .cambio-svg{stroke-width:2.1}
+  .cambio-moneta.piana{background:var(--bg);color:var(--ink)}
+  html[data-tema="scuro"] .cambio-moneta.ln{background:#3B3424}
+  .cambio-dati{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+  .cambio-eti{font-size:11.5px;font-weight:800;letter-spacing:.3px;
+    text-transform:uppercase;color:var(--muted)}
+  .cambio-rete{font-size:15px;font-weight:800;color:var(--ink)}
+  .cambio-cifra{flex:0 1 auto;min-width:0;display:flex;align-items:baseline;
+    justify-content:flex-end;gap:4px;font:800 23px/1.1 'Baloo 2','Nunito',sans-serif;
+    color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .cambio-cifra small{font:700 12px/1 'Nunito',sans-serif;color:var(--muted)}
+  .cambio-lato.arriva .cambio-cifra{color:var(--sats-text)}
+  .cambio-lato.scritto{box-shadow:inset 0 0 0 1.5px var(--line)}
+  .cambio-lato.scritto:focus-within{box-shadow:inset 0 0 0 2px var(--sats)}
+  .cambio-cifra-campo{width:7.5ch;min-width:0;border:0;padding:0;background:transparent;
+    font:inherit;color:inherit;text-align:right;outline:none}
+  .cambio-cifra-campo::placeholder{color:var(--muted)}
+  .cambio-gira{position:relative;height:6px;display:flex;justify-content:center;z-index:1}
+  .cambio-gira button{position:absolute;top:-16px;width:38px;height:38px;padding:0;
+    border-radius:50%;border:3px solid var(--card);background:var(--ink);color:var(--on-ink);
+    display:grid;place-items:center;cursor:pointer}
+  .cambio-gira button:active{transform:scale(.94)}
+  .cambio-gira .cambio-svg{width:18px;height:18px;stroke-width:2;vertical-align:0}
+  .cambio-costo{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:10px 8px 6px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .cambio-costo b{color:var(--ink)}
+  .cambio-dettagli{border:0;background:none;padding:6px 2px;cursor:pointer;
+    font:800 13.5px/1 'Nunito',sans-serif;color:var(--sats-text)}
+  .cambio-voci{margin:2px 6px 6px;padding:2px 12px 8px;border-radius:12px;background:var(--bg)}
+  .cambio-voci[hidden]{display:none}
+  .cambio-voci .swap-riga{font-size:13px}
+  .cambio-voci .swap-riga:last-of-type{border-bottom:0}
+  .cambio-voci-nota{font-size:12px;font-weight:600;color:var(--muted);line-height:1.45;padding-top:4px}
+  .cambio-campo-et{display:block;margin:0 2px 6px;font-size:13px;font-weight:800;color:var(--muted)}
+  .cambio-campo-riga{display:flex;align-items:center;gap:6px;padding:5px 5px 5px 4px;
+    background:var(--card);border:1px solid var(--line);border-radius:14px}
+  .cambio-campo-riga:focus-within{border-color:var(--sats)}
+  .cambio-campo-riga .swap-indirizzo{flex:1 1 auto;min-width:0;margin:0;border:0;background:transparent}
+  .cambio-ico{flex:0 0 auto;width:42px;height:42px;padding:0;border:0;border-radius:11px;
+    background:var(--bg);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+  .cambio-ico:active{transform:scale(.95)}
+  .cambio-ico .cambio-svg{vertical-align:0}
+  .swap-campo .hint{margin:-2px 2px 8px}
+  .btn.cambio-vai{width:100%;margin-top:14px}
+  .cambio-limiti{margin-top:8px;text-align:center;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+  .cambio-tessere{list-style:none;margin:18px 0 0;padding:0;display:grid;
+    grid-template-columns:repeat(3,1fr);gap:8px}
+  .cambio-tessere li{display:flex;flex-direction:column;align-items:center;gap:6px;
+    padding:12px 4px;border-radius:14px;background:var(--card);border:1px solid var(--line-soft);
+    font-size:12.5px;font-weight:800;color:var(--ink);text-align:center}
+  .cambio-tessera-ico{color:var(--sats-text)}
+  .cambio-tessera-ico .cambio-svg{width:22px;height:22px;vertical-align:0}
+  .cambio-sez{margin:24px 2px 8px;font-size:12px;font-weight:800;letter-spacing:.3px;
+    text-transform:uppercase;color:var(--muted)}
+  .cambio-voce{padding:12px;margin-bottom:8px;border-radius:16px;background:var(--card);
+    border:1px solid var(--line-soft)}
+  .cambio-voce-riga{display:flex;align-items:center;gap:12px}
+  .cambio-voce .cambio-moneta{width:36px;height:36px}
+  .cambio-voce .cambio-moneta .cambio-svg{width:19px;height:19px}
+  .cambio-voce-dati{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;
+    font-size:12.5px;font-weight:600;line-height:1.4;color:var(--ink-soft)}
+  .cambio-voce-dati b{font-size:14.5px;color:var(--ink)}
+  .cambio-voce-cifra{flex:0 0 auto;font:800 16px/1 'Baloo 2','Nunito',sans-serif;color:var(--ink)}
+  .cambio-barrette{display:flex;gap:4px;margin-top:4px}
+  .cambio-barrette i{width:22px;height:4px;border-radius:2px;background:var(--line)}
+  .cambio-barrette i.fatto{background:var(--trust)}
+  .cambio-riserva{margin-top:24px;border-radius:18px;background:var(--card);border:1px solid var(--line-soft)}
+  .cambio-riserva-testa{width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;
+    border:0;background:none;text-align:left;cursor:pointer;color:var(--ink);font:inherit}
+  .cambio-riserva-testa .cambio-moneta{width:36px;height:36px}
+  .cambio-riserva-testa .cambio-moneta .cambio-svg{width:19px;height:19px}
+  .cambio-riserva-nome{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+  .cambio-riserva-nome b{font-size:15px}
+  .cambio-riserva-nome small{font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+  .cambio-riserva-fr{color:var(--muted);transition:transform .15s}
+  .cambio-riserva.aperta .cambio-riserva-fr{transform:rotate(90deg)}
+  .cambio-riserva-dentro{padding:0 14px 14px}
+  .cambio-riserva-dentro h4:first-child{margin-top:4px}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5}
   /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
@@ -12073,15 +12175,22 @@ document.getElementById('cartello')?.remove();</script>
        e il loro recupero. Oggi e' la pagina vuota, e ci si arriva solo
        a leva accesa (toccaCellaAste). MARKUP FISSO e segnaposto vuoti:
        i testi li scrive renderSwap() con textContent, in italiano o in
-       inglese (SWAP_TESTI). Riusa lo stato vuoto di casa, come i
-       «coming soon». -->
+       inglese (SWAP_TESTI). Fino al 28 ott 2026 riusava lo stato
+       vuoto di casa, come i «coming soon». -->
   <div class="view" id="view-swap">
-    <div class="empty" style="padding-top:34px">
-      <div class="big">🔄</div>
-      <b class="empty-title" id="swapTitolo"></b>
-      <span id="swapTesto"></span>
-      <span id="swapVuoto" class="swap-vuoto"></span>
+    <!-- (28 ott 2026, cantiere grafica-cambio) la testa: il nome e UNA
+         riga, a sinistra come le altre pagine; via l'emoji grande e il
+         paragrafo. La frase del «per ora nessun cambio» resta solo dove
+         il cambio libero non c'e' (la nasconde renderSwapTelefono). -->
+    <div class="cambio-testa">
+      <h2 class="cambio-titolo" id="swapTitolo"></h2>
+      <p id="swapTesto"></p>
+      <p id="swapVuoto" class="swap-vuoto"></p>
     </div>
+    <!-- (28 ott 2026) il riquadro del cambio libero ha il suo posto fisso:
+         lo scrive renderSwapCambio, e il ridisegno della lista qui sotto
+         non lo tocca (il campo della cifra non si perde mentre si scrive) -->
+    <div id="swapCambio" class="swap-telefono"></div>
     <!-- (20 ott 2026, tappa 3) gli swap di questo telefono, le 12 parole
          e il recupero: li scrive renderSwapTelefono (swap/instradatore.js) -->
     <div id="swapTelefono" class="swap-telefono"></div>
@@ -18339,7 +18448,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '1d9599709a';
+const SWAP_TELEFONO_VER = 'f09dfa9c1f';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18419,7 +18528,7 @@ const SWAP_TESTI = {
      non confonderli con la cassa on-chain che arrivera'. Le chiavi
      interne (onchain, conferma...) restano quelle. */
   it: {titolo: 'Cambio',
-       testo: 'Qui cambi i tuoi sats fra Lightning e il tuo indirizzo bitcoin, trovi gli incassi mandati là e le tue 12 parole di riserva.',
+       testo: 'Sposta i tuoi sats fra Lightning e bitcoin.',
        vuoto: 'Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin.',
        scegli: 'Come ricevi i sats', onchain: 'Al tuo indirizzo bitcoin',
        carico: 'Calcolo quanto ricevi…',
@@ -18442,6 +18551,10 @@ const SWAP_TESTI = {
        cambioNonRisponde: '{f} ora non risponde: riprova fra poco.',
        cambioSpento: 'Ora il cambio non si può fare.',
        ricalcola: 'Ricalcola',
+       /* (grafica-cambio, 28 ott 2026) i riquadri: il nome della rete
+          sotto l'etichetta, il costo in una riga, le voci a richiesta */
+       reti: {ln: 'Lightning', btc: 'Bitcoin'}, mandiBreve: 'Mandi', riceviBreve: 'Ricevi',
+       costo: 'Costo', dettagli: 'Dettagli', nascondiDettagli: 'Nascondi',
        /* (tappa 3) la strada bitcoin → Lightning: quanto MANDARE */
        titoloPrevSub: 'Quanto mandi in bitcoin', mandi: 'Mandi all\'indirizzo',
        voci: {dovuto: 'Ti spettano', cambi: 'Cambi',
@@ -18450,7 +18563,7 @@ const SWAP_TESTI = {
               rete_invio: 'Rete bitcoin: partenza',
               rete_ritiro: 'Rete bitcoin: arrivo a te (stima)'}},
   en: {titolo: 'Exchange',
-       testo: 'Here you exchange your sats between Lightning and your bitcoin address, find the payouts sent there and your 12 backup words.',
+       testo: 'Move your sats between Lightning and bitcoin.',
        vuoto: 'No exchanges and no payouts to your bitcoin address yet.',
        scegli: 'How you receive the sats', onchain: 'To your bitcoin address',
        carico: 'Working out how much you receive…',
@@ -18471,6 +18584,8 @@ const SWAP_TESTI = {
        cambioNonRisponde: '{f} is not responding: try again shortly.',
        cambioSpento: 'The exchange is not available right now.',
        ricalcola: 'Recalculate',
+       reti: {ln: 'Lightning', btc: 'Bitcoin'}, mandiBreve: 'You send', riceviBreve: 'You receive',
+       costo: 'Cost', dettagli: 'Details', nascondiDettagli: 'Hide',
        titoloPrevSub: 'What you send in bitcoin', mandi: 'You send to the address',
        voci: {dovuto: 'You are owed', cambi: 'You exchange',
               ricevi_ln: 'You receive on Lightning', rete_loro: 'Bitcoin network: the claim by {f}', fee_barattolo: 'Barattolo fee ({p}%)',
@@ -18502,7 +18617,7 @@ function selettoreIncassoSwap(id, scelta){
     + `aria-checked="${scelta === s}" class="${scelta === s ? 'on' : ''}" `
     + `data-swap="scegli" data-ordine="${n}" data-scelta="${s}">${testo}</button>`;
   return `<div class="scelta-incasso" role="radiogroup" aria-label="${esc(t.scegli)}">`
-    + tasto('ln', '⚡ Lightning') + tasto('swap', '₿ ' + esc(t.onchain)) + `</div>`;
+    + tasto('ln', iconaSwap('ln') + 'Lightning') + tasto('swap', iconaSwap('btc') + esc(t.onchain)) + `</div>`;
 }
 function ridisegnaIncassoSwap(){
   const box = el('payoutIncasso');
@@ -18634,57 +18749,99 @@ function etichettaVoceSwap(r, t, fornitore){
   return (t.voci[r.voce] || r.voce).replace('{p}', percentoSwap(r.percento))
     .replace('{f}', fornitore || 'SATS Routing');
 }
+/* I RIQUADRI DEL CAMBIO (28 ott 2026, cantiere grafica-cambio, Andrea: «non
+   mi piacciono le icone e ci sono troppi testi», con la pagina di SATS
+   Routing come esempio): due riquadri, quel che parte sopra e quel che
+   arriva sotto, ognuno con la sua moneta disegnata e la cifra grande; il
+   costo in UNA riga, e le voci una per una dietro «Dettagli» (stanno nel
+   markup anche chiuse, col loro `hidden`: chi le vuole le apre, e il
+   conto resta quello di sempre). Li usano il pannello dell'ordine (qui
+   sotto) e il cambio libero (`renderSwapCambio`, nell'instradatore). Le
+   icone sono dell'instradatore: senza di lui il riquadro resta senza. */
+let dettagliSwap = {};   // ordine -> true con le voci aperte
+function iconaSwap(nome){ return typeof swapIcona === 'function' ? swapIcona(nome) : ''; }
+function latoSwap(rete, eti, cifra, classe){
+  const t = testiSwap();
+  return `<div class="cambio-lato${classe ? ' ' + classe : ''}">`
+    + `<span class="cambio-moneta ${rete}">${iconaSwap(rete)}</span>`
+    + `<span class="cambio-dati"><span class="cambio-eti">${esc(eti)}</span>`
+    + `<span class="cambio-rete">${esc(t.reti[rete])}</span></span>`
+    + `<span class="cambio-cifra">${cifra}</span></div>`;
+}
+/* le voci del conto, una per riga (le cifre incolonnate a destra) */
+function vociSwap(n, d){
+  const t = testiSwap(), cambio = Number(n) === 0;
+  return (d.righe || []).map(r => `<div class="swap-riga${r.sats < 0 || r.piu ? ' meno' : ''}">`
+    + `<span>${esc(etichettaVoceSwap(cambio && r.voce === 'dovuto' ? Object.assign({}, r, {voce: 'cambi'}) : r, t, d.fornitore_nome))}</span>`
+    + `<b>${r.sats < 0 ? '−' : r.piu ? '+' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
+}
+/* IL COSTO IN UNA RIGA: la somma di quel che si toglie (strada verso
+   l'indirizzo) o si aggiunge (strada verso Lightning), col nome di chi fa
+   il cambio; «Dettagli» apre le voci, e con loro le due frasi piccole */
+function costoSwap(n, d){
+  const t = testiSwap(), aperto = !!dettagliSwap[Number(n)];
+  const costo = (d.righe || []).filter(r => r.sats < 0 || r.piu)
+    .reduce((s, r) => s + Math.abs(Number(r.sats) || 0), 0);
+  const chi = d.fornitore_nome || 'SATS Routing';
+  return `<div class="cambio-costo"><span>${esc(t.costo)} <b>${fmt(costo)} sats</b> · ${esc(chi)}</span>`
+    + `<button type="button" class="cambio-dettagli" data-swap="dettagli" data-ordine="${Number(n)}" aria-expanded="${aperto}">${esc(aperto ? t.nascondiDettagli : t.dettagli)}</button></div>`
+    + `<div class="cambio-voci"${aperto ? '' : ' hidden'}>${vociSwap(n, d)}`
+    + `<div class="cambio-voci-nota">${esc(t.valgonoOra)} ${esc(t.eseguitoDa.replace('{n}', chi))}.</div></div>`;
+}
+/* il no del preventivo, nelle parole giuste: il cambio libero (ordine 0)
+   non dice «incassa in Lightning», che li' non c'e' nessun incasso */
+function rifiutoSwap(n, d){
+  const t = testiSwap(), f = d.fornitore_nome || 'SATS Routing';
+  if (Number(n) === 0)
+    return d.motivo === 'sotto_minimo' ? t.cambioSottoMinimo.replace('{n}', fmt(d.minimo))
+      : d.motivo === 'sopra_tetto' ? t.cambioSopraTetto.replace('{n}', fmt(d.massimo))
+      : d.motivo === 'tetto_giorno' ? t.cambioTettoGiorno.replace('{n}', fmt(d.al_giorno || 0))
+      : d.motivo === 'cifra' ? t.cambioCifra
+      : d.motivo === 'spento' ? t.cambioSpento
+      : t.cambioNonRisponde.replace('{f}', f);
+  return d.motivo === 'sotto_minimo' ? t.sottoMinimo.replace('{n}', fmt(d.minimo))
+    : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
+    : d.motivo === 'spento' ? t.spento
+    : t.nonRisponde.replace('{f}', f);
+}
+/* le due frasi sopra le cifre: le cifre sono cambiate, o un fornitore ha
+   dato numeri storti e si e' passati al secondo */
+function notaSwap(p, d){
+  const t = testiSwap();
+  return p.nota === 'cambiata'
+      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>`
+    : p.nota === 'ripiego'
+      ? `<div class="swap-rifiuto" role="status">${esc(t.ripiego.replace('{a}', p.ripiegoDa || '').replace('{b}', d.fornitore_nome || ''))}</div>` : '';
+}
 /* (27 ott 2026, cantiere grafica-swap) `campo` e' il campo dell'indirizzo
    con «Incolla» e «QR», che scrive l'instradatore: sta PRIMA di
-   «Conferma», cosi' dopo la conferma non resta niente da scrivere */
+   «Conferma», cosi' dopo la conferma non resta niente da scrivere.
+   (grafica-cambio) Il preventivo dell'ORDINE coi due riquadri: sopra
+   quel che ti spetta in Lightning, sotto quel che ricevi circa al tuo
+   indirizzo. Il cambio libero (ordine 0) i riquadri se li disegna da
+   se', col campo della cifra dentro (`renderSwapCambio`). */
 function pannelloPreventivoSwap(o, campo){
   const n = Number(o.id), t = testiSwap(), p = preventiviSwap[n];
   if (!p || !p.dati)
     return `<div class="swap-prev"><div class="hint">${esc(t.carico)}</div></div>`;
   const d = p.dati;
-  /* (cambio-libero) l'ordine 0 e' il cambio libero: i suoi rifiuti non
-     dicono «incassa in Lightning» (non c'e' nessun incasso), la prima
-     riga dice «Cambi» e non «Ti spettano», e al posto del ritorno a
-     Lightning c'e' «Ricalcola» */
-  const cambio = n === 0;
   if (!d.ok) {
-    const f = d.fornitore_nome || 'SATS Routing';
-    const testo = cambio
-      ? (d.motivo === 'sotto_minimo' ? t.cambioSottoMinimo.replace('{n}', fmt(d.minimo))
-        : d.motivo === 'sopra_tetto' ? t.cambioSopraTetto.replace('{n}', fmt(d.massimo))
-        : d.motivo === 'tetto_giorno' ? t.cambioTettoGiorno.replace('{n}', fmt(d.al_giorno || 0))
-        : d.motivo === 'cifra' ? t.cambioCifra
-        : d.motivo === 'spento' ? t.cambioSpento
-        : t.cambioNonRisponde.replace('{f}', f))
-      : (d.motivo === 'sotto_minimo' ? t.sottoMinimo.replace('{n}', fmt(d.minimo))
-        : d.motivo === 'sopra_tetto' ? t.sopraTetto.replace('{n}', fmt(d.massimo))
-        : d.motivo === 'spento' ? t.spento
-        : t.nonRisponde.replace('{f}', f));
-    const tasto = cambio
+    const tasto = n === 0
       ? `<button class="btn ghost" type="button" data-swap="cambio-calcola">${esc(t.ricalcola)}</button>`
-      : `<button class="btn ghost" type="button" data-swap="scegli" data-ordine="${n}" data-scelta="ln">⚡ ${esc(t.tornaLn)}</button>`;
-    return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(testo)}</div>${tasto}</div>`;
+      : `<button class="btn ghost" type="button" data-swap="scegli" data-ordine="${n}" data-scelta="ln">${iconaSwap('ln')}${esc(t.tornaLn)}</button>`;
+    return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(rifiutoSwap(n, d))}</div>${tasto}</div>`;
   }
-  /* (tappa 3) nella strada bitcoin → Lightning i costi si AGGIUNGONO
-     (`piu`): il totale e' quanto mandare all'indirizzo */
-  const sub = cambio && d.direzione === 'btc-ln';
-  const righe = (d.righe || []).map(r => `<div class="swap-riga${r.sats < 0 || r.piu ? ' meno' : ''}">`
-    + `<span>${esc(etichettaVoceSwap(cambio && r.voce === 'dovuto' ? Object.assign({}, r, {voce: 'cambi'}) : r, t, d.fornitore_nome))}</span>`
-    + `<b>${r.sats < 0 ? '−' : r.piu ? '+' : ''}${fmt(Math.abs(r.sats))}</b></div>`).join('');
-  const nota = p.nota === 'cambiata'
-      ? `<div class="swap-rifiuto" role="status">${esc(t.cambiata)}</div>`
-    : p.nota === 'ripiego'
-      ? `<div class="swap-rifiuto" role="status">${esc(t.ripiego.replace('{a}', p.ripiegoDa || '').replace('{b}', d.fornitore_nome || ''))}</div>` : '';
+  const dovuto = ((d.righe || []).find(r => r.voce === 'dovuto') || {}).sats || d.dovuto || 0;
   return `<div class="swap-prev">
-      <h4>₿ ${esc(sub ? t.titoloPrevSub : t.titoloPrev)}</h4>
-      ${nota}
-      <div class="swap-righe">${righe}
-        <div class="swap-riga totale"><span>${esc(sub ? t.mandi : t.ricevi)}</span><b>${fmt(sub ? d.mandi : d.ricevi)}<span class="unit">sats</span></b></div>
+      ${notaSwap(p, d)}
+      <div class="cambio-carta" role="group" aria-label="${esc(t.titoloPrev)}">
+        ${latoSwap('ln', t.voci.dovuto, `${fmt(dovuto)}<small>sats</small>`)}
+        <div class="cambio-gira"></div>
+        ${latoSwap('btc', t.ricevi, `${fmt(d.ricevi)}<small>sats</small>`, 'arriva')}
+        ${costoSwap(n, d)}
       </div>
-      <div class="hint">${esc(t.valgonoOra.replace('{f}', d.fornitore_nome || 'SATS Routing'))}</div>
-      ${d.fornitore_nome ? `<div class="swap-da">${esc(t.eseguitoDa.replace('{n}', d.fornitore_nome))}</div>` : ''}
       ${campo || ''}
-      <button class="btn orange" type="button" data-swap="avanti" data-ordine="${n}"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
+      <button class="btn orange cambio-vai" type="button" data-swap="avanti" data-ordine="${n}"${p.stato === 'carico' ? ' disabled' : ''}>${esc(t.conferma)}</button>
     </div>`;
 }
 function renderSwap(){
@@ -36886,7 +37043,15 @@ function pannelloPagamento(o){
   const p = o.pagamento;
   if (!p) return '';
   const fatto = p.passo==='arrivato';
-  const via = p.via==='onchain' ? 'on-chain ⛓' : 'Lightning ⚡';
+  /* (28 ott 2026, cantiere grafica-cambio) chi vende ha scelto di ricevere
+     al suo indirizzo bitcoin: Barattolo paga in Lightning il CAMBIO, e
+     i bitcoin arrivano a lui. «via Lightning ⚡» era vero per la cassa e
+     falso per lui. Lo sa solo il suo telefono (lo swap e' nato li'),
+     quindi a chi compra resta la riga di sempre. */
+  const conCambio = p.via!=='onchain' && typeof swapDiOrdine === 'function'
+    && !!swapDiOrdine(o.id);
+  const via = p.via==='onchain' ? 'on-chain ⛓'
+    : conCambio ? 'il cambio, al tuo indirizzo bitcoin' : 'Lightning ⚡';
   return `
     <div class="payout" id="pannelloPagamento">
       <h4>${fatto ? '✅ Pagamento al venditore' : '💸 In pagamento al venditore'}</h4>

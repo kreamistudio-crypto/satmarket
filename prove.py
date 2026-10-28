@@ -7509,6 +7509,30 @@ def prove_in_pagamento():
             os.unlink(f.name)
         prova("le parole del client girano davvero: 21 casi, nessun errore",
               (21, ""), (len(righe), (out.stderr or "")[:200]))
+        # (28 ott 2026, grafica-cambio) chi vende ha il cambio al suo
+        # indirizzo bitcoin: la riga dice dove arrivano i sats, non
+        # «via Lightning ⚡»; senza il cambio, o a chi compra, quella di sempre
+        vende = dict(next(c for c in casi if c["role"] == "seller"), id=7)
+        compra = dict(next(c for c in casi if c["role"] == "buyer"), id=8)
+        sopra = dict(vende, pagamento=dict(vende["pagamento"], via="onchain"))
+        js2 = ("const esc = s => String(s); const fmt = n => String(n);\n"
+               "const swapDiOrdine = id => id === 7 ? {fornitore: 'satsrouting'} : null;\n"
+               + mini[i:j] + "\nconsole.log(JSON.stringify("
+               + json.dumps([vende, compra, sopra]) + ".map(o => "
+               "(pannelloPagamento(o).match(/<span class=\"pag-via\">([^<]*)</) || [])[1])));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js2)
+        try:
+            out2 = subprocess.run([node, f.name], capture_output=True,
+                                  encoding="utf-8", timeout=60)
+            vie = json.loads(out2.stdout or "[]")
+        finally:
+            os.unlink(f.name)
+        prova("col cambio la riga dice «al tuo indirizzo bitcoin», "
+              "senza resta «Lightning ⚡», e on-chain resta on-chain",
+              ["via il cambio, al tuo indirizzo bitcoin", "via Lightning ⚡",
+               "via on-chain ⛓"], vie)
         tutte = {(r[0], r[1], r[2]): r for r in righe}
         prova("nessuna frase esce con un «undefined» dentro", [],
               [k for k, r in tutte.items() if "undefined" in r[4] + r[5]])
@@ -177982,7 +178006,7 @@ console.log(JSON.stringify(out));
           (1, 1, 1, 1), (testi.count("titolo: 'Cambio',"),
                          testi.count("titoloPrev: 'Quanto ricevi al tuo indirizzo'"),
                          testi.count("titoloPrev: 'What you receive at your address'"),
-                         testi.count("titolo: 'Exchange',\n       testo: 'Here")))
+                         testi.count("titolo: 'Exchange',\n       testo: 'Move")))
 
 
 def prove_swap_telefono():
@@ -180078,7 +180102,7 @@ def prove_cambio_libero():
           (True, True, True, True, True),
           ("function swapCambioStradaScelta()" in js, 'id="swapFattura_${n}"' in js,
            "else if (a === 'cambio-copia-indirizzo')" in js,
-           "else if (a === 'cambio-strada')" in js, "else if (a === 'incolla-fattura')" in js))
+           "else if (a === 'cambio-gira')" in js, "else if (a === 'incolla-fattura')" in js))
     prova("...il giro del submarine: a fattura pagata la nostra meta', fallito con l'indirizzo il rimborso",
           True, "async function swapGiroSub(rec, f){" in js
           and "if (swapESub(rec)) { await swapGiroSub(rec, f); continue; }" in js

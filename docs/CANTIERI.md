@@ -74074,3 +74074,96 @@ ott) ha avuto il sì di Alan («puoi farlo tu», coi suoi paletti: la
 capienza in entrata, il costo scritto, la scelta nel profilo «sempre
 on-chain / sempre Lightning / di volta in volta»): va aperto a parte,
 col piano da approvare.
+
+## La pagina «Cambio» più pulita (28 ott 2026, cantiere grafica-cambio, Andrea: «dobbiamo renderla piu pulita e soprattutto mettere una grafica piu bella», «non mi piacciono le icone e ci sono troppi testi»)
+
+**DA DOVE.** Andrea ha guardato la pagina «Cambio» sul collaudo (la voce
+3 di DA-FARE-ANDREA, accesa il 28 ott alle 13:23 UTC) e l'ha bocciata:
+emoji come icone, una spiegazione sotto ogni cosa, e il cambio chiuso
+dietro un tasto «🔁 Cambia». Questo è il verbale di quella voce, che
+si chiude qui. Il riferimento che ha mandato è la pagina
+«Create Swap» di SATS Routing: due riquadri Mandi/Ricevi, una freccia
+che inverte, il costo in una riga, il campo dell'indirizzo e un solo
+bottone grande. «Ovviamente fallo in stile barattolo».
+
+**IL PIANO, APPROVATO CON DUE MODIFICHE.** Dodici punti, mandati con
+quattro anteprime finte (`/mnt/project-files/grafica-cambio/`). Andrea
+li ha approvati cambiando due cose: la cifra che si aggiorna da sola
+ASPETTA che si smetta di scrivere (mai un preventivo a ogni tasto), e
+la schermata delle 12 parole la PRIMA volta resta obbligatoria, come
+deciso il 27 ott. Sulle tre tessere in fondo ha scelto la versione
+corta («Veloce», «Restano tuoi», «Due strade»).
+
+**COSA È CAMBIATO.**
+- In cima solo il titolo e una riga («Sposta i tuoi sats fra Lightning
+  e bitcoin.»). Il riquadro `#swapCambio` ora sta nel markup della
+  pagina, fisso, sopra `#swapTelefono`, e non più dentro la lista.
+- Il cambio è sempre aperto: via «🔁 Cambia», «Chiudi», le due pillole
+  della strada e «Vedi quanto ricevi». Una carta con due riquadri
+  (`latoSwap`): la moneta disegnata (fulmine su nero, ₿ su arancio), la
+  rete, la cifra. Il tondo in mezzo (`cambio-gira`) inverte la strada,
+  e c'è solo se le strade sono due (`CAMBIO_BTC_LN_ATTIVO`).
+- LA CIFRA ASPETTA. A ogni tasto `swapCambioScrive` si ricorda la cifra
+  e mostra «…» nell'altro riquadro; il preventivo parte 800 ms dopo
+  l'ultimo tasto (`SWAP_CAMBIO_ATTESA_MS`). Il ridisegno è PARZIALE
+  (riquadro di fronte, costo, avviso, «Conferma»): se si ridisegnasse
+  tutto, il campo perderebbe il fuoco e la tastiera si chiuderebbe a
+  ogni cifra. Una risposta arrivata tardi, per una cifra o una strada
+  che non è più quella scritta, si butta (`swapCambioDiAdesso`: il
+  server rimanda `dovuto` e `direzione`) e il conto si richiede.
+- Il costo in una riga («Costo 1.158 sats · SATS Routing») con
+  «Dettagli» che apre le voci di sempre (`costoSwap`, `vociSwap`).
+  Vale anche per il pannello dell'incasso di un ordine
+  (`pannelloPreventivoSwap`), che usa gli stessi pezzi.
+- «Incolla» e QR sono icone dentro il campo; un solo «Conferma»; i
+  limiti in una riga piccola sotto.
+- Le 12 parole e il recupero stanno in una riga chiusa in fondo («Le 12
+  parole e il recupero — Servono solo se qualcosa va storto»), che si
+  apre col tocco. La PRIMA volta la schermata delle parole resta quella
+  del 27 ott, obbligatoria, prima di qualunque cambio.
+- «I tuoi cambi» a schede: moneta, titolo, la frase dello stato, tre
+  barrette dell'avanzamento e la cifra.
+- Tutte le emoji della pagina sono diventate icone SVG disegnate a
+  mano (`SWAP_ICONE`, `swapIcona`, `swapMoneta`): nessuna immagine
+  nuova, nessun file in più.
+- Il pannello del pagamento dell'ordine (punto 12, chiesto dal
+  coordinatore): a chi vende e ha il cambio al suo indirizzo bitcoin
+  dice «via il cambio, al tuo indirizzo bitcoin» invece di «via
+  Lightning ⚡». Lo sa solo il suo telefono (lo swap nasce lì), quindi a
+  chi compra resta la riga di sempre.
+- Tre scritte piccole nuove (i limiti, il sottotitolo della riga delle
+  parole, i dati delle schede) sono in `--ink-soft` e non in `--muted`:
+  la regola delle introduzioni leggibili (24 set) le ha prese al primo
+  giro della suite.
+
+**STRADE SCARTATE.** Immagini generate (Google Flow): Andrea l'aveva
+proposto, ma icone SVG nel file pesano niente, seguono il tema scuro e
+non chiedono una rotta nuova (regola 3). Il preventivo a ogni tasto:
+vietato da Andrea. Etichette lunghe nei riquadri («Mandi all'indirizzo»
+andava a capo a 375 px): ora «Mandi» / «Ricevi» / «Ricevi circa».
+
+**PROVATO.** Collaudi aggiornati alla pagina nuova:
+`collaudo_cambio_libero` (92: la carta aperta, i riquadri, nessuna
+emoji fuori dalle icone, l'attesa della cifra, la risposta vecchia
+buttata, i dettagli che si aprono, il giro rovesciato),
+`collaudo_swap_instradatore` (la riga delle parole chiusa e poi
+aperta), `collaudo_swap_telefono` (l'ascoltatore `focusout` che rimette
+i puntini alla cifra); `prove_in_pagamento` guarda la riga del
+pannello del pagamento coi tre casi. Giro dal vivo col Chromium del
+container a 375 px, chiaro e scuro, contro il SATS Routing di cartone:
+scrivendo 100000 il fuoco resta nel campo, «…», poi 98.842 e «Conferma»
+acceso; invertito, 100.818 da mandare per 100.000 da ricevere. Foto in
+`/mnt/project-files/grafica-cambio/` (`fatto-*.png`). Controprove, tutte
+rosse: tolta l'attesa, tolta la guardia della risposta vecchia, un'emoji
+in una tessera, i dettagli sempre aperti, la riga delle parole sempre
+aperta, la riga del pannello del pagamento tolta, la schermata delle
+parole saltata la prima volta, la pagina che non la mostra. Suite e
+collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Guardarla dal telefono, dentro Telegram, sul collaudo:
+la tastiera numerica sul campo della cifra, il fuoco che resta mentre
+si scrive nella WebView, il QR e «Incolla» dentro il campo. Il pannello
+dell'incasso di un ordine col cambio non è stato fotografato (lo
+coprono i collaudi). Notato, non toccato: in `swapCreaDentro` il
+controllo «parole non copiate» è un secondo cancello che nessun collaudo
+prova da solo (il primo, in `swapAvantiDentro`, è provato).
