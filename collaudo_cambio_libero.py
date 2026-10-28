@@ -639,7 +639,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   await run("swapCambioScegliStrada('btc-ln')");
   const fs1 = box();
   sub.scelta = [fs1.includes('data-swap="cambio-gira" data-strada="ln-btc"'),
-                /<div class="cambio-lato arriva scritto"><span class="cambio-dati"><span class="cambio-eti">Ricevi<\/span><span class="cambio-tendina"><button[^>]*data-lato="ricevi"[^>]*>[^]*?<b>LN<\/b>/.test(fs1)
+                /<div class="cambio-lato arriva scritto con-euro"><span class="cambio-dati"><span class="cambio-eti">Ricevi<\/span><span class="cambio-tendina"><button[^>]*data-lato="ricevi"[^>]*>[^]*?<b>LN<\/b>/.test(fs1)
                   && fs1.indexOf('<span class="cambio-eti">Ricevi</span>') < fs1.indexOf('id="swapCambioRicevi"'),
                 preventivi().length - pGira, preventivi()[preventivi().length - 1].strada];
   /* (cambio-due-riquadri) la cifra resta in «Mandi», ora on-chain: il
@@ -669,6 +669,17 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
                     campoFattura: fs2.includes('id="swapFattura_0"') && fs2.includes('data-swap="incolla-fattura"'),
                     campoIndirizzo: fs2.includes('id="swapIndirizzo_0"'),
                     spiega: fs2.includes('crea una richiesta di 100000 sats esatti')};
+  /* (cambio-euro) IL CONTROVALORE sotto ogni cifra: col cambio vero in
+     mano «≈ … €» (100.818 e 100.000 sats a 95.000 €/BTC), senza niente */
+  const euri = f => [(f.match(/<span class="cambio-euro" id="swapCambioEuroMandi">([^<]*)<\/span>/) || [])[1],
+                     (f.match(/<span class="cambio-euro" id="swapCambioEuroRicevi">([^<]*)<\/span>/) || [])[1]];
+  sub.euro = {senza: euri(fs2)};
+  run("var cambioVivo = true, eurPerSat = 95000 / 100000000; var fmtEur = e => e.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});");
+  run('renderSwapCambio()');
+  sub.euro.con = euri(box());
+  sub.euro.dentro = /<span class="cambio-cifra"><input[^>]*id="swapCambioMandi"[^>]*><small>sats<\/small><span class="cambio-euro"/.test(box());
+  run('cambioVivo = false; renderSwapCambio()');
+  sub.euro.spento = euri(box());
   /* «Conferma» coi no della richiesta: manca, storta, importo, rete */
   const noFattura = async v => { run(`elementi.swapFattura_0 = {value: ${JSON.stringify(v)}}`); await run('swapAvanti(0)'); return run("swapErrori[0] || ''"); };
   const sPrimaSub = server().length;
@@ -953,6 +964,11 @@ def il_telefono(base):
           "il campo della richiesta Lightning al posto dell'indirizzo",
           {"strada": "btc-ln", "titolo": True, "piu": True, "mandi": True, "riceviLn": True,
            "campoFattura": True, "campoIndirizzo": False, "spiega": True}, s.get("preventivo"))
+    prova("(cambio-euro) sotto ogni cifra il controvalore, «≈ 95,78 €» e «≈ 95,00 €» "
+          "a 95.000 €/BTC, dentro la cifra dopo l'unita'; senza un cambio vero in mano "
+          "la riga resta vuota (mai un numero inventato)",
+          {"senza": ["", ""], "con": ["≈ 95,78 €", "≈ 95,00 €"], "dentro": True, "spento": ["", ""]},
+          s.get("euro"))
     prova("«Conferma» coi no della richiesta: manca, storta, importo sbagliato, altra "
           "rete; al server non va niente",
           ["Prima incolla la richiesta del tuo wallet Lightning: tocca «Incolla».",

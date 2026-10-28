@@ -74554,3 +74554,48 @@ fanno rosso `collaudo_cambio_libero`; le sigle rimesse a
 «Lightning»/«On-chain» fanno rossi `prove_grafica_swap` e il collaudo.
 DA GUARDARE: dal telefono, in Telegram, che la tendina si apra sopra il
 riquadro di sotto senza essere tagliata.
+
+## Il controvalore in euro sotto le cifre del Cambio (28 ott 2026, cantiere cambio-euro, Andrea: «voglio vedere il controvalore in euro sotto alla cifra in sats o btc proprio come su satsrouting»)
+
+Sotto la cifra di ogni riquadro della pagina «Cambio» c'è ora il suo
+controvalore, piccolo e grigio, come l'USD di SATS Routing: «≈ 95,00 €».
+Quello della cifra scritta cambia a ogni tasto; quello dell'altro
+riquadro arriva col conto. Vale in sats e in BTC.
+
+IL CAMBIO È QUELLO DI TUTTA L'APP (`eurPerSat`, dal nostro server, come
+i «≈» della vetrina): nessuna fonte nuova. Senza un cambio VERO in mano
+(`cambioVivo` falso: server muto, CoinGecko fermo) la riga resta vuota,
+il patto di sempre: mai un numero inventato. Il cambio arriva con la
+busta di /api/listings all'avvio e il battito del minuto gira solo sulle
+viste del P2P; per non lasciare sul Cambio quello di ore prima, ENTRANDO
+nella pagina (`vaiSwap`) un cambio di più di un minuto si richiede
+(`rileggiCambio`, la stessa domanda del libro) e i riquadri si rifanno
+solo se è cambiato. Chi resta sulla pagina tiene quello dell'ingresso.
+
+LA FORMA: la riga sta dentro `.cambio-cifra`, appesa sotto (assoluta),
+così la cifra resta all'altezza della pillola; il riquadro ha 6 px in
+più sotto (`.con-euro`), anche senza cambio, perché non salti quando la
+riga compare. 12,5 px in --muted: la regola delle introduzioni lo
+vieta alle spiegazioni, non ai dati, e `.cambio-euro` è entrata
+nell'elenco dei dati di `prove_introduzioni_leggibili`. Le cifre sono
+in `fmtEur`, all'italiana anche per chi legge in inglese, come in tutta
+l'app.
+
+NON TOCCATO: il pannello dell'ordine in cui il venditore sceglie «Al tuo
+indirizzo bitcoin» usa gli stessi riquadri (`latoSwap`) ma senza euro:
+Andrea ha chiesto la pagina «Cambio».
+
+PROVATO: le prove del cambio (711, 0 fallite), la suite severa, i 108
+collaudi della CI nel venv senza coincurve; `collaudo_cambio_libero` ha
+la prova nuova (95.000 €/BTC: «≈ 95,78 €» su 100.818 sats e «≈ 95,00 €»
+su 100.000, dentro la cifra dopo l'unità; vuota prima e dopo il cambio
+vero). Dal vivo col Chromium, cambio finto a 95.000 €/BTC su
+/api/cambio: l'euro della cifra scritta compare mentre si scrive senza
+togliere il fuoco, quello del conto arriva col conto, in BTC resta; la
+pagina chiede il cambio entrando; senza cambio le righe restano vuote; a
+375 e 320 px la riga sta dentro il riquadro (7 px dal bordo) e la cifra
+resta all'altezza della pillola. Foto in
+`/mnt/project-files/grafica-cambio/euro-*.png`. CONTROPROVE: tolta la
+guardia del cambio vero, scambiati i due lati, tolta la riga (collaudo
+rosso; l'ultima anche la sentinella), tolta la domanda entrando
+(sentinella rossa).

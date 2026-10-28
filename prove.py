@@ -102120,6 +102120,7 @@ def prove_introduzioni_leggibili():
         ".acc-h .conta",                          # il conteggio del cassetto
         ".p2p-meta", ".p2p-box", ".order .sub",   # dati
         ".ctrl-riga .ctrl-nota",                  # «per N pezzi»: un dato
+        ".cambio-euro",                           # il «≈ 0,81 €» del Cambio: un dato (28 ott 2026)
         ".punto-salvato .ps-dove",                # un indirizzo
         ".ordine-num"])                           # il numero d'ordine
     prova("a 12,5px in --muted restano solo controlli, titoli e dati "
@@ -180334,6 +180335,19 @@ console.log(JSON.stringify(fuori));
     # sigle di SATS Routing, «LN» e «BTC»; l'«On-chain» del giro prima e' via
     prova("...e nelle pillole dei riquadri le sigle «LN» e «BTC»",
           (2, 0), (testi.count("reti: {ln: 'LN', btc: 'BTC'}"), frasi.count("On-chain")))
+    # (28 ott 2026, cambio-euro, Andrea: «voglio vedere il controvalore in
+    # euro sotto alla cifra») il «≈ €» sotto ogni cifra usa il cambio di
+    # tutta l'app e tace senza un cambio vero; entrando nella pagina un
+    # cambio di oltre un minuto si richiede. Il giro: collaudo_cambio_libero
+    euro = pezzo_js(js, "function euroSwap(sats){", "\n}\n")
+    vai = pezzo_js(mini, "function vaiSwap(){", "\n}\n")
+    prova("(cambio-euro) il controvalore in euro: il cambio dell'app, mai senza "
+          "cambio vero, e la pagina che lo richiede se e' vecchio",
+          (True, True, True, 3),
+          ("!cambioVivo" in euro and "return '';" in euro and "eurPerSat" in euro,
+           "Date.now() - cambioChiesto >= CAMBIO_LIBRO_MS" in vai and "rileggiCambio()" in vai,
+           ".cambio-euro{position:absolute" in mini,
+           js.count("class=\"cambio-euro\"") + js.count("con-euro', tendina")))
     # (cambio-libero, 27 ott 2026) «Ricevi in bitcoin» e' diventato «Cambio»:
     # un nome che valga per le due direzioni, chiesto da Andrea
     prova("il tasto in basso e la pagina si chiamano «Cambio»",

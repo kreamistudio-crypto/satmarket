@@ -9770,6 +9770,12 @@
     font:inherit;color:inherit;text-align:right;outline:none}
   .cambio-cifra-campo::placeholder{color:var(--muted)}
   .cambio-cifra-campo.btc{width:10.5ch;font-size:18px}
+  /* (cambio-euro) il «≈ 0,81 €» sotto la cifra, come l'USD di SATS
+     Routing: appeso sotto, cosi' la cifra resta all'altezza della pillola */
+  .cambio-lato.con-euro{padding-bottom:18px}
+  .cambio-lato.con-euro .cambio-cifra{position:relative}
+  .cambio-euro{position:absolute;right:0;top:100%;margin-top:4px;
+    font:700 12.5px/1 'Nunito',sans-serif;color:var(--muted)}
   /* (28 ott 2026, cantiere btc-320) su un telefono da 320 px la cifra in
      BTC non ci stava: tagliata nel campo e attaccata al nome della rete.
      Sotto i 350 px la moneta e lo spazio si stringono e la cifra in BTC
@@ -18498,7 +18504,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '06691fdceb';
+const SWAP_TELEFONO_VER = '4ab7326bdf';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18564,6 +18570,10 @@ function vaiSwap(){
   haptic();
   go('swap');
   if (typeof navRiflette === 'function') navRiflette();
+  /* (cambio-euro) i «≈ €» del Cambio: chi entra con un cambio di piu'
+     di un minuto lo richiede, e i riquadri si rifanno solo se e' mosso */
+  if (typeof rileggiCambio === 'function' && Date.now() - cambioChiesto >= CAMBIO_LIBRO_MS)
+    rileggiCambio().then(mosso => { if (mosso && typeof renderSwapCambio === 'function') renderSwapCambio(); }).catch(() => {});
 }
 /* I TESTI DELLA PAGINA, in italiano e in inglese (richiesta di Andrea):
    l'inglese per chi ha Telegram in un'altra lingua. Corti, una frase
