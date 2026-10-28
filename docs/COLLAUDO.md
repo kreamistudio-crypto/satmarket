@@ -243,7 +243,7 @@ aggiunge, si toglie la vecchia da GitHub.
   `cartone-swap` di systemd-run: NON sopravvive al riavvio della VM, si
   rilancia) sa anche il submarine. Nel config in fondo, oltre a
   `SWAP_ATTIVO = True` e `SWAP_API_BASE = "http://127.0.0.1:9077"`:
-  `CAMBIO_LIBERO_ATTIVO = True` (il tasto «🔁 Cambia» nella pagina
+  `CAMBIO_LIBERO_ATTIVO = True` (il riquadro del cambio nella pagina
   «Cambio», solo moderatori) e, SOLO QUI, `CAMBIO_BTC_LN_ATTIVO = True`
   per vedere la strada rovesciata contro il cartone (in produzione
   resta spenta finché non decide Andrea: Massimo ha risposto il 28

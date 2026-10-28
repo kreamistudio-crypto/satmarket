@@ -143,7 +143,6 @@ const SWAP_TESTI_T3 = {
     paroleFatto: 'Continua',
     paroleSpuntaPrima: 'Prima spunta «Le ho scritte su carta».',
     indirizzoTit: 'Il tuo indirizzo bitcoin',
-    indirizzoSpiega: 'Lo trovi nel tuo wallet, alla voce «Ricevi».',
     indirizzoManca: 'Prima metti il tuo indirizzo bitcoin: tocca «Incolla».',
     indirizzoNo: 'Questo non è un indirizzo bitcoin valido.',
     incolla: 'Incolla', qr: 'QR',
@@ -185,7 +184,7 @@ const SWAP_TESTI_T3 = {
     concluso: (sats, id) => `Concluso: ${sats} sats arrivati (transazione ${id}).`,
     ritiroErrore: 'L\'invio al tuo indirizzo non è ancora riuscito: riprovo da solo.',
     spesoAltri: n => `Quei bitcoin li ha spesi un'altra transazione, non il tuo invio: scrivi a ${n}.`,
-    lista: 'I tuoi incassi in bitcoin',
+    lista: 'I tuoi cambi',
     ordine: n => `Ordine #${n}`,
     recuperato: 'Recuperato',
     mostra: 'Mostra le 12 parole',
@@ -202,18 +201,18 @@ const SWAP_TESTI_T3 = {
     ritiraA: 'Manda a questo indirizzo',
     /* (cambio-libero) il cambio dei propri sats, senza ordine */
     cambio: 'Cambio',
-    cambia: 'Cambia',
-    cambiaTit: 'Cambia i tuoi sats',
-    cambiaSpiega: 'Scegli quanti sats cambiare: vedi prima quanto ricevi, poi paghi col tuo wallet Lightning e i bitcoin arrivano al tuo indirizzo.',
-    direzioni: {'ln-btc': '⚡ → ₿ Da Lightning a bitcoin', 'btc-ln': '₿ → ⚡ Da bitcoin a Lightning'},
-    cifraEt: 'Quanti sats cambi',
+    /* (grafica-cambio, 28 ott 2026) il tondo fra i due riquadri dice
+       dove porta; sotto «Conferma» le tre tesserine, e in fondo la riga
+       chiusa delle parole e del recupero */
+    direzioni: {'ln-btc': 'Da Lightning a bitcoin', 'btc-ln': 'Da bitcoin a Lightning'},
     cifraTra: (a, b) => `Da ${a} a ${b} sats`,
-    oggi: (n, m) => `Oggi: ${n} di ${m}`,
-    calcola: 'Vedi quanto ricevi',
+    oggi: (n, m) => `oggi ${n} di ${m}`,
+    tessere: [['ln', 'Veloce'], ['scudo', 'Restano tuoi'], ['gira', 'Due strade']],
+    riservaTit: 'Le 12 parole e il recupero',
+    riservaSotto: 'Servono solo se qualcosa va storto',
     cifraNo: 'Scrivi quanti sats vuoi cambiare.',
     tettoGiorno: m => `Per oggi hai fatto i ${m} cambi possibili: riprova domani.`,
     cambioNonRisponde: n => `${n} ora non risponde: riprova fra poco.`,
-    chiudi: 'Chiudi',
     pagaTu: n => `Paga questa richiesta col tuo wallet Lightning: appena ${n} la vede, i bitcoin partono verso il tuo indirizzo.`,
     copia: 'Copia', copiata: 'Copiata', apriWallet: 'Apri nel wallet',
     valeFino: h => `Vale fino alle ${h}`,
@@ -221,7 +220,6 @@ const SWAP_TESTI_T3 = {
     cambioFallito: 'Non riuscito: nessun sats si è mosso. Puoi fare un cambio nuovo.',
     cambioRipreso: n => `${n} si è ripreso i bitcoin, e il tuo pagamento torna al tuo wallet.`,
     /* (tappa 3) la strada rovesciata: bitcoin → Lightning */
-    cifraEtSub: 'Quanti sats vuoi ricevere in Lightning',
     fatturaTit: 'La tua richiesta Lightning',
     fatturaSpiega: n => `Dal tuo wallet Lightning crea una richiesta di ${n} sats esatti e incollala qui.`,
     fatturaManca: 'Prima incolla la richiesta del tuo wallet Lightning: tocca «Incolla».',
@@ -254,7 +252,6 @@ const SWAP_TESTI_T3 = {
     paroleFatto: 'Continue',
     paroleSpuntaPrima: 'First tick «I wrote them on paper».',
     indirizzoTit: 'Your bitcoin address',
-    indirizzoSpiega: 'You find it in your wallet, under «Receive».',
     indirizzoManca: 'First add your bitcoin address: tap «Paste».',
     indirizzoNo: 'This is not a valid bitcoin address.',
     incolla: 'Paste', qr: 'QR',
@@ -294,7 +291,7 @@ const SWAP_TESTI_T3 = {
     concluso: (sats, id) => `Done: ${sats} sats arrived (transaction ${id}).`,
     ritiroErrore: 'Sending to your address did not go through yet: retrying by itself.',
     spesoAltri: n => `Those bitcoin were spent by another transaction, not by your sending: write to ${n}.`,
-    lista: 'Your bitcoin payouts',
+    lista: 'Your exchanges',
     ordine: n => `Order #${n}`,
     recuperato: 'Recovered',
     mostra: 'Show the 12 words',
@@ -310,25 +307,21 @@ const SWAP_TESTI_T3 = {
       : n === 1 ? 'Recovered 1 payout.' : `Recovered ${n} payouts.`,
     ritiraA: 'Send to this address',
     cambio: 'Exchange',
-    cambia: 'Exchange',
-    cambiaTit: 'Exchange your sats',
-    cambiaSpiega: 'Choose how many sats to exchange: you see first what you receive, then you pay with your Lightning wallet and the bitcoin arrive at your address.',
-    direzioni: {'ln-btc': '⚡ → ₿ From Lightning to bitcoin', 'btc-ln': '₿ → ⚡ From bitcoin to Lightning'},
-    cifraEt: 'How many sats you exchange',
+    direzioni: {'ln-btc': 'From Lightning to bitcoin', 'btc-ln': 'From bitcoin to Lightning'},
     cifraTra: (a, b) => `From ${a} to ${b} sats`,
-    oggi: (n, m) => `Today: ${n} of ${m}`,
-    calcola: 'See what you receive',
+    oggi: (n, m) => `today ${n} of ${m}`,
+    tessere: [['ln', 'Fast'], ['scudo', 'Stays yours'], ['gira', 'Two ways']],
+    riservaTit: 'The 12 words and recovery',
+    riservaSotto: 'Needed only if something goes wrong',
     cifraNo: 'Write how many sats you want to exchange.',
     tettoGiorno: m => `You made the ${m} exchanges allowed for today: try again tomorrow.`,
     cambioNonRisponde: n => `${n} is not responding: try again shortly.`,
-    chiudi: 'Close',
     pagaTu: n => `Pay this request with your Lightning wallet: as soon as ${n} sees it, the bitcoin leave for your address.`,
     copia: 'Copy', copiata: 'Copied', apriWallet: 'Open in wallet',
     valeFino: h => `Valid until ${h}`,
     cambioScaduto: 'Expired: no sats moved. You can start a new exchange.',
     cambioFallito: 'Failed: no sats moved. You can start a new exchange.',
     cambioRipreso: n => `${n} took the bitcoin back, and your payment returns to your wallet.`,
-    cifraEtSub: 'How many sats you want to receive on Lightning',
     fatturaTit: 'Your Lightning request',
     fatturaSpiega: n => `From your Lightning wallet create a request for exactly ${n} sats and paste it here.`,
     fatturaManca: 'First paste the request from your Lightning wallet: tap «Paste».',
@@ -355,6 +348,34 @@ function t3(){ return SWAP_TESTI_T3[linguaSwap()]; }
 function swapNonRisponde(n, nome){ return n === 0 ? t3().cambioNonRisponde(nome) : t3().nonRisponde(nome); }
 function swapCorto(s, n){ s = String(s || ''); return s.length > 2 * n + 1 ? `${s.slice(0, n)}…${s.slice(-n)}` : s; }
 function swapPiuFornitori(){ return swapFornitori().length > 1; }
+/* LE ICONE DEL CAMBIO (28 ott 2026, cantiere grafica-cambio, Andrea: «non
+   mi piacciono le icone e ci sono troppi testi»): DISEGNATE, col tratto
+   della barra in basso (griglia da 24, currentColor), al posto delle
+   emoji, che cambiavano forma da un telefono all'altro e nel tema scuro
+   restavano quelle. Il ₿ e' quello della cella P2P; il fulmine si
+   riempie (classe `pieno`). La pagina le chiede con `swapIcona`, anche
+   dal pannello dell'ordine, solo quando questo file e' arrivato. */
+const SWAP_ICONE = {
+  ln: '<path class="pieno" d="M13.6 2.6 5.2 13.4h6.1l-1 8 8.5-10.9h-6.2z"/>',
+  btc: '<g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/>'
+    + '<path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/>'
+    + '<path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g>',
+  gira: '<path d="M7.5 4v16"/><path d="m4 16.5 3.5 3.5 3.5-3.5"/><path d="M16.5 20V4"/><path d="m13 7.5 3.5-3.5 3.5 3.5"/>',
+  incolla: '<rect x="6" y="4.5" width="12" height="16" rx="2.5"/><path d="M9.5 4.5v-.7c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v.7"/>'
+    + '<path d="M9.5 11h5M9.5 14.5h5"/>',
+  copia: '<rect x="8.5" y="8.5" width="11" height="12" rx="2.3"/><path d="M15.5 8.5V6.3c0-1-.8-1.8-1.8-1.8H6.3c-1 0-1.8.8-1.8 1.8v7.4c0 1 .8 1.8 1.8 1.8h2.2"/>',
+  qr: '<path d="M4 8.5v-3C4 4.7 4.7 4 5.5 4h3M15.5 4h3c.8 0 1.5.7 1.5 1.5v3M20 15.5v3c0 .8-.7 1.5-1.5 1.5h-3M8.5 20h-3C4.7 20 4 19.3 4 18.5v-3"/>'
+    + '<path d="M7.5 12h9"/>',
+  chiave: '<circle cx="8" cy="15.5" r="3.8"/><path d="m10.8 12.8 8.7-8.7M16.3 7.3l2.4 2.4M13.8 9.8l2 2"/>',
+  scudo: '<path d="M12 3.2 5.5 5.6v5.7c0 4.3 2.8 7.6 6.5 9.2 3.7-1.6 6.5-4.9 6.5-9.2V5.6z"/><path d="m9.2 12.2 2 2 3.8-4"/>',
+  freccia: '<path d="m9.5 6 6 6-6 6"/>'};
+function swapIcona(nome){
+  return `<svg class="cambio-svg" viewBox="0 0 24 24" aria-hidden="true">${SWAP_ICONE[nome] || ''}</svg>`;
+}
+/* la moneta tonda dei riquadri e delle schede: fulmine o ₿ */
+function swapMoneta(rete){
+  return `<span class="cambio-moneta ${rete === 'ln' ? 'ln' : rete === 'btc' ? 'btc' : 'piana'}">${swapIcona(rete)}</span>`;
+}
 
 /* ─── 4. IL PREVENTIVO INSTRADATO ───────────────────────────────────────
    Il conto lo fa il server, per fornitore (`leggiPreventivoSwap` della
@@ -443,34 +464,38 @@ function swapQrBrowser(){
     && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 function swapQrPossibile(){ return swapQrTelegram() || swapQrBrowser(); }
+/* (grafica-cambio) il campo e i suoi attrezzi su una riga: «Incolla» e il
+   QR sono due icone dentro il bordo del campo, col loro nome detto al
+   lettore di schermo; la spiegazione di dove si trova l'indirizzo non
+   c'e' piu' (il segnaposto «bc1…» e gli avvisi bastano) */
 function campoIndirizzoSwap(n, errore){
   const t = t3();
   return `<div class="swap-campo">
-      <h4>₿ ${esc(t.indirizzoTit)}</h4>
-      <div class="hint">${esc(t.indirizzoSpiega)}</div>
+      <label class="cambio-campo-et" for="swapIndirizzo_${n}">${esc(t.indirizzoTit)}</label>
       ${errore}
-      <input class="swap-indirizzo" id="swapIndirizzo_${n}" type="text" autocomplete="off"
-        spellcheck="false" placeholder="bc1…" inputmode="text" value="${esc(swapIndirizziScritti[n] || '')}">
-      <div class="swap-attrezzi">
-        <button class="btn ghost" type="button" data-swap="incolla" data-ordine="${n}">📋 ${esc(t.incolla)}</button>
-        ${swapQrPossibile() ? `<button class="btn ghost" type="button" data-swap="qr" data-ordine="${n}">📷 ${esc(t.qr)}</button>` : ''}
+      <div class="cambio-campo-riga">
+        <input class="swap-indirizzo" id="swapIndirizzo_${n}" type="text" autocomplete="off"
+          spellcheck="false" placeholder="bc1…" inputmode="text" value="${esc(swapIndirizziScritti[n] || '')}">
+        <button class="cambio-ico" type="button" data-swap="incolla" data-ordine="${n}" aria-label="${esc(t.incolla)}" title="${esc(t.incolla)}">${swapIcona('incolla')}</button>
+        ${swapQrPossibile() ? `<button class="cambio-ico" type="button" data-swap="qr" data-ordine="${n}" aria-label="${esc(t.qr)}" title="${esc(t.qr)}">${swapIcona('qr')}</button>` : ''}
       </div>
     </div>`;
 }
 /* (tappa 3) IL CAMPO DELLA RICHIESTA LIGHTNING, al posto dell'indirizzo
    nella strada bitcoin → Lightning: la crea il suo wallet per la cifra
-   scritta, e qui si incolla */
+   scritta, e qui si incolla. La riga che dice di quanti sats crearla
+   resta: e' un gesto nuovo, e senza la cifra giusta il cambio non parte */
 const swapFattureScritte = {};
 function campoFatturaSwap(n, errore){
   const t = t3();
   return `<div class="swap-campo">
-      <h4>⚡ ${esc(t.fatturaTit)}</h4>
-      <div class="hint">${esc(t.fatturaSpiega(fmt(swapCambioCifra())))}</div>
+      <label class="cambio-campo-et" for="swapFattura_${n}">${esc(t.fatturaTit)}</label>
+      <div class="hint" id="swapFatturaSpiega_${n}">${esc(t.fatturaSpiega(fmt(swapCambioCifra())))}</div>
       ${errore}
-      <textarea class="swap-indirizzo" id="swapFattura_${n}" rows="3" autocomplete="off"
-        spellcheck="false" placeholder="lnbc…">${esc(swapFattureScritte[n] || '')}</textarea>
-      <div class="swap-attrezzi">
-        <button class="btn ghost" type="button" data-swap="incolla-fattura" data-ordine="${n}">📋 ${esc(t.incolla)}</button>
+      <div class="cambio-campo-riga">
+        <input class="swap-indirizzo" id="swapFattura_${n}" type="text" autocomplete="off"
+          spellcheck="false" placeholder="lnbc…" value="${esc(swapFattureScritte[n] || '')}">
+        <button class="cambio-ico" type="button" data-swap="incolla-fattura" data-ordine="${n}" aria-label="${esc(t.incolla)}" title="${esc(t.incolla)}">${swapIcona('incolla')}</button>
       </div>
     </div>`;
 }
@@ -489,7 +514,7 @@ function pannelloSwapTelefono(o){
     const c = swapCassetto(fid);
     const parole = c && c.parole ? String(c.parole).split(' ') : [];
     return `<div class="swap-prev swap-prima-volta">
-      <h4>🔑 ${esc(swapPiuFornitori() ? t.paroleDi(nome) : t.paroleTit)}</h4>
+      <h4 class="cambio-tit">${swapIcona('chiave')}${esc(swapPiuFornitori() ? t.paroleDi(nome) : t.paroleTit)}</h4>
       <p class="swap-calma">${esc(t.paroleSpiega)}</p>
       <ol class="swap-regole">${t.paroleRegole.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
       <p class="swap-calma forte">${esc(t.paroleNessuno)}</p>
@@ -500,7 +525,7 @@ function pannelloSwapTelefono(o){
     </div>`;
   }
   if (passo === 'creo') return `<div class="swap-prev">
-      <h4>₿ ${esc(t.tuoSwap)}</h4>
+      <h4 class="cambio-tit">${swapIcona(n === 0 ? 'gira' : 'btc')}${esc(n === 0 ? t.cambio : t.tuoSwap)}</h4>
       ${passiSwap(0, swapStradaDi(n) === 'btc-ln' ? {tipo: 'sub'} : null)}
       <div class="swap-stato" role="status">${esc(t.creo(nome))}</div>
     </div>`;
@@ -591,8 +616,8 @@ function fatturaCambio(rec){
   return `<div class="swap-fattura">
     <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
     <div class="swap-attrezzi">
-      <button class="btn ghost" type="button" data-swap="cambio-copia" data-id="${esc(rec.id)}">📋 ${esc(t.copia)}</button>
-      <a class="btn orange" id="swapCambioWallet" href="lightning:${esc(rec.invoice)}">⚡ ${esc(t.apriWallet)}</a>
+      <button class="btn ghost" type="button" data-swap="cambio-copia" data-id="${esc(rec.id)}">${swapIcona('copia')}${esc(t.copia)}</button>
+      <a class="btn orange" id="swapCambioWallet" href="lightning:${esc(rec.invoice)}">${swapIcona('ln')}${esc(t.apriWallet)}</a>
     </div>
     ${fino ? `<div class="hint">${esc(t.valeFino(fino))}</div>` : ''}
   </div>`;
@@ -608,15 +633,15 @@ function bitcoinDaMandare(rec){
     <div class="qr swap-qr-fattura" id="swapCambioQr" aria-label="QR"></div>
     <div class="mono swap-indirizzo-chiaro">${esc(rec.lockupAddress)}</div>
     <div class="swap-attrezzi">
-      <button class="btn ghost" type="button" data-swap="cambio-copia-indirizzo" data-id="${esc(rec.id)}">📋 ${esc(t.copiaIndirizzo)}</button>
-      <a class="btn orange" id="swapCambioWallet" href="${esc(link)}">₿ ${esc(t.apriWallet)}</a>
+      <button class="btn ghost" type="button" data-swap="cambio-copia-indirizzo" data-id="${esc(rec.id)}">${swapIcona('copia')}${esc(t.copiaIndirizzo)}</button>
+      <a class="btn orange" id="swapCambioWallet" href="${esc(link)}">${swapIcona('btc')}${esc(t.apriWallet)}</a>
     </div>
   </div>`;
 }
 function cartaSwap(rec){
   const t = t3();
   return `<div class="swap-prev swap-carta" data-swap-id="${esc(rec.id)}">
-    <h4>${swapECambio(rec) ? '🔁 ' + esc(t.cambio) : '₿ ' + esc(t.tuoSwap)}</h4>
+    <h4 class="cambio-tit">${swapECambio(rec) ? swapIcona('gira') + esc(t.cambio) : swapIcona('btc') + esc(t.tuoSwap)}</h4>
     ${passiSwap(swapTappa(rec), rec)}
     <div class="swap-stato" role="status">${esc(frasestatoSwap(rec))}</div>
     ${fatturaCambio(rec)}
@@ -779,6 +804,15 @@ async function swapCreaDentro(n){
   if (biglietto) rec.cambio = Number(biglietto.id) || 0;
   swapSalvaRecord(rec);
   delete swapPassi[n];
+  /* (grafica-cambio) nato il cambio, il riquadro di dopo riparte pulito:
+     niente cifre, indirizzo o richiesta del cambio di prima (un indirizzo
+     bitcoin riusato e' una cattiva abitudine) */
+  if (n === 0) {
+    swapCambioPulisci();
+    swapCambioScritta = '';
+    delete swapIndirizziScritti[0];
+    delete swapFattureScritte[0];
+  }
   ridisegnaIncassoSwap();
   if (n === 0) {
     /* il server sa che lo swap c'e' (le sole parti pubbliche): se non
@@ -1097,24 +1131,72 @@ function swapRidisegnaDove(rec){
 }
 
 /* ─── 7b. IL CAMBIO LIBERO: il riquadro in cima alla pagina ─────────────
-   Chiuso: il tasto «🔁 Cambia». Aperto: la direzione, la cifra e «Vedi
-   quanto ricevi»; poi il pannello dell'«ordine 0» (preventivo, indirizzo,
-   parole la prima volta, nascita) e la carta col QR da pagare. */
-let swapCambioAperto = false;
+   (28 ott 2026, cantiere grafica-cambio, piano approvato da Andrea con due
+   modifiche) SEMPRE APERTO, sul modello della pagina di SATS Routing: due
+   riquadri, quel che MANDI sopra e quel che RICEVI sotto, il tondo in
+   mezzo che inverte la strada, il costo in una riga, il campo e un solo
+   «Conferma»; sotto, i tetti in piccolo e le tre tesserine. Niente piu'
+   «🔁 Cambia», «Chiudi» e «Vedi quanto ricevi»: la cifra dell'altro
+   riquadro si fa da sola, quando chi scrive SMETTE di scrivere (modifica 1
+   di Andrea: mai un preventivo a ogni tasto, `SWAP_CAMBIO_ATTESA_MS`).
+   Dove sta il campo che si scrive: nella strada verso l'indirizzo la
+   cifra e' quella che si CAMBIA (sopra), in quella verso Lightning quella
+   che si RICEVE (sotto), come vuole il conto del server (`dovuto`).
+   Poi, alla conferma, il pannello dell'«ordine 0» (le parole la prima
+   volta, obbligatorie come il 27 ott: modifica 2; la nascita) e la carta
+   col QR da pagare. */
 let swapCambioScritta = '';
+let swapCambioTimer = null;
+const SWAP_CAMBIO_ATTESA_MS = 800;
 function swapCambioLeve(){ return (swapLeve && swapLeve.cambio) || {}; }
 function swapCambioAcceso(){ return !!swapCambioLeve().attivo; }
 function swapCambioCifra(){
   const n = parseInt(String(swapCambioScritta || '').replace(/[^0-9]/g, ''), 10);
   return n > 0 ? n : 0;
 }
+/* IL PREVENTIVO E' DI ADESSO? Due risposte possono arrivare al contrario
+   dell'ordine in cui sono partite (chi scrive in fretta): si mostra solo
+   quella della cifra e della strada scritte ora. Il server ripete la
+   cifra in `dovuto` e la strada in `direzione`; una risposta senza (la
+   rotta spenta, 403) e' sempre di adesso. */
+function swapCambioDiAdesso(d){
+  if (!d) return false;
+  if (!Object.prototype.hasOwnProperty.call(d, 'dovuto')) return true;
+  return Number(d.dovuto) === swapCambioCifra() && (!d.direzione || d.direzione === swapCambioStrada);
+}
+function swapCambioStrade(){
+  const l = swapCambioLeve();
+  const strade = Array.isArray(l.strade) && l.strade.length ? l.strade : [SWAP_STRADA];
+  if (!strade.includes(swapCambioStrada)) swapCambioStrada = strade[0];
+  return strade;
+}
+/* i pezzi che cambiano mentre si scrive: la cifra dell'altro riquadro, la
+   riga del costo, l'avviso e «Conferma». Il campo della cifra NON si
+   ridisegna mai mentre ci si scrive dentro (la tastiera del telefono si
+   chiuderebbe a ogni risposta): vedi `renderSwapCambio`. */
+function swapCambioPezzi(){
+  const t = t3(), cifra = swapCambioCifra(), sub = swapCambioStrada === 'btc-ln';
+  const p = preventiviSwap[0] || {};
+  const d = p.dati && swapCambioDiAdesso(p.dati) ? p.dati : null;
+  const attesa = !!cifra && (!d || p.stato === 'carico' || !!swapCambioTimer);
+  const pronto = !!d && d.ok && !attesa;
+  const altra = pronto ? fmt(sub ? d.mandi : d.ricevi) : attesa ? '…' : '0';
+  const avviso = swapErrori[0] || (d && !d.ok && !attesa ? rifiutoSwap(0, d) : '');
+  return {
+    altra: altra,
+    costo: pronto ? notaSwap(p, d) + costoSwap(0, d) : '',
+    avviso: avviso ? `<div class="swap-rifiuto" role="status">${esc(avviso)}</div>` : '',
+    pronto: pronto,
+    spiega: sub ? t.fatturaSpiega(fmt(cifra)) : ''};
+}
 function renderSwapCambio(){
   const box = el('swapCambio');
   if (!box) return;
-  if (!swapCambioAcceso()) { box.innerHTML = ''; return; }
-  const t = t3(), l = swapCambioLeve();
+  const forma = v => { if (box.dataset) box.dataset.forma = v; };
+  if (!swapCambioAcceso()) { box.innerHTML = ''; forma(''); return; }
   const vivo = swapDiOrdine(0);
   if (vivo) {
+    forma('');
     box.innerHTML = cartaSwap(vivo);
     const q = el('swapCambioQr');
     if (q && typeof disegnaQr === 'function' && !swapESub(vivo))
@@ -1126,54 +1208,92 @@ function renderSwapCambio(){
       disegnaQr(q, vivo.bip21 || `bitcoin:${vivo.lockupAddress}`, 'Byte');
     return;
   }
-  if (!swapCambioAperto) {
-    box.innerHTML = `<button class="btn orange" type="button" data-swap="cambia">🔁 ${esc(t.cambia)}</button>`;
+  /* dopo «Conferma»: le parole la prima volta, poi «Preparo il cambio…» */
+  if (swapPassi[0] === 'parole' || swapPassi[0] === 'creo') {
+    forma('');
+    box.innerHTML = pannelloSwapTelefono({id: 0});
     return;
   }
-  const strade = Array.isArray(l.strade) && l.strade.length ? l.strade : [SWAP_STRADA];
-  if (!strade.includes(swapCambioStrada)) swapCambioStrada = strade[0];
+  const t = t3(), tp = testiSwap(), l = swapCambioLeve();
+  const strade = swapCambioStrade();
   const sub = swapCambioStrada === 'btc-ln';
-  const pillole = strade.map(s => `<button type="button" class="consegna-pill${s === swapCambioStrada ? ' attiva' : ''}" data-swap="cambio-strada" data-strada="${esc(s)}">${esc(t.direzioni[s] || s)}</button>`).join('');
-  const p = preventiviSwap[0];
-  const dopo = p && p.dati ? pannelloSwapTelefono({id: 0}) : '';
-  const errore = !dopo && swapErrori[0] ? `<div class="swap-rifiuto" role="status">${esc(swapErrori[0])}</div>` : '';
-  box.innerHTML = `<div class="swap-prev swap-cambio">
-    <h4>🔁 ${esc(t.cambiaTit)}</h4>
-    <p class="swap-calma">${esc(t.cambiaSpiega)}</p>
-    <div class="consegna-scelta">${pillole}</div>
-    <label class="swap-cifra-et" for="swapCambioCifra_0">${esc(sub ? t.cifraEtSub : t.cifraEt)}</label>
-    <input class="swap-indirizzo" id="swapCambioCifra_0" type="text" inputmode="numeric" autocomplete="off" placeholder="${fmt(l.minimo || 0)}" value="${esc(swapCambioScritta)}">
-    <div class="hint">${esc(t.cifraTra(fmt(l.minimo || 0), fmt(l.massimo || 0)))}${l.al_giorno ? ' · ' + esc(t.oggi(l.oggi || 0, l.al_giorno)) : ''}</div>
-    ${errore}
-    ${dopo ? '' : `<button class="btn orange" type="button" data-swap="cambio-calcola">${esc(t.calcola)}</button>`}
-    ${dopo}
-    <button class="btn ghost" type="button" data-swap="cambio-chiudi">${esc(t.chiudi)}</button>
+  const pz = swapCambioPezzi();
+  /* GIA' DISEGNATO, STESSA STRADA: si aggiornano solo i pezzi */
+  const altra = el('swapCambioAltra'), costo = el('swapCambioCosto'), avviso = el('swapCambioAvviso'), vai = el('swapCambioVai');
+  if (box.dataset && box.dataset.forma === swapCambioStrada && altra && costo && avviso && vai) {
+    altra.textContent = pz.altra;
+    if (costo.innerHTML !== pz.costo) costo.innerHTML = pz.costo;
+    if (avviso.innerHTML !== pz.avviso) avviso.innerHTML = pz.avviso;
+    vai.disabled = !pz.pronto;
+    const spiega = el('swapFatturaSpiega_0');
+    if (spiega && sub) spiega.textContent = pz.spiega;
+    return;
+  }
+  const campoCifra = `<input class="cambio-cifra-campo" id="swapCambioCifra_0" type="text" inputmode="numeric" autocomplete="off"`
+    + ` placeholder="0" aria-label="${esc(sub ? tp.voci.ricevi_ln : tp.voci.cambi)}" value="${esc(swapCambioScritta)}"><small>sats</small>`;
+  const calcolata = `<span id="swapCambioAltra">${esc(pz.altra)}</span><small>sats</small>`;
+  const sopra = sub ? latoSwap('btc', tp.mandiBreve, calcolata) : latoSwap('ln', tp.mandiBreve, campoCifra, 'scritto');
+  const sotto = sub ? latoSwap('ln', tp.riceviBreve, campoCifra, 'arriva scritto') : latoSwap('btc', tp.ricevi, calcolata, 'arriva');
+  const altraStrada = strade.find(x => x !== swapCambioStrada);
+  const gira = altraStrada
+    ? `<div class="cambio-gira"><button type="button" data-swap="cambio-gira" data-strada="${esc(altraStrada)}" aria-label="${esc(t.direzioni[altraStrada] || altraStrada)}">${swapIcona('gira')}</button></div>`
+    : '<div class="cambio-gira"></div>';
+  const campo = sub ? campoFatturaSwap(0, '') : campoIndirizzoSwap(0, '');
+  const limiti = esc(t.cifraTra(fmt(l.minimo || 0), fmt(l.massimo || 0)))
+    + (l.al_giorno ? ' · ' + esc(t.oggi(l.oggi || 0, l.al_giorno)) : '');
+  const tessere = t.tessere.map(([ic, testo]) =>
+    `<li><span class="cambio-tessera-ico">${swapIcona(ic)}</span>${esc(testo)}</li>`).join('');
+  forma(swapCambioStrada);
+  box.innerHTML = `<div class="swap-cambio">
+    <div class="cambio-carta" role="group" aria-label="${esc(sub ? tp.titoloPrevSub : tp.titoloPrev)}">
+      ${sopra}${gira}${sotto}
+      <div id="swapCambioCosto">${pz.costo}</div>
+    </div>
+    <div id="swapCambioAvviso">${pz.avviso}</div>
+    ${campo}
+    <button class="btn orange cambio-vai" id="swapCambioVai" type="button" data-swap="avanti" data-ordine="0"${pz.pronto ? '' : ' disabled'}>${esc(tp.conferma)}</button>
+    <div class="cambio-limiti">${limiti}</div>
+    <ul class="cambio-tessere">${tessere}</ul>
   </div>`;
 }
-function swapCambioApri(){
-  haptic();
-  swapCambioAperto = true;
-  delete preventiviSwap[0];
+/* LA CIFRA SCRITTA: a ogni tasto si ricorda e si mostra «…» nell'altro
+   riquadro; il preventivo parte solo quando si smette di scrivere */
+function swapCambioScrive(valore){
+  swapCambioScritta = String(valore || '');
   delete swapErrori[0];
-  delete swapPassi[0];
+  if (swapCambioTimer) clearTimeout(swapCambioTimer);
+  swapCambioTimer = setTimeout(() => { swapCambioTimer = null; swapCambioCalcola(true); }, SWAP_CAMBIO_ATTESA_MS);
   renderSwapCambio();
 }
-function swapCambioChiudi(){
-  haptic();
-  swapCambioAperto = false;
-  delete preventiviSwap[0];
-  delete swapErrori[0];
-  delete swapPassi[0];
-  renderSwapCambio();
-}
-async function swapCambioCalcola(){
-  haptic();
+/* il conto della cifra scritta. `daSolo` = dall'attesa dopo l'ultimo
+   tasto: a campo vuoto non rimprovera, toglie le cifre e basta */
+async function swapCambioCalcola(daSolo){
+  if (!daSolo) haptic();
   const c = el('swapCambioCifra_0');
   if (c) swapCambioScritta = String(c.value || '');
   delete swapErrori[0];
-  if (!swapCambioCifra()) { swapErrori[0] = t3().cifraNo; return renderSwapCambio(); }
+  const cifra = swapCambioCifra(), strada = swapCambioStrada;
+  if (!cifra) {
+    delete preventiviSwap[0];
+    if (!daSolo) swapErrori[0] = t3().cifraNo;
+    return renderSwapCambio();
+  }
   await swapInstradaPreventivo(0, false);
+  /* nel frattempo ha scritto ancora, o ha girato la strada: questa
+     risposta e' vecchia. Se un'attesa e' gia' in corso ci pensa lei,
+     sennò si richiede subito per la cifra di adesso */
+  if (cifra !== swapCambioCifra() || strada !== swapCambioStrada) {
+    if (!swapCambioTimer) return swapCambioCalcola(true);
+    return;
+  }
   renderSwapCambio();
+}
+/* finito un cambio, il riquadro riparte pulito: niente cifre vecchie */
+function swapCambioPulisci(){
+  delete preventiviSwap[0];
+  delete swapErrori[0];
+  delete swapPassi[0];
+  delete dettagliSwap[0];
 }
 async function swapCambioCopia(id, cosa){
   haptic();
@@ -1183,15 +1303,17 @@ async function swapCambioCopia(id, cosa){
   try { await navigator.clipboard.writeText(String(testo)); toast(t3().copiata); }
   catch(e){ toast(t3().appuntiChiusi); }
 }
-/* (tappa 3) la pillola della direzione: cambiarla azzera preventivo ed errori */
+/* (tappa 3) LA STRADA: il tondo fra i due riquadri la gira. Le cifre di
+   prima non valgono piu' (erano dell'altra strada): la cifra scritta
+   resta, e il conto si rifa' subito per la strada nuova */
 function swapCambioScegliStrada(strada){
   haptic();
   if (strada === swapCambioStrada) return;
   swapCambioStrada = strada;
-  delete preventiviSwap[0];
-  delete swapErrori[0];
-  delete swapPassi[0];
+  swapCambioPulisci();
+  if (swapCambioTimer) { clearTimeout(swapCambioTimer); swapCambioTimer = null; }
   renderSwapCambio();
+  if (swapCambioCifra()) return swapCambioCalcola(true);
 }
 /* «Incolla» della richiesta Lightning: quel che arriva va nel campo
    com'e' (il giudice parla a «Conferma»), senza «lightning:» davanti */
@@ -1215,42 +1337,75 @@ async function swapIncollaFattura(n){
 /* ─── 8. LA PAGINA «SWAP» ───────────────────────────────────────────────
    La lista di tutti gli swap; poi, per ogni fornitore, le sue parole (a
    richiesta) e il suo bottone di recupero. Un campo solo per le parole:
-   la xpub va SOLO al fornitore del bottone toccato. */
+   la xpub va SOLO al fornitore del bottone toccato.
+   (28 ott 2026, cantiere grafica-cambio) Il riquadro del cambio libero
+   sta FUORI da qui, in un suo posto fisso della pagina (#swapCambio): il
+   ridisegno della lista, che arriva anche da solo a ogni giro della
+   sorveglianza, non tocca piu' il campo della cifra mentre ci si scrive.
+   La lista e' a schede (la moneta di dove arriva, la frase, tre barrette
+   e la cifra); le parole e il recupero stanno in UNA riga chiusa in
+   fondo, che si apre a tocco, e da sola quando si chiede di vedere le
+   parole. La prima volta le parole restano il passo obbligatorio di
+   «Conferma» (`swapPassi[n] = 'parole'`): qui e' solo dove ritrovarle. */
+let swapRiservaAperta = false;
+function barretteSwap(rec){
+  const q = swapTappa(rec);
+  if (q < 0) return '';
+  return `<span class="cambio-barrette" aria-hidden="true">${[0, 1, 2].map(i => `<i class="${i < q ? 'fatto' : ''}"></i>`).join('')}</span>`;
+}
 function renderSwapTelefono(){
   const box = el('swapTelefono');
   if (!box) return;
   const t = t3(), piu = swapPiuFornitori();
   const lista = swapLista().slice().sort((a, b) => (b.creato || 0) - (a.creato || 0));
-  /* con degli swap in lista, il «per ora nessuno» della tappa 1 tace */
-  if (el('swapVuoto')) el('swapVuoto').style.display = lista.length ? 'none' : '';
-  const righe = lista.map(rec => `<div class="swap-riga-lista">
-      <b>${esc(swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
-      <span>${esc(frasestatoSwap(rec))}</span>
-      ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
+  /* con degli swap in lista, o col cambio libero acceso, il «per ora
+     nessuno» della tappa 1 tace */
+  if (el('swapVuoto')) el('swapVuoto').style.display = lista.length || swapCambioAcceso() ? 'none' : '';
+  const righe = lista.map(rec => `<div class="cambio-voce">
+      <div class="cambio-voce-riga">
+        ${swapMoneta(swapESub(rec) ? 'ln' : 'btc')}
+        <span class="cambio-voce-dati">
+          <b>${esc(swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+          <span>${esc(frasestatoSwap(rec))}</span>
+          ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
+          ${barretteSwap(rec)}
+        </span>
+        ${Number(rec.ricevi) > 0 ? `<span class="cambio-voce-cifra">${fmt(rec.ricevi)}</span>` : ''}
+      </div>
       ${(!rec.indirizzo && SWAP_FASI_RITIRO.has(swapFase(rec)) && !swapESub(rec)) || (swapDaRimborsare(rec) && !rec.indirizzo) ? `
         <input class="swap-indirizzo" id="swapIndirizzoR_${esc(rec.id)}" type="text" autocomplete="off" spellcheck="false" placeholder="bc1…">
         <button class="btn ghost" type="button" data-swap="ritira-a" data-id="${esc(rec.id)}">${esc(swapESub(rec) ? t.rimborsaA : t.ritiraA)}</button>` : ''}
     </div>`).join('');
+  const viste = swapFornitori().some(f => swapParoleViste[f.id]);
+  const aperta = swapRiservaAperta || viste;
   const parole = swapFornitori().map(f => {
     const c = swapCassetto(f.id), viste = !!swapParoleViste[f.id];
     const elenco = c && c.parole && viste
       ? `<ol class="swap-parole">${String(c.parole).split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '';
-    return `<h4>🔑 ${esc(piu ? t.paroleDi(f.nome) : t.paroleTit)}</h4>
+    return `<h4>${esc(piu ? t.paroleDi(f.nome) : t.paroleTit)}</h4>
     ${c && c.parole
       ? `<button class="btn ghost" type="button" data-swap="mostra-parole" data-fornitore="${esc(f.id)}">${esc(viste ? t.nascondi : t.mostra)}</button>${elenco}`
       : `<div class="hint">${esc(t.nessunaParola)}</div>`}`;
   }).join('');
   const bottoni = swapFornitori().map(f =>
-    `<button class="btn orange" type="button" data-swap="recupera" data-fornitore="${esc(f.id)}">${esc(piu ? t.recuperaDa(f.nome) : t.recupera)}</button>`).join('');
+    `<button class="btn ghost" type="button" data-swap="recupera" data-fornitore="${esc(f.id)}">${esc(piu ? t.recuperaDa(f.nome) : t.recupera)}</button>`).join('');
   box.innerHTML = `
-    <div id="swapCambio"></div>
-    ${lista.length ? `<h4>${esc(t.lista)}</h4>${righe}` : ''}
-    ${parole}
-    <h4>${esc(t.recuperaTit)}</h4>
-    <div class="hint">${esc(t.recuperaSpiega)}</div>
-    <textarea id="swapRecupero" rows="3" autocomplete="off" spellcheck="false"></textarea>
-    <div id="swapRecuperoNota" class="hint" role="status">${esc(swapNotaRecupero.testo)}</div>
-    ${bottoni}`;
+    ${lista.length ? `<h3 class="cambio-sez">${esc(t.lista)}</h3>${righe}` : ''}
+    <div class="cambio-riserva${aperta ? ' aperta' : ''}">
+      <button type="button" class="cambio-riserva-testa" data-swap="riserva" aria-expanded="${aperta}">
+        ${swapMoneta('chiave')}
+        <span class="cambio-riserva-nome"><b>${esc(t.riservaTit)}</b><small>${esc(t.riservaSotto)}</small></span>
+        <span class="cambio-riserva-fr">${swapIcona('freccia')}</span>
+      </button>
+      ${aperta ? `<div class="cambio-riserva-dentro">
+        ${parole}
+        <h4>${esc(t.recuperaTit)}</h4>
+        <div class="hint">${esc(t.recuperaSpiega)}</div>
+        <textarea id="swapRecupero" rows="3" autocomplete="off" spellcheck="false"></textarea>
+        <div id="swapRecuperoNota" class="hint" role="status">${esc(swapNotaRecupero.testo)}</div>
+        ${bottoni}
+      </div>` : ''}
+    </div>`;
   renderSwapCambio();
 }
 /* la frase del recupero sopravvive al ridisegno della pagina (presa dal
@@ -1326,12 +1481,12 @@ if (typeof document !== 'undefined') {
     else if (a === 'mostra-parole') { haptic(); swapParoleViste[fid] = !swapParoleViste[fid]; renderSwapTelefono(); }
     else if (a === 'recupera') swapRecupera(fid);
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
-    else if (a === 'cambia') swapCambioApri();
-    else if (a === 'cambio-chiudi') swapCambioChiudi();
+    else if (a === 'cambio-gira') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-calcola') swapCambioCalcola();
+    else if (a === 'dettagli') { haptic(); dettagliSwap[n] = !dettagliSwap[n]; ridisegnaIncassoSwap(); }
+    else if (a === 'riserva') { haptic(); swapRiservaAperta = !swapRiservaAperta; renderSwapTelefono(); }
     else if (a === 'cambio-copia') swapCambioCopia(String(b.dataset.id || ''));
     else if (a === 'cambio-copia-indirizzo') swapCambioCopia(String(b.dataset.id || ''), 'indirizzo');
-    else if (a === 'cambio-strada') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'incolla-fattura') swapIncollaFattura(n);
   });
   /* il campo dell'indirizzo si ricorda a ogni lettera: il preventivo si
@@ -1340,9 +1495,18 @@ if (typeof document !== 'undefined') {
     const c = ev.target;
     if (c && typeof c.id === 'string' && c.id.startsWith('swapIndirizzo_'))
       swapIndirizziScritti[Number(c.id.slice(14))] = String(c.value || '');
-    if (c && c.id === 'swapCambioCifra_0') swapCambioScritta = String(c.value || '');
+    if (c && c.id === 'swapCambioCifra_0') swapCambioScrive(c.value);
     if (c && typeof c.id === 'string' && c.id.startsWith('swapFattura_'))
       swapFattureScritte[Number(c.id.slice(12))] = String(c.value || '');
+  });
+  /* uscendo dal campo della cifra la si rilegge coi separatori, come la
+     cifra dell'altro riquadro (mentre si scrive no: il cursore saltava) */
+  document.addEventListener('focusout', ev => {
+    const c = ev.target;
+    if (!c || c.id !== 'swapCambioCifra_0') return;
+    const n = swapCambioCifra();
+    swapCambioScritta = n ? fmt(n) : '';
+    c.value = swapCambioScritta;
   });
   /* la fotocamera non resta accesa ad app in secondo piano */
   document.addEventListener('visibilitychange', () => {

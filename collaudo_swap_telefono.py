@@ -585,9 +585,11 @@ def il_telefono(base):
         return
     print("\n[la prima volta: le 12 parole]")
     # (27 ott 2026, grafica-swap) tre ascoltatori: i click, l'input del campo
-    # dell'indirizzo, la fotocamera spenta ad app in secondo piano
-    prova("un ascoltatore delegato sui click, piu' l'input e la visibilita'",
-          ["click", "input", "visibilitychange"], r["ascoltatori"])
+    # dell'indirizzo, la fotocamera spenta ad app in secondo piano; (28 ott
+    # 2026, grafica-cambio) piu' il focusout, che rimette i puntini alla cifra
+    # del cambio quando lasci il campo
+    prova("un ascoltatore delegato sui click, piu' l'input, l'uscita dal campo e la visibilita'",
+          ["click", "input", "focusout", "visibilitychange"], r["ascoltatori"])
     prova("«Conferma» senza indirizzo: lo dice, e le parole non nascono",
           ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", None, ""],
           r["senzaIndirizzo"])
