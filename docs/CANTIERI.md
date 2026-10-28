@@ -74021,3 +74021,72 @@ Restano anche: lo zero-conf (con una conferma chi prende non ce la fa),
 e quanto dirlo nella pagina dello scambio quando i bitcoin devono
 tornare (oggi il foglio, l'avviso e la pagina «Cambio»).
 
+
+## Il collaudo che non si confonde col vero: grigio, senza Lightning, P2P nel recinto (28 ott 2026, cantiere collaudo-grigio)
+
+**LA RICHIESTA.** Andrea, 28 ott 2026: «colorare il sito di collaudo in
+grigio di modo che sia chiaro che è collaudo, disattiva ln, e il p2p non
+deve pubblicare su nostr altrimenti diventa un ordine vero e proprio su
+barattolo ufficiale». Sul ramo `onchain`, perché il collaudo gira quello.
+
+**LE DECISIONI.**
+- Tre leve, `PROVA_GRIGIO`, `PROVA_LIGHTNING_SPENTO`, `PROVA_P2P_VERO`,
+  che mordono SOLO con `PROVA_SOLO_IDS` piena (il segno «questa è una
+  prova», lo stesso del recinto e del tetto P2P): in produzione valgono
+  False qualunque cosa dica il config. Sulla prova nascono dal verso
+  SICURO senza una riga nel config della VM (grigio sì, Lightning no,
+  P2P chiuso), e si torna indietro solo con un `False`/`True` scritto
+  (`is`, come PROVA_APERTA: una stringa non sposta niente). Fra le «mai
+  dal pannello»: sono serrature della prova. Il pannello le mostra.
+- IL GRIGIO: `_grigio_nella_pagina` scrive `class="collaudo"` sul tag
+  `<html>` (come la copertina riscrive la sua riga, ma senza toccare
+  uno script). Il CSS è `html.collaudo{filter:grayscale(1)}` più una
+  fascia «🧪 COLLAUDO · non è il Barattolo vero» che non prende tocchi.
+  Il filtro sta sulla RADICE apposta: su qualunque altro elemento un
+  `filter` diventa il contenitore dei `position:fixed` e sposterebbe
+  fogli, barra e toast; sulla radice no. `applicaTema` tinge di grigio
+  anche la testata di Telegram, che il filtro non raggiunge.
+- IL LIGHTNING SPENTO: il giudice sta dentro `crea_invoice_escrow`, da
+  cui passa ogni fattura (cassa, set, puntate, fattura nuova, banner,
+  link del negozio): 409 col perché. Passa solo la sonda del wallet
+  (`sonda=True`), che non è un pagamento. In più la cassa (`compra`) lo
+  dice in TESTA, prima della ripresa — che altrimenti ridarebbe una
+  fattura viva di prima — e prima del set; la strada on-chain no.
+  `nuova_fattura_ordine` lascia passare il 409 invece di coprirlo col
+  suo 503. Nella pagina: `/api/me` porta `lnSpento`; il foglio del
+  pagamento non conia la fattura, aspetta `/onchain/pronto` e si apre
+  su ⛓️ (`payApriSoloOnchain`); la porta ⚡ è spenta e dice perché; un
+  no dell'on-chain non ripiega più sulla fattura.
+- IL P2P NEL RECINTO: rovescia la decisione del 20 ott («il P2P del
+  collaudo è vero»), su richiesta di Andrea. Si taglia ALLA FONTE: senza
+  `PROVA_P2P_VERO` le tre liste `MOSTRO_RELAY`, `_SPECCHIO`, `_CONFERMA`
+  tengono solo i relay di casa. Il browser pubblica SOLO sui relay della
+  busta (`urlViviP2P`), quindi non ha più dove pubblicare; con le liste
+  vuote `_p2p_leve` dice attivo=False e la pagina mostra il P2P «In
+  arrivo a breve». Il journal dice una volta quali relay ha tolto.
+
+**STRADE SCARTATE.** Ritoccare i colori token per token (sono centinaia,
+e una tinta dimenticata farebbe sembrare vero un pezzo del collaudo).
+Spegnere il P2P con `P2P_ATTIVO` nel config della VM: chiede un gesto
+sulla VM e una riga che si può dimenticare, e non tocca il browser. Un
+P2P «in sola lettura» (il libro vero visibile, prese e pubblicazioni
+bloccate nel client): più codice nel motore dello scambio, e prendere un
+ordine vero resterebbe a un bottone di distanza.
+
+**PROVATO.** `prove.py` sezione 9 ter dell'istanza di prova (le leve in
+produzione e sulla prova, il grigio puro, il CSS sulla radice, il
+giudice delle fatture e la sonda, la cassa in testa, la pagina, le liste
+P2P in produzione, sulla prova e con `PROVA_P2P_VERO`).
+`collaudo_istanza_prova`: col server vero, la pagina col tag grigio e di
+nuovo identica a leva spenta, `/api/me` con `lnSpento`, la cassa a 409
+col perché e nessun ordine nato, la strada on-chain che non si sente
+dire «Lightning spento». A schermo (Chromium, 375 di larghezza, chiaro
+e scuro) la pagina grigia con la fascia e il P2P «In arrivo a breve».
+
+**DA GUARDARE.** Sul telefono vero, dentro Telegram, la testata grigia e
+quanto pesa il filtro sullo scorrimento. Il foglio del pagamento su ⛓️
+con un venditore che riceve on-chain (il percorso è quello del tocco su
+⛓️, già provato). LA PROVA DAL VIVO DELLA PORTA ⛓️ DEL P2P (cantiere
+onchain-p2p, «coi soldi veri piccoli sul collaudo») ora vuole
+`PROVA_P2P_VERO = True` per il tempo della prova, oppure un Mostro di
+casa: è una scelta di Andrea.

@@ -38157,12 +38157,14 @@ def _amb_seo():
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
               "_hash_asset", "_timbra_asset_pagina", "_bot_nella_pagina",
               "_dominio_nella_pagina", "_privata_nella_pagina",
+              "_grigio_nella_pagina",
               "_spezza_pagina", "_monta_pagina",
               "_riga_sitemap", "_sitemap"):
         exec(pezzo(f), amb)
     amb["BOT_NOME"] = "ilbarattolobot"     # le leve non dichiarate
     amb["DOMINIO_PUBBLICO"] = "barattolo.store"
     amb["PROVA_SOLO_IDS"] = set()          # la produzione: nessuna copertina
+    amb["PROVA_GRIGIO"] = False            # ...e nessun grigio
     # IL GIUDICE DELLA COPERTINA (30 set 2026): `_seo_negozio` lo chiama,
     # e si monta VERO — nessuna pagina del server pubblicata, qui, quindi
     # solo il negozio di casa esce con la sua copertina (vedi
@@ -167585,7 +167587,7 @@ process.stdout.write(JSON.stringify(out));
     def leva_con(valore, coro):
         detto = []
         amb_l = {"print": lambda *x, **k: detto.append(" ".join(str(i) for i in x)),
-                 "MOSTRO_RELAY": list(coro)}
+                 "MOSTRO_RELAY": list(coro), "PROVA_SOLO_IDS": set()}
         finto = type("C", (), {})()
         if valore is not None:
             finto.MOSTRO_RELAY_CONFERMA = valore
@@ -177355,6 +177357,129 @@ def prove_istanza_prova():
           '"PROVA_APERTA",\n                  PROVA_APERTA,' in ls
           and "allarme=PROVA_APERTA and not PROVA_SOLO_IDS" in ls)
     prova("config_esempio la porta spenta", True, "\nPROVA_APERTA = False\n" in es)
+
+    # ---------------- 9 ter) il collaudo che non si confonde (28 ott 2026)
+    # «colorare il sito di collaudo in grigio [...], disattiva ln, e il
+    # p2p non deve pubblicare su nostr»: tre leve che mordono SOLO con la
+    # lista piena, e sulla prova nascono dal verso sicuro
+    k = src.index("try:\n    from config import PROVA_GRIGIO\n")
+    blocco_tre = src[k:src.index("\n\n", k)]
+    def tre(lista, **cfg):
+        mod = type(sys)("config")
+        mod.__dict__.update(cfg)
+        vecchio = sys.modules.get("config")
+        sys.modules["config"] = mod
+        try:
+            amb = {"PROVA_SOLO_IDS": lista}
+            exec(blocco_tre, amb)
+            return (amb["PROVA_GRIGIO"], amb["PROVA_LIGHTNING_SPENTO"],
+                    amb["PROVA_P2P_VERO"])
+        finally:
+            if vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+    prova("in produzione (lista vuota) tutte spente, qualunque cosa dica il config",
+          [(False, False, False)] * 2,
+          [tre(set()), tre(set(), PROVA_GRIGIO=True, PROVA_LIGHTNING_SPENTO=True,
+                           PROVA_P2P_VERO=True)])
+    prova("sulla prova, senza righe: grigio, Lightning spento, P2P nel recinto",
+          (True, True, False), tre({111}))
+    prova("...si torna indietro solo con False / True scritti, mai con una stringa",
+          [(False, False, True), (True, True, False)],
+          [tre({111}, PROVA_GRIGIO=False, PROVA_LIGHTNING_SPENTO=False, PROVA_P2P_VERO=True),
+           tre({111}, PROVA_GRIGIO="False", PROVA_LIGHTNING_SPENTO="False",
+               PROVA_P2P_VERO="True")])
+    prova("le tre stanno fra le «mai dal pannello», e il pannello le mostra", True,
+          all(f'"{n}"' in src[:src.index("_LEVA_DI_NOME_CHIUSO = ")]
+              for n in ("PROVA_GRIGIO", "PROVA_LIGHTNING_SPENTO", "PROVA_P2P_VERO"))
+          and all(f'"{n}"' in ls for n in ("PROVA_GRIGIO", "PROVA_LIGHTNING_SPENTO",
+                                           "PROVA_P2P_VERO")))
+    prova("config_esempio le scrive dal verso sicuro", True,
+          "\nPROVA_GRIGIO = True\nPROVA_LIGHTNING_SPENTO = True\nPROVA_P2P_VERO = False\n" in es)
+    # il grigio: una classe sul tag <html>, nessuno script toccato
+    amb = {}
+    k = src.index("_RIGA_HTML_PAGINA = ")
+    exec(src[k:src.index("\n", k)], amb)
+    righe = []
+    amb["print"] = lambda *a, **k: righe.append(a)
+    exec(pezzo("_grigio_nella_pagina"), amb)
+    gr = amb["_grigio_nella_pagina"]
+    prova("grigio spento: la pagina esce IDENTICA (lo stesso oggetto)", True, gr(grezzo, False) is grezzo)
+    acc = gr(grezzo, True)
+    prova("...acceso cambia il solo tag <html>", (1, 0, len(grezzo) + len(b' class="collaudo"')),
+          (acc.count(b'<html lang="it" class="collaudo">'), acc.count(b'<html lang="it">'), len(acc)))
+    prova("...e un tag che manca non s'indovina, e lo si dice", (b"x", 1), (gr(b"x", True), len(righe)))
+    prova("la pagina si veste dopo la copertina, prima della cache", True,
+          cm.index("grezzo = _privata_nella_pagina(")
+          < cm.index("grezzo = _grigio_nella_pagina(grezzo, PROVA_GRIGIO)")
+          < cm.index("_PAGINA_CACHE.update("))
+    prova("il CSS: il filtro sulla RADICE (mai sul body: sposterebbe i fixed), la fascia che non prende tocchi",
+          True, "html.collaudo{filter:grayscale(1)}" in mini
+          and "html.collaudo body::after{" in mini
+          and "pointer-events:none" in mini[mini.index("html.collaudo body::after{"):][:600]
+          and "body.collaudo" not in mini)
+    at = pezzo_js(mini, "function applicaTema(){", "\n}\n")
+    prova("...e la testata di Telegram si fa grigia anche lei", True,
+          "classList.contains('collaudo')" in at and "'#EEEEEE'" in at)
+    # il Lightning spento: il giudice e' dentro la fabbrica delle fatture
+    ci = pezzo("crea_invoice_escrow")
+    prova("nessuna fattura col Lightning spento, prima ancora delle chiavi della cassaforte", True,
+          ci.index("if PROVA_LIGHTNING_SPENTO and not sonda:")
+          < ci.index("raise HTTPException(409, MSG_LIGHTNING_SPENTO)")
+          < ci.index("cf = _chiavi_cassaforte(cassaforte)"))
+    prova("...passa solo la sonda del wallet", (1, 1),
+          (src.count("sonda=True)"), pezzo("_fattura_prova_wallet").count("sonda=True)")))
+    cp = pezzo("compra")
+    prova("...la cassa lo dice in testa (prima della ripresa e del set), all'on-chain no", True,
+          cp.index('onchain = d.get("metodo") == "onchain"')
+          < cp.index("if PROVA_LIGHTNING_SPENTO and not onchain:\n        raise HTTPException(409, MSG_LIGHTNING_SPENTO)")
+          < cp.index("return await _compra_set(user, d)")
+          < cp.index("if mio and not onchain:"))
+    prova("...e la fattura nuova di un ordine non lo copre col suo 503", True,
+          "except HTTPException:\n        raise                       # il Lightning spento del collaudo"
+          in pezzo("nuova_fattura_ordine"))
+    prova("/api/me lo dice alla pagina", True,
+          'profilo["lnSpento"] = PROVA_LIGHTNING_SPENTO' in src)
+    sb = pezzo_js(mini, "async function startBuy(){", "\n}\n")
+    prova("il foglio: con Lightning spento si apre su ⛓️ e non conia la fattura", True,
+          "myLnSpento = !!me.lnSpento;" in mini
+          and sb.index("if (myLnSpento && !DEMO) { await payApriSoloOnchain(); return; }")
+          < sb.index("await payCreaFattura(l, offAcc);"))
+    pp = pezzo_js(mini, "async function payPassaA(m){", "\n}\n")
+    prova("...la porta ⚡ dice di no, e il no dell'on-chain non ripiega sulla fattura", True,
+          "if (m === 'ln' && myLnSpento) {" in pp and "if (!payOc && !myLnSpento) {" in pp)
+    # il P2P nel recinto: alla fonte, le tre liste
+    k = src.index("try:\n    from config import MOSTRO_RELAY\n")
+    blocco_p2p = src[k:src.index("_conferma_fuori_coro = ", k)]
+    def p2p(lista, vero=False):
+        mod = type(sys)("config")
+        mod.MOSTRO_RELAY = ["wss://relay.barattolo.store", "wss://nos.lol", "ws://127.0.0.1:7777"]
+        mod.MOSTRO_RELAY_SPECCHIO = ["wss://relay.damus.io"]
+        mod.MOSTRO_RELAY_CONFERMA = ["wss://relay.barattolo.store"]
+        vecchio = sys.modules.get("config")
+        sys.modules["config"] = mod
+        try:
+            amb = {"PROVA_SOLO_IDS": lista, "PROVA_P2P_VERO": vero,
+                   "print": lambda *a, **k: None,
+                   "urlparse": __import__("urllib.parse").parse.urlparse,
+                   "ipaddress": __import__("ipaddress")}
+            exec(pezzo("relay_di_casa"), amb)
+            exec(blocco_p2p, amb)
+            return (amb["MOSTRO_RELAY"], amb["MOSTRO_RELAY_SPECCHIO"],
+                    amb["MOSTRO_RELAY_CONFERMA"])
+        finally:
+            if vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+    prova("P2P: in produzione le liste restano intere",
+          (["wss://relay.barattolo.store", "wss://nos.lol", "ws://127.0.0.1:7777"],
+           ["wss://relay.damus.io"], ["wss://relay.barattolo.store"]), p2p(set()))
+    prova("...sulla prova restano solo i relay di casa (il nostro vero compreso fuori)",
+          (["ws://127.0.0.1:7777"], [], []), p2p({111}))
+    prova("...e con PROVA_P2P_VERO torna la decisione del 20 ott", 3,
+          len(p2p({111}, vero=True)[0]))
 
     # ---------------- 10) il recinto dei relay (20 ott 2026) -----------
     # «niente annunci ne' post del collaudo sui relay veri; i relay veri

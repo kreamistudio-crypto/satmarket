@@ -446,6 +446,25 @@
     --shadow-card:0 1px 4px rgba(60,45,10,.08);
     --shadow-hover:0 8px 24px rgba(0,0,0,.07);
   }
+  /* ---------- IL COLLAUDO IN GRIGIO (28 ott 2026, cantiere
+     collaudo-grigio, Andrea: «colorare il sito di collaudo in grigio di
+     modo che sia chiaro che è collaudo») ----------
+     La classe `collaudo` su <html> la scrive SOLO il server dell'istanza
+     di prova (`_grigio_nella_pagina`, leva PROVA_GRIGIO): in produzione
+     queste regole non trovano niente. Il filtro sta sulla RADICE, e non
+     sul body, apposta: su ogni altro elemento un `filter` diventa il
+     contenitore dei `position:fixed` (fogli, barra in basso, toast) e li
+     sposterebbe; sulla radice no. La fascia e' un'etichetta che non
+     prende tocchi, in alto al centro. */
+  html.collaudo{filter:grayscale(1)}
+  html.collaudo body::after{
+    content:"🧪 COLLAUDO · non è il Barattolo vero";
+    position:fixed;left:50%;top:0;transform:translateX(-50%);z-index:2147483647;
+    pointer-events:none;white-space:nowrap;
+    font:800 10px/1 system-ui,sans-serif;letter-spacing:.06em;
+    padding:4px 10px;border-radius:0 0 8px 8px;
+    background:#3A3A3A;color:#fff;opacity:.85;
+  }
   /* ---------- tema scuro: «mercatino di sera» ----------
      Stessa personalita', fondo bruno caldo (mai nero piatto): arancio
      e oro restano i protagonisti. Il JS risolve la scelta dell'utente
@@ -16183,6 +16202,10 @@ let myTgId = null, isAdmin = false;
    falso anche per i moderatori. */
 let myOnchain = false;
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
+/* Il collaudo senza Lightning (28 ott 2026, `PROVA_LIGHTNING_SPENTO`):
+   il foglio del pagamento si apre su ⛓️ e la porta ⚡ resta spenta. Lo
+   dice il server; in produzione e' sempre falso. */
+let myLnSpento = false;
 /* Ha premuto Avvia per entrare dal bot (19 ott 2026, ENTRA DAL BOT):
    gli avvisi in chat gli arrivano, e su onion il banner glielo dice
    invece di «non si possono attivare». Da /api/me, `bot_avviato`. */
@@ -25806,6 +25829,14 @@ function applicaTema(){
   if (!guscioInVista())
     document.getElementById('metaTema')?.setAttribute('content', sfondo);
   try { tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo); } catch(e){}
+  /* sul collaudo grigio (28 ott 2026) anche la testata di Telegram, che
+     il filtro della pagina non raggiunge: si ridipinge DOPO, cosi' le
+     righe di sempre restano quelle di sempre (la barra del browser no:
+     `metaTema` ha una mano sola, e fuori da Telegram basta la fascia) */
+  if (document.documentElement.classList.contains('collaudo')) {
+    const grigio = scuro ? '#2B2B2B' : '#EEEEEE';
+    try { tg?.setHeaderColor?.(grigio); tg?.setBackgroundColor?.(grigio); } catch(e){}
+  }
   el('temaAuto')?.classList.toggle('active', temaScelto==='auto');
   el('temaChiaro')?.classList.toggle('active', temaScelto==='chiaro');
   el('temaScuro')?.classList.toggle('active', temaScelto==='scuro');
@@ -32384,6 +32415,7 @@ async function startBuy(){
   el('paySheet').classList.add('open');
   aggiornaPayHint();
   payMetodoPrepara(l, offAcc, totS);
+  if (myLnSpento && !DEMO) { await payApriSoloOnchain(); return; }
   if (DEMO) {
     el('payInvoice').textContent =
       'lnbc'+l.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
@@ -55242,12 +55274,13 @@ let payMetodoAcceso = false;     // il foglio di adesso ha le due porte
 let payMetodoOccupato = false;   // un passaggio e' in corso
 let payNotaLn = null;            // la nota del Lightning, per il ritorno
 let payOffAcc = null;            // l'accordo del foglio (qui sempre nessuno), per il ritorno
+let payOcChiesto = null;         // la domanda a /onchain/pronto in volo
 
 function payMetodoSpegni(){
   if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
   if (payOc && el('payQrNota'))
     el('payQrNota').textContent = 'inquadra il QR col wallet, o tocca la invoice per copiarla';
-  payOc = null; payOcPronto = null; payMetodoAcceso = false;
+  payOc = null; payOcPronto = null; payOcChiesto = null; payMetodoAcceso = false;
   acqMetodo = 'ln';
   const box = el('payMetodo'), nota = el('payMetodoNota');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
@@ -55263,7 +55296,7 @@ function payMetodoPrepara(l, offAcc, sats){
   payNotaLn = {mostra: el('payEurNota').style.display,
                testo: el('payEurNota').textContent};
   renderPayMetodo();
-  fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
+  payOcChiesto = fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
     .then(r => r.ok ? r.json() : {pronto: false, motivo: 'on-chain spento su questo server'})
     .then(x => { if (payMetodoAcceso) { payOcPronto = x; renderPayMetodo(); } })
     .catch(() => { if (payMetodoAcceso) { payOcPronto = {pronto: false, motivo: 'rete assente'}; renderPayMetodo(); } });
@@ -55277,7 +55310,7 @@ function renderPayMetodo(){
     `<button type="button" role="tab" class="${cls}${acqMetodo === m ? ' attiva' : ''}${spento ? ' spento' : ''}"
        aria-selected="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
        onclick="payPassaA('${m}')">${titolo}<small>${sotto}</small></button>`;
-  box.innerHTML = porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', false)
+  box.innerHTML = porta('ln', 'ln', '⚡ Lightning', myLnSpento ? 'spento sul collaudo' : 'subito, in un secondo', myLnSpento)
     + porta('onchain', 'oc', '⛓️ On-chain 🛡️', ocSi ? '2-di-3, una conferma' : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
   box.style.display = 'flex';
 }
@@ -55292,6 +55325,10 @@ function payMetodoNota(html){
 async function payPassaA(m){
   if (!payMetodoAcceso || payMetodoOccupato || m === acqMetodo) return;
   haptic();
+  if (m === 'ln' && myLnSpento) {
+    payMetodoNota('⚡ Lightning è spento su questo collaudo: si paga solo on-chain (signet).');
+    return;
+  }
   if (m === 'onchain' && !(payOcPronto && payOcPronto.pronto)) {
     payMetodoNota(payOcPronto
       ? '⛓️ On-chain non disponibile: ' + esc(payOcPronto.motivo || '')
@@ -55323,7 +55360,7 @@ async function payPassaA(m){
       /* l'indirizzo non e' nato (un no del server, la rete): la fattura
          di prima e' gia' chiusa, quindi se ne fa una nuova — il foglio
          non resta mai senza niente da pagare */
-      if (!payOc) {
+      if (!payOc && !myLnSpento) {
         acqMetodo = 'ln'; renderPayMetodo();
         await payCreaFattura(currentListing, payOffAcc);
       }
@@ -55398,7 +55435,34 @@ async function payMostraOnchain(){
   } catch(e) {
     payOc = null;
     el('payInvoice').textContent = '';
-    payMetodoNota('⛓️ On-chain non disponibile: ' + esc(e.message || 'errore') + '. Qui sotto c\'è di nuovo la fattura ⚡.');
+    payMetodoNota('⛓️ On-chain non disponibile: ' + esc(e.message || 'errore')
+      + (myLnSpento ? '. Lightning è spento su questo collaudo.' : '. Qui sotto c\'è di nuovo la fattura ⚡.'));
+  }
+}
+
+/* IL FOGLIO DEL COLLAUDO SENZA LIGHTNING (28 ott 2026, cantiere
+   collaudo-grigio, Andrea: «disattiva ln»). Nessuna fattura: si aspetta
+   la risposta di /onchain/pronto e si apre direttamente su ⛓️. Dove la
+   porta ⛓️ non c'e' (set, accordi, codici, chi non vede l'on-chain) o
+   chi vende non riceve on-chain, il foglio lo dice e non paga niente.
+   Il server dice no lo stesso (409 in `crea_invoice_escrow`): questa e'
+   la cortesia, quella la serratura. */
+async function payApriSoloOnchain(){
+  el('payInvoice').textContent = '';
+  mostraQr('');
+  if (payMetodoAcceso && payOcChiesto) await payOcChiesto;
+  if (!payMetodoAcceso || !(payOcPronto && payOcPronto.pronto)) {
+    el('payInvoice').textContent = '⚡ Lightning è spento su questo collaudo e qui on-chain non si può pagare'
+      + (payOcPronto && payOcPronto.motivo ? ': ' + payOcPronto.motivo : ' (un oggetto solo, al prezzo di listino)')
+      + '.';
+    return;
+  }
+  payMetodoOccupato = true; renderPayMetodo();
+  try {
+    acqMetodo = 'onchain'; renderPayMetodo(); payMetodoNota('');
+    await payMostraOnchain();
+  } finally {
+    payMetodoOccupato = false; renderPayMetodo();
   }
 }
 
@@ -88784,6 +88848,7 @@ async function avvia(){
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
     myOnchainIncasso = me.onchain_incasso || '';
+    myLnSpento = !!me.lnSpento;
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */
     if (myOnchain) setTimeout(onchainCofirmeInSottofondo, 3000);
     /* ...e l'on-chain si accende da solo (27 ott 2026) */

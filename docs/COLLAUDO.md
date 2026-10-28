@@ -162,13 +162,30 @@ aggiunge, si toglie la vecchia da GitHub.
   il recinto dei relay (annunci e post finirebbero sui relay veri), il
   tetto degli ordini P2P e la semina. Il P2P resta di `P2P_PROVA_IDS`.
 - **I dati del mercatino**: finti (la semina), database nuovo.
-- **I pagamenti del mercatino**: finti (LNbits FakeWallet: il «paga» si
-  fa da un secondo wallet nel pannello, dal tunnel ssh).
+- **Si vede che è una prova** (28 ott 2026, `PROVA_GRIGIO`, accesa di
+  serie sulla prova senza scriverla): la pagina è in grigio, con la
+  fascia «🧪 COLLAUDO · non è il Barattolo vero», e grigia è anche la
+  testata di Telegram. In produzione la leva non morde (lista vuota).
+- **I pagamenti del mercatino**: SOLO ON-CHAIN, in signet, dal 28 ott
+  2026 (`PROVA_LIGHTNING_SPENTO`, accesa di serie sulla prova): nessuna
+  fattura Lightning nasce (409 «⚡ Lightning è spento su questo
+  collaudo»), il foglio del pagamento si apre su ⛓️ e la porta ⚡ si vede
+  spenta. Dove ⛓️ non c'è (set, accordi, codici sconto) non si compra.
+  Prima: finti, LNbits FakeWallet (il «paga» da un secondo wallet nel
+  pannello, dal tunnel ssh) — tornano con `PROVA_LIGHTNING_SPENTO = False`.
 - **Nostr**: il server parla solo coi relay di casa della VM (il
   recinto: `RELAY_NOSTR` col relay di prova su 127.0.0.1, o nessuno: dal
   20 ott nessuno), con una chiave NUOVA. Annunci, post e DM mai su
   `relay.barattolo.store` ne' sui relay pubblici.
-- **Il P2P**: VERO (decisione di Andrea con Alan): il coordinatore
+- **Il P2P**: SPENTO dal 28 ott 2026 (richiesta di Andrea: «il p2p non
+  deve pubblicare su nostr altrimenti diventa un ordine vero e proprio
+  su barattolo ufficiale»). Senza `PROVA_P2P_VERO = True` il server
+  toglie da `MOSTRO_RELAY`, `_SPECCHIO` e `_CONFERMA` ogni relay che
+  non è di casa: il browser non riceve nessun relay su cui pubblicare,
+  e con le liste vuote il P2P si mostra spento («In arrivo a breve»).
+  Le righe della produzione nel config della VM possono restare: non
+  mordono. QUEL CHE VALEVA PRIMA, e torna con `PROVA_P2P_VERO = True`:
+  VERO (decisione di Andrea con Alan): il coordinatore
   Mostro di produzione, ordini e sats veri, coi paletti — solo gli id in
   lista, ogni ordine al massimo `P2P_MAX_SATS_PROVA` (10.000 sats), sulla
   VM MAI la chiave del moderatore/solver né altre chiavi Mostro di

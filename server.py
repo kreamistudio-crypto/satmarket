@@ -223,7 +223,8 @@ for _canale in (sys.stdout, sys.stderr):
 LEVE_MAI_DAL_PANNELLO = frozenset({
     # 🚦 sicurezza
     "MODALITA_COLLAUDO", "URL_PUBBLICO", "LINK_BOT", "PROVA_SOLO_IDS",
-    "PROVA_APERTA", "ORE_INITDATA", "PROTEGGI_IFRAME", "CSP_ATTIVA",
+    "PROVA_APERTA", "PROVA_GRIGIO", "PROVA_LIGHTNING_SPENTO",
+    "PROVA_P2P_VERO", "ORE_INITDATA", "PROTEGGI_IFRAME", "CSP_ATTIVA",
     "ONION_HOST", "ONION_SEGNALE", "CONNETTORI_NEGOZIO_APERTI",
     "CONNETTORI_NEGOZIO_PER_TUTTI", "TELEGRAM_WEBHOOK_SEGRETO",
     "RELAY_CHIAVI_TOKEN", "ADMIN_IDS", "ADMIN_CANALE_ID", "GRUPPO_ADMIN_CODA",
@@ -2984,6 +2985,44 @@ try:
     PROVA_APERTA = PROVA_APERTA is True
 except ImportError:
     PROVA_APERTA = False
+
+# IL COLLAUDO CHE NON SI CONFONDE COL VERO (28 ott 2026, cantiere
+# collaudo-grigio, richiesta di Andrea: «colorare il sito di collaudo in
+# grigio di modo che sia chiaro che è collaudo, disattiva ln, e il p2p
+# non deve pubblicare su nostr altrimenti diventa un ordine vero e
+# proprio su barattolo ufficiale»). Tre leve, e TUTTE E TRE MORDONO SOLO
+# SULL'ISTANZA DI PROVA (`PROVA_SOLO_IDS` non vuota): in produzione
+# valgono False qualunque cosa dica il config, e la pagina esce identica.
+# Sulla prova nascono dal verso SICURO, senza una riga nel config della
+# VM: grigio acceso, Lightning spento, P2P chiuso nel recinto. Per
+# tornare indietro serve una riga scritta, e `is` come per PROVA_APERTA:
+# una stringa «False» non spegne niente.
+# - PROVA_GRIGIO: la pagina si veste di grigio con la fascia «COLLAUDO».
+# - PROVA_LIGHTNING_SPENTO: nessuna fattura Lightning nasce (il giudice
+#   e' `crea_invoice_escrow`): si paga solo on-chain, in signet.
+# - PROVA_P2P_VERO: ROVESCIA la decisione del 20 ott («il P2P del
+#   collaudo e' vero»). Di serie i relay di Mostro passano dal recinto
+#   (solo quelli di casa): niente ordini del collaudo nel libro vero.
+try:
+    from config import PROVA_GRIGIO
+    PROVA_GRIGIO = PROVA_GRIGIO is not False
+except ImportError:
+    PROVA_GRIGIO = True
+try:
+    from config import PROVA_LIGHTNING_SPENTO
+    PROVA_LIGHTNING_SPENTO = PROVA_LIGHTNING_SPENTO is not False
+except ImportError:
+    PROVA_LIGHTNING_SPENTO = True
+try:
+    from config import PROVA_P2P_VERO
+    PROVA_P2P_VERO = PROVA_P2P_VERO is True
+except ImportError:
+    PROVA_P2P_VERO = False
+PROVA_GRIGIO = bool(PROVA_SOLO_IDS) and PROVA_GRIGIO
+PROVA_LIGHTNING_SPENTO = bool(PROVA_SOLO_IDS) and PROVA_LIGHTNING_SPENTO
+PROVA_P2P_VERO = bool(PROVA_SOLO_IDS) and PROVA_P2P_VERO
+MSG_LIGHTNING_SPENTO = ("⚡ Lightning è spento su questo collaudo: "
+                        "si paga solo on-chain (signet)")
 
 # Le porte che restano aperte a chiunque: la salute (la guarda il
 # deploy), il campanello di Telegram (ha il suo segreto, e senza il bot
@@ -12680,7 +12719,8 @@ def _cassaforte_uscita(o) -> str:
 
 async def crea_invoice_escrow(sats: int, memo: str,
                               expiry: int = INVOICE_EXPIRY,
-                              cassaforte: str = "") -> dict:
+                              cassaforte: str = "",
+                              sonda: bool = False) -> dict:
     """Crea la invoice che l'acquirente paghera': i sats finiscono
     nel wallet della piattaforma (la cassaforte). Di serie scade in
     15 minuti (se non viene pagata, l'ordine si autodistrugge poco
@@ -12691,7 +12731,15 @@ async def crea_invoice_escrow(sats: int, memo: str,
     `cassaforte` vuoto = quella del denaro nuovo; i rilanci d'asta
     passano quella della puntata. La risposta porta `cassaforte`
     accanto a payment_hash e payment_request: e' quel che il chiamante
-    scrive in colonna, e lo scrive SEMPRE (c'e' la sentinella)."""
+    scrive in colonna, e lo scrive SEMPRE (c'e' la sentinella).
+    IL LIGHTNING SPENTO DEL COLLAUDO (28 ott 2026): con
+    `PROVA_LIGHTNING_SPENTO` nessuna fattura nasce, e chi la chiedeva
+    riceve il perche' (409). Qui e non nelle rotte: ogni fattura di
+    Barattolo passa di qui, e la rotta di domani eredita il no. Solo la
+    `sonda` del wallet (`_fattura_prova_wallet`) passa: e' una fattura
+    da 1 sat che nessuno paga, e dice se LNbits e' vivo."""
+    if PROVA_LIGHTNING_SPENTO and not sonda:
+        raise HTTPException(409, MSG_LIGHTNING_SPENTO)
     cf = _chiavi_cassaforte(cassaforte)
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.post(f"{cf.LNBITS_URL}/api/v1/payments",
@@ -32032,6 +32080,22 @@ def _leve_stato():
                          "relay, tetto P2P e semina",
                   spento="entra solo chi è in PROVA_SOLO_IDS",
                   allarme=PROVA_APERTA and not PROVA_SOLO_IDS),
+            # le tre del collaudo che non si confonde (28 ott 2026): in
+            # produzione sono spente per costruzione (lista vuota)
+            _leva("Istanza di prova: in grigio", "PROVA_GRIGIO",
+                  PROVA_GRIGIO,
+                  acceso="la pagina in grigio con la fascia «🧪 COLLAUDO»",
+                  spento="colori di sempre (in produzione è giusto così)"),
+            _leva("Istanza di prova: Lightning spento",
+                  "PROVA_LIGHTNING_SPENTO", PROVA_LIGHTNING_SPENTO,
+                  acceso="nessuna fattura Lightning: si paga solo on-chain",
+                  spento="Lightning acceso (in produzione è giusto così)"),
+            _leva("Istanza di prova: P2P sul coordinatore vero",
+                  "PROVA_P2P_VERO", PROVA_P2P_VERO,
+                  acceso="gli ordini P2P del collaudo vanno nel libro VERO "
+                         "di Barattolo (col tetto P2P_MAX_SATS_PROVA)",
+                  spento="sulla prova i relay di Mostro restano fuori dal "
+                         "recinto: nessun ordine nel libro vero"),
             _leva("Scadenza dell'initData (ore)", "ORE_INITDATA",
                   ORE_INITDATA, allarme=not ORE_INITDATA,
                   spento="un initData catturato apre quell'account per "
@@ -41242,6 +41306,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # (`_onchain_compra`). Un oggetto alla volta: il set ha una testata
     # e N righe, e il 2-di-3 per ora sa tenere una cosa sola.
     onchain = d.get("metodo") == "onchain"
+    # il collaudo senza Lightning (28 ott 2026): lo dice anche il giudice
+    # dentro la fabbrica delle fatture, ma qui il no arriva PRIMA della
+    # ripresa, che ridarebbe una fattura viva di prima, e prima di aprire
+    # il database. Vale anche per il set, che e' solo Lightning
+    if PROVA_LIGHTNING_SPENTO and not onchain:
+        raise HTTPException(409, MSG_LIGHTNING_SPENTO)
     if onchain:
         _onchain_compra_ammesso(user["id"])
         if not d.get("annuncio_id"):
@@ -42405,6 +42475,8 @@ async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     try:
         inv = await crea_invoice_escrow(o["prezzo_sats"], memo,
                                         cassaforte=cf)
+    except HTTPException:
+        raise                       # il Lightning spento del collaudo
     except Exception as e:
         print(f"⚠️ Fattura nuova per l'ordine #{ordine_id} non coniata: {e}")
         raise HTTPException(503, "Non riesco a creare la fattura adesso: "
@@ -45931,6 +46003,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # allarga questa riga e' gia' giusta. A leva spenta e' False per
     # tutti, moderatori compresi, e il bottone non compare a nessuno.
     profilo["onchain"] = onchain_ammesso(user["id"])
+    # il collaudo senza Lightning (28 ott 2026): il foglio del pagamento
+    # si apre gia' su ⛓️ e la porta ⚡ si vede spenta. In produzione e'
+    # sempre False
+    profilo["lnSpento"] = PROVA_LIGHTNING_SPENTO
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -50905,7 +50981,7 @@ def fuori_dal_recinto(relay: str, cosa: str) -> bool:
 if PROVA_SOLO_IDS:
     RELAYS_VERIFICA = [r for r in _RELAY_NOSTR_DICHIARATI if relay_di_casa(r)]
     print(f"🧱 [recinto] istanza di prova: relay Nostr {RELAYS_VERIFICA or 'nessuno'}"
-          " (il P2P resta coi relay di Mostro)", flush=True)
+          " (il P2P coi relay di Mostro solo con PROVA_P2P_VERO)", flush=True)
 
 
 def lettura_simulata(relay: str, cosa: str) -> bool:
@@ -51236,6 +51312,26 @@ try:
                              if str(r).strip()]
 except ImportError:
     MOSTRO_RELAY_CONFERMA = []
+# IL P2P DEL COLLAUDO NEL RECINTO (28 ott 2026, cantiere collaudo-grigio,
+# Andrea: «il p2p non deve pubblicare su nostr altrimenti diventa un
+# ordine vero e proprio su barattolo ufficiale»). Sull'istanza di prova,
+# senza `PROVA_P2P_VERO`, le tre liste tengono SOLO i relay di casa — e
+# vuote spengono il P2P (`_p2p_leve` dice attivo=False). Si taglia QUI,
+# alla fonte, perche' ogni relay del P2P lo usa da qui: il server per
+# leggere e ascoltare, il BROWSER per pubblicare (`urlViviP2P` scorre la
+# lista che gli manda la busta, e nessun'altra).
+if PROVA_SOLO_IDS and not PROVA_P2P_VERO:
+    _p2p_fuori = [r for r in MOSTRO_RELAY + MOSTRO_RELAY_SPECCHIO
+                  if not relay_di_casa(r)]
+    MOSTRO_RELAY = [r for r in MOSTRO_RELAY if relay_di_casa(r)]
+    MOSTRO_RELAY_SPECCHIO = [r for r in MOSTRO_RELAY_SPECCHIO
+                             if relay_di_casa(r)]
+    MOSTRO_RELAY_CONFERMA = [r for r in MOSTRO_RELAY_CONFERMA
+                             if relay_di_casa(r)]
+    if _p2p_fuori:
+        print(f"🧱 [recinto] istanza di prova: il P2P non parla con "
+              f"{', '.join(_p2p_fuori)} (PROVA_P2P_VERO spenta): nessun "
+              "ordine del collaudo nel libro vero", flush=True)
 _conferma_fuori_coro = [r for r in MOSTRO_RELAY_CONFERMA if r not in MOSTRO_RELAY]
 if _conferma_fuori_coro:
     print("[p2p] MOSTRO_RELAY_CONFERMA nomina relay che non stanno in "
@@ -87994,6 +88090,30 @@ def _privata_nella_pagina(grezzo: bytes, privata: bool) -> bytes:
                           b"const ISTANZA_PRIVATA = true;")
 
 
+# IL COLLAUDO IN GRIGIO (28 ott 2026, cantiere collaudo-grigio, Andrea:
+# «colorare il sito di collaudo in grigio di modo che sia chiaro che è
+# collaudo»). Una classe sul tag <html>, scritta qui come le altre
+# riscritture e PRIMA del primo paint: il CSS `html.collaudo` fa il
+# resto (grigio e fascia «COLLAUDO»), e `applicaTema` tinge di grigio
+# anche la testata di Telegram. Si tocca il tag e non uno script: gli
+# script restano byte per byte quelli del disco.
+_RIGA_HTML_PAGINA = b'<html lang="it">'
+
+
+def _grigio_nella_pagina(grezzo: bytes, grigio: bool) -> bytes:
+    """PURA: spenta (la produzione) la pagina esce IDENTICA, senza
+    nemmeno cercare. Un tag che manca non s'indovina: si dice."""
+    if not grigio:
+        return grezzo
+    if grezzo.count(_RIGA_HTML_PAGINA) != 1:
+        print("⚠️ [pagina] il tag «<html lang=\"it\">» non c'e' una volta "
+              "sola in miniapp.html: il collaudo non si veste di grigio",
+              flush=True)
+        return grezzo
+    return grezzo.replace(_RIGA_HTML_PAGINA,
+                          b'<html lang="it" class="collaudo">')
+
+
 def _spezza_pagina(grezzo: bytes) -> dict:
     """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
 
@@ -88078,6 +88198,7 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         grezzo = _bot_nella_pagina(grezzo, BOT_NOME)
         grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)
         grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS) and not PROVA_APERTA)
+        grezzo = _grigio_nella_pagina(grezzo, PROVA_GRIGIO)
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.
@@ -92776,7 +92897,8 @@ async def _fattura_prova_wallet() -> tuple:
     try:
         inv = await crea_invoice_escrow(1, PROVA_WALLET_MEMO,
                                         expiry=PROVA_WALLET_SCADENZA,
-                                        cassaforte=cassaforte_nuova())
+                                        cassaforte=cassaforte_nuova(),
+                                        sonda=True)
         nuova = str(inv.get("payment_request") or "").strip()
         if not nuova.lower().startswith("ln"):
             raise ValueError("LNbits ha risposto senza fattura")

@@ -333,6 +333,51 @@ def main():
           S._p2p_leve()["maxSatsProva"])
     S.PROVA_SOLO_IDS = set()
 
+    # IL COLLAUDO CHE NON SI CONFONDE (28 ott 2026, cantiere
+    # collaudo-grigio): le tre leve girate sul modulo, come le altre; a
+    # import fatto con la lista vuota valgono tutte False
+    print("\n[il collaudo in grigio, senza Lightning, col P2P nel recinto]")
+    prova("in produzione le tre sono spente", (False, False, False),
+          (S.PROVA_GRIGIO, S.PROVA_LIGHTNING_SPENTO, S.PROVA_P2P_VERO))
+    S._PAGINA_CACHE["timbro"] = False
+    prova("...e la pagina non porta la classe del collaudo", (0, 1),
+          (c.get("/").text.count('class="collaudo"'), c.get("/").text.count('<html lang="it">')))
+    S.PROVA_GRIGIO = True
+    S._PAGINA_CACHE["timbro"] = False
+    prova("col grigio acceso il tag <html> la porta, la pagina e la Mini App", (1, 1),
+          (c.get("/").text.count('<html lang="it" class="collaudo">'),
+           c.get("/miniapp.html").text.count('<html lang="it" class="collaudo">')))
+    S.PROVA_GRIGIO = False
+    S._PAGINA_CACHE["timbro"] = False
+    prova("...spento, torna identica", pagina, c.get("/").text)
+    me = c.get("/api/me", headers=chi(111, "Compra")).json()
+    prova("/api/me in produzione: lnSpento falso", False, me.get("lnSpento"))
+    r = c.post("/api/orders", json={"annuncio_id": aid, "consegna": "ritiro"},
+               headers=chi(111, "Compra"))
+    prova("in produzione la cassa conia la fattura", (200, True),
+          (r.status_code, bool(r.json().get("invoice"))))
+    def ordini():
+        con = S.db()
+        n = con.execute("SELECT COUNT(*) FROM ordini").fetchone()[0]
+        con.close()
+        return n
+    prima = ordini()
+    S.PROVA_LIGHTNING_SPENTO = True
+    try:
+        prova("/api/me col Lightning spento lo dice", True,
+              c.get("/api/me", headers=chi(111, "Compra")).json().get("lnSpento"))
+        r = c.post("/api/orders", json={"annuncio_id": aid, "consegna": "ritiro"},
+                   headers=chi(111, "Compra"))
+        prova("...la cassa risponde 409 col perche'", (409, S.MSG_LIGHTNING_SPENTO),
+              (r.status_code, r.json().get("detail")))
+        r = c.post("/api/orders", json={"annuncio_id": aid, "consegna": "ritiro",
+                                        "metodo": "onchain"}, headers=chi(111, "Compra"))
+        prova("...mentre la strada on-chain non si sente dire «Lightning spento»", True,
+              r.json().get("detail") != S.MSG_LIGHTNING_SPENTO)
+    finally:
+        S.PROVA_LIGHTNING_SPENTO = False
+    prova("nessun ordine e' nato dal no", prima, ordini())
+
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)

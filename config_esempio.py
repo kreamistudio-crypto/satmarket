@@ -2050,6 +2050,20 @@ PROVA_SOLO_IDS = []
 # ordini P2P e la semina. Il P2P resta comunque di P2P_PROVA_IDS. In
 # produzione non ha effetto (lista vuota = gia' aperta); qui False.
 PROVA_APERTA = False
+# IL COLLAUDO CHE NON SI CONFONDE COL VERO (28 ott 2026, richiesta di
+# Andrea). Tre leve che mordono SOLO con PROVA_SOLO_IDS piena: in
+# produzione non fanno niente, qualunque cosa ci sia scritto. Sulla prova
+# valgono gia' cosi' anche senza scriverle; servono per tornare indietro.
+# - PROVA_GRIGIO: la pagina in grigio con la fascia «🧪 COLLAUDO».
+# - PROVA_LIGHTNING_SPENTO: nessuna fattura Lightning (409 a chi la
+#   chiede); il foglio del pagamento si apre su ⛓️, signet.
+# - PROVA_P2P_VERO: False = i relay di Mostro passano dal recinto (solo
+#   quelli di casa, cioe' nessuno: P2P spento) e nessun ordine del
+#   collaudo finisce nel libro di Barattolo vero. True rimette la
+#   decisione del 20 ott (P2P vero, col tetto P2P_MAX_SATS_PROVA).
+PROVA_GRIGIO = True
+PROVA_LIGHTNING_SPENTO = True
+PROVA_P2P_VERO = False
 # IL CONFIG DELLA PROVA si scrive DA QUI e non copiando quello del VPS
 # (che non lascia mai il VPS): sotto ci sono le righe che cambiano,
 # tutto il resto resta com'e' in questo file. MAI una chiave vera — ne'
