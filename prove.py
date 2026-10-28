@@ -152475,6 +152475,16 @@ def prove_onchain_tetto():
           < compra.index("con = _onchain_db_ordini()"))
     prova("il codice dice 250, anche con una riga storta", 2,
           _SORGENTE.count("    ONCHAIN_MAX_EURO = 250\n"))
+    # IL PAVIMENTO DEL MARGINE A 500 (28 ott 2026, Andrea: «imposta 500
+    # sats»): sotto la rete cara comanda il pavimento, sopra il triplo
+    amb = {"ONCHAIN_MARGINE_MIN_SATS": 500, "ONCHAIN_VBYTE_USCITA": 180,
+           "ONCHAIN_MARGINE_X": 3, "math": __import__("math")}
+    exec(pezzo("onchain_margine"), amb)
+    m = amb["onchain_margine"]
+    prova("il margine: 500 a rete ferma, 540 a 1 sat/vB, 1.080 a 2",
+          [500, 540, 1080], [m(0.2), m(1.0), m(2.0)])
+    prova("...e il codice dice 500", True,
+          "\nONCHAIN_MARGINE_MIN_SATS = 500\n" in _SORGENTE)
 
 
 def _pezzi_incasso_js(mini):

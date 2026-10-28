@@ -90191,9 +90191,13 @@ ONCHAIN_ORE_ATTESA = 24
 # torna a lui nella stessa transazione. Tre volte la tariffa di
 # mezz'ora su una transazione d'uscita tipica (un ingresso 2-di-3, due
 # uscite: ~180 vbyte), mai meno del pavimento.
+# IL PAVIMENTO E' 500 (28 ott 2026, Andrea, dopo un oggetto da 3.000 sats
+# che ne chiedeva 4.000): con la rete scarica l'avanzo resta sotto la
+# polvere (546) e va tutto alla rete, come una commissione fissa; con la
+# rete cara comanda il triplo della tariffa, e l'avanzo torna a chi compra.
 ONCHAIN_VBYTE_USCITA = 180
 ONCHAIN_MARGINE_X = 3
-ONCHAIN_MARGINE_MIN_SATS = 1000
+ONCHAIN_MARGINE_MIN_SATS = 500
 ONCHAIN_POLVERE = 546       # sotto, un'uscita costa piu' di quel che porta
 _ONCHAIN_TARIFFA = {"sat_vb": 0.0, "quando": 0.0}
 

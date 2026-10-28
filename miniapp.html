@@ -54725,7 +54725,8 @@ function onchainSchedaInfo(){
         rete, di solito una decina di minuti. All'importo si aggiunge un
         piccolo <b>margine per la commissione di rete</b> dell'ultimo
         passaggio: quel che non si spende torna a te quando liberi i
-        sats.</div>
+        sats, se supera i 546 sats (sotto, la rete non lo trasmette e
+        resta a lei).</div>
     </div>
 
     <div class="payout">
@@ -55410,7 +55411,7 @@ async function payDisegnaOnchain(){
   el('payAmount').textContent = fmt(o.importo_sats);
   el('payScomposto').innerHTML = riga(o.prezzo_sats, 'Prezzo')
     + (o.quota_sats ? riga(o.quota_sats, 'Quota fissa a Barattolo (spese di rete)') : '')
-    + riga(o.margine_sats, 'Margine di rete (l\'avanzo torna a te)')
+    + riga(o.margine_sats, 'Margine di rete (se avanza più di 546 sats, torna a te)')
     + riga(o.importo_sats, 'Da mandare', true);
   el('payEurNota').style.display = 'block';
   el('payEurNota').textContent = `Signet, rete di prova. L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;

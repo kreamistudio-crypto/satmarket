@@ -73925,3 +73925,20 @@ riprenderseli da solo, e serve un moderatore (rimborso col reso o con la
 disputa). Un promemoria a chi vende dopo qualche giorno sarebbe la cosa
 giusta, ma non è stato chiesto. Resta aperta, come prima, la domanda sui
 rimborsi a chi compra (il `/1/n` del SUO seme).
+
+## Il pavimento del margine on-chain a 500 sats (28 ott 2026, cantiere onchain-margine, Andrea: «imposta 500 sats», dopo un oggetto da 3.000 sats che ne chiedeva 4.000)
+
+`ONCHAIN_MARGINE_MIN_SATS` scende da 1.000 a 500. Il margine resta il
+più alto tra il pavimento e tre volte la tariffa per ~180 vbyte (a 1
+sat/vB fa 540, a 2 fa 1.080). Conseguenza voluta: con la rete scarica
+l'avanzo (margine meno commissione, ~360 sats) sta sotto la polvere
+(546), e chi propone non mette l'uscita di resto (`resto >=
+ONCHAIN_POLVERE`, telefono e server): va tutto alla rete, come una
+commissione fissa. È anche la risposta alla domanda di Andrea «quel 1k
+in più dove lo ritrovo?»: col pavimento a 1.000 l'avanzo (~800) andava
+al `/1/n` del seme di chi compra, che l'app non mostra (si ritrova in
+Sparrow, Single Signature Native Segwit sulla strada `m/48'/1'/0'/2'`,
+tra gli indirizzi di resto). Le due scritte «l'avanzo torna a te»
+dicono ora «se supera i 546 sats». Provato: `prove_onchain_tetto` (il
+margine eseguito a 0,2, 1 e 2 sat/vB), suite e collaudi. Resta aperta
+la domanda dei rimborsi e degli avanzi a un wallet di chi compra.
