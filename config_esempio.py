@@ -814,9 +814,11 @@ CAMBIO_LIBERO_MAX_SATS = 500_000
 CAMBIO_LIBERO_MAX_AL_GIORNO = 5
 # La strada bitcoin → Lightning del cambio libero (tappa 3, 27 ott 2026):
 # chi la sceglie manda bitcoin all'indirizzo del fornitore e riceve la
-# sua richiesta Lightning pagata. Nasce SPENTA e resta spenta finche'
-# Massimo (SATS Routing) non risponde sulla quota partner del submarine
-# e sui limiti di chiamate: decisione di Andrea.
+# sua richiesta Lightning pagata. Nasce SPENTA. Aspettava Massimo (SATS
+# Routing) sulla quota partner del submarine e sui limiti di chiamate: ha
+# risposto il 28 ott 2026 (la quota vale su tutti gli swap, sulla
+# commissione finale; nessun limite di chiamate, solo il minimo e il
+# massimo dell'importo). Si accende quando decide Andrea.
 CAMBIO_BTC_LN_ATTIVO = False
 # Chi vende on-chain riceve in Lightning (28 ott 2026, cantiere
 # onchain-verso-lightning): allo sblocco i bitcoin del 2-di-3 vanno a un
