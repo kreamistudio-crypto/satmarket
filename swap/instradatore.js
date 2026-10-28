@@ -374,7 +374,11 @@ const SWAP_ICONE = {
     + '<path d="M7.5 12h9"/>',
   chiave: '<circle cx="8" cy="15.5" r="3.8"/><path d="m10.8 12.8 8.7-8.7M16.3 7.3l2.4 2.4M13.8 9.8l2 2"/>',
   scudo: '<path d="M12 3.2 5.5 5.6v5.7c0 4.3 2.8 7.6 6.5 9.2 3.7-1.6 6.5-4.9 6.5-9.2V5.6z"/><path d="m9.2 12.2 2 2 3.8-4"/>',
-  freccia: '<path d="m9.5 6 6 6-6 6"/>'};
+  freccia: '<path d="m9.5 6 6 6-6 6"/>',
+  /* (unita-tendine) la freccina della tendina, e il simbolo dei sats:
+     tre righe e il tratto che le attraversa sopra e sotto */
+  giu: '<path d="m6.5 9.5 5.5 5.5 5.5-5.5"/>',
+  sats: '<path d="M6.5 8.5h11M6.5 12h11M6.5 15.5h11M12 4.5v2.4M12 17.1v2.4"/>'};
 function swapIcona(nome){
   return `<svg class="cambio-svg" viewBox="0 0 24 24" aria-hidden="true">${SWAP_ICONE[nome] || ''}</svg>`;
 }
@@ -1216,10 +1220,13 @@ const SWAP_CAMBIO_ATTESA_MS = 800;
    scritto; il server fa il conto al contrario quando non e' il lato del
    suo `dovuto` (mai sotto la cifra scritta: un sat in piu', mai in meno).
    L'UNITA' (Andrea: «diamo la possibilita di selezionare sats o btc»,
-   «senza scritte solo selettore», il fulmine per i sats e la ₿ per i BTC):
+   «senza scritte solo selettore»; dal cantiere unita-tendine la ₿ per i
+   BTC e il segno dei sats come su SATS Routing):
    un selettore sotto i riquadri, la scelta resta sul telefono. In BTC le
    cifre hanno otto decimali, esatte al sat: niente arrotondamenti. */
 let swapCambioLato = 'mandi';
+/* la tendina aperta: 'mandi', 'ricevi' o nessuna (unita-tendine) */
+let swapCambioTendina = null;
 const SWAP_CAMBIO_UNITA_CASA = 'barattolo_cambio_unita';
 let swapCambioUnita = (() => {
   try { return localStorage.getItem(SWAP_CAMBIO_UNITA_CASA) === 'btc' ? 'btc' : 'sats'; }
@@ -1361,13 +1368,31 @@ function renderSwapCambio(){
       + ` placeholder="${esc(mio ? '0' : pz.vuota)}" aria-label="${esc(eti)}" value="${esc(mio ? swapCambioScritta : pz.altra)}">`
       + `<small>${swapCambioUnitaNome()}</small>`;
   };
-  const sopra = latoSwap(sub ? 'btc' : 'ln', tp.mandiBreve, campoCifra('mandi', sub ? tp.mandiBreve : tp.voci.cambi), 'scritto');
-  const sotto = latoSwap(sub ? 'ln' : 'btc', sub ? tp.riceviBreve : tp.ricevi, campoCifra('ricevi', sub ? tp.voci.ricevi_ln : tp.ricevi), 'arriva scritto');
-  /* il selettore dell'unita': due tondi senza scritte, il fulmine per i
-     sats e la ₿ per i BTC (le parole stanno solo per chi legge lo schermo) */
-  const unita = ['sats', 'btc'].map(u => `<button type="button" class="cambio-unita-tasto${u === swapCambioUnita ? ' scelta' : ''}"`
+  /* (unita-tendine) LA TENDINA della pillola: con due strade si sceglie
+     la rete di quel riquadro, e l'altro si gira da solo (scegliere «BTC» in
+     «Mandi» e' la strada verso Lightning). Con una strada sola, niente
+     tendina: la pillola dice e basta */
+  const tendina = (lato, rete) => {
+    if (strade.length < 2) return '';
+    const aperta = swapCambioTendina === lato;
+    const voci = ['ln', 'btc'].map(r => {
+      const strada = (lato === 'mandi' ? r === 'ln' : r === 'btc') ? 'ln-btc' : 'btc-ln';
+      if (!strade.includes(strada)) return '';
+      return `<li><button type="button" role="option" aria-selected="${r === rete}" data-swap="cambio-rete" data-strada="${strada}">`
+        + `${monetinaSwap(r)}${esc(tp.reti[r])}</button></li>`;
+    }).join('');
+    return `<span class="cambio-tendina"><button type="button" class="cambio-pillola" data-swap="cambio-tendina" data-lato="${lato}"`
+      + ` aria-haspopup="listbox" aria-expanded="${aperta}">${monetinaSwap(rete)}<b>${esc(tp.reti[rete])}</b>${swapIcona('giu')}</button>`
+      + (aperta ? `<ul class="cambio-menu" role="listbox">${voci}</ul>` : '') + '</span>';
+  };
+  const reteSopra = sub ? 'btc' : 'ln', reteSotto = sub ? 'ln' : 'btc';
+  const sopra = latoSwap(reteSopra, tp.mandiBreve, campoCifra('mandi', sub ? tp.mandiBreve : tp.voci.cambi), 'scritto', tendina('mandi', reteSopra));
+  const sotto = latoSwap(reteSotto, sub ? tp.riceviBreve : tp.ricevi, campoCifra('ricevi', sub ? tp.voci.ricevi_ln : tp.ricevi), 'arriva scritto', tendina('ricevi', reteSotto));
+  /* il selettore dell'unita': due tondi senza scritte, la ₿ per i BTC
+     e il segno dei sats (le parole stanno solo per chi legge lo schermo) */
+  const unita = ['btc', 'sats'].map(u => `<button type="button" class="cambio-unita-tasto${u === swapCambioUnita ? ' scelta' : ''}"`
     + ` data-swap="cambio-unita" data-unita="${u}" aria-pressed="${u === swapCambioUnita}" aria-label="${u === 'btc' ? 'BTC' : 'sats'}">`
-    + `${swapMoneta(u === 'btc' ? 'btc' : 'ln')}</button>`).join('');
+    + `${swapIcona(u)}</button>`).join('');
   const altraStrada = strade.find(x => x !== swapCambioStrada);
   const gira = altraStrada
     ? `<div class="cambio-gira"><button type="button" data-swap="cambio-gira" data-strada="${esc(altraStrada)}" aria-label="${esc(t.direzioni[altraStrada] || altraStrada)}">${swapIcona('gira')}</button></div>`
@@ -1444,12 +1469,24 @@ async function swapCambioCopia(id, cosa){
    resta, e il conto si rifa' subito per la strada nuova */
 function swapCambioScegliStrada(strada){
   haptic();
-  if (strada === swapCambioStrada) return;
+  swapCambioTendina = null;
+  if (strada === swapCambioStrada) return swapCambioRidisegna();
   swapCambioStrada = strada;
   swapCambioPulisci();
   if (swapCambioTimer) { clearTimeout(swapCambioTimer); swapCambioTimer = null; }
   renderSwapCambio();
   if (swapCambioCifra()) return swapCambioCalcola(true);
+}
+/* la tendina si apre e si chiude: il riquadro si ridisegna intero */
+function swapCambioRidisegna(){
+  const box = el('swapCambio');
+  if (box && box.dataset) box.dataset.forma = '';
+  renderSwapCambio();
+}
+function swapCambioApriTendina(lato){
+  haptic();
+  swapCambioTendina = swapCambioTendina === lato ? null : lato;
+  swapCambioRidisegna();
 }
 /* IL SELETTORE DELL'UNITA': la cifra scritta resta la stessa in sats, e
    si riscrive nell'unita' nuova; il conto non cambia, cambia come si legge */
@@ -1616,6 +1653,11 @@ function swapRitiraA(id){
 if (typeof document !== 'undefined') {
   document.addEventListener('click', ev => {
     const b = ev.target && ev.target.closest ? ev.target.closest('[data-swap]') : null;
+    /* (unita-tendine) un tocco fuori dalla tendina aperta la chiude */
+    if (swapCambioTendina && !(b && (b.dataset.swap === 'cambio-tendina' || b.dataset.swap === 'cambio-rete'))) {
+      swapCambioTendina = null;
+      swapCambioRidisegna();
+    }
     if (!b) return;
     const n = Number(b.dataset.ordine || 0);
     const a = b.dataset.swap;
@@ -1631,6 +1673,8 @@ if (typeof document !== 'undefined') {
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
     else if (a === 'cambio-gira') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-unita') swapCambioScegliUnita(String(b.dataset.unita || 'sats'));
+    else if (a === 'cambio-tendina') swapCambioApriTendina(String(b.dataset.lato || 'mandi'));
+    else if (a === 'cambio-rete') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-calcola') swapCambioCalcola();
     else if (a === 'dettagli') { haptic(); dettagliSwap[n] = !dettagliSwap[n]; ridisegnaIncassoSwap(); }
     else if (a === 'riserva') { haptic(); swapRiservaAperta = !swapRiservaAperta; renderSwapTelefono(); }

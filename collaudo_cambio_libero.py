@@ -473,10 +473,14 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   const f1 = box();
   const senzaSvg = f1.replace(/<svg[\s\S]*?<\/svg>/g, '');
   out.aperto = {campo: f1.includes('id="swapCambioMandi" data-lato="mandi"') && f1.includes('id="swapCambioRicevi" data-lato="ricevi"'),
-                mandi: f1.includes('<span class="cambio-eti">Mandi</span><span class="cambio-rete">Lightning</span>'),
-                ricevi: f1.includes('<span class="cambio-eti">Ricevi circa</span><span class="cambio-rete">On-chain</span>'),
-                unita: [(f1.match(/data-swap="cambio-unita"/g) || []).length, f1.includes('data-unita="sats" aria-pressed="true" aria-label="sats"><span class="cambio-moneta ln">'),
-                        f1.includes('data-unita="btc" aria-pressed="false" aria-label="BTC"><span class="cambio-moneta btc">')],
+                /* (28 ott 2026, unita-tendine) le pillole di SATS Routing: il fulmine
+                   «LN» e la moneta «BTC»; con una strada sola niente tendina */
+                mandi: /<span class="cambio-eti">Mandi<\/span><span class="cambio-pillola"><span class="cambio-fulmine"><svg[^]*?<\/svg><\/span><b>LN<\/b><\/span>/.test(f1),
+                ricevi: /<span class="cambio-eti">Ricevi circa<\/span><span class="cambio-pillola"><span class="cambio-moneta btc"><svg[^]*?<\/svg><\/span><b>BTC<\/b><\/span>/.test(f1),
+                tendine: (f1.match(/data-swap="cambio-tendina"/g) || []).length,
+                unita: [(f1.match(/data-swap="cambio-unita"/g) || []).length, f1.includes('data-unita="sats" aria-pressed="true" aria-label="sats"><svg'),
+                        f1.includes('data-unita="btc" aria-pressed="false" aria-label="BTC"><svg'),
+                        f1.indexOf('data-unita="btc"') < f1.indexOf('data-unita="sats"')],
                 gira: (f1.match(/data-swap="cambio-gira"/g) || []).length,
                 tra: f1.includes('Da 25000 a 500000 sats · oggi 0 di 5'),
                 tessere: (f1.match(/<li><span class="cambio-tessera-ico"><svg/g) || []).length,
@@ -611,12 +615,31 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   const F = D.fattureSub;
   run('renderSwapCambio()');
   sub.pillole = [(box().match(/data-swap="cambio-gira" data-strada="btc-ln"/g) || []).length, box().includes('aria-label="Da bitcoin a Lightning"')];
+  /* (unita-tendine) LA TENDINA della pillola: due reti, quella di adesso
+     scelta; un tocco fuori la chiude; in «Ricevi» «BTC» e' la strada di
+     sempre e «LN» quella rovesciata */
+  const tocco = target => { for (const [tipo, f] of run('ascoltatori')) if (tipo === 'click') f({target}); };
+  run("swapCambioApriTendina('mandi')");
+  const fT = box();
+  sub.tendina = {pillole: (fT.match(/data-swap="cambio-tendina"/g) || []).length,
+                 menu: (fT.match(/role="option"/g) || []).length,
+                 ln: /aria-selected="true" data-swap="cambio-rete" data-strada="ln-btc">[^]*?LN<\/button>/.test(fT),
+                 btc: /aria-selected="false" data-swap="cambio-rete" data-strada="btc-ln">[^]*?BTC<\/button>/.test(fT),
+                 aperta: fT.includes('data-lato="mandi" aria-haspopup="listbox" aria-expanded="true"')};
+  tocco({closest: () => null});
+  sub.tendina.chiusaFuori = !box().includes('role="listbox"') && run('swapCambioTendina') === null;
+  run("swapCambioApriTendina('ricevi')");
+  const fR2 = box();
+  sub.tendina.ricevi = [/data-strada="ln-btc">[^]*?BTC<\/button>/.test(fR2), /data-strada="btc-ln">[^]*?LN<\/button>/.test(fR2)];
+  /* scegliere la rete che c'e' gia' chiude e basta */
+  run("swapCambioScegliStrada('ln-btc')");
+  sub.tendina.stessa = [run('swapCambioTendina'), run('swapCambioStradaScelta()'), box().includes('role="listbox"')];
   /* il tondo gira la strada; la cifra scritta resta, e il conto si rifa' da solo */
   const pGira = preventivi().length;
   await run("swapCambioScegliStrada('btc-ln')");
   const fs1 = box();
   sub.scelta = [fs1.includes('data-swap="cambio-gira" data-strada="ln-btc"'),
-                fs1.indexOf('<div class="cambio-lato arriva scritto"><span class="cambio-moneta ln">') >= 0
+                /<div class="cambio-lato arriva scritto"><span class="cambio-dati"><span class="cambio-eti">Ricevi<\/span><span class="cambio-tendina"><button[^>]*data-lato="ricevi"[^>]*>[^]*?<b>LN<\/b>/.test(fs1)
                   && fs1.indexOf('<span class="cambio-eti">Ricevi</span>') < fs1.indexOf('id="swapCambioRicevi"'),
                 preventivi().length - pGira, preventivi()[preventivi().length - 1].strada];
   /* (cambio-due-riquadri) la cifra resta in «Mandi», ora on-chain: il
@@ -641,7 +664,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   const fs2 = box();
   sub.preventivo = {strada: preventivi()[preventivi().length - 1].strada,
                     titolo: fs2.includes('aria-label="Quanto mandi in bitcoin"'), piu: fs2.includes('<b>+500</b>') && fs2.includes('<b>+318</b>'),
-                    mandi: /<span class="cambio-eti">Mandi<\/span><span class="cambio-rete">On-chain<\/span><\/span><span class="cambio-cifra"><input[^>]*id="swapCambioMandi"[^>]*value="100818">/.test(fs2),
+                    mandi: /<span class="cambio-eti">Mandi<\/span><span class="cambio-tendina">[^]*?<b>BTC<\/b>[^]*?<\/span><\/span><span class="cambio-cifra"><input[^>]*id="swapCambioMandi"[^>]*value="100818">/.test(fs2),
                     riceviLn: fs2.includes('<span>Ricevi in Lightning</span><b>100000</b>'),
                     campoFattura: fs2.includes('id="swapFattura_0"') && fs2.includes('data-swap="incolla-fattura"'),
                     campoIndirizzo: fs2.includes('id="swapIndirizzo_0"'),
@@ -831,11 +854,11 @@ def il_telefono(base):
     # (28 ott 2026, cantiere grafica-cambio) niente piu' tasto «🔁 Cambia»
     # ne' «Chiudi»: a leva accesa il riquadro e' gia' aperto
     prova("a leva del cambio spenta il riquadro e' vuoto", "", r["spento"])
-    prova("accesa, SUBITO APERTO: «Mandi / Lightning» e «Ricevi circa / On-chain» coi due "
-          "campi (cambio-due-riquadri), il selettore sats/BTC (fulmine acceso, ₿ spenta), "
-          "una strada sola (nessun tondo), i tetti, tre tesserine, l'indirizzo e «Conferma» "
-          "spento; niente tasti di ieri, niente emoji fuori dalle icone disegnate",
-          {"campo": True, "mandi": True, "ricevi": True, "unita": [2, True, True], "gira": 0, "tra": True, "tessere": 3,
+    prova("accesa, SUBITO APERTO: «Mandi» col fulmine «LN» e «Ricevi circa» con la moneta "
+          "«BTC» (unita-tendine; una strada sola: niente tendine, niente tondo), i due campi, "
+          "il selettore ₿ / sats (sats scelto), i tetti, tre tesserine, l'indirizzo e "
+          "«Conferma» spento; niente tasti di ieri, niente emoji fuori dalle icone disegnate",
+          {"campo": True, "mandi": True, "ricevi": True, "tendine": 0, "unita": [2, True, True, True], "gira": 0, "tra": True, "tessere": 3,
            "indirizzo": True, "fermo": True, "vecchi": [], "emoji": []}, r["aperto"])
     prova("senza cifra: lo dice e non chiede niente", [True, 0], r["senzaCifra"])
     prova("la cifra scritta tasto per tasto: intanto «…» e «Conferma» spento, nessun "
@@ -913,11 +936,16 @@ def il_telefono(base):
     print("\n[il telefono, la strada bitcoin → Lightning (tappa 3)]")
     s = r.get("sub") or {}
     prova("con le due strade dal server, il tondo fra i riquadri (dice dove porta); "
-          "girato: «Ricevi / Lightning» sotto, il tondo riporta indietro, e il conto si "
+          "girato: «Ricevi / LN» sotto, il tondo riporta indietro, e il conto si "
           "rifa' da solo per la strada nuova",
           ([1, True], [True, True, 1, "btc-ln"]), (s.get("pillole"), s.get("scelta")))
     prova("(cambio-due-riquadri) la cifra resta in «Mandi», ora on-chain: il conto al "
           "contrario dice quanto si riceve", ["mandi", 99_186, True], s.get("mandiScritto"))
+    prova("(unita-tendine) con due strade la tendina in ogni pillola: LN e BTC, quella di "
+          "adesso scelta; un tocco fuori la chiude; in «Ricevi» BTC e' la strada di sempre e "
+          "LN quella rovesciata; la rete che c'e' gia' chiude e basta",
+          {"pillole": 2, "menu": 2, "ln": True, "btc": True, "aperta": True, "chiusaFuori": True,
+           "ricevi": [True, True], "stessa": [None, "ln-btc", False]}, s.get("tendina"))
     prova("...un sat in piu', mai in meno: scritti 100.015 da mandare, ne servono "
           "100.016; uscendo dal campo si vede la cifra vera, e il conto resta buono",
           ["100016", 100_016, 99_201, True, 0], s.get("unSatInPiu"))

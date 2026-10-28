@@ -34004,9 +34004,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swapCambioDovuto()`. L'unità: `swapCambioUnita` ('sats'/'btc', in
   `localStorage` `barattolo_cambio_unita`), `swapCambioLeggi`,
   `swapCambioNum`; nella pagina `numSwap`/`unitaSwap` (solo l'ordine 0),
-  il selettore `.cambio-unita` con `data-swap="cambio-unita"`. Il nome
-  della rete nel riquadro è «On-chain» (`reti.btc`), eccezione chiesta
-  da Andrea alla regola delle parole tecniche.
+  il selettore `.cambio-unita` con `data-swap="cambio-unita"`.
+  AGGIORNATO lo stesso giorno (cantiere unita-tendine; perché in
+  CANTIERI, «Le unità e le tendine del Cambio come SATS Routing»): nel
+  riquadro la rete è una pillola (`latoSwap(rete, eti, cifra, classe,
+  tendina)`, `monetinaSwap`) con le sigle «LN»/«BTC» (`reti`), niente
+  più «On-chain» né eccezioni alla regola delle parole tecniche; con due
+  strade la pillola è una tendina (`data-swap="cambio-tendina"`, il menu
+  `.cambio-menu` con `data-swap="cambio-rete"` e `data-strada`), aperta
+  in `swapCambioTendina` ('mandi'/'ricevi'/null) e chiusa da un tocco
+  fuori. Il selettore dell'unità ha la ₿ e il segno dei sats
+  (`SWAP_ICONE.btc`/`.sats`).
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr

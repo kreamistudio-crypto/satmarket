@@ -9738,11 +9738,28 @@
   .cambio-moneta.btc .cambio-svg{stroke-width:2.1}
   .cambio-moneta.piana{background:var(--bg);color:var(--ink)}
   html[data-tema="scuro"] .cambio-moneta.ln{background:#3B3424}
-  .cambio-dati{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+  .cambio-dati{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:7px}
   .cambio-eti{font-size:11.5px;font-weight:800;letter-spacing:.3px;
     text-transform:uppercase;color:var(--muted)}
-  .cambio-rete{font-size:15px;font-weight:800;color:var(--ink)}
-  .cambio-cifra{flex:0 1 auto;min-width:0;display:flex;align-items:baseline;
+  /* la pillola della rete, e la sua tendina (unita-tendine) */
+  .cambio-tendina{position:relative;display:inline-block}
+  .cambio-pillola{display:inline-flex;align-items:center;gap:7px;padding:4px 10px 4px 5px;
+    border-radius:999px;border:1.5px solid var(--line);background:var(--card);
+    font:800 15px/1 'Nunito',sans-serif;color:var(--ink);white-space:nowrap}
+  button.cambio-pillola{cursor:pointer}
+  button.cambio-pillola:active{transform:scale(.97)}
+  .cambio-pillola .cambio-moneta,.cambio-menu .cambio-moneta{width:24px;height:24px}
+  .cambio-pillola .cambio-moneta .cambio-svg,.cambio-menu .cambio-moneta .cambio-svg{width:14px;height:14px}
+  .cambio-fulmine{display:grid;place-items:center;width:24px;height:24px;color:#F5B800}
+  .cambio-fulmine .cambio-svg{width:21px;height:21px;vertical-align:0}
+  .cambio-pillola>.cambio-svg{width:15px;height:15px;margin:0;color:var(--muted);vertical-align:0}
+  .cambio-menu{position:absolute;z-index:5;top:calc(100% + 6px);left:0;min-width:120px;margin:0;
+    padding:5px;list-style:none;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow-card)}
+  .cambio-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px;border:0;
+    border-radius:10px;background:none;font:800 15px/1 'Nunito',sans-serif;color:var(--ink);cursor:pointer}
+  .cambio-menu button[aria-selected="true"]{background:var(--bg)}
+  .cambio-cifra{flex:0 1 auto;min-width:0;display:flex;align-items:baseline;align-self:flex-end;margin-bottom:5px;
     justify-content:flex-end;gap:4px;font:800 23px/1.1 'Baloo 2','Nunito',sans-serif;
     color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
   .cambio-cifra small{font:700 12px/1 'Nunito',sans-serif;color:var(--muted)}
@@ -9753,6 +9770,14 @@
     font:inherit;color:inherit;text-align:right;outline:none}
   .cambio-cifra-campo::placeholder{color:var(--muted)}
   .cambio-cifra-campo.btc{width:10.5ch;font-size:18px}
+  /* (28 ott 2026, cantiere btc-320) su un telefono da 320 px la cifra in
+     BTC non ci stava: tagliata nel campo e attaccata al nome della rete.
+     Sotto i 350 px la moneta e lo spazio si stringono e la cifra in BTC
+     scende di un punto e mezzo; da 360 px in su non cambia niente */
+  @media (max-width:350px){
+    .cambio-lato{gap:8px;padding:12px 10px}
+    .cambio-cifra-campo.btc{font-size:16px}
+  }
   .cambio-gira{position:relative;height:6px;display:flex;justify-content:center;z-index:1}
   .cambio-gira button{position:absolute;top:-16px;width:38px;height:38px;padding:0;
     border-radius:50%;border:3px solid var(--card);background:var(--ink);color:var(--on-ink);
@@ -9760,12 +9785,14 @@
   .cambio-gira button:active{transform:scale(.94)}
   .cambio-gira .cambio-svg{width:18px;height:18px;stroke-width:2;vertical-align:0}
   /* (cambio-due-riquadri) il selettore sats/BTC: due tondi, senza scritte */
-  .cambio-unita{display:flex;gap:6px;padding:8px 6px 0}
-  .cambio-unita-tasto{width:34px;height:34px;padding:0;border-radius:50%;cursor:pointer;
-    border:2px solid transparent;background:none;display:grid;place-items:center;opacity:.5}
-  .cambio-unita-tasto .cambio-moneta{width:26px;height:26px}
-  .cambio-unita-tasto .cambio-moneta .cambio-svg{width:15px;height:15px}
-  .cambio-unita-tasto.scelta{opacity:1;border-color:var(--sats)}
+  /* (unita-tendine) come su SATS Routing: una pillola con la ₿ e il
+     simbolo dei sats a tre righe; quella scelta nel tondo, arancione */
+  .cambio-unita{display:inline-flex;gap:3px;margin:10px 6px 0;padding:3px;
+    border:1.5px solid var(--line);border-radius:999px}
+  .cambio-unita-tasto{width:36px;height:36px;padding:0;border-radius:50%;cursor:pointer;
+    border:2px solid transparent;background:none;display:grid;place-items:center;color:var(--ink)}
+  .cambio-unita-tasto .cambio-svg{width:21px;height:21px;stroke-width:2.3;vertical-align:0}
+  .cambio-unita-tasto.scelta{border-color:var(--line);background:var(--bg);color:#F7931A}
   .cambio-unita-tasto:active{transform:scale(.94)}
   .cambio-costo{display:flex;justify-content:space-between;align-items:center;gap:10px;
     padding:10px 8px 6px;font-size:13.5px;font-weight:600;color:var(--muted)}
@@ -18471,7 +18498,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '492b3ceb53';
+const SWAP_TELEFONO_VER = '06691fdceb';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18576,7 +18603,7 @@ const SWAP_TESTI = {
        ricalcola: 'Ricalcola',
        /* (grafica-cambio, 28 ott 2026) i riquadri: il nome della rete
           sotto l'etichetta, il costo in una riga, le voci a richiesta */
-       reti: {ln: 'Lightning', btc: 'On-chain'}, mandiBreve: 'Mandi', riceviBreve: 'Ricevi',
+       reti: {ln: 'LN', btc: 'BTC'}, mandiBreve: 'Mandi', riceviBreve: 'Ricevi',
        costo: 'Costo', dettagli: 'Dettagli', nascondiDettagli: 'Nascondi',
        /* (tappa 3) la strada bitcoin → Lightning: quanto MANDARE */
        titoloPrevSub: 'Quanto mandi in bitcoin', mandi: 'Mandi all\'indirizzo',
@@ -18607,7 +18634,7 @@ const SWAP_TESTI = {
        cambioNonRisponde: '{f} is not responding: try again shortly.',
        cambioSpento: 'The exchange is not available right now.',
        ricalcola: 'Recalculate',
-       reti: {ln: 'Lightning', btc: 'On-chain'}, mandiBreve: 'You send', riceviBreve: 'You receive',
+       reti: {ln: 'LN', btc: 'BTC'}, mandiBreve: 'You send', riceviBreve: 'You receive',
        costo: 'Cost', dettagli: 'Details', nascondiDettagli: 'Hide',
        titoloPrevSub: 'What you send in bitcoin', mandi: 'You send to the address',
        voci: {dovuto: 'You are owed', cambi: 'You exchange',
@@ -18795,12 +18822,21 @@ function numSwap(n, sats){
 function unitaSwap(n){
   return Number(n) === 0 && typeof swapCambioUnitaNome === 'function' ? swapCambioUnitaNome() : 'sats';
 }
-function latoSwap(rete, eti, cifra, classe){
+/* (28 ott 2026, cantiere unita-tendine, Andrea: «usa esattamente
+   queste unità di misura e stessi loghi e tendine») come su SATS Routing:
+   l'etichetta sopra, sotto la PILLOLA con logo e sigla (il fulmine giallo
+   «LN», la moneta arancione «BTC»), la cifra a destra. Il cambio libero ci
+   mette la sua tendina (`tendina`), che sceglie la rete; altrove la
+   pillola e' solo un'etichetta */
+function monetinaSwap(rete){
+  return rete === 'btc' ? `<span class="cambio-moneta btc">${iconaSwap('btc')}</span>`
+    : `<span class="cambio-fulmine">${iconaSwap('ln')}</span>`;
+}
+function latoSwap(rete, eti, cifra, classe, tendina){
   const t = testiSwap();
+  const pillola = tendina || `<span class="cambio-pillola">${monetinaSwap(rete)}<b>${esc(t.reti[rete])}</b></span>`;
   return `<div class="cambio-lato${classe ? ' ' + classe : ''}">`
-    + `<span class="cambio-moneta ${rete}">${iconaSwap(rete)}</span>`
-    + `<span class="cambio-dati"><span class="cambio-eti">${esc(eti)}</span>`
-    + `<span class="cambio-rete">${esc(t.reti[rete])}</span></span>`
+    + `<span class="cambio-dati"><span class="cambio-eti">${esc(eti)}</span>${pillola}</span>`
     + `<span class="cambio-cifra">${cifra}</span></div>`;
 }
 /* le voci del conto, una per riga (le cifre incolonnate a destra) */
