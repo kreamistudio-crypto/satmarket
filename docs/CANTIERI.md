@@ -73947,7 +73947,7 @@ la domanda dei rimborsi e degli avanzi a un wallet di chi compra.
 
 Con `PROVA_APERTA = True` sul collaudo entra chiunque, e il collaudo era
 identico al mercatino vero. Ora, sul collaudo, la pagina ha il **fondo
-azzurro** (`--bg` #E3EEF9 di giorno, #12202E di sera, al posto del crema
+azzurro** (`--bg` #E3EEF9 di giorno, #12202E di sera — dal secondo giro più carichi, vedi sotto — al posto del crema
 e del bruno) e una **banda fissa in cima**, «🧪 COLLAUDO · non è il
 mercatino vero», alta 20px e che non si tocca (`pointer-events:none`).
 Anche la barra del browser e l'header di Telegram prendono l'azzurro
@@ -74005,3 +74005,28 @@ pannello del libro P2P da schermo largo, che parte a 60px e sta 20px
 sotto la topbar abbassata). Su
 iPhone a schermo intero (PWA) la banda sta sotto la tacca, come la
 testata di oggi.
+
+## Il collaudo più acceso (28 ott 2026, cantiere collaudo-chiaro, Andrea: «i colori del collaudo sono troppo sbiaditi, accentuerei il colore»; poi «lascia il tema scuro anche»)
+
+Il secondo giro del vestito del collaudo. L'azzurro pallido (#E3EEF9) si
+confondeva col crema di produzione: ora il fondo è **#B5D8FA** di giorno
+e **#0E2A4D** di sera, la banda un blu pieno #0A66D1, e la barra di
+Telegram segue i due fondi nuovi (`applicaTema`). Il tema scuro resta:
+Andrea ha chiesto per un momento il solo chiaro, poi ha cambiato idea
+prima che si scrivesse codice.
+
+**IL GRIGIO DELLE SCRITTE PICCOLE.** Col fondo carico `--muted`
+(#8A8271) scendeva a 2,6:1, illeggibile («ESPLORA PER CATEGORIE», le
+date, le note). Sul collaudo di giorno diventa #5E5747 (4,8:1). Di sera
+il valore della sera regge da solo (5,5:1), ma va RISCRITTO nella regola
+della sera del collaudo: la regola del giorno sta dopo il blocco della
+sera con lo stesso peso, e senza quella riga il grigio scuro del giorno
+sarebbe finito sul blu notte. La prova calcola i due contrasti (WCAG,
+almeno 4,5:1) e controlla che il valore di sera sia quello del blocco
+della sera.
+
+**PROVATO.** `prove_istanza_prova` coi colori nuovi e i contrasti;
+controprove: tolto `--muted` dalla sera, tolto dal giorno, rimesso il
+colore vecchio a Telegram, tutte rosse. Foto della pagina col Chromium
+del container (telefono di giorno e di sera). Da guardare dal vivo come
+il primo giro.
