@@ -129538,7 +129538,7 @@ def prove_guscio_apertura():
     prova("...detto DOPO aver tolto guscio e copertura", True,
           -1 not in _i.values() and sorted(_i.values()) == list(_i.values()))
     prova("...e i due colori che Telegram riceve sono il FONDO dell'app",
-          True, "? (scuro ? '#12202E' : '#E3EEF9') : (scuro ? '#211A10' : '#FAF4E4');" in js
+          True, "? (scuro ? '#0E2A4D' : '#B5D8FA') : (scuro ? '#211A10' : '#FAF4E4');" in js
           and "tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo);"
           in js)
 
@@ -177395,10 +177395,23 @@ def prove_istanza_prova():
           mini.index('html[data-tema="scuro"]{') < _i_vest
           and mini.index("@media (min-width:768px){\n    #app{max-width:960px;") < _i_vest
           and mini.index("\n  /* ====", _i_vest) == _i_largo - 3)
-    prova("...cambia il solo fondo, di giorno e di sera", True,
-          "html.istanza-prova{--bg:#E3EEF9}" in vcss
-          and 'html.istanza-prova[data-tema="scuro"]{--bg:#12202E}' in vcss
+    prova("...cambia il fondo (e il grigio delle scritte piccole), di giorno e di sera", True,
+          "html.istanza-prova{--bg:#B5D8FA;--muted:#5E5747}" in vcss
+          and 'html.istanza-prova[data-tema="scuro"]{--bg:#0E2A4D;--muted:#A99F87}' in vcss
           and vcss.count("--bg:") == 2 and "--card:" not in vcss and "--ink:" not in vcss)
+    def _lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    def _contrasto(a, b):
+        la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+    prova("...le scritte piccole si leggono sul fondo acceso (almeno 4,5:1, giorno e sera)",
+          [True, True], [_contrasto("#5E5747", "#B5D8FA") >= 4.5,
+                         _contrasto("#A99F87", "#0E2A4D") >= 4.5])
+    prova("...e di sera --muted e' proprio quello della sera (la regola del giorno, "
+          "che viene dopo, non deve passarci sopra)", True,
+          "--bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87;" in mini)
     prova("...nessun filtro: i colori dei bottoni restano quelli veri", False,
           "filter" in vcss or "grayscale" in vcss)
     _banda = vcss[vcss.index("html.istanza-prova body::before{"):]
@@ -177423,7 +177436,7 @@ def prove_istanza_prova():
     prova("applicaTema porta il fondo azzurro anche alla barra e a Telegram, "
           "gli stessi due del CSS", True,
           "document.documentElement.classList.contains('istanza-prova')" in at_v
-          and "? (scuro ? '#12202E' : '#E3EEF9')" in at_v)
+          and "? (scuro ? '#0E2A4D' : '#B5D8FA')" in at_v)
     prova("...e la classe non la scrive nessun altro: il JS la legge e basta", 0,
           len(re.findall(r"classList\.(?:add|toggle|remove)\('istanza-prova'", mini)))
 
