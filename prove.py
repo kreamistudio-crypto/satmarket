@@ -179879,8 +179879,9 @@ def prove_cambio_libero():
     la strada rovesciata, bitcoin → Lightning (il «submarine»: l'utente
     manda i bitcoin all'indirizzo del fornitore e incassa la SUA richiesta
     Lightning; fallito, si rimborsa da solo con le 12 parole), dietro la
-    leva CAMBIO_BTC_LN_ATTIVO che resta SPENTA finche' Massimo non
-    risponde sulla quota partner e sui limiti di chiamate."""
+    leva CAMBIO_BTC_LN_ATTIVO, SPENTA di serie (aspettava Massimo sulla
+    quota partner e sui limiti di chiamate: ha risposto il 28 ott, e
+    ora si accende quando decide Andrea)."""
     print("\n[il cambio libero, tappa 2: il biglietto e l'«ordine 0»]")
     src = _SORGENTE.replace("\r\n", "\n")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
@@ -180004,15 +180005,20 @@ def prove_cambio_libero():
            "collaudo_cambio_libero.py" in compila))
 
     # ─── LA TAPPA 3: bitcoin → Lightning (il «submarine»), dietro una leva
-    # che resta SPENTA finche' Massimo non risponde (quota partner, limiti)
+    # SPENTA di serie (Massimo ha risposto il 28 ott: decide Andrea)
     print("\n[il cambio libero, tappa 3: bitcoin → Lightning, dietro la leva]")
     bz = open(os.path.join("swap", "boltz.js"), encoding="utf-8").read().replace("\r\n", "\n")
     prova("la leva CAMBIO_BTC_LN_ATTIVO: d'esempio SPENTA, di serie e nel pannello", (1, 1, 1),
           (esempio.count("\nCAMBIO_BTC_LN_ATTIVO = False\n"),
            src.count("    CAMBIO_BTC_LN_ATTIVO = False\n"),
            pannello.count('"CAMBIO_BTC_LN_ATTIVO"')))
-    prova("...e il pannello dice perche' e' spenta (Massimo)", True,
-          "spenta finche' Massimo non risponde" in pannello)
+    # (28 ott 2026) Massimo ha risposto: il pannello non dice piu' che
+    # lo si aspetta, dice chi decide
+    prova("...e il pannello dice com'e' spenta: Massimo ha risposto, decide Andrea",
+          (True, False),
+          ("ha risposto (28 ott)" in pannello
+           and "quando decide Andrea" in pannello,
+           "finche' Massimo non risponde" in pannello))
     amb3 = {"CAMBIO_BTC_LN_ATTIVO": False}
     for nome in ("cambio_strade", "preventivo_sub", "tariffa_sub_da_risposta"):
         exec(pezzo(nome), amb3)

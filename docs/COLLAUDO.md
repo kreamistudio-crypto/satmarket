@@ -246,7 +246,10 @@ aggiunge, si toglie la vecchia da GitHub.
   `CAMBIO_LIBERO_ATTIVO = True` (il tasto «🔁 Cambia» nella pagina
   «Cambio», solo moderatori) e, SOLO QUI, `CAMBIO_BTC_LN_ATTIVO = True`
   per vedere la strada rovesciata contro il cartone (in produzione
-  resta spenta finché Massimo non risponde). Da guardare sul telefono
+  resta spenta finché non decide Andrea: Massimo ha risposto il 28
+  ott). ATTENZIONE: il cartone acceso PRIMA del 27 ott 08:56 UTC
+  (23462f4) non sa il submarine; si spegne e si rilancia (28 ott).
+  Da guardare sul telefono
   vero: il QR della fattura e «Apri nel wallet» dentro Telegram (strada
   Lightning → bitcoin), «Incolla» della richiesta e il link `bitcoin:`
   dentro Telegram (strada rovesciata). Col cartone nessun sat si muove:
