@@ -74490,3 +74490,17 @@ BTC. Suite e collaudi: nel messaggio del commit.
 in BTC, il passaggio da un riquadro all'altro col dito. In BTC la riga
 del costo può andare a capo a 375 px («SATS Routing» sotto): si legge,
 non si è toccato.
+
+## La riga del costo resta una anche in BTC (28 ott 2026, cantiere costo-una-riga, chiesto dal coordinatore sul «notato» del cantiere cambio-due-riquadri)
+
+In BTC la cifra del costo è lunga («0,00001158 BTC»): a 360 px, e a 375
+px con «Nascondi», «SATS Routing» andava a capo. Ora la riga resta UNA:
+il testo si accorcia coi puntini alla fine (il nome di chi cambia, che
+resta intero in «Dettagli»), la cifra e «Dettagli»/«Nascondi» non si
+stringono mai (`flex:0 0 auto`). Solo CSS. PROVATO col Chromium del
+container a 320, 360 e 375 px, sulle due strade e coi dettagli aperti e
+chiusi: la riga è alta 20 px (prima 39 a 360 px); la sentinella sta in
+`prove_grafica_swap`. Controprova: tolta la regola, la sentinella è
+rossa e la misura a 360 px torna a 39. NOTATO, non toccato: a 320 px
+(telefoni piccolissimi) in BTC la cifra dei riquadri tocca l'etichetta
+della rete.

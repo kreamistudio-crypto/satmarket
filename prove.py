@@ -180344,6 +180344,14 @@ console.log(JSON.stringify(fuori));
           (cella.rstrip().endswith("+ '<span class=\"eti-ricevi\">Cambio</span>';"),
            "Swap';" in cella, testi.count("titolo: 'Cambio',"),
            testi.count("titolo: 'Exchange',")))
+    # (28 ott 2026, costo-una-riga) in BTC la riga del costo andava a capo a
+    # 360 px: resta una, il nome si accorcia coi puntini, «Dettagli» no
+    # (misurata col Chromium a 320, 360 e 375 px: 20 px di altezza, una riga)
+    prova("la riga del costo resta una: il testo si accorcia coi puntini, "
+          "«Dettagli» non si stringe", (True, True),
+          (".cambio-costo>span:first-child{min-width:0;overflow:hidden;"
+           "text-overflow:ellipsis;white-space:nowrap}" in mini,
+           ".cambio-dettagli{flex:0 0 auto;" in mini))
     prova("...un punto piu' piccola e un filo stretta: ci sta su una riga da 360 px",
           True, "nav .eti-ricevi{display:block;font-size:9.5px;line-height:1.3;"
           "letter-spacing:-.15px;" in mini)
