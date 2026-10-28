@@ -269,6 +269,30 @@ def main():
     S._PAGINA_CACHE["timbro"] = False
     prova("rimesso quello di serie, la pagina torna identica", pagina, c.get("/").text)
 
+    print("\n[il vestito del collaudo: fondo azzurro e banda (28 ott 2026)]")
+    VESTITO = '<html lang="it" class="istanza-prova">'
+    prova("a lista vuota nessun vestito: la produzione", (0, 1),
+          (pagina.count(VESTITO), pagina.count('<html lang="it">')))
+    S.PROVA_SOLO_IDS = {111}
+    S.PROVA_APERTA = True
+    try:
+        S._PAGINA_CACHE["timbro"] = False
+        for via in ("/", "/miniapp.html", f"/annuncio/{aid}"):
+            r = c.get(via)
+            prova(f"{via}: a prova APERTA il vestito c'e', una volta",
+                  (200, 1), (r.status_code, r.text.count(VESTITO)))
+        S.PROVA_APERTA = False
+        S._PAGINA_CACHE["timbro"] = False
+        p = c.get("/").text
+        prova("...e a prova chiusa pure, accanto alla copertina", (1, True),
+              (p.count(VESTITO), "const ISTANZA_PRIVATA = true;" in p))
+    finally:
+        S.PROVA_SOLO_IDS = set()
+        S.PROVA_APERTA = False
+    S._PAGINA_CACHE["timbro"] = False
+    prova("rimessa vuota la lista, la pagina torna identica byte per byte",
+          pagina, c.get("/").text)
+
     print("\n[il pannello «Stato delle leve»]")
     def righe_leve():
         g = c.get("/api/admin/leve", headers=chi(999, "Admin")).json()["gruppi"]

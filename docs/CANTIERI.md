@@ -73942,3 +73942,66 @@ tra gli indirizzi di resto). Le due scritte «l'avanzo torna a te»
 dicono ora «se supera i 546 sats». Provato: `prove_onchain_tetto` (il
 margine eseguito a 0,2, 1 e 2 sat/vB), suite e collaudi. Resta aperta
 la domanda dei rimborsi e degli avanzi a un wallet di chi compra.
+
+## Il collaudo riconoscibile a colpo d'occhio (28 ott 2026, cantiere collaudo-riconoscibile, Andrea: «possiamo modificare il colore dello sfondo di barattolo collaudo così si capisce subito che quello è il collaudo?»)
+
+Con `PROVA_APERTA = True` sul collaudo entra chiunque, e il collaudo era
+identico al mercatino vero. Ora, sul collaudo, la pagina ha il **fondo
+azzurro** (`--bg` #E3EEF9 di giorno, #12202E di sera, al posto del crema
+e del bruno) e una **banda fissa in cima**, «🧪 COLLAUDO · non è il
+mercatino vero», alta 20px e che non si tocca (`pointer-events:none`).
+Anche la barra del browser e l'header di Telegram prendono l'azzurro
+(`applicaTema`). La scelta è di Andrea, fra quattro opzioni.
+
+**IL SEGNALE È LA LISTA, NON UNA LEVA NUOVA.** `PROVA_SOLO_IDS` piena
+vuol dire «questa è una prova», con la prova aperta o chiusa. In
+produzione è vuota per regola. Il server, alla rilettura della pagina,
+mette la classe `istanza-prova` su `<html>` (`_prova_nella_pagina`, la
+quarta riga gemella dopo bot, dominio e copertina). Il colore c'è quindi
+già al primo disegno, senza il lampo del crema. A lista vuota la pagina
+esce identica, lo stesso oggetto. Niente riga nel config della VM e
+niente riavvio: il collaudo lo tira su da solo con develop.
+`MODALITA_COLLAUDO` non serve: sulla VM è False.
+
+**SOLO IL FONDO.** Carta, inchiostro e bottoni restano quelli veri,
+perché sul collaudo si guarda la grafica nuova prima che vada online.
+Il CSS sta dopo la sera e dopo la media query da desktop, così a parità
+di peso vince lui, e subito prima dello SCHERMO LARGO, che deve restare
+l'ultimo blocco del foglio (al primo giro l'avevo messo in fondo e
+`prove_schermo_largo` è diventata rossa: giusto così). La banda è sopra testata, nav e fogli (z 60) e sotto
+lightbox, fotocamera e tour, che sono a schermo intero. La pagina scende
+di 20px: il corpo e chi si appiccica in cima (testata, pillola del P2P,
+pacco, «Altri oggetti»). Da desktop scendono anche la topbar e quel che
+si ferma sotto di lei (60 → 80px).
+
+**STRADE SCARTATE.**
+- Bianco e nero (`filter:grayscale`): si vede benissimo, ma spegne
+  proprio i colori che si vengono a provare (il ⚡ giallo della cassa) e
+  sui telefoni vecchi rallenta lo scorrimento.
+- Fondo bianco: le schede sono già bianche, la pagina diventava piatta.
+- La banda dentro la testata (`header::before`): la testata c'è solo in
+  Esplora, e nelle altre viste la banda spariva.
+- «sats finti» nella banda, come proposto nel piano: sul collaudo il P2P
+  è vero (COLLAUDO.md, sezione 6), e la frase sarebbe stata falsa
+  proprio lì.
+- Una leva nuova tipo `ASPETTO_COLLAUDO`: una riga in più da scrivere e
+  da dimenticare, quando il segnale c'è già.
+
+**PROVATO.** `prove_istanza_prova`, sezione «9 ter»: la riga una volta
+sola, la funzione pura (lista vuota uguale, lista piena una sola riga
+cambiata, riga mancante detta), il segnale senza `PROVA_APERTA`, l'ordine
+nella pagina, il CSS ultimo e senza filtri, la banda e i suoi piani, gli
+spostamenti, `applicaTema` coi colori del CSS. `collaudo_istanza_prova`,
+dal server vero: a lista vuota nessun vestito; a prova aperta il vestito
+su `/`, `/miniapp.html` e `/annuncio/{id}`; a prova chiusa pure, accanto
+alla copertina; a lista rimessa vuota la pagina torna identica byte per
+byte. Controprove nel verbale del thread.
+
+**DA GUARDARE.** Dal vivo sul collaudo, su telefono e da desktop: che la
+banda non copra niente nelle viste meno battute (i fogli che si aprono
+dall'alto, i toast in cima, le foto appiccicate del dettaglio da
+desktop, che restano a 76px e possono passare 20px sotto la banda, e il
+pannello del libro P2P da schermo largo, che parte a 60px e sta 20px
+sotto la topbar abbassata). Su
+iPhone a schermo intero (PWA) la banda sta sotto la tacca, come la
+testata di oggi.

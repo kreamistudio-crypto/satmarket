@@ -87685,6 +87685,37 @@ def _privata_nella_pagina(grezzo: bytes, privata: bool) -> bytes:
                           b"const ISTANZA_PRIVATA = true;")
 
 
+# IL VESTITO DEL COLLAUDO (28 ott 2026, cantiere collaudo-riconoscibile,
+# richiesta di Andrea): da quando PROVA_APERTA fa entrare chiunque, il
+# collaudo dev'essere riconoscibile al primo sguardo, o chi ci capita
+# lo scambia per il mercatino vero. La quarta riga gemella: sulla prova
+# la classe `istanza-prova` sale su <html> DAL SERVER, quindi c'e' gia'
+# al primo disegno (niente lampo del crema di produzione), e il CSS fa
+# il resto — lo sfondo azzurro e la banda «🧪 COLLAUDO» in cima.
+# IL SEGNALE E' LA LISTA, non PROVA_APERTA: aperta o chiusa, la prova
+# resta una prova (e' la stessa ragione per cui la lista non si svuota
+# quando la si apre). Niente riga nuova nel config, niente leva da
+# dimenticare accesa: in produzione la lista e' vuota per regola.
+_RIGA_PROVA_PAGINA = b'<html lang="it">'
+
+
+def _prova_nella_pagina(grezzo: bytes, prova: bool) -> bytes:
+    """PURA, come le sue gemelle: a lista vuota (la produzione) la pagina
+    esce IDENTICA, senza nemmeno cercare. Una riga che manca o c'e' due
+    volte non s'indovina: si dice, e la pagina esce col vestito di
+    produzione (le porte della prova le decide il middleware, non il
+    colore)."""
+    if not prova:
+        return grezzo
+    if grezzo.count(_RIGA_PROVA_PAGINA) != 1:
+        print("⚠️ [pagina] la riga «<html lang=\"it\">» non c'e' una volta "
+              "sola in miniapp.html: il collaudo esce col vestito della "
+              "produzione, senza sfondo azzurro ne' banda", flush=True)
+        return grezzo
+    return grezzo.replace(_RIGA_PROVA_PAGINA,
+                          b'<html lang="it" class="istanza-prova">')
+
+
 def _spezza_pagina(grezzo: bytes) -> dict:
     """miniapp.html tagliato nelle sue QUATTRO fessure. PURA.
 
@@ -87769,6 +87800,8 @@ def _pagina_con_meta(meta: str, titolo: str = "",
         grezzo = _bot_nella_pagina(grezzo, BOT_NOME)
         grezzo = _dominio_nella_pagina(grezzo, DOMINIO_PUBBLICO)
         grezzo = _privata_nella_pagina(grezzo, bool(PROVA_SOLO_IDS) and not PROVA_APERTA)
+        # il vestito del collaudo: la lista piena basta, aperta o no
+        grezzo = _prova_nella_pagina(grezzo, bool(PROVA_SOLO_IDS))
         # Le print di allarme vivono dentro _spezza_pagina, cioe'
         # dentro QUESTO ramo: fuori sarebbero una riga di log per
         # richiesta.
