@@ -9793,13 +9793,19 @@
   /* (cambio-due-riquadri) il selettore sats/BTC: due tondi, senza scritte */
   /* (unita-tendine) come su SATS Routing: una pillola con la ₿ e il
      simbolo dei sats a tre righe; quella scelta nel tondo, arancione */
-  .cambio-unita{display:inline-flex;gap:3px;margin:10px 6px 0;padding:3px;
+  .cambio-unita{display:inline-flex;vertical-align:top;gap:3px;margin:10px 6px 0;padding:3px;
     border:1.5px solid var(--line);border-radius:999px}
   .cambio-unita-tasto{width:36px;height:36px;padding:0;border-radius:50%;cursor:pointer;
     border:2px solid transparent;background:none;display:grid;place-items:center;color:var(--ink)}
   .cambio-unita-tasto .cambio-svg{width:21px;height:21px;stroke-width:2.3;vertical-align:0}
   .cambio-unita-tasto.scelta{border-color:var(--line);background:var(--bg);color:#F7931A}
   .cambio-unita-tasto:active{transform:scale(.94)}
+  /* (euro-ordine) il tasto «onion» accanto al selettore: la stessa
+     pillola bordata, alta uguale, con la scritta */
+  .cambio-onion{display:inline-flex;align-items:center;vertical-align:top;height:44px;
+    margin:10px 0 0;padding:0 16px;border:1.5px solid var(--line);border-radius:999px;
+    background:none;font:800 14px/1 'Nunito',sans-serif;color:var(--ink);cursor:pointer}
+  .cambio-onion:active{transform:scale(.96)}
   .cambio-costo{display:flex;justify-content:space-between;align-items:center;gap:10px;
     padding:10px 8px 6px;font-size:13.5px;font-weight:600;color:var(--muted)}
   .cambio-costo b{color:var(--ink)}
@@ -18504,7 +18510,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '4ab7326bdf';
+const SWAP_TELEFONO_VER = '1cdb12d96e';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18588,7 +18594,10 @@ const SWAP_TESTI = {
      non confonderli con la cassa on-chain che arrivera'. Le chiavi
      interne (onchain, conferma...) restano quelle. */
   it: {titolo: 'Cambio',
-       testo: 'Sposta i tuoi sats fra Lightning e bitcoin.',
+       /* (28 ott 2026, euro-ordine) Andrea: «aggiungi on-chain dopo
+          bitcoin»: l'unica eccezione alla regola qui sopra, solo qui.
+          Il \u2060 (word joiner) tiene «on-chain» intero a 320 px */
+       testo: 'Sposta i tuoi sats fra Lightning e bitcoin on-\u2060chain.',
        vuoto: 'Per ora nessun cambio e nessun incasso al tuo indirizzo bitcoin.',
        scegli: 'Come ricevi i sats', onchain: 'Al tuo indirizzo bitcoin',
        carico: 'Calcolo quanto ricevi…',
@@ -18623,7 +18632,7 @@ const SWAP_TESTI = {
               rete_invio: 'Rete bitcoin: partenza',
               rete_ritiro: 'Rete bitcoin: arrivo a te (stima)'}},
   en: {titolo: 'Exchange',
-       testo: 'Move your sats between Lightning and bitcoin.',
+       testo: 'Move your sats between Lightning and on-\u2060chain bitcoin.',
        vuoto: 'No exchanges and no payouts to your bitcoin address yet.',
        scegli: 'How you receive the sats', onchain: 'To your bitcoin address',
        carico: 'Working out how much you receive…',
@@ -18693,6 +18702,10 @@ function scegliIncassoSwap(id, s){
   /* il preventivo vale un minuto (`valido_s`): scaduto, si rilegge */
   const vecchio = !p || !p.dati
     || Date.now() - (p.quando || 0) > ((p.dati.valido_s || 60) * 1000);
+  /* (euro-ordine) gli euro sotto le cifre: un cambio di piu' di un
+     minuto si richiede, e il pannello si rifa' solo se e' mosso */
+  if (s === 'swap' && typeof rileggiCambio === 'function' && Date.now() - cambioChiesto >= CAMBIO_LIBRO_MS)
+    rileggiCambio().then(mosso => { if (mosso) ridisegnaIncassoSwap(); }).catch(() => {});
   if (s === 'swap' && vecchio) { caricaPreventivoSwap(id, false); return; }
   ridisegnaIncassoSwap();
 }
@@ -18900,7 +18913,10 @@ function notaSwap(p, d){
    (grafica-cambio) Il preventivo dell'ORDINE coi due riquadri: sopra
    quel che ti spetta in Lightning, sotto quel che ricevi circa al tuo
    indirizzo. Il cambio libero (ordine 0) i riquadri se li disegna da
-   se', col campo della cifra dentro (`renderSwapCambio`). */
+   se', col campo della cifra dentro (`renderSwapCambio`).
+   (28 ott 2026, cantiere euro-ordine, Andrea: «si» agli euro anche qui)
+   sotto le due cifre il controvalore, come nella pagina «Cambio»
+   (`euroSwap`: vuoto senza un cambio vero) */
 function pannelloPreventivoSwap(o, campo){
   const n = Number(o.id), t = testiSwap(), p = preventiviSwap[n];
   if (!p || !p.dati)
@@ -18913,12 +18929,13 @@ function pannelloPreventivoSwap(o, campo){
     return `<div class="swap-prev"><div class="swap-rifiuto" role="status">${esc(rifiutoSwap(n, d))}</div>${tasto}</div>`;
   }
   const dovuto = ((d.righe || []).find(r => r.voce === 'dovuto') || {}).sats || d.dovuto || 0;
+  const euro = s => `<span class="cambio-euro">${esc(typeof euroSwap === 'function' ? euroSwap(s) : '')}</span>`;
   return `<div class="swap-prev">
       ${notaSwap(p, d)}
       <div class="cambio-carta" role="group" aria-label="${esc(t.titoloPrev)}">
-        ${latoSwap('ln', t.voci.dovuto, `${fmt(dovuto)}<small>sats</small>`)}
+        ${latoSwap('ln', t.voci.dovuto, `${fmt(dovuto)}<small>sats</small>${euro(dovuto)}`, 'con-euro')}
         <div class="cambio-gira"></div>
-        ${latoSwap('btc', t.ricevi, `${fmt(d.ricevi)}<small>sats</small>`, 'arriva')}
+        ${latoSwap('btc', t.ricevi, `${fmt(d.ricevi)}<small>sats</small>${euro(d.ricevi)}`, 'arriva con-euro')}
         ${costoSwap(n, d)}
       </div>
       ${campo || ''}
@@ -27018,6 +27035,20 @@ function renderTor(){
    l'indirizzo nel toast invece di tacere. */
 function copiaOnion(){
   if (onionHost) copiaLink(onionHost, 'Indirizzo copiato');
+}
+/* IL TASTO «onion» DEL CAMBIO (28 ott 2026, cantiere euro-ordine,
+   chiesto da Andrea): apre Barattolo sul sito Tor. Dentro Telegram
+   passa dal client, che lo da' al browser del telefono (si apre se e'
+   il Tor Browser, o coi modi del cassetto «🧅 Sito Tor»); nel browser
+   e' una scheda nuova. L'indirizzo e' quello del server, ripulito di
+   un eventuale «http://» e di un percorso */
+function apriSitoOnion(){
+  const host = String(onionHost || '').trim().replace(/^https?:\/\//i, '').replace(/[\/?#].*$/, '');
+  if (!host.endsWith('.onion')) return;
+  haptic();
+  const url = 'http://' + host + '/';
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
+  window.open(url, '_blank', 'noopener');
 }
 /* Dentro Telegram il link al canale passa dal client (che sa aprire
    gli inviti t.me/+…); nel browser e' una scheda nuova. */

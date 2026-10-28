@@ -74599,3 +74599,66 @@ resta all'altezza della pillola. Foto in
 guardia del cambio vero, scambiati i due lati, tolta la riga (collaudo
 rosso; l'ultima anche la sentinella), tolta la domanda entrando
 (sentinella rossa).
+
+## Gli euro anche nei riquadri dell'ordine, «bitcoin on-chain» nel sottotitolo e il tasto «onion» del Cambio (28 ott 2026, cantiere euro-ordine, Andrea: «si» agli euro nel pannello dell'ordine, notato nel cantiere cambio-euro; «aggiungi on-chain dopo bitcoin»; «affianco al toggle btc sats aggiungi anche un piccolo tasto in stile barattolo con la scritta "onion" se qualcuno ci clicca lo porta al sito tor»)
+
+GLI EURO NELL'ORDINE: quando chi vende sceglie «Al tuo indirizzo
+bitcoin», i due riquadri del preventivo («Ti spettano» in LN, «Ricevi
+circa» in BTC, `pannelloPreventivoSwap`) hanno sotto la cifra lo stesso
+«≈ X €» della pagina «Cambio»: stessa `euroSwap`, stessa forma
+(`.con-euro`), vuoto senza un cambio vero. Il pannello sta nella pagina
+dell'ordine, dove il battito del cambio non gira: quando chi vende
+sceglie il cambio (`scegliIncassoSwap(id, 'swap')`) un cambio di più di
+un minuto si richiede e il pannello si rifà solo se è mosso, come
+`vaiSwap`. `euroSwap` vive nel file del telefono: il pannello la usa
+solo se c'è (`typeof`), e la scelta del cambio si offre comunque solo
+col file arrivato.
+
+IL SOTTOTITOLO: «Sposta i tuoi sats fra Lightning e bitcoin on-chain.»
+(in inglese «Move your sats between Lightning and on-chain bitcoin.»).
+È l'UNICA eccezione alla regola delle parole tecniche del Cambio,
+chiesta da Andrea: la prova delle parole la ammette per nome (le due
+frasi esatte), e un «on-chain» in qualunque altra frase la fa ancora
+rossa. Fra «on-» e «chain» c'è un word joiner (`\u2060`): a 320 px
+la riga andava a capo DENTRO la parola («on-» / «chain»); ora va a capo
+prima di «on-chain». La prova delle parole guarda le frasi senza.
+
+IL TASTO «onion»: accanto al selettore ₿ / sats, la stessa pillola
+bordata (alta uguale, 44 px), con la scritta «onion» e basta (niente
+emoji: la regola della pagina). Porta a BARATTOLO sul sito Tor — la
+lettura scelta di «il sito tor»: è l'indirizzo che il server già manda
+nella busta (`ONION_HOST` → `onionHost`, quello del cassetto «🧅 Sito
+Tor»), MAI scritto a mano (la sentinella conta zero indirizzi v3 nel
+codice). Non c'è senza indirizzo dal server, e non c'è per chi è già
+su Tor (`suOnion()`). `apriSitoOnion()` ripulisce l'indirizzo, apre
+`http://<onion>/` (un .onion non ha certificato: l'http è quello
+giusto) e dentro Telegram passa da `tg.openLink`, che lo dà al browser
+del telefono: si apre solo se quello è Tor Browser o coi modi del
+cassetto. STRADA NON PRESA: aprire la pagina «Cambio» direttamente
+sul .onion (serve un percorso che la pagina sappia rileggere; per ora
+si arriva alla vetrina).
+
+PROVATO: le prove del cambio (714, 0 fallite), la suite severa, i 108
+collaudi della CI nel venv senza coincurve; in `prove_swap_preventivo`
+la prova nuova («≈ 45,60 €» su 48.000 e «≈ 44,80 €» su 47.154 a
+95.000 €/BTC, vuoti a `cambioVivo` falso), in `prove_grafica_swap` la
+frase ammessa col word joiner e la sentinella di `apriSitoOnion`; in
+`collaudo_cambio_libero` la scena del tasto «onion» (senza indirizzo
+no, con l'indirizzo sì e subito dopo il selettore, toccato apre, su
+Tor no). Dal vivo il tasto: alto come il selettore e allineato, 6 px
+fra i due, il tocco apre `http://…onion/` in una scheda nuova (fuori da
+Telegram); a 320 px il sottotitolo non spezza più «on-chain». Dal vivo col Chromium (il pannello disegnato col
+preventivo finto dentro la pagina vera, cambio a 95.000 €/BTC): a 375
+chiaro e a 320 scuro la riga sta nel riquadro (7 px dal bordo), senza
+cambio resta vuota. Foto `euro-ordine-*.png`, `sottotitolo-onchain-375.png` e
+`onion-*.png`
+in `/mnt/project-files/grafica-cambio/`. CONTROPROVE: tolti gli euro
+del riquadro e tolta la guardia del cambio vero (prova nuova rossa;
+la seconda solo dopo aver fatto il caso «senza» con `cambioVivo` falso
+invece che non definito), frase vecchia (rossa la frase ammessa),
+«on-chain» in un'altra frase (rossa la regola), il word joiner tolto
+(rossa la frase), il tasto anche su Tor e il tocco senza effetto
+(collaudo rosso), `https://` al posto di `http://` (sentinella rossa).
+NON PROVATO DAL VIVO: il giro intero di un ordine vero da venditore col
+cambio, e il tasto «onion» dentro Telegram sul telefono (sul collaudo
+l'indirizzo .onion c'è solo se il suo config ha `ONION_HOST`).

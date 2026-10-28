@@ -1415,6 +1415,12 @@ function renderSwapCambio(){
   const unita = ['btc', 'sats'].map(u => `<button type="button" class="cambio-unita-tasto${u === swapCambioUnita ? ' scelta' : ''}"`
     + ` data-swap="cambio-unita" data-unita="${u}" aria-pressed="${u === swapCambioUnita}" aria-label="${u === 'btc' ? 'BTC' : 'sats'}">`
     + `${swapIcona(u)}</button>`).join('');
+  /* (28 ott 2026, cantiere euro-ordine, Andrea: «affianco al toggle btc
+     sats aggiungi anche un piccolo tasto ... con la scritta "onion"») il
+     tasto porta a Barattolo sul sito Tor. Solo se il server ha un
+     indirizzo .onion, e non a chi c'e' gia' sopra */
+  const onion = typeof onionHost === 'string' && onionHost && !(typeof suOnion === 'function' && suOnion())
+    ? '<button type="button" class="cambio-onion" data-swap="cambio-onion">onion</button>' : '';
   const altraStrada = strade.find(x => x !== swapCambioStrada);
   const gira = altraStrada
     ? `<div class="cambio-gira"><button type="button" data-swap="cambio-gira" data-strada="${esc(altraStrada)}" aria-label="${esc(t.direzioni[altraStrada] || altraStrada)}">${swapIcona('gira')}</button></div>`
@@ -1428,7 +1434,7 @@ function renderSwapCambio(){
   box.innerHTML = `<div class="swap-cambio">
     <div class="cambio-carta" role="group" aria-label="${esc(sub ? tp.titoloPrevSub : tp.titoloPrev)}">
       ${sopra}${gira}${sotto}
-      <div class="cambio-unita" role="group" aria-label="${esc(t.unita)}">${unita}</div>
+      <div class="cambio-unita" role="group" aria-label="${esc(t.unita)}">${unita}</div>${onion}
       <div id="swapCambioCosto">${pz.costo}</div>
     </div>
     <div id="swapCambioAvviso">${pz.avviso}</div>
@@ -1695,6 +1701,7 @@ if (typeof document !== 'undefined') {
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
     else if (a === 'cambio-gira') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-unita') swapCambioScegliUnita(String(b.dataset.unita || 'sats'));
+    else if (a === 'cambio-onion' && typeof apriSitoOnion === 'function') apriSitoOnion();
     else if (a === 'cambio-tendina') swapCambioApriTendina(String(b.dataset.lato || 'mandi'));
     else if (a === 'cambio-rete') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-calcola') swapCambioCalcola();

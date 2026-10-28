@@ -178097,6 +178097,17 @@ const sw = payoutPanel(o);
 out.swap = [sw.includes('Costo del cambio, SATS Routing (0,6\u00a0%)'), sw.includes('−288'),
             sw.includes('Ricevi circa'), sw.includes('47154'),
             sw.includes('sellerInvoice'), sw.includes('data-swap="avanti" data-ordine="7"')];
+/* (28 ott 2026, euro-ordine) sotto le due cifre il controvalore: vuoto
+   senza un cambio vero, «≈ X €» col cambio (95.000 €/BTC) */
+var cambioVivo = true, eurPerSat = 95000 / 100000000;
+const fmtEur = e => e.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+__EURO__
+const swE = payoutPanel(o);
+cambioVivo = false;
+const swS = payoutPanel(o);
+out.euro = [(swE.match(/<span class="cambio-euro">[^<]*<\/span>/g) || []).map(x => x.replace(/<[^>]+>/g, '')),
+            (swS.match(/<span class="cambio-euro"><\/span>/g) || []).length,
+            (swE.match(/class="cambio-lato[^"]*con-euro"/g) || []).length];
 preventiviSwap[7].nota = 'cambiata';
 out.cambiata = payoutPanel(o).includes('Le cifre sono cambiate');
 preventiviSwap[7] = {stato: 'pronto', quando: 0, nota: '', dati: {ok: false, motivo: 'sotto_minimo', minimo: 25000}};
@@ -178114,7 +178125,9 @@ out.en = [en.includes('Exchange fee, SATS Routing (0.6%)'), en.includes('>Confir
 out.onclick = [sw, giu, en].filter(x => /\son[a-z]+=/.test(x)).length;
 console.log(JSON.stringify(out));
 """.replace("__TESTI__", testi).replace("__LINGUA__", lingua).replace(
-        "__MOTORE__", motore).replace("__PANNELLO__", pannello)
+        "__MOTORE__", motore).replace("__PANNELLO__", pannello).replace(
+        "__EURO__", pezzo_js(open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read(),
+                             "function euroSwap(sats){", "\n}\n") + "\n}\n")
     r = _node_banco(js)
     if r is None:
         salta("il banco del pannello dell'incasso con lo swap", "node non c'e'")
@@ -178134,6 +178147,9 @@ console.log(JSON.stringify(out));
     prova("scelto lo swap, prima si leggono le tariffe", True, r.get("carico"))
     prova("...poi il preventivo riga per riga, senza il campo della fattura",
           [True, True, True, True, False, True], r.get("swap"))
+    prova("(euro-ordine) sotto le due cifre il controvalore in euro, come nella "
+          "pagina «Cambio»; senza un cambio vero la riga resta vuota",
+          [["≈ 45,60 €", "≈ 44,80 €"], 2, 2], r.get("euro"))
     prova("i quattro rifiuti dicono il perche'", (True, True, True, [True, True]),
           (r.get("cambiata"), r.get("sotto"), r.get("sopra"), r.get("giu")))
     prova("in inglese per Telegram in un'altra lingua", [True, True], r.get("en"))
@@ -180326,7 +180342,26 @@ console.log(JSON.stringify(fuori));
         salta("le parole della grafica dello swap", "node non c'e'")
         return
     vietate = ("swap", "htlc", "rgb", "fornitore", "lockup", "on-chain", "onchain")
-    trovate = sorted({p for f in frasi for p in vietate if p in f.lower()})
+    # (28 ott 2026, euro-ordine) l'unica eccezione, chiesta da Andrea:
+    # «on-chain» dopo «bitcoin» nel sottotitolo della pagina «Cambio»
+    ammesse = ("Sposta i tuoi sats fra Lightning e bitcoin on-chain.",
+               "Move your sats between Lightning and on-chain bitcoin.")
+    # (il word joiner dopo il trattino tiene «on-chain» intero a 320 px:
+    # le parole si guardano senza)
+    frasi = [f.replace("\u2060", "") for f in frasi]
+    # (euro-ordine) il tasto «onion» apre l'indirizzo del SERVER, mai uno
+    # scritto a mano, in http:// (un .onion non ha certificato), e da
+    # Telegram passa dal client. Il giro: collaudo_cambio_libero
+    apri = pezzo_js(mini, "function apriSitoOnion(){", "\n}\n")
+    prova("(euro-ordine) il tasto «onion» apre l'indirizzo .onion del server",
+          (True, True, True, 0),
+          ("String(onionHost || '')" in apri and "if (!host.endsWith('.onion')) return;" in apri,
+           "const url = 'http://' + host + '/';" in apri,
+           "tg.openLink(url)" in apri and "window.open(url, '_blank', 'noopener')" in apri,
+           len(re.findall(r"[a-z2-7]{56}\.onion", mini + js))))
+    prova("...il sottotitolo del Cambio dice «bitcoin on-chain» (Andrea), mai spezzato",
+          [1, 1, 2], [frasi.count(a) for a in ammesse] + [testi.count("on-\\u2060chain")])
+    trovate = sorted({p for f in frasi if f not in ammesse for p in vietate if p in f.lower()})
     prova("nelle frasi della pagina e del telefono nessuna parola tecnica "
           "(swap, HTLC, RGB, fornitore, lockup, on-chain)", ([], True),
           (trovate, len(frasi) > 150))
