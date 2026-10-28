@@ -74292,3 +74292,126 @@ la leva, il numero dell'argomento «assistenza»); la prima conversazione
 VERA da un admin, e il verbale qui. Rileggere `assistente/sapere.md` con
 gli occhi di Andrea: ogni frase sbagliata lì è una risposta sbagliata.
 Quando una funzione cambia, il libro si aggiorna nello stesso cantiere.
+
+## Chi vende on-chain riceve in Lightning (28 ott 2026, cantiere onchain-verso-lightning, piano in dieci righe di Alan e Andrea: «ok» alle 15:43 UTC, «Sì, fallo adesso» alle 15:54)
+
+**DA DOVE.** Il 28 ott Alan ha scritto ad Andrea: «quando il compratore
+paga on chain, se il venditore li vuole LN, internamente dobbiamo
+direzionare l'invio verso satsrouting, il venditore deve impostare
+solamente una invoice LN», con tre paletti: l'avviso sulla capienza in
+entrata del wallet, il costo del cambio chiaro e riconoscibile COME un
+cambio, e nel profilo la scelta «sempre on-chain / sempre LN / di volta
+in volta». Massimo, lo stesso giorno: la quota partner vale su tutti gli
+swap (submarine compreso), e i soli limiti sono il minimo e il massimo.
+Il piano in dieci righe è stato approvato; poi una decisione: l'on-chain
+gira su signet e SATS Routing solo su bitcoin, quindi la strada oggi non
+può funzionare dal vivo. Andrea ha scelto di costruirla adesso dietro una
+leva spenta, provata col cartone, pronta per il giorno della mainnet.
+
+**COSA SI È DECISO.**
+- UNA LEVA, `ONCHAIN_INCASSO_LN_ATTIVO`, False di serie e nessuna riga
+  sul VPS. Vuole anche `CAMBIO_BTC_LN_ATTIVO` e lo swap per la persona, e
+  soprattutto LE RETI GIUSTE: `onchain_ln_rete_ok` confronta la rete
+  dell'on-chain con quella del fornitore (signet ↔ testnet, bitcoin ↔
+  bitcoin). Oggi dice no, e la riga del pannello «Stato delle leve», se
+  qualcuno la accendesse, lo scrive in rosso: «accesa ma FERMA». Dei
+  bitcoin di prova non si cambiano in Lightning vero.
+- LA SCELTA NEL PROFILO (cassetto «Incassi on-chain»): ⛓️ sempre on-chain
+  (di serie), ⚡ sempre Lightning, 🤔 scelgo ogni volta, con l'esempio vero
+  del costo su 100.000 sats (oggi col cartone: 99.186 in Lightning, 814 di
+  cambio) e l'avviso della capienza. Chi sceglie Lightning tiene comunque
+  il wallet on-chain: sotto il minimo del cambio (50.000 sats ricevuti per
+  SATS Routing) la vendita arriva on-chain, e il profilo lo dice prima.
+- L'ORDINE DEI GESTI: con modo ≠ on-chain l'incasso resta vuoto alla
+  cassa (come «la destinazione dopo» del 27 ott). Chi compra tocca «Ho
+  ricevuto», e la sua conferma ora la FIRMA IL SUO SEME. Poi è il
+  telefono di chi vende a fare tutto: vede il costo («È un cambio, fatto
+  da SATS Routing: costa X sats. Ricevi N sats in Lightning invece di P
+  on-chain») e l'avviso della capienza, incolla la richiesta (o la prende
+  dal suo Lightning address, con «sempre Lightning»), le 12 parole di
+  riserva la prima volta, e a «Conferma» il cambio nasce dal SUO telefono,
+  la destinazione la firma il suo seme, e mette la PRIMA firma del
+  rilascio verso l'indirizzo del cambio, col prezzo esatto. La seconda la
+  mette il telefono di chi compra quando apre l'app.
+- PERCHÉ CHI VENDE FIRMA PER PRIMO, e non chi compra come di solito: la
+  richiesta Lightning scade, e chi compra può aprire l'app domani. Così
+  il cambio nasce quando chi vende è lì a guardarlo, e la finestra
+  pericolosa è una sola: fra la sua firma e quella di chi compra. Per
+  quella: la richiesta incollata deve durare 23 ore (quella del Lightning
+  address 3), e il server, PRIMA di trasmettere, chiede al fornitore se il
+  cambio è vivo (`invoice.set`) e se alla fattura restano due ore. Muto =
+  503 e non parte niente; morto = il cambio si toglie, si avvisa chi vende,
+  e si rifà. Il telefono di chi compra non ha bisogno del codice dello swap.
+- LA SICUREZZA DEL TELEFONO DI CHI COMPRA, che firma da solo: firma solo
+  se la conferma scritta sull'ordine è firmata dal SUO seme
+  (`onchainRicevutoMio`), se il resto torna a una sua chiave, se all'incasso
+  va il prezzo esatto e la quota è quella dell'ordine, e se su OGNI moneta
+  c'è una firma VALIDA della chiave di chi vende (`onchainFirmataDaChiVende`,
+  rifà l'impronta SIGHASH_ALL da sé). Senza quest'ultima, un server
+  manomesso potrebbe proporre una transazione firmata dalla sola chiave di
+  Barattolo e far mettere a chi compra la seconda: due su tre senza chi
+  vende. Con la verifica, la prima firma deve essere davvero sua. Limite
+  dichiarato (riga 5 del piano): con «sempre Lightning» la richiesta la
+  prende il server dal Lightning address, e un server manomesso potrebbe
+  darne una sua; con la richiesta incollata no. Nessuna chiave sul server,
+  la quota e il resto come oggi, le dispute restano on-chain.
+- Il preventivo dell'ordine è il conto ROVESCIATO del submarine
+  (`preventivo_sub_da_mandare`): nel 2-di-3 c'è il prezzo, e si cerca il
+  massimo che arriva in Lightning senza che SATS Routing chieda di più.
+  L'avanzo dell'arrotondamento (0 o 1 sat) resta nell'uscita, che porta
+  sempre il prezzo esatto: il giudice delle proposte non cambia. Il tetto
+  è solo quello del fornitore (`SWAP_MAX_SATS` guarda i sats che Barattolo
+  paga dalla cassaforte, e qui la cassaforte non c'è).
+
+**STRADE SCARTATE.** Chi compra firma per primo verso il cambio (come il
+rilascio di sempre): il cambio dovrebbe nascere prima di quella firma, e
+la richiesta scadrebbe mentre si aspetta chi vende. Un cambio fatto dal
+server: vorrebbe la chiave di rimborso sul server, cioè custodia (regola
+ferrea 2). Il cambio dalla cassaforte del mercatino (submarine da
+Barattolo): già escluso il 27 ott da Andrea e Alan. Aspettare la mainnet
+per scrivere: Andrea ha scelto di averlo pronto.
+
+**PROVATO.** Nuovo `collaudo_onchain_verso_lightning` (65 verdi, anche
+nell'ambiente senza coincurve): server vero per HTTP, SATS Routing di
+cartone in testnet, e il TELEFONO VERO in node coi due bundle (la
+conferma firmata, il cambio che nasce con le 12 parole e la spunta, la
+richiesta di un'ora rifiutata, il record nella lista con la frase giusta
+e senza QR, la sorveglianza; la seconda firma che dice no a una proposta
+toccata dopo la firma di chi vende e a una conferma d'un altro seme). Il
+server giudica quel che il telefono ha mandato (la prova doppia), con i
+suoi no (firma d'un altro seme, indirizzo non taproot, richiesta che
+scade, cifre oltre il prezzo, meno del prezzo al cambio, chi compra al
+posto di chi vende), il fornitore muto (503) e il cambio scaduto (409, si
+toglie, si rifà), «ogni volta» con l'on-chain allo sblocco, sotto il
+minimo, il ritorno a «sempre on-chain». `prove_onchain_verso_lightning`
+(il conto rovesciato, le reti, l'ordine dei controlli, niente «swap» nel
+riquadro). CONTROPROVE: tolta la verifica della firma di chi vende nel
+telefono, tolto il controllo «vivo» prima di trasmettere, tolta la
+verifica della conferma firmata, tolto il «decide allo sblocco» della
+cassa: rosse tutte e quattro. Toccati per forza: `collaudo_onchain_incasso`
+(la conferma ora si firma, con due controprove nuove), le sentinelle che
+contano le rotte on-chain, i freni, le strade verso SATS Routing (la terza
+è la sola lettura dello stato), la trappola del 7 nel censimento delle
+leve; il cartone sa fare richieste che durano un giorno; la sentinella
+«co-firma solo quel che va a lui» ora conosce l'unica eccezione (la
+vendita confermata da chi compra, verificata in `onchainCofirma`).
+Suite severa: 26468 passate e 0 fallite (26463 nell'ambiente senza
+coincurve), con le 2 SALTATE di nostr-tools che in questa macchina non
+c'è (lo script vero della 10002 e quello con le due identità, nessuno
+dei due toccato); collaudi della CI 107 verdi e 0 rossi in tutti e due
+gli ambienti. Rimesso sopra develop efb3540 (la pagina «Cambio» più
+pulita e l'assistente del bot, arrivati nel frattempo; un solo urto,
+`SWAP_TELEFONO_VER`, rifatta sull'impronta dei file nuovi), di nuovo
+tutto: 26536/0 e 26531/0 con le stesse 2 SALTATE, collaudi 108 verdi
+nei due ambienti. Le due suite non girano in parallelo nella stessa cartella:
+si pestano il banco `.banco-onchain-tappa2.js`.
+
+**COSA RESTA.** Non provato dal vivo: non si può finché l'on-chain non va
+su mainnet. Da provare quel giorno, a cifre piccole: che SATS Routing vero
+accetti una richiesta che dura 23 ore e un lockup un sat sopra
+`expectedAmount`, e il giro intero col telefono. Alan rivede le parti del
+2-di-3 (la prima firma di chi vende, la verifica nel telefono di chi
+compra, `/firma`) prima della promozione. Gli ordini confermati prima di
+oggi non hanno la conferma firmata: chi compra può ridarla («Ho
+ricevuto» di nuovo), e stavolta si firma. A leva rispenta, un ordine rimasto senza incasso torna a
+«scegli dove ricevere» del 27 ott (si riempie salvando il wallet).

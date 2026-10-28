@@ -34440,6 +34440,67 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   manca; `onchainRilascioDaFirmare(o)` e `onchainCofirmeInAttesa` firmano
   la proposta da soli dopo la scelta; `pannelloOnchainOrdine` dice a chi
   vende «non hai ancora scelto» col bottone al cassetto `accOnchainIncasso`.
+- CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
+  onchain-verso-lightning; perché in CANTIERI, «Chi vende on-chain riceve
+  in Lightning»). La leva `ONCHAIN_INCASSO_LN_ATTIVO` (False) e il giudice
+  per persona `onchain_ln_per` (leva, `onchain_ammesso`, `swap_per`, la
+  strada «btc-ln» di `cambio_strade`, e `onchain_ln_rete_ok`: la rete del
+  fornitore deve essere quella di `ONCHAIN_RETE_DEL_CAMBIO[ONCHAIN_RETE]`,
+  signet → testnet, bitcoin → bitcoin; oggi no, e la riga del pannello lo
+  dice in rosso). LA SCELTA: tabella `onchain_modo` (tg_id, modo
+  `lightning`|`ogni_volta`; nessuna riga = `onchain`), `POST
+  /api/onchain/incasso/modo` (tornando a `onchain` chiama
+  `_onchain_riempi_incassi`), `onchain_modo_vivo` (a leva spenta tutti
+  `onchain`), `/api/me.onchain_ln` {attivo, modo, minimo, fornitore}, `GET
+  /api/onchain/cambio/esempio?sats=` (freno `onchain_cambio`). Con modo ≠
+  onchain la cassa e `_onchain_riempi_incassi` lasciano l'incasso VUOTO:
+  si decide allo sblocco. «HO RICEVUTO» FIRMATO: `rilascio-chiesto` vuole
+  {firma} = la chiave `/2/0` di chi compra su `onchain_messaggio_ricevuto`
+  («barattolo/onchain/ricevuto/v1», rete, ordine, indirizzo del 2-di-3;
+  `onchain_firma_valida_testo`), scritta nella colonna `rilascio_firma`;
+  il telefono la rifà (`onchainFirmaRicevuto`) e la rilegge
+  (`onchainRicevutoMio`). LA PRIMA FIRMA DI CHI VENDE:
+  `_onchain_puo_firmare_prima` (pagato, conferma firmata e valida, niente
+  decisione, modo ≠ onchain) apre `/proposta` verso venditore a chi vende;
+  `_onchain_da_sbloccare` è il cancello delle rotte di chi vende. IL
+  CAMBIO: `GET /api/onchain/ordini/{oid}/cambio/preventivo`
+  (`_onchain_preventivo_cambio` → `preventivo_sub_da_mandare`, il conto
+  rovesciato di `preventivo_sub`: dal prezzo il massimo `ricevi`, con
+  `costo` e `avanzo`; più `modo`, `ln_address`, `vita_incollata_s` 23 h,
+  `vita_address_s` 3 h); `POST …/cambio/fattura` {sats} (dal Lightning
+  address, `invoice_da_ln_address`; limite dichiarato: un server manomesso
+  potrebbe darne una sua); `POST …/cambio` {cambio {fornitore, id, lockup,
+  ricevi, mandi, scade_fattura, timeout}, firma, psbt}: lockup p2tr della
+  rete, scadenza ≥ `ONCHAIN_CAMBIO_VITA_MIN_S`, `0 < ricevi < mandi ≤
+  prezzo`, la firma del seme di chi vende con tipo «cambio» e valore
+  «<ordine>:<lockup>» (`onchain_firma_valida`), la PSBT giudicata con
+  `incasso = lockup`; scrive `incasso_tipo='cambio'`, la colonna `cambio`
+  (JSON, `_onchain_cambio_letto`) e la proposta in un colpo; `POST
+  …/cambio/togli`; `POST …/incasso-ora` (l'on-chain allo sblocco: la
+  destinazione viva per quest'ordine). Una proposta di chi compra verso
+  venditore su un cambio è 409. In `/firma`, prima di
+  `onchain_mempool_invia`, `onchain_cambio_perche_morto` (`swap_stato_di`:
+  GET `/v2/swap/{id}`, deve dire `invoice.set`; la fattura deve avere
+  davanti 2 h): None → 503, un perché → `_onchain_cambio_togli` + 409.
+  Vista dell'ordine: `rilascio_firma`, `cambio`, `modo_venditore`; in
+  `/api/orders`: `incasso_tipo`, `modo_venditore`, `cambio`, `prezzo_sats`.
+  IL TELEFONO: profilo `onchainModoBlocco`/`onchainModoScegli`/
+  `onchainEsempioCarica` (`myOnchainLn`); ordine `pannelloOnchainOrdine`
+  coi rami del cambio e il riquadro `onchainCambioBlocco` (stato in
+  `onchainCambi`), `onchainCambioApri`, `onchainCambioPrendiFattura`,
+  `onchainCambioConferma` (vita della richiesta, 12 parole con
+  `swapParolePerOnchain`/`swapCopiatePerOnchain`, `swapCreaPerOnchain` in
+  swap/instradatore.js §6c, taproot della rete, firma della destinazione,
+  `onchainUsciteVersoVenditore(o, lockup, 12)` + `onchainPsbtFirmata`),
+  `onchainRiceviOnchainOra`, `onchainCambioTogli`; chi compra:
+  `onchainPrimaDiChiVende`, e in `onchainCofirma` il ramo che rilegge la
+  sua conferma e verifica la firma di chi vende su ogni moneta
+  (`onchainFirmataDaChiVende`: `preimageWitnessV0` + `onchainDerACompatta`).
+  Il record del cambio nella lista degli swap porta `onchain` (frase
+  `subDaOrdine`, niente QR da pagare); il rimborso di un cambio fallito è
+  quello di sempre, dalla pagina «Cambio». Le prove:
+  `prove_onchain_verso_lightning`; il collaudo
+  `collaudo_onchain_verso_lightning` (cartone in testnet, telefono in node).
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):
   `LEVE_SCRIVIBILI` (chiave → giudice, di_serie, dal_config, pavimento,
   tetto, tipo; oggi `ONCHAIN_SOLO_ADMIN` sì/no, letta da `onchain_ammesso`,
