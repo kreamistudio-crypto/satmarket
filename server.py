@@ -1758,10 +1758,13 @@ try:
     from config import CAMBIO_LIBERO_MAX_AL_GIORNO
 except ImportError:
     CAMBIO_LIBERO_MAX_AL_GIORNO = 5
-# La strada bitcoin → Lightning (tappa 3): SPENTA finche' Massimo non
-# risponde sulla quota partner del submarine e sui limiti di chiamate
-# (decisione di Andrea, 27 ott 2026). A leva spenta la direzione non
-# compare nel telefono e il server la rifiuta.
+# La strada bitcoin → Lightning (tappa 3): SPENTA di serie. Aspettava la
+# risposta di Massimo sulla quota partner del submarine e sui limiti di
+# chiamate (decisione di Andrea, 27 ott 2026); Massimo ha risposto il 28
+# ott: la quota vale su tutti gli swap, sulla commissione finale, e non ci
+# sono limiti di chiamate, solo il minimo e il massimo dell'importo. Si
+# accende con una riga nel config, quando Andrea decide. A leva spenta la
+# direzione non compare nel telefono e il server la rifiuta.
 try:
     from config import CAMBIO_BTC_LN_ATTIVO
 except ImportError:
@@ -32360,8 +32363,9 @@ def _leve_stato():
                   acceso="la seconda strada del cambio: bitcoin "
                          "all'indirizzo del fornitore, la richiesta "
                          "Lightning pagata",
-                  spento="solo Lightning → indirizzo bitcoin; resta "
-                         "spenta finche' Massimo non risponde"),
+                  spento="solo Lightning → indirizzo bitcoin; Massimo "
+                         "ha risposto (28 ott): si accende con una "
+                         "riga nel config, quando decide Andrea"),
             # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
             # fattura dello swap e' meno di quel che spetta a chi vende, e
             # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
@@ -74733,8 +74737,8 @@ async def swap_pagamento_stato(ordine_id: int,
 # il tetto e' una regola della casa, non una cassaforte.
 def cambio_strade() -> tuple:
     """Le direzioni del cambio: Lightning → indirizzo sempre; bitcoin →
-    Lightning solo a `CAMBIO_BTC_LN_ATTIVO` (spenta finche' Massimo non
-    risponde)."""
+    Lightning solo a `CAMBIO_BTC_LN_ATTIVO` (spenta di serie: si accende
+    dal config, quando decide Andrea)."""
     return ("ln-btc", "btc-ln") if CAMBIO_BTC_LN_ATTIVO else ("ln-btc",)
 
 

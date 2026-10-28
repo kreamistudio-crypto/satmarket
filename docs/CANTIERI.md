@@ -74030,3 +74030,47 @@ controprove: tolto `--muted` dalla sera, tolto dal giorno, rimesso il
 colore vecchio a Telegram, tutte rosse. Foto della pagina col Chromium
 del container (telefono di giorno e di sera). Da guardare dal vivo come
 il primo giro.
+
+## Massimo ha risposto: la strada bitcoin → Lightning non lo aspetta più (28 ott 2026, cantiere massimo-risposto, Andrea: «sì» a correggere il pannello e i documenti)
+
+**DA DOVE.** Il 27 ott, nel piano del cambio libero, Andrea aveva deciso
+che `CAMBIO_BTC_LN_ATTIVO` (la strada bitcoin → Lightning, il submarine)
+non si accendeva finché Massimo di SATS Routing non rispondeva a due
+domande: la quota partner vale anche sul submarine? ci sono limiti di
+chiamate? Il 28 ott Massimo ha risposto ad Andrea: la quota «vale su
+tutti gli swap e si applica alla commissione finale applicata»; i limiti
+«sono solo il min e max» dell'importo, nessun tetto di chiamate.
+
+**COSA CAMBIA.** Solo parole, nessun comportamento: la leva resta False
+di serie e in produzione non si accende niente da sola. La riga del
+pannello «⚙️ Stato delle leve» a leva spenta non dice più «resta spenta
+finché Massimo non risponde», ma «Massimo ha risposto (28 ott): si
+accende con una riga nel config, quando decide Andrea». Lo stesso nei
+commenti di `server.py` (la leva e `cambio_strade`), in PRODUZIONE («IL
+CAMBIO LIBERO: LE LEVE», con la risposta intera), in ARCHITETTURA, in
+COLLAUDO §6 e in DA-FARE-ANDREA voce 3. L'ordine dell'accensione in
+produzione resta di Andrea: la promozione, poi `SWAP_ATTIVO` (lui e Alan,
+cifre piccole), poi `CAMBIO_LIBERO_ATTIVO` e `CAMBIO_BTC_LN_ATTIVO`.
+
+**SUL COLLAUDO (28 ott, 13:23 UTC, gesti di Andrea col thread «Accendere
+lo swap sul collaudo»).** Accese `CAMBIO_LIBERO_ATTIVO` e
+`CAMBIO_BTC_LN_ATTIVO` in fondo al config (copia
+`config.py.prima-cambio`), salute 200. Il cartone acceso il 27 ott alle
+08:07 UTC girava col codice di PRIMA della tappa 1 (23462f4, 08:56) e non
+sapeva il submarine: spento e rilanciato con lo stesso `systemd-run`, ora
+risponde a `/v2/swap/submarine`. Lezione: un `systemd-run` tiene il codice
+di quando è partito, il seguace del collaudo non lo rinnova; dopo un
+cantiere che tocca `cartone_satsrouting.py` si rilancia (scritto in
+COLLAUDO §6).
+
+**PROVATO.** `prove_cambio_libero` con la frase nuova del pannello (e
+quella vecchia assente); controprova: rimessa la frase vecchia nel
+pannello, la prova è rossa. Suite e collaudi: nel messaggio del commit.
+
+**COSA RESTA.** Guardare dal telefono la pagina «Cambio» sul collaudo e
+scriverne qui il verbale. Notato, non toccato: il cantiere «chi compra in
+bitcoin, chi vende riceve in Lightning» (la tappa 4 lasciata fuori il 27
+ott) ha avuto il sì di Alan («puoi farlo tu», coi suoi paletti: la
+capienza in entrata, il costo scritto, la scelta nel profilo «sempre
+on-chain / sempre Lightning / di volta in volta»): va aperto a parte,
+col piano da approvare.

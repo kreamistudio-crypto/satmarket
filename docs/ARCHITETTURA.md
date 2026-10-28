@@ -33895,11 +33895,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fallito o scaduto coi bitcoin già mandati, l'utente si rimborsa da
   solo col suo telefono e le 12 parole. LA LEVA `CAMBIO_BTC_LN_ATTIVO`
   (config, False di serie, nel pannello delle leve con la sua riga
-  «resta spenta finché Massimo non risponde»): a leva spenta
+  che dal 28 ott 2026 dice «Massimo ha risposto (28 ott): si accende
+  con una riga nel config, quando decide Andrea»): a leva spenta
   `cambio_strade()` dice solo `ln-btc`, il preventivo risponde 400 e il
   biglietto «direzione», il telefono non mostra la seconda pillola.
-  NON SI ACCENDE FINCHÉ MASSIMO NON RISPONDE sulla quota partner del
-  submarine e sui limiti di chiamate (la domanda la fa Andrea).
+  Aspettava Massimo sulla quota partner del submarine e sui limiti di
+  chiamate: ha risposto il 28 ott 2026 (la quota vale su tutti gli swap,
+  sulla commissione finale; nessun limite di chiamate, solo il minimo e
+  il massimo dell'importo). Si accende quando decide Andrea.
   IL SERVER: `leggi_tariffa_sub` legge `GET /v2/swap/submarine` del
   fornitore (header `Referral`, copia di 30 s, `swap_lettura_simulata`
   come il reverse) e `tariffa_sub_da_risposta` ne tiene percentuale,

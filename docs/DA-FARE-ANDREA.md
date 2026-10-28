@@ -69,9 +69,14 @@ perché vanno in `docs/NODO-MOSTRO.md`, e questa voce si cancella.
 **Perché.** Il cambio libero (pagina «Cambio», tasto «🔁 Cambia») è su
 develop dietro leve spente: sul collaudo si guarda la grafica e il giro
 col SATS Routing di cartone (regola di Andrea: mai quello vero). In
-produzione NON si accende niente per ora (`SWAP_ATTIVO` è spenta, e
-`CAMBIO_BTC_LN_ATTIVO` aspetta la risposta di Massimo su quota partner e
-limiti di chiamate). Un gesto alla volta, col sì di Andrea (COLLAUDO.md).
+produzione NON si accende niente per ora (`SWAP_ATTIVO` è spenta; per
+`CAMBIO_BTC_LN_ATTIVO` Massimo ha risposto il 28 ott 2026, la quota vale
+su tutti gli swap e non ci sono limiti di chiamate: si accende quando
+decide Andrea). Un gesto alla volta, col sì di Andrea (COLLAUDO.md).
+FATTO SUL COLLAUDO il 28 ott 2026, 13:23 UTC (le due righe in fondo al
+config, copia `config.py.prima-cambio`, salute 200; il cartone rilanciato
+perché quello del 27 ott 08:07 non sapeva il submarine). Resta da
+guardare dal telefono e da scrivere nel verbale, poi la voce si cancella.
 
 **Sola lettura** (sulla VM): il cartone è vivo? e le righe dello swap
 ci sono già (dal 27 ott 08:07)?

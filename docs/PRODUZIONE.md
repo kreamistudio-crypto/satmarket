@@ -4667,10 +4667,14 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   /srv/barattolo/config.py` (atteso oggi: niente). Lo stato VIVO sta
   nel pannello «⚙️ Stato delle leve», gruppo dello swap, righe «Cambio
   libero: …».
-  ⚠️ `CAMBIO_BTC_LN_ATTIVO` (la strada bitcoin → Lightning) NON SI
-  ACCENDE FINCHÉ MASSIMO NON RISPONDE sulla quota partner del
-  submarine e sui limiti di chiamate (la domanda la fa Andrea, 27 ott
-  2026): il pannello lo dice sulla sua riga. Prima dell'accensione,
+  ⚠️ `CAMBIO_BTC_LN_ATTIVO` (la strada bitcoin → Lightning) aspettava
+  la risposta di Massimo sulla quota partner del submarine e sui limiti
+  di chiamate (la domanda l'ha fatta Andrea, 27 ott 2026). MASSIMO HA
+  RISPOSTO IL 28 OTT 2026: la quota vale su tutti gli swap e si applica
+  alla commissione finale; limiti di chiamate nessuno, solo il minimo e
+  il massimo dell'importo. Ora si accende quando decide Andrea, dopo
+  `SWAP_ATTIVO` e `CAMBIO_LIBERO_ATTIVO`: il pannello lo dice sulla sua
+  riga. Prima dell'accensione,
   sul collaudo: il submarine di SATS Routing vero non è mai stato
   chiamato (solo il cartone), un wallet vero che manda dal link
   `bitcoin:` dentro Telegram, la richiesta incollata dalla WebView, il
