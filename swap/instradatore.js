@@ -1298,7 +1298,11 @@ function swapCambioPezzi(){
   const attesa = !!cifra && (!d || p.stato === 'carico' || !!swapCambioTimer);
   const pronto = !!d && d.ok && !attesa;
   /* l'altro riquadro: la cifra del conto, «…» mentre si aspetta */
-  const altra = pronto ? swapCambioNum(swapCambioLato === 'mandi' ? d.ricevi : (sub ? d.mandi : d.dovuto)) : '';
+  const altraSats = pronto ? Number(swapCambioLato === 'mandi' ? d.ricevi : (sub ? d.mandi : d.dovuto)) || 0 : 0;
+  const altra = pronto ? swapCambioNum(altraSats) : '';
+  /* (cambio-euro) sotto ogni cifra il suo controvalore: quella scritta
+     subito, a ogni tasto; quella del conto quando arriva */
+  const euroMio = euroSwap(cifra), euroAltra = euroSwap(altraSats);
   const avviso = swapErrori[0] || (d && !d.ok && !attesa ? rifiutoSwap(0, d) : '');
   const dovuto = swapCambioDovuto();
   return {
@@ -1307,7 +1311,21 @@ function swapCambioPezzi(){
     costo: pronto ? notaSwap(p, d) + costoSwap(0, d) : '',
     avviso: avviso ? `<div class="swap-rifiuto" role="status">${esc(avviso)}</div>` : '',
     pronto: pronto,
+    euroMandi: swapCambioLato === 'mandi' ? euroMio : euroAltra,
+    euroRicevi: swapCambioLato === 'mandi' ? euroAltra : euroMio,
     spiega: sub ? swapCambioSpiega(dovuto) : ''};
+}
+/* IL CONTROVALORE IN EURO (28 ott 2026, cantiere cambio-euro, Andrea:
+   «voglio vedere il controvalore in euro sotto alla cifra in sats o btc
+   proprio come su satsrouting»): «≈ 0,81 €», piccolo, sotto la cifra di
+   ogni riquadro. Il cambio e' quello di tutta l'app (`eurPerSat`, dal
+   nostro server); senza un cambio VERO in mano (`cambioVivo` falso) la
+   riga resta vuota: mai un numero inventato, il patto di sempre */
+function euroSwap(sats){
+  const n = Number(sats) || 0;
+  if (!(n > 0) || typeof cambioVivo === 'undefined' || !cambioVivo
+      || typeof eurPerSat === 'undefined' || typeof fmtEur !== 'function') return '';
+  return `≈ ${fmtEur(n * eurPerSat)} €`;
 }
 /* la frase della richiesta Lightning resta in sats (i wallet chiedono
    quelli), coi BTC accanto se si e' scelto BTC */
@@ -1357,6 +1375,9 @@ function renderSwapCambio(){
     vai.disabled = !pz.pronto;
     const spiega = el('swapFatturaSpiega_0');
     if (spiega && sub) spiega.textContent = pz.spiega;
+    const em = el('swapCambioEuroMandi'), er = el('swapCambioEuroRicevi');
+    if (em) em.textContent = pz.euroMandi;
+    if (er) er.textContent = pz.euroRicevi;
     return;
   }
   /* i due riquadri si scrivono tutti e due: in quello dove si e' scritto
@@ -1366,7 +1387,8 @@ function renderSwapCambio(){
     return `<input class="cambio-cifra-campo${swapCambioUnita === 'btc' ? ' btc' : ''}" id="${lato === 'mandi' ? 'swapCambioMandi' : 'swapCambioRicevi'}" data-lato="${lato}"`
       + ` type="text" inputmode="${swapCambioUnita === 'btc' ? 'decimal' : 'numeric'}" autocomplete="off"`
       + ` placeholder="${esc(mio ? '0' : pz.vuota)}" aria-label="${esc(eti)}" value="${esc(mio ? swapCambioScritta : pz.altra)}">`
-      + `<small>${swapCambioUnitaNome()}</small>`;
+      + `<small>${swapCambioUnitaNome()}</small>`
+      + `<span class="cambio-euro" id="${lato === 'mandi' ? 'swapCambioEuroMandi' : 'swapCambioEuroRicevi'}">${esc(lato === 'mandi' ? pz.euroMandi : pz.euroRicevi)}</span>`;
   };
   /* (unita-tendine) LA TENDINA della pillola: con due strade si sceglie
      la rete di quel riquadro, e l'altro si gira da solo (scegliere «BTC» in
@@ -1386,8 +1408,8 @@ function renderSwapCambio(){
       + (aperta ? `<ul class="cambio-menu" role="listbox">${voci}</ul>` : '') + '</span>';
   };
   const reteSopra = sub ? 'btc' : 'ln', reteSotto = sub ? 'ln' : 'btc';
-  const sopra = latoSwap(reteSopra, tp.mandiBreve, campoCifra('mandi', sub ? tp.mandiBreve : tp.voci.cambi), 'scritto', tendina('mandi', reteSopra));
-  const sotto = latoSwap(reteSotto, sub ? tp.riceviBreve : tp.ricevi, campoCifra('ricevi', sub ? tp.voci.ricevi_ln : tp.ricevi), 'arriva scritto', tendina('ricevi', reteSotto));
+  const sopra = latoSwap(reteSopra, tp.mandiBreve, campoCifra('mandi', sub ? tp.mandiBreve : tp.voci.cambi), 'scritto con-euro', tendina('mandi', reteSopra));
+  const sotto = latoSwap(reteSotto, sub ? tp.riceviBreve : tp.ricevi, campoCifra('ricevi', sub ? tp.voci.ricevi_ln : tp.ricevi), 'arriva scritto con-euro', tendina('ricevi', reteSotto));
   /* il selettore dell'unita': due tondi senza scritte, la ₿ per i BTC
      e il segno dei sats (le parole stanno solo per chi legge lo schermo) */
   const unita = ['btc', 'sats'].map(u => `<button type="button" class="cambio-unita-tasto${u === swapCambioUnita ? ' scelta' : ''}"`

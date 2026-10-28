@@ -34015,6 +34015,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   in `swapCambioTendina` ('mandi'/'ricevi'/null) e chiusa da un tocco
   fuori. Il selettore dell'unità ha la ₿ e il segno dei sats
   (`SWAP_ICONE.btc`/`.sats`).
+  IL CONTROVALORE IN EURO (stesso giorno, cantiere cambio-euro; perché in
+  CANTIERI, «Il controvalore in euro sotto le cifre del Cambio»):
+  `euroSwap(sats)` dà «≈ X €» con `eurPerSat` e `fmtEur`, vuoto senza
+  `cambioVivo`; `swapCambioPezzi` porta `euroMandi`/`euroRicevi`, gli
+  span `swapCambioEuroMandi`/`swapCambioEuroRicevi` stanno dentro
+  `.cambio-cifra` e il ridisegno a pezzi li aggiorna senza toccare il
+  campo. `vaiSwap` richiede il cambio se ha più di `CAMBIO_LIBRO_MS`.
 
 - GLI AVVISI A CHI ENTRA SOLO DA NOSTR (20 ott 2026, cantiere
   avvisi-nostr-arrivano; perché in CANTIERI, «Gli avvisi Nostr
