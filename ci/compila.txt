@@ -165,6 +165,7 @@ collaudo_margine_cassaforte.py
 collaudo_onchain_indirizzo.py
 collaudo_onchain_ordine.py
 collaudo_onchain_incasso.py
+collaudo_onchain_p2p.py
 collaudo_leve_pannello.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py

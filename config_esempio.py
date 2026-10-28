@@ -798,6 +798,15 @@ CAMBIO_LIBERO_MAX_AL_GIORNO = 5
 # Massimo (SATS Routing) non risponde sulla quota partner del submarine
 # e sui limiti di chiamate: decisione di Andrea.
 CAMBIO_BTC_LN_ATTIVO = False
+# ⛓️ nel P2P (28 ott 2026, cantiere onchain-p2p): la porta ⛓️ del foglio
+# «Blocca i sats» fa pagare la garanzia di Mostro in bitcoin, dalla strada
+# bitcoin → Lightning qui sopra (che deve essere accesa). Nasce SPENTA e
+# solo-moderatori; non si accende prima della prova dal vivo. I minuti:
+# quanti ne devono restare alla richiesta perche' la porta si offra (i
+# bitcoin vogliono una conferma prima che il fornitore paghi).
+P2P_ONCHAIN_ATTIVO = False
+P2P_ONCHAIN_SOLO_MODERATORI = True
+P2P_ONCHAIN_MINUTI_MIN = 60
 ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
                              # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa

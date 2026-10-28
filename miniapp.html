@@ -18291,7 +18291,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '1d9599709a';
+const SWAP_TELEFONO_VER = 'ff0570690f';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -69600,6 +69600,9 @@ async function apriHoldP2P(){
   haptic();
   p2pHoldOrdine = id;
   p2pHoldModo = 'hold';
+  /* ⛓️ (onchain-p2p) si riapre sulla porta dei bitcoin se per questo
+     scambio un cambio e' gia' nato e non e' finito male */
+  if (typeof apriPorteP2P === 'function') apriPorteP2P(id);
   /* «ci sto provando» (10 ott 2026, reputazione-p2p): aprire la
      richiesta e' il primo gesto che il server puo' vedere */
   if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(id, 'garanzia_aperta');
@@ -69610,6 +69613,7 @@ async function apriHoldP2P(){
   el('p2pHoldSheet').classList.add('open');
   /* ...e da aperto chiede da se' a che punto e' (15 ott 2026) */
   if (typeof sentinellaFoglioP2P === 'function') sentinellaFoglioP2P();
+  if (typeof portaOnchainAccesaP2P === 'function' && portaOnchainAccesaP2P(o)) return;
   await disegnaQr(el('p2pHoldQr'),
                   ('lightning:' + o.hold.bolt11.trim()).toUpperCase(), 'Alphanumeric');
 }
@@ -69713,6 +69717,16 @@ function renderHoldP2P(){
   }
   if (!box || !o || !o.hold) return;
   const tit = el('p2pHoldTit'); if (tit) tit.textContent = '🔒 Blocca i sats';
+  /* ⛓️ (28 ott 2026, onchain-p2p): con la porta accesa le due schede
+     stanno in cima, come nel foglio del mercatino; su ⛓️ il corpo e'
+     quello dei bitcoin da mandare, e qui sotto non si passa */
+  const porte = typeof portePagamentoP2P === 'function' ? portePagamentoP2P(o) : '';
+  if (porte && portaOnchainAccesaP2P(o)) {
+    box.innerHTML = porte + corpoOnchainP2P(o);
+    orologioHoldP2P(o);
+    disegnaOnchainP2P(o);
+    return;
+  }
   const quanti = o.hold.sats > 0 ? fmt(o.hold.sats) + ' sats' : '';
   /* ⚠️ IL TEMPO LO DA' `expiration_seconds`, MAI
      `hold_invoice_expiration_window` (13 set 2026): la seconda non la
@@ -69731,7 +69745,7 @@ function renderHoldP2P(){
   const min = !(p2pInfo && p2pInfo.scadenzaSec > 0) || !(scadenzaFoglioP2P(o, 'hold') > 0) ? ''
     : typeof finestraMiaP2P === 'function' ? tempoParoleP2P(finestraMiaP2P(o))
     : Math.max(1, Math.round(p2pInfo.scadenzaSec / 60)) + ' minuti';
-  box.innerHTML =
+  box.innerHTML = porte +
     '<div class="hint">' + (quanti ? 'Paga <b>' + esc(quanti) + '</b> dal tuo wallet: ' : 'Paga dal tuo wallet: ') +
       'i sats restano <b>bloccati in garanzia</b> e non escono finché non li liberi tu.' +
       (min ? ' Hai circa ' + min + '.' : '') + '</div>' +
@@ -83286,6 +83300,310 @@ function tentativoWalletP2P(gesto){
   segnaTentativoP2P(p2pHoldOrdine, quale + (gesto === 'copiata' ? 'copiata' : 'wallet'));
 }
 /* ============ fine della reputazione che chiede ============ */
+/* ============ ⛓️ NEL P2P (28 ott 2026, cantiere onchain-p2p, Andrea:
+   «lo stesso metodo di pagamento LN/onchain deve comparire anche nel
+   p2p») ============
+   Mostro sa solo Lightning: la garanzia e' una hold invoice, e il libro,
+   la chat, la reputazione e le dispute restano suoi. La porta ⛓️ fa
+   pagare QUELLA garanzia in bitcoin, con la strada bitcoin → Lightning
+   del cambio (lo swap «submarine» del telefono, swap/boltz.js): chi vende
+   bitcoin manda i suoi all'indirizzo del fornitore, il fornitore paga la
+   richiesta di Mostro, e lo scambio va avanti come sempre. Per chi la usa
+   e' solo un altro QR, nello stesso foglio.
+   COME VA A FINIRE, senza una riga in piu' su Mostro:
+   • liberati i sats, Mostro chiude la garanzia, il fornitore ha il
+     segreto e ritira i bitcoin (la nostra meta' del ritiro la da' il
+     giro del cambio, `swapGiroSub`, solo col segreto giusto);
+   • scambio annullato o disputa persa, Mostro scioglie la garanzia, il
+     pagamento del fornitore torna indietro e i BITCOIN TORNANO A CHI LI
+     HA MANDATI: lo dice questo foglio, e la lista della pagina «Cambio»
+     chiede dove rimandarli (il rimborso del cambio, dal SUO telefono).
+   LE CHIAVI sono quelle del cambio: le 12 parole di riserva nate nel
+   telefono, la prima volta da scrivere. Il server non vede niente: da'
+   solo il preventivo (`/api/swap/p2p/preventivo`) e il cancello
+   (`swap_leve.p2p`). I TEMPI: i bitcoin vogliono una conferma prima che
+   il fornitore paghi, quindi la porta si offre solo se alla richiesta
+   di Mostro restano almeno `swap_leve.p2p.minuti` minuti. */
+let p2pPorta = 'ln';            // la porta accesa nel foglio della garanzia
+let p2pOcPrev = null;           // {id, sats, dati}: il preventivo del foglio
+let p2pOcErrore = '';           // l'ultimo no, in parole
+let p2pOcOccupato = false;      // una nascita e' in corso
+let p2pOcParole = false;        // il passo delle 12 parole e' aperto
+function p2pOcLeve(){
+  return (typeof swapLeve !== 'undefined' && swapLeve && swapLeve.p2p) || {};
+}
+function p2pOcFornitore(){
+  if (typeof swapFornitori !== 'function') return null;
+  return swapFornitori().find(f => Array.isArray(f.strade) && f.strade.includes('btc-ln')
+                                   && typeof f.creaSub === 'function') || null;
+}
+/* il cambio di questo scambio: l'ultimo nato per lui */
+function swapOnchainP2P(id){
+  if (typeof swapLista !== 'function') return null;
+  return swapLista().filter(r => r && r.p2p === id && r.tipo === 'sub').pop() || null;
+}
+/* vivo = da guardare in questo foglio: non finito, o finito coi
+   bitcoin da riprendere */
+function swapVivoP2P(rec){
+  if (!rec || typeof swapFase !== 'function') return false;
+  const fase = swapFase(rec);
+  if (['creato', 'bloccato', 'confermato', 'pagata'].includes(fase)) return true;
+  return typeof swapDaRimborsare === 'function' && swapDaRimborsare(rec);
+}
+/* PURA: la porta ⛓️ si puo' usare? '' = si', sennò il perche' in
+   parole. `minuti` = quanti ne restano alla richiesta (null = non si sa) */
+function portaOnchainP2PPerche(leve, minuti, fornitore, perFattura){
+  if (!leve || !leve.attivo) return 'spenta';
+  if (!fornitore) return 'Il cambio in bitcoin oggi non risponde.';
+  if (perFattura) return 'Questa richiesta non si può pagare in bitcoin.';
+  const min = Math.max(0, Math.floor(Number(leve.minuti) || 0));
+  if (min > 0 && minuti != null && minuti < min)
+    return 'Servono almeno ' + min + ' minuti (i bitcoin vogliono una conferma): ne restano ' + Math.max(0, minuti) + '. Paga con ⚡.';
+  return '';
+}
+function minutiRestanoP2P(o){
+  const fine = scadenzaFoglioP2P(o, 'hold');
+  return fine > 0 ? Math.floor((fine - Date.now() / 1000) / 60) : null;
+}
+function perchePortaOnchainP2P(o){
+  const f = p2pOcFornitore();
+  const no = f && o && o.hold && f.fatturaValida ? f.fatturaValida(o.hold.bolt11, o.hold.sats) : null;
+  return portaOnchainP2PPerche(p2pOcLeve(), minutiRestanoP2P(o), f, no);
+}
+/* le due schede in cima al foglio; '' a porta spenta (il foglio di sempre) */
+function portePagamentoP2P(o){
+  if (p2pHoldModo !== 'hold' || !p2pOcLeve().attivo) return '';
+  const vivo = swapVivoP2P(swapOnchainP2P(o.id));
+  const no = vivo ? '' : perchePortaOnchainP2P(o);
+  if (no && p2pPorta === 'onchain') p2pPorta = 'ln';
+  const porta = (m, cls, titolo, sotto, spento) =>
+    `<button type="button" role="tab" class="${cls}${p2pPorta === m ? ' attiva' : ''}${spento ? ' spento' : ''}"
+       aria-selected="${p2pPorta === m}" onclick="passaPortaP2P('${m}')">${titolo}<small>${sotto}</small></button>`;
+  return '<div class="pay-metodo" role="tablist" aria-label="Come paghi">'
+    + porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', vivo)
+    + porta('onchain', 'oc', '⛓️ On-chain 🛡️', no ? 'non adesso' : 'una conferma', !!no)
+    + '</div>'
+    + (p2pOcErrore ? '<div class="escrow-note" role="status" style="margin:0 0 8px">' + esc(p2pOcErrore) + '</div>' : '');
+}
+/* (il motore le chiama col typeof: nel suo banco questo blocco non c'e') */
+function apriPorteP2P(id){
+  p2pPorta = swapVivoP2P(swapOnchainP2P(id)) ? 'onchain' : 'ln';
+  p2pOcErrore = '';
+  p2pOcParole = false;
+}
+function portaOnchainAccesaP2P(o){
+  return p2pPorta === 'onchain' && p2pHoldModo === 'hold' && !!p2pOcLeve().attivo;
+}
+function passaPortaP2P(m){
+  const o = ordiniP2P()[p2pHoldOrdine];
+  if (!o || m === p2pPorta) return;
+  haptic();
+  p2pOcErrore = '';
+  if (m === 'onchain') {
+    const no = perchePortaOnchainP2P(o);
+    if (no) { p2pOcErrore = '⛓️ ' + no; renderHoldP2P(); return; }
+  } else if (swapVivoP2P(swapOnchainP2P(o.id))) {
+    /* UN PAGAMENTO ALLA VOLTA: con i bitcoin gia' chiesti, pagare anche
+       con ⚡ vorrebbe dire pagare due volte */
+    p2pOcErrore = 'Hai già chiesto di pagare in bitcoin: aspetta che arrivino, o che tornino a te.';
+    renderHoldP2P(); return;
+  }
+  p2pPorta = m;
+  renderHoldP2P();
+  if (m === 'ln') disegnaQr(el('p2pHoldQr'), ('lightning:' + o.hold.bolt11.trim()).toUpperCase(), 'Alphanumeric');
+  else if (!swapOnchainP2P(o.id) || !swapVivoP2P(swapOnchainP2P(o.id))) preventivoOnchainP2P(o);
+}
+async function preventivoOnchainP2P(o){
+  const f = p2pOcFornitore();
+  if (!f || !o || !o.hold) return;
+  p2pOcPrev = {id: o.id, sats: o.hold.sats, dati: null};
+  try {
+    const r = await fetch(`${API_BASE}/swap/p2p/preventivo?sats=${o.hold.sats}&fornitore=${encodeURIComponent(f.id)}`,
+                          {headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = r.ok ? await r.json() : {ok: false, motivo: 'non_risponde'};
+    if (p2pOcPrev && p2pOcPrev.id === o.id) p2pOcPrev.dati = d;
+  } catch(e) {
+    if (p2pOcPrev && p2pOcPrev.id === o.id) p2pOcPrev.dati = {ok: false, motivo: 'non_risponde'};
+  }
+  if (p2pHoldOrdine === o.id && p2pPorta === 'onchain') renderHoldP2P();
+}
+/* PURA: il no del preventivo, in parole */
+function prevOnchainP2PPerche(d){
+  if (!d) return '';
+  if (d.ok) return '';
+  if (d.motivo === 'sotto_minimo') return 'Questa cifra è sotto il minimo del cambio in bitcoin (' + fmt(d.minimo || 0) + ' sats): paga con ⚡.';
+  if (d.motivo === 'sopra_tetto') return 'Questa cifra è sopra il massimo del cambio in bitcoin (' + fmt(d.massimo || 0) + ' sats): paga con ⚡.';
+  return 'Il cambio in bitcoin non risponde: riprova fra un minuto, o paga con ⚡.';
+}
+/* il corpo del foglio su ⛓️: prima del cambio il conto e il bottone,
+   poi l'indirizzo col QR, poi a che punto e' */
+function corpoOnchainP2P(o){
+  const rec = swapOnchainP2P(o.id);
+  const scade = '<div class="pay-scade" id="p2pHoldScadeRiga" style="display:none"><span id="p2pHoldScade"></span></div>';
+  if (rec && swapVivoP2P(rec)) return statoOnchainP2P(o, rec) + scade;
+  const p = p2pOcPrev && p2pOcPrev.id === o.id ? p2pOcPrev.dati : null;
+  const spiega = '<div class="hint">Paghi la garanzia <b>in bitcoin</b>, dal tuo wallet: il cambio li riceve e blocca per te <b>' +
+    esc(fmt(o.hold.sats)) + ' sats</b> in garanzia. Serve una conferma della rete, di solito 10-60 minuti: quando arriva, questo foglio si chiude da solo. ' +
+    'Se lo scambio si annulla, i tuoi bitcoin tornano a te.</div>';
+  if (!p) return spiega + '<div class="hint" role="status">⛓️ Chiedo il conto al cambio…</div>' + scade;
+  const no = prevOnchainP2PPerche(p);
+  if (no) return spiega + '<div class="escrow-note" role="status">' + esc(no) + '</div>' + scade;
+  const riga = (n, t, b) => `<div style="display:flex;justify-content:space-between;gap:12px${b ? ';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px' : ''}"><span>${t}</span><span class="mono">${fmt(n)} sats</span></div>`;
+  const comm = (p.righe || []).find(x => x.voce === 'commissione') || {sats: 0};
+  const rete = (p.righe || []).find(x => x.voce === 'rete_loro') || {sats: 0};
+  const conto = '<div class="hint">' + riga(p.ricevi, 'In garanzia') + riga(comm.sats, 'Commissione del cambio')
+    + riga(rete.sats, 'Rete del cambio') + riga(p.mandi, 'Da mandare in bitcoin', true) + '</div>';
+  const f = p2pOcFornitore();
+  const c = f && typeof swapCassetto === 'function' ? swapCassetto(f.id) : null;
+  if (p2pOcParole && c && c.parole) {
+    return spiega + conto +
+      '<div class="hint"><b>🔑 Le tue 12 parole di riserva.</b> Servono solo se un giorno i bitcoin devono tornare a te e questo telefono non c\'è più: scrivile su carta, in ordine.</div>' +
+      '<ol class="swap-parole">' + String(c.parole).split(' ').map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
+      '<label class="hint"><input type="checkbox" id="p2pOcSpunta"> Le ho scritte</label>' +
+      '<button class="btn primary" onclick="paroleFatteOnchainP2P()">Continua</button>' + scade;
+  }
+  return spiega + conto +
+    '<button class="btn primary"' + (p2pOcOccupato ? ' disabled aria-busy="true"' : '') +
+      ' onclick="creaOnchainP2P()">⛓️ ' + (p2pOcOccupato ? 'Preparo l\'indirizzo…' : 'Paga in bitcoin') + '</button>' + scade;
+}
+/* PURA: la frase dello stato del cambio, per chi vende bitcoin */
+function fraseOnchainP2P(fase, daRimborsare, rimborso){
+  if (rimborso) return '✅ I tuoi bitcoin sono tornati a te.';
+  if (daRimborsare) return '↩️ La garanzia non è servita: i tuoi bitcoin tornano a te. Scrivi qui sotto dove rimandarli.';
+  return fase === 'creato' ? '⏳ Manda i bitcoin a questo indirizzo, la cifra esatta.'
+    : fase === 'bloccato' ? '👀 Bitcoin visti: aspetto la conferma della rete.'
+    : fase === 'confermato' ? '🔒 Confermati: il cambio sta bloccando la garanzia.'
+    : fase === 'pagata' ? '✅ Garanzia bloccata.'
+    : '';
+}
+function statoOnchainP2P(o, rec){
+  const fase = swapFase(rec);
+  const rimb = swapDaRimborsare(rec);
+  let h = '<div class="hint" role="status">' + esc(fraseOnchainP2P(fase, rimb, rec.rimborso && rec.rimborso.txid)) + '</div>';
+  if (fase === 'creato' && rec.lockupAddress) {
+    h += '<div class="hint"><b>' + esc(fmt(rec.mandi || rec.onchainAmount)) + ' sats</b> in bitcoin: non di meno, o il cambio non paga.</div>' +
+      '<div class="qr" id="p2pHoldQr"></div>' +
+      '<div class="invoice mono" id="p2pOcIndirizzo">' + esc(rec.lockupAddress) + '</div>' +
+      '<button class="btn primary" onclick="copiaOnchainP2P()">📋 Copia l\'indirizzo</button>' +
+      '<a class="btn ghost" href="' + esc(linkOnchainP2P(rec)) + '">₿ Apri nel wallet</a>';
+  }
+  if (rimb && !rec.indirizzo) {
+    h += '<input class="swap-indirizzo" id="p2pOcRimborso" type="text" autocomplete="off" spellcheck="false" placeholder="bc1…">' +
+      '<button class="btn primary" onclick="rimborsoOnchainP2P()">↩️ Rimanda qui i miei bitcoin</button>';
+  } else if (rimb && rec.indirizzo) {
+    h += '<div class="hint">' + (rec.aspettaScadenza
+      ? 'Tornano a <span class="mono">' + esc(rec.indirizzo) + '</span> alla scadenza del cambio: ci penso io, apri l\'app ogni tanto.'
+      : 'Li sto rimandando a <span class="mono">' + esc(rec.indirizzo) + '</span>.') + '</div>';
+  }
+  return h + '<div class="hint">Le 12 parole di riserva e tutti i cambi stanno nella pagina «Cambio».</div>';
+}
+function linkOnchainP2P(rec){
+  return rec.bip21 || ('bitcoin:' + rec.lockupAddress + '?amount=' + (Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8));
+}
+async function disegnaOnchainP2P(o){
+  const rec = swapOnchainP2P(o.id);
+  if (rec && swapFase(rec) === 'creato' && rec.lockupAddress && el('p2pHoldQr'))
+    await disegnaQr(el('p2pHoldQr'), linkOnchainP2P(rec), 'Byte');
+}
+function copiaOnchainP2P(){
+  const rec = swapOnchainP2P(p2pHoldOrdine);
+  if (rec && rec.lockupAddress) copiaLink(rec.lockupAddress, 'Indirizzo copiato 📋');
+}
+/* «Paga in bitcoin»: la prima volta le 12 parole, poi la nascita */
+async function creaOnchainP2P(){
+  const o = ordiniP2P()[p2pHoldOrdine];
+  const f = p2pOcFornitore();
+  if (!o || !f || p2pOcOccupato) return;
+  haptic();
+  let c = swapCassetto(f.id);
+  if (!c || !c.parole) {
+    let parole;
+    try { parole = await f.nuoveParole(); }
+    catch(e){ p2pOcErrore = 'Il cambio in bitcoin non risponde: riprova fra un minuto.'; return renderHoldP2P(); }
+    c = {parole: parole, prossimo: 0, copiata: false};
+    if (!swapScrivi(swapCasaParole(f.id), c)) { p2pOcErrore = 'Questo telefono non riesce a salvare le parole: paga con ⚡.'; return renderHoldP2P(); }
+  }
+  if (!c.copiata) { p2pOcParole = true; return renderHoldP2P(); }
+  return nasciOnchainP2P(o, f);
+}
+function paroleFatteOnchainP2P(){
+  const f = p2pOcFornitore();
+  const o = ordiniP2P()[p2pHoldOrdine];
+  if (!f || !o) return;
+  haptic();
+  const sp = el('p2pOcSpunta');
+  if (!sp || !sp.checked) { toast('Prima spunta «Le ho scritte»'); return; }
+  const c = swapCassetto(f.id);
+  if (!c) return;
+  c.copiata = true;
+  swapScrivi(swapCasaParole(f.id), c);
+  p2pOcParole = false;
+  return nasciOnchainP2P(o, f);
+}
+async function nasciOnchainP2P(o, f){
+  const p = p2pOcPrev && p2pOcPrev.id === o.id ? p2pOcPrev.dati : null;
+  if (!p || !p.ok) return preventivoOnchainP2P(o);
+  /* la richiesta di Mostro si ricontrolla qui, coi minuti che restano */
+  const no = perchePortaOnchainP2P(o);
+  if (no) { p2pOcErrore = '⛓️ ' + no; p2pPorta = 'ln'; return renderHoldP2P(); }
+  const c = swapCassetto(f.id);
+  if (!c || !c.parole || !c.copiata) return;
+  /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE (la regola del cambio): mai un
+     segreto riusato, anche se il telefono si spegne a meta' */
+  const indice = Number(c.prossimo) || 0;
+  c.prossimo = indice + 1;
+  if (!swapScrivi(swapCasaParole(f.id), c)) { p2pOcErrore = 'Questo telefono non riesce a salvare: paga con ⚡.'; return renderHoldP2P(); }
+  p2pOcOccupato = true; p2pOcErrore = '';
+  renderHoldP2P();
+  let nuovo;
+  try { nuovo = await f.creaSub({parole: c.parole, indice: indice, preventivo: p, fattura: o.hold.bolt11}); }
+  catch(e){
+    p2pOcOccupato = false;
+    p2pOcErrore = e && e.tipo === 'mente'
+      ? 'Il cambio ha risposto con dati che non tornano: non mandare niente, paga con ⚡.'
+      : 'Il cambio in bitcoin non risponde: riprova fra un minuto, o paga con ⚡.';
+    p2pOcPrev = null;
+    return renderHoldP2P();
+  }
+  /* `ordine: 'p2p'` e non null: null vale 0, cioe' il cambio libero, e
+     un cambio P2P vivo bloccherebbe quello */
+  const rec = Object.assign(nuovo, {fornitore: f.id, ordine: 'p2p', p2p: o.id, indice: indice,
+    indirizzo: '', creato: Date.now(), pagamento: ''});
+  swapSalvaRecord(rec);
+  p2pOcOccupato = false;
+  swapSorveglia();
+  if (p2pHoldOrdine === o.id) renderHoldP2P();
+}
+/* il giro del cambio ha cambiato qualcosa: il foglio, se e' aperto su
+   questo scambio e sulla porta dei bitcoin; e una volta sola l'avviso
+   dei bitcoin da riprendere, anche a foglio chiuso (lo scambio
+   annullato il foglio non lo riapre piu') */
+function ridisegnaOnchainP2P(rec){
+  const aperto = el('p2pHoldSheet') && el('p2pHoldSheet').classList.contains('open');
+  if (aperto && p2pHoldOrdine === rec.p2p && p2pPorta === 'onchain') renderHoldP2P();
+  else if (swapDaRimborsare(rec) && !rec.indirizzo && !rec.avvisato) {
+    rec.avvisato = true;
+    swapSalvaRecord(rec);
+    toast('↩️ Lo scambio P2P si è chiuso senza la tua garanzia in bitcoin: i bitcoin tornano a te. Apri «Cambio» e scrivi dove rimandarli.', 9000);
+  }
+}
+function rimborsoOnchainP2P(){
+  const rec = swapOnchainP2P(p2pHoldOrdine);
+  const v = String((el('p2pOcRimborso') || {}).value || '').trim();
+  if (!rec || !v) return;
+  haptic();
+  const f = swapFornitore(swapDiChi(rec));
+  if (!f) return;
+  f.indirizzoValido(v).then(ok => {
+    if (!ok) { toast('Questo non sembra un indirizzo bitcoin'); return; }
+    rec.indirizzo = v;
+    swapSalvaRecord(rec);
+    swapRimborsa(rec);
+    swapSorveglia();
+    renderHoldP2P();
+  }).catch(() => toast('Il cambio non risponde: riprova fra un minuto'));
+}
+/* ============ fine del ⛓️ nel P2P ============ */
 /* ============ LA PAUSA DEGLI ORDINI, LA PARTE CHE CHIEDE (12 ott 2026, cantiere
    tempo-di-chi-pubblica): la lettura e la scrittura della propria pausa.
    Stanno qui, fuori dal motore, come le due rotte della reputazione. ---- */

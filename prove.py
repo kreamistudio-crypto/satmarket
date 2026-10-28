@@ -156861,9 +156861,11 @@ def prove_apri_nel_wallet():
            GANCIO in fn("function orologioHoldP2P(o){"),
            mini.count("pw.onclick = tentativoWalletP2P")])
     anw = nudo(fn("function apriNelWallet(a, ev, tentativo){"))
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei tre QR "
+    # (28 ott 2026, onchain-p2p) il quarto QR: la garanzia ridisegnata
+    # quando si torna dalla porta ⛓️ alla ⚡ (`passaPortaP2P`)
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, nei quattro QR "
           "e nel Riprova, e in nessuna navigazione da script",
-          [0, 4],
+          [0, 5],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
            mini.count("('lightning:' + ")])

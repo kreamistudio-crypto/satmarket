@@ -4680,6 +4680,26 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   annullo del biglietto non hanno cancello, il ritiro e il rimborso
   sono del telefono con le 12 parole).
 
+- ⛓️ NEL P2P: LE LEVE (28 ott 2026, cantiere onchain-p2p; perché in
+  CANTIERI, «⛓️ nel P2P»; com'è fatto in ARCHITETTURA, «⛓️ NEL P2P»).
+  SUL VPS NON CAMBIA NIENTE: le tre leve sono di serie e NON compaiono
+  da sole nel config (`P2P_ONCHAIN_ATTIVO` False,
+  `P2P_ONCHAIN_SOLO_MODERATORI` True, `P2P_ONCHAIN_MINUTI_MIN` 60); si
+  cambiano anche dal pannello «⚙️ Stato delle leve», righe «P2P ⛓️».
+  La porta sta SOPRA due cancelli: lo swap (`swap_per`) e la strada
+  bitcoin → Lightning (`CAMBIO_BTC_LN_ATTIVO`, che aspetta Massimo).
+  Senza tutti e due la porta non c'è, qualunque cosa dica la sua leva.
+  Mostro e il nodo non cambiano: la garanzia resta la hold invoice di
+  sempre, la paga il fornitore dello swap.
+  ⚠️ NON SI ACCENDE PRIMA DELLA PROVA DAL VIVO sul collaudo, coi soldi
+  veri piccoli: che SATS Routing accetti di pagare una HOLD invoice di
+  Mostro (CLTV 576) e la tenga in volo per ore senza annullarla; che
+  rilasciata la garanzia ritiri i bitcoin; che sciolta (annullo,
+  disputa persa) il rimborso torni a chi li ha mandati. Fino ad allora
+  è provato solo sul cartone (`collaudo_onchain_p2p`).
+  PER SPEGNERE: `P2P_ONCHAIN_ATTIVO = False` (pannello o config). I
+  cambi già nati finiscono dal telefono come quelli del cambio libero.
+
 - LA CHIAVE DI BARATTOLO DELL'ON-CHAIN (27 ott 2026, cantiere
   onchain-disputa; com'è fatta in ARCHITETTURA, «LA DISPUTA ON-CHAIN E
   LA CHIAVE DI BARATTOLO SUL VPS»). NASCE DAL PANNELLO, MAI DA UN

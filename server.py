@@ -1766,6 +1766,31 @@ try:
     from config import CAMBIO_BTC_LN_ATTIVO
 except ImportError:
     CAMBIO_BTC_LN_ATTIVO = False
+# ⛓️ NEL P2P (28 ott 2026, cantiere onchain-p2p, richiesta di Andrea: «lo
+# stesso metodo di pagamento LN/onchain deve comparire anche nel p2p»).
+# Mostro sa solo Lightning: la garanzia e' una hold invoice. La porta ⛓️
+# del foglio «Blocca i sats» la fa pagare in bitcoin dalla strada
+# bitcoin → Lightning del cambio (lo swap submarine del telefono): chi
+# vende bitcoin manda i suoi all'indirizzo del fornitore, e il fornitore
+# paga la garanzia. Mostro non cambia di una riga. Vuole lo swap
+# (SWAP_ATTIVO) e la strada bitcoin → Lightning (CAMBIO_BTC_LN_ATTIVO);
+# nasce SPENTA e solo-moderatori, e non si accende prima della prova dal
+# vivo (il fornitore che tiene una hold invoice per ore).
+try:
+    from config import P2P_ONCHAIN_ATTIVO
+except ImportError:
+    P2P_ONCHAIN_ATTIVO = False
+try:
+    from config import P2P_ONCHAIN_SOLO_MODERATORI
+except ImportError:
+    P2P_ONCHAIN_SOLO_MODERATORI = True
+# I MINUTI CHE DEVONO RESTARE alla richiesta di Mostro per offrire ⛓️:
+# i bitcoin vogliono una conferma prima che il fornitore paghi, e chi
+# PRENDE ha 30 minuti (`expiration_seconds`, che non si allunga).
+try:
+    from config import P2P_ONCHAIN_MINUTI_MIN
+except ImportError:
+    P2P_ONCHAIN_MINUTI_MIN = 60
 # QUANTI BLOCCHI DEVONO RESTARE allo swap quando lo paghiamo: dopo il
 # pagamento il fornitore blocca i bitcoin e il telefono li ritira, e se
 # lo swap scade prima il fornitore se li riprende (e il pagamento torna
@@ -1940,6 +1965,20 @@ def cambio_libero_per(tg_id: int) -> bool:
     if not swap_per(tg_id) or not CAMBIO_LIBERO_ATTIVO:
         return False
     if CAMBIO_LIBERO_SOLO_MODERATORI:
+        return e_admin(int(tg_id or 0))
+    return True
+
+
+def p2p_onchain_per(tg_id: int) -> bool:
+    """LA PORTA ⛓️ DEL P2P C'E' PER QUESTA PERSONA? Sopra il cancello dello
+    swap (il telefono che fa il cambio), la strada bitcoin → Lightning, la
+    sua leva e il suo solo-moderatori. Il client lo legge in
+    `swap_leve.p2p.attivo` e non lo indovina mai."""
+    if not swap_per(tg_id) or not P2P_ONCHAIN_ATTIVO:
+        return False
+    if "btc-ln" not in cambio_strade():
+        return False
+    if P2P_ONCHAIN_SOLO_MODERATORI:
         return e_admin(int(tg_id or 0))
     return True
 
@@ -32362,6 +32401,22 @@ def _leve_stato():
                          "Lightning pagata",
                   spento="solo Lightning → indirizzo bitcoin; resta "
                          "spenta finche' Massimo non risponde"),
+            _leva("P2P: ⛓️ blocca i sats in bitcoin",
+                  "P2P_ONCHAIN_ATTIVO", bool(P2P_ONCHAIN_ATTIVO),
+                  acceso="nel foglio «Blocca i sats» la porta ⛓️: chi "
+                         "vende bitcoin manda i suoi al cambio, che paga "
+                         "la garanzia di Mostro",
+                  spento="la garanzia del P2P solo in Lightning; vuole "
+                         "anche bitcoin → Lightning del cambio, e la "
+                         "prova dal vivo prima di accendersi"),
+            _leva("P2P ⛓️: solo i moderatori",
+                  "P2P_ONCHAIN_SOLO_MODERATORI",
+                  bool(P2P_ONCHAIN_SOLO_MODERATORI),
+                  acceso="la porta ⛓️ la vedono solo i moderatori",
+                  spento="a porta accesa la vedono TUTTI"),
+            _leva("P2P ⛓️: minuti che devono restare",
+                  "P2P_ONCHAIN_MINUTI_MIN", int(P2P_ONCHAIN_MINUTI_MIN or 0),
+                  spento="a 0 la porta si offre fino all'ultimo minuto"),
             # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
             # fattura dello swap e' meno di quel che spetta a chi vende, e
             # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
@@ -46188,7 +46243,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                             # (27 ott 2026, cambio-libero) il cambio dei
                             # suoi sats senza ordine: il cancello, i tetti,
                             # quanti ne ha fatti oggi
-                            "cambio": cambio_leve(user["id"])}
+                            "cambio": cambio_leve(user["id"]),
+                            # (28 ott 2026, onchain-p2p) la porta ⛓️ del
+                            # foglio «Blocca i sats»
+                            "p2p": {"attivo": p2p_onchain_per(user["id"]),
+                                    "minuti": int(P2P_ONCHAIN_MINUTI_MIN or 0)}}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
@@ -74858,6 +74917,37 @@ async def cambio_preventivo(sats: str = "", direzione: str = "ln-btc",
             return dict(busta, ok=False, motivo="non_risponde")
         p = preventivo_swap(cifra, tariffa, SWAP_FEE_PERCENTO,
                             SWAP_MIN_SATS, CAMBIO_LIBERO_MAX_SATS)
+    p["cambiata"] = bool(hash) and hash != tariffa["hash"]
+    p["valido_s"] = SWAP_PREVENTIVO_VALE_S
+    return dict(busta, **p)
+
+
+@app.get("/api/swap/p2p/preventivo")
+async def p2p_onchain_preventivo(sats: str = "", fornitore: str = "satsrouting",
+                                 hash: str = "",
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """IL PREVENTIVO DELLA PORTA ⛓️ DEL P2P (28 ott 2026, onchain-p2p):
+    quanti bitcoin mandare perche' il fornitore paghi la garanzia di
+    Mostro da `sats`. Lo stesso conto del cambio bitcoin → Lightning
+    (`preventivo_sub`), senza i tetti del cambio libero: il tetto e'
+    quello del P2P, che Mostro ha gia' giudicato. Non crea niente, e
+    i sats non passano mai da Barattolo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_onchain_per(user["id"]):
+        raise HTTPException(403, "On-chain nel P2P non disponibile")
+    chi = swap_fornitore(str(fornitore or ""))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
+    cifra = _cambio_sats(sats)
+    busta = {"dovuto": cifra, "fornitore": chi["id"],
+             "fornitore_nome": chi["nome"]}
+    if not cifra:
+        return dict(busta, ok=False, motivo="cifra")
+    tariffa = await leggi_tariffa_sub(chi)
+    if tariffa is None:
+        return dict(busta, ok=False, motivo="non_risponde")
+    p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, 0)
     p["cambiata"] = bool(hash) and hash != tariffa["hash"]
     p["valido_s"] = SWAP_PREVENTIVO_VALE_S
     return dict(busta, **p)

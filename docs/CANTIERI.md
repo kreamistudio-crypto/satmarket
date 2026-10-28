@@ -73942,3 +73942,82 @@ tra gli indirizzi di resto). Le due scritte «l'avanzo torna a te»
 dicono ora «se supera i 546 sats». Provato: `prove_onchain_tetto` (il
 margine eseguito a 0,2, 1 e 2 sat/vB), suite e collaudi. Resta aperta
 la domanda dei rimborsi e degli avanzi a un wallet di chi compra.
+
+## ⛓️ nel P2P: la garanzia di Mostro pagata in bitcoin, dietro una leva spenta (28 ott 2026, cantiere onchain-p2p, Andrea: «lo stesso metodo di pagamento LN/onchain deve comparire anche nel p2p»)
+
+**LA RICHIESTA.** Nel mercatino la cassa ha due schede, ⚡ e ⛓️. Andrea
+vuole la stessa scelta nel P2P. Il P2P però lo fa Mostro, che conosce
+solo Lightning: la garanzia di chi vende bitcoin è una hold invoice.
+
+**LA STRADA.** La porta ⛓️ del foglio «Blocca i sats» paga QUELLA hold
+invoice in bitcoin, con lo swap submarine che il cambio libero ha già
+(tappa 3): la richiesta di Mostro fa da fattura, chi vende manda i
+bitcoin all'indirizzo del fornitore, il fornitore paga la garanzia.
+Mostro non cambia di una riga: libro, chat, reputazione e dispute
+restano le sue. Rilasciati i sats, il fornitore ha il segreto e ritira i
+bitcoin. Annullato lo scambio o persa la disputa, la garanzia si
+scioglie, il pagamento del fornitore torna indietro e i bitcoin tornano
+a chi li ha mandati (il rimborso del cambio, dal suo telefono). Per chi
+paga è solo un altro QR, nello stesso foglio. Sul biglietto ad Andrea
+c'erano anche il 2-di-3 vero accanto a Mostro (lo studio del 27 ott,
+4-5 sessioni e una bacheca nostra) e «prima lo swap, poi il 2-di-3»,
+che è quella raccomandata: questa sessione ha costruito la parte swap
+mentre aspettava la risposta.
+
+**LE DECISIONI.**
+- Tutto dietro `P2P_ONCHAIN_ATTIVO` spenta, solo-moderatori, e sopra due
+  cancelli già spenti: lo swap e la strada bitcoin → Lightning
+  (`CAMBIO_BTC_LN_ATTIVO`, che aspetta Massimo).
+- I MINUTI. I bitcoin vogliono una conferma prima che il fornitore paghi
+  (il cartone come SATS Routing: zero-conf 0). Chi PRENDE ha 30 minuti
+  (`expiration_seconds`, che non si allunga), chi pubblica 180: la
+  porta si offre solo se ne restano `P2P_ONCHAIN_MINUTI_MIN` (60). Con
+  meno la scheda è spenta e il tocco dice quanti ne restano.
+- Solo la GARANZIA, non la cauzione dei contanti: quella ha la sua
+  finestra di 15 minuti, troppo corta per una conferma.
+- UN PAGAMENTO ALLA VOLTA. Coi bitcoin chiesti, la scheda ⚡ dice di no:
+  pagare anche la fattura vorrebbe dire due pagamenti per una garanzia.
+- Il preventivo lo fa il server (`/api/swap/p2p/preventivo`, il conto di
+  sempre, `preventivo_sub`), senza i tetti del cambio libero: la cifra
+  l'ha già giudicata il P2P (250 € in beta). Nessun biglietto e nessuna
+  tabella: Barattolo non tocca i sats e non deve contare niente.
+- L'indirizzo del RIMBORSO si chiede DOPO, solo se serve, come nel cambio
+  libero; a foglio chiuso un avviso, una volta, manda a «Cambio».
+- `ordine: 'p2p'` nel record, e non `null`: `Number(null)` vale 0, cioè
+  il cambio libero, e un cambio P2P vivo lo avrebbe bloccato (la
+  controprova del collaudo lo fa vedere).
+- Il blocco sta FUORI dal motore dello scambio (le sentinelle vogliono il
+  motore a zero fetch); `renderHoldP2P` e `apriHoldP2P` lo chiamano col
+  typeof. La sentinella dei QR `lightning:` passa da 4 a 5: il quinto è
+  la garanzia ridisegnata tornando da ⛓️ a ⚡.
+
+**STRADE SCARTATE.** Il 2-di-3 dentro Mostro (una patch al cuore del
+coordinator, e `mostrod` dovrebbe tenere una chiave). Un segno nuovo nel
+catalogo dei tentativi («garanzia_onchain»): aprire il foglio è già un
+tentativo, e il catalogo ha nove gesti provati in cinque posti.
+
+**PROVATO.** `collaudo_onchain_p2p` 34/0, nella gabbia della CI
+(`collaudi_ci.py`): il cancello (spento di serie; senza la strada
+btc-ln, senza lo swap, a solo-moderatori), il preventivo (100.000 →
+100.818, niente tetto del cambio libero, sotto il minimo, cartone giù,
+404); il telefono in node col codice vero contro il cartone: senza leva
+il foglio di sempre, con 30 minuti ⛓️ spenta col perché, con 3 ore il
+conto riga per riga, le 12 parole la prima volta, lo swap con la
+richiesta di Mostro, il QR `bitcoin:`, ⚡ che dice di no, il foglio che
+si riapre sui bitcoin, «Scambio P2P ⛓️» nella pagina «Cambio» e il cambio
+libero libero, visti → confermati → la nostra metà del ritiro → fatto,
+lo scambio annullato col rimborso a due all'indirizzo scritto, l'avviso
+a foglio chiuso una volta sola, la sentinella (solo cartone e rotta del
+preventivo, Barattolo non paga). CONTROPROVA: col record a `ordine: null`
+due scene rosse (il record e il cambio libero bloccato).
+
+**DA GUARDARE PRIMA DI ACCENDERE.** Niente di questo è provato dal vivo.
+La domanda vera è a SATS Routing (con quella di Massimo): accetta di
+pagare una HOLD invoice di Mostro col suo CLTV di 576 blocchi, e di
+tenerla in volo per ore? Se il loro timeout on-chain è più corto, o se
+annullano un pagamento lungo, la porta non regge. Poi la prova sul
+collaudo coi soldi veri piccoli, nei due finali (rilascio e annullo).
+Restano anche: lo zero-conf (con una conferma chi prende non ce la fa),
+e quanto dirlo nella pagina dello scambio quando i bitcoin devono
+tornare (oggi il foglio, l'avviso e la pagina «Cambio»).
+

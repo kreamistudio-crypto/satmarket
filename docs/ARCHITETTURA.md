@@ -34266,6 +34266,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_banco_chiavi_onchain`, `prove_chiave_che_nasce_da_sola`,
   `prove_checksum_descrittore`, `prove_indirizzo_ordine_onchain`,
   `prove_bundle_bitcoin`; il collaudo `collaudo_onchain_indirizzo`.
+- ⛓️ NEL P2P: LA GARANZIA DI MOSTRO PAGATA IN BITCOIN (28 ott 2026,
+  cantiere onchain-p2p; perché in CANTIERI, «⛓️ nel P2P»; le leve in
+  PRODUZIONE, «⛓️ NEL P2P: LE LEVE»). Mostro sa solo Lightning e non si
+  tocca: la porta ⛓️ del foglio «Blocca i sats» (`p2pHoldSheet`, solo la
+  garanzia, non la cauzione) paga LA SUA hold invoice con lo swap
+  submarine del cambio (CAMBIO LIBERO, TAPPA 3): la richiesta di Mostro
+  fa da fattura, chi vende bitcoin manda i suoi all'indirizzo del
+  fornitore, il fornitore paga la garanzia. Rilasciata, il fornitore ha
+  il segreto e ritira (la nostra metà del ritiro a due solo col segreto
+  giusto, `swapGiroSub`); sciolta (annullo, disputa persa), il suo
+  pagamento torna indietro e il telefono rimborsa i bitcoin
+  all'indirizzo che chi vende scrive nel foglio o nella pagina «Cambio».
+  I PEZZI. Server: `p2p_onchain_per` (swap + strada btc-ln + leva +
+  solo-moderatori), `swap_leve.p2p` in `/api/me` ({attivo, minuti}), la
+  rotta `GET /api/swap/p2p/preventivo` (il conto di `preventivo_sub`,
+  senza i tetti del cambio libero: la cifra l'ha già giudicata il P2P).
+  Telefono: il blocco «⛓️ NEL P2P» di miniapp.html, FUORI DAL MOTORE
+  (il motore resta a zero fetch: `renderHoldP2P` e `apriHoldP2P` lo
+  chiamano col typeof); il record dello swap porta `ordine: 'p2p'` e
+  `p2p: <id dello scambio>` (MAI `ordine: null`, che vale 0, cioè il
+  cambio libero, e un cambio P2P vivo lo bloccherebbe); `swapRidisegnaDove`
+  manda i suoi cambi a `ridisegnaOnchainP2P` (il foglio, o un avviso
+  una volta a foglio chiuso). UN PAGAMENTO ALLA VOLTA: coi bitcoin
+  chiesti la scheda ⚡ dice di no. I TEMPI: la porta si offre solo se
+  alla richiesta restano `P2P_ONCHAIN_MINUTI_MIN` minuti (chi prende ne
+  ha 30, chi pubblica 180). Il collaudo: `collaudo_onchain_p2p`.
 - IL PAGAMENTO ON-CHAIN: L'INCASSO SU UN WALLET PROPRIO E LA QUOTA DI
   BARATTOLO (27 ott 2026, cantiere onchain-incasso-esterno; perché in
   CANTIERI, «L'on-chain incassa dove vuoi tu»). Sopra l'ordine on-chain

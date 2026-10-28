@@ -188,6 +188,7 @@ const SWAP_TESTI_T3 = {
     lista: 'I tuoi incassi in bitcoin',
     ordine: n => `Ordine #${n}`,
     recuperato: 'Recuperato',
+    p2p: 'Scambio P2P ⛓️',
     mostra: 'Mostra le 12 parole',
     nascondi: 'Nascondi',
     nessunaParola: 'Non hai ancora le parole: nascono col primo incasso in bitcoin.',
@@ -297,6 +298,7 @@ const SWAP_TESTI_T3 = {
     lista: 'Your bitcoin payouts',
     ordine: n => `Order #${n}`,
     recuperato: 'Recovered',
+    p2p: 'P2P trade ⛓️',
     mostra: 'Show the 12 words',
     nascondi: 'Hide',
     nessunaParola: 'You have no words yet: they are born with the first bitcoin payout.',
@@ -1090,7 +1092,11 @@ async function swapRitira(rec){
 }
 function swapRiprendi(){ if (swapAcceso()) swapSorveglia(); }
 function swapRidisegnaDove(rec){
-  if (swapECambio(rec)) renderSwapCambio();
+  /* (28 ott 2026, onchain-p2p) il cambio che paga la garanzia di uno
+     scambio P2P: il foglio «Blocca i sats», se e' aperto su di lui */
+  if (rec && rec.p2p) {
+    if (typeof ridisegnaOnchainP2P === 'function') ridisegnaOnchainP2P(rec);
+  } else if (swapECambio(rec)) renderSwapCambio();
   if (currentOrder && Number(currentOrder.id) === Number(rec.ordine)
       && el('payoutIncasso')) ridisegnaIncassoSwap();
   if (el('view-swap') && el('view-swap').classList.contains('active')) renderSwapTelefono();
@@ -1224,7 +1230,7 @@ function renderSwapTelefono(){
   /* con degli swap in lista, il «per ora nessuno» della tappa 1 tace */
   if (el('swapVuoto')) el('swapVuoto').style.display = lista.length ? 'none' : '';
   const righe = lista.map(rec => `<div class="swap-riga-lista">
-      <b>${esc(swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+      <b>${esc(rec.p2p ? t.p2p : swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
       <span>${esc(frasestatoSwap(rec))}</span>
       ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
       ${(!rec.indirizzo && SWAP_FASI_RITIRO.has(swapFase(rec)) && !swapESub(rec)) || (swapDaRimborsare(rec) && !rec.indirizzo) ? `
