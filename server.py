@@ -77975,15 +77975,22 @@ def _incassi_in_attesa(con) -> dict:
     dentro, e quanti sats (il prezzo pieno: il massimo che puo' uscire).
     Conta SOLO `ordini`: rimborsi d'asta e pagamenti P2P hanno i loro
     registri, e un numero che li mescolasse non combacerebbe con nessun
-    wallet (la lezione del polso 23 del libro mastro)."""
+    wallet (la lezione del polso 23 del libro mastro).
+    PER CASSAFORTE D'USCITA, non d'entrata (29 ott 2026, trasloco del
+    SaaS): un ordine spostato sul nodo («Sposta sulla cassaforte nodo»)
+    paga e rimborsa dal nodo, quindi e' il nodo che deve averne il
+    margine — il calco SQL di `_cassaforte_uscita`. Contato dove i sats
+    sono ENTRATI, quei quattro ordini davano «⚠️ Margine saas» su un
+    wallet svuotato apposta, e sul nodo mancavano dal conto."""
     seg = ",".join("?" * len(STATI_SATS_IN_CASSAFORTE))
     out = {}
     for r in con.execute(
-            f"SELECT cassaforte, COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) "
+            f"SELECT COALESCE(NULLIF(cassaforte_payout,''), cassaforte) AS "
+            f"uscita, COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) "
             f"AS sats FROM ordini WHERE stato IN ({seg}) AND "
-            "COALESCE(payout_stato,'')<>'uscito' GROUP BY cassaforte",
+            "COALESCE(payout_stato,'')<>'uscito' GROUP BY uscita",
             STATI_SATS_IN_CASSAFORTE):
-        out[r["cassaforte"] or ""] = {"n": int(r["n"]), "sats": int(r["sats"])}
+        out[r["uscita"] or ""] = {"n": int(r["n"]), "sats": int(r["sats"])}
     return out
 
 
@@ -78023,8 +78030,9 @@ def _cassaforte_configurata(cf) -> bool:
 
 
 async def _voci_margine() -> list:
-    """La sesta domanda, per ogni cassaforte configurata: il saldo con la
-    chiave di lettura, gli incassi in attesa dal database. Spenta con le
+    """La sesta domanda, per ogni cassaforte configurata che ha incassi in
+    attesa o riceve il denaro nuovo: il saldo con la chiave di lettura,
+    gli incassi in attesa dal database. Spenta con le
     due leve a 0. Fail-open: un errore e' una voce «non misurata», mai un
     giro saltato."""
     if not (LIQUIDITA_MARGINE_PERCENTO or LIQUIDITA_MARGINE_MIN_SATS):
@@ -78046,6 +78054,14 @@ async def _voci_margine() -> list:
         except ValueError:
             continue
         if not _cassaforte_configurata(cf):
+            continue
+        # UNA CASSAFORTE SENZA DOVERI NON SI GIUDICA (29 ott 2026): se da
+        # li' non deve uscire niente e il denaro nuovo nasce altrove, il
+        # suo margine non serve a nessuno — il SaaS svuotato e chiuso
+        # dava un «⚠️» o un «❔» a ogni giro. Quella del denaro nuovo si
+        # giudica sempre; con le attese illeggibili si giudicano tutte.
+        if (attese is not None and not attese.get(nome)
+                and nome != cassaforte_nuova()):
             continue
         saldo = await _saldo_cassaforte(cf) if attese is not None else None
         voci.append(_giudizio_margine(nome, saldo, (attese or {}).get(nome, {})))

@@ -180619,7 +180619,8 @@ def prove_margine_cassaforte():
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
     con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
-                "payout_stato TEXT, prezzo_sats INTEGER, cassaforte TEXT)")
+                "payout_stato TEXT, prezzo_sats INTEGER, cassaforte TEXT, "
+                "cassaforte_payout TEXT DEFAULT '')")
     righe = [("locked", "", 10_000, "nodo"), ("confirmed", "", 20_000, "nodo"),
              ("confirmed", "uscito", 99_000, "nodo"),   # gia' pagato
              ("released", "uscito", 99_000, "nodo"), ("creato", "", 99_000, "nodo"),
@@ -180628,14 +180629,29 @@ def prove_margine_cassaforte():
              ("dispute", "incerto", 7_000, "saas")]
     con.executemany("INSERT INTO ordini(stato, payout_stato, prezzo_sats, "
                     "cassaforte) VALUES(?,?,?,?)", righe)
+    # (29 ott 2026) uno nato sul SaaS e spostato sul nodo, e uno col NULL
+    # delle righe di ieri: il primo conta sul nodo, il secondo sul saas
+    con.execute("INSERT INTO ordini(stato, payout_stato, prezzo_sats, "
+                "cassaforte, cassaforte_payout) "
+                "VALUES('locked','',4000,'saas','nodo')")
+    con.execute("INSERT INTO ordini(stato, payout_stato, prezzo_sats, "
+                "cassaforte, cassaforte_payout) "
+                "VALUES('locked','',1000,'saas',NULL)")
     amb = {"STATI_SATS_IN_CASSAFORTE": (
         "locked", "shipped", "delivered", "confirmed", "dispute",
         "return_pending", "return_shipped", "refund")}
     exec(pezzo("_incassi_in_attesa"), amb)
     prova("gli incassi in attesa: solo gli stati coi sats dentro e non "
-          "ancora usciti, per cassaforte",
-          {"nodo": {"n": 2, "sats": 30_000}, "saas": {"n": 3, "sats": 18_000}},
+          "ancora usciti, per cassaforte D'USCITA (lo spostato sul nodo "
+          "conta sul nodo)",
+          {"nodo": {"n": 3, "sats": 34_000}, "saas": {"n": 4, "sats": 19_000}},
           amb["_incassi_in_attesa"](con))
+    vm = codice(pezzo("_voci_margine"))
+    prova("la sesta domanda salta la cassaforte senza doveri che non riceve "
+          "il denaro nuovo, e solo con le attese lette", True,
+          "if (attese is not None and not attese.get(nome)\n"
+          "                and nome != cassaforte_nuova()):\n"
+          "            continue" in vm)
     amb = {"LIQUIDITA_MARGINE_PERCENTO": 1, "LIQUIDITA_MARGINE_MIN_SATS": 10_000,
            "_fmt_sats": reale("_fmt_sats")}
     exec(pezzo("_giudizio_margine"), amb)
