@@ -74662,3 +74662,40 @@ invece che non definito), frase vecchia (rossa la frase ammessa),
 NON PROVATO DAL VIVO: il giro intero di un ordine vero da venditore col
 cambio, e il tasto «onion» dentro Telegram sul telefono (sul collaudo
 l'indirizzo .onion c'è solo se il suo config ha `ONION_HOST`).
+
+## Il cambio di chi vende on-chain usa il suo stesso seme (29 ott 2026, cantiere swap-seme-onchain, Andrea: «lo stesso wallet autogenerato per l'onchain è lo stesso che in caso di problemi deve essere utilizzato nello swap. Inoltre il venditore può incassare dove il compratore ha pagato o ricevere direttamente dallo swap con fee di swap segnate. Di modo che il venditore non deve nemmeno fare lo swap da solo, lo fa il sistema internamente»)
+
+LA SECONDA METÀ C'ERA GIÀ: chi vende on-chain e sceglie in Profilo
+«sempre Lightning» o «scelgo ogni volta» riceve dal cambio, col costo
+detto come un cambio prima di confermare (cantiere
+onchain-verso-lightning, 28 ott, leva `ONCHAIN_INCASSO_LN_ATTIVO` spenta).
+Il cambio lo fa il sistema: chi vende tocca solo «Conferma», perché la
+prima firma del rilascio la deve mettere il SUO telefono (il 2-di-3 non
+è custodial: il server da solo non può mandare niente). Qui si è fatta
+la prima metà. PRIMA: al primo cambio il telefono creava 12 parole
+NUOVE, del fornitore, da scrivere su carta con la spunta, e a cambio
+fallito i bitcoin si riprendevano a mano dalla pagina «Cambio»
+scrivendo un indirizzo. ORA: la chiave di riserva del cambio nasce
+dalle parole dell'on-chain (che hanno già le loro copie su Telegram e
+Nostr), sulla strada di SATS Routing m/44/0/0/0/i, lontana da quella del
+2-di-3 (m/48'/1'/0'/2'), e il record porta come indirizzo di rimborso il
+`/1/n` dell'ordine dello stesso seme: a cambio fallito il giro della
+sorveglianza rimanda i bitcoin DA SOLI, senza parole a parte e senza
+indirizzo da scrivere. Il contatore degli indici è suo
+(`barattolo_swap_oc_<tg>`) e non riparte mai sotto un indice già in
+lista. STRADE SCARTATE: tenere le 12 parole del fornitore e copiarle nel
+seme (due segreti da custodire invece di uno); rimborsare a un indirizzo
+del fornitore o del server (custodia, regola 2). LIMITE NOTO: su un
+telefono nuovo la lista degli swap è vuota; il cambio si ritrova col
+«Recupera» della pagina «Cambio» incollando le 12 parole dell'on-chain
+(provato col cartone: lo ritrova all'indice giusto). Gli swap del Cambio
+libero (pagina «Cambio») restano con le loro 12 parole: non sono legati
+a un ordine on-chain.
+
+PROVATO: `collaudo_onchain_verso_lightning` (67, 0 fallite) con le scene
+nuove (niente spunta né cassetto del fornitore, record `seme: 'onchain'`
+col `/1/n` di chi vende, il «Recupera» con la xpub delle parole
+dell'on-chain, e il cambio fallito rimborsato da solo con l'uscita allo
+script del `/1/n`), la suite severa e i collaudi della CI. NON PROVATO
+DAL VIVO: un cambio vero fallito su testnet/signet (la rete del cambio
+oggi non è quella dell'on-chain: la leva resta spenta).

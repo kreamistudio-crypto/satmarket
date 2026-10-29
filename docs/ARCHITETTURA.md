@@ -34525,17 +34525,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `onchainEsempioCarica` (`myOnchainLn`); ordine `pannelloOnchainOrdine`
   coi rami del cambio e il riquadro `onchainCambioBlocco` (stato in
   `onchainCambi`), `onchainCambioApri`, `onchainCambioPrendiFattura`,
-  `onchainCambioConferma` (vita della richiesta, 12 parole con
-  `swapParolePerOnchain`/`swapCopiatePerOnchain`, `swapCreaPerOnchain` in
-  swap/instradatore.js §6c, taproot della rete, firma della destinazione,
+  `onchainCambioConferma` (vita della richiesta, `swapCreaPerOnchain` in
+  swap/instradatore.js §6c col `rimborso` = `onchainMieChiavi(...).incasso`,
+  taproot della rete, firma della destinazione,
   `onchainUsciteVersoVenditore(o, lockup, 12)` + `onchainPsbtFirmata`),
   `onchainRiceviOnchainOra`, `onchainCambioTogli`; chi compra:
   `onchainPrimaDiChiVende`, e in `onchainCofirma` il ramo che rilegge la
   sua conferma e verifica la firma di chi vende su ogni moneta
   (`onchainFirmataDaChiVende`: `preimageWitnessV0` + `onchainDerACompatta`).
   Il record del cambio nella lista degli swap porta `onchain` (frase
-  `subDaOrdine`, niente QR da pagare); il rimborso di un cambio fallito è
-  quello di sempre, dalla pagina «Cambio». Le prove:
+  `subDaOrdine`, niente QR da pagare). LO STESSO SEME (29 ott 2026,
+  cantiere swap-seme-onchain; perché in CANTIERI, «Il cambio di chi vende
+  on-chain usa il suo stesso seme»): il record porta `seme: 'onchain'` e
+  `indirizzo` = il `/1/n` dell'ordine; la chiave di rimborso è
+  m/44/0/0/0/i delle parole dell'on-chain (`swapParoleOnchain` →
+  `onchainSemeLocale`), il contatore sta in `barattolo_swap_oc_<tg>`
+  (`swapCasaOnchain`, mai sotto un indice già in lista), e `swapParoleDi(rec)`
+  sceglie le parole per `swapGiroSub` e `swapRimborsa`: a cambio fallito il
+  rimborso parte da solo al giro dopo. Errore nuovo `.tipo = 'seme'`;
+  `swapParolePerOnchain`/`swapCopiatePerOnchain` non ci sono più. Le prove:
   `prove_onchain_verso_lightning`; il collaudo
   `collaudo_onchain_verso_lightning` (cartone in testnet, telefono in node).
 - LE LEVE SCRIVIBILI DAL PANNELLO (27 ott 2026, stesso cantiere):

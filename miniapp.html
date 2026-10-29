@@ -18510,7 +18510,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '1cdb12d96e';
+const SWAP_TELEFONO_VER = 'b7e1c3344c';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -43330,7 +43330,8 @@ async function onchainSecondaFirmaDallOrdine(btn, o){
    nascosto), l'avviso sulla capienza del suo wallet Lightning, e la
    richiesta da incollare — o presa dal suo Lightning address, con
    «sempre Lightning». A «Conferma» il SUO telefono fa nascere il cambio
-   (le 12 parole di riserva la prima volta: `swapCreaPerOnchain`), firma
+   (la chiave di riserva dallo stesso seme del 2-di-3, il rimborso al suo
+   /1/n: `swapCreaPerOnchain`), firma
    col seme l'indirizzo del cambio come destinazione e mette la PRIMA
    firma del rilascio verso di lui; la seconda la mette il telefono di
    chi compra quando apre la Mini App (`onchainCofirma`). Il server, prima
@@ -43370,19 +43371,6 @@ function onchainCambioBlocco(o){
       ${p.motivo === 'non_risponde' ? `<button class="btn orange" onclick="onchainCambioApri(this, currentOrder)">🔄 Riprova</button>` : ''}
       ${suOnchain}</div>`;
   }
-  let parole = '';
-  if (st.stato === 'parole' && typeof t3 === 'function') {
-    const t = t3();
-    const c = typeof swapCassetto === 'function' ? swapCassetto(p.fornitore) : null;
-    parole = `<div class="swap-prev swap-prima-volta">
-      <h4>🔑 ${esc(t.paroleTit)}</h4>
-      <p class="swap-calma">${esc(t.paroleSpiega)}</p>
-      <ol class="swap-regole">${t.paroleRegole.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
-      <p class="swap-calma forte">${esc(t.paroleNessuno)}</p>
-      <ol class="swap-parole">${(c && c.parole ? String(c.parole).split(' ') : []).map(x => `<li>${esc(x)}</li>`).join('')}</ol>
-      <label class="swap-spunta"><input type="checkbox" id="ocCambioSpunta_${Number(oc.id)}"> ${esc(t.paroleSpunta)}</label>
-    </div>`;
-  }
   const ore = Math.round((Number(p.vita_incollata_s) || 82800) / 3600);
   return `<div class="payout">
     <h4>⚡ Ricevi in Lightning</h4>
@@ -43391,8 +43379,7 @@ function onchainCambioBlocco(o){
     <div class="hint" style="margin-top:6px">⚠️ <b>Il tuo wallet Lightning deve poter ricevere ${fmt(Number(p.ricevi) || 0)} sats in una volta:</b>
       se è nuovo o piccolo, controlla prima che abbia abbastanza capienza (alcuni wallet la
       chiamano «liquidità in entrata»). Se la richiesta non si riesce a pagare, i bitcoin
-      tornano a te dalla pagina «Cambio», con le tue 12 parole di riserva.</div>
-    ${parole}
+      tornano da soli al tuo wallet on-chain di Barattolo, quello delle tue stesse 12 parole.</div>
     <h4 style="margin-top:10px">La tua richiesta Lightning</h4>
     <div class="hint">Dal tuo wallet Lightning crea una richiesta di <b>${fmt(Number(p.ricevi) || 0)} sats esatti</b>
       che valga almeno ${ore} ore (chi ha comprato può aprire l'app domani), e incollala qui.</div>
@@ -43469,15 +43456,9 @@ async function onchainCambioConferma(btn, o){
   let finito = false;
   try {
     if (!(await caricaSwapTelefono())) throw new Error('non riesco a caricare il cambio: riprova');
-    /* LE 12 PAROLE DI RISERVA, la prima volta: si mostrano qui, e il
-       cambio parte solo dopo la spunta */
-    const c = await swapParolePerOnchain(p.fornitore);
-    if (!c.copiata && st.stato !== 'parole') { st.stato = 'parole'; return; }
-    if (!c.copiata) {
-      const spunta = el(`ocCambioSpunta_${Number(oc0.id)}`);
-      if (!spunta || !spunta.checked) { st.errore = t3().paroleSpuntaPrima; return; }
-      if (!swapCopiatePerOnchain(p.fornitore)) throw Object.assign(new Error('casa'), {tipo: 'casa'});
-    }
+    /* NIENTE 12 PAROLE A PARTE (29 ott 2026): la chiave di riserva del
+       cambio nasce dallo STESSO seme del 2-di-3, e il rimborso va da
+       solo al suo /1/n (`swapCreaPerOnchain`, in instradatore.js) */
     st.stato = 'creo';
     await onchainLeggiOrdini();
     const oc = onchainOrdini.find(x => x.id === Number(oc0.id));
@@ -43489,7 +43470,8 @@ async function onchainCambioConferma(btn, o){
     if (B.hex.encode(io.firma.publicKey) !== oc.indirizzo.chiavi.venditore)
       throw new Error('la chiave dell\'ordine non è del tuo seme');
     const w = onchainScriptOrdine(B, oc);
-    const rec = await swapCreaPerOnchain({ordine: o.id, onchain: oc.id, fattura: fattura, preventivo: p});
+    const rec = await swapCreaPerOnchain({ordine: o.id, onchain: oc.id, fattura: fattura,
+      preventivo: p, rimborso: io.incasso});
     let dove = null;
     try { dove = B.Address(B.TEST_NETWORK).decode(rec.lockupAddress); } catch(e) { dove = null; }
     if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo del cambio non è della rete giusta');
@@ -43512,6 +43494,7 @@ async function onchainCambioConferma(btn, o){
       : e && e.tipo === 'mente' ? `${nome} ha risposto con dati che non tornano: non è partito niente.`
       : e && e.tipo === 'giu' ? `${nome} ora non risponde: riprova fra poco.`
       : e && e.tipo === 'casa' ? t3().nienteCasa
+      : e && e.tipo === 'seme' ? 'su questo dispositivo non c\'è la tua chiave'
       : (e && e.message) || 'errore';
   } finally {
     rip();
