@@ -1,6 +1,6 @@
-From 8c0e3d819685d3103554ce2980acc373cdf5cdce Mon Sep 17 00:00:00 2001
-From: Barattolo <barattolo@example.invalid>
-Date: Mon, 12 Oct 2026 17:27:44 +0200
+From 8a34583e867a51d5cd410271d575fb25a36caa43 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Thu, 29 Oct 2026 17:53:08 +0000
 Subject: [PATCH] events: tell the marketplace server when the escrow guardian
  opens a dispute by itself
 
@@ -32,7 +32,7 @@ that goes on the wire.
  2 files changed, 29 insertions(+)
 
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
-index 6d6b87f..986ba20 100644
+index 934d517..07411da 100644
 --- a/src/barattolo_eventi.rs
 +++ b/src/barattolo_eventi.rs
 @@ -83,6 +83,9 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
@@ -67,10 +67,10 @@ index 6d6b87f..986ba20 100644
      fn lnd_failure_reasons_by_code() {
          assert_eq!(failure_reason_name(2), "NO_ROUTE");
 diff --git a/src/scheduler.rs b/src/scheduler.rs
-index beb5e71..b55e304 100644
+index f29945a..87b53a3 100644
 --- a/src/scheduler.rs
 +++ b/src/scheduler.rs
-@@ -1138,6 +1138,18 @@ async fn enforce_escrow_deadline_pass(
+@@ -1296,6 +1296,18 @@ async fn enforce_escrow_deadline_pass(
                      "escrow_deadline: order {} moved to dispute — fiat claimed sent and the escrow is near its CLTV horizon",
                      order.id
                  );
@@ -90,5 +90,5 @@ index beb5e71..b55e304 100644
                  // notification, mirroring `flow::hold_invoice_canceled`.
                  for (party, action) in [
 -- 
-2.55.0.windows.3
+2.43.0
 

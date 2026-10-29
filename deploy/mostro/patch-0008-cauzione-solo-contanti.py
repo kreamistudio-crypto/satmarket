@@ -86,7 +86,8 @@ BE = "crate::barattolo_eventi::"
 AGGANCI = [
     # ── A) la porta per metodo ──────────────────────────────────────
     ("src/config/types.rs",
-     "    pub maker_bond_payment_timeout_seconds: u64,\n}\n",
+     "    pub maker_bond_payment_timeout_seconds: u64,\n"
+     "    /// CLTV delta, in blocks, of the maker and taker bond hold invoices\n",
      "    pub maker_bond_payment_timeout_seconds: u64,\n"
      "    /// Barattolo fork (patch 0008): the payment methods the bond applies\n"
      "    /// to. Each comma-separated entry of the order's `payment_method` is\n"
@@ -94,7 +95,7 @@ AGGANCI = [
      "    /// default) = every method, i.e. upstream behaviour.\n"
      "    #[serde(default)]\n"
      "    pub only_payment_methods: Vec<String>,\n"
-     "}\n", "al posto", 1),
+     "    /// CLTV delta, in blocks, of the maker and taker bond hold invoices\n", "al posto", 1),
     ("src/config/types.rs",
      "            maker_bond_payment_timeout_seconds: default_maker_bond_payment_timeout_seconds(),\n",
      "            only_payment_methods: Vec::new(),\n", "dopo", 1),
@@ -207,7 +208,7 @@ AGGANCI = [
      "# only_payment_methods = [\"Contanti\"]\n", "dopo", 1),
     # ── B) la rilettura della 0005: la riga del vincitore ───────────
     ("src/app/bond/flow.rs",
-     "    let order = promote_taker_context_to_order(pool, order, &current).await?;\n",
+     "    let order = promote_taker_context_to_order(pool, order, &current, now).await?;\n",
      "    // Barattolo fork (patch 0008): re-apply the per-party fees for the\n"
      "    // WINNER. Patch 0005 writes one side row per order at every take\n"
      "    // attempt; with concurrent bonds the last attempt's row overwrites the\n"

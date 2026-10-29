@@ -108,8 +108,11 @@ AGGANCI = [
      "                    );\n"
      "                    Ok(())\n", "al posto"),
     # 6. la garanzia e' stata pagata; nel ramo senza fattura mostrod la
-    #    chiede a chi compra
-    ("src/flow.rs", "    // Update the invoice_held_at field\n",
+    #    chiede a chi compra. Dalla 0.20.2 `hold_invoice_paid` scrive e
+    #    pubblica PRIMA di avvisare, e se la scrittura fallisce esce senza
+    #    dire niente a nessuno: l'evento sta dove partono gli avvisi, cosi'
+    #    il server lo riceve solo per un passaggio che e' stato salvato.
+    ("src/flow.rs", "    for (action, payload, destination) in pending_msgs {\n",
      "    // Barattolo fork (patch 0007): tell the marketplace server.\n"
      "    " + E + "emit_detail(\n"
      "        \"hold-invoice-paid\",\n"
@@ -207,11 +210,11 @@ AGGANCI = [
     #      mai il testo dell'errore.
     ("src/app/release.rs",
      "        Err(e) => {\n"
-     "            check_failure_retries_or_log(ctx, &order, request_id).await;\n"
+     "            check_failure_retries_or_log(ctx, &order, request_id, None).await;\n"
      "            Err(e)\n"
      "        }\n",
      "        Err(e) => {\n"
-     "            check_failure_retries_or_log(ctx, &order, request_id).await;\n"
+     "            check_failure_retries_or_log(ctx, &order, request_id, None).await;\n"
      "            // Barattolo fork (patch 0007): tell the marketplace server.\n"
      "            " + E + "emit_payout_failed_pre_claim(&order, &e);\n"
      "            Err(e)\n"

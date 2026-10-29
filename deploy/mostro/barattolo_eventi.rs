@@ -505,7 +505,7 @@ mod tests {
 
     #[test]
     fn without_a_url_or_a_secret_it_is_inert() {
-        assert_eq!(endpoint_from(None, Some("s"), Some("f")), None);
+        assert_eq!(endpoint_from(None, Some("s")), None);
         assert_eq!(endpoint_from(Some(""), Some("s")), None);
         assert_eq!(endpoint_from(Some("  "), Some("s")), None);
         assert_eq!(endpoint_from(Some("http://x"), None), None);

@@ -1,4 +1,25 @@
-# IL FORK DI MOSTRO — otto patch sopra il tag v0.19.0, più la 0010
+# IL FORK DI MOSTRO — le undici patch, dal 29 ott 2026 sopra il tag v0.20.2
+
+**Dal 29 ottobre 2026 il fork sta sulla `v0.20.2`** (`fe2a905`, uscita il
+28 ott; cantiere `mostro-0202`, decisione di Andrea: il fork intero,
+non la sola cura). Le undici patch sono le stesse della `-bar8`: tre
+patcher hanno cambiato ancora — la 0007 (due: `hold_invoice_paid` scrive
+PRIMA di avvisare ed esce zitto se non salva, quindi l'evento al server
+sta accanto agli avvisi e parte solo per un passaggio salvato;
+`check_failure_retries_or_log` ha un argomento in più, #1065), la 0008
+(due: `bond_cltv_delta` dopo `maker_bond_payment_timeout_seconds` e
+`promote_taker_context_to_order` con `now`, #1085) e la 0011 (una:
+`escrow_tags` al posto di `invoice_window_tags`, #1045). Gli altri otto
+entrano come sono. Le undici `.patch` sono riesportate sulla `v0.20.2`
+(`git am` su un clone pulito dà l'albero `16734181`), e PER LA PRIMA
+VOLTA il fork è stato COMPILATO E PROVATO prima del nodo — nel cloud,
+dove c'è `cargo` (il verbale sta in CANTIERI, «Mostro 0.20.2»; i numeri
+in «PROVATO», in fondo). ⚠️ Cosa pretende la 0.20.2 dal `settings.toml`
+del nodo: `[anti_abuse_bond] bond_cltv_delta` sopra
+`hold_invoice_cltv_delta + 144` e al più 864 (col nostro 576: fra 721 e
+864), sennò `mostrod` NON PARTE (#1085); e il database prende UNDICI
+migrazioni, quindi il ritorno vuole la copia di prima (PRODUZIONE, «LA
+SALITA ALLA 0.20.2»). Fino a quel giorno il nodo gira la `-bar8`.
 
 **Dal 10 ottobre 2026 (sera) c'è la 0010**, la cauzione sul metodo che chi
 prende DICHIARA nel take (cantiere `cauzione-metodo-scelto`, decisione di
@@ -612,10 +633,10 @@ fermano («porta gia' questa modifica»).
 | 0004 | `patch-0004-prezzo-mai-visto.py` | `order.rs`, `take_buy.rs`, `take_sell.rs`, 4 |
 | 0005 | `patch-0005-fee-per-parte.py` + `barattolo_fee.rs` | 7 agganci in 6 file |
 | 0006 | `patch-0006-perche-e-fallito.py` | `src/app/release.rs`, 1 |
-| 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file |
-| 0008 | `patch-0008-cauzione-solo-contanti.py` | 20 agganci in 10 file (il ventesimo, 1 ott 2026, emenda il test della 0007 sugli importi), più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026) |
+| 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file (due riagganciati sulla 0.20.2 il 29 ott 2026: `flow.rs`, `release.rs`) |
+| 0008 | `patch-0008-cauzione-solo-contanti.py` | 20 agganci in 10 file (il ventesimo, 1 ott 2026, emenda il test della 0007 sugli importi), più i test in coda a `flow.rs` e `nip33.rs` (1 ott 2026); due riagganciati sulla 0.20.2 il 29 ott 2026 (`config/types.rs`, `bond/flow.rs`) |
 | 0010 | `patch-0010-cauzione-metodo-dichiarato.py` | 8 agganci in 5 file (`util.rs`, `bond/flow.rs`, `bond/mod.rs`, `take_buy.rs`, `take_sell.rs`), più i test in coda a `flow.rs` (10 ott 2026); pretende la 0008 |
-| 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` | 13 agganci in 7 file (`main.rs`, `config/types.rs`, `settings.tpl.toml`, `db.rs`, `scheduler.rs`, `barattolo_eventi.rs`, `nip33.rs`), coi test dentro il modulo (12 ott 2026); pretende la 0007 |
+| 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` | 13 agganci in 7 file (`main.rs`, `config/types.rs`, `settings.tpl.toml`, `db.rs`, `scheduler.rs`, `barattolo_eventi.rs`, `nip33.rs`), coi test dentro il modulo (12 ott 2026); pretende la 0007; uno riagganciato sulla 0.20.2 il 29 ott 2026 (`nip33.rs`) |
 | 0012 | `patch-0012-disputa-automatica.py` | 3 agganci in 2 file (`scheduler.rs`: l'evento nel ramo `fiat-sent` del guardiano; `barattolo_eventi.rs`: la riga del vocabolario e una prova pura) (12 ott 2026); pretende la 0011 |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
@@ -640,6 +661,13 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
   annidati di cui sopra.
 
 ## IN SERVIZIO
+
+⚠️ LA 0.20.2 È PREPARATA, NON IN SERVIZIO (29 ott 2026): sul nodo gira
+ancora `mostro:v0.19.0-bar8` (sotto, «LA -bar8»). La salita — immagine
+`mostro:v0.20.2-bar9`, la riga `bond_cltv_delta`, le undici migrazioni,
+il backup col database di prima — sta in PRODUZIONE, «LA SALITA ALLA
+0.20.2», e la fa Andrea un comando alla volta. Quando è fatta, questa
+riga cambia e `CLAUDE.md` con lei.
 
 Immagine `mostro:v0.19.0-bar6` dal 1 ott 2026: le OTTO patch di questa
 cartella sopra la `v0.19.0` (`d53e41d`), otto commit sul nodo sul branch
@@ -732,6 +760,28 @@ tornerebbe identico.
 
 ## PROVATO
 
+- LA 0.20.2 NEL CLOUD (29 ott 2026, cantiere `mostro-0202`, la prima
+  compilazione del fork fuori dal nodo): `v0.20.2` pulita, `cargo test
+  --release --no-run` in 9 min 32; le undici patch coi patcher di questa
+  cartella, un commit ciascuna (albero `16734181`, lo stesso che dà
+  `git am` delle undici `.patch` su un clone pulito); il fork compila in
+  3 min 56 senza avvisi; i filtri della liturgia (`lnurl config::util
+  dev_fee app::order app::take_buy app::take_sell barattolo_fee flow
+  app::add_invoice barattolo_eventi app::fiat_sent app::release
+  app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
+  publish spam_gate barattolo_bond toml_only_payment_methods
+  barattolo_tempo nip33 find_order_by_seconds a_dispute_the_daemon_opens`)
+  **730 passate, 0 fallite, 1 ignorata** (di upstream), `util::tests::`
+  da solo **90 e 0**; la suite INTERA di `cargo test --release`, 1.995
+  prove, **1.991 passate, 0 fallite, 4 ignorate** (tutte di upstream);
+  le 48 prove nostre cercate per nome, tutte `ok`.
+  TROVATO: in `barattolo_eventi.rs` la prova
+  `without_a_url_or_a_secret_it_is_inert` chiamava `endpoint_from` con
+  TRE argomenti — l'avanzo della M6 del 1 ott, che ha tolto il ripiego —
+  e il compilatore si fermava lì: corretta (due argomenti). Era nel repo
+  e nella `.patch` dal 1 ott e nessuno l'aveva vista, perché il modulo
+  del nodo è quello di prima e sul PC non c'è `cargo`. Controprova: la
+  riga rimessa a tre argomenti fa rosso il compilatore.
 - I sette commit sopra il tag, uno per patch, nessun altro tocco:
   `git log --oneline v0.18.7..HEAD` (i primi tre erano uno per file).
 - `cargo test` nello stadio `builder` dell'immagine, sui tre moduli
@@ -822,6 +872,14 @@ sbagliata, il conto sarebbe tornato identico. La tabella a lato esiste
 per il caso asimmetrico, e il caso asimmetrico dal vivo non c'è ancora.
 
 ## AGGIORNARE A UNA VERSIONE UPSTREAM NUOVA
+
+DAL 29 OTT 2026 LA PROVA SI FA NEL CLOUD, dove c'è `cargo`, e il nodo
+riceve un fork GIÀ compilato e provato (è la salita alla 0.20.2: i
+patcher in fila su un worktree del tag, le ancore che non reggono
+riagganciate leggendo il diff upstream, `cargo test --release` sui
+filtri della liturgia, poi `git format-patch -1 --start-number N` per
+ognuna e `git am` delle undici su un secondo clone che deve dare lo
+stesso `git rev-parse HEAD^{tree}`). Quel che segue resta vero.
 
 PRIMA sul PC, a secco, su un clone del tag nuovo: si fanno girare i
 sette patcher in fila (`--secco`, poi senza, un commit per patch) —

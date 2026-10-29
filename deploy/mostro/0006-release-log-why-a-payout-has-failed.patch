@@ -1,17 +1,17 @@
-From 5d934db547cf575e5154a8fcd57853eba3500a9a Mon Sep 17 00:00:00 2001
+From d61acfa2a2a2f52224541ab07394249d2d4e00e2 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Wed, 30 Sep 2026 21:02:34 +0200
-Subject: [PATCH 6/7] release: log why a payout has failed
+Date: Thu, 29 Oct 2026 17:53:07 +0000
+Subject: [PATCH] release: log why a payout has failed
 
 ---
  src/app/release.rs | 15 +++++++++++++--
  1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/src/app/release.rs b/src/app/release.rs
-index eff753b..31c40cc 100644
+index 56857ca..9bd833d 100644
 --- a/src/app/release.rs
 +++ b/src/app/release.rs
-@@ -1078,9 +1078,20 @@ async fn dispatch_payout(
+@@ -1138,9 +1138,20 @@ async fn dispatch_payout(
                                  }
                              }
                              PaymentStatus::Failed => {
@@ -32,8 +32,8 @@ index eff753b..31c40cc 100644
 +                                    msg.payment.failure_reason,
 +                                    msg.payment.htlcs.len()
                                  );
- 
                                  // Release our own claim (scoped to this hash and
+                                 // the per-claim timestamp) and re-arm retry. Only
 -- 
-2.55.0.windows.3
+2.43.0
 

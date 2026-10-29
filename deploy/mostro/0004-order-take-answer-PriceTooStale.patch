@@ -1,8 +1,8 @@
-From c0e7f7fa9dca6bfa33421d0fa433565311ce2f45 Mon Sep 17 00:00:00 2001
+From 80fe988cecfb86f3f6ed8c574c1c2262fd469401 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Wed, 30 Sep 2026 21:02:33 +0200
-Subject: [PATCH 4/7] order/take: answer PriceTooStale when no price is cached
- yet, instead of a silent internal error
+Date: Thu, 29 Oct 2026 17:53:06 +0000
+Subject: [PATCH] order/take: answer PriceTooStale when no price is cached yet,
+ instead of a silent internal error
 
 ---
  src/app/order.rs     | 16 +++++++++-------
@@ -11,7 +11,7 @@ Subject: [PATCH 4/7] order/take: answer PriceTooStale when no price is cached
  3 files changed, 15 insertions(+), 9 deletions(-)
 
 diff --git a/src/app/order.rs b/src/app/order.rs
-index 634aec9..af73ec6 100644
+index 983bc01..0a863dc 100644
 --- a/src/app/order.rs
 +++ b/src/app/order.rs
 @@ -23,8 +23,12 @@ async fn calculate_and_check_quote(
@@ -28,7 +28,7 @@ index 634aec9..af73ec6 100644
              }
          },
          _ => order.amount,
-@@ -514,17 +518,15 @@ mod tests {
+@@ -545,17 +549,15 @@ mod tests {
          }
  
          #[tokio::test]
@@ -81,5 +81,5 @@ index aa16fe7..8ebfdd1 100644
      } else {
          // Fixed price: only calculate dev_fee (amount/fee already set at creation)
 -- 
-2.55.0.windows.3
+2.43.0
 

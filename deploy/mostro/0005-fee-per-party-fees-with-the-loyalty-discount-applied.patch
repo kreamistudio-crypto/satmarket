@@ -1,8 +1,8 @@
-From a1e4e54637e87298c0e0f8df10ea9f1fa97db49e Mon Sep 17 00:00:00 2001
+From af78bedad5a77335d0b82da1c0e6d4f5f3977a42 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Wed, 30 Sep 2026 21:02:34 +0200
-Subject: [PATCH 5/7] fee: per-party fees, with the loyalty discount applied at
- the source
+Date: Thu, 29 Oct 2026 17:53:07 +0000
+Subject: [PATCH] fee: per-party fees, with the loyalty discount applied at the
+ source
 
 ---
  src/app/add_invoice.rs |   5 +-
@@ -677,10 +677,10 @@ index 0000000..955e593
 +    }
 +}
 diff --git a/src/flow.rs b/src/flow.rs
-index 5a27532..14830b8 100644
+index 904fb0f..919e6eb 100644
 --- a/src/flow.rs
 +++ b/src/flow.rs
-@@ -106,7 +106,10 @@ pub async fn hold_invoice_paid(
+@@ -119,7 +119,10 @@ pub async fn hold_invoice_paid(
          order_data.status = Some(status);
          // We send a confirmation message to seller
          let mut seller_order_data = order_data.clone();
@@ -689,11 +689,11 @@ index 5a27532..14830b8 100644
 +        seller_order_data.amount = order
 +            .amount
 +            .saturating_add(crate::barattolo_fee::seller_fee(&order).await);
-         enqueue_order_msg(
-             request_id,
-             Some(order.id),
+         pending_msgs.push((
+             Action::BuyerTookOrder,
+             Some(Payload::Order(seller_order_data)),
 diff --git a/src/main.rs b/src/main.rs
-index 63f16e5..ef838ba 100644
+index 9a2e946..566866e 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -1,4 +1,5 @@
@@ -702,7 +702,7 @@ index 63f16e5..ef838ba 100644
  mod bitcoin_price;
  pub mod cashu;
  pub mod cli;
-@@ -80,6 +81,10 @@ async fn main() -> Result<()> {
+@@ -82,6 +83,10 @@ async fn main() -> Result<()> {
          exit(1);
      };
  
@@ -710,14 +710,14 @@ index 63f16e5..ef838ba 100644
 +    // the keep-warm loop towards the marketplace server.
 +    barattolo_fee::init().await;
 +
-     // Connect to relays
-     if NOSTR_CLIENT.set(util::connect_nostr().await?).is_err() {
-         tracing::error!("No connection to nostr relay - closing Mostro!");
+     // Serbero, the dispute assistant: the configured key must be a read-only
+     // solver. Registered here when it has no row yet; any other kind of row
+     // is left untouched and stops the boot (docs/SOLVER_PERMISSION_LEVELS.md).
 diff --git a/src/util.rs b/src/util.rs
-index 86b4913..5f42a68 100644
+index 98810b4..14f043c 100644
 --- a/src/util.rs
 +++ b/src/util.rs
-@@ -1571,7 +1571,8 @@ pub async fn show_hold_invoice(
+@@ -1637,7 +1637,8 @@ pub async fn show_hold_invoice(
      let mut ln_client = lightning::LndConnector::new().await?;
      // Seller pays only the order amount and their Mostro fee
      // Dev fee is NOT charged to seller - it's paid by mostrod from its earnings
@@ -728,5 +728,5 @@ index 86b4913..5f42a68 100644
      // Now we generate the hold invoice that seller should pay
      let (invoice_response, preimage, hash) = ln_client
 -- 
-2.55.0.windows.3
+2.43.0
 
