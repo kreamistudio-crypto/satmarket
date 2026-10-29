@@ -430,10 +430,12 @@ SELECT p.id, p.tg_id, p.importo_sats,
   FROM pagamenti p JOIN utenti u ON u.tg_id = p.tg_id
  WHERE p.motivo = 'banner' AND p.stato = 'pagato'
    AND COALESCE(u.banner_sbloccato_il, 0) = 0;
--- 2) la porta si e' aperta senza che nessuno abbia pagato
+-- 2) la porta si e' aperta senza che nessuno abbia pagato. Le porte
+--    REGALATE dal grandfathering del 15 set 2026 (aperte prima del 17
+--    set, 1789603200) non contano: erano un regalo deciso (29 ott 2026).
 SELECT u.tg_id, u.negozio,
        datetime(u.banner_sbloccato_il, 'unixepoch', 'localtime') AS aperta
-  FROM utenti u WHERE COALESCE(u.banner_sbloccato_il, 0) > 0
+  FROM utenti u WHERE COALESCE(u.banner_sbloccato_il, 0) >= 1789603200
    AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id = u.tg_id
      AND p.motivo = 'banner' AND p.stato IN ('pagato','rimborsato'));
 -- 3) pagato due volte la stessa porta

@@ -74755,3 +74755,35 @@ rossi 1 prova e 4 del collaudo, il salto tolto 1 prova e 2 del collaudo.
 COSA RESTA: al «🏁» togliere le righe del SaaS dal config del VPS (copia
 prima); la cura arriva in produzione con la promozione o un
 cherry-pick firmato dal PC, e fino ad allora l'avviso falso può suonare.
+
+## La porta del banner regalata il 15 set non suona più nel libro mastro (29 ott 2026, cantiere porta-regalata, Andrea: «sistemiamo prima anche questo una volta per tutte»)
+
+IL FATTO. Ogni giorno la ronda diceva «🧊 Libro mastro: 1 controllo non
+torna — porta del banner aperta senza pagamento — 613784705». Letto sul
+VPS in sola lettura: `banner_stato` attivo, porta aperta il 15 set 2026
+alle 06:06:23 UTC, la STESSA ora di `banner_chiesto_il`, zero pagamenti
+del banner. È la firma del grandfathering di `init_db` (Cantieri, «Il
+banner si paga sempre», 15 set): chi aveva la porta gratis col vecchio
+livello se l'è tenuta, segnata alla data della sua richiesta. Quel
+cantiere ha insegnato la regola nuova a `init_db` ma non al controllo
+del libro mastro, che da allora suonava su un regalo deciso.
+LA CURA: il controllo (e il suo gemello 17e in `query_libro_mastro.sql`)
+guarda solo le porte aperte dal 17 set 2026 00:00 UTC (1789603200), dopo
+il deploy del 15: prima di quella data una porta senza pagamento può
+essere solo il regalo; da lì in poi suona come prima. STRADE SCARTATE:
+riconoscere il regalo da `banner_sbloccato_il = banner_chiesto_il` (la
+data della richiesta si riscrive a ogni banner nuovo, e il regalo
+tornerebbe a suonare il giorno che cambia l'insegna); una tabella dei
+regali con una riga scritta a mano o da una migrazione (uno schema in
+più per un caso solo, chiuso nel passato); un finto pagamento a 0 sats
+(sporcherebbe `pagamenti`, che `orfani.py` e il capitale leggono).
+PROVATO: `prove_libro_mastro` (il caso rotto ora alla soglia esatta, la
+porta del 15 set 06:06 che tace, un secondo prima della soglia che tace,
+la soglia uguale nel server e nel gemello SQL), 588 verdi; controprove:
+la soglia tolta dal server = 3 rosse, tolta dal gemello SQL = 1 rossa.
+Suite severa 26550/0 (2 saltate: nostr-tools assente nella macchina
+cloud), collaudi della CI 108/0 con e senza coincurve.
+NOTATO E NON TOCCATO: il grandfathering gira a ogni avvio; uno sblocco
+RIMBORSATO lascia `banner_stato='spento'` con la porta a zero, cioè la
+combinazione che al riavvio successivo la riapre gratis (la ronda la
+vede come «sblocco rimborsato e porta ancora aperta»). Da decidere.
