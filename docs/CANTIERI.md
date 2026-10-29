@@ -75058,3 +75058,26 @@ suite severa 26.545 passate, 0 fallite, 2 saltate (le due di
 `nostr-tools`, che nella macchina cloud non c'è: le stesse di ogni
 sessione cloud); collaudi della CI nel venv SENZA coincurve 108 verdi,
 0 rossi (683 s). Rust, sull'albero `16734181`: 1.991/0.
+
+## Le 12 parole in poche righe (29 ott 2026, cantiere parole-corte, Andrea: «il testo relativo alle 12 parole è troppo lungo», «riduci e scrivilo leggermente più semplice»)
+
+Solo testi, dopo parole-uniche. Nel Profilo, «🔑 Il wallet di Barattolo»:
+la chiave in una frase («La tieni solo tu, in questo telefono. Ogni
+ordine e ogni cambio ne usa una nuova»), la coda della metà pubblica
+come «Codice pubblico nei 2-di-3: …», le parole in una frase, «I tuoi
+cambi» in una domanda. Nel Cambio, dove le parole non hanno copia: due
+frasi e DUE regole (erano tre più una riga in grassetto: «nessuno può
+recuperarli» è entrato in «Se perdi il telefono, con queste riprendi i
+tuoi bitcoin»; «non fotografarle» è caduto dentro «non darle a
+nessuno»), titolo «Le tue 12 parole» senza «di riserva». La spiegazione
+del backup automatico (cloud di Telegram, relay Nostr) è uscita dal
+Profilo: la dice «Controlla il backup». Inglese allineato. SCARTATO:
+togliere anche le regole (la riga «Le ritrovi nel Profilo» è quella che
+rende sicuro farle vedere una volta sola).
+PROVATO: collaudo_swap_telefono 62/0, collaudo_swap_instradatore 27/0
+(il titolo cercato è «Le tue 12 parole»), cambio_libero 106/0,
+swap_pagamento 51/0, onchain_verso_lightning 67/0; suite severa 26557/0
+(2 saltate: nostr-tools assente nella macchina cloud), collaudi della CI
+108/0 senza coincurve; giro in locale col Chromium a 375 px, foto in
+project-files/parole-corte. Nuova impronta del codice del telefono
+(SWAP_TELEFONO_VER).

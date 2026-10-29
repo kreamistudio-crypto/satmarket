@@ -18516,7 +18516,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '339285a5ed';
+const SWAP_TELEFONO_VER = '920998532b';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -55744,19 +55744,14 @@ async function renderWalletBarattolo(){
   if (!box || !sotto || DEMO || !(myOnchain || swapAcceso())) return;
   const parole = onchainSemeLocale();
   box.innerHTML = `<div class="payout"><h4>La tua chiave</h4>
-    <div class="hint">Una chiave sola, nata in questo telefono: la tieni
-      solo tu, noi non la vediamo. Da lì nasce una chiave <b>nuova</b> per
-      ogni ordine on-chain, che con quella di chi compra e quella di
-      Barattolo fa il 2-di-3 (col suo indirizzo e il suo descrittore), e
-      per ogni cambio. Mai la stessa due volte.</div>
+    <div class="hint">La tieni solo tu, in questo telefono. Ogni ordine
+      e ogni cambio ne usa una <b>nuova</b>.</div>
     <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
-      : 'Non è ancora nata: nasce da sola la prima volta che serve.'}</div></div>`;
+      : 'Nasce da sola la prima volta che serve.'}</div></div>`;
   const cambi = swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : '';
   sotto.innerHTML = `<div class="payout"><h4>Le 12 parole</h4>
-    <div class="hint">Sono la tua chiave scritta in parole: chi le ha
-      prende i tuoi bitcoin. Non mandarle a nessuno, nemmeno a noi. Il
-      backup si fa da solo (il cloud di Telegram, i relay Nostr):
-      scriverle su carta è una copia in più.</div>
+    <div class="hint">Con queste riprendi i tuoi bitcoin da un altro
+      telefono. Non darle a nessuno, nemmeno a noi.</div>
     ${walletParoleViste && parole
       ? `<ol class="swap-parole">${parole.split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>
          <button class="btn ghost" onclick="walletParoleViste=false;renderWalletBarattolo()">🙈 Nascondi</button>`
@@ -55770,8 +55765,8 @@ async function renderWalletBarattolo(){
     try {
       const x = await onchainMiaXpub(parole, onchainSrv || {strada: "m/48'/1'/0'/2'"});
       const riga = el('walletCoda');
-      if (riga) riga.innerHTML = `Nei tuoi 2-di-3 entra la sua metà pubblica, che finisce in
-        <span class="mono">…${esc(onchainCoda(x))}</span>.`;
+      if (riga) riga.innerHTML = `Codice pubblico nei 2-di-3:
+        <span class="mono">…${esc(onchainCoda(x))}</span>`;
     } catch(e){}
   }
 }
