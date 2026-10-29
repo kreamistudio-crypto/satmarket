@@ -74699,3 +74699,59 @@ dell'on-chain, e il cambio fallito rimborsato da solo con l'uscita allo
 script del `/1/n`), la suite severa e i collaudi della CI. NON PROVATO
 DAL VIVO: un cambio vero fallito su testnet/signet (la rete del cambio
 oggi non è quella dell'on-chain: la leva resta spenta).
+
+## Il trasloco del SaaS e la sesta domanda per cassaforte d'uscita (29 ott 2026, cantiere margine-uscita, Andrea: «devi aiutarmi a trasferire tutti i fondi degli ordini sulla vecchia cassaforte di lnbits su quella nuova del nodo perche l istanza di lnbits non la useremo piu»; poi «si sistemalo» all'avviso falso)
+
+IL TRASLOCO, FATTO A MANO E SENZA CODICE (29 ott 2026, 15:05-15:16
+UTC). Sul SaaS restavano quattro ordini `locked` di To The Mooon (#129,
+#131, #134, #138: 341.570 sats al prezzo pieno), nessun altro dovere
+(aste, pagamenti, crediti a zero). La strada era già scritta in
+PRODUZIONE, «CHIUDERE LA CASSAFORTE SAAS»: copia del database
+(`sqlite3 -readonly … ".backup /root/prima-trasloco-saas-2026-10-29.db"`,
+integrity `ok`), il gesto «➡️ Sposta sulla cassaforte nodo» sui quattro
+(`cassaforte_payout='nodo'` letto dopo su tutte e quattro), poi UNA
+fattura da 350.000 sats coniata dal LNbits del nodo con la sola chiave
+di lettura (memo «Trasloco dal SaaS (To The Mooon)», un'ora) e pagata dal
+wallet SaaS, verificata `paid: True` per hash. Saldi dopo: nodo 705.815
+(era 355.815), SaaS 74.189 (commissioni 1.631). Il resto del SaaS è
+capitale di Andrea ed è andato al suo wallet (gli ultimi 4.950 del
+wallet «barattolo test» sono rimasti «pending» su Spark, come il #152:
+Andrea ci ha rinunciato); l'istanza SaaS è ELIMINATA alle 15:42 UTC.
+Da qui `orfani.py` e `capitale_cassa.py` sul VPS si fermano sul SaaS
+finché le sue righe stanno nel config: è atteso.
+I GESTI NELL'ORDINE, E PERCHÉ: prima le etichette, poi i sats, così in
+nessun momento un ordine poteva chiedere a un SaaS già svuotato; un
+pagamento chiuso nel frattempo avrebbe pagato il nodo, dopo la domanda
+del saldo. UNA fattura sola: un «pending» non si ripaga con una
+fattura nuova (la regola del #241), si ritenta solo la stessa.
+LE RIGHE `LNBITS_*` DEL SAAS RESTANO NEL CONFIG DEL VPS fino al «🏁»:
+`DOVERI_SAAS` conta gli ordini NATI sul SaaS, aperti, anche se spostati
+(la strada scartata e) del 24 set), e il 🏁 suona quando i quattro si
+chiudono.
+
+LA CURA, `_incassi_in_attesa` e `_voci_margine`. La sesta domanda della
+guardia contava gli ordini per la cassaforte d'ENTRATA: dopo il
+trasloco avrebbe dato «⚠️ Margine saas» su un wallet svuotato apposta
+(117 sats contro 341.570 «in attesa»), e il nodo — da dove quei sats
+usciranno — non li contava. Ora il conto è per cassaforte d'USCITA, il
+calco SQL di `_cassaforte_uscita` (`COALESCE(NULLIF(cassaforte_payout,
+''), cassaforte)`). E UNA CASSAFORTE SENZA DOVERI CHE NON RICEVE IL
+DENARO NUOVO NON SI GIUDICA: col SaaS chiuso ma ancora nel config ogni
+giro avrebbe scritto «❔ il saldo non si è potuto leggere», e un avviso
+che suona per niente insegna a non leggerlo. Quella di
+`cassaforte_nuova()` si giudica sempre (ci nascono gli ordini di
+domani), e con le attese illeggibili si giudicano tutte, come ieri.
+STRADE SCARTATE: togliere subito le righe del SaaS dal config (un gesto
+sul VPS con riavvio per un rumore che si cura nel codice, e i doveri del
+SaaS restano finché i quattro non chiudono); giudicare il SaaS «senza
+doveri» dai `DOVERI_SAAS` (quelli contano gli ordini nati là, anche
+spostati: proprio il conto sbagliato per il margine).
+PROVATO: `prove_margine_cassaforte` (lo spostato conta sul nodo, il NULL
+di ieri sul saas, la sentinella del salto), `collaudo_margine_cassaforte`
+scena 9 col server vero (prima e dopo lo spostamento, il saas a 117 e
+muto, la leva girata che lo rimette sotto giudizio), suite severa e
+collaudi della CI nei due venv. Controprove: il conto per entrata rende
+rossi 1 prova e 4 del collaudo, il salto tolto 1 prova e 2 del collaudo.
+COSA RESTA: al «🏁» togliere le righe del SaaS dal config del VPS (copia
+prima); la cura arriva in produzione con la promozione o un
+cherry-pick firmato dal PC, e fino ad allora l'avviso falso può suonare.

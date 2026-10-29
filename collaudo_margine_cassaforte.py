@@ -30,7 +30,10 @@ anche il SALDO del wallet. Le scene:
   8. la sesta domanda della guardia (`_voci_margine`) sul server vero:
      una voce per cassaforte configurata, buona/cattiva/non misurata,
      con gli incassi in attesa letti dal database; e la sua frase dentro
-     l'avviso della guardia.
+     l'avviso della guardia;
+  9. il trasloco del SaaS (29 ott 2026): l'ordine spostato sul nodo
+     conta sul nodo, e la cassaforte senza doveri che non riceve il
+     denaro nuovo non si giudica (niente «⚠️» ne' «❔» sul SaaS chiuso).
 
 NON TOCCA NIENTE DI VERO: il config finto si installa PRIMA dell'import
 di server (lo fa `avvio()` del banco). Nessuna rete.
@@ -238,6 +241,45 @@ def main():
     SRV.LIQUIDITA_MARGINE_PERCENTO, SRV.LIQUIDITA_MARGINE_MIN_SATS = 0, 0
     prova("con le due leve a 0 la domanda e' spenta", [],
           asyncio.run(SRV._voci_margine()))
+
+    print("\n[9. il trasloco del SaaS: l'ordine spostato conta sul nodo]")
+    # (29 ott 2026) le due casseforti configurate, il denaro nuovo sul
+    # nodo, e il #4 nato sul saas spostato sul nodo col gesto vero
+    # della riga (`cassaforte_payout`): il saas resta senza doveri.
+    SRV.LIQUIDITA_MARGINE_PERCENTO, SRV.LIQUIDITA_MARGINE_MIN_SATS = 1, 10_000
+    SRV.LNBITS_NODO_URL = SRV.LNBITS_URL
+    SRV.LNBITS_NODO_INVOICE_KEY = "collaudo-nodo-lettura"
+    SRV.LNBITS_NODO_ADMIN_KEY = "collaudo-nodo-paga"
+    SRV.CASSAFORTE_NUOVA = True
+    banco.NODO["saldo"] = 50_000 + soglia
+    voci = asyncio.run(SRV._voci_margine())
+    prova("prima dello spostamento: il saas ha il #4 e si giudica, il nodo "
+          "riceve il denaro nuovo e si giudica anche senza doveri",
+          [("margine_saas", True), ("margine_nodo", True)],
+          [(k, e) for k, e, _ in voci])
+    con = SRV.db()
+    con.execute("UPDATE ordini SET cassaforte_payout='nodo' WHERE id=?", (o4,))
+    con.commit()
+    attese = SRV._incassi_in_attesa(con)
+    con.close()
+    prova("dopo: gli incassi in attesa contano il #4 sul nodo, da dove "
+          "uscira'", {"nodo": {"n": 1, "sats": 50_000}}, attese)
+    banco.NODO["saldo"] = 117
+    voci = asyncio.run(SRV._voci_margine())
+    prova("...e il saas svuotato (117 sats) non da' piu' «⚠️ Margine saas»: "
+          "una voce sola, quella del nodo", ["margine_nodo"],
+          [k for k, _, _ in voci])
+    banco.NODO["saldo"] = None
+    voci = asyncio.run(SRV._voci_margine())
+    prova("...ne' «❔» col saas chiuso che non risponde: resta il nodo",
+          [("margine_nodo", None)], [(k, e) for k, e, _ in voci])
+    SRV.CASSAFORTE_NUOVA = False
+    banco.NODO["saldo"] = 50_000 + soglia
+    voci = asyncio.run(SRV._voci_margine())
+    prova("con la leva girata il saas torna la cassaforte del denaro "
+          "nuovo e si giudica di nuovo, anche senza doveri",
+          [("margine_saas", True), ("margine_nodo", True)],
+          [(k, e) for k, e, _ in voci])
 
     sys.stdout = tee.vero
     print("\n" + "=" * 58)
