@@ -389,6 +389,21 @@ function ridisegnaIncassoSwap(){}
 function pannelloPreventivoSwap(){ return '<div>preventivo</div>'; }
 function scegliIncassoSwap(){}
 function linguaSwap(){ return 'it'; }
+/* (29 ott 2026, parole-uniche) IL WALLET DI BARATTOLO DELLA PAGINA, di
+   cartone: le parole dei cambi sono quelle del wallet (le ritrova se ci
+   sono, sennò nascono), e nessuna copia fuori da qui, cosi' il passo
+   delle parole si vede come la prima volta di prima */
+function onchainSemeLocale(){ return localStorage.getItem('barattolo_onchain_' + myTgId) || ''; }
+let onchainNato = '';
+async function onchainSemeAssicurato(){
+  let p = onchainSemeLocale();
+  if (p) { onchainNato = 'locale'; return p; }
+  p = BarattoloSwap.generateMnemonic(BarattoloSwap.wordlist);
+  localStorage.setItem('barattolo_onchain_' + myTgId, p);
+  onchainNato = 'nuovo';
+  return p;
+}
+async function onchainSemeCoperto(){ return false; }
 const localStorage = {getItem: k => __memoria.has(k) ? __memoria.get(k) : null,
                       setItem: (k, v) => { __memoria.set(k, String(v)); },
                       removeItem: k => { __memoria.delete(k); }};
@@ -568,7 +583,9 @@ const setInterval = () => 1, clearInterval = () => {};
                 scade_blocco: r7.timeoutBlockHeight, onchain: r7.onchainAmount};
 
   // ─── LA SENTINELLA ────────────────────────────────────────────────
-  const parole = JSON.parse(mem.get('barattolo_swap_999') || '{}').parole || '';
+  /* (29 ott 2026, parole-uniche) le parole sono quelle del wallet di
+     Barattolo, non piu' un cassetto del fornitore */
+  const parole = mem.get('barattolo_onchain_999') || '';
   const alServer = chiamate.filter(c => c.url.startsWith(D.ponte));
   const pagamenti = alServer.filter(c => c.url.includes('/swap/paga/'));
   out.sentinella = {

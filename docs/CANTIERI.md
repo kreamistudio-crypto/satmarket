@@ -74787,3 +74787,106 @@ NOTATO E NON TOCCATO: il grandfathering gira a ogni avvio; uno sblocco
 RIMBORSATO lascia `banner_stato='spento'` con la porta a zero, cioè la
 combinazione che al riavvio successivo la riapre gratis (la ronda la
 vede come «sblocco rimborsato e porta ancora aperta»). Da decidere.
+
+
+## Le 12 parole del cambio nel wallet di Barattolo (29 ott 2026, cantiere parole-uniche, idea di Alan: «vorrei nascondere le 12 parole dalla parte dello swap, le vede dalle impostazioni non lì», «la chiave deve cambiare sempre, ma durante la fase della costruzione del multisig il descrittore deve essere unico», «dove vedo la parte LN deve esserci una sezione che mostri il wallet di Barattolo per la composizione del multisig e dove poter ricevere i fondi on-chain»; Andrea: «Prima le parole, poi promuovi», «Ok così sì»)
+
+DA DOVE. Fino a qui ogni fornitore di cambio aveva dodici parole sue,
+nate al primo cambio e mostrate in mezzo al cambio con la spunta «Le ho
+scritte su carta» (decisione di Andrea del 28 ott, cantiere
+grafica-cambio: «la prima volta le 12 parole restano obbligatorie»), e
+ritrovate in una riga chiusa in fondo alla pagina «Cambio». Dal 29 ott
+(swap-seme-onchain) il solo cambio di una vendita on-chain usava già le
+parole del wallet on-chain. Alan: le parole fuori dal cambio, nelle
+impostazioni. Questo cantiere ROVESCIA la decisione del 28 ott, e regge
+perché adesso le parole hanno un backup che si fa da solo.
+
+COSA FA.
+- UNA CHIAVE SOLA. Ogni cambio nuovo (pagina «Cambio», «Al tuo indirizzo
+  bitcoin» negli ordini, la vendita on-chain verso Lightning) nasce dalle
+  dodici parole del wallet di Barattolo, quelle dell'on-chain
+  (`onchainSemeAssicurato`: ritrovate sul telefono, nel cloud di
+  Telegram o sui relay Nostr, sennò nascono e si copiano da sole).
+  LE PAROLE SONO UNA, LE CHIAVI NO (la frase di Alan): ogni cambio prende
+  m/44/0/0/0/i con l'indice prenotato prima di chiedere
+  (`swapPrenotaIndice`), UNA serie per tutti i fornitori — un indice
+  riusato con un fornitore diverso sarebbe lo stesso segreto due volte;
+  il 2-di-3 sta su m/48'/1'/0'/2' (indurita: la xpub di radice che il
+  recupero manda al fornitore non lo raggiunge), un indirizzo e un
+  descrittore per ordine, come prima.
+- IL PASSO DELLE PAROLE SPARISCE dove le parole hanno una copia fuori da
+  questo dispositivo che ridà LE STESSE (`onchainSemeCoperto`): dentro
+  Telegram e per chi ha Nostr, cioè quasi tutti, «Conferma» fa nascere
+  il cambio e basta. Una casa vuota dentro Telegram si riempie (non
+  schiaccia nessuno); una casa che dice un'ALTRA chiave non si tocca, e
+  la risposta è no. DOVE NON C'È NESSUNA COPIA (browser fuori da
+  Telegram, senza Nostr) il passo resta, una volta (`copiata`), con le
+  parole del wallet e la frase «Qui non ne esiste una copia di riserva,
+  quindi scrivile tu»: lì un telefono perso perderebbe i bitcoin di un
+  cambio andato storto.
+- NEL PROFILO, «Incassi e pagamenti», il cassetto «⛓️ Incassi on-chain»
+  diventa «🔑 Il wallet di Barattolo» (stesso id, `accOnchainIncasso`,
+  che aprono «Completa il profilo» e gli ordini) e si accende con
+  l'on-chain O col cambio: la chiave (una per tutto, una nuova per ogni
+  ordine e ogni cambio, e le ultime otto lettere della metà pubblica che
+  entra nei 2-di-3), dove ricevi on-chain (il blocco di prima), le 12
+  parole a richiesta («Mostra», che se la chiave non c'è la cerca nelle
+  copie o la fa nascere), «Controlla il backup» (lo stesso controllo
+  della pagina On-chain) e «Ritrova i miei cambi». Il Profilo da solo
+  non fa nascere niente.
+- «RITROVA I MIEI CAMBI» (`swapRitrovaCambi`): su un telefono nuovo le
+  parole tornano dal backup, e il bottone manda la xpub di radice a ogni
+  fornitore e ritrova i cambi di tutti, senza chiedere le parole; il
+  contatore riparte dopo il più alto trovato.
+- LA PAGINA «CAMBIO» perde la riga chiusa delle parole e del recupero:
+  in fondo resta «🔑 Le 12 parole di riserva sono nel Profilo», che apre
+  il cassetto.
+- I CAMBI DI PRIMA (nati con le parole del fornitore, solo sul
+  collaudo: in produzione lo swap non è mai stato acceso) restano
+  leggibili: il record senza `seme` prende il cassetto vecchio
+  (`swapParoleDi`, ora anche nel ritiro), e nel Profilo, solo se un
+  cassetto vecchio c'è, «Le parole dei cambi di prima» col loro
+  recupero scrivendole.
+
+STRADE SCARTATE. Tenere dodici parole del cambio a parte ma nasconderle
+(due segreti da custodire, e uno dei due senza copia); mostrare le parole
+sempre la prima volta (è proprio quel che Alan chiede di togliere, e
+dentro Telegram il backup c'è già); scrivere la copia nel cloud anche
+sopra una chiave diversa (potrebbe essere quella buona di un altro
+telefono, coi sats di un ordine aperto); far nascere la chiave
+all'apertura del Profilo (un segreto nato senza un gesto); una sezione
+nuova accanto a quella on-chain (due cassetti per una chiave sola).
+
+RESTA DA GUARDARE. Il cloud di Telegram non è end-to-end (lo dice già la
+pagina On-chain, che consiglia Nostr): con questo cantiere anche la
+chiave del cambio sta lì. La xpub di radice va a ogni fornitore al
+«Ritrova» (prima andava solo a quello delle parole): vede le chiavi
+pubbliche m/44/0/0/0/i, non quelle del 2-di-3. Non provato dentro
+Telegram vero: il CloudStorage e la domanda «c'è una copia?» col
+telefono in mano.
+
+PROVATO. I quattro banchi del telefono (codice vero in node vm, pagina
+di cartone) adattati alle parole del wallet: collaudo_swap_telefono
+62/0 (nuove le scene «Ritrova», telefono nuovo con 8 cambi ritrovati e
+il contatore a 8, e «coperte», il cambio che nasce senza il passo delle
+parole), collaudo_swap_instradatore 27/0 (un indice per due fornitori:
+il ripiego su SATS Routing prende l'indice 2 senza parole nuove, e
+«Ritrova» trova i 5 cambi di entrambi), collaudo_cambio_libero 106/0,
+collaudo_swap_pagamento 51/0 (la sua sentinella cerca ora nelle
+chiamate le parole del wallet, non il cassetto vecchio che sarebbe
+stato vuoto e l'avrebbe fatta passare a vuoto). `prove_parole_uniche`:
+gli otto casi di `onchainSemeCoperto` (copia locale nata dal cloud o
+dai relay, cloud uguale, cloud vuoto dentro e fuori Telegram, cloud
+diverso, relay uguale e diverso) più le sentinelle, 7/0. Suite severa
+26557/0 (2 saltate: nostr-tools assente nella macchina cloud), collaudi
+della CI 108/0 con coincurve e, senza, 107/0 più
+collaudo_swap_pagamento rifatto verde dopo il suo adattamento (era
+rimasto senza il wallet di cartone). Controprove: le parole mostrate sempre = il banco
+del telefono rosso (il secondo cambio si ferma alle parole); il ritiro
+col cassetto vecchio al posto di `swapParoleDi` = 17 rosse nel banco
+del telefono, 1 nell'instradatore, 2 nel pagamento. Giro dal vivo in
+locale (server del worktree, SATS Routing di cartone, relay morti,
+Chromium 375×812): il cassetto nel Profilo con la coda della chiave, le
+12 parole a «Mostra», «Ritrova», il link dalla pagina «Cambio» che apre
+il cassetto, e fuori da Telegram senza Nostr il passo delle parole che
+resta. Le schermate in project-files/parole-uniche.

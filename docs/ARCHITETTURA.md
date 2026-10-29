@@ -33985,9 +33985,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `focusout` rimette i puntini. Il costo in una riga con «Dettagli»
   (`costoSwap`, `vociSwap`, stato in `dettagliSwap[n]`), pezzi comuni
   col pannello dell'incasso (`pannelloPreventivoSwap`). Le 12 parole e il
-  recupero in una riga chiusa (`swapRiservaAperta`, azione `riserva`);
-  la prima volta la schermata delle parole resta obbligatoria
-  (`swapAvantiDentro`). Le icone sono SVG nel file (`SWAP_ICONE`,
+  recupero stavano in una riga chiusa in fondo (`swapRiservaAperta`,
+  azione `riserva`): dal 29 ott 2026 (parole-uniche, sotto) stanno nel
+  Profilo, e qui resta la porta `al-profilo`. Le icone sono SVG nel file (`SWAP_ICONE`,
   `swapIcona`, `swapMoneta`, `iconaSwap` dal lato della pagina), stili
   `.cambio-*`. `pannelloPagamento` dice «via il cambio, al tuo
   indirizzo bitcoin» quando `swapDiOrdine(o.id)` c'è (solo il telefono
@@ -34241,6 +34241,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `eti-ricevi` (9,5 px, una riga da 360 px in su). Gli id interni
   (`view-swap`, `nav-aste`, `data-swap`, le chiavi dei testi) non
   cambiano.
+  UNA CHIAVE SOLA, IL WALLET DI BARATTOLO (29 ott 2026, cantiere
+  parole-uniche; perché in CANTIERI, «Le 12 parole del cambio nel wallet
+  di Barattolo»). Ogni cambio nuovo nasce dalle dodici parole del wallet
+  on-chain: `swapSemePronto` chiede alla pagina `onchainSemeAssicurato`
+  (le ritrova sul telefono, nel cloud di Telegram o sui relay, sennò
+  nascono) e `onchainSemeCoperto(parole)` (c'è una copia fuori da qui
+  che ridà QUELLE parole? una casa vuota dentro Telegram si riempie, una
+  che dice un'altra chiave non si tocca). Le chiavi: m/44/0/0/0/i, i da
+  `swapPrenotaIndice` (contatore `barattolo_swap_oc_<tg>` = {prossimo,
+  copiata}, mai sotto un indice in lista), UNA serie per tutti i
+  fornitori; il record porta `seme: 'onchain'` e `swapParoleDi(rec)` dà
+  le parole a ritiro, rimborso e firma a due. Il passo `parole` mostra
+  le parole del wallet SOLO senza copia fuori e non ancora `copiata`
+  (`swapSemeDaMostrare`). I cassetti per fornitore di prima
+  (`swapCassetto`) restano per i record senza `seme`. Nel Profilo il
+  cassetto `accOnchainIncasso` si chiama «🔑 Il wallet di Barattolo» e
+  si accende con `myOnchain || swapAcceso()` (`aggiornaCassettoWallet`):
+  `renderWalletBarattolo` disegna la chiave (`#walletBarattolo`, la coda
+  della xpub del conto 2-di-3), il blocco di prima (`#onchainIncassoProfilo`)
+  e le parole (`#walletParole`: «Mostra» via `walletMostraParole`,
+  «Controlla il backup» = `onchainGuarda(btn, 'walletBackup')`, e
+  `swapBloccoProfilo()` dell'instradatore: «Ritrova i miei cambi» =
+  `swapRitrovaCambi`, la xpub di radice a ogni fornitore, e le parole
+  dei cambi di prima solo se un cassetto vecchio c'è).
   I PASSI (`swapPassi[ordine]`): `preventivo` → `parole` (solo con le
   parole non ancora `copiata`) → `creo`; il passo `indirizzo` non c'è
   più. Il campo dell'indirizzo (`campoIndirizzoSwap`: `#swapIndirizzo_<n>`,

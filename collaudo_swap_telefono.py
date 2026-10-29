@@ -14,8 +14,10 @@ giudica il cartone in Python puro (BIP-340), non la libreria del telefono.
 LE SCENE:
   - il server: in /api/me dove parlare e su quale rete; la CSP che a swap
     acceso ammette la sola origine di SATS Routing; le due rotte dei file;
-  - la prima volta nascono le 12 parole, e senza la spunta «le ho scritte»
-    non si va avanti;
+  - la prima volta nascono le 12 parole (dal 29 ott 2026, parole-uniche,
+    quelle del wallet di Barattolo, e il passo solo dove non hanno copia
+    fuori dal telefono: il banco dice di no), e senza la spunta «le ho
+    scritte» non si va avanti;
   - un indirizzo sbagliato non chiede niente a nessuno;
   - SATS ROUTING CHE MENTE, cinque modi (importo, impronta, albero,
     indirizzo, meno on-chain): il telefono rifiuta, non salva niente, e
@@ -25,6 +27,8 @@ LE SCENE:
     e il cartone accetta la firma; poi «fatto»;
   - SATS Routing che non firma: si ritira dallo script;
   - la RIPRESA: uno swap lasciato a meta' si ritira alla riapertura;
+  - «RITROVA I MIEI CAMBI» su un telefono nuovo (dal 29 ott 2026): le
+    parole del wallet tornate dal backup ritrovano tutto, senza chiederle;
   - il RECUPERO da 12 parole su un telefono vuoto: tutti gli swap, e il
     contatore delle chiavi riparte dopo il piu' alto;
   - LA SENTINELLA: nessuna chiamata verso il server di Barattolo, e in
@@ -140,6 +144,23 @@ const ascoltatori = [];
 const document = {addEventListener: (t, f) => ascoltatori.push([t, f]),
                   head: {appendChild(){}}, createElement(){ return {}; }};
 const setInterval = () => 1, clearInterval = () => {};
+/* (29 ott 2026, parole-uniche) IL WALLET DI BARATTOLO DELLA PAGINA, di
+   cartone: le parole sotto il conto (le ritrova se ci sono, sennò
+   nascono), e la domanda «c'e' una copia fuori da qui?», che il banco
+   decide (\`semeCoperto\`: di serie no, cosi' il passo delle parole si
+   vede come la prima volta di prima) */
+function onchainSemeLocale(){ return localStorage.getItem('barattolo_onchain_' + myTgId) || ''; }
+let onchainNato = '';
+async function onchainSemeAssicurato(){
+  let p = onchainSemeLocale();
+  if (p) { onchainNato = 'locale'; return p; }
+  p = BarattoloSwap.generateMnemonic(BarattoloSwap.wordlist);
+  localStorage.setItem('barattolo_onchain_' + myTgId, p);
+  onchainNato = 'nuovo';
+  return p;
+}
+let semeCoperto = false;
+async function onchainSemeCoperto(){ return semeCoperto; }
 `, Object.assign(ctx, {__memoria: memoria}));
   vm.runInContext(D.bolt11, ctx);
   for (const codice of TELEFONO) vm.runInContext(codice, ctx);
@@ -152,7 +173,15 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   const out = {};
   const memA = new Map();
   const A = pagina(memA);
-  const cassetto = () => JSON.parse(memA.get('barattolo_swap_222') || 'null');
+  /* (parole-uniche) il «cassetto» di prima, letto dove sta adesso: le
+     parole del wallet di Barattolo e lo stato del seme */
+  const cassettoDi = mem => {
+    const parole = mem.get('barattolo_onchain_222');
+    if (!parole) return null;
+    const oc = JSON.parse(mem.get('barattolo_swap_oc_222') || '{}');
+    return {parole: parole, prossimo: Number(oc.prossimo) || 0, copiata: !!oc.copiata};
+  };
+  const cassetto = () => cassettoDi(memA);
   const lista = mem => JSON.parse(mem.get('barattolo_swap_lista_222') || '[]');
   out.ascoltatori = A.run('ascoltatori.map(a => a[0])');
 
@@ -174,10 +203,13 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   /* le parole sole: sopra ci sono le tre regole, anche loro in lista */
   const elenco0 = (p0.split('class="swap-parole"')[1] || '').split('</ol>')[0];
   out.parolePannello = (elenco0.match(/<li>/g) || []).length;
-  out.paroleCalma = [p0.includes('Servono solo se qualcosa va storto'),
+  out.paroleCalma = [p0.includes('servono solo se qualcosa va storto'),
                      (p0.match(/class="swap-regole"/g) || []).length,
                      p0.includes('Senza queste parole nessuno può recuperarli, nemmeno noi.'),
-                     p0.includes('>Continua<')];
+                     p0.includes('>Continua<'),
+                     /* (parole-uniche) dove ritrovarle: il Profilo, non la pagina «Cambio» */
+                     p0.includes('le ritrovi nel Profilo, in «Il wallet di Barattolo»'),
+                     p0.includes('Qui non ne esiste una copia di riserva')];
   A.run("elementi.swapSpunta_7 = {checked: false}");
   A.run('swapParoleFatte(7)');
   out.senzaSpunta = [A.run('swapPassi[7]'), A.run('swapErrori[7]'), cassetto().copiata];
@@ -308,14 +340,36 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   out.recuperoAltre = [Dp.run('elementi.swapRecuperoNota.textContent'),
                        JSON.parse(memD.get('barattolo_swap_222')).parole.startsWith('abandon')];
 
-  // --- la pagina Swap: le parole si mostrano solo a richiesta, col tocco
+  // --- (29 ott 2026, parole-uniche) «RITROVA I MIEI CAMBI» su un telefono
+  // nuovo: le parole tornano dal backup (qui: gia' sotto il conto), e il
+  // bottone ritrova tutto senza chiederle
+  const memE = new Map([['barattolo_onchain_222', parole]]);
+  const E = pagina(memE);
+  E.run(`elementi.swapTelefono = {innerHTML: ''}; elementi.swapVuoto = {style: {}}; elementi.swapRecuperoNota = {textContent: ''}`);
+  const toccoE = E.run('ascoltatori[0][1]');
+  toccoE({target: {closest: () => ({dataset: {swap: 'ritrova'}})}});
+  for (let i = 0; i < 100 && !E.run('swapNotaRecupero.testo'); i++) await sleep(50);
+  const le = lista(memE);
+  out.ritrova = {nota: E.run('swapNotaRecupero.testo'), quanti: le.length,
+                 seme: le.every(r => r.seme === 'onchain'),
+                 indici: le.map(r => r.indice).sort((a, b) => a - b),
+                 prossimo: cassettoDi(memE).prossimo,
+                 vecchio: memE.has('barattolo_swap_222')};
+  // --- la pagina Swap: le parole NON ci sono piu', nemmeno col tocco; c'e'
+  // la porta verso il Profilo
   A.run(`elementi.swapTelefono = {innerHTML: ''}; elementi.swapVuoto = {style: {}}`);
   A.run('renderSwapTelefono()');
   out.paroleNascoste = !A.run('elementi.swapTelefono.innerHTML').includes(parole.split(' ')[0] + '</li>');
   const tocco = A.run('ascoltatori[0][1]');
   tocco({target: {closest: () => ({dataset: {swap: 'mostra-parole'}})}});
   out.paroleMostrate = A.run('elementi.swapTelefono.innerHTML').includes(parole.split(' ')[0] + '</li>');
+  out.portaProfilo = A.run('elementi.swapTelefono.innerHTML').includes('data-swap="al-profilo"');
   html.push(A.run('elementi.swapTelefono.innerHTML'));
+  /* il pezzo del Profilo: «Ritrova», e senza cambi di prima niente parole */
+  const prof = A.run('swapBloccoProfilo()');
+  html.push(prof);
+  out.profilo = [prof.includes('data-swap="ritrova"'), prof.includes(parole.split(' ')[0] + '</li>'),
+                 prof.includes('swap-vecchie')];
   tocco({target: {closest: () => ({dataset: {swap: 'scegli', ordine: '7', scelta: 'swap'}})}});
   tocco({target: {closest: () => null}});
   out.scelte = A.run('scelte');
@@ -463,6 +517,24 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                       riprovo: A.run('cartaSwap(swapLista().find(r => r.ordine === 18))').includes('riprovo da solo')};
   await modo('normale');
 
+  // --- (29 ott 2026, parole-uniche) IL CASO DI TUTTI: le parole del wallet
+  // hanno una copia fuori da qui (il cloud di Telegram, i relay). Niente
+  // passo delle parole, niente spunta: «Conferma» e il cambio nasce
+  const memF = new Map();
+  const F = pagina(memF);
+  F.run('semeCoperto = true');
+  F.run(`elementi.swapIndirizzo_30 = {value: '${D.indirizzo}'}`);
+  await F.run('swapAvanti(30)');
+  const rF = lista(memF).find(r => r.ordine === 30) || {};
+  const pF = F.run('pannelloSwapTelefono({id: 30})');
+  html.push(pF);
+  out.coperte = {passo: F.run('swapPassi[30] || ""'), errore: F.run('swapErrori[30] || ""'),
+                 nato: !!rF.id, seme: rF.seme, indice: rF.indice,
+                 parole: (memF.get('barattolo_onchain_222') || '').split(' ').length,
+                 copiata: !!(cassettoDi(memF) || {}).copiata,
+                 nelPannello: pF.includes('swap-parole') || pF.includes('Le tue 12 parole'),
+                 vecchio: memF.has('barattolo_swap_222')};
+
   // --- LA SENTINELLA: dove sono andate le chiamate, e cosa portavano
   const priv = [];
   for (let i = 0; i < 12; i++) {
@@ -489,7 +561,7 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
                     privata: priv.some(p => tutto.includes(p)),
                     xpub: chiamate.filter(c => c.corpo.includes('xpub')).map(c => c.url.replace(BASE, ''))};
   out.onclick = html.filter(h => /\son[a-z]+=/i.test(h)).length;
-  out.dataSwap = html.join('').includes('data-swap="mostra-parole"');
+  out.dataSwap = html.join('').includes('data-swap="ritrova"');
   process.stdout.write(JSON.stringify(out));
   process.exit(0);
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
@@ -593,12 +665,15 @@ def il_telefono(base):
     prova("«Conferma» senza indirizzo: lo dice, e le parole non nascono",
           ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", None, ""],
           r["senzaIndirizzo"])
+    # (29 ott 2026, parole-uniche) sono quelle del wallet di Barattolo, e il
+    # passo c'e' perche' il banco dice che fuori da qui non ne esiste copia
     prova("nascono 12 parole valide, non ancora copiate, dal passo «parole»",
           {"quante": 12, "valide": True, "copiata": False, "prossimo": 0, "passo": "parole"},
           r["parole"])
     prova("...e il pannello le mostra tutte", 12, r["parolePannello"])
     prova("...spiegate con calma: a cosa servono, le tre regole, nessuno senza, "
-          "e «Continua»", [True, 1, True, True], r["paroleCalma"])
+          "e «Continua», e che stanno nel Profilo perche' qui non hanno copia",
+          [True, 1, True, True, True, True], r["paroleCalma"])
     prova("senza la spunta non si va avanti", ["parole", "Prima spunta «Le ho scritte su carta».", False],
           r["senzaSpunta"])
     prova("...con la spunta lo swap parte da solo: qui l'indirizzo storto lo "
@@ -641,6 +716,13 @@ def il_telefono(base):
     prova("SATS Routing che non firma: si ritira dallo script, e la firma regge",
           (True, False, "script", 47_154, ""), (sc.get("txid"), sc.get("coop"), sc.get("via"), sc.get("sats"), sc.get("errore")))
 
+    print("\n[le parole con una copia fuori da qui: il caso di tutti]")
+    prova("con la copia nel cloud o sui relay «Conferma» fa nascere il cambio: "
+          "niente passo delle parole, niente spunta, la prima chiave del wallet",
+          {"passo": "", "errore": "", "nato": True, "seme": "onchain", "indice": 0,
+           "parole": 12, "copiata": False, "nelPannello": False, "vecchio": False},
+          r.get("coperte"))
+
     print("\n[la ripresa e il recupero]")
     prova("uno swap lasciato a meta' si ritira alla riapertura della pagina",
           {"ritirato": True, "trasmesse": 3, "swapCartone": 8}, r["ripresa"])
@@ -653,8 +735,17 @@ def il_telefono(base):
     prova("un telefono con ALTRE parole e i suoi swap non le cambia",
           ["Su questo telefono ci sono già altre parole in uso: non le sostituisco.", True],
           r["recuperoAltre"])
-    prova("le parole nella pagina Swap: nascoste, poi mostrate col tocco",
-          (True, True), (r["paroleNascoste"], r["paroleMostrate"]))
+    # (29 ott 2026, parole-uniche) le parole stanno nel Profilo
+    prova("le parole nella pagina Swap non ci sono piu', nemmeno col tocco: c'e' la porta del Profilo",
+          (True, False, True), (r["paroleNascoste"], r["paroleMostrate"], r["portaProfilo"]))
+    prova("...nel Profilo «Ritrova i miei cambi», e senza cambi di prima nessuna parola",
+          [True, False, False], r["profilo"])
+    rt = r["ritrova"]
+    prova("telefono nuovo: «Ritrova i miei cambi» li ritrova tutti con le parole del wallet, senza chiederle",
+          ("Ritrovati 8 cambi.", 8, True, list(range(8))),
+          (rt.get("nota"), rt.get("quanti"), rt.get("seme"), rt.get("indici")))
+    prova("...il contatore della chiave unica riparte dopo il piu' alto, e nessun cassetto vecchio nasce",
+          (8, False), (rt.get("prossimo"), rt.get("vecchio")))
     prova("l'ascoltatore delegato passa la scelta, e ignora il resto", [[7, "swap"]], r["scelte"])
 
     prova("un ritiro cooperativo rifiutato alla trasmissione: il giro dopo dallo script",
@@ -708,9 +799,10 @@ def il_telefono(base):
           (True, [], 0), ((se.get("chiamate") or 0) > 10, se.get("fuori"), se.get("api")))
     prova("...in nessuna le 12 parole o una chiave privata", (False, False),
           (se.get("parole"), se.get("privata")))
-    # (una volta sola: le parole storte e il telefono con altre parole
-    # si fermano prima di chiedere)
-    prova("...la xpub va solo al recupero", ["/v2/swap/restore"], se.get("xpub"))
+    # (due volte: il recupero scrivendo le parole e, dal 29 ott 2026,
+    # «Ritrova i miei cambi»; le parole storte e il telefono con altre
+    # parole si fermano prima di chiedere)
+    prova("...la xpub va solo al recupero", ["/v2/swap/restore", "/v2/swap/restore"], se.get("xpub"))
     prova("nel markup del telefono nessun onclick: data-swap", (0, True),
           (r["onclick"], r["dataSwap"]))
 
