@@ -30070,7 +30070,7 @@ def prove_libro_mastro():
         # rossa — solo qualcuno che ha pagato e non ha avuto niente.
         ("UPDATE utenti SET banner_sbloccato_il=0 WHERE tg_id=222",
          "sblocco pagato e porta chiusa", "1"),
-        ("UPDATE utenti SET banner_sbloccato_il=700 WHERE tg_id=444",
+        ("UPDATE utenti SET banner_sbloccato_il=1789603200 WHERE tg_id=444",
          "porta del banner aperta senza pagamento", "444"),
         ("INSERT INTO pagamenti(id,tg_id,motivo,importo_sats,stato) "
          "VALUES(9, 222, 'banner', 10000, 'pagato')",
@@ -30161,6 +30161,31 @@ def prove_libro_mastro():
               id_atteso in trovati.get(atteso, []))
     prova("ogni controllo del catalogo ha il suo caso rotto",
           {c[0] for c in controlli}, {c[1] for c in casi})
+    # LA PORTA REGALATA IL 15 SET (29 ott 2026): aperta senza pagamento
+    # PRIMA del 17 set 2026 e' il grandfathering, e tace; un secondo
+    # dopo la soglia suona (il caso rotto qui sopra). Il negozio vero:
+    # 613784705, porta aperta il 15 set 06:06 UTC.
+    con = db_sano()
+    con.executescript("UPDATE utenti SET banner_sbloccato_il=1789452383 "
+                      "WHERE tg_id=444")
+    trovati = gira(con)
+    con.close()
+    prova("la porta regalata dal grandfathering del 15 set non suona", False,
+          "444" in trovati.get("porta del banner aperta senza pagamento", []))
+    con = db_sano()
+    con.executescript("UPDATE utenti SET banner_sbloccato_il=1789603199 "
+                      "WHERE tg_id=444")
+    trovati = gira(con)
+    con.close()
+    prova("...un secondo prima della soglia tace ancora", False,
+          "444" in trovati.get("porta del banner aperta senza pagamento", []))
+    _w = next(c[2] for c in controlli
+              if c[0] == "porta del banner aperta senza pagamento")
+    _sql_porta = open("query_libro_mastro.sql", encoding="utf-8").read()
+    prova("...e la soglia e' la stessa nel server e nel gemello SQL",
+          (True, True),
+          (">=1789603200" in _w,
+           "COALESCE(u.banner_sbloccato_il, 0) >= 1789603200" in _sql_porta))
     # IL LINK RIMBORSATO nel gemello SQL (22 set 2026): la stessa WHERE,
     # spazi e virgolette tolti — un'intestazione giusta sopra una WHERE
     # storta farebbe tacere chi lancia le query a mano.

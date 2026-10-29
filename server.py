@@ -87466,10 +87466,22 @@ CONTROLLI_LIBRO_MASTRO = (
      "SELECT p.id FROM pagamenti p JOIN utenti u ON u.tg_id=p.tg_id "
      "WHERE p.motivo='banner' AND p.stato='pagato' "
      "AND COALESCE(u.banner_sbloccato_il,0)=0"),
+    # ⚠️ LE PORTE REGALATE IL 15 SET NON SUONANO (29 ott 2026, richiesta
+    # di Andrea: «sistemiamo una volta per tutte»). Il grandfathering
+    # di `init_db` (il banner si paga sempre, chi l'aveva gratis col
+    # livello se lo tiene) ha aperto porte SENZA un pagamento, alla
+    # data della loro richiesta: questo controllo non l'aveva saputo, e
+    # suonava ogni giorno sul negozio regalato (613784705, aperta il 15
+    # set alle 06:06 UTC, la stessa ora della richiesta). 1789603200 =
+    # 17 set 2026 00:00 UTC, dopo il deploy del 15 set: prima di quella
+    # data una porta senza pagamento puo' essere solo un regalo
+    # deciso; da li' in poi suona come sempre. Gemello in
+    # query_libro_mastro.sql (17e, il 2).
     ("porta del banner aperta senza pagamento",
      "la porta risulta sbloccata ma non c'e' nessun pagamento che "
      "l'abbia aperta: si e' aperta da sola",
-     "SELECT u.tg_id FROM utenti u WHERE COALESCE(u.banner_sbloccato_il,0)>0 "
+     "SELECT u.tg_id FROM utenti u WHERE COALESCE(u.banner_sbloccato_il,0)"
+     ">=1789603200 "
      "AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id=u.tg_id "
      "AND p.motivo='banner' AND p.stato IN ('pagato','rimborsato'))"),
     ("sblocco pagato due volte",
