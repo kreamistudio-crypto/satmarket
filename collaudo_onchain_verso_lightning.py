@@ -200,18 +200,12 @@ const run = c => vm.runInContext(c, ctx);
     out.corta = {errore: run(`onchainCambi[${oc.id}].errore || ''`),
                  swap: (await (await fetchVero(D.base + '/cartone/visto')).json()).swap - v0,
                  server: run('alServer.length')};
-    /* quella buona: la prima volta le 12 parole, senza spunta no */
+    /* quella buona: niente 12 parole a parte (29 ott 2026), il cambio
+       nasce al primo «Conferma» col seme dell'on-chain */
     run(`onchainCambi[${oc.id}].fattura = ${JSON.stringify(D.buona)}; elementi['ocCambioFattura_${oc.id}'] = {value: ${JSON.stringify(D.buona)}}`);
+    out.nienteSpunta = !run(`onchainCambioBlocco(currentOrder)`).includes('ocCambioSpunta_');
     await run(`onchainCambioConferma(null, currentOrder)`);
-    const cass = JSON.parse(memoria.get('barattolo_swap_' + D.tg) || 'null');
-    out.parole = {stato: run(`onchainCambi[${oc.id}].stato`), parole: !!(cass && cass.parole && cass.parole.split(' ').length === 12),
-                  copiata: cass && cass.copiata, riquadro: run(`onchainCambioBlocco(currentOrder)`).includes('ocCambioSpunta_' + oc.id),
-                  swap: (await (await fetchVero(D.base + '/cartone/visto')).json()).swap - v0};
-    run(`elementi['ocCambioSpunta_${oc.id}'] = {checked: false}`);
-    await run(`onchainCambioConferma(null, currentOrder)`);
-    out.senzaSpunta = run(`onchainCambi[${oc.id}].errore || ''`);
-    run(`elementi['ocCambioSpunta_${oc.id}'] = {checked: true}`);
-    await run(`onchainCambioConferma(null, currentOrder)`);
+    out.cassettoFornitore = memoria.get('barattolo_swap_' + D.tg) || null;
     out.nato = run('alServer.slice()');
     out.errore = run(`(onchainCambi[${oc.id}] || {}).errore || ''`);
     const lista = JSON.parse(memoria.get('barattolo_swap_lista_' + D.tg) || '[]');
@@ -220,11 +214,28 @@ const run = c => vm.runInContext(c, ctx);
                lockup: rec.lockupAddress, fase: run(`swapFase(swapLista().find(r => r.onchain === ${oc.id}))`),
                frase: run(`frasestatoSwap(swapLista().find(r => r.onchain === ${oc.id}))`),
                daMandare: run(`bitcoinDaMandare(swapLista().find(r => r.onchain === ${oc.id}))`),
-               indice: rec.indice, prossimo: JSON.parse(memoria.get('barattolo_swap_' + D.tg)).prossimo};
+               indice: rec.indice, seme: rec.seme, indirizzo: rec.indirizzo,
+               prossimo: JSON.parse(memoria.get('barattolo_swap_oc_' + D.tg) || '{}').prossimo,
+               incasso: run(`onchainMieChiavi(B0, PAROLE, ${JSON.stringify(oc)}).incasso`)};
+    out.recId = rec.id;
     /* la sorveglianza lo segue come gli altri: i bitcoin visti */
     await fetchVero(`${D.base}/cartone/stato?id=${rec.id}&s=transaction.mempool`);
     await run('swapGiro()');
     out.visti = run(`frasestatoSwap(swapLista().find(r => r.onchain === ${oc.id}))`);
+    /* IL CAMBIO FALLISCE (29 ott 2026): i bitcoin tornano DA SOLI, al
+       giro dopo, al /1/n di chi vende, con la chiave dello stesso seme */
+    await fetchVero(`${D.base}/cartone/stato?id=${rec.id}&s=invoice.failedToPay`);
+    const recOra = () => swapLista().find(r => r.onchain === oc.id) || {};
+    const swapLista = () => JSON.parse(memoria.get('barattolo_swap_lista_' + D.tg) || '[]');
+    await run('swapGiro()');
+    for (let i = 0; i < 50 && !(recOra().rimborso || {}).txid && !recOra().errore; i++)
+      await new Promise(r => setTimeout(r, 100));
+    const vR = (await (await fetchVero(D.base + '/cartone/visto')).json());
+    const tR = (vR.trasmesse || []).find(x => recOra().rimborso && x.txid === recOra().rimborso.txid) || {};
+    out.rimborso = {txid: /^[0-9a-f]{64}$/.test(String((recOra().rimborso || {}).txid || '')),
+      errore: recOra().errore || '',
+      aIncasso: !!(tR.uscite && tR.uscite[0] && tR.uscite[0].script === run(
+        `B0.hex.encode(B0.OutScript.encode(B0.Address(B0.TEST_NETWORK).decode(${JSON.stringify(rec.indirizzo)})))`))};
     out.avvisi = run('avvisi.slice()');
   } else if (D.fase === 'compra') {
     const oc = D.oc;
@@ -596,15 +607,13 @@ def main():
     prova("una richiesta che vive un'ora: no, e non si chiede niente a nessuno",
           ("Questa richiesta scade fra meno di 23 ore: creane una che duri di più.", 0, 0),
           (t["corta"]["errore"], t["corta"]["swap"], t["corta"]["server"]))
-    prova("la prima volta le 12 parole di riserva, prima di tutto (nessun "
-          "cambio chiesto)", {"stato": "parole", "parole": True, "copiata": False,
-                              "riquadro": True, "swap": 0}, t["parole"])
-    prova("...e senza la spunta non parte", "Prima spunta «Le ho scritte su carta».",
-          t["senzaSpunta"])
+    prova("niente 12 parole a parte: nessuna spunta nel riquadro, e nessun "
+          "cassetto del fornitore nasce", (True, None),
+          (t["nienteSpunta"], t["cassettoFornitore"]))
     mandati = t.get("nato") or []
     url, corpo = mandati[-1] if mandati else ("", {})
-    prova("con la spunta: il cambio nasce, e al server va UNA chiamata con le "
-          "sole parti pubbliche, la firma e la prima firma",
+    prova("al primo «Conferma» il cambio nasce, e al server va UNA chiamata "
+          "con le sole parti pubbliche, la firma e la prima firma",
           (1, f"/api/onchain/ordini/{oid1}/cambio", ["cambio", "firma", "psbt"], ""),
           (len(mandati), url, sorted(corpo), t["errore"]))
     rec = t["rec"]
@@ -612,6 +621,17 @@ def main():
           ("sub", o1v["ordine_id"], oid1, 99_186, 100_000, True, 0, 1),
           (rec["tipo"], rec["ordine"], rec["onchain"], rec["ricevi"], rec["mandi"],
            str(rec["lockup"]).startswith("tb1p"), rec["indice"], rec["prossimo"]))
+    prova("...la chiave di riserva e' dello STESSO seme dell'on-chain, e il "
+          "rimborso va da solo al /1/n di chi vende", ("onchain", True),
+          (rec["seme"], bool(rec["incasso"]) and rec["indirizzo"] == rec["incasso"]))
+    # il «Recupera» della pagina Cambio: la xpub della radice delle STESSE
+    # 12 parole del 2-di-3 ritrova il cambio, all'indice giusto
+    trovati = cartone("/v2/swap/restore", {"xpub": bip32.HDKey.from_seed(
+        bip39.mnemonic_to_seed(semi[888])).to_public().to_base58()})
+    ritrovato = next((x for x in trovati if x["id"] == t["recId"]), {})
+    prova("...e le 12 parole dell'on-chain lo ritrovano col «Recupera»",
+          ("submarine", 0), (ritrovato.get("type"),
+                             (ritrovato.get("refundDetails") or {}).get("keyIndex")))
     prova("...e dice che i bitcoin li manda il deposito di garanzia, senza «manda "
           "tu» e senza QR da pagare",
           ("creato", "I bitcoin partono dal deposito di garanzia appena chi ha "
@@ -620,6 +640,9 @@ def main():
           (rec["fase"], rec["frase"], rec["daMandare"]))
     prova("...la sorveglianza lo segue come gli altri", t["visti"],
           "Bitcoin visti: aspetto la conferma della rete, di solito una decina di minuti.")
+    prova("...e se il cambio fallisce i bitcoin tornano DA SOLI al /1/n di "
+          "chi vende, senza parole a parte ne' indirizzo da scrivere",
+          {"txid": True, "errore": "", "aIncasso": True}, t.get("rimborso"))
     cartone(f"/cartone/stato?id={corpo['cambio']['id']}&s=invoice.set")
 
     print("\n[i no del server sul cambio]")

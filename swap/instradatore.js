@@ -1016,50 +1016,56 @@ async function swapRipiega(n, f){
    Chi ha venduto con un pagamento on-chain vuole i sats in Lightning: i
    bitcoin non li manda il suo wallet ma il deposito di garanzia 2-di-3,
    con la prima firma di chi vende e la seconda di chi compra. Qui nasce
-   SOLO il cambio — la chiave di rimborso dalle 12 parole (un indice
-   nuovo, prenotato prima di chiedere), la richiesta Lightning letta, la
+   SOLO il cambio — la chiave di rimborso dal seme dell'on-chain (un
+   indice nuovo, prenotato prima di chiedere), la richiesta Lightning letta, la
    risposta del fornitore verificata (`creaSub`) — e il record entra
    nella lista con `onchain` (il numero dell'ordine on-chain), sorvegliato
    come gli altri: a fattura pagata la meta' del ritiro a due, a cambio
-   fallito coi bitcoin mandati il rimborso dalla pagina «Cambio». Le firme
+   fallito coi bitcoin mandati il rimborso, da solo, al `rimborso`. Le firme
    e il server li fa la pagina (`onchainCambioConferma`): qui niente fetch.
-   Alza con `.tipo`: 'parole' (prima le 12 parole), 'fattura' (il perche'
+   Alza con `.tipo`: 'seme' (niente chiave on-chain qui), 'fattura' (il perche'
    in `.perche`), 'casa', 'giu', 'mente'. */
 function swapNoOnchain(tipo){ const e = new Error(tipo); e.tipo = tipo; return e; }
-/* le 12 parole del fornitore, nate adesso se mancano (si mostrano una
-   volta, e il cambio parte solo dopo la spunta: `swapCopiatePerOnchain`) */
-async function swapParolePerOnchain(fid){
-  const f = swapFornitore(fid);
-  if (!f) throw swapNoOnchain('giu');
-  let c = swapCassetto(f.id);
-  if (!c || !c.parole) {
-    let parole;
-    try { parole = await f.nuoveParole(); }
-    catch(e){ throw swapNoOnchain('giu'); }
-    c = {parole: parole, prossimo: 0, copiata: false};
-    if (!swapScrivi(swapCasaParole(f.id), c)) throw swapNoOnchain('casa');
+/* LO STESSO SEME DEL 2-DI-3 (29 ott 2026, Andrea: «lo stesso wallet
+   autogenerato per l'onchain è lo stesso che in caso di problemi deve
+   essere utilizzato nello swap»). Il cambio di una vendita on-chain non
+   ha piu' 12 parole sue: la chiave di rimborso nasce dalle parole
+   dell'on-chain (che hanno gia' le loro copie, Telegram e Nostr), sulla
+   strada di SATS Routing (m/44/0/0/0/i, lontana da quella del 2-di-3), e
+   se il cambio fallisce i bitcoin tornano DA SOLI a un indirizzo dello
+   stesso seme (`rimborso`, lo sceglie la pagina): nessun passo in piu'
+   per chi vende, nessun indirizzo da scrivere. Il contatore delle chiavi
+   e' suo (`swapCasaOnchain`), e riparte mai sotto l'ultimo usato. */
+function swapCasaOnchain(){ return `barattolo_swap_oc_${myTgId || 'x'}`; }
+function swapParoleOnchain(){
+  return typeof onchainSemeLocale === 'function' ? String(onchainSemeLocale() || '') : '';
+}
+/* le parole di uno swap: quelle del fornitore, o quelle dell'on-chain */
+function swapParoleDi(rec){
+  if (rec && rec.seme === 'onchain') {
+    const parole = swapParoleOnchain();
+    return parole ? {parole: parole} : null;
   }
-  return c;
+  return swapCassetto(swapDiChi(rec));
 }
-function swapCopiatePerOnchain(fid){
-  const c = swapCassetto(fid);
-  if (!c || !c.parole) return false;
-  c.copiata = true;
-  return swapScrivi(swapCasaParole(fid), c);
-}
-async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo}){
+async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimborso}){
   const f = swapFornitore(preventivo && preventivo.fornitore);
   if (!f || !f.creaSub) throw swapNoOnchain('giu');
   const perche = f.fatturaValida(fattura, Number(preventivo.ricevi));
   if (perche) { const e = swapNoOnchain('fattura'); e.perche = perche; throw e; }
-  const c = swapCassetto(f.id);
-  if (!c || !c.parole || !c.copiata) throw swapNoOnchain('parole');
-  const indice = Number(c.prossimo) || 0;
-  c.prossimo = indice + 1;
-  if (!swapScrivi(swapCasaParole(f.id), c)) throw swapNoOnchain('casa');
-  const nuovo = await f.creaSub({parole: c.parole, indice: indice, preventivo: preventivo, fattura: fattura});
+  const parole = swapParoleOnchain();
+  if (!parole) throw swapNoOnchain('seme');
+  if (!rimborso) throw swapNoOnchain('seme');
+  /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE, come per gli altri: mai sotto
+     uno gia' in lista (un telefono che ha perso il contatore non riusa) */
+  const c = swapLeggi(swapCasaOnchain(), {prossimo: 0});
+  const usati = swapLista().filter(r => r.seme === 'onchain').map(r => Number(r.indice) + 1);
+  const indice = Math.max(Number(c.prossimo) || 0, ...usati, 0);
+  if (!swapScrivi(swapCasaOnchain(), {prossimo: indice + 1})) throw swapNoOnchain('casa');
+  const nuovo = await f.creaSub({parole: parole, indice: indice, preventivo: preventivo, fattura: fattura});
   const rec = Object.assign(nuovo, {fornitore: f.id, ordine: Number(ordine) || null,
-    onchain: Number(onchain), indice: indice, indirizzo: '', creato: Date.now(), pagamento: ''});
+    onchain: Number(onchain), indice: indice, seme: 'onchain', indirizzo: String(rimborso),
+    creato: Date.now(), pagamento: ''});
   swapSalvaRecord(rec);
   swapSorveglia();
   return rec;
@@ -1123,7 +1129,7 @@ async function swapGiro(){
 async function swapGiroSub(rec, f){
   const fase = swapFase(rec);
   if (fase === 'pagata' && !rec.ritiro && f.aiutaRitiro) {
-    const c = swapCassetto(swapDiChi(rec));
+    const c = swapParoleDi(rec);
     try {
       if (!c || !c.parole) throw new Error('parole assenti');
       const fatto = await f.aiutaRitiro(rec, c.parole);
@@ -1145,7 +1151,7 @@ async function swapRimborsa(rec){
   swapRitirando.add(rec.id);
   try {
     const fid = swapDiChi(rec), f = swapFornitore(fid);
-    const c = swapCassetto(fid);
+    const c = swapParoleDi(rec);
     if (!f || !f.rimborsa) throw new Error('fornitore assente');
     if (!c || !c.parole) throw new Error('parole assenti');
     const fatto = await f.rimborsa(rec, c.parole);
