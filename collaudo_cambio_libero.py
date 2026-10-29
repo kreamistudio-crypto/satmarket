@@ -454,6 +454,18 @@ const ascoltatori = [];
 const document = {addEventListener: (t, f) => ascoltatori.push([t, f]),
                   head: {appendChild(){}}, createElement(){ return {}; }};
 const setInterval = () => 1, clearInterval = () => {};
+/* (29 ott 2026, parole-uniche) il wallet di Barattolo della pagina, di
+   cartone: le parole sotto il conto, ritrovate o nate; fuori da qui
+   nessuna copia, cosi' il passo delle parole si vede una volta */
+function onchainSemeLocale(){ return localStorage.getItem('barattolo_onchain_' + myTgId) || ''; }
+async function onchainSemeAssicurato(){
+  let p = onchainSemeLocale();
+  if (p) return p;
+  p = BarattoloSwap.generateMnemonic(BarattoloSwap.wordlist);
+  localStorage.setItem('barattolo_onchain_' + myTgId, p);
+  return p;
+}
+async function onchainSemeCoperto(){ return false; }
 `, Object.assign(ctx, {__memoria: memoria}));
 vm.runInContext(D.pagina, ctx);
 for (const codice of TELEFONO) vm.runInContext(codice, ctx);
@@ -548,10 +560,11 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   // --- «Conferma» senza indirizzo: lo dice, niente biglietto
   await run('swapAvanti(0)');
   out.senzaIndirizzo = [run("swapErrori[0] || ''"), server().length];
-  // --- con l'indirizzo: la prima volta le parole, poi «Continua»
+  // --- con l'indirizzo: la prima volta le parole (qui senza copia fuori
+  // dal telefono), poi «Continua»
   run(`elementi.swapIndirizzo_0 = {value: '${D.indirizzo}'}`);
   await run('swapAvanti(0)');
-  out.parole = [run("swapPassi[0] || ''"), box().includes('class="swap-parole"'), box().includes('pagina «Cambio»'), server().length];
+  out.parole = [run("swapPassi[0] || ''"), box().includes('class="swap-parole"'), box().includes('nel Profilo, in «Il wallet di Barattolo»'), server().length];
   run("elementi.swapSpunta_0 = {checked: true}");
   const vPrima = await visto();
   await run('swapParoleFatte(0)');
@@ -600,7 +613,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   const vD2 = await visto();
   out.tettoGiorno = {errore: run("swapErrori[0] || ''"), passo: run("swapPassi[0] || 'preventivo'"),
                      swap: vD2.swap - vP2.swap, server: server().slice(sPrima).map(s => s[0]),
-                     mostrato: box().includes('Per oggi hai fatto i 5 cambi possibili'), indice: JSON.parse(memoria.get('barattolo_swap_999')).prossimo};
+                     mostrato: box().includes('Per oggi hai fatto i 5 cambi possibili'), indice: JSON.parse(memoria.get('barattolo_swap_oc_999')).prossimo};
   // --- il fornitore non risponde dopo il biglietto: l'annullo
   run('bigliettoRisposta = {ok: true, id: 42, oggi: 2}');
   await modo('giu');
@@ -701,7 +714,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
   run("navigator = {clipboard: {readText: async () => 'lightning:' + " + JSON.stringify(F.buona.invoice) + ", writeText: async t => { avvisi.push('APPUNTI:' + t.slice(0, 4)); }}}");
   await run('swapIncollaFattura(0)');
   sub.incollata = run('swapFattureScritte[0]') === F.buona.invoice;
-  /* la nascita rovesciata (le parole sono gia' copiate: stesso cassetto) */
+  /* la nascita rovesciata (le parole sono gia' copiate: lo stesso wallet) */
   const vS1 = await visto();
   await run('swapAvanti(0)');
   const vS2 = await visto();
@@ -810,7 +823,7 @@ const lista = () => JSON.parse(memoria.get('barattolo_swap_lista_999') || '[]');
                aperto: run('swapAperti().some(r => r.id === ' + JSON.stringify(r4.id) + ')')};
   /* il recupero dalla xpub ritrova anche i submarine, con la chiave di rimborso */
   const trovati = await fetchVero(`${BASE}/v2/swap/restore`, {method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({xpub: run('(() => { const S = window.BarattoloSwap; return swapXpub(S, swapCassetto("satsrouting").parole); })()')})}).then(r => r.json());
+    body: JSON.stringify({xpub: run('(() => { const S = window.BarattoloSwap; return swapXpub(S, onchainSemeLocale()); })()')})}).then(r => r.json());
   sub.recupero = trovati.filter(s => s.type === 'submarine').length;
   out.sub = sub;
   // --- la sentinella: il telefono ha chiamato solo il cartone
@@ -911,7 +924,7 @@ def il_telefono(base):
           [100_000, 98_842, 150_000_000, 12_345_678, 0, 0, 10_000], r["leggi"])
     prova("«Conferma» senza indirizzo: lo dice, e al server non va niente",
           ["Prima metti il tuo indirizzo bitcoin: tocca «Incolla».", 0], r["senzaIndirizzo"])
-    prova("con l'indirizzo, la prima volta le 12 parole (che citano la pagina «Cambio»)",
+    prova("con l'indirizzo, la prima volta le 12 parole (che dicono dove ritrovarle: il Profilo)",
           ["parole", True, True, 0], r["parole"])
     n = r["nato"]
     prova("«Continua»: PRIMA il biglietto, poi lo swap al cartone, poi la nascita; "

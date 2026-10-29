@@ -22,16 +22,18 @@ LE SCENE:
     CSP apre le due origini; le voci storte di SWAP_FORNITORI_IN_PIU si
     saltano;
   - il migliore: l'instradatore sceglie Cartone Due, il preventivo dice
-    «Eseguito da Cartone Due», le parole sono SUE, lo swap nasce li' e li'
-    si ritira;
+    «Eseguito da Cartone Due», le parole sono quelle del wallet di
+    Barattolo (dal 29 ott 2026, parole-uniche: prima erano SUE), lo swap
+    nasce li' e li' si ritira;
   - il ripiego: Cartone Due mente, si mostra il preventivo di SATS Routing
-    con una nuova conferma, nascono le parole di SATS Routing, lo swap
-    nasce li';
+    con una nuova conferma, e lo swap nasce li' con la chiave successiva
+    della stessa serie (prima nascevano le parole di SATS Routing);
   - mentono tutt'e due: ci si ferma col perche', niente salvato;
   - il fuori-gioco vale per QUELL'ordine: su un ordine nuovo Cartone Due
     torna in gara; e se e' giu' vince SATS Routing;
-  - il recupero per fornitore: le parole di Cartone Due ritrovano i SUOI
-    swap, e la xpub va solo a lui;
+  - «Ritrova i miei cambi» (dal 29 ott 2026; prima il recupero per
+    fornitore): le parole del wallet ritrovano i cambi di tutti e due i
+    fornitori, e la xpub va a tutti e due;
   - LA SENTINELLA: nessuna chiamata al server di Barattolo dai file del
     telefono, in nessuna le parole o una chiave privata.
 
@@ -176,6 +178,19 @@ const ascoltatori = [];
 const document = {addEventListener: (t, f) => ascoltatori.push([t, f]),
                   head: {appendChild(){}}, createElement(){ return {}; }};
 const setInterval = () => 1, clearInterval = () => {};
+/* (29 ott 2026, parole-uniche) il wallet di Barattolo della pagina, di
+   cartone: le parole sotto il conto, ritrovate o nate; fuori da qui
+   nessuna copia (\`semeCoperto\`), cosi' il passo delle parole si vede */
+function onchainSemeLocale(){ return localStorage.getItem('barattolo_onchain_' + myTgId) || ''; }
+async function onchainSemeAssicurato(){
+  let p = onchainSemeLocale();
+  if (p) return p;
+  p = BarattoloSwap.generateMnemonic(BarattoloSwap.wordlist);
+  localStorage.setItem('barattolo_onchain_' + myTgId, p);
+  return p;
+}
+let semeCoperto = false;
+async function onchainSemeCoperto(){ return semeCoperto; }
 `, Object.assign(ctx, {__memoria: memoria, __letti: letti}));
   vm.runInContext(D.pagina, ctx);
   for (const codice of TELEFONO) vm.runInContext(codice, ctx);
@@ -206,18 +221,20 @@ const O = D.ordini;
   /* (27 ott 2026, grafica-swap) l'indirizzo sta sopra «Conferma» */
   A.run(`elementi.swapIndirizzo_${o1} = {value: '${D.indirizzo}'}`);
   await A.run(`swapAvanti(${o1})`);
-  out.paroleSue = [A.run(`swapPassi[${o1}]`), !!cass(mem, 'barattolo_swap_cartone2_222'),
-                   !!cass(mem, 'barattolo_swap_222')];
+  /* (29 ott 2026, parole-uniche) le parole sono UNA, quelle del wallet di
+     Barattolo, qualunque sia il fornitore: nessun cassetto per fornitore */
+  out.paroleSue = [A.run(`swapPassi[${o1}]`), !!mem.get('barattolo_onchain_222'),
+                   !!cass(mem, 'barattolo_swap_cartone2_222'), !!cass(mem, 'barattolo_swap_222')];
   const pp = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(pp);
-  out.titoloParole = pp.includes('Le tue 12 parole di riserva per Cartone Due');
+  out.titoloParole = [pp.includes('Le tue 12 parole di riserva'), pp.includes('di riserva per ')];
   A.run(`elementi.swapSpunta_${o1} = {checked: true}`);
   /* «Continua» fa nascere lo swap da solo */
   await A.run(`swapParoleFatte(${o1})`);
   const r1 = lista(mem).find(r => r.ordine === o1) || {};
   const v2 = await visto(B2), v1 = await visto(B1);
   out.nato = {fornitore: r1.fornitore, ricevi: r1.ricevi, errore: A.run(`swapErrori[${o1}] || ''`),
-              daDue: v2.swap, daUno: v1.swap};
+              daDue: v2.swap, daUno: v1.swap, seme: r1.seme, indice: r1.indice};
   const carta = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(carta);
   out.carta = carta.includes('Il cambio lo fa Cartone Due');
@@ -244,13 +261,17 @@ const O = D.ordini;
                  frase: pann2.includes('Cartone Due ha dato cifre che non tornano: ecco quelle di SATS Routing.'),
                  eseguito: pann2.includes('Il cambio lo fa SATS Routing'),
                  conferma: pann2.includes('data-swap="avanti"')};
+  /* (parole-uniche) le parole sono gia' copiate: la conferma fa nascere
+     lo swap da SATS Routing, senza un passo di parole sue */
   await A.run(`swapAvanti(${o2})`);
-  out.ripiegoParole = [A.run(`swapPassi[${o2}]`), !!cass(mem, 'barattolo_swap_222')];
-  A.run(`elementi.swapSpunta_${o2} = {checked: true}`);
-  await A.run(`swapParoleFatte(${o2})`);
+  out.ripiegoParole = [A.run(`swapPassi[${o2}] || ''`), !!cass(mem, 'barattolo_swap_222')];
   const r2 = lista(mem).find(r => r.ordine === o2) || {};
   out.ripiegoNato = {fornitore: r2.fornitore, ricevi: r2.ricevi, errore: A.run(`swapErrori[${o2}] || ''`),
-                     daUno: (await visto(B1)).swap};
+                     daUno: (await visto(B1)).swap, seme: r2.seme,
+                     /* la serie delle chiavi e' UNA per tutti i fornitori: il
+                        tentativo bugiardo di Cartone Due ha bruciato il suo
+                        indice, e SATS Routing prende il successivo */
+                     indice: r2.indice};
 
   // --- mentono tutt'e due
   const o3 = O[2];
@@ -272,32 +293,36 @@ const O = D.ordini;
   out.nuovoOrdine = A.run(`preventiviSwap[${o4}].dati.fornitore`);
   out.dueGiu = A.run(`preventiviSwap[${o5}].dati.fornitore`);
 
-  // --- la pagina Swap con due fornitori, e il recupero per fornitore
+  // --- la pagina Swap con due fornitori: niente parole, la porta del Profilo
+  // (29 ott 2026, parole-uniche: la riga chiusa delle parole e' passata li')
   A.run(`elementi.swapTelefono = {innerHTML: ''}; elementi.swapVuoto = {style: {}}`);
   A.run('renderSwapTelefono()');
-  // (28 ott 2026, grafica-cambio) la riga delle 12 parole sta chiusa in fondo:
-  // si apre col tocco, e solo allora parole e recupero si vedono
-  const chiusa = A.run('elementi.swapTelefono.innerHTML');
-  out.chiusa = [chiusa.includes('Le 12 parole e il recupero'), chiusa.includes('data-swap="riserva"'),
-                chiusa.includes('Recupera da'), chiusa.includes('Le tue 12 parole di riserva')];
-  A.run('swapRiservaAperta = true; renderSwapTelefono()');
   const pag = A.run('elementi.swapTelefono.innerHTML');
   html.push(pag);
-  out.pagina = [pag.includes('Le tue 12 parole di riserva per SATS Routing'), pag.includes('Le tue 12 parole di riserva per Cartone Due'),
-                pag.includes('Recupera da SATS Routing'), pag.includes('Recupera da Cartone Due'),
-                pag.includes('data-fornitore="cartone2"')];
-  const paroleDue = cass(mem, 'barattolo_swap_cartone2_222').parole;
-  const memC = new Map();
+  out.pagina = [pag.includes('Le tue 12 parole di riserva'), pag.includes('data-swap="riserva"'),
+                pag.includes('Recupera da'), pag.includes('data-swap="al-profilo"')];
+  const prof = A.run('swapBloccoProfilo()');
+  html.push(prof);
+  out.profilo = [prof.includes('data-swap="ritrova"'), prof.includes('Recupera da'), prof.includes('swap-vecchie')];
+  // --- «Ritrova i miei cambi» su un telefono nuovo: le parole del wallet
+  // (tornate dal backup) ritrovano i cambi di TUTTI e due i fornitori, e
+  // la xpub va a tutti e due
+  const seme = mem.get('barattolo_onchain_222');
+  const memC = new Map([['barattolo_onchain_222', seme]]);
   const C = pagina(memC);
   const primaDiC = chiamate.length;
-  C.run(`elementi.swapRecupero = {value: ${JSON.stringify(paroleDue)}}; elementi.swapRecuperoNota = {textContent: ''}`);
-  await C.run(`swapRecupera('cartone2')`);
+  C.run(`elementi.swapRecuperoNota = {textContent: ''}`);
+  await C.run('swapRitrovaCambi()');
   const lc = lista(memC);
-  out.recupero = {nota: C.run('elementi.swapRecuperoNota.textContent'),
-                  fornitori: [...new Set(lc.map(r => r.fornitore))],
-                  prossimo: (cass(memC, 'barattolo_swap_cartone2_222') || {}).prossimo,
-                  sats: !!cass(memC, 'barattolo_swap_222'),
-                  dove: chiamate.slice(primaDiC).filter(c => c.corpo.includes('xpub')).map(c => c.url.startsWith(B2))};
+  const ocA = JSON.parse(mem.get('barattolo_swap_oc_222') || '{}');
+  const ocC = JSON.parse(memC.get('barattolo_swap_oc_222') || '{}');
+  out.recupero = {nota: C.run('swapNotaRecupero.testo'),
+                  fornitori: [...new Set(lc.map(r => r.fornitore))].sort(),
+                  prossimo: [ocC.prossimo, ocA.prossimo],
+                  seme: lc.every(r => r.seme === 'onchain'),
+                  vecchi: !!cass(memC, 'barattolo_swap_222') || !!cass(memC, 'barattolo_swap_cartone2_222'),
+                  dove: chiamate.slice(primaDiC).filter(c => c.corpo.includes('xpub'))
+                          .map(c => c.url.startsWith(B2) ? 'cartone2' : c.url.startsWith(B1) ? 'satsrouting' : '?').sort()};
 
   // --- la sentinella
   const valori = [];
@@ -305,7 +330,7 @@ const O = D.ordini;
                           else if (v !== undefined && v !== null) valori.push(String(v)); };
   for (const c of chiamate) { try { raccogli(JSON.parse(c.corpo || 'null')); } catch(e){ valori.push(c.corpo); } }
   const soloValori = valori.join('\n').toLowerCase();
-  const tutte = [cass(mem, 'barattolo_swap_222').parole, paroleDue];
+  const tutte = [seme];
   const priv = [];
   for (const p of tutte) for (let i = 0; i < 6; i++)
     priv.push(S.hex.encode(S.HDKey.fromMasterSeed(S.mnemonicToSeedSync(p)).derive(`m/44/0/0/0/${i}`).privateKey));
@@ -394,10 +419,13 @@ def il_telefono(dati):
           ("cartone2", 47_298, ["cartone2", "satsrouting"], True, True),
           (m.get("chi"), m.get("ricevi"), m.get("chiesti"), m.get("eseguito"),
            m.get("voce")))
-    prova("le parole sono di Cartone Due, non di SATS Routing",
-          (["parole", True, False], True), (r["paroleSue"], r["titoloParole"]))
-    prova("lo swap nasce da Cartone Due, e solo li'",
-          {"fornitore": "cartone2", "ricevi": 47_298, "errore": "", "daDue": 1, "daUno": 0},
+    # (29 ott 2026, parole-uniche) erano le parole di Cartone Due: ora sono
+    # quelle del wallet di Barattolo, una sola serie per ogni fornitore
+    prova("le parole sono quelle del wallet di Barattolo, nessun cassetto per fornitore",
+          (["parole", True, False, False], [True, False]), (r["paroleSue"], r["titoloParole"]))
+    prova("lo swap nasce da Cartone Due, e solo li', con la prima chiave del wallet",
+          {"fornitore": "cartone2", "ricevi": 47_298, "errore": "", "daDue": 1, "daUno": 0,
+           "seme": "onchain", "indice": 0},
           r["nato"])
     prova("...la carta dice chi lo esegue", True, r["carta"])
     prova("...e si ritira da Cartone Due",
@@ -410,9 +438,11 @@ def il_telefono(dati):
     prova("quando mente: il preventivo di SATS Routing, con una nuova conferma, niente salvato",
           {"passo": "preventivo", "nota": "ripiego", "chi": "satsrouting", "ricevi": 47_154,
            "salvati": 0, "frase": True, "eseguito": True, "conferma": True}, rp)
-    prova("...confermato, nascono le parole di SATS Routing", ["parole", True], r["ripiegoParole"])
-    prova("...e lo swap nasce da SATS Routing",
-          {"fornitore": "satsrouting", "ricevi": 47_154, "errore": "", "daUno": 1},
+    prova("...confermato, nessun passo di parole nuove: sono gia' quelle del wallet",
+          ["", False], r["ripiegoParole"])
+    prova("...e lo swap nasce da SATS Routing con la chiave DOPO quella bruciata da Cartone Due",
+          {"fornitore": "satsrouting", "ricevi": 47_154, "errore": "", "daUno": 1,
+           "seme": "onchain", "indice": 2},
           r["ripiegoNato"])
 
     print("\n[mentono tutt'e due]")
@@ -425,14 +455,20 @@ def il_telefono(dati):
           "cartone2", r["nuovoOrdine"])
     prova("...e con Cartone Due giu' vince SATS Routing", "satsrouting", r["dueGiu"])
 
-    print("\n[la pagina Swap e il recupero per fornitore]")
-    prova("le 12 parole stanno in una riga chiusa, che si apre col tocco",
-          [True, True, False, False], r["chiusa"])
-    prova("le parole e il recupero, uno per fornitore", [True] * 5, r["pagina"])
+    print("\n[la pagina Swap e «Ritrova i miei cambi»]")
+    prova("nella pagina Swap niente parole e niente recupero: la porta del Profilo",
+          [False, False, False, True], r["pagina"])
+    prova("...nel Profilo «Ritrova», e senza cambi di prima niente parole vecchie",
+          [True, False, False], r["profilo"])
     rc = r["recupero"]
-    prova("le parole di Cartone Due ritrovano i SUOI swap, e la xpub va solo a lui",
-          {"nota": "Recuperati 3 incassi.", "fornitori": ["cartone2"], "prossimo": 3,
-           "sats": False, "dove": [True]}, rc)
+    # i cinque: Cartone Due ne ha tre (l'ordine 1, e i tentativi bugiardi
+    # dei due ordini dopo), SATS Routing due (il ripiego dell'ordine 2 e il
+    # tentativo bugiardo dell'ordine 3); il contatore torna a 5 come sul
+    # telefono di prima
+    prova("telefono nuovo: le parole del wallet ritrovano i cambi di tutti e due i fornitori, "
+          "e la xpub va a tutti e due",
+          {"nota": "Ritrovati 5 cambi.", "fornitori": ["cartone2", "satsrouting"], "prossimo": [5, 5],
+           "seme": True, "vecchi": False, "dove": ["cartone2", "satsrouting"]}, rc)
 
     print("\n[la sentinella]")
     prova("dal telefono nessuna chiamata fuori dai due fornitori", 0,

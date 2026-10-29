@@ -152099,11 +152099,15 @@ def prove_banco_chiavi_onchain():
     # in «Incassi e pagamenti», per chi passa il cancello, non solo per
     # gli admin; dalla sera e' un cassetto col campo dentro, e la voce di
     # «Completa il profilo» lo apre
-    prova("«⛓️ Incassi on-chain» nel Profilo, col cancello e mai in DEMO, "
-          "col campo dentro e la voce in «Completa il profilo»",
+    # (29 ott 2026, parole-uniche) il cassetto si chiama «🔑 Il wallet di
+    # Barattolo», si accende col cancello dell'on-chain O con quello del
+    # cambio, e tiene la chiave sopra e le parole sotto il campo di prima
+    prova("«🔑 Il wallet di Barattolo» nel Profilo, col cancello dell'on-chain o del "
+          "cambio e mai in DEMO, col campo dentro e la voce in «Completa il profilo»",
           [True, True, True, True],
-          ["el('accOnchainIncasso').style.display = (myOnchain && !DEMO) ? '' : 'none';" in mini,
-           '<div class="acc-b"><div id="onchainIncassoProfilo"></div></div>' in mini,
+          ["el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso()) && !DEMO) ? '' : 'none';" in mini,
+           '<div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div>'
+           '<div id="walletParole"></div></div>' in mini,
            "onchainModuloIncasso('ocProf')" in mini,
            "acc:'accOnchainIncasso'});" in pezzo_js(mini, "function renderChecklist(){", "\n}\n")])
     prova("...e la porta alla scheda Impostazioni resta, per i dettagli",
@@ -152336,7 +152340,7 @@ def prove_ripristino_visibile():
           [True, True, True],
           ['onclick="onchainGuarda(this)">🔍 Controlla il backup<' in imp,
            "Non cancella niente." in imp, "${onchainDoveAbita()}" in imp])
-    guarda = pezzo_js(mini, "async function onchainGuarda(btn){", "\n}\n")
+    guarda = pezzo_js(mini, "async function onchainGuarda(btn, dove){", "\n}\n")
     prova("il controllo confronta le copie con la chiave di qui, senza "
           "toccare il localStorage", [True, True, False],
           [".every(x => x === qui)" in guarda,
@@ -152665,6 +152669,98 @@ def prove_onchain_verso_lightning():
            "deve poter ricevere" in blocco,
            re.search(r"\bswap\b", re.sub(r"<[^>]*>|swap[A-Z]\w*", "", blocco),
                      re.I) is not None))
+
+
+def prove_parole_uniche():
+    """LE 12 PAROLE DEL CAMBIO NEL WALLET DI BARATTOLO (29 ott 2026,
+    cantiere parole-uniche, idea di Alan, ok di Andrea). Ogni cambio nasce
+    dalle parole del wallet on-chain con una chiave NUOVA (una serie sola
+    per tutti i fornitori); il passo delle parole resta solo dove nessuna
+    copia fuori dal telefono ridà le stesse; le parole stanno nel
+    Profilo. Qui: la domanda «c'e' una copia?» girata in node coi suoi
+    otto casi (la casa che dice un'ALTRA chiave non si tocca MAI), e le
+    sentinelle sul codice del telefono. Il cambio intero lo girano
+    collaudo_swap_telefono, _instradatore e collaudo_cambio_libero."""
+    print("\n[le 12 parole del cambio nel wallet di Barattolo]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    coperto = pezzo_js(mini, "async function onchainSemeCoperto(parole){", "\n}\n") + "\n}\n"
+    banco = """
+const ONCHAIN_CLOUD = 'barattolo_onchain';
+let onchainSrv = null, onchainNato = '', onchainCase = {nuvola: null, relay: null};
+let locale = '', cloud = {ok: true, testo: ''}, telegram = true, relay = '', scritti = [];
+function onchainSemeLocale(){ return locale; }
+async function cloudLeggiEsito(){ return cloud; }
+function cloudTelegram(){ return telegram ? {} : null; }
+async function cloudScrivi(k, v){ scritti.push([k, JSON.parse(v).parole]); return true; }
+async function onchainDaiRelay(){ return relay; }
+""" + coperto + """
+const P = 'uno due tre', Q = 'altre parole qui';
+const giro = async (o) => {
+  locale = P; onchainNato = o.nato || 'locale';
+  onchainCase = Object.assign({nuvola: null, relay: null}, o.casa || {});
+  cloud = o.cloud || {ok: true, testo: ''}; telegram = o.telegram !== false;
+  relay = o.relay || ''; scritti = [];
+  const r = await onchainSemeCoperto(P);
+  return [r, scritti.length ? scritti[0][1] : ''];
+};
+(async () => {
+  const out = [];
+  out.push(await giro({nato: 'nuvola'}));
+  out.push(await giro({nato: 'nuovo', casa: {relay: true}}));
+  out.push(await giro({cloud: {ok: true, testo: JSON.stringify({parole: P})}}));
+  out.push(await giro({cloud: {ok: true, testo: ''}}));
+  out.push(await giro({cloud: {ok: true, testo: JSON.stringify({parole: Q})}}));
+  out.push(await giro({cloud: {ok: false}, relay: P}));
+  out.push(await giro({cloud: {ok: true, testo: ''}, telegram: false}));
+  out.push(await giro({nato: 'nuovo', casa: {nuvola: false, relay: false}, cloud: {ok: false}}));
+  console.log(JSON.stringify(out));
+})();
+"""
+    r = _node_banco(banco)
+    if r is None:
+        salta("la domanda «c'e' una copia?»", "node non c'e'")
+    else:
+        prova("«c'e' una copia fuori da qui?» nei suoi otto casi: ritrovata o "
+              "copiata alla nascita si'; il cloud con le stesse parole si'; il "
+              "cloud VUOTO dentro Telegram si riempie e si'; il cloud con "
+              "un'ALTRA chiave non si tocca e no; il relay con le stesse si'; "
+              "fuori da Telegram senza relay no; nata senza nessuna copia no",
+              [[True, ""], [True, ""], [True, ""], [True, "uno due tre"],
+               [False, ""], [True, ""], [False, ""], [False, ""]], r)
+    crea = pezzo_js(js, "async function swapCreaDentro(n){", "\n}\n")
+    prova("ogni cambio nasce dalle parole del wallet, con l'indice della serie "
+          "unica prenotato prima di chiedere, e il record lo dice",
+          [True, True, True, True],
+          ["const parole = swapParoleOnchain();" in crea,
+           "const indice = swapPrenotaIndice();" in crea,
+           "f.crea({parole: parole, indice: indice," in crea,
+           "seme: 'onchain'," in crea])
+    prova("...nessun fornitore fa piu' nascere parole sue, e la vendita on-chain "
+          "usa la stessa serie",
+          [False, True],
+          ["f.nuoveParole()" in js,
+           "const indice = swapPrenotaIndice();" in pezzo_js(js, "async function swapCreaPerOnchain(", "\n}\n")])
+    prova("il ritiro prende le parole del SUO record (wallet, o cassetto di prima)",
+          True, "const c = swapParoleDi(rec);" in pezzo_js(js, "async function swapRitira(rec){", "\n}\n"))
+    pannello = pezzo_js(js, "function pannelloSwapTelefono(o){", "\n}\n")
+    prova("il passo delle parole mostra quelle del wallet, e c'e' solo dove non "
+          "hanno copia e non sono gia' state copiate",
+          [True, True, True],
+          ["const testo = swapParoleOnchain();" in pannello,
+           "if (seme.mostrare) { swapPassi[n] = 'parole';" in js,
+           "return parole !== swapParoleCoperte && !swapStatoSeme().copiata;" in js])
+    prova("la pagina «Cambio» non ha piu' la riga delle parole: la porta del Profilo",
+          [False, True, True],
+          ['data-swap="riserva"' in js, 'data-swap="al-profilo"' in js,
+           "apriCassettoProfilo('accOnchainIncasso')" in js])
+    prova("il Profilo: la chiave, le parole a richiesta, il controllo del backup "
+          "nel suo posto, e il pezzo dei cambi dall'instradatore",
+          [True, True, True, True],
+          ["async function renderWalletBarattolo(){" in mini,
+           "onclick=\"walletMostraParole(this)\"" in mini,
+           "onchainGuarda(this, 'walletBackup')" in mini,
+           "swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : ''" in mini])
 
 
 def prove_incasso_esterno_onchain():
@@ -178343,8 +178439,12 @@ def prove_swap_telefono():
           ("? `barattolo_swap_${myTgId || 'x'}`" in js,
            "`barattolo_swap_${fid}_${myTgId || 'x'}`" in js,
            "`barattolo_swap_lista_${myTgId || 'x'}`" in js))
-    prova("l'indice della chiave si salva PRIMA di chiedere lo swap", True,
-          js.index("c.prossimo = indice + 1;") < js.index("await f.crea({parole: c.parole"))
+    # (29 ott 2026, parole-uniche) l'indice e' della serie unica del
+    # wallet di Barattolo: `swapPrenotaIndice` lo salva e poi si chiede
+    prenota = pezzo_js(js, "function swapPrenotaIndice(){", "\n}\n")
+    prova("l'indice della chiave si salva PRIMA di chiedere lo swap", (True, True),
+          ("c.prossimo = indice + 1;\n  return swapScrivi(swapCasaOnchain(), c) ? indice : -1;" in prenota,
+           js.index("const indice = swapPrenotaIndice();") < js.index("await f.crea({parole: parole")))
     prova("il recupero riparte dopo l'indice piu' alto", (True, True),
           ("prossimo = Math.max(prossimo, Number(d.keyIndex) + 1);" in bz,
            "prossimo = Math.max(prossimo, Number(trovati.prossimo) || 0);" in js))
@@ -180169,7 +180269,7 @@ def prove_cambio_libero():
     prova("nell'instradatore l'ordine 0 chiede il biglietto PRIMA dello swap, e a "
           "un no annulla; poi la nascita al server, mai il pagamento di Barattolo",
           (True, True, True, True),
-          (crea.index("biglietto = await chiediBigliettoCambio(") < crea.index("await f.crea({parole: c.parole"),
+          (crea.index("biglietto = await chiediBigliettoCambio(") < crea.index("await f.crea({parole: parole"),
            "if (biglietto) { try { await liberaBigliettoCambio(biglietto.id); } catch(e2){} }" in crea,
            "try { await natoCambioAlServer(rec.cambio, rec); } catch(e){}" in crea,
            "} else await swapPaga(rec);" in crea))
@@ -180189,8 +180289,10 @@ def prove_cambio_libero():
            'id="swapCambioWallet" href="lightning:${esc(rec.invoice)}"' in js,
            "disegnaQr(q, ('lightning:' + String(vivo.invoice).trim()).toUpperCase(), 'Alphanumeric');" in js))
     prova("nel riquadro del cambio il «non risponde» non dice «incassa in Lightning»",
-          (True, 5), ("function swapNonRisponde(n, nome){ return n === 0 ? t3().cambioNonRisponde(nome) : t3().nonRisponde(nome); }" in js,
-                      js.count("swapNonRisponde(n, ")))   # la definizione e i quattro usi
+          (True, 4), ("function swapNonRisponde(n, nome){ return n === 0 ? t3().cambioNonRisponde(nome) : t3().nonRisponde(nome); }" in js,
+                      js.count("swapNonRisponde(n, ")))   # la definizione e i tre usi (dal 29 ott 2026,
+                                                          # parole-uniche, nessun fornitore fa nascere parole: il
+                                                          # suo «non risponde» non c'e' piu')
     testi = pezzo_js(mini, "const SWAP_TESTI = {", "function linguaSwap(){")
     chiavi = ("SottoMinimo", "SopraTetto", "TettoGiorno", "Cifra", "NonRisponde", "Spento")
     prova("i sei rifiuti del cambio nella pagina, in due lingue, senza «incassa in Lightning»",
@@ -180431,17 +180533,18 @@ console.log(JSON.stringify(fuori));
     it = t3[:t3.index("\n  en: {")]
     prova("le 12 parole: a cosa servono, le tre regole, la frase di Andrea",
           (True, 3, True, True),
-          ("Servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin "
-           "anche da un altro telefono." in it,
+          # (29 ott 2026, parole-uniche) sono la chiave del wallet, si
+          # mostrano solo dove non hanno copia, e si ritrovano nel Profilo
+          ("servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin "
+           "anche da un altro telefono. Qui non ne esiste una copia di riserva" in it,
            it[it.index("paroleRegole: ["):it.index("],", it.index("paroleRegole: ["))].count("',") + 1,
            "paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.'," in it,
-           "le ritrovi nella pagina «Cambio»." in it))
+           "le ritrovi nel Profilo, in «Il wallet di Barattolo»." in it))
     avanti = js[js.index("async function swapAvantiDentro(n){"):js.index("/* «Continua» delle parole")]
-    prova("...e solo la prima volta: il passo «parole» c'e' solo con le parole "
-          "non ancora copiate, sennò lo swap parte subito",
+    prova("...e solo dove serve: il passo «parole» c'e' solo con le parole "
+          "senza copia fuori e non ancora copiate, sennò lo swap parte subito",
           (True, True),
-          ("if (!c || !c.parole || !c.copiata) {" in avanti
-           and "swapPassi[n] = 'parole';" in avanti,
+          ("if (seme.mostrare) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }" in avanti,
            avanti.rstrip().endswith("return swapCreaDentro(n);\n}")))
 
     # --- i tocchi: l'indirizzo PRIMA di «Conferma», niente bottone dopo
@@ -181813,6 +181916,7 @@ def main():
     prove_indirizzo_ordine_onchain,
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_onchain_verso_lightning,
+    prove_parole_uniche,
     prove_ripristino_visibile,
     prove_onchain_pagina,
     prove_onchain_nell_ordine,

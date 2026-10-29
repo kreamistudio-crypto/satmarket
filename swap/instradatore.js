@@ -15,12 +15,16 @@
    fornitore offre e' scritta in testa a `swap/boltz.js`. Un server di
    ieri senza `fornitori` vale «SATS Routing, coi campi di sempre».
 
-   LE CHIAVI SONO DEL TELEFONO, per fornitore: dodici parole per ognuno,
-   nel localStorage sotto il conto (`barattolo_swap_<tg_id>` per SATS
-   Routing, come dalla tappa 3; `barattolo_swap_<fornitore>_<tg_id>` per
-   gli altri). Gli swap stanno in una lista sola, e ognuno porta il suo
-   fornitore. Al server di Barattolo arriva solo la richiesta del
-   preventivo (`leggiPreventivoSwap` della pagina): niente chiavi.
+   LE CHIAVI SONO DEL TELEFONO. Dal 29 ott 2026 (cantiere parole-uniche)
+   ogni cambio nuovo nasce dalle dodici parole del wallet di Barattolo,
+   le stesse dell'on-chain (vedi «UNA CHIAVE SOLA», qui sotto), con una
+   chiave nuova a ogni cambio. Prima ogni fornitore aveva dodici parole
+   sue, nel localStorage sotto il conto (`barattolo_swap_<tg_id>` per
+   SATS Routing, `barattolo_swap_<fornitore>_<tg_id>` per gli altri):
+   quei cassetti restano per i cambi gia' nati con loro. Gli swap stanno
+   in una lista sola, e ognuno porta il suo fornitore. Al server di
+   Barattolo arriva solo la richiesta del preventivo
+   (`leggiPreventivoSwap` della pagina): niente chiavi.
 
    Niente script inline e niente `onclick=` (arriva la fase 2 della CSP):
    i bottoni portano `data-swap="…"` e li ascolta UN solo ascoltatore
@@ -35,7 +39,7 @@
    IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero, tappa 2): dalla
    pagina «Cambio» chi passa il cancello cambia i SUOI sats senza un
    ordine. E' «l'ordine numero 0»: gli stessi passi dell'incasso
-   (preventivo, indirizzo, parole la prima volta, nascita, sorveglianza,
+   (preventivo, indirizzo, parole dove servono, nascita, sorveglianza,
    ritiro) con tre differenze — la cifra la scrive lui; prima di chiedere
    lo swap al fornitore si stacca un BIGLIETTO al server (i tetti del
    giorno: `chiediBigliettoCambio` della pagina); e la fattura la paga LUI
@@ -97,6 +101,66 @@ function swapScrivi(k, v){
   try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; }
 }
 function swapCassetto(fid){ return swapLeggi(swapCasaParole(fid), null); }
+/* UNA CHIAVE SOLA, IL WALLET DI BARATTOLO (29 ott 2026, cantiere
+   parole-uniche, idea di Alan, ok di Andrea: «la chiave deve cambiare
+   sempre, ma durante la costruzione del multisig il descrittore deve
+   essere unico»). Ogni cambio nuovo — la pagina «Cambio», «Al tuo
+   indirizzo bitcoin» negli ordini, la vendita on-chain verso Lightning —
+   nasce dalle dodici parole del wallet on-chain (`onchainSemeAssicurato`
+   della pagina), che nascono da sole e hanno gia' le loro copie: il
+   cloud di Telegram e i relay Nostr. LE PAROLE SONO UNA, LE CHIAVI NO:
+   ogni cambio prende la sua, m/44/0/0/0/i con l'indice prenotato prima
+   di chiedere (`swapPrenotaIndice`), mai la stessa due volte; il 2-di-3
+   sta su un'altra strada (m/48'/1'/0'/2', indurita: la xpub di radice
+   che il recupero manda al fornitore non la raggiunge), e ogni suo
+   indirizzo ha il suo descrittore. Le parole nel cambio NON si mostrano
+   piu': stanno nel Profilo, «Il wallet di Barattolo». Unica eccezione:
+   dove nessuna copia fuori da questo dispositivo ridà le STESSE parole
+   (fuori da Telegram e senza Nostr) il passo 'parole' resta, una volta
+   (`copiata`), perche' li' un telefono perso perderebbe i bitcoin di un
+   cambio andato storto. Il contatore e lo stato stanno in
+   `barattolo_swap_oc_<tg_id>`: {prossimo, copiata}. */
+function swapCasaOnchain(){ return `barattolo_swap_oc_${myTgId || 'x'}`; }
+function swapStatoSeme(){
+  const c = swapLeggi(swapCasaOnchain(), {});
+  return c && typeof c === 'object' && !Array.isArray(c) ? c : {};
+}
+function swapParoleOnchain(){
+  return typeof onchainSemeLocale === 'function' ? String(onchainSemeLocale() || '').trim() : '';
+}
+/* l'indice della prossima chiave, PRENOTATO e salvato prima di chiedere:
+   mai sotto uno gia' in lista (un telefono che ha perso il contatore non
+   riusa). -1 se il telefono non riesce a salvarlo: allora non parte niente */
+function swapPrenotaIndice(){
+  const c = swapStatoSeme();
+  const usati = swapLista().filter(r => r.seme === 'onchain').map(r => (Number(r.indice) || 0) + 1);
+  const indice = Math.max(Number(c.prossimo) || 0, ...usati, 0);
+  c.prossimo = indice + 1;
+  return swapScrivi(swapCasaOnchain(), c) ? indice : -1;
+}
+/* le parole che una copia fuori da qui ridà, viste in questa apertura:
+   chi le ha gia' viste coperte non le richiede a ogni cambio */
+let swapParoleCoperte = '';
+function swapSemeDaMostrare(parole){
+  return parole !== swapParoleCoperte && !swapStatoSeme().copiata;
+}
+/* IL SEME PRONTO PER UN CAMBIO: le parole (ritrovate o nate adesso,
+   dalla pagina) e se va mostrato il passo delle parole. Alza con
+   `.tipo` 'seme' quando la pagina non lo da' (il cloud di Telegram che
+   non risponde: lei non fa nascere una chiave nuova sopra una vecchia) */
+async function swapSemePronto(){
+  if (typeof onchainSemeAssicurato !== 'function') throw swapNoOnchain('seme');
+  let parole = '';
+  try { parole = String(await onchainSemeAssicurato() || '').trim(); }
+  catch(e){ throw swapNoOnchain('seme'); }
+  if (!parole) throw swapNoOnchain('seme');
+  if (parole !== swapParoleCoperte && typeof onchainSemeCoperto === 'function') {
+    let coperte = false;
+    try { coperte = !!(await onchainSemeCoperto(parole)); } catch(e){ coperte = false; }
+    if (coperte) swapParoleCoperte = parole;
+  }
+  return {parole: parole, mostrare: swapSemeDaMostrare(parole)};
+}
 function swapLista(){ const l = swapLeggi(swapCasaLista(), []); return Array.isArray(l) ? l : []; }
 function swapDiChi(rec){ return (rec && rec.fornitore) || 'satsrouting'; }
 function swapSalvaRecord(rec){
@@ -134,10 +198,10 @@ const SWAP_TESTI_T3 = {
   it: {
     paroleTit: 'Le tue 12 parole di riserva',
     paroleDi: n => `Le tue 12 parole di riserva per ${n}`,
-    paroleSpiega: 'Servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche da un altro telefono.',
+    paroleSpiega: 'Sono la chiave del tuo wallet di Barattolo e servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche da un altro telefono. Qui non ne esiste una copia di riserva, quindi scrivile tu.',
     paroleRegole: ['Scrivile su carta, in ordine.',
                    'Non fotografarle e non darle a nessuno, nemmeno a noi.',
-                   'Te le chiediamo una volta sola: le ritrovi nella pagina «Cambio».'],
+                   'Te le chiediamo una volta sola: le ritrovi nel Profilo, in «Il wallet di Barattolo».'],
     paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.',
     paroleSpunta: 'Le ho scritte su carta',
     paroleFatto: 'Continua',
@@ -154,6 +218,7 @@ const SWAP_TESTI_T3 = {
     qrChiudi: 'Chiudi',
     creo: n => `Preparo il cambio con ${n} e controllo la sua risposta…`,
     nienteCasa: 'Questo telefono non riesce a conservare le 12 parole: da qui si incassa solo in Lightning.',
+    semeNo: 'Non riesco a preparare la chiave del tuo wallet di Barattolo: riprova fra un momento. Nessun sats si è mosso.',
     rifiuto: n => `${n} ha risposto con dati che non tornano: non parte niente, nessun sats si è mosso.`,
     nonRisponde: n => `${n} ora non risponde: riprova, o incassa in Lightning.`,
     tuoSwap: 'Il tuo incasso in bitcoin',
@@ -191,7 +256,6 @@ const SWAP_TESTI_T3 = {
     nascondi: 'Nascondi',
     nessunaParola: 'Non hai ancora le parole: nascono col primo incasso in bitcoin.',
     recuperaTit: 'Recupera da 12 parole',
-    recuperaSpiega: 'Se avevi già degli incassi in bitcoin su un altro telefono, incolla qui le tue 12 parole.',
     recupera: 'Recupera',
     recuperaDa: n => `Recupera da ${n}`,
     recuperaNo: 'Queste non sono 12 parole valide.',
@@ -202,15 +266,23 @@ const SWAP_TESTI_T3 = {
     /* (cambio-libero) il cambio dei propri sats, senza ordine */
     cambio: 'Cambio',
     /* (grafica-cambio, 28 ott 2026) il tondo fra i due riquadri dice
-       dove porta; sotto «Conferma» le tre tesserine, e in fondo la riga
-       chiusa delle parole e del recupero */
+       dove porta; sotto «Conferma» le tre tesserine (la riga chiusa
+       delle parole e del recupero che stava in fondo e' passata al
+       Profilo il 29 ott 2026, cantiere parole-uniche) */
     direzioni: {'ln-btc': 'Da Lightning a bitcoin', 'btc-ln': 'Da bitcoin a Lightning'},
     cifraTra: (a, b, u) => `Da ${a} a ${b} ${u || 'sats'}`,
     oggi: (n, m) => `oggi ${n} di ${m}`,
     unita: 'Unità delle cifre',
     tessere: [['ln', 'Veloce'], ['scudo', 'Restano tuoi'], ['gira', 'Due strade']],
-    riservaTit: 'Le 12 parole e il recupero',
-    riservaSotto: 'Servono solo se qualcosa va storto',
+    /* (parole-uniche, 29 ott 2026) le parole stanno nel Profilo */
+    riservaDove: 'Le 12 parole di riserva sono nel Profilo',
+    ritrovaTit: 'I tuoi cambi',
+    ritrovaSpiega: 'Su un telefono nuovo i cambi fatti altrove non si vedono: «Ritrova i miei cambi» li cerca con la chiave del tuo wallet, senza chiederti le parole.',
+    ritrova: 'Ritrova i miei cambi',
+    ritrovaFatto: n => n === 0 ? 'Nessun cambio nuovo da ritrovare.'
+      : n === 1 ? 'Ritrovato 1 cambio.' : `Ritrovati ${n} cambi.`,
+    vecchieTit: 'Le parole dei cambi di prima',
+    vecchieSpiega: 'I cambi nati prima del 29 ottobre 2026 hanno 12 parole loro: restano qui finché servono.',
     cifraNo: 'Scrivi quanti sats vuoi cambiare.',
     tettoGiorno: m => `Per oggi hai fatto i ${m} cambi possibili: riprova domani.`,
     cambioNonRisponde: n => `${n} ora non risponde: riprova fra poco.`,
@@ -247,10 +319,10 @@ const SWAP_TESTI_T3 = {
   en: {
     paroleTit: 'Your 12 backup words',
     paroleDi: n => `Your 12 backup words for ${n}`,
-    paroleSpiega: 'You need them only if something goes wrong: with them you get your bitcoin back, even from another phone.',
+    paroleSpiega: 'They are the key of your Barattolo wallet and you need them only if something goes wrong: with them you get your bitcoin back, even from another phone. There is no backup copy of them here, so write them down yourself.',
     paroleRegole: ['Write them on paper, in order.',
                    'Do not photograph them and do not give them to anyone, not even to us.',
-                   'We ask you only once: you find them again on the «Exchange» page.'],
+                   'We ask you only once: you find them again in the Profile, under «Your Barattolo wallet».'],
     paroleNessuno: 'Without these words nobody can recover them, not even us.',
     paroleSpunta: 'I wrote them on paper',
     paroleFatto: 'Continue',
@@ -267,6 +339,7 @@ const SWAP_TESTI_T3 = {
     qrChiudi: 'Close',
     creo: n => `Preparing the exchange with ${n} and checking its answer…`,
     nienteCasa: 'This phone cannot keep the 12 words: from here you can only receive via Lightning.',
+    semeNo: 'I cannot prepare the key of your Barattolo wallet: try again in a moment. No sats moved.',
     rifiuto: n => `${n} answered with data that does not add up: nothing starts, no sats moved.`,
     nonRisponde: n => `${n} is not responding: try again, or receive via Lightning.`,
     tuoSwap: 'Your payout in bitcoin',
@@ -302,7 +375,6 @@ const SWAP_TESTI_T3 = {
     nascondi: 'Hide',
     nessunaParola: 'You have no words yet: they are born with the first bitcoin payout.',
     recuperaTit: 'Recover from 12 words',
-    recuperaSpiega: 'If you had bitcoin payouts on another phone, paste your 12 words here.',
     recupera: 'Recover',
     recuperaDa: n => `Recover from ${n}`,
     recuperaNo: 'These are not 12 valid words.',
@@ -316,8 +388,14 @@ const SWAP_TESTI_T3 = {
     oggi: (n, m) => `today ${n} of ${m}`,
     unita: 'Unit of the figures',
     tessere: [['ln', 'Fast'], ['scudo', 'Stays yours'], ['gira', 'Two ways']],
-    riservaTit: 'The 12 words and recovery',
-    riservaSotto: 'Needed only if something goes wrong',
+    riservaDove: 'The 12 backup words are in the Profile',
+    ritrovaTit: 'Your exchanges',
+    ritrovaSpiega: 'On a new phone the exchanges made elsewhere do not show: «Find my exchanges» looks for them with the key of your wallet, without asking for the words.',
+    ritrova: 'Find my exchanges',
+    ritrovaFatto: n => n === 0 ? 'No new exchanges to find.'
+      : n === 1 ? 'Found 1 exchange.' : `Found ${n} exchanges.`,
+    vecchieTit: 'The words of earlier exchanges',
+    vecchieSpiega: 'Exchanges born before 29 October 2026 have 12 words of their own: they stay here as long as they are needed.',
     cifraNo: 'Write how many sats you want to exchange.',
     tettoGiorno: m => `You made the ${m} exchanges allowed for today: try again tomorrow.`,
     cambioNonRisponde: n => `${n} is not responding: try again shortly.`,
@@ -426,12 +504,12 @@ async function swapInstradaPreventivo(n, ricontrolla){
 
 /* ─── 5. IL PANNELLO DELL'INCASSO, ramo swap ────────────────────────────
    I passi di un ordine: 'preventivo' (le cifre, e sotto il campo
-   dell'indirizzo) -> 'parole' (la prima volta con QUEL fornitore) ->
-   'creo'. Poi c'e' lo swap, e il pannello mostra il suo stato.
+   dell'indirizzo) -> 'parole' (dal 29 ott 2026 solo dove le parole del
+   wallet di Barattolo non hanno copia fuori da qui, una volta) -> 'creo'. Poi c'e' lo swap, e il pannello mostra il suo stato.
    I TOCCHI (27 ott 2026, cantiere grafica-swap, regola di Andrea: al piu'
    tre dopo la conferma): l'indirizzo si mette PRIMA di «Conferma», con
-   «Incolla» o col QR; dopo la conferma chi ha gia' le parole non tocca
-   piu' niente, e la prima volta tocca la spunta e «Continua». Il passo
+   «Incolla» o col QR; dopo la conferma non si tocca piu' niente, e solo
+   chi non ha copia delle parole tocca, una volta, la spunta e «Continua». Il passo
    'indirizzo' di ieri non c'e' piu': chi lo avesse in memoria torna al
    preventivo, che ha il campo. */
 const swapPassi = {};      // ordine -> passo
@@ -518,13 +596,15 @@ function pannelloSwapTelefono(o){
   const errore = swapErrori[n]
     ? `<div class="swap-rifiuto" role="status">${esc(swapErrori[n])}</div>` : '';
   if (passo === 'parole') {
-    /* LE 12 PAROLE, UNA VOLTA SOLA E CON CALMA: a cosa servono, le tre
-       regole, chi puo' recuperare senza (nessuno). Poi le parole, la
-       spunta e «Continua», che fa partire tutto da solo. */
-    const c = swapCassetto(fid);
-    const parole = c && c.parole ? String(c.parole).split(' ') : [];
+    /* LE 12 PAROLE, UNA VOLTA SOLA E CON CALMA, e dal 29 ott 2026 (cantiere
+       parole-uniche) SOLO dove nessuna copia fuori da qui le ridà: a cosa
+       servono, le tre regole, chi puo' recuperare senza (nessuno). Poi le
+       parole del wallet di Barattolo, la spunta e «Continua», che fa
+       partire tutto da solo. */
+    const testo = swapParoleOnchain();
+    const parole = testo ? testo.split(' ') : [];
     return `<div class="swap-prev swap-prima-volta">
-      <h4 class="cambio-tit">${swapIcona('chiave')}${esc(swapPiuFornitori() ? t.paroleDi(nome) : t.paroleTit)}</h4>
+      <h4 class="cambio-tit">${swapIcona('chiave')}${esc(t.paroleTit)}</h4>
       <p class="swap-calma">${esc(t.paroleSpiega)}</p>
       <ol class="swap-regole">${t.paroleRegole.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
       <p class="swap-calma forte">${esc(t.paroleNessuno)}</p>
@@ -667,8 +747,9 @@ function cartaSwap(rec){
 /* ─── 6. LE AZIONI ──────────────────────────────────────────────────── */
 /* «Conferma» del preventivo: l'indirizzo prima (si guarda in casa, senza
    rete), poi si ricontrollano le tariffe del fornitore scelto con
-   l'impronta di quelle mostrate (la tappa 2); se reggono, la prima volta
-   con quel fornitore le parole, sennò lo swap parte subito */
+   l'impronta di quelle mostrate (la tappa 2); se reggono, la chiave del
+   wallet di Barattolo (le parole solo dove non hanno copia), e lo swap
+   parte subito */
 /* UN GIRO ALLA VOLTA PER ORDINE: da quando «Conferma» non ha piu' un
    secondo bottone dopo, un doppio tocco farebbe nascere due swap. Chi
    arriva mentre l'altro lavora, o quando lo swap c'e' gia', non fa niente. */
@@ -719,20 +800,14 @@ async function swapAvantiDentro(n){
   await swapInstradaPreventivo(n, true);
   const p = preventiviSwap[n] || {};
   if (!p.dati || !p.dati.ok || p.nota === 'cambiata') return;
-  const fid = swapScelto(n), f = swapFornitore(fid);
-  if (!f) return;
-  const c = swapCassetto(fid);
-  if (!c || !c.parole || !c.copiata) {
-    if (!c || !c.parole) {
-      let parole;
-      try { parole = await f.nuoveParole(); }
-      catch(e){ swapErrori[n] = swapNonRisponde(n, f.nome); return ridisegnaIncassoSwap(); }
-      const nuovo = {parole: parole, prossimo: 0, copiata: false};
-      if (!swapScrivi(swapCasaParole(fid), nuovo)) { swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
-    }
-    swapPassi[n] = 'parole';
-    return ridisegnaIncassoSwap();
-  }
+  if (!swapFornitore(swapScelto(n))) return;
+  /* (parole-uniche) la chiave e' quella del wallet di Barattolo: si
+     ritrova o nasce qui, e le parole si mostrano solo dove non hanno
+     nessuna copia fuori da questo dispositivo */
+  let seme;
+  try { seme = await swapSemePronto(); }
+  catch(e){ swapErrori[n] = t.semeNo; return ridisegnaIncassoSwap(); }
+  if (seme.mostrare) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
   return swapCreaDentro(n);
 }
 /* «Continua» delle parole: segnate come copiate, lo swap parte da solo
@@ -742,11 +817,10 @@ function swapParoleFatte(n){
   if (swapInCorso.has(n) || swapDiOrdine(n)) return;
   const spunta = el(`swapSpunta_${n}`);
   if (!spunta || !spunta.checked) { swapErrori[n] = t3().paroleSpuntaPrima; return ridisegnaIncassoSwap(); }
-  const fid = swapScelto(n);
-  const c = swapCassetto(fid);
-  if (!c) return;
+  if (!swapParoleOnchain()) return;
+  const c = swapStatoSeme();
   c.copiata = true;
-  if (!swapScrivi(swapCasaParole(fid), c)) { swapErrori[n] = t3().nienteCasa; return ridisegnaIncassoSwap(); }
+  if (!swapScrivi(swapCasaOnchain(), c)) { swapErrori[n] = t3().nienteCasa; return ridisegnaIncassoSwap(); }
   delete swapErrori[n];
   return swapCrea(n);
 }
@@ -775,13 +849,16 @@ async function swapCreaDentro(n){
     if (!valido) { swapPassi[n] = 'preventivo'; swapErrori[n] = indirizzo ? t.indirizzoNo : t.indirizzoManca; return ridisegnaIncassoSwap(); }
   }
   if (!p.ok || !p.hash) { swapPassi[n] = 'preventivo'; return ridisegnaIncassoSwap(); }
-  const c = swapCassetto(fid);
-  if (!c || !c.parole || !c.copiata) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
+  /* (parole-uniche) le parole del wallet di Barattolo, gia' pronte
+     (`swapSemePronto` in «Conferma»): senza, o non ancora copiate dove
+     non hanno copia, non nasce niente */
+  const parole = swapParoleOnchain();
+  if (!parole) { swapPassi[n] = 'preventivo'; swapErrori[n] = t.semeNo; return ridisegnaIncassoSwap(); }
+  if (swapSemeDaMostrare(parole)) { swapPassi[n] = 'parole'; return ridisegnaIncassoSwap(); }
   /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE: se il telefono si spegne a meta',
      al giro dopo si usa il successivo, mai lo stesso */
-  const indice = Number(c.prossimo) || 0;
-  c.prossimo = indice + 1;
-  if (!swapScrivi(swapCasaParole(fid), c)) { swapPassi[n] = 'preventivo'; swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
+  const indice = swapPrenotaIndice();
+  if (indice < 0) { swapPassi[n] = 'preventivo'; swapErrori[n] = t.nienteCasa; return ridisegnaIncassoSwap(); }
   swapPassi[n] = 'creo';
   delete swapErrori[n];
   ridisegnaIncassoSwap();
@@ -801,8 +878,8 @@ async function swapCreaDentro(n){
   }
   let nuovo;
   try {
-    nuovo = sub ? await f.creaSub({parole: c.parole, indice: indice, preventivo: p, fattura: fattura})
-                : await f.crea({parole: c.parole, indice: indice, preventivo: p, indirizzo: indirizzo});
+    nuovo = sub ? await f.creaSub({parole: parole, indice: indice, preventivo: p, fattura: fattura})
+                : await f.crea({parole: parole, indice: indice, preventivo: p, indirizzo: indirizzo});
   }
   catch(e){
     if (biglietto) { try { await liberaBigliettoCambio(biglietto.id); } catch(e2){} }
@@ -811,7 +888,7 @@ async function swapCreaDentro(n){
     swapErrori[n] = swapNonRisponde(n, f.nome);
     return ridisegnaIncassoSwap();
   }
-  const rec = Object.assign(nuovo, {fornitore: fid, ordine: n, indice: indice,
+  const rec = Object.assign(nuovo, {fornitore: fid, ordine: n, indice: indice, seme: 'onchain',
     indirizzo: indirizzo, creato: Date.now(), pagamento: ''});
   if (biglietto) rec.cambio = Number(biglietto.id) || 0;
   swapSalvaRecord(rec);
@@ -1035,11 +1112,9 @@ function swapNoOnchain(tipo){ const e = new Error(tipo); e.tipo = tipo; return e
    se il cambio fallisce i bitcoin tornano DA SOLI a un indirizzo dello
    stesso seme (`rimborso`, lo sceglie la pagina): nessun passo in piu'
    per chi vende, nessun indirizzo da scrivere. Il contatore delle chiavi
-   e' suo (`swapCasaOnchain`), e riparte mai sotto l'ultimo usato. */
-function swapCasaOnchain(){ return `barattolo_swap_oc_${myTgId || 'x'}`; }
-function swapParoleOnchain(){
-  return typeof onchainSemeLocale === 'function' ? String(onchainSemeLocale() || '') : '';
-}
+   e' suo (`swapCasaOnchain`), e riparte mai sotto l'ultimo usato. Dal 29
+   ott 2026 (parole-uniche) lo stesso seme e lo stesso contatore valgono
+   per ogni cambio: vedi «UNA CHIAVE SOLA», in cima. */
 /* le parole di uno swap: quelle del fornitore, o quelle dell'on-chain */
 function swapParoleDi(rec){
   if (rec && rec.seme === 'onchain') {
@@ -1058,10 +1133,8 @@ async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimbors
   if (!rimborso) throw swapNoOnchain('seme');
   /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE, come per gli altri: mai sotto
      uno gia' in lista (un telefono che ha perso il contatore non riusa) */
-  const c = swapLeggi(swapCasaOnchain(), {prossimo: 0});
-  const usati = swapLista().filter(r => r.seme === 'onchain').map(r => Number(r.indice) + 1);
-  const indice = Math.max(Number(c.prossimo) || 0, ...usati, 0);
-  if (!swapScrivi(swapCasaOnchain(), {prossimo: indice + 1})) throw swapNoOnchain('casa');
+  const indice = swapPrenotaIndice();
+  if (indice < 0) throw swapNoOnchain('casa');
   const nuovo = await f.creaSub({parole: parole, indice: indice, preventivo: preventivo, fattura: fattura});
   const rec = Object.assign(nuovo, {fornitore: f.id, ordine: Number(ordine) || null,
     onchain: Number(onchain), indice: indice, seme: 'onchain', indirizzo: String(rimborso),
@@ -1175,7 +1248,9 @@ async function swapRitira(rec){
   swapRitirando.add(rec.id);
   try {
     const fid = swapDiChi(rec), f = swapFornitore(fid);
-    const c = swapCassetto(fid);
+    /* (parole-uniche) le parole del SUO record: quelle del wallet di
+       Barattolo, o il cassetto del fornitore per i cambi di prima */
+    const c = swapParoleDi(rec);
     if (!f) throw new Error('fornitore assente');
     if (!c || !c.parole) throw new Error('parole assenti');
     const fatto = await f.ritira(rec, c.parole);
@@ -1358,7 +1433,7 @@ function renderSwapCambio(){
       disegnaQr(q, vivo.bip21 || `bitcoin:${vivo.lockupAddress}`, 'Byte');
     return;
   }
-  /* dopo «Conferma»: le parole la prima volta, poi «Preparo il cambio…» */
+  /* dopo «Conferma»: le parole (solo dove non hanno copia), poi «Preparo il cambio…» */
   if (swapPassi[0] === 'parole' || swapPassi[0] === 'creo') {
     forma('');
     box.innerHTML = pannelloSwapTelefono({id: 0});
@@ -1554,19 +1629,19 @@ async function swapIncollaFattura(n){
 }
 
 /* ─── 8. LA PAGINA «SWAP» ───────────────────────────────────────────────
-   La lista di tutti gli swap; poi, per ogni fornitore, le sue parole (a
-   richiesta) e il suo bottone di recupero. Un campo solo per le parole:
-   la xpub va SOLO al fornitore del bottone toccato.
+   La lista di tutti gli swap.
    (28 ott 2026, cantiere grafica-cambio) Il riquadro del cambio libero
    sta FUORI da qui, in un suo posto fisso della pagina (#swapCambio): il
    ridisegno della lista, che arriva anche da solo a ogni giro della
    sorveglianza, non tocca piu' il campo della cifra mentre ci si scrive.
    La lista e' a schede (la moneta di dove arriva, la frase, tre barrette
-   e la cifra); le parole e il recupero stanno in UNA riga chiusa in
-   fondo, che si apre a tocco, e da sola quando si chiede di vedere le
-   parole. La prima volta le parole restano il passo obbligatorio di
-   «Conferma» (`swapPassi[n] = 'parole'`): qui e' solo dove ritrovarle. */
-let swapRiservaAperta = false;
+   e la cifra).
+   (29 ott 2026, cantiere parole-uniche, Alan: «vorrei nascondere le 12
+   parole dalla parte dello swap, le vede dalle impostazioni non lì») La
+   riga chiusa delle parole e del recupero che stava in fondo e' MORTA:
+   qui resta solo la porta verso il Profilo, dove «Il wallet di
+   Barattolo» le mostra a richiesta e ritrova i cambi
+   (`swapBloccoProfilo`, sotto). */
 function barretteSwap(rec){
   const q = swapTappa(rec);
   if (q < 0) return '';
@@ -1595,37 +1670,46 @@ function renderSwapTelefono(){
         <input class="swap-indirizzo" id="swapIndirizzoR_${esc(rec.id)}" type="text" autocomplete="off" spellcheck="false" placeholder="bc1…">
         <button class="btn ghost" type="button" data-swap="ritira-a" data-id="${esc(rec.id)}">${esc(swapESub(rec) ? t.rimborsaA : t.ritiraA)}</button>` : ''}
     </div>`).join('');
-  const viste = swapFornitori().some(f => swapParoleViste[f.id]);
-  const aperta = swapRiservaAperta || viste;
-  const parole = swapFornitori().map(f => {
-    const c = swapCassetto(f.id), viste = !!swapParoleViste[f.id];
-    const elenco = c && c.parole && viste
-      ? `<ol class="swap-parole">${String(c.parole).split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '';
-    return `<h4>${esc(piu ? t.paroleDi(f.nome) : t.paroleTit)}</h4>
-    ${c && c.parole
-      ? `<button class="btn ghost" type="button" data-swap="mostra-parole" data-fornitore="${esc(f.id)}">${esc(viste ? t.nascondi : t.mostra)}</button>${elenco}`
-      : `<div class="hint">${esc(t.nessunaParola)}</div>`}`;
-  }).join('');
-  const bottoni = swapFornitori().map(f =>
-    `<button class="btn ghost" type="button" data-swap="recupera" data-fornitore="${esc(f.id)}">${esc(piu ? t.recuperaDa(f.nome) : t.recupera)}</button>`).join('');
   box.innerHTML = `
     ${lista.length ? `<h3 class="cambio-sez">${esc(t.lista)}</h3>${righe}` : ''}
-    <div class="cambio-riserva${aperta ? ' aperta' : ''}">
-      <button type="button" class="cambio-riserva-testa" data-swap="riserva" aria-expanded="${aperta}">
-        ${swapMoneta('chiave')}
-        <span class="cambio-riserva-nome"><b>${esc(t.riservaTit)}</b><small>${esc(t.riservaSotto)}</small></span>
-        <span class="cambio-riserva-fr">${swapIcona('freccia')}</span>
-      </button>
-      ${aperta ? `<div class="cambio-riserva-dentro">
-        ${parole}
-        <h4>${esc(t.recuperaTit)}</h4>
-        <div class="hint">${esc(t.recuperaSpiega)}</div>
-        <textarea id="swapRecupero" rows="3" autocomplete="off" spellcheck="false"></textarea>
-        <div id="swapRecuperoNota" class="hint" role="status">${esc(swapNotaRecupero.testo)}</div>
-        ${bottoni}
-      </div>` : ''}
-    </div>`;
+    <button class="btn link cambio-al-profilo" type="button" data-swap="al-profilo">${swapIcona('chiave')}${esc(t.riservaDove)}</button>`;
   renderSwapCambio();
+}
+/* IL PEZZO DEL CAMBIO NEL PROFILO (29 ott 2026, parole-uniche): lo mette
+   la pagina dentro «Il wallet di Barattolo», sotto le parole (quelle le
+   mostra lei: sono del wallet, non del cambio). Qui «Ritrova i miei
+   cambi», e — solo per chi ha dei cambi nati prima, con dodici parole
+   loro — quelle parole a richiesta e il recupero scrivendole. */
+function swapBloccoProfilo(){
+  const t = t3(), piu = swapPiuFornitori();
+  const vecchi = swapFornitori().filter(f => { const c = swapCassetto(f.id); return c && c.parole; });
+  const vecchie = vecchi.map(f => {
+    const c = swapCassetto(f.id), viste = !!swapParoleViste[f.id];
+    const elenco = viste
+      ? `<ol class="swap-parole">${String(c.parole).split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>` : '';
+    return `<h4>${esc(piu ? t.paroleDi(f.nome) : t.paroleTit)}</h4>
+    <button class="btn ghost" type="button" data-swap="mostra-parole" data-fornitore="${esc(f.id)}">${esc(viste ? t.nascondi : t.mostra)}</button>${elenco}`;
+  }).join('');
+  const bottoni = vecchi.map(f =>
+    `<button class="btn ghost" type="button" data-swap="recupera" data-fornitore="${esc(f.id)}">${esc(piu ? t.recuperaDa(f.nome) : t.recupera)}</button>`).join('');
+  return `<h4>${esc(t.ritrovaTit)}</h4>
+    <div class="hint">${esc(t.ritrovaSpiega)}</div>
+    <button class="btn ghost" type="button" data-swap="ritrova">${esc(t.ritrova)}</button>
+    <div id="swapRecuperoNota" class="hint" role="status">${esc(swapNotaRecupero.testo)}</div>
+    ${vecchi.length ? `<details class="payout swap-vecchie"${vecchi.some(f => swapParoleViste[f.id]) ? ' open' : ''}>
+      <summary><b>${esc(t.vecchieTit)}</b></summary>
+      <div class="hint">${esc(t.vecchieSpiega)}</div>
+      ${vecchie}
+      <h4>${esc(t.recuperaTit)}</h4>
+      <textarea id="swapRecupero" rows="3" autocomplete="off" spellcheck="false"></textarea>
+      ${bottoni}
+    </details>` : ''}`;
+}
+/* dopo un gesto sulle parole o sul recupero si ridisegnano tutt'e due i
+   posti dove possono stare: la pagina «Cambio» e il Profilo */
+function swapRidisegnaRiserva(){
+  renderSwapTelefono();
+  if (typeof renderWalletBarattolo === 'function') renderWalletBarattolo();
 }
 /* la frase del recupero sopravvive al ridisegno della pagina (presa dal
    giro dal vivo: la pagina si riscrive subito dopo, e la cancellava) */
@@ -1635,6 +1719,41 @@ function swapDiciRecupero(frase){
   const n = el('swapRecuperoNota');
   if (n) n.textContent = frase;
 }
+/* «RITROVA I MIEI CAMBI» (parole-uniche): la chiave del wallet di
+   Barattolo (ritrovata dal backup su un telefono nuovo, dalla pagina),
+   la sua xpub di radice a OGNI fornitore, e il contatore che riparte
+   dopo l'indice piu' alto trovato da tutti: le chiavi sono una serie
+   sola, e un indice riusato con un fornitore diverso sarebbe lo stesso
+   segreto due volte. */
+async function swapRitrovaCambi(){
+  haptic();
+  const t = t3();
+  swapDiciRecupero('');
+  let parole;
+  try { parole = (await swapSemePronto()).parole; }
+  catch(e){ swapDiciRecupero(t.semeNo); return; }
+  let quanti = 0, prossimo = 0;
+  for (const f of swapFornitori()) {
+    if (!f.recupera) continue;
+    let trovati;
+    try { trovati = await f.recupera(parole); }
+    catch(e){ swapDiciRecupero(t.nonRisponde(f.nome)); return; }
+    prossimo = Math.max(prossimo, Number(trovati.prossimo) || 0);
+    for (const s of trovati.swap) {
+      if (swapLista().some(r => r.id === s.id)) continue;
+      swapSalvaRecord(Object.assign(s, {fornitore: f.id, ordine: null, indirizzo: '', seme: 'onchain'}));
+      quanti++;
+    }
+  }
+  const c = swapStatoSeme();
+  c.prossimo = Math.max(Number(c.prossimo) || 0, prossimo);
+  swapScrivi(swapCasaOnchain(), c);
+  swapDiciRecupero(t.ritrovaFatto(quanti));
+  swapRidisegnaRiserva();
+  swapSorveglia();
+}
+/* il recupero SCRIVENDO le parole: per i soli cambi di prima del 29 ott
+   2026, che hanno dodici parole loro */
 async function swapRecupera(fid){
   haptic();
   const t = t3();
@@ -1647,7 +1766,7 @@ async function swapRecupera(fid){
   catch(e){ swapDiciRecupero(t.nonRisponde(f.nome)); return; }
   if (!valide) { swapDiciRecupero(t.recuperaNo); return; }
   const c = swapCassetto(f.id);
-  if (c && c.parole && c.parole !== parole && swapLista().some(r => swapDiChi(r) === f.id)) {
+  if (c && c.parole && c.parole !== parole && swapLista().some(r => swapDiChi(r) === f.id && r.seme !== 'onchain')) {
     swapDiciRecupero(t.recuperaAltre); return;
   }
   let trovati;
@@ -1663,7 +1782,7 @@ async function swapRecupera(fid){
   }
   swapScrivi(swapCasaParole(f.id), {parole: parole, prossimo: prossimo, copiata: true});
   swapDiciRecupero(t.recuperaFatto(quanti));
-  renderSwapTelefono();
+  swapRidisegnaRiserva();
   swapSorveglia();
 }
 function swapRitiraA(id){
@@ -1702,8 +1821,10 @@ if (typeof document !== 'undefined') {
     else if (a === 'incolla') swapIncolla(n);
     else if (a === 'qr') swapQr(n);
     else if (a === 'qr-chiudi') { haptic(); swapQrChiudi(); }
-    else if (a === 'mostra-parole') { haptic(); swapParoleViste[fid] = !swapParoleViste[fid]; renderSwapTelefono(); }
+    else if (a === 'mostra-parole') { haptic(); swapParoleViste[fid] = !swapParoleViste[fid]; swapRidisegnaRiserva(); }
     else if (a === 'recupera') swapRecupera(fid);
+    else if (a === 'ritrova') swapRitrovaCambi();
+    else if (a === 'al-profilo' && typeof apriCassettoProfilo === 'function') { haptic(); apriCassettoProfilo('accOnchainIncasso'); }
     else if (a === 'ritira-a') swapRitiraA(String(b.dataset.id || ''));
     else if (a === 'cambio-gira') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-unita') swapCambioScegliUnita(String(b.dataset.unita || 'sats'));
@@ -1712,7 +1833,6 @@ if (typeof document !== 'undefined') {
     else if (a === 'cambio-rete') swapCambioScegliStrada(String(b.dataset.strada || 'ln-btc'));
     else if (a === 'cambio-calcola') swapCambioCalcola();
     else if (a === 'dettagli') { haptic(); dettagliSwap[n] = !dettagliSwap[n]; ridisegnaIncassoSwap(); }
-    else if (a === 'riserva') { haptic(); swapRiservaAperta = !swapRiservaAperta; renderSwapTelefono(); }
     else if (a === 'cambio-copia') swapCambioCopia(String(b.dataset.id || ''));
     else if (a === 'cambio-copia-indirizzo') swapCambioCopia(String(b.dataset.id || ''), 'indirizzo');
     else if (a === 'incolla-fattura') swapIncollaFattura(n);

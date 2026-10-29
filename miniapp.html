@@ -9854,18 +9854,12 @@
   .cambio-barrette{display:flex;gap:4px;margin-top:4px}
   .cambio-barrette i{width:22px;height:4px;border-radius:2px;background:var(--line)}
   .cambio-barrette i.fatto{background:var(--trust)}
-  .cambio-riserva{margin-top:24px;border-radius:18px;background:var(--card);border:1px solid var(--line-soft)}
-  .cambio-riserva-testa{width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;
-    border:0;background:none;text-align:left;cursor:pointer;color:var(--ink);font:inherit}
-  .cambio-riserva-testa .cambio-moneta{width:36px;height:36px}
-  .cambio-riserva-testa .cambio-moneta .cambio-svg{width:19px;height:19px}
-  .cambio-riserva-nome{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
-  .cambio-riserva-nome b{font-size:15px}
-  .cambio-riserva-nome small{font-size:12.5px;font-weight:600;color:var(--ink-soft)}
-  .cambio-riserva-fr{color:var(--muted);transition:transform .15s}
-  .cambio-riserva.aperta .cambio-riserva-fr{transform:rotate(90deg)}
-  .cambio-riserva-dentro{padding:0 14px 14px}
-  .cambio-riserva-dentro h4:first-child{margin-top:4px}
+  /* (29 ott 2026, cantiere parole-uniche) la riga chiusa delle parole e
+     del recupero e' passata al Profilo, «Il wallet di Barattolo»: in
+     fondo alla pagina «Cambio» resta la porta, col disegno della chiave */
+  .cambio-al-profilo{display:flex;align-items:center;justify-content:center;gap:6px;
+    margin-top:24px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .cambio-al-profilo .cambio-svg{width:16px;height:16px}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5}
   /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
@@ -14104,7 +14098,19 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="lnAddrBlocco"></div></div>
       </div>
 
-      <!-- ⛓️ GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea: «il
+      <!-- 🔑 IL WALLET DI BARATTOLO (29 ott 2026, cantiere parole-uniche,
+           Alan: «dove vedo la parte LN deve esserci una sezione che
+           mostri il wallet di Barattolo per la composizione del multisig
+           e dove poter ricevere i fondi on-chain»). Il cassetto degli
+           incassi on-chain qui sotto si allarga: la chiave (la parte che
+           entra nei 2-di-3), dove ricevi on-chain, le 12 parole a
+           richiesta col backup, e i cambi da ritrovare. Le parole NON si
+           mostrano piu' dentro il cambio: stanno qui. L'id resta
+           `accOnchainIncasso`, perche' lo aprono «Completa il profilo» e
+           gli ordini. Si accende col cancello dell'on-chain (`myOnchain`)
+           O con quello del cambio (`swapAcceso`): le parole servono a
+           tutti e due.
+           ⛓️ GLI INCASSI ON-CHAIN NEL PROFILO (27 ott 2026, Andrea: «il
            venditore deve poter configurare nel profilo dove ricevere i
            fondi, un indirizzo o una xpub»). Era una porta verso la
            pagina On-chain; dal secondo giro della stessa sera e' un
@@ -14115,8 +14121,8 @@ document.getElementById('cartello')?.remove();</script>
            firmata dal seme, la stessa della scheda Impostazioni. Si
            accende col CANCELLO (`myOnchain`), come il resto dell'on-chain. -->
       <div class="acc" id="accOnchainIncasso" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em">⛓️</span>Incassi on-chain<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="onchainIncassoProfilo"></div></div>
+        <button class="acc-h" onclick="toggleAcc('accOnchainIncasso')"><span class="em">🔑</span>Il wallet di Barattolo<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="walletBarattolo"></div><div id="onchainIncassoProfilo"></div><div id="walletParole"></div></div>
       </div>
 
       <div class="acc" id="accNwc">
@@ -18510,7 +18516,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'b7e1c3344c';
+const SWAP_TELEFONO_VER = '339285a5ed';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -18533,6 +18539,10 @@ function caricaSwapTelefono(){
     }
     ridisegnaIncassoSwap();
     if (el('view-swap')?.classList.contains('active')) renderSwap();
+    /* (parole-uniche) il cambio arriva dopo il Profilo: accende il
+       cassetto del wallet di Barattolo e ci mette il pezzo dei cambi */
+    aggiornaCassettoWallet();
+    renderWalletBarattolo();
     return true;
   })();
   return swapTelefonoPromessa;
@@ -37341,8 +37351,9 @@ function renderLnAddress(){
      spegne da solo (aggiornaGruppiProfilo) */
   const vociIncassi = ['accLnAddress', 'accNwc', 'vocEsporta'];
   vociIncassi.forEach(id => { if (el(id)) el(id).style.display = DEMO ? 'none' : ''; });
-  if (el('accOnchainIncasso')) el('accOnchainIncasso').style.display = (myOnchain && !DEMO) ? '' : 'none';
+  aggiornaCassettoWallet();
   renderIncassoOnchainProfilo();
+  renderWalletBarattolo();
   if (DEMO) return;
   if (myLnAddress && !lnAddrModifica) {
     box.innerHTML = `
@@ -55710,6 +55721,70 @@ function renderIncassoOnchainProfilo(){
     + `<button class="btn link" style="margin-top:4px" onclick="onchainApriIncassi()">Dettagli nella pagina On-chain ›</button>`;
 }
 
+/* ============ IL WALLET DI BARATTOLO NEL PROFILO (29 ott 2026,
+   cantiere parole-uniche, idea di Alan, ok di Andrea) ============
+   Il cassetto «🔑 Il wallet di Barattolo» di «Incassi e pagamenti»: in
+   cima la CHIAVE (la parte che entra nei 2-di-3, con le ultime otto
+   lettere della sua metà pubblica), in mezzo dove ricevi on-chain (il
+   blocco di prima, `renderIncassoOnchainProfilo`), in fondo le 12
+   PAROLE a richiesta, il controllo del backup e i cambi da ritrovare
+   (`swapBloccoProfilo` dell'instradatore, solo col cambio acceso).
+   LE PAROLE SONO UNA, LE CHIAVI NO: ogni ordine on-chain e ogni cambio ne
+   prende una nuova, ricavata da qui, mai la stessa due volte. Il
+   Profilo NON fa nascere la chiave da solo: la fa nascere il primo
+   gesto che la usa, o «Mostra le 12 parole» (che prima la cerca nelle
+   sue copie, come la pagina On-chain). */
+let walletParoleViste = false;
+function aggiornaCassettoWallet(){
+  if (el('accOnchainIncasso'))
+    el('accOnchainIncasso').style.display = ((myOnchain || swapAcceso()) && !DEMO) ? '' : 'none';
+}
+async function renderWalletBarattolo(){
+  const box = el('walletBarattolo'), sotto = el('walletParole');
+  if (!box || !sotto || DEMO || !(myOnchain || swapAcceso())) return;
+  const parole = onchainSemeLocale();
+  box.innerHTML = `<div class="payout"><h4>La tua chiave</h4>
+    <div class="hint">Una chiave sola, nata in questo telefono: la tieni
+      solo tu, noi non la vediamo. Da lì nasce una chiave <b>nuova</b> per
+      ogni ordine on-chain, che con quella di chi compra e quella di
+      Barattolo fa il 2-di-3 (col suo indirizzo e il suo descrittore), e
+      per ogni cambio. Mai la stessa due volte.</div>
+    <div class="hint" id="walletCoda" style="margin-top:6px">${parole ? ''
+      : 'Non è ancora nata: nasce da sola la prima volta che serve.'}</div></div>`;
+  const cambi = swapAcceso() && typeof swapBloccoProfilo === 'function' ? swapBloccoProfilo() : '';
+  sotto.innerHTML = `<div class="payout"><h4>Le 12 parole</h4>
+    <div class="hint">Sono la tua chiave scritta in parole: chi le ha
+      prende i tuoi bitcoin. Non mandarle a nessuno, nemmeno a noi. Il
+      backup si fa da solo (il cloud di Telegram, i relay Nostr):
+      scriverle su carta è una copia in più.</div>
+    ${walletParoleViste && parole
+      ? `<ol class="swap-parole">${parole.split(' ').map(p => `<li>${esc(p)}</li>`).join('')}</ol>
+         <button class="btn ghost" onclick="walletParoleViste=false;renderWalletBarattolo()">🙈 Nascondi</button>`
+      : `<button class="btn ghost" onclick="walletMostraParole(this)">👁 Mostra le 12 parole</button>`}
+    <button class="btn ghost" onclick="onchainGuarda(this, 'walletBackup')">🔍 Controlla il backup</button>
+    <div id="walletBackup" class="hint"></div>
+    ${cambi}</div>`;
+  /* la metà pubblica, solo per chi ha l'on-chain: la libreria arriva
+     quando serve, e la riga si scrive dopo */
+  if (parole && myOnchain) {
+    try {
+      const x = await onchainMiaXpub(parole, onchainSrv || {strada: "m/48'/1'/0'/2'"});
+      const riga = el('walletCoda');
+      if (riga) riga.innerHTML = `Nei tuoi 2-di-3 entra la sua metà pubblica, che finisce in
+        <span class="mono">…${esc(onchainCoda(x))}</span>.`;
+    } catch(e){}
+  }
+}
+async function walletMostraParole(btn){
+  haptic();
+  const rip = onchainAttesa(btn, 'Cerco…');
+  try { await onchainSemeAssicurato(); }
+  catch(e){ rip(); return toast('⚠️ ' + (e.message || 'la chiave non è pronta: riprova'), 7000); }
+  rip();
+  walletParoleViste = true;
+  renderWalletBarattolo();
+}
+
 async function onchainIncassoSalva(btn, pref){
   haptic();
   const campo = el(pref + 'Valore');
@@ -56744,13 +56819,14 @@ async function onchainBackup(btn){
   renderOnchain();
 }
 
-async function onchainGuarda(btn){
+async function onchainGuarda(btn, dove){
   haptic();
   const rip = onchainAttesa(btn, 'Guardo…');
   const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
   const suiRelay = await onchainDaiRelay();
   rip();
-  const box = el('onchainCloud');
+  /* (parole-uniche) lo stesso controllo anche dal Profilo, nel suo posto */
+  const box = el(dove || 'onchainCloud');
   if (!box) return;
   const righe = [];
   if (!r.ok) {
@@ -56789,6 +56865,35 @@ async function onchainGuarda(btn){
         + 'fermati e dimmelo, è il caso che non deve succedere.');
   }
   box.innerHTML = righe.join('<br>');
+}
+
+/* C'E' UNA COPIA FUORI DA QUI CHE RIDA' QUESTE PAROLE? (29 ott 2026,
+   cantiere parole-uniche) La domanda del cambio prima di decidere se
+   mostrare le parole: si', e non si mostrano; no, e si mostrano una
+   volta. Ritrovate da una copia, o appena copiate alla nascita: si'.
+   Sennò si leggono le case, come «Controlla». Una casa VUOTA dentro
+   Telegram si riempie (non schiaccia nessuno); una casa che dice un'ALTRA
+   chiave non si tocca mai, e la risposta e' no. */
+async function onchainSemeCoperto(parole){
+  if (!parole) return false;
+  if (parole === onchainSemeLocale()) {
+    if (onchainNato === 'nuvola' || onchainNato === 'relay') return true;
+    if (onchainNato === 'nuovo' && (onchainCase.nuvola === true || onchainCase.relay === true)) return true;
+  }
+  const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+  if (r.ok) {
+    let dalCloud = '';
+    try { dalCloud = (JSON.parse(r.testo || '{}').parole || '').trim(); }
+    catch(e){ dalCloud = ''; }
+    if (dalCloud === parole) return true;
+    if (!r.testo && cloudTelegram()) {
+      const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || "m/48'/1'/0'/2'"});
+      let fatto = false;
+      try { fatto = await cloudScrivi(ONCHAIN_CLOUD, corpo); } catch(e){ fatto = false; }
+      if (fatto) { onchainCase.nuvola = true; return true; }
+    }
+  }
+  return (await onchainDaiRelay()) === parole;
 }
 
 async function onchainEsporta(btn){
