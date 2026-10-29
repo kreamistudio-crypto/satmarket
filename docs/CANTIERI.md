@@ -74890,3 +74890,171 @@ Chromium 375×812): il cassetto nel Profilo con la coda della chiave, le
 12 parole a «Mostra», «Ritrova», il link dalla pagina «Cambio» che apre
 il cassetto, e fuori da Telegram senza Nostr il passo delle parole che
 resta. Le schermate in project-files/parole-uniche.
+
+## Mostro 0.20.2: il fork rifatto sul tag nuovo, compilato e provato nel cloud prima del nodo (29 ott 2026, cantiere mostro-0202, Andrea: «so che è uscito un aggiornamento di mostro puoi verificare di cosa si tratta e nel caso aggiorniamo?», poi «fork intero sulla 0.20.2»)
+
+**PERCHÉ OGGI.** Andrea ha saputo di un aggiornamento di Mostro. Letto il
+repo `MostroP2P/mostro` (clone, non a memoria): dalla nostra 0.19.0 del
+29 set sono uscite SEI versioni — 0.19.1 (1 ott), 0.19.2, 0.19.3,
+0.20.0 (15 ott), 0.20.1, 0.20.2 (28 ott, `fe2a905`). La ragione forte è
+la cura #910 (0.19.1): oggi un venditore può pagare la garanzia e
+annullare un istante dopo — i due percorsi dell'annullo non chiedevano a
+LND se la hold era stata pagata nel frattempo — e si riprende i sats
+mentre al compratore arriva «pagato, manda gli euro». Con lei: le
+dispute scritte tutte insieme (#923), i limiti in sats contati col
+premio (#1095), l'arrotondamento al sat (#1090), la manutenzione DA
+SOLA dopo 10 minuti di LND non sincronizzato coi pagamenti rimandati
+senza bruciare i tentativi del compratore (#1065, nata da un nodo di
+upstream fermo 21 ore su una catena vecchia il 14 ott), l'evento di
+salute kind 38389 (#1066), `bond_cltv_delta` per le hold della cauzione
+(#1085), e le due novità grosse: la reputazione che si porta da un nodo
+all'altro (export/import, 0.19.3-0.20.1) e le VALUTE AGGANCIATE
+(`[price.providers.pegged]`, #1083 e #1091): un ordine può essere sats
+contro USDT/USDC/DOC al prezzo del dollaro, o sats Lightning contro
+BTC on-chain, LBTC, RBTC alla pari. Tutt'e due SPENTE di serie.
+
+**LE DECISIONI DI ANDREA**, sulla scheda e in chat (29 ott, 17:36 UTC).
+1. IL FORK INTERO SULLA 0.20.2, non la sola cura #910 sopra la 0.19.0
+   (la strada corta era pronta: un conflitto in `flow.rs`). Il 13 ott
+   era già scritto «Mostro 0.19.3 dopo Torino, nella stessa build, con
+   il fork rifatto da capo coi patcher del repo»: è questa, sei versioni
+   dopo.
+2. GLI USDT: la domanda l'ha fatta lui («ho visto che menzionano anche
+   usdt»). Spiegato che il cassiere (il nodo) li saprà fare, la vetrina
+   (l'app) no, e che sul nodo `fiat_currencies_accepted = ['EUR']`
+   (letto da lui) li chiude anche a prezzo fisso. Restano SPENTI: si
+   accendono con una riga nel config e col cantiere `p2p-usdt`, quando
+   decide.
+3. IL 2-DI-3 NEL P2P, DOPO: Andrea vuole mettere il nostro multisig
+   on-chain (la cassa di Alan) dentro gli ordini sats↔BTC, «facciamo delle
+   prove noi in mainnet», e aspetta le ultime note di Alan. Detto il
+   contrappeso (due transazioni on-chain invece di una, Barattolo
+   co-firmatario, il tema MiCA) e che con Mostro da solo il lato
+   on-chain è già difendibile (la disputa si decide guardando la
+   blockchain). Thread suo, dopo questo.
+4. LA PROMOZIONE PRIMA, MOSTRO DOPO («una causa per volta»: le due
+   macchine sono diverse e la 0.20.2 parla lo stesso protocollo, quindi
+   l'app di oggi va bene con lei). Il modello: Fable, su sua scelta.
+
+**COM'È ANDATA, NEL CLOUD** (il nodo non è stato toccato; i comandi di
+sola lettura sul nodo Andrea non li ha ancora lanciati, e non servivano
+per questa parte).
+- LA PROVA A SECCO, prima di tutto: i nostri undici patcher su un
+  worktree del tag `v0.20.2`. 0001-0006 entrano; la 0007 si ferma
+  sull'ancora di `flow.rs` («// Update the invoice_held_at field»), la
+  stessa del 13 ott sulla 0.19.3. Contate le ancore una per una (uno
+  script che le prova senza scrivere): CINQUE su 69 non reggevano più,
+  tutte per mano di upstream, nessuna per una patch nostra sotto —
+  0007: `flow.rs` e `release.rs`; 0008: `config/types.rs` e
+  `bond/flow.rs`; 0011: `nip33.rs` (il conto grezzo ne diceva sette: le
+  altre due erano le literal dei test di `nip33.rs` che il patcher 0008
+  pretende DUE volte, e due sono).
+- I RIAGGANCI, letti nel diff di upstream e non indovinati:
+  a) `hold_invoice_paid` (0007) nella 0.20.2 scrive la transizione
+  PRIMA di avvisare e, se la scrittura fallisce, esce senza dire niente
+  a nessuno (il marcatore `invoice_held_at` viaggia nella stessa
+  scrittura). L'evento `hold-invoice-paid` al server sta ora accanto
+  agli avvisi (`for … in pending_msgs`), DOPO il `return` del
+  non-salvato: il server lo riceve solo per un passaggio che esiste.
+  Prima stava dopo l'update, a prescindere.
+  b) `check_failure_retries_or_log` (0007) ha un quarto argomento,
+  `attempt_started_at` (#1065): `None` nel ramo pre-claim.
+  c) `AntiAbuseBondSettings` (0008) ha `bond_cltv_delta` dopo
+  `maker_bond_payment_timeout_seconds`: il nostro `only_payment_methods`
+  si infila in mezzo. `promote_taker_context_to_order` (0008) prende
+  `now` (#1085).
+  d) Il 38385 (0011): `escrow_tags(escrow, ln_settings)` al posto di
+  `invoice_window_tags` (dalla #1045 il nodo può essere in modo Cashu),
+  i due tag nostri seguono `bond_policy_tags` come prima.
+  Poi la rilettura dei ganci NEL CODICE NUOVO, non solo le ancore: lo
+  scheduler della 0.20.2 chiede a LND lo stato della hold PRIMA di
+  annullarla (`decide_escrow_cancel`, è la #910) e salta l'ordine se è
+  pagata — quindi il ramo nostro del ritorno nel libro (0011) non vede
+  mai un ordine con la garanzia pagata, che era il buco che upstream ha
+  chiuso; `maker_bond_required()` ha un chiamante nuovo nello scheduler
+  (accende il guardiano delle cauzioni di chi pubblica, che noi non
+  usiamo: `apply_to = "take"`); il protocollo di `mostro-core` passa da
+  0.16.0 a 0.17.3 ma `PROTOCOL_VER` resta 2 e le `Action` sono solo
+  aggiunte; `SmallOrder` ha `cashu_mint_url` che non viaggia se è
+  `None`. Il client di Barattolo legge gli stessi tag (`miniapp.html`,
+  `p2pInfo`): nessun ritocco.
+- LA COMPILAZIONE, per la prima volta fuori dal nodo: qui c'è `cargo`
+  (toolchain 1.94 come `rust-toolchain.toml`; mancava solo
+  `protobuf-compiler`, installato). La `v0.20.2` pulita in 9 min 32 coi
+  test. Il fork: ROSSO al primo colpo — `src/barattolo_eventi.rs:555`,
+  `endpoint_from(None, Some("s"), Some("f"))`: la prova chiama la
+  funzione con tre argomenti e la funzione ne ha due da quando la M6
+  (1 ott) ha tolto il ripiego sul segreto dello sconto. Era nel repo e
+  nella `.patch` dal 1 ott, mai vista: il modulo sul nodo è quello di
+  PRIMA della M6 (NODO-MOSTRO, «il sorgente del nodo è più vecchio del
+  repo») e sul PC non c'è `cargo`. Corretta la riga (due argomenti) nel
+  modulo del repo, che il patcher copia; poi 3 min 56 senza un avviso.
+  È la ragione per cui si compila PRIMA del nodo, e la liturgia del 13
+  ott (il primo `cargo` è quello del nodo) da oggi non vale più.
+- I TEST: i filtri della liturgia della `-bar8` più quelli della
+  `-bar7`, in un lancio: 730 passate, 0 fallite, 1 ignorata (di
+  upstream, gira solo dentro un'altra prova); `util::tests::` da solo
+  90 e 0; la suite INTERA di `cargo test --release` (1.995 prove) 1.991
+  passate, 0 fallite, 4 ignorate (di upstream). Le 48 prove nostre
+  cercate per nome nel registro, tutte `ok`:
+  gli otto di `barattolo_tempo`, i quattro `reconfirm_timeout_…`,
+  l'unica `find_order_by_seconds…`, le tre `escrow_deadline_…`, la prova
+  della 0012, `dev_fee_zero_is_accepted_as_opt_out`, le due della M6
+  (`without_a_url_or_a_secret_it_is_inert`,
+  `only_its_own_secret_and_no_fallback_on_the_0005_one`). Controprova:
+  la riga sbagliata rimessa fa rosso il compilatore.
+- LE CARTE: le undici `.patch` riesportate sul tag nuovo coi nomi di
+  sempre (`git format-patch -1 --start-number N`, i messaggi di prima
+  più un paragrafo «Re-anchored on v0.20.2» nelle tre toccate); `git am`
+  delle undici su un clone pulito dà lo stesso albero dei patcher,
+  `16734181`. I tre patcher riagganciati, il modulo corretto, il README
+  del fork (in cima, la tabella, «IN SERVIZIO», «PROVATO»,
+  «AGGIORNARE»), NODO-MOSTRO («LA 0.20.2 PREPARATA»), PRODUZIONE («LA
+  SALITA ALLA 0.20.2»: sei letture, backup con l'API di sqlite, `git am`
+  col controllo dell'albero, i test con i numeri attesi, la build
+  `mostro:v0.20.2-bar9`, i due file dell'andata preparati senza editor,
+  il cambio in UN comando che conta prima di toccare, il controllo con
+  `_sqlx_migrations` a 26, la prova intera a due account, il ROLLBACK
+  col database di prima), DA-FARE-ANDREA (voce 4, le letture).
+
+**COSA PRETENDE DAL NODO, e si dice tre volte perché costa un riavvio
+a vuoto.** a) `bond_cltv_delta` in `[anti_abuse_bond]`, fra 721 e 864
+col nostro `hold_invoice_cltv_delta = 576`, sennò `mostrod` non parte:
+proposto 744 (il minimo più 24 blocchi: è il CLTV delle hold della
+cauzione di chi prende, e più è corto meno resta bloccato un wallet se
+va storto; prima valeva 576 come la garanzia). b) Undici migrazioni
+(`_sqlx_migrations` da 15 a 26): il ritorno alla `-bar8` rimette il
+database di prima e perde gli ordini nati dopo — per questo la prova si
+fa subito. c) `BARATTOLO_EVENTI_SEGRETO` nel compose, uguale a
+`P2P_EVENTI_SEGRETO` del VPS: col fork nuovo (M6) senza quella gli
+eventi al server si spengono; la liturgia la controlla con otto lettere
+di impronta, senza stampare il segreto. d) `[cashu]` assente o
+commentata (`mint_url` → `mint_urls`, e quella sezione rifiuta le chiavi
+sconosciute). Niente da fare sul VPS prima: il 38385 ha gli stessi tag
+(più `escrow_mode` e `escrow_deadline_margin_blocks`), il 38389 il
+server non lo legge e il relay lo accetta (chiave in lista).
+
+**STRADE SCARTATE.** La sola cura #910 sulla 0.19.0 (`-bar9` in poche
+ore, niente migrazioni): pronta come proposta, scartata da Andrea
+perché non porta gli USDT né le altre cure. Tenere le ancore «a doppio
+binario» (valide sulla 0.19.0 e sulla 0.20.2): no, il fork va avanti e
+i patcher dicono dove upstream ha messo mano, è il loro mestiere.
+Accendere `[price.providers.pegged]` nella stessa salita: no, una
+causa per volta, e la vetrina non c'è.
+
+**NON PROVATO, e si dice.** Tutto quel che vuole il nodo: la salita è
+scritta, non fatta. Nel cloud non girano LND, Tor, il relay: i test sono
+quelli di `cargo`, non uno scambio. La scadenza di chi pubblica, la
+disputa automatica, la manutenzione da sola, la cura #910 dal vivo. Il
+2-di-3 nel P2P è un'idea, non uno studio.
+
+**COSA È GIRATO SU QUALE ALBERO.** Rust: sul tag `v0.20.2` più le undici
+patch (albero `16734181`), nel cloud. Python: la suite severa del repo e
+i collaudi della CI nel venv senza coincurve, sul worktree di questo
+cantiere sopra `origin/develop` (d891fc8): i numeri in coda a questa
+voce.
+I NUMERI (29 ott 2026, sera, nel cloud, worktree sopra `d891fc8`):
+suite severa 26.545 passate, 0 fallite, 2 saltate (le due di
+`nostr-tools`, che nella macchina cloud non c'è: le stesse di ogni
+sessione cloud); collaudi della CI nel venv SENZA coincurve 108 verdi,
+0 rossi (683 s). Rust, sull'albero `16734181`: 1.991/0.

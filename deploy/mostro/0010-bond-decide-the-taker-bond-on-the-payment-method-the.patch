@@ -1,6 +1,6 @@
-From ebecfeb2ec92d4f1b465b8098eb67194d0e47cbe Mon Sep 17 00:00:00 2001
+From 0c136f719921a4a42c714d807bda9afb489292a7 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Sat, 10 Oct 2026 23:45:42 +0200
+Date: Thu, 29 Oct 2026 17:53:07 +0000
 Subject: [PATCH] bond: decide the taker bond on the payment method the taker
  declares
 
@@ -13,10 +13,10 @@ Subject: [PATCH] bond: decide the taker bond on the payment method the taker
  5 files changed, 146 insertions(+), 7 deletions(-)
 
 diff --git a/src/app/bond/flow.rs b/src/app/bond/flow.rs
-index 9888544..c7bdc7d 100644
+index 8511661..7cd9663 100644
 --- a/src/app/bond/flow.rs
 +++ b/src/app/bond/flow.rs
-@@ -124,6 +124,50 @@ pub fn taker_bond_required_for(order: &Order) -> bool {
+@@ -125,6 +125,50 @@ pub fn taker_bond_required_for(order: &Order) -> bool {
      taker_bond_required() && bond_applies_to_order(order)
  }
  
@@ -67,7 +67,7 @@ index 9888544..c7bdc7d 100644
  /// [`maker_bond_required`] for THIS order (patch 0008).
  pub fn maker_bond_required_for(order: &Order) -> bool {
      maker_bond_required() && bond_applies_to_order(order)
-@@ -5019,3 +5063,47 @@ mod barattolo_bond_methods {
+@@ -5162,3 +5206,47 @@ mod barattolo_bond_methods {
          assert!(!maker_bond_required_for(&order));
      }
  }
@@ -116,10 +116,10 @@ index 9888544..c7bdc7d 100644
 +    }
 +}
 diff --git a/src/app/bond/mod.rs b/src/app/bond/mod.rs
-index ad081ea..ebaf15f 100644
+index f1dce4f..8e8ca70 100644
 --- a/src/app/bond/mod.rs
 +++ b/src/app/bond/mod.rs
-@@ -24,6 +24,7 @@ pub use flow::{
+@@ -25,6 +25,7 @@ pub use flow::{
      release_bonds_for_order_or_warn, release_taker_bonds_for_order_or_warn, request_maker_bond,
      request_taker_bond, resubscribe_active_bonds, taker_bond_required,
      bond_applies_to_order, maker_bond_required_for, payment_method_in, taker_bond_required_for,
@@ -181,10 +181,10 @@ index 11f2cbe..ba9ab4b 100644
          let active = crate::app::bond::db::find_active_bonds_for_order(pool, order.id).await?;
          if bond::trade_committed_by_locked_taker_bond(&active) {
 diff --git a/src/util.rs b/src/util.rs
-index 3e94bdc..f8dc5a3 100644
+index a7c6ff5..da9a9c4 100644
 --- a/src/util.rs
 +++ b/src/util.rs
-@@ -2105,7 +2105,15 @@ pub fn get_fiat_amount_requested(order: &Order, msg: &Message) -> Option<i64> {
+@@ -2163,7 +2163,15 @@ pub fn get_fiat_amount_requested(order: &Order, msg: &Message) -> Option<i64> {
      // Check if order is range and get amount request after checking boundaries
      // set order fiat amount to the value requested preparing for hold invoice
      if order.is_range_order() {
@@ -201,7 +201,7 @@ index 3e94bdc..f8dc5a3 100644
              info!("amount_buyer: {amount_buyer}");
              match Some(amount_buyer) <= order.max_amount && Some(amount_buyer) >= order.min_amount {
                  true => Some(amount_buyer),
-@@ -2120,6 +2128,43 @@ pub fn get_fiat_amount_requested(order: &Order, msg: &Message) -> Option<i64> {
+@@ -2178,6 +2186,43 @@ pub fn get_fiat_amount_requested(order: &Order, msg: &Message) -> Option<i64> {
      }
  }
  
@@ -246,5 +246,5 @@ index 3e94bdc..f8dc5a3 100644
  pub fn get_nostr_client() -> Result<&'static Client, MostroError> {
      if let Some(client) = NOSTR_CLIENT.get() {
 -- 
-2.55.0.windows.3
+2.43.0
 

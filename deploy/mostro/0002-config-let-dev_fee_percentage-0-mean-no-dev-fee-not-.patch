@@ -1,18 +1,18 @@
-From 3255b525f856ba4becb64257cde986e3a477ed5d Mon Sep 17 00:00:00 2001
+From 68c4587450d8b20e8f02f0a09091e03299ff1707 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Wed, 30 Sep 2026 21:02:33 +0200
-Subject: [PATCH 2/7] config: let dev_fee_percentage = 0 mean no dev fee, not
- an invalid value
+Date: Thu, 29 Oct 2026 17:53:06 +0000
+Subject: [PATCH] config: let dev_fee_percentage = 0 mean no dev fee, not an
+ invalid value
 
 ---
  src/config/util.rs | 15 ++++++++++++---
  1 file changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/src/config/util.rs b/src/config/util.rs
-index 635a5ce..381355f 100644
+index 2a8a390..7d630e8 100644
 --- a/src/config/util.rs
 +++ b/src/config/util.rs
-@@ -50,10 +50,12 @@ fn apply_nsec_env_override(settings: &mut Settings) {
+@@ -71,10 +71,12 @@ fn apply_nsec_env_override(settings: &mut Settings) {
  fn validate_mostro_settings(settings: &Settings) -> Result<(), MostroError> {
      let dev_fee = settings.mostro.dev_fee_percentage;
  
@@ -28,7 +28,7 @@ index 635a5ce..381355f 100644
              dev_fee, MIN_DEV_FEE_PERCENTAGE
          ))));
      }
-@@ -468,6 +470,13 @@ mod startup_validation_tests {
+@@ -1192,6 +1194,13 @@ mod startup_validation_tests {
          assert!(err.to_string().contains("below minimum"));
      }
  
@@ -43,5 +43,5 @@ index 635a5ce..381355f 100644
      fn dev_fee_above_maximum_is_rejected() {
          let mut settings = base_settings();
 -- 
-2.55.0.windows.3
+2.43.0
 

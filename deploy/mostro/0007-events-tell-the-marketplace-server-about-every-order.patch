@@ -1,9 +1,14 @@
-From e4c06b203cda9670bde42e340ed338b6f2311eb6 Mon Sep 17 00:00:00 2001
+From 0752ec369c2f73c38d6bfb1c19942c6867879ad7 Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
-Date: Wed, 30 Sep 2026 21:02:34 +0200
-Subject: [PATCH 7/7] events: tell the marketplace server about every order
+Date: Thu, 29 Oct 2026 17:53:07 +0000
+Subject: [PATCH] events: tell the marketplace server about every order
  transition
 
+Re-anchored on v0.20.2 (29 Oct 2026): `hold_invoice_paid` now persists
+the transition before notifying and bails silently when the write
+fails, so the event moves next to the notifications and only fires for
+a stored transition; `check_failure_retries_or_log` gained the
+`attempt_started_at` argument (#1065).
 ---
  src/app/add_invoice.rs  |  21 +
  src/app/admin_cancel.rs |   2 +
@@ -82,10 +87,10 @@ index 72fe47d..71642db 100644
      let message = Message::new_order(
          Some(order.id),
 diff --git a/src/app/admin_settle.rs b/src/app/admin_settle.rs
-index 1df3b16..75afbb9 100644
+index 50096d1..9b9d69c 100644
 --- a/src/app/admin_settle.rs
 +++ b/src/app/admin_settle.rs
-@@ -141,6 +141,9 @@ pub async fn admin_settle_action(
+@@ -144,6 +144,9 @@ pub async fn admin_settle_action(
          return Ok(());
      }
  
@@ -96,10 +101,10 @@ index 1df3b16..75afbb9 100644
      let dispute = find_dispute_by_order_id(pool, order.id).await;
  
 diff --git a/src/app/cancel.rs b/src/app/cancel.rs
-index fa266d4..b90697f 100644
+index 36379aa..95962c9 100644
 --- a/src/app/cancel.rs
 +++ b/src/app/cancel.rs
-@@ -134,6 +134,13 @@ async fn cancel_cooperative_execution_step_2<L: CancelLightning + Send>(
+@@ -247,6 +247,13 @@ async fn cancel_cooperative_execution_step_2<L: CancelLightning + Send>(
      )
      .await;
      info!("Cancel: Order Id {} canceled cooperatively!", order.id);
@@ -113,7 +118,7 @@ index fa266d4..b90697f 100644
  
      // If there was an active dispute on this order, close it since the users
      // resolved the situation themselves via cooperative cancellation.
-@@ -177,6 +184,8 @@ async fn cancel_cooperative_execution_step_1(
+@@ -290,6 +297,8 @@ async fn cancel_cooperative_execution_step_1(
          .update(pool)
          .await
          .map_err(|e| MostroInternalErr(ServiceError::DbAccessError(e.to_string())))?;
@@ -122,7 +127,7 @@ index fa266d4..b90697f 100644
      // Notify both parties: initiator sees "initiated by you" and the counterparty sees
      // "initiated by peer".
      enqueue_order_msg(
-@@ -305,6 +314,15 @@ async fn cancel_order_by_taker_inner<L: CancelLightning + Send>(
+@@ -418,6 +427,15 @@ async fn cancel_order_by_taker_inner<L: CancelLightning + Send>(
      )
      .await;
  
@@ -138,7 +143,7 @@ index fa266d4..b90697f 100644
      // Reset api quotes
      reset_api_quotes(&mut order);
  
-@@ -381,6 +399,9 @@ async fn cancel_order_by_maker<L: CancelLightning + Send>(
+@@ -507,6 +525,9 @@ async fn cancel_order_by_maker<L: CancelLightning + Send>(
      )
      .await;
  
@@ -148,7 +153,7 @@ index fa266d4..b90697f 100644
      // Phase 1/6: maker cancelled before the trade went active — release any
      // taker bond that had already been locked, and resolve the maker bond at
      // range close (release when no slice was slashed; settle-at-close
-@@ -484,6 +505,14 @@ async fn cancel_pending_order_from_maker(
+@@ -610,6 +631,14 @@ async fn cancel_pending_order_from_maker(
              );
          }
      }
@@ -164,10 +169,10 @@ index fa266d4..b90697f 100644
      bond::resolve_range_maker_bond_at_close_or_warn(pool, order, "pending_maker_cancel").await;
      Ok(())
 diff --git a/src/app/dispute.rs b/src/app/dispute.rs
-index 0a4e853..06d4133 100644
+index 9ab088e..56277ab 100644
 --- a/src/app/dispute.rs
 +++ b/src/app/dispute.rs
-@@ -216,6 +216,13 @@ pub async fn dispute_action(
+@@ -272,6 +272,13 @@ pub async fn dispute_action(
      )
      .await?;
  
@@ -196,10 +201,10 @@ index ba0c6db..45890bf 100644
  }
  
 diff --git a/src/app/release.rs b/src/app/release.rs
-index 31c40cc..8ba5f94 100644
+index 9bd833d..53bc39e 100644
 --- a/src/app/release.rs
 +++ b/src/app/release.rs
-@@ -376,6 +376,9 @@ pub async fn release_action(
+@@ -415,6 +415,9 @@ pub async fn release_action(
      close_dispute_after_user_resolution(ctx, &order, DisputeStatus::Released, my_keys, "release")
          .await;
  
@@ -209,16 +214,16 @@ index 31c40cc..8ba5f94 100644
      enqueue_order_msg(
          None,
          Some(order.id),
-@@ -698,6 +701,8 @@ pub async fn do_payment(
+@@ -750,6 +753,8 @@ pub async fn do_payment(
          Ok(()) => Ok(()),
          Err(e) => {
-             check_failure_retries_or_log(ctx, &order, request_id).await;
+             check_failure_retries_or_log(ctx, &order, request_id, None).await;
 +            // Barattolo fork (patch 0007): tell the marketplace server.
 +            crate::barattolo_eventi::emit_payout_failed_pre_claim(&order, &e);
              Err(e)
          }
      }
-@@ -1093,6 +1098,11 @@ async fn dispatch_payout(
+@@ -1153,6 +1158,11 @@ async fn dispatch_payout(
                                      msg.payment.failure_reason,
                                      msg.payment.htlcs.len()
                                  );
@@ -227,11 +232,11 @@ index 31c40cc..8ba5f94 100644
 +                                    &order,
 +                                    msg.payment.failure_reason,
 +                                );
- 
                                  // Release our own claim (scoped to this hash and
                                  // the per-claim timestamp) and re-arm retry. Only
-@@ -1294,6 +1304,9 @@ async fn payment_success(
-         return Ok(true);
+                                 // do the failure bookkeeping and buyer
+@@ -1527,6 +1537,9 @@ async fn payment_success(
+             .persist_last_success_in_background(ctx.pool_arc());
      }
  
 +    // Barattolo fork (patch 0007): tell the marketplace server.
@@ -260,7 +265,7 @@ index a4d4331..4deeb33 100644
                  Err(_) => Err(MostroInternalErr(ServiceError::UpdateOrderStatusError)),
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
 new file mode 100644
-index 0000000..316024b
+index 0000000..74fe345
 --- /dev/null
 +++ b/src/barattolo_eventi.rs
 @@ -0,0 +1,823 @@
@@ -771,7 +776,7 @@ index 0000000..316024b
 +
 +    #[test]
 +    fn without_a_url_or_a_secret_it_is_inert() {
-+        assert_eq!(endpoint_from(None, Some("s"), Some("f")), None);
++        assert_eq!(endpoint_from(None, Some("s")), None);
 +        assert_eq!(endpoint_from(Some(""), Some("s")), None);
 +        assert_eq!(endpoint_from(Some("  "), Some("s")), None);
 +        assert_eq!(endpoint_from(Some("http://x"), None), None);
@@ -1102,11 +1107,11 @@ index 955e593..9ad9fad 100644
      CLIENT.get_or_init(|| {
          reqwest::Client::builder()
 diff --git a/src/flow.rs b/src/flow.rs
-index 14830b8..c69f2c3 100644
+index 919e6eb..44b9552 100644
 --- a/src/flow.rs
 +++ b/src/flow.rs
-@@ -180,6 +180,21 @@ pub async fn hold_invoice_paid(
-         let _ = updated_order.update(pool).await;
+@@ -204,6 +204,21 @@ pub async fn hold_invoice_paid(
+         return Ok(());
      }
  
 +    // Barattolo fork (patch 0007): tell the marketplace server.
@@ -1124,11 +1129,11 @@ index 14830b8..c69f2c3 100644
 +        crate::barattolo_eventi::emit("buyer-invoice-requested", &order, "mostro");
 +    }
 +
-     // Update the invoice_held_at field
-     crate::db::update_order_invoice_held_at_time(pool, order.id, Timestamp::now().as_secs() as i64)
-         .await
+     for (action, payload, destination) in pending_msgs {
+         enqueue_order_msg(
+             request_id,
 diff --git a/src/main.rs b/src/main.rs
-index ef838ba..ae39918 100644
+index 566866e..c3e4931 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -1,4 +1,5 @@
@@ -1137,20 +1142,20 @@ index ef838ba..ae39918 100644
  pub mod barattolo_fee;
  mod bitcoin_price;
  pub mod cashu;
-@@ -84,6 +85,8 @@ async fn main() -> Result<()> {
+@@ -86,6 +87,8 @@ async fn main() -> Result<()> {
      // Barattolo fork (patch 0005): side table for the per-party fees and
      // the keep-warm loop towards the marketplace server.
      barattolo_fee::init().await;
 +    // Barattolo fork (patch 0007): order events to the marketplace server.
 +    barattolo_eventi::init().await;
  
-     // Connect to relays
-     if NOSTR_CLIENT.set(util::connect_nostr().await?).is_err() {
+     // Serbero, the dispute assistant: the configured key must be a read-only
+     // solver. Registered here when it has no row yet; any other kind of row
 diff --git a/src/scheduler.rs b/src/scheduler.rs
-index d39f088..d95443b 100644
+index 72d6e9f..f9e6d4e 100644
 --- a/src/scheduler.rs
 +++ b/src/scheduler.rs
-@@ -725,6 +725,17 @@ async fn job_cancel_orders(ctx: AppContext) {
+@@ -881,6 +881,17 @@ async fn job_cancel_orders(ctx: AppContext) {
                          if let Ok(order_updated) =
                              update_order_event(&keys, new_status, &edited_order).await
                          {
@@ -1168,7 +1173,7 @@ index d39f088..d95443b 100644
                              // Notify users about order status changes - here order is updated
                              notify_users_canceled_order(&order_updated, &order, maker_action).await;
                              // trace new status
-@@ -970,6 +981,13 @@ async fn enforce_escrow_deadline_pass(
+@@ -1128,6 +1139,13 @@ async fn enforce_escrow_deadline_pass(
                      "escrow_deadline: order {} canceled — trade escrow reached its CLTV lifetime",
                      order.id
                  );
@@ -1182,7 +1187,7 @@ index d39f088..d95443b 100644
                  notify_users_canceled_order(&updated, &order, Some(Action::Canceled)).await;
                  // Idempotent close of any range maker bond, mirroring the
                  // waiting-state timeout path.
-@@ -1275,6 +1293,13 @@ async fn job_expire_pending_older_orders(ctx: AppContext) {
+@@ -1562,6 +1580,13 @@ async fn job_expire_pending_older_orders(ctx: AppContext) {
                          // Snapshot before `update` consumes the row — the
                          // Phase 6 close hook below needs an `&Order`.
                          let order_snapshot = order_updated.clone();
@@ -1197,10 +1202,10 @@ index d39f088..d95443b 100644
                          // bonds when the Expired status was actually
                          // persisted. On persist failure the next tick
 diff --git a/src/util.rs b/src/util.rs
-index 5f42a68..b419c61 100644
+index 14f043c..8eb2819 100644
 --- a/src/util.rs
 +++ b/src/util.rs
-@@ -1670,6 +1670,19 @@ pub async fn show_hold_invoice(
+@@ -1736,6 +1736,19 @@ pub async fn show_hold_invoice(
      )
      .await;
  
@@ -1221,5 +1226,5 @@ index 5f42a68..b419c61 100644
  
      Ok(())
 -- 
-2.55.0.windows.3
+2.43.0
 

@@ -1,6 +1,6 @@
-From c0bdff3c253c65c706f5f73e5156ef5901eaf9fa Mon Sep 17 00:00:00 2001
-From: Barattolo <barattolo@example.invalid>
-Date: Mon, 12 Oct 2026 16:36:21 +0200
+From 86362b8590d0fd7a89bf3f90c77ead2c84807737 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Thu, 29 Oct 2026 17:53:08 +0000
 Subject: [PATCH] timeout: give the maker a waiting window of his own, and put
  the order back in the book when he lets a take lapse
 
@@ -32,6 +32,10 @@ The marketplace event for a republish that is the maker's fault is
 `waiting-payment` is published as in-progress on sell orders too: a sell
 order taken with the invoice already in the take stayed `pending` on the
 book for the whole wait.
+
+Re-anchored on v0.20.2 (29 Oct 2026): the info event's escrow tags are
+built by `escrow_tags` (Lightning or Cashu mode, #1045), and the two
+tags of this patch follow `bond_policy_tags` as before.
 ---
  settings.tpl.toml       |   8 +
  src/barattolo_eventi.rs |   2 +
@@ -45,10 +49,10 @@ book for the whole wait.
  create mode 100644 src/barattolo_tempo.rs
 
 diff --git a/settings.tpl.toml b/settings.tpl.toml
-index 54ebea8..57fd035 100644
+index 00d9256..d78da26 100644
 --- a/settings.tpl.toml
 +++ b/settings.tpl.toml
-@@ -107,6 +107,14 @@ expiration_hours = 24
+@@ -113,6 +113,14 @@ expiration_hours = 24
  max_expiration_days = 15
  # Expiration of pending orders
  expiration_seconds = 900
@@ -64,7 +68,7 @@ index 54ebea8..57fd035 100644
  user_rates_sent_interval_seconds = 3600
  # Relay list event time interval
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
-index 7fcc27d..6d6b87f 100644
+index ec4a269..934d517 100644
 --- a/src/barattolo_eventi.rs
 +++ b/src/barattolo_eventi.rs
 @@ -80,6 +80,8 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
@@ -438,10 +442,10 @@ index 0000000..8eb7e6d
 +    }
 +}
 diff --git a/src/config/types.rs b/src/config/types.rs
-index 70fe9c9..50aaf39 100644
+index 85f6606..f6490dc 100644
 --- a/src/config/types.rs
 +++ b/src/config/types.rs
-@@ -730,6 +730,20 @@ pub struct MostroSettings {
+@@ -967,6 +967,20 @@ pub struct MostroSettings {
      pub expiration_hours: u32,
      /// Expiration seconds
      pub expiration_seconds: u32,
@@ -462,7 +466,7 @@ index 70fe9c9..50aaf39 100644
      /// User rates sent interval seconds
      pub user_rates_sent_interval_seconds: u32,
      /// Maximum expiration days
-@@ -864,6 +878,8 @@ impl Default for MostroSettings {
+@@ -1116,6 +1130,8 @@ impl Default for MostroSettings {
              min_payment_amount: 100,
              expiration_hours: 24,
              expiration_seconds: 900,
@@ -472,7 +476,7 @@ index 70fe9c9..50aaf39 100644
              max_expiration_days: 15,
              publish_relays_interval: 60,
 diff --git a/src/db.rs b/src/db.rs
-index c268ca7..3631c97 100644
+index ad8451b..9172f9b 100644
 --- a/src/db.rs
 +++ b/src/db.rs
 @@ -663,7 +663,13 @@ pub async fn find_order_by_date(pool: &SqlitePool) -> Result<Vec<Order>, MostroE
@@ -506,7 +510,7 @@ index c268ca7..3631c97 100644
  
  pub async fn find_dispute_by_order_id(
 diff --git a/src/main.rs b/src/main.rs
-index ae39918..fdac07b 100644
+index c3e4931..546960f 100644
 --- a/src/main.rs
 +++ b/src/main.rs
 @@ -1,6 +1,7 @@
@@ -518,10 +522,10 @@ index ae39918..fdac07b 100644
  pub mod cashu;
  pub mod cli;
 diff --git a/src/nip33.rs b/src/nip33.rs
-index 2f99fbe..23ec2b6 100644
+index c4ec113..95d9cf8 100644
 --- a/src/nip33.rs
 +++ b/src/nip33.rs
-@@ -349,7 +349,12 @@ fn create_status_tags(order: &Order) -> Result<(bool, Status), MostroError> {
+@@ -358,7 +358,12 @@ fn create_status_tags(order: &Order) -> Result<(bool, Status), MostroError> {
  
      match status {
          Status::WaitingBuyerInvoice => Ok((order.is_sell_order().is_ok(), Status::InProgress)),
@@ -535,9 +539,9 @@ index 2f99fbe..23ec2b6 100644
          Status::Canceled
          | Status::CanceledByAdmin
          | Status::CooperativelyCanceled
-@@ -688,6 +693,12 @@ pub fn info_to_tags(ln_status: &LnStatus, maintenance: bool) -> Tags {
+@@ -764,6 +769,12 @@ fn build_info_tags(
  
-     tags_vec.extend(invoice_window_tags(ln_settings));
+     tags_vec.extend(escrow_tags(escrow, ln_settings));
      tags_vec.extend(bond_policy_tags(bond_settings));
 +    // Barattolo fork (patch 0011): the maker's own waiting window, and after
 +    // how many maker lapses in a row the order is removed — each tag only
@@ -545,10 +549,10 @@ index 2f99fbe..23ec2b6 100644
 +    for (name, value) in crate::barattolo_tempo::info_pairs(mostro_settings, bond_settings) {
 +        tags_vec.push(Tag::custom(name, vec![value]));
 +    }
-     tags_vec.push(Tag::custom(
-         "maintenance_mode",
-         vec![maintenance.to_string()],
-@@ -1825,11 +1836,12 @@ mod tests {
+     tags_vec.extend(serbero_tags(mostro_settings));
+     tags_vec.extend(reputation_import_tags(reputation_import));
+     tags_vec.extend(reputation_issuer_tags(reputation_issuer));
+@@ -2451,11 +2462,12 @@ mod tests {
              (true, Status::InProgress)
          );
  
@@ -564,10 +568,10 @@ index 2f99fbe..23ec2b6 100644
  
          // WaitingPayment on a buy order → emit as InProgress.
 diff --git a/src/scheduler.rs b/src/scheduler.rs
-index d95443b..beb5e71 100644
+index f9e6d4e..f29945a 100644
 --- a/src/scheduler.rs
 +++ b/src/scheduler.rs
-@@ -501,7 +501,10 @@ async fn reconfirm_timeout_eligibility(
+@@ -627,7 +627,10 @@ async fn reconfirm_timeout_eligibility(
      };
      let still_waiting = fresh.status == Status::WaitingBuyerInvoice.to_string()
          || fresh.status == Status::WaitingPayment.to_string();
@@ -579,7 +583,7 @@ index d95443b..beb5e71 100644
      (still_waiting && still_expired).then_some(fresh)
  }
  
-@@ -657,6 +660,22 @@ async fn job_cancel_orders(ctx: AppContext) {
+@@ -813,6 +816,22 @@ async fn job_cancel_orders(ctx: AppContext) {
                              }
                          }
  
@@ -602,7 +606,7 @@ index d95443b..beb5e71 100644
                          let (maker_action, new_status, edited_order) =
                              match (order_status, order_kind) {
                                  (Status::WaitingBuyerInvoice, Kind::Sell)
-@@ -685,6 +704,37 @@ async fn job_cancel_orders(ctx: AppContext) {
+@@ -841,6 +860,37 @@ async fn job_cancel_orders(ctx: AppContext) {
                                          edit_pubkeys_order(pool, &order).await,
                                      )
                                  }
@@ -640,7 +644,7 @@ index d95443b..beb5e71 100644
                                  (Status::WaitingBuyerInvoice, Kind::Buy)
                                  | (Status::WaitingPayment, Kind::Sell) => {
                                      // Update order status
-@@ -730,7 +780,12 @@ async fn job_cancel_orders(ctx: AppContext) {
+@@ -886,7 +936,12 @@ async fn job_cancel_orders(ctx: AppContext) {
                                  "expired",
                                  &order,
                                  "mostro",
@@ -655,5 +659,5 @@ index d95443b..beb5e71 100644
                                  } else {
                                      "maker-timeout"
 -- 
-2.55.0.windows.3
+2.43.0
 

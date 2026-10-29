@@ -605,3 +605,34 @@ risposta di chi ha pubblicato e si toglie alla seconda (FASE 5 della
 liturgia: la prova del 13 si è fermata al conto alla rovescia, e si è
 chiusa con l'annullo di chi aveva preso); la disputa automatica a ~92
 ore; il ritorno alla `-bar7` (i due file `.prima-bar8` e `up -d`).
+
+LA 0.20.2 PREPARATA, NON ANCORA SUL NODO (29 ott 2026, cantiere
+`mostro-0202`; la liturgia in PRODUZIONE, «LA SALITA ALLA 0.20.2», il
+perché in CANTIERI, «Mostro 0.20.2»). Upstream ha fatto sei versioni
+dalla nostra 0.19.0 (la `v0.20.2` è del 28 ott). Il fork è stato
+RIFATTO DA CAPO sul tag nuovo coi patcher del repo — quindi porta anche
+i tre ritocchi dell'audit del 1 ott (M6, M4, B6) che il nodo non ha mai
+avuto — e, per la prima volta, compilato e provato nel cloud prima del
+nodo. Tre ancore su undici patch erano cambiate (0007, 0008, 0011); una
+riga di un test della 0007 nel repo (`endpoint_from` a tre argomenti,
+avanzo della M6) non compilava e nessuno l'aveva mai visto: corretta.
+COSA PRETENDE DAL NODO: la riga `bond_cltv_delta` in `[anti_abuse_bond]`
+(fra 721 e 864 col nostro `hold_invoice_cltv_delta = 576`; proposta
+744; senza la riga `mostrod` NON PARTE, #1085); undici migrazioni al
+database, quindi il ritorno alla `-bar8` vuole la copia di prima; e
+`BARATTOLO_EVENTI_SEGRETO` nel compose (M6: senza, gli eventi al server
+si spengono). COSA PORTA AGLI UTENTI: la cura #910 (il venditore che
+paga la garanzia e annulla subito dopo non si riprende più i sats
+mentre al compratore arriva «pagato»), le dispute scritte tutte insieme
+(#923), i limiti in sats contati col premio (#1095), l'arrotondamento
+al sat più vicino (#1090), la manutenzione DA SOLA dopo 10 minuti di
+LND non sincronizzato e i pagamenti rimandati senza bruciare i
+tentativi del compratore (#1065), l'evento di salute kind 38389 ogni
+60 s sui relay (`[health]`, di serie acceso; coi tag grossolani
+pubblici e i numeri cifrati solo per un `watchdog_pubkey`, che non
+mettiamo). Il protocollo resta la versione 2, il 38385 tiene gli stessi
+tag (più `escrow_mode`, `escrow_deadline_margin_blocks`). GLI USDT e il
+bitcoin on-chain come valuta dell'ordine (`[price.providers.pegged]`,
+#1083 e #1091) restano SPENTI: `fiat_currencies_accepted = ['EUR']`
+chiude anche gli ordini a prezzo fisso; si accendono solo con una
+decisione di Andrea e il cantiere dell'app (p2p-usdt).

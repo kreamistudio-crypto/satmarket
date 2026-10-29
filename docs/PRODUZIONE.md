@@ -3892,6 +3892,204 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   dell'apertura» alle prese, «⚠️ Paracadute P2P: battito saltato» se il
   giro inciampa (il prossimo arriva lo stesso).
 
+- LA SALITA ALLA 0.20.2, immagine `mostro:v0.20.2-bar9` (preparata il 29
+  ott 2026, cantiere `mostro-0202`, decisione di Andrea: «fork intero
+  sulla 0.20.2»; NON ANCORA FATTA SUL NODO: build e riavvio solo con l'ok
+  esplicito di Andrea, un comando alla volta, a libro fermo). È la prima
+  salita di VERSIONE dalla 0.19.0 (30 set): sei versioni di upstream in
+  un colpo (0.19.1 → 0.20.2, tag del 28 ott, `fe2a905`), e il fork è
+  RIFATTO DA CAPO sul tag nuovo coi patcher del repo — quindi porta anche
+  i tre ritocchi dell'audit del 1 ott (M6, M4, B6) che il nodo non ha mai
+  avuto. Cosa cambia per noi (CANTIERI, «Mostro 0.20.2», e NODO-MOSTRO,
+  «LA 0.20.2 PREPARATA»): la cura #910 (il venditore che paga la
+  garanzia e annulla un istante dopo non si riprende più i sats mentre al
+  compratore arriva «pagato»), #923, #1095, #1090, la manutenzione da
+  sola se LND resta indietro (#1065, sezione `[health]`, di serie
+  accesa), l'evento di salute kind 38389 ogni 60 s, e la base per gli
+  USDT (`[price.providers.pegged]`, SPENTA). Il protocollo resta il 2.
+  ⚠️ TRE COSE CHE LA 0.19.0 NON AVEVA:
+  a) `[anti_abuse_bond] bond_cltv_delta` è OBBLIGATORIA con la cauzione
+  accesa: deve stare sopra `hold_invoice_cltv_delta + 144` e al più 864
+  (col nostro 576: fra 721 e 864), sennò `mostrod` NON PARTE (#1085).
+  Si mette 744: il minimo più 24 blocchi di margine — è il CLTV delle
+  hold della cauzione, e più è corto meno a lungo resta bloccato il
+  wallet di chi prende se qualcosa va storto (prima era 576, lo stesso
+  della garanzia). Lo decide Andrea.
+  b) UNDICI MIGRAZIONI al database (`payer_history`, `order_success_at`,
+  le quattro della reputazione, `dev_fee_retry_backoff`,
+  `bond_payout_sent_at`, `order_hold_settled_at`, `health_query_indexes`,
+  `orders_master_buyer_pubkey_index`): `_sqlx_migrations` passa da 15 a
+  26 righe. IL RITORNO ALLA `-bar8` VUOLE LA COPIA DEL DATABASE DI PRIMA
+  (la `-bar8` rifiuta un database con migrazioni che non conosce), e gli
+  ordini nati dopo il cambio si perdono: per questo la prova si fa
+  SUBITO dopo.
+  c) `BARATTOLO_EVENTI_SEGRETO` nel compose: col fork nuovo (M6) senza
+  quella variabile gli eventi al server si SPENGONO, senza ripiego sul
+  segreto dello sconto. Si guarda PRIMA (fase 1, e).
+  NON C'È UN «PRIMA IL SERVER»: il VPS non deve cambiare niente per
+  questa salita (il 38385 ha gli stessi tag, più `escrow_mode` e
+  `escrow_deadline_margin_blocks`; il 38389 il server non lo legge).
+  ✅ COMPILATA E PROVATA NEL CLOUD il 29 ott (`cargo` c'è): i numeri in
+  fondo, «COM'È ANDATA NEL CLOUD». Sul nodo i test si rifanno lo stesso
+  (fase 3, punto 3) e devono dire gli stessi numeri.
+  Host, in cima a tutto: `ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`
+  FASE 1 — IN SOLA LETTURA (`cd ~/nodo`), tutte e sei:
+  a) `docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
+  → `mostro:v0.19.0-bar8`.
+  b) `git -C ~/nodo/mostro-src status --short | wc -l && git -C ~/nodo/mostro-src log --oneline v0.19.0..HEAD | wc -l`
+  → `0` e `11` (albero pulito, undici commit sopra la 0.19.0). Se non è
+  pulito NON si va avanti.
+  c) IL LIBRO FERMO (`mode=ro`):
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY 2 DESC').fetchall(), c.execute('SELECT COUNT(*) FROM _sqlx_migrations').fetchone())"`
+  Devono comparire SOLO `pending` e stati finali, e `(15,)` migrazioni;
+  uno fra `waiting-payment`, `waiting-buyer-invoice`,
+  `waiting-taker-bond`, `active`, `fiat-sent`, `settled-hold-invoice`,
+  `in-progress` o `dispute` = c'è uno scambio in corso: si ASPETTA.
+  d) IL `settings.toml`, le righe che contano e le sezioni:
+  `grep -n -E "^hold_invoice_cltv_delta|^escrow_deadline_margin_blocks|^bond_cltv_delta|^expiration_seconds|^maker_expiration_seconds|^maker_timeout_limit|^fiat_currencies_accepted|^\[" ~/nodo/mostro/settings.toml`
+  → `576`, `24`, NESSUNA `bond_cltv_delta`, `1800`, `10800`, `2`,
+  `['EUR']`, e `[anti_abuse_bond]` come ULTIMA sezione non commentata
+  (la riga nuova si accoda in fondo al file: se dopo c'è un'altra
+  sezione viva, si ferma e si chiede a Claude come metterla). `[cashu]`
+  deve essere assente o commentata (la 0.20.2 ha rinominato `mint_url`
+  in `mint_urls` e quella sezione rifiuta le chiavi che non conosce).
+  e) IL SEGRETO DEGLI EVENTI, solo il conto: `grep -c "BARATTOLO_EVENTI_SEGRETO" ~/nodo/docker-compose.yml`
+  → `1`. Se è `0` ci si ferma: va aggiunta al compose (con copia prima)
+  uguale a `P2P_EVENTI_SEGRETO` del VPS, e si chiede a Claude i comandi.
+  Che sia UGUALE a quella del VPS si vede senza stamparla, con otto
+  lettere di impronta da confrontare a occhio — NODO:
+  `grep -o "BARATTOLO_EVENTI_SEGRETO=.*" ~/nodo/docker-compose.yml | head -1 | cut -d= -f2- | tr -d ' "\n' | sha256sum | cut -c1-8`
+  e VPS (`ssh root@46.62.162.103`):
+  `grep "^P2P_EVENTI_SEGRETO" /srv/barattolo/config.py | cut -d= -f2- | tr -d ' "\x27\n' | sha256sum | cut -c1-8`
+  → le stesse otto lettere. Se no, gli eventi non arriverebbero già
+  oggi col ripiego, e si guarda PRIMA di andare avanti.
+  f) IL DISCO: `df -h / && docker system df` → almeno 6 GB liberi (la
+  cucina della build ne prende 3; le immagini `mostro-test:bar2`…`bar8`
+  si possono togliere PRIMA, `docker rmi mostro-test:barN` una per una,
+  dopo averle contate con `docker images | grep mostro`: le immagini
+  `mostro:v0.19.0-bar7` e `-bar8` NON si toccano, sono il ritorno).
+  FASE 2 — IL BACKUP (costa un secondo), tre copie `.prima-0202`:
+  `sudo python3 -c "import sqlite3; s=sqlite3.connect('/home/debian/nodo/mostro/mostro.db'); d=sqlite3.connect('/home/debian/nodo/mostro/mostro.db.prima-0202'); s.backup(d); print(d.execute('SELECT COUNT(*) FROM orders').fetchone(), s.execute('SELECT COUNT(*) FROM orders').fetchone())" && sudo chown --reference=/home/debian/nodo/mostro/mostro.db /home/debian/nodo/mostro/mostro.db.prima-0202 && sudo chmod 600 /home/debian/nodo/mostro/mostro.db.prima-0202 && ls -l /home/debian/nodo/mostro/mostro.db*`
+  (l'API di sqlite e non `cp` su un file vivo — lezione della `-bar8`;
+  i due conti devono essere uguali, e la copia con lo STESSO
+  proprietario del vivo, così il ritorno la rimette senza chown).
+  `cp -p ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-0202`
+  `cp -p ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-0202`
+  FASE 3 — LA BUILD:
+  1) SUL PC (PowerShell, dentro il repo sulla punta di `develop` o di
+  `main` che porta questo cantiere), le undici `.patch` al nodo PRESE DA
+  GIT, non dalla cartella di lavoro (dove i patcher escono CRLF — qui
+  servono solo le `.patch`, LF):
+  `git archive HEAD deploy/mostro --format=tar -o $env:TEMP\mostro-0202.tar`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\mostro-0202.tar debian@vm-1937.lnvps.cloud:`
+  SUL NODO: `mkdir -p ~/nodo/patch-0202 && tar xf ~/mostro-0202.tar -C ~/nodo/patch-0202 --strip-components=2 && ls ~/nodo/patch-0202/*.patch | wc -l`
+  → `11`.
+  2) SUL NODO, il tag nuovo e le undici patch con `git am` (è la strada
+  di «RICOSTRUIRE DA ZERO» del README del fork: i patcher sono già
+  girati nel cloud su questo stesso tag, e l'albero è noto):
+  `cd ~/nodo/mostro-src && git fetch --tags origin && git switch -c barattolo/v0.20.2 v0.20.2`
+  → `HEAD is now at fe2a905` (il branch `barattolo/v0.19.0` RESTA: è
+  il ritorno del sorgente).
+  `git am ~/nodo/patch-0202/00*.patch && git log --oneline v0.20.2..HEAD | wc -l && git rev-parse HEAD^{tree}`
+  → `11` e `16734181e552e552f54b0c18c5ce2381764e67fe`: lo STESSO albero
+  del cloud, byte per byte (è il controllo che la `-bar8` faceva con il
+  `diff` delle `.patch`: qui lo fa git). Un `git am` che si ferma si
+  incolla a Claude e si fa `git am --abort`.
+  3) I TEST PRIMA DELLA BUILD VERA, in DUE lanci come per la `-bar7` e
+  la `-bar8` (una prova di upstream legge una globale):
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:0202 .`
+  `docker run --rm mostro-test:0202 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods barattolo_tempo nip33 find_order_by_seconds a_dispute_the_daemon_opens`
+  → `730 passed; 0 failed; 1 ignored` (l'ignorata è di upstream,
+  `lnurl_get_reaches_the_pinned_host_in_a_proxied_env`, che gira solo
+  dentro un'altra prova). Fra i verdi le 48 prove nostre
+  (`barattolo_fee`, `barattolo_eventi`, `barattolo_bond*`,
+  `barattolo_tempo`), le tredici nominate dalla liturgia della `-bar8`
+  (gli otto di `barattolo_tempo::tests::`, i quattro
+  `reconfirm_timeout_eligibility_…`, l'unica `find_order_by_seconds…`,
+  `status_tags_map_lifecycle_statuses_to_nip69_buckets`,
+  `a_dispute_the_daemon_opens_is_mostros_and_says_why` e le tre
+  `escrow_deadline_…` dello scheduler) e `dev_fee_zero_is_accepted_as_opt_out`.
+  `docker run --rm mostro-test:0202 cargo test --release -- util::tests::`
+  → `90 passed; 0 failed`.
+  Numeri diversi o una rossa: l'errore si incolla a Claude, niente
+  ritocchi a mano; il sorgente torna con `git switch barattolo/v0.19.0`.
+  4) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.20.2-bar9 .`
+  — tag nuovo; la `-bar8` resta sulla macchina. Poi
+  `docker run --rm --entrypoint sh mostro:v0.20.2-bar9 -c "grep -c maker_timeout_limit /usr/local/bin/mostrod; grep -c bond_cltv_delta /usr/local/bin/mostrod"`
+  → due numeri sopra zero (la 0011 nostra e la #1085 di upstream, tutt'e
+  due dentro il binario).
+  5) I DUE FILE DELL'ANDATA, preparati e letti PRIMA del cambio (niente
+  editor):
+  `cd ~/nodo && sed 's#mostro:v0.19.0-bar8#mostro:v0.20.2-bar9#' docker-compose.yml > docker-compose.yml.0202 && diff docker-compose.yml docker-compose.yml.0202; docker compose -f docker-compose.yml.0202 config -q && echo compose-ok`
+  → UNA riga cambiata (l'immagine) e `compose-ok`.
+  `cp -p ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.0202 && printf '# Barattolo, 29 ott 2026 (0.20.2, #1085): CLTV delle hold della cauzione, fra 721 e 864 col nostro hold_invoice_cltv_delta = 576.\nbond_cltv_delta = 744\n' >> ~/nodo/mostro/settings.toml.0202 && diff ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.0202; python3 -c "import tomllib; d=tomllib.load(open('/home/debian/nodo/mostro/settings.toml.0202','rb')); print(d['anti_abuse_bond']['bond_cltv_delta'], d['lightning']['hold_invoice_cltv_delta'], d['lightning']['escrow_deadline_margin_blocks'], d['mostro']['expiration_seconds'], d['mostro']['maker_expiration_seconds'])"`
+  → due righe in più in fondo, e `744 576 24 1800 10800`: la riga nuova
+  è caduta dentro `[anti_abuse_bond]` (se `tomllib` la mette altrove, o
+  manca `python3`, ci si ferma e si chiede).
+  FASE 4 — IL CAMBIO, UN COMANDO: conta gli scambi aperti e, se non sono
+  zero, non tocca niente; se sono zero mette i due file e riavvia il
+  solo container Mostro (`up -d`, non `restart`: cambia l'immagine):
+  `cd ~/nodo && n=$(sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute(\"SELECT COUNT(*) FROM orders WHERE status IN ('waiting-payment','waiting-buyer-invoice','waiting-taker-bond','active','fiat-sent','settled-hold-invoice','in-progress','dispute')\").fetchone()[0])") && echo "scambi aperti: $n" && [ "$n" = 0 ] && date -u && cp -p docker-compose.yml.0202 docker-compose.yml && cp -p mostro/settings.toml.0202 mostro/settings.toml && docker compose up -d mostro && date -u`
+  Il libro è fermo fra le due date (la `-bar8`: undici secondi; qui le
+  migrazioni aggiungono qualche secondo).
+  IL CONTROLLO, subito:
+  `docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && docker compose ps mostro`
+  → `mostro:v0.20.2-bar9`, `running`.
+  `docker compose logs mostro --since 3m | grep -i -E "migrat|Settings correctly|barattolo_|Transport|health|error|panic" | head -40`
+  → «Settings correctly loaded!», `Transport: nip44`, `barattolo_fee` e
+  `barattolo_eventi: order events go to …` (se quest'ultima manca, gli
+  eventi sono spenti: fase 1, e), NESSUN `error`/`panic`; le migrazioni
+  sqlx le applica in silenzio (il conto certo è `_sqlx_migrations`, qui
+  sotto), e del `[health]` acceso di serie il registro non dice niente
+  (scrive solo se è spento o se l'intervallo non è 60). Un `mostrod` che non
+  parte dice il perché nel log (`bond_cltv_delta`, una chiave rifiutata,
+  una migrazione): si incolla a Claude e si torna indietro (ROLLBACK).
+  `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT COUNT(*) FROM _sqlx_migrations').fetchone())"`
+  → `(26,)`.
+  Dall'app («Info P2P»): `mostro_version 0.20.2`, i tempi come prima
+  (30 minuti / 3 ore), `bond_enabled true`, `bond_only_payment_methods
+  Contanti`. Sul VPS, nel journal, entro qualche minuto nessun errore
+  nuovo del P2P. E QUI CI SI FERMA.
+  FASE 5 — LA PROVA DAL VIVO, di Andrea con due account, SUBITO (il
+  ritorno costa gli ordini nati dopo il cambio: meglio provare prima
+  che ne nascano di altri). Uno scambio PICCOLO e INTERO, non solo
+  pubblica-prendi-annulla come il 13 ott: A pubblica una vendita, B la
+  prende, A paga la garanzia (è il passo spostato dalla 0.20.2: a B deve
+  arrivare «sats in garanzia, manda gli euro», cioè l'evento
+  `hold-invoice-paid` al server), B segna «ho pagato», A libera, B
+  riceve. Nel registro del nodo ogni passo ha la sua riga
+  `barattolo_eventi: order … delivered`; nel bot i soliti avvisi; e le
+  fee per parte (0005) come prima. Poi un secondo giro pubblica-prendi e
+  annullo da chi ha preso, come il 13 ott. Quel che la prova NON copre
+  (e si dice): la scadenza vera di chi pubblica (FASE 5 della `-bar8`,
+  ancora mai vista), la disputa automatica, la manutenzione da sola di
+  LND, la cura #910 (vuole un venditore che annulla nel secondo esatto).
+  FASE 6 — A `-bar9` IN SERVIZIO, tre righe di testo (si chiedono a
+  Claude): il README del fork («IN SERVIZIO»), NODO-MOSTRO («LA 0.20.2
+  PREPARATA» diventa «IN SERVIZIO», con l'ora del libro fermo), e la riga
+  dell'immagine in `CLAUDE.md` (`mostro:v0.19.0-bar8` → `v0.20.2-bar9`,
+  commit suo). E `docker rmi mostro-test:0202` quando si vuole il disco.
+  ROLLBACK (solo se la `-bar9` non regge; vuole il database di prima):
+  `cd ~/nodo && docker compose stop mostro && cp -p docker-compose.yml.prima-0202 docker-compose.yml && cp -p mostro/settings.toml.prima-0202 mostro/settings.toml && sudo cp -p mostro/mostro.db.prima-0202 mostro/mostro.db && docker compose up -d mostro && docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
+  → `-bar8`. Gli ordini pubblicati o presi DOPO il cambio non ci sono
+  più (erano nel database nuovo): chi li aveva pubblicati li rifà. Il
+  sorgente: `git -C ~/nodo/mostro-src switch barattolo/v0.19.0`. Sul VPS
+  niente da toccare.
+  COM'È ANDATA NEL CLOUD (29 ott 2026, cantiere `mostro-0202`; il nodo
+  non è stato toccato): la `v0.20.2` pulita compila in 9 min 32 coi
+  test; i patcher 0001-0006 entrano come sono, la 0007 si ferma
+  sull'ancora di `flow.rs` (la stessa del 13 ott) e dietro di lei cinque
+  ancore in tutto erano cambiate — riagganciate leggendo il diff di
+  upstream (README del fork, in cima); il fork compila in 3 min 56
+  senza un avviso DOPO una correzione: una riga di un test di
+  `barattolo_eventi.rs` nel repo (`endpoint_from` a tre argomenti,
+  avanzo della M6 del 1 ott) non compilava — mai vista perché quel file
+  non era MAI stato compilato (il nodo gira il modulo di prima). Primo
+  lancio dei test 730/0 (1 ignorata), secondo 90/0, la suite intera di
+  `cargo` 1.991/0 (4 ignorate, di upstream), le 48 nostre cercate per
+  nome; `git am` delle undici `.patch` su un clone pulito dà
+  l'albero `16734181`. Controprova: la riga sbagliata rimessa fa rosso
+  il compilatore (è così che si è vista).
 - LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (preparata il 12
   ott 2026, cantiere `tempo-di-chi-pubblica`; ✅ FATTA SUL NODO il 13 ott
   2026, cantiere `mostro-bar8`: in servizio dalle 11:36 UTC, e com'è

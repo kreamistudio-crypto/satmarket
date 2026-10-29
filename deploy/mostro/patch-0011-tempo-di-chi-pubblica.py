@@ -259,7 +259,7 @@ AGGANCI = [
 
     # ── i due tag del 38385 ──────────────────────────────────────────
     ("src/nip33.rs",
-     "    tags_vec.extend(invoice_window_tags(ln_settings));\n"
+     "    tags_vec.extend(escrow_tags(escrow, ln_settings));\n"
      "    tags_vec.extend(bond_policy_tags(bond_settings));\n",
      "    // Barattolo fork (patch 0011): the maker's own waiting window, and after\n"
      "    // how many maker lapses in a row the order is removed — each tag only\n"
