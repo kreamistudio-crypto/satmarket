@@ -227,7 +227,8 @@ const O = D.ordini;
                    !!cass(mem, 'barattolo_swap_cartone2_222'), !!cass(mem, 'barattolo_swap_222')];
   const pp = A.run(`pannelloSwapTelefono({id: ${o1}})`);
   html.push(pp);
-  out.titoloParole = [pp.includes('Le tue 12 parole di riserva'), pp.includes('di riserva per ')];
+  /* (parole-corte) il titolo e' «Le tue 12 parole», senza il nome del fornitore */
+  out.titoloParole = [pp.includes('Le tue 12 parole<'), pp.includes('12 parole per ')];
   A.run(`elementi.swapSpunta_${o1} = {checked: true}`);
   /* «Continua» fa nascere lo swap da solo */
   await A.run(`swapParoleFatte(${o1})`);

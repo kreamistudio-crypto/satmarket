@@ -203,13 +203,15 @@ const S = vm.runInNewContext(BUNDLE + ';BarattoloSwap', {crypto: globalThis.cryp
   /* le parole sole: sopra ci sono le tre regole, anche loro in lista */
   const elenco0 = (p0.split('class="swap-parole"')[1] || '').split('</ol>')[0];
   out.parolePannello = (elenco0.match(/<li>/g) || []).length;
-  out.paroleCalma = [p0.includes('servono solo se qualcosa va storto'),
+  /* (29 ott 2026, parole-corte) due frasi e due regole: la riga in
+     grassetto «nessuno può recuperarli» è entrata nella spiegazione */
+  out.paroleCalma = [p0.includes('Se perdi il telefono, con queste riprendi i tuoi bitcoin.'),
                      (p0.match(/class="swap-regole"/g) || []).length,
-                     p0.includes('Senza queste parole nessuno può recuperarli, nemmeno noi.'),
+                     !p0.includes('class="swap-calma forte"'),
                      p0.includes('>Continua<'),
                      /* (parole-uniche) dove ritrovarle: il Profilo, non la pagina «Cambio» */
-                     p0.includes('le ritrovi nel Profilo, in «Il wallet di Barattolo»'),
-                     p0.includes('Qui non ne esiste una copia di riserva')];
+                     p0.includes('Le ritrovi nel Profilo, in «Il wallet di Barattolo»'),
+                     p0.includes('Qui non c&#39;è una copia') || p0.includes("Qui non c'è una copia")];
   A.run("elementi.swapSpunta_7 = {checked: false}");
   A.run('swapParoleFatte(7)');
   out.senzaSpunta = [A.run('swapPassi[7]'), A.run('swapErrori[7]'), cassetto().copiata];

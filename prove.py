@@ -180531,15 +180531,17 @@ console.log(JSON.stringify(fuori));
 
     # --- le 12 parole: con calma, e la frase di Andrea alla fine
     it = t3[:t3.index("\n  en: {")]
-    prova("le 12 parole: a cosa servono, le tre regole, la frase di Andrea",
-          (True, 3, True, True),
+    prova("le 12 parole: a cosa servono e le due regole, in poche righe",
+          (True, 2, False, True),
           # (29 ott 2026, parole-uniche) sono la chiave del wallet, si
-          # mostrano solo dove non hanno copia, e si ritrovano nel Profilo
-          ("servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin "
-           "anche da un altro telefono. Qui non ne esiste una copia di riserva" in it,
+          # mostrano solo dove non hanno copia, e si ritrovano nel Profilo;
+          # (parole-corte, Andrea: «il testo è troppo lungo») due frasi e
+          # due regole, la riga in grassetto è entrata nella spiegazione
+          ("Se perdi il telefono, con queste riprendi i tuoi bitcoin. "
+           "Qui non c\\'è una copia: scrivile tu." in it,
            it[it.index("paroleRegole: ["):it.index("],", it.index("paroleRegole: ["))].count("',") + 1,
-           "paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.'," in it,
-           "le ritrovi nel Profilo, in «Il wallet di Barattolo»." in it))
+           "paroleNessuno" in t3,
+           "'Le ritrovi nel Profilo, in «Il wallet di Barattolo».'" in it))
     avanti = js[js.index("async function swapAvantiDentro(n){"):js.index("/* «Continua» delle parole")]
     prova("...e solo dove serve: il passo «parole» c'e' solo con le parole "
           "senza copia fuori e non ancora copiate, sennò lo swap parte subito",

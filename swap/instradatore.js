@@ -196,13 +196,11 @@ function swapFase(rec){
    spiegano con calma UNA volta, alla prima (il passo 'parole'). */
 const SWAP_TESTI_T3 = {
   it: {
-    paroleTit: 'Le tue 12 parole di riserva',
-    paroleDi: n => `Le tue 12 parole di riserva per ${n}`,
-    paroleSpiega: 'Sono la chiave del tuo wallet di Barattolo e servono solo se qualcosa va storto: con queste riprendi i tuoi bitcoin anche da un altro telefono. Qui non ne esiste una copia di riserva, quindi scrivile tu.',
-    paroleRegole: ['Scrivile su carta, in ordine.',
-                   'Non fotografarle e non darle a nessuno, nemmeno a noi.',
-                   'Te le chiediamo una volta sola: le ritrovi nel Profilo, in «Il wallet di Barattolo».'],
-    paroleNessuno: 'Senza queste parole nessuno può recuperarli, nemmeno noi.',
+    paroleTit: 'Le tue 12 parole',
+    paroleDi: n => `Le tue 12 parole per ${n}`,
+    paroleSpiega: 'Se perdi il telefono, con queste riprendi i tuoi bitcoin. Qui non c\'è una copia: scrivile tu.',
+    paroleRegole: ['Scrivile su carta e non darle a nessuno, nemmeno a noi.',
+                   'Le ritrovi nel Profilo, in «Il wallet di Barattolo».'],
     paroleSpunta: 'Le ho scritte su carta',
     paroleFatto: 'Continua',
     paroleSpuntaPrima: 'Prima spunta «Le ho scritte su carta».',
@@ -275,14 +273,14 @@ const SWAP_TESTI_T3 = {
     unita: 'Unità delle cifre',
     tessere: [['ln', 'Veloce'], ['scudo', 'Restano tuoi'], ['gira', 'Due strade']],
     /* (parole-uniche, 29 ott 2026) le parole stanno nel Profilo */
-    riservaDove: 'Le 12 parole di riserva sono nel Profilo',
+    riservaDove: 'Le 12 parole sono nel Profilo',
     ritrovaTit: 'I tuoi cambi',
-    ritrovaSpiega: 'Su un telefono nuovo i cambi fatti altrove non si vedono: «Ritrova i miei cambi» li cerca con la chiave del tuo wallet, senza chiederti le parole.',
+    ritrovaSpiega: 'Hai cambiato telefono? Tocca qui e ritrovi i tuoi cambi.',
     ritrova: 'Ritrova i miei cambi',
     ritrovaFatto: n => n === 0 ? 'Nessun cambio nuovo da ritrovare.'
       : n === 1 ? 'Ritrovato 1 cambio.' : `Ritrovati ${n} cambi.`,
     vecchieTit: 'Le parole dei cambi di prima',
-    vecchieSpiega: 'I cambi nati prima del 29 ottobre 2026 hanno 12 parole loro: restano qui finché servono.',
+    vecchieSpiega: 'Servono solo per i cambi fatti prima del 29 ottobre 2026.',
     cifraNo: 'Scrivi quanti sats vuoi cambiare.',
     tettoGiorno: m => `Per oggi hai fatto i ${m} cambi possibili: riprova domani.`,
     cambioNonRisponde: n => `${n} ora non risponde: riprova fra poco.`,
@@ -317,13 +315,11 @@ const SWAP_TESTI_T3 = {
     rimborsaA: 'Rimanda a questo indirizzo',
     passiSub: ['Mandati', 'Confermati', 'Pagato']},
   en: {
-    paroleTit: 'Your 12 backup words',
-    paroleDi: n => `Your 12 backup words for ${n}`,
-    paroleSpiega: 'They are the key of your Barattolo wallet and you need them only if something goes wrong: with them you get your bitcoin back, even from another phone. There is no backup copy of them here, so write them down yourself.',
-    paroleRegole: ['Write them on paper, in order.',
-                   'Do not photograph them and do not give them to anyone, not even to us.',
-                   'We ask you only once: you find them again in the Profile, under «Your Barattolo wallet».'],
-    paroleNessuno: 'Without these words nobody can recover them, not even us.',
+    paroleTit: 'Your 12 words',
+    paroleDi: n => `Your 12 words for ${n}`,
+    paroleSpiega: 'If you lose your phone, these get your bitcoin back. There is no copy here: write them down.',
+    paroleRegole: ['Write them on paper and give them to no one, not even us.',
+                   'You find them in the Profile, under «Your Barattolo wallet».'],
     paroleSpunta: 'I wrote them on paper',
     paroleFatto: 'Continue',
     paroleSpuntaPrima: 'First tick «I wrote them on paper».',
@@ -388,14 +384,14 @@ const SWAP_TESTI_T3 = {
     oggi: (n, m) => `today ${n} of ${m}`,
     unita: 'Unit of the figures',
     tessere: [['ln', 'Fast'], ['scudo', 'Stays yours'], ['gira', 'Two ways']],
-    riservaDove: 'The 12 backup words are in the Profile',
+    riservaDove: 'The 12 words are in the Profile',
     ritrovaTit: 'Your exchanges',
-    ritrovaSpiega: 'On a new phone the exchanges made elsewhere do not show: «Find my exchanges» looks for them with the key of your wallet, without asking for the words.',
+    ritrovaSpiega: 'New phone? Tap here to find your exchanges.',
     ritrova: 'Find my exchanges',
     ritrovaFatto: n => n === 0 ? 'No new exchanges to find.'
       : n === 1 ? 'Found 1 exchange.' : `Found ${n} exchanges.`,
     vecchieTit: 'The words of earlier exchanges',
-    vecchieSpiega: 'Exchanges born before 29 October 2026 have 12 words of their own: they stay here as long as they are needed.',
+    vecchieSpiega: 'Needed only for exchanges made before 29 October 2026.',
     cifraNo: 'Write how many sats you want to exchange.',
     tettoGiorno: m => `You made the ${m} exchanges allowed for today: try again tomorrow.`,
     cambioNonRisponde: n => `${n} is not responding: try again shortly.`,
@@ -598,7 +594,7 @@ function pannelloSwapTelefono(o){
   if (passo === 'parole') {
     /* LE 12 PAROLE, UNA VOLTA SOLA E CON CALMA, e dal 29 ott 2026 (cantiere
        parole-uniche) SOLO dove nessuna copia fuori da qui le ridà: a cosa
-       servono, le tre regole, chi puo' recuperare senza (nessuno). Poi le
+       servono (in due righe: 29 ott 2026, parole-corte), le due regole. Poi le
        parole del wallet di Barattolo, la spunta e «Continua», che fa
        partire tutto da solo. */
     const testo = swapParoleOnchain();
@@ -607,7 +603,6 @@ function pannelloSwapTelefono(o){
       <h4 class="cambio-tit">${swapIcona('chiave')}${esc(t.paroleTit)}</h4>
       <p class="swap-calma">${esc(t.paroleSpiega)}</p>
       <ol class="swap-regole">${t.paroleRegole.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
-      <p class="swap-calma forte">${esc(t.paroleNessuno)}</p>
       ${errore}
       <ol class="swap-parole">${parole.map(p => `<li>${esc(p)}</li>`).join('')}</ol>
       <label class="swap-spunta"><input type="checkbox" id="swapSpunta_${n}"> ${esc(t.paroleSpunta)}</label>
