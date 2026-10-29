@@ -55296,7 +55296,7 @@ function payMetodoPrepara(l, offAcc, sats){
   payNotaLn = {mostra: el('payEurNota').style.display,
                testo: el('payEurNota').textContent};
   renderPayMetodo();
-  payOcChiesto = fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
+  payOcChiesto = fetch(`${API_BASE}/onchain/pronto/${l.sellerId}?annuncio=${l.id}&sats=${Math.max(0, Math.floor(Number(sats) || 0))}`, {headers: {'X-Tg-Init-Data': authHdr()}})
     .then(r => r.ok ? r.json() : {pronto: false, motivo: 'on-chain spento su questo server'})
     .then(x => { if (payMetodoAcceso) { payOcPronto = x; renderPayMetodo(); } })
     .catch(() => { if (payMetodoAcceso) { payOcPronto = {pronto: false, motivo: 'rete assente'}; renderPayMetodo(); } });

@@ -91302,17 +91302,32 @@ async def onchain_ordini(x_tg_init_data: str = Header(""),
 
 
 @app.get("/api/onchain/pronto/{venditore_id}")
-async def onchain_pronto(venditore_id: int, sats: int = 0,
+async def onchain_pronto(venditore_id: int, sats: int = 0, annuncio: int = 0,
                          x_tg_init_data: str = Header(""),
                          barattolo_sessione: str = Cookie("")):
     """La cassa chiede se a QUESTO venditore si puo' pagare on-chain,
     prima di mostrare la scelta: si o no, e il perche' a parole. Non
-    dice la xpub di nessuno, solo se c'e'."""
+    dice la xpub di nessuno, solo se c'e'.
+    L'ID DI UN ACCOUNT NOSTR NON SOPRAVVIVE AL BROWSER (29 ott 2026, giro
+    dal vivo con due account Nostr): e' un intero a 63 bit, e JSON.parse
+    lo arrotonda a 53 — la cassa chiedeva di un venditore che non esiste
+    e la porta ⛓️ restava spenta per OGNI venditore Nostr. Con
+    `annuncio` il venditore si rilegge dal database, e l'id del percorso
+    e' solo un ripiego per i client di ieri."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
     if not EMBIT:
         return {"pronto": False, "motivo": "manca la libreria embit"}
+    if annuncio:
+        con = db()
+        try:
+            r = con.execute("SELECT venditore_id FROM annunci WHERE id=?",
+                            (int(annuncio),)).fetchone()
+        finally:
+            con.close()
+        if r:
+            venditore_id = int(r["venditore_id"])
     if not onchain_ammesso(venditore_id):
         return {"pronto": False, "motivo": "questo venditore non riceve on-chain"}
     con = _onchain_db()

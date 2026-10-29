@@ -74090,3 +74090,53 @@ con un venditore che riceve on-chain (il percorso è quello del tocco su
 onchain-p2p, «coi soldi veri piccoli sul collaudo») ora vuole
 `PROVA_P2P_VERO = True` per il tempo della prova, oppure un Mostro di
 casa: è una scelta di Andrea.
+
+## Il giro on-chain dal vivo con due account Nostr, e l'id che il browser arrotonda (29 ott 2026, cantiere giro-signet, Andrea: «fai dei test tra faucet e due account nostr non admin, una transazione che vada a buon fine e una con dei problemi per cui gli admin devono intervenire. Voglio che mi dai il verdetto per capire quanto è possibile provarlo in mainnet»)
+
+**IL GIRO.** Due browser veri (Playwright) contro il server vero in
+locale, col nodo muto del banco: chi compra e chi vende entrano con una
+chiave Nostr appena nata (non admin, `ONCHAIN_SOLO_ADMIN` spenta dal
+pannello), l'on-chain si accende da solo, chi vende incolla un indirizzo
+del suo wallet e lo firma col seme, chi compra apre il foglio su ⚡ e
+tocca ⛓️: nasce il 2-di-3, un wallet esterno paga l'importo esatto, «Ho
+pagato» lo trova, l'ordine di sempre è `locked`. Giro buono: chi compra
+conferma (prima firma), chi vende apre l'app e il suo telefono mette la
+seconda da solo; in rete esce una transazione con 30.000 sats
+all'indirizzo scelto e 540 di commissione (tutto il margine, perché
+l'avanzo sta sotto la polvere). Giro con disputa: chi compra la apre, un
+admin che non è parte decide «rimborsa», Barattolo firma sul server con
+la chiave nata dal pannello, chi compra apre l'app e co-firma: 20.246
+sats tornano al suo indirizzo di rimborso. 20 passi verdi su 21: l'unico
+rosso è apposta, ed è il bug qui sotto. Le notifiche del bot escono nei
+punti giusti, moderatori compresi. Strumento e istruzioni in
+`strumenti/giro-onchain-nostr/`.
+
+**COSA È FINTO.** Solo la rete Bitcoin: dall'ambiente cloud mempool.space
+e le faucet di signet sono bloccati (si aprono da Project settings →
+Cloud environment → Allowed domains). La rete finta sta in memoria nel
+server del giro: tiene le monete per indirizzo, accetta una transazione
+solo se spende monete esistenti e non supera le entrate, e NON verifica
+le firme (quelle le giudica già il server vero prima di trasmettere, e
+`embit` le costruisce). La faucet è una riga nella rete finta. Il
+wallet esterno è `embit` con un seme di prova (BIP-84, come Sparrow).
+
+**IL BUG TROVATO, E CURATO.** Gli id degli account Nostr sono interi a
+63 bit; `JSON.parse` nel browser li arrotonda a 53. La cassa chiedeva
+`/api/onchain/pronto/<id arrotondato>` e il server rispondeva «il
+venditore non ha ancora aperto Barattolo»: la porta ⛓️ restava spenta
+per OGNI venditore Nostr, e nessun collaudo se n'era accorto perché i
+collaudi usano id piccoli. Cura minima: la cassa manda anche
+`annuncio=<id>`, e il server rilegge il venditore dall'annuncio; il
+percorso resta per i client di ieri. Sentinella in
+`prove_cancello_onchain`. Lo stesso arrotondamento tocca `myTgId` e
+ogni id Nostr che il browser rimanda come numero: non fa danni dove
+server e browser arrotondano uguale, ma va guardato.
+
+**STRADE SCARTATE.** Ribattezzare la rotta sull'annuncio (romperebbe la
+lista delle rotte e i client vecchi). Mandare gli id come stringhe in
+tutto il JSON (giusto, ma è un cantiere a sé e tocca cento punti).
+
+**DA GUARDARE.** Il giro vero su signet con la faucet, appena la rete è
+aperta: basta togliere la rete finta dal server del giro. L'ordine
+Nostr→Nostr in Telegram (CONTO_MINI) non è stato provato. Il verdetto
+per la mainnet sta nel documento consegnato ad Andrea.

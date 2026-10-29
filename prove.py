@@ -153531,6 +153531,17 @@ def prove_cancello_onchain():
            "/api/onchain/ordini/{oid}/rilascio-chiesto",
            "/api/onchain/ordini/{oid}/proposta",
            "/api/onchain/ordini/{oid}/firma"], rotte)
+    # L'ID NOSTR NON SOPRAVVIVE AL BROWSER (29 ott 2026, giro dal vivo con
+    # due account Nostr): JSON.parse arrotonda un intero a 63 bit, e la
+    # cassa chiedeva di un venditore che non esiste. Il browser manda
+    # l'annuncio, il server rilegge il venditore da li'
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la cassa chiede «pronto?» con l'ANNUNCIO, e il server rilegge "
+          "il venditore da li' (gli id Nostr arrotondati dal browser)",
+          [True, True, True],
+          ["/onchain/pronto/${l.sellerId}?annuncio=${l.id}&sats=" in mini,
+           "annuncio: int = 0" in pezzo("onchain_pronto"),
+           "SELECT venditore_id FROM annunci WHERE id=?" in pezzo("onchain_pronto")])
     # il conto che conta: ogni rotta on-chain deve nominare il cancello
     # nel suo corpo.
     senza = []

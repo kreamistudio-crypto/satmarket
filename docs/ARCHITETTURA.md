@@ -34421,6 +34421,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `accOnchainIncasso` in `renderChecklist`, modulo `onchainModuloIncasso(pref)`
   con `onchainTipoIncollato`, `onchainSembraSegreto`,
   `onchainIncassoGuarda(Presto)`, `onchainIncassoSalva(btn, pref)`.
+- GLI ID NOSTR E LA CASSA (29 ott 2026, cantiere giro-signet). Un
+  account Nostr ha un `tg_id` a 63 bit (`tg_id_da_pubkey`); nel browser
+  `JSON.parse` lo arrotonda a 53, quindi `l.sellerId` non è l'id vero.
+  `GET /api/onchain/pronto/{venditore_id}` prende `?annuncio=<id>` e,
+  quando c'è, rilegge il venditore dall'annuncio (il percorso resta per i
+  client di ieri); `payMetodoPrepara` lo manda sempre. Ogni altro id
+  Nostr che il browser rimanda al server come numero ha lo stesso
+  problema. Il giro dal vivo con due browser e account Nostr sta in
+  `strumenti/giro-onchain-nostr/` (non è un collaudo della CI).
 - LA DESTINAZIONE DOPO (27 ott 2026, cantiere onchain-dopo; perché in
   CANTIERI, «La destinazione dopo»). Un ordine on-chain con `incasso`
   vuoto è un 2-di-3 normale da cui verso chi vende non esce niente: la
