@@ -75487,6 +75487,25 @@ liberazione resta ferma (409), e i sats restano nel 2-di-3. Nel
 Profilo c'è «Togli»: il server lo sapeva fare (`tipo: 'barattolo'`),
 mancava il tasto. Gli scambi già nati tengono l'indirizzo che avevano.
 
+RITOCCO DELLO STESSO POMERIGGIO (Andrea: «dalle impostazioni si può
+inserire una xpub, se manca si inserisce l'indirizzo al volo con lo
+stesso controllo che c'è ora»). La pagina dello scambio non chiede più
+il modulo del Profilo: chiede SOLO un indirizzo, con lo stesso
+controllo (valido, già usato o no), e lo scrive su QUELLO scambio con
+la rotta nuova `POST /api/p2p/onchain/{id}/incasso`. Firmato dal seme
+come nel Profilo (`onchain_firma_valida`): il telefono di chi libera
+controlla la destinazione con quella firma, e senza non partirebbe.
+Il Profilo non si tocca: la chiave del conto (un indirizzo nuovo a ogni
+scambio) resta una scelta delle impostazioni, e il campo dello scambio,
+se ci incolli una chiave, rimanda lì. La rotta vuole chi compra, un
+incasso vuoto e nessuna proposta già firmata: quel che è scritto non si
+cambia sotto i piedi di chi libera (409). SCARTATO: togliere
+l'indirizzo fisso dal Profilo per lasciarci solo la chiave del conto —
+quel modulo serve anche ai venditori del mercatino on-chain, e Andrea
+non l'ha chiesto. Provato nella gabbia (sezione 11-ter: 403 a chi
+vende, 400 alla chiave del conto e alla firma di un altro seme, 200 col
+Profilo che resta vuoto, 409 al secondo giro).
+
 ## I colori veri all'amministratore del collaudo (30 ott 2026, cantiere collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi mettere gli sfondi originali nellapp collaudo solo per me amministratore? la striscia blu in alto va bene ... per tutti gli altri utenti che hanno accesso al collaudo invece rimane cosi blu»)
 
 Il perché di Andrea: la pagina si giudica coi colori che avrà in

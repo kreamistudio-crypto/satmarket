@@ -94100,6 +94100,57 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
     return {"ok": True}
 
 
+@app.post("/api/p2p/onchain/{oid}/incasso")
+async def p2p_onchain_incasso_qui(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """L'INDIRIZZO AL VOLO (30 ott 2026, Andrea: «dalle impostazioni si può
+    inserire una xpub, se manca si inserisce l'indirizzo al volo con lo
+    stesso controllo che c'è ora»). Chi compra bitcoin e non ha scelto dove
+    ricevere scrive un indirizzo per QUESTO scambio: lo stesso giudice e la
+    stessa firma del seme del Profilo (`onchain_destinazione_motivo`,
+    `onchain_firma_valida`), ma il Profilo non si tocca — la chiave del
+    conto che vale per tutti gli scambi resta una scelta delle
+    impostazioni. Solo un indirizzo, solo a incasso vuoto e senza una
+    proposta gia' firmata: quel che e' scritto non si cambia sotto i piedi
+    di chi libera."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_incasso", user["id"])
+    d = await leggi_json(req)
+    valore = str(d.get("valore") or "").strip()
+    firma = str(d.get("firma") or "").strip().lower()
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
+            raise HTTPException(403, "Dove ricevere lo sceglie chi compra bitcoin")
+        if (o["stato"] not in ("preso", "depositato", "euro_inviati", "disputa")
+                or o["incasso"] or o["proposta_psbt"]):
+            raise HTTPException(409, "Dove ricevere non si cambia più")
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not r:
+            raise HTTPException(400, "Prima accendi l'on-chain")
+        motivo = onchain_destinazione_motivo("indirizzo", valore, r["xpub"])
+        if motivo:
+            raise HTTPException(400, motivo)
+        valore = onchain_indirizzo_esterno("indirizzo", valore, 0)
+        if not onchain_firma_valida(r["xpub"], "indirizzo", valore, firma):
+            raise HTTPException(400, "L'indirizzo non è firmato dal tuo seme: "
+                                     "rifallo da questo telefono")
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso=?, incasso_tipo='indirizzo',"
+            " incasso_valore=?, incasso_firma=?, incasso_indice=0, aggiornato=?"
+            " WHERE id=? AND incasso='' AND proposta_psbt=''",
+            (valore, valore, firma, int(time.time()), oid))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Dove ricevere non si cambia più")
+        return _p2p_onchain_per(con, _p2p_onchain_carica(con, oid), user["id"])
+    finally:
+        con.close()
+
+
 @app.post("/api/p2p/onchain/{oid}/proposta")
 async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):

@@ -55766,6 +55766,10 @@ async function onchainIncassoGuarda(pref){
   }
   const tipo = onchainTipoIncollato(v);
   if (!tipo) { const rt = onchainRete(); return dici(`Incolla un indirizzo <span class="mono">${rt.indirizzo}…</span> o una chiave <span class="mono">${rt.conto}…</span> / <span class="mono">${rt.xpub}…</span>.`); }
+  /* nello scambio P2P solo l'indirizzo al volo (30 ott 2026, Andrea): la
+     chiave del conto e' una scelta delle impostazioni, vale per tutti */
+  if (pref === 'ocP2p' && tipo !== 'indirizzo')
+    return dici('Qui va un indirizzo. La chiave del conto si mette nel <b>Profilo</b>: da lì vale per tutti i tuoi scambi.');
   const valore = onchainNormaDestinazione(tipo, v);
   const giro = ++onchainIncassoGiro;
   dici('Controllo…');
@@ -57167,12 +57171,46 @@ function depositoVistoOnchainP2P(o){
    indirizzo o chiave del conto): salvato, il server riempie gli scambi
    che aspettavano (`_p2p_onchain_riempi_incassi`) e la pagina si rifa'. */
 function incassoMancanteOnchainP2P(o){
-  if (!o || o.ruolo !== 'venditore' || o.incasso) return '';
+  if (!o || o.ruolo !== 'venditore' || o.incasso || o.proposta) return '';
   if (!['preso', 'depositato', 'euro_inviati', 'disputa'].includes(o.stato)) return '';
+  const rt = onchainRete();
   return '<div class="p2p-box p2p-onchain-incasso"><b>Dove ricevi i bitcoin?</b>'
-    + '<div class="hint">Serve prima che chi vende liberi i sats: un tuo indirizzo, oppure la chiave '
-    + 'del conto del tuo wallet per avere un indirizzo nuovo a ogni scambio.</div>'
-    + onchainModuloIncasso('ocP2p') + '</div>';
+    + '<div class="hint">Serve prima che chi vende liberi i sats: incolla un tuo indirizzo, vale per questo scambio.</div>'
+    + '<div class="field" style="margin:12px 0 4px"><input id="ocP2pValore" class="mono" autocomplete="off" spellcheck="false"'
+    + ' placeholder="' + rt.indirizzo + '…" oninput="onchainIncassoGuardaPresto(\'ocP2p\')"></div>'
+    + '<div id="ocP2pEsito" class="hint" style="min-height:1.2em"></div>'
+    + '<button class="btn" id="ocP2pSalva" disabled onclick="incassoQuiOnchainP2P(this, ' + Number(o.id) + ')">✍️ Firma e usa questo indirizzo</button>'
+    + '<div class="hint" style="margin-top:8px">Per non doverlo scrivere ogni volta, metti nel <b>Profilo</b> la chiave '
+    + 'del conto del tuo wallet (<span class="mono">' + rt.conto + '…</span>): ogni scambio arriva a un indirizzo nuovo.</div>'
+    + '</div>';
+}
+/* «Firma e usa questo indirizzo»: la stessa firma del seme del Profilo
+   (`onchainFirmaDestinazione`), ma verso lo scambio e non verso il
+   Profilo — la rotta `incasso` dello scambio la controlla e la scrive
+   solo li'. */
+async function incassoQuiOnchainP2P(btn, id){
+  haptic();
+  const campo = el('ocP2pValore');
+  const grezzo = campo ? campo.value.trim() : '';
+  if (onchainSembraSegreto(grezzo)) { if (campo) campo.value = ''; return toast('⛔ Una chiave privata non si incolla qui'); }
+  if (onchainTipoIncollato(grezzo) !== 'indirizzo') return toast('⚠️ Incolla prima un tuo indirizzo');
+  const valore = onchainNormaDestinazione('indirizzo', grezzo);
+  const rip = onchainAttesa(btn, 'Firmo…');
+  try {
+    await onchainAccendiDaSolo();
+    const parole = onchainSemeLocale();
+    if (!parole) throw new Error('su questo dispositivo non c\'è la tua chiave');
+    const firma = await onchainFirmaDestinazione(await caricaBitcoin(), parole, 'indirizzo', valore);
+    const r = await fetch(`${API_BASE}/p2p/onchain/${Number(id)}/incasso`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({valore, firma})});
+    const x = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(x.detail || 'non salvato');
+    toast('✅ Ricevi in questo indirizzo', 4000);
+    if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();
+  } catch(e) {
+    toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'indirizzo non salvato'), 6000);
+  } finally { rip(); }
 }
 
 async function leggiMieiOnchainP2P(){

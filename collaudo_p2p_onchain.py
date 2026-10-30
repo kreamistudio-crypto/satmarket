@@ -697,6 +697,39 @@ def main():
     prova("...e per uno scambio nuovo l'incasso nasce vuoto: la pagina glielo chiede",
           ("", "", "", "", 0), vuoto)
 
+    # ---- 11-ter) l'indirizzo al volo, solo per lo scambio (30 ott 2026, Andrea)
+    print("\n[l'indirizzo al volo: vale per lo scambio, il Profilo non si tocca]")
+    # il giro ha gia' riempito i cinque posti aperti di Andrea: qui se ne
+    # allarga uno (che il tetto esista lo prova la sezione sua)
+    tetto = SRV.P2P_ONCHAIN_APERTI_MAX
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto + 5
+    o4 = pubblica(999, sats=60000, euro_cent=5400, metodi=["Bonifico"]).json()
+    oid4 = o4["id"]
+    gesto(888, oid4, "prendi")
+    qui = dal_wallet(7)
+    prova("Alan prende senza un posto dove ricevere: l'incasso e' vuoto", "",
+          uno(888, oid4)["incasso"])
+    prova("l'indirizzo dello scambio lo scrive solo chi compra: 403 ad Andrea", 403,
+          gesto(999, oid4, "incasso", valore=qui,
+                firma=firma_dest(999, "indirizzo", qui)).status_code)
+    prova("...qui solo un indirizzo: la chiave del conto e' un 400", 400,
+          gesto(888, oid4, "incasso", valore=vpub,
+                firma=firma_dest(888, "xpub", vpub)).status_code)
+    prova("...firmato da un altro seme: 400", 400,
+          gesto(888, oid4, "incasso", valore=qui,
+                firma=firma_dest(999, "indirizzo", qui)).status_code)
+    r = gesto(888, oid4, "incasso", valore=qui, firma=firma_dest(888, "indirizzo", qui))
+    prova("...giusto e firmato dal suo seme: 200, lo scambio riceve li', "
+          "e il Profilo resta vuoto",
+          (200, qui, "indirizzo", ""),
+          (r.status_code, uno(888, oid4)["incasso"],
+           (uno(888, oid4)["destinazione"] or {}).get("tipo"),
+           c.get("/api/me").json().get("onchain_incasso") or ""))
+    prova("...e scritto non si cambia: 409", 409,
+          gesto(888, oid4, "incasso", valore=dal_wallet(8),
+                firma=firma_dest(888, "indirizzo", dal_wallet(8))).status_code)
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
     nudi = [t[:60] for chi, t, b in BOTTONI

@@ -152987,17 +152987,35 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
            "await spuntaAttesaP2P('Fatto', P2P_TORNA_MS);" in fatto,
            "go('p2pmiei');" in fatto))
     casella = pezzo_js(mini, "function incassoMancanteOnchainP2P(o){", "\n}\n")
+    qui = pezzo_js(mini, "async function incassoQuiOnchainP2P(btn, id){", "\n}\n")
+    guarda = pezzo_js(mini, "async function onchainIncassoGuarda(pref){", "\n}\n")
     prova("chi compra senza un posto dove ricevere se lo vede chiedere nella pagina "
-          "dello scambio, col modulo del Profilo (indirizzo o chiave del conto); "
-          "salvato, la pagina si rifa'; e nel Profilo c'e' «Togli» (Alan e Andrea)",
-          (True, True, True, True, True, True),
+          "dello scambio: SOLO un indirizzo, al volo, con lo stesso controllo del "
+          "Profilo, firmato dal seme e scritto sullo scambio e non nel Profilo "
+          "(Andrea: «dalle impostazioni si può inserire una xpub, se manca si "
+          "inserisce l'indirizzo al volo»); e nel Profilo c'e' «Togli»",
+          (True,) * 9,
           ("${incassoMancanteOnchainP2P(o)}" in pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n"),
-           "if (!o || o.ruolo !== 'venditore' || o.incasso) return '';" in casella,
-           "onchainModuloIncasso('ocP2p')" in casella,
+           "if (!o || o.ruolo !== 'venditore' || o.incasso || o.proposta) return '';" in casella,
+           "onchainIncassoGuardaPresto(\\'ocP2p\\')" in casella and "onchainModuloIncasso" not in casella,
+           "if (pref === 'ocP2p' && tipo !== 'indirizzo')" in guarda,
+           "onchainFirmaDestinazione(await caricaBitcoin(), parole, 'indirizzo', valore)" in qui,
+           "/p2p/onchain/${Number(id)}/incasso" in qui and "/onchain/incasso`" not in qui,
            "if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();"
            in pezzo_js(mini, "async function onchainIncassoSalva(btn, pref){", "\n}\n"),
            'onclick="onchainIncassoTogli(this)"' in mini,
            "body: JSON.stringify({tipo: 'barattolo'})" in pezzo_js(mini, "function onchainIncassoTogli(btn){", "\n}\n")))
+    rotta = pezzo("p2p_onchain_incasso_qui")
+    prova("...e la rotta dello scambio: solo chi compra, solo a incasso vuoto e senza "
+          "proposta, lo stesso giudice e la stessa firma del Profilo, il Profilo "
+          "non lo tocca",
+          (True, True, True, True, True),
+          ('!= "venditore":' in rotta,
+           'or o["incasso"] or o["proposta_psbt"]' in rotta
+           and "WHERE id=? AND incasso='' AND proposta_psbt=''" in rotta,
+           'onchain_destinazione_motivo("indirizzo", valore, r["xpub"])' in rotta,
+           'onchain_firma_valida(r["xpub"], "indirizzo", valore, firma)' in rotta,
+           "onchain_incasso(" not in rotta and "INSERT" not in rotta))
     prova("...e ha il suo freno, largo per un battito ogni 15 secondi",
           (True, True),
           ('_frena("p2p_onchain_controlla", user["id"])' in pezzo("p2p_onchain_controlla_rotta"),
