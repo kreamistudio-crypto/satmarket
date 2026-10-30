@@ -3951,7 +3951,7 @@
     border-radius:14px;height:48px}
   .p2p-oc-faccia{position:absolute;inset:0;display:flex;align-items:center;gap:10px;
     padding:0 14px 0 8px;border:0;border-radius:14px;cursor:pointer;
-    background:#140B03;box-shadow:inset 0 0 0 1px #5A2E05;color:#fff;
+    background:#8A4A0E;box-shadow:inset 0 0 0 1px #C26A10;color:#fff;
     transition:background-color .25s ease,box-shadow .25s ease;
     text-shadow:0 1px 2px rgba(0,0,0,.35);font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
   /* 17:55 il gradiente della scelta del + (Andrea: «fai con quel gradiente
@@ -3964,7 +3964,9 @@
      si trasforma in arancio mentre viene mostrato il tutorial» e «il bordo
      della D va bene»): il quasi nero della D, pieno, col suo filo di 1 px;
      dal tocco alla fine del tutorial (`accendiNovitaOcP2P`) l'arancio della
-     moneta, e la moneta riprende il filo bianco dei fondi arancio */
+     moneta, e la moneta riprende il filo bianco dei fondi arancio.
+     «Troppo scuro» (19:33): fra tre varianti piu' chiare (foto 33) la C
+     (scelta di Andrea, 19:36), arancio bruciato #8A4A0E col filo #C26A10 */
   .p2p-oc-faccia:active{filter:brightness(1.06)}
   .p2p-oc-novita.acceso .p2p-oc-faccia{background:#F7931A;box-shadow:inset 0 0 0 1px #B8650C}
   .p2p-oc-novita.acceso .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
@@ -4022,12 +4024,15 @@
      e' un filo dello stesso colore. SCURO E PIU' FINE (18:46, Andrea:
      «provami dei bordi scuri più fini»): 1 px del tono bruciato della rete; e lo scuro
      dentro «più scuro, contrastato» (18:47): quasi nero sotto la moneta.
-     «Leggermente meno ombra» (18:58): l'alone da 14 px a 10, piu' tenue */
+     «Leggermente meno ombra» (18:58): l'alone da 14 px a 10, piu' tenue.
+     «Troppo scuri, leggermente piu' chiari e meno alone colorato dietro»
+     (19:34): il bruno di partenza piu' chiaro (#2E1A08, #2C2408) e piu'
+     corto (14%), il filo un tono sopra, l'alone a 6 px e .2 (foto 34) */
   .btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:#fff;border:0;text-shadow:0 1px 2px rgba(0,0,0,.35)}
-  .btn.p2p-scelta-oc{background:linear-gradient(90deg,#140B03 0%,#140B03 18%,#B8650C 55%,#F7931A 100%);
-    box-shadow:inset 0 0 0 1px #5A2E05,0 0 10px rgba(247,147,26,.32)}
-  .btn.p2p-scelta-ln{background:linear-gradient(90deg,#130F03 0%,#130F03 18%,#B88A12 55%,#FFC83D 100%);
-    box-shadow:inset 0 0 0 1px #5C4708,0 0 10px rgba(255,200,61,.32)}
+  .btn.p2p-scelta-oc{background:linear-gradient(90deg,#2E1A08 0%,#2E1A08 14%,#C06E12 55%,#F7931A 100%);
+    box-shadow:inset 0 0 0 1px #6A3808,0 0 6px rgba(247,147,26,.2)}
+  .btn.p2p-scelta-ln{background:linear-gradient(90deg,#2C2408 0%,#2C2408 14%,#C29414 55%,#FFC83D 100%);
+    box-shadow:inset 0 0 0 1px #6A5410,0 0 6px rgba(255,200,61,.2)}
   .btn.p2p-scelta-oc:active,.btn.p2p-scelta-ln:active{filter:brightness(1.06)}
   /* IL FOGLIO «PUBBLICA» ON-CHAIN: la scritta sopra il titolo, e la
      valuta che non si sceglie (una riga, senza freccina) */
@@ -4061,22 +4066,40 @@
      filo scuro di 1 px (il bordo del ruolo: l'altezza non cambia),
      scritta bianca e un alone corto. Sono le leve del
      ruolo, non un dipinto sopra: premuto, spento e «in corso» le leggono
-     come per gli altri. Barattozon («Rileggi e pubblica»), «Scegli» e il
-     «Pubblica il tuo primo ordine» del libro vuoto non lo portano.
+     come per gli altri. «Scegli» e il «Pubblica il tuo primo ordine» del
+     libro vuoto non lo portano; Barattozon si' dalle 19:40 (vedi sotto).
      L'ICONA STA A SINISTRA, sul nero (fulmine o moneta, senza filo
      bianco), e la scritta resta al centro; nel fantasma della morfosi
      la stessa regola, che le copia i nodi del bottone. */
-  .btn.primary.p2p-scuro{--b-bg:linear-gradient(90deg,#04140A 0%,#04140A 18%,#157A45 55%,#34B47A 100%);
+  .btn.primary.p2p-scuro{--b-bg:linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%);
     --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#0B3D22;
     --b-sh:0 0 8px rgba(52,180,122,.25);--b-sh-on:var(--b-sh)}
-  .btn.rosso.p2p-scuro{--b-bg:linear-gradient(90deg,#170604 0%,#170604 18%,#9E2D16 55%,#E04A26 100%);
+  .btn.rosso.p2p-scuro{--b-bg:linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%);
     --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#5A1608;
     --b-sh:0 0 8px rgba(224,74,38,.25);--b-sh-on:var(--b-sh)}
+  /* ...E BARATTOZON (19:40, Andrea: «stesso effetto quando pubblichi un
+     ordine barattozon, l'icona a sinistra nello scuro e poi diventa del
+     colore attuale»): dal quasi nero al suo blu #191D29, che in fondo
+     schiarisce di un tono perche' la sfumatura si veda; il logo a
+     sinistra. Su «Rileggi e pubblica» e sul «Pubblica» del riepilogo */
+  .btn.bz.p2p-scuro{--b-bg:linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%);
+    --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#0A0C12;
+    --b-sh:0 0 8px rgba(70,84,128,.25);--b-sh-on:var(--b-sh)}
   .btn.p2p-scuro{position:relative;text-shadow:0 1px 2px rgba(0,0,0,.35)}
   .btn.p2p-scuro .p2p-invia-ico,.btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
+  .btn.p2p-scuro > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz,
   #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico,
   #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{
     position:absolute;left:16px;top:50%;margin:0;transform:translateY(-50%)}
+  /* 19:34 (Andrea: «fai partire il verde più vicino alle icone e anche le
+     icone leggermente più grosse»): il nero fino all'8% e il tono pieno
+     al 34% invece di 18 e 55, il fulmine a 24 px e la moneta a 32 */
+  .btn.p2p-scuro .p2p-invia-ico,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico{font-size:24px;line-height:1}
+  .btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
+  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{width:32px;height:32px}
+  .btn.p2p-scuro > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz{width:29px;height:28px}
+  .btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta .cambio-svg,
+  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
      metodi della card, la pillola del filtro e la voce del foglio
@@ -4625,6 +4648,11 @@
     border-color:var(--b-rosso-line);box-shadow:var(--b-rosso-sh)}
   #p2pMorfo.bz .morfo-meta{background:var(--b-bz-bg);border-color:var(--b-bz-line);
     box-shadow:var(--b-bz-sh)}
+  /* (30 ott 2026, 19:40) col vestito scuro anche il blu: la sfumatura di
+     `.btn.bz.p2p-scuro`, o all'ultimo fotogramma cambierebbe di colpo */
+  html body #p2pMorfo.bz .morfo-meta{
+    background:linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%);
+    border-color:#0A0C12;box-shadow:0 0 8px rgba(70,84,128,.25)}
   #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
     display:flex;align-items:center;justify-content:center;
     color:var(--b-ok-fg);font-weight:800;
@@ -4649,10 +4677,10 @@
      Pesano piu' del rosso del lato (vedi sopra) e lasciano stare il blu
      di Barattozon e il + del mercatino */
   html body #p2pMorfo:not(.bz):not(.merc) .morfo-meta{
-    background:linear-gradient(90deg,#04140A 0%,#04140A 18%,#157A45 55%,#34B47A 100%);
+    background:linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%);
     border-color:#0B3D22;box-shadow:0 0 8px rgba(52,180,122,.25)}
   html body.p2p-vendo #p2pMorfo:not(.bz):not(.merc) .morfo-meta{
-    background:linear-gradient(90deg,#170604 0%,#170604 18%,#9E2D16 55%,#E04A26 100%);
+    background:linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%);
     border-color:#5A1608;box-shadow:0 0 8px rgba(224,74,38,.25)}
   html body #p2pMorfo:not(.bz):not(.merc) .morfo-eti{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
   /* ====== LA MORFOSI DAL + IN FONDO (quinto giro, 24 set 2026, richiesta
@@ -35846,7 +35874,8 @@ function chiediConferma(c){
      Il foglio e' uno per tutti, quindi il vestito si rimette a ogni
      apertura; l'etichetta resta testo, scappato. */
   const ok = el('confOk');
-  ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz' : 'orange');
+  /* (30 ott 2026, 19:40) il blu col vestito scuro del P2P, logo a sinistra */
+  ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz p2p-scuro' : 'orange');
   el('confOk').textContent = c.etichetta || 'Conferma';
   /* il logo e' una costante nostra, e l'etichetta resta col textContent
      di sempre, che e' la guardia (vedi prove_onion) */
@@ -78071,7 +78100,7 @@ function renderNuovoOrdineP2P(){
        questo foglio non nomina, e un commento innocente la farebbe
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
-      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + (tab ? '' : ' p2p-scuro') + '" id="p2pNuovoInvia" ' +
+      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + ' p2p-scuro" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">' +
         /* col percorso Barattozon il bottone dice che prima c'e' il
            riepilogo: e' l'ultimo passo, non un salto nel vuoto — e al
