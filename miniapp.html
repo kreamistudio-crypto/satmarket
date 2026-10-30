@@ -19238,7 +19238,7 @@ function go(view){
   if (view==='p2p' || view==='p2pmiei') renderP2P();
   /* gli scambi on-chain (30 ott 2026): la pagina si rilegge dal server
      a ogni ingresso, e la striscia in «I miei scambi» conta i vivi */
-  if (view==='p2ponchain') renderP2POnchain();
+  if (view==='p2ponchain') { renderP2POnchain(); osservaDepositoOnchainP2P(); }
   if (view==='p2pmiei' && myP2POnchain) leggiMieiOnchainP2P().then(renderStrisciaOnchainP2P);
   /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
      entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
@@ -55907,7 +55907,8 @@ function renderIncassoOnchainProfilo(){
   box.innerHTML = onchainModoBlocco() + (myOnchainIncasso
     ? `<div class="hint" style="color:var(--ok);margin-top:10px"><b>✅ Ricevi nel tuo wallet</b>
          (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}).
-         Per cambiarlo, incolla qui sotto.</div>`
+         Per cambiarlo, incolla qui sotto.
+         <button type="button" class="btn link" onclick="onchainIncassoTogli(this)">Togli</button></div>`
     : `<div class="hint" style="margin-top:10px"><b>Non hai ancora scelto dove ricevere on-chain.</b>
          Chi compra può pagarti on-chain lo stesso: i sats restano al sicuro
          nel 2-di-3 ed escono appena scegli. Non finiscono mai in un conto di Barattolo.</div>`)
@@ -55974,6 +55975,30 @@ async function walletMostraParole(btn){
   renderWalletBarattolo();
 }
 
+/* TOGLIERE DOVE SI RICEVE (30 ott 2026, Andrea e Alan durante la prova:
+   «voglio toglierlo per vedere cosa succede»). Il server lo sapeva gia'
+   fare (`tipo: 'barattolo'` cancella la riga); mancava il tasto. Gli
+   scambi e le vendite gia' nati tengono l'indirizzo che avevano: conta
+   per i prossimi, che aspetteranno una scelta nuova. */
+function onchainIncassoTogli(btn){
+  chiediConferma({titolo: 'Togli dove ricevi on-chain?', etichetta: 'Togli', vestito: 'allarme',
+    corpo: 'Gli scambi già nati tengono l\'indirizzo che avevano. Per i prossimi l\'app ti chiederà dove ricevere.',
+    poi: async () => {
+      const rip = onchainAttesa(btn, 'Tolgo…');
+      try {
+        const r = await fetch(`${API_BASE}/onchain/incasso`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify({tipo: 'barattolo'})});
+        if (!r.ok) throw new Error(((await r.json().catch(() => ({}))).detail) || 'non tolto');
+        myOnchainIncasso = '';
+        onchainSrv = null;
+        toast('Tolto: per i prossimi scambi l\'app ti chiederà dove ricevere', 5000);
+      } catch(e) { toast('⚠️ ' + (e.message || 'non tolto'), 6000); }
+      finally { rip(); }
+      renderIncassoOnchainProfilo();
+      renderChecklist();
+    }});
+}
 async function onchainIncassoSalva(btn, pref){
   haptic();
   const campo = el(pref + 'Valore');
@@ -56005,6 +56030,8 @@ async function onchainIncassoSalva(btn, pref){
     renderIncassoOnchainProfilo();
     renderChecklist();
     if (el('view-onchain') && el('view-onchain').classList.contains('active')) renderOnchain();
+    /* ...e lo scambio P2P on-chain che aspettava questa scelta (30 ott 2026) */
+    if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();
   } catch(e) {
     toast('⚠️ ' + (e.message && e.message.length < 120 ? e.message : 'chiave non leggibile'), 6000);
   } finally { rip(); }
@@ -57055,6 +57082,99 @@ async function prendiOnchainP2P(id){
   rinfrescaOnchainP2P(true);
 }
 
+/* il prefisso del nome pubblico di uno scambio on-chain (il `d` del
+   38383, P2P_ONCHAIN_PREFISSO del server) */
+const P2P_ONCHAIN_PREFISSO = 'bar-onchain-';
+
+/* IL BOTTONE DELL'AVVISO (30 ott 2026): apre la pagina dello scambio
+   on-chain col nome pubblico che il link porta. Il cancello
+   (`myP2POnchain`) arriva con /api/me: chi atterra dal bottone puo'
+   essere qui un attimo prima, e allora si aspetta un poco. Fra i MIEI si
+   cerca: il nome nel link non apre niente di altri. */
+async function apriScambioOnchainDaAvvisoP2P(ordine){
+  for (let i = 0; i < 20 && !myP2POnchain; i++) await new Promise(r => setTimeout(r, 250));
+  if (!myP2POnchain) return 'fuori';
+  const miei = await leggiMieiOnchainP2P();
+  const o = (miei || []).find(x => String(x.ordine) === String(ordine));
+  if (!o) { toast('Questo scambio on-chain non è fra i tuoi', 4000); return 'sparito'; }
+  p2pOnchainAperto = Number(o.id); p2pOnchainForm = false;
+  go('p2ponchain');
+  return 'aperto';
+}
+
+/* IL DEPOSITO SI VEDE DA SOLO (30 ott 2026, Andrea alla prima prova:
+   «quando pago lui dovrebbe capire in automatico che ho pagato come
+   avviene nel lightning e deve dire fatto e poi chiudersi la pagina
+   riportando sui miei scambi»). Finche' si guarda la pagina on-chain, un
+   battito ogni 15 secondi: se lo scambio aperto e' MIO da depositare
+   (`compratore` del 2-di-3, stato `preso`), chiede al server di guardare
+   mempool (la rotta «controlla»); appena la transazione si VEDE in rete
+   con almeno l'importo — anche senza conferma: i sats sono partiti — il
+   velo dice «Fatto» e si torna a «I miei scambi», come dopo la garanzia
+   del Lightning (`tornaAdessoP2P`). La conferma arriva dopo, con
+   l'avviso del bot, e la ronda del server la guarda comunque da sola.
+   Fuori dalla pagina, o col telefono in tasca, il battito tace. */
+const P2P_ONCHAIN_OSSERVA_MS = 15000;
+let p2pOnchainOsserva = 0;
+function osservaDepositoOnchainP2P(){
+  clearTimeout(p2pOnchainOsserva);
+  p2pOnchainOsserva = setTimeout(battitoDepositoOnchainP2P, P2P_ONCHAIN_OSSERVA_MS);
+}
+async function battitoDepositoOnchainP2P(){
+  p2pOnchainOsserva = 0;
+  if (vistaAttivaP2P() !== 'view-p2ponchain') return;
+  const id = Number(p2pOnchainAperto) || 0;
+  const o = id && p2pOnchainMiei.find(x => Number(x.id) === id);
+  if (o && o.ruolo === 'compratore' && o.stato === 'preso' && document.visibilityState !== 'hidden') {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/onchain/${id}/controlla`, {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
+      const n = r.ok ? await r.json() : null;
+      if (n && depositoVistoOnchainP2P(n) && vistaAttivaP2P() === 'view-p2ponchain'
+          && Number(p2pOnchainAperto) === id) {
+        Object.assign(o, n);
+        const rip = attesaP2P('');
+        try { await spuntaAttesaP2P('Fatto', P2P_TORNA_MS); }
+        finally { rip(); }
+        if (vistaAttivaP2P() === 'view-p2ponchain' && Number(p2pOnchainAperto) === id) {
+          p2pOnchainAperto = 0;
+          /* il foglio del deposito col QR, se e' aperto (thread del
+             design, 30 ott 2026): si chiude prima di tornare */
+          if (typeof chiudiFoglioP2P === 'function') chiudiFoglioP2P('p2pOcDepositoSheet');
+          go('p2pmiei');
+        }
+        return;
+      }
+    } catch(e) { /* al prossimo battito */ }
+  }
+  osservaDepositoOnchainP2P();
+}
+/* PURA: il deposito di questo scambio si vede in rete? Visti almeno
+   l'importo (prezzo + margine), o gia' confermato e passato oltre. */
+function depositoVistoOnchainP2P(o){
+  if (!o) return false;
+  if (o.stato && o.stato !== 'preso') return o.stato !== 'annullato' && o.stato !== 'scaduto';
+  return (Number(o.visti_sats) || 0) >= (Number(o.importo_sats) || 1);
+}
+
+/* DOVE RICEVE CHI COMPRA, CHIESTO LI' (30 ott 2026, Alan alla prima
+   prova: «se non lo avessi fatto avrebbe dovuto chiedermelo lì, perché
+   un'altra opzione è inserire una xpub, di modo che ogni volta generi in
+   automatico un altro indirizzo non ancora usato»). Chi compra bitcoin
+   riceve sul wallet SUO (`onchain_incasso`); senza, i sats aspettano nel
+   2-di-3 e «Libera i sats» non ha dove mandarli. Allora la pagina dello
+   scambio mostra il modulo del Profilo, lo stesso (`onchainModuloIncasso`,
+   indirizzo o chiave del conto): salvato, il server riempie gli scambi
+   che aspettavano (`_p2p_onchain_riempi_incassi`) e la pagina si rifa'. */
+function incassoMancanteOnchainP2P(o){
+  if (!o || o.ruolo !== 'venditore' || o.incasso) return '';
+  if (!['preso', 'depositato', 'euro_inviati', 'disputa'].includes(o.stato)) return '';
+  return '<div class="p2p-box p2p-onchain-incasso"><b>Dove ricevi i bitcoin?</b>'
+    + '<div class="hint">Serve prima che chi vende liberi i sats: un tuo indirizzo, oppure la chiave '
+    + 'del conto del tuo wallet per avere un indirizzo nuovo a ogni scambio.</div>'
+    + onchainModuloIncasso('ocP2p') + '</div>';
+}
+
 async function leggiMieiOnchainP2P(){
   if (!myP2POnchain || DEMO || VETRINA) { p2pOnchainMiei = []; return p2pOnchainMiei; }
   try {
@@ -57285,6 +57405,7 @@ function schedaOnchainP2P(o){
       · ${esc((o.metodi || []).join(', '))}</span>
     ${parti}
     <div class="p2p-box">${testo}</div>
+    ${incassoMancanteOnchainP2P(o)}
     ${recapitoBox}
     ${indirizzoBox}
     ${uscita}
@@ -57377,30 +57498,56 @@ function rinunciaOnchainP2P(btn, id){
 }
 
 /* la prima firma, dopo la domanda: le funzioni di sempre del telefono */
+/* LA FIRMA SI VEDE, E POI SI TORNA (30 ott 2026, Andrea alla prima
+   prova: «quando clicco ricevuti, libera i sats la pagina rimane
+   bloccata, dovrebbe andar via subito»). La firma nel telefono carica
+   la libreria e firma: qualche secondo senza un segno sembrava un'app
+   ferma. Adesso il velo d'attesa del P2P sta su mentre si firma, al
+   riuscito dice «Fatto» e si torna a «I miei scambi», come dopo un
+   gesto del Lightning (`tornaAdessoP2P`); se non riesce si resta e lo
+   dice. Vale per «Libera i sats», per «Rinuncio» e per la co-firma. */
+async function fattoOnchainP2P(rip){
+  try { await spuntaAttesaP2P('Fatto', P2P_TORNA_MS); }
+  finally { rip(); }
+  p2pOnchainAperto = 0;
+  go('p2pmiei');
+}
 async function firmaOnchainP2P(id, verso){
   const o = p2pOnchainMiei.find(x => x.id === id);
   if (!o) return;
+  const rip = attesaP2P(verso === 'venditore' ? 'Libero i sats…' : 'Firmo il rimborso…');
   try {
     await onchainFirmaProposta(o, verso);
-    toast(verso === 'venditore'
-      ? '🔓 Firmato: i sats partono appena chi compra apre l\'app (la sua firma la mette il telefono)'
-      : '↩️ Firmato: il rimborso parte appena chi vende apre l\'app', 7000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
-  renderP2POnchain();
+  } catch(e) {
+    rip();
+    toast('⚠️ ' + (e.message || 'non firmato'), 7000);
+    renderP2POnchain();
+    return;
+  }
+  await fattoOnchainP2P(rip);
+  toast(verso === 'venditore'
+    ? '🔓 Firmato: i sats partono appena chi compra apre l\'app (la sua firma la mette il telefono)'
+    : '↩️ Firmato: il rimborso parte appena chi vende apre l\'app', 7000);
 }
 
 async function cofirmaOnchainP2P(btn, id){
   haptic();
   const o = p2pOnchainMiei.find(x => x.id === id);
   if (!o) return;
-  const rip = onchainAttesa(btn, 'Firmo…');
+  const rip = attesaP2P('Firmo…', btn);
+  let no = '';
   try {
     const parole = await onchainSemeAssicurato();
-    const no = await onchainCofirma(o, parole);
-    toast(no ? '⛓️ Non firmato: ' + no : '✅ Firmato e trasmesso: i sats sono partiti', 7000);
-  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
-  finally { rip(); }
-  renderP2POnchain();
+    no = await onchainCofirma(o, parole);
+  } catch(e) { no = (e && e.message) || 'errore'; }
+  if (no) {
+    rip();
+    toast('⚠️ Non firmato: ' + no, 7000);
+    renderP2POnchain();
+    return;
+  }
+  await fattoOnchainP2P(rip);
+  toast('✅ Firmato e trasmesso: i sats sono partiti', 7000);
 }
 
 /* le seconde firme che aspettano me, in sottofondo (le chiama
@@ -89651,6 +89798,17 @@ function apriP2PDaUrl(){
     && typeof apriOrdineCondivisoP2P === 'function';
   if (condiviso) p2pCondivisoInVolo = true;
   vaiP2P();
+  /* LO SCAMBIO ON-CHAIN DELL'AVVISO (30 ott 2026): il bottone «🟠 Apri
+     lo scambio» degli avvisi on-chain porta `?scambio=bar-onchain-…`, il
+     nome pubblico di uno scambio del secondo libro. Non e' di Mostro, e
+     la strada di Mostro qui sotto direbbe «sparito»: va alla sua pagina. */
+  /* col typeof: i banchi della porta estraggono questa funzione da sola */
+  if (typeof P2P_ONCHAIN_PREFISSO === 'string' && String(P2P_SCAMBIO_URL || '').startsWith(P2P_ONCHAIN_PREFISSO)) {
+    arrivoP2PFatto();
+    if (p2pAcceso() && typeof apriScambioOnchainDaAvvisoP2P === 'function')
+      apriScambioOnchainDaAvvisoP2P(P2P_SCAMBIO_URL).catch(() => {});
+    return;
+  }
   if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function') {
     apriOrdineP2P(P2P_SCAMBIO_URL);
     /* il tasto di «Hai un nuovo messaggio» (20 ott 2026): dritti alla chat */
