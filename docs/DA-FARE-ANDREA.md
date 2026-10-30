@@ -194,3 +194,42 @@ si vede (txid, tempi, commissioni, frasi storte) va nel verbale
 `ONCHAIN_ATTIVO = False` e riavvio (PRODUZIONE dice perché la RETE non
 si rimette su signet con ordini aperti).
 
+
+## 5. Gli scambi P2P on-chain (2-di-3) sul collaudo (30 ott 2026, cantiere p2p-onchain-2di3)
+
+**Perché.** Il secondo libro del P2P, con la garanzia 2-di-3 al posto
+della hold invoice di Mostro, è su `develop` dietro la leva
+`P2P_ONCHAIN_ATTIVO`, spenta di serie. Sul collaudo l'on-chain
+(`ONCHAIN_ATTIVO`) e il P2P sono già accesi: manca solo questa riga.
+Il perché di tutto: CANTIERI, «La garanzia 2-di-3 negli scambi P2P
+on-chain».
+
+**Sola lettura** (la riga non c'è già: deve dire `0`):
+```
+sudo grep -c "^P2P_ONCHAIN_ATTIVO" /srv/collaudo/barattolo/config.py
+```
+
+**Scrive**, dopo che il collaudo ha tirato `develop` con il cantiere. La
+copia di riserva, poi la riga, poi il riavvio:
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-p2p-onchain
+```
+```
+printf '\nP2P_ONCHAIN_ATTIVO = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi, da admin, nel P2P: in cima al libro la riga «⛓️
+Scambi on-chain», da lì «Pubblica» (vendo 50.000 sats per X €), e con
+il secondo account «Prendi»; il deposito è su signet (i sats di prova
+del faucet), chi vende li manda all'indirizzo 2-di-3, chi compra tocca
+«Ho inviato gli euro», chi vende «Ricevuti: libera i sats», e il
+telefono di chi compra mette la seconda firma da solo. Quel che si vede
+va nel verbale (CANTIERI, «NON PROVATO»). In produzione la leva resta
+spenta finché Alan non ha rivisto le parti 2-di-3 e non c'è il parere
+MiCA. ATTENZIONE alle copie vecchie del config del collaudo: quelle di
+prima di oggi non hanno questa riga.

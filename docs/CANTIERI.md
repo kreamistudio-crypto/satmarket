@@ -75270,3 +75270,126 @@ tasto non arriva (senza scrivere), senza l'aggiunta nel ridisegno a
 pezzi nemmeno; la sentinella nuova in `prove_grafica_swap` è rossa
 senza la chiamata. Le prove del cambio 715/0, i collaudi dello swap, la
 suite severa, i 108 collaudi della CI nel venv senza coincurve.
+
+## La garanzia 2-di-3 negli scambi P2P on-chain (30 ott 2026, cantiere p2p-onchain-2di3, decisione di Andrea con Alan: «sì, la logica è giusta»)
+
+**COSA.** Un secondo libro accanto a quello di Mostro: scambi «vendo /
+compro bitcoin per euro» in cui la garanzia non è la hold invoice
+Lightning del coordinatore ma il 2-di-3 non custodial di Alan, lo
+stesso degli ordini on-chain del mercatino (`onchain_indirizzi`, il
+giudice dei PSBT `_onchain_psbt_giudica`, la sorveglianza di mempool,
+le due firme nei telefoni, la terza chiave di Barattolo sul VPS per le
+dispute). Tutto NEL SERVER E NELL'APP: tabella `p2p_onchain_ordini`,
+rotte `/api/p2p/onchain/*`, ronda dentro `orologio_onchain`, pagina
+«⛓️ Scambi on-chain» sorella di «I miei scambi», card in cima al libro
+del P2P col segno «⛓️ on-chain · 2-di-3». Leva `P2P_ONCHAIN_ATTIVO`,
+spenta di serie, sotto il cancello dell'on-chain (oggi solo admin) e
+sotto il P2P acceso: a leva spenta non esiste nessuna rotta e nessuna
+card, nemmeno per i moderatori. Mostro NON si tocca: in 0.20.2 la
+garanzia è sempre una hold invoice, e un escrow on-chain dentro mostrod
+sarebbe una patch enorme da rifare a ogni versione (la voce «Mostro
+0.20.2», coda del 30 ott).
+
+**GLI ORDINI STANNO SU NOSTR** (condizione di Alan): ogni ordine esce
+come 38383 NIP-69 — `d` (`bar-onchain-<16 hex>`), `k`, `f` EUR, `s`
+(i quattro secchi pending / in-progress / success / canceled), `amt`,
+`fa` (come lo scrive Mostro: «90», «90.5»), `pm`, `premium` 0 — più i
+tag che dicono la differenza: `layer` = onchain, `network` = la rete
+dell'on-chain (oggi signet), `y` = barattolo, `z` = order. Firmato
+dalla chiave del server (quella dei NIP-99) e spedito agli stessi
+relay, fail-open: relay muti o chiave assente sono una riga nel
+journal, mai un errore a chi ha appena pubblicato. Chiunque lo legge;
+per prenderlo si passa dalla nostra app, perché presa, deposito, firme
+e dispute vivono qui. `expiration` = la scadenza nel libro (24 h)
+finché è da prendere, poi una settimana dall'ultimo cambio.
+
+**I RUOLI, scritti una volta** perché è il punto in cui ci si confonde.
+Nel 2-di-3 del mercatino chi COMPRA l'oggetto mette i sats e li libera;
+in uno scambio P2P a mettere i sats è chi VENDE bitcoin. Quindi il
+depositante (vende bitcoin) è il «compratore» del 2-di-3
+(`compratore_id` in `onchain_indirizzi`, rimborso su `/1/n` del suo
+seme) e il ricevente (compra bitcoin) è il «venditore», che incassa sul
+wallet SUO firmato dal suo seme (`onchain_incasso`, regola di Andrea del
+27 ott: mai il conto fatto da Barattolo). Le colonne si chiamano
+`depositante_id` / `ricevente_id`, `_p2p_onchain_ruolo` traduce nel nome
+che le firme si aspettano, e `parte` ('vendo' | 'compro') dà le parole
+all'app. Così il telefono firma con le funzioni di sempre
+(`onchainFirmaProposta`, `onchainCofirma`), che ora prendono l'ordine
+intero e mandano alla sua `rotta`: il codice delle firme non sa la
+differenza fra un ordine del mercatino e uno scambio.
+
+**IL GIRO.** Pubblica (serve la propria xpub on-chain, al massimo 5
+scambi vivi, i tetti del P2P in euro e in sats di prova) → prendi
+(nasce il 2-di-3 con `onchain_nuovo_indirizzo`, margine di rete dalla
+tariffa viva, `ordine_id` NEGATIVO sull'indirizzo per dire «è del P2P»,
+6 ore per depositare) → deposito visto su mempool (una conferma e
+almeno l'importo = 'depositato', avvisi a tutt'e due) → «Ho inviato gli
+euro» (chi compra; da lì non rinuncia più da solo) → «Ricevuti, libera i
+sats» (chi vende, prima firma verso `venditore`, giudicata dal giudice
+unico) → seconda firma del telefono di chi compra, da sola in
+sottofondo, trasmessa → 'rilasciato'. Il rimborso: chi compra propone
+verso `compratore`, chi vende co-firma. La disputa, ai NOSTRI
+moderatori: dal deposito in poi, fa decadere la proposta di parte,
+`notifica_admin` nell'argomento dispute; il moderatore (mai una parte)
+decide e Barattolo firma con la terza chiave (`_onchain_psbt_barattolo`,
+che ripassa dal giudice), la seconda la mette il telefono di chi vince.
+Una firma data non si ritira (409 su un verso diverso).
+
+**L'ANNULLO E I RITARDATARI.** Nel libro lo ritira chi l'ha pubblicato.
+Preso: chi deve depositare annulla quando vuole se non ha ancora messo
+niente; chi riceve solo dopo la finestra delle 6 ore; MAI alla cieca
+(prima si guarda mempool) e mai con un sats visto: da lì si esce col
+rimborso o con la disputa. Nessun ritorno automatico al libro: un
+deposito in ritardo su un indirizzo riaperto a un altro resterebbe
+appeso. Gli scambi chiusi con l'indirizzo si riguardano per sette
+giorni: i sats arrivati DOPO l'annullo si vedono, finiscono nella coda
+dei moderatori e tornano indietro con la decisione o con la proposta di
+chi compra.
+
+**IL LIBRO DALLA MEMORIA.** `/api/p2p/libro` regge tutta Esplora e per
+richiesta non tocca il database: la busta `onchain` viene da
+`_P2P_ONCHAIN_FOTO`, rifatta a ogni scrittura e dalla ronda; senza
+sessione niente nomi e niente «miei», mai il recapito per gli euro (che
+esce SOLO alle due parti, mai al moderatore). L'ETag conta anche la
+fotografia on-chain. Il telefono la prende PRIMA del ritorno anticipato
+di `chiediFotoLibroP2P` (con Mostro muto le card on-chain ci sono lo
+stesso) e la rilegge ogni mezzo minuto dalla rotta leggera.
+
+**STRADE SCARTATE.** La patch a Mostro (sopra). Una colonna in più in
+`onchain_ordini`: avrebbe legato ogni scambio a un annuncio e a un
+ordine del mercatino che non esistono; la tabella a parte tiene gli
+STESSI nomi delle colonne della cassa (`utxo`, `incasso`, `rimborso`,
+`margine_sats`, `quota_*`), e così il giudice dei PSBT e la firma di
+Barattolo si riusano senza una riga. Il ritorno automatico al libro
+dopo le 6 ore (il motivo sopra). Un «parte» nel protocollo: i ruoli del
+2-di-3 restano quelli, la traduzione è nostra.
+
+**PROVATO.** `collaudo_p2p_onchain` nella gabbia (91/0): leva spenta,
+cancello, giudice, libro anonimo e con sessione, il 38383 firmato e
+verificato con schnorr_puro, presa e ruoli, deposito a tappe, euro,
+prima e seconda firma con le uscite controllate sulla transazione
+trasmessa, lato buy col rimborso, disputa con la firma di Barattolo
+(cartone) e la co-firma di chi vince, annullo e ritardatario, scadenza
+dalla ronda, tetti, leva spenta a scambi in corso. `prove_p2p_onchain`
+(27/0) con sei controprove rosse (tag `layer`, giudice scavalcato,
+libro che apre il db, rotta fissa nel telefono, giudice della firma
+rovesciato, leva accesa di serie). Suite severa 26597/0 (2 saltate:
+nostr-tools assente nella macchina cloud) e i 109 collaudi della CI
+nella gabbia tutti verdi, anche senza coincurve. NON PROVATO dal vivo: il giro sul collaudo
+con due telefoni (serve `P2P_ONCHAIN_ATTIVO = True` nel config della
+VM, DA-FARE-ANDREA voce 5); i relay veri (nella gabbia sono muti per
+costruzione). ALBERO: il cantiere è nato su develop e7bce24 e ribasato
+su 6bc696f e poi f0f8299 (onchain-mainnet e tasto onion, stesso giorno: cinque conflitti di sole
+code, sciolti tenendo entrambi i lati); suite e collaudi sono girati
+sull'albero ribasato.
+
+**COSA RESTA.** Alan deve rivedere le parti 2-di-3 (insieme a f5f883c e
+83fff98). Il parere MiCA prima di aprire oltre gli admin. La rete la
+dice la leva `ONCHAIN_RETE` (cantiere onchain-mainnet): questo libro la
+segue — il tag `network` del 38383, la busta del libro e la scheda
+dicono quella — signet di serie e mainnet solo dal config del VPS; la
+prova da 5 € in mainnet (DA-FARE voce 4) viene PRIMA di accendere
+questo libro là.
+La reputazione sulle card on-chain (il tag `rating` è del coordinatore;
+qui c'è il nome e basta). La chat dello scambio (oggi il recapito per
+gli euro si scrive nell'ordine, e il resto passa da Telegram).
