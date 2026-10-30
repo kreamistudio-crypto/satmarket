@@ -153170,6 +153170,123 @@ console.log(JSON.stringify(out));
           ("function formOnchainP2P(" in mini, "p2p-onchain-porta" in mini, "p2pOnchainForm" in mini))
 
 
+def prove_deposito_p2p_onchain():
+    """IL FOGLIO DEL DEPOSITO E LA PAGINA DELLO SCAMBIO ON-CHAIN (30 ott
+    2026, cantiere grafica-p2p-onchain, Andrea: «anche la pagina del qr
+    dove viene mostrato il codice dovrebbe essere identica alla pagina di
+    pagamento del lighting», «non deve neanche esserci scritto "com'è
+    fatto questo 2-di-3"... quella pagina deve essere simile alle altre
+    dell'app»). Il QR del deposito sta nel gemello di «🔒 Blocca i sats»
+    (`p2pOcDepositoSheet`), coi pezzi nello stesso ordine; la scheda dello
+    scambio ha il conto, i quattro passi e la nota come «Nel dettaglio» di
+    Lightning. I pezzi girano in node con finte minime."""
+    print("\n[il deposito on-chain come «Blocca i sats», la pagina come «Nel dettaglio»]")
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    foglio = mini[mini.index("let p2pOcDeposito = null"):mini.index("/* I GESTI SEMPLICI")]
+    scheda = mini[mini.index("function schedaOnchainP2P(o){"):mini.index("function copiaOnchainP2P(")]
+    banco = """
+const NODI = {}, QR = [];
+function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '', href: '#', style: {},
+  classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}}); }
+const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), haptic = () => {}, toast = () => {};
+const disegnaQr = (nodo, testo, modo) => QR.push([testo, modo]);
+const onchainRete = () => ({prova: true, nome: 'signet'});
+const daFirmareOnchainP2P = () => false;
+let p2pOnchainMiei = [];
+""" + pezzo_js(mini, "const P2P_ONCHAIN_VIVI = ", ";\n") + ";\n" \
+        + pezzo_js(mini, "const P2P_ONCHAIN_STATI = {", "};\n") + "};\n" \
+        + pezzo_js(mini, "function minutiSecondi(sec){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function onchainUriPagamento(o){", "\n}\n") + "\n}\n" \
+        + scheda + foglio + """
+const out = {};
+const ind = {indirizzo: 'tb1qdueditre', chiavi: {}, descrittore: 'wsh(sortedmulti(2,...))'};
+const base = {id: 7, sats: 10000, margine_sats: 540, importo_sats: 10540, euro: 7, metodi: ['SEPA'],
+              indirizzo: ind, deposito_entro: Math.floor(Date.now() / 1000) + 6 * 3600 + 30, visti_sats: 0};
+const chi = {ruolo: 'compratore', parte: 'vendo', stato: 'preso'};
+const o = Object.assign({}, base, chi);
+out.daFare = [depositoDaFareOnchainP2P(o),
+  depositoDaFareOnchainP2P(Object.assign({}, o, {ruolo: 'venditore'})),
+  depositoDaFareOnchainP2P(Object.assign({}, o, {stato: 'depositato'})),
+  depositoDaFareOnchainP2P(Object.assign({}, o, {indirizzo: {}}))];
+const t0 = 1000000;
+out.tempo = [tempoDepositoOnchainP2P(0, t0).testo, tempoDepositoOnchainP2P(t0 + 6 * 3600, t0).testo,
+  tempoDepositoOnchainP2P(t0 + 5 * 3600 + 12 * 60 + 30, t0).testo, tempoDepositoOnchainP2P(t0 + 600, t0).testo,
+  tempoDepositoOnchainP2P(t0 - 1, t0)];
+apriDepositoOnchainP2P(7, o);
+const c = el('p2pOcDepositoCorpo').innerHTML;
+const pos = ['<div class="hint">Manda', 'class="qr"', 'class="invoice"', 'class="pay-scade"', 'class="btn primary"',
+             'si chiude da solo'].map(x => c.indexOf(x));
+out.foglio = [el('p2pOcDepositoSheet').classList.contains('open'), el('sheetBg').classList.contains('open'),
+  pos.every((x, i) => x >= 0 && (i === 0 || x > pos[i - 1])), /10540 sats/.test(c), /signet/.test(c),
+  /Copia l'indirizzo/.test(c)];
+out.fili = [el('p2pOcDepositoIndirizzo').textContent, el('p2pOcDepositoWallet').href, QR[QR.length - 1],
+  el('p2pOcDepositoScade').textContent, p2pOcDepositoVisti.has(7)];
+clearInterval(p2pOcDepositoOrologio);
+const sc = schedaOnchainP2P(o);
+out.schedaDeposito = [/btn orange" onclick="apriDepositoOnchainP2P\\(7\\)">🔒 Blocca i sats/.test(sc),
+  /Com'è fatto|p2pOcQr|explorer|tb1qdueditre/.test(sc), /class="steps"/.test(sc), /👉 tocca a te/.test(sc),
+  /Deposita.*10540/.test(sc), /class="ctrl-conto conto-p2p lato-vendo"/.test(sc)];
+const r = Object.assign({}, base, {ruolo: 'venditore', parte: 'compro', stato: 'preso'});
+const sr = schedaOnchainP2P(r);
+out.schedaRiceve = [/apriDepositoOnchainP2P/.test(sr), /✋ Aspetta/.test(sr), /step now/.test(sr),
+  /Ricevi.*10000/.test(sr), /tb1qdueditre/.test(sr)];
+const m = Object.assign({}, base, {ruolo: 'moderatore', stato: 'disputa', parti: {vende: 'a', compra: 'b'}});
+const sm = schedaOnchainP2P(m);
+out.schedaMod = [/tb1qdueditre/.test(sm), /explorer/.test(sm), /tocca a te|Aspetta/.test(sm)];
+const st = x => passiOnchainP2P(Object.assign({}, r, x));
+out.passi = [st({stato: 'pending'}).passi[0].t, st({stato: 'depositato'}).prog, st({stato: 'euro_inviati'}).prog,
+  st({stato: 'rilasciato'}).prog, st({stato: 'rimborsato', euro_inviati_il: 5}).fermo,
+  st({stato: 'rimborsato', euro_inviati_il: 5}).passi[3].t, st({stato: 'annullato'}).fermo,
+  st({stato: 'disputa', euro_inviati_il: 5}).prog];
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco del deposito on-chain", "node assente")
+        return
+    if out is None:
+        prova("il banco del deposito on-chain gira", "", (r.stderr or "")[-600:])
+        return
+    prova("il foglio del deposito e' solo di chi deposita, a scambio preso e con l'indirizzo",
+          [True, False, False, False], out["daFare"])
+    prova("la riga del tempo: in ore finche' sono ore, poi come l'orologio di Lightning; "
+          "a tempo finito la porta del wallet si spegne",
+          ["", "⏱ Scade tra 6 h", "⏱ Scade tra 5 h 12 min", "⏱ Scade tra 10:00",
+           {"viva": False, "testo": "⌛ Tempo del deposito finito"}], out["tempo"])
+    prova("il foglio si apre col velo, e ha i pezzi di «Blocca i sats» nel suo ordine "
+          "(frase, QR, stringa, riga del tempo, Copia in evidenza, chiusura)",
+          [True, True, True, True, True, True], out["foglio"])
+    prova("la stringa e' l'indirizzo; la porta del wallet e il QR sono lo stesso bitcoin: "
+          "con la cifra; il tempo batte; lo scambio e' segnato come gia' aperto",
+          ["tb1qdueditre", "bitcoin:tb1qdueditre?amount=0.00010540",
+           ["bitcoin:tb1qdueditre?amount=0.00010540", "Byte"], "⏱ Scade tra 6 h", True], out["fili"])
+    prova("la scheda di chi deposita: il tasto «🔒 Blocca i sats» in evidenza, niente "
+          "indirizzo in chiaro, explorer o «Com'è fatto»; passi, «tocca a te» e il conto",
+          [True, False, True, True, True, True], out["schedaDeposito"])
+    prova("la scheda di chi riceve: niente foglio del deposito, «✋ Aspetta», il primo "
+          "passo in corso, quel che riceve; l'indirizzo non si vede",
+          [False, True, True, True, False], out["schedaRiceve"])
+    prova("al moderatore l'indirizzo e l'explorer restano, senza pillole",
+          [True, True, False], out["schedaMod"])
+    prova("i quattro passi seguono gli stati (pubblicato, euro, concluso, il fermo del "
+          "rimborso e dell'annullo, la disputa dopo gli euro)",
+          ["Ordine pubblicato", 2, 3, 4, 3, "Rimborsato", 0, 3], out["passi"])
+    # --- i fili ---
+    chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    pagina = pezzo_js(mini, "async function renderP2POnchain(){", "\n}\n")
+    prova("il foglio c'e', si chiama come quello di Lightning e closeSheet lo chiude",
+          (True, True), ('<h3 id="p2pOcDepositoTit">🔒 Blocca i sats</h3>' in mini,
+                         "el('p2pOcDepositoSheet').classList.remove('open');" in chiudi))
+    prova("la pagina apre il foglio da sola UNA volta per scambio e lo rifa' se e' aperto; "
+          "il QR non sta piu' nella scheda",
+          (True, True, False), ("!p2pOcDepositoVisti.has(o.id)" in pagina,
+                                "renderDepositoOnchainP2P();" in pagina, "p2pOcQr" in mini))
+    prova("il foglio non chiede niente al server (lo rilegge la pagina)", False, "fetch(" in foglio)
+
+
 def prove_parole_uniche():
     """LE 12 PAROLE DEL CAMBIO NEL WALLET DI BARATTOLO (29 ott 2026,
     cantiere parole-uniche, idea di Alan, ok di Andrea). Ogni cambio nasce
@@ -182726,6 +182843,7 @@ def main():
     prove_onchain_verso_lightning,
     prove_p2p_onchain,
     prove_grafica_p2p_onchain,
+    prove_deposito_p2p_onchain,
     prove_parole_uniche,
     prove_ripristino_visibile,
     prove_onchain_pagina,
