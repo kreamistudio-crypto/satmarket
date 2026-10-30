@@ -75090,6 +75090,30 @@ sua: «funziona tutto, appena fatto scambio»): uno scambio intero sulla
 scadenza vera di chi pubblica, la disputa automatica, la manutenzione
 da sola di LND, la cura #910 (vuole il venditore che annulla nel
 secondo esatto).
+DECISO DOPO LA SALITA (30 ott 2026, ~09:15 UTC, Andrea con Alan: «sì,
+la logica è giusta»): IL 2-DI-3 ON-CHAIN NEGLI SCAMBI P2P SI FA NEL
+SERVER E NELL'APP, NON COME PATCH A MOSTRO. Alan l'aveva pensato come
+patch al nodo; letto il sorgente della 0.20.2, la garanzia di Mostro è
+SEMPRE la hold invoice Lightning — USDT, USDC, DOC, BTC, L-BTC e RBTC
+entrano solo come valuta dell'ordine al posto degli euro (il provider
+`pegged`), viaggiano fuori e nessuno li garantisce; l'unica alternativa
+di upstream è la modalità Cashu (ecash su un mint, nodo senza LND,
+incompatibile con la cauzione). Un escrow on-chain dentro `mostrod`
+sarebbe una modalità intera (stati, messaggi nuovi nel protocollo che
+saprebbe solo la nostra app) e ogni versione di upstream un rebase di
+giorni: il 29 ott cinque ancore su undici patch piccole sono saltate per
+sei versioni. La condizione di Alan — «gli ordini devono comunque stare
+su Nostr» — regge lo stesso: le offerte on-chain escono come 38383 con
+un'etichetta on-chain, firmate dalla chiave del server, sul nostro relay
+e sui pubblici, come già gli annunci NIP-99 del mercatino; la presa, la
+firma del 2-di-3, le conferme e le dispute (ai nostri moderatori) stanno
+nel server e nell'app, seconda strada di garanzia accanto a quella
+Lightning di Mostro, che resta il giudice solo di quella. Se un giorno
+lo si vorrà dentro Mostro, la via è proporlo a upstream come modalità
+opzionale, come Cashu, mai una patch privata. Il cantiere NON è aperto:
+si apre quando Andrea lo chiede, in un thread suo, dalle note di Alan;
+prima la tappa mainnet dell'on-chain (`ONCHAIN_RETE` è ancora signet) e
+il parere MiCA prima di aprire a tutti.
 
 ## Le 12 parole in poche righe (29 ott 2026, cantiere parole-corte, Andrea: «il testo relativo alle 12 parole è troppo lungo», «riduci e scrivilo leggermente più semplice»)
 
