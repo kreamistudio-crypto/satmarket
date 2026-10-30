@@ -1,0 +1,673 @@
+# -*- coding: utf-8 -*-
+"""
+IL COLLAUDO DEGLI SCAMBI P2P ON-CHAIN (30 ott 2026, cantiere
+p2p-onchain-2di3) — il giro col SERVER VERO, per HTTP (TestClient, la app
+vera), della garanzia 2-di-3 negli scambi bitcoin ↔ euro: il libro
+accanto a quello di Mostro, l'ordine che nasce e va su Nostr (38383),
+la presa che fa nascere il 2-di-3, il deposito visto su mempool, «ho
+inviato gli euro», la prima firma di chi vende bitcoin e la seconda di
+chi li compra, il rimborso, la disputa decisa da un moderatore con la
+firma di Barattolo, l'annullo prima del deposito e il ritardatario, la
+scadenza nel libro, i tetti e la leva spenta.
+
+IL «TELEFONO» QUI E' EMBIT, come nel collaudo dell'ordine on-chain: i
+semi sono i vettori ufficiali del BIP-39 e le firme si fanno con embit.
+MEMPOOL E' DI CARTONE (monete, tariffa, trasmissione sostituite), i
+relay sono muti per costruzione (MODALITA_COLLAUDO: `_spedisci_ai_relay`
+non apre niente). Nessuna rete, nessun sats. La chiave di Barattolo e'
+quella di cartone della gabbia: la stessa strada del VPS (`_onchain_
+psbt_barattolo`), solo con un seme pubblicato in uno standard.
+
+USO:  python collaudo_p2p_onchain.py
+"""
+import asyncio
+import hashlib
+import json
+import os
+import sys
+import time
+
+import collaudo_lnbits_muto as banco
+import schnorr_puro
+
+prova = banco.prova
+
+
+def nuova_chiave() -> bytes:
+    """Una chiave usa-e-getta, 32 byte nella misura del BIP-340."""
+    while True:
+        sk = os.urandom(32)
+        if 1 <= int.from_bytes(sk, "big") < schnorr_puro.N:
+            return sk
+
+
+class ChiaveDiCalco:
+    """La chiave della piattaforma dove coincurve non c'e' (il calco di
+    collaudo_annunci_sul_profilo): `secret` e `sign_schnorr`."""
+
+    def __init__(self, sk: bytes):
+        self.secret = sk
+
+    def sign_schnorr(self, msg: bytes) -> bytes:
+        return schnorr_puro.firma(self.secret, msg, os.urandom(32))
+
+
+def main():
+    print("=" * 58)
+    print("  GLI SCAMBI P2P ON-CHAIN (2-di-3) — il giro vero")
+    print("=" * 58)
+    banco.avvio()
+    SRV = banco.SRV
+    from embit import bip32, bip39, script
+    from embit.ec import PublicKey
+    from embit.finalizer import finalize_psbt
+    from embit.networks import NETWORKS
+    from embit.psbt import PSBT
+    from embit.transaction import (Transaction, TransactionInput,
+                                   TransactionOutput)
+    from fastapi.testclient import TestClient
+    c = TestClient(SRV.app)
+    N = NETWORKS["signet"]
+    vett = json.load(open(os.path.join(banco.QUI, "vendor",
+                                       "vettori-bip.json"), encoding="utf-8"))
+    semi = {999: vett["bip39_english"][0]["parole"],
+            888: vett["bip39_english"][1]["parole"],
+            "wallet": vett["bip39_english"][2]["parole"]}
+
+    def radice(tg):
+        return bip32.HDKey.from_seed(bip39.mnemonic_to_seed(semi[tg]),
+                                     version=N["xprv"])
+
+    def conto(tg):
+        return radice(tg).derive("m/48h/1h/0h/2h").to_public().to_string(
+            version=N["xpub"])
+
+    def rimborso_mio(tg, n):
+        k = radice(tg).derive(f"m/48h/1h/0h/2h/1/{n}")
+        return script.p2wpkh(k.key.get_public_key()).address(N)
+
+    vpub = bip32.HDKey.from_seed(bip39.mnemonic_to_seed(semi["wallet"]),
+                                 version=b"\x04\x5f\x18\xbc").derive(
+        "m/84h/1h/0h").to_public().to_base58()
+
+    def dal_wallet(i):
+        k = radice("wallet").derive(f"m/84h/1h/0h/0/{i}")
+        return script.p2wpkh(k.key.get_public_key()).address(N)
+
+    def firma_dest(tg, tipo, valore):
+        msg = SRV.onchain_messaggio_destinazione(tipo, valore)
+        der = radice(tg).derive("m/48h/1h/0h/2h/2/0").key.sign(
+            hashlib.sha256(msg).digest()).serialize()
+        lr = der[3]
+        r, s_ = der[4:4 + lr], der[6 + lr:]
+        return (r[-32:].rjust(32, b"\0") + s_[-32:].rjust(32, b"\0")).hex()
+
+    # --- mempool di cartone ------------------------------------------
+    MONETE, INVIATE = {}, []
+
+    async def utxo_finte(indirizzo):
+        return list(MONETE.get(indirizzo, []))
+
+    async def tariffa_finta():
+        return 2.0
+
+    async def invia_finta(tx_hex):
+        INVIATE.append(tx_hex)
+        return Transaction.from_string(tx_hex).txid().hex()
+
+    SRV.onchain_mempool_utxo = utxo_finte
+    SRV.onchain_mempool_tariffa = tariffa_finta
+    SRV.onchain_mempool_invia = invia_finta
+
+    con = SRV.db()
+    for tg, nome in ((999, "Andrea"), (888, "Alan"), (777, "Terzo"),
+                     (111, "Compra")):
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,"
+                    "registrato,ln_address) VALUES(?,?,?,1,'')",
+                    (tg, nome, f"neg{tg}{tg}"))
+    con.commit()
+    con.close()
+    SRV.ADMIN_IDS = [999, 888, 777]
+    SRV.ONCHAIN_ATTIVO = True
+    SRV.P2P_ATTIVO = True
+    SRV.MOSTRO_HEX = "cd" * 32
+    SRV.MOSTRO_RELAY = ["ws://127.0.0.1:9"]
+    SRV.P2P_PROVA_IDS = []
+    SRV.P2P_MAX_EURO = 250
+    # il giro pubblica e prende piu' volte di quanto un freno orario
+    # conceda a una persona: qui i freni si allargano (il collaudo degli
+    # avvisi fa lo stesso con «annunci»); che esistano lo dice prove.py
+    for nome in ("p2p_onchain_pubblica", "p2p_onchain_prendi", "onchain_firma",
+                 "onchain_controlla"):
+        SRV.FRENI[nome] = (1000, 3600)
+    # la chiave della piattaforma, di prova: cosi' il 38383 esce firmato
+    # anche nella gabbia (i relay restano muti per costruzione)
+    sk_noi = nuova_chiave()
+    SRV._NOSTR = ((SRV.ChiavePrivataNostr(sk_noi) if SRV.ChiavePrivataNostr
+                   is not None else ChiaveDiCalco(sk_noi)),
+                  schnorr_puro.pubblica(sk_noi).hex())
+
+    def come(tg):
+        banco.come(tg, admin=tg in SRV.ADMIN_IDS)
+
+    def pubblica(tg, **d):
+        come(tg)
+        base = {"lato": "sell", "sats": 100000, "euro_cent": 9000,
+                "metodi": ["Bonifico", "Revolut"], "recapito": "IT00 X 1234"}
+        return c.post("/api/p2p/onchain/pubblica", json={**base, **d})
+
+    def uno(tg, oid):
+        come(tg)
+        return c.get(f"/api/p2p/onchain/{oid}").json()
+
+    def gesto(tg, oid, cosa, **d):
+        come(tg)
+        return c.post(f"/api/p2p/onchain/{oid}/{cosa}", json=d)
+
+    def libro(tg=0):
+        # il libro riconosce chi guarda da solo (`_chi_guarda_p2p` legge
+        # l'initData): nella gabbia glielo si dice, come fa il collaudo
+        # dei volti
+        SRV._chi_guarda_p2p = lambda *a, **k: int(tg)
+        return c.get("/api/p2p/libro").json()
+
+    def paga(o, confermata=True, quanto=None):
+        MONETE[o["indirizzo"]["indirizzo"]] = [{
+            "txid": f"{o['id']:02x}" * 32, "vout": 0,
+            "value": o["importo_sats"] if quanto is None else quanto,
+            "status": {"confirmed": confermata}}]
+
+    def psbt_di(o, uscite, firma=None):
+        ch = o["indirizzo"]["chiavi"]
+        pubs = sorted((PublicKey.parse(bytes.fromhex(ch[k]))
+                       for k in ("compratore", "venditore", "barattolo")),
+                      key=lambda p: p.sec())
+        ws = script.multisig(2, pubs)
+        tx = Transaction(
+            vin=[TransactionInput(bytes.fromhex(u["txid"]), u["vout"])
+                 for u in o["utxo"]],
+            vout=[TransactionOutput(v, script.address_to_scriptpubkey(d))
+                  for d, v in uscite])
+        p = PSBT(tx)
+        for i, u in zip(p.inputs, o["utxo"]):
+            i.witness_utxo = TransactionOutput(u["value"], script.p2wsh(ws))
+            i.witness_script = ws
+        if firma:
+            n = o["indirizzo"]["mio_numero"]
+            p.sign_with(radice(firma).derive(f"m/48h/1h/0h/2h/0/{n}").key)
+        return p
+
+    def cofirma(tg, o):
+        p = PSBT.from_string(o["proposta"]["psbt"])
+        p.sign_with(radice(tg).derive(
+            f"m/48h/1h/0h/2h/0/{o['indirizzo']['mio_numero']}").key)
+        return finalize_psbt(p).serialize().hex()
+
+    def tx_nuda(o):
+        """La transazione della proposta SENZA firme: leggibile, stesso
+        txid, ma e' il server a dover dire di no prima di guardarla."""
+        return PSBT.from_string(o["proposta"]["psbt"]).tx.serialize().hex()
+
+    def detto_a(tg, pezzo):
+        return any(pezzo in t for chi, t in banco.DETTO if chi == tg)
+
+    # ---- 0) la leva spenta ------------------------------------------------
+    print("\n[la leva spenta: niente esiste]")
+    SRV.P2P_ONCHAIN_ATTIVO = False
+    come(999)
+    prova("a leva spenta /api/me dice p2p_onchain False, anche all'admin",
+          False, c.get("/api/me").json().get("p2p_onchain"))
+    prova("...il libro non ha la busta onchain", False, "onchain" in libro(999))
+    prova("...e pubblicare, prendere e moderare sono 404", [404, 404, 404],
+          [pubblica(999).status_code,
+           c.post("/api/p2p/onchain/1/prendi", json={}).status_code,
+           c.get("/api/p2p/onchain/moderazione/aperte").status_code])
+    SRV.P2P_ONCHAIN_ATTIVO = True
+    SRV.ONCHAIN_ATTIVO = False
+    prova("leva P2P accesa ma on-chain spento: non esiste lo stesso "
+          "(il 2-di-3 non c'e')", (False, 404),
+          (SRV.p2p_onchain_leva(), pubblica(999).status_code))
+    SRV.ONCHAIN_ATTIVO = True
+
+    # ---- 1) chi e' ammesso --------------------------------------------------
+    print("\n[chi e' ammesso: il cancello dell'on-chain e del P2P]")
+    come(999)
+    prova("leva accesa: l'admin e' ammesso", True,
+          c.get("/api/me").json()["p2p_onchain"])
+    come(111)
+    prova("...chi non e' ammesso all'on-chain (ONCHAIN_SOLO_ADMIN) no", False,
+          c.get("/api/me").json()["p2p_onchain"])
+    prova("...e per lui pubblicare e' 404", 404, pubblica(111).status_code)
+    r = pubblica(999)
+    prova("l'admin senza la chiave on-chain: 409 col perche'", (409, True),
+          (r.status_code, "chiave on-chain" in r.json()["detail"]))
+    for tg in (999, 888):
+        come(tg)
+        c.post("/api/onchain/xpub", json={"xpub": conto(tg)})
+
+    # ---- 2) pubblicare ------------------------------------------------------
+    print("\n[pubblicare: il giudice e il libro]")
+    G = SRV.p2p_onchain_giudica_nuovo
+    prova("il giudice puro dice i no: lato, minimo, euro, metodi, tetto, "
+          "tetto sats di prova, metodo storto; e il si'",
+          [True, True, True, True, True, True, True, ""],
+          [G("x", 1, 1, ["a"], "", 0, 0).startswith("Di' se vendi"),
+           G("sell", 5000, 100, ["a"], "", 0, 0).startswith("Minimo 10.000"),
+           G("sell", 50000, 0, ["a"], "", 0, 0).startswith("Scrivi quanti euro"),
+           G("sell", 50000, 100, [], "", 0, 0).startswith("Scegli almeno"),
+           "fino a 250 €" in G("sell", 50000, 30000, ["a"], "", 250, 0),
+           "oltre 40.000" in G("sell", 50000, 100, ["a"], "", 0, 40000),
+           "non si legge" in G("sell", 50000, 100, ["a,b"], "", 0, 0),
+           G("sell", 50000, 9000, ["Bonifico"], "", 250, 0)])
+    prova("per HTTP: sotto il minimo 400, euro sopra il tetto 400, metodi "
+          "vuoti 400", [400, 400, 400],
+          [pubblica(999, sats=5000).status_code,
+           pubblica(999, euro_cent=30000).status_code,
+           pubblica(999, metodi=[]).status_code])
+    r = pubblica(999)
+    o = r.json()
+    prova("vendo 100.000 sats per 90 €: nasce nel libro, pending, mio, "
+          "con la rotta per il telefono",
+          (200, "pending", "sell", True, True, "maker"),
+          (r.status_code, o["stato"], o["lato"], o["mio"],
+           o["ordine"].startswith("bar-onchain-"), o["ruolo"]))
+    oid = o["id"]
+    prova("...il recapito lo vede chi l'ha scritto", "IT00 X 1234", o["recapito"])
+    L = libro()
+    prova("il libro anonimo ha la busta onchain con l'ordine, senza nome "
+          "ne' recapito ne' «miei»", (1, 100000, 90.0, False, False, False, "signet"),
+          (len(L["onchain"]["eventi"]), L["onchain"]["eventi"][0]["sats"],
+           L["onchain"]["eventi"][0]["euro"], "nome" in L["onchain"]["eventi"][0],
+           "recapito" in L["onchain"]["eventi"][0], "miei" in L["onchain"],
+           L["onchain"]["rete"]))
+    prova("...a chi e' entrato dice il nome di chi pubblica e quali sono suoi",
+          ("Andrea", [o["ordine"]], []),
+          (libro(888)["onchain"]["eventi"][0]["nome"], libro(999)["onchain"]["miei"],
+           libro(888)["onchain"]["miei"]))
+    con = SRV.db()
+    riga = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                       (oid,)).fetchone()
+    con.close()
+    tags = {t[0]: t[1:] for t in SRV.p2p_onchain_tags(riga, 1000)}
+    prova("il 38383 NIP-69: d, k, f, s, amt, fa, pm, premium + layer/network",
+          ([riga["ordine"]], ["sell"], ["EUR"], ["pending"], ["100000"],
+           ["90"], ["Bonifico", "Revolut"], ["onchain"], ["signet"],
+           [str(riga["scade"])], ["barattolo"]),
+          (tags["d"], tags["k"], tags["f"], tags["s"], tags["amt"], tags["fa"],
+           tags["pm"], tags["layer"], tags["network"], tags["expiration"],
+           tags["y"]))
+    ev = SRV.p2p_onchain_evento(riga)
+    prova("...l'evento e' un 38383 firmato dalla chiave del server, senza "
+          "contenuto, e la firma regge", (38383, SRV._NOSTR[1], "", True),
+          (ev["kind"], ev["pubkey"], ev["content"],
+           schnorr_puro.verifica(bytes.fromhex(ev["pubkey"]), bytes.fromhex(ev["id"]),
+                                 bytes.fromhex(ev["sig"]))))
+    con = SRV.db()
+    riga = con.execute("SELECT evento_id, pubblicato_stato FROM p2p_onchain_ordini"
+                       " WHERE id=?", (oid,)).fetchone()
+    con.close()
+    prova("...e la riga ricorda l'evento partito (pubblicato come pending)",
+          (64, "pending"), (len(riga["evento_id"] or ""), riga["pubblicato_stato"]))
+    come(999)
+    prova("«I miei scambi» di chi ha pubblicato lo ha; per un altro e' vuoto",
+          (1, 0), (len(c.get("/api/p2p/onchain/miei").json()["ordini"]),
+                   (come(888), len(c.get("/api/p2p/onchain/miei").json()["ordini"]))[1]))
+
+    # ---- 3) prendere --------------------------------------------------------
+    print("\n[prendere: nasce il 2-di-3]")
+    prova("chi l'ha pubblicato non lo prende: 409", 409,
+          gesto(999, oid, "prendi").status_code)
+    come(111)
+    prova("chi non e' ammesso: 404", 404,
+          c.post(f"/api/p2p/onchain/{oid}/prendi", json={}).status_code)
+    banco.DETTO.clear()
+    r = gesto(888, oid, "prendi")
+    o = r.json()
+    prova("Alan compra: preso, lui e' il «venditore» del 2-di-3 (riceve), "
+          "il margine di rete e' 3 x 2 x 180 = 1080",
+          (200, "preso", "venditore", "compro", 1080, 101080),
+          (r.status_code, o["stato"], o["ruolo"], o["parte"],
+           o["margine_sats"], o["importo_sats"]))
+    prova("...l'indirizzo e' un 2-di-3 di signet; chi compra non ha ancora "
+          "scelto dove ricevere (incasso vuoto), il rimborso torna al seme "
+          "di chi vende",
+          (True, "", rimborso_mio(999, 0), "Andrea"),
+          (o["indirizzo"]["indirizzo"].startswith("tb1q"), o["incasso"],
+           o["rimborso"], o["altro"]))
+    prova("...e il recapito per gli euro lo legge", "IT00 X 1234", o["recapito"])
+    oa = uno(999, oid)
+    prova("Andrea e' il «compratore» del 2-di-3 (deposita), parte 'vendo'",
+          ("compratore", "vendo", "Alan", True),
+          (oa["ruolo"], oa["parte"], oa["altro"], oa["deposito_entro"] > oa["preso_il"]))
+    prova("...tutt'e due avvisati, nessuna xpub in giro",
+          (True, True, False, False),
+          (detto_a(999, "Deposita"), detto_a(888, "sta depositando"),
+           conto(999) in r.text, conto(888) in r.text))
+    prova("il libro non lo mostra piu'", 0, len(libro()["onchain"]["eventi"]))
+    con = SRV.db()
+    prova("l'indirizzo e' marcato come del P2P (ordine_id negativo)", -oid,
+          con.execute("SELECT ordine_id FROM onchain_indirizzi WHERE id=?",
+                      (o["indirizzo"]["id"],)).fetchone()[0])
+    con.close()
+    come(777)
+    t = c.get(f"/api/p2p/onchain/{oid}").json()
+    prova("un moderatore terzo lo vede, ma senza recapito e con le parti",
+          ("moderatore", False, "Andrea", "Alan"),
+          (t["ruolo"], "recapito" in t, t["parti"]["vende"], t["parti"]["compra"]))
+
+    # ---- 4) il deposito -----------------------------------------------------
+    print("\n[il deposito: mempool vede, una conferma decide]")
+    r = gesto(888, oid, "annulla")
+    prova("chi compra non rinuncia prima della finestra del deposito: 409",
+          (409, True), (r.status_code, "ancora tempo" in r.json()["detail"]))
+    prova("niente sull'indirizzo: resta preso", "preso",
+          gesto(999, oid, "controlla").json()["stato"])
+    paga(oa, confermata=False)
+    d = gesto(999, oid, "controlla").json()
+    prova("visti ma non confermati: ancora preso, e lo si vede",
+          ("preso", 101080, 0), (d["stato"], d["visti_sats"], d["ricevuti_sats"]))
+    prova("...e ora nessuno dei due annulla: 409", [409, 409],
+          [gesto(999, oid, "annulla").status_code,
+           gesto(888, oid, "annulla").status_code])
+    paga(oa, quanto=100000)
+    prova("confermati ma meno del dovuto: ancora preso", "preso",
+          gesto(888, oid, "controlla").json()["stato"])
+    prova("gli euro non si mandano prima del deposito: 409", 409,
+          gesto(888, oid, "euro-inviati").status_code)
+    banco.DETTO.clear()
+    paga(oa)
+    d = gesto(888, oid, "controlla").json()
+    prova("confermati tutti: depositato, con la sua moneta", ("depositato", 1),
+          (d["stato"], len(d["utxo"])))
+    prova("...chi compra sa di mandare gli euro, chi vende di aspettarli",
+          (True, True), (detto_a(888, "Sats depositati"),
+                         detto_a(999, "Deposito confermato")))
+
+    # ---- 5) gli euro e le due firme --------------------------------------
+    print("\n[gli euro, poi la prima e la seconda firma]")
+    prova("«ho inviato gli euro» lo dice chi compra bitcoin: 403 a chi vende",
+          403, gesto(999, oid, "euro-inviati").status_code)
+    banco.DETTO.clear()
+    prova("...Alan lo dice: euro_inviati, e Andrea e' avvisato", (200, True),
+          (gesto(888, oid, "euro-inviati").status_code, detto_a(999, "Euro inviati")))
+    prova("...una volta sola: 409", 409, gesto(888, oid, "euro-inviati").status_code)
+    o = uno(999, oid)
+    r = gesto(999, oid, "proposta", verso="venditore",
+              psbt=psbt_di(o, [(o["rimborso"], 100780)], 999).to_string())
+    prova("Alan non ha ancora scelto dove ricevere: la liberazione aspetta "
+          "(409), i sats restano nel 2-di-3", (409, True),
+          (r.status_code, "non ha ancora scelto dove ricevere" in r.json()["detail"]))
+    come(888)
+    prova("Alan sceglie il suo wallet (firmato dal suo seme)...", 200,
+          c.post("/api/onchain/incasso", json={
+              "tipo": "xpub", "valore": vpub,
+              "firma": firma_dest(888, "xpub", vpub)}).status_code)
+    o = uno(999, oid)
+    prova("...e lo scambio preso prima prende la destinazione: il primo "
+          "indirizzo del suo wallet", dal_wallet(0), o["incasso"])
+    giusto = [(o["incasso"], 100000), (o["rimborso"], 101080 - 100000 - 300)]
+    prova("i sats li libera chi vende bitcoin: Alan che prova a liberarseli "
+          "da solo trova 403", 403,
+          gesto(888, oid, "proposta", verso="venditore",
+                psbt=psbt_di(uno(888, oid), giusto, 888).to_string()).status_code)
+    r = gesto(999, oid, "proposta", verso="venditore",
+              psbt=psbt_di(o, giusto).to_string())
+    prova("senza la firma di chi propone: 400", (400, True),
+          (r.status_code, "manca la tua firma" in r.json()["detail"]))
+    r = gesto(999, oid, "proposta", verso="venditore",
+              psbt=psbt_di(o, [(o["incasso"], 99000), giusto[1]], 999).to_string())
+    prova("a chi compra meno del prezzo: 400 (lo stesso giudice del mercatino)",
+          (400, True), (r.status_code, "esattamente il prezzo" in r.json()["detail"]))
+    banco.DETTO.clear()
+    r = gesto(999, oid, "proposta", verso="venditore",
+              psbt=psbt_di(o, giusto, 999).to_string())
+    prova("la proposta giusta passa, e Alan e' chiamato a co-firmare", (200, True),
+          (r.status_code, detto_a(888, "seconda firma")))
+    ob = uno(888, oid)
+    prova("...Alan la vede: verso venditore, non sua", ("venditore", False),
+          (ob["proposta"]["verso"], ob["proposta"]["mia"]))
+    prova("chi ha proposto non mette anche la seconda: 409", 409,
+          gesto(999, oid, "firma", tx=tx_nuda(uno(999, oid))).status_code)
+    prova("una transazione diversa da quella proposta: 400", 400,
+          gesto(888, oid, "firma", tx=cofirma_storta(ob, 888, radice, PSBT,
+                                                      finalize_psbt, psbt_di)).status_code)
+    banco.DETTO.clear()
+    r = gesto(888, oid, "firma", tx=cofirma(888, ob))
+    prova("la seconda firma di Alan: trasmessa, rilasciato, txid",
+          (200, "rilasciato", 1, True),
+          (r.status_code, r.json()["stato"], len(INVIATE),
+           r.json()["txid"] == uno(999, oid)["txid_uscita"]))
+    prova("...chiuso per tutt'e due, avvisati", ("rilasciato", True, True),
+          (uno(888, oid)["stato"], detto_a(999, "concluso"), detto_a(888, "concluso")))
+    prova("dopo: niente da co-firmare, niente da liberare", [409, 409],
+          [gesto(888, oid, "firma", tx=cofirma(888, ob)).status_code,
+           gesto(999, oid, "proposta", verso="venditore",
+                 psbt=psbt_di(o, giusto, 999).to_string()).status_code])
+    tx = Transaction.from_string(INVIATE[0])
+    prova("la transazione uscita paga il wallet di Alan e il resto ad Andrea",
+          sorted([100000, 780]), sorted(v.value for v in tx.vout))
+
+    # ---- 6) compro bitcoin, poi rinuncio: il rimborso ---------------------
+    print("\n[lato buy: chi prende deposita; la rinuncia di chi compra]")
+    INVIATE.clear()
+    r = pubblica(888, lato="buy", sats=50000, euro_cent=4500,
+                 metodi=["Satispay"], recapito="")
+    ob = r.json()
+    prova("Alan pubblica «compro 50.000 sats»: pending", (200, "buy"),
+          (r.status_code, ob["lato"]))
+    oid2 = ob["id"]
+    r = gesto(999, oid2, "prendi", recapito="Revolut @andrea")
+    oa = r.json()
+    prova("Andrea prende vendendo: deposita lui (compratore del 2-di-3), col "
+          "suo recapito", (200, "compratore", "vendo", "Revolut @andrea"),
+          (r.status_code, oa["ruolo"], oa["parte"], oa["recapito"]))
+    prova("...Alan riceve: ruolo venditore, e legge il recapito",
+          ("venditore", "Revolut @andrea"),
+          (uno(888, oid2)["ruolo"], uno(888, oid2)["recapito"]))
+    prova("il recapito lo cambia solo chi vende bitcoin", [403, 200, "IBAN nuovo"],
+          [gesto(888, oid2, "recapito", recapito="x").status_code,
+           gesto(999, oid2, "recapito", recapito="IBAN nuovo").status_code,
+           uno(888, oid2)["recapito"]])
+    paga(oa)
+    prova("deposito confermato", "depositato",
+          gesto(999, oid2, "controlla").json()["stato"])
+    prova("chi vende bitcoin non propone il rimborso a se stesso: 403", 403,
+          gesto(999, oid2, "proposta", verso="compratore",
+                psbt=psbt_di(uno(999, oid2), [(oa["rimborso"], 51080 - 300)], 999)
+                .to_string()).status_code)
+    ob = uno(888, oid2)
+    banco.DETTO.clear()
+    r = gesto(888, oid2, "proposta", verso="compratore",
+              psbt=psbt_di(ob, [(ob["rimborso"], 51080 - 300)], 888).to_string())
+    prova("Alan rinuncia (rimborso a chi ha depositato): 200, Andrea avvisato",
+          (200, True), (r.status_code, detto_a(999, "Rimborso proposto")))
+    prova("...la seconda firma e' di Andrea: rimborsato", (200, "rimborsato", 1),
+          (lambda r: (r.status_code, r.json()["stato"], len(INVIATE)))(
+              gesto(999, oid2, "firma", tx=cofirma(999, uno(999, oid2)))))
+    tx = Transaction.from_string(INVIATE[0])
+    prova("...tutto torna al rimborso di Andrea, meno la rete",
+          [(oa["rimborso"], 51080 - 300)],
+          [(script.Script(v.script_pubkey.data).address(N), v.value) for v in tx.vout])
+
+    # ---- 7) la disputa e la firma di Barattolo ----------------------------
+    print("\n[la disputa: decide un moderatore, firma Barattolo]")
+    INVIATE.clear()
+    o3 = pubblica(999, sats=60000, euro_cent=5400, metodi=["Bonifico"]).json()
+    oid3 = o3["id"]
+    gesto(888, oid3, "prendi")
+    oa = uno(999, oid3)
+    prova("disputa prima del deposito: 409 (niente da contendere)", 409,
+          gesto(999, oid3, "disputa", motivo="x").status_code)
+    paga(oa)
+    gesto(999, oid3, "controlla")
+    gesto(888, oid3, "euro-inviati")
+    # Alan propone il rimborso... poi Andrea apre la disputa: la proposta decade
+    ob = uno(888, oid3)
+    gesto(888, oid3, "proposta", verso="compratore",
+          psbt=psbt_di(ob, [(ob["rimborso"], 61080 - 300)], 888).to_string())
+    banco.DETTO.clear()
+    banco.AVVISI.clear() if hasattr(banco, "AVVISI") else None
+    r = gesto(999, oid3, "disputa", motivo="Gli euro non sono mai arrivati")
+    oa = uno(999, oid3)
+    prova("Andrea apre la disputa: stato disputa, la proposta di parte decade, "
+          "Alan e i moderatori avvisati",
+          (200, "disputa", None, "io", True, True),
+          (r.status_code, oa["stato"], oa["proposta"], oa["disputa"]["da"],
+           detto_a(888, "Disputa aperta"),
+           any("Disputa P2P on-chain" in t for t in banco.AVVISI)))
+    prova("in disputa nessuno propone: 409", 409,
+          gesto(999, oid3, "proposta", verso="venditore",
+                psbt=psbt_di(oa, [(oa["incasso"], 60000), (oa["rimborso"], 780)], 999)
+                .to_string()).status_code)
+    come(777)
+    ap = c.get("/api/p2p/onchain/moderazione/aperte").json()["dispute"]
+    prova("il moderatore terzo la vede, con le parti e SENZA recapito",
+          (1, "Andrea", "Alan", False, "Gli euro non sono mai arrivati"),
+          (len(ap), ap[0]["parti"]["vende"], ap[0]["parti"]["compra"],
+           "recapito" in ap[0], ap[0]["disputa"]["motivo"]))
+    prova("una parte non decide il proprio scambio, anche se admin: 403", 403,
+          gesto(999, oid3, "decidi", verso="venditore").status_code)
+    banco.DETTO.clear()
+    r = gesto(777, oid3, "decidi", verso="venditore")
+    prova("il terzo decide per chi compra: Barattolo firma, aspetta Alan",
+          (200, "venditore", True, True),
+          (r.status_code, r.json()["attesa_firma"], detto_a(888, "a tuo favore"),
+           detto_a(999, "ragione all'altra parte")))
+    ob = uno(888, oid3)
+    prova("...Alan vede la proposta di Barattolo (disputa), non sua, verso di lui",
+          ("venditore", False, "disputa", "venditore"),
+          (ob["proposta"]["verso"], ob["proposta"]["mia"], ob["proposta"]["barattolo"],
+           ob["decisione"]["verso"]))
+    prova("un verso diverso dopo la firma: 409, una firma data non si ritira",
+          (409, True), (lambda r: (r.status_code, "non si ritira" in r.json()["detail"]))(
+              gesto(777, oid3, "decidi", verso="compratore")))
+    prova("lo stesso verso: gia' firmata", True,
+          gesto(777, oid3, "decidi", verso="venditore").json().get("gia_firmata"))
+    prova("Andrea (che ha perso) non co-firma: 409", 409,
+          gesto(999, oid3, "firma", tx=cofirma(999, uno(999, oid3))).status_code)
+    r = gesto(888, oid3, "firma", tx=cofirma(888, ob))
+    prova("Alan co-firma la firma di Barattolo: rilasciato", (200, "rilasciato", 1),
+          (r.status_code, r.json()["stato"], len(INVIATE)))
+    tx = Transaction.from_string(INVIATE[0])
+    # l'indirizzo di Alan e' il TERZO del suo wallet (0 e 1 li hanno presi i
+    # due scambi prima: la fila e' una sola), la rete e' la misura di
+    # `_onchain_psbt_barattolo`: (11 + 105 + 31 x 2) x 2 sat/vB = 356
+    prova("...60.000 al wallet di Alan (il suo terzo indirizzo), il resto ad "
+          "Andrea meno la rete che Barattolo ha misurato",
+          sorted([(dal_wallet(2), 60000), (oa["rimborso"], 61080 - 60000 - 356)]),
+          sorted((script.Script(v.script_pubkey.data).address(N), v.value)
+                 for v in tx.vout))
+    come(777)
+    prova("la coda dei moderatori e' vuota", 0,
+          len(c.get("/api/p2p/onchain/moderazione/aperte").json()["dispute"]))
+
+    # ---- 8) l'annullo prima del deposito, e il ritardatario ---------------
+    print("\n[annullare prima del deposito; i sats che arrivano dopo]")
+    INVIATE.clear()
+    o4 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    oid4 = o4["id"]
+    prova("nel libro lo ritira solo chi l'ha pubblicato (per gli altri non "
+          "esiste nemmeno: 404)", [404, 200],
+          [gesto(888, oid4, "annulla").status_code,
+           gesto(999, oid4, "annulla").status_code])
+    prova("...annullato, fuori dal libro", ("annullato", 0),
+          (uno(999, oid4)["stato"], len(libro()["onchain"]["eventi"])))
+    o5 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    oid5 = o5["id"]
+    gesto(888, oid5, "prendi")
+    oa = uno(999, oid5)
+    banco.DETTO.clear()
+    prova("preso, senza un sats: chi deve depositare annulla quando vuole, "
+          "e l'altro lo sa", (200, "annullato", True),
+          (gesto(999, oid5, "annulla").status_code, uno(888, oid5)["stato"],
+           detto_a(888, "annullato")))
+    paga(oa)   # i sats arrivano DOPO l'annullo: il ritardatario
+    asyncio.run(SRV._p2p_onchain_controlla(oid5))
+    oa = uno(999, oid5)
+    prova("i sats arrivati dopo si vedono, lo stato resta annullato",
+          ("annullato", 31080), (oa["stato"], oa["ricevuti_sats"]))
+    come(777)
+    ap = c.get("/api/p2p/onchain/moderazione/aperte").json()["dispute"]
+    prova("...e il moderatore lo trova nella coda", [oid5], [x["id"] for x in ap])
+    ob = uno(888, oid5)
+    prova("chi compra puo' proporre il rimborso anche cosi'", 200,
+          gesto(888, oid5, "proposta", verso="compratore",
+                psbt=psbt_di(ob, [(ob["rimborso"], 31080 - 300)], 888).to_string())
+          .status_code)
+    prova("...o decide il moderatore (a favore di chi ha depositato)", 200,
+          gesto(777, oid5, "decidi", verso="compratore").status_code)
+    prova("Andrea co-firma: rimborsato, e la coda si svuota", ("rimborsato", 0),
+          (gesto(999, oid5, "firma", tx=cofirma(999, uno(999, oid5))).json()["stato"],
+           (come(777), len(c.get("/api/p2p/onchain/moderazione/aperte").json()["dispute"]))[1]))
+    o6 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    gesto(888, o6["id"], "prendi")
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET deposito_entro=? WHERE id=?",
+                (int(time.time()) - 1, o6["id"]))
+    con.commit()
+    con.close()
+    prova("rinunciare dopo la finestra del deposito, senza sats: si puo'",
+          (200, "annullato"),
+          (gesto(888, o6["id"], "annulla").status_code, uno(999, o6["id"])["stato"]))
+
+    # ---- 9) la scadenza nel libro e la ronda ------------------------------
+    print("\n[la ronda: la scadenza nel libro]")
+    o7 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET scade=? WHERE id=?",
+                (int(time.time()) - 1, o7["id"]))
+    con.commit()
+    con.close()
+    SRV._p2p_onchain_rifai_foto()
+    prova("scaduto: sparisce dal libro prima ancora della ronda", 0,
+          len(libro()["onchain"]["eventi"]))
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("...e la ronda lo marca scaduto", "scaduto", uno(999, o7["id"])["stato"])
+    prova("prendere uno scaduto: 409", 409, gesto(888, o7["id"], "prendi").status_code)
+
+    # ---- 10) i tetti ---------------------------------------------------------
+    print("\n[i tetti: ordini aperti, euro]")
+    aperti = [pubblica(999, sats=20000, euro_cent=1800, metodi=["Bonifico"]).status_code
+              for _ in range(SRV.P2P_ONCHAIN_APERTI_MAX)]
+    r = pubblica(999, sats=20000, euro_cent=1800, metodi=["Bonifico"])
+    prova(f"al massimo {SRV.P2P_ONCHAIN_APERTI_MAX} scambi aperti a testa: poi 409",
+          ([200] * SRV.P2P_ONCHAIN_APERTI_MAX, 409, True),
+          (aperti, r.status_code, "aperti" in r.json()["detail"]))
+    SRV.P2P_MAX_EURO = 0
+    prova("a tetto euro spento la cifra grande passa dal giudice", "",
+          SRV.p2p_onchain_giudica_nuovo("sell", 50000, 30000, ["a"], "", 0, 0))
+    SRV.P2P_MAX_EURO = 250
+
+    # ---- 11) la leva spenta, di nuovo ----------------------------------------
+    print("\n[la leva spenta a scambi in corso]")
+    SRV.P2P_ONCHAIN_ATTIVO = False
+    prova("le rotte dicono 404 e il libro perde la busta", ([404, 404, 404], False),
+          ([gesto(999, oid, "controlla").status_code,
+            (come(999), c.get("/api/p2p/onchain/miei").status_code)[1],
+            (come(999), c.get(f"/api/p2p/onchain/{oid}").status_code)[1]],
+           "onchain" in libro(999)))
+    prova("...e la ronda non tocca niente", None, asyncio.run(SRV._p2p_onchain_ronda()))
+    SRV.P2P_ONCHAIN_ATTIVO = True
+
+    print("\n" + "=" * 58)
+    print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
+    print("=" * 58)
+    return 1 if banco.FALLITE else 0
+
+
+def cofirma_storta(o, tg, radice, PSBT, finalize_psbt, psbt_di):
+    """Una transazione completa ma DIVERSA dalla proposta: stesse monete,
+    un'uscita in meno. Serve a provare che il server confronta i txid."""
+    p = psbt_di(o, [(o["rimborso"], o["importo_sats"] - 300)], tg)
+    # la seconda firma con la chiave dell'altra parte non c'e': basta che
+    # sia leggibile e che il txid non torni
+    p.sign_with(radice(tg).derive(
+        f"m/48h/1h/0h/2h/0/{o['indirizzo']['mio_numero']}").key)
+    try:
+        return finalize_psbt(p).serialize().hex()
+    except Exception:
+        return p.tx.serialize().hex()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

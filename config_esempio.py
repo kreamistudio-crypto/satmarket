@@ -1256,6 +1256,16 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
 # Il valore del codice e' gia' 250: la riga serve il giorno che sale.
 ONCHAIN_MAX_EURO = 250
+# GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, decisione di Andrea
+# con Alan): nel P2P, accanto agli ordini Lightning di Mostro, gli scambi
+# bitcoin on-chain ↔ euro in cui chi vende bitcoin li deposita nel 2-di-3
+# non custodial dell'on-chain e li libera quando gli euro sono arrivati.
+# Vivono NEL SERVER E NELL'APP (Mostro non si tocca), escono su Nostr
+# come 38383 firmati dalla chiave del server. Vale solo con ONCHAIN_ATTIVO
+# e il P2P accesi, per chi e' ammesso all'on-chain (oggi gli admin).
+# Spento di serie: in produzione si accende dopo il parere MiCA e la
+# revisione di Alan delle parti 2-di-3. Sul collaudo: True.
+P2P_ONCHAIN_ATTIVO = False
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
 # RGB_ATTIVO si accende; una riga storta vale «chiusa a tutti» e lo dice.

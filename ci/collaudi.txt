@@ -134,6 +134,7 @@ collaudo_onchain_indirizzo
 collaudo_onchain_ordine
 collaudo_onchain_incasso
 collaudo_onchain_verso_lightning
+collaudo_p2p_onchain
 collaudo_leve_pannello
 collaudo_certificati_relay
 collaudo_filtro_avorio

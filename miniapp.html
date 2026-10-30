@@ -3884,6 +3884,24 @@
   @media (prefers-reduced-motion:reduce){.p2p-btn-giro{animation:none}}
   @media (prefers-reduced-motion:reduce){.p2p-ord.p2p-nuova{animation:none}}
   .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
+  /* le card del libro on-chain (30 ott 2026): la stessa card, col segno
+     «⛓️ on-chain · 2-di-3» al posto dell'anello della scadenza */
+  .p2p-onchain-segno{font-size:11px;font-weight:700;color:var(--muted);background:var(--chip-bg);
+    border-radius:999px;padding:3px 8px;white-space:nowrap;margin-left:auto}
+  .p2p-onchain-porta{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+    margin-top:10px;padding:10px 14px;border-radius:14px;border:1px dashed var(--orange);
+    background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+  .p2p-onchain-porta small{display:block;color:var(--muted);font-size:12px}
+  .p2p-onchain-piu{color:var(--orange);font-weight:700;font-size:13px;white-space:nowrap}
+  .p2p-onchain-h{margin:16px 0 4px;font-size:15px}
+  .p2p-onchain-gesti{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .p2p-onchain-gesti:empty{display:none}
+  .p2p-onchain-metodi{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+  .p2p-onchain-metodi .chip-check{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+    border-radius:999px;background:var(--chip-bg);font-size:13px}
+  .p2p-onchain-riass{text-align:center;font-size:15px;margin-bottom:6px}
+  .p2p-onchain-form .row{display:flex;gap:8px;margin-top:10px}
+  .p2p-onchain-form .row .btn{flex:1}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
      metodi della card, la pillola del filtro e la voce del foglio
@@ -12572,6 +12590,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <!-- LA STRISCIA DEI MODERATORI (28 set 2026): vuota per tutti gli
            altri; la riempie renderStrisciaModP2P -->
+      <div id="p2pOnchainStriscia"></div>
       <div id="p2pModStriscia"></div>
       <div id="p2pMieiCorpo"></div>
     </div>
@@ -12817,6 +12836,23 @@ document.getElementById('cartello')?.remove();</script>
         <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
       </div>
       <div id="p2pModCorpo"></div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: GLI SCAMBI ON-CHAIN (30 ott 2026) ============
+       La pagina del secondo libro del P2P, quello con la garanzia 2-di-3:
+       i miei scambi, il foglio «Pubblica», la scheda di uno scambio e,
+       per i moderatori, le dispute. Sorella di «Moderazione P2P»: stesso
+       cappello, stessa radice nella nav («I miei scambi»). -->
+  <div class="view" id="view-p2ponchain">
+    <div class="sicu">
+      <div class="foglio-testa">
+        <button type="button" class="foglio-back" onclick="navIndietro()"
+                title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
+        <h3>⛓️ Scambi on-chain</h3>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+      </div>
+      <div id="p2pOnchainCorpo"></div>
     </div>
   </div>
 
@@ -18483,6 +18519,8 @@ function voceNav(view){
   else if (view === 'p2pordine') view = 'p2pmiei';
   /* ...e la pagina dei moderatori pure (28 set 2026) */
   else if (view === 'p2pmod') view = 'p2pmiei';
+  /* ...e gli scambi on-chain (30 ott 2026), per la stessa ragione */
+  else if (view === 'p2ponchain') view = 'p2pmiei';
   /* Il ramo resta alle sole ASTE: quello di Sfoglia non esiste piu'.
      LA RIGA CHE SI ROVESCIA, col suo motivo — «MA LA NAV MENTIVA»:
      entrando in un reparto si accendeva Esplora su una vetrina
@@ -19021,6 +19059,8 @@ const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine','p2pinfo']);
    nell'elenco: le quattro viste di tutti restano quattro, e questa la
    apre solo chi e' moderatore. */
 VISTE_NAV_P2P.add('p2pmod');
+/* ...e la pagina degli scambi on-chain (30 ott 2026): stessa ragione */
+VISTE_NAV_P2P.add('p2ponchain');
 /* IL + GRIGIO (23 set 2026, richiesta di Andrea): fuori dal libro il
    tondo non pubblica — porta al libro, su «Compra BTC». La classe la
    scrive go() dalla vista, come nav-p2p; la LARGHEZZA si chiede qui
@@ -19164,6 +19204,10 @@ function go(view){
      cronologia, e da vaiP2P non si passa. renderP2P dipinge ENTRAMBI
      i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
   if (view==='p2p' || view==='p2pmiei') renderP2P();
+  /* gli scambi on-chain (30 ott 2026): la pagina si rilegge dal server
+     a ogni ingresso, e la striscia in «I miei scambi» conta i vivi */
+  if (view==='p2ponchain') renderP2POnchain();
+  if (view==='p2pmiei' && myP2POnchain) leggiMieiOnchainP2P().then(renderStrisciaOnchainP2P);
   /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
      entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
      come nav-p2p, cosi' vale anche per indietro e cronologia */
@@ -56551,7 +56595,9 @@ async function onchainProponi(btn, oid){
    l'oggetto — libera i sats» e «Annulla l'ordine» su un ordine pagato
    on-chain passano da qui. Torna il verso firmato, o alza col motivo. */
 async function onchainFirmaProposta(oid, verso){
-  let o = onchainOrdini.find(x => x.id === oid);
+  /* (30 ott 2026) uno scambio P2P on-chain arriva INTERO, con la sua
+     `rotta`: non sta in `onchainOrdini` e il codice sotto non lo sa */
+  let o = (oid && typeof oid === 'object') ? oid : onchainOrdini.find(x => x.id === oid);
   if (!o) o = (await onchainLeggiOrdini()).find(x => x.id === oid);
   if (!o) throw new Error('ordine on-chain non trovato');
   const B = await caricaBitcoin();
@@ -56579,7 +56625,7 @@ async function onchainFirmaProposta(oid, verso){
      compra, e `onchainUsciteVersoVenditore` controlla il tetto */
   const uscite = verso === 'venditore' ? onchainUsciteVersoVenditore(o, o.incasso, 0)
     : [[o.rimborso, tot - Math.ceil(vb(1) * tar)]];
-  const r = await fetch(`${API_BASE}/onchain/ordini/${oid}/proposta`, {method: 'POST',
+  const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/proposta`, {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
     body: JSON.stringify({verso, psbt: onchainPsbtFirmata(B, o, io, w, uscite)})});
   const d = await r.json().catch(() => ({}));
@@ -56650,7 +56696,7 @@ async function onchainCofirma(o, parole){
   if (rete <= 0 || rete > o.margine_sats) return 'la commissione esce dal margine';
   for (let i = 0; i < tx.inputsLength; i++) tx.signIdx(io.firma.privateKey, i);
   tx.finalize();
-  const r = await fetch(`${API_BASE}/onchain/ordini/${o.id}/firma`, {method: 'POST',
+  const r = await fetch(`${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/firma`, {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
     body: JSON.stringify({tx: tx.hex})});
   const d = await r.json().catch(() => ({}));
@@ -56732,10 +56778,14 @@ async function onchainCofirmeInSottofondo(){
     const parole = onchainSemeLocale();
     if (!parole) return;
     const ordini = await onchainLeggiOrdini();
-    if (!ordini.some(o => onchainRilascioDaFirmare(o) || onchainPrimaDiChiVende(o)
+    const daFare = ordini.some(o => onchainRilascioDaFirmare(o) || onchainPrimaDiChiVende(o)
                           || (o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
-                              && (o.stato === 'pagato' || o.stato === 'attesa')))) return;
-    const fatte = await onchainCofirmeInAttesa(parole);
+                              && (o.stato === 'pagato' || o.stato === 'attesa')));
+    const fatte = daFare ? await onchainCofirmeInAttesa(parole) : [];
+    /* ...e le seconde firme degli scambi P2P on-chain (30 ott 2026):
+       stesso seme, stessa `onchainCofirma`, l'elenco e' il loro */
+    if (typeof p2pOnchainCofirmeInAttesa === 'function')
+      fatte.push(...await p2pOnchainCofirmeInAttesa(parole));
     if (fatte.length) {
       toast('⛓️ ' + fatte.join(' · '), 7000);
       /* l'ordine di sempre si e' chiuso sul server: «Ordini» lo dice */
@@ -56748,6 +56798,592 @@ async function onchainCofirmeInSottofondo(){
 
 function onchainUriPagamento(o){
   return `bitcoin:${o.indirizzo.indirizzo}?amount=${(o.importo_sats / 1e8).toFixed(8)}`;
+}
+
+/* ============ GLI SCAMBI P2P ON-CHAIN: LA GARANZIA 2-DI-3 (30 ott 2026,
+   cantiere p2p-onchain-2di3) ============
+   Il secondo libro del P2P: scambi bitcoin ↔ euro in cui la garanzia
+   non e' la hold invoice di Mostro ma il 2-di-3 non custodial
+   dell'on-chain — lo stesso degli ordini on-chain del mercatino, con le
+   STESSE funzioni di firma del telefono (`onchainFirmaProposta`,
+   `onchainCofirma`): un ordine P2P on-chain arriva dal server nella
+   forma di un ordine on-chain (`ruolo`, `indirizzo.chiavi`, `utxo`,
+   `rimborso`, `incasso`, `destinazione`, `proposta`) piu' la sua
+   `rotta`, e il codice delle firme non sa la differenza.
+   I RUOLI: chi VENDE bitcoin deposita i sats (e' il «compratore» del
+   2-di-3: li libera, il resto torna a lui), chi li COMPRA li riceve sul
+   wallet SUO (il «venditore»). `o.parte` dice 'vendo' | 'compro' per le
+   parole dell'app, `o.ruolo` resta quello del 2-di-3 per le firme.
+   Il libro arriva dentro `/api/p2p/libro` (busta `onchain`, dalla
+   memoria del server) e le sue card stanno IN CIMA al libro di Mostro,
+   col segno «⛓️ on-chain · 2-di-3»; tutto il resto — pubblicare,
+   prendere, depositare, gli euro, le firme, la disputa — vive nella
+   pagina «Scambi on-chain», sorella di «I miei scambi». Tutto dietro
+   `myP2POnchain` (il cancello del server: leva + on-chain + P2P, per
+   me); senza, il libro si vede e basta. */
+let myP2POnchain = false;
+let p2pOnchainLibro = {eventi: [], miei: [], quando: 0, rete: 'signet', minSats: 10000, oreDeposito: 6};
+let p2pOnchainMiei = [];        // /api/p2p/onchain/miei, gli ultimi trenta
+let p2pOnchainAperto = 0;       // lo scambio nella pagina; 0 = l'elenco
+let p2pOnchainForm = false;     // il foglio «Pubblica» aperto nell'elenco
+let p2pOnchainMod = [];         // le dispute e i ritardatari (solo moderatori)
+let p2pOnchainLetto = 0;        // quando il libro on-chain e' stato riletto
+
+/* la busta `onchain` di /api/p2p/libro: assente = leva spenta, e il
+   libro on-chain si svuota (mai card prese da un pezzo) */
+function prendiOnchainP2P(busta){
+  if (!busta || typeof busta !== 'object') {
+    p2pOnchainLibro = Object.assign({}, p2pOnchainLibro, {eventi: [], miei: [], quando: 0});
+    return false;
+  }
+  p2pOnchainLibro = {
+    eventi: Array.isArray(busta.eventi) ? busta.eventi : [],
+    miei: Array.isArray(busta.miei) ? busta.miei.map(String) : [],
+    quando: Number(busta.quando) || 0,
+    rete: busta.rete || 'signet',
+    minSats: Number(busta.minSats) || 10000,
+    oreDeposito: Number(busta.oreDeposito) || 6};
+  p2pOnchainLetto = Date.now();
+  return p2pOnchainLibro.eventi.length > 0;
+}
+
+/* il libro on-chain si rilegge da solo ogni mezzo minuto mentre si
+   guarda il P2P (la fotografia di Mostro ha la sua strada): la rotta
+   leggera, e si ridisegna solo se e' cambiato qualcosa */
+async function rinfrescaOnchainP2P(subito){
+  if (!(p2pOnchainLibro.quando > 0 || myP2POnchain)) return;
+  if (!subito && Date.now() - p2pOnchainLetto < 30000) return;
+  p2pOnchainLetto = Date.now();
+  try {
+    const h = {};
+    if (myTgId && !VETRINA) h['X-Tg-Init-Data'] = authHdr();
+    const r = await fetch(`${API_BASE}/p2p/onchain/libro`, {headers: h, cache: 'no-store'});
+    if (!r.ok) { if (r.status === 404) prendiOnchainP2P(null); return; }
+    const prima = p2pOnchainLibro.quando + ':' + p2pOnchainLibro.eventi.length;
+    prendiOnchainP2P(await r.json());
+    if (prima !== p2pOnchainLibro.quando + ':' + p2pOnchainLibro.eventi.length
+        && typeof vistaAttivaP2P === 'function' && vistaAttivaP2P() === 'view-p2p') renderP2P();
+  } catch(e) { /* al prossimo giro */ }
+}
+
+/* LE CARD IN CIMA AL LIBRO: quelle del lato della scheda (k = sell nel
+   tab «Compra BTC», buy in «Vendi BTC»), e per chi e' ammesso la riga
+   che apre «Pubblica». Chi non e' ammesso le vede e basta. */
+function carteOnchainLibroP2P(k){
+  const righe = p2pOnchainLibro.eventi.filter(o => o.lato === k);
+  if (!righe.length && !myP2POnchain) return '';
+  const porta = myP2POnchain
+    ? '<button type="button" class="p2p-onchain-porta" onclick="apriOnchainP2P(0, \'elenco\')">'
+      + '<span><b>⛓️ Scambi on-chain</b><small>con la garanzia 2-di-3, senza Lightning'
+      + (p2pOnchainLibro.rete !== 'mainnet' ? ' · ' + esc(p2pOnchainLibro.rete) : '')
+      + '</small></span><span class="p2p-onchain-piu">Pubblica / I miei</span></button>'
+    : '';
+  return porta + righe.map(rigaOnchainP2P).join('');
+}
+
+function rigaOnchainP2P(o){
+  const paghiEuro = o.lato === 'sell';
+  const mio = p2pOnchainLibro.miei.includes(String(o.ordine));
+  const rigaEuro = '<span class="p2p-grande p2p-euro">' + (paghiEuro ? 'Invia ' : 'Ricevi ')
+    + esc(fmtEur(o.euro)) + ' €</span>';
+  const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">'
+    + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + fmt(Number(o.sats) || 0) + ' sats</span>';
+  const metodi = Array.isArray(o.metodi) ? o.metodi : [];
+  const paga = metodi.length
+    ? `<div class="p2p-box p2p-paga" title="${esc(metodi.join(', '))}">`
+      + metodi.map(m => typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(m) : esc(m)).join(', ')
+      + '</div>' : '';
+  return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${mio ? ' p2p-mio' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"
+    onclick="apriOnchainP2P(Number(this.dataset.id))">
+    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}<span class="p2p-onchain-segno">⛓️ on-chain · 2-di-3</span></div>
+    ${paghiEuro ? rigaSats : rigaEuro}
+    ${paga}
+    ${o.nome ? '<div class="p2p-box">👤 ' + esc(o.nome) + '</div>' : ''}
+    ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
+  </div>`;
+}
+
+/* la striscia in «I miei scambi», come quella dei moderatori: quanti
+   scambi on-chain ho in corso, e la porta alla loro pagina */
+function renderStrisciaOnchainP2P(){
+  const box = el('p2pOnchainStriscia');
+  if (!box) return;
+  if (!myP2POnchain) { box.innerHTML = ''; return; }
+  const n = p2pOnchainMiei.filter(o => P2P_ONCHAIN_VIVI.has(o.stato)).length;
+  box.innerHTML = '<button type="button" class="mod-striscia' + (n ? ' viva' : '') + '" onclick="apriOnchainP2P(0, \'elenco\')">'
+    + '<span><b>⛓️ Scambi on-chain</b><small>'
+    + (n ? (n === 1 ? '1 scambio in corso' : n + ' scambi in corso') : 'Nessuno scambio in corso')
+    + ' · garanzia 2-di-3</small></span>'
+    + (n ? '<span class="badge dispute">' + n + '</span>' : '') + '</button>';
+}
+
+const P2P_ONCHAIN_VIVI = new Set(['pending', 'preso', 'depositato', 'euro_inviati', 'disputa']);
+const P2P_ONCHAIN_STATI = {
+  pending: 'Nel libro', preso: 'Preso: si aspetta il deposito',
+  depositato: 'Sats depositati', euro_inviati: 'Euro inviati',
+  disputa: 'In disputa', rilasciato: 'Concluso', rimborsato: 'Rimborsato',
+  annullato: 'Annullato', scaduto: 'Scaduto'};
+
+/* IL TOCCO SU UNA CARD: il mio ordine si apre nella sua pagina, uno
+   altrui chiede «Prendi?» con la frase che dice COSA succede a chi
+   prende — chi deposita e chi riceve dipende dal lato. `modo` apre la
+   pagina senza card: 'elenco' i miei, 'pubblica' il foglio nuovo. */
+function apriOnchainP2P(id, modo){
+  if (!myP2POnchain) {
+    chiediConferma({titolo: '⛓️ Scambi on-chain', etichetta: 'Ho capito', avviso: true,
+      corpo: 'Gli scambi con la garanzia 2-di-3 sono in prova: il libro lo vedi, '
+        + 'ma pubblicare e prendere oggi lo fanno solo i moderatori di Barattolo.'});
+    return;
+  }
+  if (modo) {
+    p2pOnchainAperto = 0;
+    p2pOnchainForm = modo === 'pubblica';
+    return go('p2ponchain');
+  }
+  const o = p2pOnchainLibro.eventi.find(x => Number(x.id) === Number(id));
+  if (!o) return toast('⛓️ Quest\'ordine non è più nel libro', 4000);
+  if (p2pOnchainLibro.miei.includes(String(o.ordine))) {
+    p2pOnchainAperto = Number(o.id); p2pOnchainForm = false;
+    return go('p2ponchain');
+  }
+  const vendeLui = o.lato === 'sell';
+  const metodi = (o.metodi || []).join(', ');
+  chiediConferma({
+    titolo: vendeLui ? '⛓️ Compri bitcoin on-chain' : '⛓️ Vendi bitcoin on-chain',
+    testata: '<div class="p2p-onchain-riass"><b>' + fmt(Number(o.sats) || 0) + ' sats</b> per <b>'
+      + esc(fmtEur(o.euro)) + ' €</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : '')
+      + (o.nome ? '<br><small>di ' + esc(o.nome) + '</small>' : '') + '</div>',
+    corpo: vendeLui
+      ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
+        + 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; '
+        + 'lui li libera e arrivano sul TUO wallet on-chain. Se qualcosa va storto decide un moderatore.'
+      : 'Se prendi, depositi tu ' + fmt(Number(o.sats) || 0) + ' sats più il margine di rete '
+        + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore. Chi compra ti manda '
+        + esc(fmtEur(o.euro)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
+        + 'Se non arrivano, apri una disputa: decide un moderatore.',
+    etichetta: 'Prendi lo scambio',
+    poi: () => prendiOnchainP2P(Number(o.id))});
+}
+
+async function prendiOnchainP2P(id){
+  haptic();
+  try {
+    /* la chiave sul dispositivo e la sua meta' pubblica al server, come
+       all'apertura: senza non c'e' niente con cui firmare */
+    await onchainAccendiDaSolo();
+    const r = await fetch(`${API_BASE}/p2p/onchain/${id}/prendi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non si è potuto prendere');
+    p2pOnchainAperto = Number(id); p2pOnchainForm = false;
+    await leggiMieiOnchainP2P();
+    go('p2ponchain');
+    toast(d.ruolo === 'compratore'
+      ? '⛓️ Preso: ora deposita i sats nell\'indirizzo 2-di-3'
+      : '⛓️ Preso: chi vende sta depositando i sats', 6000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  rinfrescaOnchainP2P(true);
+}
+
+async function leggiMieiOnchainP2P(){
+  if (!myP2POnchain || DEMO || VETRINA) { p2pOnchainMiei = []; return p2pOnchainMiei; }
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/miei`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    p2pOnchainMiei = r.ok ? ((await r.json()).ordini || []) : [];
+  } catch(e) { /* resta quel che c'era */ }
+  return p2pOnchainMiei;
+}
+
+/* LA PAGINA: l'elenco dei miei (col foglio «Pubblica» e, per i
+   moderatori, le dispute) oppure uno scambio. Si rilegge dal server a
+   ogni ingresso: lo stato lo fa la rete, non il telefono. */
+async function renderP2POnchain(){
+  const box = el('p2pOnchainCorpo');
+  if (!box) return;
+  if (!myP2POnchain) {
+    box.innerHTML = '<div class="empty"><span class="empty-title">Scambi on-chain in prova</span>'
+      + 'Oggi li fanno solo i moderatori di Barattolo. Il libro lo vedi nel P2P.</div>';
+    return;
+  }
+  if (!p2pOnchainMiei.length) box.innerHTML = '<div class="hint">Leggo i tuoi scambi…</div>';
+  await leggiMieiOnchainP2P();
+  if (isAdmin) {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/onchain/moderazione/aperte`, {headers: {'X-Tg-Init-Data': authHdr()}});
+      p2pOnchainMod = r.ok ? ((await r.json()).dispute || []) : [];
+    } catch(e) { p2pOnchainMod = []; }
+  }
+  if (p2pOnchainAperto) {
+    let o = p2pOnchainMiei.find(x => x.id === p2pOnchainAperto)
+      || p2pOnchainMod.find(x => x.id === p2pOnchainAperto);
+    if (!o) {
+      try {
+        const r = await fetch(`${API_BASE}/p2p/onchain/${p2pOnchainAperto}`, {headers: {'X-Tg-Init-Data': authHdr()}});
+        if (r.ok) o = await r.json();
+      } catch(e) {}
+    }
+    if (!o) { p2pOnchainAperto = 0; return renderP2POnchain(); }
+    box.innerHTML = '<button type="button" class="scopri-link" onclick="apriOnchainP2P(0, \'elenco\')">← Tutti i miei scambi on-chain</button>'
+      + schedaOnchainP2P(o);
+    const qr = el('p2pOcQr');
+    if (qr) disegnaQr(qr, onchainUriPagamento(o), 'Byte');
+    return;
+  }
+  const vivi = p2pOnchainMiei.filter(o => P2P_ONCHAIN_VIVI.has(o.stato));
+  const chiusi = p2pOnchainMiei.filter(o => !P2P_ONCHAIN_VIVI.has(o.stato));
+  box.innerHTML = '<div class="hint">Bitcoin on-chain contro euro, con la garanzia 2-di-3: chi vende '
+    + 'deposita i sats in un indirizzo chiuso da tre chiavi (le due parti e Barattolo), e li libera '
+    + 'quando gli euro sono arrivati. Barattolo firma solo in disputa.'
+    + (p2pOnchainLibro.rete !== 'mainnet' ? ' <b>Rete: ' + esc(p2pOnchainLibro.rete) + '</b> — sats di prova.' : '')
+    + '</div>'
+    + (p2pOnchainForm ? formOnchainP2P()
+       : '<button type="button" class="btn orange" onclick="p2pOnchainForm=true;renderP2POnchain()">➕ Pubblica uno scambio on-chain</button>')
+    + (vivi.length ? '<h3 class="p2p-onchain-h">In corso</h3>' + vivi.map(rigaMiaOnchainP2P).join('') : '')
+    + (chiusi.length ? '<h3 class="p2p-onchain-h">Chiusi</h3>' + chiusi.map(rigaMiaOnchainP2P).join('') : '')
+    + (!p2pOnchainMiei.length ? '<div class="empty scambi-vuoto"><span class="empty-title">Nessuno scambio on-chain</span>'
+       + '<button type="button" class="btn ghost" onclick="go(\'p2p\')">Vai al libro ordini</button></div>' : '')
+    + (isAdmin ? moderazioneOnchainP2P() : '');
+}
+
+function rigaMiaOnchainP2P(o){
+  return `<div class="p2p-ord p2p-onchain${o.lato === 'sell' ? ' lato-compro' : ' lato-vendo'}" role="button" tabindex="0"
+    onclick="p2pOnchainAperto=${Number(o.id)};renderP2POnchain()">
+    <div class="p2p-testa"><span class="p2p-grande p2p-euro">${o.parte === 'vendo' ? 'Vendi' : 'Compri'} ${fmt(o.sats)} sats</span>
+      <span class="p2p-onchain-segno">${esc(P2P_ONCHAIN_STATI[o.stato] || o.stato)}</span></div>
+    <span class="p2p-piccola p2p-sats">per ${esc(fmtEur(o.euro))} €${o.altro ? ' · con ' + esc(o.altro) : ''}</span>
+    ${daFirmareOnchainP2P(o) ? '<div class="p2p-box p2p-tuo">✍️ Aspetta la tua firma</div>' : ''}
+  </div>`;
+}
+
+/* la proposta che aspetta la MIA seconda firma: dell'altra parte o di
+   Barattolo, verso di me, su uno scambio ancora aperto */
+function daFirmareOnchainP2P(o){
+  return !!(o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
+    && o.stato !== 'rilasciato' && o.stato !== 'rimborsato');
+}
+
+function formOnchainP2P(){
+  const metodi = P2P_METODI.filter(m => m !== P2P_TABACCHINO);
+  return '<div class="form p2p-onchain-form">'
+    + '<label>Cosa fai</label><select id="p2pOcLato">'
+    + '<option value="sell">Vendo bitcoin (deposito io i sats)</option>'
+    + '<option value="buy">Compro bitcoin (li ricevo sul mio wallet)</option></select>'
+    + '<label>Sats</label><input id="p2pOcSats" type="number" inputmode="numeric" min="' + p2pOnchainLibro.minSats
+    + '" placeholder="es. 100000" oninput="euroOnchainP2P()">'
+    + '<label>Euro</label><input id="p2pOcEuro" type="number" inputmode="decimal" step="0.01" min="1" placeholder="es. 90,00">'
+    + '<div class="hint" id="p2pOcCambio"></div>'
+    + '<label>Metodi di pagamento in euro</label><div class="p2p-onchain-metodi">'
+    + metodi.map(m => '<label class="chip-check"><input type="checkbox" value="' + esc(m) + '"> ' + esc(m) + '</label>').join('')
+    + '</div>'
+    + '<label>Dove vuoi gli euro (lo legge solo chi scambia con te)</label>'
+    + '<input id="p2pOcRecapito" maxlength="300" placeholder="IBAN, nome Revolut, numero Satispay… (facoltativo ora)">'
+    + '<div class="hint">Minimo ' + fmt(p2pOnchainLibro.minSats) + ' sats. L\'ordine resta nel libro 24 ore ed esce su Nostr '
+    + 'firmato da Barattolo; chi lo prende passa da qui.</div>'
+    + '<div class="row"><button type="button" class="btn ghost" onclick="p2pOnchainForm=false;renderP2POnchain()">Annulla</button>'
+    + '<button type="button" class="btn orange" onclick="pubblicaOnchainP2P(this)">Pubblica</button></div>'
+    + '</div>';
+}
+
+function euroOnchainP2P(){
+  const s = Number((el('p2pOcSats') || {}).value) || 0;
+  const h = el('p2pOcCambio');
+  if (!h) return;
+  h.textContent = s > 0 && eurPerSat ? '≈ ' + fmtEur(s * eurPerSat) + ' € al cambio di adesso (il prezzo lo scrivi tu)' : '';
+}
+
+async function pubblicaOnchainP2P(btn){
+  haptic();
+  const sats = Math.round(Number(el('p2pOcSats').value) || 0);
+  const euro = Number(String(el('p2pOcEuro').value).replace(',', '.')) || 0;
+  const metodi = [...document.querySelectorAll('.p2p-onchain-metodi input:checked')].map(i => i.value);
+  if (!sats || !euro) return toast('Scrivi sats ed euro', 4000);
+  if (!metodi.length) return toast('Scegli almeno un metodo di pagamento', 4000);
+  const rip = onchainAttesa(btn, 'Pubblico…');
+  try {
+    await onchainAccendiDaSolo();
+    const r = await fetch(`${API_BASE}/p2p/onchain/pubblica`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({lato: el('p2pOcLato').value, sats, euro_cent: Math.round(euro * 100),
+                            metodi, recapito: el('p2pOcRecapito').value.trim()})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non pubblicato');
+    p2pOnchainForm = false; p2pOnchainAperto = Number(d.id);
+    toast('⛓️ Pubblicato: è nel libro ed esce su Nostr', 5000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  renderP2POnchain();
+  rinfrescaOnchainP2P(true);
+}
+
+/* LA SCHEDA DI UNO SCAMBIO: lo stato a parole, i fatti (indirizzo,
+   sats visti, recapito), e i gesti di CHI guarda in QUESTO stato. */
+function schedaOnchainP2P(o){
+  const vendo = o.parte === 'vendo';
+  const deposito = o.ruolo === 'compratore';   // chi vende bitcoin
+  const ricevo = o.ruolo === 'venditore';      // chi compra bitcoin
+  const mod = o.ruolo === 'moderatore';
+  const ind = o.indirizzo || {};
+  const espl = o.esploratore || 'https://mempool.space/signet';
+  const quando = (t) => t ? new Date(t * 1000).toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '';
+  let testo = '', gesti = '';
+  const bott = (cls, onclick, label) => `<button type="button" class="btn ${cls}" onclick="${onclick}">${label}</button>`;
+  const g = (cosa, label, cls) => bott(cls || 'ghost', `gestoOnchainP2P(this, ${o.id}, '${cosa}')`, label);
+  switch (o.stato) {
+    case 'pending':
+      testo = 'È nel libro: chi lo prende fa nascere l\'indirizzo 2-di-3. Scade ' + quando(o.scade) + '.';
+      gesti = g('annulla', '🗑 Ritira dal libro');
+      break;
+    case 'preso':
+      testo = deposito
+        ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete) `
+          + `sull'indirizzo qui sotto entro le ${quando(o.deposito_entro)}. Con una conferma lo scambio va avanti.`
+        : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
+          + 'Ti avvisiamo appena sono confermati: allora mandi gli euro.';
+      gesti = (deposito ? g('controlla', '🔎 Ho depositato: controlla', 'orange') : g('controlla', '🔎 Controlla la rete'))
+        + ((deposito && !o.visti_sats) || (ricevo && Date.now() / 1000 > o.deposito_entro && !o.visti_sats)
+           ? g('annulla', deposito ? 'Annulla (non deposito)' : 'Rinuncia: il deposito non è arrivato') : '');
+      break;
+    case 'depositato':
+      testo = ricevo
+        ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Manda <b>${esc(fmtEur(o.euro))} €</b> a chi vende `
+          + `(${esc((o.metodi || []).join(', '))})` + (o.recapito ? ` a: <b>${esc(o.recapito)}</b>` : ', col recapito che ti scrive')
+          + ', poi tocca «Ho inviato gli euro».'
+        : `Deposito confermato. Chi compra ti manda <b>${esc(fmtEur(o.euro))} €</b>: quando li VEDI sul tuo conto, `
+          + 'libera i sats. Mai prima.';
+      gesti = (ricevo ? g('euro-inviati', '💶 Ho inviato gli euro', 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+        + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+        + g('disputa', '⚖️ Apri una disputa');
+      break;
+    case 'euro_inviati':
+      testo = deposito
+        ? `Chi compra dice di averti mandato <b>${esc(fmtEur(o.euro))} €</b> (${quando(o.euro_inviati_il)}). `
+          + 'Controlla il tuo conto: se ci sono, libera i sats; se non arrivano, apri una disputa.'
+        : `Hai detto di aver mandato ${esc(fmtEur(o.euro))} € (${quando(o.euro_inviati_il)}). Chi vende li controlla e libera i sats `
+          + 'sul tuo wallet. Se non lo fa, apri una disputa.';
+      gesti = (deposito ? bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats') : '')
+        + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+        + g('disputa', '⚖️ Apri una disputa');
+      break;
+    case 'disputa':
+      testo = 'Disputa aperta ' + (o.disputa ? (o.disputa.da === 'io' ? 'da te' : 'dall\'altra parte') + ' il ' + quando(o.disputa.il)
+        + (o.disputa.motivo ? ': «' + esc(o.disputa.motivo) + '»' : '') : '')
+        + '. Un moderatore di Barattolo decide a chi vanno i sats e Barattolo mette la sua firma; '
+        + 'la seconda la mette il telefono di chi ha ragione.'
+        + (o.decisione ? '<br><b>Deciso:</b> i sats vanno a chi ' + (o.decisione.verso === 'venditore' ? 'compra' : 'vende') + ' bitcoin.' : '');
+      break;
+    case 'rilasciato': testo = 'Concluso: i sats sono andati al wallet di chi ha comprato.'; break;
+    case 'rimborsato': testo = 'Rimborsato: i sats sono tornati a chi li aveva depositati.'; break;
+    case 'annullato': testo = 'Annullato prima del deposito.' + (o.ricevuti_sats ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
+    case 'scaduto': testo = 'Scaduto nel libro senza essere preso.'; break;
+  }
+  /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
+  if (daFirmareOnchainP2P(o) && !mod) {
+    gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`,
+      '✍️ Metti la seconda firma' + (o.proposta.barattolo ? ' (Barattolo ha firmato)' : '')) + gesti;
+    testo += '<br><b>' + (o.proposta.verso === 'venditore' ? 'I sats stanno per arrivare sul tuo wallet' : 'Il rimborso sta per tornare a te')
+      + ':</b> manca solo la tua firma, che il telefono mette da solo.';
+  } else if (o.proposta && o.proposta.mia && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') {
+    testo += '<br>Hai firmato: si aspetta la seconda firma dell\'altra parte (il suo telefono la mette quando apre l\'app).';
+  }
+  /* il recapito per gli euro: lo scrive chi vende bitcoin, finche' gli euro non partono */
+  const recapito = deposito || (o.ruolo === 'maker' && o.lato === 'sell');
+  const recapitoBox = recapito && ['pending', 'preso', 'depositato'].includes(o.stato)
+    ? '<div class="p2p-box"><label>Dove vuoi gli euro</label><input id="p2pOcRecapitoVivo" maxlength="300" value="' + esc(o.recapito || '')
+      + '" placeholder="IBAN, nome Revolut…"> ' + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>'
+    : (o.recapito && (ricevo || deposito) ? '<div class="p2p-box">💶 Recapito per gli euro: <b>' + esc(o.recapito) + '</b></div>' : '');
+  const indirizzoBox = ind.indirizzo
+    ? '<div class="p2p-box"><b>Indirizzo 2-di-3</b><div class="mono" style="word-break:break-all">' + esc(ind.indirizzo) + '</div>'
+      + (deposito && o.stato === 'preso' ? '<div class="qr" id="p2pOcQr"></div>'
+         + bott('ghost', `copiaOnchainP2P('${esc(ind.indirizzo)}')`, '📋 Copia l\'indirizzo') : '')
+      + '<div class="hint">Visti in rete: ' + fmt(o.visti_sats || 0) + ' sats, confermati ' + fmt(o.ricevuti_sats || 0)
+      + ' · <a href="' + esc(espl) + '/address/' + esc(ind.indirizzo) + '" target="_blank" rel="noopener">explorer</a></div>'
+      + (typeof onchainComeEFatto === 'function' && !mod ? onchainComeEFatto(o, {}) : '')
+      + '</div>' : '';
+  const uscita = o.txid_uscita
+    ? '<div class="p2p-box">Transazione: <a href="' + esc(espl) + '/tx/' + esc(o.txid_uscita) + '" target="_blank" rel="noopener" class="mono">'
+      + esc(o.txid_uscita.slice(0, 16)) + '…</a></div>' : '';
+  const parti = mod && o.parti
+    ? '<div class="p2p-box">Vende bitcoin: <b>' + esc(o.parti.vende) + '</b> (' + o.parti.vende_id + ') · compra: <b>'
+      + esc(o.parti.compra) + '</b> (' + o.parti.compra_id + ')</div>' : '';
+  const decidi = mod && (o.stato === 'disputa' || (o.ricevuti_sats && ['annullato', 'scaduto'].includes(o.stato))) && !o.decisione
+    ? '<div class="row">' + bott('orange', `decidiOnchainP2P(this, ${o.id}, 'venditore')`, '⚖️ I sats a chi compra')
+      + bott('allarme', `decidiOnchainP2P(this, ${o.id}, 'compratore')`, '⚖️ Rimborsa chi vende') + '</div>' : '';
+  return `<div class="p2p-ord p2p-onchain${o.lato === 'sell' ? ' lato-compro' : ' lato-vendo'}">
+    <div class="p2p-testa"><span class="p2p-grande p2p-euro">${mod ? 'Scambio' : (vendo ? 'Vendi' : 'Compri')} ${fmt(o.sats)} sats</span>
+      <span class="p2p-onchain-segno">${esc(P2P_ONCHAIN_STATI[o.stato] || o.stato)}</span></div>
+    <span class="p2p-piccola p2p-sats">per ${esc(fmtEur(o.euro))} €${o.altro ? ' · con ' + esc(o.altro) : ''}
+      · ${esc((o.metodi || []).join(', '))}</span>
+    ${parti}
+    <div class="p2p-box">${testo}</div>
+    ${recapitoBox}
+    ${indirizzoBox}
+    ${uscita}
+    ${gesti.includes("'disputa'") ? '<input id="p2pOcMotivo" maxlength="500" placeholder="Per una disputa: cosa è successo? (lo leggono i moderatori)">' : ''}
+    <div class="p2p-onchain-gesti">${gesti}</div>
+    ${decidi}
+  </div>`;
+}
+
+function copiaOnchainP2P(testo){
+  if (!navigator.clipboard) return toast('Copia a mano l\'indirizzo', 3000);
+  navigator.clipboard.writeText(testo).then(() => toast('📋 Indirizzo copiato', 2500),
+                                            () => toast('Copia a mano l\'indirizzo', 3000));
+}
+
+/* I GESTI SEMPLICI: una POST, un toast, la scheda rifatta. Quelli che
+   non si disfano passano dalla domanda unica di casa (`chiediConferma`,
+   mai un confirm() o un prompt() di sistema): l'annullo, e la disputa
+   col motivo scritto nel campo della scheda. */
+function gestoOnchainP2P(btn, id, cosa){
+  haptic();
+  if (cosa === 'annulla') {
+    return chiediConferma({titolo: '⛓️ Annulli lo scambio?', etichetta: 'Annulla lo scambio',
+      vestito: 'allarme',
+      corpo: 'Nessun sats si è mosso: lo scambio si chiude qui e l\'altra parte lo sa subito.',
+      poi: () => eseguiGestoOnchainP2P(id, 'annulla', {})});
+  }
+  if (cosa === 'disputa') {
+    const motivo = String((el('p2pOcMotivo') || {}).value || '').trim().slice(0, 500);
+    return chiediConferma({titolo: '⚖️ Apri una disputa?', etichetta: 'Apri la disputa',
+      vestito: 'allarme',
+      corpo: 'Un moderatore di Barattolo guarda, sente le due parti e decide a chi vanno i sats; '
+        + 'Barattolo mette la sua firma e il telefono di chi ha ragione la seconda. '
+        + (motivo ? 'Il motivo che hai scritto: «' + motivo + '».' : 'Non hai scritto un motivo: lo puoi scrivere nel campo sopra il bottone.'),
+      poi: () => eseguiGestoOnchainP2P(id, 'disputa', {motivo})});
+  }
+  return eseguiGestoOnchainP2P(id, cosa, {}, btn);
+}
+
+async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
+  const rip = btn ? onchainAttesa(btn, '…') : () => {};
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${id}/${cosa}`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify(corpo || {})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non riuscito');
+    if (cosa === 'controlla') toast(d.stato === 'depositato' ? '⛓️ Deposito confermato' : d.visti_sats
+      ? `⛓️ Visti ${fmt(d.visti_sats)} sats, aspetto la conferma` : '⛓️ Niente ancora sull\'indirizzo', 5000);
+    else if (cosa === 'euro-inviati') toast('💶 Detto a chi vende: controlla il conto e libera i sats', 5000);
+    else if (cosa === 'disputa') toast('⚖️ Disputa aperta: un moderatore guarderà', 5000);
+    else toast('⛓️ Fatto', 3000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  renderP2POnchain();
+  rinfrescaOnchainP2P(true);
+}
+
+async function recapitoOnchainP2P(btn, id){
+  const v = (el('p2pOcRecapitoVivo') || {}).value || '';
+  const rip = onchainAttesa(btn, '…');
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${id}/recapito`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({recapito: v.trim()})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non salvato');
+    toast('💶 Recapito salvato', 3000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 6000); }
+  finally { rip(); }
+  renderP2POnchain();
+}
+
+/* LA PRIMA FIRMA: chi vende bitcoin libera (verso «venditore» del
+   2-di-3 = chi compra riceve), chi compra rinuncia (verso «compratore»
+   = tutto torna a chi ha depositato). Le stesse funzioni del mercatino,
+   con l'ordine passato intero: la `rotta` dice dove mandarla. */
+function liberaOnchainP2P(btn, id){
+  haptic();
+  chiediConferma({titolo: '🔓 Liberi i sats?', etichetta: 'Sì, li ho ricevuti: libera',
+    corpo: 'Hai VISTO gli euro sul tuo conto? Liberando, i sats partono verso chi compra e non tornano.',
+    poi: () => firmaOnchainP2P(id, 'venditore')});
+}
+
+function rinunciaOnchainP2P(btn, id){
+  haptic();
+  chiediConferma({titolo: '↩️ Rinunci allo scambio?', etichetta: 'Rinuncio', vestito: 'allarme',
+    corpo: 'I sats tornano a chi li ha depositati, meno la commissione di rete. Se hai già mandato gli euro, apri una disputa invece.',
+    poi: () => firmaOnchainP2P(id, 'compratore')});
+}
+
+/* la prima firma, dopo la domanda: le funzioni di sempre del telefono */
+async function firmaOnchainP2P(id, verso){
+  const o = p2pOnchainMiei.find(x => x.id === id);
+  if (!o) return;
+  try {
+    await onchainFirmaProposta(o, verso);
+    toast(verso === 'venditore'
+      ? '🔓 Firmato: i sats partono appena chi compra apre l\'app (la sua firma la mette il telefono)'
+      : '↩️ Firmato: il rimborso parte appena chi vende apre l\'app', 7000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  renderP2POnchain();
+}
+
+async function cofirmaOnchainP2P(btn, id){
+  haptic();
+  const o = p2pOnchainMiei.find(x => x.id === id);
+  if (!o) return;
+  const rip = onchainAttesa(btn, 'Firmo…');
+  try {
+    const parole = await onchainSemeAssicurato();
+    const no = await onchainCofirma(o, parole);
+    toast(no ? '⛓️ Non firmato: ' + no : '✅ Firmato e trasmesso: i sats sono partiti', 7000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  finally { rip(); }
+  renderP2POnchain();
+}
+
+/* le seconde firme che aspettano me, in sottofondo (le chiama
+   `onchainCofirmeInSottofondo` dopo quelle del mercatino) */
+async function p2pOnchainCofirmeInAttesa(parole){
+  const fatte = [];
+  if (!myP2POnchain) return fatte;
+  for (const o of await leggiMieiOnchainP2P()) {
+    if (!daFirmareOnchainP2P(o)) continue;
+    try {
+      const no = await onchainCofirma(o, parole);
+      fatte.push(no ? `⚠️ scambio #${o.id}: non co-firmato — ${no}`
+                    : `✅ scambio #${o.id}: co-firmato, i sats sono partiti`);
+    } catch(e) { fatte.push(`⚠️ scambio #${o.id}: ${e.message || 'errore'}`); }
+  }
+  return fatte;
+}
+
+/* LA MODERAZIONE (solo admin): le dispute e i ritardatari, con i due
+   bottoni. Barattolo firma, il telefono di chi vince co-firma da solo. */
+function moderazioneOnchainP2P(){
+  if (!p2pOnchainMod.length) return '<h3 class="p2p-onchain-h">⚖️ Moderazione on-chain</h3><div class="hint">Nessuna disputa aperta.</div>';
+  return '<h3 class="p2p-onchain-h">⚖️ Moderazione on-chain</h3>' + p2pOnchainMod.map(o =>
+    `<div class="p2p-ord p2p-onchain" role="button" tabindex="0" onclick="p2pOnchainAperto=${Number(o.id)};renderP2POnchain()">
+      <div class="p2p-testa"><span class="p2p-grande p2p-euro">#${o.id} · ${fmt(o.sats)} sats</span>
+        <span class="p2p-onchain-segno">${esc(P2P_ONCHAIN_STATI[o.stato] || o.stato)}</span></div>
+      <span class="p2p-piccola p2p-sats">per ${esc(fmtEur(o.euro))} € · vende ${esc((o.parti || {}).vende || '')}, compra ${esc((o.parti || {}).compra || '')}</span>
+      ${o.disputa && o.disputa.motivo ? '<div class="p2p-box">«' + esc(o.disputa.motivo) + '»</div>' : ''}
+    </div>`).join('');
+}
+
+function decidiOnchainP2P(btn, id, verso){
+  haptic();
+  chiediConferma({titolo: '⚖️ Decidi la disputa', vestito: 'allarme',
+    etichetta: verso === 'venditore' ? 'I sats a chi compra' : 'Rimborsa chi vende',
+    corpo: (verso === 'venditore' ? 'I sats vanno a chi COMPRA bitcoin.' : 'I sats tornano a chi VENDE bitcoin.')
+      + ' Barattolo firma con la sua chiave, e una firma data non si ritira: la seconda la mette il telefono di chi ha ragione.',
+    poi: () => eseguiDecisioneOnchainP2P(id, verso)});
+}
+
+async function eseguiDecisioneOnchainP2P(id, verso){
+  const rip = () => {};
+  try {
+    const r = await fetch(`${API_BASE}/p2p/onchain/${id}/decidi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({verso})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'non deciso');
+    toast('⚖️ Barattolo ha firmato: manca la firma di chi ha ragione', 6000);
+  } catch(e) { toast('⛓️ ' + (e.message || 'errore'), 7000); }
+  finally { rip(); }
+  renderP2POnchain();
 }
 
 /* (La scheda degli ordini on-chain, `onchainBloccoOrdini`, e' morta il
@@ -61117,10 +61753,17 @@ function renderP2P(){
      cantiere libro-vuoto): niente offerte, o offerte che il filtro
      ferma — vedi `vuotoLibroP2P` */
   const vuoto = mostrati.length ? null : vuotoLibroP2P(vivi, p2pFiltro, p2pLato);
+  /* LE CARD ON-CHAIN IN CIMA (30 ott 2026): il secondo libro, dello
+     stesso lato, sopra quello di Mostro; con solo quelle il vuoto di
+     Mostro non si scrive. E il libro on-chain si rilegge ogni mezzo minuto. */
+  const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k) : '';
+  if (typeof rinfrescaOnchainP2P === 'function') rinfrescaOnchainP2P();
   box.innerHTML = avvisi
     /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
     + (typeof avvisoMemoriaBrowserP2P === 'function' ? avvisoMemoriaBrowserP2P(typeof suOnion === 'function' && suOnion()) : '')
+    + onchainCarte
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
+       : onchainCarte ? ''
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vuoto.logo
            ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
@@ -81700,6 +82343,9 @@ async function chiediFotoLibroP2P(){
   const pause = typeof prendiPauseP2P === 'function' && prendiPauseP2P(d && d.pause);
   /* ...e quelli col paracadute aperto (13 ott 2026): la fotografia intera */
   const paracadute = typeof prendiParacaduteP2P === 'function' && prendiParacaduteP2P(d && d.paracadute);
+  /* ...e il libro on-chain (30 ott 2026): la busta `onchain`, PRIMA del
+     ritorno anticipato qui sotto — con Mostro muto le sue card ci sono lo stesso */
+  const onchain = typeof prendiOnchainP2P === 'function' && prendiOnchainP2P(d && d.onchain);
   /* ...e i miei secondo il server (28 set 2026): la stessa lista della
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
@@ -81707,7 +82353,7 @@ async function chiediFotoLibroP2P(){
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
-      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri || pause || paracadute;
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri || pause || paracadute || onchain;
   libroDaCopiaP2P(eventi, quando, 'server');
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
@@ -82403,6 +83049,7 @@ async function chiediFotoVetrinaP2P(){
   if (typeof prendiFiltriP2P === 'function') prendiFiltriP2P(d && d.filtri);
   if (typeof prendiPauseP2P === 'function') prendiPauseP2P(d && d.pause);
   if (typeof prendiParacaduteP2P === 'function') prendiParacaduteP2P(d && d.paracadute);
+  if (typeof prendiOnchainP2P === 'function') prendiOnchainP2P(d && d.onchain);   /* il libro on-chain (30 ott 2026) */
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
@@ -89424,6 +90071,8 @@ async function avvia(){
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
     myOnchainRete = me.onchain_rete || '';
+    /* ...e gli scambi P2P con la garanzia 2-di-3 (30 ott 2026) */
+    myP2POnchain = !!me.p2p_onchain;
     myOnchainIncasso = me.onchain_incasso || '';
     myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */

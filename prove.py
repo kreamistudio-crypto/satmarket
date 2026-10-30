@@ -44362,8 +44362,10 @@ def prove_fogli_di_casa():
     # che non cancella niente e quindi non chiede niente.
     # (27 ott 2026, cantiere onchain-disputa: «Crea la chiave di
     # Barattolo», il novantaquattresimo)
-    prova("i gesti che passano dalla domanda unica sono novantaquattro",
-          94, solo_codice(mini).count("chiediConferma({"))
+    prova("i gesti che passano dalla domanda unica sono centouno (dal 30 ott "
+          "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
+          "disputa, libera, rinuncia, decidi)",
+          101, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -61303,7 +61305,9 @@ def prove_libro_subito():
              "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
              "MAX_ORDINI_P2P": 200, "MAX_ORDINI_MAI_VISTI_P2P": 50, "P2P_ORDINI_MAI_VISTI_S": 86400, "_tag_evento_p2p": amb["_tag_evento_p2p"],
              # piu' account (16 ott 2026): spenta, il libro di ieri
-             "PIU_ACCOUNT_OVUNQUE": False}
+             "PIU_ACCOUNT_OVUNQUE": False,
+             # gli scambi on-chain (30 ott 2026): leva spenta, nessuna busta
+             "p2p_onchain_leva": lambda: False}
     chieste = []
     mondo["_facce_ordini_p2p"] = lambda con, ids, adesso: (
         chieste.append(list(ids)) or {i: {"nome": "Ada"} for i in ids})
@@ -62776,6 +62780,7 @@ def prove_card_p2p_vetrina():
            # piu' account (16 ott 2026): a leva spenta l'account scelto
            # non conta, e chi guarda e' quello della firma
            "conto_scelto": lambda u: u, "PIU_ACCOUNT_OVUNQUE": False,
+           "p2p_onchain_leva": lambda: False,   # gli scambi on-chain (30 ott 2026), spenti
            "utente_da_sessione": lambda s: SESS.append(s) or ({"id": 5} if s == "COOKIE-BUONO" else None),
            "_P2P_FOTO": {"eventi": [{"kind": 38383, "tags": [["d", "ordine-uno-1"]]}],
                          "quando": 1000, "facce": {"ordine-uno-1": {"nome": "Luca"}},
@@ -147010,6 +147015,10 @@ def prove_freni():
            # 28 ott 2026: il cambio in Lightning di chi vende (preventivo,
            # fattura, nascita) 40 all'ora
            "onchain_cambio": (40, 3600),
+           # 30 ott 2026: gli scambi P2P on-chain (2-di-3): pubblicare e
+           # prendere 10 all'ora, una disputa 5 all'ora
+           "p2p_onchain_pubblica": (10, 3600), "p2p_onchain_prendi": (10, 3600),
+           "p2p_onchain_disputa": (5, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
            "cassetta_spedisci": (60, 60)}, F)
@@ -152724,6 +152733,176 @@ def prove_onchain_verso_lightning():
                      re.I) is not None))
 
 
+def prove_p2p_onchain():
+    """GLI SCAMBI P2P CON LA GARANZIA 2-DI-3 (30 ott 2026, cantiere
+    p2p-onchain-2di3, decisione di Andrea con Alan). Il giro vero — server,
+    telefono embit, mempool di cartone, la firma di Barattolo in disputa —
+    sta in collaudo_p2p_onchain; qui le sentinelle di forma e i pezzi puri:
+    la leva nasce spenta; i tag del 38383 (NIP-69 piu' `layer`/`network`);
+    il giudice dell'ordine nuovo; il libro dalla MEMORIA e mai dal database
+    a ogni lettura; il giudice dei PSBT e' quello UNICO del mercatino, e la
+    disputa la firma Barattolo con la sua chiave; il telefono firma con le
+    funzioni di sempre, che sanno la `rotta`; Mostro non si tocca."""
+    print("\n⛓️ Gli scambi P2P on-chain (2-di-3)")
+    import subprocess
+    src = _SORGENTE
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    prova("la leva nasce spenta, nel config d'esempio e nel codice, e il "
+          "fatto vuole on-chain E P2P accesi",
+          (True, True, True),
+          ("\nP2P_ONCHAIN_ATTIVO = False" in esempio,
+           "except ImportError:\n    P2P_ONCHAIN_ATTIVO = False" in src,
+           "return bool(P2P_ONCHAIN_ATTIVO and ONCHAIN_ATTIVO and _p2p_leve()[\"attivo\"])"
+           in pezzo("p2p_onchain_leva")))
+    # --- i tag del 38383: puri ---
+    amb = {"json": json, "time": time, "ONCHAIN_RETE": "signet",
+           "P2P_ONCHAIN_STATO_LIBRO": {
+               "pending": "pending", "preso": "in-progress", "depositato": "in-progress",
+               "euro_inviati": "in-progress", "disputa": "in-progress",
+               "rilasciato": "success", "rimborsato": "canceled",
+               "annullato": "canceled", "scaduto": "canceled"}}
+    exec(pezzo("_p2p_onchain_euro_testo"), amb)
+    exec(pezzo("p2p_onchain_tags"), amb)
+    o = {"ordine": "bar-onchain-abc", "lato": "sell", "stato": "pending",
+         "prezzo_sats": 100000, "euro_cent": 9050, "scade": 5000,
+         "metodi": '["Bonifico", "Revolut"]'}
+    t = {x[0]: x[1:] for x in amb["p2p_onchain_tags"](o, 1000)}
+    prova("un ordine nel libro: d, k, f, s, amt, fa (euro con i centesimi solo se "
+          "ci sono), pm, premium 0, network, layer, expiration = la scadenza nel libro",
+          (["bar-onchain-abc"], ["sell"], ["EUR"], ["pending"], ["100000"], ["90.5"],
+           ["Bonifico", "Revolut"], ["0"], ["signet"], ["onchain"], ["5000"],
+           ["barattolo"], ["order"]),
+          (t["d"], t["k"], t["f"], t["s"], t["amt"], t["fa"], t["pm"], t["premium"],
+           t["network"], t["layer"], t["expiration"], t["y"], t["z"]))
+    for stato, secchio in (("preso", "in-progress"), ("rilasciato", "success"),
+                           ("rimborsato", "canceled"), ("scaduto", "canceled")):
+        t = {x[0]: x[1:] for x in amb["p2p_onchain_tags"]({**o, "stato": stato}, 1000)}
+        prova(f"...{stato} esce nel secchio NIP-69 «{secchio}» e vive una settimana",
+              ([secchio], [str(1000 + 7 * 86400)]), (t["s"], t["expiration"]))
+    prova("90 euro tondi: «90», senza centesimi finti", "90",
+          amb["_p2p_onchain_euro_testo"](9000))
+    prova("...e il 38383 lo firma la chiave del server, senza contenuto", True,
+          'return firma_evento(38383, p2p_onchain_tags(o, adesso), "")'
+          in pezzo("p2p_onchain_evento"))
+    # --- il giudice dell'ordine nuovo: puro ---
+    amb = {"P2P_ONCHAIN_MIN_SATS": 10_000, "P2P_ONCHAIN_METODI_MAX": 5,
+           "P2P_ONCHAIN_METODO_MAX": 40, "P2P_ONCHAIN_RECAPITO_MAX": 300,
+           "_fmt_sats": reale("_fmt_sats")}
+    exec(pezzo("p2p_onchain_giudica_nuovo"), amb)
+    G = amb["p2p_onchain_giudica_nuovo"]
+    prova("il giudice: lato, numeri, minimo, euro, tetto euro, tetto sats di "
+          "prova, metodi vuoti, troppi, uno storto, recapito lungo — e il si'",
+          [True, True, True, True, True, True, True, True, True, True, ""],
+          [G("x", 1, 1, ["a"], "", 0, 0).startswith("Di' se vendi"),
+           "numeri" in G("sell", "x", 1, ["a"], "", 0, 0),
+           G("sell", 9_999, 100, ["a"], "", 0, 0).startswith("Minimo 10.000"),
+           G("sell", 50_000, 0, ["a"], "", 0, 0).startswith("Scrivi quanti euro"),
+           "fino a 250 €" in G("sell", 50_000, 25_001, ["a"], "", 250, 0),
+           "oltre 40.000" in G("sell", 40_001, 100, ["a"], "", 0, 40_000),
+           G("sell", 50_000, 100, [], "", 0, 0).startswith("Scegli almeno"),
+           "Al massimo 5" in G("sell", 50_000, 100, list("abcdef"), "", 0, 0),
+           "non si legge" in G("sell", 50_000, 100, ["a,b"], "", 0, 0),
+           "troppo lungo" in G("sell", 50_000, 100, ["a"], "x" * 301, 0, 0),
+           G("sell", 50_000, 25_000, ["Bonifico"], "IT00", 250, 0)])
+    # --- il libro: dalla memoria ---
+    libro = src[src.index('@app.get("/api/p2p/libro")'):]
+    libro = libro[:libro.index("\n@app.")]
+    prova("`/api/p2p/libro` prende la busta on-chain dalla fotografia in "
+          "memoria, a leva accesa, e l'ETag la conta", (True, False, True),
+          ('fuori["onchain"] = _p2p_onchain_libro(chi)' in libro,
+           "_p2p_onchain_db()" in codice(libro) or "con.execute" in codice(libro),
+           '(fuori.get("onchain") or {}).get("quando", 0)' in libro))
+    prova("...e la busta esce dalla fotografia `_P2P_ONCHAIN_FOTO`, senza recapiti",
+          (True, False),
+          ("F = _P2P_ONCHAIN_FOTO" in pezzo("_p2p_onchain_libro"),
+           "recapito" in pezzo("_p2p_onchain_riga_pubblica")))
+    # --- il giudice unico e la firma di Barattolo ---
+    prova("la prima firma passa dal giudice UNICO del mercatino, con la chiave "
+          "del ruolo del 2-di-3", True,
+          '_onchain_psbt_giudica(o, verso, psbt_b64, ind["chiave_" + ruolo])'
+          in pezzo("p2p_onchain_proposta"))
+    prova("...e la decisione del moderatore la firma Barattolo con la terza "
+          "chiave, mai una parte del proprio scambio", (True, True),
+          ("psbt = _onchain_psbt_barattolo(con, o, verso)" in pezzo("p2p_onchain_decidi"),
+           "Un moderatore non decide il proprio scambio" in pezzo("p2p_onchain_decidi")))
+    prova("la seconda firma: mai chi ha proposto, solo chi riceve quell'uscita, "
+          "stesso txid", (True, True, True),
+          ('if int(o["proposta_da"] or 0) == int(user["id"]):' in pezzo("p2p_onchain_firma"),
+           'if o["proposta_verso"] != ruolo:' in pezzo("p2p_onchain_firma"),
+           "if atteso != arrivato:" in pezzo("p2p_onchain_firma")))
+    prova("i ruoli: chi deposita (vende bitcoin) e' il «compratore» del 2-di-3, "
+          "e l'indirizzo nasce con lui per primo", (True, True),
+          ("ind_id = onchain_nuovo_indirizzo(con, dep, ric, adesso)" in pezzo("p2p_onchain_prendi"),
+           'return "compratore"' in pezzo("_p2p_onchain_ruolo")))
+    prova("la disputa fa decadere la proposta di parte", True,
+          "proposta_psbt='', proposta_da=0" in pezzo("p2p_onchain_disputa"))
+    prova("l'annullo di chi riceve aspetta la finestra del deposito, e nessuno "
+          "annulla con sats visti", (True, True),
+          ('if ruolo == "venditore" and adesso < int(o["deposito_entro"] or 0):'
+           in pezzo("p2p_onchain_annulla"),
+           "AND visti_sats=0" in pezzo("p2p_onchain_annulla")))
+    prova("la ronda batte dentro `orologio_onchain`, e i tre freni esistono",
+          (True, True),
+          ("await _p2p_onchain_ronda()" in pezzo("orologio_onchain"),
+           all(f'"{n}": (' in src for n in ("p2p_onchain_pubblica", "p2p_onchain_prendi",
+                                             "p2p_onchain_disputa"))))
+    prova("Mostro non si tocca: nessuna patch nuova e nessun file del nodo nel cantiere",
+          True, not any("p2p_onchain" in open(os.path.join("deploy", "mostro", f),
+                                                encoding="utf-8", errors="ignore").read()
+                         for f in os.listdir(os.path.join("deploy", "mostro"))
+                         if os.path.isfile(os.path.join("deploy", "mostro", f))))
+    # --- il telefono ---
+    prova("il client legge il CANCELLO dal server", True,
+          "myP2POnchain = !!me.p2p_onchain;" in mini)
+    fp = pezzo_js(mini, "async function onchainFirmaProposta(oid, verso){", "\n}\n")
+    cof = pezzo_js(mini, "async function onchainCofirma(o, parole){", "\n}\n")
+    prova("le firme di sempre prendono l'ordine intero e mandano alla sua `rotta`",
+          (True, True, True),
+          ("(oid && typeof oid === 'object') ? oid : onchainOrdini.find(" in fp,
+           "${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/proposta" in fp,
+           "${API_BASE}${o.rotta || '/onchain/ordini/' + o.id}/firma" in cof))
+    prova("...e il P2P le chiama col verso giusto: chi vende bitcoin libera "
+          "(verso venditore), chi compra rinuncia (verso compratore)", (True, True),
+          ("poi: () => firmaOnchainP2P(id, 'venditore')" in pezzo_js(mini, "function liberaOnchainP2P(btn, id){", "\n}\n"),
+           "poi: () => firmaOnchainP2P(id, 'compratore')" in pezzo_js(mini, "function rinunciaOnchainP2P(btn, id){", "\n}\n")
+           and "await onchainFirmaProposta(o, verso);" in pezzo_js(mini, "async function firmaOnchainP2P(id, verso){", "\n}\n")))
+    sotto = pezzo_js(mini, "async function onchainCofirmeInSottofondo(){", "\n}\n")
+    prova("le seconde firme del P2P partono in sottofondo con quelle del mercatino",
+          True, "fatte.push(...await p2pOnchainCofirmeInAttesa(parole));" in sotto)
+    foto = pezzo_js(mini, "async function chiediFotoLibroP2P(){", "\n}\n")
+    prova("la busta on-chain si prende PRIMA del ritorno anticipato del libro di Mostro",
+          True, foto.index("const onchain = typeof prendiOnchainP2P === 'function' && prendiOnchainP2P(d && d.onchain);")
+          < foto.index("return Object.keys(facce).length > 0"))
+    prova("la vista esiste, accende «I miei scambi» nella nav, e il libro mette "
+          "le sue card in cima", (1, True, True, True),
+          (mini.count('<div class="view" id="view-p2ponchain">'),
+           "else if (view === 'p2ponchain') view = 'p2pmiei';" in mini,
+           "VISTE_NAV_P2P.add('p2ponchain');" in mini,
+           "+ onchainCarte\n    + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')" in mini))
+    # il giudice della firma che aspetta me, in node
+    banco = pezzo_js(mini, "function daFirmareOnchainP2P(o){", "\n}\n") + "\n}\n" + """
+const casi = [
+  [{proposta: {mia: false, verso: 'venditore'}, ruolo: 'venditore', stato: 'euro_inviati'}, true],
+  [{proposta: {mia: true, verso: 'venditore'}, ruolo: 'venditore', stato: 'euro_inviati'}, false],
+  [{proposta: {mia: false, verso: 'venditore'}, ruolo: 'compratore', stato: 'disputa'}, false],
+  [{proposta: {mia: false, verso: 'compratore'}, ruolo: 'compratore', stato: 'disputa'}, true],
+  [{proposta: {mia: false, verso: 'venditore'}, ruolo: 'venditore', stato: 'rilasciato'}, false],
+  [{proposta: null, ruolo: 'venditore', stato: 'depositato'}, false]];
+console.log(JSON.stringify(casi.map(([o]) => daFirmareOnchainP2P(o))));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        prova("il telefono co-firma solo la proposta altrui (o di Barattolo) verso di "
+              "se', su uno scambio aperto", [True, False, False, True, False, False],
+              json.loads(r.stdout.strip() or "null"))
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il giudice della firma che aspetta me", "node assente")
+    prova("il collaudo del giro vero sta nelle due liste della CI", (True, True),
+          ("\ncollaudo_p2p_onchain\n" in open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read(),
+           "\ncollaudo_p2p_onchain.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
+
+
 def prove_parole_uniche():
     """LE 12 PAROLE DEL CAMBIO NEL WALLET DI BARATTOLO (29 ott 2026,
     cantiere parole-uniche, idea di Alan, ok di Andrea). Ogni cambio nasce
@@ -155896,7 +156075,7 @@ def prove_contanti_zona():
            # (10 ott 2026, reputazione-p2p) ...e i filtri, in coda alle zone;
            # (12 ott 2026, tempo-di-chi-pubblica) e in coda ai filtri le pause
            # (13 ott 2026, paracadute) e in coda alle pause il paracadute
-           and "> 0 || cambi || zone || filtri || pause || paracadute;" in fn("async function chiediFotoLibroP2P(){"),
+           and "> 0 || cambi || zone || filtri || pause || paracadute || onchain;" in fn("async function chiediFotoLibroP2P(){"),
            mini.count("\n  prendiZoneP2P(d && d.zone);\n") == 1])
     riga = fn("function rigaOrdineP2P(o){")
     prova("la card del libro mette la zona sotto la scatola dei metodi; la card d'esempio no",
@@ -165623,7 +165802,7 @@ def prove_canale_admin():
           # dispute, la nascita della sua chiave nella liquidita'
           # (28 ott 2026, bot-assistente) «🙋 Parla con una persona»
           # nella stanza sua, l'assistenza
-          {"assistenza": 1, "dispute": 3, "dm": 1, "errori": 33,
+          {"assistenza": 1, "dispute": 5, "dm": 1, "errori": 33,
            "liquidita": 2, "moderazione": 14, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -165659,13 +165838,14 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "90 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "92 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
           "margine della cassaforte, dall'on-chain la firma di Barattolo "
           "e la nascita della sua chiave, e chi chiede una persona "
-          "all'assistente del bot)", 90,
+          "all'assistente del bot, e le dispute P2P on-chain: aperta e "
+          "decisa, 30 ott 2026)", 92,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -170633,7 +170813,7 @@ def prove_paracadute_app():
           < annulla.find("chiamataOrdineP2P(o, 'cancel')"))
     foto = fn("async function chiediFotoLibroP2P(){")
     prova("la fotografia dice «e' cambiato qualcosa» anche per il solo paracadute", True,
-          "|| cambi || zone || filtri || pause || paracadute;" in foto)
+          "|| cambi || zone || filtri || pause || paracadute || onchain;" in foto)
     prova("CHI HA IL LIBRO DAVANTI LO VEDE USCIRE: la fotografia si richiede dall'interval "
           "unico (una volta al minuto) e dalla tirata (subito)", [True, True],
           ["try { if (typeof rinfrescaFuoriLibroP2P === 'function') rinfrescaFuoriLibroP2P(); } "
@@ -182096,6 +182276,7 @@ def main():
     prove_indirizzo_ordine_onchain,
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_onchain_verso_lightning,
+    prove_p2p_onchain,
     prove_parole_uniche,
     prove_ripristino_visibile,
     prove_onchain_pagina,

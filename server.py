@@ -2691,6 +2691,12 @@ FRENI = {
     # l'incasso su un wallet proprio e le leve dal pannello (27 ott 2026)
     "onchain_incasso": (10, 3600),    # «Dove ricevi i sats», per persona
     "onchain_incasso_guarda": (40, 3600),  # il controllo di un indirizzo incollato (mempool), per persona
+    # gli scambi P2P con la garanzia 2-di-3 (30 ott 2026): pubblicare e
+    # prendere scrivono su Nostr e fanno nascere indirizzi, la disputa
+    # suona ai moderatori
+    "p2p_onchain_pubblica": (10, 3600),  # un ordine on-chain nel libro, per persona
+    "p2p_onchain_prendi": (10, 3600),    # una presa (nasce un 2-di-3), per persona
+    "p2p_onchain_disputa": (5, 3600),    # una disputa ai moderatori, per persona
     # (28 ott 2026) il cambio in Lightning di un ordine on-chain: il
     # preventivo legge le tariffe del fornitore, la fattura bussa al
     # Lightning address, la nascita legge un PSBT
@@ -33615,6 +33621,19 @@ def _leve_stato():
                          "(ADMIN_IDS): è la beta chiusa di Andrea e Alan",
                   spento="appena ONCHAIN_ATTIVO si accende vale per "
                          "chiunque: è il gesto che allarga la beta")),
+            # GLI SCAMBI P2P CON IL 2-DI-3 (30 ott 2026): la garanzia
+            # on-chain negli scambi bitcoin ↔ euro, nel server e nell'app,
+            # Mostro non toccato. Sotto il cancello dell'on-chain e del P2P.
+            _leva("Scambi P2P on-chain (2-di-3)", "P2P_ONCHAIN_ATTIVO",
+                  bool(P2P_ONCHAIN_ATTIVO),
+                  acceso="nel P2P compaiono gli scambi «⛓️ on-chain»: chi "
+                         "vende bitcoin li deposita nel 2-di-3, gli ordini "
+                         "escono su Nostr (38383) firmati dal server; vale "
+                         "solo con ONCHAIN_ATTIVO e il P2P accesi, per chi è "
+                         "ammesso all'on-chain",
+                  spento="il P2P è solo quello di Mostro (Lightning): "
+                         "nessuna rotta /api/p2p/onchain/*, nessuna card",
+                  allarme=bool(P2P_ONCHAIN_ATTIVO) and not ONCHAIN_ATTIVO),
             # LA TAPPA 2 (20 ott 2026): la libreria che fa i conti degli
             # indirizzi, e la terza chiave — detta per quel che E', mai
             # stampata (una xpub non e' un segreto, ma non si sparge)
@@ -46414,6 +46433,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # l'accensione da sola partono dall'avvio. Si dice anche a cancello
     # chiuso: non e' un segreto, e' la rete.
     profilo["onchain_rete"] = ONCHAIN_RETE
+    # ...e chi puo' pubblicare e prendere scambi P2P con la garanzia
+    # 2-di-3 (30 ott 2026): la leva P2P_ONCHAIN_ATTIVO sotto il cancello
+    # dell'on-chain e quello del P2P. Il libro, invece, lo vede chiunque.
+    profilo["p2p_onchain"] = p2p_onchain_ammesso(user["id"])
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -55683,19 +55706,26 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # senza dire di chi — il client li toglie dal libro degli altri
     if fuori["eventi"] and F.get("paracadute"):
         fuori["paracadute"] = F["paracadute"]
+    onchain = p2p_onchain_leva()
     chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
-        if fuori["eventi"] else 0
+        if (fuori["eventi"] or onchain) else 0
     if chi and F.get("facce"):
         fuori["facce"] = F["facce"]
     if chi:
         fuori["miei"] = sorted(d for d, t in (F.get("autori") or {}).items()
                                if t == chi)
+    # IL LIBRO ON-CHAIN (30 ott 2026): gli scambi con la garanzia 2-di-3,
+    # dalla SUA fotografia in memoria (`_P2P_ONCHAIN_FOTO`), mai dal
+    # database a ogni lettura. A leva spenta la chiave non c'e'.
+    if onchain:
+        fuori["onchain"] = _p2p_onchain_libro(chi)
     # L'ETAG (cura 4): la fila la rilegge ogni 15 s e la fotografia cambia
     # ogni minuto, quindi tre letture su quattro tornavano identiche —
     # centinaia di KB riserializzati e rimandati. L'impronta e' il
     # momento della fotografia piu' chi guarda: a impronta uguale un 304
     # nudo, e il client tiene la copia che ha.
-    etag = f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}"'
+    etag = (f'W/"{fuori["quando"]}-{chi}-{len(fuori["eventi"])}'
+            f'-{(fuori.get("onchain") or {}).get("quando", 0)}"')
     testa = {"Cache-Control": "private, max-age=10",
              "Vary": "X-Tg-Init-Data, X-Barattolo-Conto, Cookie",
              "ETag": etag}
@@ -90785,6 +90815,8 @@ async def onchain_incasso_scegli(req: Request, x_tg_init_data: str = Header(""),
         # (27 ott 2026): l'ordine e' nato col 2-di-3, l'uscita si sceglie qui
         _onchain_prepara_ordini(con)
         riempiti = _onchain_riempi_incassi(con, user["id"])
+        # ...e gli scambi P2P on-chain presi senza destinazione (30 ott 2026)
+        _p2p_onchain_riempi_incassi(con, user["id"])
         con.commit()
     finally:
         con.close()
@@ -92515,6 +92547,7 @@ async def onchain_incasso_modo(req: Request, x_tg_init_data: str = Header(""),
         if modo == "onchain":
             _onchain_prepara_ordini(con)
             riempiti = _onchain_riempi_incassi(con, user["id"])
+            _p2p_onchain_riempi_incassi(con, user["id"])   # gli scambi P2P (30 ott)
             con.commit()
     finally:
         con.close()
@@ -92865,12 +92898,1276 @@ async def orologio_onchain():
             await _onchain_riprendi_incassi()
         except Exception as e:
             print(f"⚠️ On-chain: ronda saltata: {e}", flush=True)
+        # il libro on-chain del P2P (30 ott 2026): stesso battito, errore suo
+        try:
+            await _p2p_onchain_ronda()
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: ronda saltata: {e}", flush=True)
 
 
 @app.on_event("startup")
 async def avvia_onchain():
     global _TASK_ONCHAIN
     _TASK_ONCHAIN = asyncio.create_task(orologio_onchain())
+
+
+# ═══ IL P2P ON-CHAIN: LA GARANZIA 2-DI-3 NEGLI SCAMBI BITCOIN ↔ EURO ═══
+# (30 ott 2026, cantiere p2p-onchain-2di3; decisione di Andrea con Alan
+# del 30 ott, «sì, la logica è giusta», dopo la salita a Mostro 0.20.2)
+#
+# COSA. Un secondo libro accanto a quello di Mostro: ordini «vendo /
+# compro bitcoin per euro» in cui la garanzia NON e' la hold invoice
+# Lightning del coordinatore ma il 2-di-3 non custodial di Alan — lo
+# stesso degli ordini on-chain del mercatino (`onchain_indirizzi`, il
+# giudice dei PSBT, la sorveglianza di mempool, le due firme nei
+# telefoni, la terza chiave di Barattolo sul VPS per le dispute).
+# Mostro resta il giudice SOLO degli scambi Lightning e non si tocca:
+# in 0.20.2 la garanzia e' sempre la hold invoice, e un escrow on-chain
+# dentro mostrod sarebbe una patch enorme da rifare a ogni versione
+# (CANTIERI, «Mostro 0.20.2», la coda del 30 ott).
+#
+# GLI ORDINI STANNO SU NOSTR (condizione di Alan): ogni ordine esce come
+# 38383 NIP-69 — i tag che legge gia' ogni client di Mostro (`d`, `k`,
+# `f`, `s`, `amt`, `fa`, `pm`, `premium`, `expiration`) piu' quelli che
+# dicono la differenza: `layer` = onchain, `network` = la rete
+# dell'on-chain (oggi signet), `y` = barattolo (la piattaforma), `z` =
+# order. FIRMATO DALLA CHIAVE DEL SERVER (la stessa dei NIP-99 del
+# mercatino) e spedito agli stessi relay. Chiunque lo legge; per
+# prenderlo si passa dalla nostra app, perche' la presa, il deposito,
+# le firme e le dispute vivono qui.
+#
+# I RUOLI, scritti una volta per tutte perche' e' il punto in cui ci si
+# confonde. Nel 2-di-3 del mercatino chi COMPRA l'oggetto mette i sats
+# e li libera; chi VENDE li riceve. In uno scambio P2P a mettere i sats
+# e' chi VENDE bitcoin (li deposita in garanzia, e li libera quando gli
+# euro sono arrivati) e a riceverli e' chi li COMPRA. Quindi:
+#   depositante = chi vende bitcoin = il «compratore» del 2-di-3
+#                 (`compratore_id` in onchain_indirizzi, chiave
+#                 `chiave_compratore`, rimborso su `/1/n` del suo seme);
+#   ricevente   = chi compra bitcoin = il «venditore» del 2-di-3
+#                 (riceve sul wallet SUO, scelto e firmato dal suo seme:
+#                 `onchain_incasso`, mai il conto fatto da Barattolo —
+#                 la regola di Andrea del 27 ott).
+# Le colonne qui si chiamano `depositante_id` e `ricevente_id`, mai
+# compratore/venditore, e `_p2p_onchain_ruolo` traduce nel nome che il
+# codice delle firme (server e telefono) si aspetta.
+#
+# IL GIRO. pending (nel libro) → preso (nasce l'indirizzo 2-di-3, chi
+# vende ha P2P_ONCHAIN_ORE_DEPOSITO per depositare sats + margine di
+# rete) → depositato (1 conferma; chi compra manda gli euro col metodo
+# scelto) → euro_inviati («Ho pagato») → chi vende tocca «Ricevuti,
+# libera» = prima firma; il telefono di chi compra co-firma da solo →
+# rilasciato. Chi compra puo' rinunciare prima degli euro: propone il
+# rimborso, chi vende co-firma → rimborsato. Disputa dal deposito in
+# poi: un moderatore decide, Barattolo firma, il telefono di chi vince
+# mette la seconda (`_onchain_psbt_barattolo`, come nel mercatino).
+#
+# COSA NON C'E' (dichiarato): il prezzo di mercato col premio (solo
+# prezzo fisso: sats ed euro li scrive chi pubblica), la commissione di
+# Barattolo (come l'on-chain del mercatino, tappa 7), la chat dello
+# scambio (il recapito per gli euro si scrive nell'ordine, in chiaro
+# per le sole due parti), la reputazione del libro (il tag `rating` e'
+# del coordinatore). Tutto dietro una leva spenta di serie, sotto il
+# cancello dell'on-chain (oggi solo admin) e sotto il P2P acceso.
+try:
+    from config import P2P_ONCHAIN_ATTIVO
+except ImportError:
+    P2P_ONCHAIN_ATTIVO = False
+if not isinstance(P2P_ONCHAIN_ATTIVO, bool):
+    print("[p2p] P2P_ONCHAIN_ATTIVO non e' True/False: gli scambi P2P "
+          "on-chain restano spenti", flush=True)
+    P2P_ONCHAIN_ATTIVO = False
+
+P2P_ONCHAIN_PREFISSO = "bar-onchain-"   # il `d` del 38383: nostro, riconoscibile
+P2P_ONCHAIN_ORE_LIBRO = 24      # quanto resta nel libro un ordine non preso
+P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confermato
+P2P_ONCHAIN_MIN_SATS = 10_000   # sotto, la commissione di rete mangia lo scambio
+P2P_ONCHAIN_METODI_MAX = 5
+P2P_ONCHAIN_METODO_MAX = 40
+P2P_ONCHAIN_RECAPITO_MAX = 300
+P2P_ONCHAIN_APERTI_MAX = 5      # ordini vivi per persona
+P2P_ONCHAIN_RITARDATARI_S = 7 * 24 * 3600   # per quanto si guarda un indirizzo di un ordine chiuso
+STATI_P2P_ONCHAIN = ("pending", "preso", "depositato", "euro_inviati",
+                     "rilasciato", "rimborsato", "disputa", "annullato",
+                     "scaduto")
+# i quattro secchi di NIP-69, perche' i client di Mostro leggano il libro
+P2P_ONCHAIN_STATO_LIBRO = {
+    "pending": "pending", "preso": "in-progress", "depositato": "in-progress",
+    "euro_inviati": "in-progress", "disputa": "in-progress",
+    "rilasciato": "success", "rimborsato": "canceled",
+    "annullato": "canceled", "scaduto": "canceled"}
+STATI_P2P_ONCHAIN_VIVI = ("pending", "preso", "depositato", "euro_inviati",
+                          "disputa")
+STATI_P2P_ONCHAIN_CON_SATS = ("depositato", "euro_inviati", "disputa")
+
+
+def p2p_onchain_leva() -> bool:
+    """IL FATTO: la leva accesa, l'on-chain acceso (il 2-di-3 esiste) e
+    il P2P acceso (la schermata e' quella). Una delle tre spenta = non
+    esiste, per nessuno."""
+    return bool(P2P_ONCHAIN_ATTIVO and ONCHAIN_ATTIVO and _p2p_leve()["attivo"])
+
+
+def p2p_onchain_ammesso(tg_id) -> bool:
+    """Chi puo' pubblicare e prendere: il cancello dell'on-chain (oggi
+    solo admin) E quello del P2P per questa persona. Il libro, invece,
+    lo legge chiunque: e' su Nostr."""
+    return (p2p_onchain_leva() and onchain_ammesso(tg_id)
+            and bool(_p2p_per(tg_id)["attivo"]))
+
+
+def _p2p_onchain_prepara(con):
+    """La tabella dello scambio. Le colonne della cassa (`prezzo_sats`,
+    `margine_sats`, `incasso`, `rimborso`, `utxo`, `quota_*`,
+    `proposta_*`, `decisione_*`) portano GLI STESSI NOMI di
+    `onchain_ordini`, apposta: `_onchain_psbt_giudica` e
+    `_onchain_psbt_barattolo` leggono una riga di qui come una di la',
+    e il giudice dei PSBT resta uno solo."""
+    con.execute("""CREATE TABLE IF NOT EXISTS p2p_onchain_ordini(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine TEXT NOT NULL UNIQUE,
+        lato TEXT NOT NULL,
+        -- 'sell' | 'buy': il `k` del libro, dal lato di chi pubblica
+        maker_id INTEGER NOT NULL,
+        taker_id INTEGER NOT NULL DEFAULT 0,
+        depositante_id INTEGER NOT NULL DEFAULT 0,
+        ricevente_id INTEGER NOT NULL DEFAULT 0,
+        prezzo_sats INTEGER NOT NULL,
+        euro_cent INTEGER NOT NULL,
+        metodi TEXT NOT NULL DEFAULT '[]',
+        recapito TEXT NOT NULL DEFAULT '',
+        stato TEXT NOT NULL DEFAULT 'pending',
+        indirizzo_id INTEGER NOT NULL DEFAULT 0,
+        margine_sats INTEGER NOT NULL DEFAULT 0,
+        importo_sats INTEGER NOT NULL DEFAULT 0,
+        incasso TEXT NOT NULL DEFAULT '',
+        incasso_tipo TEXT NOT NULL DEFAULT '',
+        incasso_valore TEXT NOT NULL DEFAULT '',
+        incasso_firma TEXT NOT NULL DEFAULT '',
+        incasso_indice INTEGER NOT NULL DEFAULT 0,
+        rimborso TEXT NOT NULL DEFAULT '',
+        quota_sats INTEGER NOT NULL DEFAULT 0,
+        quota_indirizzo TEXT NOT NULL DEFAULT '',
+        visti_sats INTEGER DEFAULT 0,
+        ricevuti_sats INTEGER DEFAULT 0,
+        utxo TEXT DEFAULT '[]',
+        preso_il INTEGER DEFAULT 0,
+        deposito_entro INTEGER DEFAULT 0,
+        depositato_il INTEGER DEFAULT 0,
+        euro_inviati_il INTEGER DEFAULT 0,
+        proposta_verso TEXT DEFAULT '',
+        proposta_psbt TEXT DEFAULT '',
+        proposta_da INTEGER DEFAULT 0,
+        proposta_il INTEGER DEFAULT 0,
+        decisione_da INTEGER DEFAULT 0,
+        decisione_il INTEGER DEFAULT 0,
+        decisione_perche TEXT DEFAULT '',
+        disputa_da INTEGER DEFAULT 0,
+        disputa_il INTEGER DEFAULT 0,
+        disputa_motivo TEXT DEFAULT '',
+        txid_uscita TEXT DEFAULT '',
+        scade INTEGER NOT NULL,
+        evento_id TEXT DEFAULT '',
+        pubblicato_il INTEGER DEFAULT 0,
+        pubblicato_stato TEXT DEFAULT '',
+        chiuso_il INTEGER DEFAULT 0,
+        creato INTEGER NOT NULL,
+        aggiornato INTEGER NOT NULL)""")
+
+
+def _p2p_onchain_db():
+    con = _onchain_db_ordini()
+    _p2p_onchain_prepara(con)
+    return con
+
+
+def _p2p_onchain_euro_testo(cent: int) -> str:
+    """Il tag `fa`: «10» o «12.5», col punto e senza zeri inutili, come
+    lo scrive Mostro (un numero, mai una stringa italiana)."""
+    cent = int(cent)
+    if cent % 100 == 0:
+        return str(cent // 100)
+    return f"{cent // 100}.{cent % 100:02d}".rstrip("0")
+
+
+def p2p_onchain_tags(o, adesso: int = None) -> list:
+    """PURA: i tag del 38383 di un ordine on-chain, NIP-69. `expiration`
+    e' la vita nel libro finche' l'ordine e' da prendere; dopo, una
+    settimana dall'ultimo cambio, cosi' chi segue lo scambio lo ritrova
+    e i relay non lo tengono per sempre."""
+    adesso = int(adesso or time.time())
+    try:
+        metodi = json.loads(o["metodi"] or "[]")
+    except Exception:
+        metodi = []
+    stato = o["stato"]
+    scad = int(o["scade"]) if stato == "pending" else adesso + 7 * 24 * 3600
+    return [["d", o["ordine"]],
+            ["k", o["lato"]],
+            ["f", "EUR"],
+            ["s", P2P_ONCHAIN_STATO_LIBRO.get(stato, "canceled")],
+            ["amt", str(int(o["prezzo_sats"]))],
+            ["fa", _p2p_onchain_euro_testo(o["euro_cent"])],
+            ["pm", *[str(m) for m in metodi]],
+            ["premium", "0"],
+            ["network", ONCHAIN_RETE],
+            ["layer", "onchain"],
+            ["expiration", str(scad)],
+            ["y", "barattolo"],
+            ["z", "order"]]
+
+
+def p2p_onchain_evento(o, adesso: int = None):
+    """Il 38383 firmato dalla chiave del server, o None senza la chiave
+    (niente coincurve, o nessuna nsec nel config): l'ordine vive lo
+    stesso nel nostro libro, e lo si dice nel journal."""
+    if _NOSTR is None:
+        return None
+    return firma_evento(38383, p2p_onchain_tags(o, adesso), "")
+
+
+async def _p2p_onchain_pubblica(oid: int) -> bool:
+    """Manda ai relay il 38383 dello stato DI ADESSO. Fail-open: un relay
+    muto o una chiave assente sono una riga nel journal, mai un errore
+    che sale a chi ha appena pubblicato o preso. La riga ricorda l'id e
+    lo stato dell'ultimo evento partito, cosi' la ronda ripubblica solo
+    cio' che e' cambiato."""
+    con = _p2p_onchain_db()
+    try:
+        o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                        (int(oid),)).fetchone()
+    finally:
+        con.close()
+    if not o:
+        return False
+    ev = p2p_onchain_evento(o)
+    if ev is None:
+        print(f"⛓️ P2P on-chain: ordine {o['ordine'][:20]} non pubblicato su "
+              "Nostr (manca la chiave della piattaforma)", flush=True)
+        return False
+    try:
+        n = await _spedisci_ai_relay(ev)
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: relay muti per {o['ordine'][:20]}: {e}",
+              flush=True)
+        n = 0
+    con = _p2p_onchain_db()
+    try:
+        con.execute("UPDATE p2p_onchain_ordini SET evento_id=?, pubblicato_il=?,"
+                    " pubblicato_stato=? WHERE id=?",
+                    (ev["id"], int(time.time()), o["stato"], int(oid)))
+        con.commit()
+    finally:
+        con.close()
+    _p2p_onchain_rifai_foto()
+    return n > 0
+
+
+# LA FOTOGRAFIA DEL LIBRO ON-CHAIN: in memoria, come quella del libro di
+# Mostro (`_P2P_FOTO`). `/api/p2p/libro` regge tutta Esplora e per
+# richiesta non tocca il database: qui si legge dalla memoria, e la
+# memoria la rifa' ogni scrittura (pubblica, prendi, annulla, ronda).
+_P2P_ONCHAIN_FOTO = {"righe": [], "quando": 0}
+
+
+def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
+    """Un ordine del libro come lo vede CHIUNQUE: cifre, metodi, lato,
+    scadenza, rete. Mai chi l'ha pubblicato (il nome, quando c'e', e'
+    quello che il mercatino mostra gia' di chi vende — e qui entra solo
+    con una sessione, come i volti del libro di Mostro)."""
+    try:
+        metodi = json.loads(o["metodi"] or "[]")
+    except Exception:
+        metodi = []
+    r = {"id": o["ordine"], "lato": o["lato"], "stato": o["stato"],
+         "sats": int(o["prezzo_sats"]), "euro": int(o["euro_cent"]) / 100,
+         "metodi": metodi, "scade": int(o["scade"]), "creato": int(o["creato"]),
+         "rete": ONCHAIN_RETE, "onchain": True}
+    if nome:
+        r["nome"] = nome
+    return r
+
+
+def _p2p_onchain_rifai_foto() -> None:
+    """Gli ordini DA PRENDERE adesso, con chi li ha pubblicati (resta in
+    memoria, non esce mai intero: la rotta ne da' a ciascuno i suoi)."""
+    adesso = int(time.time())
+    try:
+        con = _p2p_onchain_db()
+        try:
+            righe = con.execute(
+                "SELECT * FROM p2p_onchain_ordini WHERE stato='pending' AND "
+                "scade>? ORDER BY id DESC LIMIT 200", (adesso,)).fetchall()
+            foto = [(dict(o), int(o["maker_id"]), _onchain_nome(con, o["maker_id"]))
+                    for o in righe]
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: fotografia saltata: {e}", flush=True)
+        return
+    _P2P_ONCHAIN_FOTO.update(righe=foto, quando=adesso)
+
+
+def _p2p_onchain_libro(chi: int) -> dict:
+    """La busta `onchain` di `/api/p2p/libro`: gli ordini da prendere e,
+    con la sessione, quali sono MIEI e il nome di chi pubblica. Dalla
+    memoria, mai dal database. A leva spenta non esiste."""
+    F = _P2P_ONCHAIN_FOTO
+    if not F["quando"] or time.time() - F["quando"] > 300:
+        _p2p_onchain_rifai_foto()
+    eventi, miei = [], []
+    for o, maker, nome in F["righe"]:
+        eventi.append(_p2p_onchain_riga_pubblica(o, nome if chi else ""))
+        if chi and maker == int(chi):
+            miei.append(o["ordine"])
+    fuori = {"eventi": eventi, "quando": F["quando"], "rete": ONCHAIN_RETE,
+             "minSats": P2P_ONCHAIN_MIN_SATS, "oreDeposito": P2P_ONCHAIN_ORE_DEPOSITO}
+    if chi:
+        fuori["miei"] = miei
+    return fuori
+
+
+def _p2p_onchain_ruolo(o, tg_id) -> str:
+    """Il nome del ruolo nel 2-DI-3 — quello che `_onchain_psbt_giudica`
+    e il telefono (`onchainCofirma`) si aspettano: chi deposita e'
+    'compratore' (mette i sats, li libera, il resto torna a lui), chi
+    riceve e' 'venditore' (incassa il prezzo). 404 a chi non c'entra,
+    come altrove: non sa nemmeno che c'e'."""
+    if int(o["depositante_id"] or 0) == int(tg_id):
+        return "compratore"
+    if int(o["ricevente_id"] or 0) == int(tg_id):
+        return "venditore"
+    if int(o["maker_id"]) == int(tg_id) and o["stato"] in ("pending", "scaduto", "annullato") \
+            and not o["taker_id"]:
+        return "maker"
+    raise HTTPException(404, "Ordine non trovato")
+
+
+def _p2p_onchain_parte_btc(o, tg_id) -> str:
+    """'vendo' | 'compro' bitcoin, per le parole dell'app."""
+    if int(o["depositante_id"] or 0) == int(tg_id):
+        return "vendo"
+    if int(o["ricevente_id"] or 0) == int(tg_id):
+        return "compro"
+    return "vendo" if o["lato"] == "sell" else "compro"
+
+
+def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
+    """Un ordine come lo vede UNA parte (o un moderatore): la forma di
+    `_onchain_ordine_per`, con gli stessi nomi, perche' il codice delle
+    firme nel telefono e' lo stesso. `rotta` dice al telefono dove
+    mandare proposta e firma; `ruolo` e' quello del 2-di-3, `parte`
+    quello dello scambio. Il recapito per gli euro esce SOLO alle due
+    parti, mai al moderatore e mai nel libro."""
+    tg_id = int(tg_id)
+    try:
+        metodi = json.loads(o["metodi"] or "[]")
+    except Exception:
+        metodi = []
+    dep, ric = int(o["depositante_id"] or 0), int(o["ricevente_id"] or 0)
+    parte_vera = tg_id in (dep, ric) or (tg_id == int(o["maker_id"]))
+    if dep and tg_id == dep:
+        ruolo = "compratore"
+    elif ric and tg_id == ric:
+        ruolo = "venditore"
+    else:
+        ruolo = "maker" if tg_id == int(o["maker_id"]) else "moderatore"
+    altro = (ric if tg_id == dep else dep) if dep and ric else 0
+    proposta = None
+    if o["proposta_psbt"]:
+        proposta = {"verso": o["proposta_verso"], "psbt": o["proposta_psbt"],
+                    "mia": int(o["proposta_da"] or 0) == tg_id,
+                    "il": o["proposta_il"],
+                    "barattolo": "disputa" if o["decisione_da"] else ""}
+    indirizzo = None
+    if o["indirizzo_id"]:
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+        if ind:
+            indirizzo = (onchain_riga_per(ind, tg_id, _onchain_nome(con, altro))
+                         if ruolo in ("compratore", "venditore")
+                         else _onchain_indirizzo_pubblico(con, o))
+    d = {
+        "id": o["id"], "ordine": o["ordine"], "rotta": f"/p2p/onchain/{o['id']}",
+        "lato": o["lato"], "stato": o["stato"], "ruolo": ruolo,
+        "parte": _p2p_onchain_parte_btc(o, tg_id),
+        "mio": int(o["maker_id"]) == tg_id,
+        "sats": int(o["prezzo_sats"]), "prezzo_sats": int(o["prezzo_sats"]),
+        "euro": int(o["euro_cent"]) / 100, "metodi": metodi,
+        "margine_sats": int(o["margine_sats"] or 0),
+        "importo_sats": int(o["importo_sats"] or 0),
+        "visti_sats": int(o["visti_sats"] or 0),
+        "ricevuti_sats": int(o["ricevuti_sats"] or 0),
+        "utxo": json.loads(o["utxo"] or "[]"),
+        "incasso": o["incasso"] or "", "rimborso": o["rimborso"] or "",
+        "destinazione": ({"tipo": o["incasso_tipo"], "valore": o["incasso_valore"],
+                          "firma": o["incasso_firma"], "indice": o["incasso_indice"]}
+                         if o["incasso_tipo"] else None),
+        "quota_sats": int(o["quota_sats"] or 0),
+        "quota_indirizzo": o["quota_indirizzo"] or "",
+        "indirizzo": indirizzo, "proposta": proposta,
+        "txid_uscita": o["txid_uscita"] or "",
+        "scade": int(o["scade"]), "preso_il": int(o["preso_il"] or 0),
+        "deposito_entro": int(o["deposito_entro"] or 0),
+        "depositato_il": int(o["depositato_il"] or 0),
+        "euro_inviati_il": int(o["euro_inviati_il"] or 0),
+        "disputa": ({"da": "io" if int(o["disputa_da"] or 0) == tg_id else "altro",
+                     "il": int(o["disputa_il"] or 0),
+                     "motivo": o["disputa_motivo"] or ""}
+                    if o["disputa_il"] else None),
+        "decisione": ({"verso": o["proposta_verso"], "il": int(o["decisione_il"] or 0)}
+                      if o["decisione_da"] else None),
+        "chiuso_il": int(o["chiuso_il"] or 0), "creato": int(o["creato"]),
+        "altro": _onchain_nome(con, altro) if altro and parte_vera else "",
+        "rete": ONCHAIN_RETE,
+        "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
+        "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
+        "oreDeposito": P2P_ONCHAIN_ORE_DEPOSITO,
+    }
+    if parte_vera and not admin:
+        d["recapito"] = o["recapito"] or ""
+    if admin and not parte_vera:
+        # il moderatore vede chi sono le due parti (deve poterle sentire)
+        d["parti"] = {"vende": _onchain_nome(con, dep) if dep else "",
+                      "compra": _onchain_nome(con, ric) if ric else "",
+                      "vende_id": dep, "compra_id": ric}
+    return d
+
+
+def _p2p_onchain_prossimo_esterno(con, tg_id: int, valore: str) -> int:
+    """Il prossimo `/0/i` di una chiave di conto esterna, contando ANCHE
+    gli incassi del mercatino: la stessa fila di `_onchain_prossimo_
+    esterno`, perche' un indirizzo non si dia due volte fra i due libri."""
+    a = _onchain_prossimo_esterno(con, tg_id, valore)
+    r = con.execute("SELECT MAX(incasso_indice) FROM p2p_onchain_ordini WHERE "
+                    "ricevente_id=? AND incasso_tipo='xpub' AND incasso_valore=?",
+                    (int(tg_id), valore)).fetchone()
+    b = 0 if r[0] is None else int(r[0]) + 1
+    return max(a, b)
+
+
+def _p2p_onchain_incasso_di(con, ricevente_id: int, xpub_dedicata: str) -> tuple:
+    """Dove riceve chi compra bitcoin: il wallet SUO, firmato dal suo
+    seme (`onchain_incasso`), o niente — e allora l'incasso resta vuoto
+    finche' non sceglie (`_p2p_onchain_riempi_incassi`). Torna
+    (incasso, tipo, valore, firma, indice)."""
+    dest = _onchain_destinazione_viva(con, ricevente_id, xpub_dedicata)
+    if not dest:
+        return "", "", "", "", 0
+    indice = (_p2p_onchain_prossimo_esterno(con, ricevente_id, dest["valore"])
+              if dest["tipo"] == "xpub" else 0)
+    return (onchain_indirizzo_esterno(dest["tipo"], dest["valore"], indice),
+            dest["tipo"], dest["valore"], dest["firma"], indice)
+
+
+def _p2p_onchain_riempi_incassi(con, tg_id: int) -> list:
+    """L'INCASSO SCELTO DOPO, come nel mercatino: gli scambi in cui questa
+    persona compra bitcoin, nati senza una destinazione, prendono quella
+    viva di adesso. Si chiama dalle stesse due porte di
+    `_onchain_riempi_incassi`. Torna le righe riempite."""
+    try:
+        r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
+                        (int(tg_id),)).fetchone()
+        if not r:
+            return []
+        _p2p_onchain_prepara(con)
+        righe = con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE ricevente_id=? AND incasso='' "
+            "AND stato IN ('preso','depositato','euro_inviati','disputa') "
+            "AND proposta_psbt='' ORDER BY id", (int(tg_id),)).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    fatti = []
+    for o in righe:
+        incasso, tipo, valore, firma, indice = _p2p_onchain_incasso_di(
+            con, tg_id, r["xpub"])
+        if not incasso:
+            break
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso=?, incasso_tipo=?,"
+            " incasso_valore=?, incasso_firma=?, incasso_indice=?, aggiornato=?"
+            " WHERE id=? AND incasso='' AND proposta_psbt=''",
+            (incasso, tipo, valore, firma, indice, int(time.time()), o["id"]))
+        if cur.rowcount:
+            fatti.append(o)
+    return fatti
+
+
+def _p2p_onchain_serve(user) -> None:
+    """Il cancello di ogni gesto: 404 a chi non e' ammesso (come le rotte
+    dell'on-chain: la funzione «non esiste»), 503 senza embit."""
+    if not p2p_onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _onchain_serve_embit()
+
+
+def _p2p_onchain_vivi_di(con, tg_id: int) -> int:
+    return int(con.execute(
+        "SELECT COUNT(*) FROM p2p_onchain_ordini WHERE (maker_id=? OR taker_id=?)"
+        " AND stato IN ('pending','preso','depositato','euro_inviati','disputa')",
+        (int(tg_id), int(tg_id))).fetchone()[0] or 0)
+
+
+def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
+                              tetto_euro: int, tetto_sats: int) -> str:
+    """PURA: il perche' un ordine nuovo non va, o '' se va. Prezzo FISSO
+    e basta: sats ed euro li scrive chi pubblica, e tutt'e due devono
+    essere numeri interi sensati; i metodi sono parole corte del
+    catalogo o scritte a mano (testo di sconosciuti: escono scappati)."""
+    if lato not in ("sell", "buy"):
+        return "Di' se vendi o compri bitcoin"
+    try:
+        sats, euro_cent = int(sats), int(euro_cent)
+    except (TypeError, ValueError):
+        return "Sats ed euro devono essere numeri"
+    if sats < P2P_ONCHAIN_MIN_SATS:
+        return f"Minimo {_fmt_sats(P2P_ONCHAIN_MIN_SATS)} sats: sotto, la commissione di rete mangia lo scambio"
+    if sats > 21_000_000 * 100_000_000:
+        return "Troppi sats"
+    if euro_cent <= 0:
+        return "Scrivi quanti euro"
+    if tetto_euro and euro_cent > tetto_euro * 100:
+        return f"In questa fase gli ordini P2P arrivano fino a {tetto_euro} €"
+    if tetto_sats and sats > tetto_sats:
+        return f"Dal collaudo non si va oltre {_fmt_sats(tetto_sats)} sats"
+    if not isinstance(metodi, list) or not metodi:
+        return "Scegli almeno un metodo di pagamento"
+    if len(metodi) > P2P_ONCHAIN_METODI_MAX:
+        return f"Al massimo {P2P_ONCHAIN_METODI_MAX} metodi"
+    for m in metodi:
+        if not isinstance(m, str) or not m.strip() or len(m) > P2P_ONCHAIN_METODO_MAX \
+                or "," in m:
+            return "Un metodo di pagamento non si legge"
+    if recapito is not None and len(str(recapito)) > P2P_ONCHAIN_RECAPITO_MAX:
+        return "Il recapito per gli euro è troppo lungo"
+    return ""
+
+
+@app.get("/api/p2p/onchain/libro")
+def p2p_onchain_libro_rotta(x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il libro on-chain da solo, per la pagina P2P che lo rinfresca: la
+    stessa busta che `/api/p2p/libro` porta dentro `onchain`. Aperto a
+    chiunque, come il libro; i nomi e i «miei» solo con la sessione."""
+    if not p2p_onchain_leva():
+        return JSONResponse({"eventi": [], "quando": 0},
+                            headers={"Cache-Control": "no-store"})
+    chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione)
+    return JSONResponse(_p2p_onchain_libro(chi),
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/p2p/onchain/miei")
+async def p2p_onchain_miei(x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """I miei scambi on-chain, pubblicati o presi, gli ultimi trenta:
+    con tutto quel che serve al telefono per firmare."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = _p2p_onchain_db()
+    try:
+        righe = con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE maker_id=? OR taker_id=? "
+            "ORDER BY id DESC LIMIT 30", (user["id"], user["id"])).fetchall()
+        return {"ordini": [_p2p_onchain_per(con, o, user["id"]) for o in righe],
+                "rete": ONCHAIN_RETE}
+    finally:
+        con.close()
+
+
+def _p2p_onchain_carica(con, oid: int):
+    o = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                    (int(oid),)).fetchone()
+    if not o:
+        raise HTTPException(404, "Ordine non trovato")
+    return o
+
+
+@app.get("/api/p2p/onchain/{oid}")
+async def p2p_onchain_uno(oid: int, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Uno scambio, per una delle due parti o per un moderatore (che lo
+    vede senza recapito e senza i numeri delle chiavi altrui)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_onchain_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        admin = e_admin(user["id"])
+        if user["id"] not in (int(o["maker_id"]), int(o["taker_id"] or 0)) and not admin:
+            raise HTTPException(404, "Ordine non trovato")
+        return _p2p_onchain_per(con, o, user["id"],
+                                admin=admin and user["id"] not in (
+                                    int(o["maker_id"]), int(o["taker_id"] or 0)))
+    finally:
+        con.close()
+
+
+@app.post("/api/p2p/onchain/pubblica")
+async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """PUBBLICA: `{lato, sats, euro_cent, metodi, recapito}`. Chi pubblica
+    deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
+    tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
+    promettere. Il tetto in euro e' quello del P2P (`P2P_MAX_EURO`),
+    quello in sats dell'istanza di prova. L'ordine nasce nel nostro
+    libro e parte verso i relay; la risposta non aspetta i relay."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("p2p_onchain_pubblica", user["id"])
+    d = await leggi_json(req)
+    lato = str(d.get("lato") or "")
+    metodi = d.get("metodi")
+    if isinstance(metodi, list):
+        metodi = [str(m).strip() for m in metodi if str(m or "").strip()]
+    recapito = str(d.get("recapito") or "").strip()
+    perche = p2p_onchain_giudica_nuovo(lato, d.get("sats"), d.get("euro_cent"),
+                                       metodi, recapito, int(P2P_MAX_EURO or 0),
+                                       tetto_sats_prova())
+    if perche:
+        raise HTTPException(400, perche)
+    try:
+        onchain_xpub_barattolo()
+    except ValueError as e:
+        raise HTTPException(503, str(e))
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        if not con.execute("SELECT 1 FROM onchain_xpub WHERE tg_id=?",
+                           (user["id"],)).fetchone():
+            raise HTTPException(409, "La tua chiave on-chain non c'è ancora: "
+                                     "apri Profilo → On-chain e riprova")
+        if _p2p_onchain_vivi_di(con, user["id"]) >= P2P_ONCHAIN_APERTI_MAX:
+            raise HTTPException(409, f"Hai già {P2P_ONCHAIN_APERTI_MAX} scambi "
+                                     "on-chain aperti: chiudine uno prima")
+        ordine = P2P_ONCHAIN_PREFISSO + secrets.token_hex(8)
+        cur = con.execute(
+            "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
+            " euro_cent, metodi, recapito, scade, creato, aggiornato)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (ordine, lato, user["id"], int(d["sats"]), int(d["euro_cent"]),
+             json.dumps(metodi, ensure_ascii=False), recapito,
+             adesso + P2P_ONCHAIN_ORE_LIBRO * 3600, adesso, adesso))
+        con.commit()
+        oid = cur.lastrowid
+        fuori = _p2p_onchain_per(con, _p2p_onchain_carica(con, oid), user["id"])
+    finally:
+        con.close()
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(oid))
+    return fuori
+
+
+@app.post("/api/p2p/onchain/{oid}/annulla")
+async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """ANNULLA. Nel libro (pending): chi l'ha pubblicato, quando vuole.
+    Preso ma senza un sats visto: chi deve depositare quando vuole (non
+    ha ancora messo niente), chi riceve solo DOPO la finestra del
+    deposito — e mai alla cieca: prima si guarda la rete, come
+    nell'annullo del mercatino. Con anche un sats visto non si annulla:
+    si esce col rimborso (due firme) o con una disputa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        ruolo = _p2p_onchain_ruolo(o, user["id"])
+    finally:
+        con.close()
+    if o["stato"] == "preso":
+        try:
+            await _p2p_onchain_controlla(oid)
+        except Exception:
+            raise HTTPException(503, "mempool non risponde: non annullo alla "
+                                     "cieca, riprova fra poco")
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if o["stato"] == "pending":
+            if int(o["maker_id"]) != int(user["id"]):
+                raise HTTPException(403, "Lo ritira chi l'ha pubblicato")
+        elif o["stato"] == "preso":
+            if int(o["visti_sats"] or 0) or int(o["ricevuti_sats"] or 0):
+                raise HTTPException(409, "Ci sono già dei sats sull'indirizzo: "
+                                         "ora si esce solo col rimborso o con "
+                                         "una disputa")
+            if ruolo == "venditore" and adesso < int(o["deposito_entro"] or 0):
+                raise HTTPException(409, "Chi vende ha ancora tempo per "
+                                         "depositare: puoi rinunciare dopo "
+                                         "la scadenza")
+        else:
+            raise HTTPException(409, "Questo scambio non si annulla più")
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+            " aggiornato=? WHERE id=? AND stato=? AND visti_sats=0",
+            (adesso, adesso, oid, o["stato"]))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Lo scambio è cambiato un attimo fa: riapri")
+        altro = (int(o["taker_id"] or 0) if int(o["maker_id"]) == int(user["id"])
+                 else int(o["maker_id"]))
+    finally:
+        con.close()
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(oid))
+    if altro and o["stato"] == "preso":
+        await notifica(altro, "⛓️ <b>Scambio on-chain annullato</b> dall'altra "
+                              "parte prima del deposito: nessun sats si è mosso.")
+    return {"ok": True}
+
+
+@app.post("/api/p2p/onchain/{oid}/prendi")
+async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """PRENDI: nasce il 2-di-3. Chi prende deve avere la sua chiave
+    on-chain e non essere chi ha pubblicato. Da qui: chi vende bitcoin
+    (il depositante) ha `P2P_ONCHAIN_ORE_DEPOSITO` per mandare sats +
+    margine di rete sull'indirizzo; chi compra riceve sul wallet suo, se
+    l'ha gia' scelto (sennò lo sceglie dopo, i sats aspettano nel
+    2-di-3). `recapito` (facoltativo) e' dove chi vende vuole gli euro,
+    se lo scrive chi prende vendendo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("p2p_onchain_prendi", user["id"])
+    d = await leggi_json(req)
+    recapito = str(d.get("recapito") or "").strip()[:P2P_ONCHAIN_RECAPITO_MAX]
+    try:
+        onchain_xpub_barattolo()
+    except ValueError as e:
+        raise HTTPException(503, str(e))
+    # l'unico await prima delle scritture, come nella cassa on-chain
+    margine = onchain_margine(await onchain_mempool_tariffa())
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if int(o["maker_id"]) == int(user["id"]):
+            raise HTTPException(409, "È il tuo ordine: non puoi prenderlo")
+        if o["stato"] != "pending" or int(o["scade"]) <= adesso:
+            raise HTTPException(409, "Quest'ordine non è più nel libro")
+        if not p2p_onchain_ammesso(o["maker_id"]):
+            raise HTTPException(409, "Chi ha pubblicato non può più scambiare "
+                                     "on-chain adesso")
+        if _p2p_onchain_vivi_di(con, user["id"]) >= P2P_ONCHAIN_APERTI_MAX:
+            raise HTTPException(409, f"Hai già {P2P_ONCHAIN_APERTI_MAX} scambi "
+                                     "on-chain aperti: chiudine uno prima")
+        # chi pubblica 'sell' vende bitcoin: deposita lui; chi prende compra
+        if o["lato"] == "sell":
+            dep, ric = int(o["maker_id"]), int(user["id"])
+        else:
+            dep, ric = int(user["id"]), int(o["maker_id"])
+        try:
+            # il depositante e' il «compratore» del 2-di-3 (vedi i RUOLI)
+            ind_id = onchain_nuovo_indirizzo(con, dep, ric, adesso)
+        except ValueError as e:
+            msg = str(e)
+            if "chi compra non ha" in msg:
+                msg = "Chi vende bitcoin non ha ancora la chiave on-chain"
+            elif "chi vende non ha" in msg:
+                msg = "Chi compra bitcoin non ha ancora la chiave on-chain"
+            raise HTTPException(409, msg)
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (ind_id,)).fetchone()
+        incasso, i_tipo, i_val, i_firma, i_ind = _p2p_onchain_incasso_di(
+            con, ric, ind["xpub_venditore"])
+        rimborso = onchain_incasso(ind["xpub_compratore"], ind["numero_compratore"])
+        rec = o["recapito"] or ""
+        if dep == int(user["id"]) and recapito and not rec:
+            rec = recapito
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET stato='preso', taker_id=?,"
+            " depositante_id=?, ricevente_id=?, indirizzo_id=?, margine_sats=?,"
+            " importo_sats=?, incasso=?, incasso_tipo=?, incasso_valore=?,"
+            " incasso_firma=?, incasso_indice=?, rimborso=?, recapito=?,"
+            " preso_il=?, deposito_entro=?, aggiornato=?"
+            " WHERE id=? AND stato='pending'",
+            (user["id"], dep, ric, ind_id, margine, int(o["prezzo_sats"]) + margine,
+             incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
+             adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, oid))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")
+        con.execute("UPDATE onchain_indirizzi SET ordine_id=? WHERE id=?",
+                    (-int(oid), ind_id))   # negativo: e' un ordine del P2P, non di `ordini`
+        con.commit()
+        o = _p2p_onchain_carica(con, oid)
+        fuori = _p2p_onchain_per(con, o, user["id"])
+        euro = _fmt_eur(int(o["euro_cent"]) / 100)
+    finally:
+        con.close()
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(oid))
+    tot = int(o["importo_sats"])
+    await notifica(dep, f"⛓️ <b>Scambio on-chain preso:</b> vendi {_fmt_sats(int(o['prezzo_sats']))} "
+                        f"sats per {euro} €. Deposita <b>{_fmt_sats(tot)} sats</b> "
+                        f"(prezzo + margine di rete) sull'indirizzo 2-di-3 entro "
+                        f"{P2P_ONCHAIN_ORE_DEPOSITO} ore: apri P2P → I miei scambi.")
+    await notifica(ric, f"⛓️ <b>Scambio on-chain preso:</b> compri {_fmt_sats(int(o['prezzo_sats']))} "
+                        f"sats per {euro} €. Chi vende sta depositando i sats nel "
+                        "2-di-3: ti avvisiamo appena sono confermati, poi mandi gli euro.")
+    return fuori
+
+
+async def _p2p_onchain_controlla(oid: int) -> str:
+    """LA SORVEGLIANZA, come `onchain_controlla`: chiede a mempool le
+    monete dell'indirizzo di uno scambio preso. Con una conferma e
+    almeno l'importo → 'depositato', e chi compra sa che puo' mandare gli
+    euro. Le monete non confermate si vedono ma non contano. Si rilegge
+    anche su uno scambio gia' avanti o chiuso con l'indirizzo (la coda
+    dei ritardatari: un deposito arrivato DOPO l'annullo si vede qui, e
+    un moderatore puo' rimandarlo indietro). Torna lo stato."""
+    con = _p2p_onchain_db()
+    try:
+        o = con.execute("SELECT o.*, i.indirizzo AS dove FROM p2p_onchain_ordini o"
+                        " JOIN onchain_indirizzi i ON i.id=o.indirizzo_id"
+                        " WHERE o.id=?", (int(oid),)).fetchone()
+    finally:
+        con.close()
+    if not o:
+        return ""
+    if o["stato"] in ("rilasciato", "rimborsato"):
+        return o["stato"]
+    utxo = await onchain_mempool_utxo(o["dove"])
+    buone = [{"txid": str(u["txid"]), "vout": int(u["vout"]),
+              "value": int(u["value"])}
+             for u in utxo if (u.get("status") or {}).get("confirmed")]
+    visti = sum(int(u["value"]) for u in utxo)
+    ricevuti = sum(u["value"] for u in buone)
+    adesso = int(time.time())
+    avvisi = []
+    con = _p2p_onchain_db()
+    try:
+        # le monete si riscrivono solo finche' nessuno ha firmato sopra:
+        # una proposta e' fatta su QUELLE monete
+        con.execute("UPDATE p2p_onchain_ordini SET visti_sats=?, ricevuti_sats=?,"
+                    " utxo=CASE WHEN proposta_psbt='' THEN ? ELSE utxo END,"
+                    " aggiornato=? WHERE id=?",
+                    (visti, ricevuti, json.dumps(buone), adesso, o["id"]))
+        stato = o["stato"]
+        if stato == "preso" and ricevuti >= int(o["importo_sats"]):
+            cur = con.execute("UPDATE p2p_onchain_ordini SET stato='depositato',"
+                              " depositato_il=? WHERE id=? AND stato='preso'",
+                              (adesso, o["id"]))
+            if cur.rowcount:
+                stato = "depositato"
+                try:
+                    metodi = ", ".join(json.loads(o["metodi"] or "[]"))
+                except Exception:
+                    metodi = ""
+                euro = _fmt_eur(int(o["euro_cent"]) / 100)
+                avvisi = [
+                    (o["ricevente_id"], f"⛓️ <b>Sats depositati:</b> {_fmt_sats(int(o['prezzo_sats']))} "
+                     f"sats sono nel 2-di-3. Ora manda <b>{euro} €</b> a chi vende "
+                     f"({html.escape(metodi)}) e tocca «Ho inviato gli euro»: "
+                     "il recapito è nello scambio (P2P → I miei scambi)."),
+                    (o["depositante_id"], "⛓️ <b>Deposito confermato.</b> Chi compra "
+                     f"sta per mandarti {euro} €: quando li vedi sul tuo conto, "
+                     "apri lo scambio e tocca «Ricevuti, libera i sats». Mai prima.")]
+        con.commit()
+    finally:
+        con.close()
+    if stato == "depositato" and avvisi:
+        asyncio.create_task(_p2p_onchain_pubblica(int(o["id"])))
+    for chi, testo in avvisi:
+        await notifica(chi, testo)
+    return stato
+
+
+@app.post("/api/p2p/onchain/{oid}/controlla")
+async def p2p_onchain_controlla_rotta(oid: int, x_tg_init_data: str = Header(""),
+                                      barattolo_sessione: str = Cookie("")):
+    """«Ho depositato, guarda adesso»: la stessa domanda della ronda."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_controlla", user["id"])
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        _p2p_onchain_ruolo(o, user["id"])
+        if not o["indirizzo_id"]:
+            return _p2p_onchain_per(con, o, user["id"])
+    finally:
+        con.close()
+    try:
+        await _p2p_onchain_controlla(oid)
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    con = _p2p_onchain_db()
+    try:
+        return _p2p_onchain_per(con, _p2p_onchain_carica(con, oid), user["id"])
+    finally:
+        con.close()
+
+
+@app.post("/api/p2p/onchain/{oid}/euro-inviati")
+async def p2p_onchain_euro_inviati(oid: int, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """«HO INVIATO GLI EURO»: lo dice chi compra bitcoin, a sats
+    depositati. Non muove niente: avvisa chi vende di guardare il conto.
+    Da qui chi compra non puo' piu' rinunciare da solo (ha detto di aver
+    pagato): resta la disputa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
+            raise HTTPException(403, "Lo dice chi compra bitcoin")
+        if o["stato"] != "depositato":
+            raise HTTPException(409, "Gli euro si mandano quando i sats sono "
+                                     "depositati, e una volta sola")
+        con.execute("UPDATE p2p_onchain_ordini SET stato='euro_inviati',"
+                    " euro_inviati_il=?, aggiornato=? WHERE id=? AND stato='depositato'",
+                    (adesso, adesso, oid))
+        con.commit()
+        euro = _fmt_eur(int(o["euro_cent"]) / 100)
+    finally:
+        con.close()
+    await notifica(o["depositante_id"],
+                   f"💶 <b>Euro inviati:</b> chi compra dice di averti mandato {euro} €. "
+                   "Controlla il tuo conto: quando li vedi, apri lo scambio e tocca "
+                   "«Ricevuti, libera i sats». Se non arrivano, apri una disputa.")
+    return {"ok": True}
+
+
+@app.post("/api/p2p/onchain/{oid}/recapito")
+async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """DOVE VUOLE GLI EURO chi vende bitcoin (IBAN, nome Revolut...): lo
+    scrive lui, lo legge solo chi compra. Testo libero, corto, scappato
+    all'uscita. Si puo' cambiare finche' gli euro non sono partiti."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    d = await leggi_json(req)
+    testo = str(d.get("recapito") or "").strip()
+    if len(testo) > P2P_ONCHAIN_RECAPITO_MAX:
+        raise HTTPException(400, "Il recapito è troppo lungo")
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        ruolo = _p2p_onchain_ruolo(o, user["id"])
+        vende = ruolo == "compratore" or (ruolo == "maker" and o["lato"] == "sell")
+        if not vende:
+            raise HTTPException(403, "Il recapito lo scrive chi vende bitcoin")
+        if o["stato"] not in ("pending", "preso", "depositato"):
+            raise HTTPException(409, "Il recapito non si cambia più")
+        con.execute("UPDATE p2p_onchain_ordini SET recapito=?, aggiornato=? WHERE id=?",
+                    (testo, int(time.time()), oid))
+        con.commit()
+    finally:
+        con.close()
+    if o["stato"] in ("preso", "depositato") and o["ricevente_id"]:
+        await notifica(o["ricevente_id"], "⛓️ Chi vende ha scritto dove vuole gli "
+                                          "euro: lo trovi nello scambio.")
+    return {"ok": True}
+
+
+@app.post("/api/p2p/onchain/{oid}/proposta")
+async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """LA PRIMA FIRMA, il calco di `onchain_ordine_proposta`. `verso:
+    venditore` = i sats a chi compra bitcoin (il prezzo al suo incasso,
+    il resto del margine a chi vende): la manda chi vende, «Ricevuti,
+    libera i sats». `verso: compratore` = tutto torna a chi vende (il
+    rimborso): la manda chi compra, «Rinuncio». Il server la giudica con
+    lo stesso giudice del mercatino e avvisa l'altro, che co-firma dal
+    suo telefono. In disputa nessuno propone: decide un moderatore."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_firma", user["id"])
+    d = await leggi_json(req)
+    verso = str(d.get("verso") or "")
+    psbt_b64 = str(d.get("psbt") or "").strip()
+    if verso not in ("venditore", "compratore") or not psbt_b64:
+        raise HTTPException(400, "Proposta incompleta")
+    if len(psbt_b64) > 20000:
+        raise HTTPException(400, "Proposta troppo grande")
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        ruolo = _p2p_onchain_ruolo(o, user["id"])
+        if verso == "venditore" and ruolo != "compratore":
+            raise HTTPException(403, "I sats li libera chi vende bitcoin, "
+                                     "quando ha ricevuto gli euro")
+        if verso == "compratore" and ruolo != "venditore":
+            raise HTTPException(403, "Il rimborso lo propone chi compra bitcoin")
+        if o["stato"] == "disputa":
+            raise HTTPException(409, "C'è una disputa aperta: decide un moderatore")
+        if o["decisione_da"]:
+            raise HTTPException(409, "Su questo scambio ha già firmato "
+                                     "Barattolo: manca solo la seconda firma")
+        if verso == "venditore" and o["stato"] not in ("depositato", "euro_inviati"):
+            raise HTTPException(409, "I sats si liberano quando sono depositati")
+        if verso == "compratore" and not (
+                o["stato"] in ("depositato", "euro_inviati")
+                or (o["stato"] in ("preso", "annullato") and int(o["ricevuti_sats"] or 0) > 0)):
+            raise HTTPException(409, "Non c'è niente da rimborsare adesso")
+        if verso == "venditore" and not o["incasso"]:
+            raise HTTPException(409, "Chi compra non ha ancora scelto dove ricevere "
+                                     "(Profilo → Incassi on-chain): i sats restano "
+                                     "al sicuro nel 2-di-3, ed escono appena lo fa")
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+        try:
+            _onchain_psbt_giudica(o, verso, psbt_b64, ind["chiave_" + ruolo])
+        except ValueError as e:
+            raise HTTPException(400, f"Proposta rifiutata: {e}")
+        adesso = int(time.time())
+        con.execute("UPDATE p2p_onchain_ordini SET proposta_verso=?, proposta_psbt=?,"
+                    " proposta_da=?, proposta_il=?, aggiornato=? WHERE id=?",
+                    (verso, psbt_b64, user["id"], adesso, adesso, oid))
+        con.commit()
+        altro = o["ricevente_id"] if ruolo == "compratore" else o["depositante_id"]
+    finally:
+        con.close()
+    await notifica(altro, (
+        "⛓️ <b>Sats liberati:</b> chi vende ha confermato gli euro e ha firmato. "
+        "Apri la Mini App: il tuo telefono mette la seconda firma e i sats "
+        "arrivano al tuo wallet."
+        if verso == "venditore" else
+        "⛓️ <b>Rimborso proposto:</b> chi compra ha rinunciato e ha firmato. "
+        "Apri la Mini App: il tuo telefono mette la seconda firma e i sats "
+        "tornano a te."))
+    return {"ok": True}
+
+
+@app.post("/api/p2p/onchain/{oid}/firma")
+async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """LA SECONDA FIRMA, il calco di `onchain_ordine_firma`: la
+    transazione completa, stesso txid della proposta, trasmessa. Mai chi
+    ha proposto. Sulla firma di Barattolo co-firma chi ha vinto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_firma", user["id"])
+    from embit.psbt import PSBT
+    from embit.transaction import Transaction
+    d = await leggi_json(req)
+    tx_hex = str(d.get("tx") or "").strip()
+    if not tx_hex or len(tx_hex) > 40000:
+        raise HTTPException(400, "Manca la transazione")
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        ruolo = _p2p_onchain_ruolo(o, user["id"])
+        if not o["proposta_psbt"] or o["stato"] in ("rilasciato", "rimborsato"):
+            raise HTTPException(409, "Non c'è niente da co-firmare")
+        if int(o["proposta_da"] or 0) == int(user["id"]):
+            raise HTTPException(409, "La seconda firma è dell'altra parte")
+        # la seconda firma e' di chi RICEVE quell'uscita: verso 'venditore'
+        # co-firma chi compra bitcoin (ruolo venditore), e viceversa
+        if o["proposta_verso"] != ruolo:
+            raise HTTPException(409, "Questa uscita non va a te: la co-firma "
+                                     "l'altra parte")
+        try:
+            atteso = PSBT.from_string(o["proposta_psbt"]).tx.txid().hex()
+            arrivato = Transaction.from_string(tx_hex).txid().hex()
+        except Exception:
+            raise HTTPException(400, "La transazione non si legge")
+        if atteso != arrivato:
+            raise HTTPException(400, "Non è la transazione proposta")
+        verso = o["proposta_verso"]
+    finally:
+        con.close()
+    try:
+        txid = await onchain_mempool_invia(tx_hex)
+    except ValueError as e:
+        raise HTTPException(400, f"La rete l'ha rifiutata: {e}")
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: riprova fra poco")
+    stato = "rilasciato" if verso == "venditore" else "rimborsato"
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        con.execute("UPDATE p2p_onchain_ordini SET stato=?, txid_uscita=?,"
+                    " chiuso_il=?, aggiornato=? WHERE id=?",
+                    (stato, txid or arrivato, adesso, adesso, oid))
+        con.commit()
+    finally:
+        con.close()
+    asyncio.create_task(_p2p_onchain_pubblica(oid))
+    testo = ("⛓️ <b>Scambio concluso:</b> i sats sono partiti verso chi ha comprato."
+             if verso == "venditore" else
+             "⛓️ <b>Scambio annullato:</b> i sats sono tornati a chi li aveva depositati.") \
+        + f" Transazione {(txid or arrivato)[:12]}…"
+    for chi in (o["depositante_id"], o["ricevente_id"]):
+        await notifica(chi, testo)
+    return {"ok": True, "stato": stato, "txid": txid or arrivato}
+
+
+@app.post("/api/p2p/onchain/{oid}/disputa")
+async def p2p_onchain_disputa(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """LA DISPUTA, ai NOSTRI moderatori (non a Mostro: questo libro e'
+    nostro). Si apre dal deposito in poi — prima non c'e' niente da
+    contendere — e ferma le proposte delle due parti. Il motivo e'
+    testo di sconosciuti: corto, scappato quando esce."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("p2p_onchain_disputa", user["id"])
+    d = await leggi_json(req)
+    motivo = str(d.get("motivo") or "").strip()[:500]
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        ruolo = _p2p_onchain_ruolo(o, user["id"])
+        if o["stato"] not in ("depositato", "euro_inviati"):
+            raise HTTPException(409, "La disputa si apre quando i sats sono "
+                                     "depositati e lo scambio è ancora aperto")
+        # una proposta di parte ancora senza seconda firma DECADE: da qui
+        # l'unica firma che conta e' quella di Barattolo (`decidi`)
+        con.execute("UPDATE p2p_onchain_ordini SET stato='disputa', disputa_da=?,"
+                    " disputa_il=?, disputa_motivo=?, proposta_verso='',"
+                    " proposta_psbt='', proposta_da=0, proposta_il=0, aggiornato=?"
+                    " WHERE id=? AND stato IN ('depositato','euro_inviati')",
+                    (user["id"], adesso, motivo, adesso, oid))
+        con.commit()
+        altro = o["ricevente_id"] if ruolo == "compratore" else o["depositante_id"]
+        euro = _fmt_eur(int(o["euro_cent"]) / 100)
+    finally:
+        con.close()
+    asyncio.create_task(_p2p_onchain_pubblica(oid))
+    await notifica(altro, "⚖️ <b>Disputa aperta</b> sul vostro scambio on-chain: un "
+                          "moderatore di Barattolo guarderà e deciderà a chi vanno "
+                          "i sats. Scrivi ai moderatori quel che sai.")
+    await notifica_admin(argomento="dispute", testo=
+        f"⚖️ <b>Disputa P2P on-chain</b> sullo scambio #{int(oid)} "
+        f"({_fmt_sats(int(o['prezzo_sats']))} sats per {euro} €), aperta da "
+        f"{int(user['id'])} ({'vende' if ruolo == 'compratore' else 'compra'} bitcoin)"
+        + (f": «{html.escape(motivo[:200])}»" if motivo else "")
+        + ". Si decide da P2P → I miei scambi → Moderazione on-chain.")
+    return {"ok": True}
+
+
+@app.get("/api/p2p/onchain/moderazione/aperte")
+async def p2p_onchain_moderazione(x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: le dispute aperte e i ritardatari (scambi chiusi
+    con sats arrivati dopo), senza recapiti."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]) or not p2p_onchain_leva():
+        raise HTTPException(404, "Non esiste")
+    con = _p2p_onchain_db()
+    try:
+        righe = con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE stato='disputa' OR "
+            "(stato IN ('annullato','scaduto') AND ricevuti_sats>0 AND "
+            "txid_uscita='') ORDER BY id DESC LIMIT 50").fetchall()
+        return {"dispute": [_p2p_onchain_per(con, o, user["id"], admin=True)
+                            for o in righe]}
+    finally:
+        con.close()
+
+
+@app.post("/api/p2p/onchain/{oid}/decidi")
+async def p2p_onchain_decidi(oid: int, req: Request, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """IL MODERATORE DECIDE, BARATTOLO FIRMA: il calco di `_onchain_decide`.
+    `verso: venditore` = i sats a chi compra bitcoin, `verso: compratore`
+    = tornano a chi vende. Il PSBT lo scrive e lo firma il server con la
+    terza chiave (`_onchain_psbt_barattolo`, che passa dallo stesso
+    giudice), e resta come proposta: la seconda firma e' del telefono
+    di chi vince, da solo quando apre l'app. UNA FIRMA DATA NON SI
+    RITIRA: un verso diverso e' un 409."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]) or not p2p_onchain_leva():
+        raise HTTPException(404, "Non esiste")
+    _onchain_serve_embit()
+    d = await leggi_json(req)
+    verso = str(d.get("verso") or "")
+    if verso not in ("venditore", "compratore"):
+        raise HTTPException(400, "Di' a chi vanno i sats")
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if int(user["id"]) in (int(o["depositante_id"] or 0), int(o["ricevente_id"] or 0)):
+            raise HTTPException(403, "Un moderatore non decide il proprio scambio")
+        if not (o["stato"] == "disputa" or (o["stato"] in ("annullato", "scaduto")
+                                            and int(o["ricevuti_sats"] or 0) > 0)):
+            raise HTTPException(409, "Su questo scambio non c'è niente da decidere")
+        if not int(o["ricevuti_sats"] or 0):
+            raise HTTPException(409, "Nel 2-di-3 non ci sono sats confermati")
+        if o["decisione_da"]:
+            if o["proposta_verso"] == verso:
+                return {"ok": True, "gia_firmata": True, "attesa_firma": verso}
+            raise HTTPException(409, "Barattolo ha già firmato a favore "
+                                     + ("di chi compra" if o["proposta_verso"] == "venditore"
+                                        else "di chi vende")
+                                     + ": una firma data non si ritira")
+        if verso == "venditore" and not o["incasso"]:
+            raise HTTPException(409, "Chi compra non ha ancora scelto dove ricevere: "
+                                     "decidi di nuovo quando l'ha fatto")
+        try:
+            psbt = _onchain_psbt_barattolo(con, o, verso)
+        except ValueError as e:
+            raise HTTPException(409, f"Barattolo non può firmare: {e}")
+        adesso = int(time.time())
+        cur = con.execute("UPDATE p2p_onchain_ordini SET proposta_verso=?, proposta_psbt=?,"
+                          " proposta_da=0, proposta_il=?, decisione_da=?, decisione_il=?,"
+                          " decisione_perche='disputa', aggiornato=? WHERE id=? AND"
+                          " decisione_da=0",
+                          (verso, psbt, adesso, int(user["id"]), adesso, adesso, oid))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Un altro moderatore ha appena deciso: riapri")
+        vince = o["ricevente_id"] if verso == "venditore" else o["depositante_id"]
+        perde = o["depositante_id"] if verso == "venditore" else o["ricevente_id"]
+    finally:
+        con.close()
+    await notifica(vince, "⚖️ <b>Disputa decisa a tuo favore:</b> Barattolo ha firmato. "
+                          "Apri la Mini App: il tuo telefono mette la seconda firma e "
+                          "i sats partono.")
+    await notifica(perde, "⚖️ <b>Disputa decisa:</b> il moderatore ha dato ragione "
+                          "all'altra parte, e Barattolo ha firmato. Se pensi che ci "
+                          "sia un errore, scrivi ai moderatori.")
+    await notifica_admin(argomento="dispute", testo=
+        f"⛓️ <b>Barattolo ha firmato</b> lo scambio P2P on-chain #{int(oid)} a favore "
+        + ("di chi compra bitcoin" if verso == "venditore" else "di chi vende bitcoin")
+        + f", deciso dal moderatore {int(user['id'])}.")
+    return {"ok": True, "attesa_firma": verso}
+
+
+async def _p2p_onchain_ronda() -> None:
+    """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
+    minuti): gli scambi presi si guardano su mempool; gli ordini nel
+    libro oltre la scadenza diventano 'scaduto' e si ripubblicano
+    `canceled`; gli scambi chiusi con l'indirizzo si riguardano per una
+    settimana (i ritardatari). Un errore su uno non ferma gli altri."""
+    if not p2p_onchain_leva():
+        return
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        scaduti = [r["id"] for r in con.execute(
+            "SELECT id FROM p2p_onchain_ordini WHERE stato='pending' AND scade<=?"
+            " LIMIT 50", (adesso,))]
+        for oid in scaduti:
+            con.execute("UPDATE p2p_onchain_ordini SET stato='scaduto', chiuso_il=?,"
+                        " aggiornato=? WHERE id=? AND stato='pending'",
+                        (adesso, adesso, oid))
+        con.commit()
+        da_guardare = [r["id"] for r in con.execute(
+            "SELECT id FROM p2p_onchain_ordini WHERE indirizzo_id>0 AND ("
+            "stato='preso' OR (stato IN ('annullato','scaduto') AND ricevuti_sats=0"
+            " AND chiuso_il>?)) ORDER BY id LIMIT 50",
+            (adesso - P2P_ONCHAIN_RITARDATARI_S,))]
+    finally:
+        con.close()
+    if scaduti:
+        _p2p_onchain_rifai_foto()
+    for oid in scaduti:
+        await _p2p_onchain_pubblica(oid)
+    for oid in da_guardare:
+        try:
+            await _p2p_onchain_controlla(oid)
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: scambio {oid} non controllato: {e}", flush=True)
 
 
 @app.get("/vendor/btc.js")

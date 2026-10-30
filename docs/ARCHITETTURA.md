@@ -34723,3 +34723,49 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   minuti a persona, anche a leva spenta. Il client è
   `_cliente_assistente()` (chiave sua, un retry, 40 s), ed è il punto
   dove prove e collaudo mettono il cartone.
+
+- GLI SCAMBI P2P ON-CHAIN CON LA GARANZIA 2-DI-3 (30 ott 2026, cantiere
+  p2p-onchain-2di3; il perché in CANTIERI, «La garanzia 2-di-3 negli
+  scambi P2P on-chain»). Un secondo libro accanto a quello di Mostro, nel
+  server e nell'app, Mostro non toccato. Leva `P2P_ONCHAIN_ATTIVO`
+  (spenta di serie; il fatto è `p2p_onchain_leva()` = leva E
+  `ONCHAIN_ATTIVO` E `_p2p_leve()["attivo"]`; per persona
+  `p2p_onchain_ammesso` = cancello dell'on-chain E del P2P; in `/api/me`
+  come `profilo["p2p_onchain"]`). Tabella `p2p_onchain_ordini` nel
+  database dell'on-chain (`_p2p_onchain_db`), con le STESSE colonne di
+  cassa di `onchain_ordini` perché `_onchain_psbt_giudica` e
+  `_onchain_psbt_barattolo` si riusano tali e quali; i ruoli sono
+  `depositante_id` (vende bitcoin = «compratore» del 2-di-3) e
+  `ricevente_id` (compra bitcoin = «venditore»), tradotti da
+  `_p2p_onchain_ruolo`; l'indirizzo in `onchain_indirizzi` porta
+  `ordine_id` NEGATIVO (-id dello scambio). Stati: pending | preso |
+  depositato | euro_inviati | disputa | rilasciato | rimborsato |
+  annullato | scaduto (`STATI_P2P_ONCHAIN`; nel 38383 i quattro secchi
+  di `P2P_ONCHAIN_STATO_LIBRO`). Le rotte, tutte sotto `/api/p2p/onchain`
+  e tutte 404 a chi non è ammesso (`_p2p_onchain_serve`): GET `libro`
+  (aperta, dalla fotografia `_P2P_ONCHAIN_FOTO`), GET `miei`, GET `{oid}`
+  (le parti e i moderatori), POST `pubblica`, `{oid}/prendi`,
+  `{oid}/annulla`, `{oid}/controlla`, `{oid}/euro-inviati`,
+  `{oid}/recapito`, `{oid}/proposta` (prima firma, giudice unico),
+  `{oid}/firma` (seconda firma, stesso txid, trasmissione),
+  `{oid}/disputa`; per gli admin GET `moderazione/aperte` e POST
+  `{oid}/decidi` (Barattolo firma con la terza chiave). Freni:
+  `p2p_onchain_pubblica` 10/h, `p2p_onchain_prendi` 10/h,
+  `p2p_onchain_disputa` 5/h, più quelli dell'on-chain per controlla e
+  firme. La ronda `_p2p_onchain_ronda` batte dentro `orologio_onchain`
+  (ogni 2 minuti): scadenze nel libro, mempool degli scambi presi, i
+  ritardatari (7 giorni). Su Nostr: `p2p_onchain_tags` (puro, NIP-69 +
+  `layer`/`network`/`y`/`z`), `p2p_onchain_evento` (38383 firmato con
+  `firma_evento`), `_p2p_onchain_pubblica` (ai relay di sempre,
+  fail-open, ricorda `evento_id` e `pubblicato_stato`). La busta
+  `onchain` di `/api/p2p/libro` esce a leva accesa, dalla memoria, e
+  l'ETag la conta. Nel telefono: `myP2POnchain`, le card
+  `rigaOnchainP2P` in cima al libro del lato (`carteOnchainLibroP2P`),
+  la vista `view-p2ponchain` (radice «I miei scambi» nella nav, come
+  `p2pmod`) con `renderP2POnchain`, `schedaOnchainP2P`,
+  `formOnchainP2P`; le firme passano da `onchainFirmaProposta(o, verso)`
+  e `onchainCofirma(o, parole)`, che prendono l'ordine intero e mandano
+  alla sua `rotta`; le seconde firme partono in sottofondo da
+  `p2pOnchainCofirmeInAttesa`, chiamata da `onchainCofirmeInSottofondo`.
+  Il collaudo del giro: `collaudo_p2p_onchain`; le sentinelle:
+  `prove_p2p_onchain`.
