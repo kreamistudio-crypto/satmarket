@@ -646,7 +646,9 @@ toccare), e la mattina dopo, a libro fermo e con la copia del database
 rifatta, il cambio ha tenuto il libro fermo dodici secondi. Undici
 migrazioni entrate, `bond_cltv_delta = 744` in fondo al `settings.toml`,
 `mostrod --version` → `mostro p2p 0.20.2`, eventi al server accesi,
-primo evento di salute 38389 pubblicato, journal del VPS pulito. Notato:
+primo evento di salute 38389 pubblicato, journal del VPS pulito; alle
+07:44 la prova di Andrea con due account, uno scambio intero: «funziona
+tutto». Notato:
 `blockchain.info` risponde 403 all'uscita Tor (uno dei quattro fornitori
 del prezzo; gli altri tre rispondono). Le impronte del segreto degli
 eventi sono uguali sul nodo e sul VPS (`12b649c7`): la prima lettura
