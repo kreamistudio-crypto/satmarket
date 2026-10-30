@@ -75084,6 +75084,12 @@ journal del VPS senza errori. NOTATO E NON TOCCATO: un WARN
 fornitori del prezzo rifiuta l'uscita Tor; gli altri tre rispondono); e
 la pagina «Info P2P» dell'app legge `mostro_version` dal 38385 ma non lo
 stampa — la liturgia lo prometteva e ora dice `mostrod --version`.
+LA PROVA DAL VIVO (30 ott, 07:44 UTC, Andrea con due account, parola
+sua: «funziona tutto, appena fatto scambio»): uno scambio intero sulla
+`-bar9`, sette minuti dopo il cambio. Non coperti, e si dice: la
+scadenza vera di chi pubblica, la disputa automatica, la manutenzione
+da sola di LND, la cura #910 (vuole il venditore che annulla nel
+secondo esatto).
 
 ## Le 12 parole in poche righe (29 ott 2026, cantiere parole-corte, Andrea: «il testo relativo alle 12 parole è troppo lungo», «riduci e scrivilo leggermente più semplice»)
 

@@ -4134,7 +4134,9 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `barattolo/v0.20.2` (undici commit sopra `fe2a905`); `barattolo/v0.19.0`
   è rimasto com'era per il ritorno. L'immagine `mostro-test:0202` è
   ancora sulla macchina (`docker rmi mostro-test:0202` quando serve il
-  disco: 26 GB liberi prima della salita).
+  disco: 26 GB liberi prima della salita). LA PROVA DAL VIVO (fase 5):
+  alle 07:44 UTC Andrea, con due account, uno scambio intero — «funziona
+  tutto, appena fatto scambio». Sette minuti dopo il cambio.
 - LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (preparata il 12
   ott 2026, cantiere `tempo-di-chi-pubblica`; ✅ FATTA SUL NODO il 13 ott
   2026, cantiere `mostro-bar8`: in servizio dalle 11:36 UTC, e com'è
