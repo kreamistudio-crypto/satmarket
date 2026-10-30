@@ -34630,8 +34630,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «L'on-chain in mainnet»; la procedura in PRODUZIONE, «L'ON-CHAIN IN
   MAINNET»). `ONCHAIN_RETE` si legge dal config: `"signet"` di serie
   (codice e collaudo), `"mainnet"` (o `"bitcoin"`, sinonimo) sul VPS;
-  una parola storta resta signet e lo dice nel journal; sta in
-  `LEVE_MAI_DAL_PANNELLO` (solo dal VPS). DA LEI DISCENDE TUTTO, in una
+  una parola storta resta signet e lo dice nel journal. DAL PANNELLO
+  (30 ott 2026, cantiere onchain-rete-pannello, richiesta di Andrea; non
+  è più fra le «mai»): la scheda «Rete dell'on-chain» è un tasto a due
+  scelte (`tipo: "scelta"` in `_leva_generica`), e la rete è l'unica di
+  `_LEVE_SOLO_AL_RIAVVIO`: `_leva_scrivi` scrive la riga ma NON tocca il
+  globale (da lei discende tutto, una volta all'avvio: a processo vivo
+  sarebbe mezzo signet e mezzo mainnet), la scheda dice `dal_riavvio`.
+  Due serrature dei sats veri: `_onchain_rete_si_puo_lasciare` (400 se
+  si lascia mainnet con ordini aperti, mercatino o P2P, contati da
+  `_onchain_aperti_su` sulla `rete` di `onchain_indirizzi`) e, all'avvio,
+  `_onchain_rete_al_riavvio`, subito dopo la lettura: se la scelta non è mainnet
+  ma ci sono ordini aperti su mainnet, resta mainnet e lo dice
+  (`ONCHAIN_RETE_TRATTENUTA`, nel journal e in rosso nella scheda).
+  DA LEI DISCENDE TUTTO, in una
   tabella sola del server: `ONCHAIN_STRADA_PER_RETE` (il conto BIP-48,
   coin type 1 o 0), `ONCHAIN_RETE_EMBIT` (embit la chiama "main"),
   `ONCHAIN_PREFISSI` (xpub/tpub, bc1/tb1, zpub/vpub, la strada del

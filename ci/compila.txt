@@ -166,6 +166,7 @@ collaudo_onchain_indirizzo.py
 collaudo_onchain_ordine.py
 collaudo_onchain_incasso.py
 collaudo_onchain_verso_lightning.py
+collaudo_onchain_rete_pannello.py
 collaudo_p2p_onchain.py
 collaudo_leve_pannello.py
 cartone_satsrouting.py

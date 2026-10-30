@@ -34381,6 +34381,9 @@ def _censimento(acceso, dopo=None):
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
     amb["_RONDA_RELAY"] = {"stati": {}}
     amb["_RONDA_NOSTR"] = {"stati": {}}
+    # la rete trattenuta su mainnet al riavvio (30 ott 2026, cantiere
+    # onchain-rete-pannello): una frase, vuota quando non c'e'
+    amb["ONCHAIN_RETE_TRATTENUTA"] = ""
     # la campagna a tutti (9 ott 2026): l'ottava volta, la riga del
     # pannello CHIAMA `timbro_letto` — che aprirebbe il database — e
     # nomina il timbro; a leve accese il timbro c'e', a spente no
@@ -152101,8 +152104,12 @@ def prove_banco_chiavi_onchain():
            len(re.findall(r"^ONCHAIN_RETE = ", src, re.M)),
            '"rete": ONCHAIN_RETE,' in src,
            'profilo["onchain_rete"] = ONCHAIN_RETE' in src])
-    prova("...e non si cambia dal pannello: solo dal VPS", True,
-          not _leva_apribile_di_nome_vera("ONCHAIN_RETE"))
+    # (30 ott 2026, cantiere onchain-rete-pannello, Andrea: «un tasto
+    # configurabile direttamente dalle impostazioni») si apre dal
+    # pannello, ma solo al riavvio: prove_rete_onchain_dal_pannello
+    prova("...e dal pannello si cambia, ma solo al riavvio", [True, True],
+          [_leva_apribile_di_nome_vera("ONCHAIN_RETE"),
+           '_LEVE_SOLO_AL_RIAVVIO = frozenset({"ONCHAIN_RETE"})' in src])
     prova("il conto del 2-di-3 e' BIP-48 e segue la rete (coin type 1 di "
           "prova, 0 su mainnet), e lo dice la rotta",
           [True, True, True, False],
@@ -154109,7 +154116,10 @@ def prove_cancello_onchain():
         sys.modules["config"] = finto
         amb = {"__builtins__": __builtins__,
                # di cartone: conosce solo il 999, come il collaudo
-               "e_admin": lambda tg_id: tg_id == 999}
+               "e_admin": lambda tg_id: tg_id == 999,
+               # la serratura dei sats veri al riavvio (30 ott 2026):
+               # senza database non c'e' niente da trattenere
+               "_onchain_rete_al_riavvio": lambda r: (r, "")}
         # dal 27 ott 2026 «Solo gli admin» si legge da `leva_scrivibile`
         # (pannello > config > codice): qui senza pannello, quindi il
         # valore e' quello che il config di cartone ha messo nel blocco
@@ -154249,7 +154259,9 @@ def prove_leva_rgb():
         sys.modules["config"] = finto
         stampe = []
         amb = {"__builtins__": __builtins__, "re": re,
-               "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
+               "print": lambda *a, **k: stampe.append(" ".join(map(str, a))),
+               # la serratura dei sats veri al riavvio (30 ott 2026)
+               "_onchain_rete_al_riavvio": lambda r: (r, "")}
         try:
             exec(cod, amb)
         finally:
@@ -182142,6 +182154,146 @@ def prove_assistente_bot():
           and "per mezz'ora, solo in memoria" in mini)
 
 
+def prove_rete_onchain_dal_pannello():
+    """LA RETE DELL'ON-CHAIN DAL PANNELLO (30 ott 2026, cantiere
+    onchain-rete-pannello, Andrea: «signet e mainnet devono essere
+    automatici nelle descrizioni, e devono essere un tasto configurabile
+    direttamente dalle impostazioni»). Il tasto c'e', con le serrature:
+    vale al riavvio (mai sul globale a processo vivo), non si lascia
+    mainnet con ordini aperti coi sats veri, e al riavvio il server
+    resta su mainnet se nel frattempo ne e' nato uno. I testi del
+    telefono dicono la rete che dice il server."""
+    print("\n[la rete dell'on-chain dal pannello]")
+    import sqlite3
+    import shutil
+    import tempfile
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    amb = {"sqlite3": sqlite3}
+    for f in ("_onchain_rete_normale", "_giudice_rete_onchain",
+              "_onchain_aperti_su", "_onchain_rete_si_puo_lasciare"):
+        exec(pezzo(f), amb)
+    prova("il giudice: due parole, «bitcoin» vale mainnet, il resto no",
+          [("signet", ""), ("mainnet", ""), ("mainnet", ""), None, None],
+          [amb["_giudice_rete_onchain"](" Signet "),
+           amb["_giudice_rete_onchain"]("mainnet"),
+           amb["_giudice_rete_onchain"]("bitcoin"),
+           amb["_giudice_rete_onchain"]("testnet")[0],
+           amb["_giudice_rete_onchain"](None)[0]])
+    # un database vero, con le due tabelle ridotte all'osso
+    d = tempfile.mkdtemp()
+    percorso = os.path.join(d, "rete.db")
+    con = sqlite3.connect(percorso)
+    con.execute("CREATE TABLE onchain_indirizzi(id INTEGER PRIMARY KEY, rete TEXT)")
+    for tab in ("onchain_ordini", "p2p_onchain_ordini"):
+        con.execute(f"CREATE TABLE {tab}(id INTEGER PRIMARY KEY, indirizzo_id"
+                    " INTEGER, stato TEXT, txid_uscita TEXT DEFAULT '',"
+                    " ricevuti_sats INTEGER DEFAULT 0, visti_sats INTEGER DEFAULT 0)")
+    con.executemany("INSERT INTO onchain_indirizzi VALUES (?,?)",
+                    [(1, "signet"), (2, "mainnet"), (3, "mainnet"),
+                     (4, "mainnet"), (5, "mainnet"), (6, "mainnet")])
+    con.executemany(
+        "INSERT INTO onchain_ordini(indirizzo_id, stato, txid_uscita,"
+        " ricevuti_sats, visti_sats) VALUES (?,?,?,?,?)",
+        [(1, "pagato", "", 1000, 1000),        # signet: non conta
+         (2, "rilasciato", "ab", 1000, 1000),  # chiuso
+         (3, "scaduto", "", 0, 0),             # mai visto un sat: chiuso
+         (4, "scaduto", "", 5000, 5000)])      # sats da ridare: APERTO
+    con.commit()
+    prova("gli aperti coi sats veri: quelli con monete ancora in catena",
+          [1, 1], [amb["_onchain_aperti_su"](con, "mainnet"),
+                   amb["_onchain_aperti_su"](con, "signet")])
+    con.execute("INSERT INTO p2p_onchain_ordini(indirizzo_id, stato) "
+                "VALUES (5, 'depositato')")
+    con.commit()
+    prova("...anche nel P2P, e una tabella che manca conta zero", [2, 0],
+          [amb["_onchain_aperti_su"](con, "mainnet"),
+           amb["_onchain_aperti_su"](sqlite3.connect(":memory:"), "mainnet")])
+    con.close()
+
+    def db():
+        return sqlite3.connect(percorso)
+    amb["db"] = db
+
+    def esito(attuale, nuova):
+        amb["ONCHAIN_RETE"] = attuale
+        try:
+            amb["_onchain_rete_si_puo_lasciare"](nuova)
+            return "ok"
+        except ValueError as e:
+            return "no: " + str(e)[:12]
+    prova("da mainnet non si va via con ordini aperti; verso mainnet sì, "
+          "e da signet sempre", ["no: ci sono 2 or", "ok", "ok", "ok"],
+          [esito("mainnet", "signet"), esito("mainnet", "mainnet"),
+           esito("signet", "mainnet"), esito("signet", "signet")])
+    c = sqlite3.connect(percorso)
+    c.execute("UPDATE onchain_ordini SET txid_uscita='cd' WHERE indirizzo_id=4")
+    c.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato'")
+    c.commit()
+    c.close()
+    prova("...e chiusi gli ordini, si va", "ok", esito("mainnet", "signet"))
+
+    scrivi = pezzo("_leva_scrivi")
+    prova("nel gesto unico: il giudice della rete, la serratura PRIMA di "
+          "scrivere, e niente sul globale (vale al riavvio)",
+          [True, True, True, True],
+          ["elif chiave in _LEVE_SOLO_AL_RIAVVIO:\n        giudice = "
+           "_giudice_rete_onchain" in scrivi,
+           scrivi.index("_onchain_rete_si_puo_lasciare(")
+           < scrivi.index("INSERT INTO leve_pannello("),
+           "    if chiave in _LEVE_SOLO_AL_RIAVVIO:\n        # niente sul "
+           "globale" in scrivi
+           and scrivi.index("if chiave in _LEVE_SOLO_AL_RIAVVIO:\n        # niente")
+           < scrivi.index("_leva_metti_viva("),
+           "_onchain_rete_prossima() if chiave in _LEVE_SOLO_AL_RIAVVIO" in scrivi])
+    gen = pezzo("_leva_generica")
+    prova("la scheda: un tasto a due scelte, quella del riavvio, la "
+          "trattenuta", [True] * 3,
+          ['"tipo": "scelta", "scelte": list(ONCHAIN_RETI)' in gen,
+           '"dal_riavvio": prossima if prossima != ONCHAIN_RETE else ""' in gen,
+           '"trattenuta": ONCHAIN_RETE_TRATTENUTA' in gen])
+    i = src.index("# LA SERRATURA DEI SATS VERI, AL RIAVVIO")
+    avvio = src[i:src.index("# IL CONTO DEL 2-DI-3", i)]
+    exec(pezzo("_onchain_rete_al_riavvio"), amb)
+    c = sqlite3.connect(percorso)
+    c.executemany("INSERT INTO p2p_onchain_ordini(indirizzo_id, stato) "
+                  "VALUES (?, 'preso')", [(5,), (6,)])
+    c.commit()
+    c.close()
+    stampe = []
+    amb["print"] = stampe.append
+    amb["DB"] = percorso
+    prova("al riavvio: con sats veri aperti si resta su mainnet, e si dice",
+          [True, ("mainnet", ""), True, True],
+          ["ONCHAIN_RETE, ONCHAIN_RETE_TRATTENUTA = "
+           "_onchain_rete_al_riavvio(ONCHAIN_RETE)\n" in avvio,
+           amb["_onchain_rete_al_riavvio"]("mainnet"),
+           amb["_onchain_rete_al_riavvio"]("signet")[0] == "mainnet"
+           and "2 ordini on-chain" in amb["_onchain_rete_al_riavvio"]("signet")[1],
+           bool(stampe)])
+    shutil.rmtree(d, ignore_errors=True)
+    prova("la rete non e' piu' fra le «mai», e nessun'altra ne e' uscita",
+          [False, True], ['"ONCHAIN_RETE"' in src[src.index(
+              "LEVE_MAI_DAL_PANNELLO = frozenset({"):src.index("})", src.index(
+                  "LEVE_MAI_DAL_PANNELLO = frozenset({"))],
+              '"ONCHAIN_XPUB", "RGB_PROVA_IDS", "NIP05_NOMI",' in src])
+    # il telefono
+    prova("il pannello sa la leva a scelte: i tasti, la casella, la "
+          "conferma dei sats veri", [True] * 4,
+          ["tipo === 'scelta' ? tasti" in mini,
+           "if (tipo === 'scelta') return (v.scrivibile.scelte || []).includes(t) ? t : null;" in mini,
+           "(chiave === 'ONCHAIN_RETE' && valore === 'mainnet')" in mini,
+           "ONCHAIN_RETE: x => x === 'mainnet'" in mini])
+    prova("le descrizioni dicono la rete del server, mai signet cucita",
+          [0, 1, 1, 0, 0],
+          [mini.count("`Signet, rete di prova. L'indirizzo"),
+           mini.count("${onchainRete().prova ? 'Signet, rete di prova.' : "
+                      "'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a"),
+           mini.count("'https://mempool.space/signet'"),
+           mini.count("busta.rete || 'signet'"),
+           mini.count("o.esploratore || 'https://mempool.space/signet'")])
+
+
 def _leva_apribile_di_nome_vera(chiave):
     """Il primo filtro VERO del pannello sulle leve, sul solo nome."""
     src = _SORGENTE
@@ -182341,7 +182493,7 @@ def main():
     prove_p2p_barattozon,
     prove_p2p_paycode,
     prove_cancello_onchain,
-    prove_banco_chiavi_onchain,
+    prove_banco_chiavi_onchain, prove_rete_onchain_dal_pannello,
     prove_indirizzo_ordine_onchain,
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_onchain_verso_lightning,
