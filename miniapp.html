@@ -3942,9 +3942,19 @@
   .p2p-scelta-rete .logo-bz{width:42px;height:40px;object-fit:contain}
   /* IL FOGLIO «PUBBLICA» ON-CHAIN: la scritta sopra il titolo, e la
      valuta che non si sceglie (una riga, senza freccina) */
-  .p2p-oc-sopra{display:flex;align-items:center;justify-content:center;gap:8px;
-    margin:2px var(--pad) 0;font-weight:800;font-size:14px;color:var(--orange)}
-  .p2p-oc-sopra small{font-size:12px;font-weight:700;color:var(--muted)}
+  .p2p-oc-sopra{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin:2px var(--pad) 0}
+  .p2p-oc-sopra:empty{display:none}
+  .p2p-oc-sopra small{text-align:center;font-size:12px;font-weight:700;color:var(--muted)}
+  /* L'INTERRUTTORE DELLA RETE: due tasti in una capsula, acceso quello
+     del foglio aperto (come la levetta Compra/Vendi del libro) */
+  .p2p-rete-scelta{display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--chip-bg)}
+  .p2p-rete-tasto{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;
+    min-height:42px;border:0;border-radius:12px;background:none;color:var(--muted);
+    font:800 15px 'Nunito',sans-serif;cursor:pointer}
+  .p2p-rete-tasto.su{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.18)}
+  .p2p-rete-tasto .cambio-moneta.p2p-oc-moneta{width:26px;height:26px}
+  .p2p-rete-tasto .cambio-moneta.p2p-oc-moneta .cambio-svg{width:15px;height:15px}
+  .p2p-rete-tasto:not(.su) .cambio-moneta.p2p-oc-moneta{opacity:.55}
   .p2p-tendina.p2p-oc-fissa{cursor:default}
   .btn#p2pOcInvia{display:flex;align-items:center;justify-content:center;gap:10px}
   #p2pOcInvia .cambio-moneta.p2p-oc-moneta{background:#FFF4E5;color:#F7931A}
@@ -14833,6 +14843,9 @@ document.getElementById('cartello')?.remove();</script>
        centrato slitterebbe della larghezza della freccia. -->
   <div class="sheet pieno" id="p2pNuovoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pNuovoTit">
     <div class="grab"></div>
+    <!-- l'interruttore Lightning / On-chain (30 ott 2026), solo a chi e'
+         ammesso all'on-chain: lo riempie renderNuovoOrdineP2P -->
+    <div class="p2p-oc-sopra" id="p2pNuovoRete"></div>
     <div class="foglio-testa">
       <button type="button" class="foglio-back" onclick="navIndietro()" aria-label="Chiudi">&#8592;</button>
       <h3 id="p2pNuovoTit">Vuoi comprare Bitcoin</h3>
@@ -57073,14 +57086,17 @@ const P2P_LN_MONETA = '<span class="cambio-moneta ln p2p-oc-moneta" aria-hidden=
    tab «Compra BTC», buy in «Vendi BTC»). Sopra, per chi e' ammesso, IL
    RETTANGOLO ARANCIO (30 ott 2026, Andrea: «con scritto dentro solo:
    novità scambi onchain»): la moneta, quattro parole, la freccina, e
-   porta alla pagina on-chain. Al posto della riga tratteggiata di prima,
+   apre il foglio «Pubblica» on-chain (dalle 14:07, Andrea: «non deve
+   portarti in pagine separate ma si deve integrare tutto nello stesso
+   posto»: la pagina-elenco on-chain se ne va, gli scambi stanno in «I
+   miei scambi» con quelli di Lightning). Al posto della riga tratteggiata di prima,
    che diceva in piccolo quel che la pagina dice gia'. Chi non e'
    ammesso vede le card e basta: per lui sarebbe una porta su «in prova». */
 function carteOnchainLibroP2P(k){
   const righe = p2pOnchainLibro.eventi.filter(o => o.lato === k);
   if (!righe.length && !myP2POnchain) return '';
   const porta = myP2POnchain
-    ? '<button type="button" class="p2p-oc-novita" onclick="apriOnchainP2P(0, \'elenco\')">'
+    ? '<button type="button" class="p2p-oc-novita" onclick="apriPubblicaOnchainP2P()">'
       + P2P_OC_MONETA + '<span class="p2p-oc-novita-testo">Novità: scambi on-chain</span>'
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
     : '';
@@ -57158,6 +57174,18 @@ const P2P_ONCHAIN_STATI = {
    altrui chiede «Prendi?» con la frase che dice COSA succede a chi
    prende — chi deposita e chi riceve dipende dal lato. `modo` apre la
    pagina senza card: 'elenco' i miei, 'pubblica' il foglio nuovo. */
+/* LA PORTA UNICA DEL DETTAGLIO (30 ott 2026, «tutto nello stesso
+   posto»): la chiamano le card on-chain di «I miei scambi», il «Fatto»,
+   l'avviso del bot, «Pubblica» e «Prendi». La vista `p2ponchain` e'
+   ormai solo «Nel dettaglio» di UNO scambio; il ✕ torna da dove si era
+   venuti (`navIndietro`), come quello di Lightning. */
+function apriDettaglioOnchainP2P(id){
+  p2pOnchainAperto = Number(id) || 0;
+  chiudiFoglioP2P('p2pOcSheet');
+  if (vistaAttivaP2P() === 'view-p2ponchain') return renderP2POnchain();
+  go('p2ponchain');
+}
+
 function apriOnchainP2P(id, modo){
   if (!myP2POnchain) {
     chiediConferma({titolo: '⛓️ Scambi on-chain', etichetta: 'Ho capito', avviso: true,
@@ -57172,10 +57200,7 @@ function apriOnchainP2P(id, modo){
   }
   const o = p2pOnchainLibro.eventi.find(x => Number(x.id) === Number(id));
   if (!o) return toast('⛓️ Quest\'ordine non è più nel libro', 4000);
-  if (p2pOnchainLibro.miei.includes(String(o.ordine))) {
-    p2pOnchainAperto = Number(o.id);
-    return go('p2ponchain');
-  }
+  if (p2pOnchainLibro.miei.includes(String(o.ordine))) return apriDettaglioOnchainP2P(o.id);
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
   chiediConferma({
@@ -57206,9 +57231,8 @@ async function prendiOnchainP2P(id){
       body: JSON.stringify({})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non si è potuto prendere');
-    p2pOnchainAperto = Number(id);
     await leggiMieiOnchainP2P();
-    go('p2ponchain');
+    apriDettaglioOnchainP2P(id);
     toast(d.ruolo === 'compratore'
       ? '⛓️ Preso: ora deposita i sats nell\'indirizzo 2-di-3'
       : '⛓️ Preso: chi vende sta depositando i sats', 6000);
@@ -57385,8 +57409,7 @@ async function renderP2POnchain(){
     if (!o) { p2pOnchainAperto = 0; return renderP2POnchain(); }
     /* uno scambio aperto si chiama come quello di Lightning */
     if (tit) tit.innerHTML = P2P_OC_MONETA + 'Nel dettaglio';
-    box.innerHTML = '<button type="button" class="scopri-link" onclick="apriOnchainP2P(0, \'elenco\')">← Tutti i miei scambi on-chain</button>'
-      + schedaOnchainP2P(o);
+    box.innerHTML = schedaOnchainP2P(o);
     /* il foglio del deposito: si apre da solo la prima volta che chi
        deposita trova lo scambio da depositare (dopo «Prendi», o dal
        tocco sull'avviso), come la garanzia di Lightning; se e' gia'
@@ -57484,8 +57507,11 @@ function renderPubblicaOnchainP2P(){
   const tit = el('p2pOcTit');
   if (tit) tit.textContent = vendo ? 'Vuoi vendere Bitcoin' : 'Vuoi comprare Bitcoin';
   const sopra = el('p2pOcSopra');
-  if (sopra) sopra.innerHTML = P2P_OC_MONETA + 'Scambi on-chain'
-    + (p2pOnchainLibro.rete !== 'mainnet' ? ' <small>· rete di prova (' + esc(p2pOnchainLibro.rete) + ')</small>' : '');
+  /* in cima l'interruttore della rete (14:09, Andrea: «anche dopo aver
+     scelto se lightning o onchain in cima alla pagina puoi comunque
+     cambiare ancora tra i due»), e sotto la rete di prova se lo e' */
+  if (sopra) sopra.innerHTML = interruttoreReteP2P('onchain')
+    + (p2pOnchainLibro.rete !== 'mainnet' ? '<small>Rete di prova (' + esc(p2pOnchainLibro.rete) + ')</small>' : '');
   const voce = (l, testo) => '<button type="button" class="p2p-accesso-chip' + (p2pOcLato === l ? ' on' : '')
     + '" aria-pressed="' + (p2pOcLato === l ? 'true' : 'false') + '" onclick="latoOnchainP2P(\'' + l + '\')">' + testo + '</button>';
   const lato = !p2pOcScelta ? '' : sezioneNuovoP2P({
@@ -57589,10 +57615,7 @@ async function pubblicaOnchainP2P(btn){
     toast('Pubblicato: è nel libro ed esce su Nostr', 5000);
   } catch(e) { toast(e.message || 'errore', 6000); }
   finally { rip(); }
-  if (fatto) {
-    chiudiFoglioP2P('p2pOcSheet');
-    if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain(); else go('p2ponchain');
-  }
+  if (fatto) apriDettaglioOnchainP2P(p2pOnchainAperto);
   rinfrescaOnchainP2P(true);
 }
 
@@ -58045,6 +58068,37 @@ function apriSceltaPubblicaP2P(){
   el('p2pSceltaSheet').classList.add('open');
   return true;
 }
+/* L'INTERRUTTORE DELLA RETE IN CIMA AI DUE FOGLI «PUBBLICA» (30 ott
+   2026, 14:09, Andrea: «anche dopo aver scelto se lightning o onchain
+   in cima alla pagina puoi comunque cambiare ancora tra i due»). Due
+   tasti con la moneta, nello stesso ordine della scelta al + (On-chain,
+   Lightning); acceso quello del foglio aperto. Solo a chi e' ammesso
+   all'on-chain: agli altri il foglio di Lightning resta quello di
+   sempre. PURA a parte le leve che legge. */
+function interruttoreReteP2P(attiva){
+  if (!myP2POnchain || DEMO || VETRINA) return '';
+  const tasto = (rete, moneta, nome) => '<button type="button" role="radio" class="p2p-rete-tasto'
+    + (rete === attiva ? ' su' : '') + '" aria-checked="' + (rete === attiva ? 'true' : 'false')
+    + '" onclick="cambiaReteP2P(\'' + rete + '\')">' + moneta + '<span>' + nome + '</span></button>';
+  return '<div class="p2p-rete-scelta" role="radiogroup" aria-label="Rete dello scambio">'
+    + tasto('onchain', P2P_OC_MONETA, 'On-chain') + tasto('ln', P2P_LN_MONETA, 'Lightning') + '</div>';
+}
+/* il passaggio da un foglio all'altro, col lato che si porta dietro: il
+   velo resta, il foglio di prima scende, quello nuovo sale */
+function cambiaReteP2P(rete){
+  const ln = el('p2pNuovoSheet').classList.contains('open');
+  const oc = el('p2pOcSheet').classList.contains('open');
+  if ((rete === 'ln' && ln) || (rete === 'onchain' && oc)) return;
+  if (rete === 'onchain') {
+    el('p2pNuovoSheet').classList.remove('open');
+    return apriPubblicaOnchainP2P(p2pLato === 'vendo' ? 'sell' : 'buy');
+  }
+  el('p2pOcSheet').classList.remove('open');
+  const lato = p2pOcLato === 'sell' ? 'vendo' : 'compro';
+  if (lato !== p2pLato && typeof setLatoP2P === 'function') setLatoP2P(lato, true);
+  apriNuovoOrdineP2P();
+}
+
 function sceltaReteP2P(rete){
   /* il click che il browser manda dopo il gesto del + cadrebbe su un
      tasto della scelta: lo stesso orologio di `toccaPiu` */
@@ -77204,6 +77258,10 @@ function renderNuovoOrdineP2P(){
   const tab = tabacchinoP2P(p2pNuovoMetodi);
   const tit = el('p2pNuovoTit');
   if (tit) titoloNuovoP2P(tit, compro, tab);
+  /* l'interruttore della rete in cima (30 ott 2026): vuoto a chi non e'
+     ammesso all'on-chain, e nel banco del motore non c'e' */
+  const rete = el('p2pNuovoRete');
+  if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function' ? interruttoreReteP2P('ln') : '';
   const val = P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0];
   const scelti = p2pNuovoMetodi.length
     ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';

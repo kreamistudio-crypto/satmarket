@@ -34791,7 +34791,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   gemello di «🔒 Blocca i sats» (`apriDepositoOnchainP2P`,
   `renderDepositoOnchainP2P`, il tempo puro `tempoDepositoOnchainP2P`),
   che la pagina apre da sola una volta per scambio a chi deposita
-  (`p2pOcDepositoVisti`). Le firme passano da `onchainFirmaProposta(o, verso)`
+  (`p2pOcDepositoVisti`); la porta unica del dettaglio
+  `apriDettaglioOnchainP2P(id)` (la vista `p2ponchain` e' solo il
+  dettaglio di uno scambio, gli scambi stanno in «I miei scambi»);
+  l'interruttore On-chain / Lightning in cima ai due fogli «Pubblica»
+  (`interruttoreReteP2P`, `cambiaReteP2P`, il posto `p2pNuovoRete` nel
+  foglio di Lightning). Le firme passano da `onchainFirmaProposta(o, verso)`
   e `onchainCofirma(o, parole)`, che prendono l'ordine intero e mandano
   alla sua `rotta`; le seconde firme partono in sottofondo da
   `p2pOnchainCofirmeInAttesa`, chiamata da `onchainCofirmeInSottofondo`.
