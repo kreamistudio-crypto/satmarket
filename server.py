@@ -244,8 +244,9 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
     "P2P_EVENTI_SEGRETO", "SEGRETI_PROFILO_P2P", "SEGRETO_PROFILO_P2P_VIVA",
     "MOSTRO_RELAY_SPECCHIO", "MOSTRO_RELAY_CONFERMA",
-    # ⛓️ 🪙 🔔 chiavi e liste di persone
-    "ONCHAIN_XPUB", "RGB_PROVA_IDS", "NIP05_NOMI", "AVVISI_ORDINI_ADMIN",
+    # ⛓️ 🪙 🔔 chiavi, la rete dei sats veri, e liste di persone
+    "ONCHAIN_XPUB", "ONCHAIN_RETE", "RGB_PROVA_IDS", "NIP05_NOMI",
+    "AVVISI_ORDINI_ADMIN",
     # quelle che il server legge prima di tutto, e il freno a mano stesso
     "BOT_TOKEN", "ANTHROPIC_API_KEY", "LNBITS_URL", "LNBITS_INVOICE_KEY",
     "LNBITS_ADMIN_KEY", "MODELLO_RICERCA", "DB", "LEVE_PANNELLO_SPENTE",
@@ -33625,7 +33626,19 @@ def _leve_stato():
                          "rispondono 503 (pip install -r requirements.txt)",
                   allarme=bool(ONCHAIN_ATTIVO) and not EMBIT),
             _leva("Terza chiave (Barattolo)", "ONCHAIN_XPUB",
-                  _onchain_terza_chiave_a_parole()),
+                  _onchain_terza_chiave_a_parole(),
+                  allarme=_onchain_terza_chiave_a_parole().startswith("⚠️")),
+            # LA RETE (30 ott 2026, cantiere onchain-mainnet): la leva che
+            # separa la prova dai sats veri. Solo dal VPS (LEVE_MAI_DAL_
+            # PANNELLO): cambiarla da un telefono rubato cambierebbe la
+            # catena su cui nascono gli indirizzi
+            _leva("Rete dell'on-chain", "ONCHAIN_RETE", ONCHAIN_RETE,
+                  acceso=("sats VERI: indirizzi bc1…, conto m/48'/0'/0'/2', "
+                          "mempool.space; la terza chiave di cartone non si "
+                          "usa" if ONCHAIN_RETE == "mainnet" else
+                          "la rete di prova: indirizzi tb1…, i sats non "
+                          "valgono niente; sul VPS si passa ai sats veri con "
+                          "ONCHAIN_RETE = \"mainnet\"")),
             _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
                   ONCHAIN_MAX_EURO,
                   acceso="un ordine on-chain sopra questa cifra non si "
@@ -46394,6 +46407,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # allarga questa riga e' gia' giusta. A leva spenta e' False per
     # tutti, moderatori compresi, e il bottone non compare a nessuno.
     profilo["onchain"] = onchain_ammesso(user["id"])
+    # LA RETE (30 ott 2026, cantiere onchain-mainnet): «signet» o
+    # «mainnet». Il telefono ne ricava il conto BIP-48, le versioni delle
+    # chiavi e la forma degli indirizzi (`onchainRete()`), e gli serve
+    # PRIMA di aprire il foglio On-chain: la co-firma in sottofondo e
+    # l'accensione da sola partono dall'avvio. Si dice anche a cancello
+    # chiuso: non e' un segreto, e' la rete.
+    profilo["onchain_rete"] = ONCHAIN_RETE
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -51492,30 +51512,53 @@ try:
     from config import ONCHAIN_XPUB
 except ImportError:
     ONCHAIN_XPUB = ""
-# LA RETE DELLA TAPPA DI PROVA (16 ott 2026, parola di Andrea: «in
-# collaudo voglio provare tutto in testnet»; SIGNET dal 20 ott 2026,
-# decisione di Andrea: «rete di prova: signet», come diceva lo studio).
-# Non e' una leva: e' una COSTANTE, e un indirizzo mainnet in questa
-# tappa non si calcola da nessuna parte — ne' qui ne' nel browser. Il
-# motivo e' semplice: un 2-di-3 con una chiave di cartone che
-# mostrasse un `bc1q...` sarebbe un invito a mandarci sats veri che
-# nessuno potrebbe piu' sbloccare. La rete diventera' una leva alla
-# tappa dei pagamenti, non prima.
+# LA RETE DELL'ON-CHAIN (16 ott 2026, parola di Andrea: «in collaudo
+# voglio provare tutto in testnet»; SIGNET dal 20 ott 2026, decisione di
+# Andrea: «rete di prova: signet», come diceva lo studio; LEVA dal 30 ott
+# 2026, cantiere onchain-mainnet, proposta di Alan: «portarlo su main con
+# il flag on-chain attivo solo per gli admin, una prova da 5 euro in
+# mainnet»). Fino al 30 ott era una COSTANTE, e il motivo era giusto: un
+# 2-di-3 con una chiave di cartone che mostrasse un `bc1q...` sarebbe un
+# invito a mandarci sats veri che nessuno potrebbe piu' sbloccare. La
+# leva mantiene quella promessa in un altro modo: su mainnet la terza
+# chiave di cartone NON SI USA (`onchain_xpub_barattolo` dice di no, le
+# rotte 503, il pannello delle leve in allarme) finche' la chiave di
+# Barattolo non e' nata sul VPS — e una chiave nata su signet non vale
+# su mainnet (`_onchain_chiave_vps`).
+# DUE PAROLE SOLE: "signet" (di serie, nel codice e sul collaudo) e
+# "mainnet" (la riga del VPS il giorno dei sats veri; «bitcoin» vale
+# come sinonimo). Una parola storta resta signet e lo dice nel journal:
+# qui un refuso che aprisse la mainnet sarebbe un refuso coi soldi.
 # ⚠️ SIGNET HA LE STESSE FORME DI TESTNET: indirizzi `tb1...`, chiavi
 # estese `tpub...`, coin type 1 nel BIP-44/48. Quel che cambia e' la
-# CATENA che li guarda: la verifica dei pagamenti (tappa 4) chiedera'
-# all'API signet di mempool.space (`https://mempool.space/signet/api`),
-# e un pagamento mandato da un wallet testnet li' non si vede.
-ONCHAIN_RETE = "signet"
+# CATENA che li guarda: la verifica dei pagamenti chiede all'API signet
+# di mempool.space (`https://mempool.space/signet/api`), e un pagamento
+# mandato da un wallet testnet li' non si vede. Su mainnet: `bc1...`,
+# `xpub...`, coin type 0, `https://mempool.space/api`.
+ONCHAIN_RETI = ("signet", "mainnet")
+try:
+    from config import ONCHAIN_RETE
+    ONCHAIN_RETE = str(ONCHAIN_RETE or "").strip().lower()
+    if ONCHAIN_RETE == "bitcoin":
+        ONCHAIN_RETE = "mainnet"
+    if ONCHAIN_RETE not in ONCHAIN_RETI:
+        print(f"[onchain] ONCHAIN_RETE «{ONCHAIN_RETE}» non e' una rete "
+              f"conosciuta ({', '.join(ONCHAIN_RETI)}): resta signet")
+        ONCHAIN_RETE = "signet"
+except ImportError:
+    ONCHAIN_RETE = "signet"
 # IL CONTO DEL 2-DI-3 (20 ott 2026, tappa 2): la strada BIP-48 dal seme
 # di ciascuno alla sua «xpub dedicata» — scopo 48 (multisig), coin
-# type 1 (le reti di prova: signet), conto 0, tipo 2 (p2wsh). Da li'
-# ogni ordine prende la chiave `/0/i`, con l'`i` assegnato qui una
-# volta sola. La dice il server al telefono, cosi' il telefono non
-# inventa strade sue e due dispositivi dello stesso seme fanno la
-# STESSA xpub. Il giorno della mainnet il coin type diventa 0: e' un
-# altro conto, apposta.
-ONCHAIN_STRADA_CONTO = "m/48'/1'/0'/2'"
+# type 1 (le reti di prova: signet) o 0 (mainnet), conto 0, tipo 2
+# (p2wsh). Da li' ogni ordine prende la chiave `/0/i`, con l'`i`
+# assegnato qui una volta sola. La dice il server al telefono, cosi' il
+# telefono non inventa strade sue e due dispositivi dello stesso seme
+# fanno la STESSA xpub. Il coin type segue la rete: e' un altro conto,
+# apposta — una xpub di signet non vale su mainnet, e viceversa (il
+# telefono ha la stessa tabella, `ONCHAIN_RETI` in miniapp.html).
+ONCHAIN_STRADA_PER_RETE = {"signet": "m/48'/1'/0'/2'",
+                           "mainnet": "m/48'/0'/0'/2'"}
+ONCHAIN_STRADA_CONTO = ONCHAIN_STRADA_PER_RETE[ONCHAIN_RETE]
 # LA QUOTA FISSA DI BARATTOLO SULL'ON-CHAIN (27 ott 2026, decisione di
 # Andrea: «0 commissione sul mercatino al momento, al massimo metterei
 # 500 sats fissi solamente per coprire le spese di rete»). Una cifra in
@@ -90054,6 +90097,39 @@ try:
     EMBIT = True
 except ImportError:
     EMBIT = False
+# LA RETE A PAROLE E PER EMBIT (30 ott 2026, cantiere onchain-mainnet):
+# `ONCHAIN_RETE` e' una leva («signet» di serie, «mainnet» sul VPS il
+# giorno dei sats veri), e qui c'e' TUTTO quel che da lei discende — il
+# nome con cui embit la conosce ("main", non "mainnet"), i prefissi
+# delle chiavi estese e degli indirizzi che i messaggi nominano, le
+# versioni BIP-32 delle chiavi di conto dei wallet (vpub/zpub). Chi
+# scrive «tpub» o «tb1» in un testo passa da qui, mai a mano: il
+# telefono ha la stessa tabella (`ONCHAIN_RETI` in miniapp.html).
+ONCHAIN_RETE_EMBIT = {"signet": "signet", "mainnet": "main"}
+ONCHAIN_PREFISSI = {
+    "signet": {"xpub": "tpub", "indirizzo": "tb1", "conto": "vpub",
+               "strada_wallet": "m/84'/1'/0'"},
+    "mainnet": {"xpub": "xpub", "indirizzo": "bc1", "conto": "zpub",
+                "strada_wallet": "m/84'/0'/0'"},
+}
+# la versione BIP-32 della chiave di CONTO di un wallet BIP-84 (quella
+# che Sparrow mostra): vpub sulle reti di prova, zpub su mainnet
+ONCHAIN_VERSIONE_CONTO = {"signet": b"\x04\x5f\x1c\xf6",
+                          "mainnet": b"\x04\xb2\x47\x46"}
+
+
+def _onchain_rete():
+    """La rete di embit per la leva di adesso: si rilegge a ogni chiamata,
+    cosi' il collaudo la cambia a caldo come ogni altra leva."""
+    return _EMBIT_RETI[ONCHAIN_RETE_EMBIT[ONCHAIN_RETE]]
+
+
+def _onchain_prefisso(cosa: str) -> str:
+    """Il prefisso di `cosa` («xpub», «indirizzo», «conto»...) sulla
+    rete di adesso, per i messaggi e i controlli."""
+    return ONCHAIN_PREFISSI[ONCHAIN_RETE][cosa]
+
+
 # una xpub e' lunga 111 caratteri: il tetto ferma i corpi assurdi prima
 # che arrivino alla libreria
 ONCHAIN_XPUB_MAX = 200
@@ -90069,9 +90145,9 @@ def _onchain_sembra_privata(s: str) -> bool:
 
 def onchain_xpub_motivo(testo) -> str:
     """'' se `testo` e' una xpub DEDICATA buona, sennò il perche' (mai
-    con la chiave dentro). Buona vuol dire: pubblica, di signet (una
-    `tpub`), e il conto del 2-di-3 — profondita' 4, ultimo passo 2'
-    (ONCHAIN_STRADA_CONTO). Una xpub del wallet della persona, o di
+    con la chiave dentro). Buona vuol dire: pubblica, della rete di
+    adesso (una `tpub` su signet, una `xpub` su mainnet), e il conto
+    del 2-di-3 — profondita' 4, ultimo passo 2' (ONCHAIN_STRADA_CONTO). Una xpub del wallet della persona, o di
     un'altra strada, non e' dedicata e si rifiuta: gli indirizzi
     nascerebbero dove il suo wallet non li cerca."""
     s = str(testo or "").strip()
@@ -90085,8 +90161,9 @@ def onchain_xpub_motivo(testo) -> str:
         return "non è una chiave estesa leggibile"
     if k.is_private:
         return "questa è una chiave PRIVATA: qui non entra, e non va data a nessuno"
-    if k.version != _EMBIT_RETI[ONCHAIN_RETE]["xpub"]:
-        return f"non è una chiave di {ONCHAIN_RETE} (deve cominciare per tpub)"
+    if k.version != _onchain_rete()["xpub"]:
+        return (f"non è una chiave di {ONCHAIN_RETE} (deve cominciare per "
+                f"{_onchain_prefisso('xpub')})")
     if k.depth != 4 or k.child_number != 0x80000002:
         return f"non è il conto del 2-di-3 ({ONCHAIN_STRADA_CONTO})"
     return ""
@@ -90094,10 +90171,15 @@ def onchain_xpub_motivo(testo) -> str:
 
 def onchain_xpub_barattolo() -> tuple:
     """(xpub, di_cartone) della TERZA chiave. Vuota → quella di cartone
-    dei vettori BIP-32. Piena → deve essere una `tpub` PUBBLICA di
-    signet: una `xpub` di mainnet finche' la rete e' di prova e' un
-    errore di chi ha scritto il config, e si dice (ValueError) invece di
-    calcolare indirizzi che mischiano due reti.
+    dei vettori BIP-32 — MA SOLO SU SIGNET (30 ott 2026, cantiere
+    onchain-mainnet): su mainnet la cartone ha la privata pubblica, e un
+    2-di-3 con lei dentro lo svuota chiunque con una firma sola in piu';
+    quindi ValueError, e l'on-chain resta fermo finche' la chiave di
+    Barattolo non nasce dal pannello. Piena → deve essere PUBBLICA e
+    della rete di adesso: una `xpub` di mainnet finche' la rete e' di
+    prova (o una `tpub` su mainnet) e' un errore di chi ha scritto il
+    config, e si dice (ValueError) invece di calcolare indirizzi che
+    mischiano due reti.
     DAL 27 OTT 2026 VINCE LA CHIAVE SUL VPS (`_onchain_chiave_vps`), se
     un admin l'ha creata: e se nel config c'e' anche una ONCHAIN_XPUB
     diversa, le terze chiavi sarebbero due — si dice, e non si calcola
@@ -90111,6 +90193,11 @@ def onchain_xpub_barattolo() -> tuple:
                              "due. Va tolta la riga dal config")
         return vps["xpub"], False
     if not s:
+        if ONCHAIN_RETE != "signet":
+            raise ValueError("su mainnet la terza chiave di cartone non si "
+                             "usa: la chiave di Barattolo va creata dal "
+                             "pannello admin («⛓️ Crea la chiave di "
+                             "Barattolo») prima di qualunque ordine")
         return XPUB_CARTONE, True
     if _onchain_sembra_privata(s):
         raise ValueError("ONCHAIN_XPUB e' una chiave privata: va tolta "
@@ -90122,8 +90209,9 @@ def onchain_xpub_barattolo() -> tuple:
     if k.is_private:
         raise ValueError("ONCHAIN_XPUB e' una chiave privata: va tolta "
                          "dal config, e ruotata")
-    if k.version != _EMBIT_RETI[ONCHAIN_RETE]["xpub"]:
-        raise ValueError(f"ONCHAIN_XPUB non e' di {ONCHAIN_RETE} (una tpub)")
+    if k.version != _onchain_rete()["xpub"]:
+        raise ValueError(f"ONCHAIN_XPUB non e' di {ONCHAIN_RETE} (una "
+                         f"{_onchain_prefisso('xpub')})")
     return s, False
 
 
@@ -90169,6 +90257,19 @@ def _onchain_chiave_vps():
         d = json.load(h)
     if not d.get("parole") or not d.get("xpub"):
         raise ValueError("il file della chiave di Barattolo e' monco")
+    # LA RETE DEL FILE (30 ott 2026, cantiere onchain-mainnet): la chiave
+    # e' nata su una rete e con il conto di quella (coin type 1 o 0);
+    # se la leva e' cambiata dopo, quel file non e' la terza chiave di
+    # questa rete — e tornare alla cartone in silenzio, su mainnet,
+    # sarebbe il modo di far nascere indirizzi che chiunque puo' svuotare.
+    # Si dice, e non si calcola niente: la chiave di mainnet si crea dal
+    # pannello DOPO aver spostato quel file (PRODUZIONE, «L'ON-CHAIN IN
+    # MAINNET»). I file di prima del 30 ott dicevano "signet" gia' allora.
+    if (d.get("rete") or "signet") != ONCHAIN_RETE:
+        raise ValueError(f"la chiave di Barattolo sul VPS e' nata su "
+                         f"{d.get('rete') or 'signet'}, ma la rete adesso e' "
+                         f"{ONCHAIN_RETE}: non e' la terza chiave di questa "
+                         f"rete")
     return d
 
 
@@ -90176,7 +90277,7 @@ def _onchain_radice_barattolo(parole: str):
     from embit import bip39
     return _embit_bip32.HDKey.from_seed(
         bip39.mnemonic_to_seed(parole),
-        version=_EMBIT_RETI[ONCHAIN_RETE]["xprv"])
+        version=_onchain_rete()["xprv"])
 
 
 def onchain_crea_chiave_barattolo(admin_id: int) -> dict:
@@ -90193,7 +90294,7 @@ def onchain_crea_chiave_barattolo(admin_id: int) -> dict:
     parole = bip39.mnemonic_from_bytes(os.urandom(16))
     radice = _onchain_radice_barattolo(parole)
     xpub = radice.derive(ONCHAIN_STRADA_CONTO).to_public().to_string(
-        version=_EMBIT_RETI[ONCHAIN_RETE]["xpub"])
+        version=_onchain_rete()["xpub"])
     d = {"parole": parole, "strada": ONCHAIN_STRADA_CONTO,
          "rete": ONCHAIN_RETE, "xpub": xpub,
          "impronta": radice.my_fingerprint.hex(),
@@ -90247,9 +90348,15 @@ def _onchain_terza_chiave_a_parole() -> str:
                 + ("" if st.get("nel_backup") else
                    " — ⚠️ non ancora in un backup fuori sede"))
     if st["dove"] == "config":
-        return "vera (tpub), solo pubblica dal config: qui non firma"
+        return (f"vera ({_onchain_prefisso('xpub')}), solo pubblica dal "
+                "config: qui non firma")
     if st["dove"] == "rotta":
         return "⚠️ file illeggibile: " + st.get("motivo", "")
+    if ONCHAIN_RETE != "signet":
+        # (30 ott 2026) su mainnet la cartone non si usa: l'on-chain e'
+        # fermo finche' la chiave non nasce, e il pannello lo grida
+        return ("⚠️ di cartone su MAINNET: l'on-chain è FERMO (503) finché "
+                "un admin non preme «⛓️ Crea la chiave di Barattolo»")
     return "di cartone (vettori BIP-32: la privata è pubblica)"
 
 
@@ -90267,7 +90374,7 @@ def _onchain_privata_barattolo(xpub: str):
     conto = _onchain_radice_barattolo(vps["parole"]).derive(
         vps.get("strada") or ONCHAIN_STRADA_CONTO)
     if conto.to_public().to_string(
-            version=_EMBIT_RETI[ONCHAIN_RETE]["xpub"]) != xpub:
+            version=_onchain_rete()["xpub"]) != xpub:
         raise ValueError("le parole del file non danno la sua xpub")
     return conto
 
@@ -90294,7 +90401,7 @@ def onchain_indirizzo_da(descrittore: str) -> str:
     PRIMA del `#`: il checksum lo giudica la prova, non la libreria."""
     corpo = descrittore.split("#", 1)[0]
     return _EmbitDescrittore.from_string(corpo).address(
-        _EMBIT_RETI[ONCHAIN_RETE])
+        _onchain_rete())
 
 
 def _onchain_prepara_tabelle(con):
@@ -90506,7 +90613,18 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not onchain_ammesso(user["id"]):
         raise HTTPException(404, "Non esiste")
-    cartone = not (ONCHAIN_XPUB or "").strip()
+    # LA TERZA CHIAVE COME LA VEDE IL GIUDICE (30 ott 2026, cantiere
+    # onchain-mainnet): fino a ieri qui si leggeva il solo config, e una
+    # chiave nata sul VPS dal pannello (27 ott) il foglio la chiamava
+    # ancora «di cartone». Adesso risponde `onchain_xpub_barattolo`, lo
+    # stesso che decide gli indirizzi degli ordini; se dice di no (la
+    # cartone su mainnet, il file nato su un'altra rete, due terze
+    # chiavi) il foglio lo scrive in `ferma` e non disegna indirizzi.
+    ferma = ""
+    try:
+        xpub_barattolo, cartone = onchain_xpub_barattolo()
+    except ValueError as e:
+        xpub_barattolo, cartone, ferma = XPUB_CARTONE, True, str(e)
     # LA TAPPA 2 (20 ott 2026): la mia xpub dedicata se l'ho gia' data,
     # con chi posso fare un indirizzo di prova (gli altri ammessi che
     # l'hanno data), e i miei ultimi indirizzi. Si legge anche senza
@@ -90540,13 +90658,17 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {
-        "xpub": (ONCHAIN_XPUB or "").strip() or XPUB_CARTONE,
+        "xpub": xpub_barattolo,
         # il VENDITORE dell'ordine finto: sempre di cartone, in questa
         # tappa non esiste un venditore vero da cui prendere un'xpub
         "xpub_venditore": XPUB_CARTONE_VENDITORE,
         # «di cartone» il foglio lo scrive a schermo: chi prova deve
         # sapere che quella terza chiave non e' di nessuno
         "cartone": cartone,
+        # (30 ott 2026) il motivo per cui su questa rete non nasce
+        # nessun indirizzo, o vuoto: il foglio lo mostra al posto
+        # dell'esempio, e la cassa risponde 503 con le stesse parole
+        "ferma": ferma,
         "rete": ONCHAIN_RETE,
         # la strada del CONTO del 2-di-3 (BIP-48), cosi' il client non
         # inventa numeri suoi e due dispositivi dello stesso seme fanno
@@ -90795,7 +90917,8 @@ try:
     from config import ONCHAIN_MEMPOOL_API
 except ImportError:
     ONCHAIN_MEMPOOL_API = ""
-ONCHAIN_MEMPOOL_DI_SERIE = {"signet": "https://mempool.space/signet/api"}
+ONCHAIN_MEMPOOL_DI_SERIE = {"signet": "https://mempool.space/signet/api",
+                            "mainnet": "https://mempool.space/api"}
 # quanto vive un indirizzo che aspetta i sats: un bonifico on-chain non
 # e' un tocco, e un giorno copre chi paga da un wallet che non ha sotto
 # mano. Prenota lo stock per tutto quel tempo (`_riservati`).
@@ -90880,7 +91003,7 @@ def onchain_incasso(xpub: str, numero: int) -> str:
     dal seme con la stessa strada (`onchainIncassoMio`)."""
     from embit.script import p2wpkh
     k = _embit_bip32.HDKey.from_string(xpub).derive([1, int(numero)])
-    return p2wpkh(k.key).address(_EMBIT_RETI[ONCHAIN_RETE])
+    return p2wpkh(k.key).address(_onchain_rete())
 
 
 # ============ L'INCASSO SU UN WALLET PROPRIO (27 ott 2026, cantiere
@@ -90901,7 +91024,6 @@ def onchain_incasso(xpub: str, numero: int) -> str:
 # il telefono del venditore prima della seconda firma, con la chiave che
 # rifa' da se'. Chi non ha il seme non sa firmare una destinazione.
 ONCHAIN_DESTINAZIONE_MAX = 120
-_ONCHAIN_VPUB_PROVA = b"\x04\x5f\x1c\xf6"   # vpub: zpub delle reti di prova
 
 
 def onchain_messaggio_destinazione(tipo: str, valore: str) -> bytes:
@@ -90960,17 +91082,18 @@ def onchain_destinazione_motivo(tipo: str, valore: str,
     s = str(valore or "").strip()
     if not s or len(s) > ONCHAIN_DESTINAZIONE_MAX:
         return "manca l'indirizzo o la chiave"
-    rete = _EMBIT_RETI[ONCHAIN_RETE]
+    rete = _onchain_rete()
     if tipo == "indirizzo":
         from embit.script import address_to_scriptpubkey
         # un bech32 si puo' scrivere tutto maiuscolo (i QR lo fanno):
         # embit lo vuole minuscolo, e minuscolo si firma e si salva
-        s = s.lower() if s[:3].lower() == "tb1" else s
+        pref = _onchain_prefisso("indirizzo")
+        s = s.lower() if s[:3].lower() == pref else s
         try:
             if address_to_scriptpubkey(s).address(rete) != s:
                 raise ValueError
         except Exception:
-            return f"non è un indirizzo di {ONCHAIN_RETE} (comincia per tb1)"
+            return f"non è un indirizzo di {ONCHAIN_RETE} (comincia per {pref})"
         return ""
     if tipo != "xpub":
         return "tipo di destinazione sconosciuto"
@@ -90982,13 +91105,14 @@ def onchain_destinazione_motivo(tipo: str, valore: str,
         return "non è una chiave estesa leggibile"
     if k.is_private:
         return "questa è una chiave PRIVATA: qui non entra, e non va data a nessuno"
-    if k.version not in (rete["xpub"], _ONCHAIN_VPUB_PROVA):
-        return f"non è una chiave di {ONCHAIN_RETE} (deve cominciare per vpub o tpub)"
+    if k.version not in (rete["xpub"], ONCHAIN_VERSIONE_CONTO[ONCHAIN_RETE]):
+        return (f"non è una chiave di {ONCHAIN_RETE} (deve cominciare per "
+                f"{_onchain_prefisso('conto')} o {_onchain_prefisso('xpub')})")
     if xpub_dedicata and s == xpub_dedicata:
         return "questa è la chiave del 2-di-3, non quella di un tuo wallet"
     if k.depth != 3:
         return ("serve la chiave del CONTO del tuo wallet (in Sparrow: "
-                "Impostazioni → «Keystore», m/84'/1'/0')")
+                f"Impostazioni → «Keystore», {_onchain_prefisso('strada_wallet')})")
     return ""
 
 
@@ -90997,12 +91121,12 @@ def onchain_indirizzo_esterno(tipo: str, valore: str, indice: int) -> str:
     stesso, oppure `/0/indice` della chiave del conto (p2wpkh, BIP-84)."""
     if tipo == "indirizzo":
         s = str(valore).strip()
-        return s.lower() if s[:3].lower() == "tb1" else s
+        return s.lower() if s[:3].lower() == _onchain_prefisso("indirizzo") else s
     from embit.script import p2wpkh
     if not 0 <= int(indice) <= ONCHAIN_NUMERO_MAX:
         raise ValueError("numero fuori misura")
     k = _embit_bip32.HDKey.from_string(valore).derive([0, int(indice)])
-    return p2wpkh(k.key).address(_EMBIT_RETI[ONCHAIN_RETE])
+    return p2wpkh(k.key).address(_onchain_rete())
 
 
 def _onchain_destinazione_viva(con, tg_id: int, xpub_dedicata: str):
@@ -91507,7 +91631,7 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
     if sorted((v.txid.hex(), v.vout) for v in p.tx.vin) != sorted(
             (m["txid"], m["vout"]) for m in monete):
         raise ValueError("non spende esattamente i sats dell'ordine")
-    rete = _EMBIT_RETI[ONCHAIN_RETE]
+    rete = _onchain_rete()
     uscite = [(u.script_pubkey.address(rete), u.value) for u in p.tx.vout]
     if verso == "venditore":
         if [v for d, v in uscite if d == o["incasso"]] != [o["prezzo_sats"]]:
@@ -91753,6 +91877,14 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
         raise HTTPException(404, "Non esiste")
     if not EMBIT:
         return {"pronto": False, "motivo": "manca la libreria embit"}
+    # (30 ott 2026, cantiere onchain-mainnet) la terza chiave che manca o
+    # non e' di questa rete spegne la porta ⛓️ PRIMA del tocco, con le
+    # parole del giudice: su mainnet senza la chiave di Barattolo non
+    # nasce nessun indirizzo
+    try:
+        onchain_xpub_barattolo()
+    except ValueError as e:
+        return {"pronto": False, "motivo": str(e)}
     if not onchain_ammesso(venditore_id):
         return {"pronto": False, "motivo": "questo venditore non riceve on-chain"}
     con = _onchain_db()
@@ -92156,7 +92288,7 @@ ONCHAIN_MODI = ("onchain", "lightning", "ogni_volta")
 # La rete del fornitore che va bene per ogni rete dell'on-chain: signet
 # ha le forme di testnet (tb1…, lntb…), e la mainnet vuole bitcoin.
 ONCHAIN_RETE_DEL_CAMBIO = {"signet": "testnet", "testnet": "testnet",
-                           "bitcoin": "bitcoin"}
+                           "mainnet": "bitcoin", "bitcoin": "bitcoin"}
 # Quanto deve restare alla fattura di chi vende quando i bitcoin partono:
 # il fornitore paga dopo una conferma, e una conferma puo' metterci ore.
 ONCHAIN_CAMBIO_VITA_MIN_S = 2 * 3600
@@ -92528,7 +92660,7 @@ async def onchain_cambio_nasce(oid: int, req: Request,
         raise HTTPException(400, "Il cambio non si legge")
     # l'indirizzo del cambio: un taproot della rete dell'on-chain
     from embit.script import address_to_scriptpubkey
-    rete = _EMBIT_RETI[ONCHAIN_RETE]
+    rete = _onchain_rete()
     try:
         sc = address_to_scriptpubkey(lockup)
         buono = sc.script_type() == "p2tr" and sc.address(rete) == lockup

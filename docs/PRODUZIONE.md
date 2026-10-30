@@ -4945,9 +4945,64 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   IL RIPRISTINO: dall'archivio (`age -d`), il file `chiavi/` torna
   accanto al database, proprietario `barattolo`, e il server lo rilegge
   da solo. Per firmare A MANO (server perso): le dodici parole del
-  file in Sparrow come terzo firmatario di un multisig 2-di-3, strada
-  `m/48'/1'/0'/2'`, coi descrittori degli ordini. Mai in chiaro su
-  Telegram o in chat: le parole firmano le dispute.
+  file in Sparrow come terzo firmatario di un multisig 2-di-3, con la
+  strada scritta nel file (`strada`: `m/48'/1'/0'/2'` su signet,
+  `m/48'/0'/0'/2'` su mainnet), coi descrittori degli ordini. Mai in
+  chiaro su Telegram o in chat: le parole firmano le dispute.
+  ⚠️ IL FILE DICE LA SUA RETE (`rete`, dal 30 ott 2026): con
+  `ONCHAIN_RETE` su un'altra rete il server lo rifiuta (503, pannello
+  «file illeggibile») e NON torna alla chiave di cartone. Sotto, «L'ON-
+  CHAIN IN MAINNET».
+
+- L'ON-CHAIN IN MAINNET: I SATS VERI, SOLO AGLI ADMIN (30 ott 2026,
+  cantiere onchain-mainnet, proposta di Alan: «portarlo su main con il
+  flag on-chain attivo solo per gli admin, una prova da 5 euro»; perché
+  in CANTIERI, «L'on-chain in mainnet»; com'è fatto in ARCHITETTURA,
+  «L'ON-CHAIN IN MAINNET: LA RETE È UNA LEVA»). Di serie il codice sta
+  su signet e l'on-chain è SPENTO: la mainnet si apre SOLO con le righe
+  nel config del VPS, dopo la promozione. L'ORDINE DEI GESTI CONTA,
+  perché la chiave di Barattolo nasce sulla rete che il server ha in
+  quel momento. Un passo alla volta, col sì di Andrea, ognuno col suo
+  risultato incollato (i comandi pronti: docs/DA-FARE-ANDREA.md):
+  1) embit sul VPS (sopra, «L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS»): se
+     `import embit` non risponde, prima quello;
+  2) sola lettura: `grep -n "^ONCHAIN_" /srv/barattolo/config.py` — di
+     solito nessuna riga; se c'è `ONCHAIN_RETE` o `ONCHAIN_XPUB` ci si
+     ferma e si guarda; e `sudo ls -l /root/satmarket/chiavi/` deve
+     dire «No such file»: un file nato su signet là NON vale su mainnet
+     (si sposta via, con copia, prima del passo 4);
+  3) copia del config, poi le QUATTRO righe in coda (`printf | tee -a`,
+     mai nano): `ONCHAIN_RETE = "mainnet"`, `ONCHAIN_ATTIVO = True`,
+     `ONCHAIN_MAX_EURO = 10` (il tetto della prova: in codice è 250),
+     `ONCHAIN_SOLO_ADMIN = True` (è già il valore del codice: la riga
+     dice che è una decisione); il file si rilegge con `ast.parse`;
+  4) riavvio del servizio; il pannello «⚙️ Stato delle leve», gruppo
+     «⛓️ Pagamento on-chain», deve dire «Rete dell'on-chain: mainnet» e la
+     terza chiave in ALLARME («⚠️ di cartone su MAINNET: l'on-chain è
+     FERMO»): è il verso giusto, nessun indirizzo nasce;
+  5) un admin preme «⛓️ Crea la chiave di Barattolo» (cassetto «Chiave di
+     Barattolo» del pannello admin): nasce `chiavi/onchain-barattolo.json`
+     con `"rete": "mainnet"` e il conto `m/48'/0'/0'/2'`; il pannello
+     delle leve dice «sul VPS (impronta …) — ⚠️ non ancora in un backup
+     fuori sede»: SUBITO un backup a mano (`backup-fuori.sh`) o un deploy,
+     finché la copia è una sola — su mainnet quella chiave vale sats;
+  6) Andrea e Alan aprono la Mini App: l'on-chain si accende da solo con
+     la xpub di MAINNET (le tpub del collaudo non valgono qui), e nel
+     Profilo → «⛓️ On-chain» la scheda Tecnico dice in rosso «Rete
+     Bitcoin (mainnet): i sats sono veri»;
+  7) la prova: un oggetto di Alan sotto i 10 €, Andrea sceglie ⛓️ alla
+     cassa, paga da un wallet vero su un `bc1q`, UNA conferma (dieci
+     minuti o più: su mainnet il margine per la rete lo decide la
+     tariffa di mempool.space), poi «🔓 Libera i sats», e il telefono
+     di Alan co-firma alla prima apertura. L'explorer:
+     `https://mempool.space/address/<bc1q…>`.
+  PER TORNARE INDIETRO: `ONCHAIN_ATTIVO = False` (o via la riga) e
+  riavvio: le rotte on-chain tornano 404 e un ordine già pagato resta
+  nel suo 2-di-3 finché due telefoni non firmano (la leva spegne la
+  cassa, non le chiavi). `ONCHAIN_RETE` NON si rimette su signet con
+  ordini di mainnet aperti: la chiave di Barattolo sul VPS è di
+  mainnet e su signet il server la rifiuterebbe. Verifica in sola
+  lettura: `grep -n "^ONCHAIN_" /srv/barattolo/config.py` e il pannello.
 
 - L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS, PRIMA DELLA PROMOZIONE (20 ott
   2026, cantiere onchain-tappa2; perché in CANTIERI, «L'indirizzo

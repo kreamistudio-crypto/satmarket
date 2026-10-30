@@ -97,7 +97,15 @@ def pezzi_pagina():
     def riga(inizio):
         i = mini.index(inizio)
         return mini[i:mini.index("\n", i) + 1]
+
+    def blocco(inizio, fine):
+        i = mini.index(inizio)
+        return mini[i:mini.index(fine, i) + len(fine)]
     firme = [
+        # (30 ott 2026, onchain-mainnet) la rete la dice il server: il
+        # giudice e le due letture, prima di chi li usa
+        "function onchainRete(){", "function onchainReteBtc(B){",
+        "function onchainLeggiChiaveConto(B, s){",
         "function importoBolt11(pr){", "function leggiBolt11(pr){",
         "function onchainLeggiXpub(B, s){", "function onchainConto(B, parole, strada){",
         "function onchainMieChiavi(B, parole, o){", "function onchainScriptOrdine(B, o){",
@@ -121,7 +129,7 @@ def pezzi_pagina():
         "function onchainCambioLeggiCampo(oc){",
         "async function onchainCambioConferma(btn, o){"]
     return "\n".join([riga("const ONCHAIN_VERSIONI_PROVA = "),
-                      riga("const ONCHAIN_VERSIONI_VPUB = "),
+                      blocco("const ONCHAIN_RETI = {", "\n};\n"),
                       riga("const ONCHAIN_QUOTA_TETTO = "),
                       riga("const ONCHAIN_POLVERE = "),
                       riga("const onchainCambi = {};")]
