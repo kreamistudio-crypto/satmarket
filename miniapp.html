@@ -3269,6 +3269,9 @@
      CANTIERI, «Il velo esce dal libro»). */
   .p2p-scambio-chiuso{float:right;margin:2px 0 0 10px;font-size:11.5px;
     font-weight:700;color:var(--ink-soft)}
+  /* IL SEGNO DELLA RETE sulla card on-chain di «I miei scambi» (30 ott
+     2026): nell'angolo come la data, che gli sta accanto */
+  .p2p-scambio-rete{float:right;margin:0 0 0 8px;font-size:15px;line-height:1}
   /* LA FRECCETTA DEL TOCCO (set 2026, richiesta di Andrea): il › di
      casa, quello della riga della classifica (`.cl-fr`) — stesso
      glifo, stesso corpo, stesso `--muted`. Non e' un bottone e non ha
@@ -12679,7 +12682,6 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <!-- LA STRISCIA DEI MODERATORI (28 set 2026): vuota per tutti gli
            altri; la riempie renderStrisciaModP2P -->
-      <div id="p2pOnchainStriscia"></div>
       <div id="p2pModStriscia"></div>
       <div id="p2pMieiCorpo"></div>
     </div>
@@ -19336,9 +19338,10 @@ function go(view){
      i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
   if (view==='p2p' || view==='p2pmiei') renderP2P();
   /* gli scambi on-chain (30 ott 2026): la pagina si rilegge dal server
-     a ogni ingresso, e la striscia in «I miei scambi» conta i vivi */
+     a ogni ingresso, e «I miei scambi» li mescola ai Lightning — si
+     rileggono entrando e la lista si ridisegna quando arrivano */
   if (view==='p2ponchain') { renderP2POnchain(); osservaDepositoOnchainP2P(); }
-  if (view==='p2pmiei' && myP2POnchain) leggiMieiOnchainP2P().then(renderStrisciaOnchainP2P);
+  if (view==='p2pmiei' && myP2POnchain) rileggiOnchainMieiP2P();
   /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
      entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
      come nav-p2p, cosi' vale anche per indietro e cronologia */
@@ -21044,6 +21047,10 @@ async function aggiornaVista(){
        e' la risposta che quella vista mostra, e il gesto e' esplicito
        come il «Riprova» (la bandierina e' l'unico gate) */
     if (v === 'p2pmiei') p2pMieiChiesto = false;
+    /* ...e gli scambi on-chain, che stanno nella stessa lista (col typeof:
+       il banco della tirata estrae questa funzione da sola) */
+    if (v === 'p2pmiei' && typeof rileggiOnchainMieiP2P === 'function' && myP2POnchain)
+      rileggiOnchainMieiP2P();
     /* ...e si rilegge anche il CAMBIO (10 ott 2026, vedi «IL CAMBIO SUL
        LIBRO P2P»): le stime in sats e i badge % si fanno con lui, e un
        libro nuovo col bitcoin di un'ora fa e' aggiornato a meta'. Parte
@@ -57149,20 +57156,6 @@ function rigaOnchainP2P(o){
   </div>`;
 }
 
-/* la striscia in «I miei scambi», come quella dei moderatori: quanti
-   scambi on-chain ho in corso, e la porta alla loro pagina */
-function renderStrisciaOnchainP2P(){
-  const box = el('p2pOnchainStriscia');
-  if (!box) return;
-  if (!myP2POnchain) { box.innerHTML = ''; return; }
-  const n = p2pOnchainMiei.filter(o => P2P_ONCHAIN_VIVI.has(o.stato)).length;
-  box.innerHTML = '<button type="button" class="mod-striscia' + (n ? ' viva' : '') + '" onclick="apriOnchainP2P(0, \'elenco\')">'
-    + '<span><b class="p2p-oc-tit">' + P2P_OC_MONETA + 'Scambi on-chain</b><small>'
-    + (n ? (n === 1 ? '1 scambio in corso' : n + ' scambi in corso') : 'Nessuno scambio in corso')
-    + ' · garanzia 2-di-3</small></span>'
-    + (n ? '<span class="badge dispute">' + n + '</span>' : '') + '</button>';
-}
-
 const P2P_ONCHAIN_VIVI = new Set(['pending', 'preso', 'depositato', 'euro_inviati', 'disputa']);
 const P2P_ONCHAIN_STATI = {
   pending: 'Nel libro', preso: 'Preso: si aspetta il deposito',
@@ -57173,7 +57166,8 @@ const P2P_ONCHAIN_STATI = {
 /* IL TOCCO SU UNA CARD: il mio ordine si apre nella sua pagina, uno
    altrui chiede «Prendi?» con la frase che dice COSA succede a chi
    prende — chi deposita e chi riceve dipende dal lato. `modo` apre la
-   pagina senza card: 'elenco' i miei, 'pubblica' il foglio nuovo. */
+   pagina senza card: 'pubblica' il foglio nuovo; 'elenco' torna a «I miei
+   scambi», dove gli on-chain stanno coi Lightning (30 ott 2026). */
 /* LA PORTA UNICA DEL DETTAGLIO (30 ott 2026, «tutto nello stesso
    posto»): la chiamano le card on-chain di «I miei scambi», il «Fatto»,
    l'avviso del bot, «Pubblica» e «Prendi». La vista `p2ponchain` e'
@@ -57196,6 +57190,7 @@ function apriOnchainP2P(id, modo){
   if (modo === 'pubblica') return apriPubblicaOnchainP2P();
   if (modo) {
     p2pOnchainAperto = 0;
+    if (modo === 'elenco') return go('p2pmiei');
     return go('p2ponchain');
   }
   const o = p2pOnchainLibro.eventi.find(x => Number(x.id) === Number(id));
@@ -57375,6 +57370,163 @@ async function leggiMieiOnchainP2P(){
   return p2pOnchainMiei;
 }
 
+/* ═══ GLI SCAMBI ON-CHAIN IN «I MIEI SCAMBI» (30 ott 2026, Andrea alla
+   prima prova: «l'ordine appena preso lo devo vedere nei miei ordini con
+   il messaggio che dice cosa succede esattamente come nel lightning,
+   magari per identificare se lightning o onchain mettiamo l'iconcina
+   giusta nella card»; e nel thread del design, «tutto insieme»). ══════
+   Le righe on-chain entrano nella STESSA lista dei Lightning, con gli
+   stessi gruppi, lo stesso filtro, lo stesso ordine e lo stesso pallino.
+   COME: ogni scambio on-chain si veste da riga della lista (`oc` porta
+   lo scambio vero); i giudici della lista — `gruppoScambioP2P` e
+   `rigaScambioP2P` — vedono `oc` e passano la mano ai due on-chain qui
+   sotto. Lo stato della riga porta il prefisso `oc-`: nessuna lista di
+   stati del Lightning (finali, prima della presa, tinte) puo' scambiarlo
+   per uno dei suoi.
+   ⚠️ LE RIGHE ON-CHAIN ENTRANO in `mieiRigheP2P`, che e' la lista di chi
+   disegna e conta; il motore del Lightning (riascolto, stato pubblico,
+   «ha ordini vivi») passa da `apertiMieiP2P`, e li' restano fuori. */
+function righeOnchainMieiP2P(){
+  if (typeof myP2POnchain === 'undefined' || !myP2POnchain || DEMO || VETRINA) return [];
+  return (p2pOnchainMiei || []).filter(o => o && o.id && o.ruolo !== 'moderatore').map(o => ({
+    id: 'oc-' + o.id, oc: o, stato: 'oc-' + o.stato,
+    /* `parte` e' gia' nel verso della lista: 'compro' = ricevo bitcoin */
+    lato: o.parte === 'compro' ? 'compro' : 'vendo',
+    euro: Number(o.euro) || 0,
+    quando: Number(o.chiuso_il || o.euro_inviati_il || o.depositato_il || o.preso_il || o.creato) || 0}));
+}
+/* entrando in «I miei scambi» (e tirando giu' la pagina): si rileggono
+   dal server, e la lista si ridisegna se si e' ancora li' */
+function rileggiOnchainMieiP2P(){
+  return leggiMieiOnchainP2P().then(() => {
+    if (vistaAttivaP2P() === 'view-p2pmiei') renderP2P();
+  }).catch(() => {});
+}
+/* PURA: TOCCA A ME? Il giudice UNO del 👉 sulla card, del gruppo «Tocca a
+   te» e del pallino, come `azioniDisponibili` per il Lightning: la mossa
+   che la pagina dello scambio mi chiede col suo bottone pieno. */
+function toccaAMeOnchainP2P(o){
+  if (!o || !P2P_ONCHAIN_VIVI.has(o.stato) || o.stato === 'pending') return false;
+  if (daFirmareOnchainP2P(o)) return true;
+  if (o.proposta) return false;
+  const ricevo = o.ruolo === 'venditore', deposito = o.ruolo === 'compratore';
+  if (ricevo && !o.incasso && o.stato !== 'disputa') return true;
+  if (o.stato === 'preso') return deposito && !depositoVistoOnchainP2P(o);
+  if (o.stato === 'depositato') return ricevo;
+  if (o.stato === 'euro_inviati') return deposito;
+  return false;
+}
+/* PURA: il gruppo della lista (`P2P_GRUPPI`), dallo stato e dal giudice
+   qui sopra. Il rimborso e' uno scambio che non e' andato: sta con gli
+   annullati. */
+function gruppoOnchainP2P(o){
+  if (!o) return 'corso';
+  if (o.stato === 'rilasciato') return 'fatti';
+  if (['rimborsato', 'annullato', 'scaduto'].includes(o.stato)) return 'morti';
+  if (o.stato === 'pending') return 'libro';
+  return toccaAMeOnchainP2P(o) ? 'fare' : 'corso';
+}
+/* PURA: la casella dello stato — il titolo e la riga di COSA SUCCEDE,
+   come «✋ Aspetta» e la sua riga sulla card del Lightning. Dentro solo
+   testi fissi e cifre: chi la usa passa da esc(). */
+function statoOnchainCardP2P(o){
+  const ricevo = o.ruolo === 'venditore', deposito = o.ruolo === 'compratore';
+  const ora = t => t ? new Date(t * 1000).toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}) : '';
+  const chiuso = o.stato === 'rilasciato' || o.stato === 'rimborsato';
+  if (daFirmareOnchainP2P(o))
+    return {t: 'Manca la tua firma', d: o.proposta.verso === 'venditore'
+      ? 'Apri lo scambio: i sats arrivano sul tuo wallet' : 'Apri lo scambio: il rimborso torna a te'};
+  if (o.proposta && o.proposta.mia && !chiuso)
+    return {t: 'Hai firmato', d: 'Si aspetta la seconda firma dell\'altra parte'};
+  switch (o.stato) {
+    case 'pending': return {t: 'Ordine pubblicato', d: 'Aspetta che qualcuno lo prenda'};
+    case 'preso':
+      if (deposito) return depositoVistoOnchainP2P(o)
+        ? {t: 'Deposito inviato', d: 'Si aspetta la conferma della rete'}
+        : {t: 'Deposita i sats', d: 'Nell\'indirizzo 2-di-3' + (o.deposito_entro ? ', entro le ' + ora(o.deposito_entro) : '')};
+      if (ricevo && !o.incasso) return {t: 'Scegli dove ricevere', d: 'Incolla un tuo indirizzo bitcoin'};
+      return {t: 'Si aspetta il deposito', d: 'Chi vende mette i sats nel 2-di-3'};
+    case 'depositato':
+      if (ricevo) return {t: 'Manda gli euro', d: 'Poi tocca «Ho inviato gli euro»'};
+      return {t: 'Sats depositati', d: 'Chi compra ti manda gli euro'};
+    case 'euro_inviati':
+      if (deposito) return {t: 'Euro inviati', d: 'Controlla il conto e libera i sats'};
+      if (ricevo && !o.incasso) return {t: 'Scegli dove ricevere', d: 'Incolla un tuo indirizzo bitcoin'};
+      return {t: 'Euro inviati', d: 'Chi vende li controlla e libera i sats'};
+    case 'disputa': return {t: 'In disputa', d: 'Decide un moderatore di Barattolo'};
+    case 'rilasciato': return {t: 'Scambio concluso', d: ''};
+    case 'rimborsato': return {t: 'Rimborsato', d: 'I sats sono tornati a chi li aveva depositati'};
+    case 'scaduto': return {t: 'Scaduto nel libro', d: ''};
+    default: return {t: 'Annullato', d: ''};
+  }
+}
+/* la tinta della casella, nella tavolozza del Lightning (`P2P_TINTA_STATO`):
+   arancio il gesto mio, viola l'attesa, rosso la disputa */
+function tintaOnchainP2P(o){
+  const g = gruppoOnchainP2P(o);
+  const t = g === 'fare' ? 'locked' : g === 'fatti' ? 'released' : g === 'morti' ? 'annullato'
+    : g === 'libro' ? '' : o.stato === 'disputa' ? 'dispute' : 'confirmed';
+  return t ? ' badge ' + t : '';
+}
+/* il segno della rete in un angolo della card di «I miei scambi», su
+   quelle on-chain e su quelle Lightning (Andrea: «per identificare se
+   lightning o onchain mettiamo l'iconcina giusta nella card»): la moneta
+   del libro (`segnoReteP2P`), che sul Lightning c'e' solo col libro
+   on-chain acceso — in produzione, a leva spenta, la card Lightning resta
+   quella di ieri. Col typeof: i banchi che estraggono le card da sole non
+   hanno il libro, e sull'on-chain resta il cerchio arancione degli avvisi. */
+function segnoReteCardP2P(rete){
+  const m = typeof segnoReteP2P === 'function' ? segnoReteP2P(rete)
+    : (rete === 'btc' ? '<span aria-hidden="true">🟠</span>' : '');
+  return m ? '<span class="p2p-scambio-rete">' + m + '</span>' : '';
+}
+/* LA CARD: la stessa ossatura di `rigaScambioP2P` — le due cifre col
+   verso (verde quel che arriva, rosso quel che parte), le frasi al
+   passato a scambio concluso, la casella dello stato col 👉 — e il segno
+   della rete. Al tocco, il dettaglio dello scambio. */
+function rigaScambioOnchainP2P(o){
+  const ricevoSats = o.parte === 'compro';
+  const sats = fmt(Number(o.sats) || 0) + ' sats';
+  const cifraSats = '<span class="p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '">' + esc(sats) + '</span>';
+  const cifraEuro = '<span class="p2p-euro">' + esc(fmtEur(o.euro)) + ' €</span>';
+  const g = gruppoOnchainP2P(o);
+  const chiuso = g === 'fatti', annullato = g === 'morti';
+  const data = (chiuso || annullato) ? dataBreveP2P(o.chiuso_il || o.scade || o.creato) : '';
+  const righe = annullato
+    ? '<div class="p2p-scambio-lato">' + (o.stato === 'rimborsato' ? 'Rimborsato' : 'Annullato')
+      + (data ? ' il ' + esc(data) : '') + '</div>'
+      + '<div class="p2p-scambio-euro p2p-scambio-cifre">Invia '
+      + (ricevoSats ? cifraEuro : cifraSats) + ' · Ricevi ' + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+    : chiuso
+      ? '<div class="p2p-scambio-lato">Hai ricevuto ' + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+        + '<div class="p2p-scambio-euro">inviando ' + (ricevoSats ? cifraEuro : cifraSats) + '</div>'
+      : '<div class="p2p-scambio-lato">Vuoi ricevere ' + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+        + '<div class="p2p-scambio-euro">inviando ' + (ricevoSats ? cifraEuro : cifraSats) + '</div>';
+  const st = statoOnchainCardP2P(o);
+  const tocca = toccaAMeOnchainP2P(o);
+  const agire = tocca
+    ? '<span class="p2p-tocca"><span class="p2p-manina" aria-hidden="true">👉</span> tocca a te</span>'
+    : (g === 'corso' ? '<span class="p2p-aspetta">✋ Aspetta</span>' : '');
+  const tinta = tintaOnchainP2P(o).replace(' badge ', '');
+  const metodi = o.metodi || [];
+  return '<div class="p2p-ord p2p-scambio p2p-scambio-oc' + (tinta ? ' tinta tono-' + tinta : '')
+    + (annullato ? ' spenta' : '') + '" role="button" tabindex="0" data-id="' + Number(o.id) + '" '
+    + 'onclick="apriScambioOnchainMioP2P(this.dataset.id)">'
+    + segnoReteCardP2P('btc')
+    + (chiuso && data ? '<span class="p2p-scambio-chiuso">' + esc(data) + '</span>' : '')
+    + righe
+    + '<div class="p2p-scambio-stato' + tintaOnchainP2P(o) + '"><span>' + esc(st.t) + '</span>' + agire
+    + (st.d ? '<span class="p2p-aspetta-riga">' + esc(st.d) + '</span>' : '') + '</div>'
+    + (metodi.length ? '<div class="p2p-box p2p-paga" title="' + esc(metodi.join(', ')) + '">'
+       + iconaMetodiP2P(metodi) + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '')
+    + '</div>';
+}
+/* il tocco: «Nel dettaglio», la porta unica del design */
+function apriScambioOnchainMioP2P(id){
+  haptic();
+  apriDettaglioOnchainP2P(Number(id));
+}
+
 /* LA PAGINA: l'elenco dei miei (col foglio «Pubblica» e, per i
    moderatori, le dispute) oppure uno scambio. Si rilegge dal server a
    ogni ingresso: lo stato lo fa la rete, non il telefono. */
@@ -57423,29 +57575,16 @@ async function renderP2POnchain(){
     }
     return;
   }
-  const vivi = p2pOnchainMiei.filter(o => P2P_ONCHAIN_VIVI.has(o.stato));
-  const chiusi = p2pOnchainMiei.filter(o => !P2P_ONCHAIN_VIVI.has(o.stato));
   /* IL TASTO PURO (30 ott 2026, Andrea: «la pagina onchain non deve
      avere tutto quel testo ma solo il tasto»): il paragrafo sul 2-di-3,
      il vuoto con «Vai al libro ordini» e la moderazione se ne sono
      andati — come funziona lo dice la domanda di «Prendi», e le dispute
-     stanno in «⚖️ Moderazione P2P» con quelle di Lightning. Sotto il
-     tasto, i miei scambi se ce ne sono. La rete di prova resta detta
-     nel foglio «Pubblica», sopra il titolo. */
+     stanno in «⚖️ Moderazione P2P» con quelle di Lightning. La rete di
+     prova resta detta nel foglio «Pubblica», sopra il titolo. I MIEI
+     SCAMBI on-chain non stanno piu' qui: sono in «I miei scambi», coi
+     Lightning (30 ott 2026). */
   box.innerHTML = '<button type="button" class="btn orange p2p-oc-pubblica" onclick="apriPubblicaOnchainP2P()">'
-    + P2P_OC_MONETA + 'Pubblica uno scambio on-chain</button>'
-    + (vivi.length ? '<h3 class="p2p-onchain-h">In corso</h3>' + vivi.map(rigaMiaOnchainP2P).join('') : '')
-    + (chiusi.length ? '<h3 class="p2p-onchain-h">Chiusi</h3>' + chiusi.map(rigaMiaOnchainP2P).join('') : '');
-}
-
-function rigaMiaOnchainP2P(o){
-  return `<div class="p2p-ord p2p-onchain${o.lato === 'sell' ? ' lato-compro' : ' lato-vendo'}" role="button" tabindex="0"
-    onclick="p2pOnchainAperto=${Number(o.id)};renderP2POnchain()">
-    <div class="p2p-testa"><span class="p2p-grande p2p-euro">${o.parte === 'vendo' ? 'Vendi' : 'Compri'} ${fmt(o.sats)} sats</span>
-      <span class="p2p-onchain-segno">${esc(P2P_ONCHAIN_STATI[o.stato] || o.stato)}</span></div>
-    <span class="p2p-piccola p2p-sats">per ${esc(fmtEur(o.euro))} €${o.altro ? ' · con ' + esc(o.altro) : ''}</span>
-    ${daFirmareOnchainP2P(o) ? '<div class="p2p-box p2p-tuo">✍️ Aspetta la tua firma</div>' : ''}
-  </div>`;
+    + P2P_OC_MONETA + 'Pubblica uno scambio on-chain</button>';
 }
 
 /* la proposta che aspetta la MIA seconda firma: dell'altra parte o di
@@ -81131,6 +81270,8 @@ const P2P_GRUPPI = [
    e si muovono insieme. */
 function gruppoScambioP2P(o){
   if (!o) return 'corso';
+  /* lo scambio on-chain ha il giudice suo (`gruppoOnchainP2P`, 30 ott 2026) */
+  if (o.oc) return gruppoOnchainP2P(o.oc);
   if (o.stato === 'concluso') return 'fatti';
   if (o.stato === 'annullato' || o.stato === 'rifiutato') return 'morti';
   if (azioniDisponibili(o)) return 'fare';
@@ -81642,6 +81783,8 @@ function dataBreveP2P(ts){
     : {day: 'numeric', month: 'short', year: 'numeric'});
 }
 function rigaScambioP2P(o){
+  /* la card on-chain ha la sua (`rigaScambioOnchainP2P`, 30 ott 2026) */
+  if (o && o.oc) return rigaScambioOnchainP2P(o.oc);
   const st = statoTestoP2P(o);
   const l = comeLibroP2P(o);
   /* IL METODO DECISO PRENDE IL POSTO DELL'ELENCO, come nella pagina
@@ -81796,6 +81939,8 @@ function rigaScambioP2P(o){
        da datare. E' un `float`, non una posizione assoluta: cosi' la
        frase le gira attorno invece di passarci sotto, e non serve
        tenere in pari nessun numero. */
+    /* ...e accanto, la moneta della rete (30 ott 2026, `segnoReteCardP2P`) */
+    + (typeof segnoReteCardP2P === 'function' ? segnoReteCardP2P('ln') : '')
     + (chiuso && dataChiusa
         ? '<span class="p2p-scambio-chiuso">' + esc(dataChiusa) + '</span>' : '')
     /* LA PRIMA RIGA PORTA I SATS, in evidenza: e' la cifra che si va a
@@ -82864,17 +83009,24 @@ function mieiMostratiP2P(righe){
                        ordineMieiP2P());
 }
 /* le righe dei propri scambi, nude: le stesse che la striscia
-   disegna, per chi deve solo contarle */
+   disegna, per chi deve solo contarle.
+   ...E GLI SCAMBI ON-CHAIN (30 ott 2026, `righeOnchainMieiP2P`): stanno
+   nella stessa lista, coi gruppi, il filtro, il conto e il pallino. Il
+   motore del Lightning li lascia fuori in `apertiMieiP2P`. Col typeof:
+   i banchi che estraggono questa funzione da sola non li hanno. */
 function mieiRigheP2P(){
   const tutti = ordiniP2P();
-  return Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id);
+  return Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id)
+    .concat(typeof righeOnchainMieiP2P === 'function' ? righeOnchainMieiP2P() : []);
 }
 /* PURA: dei propri scambi, quelli ancora APERTI — lo stesso giudice
    con cui «I miei scambi» decide cosa riascoltare e di cosa chiedere
    lo stato: uno stato non finale (`P2P_FINALI`). Lo chiama anche la
    porta del primo ordine (9 ott 2026), che un giudice suo non ce l'ha. */
 function apertiMieiP2P(righe){
-  return righe.filter(o => P2P_FINALI.indexOf(o.stato) < 0);
+  /* gli scambi on-chain (`oc`) non sono di Mostro: niente riascolto, niente
+     stato pubblico, e non fanno «ordini vivi» del Lightning (30 ott 2026) */
+  return righe.filter(o => !o.oc && P2P_FINALI.indexOf(o.stato) < 0);
 }
 function haOrdiniViviP2P(){
   return apertiMieiP2P(mieiRigheP2P()).length > 0;
