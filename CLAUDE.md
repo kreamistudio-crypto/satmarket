@@ -162,8 +162,8 @@ modo in cui si rifà un errore già pagato.
 ⚠️ Non è il VPS di Barattolo: è il coordinator Mostro P2P su LNVPS
 (Dublino, `185.18.221.96`), tutto in container (bitcoind pruned, LND,
 tor, mostrod), tre canali (`/canali`, 12 ott 2026): LNBiG [Hub-2] 5M,
-ACINQ 1M e ACINQ 400k. Gira il nostro fork di Mostro, `mostro:v0.19.0-bar8`
-(otto patch più 0010, 0011, 0012: PRODUZIONE, «LA SALITA ALLA -bar8»). Il verbale
+ACINQ 1M e ACINQ 400k. Gira il nostro fork di Mostro, `mostro:v0.20.2-bar9`
+(undici patch sulla v0.20.2, dal 30 ott: PRODUZIONE, «LA SALITA ALLA 0.20.2»). Il verbale
 — audit, timer, sonda, dev fee, risposte del team — sta in
 `docs/NODO-MOSTRO.md`. Le regole che valgono in ogni sessione:
 - L'AUDIT DI SICUREZZA È FATTO (2 set 2026): non riproporre le sue sei
@@ -265,7 +265,7 @@ Stato al 12 ott 2026 (parola di Andrea):
   config del VPS, nel codice è False (PRODUZIONE, «LE CARD P2P IN VETRINA»).
 - I PIONIERI sono congelati a 101. La cassaforte del mercatino è «nodo»
   (LNbits self-hosted col LND del nodo: Cantieri, «Il doppio wallet»).
-- Il nodo gira Mostro 0.19.0 (`-bar8` dal 13 ott, patch 0010-0012): la cauzione solo a chi
+- Il nodo gira Mostro 0.20.2 (`-bar9` dal 30 ott, undici patch): la cauzione solo a chi
   prende scegliendo «Contanti»; `P2P_CAUZIONE_SUL_METODO` ACCESA sul VPS.
 - TETTI. Mercatino: nessun prezzo massimo (`TETTO_SATS_ANNUNCIO` spenta).
   P2P in beta: 250 € per TUTTI gli ordini (`P2P_MAX_EURO = 250` sul VPS, 0
