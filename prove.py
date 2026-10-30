@@ -56910,7 +56910,7 @@ def prove_link_dentro_telegram():
         exec(src[j:src.index("\n", j)].split("   #")[0], amb)
         j = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
         exec(src[j:src.index("}\n", j) + 2], amb)
-        for f in ("_frase_convenienza_p2p", "_testo_avviso_nuovi_p2p"):
+        for f in ("_frase_convenienza_p2p", "_avviso_onchain_p2p", "_testo_avviso_nuovi_p2p"):
             exec(pezzo(f), amb)
         return amb["_testo_avviso_nuovi_p2p"](
             [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"}])
@@ -66508,6 +66508,13 @@ out.accesoNull = filtroAccesoP2P(null);
 out.accesoMetodi = filtroAccesoP2P(filtro({metodi: ['SEPA']}));
 out.accesoPremio = filtroAccesoP2P(filtro({premioDa: -3}));
 out.accesoRep = filtroAccesoP2P(filtro({repA: 4}));
+/* LA RETE (30 ott 2026): gli ordini di Mostro sono Lightning — «solo
+   on-chain» li lascia fuori, «solo Lightning» e «tutte» no; e un filtro
+   di ieri senza la chiave vale «tutte» */
+out.rete = [filtroAccesoP2P(filtro({rete: 'onchain'})), filtroAccesoP2P(filtro({rete: 'ln'})),
+  passaFiltroP2P(con({}), filtro({rete: 'onchain'})), passaFiltroP2P(con({}), filtro({rete: 'ln'})),
+  passaFiltroP2P(con({}), filtro({rete: ''})), vuoto.rete,
+  (() => { const f = filtro({}); delete f.rete; return [filtroAccesoP2P(f), passaFiltroP2P(con({}), f)]; })()];
 /* IL METODO PER CONTENIMENTO: chiedere «SEPA» prende anche «SEPA
    Instant» e «Bonifico SEPA»; chiedere «SEPA Instant» prende solo chi
    lo dice. Uguaglianza secca avrebbe filtrato via mezzo libro senza
@@ -67283,6 +67290,11 @@ console.log(JSON.stringify(out));
           [False, False], [out["accesoNo"], out["accesoNull"]])
     prova("...ma si veste per ognuna delle leve", [True, True, True],
           [out["accesoMetodi"], out["accesoPremio"], out["accesoRep"]])
+    prova("LA RETE (30 ott 2026, Andrea: «aggiungi anche la possibilità di filtrare per "
+          "onchain e lightning»): la pillola si veste, «solo on-chain» lascia fuori gli "
+          "ordini di Mostro e «solo Lightning» no; vuota di serie, e un filtro di ieri "
+          "senza la chiave non filtra",
+          [True, True, False, True, True, "", [False, True]], out["rete"])
     # ⚠️ IL METODO SI CONFRONTA PER CONTENIMENTO: sul libro arrivano i
     # metodi scritti dagli ALTRI client, che sono testo libero —
     # «SEPA Instant», «Bonifico SEPA», «sepa». Chiedere «SEPA» deve
@@ -115204,7 +115216,7 @@ def prove_anteprima_avvisi_p2p():
         exec(src[i:src.index("\n", i)].split("   #")[0], a2)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
     exec(src[i:src.index("}\n", i) + 2], a2)
-    for f in ("_frase_convenienza_p2p", "_testo_avviso_nuovi_p2p"):
+    for f in ("_frase_convenienza_p2p", "_avviso_onchain_p2p", "_testo_avviso_nuovi_p2p"):
         exec(_senza_prosa(pezzo(f)), a2)
     avviso = a2["_testo_avviso_nuovi_p2p"](
         [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"}])
@@ -115388,7 +115400,7 @@ def prove_avvisi_nuovi_ordini():
     # --- 2) I GIUDICI PURI --------------------------------------------------
     amb = {"html": html, "URL_PUBBLICO": "https://barattolo.store", "time": time}
     gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
-    for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = "):
+    for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = ", "RETI_AVVISI_NUOVI_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("   #")[0], amb)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
@@ -115397,20 +115409,26 @@ def prove_avvisi_nuovi_ordini():
               "_tabacchino_libro", "_euro_libro", "_tipo_nuovo_p2p", "_euro_nuovo_p2p",
               "_convenienza_nuovo_p2p", "_passa_avviso_nuovo_p2p", "_frase_convenienza_p2p",
               "_testo_avviso_nuovi_p2p", "_nuovi_dalla_foto_p2p", "_tag_evento_p2p",
-              "_evento_libro_p2p"):
+              "_evento_libro_p2p", "_avviso_onchain_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     pref = amb["_pref_avvisi_nuovi_p2p"]
     T3 = ["vendita", "acquisto", "barattozon"]
-    SPENTO = {"attivo": False, "tipi": T3, "soglia": ""}
+    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": ""}
     prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
           [SPENTO, SPENTO, SPENTO],
           [pref(None), pref({"tg_id": 1}),
            pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
     prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle tre",
-          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2"},
-           {"attivo": True, "tipi": T3, "soglia": ""}],
+          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": ""},
+           {"attivo": True, "tipi": T3, "soglia": "", "rete": ""}],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
            pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"})])
+    # LA RETE (30 ott 2026, Andrea: «ricevere notifiche solo per onchain,
+    # solo lightning o tutto»)
+    prova("...la rete si rilegge se e' una delle due, sennò tutte",
+          ["onchain", "ln", "", ""],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_rete": r})["rete"]
+           for r in ("onchain", "ln", "tutte", None)])
     tipo = amb["_tipo_nuovo_p2p"]
     prova("il tipo: sell = vendita, buy = acquisto, il tabacchino = Barattozon qualunque sia il lato",
           ["vendita", "acquisto", "barattozon", "barattozon", ""],
@@ -115430,6 +115448,14 @@ def prove_avvisi_nuovi_ordini():
            conv("buy", 0, 51500, 50.0, 100000)])
     passa = amb["_passa_avviso_nuovo_p2p"]
     P = lambda a, t, s: {"attivo": a, "tipi": t, "soglia": s}
+    PR = lambda r: {"attivo": True, "tipi": T3, "soglia": "", "rete": r}
+    prova("LA RETE: «tutte» passa le due, «solo on-chain» solo l'on-chain, «solo "
+          "Lightning» solo il Lightning; chi non la dice e' Lightning (Mostro)",
+          [True, True, True, False, False, True, True, False],
+          [passa(PR(""), "vendita", None, "onchain"), passa(PR(""), "vendita", None, "ln"),
+           passa(PR("onchain"), "vendita", None, "onchain"), passa(PR("onchain"), "vendita", None, "ln"),
+           passa(PR("onchain"), "vendita", None), passa(PR("ln"), "vendita", None),
+           passa(PR("ln"), "vendita", None, "ln"), passa(PR("ln"), "vendita", None, "onchain")])
     prova("spento non passa niente; acceso passa il tipo scelto e non gli altri",
           [False, True, False],
           [passa(P(False, ["vendita"], ""), "vendita", 9), passa(P(True, ["vendita"], ""), "vendita", None),
@@ -115483,8 +115509,10 @@ def prove_avvisi_nuovi_ordini():
     con.row_factory = sqlite3.Row
     con.executescript(schema)
     amb.update(P2P_AVVISI_NUOVI_MINUTI=15, P2P_FOTO_FINESTRA_S=16 * 86400,
-               _p2p_per=lambda tg: {"attivo": tg != 444})
-    for f in ("_avvisi_p2p_accesi", "_accoda_nuovi_p2p", "_scarica_nuovi_p2p"):
+               _p2p_per=lambda tg: {"attivo": tg != 444}, sqlite3=sqlite3,
+               p2p_onchain_ammesso=lambda tg: tg in (601, 602, 603, 605))
+    for f in ("_avvisi_p2p_accesi", "_persone_avvisi_nuovi_p2p", "_pref_rete_vista_p2p",
+              "_accoda_nuovi_p2p", "_scarica_nuovi_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     accoda, scarica = amb["_accoda_nuovi_p2p"], amb["_scarica_nuovi_p2p"]
     # 111 vuole le sole vendite almeno +2; 222 tutto; 333 spento; 444 acceso ma
@@ -115555,6 +115583,64 @@ def prove_avvisi_nuovi_ordini():
           ([111], [(1,)]),
           ([tg for tg, _, _ in spento],
            [tuple(r) for r in con.execute("SELECT DISTINCT mandato FROM p2p_avvisi_nuovi WHERE tg_id=222 AND ordine='o10'")]))
+
+    # LA RETE E GLI ORDINI ON-CHAIN (30 ott 2026, Andrea: «la possibilita' di
+    # ricevere notifiche solo per onchain, solo lightning o tutto»): un
+    # database con la colonna; 601 tutte, 602 solo on-chain, 603 solo
+    # Lightning, 604 «solo on-chain» ma l'on-chain non lo vede (vale tutte, e
+    # l'on-chain non gli arriva), 605 tutte e pubblica l'on-chain
+    con2 = sqlite3.connect(":memory:")
+    con2.row_factory = sqlite3.Row
+    con2.executescript(schema.replace("avvisi_nuovi_soglia TEXT DEFAULT '');",
+                                      "avvisi_nuovi_soglia TEXT DEFAULT '', "
+                                      "avvisi_nuovi_rete TEXT DEFAULT '');"))
+    for tg, rete in ((601, ""), (602, "onchain"), (603, "ln"), (604, "onchain"), (605, "")):
+        con2.execute("INSERT INTO utenti VALUES(?,1,1,'','',?)", (tg, rete))
+    con2.commit()
+
+    class _Tieni:
+        """la connessione del banco, che `_accoda_onchain_nuovo_p2p` chiude"""
+        def __getattr__(self, n):
+            return getattr(con2, n)
+
+        def close(self):
+            pass
+    amb.update(P2P_AVVISI_NUOVI_ORDINI=True, p2p_onchain_leva=lambda: True,
+               json=json, db=lambda: _Tieni())
+    exec(_senza_prosa(pezzo("_accoda_onchain_nuovo_p2p")), amb)
+    accoda(con2, [ev("m1", T, amt="51500")], CAMBIO, T)
+    oc_riga = {"stato": "pending", "lato": "sell", "metodi": '["SEPA"]', "euro_cent": 5000,
+               "premio": 0, "prezzo_sats": 51500, "maker_id": 605,
+               "ordine": "bar-onchain-ab12", "creato": T}
+    scritte_oc = amb["_accoda_onchain_nuovo_p2p"](oc_riga, CAMBIO, T)
+    coda2 = {tg: sorted(r[0] for r in con2.execute(
+        "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (601, 602, 603, 604, 605)}
+    prova("LA RETE NELLA CODA: il Lightning a tutti tranne chi vuole solo on-chain (chi "
+          "l'on-chain non lo vede lo riceve); l'on-chain a chi lo vede e lo vuole, mai a "
+          "chi l'ha pubblicato",
+          (2, {601: ["bar-onchain-ab12", "m1"], 602: ["bar-onchain-ab12"], 603: ["m1"],
+               604: ["m1"], 605: ["m1"]}), (scritte_oc, coda2))
+    prova("...e a leva spenta, o con un ordine gia' preso, l'on-chain non si accoda", (0, 0),
+          ((amb.update(p2p_onchain_leva=lambda: False)
+            or amb["_accoda_onchain_nuovo_p2p"](dict(oc_riga, ordine="bar-onchain-cd34"), CAMBIO, T)),
+           (amb.update(p2p_onchain_leva=lambda: True)
+            or amb["_accoda_onchain_nuovo_p2p"](dict(oc_riga, ordine="bar-onchain-ef56", stato="preso"),
+                                                CAMBIO, T))))
+    msg2 = dict((tg, t) for tg, t, _ in scarica(con2, T, {"m1", "bar-onchain-ab12"}))
+    prova("...il messaggio dice quanti sono on-chain, e il migliore se e' on-chain; "
+          "senza on-chain e' quello di ieri",
+          (True, True, True, False),
+          ("\n⛓️ On-chain: 1 · ⚡ Lightning: 1\n" in msg2[601],
+           "\n⛓️ On-chain: 1\nPer te: vendita BTC on-chain da 50,00 € via SEPA, 3% più conveniente" in msg2[602],
+           msg2[603].startswith("🔔 <b>1 nuovo ordine nel libro P2P</b>\nvendita BTC: 1\nPer te: vendita BTC da"),
+           "On-chain" in msg2[603]))
+    prova("il prefisso degli on-chain e' lo stesso del nome che nasce alla pubblica", True,
+          'P2P_ONCHAIN_PREFISSO = "bar-onchain-"' in src
+          and '.startswith("bar-onchain-")' in pezzo("_avviso_onchain_p2p"))
+    prova("...si accoda alla pubblica, fail-open, e i vivi della coda contano anche il "
+          "libro on-chain", True,
+          "        _accoda_onchain_nuovo_p2p(riga, cambio, adesso)\n    except Exception as e:" in src
+          and "    vivi |= _onchain_vivi_avvisi_p2p()\n" in src)
 
     # --- 4) IL CANALE: notifica() vera, trasporti di cartone -----------------
     con4 = sqlite3.connect(":memory:")
@@ -115632,6 +115718,7 @@ def prove_avvisi_nuovi_ordini():
     js = (
         "let DEMO = false, myTgId = 222, myCanaleNotifiche = '', myNpubAccesso = '', myNpub = '', myNpubVerified = false;\n"
         "let p2pLeve = {attivo: true, avvisiNuovi: true, avvisiNuoviMinuti: 15};\n"
+        "let myP2POnchain = false;\n"
         # il nome di Barattozon viene dal catalogo dei metodi vestiti, non
         # si scrive a mano (la sentinella del catalogo): qui di cartone
         "const P2P_TABACCHINO = 'Contanti al tabacchino';\n"
@@ -115644,6 +115731,7 @@ def prove_avvisi_nuovi_ordini():
         + "async function setAvvisiNuoviP2P(p){ INVII.push(p); }\n"
         + pezzo_js(m, "function scegliTipoAvvisiNuoviP2P(t){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function scegliSogliaAvvisiNuoviP2P(s){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function scegliReteAvvisiNuoviP2P(r){", "\n}\n") + "\n}\n"
         + r"""
 const out = {};
 const attive = h => (h.match(/class="tema-pill active" aria-pressed="true" onclick="([^"]+)"/g) || [])
@@ -115680,6 +115768,17 @@ out.spentoChip = [chip.length, chip.filter(c => / disabled>$/.test(c)).length,
 INVII = []; scegliTipoAvvisiNuoviP2P('acquisto'); scegliSogliaAvvisiNuoviP2P('5');
 out.inviiSpento = INVII.length;
 out.normalizza = normalizzaAvvisiNuoviP2P({attivo: 1, tipi: ['barattozon', 'vendita', 'x'], soglia: '7'});
+// LA RETE (30 ott 2026): la sezione solo a chi l'on-chain lo vede, una
+// scelta sola, e il gesto manda la rete al server
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', rete: 'onchain'});
+const senzaOc = contenutoAvvisiNuoviP2P();
+myP2POnchain = true;
+const conOc = contenutoAvvisiNuoviP2P();
+INVII = []; scegliReteAvvisiNuoviP2P('ln'); scegliReteAvvisiNuoviP2P('boh');
+out.rete = [senzaOc.indexOf('>Rete<') < 0, conOc.indexOf('<div class="section-label">Rete</div>') >= 0,
+  attive(conOc).filter(a => /Rete/.test(a)), INVII.slice(),
+  normalizzaAvvisiNuoviP2P({rete: 'tutte'}).rete, normalizzaAvvisiNuoviP2P({rete: 'ln'}).rete];
+myP2POnchain = false;
 p2pLeve.avvisiNuovi = false;
 out.fuoriCasa = [campanellaP2P(), rigaAvvisiNuoviP2P()];
 p2pLeve.avvisiNuovi = true; DEMO = true;
@@ -115727,7 +115826,17 @@ console.log(JSON.stringify(out));
           "aria-disabled, l'interruttore no", [5, 5, True, True], out["spentoChip"])
     prova("...e un gesto che arrivasse lo stesso non chiama il server", 0, out["inviiSpento"])
     prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle tre = «tutti»",
-          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": ""}, out["normalizza"])
+          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": ""}, out["normalizza"])
+    prova("LA RETE: la sezione solo a chi l'on-chain lo vede, accesa la scelta salvata, il "
+          "gesto manda la rete (una sconosciuta vale «tutte»), e il normalizzatore tiene le due",
+          [True, True, ["scegliReteAvvisiNuoviP2P('onchain')"], [{"rete": "ln"}, {"rete": ""}], "", "ln"],
+          out["rete"])
+    prova("...e il gesto la porta al server, coi nomi del server", True,
+          "rete: voluto.rete || ''})});" in m
+          and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_RETI = ["):
+                                                 m.index("];", m.index("const P2P_AVVISI_RETI = ["))])
+          == ["", "onchain", "ln"]
+          and 'RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")' in src)
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
           [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
 
@@ -153222,7 +153331,7 @@ function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '',
   classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}}); }
 const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), haptic = () => {};
 let myP2POnchain = false, DEMO = false, VETRINA = false, myTgId = 1, p2pLato = 'compro', eurPerSat = 0;
-let p2pPiuGestoAt = -1e9;
+let p2pPiuGestoAt = -1e9, p2pFiltro = null;
 const P2P_TABACCHINO = 'Contanti al tabacchino';
 const P2P_METODI = ['SEPA', 'Revolut', 'Contanti', P2P_TABACCHINO];
 const P2P_VALUTE = [{cod: 'EUR', bandiera: 'EU'}];
@@ -153269,6 +153378,13 @@ out.sceltaNo = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains
 myP2POnchain = true;
 const porta = carteOnchainLibroP2P('sell');
 out.porta = [/p2p-oc-novita/.test(porta), /p2p-oc-novita-testo">On-Chain<\\/span>/.test(porta) && !/Novità/.test(porta), /cambio-moneta btc/.test(porta)];
+// il filtro «solo Lightning» lascia fuori le card on-chain, non il rettangolo
+p2pOnchainLibro.eventi = [{lato: 'sell'}];
+const conCard = carteOnchainLibroP2P('sell');
+p2pFiltro = {rete: 'ln'}; const soloLn = carteOnchainLibroP2P('sell');
+p2pFiltro = {rete: 'onchain'}; const soloOc = carteOnchainLibroP2P('sell');
+p2pFiltro = null; p2pOnchainLibro.eventi = [];
+out.filtroRete = [/<card>/.test(conCard), /<card>/.test(soloLn), /p2pOcNovita/.test(soloLn), /<card>/.test(soloOc)];
 // il rettangolo e' un tasto solo, che apre il tutorial: niente lati
 out.chiusa = [/p2p-oc-novita appeso" id="p2pOcNovita"/.test(porta), /p2p-oc-lat/.test(porta),
   /p2p-oc-faccia" onclick="apriNovitaOnchainP2P\\(\\)">/.test(porta)];
@@ -153358,6 +153474,8 @@ console.log(JSON.stringify(out));
         # foglio) —; alla fine il lato di partenza
         prova("il «Novità» e' un tasto solo, senza Compra e Vendi", [True, False, True],
               out["chiusa"])
+        prova("il filtro «solo Lightning» toglie le card on-chain e lascia il rettangolo; "
+              "«solo on-chain» le tiene", [True, False, True, True], out["filtroRete"])
         prova("...toccato parte il tutorial dal lato «Compra BTC», sette tappe; solo "
               "il + di Vendi e la scelta preparano la pagina; tonde la moneta, il fulmine e i due +",
               [["lato:compro", "tour:7"], [False, False, False, False, False, True, True],
@@ -153476,6 +153594,16 @@ console.log(JSON.stringify(out));
            ".p2p-oc-novita .cambio-moneta.p2p-oc-moneta," in _anello,
            ".p2p-scelta-rete .cambio-moneta" in _anello,
            "linear-gradient(90deg,var(--chip-bg) 0%,var(--chip-bg) 22%,#F7931A 100%)" in _faccia))
+    # LA RETE NEL FOGLIO DEL FILTRO (30 ott 2026, Andrea: «aggiungi anche la
+    # possibilita' di filtrare per onchain e lightning»): in cima, una
+    # scelta sola, solo a chi l'on-chain lo vede
+    rf = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
+    prova("il foglio del filtro chiede la rete in cima, solo a chi vede l'on-chain, con "
+          "moneta e fulmine", (True, True, True, True),
+          ("const rete = !myP2POnchain ? '' :" in rf and "box.innerHTML = rete +" in rf,
+           "(r[0] === 'onchain' ? P2P_OC_MONETA : r[0] === 'ln' ? P2P_LN_MONETA : '')" in rf,
+           "const P2P_FILTRO_RETI = [['', 'Tutte'], ['onchain', 'On-chain'], ['ln', 'Lightning']];" in mini,
+           "b.rete = r === 'onchain' || r === 'ln' ? r : '';" in pezzo_js(mini, "function scegliReteFiltroP2P(r){", "\n}\n")))
     # IL «NOVITÀ» COL COLPO DI PARTENZA (30 ott 2026, 17:29, Andrea: «quell
     # effetto bumper mi piace molto quindi vedi se puoi usarlo mentre fai
     # partire il tutorial»): si schiaccia e torna col rimbalzo, la moneta
@@ -169581,7 +169709,7 @@ def prove_ordine_in_pausa():
     exec(src[i:src.index("\n", i)].split("   #")[0], a2)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
     exec(src[i:src.index("}\n", i) + 2], a2)
-    for f in ("_frase_convenienza_p2p", "_testo_avviso_nuovi_p2p"):
+    for f in ("_frase_convenienza_p2p", "_avviso_onchain_p2p", "_testo_avviso_nuovi_p2p"):
         exec(_senza_prosa(pezzo(f)), a2)
     testo = a2["_testo_avviso_nuovi_p2p"]
 

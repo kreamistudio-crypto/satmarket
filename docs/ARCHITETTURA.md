@@ -28713,7 +28713,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_pause_p2p` quali ordini della coda sono fermi adesso,
   `_scarica_nuovi_p2p(con, adesso, vivi, ferme)` non li manda e non li
   consuma, e il timbro e' PER ORDINE — alla fine della pausa partono col
-  primo giro. Il canale lo sceglie `notifica()`. L'ANTEPRIMA DI QUEL
+  primo giro. LA RETE (30 ott 2026, cantiere oc-reti):
+  `avvisi_nuovi_rete` ('' = tutte, 'onchain', 'ln'), la sezione «Rete»
+  del foglio solo a chi vede l'on-chain; `_passa_avviso_nuovo_p2p` la
+  confronta con la rete dell'ordine, e `_pref_rete_vista_p2p` la spegne a
+  chi l'on-chain non lo vede piu'. Gli ordini ON-CHAIN non passano dalla
+  fotografia: `_accoda_onchain_nuovo_p2p` li mette nella stessa coda
+  quando nascono (rotta `/api/p2p/onchain/pubblica`, fail-open), solo
+  per chi e' `p2p_onchain_ammesso`; i loro nomi (`bar-onchain-…`) sono
+  «vivi» per `_onchain_vivi_avvisi_p2p`, e il messaggio aggiunge
+  «⛓️ On-chain: N» quando ce n'e' almeno uno. Il canale lo sceglie
+  `notifica()`. L'ANTEPRIMA DI QUEL
   LINK E' IN MINIATURA (9 ott 2026): `_manda_telegram` riconosce il
   messaggio dall'href `LINK_LIBRO_P2P` e chiede `link_preview_options`
   con l'url ESPLICITO (senza, l'API Bot ignora la misura) e
@@ -29723,7 +29733,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   si morderebbe la coda: senza volti non passa nessuno, e senza
   passanti non si chiedono volti. Chi non ha un account Barattolo non
   ha stelle e passa solo col minimo a zero, come chi non ha ancora
-  voti. Il verbale in CANTIERI, «Una reputazione sola».
+  voti. Il verbale in CANTIERI, «Una reputazione sola». LA RETE (30 ott
+  2026): `filtroVuotoP2P().rete` ('' | 'onchain' | 'ln'), scelta in cima
+  al foglio solo a chi vede l'on-chain; «solo on-chain» lascia fuori in
+  `passaFiltroP2P` gli ordini di Mostro, «solo Lightning» lascia fuori
+  in `carteOnchainLibroP2P` le card on-chain (il rettangolo resta).
 
 - LE RECENSIONI DEGLI SCAMBI (set 2026, richiesta di Andrea): a
   scambio P2P concluso le due parti si recensiscono come nel

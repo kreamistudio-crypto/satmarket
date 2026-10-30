@@ -76167,3 +76167,54 @@ la moneta nella scatola. Video in
 
 Da guardare: il tutorial dal telefono vero in Telegram (il riflettore
 sul + mentre sale cambiando lato).
+
+## Il filtro del libro e gli avvisi dei nuovi ordini per rete: on-chain, Lightning o tutte (30 ott 2026, sera, cantiere oc-reti)
+
+LA RICHIESTA. Andrea, 18:04, dal collaudo: «aggiungi anche la
+possibilità di filtrare per onchain e lightning e anche le notifiche la
+possibilità di ricevere notifiche solo per onchain, solo lightning o
+tutto».
+
+IL FILTRO. Una leva in più nel filtro del libro, `rete` ('' = tutte,
+'onchain', 'ln'), in cima al foglio con la moneta e il fulmine, una
+scelta sola, e solo a chi l'on-chain lo vede (`myP2POnchain`): in
+produzione, a leva spenta, il foglio è quello di ieri. Gli ordini che
+`passaFiltroP2P` giudica sono quelli di Mostro, cioè Lightning: «solo
+on-chain» li lascia fuori; le card on-chain le toglie
+`carteOnchainLibroP2P` con «solo Lightning», e il rettangolo «On-Chain»
+resta (è la porta del tutorial, non un ordine). Un filtro di ieri senza
+la chiave vale «tutte». Scartato: far passare anche le card on-chain dal
+resto del filtro (metodi, premio): non chiesto, e il premio di quelle
+card ha un altro metro.
+
+GLI AVVISI. La quarta preferenza, `utenti.avvisi_nuovi_rete`, con la
+sezione «Rete» (Tutte / Solo on-chain / Solo Lightning) nello stesso
+foglio della 🔔 e nel cassetto, di nuovo solo a chi vede l'on-chain. Gli
+ordini on-chain non arrivavano MAI come avviso: la coda nasceva dalla
+fotografia del libro di Mostro, e il libro on-chain è nostro. Adesso
+`_accoda_onchain_nuovo_p2p` li mette nella stessa coda quando nascono
+(alla pubblica, fail-open), con le stesse regole (preferenze, cancello,
+interruttore grande, mai i propri) più una: solo a chi è
+`p2p_onchain_ammesso`, l'unico che può prenderli. La finestra e il
+messaggio sono quelli di sempre, con una riga «⛓️ On-chain: N · ⚡
+Lightning: M» e «on-chain» nel migliore, solo quando c'è almeno un
+on-chain: senza, il messaggio è quello di ieri byte per byte.
+⚠️ «Solo on-chain» conta solo per chi l'on-chain lo vede
+(`_pref_rete_vista_p2p`): chi l'aveva scelto e poi lo perde (la beta che
+si stringe, la leva spenta) torna a ricevere il Lightning, invece di
+restare muto senza saperlo. Un telefono di ieri che non manda la rete
+non la azzera.
+
+Prove: `prove_p2p_libro` (la leva della rete nel giudice puro),
+`prove_grafica_p2p_onchain` (le card e il rettangolo col filtro, la
+sentinella del foglio), `prove_avvisi_nuovi_ordini` (il giudice della
+rete, la coda su sqlite con cinque persone e un ordine per rete, il
+messaggio, il client in node), `prove_ordine_in_pausa` e le altre che
+estraggono il testo del messaggio. Controprove: cinque mutazioni, rosse.
+Dal vivo a 390 px: il foglio del filtro con la rete, applicato, e il
+foglio della 🔔 con «Solo on-chain».
+
+Da guardare: un avviso on-chain vero sul collaudo (un admin pubblica,
+l'altro aspetta il messaggio); se in futuro le card on-chain dovranno
+passare anche dal resto del filtro.
+

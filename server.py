@@ -8793,6 +8793,12 @@ def init_db():
                     "avvisi_nuovi_p2p INTEGER DEFAULT 0",
                     "avvisi_nuovi_tipi TEXT DEFAULT ''",
                     "avvisi_nuovi_soglia TEXT DEFAULT ''",
+                    # LA RETE DEGLI AVVISI (30 ott 2026, Andrea: «la
+                    # possibilità di ricevere notifiche solo per onchain,
+                    # solo lightning o tutto»): '' = tutte, 'onchain',
+                    # 'ln'. Conta solo per chi l'on-chain lo vede
+                    # (`p2p_onchain_ammesso`): per gli altri vale tutte.
+                    "avvisi_nuovi_rete TEXT DEFAULT ''",
                     # GLI AVVISI DEL MERCATINO (9 ott 2026, richiesta di
                     # Andrea): «🆕 Avvisami dei nuovi annunci», 0 = SPENTO
                     # di serie, con le categorie volute coi pipe ai bordi
@@ -50196,14 +50202,25 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
     if soglia not in ("",) + SOGLIE_AVVISI_NUOVI_P2P:
         raise HTTPException(400, "Soglia sconosciuta: tutti, 0, 2 o 5")
     con = db()
+    # LA RETE (30 ott 2026): '' = tutte, 'onchain', 'ln'. Un telefono di
+    # ieri non la manda, e allora resta quella scritta
+    if "rete" in d:
+        rete = str(d.get("rete") or "").strip()
+        if rete not in ("",) + RETI_AVVISI_NUOVI_P2P:
+            con.close()
+            raise HTTPException(400, "Rete sconosciuta: tutte, on-chain o Lightning")
+    else:
+        r = con.execute("SELECT avvisi_nuovi_rete FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        rete = str(r[0] or "") if r else ""
     con.execute("UPDATE utenti SET avvisi_nuovi_p2p=?, avvisi_nuovi_tipi=?, "
-                "avvisi_nuovi_soglia=? WHERE tg_id=?",
-                (attivo, "|" + "|".join(tipi) + "|", soglia, user["id"]))
+                "avvisi_nuovi_soglia=?, avvisi_nuovi_rete=? WHERE tg_id=?",
+                (attivo, "|" + "|".join(tipi) + "|", soglia, rete, user["id"]))
     con.commit()
     con.close()
     return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(
         {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": "|" + "|".join(tipi) + "|",
-         "avvisi_nuovi_soglia": soglia})}
+         "avvisi_nuovi_soglia": soglia, "avvisi_nuovi_rete": rete})}
 
 
 # I MOTIVI DELLO SCONOSCIUTO (12 ott 2026, chi-e-l-altro): quando
@@ -62703,6 +62720,7 @@ TIPI_AVVISI_NUOVI_P2P = ("vendita", "acquisto", "barattozon")
 NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BTC",
                               "barattozon": "Barattozon"}
 SOGLIE_AVVISI_NUOVI_P2P = ("0", "2", "5")   # le tre chip, gemelle di P2P_AVVISI_SOGLIE nel client
+RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
 TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato
 _P2P_NUOVI = {"noti": None}   # gli id che la fotografia conosceva al giro prima (None = mai guardata)
 
@@ -62723,7 +62741,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     vale SPENTO coi tre tipi e «tutti»: lo spento di serie e' una regola,
     non un default del database."""
     if not riga:
-        return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": ""}
+        return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": "", "rete": ""}
     try:
         attivo = bool(int(_campo_riga(riga, "avvisi_nuovi_p2p", 0) or 0))
     except (TypeError, ValueError):
@@ -62734,7 +62752,10 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     soglia = str(_campo_riga(riga, "avvisi_nuovi_soglia", "") or "").strip()
     if soglia not in SOGLIE_AVVISI_NUOVI_P2P:
         soglia = ""
-    return {"attivo": attivo, "tipi": tipi, "soglia": soglia}
+    rete = str(_campo_riga(riga, "avvisi_nuovi_rete", "") or "").strip()
+    if rete not in RETI_AVVISI_NUOVI_P2P:
+        rete = ""
+    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete}
 
 
 def _tipo_nuovo_p2p(lato: str, metodi) -> str:
@@ -62796,12 +62817,15 @@ def _convenienza_nuovo_p2p(lato: str, premio, sats, euro: float, cambio: float):
     return p if lato == "buy" else -p
 
 
-def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv) -> bool:
+def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln") -> bool:
     """PURA: queste preferenze vogliono quest'ordine? Acceso, del tipo
-    giusto, e — se la soglia c'e' — con una convenienza nota almeno
-    pari alla soglia. Con «tutti» ('') passa anche a convenienza
-    ignota."""
+    giusto, della RETE giusta (30 ott 2026: 'onchain' o 'ln', '' = tutte;
+    chi chiama la spegne a chi l'on-chain non lo vede) e — se la soglia
+    c'e' — con una convenienza nota almeno pari alla soglia. Con
+    «tutti» ('') passa anche a convenienza ignota."""
     if not pref.get("attivo") or tipo not in (pref.get("tipi") or []):
+        return False
+    if pref.get("rete") and pref.get("rete") != rete:
         return False
     soglia = pref.get("soglia") or ""
     if soglia == "":
@@ -62837,10 +62861,19 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
             conti.append(f"{NOMI_TIPI_AVVISI_NUOVI_P2P[t]}: {q}")
     if conti:
         testo += "\n" + " · ".join(conti)
+    # GLI ON-CHAIN SI DICONO (30 ott 2026): un ordine del libro on-chain
+    # di Barattolo si riconosce dal nome (`P2P_ONCHAIN_PREFISSO`), e il conto
+    # delle reti esce solo se ce n'e' almeno uno — a leva spenta il
+    # messaggio e' quello di ieri, byte per byte
+    oc = sum(1 for r in righe if _avviso_onchain_p2p(r))
+    if oc:
+        testo += f"\n⛓️ On-chain: {oc}" + (f" · ⚡ Lightning: {n - oc}" if n - oc else "")
     noti = [r for r in righe if r.get("conv") is not None]
     if noti:
         m = max(noti, key=lambda r: float(r["conv"]))
         cosa = NOMI_TIPI_AVVISI_NUOVI_P2P.get(m.get("tipo"), "ordine")
+        if _avviso_onchain_p2p(m):
+            cosa += " on-chain"
         # «DA DA 50,00» (12 ott 2026, notte, cantiere libro-vuoto): la cifra
         # di un intervallo porta gia' il suo «da» («da 50,00 a 100,00 €»,
         # `_euro_libro`), e la frase gliene metteva davanti un altro
@@ -62858,6 +62891,11 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
     testo += (f"\n\n<a href=\"{_link_dentro_telegram(URL_PUBBLICO + '/p2p')}\">"
               "🫙 Apri il libro ordini</a>")
     return testo
+
+
+def _avviso_onchain_p2p(riga) -> bool:
+    """PURA: una riga della coda e' di un ordine on-chain? Il nome lo dice."""
+    return str((riga or {}).get("ordine") or "").startswith("bar-onchain-")
 
 
 def _nuovi_dalla_foto_p2p(eventi, noti, timbro: int) -> list:
@@ -62881,6 +62919,100 @@ def _nuovi_dalla_foto_p2p(eventi, noti, timbro: int) -> list:
     return fuori
 
 
+def _persone_avvisi_nuovi_p2p(con):
+    """Chi ha acceso gli avvisi dei nuovi ordini, con le sue preferenze.
+    Un database di ieri senza la colonna della rete legge le altre: la
+    rete vale tutte (`_pref_avvisi_nuovi_p2p`)."""
+    try:
+        return con.execute(
+            "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia, "
+            "avvisi_nuovi_rete FROM utenti WHERE avvisi_nuovi_p2p=1").fetchall()
+    except sqlite3.OperationalError:
+        return con.execute(
+            "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia "
+            "FROM utenti WHERE avvisi_nuovi_p2p=1").fetchall()
+
+
+def _pref_rete_vista_p2p(riga) -> dict:
+    """Le preferenze di una persona, con la RETE che conta solo se
+    l'on-chain lei lo vede: chi aveva scelto «solo on-chain» e poi l'ha
+    perso (la beta che si stringe, la leva spenta) non resta muto per
+    sempre sul Lightning — per lui vale «tutte»."""
+    pref = _pref_avvisi_nuovi_p2p(riga)
+    if pref["rete"] and not p2p_onchain_ammesso(int(riga["tg_id"])):
+        pref["rete"] = ""
+    return pref
+
+
+def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
+    """GLI AVVISI DEGLI ORDINI ON-CHAIN (30 ott 2026, Andrea: «la
+    possibilità di ricevere notifiche solo per onchain, solo lightning o
+    tutto»). Il libro on-chain e' nostro: l'ordine nuovo lo sappiamo
+    quando nasce, senza fotografie, e lo si mette nella STESSA coda
+    degli altri — raggruppamento, finestra e messaggio sono quelli. Le
+    regole sono le stesse di `_accoda_nuovi_p2p` (preferenze, cancello
+    del P2P, interruttore grande, mai i propri), piu' una: solo a chi
+    l'on-chain lo vede (`p2p_onchain_ammesso`), perche' solo lui puo'
+    prenderlo. Fail-open per chi chiama. Torna le righe scritte."""
+    if not P2P_AVVISI_NUOVI_ORDINI or not p2p_onchain_leva():
+        return 0
+    if str(o["stato"]) != "pending":
+        return 0
+    tipo = {"sell": "vendita", "buy": "acquisto"}.get(str(o["lato"] or ""), "")
+    if not tipo:
+        return 0
+    try:
+        metodi = [str(m) for m in json.loads(o["metodi"] or "[]")]
+    except (TypeError, ValueError):
+        metodi = []
+    euro = int(o["euro_cent"] or 0) / 100
+    conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["prezzo_sats"], euro, cambio)
+    euro_txt = _euro_libro([euro])
+    metodi_txt = ", ".join(_metodi_libro(metodi))
+    autore = int(o["maker_id"] or 0)
+    con = db()
+    try:
+        scritte = 0
+        for p in _persone_avvisi_nuovi_p2p(con):
+            tg = int(p["tg_id"])
+            if tg == autore:
+                continue                      # mai per i suoi
+            if not p2p_onchain_ammesso(tg):
+                continue
+            if not _passa_avviso_nuovo_p2p(_pref_avvisi_nuovi_p2p(p), tipo, conv, "onchain"):
+                continue
+            if not _avvisi_p2p_accesi(con, tg):
+                continue
+            cur = con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
+                "euro, metodi, quando, accodato, mandato) VALUES(?,?,?,?,?,?,?,?,0)",
+                (tg, str(o["ordine"]), tipo, conv, euro_txt, metodi_txt,
+                 int(o["creato"] or adesso), adesso))
+            scritte += cur.rowcount
+        con.commit()
+    finally:
+        con.close()
+    return scritte
+
+
+def _onchain_vivi_avvisi_p2p() -> set:
+    """I nomi degli ordini on-chain ancora nel libro: per la coda sono
+    «vivi» come gli id della fotografia di Mostro. Leva spenta, o un
+    database che non risponde: nessuno (le loro righe si consumano)."""
+    if not p2p_onchain_leva():
+        return set()
+    try:
+        con = _p2p_onchain_db()
+        try:
+            return {str(r[0]) for r in con.execute(
+                "SELECT ordine FROM p2p_onchain_ordini WHERE stato='pending'")}
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Avvisi nuovi P2P: libro on-chain illeggibile ({type(e).__name__})", flush=True)
+        return set()
+
+
 def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
     """Per ogni ordine nuovo, le persone che lo vogliono: in CODA, una
     riga per (persona, ordine). Qui stanno le regole 1 e 3 — le
@@ -62889,9 +63021,7 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
     righe nuove ha scritto. Committa."""
     if not nuovi:
         return 0
-    persone = con.execute(
-        "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia "
-        "FROM utenti WHERE avvisi_nuovi_p2p=1").fetchall()
+    persone = _persone_avvisi_nuovi_p2p(con)
     if not persone:
         return 0
     scritte = 0
@@ -62913,7 +63043,7 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             tg = int(p["tg_id"])
             if autore and tg == autore:
                 continue                      # mai per i suoi
-            if not _passa_avviso_nuovo_p2p(_pref_avvisi_nuovi_p2p(p), tipo, conv):
+            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln"):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
                 continue
@@ -63032,6 +63162,8 @@ async def _giro_avvisi_nuovi_p2p():
               and e.get("kind") == 38383]
     nuovi = _nuovi_dalla_foto_p2p(eventi, prima, timbro)
     vivi = {_tag_evento_p2p(e, "d") for e in eventi}
+    # ...e quelli del libro on-chain, che si accodano da soli quando nascono
+    vivi |= _onchain_vivi_avvisi_p2p()
     cambio = 0.0
     if nuovi:
         try:
@@ -93987,11 +94119,19 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              para, para_da, para_letto))
         con.commit()
         oid = cur.lastrowid
-        fuori = _p2p_onchain_per(con, _p2p_onchain_carica(con, oid), user["id"])
+        riga = _p2p_onchain_carica(con, oid)
+        fuori = _p2p_onchain_per(con, riga, user["id"])
     finally:
         con.close()
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
+    # 🔔 chi aspetta gli ordini nuovi: in coda adesso, il messaggio lo
+    # manda l'orologio del P2P al suo minuto (fail-open: l'ordine c'e' gia')
+    try:
+        _accoda_onchain_nuovo_p2p(riga, cambio, adesso)
+    except Exception as e:
+        print(f"⚠️ Avvisi nuovi P2P: ordine on-chain {oid} non accodato "
+              f"({type(e).__name__}: {e})", flush=True)
     return fuori
 
 
