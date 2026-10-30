@@ -76305,3 +76305,42 @@ Lightning, banner prima e durante il tutorial, spento a tutorial chiuso.
 Da guardare dal telefono sul collaudo: la morfosi del + col vestito
 nuovo, a occhio.
 
+
+## Il banner «On-Chain» arancio bruciato, i tasti del + più chiari, il verde vicino alle icone e Barattozon dal nero (30 ott 2026, sera, cantiere oc-banner)
+
+Il giro dopo oc-colori, guardato da Andrea sul collaudo.
+- IL BANNER, 19:33: «il banner novità è troppo scuro». Tre varianti
+  più chiare in tinta unica, col filo un tono sopra (foto 33: A
+  #3A2410, B #5C3410, C #8A4A0E); scelta di Andrea sulla card (19:36):
+  C, arancio bruciato #8A4A0E col filo #C26A10. Il tocco lo fa ancora
+  arancio pieno per tutto il tutorial: il salto è più piccolo, e lo
+  sapeva (la card lo diceva).
+- I TASTI DEL +, 19:34: «troppo scuri, leggermente più chiari e meno
+  alone colorato dietro». Il bruno di partenza più chiaro e più corto
+  (#2E1A08 e #2C2408 fino al 14%, tono pieno sempre al 55%), il filo un
+  tono sopra (#6A3808, #6A5410), l'alone da 10 px a .32 a 6 px a .2
+  (foto 34, prima e dopo nei due temi).
+- I BOTTONI DEL LATO, 19:34: «vanno bene, ma fai partire il verde più
+  vicino alle icone e anche le icone leggermente più grosse». Il quasi
+  nero fino all'8% e il tono pieno al 34% (erano 18 e 55), per il
+  verde e il rosso, nel bottone e nel fantasma della morfosi; il
+  fulmine da 24 px, la moneta da 32 (era 24) col segno da 18. L'altezza
+  resta 52,5 (la moneta è assoluta). Foto 35.
+
+- BARATTOZON, 19:40: «stesso effetto quando pubblichi un ordine
+  barattozon, l'icona a sinistra nello scuro e poi diventa del colore
+  attuale». `.btn.bz.p2p-scuro`: dal quasi nero #05060A al blu
+  #191D29 (al 34%), che in fondo schiarisce a #2F3752 perché la
+  sfumatura si veda (il blu di Barattozon è già quasi nero); logo a
+  sinistra, 29×28. Su «Rileggi e pubblica» (`p2p-scuro` ora su tutti e
+  tre i vestiti del bottone che pubblica) e sul «Pubblica» del
+  riepilogo (`chiediConferma` col `vestito: 'bz'`), e nel fantasma. La
+  sentinella del vestito ha la terza eccezione detta. Foto 36.
+
+Prove: `prove_grafica_p2p_onchain` (banner, tasti del +, bottoni del
+lato con la misura del fulmine, Barattozon), `prove_nav_p2p` (la meta
+del fantasma con le sfumature nuove, blu compreso),
+`prove_tasto_barattozon`, `prove_vestito_bottoni`. Controprove rosse:
+il banner tornato scuro, il fulmine tornato piccolo, il riepilogo senza
+vestito, la meta blu del fantasma tolta. Visto dal vivo nei due temi (giro locale,
+relay morti).
