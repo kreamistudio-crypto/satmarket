@@ -76007,6 +76007,43 @@ cambio di rete non sposta il titolo, pubblicato a mercato +2% con 3+ e
 paracadute 5%, la scheda con «≈ 98.000», la card per un altro col badge
 «2% meno conveniente» e lo scudo del filtro.
 
+LE RIGHE DI LIGHTNING RESTANO LETTERA PER LETTERA. La prima stesura
+metteva un `oc ?` dentro le righe del foglio che le sentinelle di
+Lightning leggono alla lettera (l'ordine delle scatole, la tendina per
+lato, il secondo importo, la porta del primo ordine, il bottone senza
+marchio, la firma `apriNuovoOrdineP2P(metodo)`): diciotto rosse. Strada
+presa: quelle righe tornano com'erano e la rete si dice altrove — la
+rete chiesta passa da `p2pNuovoReteChiesta` (una sola apertura), il
+tabacchino non c'è fra i metodi on-chain e quindi `tab` è falso da sé,
+il secondo importo si ferma con una riga sua prima di quella di ieri,
+la scatola in fondo la sceglie `riquadroLimitiP2P` («Dove vuoi gli
+euro» per chi vende, poi i numeri del 2-di-3), la moneta del bottone
+sta in uno `<span>` suo. Solo la zona porta un `!oc &&` dentro la riga
+(e le due sentinelle della zona lo dicono). Le frasi rifatte per le
+sentinelle delle parole: «Barattolo non prende commissioni» e «sats
+contati quando lo prendi».
+
+IL «NOVITÀ» VERSO SINISTRA, COL RIMBALZO (16:05, Andrea: «le card
+compaiono verso sinistra e non verso destra finendo la loro corsa
+vicino all'icona onchain. quindi non c'è bisogno di mettere 2 icone. la
+transizione deve essere fluida in stile bump effect»): il binario largo
+il doppio se n'è andato. La moneta della faccia resta ferma a sinistra;
+Compra e Vendi (senza moneta) partono fuori a destra
+(`translateX(105%)`) e corrono fino a 8 px dalla moneta con una curva
+che va oltre e torna (`cubic-bezier(.3,1.45,.55,1)`, mezzo secondo):
+passano un soffio SOTTO la moneta (che sta sopra, `z-index`) e si
+assestano; al colpo la moneta sobbalza (`p2pOcUrto`, solo al gesto: un
+libro ridisegnato da aperto non la fa saltare). Il fondo arancio prima
+restava, come vassoio; alla prova del video (16:22, Andrea: «quando fa
+il bump lo sfondo da arancio diventa marrone scuro tipo lo sfondo e
+rimangono le card compra o vendi con affianco l'icona») sfuma nella
+pagina mentre i lati corrono: l'arancio sta in un `::before` della
+faccia, perché un fondo a gradiente non sfuma da sé. Con «riduci
+movimento» niente corsa, sfumatura né sobbalzo. Misurato a 390 px: il bordo di Compra va da 390 a 43 e torna a
+64, la moneta passa da 32 a 42 px e torna a 32. Video in
+`/mnt/project-files/grafica-p2p-onchain/16-…` e `17-…` (al rallentatore).
+
 Da guardare: la sezione «Pausa degli ordini» compare solo dove compare
 nel Lightning (`tempoPubblicaP2P`); il giro locale non l'aveva, il
-collaudo sì. La presa a mercato dal telefono vero, sul collaudo.
+collaudo sì. La presa a mercato dal telefono vero, sul collaudo. Il
+rimbalzo dal telefono vero in Telegram.

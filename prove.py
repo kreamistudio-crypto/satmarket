@@ -153185,8 +153185,8 @@ const maxEuroP2P = () => 250;
 const LOG = [];
 let p2pNuovoMetodi = [], p2pNuovoEuroMax = '', p2pNuovoDue = false;
 function renderNuovoOrdineP2P(){ LOG.push('disegno:' + (p2pNuovoOc ? 'oc' : 'ln')); }
-function apriNuovoOrdineP2P(metodo, rete){ LOG.push(rete === 'onchain' ? 'oc:' + p2pLato : 'ln');
-  p2pNuovoOc = rete === 'onchain' && !!myP2POnchain; }
+function apriNuovoOrdineP2P(metodo){ LOG.push(p2pNuovoReteChiesta === 'onchain' ? 'oc:' + p2pLato : 'ln');
+  p2pNuovoOc = p2pNuovoReteChiesta === 'onchain' && !!myP2POnchain; p2pNuovoReteChiesta = ''; }
 function apriBarattozonP2P(){ LOG.push('bz'); }
 function apriOnchainP2P(){ LOG.push('pagina'); }
 function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
@@ -153210,11 +153210,11 @@ const porta = carteOnchainLibroP2P('sell');
 out.porta = [/p2p-oc-novita/.test(porta), /Novità: scambi on-chain/.test(porta), /cambio-moneta btc/.test(porta)];
 // il rettangolo che scorre: chiuso mostra la faccia (i lati inerti),
 // aperto i due lati (la faccia inerte); un lato apre il foglio e lo richiude
-out.chiusa = [/p2p-oc-novita"/.test(porta), /p2p-oc-lati" inert/.test(porta), /p2p-oc-faccia" onclick="apriNovitaOnchainP2P\(\)">/.test(porta),
-  /btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P\('buy'\)/.test(porta), /btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P\('sell'\)/.test(porta)];
+out.chiusa = [/p2p-oc-novita"/.test(porta), /p2p-oc-lati" inert/.test(porta), /p2p-oc-faccia" onclick="apriNovitaOnchainP2P\\(\\)">/.test(porta),
+  /btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P\\('buy'\\)/.test(porta), /btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P\\('sell'\\)/.test(porta)];
 apriNovitaOnchainP2P();
 const aperta = carteOnchainLibroP2P('sell');
-out.aperta = [/p2p-oc-novita aperta"/.test(aperta), /p2p-oc-lati">/.test(aperta), /onclick="apriNovitaOnchainP2P\(\)" inert>/.test(aperta)];
+out.aperta = [/p2p-oc-novita aperta"/.test(aperta), /p2p-oc-lati">/.test(aperta), /onclick="apriNovitaOnchainP2P\\(\\)" inert>/.test(aperta)];
 out.sceltaCompra = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open'), el('p2pSceltaTit').textContent];
 let c = el('p2pSceltaCorpo').innerHTML;
 out.tastiCompra = [c.indexOf('On-chain') >= 0 && c.indexOf('On-chain') < c.indexOf('Lightning'),
@@ -153367,6 +153367,27 @@ console.log(JSON.stringify(out));
           "il fondo e' arancio", (False, True, True),
           ("#FFF4E5" in css, ".p2p-oc-novita .cambio-moneta.p2p-oc-moneta" in css,
            "box-shadow:0 0 0 2px rgba(255,255,255,.9)" in css))
+    # IL «NOVITÀ» VERSO SINISTRA, COL RIMBALZO (30 ott 2026 sera, Andrea:
+    # «le card compaiono verso sinistra ... finendo la loro corsa vicino
+    # all'icona onchain. quindi non c'e' bisogno di mettere 2 icone ...
+    # bump effect»): i lati partono fuori a DESTRA e corrono a sinistra fino
+    # alla moneta, con una curva che va oltre e torna; Compra e Vendi senza
+    # moneta, quella della faccia resta ferma e sobbalza al colpo
+    porta_nv = pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n")
+    lati_nv = porta_nv[porta_nv.index("p2p-oc-lati"):]
+    apri_nv = pezzo_js(mini, "function apriNovitaOnchainP2P(){", "\n}\n")
+    prova("il «Novità»: i lati entrano da destra fino alla moneta col rimbalzo, "
+          "senza una seconda moneta, il fondo che sfuma e il colpo solo al gesto",
+          (True, True, True, False, True, True, True, True),
+          (".p2p-oc-lati{position:absolute;top:0;bottom:0;left:48px;" in css,
+           "transform:translateX(105%);" in css,
+           "cubic-bezier(.3,1.45,.55,1)" in css,
+           "P2P_OC_MONETA" in lati_nv,
+           porta_nv.index("p2p-oc-faccia") < porta_nv.index("p2p-oc-lati"),
+           "r.classList.add('aperta', 'urto');" in apri_nv,
+           # (16:22) e al colpo il fondo arancio sfuma nella pagina
+           ".p2p-oc-novita.aperta .p2p-oc-faccia::before{opacity:0}" in css,
+           "prefers-reduced-motion: reduce){\n    .p2p-oc-lati" in css))
     # il cambio di rete senza salto: dal foglio unico (cantiere
     # oc-identico) nessun foglio si apre o si chiude, si ridisegna e basta
     cambia = pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n")
@@ -153527,18 +153548,24 @@ console.log(JSON.stringify(out));
     prova("a rete on-chain il foglio tiene tipo di prezzo, premio, «Chi può "
           "prendere», pausa e paracadute (le stesse funzioni, senza condizioni)",
           (True, True),
-          ("+ quanti + premio + (oc && !compro ? sezioneRecapitoOnchainP2P() : '')\n"
-           "    + accesso + pausa + paracadute + (oc ? riquadroOnchainP2P() : riquadroLimitiP2P()) +"
+          # le scatole sono quelle di Lightning, nello stesso ordine e con le
+          # stesse parole: la rete cambia solo l'ultima, dentro `riquadroLimitiP2P`
+          ("+ quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +"
            in nuovo,
            "const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';"
            in nuovo))
     prova("...e lascia quel che la rete non ha: Barattozon, l'intervallo, la zona; "
           "il bottone porta la moneta", (True, True, True, True, True),
-          ("const tab = !oc && tabacchinoP2P(p2pNuovoMetodi);" in nuovo,
-           "((p2pNuovoFisso || oc) ? '' :" in nuovo,
+          # Barattozon: il tabacchino non sta fra i metodi della rete;
+          # l'intervallo: il secondo importo non si svela
+          ("(oc ? metodiOnchainP2P(compro ? 'compro' : 'vendo') : metodiPubblicabiliP2P(" in nuovo,
+           "  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return;\n"
+           "  if (p2pNuovoDue || p2pNuovoFisso || tabacchinoP2P(p2pNuovoMetodi)) return;"
+           in pezzo_js(mini, "function svelaSecondoImportoP2P(){", "\n}\n"),
            "const zona = !oc && typeof sezioneZonaNuovoP2P" in nuovo,
-           "oc ? P2P_OC_MONETA + 'Pubblica ordine' : '⚡ Pubblica ordine'" in nuovo,
-           "(oc ? metodiOnchainP2P : metodiPubblicabiliP2P)" in nuovo))
+           "(oc ? '<span class=\"p2p-invia-oc\">' + P2P_OC_MONETA + 'Pubblica ordine</span></button>'" in nuovo,
+           "return (p2pLato !== 'compro' ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();"
+           in pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")))
     invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
     prova("il bottone del foglio a rete on-chain va al server di Barattolo, prima "
@@ -153572,7 +153599,7 @@ console.log(JSON.stringify(out));
     if card is not None:
         prova("la card on-chain: i sats fissi, la stima a mercato col «≈», la frase "
               "senza cambio, i sats veri dopo la presa; la pausa vale finché non finisce",
-              ["5000 sats", "≈ 98000 sats", "sats al cambio della presa", "88200 sats",
+              ["5000 sats", "≈ 98000 sats", "sats contati quando lo prendi", "88200 sats",
                200, 0, 0], card)
     riga = pezzo_js(mini, "function rigaOnchainP2P(o){", "\n}\n")
     apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
@@ -156736,7 +156763,8 @@ def prove_contanti_zona():
     vale = fn("function valeNuovoOrdineP2P(v){")
     prova("il giudice del foglio chiede la zona dopo i metodi e prima del tabacchino, col suo campo",
           True,
-          "const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';" in vale
+          # (30 ott 2026, oc-identico) a rete on-chain niente zona: `!v.oc &&`
+          "const zonaNo = !v.oc && typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';" in vale
           and "if (zonaNo) return {ok: false, manca: zonaNo, campo: 'p2pNuovoZona'};" in vale
           and vale.index("'Scegli almeno un metodo di pagamento'") < vale.index("const zonaNo = ")
           < vale.index("if (tabacchinoP2P(v.metodi)) {"))
@@ -156744,7 +156772,7 @@ def prove_contanti_zona():
           "zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : ''," in fn("function campiNuovoP2P(){"))
     fog = fn("function renderNuovoOrdineP2P(){")
     prova("il foglio monta la sezione della zona subito sotto i metodi", True,
-          "const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in fog
+          "const zona = !oc && typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';" in fog
           and "valuta + metodi + zona + importo + " in fog)
     prova("...e riparte vuoto a ogni apertura, come gli altri campi", True,
           "  p2pNuovoMetodi = [];\n  p2pNuovoZona = '';\n" in fn("function apriNuovoOrdineP2P(metodo){"))
