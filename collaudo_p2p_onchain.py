@@ -730,6 +730,133 @@ def main():
                 firma=firma_dest(888, "indirizzo", dal_wallet(8))).status_code)
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
+    # ---- 11-quater) il foglio di Lightning (30 ott 2026, cantiere oc-identico,
+    # Andrea: «deve essere identico allaltro»): prezzo di mercato col premio,
+    # chi puo' prendere, la pausa, il paracadute
+    print("\n[il foglio di Lightning: mercato, chi può prendere, pausa, paracadute]")
+    tetto = SRV.P2P_ONCHAIN_APERTI_MAX
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+
+    def cambio(eur, eta=0):
+        SRV._cambio_cache["valori"]["eur"] = float(eur)
+        SRV._cambio_cache["quando"] = time.time() - eta
+
+    def riga_db(oid):
+        con = SRV.db()
+        try:
+            return dict(con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                                    (oid,)).fetchone())
+        finally:
+            con.close()
+
+    def nel_libro(oid):
+        return next((e for e in libro(888)["onchain"]["eventi"] if e["id"] == oid), None)
+    cambio(90000)
+    prova("i sats a mercato: la formula del coordinatore (90 € a 90.000 €/BTC, "
+          "premio +2% = 98.000; −2% = 102.000; senza cambio 0)",
+          (98000, 102000, 0),
+          (SRV.p2p_onchain_sats_mercato(9000, 2, 90000),
+           SRV.p2p_onchain_sats_mercato(9000, -2, 90000),
+           SRV.p2p_onchain_sats_mercato(9000, 2, 0)))
+    r = pubblica(999, tipo="mercato", premio=2, sats=None)
+    om = r.json()
+    prova("a mercato: nasce senza sats (0 fino alla presa), col premio e la stima "
+          "al cambio di adesso", (200, True, 2, 0, 98000),
+          (r.status_code, om.get("mercato"), om.get("premio"), om.get("sats"),
+           om.get("stima")))
+    e = nel_libro(om["id"]) or {}
+    prova("...nel libro: mercato, premio, stima; niente paracadute a chi guarda",
+          (True, 2, 98000, 0, False), (e.get("mercato"), e.get("premio"),
+                                       e.get("stima"), e.get("sats"), "paracadute" in e))
+    tags = {t[0]: t[1:] for t in SRV.p2p_onchain_tags(riga_db(om["id"]), 1000)}
+    prova("...e il 38383 dice amt 0 e premium 2, come un ordine a mercato di Mostro",
+          (["0"], ["2"]), (tags["amt"], tags["premium"]))
+    prova("i no del mercato: pochi euro (sotto il minimo al cambio), premio "
+          "oltre il 20%, tipo inventato", [400, 400, 400],
+          [pubblica(999, tipo="mercato", euro_cent=500).status_code,
+           pubblica(999, tipo="mercato", premio=25).status_code,
+           pubblica(999, tipo="baratto").status_code])
+    cambio(100000, eta=3600)
+    r = gesto(888, om["id"], "prendi")
+    prova("alla presa con un cambio vecchio di un'ora: 503, e l'ordine resta nel libro",
+          (503, "pending"), (r.status_code, riga_db(om["id"])["stato"]))
+    cambio(100000)
+    r = gesto(888, om["id"], "prendi")
+    d = riga_db(om["id"])
+    prova("alla presa i sats nascono al cambio di ADESSO (90 € a 100.000 = 90.000, "
+          "−2% = 88.200), prima dell'indirizzo, e l'importo e' prezzo + margine",
+          (200, "preso", 88200, 88200 + d["margine_sats"], 100000.0, True),
+          (r.status_code, d["stato"], d["prezzo_sats"], d["importo_sats"],
+           d["cambio_presa"], d["indirizzo_id"] > 0))
+    prova("...e chi ha preso legge i sats veri", (88200, 88200),
+          (uno(888, om["id"])["sats"], r.json().get("sats")))
+    # chi puo' prendere
+    of = pubblica(999, filtro=3).json()
+    e = nel_libro(of["id"]) or {}
+    r = gesto(888, of["id"], "prendi")
+    prova("«3+ scambi»: il libro lo dice, e chi non ne ha tre non prende (409 "
+          "col perche')", (3, 409, True, "pending"),
+          (e.get("filtro"), r.status_code, "almeno 3 scambi" in r.json().get("detail", ""),
+           riga_db(of["id"])["stato"]))
+    prova("...una soglia fuori dal catalogo vale «tutti»", 0,
+          pubblica(999, filtro=4).json().get("filtro"))
+    # la pausa di chi pubblica
+    op = pubblica(999).json()
+    adesso = int(time.time())
+    con = SRV.db()
+    SRV._scrivi_pausa_p2p(con, 999, {"fasce": [], "fuso": "Europe/Rome", "scarto": 0,
+                                     "una_da": adesso - 60, "una_fino": adesso + 3600},
+                          adesso)
+    con.close()
+    SRV._p2p_onchain_rifai_foto()
+    e = nel_libro(op["id"]) or {}
+    r = gesto(888, op["id"], "prendi")
+    prova("chi ha pubblicato e' in pausa: la card dice fino a quando, e la presa "
+          "dice di no", (adesso + 3600, 409, True),
+          (e.get("pausa_fino"), r.status_code, "pausa" in r.json().get("detail", "")))
+    con = SRV.db()
+    SRV._scrivi_pausa_p2p(con, 999, {"fasce": [], "fuso": "", "scarto": 0,
+                                     "una_da": 0, "una_fino": 0}, adesso)
+    con.close()
+    SRV._p2p_onchain_rifai_foto()
+    prova("...finita la pausa la card torna normale e si prende", (False, 200),
+          ("pausa_fino" in (nel_libro(op["id"]) or {}),
+           gesto(888, op["id"], "prendi").status_code))
+    # il paracadute
+    SRV.P2P_PARACADUTE = False
+    prova("a leva del paracadute spenta la soglia non si scrive", 0,
+          pubblica(999, paracadute=5).json().get("paracadute"))
+    SRV.P2P_PARACADUTE = True
+    cambio(100000)
+    o5 = pubblica(999, paracadute=5).json()
+    o20 = pubblica(999, paracadute=20).json()
+    prova("col paracadute al 5%: la scheda di chi pubblica lo porta, il libro no, "
+          "e la partenza la scrive il server", (5, False, 100000.0),
+          (uno(999, o5["id"])["paracadute"], "paracadute" in (nel_libro(o5["id"]) or {}),
+           riga_db(o5["id"])["para_partenza"]))
+    prima = len(BOTTONI)
+    cambio(106000)
+    asyncio.run(SRV._p2p_onchain_ronda())
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("una lettura oltre il 5% (+6%), contata una volta sola anche con due "
+          "giri: l'ordine resta nel libro", ("pending", 1),
+          (riga_db(o5["id"])["stato"], riga_db(o5["id"])["para_oltre"]))
+    SRV._cambio_cache["quando"] = time.time() + 1
+    asyncio.run(SRV._p2p_onchain_ronda())
+    d5 = riga_db(o5["id"])
+    nuovi = BOTTONI[prima:]
+    prova("la seconda lettura di fila oltre la soglia lo annulla: annullato dal "
+          "paracadute, fuori dal libro, e chi l'ha pubblicato e' avvisato col "
+          "bottone dello scambio", ("annullato", "paracadute", None, True),
+          (d5["stato"], d5["chiuso_perche"], nel_libro(o5["id"]),
+           any(chi == 999 and "paracadute si è aperto" in t and b
+               and b[1].endswith(o5["ordine"]) for chi, t, b in nuovi)))
+    prova("...e quello al 20% resta nel libro", "pending", riga_db(o20["id"])["stato"])
+    prova("...la scheda dice perche' si e' chiuso", "paracadute",
+          uno(999, o5["id"]).get("chiuso_perche"))
+    SRV.P2P_PARACADUTE = False
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
     nudi = [t[:60] for chi, t, b in BOTTONI

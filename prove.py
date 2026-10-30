@@ -152806,6 +152806,7 @@ def prove_p2p_onchain():
                "rilasciato": "success", "rimborsato": "canceled",
                "annullato": "canceled", "scaduto": "canceled"}}
     exec(pezzo("_p2p_onchain_euro_testo"), amb)
+    exec(pezzo("_p2p_onchain_campo"), amb)
     exec(pezzo("p2p_onchain_tags"), amb)
     o = {"ordine": "bar-onchain-abc", "lato": "sell", "stato": "pending",
          "prezzo_sats": 100000, "euro_cent": 9050, "scade": 5000,
@@ -152848,6 +152849,26 @@ def prove_p2p_onchain():
            "non si legge" in G("sell", 50_000, 100, ["a,b"], "", 0, 0),
            "troppo lungo" in G("sell", 50_000, 100, ["a"], "x" * 301, 0, 0),
            G("sell", 50_000, 25_000, ["Bonifico"], "IT00", 250, 0)])
+    # IL FOGLIO DI LIGHTNING (30 ott 2026, cantiere oc-identico): a
+    # mercato gli euro e il premio, i sats alla presa
+    amb["P2P_ONCHAIN_PREMIO_MAX"] = 20
+    exec(pezzo("p2p_onchain_sats_mercato"), amb)
+    M = amb["p2p_onchain_sats_mercato"]
+    prova("i sats a mercato, la formula del coordinatore: 90 € a 90.000 €/BTC "
+          "col +2% = 98.000, col −2% = 102.000; cambio o euro che mancano = 0",
+          (98000, 102000, 100000, 0, 0, 0),
+          (M(9000, 2, 90000), M(9000, -2, 90000), M(9000, 0, 90000), M(9000, 2, 0),
+           M(0, 2, 90000), M("x", 2, 90000)))
+    prova("il giudice a mercato: premio oltre il 20%, premio storto, tipo "
+          "inventato, la stima sotto il minimo al cambio di adesso, e i si' "
+          "(anche senza cambio: giudica la presa)",
+          [True, True, True, True, "", ""],
+          [G("sell", 0, 9000, ["a"], "", 0, 0, "mercato", 21, 90000).startswith("Il premio va"),
+           "numero" in G("sell", 0, 9000, ["a"], "", 0, 0, "mercato", "x", 90000),
+           G("sell", 0, 9000, ["a"], "", 0, 0, "baratto").startswith("Scegli prezzo"),
+           "circa 5.556 sats" in G("sell", 0, 500, ["a"], "", 0, 0, "mercato", 0, 90000),
+           G("sell", None, 9000, ["a"], "", 250, 0, "mercato", -20, 90000),
+           G("buy", None, 9000, ["a"], "", 250, 0, "mercato", 5, 0)])
     # --- il libro: dalla memoria ---
     libro = src[src.index('@app.get("/api/p2p/libro")'):]
     libro = libro[:libro.index("\n@app.")]
@@ -153138,7 +153159,10 @@ def prove_grafica_p2p_onchain():
     import subprocess
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     monete = pezzo_js(mini, "const P2P_OC_MONETA = ", "\n\n/* LE CARD IN CIMA")
-    foglio = mini[mini.index("let p2pOcLato = 'sell';"):mini.index("async function pubblicaOnchainP2P(btn){")]
+    # dal 30 ott 2026 sera (cantiere oc-identico) il foglio on-chain e'
+    # quello di Lightning: qui i pezzi della rete, il disegno lo guardano
+    # le sentinelle sotto e il giro dal vivo
+    foglio = mini[mini.index("let p2pNuovoOc = false;"):mini.index("async function pubblicaOnchainDalFoglioP2P(")]
     banco = """
 const NODI = {};
 function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '',
@@ -153157,19 +153181,23 @@ const vesteMetodoP2P = () => false, marchioMetodoP2P = m => m;
 const nomeMetodiP2P = l => l === 'compro' ? 'Come vuoi inviare' : 'Come vuoi ricevere';
 const sezioneNuovoP2P = o => '<sez ico="' + (o.ico || '') + '">' + o.titolo + '|' + o.corpo + (o.sotto || '') + '</sez>';
 const rigaOnchainP2P = o => '<card>';
+const maxEuroP2P = () => 250;
 const LOG = [];
-function apriNuovoOrdineP2P(){ LOG.push('ln'); }
+let p2pNuovoMetodi = [], p2pNuovoEuroMax = '', p2pNuovoDue = false;
+function renderNuovoOrdineP2P(){ LOG.push('disegno:' + (p2pNuovoOc ? 'oc' : 'ln')); }
+function apriNuovoOrdineP2P(metodo, rete){ LOG.push(rete === 'onchain' ? 'oc:' + p2pLato : 'ln');
+  p2pNuovoOc = rete === 'onchain' && !!myP2POnchain; }
 function apriBarattozonP2P(){ LOG.push('bz'); }
 function apriOnchainP2P(){ LOG.push('pagina'); }
 function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
-function setLatoP2P(l){ p2pLato = l; }
+function setLatoP2P(l){ p2pLato = l; LOG.push('lato:' + l); }
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
         + mini[mini.index("let p2pOcNovitaAperta = false;"):mini.index("function carteOnchainLibroP2P(k){")] \
         + pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function interruttoreReteP2P(attiva){", "\n}\n") + "\n}\n" \
-        + pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n") + "\n}\n" + foglio + """
+        + foglio + pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n") + "\n}\n" + """
 const out = {};
 out.reteSpento = [segnoReteP2P('ln'), /cambio-moneta btc/.test(segnoReteP2P('btc'))];
 p2pOnchainLibro.quando = 5;
@@ -153198,34 +153226,39 @@ p2pPiuGestoAt = performance.now();
 sceltaReteP2P('ln'); out.fantasma = LOG.slice();
 p2pPiuGestoAt = -1e9;
 sceltaReteP2P('ln'); sceltaReteP2P('bz'); out.strade = LOG.slice();
+LOG.length = 0; p2pLato = 'vendo';
 sceltaReteP2P('onchain');
-let f = el('p2pOcCorpo').innerHTML;
-out.foglioVendi = [el('p2pOcSheet').classList.contains('open'), p2pOcLato, el('p2pOcTit').textContent,
-  /Dove vuoi gli euro/.test(f), /btn rosso/.test(f), /Premio|Tipo di prezzo|Cosa vuoi fare/.test(f),
-  /sez ico="btc"/.test(f), /Rete di prova/.test(el('p2pOcSopra').innerHTML)];
-const sopra = el('p2pOcSopra').innerHTML;
+out.sceltaOc = [LOG.slice(), p2pNuovoOc];
+// il «Vendi» del rettangolo da «Compra BTC»: il lato del libro segue
+LOG.length = 0; p2pLato = 'compro'; p2pNuovoOc = false;
+apriPubblicaOnchainP2P('sell');
+out.dalVendi = [LOG.slice(), p2pLato, p2pNuovoOc];
+LOG.length = 0; apriPubblicaOnchainP2P();
+out.senzaLato = LOG.slice();
+// l'interruttore: un segno e un disegno, mai un foglio
+LOG.length = 0; p2pNuovoOc = true;
+cambiaReteP2P('onchain'); out.stessaRete = LOG.slice();
+cambiaReteP2P('ln'); out.versoLn = [LOG.slice(), p2pNuovoOc];
+LOG.length = 0; p2pLato = 'vendo';
+p2pNuovoMetodi = ['SEPA', P2P_TABACCHINO]; p2pNuovoEuroMax = '90'; p2pNuovoDue = true;
+cambiaReteP2P('onchain');
+out.versoOc = [LOG.slice(), p2pNuovoOc, p2pNuovoMetodi, p2pNuovoEuroMax, p2pNuovoDue, el('p2pNuovoPorta').hidden];
+const sopra = interruttoreReteP2P('onchain');
 out.interruttore = [/p2p-rete-tasto su" aria-checked="true" onclick="cambiaReteP2P\\('onchain'\\)/.test(sopra),
   sopra.indexOf("cambiaReteP2P('onchain')") < sopra.indexOf("cambiaReteP2P('ln')"), /cambio-moneta ln/.test(sopra)];
-LOG.length = 0;
-cambiaReteP2P('onchain'); out.stessaRete = [LOG.slice(), el('p2pOcSheet').classList.contains('open')];
-p2pLato = 'compro';
-cambiaReteP2P('ln'); out.versoLn = [LOG.slice(), el('p2pOcSheet').classList.contains('open'), p2pLato];
-el('p2pNuovoSheet').classList.add('open');
-cambiaReteP2P('onchain'); out.versoOc = [el('p2pNuovoSheet').classList.contains('open'), el('p2pOcSheet').classList.contains('open'), p2pOcLato];
-el('p2pOcSheet').classList.remove('open');
-myP2POnchain = false; out.chiuso = interruttoreReteP2P('ln'); myP2POnchain = true;
-p2pLato = 'compro'; apriPubblicaOnchainP2P('buy'); f = el('p2pOcCorpo').innerHTML;
-out.foglioCompra = [p2pOcLato, /Dove vuoi gli euro/.test(f), /btn primary/.test(f), el('p2pOcTit').textContent];
-el('p2pOcSheet').classList.remove('open');
+myP2POnchain = false; out.chiuso = interruttoreReteP2P('ln');
+LOG.length = 0; p2pNuovoOc = false; cambiaReteP2P('onchain'); out.chiusoOc = [LOG.slice(), p2pNuovoOc];
+myP2POnchain = true;
+out.metodi = [metodiOnchainP2P('vendo'), metodiOnchainP2P('compro')];
+const rec = sezioneRecapitoOnchainP2P();
+out.recapito = [/Dove vuoi gli euro/.test(rec), /id="p2pOcRecapito"/.test(rec)];
+let riq = riquadroOnchainP2P();
+out.riquadro = [/Minimo 10000 sats/.test(riq), /max 250 €/.test(riq), /Rete di prova \\(signet\\)/.test(riq)];
+p2pOnchainLibro.rete = 'mainnet'; riq = riquadroOnchainP2P(); p2pOnchainLibro.rete = 'signet';
+out.mainnet = /Rete di prova/.test(riq);
+LOG.length = 0; p2pLato = 'compro';
 apriNovitaOnchainP2P(); latoNovitaOnchainP2P('sell');
-out.dalLato = [el('p2pOcSheet').classList.contains('open'), p2pOcLato, p2pOcNovitaAperta,
-  /p2p-oc-novita"/.test(carteOnchainLibroP2P('sell'))];
-apriPubblicaOnchainP2P(); f = el('p2pOcCorpo').innerHTML;
-out.dallaPagina = [/Cosa vuoi fare/.test(f), p2pOcLato];
-metodoOnchainP2P('Revolut'); metodoOnchainP2P('SEPA'); metodoOnchainP2P(P2P_TABACCHINO);
-out.metodi = p2pOcMetodi;
-tendinaOnchainP2P(); f = el('p2pOcCorpo').innerHTML;
-out.voci = [/data-m="SEPA"/.test(f), /data-m="Contanti al tabacchino"/.test(f)];
+out.dalLato = [LOG.slice(), p2pOcNovitaAperta, /p2p-oc-novita"/.test(carteOnchainLibroP2P('sell'))];
 console.log(JSON.stringify(out));
 """
     try:
@@ -153250,7 +153283,7 @@ console.log(JSON.stringify(out));
         prova("...toccato scorre: i due lati in vista, la faccia inerte, e resta "
               "aperto al disegno dopo", [True, True, True], out["aperta"])
         prova("...un lato apre il foglio «Pubblica» on-chain col suo lato e "
-              "richiude il rettangolo", [True, "sell", False, True], out["dalLato"])
+              "richiude il rettangolo", [["lato:vendo", "oc:vendo"], False, True], out["dalLato"])
         prova("a chi non e' ammesso il + non chiede niente (la scelta torna falso e "
               "non si apre)", [False, False], out["sceltaNo"])
         prova("su «Compra BTC»: On-chain sopra, Lightning verde sotto, niente "
@@ -153260,35 +153293,40 @@ console.log(JSON.stringify(out));
               [True, True, "Vuoi vendere Bitcoin"], out["tastiVendi"])
         prova("il click fantasma dopo il gesto del + non sceglie niente, e ogni "
               "tasto apre il suo foglio", ([], ["ln", "bz"]), (out["fantasma"], out["strade"]))
-        prova("il foglio on-chain da «Vendi BTC»: aperto, lato sell, recapito, "
-              "bottone rosso, niente premio ne' scelta del lato, il ₿ sui sats, "
-              "la rete di prova sopra", [True, "sell", "Vuoi vendere Bitcoin", True, True,
-                                         False, True, True], out["foglioVendi"])
-        # l'interruttore in cima (30 ott 2026, 14:09, Andrea: «anche dopo aver
-        # scelto ... in cima alla pagina puoi comunque cambiare ancora»)
-        prova("in cima al foglio on-chain l'interruttore della rete: On-chain acceso, "
-              "prima di Lightning, col fulmine", [True, True, True], out["interruttore"])
-        prova("l'interruttore sulla rete gia' aperta non fa niente", [[], True], out["stessaRete"])
-        prova("...verso Lightning: il foglio on-chain scende, sale quello di Lightning "
-              "col lato che si porta dietro", [["ln"], False, "vendo"], out["versoLn"])
-        prova("...verso on-chain: il foglio di Lightning scende, sale quello on-chain "
-              "col lato del libro", [False, True, "sell"], out["versoOc"])
-        prova("...e a chi non e' ammesso l'interruttore non c'e'", "", out["chiuso"])
-        prova("...da «Compra BTC»: lato buy, niente recapito, bottone verde",
-              ["buy", False, True, "Vuoi comprare Bitcoin"], out["foglioCompra"])
-        prova("...dalla pagina c'e' «Compro / Vendo», col lato della scheda",
-              [True, "buy"], out["dallaPagina"])
-        prova("i metodi restano nell'ordine del vocabolario, senza il tabacchino",
-              (["SEPA", "Revolut"], [True, False]), (out["metodi"], out["voci"]))
+        # IL FOGLIO DI LIGHTNING (30 ott 2026 sera, cantiere oc-identico,
+        # Andrea: «deve essere identico allaltro»): una rete, un foglio
+        prova("On-chain dalla scelta del +: il foglio di Lightning con la rete on-chain",
+              [["oc:vendo"], True], out["sceltaOc"])
+        prova("«Vendi» del rettangolo da «Compra BTC»: il lato del libro diventa "
+              "«vendo» e si apre lo stesso foglio, on-chain",
+              [["lato:vendo", "oc:vendo"], "vendo", True], out["dalVendi"])
+        prova("...senza lato vale quello del libro", ["oc:vendo"], out["senzaLato"])
+        prova("l'interruttore sulla rete gia' scelta non fa niente", [], out["stessaRete"])
+        prova("...verso Lightning cambia il segno e ridisegna: nessun foglio si apre "
+              "o si chiude (il salto)", [["disegno:ln"], False], out["versoLn"])
+        prova("...verso on-chain lascia quel che l'on-chain non ha (il tabacchino, "
+              "il secondo importo) e la porta del primo ordine di Mostro",
+              [["disegno:oc"], True, ["SEPA"], "", False, True], out["versoOc"])
+        prova("in cima l'interruttore della rete: On-chain acceso, prima di "
+              "Lightning, col fulmine", [True, True, True], out["interruttore"])
+        prova("...e a chi non e' ammesso l'interruttore non c'e', e on-chain non si accende",
+              ("", [[], False]), (out["chiuso"], out["chiusoOc"]))
+        prova("i metodi on-chain sono quelli del lato senza il tabacchino",
+              [["SEPA"], ["SEPA"]], out["metodi"])
+        prova("«Dove vuoi gli euro» e il riquadro della rete: il minimo, il tetto, "
+              "la rete di prova (e su mainnet niente)",
+              ([True, True], [True, True, True], False),
+              (out["recapito"], out["riquadro"], out["mainnet"]))
     tocca = pezzo_js(mini, "function toccaPiu(){", "\n}\n")
     prova("il + chiede la scelta PRIMA del foglio di Lightning, e senza scelta va "
           "avanti come sempre", True,
           0 < tocca.find("&& apriSceltaPubblicaP2P()) return;")
           < tocca.find("{ apriNuovoOrdineP2P(); return; }"))
     chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
-    prova("i due fogli nuovi si chiudono con gli altri", (True, True),
+    prova("il foglio della scelta si chiude con gli altri, e il foglio «Pubblica» "
+          "on-chain a parte non c'e' piu' (e' quello di Lightning)", (True, False, False),
           ("el('p2pSceltaSheet').classList.remove('open');" in chiudi,
-           "el('p2pOcSheet').classList.remove('open');" in chiudi))
+           'id="p2pOcSheet"' in mini, "p2pOcSheet" in mini))
     pag = pezzo_js(mini, "async function renderP2POnchain(){", "\n}\n")
     # l'elenco: dall'ultimo disegno della pagina in giu' (il commento
     # sopra racconta cosa se n'e' andato, e quelle parole le dice)
@@ -153329,14 +153367,13 @@ console.log(JSON.stringify(out));
           "il fondo e' arancio", (False, True, True),
           ("#FFF4E5" in css, ".p2p-oc-novita .cambio-moneta.p2p-oc-moneta" in css,
            "box-shadow:0 0 0 2px rgba(255,255,255,.9)" in css))
-    # il cambio di rete senza salto: i fogli si scambiano a corsa spenta,
-    # e la morfosi dal + non parte mentre si scambiano
+    # il cambio di rete senza salto: dal foglio unico (cantiere
+    # oc-identico) nessun foglio si apre o si chiude, si ridisegna e basta
     cambia = pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n")
-    morfo = pezzo_js(mini, "function morfoPuoiP2P(prima){", "\n}\n")
-    prova("il cambio Lightning / On-chain non salta: corse spente, niente morfosi, "
-          "e tutto torna com'era dopo", (True, True, True, True),
-          ("f.style.transition = 'none'" in cambia, "p2pSenzaCorsa = true;" in cambia,
-           "finally {\n    p2pSenzaCorsa = false;" in cambia, "p2pSenzaCorsa) return false;" in morfo))
+    prova("il cambio Lightning / On-chain non salta: nessun foglio si apre o si "
+          "chiude, nessuna morfosi, si ridisegna sul posto", (False, False, True),
+          ("Sheet').classList" in cambia, "apriMorfoP2P" in cambia,
+           "renderNuovoOrdineP2P();" in cambia))
 
 
 def prove_deposito_p2p_onchain():
@@ -153462,7 +153499,7 @@ console.log(JSON.stringify(out));
     # chiama anche lei; nel dettaglio niente rimando a un elenco a parte
     porta = pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n")
     dett = pezzo_js(mini, "function apriDettaglioOnchainP2P(id){", "\n}\n")
-    pubb = pezzo_js(mini, "async function pubblicaOnchainP2P(btn){", "\n}\n")
+    pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
     lati = pezzo_js(mini, "function latoNovitaOnchainP2P(lato){", "\n}\n")
@@ -153473,14 +153510,84 @@ console.log(JSON.stringify(out));
     prova("la porta unica del dettaglio: mette lo scambio, chiude il foglio, va alla vista; "
           "la usano «Pubblica», «Prendi» e il mio ordine nel libro",
           (True, True, True, True, True, True),
-          ("p2pOnchainAperto = Number(id)" in dett, "chiudiFoglioP2P('p2pOcSheet')" in dett,
-           "go('p2ponchain')" in dett, "apriDettaglioOnchainP2P(p2pOnchainAperto)" in pubb,
+          ("p2pOnchainAperto = Number(id)" in dett, "chiudiFoglioP2P('p2pNuovoSheet')" in dett,
+           "go('p2ponchain')" in dett, "if (fatto) apriDettaglioOnchainP2P(fatto);" in pubb,
            "apriDettaglioOnchainP2P(id)" in prendi, "return apriDettaglioOnchainP2P(o.id);" in apri))
     prova("nel dettaglio niente «Tutti i miei scambi on-chain»", False,
           "Tutti i miei scambi on-chain" in pagina)
     nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio di Lightning ha il suo posto in cima per l'interruttore, e lo riempie",
-          (True, True), ('id="p2pNuovoRete"' in mini, "interruttoreReteP2P('ln')" in nuovo))
+          (True, True), ('id="p2pNuovoRete"' in mini,
+                         "interruttoreReteP2P(oc ? 'onchain' : 'ln')" in nuovo))
+    # IL FOGLIO ON-CHAIN E' QUELLO DI LIGHTNING (30 ott 2026 sera, cantiere
+    # oc-identico, Andrea: «di deve essere la possibilita di pubblicare a
+    # prezzo di mercato o a prezzo fisso la domanda chi puo prendere l
+    # ordine, la pausa e il paracadute»): le sezioni sono le stesse per
+    # tutt'e due le reti, e cambiano solo quelle della rete
+    prova("a rete on-chain il foglio tiene tipo di prezzo, premio, «Chi può "
+          "prendere», pausa e paracadute (le stesse funzioni, senza condizioni)",
+          (True, True),
+          ("+ quanti + premio + (oc && !compro ? sezioneRecapitoOnchainP2P() : '')\n"
+           "    + accesso + pausa + paracadute + (oc ? riquadroOnchainP2P() : riquadroLimitiP2P()) +"
+           in nuovo,
+           "const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';"
+           in nuovo))
+    prova("...e lascia quel che la rete non ha: Barattozon, l'intervallo, la zona; "
+          "il bottone porta la moneta", (True, True, True, True, True),
+          ("const tab = !oc && tabacchinoP2P(p2pNuovoMetodi);" in nuovo,
+           "((p2pNuovoFisso || oc) ? '' :" in nuovo,
+           "const zona = !oc && typeof sezioneZonaNuovoP2P" in nuovo,
+           "oc ? P2P_OC_MONETA + 'Pubblica ordine' : '⚡ Pubblica ordine'" in nuovo,
+           "(oc ? metodiOnchainP2P : metodiPubblicabiliP2P)" in nuovo))
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
+    pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
+    prova("il bottone del foglio a rete on-chain va al server di Barattolo, prima "
+          "di ogni attesa del coordinatore", True,
+          0 < invia.find("return pubblicaOnchainDalFoglioP2P(confermato);")
+          < invia.find("aspettaLibroVeroP2P"))
+    prova("...col giudice dei campi di Lightning, la domanda della pausa, e sul "
+          "filo tipo, premio, filtro e paracadute",
+          (True, True, True, True, True, True),
+          ("const g = valeNuovoOrdineP2P(campi);" in pubb, "fermaPerPausaP2P()" in pubb,
+           "tipo: campi.fisso ? 'fisso' : 'mercato'" in pubb,
+           "else corpo.premio = Number(campi.premio) || 0;" in pubb,
+           "filtro: campi.filtro || 0, paracadute: campi.paracadute || 0" in pubb,
+           "/p2p/onchain/pubblica" in pubb))
+    # la card del libro: i sats a mercato col «≈», la pausa di chi pubblica
+    banco_card = ("const fmt = n => String(n);\n"
+                  + pezzo_js(mini, "function satsCardOnchainP2P(o){", "\n}\n") + "\n}\n"
+                  + pezzo_js(mini, "function pausaOnchainP2P(o, adesso){", "\n}\n") + "\n}\n"
+                  + "console.log(JSON.stringify([satsCardOnchainP2P({sats: 5000}), "
+                  "satsCardOnchainP2P({mercato: true, sats: 0, stima: 98000}), "
+                  "satsCardOnchainP2P({mercato: true, sats: 0, stima: 0}), "
+                  "satsCardOnchainP2P({mercato: true, sats: 88200, stima: 98000}), "
+                  "pausaOnchainP2P({pausa_fino: 200}, 100), pausaOnchainP2P({pausa_fino: 100}, 100), "
+                  "pausaOnchainP2P({}, 100)]));")
+    try:
+        r = subprocess.run(["node", "-e", banco_card], capture_output=True, text=True, timeout=30)
+        card = json.loads(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else r.stderr[-300:]
+    except (OSError, subprocess.TimeoutExpired):
+        card = None
+        salta("la card on-chain a mercato", "node assente")
+    if card is not None:
+        prova("la card on-chain: i sats fissi, la stima a mercato col «≈», la frase "
+              "senza cambio, i sats veri dopo la presa; la pausa vale finché non finisce",
+              ["5000 sats", "≈ 98000 sats", "sats al cambio della presa", "88200 sats",
+               200, 0, 0], card)
+    riga = pezzo_js(mini, "function rigaOnchainP2P(o){", "\n}\n")
+    apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    prova("...sulla card il badge del premio di Lightning, il filtro, la carta "
+          "grigia in pausa; e il tocco in pausa non chiede di prendere",
+          (True, True, True, True),
+          ("badgePremioP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0})" in riga,
+           "fraseFiltroP2P(Number(o.filtro))" in riga, "' p2p-in-pausa' : ''" in riga,
+           0 < apri.find("const pausa = pausaOnchainP2P(o);")
+           < apri.find("titolo: vendeLui ? '⛓️ Compri bitcoin on-chain'")))
+    campi = pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
+    vale = pezzo_js(mini, "function valeNuovoOrdineP2P(v){", "\n}\n")
+    prova("...e il giudice usa il minimo on-chain e non chiede la zona", (True, True),
+          ("? (p2pOnchainLibro.minSats || 0)" in campi,
+           "const zonaNo = !v.oc &&" in vale))
 
 
 def prove_parole_uniche():

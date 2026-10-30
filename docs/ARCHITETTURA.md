@@ -34772,13 +34772,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fail-open, ricorda `evento_id` e `pubblicato_stato`). La busta
   `onchain` di `/api/p2p/libro` esce a leva accesa, dalla memoria, e
   l'ETag la conta. Nel telefono: `myP2POnchain`, le card
-  `rigaOnchainP2P` in cima al libro del lato (`carteOnchainLibroP2P`),
+  `rigaOnchainP2P` in cima al libro del lato (`carteOnchainLibroP2P`,
+  col rettangolo «Novità» che scorre su Compra / Vendi:
+  `apriNovitaOnchainP2P`, `latoNovitaOnchainP2P`),
   la vista `view-p2ponchain` (radice «I miei scambi» nella nav, come
   `p2pmod`) con `renderP2POnchain`, `schedaOnchainP2P`; il foglio
-  «Pubblica» a pieno schermo `p2pOcSheet` (`renderPubblicaOnchainP2P`,
-  dal 30 ott 2026 al posto di `formOnchainP2P`: i riquadri
-  `sezioneNuovoP2P` del foglio di Lightning, stato nelle variabili
-  `p2pOc…`); la scelta del + `p2pSceltaSheet` (`apriSceltaPubblicaP2P`,
+  «Pubblica» E' QUELLO DI LIGHTNING (dal 30 ott 2026 sera, cantiere
+  oc-identico: `p2pNuovoSheet` con `p2pNuovoOc` acceso, aperto da
+  `apriPubblicaOnchainP2P(lato)` = `apriNuovoOrdineP2P('', 'onchain')`;
+  le sezioni di Lightning, piu' `sezioneRecapitoOnchainP2P` e
+  `riquadroOnchainP2P`, senza Barattozon, intervallo e zona; il gesto
+  `pubblicaOnchainDalFoglioP2P`, chiamato da `inviaNuovoOrdineP2P`).
+  IL FOGLIO DI LIGHTNING NEL SERVER: colonne `prezzo_tipo` ('fisso' |
+  'mercato'), `premio`, `filtro`, `paracadute` col suo conto
+  (`para_partenza`, `para_oltre`, `para_lettura`, `para_arrivo`),
+  `chiuso_perche` e `cambio_presa`; a mercato `prezzo_sats` e' 0 nel
+  libro (la card mostra la `stima`, `_p2p_onchain_foglio`) e nasce alla
+  presa con `p2p_onchain_sats_mercato` (formula del coordinatore,
+  `cambio_noto_ora` non piu' vecchio di `P2P_ONCHAIN_CAMBIO_FRESCO_S`);
+  la porta della presa `_p2p_onchain_porta_presa` (la pausa di chi
+  pubblica, poi il filtro con `_reputazione_p2p` e `_giudice_presa_p2p`);
+  la pausa nella busta come `pausa_fino` (letta con la fotografia); il
+  paracadute in `_p2p_onchain_passata_paracadute` dentro la ronda, coi
+  giudici puri del Lightning, che annulla da se' (`chiuso_perche =
+  'paracadute'`, avviso `_p2p_onchain_testo_paracadute`); la scelta del + `p2pSceltaSheet` (`apriSceltaPubblicaP2P`,
   solo a chi e' ammesso: On-chain, Lightning, e Barattozon su «Vendi
   BTC»); il segno della rete su ogni card (`segnoReteP2P`, la moneta
   `P2P_OC_MONETA` e il fulmine `P2P_LN_MONETA` della pagina Cambio; il
@@ -34794,9 +34811,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`p2pOcDepositoVisti`); la porta unica del dettaglio
   `apriDettaglioOnchainP2P(id)` (la vista `p2ponchain` e' solo il
   dettaglio di uno scambio, gli scambi stanno in «I miei scambi»);
-  l'interruttore On-chain / Lightning in cima ai due fogli «Pubblica»
-  (`interruttoreReteP2P`, `cambiaReteP2P`, il posto `p2pNuovoRete` nel
-  foglio di Lightning). Le firme passano da `onchainFirmaProposta(o, verso)`
+  l'interruttore On-chain / Lightning in cima al foglio «Pubblica»
+  (`interruttoreReteP2P`, il posto `p2pNuovoRete`; `cambiaReteP2P` cambia
+  `p2pNuovoOc` e ridisegna, nessun foglio si apre o si chiude). Le firme passano da `onchainFirmaProposta(o, verso)`
   e `onchainCofirma(o, parole)`, che prendono l'ordine intero e mandano
   alla sua `rotta`; le seconde firme partono in sottofondo da
   `p2pOnchainCofirmeInAttesa`, chiamata da `onchainCofirmeInSottofondo`.
