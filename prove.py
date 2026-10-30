@@ -152770,6 +152770,17 @@ def prove_p2p_onchain():
            mini.count("if (typeof accogliLibroOnchainP2P === 'function') "
                       "accogliLibroOnchainP2P(d && d.onchain);"),
            mini.count("prendiOnchainP2P(d && d.onchain)")))
+    # LA SECONDA CURA del 30 ott 2026 (Alan, prima prova: «non e' piu' nel
+    # libro»): la riga pubblica diceva `id` = il NOME dell'ordine, e la
+    # card faceva Number(o.id) = NaN. Il numero e il nome viaggiano tutti
+    # e due, con la card e la ricerca che leggono il numero e «miei» il nome.
+    prova("la riga pubblica del libro on-chain porta il numero in `id` e il "
+          "nome in `ordine`, e il telefono li legge cosi'",
+          (True, 1, 1, 1),
+          ('"id": int(o["id"]), "ordine": o["ordine"]' in pezzo("_p2p_onchain_riga_pubblica"),
+           mini.count('data-id="${Number(o.id)}"'),
+           mini.count("const o = p2pOnchainLibro.eventi.find(x => Number(x.id) === Number(id));"),
+           mini.count("const mio = p2pOnchainLibro.miei.includes(String(o.ordine));")))
     prova("la leva nasce spenta, nel config d'esempio e nel codice, e il "
           "fatto vuole on-chain E P2P accesi",
           (True, True, True),

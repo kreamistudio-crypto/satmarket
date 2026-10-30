@@ -75413,6 +75413,25 @@ lezione: una sentinella di forma vale più di un giro finto quando il
 difetto è un nome. Provato: suite severa e i collaudi della CI che
 leggono miniapp.html: suite severa 26602/0 (2 saltate nostr-tools) e 18 collaudi verdi, sopra develop 9dbc48c.
 
+**SECONDA CURA, STESSO POMERIGGIO (cantiere cura-id-libro-onchain,
+Alan alla prima prova: «Non posso prenderlo perché non è più nel
+libro»).** La riga pubblica del libro on-chain portava in `id` il NOME
+dell'ordine (`bar-onchain-…`), mentre la card del telefono fa
+`Number(o.id)`: NaN, la ricerca non trovava nulla e a chiunque tocchi
+una card altrui usciva «Quest'ordine non è più nel libro»; e `miei`,
+confrontato con `o.ordine` che non c'era, non riconosceva nemmeno le
+proprie. Ora la riga porta tutti e due, `id` = il numero (quello che
+vogliono la card e la rotta) e `ordine` = il nome (quello del `d` del
+38383 e di `miei`). Perché la gabbia non l'ha visto: il collaudo
+guardava cifre, nome e rete della riga, e la presa la faceva con
+l'`id` della pagina «miei», che è il numero; la card non la tocca
+nessun banco. Da allora il collaudo controlla che la riga del libro
+porti il numero uguale a quello dell'ordine (controprova: con la riga
+vecchia è rosso) e `prove_p2p_onchain` che il telefono legga `id` per
+la card e `ordine` per «miei». La lezione, gemella della prima: il
+pezzo che nessun giro finto attraversa è il passaggio fra il libro e
+il dito; la prova dal vivo l'ha trovato in cinque minuti. Provato: suite severa 26603/0 (2 saltate nostr-tools) e collaudo_p2p_onchain verde, sopra develop 214c200.
+
 ## I colori veri all'amministratore del collaudo (30 ott 2026, cantiere collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi mettere gli sfondi originali nellapp collaudo solo per me amministratore? la striscia blu in alto va bene ... per tutti gli altri utenti che hanno accesso al collaudo invece rimane cosi blu»)
 
 Il perché di Andrea: la pagina si giudica coi colori che avrà in

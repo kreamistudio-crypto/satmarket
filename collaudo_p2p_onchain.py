@@ -280,6 +280,11 @@ def main():
            L["onchain"]["eventi"][0]["euro"], "nome" in L["onchain"]["eventi"][0],
            "recapito" in L["onchain"]["eventi"][0], "miei" in L["onchain"],
            L["onchain"]["rete"]))
+    prova("...e ogni riga porta il NUMERO (quello che la card tocca e la "
+          "rotta vuole) e il nome pubblico (quello di «miei»)",
+          (oid, o["ordine"], True),
+          (L["onchain"]["eventi"][0]["id"], L["onchain"]["eventi"][0]["ordine"],
+           isinstance(L["onchain"]["eventi"][0]["id"], int)))
     prova("...a chi e' entrato dice il nome di chi pubblica e quali sono suoi",
           ("Andrea", [o["ordine"]], []),
           (libro(888)["onchain"]["eventi"][0]["nome"], libro(999)["onchain"]["miei"],
