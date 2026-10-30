@@ -153142,6 +153142,7 @@ def prove_grafica_p2p_onchain():
     banco = """
 const NODI = {};
 function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '',
+  querySelector: () => null,
   classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}}); }
 const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), haptic = () => {};
 let myP2POnchain = false, DEMO = false, VETRINA = false, myTgId = 1, p2pLato = 'compro', eurPerSat = 0;
@@ -153163,6 +153164,7 @@ function apriOnchainP2P(){ LOG.push('pagina'); }
 function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
 function setLatoP2P(l){ p2pLato = l; }
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
+        + mini[mini.index("let p2pOcNovitaAperta = false;"):mini.index("function carteOnchainLibroP2P(k){")] \
         + pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
@@ -153178,6 +153180,13 @@ out.sceltaNo = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains
 myP2POnchain = true;
 const porta = carteOnchainLibroP2P('sell');
 out.porta = [/p2p-oc-novita/.test(porta), /Novità: scambi on-chain/.test(porta), /cambio-moneta btc/.test(porta)];
+// il rettangolo che scorre: chiuso mostra la faccia (i lati inerti),
+// aperto i due lati (la faccia inerte); un lato apre il foglio e lo richiude
+out.chiusa = [/p2p-oc-novita"/.test(porta), /p2p-oc-lati" inert/.test(porta), /p2p-oc-faccia" onclick="apriNovitaOnchainP2P\(\)">/.test(porta),
+  /btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P\('buy'\)/.test(porta), /btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P\('sell'\)/.test(porta)];
+apriNovitaOnchainP2P();
+const aperta = carteOnchainLibroP2P('sell');
+out.aperta = [/p2p-oc-novita aperta"/.test(aperta), /p2p-oc-lati">/.test(aperta), /onclick="apriNovitaOnchainP2P\(\)" inert>/.test(aperta)];
 out.sceltaCompra = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open'), el('p2pSceltaTit').textContent];
 let c = el('p2pSceltaCorpo').innerHTML;
 out.tastiCompra = [c.indexOf('On-chain') >= 0 && c.indexOf('On-chain') < c.indexOf('Lightning'),
@@ -153207,6 +153216,10 @@ el('p2pOcSheet').classList.remove('open');
 myP2POnchain = false; out.chiuso = interruttoreReteP2P('ln'); myP2POnchain = true;
 p2pLato = 'compro'; apriPubblicaOnchainP2P('buy'); f = el('p2pOcCorpo').innerHTML;
 out.foglioCompra = [p2pOcLato, /Dove vuoi gli euro/.test(f), /btn primary/.test(f), el('p2pOcTit').textContent];
+el('p2pOcSheet').classList.remove('open');
+apriNovitaOnchainP2P(); latoNovitaOnchainP2P('sell');
+out.dalLato = [el('p2pOcSheet').classList.contains('open'), p2pOcLato, p2pOcNovitaAperta,
+  /p2p-oc-novita"/.test(carteOnchainLibroP2P('sell'))];
 apriPubblicaOnchainP2P(); f = el('p2pOcCorpo').innerHTML;
 out.dallaPagina = [/Cosa vuoi fare/.test(f), p2pOcLato];
 metodoOnchainP2P('Revolut'); metodoOnchainP2P('SEPA'); metodoOnchainP2P(P2P_TABACCHINO);
@@ -153229,6 +153242,15 @@ console.log(JSON.stringify(out));
               (out["reteSpento"], out["reteAcceso"]))
         prova("il rettangolo «Novità» solo a chi e' ammesso, con la moneta e le "
               "quattro parole", ("", [True, True, True]), (out["portaNo"], out["porta"]))
+        # il rettangolo piu' piccolo che scorre (30 ott 2026, 15:10, Andrea:
+        # «quando ci clicco sopra ... si muove verso destra e compaiono i
+        # tasti compra o vendi»)
+        prova("il «Novità» chiuso mostra la faccia e tiene inerti Compra e Vendi",
+              [True, True, True, True, True], out["chiusa"])
+        prova("...toccato scorre: i due lati in vista, la faccia inerte, e resta "
+              "aperto al disegno dopo", [True, True, True], out["aperta"])
+        prova("...un lato apre il foglio «Pubblica» on-chain col suo lato e "
+              "richiude il rettangolo", [True, "sell", False, True], out["dalLato"])
         prova("a chi non e' ammesso il + non chiede niente (la scelta torna falso e "
               "non si apre)", [False, False], out["sceltaNo"])
         prova("su «Compra BTC»: On-chain sopra, Lightning verde sotto, niente "
@@ -153283,6 +153305,38 @@ console.log(JSON.stringify(out));
            "function moderazioneOnchainP2P(" in mini))
     prova("il foglio vecchio e la riga tratteggiata non ci sono piu'", (False, False, False),
           ("function formOnchainP2P(" in mini, "p2p-onchain-porta" in mini, "p2pOnchainForm" in mini))
+    # LE TRE CURE DELLE 15:10 (30 ott 2026, Andrea). Il click fantasma del
+    # + su «Vendi BTC» cadeva sul velo e chiudeva la scelta: il velo tace
+    # per 700 ms dal gesto, poi chiude come sempre
+    velo = pezzo_js(mini, "function tapFuoriSheet(){", "\n}\n") + "\n}\n"
+    banco_velo = ("let p2pPiuGestoAt = -1e9; const PASSI = []; const navIndietro = () => PASSI.push(1);\n"
+                  + velo + "tapFuoriSheet(); p2pPiuGestoAt = performance.now(); tapFuoriSheet();"
+                  "\np2pPiuGestoAt -= 800; tapFuoriSheet(); console.log(JSON.stringify(PASSI.length));")
+    try:
+        r = subprocess.run(["node", "-e", banco_velo], capture_output=True, text=True, timeout=30)
+        passi = json.loads(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else r.stderr[-300:]
+    except (OSError, subprocess.TimeoutExpired):
+        passi = None
+        salta("il velo e il click fantasma del +", "node assente")
+    if passi is not None:
+        prova("il tocco sul velo entro 700 ms dal gesto del + non chiude niente; "
+              "prima e dopo si', come sempre", 2, passi)
+    # la moneta on-chain arancio dappertutto (Andrea: «deve essere arancio e
+    # non bianco ... piuttosto metti un leggero bordo bianco»): niente piu'
+    # moneta crema sugli sfondi arancio, al suo posto l'anello bianco
+    css = mini[:mini.index("</style>")]
+    prova("la moneta on-chain resta arancio: niente crema, l'anello bianco dove "
+          "il fondo e' arancio", (False, True, True),
+          ("#FFF4E5" in css, ".p2p-oc-novita .cambio-moneta.p2p-oc-moneta" in css,
+           "box-shadow:0 0 0 2px rgba(255,255,255,.9)" in css))
+    # il cambio di rete senza salto: i fogli si scambiano a corsa spenta,
+    # e la morfosi dal + non parte mentre si scambiano
+    cambia = pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n")
+    morfo = pezzo_js(mini, "function morfoPuoiP2P(prima){", "\n}\n")
+    prova("il cambio Lightning / On-chain non salta: corse spente, niente morfosi, "
+          "e tutto torna com'era dopo", (True, True, True, True),
+          ("f.style.transition = 'none'" in cambia, "p2pSenzaCorsa = true;" in cambia,
+           "finally {\n    p2pSenzaCorsa = false;" in cambia, "p2pSenzaCorsa) return false;" in morfo))
 
 
 def prove_deposito_p2p_onchain():
@@ -153411,8 +153465,11 @@ console.log(JSON.stringify(out));
     pubb = pezzo_js(mini, "async function pubblicaOnchainP2P(btn){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
-    prova("il rettangolo «Novità» apre il foglio «Pubblica» on-chain, non una pagina",
-          (True, False), ('onclick="apriPubblicaOnchainP2P()"' in porta, "'elenco'" in porta))
+    lati = pezzo_js(mini, "function latoNovitaOnchainP2P(lato){", "\n}\n")
+    prova("il rettangolo «Novità» scorre su Compra / Vendi, e il lato apre il "
+          "foglio «Pubblica» on-chain, non una pagina", (True, True, True, False),
+          ('onclick="apriNovitaOnchainP2P()"' in porta, "latoNovitaOnchainP2P(\\'buy\\')" in porta,
+           "apriPubblicaOnchainP2P(lato);" in lati, "'elenco'" in porta))
     prova("la porta unica del dettaglio: mette lo scambio, chiude il foglio, va alla vista; "
           "la usano «Pubblica», «Prendi» e il mio ordine nel libro",
           (True, True, True, True, True, True),
