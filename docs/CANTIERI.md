@@ -75438,3 +75438,37 @@ La sentinella nuova in `prove_istanza_prova`; CONTROPROVE 6/6 (senza
 
 In produzione non cambia niente: la classe `istanza-prova` lì non c'è,
 e senza quella `coloriVeriCollaudo` non accende nulla.
+
+## Le cifre del Cambio della stessa grandezza, e il tasto «onion» sotto le tessere (30 ott 2026, cantiere cifre-stessa-misura, Andrea: «perche quando cambio da bitcoin a satoshi dal tasto toggle la grandezza dei numeri dentro le caselle cmabiano? non dovrebbero» e «il tasto onion fammelo rettangolare in stile barattolo sotto le card»)
+
+LE CIFRE. La cifra in BTC aveva una grandezza sua (`.cambio-cifra-campo.btc`,
+18 px, e 16 sotto i 350 px) messa nei giri di cambio-due-riquadri e
+btc-320, quando le pillole dicevano ancora «Lightning» e «On-chain» e una
+cifra a 10 caratteri non ci stava. Con le sigle corte «LN»/«BTC»
+(unita-tendine) lo spazio c'è: la regola sua sparisce e la cifra in BTC
+prende la grandezza di quella in sats, 23 px. Cambia solo la larghezza
+del campo, da 10,5 a 10 caratteri («0,01999999» ci sta intera). Sotto i
+350 px scendono a 20 px tutte e due, quindi sullo stesso telefono il
+selettore non cambia mai la grandezza. MISURATO col Chromium, con
+1 999 999 sats e 0,01999999 BTC: a 375 px fra pillola e cifra 49 px in
+BTC (84 in sats), a 351 px 25, a 320 px 16 (7 nel riquadro «Ricevi
+circa», il più stretto); niente tagliato, niente fuori dal riquadro.
+STRADA SCARTATA: 23 px anche sotto i 350 px (a 320 px la cifra in BTC
+toccava la pillola, −2 px).
+
+IL TASTO «onion». Non più la pillola accanto al selettore ₿/sats: un
+rettangolo largo quanto la pagina subito sotto le tre tessere («Veloce»,
+«Restano tuoi», «Due strade»), vestito come loro (fondo `--card`, bordo
+`--line-soft`, angoli 14 px), alto 46 px. Il ridisegno a pezzi di
+onion-tardi ora lo cerca dopo `.cambio-tessere`: provato dal vivo che
+arriva anche a pagina già aperta (uno solo, il fuoco resta nel campo).
+`SWAP_TELEFONO_VER` rifatto (instradatore.js cambiato).
+
+PROVATO: le prove del cambio 717/0, i collaudi dello swap,
+`collaudo_cambio_libero` (la regola del tasto ora vuole `</ul>` delle
+tessere prima del tasto), la suite severa e i collaudi della CI nel venv
+senza coincurve. CONTROPROVE 5/5 rosse: la cifra BTC di nuovo a 18 px,
+senza i 20 px sotto i 350, il tasto tolto da sotto le tessere (rosso
+anche il collaudo), il ridisegno a pezzi che lo cerca accanto al
+selettore, il tasto di nuovo tondo. Foto in
+/mnt/project-files/grafica-cambio/ (cifre-confronto, onion-sotto-scuro).

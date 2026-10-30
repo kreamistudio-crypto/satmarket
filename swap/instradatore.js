@@ -1412,7 +1412,8 @@ function swapCambioSpiega(dovuto){
 /* (28 ott 2026, cantiere euro-ordine, Andrea: «affianco al toggle btc
    sats aggiungi anche un piccolo tasto ... con la scritta "onion"») il
    tasto porta a Barattolo sul sito Tor. Solo se il server ha un
-   indirizzo .onion, e non a chi c'e' gia' sopra */
+   indirizzo .onion, e non a chi c'e' gia' sopra. Dal 30 ott sta sotto
+   le tre tessere, rettangolare (cifre-stessa-misura) */
 function onionSwap(){
   return typeof onionHost === 'string' && onionHost && !(typeof suOnion === 'function' && suOnion())
     ? '<button type="button" class="cambio-onion" data-swap="cambio-onion">onion</button>' : '';
@@ -1465,9 +1466,9 @@ function renderSwapCambio(){
     /* (30 ott 2026, cantiere onion-tardi: Andrea non vedeva il tasto)
        l'indirizzo .onion arriva con la busta della vetrina, e chi apre
        il Cambio prima di lei l'aveva gia' disegnato senza: il tasto si
-       aggiunge (o si toglie) qui accanto al selettore, senza ridisegnare
-       i campi */
-    const u = box.querySelector ? box.querySelector('.cambio-unita') : null;
+       aggiunge (o si toglie) qui sotto le tessere, senza ridisegnare i
+       campi */
+    const u = box.querySelector ? box.querySelector('.cambio-tessere') : null;
     if (u) {
       const vicino = u.nextElementSibling, ce = !!(vicino && vicino.classList.contains('cambio-onion'));
       const serve = onionSwap();
@@ -1525,14 +1526,14 @@ function renderSwapCambio(){
   box.innerHTML = `<div class="swap-cambio">
     <div class="cambio-carta" role="group" aria-label="${esc(sub ? tp.titoloPrevSub : tp.titoloPrev)}">
       ${sopra}${gira}${sotto}
-      <div class="cambio-unita" role="group" aria-label="${esc(t.unita)}">${unita}</div>${onion}
+      <div class="cambio-unita" role="group" aria-label="${esc(t.unita)}">${unita}</div>
       <div id="swapCambioCosto">${pz.costo}</div>
     </div>
     <div id="swapCambioAvviso">${pz.avviso}</div>
     ${campo}
     <button class="btn orange cambio-vai" id="swapCambioVai" type="button" data-swap="avanti" data-ordine="0"${pz.pronto ? '' : ' disabled'}>${esc(tp.conferma)}</button>
     <div class="cambio-limiti">${limiti}</div>
-    <ul class="cambio-tessere">${tessere}</ul>
+    <ul class="cambio-tessere">${tessere}</ul>${onion}
   </div>`;
 }
 /* LA CIFRA SCRITTA: a ogni tasto si ricorda e si mostra «…» nell'altro
