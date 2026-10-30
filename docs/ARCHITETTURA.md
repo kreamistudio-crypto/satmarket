@@ -34784,7 +34784,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `P2P_OC_MONETA` e il fulmine `P2P_LN_MONETA` della pagina Cambio; il
   fulmine solo a libro on-chain acceso); le dispute on-chain in
   «⚖️ Moderazione P2P» (`leggiModOnchainP2P`, `disputeOnchainModP2P`,
-  e nel numero della sua striscia). Le firme passano da `onchainFirmaProposta(o, verso)`
+  e nel numero della sua striscia); la scheda dello scambio vestita come
+  «Nel dettaglio» di Lightning (`contoOnchainP2P`, i passi puri
+  `passiOnchainP2P`, la nota con «👉 tocca a te»; indirizzo ed explorer
+  solo al moderatore); il deposito nel foglio `p2pOcDepositoSheet`,
+  gemello di «🔒 Blocca i sats» (`apriDepositoOnchainP2P`,
+  `renderDepositoOnchainP2P`, il tempo puro `tempoDepositoOnchainP2P`),
+  che la pagina apre da sola una volta per scambio a chi deposita
+  (`p2pOcDepositoVisti`). Le firme passano da `onchainFirmaProposta(o, verso)`
   e `onchainCofirma(o, parole)`, che prendono l'ordine intero e mandano
   alla sua `rotta`; le seconde firme partono in sottofondo da
   `p2pOnchainCofirmeInAttesa`, chiamata da `onchainCofirmeInSottofondo`.

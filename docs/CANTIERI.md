@@ -75745,3 +75745,49 @@ e database del giro tolti dal worktree prima delle prove. La sentinella
 di `prove_p2p_libro` sulla testa della card segue la riga nuova (il segno
 della rete fra la cifra e l'anello). Suite e collaudi: nel verbale del
 commit.
+
+**SEGUITO, LO STESSO GIORNO: IL DEPOSITO E LA PAGINA DELLO SCAMBIO.**
+Andrea, durante la prova dal vivo con Alan (dal thread del 2-di-3):
+«anche la pagina del qr dove viene mostrato il codice dovrebbe essere
+identica alla pagina di pagamento del lighting», e poi «non deve neanche
+esserci scritto "com'è fatto questo 2-di-3", non importa a nessuno...
+quella pagina deve essere simile alle altre nell'app». Due pezzi:
+- IL FOGLIO DEL DEPOSITO `p2pOcDepositoSheet`, gemello di «🔒 Blocca i
+  sats» (`renderHoldP2P`) con lo stesso titolo e gli stessi pezzi nello
+  stesso ordine: la frase con la cifra (e il margine, e la rete di prova
+  se lo è), il QR, la stringa, la riga del tempo con «₿ Apri nel wallet»,
+  «📋 Copia l'indirizzo» in evidenza, la frase di chiusura. Il QR è il
+  `bitcoin:` con la cifra del mercatino (`onchainUriPagamento`), e la
+  porta del wallet è lo stesso link: niente `portaWallet`, che scrive
+  `lightning:`. Il tempo è `deposito_entro`, in ore finché sono ore
+  (sei, non i minuti di una hold) e poi come l'orologio di Lightning; a
+  tempo finito la porta si spegne ma il foglio NON si vela: un deposito
+  tardivo resta possibile finché chi compra non rinuncia (la regola del
+  2-di-3 non si tocca). Il foglio non chiede niente al server: la pagina
+  rilegge lo scambio e lo rifà se è aperto; si apre da solo UNA volta per
+  scambio a chi deposita (dopo «Prendi» o dall'avviso), come la
+  garanzia; a deposito visto lo chiude il «Fatto» del thread del 2-di-3
+  (`chiudiFoglioP2P('p2pOcDepositoSheet')`).
+- LA SCHEDA COME «NEL DETTAGLIO»: il conto nel vestito `.ctrl-conto
+  .conto-p2p` (Deposita/Ricevi dal verso di chi guarda, il margine solo a
+  chi deposita, niente riga del metodo come nel conto di Lightning), i
+  quattro passi `.steps` con gli stessi nomi di Lightning
+  (`passiOnchainP2P`, pura: annullo e rimborso fermano il passo col nome
+  dello stato), la nota con «👉 tocca a te» o «✋ Aspetta», poi recapito
+  e gesti; il titolo della vista diventa «Nel dettaglio». Via per le
+  parti l'indirizzo in chiaro, l'explorer e il «Com'è fatto»: restano al
+  MODERATORE, che deve giudicare. Il «🔎 Ho depositato: controlla» resta
+  (ora secondo, sotto «🔒 Blocca i sats»). I due campi (recapito e motivo
+  della disputa) vestono come i campi di casa, non quelli del sistema.
+- SCARTATO: riusare `renderOrdineP2P` di Lightning con un ordine finto —
+  dipende da Mostro in ogni riga (cauzione, PayCode, orari del
+  coordinatore), e una finta ci si scollerebbe al primo ritocco.
+PROVE: `prove_deposito_p2p_onchain` (banco node: chi vede il foglio, la
+riga del tempo, l'ordine dei pezzi, stringa/QR/porta col `bitcoin:`, le
+tre schede — chi deposita, chi riceve, il moderatore — e i passi; 6
+controprove rosse: «Com'è fatto» che torna, le ore come minuti, il Copia
+spento, closeSheet che lo scorda, il foglio a chi riceve, l'apertura a
+ogni giro). Giro dal vivo con le rotte `miei`/`7` finte di Playwright a
+390 scuro e 320 chiaro (foto 7-9 in `grafica-p2p-onchain/` dei file del
+progetto). Il nome `battitoDepositoOnchainP2P` era anche del thread del
+2-di-3: il mio è diventato `battitoFoglioDepositoOnchainP2P`.

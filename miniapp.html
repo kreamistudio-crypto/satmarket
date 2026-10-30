@@ -3891,6 +3891,13 @@
     border-radius:999px;padding:3px 8px;white-space:nowrap;margin-left:auto}
   .p2p-onchain-h{margin:16px 0 4px;font-size:15px}
   .p2p-onchain-gesti{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  /* i due campi della pagina dello scambio (30 ott 2026): il vestito
+     dei campi di casa, a tutta riga sotto la loro etichetta, non quello
+     del sistema */
+  #p2pOcRecapitoVivo,#p2pOcMotivo{display:block;box-sizing:border-box;width:100%;margin:8px 0;
+    border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;
+    padding:12px 14px;font:inherit;font-weight:600;outline:none;color:var(--ink)}
+  #p2pOcRecapitoVivo:focus,#p2pOcMotivo:focus{border-color:var(--ink)}
   .p2p-onchain-gesti:empty{display:none}
   .p2p-onchain-riass{text-align:center;font-size:15px;margin-bottom:6px}
   /* ══ IL RIDISEGNO DELL'ON-CHAIN (30 ott 2026, cantiere grafica-p2p-onchain) ══
@@ -15092,6 +15099,15 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pHoldTit">🔒 Blocca i sats</h3>
     <div id="p2pHoldCorpo"></div>
+  </div>
+
+  <!-- IL DEPOSITO ON-CHAIN (30 ott 2026): il gemello di «🔒 Blocca i
+       sats» qui sopra, per chi vende bitcoin nel 2-di-3. Lo riempie
+       `renderDepositoOnchainP2P`. -->
+  <div class="sheet" id="p2pOcDepositoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pOcDepositoTit">
+    <div class="grab"></div>
+    <h3 id="p2pOcDepositoTit">🔒 Blocca i sats</h3>
+    <div id="p2pOcDepositoCorpo"></div>
   </div>
 
   <!-- LA META' DELLA CAUZIONE BRUCIATA ALL'ALTRA PERSONA (1 ott 2026):
@@ -33923,6 +33939,7 @@ function closeSheet(){
   el('p2pCosaSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
+  el('p2pOcDepositoSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
   el('p2pCampiSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
@@ -57366,10 +57383,22 @@ async function renderP2POnchain(){
       } catch(e) {}
     }
     if (!o) { p2pOnchainAperto = 0; return renderP2POnchain(); }
+    /* uno scambio aperto si chiama come quello di Lightning */
+    if (tit) tit.innerHTML = P2P_OC_MONETA + 'Nel dettaglio';
     box.innerHTML = '<button type="button" class="scopri-link" onclick="apriOnchainP2P(0, \'elenco\')">← Tutti i miei scambi on-chain</button>'
       + schedaOnchainP2P(o);
-    const qr = el('p2pOcQr');
-    if (qr) disegnaQr(qr, onchainUriPagamento(o), 'Byte');
+    /* il foglio del deposito: si apre da solo la prima volta che chi
+       deposita trova lo scambio da depositare (dopo «Prendi», o dal
+       tocco sull'avviso), come la garanzia di Lightning; se e' gia'
+       aperto sullo stesso scambio si rifa' coi numeri nuovi */
+    if (depositoDaFareOnchainP2P(o)) {
+      if (el('p2pOcDepositoSheet').classList.contains('open') && p2pOcDeposito && p2pOcDeposito.id === o.id) {
+        p2pOcDeposito = o;
+        renderDepositoOnchainP2P();
+      } else if (!p2pOcDepositoVisti.has(o.id)) {
+        apriDepositoOnchainP2P(o.id, o);
+      }
+    }
     return;
   }
   const vivi = p2pOnchainMiei.filter(o => P2P_ONCHAIN_VIVI.has(o.stato));
@@ -57588,10 +57617,13 @@ function schedaOnchainP2P(o){
     case 'preso':
       testo = deposito
         ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete) `
-          + `sull'indirizzo qui sotto entro le ${quando(o.deposito_entro)}. Con una conferma lo scambio va avanti.`
+          + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
         : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
           + 'Ti avvisiamo appena sono confermati: allora mandi gli euro.';
-      gesti = (deposito ? g('controlla', '🔎 Ho depositato: controlla', 'orange') : g('controlla', '🔎 Controlla la rete'))
+      /* il foglio del deposito, come «🔒 Blocca i sats» di Lightning
+         (30 ott 2026): il suo tasto e' quello in evidenza */
+      gesti = (deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
+                          + g('controlla', '🔎 Ho depositato: controlla') : g('controlla', '🔎 Controlla la rete'))
         + ((deposito && !o.visti_sats) || (ricevo && Date.now() / 1000 > o.deposito_entro && !o.visti_sats)
            ? g('annulla', deposito ? 'Annulla (non deposito)' : 'Rinuncia: il deposito non è arrivato') : '');
       break;
@@ -57643,44 +57675,201 @@ function schedaOnchainP2P(o){
     ? '<div class="p2p-box"><label>Dove vuoi gli euro</label><input id="p2pOcRecapitoVivo" maxlength="300" value="' + esc(o.recapito || '')
       + '" placeholder="IBAN, nome Revolut…"> ' + bott('ghost', `recapitoOnchainP2P(this, ${o.id})`, 'Salva') + '</div>'
     : (o.recapito && (ricevo || deposito) ? '<div class="p2p-box">💶 Recapito per gli euro: <b>' + esc(o.recapito) + '</b></div>' : '');
-  const indirizzoBox = ind.indirizzo
+  /* COME LA PAGINA «NEL DETTAGLIO» DI LIGHTNING (30 ott 2026, Andrea:
+     «non deve neanche esserci scritto "com'è fatto questo 2-di-3", non
+     importa a nessuno. Quella pagina deve essere simile alle altre
+     dell'app»): il conto nel riquadro del lato, i quattro passi
+     (`.steps`), la nota dello stato con «👉 tocca a te» o «✋ Aspetta»,
+     poi il recapito e i gesti. L'indirizzo in chiaro, l'explorer e il
+     «Com'è fatto» se ne sono andati per le parti: il QR e l'indirizzo
+     stanno nel foglio del deposito, il resto lo dicono i passi.
+     L'indirizzo e l'explorer restano al MODERATORE, che deve giudicare. */
+  const indirizzoBox = mod && ind.indirizzo
     ? '<div class="p2p-box"><b>Indirizzo 2-di-3</b><div class="mono" style="word-break:break-all">' + esc(ind.indirizzo) + '</div>'
-      + (deposito && o.stato === 'preso' ? '<div class="qr" id="p2pOcQr"></div>'
-         + bott('ghost', `copiaOnchainP2P('${esc(ind.indirizzo)}')`, '📋 Copia l\'indirizzo') : '')
       + '<div class="hint">Visti in rete: ' + fmt(o.visti_sats || 0) + ' sats, confermati ' + fmt(o.ricevuti_sats || 0)
       + ' · <a href="' + esc(espl) + '/address/' + esc(ind.indirizzo) + '" target="_blank" rel="noopener">explorer</a></div>'
-      + (typeof onchainComeEFatto === 'function' && !mod ? onchainComeEFatto(o, {}) : '')
       + '</div>' : '';
+  /* i sats visti e non ancora confermati, a chi aspetta il deposito */
+  if (o.stato === 'preso' && o.visti_sats && !mod)
+    testo += '<br>👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: si aspetta la conferma.';
   const uscita = o.txid_uscita
-    ? '<div class="p2p-box">Transazione: <a href="' + esc(espl) + '/tx/' + esc(o.txid_uscita) + '" target="_blank" rel="noopener" class="mono">'
-      + esc(o.txid_uscita.slice(0, 16)) + '…</a></div>' : '';
+    ? '<div class="trust-note"><span>🔗</span><span>Transazione: <a href="' + esc(espl) + '/tx/' + esc(o.txid_uscita)
+      + '" target="_blank" rel="noopener" class="mono">' + esc(o.txid_uscita.slice(0, 16)) + '…</a></span></div>' : '';
   const parti = mod && o.parti
     ? '<div class="p2p-box">Vende bitcoin: <b>' + esc(o.parti.vende) + '</b> (' + o.parti.vende_id + ') · compra: <b>'
       + esc(o.parti.compra) + '</b> (' + o.parti.compra_id + ')</div>' : '';
   const decidi = mod && (o.stato === 'disputa' || (o.ricevuti_sats && ['annullato', 'scaduto'].includes(o.stato))) && !o.decisione
     ? '<div class="row">' + bott('orange', `decidiOnchainP2P(this, ${o.id}, 'venditore')`, '⚖️ I sats a chi compra')
       + bott('allarme', `decidiOnchainP2P(this, ${o.id}, 'compratore')`, '⚖️ Rimborsa chi vende') + '</div>' : '';
-  return `<div class="p2p-ord p2p-onchain${o.lato === 'sell' ? ' lato-compro' : ' lato-vendo'}">
-    <div class="p2p-testa"><span class="p2p-grande p2p-euro">${mod ? 'Scambio' : (vendo ? 'Vendi' : 'Compri')} ${fmt(o.sats)} sats</span>
-      <span class="p2p-onchain-segno">${esc(P2P_ONCHAIN_STATI[o.stato] || o.stato)}</span></div>
-    <span class="p2p-piccola p2p-sats">per ${esc(fmtEur(o.euro))} €${o.altro ? ' · con ' + esc(o.altro) : ''}
-      · ${esc((o.metodi || []).join(', '))}</span>
-    ${parti}
-    <div class="p2p-box">${testo}</div>
-    ${incassoMancanteOnchainP2P(o)}
-    ${recapitoBox}
-    ${indirizzoBox}
-    ${uscita}
-    ${gesti.includes("'disputa'") ? '<input id="p2pOcMotivo" maxlength="500" placeholder="Per una disputa: cosa è successo? (lo leggono i moderatori)">' : ''}
-    <div class="p2p-onchain-gesti">${gesti}</div>
-    ${decidi}
-  </div>`;
+  const ps = passiOnchainP2P(o);
+  const tocca = !mod && gesti.includes('btn orange');
+  const finito = !P2P_ONCHAIN_VIVI.has(o.stato);
+  return parti
+    + '<div class="p2p-ord lato-' + (vendo ? 'vendo' : 'compro') + '">' + contoOnchainP2P(o) + '</div>'
+    + '<div class="p2p-passi"><div class="steps">'
+    + ps.passi.map((p, i) => {
+        const cl = ps.fermo >= 0 ? (i < ps.fermo ? 'done' : i === ps.fermo ? 'stop' : 'todo')
+                                 : (i < ps.prog ? 'done' : i === ps.prog ? 'now' : 'todo');
+        return '<div class="step ' + cl + '"><span class="dot"></span><b>' + esc(p.t) + '</b><small>' + esc(p.d) + '</small></div>';
+      }).join('')
+    + '</div></div>'
+    + '<div class="trust-note nota-scambio"><span><b>' + esc(P2P_ONCHAIN_STATI[o.stato] || o.stato) + '</b>'
+      + (tocca ? '<span class="p2p-tocca">👉 tocca a te</span>' : (finito || mod ? '' : '<span class="p2p-aspetta">✋ Aspetta</span>'))
+      + '<br>' + testo + '</span></div>'
+    /* chi compra senza un posto dove ricevere lo scrive qui (thread del
+       2-di-3, richiesta di Alan): subito sotto la nota, ben in vista */
+    + `${incassoMancanteOnchainP2P(o)}`
+    + recapitoBox
+    + indirizzoBox
+    + uscita
+    + (gesti.includes("'disputa'") ? '<input id="p2pOcMotivo" maxlength="500" placeholder="Per una disputa: cosa è successo? (lo leggono i moderatori)">' : '')
+    + '<div class="p2p-onchain-gesti">' + gesti + '</div>'
+    + decidi;
+}
+
+/* PURA: il conto dello scambio, nel vestito di quello di Lightning
+   (`.ctrl-conto.conto-p2p`): le cifre che passano di mano dal verso di
+   chi guarda. A chi deposita anche il margine di rete, che entra nel
+   deposito (e quel che avanza gli torna). Il metodo non ha la sua
+   riga, come nel conto di Lightning: lo dice la nota dello stato
+   quando serve. */
+function contoOnchainP2P(o){
+  const compro = o.parte !== 'vendo';
+  const deposito = o.ruolo === 'compratore';
+  const r = (t, v, cls) => '<div class="ctrl-riga' + (cls ? ' ' + cls : '')
+    + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
+  const sats = n => '<span class="num">' + fmt(n) + '<span class="unita-sats"> sats</span></span>';
+  const euro = '<span class="num">' + esc(fmtEur(o.euro)) + ' €</span>';
+  /* il moderatore non sta da nessun lato: le due cifre e basta */
+  if (o.ruolo === 'moderatore') return '<div class="ctrl-conto conto-p2p lato-vendo"><div class="ctrl-chiusa">'
+    + r('Sats', sats(o.sats), 'tot sats') + r('Euro', euro, 'tot euro') + '</div></div>';
+  return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
+    + r('Sats dello scambio', sats(o.sats))
+    + (deposito && o.margine_sats ? r('Margine per la rete', sats(o.margine_sats)) : '')
+    + '<div class="ctrl-chiusa">'
+    + r(compro ? 'Ricevi' : 'Deposita', sats(deposito ? (o.importo_sats || o.sats) : o.sats), 'tot sats')
+    + r(compro ? 'Totale da inviare' : 'Ricevi', euro, 'tot euro')
+    + '</div></div>';
+}
+
+/* PURA: i quattro passi dello scambio, dal verso di chi guarda, come
+   quelli di Lightning (stessi nomi: «Ordine preso», «Sats bloccati»,
+   «Euro inviati», «Scambio concluso»). `prog` e' il passo in corso,
+   `fermo` quello su cui uno scambio chiuso male si e' fermato (-1 se
+   no), col nome dello stato al posto del suo. */
+function passiOnchainP2P(o){
+  const vendo = o.parte === 'vendo';
+  const passi = vendo ? [
+    {t: 'Ordine preso', d: 'Deposita i sats'},
+    {t: 'Sats bloccati', d: 'Restano nel 2-di-3 fino alla fine'},
+    {t: 'Euro inviati', d: 'Al recapito che hai indicato'},
+    {t: 'Scambio concluso', d: 'I sats sono arrivati a chi compra'}
+  ] : [
+    {t: 'Ordine preso', d: 'Chi vende deposita i sats'},
+    {t: 'Sats bloccati', d: 'Chi vende li ha messi nel 2-di-3'},
+    {t: 'Euro inviati', d: 'Al recapito che ti dà chi vende'},
+    {t: 'Scambio concluso', d: 'I sats sono arrivati a te'}
+  ];
+  if (o.stato === 'pending') passi[0] = {t: 'Ordine pubblicato',
+    d: vendo ? 'Aspetta chi ti compra i sats' : 'Aspetta chi ti vende i sats'};
+  const euroPartiti = !!o.euro_inviati_il;
+  const PROG = {pending: 0, preso: 0, depositato: 2, euro_inviati: 3, rilasciato: 4,
+                disputa: euroPartiti ? 3 : 2};
+  let fermo = -1;
+  if (o.stato === 'annullato' || o.stato === 'scaduto') fermo = 0;
+  if (o.stato === 'rimborsato') fermo = euroPartiti ? 3 : 2;
+  if (fermo >= 0) passi[fermo] = {t: P2P_ONCHAIN_STATI[o.stato] || o.stato, d: ''};
+  return {passi, prog: PROG[o.stato] != null ? PROG[o.stato] : 0, fermo};
 }
 
 function copiaOnchainP2P(testo){
   if (!navigator.clipboard) return toast('Copia a mano l\'indirizzo', 3000);
   navigator.clipboard.writeText(testo).then(() => toast('📋 Indirizzo copiato', 2500),
                                             () => toast('Copia a mano l\'indirizzo', 3000));
+}
+
+/* IL FOGLIO DEL DEPOSITO (30 ott 2026, cantiere grafica-p2p-onchain,
+   Andrea: «anche la pagina del qr dove viene mostrato il codice
+   dovrebbe essere identica alla pagina di pagamento del lighting»). Il
+   QR e il «Copia» stavano dentro la scheda dello scambio; adesso sono il
+   gemello di «🔒 Blocca i sats» (`renderHoldP2P`), coi suoi pezzi nello
+   stesso ordine: la frase con la cifra, il QR, la stringa, la riga del
+   tempo con la porta del wallet, il Copia in evidenza, la frase di
+   chiusura. Le differenze sono solo quelle della rete: il QR e' un
+   `bitcoin:` con la cifra (`onchainUriPagamento`, quello del mercatino),
+   la stringa e' l'indirizzo 2-di-3, il tempo e' `deposito_entro`.
+   Il foglio NON chiede niente al server: lo scambio lo rilegge la pagina
+   (`renderP2POnchain`), che rifa' il foglio se e' aperto; a deposito
+   visto lo chiude chi se ne accorge (`chiudiFoglioP2P`). */
+let p2pOcDeposito = null, p2pOcDepositoOrologio = null;
+const p2pOcDepositoVisti = new Set();   // gli scambi a cui il foglio si e' gia' aperto da solo
+/* PURA: tocca a me depositare? */
+function depositoDaFareOnchainP2P(o){
+  return !!(o && o.ruolo === 'compratore' && o.stato === 'preso' && o.indirizzo && o.indirizzo.indirizzo);
+}
+/* PURA: la riga del tempo. Le ore si dicono in ore (il deposito ne ha
+   sei), l'ultima ora come l'orologio di Lightning. */
+function tempoDepositoOnchainP2P(entro, adesso){
+  if (!(entro > 0)) return {viva: true, testo: ''};
+  const resta = entro - adesso;
+  if (resta <= 0) return {viva: false, testo: '⌛ Tempo del deposito finito'};
+  if (resta >= 3600) {
+    const h = Math.floor(resta / 3600), m = Math.floor((resta % 3600) / 60);
+    return {viva: true, testo: '⏱ Scade tra ' + h + ' h' + (m ? ' ' + m + ' min' : '')};
+  }
+  return {viva: true, testo: '⏱ Scade tra ' + minutiSecondi(resta)};
+}
+function apriDepositoOnchainP2P(id, dato){
+  const o = dato || p2pOnchainMiei.find(x => x.id === Number(id));
+  if (!depositoDaFareOnchainP2P(o)) return toast('L\'indirizzo per il deposito non c\'è ancora', 3000);
+  haptic();
+  p2pOcDeposito = o;
+  p2pOcDepositoVisti.add(o.id);
+  renderDepositoOnchainP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pOcDepositoSheet').classList.add('open');
+}
+function renderDepositoOnchainP2P(){
+  const box = el('p2pOcDepositoCorpo');
+  const o = p2pOcDeposito;
+  if (!box || !o) return;
+  const prova = typeof onchainRete === 'function' && onchainRete().prova;
+  box.innerHTML =
+    '<div class="hint">Manda <b>' + fmt(o.importo_sats) + ' sats</b> dal tuo wallet Bitcoin: '
+      + 'restano <b>bloccati nel 2-di-3</b> e non escono finché non li liberi tu. '
+      + 'Dentro ci sono ' + fmt(o.margine_sats) + ' sats di margine per la rete.'
+      + (prova ? ' Rete di prova (signet).' : '') + '</div>'
+    + (o.visti_sats ? '<div class="hint">👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: aspetto la conferma.</div>' : '')
+    + '<div class="qr" id="p2pOcDepositoQr"></div>'
+    + '<div class="invoice" id="p2pOcDepositoIndirizzo"></div>'
+    + '<div class="pay-scade" id="p2pOcDepositoScadeRiga" style="display:none">'
+      + '<span id="p2pOcDepositoScade"></span>'
+      + '<a class="btn mini" id="p2pOcDepositoWallet" href="#">₿ Apri nel wallet</a></div>'
+    + '<button class="btn primary" onclick="copiaOnchainP2P(p2pOcDeposito.indirizzo.indirizzo)">📋 Copia l\'indirizzo</button>'
+    + '<div class="hint">Quando il deposito si vede in rete questo foglio si chiude da solo: non c\'è niente da confermare. '
+      + 'Con una conferma, circa dieci minuti, lo scambio va avanti.</div>';
+  el('p2pOcDepositoIndirizzo').textContent = o.indirizzo.indirizzo;
+  /* la porta del wallet: un link `bitcoin:` toccato dall'utente, che il
+     sistema passa al wallet installato (la stessa stringa del QR) */
+  el('p2pOcDepositoWallet').href = onchainUriPagamento(o);
+  disegnaQr(el('p2pOcDepositoQr'), onchainUriPagamento(o), 'Byte');
+  if (p2pOcDepositoOrologio) { clearInterval(p2pOcDepositoOrologio); p2pOcDepositoOrologio = null; }
+  if (!battitoFoglioDepositoOnchainP2P()) return;
+  p2pOcDepositoOrologio = setInterval(() => {
+    if (!el('p2pOcDepositoSheet').classList.contains('open')) {
+      clearInterval(p2pOcDepositoOrologio); p2pOcDepositoOrologio = null; return;
+    }
+    if (!battitoFoglioDepositoOnchainP2P()) { clearInterval(p2pOcDepositoOrologio); p2pOcDepositoOrologio = null; }
+  }, 1000);
+}
+function battitoFoglioDepositoOnchainP2P(){
+  const o = p2pOcDeposito, riga = el('p2pOcDepositoScadeRiga');
+  if (!o || !riga) return false;
+  const t = tempoDepositoOnchainP2P(Number(o.deposito_entro) || 0, Date.now() / 1000);
+  riga.style.display = t.testo ? '' : 'none';
+  el('p2pOcDepositoScade').textContent = t.testo;
+  el('p2pOcDepositoWallet').style.display = t.viva ? '' : 'none';
+  return t.viva && !!t.testo;
 }
 
 /* I GESTI SEMPLICI: una POST, un toast, la scheda rifatta. Quelli che
