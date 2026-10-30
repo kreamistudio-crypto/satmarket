@@ -244,8 +244,12 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
     "P2P_EVENTI_SEGRETO", "SEGRETI_PROFILO_P2P", "SEGRETO_PROFILO_P2P_VIVA",
     "MOSTRO_RELAY_SPECCHIO", "MOSTRO_RELAY_CONFERMA",
-    # ⛓️ 🪙 🔔 chiavi, la rete dei sats veri, e liste di persone
-    "ONCHAIN_XPUB", "ONCHAIN_RETE", "RGB_PROVA_IDS", "NIP05_NOMI",
+    # ⛓️ 🪙 🔔 chiavi e liste di persone. ONCHAIN_RETE ne e' uscita il
+    # 30 ott 2026 (cantiere onchain-rete-pannello, Andrea: «signet e
+    # mainnet ... devono essere un tasto configurabile direttamente dalle
+    # impostazioni»): si cambia dal pannello, ma solo al riavvio e mai
+    # lasciando indietro ordini coi sats veri (`_LEVE_SOLO_AL_RIAVVIO`)
+    "ONCHAIN_XPUB", "RGB_PROVA_IDS", "NIP05_NOMI",
     "AVVISI_ORDINI_ADMIN",
     # quelle che il server legge prima di tutto, e il freno a mano stesso
     "BOT_TOKEN", "ANTHROPIC_API_KEY", "LNBITS_URL", "LNBITS_INVOICE_KEY",
@@ -33648,16 +33652,18 @@ def _leve_stato():
                   _onchain_terza_chiave_a_parole(),
                   allarme=_onchain_terza_chiave_a_parole().startswith("⚠️")),
             # LA RETE (30 ott 2026, cantiere onchain-mainnet): la leva che
-            # separa la prova dai sats veri. Solo dal VPS (LEVE_MAI_DAL_
-            # PANNELLO): cambiarla da un telefono rubato cambierebbe la
-            # catena su cui nascono gli indirizzi
+            # separa la prova dai sats veri. Dal pannello dallo stesso
+            # giorno (cantiere onchain-rete-pannello), ma solo al riavvio
+            # e mai lasciando indietro i sats veri (`_LEVE_SOLO_AL_RIAVVIO`)
             _leva("Rete dell'on-chain", "ONCHAIN_RETE", ONCHAIN_RETE,
-                  acceso=("sats VERI: indirizzi bc1…, conto m/48'/0'/0'/2', "
+                  acceso=("⚠️ " + ONCHAIN_RETE_TRATTENUTA
+                          if ONCHAIN_RETE_TRATTENUTA else
+                          "sats VERI: indirizzi bc1…, conto m/48'/0'/0'/2', "
                           "mempool.space; la terza chiave di cartone non si "
                           "usa" if ONCHAIN_RETE == "mainnet" else
                           "la rete di prova: indirizzi tb1…, i sats non "
-                          "valgono niente; sul VPS si passa ai sats veri con "
-                          "ONCHAIN_RETE = \"mainnet\"")),
+                          "valgono niente"),
+                  allarme=bool(ONCHAIN_RETE_TRATTENUTA)),
             _leva("Tetto ordini on-chain (€)", "ONCHAIN_MAX_EURO",
                   ONCHAIN_MAX_EURO,
                   acceso="un ordine on-chain sopra questa cifra non si "
@@ -33928,6 +33934,143 @@ LEVE_SCRIVIBILI = {
 }
 
 
+# LA RETE DELL'ON-CHAIN DAL PANNELLO (30 ott 2026, cantiere
+# onchain-rete-pannello, Andrea: «signet e mainnet devono essere
+# automatici nelle descrizioni, e devono essere un tasto configurabile
+# direttamente dalle impostazioni»). Fino a stamattina la rete stava fra
+# le «mai» (cantiere onchain-mainnet): «cambiarla da un telefono rubato
+# cambierebbe la catena su cui nascono gli indirizzi». Il tasto c'e', con
+# tre serrature al posto del divieto:
+# - VALE SOLO AL RIAVVIO. Dalla rete discendono, una volta all'avvio, la
+#   strada del conto, i prefissi, le versioni, il mempool: cambiarla a
+#   processo vivo lascerebbe un server mezzo signet e mezzo mainnet, cioe'
+#   indirizzi derivati su una strada e guardati su un'altra catena. Il
+#   pannello scrive la riga, il globale resta quello di adesso, e la
+#   scheda dice «dal prossimo riavvio» (il prossimo aggiornamento).
+# - I SATS VERI NON SI LASCIANO INDIETRO. Da mainnet non si va via
+#   finche' c'e' un ordine on-chain (mercatino o P2P) con le monete
+#   ancora in catena: 409 dal pannello, e al riavvio, se nel frattempo
+#   ne e' nato uno, il server resta su mainnet e lo dice nel journal e
+#   nella scheda (`ONCHAIN_RETE_TRATTENUTA`). Gli ordini di signet invece
+#   non fermano niente: valgono zero, e tornando su signet ripartono.
+# - VERSO MAINNET la terza chiave di cartone resta fuori come prima
+#   (`onchain_xpub_barattolo`): finche' un admin non crea la chiave vera,
+#   l'on-chain e' fermo (503) e il pannello e' in allarme.
+_LEVE_SOLO_AL_RIAVVIO = frozenset({"ONCHAIN_RETE"})
+
+
+def _onchain_rete_normale(valore):
+    """«signet» o «mainnet» («bitcoin» vale mainnet), o None se e' altro."""
+    t = str(valore if valore is not None else "").strip().lower()
+    if t == "bitcoin":
+        t = "mainnet"
+    return t if t in ("signet", "mainnet") else None
+
+
+def _giudice_rete_onchain(valore):
+    v = _onchain_rete_normale(valore)
+    if v is None:
+        return None, "signet (la prova) oppure mainnet (i sats veri)"
+    return v, ""
+
+
+def _onchain_aperti_su(con, rete: str) -> int:
+    """Quanti ordini on-chain (mercatino e P2P) hanno ancora le monete
+    in catena su `rete`: non rilasciati, non rimborsati, senza uscita
+    trasmessa — e non i chiusi senza aver mai visto un sat. Una tabella
+    che non c'e' ancora conta zero."""
+    n = 0
+    for tab in ("onchain_ordini", "p2p_onchain_ordini"):
+        try:
+            n += con.execute(
+                f"SELECT COUNT(*) FROM {tab} o JOIN onchain_indirizzi i"
+                " ON i.id=o.indirizzo_id WHERE i.rete=?"
+                " AND COALESCE(o.txid_uscita,'')=''"
+                " AND o.stato NOT IN ('rilasciato','rimborsato')"
+                " AND NOT (o.stato IN ('scaduto','annullato')"
+                " AND COALESCE(o.ricevuti_sats,0)=0"
+                " AND COALESCE(o.visti_sats,0)=0)", (rete,)).fetchone()[0]
+        except sqlite3.Error:
+            pass
+    return n
+
+
+def _onchain_rete_al_riavvio(rete: str):
+    """(rete, trattenuta) con cui parte il server: se la rete scelta non
+    e' mainnet ma ci sono ordini aperti coi sats veri, resta mainnet e la
+    frase dice perche' (vuota se non c'e' niente da dire)."""
+    if rete == "mainnet":
+        return rete, ""
+    try:
+        con = sqlite3.connect(DB, timeout=5)
+        try:
+            aperti = _onchain_aperti_su(con, "mainnet")
+        finally:
+            con.close()
+    except sqlite3.Error:
+        aperti = 0
+    if not aperti:
+        return rete, ""
+    perche = (f"la rete scelta e' {rete}, ma {aperti} ordini on-chain hanno "
+              "ancora i sats veri su mainnet: resta mainnet finche' non sono "
+              "chiusi")
+    print(f"⛓️ [onchain] {perche}")
+    return "mainnet", perche
+
+
+def _onchain_rete_del_config() -> str:
+    """La rete scritta nel config.py del VPS (signet se non c'e'), senza
+    la riga del pannello."""
+    if "ONCHAIN_RETE" in _CONFIG_DEL_FILE:
+        v = _CONFIG_DEL_FILE["ONCHAIN_RETE"]
+    elif "ONCHAIN_RETE" in _LEVE_POSATE_ALL_AVVIO:
+        v = "signet"
+    else:
+        try:
+            import config as _c
+            v = getattr(_c, "ONCHAIN_RETE", "signet")
+        except ImportError:
+            v = "signet"
+    return _onchain_rete_normale(v) or "signet"
+
+
+def _onchain_rete_prossima() -> str:
+    """La rete con cui ripartira' il server: la riga del pannello se
+    c'e', sennò il config. (Al riavvio la serratura dei sats veri puo'
+    ancora trattenerla su mainnet.)"""
+    try:
+        con = db()
+        try:
+            _leve_pannello_tabella(con)
+            r = con.execute("SELECT valore FROM leve_pannello WHERE "
+                            "chiave='ONCHAIN_RETE'").fetchone()
+        finally:
+            con.close()
+        if r is not None:
+            v = _onchain_rete_normale(_leva_da_json(r["valore"]))
+            if v:
+                return v
+    except Exception:
+        pass
+    return _onchain_rete_del_config()
+
+
+def _onchain_rete_si_puo_lasciare(nuova: str):
+    """ValueError col perche' se passare a `nuova` lascerebbe indietro
+    ordini coi sats veri (solo uscendo da mainnet)."""
+    if nuova == "mainnet" or ONCHAIN_RETE != "mainnet":
+        return
+    con = db()
+    try:
+        n = _onchain_aperti_su(con, "mainnet")
+    finally:
+        con.close()
+    if n:
+        raise ValueError(
+            f"ci sono {n} ordini on-chain aperti coi sats veri (mainnet): "
+            "la rete si cambia quando sono chiusi (rilasciati o rimborsati)")
+
+
 def _leve_pannello_tabella(con):
     con.execute("""CREATE TABLE IF NOT EXISTS leve_pannello(
         chiave TEXT PRIMARY KEY,
@@ -34182,6 +34325,14 @@ _VALORE_SENZA_PANNELLO = {}   # chiave -> il valore che c'era prima del pannello
 def _leva_generica(riga: dict):
     """Il «si cambia da qui» di una riga del censimento, o None."""
     k = riga.get("chiave", "")
+    if k in _LEVE_SOLO_AL_RIAVVIO:
+        # la rete: un tasto a due scelte, e quella che verra' al riavvio
+        prossima = _onchain_rete_prossima()
+        return {"tipo": "scelta", "scelte": list(ONCHAIN_RETI),
+                "attuale": ONCHAIN_RETE,
+                "origine": _leva_generica_origine(k), "subito": False,
+                "dal_riavvio": prossima if prossima != ONCHAIN_RETE else "",
+                "trattenuta": ONCHAIN_RETE_TRATTENUTA}
     if k in LEVE_SCRIVIBILI or not _leva_apribile_di_nome(k):
         return None
     lette = _leve_lette_dal_codice()
@@ -34269,6 +34420,8 @@ def _leva_scrivi(chiave: str, valore=None, al_config=False, chi=0,
     valore non passa il giudice; KeyError se la leva non si apre."""
     if chiave in LEVE_SCRIVIBILI:
         giudice = LEVE_SCRIVIBILI[chiave]["giudice"]
+    elif chiave in _LEVE_SOLO_AL_RIAVVIO:
+        giudice = _giudice_rete_onchain
     elif _leva_apribile_di_nome(chiave) and chiave in globals() \
             and chiave in _leve_lette_dal_codice()["dal_config"] \
             and _tipo_leva(globals()[chiave]):
@@ -34285,6 +34438,10 @@ def _leva_scrivi(chiave: str, valore=None, al_config=False, chi=0,
         v, motivo = giudice(valore)
         if motivo:
             raise ValueError(motivo)
+    if chiave in _LEVE_SOLO_AL_RIAVVIO:
+        # la rete: la serratura dei sats veri, prima di scrivere
+        _onchain_rete_si_puo_lasciare(
+            _onchain_rete_del_config() if al_config else v)
     subito = True
     con = db()
     try:
@@ -34303,7 +34460,10 @@ def _leva_scrivi(chiave: str, valore=None, al_config=False, chi=0,
         con.commit()
     finally:
         con.close()
-    if chiave not in LEVE_SCRIVIBILI:
+    if chiave in _LEVE_SOLO_AL_RIAVVIO:
+        # niente sul globale: la rete cambia tutta insieme, al riavvio
+        subito = False
+    elif chiave not in LEVE_SCRIVIBILI:
         subito = chiave not in _leve_lette_dal_codice()["all_avvio"]
         if al_config:
             if chiave in _VALORE_SENZA_PANNELLO or chiave not in _LEVE_POSATE_ALL_AVVIO:
@@ -34312,7 +34472,8 @@ def _leva_scrivi(chiave: str, valore=None, al_config=False, chi=0,
                 subito = False   # sotto c'era un valore che non si sa: dal riavvio
         else:
             _leva_metti_viva(chiave, v)
-    dopo = _leva_valore_vivo(chiave)
+    dopo = (_onchain_rete_prossima() if chiave in _LEVE_SOLO_AL_RIAVVIO
+            else _leva_valore_vivo(chiave))
     con = db()
     try:
         _leve_storia_tabella(con)
@@ -51570,6 +51731,12 @@ try:
         ONCHAIN_RETE = "signet"
 except ImportError:
     ONCHAIN_RETE = "signet"
+# LA SERRATURA DEI SATS VERI, AL RIAVVIO (30 ott 2026, cantiere
+# onchain-rete-pannello): se la rete scelta (pannello o config) non e'
+# mainnet ma ci sono ordini on-chain con le monete ancora su mainnet, il
+# server resta su mainnet: andarsene li lascerebbe senza nessuno che li
+# guarda. Lo dice il journal, e la scheda della rete nel pannello.
+ONCHAIN_RETE, ONCHAIN_RETE_TRATTENUTA = _onchain_rete_al_riavvio(ONCHAIN_RETE)
 # IL CONTO DEL 2-DI-3 (20 ott 2026, tappa 2): la strada BIP-48 dal seme
 # di ciascuno alla sua «xpub dedicata» — scopo 48 (multisig), coin
 # type 1 (le reti di prova: signet) o 0 (mainnet), conto 0, tipo 2

@@ -5598,6 +5598,13 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
   .leva-interruttore.su{background:var(--sats)}
   .leva-interruttore.su span{transform:translateX(24px)}
+  /* la leva a scelte (30 ott 2026, la rete dell'on-chain): due tasti
+     larghi come pollici, acceso quello che vale al riavvio */
+  .leva-scelte{display:flex;gap:8px;margin-top:12px}
+  .leva-scelta{flex:1 1 0;min-height:44px;border-radius:14px;cursor:pointer;
+    border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+    font:800 14px 'Nunito',sans-serif}
+  .leva-scelta.su{border-color:var(--sats);background:var(--sats);color:#fff}
 
   /* ---- 🖼 Anteprima personalizzazioni livello (mockup, set 2026) ----
      SOLO PER DECIDERE IL VERSO: cornici e temi colore finti, prezzo
@@ -50017,7 +50024,13 @@ const EFFETTO_LEVA = {
   ONCHAIN_QUOTA_FISSA_SATS: x => Number(x) > 0
     ? `Chi compra on-chain paga ${fmt(Number(x))} sats in più a Barattolo, e lo vede prima di pagare.`
     : 'Nessuna quota: chi compra on-chain paga il prezzo e la rete, niente a Barattolo.',
+  /* la rete (30 ott 2026, cantiere onchain-rete-pannello) */
+  ONCHAIN_RETE: x => x === 'mainnet'
+    ? 'Mainnet, la rete Bitcoin: i sats sono veri.'
+    : 'Signet, la rete di prova: i sats non valgono niente.',
 };
+/* i nomi dei tasti di una leva a scelte */
+const NOME_SCELTA = {signet: '🧪 Signet', mainnet: '₿ Mainnet'};
 const effettoLeva = (chiave, x) => EFFETTO_LEVA[chiave] ? EFFETTO_LEVA[chiave](x) : '';
 const tutteLeLeve = () => admLeve.flatMap(g => g.voci || []);
 const levaDi = chiave => tutteLeLeve().find(v => v.chiave === chiave);
@@ -50174,9 +50187,19 @@ function schedaLevaCambiabile(v){
          aria-label="${esc(v.nome)}" onclick="levaChiedi('${k}', ${vero ? 'false' : 'true'})"><span></span></button>`
     : (tipo === 'intero' || tipo === 'decimale')
       ? `<div class="leva-scheda-val">${esc(valoreLeva(vero))}</div>` : '';
+  /* LA LEVA A SCELTE (30 ott 2026, la rete dell'on-chain): un tasto per
+     scelta; acceso quello con cui il server ripartira' */
+  const scelta = w.dal_riavvio || vero;
+  const tasti = tipo !== 'scelta' ? '' : `
+      <div class="leva-scelte" role="radiogroup" aria-label="${esc(v.nome)}">
+        ${(w.scelte || []).map(x => `<button class="leva-scelta${x === scelta ? ' su' : ''}" role="radio"
+           aria-checked="${x === scelta ? 'true' : 'false'}" onclick="levaChiedi('${k}', '${esc(x)}')">${esc(NOME_SCELTA[x] || x)}</button>`).join('')}
+      </div>
+      ${w.dal_riavvio ? `<div class="leva-nota">⏳ Adesso il server usa <b>${esc(vero)}</b>: passa a <b>${esc(w.dal_riavvio)}</b> al prossimo riavvio (il prossimo aggiornamento).</div>` : ''}
+      ${w.trattenuta ? `<div class="leva-nota" style="color:var(--danger)">⚠️ ${esc(w.trattenuta)}.</div>` : ''}`;
   const testoCasella = tipo === 'lista' ? (vero || []).join(', ')
     : tipo === 'dizionario' ? JSON.stringify(vero, null, 1) : String(vero ?? '');
-  const casella = tipo === 'si_no' ? '' : `
+  const casella = tipo === 'si_no' ? '' : tipo === 'scelta' ? tasti : `
       <div class="leva-numero${tipo === 'dizionario' ? ' alto' : ''}">
         ${tipo === 'dizionario'
           ? `<textarea id="${idLeva(v.chiave)}" rows="4">${esc(testoCasella)}</textarea>`
@@ -50219,6 +50242,7 @@ function levaDaCasella(v, testo){
     return /^-?\d+(\.\d+)?$/.test(n) ? Number(n) : null;
   }
   if (tipo === 'testo') return t;
+  if (tipo === 'scelta') return (v.scrivibile.scelte || []).includes(t) ? t : null;
   if (tipo === 'lista') {
     const voci = t ? t.split(',').map(x => x.trim()).filter(x => x !== '') : [];
     const prima = valoreVeroLeva(v) || [];
@@ -50234,7 +50258,8 @@ function levaDaCasella(v, testo){
 function levaChiedi(chiave, valore, alConfig){
   const v = levaDi(chiave);
   if (!v || !v.scrivibile) return;
-  const prima = valoreVeroLeva(v);
+  /* a scelte: «prima» e' quella con cui il server ripartira' */
+  const prima = (v.scrivibile.tipo === 'scelta' && v.scrivibile.dal_riavvio) || valoreVeroLeva(v);
   if (!alConfig && v.scrivibile.tipo !== 'si_no') {
     valore = levaDaCasella(v, valore);
     if (valore === null) { toast('⚠️ ' + (AIUTO_TIPO[v.scrivibile.tipo] || 'Valore non valido')); return; }
@@ -50243,12 +50268,16 @@ function levaChiedi(chiave, valore, alConfig){
   const detto = x => effettoLeva(chiave, x) || valoreLeva(x);
   const dopo = alConfig ? 'Il valore scritto nel config del VPS (o quello di serie).' : detto(valore);
   /* un salto grande si dice: dieci volte tanto, o a zero da acceso */
-  const salto = typeof valore === 'number' && typeof prima === 'number' && prima > 0
-    && (valore >= prima * 10 || valore === 0);
+  const salto = (typeof valore === 'number' && typeof prima === 'number' && prima > 0
+    && (valore >= prima * 10 || valore === 0))
+    || (chiave === 'ONCHAIN_RETE' && valore === 'mainnet');
   chiediConferma({
     titolo: `⚙️ ${v.nome}`,
     corpo: `Adesso: ${detto(prima)}\nDopo: ${dopo}\n\n`
-      + (salto ? '⚠️ È un salto grande: controlla il numero.\n\n' : '')
+      + (chiave === 'ONCHAIN_RETE' && valore === 'mainnet'
+        ? '⚠️ Dopo il riavvio l\'on-chain usa i sats veri. Senza la chiave di Barattolo vera (sezione on-chain) resta fermo finché non la crei.\n\n'
+        : chiave === 'ONCHAIN_RETE' ? 'Si torna alla prova. Se restano ordini aperti coi sats veri, il server resta su mainnet finché non sono chiusi.\n\n'
+        : salto ? '⚠️ È un salto grande: controlla il numero.\n\n' : '')
       + (v.scrivibile.subito === false ? 'Vale del tutto dal prossimo riavvio.' : 'Vale subito, per tutti.'),
     etichetta: alConfig ? 'Torna al config' : (typeof valore === 'boolean' ? (valore ? 'Accendi' : 'Spegni') : 'Cambia'),
     vestito: salto ? 'allarme' : undefined,
@@ -56310,7 +56339,7 @@ async function payDisegnaOnchain(){
     + riga(o.margine_sats, 'Margine di rete (se avanza più di 546 sats, torna a te)')
     + riga(o.importo_sats, 'Da mandare', true);
   el('payEurNota').style.display = 'block';
-  el('payEurNota').textContent = `Signet, rete di prova. L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
+  el('payEurNota').textContent = `${onchainRete().prova ? 'Signet, rete di prova.' : 'Rete Bitcoin: sats veri.'} L'indirizzo vale fino a ${new Date(o.scade * 1000).toLocaleString('it-IT')}.`;
   el('payPatto').innerHTML = 'Paga con un wallet Bitcoin. I sats vanno in un <b style="color:var(--trust)">2-di-3</b> fra te, chi vende e Barattolo: escono solo con due firme, e al venditore arrivano quando confermi di aver ricevuto l\'oggetto. Serve una conferma, circa dieci minuti.'
     + (o.visti_sats ? `<br><b>Visti in rete: ${fmt(o.visti_sats)} sats</b>, confermati ${fmt(o.ricevuti_sats)}.` : '');
   el('payScadeRiga').style.display = 'none';
@@ -56880,7 +56909,7 @@ function accogliLibroOnchainP2P(busta){
     eventi: Array.isArray(busta.eventi) ? busta.eventi : [],
     miei: Array.isArray(busta.miei) ? busta.miei.map(String) : [],
     quando: Number(busta.quando) || 0,
-    rete: busta.rete || 'signet',
+    rete: busta.rete || onchainRete().nome,
     minSats: Number(busta.minSats) || 10000,
     oreDeposito: Number(busta.oreDeposito) || 6};
   p2pOnchainLetto = Date.now();
@@ -57164,7 +57193,7 @@ function schedaOnchainP2P(o){
   const ricevo = o.ruolo === 'venditore';      // chi compra bitcoin
   const mod = o.ruolo === 'moderatore';
   const ind = o.indirizzo || {};
-  const espl = o.esploratore || 'https://mempool.space/signet';
+  const espl = o.esploratore || onchainRete().esplora;
   const quando = (t) => t ? new Date(t * 1000).toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '';
   let testo = '', gesti = '';
   const bott = (cls, onclick, label) => `<button type="button" class="btn ${cls}" onclick="${onclick}">${label}</button>`;

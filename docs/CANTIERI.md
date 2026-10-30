@@ -75510,3 +75510,77 @@ senza i 20 px sotto i 350, il tasto tolto da sotto le tessere (rosso
 anche il collaudo), il ridisegno a pezzi che lo cerca accanto al
 selettore, il tasto di nuovo tondo. Foto in
 /mnt/project-files/grafica-cambio/ (cifre-confronto, onion-sotto-scuro).
+
+## La rete dell'on-chain dal pannello, e le descrizioni che la seguono (30 ott 2026, cantiere onchain-rete-pannello, Andrea: «signet e mainnet devono essere automatici nelle descrizioni, e devono essere un tasto configurabile direttamente dalle impostazioni»)
+
+DA DOVE. Stamattina il cantiere onchain-mainnet aveva fatto della rete
+una leva del config (`ONCHAIN_RETE`) e l'aveva messa fra le «mai» del
+pannello, scartando il bottone: «la rete si cambia a mano e con un
+riavvio, mai da un bottone». Andrea ha chiesto il contrario, in parole
+sue: il tasto nelle impostazioni. È sua la decisione; qui ci sono le
+serrature che sostituiscono il divieto.
+
+COSA SI È DECISO.
+- IL TASTO. `ONCHAIN_RETE` esce da `LEVE_MAI_DAL_PANNELLO` (solo lei).
+  Nella pagina «⚙️ Le leve» è una scheda a due tasti, «🧪 Signet» e
+  «₿ Mainnet» (`tipo: "scelta"`, nuovo nel telefono: i tasti, la
+  casella che non c'è, il giudice `levaDaCasella`). Il foglio di
+  conferma verso mainnet è in allarme e dice che senza la chiave vera
+  di Barattolo l'on-chain resta fermo; verso signet dice della serratura.
+  Giudice: `_giudice_rete_onchain`, due parole (bitcoin = mainnet).
+- VALE AL RIAVVIO, E SOLO LÌ (`_LEVE_SOLO_AL_RIAVVIO`). Dalla rete
+  discendono all'avvio la strada del conto, i prefissi, le versioni, il
+  mempool: posarla sul globale a processo vivo darebbe un server mezzo
+  signet e mezzo mainnet (indirizzi derivati su una strada e guardati su
+  un'altra catena). `_leva_scrivi` scrive la riga e la storia ma non
+  chiama `_leva_metti_viva`; la scheda mostra «adesso usa X, passa a Y al
+  prossimo riavvio (il prossimo aggiornamento)». Al riavvio il
+  meccanismo di sempre (`_leve_pannello_sopra_il_config`) la posa sul
+  config prima dell'import.
+- I SATS VERI NON SI LASCIANO INDIETRO. Da mainnet non si va via (né col
+  tasto, né con «Torna al config», né con Annulla o un backup, che
+  passano dallo stesso gesto) se c'è un ordine on-chain, del mercatino o
+  del P2P, con le monete ancora in catena (`_onchain_aperti_su`: non
+  rilasciato né rimborsato, senza uscita trasmessa, e non i chiusi che
+  non hanno mai visto un sat; la rete è quella di `onchain_indirizzi`).
+  E siccome fra il tasto e il riavvio può nascere un ordine nuovo, la
+  stessa domanda si rifà all'avvio: con ordini aperti su mainnet il
+  server RESTA su mainnet, lo scrive nel journal e la scheda lo dice in
+  rosso (`_onchain_rete_al_riavvio`, `ONCHAIN_RETE_TRATTENUTA`). Gli ordini di signet invece non
+  fermano niente: valgono zero, e tornando su signet ripartono.
+- VERSO MAINNET resta la serratura di stamattina: con la terza chiave di
+  cartone l'on-chain è fermo (503) finché un admin non crea la chiave.
+- LE DESCRIZIONI. Stamattina erano già quasi tutte automatiche
+  (`onchainRete()`); ne restavano tre cucite: la nota della cassa
+  («Signet, rete di prova», ora «Rete Bitcoin: sats veri» su mainnet), la
+  rete del libro P2P on-chain se la busta non la dice, e l'esploratore
+  dell'ordine P2P se manca. Ora seguono la rete del server.
+
+STRADE SCARTATE. Il cambio a processo vivo (rifare tutte le costanti
+derivate a ogni giro): 47 letture e un errore possibile coi soldi, contro
+un riavvio che arriva comunque col prossimo aggiornamento. Il blocco
+simmetrico anche sugli ordini di signet: fermerebbe la prima prova in
+mainnet per ordini di prova che non valgono niente. Un bottone «riavvia
+adesso» nel pannello: non chiesto, ed è un gesto sul servizio.
+
+PROVATO. `prove_rete_onchain_dal_pannello` nuova (il giudice; gli aperti
+su un database vero, mercatino e P2P, i chiusi e i mai pagati; la
+serratura da mainnet sì, verso mainnet e da signet no; il gesto unico
+che giudica, chiude prima di scrivere e non tocca il globale; la scheda;
+il blocco d'avvio; nessun «signet» cucito nelle descrizioni), la
+sentinella di onchain-mainnet rovesciata a «si apre, ma al riavvio», la
+trappola del 7 in `_censimento` (`ONCHAIN_RETE_TRATTENUTA`). Collaudo
+nuovo `collaudo_onchain_rete_pannello` (15 verdi, server vero e un
+secondo processo sullo stesso database: la scheda, il 400 di una parola
+storta, «mainnet» scritto col server di adesso ancora signet, il
+riavvio che parte mainnet con la strada m/48'/0'/0'/2', «Torna al
+config», il 400 con un ordine aperto coi sats veri, il riavvio
+trattenuto su mainnet, e chiuso l'ordine il ritorno a signet). Verdi
+anche leve_pannello, onchain_indirizzo, onchain_ordine, onchain_incasso,
+onchain_verso_lightning. Suite severa: nel verbale del commit.
+
+RESTA. Il riavvio lo fa il prossimo aggiornamento: finché non arriva, la
+scheda dice la rete di adesso e quella che verrà. La procedura di
+PRODUZIONE e la voce 4 di DA-FARE-ANDREA dicono ancora la riga del
+config: valgono lo stesso (il pannello vince sul config se ha una riga).
+Non provato su un telefono vero.
