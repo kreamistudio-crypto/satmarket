@@ -3926,28 +3926,54 @@
   /* IL RETTANGOLO «NOVITÀ» nel libro, sotto Recenti e Filtro: l'arancio
      pieno dei bottoni di casa. PIU' PICCOLO E CHE SCORRE (30 ott 2026,
      Andrea: «quando ci clicco sopra subito la tendina si muove verso
-     destra e compaiono i tasti compra o vendi»): un binario largo il
-     doppio, i due lati a sinistra e la faccia a destra; aperto, il
-     binario va a destra e i lati entrano. */
+     destra e compaiono i tasti compra o vendi»). E POI VERSO SINISTRA,
+     COL RIMBALZO (30 ott 2026 sera, Andrea: «le card compaiono verso
+     sinistra e non verso destra finendo la loro corsa vicino all'icona
+     onchain. quindi non c'e' bisogno di mettere 2 icone ... stile bump
+     effect»): la moneta resta ferma a sinistra, Compra e Vendi entrano
+     da destra, sbattono contro la moneta e si assestano, e la moneta
+     sobbalza al colpo. I due tasti senza moneta: quella c'e' gia'.
+     IL FONDO SE NE VA AL COLPO (16:22, Andrea: «quando fa il bump lo
+     sfondo da arancio diventa marrone scuro tipo lo sfondo e rimangono
+     le card compra o vendi con affianco l'icona»): l'arancio sta in un
+     `::before` che sfuma mentre i lati corrono — un fondo a gradiente
+     non sfuma da se' — e restano la moneta e i due tasti sulla pagina. */
   .p2p-oc-novita{position:relative;overflow:hidden;width:100%;margin:10px 0 4px;
     border-radius:14px;height:48px}
-  .p2p-oc-binario{display:flex;width:200%;height:100%;transform:translateX(-50%);
-    transition:transform .32s cubic-bezier(.2,.8,.2,1)}
-  .p2p-oc-novita.aperta .p2p-oc-binario{transform:translateX(0)}
-  .p2p-oc-faccia,.p2p-oc-lati{flex:0 0 50%;height:100%}
-  .p2p-oc-faccia{display:flex;align-items:center;gap:10px;padding:0 14px 0 8px;border:0;cursor:pointer;
-    background:var(--b-pri-bg);color:var(--b-pri-fg);
+  .p2p-oc-faccia{position:absolute;inset:0;display:flex;align-items:center;gap:10px;
+    padding:0 14px 0 8px;border:0;border-radius:14px;cursor:pointer;
+    background:transparent;color:var(--b-pri-fg);
     font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
+  .p2p-oc-faccia::before{content:'';position:absolute;inset:0;border-radius:inherit;
+    background:var(--b-pri-bg);transition:opacity .3s ease .05s}
+  .p2p-oc-novita.aperta .p2p-oc-faccia::before{opacity:0}
+  .p2p-oc-novita-testo,.p2p-oc-faccia .p2p-oc-freccia{position:relative}
   .p2p-oc-faccia:active{filter:brightness(.97)}
-  .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{width:32px;height:32px}
+  .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{width:32px;height:32px;position:relative;z-index:3}
   .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px;stroke-width:2.3}
   .p2p-oc-novita-testo{flex:1;min-width:0}
-  .p2p-oc-lati{display:flex;gap:8px;padding:0 2px}
+  .p2p-oc-novita-testo,.p2p-oc-faccia .p2p-oc-freccia{transition:opacity .18s ease,transform .25s ease}
+  .p2p-oc-novita.aperta .p2p-oc-novita-testo,.p2p-oc-novita.aperta .p2p-oc-freccia{
+    opacity:0;transform:translateX(-18px)}
+  /* i lati partono fuori a destra; aperti, corrono fino alla moneta
+     (8 di margine + 32 di moneta + 8 di aria) e la superano di un
+     soffio: la curva che va oltre e torna e' il rimbalzo */
+  .p2p-oc-lati{position:absolute;top:0;bottom:0;left:48px;right:0;z-index:2;
+    display:flex;gap:8px;transform:translateX(105%);
+    transition:transform .5s cubic-bezier(.3,1.45,.55,1)}
+  .p2p-oc-novita.aperta .p2p-oc-lati{transform:translateX(0)}
   .p2p-oc-lati .p2p-oc-lato{flex:1 1 0;min-height:0;height:100%;margin:0;padding:0 10px;font-size:15px;
     display:flex;align-items:center;justify-content:center;gap:8px}
   /* il margine dei bottoni del libro (#view-p2p .btn) qui li tagliava */
   #view-p2p .p2p-oc-lati .p2p-oc-lato{margin:0}
-  .p2p-oc-lato .cambio-moneta.p2p-oc-moneta{width:24px;height:24px;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
+  /* il colpo: la moneta sobbalza quando i lati arrivano */
+  .p2p-oc-novita.urto .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{animation:p2pOcUrto .42s ease-out .2s}
+  @keyframes p2pOcUrto{0%{transform:scale(1)}35%{transform:scale(1.18) rotate(-8deg)}
+    65%{transform:scale(.94) rotate(3deg)}100%{transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){
+    .p2p-oc-lati,.p2p-oc-faccia::before,.p2p-oc-novita-testo,.p2p-oc-faccia .p2p-oc-freccia{transition:none}
+    .p2p-oc-novita.urto .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{animation:none}
+  }
   .p2p-oc-freccia{flex:0 0 auto;width:9px;height:9px;margin-right:4px;
     border:solid currentColor;border-width:0 2.5px 2.5px 0;transform:rotate(-45deg);opacity:.75}
   /* il titolo della pagina e la striscia: la moneta prima del nome */
@@ -3978,7 +4004,7 @@
   .p2p-rete-tasto .cambio-moneta.p2p-oc-moneta{width:26px;height:26px}
   .p2p-rete-tasto .cambio-moneta.p2p-oc-moneta .cambio-svg{width:15px;height:15px}
   .p2p-rete-tasto:not(.su) .cambio-moneta.p2p-oc-moneta{opacity:.55}
-  .btn.p2p-invia-oc{display:flex;align-items:center;justify-content:center;gap:10px}
+  .p2p-invia-oc{display:inline-flex;align-items:center;justify-content:center;gap:10px;vertical-align:middle}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
      metodi della card, la pillola del filtro e la voce del foglio
@@ -57120,7 +57146,10 @@ function apriNovitaOnchainP2P(){
   p2pOcNovitaAperta = true;
   const r = el('p2pOcNovita');
   if (!r) return;
-  r.classList.add('aperta');
+  // il colpo si da' solo al gesto: un libro ridisegnato da aperto non
+  // fa sobbalzare la moneta a ogni giro
+  r.classList.add('aperta', 'urto');
+  setTimeout(() => r.classList.remove('urto'), 700);
   r.querySelector('.p2p-oc-lati')?.removeAttribute('inert');
   r.querySelector('.p2p-oc-faccia')?.setAttribute('inert', '');
 }
@@ -57139,16 +57168,13 @@ function carteOnchainLibroP2P(k){
   if (!righe.length && !myP2POnchain) return '';
   const porta = myP2POnchain
     ? '<div class="p2p-oc-novita' + (p2pOcNovitaAperta ? ' aperta' : '') + '" id="p2pOcNovita">'
-      + '<div class="p2p-oc-binario">'
-      + '<div class="p2p-oc-lati"' + (p2pOcNovitaAperta ? '' : ' inert') + '>'
-      + '<button type="button" class="btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P(\'buy\')">'
-      + P2P_OC_MONETA + 'Compra</button>'
-      + '<button type="button" class="btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P(\'sell\')">'
-      + P2P_OC_MONETA + 'Vendi</button></div>'
       + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaOnchainP2P()"' + (p2pOcNovitaAperta ? ' inert' : '') + '>'
       + P2P_OC_MONETA + '<span class="p2p-oc-novita-testo">Novità: scambi on-chain</span>'
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
-      + '</div></div>'
+      + '<div class="p2p-oc-lati"' + (p2pOcNovitaAperta ? '' : ' inert') + '>'
+      + '<button type="button" class="btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P(\'buy\')">Compra</button>'
+      + '<button type="button" class="btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P(\'sell\')">Vendi</button></div>'
+      + '</div>'
     : '';
   return porta + righe.map(rigaOnchainP2P).join('');
 }
@@ -57182,7 +57208,7 @@ function anelloOnchainP2P(o){
    cantiere oc-identico), o la frase se il cambio non c'e' */
 function satsCardOnchainP2P(o){
   if (!o.mercato || Number(o.sats) > 0) return fmt(Number(o.sats) || 0) + ' sats';
-  return Number(o.stima) > 0 ? '≈ ' + fmt(Number(o.stima)) + ' sats' : 'sats al cambio della presa';
+  return Number(o.stima) > 0 ? '≈ ' + fmt(Number(o.stima)) + ' sats' : 'sats contati quando lo prendi';
 }
 /* PURA: fino a quando l'ordine di un ALTRO e' fermo per la sua pausa
    (0 = si prende), come la carta grigia del Lightning */
@@ -57712,13 +57738,15 @@ function daFirmareOnchainP2P(o){
    della rete al posto di quello della commissione del coordinatore. */
 let p2pNuovoOc = false;       // il foglio «Pubblica» e' on-chain
 let p2pOcRecapito = '';       // «Dove vuoi gli euro», se vendo on-chain
+let p2pNuovoReteChiesta = ''; // 'onchain' per la prossima apertura del foglio
 
 /* `lato` = 'sell' (vendo bitcoin) | 'buy' (compro) | niente: quello del libro */
 function apriPubblicaOnchainP2P(lato){
   if (!myP2POnchain) return apriOnchainP2P(0);
   const l = lato === 'buy' ? 'compro' : lato === 'sell' ? 'vendo' : p2pLato;
   if (l !== p2pLato && typeof setLatoP2P === 'function') setLatoP2P(l, true);
-  apriNuovoOrdineP2P('', 'onchain');
+  p2pNuovoReteChiesta = 'onchain';
+  apriNuovoOrdineP2P('');
 }
 
 /* i metodi che l'on-chain pubblica: quelli del lato, senza il tabacchino */
@@ -57744,7 +57772,7 @@ function riquadroOnchainP2P(){
   return sezioneNuovoP2P({ico: '', titolo: 'Quanto si può, e quanto costa',
     corpo: 'Minimo ' + fmt(p2pOnchainLibro.minSats || 0) + ' sats'
       + (tetto > 0 ? ' · fase beta: max ' + fmt(tetto) + ' €' : '')
-      + '. Nessuna commissione di Barattolo: chi vende deposita anche il margine per la rete.'
+      + '. Barattolo non prende commissioni: chi vende deposita anche il margine per la rete.'
       + (rete && rete !== 'mainnet'
          ? '<div class="hint">Rete di prova (' + esc(rete) + '): i sats non hanno valore.</div>' : '')});
 }
@@ -76497,7 +76525,7 @@ function apriVietato(){
   el('vietatoSheet').classList.add('open');
 }
 
-function apriNuovoOrdineP2P(metodo, rete){
+function apriNuovoOrdineP2P(metodo){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
@@ -76532,17 +76560,21 @@ function apriNuovoOrdineP2P(metodo, rete){
   p2pNuovoPremioTab = '';
   p2pNuovoPremioTabMano = false;
   p2pNuovoEuroVia = '';
-  /* LA RETE (30 ott 2026, cantiere oc-identico): 'onchain' apre questo
-     stesso foglio per uno scambio con la garanzia 2-di-3, solo a chi e'
+  /* LA RETE (30 ott 2026, cantiere oc-identico): 'onchain', chiesta da
+     `apriPubblicaOnchainP2P` per questa sola apertura, apre questo stesso
+     foglio per uno scambio con la garanzia 2-di-3, solo a chi e'
      ammesso; tutto il resto riparte come sopra */
-  p2pNuovoOc = rete === 'onchain' && !!myP2POnchain;
+  p2pNuovoOc = typeof p2pNuovoReteChiesta !== 'undefined'
+    && p2pNuovoReteChiesta === 'onchain' && !!myP2POnchain;
+  p2pNuovoReteChiesta = '';
   p2pOcRecapito = '';
   renderNuovoOrdineP2P();
   /* la riga della porta del primo ordine (9 ott 2026), solo a chi la
      porta riguarda: agli altri il foglio e' quello di sempre (e la
      porta e' di Mostro: sull'on-chain non c'e') */
   const porta = el('p2pNuovoPorta');
-  if (porta) porta.hidden = p2pNuovoOc || !(typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P());
+  if (porta) porta.hidden = !(typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P());
+  if (porta && p2pNuovoOc) porta.hidden = true;
   el('sheetBg').classList.add('open');
   /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
      a foglio gia' a posto): se non se ne occupa — reduced-motion,
@@ -77388,6 +77420,11 @@ function articoloDetPercentoP2P(testo){
   return a === 'dello ' ? 'lo ' : a === 'del ' ? 'il ' : 'l\'';
 }
 function riquadroLimitiP2P(){
+  /* A RETE ON-CHAIN (30 ott 2026, cantiere oc-identico) la scatola in
+     fondo e' la sua: «Dove vuoi gli euro» per chi vende, e i numeri del
+     2-di-3 al posto del tetto e della fee di Lightning */
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && myP2POnchain)
+    return (p2pLato !== 'compro' ? sezioneRecapitoOnchainP2P() : '') + riquadroOnchainP2P();
   const riga = rigaTettoFeeP2P();
   return riga ? sezioneNuovoP2P({
     ico: '', titolo: 'Quanto si può, e quanto costa', corpo: riga}) : '';
@@ -77447,7 +77484,7 @@ function renderNuovoOrdineP2P(){
   /* la rete del foglio (30 ott 2026, cantiere oc-identico): vedi
      `apriPubblicaOnchainP2P` */
   const oc = !!(p2pNuovoOc && myP2POnchain);
-  const tab = !oc && tabacchinoP2P(p2pNuovoMetodi);
+  const tab = tabacchinoP2P(p2pNuovoMetodi);
   const tit = el('p2pNuovoTit');
   if (tit) titoloNuovoP2P(tit, compro, tab);
   /* l'interruttore della rete in cima (30 ott 2026): vuoto a chi non e'
@@ -77503,7 +77540,7 @@ function renderNuovoOrdineP2P(){
           'onclick="apriEuroTabP2P(\'min\')">' +
           '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuro, val.segno, 'min')) + '</span>' +
           '<i aria-hidden="true">▾</i></button>' +
-      ((p2pNuovoFisso || oc) ? '' :
+      (p2pNuovoFisso ? '' :
         '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
         '<button type="button" id="p2pNuovoEuroMax" class="p2p-tendina' +
         (interoP2P(p2pNuovoEuroMax).n > 0 ? '' : ' vuota') + '" ' +
@@ -77528,7 +77565,7 @@ function renderNuovoOrdineP2P(){
          non una regola per sempre. Il numero resta vivo. */
       (maxTestoP2P()
         ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
-      (oc ? '' : p2pNuovoFisso
+      (p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
@@ -77548,7 +77585,7 @@ function renderNuovoOrdineP2P(){
       (p2pNuovoAperta ? 'true' : 'false') + '" onclick="apriTendinaMetodiP2P()">' +
       '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
     sotto: (p2pNuovoAperta
-      ? '<div class="p2p-voci">' + (oc ? metodiOnchainP2P : metodiPubblicabiliP2P)(compro ? 'compro' : 'vendo').map(m =>
+      ? '<div class="p2p-voci">' + (oc ? metodiOnchainP2P(compro ? 'compro' : 'vendo') : metodiPubblicabiliP2P(compro ? 'compro' : 'vendo')).map(m =>
           /* la voce col marchio stringe il respiro per farlo grande:
              la classe la chiede il CATALOGO, come la pillola */
           '<button type="button" class="p2p-voce' +
@@ -77707,8 +77744,7 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + (oc && !compro ? sezioneRecapitoOnchainP2P() : '')
-    + accesso + pausa + paracadute + (oc ? riquadroOnchainP2P() : riquadroLimitiP2P()) +
+    + quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
@@ -77744,12 +77780,15 @@ function renderNuovoOrdineP2P(){
        questo foglio non nomina, e un commento innocente la farebbe
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
-      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + (oc ? ' p2p-invia-oc' : '') + '" id="p2pNuovoInvia" ' +
+      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + '" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">' +
         /* col percorso Barattozon il bottone dice che prima c'e' il
            riepilogo: e' l'ultimo passo, non un salto nel vuoto — e al
            posto della ricevuta porta il logo (24 set 2026) */
-        (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : oc ? P2P_OC_MONETA + 'Pubblica ordine' : '⚡ Pubblica ordine') + '</button>' +
+        /* a rete on-chain la moneta arancio col filo bianco al posto del
+           fulmine (30 ott 2026, oc-identico) */
+        (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + 'Pubblica ordine</span></button>'
+          : (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>') +
     '</div>';
 }
 /* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
@@ -79283,8 +79322,9 @@ function scegliValutaP2P(cod){
    stesso che apre la tastiera, quindi un render qui porterebbe via il
    fuoco al campo che si sta per riempire. */
 function svelaSecondoImportoP2P(){
-  if (p2pNuovoDue || p2pNuovoFisso || tabacchinoP2P(p2pNuovoMetodi)
-      || (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc)) return;
+  /* a rete on-chain l'importo e' uno solo: il 2-di-3 blocca una cifra */
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return;
+  if (p2pNuovoDue || p2pNuovoFisso || tabacchinoP2P(p2pNuovoMetodi)) return;
   p2pNuovoDue = true;
   /* LA PAGINA NON SI MUOVE (ritocco di Andrea): la nota che compare
      allunga il riquadro, e l'ancoraggio dello scorrimento del browser

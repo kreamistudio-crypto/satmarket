@@ -835,13 +835,16 @@ def main():
           (uno(999, o5["id"])["paracadute"], "paracadute" in (nel_libro(o5["id"]) or {}),
            riga_db(o5["id"])["para_partenza"]))
     prima = len(BOTTONI)
+    # una lettura DOPO quella della partenza: nello stesso secondo il
+    # giudice la prenderebbe per la stessa (e ha ragione)
     cambio(106000)
+    SRV._cambio_cache["quando"] = time.time() + 1
     asyncio.run(SRV._p2p_onchain_ronda())
     asyncio.run(SRV._p2p_onchain_ronda())
     prova("una lettura oltre il 5% (+6%), contata una volta sola anche con due "
           "giri: l'ordine resta nel libro", ("pending", 1),
           (riga_db(o5["id"])["stato"], riga_db(o5["id"])["para_oltre"]))
-    SRV._cambio_cache["quando"] = time.time() + 1
+    SRV._cambio_cache["quando"] = time.time() + 2
     asyncio.run(SRV._p2p_onchain_ronda())
     d5 = riga_db(o5["id"])
     nuovi = BOTTONI[prima:]
