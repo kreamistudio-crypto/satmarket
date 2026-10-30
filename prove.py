@@ -65335,7 +65335,7 @@ def prove_p2p_libro():
           True, '<span class="p2p-grande p2p-euro">' in mini
           and '<span class="p2p-piccola p2p-sats">' in mini)
     prova("...mentre l'ORDINE delle righe segue il gesto", True,
-          "${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}"
+          "${paghiEuro ? rigaEuro : rigaSats}${typeof segnoReteP2P === 'function' ? segnoReteP2P('ln') : ''}${anelloScadenzaP2P(o)}"
           in mini
           and "${paghiEuro ? rigaSats : rigaEuro}" in mini)
     prova("il verbo della controparte non c'e' piu'", True,
@@ -153034,6 +153034,142 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
            "\ncollaudo_p2p_onchain.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))
 
 
+def prove_grafica_p2p_onchain():
+    """LA SEZIONE ON-CHAIN DEL P2P RIDISEGNATA (30 ott 2026, cantiere
+    grafica-p2p-onchain, richieste di Andrea dalle schermate del
+    collaudo). La scelta al + (On-chain / Lightning / Barattozon) solo a
+    chi e' ammesso, il rettangolo «Novità», la moneta della rete su ogni
+    card (il fulmine solo a libro on-chain acceso), il foglio «Pubblica»
+    gemello di quello di Lightning, la pagina col tasto puro e le dispute
+    on-chain in «⚖️ Moderazione P2P». I pezzi girano in node con
+    finte minime; le sentinelle guardano i fili."""
+    print("\n[la sezione on-chain del P2P ridisegnata]")
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    monete = pezzo_js(mini, "const P2P_OC_MONETA = ", "\n\n/* LE CARD IN CIMA")
+    foglio = mini[mini.index("let p2pOcLato = 'sell';"):mini.index("async function pubblicaOnchainP2P(btn){")]
+    banco = """
+const NODI = {};
+function el(id){ return NODI[id] || (NODI[id] = {innerHTML: '', textContent: '',
+  classList: {s: new Set(), add(c){ this.s.add(c); }, remove(c){ this.s.delete(c); }, contains(c){ return this.s.has(c); }}}); }
+const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), haptic = () => {};
+let myP2POnchain = false, DEMO = false, VETRINA = false, myTgId = 1, p2pLato = 'compro', eurPerSat = 0;
+let p2pPiuGestoAt = -1e9;
+const P2P_TABACCHINO = 'Contanti al tabacchino';
+const P2P_METODI = ['SEPA', 'Revolut', 'Contanti', P2P_TABACCHINO];
+const P2P_VALUTE = [{cod: 'EUR', bandiera: 'EU'}];
+const LOGO_BZ_HTML = '<img class="logo-bz">';
+let p2pOnchainLibro = {eventi: [], miei: [], quando: 0, rete: 'signet', minSats: 10000};
+const metodiPubblicabiliP2P = l => l === 'vendo' ? ['SEPA', P2P_TABACCHINO] : ['SEPA'];
+const vesteMetodoP2P = () => false, marchioMetodoP2P = m => m;
+const nomeMetodiP2P = l => l === 'compro' ? 'Come vuoi inviare' : 'Come vuoi ricevere';
+const sezioneNuovoP2P = o => '<sez ico="' + (o.ico || '') + '">' + o.titolo + '|' + o.corpo + (o.sotto || '') + '</sez>';
+const rigaOnchainP2P = o => '<card>';
+const LOG = [];
+function apriNuovoOrdineP2P(){ LOG.push('ln'); }
+function apriBarattozonP2P(){ LOG.push('bz'); }
+function apriOnchainP2P(){ LOG.push('pagina'); }
+function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
+""" + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" + foglio + """
+const out = {};
+out.reteSpento = [segnoReteP2P('ln'), /cambio-moneta btc/.test(segnoReteP2P('btc'))];
+p2pOnchainLibro.quando = 5;
+out.reteAcceso = /cambio-moneta ln/.test(segnoReteP2P('ln'));
+p2pOnchainLibro.quando = 0;
+out.portaNo = carteOnchainLibroP2P('sell');
+out.sceltaNo = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open')];
+myP2POnchain = true;
+const porta = carteOnchainLibroP2P('sell');
+out.porta = [/p2p-oc-novita/.test(porta), /Novità: scambi on-chain/.test(porta), /cambio-moneta btc/.test(porta)];
+out.sceltaCompra = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open'), el('p2pSceltaTit').textContent];
+let c = el('p2pSceltaCorpo').innerHTML;
+out.tastiCompra = [c.indexOf('On-chain') >= 0 && c.indexOf('On-chain') < c.indexOf('Lightning'),
+  /btn primary p2p-scelta-rete/.test(c), /Barattozon/.test(c)];
+p2pLato = 'vendo';
+apriSceltaPubblicaP2P(); c = el('p2pSceltaCorpo').innerHTML;
+out.tastiVendi = [/btn rosso p2p-scelta-rete/.test(c), /btn bz p2p-scelta-rete/.test(c), el('p2pSceltaTit').textContent];
+p2pPiuGestoAt = performance.now();
+sceltaReteP2P('ln'); out.fantasma = LOG.slice();
+p2pPiuGestoAt = -1e9;
+sceltaReteP2P('ln'); sceltaReteP2P('bz'); out.strade = LOG.slice();
+sceltaReteP2P('onchain');
+let f = el('p2pOcCorpo').innerHTML;
+out.foglioVendi = [el('p2pOcSheet').classList.contains('open'), p2pOcLato, el('p2pOcTit').textContent,
+  /Dove vuoi gli euro/.test(f), /btn rosso/.test(f), /Premio|Tipo di prezzo|Cosa vuoi fare/.test(f),
+  /sez ico="btc"/.test(f), /rete di prova/.test(el('p2pOcSopra').innerHTML)];
+p2pLato = 'compro'; apriPubblicaOnchainP2P('buy'); f = el('p2pOcCorpo').innerHTML;
+out.foglioCompra = [p2pOcLato, /Dove vuoi gli euro/.test(f), /btn primary/.test(f), el('p2pOcTit').textContent];
+apriPubblicaOnchainP2P(); f = el('p2pOcCorpo').innerHTML;
+out.dallaPagina = [/Cosa vuoi fare/.test(f), p2pOcLato];
+metodoOnchainP2P('Revolut'); metodoOnchainP2P('SEPA'); metodoOnchainP2P(P2P_TABACCHINO);
+out.metodi = p2pOcMetodi;
+tendinaOnchainP2P(); f = el('p2pOcCorpo').innerHTML;
+out.voci = [/data-m="SEPA"/.test(f), /data-m="Contanti al tabacchino"/.test(f)];
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco della sezione on-chain ridisegnata", "node assente")
+        out = None
+    if out is None:
+        prova("il banco della sezione on-chain ridisegnata gira", "", (locals().get("r") and r.stderr or "")[-600:])
+    else:
+        prova("il fulmine sulle card di Mostro c'e' solo a libro on-chain acceso; la "
+              "moneta sulle card on-chain sempre", (["", True], True),
+              (out["reteSpento"], out["reteAcceso"]))
+        prova("il rettangolo «Novità» solo a chi e' ammesso, con la moneta e le "
+              "quattro parole", ("", [True, True, True]), (out["portaNo"], out["porta"]))
+        prova("a chi non e' ammesso il + non chiede niente (la scelta torna falso e "
+              "non si apre)", [False, False], out["sceltaNo"])
+        prova("su «Compra BTC»: On-chain sopra, Lightning verde sotto, niente "
+              "Barattozon", ([True, True, "Vuoi comprare Bitcoin"], [True, True, False]),
+              (out["sceltaCompra"], out["tastiCompra"]))
+        prova("su «Vendi BTC»: Lightning rosso e Barattozon blu",
+              [True, True, "Vuoi vendere Bitcoin"], out["tastiVendi"])
+        prova("il click fantasma dopo il gesto del + non sceglie niente, e ogni "
+              "tasto apre il suo foglio", ([], ["ln", "bz"]), (out["fantasma"], out["strade"]))
+        prova("il foglio on-chain da «Vendi BTC»: aperto, lato sell, recapito, "
+              "bottone rosso, niente premio ne' scelta del lato, il ₿ sui sats, "
+              "la rete di prova sopra", [True, "sell", "Vuoi vendere Bitcoin", True, True,
+                                         False, True, True], out["foglioVendi"])
+        prova("...da «Compra BTC»: lato buy, niente recapito, bottone verde",
+              ["buy", False, True, "Vuoi comprare Bitcoin"], out["foglioCompra"])
+        prova("...dalla pagina c'e' «Compro / Vendo», col lato della scheda",
+              [True, "buy"], out["dallaPagina"])
+        prova("i metodi restano nell'ordine del vocabolario, senza il tabacchino",
+              (["SEPA", "Revolut"], [True, False]), (out["metodi"], out["voci"]))
+    tocca = pezzo_js(mini, "function toccaPiu(){", "\n}\n")
+    prova("il + chiede la scelta PRIMA del foglio di Lightning, e senza scelta va "
+          "avanti come sempre", True,
+          0 < tocca.find("&& apriSceltaPubblicaP2P()) return;")
+          < tocca.find("{ apriNuovoOrdineP2P(); return; }"))
+    chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    prova("i due fogli nuovi si chiudono con gli altri", (True, True),
+          ("el('p2pSceltaSheet').classList.remove('open');" in chiudi,
+           "el('p2pOcSheet').classList.remove('open');" in chiudi))
+    pag = pezzo_js(mini, "async function renderP2POnchain(){", "\n}\n")
+    # l'elenco: dall'ultimo disegno della pagina in giu' (il commento
+    # sopra racconta cosa se n'e' andato, e quelle parole le dice)
+    elenco = pag[pag.index("box.innerHTML = '<button type=\"button\" class=\"btn orange p2p-oc-pubblica\""):]
+    prova("la pagina on-chain e' il tasto puro: niente paragrafo, niente "
+          "moderazione", (True, False, False, False, False),
+          ("onclick=\"apriPubblicaOnchainP2P()\"" in elenco, "Bitcoin on-chain contro euro" in pag,
+           "moderazione" in elenco.lower(), "Vai al libro ordini" in elenco, "class=\"hint\"" in elenco))
+    mod = pezzo_js(mini, "function renderModerazioneP2P(){", "\n}\n")
+    stris = pezzo_js(mini, "function renderStrisciaModP2P(){", "\n}\n")
+    prova("le dispute on-chain stanno in «⚖️ Moderazione P2P» e nel suo numero",
+          (True, True, False),
+          ("disputeOnchainModP2P()" in mod, "p2pOnchainMod.length" in stris,
+           "function moderazioneOnchainP2P(" in mini))
+    prova("il foglio vecchio e la riga tratteggiata non ci sono piu'", (False, False, False),
+          ("function formOnchainP2P(" in mini, "p2p-onchain-porta" in mini, "p2pOnchainForm" in mini))
+
+
 def prove_parole_uniche():
     """LE 12 PAROLE DEL CAMBIO NEL WALLET DI BARATTOLO (29 ott 2026,
     cantiere parole-uniche, idea di Alan, ok di Andrea). Ogni cambio nasce
@@ -182589,6 +182725,7 @@ def main():
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_onchain_verso_lightning,
     prove_p2p_onchain,
+    prove_grafica_p2p_onchain,
     prove_parole_uniche,
     prove_ripristino_visibile,
     prove_onchain_pagina,

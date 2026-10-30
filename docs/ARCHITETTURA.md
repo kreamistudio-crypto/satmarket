@@ -34774,8 +34774,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   l'ETag la conta. Nel telefono: `myP2POnchain`, le card
   `rigaOnchainP2P` in cima al libro del lato (`carteOnchainLibroP2P`),
   la vista `view-p2ponchain` (radice «I miei scambi» nella nav, come
-  `p2pmod`) con `renderP2POnchain`, `schedaOnchainP2P`,
-  `formOnchainP2P`; le firme passano da `onchainFirmaProposta(o, verso)`
+  `p2pmod`) con `renderP2POnchain`, `schedaOnchainP2P`; il foglio
+  «Pubblica» a pieno schermo `p2pOcSheet` (`renderPubblicaOnchainP2P`,
+  dal 30 ott 2026 al posto di `formOnchainP2P`: i riquadri
+  `sezioneNuovoP2P` del foglio di Lightning, stato nelle variabili
+  `p2pOc…`); la scelta del + `p2pSceltaSheet` (`apriSceltaPubblicaP2P`,
+  solo a chi e' ammesso: On-chain, Lightning, e Barattozon su «Vendi
+  BTC»); il segno della rete su ogni card (`segnoReteP2P`, la moneta
+  `P2P_OC_MONETA` e il fulmine `P2P_LN_MONETA` della pagina Cambio; il
+  fulmine solo a libro on-chain acceso); le dispute on-chain in
+  «⚖️ Moderazione P2P» (`leggiModOnchainP2P`, `disputeOnchainModP2P`,
+  e nel numero della sua striscia). Le firme passano da `onchainFirmaProposta(o, verso)`
   e `onchainCofirma(o, parole)`, che prendono l'ordine intero e mandano
   alla sua `rotta`; le seconde firme partono in sottofondo da
   `p2pOnchainCofirmeInAttesa`, chiamata da `onchainCofirmeInSottofondo`.
