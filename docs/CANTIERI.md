@@ -76218,3 +76218,90 @@ Da guardare: un avviso on-chain vero sul collaudo (un admin pubblica,
 l'altro aspetta il messaggio); se in futuro le card on-chain dovranno
 passare anche dal resto del filtro.
 
+## Il banner «On-Chain» scuro, i tasti del + più contrastati e i bottoni del lato dal nero (30 ott 2026, sera, cantiere oc-colori)
+
+LA RICHIESTA. Andrea, 18:43-18:44, dal collaudo: «il banner novità col
+colore gradiente non mi piace, proviamone un altro; inoltre i tasti
+onchain e lightning quando clicchi il pulsante + sono sbiaditi, fammeli
+più contrastati, magari anche con un bordo fine».
+
+I TASTI DEL +. Sul telefono il gradiente che partiva dal fondo dei
+metodi (`--chip-bg`) si leggeva spento: adesso parte da un marrone scuro
+FISSO nei due temi, passa da un tono pieno e arriva al colore della
+rete; scritta bianca con un filo d'ombra, bordo fine (un `inset`, che
+non cambia la misura del tasto) e il bagliore un po' più forte. Due
+ritocchi a seguire: «provami dei bordi scuri più fini» (18:46) — il
+bordo da 1,5 px chiaro diventa 1 px del tono bruciato della rete,
+#5A2E05 e #5C4708 — e «lo scuro dentro il tasto deve essere più scuro,
+contrastato» (18:47): quasi nero sotto la moneta (#140B03 e #130F03
+fino al 18%), il tono pieno al 55%. «Leggermente meno ombra» (18:58):
+l'alone da 14 px a .45 diventa 10 px a .32. L'eccezione scritta della
+sentinella del vestito resta quella.
+
+IL BANNER. Sette varianti in due giri, fotografate nei due temi (foto
+24: A scuro col bordo arancio, B arancio pieno, C alone; foto 27,
+chieste da Andrea alle 18:49 «fammi altri esempi»: D come il tasto
+On-chain del +, E quasi nero col filo arancio, F arancio pieno col bordo
+scuro, G nero con la punta arancio). Scelta di Andrea sulla card (18:52):
+D, cioè gli stessi colori del tasto On-chain ritoccato alle 18:47 —
+banner e scelta del + parlano la stessa lingua. Poi, alle 19:01:
+«fammelo mono colore scuro con un bordino fine arancio attorno, quando
+lo clicchi si trasforma in arancio mentre viene mostrato il tutorial» e
+«il bordo della D va bene»: tinta unica #140B03 col filo #5A2E05 della
+D; dal tocco alla fine del tutorial la classe `acceso` lo fa arancio
+#F7931A (transizione di un quarto di secondo) e la moneta riprende il
+filo bianco dei fondi arancio. La accende `apriNovitaOnchainP2P`, la
+spengono `fineTutorialOcP2P` e il ritorno a vuoto di
+`tutorialOnchainP2P` (un tutorial che non parte non lascia il banner
+arancio), e `carteOnchainLibroP2P` la rimette se il libro si ridisegna
+nel frattempo. L'alone del banner non c'è: il rettangolo ha
+`overflow:hidden` e se lo mangiava comunque. Foto 31.
+
+I BOTTONI DEL LATO. Andrea, 18:53: «voglio che abbiano questo stile
+anche i tasti pubblica ordine onchain e pubblica ordine lighting con i
+relativi colori verde o rosso in base se vende o compri, mandami foto
+prima». Foto 28-29 (prima e dopo, i due temi), e alle 18:57 «si
+perfetto con anche meno alone dietro e le icone spostale a sinistra
+verso il nero così levi anche il bordino bianco all'icona onchain;
+stessa cosa per i tasti compra o vendi quando prendi un ordine»; alle
+19:04 «affianco a vendi e compra metti la relativa icona così chi lo
+prende sa se è onchain o lightning».
+- Un vestito nuovo, `p2p-scuro`, accanto a `primary` o `rosso`: dal
+  quasi nero (#04140A, #170604) al verde #34B47A o al rosso #E04A26,
+  bordo di 1 px scuro (il bordo del ruolo, quindi l'altezza resta 52,5),
+  scritta bianca, alone corto (8 px a .25). Riscrive le LEVE del ruolo
+  (`--b-bg`, `--b-sh`…), non dipinge sopra: premuto, spento e «in corso»
+  le leggono come per gli altri bottoni. La sentinella del vestito ha
+  la sua seconda eccezione scritta, con le parole di Andrea.
+- Lo portano i due «Pubblica ordine» (non col tabacchino: Barattozon
+  resta blu) e Compra/Vendi del dettaglio Lightning (non «Scegli», che
+  resta arancio). NON il «Pubblica il tuo primo ordine» del libro vuoto,
+  che usa lo stesso `vestitoInvioP2P`: non chiesto.
+- L'icona a sinistra, sul nero, e la scritta al centro: il fulmine in
+  uno span (`p2p-invia-ico`, la sentinella del ⚡ che resta uno solo
+  conta la stringa nuova) e la moneta, entrambi `position:absolute`;
+  la moneta perde il filo bianco qui.
+- Il fantasma della morfosi copia i nodi del bottone: le stesse regole
+  posano l'icona a sinistra anche lì, e la meta veste la sfumatura e la
+  scritta bianca (pesano più del rosso del lato; Barattozon e il + del
+  mercatino esclusi), o all'ultimo fotogramma il bottone cambierebbe di
+  colpo. Le prove della morfosi che leggevano `var(--b-ok-bg)` ora
+  leggono la sfumatura.
+- La presa ON-CHAIN passava da «Prendi lo scambio» arancio (la domanda
+  di casa, `chiediConferma`): adesso dice «Compra» o «Vendi», col
+  vestito scuro del lato e la moneta a sinistra (`vestito: 'compro-oc'`
+  / `'vendo-oc'`); l'etichetta resta scritta col textContent, la
+  moneta (una costante nostra) entra dopo. La presa Lightning porta il
+  fulmine. Foto 30 e 32.
+
+Prove: `prove_grafica_p2p_onchain` (banner, tasti del +, bottoni del
+lato, fantasma, «acceso», la presa con la rete), `prove_vestito_bottoni`,
+`prove_p2p_dettaglio`, `prove_nav_p2p`, `prove_p2p_pubblica`,
+`prove_tasto_barattozon`. Controprove rosse: il banner (due), il
+vestito del «Pubblica ordine» tolto, `accendiNovitaOcP2P(false)` tolto
+da `fineTutorialOcP2P`, la meta del fantasma tolta. Visto dal vivo nei
+due temi col giro locale (relay morti): bottoni, presa on-chain e
+Lightning, banner prima e durante il tutorial, spento a tutorial chiuso.
+Da guardare dal telefono sul collaudo: la morfosi del + col vestito
+nuovo, a occhio.
+
