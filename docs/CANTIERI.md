@@ -75930,3 +75930,83 @@ lati interi, «Vendi» apre il foglio on-chain con lato sell.
 
 Da guardare sul telefono: il + rosso su «Vendi BTC» nella WebView di
 Telegram, che è quella che conta.
+
+## Il foglio «Pubblica» on-chain identico a quello di Lightning: prezzo di mercato col premio, chi può prendere, la pausa, il paracadute (30 ott 2026, sera, cantiere oc-identico, passo 2 della lettera di Andrea delle 15:10: «quella pagina onchain deve essere identica alla pagina lighting nel senso che ci deve essere la possibilita di pubblicare a prezzo di mercato o a prezzo fisso la domanda chi puo prendere l ordine, la pausa e il paracadute. cioe deve essere identico allaltro non capisco perche me lo hai fatto diverso»)
+
+LA DECISIONE: UN FOGLIO SOLO. Il foglio on-chain di grafica-p2p-onchain
+era un gemello (`p2pOcSheet`, `renderPubblicaOnchainP2P`): stessi
+riquadri, ma i campi suoi, e mancava tutto quel che Andrea elenca. Rifarlo
+gemello con le quattro cose in più voleva dire due fogli da tenere in
+pari per sempre, e il salto del cambio di rete (un foglio che scende e
+uno che sale) restava. Adesso il foglio è `p2pNuovoSheet` per tutt'e due
+le reti, con `p2pNuovoOc` acceso: le sezioni sono le STESSE funzioni
+(tipo di prezzo, premio, «Chi può prendere l'ordine», pausa,
+paracadute), il giudice dei campi è `valeNuovoOrdineP2P`, la domanda
+della pausa è `fermaPerPausaP2P`. L'interruttore in cima cambia solo il
+segno e ridisegna: niente foglio che si apre o si chiude, quindi niente
+salto — il titolo misurato dal vivo sta a 66 px prima e dopo il cambio.
+Il foglio gemello, le sue sette funzioni e le variabili `p2pOc…` sono
+tolte, e con loro la cura del passo 1 a corse spente (`p2pSenzaCorsa`):
+non c'è più niente da scambiare.
+
+LE DIFFERENZE CHE RESTANO SONO DELLA RETE, e il foglio le dice: niente
+Barattozon (il PayCode vive nella garanzia del coordinatore), niente
+intervallo (un importo solo: i sats si contano una volta), niente zona
+del contanti (la porta col coordinatore, che qui non c'è), «Dove vuoi
+gli euro» per chi vende (sul Lightning lo porta la chat dello scambio),
+e in fondo il riquadro della rete (minimo 10.000 sats, il tetto della
+fase beta, «Rete di prova (signet)») al posto di quello della
+commissione del coordinatore. La riga «Rete di prova» sotto
+l'interruttore è scesa lì: sopra il titolo lo spostava.
+
+IL SERVER, perché l'ordine on-chain è suo (Mostro non c'entra):
+- A MERCATO si scrivono gli euro e il premio (±20%, come il cursore);
+  nel libro `prezzo_sats` è 0 (il `amt` 0 di NIP-69, `premium` col
+  premio) e la card mostra «≈ 98.000 sats» al cambio di adesso. I sats
+  NASCONO ALLA PRESA, con la formula del coordinatore (`sats -=
+  premio/100 * sats`) e `cambio_noto_ora` non più vecchio di dieci
+  minuti (sennò 503: «riprova fra un minuto»), e si scrivono in
+  `prezzo_sats` nella stessa riga di `importo_sats` — è quel che ronda,
+  avvisi e giudice dei PSBT leggono da lì in poi. Sotto il minimo al
+  cambio della presa, o oltre il tetto di prova: 409. Pubblicando, la
+  stima sotto il minimo è già un «no» col numero.
+- CHI PUÒ PRENDERE: la soglia del foglio (1+, 3+, 5+) sta sull'ordine e
+  la giudica la presa con la reputazione e il giudice del Lightning
+  (`_reputazione_p2p`, `_giudice_presa_p2p`). Il limite delle prese
+  aperte del Lightning qui non conta: l'on-chain ha il suo.
+- LA PAUSA è quella della persona (profilo di scambio), la stessa del
+  Lightning: l'ordine resta nel libro in grigio con «⏸ Puoi prenderlo
+  tra…», il tocco vibra e non chiede di prendere, la presa dice di no.
+  Letta con la fotografia del libro (la busta non tocca il database).
+  Come nel Lightning vale dentro Barattolo: il 38383 non cambia, e
+  scartata la strada di ripubblicarlo a ogni inizio e fine di pausa —
+  chi lo legge altrove non può prenderlo comunque.
+- IL PARACADUTE (dietro la leva `P2P_PARACADUTE`, come nel Lightning):
+  la partenza la scrive il server pubblicando; una passata nella ronda
+  coi giudici puri del Lightning (due letture di fila oltre la soglia,
+  la stessa lettura non conta due volte, la fonte muta non apre) e,
+  quando si apre, l'ordine si ANNULLA DA SÉ — qui nessun telefono deve
+  firmare un `cancel` — con `chiuso_perche = 'paracadute'`, l'avviso col
+  bottone «🟠 Apri lo scambio» e la scheda che dice perché.
+
+Prove: `prove_p2p_onchain` (la formula, il giudice a mercato),
+`prove_grafica_p2p_onchain` (il foglio unico: la scelta, il «Vendi» del
+rettangolo che porta il lato, l'interruttore che ridisegna e lascia
+tabacchino e intervallo, i metodi, il riquadro della rete),
+`prove_deposito_p2p_onchain` (le sezioni nel foglio, il gesto e quel che
+va sul filo, la card a mercato e in pausa); `collaudo_p2p_onchain`,
+sezione 11-quater: a mercato dal libro alla presa (98.000 stimati a
+90.000 €/BTC, 88.200 nati alla presa a 100.000), il cambio vecchio, i no
+del mercato, il filtro, la pausa e il suo ritorno, il paracadute (una
+lettura, la stessa due volte, la seconda che apre; al 20% fermo; leva
+spenta). Controprove: sette mutazioni del server (formula, porta della
+presa, freschezza del cambio, passata del paracadute, pausa nella busta,
+leva del paracadute, pausa nella porta), ciascuna rossa. Giro dal vivo a
+390 px tema scuro: il «Vendi» del rettangolo apre il foglio on-chain, il
+cambio di rete non sposta il titolo, pubblicato a mercato +2% con 3+ e
+paracadute 5%, la scheda con «≈ 98.000», la card per un altro col badge
+«2% meno conveniente» e lo scudo del filtro.
+
+Da guardare: la sezione «Pausa degli ordini» compare solo dove compare
+nel Lightning (`tempoPubblicaP2P`); il giro locale non l'aveva, il
+collaudo sì. La presa a mercato dal telefono vero, sul collaudo.

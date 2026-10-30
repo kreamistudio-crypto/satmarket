@@ -3921,7 +3921,7 @@
      piuttosto metti un leggero bordo bianco»): dove il fondo e' arancio
      la moneta porta un filo bianco, e basta */
   .p2p-oc-novita .cambio-moneta.p2p-oc-moneta,.p2p-oc-pubblica .cambio-moneta.p2p-oc-moneta,
-  .p2p-scelta-rete .cambio-moneta.btc.p2p-oc-moneta,#p2pOcInvia .cambio-moneta.p2p-oc-moneta{
+  .p2p-scelta-rete .cambio-moneta.btc.p2p-oc-moneta,#p2pNuovoInvia .cambio-moneta.p2p-oc-moneta{
     box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   /* IL RETTANGOLO «NOVITÀ» nel libro, sotto Recenti e Filtro: l'arancio
      pieno dei bottoni di casa. PIU' PICCOLO E CHE SCORRE (30 ott 2026,
@@ -3978,8 +3978,7 @@
   .p2p-rete-tasto .cambio-moneta.p2p-oc-moneta{width:26px;height:26px}
   .p2p-rete-tasto .cambio-moneta.p2p-oc-moneta .cambio-svg{width:15px;height:15px}
   .p2p-rete-tasto:not(.su) .cambio-moneta.p2p-oc-moneta{opacity:.55}
-  .p2p-tendina.p2p-oc-fissa{cursor:default}
-  .btn#p2pOcInvia{display:flex;align-items:center;justify-content:center;gap:10px}
+  .btn.p2p-invia-oc{display:flex;align-items:center;justify-content:center;gap:10px}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
      metodi della card, la pillola del filtro e la voce del foglio
@@ -14888,20 +14887,6 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pSceltaTit">Vuoi comprare Bitcoin</h3>
     <div id="p2pSceltaCorpo"></div>
-  </div>
-
-  <!-- IL FOGLIO «PUBBLICA» DELL'ON-CHAIN (30 ott 2026): il gemello a pieno
-       schermo di quello di Lightning, con «Scambi on-chain» sopra il
-       titolo. Lo riempie `renderPubblicaOnchainP2P`. -->
-  <div class="sheet pieno" id="p2pOcSheet" role="dialog" aria-modal="true" aria-labelledby="p2pOcTit">
-    <div class="grab"></div>
-    <div class="p2p-oc-sopra" id="p2pOcSopra"></div>
-    <div class="foglio-testa">
-      <button type="button" class="foglio-back" onclick="navIndietro()" aria-label="Chiudi">&#8592;</button>
-      <h3 id="p2pOcTit">Vuoi vendere Bitcoin</h3>
-      <span class="foglio-back vuoto" aria-hidden="true">&#8592;</span>
-    </div>
-    <div class="foglio-corpo" id="p2pOcCorpo"></div>
   </div>
 
   <!-- I PASSI 1 E 2 DI BARATTOZON (9 ott 2026, sera): il PayCode e
@@ -33963,7 +33948,6 @@ function closeSheet(){
   pulisciChiaveModP2P();
   el('p2pNuovoSheet').classList.remove('open');
   el('p2pSceltaSheet').classList.remove('open');
-  el('p2pOcSheet').classList.remove('open');
   el('p2pScadeSheet').classList.remove('open');
   el('p2pPayCodeSheet').classList.remove('open');
   el('p2pEuroSheet').classList.remove('open');
@@ -57193,24 +57177,52 @@ function anelloOnchainP2P(o){
                          creato: Number(o.creato) || 0, faccia: {nome: o.nome || ''}}) : '';
 }
 
+/* PURA: i sats della card — quelli scritti a prezzo fisso, a mercato la
+   stima al cambio di adesso col «≈» (i sats veri nascono alla presa,
+   cantiere oc-identico), o la frase se il cambio non c'e' */
+function satsCardOnchainP2P(o){
+  if (!o.mercato || Number(o.sats) > 0) return fmt(Number(o.sats) || 0) + ' sats';
+  return Number(o.stima) > 0 ? '≈ ' + fmt(Number(o.stima)) + ' sats' : 'sats al cambio della presa';
+}
+/* PURA: fino a quando l'ordine di un ALTRO e' fermo per la sua pausa
+   (0 = si prende), come la carta grigia del Lightning */
+function pausaOnchainP2P(o, adesso){
+  const f = Math.floor(Number(o && o.pausa_fino) || 0);
+  return f > (adesso || Math.floor(Date.now() / 1000)) ? f : 0;
+}
 function rigaOnchainP2P(o){
   const paghiEuro = o.lato === 'sell';
   const mio = p2pOnchainLibro.miei.includes(String(o.ordine));
   const rigaEuro = '<span class="p2p-grande p2p-euro">' + (paghiEuro ? 'Invia ' : 'Ricevi ')
     + esc(fmtEur(o.euro)) + ' €</span>';
   const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">'
-    + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + fmt(Number(o.sats) || 0) + ' sats</span>';
+    + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + esc(satsCardOnchainP2P(o)) + '</span>';
+  /* IL FOGLIO DI LIGHTNING SULLA CARD (30 ott 2026, cantiere oc-identico):
+     il premio a mercato col badge di Lightning, chi puo' prendere, e la
+     pausa — grigia con «Puoi prenderlo tra…» per chi guarda, «In pausa
+     fino…» sulla mia */
+  const adesso = Math.floor(Date.now() / 1000);
+  const pausa = pausaOnchainP2P(o, adesso);
+  const fermo = pausa && !mio ? '<div class="p2p-pausa-tra" data-fine="' + pausa + '">⏸ Puoi prenderlo tra <b>'
+    + esc(traQuantoP2P(pausa - adesso)) + '</b></div>' : '';
+  const badge = o.mercato && typeof badgePremioP2P === 'function'
+    ? badgePremioP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0}) : '';
+  const filtro = Number(o.filtro) > 0 ? '<div class="p2p-box p2p-accesso">🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</div>' : '';
   const metodi = Array.isArray(o.metodi) ? o.metodi : [];
   const paga = metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(metodi.join(', '))}">`
       + metodi.map(m => typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(m) : esc(m)).join(', ')
       + '</div>' : '';
-  return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${mio ? ' p2p-mio' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${mio ? ' p2p-mio' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
     onclick="apriOnchainP2P(Number(this.dataset.id))">
+    ${fermo}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${segnoReteP2P('btc')}${anelloOnchainP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
+    ${badge ? '<div class="p2p-badge-riga">' + badge + '</div>' : ''}
     ${paga}
+    ${filtro}
     ${o.nome ? '<div class="p2p-box">👤 ' + esc(o.nome) + '</div>' : ''}
+    ${mio && pausa ? '<div class="p2p-box p2p-pausa">⏸ In pausa fino ' + esc(quandoPausaP2P(pausa)) + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
 }
@@ -57234,7 +57246,7 @@ const P2P_ONCHAIN_STATI = {
    venuti (`navIndietro`), come quello di Lightning. */
 function apriDettaglioOnchainP2P(id){
   p2pOnchainAperto = Number(id) || 0;
-  chiudiFoglioP2P('p2pOcSheet');
+  chiudiFoglioP2P('p2pNuovoSheet');
   if (vistaAttivaP2P() === 'view-p2ponchain') return renderP2POnchain();
   go('p2ponchain');
 }
@@ -57255,18 +57267,28 @@ function apriOnchainP2P(id, modo){
   const o = p2pOnchainLibro.eventi.find(x => Number(x.id) === Number(id));
   if (!o) return toast('⛓️ Quest\'ordine non è più nel libro', 4000);
   if (p2pOnchainLibro.miei.includes(String(o.ordine))) return apriDettaglioOnchainP2P(o.id);
+  /* in pausa non si prende (30 ott 2026): la carta lo dice, il tocco
+     vibra e lo ripete — il server comunque direbbe di no */
+  const pausa = pausaOnchainP2P(o);
+  if (pausa) {
+    haptic('warning');
+    return toast('⏸ Chi l\'ha pubblicato è in pausa: puoi prenderlo tra '
+      + traQuantoP2P(pausa - Math.floor(Date.now() / 1000)), 4000);
+  }
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
   chiediConferma({
     titolo: vendeLui ? '⛓️ Compri bitcoin on-chain' : '⛓️ Vendi bitcoin on-chain',
-    testata: '<div class="p2p-onchain-riass"><b>' + fmt(Number(o.sats) || 0) + ' sats</b> per <b>'
+    testata: '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
       + esc(fmtEur(o.euro)) + ' €</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : '')
+      + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi</small>' : '')
+      + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
       + (o.nome ? '<br><small>di ' + esc(o.nome) + '</small>' : '') + '</div>',
     corpo: vendeLui
       ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
         + 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; '
         + 'lui li libera e arrivano sul TUO wallet on-chain. Se qualcosa va storto decide un moderatore.'
-      : 'Se prendi, depositi tu ' + fmt(Number(o.sats) || 0) + ' sats più il margine di rete '
+      : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più il margine di rete '
         + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore. Chi compra ti manda '
         + esc(fmtEur(o.euro)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
         + 'Se non arrivano, apri una disputa: decide un moderatore.',
@@ -57675,144 +57697,88 @@ function daFirmareOnchainP2P(o){
    I campi vivono in variabili (`p2pOc…`) e il foglio si ridisegna solo
    ai tocchi (lato, tendina, voci): mentre si scrive si legge il campo e
    basta, che un render porterebbe via il fuoco e la tastiera. */
-let p2pOcLato = 'sell';       // 'sell' = vendo bitcoin (deposito io) | 'buy' = compro bitcoin
-let p2pOcScelta = false;      // la scelta «Compro / Vendo» in cima (entrando dalla pagina)
-let p2pOcMetodi = [];
-let p2pOcAperta = false;      // la tendina dei metodi e' aperta
-let p2pOcSats = '', p2pOcEuro = '', p2pOcRecapito = '';
+/* IL FOGLIO «PUBBLICA» DELL'ON-CHAIN E' QUELLO DI LIGHTNING (30 ott 2026,
+   cantiere oc-identico, Andrea: «quella pagina onchain deve essere
+   identica alla pagina lighting ... non capisco perche me lo hai fatto
+   diverso»). Non ha piu' un foglio suo: e' `p2pNuovoSheet` con
+   `p2pNuovoOc` acceso, e l'interruttore in cima cambia solo quel segno e
+   ridisegna — nessun foglio che scende e sale, quindi nessun salto.
+   Prezzo di mercato o fisso col premio, «Chi può prendere l'ordine», la
+   pausa e il paracadute sono le sezioni di Lightning, le stesse funzioni.
+   Le differenze sono quelle della rete: niente Barattozon (il PayCode
+   vive nella garanzia del coordinatore), niente intervallo (un importo
+   solo), niente zona del contanti, e «Dove vuoi gli euro» per chi vende
+   (sul Lightning lo porta la chat dello scambio); in fondo il riquadro
+   della rete al posto di quello della commissione del coordinatore. */
+let p2pNuovoOc = false;       // il foglio «Pubblica» e' on-chain
+let p2pOcRecapito = '';       // «Dove vuoi gli euro», se vendo on-chain
 
+/* `lato` = 'sell' (vendo bitcoin) | 'buy' (compro) | niente: quello del libro */
 function apriPubblicaOnchainP2P(lato){
-  haptic();
   if (!myP2POnchain) return apriOnchainP2P(0);
-  p2pOcScelta = lato !== 'sell' && lato !== 'buy';
-  p2pOcLato = lato === 'buy' ? 'buy' : lato === 'sell' ? 'sell' : (p2pLato === 'compro' ? 'buy' : 'sell');
-  p2pOcMetodi = []; p2pOcAperta = false;
-  p2pOcSats = ''; p2pOcEuro = ''; p2pOcRecapito = '';
-  renderPubblicaOnchainP2P();
-  el('sheetBg').classList.add('open');
-  el('p2pOcSheet').classList.add('open');
+  const l = lato === 'buy' ? 'compro' : lato === 'sell' ? 'vendo' : p2pLato;
+  if (l !== p2pLato && typeof setLatoP2P === 'function') setLatoP2P(l, true);
+  apriNuovoOrdineP2P('', 'onchain');
 }
 
-function metodiOnchainP2P(){
-  return P2P_METODI.filter(m => m !== P2P_TABACCHINO);
+/* i metodi che l'on-chain pubblica: quelli del lato, senza il tabacchino */
+function metodiOnchainP2P(lato){
+  return metodiPubblicabiliP2P(lato).filter(m => m !== P2P_TABACCHINO);
 }
 
-function renderPubblicaOnchainP2P(){
-  const box = el('p2pOcCorpo');
-  if (!box) return;
-  const vendo = p2pOcLato === 'sell';
-  const tit = el('p2pOcTit');
-  if (tit) tit.textContent = vendo ? 'Vuoi vendere Bitcoin' : 'Vuoi comprare Bitcoin';
-  const sopra = el('p2pOcSopra');
-  /* in cima l'interruttore della rete (14:09, Andrea: «anche dopo aver
-     scelto se lightning o onchain in cima alla pagina puoi comunque
-     cambiare ancora tra i due»), e sotto la rete di prova se lo e' */
-  if (sopra) sopra.innerHTML = interruttoreReteP2P('onchain')
-    + (p2pOnchainLibro.rete !== 'mainnet' ? '<small>Rete di prova (' + esc(p2pOnchainLibro.rete) + ')</small>' : '');
-  const voce = (l, testo) => '<button type="button" class="p2p-accesso-chip' + (p2pOcLato === l ? ' on' : '')
-    + '" aria-pressed="' + (p2pOcLato === l ? 'true' : 'false') + '" onclick="latoOnchainP2P(\'' + l + '\')">' + testo + '</button>';
-  const lato = !p2pOcScelta ? '' : sezioneNuovoP2P({
-    titolo: 'Cosa vuoi fare',
-    corpo: '<div class="p2p-accesso-scelte">' + voce('buy', 'Compro bitcoin') + voce('sell', 'Vendo bitcoin') + '</div>'});
-  const val = P2P_VALUTE[0];
-  const valuta = sezioneNuovoP2P({
-    ico: 'valuta',
-    titolo: 'La valuta con cui ' + (vendo ? 'riceverai' : 'invierai'),
-    corpo: '<div class="p2p-tendina p2p-oc-fissa"><span>' + val.bandiera + ' ' + esc(val.cod) + '</span></div>'});
-  const metodi = sezioneNuovoP2P({
-    ico: 'metodi',
-    titolo: nomeMetodiP2P(vendo ? 'vendo' : 'compro') + ' — puoi sceglierne più di uno',
-    corpo: '<button type="button" id="p2pOcMetodiBtn" class="p2p-tendina' + (p2pOcMetodi.length ? '' : ' vuota')
-      + '" aria-expanded="' + (p2pOcAperta ? 'true' : 'false') + '" onclick="tendinaOnchainP2P()">'
-      + '<span>' + esc(p2pOcMetodi.length ? p2pOcMetodi.join(', ') : 'Seleziona metodi di pagamento')
-      + '</span><i aria-hidden="true">▾</i></button>',
-    sotto: p2pOcAperta
-      ? '<div class="p2p-voci">' + metodiOnchainP2P().map(m => {
-          const si = p2pOcMetodi.indexOf(m) >= 0;
-          return '<button type="button" class="p2p-voce' + (vesteMetodoP2P(m) ? ' p2p-voce-marchio' : '')
-            + '" data-m="' + esc(m) + '" aria-pressed="' + (si ? 'true' : 'false') + '" '
-            + 'onclick="metodoOnchainP2P(this.dataset.m)"><b aria-hidden="true">' + (si ? '✓' : '') + '</b>'
-            + marchioMetodoP2P(m, true) + '</button>';
-        }).join('') + '</div>'
-      : ''});
-  const importo = sezioneNuovoP2P({
-    ico: 'importo',
-    titolo: 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' + (vendo ? 'ricevere' : 'inviare'),
-    corpo: '<input type="text" id="p2pOcEuro" inputmode="decimal" autocomplete="off" enterkeyhint="next" '
-      + 'placeholder="Importo" aria-label="Importo in euro" value="' + esc(p2pOcEuro) + '" '
-      + 'oninput="p2pOcEuro=this.value">'});
-  const sats = sezioneNuovoP2P({
-    ico: 'btc',
-    titolo: 'Inserisci la quantità di sats che vuoi ' + (vendo ? 'vendere' : 'comprare'),
-    corpo: '<input type="text" id="p2pOcSats" inputmode="numeric" autocomplete="off" enterkeyhint="next" '
-      + 'placeholder="Sats" aria-label="Quantità di sats" value="' + esc(p2pOcSats) + '" '
-      + 'oninput="p2pOcSats=this.value;euroOnchainP2P()">',
-    sotto: '<div class="hint" id="p2pOcCambio">' + esc(cambioOnchainP2P()) + '</div>'});
-  const recapito = !vendo ? '' : sezioneNuovoP2P({
-    ico: 'scontrino',
-    titolo: 'Dove vuoi gli euro',
+/* «Dove vuoi gli euro»: la sezione in piu' di chi vende on-chain */
+function sezioneRecapitoOnchainP2P(){
+  return sezioneNuovoP2P({
+    ico: 'scontrino', titolo: 'Dove vuoi gli euro',
     corpo: '<input type="text" id="p2pOcRecapito" maxlength="300" autocomplete="off" enterkeyhint="done" '
       + 'placeholder="IBAN, nome Revolut, numero Satispay…" aria-label="Dove vuoi gli euro" '
       + 'value="' + esc(p2pOcRecapito) + '" oninput="p2pOcRecapito=this.value">',
     sotto: '<div class="hint">Lo legge solo chi prende il tuo scambio. Puoi scriverlo anche dopo.</div>'});
-  box.innerHTML = lato + valuta + metodi + importo + sats + recapito
-    + '<div class="foglio-piede sola">'
-    + '<button type="button" class="btn ' + (vendo ? 'rosso' : 'primary') + '" id="p2pOcInvia" onclick="pubblicaOnchainP2P(this)">'
-    + P2P_OC_MONETA + 'Pubblica ordine</button></div>';
 }
 
-function latoOnchainP2P(l){
-  haptic();
-  p2pOcLato = l === 'buy' ? 'buy' : 'sell';
-  renderPubblicaOnchainP2P();
-}
-function tendinaOnchainP2P(){
-  haptic();
-  p2pOcAperta = !p2pOcAperta;
-  renderPubblicaOnchainP2P();
-}
-/* le voci restano nell'ordine del vocabolario, come quelle di Lightning */
-function metodoOnchainP2P(m){
-  haptic();
-  const scelti = new Set(p2pOcMetodi);
-  if (scelti.has(m)) scelti.delete(m); else scelti.add(m);
-  p2pOcMetodi = metodiOnchainP2P().filter(x => scelti.has(x));
-  renderPubblicaOnchainP2P();
+/* il riquadro in fondo, al posto di quello del coordinatore: il minimo,
+   il tetto della fase beta, e la rete di prova se lo e' */
+function riquadroOnchainP2P(){
+  const rete = String(p2pOnchainLibro.rete || '');
+  const tetto = typeof maxEuroP2P === 'function' ? maxEuroP2P() : 0;
+  return sezioneNuovoP2P({ico: '', titolo: 'Quanto si può, e quanto costa',
+    corpo: 'Minimo ' + fmt(p2pOnchainLibro.minSats || 0) + ' sats'
+      + (tetto > 0 ? ' · fase beta: max ' + fmt(tetto) + ' €' : '')
+      + '. Nessuna commissione di Barattolo: chi vende deposita anche il margine per la rete.'
+      + (rete && rete !== 'mainnet'
+         ? '<div class="hint">Rete di prova (' + esc(rete) + '): i sats non hanno valore.</div>' : '')});
 }
 
-/* la riga sotto i sats: il minimo, e quanto fanno al cambio di adesso */
-function cambioOnchainP2P(){
-  const s = Math.round(Number(String(p2pOcSats).replace(/[^\d]/g, '')) || 0);
-  return 'Minimo ' + fmt(p2pOnchainLibro.minSats) + ' sats'
-    + (s > 0 && eurPerSat ? ' · ≈ ' + fmtEur(s * eurPerSat) + ' € al cambio di adesso' : '');
-}
-function euroOnchainP2P(){
-  const h = el('p2pOcCambio');
-  if (h) h.textContent = cambioOnchainP2P();
-}
-
-async function pubblicaOnchainP2P(btn){
+/* IL GESTO, dal bottone del foglio: `inviaNuovoOrdineP2P` passa di qui a
+   rete on-chain. Lo stesso giudice dei campi di Lightning e la stessa
+   domanda della pausa; a mercato i sats li conta il server alla presa. */
+async function pubblicaOnchainDalFoglioP2P(confermato){
   haptic();
-  const sats = Math.round(Number(String(p2pOcSats).replace(/[^\d]/g, '')) || 0);
-  const euro = Number(String(p2pOcEuro).replace(',', '.')) || 0;
-  const metodi = p2pOcMetodi.slice();
-  if (!sats || !euro) return toast('Scrivi sats ed euro', 4000);
-  if (!metodi.length) return toast('Scegli almeno un metodo di pagamento', 4000);
-  const rip = onchainAttesa(btn, 'Pubblico…');
-  let fatto = false;
+  const campi = campiNuovoP2P();
+  const g = valeNuovoOrdineP2P(campi);
+  if (!g.ok) { avvisaMancaP2P(g); return; }
+  if (!confermato && typeof fermaPerPausaP2P === 'function' && fermaPerPausaP2P()) return;
+  const vendo = campi.lato === 'vendo';
+  const corpo = {lato: vendo ? 'sell' : 'buy', tipo: campi.fisso ? 'fisso' : 'mercato',
+    euro_cent: interoP2P(campi.euro).n * 100, metodi: campi.metodi.slice(),
+    recapito: vendo ? String(p2pOcRecapito).trim() : '',
+    filtro: campi.filtro || 0, paracadute: campi.paracadute || 0};
+  if (campi.fisso) corpo.sats = interoP2P(campi.sats).n;
+  else corpo.premio = Number(campi.premio) || 0;
+  const rip = onchainAttesa(el('p2pNuovoInvia'), 'Pubblico…');
+  let fatto = 0;
   try {
     await onchainAccendiDaSolo();
     const r = await fetch(`${API_BASE}/p2p/onchain/pubblica`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({lato: p2pOcLato, sats, euro_cent: Math.round(euro * 100),
-                            metodi, recapito: p2pOcLato === 'sell' ? String(p2pOcRecapito).trim() : ''})});
+      body: JSON.stringify(corpo)});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non pubblicato');
-    p2pOnchainAperto = Number(d.id); fatto = true;
+    fatto = Number(d.id) || 0;
     toast('Pubblicato: è nel libro ed esce su Nostr', 5000);
   } catch(e) { toast(e.message || 'errore', 6000); }
   finally { rip(); }
-  if (fatto) apriDettaglioOnchainP2P(p2pOnchainAperto);
+  if (fatto) apriDettaglioOnchainP2P(fatto);
   rinfrescaOnchainP2P(true);
 }
 
@@ -57832,6 +57798,11 @@ function schedaOnchainP2P(o){
   switch (o.stato) {
     case 'pending':
       testo = 'È nel libro: chi lo prende fa nascere l\'indirizzo 2-di-3. Scade ' + quando(o.scade) + '.';
+      /* le scelte del foglio di Lightning (30 ott 2026, cantiere oc-identico) */
+      if (o.mercato) testo += ' A prezzo di mercato' + (Number(o.premio) ? ' (' + (o.premio > 0 ? '+' : '') + Number(o.premio) + '%)' : '')
+        + ': i sats si contano quando qualcuno lo prende.';
+      if (Number(o.filtro) > 0) testo += ' 🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '.';
+      if (Number(o.paracadute) > 0) testo += ' 🪂 Paracadute ' + Number(o.paracadute) + '%.';
       gesti = g('annulla', '🗑 Ritira dal libro');
       break;
     case 'preso':
@@ -57877,7 +57848,9 @@ function schedaOnchainP2P(o){
       break;
     case 'rilasciato': testo = 'Concluso: i sats sono andati al wallet di chi ha comprato.'; break;
     case 'rimborsato': testo = 'Rimborsato: i sats sono tornati a chi li aveva depositati.'; break;
-    case 'annullato': testo = 'Annullato prima del deposito.' + (o.ricevuti_sats ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
+    case 'annullato': testo = (o.chiuso_perche === 'paracadute'
+        ? '🪂 Annullato dal paracadute: BTC si è mosso più del ' + Number(o.paracadute) + '% da quando l\'hai pubblicato. Puoi ripubblicarlo al prezzo nuovo.'
+        : 'Annullato prima del deposito.') + (o.ricevuti_sats ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
     case 'scaduto': testo = 'Scaduto nel libro senza essere preso.'; break;
   }
   /* la seconda firma, quando tocca a me: lo stesso bottone in ogni stato */
@@ -57958,7 +57931,11 @@ function contoOnchainP2P(o){
   const deposito = o.ruolo === 'compratore';
   const r = (t, v, cls) => '<div class="ctrl-riga' + (cls ? ' ' + cls : '')
     + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
-  const sats = n => '<span class="num">' + fmt(n) + '<span class="unita-sats"> sats</span></span>';
+  /* a mercato, finche' nessuno prende, i sats sono la stima col «≈» (30
+     ott 2026, cantiere oc-identico): nascono alla presa */
+  const stima = o.mercato && !(Number(o.sats) > 0);
+  const sats = n => '<span class="num">' + (stima ? (Number(o.stima) > 0 ? '≈ ' + fmt(o.stima) : '—') : fmt(n))
+    + '<span class="unita-sats"> sats</span></span>';
   const euro = '<span class="num">' + esc(fmtEur(o.euro)) + ' €</span>';
   /* il moderatore non sta da nessun lato: le due cifre e basta */
   if (o.ruolo === 'moderatore') return '<div class="ctrl-conto conto-p2p lato-vendo"><div class="ctrl-chiusa">'
@@ -58280,35 +58257,25 @@ function interruttoreReteP2P(attiva){
   return '<div class="p2p-rete-scelta" role="radiogroup" aria-label="Rete dello scambio">'
     + tasto('onchain', P2P_OC_MONETA, 'On-chain') + tasto('ln', P2P_LN_MONETA, 'Lightning') + '</div>';
 }
-/* il passaggio da un foglio all'altro, col lato che si porta dietro: il
-   velo resta, il foglio di prima scende, quello nuovo sale */
 /* SENZA SALTO (30 ott 2026, Andrea: «quando scelgo tra lightning e
-   onchain la pagina salta»): i due fogli si scambiano FERMI — niente
-   scivolata e niente morfosi dal + (`p2pSenzaCorsa`, letta da
-   `morfoPuoiP2P`); le corse tornano al giro dopo */
-let p2pSenzaCorsa = false;
+   onchain la pagina salta»): il foglio e' uno solo (cantiere
+   oc-identico), e l'interruttore cambia la rete e ridisegna i campi sul
+   posto — nessun foglio che scende e sale, nessuna morfosi dal +. Quel
+   che la rete nuova non porta si lascia: i metodi che l'on-chain non ha
+   (il tabacchino) e il secondo importo dell'intervallo. */
 function cambiaReteP2P(rete){
-  const ln = el('p2pNuovoSheet').classList.contains('open');
-  const oc = el('p2pOcSheet').classList.contains('open');
-  if ((rete === 'ln' && ln) || (rete === 'onchain' && oc)) return;
-  const fogli = [el('p2pNuovoSheet'), el('p2pOcSheet')];
-  fogli.forEach(f => { if (f && f.style) f.style.transition = 'none'; });
-  p2pSenzaCorsa = true;
-  try {
-    if (rete === 'onchain') {
-      el('p2pNuovoSheet').classList.remove('open');
-      apriPubblicaOnchainP2P(p2pLato === 'vendo' ? 'sell' : 'buy');
-    } else {
-      el('p2pOcSheet').classList.remove('open');
-      const lato = p2pOcLato === 'sell' ? 'vendo' : 'compro';
-      if (lato !== p2pLato && typeof setLatoP2P === 'function') setLatoP2P(lato, true);
-      apriNuovoOrdineP2P();
-    }
-  } finally {
-    p2pSenzaCorsa = false;
-    if (fogli[0] && typeof fogli[0].offsetWidth !== 'undefined') void fogli[0].offsetWidth;
-    fogli.forEach(f => { if (f && f.style) f.style.transition = ''; });
+  const oc = rete === 'onchain' && !!myP2POnchain;
+  if (oc === p2pNuovoOc) return;
+  haptic();
+  p2pNuovoOc = oc;
+  if (oc) {
+    const vale = metodiOnchainP2P(p2pLato);
+    p2pNuovoMetodi = p2pNuovoMetodi.filter(m => vale.indexOf(m) >= 0);
+    p2pNuovoEuroMax = ''; p2pNuovoDue = false;
+    const porta = el('p2pNuovoPorta');
+    if (porta) porta.hidden = true;
   }
+  renderNuovoOrdineP2P();
 }
 
 function sceltaReteP2P(rete){
@@ -76190,8 +76157,6 @@ function barraSeccaP2P(){
    dopo l'avvio la discesa non partiva — l'ha visto il banco dal vivo. */
 function morfoPuoiP2P(prima){
   if (effettiRidotti()) return false;
-  /* il cambio di rete in cima al foglio non vola dal + (30 ott 2026) */
-  if (typeof p2pSenzaCorsa !== 'undefined' && p2pSenzaCorsa) return false;
   if (!matchMedia('(max-width: 767px)').matches) return false;
   const tondo = tondoBarraP2P();
   return !!(el('p2pMorfo') && (prima || el('p2pNuovoInvia')) && tondo
@@ -76532,7 +76497,7 @@ function apriVietato(){
   el('vietatoSheet').classList.add('open');
 }
 
-function apriNuovoOrdineP2P(metodo){
+function apriNuovoOrdineP2P(metodo, rete){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
@@ -76567,11 +76532,17 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoPremioTab = '';
   p2pNuovoPremioTabMano = false;
   p2pNuovoEuroVia = '';
+  /* LA RETE (30 ott 2026, cantiere oc-identico): 'onchain' apre questo
+     stesso foglio per uno scambio con la garanzia 2-di-3, solo a chi e'
+     ammesso; tutto il resto riparte come sopra */
+  p2pNuovoOc = rete === 'onchain' && !!myP2POnchain;
+  p2pOcRecapito = '';
   renderNuovoOrdineP2P();
   /* la riga della porta del primo ordine (9 ott 2026), solo a chi la
-     porta riguarda: agli altri il foglio e' quello di sempre */
+     porta riguarda: agli altri il foglio e' quello di sempre (e la
+     porta e' di Mostro: sull'on-chain non c'e') */
   const porta = el('p2pNuovoPorta');
-  if (porta) porta.hidden = !(typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P());
+  if (porta) porta.hidden = p2pNuovoOc || !(typeof portaPrimoOrdineP2P === 'function' && portaPrimoOrdineP2P());
   el('sheetBg').classList.add('open');
   /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
      a foglio gia' a posto): se non se ne occupa — reduced-motion,
@@ -76966,7 +76937,7 @@ function valeNuovoOrdineP2P(v){
      persona, al massimo 40 caratteri — la frase e' di `giudiceZonaP2P`,
      che vive nel blocco del contanti (da qui il typeof). Senza
      «Contanti» il campo non c'e' e il giudice tace. */
-  const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';
+  const zonaNo = !v.oc && typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(v.zona, v.metodi) : '';
   if (zonaNo) return {ok: false, manca: zonaNo, campo: 'p2pNuovoZona'};
   /* IL TABACCHINO (set 2026): i tre dati sono OBBLIGATORI e la
      scadenza sta dentro la finestra della garanzia letta VIVA —
@@ -77106,8 +77077,12 @@ function campiNuovoP2P(){
     premioTab: p2pNuovoPremioTab,
     /* il cambio vivo, 0 = non lo so: serve ai sats del tabacchino */
     cambio: (cambioVivo && eurPerSat > 0) ? eurPerSat : 0,
-    maxSats: (p2pInfo && p2pInfo.maxSats) || 0,
-    minSats: (p2pInfo && p2pInfo.minSats) || 0,
+    /* a rete on-chain (30 ott 2026) i tetti in sats sono quelli del
+       server di Barattolo: il minimo e nessun massimo; e niente zona */
+    oc: typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc,
+    maxSats: (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) ? 0 : (p2pInfo && p2pInfo.maxSats) || 0,
+    minSats: (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) ? (p2pOnchainLibro.minSats || 0)
+      : (p2pInfo && p2pInfo.minSats) || 0,
     /* il tetto in euro di Barattolo, dalla busta delle leve: 0 = spento */
     maxEuro: maxEuroP2P(),
     /* il minimo di Barattozon (30 set 2026), dalla stessa busta: 0 = spento */
@@ -77469,13 +77444,16 @@ function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
   const compro = p2pLato === 'compro';
-  const tab = tabacchinoP2P(p2pNuovoMetodi);
+  /* la rete del foglio (30 ott 2026, cantiere oc-identico): vedi
+     `apriPubblicaOnchainP2P` */
+  const oc = !!(p2pNuovoOc && myP2POnchain);
+  const tab = !oc && tabacchinoP2P(p2pNuovoMetodi);
   const tit = el('p2pNuovoTit');
   if (tit) titoloNuovoP2P(tit, compro, tab);
   /* l'interruttore della rete in cima (30 ott 2026): vuoto a chi non e'
      ammesso all'on-chain, e nel banco del motore non c'e' */
   const rete = el('p2pNuovoRete');
-  if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function' ? interruttoreReteP2P('ln') : '';
+  if (rete) rete.innerHTML = typeof interruttoreReteP2P === 'function' ? interruttoreReteP2P(oc ? 'onchain' : 'ln') : '';
   const val = P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0];
   const scelti = p2pNuovoMetodi.length
     ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';
@@ -77525,7 +77503,7 @@ function renderNuovoOrdineP2P(){
           'onclick="apriEuroTabP2P(\'min\')">' +
           '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuro, val.segno, 'min')) + '</span>' +
           '<i aria-hidden="true">▾</i></button>' +
-      (p2pNuovoFisso ? '' :
+      ((p2pNuovoFisso || oc) ? '' :
         '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
         '<button type="button" id="p2pNuovoEuroMax" class="p2p-tendina' +
         (interoP2P(p2pNuovoEuroMax).n > 0 ? '' : ' vuota') + '" ' +
@@ -77550,7 +77528,7 @@ function renderNuovoOrdineP2P(){
          non una regola per sempre. Il numero resta vivo. */
       (maxTestoP2P()
         ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
-      (p2pNuovoFisso
+      (oc ? '' : p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
@@ -77570,7 +77548,7 @@ function renderNuovoOrdineP2P(){
       (p2pNuovoAperta ? 'true' : 'false') + '" onclick="apriTendinaMetodiP2P()">' +
       '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
     sotto: (p2pNuovoAperta
-      ? '<div class="p2p-voci">' + metodiPubblicabiliP2P(compro ? 'compro' : 'vendo').map(m =>
+      ? '<div class="p2p-voci">' + (oc ? metodiOnchainP2P : metodiPubblicabiliP2P)(compro ? 'compro' : 'vendo').map(m =>
           /* la voce col marchio stringe il respiro per farlo grande:
              la classe la chiede il CATALOGO, come la pillola */
           '<button type="button" class="p2p-voce' +
@@ -77592,7 +77570,7 @@ function renderNuovoOrdineP2P(){
   /* LA ZONA DI SCAMBIO (10 ott 2026): la sua sezione, subito sotto i
      metodi, solo quando «Contanti» e' scelto — vedi
      `sezioneZonaNuovoP2P` */
-  const zona = typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';
+  const zona = !oc && typeof sezioneZonaNuovoP2P === 'function' ? sezioneZonaNuovoP2P(p2pNuovoMetodi) : '';
   /* CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la sua
      sezione, dopo il premio e prima dei limiti — vedi `sezioneAccessoNuovoP2P` */
   const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';
@@ -77729,7 +77707,8 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + accesso + pausa + paracadute + riquadroLimitiP2P() +
+    + quanti + premio + (oc && !compro ? sezioneRecapitoOnchainP2P() : '')
+    + accesso + pausa + paracadute + (oc ? riquadroOnchainP2P() : riquadroLimitiP2P()) +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
@@ -77765,12 +77744,12 @@ function renderNuovoOrdineP2P(){
        questo foglio non nomina, e un commento innocente la farebbe
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
-      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + '" id="p2pNuovoInvia" ' +
+      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + (oc ? ' p2p-invia-oc' : '') + '" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">' +
         /* col percorso Barattozon il bottone dice che prima c'e' il
            riepilogo: e' l'ultimo passo, non un salto nel vuoto — e al
            posto della ricevuta porta il logo (24 set 2026) */
-        (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>' +
+        (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : oc ? P2P_OC_MONETA + 'Pubblica ordine' : '⚡ Pubblica ordine') + '</button>' +
     '</div>';
 }
 /* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
@@ -79304,7 +79283,8 @@ function scegliValutaP2P(cod){
    stesso che apre la tastiera, quindi un render qui porterebbe via il
    fuoco al campo che si sta per riempire. */
 function svelaSecondoImportoP2P(){
-  if (p2pNuovoDue || p2pNuovoFisso || tabacchinoP2P(p2pNuovoMetodi)) return;
+  if (p2pNuovoDue || p2pNuovoFisso || tabacchinoP2P(p2pNuovoMetodi)
+      || (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc)) return;
   p2pNuovoDue = true;
   /* LA PAGINA NON SI MUOVE (ritocco di Andrea): la nota che compare
      allunga il riquadro, e l'ancoraggio dello scorrimento del browser
@@ -79413,6 +79393,9 @@ function spiegaPremioP2P(){
   });
 }
 async function inviaNuovoOrdineP2P(confermato){
+  /* a rete on-chain il gesto e' del server di Barattolo (30 ott 2026) */
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && myP2POnchain)
+    return pubblicaOnchainDalFoglioP2P(confermato);
   /* PUBBLICARE NON HA BISOGNO DEL LIBRO, ma delle impostazioni vive
      del coordinatore (fee e tetti), che viaggiano con lui: su una copia
      il bottone gira finche' la lettura vera non risponde (26 set 2026).

@@ -93132,8 +93132,34 @@ async def avvia_onchain():
 # poi: un moderatore decide, Barattolo firma, il telefono di chi vince
 # mette la seconda (`_onchain_psbt_barattolo`, come nel mercatino).
 #
-# COSA NON C'E' (dichiarato): il prezzo di mercato col premio (solo
-# prezzo fisso: sats ed euro li scrive chi pubblica), la commissione di
+# IL FOGLIO DI LIGHTNING, IDENTICO (30 ott 2026, cantiere oc-identico,
+# Andrea: «quella pagina onchain deve essere identica alla pagina
+# lighting ... prezzo di mercato o a prezzo fisso, la domanda chi puo
+# prendere l'ordine, la pausa e il paracadute»). Quattro cose di
+# Lightning, qui fatte dal server perche' l'ordine e' suo:
+#   • A MERCATO chi pubblica scrive gli euro e il premio; i sats li
+#     conta il server ALLA PRESA, col cambio di tutta l'app
+#     (`cambio_noto_ora`, non piu' vecchio di P2P_ONCHAIN_CAMBIO_FRESCO_S)
+#     e la formula del coordinatore (`sats -= premio/100 * sats`), e li
+#     scrive in `prezzo_sats` PRIMA che nasca l'indirizzo: `importo_sats`
+#     (prezzo + margine) e' quel che legge la ronda e il giudice dei PSBT.
+#     Nel libro, finche' nessuno prende, `prezzo_sats` e' 0 (il `amt` 0
+#     di NIP-69 per gli ordini a mercato) e la card mostra la stima;
+#   • CHI PUO' PRENDERE: la soglia del foglio (1+, 3+, 5+ scambi), con
+#     lo stesso giudice e la stessa reputazione del Lightning
+#     (`_giudice_presa_p2p`, `_reputazione_p2p`), giudicata alla presa;
+#   • LA PAUSA di chi pubblica (la sua, dal profilo di scambio, la
+#     stessa del Lightning): l'ordine resta nel libro in grigio e non si
+#     prende fino alla fine della pausa. Come nel Lightning vale solo
+#     dentro Barattolo: il 38383 non cambia (chi lo legge altrove non
+#     puo' comunque prenderlo: la presa passa da qui);
+#   • IL PARACADUTE (leva `P2P_PARACADUTE`, come nel Lightning): la
+#     passata e' nella ronda, coi giudici puri del Lightning
+#     (`_passo_paracadute_p2p`: due letture di fila oltre la soglia, una
+#     fonte muta non apre). Qui nessun telefono deve firmare il `cancel`:
+#     l'ordine e' del server, che lo annulla da se' (`chiuso_perche`).
+# COSA NON C'E' (dichiarato): gli ordini a intervallo (un importo solo),
+# la zona del contanti, la commissione di
 # Barattolo (come l'on-chain del mercatino, tappa 7), la chat dello
 # scambio (il recapito per gli euro si scrive nell'ordine, in chiaro
 # per le sole due parti), la reputazione del libro (il tag `rating` e'
@@ -93156,6 +93182,8 @@ P2P_ONCHAIN_METODI_MAX = 5
 P2P_ONCHAIN_METODO_MAX = 40
 P2P_ONCHAIN_RECAPITO_MAX = 300
 P2P_ONCHAIN_APERTI_MAX = 5      # ordini vivi per persona
+P2P_ONCHAIN_PREMIO_MAX = 20     # il premio a mercato, ±, come il cursore del foglio
+P2P_ONCHAIN_CAMBIO_FRESCO_S = 600   # alla presa a mercato: un cambio piu' vecchio non conta
 P2P_ONCHAIN_RITARDATARI_S = 7 * 24 * 3600   # per quanto si guarda un indirizzo di un ordine chiuso
 STATI_P2P_ONCHAIN = ("pending", "preso", "depositato", "euro_inviati",
                      "rilasciato", "rimborsato", "disputa", "annullato",
@@ -93243,6 +93271,55 @@ def _p2p_onchain_prepara(con):
         chiuso_il INTEGER DEFAULT 0,
         creato INTEGER NOT NULL,
         aggiornato INTEGER NOT NULL)""")
+    # 30 ott 2026, cantiere oc-identico: il foglio di Lightning. Il tipo
+    # di prezzo e il premio, chi puo' prendere, il paracadute col suo
+    # conto (le colonne di `p2p_paracadute`), perche' si e' chiuso, e il
+    # cambio con cui alla presa sono nati i sats di un ordine a mercato
+    gia = {r[1] for r in con.execute("PRAGMA table_info(p2p_onchain_ordini)")}
+    for col, tipo in (("prezzo_tipo", "TEXT DEFAULT 'fisso'"),
+                      ("premio", "INTEGER DEFAULT 0"),
+                      ("filtro", "INTEGER DEFAULT 0"),
+                      ("paracadute", "INTEGER DEFAULT 0"),
+                      ("para_partenza", "REAL DEFAULT 0"),
+                      ("para_oltre", "INTEGER DEFAULT 0"),
+                      ("para_lettura", "INTEGER DEFAULT 0"),
+                      ("para_arrivo", "REAL DEFAULT 0"),
+                      ("chiuso_perche", "TEXT DEFAULT ''"),
+                      ("cambio_presa", "REAL DEFAULT 0")):
+        if col not in gia:
+            con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+
+
+def _p2p_onchain_campo(o, nome: str, vuoto=None):
+    """PURA: una colonna di una riga (sqlite3.Row o dict), o `vuoto`
+    se non c'e' — le righe dei banchi e le tabelle di ieri."""
+    try:
+        v = o[nome]
+    except (KeyError, IndexError):
+        return vuoto
+    return vuoto if v is None else v
+
+
+def _p2p_onchain_mercato(o) -> bool:
+    """PURA: l'ordine e' a prezzo di mercato (i sats si contano alla presa)."""
+    return _p2p_onchain_campo(o, "prezzo_tipo", "fisso") == "mercato"
+
+
+def p2p_onchain_sats_mercato(euro_cent, premio, eur_btc) -> int:
+    """PURA: I SATS DI UN ORDINE A MERCATO, la formula del coordinatore
+    (`sats -= premium/100 * sats`, uguale sui due versi: un premio
+    positivo assottiglia sempre i sats). `eur_btc` e' il cambio in euro
+    per bitcoin; 0 se manca qualcosa — un numero che non c'e' non fa
+    sats."""
+    try:
+        e, p, c = int(euro_cent), float(premio or 0), float(eur_btc or 0)
+    except (TypeError, ValueError):
+        return 0
+    if e <= 0 or not c > 0 or c == float("inf"):
+        return 0
+    sats = e / 100 / c * 100_000_000
+    sats -= p / 100 * sats
+    return max(0, int(round(sats)))
 
 
 def _p2p_onchain_db():
@@ -93340,7 +93417,9 @@ def p2p_onchain_tags(o, adesso: int = None) -> list:
             ["amt", str(int(o["prezzo_sats"]))],
             ["fa", _p2p_onchain_euro_testo(o["euro_cent"])],
             ["pm", *[str(m) for m in metodi]],
-            ["premium", "0"],
+            # a mercato il premio di chi pubblica (e `amt` 0 finche' i sats
+            # non nascono alla presa), come gli ordini a mercato di Mostro
+            ["premium", str(int(_p2p_onchain_campo(o, "premio", 0) or 0))],
             ["network", ONCHAIN_RETE],
             ["layer", "onchain"],
             ["expiration", str(scad)],
@@ -93420,10 +93499,27 @@ def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
          "stato": o["stato"],
          "sats": int(o["prezzo_sats"]), "euro": int(o["euro_cent"]) / 100,
          "metodi": metodi, "scade": int(o["scade"]), "creato": int(o["creato"]),
-         "rete": ONCHAIN_RETE, "onchain": True}
+         "rete": ONCHAIN_RETE, "onchain": True, **_p2p_onchain_foglio(o, pubblico=True)}
     if nome:
         r["nome"] = nome
     return r
+
+
+def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
+    """I CAMPI DEL FOGLIO DI LIGHTNING su una riga (30 ott 2026): il tipo
+    di prezzo, il premio, chi puo' prendere e — a mercato, finche' i sats
+    non sono nati — la `stima` al cambio di adesso (0 senza cambio). Il
+    paracadute e' di chi ha pubblicato: nel libro di tutti non esce (lo
+    porta la sua scheda), come la card del Lightning lo mostra solo a lui."""
+    mercato = _p2p_onchain_mercato(o)
+    d = {"mercato": mercato, "premio": int(_p2p_onchain_campo(o, "premio", 0) or 0),
+         "filtro": _soglia_filtro_p2p(_p2p_onchain_campo(o, "filtro", 0))}
+    if mercato and not int(o["prezzo_sats"] or 0):
+        d["stima"] = p2p_onchain_sats_mercato(o["euro_cent"], d["premio"], cambio_noto_ora())
+    if not pubblico:
+        d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
+        d["chiuso_perche"] = str(_p2p_onchain_campo(o, "chiuso_perche", "") or "")
+    return d
 
 
 def _p2p_onchain_rifai_foto() -> None:
@@ -93438,6 +93534,18 @@ def _p2p_onchain_rifai_foto() -> None:
                 "scade>? ORDER BY id DESC LIMIT 200", (adesso,)).fetchall()
             foto = [(dict(o), int(o["maker_id"]), _onchain_nome(con, o["maker_id"]))
                     for o in righe]
+            # LA PAUSA di chi pubblica (30 ott 2026): fino a quando la sua
+            # card resta grigia. Letta qui, con la fotografia: la busta non
+            # tocca il database, e la presa la rigiudica comunque
+            pause = {}
+            for _, maker, _ in foto:
+                if maker not in pause:
+                    try:
+                        pause[maker] = _fine_pausa_p2p(_pausa_p2p(con, maker), adesso)
+                    except Exception:
+                        pause[maker] = 0
+            for o, maker, _ in foto:
+                o["_pausa_fino"] = pause.get(maker, 0)
         finally:
             con.close()
     except Exception as e:
@@ -93454,8 +93562,13 @@ def _p2p_onchain_libro(chi: int) -> dict:
     if not F["quando"] or time.time() - F["quando"] > 300:
         _p2p_onchain_rifai_foto()
     eventi, miei = [], []
+    adesso = int(time.time())
     for o, maker, nome in F["righe"]:
-        eventi.append(_p2p_onchain_riga_pubblica(o, nome if chi else ""))
+        riga = _p2p_onchain_riga_pubblica(o, nome if chi else "")
+        # in pausa fino a quell'ora: la card grigia, e da qui non si prende
+        if int(o.get("_pausa_fino") or 0) > adesso:
+            riga["pausa_fino"] = int(o["_pausa_fino"])
+        eventi.append(riga)
         if chi and maker == int(chi):
             miei.append(o["ordine"])
     fuori = {"eventi": eventi, "quando": F["quando"], "rete": ONCHAIN_RETE,
@@ -93532,6 +93645,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "mio": int(o["maker_id"]) == tg_id,
         "sats": int(o["prezzo_sats"]), "prezzo_sats": int(o["prezzo_sats"]),
         "euro": int(o["euro_cent"]) / 100, "metodi": metodi,
+        # il foglio di Lightning (30 ott 2026): a mercato `sats` e' 0
+        # finche' nessuno prende, e `stima` dice quanti al cambio di adesso
+        **_p2p_onchain_foglio(o),
         "margine_sats": int(o["margine_sats"] or 0),
         "importo_sats": int(o["importo_sats"] or 0),
         "visti_sats": int(o["visti_sats"] or 0),
@@ -93646,18 +93762,81 @@ def _p2p_onchain_vivi_di(con, tg_id: int) -> int:
         (int(tg_id), int(tg_id))).fetchone()[0] or 0)
 
 
+# le frasi dei «no» del filtro, dai codici di `_giudice_presa_p2p`
+P2P_ONCHAIN_NO_FILTRO = {
+    "filtro": "Quest'ordine lo può prendere solo chi ha almeno {n} scambi completati",
+    "mancati": "Quest'ordine ha un filtro: non lo può prendere chi ha scambi non "
+               "completati negli ultimi 30 giorni",
+    "dispute": "Quest'ordine ha un filtro: non lo può prendere chi ha perso una "
+               "disputa negli ultimi 90 giorni"}
+
+
+def _p2p_onchain_porta_presa(con, o, tg_id: int, adesso: int) -> str:
+    """LA PORTA DELLA PRESA del foglio di Lightning (30 ott 2026): '' se
+    si puo' prendere, se no il perche'. LA PAUSA di chi ha pubblicato
+    (la sua, quella del profilo di scambio: `_fine_pausa_p2p`), poi IL
+    FILTRO di chi puo' prendere, con la reputazione e il giudice del
+    Lightning (il limite delle prese aperte del Lightning qui non conta:
+    l'on-chain ha il suo, `P2P_ONCHAIN_APERTI_MAX`). Pura sulla
+    connessione. Una pausa o una reputazione che non si leggono non
+    chiudono la porta a nessuno."""
+    try:
+        fino = _fine_pausa_p2p(_pausa_p2p(con, o["maker_id"]), adesso)
+    except Exception:
+        fino = 0
+    if fino:
+        return ("Chi l'ha pubblicato è in pausa: l'ordine si potrà prendere "
+                "quando torna (l'ora è sulla card)")
+    soglia = _soglia_filtro_p2p(_p2p_onchain_campo(o, "filtro", 0))
+    if not soglia:
+        return ""
+    try:
+        rep = _reputazione_p2p(con, tg_id, adesso)
+    except Exception:
+        return ""
+    ok, motivo = _giudice_presa_p2p(soglia, rep, 0)
+    if ok:
+        return ""
+    return P2P_ONCHAIN_NO_FILTRO.get(motivo, P2P_ONCHAIN_NO_FILTRO["filtro"]).format(n=soglia)
+
+
 def p2p_onchain_giudica_nuovo(lato, sats, euro_cent, metodi, recapito,
-                              tetto_euro: int, tetto_sats: int) -> str:
-    """PURA: il perche' un ordine nuovo non va, o '' se va. Prezzo FISSO
-    e basta: sats ed euro li scrive chi pubblica, e tutt'e due devono
-    essere numeri interi sensati; i metodi sono parole corte del
-    catalogo o scritte a mano (testo di sconosciuti: escono scappati)."""
+                              tetto_euro: int, tetto_sats: int,
+                              tipo: str = "fisso", premio=0, cambio=0) -> str:
+    """PURA: il perche' un ordine nuovo non va, o '' se va. A PREZZO
+    FISSO sats ed euro li scrive chi pubblica, e tutt'e due devono essere
+    numeri interi sensati. A MERCATO (30 ott 2026) si scrivono gli euro e
+    il premio, e i sats si contano alla presa: qui, col `cambio` di
+    adesso (euro per bitcoin; 0 = non c'e', e allora giudica la presa),
+    si guarda che la stima non stia sotto il minimo ne' sopra il tetto
+    di prova. I metodi sono parole corte del catalogo o scritte a mano
+    (testo di sconosciuti: escono scappati)."""
     if lato not in ("sell", "buy"):
         return "Di' se vendi o compri bitcoin"
+    if tipo not in ("fisso", "mercato"):
+        return "Scegli prezzo fisso o di mercato"
+    if tipo == "mercato":
+        if isinstance(premio, bool):
+            return "Il premio dev'essere un numero"
+        try:
+            premio = int(premio)
+        except (TypeError, ValueError):
+            return "Il premio dev'essere un numero"
+        if abs(premio) > P2P_ONCHAIN_PREMIO_MAX:
+            return f"Il premio va da −{P2P_ONCHAIN_PREMIO_MAX}% a +{P2P_ONCHAIN_PREMIO_MAX}%"
+        try:
+            sats = p2p_onchain_sats_mercato(int(euro_cent), premio, cambio)
+        except (TypeError, ValueError):
+            return "Gli euro devono essere un numero"
+        if not sats:
+            sats = P2P_ONCHAIN_MIN_SATS   # senza cambio: lo dira' la presa
     try:
         sats, euro_cent = int(sats), int(euro_cent)
     except (TypeError, ValueError):
         return "Sats ed euro devono essere numeri"
+    if sats < P2P_ONCHAIN_MIN_SATS and tipo == "mercato":
+        return (f"Al cambio di adesso sono circa {_fmt_sats(sats)} sats: il minimo "
+                f"è {_fmt_sats(P2P_ONCHAIN_MIN_SATS)}, scrivi qualche euro in più")
     if sats < P2P_ONCHAIN_MIN_SATS:
         return f"Minimo {_fmt_sats(P2P_ONCHAIN_MIN_SATS)} sats: sotto, la commissione di rete mangia lo scambio"
     if sats > 21_000_000 * 100_000_000:
@@ -93746,7 +93925,10 @@ async def p2p_onchain_uno(oid: int, x_tg_init_data: str = Header(""),
 @app.post("/api/p2p/onchain/pubblica")
 async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(""),
                                      barattolo_sessione: str = Cookie("")):
-    """PUBBLICA: `{lato, sats, euro_cent, metodi, recapito}`. Chi pubblica
+    """PUBBLICA: `{lato, sats, euro_cent, metodi, recapito}`, e dal 30 ott
+    2026 (il foglio di Lightning) `tipo` ('fisso' | 'mercato', di serie
+    fisso), `premio` (a mercato), `filtro` (1, 3, 5: chi puo' prendere) e
+    `paracadute` (5, 10, 20, solo a leva accesa). Chi pubblica
     deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
     tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
     promettere. Il tetto in euro e' quello del P2P (`P2P_MAX_EURO`),
@@ -93761,11 +93943,23 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     if isinstance(metodi, list):
         metodi = [str(m).strip() for m in metodi if str(m or "").strip()]
     recapito = str(d.get("recapito") or "").strip()
+    tipo = str(d.get("tipo") or "fisso")
+    premio = d.get("premio") or 0
+    cambio = cambio_noto_ora()
     perche = p2p_onchain_giudica_nuovo(lato, d.get("sats"), d.get("euro_cent"),
                                        metodi, recapito, int(P2P_MAX_EURO or 0),
-                                       tetto_sats_prova())
+                                       tetto_sats_prova(), tipo, premio, cambio)
     if perche:
         raise HTTPException(400, perche)
+    # a mercato i sats nascono alla presa: nel libro 0, il `amt` di NIP-69
+    sats = 0 if tipo == "mercato" else int(d["sats"])
+    premio = int(premio) if tipo == "mercato" else 0
+    filtro = _soglia_filtro_p2p(d.get("filtro"))
+    # IL PARACADUTE parte dal cambio di ADESSO, scritto dal server come nel
+    # Lightning: il telefono manda la sola soglia
+    para = _soglia_paracadute_p2p(d.get("paracadute")) if P2P_PARACADUTE else 0
+    para_da = cambio if para and cambio > 0 else 0.0
+    para_letto = int(_cambio_cache["quando"] or 0) if para_da else 0
     try:
         onchain_xpub_barattolo()
     except ValueError as e:
@@ -93783,11 +93977,14 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
         ordine = P2P_ONCHAIN_PREFISSO + secrets.token_hex(8)
         cur = con.execute(
             "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
-            " euro_cent, metodi, recapito, scade, creato, aggiornato)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (ordine, lato, user["id"], int(d["sats"]), int(d["euro_cent"]),
+            " euro_cent, metodi, recapito, scade, creato, aggiornato,"
+            " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (ordine, lato, user["id"], sats, int(d["euro_cent"]),
              json.dumps(metodi, ensure_ascii=False), recapito,
-             adesso + P2P_ONCHAIN_ORE_LIBRO * 3600, adesso, adesso))
+             adesso + P2P_ONCHAIN_ORE_LIBRO * 3600, adesso, adesso,
+             "mercato" if tipo == "mercato" else "fisso", premio, filtro,
+             para, para_da, para_letto))
         con.commit()
         oid = cur.lastrowid
         fuori = _p2p_onchain_per(con, _p2p_onchain_carica(con, oid), user["id"])
@@ -93894,6 +94091,27 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         if _p2p_onchain_vivi_di(con, user["id"]) >= P2P_ONCHAIN_APERTI_MAX:
             raise HTTPException(409, f"Hai già {P2P_ONCHAIN_APERTI_MAX} scambi "
                                      "on-chain aperti: chiudine uno prima")
+        # IL FOGLIO DI LIGHTNING ALLA PRESA (30 ott 2026): la pausa di chi
+        # ha pubblicato, chi puo' prendere, e i sats di un ordine a mercato
+        perche = _p2p_onchain_porta_presa(con, o, user["id"], adesso)
+        if perche:
+            raise HTTPException(409, perche)
+        prezzo, cambio_presa = int(o["prezzo_sats"]), 0.0
+        if _p2p_onchain_mercato(o):
+            cambio_presa = cambio_noto_ora()
+            eta = cambio_eta_ora()
+            if not cambio_presa > 0 or eta is None or eta > P2P_ONCHAIN_CAMBIO_FRESCO_S:
+                raise HTTPException(503, "Il cambio di adesso non c'è: è un ordine "
+                                         "a prezzo di mercato, riprova fra un minuto")
+            prezzo = p2p_onchain_sats_mercato(o["euro_cent"], o["premio"], cambio_presa)
+            if prezzo < P2P_ONCHAIN_MIN_SATS:
+                raise HTTPException(409, f"Al cambio di adesso sarebbero "
+                                         f"{_fmt_sats(prezzo)} sats: sotto il minimo "
+                                         f"di {_fmt_sats(P2P_ONCHAIN_MIN_SATS)}")
+            if tetto_sats_prova() and prezzo > tetto_sats_prova():
+                raise HTTPException(409, f"Al cambio di adesso sarebbero "
+                                         f"{_fmt_sats(prezzo)} sats: dal collaudo non "
+                                         f"si va oltre {_fmt_sats(tetto_sats_prova())}")
         # chi pubblica 'sell' vende bitcoin: deposita lui; chi prende compra
         if o["lato"] == "sell":
             dep, ric = int(o["maker_id"]), int(user["id"])
@@ -93917,16 +94135,21 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         rec = o["recapito"] or ""
         if dep == int(user["id"]) and recapito and not rec:
             rec = recapito
+        # `prezzo_sats` si scrive QUI, nella stessa riga dell'importo: a
+        # mercato e' nato adesso, e da qui in poi ronda, avvisi e giudice
+        # dei PSBT leggono quello
         cur = con.execute(
             "UPDATE p2p_onchain_ordini SET stato='preso', taker_id=?,"
             " depositante_id=?, ricevente_id=?, indirizzo_id=?, margine_sats=?,"
             " importo_sats=?, incasso=?, incasso_tipo=?, incasso_valore=?,"
             " incasso_firma=?, incasso_indice=?, rimborso=?, recapito=?,"
-            " preso_il=?, deposito_entro=?, aggiornato=?"
+            " preso_il=?, deposito_entro=?, aggiornato=?, prezzo_sats=?,"
+            " cambio_presa=?"
             " WHERE id=? AND stato='pending'",
-            (user["id"], dep, ric, ind_id, margine, int(o["prezzo_sats"]) + margine,
+            (user["id"], dep, ric, ind_id, margine, prezzo + margine,
              incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
-             adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, oid))
+             adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
+             cambio_presa, oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")
@@ -94426,6 +94649,67 @@ async def p2p_onchain_decidi(oid: int, req: Request, x_tg_init_data: str = Heade
     return {"ok": True, "attesa_firma": verso}
 
 
+def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:
+    """IL PARACADUTE DEGLI ORDINI ON-CHAIN (30 ott 2026), una passata: una
+    lettura del prezzo su ogni ordine ancora nel libro col paracadute, coi
+    giudici puri del Lightning (`_passo_paracadute_p2p`: due letture di
+    fila oltre la soglia, la stessa lettura non conta due volte, una
+    fonte muta non apre e non azzera). Quelli che si aprono si ANNULLANO
+    QUI — l'ordine e' del server, nessun telefono deve firmare niente — e
+    tornano `[{id, maker_id, soglia, partenza, arrivo, lato, euro_cent}]`.
+    Pura sulla connessione; COMMITTA. A leva spenta non fa niente."""
+    if not P2P_PARACADUTE:
+        return []
+    righe = con.execute(
+        "SELECT * FROM p2p_onchain_ordini WHERE stato='pending' AND paracadute>0"
+        " AND scade>? LIMIT 200", (int(adesso),)).fetchall()
+    aperti, toccati = [], 0
+    for o in righe:
+        p = _passo_paracadute_p2p({"soglia": o["paracadute"], "partenza": o["para_partenza"],
+                                   "oltre": o["para_oltre"], "lettura": o["para_lettura"]},
+                                  prezzo, letto, adesso)
+        if not p["cambia"]:
+            continue
+        if p["apre"]:
+            cur = con.execute(
+                "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+                " chiuso_perche='paracadute', para_partenza=?, para_oltre=?,"
+                " para_lettura=?, para_arrivo=?, aggiornato=?"
+                " WHERE id=? AND stato='pending'",
+                (int(adesso), p["partenza"], p["oltre"], p["lettura"], float(prezzo),
+                 int(adesso), o["id"]))
+            if cur.rowcount:
+                aperti.append({"id": int(o["id"]), "ordine": o["ordine"],
+                               "maker_id": int(o["maker_id"]),
+                               "soglia": int(o["paracadute"]), "partenza": p["partenza"],
+                               "arrivo": float(prezzo), "lato": o["lato"],
+                               "euro_cent": int(o["euro_cent"])})
+            toccati += cur.rowcount
+            continue
+        toccati += con.execute(
+            "UPDATE p2p_onchain_ordini SET para_partenza=?, para_oltre=?,"
+            " para_lettura=? WHERE id=? AND stato='pending'",
+            (p["partenza"], p["oltre"], p["lettura"], o["id"])).rowcount
+    if toccati:
+        con.commit()
+    return aperti
+
+
+def _p2p_onchain_testo_paracadute(a: dict) -> str:
+    """PURA: l'avviso a chi aveva pubblicato, quando il paracadute di un
+    ordine on-chain si apre: la frase del Lightning, senza la riga del
+    `cancel` da firmare (qui l'ordine l'ha gia' tolto il server)."""
+    scarto = _scarto_paracadute_p2p(a.get("partenza"), a.get("arrivo"))
+    perc = f"{abs(scarto):.1f}".replace(".", ",")
+    cosa = {"sell": " di vendita", "buy": " di acquisto"}.get(a.get("lato") or "", "")
+    euro = f" da {_fmt_eur(int(a['euro_cent']) / 100)} €" if a.get("euro_cent") else ""
+    return (f"{P2P_ONCHAIN_SEGNO} 🪂 <b>Il paracadute si è aperto</b>: BTC è passato da "
+            f"{_euro_btc_p2p(a.get('partenza'))} a {_euro_btc_p2p(a.get('arrivo'))} "
+            f"({'+' if scarto > 0 else '−'}{perc}%), il tuo ordine on-chain{cosa}{euro} "
+            "è stato annullato. Nessuna penalità.\n"
+            "Puoi ripubblicarlo al prezzo nuovo dal libro degli ordini.")
+
+
 async def _p2p_onchain_ronda() -> None:
     """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
     minuti): gli scambi presi si guardano su mempool; gli ordini nel
@@ -94445,6 +94729,10 @@ async def _p2p_onchain_ronda() -> None:
                         " aggiornato=? WHERE id=? AND stato='pending'",
                         (adesso, adesso, oid))
         con.commit()
+        # IL PARACADUTE (30 ott 2026, il foglio di Lightning)
+        aperti = _p2p_onchain_passata_paracadute(
+            con, cambio_noto_ora(), _cambio_cache["quando"], adesso)
+        scaduti += [a["id"] for a in aperti]
         da_guardare = [r["id"] for r in con.execute(
             "SELECT id FROM p2p_onchain_ordini WHERE indirizzo_id>0 AND ("
             "stato='preso' OR (stato IN ('annullato','scaduto') AND ricevuti_sats=0"
@@ -94456,6 +94744,18 @@ async def _p2p_onchain_ronda() -> None:
         _p2p_onchain_rifai_foto()
     for oid in scaduti:
         await _p2p_onchain_pubblica(oid)
+    for a in aperti:
+        try:
+            # il bottone di ogni avviso on-chain: apre lo scambio, che dice
+            # «annullato dal paracadute»; da li' si ripubblica
+            await notifica(a["maker_id"], _p2p_onchain_testo_paracadute(a),
+                           _p2p_onchain_bottone(a))
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: avviso del paracadute {a['id']} saltato: {e}",
+                  flush=True)
+        print(f"🪂 P2P on-chain: ordine {a['id']} di {a['maker_id']} annullato dal "
+              f"paracadute al {a['soglia']}% (da {a['partenza']:.0f} a "
+              f"{a['arrivo']:.0f} €/BTC)", flush=True)
     for oid in da_guardare:
         try:
             await _p2p_onchain_controlla(oid)
