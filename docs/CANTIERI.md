@@ -76344,3 +76344,47 @@ del fantasma con le sfumature nuove, blu compreso),
 il banner tornato scuro, il fulmine tornato piccolo, il riepilogo senza
 vestito, la meta blu del fantasma tolta. Visto dal vivo nei due temi (giro locale,
 relay morti).
+
+## Il banner «On-Chain» del colore delle card, la rete sotto il cappello e i tasti del + negli scuri del tema (30 ott 2026, sera, cantiere oc-dettaglio)
+
+Andrea, 20:24, dal collaudo: «il tasto novità mettilo con uno sfondo di
+colore uguale alle card e scrivi affianco novità vicino alla freccetta;
+quando lo clicchi si colora arancione e poi si spegne di nuovo finito il
+tutorial; poi quando clicchi su un ordine si deve vedere in alto stai
+vendendo/comprando sats e sotto via lightning / via on-chain; poi i
+tasti grandi onchain e lightning quando clicco sul pulsante + cambiami
+bordo e colore, proponimi altri colori», e alle 20:25 «piuttosto colori
+uniformi oppure colori normali arancio o scuri del tema».
+- IL BANNER: fondo `--card` col filo delle card (`--line-soft`),
+  scritta d'inchiostro, e «Novità» in arancio (#E8870F) fra «On-Chain»
+  e la freccia. Acceso (il tutorial, invariato: `accendiNovitaOcP2P`)
+  l'arancio pieno con le scritte bianche e il filo bianco alla moneta.
+- LA RETE SOTTO IL CAPPELLO: il dettaglio Lightning scrive
+  «Stai comprando/vendendo sats» col textContent di sempre e poi
+  aggiunge `<small class="p2p-via">via Lightning</small>`, costante.
+  La presa on-chain passa da `chiediConferma`: il titolo era
+  «⛓️ Compri/Vendi bitcoin on-chain», adesso è lo stesso cappello del
+  dettaglio con la riga nuova `via: 'via on-chain'`, che la domanda di
+  casa scrive con un `small` e il textContent (testo nudo, come il
+  titolo). La riga c'è per tutti, anche per chi l'on-chain non lo vede:
+  è vera, e la promozione la porta a tutti.
+- I TASTI DEL +: quattro varianti in tinta unita (foto 38: A arancio e
+  giallo pieni, B l'arancio di casa, C gli scuri del tema, D le card col
+  bordo colorato); scelta di Andrea sulla card (20:30): C, il fondo delle
+  scatole dei metodi (`--chip-bg`) col filo delle card, scritta
+  d'inchiostro, niente alone. Il colore lo portano moneta e fulmine.
+  Poi (20:36) «mi piacciono, ma me li puoi fare con una forma che sembra
+  3D tipo la versione B? perché così sembrano spenti»: la ricetta dei
+  bottoni pieni di casa sul fondo del tema — una luce dall'alto che
+  sfuma in un'ombra in basso (`background-image` sopra il
+  `background-color`), il filo di luce sul bordo di sopra, l'ombra che
+  stacca il tasto (foto 39).
+  L'eccezione della sentinella del vestito resta (il selettore è quello).
+
+Prove: `prove_grafica_p2p_onchain` (banner, tasti del +, la riga `via`
+della domanda di casa), `prove_p2p_dettaglio` (il banco ha imparato
+`insertAdjacentHTML` e legge la riga della rete),
+`prove_deposito_p2p_onchain` (il cappello della presa on-chain).
+Controprove rosse: «Novità» tolto, il fondo dei tasti cambiato, la riga
+«via Lightning» tolta. Visto dal vivo nei due temi (foto 37 e la C
+vera). Da guardare dal telefono: il banner acceso durante il tutorial.

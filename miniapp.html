@@ -3951,9 +3951,9 @@
     border-radius:14px;height:48px}
   .p2p-oc-faccia{position:absolute;inset:0;display:flex;align-items:center;gap:10px;
     padding:0 14px 0 8px;border:0;border-radius:14px;cursor:pointer;
-    background:#8A4A0E;box-shadow:inset 0 0 0 1px #C26A10;color:#fff;
-    transition:background-color .25s ease,box-shadow .25s ease;
-    text-shadow:0 1px 2px rgba(0,0,0,.35);font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
+    background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink);
+    transition:background-color .25s ease,box-shadow .25s ease,color .25s ease;
+    font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
   /* 17:55 il gradiente della scelta del + (Andrea: «fai con quel gradiente
      anche il banner novita'»), e alle 18:43 «non mi piace, proviamone un
      altro»: fra sette varianti in due giri (18:45 e 18:50) quella che
@@ -3966,9 +3966,20 @@
      dal tocco alla fine del tutorial (`accendiNovitaOcP2P`) l'arancio della
      moneta, e la moneta riprende il filo bianco dei fondi arancio.
      «Troppo scuro» (19:33): fra tre varianti piu' chiare (foto 33) la C
-     (scelta di Andrea, 19:36), arancio bruciato #8A4A0E col filo #C26A10 */
+     (scelta di Andrea, 19:36), arancio bruciato #8A4A0E col filo #C26A10.
+     IL FONDO DELLE CARD (20:24, Andrea: «il tasto novità mettilo con uno
+     sfondo di colore uguale alle card e scrivi affianco novità vicino
+     alla freccetta; quando lo clicchi si colora arancione e poi si spegne
+     di nuovo finito il tutorial»): `--card` col filo delle card, la
+     scritta d'inchiostro, e «Novità» in arancio accanto alla freccia;
+     acceso, l'arancio pieno con le scritte bianche */
   .p2p-oc-faccia:active{filter:brightness(1.06)}
-  .p2p-oc-novita.acceso .p2p-oc-faccia{background:#F7931A;box-shadow:inset 0 0 0 1px #B8650C}
+  /* la riga della rete sotto il cappello del dettaglio e della presa */
+  .p2p-via{display:block;margin-top:1px;font:700 13px 'Nunito',sans-serif;color:var(--muted)}
+  .p2p-oc-novita-tag{flex:0 0 auto;font-size:13px;font-weight:800;color:#E8870F}
+  .p2p-oc-novita.acceso .p2p-oc-faccia{background:#F7931A;box-shadow:inset 0 0 0 1px #B8650C;
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .p2p-oc-novita.acceso .p2p-oc-novita-tag{color:#fff}
   .p2p-oc-novita.acceso .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{width:32px;height:32px;position:relative;z-index:1}
   .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px;stroke-width:2.3}
@@ -4027,12 +4038,21 @@
      «Leggermente meno ombra» (18:58): l'alone da 14 px a 10, piu' tenue.
      «Troppo scuri, leggermente piu' chiari e meno alone colorato dietro»
      (19:34): il bruno di partenza piu' chiaro (#2E1A08, #2C2408) e piu'
-     corto (14%), il filo un tono sopra, l'alone a 6 px e .2 (foto 34) */
-  .btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:#fff;border:0;text-shadow:0 1px 2px rgba(0,0,0,.35)}
-  .btn.p2p-scelta-oc{background:linear-gradient(90deg,#2E1A08 0%,#2E1A08 14%,#C06E12 55%,#F7931A 100%);
-    box-shadow:inset 0 0 0 1px #6A3808,0 0 6px rgba(247,147,26,.2)}
-  .btn.p2p-scelta-ln{background:linear-gradient(90deg,#2C2408 0%,#2C2408 14%,#C29414 55%,#FFC83D 100%);
-    box-shadow:inset 0 0 0 1px #6A5410,0 0 6px rgba(255,200,61,.2)}
+     corto (14%), il filo un tono sopra, l'alone a 6 px e .2 (foto 34).
+     TINTA UNITA, GLI SCURI DEL TEMA (20:24-20:30, Andrea: «cambiami bordo
+     e colore, proponimi altri colori ... piuttosto colori uniformi oppure
+     colori normali arancio o scuri del tema»): fra quattro varianti (foto
+     38) la C, il fondo delle scatole dei metodi (`--chip-bg`) col filo
+     delle card e la scritta d'inchiostro; il colore lo portano le icone.
+     IN RILIEVO (20:36, Andrea: «me li puoi fare con una forma che sembra
+     3d tipo la versione B? perché così sembrano spenti»): la ricetta dei
+     bottoni pieni di casa sul fondo del tema — una luce dall'alto che
+     sfuma verso un'ombra in basso, il filo di luce sul bordo di sopra e
+     l'ombra che stacca il tasto dal foglio */
+  .btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:var(--ink);border:0;background-color:var(--chip-bg);
+    background-image:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%,rgba(0,0,0,.10) 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 0 1px var(--line-soft),
+      0 1px 2px rgba(0,0,0,.25),0 7px 16px -8px rgba(0,0,0,.55)}
   .btn.p2p-scelta-oc:active,.btn.p2p-scelta-ln:active{filter:brightness(1.06)}
   /* IL FOGLIO «PUBBLICA» ON-CHAIN: la scritta sopra il titolo, e la
      valuta che non si sceglie (una riga, senza freccina) */
@@ -35859,6 +35879,14 @@ function chiediConferma(c){
      avviso non farebbe nulla e il foglio non si chiuderebbe piu'. */
   confermaAzione = c.poi || (c.avviso ? (()=>{}) : null);
   el('confTit').textContent = c.titolo || 'Confermi?';
+  /* `via`: la riga piccola sotto il titolo (30 ott 2026, la rete della
+     presa on-chain); testo nudo, scritto col textContent come il titolo */
+  if (c.via) {
+    const via = document.createElement('small');
+    via.className = 'p2p-via';
+    via.textContent = c.via;
+    el('confTit').appendChild(via);
+  }
   /* IL VOLTO DELL'ACCOUNT ATTIVO prima di un gesto coi soldi (16 ott
      2026): con piu' account aperti si vede chi sta pagando o liberando */
   const chi = c.soldi && typeof contoInVistaHTML === 'function' ? contoInVistaHTML() : '';
@@ -57425,6 +57453,8 @@ function carteOnchainLibroP2P(k){
       + (tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '') + '" id="p2pOcNovita">'
       + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaOnchainP2P()">'
       + P2P_OC_MONETA + '<span class="p2p-oc-novita-testo">On-Chain</span>'
+      /* «Novità» accanto alla freccia (20:24, Andrea) */
+      + '<span class="p2p-oc-novita-tag">Novità</span>'
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
       + '</div>'
     : '';
@@ -57570,7 +57600,10 @@ function apriOnchainP2P(id, modo){
   const vendeLui = o.lato === 'sell';
   const metodi = (o.metodi || []).join(', ');
   chiediConferma({
-    titolo: vendeLui ? '⛓️ Compri bitcoin on-chain' : '⛓️ Vendi bitcoin on-chain',
+    /* lo stesso cappello del dettaglio Lightning, con la rete sotto
+       (20:24, Andrea): era «⛓️ Compri bitcoin on-chain» */
+    titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',
+    via: 'via on-chain',
     testata: '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
       + esc(fmtEur(o.euro)) + ' €</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : '')
       + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi</small>' : '')
@@ -70725,6 +70758,11 @@ function renderDettaglioP2P(){
      dice anche la prima riga delle card di «I miei scambi» — e due
      stesure della stessa frase prima o poi dicono due cose. */
   if (tit) tit.textContent = fraseLatoP2P(o);
+  /* LA RETE SOTTO IL CAPPELLO (30 ott 2026, 20:24, Andrea: «quando clicchi
+     su un ordine si deve vedere in alto stai vendendo/comprando sats e
+     sotto via lightning / via on-chain»): qui sempre Lightning; la presa
+     on-chain dice «via on-chain» nella sua domanda (`apriOnchainP2P`) */
+  if (tit) tit.insertAdjacentHTML('beforeend', '<small class="p2p-via">via Lightning</small>');
   /* ⚠️ IL BOTTONE NON SI SPEGNE PIU' PER IL METODO (9 ott 2026,
      cantiere prendi-metodo): qui nasceva `manca`, la frase rossa in
      fondo accanto a «Compra» spento. Adesso il bottone e' acceso e la

@@ -67940,6 +67940,8 @@ function tourRidotto(){ return false; }
 function el(id){
   if (!nodi[id]) nodi[id] = {id: id, innerHTML: '', textContent: '',
     classList: {add(){}, remove(){}},
+    /* la riga della rete sotto il cappello (30 ott 2026) */
+    insertAdjacentHTML(dove, h){ this.via = (this.via || '') + h; },
     closest(){ return (nodi.p2pDettCorpo || {innerHTML: ''}).innerHTML
       .indexOf('id="' + this.id + '"') >= 0 ? sezFinta : null; }};
   return nodi[id];
@@ -68143,6 +68145,7 @@ p2pLibro = {ordini: [ordine({id: 'ord-1', metodi: ['SEPA', 'Revolut'],
 p2pFacce = {'ord-1': {nome: 'Ada', media: 4.8, voti: 12, giorni: 41}};
 apriDettaglioP2P('ord-1');
 out.titoloCompra = el('p2pDettTit').textContent;
+out.viaCompra = el('p2pDettTit').via || '';
 out.pagina = el('p2pDettCorpo').innerHTML;
 /* col metodo non scelto il bottone e' ACCESO (9 ott 2026, cantiere
    prendi-metodo) e la domanda aspetta, nascosta, sopra le pillole */
@@ -69194,6 +69197,9 @@ console.log(JSON.stringify(out));
     prova("il titolo dice il lato in seconda persona",
           ["Stai comprando sats", "Stai vendendo sats"],
           [o["titoloCompra"], o["titoloVendi"]])
+    # (30 ott 2026, 20:24, Andrea: «in alto stai vendendo/comprando sats e
+    # sotto via lightning / via on-chain») la rete sotto il cappello
+    prova("...e sotto, la rete", '<small class="p2p-via">via Lightning</small>', o["viaCompra"])
     # ⚠️ SI CERCA NEL SORGENTE RIPULITO DAI COMMENTI, ed e' la trappola
     # gia' pagata dalla sentinella dello sconto: il commento che
     # introduce il titolo nuovo CITA quello vecchio — e' la storia del
@@ -153402,7 +153408,7 @@ out.portaNo = carteOnchainLibroP2P('sell');
 out.sceltaNo = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open')];
 myP2POnchain = true;
 const porta = carteOnchainLibroP2P('sell');
-out.porta = [/p2p-oc-novita/.test(porta), /p2p-oc-novita-testo">On-Chain<\\/span>/.test(porta) && !/Novità/.test(porta), /cambio-moneta btc/.test(porta)];
+out.porta = [/p2p-oc-novita/.test(porta), /p2p-oc-novita-testo">On-Chain<\\/span><span class="p2p-oc-novita-tag">Novità<\\/span>/.test(porta), /cambio-moneta btc/.test(porta)];
 // il filtro «solo Lightning» lascia fuori le card on-chain, non il rettangolo
 p2pOnchainLibro.eventi = [{lato: 'sell'}];
 const conCard = carteOnchainLibroP2P('sell');
@@ -153489,9 +153495,9 @@ console.log(JSON.stringify(out));
         prova("il fulmine sulle card di Mostro c'e' solo a libro on-chain acceso; la "
               "moneta sulle card on-chain sempre", (["", True], True),
               (out["reteSpento"], out["reteAcceso"]))
-        prova("il rettangolo «Novità» solo a chi e' ammesso, con la moneta e la "
-              "sola parola «On-Chain» (17:57, Andrea: «scrivi così: On-Chain, pulito "
-              "senza novità»)", ("", [True, True, True]), (out["portaNo"], out["porta"]))
+        # (20:24, Andrea: «scrivi affianco novità vicino alla freccetta»)
+        prova("il rettangolo «Novità» solo a chi e' ammesso, con la moneta, «On-Chain» "
+              "e «Novità» accanto alla freccia", ("", [True, True, True]), (out["portaNo"], out["porta"]))
         # IL «NOVITÀ» APRE IL TUTORIAL (30 ott 2026, 17:29, Andrea: «quando
         # clicchi sul pulsante novita parte un tutorial»): sette tappe — la
         # novita', come funziona, la moneta, il fulmine, il + di Compra, il +
@@ -153621,20 +153627,25 @@ console.log(JSON.stringify(out));
            ".p2p-scelta-rete .cambio-moneta" in _anello,
            # 18:43 il gradiente non piace piu'; 18:52 quello del tasto
            # On-chain del +; 19:01 tinta unica scura col filo della D
-           # 19:33 «troppo scuro»: la variante C (19:36), arancio bruciato
-           "background:#8A4A0E;box-shadow:inset 0 0 0 1px #C26A10;" in _faccia))
+           # 19:33 «troppo scuro»: la variante C (19:36); 20:24 il fondo delle card
+           "background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink);" in _faccia))
+    _conf_via = pezzo_js(mini, "function chiediConferma(c){", "\n}\n")
+    prova("...e la domanda di casa sa dire la rete sotto il titolo, a testo nudo", (True, True),
+          ("via.textContent = c.via;" in _conf_via and "el('confTit').appendChild(via);" in _conf_via,
+           "  .p2p-oc-novita.acceso .p2p-oc-novita-tag{color:#fff}" in css))
     prova("...e non c'e' nemmeno sul «Pubblica ordine»", False,
           "#p2pNuovoInvia .cambio-moneta.p2p-oc-moneta" in _anello)
     # I TASTI DEL + PIU' CONTRASTATI, COL BORDO FINE (18:44, Andrea: «sono
     # sbiaditi, fammeli più contrastati magari anche con un bordo fine»)
-    prova("i tasti della scelta del +: marrone scuro fisso, scritta bianca, filo scuro (18:46) "
-          "del colore della rete", (True, True, True),
-          (".btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:#fff;border:0;" in css,
-           # 19:34 «troppo scuri, leggermente più chiari e meno alone»
-           "background:linear-gradient(90deg,#2E1A08 0%,#2E1A08 14%,#C06E12 55%,#F7931A 100%);\n"
-           "    box-shadow:inset 0 0 0 1px #6A3808,0 0 6px rgba(247,147,26,.2)}" in css,
-           "background:linear-gradient(90deg,#2C2408 0%,#2C2408 14%,#C29414 55%,#FFC83D 100%);\n"
-           "    box-shadow:inset 0 0 0 1px #6A5410,0 0 6px rgba(255,200,61,.2)}" in css))
+    # (20:30, scelta di Andrea fra quattro varianti in tinta unita, foto 38)
+    # la C: gli scuri del tema, il fondo delle scatole dei metodi
+    prova("i tasti della scelta del +: il fondo dei metodi col filo delle card, in rilievo",
+          (True, False),
+          # (20:36) in rilievo, come i bottoni pieni di casa
+          (".btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:var(--ink);border:0;background-color:var(--chip-bg);\n"
+           "    background-image:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%,rgba(0,0,0,.10) 100%);\n"
+           "    box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 0 1px var(--line-soft),\n" in css,
+           ".btn.p2p-scelta-oc{background:" in css or ".btn.p2p-scelta-ln{background:" in css))
     # I BOTTONI DEL LATO NELLO STILE DEL + (18:53-18:57, Andrea): i due
     # «Pubblica ordine» e Compra/Vendi della presa, dal nero al verde o al
     # rosso, alone corto, icona a sinistra; Barattozon e «Scegli» no
@@ -153981,7 +153992,7 @@ console.log(JSON.stringify(out));
           ("badgePremioP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0})" in riga,
            "fraseFiltroP2P(Number(o.filtro))" in riga, "' p2p-in-pausa' : ''" in riga,
            0 < apri.find("const pausa = pausaOnchainP2P(o);")
-           < apri.find("titolo: vendeLui ? '⛓️ Compri bitcoin on-chain'")))
+           < apri.find("titolo: vendeLui ? 'Stai comprando sats' : 'Stai vendendo sats',\n    via: 'via on-chain',")))
     campi = pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
     vale = pezzo_js(mini, "function valeNuovoOrdineP2P(v){", "\n}\n")
     prova("...e il giudice usa il minimo on-chain e non chiede la zona", (True, True),
