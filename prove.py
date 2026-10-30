@@ -67660,7 +67660,7 @@ def prove_p2p_dettaglio():
           [True, True, True, False, True], ['<div class="foglio-piede">' in rd,
           'class="btn ghost" onclick="navIndietro()">Annulla' in rd,
           # (30 ott 2026, 18:57) col vestito scuro dei due «Pubblica ordine»
-          "'<button type=\"button\" class=\"btn ' + (daScegliere ? 'orange' : compro ? 'primary p2p-scuro' : 'rosso p2p-scuro')\n"
+          "'<button type=\"button\" class=\"btn ' + (daScegliere ? 'orange' : compro ? 'primary p2p-ico-3d' : 'rosso p2p-ico-3d')\n"
           "        + '\" id=\"p2pDettVai\"'" in rd,
           "'<button type=\"button\" class=\"btn orange\" id=\"p2pDettVai\"'" in rd,
           "return tab ? 'bz' : (p2pLato === 'vendo' ? 'rosso' : 'primary');" in mini])
@@ -68450,7 +68450,7 @@ console.log(JSON.stringify(out));
     prova("...con «sats» piccolo e la sua copia per la voce, e il bottone torna «Compra» verde", [True, True, True],
           ['<span class="unita-sats"> sats</span>' in rs, '<span class="solo-voce">≈ 120000 sats</span>' in rs,
            # (30 ott 2026, 18:57-19:04) vestito scuro e fulmine a sinistra
-           '<button type="button" class="btn primary p2p-scuro" id="p2pDettVai" onclick="confermaDettaglioP2P()">'
+           '<button type="button" class="btn primary p2p-ico-3d" id="p2pDettVai" onclick="confermaDettaglioP2P()">'
            '<span class="p2p-invia-ico">⚡</span>Compra</button>' in rs])
     prova("...e la fee a zero, sulla cifra scelta, dice «0 sats» piccolo e a voce", True,
           '<span class="num"><span aria-hidden="true">0<span class="unita-sats"> sats</span></span>'
@@ -68464,7 +68464,7 @@ console.log(JSON.stringify(out));
     prova("dal lato di chi vende: «ricevere», «Scegli» arancio, e «Vendi» rosso dopo la scelta", [True, True, True, True],
           ["Scegli quanto vuoi ricevere per vedere il dettaglio" in rva,
            'class="btn orange" id="p2pDettVai" aria-label="Scegli quanto ricevere"' in rva,
-           '<button type="button" class="btn rosso p2p-scuro" id="p2pDettVai" onclick="confermaDettaglioP2P()">'
+           '<button type="button" class="btn rosso p2p-ico-3d" id="p2pDettVai" onclick="confermaDettaglioP2P()">'
            '<span class="p2p-invia-ico">⚡</span>Vendi</button>' in rvs,
            o["rangeVendiPresa"] == [["ord-5", 40, "SEPA"]]])
     prova("il mio intervallo visto dal libro: la frase di chi prende, e niente «Scegli»", [True, False],
@@ -71688,7 +71688,7 @@ def prove_tasto_barattozon():
     _ves = pezzo_js(mini, "function vestitoInvioP2P(tab){", "\n}\n")
     prova("il bottone che pubblica: verde, rosso, o il blu di Barattozon", True,
           "return tab ? 'bz' : (p2pLato === 'vendo' ? 'rosso' : 'primary');" in _ves
-          and "'<button type=\"button\" class=\"btn ' + vestitoInvioP2P(tab) + ' p2p-scuro\" "
+          and "'<button type=\"button\" class=\"btn ' + vestitoInvioP2P(tab) + ' p2p-ico-3d\" "
               "id=\"p2pNuovoInvia\" ' +" in mini)
     # (ott 2026, il secondo giro del vestito A) il rosso e il blu sono due
     # RUOLI: copiano le loro leve nelle correnti e la regola comune dipinge
@@ -71753,7 +71753,7 @@ def prove_tasto_barattozon():
           [True, True, True],
           ["etichetta: 'Pubblica', vestito: 'bz'," in _inv,
            # (30 ott 2026, 19:40) il blu col vestito scuro del P2P
-           "ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz p2p-scuro' : 'orange');" in _chc
+           "ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz p2p-ico-3d' : 'orange');" in _chc
            and "el('confOk').textContent = c.etichetta || 'Conferma';" in _chc,
            "if (c.vestito === 'bz') ok.insertAdjacentHTML('afterbegin', LOGO_BZ_HTML);" in _chc])
 
@@ -80501,19 +80501,16 @@ def prove_p2p_pubblica():
     # cambierebbe di colpo
     prova("...e la meta veste il bottone, e VINCE: verde, rosso col lato, blu "
           "col tabacchino anche a «Vendi BTC»",
-          # (30 ott 2026, 18:57) col vestito scuro dei «Pubblica ordine»: la
-          # sfumatura dal nero, che pesa piu' del rosso del lato; il blu resta
-          ["linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%)",
-           "linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%)",
-           # (19:40) anche il blu di Barattozon, dal nero
-           "linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%)"],
+          # (30 ott 2026: per una sera le sfumature dal nero, poi alle 21:00
+          # «lasciamo i colori come erano prima»)
+          ["var(--b-ok-bg)", "var(--b-rosso-bg)", "var(--b-bz-bg)"],
           [_fantasma([], ["acceso"], _META).get("background"),
            _fantasma(_V, ["acceso"], _META).get("background"),
            _fantasma(_V, ["acceso", "bz"], _META).get("background")])
     # (ott 2026) gli inchiostri sono quelli dei ruoli del vestito: il rosso
     # dei bottoni e' lo stesso nei due temi, col bianco
     prova("...e la scritta ha l'inchiostro del bottone d'arrivo, e VINCE",
-          ["#fff", "#fff", "var(--b-bz-fg)"],
+          ["var(--b-ok-fg)", "var(--b-rosso-fg)", "var(--b-bz-fg)"],
           [_fantasma([], ["acceso"], _ETI).get("color"),
            _fantasma(_V, ["acceso"], _ETI).get("color"),
            _fantasma(_V, ["acceso", "bz"], _ETI).get("color")])
@@ -145617,23 +145614,13 @@ def prove_vestito_bottoni():
     # leva del vestito o se ridipinge un bottone.
     def _del_p2p(lista):
         return re.search(r"p2p|P2P|contanti|app-naviga|luogo-qui", lista) is not None
-    # L'UNICA ECCEZIONE, DETTA (30 ott 2026, cantiere oc-colori): il
-    # vestito `p2p-scuro` dei due «Pubblica ordine» e di Compra/Vendi della
-    # presa (Andrea, 18:53: «voglio che abbiano questo stile anche i tasti
-    # pubblica ordine ... con i relativi colori verde o rosso»; 18:57 «si
-    # perfetto ... stessa cosa per i tasti compra o vendi»). Riscrive le
-    # leve del SUO ruolo apposta: premuto, spento e «in corso» restano
-    # quelli del vestito
-    # (19:40, «stesso effetto quando pubblichi un ordine barattozon»)
-    _leve_dette = {".btn.primary.p2p-scuro", ".btn.rosso.p2p-scuro", ".btn.bz.p2p-scuro"}
+    # (30 ott 2026, 21:00) il vestito scuro dei bottoni del lato e' durato
+    # una sera: «via i gradienti ... lasciamo i colori come erano prima».
+    # Le sue tre eccezioni se ne sono andate con lui, e la sentinella e'
+    # tornata quella di prima
     leve = [lista.strip() for lista, corpo, gruppi in reg
-            if lista.strip() not in _leve_dette
-            and _del_p2p(lista) and re.search(r"(?:^|;)\s*--b-", corpo)]
+            if _del_p2p(lista) and re.search(r"(?:^|;)\s*--b-", corpo)]
     prova("nessuna regola del P2P riscrive una leva del vestito", [], leve)
-    prova("...e le tre eccezioni dette ci sono, e toccano solo le leve", [True, True, True],
-          [any(lista.strip() == x and re.search(r"(?:^|;)\s*--b-bg\s*:", corpo)
-               and not re.search(r"(?:^|;)\s*background\s*:", corpo)
-               for lista, corpo, gruppi in reg) for x in sorted(_leve_dette)])
     # L'UNICA ECCEZIONE, DETTA (30 ott 2026, cantiere oc-tutorial): i due
     # tasti della scelta del + sono sfumati dal marrone dei metodi
     # all'arancio e al giallo per decisione di Andrea («un gradiente che
@@ -145641,7 +145628,12 @@ def prove_vestito_bottoni():
     # come la card super affare», 17:49; «si i colori ora sono molto
     # fighi», 17:51): nessun ruolo del vestito ha quella sfumatura, e un
     # ruolo nuovo per due tasti sarebbe un vestito per un'occasione sola
-    _eccezioni = {".btn.p2p-scelta-oc,.btn.p2p-scelta-ln", ".btn.p2p-scelta-oc", ".btn.p2p-scelta-ln"}
+    _eccezioni = {".btn.p2p-scelta-oc,.btn.p2p-scelta-ln", ".btn.p2p-scelta-oc", ".btn.p2p-scelta-ln",
+                  # (30 ott 2026, 21:00, Andrea: «cambiano solo le icone
+                  # rendendole leggermente in 3D»): l'ombra e' della MONETA
+                  # dentro il bottone, non del bottone
+                  ".btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,\n"
+                  "  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta"}
     ridipinti = [lista.strip() for lista, corpo, gruppi in reg
                  if lista.strip() not in _eccezioni
                  and _del_p2p(lista) and ".btn" in lista and re.search(
@@ -153646,20 +153638,26 @@ console.log(JSON.stringify(out));
            "    background-image:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%,rgba(0,0,0,.10) 100%);\n"
            "    box-shadow:inset 0 1px 0 rgba(255,255,255,.16),inset 0 0 0 1px var(--line-soft),\n" in css,
            ".btn.p2p-scelta-oc{background:" in css or ".btn.p2p-scelta-ln{background:" in css))
-    # I BOTTONI DEL LATO NELLO STILE DEL + (18:53-18:57, Andrea): i due
-    # «Pubblica ordine» e Compra/Vendi della presa, dal nero al verde o al
-    # rosso, alone corto, icona a sinistra; Barattozon e «Scegli» no
+    # L'ICONA A SINISTRA, IN RILIEVO (18:53-21:00, Andrea): i due «Pubblica
+    # ordine», Compra/Vendi della presa e Barattozon tengono i colori del
+    # loro ruolo («via i gradienti ... lasciamo i colori come erano
+    # prima»); l'icona sta a sinistra, piu' grande, con l'ombra, e la
+    # moneta senza filo bianco («l'icona onchain deve essere senza bordo
+    # bianco»)
     _fog_nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
-    prova("i bottoni del lato: verde e rosso dal nero, alone corto, icona a sinistra",
-          (True, True, True, True, True),
-          (".btn.primary.p2p-scuro{--b-bg:linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%);" in css,
-           ".btn.rosso.p2p-scuro{--b-bg:linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%);" in css,
-           "--b-sh:0 0 8px rgba(52,180,122,.25);" in css and "--b-sh:0 0 8px rgba(224,74,38,.25);" in css,
-           "  .btn.p2p-scuro .p2p-invia-ico,.btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,\n" in css
-           and "position:absolute;left:16px;top:50%;margin:0;transform:translateY(-50%)}" in css
-           # 19:34 le icone un po' piu' grosse
-           and ".btn.p2p-scuro .p2p-invia-ico,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico{font-size:24px;line-height:1}" in css,
-           "vestitoInvioP2P(tab) + ' p2p-scuro\"" in _fog_nuovo))
+    prova("i bottoni del lato: i colori del ruolo, l'icona in rilievo accanto alla scritta, la "
+          "moneta senza filo bianco", (False, True, True, True, True, False),
+          (re.search(r"\.p2p-ico-3d\{[^}]*--b-", css) is not None,
+           # (21:11, «mettile vicine alla scritta come erano prima, nel tasto
+           # lungo»): a sinistra resta solo il fulmine del «Compra» corto
+           "  #p2pDettVai.p2p-ico-3d .p2p-invia-ico{position:absolute;left:16px;" in css
+           and css.count("position:absolute;left:16px;top:50%;margin:0;transform:translateY(-50%)}") == 1,
+           ".btn.p2p-ico-3d .p2p-invia-ico,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico{font-size:24px;line-height:1;\n"
+           "    filter:drop-shadow(" in css,
+           "#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{width:32px;height:32px;\n"
+           "    box-shadow:inset 0 2px 1px rgba(255,255,255,.45)," in css,
+           "vestitoInvioP2P(tab) + ' p2p-ico-3d\"" in _fog_nuovo,
+           "rgba(255,255,255,.9)" in pezzo_js(css, "  .btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,\n  #p2pMorfo", "}")))
     # LA RETE ACCANTO A «COMPRA» / «VENDI» (19:04, Andrea: «così chi lo
     # prende sa se e' onchain o lightning»): il fulmine nella presa
     # Lightning, la moneta in quella on-chain, che dice anche lei Compra/Vendi
@@ -153669,31 +153667,21 @@ console.log(JSON.stringify(out));
           (True, True, True, True, False),
           ("(daScegliere ? 'Scegli' : '<span class=\"p2p-invia-ico\">⚡</span>' + (compro ? 'Compra' : 'Vendi'))" in mini,
            "etichetta: vendeLui ? 'Compra' : 'Vendi',\n    vestito: vendeLui ? 'compro-oc' : 'vendo-oc'," in _oc_presa,
-           "ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-scuro';" in _conf,
+           "ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-ico-3d';" in _conf,
            "ok.insertAdjacentHTML('afterbegin', '<span class=\"p2p-invia-oc\">' + P2P_OC_MONETA + '</span>');" in _conf
            # l'etichetta resta scritta col textContent PRIMA della moneta
            and _conf.index("el('confOk').textContent = c.etichetta || 'Conferma';")
                < _conf.index("ok.insertAdjacentHTML('afterbegin', '<span class=\"p2p-invia-oc\">'"),
            "etichetta: 'Prendi lo scambio'" in _oc_presa))
-    prova("...e «Scegli» resta senza", False, "'orange p2p-scuro'" in mini)
-    # BARATTOZON COL VESTITO SCURO (19:40, Andrea: «stesso effetto quando
-    # pubblichi un ordine barattozon»): dal nero al suo blu, il logo a
-    # sinistra, nel bottone, nel riepilogo e nel fantasma
-    prova("Barattozon: dal nero al blu, logo a sinistra, anche nel fantasma",
-          (True, True, True),
-          (".btn.bz.p2p-scuro{--b-bg:linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%);" in css,
-           "  .btn.p2p-scuro > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz,\n" in css,
-           "  html body #p2pMorfo.bz .morfo-meta{\n"
-           "    background:linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%);" in css))
-    # IL FANTASMA DELLA MORFOSI porta lo stesso vestito, o cambierebbe di
-    # colpo all'ultimo fotogramma; il blu e il + del mercatino no
-    prova("il fantasma del + veste come il bottone d'arrivo, senza toccare Barattozon",
-          (True, True, True),
-          ("  html body #p2pMorfo:not(.bz):not(.merc) .morfo-meta{\n"
-           "    background:linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%);" in css,
-           "  html body.p2p-vendo #p2pMorfo:not(.bz):not(.merc) .morfo-meta{\n"
-           "    background:linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%);" in css,
-           "  html body #p2pMorfo:not(.bz):not(.merc) .morfo-eti{color:#fff;" in css))
+    prova("...e «Scegli» resta senza", False, "'orange p2p-ico-3d'" in mini)
+    # BARATTOZON (19:40, «stesso effetto quando pubblichi un ordine
+    # barattozon»): il suo blu, il logo a sinistra in rilievo, nel bottone,
+    # nel riepilogo e nel fantasma; e il fantasma non ha piu' sfumature
+    prova("Barattozon: il logo in rilievo, e il fantasma coi colori del ruolo",
+          (True, False, False),
+          ("  .btn.p2p-ico-3d > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz{width:29px;height:28px;" in css,
+           "html body #p2pMorfo.bz .morfo-meta{" in css,
+           "html body #p2pMorfo:not(.bz):not(.merc) .morfo-meta{" in css))
     # IL «NOVITÀ» ARANCIO MENTRE IL TUTORIAL GIRA (19:01, Andrea: «quando
     # lo clicchi si trasforma in arancio mentre viene mostrato il tutorial»)
     _acc = pezzo_js(mini, "function apriNovitaOnchainP2P(){", "\n}\n")

@@ -76388,3 +76388,47 @@ della domanda di casa), `prove_p2p_dettaglio` (il banco ha imparato
 Controprove rosse: «Novità» tolto, il fondo dei tasti cambiato, la riga
 «via Lightning» tolta. Visto dal vivo nei due temi (foto 37 e la C
 vera). Da guardare dal telefono: il banner acceso durante il tutorial.
+
+## I bottoni del lato tornano ai loro colori, e resta l'icona in rilievo (30 ott 2026, sera, cantiere oc-icone)
+
+Andrea, 21:00: «via i gradienti nei tasti pubblica ordine e nei tasti
+compra o vendi, lasciamo i colori come erano prima, cambiano solo le
+icone rendendole magari leggermente in 3D per farle più visibili
+rispetto a prima», e subito dopo «l'icona onchain deve essere senza
+bordo bianco».
+- Il vestito `p2p-scuro` di oc-colori (sfumature dal nero al verde, al
+  rosso e al blu di Barattozon, sulle leve del ruolo, e nel fantasma
+  della morfosi) se ne va tutto: i bottoni e il fantasma tornano ai
+  colori del loro ruolo, e la sentinella del vestito torna senza le tre
+  eccezioni delle leve.
+- Resta, e si chiama per quel che fa, `p2p-ico-3d`: l'icona — fulmine,
+  moneta, logo di Barattozon — più grande (24 px, 32, 29×28). Alle 21:11
+  «le icone vanno bene ma mettile vicine alla scritta come erano prima,
+  nel tasto lungo intendo»: nei bottoni lunghi l'icona torna accanto
+  alla scritta (margini negativi, così il bottone resta alto 52,5); a
+  sinistra con la scritta al centro resta solo il fulmine del «Compra» /
+  «Vendi» corto del dettaglio Lightning (`#p2pDettVai`). Alle 21:17
+  «leggermente più distanziati, nel tasto lungo»: fra icona e scritta
+  14 px, dove prima ce n'erano 8-10 (il corto non cambia). Il rilievo: il fulmine e il logo con due
+  `drop-shadow`, la moneta con la luce sopra e l'ombra sotto (due
+  `inset` e due ombre), SENZA il filo bianco. La sentinella del vestito
+  ha un'eccezione scritta per la regola della moneta: l'ombra è della
+  moneta dentro il bottone, non del bottone.
+- Dove: i due «Pubblica ordine», Compra/Vendi della presa (Lightning col
+  fulmine, on-chain con la moneta), «Rileggi e pubblica» e il «Pubblica»
+  del riepilogo di Barattozon. Foto 40 (icone a sinistra), 41 (accanto
+  alla scritta) e 42 (più distanziate).
+
+IDEA DI ANDREA, 21:02, NON FATTA QUI: alla presa si dovrebbe poter
+ricevere sull'altra rete con uno swap SATS Routing (un ordine Lightning
+ricevuto on-chain, e il contrario), con le fee a chi prende; la rete
+dell'annuncio dice come paga chi pubblica, non chi può prendere. Tocca
+le due garanzie (Mostro e il 2-di-3): chiesto un thread a parte che
+parta da uno studio. Intanto il filtro per rete del libro resta una
+vista.
+
+Prove: `prove_grafica_p2p_onchain` (icone a sinistra in rilievo, moneta
+senza filo, Barattozon, fantasma senza sfumature), `prove_p2p_pubblica`
+(la meta del fantasma torna `var(--b-ok-bg)`/`rosso`/`bz`),
+`prove_vestito_bottoni`. Controprova rossa: il filo bianco rimesso alla
+moneta. Visto dal vivo nei due temi.

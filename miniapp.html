@@ -4075,50 +4075,49 @@
      cambia dimensione»): era 1,5 px piu' alta della riga del fulmine; il
      margine negativo la fa sporgere senza spingere */
   .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{margin:-4px 0}
-  /* I BOTTONI DEL LATO NELLO STILE DEL + (30 ott 2026, 18:53, Andrea:
-     «voglio che abbiano questo stile anche i tasti pubblica ordine onchain
-     e pubblica ordine lighting con i relativi colori verde o rosso in base
-     se vende o compri»; foto 28-29, e alle 18:57 «si perfetto con anche
-     meno alone dietro e le icone spostale a sinistra verso il nero ...
-     stessa cosa per i tasti compra o vendi quando prendi un ordine»).
-     Il vestito `p2p-scuro` sta sui due «Pubblica ordine» e su «Compra» /
-     «Vendi» del dettaglio: parte quasi nero, sfuma nel verde o nel rosso,
-     filo scuro di 1 px (il bordo del ruolo: l'altezza non cambia),
-     scritta bianca e un alone corto. Sono le leve del
-     ruolo, non un dipinto sopra: premuto, spento e «in corso» le leggono
-     come per gli altri. «Scegli» e il «Pubblica il tuo primo ordine» del
-     libro vuoto non lo portano; Barattozon si' dalle 19:40 (vedi sotto).
-     L'ICONA STA A SINISTRA, sul nero (fulmine o moneta, senza filo
-     bianco), e la scritta resta al centro; nel fantasma della morfosi
-     la stessa regola, che le copia i nodi del bottone. */
-  .btn.primary.p2p-scuro{--b-bg:linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%);
-    --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#0B3D22;
-    --b-sh:0 0 8px rgba(52,180,122,.25);--b-sh-on:var(--b-sh)}
-  .btn.rosso.p2p-scuro{--b-bg:linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%);
-    --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#5A1608;
-    --b-sh:0 0 8px rgba(224,74,38,.25);--b-sh-on:var(--b-sh)}
-  /* ...E BARATTOZON (19:40, Andrea: «stesso effetto quando pubblichi un
-     ordine barattozon, l'icona a sinistra nello scuro e poi diventa del
-     colore attuale»): dal quasi nero al suo blu #191D29, che in fondo
-     schiarisce di un tono perche' la sfumatura si veda; il logo a
-     sinistra. Su «Rileggi e pubblica» e sul «Pubblica» del riepilogo */
-  .btn.bz.p2p-scuro{--b-bg:linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%);
-    --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#0A0C12;
-    --b-sh:0 0 8px rgba(70,84,128,.25);--b-sh-on:var(--b-sh)}
-  .btn.p2p-scuro{position:relative;text-shadow:0 1px 2px rgba(0,0,0,.35)}
-  .btn.p2p-scuro .p2p-invia-ico,.btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
-  .btn.p2p-scuro > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz,
-  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico,
-  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{
-    position:absolute;left:16px;top:50%;margin:0;transform:translateY(-50%)}
-  /* 19:34 (Andrea: «fai partire il verde più vicino alle icone e anche le
-     icone leggermente più grosse»): il nero fino all'8% e il tono pieno
-     al 34% invece di 18 e 55, il fulmine a 24 px e la moneta a 32 */
-  .btn.p2p-scuro .p2p-invia-ico,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico{font-size:24px;line-height:1}
-  .btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
-  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{width:32px;height:32px}
-  .btn.p2p-scuro > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz{width:29px;height:28px}
-  .btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta .cambio-svg,
+  /* L'ICONA IN RILIEVO (30 ott 2026). Storia di una sera: alle
+     18:53 Andrea volle i due «Pubblica ordine» e Compra/Vendi della presa
+     nello stile dei tasti del + (dal nero al verde o al rosso, icona a
+     sinistra sul nero), poi anche Barattozon (19:40); alle 21:00 «via i
+     gradienti nei tasti pubblica ordine e nei tasti compra o vendi,
+     lasciamo i colori come erano prima, cambiano solo le icone rendendole
+     magari leggermente in 3D per farle più visibili rispetto a prima», e
+     «l'icona onchain deve essere senza bordo bianco»; alle 21:11 «le icone
+     vanno bene ma mettile vicine alla scritta come erano prima, nel tasto
+     lungo intendo».
+     Restano dunque i vestiti del ruolo (`primary`, `rosso`, `bz`)
+     intatti, e `p2p-ico-3d` fa solo questo: l'icona — fulmine, moneta o
+     logo di Barattozon — piu' grande, con un'ombra che la stacca dal
+     fondo (il fulmine e il logo con un `drop-shadow`, la moneta con la
+     luce sopra e l'ombra sotto, senza filo bianco). Nei bottoni lunghi
+     sta accanto alla scritta, come prima; nel «Compra» / «Vendi» corto
+     del dettaglio Lightning resta a sinistra, con la scritta al centro.
+     Nel fantasma della morfosi le stesse regole, che gli copia i nodi
+     del bottone. «Scegli» e il «Pubblica il tuo primo ordine» del libro
+     vuoto non lo portano. */
+  #p2pDettVai.p2p-ico-3d{position:relative}
+  #p2pDettVai.p2p-ico-3d .p2p-invia-ico{position:absolute;left:16px;top:50%;margin:0;transform:translateY(-50%)}
+  /* accanto alla scritta senza allungare il bottone: il fulmine col suo
+     spazio, la moneta grande che sporge (la sua scatola resta alta come
+     la riga). «Leggermente più distanziati» (21:17): fra icona e
+     scritta 14 px, dove prima ce n'erano 8-10 */
+  .btn.p2p-ico-3d .p2p-invia-ico,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico{margin:-6px 6px -6px 0}
+  .btn.p2p-ico-3d .p2p-invia-oc,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc{gap:14px}
+  .btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
+  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{margin:-8px 0}
+  .btn.p2p-ico-3d > .p2p-invia-oc:first-child{margin-right:6px}
+  .btn.p2p-ico-3d > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz{margin:-4px 6px -4px 0}
+  /* le icone un po' piu' grosse (19:34, Andrea): il fulmine a 24 px, la
+     moneta a 32, il logo a 29x28 */
+  .btn.p2p-ico-3d .p2p-invia-ico,#p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico{font-size:24px;line-height:1;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.45)) drop-shadow(0 2px 3px rgba(0,0,0,.22))}
+  .btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
+  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{width:32px;height:32px;
+    box-shadow:inset 0 2px 1px rgba(255,255,255,.45),inset 0 -3px 4px rgba(0,0,0,.22),
+      0 1px 2px rgba(0,0,0,.35),0 3px 6px rgba(0,0,0,.2)}
+  .btn.p2p-ico-3d > .logo-bz,#p2pMorfo.bz .morfo-eti .logo-bz{width:29px;height:28px;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.5)) drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  .btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta .cambio-svg,
   #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
@@ -4668,11 +4667,6 @@
     border-color:var(--b-rosso-line);box-shadow:var(--b-rosso-sh)}
   #p2pMorfo.bz .morfo-meta{background:var(--b-bz-bg);border-color:var(--b-bz-line);
     box-shadow:var(--b-bz-sh)}
-  /* (30 ott 2026, 19:40) col vestito scuro anche il blu: la sfumatura di
-     `.btn.bz.p2p-scuro`, o all'ultimo fotogramma cambierebbe di colpo */
-  html body #p2pMorfo.bz .morfo-meta{
-    background:linear-gradient(90deg,#05060A 0%,#05060A 8%,#191D29 34%,#2F3752 100%);
-    border-color:#0A0C12;box-shadow:0 0 8px rgba(70,84,128,.25)}
   #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
     display:flex;align-items:center;justify-content:center;
     color:var(--b-ok-fg);font-weight:800;
@@ -4691,18 +4685,6 @@
      bianco (IL + CHE DIVENTA BLU SCENDENDO) */
   #p2pMorfo.bz .morfo-eti,#p2pMorfo.bz .morfo-glifo{color:var(--b-bz-fg)}
   #p2pMorfo .morfo-eti .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
-  /* ...e col vestito `p2p-scuro` del «Pubblica ordine» (30 ott 2026,
-     18:57) la meta porta la stessa sfumatura e la scritta e' bianca: un
-     fantasma tinta unita diventerebbe sfumato all'ultimo fotogramma.
-     Pesano piu' del rosso del lato (vedi sopra) e lasciano stare il blu
-     di Barattozon e il + del mercatino */
-  html body #p2pMorfo:not(.bz):not(.merc) .morfo-meta{
-    background:linear-gradient(90deg,#04140A 0%,#04140A 8%,#157A45 34%,#34B47A 100%);
-    border-color:#0B3D22;box-shadow:0 0 8px rgba(52,180,122,.25)}
-  html body.p2p-vendo #p2pMorfo:not(.bz):not(.merc) .morfo-meta{
-    background:linear-gradient(90deg,#170604 0%,#170604 8%,#9E2D16 34%,#E04A26 100%);
-    border-color:#5A1608;box-shadow:0 0 8px rgba(224,74,38,.25)}
-  html body #p2pMorfo:not(.bz):not(.merc) .morfo-eti{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
   /* ====== LA MORFOSI DAL + IN FONDO (quinto giro, 24 set 2026, richiesta
      di Andrea) ======
      Barattozon si apre dal + che e' SCESO sul logo: trascinato e lasciato
@@ -35902,8 +35884,8 @@ function chiediConferma(c){
      Il foglio e' uno per tutti, quindi il vestito si rimette a ogni
      apertura; l'etichetta resta testo, scappato. */
   const ok = el('confOk');
-  /* (30 ott 2026, 19:40) il blu col vestito scuro del P2P, logo a sinistra */
-  ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz p2p-scuro' : 'orange');
+  /* (30 ott 2026, 19:40) il logo in rilievo (`p2p-ico-3d`) */
+  ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz p2p-ico-3d' : 'orange');
   el('confOk').textContent = c.etichetta || 'Conferma';
   /* il logo e' una costante nostra, e l'etichetta resta col textContent
      di sempre, che e' la guardia (vedi prove_onion) */
@@ -35913,10 +35895,11 @@ function chiediConferma(c){
      l'arancio del «vai avanti» */
   if (c.vestito === 'allarme') ok.className = 'btn allarme';
   /* ...e `vestito: 'compro-oc'` / `'vendo-oc'` e' la presa di un ordine
-     on-chain (30 ott 2026, 19:04): il verde o il rosso del lato col
-     vestito scuro dei «Pubblica ordine», e la moneta a sinistra */
+     on-chain (30 ott 2026, 19:04): il verde o il rosso del lato e la
+     moneta in rilievo accanto alla scritta, come i «Pubblica ordine»
+     (`p2p-ico-3d`) */
   if (c.vestito === 'compro-oc' || c.vestito === 'vendo-oc') {
-    ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-scuro';
+    ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-ico-3d';
     ok.insertAdjacentHTML('afterbegin', '<span class="p2p-invia-oc">' + P2P_OC_MONETA + '</span>');
   }
   el('confNo').style.display = c.avviso ? 'none' : '';
@@ -57620,7 +57603,7 @@ function apriOnchainP2P(id, modo){
     /* «COMPRA» / «VENDI» COME NELLA PRESA LIGHTNING (30 ott 2026, 19:04,
        Andrea: «affianco a vendi e compra metti la relativa icona cosi chi
        lo prende sa se e' onchain o lightning»): era «Prendi lo scambio»
-       arancio; adesso il verde o il rosso del lato dal nero, con la moneta
+       arancio; adesso il verde o il rosso del lato, con la moneta
        a sinistra (`vestito: 'compro-oc'` / `'vendo-oc'`, vedi chiediConferma) */
     etichetta: vendeLui ? 'Compra' : 'Vendi',
     vestito: vendeLui ? 'compro-oc' : 'vendo-oc',
@@ -70889,7 +70872,7 @@ function renderDettaglioP2P(){
         '</div>'
       : '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
-      '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary p2p-scuro' : 'rosso p2p-scuro')
+      '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary p2p-ico-3d' : 'rosso p2p-ico-3d')
         + '" id="p2pDettVai"' +
         /* spento quando il server ha detto di no (10 ott 2026): la frase
            sta nel riquadro qui sopra, e la cintura vera in `eseguiPresaP2P` */
@@ -70908,7 +70891,7 @@ function renderDettaglioP2P(){
         /* LA RETE ACCANTO A «COMPRA» / «VENDI» (30 ott 2026, 19:04, Andrea:
            «affianco a vendi e compra metti la relativa icona cosi chi lo
            prende sa se e' onchain o lightning»): qui il fulmine, a sinistra
-           sul nero come nei «Pubblica ordine»; la moneta sta nella presa
+           in rilievo come nei «Pubblica ordine»; la moneta sta nella presa
            on-chain (`apriOnchainP2P`) */
         (daScegliere ? 'Scegli' : '<span class="p2p-invia-ico">⚡</span>' + (compro ? 'Compra' : 'Vendi')) + '</button>' +
     '</div>');
@@ -78138,14 +78121,14 @@ function renderNuovoOrdineP2P(){
        questo foglio non nomina, e un commento innocente la farebbe
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
-      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + ' p2p-scuro" id="p2pNuovoInvia" ' +
+      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + ' p2p-ico-3d" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">' +
         /* col percorso Barattozon il bottone dice che prima c'e' il
            riepilogo: e' l'ultimo passo, non un salto nel vuoto — e al
            posto della ricevuta porta il logo (24 set 2026) */
         /* a rete on-chain la moneta arancio al posto del fulmine (30 ott
-           2026, oc-identico); dalle 18:57 l'una e l'altro stanno a
-           sinistra, sul nero (vedi I BOTTONI DEL LATO NELLO STILE DEL +) */
+           2026, oc-identico); l'una e l'altro in rilievo, accanto alla
+           scritta (vedi L'ICONA IN RILIEVO) */
         (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + 'Pubblica ordine</span></button>'
           : (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '<span class="p2p-invia-ico">⚡</span>Pubblica ordine') + '</button>') +
     '</div>';
