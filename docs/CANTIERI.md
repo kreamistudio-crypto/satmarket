@@ -75827,3 +75827,13 @@ i due passaggi col lato, nessun interruttore a chi non è ammesso); in
 interruttore). Giro dal vivo a 390 scuro e 320 chiaro: on-chain →
 Lightning → on-chain coi tocchi veri (foto 10-11).
 
+**REBASE SOPRA 57bba1c ED e4f4862 (thread del 2-di-3).** Due cuciture:
+`apriScambioOnchainDaAvvisoP2P` scriveva ancora `p2pOnchainForm = false`
+(la variabile se n'era andata col foglio vecchio): adesso passa da
+`apriDettaglioOnchainP2P`; e la riga `${incassoMancanteOnchainP2P(o)}`
+sta nella scheda nuova subito sotto la nota dello stato (il banco di
+`prove_deposito_p2p_onchain` ha la sua finta). Sezioni toccate dai due
+alberi (34 sezioni, 3302 prove) verdi dopo il rebase; la suite severa
+intera era verde prima (26649/0, le 2 SALTATE di nostr-tools assente
+nella macchina cloud).
+

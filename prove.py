@@ -153217,6 +153217,7 @@ const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n), hapti
 const disegnaQr = (nodo, testo, modo) => QR.push([testo, modo]);
 const onchainRete = () => ({prova: true, nome: 'signet'});
 const daFirmareOnchainP2P = () => false;
+const incassoMancanteOnchainP2P = () => '';
 let p2pOnchainMiei = [];
 """ + pezzo_js(mini, "const P2P_ONCHAIN_VIVI = ", ";\n") + ";\n" \
         + pezzo_js(mini, "const P2P_ONCHAIN_STATI = {", "};\n") + "};\n" \
