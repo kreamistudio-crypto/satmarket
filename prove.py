@@ -152748,6 +152748,28 @@ def prove_p2p_onchain():
     src = _SORGENTE
     esempio = open("config_esempio.py", encoding="utf-8").read()
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # LA CURA DEL 30 ott 2026 (Andrea sul collaudo: «mi continua a vibrare il
+    # cellulare e mi esce object in basso»): due funzioni col nome
+    # `prendiOnchainP2P`, una accoglieva la busta del libro e l'altra
+    # prendeva uno scambio; in JavaScript vince l'ultima, e ogni fotografia
+    # del libro diventava un POST «prendi» su un oggetto, col suo haptic e
+    # il suo toast, in un anello senza fine. Da allora: nessun nome di
+    # funzione si ripete in tutto il telefono, e la busta ha il suo nome.
+    import re as _re
+    nomi = _re.findall(r"^(?:async )?function ([A-Za-z0-9_$]+)\(", mini, _re.M)
+    doppi = sorted({n for n in nomi if nomi.count(n) > 1})
+    prova("nessuna funzione del telefono porta il nome di un'altra (la busta "
+          "del libro on-chain e' accogliLibroOnchainP2P, prendere e' prendiOnchainP2P)",
+          ([], 1, 1),
+          (doppi, mini.count("function accogliLibroOnchainP2P(busta){"),
+           mini.count("async function prendiOnchainP2P(id){")))
+    prova("...e le due fotografie del libro accolgono la busta, non prendono nulla",
+          (1, 1, 0),
+          (mini.count("const onchain = typeof accogliLibroOnchainP2P === 'function' "
+                      "&& accogliLibroOnchainP2P(d && d.onchain);"),
+           mini.count("if (typeof accogliLibroOnchainP2P === 'function') "
+                      "accogliLibroOnchainP2P(d && d.onchain);"),
+           mini.count("prendiOnchainP2P(d && d.onchain)")))
     prova("la leva nasce spenta, nel config d'esempio e nel codice, e il "
           "fatto vuole on-chain E P2P accesi",
           (True, True, True),
@@ -152872,7 +152894,7 @@ def prove_p2p_onchain():
           True, "fatte.push(...await p2pOnchainCofirmeInAttesa(parole));" in sotto)
     foto = pezzo_js(mini, "async function chiediFotoLibroP2P(){", "\n}\n")
     prova("la busta on-chain si prende PRIMA del ritorno anticipato del libro di Mostro",
-          True, foto.index("const onchain = typeof prendiOnchainP2P === 'function' && prendiOnchainP2P(d && d.onchain);")
+          True, foto.index("const onchain = typeof accogliLibroOnchainP2P === 'function' && accogliLibroOnchainP2P(d && d.onchain);")
           < foto.index("return Object.keys(facce).length > 0"))
     prova("la vista esiste, accende «I miei scambi» nella nav, e il libro mette "
           "le sue card in cima", (1, True, True, True),

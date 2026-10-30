@@ -75394,6 +75394,25 @@ La reputazione sulle card on-chain (il tag `rating` è del coordinatore;
 qui c'è il nome e basta). La chat dello scambio (oggi il recapito per
 gli euro si scrive nell'ordine, e il resto passa da Telegram).
 
+**CURA DEL POMERIGGIO (30 ott 2026, cantiere cura-prendi-onchain,
+Andrea sul collaudo: «mi continua a vibrare il cellulare come se
+stessi premendo più volte i tasti e mi esce object in basso»).** Nel
+telefono c'erano DUE funzioni col nome `prendiOnchainP2P`: una
+accoglieva la busta del libro on-chain dentro la fotografia del P2P,
+l'altra prendeva uno scambio (POST `/prendi`, con il suo haptic e il
+suo toast). In JavaScript vince l'ultima dichiarata: ogni fotografia
+del libro diventava un «prendi» su un oggetto, e il suo errore
+richiamava la rilettura del libro, in un anello senza fine — la
+vibrazione continua e «[object Object]» nel toast. La busta ora si
+chiama `accogliLibroOnchainP2P`, e `prove_p2p_onchain` da allora
+conta che nessun nome di funzione si ripeta in tutto il telefono
+(prima della cura ce n'era uno solo: questo). Perché la gabbia non
+l'ha visto: i banchi node caricano i pezzi del telefono uno alla
+volta, e non c'è un collaudo che apra il P2P in un browser vero. La
+lezione: una sentinella di forma vale più di un giro finto quando il
+difetto è un nome. Provato: suite severa e i collaudi della CI che
+leggono miniapp.html: suite severa 26602/0 (2 saltate nostr-tools) e 18 collaudi verdi, sopra develop 9dbc48c.
+
 ## I colori veri all'amministratore del collaudo (30 ott 2026, cantiere collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi mettere gli sfondi originali nellapp collaudo solo per me amministratore? la striscia blu in alto va bene ... per tutti gli altri utenti che hanno accesso al collaudo invece rimane cosi blu»)
 
 Il perché di Andrea: la pagina si giudica coi colori che avrà in
