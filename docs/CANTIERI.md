@@ -75791,3 +75791,39 @@ ogni giro). Giro dal vivo con le rotte `miei`/`7` finte di Playwright a
 390 scuro e 320 chiaro (foto 7-9 in `grafica-p2p-onchain/` dei file del
 progetto). Il nome `battitoDepositoOnchainP2P` era anche del thread del
 2-di-3: il mio è diventato `battitoFoglioDepositoOnchainP2P`.
+
+**SEGUITO DELLE 14:07: TUTTO NELLO STESSO POSTO.** Andrea: «il fatto che
+scegli tra lightning e onchain non deve portarti in pagine separate ma si
+deve integrare tutto nello stesso posto»; sulla domanda (scelta al + o
+interruttore nel foglio) ha scelto «Tutto insieme, scelta al +», e alle
+14:09 «anche dopo aver scelto se lightning o onchain in cima alla pagina
+puoi comunque cambiare ancora tra i due». Quindi:
+- la vista `p2ponchain` è solo «Nel dettaglio» di UNO scambio, e ci si
+  entra da una porta sola, `apriDettaglioOnchainP2P(id)` (la usano
+  «Pubblica», «Prendi», il mio ordine nel libro; il thread del 2-di-3 la
+  chiama dalle card di «I miei scambi», dal «Fatto» e dall'avviso). Via il
+  «← Tutti i miei scambi on-chain»: il ✕ fa `navIndietro` come Lightning;
+- il rettangolo «Novità» apre il foglio «Pubblica» on-chain (con la scelta
+  Compro/Vendo in cima), non più una pagina;
+- in cima ai DUE fogli «Pubblica» l'interruttore On-chain / Lightning
+  (`interruttoreReteP2P`, `cambiaReteP2P`: il velo resta, un foglio scende
+  e l'altro sale, il lato si porta dietro; passando a Lightning il libro
+  si mette sul lato del foglio). Solo a chi è ammesso all'on-chain: il
+  foglio di Lightning degli altri è quello di sempre. Nel foglio on-chain
+  l'interruttore prende il posto della scritta «Scambi on-chain» (la dice
+  il tasto acceso), con la rete di prova sotto;
+- DIVISIONE COL THREAD DEL 2-DI-3, concordata: la lista mescolata in «I
+  miei scambi» (gruppi «Tocca a te», «In corso», «Chiusi», per data, con
+  la moneta), la via della striscia, del ramo elenco di
+  `renderP2POnchain`, di `rigaMiaOnchainP2P` e del modo 'elenco' sono
+  sue, nel commit della lista: fino ad allora l'elenco resta, unica strada
+  verso i propri scambi durante la prova dal vivo di Andrea.
+PROVE: nel banco di `prove_grafica_p2p_onchain` l'interruttore (acceso
+quello giusto, nell'ordine della scelta, la rete già aperta non fa niente,
+i due passaggi col lato, nessun interruttore a chi non è ammesso); in
+`prove_deposito_p2p_onchain` le sentinelle della porta unica, del
+«Novità» e del posto nel foglio di Lightning. 4 controprove rosse
+(interruttore a tutti, lato perso, «Novità» alla pagina, Lightning senza
+interruttore). Giro dal vivo a 390 scuro e 320 chiaro: on-chain →
+Lightning → on-chain coi tocchi veri (foto 10-11).
+

@@ -153070,10 +153070,13 @@ function apriNuovoOrdineP2P(){ LOG.push('ln'); }
 function apriBarattozonP2P(){ LOG.push('bz'); }
 function apriOnchainP2P(){ LOG.push('pagina'); }
 function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
+function setLatoP2P(l){ p2pLato = l; }
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
-        + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" + foglio + """
+        + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function interruttoreReteP2P(attiva){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n") + "\n}\n" + foglio + """
 const out = {};
 out.reteSpento = [segnoReteP2P('ln'), /cambio-moneta btc/.test(segnoReteP2P('btc'))];
 p2pOnchainLibro.quando = 5;
@@ -153099,7 +153102,18 @@ sceltaReteP2P('onchain');
 let f = el('p2pOcCorpo').innerHTML;
 out.foglioVendi = [el('p2pOcSheet').classList.contains('open'), p2pOcLato, el('p2pOcTit').textContent,
   /Dove vuoi gli euro/.test(f), /btn rosso/.test(f), /Premio|Tipo di prezzo|Cosa vuoi fare/.test(f),
-  /sez ico="btc"/.test(f), /rete di prova/.test(el('p2pOcSopra').innerHTML)];
+  /sez ico="btc"/.test(f), /Rete di prova/.test(el('p2pOcSopra').innerHTML)];
+const sopra = el('p2pOcSopra').innerHTML;
+out.interruttore = [/p2p-rete-tasto su" aria-checked="true" onclick="cambiaReteP2P\('onchain'\)/.test(sopra),
+  sopra.indexOf("cambiaReteP2P('onchain')") < sopra.indexOf("cambiaReteP2P('ln')"), /cambio-moneta ln/.test(sopra)];
+LOG.length = 0;
+cambiaReteP2P('onchain'); out.stessaRete = [LOG.slice(), el('p2pOcSheet').classList.contains('open')];
+p2pLato = 'compro';
+cambiaReteP2P('ln'); out.versoLn = [LOG.slice(), el('p2pOcSheet').classList.contains('open'), p2pLato];
+el('p2pNuovoSheet').classList.add('open');
+cambiaReteP2P('onchain'); out.versoOc = [el('p2pNuovoSheet').classList.contains('open'), el('p2pOcSheet').classList.contains('open'), p2pOcLato];
+el('p2pOcSheet').classList.remove('open');
+myP2POnchain = false; out.chiuso = interruttoreReteP2P('ln'); myP2POnchain = true;
 p2pLato = 'compro'; apriPubblicaOnchainP2P('buy'); f = el('p2pOcCorpo').innerHTML;
 out.foglioCompra = [p2pOcLato, /Dove vuoi gli euro/.test(f), /btn primary/.test(f), el('p2pOcTit').textContent];
 apriPubblicaOnchainP2P(); f = el('p2pOcCorpo').innerHTML;
@@ -153137,6 +153151,16 @@ console.log(JSON.stringify(out));
               "bottone rosso, niente premio ne' scelta del lato, il ₿ sui sats, "
               "la rete di prova sopra", [True, "sell", "Vuoi vendere Bitcoin", True, True,
                                          False, True, True], out["foglioVendi"])
+        # l'interruttore in cima (30 ott 2026, 14:09, Andrea: «anche dopo aver
+        # scelto ... in cima alla pagina puoi comunque cambiare ancora»)
+        prova("in cima al foglio on-chain l'interruttore della rete: On-chain acceso, "
+              "prima di Lightning, col fulmine", [True, True, True], out["interruttore"])
+        prova("l'interruttore sulla rete gia' aperta non fa niente", [[], True], out["stessaRete"])
+        prova("...verso Lightning: il foglio on-chain scende, sale quello di Lightning "
+              "col lato che si porta dietro", [["ln"], False, "vendo"], out["versoLn"])
+        prova("...verso on-chain: il foglio di Lightning scende, sale quello on-chain "
+              "col lato del libro", [False, True, "sell"], out["versoOc"])
+        prova("...e a chi non e' ammesso l'interruttore non c'e'", "", out["chiuso"])
         prova("...da «Compra BTC»: lato buy, niente recapito, bottone verde",
               ["buy", False, True, "Vuoi comprare Bitcoin"], out["foglioCompra"])
         prova("...dalla pagina c'e' «Compro / Vendo», col lato della scheda",
@@ -153285,6 +153309,29 @@ console.log(JSON.stringify(out));
           (True, True, False), ("!p2pOcDepositoVisti.has(o.id)" in pagina,
                                 "renderDepositoOnchainP2P();" in pagina, "p2pOcQr" in mini))
     prova("il foglio non chiede niente al server (lo rilegge la pagina)", False, "fetch(" in foglio)
+    # TUTTO NELLO STESSO POSTO (30 ott 2026, 14:07, Andrea: «non deve
+    # portarti in pagine separate»; scelta «Tutto insieme, scelta al +»):
+    # il «Novità» apre il foglio, e ogni strada verso uno scambio passa
+    # dalla porta unica del dettaglio, che la lista di «I miei scambi»
+    # chiama anche lei; nel dettaglio niente rimando a un elenco a parte
+    porta = pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n")
+    dett = pezzo_js(mini, "function apriDettaglioOnchainP2P(id){", "\n}\n")
+    pubb = pezzo_js(mini, "async function pubblicaOnchainP2P(btn){", "\n}\n")
+    prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
+    apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    prova("il rettangolo «Novità» apre il foglio «Pubblica» on-chain, non una pagina",
+          (True, False), ('onclick="apriPubblicaOnchainP2P()"' in porta, "'elenco'" in porta))
+    prova("la porta unica del dettaglio: mette lo scambio, chiude il foglio, va alla vista; "
+          "la usano «Pubblica», «Prendi» e il mio ordine nel libro",
+          (True, True, True, True, True, True),
+          ("p2pOnchainAperto = Number(id)" in dett, "chiudiFoglioP2P('p2pOcSheet')" in dett,
+           "go('p2ponchain')" in dett, "apriDettaglioOnchainP2P(p2pOnchainAperto)" in pubb,
+           "apriDettaglioOnchainP2P(id)" in prendi, "return apriDettaglioOnchainP2P(o.id);" in apri))
+    prova("nel dettaglio niente «Tutti i miei scambi on-chain»", False,
+          "Tutti i miei scambi on-chain" in pagina)
+    nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("il foglio di Lightning ha il suo posto in cima per l'interruttore, e lo riempie",
+          (True, True), ('id="p2pNuovoRete"' in mini, "interruttoreReteP2P('ln')" in nuovo))
 
 
 def prove_parole_uniche():
