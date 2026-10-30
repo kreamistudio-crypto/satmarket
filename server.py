@@ -93179,7 +93179,14 @@ def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
         metodi = json.loads(o["metodi"] or "[]")
     except Exception:
         metodi = []
-    r = {"id": o["ordine"], "lato": o["lato"], "stato": o["stato"],
+    # `id` e' il NUMERO della riga (la card del telefono fa Number(o.id),
+    # e la rotta /api/p2p/onchain/{oid} vuole quello); `ordine` e' il
+    # nome pubblico, il `d` del 38383, con cui il telefono riconosce i
+    # SUOI fra `miei`. Fino al 30 ott 2026 pomeriggio `id` portava il
+    # nome: la card diceva «Quest'ordine non e' piu' nel libro» a chi
+    # la toccava (Alan, prima prova sul collaudo).
+    r = {"id": int(o["id"]), "ordine": o["ordine"], "lato": o["lato"],
+         "stato": o["stato"],
          "sats": int(o["prezzo_sats"]), "euro": int(o["euro_cent"]) / 100,
          "metodi": metodi, "scade": int(o["scade"]), "creato": int(o["creato"]),
          "rete": ONCHAIN_RETE, "onchain": True}
