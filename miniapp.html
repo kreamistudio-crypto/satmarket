@@ -11272,8 +11272,15 @@
      confondeva col crema. Col fondo carico il grigio-bruno delle
      scritte piccole (--muted) scendeva a 2,6:1, illeggibile: di giorno
      si scurisce a 4,8:1. Di sera --muted regge da solo (5,5:1). */
-  html.istanza-prova{--bg:#B5D8FA;--muted:#5E5747}
-  html.istanza-prova[data-tema="scuro"]{--bg:#0E2A4D;--muted:#A99F87}
+  /* I COLORI VERI ALL'AMMINISTRATORE (30 ott 2026, cantiere
+     collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi
+     mettere gli sfondi originali ... solo per me amministratore? la
+     striscia blu in alto va bene»): con la classe `colori-veri` (la
+     mette `coloriVeriCollaudo`, solo a chi /api/me dice admin) il fondo
+     torna quello della produzione, cosi' la pagina si giudica com'e'.
+     La banda resta per tutti; gli altri ospiti restano sull'azzurro. */
+  html.istanza-prova:not(.colori-veri){--bg:#B5D8FA;--muted:#5E5747}
+  html.istanza-prova:not(.colori-veri)[data-tema="scuro"]{--bg:#0E2A4D;--muted:#A99F87}
   /* La banda non si tocca e non si sceglie: pointer-events:none, e
      sopra testata, nav e fogli (z 20-50) ma sotto lightbox,
      fotocamera e tour, che sono schermi interi coi loro bottoni. */
@@ -11599,6 +11606,15 @@
      questo file significa gia' un'altra cosa (il login col cookie). */
   if (!(tw && tw.initData))
     document.documentElement.classList.add('fuori-telegram');
+  /* (30 ott 2026, collaudo-colori-veri) sul collaudo l'amministratore
+     vede i colori veri: qui la copia svelta dell'ultima risposta, cosi'
+     non vede il lampo azzurro prima che /api/me risponda. La decide
+     `coloriVeriCollaudo`, che la toglie a chi admin non e' */
+  try {
+    if (document.documentElement.classList.contains('istanza-prova')
+        && localStorage.getItem('barattolo_colori_veri') === '1')
+      document.documentElement.classList.add('colori-veri');
+  } catch(e){}
   /* ══ IL GUSCIO E' SOLO DELL'APK (set 2026) ══════════════════════
      Il guscio di apertura serve a UN caso solo: nell'APK Android
      Chrome disegna il suo splash e lo toglie al primo paint, e sotto
@@ -26154,6 +26170,20 @@ function temaEffettivo(){
   if (tg?.initData) return tg.colorScheme==='dark' ? 'scuro' : 'chiaro';
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'scuro' : 'chiaro';
 }
+/* (30 ott 2026, collaudo-colori-veri) il fondo vero all'amministratore
+   del collaudo, e la copia svelta per il prossimo avvio. Fuori dal
+   collaudo non accende niente (la classe `istanza-prova` la scrive il
+   server solo li') */
+function coloriVeriCollaudo(admin){
+  const h = document.documentElement;
+  const si = h.classList.contains('istanza-prova') && !!admin;
+  h.classList.toggle('colori-veri', si);
+  try {
+    if (si) localStorage.setItem('barattolo_colori_veri', '1');
+    else localStorage.removeItem('barattolo_colori_veri');
+  } catch(e){}
+  applicaTema();
+}
 function applicaTema(){
   const scuro = temaEffettivo()==='scuro';
   if (scuro) document.documentElement.dataset.tema = 'scuro';
@@ -26162,6 +26192,7 @@ function applicaTema(){
   /* sul collaudo il fondo e' azzurro (IL VESTITO DEL COLLAUDO, in
      fondo al foglio): la barra e Telegram seguono lui */
   const sfondo = document.documentElement.classList.contains('istanza-prova')
+      && !document.documentElement.classList.contains('colori-veri')
     ? (scuro ? '#0E2A4D' : '#B5D8FA') : (scuro ? '#211A10' : '#FAF4E4');
   /* ...ma nell'APK, finche' il guscio e' in vista, la barra resta del
      SUO arancio (l'ha accesa l'head): questo colore glielo porta
@@ -90065,8 +90096,10 @@ async function avvia(){
       if (!r.ok || !me.tg_id) { mostraCollaudoPrivato(r.status || 401); return; }
       nascondiCollaudoPrivato();
     }
+    if (!r.ok || !me.tg_id) coloriVeriCollaudo(false);
     if (!r.ok || !me.tg_id) throw ANONIMO;
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
+    coloriVeriCollaudo(isAdmin);
     /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;

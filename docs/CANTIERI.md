@@ -75393,3 +75393,48 @@ questo libro là.
 La reputazione sulle card on-chain (il tag `rating` è del coordinatore;
 qui c'è il nome e basta). La chat dello scambio (oggi il recapito per
 gli euro si scrive nell'ordine, e il resto passa da Telegram).
+
+## I colori veri all'amministratore del collaudo (30 ott 2026, cantiere collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi mettere gli sfondi originali nellapp collaudo solo per me amministratore? la striscia blu in alto va bene ... per tutti gli altri utenti che hanno accesso al collaudo invece rimane cosi blu»)
+
+Il perché di Andrea: la pagina si giudica coi colori che avrà in
+produzione, prima di mandarla su. Il vestito del collaudo (cantiere
+collaudo-riconoscibile, 28 ott) resta com'era per tutti gli altri
+ospiti; all'amministratore cambia solo il fondo, la banda «🧪 COLLAUDO»
+in alto resta.
+
+COME: una classe `colori-veri` su `<html>`. Le due regole del fondo
+azzurro diventano `html.istanza-prova:not(.colori-veri)`, quindi con la
+classe tornano il crema e il marrone della produzione (e il loro
+`--muted`). La mette SOLO `coloriVeriCollaudo(admin)`, chiamata dopo
+/api/me con `isAdmin` (e con `false` quando /api/me dice no): la
+accende solo se la pagina è del collaudo E chi la apre è admin, la
+toglie in ogni altro caso, e rifà `applicaTema()` perché anche il
+colore della testata di Telegram e il meta theme-color seguano. Per
+non dare all'amministratore un lampo azzurro a ogni apertura, l'ultima
+risposta resta in `localStorage` (`barattolo_colori_veri`) e lo script
+nella testa della pagina la rimette subito; /api/me poi la conferma o
+la toglie. Il localStorage può solo anticipare, mai decidere.
+
+«Solo per me» l'ho letto come «per gli amministratori» (`isAdmin` di
+/api/me, cioè `ADMIN_IDS`): oggi sono Andrea e Alan. Se Andrea lo vuole
+solo per sé, è un controllo sull'id in più, da decidere con lui.
+
+STRADE SCARTATE: deciderlo nel server (la pagina è la stessa per tutti
+e sta in cache, `_PAGINA_CACHE`: renderla per-utente vuol dire toccare
+gli header anti-cache, che non si toccano); un bottone «colori veri»
+da premere (Andrea ha chiesto che sia così e basta).
+
+PROVATO: dal vivo col Chromium, `PROVA_SOLO_IDS = [111, 222, 999]` e
+`PROVA_APERTA = True`: Admin 999 fondo #FAF4E4 di giorno e #211A10 di
+sera, meta theme-color uguale, banda presente; Compratore 111 azzurro
+#B5D8FA / #0E2A4D come prima; al secondo caricamento, con /api/me
+ritardata di 3 s, l'admin è già sul fondo vero; nello stesso browser
+l'admin e poi il compratore: la classe e il localStorage spariscono.
+La sentinella nuova in `prove_istanza_prova`; CONTROPROVE 6/6 (senza
+`:not(.colori-veri)`, senza la chiamata con `isAdmin`, senza quella con
+`false`, senza la copia nella testa, senza il controllo in
+`applicaTema`, senza la condizione «è il collaudo»: rossa ognuna).
+`collaudo_istanza_prova`, la suite severa, i collaudi della CI.
+
+In produzione non cambia niente: la classe `istanza-prova` lì non c'è,
+e senza quella `coloriVeriCollaudo` non accende nulla.

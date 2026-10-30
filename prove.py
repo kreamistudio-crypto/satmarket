@@ -178017,8 +178017,8 @@ def prove_istanza_prova():
           and mini.index("@media (min-width:768px){\n    #app{max-width:960px;") < _i_vest
           and mini.index("\n  /* ====", _i_vest) == _i_largo - 3)
     prova("...cambia il fondo (e il grigio delle scritte piccole), di giorno e di sera", True,
-          "html.istanza-prova{--bg:#B5D8FA;--muted:#5E5747}" in vcss
-          and 'html.istanza-prova[data-tema="scuro"]{--bg:#0E2A4D;--muted:#A99F87}' in vcss
+          "html.istanza-prova:not(.colori-veri){--bg:#B5D8FA;--muted:#5E5747}" in vcss
+          and 'html.istanza-prova:not(.colori-veri)[data-tema="scuro"]{--bg:#0E2A4D;--muted:#A99F87}' in vcss
           and vcss.count("--bg:") == 2 and "--card:" not in vcss and "--ink:" not in vcss)
     def _lum(h):
         c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
@@ -178058,6 +178058,24 @@ def prove_istanza_prova():
           "gli stessi due del CSS", True,
           "document.documentElement.classList.contains('istanza-prova')" in at_v
           and "? (scuro ? '#0E2A4D' : '#B5D8FA')" in at_v)
+    # (30 ott 2026, collaudo-colori-veri, Andrea: «gli sfondi originali
+    # ... solo per me amministratore», la banda resta) all'admin il fondo
+    # vero: la classe `colori-veri` la mette SOLO coloriVeriCollaudo, che
+    # la decide dalla risposta di /api/me; la copia svelta in testa evita
+    # il lampo azzurro. La banda non la guarda
+    cv = pezzo_js(mini, "function coloriVeriCollaudo(admin){", "\n}\n")
+    prova("(colori-veri) all'amministratore del collaudo il fondo vero, banda compresa; "
+          "agli altri l'azzurro",
+          (True, True, True, True, True, 0, True),
+          ("h.classList.contains('istanza-prova') && !!admin" in cv
+           and "h.classList.toggle('colori-veri', si)" in cv and "applicaTema();" in cv,
+           "if (!r.ok || !me.tg_id) coloriVeriCollaudo(false);\n    if (!r.ok || !me.tg_id) throw ANONIMO;" in mini
+           and "isAdmin = !!me.admin;\n    coloriVeriCollaudo(isAdmin);" in mini,
+           "&& !document.documentElement.classList.contains('colori-veri')" in at_v,
+           "&& localStorage.getItem('barattolo_colori_veri') === '1')\n      document.documentElement.classList.add('colori-veri');" in mini,
+           mini.index("document.documentElement.classList.add('colori-veri')") < mini.index("<body"),
+           _banda.count("colori-veri"),
+           len(re.findall(r"classList\.(?:add|toggle)\('colori-veri'", mini)) == 2))
     prova("...e la classe non la scrive nessun altro: il JS la legge e basta", 0,
           len(re.findall(r"classList\.(?:add|toggle|remove)\('istanza-prova'", mini)))
 
