@@ -57255,8 +57255,7 @@ async function apriScambioOnchainDaAvvisoP2P(ordine){
   const miei = await leggiMieiOnchainP2P();
   const o = (miei || []).find(x => String(x.ordine) === String(ordine));
   if (!o) { toast('Questo scambio on-chain non è fra i tuoi', 4000); return 'sparito'; }
-  p2pOnchainAperto = Number(o.id); p2pOnchainForm = false;
-  go('p2ponchain');
+  apriDettaglioOnchainP2P(o.id);
   return 'aperto';
 }
 
