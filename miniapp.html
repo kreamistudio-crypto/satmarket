@@ -3929,8 +3929,10 @@
   /* 17:53-17:55 (Andrea: «il bordino bianco attorno all'icona onchain non
      e' piu necessario»): nella scelta del + e nel «Novità» la moneta sta
      sul marrone scuro del gradiente, e il filo se ne va */
-  .p2p-oc-pubblica .cambio-moneta.p2p-oc-moneta,
-  #p2pNuovoInvia .cambio-moneta.p2p-oc-moneta{
+  /* 18:57 (Andrea: «le icone spostale a sinistra verso il nero cosi levi
+     anche il bordino bianco all'icona onchain»): anche nel «Pubblica
+     ordine» la moneta sta sul quasi nero, e il filo resta solo qui */
+  .p2p-oc-pubblica .cambio-moneta.p2p-oc-moneta{
     box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   /* IL RETTANGOLO «NOVITÀ» nel libro, sotto Recenti e Filtro: l'arancio
      pieno dei bottoni di casa. Ha avuto tre vite in un giorno (30 ott
@@ -3949,13 +3951,23 @@
     border-radius:14px;height:48px}
   .p2p-oc-faccia{position:absolute;inset:0;display:flex;align-items:center;gap:10px;
     padding:0 14px 0 8px;border:0;border-radius:14px;cursor:pointer;
-    background:linear-gradient(90deg,var(--chip-bg) 0%,var(--chip-bg) 22%,#F7931A 100%);
-    box-shadow:0 0 12px rgba(247,147,26,.35);color:var(--ink);
-    font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
-  /* 17:55 (Andrea: «fai con quel gradiente anche il banner novita'»): lo
-     stesso della scelta del +, marrone scuro sotto la moneta e arancio in
-     fondo */
+    background:#140B03;box-shadow:inset 0 0 0 1px #5A2E05;color:#fff;
+    transition:background-color .25s ease,box-shadow .25s ease;
+    text-shadow:0 1px 2px rgba(0,0,0,.35);font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
+  /* 17:55 il gradiente della scelta del + (Andrea: «fai con quel gradiente
+     anche il banner novita'»), e alle 18:43 «non mi piace, proviamone un
+     altro»: fra sette varianti in due giri (18:45 e 18:50) quella che
+     ripete il tasto On-chain della scelta del + (gli stessi colori del
+     ritocco delle 18:47), cosi' banner e scelta parlano la stessa lingua.
+     MONOCOLORE SCURO, E ARANCIO DURANTE IL TUTORIAL (19:01, Andrea: «fammelo
+     mono colore scuro con un bordino fine arancio attorno, quando lo clicchi
+     si trasforma in arancio mentre viene mostrato il tutorial» e «il bordo
+     della D va bene»): il quasi nero della D, pieno, col suo filo di 1 px;
+     dal tocco alla fine del tutorial (`accendiNovitaOcP2P`) l'arancio della
+     moneta, e la moneta riprende il filo bianco dei fondi arancio */
   .p2p-oc-faccia:active{filter:brightness(1.06)}
+  .p2p-oc-novita.acceso .p2p-oc-faccia{background:#F7931A;box-shadow:inset 0 0 0 1px #B8650C}
+  .p2p-oc-novita.acceso .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{width:32px;height:32px;position:relative;z-index:1}
   .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px;stroke-width:2.3}
   .p2p-oc-novita-testo{flex:1;min-width:0}
@@ -4002,12 +4014,20 @@
      gradiente che parte marrone scuro dove c'e' il logo e si colora in
      fondo, un po' come la card super affare»): la sfumatura di traverso
      di `.p2p-affarone.super`, dal fondo dei metodi (`--chip-bg`, che
-     segue il tema) al colore della rete, col bagliore fermo */
-  .btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:var(--ink);border:0}
-  .btn.p2p-scelta-oc{background:linear-gradient(90deg,var(--chip-bg) 0%,var(--chip-bg) 22%,#F7931A 100%);
-    box-shadow:0 0 12px rgba(247,147,26,.35)}
-  .btn.p2p-scelta-ln{background:linear-gradient(90deg,var(--chip-bg) 0%,var(--chip-bg) 22%,#FFC83D 100%);
-    box-shadow:0 0 12px rgba(255,200,61,.35)}
+     segue il tema) al colore della rete, col bagliore fermo.
+     PIU' CONTRASTATI, COL BORDO FINE (18:44, Andrea: «sono sbiaditi,
+     fammeli più contrastati magari anche con un bordo fine»): il marrone
+     di partenza e' scuro e fisso nei due temi, la sfumatura passa da un
+     tono pieno a meta', la scritta bianca con un filo d'ombra, e il bordo
+     e' un filo dello stesso colore. SCURO E PIU' FINE (18:46, Andrea:
+     «provami dei bordi scuri più fini»): 1 px del tono bruciato della rete; e lo scuro
+     dentro «più scuro, contrastato» (18:47): quasi nero sotto la moneta.
+     «Leggermente meno ombra» (18:58): l'alone da 14 px a 10, piu' tenue */
+  .btn.p2p-scelta-oc,.btn.p2p-scelta-ln{color:#fff;border:0;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .btn.p2p-scelta-oc{background:linear-gradient(90deg,#140B03 0%,#140B03 18%,#B8650C 55%,#F7931A 100%);
+    box-shadow:inset 0 0 0 1px #5A2E05,0 0 10px rgba(247,147,26,.32)}
+  .btn.p2p-scelta-ln{background:linear-gradient(90deg,#130F03 0%,#130F03 18%,#B88A12 55%,#FFC83D 100%);
+    box-shadow:inset 0 0 0 1px #5C4708,0 0 10px rgba(255,200,61,.32)}
   .btn.p2p-scelta-oc:active,.btn.p2p-scelta-ln:active{filter:brightness(1.06)}
   /* IL FOGLIO «PUBBLICA» ON-CHAIN: la scritta sopra il titolo, e la
      valuta che non si sceglie (una riga, senza freccina) */
@@ -4030,6 +4050,33 @@
      cambia dimensione»): era 1,5 px piu' alta della riga del fulmine; il
      margine negativo la fa sporgere senza spingere */
   .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{margin:-4px 0}
+  /* I BOTTONI DEL LATO NELLO STILE DEL + (30 ott 2026, 18:53, Andrea:
+     «voglio che abbiano questo stile anche i tasti pubblica ordine onchain
+     e pubblica ordine lighting con i relativi colori verde o rosso in base
+     se vende o compri»; foto 28-29, e alle 18:57 «si perfetto con anche
+     meno alone dietro e le icone spostale a sinistra verso il nero ...
+     stessa cosa per i tasti compra o vendi quando prendi un ordine»).
+     Il vestito `p2p-scuro` sta sui due «Pubblica ordine» e su «Compra» /
+     «Vendi» del dettaglio: parte quasi nero, sfuma nel verde o nel rosso,
+     filo scuro di 1 px (il bordo del ruolo: l'altezza non cambia),
+     scritta bianca e un alone corto. Sono le leve del
+     ruolo, non un dipinto sopra: premuto, spento e «in corso» le leggono
+     come per gli altri. Barattozon («Rileggi e pubblica»), «Scegli» e il
+     «Pubblica il tuo primo ordine» del libro vuoto non lo portano.
+     L'ICONA STA A SINISTRA, sul nero (fulmine o moneta, senza filo
+     bianco), e la scritta resta al centro; nel fantasma della morfosi
+     la stessa regola, che le copia i nodi del bottone. */
+  .btn.primary.p2p-scuro{--b-bg:linear-gradient(90deg,#04140A 0%,#04140A 18%,#157A45 55%,#34B47A 100%);
+    --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#0B3D22;
+    --b-sh:0 0 8px rgba(52,180,122,.25);--b-sh-on:var(--b-sh)}
+  .btn.rosso.p2p-scuro{--b-bg:linear-gradient(90deg,#170604 0%,#170604 18%,#9E2D16 55%,#E04A26 100%);
+    --b-bg-on:var(--b-bg);--b-fg:#fff;--b-line:#5A1608;
+    --b-sh:0 0 8px rgba(224,74,38,.25);--b-sh-on:var(--b-sh)}
+  .btn.p2p-scuro{position:relative;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .btn.p2p-scuro .p2p-invia-ico,.btn.p2p-scuro .p2p-invia-oc .cambio-moneta.p2p-oc-moneta,
+  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-ico,
+  #p2pMorfo:not(.bz) .morfo-eti .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{
+    position:absolute;left:16px;top:50%;margin:0;transform:translateY(-50%)}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
      metodi della card, la pillola del filtro e la voce del foglio
@@ -4596,6 +4643,18 @@
      bianco (IL + CHE DIVENTA BLU SCENDENDO) */
   #p2pMorfo.bz .morfo-eti,#p2pMorfo.bz .morfo-glifo{color:var(--b-bz-fg)}
   #p2pMorfo .morfo-eti .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
+  /* ...e col vestito `p2p-scuro` del «Pubblica ordine» (30 ott 2026,
+     18:57) la meta porta la stessa sfumatura e la scritta e' bianca: un
+     fantasma tinta unita diventerebbe sfumato all'ultimo fotogramma.
+     Pesano piu' del rosso del lato (vedi sopra) e lasciano stare il blu
+     di Barattozon e il + del mercatino */
+  html body #p2pMorfo:not(.bz):not(.merc) .morfo-meta{
+    background:linear-gradient(90deg,#04140A 0%,#04140A 18%,#157A45 55%,#34B47A 100%);
+    border-color:#0B3D22;box-shadow:0 0 8px rgba(52,180,122,.25)}
+  html body.p2p-vendo #p2pMorfo:not(.bz):not(.merc) .morfo-meta{
+    background:linear-gradient(90deg,#170604 0%,#170604 18%,#9E2D16 55%,#E04A26 100%);
+    border-color:#5A1608;box-shadow:0 0 8px rgba(224,74,38,.25)}
+  html body #p2pMorfo:not(.bz):not(.merc) .morfo-eti{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
   /* ====== LA MORFOSI DAL + IN FONDO (quinto giro, 24 set 2026, richiesta
      di Andrea) ======
      Barattozon si apre dal + che e' SCESO sul logo: trascinato e lasciato
@@ -35796,6 +35855,13 @@ function chiediConferma(c){
      disputa-per-sbaglio): un gesto che ferma lo scambio non veste
      l'arancio del «vai avanti» */
   if (c.vestito === 'allarme') ok.className = 'btn allarme';
+  /* ...e `vestito: 'compro-oc'` / `'vendo-oc'` e' la presa di un ordine
+     on-chain (30 ott 2026, 19:04): il verde o il rosso del lato col
+     vestito scuro dei «Pubblica ordine», e la moneta a sinistra */
+  if (c.vestito === 'compro-oc' || c.vestito === 'vendo-oc') {
+    ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-scuro';
+    ok.insertAdjacentHTML('afterbegin', '<span class="p2p-invia-oc">' + P2P_OC_MONETA + '</span>');
+  }
   el('confNo').style.display = c.avviso ? 'none' : '';
   /* LA SECONDA STRADA (12 ott 2026, notte, cantiere libro-vuoto): chi
      passa `altra: {etichetta, poi}` ha DUE azioni vere e nessun
@@ -57200,6 +57266,7 @@ function apriNovitaOnchainP2P(){
   haptic();
   /* aperto una volta, dal prossimo disegno scorre con la pagina */
   try { localStorage.setItem(P2P_OC_NOVITA_CHIAVE, Date.now()); } catch(e){}
+  accendiNovitaOcP2P(true);
   const r = el('p2pOcNovita');
   if (!r || effettiRidotti()) { tutorialOnchainP2P(); return; }
   r.classList.remove('urto');
@@ -57234,8 +57301,10 @@ const TAPPE_TUTORIAL_OC_P2P = [
     testo: `Toccato il +, scegli dove scambiare: <b>On-chain</b> o <b>Lightning</b>.` },
 ];
 function tutorialOnchainP2P(){
-  if (tourInCorso || !myP2POnchain) return;
-  if (document.querySelector('.view.active')?.id !== 'view-p2p') return;
+  if (tourInCorso || !myP2POnchain || document.querySelector('.view.active')?.id !== 'view-p2p') {
+    if (tutorialOcLato === null) accendiNovitaOcP2P(false);
+    return;
+  }
   tutorialOcLato = p2pLato;
   if (p2pLato !== 'compro') setLatoP2P('compro', true);
   if (!avviaTour(TAPPE_TUTORIAL_OC_P2P, fineTutorialOcP2P)) fineTutorialOcP2P();
@@ -57284,6 +57353,14 @@ function fineTutorialOcP2P(){
   if (el('p2pSceltaSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pSceltaSheet');
   if (lato && lato !== p2pLato) setLatoP2P(lato, true);
   el('p2pOcNovita')?.classList.remove('appeso');
+  accendiNovitaOcP2P(false);
+}
+/* IL «NOVITÀ» ARANCIO MENTRE IL TUTORIAL GIRA (30 ott 2026, 19:01): si
+   accende al tocco e si spegne alla fine; il disegno del libro lo rimette
+   da solo finche' il tutorial e' aperto (`carteOnchainLibroP2P`) */
+function accendiNovitaOcP2P(si){
+  const r = el('p2pOcNovita');
+  if (r) r.classList[si ? 'add' : 'remove']('acceso');
 }
 /* IL «NOVITÀ» APPESO (vedi il CSS): appeso finche' nessuno l'ha aperto da
    questo browser. ⚠️ Se `localStorage` non risponde vale «gia' aperto»,
@@ -57315,7 +57392,8 @@ function carteOnchainLibroP2P(k){
   const appeso = myP2POnchain && !novitaOcApertaP2P();
   if (appeso) testaAltaP2P();
   const porta = myP2POnchain
-    ? '<div class="p2p-oc-novita' + (appeso ? ' appeso' : '') + '" id="p2pOcNovita">'
+    ? '<div class="p2p-oc-novita' + (appeso ? ' appeso' : '')
+      + (tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '') + '" id="p2pOcNovita">'
       + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaOnchainP2P()">'
       + P2P_OC_MONETA + '<span class="p2p-oc-novita-testo">On-Chain</span>'
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
@@ -57477,7 +57555,13 @@ function apriOnchainP2P(id, modo){
         + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore. Chi compra ti manda '
         + esc(fmtEur(o.euro)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
         + 'Se non arrivano, apri una disputa: decide un moderatore.',
-    etichetta: 'Prendi lo scambio',
+    /* «COMPRA» / «VENDI» COME NELLA PRESA LIGHTNING (30 ott 2026, 19:04,
+       Andrea: «affianco a vendi e compra metti la relativa icona cosi chi
+       lo prende sa se e' onchain o lightning»): era «Prendi lo scambio»
+       arancio; adesso il verde o il rosso del lato dal nero, con la moneta
+       a sinistra (`vestito: 'compro-oc'` / `'vendo-oc'`, vedi chiediConferma) */
+    etichetta: vendeLui ? 'Compra' : 'Vendi',
+    vestito: vendeLui ? 'compro-oc' : 'vendo-oc',
     poi: () => prendiOnchainP2P(Number(o.id))});
 }
 
@@ -70738,7 +70822,7 @@ function renderDettaglioP2P(){
         '</div>'
       : '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
-      '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary' : 'rosso')
+      '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary p2p-scuro' : 'rosso p2p-scuro')
         + '" id="p2pDettVai"' +
         /* spento quando il server ha detto di no (10 ott 2026): la frase
            sta nel riquadro qui sopra, e la cintura vera in `eseguiPresaP2P` */
@@ -70754,7 +70838,12 @@ function renderDettaglioP2P(){
            parola che si vede sta in testa, e il resto la completa. */
         (daScegliere ? ' aria-label="Scegli quanto ' + verboEuro + '"' : '') +
         ' onclick="confermaDettaglioP2P()">' +
-        (daScegliere ? 'Scegli' : (compro ? 'Compra' : 'Vendi')) + '</button>' +
+        /* LA RETE ACCANTO A «COMPRA» / «VENDI» (30 ott 2026, 19:04, Andrea:
+           «affianco a vendi e compra metti la relativa icona cosi chi lo
+           prende sa se e' onchain o lightning»): qui il fulmine, a sinistra
+           sul nero come nei «Pubblica ordine»; la moneta sta nella presa
+           on-chain (`apriOnchainP2P`) */
+        (daScegliere ? 'Scegli' : '<span class="p2p-invia-ico">⚡</span>' + (compro ? 'Compra' : 'Vendi')) + '</button>' +
     '</div>');
 }
 /* «COME FUNZIONA», I QUATTRO PASSI DELLO SCAMBIO (6 ott 2026, idea e
@@ -77982,15 +78071,16 @@ function renderNuovoOrdineP2P(){
        questo foglio non nomina, e un commento innocente la farebbe
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
-      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + '" id="p2pNuovoInvia" ' +
+      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + (tab ? '' : ' p2p-scuro') + '" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">' +
         /* col percorso Barattozon il bottone dice che prima c'e' il
            riepilogo: e' l'ultimo passo, non un salto nel vuoto — e al
            posto della ricevuta porta il logo (24 set 2026) */
-        /* a rete on-chain la moneta arancio col filo bianco al posto del
-           fulmine (30 ott 2026, oc-identico) */
+        /* a rete on-chain la moneta arancio al posto del fulmine (30 ott
+           2026, oc-identico); dalle 18:57 l'una e l'altro stanno a
+           sinistra, sul nero (vedi I BOTTONI DEL LATO NELLO STILE DEL +) */
         (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + 'Pubblica ordine</span></button>'
-          : (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>') +
+          : (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '<span class="p2p-invia-ico">⚡</span>Pubblica ordine') + '</button>') +
     '</div>';
 }
 /* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
