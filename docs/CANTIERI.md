@@ -75658,3 +75658,90 @@ scheda dice la rete di adesso e quella che verrà. La procedura di
 PRODUZIONE e la voce 4 di DA-FARE-ANDREA dicono ancora la riga del
 config: valgono lo stesso (il pannello vince sul config se ha una riga).
 Non provato su un telefono vero.
+
+## La sezione on-chain del P2P ridisegnata: la scelta al +, la moneta su ogni card, il foglio come quello di Lightning (30 ott 2026, cantiere grafica-p2p-onchain, Andrea: «è tutto strano la sezione onchain», «quando dal libro ordini su compra btc o vendi btc clicchi il pulsante + prima della classica schermata devono esserci due tasti centrali rettangolari: onchain e sotto lighting»)
+
+**PERCHÉ.** La sezione «Scambi on-chain» nata il mattino stesso (e09da58)
+funzionava ma non era di casa: una riga tratteggiata nel libro, una
+pagina con un paragrafo sul 2-di-3, un modulo con etichette in fila, un
+`<select>` del telefono e caselle da spuntare, e in fondo la
+«Moderazione on-chain» separata. Andrea l'ha guardata sul collaudo e ha
+mandato quattro schermate con le richieste.
+
+**COSA SI È DECISO (parole di Andrea, una per una).**
+1. **Il + del libro chiede la rete** a chi è ammesso all'on-chain: un
+   foglio con due tasti rettangolari, «On-chain» arancio sopra e
+   «Lightning» sotto (verde su «Compra BTC», rosso su «Vendi BTC», i
+   colori del bottone che pubblica), e su «Vendi BTC» anche
+   «Barattozon» nel suo blu («compreso barattozon se si può»). Ognuno
+   apre il SUO foglio; Lightning con la morfosi di sempre. A chi non è
+   ammesso — oggi tutta la produzione, leva spenta — il + fa quel che
+   faceva: una scelta con una strada sola è un tocco in più per niente
+   (`apriSceltaPubblicaP2P` torna falso e `toccaPiu` prosegue).
+2. **Il rettangolo arancio «Novità: scambi on-chain»** sotto Recenti e
+   Filtro, al posto della riga tratteggiata, solo per chi è ammesso;
+   porta alla pagina on-chain.
+3. **Il logo è la moneta del Cambio** («la stessa icona che rappresenta
+   l'onchain nella pagina di sats routing»): la `.cambio-moneta.btc`
+   col ₿ bianco, e per Lightning il suo fulmine. Le quattro idee
+   proposte (blocchi, lucchetto, moneta con «2/3», tre chiavi) sono
+   SCARTATE da lui. I tratti stanno in `P2P_OC_MONETA`/`P2P_LN_MONETA`,
+   copiati da `SWAP_ICONE` perché `swap/instradatore.js` arriva solo col
+   Cambio.
+4. **La rete su ogni card** («così la gente capisce subito su quale rete
+   bisogna scambiare... affianco al toggle degli utenti»): la moneta
+   piccola accanto all'anello col volto (`segnoReteP2P`). Lettura mia,
+   detta ad Andrea: il fulmine sulle card di Mostro c'è SOLO a libro
+   on-chain acceso (busta arrivata o utente ammesso) — con una rete sola
+   è rumore, e in produzione le card restano quelle di ieri. La card
+   on-chain prende anche l'anello della scadenza con l'iniziale del nome
+   (`anelloOnchainP2P`): prima al suo posto c'era il bollino di testo
+   «⛓️ on-chain · 2-di-3», che se n'è andato.
+5. **La pagina on-chain è il tasto puro** («non deve avere tutto quel
+   testo»): «Pubblica uno scambio on-chain» e sotto i miei scambi. Via
+   il paragrafo, il vuoto con «Vai al libro ordini» e la moderazione.
+6. **Le dispute in un posto solo** («che sia lightning o onchain»): le
+   on-chain stanno in «⚖️ Moderazione P2P», card dopo quelle vive di
+   Mostro, e nel numero della striscia; il tocco apre la scheda dello
+   scambio coi due bottoni della decisione. L'elenco lo legge
+   `leggiModOnchainP2P` all'ingresso di «I miei scambi» e della
+   moderazione (al più ogni 15 s).
+7. **Il foglio «Pubblica» on-chain è quello di Lightning** («identica
+   praticamente, magari solo con la scritta sopra scambi on chain»):
+   `p2pOcSheet` a pieno schermo, freccia in alto, titolo «Vuoi vendere /
+   comprare Bitcoin» e sopra la moneta con «Scambi on-chain» (più «rete
+   di prova (signet)» fuori da mainnet: è il posto dove quella frase è
+   rimasta, dopo che il paragrafo della pagina se n'è andato), poi i
+   riquadri `sezioneNuovoP2P` — valuta, metodi con la stessa tendina,
+   importo, sats (col ₿ e non col fulmine: nuova icona `btc` in
+   `P2P_ICONE`), «Dove vuoi gli euro» solo a chi vende — e un bottone
+   solo. NIENTE «Tipo di prezzo» e «Premio»: l'on-chain è sempre a
+   prezzo fisso. La valuta è una riga senza freccina: una tendina con
+   una voce e niente da scegliere sarebbe una promessa. Il lato viene
+   dalla scheda del +; entrando dalla pagina, in cima «Compro / Vendo».
+
+**LA LOGICA NON SI È MOSSA**: stesse rotte, stessi campi a
+`/p2p/onchain/pubblica`, stessi controlli («Scrivi sats ed euro»,
+«Scegli almeno un metodo»). Una sola differenza nel corpo: chi COMPRA
+non manda più un recapito (il campo non c'è), che nel 2-di-3 lo scrive
+solo chi vende bitcoin — prima un compratore poteva scriverne uno che
+nessuno avrebbe letto. Dopo «Pubblica» il foglio si chiude e si apre la
+scheda dello scambio.
+
+**COSA NON È CAMBIATO, e resta da guardare.** I toast e i titoli delle
+domande della sezione dicono ancora «⛓️» (testo, non disegno: un SVG in
+un toast non entra). La scheda dello scambio (`schedaOnchainP2P`) e la
+lista di «I miei scambi» non sono state ridisegnate: la seconda la
+tocca, in parallelo, il thread della prova (avvisi del bot e scambi
+on-chain in «I miei scambi»), che usa `P2P_OC_MONETA` e `segnoReteP2P`.
+
+**PROVE.** Giro dal vivo nel worktree (server di collaudo, database
+nuovo, leve P2P/ONCHAIN/P2P_ONCHAIN accese nel config del giro, relay
+morti, ADMIN_IDS 999 e 222, libro di Mostro finto in pagina): libro nei
+due tab, scelta al + nei due lati, foglio dai due ingressi, pagina,
+«I miei scambi» con le due strisce, moderazione con una disputa on-chain
+data da una rotta finta di Playwright; a 390 scuro e 320 chiaro. Config
+e database del giro tolti dal worktree prima delle prove. La sentinella
+di `prove_p2p_libro` sulla testa della card segue la riga nuova (il segno
+della rete fra la cifra e l'anello). Suite e collaudi: nel verbale del
+commit.
