@@ -75506,6 +75506,43 @@ non l'ha chiesto. Provato nella gabbia (sezione 11-ter: 403 a chi
 vende, 400 alla chiave del conto e alla firma di un altro seme, 200 col
 Profilo che resta vuoto, 409 al secondo giro).
 
+GLI SCAMBI ON-CHAIN IN «I MIEI SCAMBI» (stesso pomeriggio, Andrea:
+«l'ordine appena preso lo devo vedere nei miei ordini con il messaggio
+che dice cosa succede esattamente come nel lightning, magari per
+identificare se lightning o onchain mettiamo l'iconcina giusta nella
+card»; nel thread del design ha scelto «tutto insieme»). Le card
+on-chain stanno nella stessa lista dei Lightning, con gli stessi gruppi
+(Tocca a te, In corso, Nel libro, Conclusi, Annullati), lo stesso
+filtro, lo stesso ordine, lo stesso conto in testa e lo stesso pallino.
+COME: ogni scambio on-chain si veste da riga della lista
+(`righeOnchainMieiP2P`, il vero sta in `oc`), e i due giudici della
+lista (`gruppoScambioP2P`, `rigaScambioP2P`) vedono `oc` e passano la
+mano ai giudici on-chain. «Tocca a te» ha un giudice solo,
+`toccaAMeOnchainP2P` (depositare, scegliere dove ricevere, mandare gli
+euro, liberare, la seconda firma), e lo usano il 👉, il gruppo e il
+pallino. La card ha l'ossatura di quella Lightning (le due cifre col
+verso, le frasi al passato a scambio chiuso, la casella con la riga di
+cosa succede) e nell'angolo il segno della rete, la moneta del libro
+(`segnoReteP2P`): ₿ sulle on-chain e il fulmine sulle Lightning, che
+come nel libro c'è solo col libro on-chain acceso (in produzione, a leva
+spenta, la card Lightning resta quella di ieri). Al tocco si apre «Nel
+dettaglio» (`apriDettaglioOnchainP2P`, del thread del design). Le righe entrano in `mieiRigheP2P`, la lista di chi disegna e
+conta (col typeof, per i banchi che la estraggono da sola); il motore
+del Lightning (riascolto dei relay, stato pubblico, «ha ordini vivi»)
+passa da `apertiMieiP2P`, che le lascia fuori: una riga on-chain lì
+avrebbe chiesto a Mostro di uno scambio che Mostro non conosce. SCARTATA
+la prima stesura, una `mieiTuttiP2P` nuova chiamata dai cinque posti
+che disegnano: rompeva 64 prove, i banchi che estraggono quelle funzioni
+e le sentinelle che ne leggono il testo. Lo stato delle righe porta il
+prefisso `oc-`, così nessuna lista di stati del Lightning le scambia per
+sue.
+Tolti la striscia «⛓️ Scambi on-chain», l'elenco della pagina on-chain e
+`rigaMiaOnchainP2P`: il modo 'elenco' ora torna a «I miei scambi», e la
+pagina on-chain senza uno scambio aperto è il solo tasto «Pubblica».
+Provato in node (14 stati: gruppo, 👉, titolo della casella; la card;
+le righe e il cancello). Da guardare sul telefono: come sta il segno
+nell'angolo accanto alla data sulle card concluse.
+
 ## I colori veri all'amministratore del collaudo (30 ott 2026, cantiere collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi mettere gli sfondi originali nellapp collaudo solo per me amministratore? la striscia blu in alto va bene ... per tutti gli altri utenti che hanno accesso al collaudo invece rimane cosi blu»)
 
 Il perché di Andrea: la pagina si giudica coi colori che avrà in

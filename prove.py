@@ -153016,6 +153016,97 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
            'onchain_destinazione_motivo("indirizzo", valore, r["xpub"])' in rotta,
            'onchain_firma_valida(r["xpub"], "indirizzo", valore, firma)' in rotta,
            "onchain_incasso(" not in rotta and "INSERT" not in rotta))
+    # GLI SCAMBI ON-CHAIN IN «I MIEI SCAMBI» (30 ott 2026, Andrea: «l'ordine
+    # appena preso lo devo vedere nei miei ordini con il messaggio che dice
+    # cosa succede esattamente come nel lightning»): i giudici puri in node
+    pz = lambda inizio: pezzo_js(mini, inizio, "\n}\n") + "\n}\n"
+    banco = ("const P2P_ONCHAIN_VIVI = new Set(['pending', 'preso', 'depositato', 'euro_inviati', 'disputa']);\n"
+             + "".join(pz(f) for f in (
+                 "function depositoVistoOnchainP2P(o){", "function daFirmareOnchainP2P(o){",
+                 "function toccaAMeOnchainP2P(o){", "function gruppoOnchainP2P(o){",
+                 "function statoOnchainCardP2P(o){", "function tintaOnchainP2P(o){",
+                 "function segnoReteCardP2P(rete){", "function rigaScambioOnchainP2P(o){",
+                 "function righeOnchainMieiP2P(){"))
+             + r"""
+const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n);
+const dataBreveP2P = t => t ? 'D' + t : '';
+const iconaMetodiP2P = () => '', marchioMetodoP2P = m => m;
+let myP2POnchain = true, DEMO = false, VETRINA = false;
+const b = {ruolo: 'compratore', parte: 'vendo', sats: 10000, euro: 9, metodi: ['Bonifico'],
+           importo_sats: 10540, visti_sats: 0, incasso: '', proposta: null, creato: 5};
+const casi = [
+  {stato: 'pending', ruolo: 'maker'},
+  {stato: 'preso'},
+  {stato: 'preso', visti_sats: 10540},
+  {stato: 'preso', ruolo: 'venditore', parte: 'compro'},
+  {stato: 'preso', ruolo: 'venditore', parte: 'compro', incasso: 'tb1q'},
+  {stato: 'depositato', ruolo: 'venditore', parte: 'compro', incasso: 'tb1q'},
+  {stato: 'depositato'},
+  {stato: 'euro_inviati'},
+  {stato: 'euro_inviati', ruolo: 'venditore', parte: 'compro', incasso: 'tb1q',
+   proposta: {verso: 'venditore', mia: false}},
+  {stato: 'euro_inviati', proposta: {verso: 'venditore', mia: true}},
+  {stato: 'disputa'},
+  {stato: 'rilasciato', chiuso_il: 7},
+  {stato: 'rimborsato', chiuso_il: 7},
+  {stato: 'scaduto'}].map(x => Object.assign({}, b, x));
+const out = casi.map(o => [gruppoOnchainP2P(o), toccaAMeOnchainP2P(o), statoOnchainCardP2P(o).t]);
+const card = casi.map(rigaScambioOnchainP2P);
+let p2pOnchainMiei = [Object.assign({id: 4}, casi[3]), Object.assign({}, casi[1], {id: 5, ruolo: 'moderatore'})];
+const righe = righeOnchainMieiP2P();
+myP2POnchain = false;
+console.log(JSON.stringify({out,
+  manina: card.map(c => c.includes('👉')),
+  segno: card.every(c => c.includes('🟠') && c.includes('apriScambioOnchainMioP2P(this.dataset.id)')),
+  passato: [card[11].includes('Hai ricevuto'), card[12].includes('Rimborsato il D7'), card[1].includes('Vuoi ricevere')],
+  verso: [card[1].includes('p2p-sats invia'), card[3].includes('p2p-sats riceve')],
+  righe: righe.map(r => [r.id, r.stato, r.lato, r.oc.id]), spento: righeOnchainMieiP2P().length}));
+""")
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        x = json.loads(r.stdout.strip() or "null") or {}
+        prova("ogni stato on-chain cade nel suo gruppo della lista, «tocca a te» dice "
+              "il gesto che la pagina chiede (depositare, scegliere dove ricevere, "
+              "mandare gli euro, liberare, la seconda firma), e la casella dice cosa "
+              "succede",
+              [["libro", False, "Ordine pubblicato"], ["fare", True, "Deposita i sats"],
+               ["corso", False, "Deposito inviato"], ["fare", True, "Scegli dove ricevere"],
+               ["corso", False, "Si aspetta il deposito"], ["fare", True, "Manda gli euro"],
+               ["corso", False, "Sats depositati"], ["fare", True, "Euro inviati"],
+               ["fare", True, "Manca la tua firma"], ["corso", False, "Hai firmato"],
+               ["corso", False, "In disputa"], ["fatti", False, "Scambio concluso"],
+               ["morti", False, "Rimborsato"], ["morti", False, "Scaduto nel libro"]],
+              x.get("out"))
+        prova("...la card: il 👉 dove tocca a me, il segno della rete e il tocco sul "
+              "dettaglio, le frasi al passato a scambio chiuso, il verde e il rosso "
+              "del verso",
+              ([False, True, False, True, False, True, False, True, True, False, False,
+                False, False, False], True, [True, True, True], [True, True]),
+              (x.get("manina"), x.get("segno"), x.get("passato"), x.get("verso")))
+        prova("...e le righe della lista: id e stato col prefisso «oc-» (nessuna lista "
+              "di stati del Lightning le scambia per sue), il verso dalla parte, il "
+              "moderatore fuori; a cancello chiuso nessuna",
+              ([["oc-4", "oc-preso", "compro", 4]], 0), (x.get("righe"), x.get("spento")))
+    except (OSError, subprocess.TimeoutExpired):
+        salta("gli scambi on-chain in «I miei scambi»", "node assente")
+    scambi = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+    prova("...le righe entrano nella lista di chi la disegna e la conta (lista, "
+          "filtro, intestazione, pallino) e i giudici della lista passano la mano "
+          "(la card Lightning porta anche lei la moneta della sua rete); "
+          "il motore del Lightning le lascia fuori; la striscia e l'elenco della "
+          "pagina on-chain non ci sono piu'",
+          (True,) * 8,
+          ("if (o.oc) return gruppoOnchainP2P(o.oc);" in pezzo_js(mini, "function gruppoScambioP2P(o){", "\n}\n"),
+           "if (o && o.oc) return rigaScambioOnchainP2P(o.oc);" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
+           ".concat(typeof righeOnchainMieiP2P === 'function' ? righeOnchainMieiP2P() : [])"
+           in pezzo_js(mini, "function mieiRigheP2P(){", "\n}\n"),
+           "return righe.filter(o => !o.oc && P2P_FINALI.indexOf(o.stato) < 0);"
+           in pezzo_js(mini, "function apertiMieiP2P(righe){", "\n}\n"),
+           "mieiTuttiP2P" not in mini
+           and "segnoReteCardP2P('ln')" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
+           "if (view==='p2pmiei' && myP2POnchain) rileggiOnchainMieiP2P();" in mini,
+           "if (modo === 'elenco') return go('p2pmiei');" in mini,
+           all(x not in mini for x in ("renderStrisciaOnchainP2P", "rigaMiaOnchainP2P", "p2pOnchainStriscia"))))
     prova("...e ha il suo freno, largo per un battito ogni 15 secondi",
           (True, True),
           ('_frena("p2p_onchain_controlla", user["id"])' in pezzo("p2p_onchain_controlla_rotta"),
