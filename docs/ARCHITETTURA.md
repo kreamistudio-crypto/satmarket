@@ -34297,10 +34297,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `onchain_ammesso(tg_id)`: `ONCHAIN_ATTIVO` (False) e
   `ONCHAIN_SOLO_ADMIN` (True); a leva spenta ogni rotta `/api/onchain/*`
   è 404 per chiunque, admin compresi.
-  LA RETE è la costante `ONCHAIN_RETE = "signet"` (forme di testnet:
-  `tb1`, `tpub`); un indirizzo mainnet non si calcola da nessuna parte.
-  IL CONTO è `ONCHAIN_STRADA_CONTO = "m/48'/1'/0'/2'"` (BIP-48, p2wsh);
-  la chiave dell'ordine n è `/0/n` dal conto.
+  LA RETE era la costante `ONCHAIN_RETE = "signet"`; dal 30 ott 2026 è
+  una LEVA (sotto, «L'ON-CHAIN IN MAINNET»): signet di serie (forme di
+  testnet: `tb1`, `tpub`), mainnet solo dal config del VPS.
+  IL CONTO è `ONCHAIN_STRADA_CONTO` = `ONCHAIN_STRADA_PER_RETE[rete]`
+  (`m/48'/1'/0'/2'` su signet, `m/48'/0'/0'/2'` su mainnet; BIP-48,
+  p2wsh); la chiave dell'ordine n è `/0/n` dal conto.
   NEL TELEFONO (miniapp.html, blocco «IL BANCO DELLE CHIAVI ON-CHAIN» e
   seguenti; bundle `/vendor/btc.js`, caricato pigro da `caricaBitcoin`):
   il seme BIP-39 nasce a caso nel browser e sta in
@@ -34622,6 +34624,53 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `storiaAnnullaChiedi`, `backupControlla`/`backupRipristinaChiedi`.
   Collaudo: `collaudo_leve_pannello` (anche il riavvio in un secondo
   processo, e il freno a mano).
+
+- L'ON-CHAIN IN MAINNET: LA RETE È UNA LEVA (30 ott 2026, cantiere
+  onchain-mainnet, proposta di Alan via Andrea; perché in CANTIERI,
+  «L'on-chain in mainnet»; la procedura in PRODUZIONE, «L'ON-CHAIN IN
+  MAINNET»). `ONCHAIN_RETE` si legge dal config: `"signet"` di serie
+  (codice e collaudo), `"mainnet"` (o `"bitcoin"`, sinonimo) sul VPS;
+  una parola storta resta signet e lo dice nel journal; sta in
+  `LEVE_MAI_DAL_PANNELLO` (solo dal VPS). DA LEI DISCENDE TUTTO, in una
+  tabella sola del server: `ONCHAIN_STRADA_PER_RETE` (il conto BIP-48,
+  coin type 1 o 0), `ONCHAIN_RETE_EMBIT` (embit la chiama "main"),
+  `ONCHAIN_PREFISSI` (xpub/tpub, bc1/tb1, zpub/vpub, la strada del
+  wallet m/84'/0'/0' o m/84'/1'/0' nei messaggi), `ONCHAIN_VERSIONE_CONTO`
+  (la versione BIP-32 della chiave di conto di un wallet BIP-84),
+  `ONCHAIN_MEMPOOL_DI_SERIE` (mempool.space/api), `ONCHAIN_RETE_DEL_CAMBIO`
+  («mainnet» → «bitcoin»). Ogni `_EMBIT_RETI[ONCHAIN_RETE]` è diventato
+  `_onchain_rete()`, e ogni «tpub»/«tb1» nei testi `_onchain_prefisso()`.
+  NEL TELEFONO la gemella è `ONCHAIN_RETI` (miniapp.html, dopo
+  `ONCHAIN_VERSIONI_PROVA`): `onchainRete()` legge la rete da
+  `onchainSrv.rete` (`/api/onchain/prova`) o da `myOnchainRete`
+  (`/api/me` → `onchain_rete`, detta anche a cancello chiuso), e SENZA
+  server è signet; `onchainReteBtc(B)` è l'unico posto con
+  `B.TEST_NETWORK`/`B.NETWORK`; `onchainConto` usa le versioni della rete
+  (su mainnet quelle di serie di HDKey, `xpub`); `onchainLeggiChiaveConto`
+  legge vpub e zpub dal prefisso; i testi firmati (`incasso/v1`,
+  `ricevuto/v1`) portano `onchainRete().nome`; le strade di riserva sono
+  `onchainRete().strada`; il riconoscitore di quel che si incolla, il
+  modulo «Dove ricevi», la scheda Tecnico (`onchainTestoRete`), l'export
+  dicono la rete. LA TERZA CHIAVE SU MAINNET: `onchain_xpub_barattolo`
+  con la cartone (niente file, niente `ONCHAIN_XPUB`) alza ValueError →
+  `/api/onchain/prova` risponde `ferma` col motivo (il foglio lo mostra,
+  `onchainTestoFerma`), `/api/onchain/pronto` dice no alla cassa, la
+  cassa e `/prova/indirizzo` 503, il pannello delle leve ha la voce
+  «Rete dell'on-chain» e la terza chiave in allarme («⚠️ di cartone su
+  MAINNET: l'on-chain è FERMO»). `_onchain_chiave_vps` rifiuta un file
+  nato su un'altra rete (`rete` nel file; i file di prima dicevano già
+  "signet"): non si torna alla cartone in silenzio. `/api/onchain/prova`
+  dice la terza chiave col giudice, non col solo config (prima una
+  chiave nata sul VPS la chiamava ancora «di cartone»). Le xpub dedicate
+  di signet nel database non valgono su mainnet (`onchain_xpub_motivo`
+  le rifiuta): l'app le ridà da sola (`onchainAccendiDaSolo`). Le prove:
+  `prove_banco_chiavi_onchain` (la leva, le tabelle gemelle, il
+  telefono senza rete scritta a mano), `prove_indirizzo_ordine_onchain`
+  (il blocco eseguito su mainnet: xpub, bc1q, la cartone che dice no,
+  il file di signet che non vale; la prova doppia embit↔telefono anche
+  su mainnet, dodici ordini), `collaudo_onchain_indirizzo` (la leva a
+  caldo col server vero: /api/me, prova, 503, pronto, pannello, la
+  chiave creata su mainnet e il ritorno a signet).
 
 - I CERTIFICATI DEI RELAY (20 ott 2026, cantiere certificati-relay;
   perché in CANTIERI, «I certificati dei relay si verificano»; il journal

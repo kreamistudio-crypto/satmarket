@@ -14308,10 +14308,11 @@ document.getElementById('cartello')?.remove();</script>
        QUI NON SI PAGA NIENTE, e non e' una limitazione: le tre cose
        che servono — vedere le chiavi, capire chi ha cosa, provare che
        il backup regge — si fanno con ZERO sats, zero nodo, zero rete.
-       La rete e' SEMPRE signet (testnet fino al 20 ott 2026) e un
-       indirizzo mainnet non si calcola da nessuna parte: un 2-di-3 con una chiave di cartone che
-       mostrasse un `bc1q...` sarebbe un invito a mandarci sats veri
-       che nessuno potrebbe piu' sbloccare.
+       La rete la dice il SERVER (dal 30 ott 2026: signet di prova, o
+       mainnet coi sats veri; prima era sempre signet): su mainnet un
+       2-di-3 con una chiave di cartone sarebbe un invito a mandarci
+       sats veri che nessuno potrebbe piu' sbloccare, e il server non
+       lo calcola (`ferma`).
        Il corpo lo scrive `renderOnchain()`: qui c'e' il guscio, perche'
        un ridisegno non debba ricostruire la pagina. -->
   <div class="view" id="view-onchain">
@@ -16405,6 +16406,7 @@ let myTgId = null, isAdmin = false;
    SERVER in /api/me, e non si deduce da `isAdmin` — a leva spenta e'
    falso anche per i moderatori. */
 let myOnchain = false;
+let myOnchainRete = '';     // «signet» o «mainnet», detta da /api/me (30 ott 2026)
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
 /* come ricevo quando vendo on-chain (28 ott 2026): {attivo, modo, minimo} */
 let myOnchainLn = {attivo: false};
@@ -43484,7 +43486,7 @@ async function onchainCambioConferma(btn, o){
     const rec = await swapCreaPerOnchain({ordine: o.id, onchain: oc.id, fattura: fattura,
       preventivo: p, rimborso: io.incasso});
     let dove = null;
-    try { dove = B.Address(B.TEST_NETWORK).decode(rec.lockupAddress); } catch(e) { dove = null; }
+    try { dove = B.Address(onchainReteBtc(B)).decode(rec.lockupAddress); } catch(e) { dove = null; }
     if (!dove || dove.type !== 'tr') throw new Error('l\'indirizzo del cambio non è della rete giusta');
     if (!(rec.mandi > 0 && rec.mandi <= oc.prezzo_sats)) throw new Error('le cifre del cambio non tornano');
     const firma = await onchainFirmaDestinazione(B, parole, 'cambio', `${oc.id}:${rec.lockupAddress}`);
@@ -49844,6 +49846,7 @@ function boxChiaveBarattolo(){
   } else {
     conta = 'di cartone';
     dentro = `<div class="sub">Oggi la terza chiave è <b>di cartone</b>: quella dei vettori di prova del BIP-32, la cui privata è pubblica. Va bene su signet; prima dei sats veri serve la chiave vera. ${firma}</div>
+      ${onchainRete().prova ? '' : '<div class="sub" style="color:var(--danger)"><b>⚠️ La rete è mainnet e la chiave non c\'è: l\'on-chain è fermo</b> (nessun indirizzo nasce, la cassa non offre ⛓️) finché non la crei qui sotto.</div>'}
       <button class="btn orange" style="margin-top:10px" onclick="creaChiaveBarattolo(this)">⛓️ Crea la chiave di Barattolo</button>`;
   }
   return cassettoAdm('accAdmChiaveOc', '⛓️', 'Chiave di Barattolo', conta, dentro);
@@ -54740,10 +54743,11 @@ function caricaNostrTools(){
 
    QUI NON SI PAGA NIENTE, e le tre cose che servono si fanno con ZERO
    sats: vedere le tre chiavi, capire chi ha cosa, e provare che il
-   backup regge davvero. La rete e' SEMPRE signet (`tb1...`) e un
-   indirizzo mainnet non si calcola da nessuna parte — con una chiave di
-   cartone nel 2-di-3, un `bc1q...` a schermo sarebbe un invito a
-   mandarci sats veri che nessuno potrebbe piu' sbloccare.
+   backup regge davvero. La rete la dice il server (`onchainRete()`:
+   signet di prova, o mainnet dal 30 ott 2026) — e con una chiave di
+   cartone nel 2-di-3 un `bc1q...` a schermo sarebbe un invito a
+   mandarci sats veri che nessuno potrebbe piu' sbloccare: su mainnet
+   il server non lo calcola, e qui si legge il perche' (`ferma`).
 
    IL SEME NASCE E MUORE NEL BROWSER (regola ferrea 2 dal lato dei
    soldi): al server non arriva mai, e il server non ha i pezzi per
@@ -54891,7 +54895,7 @@ async function onchainSemeAssicurato(){
    foglio, che legge `onchainCase` — e un backup che non c'e' va
    DETTO, non nascosto. */
 async function onchainMettiAlSicuro(parole){
-  const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || "m/48'/1'/0'/2'"});
+  const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || onchainRete().strada});
   try { onchainCase.nuvola = await cloudScrivi(ONCHAIN_CLOUD, corpo); }
   catch(e){ onchainCase.nuvola = false; }
   try { onchainCase.relay = await onchainSuiRelay(corpo); }
@@ -55058,6 +55062,47 @@ function descrittoreConChecksum(s){
    serie: il prefisso decide. */
 const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};
 
+/* ============ LA RETE: SIGNET O MAINNET (30 ott 2026, cantiere
+   onchain-mainnet, proposta di Alan: «con flag on-chain attivo solo per
+   gli admin, una prova da 5 euro in mainnet») ============
+   Fino a ieri la rete era scritta qui dentro una riga per volta:
+   la rete di prova del bundle, `tpub`, `tb1`, `signet` nei testi firmati. Adesso la
+   dice il SERVER (`/api/me` → `onchain_rete`, `/api/onchain/prova` →
+   `rete`) e tutto quel che ne discende sta in UNA tabella, la gemella
+   di `ONCHAIN_PREFISSI` e `ONCHAIN_STRADA_PER_RETE` del server: il
+   conto BIP-48 (coin type 1 o 0: due conti diversi, apposta), le
+   versioni BIP-32 della radice (le `tpub` di prova; su mainnet quelle
+   di serie di HDKey, `xpub`), la rete del bundle per gli indirizzi, i
+   prefissi che i testi nominano, la versione della chiave di CONTO di
+   un wallet BIP-84 (vpub / zpub, quella che Sparrow mostra).
+   SENZA SERVER E' SIGNET: nei banchi di prova (dove `onchainSrv` e'
+   nullo e `myOnchainRete` puo' non esistere) e in ogni dubbio, la rete
+   di prova. Un refuso che aprisse la mainnet qui sarebbe un refuso
+   coi soldi: la strada verso i sats veri passa SOLO da una parola
+   esplicita del server. */
+const ONCHAIN_RETI = {
+  signet:  {nome: 'signet', prova: true, strada: "m/48'/1'/0'/2'",
+            versioni: ONCHAIN_VERSIONI_PROVA, xpub: 'tpub', indirizzo: 'tb1',
+            conto: 'vpub', versioniConto: {private: 0x045f18bc, public: 0x045f1cf6},
+            stradaWallet: "m/84'/1'/0'", esplora: 'https://mempool.space/signet'},
+  mainnet: {nome: 'mainnet', prova: false, strada: "m/48'/0'/0'/2'",
+            versioni: undefined, xpub: 'xpub', indirizzo: 'bc1',
+            conto: 'zpub', versioniConto: {private: 0x04b2430c, public: 0x04b24746},
+            stradaWallet: "m/84'/0'/0'", esplora: 'https://mempool.space'},
+};
+
+function onchainRete(){
+  const srv = (typeof onchainSrv !== 'undefined' && onchainSrv) || null;
+  const detta = (srv && srv.rete)
+    || (typeof myOnchainRete !== 'undefined' && myOnchainRete) || 'signet';
+  return ONCHAIN_RETI[detta] || ONCHAIN_RETI.signet;
+}
+
+/* la rete del bundle (@scure/btc-signer) per indirizzi e script */
+function onchainReteBtc(B){
+  return onchainRete().prova ? B.TEST_NETWORK : B.NETWORK;
+}
+
 function onchainLeggiXpub(B, s){
   const t = String(s || '');
   return t.startsWith('tpub')
@@ -55065,11 +55110,21 @@ function onchainLeggiXpub(B, s){
     : B.HDKey.fromExtendedKey(t);
 }
 
-/* Il conto del 2-di-3 di questo seme: la radice con le versioni di
-   prova, poi la strada che dice il server (`strada`). */
+/* la chiave di CONTO di un wallet BIP-84 (vpub o zpub), o una xpub/tpub
+   nuda: il prefisso dice le versioni, come in `onchainLeggiXpub` */
+function onchainLeggiChiaveConto(B, s){
+  const t = String(s || '');
+  if (t.startsWith('vpub')) return B.HDKey.fromExtendedKey(t, ONCHAIN_RETI.signet.versioniConto);
+  if (t.startsWith('zpub')) return B.HDKey.fromExtendedKey(t, ONCHAIN_RETI.mainnet.versioniConto);
+  return onchainLeggiXpub(B, t);
+}
+
+/* Il conto del 2-di-3 di questo seme: la radice con le versioni della
+   rete (quelle di prova su signet, quelle di serie su mainnet), poi la
+   strada che dice il server (`strada`). */
 function onchainConto(B, parole, strada){
   const seme = B.mnemonicToSeedSync(parole, '');
-  return B.HDKey.fromMasterSeed(seme, ONCHAIN_VERSIONI_PROVA).derive(strada);
+  return B.HDKey.fromMasterSeed(seme, onchainRete().versioni).derive(strada);
 }
 
 /* La chiave PUBBLICA numero `i` di un conto (o di una xpub): `/0/i`,
@@ -55084,7 +55139,7 @@ function onchainFiglia(conto, i){
    doppia confronta byte per byte: descrittore (con il checksum) e
    indirizzo devono uscire IDENTICI dalle due parti. */
 function onchainDaTre(B, tre){
-  const rete = B.TEST_NETWORK;   // signet: le stesse forme di testnet (tb1)
+  const rete = onchainReteBtc(B);   // signet (tb1) o mainnet (bc1): lo dice il server
   const w = B.sortedMultisig(2, tre, true, rete);
   const hex = (b)=>B.hex.encode(b);
   return {
@@ -55372,15 +55427,38 @@ function onchainSchedaImpostazioni(miaXpub){
     </div>`;
 }
 
+/* La rete, detta a chi guarda (30 ott 2026): signet e' la prova, i sats
+   non valgono; mainnet sono sats veri, e lo si scrive in rosso. */
+function onchainTestoRete(){
+  const rt = onchainRete();
+  return rt.prova
+    ? `<div class="hint">Rete <b>signet</b>, la rete di prova: gli
+      indirizzi cominciano per <span class="mono">tb1</span> e i sats non
+      valgono niente.</div>`
+    : `<div class="hint" style="color:var(--danger)">Rete <b>Bitcoin
+      (mainnet)</b>: gli indirizzi cominciano per <span class="mono">bc1</span>
+      e <b>i sats sono veri</b>. Controlla due volte prima di pagare.</div>`;
+}
+
+/* La terza chiave che su questa rete non c'e' (30 ott 2026): il server
+   lo dice in `ferma` (la cartone su mainnet, un file nato su un'altra
+   rete, due terze chiavi), e qui si legge al posto dell'esempio. */
+function onchainTestoFerma(){
+  const f = (onchainSrv || {}).ferma;
+  return f ? `<div class="payout" style="border-color:var(--danger)">
+      <h4>⚠️ L'on-chain è fermo su questa rete</h4>
+      <div class="hint">${esc(f)}. Nessun indirizzo nasce e la cassa non
+        offre ⛓️ finché un admin non sistema la terza chiave (pannello
+        «⛓️ Chiave di Barattolo»).</div></div>` : '';
+}
+
 /* 🔧 TECNICO: per chi vuole sapere esattamente cosa c'e' sotto. Qui e
    solo qui le dodici parole, la strada del conto, l'esempio di cartone
    e l'indirizzo di prova. */
 function onchainSchedaTecnico(parole, k, miaXpub, verifiche){
   return `
-    <div class="hint">Rete <b>signet</b>, la rete di prova: gli
-      indirizzi cominciano per <span class="mono">tb1</span>, i sats non
-      valgono niente, e un indirizzo mainnet qui non si calcola da
-      nessuna parte.</div>
+    ${onchainTestoFerma()}
+    ${onchainTestoRete()}
 
     <div class="payout">
       <h4>Le dodici parole</h4>
@@ -55410,10 +55488,10 @@ function onchainSchedaTecnico(parole, k, miaXpub, verifiche){
         (in ordine alfabetico, BIP-67). Le otto lettere dopo il
         <span class="mono">#</span> sono il controllo del BIP-380.</div>
       <div class="hint" style="margin-top:8px;line-height:1.7">
-        • <b>Bitcoin Core</b> (signet): <span class="mono">deriveaddresses "descrittore"</span>
+        • <b>Bitcoin Core</b> (${esc(onchainRete().nome)}): <span class="mono">deriveaddresses "descrittore"</span>
         ti ridà l'indirizzo dell'ordine; <span class="mono">importdescriptors</span>
         lo mette in un wallet da guardare.<br>
-        • <b>Sparrow</b> (signet): un wallet nuovo con le dodici parole e
+        • <b>Sparrow</b> (${esc(onchainRete().nome)}): un wallet nuovo con le dodici parole e
         la strada qui sopra ti dà la tua chiave per firmare; il
         descrittore dell'ordine dice con chi.<br>
         Il descrittore di ogni ordine si copia da «🔍 Com'è fatto questo
@@ -55444,7 +55522,7 @@ function onchainSchedaTecnico(parole, k, miaXpub, verifiche){
              mandarci niente.</b> Due chiavi su tre di questo indirizzo
              le può firmare chiunque.</div>`
         : ''}
-      <div style="margin-top:8px"><b>Indirizzo</b> (signet)</div>
+      <div style="margin-top:8px"><b>Indirizzo</b> (${esc(onchainRete().nome)})</div>
       <div class="mono" style="word-break:break-all">${esc(k.indirizzo)}</div>
       <div style="margin-top:8px"><b>Descrittore</b></div>
       <div class="mono" style="word-break:break-all;font-size:11px">${esc(k.descrittore)}</div>
@@ -55527,9 +55605,9 @@ let onchainIncassoMio = null;
      (`ocProf`) e la scheda Impostazioni della pagina On-chain (`ocImp`)
      — col prefisso degli id che li tiene separati. */
 function onchainTipoIncollato(t){
-  const v = String(t || '').trim();
-  if (/^tb1/i.test(v)) return 'indirizzo';
-  if (/^(vpub|tpub)/.test(v)) return 'xpub';
+  const v = String(t || '').trim(), rt = onchainRete();
+  if (v.slice(0, 3).toLowerCase() === rt.indirizzo) return 'indirizzo';
+  if (v.startsWith(rt.conto) || v.startsWith(rt.xpub)) return 'xpub';
   return '';
 }
 function onchainSembraSegreto(t){
@@ -55541,14 +55619,14 @@ function onchainModuloIncasso(pref){
   return `
     <div class="field" style="margin:12px 0 4px"><label>Il tuo indirizzo o la chiave del conto</label>
       <input id="${pref}Valore" class="mono" autocomplete="off" spellcheck="false"
-        placeholder="tb1…  oppure  vpub… / tpub…" oninput="onchainIncassoGuardaPresto('${pref}')"></div>
+        placeholder="${onchainRete().indirizzo}…  oppure  ${onchainRete().conto}… / ${onchainRete().xpub}…" oninput="onchainIncassoGuardaPresto('${pref}')"></div>
     <div id="${pref}Esito" class="hint" style="min-height:1.2em"></div>
     <button class="btn" id="${pref}Salva" disabled onclick="onchainIncassoSalva(this, '${pref}')">✍️ Firma e salva</button>
     <div class="hint" style="margin-top:8px;line-height:1.5">Incolla <b>un tuo indirizzo</b>
-      (<span class="mono">tb1…</span>) oppure, meglio, <b>la chiave pubblica del conto</b>
-      del tuo wallet (<span class="mono">vpub…</span>: in Sparrow, Impostazioni → Keystore,
-      strada <span class="mono">m/84'/1'/0'</span>): con la chiave ogni vendita arriva a
-      un indirizzo nuovo, e con lei non si spende niente. Signet, rete di prova.</div>`;
+      (<span class="mono">${onchainRete().indirizzo}…</span>) oppure, meglio, <b>la chiave pubblica del conto</b>
+      del tuo wallet (<span class="mono">${onchainRete().conto}…</span>: in Sparrow, Impostazioni → Keystore,
+      strada <span class="mono">${esc(onchainRete().stradaWallet)}</span>): con la chiave ogni vendita arriva a
+      un indirizzo nuovo, e con lei non si spende niente. ${onchainRete().prova ? 'Signet, rete di prova.' : 'Rete Bitcoin: sats veri.'}</div>`;
 }
 
 const onchainIncassoTimer = {};
@@ -55571,7 +55649,7 @@ async function onchainIncassoGuarda(pref){
     return dici('⛔ Questa è una chiave <b>privata</b> (o le parole del seme): non incollarla da nessuna parte. L\'ho tolta dal campo, e non è partita.', 'var(--danger)');
   }
   const tipo = onchainTipoIncollato(v);
-  if (!tipo) return dici('Incolla un indirizzo <span class="mono">tb1…</span> o una chiave <span class="mono">vpub…</span> / <span class="mono">tpub…</span>.');
+  if (!tipo) { const rt = onchainRete(); return dici(`Incolla un indirizzo <span class="mono">${rt.indirizzo}…</span> o una chiave <span class="mono">${rt.conto}…</span> / <span class="mono">${rt.xpub}…</span>.`); }
   const valore = onchainNormaDestinazione(tipo, v);
   const giro = ++onchainIncassoGiro;
   dici('Controllo…');
@@ -56259,11 +56337,11 @@ async function payRiapriOnchain(oid){
 /* La mia chiave per firmare e il mio incasso, per l'ordine `o`: lo
    stesso numero, due catene — `/0/n` firma il 2-di-3, `/1/n` riceve. */
 function onchainMieChiavi(B, parole, o){
-  const conto = onchainConto(B, parole, (onchainSrv || {}).strada || "m/48'/1'/0'/2'");
+  const conto = onchainConto(B, parole, (onchainSrv || {}).strada || onchainRete().strada);
   const n = Number(o.indirizzo.mio_numero);
   const firma = conto.deriveChild(0).deriveChild(n);
   const incasso = B.p2wpkh(conto.deriveChild(1).deriveChild(n).publicKey,
-                           B.TEST_NETWORK).address;
+                           onchainReteBtc(B)).address;
   return {firma, incasso};
 }
 
@@ -56272,7 +56350,7 @@ function onchainMieChiavi(B, parole, o){
 function onchainScriptOrdine(B, o){
   const ch = o.indirizzo.chiavi;
   const w = B.sortedMultisig(2, [ch.compratore, ch.venditore, ch.barattolo]
-    .map(c => B.hex.decode(c)), true, B.TEST_NETWORK);
+    .map(c => B.hex.decode(c)), true, onchainReteBtc(B));
   if (w.address !== o.indirizzo.indirizzo) throw new Error('l\'indirizzo non torna');
   return w;
 }
@@ -56290,21 +56368,20 @@ function onchainScriptOrdine(B, o){
    rilascio il telefono rilegge la firma con la chiave che rifa' da se':
    se non e' sua, non firma. Lo stesso testo byte per byte del server
    (`onchain_messaggio_destinazione`). */
-const ONCHAIN_VERSIONI_VPUB = {private: 0x045f18bc, public: 0x045f1cf6};
 const ONCHAIN_QUOTA_TETTO = 5000;   // come ONCHAIN_QUOTA_TETTO del server
 
 function onchainMessaggioDestinazione(tipo, valore){
   return new TextEncoder().encode(
-    `barattolo/onchain/incasso/v1\nsignet\n${tipo}\n${valore}`);
+    `barattolo/onchain/incasso/v1\n${onchainRete().nome}\n${tipo}\n${valore}`);
 }
 
 function onchainNormaDestinazione(tipo, valore){
   const v = String(valore || '').trim();
-  return (tipo === 'indirizzo' && v.slice(0, 3).toLowerCase() === 'tb1') ? v.toLowerCase() : v;
+  return (tipo === 'indirizzo' && v.slice(0, 3).toLowerCase() === onchainRete().indirizzo) ? v.toLowerCase() : v;
 }
 
 function onchainChiaveDestinazione(B, parole){
-  const conto = onchainConto(B, parole, (onchainSrv || {}).strada || "m/48'/1'/0'/2'");
+  const conto = onchainConto(B, parole, (onchainSrv || {}).strada || onchainRete().strada);
   return conto.deriveChild(2).deriveChild(0);
 }
 
@@ -56328,11 +56405,9 @@ async function onchainDestinazioneMia(B, parole, d){
    `onchain_indirizzo_esterno` del server. */
 function onchainIndirizzoEsterno(B, d){
   if (d.tipo === 'indirizzo') return onchainNormaDestinazione('indirizzo', d.valore);
-  const t = String(d.valore || '');
-  const k = t.startsWith('vpub') ? B.HDKey.fromExtendedKey(t, ONCHAIN_VERSIONI_VPUB)
-                                 : onchainLeggiXpub(B, t);
+  const k = onchainLeggiChiaveConto(B, d.valore);
   return B.p2wpkh(k.deriveChild(0).deriveChild(Number(d.indice)).publicKey,
-                  B.TEST_NETWORK).address;
+                  onchainReteBtc(B)).address;
 }
 
 /* Dove deve arrivare il MIO incasso in questo ordine: '' se la
@@ -56352,7 +56427,7 @@ async function onchainIncassoAtteso(B, parole, o, io){
    `onchainMessaggioDestinazione`. */
 function onchainMessaggioRicevuto(oid, indirizzo){
   return new TextEncoder().encode(
-    `barattolo/onchain/ricevuto/v1\nsignet\n${Number(oid)}\n${indirizzo}`);
+    `barattolo/onchain/ricevuto/v1\n${onchainRete().nome}\n${Number(oid)}\n${indirizzo}`);
 }
 
 async function onchainFirmaRicevuto(B, parole, oc){
@@ -56446,7 +56521,7 @@ function onchainPsbtFirmata(B, o, io, w, uscite){
   for (const u of o.utxo) tx.addInput({txid: u.txid, index: u.vout,
     witnessUtxo: {script: w.script, amount: BigInt(u.value)},
     witnessScript: w.witnessScript});
-  for (const [a, v] of uscite) tx.addOutputAddress(a, BigInt(v), B.TEST_NETWORK);
+  for (const [a, v] of uscite) tx.addOutputAddress(a, BigInt(v), onchainReteBtc(B));
   for (let i = 0; i < o.utxo.length; i++) tx.signIdx(io.firma.privateKey, i);
   return B.base64.encode(tx.toPSBT());
 }
@@ -56530,7 +56605,7 @@ async function onchainCofirma(o, parole){
   const uscite = [];
   for (let i = 0; i < tx.outputsLength; i++) {
     const x = tx.getOutput(i);
-    uscite.push([B.Address(B.TEST_NETWORK).encode(B.OutScript.decode(x.script)), Number(x.amount)]);
+    uscite.push([B.Address(onchainReteBtc(B)).encode(B.OutScript.decode(x.script)), Number(x.amount)]);
   }
   if (o.proposta.verso === 'venditore' && o.ruolo === 'compratore') {
     /* LA PRIMA FIRMA DI CHI VENDE (28 ott 2026): co-firmo da solo solo
@@ -56704,7 +56779,7 @@ function onchainComeEFatto(o, v){
       ${v.uguale ? '✅ <b>Il tuo telefono l\'ha già rifatto</b> da queste tre chiavi: torna lo stesso indirizzo.<br>' : ''}
       <span class="mono">sortedmulti(2,…)</span> vuol dire «2 firme su queste
       chiavi»: è la regola scritta nell'indirizzo, non una promessa.<br>
-      • Con un nodo Bitcoin (signet): <span class="mono">deriveaddresses "descrittore"</span>
+      • Con un nodo Bitcoin (${esc(onchainRete().nome)}): <span class="mono">deriveaddresses "descrittore"</span>
       deve ridare l'indirizzo qui sopra.<br>
       • Sull'explorer, quando i sats escono, la transazione mostra lo
       script <span class="mono">OP_2 &lt;3 chiavi&gt; OP_3 OP_CHECKMULTISIG</span>.
@@ -56882,7 +56957,7 @@ async function onchainSemeCoperto(parole){
     catch(e){ dalCloud = ''; }
     if (dalCloud === parole) return true;
     if (!r.testo && cloudTelegram()) {
-      const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || "m/48'/1'/0'/2'"});
+      const corpo = JSON.stringify({parole, strada: onchainSrv?.strada || onchainRete().strada});
       let fatto = false;
       try { fatto = await cloudScrivi(ONCHAIN_CLOUD, corpo); } catch(e){ fatto = false; }
       if (fatto) { onchainCase.nuvola = true; return true; }
@@ -56905,7 +56980,7 @@ async function onchainEsporta(btn){
       tieni le cose che non si perdono. Chi ha queste righe può
       ricostruire l'indirizzo e firmare, <b>senza di noi</b>.</div>
     <textarea class="mono" style="min-height:120px;font-size:11px" readonly
-      >Barattolo — prova on-chain (signet)
+      >Barattolo — on-chain (${onchainRete().nome})
 Dodici parole: ${parole}
 Strada: ${onchainSrv.strada}/0/0
 Descrittore: ${k.descrittore}
@@ -89345,6 +89420,7 @@ async function avvia(){
     /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
+    myOnchainRete = me.onchain_rete || '';
     myOnchainIncasso = me.onchain_incasso || '';
     myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */

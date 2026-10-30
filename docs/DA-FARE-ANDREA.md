@@ -122,3 +122,75 @@ LA CHIAVE E LE LEVE»: là la chiave sta nel config); a tutti, quando Andrea
 decide, `ASSISTENTE_SOLO_MODERATORI` a False dal pannello. ATTENZIONE
 alle copie vecchie del config del collaudo: quelle di prima di oggi non
 hanno queste righe.
+
+## 4. L'on-chain in mainnet, solo agli admin, per la prova da 5 € (30 ott 2026, cantiere onchain-mainnet, proposta di Alan: «ok possiamo portarlo su main, con flag onchain attivo solamente per gli admin»)
+
+**Stato.** DOPO LA PROMOZIONE INTERA develop → main (il cantiere è su
+develop). L'ordine dei gesti conta: la chiave di Barattolo nasce sulla
+rete che il server ha in quel momento, quindi PRIMA la riga della rete e
+il riavvio, POI il bottone. La procedura intera e i perché: PRODUZIONE,
+«L'ON-CHAIN IN MAINNET».
+
+**Passo 1, sola lettura.** embit c'è? (PY = il Python del servizio,
+`systemctl show -p ExecStart barattolo --no-pager`):
+```
+sudo -u barattolo PY -c "import embit; print('embit c è')"
+```
+Se manca: PRODUZIONE, «L'ON-CHAIN, TAPPA 2: EMBIT SUL VPS» (un passo alla
+volta). Poi le righe on-chain del config e il file della chiave:
+```
+grep -n "^ONCHAIN_" /srv/barattolo/config.py
+```
+```
+sudo ls -l /root/satmarket/chiavi/
+```
+Attesi: nessuna riga `ONCHAIN_`, e «No such file or directory». Se c'è un
+file, FERMATI: è nato su signet e su mainnet non vale (si sposta via con
+copia, prima del passo 3).
+
+**Passo 2, scrive: la copia e le quattro righe** (dopo il sì di Andrea):
+```
+cp -a /srv/barattolo/config.py /root/config-prima-mainnet-$(date +%F).py
+```
+```
+printf '\nONCHAIN_RETE = "mainnet"\nONCHAIN_ATTIVO = True\nONCHAIN_SOLO_ADMIN = True\nONCHAIN_MAX_EURO = 10\n' | sudo tee -a /srv/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo && sleep 5 && curl -s -o /dev/null -w 'salute %{http_code}\n' http://127.0.0.1:8080/api/salute
+```
+Atteso `ok` e `salute 200`. Nel journal nessuna riga «[onchain] ONCHAIN_RETE … resta signet»:
+```
+journalctl -u barattolo -n 60 --no-pager | grep -n "onchain" || echo "nessuna riga onchain"
+```
+
+**Passo 3, dal telefono (Andrea, admin).** Pannello «⚙️ Stato delle
+leve», gruppo «⛓️ Pagamento on-chain»: deve dire «Rete dell'on-chain:
+mainnet» e la terza chiave in ALLARME («⚠️ di cartone su MAINNET:
+l'on-chain è FERMO»). Poi, nel cassetto «⛓️ Chiave di Barattolo», il
+bottone «⛓️ Crea la chiave di Barattolo», UNA volta. Controllo in sola
+lettura:
+```
+sudo ls -l /root/satmarket/chiavi/ && sudo python3 -c "import json; d=json.load(open('/root/satmarket/chiavi/onchain-barattolo.json')); print(d['rete'], d['strada'], d['xpub'][:8])"
+```
+Atteso `-rw-------`, `mainnet m/48'/0'/0'/2' xpub6…`. SUBITO il backup
+fuori sede (finché la copia è una sola, su mainnet quella chiave vale
+sats):
+```
+cd /srv/barattolo && sudo -u barattolo ./deploy/backup-fuori.sh
+```
+Il pannello delle leve deve poi dire «sul VPS (impronta …)» senza l'avviso del backup.
+
+**Passo 4, la prova da 5 €.** Andrea e Alan aprono la Mini App (l'on-chain
+si accende da solo con la xpub di mainnet); Profilo → «⛓️ On-chain» →
+Tecnico dice in rosso «Rete Bitcoin (mainnet): i sats sono veri». Alan
+mette in vendita un oggetto sotto i 10 €; Andrea sceglie ⛓️ alla cassa,
+paga il `bc1q…` da un wallet vero, aspetta UNA conferma, tocca «🔓
+Libera i sats»; Alan riapre l'app e il suo telefono co-firma. Quel che
+si vede (txid, tempi, commissioni, frasi storte) va nel verbale
+(CANTIERI, «L'on-chain in mainnet», «COSA RESTA»). Per tornare indietro:
+`ONCHAIN_ATTIVO = False` e riavvio (PRODUZIONE dice perché la RETE non
+si rimette su signet con ordini aperti).
+

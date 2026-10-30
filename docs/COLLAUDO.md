@@ -182,8 +182,9 @@ aggiunge, si toglie la vecchia da GitHub.
   produzione (`MOSTRO_RELAY`, `_SPECCHIO`, `_CONFERMA`),
   `relay.barattolo.store` compreso (decisione di Andrea, 20 ott: i relay
   veri solo per il P2P).
-- **On-chain**: signet (è una costante del codice, `ONCHAIN_RETE`; dal
-  20 ott 2026, prima era testnet), solo admin; quando servirà la
+- **On-chain**: signet (la leva `ONCHAIN_RETE` del codice, di serie
+  signet dal 20 ott 2026, prima testnet; «mainnet» esiste dal 30 ott ed
+  è SOLO per il config del VPS: qui mai), solo admin; quando servirà la
   verifica dei pagamenti (tappa 4), l'API pubblica signet di
   mempool.space (`https://mempool.space/signet/api`), nessun nodo
   nostro. Le monete di prova si chiedono a un faucet signet

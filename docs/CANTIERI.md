@@ -75137,3 +75137,108 @@ swap_pagamento 51/0, onchain_verso_lightning 67/0; suite severa 26557/0
 108/0 senza coincurve; giro in locale col Chromium a 375 px, foto in
 project-files/parole-corte. Nuova impronta del codice del telefono
 (SWAP_TELEFONO_VER).
+
+## L'on-chain in mainnet: la rete è una leva, la terza chiave di cartone non ci entra (30 ott 2026, cantiere onchain-mainnet, Alan: «ok possiamo portarlo su main, con flag onchain attivo solamente per gli admin così facciamo una prova di una transazione da 5 euro in mainnet»; Andrea: «si apriamolo noi», «ok, procedi. Il tetto ONCHAIN_MAX_EURO tienilo, per la prova lo mettiamo a 10 €»)
+
+COSA. Fino a oggi la rete dell'on-chain era la costante `ONCHAIN_RETE =
+"signet"` scritta in `server.py`, e il telefono aveva la signet cucita
+in dieci posti (`B.TEST_NETWORK`, le versioni `tpub`/`vpub`, la strada
+`m/48'/1'/0'/2'`, i prefissi `tb1`). Per la prova vera da 5 € di Andrea
+e Alan la rete diventa una LEVA del config, `ONCHAIN_RETE`, con due
+parole ammesse, `"signet"` (di serie, nel codice e sul collaudo) e
+`"mainnet"` (`"bitcoin"` è un sinonimo accettato); una parola sconosciuta
+resta signet con una riga nel journal. Dalla leva discendono, in un
+posto solo per lato: nel server i dizionari `ONCHAIN_STRADA_PER_RETE`
+(`m/48'/0'/0'/2'` su mainnet: il coin type cambia col BIP-48),
+`ONCHAIN_RETE_EMBIT` (embit chiama la mainnet `"main"`, non
+`"mainnet"`), `ONCHAIN_PREFISSI` (xpub/bc1/zpub e la strada
+`m/84'/0'/0'` per Sparrow), `ONCHAIN_VERSIONE_CONTO` (vpub 0x045f1cf6,
+zpub 0x04b24746), il mempool di serie (`https://mempool.space/api`) e
+la rete del cambio (`"bitcoin"`); le undici letture di
+`_EMBIT_RETI[ONCHAIN_RETE]` passano da `_onchain_rete()`, i prefissi nei
+testi da `_onchain_prefisso()`. Nel telefono una sola tabella,
+`ONCHAIN_RETI` (nome, `prova`, strada, versioni BIP-32, prefissi,
+esploratore), letta da `onchainRete()`: la rete la dice il server
+(`/api/onchain/prova` porta `rete`, e `/api/me` porta `onchain_rete` a
+tutti, così anche il compratore che non ha ancora chiesto la prova
+scrive la strada giusta); `onchainReteBtc(B)` sceglie `B.NETWORK` o
+`B.TEST_NETWORK`, `onchainLeggiChiaveConto` legge vpub e zpub coi loro
+numeri. Il messaggio firmato porta il nome della rete, così una firma
+di signet non vale su mainnet. Testi: su mainnet la scheda Tecnico dice
+in rosso «Rete Bitcoin (mainnet): i sats sono veri», e il cassetto
+della chiave di cartone dell'admin avverte che lì non si usa.
+
+LA TERZA CHIAVE. Su signet, senza `ONCHAIN_XPUB` nel config e senza
+il file `chiavi/onchain-barattolo.json` sul VPS, la terza chiave è
+quella di cartone (vettori BIP-32): va bene per provare. Su MAINNET NO:
+`onchain_xpub_barattolo()` alza `ValueError` e tutto si chiude in
+avanti — `/api/onchain/prova` risponde con `ferma` (e il telefono la
+mostra in testa alla scheda), `/api/onchain/pronto` dice `pronto: False`
+col motivo, la cassa dell'ordine dà 503 senza scrivere niente, e il
+pannello «⚙️ Stato delle leve» mette in allarme la riga «Terza chiave»
+(«⚠️ di cartone su MAINNET: l'on-chain è FERMO (503) finché un admin
+non preme «⛓️ Crea la chiave di Barattolo»»). La chiave vera nasce dal
+pannello (decisione di Andrea del 27 ott: la chiave sta sul VPS, non in
+un portafoglio a parte) e il file porta `rete` e `strada`: una chiave
+nata su signet viene RIFIUTATA su mainnet (503 «nata su signet, ma la
+rete adesso è mainnet»), non riusata in silenzio con la strada
+sbagliata; e viceversa tornando a signet col file di mainnet. La riga
+«Rete dell'on-chain» è nel pannello ma `ONCHAIN_RETE` sta in
+`LEVE_MAI_DAL_PANNELLO`: la rete si cambia solo col config e il
+riavvio, come ONCHAIN_ATTIVO.
+
+PERCHÉ. Una leva e non un deploy a parte: lo stesso codice gira sul
+collaudo in signet e sul VPS in mainnet, e la differenza sta in una
+riga che Andrea vede col `grep` di PRODUZIONE. Il fail-closed sulla
+cartone perché la chiave di cartone è pubblica (sono i vettori del
+BIP-32): su mainnet un 2-di-3 con quella terza chiave sarebbe un 2-di-2
+dove il terzo voto lo ha chiunque, e un bug che ci cascasse dentro
+costerebbe sats veri. Il controllo di `rete` nel file perché la stessa
+seme su due coin type dà due xpub diverse: un file nato in signet
+riletto in mainnet avrebbe firmato con una chiave che non è quella del
+descrittore.
+
+SCARTATO: la terza chiave in un portafoglio offline (Sparrow, aria)
+proposta nel piano del mattino — Andrea l'aveva già deciso il 27 ott
+(la chiave nasce dal pannello e vive sul VPS, nel backup age), e il
+piano è stato corretto prima del codice; `ONCHAIN_RETE` apribile dal
+pannello — no, la rete si cambia a mano e con un riavvio, mai da un
+bottone; la scrittura `"main"` di embit nel config — no, l'utente dice
+«mainnet» o «bitcoin», la traduzione la fa il codice; un tetto nuovo —
+no, `ONCHAIN_MAX_EURO` c'è già (250 nel codice), per la prova la riga
+del VPS lo mette a 10 e dopo la prova si toglie.
+
+NOTATO E CURATO strada facendo (regressione no, ma stessa riga):
+`/api/onchain/prova` ignorava la chiave nata sul VPS e la mostrava
+sempre «di cartone»; ora prende `onchain_xpub_barattolo()` e dice la
+verità, con `ferma` quando non c'è.
+
+PROVATO: `prove_banco_chiavi_onchain` (sentinelle nuove: il blocco
+della leva, `ONCHAIN_RETE` fuori dal pannello, una sola `B.TEST_NETWORK`
+e una sola `B.NETWORK` nel telefono), `prove_indirizzo_ordine_onchain`
+(capitolo «1-bis) LA MAINNET»: xpub di cartone rifiutata con la frase
+del bottone, tpub rifiutata, indirizzo bc1q, file di signet rifiutato
+su mainnet e accettato su signet; il banco node fa gli stessi 12 ordini
+in mainnet e confronta con embit), `prove_incasso_esterno_onchain`,
+`prove_onchain_verso_lightning` (mainnet → «bitcoin»), le altre dieci
+dell'on-chain e `prove_leve`; collaudo_onchain_indirizzo 48/0 col
+capitolo 6 «la mainnet» (server vero: /api/me, prova `ferma`, cassa 503
+senza scritture, pronto False, pannello in allarme, POST
+/api/admin/onchain/chiave → file con `rete: mainnet` e strada
+`m/48'/0'/0'/2'`, indirizzo bc1q uguale a quello del descrittore con
+`NETWORKS["main"]`, pronto True, ritorno a signet rifiutato finché il
+file c'è), onchain_ordine, onchain_incasso, onchain_verso_lightning,
+leve_pannello verdi; suite severa 26569/0 (2 saltate: nostr-tools assente nella macchina cloud; il primo giro aveva una rossa, il banco node delle 12 parole che chiama `onchainSemeCoperto` senza `onchainRete`: curato dando al banco la tabella delle reti, e rifatto intero); i cinque collaudi
+toccati verdi anche nel venv senza coincurve, come la CI. Nessun giro dal vivo: i sats veri li
+mette Andrea.
+
+RESTA: la promozione intera develop → main (dal PC di Andrea, con la sua
+firma); poi i passi sul VPS in DA-FARE-ANDREA voce 4 (embit c'è?, copia
+del config, le quattro righe `ONCHAIN_RETE = "mainnet"`, `ONCHAIN_ATTIVO
+= True`, `ONCHAIN_SOLO_ADMIN = True`, `ONCHAIN_MAX_EURO = 10`, riavvio,
+«⛓️ Crea la chiave di Barattolo» UNA volta, `backup-fuori.sh` subito
+dopo), la prova da 5 € Andrea↔Alan e il ritorno di `ONCHAIN_MAX_EURO`
+al valore pieno. Il thread parallelo del 2-di-3 nel P2P, quando si
+aprirà, deve usare `_onchain_rete()` e non `_EMBIT_RETI[ONCHAIN_RETE]`.
+Alan rivede le parti 2-di-3 (f5f883c, 83fff98 e questo) prima della
+promozione. Non toccati: swap, parole-uniche, il wallet del Profilo.

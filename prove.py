@@ -152075,20 +152075,58 @@ def prove_banco_chiavi_onchain():
     prova("...e il bundle ha la sua rotta esplicita, mai uno StaticFiles",
           [True, False],
           ['@app.get("/vendor/btc.js")' in src, "app.mount(" in src])
-    # LA RETE E' SIGNET (20 ott 2026, decisione di Andrea): una costante
-    # sola, detta al foglio dalla rotta, e i testi che la nominano
-    prova("la rete e' SIGNET, una costante sola, detta dalla rotta",
-          [True, 1, True],
-          ['\nONCHAIN_RETE = "signet"\n' in src,
-           src.count("\nONCHAIN_RETE = "), '"rete": ONCHAIN_RETE,' in src])
-    prova("il conto del 2-di-3 e' BIP-48 di prova, e lo dice la rotta",
-          [True, True, False],
-          ["\nONCHAIN_STRADA_CONTO = \"m/48'/1'/0'/2'\"\n" in src,
+    # LA RETE E' UNA LEVA (30 ott 2026, cantiere onchain-mainnet; signet
+    # costante dal 20 ott, decisione di Andrea): «signet» di serie nel
+    # codice, «mainnet» (o «bitcoin») solo da una riga del VPS, una
+    # parola storta resta signet; detta al foglio dalla rotta e da /api/me
+    i_rete = src.index("ONCHAIN_RETI = (")
+    blocco_rete = src[i_rete:src.index("ONCHAIN_STRADA_CONTO = ", i_rete)]
+    prova("la rete e' una LEVA: signet di serie, mainnet ammessa, una parola "
+          "storta resta signet, nessun'altra assegnazione",
+          [True, True, True, True, 0, True, True],
+          ['ONCHAIN_RETI = ("signet", "mainnet")' in blocco_rete,
+           "    from config import ONCHAIN_RETE\n" in blocco_rete,
+           "except ImportError:\n    ONCHAIN_RETE = \"signet\"" in blocco_rete,
+           "if ONCHAIN_RETE not in ONCHAIN_RETI:" in blocco_rete
+           and 'ONCHAIN_RETE = "signet"' in blocco_rete.split("not in ONCHAIN_RETI:")[1],
+           len(re.findall(r"^ONCHAIN_RETE = ", src, re.M)),
+           '"rete": ONCHAIN_RETE,' in src,
+           'profilo["onchain_rete"] = ONCHAIN_RETE' in src])
+    prova("...e non si cambia dal pannello: solo dal VPS", True,
+          not _leva_apribile_di_nome_vera("ONCHAIN_RETE"))
+    prova("il conto del 2-di-3 e' BIP-48 e segue la rete (coin type 1 di "
+          "prova, 0 su mainnet), e lo dice la rotta",
+          [True, True, True, False],
+          ["\nONCHAIN_STRADA_PER_RETE = {\"signet\": \"m/48'/1'/0'/2'\",\n"
+           "                           \"mainnet\": \"m/48'/0'/0'/2'\"}\n" in src,
+           "\nONCHAIN_STRADA_CONTO = ONCHAIN_STRADA_PER_RETE[ONCHAIN_RETE]\n" in src,
            '"strada": ONCHAIN_STRADA_CONTO,' in src,
            '"strada": "m/0/0"' in src])
-    prova("...e il foglio dice signet, non piu' testnet",
-          [True, True, False],
+    # il telefono ha la STESSA tabella del server, e senza server e' signet
+    reti_js = pezzo_js(mini, "const ONCHAIN_RETI = {", "\n};\n")
+    prova("il telefono ha la tabella gemella: strade, prefissi, versioni, e "
+          "senza server e' signet", [True, True, True, True, True, True],
+          ["signet:  {nome: 'signet', prova: true, strada: \"m/48'/1'/0'/2'\"," in reti_js,
+           "mainnet: {nome: 'mainnet', prova: false, strada: \"m/48'/0'/0'/2'\"," in reti_js,
+           "xpub: 'tpub', indirizzo: 'tb1'" in reti_js
+           and "xpub: 'xpub', indirizzo: 'bc1'" in reti_js,
+           "versioniConto: {private: 0x045f18bc, public: 0x045f1cf6}" in reti_js
+           and "versioniConto: {private: 0x04b2430c, public: 0x04b24746}" in reti_js,
+           "|| 'signet';\n  return ONCHAIN_RETI[detta] || ONCHAIN_RETI.signet;" in
+           pezzo_js(mini, "function onchainRete(){", "\n}\n"),
+           "myOnchainRete = me.onchain_rete || '';" in mini])
+    prova("...e nel codice del telefono la rete non e' piu' scritta a mano "
+          "(B.TEST_NETWORK solo dentro onchainReteBtc)",
+          [1, 0, True, True],
+          [mini.count("B.TEST_NETWORK"), mini.count("\\nsignet\\n"),
+           "return onchainRete().prova ? B.TEST_NETWORK : B.NETWORK;" in mini,
+           "B.HDKey.fromMasterSeed(seme, onchainRete().versioni).derive(strada);" in mini])
+    prova("...e il foglio dice la rete che il server dice, signet o sats veri",
+          [True, True, True, False, False],
           ["Rete <b>signet</b>, la rete di prova" in mini,
+           "Rete <b>Bitcoin\n      (mainnet)</b>" in mini
+           and "<b>i sats sono veri</b>" in mini,
+           ">Barattolo — on-chain (${onchainRete().nome})" in mini,
            "prova on-chain (signet)" in mini,
            "Rete <b>testnet</b>" in mini])
     prova("il client legge il CANCELLO dal server, non `isAdmin`",
@@ -152278,11 +152316,13 @@ __PEZZO__
           True, o["deterministico"])
     prova("...e un seme diverso un indirizzo diverso", True,
           o["semeDiversoIndirizzoDiverso"])
-    prova("l'indirizzo e' di SIGNET (`tb1`, le forme di testnet), e di "
-          "mainnet non si parla",
-          [True, True],
+    # (30 ott 2026) senza una parola del server la rete e' signet; la
+    # mainnet del bundle (`B.NETWORK`) si nomina in UN posto solo
+    prova("l'indirizzo e' di SIGNET (`tb1`, le forme di testnet), e la "
+          "mainnet si nomina solo in onchainReteBtc",
+          [True, 1],
           [o["indirizzo"].startswith("tb1q"),
-           "B.NETWORK" not in chiavi_js])
+           chiavi_js.count("B.NETWORK")])
     prova("le tre chiavi sono di TRE persone diverse", [True, 3],
           [o["treDiverse"], len(o["tre"])])
     prova("...e la terza e' davvero quella che il server ha mandato",
@@ -152409,7 +152449,11 @@ def prove_onchain_pagina():
     if not node:
         print("   (node assente: il giro vero del riconoscitore salta)")
         return
-    banco = (pezzo_js(mini, "function onchainTipoIncollato(t){", "\n}\n") + "\n}\n"
+    # (30 ott 2026) il riconoscitore legge la rete: senza server e' signet
+    banco = ("const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};\n"
+             + pezzo_js(mini, "const ONCHAIN_RETI = {", "\n};\n") + "\n};\n"
+             + pezzo_js(mini, "function onchainRete(){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function onchainTipoIncollato(t){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function onchainSembraSegreto(t){", "\n}\n") + "\n}\n" + r"""
 const out = {
   tipi: ['tb1qxyz', 'TB1QXYZ', 'vpub5abc', 'tpubDabc', 'bc1qxyz', 'xpub6abc', ''].map(onchainTipoIncollato),
@@ -152564,8 +152608,13 @@ def _pezzi_incasso_js(mini):
     ott 2026), da mettere nei banchi node che fanno girare proponi e
     co-firma: senza, il codice vero non gira."""
     return "\n".join([
-        "const ONCHAIN_VERSIONI_VPUB = {private: 0x045f18bc, public: 0x045f1cf6};",
         "const ONCHAIN_QUOTA_TETTO = 5000;",
+        # (30 ott 2026, onchain-mainnet) la rete la dice il server: la
+        # tabella, il giudice (senza server: signet) e le due letture
+        pezzo_js(mini, "const ONCHAIN_RETI = {", "\n};\n") + "\n};",
+        pezzo_js(mini, "function onchainRete(){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainReteBtc(B){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function onchainLeggiChiaveConto(B, s){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainLeggiXpub(B, s){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainMessaggioDestinazione(tipo, valore){", "\n}\n") + "\n}",
         pezzo_js(mini, "function onchainNormaDestinazione(tipo, valore){", "\n}\n") + "\n}",
@@ -152611,12 +152660,16 @@ def prove_onchain_verso_lightning():
           (True, True),
           ("\nONCHAIN_INCASSO_LN_ATTIVO = False" in esempio,
            "    ONCHAIN_INCASSO_LN_ATTIVO = False" in src))
-    reti = {"signet": "testnet", "testnet": "testnet", "bitcoin": "bitcoin"}
+    reti = {"signet": "testnet", "testnet": "testnet", "mainnet": "bitcoin",
+            "bitcoin": "bitcoin"}
+    prova("la tabella del cambio conosce «mainnet» (la parola della leva "
+          "ONCHAIN_RETE dal 30 ott 2026)", True,
+          '"mainnet": "bitcoin", "bitcoin": "bitcoin"}' in src)
     amb = {"ONCHAIN_RETE_DEL_CAMBIO": reti, "ONCHAIN_RETE": "signet",
            "swap_fornitori": lambda: [{"rete": "bitcoin"}]}
     exec(pezzo("onchain_ln_rete_ok"), amb)
     oggi = amb["onchain_ln_rete_ok"]()
-    amb["ONCHAIN_RETE"] = "bitcoin"
+    amb["ONCHAIN_RETE"] = "mainnet"
     mainnet = amb["onchain_ln_rete_ok"]()
     prova("oggi (on-chain su signet, SATS Routing su bitcoin) la strada e' "
           "ferma; il giorno della mainnet si apre", (False, True), (oggi, mainnet))
@@ -152685,9 +152738,16 @@ def prove_parole_uniche():
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
     coperto = pezzo_js(mini, "async function onchainSemeCoperto(parole){", "\n}\n") + "\n}\n"
+    # (30 ott 2026, onchain-mainnet) la strada la dice la rete: la tabella
+    # e il suo giudice entrano nel banco, senza server e' signet
+    rete_js = "\n".join([
+        "const ONCHAIN_VERSIONI_PROVA = {private: 0x04358394, public: 0x043587cf};",
+        pezzo_js(mini, "const ONCHAIN_RETI = {", "\n};\n") + "\n};",
+        pezzo_js(mini, "function onchainRete(){", "\n}\n") + "\n}"])
     banco = """
 const ONCHAIN_CLOUD = 'barattolo_onchain';
 let onchainSrv = null, onchainNato = '', onchainCase = {nuvola: null, relay: null};
+""" + rete_js + """
 let locale = '', cloud = {ok: true, testo: ''}, telegram = true, relay = '', scritti = [];
 function onchainSemeLocale(){ return locale; }
 async function cloudLeggiEsito(){ return cloud; }
@@ -152844,9 +152904,20 @@ def prove_incasso_esterno_onchain():
     srv = {"hashlib": _hl, "json": json, "_embit_bip32": E32,
            "_EMBIT_RETI": ERETI, "ONCHAIN_RETE": "signet",
            "ONCHAIN_NUMERO_MAX": 2 ** 31 - 1, "ONCHAIN_DESTINAZIONE_MAX": 120,
-           "ONCHAIN_POLVERE": 546, "_ONCHAIN_VPUB_PROVA": b"\x04\x5f\x1c\xf6",
+           "ONCHAIN_POLVERE": 546,
+           # (30 ott 2026) la rete e' una leva: le tabelle e i due lettori
+           "ONCHAIN_RETE_EMBIT": {"signet": "signet", "mainnet": "main"},
+           "ONCHAIN_PREFISSI": {"signet": {"xpub": "tpub", "indirizzo": "tb1",
+                                           "conto": "vpub",
+                                           "strada_wallet": "m/84'/1'/0'"},
+                                "mainnet": {"xpub": "xpub", "indirizzo": "bc1",
+                                            "conto": "zpub",
+                                            "strada_wallet": "m/84'/0'/0'"}},
+           "ONCHAIN_VERSIONE_CONTO": {"signet": b"\x04\x5f\x1c\xf6",
+                                      "mainnet": b"\x04\xb2\x47\x46"},
            "_onchain_sembra_privata": lambda x: x[1:4].lower() == "prv"}
-    for nome in ("onchain_messaggio_destinazione", "onchain_firma_valida",
+    for nome in ("_onchain_rete", "_onchain_prefisso",
+                 "onchain_messaggio_destinazione", "onchain_firma_valida",
                  "onchain_firma_valida_testo",
                  "onchain_destinazione_motivo", "onchain_indirizzo_esterno",
                  "_onchain_psbt_giudica"):
@@ -153404,10 +153475,11 @@ console.log(JSON.stringify({
         def __init__(self, status_code, detail=""):
             self.status_code, self.detail = status_code, detail
 
-    def esegui(xpub_barattolo=""):
+    def esegui(xpub_barattolo="", rete="signet"):
         amb = {"__builtins__": __builtins__, "HTTPException": _H,
-               "ONCHAIN_RETE": "signet",
-               "ONCHAIN_STRADA_CONTO": "m/48'/1'/0'/2'",
+               "ONCHAIN_RETE": rete,
+               "ONCHAIN_STRADA_CONTO": {"signet": "m/48'/1'/0'/2'",
+                                        "mainnet": "m/48'/0'/0'/2'"}[rete],
                "ONCHAIN_XPUB": xpub_barattolo,
                "XPUB_CARTONE": vett["bip32"][0]["catene"][0]["xpub"],
                # la chiave di Barattolo sul VPS (27 ott 2026) si cerca in
@@ -153469,6 +153541,63 @@ console.log(JSON.stringify({
                 rotte_b.append((nome, "ripetuta"))
     prova("...una xpub di mainnet, una privata o una storta: ValueError, "
           "senza ripeterla", [], rotte_b)
+
+    # --- 1-bis) LA MAINNET (30 ott 2026, cantiere onchain-mainnet) --------
+    # lo stesso blocco con la leva su «mainnet»: il conto cambia coin
+    # type, le chiavi sono xpub, gli indirizzi bc1q — e la terza chiave di
+    # cartone NON si usa: senza la chiave di Barattolo non nasce niente
+    M = esegui(rete="mainnet")
+    conto_main = lambda p: conto(p, versione="main", strada="m/48h/0h/0h/2h")
+    prova("mainnet: la xpub dedicata e' una xpub (coin type 0) e una tpub si "
+          "rifiuta nominando «xpub», senza ripeterla", ["", True, False],
+          [M["onchain_xpub_motivo"](conto_main(parole[0])),
+           "cominciare per xpub" in M["onchain_xpub_motivo"](conto(parole[0])),
+           conto(parole[0])[:20] in M["onchain_xpub_motivo"](conto(parole[0]))])
+    try:
+        M["onchain_xpub_barattolo"]()
+        cartone_main = "passata"
+    except ValueError as e:
+        cartone_main = str(e)
+    prova("...la terza chiave di cartone su mainnet e' un NO, e dice di "
+          "creare la chiave dal pannello", True,
+          "cartone" in cartone_main and "Crea la chiave di Barattolo"
+          in cartone_main)
+    xm = conto_main(parole[3])
+    try:
+        esegui(conto(parole[3]), "mainnet")["onchain_xpub_barattolo"]()
+        tpub_main = "passata"
+    except ValueError as e:
+        tpub_main = "xpub" in str(e) and conto(parole[3])[:20] not in str(e)
+    prova("...una xpub vera nel config passa, una tpub no (nomina xpub, non "
+          "la ripete)", [(xm, False), True],
+          [esegui(xm, "mainnet")["onchain_xpub_barattolo"](), tpub_main])
+    kc, kv, kb = [M["onchain_chiave"](conto_main(parole[i]), 5) for i in range(3)]
+    d_main = M["onchain_descrittore"](kc, kv, kb)
+    prova("...e l'indirizzo di un ordine mainnet comincia per bc1q", True,
+          M["onchain_indirizzo_da"](d_main).startswith("bc1q"))
+    # la chiave di Barattolo nata su signet NON e' la terza chiave di mainnet
+    casa_k = _tf.mkdtemp(prefix="onchain-chiave-")
+    try:
+        os.makedirs(os.path.join(casa_k, "chiavi"))
+        json.dump({"parole": "x", "xpub": conto(parole[3]), "rete": "signet",
+                   "strada": "m/48'/1'/0'/2'"},
+                  open(os.path.join(casa_k, "chiavi", "onchain-barattolo.json"),
+                       "w", encoding="utf-8"))
+        M["DB"] = os.path.join(casa_k, "x.db")
+        try:
+            M["onchain_xpub_barattolo"]()
+            vps_main = "passata"
+        except ValueError as e:
+            vps_main = str(e)
+        prova("...un file della chiave nato su signet, con la leva su mainnet: "
+              "NO, col perche' (non si torna alla cartone in silenzio)", True,
+              "nata su signet" in vps_main and "mainnet" in vps_main)
+        S_sig = esegui()
+        S_sig["DB"] = M["DB"]
+        prova("...e lo stesso file su signet e' la terza chiave di sempre",
+              (conto(parole[3]), False), S_sig["onchain_xpub_barattolo"]())
+    finally:
+        _sh.rmtree(casa_k, ignore_errors=True)
 
     # il database: in un file, perche' i fili hanno bisogno di
     # connessioni loro
@@ -153591,6 +153720,19 @@ console.log(JSON.stringify({
         d = S["onchain_descrittore"](kc, kv, kb)
         py.append({"c": kc, "v": kv, "b": kb, "d": d,
                    "a": S["onchain_indirizzo_da"](d)})
+    # (30 ott 2026) dodici ordini su MAINNET: conto m/48'/0'/0'/2', xpub,
+    # bc1q — embit e il telefono devono combaciare anche li'
+    casi_main, py_main = [], []
+    for n in range(12):
+        pc, pv = parole[n % 3], parole[(n + 1) % 3]
+        casi_main.append({"pc": pc, "nc": n, "xv": conto_main(pv), "nv": n + 3,
+                          "xb": conto_main(parole[3]), "nb": n})
+        kc = M["onchain_chiave"](conto_main(pc), n)
+        kv = M["onchain_chiave"](conto_main(pv), n + 3)
+        kb = M["onchain_chiave"](conto_main(parole[3]), n)
+        d = M["onchain_descrittore"](kc, kv, kb)
+        py_main.append({"c": kc, "v": kv, "b": kb, "d": d,
+                        "a": M["onchain_indirizzo_da"](d)})
     # e due righe VERE del server, verificate dal telefono di ciascuno
     con2_casa = _tf.mkdtemp(prefix="onchain-righe-")
     try:
@@ -153624,10 +153766,11 @@ const B = new Function(fs.readFileSync(process.argv[2], 'utf8')
                        + '; return BarattoloBTC;')();
 const IN = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
 const caricaBitcoin = () => Promise.resolve(B);
+let onchainSrv = null;   // senza server: signet (onchainRete)
 __PEZZO__
 (async () => {
   const srv = {strada: "m/48'/1'/0'/2'"};
-  const out = {xpub: [], casi: [], righe: []};
+  const out = {xpub: [], casi: [], righe: [], xpub_main: [], casi_main: []};
   for (const p of IN.semi) out.xpub.push(await onchainMiaXpub(p, srv));
   for (const c of IN.casi) {
     const kc = onchainFiglia(onchainConto(B, c.pc, srv.strada), c.nc);
@@ -153641,6 +153784,18 @@ __PEZZO__
     const v = await onchainVerificaRiga(r.parole, srv, r.riga);
     out.righe.push([v.mia, v.uguale]);
   }
+  /* la MAINNET: il server dice la rete, e il telefono cambia conto,
+     versioni e vestito dell'indirizzo da solo */
+  onchainSrv = {rete: 'mainnet', strada: ONCHAIN_RETI.mainnet.strada};
+  for (const p of IN.semi) out.xpub_main.push(await onchainMiaXpub(p, onchainSrv));
+  for (const c of IN.casi_main) {
+    const kc = onchainFiglia(onchainConto(B, c.pc, onchainSrv.strada), c.nc);
+    const kv = onchainFiglia(onchainLeggiXpub(B, c.xv), c.nv);
+    const kb = onchainFiglia(onchainLeggiXpub(B, c.xb), c.nb);
+    const k = onchainDaTre(B, [kc.publicKey, kv.publicKey, kb.publicKey]);
+    out.casi_main.push({c: k.compratore, v: k.venditore, b: k.barattolo,
+                        d: k.descrittore, a: k.indirizzo});
+  }
   console.log(JSON.stringify(out));
 })();
 """.replace("__PEZZO__", blocco_js)
@@ -153649,7 +153804,8 @@ __PEZZO__
     with open(strada, "w", encoding="utf-8") as fh:
         fh.write(banco)
     with open(dati, "w", encoding="utf-8") as fh:
-        json.dump({"semi": parole[:3], "casi": casi, "righe": righe_vere}, fh)
+        json.dump({"semi": parole[:3], "casi": casi, "righe": righe_vere,
+                   "casi_main": casi_main}, fh)
     try:
         r = _sp.run([node, strada, os.path.join(QUI, "vendor", "btc.bundle.js"),
                      dati], capture_output=True, text=True, encoding="utf-8",
@@ -153673,6 +153829,15 @@ __PEZZO__
     prova("una riga VERA del server: il compratore la ritrova sua e uguale, "
           "il venditore pure, un seme estraneo no",
           [[True, True], [True, True], [False, True]], o["righe"])
+    prova("MAINNET: la xpub dedicata del telefono e' la xpub di embit (coin "
+          "type 0), e il server la accetta",
+          ([conto_main(p) for p in parole[:3]], ["", "", ""]),
+          (o["xpub_main"], [M["onchain_xpub_motivo"](x) for x in o["xpub_main"]]))
+    diversi = [n for n, (a, b) in enumerate(zip(py_main, o["casi_main"])) if a != b]
+    prova("...dodici ordini mainnet: chiavi, descrittore e indirizzo bc1q "
+          "IDENTICI fra embit e il telefono", (12, [], True),
+          (len(o["casi_main"]), diversi,
+           all(c["a"].startswith("bc1q") for c in o["casi_main"])))
 
 
 def prove_cancello_onchain():

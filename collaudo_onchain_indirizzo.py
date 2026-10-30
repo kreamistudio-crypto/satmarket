@@ -238,7 +238,104 @@ def main():
            SRV.ONCHAIN_XPUB[:20] in json.dumps(voci)))
     SRV.ONCHAIN_XPUB = ""
 
-    # ---- 6) la leva rispenta --------------------------------------------
+    # ---- 6) LA MAINNET (30 ott 2026, cantiere onchain-mainnet) ------------
+    # La leva su «mainnet» a caldo, come la riga del VPS: il conto cambia
+    # coin type, le chiavi sono xpub, gli indirizzi bc1q — e la terza
+    # chiave di cartone NON si usa: finche' la chiave di Barattolo non
+    # nasce (dal pannello, su QUESTA rete) non nasce nessun indirizzo, la
+    # cassa non offre ⛓️ e il pannello delle leve grida.
+    print("\n[la mainnet: la leva, il conto, la cartone che non si usa]")
+    SRV._SECCHI.clear()
+    SRV.ONCHAIN_RETE = "mainnet"
+    SRV.ONCHAIN_STRADA_CONTO = SRV.ONCHAIN_STRADA_PER_RETE["mainnet"]
+
+    def conto_main(parole):
+        return radice(parole).derive("m/48h/0h/0h/2h").to_public().to_string(
+            version=NETWORKS["main"]["xpub"])
+    come(999)
+    me = c.get("/api/me").json()
+    d = leggi(999).json()
+    prova("la leva: /api/me dice la rete, la prova dice rete, conto e il "
+          "perche' e' ferma (cartone)",
+          ("mainnet", "mainnet", "m/48'/0'/0'/2'", True, True),
+          (me.get("onchain_rete"), d["rete"], d["strada"], d["cartone"],
+           "cartone" in d["ferma"]))
+    con = SRV.db()
+    prima_n = con.execute("SELECT COUNT(*) FROM onchain_indirizzi").fetchone()[0]
+    con.close()
+    r = fai(999, 888)
+    prova("un indirizzo con la cartone su mainnet: 503, dice di creare la "
+          "chiave, e non scrive niente", (503, True, prima_n),
+          (r.status_code, "Crea la chiave di Barattolo" in r.json()["detail"],
+           SRV.db().execute("SELECT COUNT(*) FROM onchain_indirizzi").fetchone()[0]))
+    come(999)
+    r = c.get("/api/onchain/pronto/888")
+    prova("...e la cassa non offre ⛓️, con le stesse parole", (False, True),
+          (r.json()["pronto"], "cartone" in r.json()["motivo"]))
+    voci = {v["chiave"]: v for g in SRV._leve_stato() for v in g["voci"]}
+    prova("il pannello: la rete e' «mainnet» e la terza chiave e' in allarme",
+          ("mainnet", True, True),
+          (voci["ONCHAIN_RETE"]["valore"], voci["ONCHAIN_XPUB"].get("allarme"),
+           "FERMO" in voci["ONCHAIN_XPUB"]["valore"]))
+    r = dai(999, x999)
+    prova("la tpub di signet non vale piu': 400, nomina «xpub», non la ripete",
+          (400, True, False),
+          (r.status_code, "xpub" in r.json()["detail"], x999[:20] in r.text))
+    m999, m888 = conto_main(semi[0]), conto_main(semi[1])
+    prova("le xpub di mainnet (coin type 0) passano", (200, 200),
+          (dai(999, m999).status_code, dai(888, m888).status_code))
+    # la chiave di Barattolo nata su SIGNET non e' la terza chiave di qui
+    f = SRV._onchain_file_chiave()
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    json.dump({"parole": "x", "xpub": conto(semi[2]), "rete": "signet",
+               "strada": "m/48'/1'/0'/2'"}, open(f, "w", encoding="utf-8"))
+    r = fai(999, 888)
+    prova("un file della chiave nato su signet: 503 col perche', e il "
+          "pannello dice «file illeggibile», non «cartone»",
+          (503, True, "rotta"),
+          (r.status_code, "nata su signet" in r.json()["detail"],
+           SRV.onchain_stato_chiave_barattolo()["dove"]))
+    os.unlink(f)
+    # la chiave nasce dal pannello SU MAINNET: xpub, rete nel file, e firma
+    come(999)
+    r = c.post("/api/admin/onchain/chiave")
+    k = r.json()
+    dentro = json.load(open(f, encoding="utf-8"))
+    prova("«Crea la chiave» su mainnet: una xpub, il file dice mainnet e il "
+          "conto m/48'/0'/0'/2'",
+          (200, True, "mainnet", "m/48'/0'/0'/2'"),
+          (r.status_code, k.get("xpub", "").startswith("xpub"), dentro["rete"],
+           dentro["strada"]))
+    prova("...ed e' la terza chiave: le parole del file ridanno la sua xpub",
+          k.get("xpub"),
+          SRV._onchain_privata_barattolo(k["xpub"]).to_public().to_string(
+              version=NETWORKS["main"]["xpub"]))
+    r = fai(999, 888)
+    a = r.json()
+    prova("l'indirizzo di mainnet nasce: bc1q, non di cartone, la chiave di "
+          "Barattolo dalla SUA xpub, rete scritta nella riga",
+          (200, True, False, True, "mainnet"),
+          (r.status_code, a["indirizzo"].startswith("bc1q"), a["cartone"],
+           a["chiavi"]["barattolo"] == SRV.onchain_chiave(k["xpub"], 0),
+           SRV.db().execute("SELECT rete FROM onchain_indirizzi ORDER BY id "
+                            "DESC LIMIT 1").fetchone()[0]))
+    corpo = a["descrittore"].split("#")[0]
+    prova("...ed e' l'indirizzo del descrittore, su mainnet", a["indirizzo"],
+          Descriptor.from_string(corpo).address(NETWORKS["main"]))
+    prova("...e la cassa adesso offre ⛓️", True,
+          c.get("/api/onchain/pronto/888").json()["pronto"])
+    # si torna su signet: il file di mainnet non vale qui, e lo si toglie
+    SRV.ONCHAIN_RETE = "signet"
+    SRV.ONCHAIN_STRADA_CONTO = SRV.ONCHAIN_STRADA_PER_RETE["signet"]
+    prova("tornati su signet, la chiave di mainnet non e' la terza chiave "
+          "(503), finche' il file non si sposta", 503, fai(999, 888).status_code)
+    os.unlink(f)
+    # (le xpub di 999 e 888 adesso sono di mainnet: su signet un indirizzo
+    # fra loro non nasce piu' — e' giusto cosi', e la leva rispenta sotto
+    # lo chiude comunque)
+    SRV._SECCHI.clear()
+
+    # ---- 7) la leva rispenta --------------------------------------------
     SRV.ONCHAIN_ATTIVO = False
     prova("rispenta: tutto torna 404, anche con gli indirizzi nel database",
           [404, 404, 404],

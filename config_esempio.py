@@ -1213,19 +1213,34 @@ ONCHAIN_SOLO_ADMIN = True
 # dai vettori di prova del BIP-32 — pubblicata in uno standard col suo
 # seme, quindi CHIUNQUE ha la privata — e lo DICE al foglio, che la
 # mostra scritto: «non mandarci niente».
-# ⚠️ Nella tappa di prova la rete e' SEMPRE signet (dal 20 ott 2026;
-# testnet prima) e un indirizzo mainnet non si calcola da nessuna
-# parte: cosi' e' impossibile mandare sats veri a un 2-di-3 di cartone.
-# Per lo stesso motivo una xpub vera qui deve essere una `tpub...` (di
-# signet): una `xpub...` di mainnet il server la RIFIUTA, e un `xprv` o
-# un `tprv` (privata) li rifiuta sempre, senza ripeterli da nessuna
-# parte. L'indirizzo di ogni ordine si calcola sul server con la
-# libreria `embit` (requirements.txt): se manca, le rotte on-chain
-# rispondono 503 e il resto vive.
+# ⚠️ Una xpub vera qui deve essere della RETE di ONCHAIN_RETE (una
+# `tpub...` su signet, una `xpub...` su mainnet): quella dell'altra rete
+# il server la RIFIUTA, e un `xprv` o un `tprv` (privata) li rifiuta
+# sempre, senza ripeterli da nessuna parte. L'indirizzo di ogni ordine
+# si calcola sul server con la libreria `embit` (requirements.txt): se
+# manca, le rotte on-chain rispondono 503 e il resto vive.
 ONCHAIN_XPUB = ""
+# LA RETE DELL'ON-CHAIN (30 ott 2026, cantiere onchain-mainnet, proposta
+# di Alan: una prova vera da 5 € con l'on-chain acceso solo agli admin).
+# "signet" = la rete di prova (indirizzi tb1…, chiavi tpub…, conto
+# m/48'/1'/0'/2', i sats non valgono niente): e' il valore del codice e
+# del collaudo. "mainnet" (o "bitcoin") = SATS VERI: indirizzi bc1…,
+# chiavi xpub…, conto m/48'/0'/0'/2', mempool.space. Una parola storta
+# resta signet e lo dice nel journal. Solo dal VPS, mai dal pannello.
+# ⚠️ SU MAINNET LA TERZA CHIAVE DI CARTONE NON SI USA: finche' la
+# chiave di Barattolo non nasce dal pannello («⛓️ Crea la chiave di
+# Barattolo», DOPO aver messo questa riga e riavviato) l'on-chain e'
+# fermo — nessun indirizzo nasce, la cassa non offre ⛓️, il pannello
+# delle leve e' in allarme. Una chiave nata su signet NON vale su
+# mainnet (il file dice la sua rete): si sposta via prima, e se ne crea
+# una nuova. La procedura intera: PRODUZIONE, «L'ON-CHAIN IN MAINNET».
+# Le xpub dedicate date dai telefoni su signet non valgono su mainnet:
+# l'app le rida' da sola alla prima apertura (si accende da sola).
+ONCHAIN_RETE = "signet"
 # L'API mempool che guarda i pagamenti degli ordini on-chain (tappa 4) e
 # trasmette le transazioni d'uscita. Vuota = quella di serie della rete
-# (signet: https://mempool.space/signet/api).
+# (signet: https://mempool.space/signet/api; mainnet:
+# https://mempool.space/api).
 ONCHAIN_MEMPOOL_API = ""
 # LA QUOTA FISSA DI BARATTOLO SULL'ON-CHAIN (27 ott 2026): sats che chi
 # COMPRA aggiunge al conto (li vede prima di pagare) e che vanno a un
