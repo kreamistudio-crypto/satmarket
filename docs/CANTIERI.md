@@ -76047,3 +76047,123 @@ Da guardare: la sezione «Pausa degli ordini» compare solo dove compare
 nel Lightning (`tempoPubblicaP2P`); il giro locale non l'aveva, il
 collaudo sì. La presa a mercato dal telefono vero, sul collaudo. Il
 rimbalzo dal telefono vero in Telegram.
+
+## Il «Novità» che apre il tutorial on-chain, la moneta della rete nella scatola dei metodi, i colori della scelta del +, Barattozon solo via Lightning (30 ott 2026, sera, cantiere oc-tutorial, lettere di Andrea dalle 17:29 alle 18:00)
+
+LA RICHIESTA. «Cambio idea: quando clicchi sul pulsante novità parte
+un tutorial dove ti spiega, similmente agli altri tutorial, come
+prendere un ordine onchain o come pubblicarlo»: prima un banner che
+dice che da oggi si scambia on-chain e come funziona in breve, poi la
+moneta on-chain evidenziata su una card finta, poi il fulmine degli
+ordini Lightning, poi il + di Compra e di Vendi, poi il + toccato con
+la scelta On-chain / Lightning; finito, si torna al libro e il banner
+resta. «Quell'effetto bumper mi piace molto quindi vedi se puoi usarlo
+mentre fai partire il tutorial.» E quattro ritocchi: la moneta del
+banner che scorrendo «si trascina sopra la pagina»; nella scelta del +
+il Lightning «marrone scuro leggermente più chiaro dello sfondo, come
+il rettangolino dei metodi», e alle 17:38 anche l'On-chain («si
+differenziano solo con le icone»); le monete della rete «nel
+rettangolo dei metodi di pagamento tutto a destra»; alle 17:39 il
+bottone «Pubblica ordine» che cambiava misura fra le due reti. Alle
+17:30 il bug di Barattozon: passando a On-chain il bottone in fondo
+cambiava colore e misura.
+
+DECISO. Il tutorial è un giro sul MOTORE DEI GIRI (`avviaTour`, lo
+stesso del benvenuto e del giro guidato del P2P), non un'altra slide:
+velo, riflettore, fumetto, «Salta», Esc e indietro sono suoi. Sette
+tappe (`TAPPE_TUTORIAL_OC_P2P`): il «Novità» due volte (la novità, poi
+il deposito a tre chiavi in una riga), la moneta di una card on-chain
+finta, il fulmine di una card Lightning finta (le due card stanno
+subito sotto il «Novità», disegnate dalle card vere e marcate
+«Esempio», senza id e senza tocco: `esempioTutorialOcP2P`), il + di
+«Compra BTC», il + di «Vendi BTC» (il giro passa al lato da sé), la
+scelta del + aperta sotto il velo. Alla fine (`fineTutorialOcP2P`) se
+ne vanno card finte e scelta, e torna il lato di partenza. Si rivede
+a ogni tocco: niente timbro, l'ha chiesto lui col tocco. Il colpo di
+partenza: il rettangolo si schiaccia e torna col rimbalzo
+(`p2pOcBotta`), la moneta sobbalza, e a 480 ms parte il velo; coi
+ridotti subito. Compra e Vendi nel rettangolo se ne sono andati.
+La moneta che scivolava: aveva uno `z-index` suo per stare sopra i
+lati, e scavalcava la testa appiccicosa del libro; `isolation:isolate`
+sul rettangolo la chiude dentro. La moneta della rete scende dalla
+testa della card nella scatola dei metodi, in assoluto a destra
+(`pagaConReteP2P`: la scatola resta un blocco, un flex allargherebbe
+la pagina — la lezione scritta in `.p2p-paga`). Il bottone che
+pubblica: la moneta da 24 px lo faceva 1,5 px più alto del fulmine,
+ora sporge col margine negativo (52,5 px di qua e di là, misurati).
+
+I COLORI DELLA SCELTA DEL +, in quattro giri in un quarto d'ora: il
+Lightning non più verde o rosso del lato (17:29), poi tutt'e due nel
+marrone della scatola dei metodi (17:38), «sembra spento» (17:45), e
+alla fine (17:46) «sfumatura gialla lampo per il lightning e sfumato
+arancio per l'onchain», e subito dopo (17:49) «un gradiente che parte
+marrone scuro dove c'è il logo e si colora in fondo, un po' come la card
+super affare»: la sfumatura di traverso di `.p2p-affarone.super`, dal
+fondo dei metodi (`--chip-bg`, che segue il tema) all'arancio #F7931A
+per l'On-chain e al giallo #FFC83D per il Lightning, col bagliore
+fermo e la scritta nell'inchiostro di casa. E BARATTOZON ESCE DALLA SCELTA (17:45, Andrea: «non ha
+senso di esistere perché chi clicca barattozon è sempre lightning»): ci
+si arriva dalla sua capsula sotto il +, come prima del cantiere
+grafica-p2p-onchain.
+
+BARATTOZON: domanda posta ad Andrea con due strade, «solo Lightning,
+interruttore fisso» o «anche on-chain» (il PayCode pagato coi sats del
+2-di-3, cantiere sul server da far rivedere ad Alan). Scelta la prima
+(17:35): col tabacchino nel foglio in cima resta il SOLO Lightning
+(17:47, Andrea: «in alto a questo punto ci sarà solo il simbolo
+lightning»), e il giudice di `cambiaReteP2P` tiene comunque fermo
+l'on-chain («Barattozon si scambia solo via Lightning ⚡»); il foglio
+resta Barattozon, bottone blu compreso. Andrea ha visto il video del
+tutorial: «il tutorial va bene» (17:46).
+
+GLI ULTIMI CINQUE MINUTI (17:53-18:00). Il filo bianco attorno alla
+moneta on-chain «non è più necessario» sul gradiente: via dalla scelta
+del + e dal «Novità», resta dove il fondo è arancio pieno (il tasto
+della pagina, il bottone che pubblica). Il «Novità» prende lo stesso
+gradiente della scelta («fai con quel gradiente anche il banner
+novità») e una parola sola: «On-Chain, pulito, senza novità». E RESTA
+APPESO FINCHÉ NON LO APRI: «finché non lo clicchi rimane bloccato in
+quella posizione, quando avvii il tutorial la prima volta poi scorre
+normalmente». Prima l'avevo letto come un difetto (sul collaudo girava
+ancora il rettangolo coi lati nascosti a destra, che poteva incollarsi
+allo scorrere): era una richiesta. `position:sticky` sotto la testata
+appiccicosa, la cui altezza la misura un ResizeObserver
+(`--p2p-testa-alta`, in `testaAltaP2P`): un `top` scritto a mano
+sarebbe il numero da tenere in pari che il commento della testata
+vieta. L'aria sopra e sotto è fondo dipinto da bordo a bordo (lo
+stesso `box-shadow` + `clip-path` della testata), o le card si
+vedrebbero passare nella fessura. Il tocco segna `p2pOcNovitaAperta`
+in `localStorage`, la fine del tutorial stacca anche il disegno che
+c'è; se il browser non ricorda vale «già aperto», come per il giro
+guidato: un banner che non si stacca mai è peggio. E in «I miei
+scambi» la moneta e il fulmine entrano nella scatola dei metodi come
+nel libro («anche nella sezione i miei scambi»): `pagaReteCardP2P`
+passa da `pagaConReteP2P`, e il segno nell'angolo resta solo per i
+banchi che estraggono la card da sola.
+
+Prove: `prove_grafica_p2p_onchain` (il banco: il tasto solo, il
+tutorial con le sue sette tappe e il lato rimesso, il secondo tocco a
+giro aperto; la scelta in marrone; Barattozon fisso; la moneta nella
+scatola, le sentinelle del colpo e della misura del bottone),
+`prove_deposito_p2p_onchain`, la sentinella delle card Lightning in
+`prove.py` (la testa senza moneta); dopo le 17:53 il banner appeso (il
+banco con una memoria finta e una rotta), la sentinella dell'anello
+tolto, la card on-chain di «I miei scambi» con la `pagaConReteP2P`
+vera, la porta unica della card Lightning. Controprove: sei mutazioni,
+rosse. La sentinella del vestito («nessuna regola del
+P2P ridipinge un bottone») ha ora UN'ECCEZIONE SCRITTA, i due tasti
+sfumati della scelta del +: è una decisione di Andrea (17:49, 17:51), e
+un ruolo del vestito per due tasti sarebbe un abito per un'occasione
+sola. Le due prove che leggevano `${paga}` alla lettera leggono la
+scatola con la moneta.
+Giro dal vivo a 390 px tema scuro: le sette tappe una per una, il
+libro scorso senza la moneta sopra la testa, il foglio Barattozon col
+tocco su On-chain (bottone uguale, 358×52), il bottone che pubblica
+alla stessa altezza; dopo le 17:53 il libro scorso di 500 px col
+banner fermo sotto la testata (169 px di qua e di là), il tutorial, e
+il disegno dopo che scorre (-259); le due card di «I miei scambi» con
+la moneta nella scatola. Video in
+`/mnt/project-files/grafica-p2p-onchain/18-tutorial-onchain.mp4`.
+
+Da guardare: il tutorial dal telefono vero in Telegram (il riflettore
+sul + mentre sale cambiando lato).

@@ -61903,7 +61903,10 @@ def prove_giro_guidato_p2p():
     prova("...con l'etichetta «Esempio» e le righe vere (cifra, badge, metodo, stelle)",
           [True] * 5, ['<span class="p2p-esempio-tag">Esempio</span>' in _es,
                        "anelloScadenzaP2P(o)" in _es, "${affarone}" in _es,
-                       "${paga}" in _es, "p2p-rep" in _es])
+                       # (30 ott 2026, oc-tutorial) la scatola dei metodi porta
+                       # tutta a destra la moneta della rete
+                       "${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}" in _es,
+                       "p2p-rep" in _es])
     prova("...e il volto e le stelle se li porta dietro, senza toccare quelli veri", [True, True],
           ["const rep = stellineP2P(o.faccia || p2pFacce[o.id]);" in riga,
            "const f = o.faccia || p2pFacce[o.id] || {};" in pezzo_js(mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n")])
@@ -65335,7 +65338,9 @@ def prove_p2p_libro():
           True, '<span class="p2p-grande p2p-euro">' in mini
           and '<span class="p2p-piccola p2p-sats">' in mini)
     prova("...mentre l'ORDINE delle righe segue il gesto", True,
-          "${paghiEuro ? rigaEuro : rigaSats}${typeof segnoReteP2P === 'function' ? segnoReteP2P('ln') : ''}${anelloScadenzaP2P(o)}"
+          # (30 ott 2026, 17:29) la moneta della rete e' scesa nella scatola
+          # dei metodi: nella testa restano le due righe e l'anello
+          "${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}"
           in mini
           and "${paghiEuro ? rigaSats : rigaEuro}" in mini)
     prova("il verbo della controparte non c'e' piu'", True,
@@ -145489,8 +145494,17 @@ def prove_vestito_bottoni():
     leve = [lista.strip() for lista, corpo, gruppi in reg
             if _del_p2p(lista) and re.search(r"(?:^|;)\s*--b-", corpo)]
     prova("nessuna regola del P2P riscrive una leva del vestito", [], leve)
+    # L'UNICA ECCEZIONE, DETTA (30 ott 2026, cantiere oc-tutorial): i due
+    # tasti della scelta del + sono sfumati dal marrone dei metodi
+    # all'arancio e al giallo per decisione di Andrea («un gradiente che
+    # parte marrone scuro dove c'e' il logo e si colora in fondo, un po'
+    # come la card super affare», 17:49; «si i colori ora sono molto
+    # fighi», 17:51): nessun ruolo del vestito ha quella sfumatura, e un
+    # ruolo nuovo per due tasti sarebbe un vestito per un'occasione sola
+    _eccezioni = {".btn.p2p-scelta-oc,.btn.p2p-scelta-ln", ".btn.p2p-scelta-oc", ".btn.p2p-scelta-ln"}
     ridipinti = [lista.strip() for lista, corpo, gruppi in reg
-                 if _del_p2p(lista) and ".btn" in lista and re.search(
+                 if lista.strip() not in _eccezioni
+                 and _del_p2p(lista) and ".btn" in lista and re.search(
                      r"(?:^|;)\s*(?:background|color|box-shadow|border|border-radius"
                      r"|font-family|border-color)\s*:", corpo)]
     prova("...e nessuna ridipinge un bottone (le misure si', i colori no)", [], ridipinti)
@@ -153046,7 +153060,8 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
                  "function depositoVistoOnchainP2P(o){", "function daFirmareOnchainP2P(o){",
                  "function toccaAMeOnchainP2P(o){", "function gruppoOnchainP2P(o){",
                  "function statoOnchainCardP2P(o){", "function tintaOnchainP2P(o){",
-                 "function segnoReteCardP2P(rete){", "function rigaScambioOnchainP2P(o){",
+                 "function segnoReteCardP2P(rete){", "function pagaReteCardP2P(paga, rete){",
+                 "function rigaScambioOnchainP2P(o){",
                  "function righeOnchainMieiP2P(){"))
              + r"""
 const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n);
@@ -153110,6 +153125,43 @@ console.log(JSON.stringify({out,
               ([["oc-4", "oc-preso", "compro", 4]], 0), (x.get("righe"), x.get("spento")))
     except (OSError, subprocess.TimeoutExpired):
         salta("gli scambi on-chain in «I miei scambi»", "node assente")
+    # LA MONETA NELLA SCATOLA DEI METODI ANCHE IN «I MIEI SCAMBI» (30 ott
+    # 2026, 18:00, Andrea: «le icone lightning e onchain vanno a finire nel
+    # rettangolino metodo di pagamento anche nella sezione i miei scambi»):
+    # la card on-chain con la `pagaConReteP2P` vera del libro, e con le
+    # stesse parole la card Lightning
+    banco_paga = (pz("function pagaConReteP2P(paga, rete){")
+                  + "".join(pz(f) for f in ("function segnoReteCardP2P(rete){",
+                                            "function pagaReteCardP2P(paga, rete){",
+                                            "function rigaScambioOnchainP2P(o){"))
+                  + r"""
+const segnoReteP2P = r => '<span class="p2p-rete R' + r + '"></span>';
+const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n);
+const dataBreveP2P = t => '', iconaMetodiP2P = () => '', marchioMetodoP2P = m => m;
+const gruppoOnchainP2P = () => 'corso', statoOnchainCardP2P = () => ({t: 'x'});
+const toccaAMeOnchainP2P = () => false, tintaOnchainP2P = () => '';
+const o = {id: 3, parte: 'vendo', sats: 1, euro: 1, stato: 'preso'};
+const con = rigaScambioOnchainP2P(Object.assign({metodi: ['SEPA']}, o));
+const senza = rigaScambioOnchainP2P(Object.assign({metodi: []}, o));
+console.log(JSON.stringify([
+  /<div class="p2p-box p2p-paga p2p-paga-rete" title="SEPA">SEPA<span class="p2p-rete Rbtc"><\/span><\/div><\/div>$/.test(con),
+  (con.match(/p2p-rete Rbtc/g) || []).length, /p2p-scambio-rete/.test(con),
+  /p2p-paga p2p-paga-rete"><span class="p2p-rete Rbtc">/.test(senza)]));
+""")
+    try:
+        r = subprocess.run(["node", "-e", banco_paga], capture_output=True, text=True, timeout=30)
+        prova("...la moneta della rete sta nella scatola dei metodi, tutta a destra, "
+              "una volta sola e non piu' nell'angolo; senza metodi una scatola sua",
+              [True, 1, False, True],
+              json.loads(r.stdout.strip()) if r.returncode == 0 else r.stderr[-300:])
+    except (OSError, subprocess.TimeoutExpired):
+        salta("la moneta nella scatola dei metodi di «I miei scambi»", "node assente")
+    riga_ln = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    prova("...e la card Lightning di «I miei scambi» passa dalla stessa porta, "
+          "senza piu' il segno nell'angolo", (True, False),
+          ("(typeof pagaReteCardP2P === 'function' ? pagaReteCardP2P : x => x)(metodi.length" in riga_ln
+           and "+ esc(met) + '\">'" in riga_ln and "</div>' : '', 'ln')" in riga_ln,
+           "segnoReteCardP2P(" in riga_ln))
     scambi = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
     prova("...le righe entrano nella lista di chi la disegna e la conta (lista, "
           "filtro, intestazione, pallino) e i giudici della lista passano la mano "
@@ -153124,7 +153176,7 @@ console.log(JSON.stringify({out,
            "return righe.filter(o => !o.oc && P2P_FINALI.indexOf(o.stato) < 0);"
            in pezzo_js(mini, "function apertiMieiP2P(righe){", "\n}\n"),
            "mieiTuttiP2P" not in mini
-           and "segnoReteCardP2P('ln')" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
+           and "pagaReteCardP2P : x => x)(metodi.length" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
            "if (view==='p2pmiei' && myP2POnchain) rileggiOnchainMieiP2P();" in mini,
            "if (modo === 'elenco') return go('p2pmiei');" in mini,
            all(x not in mini for x in ("renderStrisciaOnchainP2P", "rigaMiaOnchainP2P", "p2pOnchainStriscia"))))
@@ -153191,12 +153243,21 @@ function apriBarattozonP2P(){ LOG.push('bz'); }
 function apriOnchainP2P(){ LOG.push('pagina'); }
 function chiudiFoglioP2P(id){ el(id).classList.remove('open'); }
 function setLatoP2P(l){ p2pLato = l; LOG.push('lato:' + l); }
+const toast = m => LOG.push('toast:' + m);
+const tabacchinoP2P = m => (m || []).indexOf(P2P_TABACCHINO) >= 0;
+const document = {querySelector: () => ({id: 'view-p2p'}), querySelectorAll: () => []};
+let tourInCorso = false, TOUR = null;
+const effettiRidotti = () => true, piuGiroP2P = () => ({}), cartaEsempioP2P = l => '<esempio>';
+function avviaTour(tappe, dopo){ TOUR = {tappe, dopo}; LOG.push('tour:' + tappe.length); return true; }
+const MEMORIA = {}, localStorage = {rotto: false,
+  getItem(k){ if (this.rotto) throw new Error('chiusa'); return k in MEMORIA ? MEMORIA[k] : null; },
+  setItem(k, v){ if (this.rotto) throw new Error('chiusa'); MEMORIA[k] = String(v); }};
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
-        + mini[mini.index("let p2pOcNovitaAperta = false;"):mini.index("function carteOnchainLibroP2P(k){")] \
+        + mini[mini.index("let p2pOcTutorialTimer = null;"):mini.index("function carteOnchainLibroP2P(k){")] \
         + pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
-        + pezzo_js(mini, "function interruttoreReteP2P(attiva){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function interruttoreReteP2P(attiva, soloLn){", "\n}\n") + "\n}\n" \
         + foglio + pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n") + "\n}\n" + """
 const out = {};
 out.reteSpento = [segnoReteP2P('ln'), /cambio-moneta btc/.test(segnoReteP2P('btc'))];
@@ -153207,25 +153268,35 @@ out.portaNo = carteOnchainLibroP2P('sell');
 out.sceltaNo = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open')];
 myP2POnchain = true;
 const porta = carteOnchainLibroP2P('sell');
-out.porta = [/p2p-oc-novita/.test(porta), /Novità: scambi on-chain/.test(porta), /cambio-moneta btc/.test(porta)];
-// il rettangolo che scorre: chiuso mostra la faccia (i lati inerti),
-// aperto i due lati (la faccia inerte); un lato apre il foglio e lo richiude
-out.chiusa = [/p2p-oc-novita"/.test(porta), /p2p-oc-lati" inert/.test(porta), /p2p-oc-faccia" onclick="apriNovitaOnchainP2P\\(\\)">/.test(porta),
-  /btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P\\('buy'\\)/.test(porta), /btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P\\('sell'\\)/.test(porta)];
+out.porta = [/p2p-oc-novita/.test(porta), /p2p-oc-novita-testo">On-Chain<\\/span>/.test(porta) && !/Novità/.test(porta), /cambio-moneta btc/.test(porta)];
+// il rettangolo e' un tasto solo, che apre il tutorial: niente lati
+out.chiusa = [/p2p-oc-novita appeso" id="p2pOcNovita"/.test(porta), /p2p-oc-lat/.test(porta),
+  /p2p-oc-faccia" onclick="apriNovitaOnchainP2P\\(\\)">/.test(porta)];
+LOG.length = 0; p2pLato = 'vendo';
 apriNovitaOnchainP2P();
-const aperta = carteOnchainLibroP2P('sell');
-out.aperta = [/p2p-oc-novita aperta"/.test(aperta), /p2p-oc-lati">/.test(aperta), /onclick="apriNovitaOnchainP2P\\(\\)" inert>/.test(aperta)];
+out.tutorial = [LOG.slice(), TOUR.tappe.map(t => !!t.prima), TOUR.tappe.map(t => !!t.tondo)];
+LOG.length = 0; TOUR.dopo(true);
+out.fineTutorial = [LOG.slice(), p2pLato];
+// appeso finche' non si apre: aperto una volta, il prossimo disegno scorre;
+// e senza memoria del browser non resta mai appeso
+out.appeso = [/appeso/.test(porta), Object.keys(MEMORIA), el('p2pOcNovita').classList.contains('appeso'),
+  /appeso/.test(carteOnchainLibroP2P('sell'))];
+el('p2pOcNovita').classList.add('appeso'); TOUR.dopo(true);
+out.appeso.push(el('p2pOcNovita').classList.contains('appeso'));
+delete MEMORIA.p2pOcNovitaAperta; localStorage.rotto = true;
+out.appeso.push(/appeso/.test(carteOnchainLibroP2P('sell'))); localStorage.rotto = false;
+tourInCorso = true; LOG.length = 0; apriNovitaOnchainP2P(); out.dueVolte = LOG.slice(); tourInCorso = false; p2pLato = 'compro';
 out.sceltaCompra = [apriSceltaPubblicaP2P(), el('p2pSceltaSheet').classList.contains('open'), el('p2pSceltaTit').textContent];
 let c = el('p2pSceltaCorpo').innerHTML;
 out.tastiCompra = [c.indexOf('On-chain') >= 0 && c.indexOf('On-chain') < c.indexOf('Lightning'),
-  /btn primary p2p-scelta-rete/.test(c), /Barattozon/.test(c)];
+  /btn p2p-scelta-oc p2p-scelta-rete/.test(c) && /btn p2p-scelta-ln p2p-scelta-rete/.test(c), /Barattozon/.test(c)];
 p2pLato = 'vendo';
 apriSceltaPubblicaP2P(); c = el('p2pSceltaCorpo').innerHTML;
-out.tastiVendi = [/btn rosso p2p-scelta-rete/.test(c), /btn bz p2p-scelta-rete/.test(c), el('p2pSceltaTit').textContent];
+out.tastiVendi = [/btn p2p-scelta-oc p2p-scelta-rete/.test(c) && /btn p2p-scelta-ln p2p-scelta-rete/.test(c), /Barattozon/.test(c), el('p2pSceltaTit').textContent];
 p2pPiuGestoAt = performance.now();
 sceltaReteP2P('ln'); out.fantasma = LOG.slice();
 p2pPiuGestoAt = -1e9;
-sceltaReteP2P('ln'); sceltaReteP2P('bz'); out.strade = LOG.slice();
+sceltaReteP2P('ln'); out.strade = LOG.slice();
 LOG.length = 0; p2pLato = 'vendo';
 sceltaReteP2P('onchain');
 out.sceltaOc = [LOG.slice(), p2pNuovoOc];
@@ -153240,9 +153311,16 @@ LOG.length = 0; p2pNuovoOc = true;
 cambiaReteP2P('onchain'); out.stessaRete = LOG.slice();
 cambiaReteP2P('ln'); out.versoLn = [LOG.slice(), p2pNuovoOc];
 LOG.length = 0; p2pLato = 'vendo';
-p2pNuovoMetodi = ['SEPA', P2P_TABACCHINO]; p2pNuovoEuroMax = '90'; p2pNuovoDue = true;
+// col tabacchino l'on-chain non si accende: Barattozon solo via Lightning
+p2pNuovoMetodi = ['SEPA', P2P_TABACCHINO];
+cambiaReteP2P('onchain');
+out.bzFisso = [LOG.slice(), p2pNuovoOc, p2pNuovoMetodi.slice()];
+LOG.length = 0;
+p2pNuovoMetodi = ['SEPA', 'Revolut']; p2pNuovoEuroMax = '90'; p2pNuovoDue = true;
 cambiaReteP2P('onchain');
 out.versoOc = [LOG.slice(), p2pNuovoOc, p2pNuovoMetodi, p2pNuovoEuroMax, p2pNuovoDue, el('p2pNuovoPorta').hidden];
+out.spento = [/On-chain/.test(interruttoreReteP2P('ln', true)), /p2p-rete-tasto su" aria-checked="true" onclick="cambiaReteP2P\\('ln'\\)/.test(interruttoreReteP2P('ln', true)),
+  /On-chain/.test(interruttoreReteP2P('ln', false))];
 const sopra = interruttoreReteP2P('onchain');
 out.interruttore = [/p2p-rete-tasto su" aria-checked="true" onclick="cambiaReteP2P\\('onchain'\\)/.test(sopra),
   sopra.indexOf("cambiaReteP2P('onchain')") < sopra.indexOf("cambiaReteP2P('ln')"), /cambio-moneta ln/.test(sopra)];
@@ -153256,9 +153334,6 @@ let riq = riquadroOnchainP2P();
 out.riquadro = [/Minimo 10000 sats/.test(riq), /max 250 €/.test(riq), /Rete di prova \\(signet\\)/.test(riq)];
 p2pOnchainLibro.rete = 'mainnet'; riq = riquadroOnchainP2P(); p2pOnchainLibro.rete = 'signet';
 out.mainnet = /Rete di prova/.test(riq);
-LOG.length = 0; p2pLato = 'compro';
-apriNovitaOnchainP2P(); latoNovitaOnchainP2P('sell');
-out.dalLato = [LOG.slice(), p2pOcNovitaAperta, /p2p-oc-novita"/.test(carteOnchainLibroP2P('sell'))];
 console.log(JSON.stringify(out));
 """
     try:
@@ -153273,26 +153348,45 @@ console.log(JSON.stringify(out));
         prova("il fulmine sulle card di Mostro c'e' solo a libro on-chain acceso; la "
               "moneta sulle card on-chain sempre", (["", True], True),
               (out["reteSpento"], out["reteAcceso"]))
-        prova("il rettangolo «Novità» solo a chi e' ammesso, con la moneta e le "
-              "quattro parole", ("", [True, True, True]), (out["portaNo"], out["porta"]))
-        # il rettangolo piu' piccolo che scorre (30 ott 2026, 15:10, Andrea:
-        # «quando ci clicco sopra ... si muove verso destra e compaiono i
-        # tasti compra o vendi»)
-        prova("il «Novità» chiuso mostra la faccia e tiene inerti Compra e Vendi",
-              [True, True, True, True, True], out["chiusa"])
-        prova("...toccato scorre: i due lati in vista, la faccia inerte, e resta "
-              "aperto al disegno dopo", [True, True, True], out["aperta"])
-        prova("...un lato apre il foglio «Pubblica» on-chain col suo lato e "
-              "richiude il rettangolo", [["lato:vendo", "oc:vendo"], False, True], out["dalLato"])
+        prova("il rettangolo «Novità» solo a chi e' ammesso, con la moneta e la "
+              "sola parola «On-Chain» (17:57, Andrea: «scrivi così: On-Chain, pulito "
+              "senza novità»)", ("", [True, True, True]), (out["portaNo"], out["porta"]))
+        # IL «NOVITÀ» APRE IL TUTORIAL (30 ott 2026, 17:29, Andrea: «quando
+        # clicchi sul pulsante novita parte un tutorial»): sette tappe — la
+        # novita', come funziona, la moneta, il fulmine, il + di Compra, il +
+        # di Vendi (che passa al lato da se'), la scelta del + (che apre il
+        # foglio) —; alla fine il lato di partenza
+        prova("il «Novità» e' un tasto solo, senza Compra e Vendi", [True, False, True],
+              out["chiusa"])
+        prova("...toccato parte il tutorial dal lato «Compra BTC», sette tappe; solo "
+              "il + di Vendi e la scelta preparano la pagina; tonde la moneta, il fulmine e i due +",
+              [["lato:compro", "tour:7"], [False, False, False, False, False, True, True],
+               [False, False, True, True, True, True, False]], out["tutorial"])
+        prova("...alla fine torna il lato di partenza", [["lato:vendo"], "vendo"], out["fineTutorial"])
+        # APPESO FINCHE' NON LO APRI (30 ott 2026, 17:57-17:59, Andrea: «finché
+        # non lo clicchi rimane bloccato in quella posizione, quando avvii il
+        # tutorial la prima volta poi scorre normalmente»)
+        prova("...il «Novità» resta appeso finche' nessuno l'ha aperto; il tocco lo "
+              "segna nel browser, il disegno dopo scorre, la fine del tutorial lo "
+              "stacca anche dal disegno che c'e'; senza memoria del browser scorre",
+              [True, ["p2pOcNovitaAperta"], False, False, False, False], out["appeso"])
+        prova("...e a tutorial aperto un secondo tocco non ne apre un altro", [], out["dueVolte"])
         prova("a chi non e' ammesso il + non chiede niente (la scelta torna falso e "
               "non si apre)", [False, False], out["sceltaNo"])
-        prova("su «Compra BTC»: On-chain sopra, Lightning verde sotto, niente "
-              "Barattozon", ([True, True, "Vuoi comprare Bitcoin"], [True, True, False]),
+        # (17:29, Andrea: «il tasto lighting colorato di verde o rosso no
+        # mettilo marrone scuro ... come quello del rettangolino dove sono
+        # segnati i metodi di pagamento»)
+        # (17:46) «sfumatura gialla lampo per il lightning e sfumato arancio
+        # per l'onchain»
+        prova("su «Compra BTC»: On-chain arancio sopra e Lightning giallo sotto, "
+              "niente Barattozon", ([True, True, "Vuoi comprare Bitcoin"], [True, True, False]),
               (out["sceltaCompra"], out["tastiCompra"]))
-        prova("su «Vendi BTC»: Lightning rosso e Barattozon blu",
-              [True, True, "Vuoi vendere Bitcoin"], out["tastiVendi"])
+        # (17:45, Andrea: «il tasto barattozon quando schiacci il pulsante +
+        # non ha senso di esistere»): Barattozon resta alla sua capsula
+        prova("su «Vendi BTC»: On-chain e Lightning, e niente Barattozon",
+              [True, False, "Vuoi vendere Bitcoin"], out["tastiVendi"])
         prova("il click fantasma dopo il gesto del + non sceglie niente, e ogni "
-              "tasto apre il suo foglio", ([], ["ln", "bz"]), (out["fantasma"], out["strade"]))
+              "tasto apre il suo foglio", ([], ["ln"]), (out["fantasma"], out["strade"]))
         # IL FOGLIO DI LIGHTNING (30 ott 2026 sera, cantiere oc-identico,
         # Andrea: «deve essere identico allaltro»): una rete, un foglio
         prova("On-chain dalla scelta del +: il foglio di Lightning con la rete on-chain",
@@ -153304,9 +153398,16 @@ console.log(JSON.stringify(out));
         prova("l'interruttore sulla rete gia' scelta non fa niente", [], out["stessaRete"])
         prova("...verso Lightning cambia il segno e ridisegna: nessun foglio si apre "
               "o si chiude (il salto)", [["disegno:ln"], False], out["versoLn"])
-        prova("...verso on-chain lascia quel che l'on-chain non ha (il tabacchino, "
-              "il secondo importo) e la porta del primo ordine di Mostro",
+        prova("...verso on-chain lascia quel che l'on-chain non ha (un metodo fuori "
+              "dalla sua lista, il secondo importo) e la porta del primo ordine di Mostro",
               [["disegno:oc"], True, ["SEPA"], "", False, True], out["versoOc"])
+        # BARATTOZON SOLO VIA LIGHTNING (17:35, scelta di Andrea: «Solo
+        # Lightning, interruttore fisso»)
+        # (17:47) «in alto a questo punto ci sara' solo il simbolo lightning»
+        prova("...ma col tabacchino non si accende: lo dice e il foglio resta "
+              "Barattozon; in cima c'e' il solo Lightning",
+              ([["toast:Barattozon si scambia solo via Lightning ⚡"], False, ["SEPA", "Contanti al tabacchino"]],
+               [False, True, True]), (out["bzFisso"], out["spento"]))
         prova("in cima l'interruttore della rete: On-chain acceso, prima di "
               "Lightning, col fulmine", [True, True, True], out["interruttore"])
         prova("...e a chi non e' ammesso l'interruttore non c'e', e on-chain non si accende",
@@ -153363,31 +153464,72 @@ console.log(JSON.stringify(out));
     # non bianco ... piuttosto metti un leggero bordo bianco»): niente piu'
     # moneta crema sugli sfondi arancio, al suo posto l'anello bianco
     css = mini[:mini.index("</style>")]
+    # 17:53-17:55: nella scelta del + e nel «Novità» col gradiente l'anello
+    # non serve piu' (Andrea: «il bordino bianco ... non e' piu necessario»)
+    _anello = css[css.index("#p2pNuovoInvia .cambio-moneta.p2p-oc-moneta{") - 200:
+                  css.index("#p2pNuovoInvia .cambio-moneta.p2p-oc-moneta{")]
+    _faccia = pezzo_js(css, "  .p2p-oc-faccia{", "}")
     prova("la moneta on-chain resta arancio: niente crema, l'anello bianco dove "
-          "il fondo e' arancio", (False, True, True),
-          ("#FFF4E5" in css, ".p2p-oc-novita .cambio-moneta.p2p-oc-moneta" in css,
-           "box-shadow:0 0 0 2px rgba(255,255,255,.9)" in css))
-    # IL «NOVITÀ» VERSO SINISTRA, COL RIMBALZO (30 ott 2026 sera, Andrea:
-    # «le card compaiono verso sinistra ... finendo la loro corsa vicino
-    # all'icona onchain. quindi non c'e' bisogno di mettere 2 icone ...
-    # bump effect»): i lati partono fuori a DESTRA e corrono a sinistra fino
-    # alla moneta, con una curva che va oltre e torna; Compra e Vendi senza
-    # moneta, quella della faccia resta ferma e sobbalza al colpo
-    porta_nv = pezzo_js(mini, "function carteOnchainLibroP2P(k){", "\n}\n")
-    lati_nv = porta_nv[porta_nv.index("p2p-oc-lati"):]
+          "il fondo e' arancio, non sul gradiente del «Novità» e della scelta",
+          (False, True, False, False, True),
+          ("#FFF4E5" in css, "box-shadow:0 0 0 2px rgba(255,255,255,.9)" in css,
+           ".p2p-oc-novita .cambio-moneta.p2p-oc-moneta," in _anello,
+           ".p2p-scelta-rete .cambio-moneta" in _anello,
+           "linear-gradient(90deg,var(--chip-bg) 0%,var(--chip-bg) 22%,#F7931A 100%)" in _faccia))
+    # IL «NOVITÀ» COL COLPO DI PARTENZA (30 ott 2026, 17:29, Andrea: «quell
+    # effetto bumper mi piace molto quindi vedi se puoi usarlo mentre fai
+    # partire il tutorial»): si schiaccia e torna col rimbalzo, la moneta
+    # sobbalza, e il tutorial parte a colpo finito; coi ridotti subito.
+    # E LA MONETA NON SCIVOLA SOPRA LA PAGINA (Andrea: «quando scorri la
+    # pagina l'icona dell'onchain ha un bug»): `isolation:isolate`
     apri_nv = pezzo_js(mini, "function apriNovitaOnchainP2P(){", "\n}\n")
-    prova("il «Novità»: i lati entrano da destra fino alla moneta col rimbalzo, "
-          "senza una seconda moneta, il fondo che sfuma e il colpo solo al gesto",
-          (True, True, True, False, True, True, True, True),
-          (".p2p-oc-lati{position:absolute;top:0;bottom:0;left:48px;" in css,
-           "transform:translateX(105%);" in css,
-           "cubic-bezier(.3,1.45,.55,1)" in css,
-           "P2P_OC_MONETA" in lati_nv,
-           porta_nv.index("p2p-oc-faccia") < porta_nv.index("p2p-oc-lati"),
-           "r.classList.add('aperta', 'urto');" in apri_nv,
-           # (16:22) e al colpo il fondo arancio sfuma nella pagina
-           ".p2p-oc-novita.aperta .p2p-oc-faccia::before{opacity:0}" in css,
-           "prefers-reduced-motion: reduce){\n    .p2p-oc-lati" in css))
+    prova("il «Novità» appeso sta sotto la testata appiccicosa misurata, col fondo "
+          "dipinto da bordo a bordo, e il colpo lo prende la sola faccia",
+          (True, True, True, True),
+          (".p2p-oc-novita.appeso{position:sticky;top:var(--p2p-testa-alta,0px);z-index:2;" in css,
+           "box-shadow:0 0 0 100vmax var(--bg);clip-path:inset(0 -100vmax)}" in pezzo_js(css, "  .p2p-oc-novita.appeso{", "}") + "}",
+           ".p2p-oc-novita.appeso.urto{animation:none}" in css,
+           "new ResizeObserver(metti).observe(t);" in mini
+           and "v.style.setProperty('--p2p-testa-alta', t.offsetHeight + 'px')" in mini))
+    prova("il «Novità»: il colpo col rimbalzo, il tutorial a colpo finito, e la "
+          "moneta chiusa nel rettangolo",
+          (True, True, True, True, True, False),
+          (".p2p-oc-novita{position:relative;isolation:isolate;" in css,
+           ".p2p-oc-novita.urto{animation:p2pOcBotta .46s cubic-bezier(.3,1.45,.55,1)}" in css,
+           "if (!r || effettiRidotti()) { tutorialOnchainP2P(); return; }" in apri_nv,
+           apri_nv.index("r.classList.add('urto');") < apri_nv.index("setTimeout(") < apri_nv.rindex("tutorialOnchainP2P();"),
+           "prefers-reduced-motion: reduce){\n    .p2p-oc-novita.urto" in css,
+           "p2p-oc-lat" in mini))
+    # IL BOTTONE «PUBBLICA ORDINE» NON CAMBIA MISURA fra le due reti (17:39,
+    # Andrea): la moneta (24 px) sporge senza spingere; misurato dal vivo a
+    # 390 px: 52,5 px di qua e di la'
+    prova("il bottone che pubblica tiene la sua altezza col fulmine e con la moneta",
+          True, ".p2p-invia-oc .cambio-moneta.p2p-oc-moneta{margin:-4px 0}" in css)
+    # LA MONETA DELLA RETE NELLA SCATOLA DEI METODI (17:29, Andrea: «vanno
+    # inseriti nel rettangolo dei metodi di pagamento tutto a destra»)
+    banco_paga = (pezzo_js(mini, "function pagaConReteP2P(paga, rete){", "\n}\n") + "\n}\n"
+                  + "const segnoReteP2P = r => '<span class=\"p2p-rete\">' + r + '</span>';\n"
+                  "console.log(JSON.stringify([pagaConReteP2P('<div class=\"p2p-box p2p-paga\" title=\"SEPA\">SEPA</div>', 'ln'), "
+                  "pagaConReteP2P('', 'btc')]));")
+    try:
+        r = subprocess.run(["node", "-e", banco_paga], capture_output=True, text=True, timeout=30)
+        paga = json.loads(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip() else r.stderr[-300:]
+    except (OSError, subprocess.TimeoutExpired):
+        paga = None
+        salta("la moneta nella scatola dei metodi", "node assente")
+    if paga is not None:
+        prova("la moneta entra nella scatola dei metodi, in coda; senza metodi la "
+              "scatola nasce per lei",
+              ['<div class="p2p-box p2p-paga p2p-paga-rete" title="SEPA">SEPA<span class="p2p-rete">ln</span></div>',
+               '<div class="p2p-box p2p-paga p2p-paga-rete"><span class="p2p-rete">btc</span></div>'], paga)
+    riga_oc = pezzo_js(mini, "function rigaOnchainP2P(o){", "\n}\n")
+    riga_ln = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    prova("...sulle card on-chain e Lightning (vera e d'esempio), non piu' nella testa; "
+          "la scatola tiene la moneta a destra",
+          (True, False, 2, True),
+          ("${pagaConReteP2P(paga, 'btc')}" in riga_oc, "segnoReteP2P(" in riga_oc + riga_ln,
+           riga_ln.count("${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}"),
+           ".p2p-paga-rete > .p2p-rete{position:absolute;right:6px;top:50%;transform:translateY(-50%)}" in css))
     # il cambio di rete senza salto: dal foglio unico (cantiere
     # oc-identico) nessun foglio si apre o si chiude, si ridisegna e basta
     cambia = pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n")
@@ -153523,11 +153665,14 @@ console.log(JSON.stringify(out));
     pubb = pezzo_js(mini, "async function pubblicaOnchainDalFoglioP2P(confermato){", "\n}\n")
     prendi = pezzo_js(mini, "async function prendiOnchainP2P(id){", "\n}\n")
     apri = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
-    lati = pezzo_js(mini, "function latoNovitaOnchainP2P(lato){", "\n}\n")
-    prova("il rettangolo «Novità» scorre su Compra / Vendi, e il lato apre il "
-          "foglio «Pubblica» on-chain, non una pagina", (True, True, True, False),
-          ('onclick="apriNovitaOnchainP2P()"' in porta, "latoNovitaOnchainP2P(\\'buy\\')" in porta,
-           "apriPubblicaOnchainP2P(lato);" in lati, "'elenco'" in porta))
+    # (17:29) il «Novità» apre il tutorial, e l'ultima tappa apre la
+    # scelta del + sotto il velo; alla fine se ne vanno card finte e scelta
+    fine_t = pezzo_js(mini, "function fineTutorialOcP2P(){", "\n}\n")
+    prova("il rettangolo «Novità» apre il tutorial, non una pagina; il tutorial "
+          "chiude quel che ha aperto", (True, False, True, True),
+          ('onclick="apriNovitaOnchainP2P()"' in porta, "'elenco'" in porta,
+           "document.querySelectorAll('.p2p-oc-esempi').forEach(n => n.remove());" in fine_t,
+           "chiudiFoglioP2P('p2pSceltaSheet');" in fine_t))
     prova("la porta unica del dettaglio: mette lo scambio, chiude il foglio, va alla vista; "
           "la usano «Pubblica», «Prendi» e il mio ordine nel libro",
           (True, True, True, True, True, True),
@@ -153539,7 +153684,7 @@ console.log(JSON.stringify(out));
     nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio di Lightning ha il suo posto in cima per l'interruttore, e lo riempie",
           (True, True), ('id="p2pNuovoRete"' in mini,
-                         "interruttoreReteP2P(oc ? 'onchain' : 'ln')" in nuovo))
+                         "interruttoreReteP2P(oc ? 'onchain' : 'ln', tab)" in nuovo))
     # IL FOGLIO ON-CHAIN E' QUELLO DI LIGHTNING (30 ott 2026 sera, cantiere
     # oc-identico, Andrea: «di deve essere la possibilita di pubblicare a
     # prezzo di mercato o a prezzo fisso la domanda chi puo prendere l
@@ -156803,7 +156948,9 @@ def prove_contanti_zona():
           ["const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P(o) : '';" in riga
            # (10 ott 2026, reputazione-p2p) fra la zona e le stelline il
            # segno piccolo del filtro di chi pubblica
-           and "    ${paga}\n    ${zona}\n    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}\n    ${rep ? " in riga,
+           # (30 ott 2026, oc-tutorial) la scatola porta la moneta della rete
+           and "    ${typeof pagaConReteP2P === 'function' ? pagaConReteP2P(paga, 'ln') : paga}\n    ${zona}\n"
+               "    ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}\n    ${rep ? " in riga,
            riga.count("${zona}")])
     dett = fn("function metodiDettP2P(o){")
     prova("il dettaglio la mette sotto il metodo, con uno e con piu' metodi", [True, True, True],
