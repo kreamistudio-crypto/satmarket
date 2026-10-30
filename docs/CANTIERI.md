@@ -75242,3 +75242,31 @@ al valore pieno. Il thread parallelo del 2-di-3 nel P2P, quando si
 aprirà, deve usare `_onchain_rete()` e non `_EMBIT_RETI[ONCHAIN_RETE]`.
 Alan rivede le parti 2-di-3 (f5f883c, 83fff98 e questo) prima della
 promozione. Non toccati: swap, parole-uniche, il wallet del Profilo.
+
+## Il tasto «onion» anche a Cambio già aperto (30 ott 2026, cantiere onion-tardi, Andrea: «la scritta onion nella pagina dello scambio non la vedo piu in barattolo collaudo»)
+
+Sul collaudo il config era a posto (l'ultima `ONION_HOST` è l'indirizzo
+della produzione, riga 2108) e il codice pure (6bc696f). Il difetto era
+mio, del cantiere euro-ordine: l'indirizzo .onion arriva con la busta
+della vetrina (/api/listings), e chi apre «Cambio» PRIMA che quella
+busta arrivi — sul telefono capita, la rete è più lenta — trovava la
+pagina disegnata senza tasto. `impostaOnion` non ridisegnava il Cambio,
+e il ridisegno a pezzi (quello che non tocca i campi) non guardava il
+tasto: restava assente finché la pagina non si rifaceva intera.
+RIPRODOTTO col Chromium: /api/listings ritardata di 4 s, «Cambio» aperto
+subito, l'indirizzo arriva e il tasto no.
+
+LA CURA: il tasto ha la sua funzione, `onionSwap()`, usata dal disegno
+intero; `impostaOnion` chiama `renderSwapCambio()` se la pagina c'è; il
+ridisegno a pezzi aggiunge il tasto subito dopo `.cambio-unita` se
+manca e serve, o lo toglie se c'è e non serve. I campi non si
+ridisegnano: chi sta scrivendo tiene il fuoco e la tastiera.
+
+PROVATO: dal vivo, busta ritardata, «Cambio» aperto e cifra scritta
+prima che arrivi: il tasto compare (uno solo), il fuoco resta nel campo
+e la scrittura continua («100» poi «000» → 100000); anche senza
+scrivere. CONTROPROVE dal vivo: senza la chiamata in `impostaOnion` il
+tasto non arriva (senza scrivere), senza l'aggiunta nel ridisegno a
+pezzi nemmeno; la sentinella nuova in `prove_grafica_swap` è rossa
+senza la chiamata. Le prove del cambio 715/0, i collaudi dello swap, la
+suite severa, i 108 collaudi della CI nel venv senza coincurve.

@@ -1409,6 +1409,14 @@ function swapCambioSpiega(dovuto){
   const t = t3();
   return t.fatturaSpiega(dovuto ? fmt(dovuto) : '…', dovuto && swapCambioUnita === 'btc' ? swapCambioNum(dovuto) : '');
 }
+/* (28 ott 2026, cantiere euro-ordine, Andrea: «affianco al toggle btc
+   sats aggiungi anche un piccolo tasto ... con la scritta "onion"») il
+   tasto porta a Barattolo sul sito Tor. Solo se il server ha un
+   indirizzo .onion, e non a chi c'e' gia' sopra */
+function onionSwap(){
+  return typeof onionHost === 'string' && onionHost && !(typeof suOnion === 'function' && suOnion())
+    ? '<button type="button" class="cambio-onion" data-swap="cambio-onion">onion</button>' : '';
+}
 function renderSwapCambio(){
   const box = el('swapCambio');
   if (!box) return;
@@ -1454,6 +1462,18 @@ function renderSwapCambio(){
     const em = el('swapCambioEuroMandi'), er = el('swapCambioEuroRicevi');
     if (em) em.textContent = pz.euroMandi;
     if (er) er.textContent = pz.euroRicevi;
+    /* (30 ott 2026, cantiere onion-tardi: Andrea non vedeva il tasto)
+       l'indirizzo .onion arriva con la busta della vetrina, e chi apre
+       il Cambio prima di lei l'aveva gia' disegnato senza: il tasto si
+       aggiunge (o si toglie) qui accanto al selettore, senza ridisegnare
+       i campi */
+    const u = box.querySelector ? box.querySelector('.cambio-unita') : null;
+    if (u) {
+      const vicino = u.nextElementSibling, ce = !!(vicino && vicino.classList.contains('cambio-onion'));
+      const serve = onionSwap();
+      if (serve && !ce) u.insertAdjacentHTML('afterend', serve);
+      else if (!serve && ce) vicino.remove();
+    }
     return;
   }
   /* i due riquadri si scrivono tutti e due: in quello dove si e' scritto
@@ -1491,12 +1511,7 @@ function renderSwapCambio(){
   const unita = ['btc', 'sats'].map(u => `<button type="button" class="cambio-unita-tasto${u === swapCambioUnita ? ' scelta' : ''}"`
     + ` data-swap="cambio-unita" data-unita="${u}" aria-pressed="${u === swapCambioUnita}" aria-label="${u === 'btc' ? 'BTC' : 'sats'}">`
     + `${swapIcona(u)}</button>`).join('');
-  /* (28 ott 2026, cantiere euro-ordine, Andrea: «affianco al toggle btc
-     sats aggiungi anche un piccolo tasto ... con la scritta "onion"») il
-     tasto porta a Barattolo sul sito Tor. Solo se il server ha un
-     indirizzo .onion, e non a chi c'e' gia' sopra */
-  const onion = typeof onionHost === 'string' && onionHost && !(typeof suOnion === 'function' && suOnion())
-    ? '<button type="button" class="cambio-onion" data-swap="cambio-onion">onion</button>' : '';
+  const onion = onionSwap();
   const altraStrada = strade.find(x => x !== swapCambioStrada);
   const gira = altraStrada
     ? `<div class="cambio-gira"><button type="button" data-swap="cambio-gira" data-strada="${esc(altraStrada)}" aria-label="${esc(t.direzioni[altraStrada] || altraStrada)}">${swapIcona('gira')}</button></div>`
