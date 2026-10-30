@@ -606,9 +606,10 @@ liturgia: la prova del 13 si è fermata al conto alla rovescia, e si è
 chiusa con l'annullo di chi aveva preso); la disputa automatica a ~92
 ore; il ritorno alla `-bar7` (i due file `.prima-bar8` e `up -d`).
 
-LA 0.20.2 PREPARATA, NON ANCORA SUL NODO (29 ott 2026, cantiere
-`mostro-0202`; la liturgia in PRODUZIONE, «LA SALITA ALLA 0.20.2», il
-perché in CANTIERI, «Mostro 0.20.2»). Upstream ha fatto sei versioni
+LA 0.20.2 IN SERVIZIO DAL 30 OTT 2026, immagine `mostro:v0.20.2-bar9`
+(preparata il 29 ott, cantiere `mostro-0202`; la liturgia in PRODUZIONE,
+«LA SALITA ALLA 0.20.2», il perché in CANTIERI, «Mostro 0.20.2»; com'è
+andata sul nodo in fondo a questa voce). Upstream ha fatto sei versioni
 dalla nostra 0.19.0 (la `v0.20.2` è del 28 ott). Il fork è stato
 RIFATTO DA CAPO sul tag nuovo coi patcher del repo — quindi porta anche
 i tre ritocchi dell'audit del 1 ott (M6, M4, B6) che il nodo non ha mai
@@ -636,3 +637,19 @@ bitcoin on-chain come valuta dell'ordine (`[price.providers.pegged]`,
 #1083 e #1091) restano SPENTI: `fiat_currencies_accepted = ['EUR']`
 chiude anche gli ordini a prezzo fisso; si accendono solo con una
 decisione di Andrea e il cantiere dell'app (p2p-usdt).
+
+COM'È ANDATA SUL NODO (30 ott 2026, 07:37 UTC, cantiere `mostro-bar9`):
+la liturgia intera un comando alla volta, tutta incollata da Andrea; il
+29 sera il comando del cambio si è fermato da solo su uno scambio
+PayPal `active` preso cinque minuti prima (il freno conta prima di
+toccare), e la mattina dopo, a libro fermo e con la copia del database
+rifatta, il cambio ha tenuto il libro fermo dodici secondi. Undici
+migrazioni entrate, `bond_cltv_delta = 744` in fondo al `settings.toml`,
+`mostrod --version` → `mostro p2p 0.20.2`, eventi al server accesi,
+primo evento di salute 38389 pubblicato, journal del VPS pulito. Notato:
+`blockchain.info` risponde 403 all'uscita Tor (uno dei quattro fornitori
+del prezzo; gli altri tre rispondono). Le impronte del segreto degli
+eventi sono uguali sul nodo e sul VPS (`12b649c7`): la prima lettura
+diversa era il `\x27` nel `tr` del comando, corretto in PRODUZIONE. I
+numeri e il registro: PRODUZIONE, «LA SALITA ALLA 0.20.2», «COM'È
+ANDATA SUL NODO».

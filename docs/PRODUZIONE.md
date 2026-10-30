@@ -3894,8 +3894,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
 
 - LA SALITA ALLA 0.20.2, immagine `mostro:v0.20.2-bar9` (preparata il 29
   ott 2026, cantiere `mostro-0202`, decisione di Andrea: «fork intero
-  sulla 0.20.2»; NON ANCORA FATTA SUL NODO: build e riavvio solo con l'ok
-  esplicito di Andrea, un comando alla volta, a libro fermo). È la prima
+  sulla 0.20.2»; ✅ FATTA SUL NODO il 30 ott 2026, in servizio dalle
+  07:37 UTC, com'è andata in fondo a questa voce, «COM'È ANDATA SUL
+  NODO». Era scritta così: build e riavvio solo con l'ok esplicito di
+  Andrea, un comando alla volta, a libro fermo). È la prima
   salita di VERSIONE dalla 0.19.0 (30 set): sei versioni di upstream in
   un colpo (0.19.1 → 0.20.2, tag del 28 ott, `fe2a905`), e il fork è
   RIFATTO DA CAPO sul tag nuovo coi patcher del repo — quindi porta anche
@@ -3958,11 +3960,16 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   uguale a `P2P_EVENTI_SEGRETO` del VPS, e si chiede a Claude i comandi.
   Che sia UGUALE a quella del VPS si vede senza stamparla, con otto
   lettere di impronta da confrontare a occhio — NODO:
-  `grep -o "BARATTOLO_EVENTI_SEGRETO=.*" ~/nodo/docker-compose.yml | head -1 | cut -d= -f2- | tr -d ' "\n' | sha256sum | cut -c1-8`
+  `grep -o "BARATTOLO_EVENTI_SEGRETO=.*" ~/nodo/docker-compose.yml | head -1 | cut -d= -f2- | tr -cd 'A-Za-z0-9_-' | sha256sum | cut -c1-8`
   e VPS (`ssh root@46.62.162.103`):
-  `grep "^P2P_EVENTI_SEGRETO" /srv/barattolo/config.py | cut -d= -f2- | tr -d ' "\x27\n' | sha256sum | cut -c1-8`
-  → le stesse otto lettere. Se no, gli eventi non arriverebbero già
-  oggi col ripiego, e si guarda PRIMA di andare avanti.
+  `grep "^P2P_EVENTI_SEGRETO" /srv/barattolo/config.py | cut -d= -f2- | tr -cd 'A-Za-z0-9_-' | sha256sum | cut -c1-8`
+  → le stesse otto lettere (il 29 ott: `12b649c7` da tutt'e due le
+  parti). Il `tr -cd` tiene SOLO le lettere del segreto e butta apici,
+  spazi e a capo: la prima stesura toglieva `' "\x27\n'` e dava due
+  impronte diverse con lo stesso segreto, perché `tr` non legge `\x27`
+  come un apice ma come le quattro lettere `\`, `x`, `2`, `7` — e le
+  toglieva dal segreto. Se le otto lettere sono diverse, gli eventi non
+  arriverebbero già oggi, e si guarda PRIMA di andare avanti.
   f) IL DISCO: `df -h / && docker system df` → almeno 6 GB liberi (la
   cucina della build ne prende 3; le immagini `mostro-test:bar2`…`bar8`
   si possono togliere PRIMA, `docker rmi mostro-test:barN` una per una,
@@ -4046,10 +4053,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   una migrazione): si incolla a Claude e si torna indietro (ROLLBACK).
   `sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute('SELECT COUNT(*) FROM _sqlx_migrations').fetchone())"`
   → `(26,)`.
-  Dall'app («Info P2P»): `mostro_version 0.20.2`, i tempi come prima
-  (30 minuti / 3 ore), `bond_enabled true`, `bond_only_payment_methods
-  Contanti`. Sul VPS, nel journal, entro qualche minuto nessun errore
-  nuovo del P2P. E QUI CI SI FERMA.
+  La versione dal binario che gira (la pagina «Info P2P» dell'app legge
+  `mostro_version` ma NON la stampa): `docker compose exec mostro mostrod --version`
+  → `mostro p2p 0.20.2`. Dall'app, i tempi come prima (30 minuti / 3
+  ore) e la cauzione solo sui contanti. Sul VPS, nel journal, entro
+  qualche minuto nessun errore nuovo del P2P:
+  `journalctl -u barattolo --since "10 min ago" --no-pager | grep -i -E "p2p|mostro|evento" | grep -i -E "error|errore|traceback|403|401" | head`
+  → vuoto. E QUI CI SI FERMA.
   FASE 5 — LA PROVA DAL VIVO, di Andrea con due account, SUBITO (il
   ritorno costa gli ordini nati dopo il cambio: meglio provare prima
   che ne nascano di altri). Uno scambio PICCOLO e INTERO, non solo
@@ -4090,6 +4100,41 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   nome; `git am` delle undici `.patch` su un clone pulito dà
   l'albero `16734181`. Controprova: la riga sbagliata rimessa fa rosso
   il compilatore (è così che si è vista).
+  COM'È ANDATA SUL NODO (29-30 ott 2026, cantiere `mostro-bar9`, Andrea
+  un comando alla volta, tutti incollati): la fase 1 tutta verde — il
+  primo confronto delle impronte del segreto degli eventi era DIVERSO
+  (`61081e84` contro `12b649c7`) per il difetto del comando del VPS
+  (`\x27`, vedi fase 1, e), e la forma delle righe (64 lettere pulite da
+  tutt'e due le parti) più l'impronta col `tr -cd` l'hanno chiuso. Fase
+  2 e 3 il 29 ott sera: backup 378/378 alle 19:32; `git am` sul nodo con
+  l'albero `16734181`, lo stesso del cloud; lo stadio `builder` in 856 s
+  (14 minuti: scarica l'immagine `rust:1.94` e cuoce le dipendenze), i
+  test 730/0/1 e 90/0 come nel cloud; l'immagine `-bar9` in 21 s (tutto
+  dalla cache) con 6 e 9 nel binario; i due file `.0202` letti prima
+  (`744 576 24 1800 10800`). Alle 20:06 UTC IL COMANDO DEL CAMBIO HA
+  DETTO «scambi aperti: 1» E NON HA TOCCATO NIENTE: una vendita da
+  347.801 sats (249 €, PayPal) pubblicata alle 19:48 e presa alle 19:51,
+  `active`, nata mentre la cucina lavorava — il freno è fatto per
+  questo, e Andrea ha scelto di riprendere il giorno dopo. Il 30 ott
+  alle 07:36 il libro era fermo (385 ordini: quello scambio e altri tre
+  chiusi `success`), la copia del database RIFATTA (385/385: quella
+  della sera non aveva lo scambio, e il ritorno deve averlo), e il
+  cambio alle 07:37:04 → 07:37:16 UTC: dodici secondi, come la `-bar8`
+  (le migrazioni non si sono sentite). Il registro, nei tre minuti
+  dopo: «Settings correctly loaded!», `barattolo_fee: per-party discount
+  0.005 verified`, `barattolo_eventi: order events go to
+  https://barattolo.store/api/p2p/evento`, `Transport: nip44 (protocol
+  v2, event kind 14)`, `Published health event: status ok, seq 1` (il
+  38389 nuovo), e un WARN `price: blockchain error: … blockchain.info/ticker:
+  status 403 Forbidden`: uno dei quattro fornitori del prezzo rifiuta
+  l'uscita Tor; gli altri tre rispondono e il prezzo c'è (da guardare se
+  insiste: Cantieri, «Mostro 0.20.2», «NOTATO»). `_sqlx_migrations`
+  `(26,)`; `mostrod --version` → `mostro p2p 0.20.2`; journal del VPS
+  senza errori del P2P. Il sorgente sul nodo sta sul branch
+  `barattolo/v0.20.2` (undici commit sopra `fe2a905`); `barattolo/v0.19.0`
+  è rimasto com'era per il ritorno. L'immagine `mostro-test:0202` è
+  ancora sulla macchina (`docker rmi mostro-test:0202` quando serve il
+  disco: 26 GB liberi prima della salita).
 - LA SALITA ALLA `-bar8`, immagine `mostro:v0.19.0-bar8` (preparata il 12
   ott 2026, cantiere `tempo-di-chi-pubblica`; ✅ FATTA SUL NODO il 13 ott
   2026, cantiere `mostro-bar8`: in servizio dalle 11:36 UTC, e com'è

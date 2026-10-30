@@ -662,12 +662,24 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-⚠️ LA 0.20.2 È PREPARATA, NON IN SERVIZIO (29 ott 2026): sul nodo gira
-ancora `mostro:v0.19.0-bar8` (sotto, «LA -bar8»). La salita — immagine
-`mostro:v0.20.2-bar9`, la riga `bond_cltv_delta`, le undici migrazioni,
-il backup col database di prima — sta in PRODUZIONE, «LA SALITA ALLA
-0.20.2», e la fa Andrea un comando alla volta. Quando è fatta, questa
-riga cambia e `CLAUDE.md` con lei.
+Immagine `mostro:v0.20.2-bar9` dal 30 ott 2026, 07:37 UTC: le UNDICI
+patch di questa cartella sopra la `v0.20.2` (`fe2a905`), messe sul nodo
+con `git am` delle `.patch` prese da git (commit `bc47e0c`), sul branch
+`barattolo/v0.20.2` — albero `16734181`, lo stesso del cloud byte per
+byte. Sul nodo i test hanno detto gli stessi numeri del cloud (730/0/1
+e 90/0), il cambio ha fermato il libro dodici secondi (07:37:04 →
+07:37:16), le undici migrazioni sono entrate (`_sqlx_migrations` 26), e
+il `settings.toml` ha la riga nuova `bond_cltv_delta = 744` in fondo a
+`[anti_abuse_bond]`. Il ritorno è la `-bar8` CON IL DATABASE DI PRIMA
+(`mostro.db.prima-0202` delle 07:36, 385 ordini) e i due file
+`.prima-0202`: PRODUZIONE, «LA SALITA ALLA 0.20.2», ROLLBACK. Il primo
+tentativo (29 ott, 20:06) il comando del cambio l'ha rifiutato da solo:
+uno scambio PayPal preso alle 19:51 era `active`; si è aspettato il
+giorno dopo, rifacendo prima la copia del database (quella della sera
+non aveva lo scambio). Com'è andata: PRODUZIONE, «COM'È ANDATA SUL NODO».
+
+Fino al 30 ott 2026, immagine `mostro:v0.19.0-bar8` dal 13 ott (sotto, «LA
+-bar8»), e prima ancora:
 
 Immagine `mostro:v0.19.0-bar6` dal 1 ott 2026: le OTTO patch di questa
 cartella sopra la `v0.19.0` (`d53e41d`), otto commit sul nodo sul branch

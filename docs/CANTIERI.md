@@ -75059,6 +75059,32 @@ suite severa 26.545 passate, 0 fallite, 2 saltate (le due di
 sessione cloud); collaudi della CI nel venv SENZA coincurve 108 verdi,
 0 rossi (683 s). Rust, sull'albero `16734181`: 1.991/0.
 
+COM'È ANDATA SUL NODO (29-30 ott 2026, cantiere `mostro-bar9`, Andrea un
+comando alla volta). Le sei letture della fase 1 tutte come attese, con
+una sorpresa buona: le impronte del segreto degli eventi sono uscite
+DIVERSE (`61081e84` sul VPS, `12b649c7` sul nodo) e il segreto era lo
+stesso — il comando del VPS toglieva `' "\x27\n'` con `tr`, che non
+legge `\x27` come apice ma come quattro lettere da togliere, e le
+toglieva dal segreto. La forma delle righe (64 lettere, niente apici né
+`${…}`) e un'impronta col solo `tr -cd 'A-Za-z0-9_-'` (`12b649c7` da
+tutt'e due le parti) l'hanno chiuso; PRODUZIONE corretta. Sul nodo
+l'albero del `git am` è `16734181`, lo stesso del cloud; i test gli
+stessi numeri (730/0/1, 90/0); l'immagine `-bar9` con 6 e 9 nel binario.
+IL FRENO HA LAVORATO: alle 20:06 UTC del 29 il comando del cambio ha
+contato «scambi aperti: 1» (una vendita da 347.801 sats, 249 € PayPal,
+presa alle 19:51 mentre la cucina costruiva) e non ha toccato niente;
+Andrea ha scelto di riprendere la mattina dopo. Il 30 alle 07:36 il
+libro era fermo (385 ordini), la copia del database è stata RIFATTA
+(quella della sera non aveva lo scambio: il ritorno deve averlo), e il
+cambio alle 07:37:04 → 07:37:16 UTC, dodici secondi come la `-bar8`.
+Registro pulito (settings, `barattolo_fee`, `barattolo_eventi`, nip44,
+primo 38389 `status ok, seq 1`), 26 migrazioni, `mostro p2p 0.20.2`,
+journal del VPS senza errori. NOTATO E NON TOCCATO: un WARN
+`blockchain.info/ticker: status 403 Forbidden` (uno dei quattro
+fornitori del prezzo rifiuta l'uscita Tor; gli altri tre rispondono); e
+la pagina «Info P2P» dell'app legge `mostro_version` dal 38385 ma non lo
+stampa — la liturgia lo prometteva e ora dice `mostrod --version`.
+
 ## Le 12 parole in poche righe (29 ott 2026, cantiere parole-corte, Andrea: «il testo relativo alle 12 parole è troppo lungo», «riduci e scrivilo leggermente più semplice»)
 
 Solo testi, dopo parole-uniche. Nel Profilo, «🔑 Il wallet di Barattolo»:
