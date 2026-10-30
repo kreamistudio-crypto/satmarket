@@ -56871,7 +56871,7 @@ let p2pOnchainLetto = 0;        // quando il libro on-chain e' stato riletto
 
 /* la busta `onchain` di /api/p2p/libro: assente = leva spenta, e il
    libro on-chain si svuota (mai card prese da un pezzo) */
-function prendiOnchainP2P(busta){
+function accogliLibroOnchainP2P(busta){
   if (!busta || typeof busta !== 'object') {
     p2pOnchainLibro = Object.assign({}, p2pOnchainLibro, {eventi: [], miei: [], quando: 0});
     return false;
@@ -56898,9 +56898,9 @@ async function rinfrescaOnchainP2P(subito){
     const h = {};
     if (myTgId && !VETRINA) h['X-Tg-Init-Data'] = authHdr();
     const r = await fetch(`${API_BASE}/p2p/onchain/libro`, {headers: h, cache: 'no-store'});
-    if (!r.ok) { if (r.status === 404) prendiOnchainP2P(null); return; }
+    if (!r.ok) { if (r.status === 404) accogliLibroOnchainP2P(null); return; }
     const prima = p2pOnchainLibro.quando + ':' + p2pOnchainLibro.eventi.length;
-    prendiOnchainP2P(await r.json());
+    accogliLibroOnchainP2P(await r.json());
     if (prima !== p2pOnchainLibro.quando + ':' + p2pOnchainLibro.eventi.length
         && typeof vistaAttivaP2P === 'function' && vistaAttivaP2P() === 'view-p2p') renderP2P();
   } catch(e) { /* al prossimo giro */ }
@@ -82385,7 +82385,7 @@ async function chiediFotoLibroP2P(){
   const paracadute = typeof prendiParacaduteP2P === 'function' && prendiParacaduteP2P(d && d.paracadute);
   /* ...e il libro on-chain (30 ott 2026): la busta `onchain`, PRIMA del
      ritorno anticipato qui sotto — con Mostro muto le sue card ci sono lo stesso */
-  const onchain = typeof prendiOnchainP2P === 'function' && prendiOnchainP2P(d && d.onchain);
+  const onchain = typeof accogliLibroOnchainP2P === 'function' && accogliLibroOnchainP2P(d && d.onchain);
   /* ...e i miei secondo il server (28 set 2026): la stessa lista della
      fila della home, che il libro prima ignorava — e cosi' un ordine
      pubblicato da un altro dispositivo qui sembrava di un altro */
@@ -83089,7 +83089,7 @@ async function chiediFotoVetrinaP2P(){
   if (typeof prendiFiltriP2P === 'function') prendiFiltriP2P(d && d.filtri);
   if (typeof prendiPauseP2P === 'function') prendiPauseP2P(d && d.pause);
   if (typeof prendiParacaduteP2P === 'function') prendiParacaduteP2P(d && d.paracadute);
-  if (typeof prendiOnchainP2P === 'function') prendiOnchainP2P(d && d.onchain);   /* il libro on-chain (30 ott 2026) */
+  if (typeof accogliLibroOnchainP2P === 'function') accogliLibroOnchainP2P(d && d.onchain);   /* il libro on-chain (30 ott 2026) */
   /* i miei secondo il server (27 set 2026): ogni risposta prende il
      posto della precedente, e senza sessione non ce ne sono */
   p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
