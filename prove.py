@@ -44365,10 +44365,12 @@ def prove_fogli_di_casa():
     # che non cancella niente e quindi non chiede niente.
     # (27 ott 2026, cantiere onchain-disputa: «Crea la chiave di
     # Barattolo», il novantaquattresimo)
-    prova("i gesti che passano dalla domanda unica sono centouno (dal 30 ott "
+    # CENTODUE (30 ott 2026, stesso giorno, avvisi-p2p-onchain): «Togli»
+    # dove si riceve on-chain, nel Profilo (Andrea e Alan durante la prova)
+    prova("i gesti che passano dalla domanda unica sono centodue (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
-          "disputa, libera, rinuncia, decidi)",
-          101, solo_codice(mini).count("chiediConferma({"))
+          "disputa, libera, rinuncia, decidi; e «Togli» dove si riceve on-chain)",
+          102, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -147019,9 +147021,10 @@ def prove_freni():
            # fattura, nascita) 40 all'ora
            "onchain_cambio": (40, 3600),
            # 30 ott 2026: gli scambi P2P on-chain (2-di-3): pubblicare e
-           # prendere 10 all'ora, una disputa 5 all'ora
+           # prendere 10 all'ora, una disputa 5 all'ora; il battito della
+           # pagina di chi deposita (uno ogni 15 s) 300 all'ora
            "p2p_onchain_pubblica": (10, 3600), "p2p_onchain_prendi": (10, 3600),
-           "p2p_onchain_disputa": (5, 3600),
+           "p2p_onchain_controlla": (300, 3600), "p2p_onchain_disputa": (5, 3600),
            # la cassetta che spedisce (20 ott 2026, nostr-da-telefono):
            # un login con la sua coda sta largo in 60 al minuto per IP
            "cassetta_spedisci": (60, 60)}, F)
@@ -152938,6 +152941,76 @@ console.log(JSON.stringify(casi.map(([o]) => daFirmareOnchainP2P(o))));
               json.loads(r.stdout.strip() or "null"))
     except (OSError, subprocess.TimeoutExpired):
         salta("il giudice della firma che aspetta me", "node assente")
+    # IL DEPOSITO SI VEDE DA SOLO (30 ott 2026, Andrea alla prima prova):
+    # il giudice puro in node, e la forma del battito
+    banco = pezzo_js(mini, "function depositoVistoOnchainP2P(o){", "\n}\n") + "\n}\n" + """
+const casi = [
+  {stato: 'preso', visti_sats: 0, importo_sats: 10540},
+  {stato: 'preso', visti_sats: 10539, importo_sats: 10540},
+  {stato: 'preso', visti_sats: 10540, importo_sats: 10540},
+  {stato: 'preso', visti_sats: 20000, importo_sats: 10540},
+  {stato: 'depositato', visti_sats: 10540, importo_sats: 10540},
+  {stato: 'annullato', visti_sats: 0, importo_sats: 10540},
+  {stato: 'preso', visti_sats: 0, importo_sats: 0},
+  null];
+console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        prova("il deposito «visto» vuole almeno l'importo in rete, o lo stato gia' "
+              "passato oltre; un annullato o un importo vuoto non lo sono mai",
+              [False, False, True, True, True, False, False, False],
+              json.loads(r.stdout.strip() or "null"))
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il deposito visto", "node assente")
+    battito = pezzo_js(mini, "async function battitoDepositoOnchainP2P(){", "\n}\n")
+    prova("il battito parte con la pagina on-chain, tace fuori di li' e a "
+          "telefono in tasca, chiede solo per lo scambio MIO da depositare, "
+          "e al visto dice «Fatto» e torna a «I miei scambi»",
+          (True, True, True, True, True, True),
+          ("if (view==='p2ponchain') { renderP2POnchain(); osservaDepositoOnchainP2P(); }" in mini,
+           "if (vistaAttivaP2P() !== 'view-p2ponchain') return;" in battito,
+           "document.visibilityState !== 'hidden'" in battito,
+           "o.ruolo === 'compratore' && o.stato === 'preso'" in battito,
+           "await spuntaAttesaP2P('Fatto', P2P_TORNA_MS);" in battito,
+           "go('p2pmiei');" in battito))
+    firma = pezzo_js(mini, "async function firmaOnchainP2P(id, verso){", "\n}\n")
+    cofirma = pezzo_js(mini, "async function cofirmaOnchainP2P(btn, id){", "\n}\n")
+    fatto = pezzo_js(mini, "async function fattoOnchainP2P(rip){", "\n}\n")
+    prova("«Libera i sats», «Rinuncio» e la co-firma: il velo sta su mentre il "
+          "telefono firma, al riuscito «Fatto» e si torna a «I miei scambi», "
+          "al fallito si resta e lo si dice (Andrea: «la pagina rimane bloccata»)",
+          (True, True, True, True, True),
+          ("const rip = attesaP2P(" in firma and "await fattoOnchainP2P(rip);" in firma,
+           "const rip = attesaP2P('Firmo…', btn);" in cofirma and "await fattoOnchainP2P(rip);" in cofirma,
+           "rip();\n    toast('⚠️ " in firma,
+           "await spuntaAttesaP2P('Fatto', P2P_TORNA_MS);" in fatto,
+           "go('p2pmiei');" in fatto))
+    casella = pezzo_js(mini, "function incassoMancanteOnchainP2P(o){", "\n}\n")
+    prova("chi compra senza un posto dove ricevere se lo vede chiedere nella pagina "
+          "dello scambio, col modulo del Profilo (indirizzo o chiave del conto); "
+          "salvato, la pagina si rifa'; e nel Profilo c'e' «Togli» (Alan e Andrea)",
+          (True, True, True, True, True, True),
+          ("${incassoMancanteOnchainP2P(o)}" in pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n"),
+           "if (!o || o.ruolo !== 'venditore' || o.incasso) return '';" in casella,
+           "onchainModuloIncasso('ocP2p')" in casella,
+           "if (vistaAttivaP2P() === 'view-p2ponchain') renderP2POnchain();"
+           in pezzo_js(mini, "async function onchainIncassoSalva(btn, pref){", "\n}\n"),
+           'onclick="onchainIncassoTogli(this)"' in mini,
+           "body: JSON.stringify({tipo: 'barattolo'})" in pezzo_js(mini, "function onchainIncassoTogli(btn){", "\n}\n")))
+    prova("...e ha il suo freno, largo per un battito ogni 15 secondi",
+          (True, True),
+          ('_frena("p2p_onchain_controlla", user["id"])' in pezzo("p2p_onchain_controlla_rotta"),
+           '"p2p_onchain_controlla": (300, 3600),' in src))
+    # GLI AVVISI COME QUELLI DEL LIGHTNING: il bottone e il link
+    amb = {"LINK_LIBRO_P2P": "https://x/p2p", "P2P_ONCHAIN_BOTTONE": "🟠 Apri lo scambio"}
+    exec(pezzo("_p2p_onchain_bottone"), amb)
+    prova("il bottone degli avvisi on-chain porta il nome pubblico, come quello "
+          "del Lightning, e la Mini App lo manda alla pagina on-chain",
+          (("🟠 Apri lo scambio", "https://x/p2p?scambio=bar-onchain-ab12"), True, True),
+          (amb["_p2p_onchain_bottone"]({"ordine": "bar-onchain-ab12"}),
+           "if (typeof P2P_ONCHAIN_PREFISSO === 'string' && String(P2P_SCAMBIO_URL || '').startsWith(P2P_ONCHAIN_PREFISSO)) {" in mini,
+           "const o = (miei || []).find(x => String(x.ordine) === String(ordine));" in mini))
     prova("il collaudo del giro vero sta nelle due liste della CI", (True, True),
           ("\ncollaudo_p2p_onchain\n" in open(os.path.join("ci", "collaudi.txt"), encoding="utf-8").read(),
            "\ncollaudo_p2p_onchain.py\n" in open(os.path.join("ci", "compila.txt"), encoding="utf-8").read()))

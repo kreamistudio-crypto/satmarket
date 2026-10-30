@@ -2700,6 +2700,9 @@ FRENI = {
     # suona ai moderatori
     "p2p_onchain_pubblica": (10, 3600),  # un ordine on-chain nel libro, per persona
     "p2p_onchain_prendi": (10, 3600),    # una presa (nasce un 2-di-3), per persona
+    # il battito della pagina di chi deposita (30 ott 2026): uno ogni 15
+    # secondi mentre guarda lo scambio, piu' i tocchi di «controlla»
+    "p2p_onchain_controlla": (300, 3600),  # mempool per uno scambio preso, per persona
     "p2p_onchain_disputa": (5, 3600),    # una disputa ai moderatori, per persona
     # (28 ott 2026) il cambio in Lightning di un ordine on-chain: il
     # preventivo legge le tariffe del fornitore, la fattura bussa al
@@ -93257,6 +93260,67 @@ def _p2p_onchain_euro_testo(cent: int) -> str:
     return f"{cent // 100}.{cent % 100:02d}".rstrip("0")
 
 
+# GLI AVVISI DEL P2P ON-CHAIN FATTI COME QUELLI DEL LIGHTNING (30 ott
+# 2026, Andrea alla prima prova sul collaudo: «vorrei che fosse
+# strutturato come nei messaggi originali nel bot ufficiale con anche il
+# tasto apri lo scambio»). La forma e' quella di `_testo_evento_p2p`: la
+# testa in grassetto dice cosa e' SUCCESSO, poi cosa si scambia, una riga
+# vuota, e cosa tocca fare ADESSO; sotto, il bottone di QUELLO scambio,
+# come `_bottone_scambio_p2p` — nel link viaggia solo il nome pubblico
+# dell'ordine (il `d` del 38383), e a capire che e' on-chain e' la
+# pagina, dal prefisso. Il segno: l'icona dell'on-chain e' quella di
+# SATS Routing, un cerchio arancione col ₿ bianco dentro; in un tasto
+# di Telegram un disegno non ci sta, e un'emoji col ₿ non esiste:
+# Andrea ha scelto il cerchio arancione 🟠 (30 ott 2026, scheda nel
+# thread della prova). Il fulmine resta al Lightning.
+P2P_ONCHAIN_SEGNO = "🟠"
+P2P_ONCHAIN_BOTTONE = f"{P2P_ONCHAIN_SEGNO} Apri lo scambio"
+
+
+def _p2p_onchain_bottone(o) -> tuple:
+    """PURA: `(etichetta, indirizzo)` del bottone sotto ogni avviso di
+    uno scambio on-chain. La Mini App lo apre con `?scambio=`, come il
+    Lightning: il prefisso `bar-onchain-` le dice quale pagina."""
+    return (P2P_ONCHAIN_BOTTONE, f"{LINK_LIBRO_P2P}?scambio={o['ordine']}")
+
+
+def _p2p_onchain_quanto(o) -> str:
+    """PURA: «10.000 sats per 9,00 € via Revolut», come `quanto` negli
+    avvisi del Lightning."""
+    try:
+        metodi = ", ".join(html.escape(str(m)) for m in json.loads(o["metodi"] or "[]"))
+    except Exception:
+        metodi = ""
+    return (f"{_fmt_sats(int(o['prezzo_sats']))} sats per "
+            f"{_fmt_eur(int(o['euro_cent']) / 100)} €"
+            + (f" via {metodi}" if metodi else ""))
+
+
+def _p2p_onchain_testi_presa(o, nome: str = "") -> dict:
+    """PURA: `{tg_id: testo}` dell'avviso della PRESA, alle due parti.
+    Chi ha pubblicato legge «Il tuo ordine on-chain è stato preso!», chi
+    ha preso «Hai preso l'ordine on-chain di …!», come nel Lightning; il
+    gesto di adesso e' sempre di chi deposita."""
+    S = P2P_ONCHAIN_SEGNO
+    maker, dep, ric = int(o["maker_id"]), int(o["depositante_id"]), int(o["ricevente_id"])
+    quanto = _p2p_onchain_quanto(o)
+
+    def testa(tg):
+        if tg == maker:
+            return f"{S} <b>Il tuo ordine on-chain è stato preso!</b> "
+        return (f"{S} <b>Hai preso l'ordine on-chain"
+                + (f" di {html.escape(str(nome))}" if nome else "") + "!</b> ")
+    return {
+        dep: (testa(dep) + f"Vendi {quanto}.\n\n"
+              f"Apri Barattolo: tocca a te depositare <b>{_fmt_sats(int(o['importo_sats']))} "
+              "sats</b> (prezzo + margine di rete) nell'indirizzo 2-di-3."
+              f"\n\n⏳ <b>Hai {P2P_ONCHAIN_ORE_DEPOSITO} ore</b>, poi chi compra può rinunciare."),
+        ric: (testa(ric) + f"Compri {quanto}.\n\n"
+              "Apri Barattolo: appena chi vende deposita i sats e la rete li "
+              "conferma, tocca a te mandare gli euro."),
+    }
+
+
 def p2p_onchain_tags(o, adesso: int = None) -> list:
     """PURA: i tag del 38383 di un ordine on-chain, NIP-69. `expiration`
     e' la vita nel libro finche' l'ordine e' da prendere; dopo, una
@@ -93789,8 +93853,9 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
     if altro and o["stato"] == "preso":
-        await notifica(altro, "⛓️ <b>Scambio on-chain annullato</b> dall'altra "
-                              "parte prima del deposito: nessun sats si è mosso.")
+        await notifica(altro, "❌ <b>L'altra parte ha annullato lo scambio on-chain.</b> "
+                              f"Era {_p2p_onchain_quanto(o)}.\n\nNessun sats si è mosso.",
+                       _p2p_onchain_bottone(o))
     return {"ok": True}
 
 
@@ -93870,19 +93935,13 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         con.commit()
         o = _p2p_onchain_carica(con, oid)
         fuori = _p2p_onchain_per(con, o, user["id"])
-        euro = _fmt_eur(int(o["euro_cent"]) / 100)
+        nome = _onchain_nome(con, o["maker_id"])
     finally:
         con.close()
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
-    tot = int(o["importo_sats"])
-    await notifica(dep, f"⛓️ <b>Scambio on-chain preso:</b> vendi {_fmt_sats(int(o['prezzo_sats']))} "
-                        f"sats per {euro} €. Deposita <b>{_fmt_sats(tot)} sats</b> "
-                        f"(prezzo + margine di rete) sull'indirizzo 2-di-3 entro "
-                        f"{P2P_ONCHAIN_ORE_DEPOSITO} ore: apri P2P → I miei scambi.")
-    await notifica(ric, f"⛓️ <b>Scambio on-chain preso:</b> compri {_fmt_sats(int(o['prezzo_sats']))} "
-                        f"sats per {euro} €. Chi vende sta depositando i sats nel "
-                        "2-di-3: ti avvisiamo appena sono confermati, poi mandi gli euro.")
+    for chi, testo in _p2p_onchain_testi_presa(o, nome).items():
+        await notifica(chi, testo, _p2p_onchain_bottone(o))
     return fuori
 
 
@@ -93928,26 +93987,23 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                               (adesso, o["id"]))
             if cur.rowcount:
                 stato = "depositato"
-                try:
-                    metodi = ", ".join(json.loads(o["metodi"] or "[]"))
-                except Exception:
-                    metodi = ""
                 euro = _fmt_eur(int(o["euro_cent"]) / 100)
                 avvisi = [
-                    (o["ricevente_id"], f"⛓️ <b>Sats depositati:</b> {_fmt_sats(int(o['prezzo_sats']))} "
-                     f"sats sono nel 2-di-3. Ora manda <b>{euro} €</b> a chi vende "
-                     f"({html.escape(metodi)}) e tocca «Ho inviato gli euro»: "
-                     "il recapito è nello scambio (P2P → I miei scambi)."),
-                    (o["depositante_id"], "⛓️ <b>Deposito confermato.</b> Chi compra "
-                     f"sta per mandarti {euro} €: quando li vedi sul tuo conto, "
-                     "apri lo scambio e tocca «Ricevuti, libera i sats». Mai prima.")]
+                    (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
+                     f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o)}.\n\n"
+                     f"Apri Barattolo: ora manda <b>{euro} €</b> a chi vende, poi tocca "
+                     "«Ho inviato gli euro». Il recapito è nello scambio."),
+                    (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> aspetta gli euro. "
+                     f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
+                     f"Chi compra sta per mandarti {euro} €: quando li vedi sul tuo "
+                     "conto, apri lo scambio e tocca «Ricevuti: libera i sats». Mai prima.")]
         con.commit()
     finally:
         con.close()
     if stato == "depositato" and avvisi:
         asyncio.create_task(_p2p_onchain_pubblica(int(o["id"])))
     for chi, testo in avvisi:
-        await notifica(chi, testo)
+        await notifica(chi, testo, _p2p_onchain_bottone(o))
     return stato
 
 
@@ -93957,7 +94013,7 @@ async def p2p_onchain_controlla_rotta(oid: int, x_tg_init_data: str = Header("")
     """«Ho depositato, guarda adesso»: la stessa domanda della ronda."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     _p2p_onchain_serve(user)
-    _frena("onchain_controlla", user["id"])
+    _frena("p2p_onchain_controlla", user["id"])
     con = _p2p_onchain_db()
     try:
         o = _p2p_onchain_carica(con, oid)
@@ -94003,9 +94059,11 @@ async def p2p_onchain_euro_inviati(oid: int, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     await notifica(o["depositante_id"],
-                   f"💶 <b>Euro inviati:</b> chi compra dice di averti mandato {euro} €. "
+                   f"💶 <b>Chi compra dice di averti inviato {euro} €.</b> "
+                   f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
                    "Controlla il tuo conto: quando li vedi, apri lo scambio e tocca "
-                   "«Ricevuti, libera i sats». Se non arrivano, apri una disputa.")
+                   "«Ricevuti: libera i sats». Se non arrivano, apri una disputa.",
+                   _p2p_onchain_bottone(o))
     return {"ok": True}
 
 
@@ -94036,8 +94094,9 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
     finally:
         con.close()
     if o["stato"] in ("preso", "depositato") and o["ricevente_id"]:
-        await notifica(o["ricevente_id"], "⛓️ Chi vende ha scritto dove vuole gli "
-                                          "euro: lo trovi nello scambio.")
+        await notifica(o["ricevente_id"], "💶 <b>Chi vende ha scritto dove vuole gli "
+                                          "euro.</b>\n\nLo trovi nello scambio.",
+                       _p2p_onchain_bottone(o))
     return {"ok": True}
 
 
@@ -94100,13 +94159,15 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
     finally:
         con.close()
     await notifica(altro, (
-        "⛓️ <b>Sats liberati:</b> chi vende ha confermato gli euro e ha firmato. "
-        "Apri la Mini App: il tuo telefono mette la seconda firma e i sats "
+        "🔓 <b>Sats liberati!</b> Chi vende ha confermato gli euro e ha firmato. "
+        f"Compri {_p2p_onchain_quanto(o)}.\n\n"
+        "Apri Barattolo: il tuo telefono mette la seconda firma e i sats "
         "arrivano al tuo wallet."
         if verso == "venditore" else
-        "⛓️ <b>Rimborso proposto:</b> chi compra ha rinunciato e ha firmato. "
-        "Apri la Mini App: il tuo telefono mette la seconda firma e i sats "
-        "tornano a te."))
+        "↩️ <b>Rimborso proposto:</b> chi compra ha rinunciato e ha firmato. "
+        f"Era {_p2p_onchain_quanto(o)}.\n\n"
+        "Apri Barattolo: il tuo telefono mette la seconda firma e i sats "
+        "tornano a te."), _p2p_onchain_bottone(o))
     return {"ok": True}
 
 
@@ -94165,12 +94226,18 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     finally:
         con.close()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
-    testo = ("⛓️ <b>Scambio concluso:</b> i sats sono partiti verso chi ha comprato."
-             if verso == "venditore" else
-             "⛓️ <b>Scambio annullato:</b> i sats sono tornati a chi li aveva depositati.") \
-        + f" Transazione {(txid or arrivato)[:12]}…"
-    for chi in (o["depositante_id"], o["ricevente_id"]):
-        await notifica(chi, testo)
+    tx = f"\n\nTransazione {(txid or arrivato)[:12]}…"
+    quanto = _p2p_onchain_quanto(o)
+    if verso == "venditore":
+        testi = {o["depositante_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai venduto {quanto}.",
+                 o["ricevente_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai comprato {quanto}: "
+                                    "i sats arrivano al tuo wallet."}
+    else:
+        testi = {o["depositante_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats tornano a te. Era {quanto}.",
+                 o["ricevente_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats sono tornati a chi "
+                                    f"li aveva depositati. Era {quanto}."}
+    for chi, testo in testi.items():
+        await notifica(chi, testo + tx, _p2p_onchain_bottone(o))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 
@@ -94207,9 +94274,10 @@ async def p2p_onchain_disputa(oid: int, req: Request, x_tg_init_data: str = Head
     finally:
         con.close()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
-    await notifica(altro, "⚖️ <b>Disputa aperta</b> sul vostro scambio on-chain: un "
-                          "moderatore di Barattolo guarderà e deciderà a chi vanno "
-                          "i sats. Scrivi ai moderatori quel che sai.")
+    await notifica(altro, "⚖️ <b>L'altra parte ha aperto una disputa</b> sullo scambio "
+                          f"on-chain di {_p2p_onchain_quanto(o)}.\n\nUn moderatore di "
+                          "Barattolo guarderà e deciderà a chi vanno i sats. Scrivi ai "
+                          "moderatori quel che sai.", _p2p_onchain_bottone(o))
     await notifica_admin(argomento="dispute", testo=
         f"⚖️ <b>Disputa P2P on-chain</b> sullo scambio #{int(oid)} "
         f"({_fmt_sats(int(o['prezzo_sats']))} sats per {euro} €), aperta da "
@@ -94294,12 +94362,12 @@ async def p2p_onchain_decidi(oid: int, req: Request, x_tg_init_data: str = Heade
         perde = o["depositante_id"] if verso == "venditore" else o["ricevente_id"]
     finally:
         con.close()
-    await notifica(vince, "⚖️ <b>Disputa decisa a tuo favore:</b> Barattolo ha firmato. "
-                          "Apri la Mini App: il tuo telefono mette la seconda firma e "
-                          "i sats partono.")
+    await notifica(vince, "⚖️ <b>Disputa decisa a tuo favore:</b> Barattolo ha firmato.\n\n"
+                          "Apri Barattolo: il tuo telefono mette la seconda firma e "
+                          "i sats partono.", _p2p_onchain_bottone(o))
     await notifica(perde, "⚖️ <b>Disputa decisa:</b> il moderatore ha dato ragione "
-                          "all'altra parte, e Barattolo ha firmato. Se pensi che ci "
-                          "sia un errore, scrivi ai moderatori.")
+                          "all'altra parte, e Barattolo ha firmato.\n\nSe pensi che ci "
+                          "sia un errore, scrivi ai moderatori.", _p2p_onchain_bottone(o))
     await notifica_admin(argomento="dispute", testo=
         f"⛓️ <b>Barattolo ha firmato</b> lo scambio P2P on-chain #{int(oid)} a favore "
         + ("di chi compra bitcoin" if verso == "venditore" else "di chi vende bitcoin")

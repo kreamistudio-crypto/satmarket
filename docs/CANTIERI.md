@@ -75432,6 +75432,61 @@ la card e `ordine` per «miei». La lezione, gemella della prima: il
 pezzo che nessun giro finto attraversa è il passaggio fra il libro e
 il dito; la prova dal vivo l'ha trovato in cinque minuti. Provato: suite severa 26603/0 (2 saltate nostr-tools) e collaudo_p2p_onchain verde, sopra develop 214c200.
 
+**GLI AVVISI E IL «FATTO», STESSO POMERIGGIO (cantiere
+avvisi-p2p-onchain; Andrea durante la prova: «vorrei che fosse
+strutturato come nei messaggi originali nel bot ufficiale con anche il
+tasto apri lo scambio», «quando pago lui dovrebbe capire in automatico
+che ho pagato come avviene nel lightning e deve dire fatto e poi
+chiudersi la pagina riportando sui miei scambi»).** Gli avvisi del
+bot hanno la forma di `_testo_evento_p2p`: la testa in grassetto dice
+cosa è successo, poi cosa si scambia (`_p2p_onchain_quanto`, «10.000
+sats per 9,00 € via Revolut»), una riga vuota e cosa tocca fare
+adesso. Alla presa, chi ha pubblicato legge «Il tuo ordine on-chain è
+stato preso!» e chi ha preso «Hai preso l'ordine on-chain di …!».
+Sotto ogni avviso alle parti c'è il bottone «🟠 Apri lo scambio»
+(`_p2p_onchain_bottone`): il link è quello del Lightning,
+`/p2p?scambio=<nome pubblico>`, e la Mini App riconosce il prefisso
+`bar-onchain-` e apre la pagina on-chain cercando fra i PROPRI scambi.
+Il segno: l'icona dell'on-chain è quella di SATS Routing, un cerchio
+arancione col ₿ bianco dentro; in un tasto di Telegram un disegno non
+ci sta e un'emoji col ₿ non esiste, e Andrea ha scelto il cerchio
+arancione 🟠 (scheda nel thread della prova; scartate la moneta 🪙,
+dorata, e il ₿ nudo). Il fulmine resta al Lightning.
+Il «Fatto»: mentre chi deposita guarda il suo scambio preso, ogni 15
+secondi il telefono chiede al server di guardare mempool, con un freno
+suo, `p2p_onchain_controlla`, 300 all'ora. Appena la transazione si
+vede in rete con almeno l'importo, anche senza conferma, il velo dice
+«Fatto» come dopo la garanzia del Lightning, e l'app chiude il foglio
+del deposito e torna a «I miei scambi». La conferma arriva dopo, con
+l'avviso. Strada scartata: aspettare la conferma per dire «Fatto»,
+perché sono dieci minuti di pagina ferma, e il Lightning dice «Fatto»
+quando il pagamento è partito. Nella stessa prova un deposito di
+15.000 sats su 10.540 è stato visto subito; il di più torna a chi ha
+depositato alla chiusura, come nel mercatino (`_onchain_psbt_giudica`:
+«il resto solo al rimborso di chi compra»). Provato: il collaudo
+controlla la forma della presa, il bottone su OGNI avviso alle parti e
+nessun ⛓️ rimasto; `prove_p2p_onchain` controlla il giudice puro del
+«visto» in node, il battito e il suo freno.
+
+Nello stesso giro («quando clicco ricevuti, libera i sats la pagina
+rimane bloccata»): la firma nel telefono carica la libreria e firma, e
+per qualche secondo non si vedeva niente. Ora «Libera i sats»,
+«Rinuncio» e la co-firma alzano il velo d'attesa del P2P; al riuscito
+il velo dice «Fatto» e l'app torna a «I miei scambi»
+(`fattoOnchainP2P`), al fallito resta sulla pagina e lo dice.
+
+E il posto dove si riceve (Alan: «se non lo avessi fatto avrebbe
+dovuto chiedermelo lì, perché un'altra opzione è inserire una xpub»;
+Andrea: «ora voglio toglierlo per vedere cosa succede»). Chi compra
+bitcoin senza un posto dove ricevere ora se lo vede chiedere nella
+pagina dello scambio (`incassoMancanteOnchainP2P`), con lo stesso
+modulo del Profilo: un indirizzo, oppure la chiave del conto per avere
+un indirizzo nuovo a ogni scambio. Salvato, il server riempie gli
+scambi che aspettavano e la pagina si rifà. Senza quella scelta la
+liberazione resta ferma (409), e i sats restano nel 2-di-3. Nel
+Profilo c'è «Togli»: il server lo sapeva fare (`tipo: 'barattolo'`),
+mancava il tasto. Gli scambi già nati tengono l'indirizzo che avevano.
+
 ## I colori veri all'amministratore del collaudo (30 ott 2026, cantiere collaudo-colori-veri, Andrea: «siccome il blu mi da fastidio puoi mettere gli sfondi originali nellapp collaudo solo per me amministratore? la striscia blu in alto va bene ... per tutti gli altri utenti che hanno accesso al collaudo invece rimane cosi blu»)
 
 Il perché di Andrea: la pagina si giudica coi colori che avrà in

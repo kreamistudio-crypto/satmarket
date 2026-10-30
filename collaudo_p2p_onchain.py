@@ -58,6 +58,15 @@ def main():
     print("=" * 58)
     banco.avvio()
     SRV = banco.SRV
+    # i BOTTONI sotto gli avvisi (30 ott 2026): il banco tiene solo il
+    # testo, e qui serve anche il bottone «🟠 Apri lo scambio»
+    BOTTONI = []
+    _notifica_del_banco = SRV.notifica
+
+    async def notifica_coi_bottoni(chi, testo, bottone=None, *a, **k):
+        BOTTONI.append((chi, testo, bottone))
+        return await _notifica_del_banco(chi, testo, bottone, *a, **k)
+    SRV.notifica = notifica_coi_bottoni
     from embit import bip32, bip39, script
     from embit.ec import PublicKey
     from embit.finalizer import finalize_psbt
@@ -138,7 +147,7 @@ def main():
     # conceda a una persona: qui i freni si allargano (il collaudo degli
     # avvisi fa lo stesso con «annunci»); che esistano lo dice prove.py
     for nome in ("p2p_onchain_pubblica", "p2p_onchain_prendi", "onchain_firma",
-                 "onchain_controlla"):
+                 "onchain_controlla", "p2p_onchain_controlla"):
         SRV.FRENI[nome] = (1000, 3600)
     # la chiave della piattaforma, di prova: cosi' il 38383 esce firmato
     # anche nella gabbia (i relay restano muti per costruzione)
@@ -346,9 +355,28 @@ def main():
           (oa["ruolo"], oa["parte"], oa["altro"], oa["deposito_entro"] > oa["preso_il"]))
     prova("...tutt'e due avvisati, nessuna xpub in giro",
           (True, True, False, False),
-          (detto_a(999, "Deposita"), detto_a(888, "sta depositando"),
+          (detto_a(999, "tocca a te depositare"), detto_a(888, "appena chi vende deposita"),
            conto(999) in r.text, conto(888) in r.text))
     prova("il libro non lo mostra piu'", 0, len(libro()["onchain"]["eventi"]))
+    # GLI AVVISI COME QUELLI DEL LIGHTNING (30 ott 2026, Andrea alla prima
+    # prova): chi ha pubblicato legge «Il tuo ordine on-chain è stato
+    # preso!», chi ha preso «Hai preso l'ordine on-chain di …!», con cosa si
+    # scambia e il bottone dello scambio sotto
+    presa = {chi: (t, b) for chi, t, b in BOTTONI if "preso" in t}
+    prova("la presa: due avvisi nella forma del Lightning, il cerchio arancione 🟠 in testa, "
+          "cosa si scambia, il tempo del deposito a chi deposita",
+          (True, True, True, True, True, True),
+          (presa[999][0].startswith("🟠 <b>Il tuo ordine on-chain è stato preso!</b> Vendi 100.000 sats per 90,00 € via Bonifico, Revolut."),
+           presa[888][0].startswith("🟠 <b>Hai preso l'ordine on-chain di Andrea!</b> Compri 100.000 sats"),
+           "\n\nApri Barattolo: tocca a te depositare" in presa[999][0],
+           "⏳ <b>Hai 6 ore</b>" in presa[999][0],
+           "⏳" not in presa[888][0],
+           "\n\nApri Barattolo:" in presa[888][0]))
+    prova("...e sotto tutti e due il bottone «🟠 Apri lo scambio» col nome "
+          "pubblico dello scambio, che la Mini App sa aprire",
+          (("🟠 Apri lo scambio", f"{SRV.LINK_LIBRO_P2P}?scambio={o['ordine']}"),) * 2
+          + (f"scambio_{o['ordine']}",),
+          (presa[999][1], presa[888][1], SRV._startapp_da_link(presa[999][1][1])))
     con = SRV.db()
     prova("l'indirizzo e' marcato come del P2P (ordine_id negativo)", -oid,
           con.execute("SELECT ordine_id FROM onchain_indirizzi WHERE id=?",
@@ -385,7 +413,7 @@ def main():
     prova("confermati tutti: depositato, con la sua moneta", ("depositato", 1),
           (d["stato"], len(d["utxo"])))
     prova("...chi compra sa di mandare gli euro, chi vende di aspettarli",
-          (True, True), (detto_a(888, "Sats depositati"),
+          (True, True), (detto_a(888, "deposito di garanzia 2-di-3"),
                          detto_a(999, "Deposito confermato")))
 
     # ---- 5) gli euro e le due firme --------------------------------------
@@ -394,7 +422,7 @@ def main():
           403, gesto(999, oid, "euro-inviati").status_code)
     banco.DETTO.clear()
     prova("...Alan lo dice: euro_inviati, e Andrea e' avvisato", (200, True),
-          (gesto(888, oid, "euro-inviati").status_code, detto_a(999, "Euro inviati")))
+          (gesto(888, oid, "euro-inviati").status_code, detto_a(999, "dice di averti inviato")))
     prova("...una volta sola: 409", 409, gesto(888, oid, "euro-inviati").status_code)
     o = uno(999, oid)
     r = gesto(999, oid, "proposta", verso="venditore",
@@ -518,7 +546,7 @@ def main():
           "Alan e i moderatori avvisati",
           (200, "disputa", None, "io", True, True),
           (r.status_code, oa["stato"], oa["proposta"], oa["disputa"]["da"],
-           detto_a(888, "Disputa aperta"),
+           detto_a(888, "aperto una disputa"),
            any("Disputa P2P on-chain" in t for t in banco.AVVISI)))
     prova("in disputa nessuno propone: 409", 409,
           gesto(999, oid3, "proposta", verso="venditore",
@@ -653,6 +681,31 @@ def main():
            "onchain" in libro(999)))
     prova("...e la ronda non tocca niente", None, asyncio.run(SRV._p2p_onchain_ronda()))
     SRV.P2P_ONCHAIN_ATTIVO = True
+
+    # ---- 11-bis) «Togli» dove si riceve (30 ott 2026, Andrea e Alan) ----------
+    print("\n[togliere dove si riceve: i prossimi scambi aspettano una scelta]")
+    come(888)
+    prova("Alan toglie il suo wallet di ricezione: 200, e /api/me non lo dice piu'",
+          (200, ""), (c.post("/api/onchain/incasso", json={"tipo": "barattolo"}).status_code,
+                      c.get("/api/me").json().get("onchain_incasso") or ""))
+    con = SRV.db()
+    try:
+        xa = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=888").fetchone()[0]
+        vuoto = SRV._p2p_onchain_incasso_di(con, 888, xa)
+    finally:
+        con.close()
+    prova("...e per uno scambio nuovo l'incasso nasce vuoto: la pagina glielo chiede",
+          ("", "", "", "", 0), vuoto)
+
+    # ---- 12) gli avvisi, tutti ----------------------------------------------
+    print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
+    nudi = [t[:60] for chi, t, b in BOTTONI
+            if chi in (999, 888) and not (b and b[0] == "🟠 Apri lo scambio"
+                                          and "?scambio=bar-onchain-" in b[1])]
+    prova("in tutto il giro nessun avviso alle parti parte senza il bottone, "
+          "e il segno della catena ⛓️ non c'e' piu' in nessuno",
+          ([], [], True),
+          (nudi, [t[:60] for chi, t, b in BOTTONI if "⛓️" in t], len(BOTTONI) >= 12))
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
