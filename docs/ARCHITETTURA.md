@@ -34773,13 +34773,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `onchain` di `/api/p2p/libro` esce a leva accesa, dalla memoria, e
   l'ETag la conta. Nel telefono: `myP2POnchain`, le card
   `rigaOnchainP2P` in cima al libro del lato (`carteOnchainLibroP2P`,
-  col rettangolo «Novità» che scorre su Compra / Vendi:
-  `apriNovitaOnchainP2P`, `latoNovitaOnchainP2P`),
+  col rettangolo «Novità» che apre il TUTORIAL on-chain: il colpo
+  `apriNovitaOnchainP2P`, poi `tutorialOnchainP2P` sul motore dei giri
+  `avviaTour` con `TAPPE_TUTORIAL_OC_P2P`, le card finte di
+  `esempioTutorialOcP2P` e la fine `fineTutorialOcP2P`; la moneta della
+  rete sta nella scatola dei metodi, `pagaConReteP2P`, anche in «I miei
+  scambi» con `pagaReteCardP2P`; il rettangolo resta APPESO sotto la
+  testata finche' non lo si apre, `novitaOcApertaP2P` sulla chiave
+  `p2pOcNovitaAperta` e l'altezza della testata in `--p2p-testa-alta`
+  da `testaAltaP2P`),
   la vista `view-p2ponchain` (radice «I miei scambi» nella nav, come
   `p2pmod`) con `renderP2POnchain`, `schedaOnchainP2P`; il foglio
   «Pubblica» E' QUELLO DI LIGHTNING (dal 30 ott 2026 sera, cantiere
   oc-identico: `p2pNuovoSheet` con `p2pNuovoOc` acceso, aperto da
-  `apriPubblicaOnchainP2P(lato)` = `apriNuovoOrdineP2P('', 'onchain')`;
+  `apriPubblicaOnchainP2P(lato)`, che chiede la rete con
+  `p2pNuovoReteChiesta` e chiama `apriNuovoOrdineP2P('')`; Barattozon
+  solo via Lightning: col tabacchino l'interruttore tiene spento On-chain;
   le sezioni di Lightning, piu' `sezioneRecapitoOnchainP2P` e
   `riquadroOnchainP2P`, senza Barattozon, intervallo e zona; il gesto
   `pubblicaOnchainDalFoglioP2P`, chiamato da `inviaNuovoOrdineP2P`).
