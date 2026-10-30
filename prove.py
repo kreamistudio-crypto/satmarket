@@ -153104,7 +153104,7 @@ out.foglioVendi = [el('p2pOcSheet').classList.contains('open'), p2pOcLato, el('p
   /Dove vuoi gli euro/.test(f), /btn rosso/.test(f), /Premio|Tipo di prezzo|Cosa vuoi fare/.test(f),
   /sez ico="btc"/.test(f), /Rete di prova/.test(el('p2pOcSopra').innerHTML)];
 const sopra = el('p2pOcSopra').innerHTML;
-out.interruttore = [/p2p-rete-tasto su" aria-checked="true" onclick="cambiaReteP2P\('onchain'\)/.test(sopra),
+out.interruttore = [/p2p-rete-tasto su" aria-checked="true" onclick="cambiaReteP2P\\('onchain'\\)/.test(sopra),
   sopra.indexOf("cambiaReteP2P('onchain')") < sopra.indexOf("cambiaReteP2P('ln')"), /cambio-moneta ln/.test(sopra)];
 LOG.length = 0;
 cambiaReteP2P('onchain'); out.stessaRete = [LOG.slice(), el('p2pOcSheet').classList.contains('open')];
