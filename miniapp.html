@@ -16012,6 +16012,9 @@ function impostaOnion(v){
   onionHost = (v || '').trim();
   scriviOnion();
   renderTor();
+  /* (30 ott 2026, onion-tardi) il tasto «onion» del Cambio, se la
+     pagina era gia' disegnata prima che l'indirizzo arrivasse */
+  if (typeof renderSwapCambio === 'function' && el('swapCambio')) renderSwapCambio();
 }
 /* Il segnaposto della pagina «I tuoi dati»: quella pagina e' markup
    FISSO (renderPrivacy() non esiste piu', e' una decisione presa), e i
@@ -18518,7 +18521,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '920998532b';
+const SWAP_TELEFONO_VER = '8a1c867583';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;

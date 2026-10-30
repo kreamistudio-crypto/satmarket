@@ -180651,6 +180651,19 @@ console.log(JSON.stringify(fuori));
            "const url = 'http://' + host + '/';" in apri,
            "tg.openLink(url)" in apri and "window.open(url, '_blank', 'noopener')" in apri,
            len(re.findall(r"[a-z2-7]{56}\.onion", mini + js))))
+    # (30 ott 2026, onion-tardi) l'indirizzo arriva con la busta della
+    # vetrina: chi apre il Cambio prima di lei non vedeva il tasto. Ora
+    # impostaOnion ridisegna il Cambio, e il ridisegno a pezzi aggiunge o
+    # toglie il tasto accanto al selettore senza toccare i campi
+    imposta = pezzo_js(mini, "function impostaOnion(v){", "\n}\n")
+    rende = pezzo_js(js, "function renderSwapCambio(){", "\n/* LA CIFRA SCRITTA")
+    pezzi = rende[:rende.index("const campoCifra")]
+    prova("(onion-tardi) il tasto «onion» arriva anche a Cambio gia' aperto",
+          (True, 2, True, True),
+          ("if (typeof renderSwapCambio === 'function' && el('swapCambio')) renderSwapCambio();" in imposta,
+           rende.count("onionSwap()"),
+           "u.insertAdjacentHTML('afterend', serve)" in pezzi and "vicino.remove()" in pezzi,
+           pezzi.index("box.dataset.forma === forma0") < pezzi.index("u.insertAdjacentHTML")))
     prova("...il sottotitolo del Cambio dice «bitcoin on-chain» (Andrea), mai spezzato",
           [1, 1, 2], [frasi.count(a) for a in ammesse] + [testi.count("on-\\u2060chain")])
     trovate = sorted({p for f in frasi if f not in ammesse for p in vietate if p in f.lower()})
