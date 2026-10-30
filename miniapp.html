@@ -4237,6 +4237,14 @@
   .giro-porta{margin:18px 0 6px;text-align:center;
     font-size:12.5px;font-weight:700;color:var(--muted)}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  /* la rete nel filtro del libro (30 ott 2026): la moneta piccola
+     davanti al nome, come sulle card */
+  .p2p-filtro-reti .p2p-rete-pill{display:inline-flex;align-items:center;gap:6px}
+  .p2p-filtro-reti .cambio-moneta.p2p-oc-moneta{width:18px;height:18px}
+  .p2p-filtro-reti .cambio-moneta.p2p-oc-moneta .cambio-svg{width:11px;height:11px}
+  /* sulla pillola scelta il fondo e' arancio pieno: la regola del filo
+     bianco di «LA MONETA RESTA ARANCIO» */
+  .p2p-rete-pill.active .cambio-moneta.btc.p2p-oc-moneta{box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
   /* L'ARIA SOTTO I TITOLI del foglio filtro (set 2026, ritocco di
      Andrea): l'etichetta di sezione di casa non ha respiro sotto —
      va bene dove separa due blocchi larghi, qui incollava «Valute»
@@ -39570,6 +39578,11 @@ const nomeTipoAvvisiP2P = t =>
   t[1] || (vesteMetodoP2P(P2P_TABACCHINO) || {}).nome || t[0];
 const P2P_AVVISI_SOGLIE = [['0', 'A prezzo di mercato o meglio'],
                            ['2', 'Almeno 2% meglio'], ['5', 'Almeno 5% meglio']];
+/* LA RETE DEGLI AVVISI (30 ott 2026, Andrea: «la possibilità di ricevere
+   notifiche solo per onchain, solo lightning o tutto»): gemelle di
+   RETI_AVVISI_NUOVI_P2P nel server; la sezione la vede solo chi
+   l'on-chain lo vede (`myP2POnchain`) */
+const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'Solo Lightning']];
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
    delle tre, spento se manca tutto (un server di ieri) */
@@ -39577,8 +39590,10 @@ function normalizzaAvvisiNuoviP2P(p){
   const tutti = P2P_AVVISI_TIPI.map(t => t[0]);
   const tipi = (p && Array.isArray(p.tipi)) ? tutti.filter(t => p.tipi.indexOf(t) >= 0) : [];
   const soglia = String((p && p.soglia != null) ? p.soglia : '');
+  const rete = String((p && p.rete) || '');
   return {attivo: !!(p && p.attivo), tipi: tipi.length ? tipi : tutti,
-          soglia: P2P_AVVISI_SOGLIE.some(s => s[0] === soglia) ? soglia : ''};
+          soglia: P2P_AVVISI_SOGLIE.some(s => s[0] === soglia) ? soglia : '',
+          rete: P2P_AVVISI_RETI.some(r => r[0] === rete) ? rete : ''};
 }
 let myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);   // spento di serie
 function avvisiNuoviP2PInCasa(){
@@ -39628,6 +39643,12 @@ function contenutoAvvisiNuoviP2P(){
     + (on ? 'Attivi' : 'Spenti') + '</button></div>'
     + '<div class="avn-corpo' + (on ? '' : ' avn-spento') + '"'
     + (on ? '' : ' aria-disabled="true"') + '>'
+    + (myP2POnchain
+        ? '<div class="section-label">Rete</div>'
+          + '<div class="p2p-metodi">' + P2P_AVVISI_RETI.map(r =>
+              pill(r[1], p.rete === r[0], "scegliReteAvvisiNuoviP2P('" + r[0] + "')")).join('')
+          + '</div>'
+        : '')
     + '<div class="section-label">Tipo di ordini</div>'
     + '<div class="p2p-metodi">' + P2P_AVVISI_TIPI.map(t =>
         pill(nomeTipoAvvisiP2P(t), p.tipi.indexOf(t[0]) >= 0,
@@ -39688,7 +39709,8 @@ async function setAvvisiNuoviP2P(patch){
   try {
     const r = await fetch(`${API_BASE}/me/avvisi-nuovi-p2p`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia})});
+       body: JSON.stringify({attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia,
+                             rete: voluto.rete || ''})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(d.avvisi_nuovi_p2p);
@@ -39707,6 +39729,10 @@ function scegliTipoAvvisiNuoviP2P(t){
     tipi.splice(i, 1);
   } else tipi.push(t);
   setAvvisiNuoviP2P({tipi});
+}
+function scegliReteAvvisiNuoviP2P(r){
+  if (!myAvvisiNuoviP2P.attivo) return;
+  setAvvisiNuoviP2P({rete: r === 'onchain' || r === 'ln' ? r : ''});
 }
 function scegliSogliaAvvisiNuoviP2P(s){
   if (!myAvvisiNuoviP2P.attivo) return;
@@ -57281,7 +57307,10 @@ function testaAltaP2P(){
   }
 }
 function carteOnchainLibroP2P(k){
-  const righe = p2pOnchainLibro.eventi.filter(o => o.lato === k);
+  /* il filtro «solo Lightning» lascia fuori le card on-chain, non il
+     rettangolo (30 ott 2026) */
+  const righe = p2pFiltro && p2pFiltro.rete === 'ln' ? []
+    : p2pOnchainLibro.eventi.filter(o => o.lato === k);
   if (!righe.length && !myP2POnchain) return '';
   const appeso = myP2POnchain && !novitaOcApertaP2P();
   if (appeso) testaAltaP2P();
@@ -60858,9 +60887,12 @@ function ordineDaEvento(ev, adesso){
    `push` su una copia scriverebbe nella costante e il «vuoto» non
    sarebbe piu' vuoto per nessuno. Una funzione ne fa uno nuovo ogni
    volta. */
+/* LA RETE (30 ott 2026, Andrea: «aggiungi anche la possibilità di
+   filtrare per onchain e lightning»): '' = tutte, 'onchain', 'ln'. La
+   chiede il foglio solo a chi l'on-chain lo vede (`myP2POnchain`). */
 function filtroVuotoP2P(){
   return {valute: [], metodi: [], premioDa: -P2P_PREMIO_MAX,
-          premioA: P2P_PREMIO_MAX, repDa: 0, repA: 5};
+          premioA: P2P_PREMIO_MAX, repDa: 0, repA: 5, rete: ''};
 }
 /* IL FILTRO SPENTO E' `null` e non un oggetto pieno di valori neutri:
    cosi' «non c'e' filtro» e' una cosa sola da controllare, e il
@@ -60877,7 +60909,7 @@ function filtroAccesoP2P(f){
   const v = filtroVuotoP2P();
   return !!(f.valute.length || f.metodi.length
     || f.premioDa > v.premioDa || f.premioA < v.premioA
-    || f.repDa > v.repDa || f.repA < v.repA);
+    || f.repDa > v.repDa || f.repA < v.repA || f.rete);
 }
 /* PURO: un ordine passa o no. Si prova senza browser e senza libro, ed
    e' l'unico posto dove le quattro regole vivono.
@@ -60905,6 +60937,10 @@ function passaFiltroP2P(o, f){
      scritto. */
   if (typeof nascostoPerParacaduteP2P === 'function' && nascostoPerParacaduteP2P(o)) return false;
   if (!o || !f) return true;
+  /* gli ordini di qui sono quelli di Mostro, cioe' Lightning: «solo
+     on-chain» li lascia fuori tutti (quelli on-chain li filtra
+     `carteOnchainLibroP2P`) */
+  if (f.rete === 'onchain') return false;
   if (f.valute.length && f.valute.indexOf(o.fiat) < 0) return false;
   if (f.metodi.length) {
     const suoi = (o.metodi || []).map(m => String(m).toLowerCase());
@@ -63102,6 +63138,13 @@ function muoviDoppioP2P(nome){
   if (sx) sx.textContent = capi.sx;
   if (dx) dx.textContent = capi.dx;
 }
+const P2P_FILTRO_RETI = [['', 'Tutte'], ['onchain', 'On-chain'], ['ln', 'Lightning']];
+function scegliReteFiltroP2P(r){
+  const b = p2pFiltroBozza; if (!b) return;
+  haptic();
+  b.rete = r === 'onchain' || r === 'ln' ? r : '';
+  renderFiltroP2P();
+}
 function scegliValutaFiltroP2P(cod){
   const b = p2pFiltroBozza; if (!b) return;
   haptic();
@@ -63134,7 +63177,18 @@ function renderFiltroP2P(){
     (vestita ? ' p2p-pill-marchio' : '') +
     '" data-v="' + esc(testo) + '" onclick="' + gesto + '(this.dataset.v)">' +
     (dentro || esc(testo)) + '</button>';
-  box.innerHTML =
+  /* LA RETE IN CIMA (30 ott 2026), una scelta sola: Tutte, On-chain con
+     la moneta, Lightning col fulmine — e solo a chi l'on-chain lo vede */
+  const rete = !myP2POnchain ? '' :
+    '<div class="section-label">Rete</div>' +
+    '<div class="p2p-metodi p2p-filtro-reti">' + P2P_FILTRO_RETI.map(r =>
+      '<button type="button" class="tema-pill p2p-rete-pill' + ((b.rete || '') === r[0] ? ' active' : '') +
+      '" aria-pressed="' + ((b.rete || '') === r[0] ? 'true' : 'false') +
+      '" onclick="scegliReteFiltroP2P(\'' + r[0] + '\')">' +
+      (r[0] === 'onchain' ? P2P_OC_MONETA : r[0] === 'ln' ? P2P_LN_MONETA : '') +
+      esc(r[1]) + '</button>').join('') +
+    '</div>';
+  box.innerHTML = rete +
     '<div class="section-label">Valute</div>' +
     '<div class="p2p-metodi">' + P2P_VALUTE.map(v =>
       pill(v.cod, b.valute.indexOf(v.cod) >= 0, 'scegliValutaFiltroP2P')).join('') +
