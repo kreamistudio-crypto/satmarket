@@ -3916,16 +3916,38 @@
     position:relative;top:-2px}
   .p2p-rete .cambio-moneta.p2p-oc-moneta{width:26px;height:26px}
   .p2p-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:15px;height:15px}
+  /* LA MONETA RESTA ARANCIO ANCHE SUI FONDI ARANCIO (30 ott 2026,
+     Andrea: «il logo onchain deve essere arancio e non bianco ...
+     piuttosto metti un leggero bordo bianco»): dove il fondo e' arancio
+     la moneta porta un filo bianco, e basta */
+  .p2p-oc-novita .cambio-moneta.p2p-oc-moneta,.p2p-oc-pubblica .cambio-moneta.p2p-oc-moneta,
+  .p2p-scelta-rete .cambio-moneta.btc.p2p-oc-moneta,#p2pOcInvia .cambio-moneta.p2p-oc-moneta{
+    box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   /* IL RETTANGOLO «NOVITÀ» nel libro, sotto Recenti e Filtro: l'arancio
-     pieno dei bottoni di casa, la moneta su un tondo chiaro */
-  .p2p-oc-novita{display:flex;align-items:center;gap:12px;width:100%;margin:12px 0 4px;
-    padding:9px 16px 9px 9px;border:0;border-radius:16px;cursor:pointer;
-    background:var(--b-pri-bg);color:var(--b-pri-fg);box-shadow:var(--b-pri-sh);
-    font:inherit;font-weight:800;font-size:16px;text-align:left;-webkit-tap-highlight-color:transparent}
-  .p2p-oc-novita:active{transform:scale(.985)}
-  .p2p-oc-novita .cambio-moneta.p2p-oc-moneta{width:40px;height:40px;background:#FFF4E5;color:#F7931A}
-  .p2p-oc-novita .cambio-moneta.p2p-oc-moneta .cambio-svg{width:23px;height:23px;stroke-width:2.3}
+     pieno dei bottoni di casa. PIU' PICCOLO E CHE SCORRE (30 ott 2026,
+     Andrea: «quando ci clicco sopra subito la tendina si muove verso
+     destra e compaiono i tasti compra o vendi»): un binario largo il
+     doppio, i due lati a sinistra e la faccia a destra; aperto, il
+     binario va a destra e i lati entrano. */
+  .p2p-oc-novita{position:relative;overflow:hidden;width:100%;margin:10px 0 4px;
+    border-radius:14px;height:48px}
+  .p2p-oc-binario{display:flex;width:200%;height:100%;transform:translateX(-50%);
+    transition:transform .32s cubic-bezier(.2,.8,.2,1)}
+  .p2p-oc-novita.aperta .p2p-oc-binario{transform:translateX(0)}
+  .p2p-oc-faccia,.p2p-oc-lati{flex:0 0 50%;height:100%}
+  .p2p-oc-faccia{display:flex;align-items:center;gap:10px;padding:0 14px 0 8px;border:0;cursor:pointer;
+    background:var(--b-pri-bg);color:var(--b-pri-fg);
+    font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
+  .p2p-oc-faccia:active{filter:brightness(.97)}
+  .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta{width:32px;height:32px}
+  .p2p-oc-faccia .cambio-moneta.p2p-oc-moneta .cambio-svg{width:18px;height:18px;stroke-width:2.3}
   .p2p-oc-novita-testo{flex:1;min-width:0}
+  .p2p-oc-lati{display:flex;gap:8px;padding:0 2px}
+  .p2p-oc-lati .p2p-oc-lato{flex:1 1 0;min-height:0;height:100%;margin:0;padding:0 10px;font-size:15px;
+    display:flex;align-items:center;justify-content:center;gap:8px}
+  /* il margine dei bottoni del libro (#view-p2p .btn) qui li tagliava */
+  #view-p2p .p2p-oc-lati .p2p-oc-lato{margin:0}
+  .p2p-oc-lato .cambio-moneta.p2p-oc-moneta{width:24px;height:24px;box-shadow:0 0 0 2px rgba(255,255,255,.9)}
   .p2p-oc-freccia{flex:0 0 auto;width:9px;height:9px;margin-right:4px;
     border:solid currentColor;border-width:0 2.5px 2.5px 0;transform:rotate(-45deg);opacity:.75}
   /* il titolo della pagina e la striscia: la moneta prima del nome */
@@ -3933,7 +3955,6 @@
   .p2p-oc-tit .cambio-moneta.p2p-oc-moneta{width:26px;height:26px}
   /* il tasto puro della pagina */
   .btn.p2p-oc-pubblica{display:flex;align-items:center;justify-content:center;gap:10px}
-  .p2p-oc-pubblica .cambio-moneta.p2p-oc-moneta{background:#FFF4E5;color:#F7931A}
   /* LA SCELTA DEL +: tasti rettangolari alti, la moneta su un tondo
      chiaro a sinistra e il nome grande */
   .p2p-scelta{display:grid;gap:12px;margin:8px 0 6px}
@@ -3941,7 +3962,6 @@
     min-height:66px;margin:0;padding:10px 18px 10px 12px;font-size:18px}
   .p2p-scelta-rete .cambio-moneta.p2p-oc-moneta{width:42px;height:42px}
   .p2p-scelta-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:23px;height:23px;margin:0}
-  .p2p-scelta-rete .cambio-moneta.btc.p2p-oc-moneta{background:#FFF4E5;color:#F7931A}
   .p2p-scelta-rete .logo-bz{width:42px;height:40px;object-fit:contain}
   /* IL FOGLIO «PUBBLICA» ON-CHAIN: la scritta sopra il titolo, e la
      valuta che non si sceglie (una riga, senza freccina) */
@@ -3960,7 +3980,6 @@
   .p2p-rete-tasto:not(.su) .cambio-moneta.p2p-oc-moneta{opacity:.55}
   .p2p-tendina.p2p-oc-fissa{cursor:default}
   .btn#p2pOcInvia{display:flex;align-items:center;justify-content:center;gap:10px}
-  #p2pOcInvia .cambio-moneta.p2p-oc-moneta{background:#FFF4E5;color:#F7931A}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
      metodi della card, la pillola del filtro e la voce del foglio
@@ -34130,7 +34149,17 @@ function chiudiPicker(){
    ed e' un passo indietro come tutti gli altri: se non passasse di li'
    resterebbe un gradino morto nella cronologia, cioe' un indietro che
    non fa niente. */
-function tapFuoriSheet(){ navIndietro(); }
+/* IL CLICK FANTASMA DEL + (30 ott 2026, Andrea: «quando clicco sul
+   pulsante vendi in rosso ... non si apre niente»): su «Vendi BTC» il +
+   apre al pointerup (IL TRASCINO), e il click che il browser manda subito
+   dopo cade sul velo appena acceso — che chiudeva il foglio della scelta
+   On-chain / Lightning nello stesso istante. Lo stesso orologio di
+   `toccaPiu`: un tocco sul velo entro 700 ms dal gesto del + non e' un
+   tocco fuori dal foglio. */
+function tapFuoriSheet(){
+  if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
+  navIndietro();
+}
 /* Esc chiude, le frecce scorrono le voci (solo a picker aperto) */
 document.addEventListener('keydown', e => {
   if (!el('pickerSheet').classList.contains('open')) return;
@@ -57099,13 +57128,43 @@ const P2P_LN_MONETA = '<span class="cambio-moneta ln p2p-oc-moneta" aria-hidden=
    miei scambi» con quelli di Lightning). Al posto della riga tratteggiata di prima,
    che diceva in piccolo quel che la pagina dice gia'. Chi non e'
    ammesso vede le card e basta: per lui sarebbe una porta su «in prova». */
+/* il rettangolo aperto (i due lati in vista) o chiuso (la faccia):
+   si ricorda fra un disegno del libro e l'altro, si chiude scelto un lato */
+let p2pOcNovitaAperta = false;
+function apriNovitaOnchainP2P(){
+  haptic();
+  p2pOcNovitaAperta = true;
+  const r = el('p2pOcNovita');
+  if (!r) return;
+  r.classList.add('aperta');
+  r.querySelector('.p2p-oc-lati')?.removeAttribute('inert');
+  r.querySelector('.p2p-oc-faccia')?.setAttribute('inert', '');
+}
+function latoNovitaOnchainP2P(lato){
+  p2pOcNovitaAperta = false;
+  const r = el('p2pOcNovita');
+  if (r) {
+    r.classList.remove('aperta');
+    r.querySelector('.p2p-oc-lati')?.setAttribute('inert', '');
+    r.querySelector('.p2p-oc-faccia')?.removeAttribute('inert');
+  }
+  apriPubblicaOnchainP2P(lato);
+}
 function carteOnchainLibroP2P(k){
   const righe = p2pOnchainLibro.eventi.filter(o => o.lato === k);
   if (!righe.length && !myP2POnchain) return '';
   const porta = myP2POnchain
-    ? '<button type="button" class="p2p-oc-novita" onclick="apriPubblicaOnchainP2P()">'
+    ? '<div class="p2p-oc-novita' + (p2pOcNovitaAperta ? ' aperta' : '') + '" id="p2pOcNovita">'
+      + '<div class="p2p-oc-binario">'
+      + '<div class="p2p-oc-lati"' + (p2pOcNovitaAperta ? '' : ' inert') + '>'
+      + '<button type="button" class="btn primary p2p-oc-lato" onclick="latoNovitaOnchainP2P(\'buy\')">'
+      + P2P_OC_MONETA + 'Compra</button>'
+      + '<button type="button" class="btn rosso p2p-oc-lato" onclick="latoNovitaOnchainP2P(\'sell\')">'
+      + P2P_OC_MONETA + 'Vendi</button></div>'
+      + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaOnchainP2P()"' + (p2pOcNovitaAperta ? ' inert' : '') + '>'
       + P2P_OC_MONETA + '<span class="p2p-oc-novita-testo">Novità: scambi on-chain</span>'
       + '<span class="p2p-oc-freccia" aria-hidden="true"></span></button>'
+      + '</div></div>'
     : '';
   return porta + righe.map(rigaOnchainP2P).join('');
 }
@@ -58223,18 +58282,33 @@ function interruttoreReteP2P(attiva){
 }
 /* il passaggio da un foglio all'altro, col lato che si porta dietro: il
    velo resta, il foglio di prima scende, quello nuovo sale */
+/* SENZA SALTO (30 ott 2026, Andrea: «quando scelgo tra lightning e
+   onchain la pagina salta»): i due fogli si scambiano FERMI — niente
+   scivolata e niente morfosi dal + (`p2pSenzaCorsa`, letta da
+   `morfoPuoiP2P`); le corse tornano al giro dopo */
+let p2pSenzaCorsa = false;
 function cambiaReteP2P(rete){
   const ln = el('p2pNuovoSheet').classList.contains('open');
   const oc = el('p2pOcSheet').classList.contains('open');
   if ((rete === 'ln' && ln) || (rete === 'onchain' && oc)) return;
-  if (rete === 'onchain') {
-    el('p2pNuovoSheet').classList.remove('open');
-    return apriPubblicaOnchainP2P(p2pLato === 'vendo' ? 'sell' : 'buy');
+  const fogli = [el('p2pNuovoSheet'), el('p2pOcSheet')];
+  fogli.forEach(f => { if (f && f.style) f.style.transition = 'none'; });
+  p2pSenzaCorsa = true;
+  try {
+    if (rete === 'onchain') {
+      el('p2pNuovoSheet').classList.remove('open');
+      apriPubblicaOnchainP2P(p2pLato === 'vendo' ? 'sell' : 'buy');
+    } else {
+      el('p2pOcSheet').classList.remove('open');
+      const lato = p2pOcLato === 'sell' ? 'vendo' : 'compro';
+      if (lato !== p2pLato && typeof setLatoP2P === 'function') setLatoP2P(lato, true);
+      apriNuovoOrdineP2P();
+    }
+  } finally {
+    p2pSenzaCorsa = false;
+    if (fogli[0] && typeof fogli[0].offsetWidth !== 'undefined') void fogli[0].offsetWidth;
+    fogli.forEach(f => { if (f && f.style) f.style.transition = ''; });
   }
-  el('p2pOcSheet').classList.remove('open');
-  const lato = p2pOcLato === 'sell' ? 'vendo' : 'compro';
-  if (lato !== p2pLato && typeof setLatoP2P === 'function') setLatoP2P(lato, true);
-  apriNuovoOrdineP2P();
 }
 
 function sceltaReteP2P(rete){
@@ -76116,6 +76190,8 @@ function barraSeccaP2P(){
    dopo l'avvio la discesa non partiva — l'ha visto il banco dal vivo. */
 function morfoPuoiP2P(prima){
   if (effettiRidotti()) return false;
+  /* il cambio di rete in cima al foglio non vola dal + (30 ott 2026) */
+  if (typeof p2pSenzaCorsa !== 'undefined' && p2pSenzaCorsa) return false;
   if (!matchMedia('(max-width: 767px)').matches) return false;
   const tondo = tondoBarraP2P();
   return !!(el('p2pMorfo') && (prima || el('p2pNuovoInvia')) && tondo

@@ -75874,3 +75874,59 @@ alberi (34 sezioni, 3302 prove) verdi dopo il rebase; la suite severa
 intera era verde prima (26649/0, le 2 SALTATE di nostr-tools assente
 nella macchina cloud).
 
+
+## Il rettangolo «Novità» che scorre, il + rosso che non apriva niente, la moneta arancio e il cambio di rete senza salto (30 ott 2026, cantiere oc-come-ln passo 1, Andrea alle 15:10-15:11: «il rettangolo novita fallo leggermente piu piccolo, quando ci clicco sopra subito la tendina si muove verso destra e compaiono i tasti compra o vendi», «quando scelgo tra lightning e onchain la pagina salta», «quando clicco sul pulsante vendi in rosso o sul pulsante barattozon non si apre niente», «il logo onchain deve essere arancio e non bianco ... piuttosto metti un leggero bordo bianco»)
+
+Quattro ritocchi dalle schermate del collaudo; il quinto della stessa
+lettera (il foglio on-chain identico a quello di Lightning: prezzo di
+mercato o fisso, «Chi può prendere l'ordine», pausa, paracadute) è il
+passo 2, con la sua voce, perché tocca anche il server.
+
+IL GUASTO DEL + ROSSO. Su «Vendi BTC» il + apre al pointerup (IL
+TRASCINO), e il click che il browser manda subito dopo cadeva sul velo
+`#sheetBg`, appena acceso dal foglio della scelta: `tapFuoriSheet` →
+`navIndietro` lo richiudeva nello stesso istante. Da fuori: «Lightning»
+e «Barattozon» non aprivano niente, perché il foglio da cui si
+sceglievano non c'era già più. Su «Compra BTC» il + apre al click, e lì
+non succedeva. La cura usa lo stesso orologio di `toccaPiu`
+(`p2pPiuGestoAt`): un tocco sul velo entro 700 ms dal gesto del + non è
+un tocco fuori dal foglio. Visto dal vivo col tocco vero di playwright
+(hasTouch): prima la scelta si chiudeva, dopo «Lightning» e «Barattozon»
+aprono il loro foglio. Scartato: spostare l'apertura al click anche su
+«Vendi BTC» (il trascino serve alla morfosi e ha le sue prove).
+
+IL RETTANGOLO CHE SCORRE. Alto 48 px (era più grosso), moneta 32. Dentro,
+un binario largo il doppio: a sinistra i due lati «Compra» (verde) e
+«Vendi» (rosso), a destra la faccia «Novità: scambi on-chain». Toccata
+la faccia il binario va a destra e i lati entrano; un lato apre il foglio
+«Pubblica» on-chain col suo lato e richiude il rettangolo. La parte
+nascosta è `inert`, così il lettore di schermo e il tab non ci cadono.
+Lo stato (`p2pOcNovitaAperta`) sopravvive ai ridisegni del libro, che
+arrivano a ogni evento dei relay. Il margine dei bottoni del libro
+(`#view-p2p .btn{margin-top:14px}`) tagliava i lati: azzerato col
+selettore che lo batte, misurato dal vivo.
+
+LA MONETA ARANCIO. Via le cinque regole che la facevano crema
+(`#FFF4E5`) sugli sfondi arancio; al loro posto un anello bianco di 2 px
+(`box-shadow`), che la stacca dal fondo arancio senza cambiarle colore.
+
+IL SALTO. Il cambio Lightning / On-chain chiudeva un foglio e ne apriva un
+altro: uno scendeva, l'altro saliva, e dal + partiva anche la morfosi.
+Adesso i due si scambiano fermi: corse spente sui due fogli durante lo
+scambio (`style.transition = 'none'`, rimesse dopo un reflow) e
+`p2pSenzaCorsa`, letta da `morfoPuoiP2P`. Resta una differenza di
+contenuto (la riga «Rete di prova (signet)» e i campi diversi), che il
+passo 2 toglie col foglio unico.
+
+Prove: `prove_grafica_p2p_onchain` (il rettangolo chiuso/aperto/lato nel
+banco node, il velo coi 700 ms in un banco a parte, l'anello e niente
+crema, le corse spente e la morfosi ferma), la sentinella del «Novità» in
+`prove_deposito_p2p_onchain`. Controprove: tolta ciascuna delle sette
+cure (guardia del velo, `p2pSenzaCorsa = true`, la guardia in
+`morfoPuoiP2P`, l'anello, il lato passato al foglio, la chiusura del
+rettangolo, l'`inert`) la sezione va rossa, rimesse torna verde.
+Giro dal vivo a 390 px, tema scuro: rettangolo 358×48, aperto coi due
+lati interi, «Vendi» apre il foglio on-chain con lato sell.
+
+Da guardare sul telefono: il + rosso su «Vendi BTC» nella WebView di
+Telegram, che è quella che conta.
