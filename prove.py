@@ -180862,6 +180862,24 @@ console.log(JSON.stringify(fuori));
            rende.count("onionSwap()"),
            "u.insertAdjacentHTML('afterend', serve)" in pezzi and "vicino.remove()" in pezzi,
            pezzi.index("box.dataset.forma === forma0") < pezzi.index("u.insertAdjacentHTML")))
+    # (30 ott 2026, cifre-stessa-misura, Andrea: «il tasto onion fammelo
+    # rettangolare in stile barattolo sotto le card») il tasto sta subito
+    # dopo le tre tessere, e il ridisegno a pezzi lo cerca li'
+    prova("(cifre-stessa-misura) il tasto «onion» sotto le tre tessere, rettangolare",
+          (1, 0, True, True),
+          (rende.count('<ul class="cambio-tessere">${tessere}</ul>${onion}'),
+           rende.count("</div>${onion}"),
+           "box.querySelector('.cambio-tessere')" in pezzi,
+           "border-radius:14px;" in re.search(r"\.cambio-onion\{[^}]*\}", mini).group(0)))
+    # (30 ott 2026, cifre-stessa-misura, Andrea: «quando cambio da bitcoin
+    # a satoshi ... la grandezza dei numeri dentro le caselle cambiano?
+    # non dovrebbero») la cifra in BTC non ha una grandezza sua: la
+    # prende da .cambio-cifra come quella in sats, anche sotto i 350 px
+    prova("(cifre-stessa-misura) la cifra in BTC e in sats della stessa grandezza",
+          ([], 1, True),
+          (re.findall(r"\.cambio-cifra-campo\.btc\{[^}]*font[^}]*\}", mini),
+           mini.count(".cambio-cifra-campo.btc{width:10ch}"),
+           ".cambio-cifra{font-size:20px}" in mini[mini.index("@media (max-width:350px){\n    .cambio-lato{gap:8px"):][:200]))
     prova("...il sottotitolo del Cambio dice «bitcoin on-chain» (Andrea), mai spezzato",
           [1, 1, 2], [frasi.count(a) for a in ammesse] + [testi.count("on-\\u2060chain")])
     trovate = sorted({p for f in frasi if f not in ammesse for p in vietate if p in f.lower()})
