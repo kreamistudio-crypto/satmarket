@@ -3951,7 +3951,8 @@
     border-radius:14px;height:48px}
   .p2p-oc-faccia{position:absolute;inset:0;display:flex;align-items:center;gap:10px;
     padding:0 14px 0 8px;border:0;border-radius:14px;cursor:pointer;
-    background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink);
+    background:linear-gradient(90deg,rgba(247,147,26,.42) 0%,rgba(247,147,26,.10) 100%),var(--card);
+    box-shadow:inset 0 0 0 .5px rgba(247,147,26,.30);color:var(--ink);
     transition:background-color .25s ease,box-shadow .25s ease,color .25s ease;
     font:inherit;font-weight:800;font-size:15px;text-align:left;-webkit-tap-highlight-color:transparent}
   /* 17:55 il gradiente della scelta del + (Andrea: «fai con quel gradiente
@@ -3972,7 +3973,13 @@
      alla freccetta; quando lo clicchi si colora arancione e poi si spegne
      di nuovo finito il tutorial»): `--card` col filo delle card, la
      scritta d'inchiostro, e «Novità» in arancio accanto alla freccia;
-     acceso, l'arancio pieno con le scritte bianche */
+     acceso, l'arancio pieno con le scritte bianche.
+     L'ARANCIO LEGGERO (31 ott, 19:42, Andrea: «mi rifai colorato il banner
+     novità? magari arancio leggero, poi come al solito quando lo schiacci
+     si colora di arancio»): fra tre varianti (foto 43) la B, un velo
+     arancio che sfuma da sinistra (42%, dietro la moneta) a destra (10%)
+     sopra il fondo delle card; il filo arancio piu' fine fra tre bordi (foto
+     45, 19:49: mezzo pixel al 30%); il tocco resta l'arancio pieno di `acceso` */
   .p2p-oc-faccia:active{filter:brightness(1.06)}
   /* la riga della rete sotto il cappello del dettaglio e della presa */
   .p2p-via{display:block;margin-top:1px;font:700 13px 'Nunito',sans-serif;color:var(--muted)}

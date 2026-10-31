@@ -153619,8 +153619,10 @@ console.log(JSON.stringify(out));
            ".p2p-scelta-rete .cambio-moneta" in _anello,
            # 18:43 il gradiente non piace piu'; 18:52 quello del tasto
            # On-chain del +; 19:01 tinta unica scura col filo della D
-           # 19:33 «troppo scuro»: la variante C (19:36); 20:24 il fondo delle card
-           "background:var(--card);box-shadow:inset 0 0 0 1px var(--line-soft);color:var(--ink);" in _faccia))
+           # 19:33 «troppo scuro»: la variante C (19:36); 20:24 il fondo delle card;
+           # 31 ott 19:44 l'arancio leggero sfumato sopra il fondo delle card (la B)
+           "background:linear-gradient(90deg,rgba(247,147,26,.42) 0%,rgba(247,147,26,.10) 100%),var(--card);" in _faccia
+           and "box-shadow:inset 0 0 0 .5px rgba(247,147,26,.30);" in _faccia))
     _conf_via = pezzo_js(mini, "function chiediConferma(c){", "\n}\n")
     prova("...e la domanda di casa sa dire la rete sotto il titolo, a testo nudo", (True, True),
           ("via.textContent = c.via;" in _conf_via and "el('confTit').appendChild(via);" in _conf_via,
