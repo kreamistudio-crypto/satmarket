@@ -28441,6 +28441,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   passo 2 e Info P2P lo dicono col numero vivo. Il custode non si nomina
   a schermo: le frasi nuove dicono «si fissa alla presa». Il verbale:
   CANTIERI, «Barattozon a mercato o a prezzo fisso, minimo 25 €».
+  BARATTOZON IN COMPRA (31 ott 2026, richiesta di Andrea: «acquistare
+  satoshi "contanti al tabacchino" [...] inserendo un range di prezzo»).
+  Fin qui il tabacchino lo pubblicava solo chi vende (l'ordine Amazon
+  e' suo); adesso anche chi COMPRA sats: `metodiPubblicabiliP2P` offre
+  il tabacchino ai due lati. IN COMPRA NIENTE PERCORSO: l'ordine e' un
+  intervallo a mercato come gli altri, a euro interi, col metodo SENZA
+  importo («Contanti al tabacchino», che `P2P_TABACCHINO_PM` gia'
+  ammetteva) e senza `expires_at`. Nel foglio il «percorso» e'
+  `tabacchinoP2P(metodi) && lato !== 'compro'`, scritto per esteso in
+  `valeNuovoOrdineP2P`, `ordineDaCampiP2P`, `campiNuovoP2P`,
+  `renderNuovoOrdineP2P` e nei campi (i banchi estraggono le funzioni
+  una per una: una funzione nuova le avrebbe rotte tutte). Il giudice
+  in compra: da solo, mai a prezzo fisso, il MASSIMO obbligatorio, il
+  tetto di Amazon sul massimo e `BARATTOZON_MIN_EURO` sul primo capo; i
+  due campi a vista, la leva del prezzo nascosta, la riga
+  `NOTA_FASCIA_BZ_COMPRO`. LA PRESA (`bzInCompraP2P`: libro `buy` col
+  tabacchino): «Scegli» diventa «🧾 Il tuo PayCode» e apre il foglio
+  «Quanto» col suo corpo (`corpoPresaBzP2P`): importo esatto coi
+  centesimi, PayCode, scadenza nel formato del recapito («17/09/2026
+  alle 14:30», `leggiDataTabacchinoP2P`), codice a barre facoltativo. Il
+  giudice e' UNO, puro, `valePresaBzP2P`: tetto di Amazon, l'INTERO PER
+  ECCESSO (`euroFiloTabacchinoP2P`) dentro la fascia, le nove cifre, la
+  scadenza fra il margine di chi pubblica un PayCode
+  (`margineTabacchinoP2P`, mai meno di due ore: c'e' da bloccare la
+  garanzia, dare la fattura e andare al tabacchino), le 72 ore e la
+  finestra della garanzia; torna la riga del tabacchino gia' composta
+  dalla forma del recapito. Sta in `p2pDettBz` (di quell'ordine o di
+  nessuno, azzerata da `apriDettaglioP2P`), la mostra `rigaPresaBzP2P`
+  sopra il conto, `confermaDettaglioP2P` la RIGIUDICA al tocco di
+  «Vendi» (la scadenza corre) e `eseguiPresaP2P` la scrive sulla riga
+  (`ord.tabacchino`, `ord.scade`) solo su un Barattozon in compra. Sul
+  filo va l'intero per eccesso: chi paga riceve almeno il valore di
+  quel che paga, la differenza sotto l'euro la mette chi vende, e il
+  foglio lo dice. DA LI' E' LA STRADA DI SEMPRE, che era gia' per ruolo
+  e non per chi pubblica: `recapitoDaAutoInvio` manda il PayCode quando
+  si sa chi e' l'altro (per chi prende un ordine d'acquisto, a scambio
+  attivo), con la domanda «e' dei nostri?»; a chi compra il riquadro
+  del PayCode, a chi vende il controllo su Amazon. Due ritocchi perche'
+  il libro non menta: `scadenzaTabacchinoOrdineP2P` legge l'`expires_at`
+  come scadenza del PayCode SOLO se l'ordine l'ha pubblicato chi vende,
+  e `avvisoPresaTabacchinoP2P` tace sugli ordini d'acquisto. Il
+  verbale: CANTIERI, «Barattozon anche in compra».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):
