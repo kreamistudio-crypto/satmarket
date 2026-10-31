@@ -73310,3 +73310,68 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## Barattozon anche in compra: la fascia, e il PayCode di chi prende (31 ott 2026, cantiere barattozon-compra, richiesta di Andrea)
+
+**LA RICHIESTA.** «Aggiungi la possibilità di acquistare satoshi
+"contanti al tabacchino", quindi Barattozon anche in compra, inserendo
+un range di prezzo. Di modo che un utente possa poi fare l'acquisto
+Amazon prendendo quell'ordine, impostando il valore all'interno del
+range e dando poi PayCode e scadenza.»
+
+**COSA SI È DECISO.** Chi compra sats pubblica una FASCIA (per esempio
+30-80 €) col metodo «Contanti al tabacchino» senza importo; è un
+intervallo a mercato come gli altri, quindi niente percorso a quattro
+tappe, niente prezzo fisso (un intervallo non ha sats fissi), il
+massimo obbligatorio, il tetto di Amazon sul massimo e il minimo di
+Barattozon sul primo capo. Chi vende sats e ha un carrello Amazon
+prende l'ordine dal foglio «Quanto», che per questi ordini chiede
+l'importo esatto del PayCode, le nove cifre, la scadenza e il codice a
+barre facoltativo. Il coordinatore riceve l'INTERO PER ECCESSO
+(47,30 € → 48), la stessa regola di Barattozon a mercato: chi paga al
+tabacchino riceve sempre almeno il valore di quel che paga, e la
+differenza la mette chi vende (il foglio lo dice con la cifra). È
+l'intero per eccesso a dover stare nella fascia. La scadenza deve
+coprire il margine di chi pubblica un PayCode (mai meno di due ore,
+4 ore e 30 coi tempi di oggi), le 72 ore e la finestra della garanzia.
+Da lì in poi tutto era già per ruolo: i dati stanno sulla riga della
+presa come quelli di chi pubblica, e l'invio automatico li manda a
+scambio attivo, con la domanda «è dei nostri?» davanti.
+
+**LE STRADE SCARTATE.** Un foglio nuovo per la presa: il foglio
+«Quanto» è già quello che si apre sopra il dettaglio per scegliere la
+cifra, e gli si è dato un corpo suo. Il selettore a griglia della
+scadenza del percorso: scrive nei campi della pubblicazione
+(`p2pNuovoTab`), e staccarlo voleva dire toccare un pezzo provato da
+tanti banchi; la scadenza si scrive come nel form del recapito, che
+già la accetta così. La firma nuova di `eseguiPresaP2P` (un quarto
+argomento): una decina di banchi la cercano per testo; i dati arrivano
+da `p2pDettBz`, di quell'ordine o di nessuno. Una funzione
+«percorso» condivisa: i banchi estraggono le funzioni una per una, e
+la condizione è scritta per esteso.
+
+**COSA È STATO PROVATO.** `prove_barattozon_in_compra` (28 prove, in
+node): il giudice della fascia (buona, senza massimo, a prezzo fisso,
+con un altro metodo, sotto il minimo, sopra il tetto beta e sopra
+Amazon, coi centesimi), il percorso di vendita intatto, l'ordine sul
+filo (buy, 30-80, `amount` 0, metodo senza importo, nessun
+`expires_at`), la fascia che resta cambiando metodo, la presa (esatto,
+intero per eccesso, PayCode e importo normalizzati, testo della forma
+del tabacchino), i capi della fascia sull'intero per eccesso, la
+scadenza nei suoi cinque no, il libro che non diventa un PayCode sugli
+ordini d'acquisto, i passi di chi vende prendendo, il payload della
+presa, il foglio dell'importo (il primo capo si conferma col massimo
+ancora vuoto: `giudizioEuroFoglioP2P` non gli attribuisce la frase del
+massimo mancante, che negli altri ordini non esiste), e il cablaggio (riga scritta solo su un Barattozon in compra,
+rigiudizio prima di prendere, avviso del tempo muto, dati azzerati
+aprendo un altro dettaglio). Suite severa intera nel worktree.
+
+**COSA RESTA DA GUARDARE.** Non provato dal vivo: una presa vera a due
+telefoni sul collaudo (pubblico la fascia da Compra BTC, prendo da
+Vendi BTC col PayCode di un carrello vero, il PayCode arriva a chi
+compra a garanzia bloccata). Non toccati, da decidere: il tasto
+Barattozon a tendina resta solo su «Vendi BTC» (in compra si sceglie
+dai metodi); gli avvisi «ordini nuovi» del server mettono un ordine
+d'acquisto col tabacchino sotto «barattozon» (`_tipo_nuovo_p2p`), che
+oggi vuol dire «da pagare al tabacchino»; «Info P2P» e la guida dei
+passi raccontano Barattozon solo dal lato di chi vende.
