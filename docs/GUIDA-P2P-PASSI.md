@@ -838,7 +838,7 @@ contanti» (contanti di persona), «✅ Ho pagato al tabacchino»
 - **La zona di scambio** (dal 10 ott 2026): nel foglio «Pubblica»,
   appena fra i metodi c'è «💵 Contanti», sotto compare la sezione «Zona
   di scambio» col campo «Città o zona, es. Milano centro» e la riga
-  «Solo indicativa: non scrivere il tuo indirizzo». È obbligatoria, al
+  «Solo indicativa: non scrivere il tuo indirizzo. Col nome del comune compari sulla mappa, al suo centro» (la seconda frase dal 31 ott 2026, con la mappa). È obbligatoria, al
   massimo 40 caratteri: senza, «⚡ Pubblica ordine» avvisa «Scrivi la
   zona di scambio: una città o una zona, come «Milano centro»». Dalla
   seconda volta il campo parte già compilato con l'ultima zona usata, e

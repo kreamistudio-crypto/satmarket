@@ -3762,6 +3762,42 @@
   .p2p-paga .p2p-contanti{display:inline-block;background:var(--trust-soft);
     color:var(--trust-text);font-weight:800;padding:1px 8px;border-radius:999px}
   .p2p-zona{color:var(--ink-soft);font-weight:700;overflow-wrap:anywhere}
+  /* LA MAPPA DEL CONTANTI DI PERSONA (31 ott 2026, mappa-contanti): la
+     pillola che apre e chiude (la pelle del Filtro), quella del comune
+     scelto, e la scatola. La sagoma dell'Italia e' grigia e un po'
+     trasparente, cosi' sta bene nei due temi senza un secondo file; i
+     pallini sono l'arancio dei sats col bordo del fondo della card.
+     `touch-action:none` sull'svg: il dito sulla mappa la trascina,
+     e non fa scorrere la pagina. */
+  .p2p-mappa-testa{display:flex;flex-wrap:wrap;justify-content:center;
+    align-items:center;gap:8px;margin:0 0 10px}
+  .p2p-mappa-testa .p2p-filtro{margin:0}
+  .p2p-mappa-scelto{border:1.5px solid var(--sats);border-radius:999px;
+    background:var(--sats-soft);color:var(--ink);font:inherit;font-weight:800;
+    font-size:13px;padding:7px 12px;cursor:pointer;overflow-wrap:anywhere}
+  .p2p-mappa{position:relative;margin:0 0 12px;border:1px solid var(--line);
+    border-radius:var(--radius);background:var(--card);overflow:hidden}
+  .p2p-mappa svg{display:block;width:100%;height:min(52vh,380px);
+    touch-action:none;cursor:grab}
+  .p2p-mappa-sagoma{stroke:#8a8f98;opacity:.55}
+  .p2p-mappa-pin{cursor:pointer;outline:none}
+  .p2p-mappa-pin circle{fill:var(--sats);stroke:var(--card)}
+  .p2p-mappa-pin.grappolo circle{fill:#D9780A}
+  .p2p-mappa-pin.scelto circle{fill:var(--trust)}
+  .p2p-mappa-pin:focus-visible circle{stroke:var(--ink)}
+  .p2p-mappa-pin text{fill:#2A1600;font-weight:800;text-anchor:middle;
+    font-family:'Nunito',sans-serif;pointer-events:none}
+  .p2p-mappa-pin.scelto text{fill:#FFFFFF}
+  .p2p-mappa-pin text.p2p-mappa-nome{fill:var(--ink);stroke:var(--card);
+    paint-order:stroke;font-weight:700}
+  .p2p-mappa-tasti{position:absolute;top:8px;right:8px;display:flex;
+    flex-direction:column;gap:6px}
+  .p2p-mappa-tasti button{width:36px;height:36px;border-radius:10px;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    font:inherit;font-size:18px;font-weight:800;cursor:pointer;
+    box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .p2p-mappa-nota{padding:8px 12px 10px;font-size:13px;color:var(--muted);
+    border-top:1px solid var(--line)}
   /* LA REPUTAZIONE DEL P2P (10 ott 2026): il marchio «⚠️ N non
      completati» (arancio, in riga o nel suo riquadro), il segno piccolo
      del filtro sulla card, il veto sopra i bottoni del dettaglio e le
@@ -65151,6 +65187,14 @@ function renderP2P(){
   chiediFacceP2P(candidati.map(o => o.id)).then(n => { if (n) renderP2P(); })
     .catch(() => {});
   const mostrati = candidati.filter(o => passaRepP2P(p2pFiltro, p2pFacce[o.id]));
+  /* LA MAPPA DEL CONTANTI (31 ott 2026, mappa-contanti): sopra le card,
+     sugli stessi `mostrati` — quel che il filtro ferma non va sulla
+     mappa — e il comune scelto restringe l'elenco. Vive fuori dal
+     motore: da qui il typeof. IL CONTO DELLA PILLOLA E' L'ELENCO: col
+     comune scelto si vedono quelle, e il numero dice quelle. */
+  const conMappa = typeof sezioneMappaP2P === 'function';
+  const mappa = conMappa ? sezioneMappaP2P(mostrati) : '';
+  const elenco = conMappa ? elencoMappaP2P(mostrati) : mostrati;
   /* IL LATO SINISTRO STA IN UNA SCATOLA SUA, e non e' cosmesi: e'
      l'appiglio che permette ai due lati di valere uguale e al
      divisorio di cadere a meta' — sotto il logo (vedi il CSS della
@@ -65159,8 +65203,8 @@ function renderP2P(){
   const pillola = `<button type="button" class="p2p-filtro${
       filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''}" onclick="apriFiltroP2P()">`
     + `<span class="p2p-filtro-sx">` + icoFiltroP2P() + `<b>Filtro</b></span>`
-    + `<s></s><em>${mostrati.length} `
-    + `offert${mostrati.length === 1 ? 'a' : 'e'}</em></button>`;
+    + `<s></s><em>${elenco.length} `
+    + `offert${elenco.length === 1 ? 'a' : 'e'}</em></button>`;
   /* GLI AVVISI RESTANO COL LIBRO e non salgono nella testata
      attaccata: la pillola e' un COMANDO e vale sempre, questi
      raccontano com'e' andata la lettura di adesso — appesi in alto
@@ -65270,7 +65314,8 @@ function renderP2P(){
     /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
     + (typeof avvisoMemoriaBrowserP2P === 'function' ? avvisoMemoriaBrowserP2P(typeof suOnion === 'function' && suOnion()) : '')
     + onchainCarte
-    + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
+    + mappa
+    + (elenco.length ? elenco.map(rigaOrdineP2P).join('')
        : onchainCarte ? ''
        : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vuoto.logo
@@ -65283,6 +65328,9 @@ function renderP2P(){
              ? ' <button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
              : ''}</div>`)
     + comeFunziona;
+  /* la mappa si disegna DOPO, nella scatola gia' in pagina: le serve
+     la sua misura */
+  if (conMappa && p2pMappaAperta) { p2pMappaUltimi = mostrati; disegnaMappaP2P(mostrati); }
   /* ...E LA STESSA RIGA DI STRUMENTI ANCHE DI LA' (set 2026, ridisegno
      di Andrea): «Ordina» a sinistra, «Filtro» in mezzo, la levetta del
      tema a destra. Le classi sono LE STESSE del libro — `.p2p-filtro`,
@@ -78983,7 +79031,7 @@ function sezioneZonaNuovoP2P(metodi){
       + 'value="' + esc(p2pNuovoZona) + '" placeholder="Città o zona, es. Milano centro" '
       + 'autocomplete="off" enterkeyhint="done" aria-label="Zona di scambio" '
       + 'oninput="cambiaZonaNuovoP2P(this)">',
-    sotto: '<div class="hint">Solo indicativa: non scrivere il tuo indirizzo</div>'
+    sotto: '<div class="hint">Solo indicativa: non scrivere il tuo indirizzo. Col nome del comune compari sulla mappa, al suo centro</div>'
   });
 }
 /* si legge il campo e basta, MAI un render: il dito e' sul campo */
@@ -87005,6 +87053,312 @@ function haOrdiniViviP2P(){
 }
 /* ============ fine del motore dello scambio ============ */
 
+/* LA MAPPA DEL CONTANTI DI PERSONA (31 ott 2026, cantiere mappa-contanti,
+   richiesta di Andrea: «vorrei poter visualizzare nel p2p una mappa
+   geografica per chi vende in contanti, quindi in presenza»).
+   COSA MOSTRA: le offerte del libro col contanti, ognuna sul CENTRO DEL
+   COMUNE che la sua zona nomina — il punto lo calcola il server dal
+   dizionario ISTAT che usa gia' per gli avvisi (`_posti_p2p`), mai un
+   indirizzo: e' la stessa cosa che la card dice gia' con «📍», messa su
+   un disegno. Chi pubblica non fa niente di nuovo: scrive la zona come
+   prima, e se ci si riconosce un comune compare sulla mappa.
+   LA MAPPA E' NOSTRA: la sagoma dell'Italia e' un SVG di puntini fatto
+   dai comuni (`/assets/italia-punti.svg`, `genera_mappa_italia.py`),
+   servito dal nostro server — nessun tassello chiesto a terzi, quindi
+   nessuno fuori di qui vede chi guarda e quale zona. La proiezione e'
+   quella del generatore, numero per numero (una prova li tiene uguali).
+   COME SI USA: «🗺️ Mappa» apre e chiude; un pallino con piu' comuni
+   dentro si tocca e la mappa si avvicina; quello di un comune solo
+   restringe l'elenco sotto a quel comune, con una pillola che lo dice e
+   lo toglie. ＋ − ⟲ e il trascinamento col dito per muoversi.
+   I filtri del libro valgono anche qui: sulla mappa c'e' quello che c'e'
+   nell'elenco, mai di piu'.
+   STA FUORI DAL MOTORE DELLO SCAMBIO, dopo il suo marcatore di chiusura:
+   chiede al server la sagoma (una `fetch`), e il motore ne ha zero per
+   regola. Il libro la chiama dietro un typeof. */
+const MAPPA_P2P_PROIEZIONE = { lon0: 6.5, lat1: 47.2, k: 100, cos: 0.7431, largo: 920, alto: 1180 };
+const MAPPA_P2P_RAGGIO_PX = 18;      // il pallino di un'offerta sola, in pixel
+const MAPPA_P2P_ZOOM = 2.5;          // quanto si avvicina un tocco o il ＋
+const MAPPA_P2P_LARGO_MIN = 40;      // la vista piu' stretta: ~50 km
+let p2pPosti = {};                   // ordine -> [lat, lon, «Nome (SIGLA)»], dal server
+let p2pMappaAperta = false;
+let p2pMappaComune = '';             // il comune scelto: restringe l'elenco
+let p2pMappaVista = null;            // la vista: {x, y, w, h} del viewBox
+let p2pMappaGrappoli = [];           // l'ultimo disegno, per i tocchi
+/* PURA: un punto si tiene solo se sta in Italia (piu' un margine) e ha
+   un nome: e' testo che arriva da fuori, e un numero storto
+   disegnerebbe un pallino nel mare. */
+function postoPulitoP2P(p){
+  if (!Array.isArray(p) || p.length < 3) return null;
+  const lat = Number(p[0]), lon = Number(p[1]);
+  if (!(lat >= 35 && lat <= 47.5 && lon >= 6 && lon <= 19)) return null;
+  const nome = typeof p[2] === 'string' ? zonaPulitaP2P(p[2].slice(0, 60)) : '';
+  return nome ? [lat, lon, nome] : null;
+}
+/* dal server: vero se ne e' entrato almeno uno nuovo (la gemella di
+   `prendiZoneP2P`) */
+function prendiPostiP2P(m){
+  if (!m || typeof m !== 'object') return false;
+  let nuovi = false;
+  for (const id of Object.keys(m)) {
+    const p = idMostroVero(id) ? postoPulitoP2P(m[id]) : null;
+    if (!p) continue;
+    const prima = p2pPosti[id];
+    if (!prima || prima[0] !== p[0] || prima[1] !== p[1] || prima[2] !== p[2]) {
+      p2pPosti[id] = p; nuovi = true;
+    }
+  }
+  return nuovi;
+}
+/* il punto di UN ordine, solo se la card mostra la zona: lo stesso
+   giudice del «📍» (`zonaOrdineP2P`), cosi' la mappa non dice mai piu'
+   della card */
+function postoOrdineP2P(o){
+  if (!o || !zonaOrdineP2P(o)) return null;
+  return p2pPosti[o.id] || null;
+}
+/* PURA: latitudine e longitudine -> le unita' del viewBox della sagoma */
+function proiettaMappaP2P(lat, lon){
+  const P = MAPPA_P2P_PROIEZIONE;
+  return [(lon - P.lon0) * P.k * P.cos, (P.lat1 - lat) * P.k];
+}
+/* PURA: gli ordini col punto, raccolti per COMUNE — `[{nome, x, y, ids}]`,
+   nell'ordine in cui arrivano */
+function comuniMappaP2P(ordini){
+  const per = new Map();
+  for (const o of ordini || []) {
+    const p = postoOrdineP2P(o);
+    if (!p) continue;
+    let g = per.get(p[2]);
+    if (!g) {
+      const [x, y] = proiettaMappaP2P(p[0], p[1]);
+      g = { nome: p[2], x, y, ids: [] };
+      per.set(p[2], g);
+    }
+    g.ids.push(o.id);
+  }
+  return [...per.values()];
+}
+/* PURA: i comuni troppo vicini per due pallini si fondono in uno, alla
+   scala di adesso (`upp`, unita' per pixel). Prima i comuni con piu'
+   offerte, ognuno entra nel primo grappolo a meno di due raggi; il
+   grappolo sta nel baricentro pesato. `[{x, y, comuni: [nomi], ids}]`. */
+function grappoliMappaP2P(comuni, upp, raggioPx){
+  const soglia = 2 * (raggioPx || MAPPA_P2P_RAGGIO_PX) * (upp > 0 ? upp : 1);
+  const fila = [...(comuni || [])].sort((a, b) => b.ids.length - a.ids.length
+    || (a.nome < b.nome ? -1 : a.nome > b.nome ? 1 : 0));
+  const grappoli = [];
+  for (const c of fila) {
+    const g = grappoli.find(g => Math.hypot(g.x - c.x, g.y - c.y) < soglia);
+    if (!g) { grappoli.push({ x: c.x, y: c.y, comuni: [c.nome], ids: [...c.ids] }); continue; }
+    const n = g.ids.length, m = c.ids.length;
+    g.x = (g.x * n + c.x * m) / (n + m);
+    g.y = (g.y * n + c.y * m) / (n + m);
+    g.comuni.push(c.nome);
+    g.ids.push(...c.ids);
+  }
+  return grappoli;
+}
+/* PURA: la vista che si avvicina di `f` attorno a (cx, cy), tenendo la
+   forma; mai piu' stretta di MAPPA_P2P_LARGO_MIN, mai piu' larga
+   dell'Italia intera (allora torna l'Italia). */
+function zoomVistaMappaP2P(v, cx, cy, f){
+  const P = MAPPA_P2P_PROIEZIONE;
+  let w = v.w / f, h = v.h / f;
+  if (w < MAPPA_P2P_LARGO_MIN) { h = h * MAPPA_P2P_LARGO_MIN / w; w = MAPPA_P2P_LARGO_MIN; }
+  if (w >= P.largo && h >= P.alto) return null;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+/* la vista dell'Italia intera, con la forma della scatola (meet) */
+function vistaInteraMappaP2P(W, H){
+  const P = MAPPA_P2P_PROIEZIONE;
+  const upp = Math.max(P.largo / W, P.alto / H);
+  const w = W * upp, h = H * upp;
+  return { x: (P.largo - w) / 2, y: (P.alto - h) / 2, w, h };
+}
+/* il nome senza la sigla, per l'etichetta: «Milano (MI)» -> «Milano» */
+function nomeCortoMappaP2P(nome){
+  return String(nome || '').replace(/\s*\([A-Z]{2}\)$/, '');
+}
+/* L'INTESTAZIONE: il bottone che apre e chiude, e la pillola del comune
+   scelto. Niente se nel libro di adesso non c'e' nessuna offerta col
+   punto — e il comune scelto in quel caso si dimentica. */
+function sezioneMappaP2P(mostrati){
+  const comuni = comuniMappaP2P(mostrati);
+  if (!comuni.length) { p2pMappaComune = ''; return ''; }
+  if (p2pMappaComune && !comuni.some(c => c.nome === p2pMappaComune)) p2pMappaComune = '';
+  const n = comuni.reduce((t, c) => t + c.ids.length, 0);
+  const senza = (mostrati || []).filter(o => zonaOrdineP2P(o) && !postoOrdineP2P(o)).length;
+  let h = '<div class="p2p-mappa-testa">'
+    + '<button type="button" class="p2p-filtro p2p-mappa-btn' + (p2pMappaAperta ? ' acceso' : '')
+    + '" aria-expanded="' + (p2pMappaAperta ? 'true' : 'false') + '" onclick="apriChiudiMappaP2P()">'
+    + '🗺️ <b>Mappa</b> <em>' + n + ' in contanti di persona</em></button>';
+  if (p2pMappaComune) h += '<button type="button" class="p2p-mappa-scelto" onclick="sceltaMappaP2P(\'\')"'
+    + ' title="Mostra tutte le offerte">📍 ' + esc(p2pMappaComune) + ' <span aria-hidden="true">✕</span></button>';
+  h += '</div>';
+  if (p2pMappaAperta) {
+    h += '<div class="p2p-mappa" id="p2pMappa">'
+      + '<svg id="p2pMappaSvg" role="img" aria-label="Mappa delle offerte in contanti di persona"'
+      + ' preserveAspectRatio="xMidYMid meet"></svg>'
+      + '<div class="p2p-mappa-tasti">'
+      + '<button type="button" onclick="zoomMappaP2P(1)" aria-label="Avvicina">＋</button>'
+      + '<button type="button" onclick="zoomMappaP2P(-1)" aria-label="Allontana">−</button>'
+      + '<button type="button" onclick="zoomMappaP2P(0)" aria-label="Tutta Italia">⟲</button></div>'
+      + '<div class="p2p-mappa-nota">Il pallino sta al centro del comune scritto da chi pubblica, mai sul luogo esatto: '
+      + 'quello lo decidete in chat.' + (senza ? ' ' + senza + (senza === 1
+        ? ' offerta in contanti ha una zona che la mappa non riconosce: la trovi nell\'elenco.'
+        : ' offerte in contanti hanno una zona che la mappa non riconosce: le trovi nell\'elenco.') : '')
+      + '</div></div>';
+  }
+  return h;
+}
+/* l'elenco sotto la mappa: tutto, o il solo comune scelto */
+function elencoMappaP2P(mostrati){
+  if (!p2pMappaComune) return mostrati;
+  return mostrati.filter(o => { const p = postoOrdineP2P(o); return p && p[2] === p2pMappaComune; });
+}
+/* IL DISEGNO, dopo che la scatola e' nella pagina: serve la sua misura
+   per sapere quanti pixel vale un'unita' (i pallini restano della
+   stessa misura a ogni zoom). Testo di sconosciuti (i nomi vengono dal
+   dizionario del server, ma passano da esc() lo stesso). */
+function disegnaMappaP2P(mostrati){
+  const svg = el('p2pMappaSvg');
+  if (!svg) return;
+  const r = svg.getBoundingClientRect();
+  const W = r.width || 320, H = r.height || 360;
+  if (!p2pMappaVista) p2pMappaVista = vistaInteraMappaP2P(W, H);
+  const v = p2pMappaVista, P = MAPPA_P2P_PROIEZIONE;
+  const upp = Math.max(v.w / W, v.h / H);
+  p2pMappaGrappoli = grappoliMappaP2P(comuniMappaP2P(mostrati), upp);
+  const vicino = v.w < P.largo / 3;      // da vicino i nomi ci stanno
+  /* la sagoma come TRATTO e non come <image>: cosi' lo spessore dei
+     puntini si sceglie a ogni zoom — crescono avvicinandosi, ma non
+     oltre i 6 px, o da vicino diventerebbero piatti grossi come monete */
+  const sagoma = sagomaMappaP2P();
+  let dentro = sagoma ? '<path class="p2p-mappa-sagoma" fill="none" stroke-linecap="round" stroke-width="'
+    + Math.min(6, 6 * upp).toFixed(2) + '" d="' + sagoma + '"/>' : '';
+  p2pMappaGrappoli.forEach((g, i) => {
+    const n = g.ids.length;
+    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * 1.5) * upp;
+    const scelto = g.comuni.length === 1 && g.comuni[0] === p2pMappaComune;
+    const titolo = g.comuni.length === 1
+      ? g.comuni[0] + ': ' + n + (n === 1 ? ' offerta' : ' offerte')
+      : g.comuni.length + ' comuni, ' + n + ' offerte: tocca per avvicinarti';
+    dentro += '<g class="p2p-mappa-pin' + (scelto ? ' scelto' : '') + (g.comuni.length > 1 ? ' grappolo' : '')
+      + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + esc(titolo) + '">'
+      + '<circle cx="' + g.x.toFixed(1) + '" cy="' + g.y.toFixed(1) + '" r="' + rg.toFixed(2)
+      + '" stroke-width="' + (2.5 * upp).toFixed(2) + '"/>'
+      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (13 * upp).toFixed(2)
+      + '" dy=".35em">' + n + '</text>'
+      + ((vicino || g.comuni.length === 1 && p2pMappaGrappoli.length <= 6)
+        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 13 * upp).toFixed(1)
+          + '" font-size="' + (12 * upp).toFixed(2) + '" stroke-width="' + (3 * upp).toFixed(2) + '">'
+          + esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])
+                : nomeCortoMappaP2P(g.comuni[0]) + ' e ' + (g.comuni.length - 1) + ' vicin' + (g.comuni.length === 2 ? 'o' : 'i'))
+          + '</text>' : '')
+      + '</g>';
+  });
+  svg.setAttribute('viewBox', [v.x, v.y, v.w, v.h].map(n => n.toFixed(1)).join(' '));
+  svg.innerHTML = dentro;
+  if (!svg.dataset.armata) { svg.dataset.armata = '1'; armaMappaP2P(svg); }
+}
+/* LA SAGOMA SI CHIEDE UNA VOLTA (29 KB, in cache del browser col suo
+   timbro ?v=): finche' non c'e', la mappa si disegna coi soli pallini e
+   all'arrivo si ridisegna. Del file si tiene SOLO il tracciato, e solo
+   se e' fatto di comandi e numeri: e' un file nostro, ma nella pagina
+   entra per innerHTML, e una forma storta resta fuori. */
+let p2pMappaSagoma = null;           // null: non chiesta; '': chiesta o caduta
+function tracciatoSagomaP2P(testo){
+  const m = /\sd="([^"]*)"/.exec(String(testo || ''));
+  return m && /^[Mh0-9 .\-]+$/.test(m[1]) ? m[1] : '';
+}
+function sagomaMappaP2P(){
+  if (p2pMappaSagoma !== null) return p2pMappaSagoma;
+  p2pMappaSagoma = '';
+  fetch('/assets/italia-punti.svg').then(r => r.ok ? r.text() : '').then(t => {
+    p2pMappaSagoma = tracciatoSagomaP2P(t);
+    if (p2pMappaSagoma) ridisegnaMappaP2P();
+  }).catch(() => {});
+  return '';
+}
+/* il tocco su un pallino: il grappolo si avvicina, il comune solo
+   restringe l'elenco */
+function toccaGrappoloMappaP2P(i){
+  const g = p2pMappaGrappoli[i];
+  if (!g) return;
+  if (g.comuni.length > 1) {
+    const v = p2pMappaVista;
+    p2pMappaVista = zoomVistaMappaP2P(v, g.x, g.y, MAPPA_P2P_ZOOM) || v;
+    ridisegnaMappaP2P();
+    return;
+  }
+  sceltaMappaP2P(g.comuni[0] === p2pMappaComune ? '' : g.comuni[0]);
+}
+function sceltaMappaP2P(nome){
+  p2pMappaComune = nome || '';
+  renderP2P();
+}
+function apriChiudiMappaP2P(){
+  p2pMappaAperta = !p2pMappaAperta;
+  if (!p2pMappaAperta) p2pMappaComune = '';
+  p2pMappaVista = null;
+  renderP2P();
+}
+/* ＋ (1), − (-1), ⟲ (0): attorno al centro della vista */
+function zoomMappaP2P(verso){
+  const v = p2pMappaVista;
+  if (!v || !verso) { p2pMappaVista = null; ridisegnaMappaP2P(); return; }
+  const f = verso > 0 ? MAPPA_P2P_ZOOM : 1 / MAPPA_P2P_ZOOM;
+  p2pMappaVista = zoomVistaMappaP2P(v, v.x + v.w / 2, v.y + v.h / 2, f);
+  ridisegnaMappaP2P();
+}
+/* solo la mappa, non il libro: muoversi non deve rifare le card */
+function ridisegnaMappaP2P(){
+  if (typeof p2pLibro === 'undefined' || !p2pLibro) return;
+  disegnaMappaP2P(p2pMappaUltimi);
+}
+let p2pMappaUltimi = [];
+/* IL DITO: trascinare sposta la vista, un tocco fermo (meno di 6 px) e'
+   un tocco sul pallino. Gli ascoltatori stanno sull'svg, che vive
+   finche' la mappa resta aperta; il movimento sulla finestra, cosi' il
+   dito che esce dalla scatola non perde la presa. */
+let p2pMappaGiu = null;               // il dito appoggiato, se c'e'
+let p2pMappaFinestra = false;        // gli ascoltatori della finestra, una volta sola
+function armaMappaP2P(svg){
+  svg.addEventListener('pointerdown', ev => {
+    if (!p2pMappaVista) return;
+    p2pMappaGiu = { svg, x: ev.clientX, y: ev.clientY, v: { ...p2pMappaVista }, mosso: false,
+                    pin: ev.target.closest && ev.target.closest('.p2p-mappa-pin') };
+  });
+  svg.addEventListener('keydown', ev => {
+    const pin = ev.target.closest && ev.target.closest('.p2p-mappa-pin');
+    if (pin && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); toccaGrappoloMappaP2P(+pin.dataset.i); }
+  });
+  if (p2pMappaFinestra) return;
+  p2pMappaFinestra = true;
+  window.addEventListener('pointermove', ev => {
+    const giu = p2pMappaGiu;
+    if (!giu || !giu.svg.isConnected) return;
+    const dx = ev.clientX - giu.x, dy = ev.clientY - giu.y;
+    if (!giu.mosso && Math.hypot(dx, dy) < 6) return;
+    giu.mosso = true;
+    const r = giu.svg.getBoundingClientRect();
+    const upp = Math.max(giu.v.w / (r.width || 1), giu.v.h / (r.height || 1));
+    p2pMappaVista = { ...giu.v, x: giu.v.x - dx * upp, y: giu.v.y - dy * upp };
+    giu.svg.setAttribute('viewBox', [p2pMappaVista.x, p2pMappaVista.y, p2pMappaVista.w, p2pMappaVista.h]
+      .map(n => n.toFixed(1)).join(' '));
+  });
+  const su = () => {
+    const giu = p2pMappaGiu;
+    p2pMappaGiu = null;
+    if (!giu || !giu.svg.isConnected) return;
+    if (giu.mosso) { ridisegnaMappaP2P(); return; }
+    if (giu.pin) toccaGrappoloMappaP2P(+giu.pin.dataset.i);
+  };
+  window.addEventListener('pointerup', su);
+  window.addEventListener('pointercancel', () => { p2pMappaGiu = null; });
+}
+
 /* ═══ IL CONTROLLO DELLA FATTURA PRIMA DEL COORDINATORE (10 ott 2026,
    cantiere controllo-fattura, richiesta di Andrea) ══════════════════
    Il 10 ott 2026 un payout da 180.917 sats e' fallito tre volte senza
@@ -87250,6 +87604,8 @@ async function chiediFotoLibroP2P(){
   const cambi = prendiCambiPubP2P(d && d.cambi);
   /* ...e le zone di scambio del contanti, a tutti come i cambi (10 ott 2026) */
   const zone = prendiZoneP2P(d && d.zone);
+  /* ...col punto sulla mappa del contanti (31 ott 2026, mappa-contanti) */
+  if (typeof prendiPostiP2P === 'function') prendiPostiP2P(d && d.posti);
   /* ...e i filtri di chi pubblica (10 ott 2026, reputazione-p2p) */
   const filtri = typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri);
   /* ...e gli ordini in pausa adesso (12 ott 2026): la fotografia intera */
@@ -87959,6 +88315,8 @@ async function chiediFotoVetrinaP2P(){
   prendiCambiPubP2P(d && d.cambi);
   /* ...e le zone di scambio del contanti (10 ott 2026) */
   prendiZoneP2P(d && d.zone);
+  /* ...col punto sulla mappa del contanti (31 ott 2026, mappa-contanti) */
+  if (typeof prendiPostiP2P === 'function') prendiPostiP2P(d && d.posti);
   if (typeof prendiFiltriP2P === 'function') prendiFiltriP2P(d && d.filtri);
   if (typeof prendiPauseP2P === 'function') prendiPauseP2P(d && d.pause);
   if (typeof prendiParacaduteP2P === 'function') prendiParacaduteP2P(d && d.paracadute);
@@ -88785,6 +89143,8 @@ async function chiediFacceP2P(ids){
       if (prendiCambiPubP2P(d && d.cambi)) nuove++;
       /* ...e la zona di scambio del contanti (10 ott 2026) */
       if (prendiZoneP2P(d && d.zone)) nuove++;
+      /* ...col punto sulla mappa (31 ott 2026, mappa-contanti) */
+      if (typeof prendiPostiP2P === 'function' && prendiPostiP2P(d && d.posti)) nuove++;
       /* ...e il filtro di chi pubblica (10 ott 2026, reputazione-p2p) */
       if (typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri)) nuove++;
       /* ...e la pausa di chi li ha pubblicati (12 ott 2026): solo per gli id chiesti */
