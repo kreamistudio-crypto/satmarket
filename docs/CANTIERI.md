@@ -76455,3 +76455,43 @@ come adesso».
 Prove: `prove_grafica_p2p_onchain` legge il gradiente e il filo nella
 regola della faccia. Controprova rossa: la A al posto della B. Visto dal
 vivo nei due temi, fermo e acceso (foto 44 e 45).
+
+## L'ultima tappa del tutorial on-chain: l'altra rete, in arrivo (31 ott 2026, sera, cantiere oc-novita-arancio)
+
+Andrea, 20:00: «alla fine del tutorial voglio mettere anche una scritta
+del tipo: vuoi ricevere on-chain un ordine Lightning o viceversa?
+nessun problema con Barattolo ... ti verrà mostrata la commissione
+aggiuntiva prima di procedere», poi «più corta e semplice, e metti
+l'icona Lightning e on-chain con in mezzo delle frecce» e «fallo vedere
+bene, la gente deve capire».
+- LA FUNZIONE NON C'È: la presa sull'altra rete col cambio di SATS
+  Routing è solo uno studio (`/mnt/project-files/presa-altra-rete/`), e
+  il verso «ordine Lightning, chi vende paga on-chain» aspetta Massimo.
+  Detto ad Andrea prima di scrivere; sulla card ha scelto «Subito, come
+  in arrivo» (scartate: la scritta pronta ma nascosta fino alla funzione,
+  e l'attesa). Corretto il testo: SATS Routing è il cambio di Massimo,
+  non «il nostro modello».
+- L'ottava tappa SENZA RIFLETTORE, AL CENTRO: alla prima foto il
+  riflettore stava sui due tasti della scelta del +, e Andrea (20:11)
+  «perché il riflettore sui tasti acceso? ... come si sceglierà se uno
+  vuole ricevere on-chain?». La scelta dell'altra rete si farà alla
+  PRESA («Ricevi in: Lightning / On-chain (cambio)» nel foglio di
+  conferma, dallo studio), non col + che pubblica: illuminare quei tasti
+  diceva una cosa falsa. Il motore del giro impara `centro`: la tappa
+  chiude il foglio della scelta, il riflettore si stringe a un punto in
+  mezzo allo schermo senza filo (`#tourLuce.centro`), il velo copre
+  tutto e il fumetto sta al centro. Le altre tappe di tutti i giri non
+  cambiano (`centro` assente = come prima). Nel fumetto le due monete a 52 px
+  con due frecce arancio che vanno e tornano (ferme con gli effetti
+  ridotti), il cartellino «In arrivo» e la scritta «Ordine Lightning ma
+  vuoi ricevere on-chain, o il contrario? Lo farai qui, col cambio di
+  SATS Routing. La commissione la vedi prima di confermare.» Il futuro
+  «Lo farai» tiene la promessa onesta insieme al cartellino.
+- QUANDO LA FUNZIONE ESISTE: via «In arrivo» e il futuro, e la prova lo
+  segue.
+
+Prove: `prove_grafica_p2p_onchain` (otto tappe, l'ultima senza `prima`
+né `tondo`; monete, frecce, «In arrivo», SATS Routing, commissione).
+Controprova rossa: tolto «In arrivo». Prova del centro: la tappa chiude il foglio, il punto senza filo, il
+fumetto in mezzo. Visto dal vivo nei due temi (foto 46 col riflettore,
+47 al centro).
