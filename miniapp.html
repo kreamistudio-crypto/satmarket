@@ -10334,6 +10334,7 @@
     box-shadow:0 0 0 9999px rgba(15,12,6,.62);
     outline:3px solid var(--sats);outline-offset:2px}
   #tourLuce.tondo{border-radius:50%}
+  #tourLuce.centro{outline:0}
   #tourFumetto{position:fixed;z-index:82;max-width:min(340px,calc(100vw - 24px));
     background:var(--card);color:var(--ink);border:1px solid var(--line);
     border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-hover);
@@ -10355,6 +10356,22 @@
   /* la prima comparsa non scivola dall'angolo: .subito spegne le
      transizioni per il primo posizionamento */
   #tour.subito #tourLuce,#tour.subito #tourFumetto{transition:none}
+  /* L'ULTIMA TAPPA DEL TUTORIAL ON-CHAIN (31 ott 2026, «fallo vedere
+     bene»): le due monete grandi, le frecce arancio che vanno e tornano
+     fra loro, e il cartellino «In arrivo» sopra la scritta */
+  .tour-reti{display:flex;align-items:center;justify-content:center;gap:12px;margin:2px 0 12px}
+  .tour-reti .cambio-moneta.p2p-oc-moneta{width:52px;height:52px}
+  .tour-reti .cambio-moneta.p2p-oc-moneta .cambio-svg{width:30px;height:30px}
+  .tour-reti-frecce svg{display:block;width:56px;height:30px;fill:none;stroke:#F7931A;
+    stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .tour-arrivo{display:table;margin:0 auto 8px;padding:2px 10px;border-radius:999px;
+    background:rgba(247,147,26,.16);color:#E8870F;font-size:12px;font-weight:800;letter-spacing:.02em}
+  @keyframes tourRetiVa{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+  @keyframes tourRetiTorna{0%,100%{transform:translateX(3px)}50%{transform:translateX(-3px)}}
+  @media (prefers-reduced-motion: no-preference){
+    .tour-reti-frecce path:first-child{animation:tourRetiVa 1.4s ease-in-out infinite}
+    .tour-reti-frecce path:last-child{animation:tourRetiTorna 1.4s ease-in-out infinite}
+  }
   /* LA FRECCETTA DEL TRASCINO (26 set 2026, ritocco di Andrea al giro del
      P2P): punta giu' accanto al + e LAMPEGGIA — si accende e si spegne,
      ferma sul posto. BIANCA e LUNGA, 76 px (seconda e terza stesura di
@@ -26956,6 +26973,7 @@ function mostraTappa(){
   if (t && t.prima) t.prima();
   const b = t && t.trova();
   if (!b || b.offsetParent === null) { tourAvanti(); return; }  // sparito nel frattempo
+  el('tourLuce').classList.toggle('centro', !!t.centro);
   const ultima = tourTappa === tourTappe.length - 1;
   el('tourFumetto').innerHTML = `<span>${t.testo}</span>
     <div class="tour-az">
@@ -26967,7 +26985,7 @@ function mostraTappa(){
      riflettore lo segue durante lo scroll (l'ascoltatore scroll
      chiama posizionaTour a ogni passo) */
   const r = b.getBoundingClientRect();
-  if (r.top < 0 || r.bottom > innerHeight)
+  if (!t.centro && (r.top < 0 || r.bottom > innerHeight))
     b.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
   /* posizionamento SUBITO, in sincrono: i rAF non battono nelle
      pagine in secondo piano, e il tour deve trovarsi pronto anche
@@ -26982,8 +27000,14 @@ function posizionaTour(){
   /* una tappa puo' illuminare piu' di un elemento (il + con la sua
      tendina, nel giro del P2P): `rett` le da' il riquadro, `raggio`
      la curva */
-  const r = t.rett ? t.rett(b) : b.getBoundingClientRect();
-  const R = 6;   // il respiro attorno al bersaglio
+  /* LA TAPPA AL CENTRO (31 ott 2026, l'ultima del tutorial on-chain): il
+     bersaglio serve solo a dire che la pagina c'e'; il riflettore si
+     stringe a un punto in mezzo allo schermo (il velo copre tutto, il
+     filo arancio lo spegne il CSS di `.centro`) e il fumetto ci si mette
+     sopra, centrato */
+  const r = t.centro ? new DOMRect(innerWidth / 2, innerHeight / 2, 0, 0)
+    : t.rett ? t.rett(b) : b.getBoundingClientRect();
+  const R = t.centro ? 0 : 6;   // il respiro attorno al bersaglio
   const luce = el('tourLuce');
   luce.classList.toggle('tondo', !!t.tondo);
   luce.style.borderRadius = t.raggio ? t.raggio + 'px' : '';
@@ -27015,7 +27039,7 @@ function posizionaTour(){
      bordi, anche sugli schermi piccoli */
   const f = el('tourFumetto');
   const fw = f.offsetWidth, fh = f.offsetHeight;
-  let top = r.bottom + R + 14;
+  let top = t.centro ? (innerHeight - fh) / 2 : r.bottom + R + 14;
   if (top + fh > innerHeight - 12) top = r.top - R - fh - 14;
   if (top < 12) top = Math.max(12, innerHeight - fh - 12);
   let left = r.left + r.width / 2 - fw / 2;
@@ -57346,6 +57370,28 @@ const TAPPE_TUTORIAL_OC_P2P = [
     testo: `…o con quello di «Vendi BTC».` },
   { prima: () => sceltaTutorialOcP2P(), trova: () => el('p2pSceltaCorpo')?.querySelector('.p2p-scelta') || el('p2pSceltaCorpo'),
     testo: `Toccato il +, scegli dove scambiare: <b>On-chain</b> o <b>Lightning</b>.` },
+  /* L'ALTRA RETE, IN ARRIVO (31 ott 2026, 20:00, Andrea: «alla fine del
+     tutorial una scritta: vuoi ricevere on-chain un ordine Lightning o
+     viceversa? ... più corta e semplice, e metti l'icona Lightning e
+     on-chain con in mezzo delle frecce che fanno capire», e «fallo vedere
+     bene, la gente deve capire»). La presa sull'altra rete col cambio di
+     SATS Routing oggi e' solo uno studio (STUDIO-PRESA-ALTRA-RETE): per
+     questo «In arrivo», scelta di Andrea sulla card delle 20:01 (scartate
+     la scritta nascosta fino alla funzione e l'attesa). Le due monete
+     grandi con le frecce che vanno e tornano sopra, la scritta sotto.
+     SENZA RIFLETTORE, AL CENTRO (20:11, Andrea: «perché il riflettore sui
+     tasti acceso? ... come si sceglierà se uno vuole ricevere on-chain?»):
+     la scelta dell'altra rete si fara' alla PRESA, non col + che pubblica,
+     quindi la tappa chiude il foglio della scelta, vela tutto e mette il
+     fumetto al centro (`centro`, vedi `posizionaTour`). Quando la
+     funzione esiste, via «In arrivo». */
+  { prima: () => { if (el('p2pSceltaSheet')?.classList.contains('open')) chiudiFoglioP2P('p2pSceltaSheet'); },
+    trova: () => el('p2pCorpo'), centro: true,
+    testo: `<span class="tour-reti" aria-hidden="true">${P2P_LN_MONETA}<span class="tour-reti-frecce">`
+      + `<svg viewBox="0 0 44 24"><path d="M4 7h34m-6-5 6 5-6 5"/><path d="M40 17H6m6-5-6 5 6 5"/></svg></span>`
+      + `${P2P_OC_MONETA}</span><span class="tour-arrivo">In arrivo</span>`
+      + `Ordine <b>Lightning</b> ma vuoi ricevere <b>on-chain</b>, o il contrario? Lo farai qui, `
+      + `col cambio di SATS Routing. La commissione la vedi prima di confermare.` },
 ];
 function tutorialOnchainP2P(){
   if (tourInCorso || !myP2POnchain || document.querySelector('.view.active')?.id !== 'view-p2p') {

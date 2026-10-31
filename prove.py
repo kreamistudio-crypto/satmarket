@@ -153501,9 +153501,34 @@ console.log(JSON.stringify(out));
               "«solo on-chain» le tiene", [True, False, True, True], out["filtroRete"])
         prova("...toccato parte il tutorial dal lato «Compra BTC», sette tappe; solo "
               "il + di Vendi e la scelta preparano la pagina; tonde la moneta, il fulmine e i due +",
-              [["lato:compro", "tour:7"], [False, False, False, False, False, True, True],
-               [False, False, True, True, True, True, False]], out["tutorial"])
+              [["lato:compro", "tour:8"], [False, False, False, False, False, True, True, True],
+               [False, False, True, True, True, True, False, False]], out["tutorial"])
         prova("...alla fine torna il lato di partenza", [["lato:vendo"], "vendo"], out["fineTutorial"])
+        # L'ALTRA RETE, IN ARRIVO (31 ott 2026, 20:00-20:02, Andrea: «alla fine
+        # del tutorial ... l'icona Lightning e on-chain con in mezzo delle
+        # frecce», «fallo vedere bene»; «In arrivo» scelto sulla card, la
+        # funzione oggi e' solo uno studio)
+        _ultima = pezzo_js(mini, "  /* L'ALTRA RETE, IN ARRIVO", "\n];")
+        prova("l'ultima tappa del tutorial: fulmine, frecce e moneta, «In arrivo», "
+              "il cambio di SATS Routing e la commissione prima di confermare",
+              (True, True, True, True, True),
+              ("${P2P_LN_MONETA}<span class=\"tour-reti-frecce\">" in _ultima
+               and "${P2P_OC_MONETA}</span>" in _ultima,
+               '<span class="tour-arrivo">In arrivo</span>' in _ultima,
+               "col cambio di SATS Routing" in _ultima,
+               "La commissione la vedi prima di confermare." in _ultima,
+               ".tour-reti .cambio-moneta.p2p-oc-moneta{width:52px;height:52px}" in mini))
+        # (20:11-20:12, Andrea: «perché il riflettore sui tasti acceso? ...
+        # basta solo il banner in mezzo allo schermo»): la scelta dell'altra
+        # rete si fara' alla presa, non col + che pubblica
+        _pos = pezzo_js(mini, "function posizionaTour(){", "\n}\n")
+        prova("...senza riflettore e al centro: chiude il foglio del +, il riflettore "
+              "si stringe a un punto senza filo, il fumetto in mezzo allo schermo",
+              (True, True, True, True),
+              ("centro: true," in _ultima and "chiudiFoglioP2P('p2pSceltaSheet')" in _ultima,
+               "t.centro ? new DOMRect(innerWidth / 2, innerHeight / 2, 0, 0)" in _pos,
+               "#tourLuce.centro{outline:0}" in mini,
+               "let top = t.centro ? (innerHeight - fh) / 2 :" in _pos))
         # APPESO FINCHE' NON LO APRI (30 ott 2026, 17:57-17:59, Andrea: «finché
         # non lo clicchi rimane bloccato in quella posizione, quando avvii il
         # tutorial la prima volta poi scorre normalmente»)
