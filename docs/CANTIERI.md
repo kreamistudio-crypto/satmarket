@@ -76432,3 +76432,26 @@ senza filo, Barattozon, fantasma senza sfumature), `prove_p2p_pubblica`
 (la meta del fantasma torna `var(--b-ok-bg)`/`rosso`/`bz`),
 `prove_vestito_bottoni`. Controprova rossa: il filo bianco rimesso alla
 moneta. Visto dal vivo nei due temi.
+
+## Il banner «On-Chain» in arancio leggero (31 ott 2026, sera, cantiere oc-novita-arancio)
+
+Andrea, 19:42: «mi rifai colorato il banner novità? ... magari arancio
+leggero», e «poi come al solito quando lo schiacci si colora di arancio
+come adesso».
+- Tre varianti fotografate nei due temi accanto a quella di adesso (foto
+  43): A un velo arancio fermo, B uno sfumato da sinistra a destra, C una
+  pesca piena con le scritte scure. Scelta di Andrea sulla card: la B.
+- Nel codice: il fondo di `.p2p-oc-faccia` è un gradiente a 90° da
+  `rgba(247,147,26,.42)` (dietro la moneta) a `.10` (dietro la freccia)
+  sopra `var(--card)`, così nel tema scuro e nel chiaro resta il colore
+  delle card a dare il tono. Il filo: fra quello arancio al 40%, uno più
+  fine e nessuno (foto 45) Andrea sceglie il più fine (19:49), mezzo pixel
+  al 30%; senza, nel tema chiaro il lato destro si perde. Lo stato `acceso`
+  del tutorial non cambia (arancio pieno, scritte bianche): la sua
+  regola `background:#F7931A` scrive anche l'immagine e copre lo sfumato.
+- Scartate: la A (si vede poco nel tema scuro), la C (nel tema scuro si
+  stacca troppo dalle card, e a riposo somiglia all'acceso).
+
+Prove: `prove_grafica_p2p_onchain` legge il gradiente e il filo nella
+regola della faccia. Controprova rossa: la A al posto della B. Visto dal
+vivo nei due temi, fermo e acceso (foto 44 e 45).
