@@ -53783,6 +53783,36 @@ def _zone_p2p(con, ordini) -> dict:
     return fuori
 
 
+# LA MAPPA DEL CONTANTI DI PERSONA (31 ott 2026, cantiere mappa-contanti,
+# richiesta di Andrea): dalla zona al PUNTO SULLA MAPPA. Il punto e' il
+# CENTRO DEL COMUNE che la zona nomina — lo stesso dizionario ISTAT degli
+# avvisi di ricerca (`_chiave_comune`), in RAM, senza un terzo a cui
+# chiederlo —, mai un indirizzo: «Milano Navigli» e «Milano centro»
+# stanno sullo stesso spillo, che e' esattamente quanto chi pubblica ha
+# voluto dire. Una zona senza un comune riconosciuto NON ha punto: la
+# card resta nell'elenco col suo «📍», e la mappa la tace (meglio
+# nessuno spillo che uno sbagliato, la regola dei COMUNI_PAROLA).
+# Coordinate a due decimali: il centro del comune e' pubblico, e due
+# decimali (~1 km) bastano a un pallino.
+def _posti_p2p(zone) -> dict:
+    """PURA (sul dizionario in RAM): `{ordine: zona}` -> `{ordine:
+    [lat, lon, «Nome (SIGLA)»]}`, solo per le zone in cui si riconosce
+    un comune. Una mappa storta e' una mappa vuota."""
+    if not isinstance(zone, dict):
+        return {}
+    fuori = {}
+    for ordine, zona in zone.items():
+        if not isinstance(zona, str):
+            continue
+        chiave = _chiave_comune(zona)
+        coord = COMUNI.get(chiave) if chiave else None
+        if not coord:
+            continue
+        fuori[ordine] = [round(coord[0], 2), round(coord[1], 2),
+                         _comuni_nome().get(chiave, "") or zona]
+    return fuori
+
+
 def _zona_ultima_p2p(con, tg_id: int) -> str:
     """L'ULTIMA ZONA USATA da questo account (10 ott 2026, ritocco di
     Andrea): quella dell'ordine in contanti piu' recente che ha
@@ -56278,8 +56308,9 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause,
-            "paracadute": paracadute}
+    # e il punto sulla mappa del contanti (31 ott 2026, mappa-contanti)
+    return {"facce": facce, "cambi": cambi, "zone": zone, "posti": _posti_p2p(zone),
+            "filtri": filtri, "pause": pause, "paracadute": paracadute}
 
 
 @app.get("/api/p2p/zona")
@@ -56349,6 +56380,9 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # ragione: chi l'ha scritta l'ha scritta per la card
     if fuori["eventi"] and F.get("zone"):
         fuori["zone"] = F["zone"]
+        # ...col punto sulla mappa (31 ott 2026, mappa-contanti): il
+        # centro del comune, calcolato qui dal dizionario in RAM
+        fuori["posti"] = _posti_p2p(F["zone"])
     # ...e i filtri di chi pubblica (10 ott 2026): il segno sulla card
     if fuori["eventi"] and F.get("filtri"):
         fuori["filtri"] = F["filtri"]
@@ -98520,6 +98554,22 @@ def asset_scambi_intestazione():
     _timbra_asset_pagina, quindi il max-age e' innocuo."""
     return FileResponse("assets/scambi-intestazione.webp",
                         media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/italia-punti.svg")
+def asset_italia_punti():
+    """LA SAGOMA DELL'ITALIA DELLA MAPPA DEL CONTANTI (31 ott 2026, cantiere
+    mappa-contanti): un puntino per casella di griglia con almeno un
+    comune, disegnato da `genera_mappa_italia.py` sul nostro
+    dati/comuni.csv (29 KB). La mappa la serve il nostro server e
+    nessun altro: niente tasselli di terzi che vedano chi guarda e dove.
+    SVG nostro, senza script dentro (lo genera il nostro programma, e
+    nella pagina entra come <image>, che gli script non li esegue
+    comunque). Rotta esplicita come le sorelle: mai un mount (regola 3).
+    Il timbro ?v= lo mette _timbra_asset_pagina."""
+    return FileResponse("assets/italia-punti.svg",
+                        media_type="image/svg+xml",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
