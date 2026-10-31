@@ -73310,3 +73310,76 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## La mappa del contanti di persona (31 ott 2026, cantiere mappa-contanti, richiesta di Andrea)
+
+LA RICHIESTA: «vorrei poter visualizzare nel p2p una mappa geografica
+per chi vende in contanti, quindi in presenza». Nel libro, sopra le
+card, una pillola «🗺️ Mappa · N in contanti di persona» apre una mappa
+dell'Italia coi pallini delle offerte in contanti; un pallino con più
+comuni dentro si tocca e la mappa si avvicina, quello di un comune solo
+restringe l'elenco a quel comune (pillola «📍 Milano (MI) ✕» per
+tornare a tutto, e il conto del Filtro dice quelle). ＋ − ⟲ e il dito
+che trascina.
+
+DA DOVE VIENE IL PUNTO. Chi pubblica non fa niente di nuovo: la zona di
+scambio c'era già, obbligatoria col contanti (cantiere contanti-zona,
+10 ott). Il punto è il CENTRO DEL COMUNE che quella zona nomina, dal
+dizionario ISTAT in RAM degli avvisi di ricerca (`_chiave_comune`,
+`dati/comuni.csv`): «Milano centro» e «Milano Navigli» stanno sullo
+stesso spillo. È la privacy che serve al contanti — la città sì, il
+portone no — e il luogo esatto resta in chat, come già oggi. Una zona
+senza un comune riconosciuto non ha punto: la card resta nell'elenco e
+la nota sotto la mappa dice quante sono. Unico ritocco per chi
+pubblica: la riga sotto il campo ora aggiunge «Col nome del comune
+compari sulla mappa, al suo centro».
+SCARTATI: il punto scelto da chi pubblica su una mappa (un indirizzo
+in più da custodire, e un gesto in più nel foglio), lo sfocamento
+casuale alla RoboSats (15×15 km: col centro del comune la sfocatura
+c'è già, ed è onesta), Photon per le zone non riconosciute (un terzo
+nel giro caldo del libro).
+
+LA MAPPA È NOSTRA. Decisione proposta ad Andrea in una card, con la
+raccomandazione: niente tasselli di OpenStreetMap né Leaflet. Ogni
+telefono chiederebbe le immagini a un server altrui, che vedrebbe IP e
+zona guardata — lo stesso patto che fa passare Photon dal nostro
+server. La sagoma è un SVG di puntini fatto dai comuni stessi
+(`genera_mappa_italia.py`: una casella di griglia da 8 unità per ogni
+casella con almeno un comune, 3.022 puntini, 29 KB), servito da una
+rotta esplicita (`/assets/italia-punti.svg`, regola 3). Le strade non
+servirebbero: il punto è già solo il comune. La pagina ne prende il
+SOLO tracciato (`tracciatoSagomaP2P`: comandi e numeri, o niente) e lo
+disegna come tratto, con lo spessore scelto a ogni zoom: come <image>
+i puntini da vicino diventavano piatti grossi come monete (visto nel
+giro, primo tentativo).
+
+DOVE VIVE. Server: `_posti_p2p` (pura sul dizionario), chiave `posti`
+accanto a `zone` nei volti e nella fotografia. Client: il blocco sta
+DOPO la fine del motore dello scambio, perché la sagoma si chiede con
+una `fetch` e il motore ne ha zero per regola (la sentinella l'ha
+detto al primo giro della suite). Nella pagina niente <title> dentro
+l'svg (la pagina ne ha uno solo, altra sentinella): il nome del
+pallino è un `aria-label`.
+
+PROVATO. `prove_mappa_contanti`: il punto dal dizionario vero (Milano,
+l'alias «Reggio Emilia», la zona senza comune, la mappa storta), la
+rotta e il file, nessuno script nell'SVG, la proiezione uguale nei due
+posti, e in node il client — id veri e punti dentro l'Italia, i comuni
+raccolti per nome, niente SEPA e niente zona senza punto, i grappoli,
+lo zoom coi suoi limiti, la sezione chiusa/aperta/assente, il comune
+scelto che restringe e quello sparito che si dimentica, il tracciato
+avvelenato. Tenute in pari tre sentinelle (il conto della pillola, la
+risposta dei volti, la riga del campo zona) e `ci/compila.txt`. DAL
+VIVO in collaudo col relay morto, Chrome via Playwright a 390×844 nei
+due temi, nove offerte finte (Milano ×2, Monza, Roma, Torino con due
+metodi, Napoli, Palermo, una zona senza comune, una SEPA): sette sulla
+mappa, Milano e Monza in un grappolo che si apre in tre tocchi, il
+tocco su Milano lascia le sue due card, il trascinamento sposta la
+vista. Nessun errore di pagina.
+
+NON PROVATO, DA GUARDARE. Sul telefono vero dentro Telegram: il dito
+che trascina (il `touch-action:none` dello svg contro lo scorrimento
+di Telegram) e il pizzico, che NON c'è — si zooma coi tasti e col
+tocco sul grappolo. Le offerte della vetrina di Esplora e il post del
+canale non hanno la mappa (solo il libro). Un comune omonimo conteso
+(«Castro») resta senza punto, come negli avvisi.

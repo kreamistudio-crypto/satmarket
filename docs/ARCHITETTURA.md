@@ -31078,6 +31078,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    del titolo scritto e nello stato vuoto — WebP con trasparenza,
    682x459, 46 KB, servita come file e mai incorporata nella pagina;
    vedi CANTIERI, «L'intestazione di I miei scambi»),
+   `/assets/italia-punti.svg` (la sagoma dell'Italia della mappa del
+   contanti, 31 ott 2026: un puntino per casella di griglia con almeno
+   un comune, 29 KB, fatta da `genera_mappa_italia.py` su
+   dati/comuni.csv; la pagina ne prende SOLO il tracciato; vedi
+   CANTIERI, «La mappa del contanti di persona»),
    `/assets/p2p-banner-fee-senza-barra.webp` (la prima pillola del
    banner delle commissioni senza la barra rossa, 9 ott 2026: 340x258,
    ~7 KB, fatta da `ritaglia_banner_fee.py` e mostrata solo nella
@@ -31830,7 +31835,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   campo è `sezioneZonaNuovoP2P`, lo stato `p2pNuovoZona`). NON viaggia
   verso il coordinatore né nel tag `pm`: sta sulla riga locale
   (`o.zona`, scritta da `inviaNuovoOrdineP2P`) e in
-  `p2p_ordini.zona`. IL GIRO: `registraOrdiniP2P` la dichiara nella POST
+  `p2p_ordini.zona`. LA MAPPA (31 ott 2026, CANTIERI, «La mappa del
+  contanti di persona»): accanto a `zone` escono `posti`, `{ordine:
+  [lat, lon, «Nome (SIGLA)»]}`, da `_posti_p2p` — il centro del comune
+  che `_chiave_comune` riconosce nella zona, a due decimali; niente
+  comune, niente punto — nei volti e nella fotografia; il client li
+  tiene in `p2pPosti` (`prendiPostiP2P`, dalle stesse tre letture) e
+  `postoOrdineP2P` li mostra solo dove la card mostra il «📍». Il blocco
+  della mappa sta DOPO la fine del motore dello scambio (chiede la
+  sagoma con una fetch): `sezioneMappaP2P` (la pillola «🗺️ Mappa», la
+  pillola del comune scelto, la scatola), `elencoMappaP2P` (il comune
+  scelto restringe l'elenco e il conto della pillola Filtro),
+  `disegnaMappaP2P` (dopo l'innerHTML del libro: grappoli in pixel con
+  `grappoliMappaP2P`, sagoma come tratto con lo spessore per zoom),
+  vista in `p2pMappaVista`, proiezione `MAPPA_P2P_PROIEZIONE` uguale a
+  quella di `genera_mappa_italia.py`. IL GIRO: `registraOrdiniP2P` la dichiara nella POST
   dell'intestazione (`zone: {ordine: zona}`, da `zoneDaDichiarareP2P`:
   solo le righe `mio` col contanti); la rotta chiama
   `_dichiara_zone_p2p` DOPO `_registra_ordini_p2p` (che accende

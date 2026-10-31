@@ -65274,7 +65274,7 @@ def prove_p2p_libro():
           and "onclick=\"apriFiltroP2P()\"" in _rp
           and "<b>Filtro</b>" in _rp)
     prova("...col singolare quando ne resta una",
-          True, "mostrati.length === 1 ? 'a' : 'e'" in _rp)
+          True, "elenco.length === 1 ? 'a' : 'e'" in _rp)
     # ⚠️ E IL NUMERO E' QUELLO FILTRATO, sempre: un conteggio sul libro
     # intero mentre a schermo se ne vedono tre sarebbe la bugia piu'
     # facile da scrivere e la piu' difficile da notare.
@@ -65286,8 +65286,12 @@ def prove_p2p_libro():
     prova("...e il numero e' quello che si vede, non il libro intero",
           True, "const candidati = vivi.filter(o => passaFiltroP2P(o, p2pFiltro));" in _rp
           and "const mostrati = candidati.filter(o => passaRepP2P(p2pFiltro, p2pFacce[o.id]));" in _rp
-          and "${mostrati.length} " in _rp
-          and "mostrati.map(rigaOrdineP2P)" in _rp)
+          # (31 ott 2026, mappa-contanti) il comune scelto sulla mappa
+          # restringe ancora: si conta e si disegna l'`elenco`, che senza
+          # comune scelto E' `mostrati`
+          and "${elenco.length} " in _rp
+          and "elenco.map(rigaOrdineP2P)" in _rp
+          and "const elenco = conMappa ? elencoMappaP2P(mostrati) : mostrati;" in _rp)
     prova("...e i volti si chiedono PRIMA della reputazione, o non si chiedono mai",
           True, 0 < _rp.find("chiediFacceP2P(candidati.map(o => o.id))")
           < _rp.find("const mostrati = candidati.filter"))
@@ -89040,8 +89044,10 @@ def prove_premio_barattozon():
           # filtri di chi pubblica (reputazione-p2p)
           # (12 ott 2026, tempo-di-chi-pubblica) ...e in coda le pause
           # (13 ott 2026, paracadute) ...e gli ordini col paracadute aperto
-          ['return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause,\n'
-           '            "paracadute": paracadute}' in pezzo("facce_ordini_p2p"),
+          # (31 ott 2026, mappa-contanti) ...e accanto alle zone i punti
+          ['return {"facce": facce, "cambi": cambi, "zone": zone, "posti": _posti_p2p(zone),\n'
+           '            "filtri": filtri, "pause": pause, "paracadute": paracadute}'
+           in pezzo("facce_ordini_p2p"),
            'if fuori["eventi"] and F.get("cambi"):\n        fuori["cambi"] = F["cambi"]'
            in pezzo("libro_fotografato_p2p")
            and pezzo("libro_fotografato_p2p").index('fuori["cambi"]')
@@ -154696,6 +154702,165 @@ def prove_riquadro_contanti_sepa():
           [False, True, True, False, False, False, "", True], o["mod"])
 
 
+def prove_mappa_contanti():
+    """LA MAPPA DEL CONTANTI DI PERSONA (31 ott 2026, cantiere
+    mappa-contanti, richiesta di Andrea). Il punto e' il CENTRO DEL
+    COMUNE che la zona nomina, calcolato dal server sul dizionario ISTAT
+    in RAM; la sagoma dell'Italia e' un SVG nostro, servito da una rotta
+    esplicita; il client mette i pallini, li fonde quando sono troppo
+    vicini, e il tocco su un comune restringe l'elenco.
+
+    QUEL CHE SI ROMPE IN SILENZIO: un punto su una zona senza comune
+    (uno spillo inventato); un punto che esce su un ordine SEPA (lo
+    stesso giudice del «📍»); la proiezione del client che non e' piu'
+    quella del generatore (i pallini scivolano in mare); la sagoma
+    servita da un mount; un numero storto dal server che disegna un
+    pallino fuori dall'Italia; il nome di un comune che entra senza
+    esc(); la mappa che mostra un'offerta che il filtro del libro ha
+    tolto."""
+    import csv as _csv, unicodedata
+    print("\n[mappa-contanti: il punto, la sagoma, i pallini]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # --- 1) IL SERVER: dalla zona al punto -------------------------------
+    amb = {"re": re, "unicodedata": unicodedata, "csv": _csv, "os": os,
+           "COMUNI": {}, "COMUNI_LISTA": [], "_COMUNI_NOME": None}
+    for _c in ("COMUNI_PAROLA = ", "PREPOSIZIONI_COMUNI = "):
+        i = src.index("\n" + _c) + 1
+        exec(src[i:src.index("}", i) + 1], amb)
+    for f in ("normalizza", "carica_comuni", "_chiave_comune", "_comuni_nome",
+              "_posti_p2p"):
+        exec(pezzo(f), amb)
+    amb["carica_comuni"]()
+    posti = amb["_posti_p2p"]({"ord-a": "Milano centro", "ord-b": "Milano Navigli",
+                               "ord-c": "dietro la stazione", "ord-d": "Reggio Emilia",
+                               "ord-e": 12})
+    prova("il punto e' il centro del comune, a due decimali, col nome ufficiale",
+          [[45.47, 9.19, "Milano (MI)"], True, "Reggio nell'Emilia (RE)"],
+          [posti.get("ord-a"), posti.get("ord-a") == posti.get("ord-b"),
+           (posti.get("ord-d") or [0, 0, ""])[2]])
+    prova("...e una zona senza comune, o storta, non ha punto (nessuno spillo inventato)",
+          [False, False, {}, {}], ["ord-c" in posti, "ord-e" in posti,
+                                   amb["_posti_p2p"](None), amb["_posti_p2p"]([])])
+    prova("i punti escono accanto alle zone: nei volti e nella fotografia", [True, True],
+          ['"zone": zone, "posti": _posti_p2p(zone),' in src,
+           'fuori["posti"] = _posti_p2p(F["zone"])' in src])
+
+    # --- 2) LA SAGOMA: un file nostro, una rotta esplicita, la stessa proiezione
+    rotta = pezzo("asset_italia_punti")
+    prova("la sagoma ha la sua rotta esplicita e il file c'e'", [True, True, True],
+          ['@app.get("/assets/italia-punti.svg")' in src,
+           'FileResponse("assets/italia-punti.svg",' in rotta,
+           os.path.exists(os.path.join("assets", "italia-punti.svg"))])
+    svg = open(os.path.join("assets", "italia-punti.svg"), encoding="utf-8").read()
+    gen = open("genera_mappa_italia.py", encoding="utf-8").read()
+    prova("...senza script dentro, e sotto i 40 KB", [False, False, True],
+          ["<script" in svg.lower(), "on" + "load" in svg.lower(), len(svg) < 40 * 1024])
+    prova("la proiezione del client e' quella del generatore, numero per numero",
+          [True, True, True, True],
+          ["LON0, LAT1, K = 6.5, 47.2, 100.0" in gen,
+           "LARGO, ALTO = 920, 1180" in gen,
+           'viewBox="0 0 920 1180"' in svg,
+           "const MAPPA_P2P_PROIEZIONE = { lon0: 6.5, lat1: 47.2, k: 100, cos: 0.7431, "
+           "largo: 920, alto: 1180 };" in mini])
+
+    # --- 3) IL CLIENT: chi prende i punti, i grappoli, la sezione -----------
+    blocco = mini[mini.index("const MAPPA_P2P_PROIEZIONE"):mini.index("let p2pMappaGiu = null;")]
+    prova("la mappa sta fuori dal motore dello scambio (lei una fetch ce l'ha)", True,
+          mini.index("const MAPPA_P2P_PROIEZIONE")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    banco = (zone_ricevute_js(mini)
+        + "function idMostroVero(id){ return /^[0-9a-zA-Z-]{8,64}$/.test(id); }\n"
+        + "function contantiAManoP2P(m){ return (m||[]).includes('Contanti'); }\n"
+        + _fn_js(mini, "function zonaOrdineP2P(o){")
+        + "function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+          ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;'); }\n"
+        + "let rendered = 0; function renderP2P(){ rendered++; }\n"
+        + "function el(){ return null; }\n"
+        + blocco + r"""
+const out = {};
+out.prende = prendiPostiP2P({'ord-aaaa-1':[45.47,9.19,'Milano (MI)'],
+  'ord-bbbb-2':[45.47,9.19,'Milano (MI)'], 'ord-cccc-3':[41.89,12.48,'Roma (RM)'],
+  'ord-mare-4':[10,10,'Mare'], 'x':[45,9,'Corto'], 'ord-dddd-5':[45,9,'<b>x</b>']});
+out.tenuti = Object.keys(p2pPosti).sort();
+out.ancora = prendiPostiP2P({'ord-aaaa-1':[45.47,9.19,'Milano (MI)']});
+const C = ['Contanti'];
+const libro = [
+  {id:'ord-aaaa-1', metodi:C, zona:'Milano centro'},
+  {id:'ord-bbbb-2', metodi:C, zona:'Milano Navigli'},
+  {id:'ord-cccc-3', metodi:C, zona:'Roma'},
+  {id:'ord-dddd-5', metodi:['SEPA'], zona:'Milano'},
+  {id:'ord-eeee-6', metodi:C, zona:'dietro la stazione'}];
+const comuni = comuniMappaP2P(libro);
+out.comuni = comuni.map(c => [c.nome, c.ids.length]);
+out.milano = proiettaMappaP2P(45.47, 9.19).map(n => Math.round(n));
+out.lontani = grappoliMappaP2P(comuni, 1).length;
+out.vicini = grappoliMappaP2P(comuni, 20).map(g => [g.comuni.length, g.ids.length]);
+out.zoom = zoomVistaMappaP2P({x:0,y:0,w:920,h:1180}, 100, 100, 2.5);
+out.zoomFondo = zoomVistaMappaP2P({x:0,y:0,w:50,h:60}, 0, 0, 2.5).w;
+out.zoomFuori = zoomVistaMappaP2P({x:0,y:0,w:920,h:1180}, 460, 590, 1/2.5);
+out.nome = nomeCortoMappaP2P("Reggio nell'Emilia (RE)");
+out.tracciato = [tracciatoSagomaP2P('<svg><path fill="none" d="M8 16h0M24 16h0"/></svg>'),
+  tracciatoSagomaP2P('<path d="M0 0h0"/><script>'), tracciatoSagomaP2P('<path d="M0 0<b>x</b>"/>'),
+  tracciatoSagomaP2P(null)];
+out.chiusa = sezioneMappaP2P(libro);
+p2pMappaAperta = true;
+out.aperta = sezioneMappaP2P(libro);
+out.nessuna = sezioneMappaP2P([libro[3]]);
+p2pMappaComune = 'Roma (RM)';
+out.elenco = elencoMappaP2P(libro).map(o => o.id);
+out.pillola = sezioneMappaP2P(libro).includes('📍 Roma (RM)');
+p2pMappaComune = 'Torino (TO)';
+sezioneMappaP2P(libro);
+out.dimenticato = p2pMappaComune;
+console.log(JSON.stringify(out));
+""")
+    r = _node_banco(banco)
+    if r is None:
+        salta("mappa-contanti: il banco del client", "node non c'e'")
+        return
+    prova("il client tiene solo id veri, dentro l'Italia, col nome pulito", 
+          [True, ["ord-aaaa-1", "ord-bbbb-2", "ord-cccc-3", "ord-dddd-5"], False],
+          [r.get("prende"), r.get("tenuti"), r.get("ancora")])
+    prova("i comuni si raccolgono per nome, e la mappa non dice piu' della card "
+          "(niente SEPA, niente zona senza punto)",
+          [["Milano (MI)", 2], ["Roma (RM)", 1]], r.get("comuni"))
+    prova("la proiezione mette Milano dove la sagoma la disegna", [200, 173], r.get("milano"))
+    prova("i pallini si fondono solo quando sono troppo vicini", [2, [[2, 3]]],
+          [r.get("lontani"), r.get("vicini")])
+    prova("lo zoom tiene la forma e il centro, non scende sotto i 40 e non esce dall'Italia",
+          [{"x": -84, "y": -136, "w": 368, "h": 472}, 40, None],
+          [r.get("zoom"), r.get("zoomFondo"), r.get("zoomFuori")])
+    prova("il nome sull'etichetta perde la sigla", "Reggio nell'Emilia", r.get("nome"))
+    prova("della sagoma si tiene solo il tracciato fatto di comandi e numeri",
+          ["M8 16h0M24 16h0", "M0 0h0", "", ""], r.get("tracciato"))
+    prova("...e il file vero passa da quel giudice (non un tracciato vuoto)", True,
+          bool(re.search(r'\sd="([Mh0-9 .\-]+)"', svg)))
+    chiusa, aperta = r.get("chiusa") or "", r.get("aperta") or ""
+    prova("chiusa: la pillola col conto e niente scatola; aperta: la scatola, i tasti e la nota",
+          [True, False, True, True, True, True],
+          ["3 in contanti di persona" in chiusa, 'id="p2pMappa"' in chiusa,
+           'id="p2pMappaSvg"' in aperta, 'onclick="zoomMappaP2P(0)"' in aperta,
+           "mai sul luogo esatto" in aperta,
+           "1 offerta in contanti ha una zona che la mappa non riconosce" in aperta])
+    prova("senza offerte col punto la mappa non c'e'", "", r.get("nessuna"))
+    prova("il comune scelto restringe l'elenco e si dice; uno che non c'e' piu' si dimentica",
+          [["ord-cccc-3"], True, ""],
+          [r.get("elenco"), r.get("pillola"), r.get("dimenticato")])
+    prova("il nome nel disegno passa da esc(), e il disegno parte dopo l'innerHTML del libro",
+          [True, True, True],
+          ["esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])" in mini,
+           "+ '\" dy=\".35em\">' + n + '</text>'" in mini,
+           "if (conMappa && p2pMappaAperta) { p2pMappaUltimi = mostrati; disegnaMappaP2P(mostrati); }"
+           in mini])
+    prova("la mappa nasce dai `mostrati` del libro (quel che il filtro toglie non c'e')",
+          [True, True], ["const mappa = conMappa ? sezioneMappaP2P(mostrati) : '';" in mini,
+                         "const elenco = conMappa ? elencoMappaP2P(mostrati) : mostrati;" in mini])
+    prova("i punti si prendono in tutte e tre le letture delle zone", 3,
+          mini.count("prendiPostiP2P(d && d.posti)"))
+
+
 def prove_contanti_zona():
     """LA ZONA DI SCAMBIO E IL VESTITO DEL CONTANTI (10 ott 2026, cantiere
     contanti-zona, richiesta di Andrea). Quattro cose: 1) la zona
@@ -154815,9 +154980,10 @@ def prove_contanti_zona():
     # (10 ott 2026, reputazione-p2p) ...e i filtri di chi pubblica, in coda
     prova("i volti portano le zone accanto, dagli stessi id", True,
           'zone = _zone_p2p(con, (d or {}).get("ordini"))' in fac
-          # (13 ott 2026, paracadute) ...e in coda gli ordini col paracadute aperto
-          and 'return {"facce": facce, "cambi": cambi, "zone": zone, "filtri": filtri, "pause": pause,\n'
-              '            "paracadute": paracadute}' in fac)
+          # (13 ott 2026, paracadute) ...e in coda gli ordini col paracadute aperto;
+          # (31 ott 2026, mappa-contanti) e accanto alle zone i loro punti
+          and 'return {"facce": facce, "cambi": cambi, "zone": zone, "posti": _posti_p2p(zone),\n'
+              '            "filtri": filtri, "pause": pause, "paracadute": paracadute}' in fac)
     lib = pezzo("libro_fotografato_p2p")
     prova("la fotografia le da' a TUTTI, prima di chiedere chi guarda (non sono un volto)", True,
           'if fuori["eventi"] and F.get("zone"):\n        fuori["zone"] = F["zone"]' in lib
@@ -155033,7 +155199,7 @@ def prove_contanti_zona():
           [x for x in ("<span>Zona di scambio</span>", 'class="p2p-sez-ico ico-zona"',
                        '<input type="text" id="p2pNuovoZona" maxlength="40" ',
                        'oninput="cambiaZonaNuovoP2P(this)"',
-                       '<div class="hint">Solo indicativa: non scrivere il tuo indirizzo</div>')
+                       '<div class="hint">Solo indicativa: non scrivere il tuo indirizzo. Col nome del comune compari sulla mappa, al suo centro</div>')
            if x not in sez[0]])
     prova("...e quel che c'era scritto torna nel campo scappato, dopo un ridisegno", True,
           'value="Milano &quot;centro&quot; &lt;b&gt;"' in sez[0])
@@ -180539,6 +180705,7 @@ def main():
               prove_prese_dalle_10, prove_campagna_p2p_tutti,
               prove_prendi_metodo,
               prove_contanti_zona,
+              prove_mappa_contanti,
               prove_riquadro_contanti_sepa,
               prove_banner_ingresso, prove_tour_banner_p2p,
               prove_reputazione_p2p, prove_dati_reputazione_p2p,
