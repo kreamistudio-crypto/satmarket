@@ -788,8 +788,8 @@ La sezione col problema lampeggia e un toast dice cosa manca:
 ## 5. Metodi di pagamento
 
 L'elenco è chiuso, nell'ordine dell'app: **SEPA**, **SEPA Instant**,
-**Revolut**, **Satispay**, **PayPal**, **Contanti**, **Contanti al
-tabacchino** (che nell'app si vede col logo **Barattozon**). Chi pubblica
+**Revolut**, **Wise** (dal 31 ott 2026), **Satispay**, **PayPal**,
+**Contanti**, **Contanti al tabacchino** (che nell'app si vede col logo **Barattozon**). Chi pubblica
 ne sceglie uno o più; chi prende ne sceglie uno nel dettaglio. Gli euro
 non passano da Barattolo: viaggiano fra le due persone.
 
@@ -799,6 +799,7 @@ Cosa chiede il foglio «🤝 I vostri recapiti» a chi vende, per metodo:
 |---|---|---|
 | SEPA, SEPA Instant | «Intestatario (nome e cognome)» → «Mario Rossi»; «IBAN» → un IBAN italiano d'esempio; «Causale (facoltativa)» → «es. regalo Mario» (dal 9 ott 2026: al più 140 caratteri; le lettere accentate diventano da sole la lettera semplice, «caffè» → «caffe», e il campo mostra il testo convertito; restano solo lettere, numeri, spazi e . , - / ( ) ' + ? : — il resto, es. € ! «, si rifiuta dicendo quali togliere; non si ricorda: a ogni nuovo scambio nasce vuota, nome e IBAN restano ricordati) | «Bonifico SEPA / Intestatario: … / IBAN: …» e, solo se scritta, «/ Causale: …» (con SEPA Instant: «Bonifico SEPA Instant / …»); chi compra ha il «📋 Copia» su intestatario, IBAN e causale |
 | Revolut | «Il tuo RevTag» → «@mariorossi» | «Revolut: @…» |
+| Wise | «Il tuo Wisetag o l'email del conto Wise» → «@mariorossi» | «Wise: …», col «📋 Copia» |
 | Satispay | «Numero di telefono Satispay» → «333 1234567» | «Satispay: …» |
 | PayPal | «Email o link paypal.me» → «mario@esempio.it» | «PayPal: …» |
 | Contanti | «📍 Dove proponi di vedervi», «🕒 Quando» (§6) | l'appuntamento |
@@ -806,7 +807,7 @@ Cosa chiede il foglio «🤝 I vostri recapiti» a chi vende, per metodo:
 | un metodo che arriva da un'altra app | «Dove vuoi ricevere gli euro (<metodo>)» → «IBAN, @tag, numero…» | «<metodo>: …» |
 
 Il bottone di chi compra cambia nome col metodo: «✅ Ho inviato gli
-euro» (bonifico, Revolut, Satispay, PayPal), «✅ Ho consegnato i
+euro» (bonifico, Revolut, Wise, Satispay, PayPal), «✅ Ho consegnato i
 contanti» (contanti di persona), «✅ Ho pagato al tabacchino»
 (Barattozon).
 

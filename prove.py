@@ -78416,8 +78416,8 @@ def prove_p2p_pubblica():
     # IL VOCABOLARIO E' CHIUSO (set 2026, decisione di Andrea che
     # ROVESCIA il campo libero di ieri): il perche' e' che ogni voce
     # deve avere il SUO form di recapito, e lo prova il blocco 9.
-    prova("...e il vocabolario e' chiuso, sette voci", True,
-          "const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', "
+    prova("...e il vocabolario e' chiuso, otto voci (Wise dal 31 ott 2026)", True,
+          "const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Wise', "
           "'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];" in mini)
     prova("...e del campo libero di ieri non resta niente", False,
           "Oppure scrivilo tu" in mini or "p2pNuovoMetodo =" in mini)
@@ -78737,7 +78737,7 @@ def prove_p2p_pubblica():
         + "\n" + re.search(r"const P2P_TABACCHINO = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO_VITA_S = [^\n]*;", mini).group(0)
-        + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
+        + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Wise',"
           " 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];\n"
         "const base = {metodi: ['SEPA', 'Revolut'], maxSats: 100000, minSats: 100};\n"
         "console.log(JSON.stringify({\n"
@@ -79000,6 +79000,10 @@ def prove_p2p_pubblica():
         "    };\n"
         "  })(),\n"
         "  forme: METODI.map(m => formaRecapito(m).forma),\n"
+        # WISE (31 ott 2026): il Wisetag o l'email in una riga sola, e la
+        # regex ha i confini di parola: «Otherwise» non e' Wise
+        "  wise: [formaRecapito('Wise').componi({conto: '@mariorossi'}),\n"
+        "         formaRecapito('Otherwise').forma],\n"
         # IL TABACCHINO (set 2026): la forma sua e non quella dei
         # contanti, il testo composto a righe fisse, le due gemelle
         # della data in andata e ritorno, e i silenzi del lettore
@@ -79386,8 +79390,8 @@ def prove_p2p_pubblica():
     prova("il campo data va e torna, e a mano vale la forma delle gemelle",
           [True, True], [tv["giro"], tv["aMano"]])
     prova("...e sulle date storte tace", [0, 0, 0, ""], tv["storta"])
-    prova("il foglio offre il tabacchino solo a chi vende: sette voci di la', sei di qua",
-          [-1, 6, 7], tv["offerti"])
+    prova("il foglio offre il tabacchino solo a chi vende: otto voci di la', sette di qua",
+          [-1, 7, 8], tv["offerti"])
     # le righe del foglio che il banco puro non vede
     _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
     prova("scegliere il tabacchino toglie gli altri, e viceversa", True,
@@ -79520,10 +79524,12 @@ def prove_p2p_pubblica():
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
     # casella generica — e questa riga diventa rossa prima.
-    prova("ognuna delle sette voci ha il suo form di recapito",
-          ["sepa", "sepa", "revolut", "satispay", "paypal", "contanti",
+    prova("ognuna delle otto voci ha il suo form di recapito",
+          ["sepa", "sepa", "revolut", "wise", "satispay", "paypal", "contanti",
            "tabacchino"],
           out["forme"])
+    prova("...Wise compone «Wise: @tag», e una parola che lo contiene non e' Wise",
+          ["Wise: @mariorossi", "altro:otherwise"], out["wise"])
     # --- IL TABACCHINO (set 2026) ---------------------------------
     tab = out["tab"]
     # la regex dei contanti prende anche «Contanti al tabacchino»:
@@ -155019,8 +155025,8 @@ def prove_contanti_zona():
           [o["voce"][1], o["voce"][4], o["voce"][5], o["voce"][6]])
     prova("...Barattozon tiene il suo marchio, senza banconote", [True, False, False],
           ['class="p2p-marca"' in o["tabVoce"], "💵" in o["tabVoce"], "p2p-contanti" in o["tabVoce"]])
-    prova("...nel vocabolario dei sette metodi l'etichetta ce l'ha uno solo, «Contanti»",
-          [False, False, False, False, False, True, False], o["etichette"])
+    prova("...nel vocabolario degli otto metodi l'etichetta ce l'ha uno solo, «Contanti»",
+          [False, False, False, False, False, False, True, False], o["etichette"])
     prova("il 💳 se ne va quando ogni voce ha il suo segno (solo contanti, solo marchio) e resta a intestare i nomi",
           ["", "💳 ", "💳 ", "", "💳 ", "💳 ", "💳 ", "💳 "], o["icone"])
     prova("...ma l'INSEGNA navy e' dei soli marchi: la scatola del contanti non lo diventa",

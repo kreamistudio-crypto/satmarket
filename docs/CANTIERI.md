@@ -73310,3 +73310,33 @@ cambio a tutti; le prove dal vivo elencate nella tappa 3; per dopo, a
 parte: chi riceve in bitcoin dal 2-di-3 di Alan che vuole cambiare in
 Lightning (stessa strada rovesciata, un ordine vero al posto
 dell'ordine 0).
+
+## Wise fra i metodi del P2P: l'ottava voce, accanto a Revolut (31 ott 2026, richiesta di Andrea)
+
+Andrea: «aggiungi anche wise come metodo di pagamento fiat nel p2p».
+`P2P_METODI` è un vocabolario CHIUSO (set 2026) perché ogni voce ha il
+suo form di recapito, quindi Wise entra in due righe che vanno insieme:
+la voce `'Wise'` in `P2P_METODI`, subito dopo Revolut (è la sua sorella:
+un conto in euro con un @tag), e la forma `wise` in
+`P2P_FORME_RECAPITO`, una casella sola «Il tuo Wisetag o l'email del
+conto Wise» (segnaposto «@mariorossi») che compone «Wise: …». La regex
+è `/\bwise\b/i`, con i confini di parola: un metodo di un altro client
+che contenesse «wise» dentro un'altra parola non cade nel form di Wise.
+L'etichetta «Wise» entra in `ETICHETTE_DA_INCOLLARE_P2P`, così chi
+compra ha il «📋 Copia» per etichetta, qualunque cosa ci abbia scritto
+chi vende (prima un «Wise: …» lo prendeva solo per FORMA: @tag, email o
+numero). La cauzione non cambia:
+le patch 0008/0010 del nodo la legano solo a «Contanti», e Wise non lo
+è. Sul filo la stringa è «Wise» nel tag `pm`, testo libero per Mostro:
+nessun ritocco al nodo né al server.
+
+Strade scartate: un form con tre campi (Wisetag, email, IBAN Wise), perché
+chi paga da Wise incolla l'uno o l'altro nello stesso campo, e l'IBAN
+Wise è già il metodo SEPA; un'icona o un marchio di Wise (`P2P_VESTE_METODI`),
+perché le card sono uguali alle sorelle e un marchio altrui non è nostro.
+
+Provato: le prove che fissavano la lista a sette voci ora dicono otto
+(vocabolario chiuso, «ognuna delle otto voci ha il suo form», il foglio
+del tabacchino 8/7, le etichette del contanti), suite severa verde.
+Aggiornata la GUIDA-P2P-PASSI §5. Resta da guardare: la riga delle
+pillole nel foglio «Pubblica» a larghezza di telefono, ora con otto voci.

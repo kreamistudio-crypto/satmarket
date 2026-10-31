@@ -67332,8 +67332,8 @@ function riquadroRecapitoP2P(testo, titolo){
    il suo «📋 Copia» se il suo valore e' un dato che si incolla in
    un'altra app — e lo si riconosce in due modi:
    • per ETICHETTA, quelle che scrivono i nostri form (`P2P_FORME_RECAPITO`):
-     intestatario e causale del bonifico, Revolut, Satispay, PayPal;
-   • per FORMA, per i metodi che il form non conosce («Wise: @mario»,
+     intestatario e causale del bonifico, Revolut, Wise, Satispay, PayPal;
+   • per FORMA, per i metodi che il form non conosce («Bizum: @mario»,
      «Postepay: 5333 …») e per i recapiti scritti da un altro client: un
      @tag, un'email, un numero (almeno sei cifre, col + davanti e gli
      spazi o i trattini che ci si mettono), un link.
@@ -67341,7 +67341,7 @@ function riquadroRecapitoP2P(testo, titolo){
    dell'appuntamento — e resta testo da leggere. L'IBAN ha la sua strada
    nel riquadro (per forma, senza spazi): un «IBAN: da chiedere» non e'
    un dato. */
-const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|satispay|paypal)$/i;
+const ETICHETTE_DA_INCOLLARE_P2P = /^(intestatario|causale|revolut|revtag|wise|satispay|paypal)$/i;
 const FORME_DA_INCOLLARE_P2P = [
   /^@[\w.\-]{2,40}$/,
   /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
@@ -69548,7 +69548,7 @@ const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺
    cade nella forma generica, dove chi deve ricevere gli euro trova una
    casella vuota invece delle sue due righe. Il testo libero restava
    leggibile dal coordinatore e ILLEGGIBILE da noi.
-   Le sette voci qui sotto hanno tutte il loro form: «SEPA Instant» cade
+   Le otto voci qui sotto hanno tutte il loro form: «SEPA Instant» cade
    in quella `sepa`, che riconosce /sepa|bonific|iban/. Una voce nuova
    si aggiunge QUI, e se vuole un form suo anche la'.
    LA SETTIMA E' «Contanti al tabacchino» (set 2026, decisione di
@@ -69558,8 +69558,11 @@ const P2P_VALUTE = [{cod: 'EUR', nome: 'Euro', segno: '€', bandiera: '🇪🇺
    quando l'ordine risulta pagato. Il suo form NON si ricorda — ogni
    ordine Amazon e' nuovo — e la stringa viaggia in chiaro nel tag
    `pm` del libro pubblico: cambiarla vuol dire cambiare quel che
-   leggono i client altrui. */
-const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];
+   leggono i client altrui.
+   L'OTTAVA E' «Wise» (31 ott 2026, richiesta di Andrea): sta accanto a
+   Revolut perche' e' la sua sorella — un conto in euro, un @tag — e il
+   suo form chiede il Wisetag o l'email del conto Wise. */
+const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Wise', 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];
 /* la voce del tabacchino ha il suo nome in UN posto: i giudici la
    cercano per questo, mai per un testo ribattuto */
 const P2P_TABACCHINO = 'Contanti al tabacchino';
@@ -76408,6 +76411,12 @@ const P2P_FORME_RECAPITO = [
   {forma: 'revolut', riconosce: /revolut/i,
    campi: [{k: 'tag', et: 'Il tuo RevTag', ph: '@mariorossi'}],
    componi: c => 'Revolut: ' + c.tag},
+  /* WISE (31 ott 2026): si riceve sul Wisetag («@mariorossi») o
+     sull'email del conto; una casella sola, come PayPal, perche' chi
+     paga da Wise incolla l'uno o l'altra nello stesso campo */
+  {forma: 'wise', riconosce: /\bwise\b/i,
+   campi: [{k: 'conto', et: 'Il tuo Wisetag o l\'email del conto Wise', ph: '@mariorossi'}],
+   componi: c => 'Wise: ' + c.conto},
   {forma: 'satispay', riconosce: /satispay/i,
    campi: [{k: 'tel', et: 'Numero di telefono Satispay', ph: '333 1234567'}],
    componi: c => 'Satispay: ' + c.tel},
