@@ -32921,7 +32921,9 @@ def _leve_stato():
                          "Lightning, se c'e' anche CAMBIO_BTC_LN_ATTIVO e "
                          "l'on-chain sta sulla rete del fornitore; e chi "
                          "prende vendendo bitcoin puo' pagare il deposito "
-                         "in Lightning (tappa 3, stessa rete)",
+                         "in Lightning (tappa 3, stessa rete); e chi vuole "
+                         "vendere su un ordine Lightning con soli bitcoin "
+                         "li cambia prima, con CAMBIO_BTC_LN_ATTIVO (caso 4)",
                   spento="chi compra riceve solo sulla rete dell'ordine"),
             _leva("P2P on-chain dal cambio: solo moderatori",
                   "P2P_ALTRA_RETE_SOLO_MODERATORI",
@@ -76202,6 +76204,8 @@ _lucchetto_cambi_p2p = asyncio.Lock()
 def p2p_altra_rete_leve(tg_id: int) -> dict:
     """La busta per `/api/me` → `swap_leve.p2p`: il cancello e i tetti."""
     return {"attivo": p2p_altra_rete_per(tg_id),
+            # (caso 4) il cambio bitcoin → Lightning prima della presa
+            "presa": p2p_presa_cambio_per(tg_id),
             "minimo": int(SWAP_MIN_SATS or 0),
             "massimo": int(P2P_ALTRA_RETE_MAX_SATS or 0)}
 
@@ -76413,19 +76417,28 @@ async def ronda_cambi_p2p(adesso: int | None = None) -> int:
         stato = await swap_stato_di(f, r["swap_id"]) if f else None
         if not stato:
             continue
-        avvisa = stato in P2P_CAMBIO_DA_RITIRARE and not r["avvisato"]
-        finito = stato in P2P_CAMBIO_FINITI
+        # (caso 4) un cambio prima della presa e' un «submarine»: altri
+        # stati, altre parole (`_avviso_presa_p2p`)
+        presa = str(r["ordine"] or "").startswith("presa:")
+        avviso = _avviso_presa_p2p(r, stato) if presa else None
+        if presa:
+            avvisa = avviso is not None and not r["avvisato"]
+            finito = stato in P2P_PRESA_FINITI
+        else:
+            avvisa = stato in P2P_CAMBIO_DA_RITIRARE and not r["avvisato"]
+            finito = stato in P2P_CAMBIO_FINITI
         if avvisa:
             try:
                 # (tappa 3) un cambio del deposito di uno scambio on-chain
                 # ha le sue parole e il suo bottone (`_avviso_ritiro_p2p`)
-                testo, bottone = _avviso_ritiro_p2p(r)
+                testo, bottone = avviso if presa else _avviso_ritiro_p2p(r)
                 esito = await notifica(int(r["tg_id"]), testo, bottone)
             except Exception as e:
                 esito = f"SALTATO ({type(e).__name__}: {e})"
             mandati += 1
-            print(f"₿ Cambio P2P {r['ordine'][:8]} di {r['tg_id']}: bitcoin "
-                  f"bloccati, avviso {esito}", flush=True)
+            print(f"₿ Cambio P2P {r['ordine'][:8]} di {r['tg_id']}: "
+                  f"{stato if presa else 'bitcoin bloccati'}, avviso {esito}",
+                  flush=True)
         if avvisa or finito or stato != r["visto"]:
             con = _cambi_p2p_db()
             try:
@@ -96037,6 +96050,154 @@ def _avviso_ritiro_p2p(r) -> tuple:
     except Exception:
         pass
     return _testo_deposito_ln_p2p(r), (P2P_BOTTONE_DEPOSITO_LN, dove)
+
+
+# --- VENDERE SU UN ORDINE P2P LIGHTNING AVENDO SOLO BITCOIN (1 nov 2026,
+# cantiere presa-altra-rete, caso 4; studio del 30 ott §9-12, risposta di
+# Massimo del 1 nov) ----------------------------------------------------------
+# Chi PRENDE un ordine Lightning per VENDERE deve bloccare i sats con la
+# garanzia di Mostro, che e' una hold invoice. Un cambio non puo' pagarla
+# (Massimo: «fare casini con invoice on hold può farti solo perdere i
+# fondi»), quindi si fa IN DUE TEMPI nella stessa pagina: prima un cambio
+# bitcoin → Lightning («submarine») di SATS Routing verso una richiesta
+# NORMALE del SUO wallet Lightning (dal wallet collegato, o incollata);
+# poi, coi sats arrivati, la presa e la garanzia di sempre, pagate dal suo
+# wallet. Barattolo non tiene mai i sats fra i due tempi (sarebbe
+# custodia). Il server qui fa il preventivo, il biglietto (nella tabella
+# della tappa 1, con lo scambio scritto «presa:<ordine>») e la ronda
+# dell'avviso: a richiesta pagata il bot dice «tocca per prendere
+# l'ordine», perche' la presa la firma la chiave dello scambio, che vive
+# solo nel telefono. Se nel frattempo l'ordine lo prende un altro, i sats
+# restano nel suo wallet: non si perde niente.
+P2P_BOTTONE_PRESA_PRONTA = "⚡ Prendi l'ordine"
+P2P_BOTTONE_PRESA_RIMBORSO = "₿ Riprenditi i bitcoin"
+# gli stati del submarine: la richiesta pagata (l'avviso buono)...
+P2P_PRESA_PAGATA = ("invoice.paid", "transaction.claimed")
+# ...quelli in cui i bitcoin sono gia' partiti dal suo wallet...
+P2P_PRESA_MANDATI = ("transaction.mempool", "transaction.confirmed",
+                     "invoice.pending")
+# ...e quelli in cui il cambio e' fallito
+P2P_PRESA_FALLITA = ("invoice.failedToPay", "transaction.lockupFailed")
+# ...e quelli in cui la ronda lo lascia (lo scaduto dice «bitcoin da
+# riprendere» solo se la ronda li aveva visti partire: senza lockup, uno
+# scaduto non ha niente da rimandare)
+P2P_PRESA_FINITI = ("transaction.claimed", "invoice.failedToPay",
+                    "transaction.lockupFailed", "swap.expired",
+                    "transaction.refunded", "swap.sconosciuto")
+
+
+def p2p_presa_cambio_per(tg_id) -> bool:
+    """IL CAMBIO PRIMA DELLA PRESA C'E'? La leva della presa sull'altra rete
+    (`p2p_altra_rete_per`, sopra lo swap) e la strada bitcoin → Lightning
+    accesa (`CAMBIO_BTC_LN_ATTIVO`). Nessuna rete dell'on-chain di mezzo:
+    i bitcoin escono dal SUO wallet, verso SATS Routing."""
+    return bool(p2p_altra_rete_per(tg_id) and "btc-ln" in cambio_strade())
+
+
+def p2p_presa_ordine(ordine: str) -> str:
+    """Il nome dello scambio nei biglietti `cambi_p2p`: «presa:<ordine>»."""
+    return f"presa:{ordine}"
+
+
+@app.get("/api/swap/p2p/presa/preventivo")
+async def p2p_presa_preventivo(sats: str = "", fornitore: str = "satsrouting",
+                               hash: str = "",
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """QUANTI BITCOIN MANDARE perche' nel suo wallet Lightning arrivino
+    `sats` (la garanzia che bloccherà): il conto del submarine
+    (`preventivo_sub`), coi tetti della presa sull'altra rete. Niente fee
+    nostra. Non crea niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_presa_cambio_per(user["id"]):
+        raise HTTPException(403, "Il cambio non e' disponibile")
+    chi = swap_fornitore(str(fornitore or ""))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
+    cifra = _cambio_sats(sats)
+    busta = {"dovuto": cifra, "fornitore": chi["id"],
+             "fornitore_nome": chi["nome"], "valido_s": SWAP_PREVENTIVO_VALE_S}
+    if not cifra:
+        return dict(busta, ok=False, motivo="cifra")
+    tariffa = await leggi_tariffa_sub(chi)
+    if tariffa is None:
+        return dict(busta, ok=False, motivo="non_risponde")
+    p = preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)
+    if p.get("ok"):
+        p["costo"] = int(p["mandi"]) - cifra
+    p["cambiata"] = bool(hash) and hash != tariffa["hash"]
+    return dict(busta, **p)
+
+
+@app.post("/api/swap/p2p/presa")
+async def p2p_presa_biglietto(req: Request, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """IL BIGLIETTO del cambio prima della presa, chiesto PRIMA dello swap:
+    l'ordine del libro, i sats da ricevere in Lightning, il fornitore. La
+    nascita e l'annullo sono quelli della tappa 1. {ok, id} o {ok: false,
+    motivo}."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_presa_cambio_per(user["id"]):
+        raise HTTPException(403, "Il cambio non e' disponibile")
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return {"ok": False, "motivo": "ordine"}
+    chi = swap_fornitore(str(d.get("fornitore") or "satsrouting"))
+    if chi is None:
+        return {"ok": False, "motivo": "fornitore"}
+    cifra = _cambio_sats(d.get("sats"))
+    if not cifra or cifra < int(SWAP_MIN_SATS or 0):
+        return {"ok": False, "motivo": "sotto_minimo"}
+    if int(P2P_ALTRA_RETE_MAX_SATS or 0) and cifra > int(P2P_ALTRA_RETE_MAX_SATS):
+        return {"ok": False, "motivo": "sopra_tetto"}
+    nome = p2p_presa_ordine(ordine)
+    adesso = int(time.time())
+    async with _lucchetto_cambi_p2p:
+        con = _cambi_p2p_db()
+        try:
+            if cambi_p2p_vivi(con, user["id"], nome, adesso) >= P2P_CAMBI_PER_SCAMBIO:
+                return {"ok": False, "motivo": "troppi"}
+            cur = con.execute(
+                "INSERT INTO cambi_p2p(tg_id,ordine,sats,fornitore,stato,"
+                "creato,aggiornato) VALUES(?,?,?,?,'chiesto',?,?)",
+                (int(user["id"]), nome, cifra, chi["id"], adesso, adesso))
+            con.commit()
+            cid = int(cur.lastrowid)
+        finally:
+            con.close()
+    return {"ok": True, "id": cid}
+
+
+def _testo_presa_p2p(r, pagata: bool) -> str:
+    """PURA: l'avviso del cambio prima della presa, riuscito o no."""
+    sats = int(r["sats"] or 0)
+    quanti = f" ({_fmt_sats(sats)} sats)" if sats > 0 else ""
+    if pagata:
+        return ("⚡ I tuoi sats sono arrivati nel tuo wallet Lightning" + quanti + ".\n"
+                "Tocca per prendere l'ordine: la garanzia la paghi dal tuo "
+                "wallet. Se intanto l'ha preso qualcun altro, i sats restano "
+                "tuoi, nel wallet.")
+    return ("₿ Il cambio dei tuoi bitcoin non è riuscito.\n"
+            "Apri Barattolo: nella pagina «Cambio» scrivi dove rimandarli, e "
+            "il tuo telefono te li rimanda. Non si è perso niente.")
+
+
+def _avviso_presa_p2p(r, stato: str):
+    """(testo, bottone) per un cambio prima della presa che ha qualcosa da
+    dire in questo stato, o None. Riuscito: la presa. Fallito coi bitcoin
+    gia' mandati (il pagamento non riuscito e il lockup sbagliato li
+    hanno per forza; lo scaduto solo se la ronda li aveva visti): il
+    rimborso. Scaduto senza bitcoin mandati: niente."""
+    ordine = str(r["ordine"] or "")[len("presa:"):]
+    if stato in P2P_PRESA_PAGATA:
+        return _testo_presa_p2p(r, True), (P2P_BOTTONE_PRESA_PRONTA,
+                                          f"{LINK_LIBRO_P2P}?ordine={ordine}")
+    if stato in P2P_PRESA_FALLITA or (
+            stato == "swap.expired" and str(r["visto"] or "") in P2P_PRESA_MANDATI):
+        return _testo_presa_p2p(r, False), (P2P_BOTTONE_PRESA_RIMBORSO,
+                                           f"{LINK_LIBRO_P2P}?ordine={ordine}")
+    return None
 
 
 def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:

@@ -34636,6 +34636,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `creaDepositoLnOnchainP2P`, `pagaDepositoLnOnchainP2P` dal wallet
   collegato, `ridisegnaDepositoLnOnchainP2P`; rotte
   `leggiPreventivoDepositoP2P`, `chiediBigliettoDepositoP2P`).
+- VENDERE SU UN ORDINE P2P LIGHTNING AVENDO SOLO BITCOIN (1 nov 2026,
+  cantiere presa-altra-rete, caso 4; perché in CANTIERI, «Vendere su un
+  ordine P2P Lightning avendo solo bitcoin»). In due tempi, mai la hold
+  invoice di Mostro dentro un cambio: prima un submarine verso una
+  richiesta NORMALE del suo wallet Lightning, poi la presa di sempre.
+  Cancello `p2p_presa_cambio_per` (`p2p_altra_rete_per` + «btc-ln» in
+  `cambio_strade()`), letto dalla pagina in `swap_leve.p2p.presa`. Rotte:
+  `GET /api/swap/p2p/presa/preventivo` (`preventivo_sub` coi tetti
+  `SWAP_MIN_SATS`/`P2P_ALTRA_RETE_MAX_SATS`, più `costo` e `cambiata`),
+  `POST /api/swap/p2p/presa` (biglietto in `cambi_p2p` con ordine
+  «presa:<ordine>», `p2p_presa_ordine`; nascita e annullo della tappa 1).
+  `ronda_cambi_p2p` per le righe «presa:» usa `_avviso_presa_p2p`: a
+  `P2P_PRESA_PAGATA` («⚡ Prendi l'ordine», `LINK_LIBRO_P2P?ordine=`), a
+  `P2P_PRESA_FALLITA` o a scaduto con lockup visto («₿ Riprenditi i
+  bitcoin»); chiude a `P2P_PRESA_FINITI`. Telefono: `swap/instradatore.js`
+  §6f (`swapDiPresaP2P`, `swapCreaPerPresaP2P`: un cambio vivo per ordine,
+  richiesta controllata con `fatturaValida`, preventivo riletto, record
+  `p2pPresa` con `indirizzo` vuoto: il rimborso si scrive nel Cambio);
+  `miniapp.html` (`rigaPresaOcP2P` sotto il conto di `renderDettaglioP2P`
+  a chi venderebbe un ordine altrui, `garanziaVendoP2P`,
+  `creaPresaOcP2P` con la richiesta incollata o chiesta al wallet
+  collegato, `qrPresaOcP2P`, `ridisegnaPresaOcP2P`; rotte
+  `leggiPreventivoPresaP2P`, `chiediBigliettoPresaP2P`).
 - CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
   onchain-verso-lightning; perché in CANTIERI, «Chi vende on-chain riceve
   in Lightning»). La leva `ONCHAIN_INCASSO_LN_ATTIVO` (False) e il giudice

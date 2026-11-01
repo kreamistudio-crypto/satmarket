@@ -132,6 +132,7 @@ collaudo_cambio_libero
 collaudo_cambio_p2p
 collaudo_cambio_onchain_p2p
 collaudo_deposito_ln_p2p
+collaudo_presa_ln_p2p
 collaudo_margine_cassaforte
 collaudo_onchain_indirizzo
 collaudo_onchain_ordine
