@@ -15849,7 +15849,11 @@ def cambio_da_solo():
     APERTA E SENZA PARAMETRI: il cambio non e' di nessuno, e il libro
     lo guarda anche chi non ha una sessione. `no-store`: un cambio
     tenuto in una cache e' di nuovo il cambio vecchio."""
+    # (1 nov 2026, cantiere p2p-usdt) anche il dollaro, dalla stessa
+    # lettura: fa le stime in sats degli ordini in USDT (1 USDT = 1 $,
+    # come il prezzo `pegged` del nodo). Mai nei percorsi del denaro.
     return JSONResponse({"cambio_eur": cambio_noto_ora(),
+                         "cambio_usd": cambio_noto_ora("usd"),
                          "cambio_eta_s": cambio_eta_ora()},
                         headers={"Cache-Control": "no-store"})
 
@@ -27057,6 +27061,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # sfoglia il mercatino non deve aspettare nessuno. 0 = non
         # disponibile, e il client sa gia' cosa farne (omette il «≈»).
         risposta["cambio_eur"] = cambio_noto_ora()
+        # ...e il dollaro (1 nov 2026, cantiere p2p-usdt): le stime in
+        # sats degli ordini P2P in USDT, 1 USDT = 1 $; 0 = non lo so
+        risposta["cambio_usd"] = cambio_noto_ora("usd")
         # ...e la sua eta' in secondi (19 ott 2026, tasso-in-chiaro): il
         # libro P2P e il conto di un ordine dicono il cambio in chiaro,
         # con l'ora; None = non c'e' (vedi `cambio_eta_ora`)
@@ -33727,6 +33734,21 @@ def _leve_stato():
                   spento="il P2P è solo quello di Mostro (Lightning): "
                          "nessuna rotta /api/p2p/onchain/*, nessuna card",
                   allarme=bool(P2P_ONCHAIN_ATTIVO) and not ONCHAIN_ATTIVO),
+            # GLI ORDINI P2P IN USDT (1 nov 2026, cantiere p2p-usdt): la
+            # valuta dell'ordine di Mostro, la garanzia resta in sats
+            _leva("Ordini P2P in USDT", "P2P_USDT_ATTIVO",
+                  bool(P2P_USDT_ATTIVO),
+                  acceso="nel foglio «Pubblica» c'è anche la valuta USDT "
+                         "(reti Tron, Polygon, Ethereum) e il libro mostra "
+                         "gli ordini in USDT; vale solo se il nodo ha USDT "
+                         "fra le valute accettate",
+                  spento="il P2P è solo in euro, come ieri"),
+            _leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",
+                  bool(P2P_USDT_SOLO_ADMIN),
+                  acceso="gli ordini in USDT li vedono solo i moderatori "
+                         "(ADMIN_IDS)",
+                  spento="appena P2P_USDT_ATTIVO si accende li vede "
+                         "chiunque abbia il P2P"),
             # LA TAPPA 2 (20 ott 2026): la libreria che fa i conti degli
             # indirizzi, e la terza chiave — detta per quel che E', mai
             # stampata (una xpub non e' un segreto, ma non si sparge)
@@ -46781,6 +46803,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # 2-di-3 (30 ott 2026): la leva P2P_ONCHAIN_ATTIVO sotto il cancello
     # dell'on-chain e quello del P2P. Il libro, invece, lo vede chiunque.
     profilo["p2p_onchain"] = p2p_onchain_ammesso(user["id"])
+    # ...e gli ordini P2P in USDT (1 nov 2026, cantiere p2p-usdt): la leva
+    # P2P_USDT_ATTIVO, la porticina degli admin e il P2P per me. Senza,
+    # il libro non mostra gli ordini in USDT e il foglio offre l'euro solo.
+    profilo["p2p_usdt"] = p2p_usdt_ammesso(user["id"])
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -52174,6 +52200,37 @@ except (TypeError, ValueError):
     P2P_MAX_EURO = 0
     print("[p2p] P2P_MAX_EURO non e' un numero intero: il tetto in "
           "euro resta SPENTO")
+# GLI ORDINI P2P IN USDT (1 nov 2026, cantiere p2p-usdt, decisione di
+# Andrea dopo lo studio «USDT e altre coin»). Mostro dalla 0.20.2 sa
+# fare un ordine con l'USDT come VALUTA al posto dell'euro (il `f` del
+# 38383 vale «USDT», il prezzo e' agganciato a 1 dollaro): la garanzia
+# resta la hold invoice in sats Lightning di sempre, e gli USDT passano
+# da persona a persona FUORI da Mostro, sulla rete scritta nel metodo
+# («USDT (Tron)», «USDT (Polygon)», «USDT (Ethereum)», la grafia del
+# protocollo). Barattolo non li tocca mai.
+# DUE LEVE, il calco dell'on-chain: `P2P_USDT_ATTIVO` dice se la
+# funzione esiste, `P2P_USDT_SOLO_ADMIN` per chi (di serie solo i
+# moderatori di ADMIN_IDS: la beta di Andrea e Alan). Spenta di serie,
+# e accesa NON BASTA: il nodo deve avere «USDT» fra le valute accettate
+# (`fiat_currencies_accepted`) e il prezzo `pegged`, o rifiuta gli
+# ordini — il gesto sul nodo e' di Andrea, dopo le prove (DA-FARE).
+# Storta: spenta, e lo dice.
+try:
+    from config import P2P_USDT_ATTIVO
+except ImportError:
+    P2P_USDT_ATTIVO = False
+if not isinstance(P2P_USDT_ATTIVO, bool):
+    print("[p2p] P2P_USDT_ATTIVO non e' True/False: gli ordini in USDT "
+          "restano spenti", flush=True)
+    P2P_USDT_ATTIVO = False
+try:
+    from config import P2P_USDT_SOLO_ADMIN
+except ImportError:
+    P2P_USDT_SOLO_ADMIN = True
+if not isinstance(P2P_USDT_SOLO_ADMIN, bool):
+    print("[p2p] P2P_USDT_SOLO_ADMIN non e' True/False: gli USDT li "
+          "vedono solo gli admin", flush=True)
+    P2P_USDT_SOLO_ADMIN = True
 # IL TETTO DEL COLLAUDO (20 ott 2026, decisione di Andrea con Alan): sul
 # collaudo il P2P parla col coordinatore VERO, quindi ordini e sats sono
 # veri; un ordine dal collaudo non supera P2P_MAX_SATS_PROVA sats, di
@@ -52694,6 +52751,20 @@ def _p2p_leve() -> dict:
             # dizionario vale «nessuno»
             "indirizziNo": dict(P2P_INDIRIZZI_NON_PASSANO)
             if isinstance(P2P_INDIRIZZI_NON_PASSANO, dict) else {}}
+
+
+def p2p_usdt_ammesso(tg_id) -> bool:
+    """CHI VEDE GLI ORDINI IN USDT (1 nov 2026, cantiere p2p-usdt): li
+    pubblica, li prende e li trova nel libro. La leva madre spenta e'
+    no per CHIUNQUE, admin compresi (la lezione di `onchain_ammesso`: un
+    cancello con una porticina laterale non e' un cancello); poi la
+    porticina degli admin; poi il P2P per questa persona, perche' un
+    ordine in USDT e' un ordine P2P come gli altri."""
+    if not (P2P_USDT_ATTIVO and _p2p_leve()["attivo"]):
+        return False
+    if P2P_USDT_SOLO_ADMIN and not e_admin(tg_id):
+        return False
+    return bool(_p2p_per(tg_id)["attivo"])
 
 
 def _p2p_per(tg_id) -> dict:
@@ -60204,7 +60275,10 @@ def _evento_libro_p2p(ev: dict):
             "sats": sats, "euro": tag.get("fa") or [],
             "metodi": tag.get("pm") or [],
             "quando": int(ev.get("created_at") or 0), "scade": scade,
-            "premio": premio}
+            "premio": premio,
+            # la valuta (1 nov 2026, cantiere p2p-usdt): «EUR» di serie, in
+            # maiuscolo come la scrive il protocollo
+            "fiat": ((tag.get("f") or ["EUR"])[0] or "EUR").upper()}
 
 
 _P2P_FIRMA_DETTO = {"manca": False}   # l'avviso di coincurve assente, una volta
@@ -63209,15 +63283,25 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         o = _evento_libro_p2p(ev)
         if not o or o["stato"] != "pending":
             continue
+        # LA VALUTA (1 nov 2026, cantiere p2p-usdt): l'euro per tutti,
+        # l'USDT solo per chi lo vede (`p2p_usdt_ammesso`, qui sotto), e
+        # un'altra valuta per nessuno — il libro di Barattolo non la mostra
+        fiat = o.get("fiat") or "EUR"
+        if fiat not in ("EUR", "USDT"):
+            continue
         tipo = _tipo_nuovo_p2p(o["lato"], o["metodi"])
         if not tipo:
             continue
         euro = _euro_nuovo_p2p(o["euro"], o["metodi"])
-        conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["sats"], euro, cambio)
+        # in USDT il metro e' il dollaro (1 USDT = 1 $, come il nodo)
+        conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["sats"], euro,
+                                      cambio if fiat == "EUR" else cambio_noto_ora("usd"))
         autore = con.execute("SELECT tg_id FROM p2p_ordini WHERE ordine=?",
                              (o["id"],)).fetchone()
         autore = int(autore["tg_id"] or 0) if autore else 0
         euro_txt = _euro_libro(o["euro"], o["metodi"])
+        if fiat == "USDT" and euro_txt.endswith(" €"):
+            euro_txt = euro_txt[:-2] + " USDT"
         metodi_txt = ", ".join(_metodi_libro(o["metodi"]))
         for p in persone:
             tg = int(p["tg_id"])
@@ -63226,6 +63310,8 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln"):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
+                continue
+            if fiat == "USDT" and not p2p_usdt_ammesso(tg):
                 continue
             cur = con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
@@ -64424,6 +64510,10 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
     vende = (ev.get("lato") == "sell") != taker
     sats = int(ev.get("sats") or 0)
     euro = _euro_libro(ev.get("euro"), ev.get("metodi"))
+    # un ordine in USDT dice USDT (1 nov 2026, cantiere p2p-usdt): la cifra
+    # e' la stessa del `fa`, cambia solo il segno
+    if str(ev.get("fiat") or "EUR").upper() == "USDT" and euro.endswith(" €"):
+        euro = euro[:-2] + " USDT"
     metodi = ", ".join(html.escape(str(m)) for m in _metodi_libro(ev.get("metodi")))
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")

@@ -44463,10 +44463,13 @@ def prove_fogli_di_casa():
     # Barattolo», il novantaquattresimo)
     # CENTODUE (30 ott 2026, stesso giorno, avvisi-p2p-onchain): «Togli»
     # dove si riceve on-chain, nel Profilo (Andrea e Alan durante la prova)
-    prova("i gesti che passano dalla domanda unica sono centodue (dal 30 ott "
+    # CENTOTRE (1 nov 2026, p2p-usdt): «Hai inviato gli USDT?», la conferma
+    # col suo id della transazione (`usdtInviatiP2P`)
+    prova("i gesti che passano dalla domanda unica sono centotre (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
-          "disputa, libera, rinuncia, decidi; e «Togli» dove si riceve on-chain)",
-          102, solo_codice(mini).count("chiediConferma({"))
+          "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
+          "dal 1 nov «Hai inviato gli USDT?»)",
+          103, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -78683,8 +78686,10 @@ def prove_p2p_pubblica():
     prova("...e la riga a schermo legge dallo STESSO ordine", True,
           "euro: ordine.max_amount ? ordine.min_amount : ordine.fiat_amount,"
           in invia and "euroMax: ordine.max_amount || 0," in invia)
-    prova("...e in EUR, che e' l'unica valuta del coordinatore", True,
-          "fiat_code: 'EUR'," in puro)
+    # (1 nov 2026, cantiere p2p-usdt) la valuta e' quella del foglio: USDT
+    # solo se scelta, e qualunque altra cosa resta l'EUR di sempre
+    prova("...nella valuta del foglio: EUR di serie, USDT solo se scelta", True,
+          "fiat_code: String(v.valuta || '').toUpperCase() === 'USDT' ? 'USDT' : 'EUR'," in puro)
     prova("il lato lo dice la scheda in cui si sta", True,
           "kind: lato === 'compro' ? 'buy' : 'sell'," in puro)
     prova("l'ordine nasce 'pending': lo prende chi vuole", True,
@@ -79831,15 +79836,19 @@ def prove_p2p_pubblica():
     prova("il form normalizza la scadenza e non ricorda il tabacchino", True,
           "campi.scade = dataTabacchinoP2P(quando);" in _inv
           and "daRicordare = fr.ricorda === false ? null" in _inv)
-    # FINCHE' LA VALUTA E' UNA SOLA il codice puo' restare cablato in
-    # `ordineDaCampiP2P` (`fiat_code: 'EUR'`). Il giorno che il
-    # catalogo cresce questa riga diventa rossa e dice dove andare:
-    # una tendina che offre USDT e un payload che scrive EUR sarebbe
-    # una bugia sul filo, non un dettaglio.
+    # FINCHE' LA VALUTA ERA UNA SOLA il codice poteva restare cablato in
+    # `ordineDaCampiP2P` (`fiat_code: 'EUR'`), e questa riga guardava
+    # avanti: il giorno che il catalogo cresceva diventava rossa. E' DIVENTATA
+    # ROSSA il 1 nov 2026 (cantiere p2p-usdt) e ha detto dove andare: adesso
+    # ogni codice del catalogo ha la sua strada nel payload, e un codice
+    # nuovo senza la sua torna a farla rossa.
     _cat = mini[mini.index("const P2P_VALUTE = ["):]
     _cat = _cat[:_cat.index("];")]
-    prova("il catalogo delle valute ne ha una, come il payload",
-          (1, True), (_cat.count("cod:"), "fiat_code: 'EUR'," in puro))
+    import re as _re_cat
+    _codici = _re_cat.findall(r"cod: '([A-Z]+)'", _cat)
+    prova("il catalogo delle valute e il payload dicono gli stessi codici",
+          ["EUR", "USDT"], [c for c in _codici
+                            if ("'%s'" % c) in puro.split("fiat_code:")[1].split("\n")[0]])
 
     # --- 10) I SEI RITOCCHI (set 2026, guardati dal vivo da Andrea) --
     stile = mini[mini.index("<style>"):mini.index("</style>")]
@@ -138152,7 +138161,8 @@ def prove_annullati_ritocchi():
            e2("da 100,00 a 20,00 €"), e2("")])
     ev = pezzo("_evento_libro_p2p")
     prova("...il lettore del libro porta il premio, e un premio storto vale zero", True,
-          '"premio": premio}' in ev and "if premio != premio or abs(premio) > 100:" in ev)
+          # EMENDATA (1 nov 2026, p2p-usdt): dopo il premio viaggia la valuta
+          '"premio": premio,' in ev and "if premio != premio or abs(premio) > 100:" in ev)
     # EMENDATA (10 ott 2026, contanti-zona): la colonna del premio non e'
     # piu' l'ultima — dopo c'e' la zona di scambio —, quindi si cerca
     # senza la chiusura, come gia' quella del cambio
@@ -153032,6 +153042,370 @@ def prove_onchain_verso_lightning():
            "deve poter ricevere" in blocco,
            re.search(r"\bswap\b", re.sub(r"<[^>]*>|swap[A-Z]\w*", "", blocco),
                      re.I) is not None))
+
+
+def _keccak_riferimento(dati, suffisso=0x01):
+    """UN KECCAK SCRITTO A PARTE, per il banco degli USDT (1 nov 2026): la
+    trascrizione in Python della «CompactFIPS202» del team Keccak, da
+    confrontare col Keccak del telefono. Con `suffisso` 0x06 e' lo SHA3-256
+    del FIPS 202, e quello si controlla contro hashlib: cosi' anche il
+    riferimento e' provato, e non e' una copia del codice che giudica."""
+    def rol(a, n):
+        n %= 64
+        return ((a >> (64 - n)) | (a << n)) & 0xFFFFFFFFFFFFFFFF if n else a
+
+    def f1600(stato):
+        L = [[int.from_bytes(stato[8 * (x + 5 * y):8 * (x + 5 * y) + 8], "little")
+              for y in range(5)] for x in range(5)]
+        R = 1
+        for _ in range(24):
+            C = [L[x][0] ^ L[x][1] ^ L[x][2] ^ L[x][3] ^ L[x][4] for x in range(5)]
+            D = [C[(x + 4) % 5] ^ rol(C[(x + 1) % 5], 1) for x in range(5)]
+            L = [[L[x][y] ^ D[x] for y in range(5)] for x in range(5)]
+            x, y = 1, 0
+            cor = L[x][y]
+            for t in range(24):
+                x, y = y, (2 * x + 3 * y) % 5
+                cor, L[x][y] = L[x][y], rol(cor, (t + 1) * (t + 2) // 2)
+            for y in range(5):
+                T = [L[x][y] for x in range(5)]
+                for x in range(5):
+                    L[x][y] = T[x] ^ ((~T[(x + 1) % 5]) & T[(x + 2) % 5])
+            for j in range(7):
+                R = ((R << 1) ^ ((R >> 7) * 0x71)) % 256
+                if R & 2:
+                    L[0][0] ^= 1 << ((1 << j) - 1)
+        fuori = bytearray(200)
+        for x in range(5):
+            for y in range(5):
+                fuori[8 * (x + 5 * y):8 * (x + 5 * y) + 8] = L[x][y].to_bytes(8, "little")
+        return fuori
+
+    passo = 136
+    stato = bytearray(200)
+    i = 0
+    blocco = 0
+    while i < len(dati):
+        blocco = min(len(dati) - i, passo)
+        for k in range(blocco):
+            stato[k] ^= dati[i + k]
+        i += blocco
+        if blocco == passo:
+            stato = f1600(stato)
+            blocco = 0
+    stato[blocco] ^= suffisso
+    stato[passo - 1] ^= 0x80
+    stato = f1600(stato)
+    return bytes(stato[:32])
+
+
+def _eip55_riferimento(nudo40):
+    basso = nudo40.lower()
+    h = _keccak_riferimento(basso.encode()).hex()
+    return "0x" + "".join(c.upper() if int(h[i], 16) >= 8 else c
+                          for i, c in enumerate(basso))
+
+
+def _tron_riferimento(venti):
+    """un indirizzo Tron vero da venti byte: 0x41 davanti, il controllo
+    del doppio SHA-256 dietro, in Base58 — scritto qui, non preso dal
+    telefono"""
+    import hashlib as _h
+    corpo = b"\x41" + venti
+    pieno = corpo + _h.sha256(_h.sha256(corpo).digest()).digest()[:4]
+    alfa = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    n = int.from_bytes(pieno, "big")
+    s = ""
+    while n:
+        n, r = divmod(n, 58)
+        s = alfa[r] + s
+    return "1" * (len(pieno) - len(pieno.lstrip(b"\0"))) + s
+
+
+def prove_p2p_usdt():
+    """GLI ORDINI P2P IN USDT (1 nov 2026, cantiere p2p-usdt, decisione di
+    Andrea: «Tron + Polygon mettiamo anche ethereum. tetto 250 €, NODO
+    solo dopo le prove»). Mostro accetta l'USDT come VALUTA dell'ordine;
+    la garanzia resta la hold invoice Lightning, e gli USDT viaggiano
+    fuori da Mostro sulla rete del metodo. Qui: i due cancelli (la leva
+    del server, di serie solo agli admin, e il libro che filtra per
+    valuta), i conti degli indirizzi contro un riferimento scritto a
+    parte, il giudice della RETE SBAGLIATA («come negli exchange»), il QR
+    con la catena dentro, il tetto in USDT, e la valuta che non si perde
+    sul filo (payload della pubblicazione e della presa). Ogni giudice ha
+    la sua controprova: un codice rotto apposta deve far diventare rossa
+    la sua riga."""
+    print("\n₮ Gli ordini P2P in USDT")
+    import hashlib as _h
+    import random as _rnd
+    src = _SORGENTE
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    # --- 0) il riferimento si prova da se': SHA3-256 contro hashlib ---
+    _rnd.seed(20261101)
+    lunghezze = [0, 1, 55, 56, 64, 135, 136, 137, 200, 271, 272, 273]
+    campioni = [bytes(_rnd.randrange(256) for _ in range(n)) for n in lunghezze]
+    prova("il Keccak di riferimento, col suffisso dello SHA3, torna con hashlib",
+          True, all(_keccak_riferimento(b, 0x06) == _h.sha3_256(b).digest()
+                    for b in campioni))
+    prova("...e col suffisso di Ethereum dice il vettore noto della stringa vuota",
+          "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+          _keccak_riferimento(b"").hex())
+
+    # --- 1) i cancelli del server ---
+    prova("la leva nasce spenta e solo agli admin, nel config d'esempio e nel codice",
+          (True, True, True, True),
+          ("\nP2P_USDT_ATTIVO = False" in esempio,
+           "\nP2P_USDT_SOLO_ADMIN = True" in esempio,
+           "P2P_USDT_ATTIVO = False" in src.split("def p2p_usdt_ammesso(")[0],
+           "P2P_USDT_SOLO_ADMIN = True" in src.split("def p2p_usdt_ammesso(")[0]))
+    amb = {"P2P_USDT_ATTIVO": True, "P2P_USDT_SOLO_ADMIN": True,
+           "_p2p_leve": lambda: {"attivo": True},
+           "e_admin": lambda tg: tg == 999,
+           "_p2p_per": lambda tg: {"attivo": tg in (111, 999)}}
+    exec(pezzo("p2p_usdt_ammesso"), amb)
+    f = amb["p2p_usdt_ammesso"]
+    accesa = [f(999), f(111), f(222)]
+    amb["P2P_USDT_SOLO_ADMIN"] = False
+    aperta = [f(999), f(111), f(222)]
+    amb["P2P_USDT_ATTIVO"] = False
+    spenta = [f(999), f(111)]
+    amb["P2P_USDT_ATTIVO"] = True
+    amb["_p2p_leve"] = lambda: {"attivo": False}
+    senza_p2p = [f(999)]
+    prova("accesa e solo-admin: l'admin si', chi e' ammesso al P2P no",
+          [True, False, False], accesa)
+    prova("...aperta: chi e' ammesso al P2P si', chi non lo e' no",
+          [True, True, False], aperta)
+    prova("...spenta, o col P2P spento, nessuno", [[False, False], [False]],
+          [spenta, senza_p2p])
+    prova("/api/me lo dice al telefono, e il pannello delle leve lo mostra",
+          (1, True, True),
+          (src.count('profilo["p2p_usdt"] = p2p_usdt_ammesso(user["id"])'),
+           '_leva("Ordini P2P in USDT", "P2P_USDT_ATTIVO",' in src,
+           '_leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",' in src))
+    acc = pezzo("_accoda_nuovi_p2p")
+    prova("gli avvisi «ordine nuovo» in USDT vanno solo a chi gli USDT li vede",
+          (True, True),
+          ("p2p_usdt_ammesso(" in acc, "USDT" in acc))
+    prova("le frasi del bot su uno scambio in USDT dicono USDT, non €", True,
+          'euro = euro[:-2] + " USDT"' in pezzo("_testo_libro_p2p"))
+    prova("il libro letto dal server porta la valuta dell'ordine (il tag f)", True,
+          '"fiat": ((tag.get("f") or ["EUR"])[0] or "EUR").upper()' in pezzo("_evento_libro_p2p"))
+
+    # --- 2) il banco del telefono ---
+    ini = mini.index("/* ═══ GLI ORDINI IN USDT (1 nov 2026")
+    fine = mini.index("\n}\n", mini.index("function qrUsdtP2P(")) + 3
+    blocco = mini[ini:fine]
+    i = mini.index("const P2P_VALUTE = [")
+    valute = mini[i:mini.index("];", i) + 2]
+    forme = mini.index("const P2P_FORME_RECAPITO = [")
+    forme_usdt = mini[forme:mini.index("/* LA CAUSALE (9 ott 2026", forme)]
+    venti = bytes(range(1, 21))
+    tron_vero = _tron_riferimento(venti)
+    tron_rotto = tron_vero[:-1] + ("2" if tron_vero[-1] != "2" else "3")
+    evm_vero = _eip55_riferimento(venti.hex())
+    # una sola lettera con la maiuscola girata: il refuso tipico che solo
+    # il controllo dell'EIP-55 vede
+    _k = next(j for j, d in enumerate(evm_vero) if j > 1 and d.isalpha())
+    evm_rotto = evm_vero[:_k] + evm_vero[_k].swapcase() + evm_vero[_k + 1:]
+    campioni_hex = [b.hex() for b in campioni]
+    js = ("var cambioVivo = true, eurPerSat = 0.001, usdPerSat = 0.00108;\n"
+          "var myP2PUsdt = false, TETTO = 250;\n"
+          "const P2P_VALUTA = 'EUR';\n"
+          "const P2P_METODI = ['SEPA', 'Revolut', 'Contanti'];\n"
+          "const maxEuroP2P = () => TETTO;\n"
+          + valute + "\n" + blocco + "\n"
+          + forme_usdt.replace("const P2P_FORME_RECAPITO = [", "const FORME = [") + "];\n"
+          + _fn_js(mini, "function righeRecapitoP2P(testo){")
+          + _fn_js(mini, "function reteUsdtDaRecapitoP2P(righe){")
+          + "const tabacchinoP2P = () => null, interoP2P = x => ({n: Math.floor(Number(x) || 0), vuoto: x === '' || x == null});\n"
+          + "const centesimiP2P = interoP2P;\n"
+          + _fn_js(mini, "function ordineDaCampiP2P(v, lato){")
+          + _fn_js(mini, "function payloadPresaP2P(riga, scelta, metodo, sulMetodo){")
+          + "const CAMPIONI = " + json.dumps(campioni_hex) + ";\n"
+          + "const TRON = " + json.dumps([tron_vero, tron_rotto]) + ";\n"
+          + "const EVM = " + json.dumps([evm_vero, evm_rotto]) + ";\n"
+          + r"""
+const hex = b => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+const da = h => Uint8Array.from((h.match(/../g) || []).map(x => parseInt(x, 16)));
+const [T, P, E] = P2P_RETI_USDT;
+const out = {};
+out.keccak = CAMPIONI.map(h => hex(keccak256P2P(da(h))));
+out.sha = CAMPIONI.map(h => hex(sha256P2P(da(h))));
+out.eip55 = ['0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed', '0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359',
+  '0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB', '0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb',
+  P.contratto, E.contratto].map(evmValidoP2P);
+out.tronContratto = tronValidoP2P(T.contratto);
+out.tron = TRON.map(tronValidoP2P);
+out.evm = EVM.map(evmValidoP2P);
+out.forme = ['bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', 'lnbc10u1pjxyz', 'mario@walletofsatoshi.com',
+  'lq1qqf8er278e6nyvuwtgf39e6ewvdcnjupn9a86rzpx655y5lhkt0walu3djf9cklkxd3ryld97hu8h3xepw7sh2rlu7q45dcew5',
+  'ab'.repeat(32), '0x' + 'ab'.repeat(32), TRON[0], EVM[0], 'ciao'].map(s => {
+    const d = reteIndirizzoP2P(s); return d ? d.forma : null; });
+/* il giudice dell'indirizzo, rete per rete */
+out.giudice = {
+  tronSuTron: giudiceIndirizzoUsdtP2P(TRON[0], T),
+  evmSuPolygon: giudiceIndirizzoUsdtP2P(EVM[0], P),
+  evmSuEthereum: giudiceIndirizzoUsdtP2P(EVM[0], E),
+  evmSuTron: giudiceIndirizzoUsdtP2P(EVM[0], T),
+  tronSuPolygon: giudiceIndirizzoUsdtP2P(TRON[0], P),
+  bitcoin: giudiceIndirizzoUsdtP2P('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq', T),
+  lightning: giudiceIndirizzoUsdtP2P('lnbc10u1pjxyz', E),
+  contratto: giudiceIndirizzoUsdtP2P(P.contratto, P),
+  refuso: giudiceIndirizzoUsdtP2P(TRON[1], T),
+  refusoEvm: giudiceIndirizzoUsdtP2P(EVM[1], E),
+  hash: giudiceIndirizzoUsdtP2P('0x' + 'ab'.repeat(32), E),
+  vuoto: giudiceIndirizzoUsdtP2P('', T)
+};
+out.txid = [giudiceTxidUsdtP2P('ab'.repeat(32), T), giudiceTxidUsdtP2P('0x' + 'ab'.repeat(32), P),
+  giudiceTxidUsdtP2P('0x' + 'ab'.repeat(32), T), giudiceTxidUsdtP2P('ab'.repeat(32), E),
+  giudiceTxidUsdtP2P('', T), giudiceTxidUsdtP2P('xyz', P)];
+out.qr = [qrUsdtP2P(P, EVM[0], 25), qrUsdtP2P(E, EVM[0], 0), qrUsdtP2P(T, TRON[0], 25), qrUsdtP2P(T, '', 25)];
+/* i cancelli del telefono */
+out.chiuso = [valuteVisibiliP2P(false).map(v => v.cod), valutaVistaP2P('USDT'), valutaVistaP2P('EUR')];
+myP2PUsdt = true;
+out.aperto = [valuteVisibiliP2P(false).map(v => v.cod), valuteVisibiliP2P(true).map(v => v.cod),
+  valutaVistaP2P('usdt'), valutaVistaP2P('BRL')];
+out.metodi = [metodiValutaP2P('USDT'), metodiValutaP2P('EUR')];
+out.segni = [segnoValutaP2P('USDT'), segnoValutaP2P('EUR'), segnoValutaP2P(undefined)];
+/* il tetto, in USDT al cambio di adesso */
+out.tetto = [tettoValutaP2P('EUR'), tettoValutaP2P('USDT')];
+usdPerSat = 0; out.tettoSenzaDollaro = tettoValutaP2P('USDT');
+TETTO = 0; out.tettoSpento = tettoValutaP2P('USDT');
+usdPerSat = 0.00108; TETTO = 250;
+cambioVivo = false; out.tettoSenzaCambio = tettoValutaP2P('USDT'); cambioVivo = true;
+out.metro = [perSatP2P({fiat: 'USDT'}), perSatP2P({fiat: 'EUR'}), perSatP2P({})];
+/* le forme del recapito: il metodo esatto, la rete prima dell'indirizzo */
+const fP = FORME.find(f => f.riconosce.test('USDT (Polygon)'));
+const fT = FORME.find(f => f.riconosce.test('usdt (tron)'));
+out.formaRecapito = [fP && fP.forma, fT && fT.forma, FORME.some(f => f.riconosce.test('USDT')),
+  FORME.some(f => f.riconosce.test('USDT (Tron) e altro'))];
+const testo = fP.componi({indirizzo: EVM[0]});
+const righe = righeRecapitoP2P(testo);
+const letto = reteUsdtDaRecapitoP2P(righe);
+out.recapito = [testo.split('\n')[0], righe[0].testa || '', letto && letto.rete.rete, letto && letto.indirizzo];
+/* la valuta sul filo: la pubblicazione e la presa */
+out.filo = [ordineDaCampiP2P({valuta: 'USDT', euro: 50, metodi: ['USDT (Tron)']}, 'vendo').fiat_code,
+  ordineDaCampiP2P({valuta: 'usdt', euro: 50, metodi: []}, 'vendo').fiat_code,
+  ordineDaCampiP2P({euro: 50, metodi: ['SEPA']}, 'compro').fiat_code,
+  ordineDaCampiP2P({valuta: 'BRL', euro: 50, metodi: []}, 'compro').fiat_code];
+out.presa = [payloadPresaP2P({euro: 30, fiat: 'USDT'}, 0, 'USDT (Tron)', true).order.fiat_code,
+  payloadPresaP2P({euro: 30}, 0, 'SEPA', true).order.fiat_code];
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(js)
+    if o is None:
+        salta("gli USDT nel telefono", "node non c'e'")
+        return
+    prova("il Keccak del telefono torna col riferimento, anche oltre un blocco (136 byte)",
+          [_keccak_riferimento(b).hex() for b in campioni], o.get("keccak"))
+    prova("lo SHA-256 del telefono torna con hashlib, ai bordi del riempimento",
+          [_h.sha256(b).hexdigest() for b in campioni], o.get("sha"))
+    prova("i quattro indirizzi dell'EIP-55 e i due contratti EVM passano il controllo",
+          [True] * 6, o.get("eip55"))
+    prova("il contratto USDT su Tron e' un indirizzo Tron valido", True, o.get("tronContratto"))
+    prova("un indirizzo Tron fatto qui passa, con un carattere cambiato no",
+          [True, False], o.get("tron"))
+    prova("un indirizzo EVM col controllo fatto qui passa, con una maiuscola girata no",
+          [True, False], o.get("evm"))
+    prova("ogni forma si riconosce: bitcoin, Lightning, indirizzo Lightning, Liquid, "
+          "id di transazione, Tron, EVM, e il resto niente",
+          ["bitcoin", "lightning", "lightning", "liquid", "hash", "hash", "tron", "evm", None],
+          o.get("forme"))
+    g = o.get("giudice") or {}
+    prova("l'indirizzo della rete giusta passa (e fra Polygon ed Ethereum non si "
+          "puo' distinguere: passa su tutt'e due)",
+          ["", "", ""], [g.get("tronSuTron"), g.get("evmSuPolygon"), g.get("evmSuEthereum")])
+    prova("LA RETE SBAGLIATA SI FERMA e la frase nomina le due reti",
+          [True, True],
+          [g.get("evmSuTron", "").startswith("⚠️ Questo è un indirizzo Ethereum o Polygon, ma hai scelto Tron"),
+           g.get("tronSuPolygon", "").startswith("⚠️ Questo è un indirizzo Tron, ma hai scelto Polygon")])
+    prova("...bitcoin e Lightning si fermano col loro nome, e il contratto non e' il tuo indirizzo",
+          [True, True, True],
+          [g.get("bitcoin", "").startswith("⚠️ Questo è un indirizzo bitcoin, non USDT"),
+           g.get("lightning", "").startswith("⚠️ Questa è una richiesta Lightning"),
+           g.get("contratto", "").startswith("Questo è l'indirizzo del contratto USDT")])
+    prova("...il refuso si vede dal controllo, su Tron e sulle EVM",
+          [True, True],
+          [g.get("refuso", "").startswith("In questo indirizzo c'è un carattere sbagliato"),
+           g.get("refusoEvm", "").startswith("In questo indirizzo c'è un carattere sbagliato")])
+    prova("...un id di transazione al posto dell'indirizzo, e il campo vuoto, si dicono",
+          [True, "Scrivi il tuo indirizzo USDT su Tron"],
+          [g.get("hash", "").startswith("Questo sembra l'id di una transazione"), g.get("vuoto")])
+    t = o.get("txid") or []
+    prova("l'id della transazione: la forma della rete passa, quella dell'altra famiglia "
+          "si ferma, il vuoto e la spazzatura pure",
+          ["", "", True, True, True, True],
+          t[:2] + [t[2].startswith("⚠️ Questo id ha la forma di Ethereum o Polygon"),
+                   t[3].startswith("⚠️ Questo id ha la forma di Tron"),
+                   t[4].startswith("Incolla l'id della transazione"),
+                   t[5].startswith("Questo non sembra l'id di una transazione su Polygon")])
+    prova("il QR delle reti EVM porta contratto e catena (EIP-681), quello di Tron "
+          "l'indirizzo, e senza indirizzo niente",
+          ["ethereum:0xc2132D05D31c914a87C6611C10748AEb04B58e8F@137/transfer?address=%s&uint256=25000000" % evm_vero,
+           "ethereum:0xdAC17F958D2ee523a2206206994597C13D831ec7@1/transfer?address=%s" % evm_vero,
+           tron_vero, ""], o.get("qr"))
+    prova("a cancello chiuso il foglio offre l'euro solo, e il libro non vede l'USDT",
+          [["EUR"], False, True], o.get("chiuso"))
+    prova("...aperto offre l'USDT, ma mai a rete on-chain; una valuta ignota resta fuori",
+          [["EUR", "USDT"], ["EUR"], True, False], o.get("aperto"))
+    prova("in USDT i metodi sono le tre reti, con la grafia del protocollo",
+          [["USDT (Tron)", "USDT (Polygon)", "USDT (Ethereum)"], ["SEPA", "Revolut", "Contanti"]],
+          o.get("metodi"))
+    prova("il segno: USDT, € e l'euro di serie", ["USDT", "€", "€"], o.get("segni"))
+    prova("il tetto di 250 € diventa USDT al cambio di adesso (250 × 1,08 = 270)",
+          [250, 270], o.get("tetto"))
+    prova("...senza il dollaro, o senza un cambio vivo, si ferma a 1 e non inventa; "
+          "spento resta spento",
+          [1, 1, 0], [o.get("tettoSenzaDollaro"), o.get("tettoSenzaCambio"), o.get("tettoSpento")])
+    prova("il metro di un ordine: il dollaro per l'USDT, l'euro per il resto",
+          [0.00108, 0.001, 0.001], o.get("metro"))
+    prova("le forme del recapito riconoscono il metodo ESATTO, una per rete",
+          ["usdt-polygon", "usdt-tron", False, False], o.get("formaRecapito"))
+    prova("il recapito dice la rete PRIMA dell'indirizzo, e chi paga lo rilegge "
+          "con rete e indirizzo",
+          ["⚠️ Manda solo su Polygon, mai su un'altra rete",
+           "⚠️ Manda solo su Polygon, mai su un'altra rete", "polygon", evm_vero],
+          o.get("recapito"))
+    prova("sul filo la valuta e' quella del foglio: USDT solo se scelta, il resto EUR",
+          ["USDT", "USDT", "EUR", "EUR"], o.get("filo"))
+    prova("...e la presa scrive la valuta della riga, non EUR a un USDT",
+          ["USDT", "EUR"], o.get("presa"))
+
+    # --- 3) dove i pezzi si incontrano (sentinelle) ---
+    inv = pezzo_js(mini, "async function inviaCampoP2P(tipo, btn){", "\n}\n")
+    prova("l'invio del recapito chiama il giudice della rete, e un no non parte", True,
+          "const no = giudiceIndirizzoUsdtP2P(campi.indirizzo, fr.usdt);" in inv
+          and "if (no) { toast(no, 7000);" in inv
+          and inv.index("giudiceIndirizzoUsdtP2P(") < inv.index("componi("))
+    eur = pezzo_js(mini, "function euroInviatiP2P(){", "\n}\n")
+    prova("«Ho inviato» in USDT passa dall'id della transazione", True,
+          "if (typeof usdtInviatiP2P === 'function' && usdtP2P(o) && reteUsdtScambioP2P(o)) "
+          "return usdtInviatiP2P(o);" in eur)
+    ui = pezzo_js(mini, "function usdtInviatiP2P(o){", "\n}\n")
+    prova("...e senza un id buono il gesto non parte", True,
+          "const no = giudiceTxidUsdtP2P(txid, r);" in ui
+          and ui.index("giudiceTxidUsdtP2P(") < ui.index("mossaOrdineP2P("))
+    libro = pezzo_js(mini, "function fondiLibroP2P(libro, ev, adesso){", "\n}\n")
+    prova("il libro dal vivo e la prima lettura filtrano la valuta con lo stesso giudice",
+          (True, 2), ("valutaVistaP2P(o.fiat)" in libro,
+                      mini.count("typeof valutaVistaP2P === 'function' ? valutaVistaP2P(o.fiat) : o.fiat === P2P_VALUTA")))
+    prova("lo scambio preso si porta la valuta della riga", True,
+          "fiat: riga.fiat || 'EUR'," in mini)
+    prova("il tetto del foglio e' quello nella valuta del foglio", True,
+          "tettoValutaP2P(typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')" in
+          pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n"))
+    vale = pezzo_js(mini, "function valeNuovoOrdineP2P(v){", "\n}\n")
+    prova("il giudice del foglio: in USDT solo le reti, le reti solo in USDT, mai on-chain",
+          (True, True, True),
+          ("'In USDT si sceglie la rete: Tron, Polygon o Ethereum'" in vale,
+           "'Le reti USDT valgono solo per un ordine in USDT'" in vale,
+           "'Gli scambi on-chain sono solo in euro'" in vale))
+    prova("il cambio del dollaro arriva dal server come quello dell'euro", (True, True),
+          ('"cambio_usd": cambio_noto_ora("usd")' in src,
+           "impostaCambioUsd(j.cambio_usd)" in mini))
 
 
 def prove_p2p_onchain():
@@ -179570,7 +179944,7 @@ def prove_istanza_prova():
     js = ("const fmt = n => String(n);\nlet cambioVivo = true, eurPerSat = 0.001;\n"
           "let COORD = {};\nconst p2pCoord = () => COORD;\n"
           + _fn_js(mini, "function maxEuroP2P(){")
-          + _fn_js(mini, "function giudiceTettoProvaP2P(euro){") + r"""
+          + _fn_js(mini, "function giudiceTettoProvaP2P(euro, cod){") + r"""
 const out = {};
 COORD = {maxEuro: 250};                 out.produzione = [maxEuroP2P(), giudiceTettoProvaP2P(1000)];
 COORD = {maxEuro: 0};                   out.senzaTetti = [maxEuroP2P(), giudiceTettoProvaP2P(1000)];
@@ -179593,7 +179967,7 @@ console.log(JSON.stringify(out));""")
         prova("...e senza cambio non si indovina: 1 €, cioe' fermo", 1, o.get("senzaCambio"))
     cd = pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n")
     prova("la presa chiede il tetto del collaudo prima di partire", True,
-          "giudiceTettoProvaP2P(g ? g.euro : o.euro)" in cd
+          "giudiceTettoProvaP2P(g ? g.euro : o.euro, o.fiat)" in cd
           and cd.index("giudiceTettoProvaP2P(") < cd.index("eseguiPresaP2P("))
 
 
@@ -183987,6 +184361,7 @@ def main():
     prove_ordine_onchain, prove_incasso_esterno_onchain,
     prove_onchain_verso_lightning,
     prove_p2p_onchain,
+    prove_p2p_usdt,
     prove_grafica_p2p_onchain,
     prove_deposito_p2p_onchain,
     prove_parole_uniche,
