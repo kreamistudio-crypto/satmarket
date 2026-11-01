@@ -76495,3 +76495,77 @@ né `tondo`; monete, frecce, «In arrivo», SATS Routing, commissione).
 Controprova rossa: tolto «In arrivo». Prova del centro: la tappa chiude il foglio, il punto senza filo, il
 fumetto in mezzo. Visto dal vivo nei due temi (foto 46 col riflettore,
 47 al centro).
+
+## Ricevere on-chain da un ordine P2P Lightning col cambio (1 nov 2026, cantiere presa-altra-rete, tappa 1)
+
+L'idea è di Andrea (30 ott, 21:02): chi vende in Lightning non è un vero
+filtro, perché chi compra e ha solo un wallet bitcoin può ricevere
+on-chain pagando la commissione del cambio di SATS Routing; la rete
+dell'annuncio dice solo come paga chi pubblica. Lo studio (30 ott, nella
+cartella del progetto `presa-altra-rete/STUDIO-PRESA-ALTRA-RETE-2026-10-30.md`)
+ha messo in fila quattro casi; Andrea il 1 nov alle 17:30 ha chiesto la
+PRIMA TAPPA: ordine Lightning, chi compra riceve on-chain, leva spenta,
+solo admin.
+
+COM'È FATTA. Nel foglio «Dove ricevere i sats» (`apriIncassoP2P`), a chi
+COMPRA su un ordine Lightning con la leva accesa compare la scelta
+«⚡ Lightning / ₿ On-chain». Su On-chain: un indirizzo bitcoin, il conto
+(«Ricevi circa X sats sul tuo indirizzo bitcoin · costo del cambio Y
+sats») e «Invia». Il telefono fa nascere un cambio reverse di SATS
+Routing per la cifra ESATTA che Mostro deve (lo stesso motore dell'incasso
+swap e del Cambio libero: chiave dal wallet di Barattolo, verifica della
+risposta, ritiro dal telefono), e manda a Mostro la fattura del cambio con
+l'`add-invoice` di sempre. Mostro non sa niente: al rilascio paga quella
+fattura, SATS Routing blocca i bitcoin e il telefono li ritira
+all'indirizzo. Se il moderatore dà ragione a chi vende, la fattura non si
+paga e il cambio scade senza costare niente.
+
+DECISIONI E PERCHÉ.
+- NIENTE NOSTRA FEE NEL PREVENTIVO (`preventivo_swap(…, 0, …)`): la
+  fattura deve portare la cifra di Mostro al sat, sennò Mostro la
+  rifiuta. Il costo che vede chi compra è solo quello di SATS Routing.
+  Il preventivo si rifà al momento di creare, con l'impronta: se è
+  cambiato o la fattura non porta esattamente i sats dello scambio, il
+  telefono si ferma.
+- IL SERVER NON TOCCA I SATS: tiene solo il preventivo, il BIGLIETTO
+  (`cambi_p2p`: chi, quale scambio, quale swap, le parti pubbliche) e LA
+  RONDA DELL'AVVISO. Le chiavi stanno solo nel telefono (regola ferrea 2),
+  quindi se al rilascio l'app è chiusa il ritiro aspetta: la ronda vede
+  lo stato del cambio dal suo numero e manda UNA volta il bot «₿ Ritira i
+  tuoi bitcoin». Senza ritiro il cambio scade, il pagamento di Mostro
+  torna indietro e Mostro chiede una fattura nuova (`fattura_nuova`):
+  i sats non si perdono. Per questo i biglietti vivi per scambio sono 3.
+- LE 12 PAROLE PRIMA: se il wallet di Barattolo non ha ancora mostrato le
+  parole il telefono si ferma (`swapNoP2P('parole')`), perché il rimborso
+  e il ritiro dipendono da lì.
+- SOLO CHI COMPRA, solo prima del rilascio e non dopo un pagamento
+  ritentato: chi vende in Lightning paga in Lightning, è la tappa 3.
+- TETTO SUO: `P2P_ALTRA_RETE_MAX_SATS` 500.000, sotto i tetti del P2P.
+
+STRADE SCARTATE. Un passo solo con il submarine verso chi vende per gli
+ordini dove chi prende paga on-chain (caso A2): Massimo (1 nov) ha
+ricordato che il sistema è trustless e una hold invoice non si può
+«piegare»: si fa in due passi o con NWC, ed è una tappa a parte. Tenere
+l'app aperta un'ora per obbligo: non si può imporre in una WebView, e
+la ronda dell'avviso copre il caso dell'app chiusa. Una patch a Mostro:
+non serve, la fattura del cambio è una fattura come le altre.
+
+PROVE. `prove_cambio_p2p` (26 controlli: leve, cancello, preventivo
+senza fee, record senza `ordine`, ronda con `avvisato`, testi senza
+«Mostro» sullo schermo); `collaudo_cambio_p2p.py` (58 controlli, col
+SATS Routing di cartone e il banco node: preventivo, nascita, biglietto,
+fattura a Mostro, rilascio, ritiro, avviso una volta sola, annullo,
+troppi biglietti, leva spenta = 403), in `ci/collaudi.txt` e
+`ci/compila.txt`. Controprove rosse: la fee nel preventivo, l'avviso
+senza `avvisato`, il record con `ordine: 0`. Il censimento di
+`dopoGestoP2P` passa da 10 a 11 (EMENDATA).
+
+COSA RESTA DA GUARDARE. Non provato dal vivo: va sul collaudo (SATS
+Routing di cartone) con Andrea compratore. Il comportamento di Mostro con
+un HTLC che resta in volo a lungo (il cambio non ritirato) non è provato
+sul nodo. La pagina dell'ordine non dice ancora che l'incasso è un
+cambio. Il tutorial on-chain dice ancora «In arrivo» (va tolto quando la
+funzione apre a tutti). Tappa 2 (ordine on-chain, ricevi Lightning) e
+tappa 3 (Luca/Mario: ordine on-chain, chi vende paga in Lightning dentro
+il 2-di-3) toccano il 2-di-3: le rivede Alan. Prima di aprire a tutti,
+il parere MiCA come per il Cambio libero.

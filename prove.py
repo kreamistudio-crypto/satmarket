@@ -142555,8 +142555,10 @@ def prove_dopo_gesto_p2p():
     # euro e il rilascio, la fattura a mano due volte, dal wallet, il
     # recapito = 5); l'annullo, il «gia' fatto» riletto, il primo piano,
     # la garanzia e la cauzione = 10. EMENDATA (1 ott 2026): erano 12, coi
-    # due della prova d'incontro, che non torna piu'
-    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 10,
+    # due della prova d'incontro, che non torna piu'. EMENDATA (1 nov 2026,
+    # presa-altra-rete): 11, con «Invia» del cambio on-chain di chi compra
+    # (`inviaCambioP2P`), che e' la fattura a mano con un'altra fattura
+    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 11,
           nudo(mini).count("dopoGestoP2P("))
 
     # --- 3) LA CARD ACCESA -------------------------------------------
@@ -150217,6 +150219,9 @@ def prove_testo_ricevere_sats():
         "const ordiniP2P = () => ({x: ORD});\n"
         "const satsDaRicevereP2P = o => o.netto || 0;\n"
         "const finestraFatturaP2P = () => 3600;\n"
+        # (1 nov 2026, presa-altra-rete) il cambio verso on-chain sta dietro
+        # la sua leva, spenta: il foglio di qui e' quello di sempre
+        "const cambioP2PDisponibile = () => false;\n"
         + pezzo_js(m, "const fmt = n =>", "\n") + "\n"
         + pezzo_js(m, "const esc = s =>", "));\n") + "));\n"
         + pezzo_js(m, "function percheFallitoP2P(", "\n}\n") + "\n}\n"
@@ -150483,7 +150488,11 @@ def prove_indirizzo_non_verificato():
     prova("la richiesta accettata cancella il rifiuto dalla riga", True,
           "delete agg.indirizziRifiutati;" in ric
           and ric.index("delete agg.indirizziRifiutati;") < ric.index("scriviOrdineP2P(agg);"))
-    prova("...e chi la ricorda e' la strada del foglio E quella del wallet collegato", 2,
+    # EMENDATA (1 nov 2026, cantiere presa-altra-rete): TRE strade, la
+    # terza e' la fattura del cambio (`inviaCambioP2P`, ricevi on-chain),
+    # che passa dallo stesso `add-invoice` e va ricordata come le altre.
+    prova("...e chi la ricorda e' la strada del foglio, quella del wallet collegato "
+          "e quella del cambio", 3,
           m.count("ricordaFatturaP2P(") - 1)
 
     # --- IL SERVER SA QUALI WALLET NON PASSANO, E LO DICE PRIMA --------
@@ -150655,6 +150664,9 @@ def prove_indirizzo_non_verificato():
         "const ordiniP2P = () => ({x: ORD});\n"
         "const satsDaRicevereP2P = o => o.netto || 0;\n"
         "const finestraFatturaP2P = () => 3600;\n"
+        # (1 nov 2026, presa-altra-rete) il cambio verso on-chain sta dietro
+        # la sua leva, spenta: il foglio di qui e' quello di sempre
+        "const cambioP2PDisponibile = () => false;\n"
         + pezzo_js(m, "const fmt = n =>", "\n") + "\n"
         + pezzo_js(m, "const esc = s =>", "));\n") + "));\n"
         + _fn_js(m, "function percheFallitoP2P(o, adesso){")
@@ -181916,6 +181928,140 @@ def prove_cambio_libero():
            mini.count("titoloPrevSub: 'Quanto mandi in bitcoin'"), mini.count("titoloPrevSub: 'What you send in bitcoin'")))
 
 
+def prove_cambio_p2p():
+    """PRENDERE UN ORDINE P2P LIGHTNING E RICEVERE ON-CHAIN, TAPPA 1 (1 nov
+    2026, cantiere presa-altra-rete; studio del 30 ott, ok di Andrea del 1
+    nov). Chi COMPRA su un ordine di Mostro sceglie «₿ On-chain» nel foglio
+    «Dove ricevere i sats»: il telefono fa nascere un cambio reverse di SATS
+    Routing per la cifra ESATTA di Mostro e manda a lui quella fattura con
+    l'`add-invoice` di sempre; al rilascio i bitcoin arrivano all'indirizzo.
+    Mostro non cambia, la cassaforte non c'entra. Il server da' il
+    preventivo (senza la nostra fee), il biglietto e la ronda dell'avviso
+    del bot. Il giro vero, server e telefono contro il cartone, e'
+    `collaudo_cambio_p2p`; qui le sentinelle e i pezzi puri."""
+    print("\n[ricevere on-chain da un ordine P2P Lightning: il cambio di chi compra]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    esempio = open("config_esempio.py", encoding="utf-8").read().replace("\r\n", "\n")
+    pannello = pezzo("_leve_stato")
+
+    # --- le tre leve: d'esempio, di serie, nel pannello
+    for nome, valore in (("P2P_ALTRA_RETE_ATTIVO", "False"),
+                         ("P2P_ALTRA_RETE_SOLO_MODERATORI", "True"),
+                         ("P2P_ALTRA_RETE_MAX_SATS", "500_000")):
+        prova(f"la leva {nome}: d'esempio, di serie e nel pannello", (1, 1, 1),
+              (esempio.count(f"\n{nome} = {valore}\n"),
+               src.count(f"    {nome} = {valore}\n"),
+               pannello.count(f'"{nome}"')))
+    prova("di serie SPENTA, sopra il cancello dello swap, e la busta in /api/me", (True, True),
+          ("    if not swap_per(tg_id) or not P2P_ALTRA_RETE_ATTIVO:\n        return False"
+           in pezzo("p2p_altra_rete_per"),
+           '"p2p": p2p_altra_rete_leve(user["id"])' in src))
+
+    # --- le rotte e i loro cancelli
+    for rotta in ('@app.get("/api/swap/p2p/preventivo")', '@app.post("/api/swap/p2p")',
+                  '@app.post("/api/swap/p2p/{cid}/nato")',
+                  '@app.post("/api/swap/p2p/{cid}/annulla")'):
+        prova(f"la rotta {rotta[9:-1]} c'e', una volta", 1, src.count(rotta))
+    prev = codice(pezzo("p2p_cambio_preventivo"))
+    big = codice(pezzo("p2p_cambio_biglietto"))
+    prova("preventivo e biglietto passano dal cancello suo; nascita e annullo no "
+          "(un cambio nato prima di spegnere deve poter finire)", (1, 1, 0, 0),
+          (prev.count('if not p2p_altra_rete_per(user["id"]):'),
+           big.count('if not p2p_altra_rete_per(user["id"]):'),
+           codice(pezzo("p2p_cambio_nato")).count("p2p_altra_rete_per"),
+           codice(pezzo("p2p_cambio_annulla")).count("p2p_altra_rete_per")))
+    # LA FATTURA DEVE PORTARE LA CIFRA DI MOSTRO AL SAT: con la nostra fee
+    # la fattura del cambio sarebbe piu' piccola, e Mostro la rifiuterebbe
+    prova("il preventivo SENZA la nostra fee, coi tetti del cambio dello scambio", 1,
+          prev.count("preventivo_swap(cifra, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)"))
+    prova("...e mai SWAP_FEE_PERCENTO nelle rotte del cambio dello scambio", 0,
+          prev.count("SWAP_FEE_PERCENTO") + big.count("SWAP_FEE_PERCENTO"))
+    prova("il biglietto controlla la forma dello scambio e i vivi per scambio", (1, 1),
+          (big.count("FORMA_ORDINE_P2P.fullmatch(ordine)"),
+           big.count("cambi_p2p_vivi(con, user[\"id\"], ordine, adesso) >= P2P_CAMBI_PER_SCAMBIO")))
+
+    # --- il conto dei vivi, puro su un database in memoria
+    import sqlite3 as _sq
+    amb = {"CAMBIO_CHIESTO_VALE_S": 900}
+    exec(pezzo("_cambi_p2p_prepara"), amb)
+    exec(pezzo("cambi_p2p_vivi"), amb)
+    con = _sq.connect(":memory:")
+    amb["_cambi_p2p_prepara"](con)
+    for stato, creato in (("nato", 1_000), ("chiesto", 9_500), ("chiesto", 8_000),
+                          ("annullato", 9_900), ("finito", 9_900)):
+        con.execute("INSERT INTO cambi_p2p(tg_id,ordine,sats,fornitore,stato,creato) "
+                    "VALUES(999,'ab12cd34',100000,'satsrouting',?,?)", (stato, creato))
+    con.execute("INSERT INTO cambi_p2p(tg_id,ordine,sats,fornitore,stato,creato) "
+                "VALUES(999,'altro123',100000,'satsrouting','nato',9000)")
+    prova("i vivi: il nato e il chiesto fresco, non il chiesto vecchio, gli annullati, i "
+          "finiti ne' l'altro scambio", 2, amb["cambi_p2p_vivi"](con, 999, "ab12cd34", 10_000))
+
+    # --- l'avviso del ritiro, puro
+    amb = {"_fmt_sats": lambda n: f"{int(n):,}".replace(",", ".")}
+    exec(pezzo("_testo_ritiro_p2p"), amb)
+    t = amb["_testo_ritiro_p2p"]({"onchain": 99_076})
+    prova("l'avviso del ritiro: i sats coi punti, apri Barattolo, cosa succede se non lo apri",
+          (True, True, True, False),
+          (t.startswith("₿ I bitcoin del tuo scambio P2P sono pronti (99.076 sats)."),
+           "Apri Barattolo per ritirarli" in t, "ti chiediamo una fattura nuova" in t,
+           "Mostro" in t))
+    prova("...senza la cifra, senza parentesi", True,
+          amb["_testo_ritiro_p2p"]({"onchain": 0}).startswith("₿ I bitcoin del tuo scambio P2P sono pronti.\n"))
+
+    # --- la ronda
+    ronda = codice(pezzo("ronda_cambi_p2p"))
+    prova("la ronda legge lo stato dal SOLO numero dello swap, e avvisa una volta", (1, 1, 1),
+          (ronda.count("await swap_stato_di(f, r[\"swap_id\"])"),
+           ronda.count("avvisa = stato in P2P_CAMBIO_DA_RITIRARE and not r[\"avvisato\"]"),
+           ronda.count("await notifica(")))
+    prova("...nasce all'avvio, col suo riferimento che la tiene viva", (1, 1),
+          (src.count("_TASK_CAMBI_P2P = asyncio.create_task(orologio_cambi_p2p())"),
+           src.count("async def orologio_cambi_p2p():")))
+
+    # --- il telefono
+    crea = pezzo_js(js, "async function swapCreaPerP2PDentro(", "\n}\n")
+    _rec = crea[crea.find("const rec = Object.assign("):]
+    _rec = _rec[:_rec.find("});")]
+    prova("il cambio dello scambio: biglietto PRIMA dello swap, nascita DOPO, record con "
+          "`p2p` e SENZA `ordine` (Barattolo non paga, non e' il cambio libero)", True,
+          0 < crea.find("chiediBigliettoCambioP2P(") < crea.find("f.crea(")
+          < crea.find("swapSalvaRecord(rec)") < crea.find("natoCambioP2PAlServer(")
+          and "p2p: id" in _rec and "ordine" not in _rec)
+    prova("...la conferma ricontrolla le tariffe con l'impronta, e la fattura deve "
+          "portare la cifra di Mostro", True,
+          "leggiPreventivoCambioP2P(sats, f.id, prima.hash)" in crea
+          and "p.cambiata || Number(p.fattura) !== sats" in crea)
+    prova("...le parole senza copia fuori da qui: non nasce niente", True,
+          "if (seme.mostrare) throw swapNoP2P('parole');" in crea)
+    prova("instradatore: nessuna fetch nel cambio dello scambio", 0,
+          pezzo_js(js, "/* ─── 6d. IL CAMBIO DI UNO SCAMBIO P2P", "/* ─── 7. LA SORVEGLIANZA").count("fetch("))
+    invia = pezzo_js(mini, "async function inviaCambioP2P(){", "\n}\n")
+    prova("«Invia» manda a Mostro LA FATTURA DEL CAMBIO, dopo le guardie di una fattura "
+          "incollata (cifra, rete, finestra, controllo del server)", True,
+          0 < invia.find("b.sats !== deve") < invia.find("avvisoReteBolt11(bolt)")
+          < invia.find("b.scade < adesso + finestraFatturaP2P()")
+          < invia.find("controlloFatturaP2P(o, bolt)")
+          < invia.find("chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]})"))
+    prova("...un cambio gia' nato si riusa prima di farne un altro", True,
+          0 < invia.find("cambioP2PRiusabile(o.id, deve, indirizzo)") < invia.find("swapCreaPerP2P("))
+    disp = pezzo_js(mini, "function cambioP2PDisponibile(o){", "\n}\n")
+    prova("il foglio col cambio solo a chi compra, col cancello del server, prima del "
+          "rilascio", True,
+          "o.lato === 'compro'" in disp and "swapP2PAcceso()" in disp
+          and "o.stato !== 'rilasciato'" in disp and "o.stato !== 'pagamento_ritentato'" in disp)
+    rend = pezzo_js(mini, "function renderIncassoP2P(){", "\n}\n")
+    prova("...e il foglio di sempre resta: con «₿ On-chain» il corpo del cambio, sennò "
+          "le due vie", True,
+          "if (conCambio && p2pIncassoRete[o.id] === 'oc') {" in rend
+          and "box.innerHTML = intro + sceltaRete + corpoCambioIncassoP2P(o, netto);" in rend
+          and "box.innerHTML = intro + sceltaRete +\n    vie +" in rend)
+    prova("la lista della pagina «Cambio» lo chiama «Scambio P2P»", (1, 1, 1),
+          (js.count("rec.p2p ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
+           js.count("scambioP2P: 'P2P trade'")))
+
+
 def prove_grafica_swap():
     """LA GRAFICA DELLO SWAP PER TUTTI (27 ott 2026, cantiere grafica-swap,
     piano approvato da Andrea con tre modifiche). Le regole: al piu' TRE
@@ -183620,7 +183766,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,

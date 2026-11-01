@@ -51,7 +51,8 @@
    leggiPreventivoSwap, pannelloPreventivoSwap, ridisegnaIncassoSwap,
    linguaSwap, pagaSwapAlServer, statoPagamentoSwap, chiediBigliettoCambio,
    natoCambioAlServer, liberaBigliettoCambio, disegnaQr, portaWallet,
-   leggiBolt11. */
+   leggiBolt11, leggiPreventivoCambioP2P, chiediBigliettoCambioP2P,
+   natoCambioP2PAlServer, liberaBigliettoCambioP2P. */
 
 /* ─── 1. LE STRADE E I FORNITORI ────────────────────────────────────── */
 /* la sola strada di oggi: i sats dell'incasso, ricevuti in bitcoin on-chain */
@@ -249,6 +250,7 @@ const SWAP_TESTI_T3 = {
     spesoAltri: n => `Quei bitcoin li ha spesi un'altra transazione, non il tuo invio: scrivi a ${n}.`,
     lista: 'I tuoi cambi',
     ordine: n => `Ordine #${n}`,
+    scambioP2P: 'Scambio P2P',
     recuperato: 'Recuperato',
     mostra: 'Mostra le 12 parole',
     nascondi: 'Nascondi',
@@ -366,6 +368,7 @@ const SWAP_TESTI_T3 = {
     spesoAltri: n => `Those bitcoin were spent by another transaction, not by your sending: write to ${n}.`,
     lista: 'Your exchanges',
     ordine: n => `Order #${n}`,
+    scambioP2P: 'P2P trade',
     recuperato: 'Recovered',
     mostra: 'Show the 12 words',
     nascondi: 'Hide',
@@ -1139,6 +1142,98 @@ async function swapCreaPerOnchain({ordine, onchain, fattura, preventivo, rimbors
   return rec;
 }
 
+/* ─── 6d. IL CAMBIO DI UNO SCAMBIO P2P (1 nov 2026, cantiere
+   presa-altra-rete, tappa 1; studio del 30 ott, ok di Andrea del 1 nov) ──
+   Chi COMPRA sats su un ordine Lightning di Mostro e vuole i bitcoin sul
+   suo indirizzo: qui nasce il cambio «reverse» per la cifra ESATTA che
+   Mostro gli deve, e la pagina (`inviaCambioP2P`) manda la sua fattura a
+   Mostro con l'`add-invoice` di sempre. Mostro non sa niente: al rilascio
+   paga la fattura, il fornitore blocca i bitcoin, e la sorveglianza di
+   sempre (qui sotto) li ritira all'indirizzo. Il record entra nella lista
+   con `p2p` (l'id dello scambio) e SENZA `ordine`: per l'instradatore
+   non e' ne' un incasso (Barattolo non paga niente: `swapPaga` e il giro
+   del pagamento lo saltano) ne' il cambio libero. Le chiavi, come per
+   ogni cambio dal 29 ott, dal wallet di Barattolo con un indice nuovo.
+   Alza con `.tipo`: 'doppio', 'giu', 'indirizzo', 'preventivo' (il no del
+   server in `.dati`), 'cambiata' (le tariffe mosse: il preventivo nuovo in
+   `.dati`), 'seme', 'parole' (le 12 parole non hanno ancora una copia
+   fuori da qui: si guardano prima nel Profilo), 'casa', 'biglietto' (il
+   perche' in `.motivo`), 'mente'. Qui niente fetch: le rotte le chiama la
+   pagina. */
+function swapP2PLeve(){ return (swapLeve && swapLeve.p2p) || {}; }
+function swapP2PAcceso(){ return swapAcceso() && !!swapP2PLeve().attivo; }
+/* il cambio di uno scambio: l'ultimo nato per quell'id */
+function swapDiP2P(ordine){
+  const id = String(ordine || '');
+  return id ? swapLista().filter(r => r.p2p === id).pop() || null : null;
+}
+/* il preventivo instradato: fra i fornitori che fanno la strada vince chi
+   fa ricevere di piu', come per gli ordini */
+async function swapPreventivoP2P(sats){
+  const candidati = swapFornitori().filter(f => f.strade.includes(SWAP_STRADA));
+  if (!candidati.length) return {ok: false, motivo: 'non_risponde'};
+  const letti = await Promise.all(candidati.map(f => leggiPreventivoCambioP2P(sats, f.id, '')));
+  return swapMigliore(letti);
+}
+function swapNoP2P(tipo, dati){ const e = swapNoOnchain(tipo); if (dati) e.dati = dati; return e; }
+/* UN CAMBIO ALLA VOLTA PER SCAMBIO: un doppio tocco su «Invia» non fa
+   nascere due cambi */
+const swapP2PInCorso = new Set();
+async function swapCreaPerP2P({ordine, sats, indirizzo, preventivo}){
+  const id = String(ordine || '');
+  if (!id || swapP2PInCorso.has(id)) throw swapNoP2P('doppio');
+  swapP2PInCorso.add(id);
+  try { return await swapCreaPerP2PDentro(id, Number(sats) || 0, String(indirizzo || ''), preventivo || {}); }
+  finally { swapP2PInCorso.delete(id); }
+}
+async function swapCreaPerP2PDentro(id, sats, scritto, prima){
+  const f = swapFornitore(prima.fornitore);
+  if (!f || !f.crea) throw swapNoP2P('giu');
+  const indirizzo = swapEstraiIndirizzo(scritto);
+  if (!indirizzo) throw swapNoP2P('indirizzo');
+  let valido;
+  try { valido = await f.indirizzoValido(indirizzo); }
+  catch(e){ throw swapNoP2P('giu'); }
+  if (!valido) throw swapNoP2P('indirizzo');
+  /* LA CONFERMA RICONTROLLA le tariffe mostrate, con la loro impronta:
+     mosse, si rimostrano e si richiede il tocco (mai un prezzo cambiato
+     di nascosto). La fattura deve portare la cifra di Mostro al sat. */
+  const p = await leggiPreventivoCambioP2P(sats, f.id, prima.hash);
+  if (!p || !p.ok) throw swapNoP2P(p && p.motivo === 'non_risponde' ? 'giu' : 'preventivo', p);
+  if (p.cambiata || Number(p.fattura) !== sats) throw swapNoP2P('cambiata', p);
+  let seme;
+  try { seme = await swapSemePronto(); }
+  catch(e){ throw swapNoP2P('seme'); }
+  if (seme.mostrare) throw swapNoP2P('parole');
+  /* L'INDICE SI PRENOTA PRIMA DI CHIEDERE, come per gli altri */
+  const indice = swapPrenotaIndice();
+  if (indice < 0) throw swapNoP2P('casa');
+  let biglietto = null;
+  try { biglietto = await chiediBigliettoCambioP2P({ordine: id, sats: sats, fornitore: f.id}); }
+  catch(e){ biglietto = null; }
+  if (!biglietto || !biglietto.ok) {
+    const e = swapNoP2P('biglietto');
+    e.motivo = String((biglietto && biglietto.motivo) || '');
+    throw e;
+  }
+  let nuovo;
+  try { nuovo = await f.crea({parole: seme.parole, indice: indice, preventivo: p, indirizzo: indirizzo}); }
+  catch(e){
+    try { await liberaBigliettoCambioP2P(biglietto.id); } catch(e2){}
+    throw swapNoP2P(e && e.tipo === 'mente' ? 'mente' : 'giu');
+  }
+  const rec = Object.assign(nuovo, {fornitore: f.id, p2p: id, indice: indice, seme: 'onchain',
+    indirizzo: indirizzo, creato: Date.now(), pagamento: '', biglietto: Number(biglietto.id) || 0});
+  /* senza il record salvato la fattura non parte: il cambio resta di
+     chi ha le parole (si ritrova dal Profilo), ma Mostro non lo paga */
+  if (!swapSalvaRecord(rec)) throw swapNoP2P('casa');
+  /* il server sa che lo swap c'e' (le sole parti pubbliche): e' la sua
+     ronda a mandare l'avviso del bot quando i bitcoin sono da ritirare */
+  try { await natoCambioP2PAlServer(rec.biglietto, rec); } catch(e){}
+  swapSorveglia();
+  return rec;
+}
+
 /* ─── 7. LA SORVEGLIANZA E IL RITIRO ──────────────────────────────────
    Ogni 5 secondi, finche' c'e' uno swap non finito, si chiede al suo
    fornitore a che punto e'; quando i bitcoin sono bloccati si ritira.
@@ -1267,6 +1362,8 @@ async function swapRitira(rec){
 function swapRiprendi(){ if (swapAcceso()) swapSorveglia(); }
 function swapRidisegnaDove(rec){
   if (swapECambio(rec)) renderSwapCambio();
+  /* (presa-altra-rete) il cambio di uno scambio P2P: lo dice la pagina */
+  if (rec && rec.p2p && typeof ridisegnaCambioP2P === 'function') ridisegnaCambioP2P(rec);
   if (currentOrder && Number(currentOrder.id) === Number(rec.ordine)
       && el('payoutIncasso')) ridisegnaIncassoSwap();
   if (el('view-swap') && el('view-swap').classList.contains('active')) renderSwapTelefono();
@@ -1670,7 +1767,7 @@ function renderSwapTelefono(){
       <div class="cambio-voce-riga">
         ${swapMoneta(swapESub(rec) ? 'ln' : 'btc')}
         <span class="cambio-voce-dati">
-          <b>${esc(swapECambio(rec) ? t.cambio : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
           <span>${esc(frasestatoSwap(rec))}</span>
           ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
           ${barretteSwap(rec)}

@@ -1775,6 +1775,26 @@ try:
     from config import CAMBIO_BTC_LN_ATTIVO
 except ImportError:
     CAMBIO_BTC_LN_ATTIVO = False
+# PRENDERE UN ORDINE P2P LIGHTNING E RICEVERE ON-CHAIN (1 nov 2026, cantiere
+# presa-altra-rete, tappa 1; idea di Andrea del 30 ott, studio e ok del 1
+# nov): chi compra sats su un ordine Lightning da' a Mostro, al posto della
+# fattura del suo wallet, quella di un cambio di SATS Routing nato dal suo
+# telefono; al rilascio i bitcoin arrivano al suo indirizzo. Mostro non
+# cambia, la cassaforte non c'entra, il costo del cambio lo paga solo chi
+# lo sceglie. SPENTA di serie, e a leva accesa di serie solo i moderatori.
+# Vuole SWAP_ATTIVO (il telefono del cambio).
+try:
+    from config import P2P_ALTRA_RETE_ATTIVO
+except ImportError:
+    P2P_ALTRA_RETE_ATTIVO = False
+try:
+    from config import P2P_ALTRA_RETE_SOLO_MODERATORI
+except ImportError:
+    P2P_ALTRA_RETE_SOLO_MODERATORI = True
+try:
+    from config import P2P_ALTRA_RETE_MAX_SATS
+except ImportError:
+    P2P_ALTRA_RETE_MAX_SATS = 500_000
 # CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
 # onchain-verso-lightning, via di Alan e piano approvato da Andrea): allo
 # sblocco i bitcoin del 2-di-3 vanno a un cambio bitcoin → Lightning di
@@ -1961,6 +1981,18 @@ def cambio_libero_per(tg_id: int) -> bool:
     if not swap_per(tg_id) or not CAMBIO_LIBERO_ATTIVO:
         return False
     if CAMBIO_LIBERO_SOLO_MODERATORI:
+        return e_admin(int(tg_id or 0))
+    return True
+
+
+def p2p_altra_rete_per(tg_id: int) -> bool:
+    """CHI COMPRA SU UN ORDINE P2P LIGHTNING PUO' RICEVERE ON-CHAIN? Sopra
+    il cancello dello swap (`swap_per`: senza lo swap non c'e' il telefono
+    che fa il cambio), la sua leva e il suo solo-moderatori. Decide il
+    server, a ogni richiesta: il client lo legge in `swap_leve.p2p.attivo`."""
+    if not swap_per(tg_id) or not P2P_ALTRA_RETE_ATTIVO:
+        return False
+    if P2P_ALTRA_RETE_SOLO_MODERATORI:
         return e_admin(int(tg_id or 0))
     return True
 
@@ -32851,6 +32883,24 @@ def _leve_stato():
                   spento="solo Lightning → indirizzo bitcoin; Massimo "
                          "ha risposto (28 ott): si accende con una "
                          "riga nel config, quando decide Andrea"),
+            # (1 nov 2026, presa-altra-rete) l'ordine P2P Lightning preso
+            # ricevendo on-chain: vuole lo swap acceso
+            _leva("P2P: chi compra su Lightning riceve on-chain",
+                  "P2P_ALTRA_RETE_ATTIVO", bool(P2P_ALTRA_RETE_ATTIVO),
+                  acceso="nel foglio «Dove ricevere i sats» c'e' «₿ "
+                         "On-chain»: la fattura a Mostro e' quella di un "
+                         "cambio di SATS Routing, e al rilascio i bitcoin "
+                         "vanno all'indirizzo di chi compra; vuole "
+                         "SWAP_ATTIVO",
+                  spento="chi compra riceve solo in Lightning"),
+            _leva("P2P on-chain dal cambio: solo moderatori",
+                  "P2P_ALTRA_RETE_SOLO_MODERATORI",
+                  bool(P2P_ALTRA_RETE_SOLO_MODERATORI),
+                  acceso="a leva accesa lo vedono solo i moderatori",
+                  spento="a leva accesa lo vedono TUTTI"),
+            _leva("P2P on-chain dal cambio: massimo (sats)",
+                  "P2P_ALTRA_RETE_MAX_SATS", int(P2P_ALTRA_RETE_MAX_SATS or 0),
+                  spento="a 0 vale solo il massimo del fornitore"),
             # (26 ott 2026, decisione di Andrea) RESTA 0: sopra 0 la
             # fattura dello swap e' meno di quel che spetta a chi vende, e
             # la tappa 4 non la paga (`swap_registra_pagamento`, «fee»)
@@ -46923,7 +46973,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                             # (27 ott 2026, cambio-libero) il cambio dei
                             # suoi sats senza ordine: il cancello, i tetti,
                             # quanti ne ha fatti oggi
-                            "cambio": cambio_leve(user["id"])}
+                            "cambio": cambio_leve(user["id"]),
+                            # (1 nov 2026, presa-altra-rete) chi compra su
+                            # un ordine P2P Lightning riceve on-chain
+                            "p2p": p2p_altra_rete_leve(user["id"])}
     # E lo scambio P2P, dallo STESSO giudice della busta di prima
     # pagina: due letture della stessa cosa un giorno dicono due cose
     # diverse, e il client ha gia' il calco di `asteAccese` per
@@ -75882,6 +75935,307 @@ async def cambio_annulla(cid: int, x_tg_init_data: str = Header(""),
         finally:
             con.close()
     return {"ok": True, "stato": "annullato"}
+
+
+# --- PRENDERE UN ORDINE P2P LIGHTNING E RICEVERE ON-CHAIN (1 nov 2026,
+# cantiere presa-altra-rete, tappa 1; studio del 30 ott, ok di Andrea del 1
+# nov) ----------------------------------------------------------------------
+# Chi COMPRA sats su un ordine Lightning di Mostro e ha solo un wallet
+# bitcoin sceglie «₿ On-chain» nel foglio «Dove ricevere i sats». Il suo
+# telefono fa nascere un cambio «reverse» di SATS Routing (lo stesso
+# dell'incasso swap e del Cambio libero: chiave dal wallet di Barattolo,
+# verifica della risposta, ritiro dal telefono) per la cifra ESATTA che
+# Mostro gli deve, e a Mostro parte la fattura del cambio con
+# l'`add-invoice` di sempre. Mostro non sa niente del cambio: al rilascio
+# paga quella fattura, SATS Routing blocca i bitcoin e il telefono li
+# ritira all'indirizzo scritto. Se il moderatore da' ragione a chi vende,
+# la fattura non si paga mai e il cambio scade senza costare niente.
+# Il server qui fa tre cose e nessuna tocca i sats: il PREVENTIVO (il conto
+# di sempre, ma SENZA la nostra fee: la fattura deve portare la cifra di
+# Mostro al sat), il BIGLIETTO (chi, quale scambio, quale swap: le sole
+# parti pubbliche) e LA RONDA DELL'AVVISO: le chiavi stanno solo nel
+# telefono, quindi se al rilascio l'app e' chiusa il ritiro aspetta;
+# il server, che vede lo stato del cambio dal suo numero, manda UNA volta
+# l'avviso del bot «apri Barattolo per ritirare i tuoi bitcoin». Senza
+# ritiro il cambio scade, il pagamento di Mostro torna indietro e Mostro
+# chiede una fattura nuova: i sats non si perdono.
+P2P_CAMBI_STATI = ("chiesto", "nato", "annullato", "finito")
+# quanti biglietti vivi per scambio: il primo, e quelli di una «fattura
+# nuova» dopo un cambio scaduto
+P2P_CAMBI_PER_SCAMBIO = 3
+# gli stati del cambio in cui i bitcoin sono gia' bloccati e aspettano il
+# ritiro del telefono: e' il momento dell'avviso
+P2P_CAMBIO_DA_RITIRARE = ("transaction.mempool", "transaction.confirmed")
+# ...e quelli in cui il cambio e' finito, bene o male: la ronda lo lascia
+P2P_CAMBIO_FINITI = ("invoice.settled", "swap.expired", "invoice.expired",
+                     "transaction.failed", "transaction.refunded",
+                     "swap.sconosciuto")
+# la ronda guarda i cambi nati negli ultimi otto giorni (la vita di un
+# ordine nel libro, 168 ore, piu' la garanzia): dopo, non c'e' piu' niente
+P2P_CAMBIO_GUARDA_S = 8 * 86400
+P2P_BOTTONE_RITIRO = "₿ Ritira i tuoi bitcoin"
+_lucchetto_cambi_p2p = asyncio.Lock()
+
+
+def p2p_altra_rete_leve(tg_id: int) -> dict:
+    """La busta per `/api/me` → `swap_leve.p2p`: il cancello e i tetti."""
+    return {"attivo": p2p_altra_rete_per(tg_id),
+            "minimo": int(SWAP_MIN_SATS or 0),
+            "massimo": int(P2P_ALTRA_RETE_MAX_SATS or 0)}
+
+
+def _cambi_p2p_prepara(con):
+    """`cambi_p2p`: un biglietto per cambio, legato allo scambio di Mostro."""
+    con.execute("""CREATE TABLE IF NOT EXISTS cambi_p2p(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        ordine TEXT NOT NULL,
+        sats INTEGER NOT NULL,
+        fornitore TEXT NOT NULL,
+        swap_id TEXT DEFAULT '',
+        impronta TEXT DEFAULT '',
+        indirizzo TEXT DEFAULT '',
+        onchain INTEGER DEFAULT 0,
+        stato TEXT DEFAULT 'chiesto',
+        visto TEXT DEFAULT '',
+        avvisato INTEGER DEFAULT 0,
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
+    con.execute("CREATE INDEX IF NOT EXISTS cambi_p2p_ordine ON "
+                "cambi_p2p(ordine, tg_id)")
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS cambi_p2p_swap ON "
+                "cambi_p2p(fornitore, swap_id) WHERE swap_id <> ''")
+
+
+def _cambi_p2p_db():
+    con = db()
+    _cambi_p2p_prepara(con)
+    return con
+
+
+def cambi_p2p_vivi(con, tg_id: int, ordine: str, adesso: int) -> int:
+    """QUANTI CAMBI VIVI ha questa persona su questo scambio: i «nati» non
+    finiti e i «chiesti» ancora freschi (un quarto d'ora, come il cambio
+    libero: un telefono spento a meta' non brucia un posto per sempre)."""
+    r = con.execute(
+        "SELECT COUNT(*) FROM cambi_p2p WHERE tg_id=? AND ordine=? AND "
+        "(stato='nato' OR (stato='chiesto' AND creato>?))",
+        (int(tg_id), str(ordine), int(adesso) - CAMBIO_CHIESTO_VALE_S)).fetchone()
+    return int(r[0] if r else 0)
+
+
+@app.get("/api/swap/p2p/preventivo")
+async def p2p_cambio_preventivo(sats: str = "", fornitore: str = "satsrouting",
+                                hash: str = "",
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """IL PREVENTIVO DEL CAMBIO DI UNO SCAMBIO P2P: `sats` e' la cifra che
+    Mostro paghera' (quella della fattura, al sat), il conto dice quanto
+    arriva all'indirizzo. SENZA la nostra fee (`preventivo_swap` con 0):
+    con la fee la fattura porterebbe meno di quel che Mostro pretende, e
+    lui la rifiuterebbe. Non crea niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_altra_rete_per(user["id"]):
+        raise HTTPException(403, "Il cambio non e' disponibile")
+    chi = swap_fornitore(str(fornitore or ""))
+    if chi is None:
+        raise HTTPException(404, "Fornitore sconosciuto")
+    cifra = _cambio_sats(sats)
+    busta = {"dovuto": cifra, "fornitore": chi["id"],
+             "fornitore_nome": chi["nome"]}
+    if not cifra:
+        return dict(busta, ok=False, motivo="cifra")
+    tariffa = await leggi_tariffa_swap(chi)
+    if tariffa is None:
+        return dict(busta, ok=False, motivo="non_risponde")
+    p = preventivo_swap(cifra, tariffa, 0, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)
+    p["cambiata"] = bool(hash) and hash != tariffa["hash"]
+    p["valido_s"] = SWAP_PREVENTIVO_VALE_S
+    return dict(busta, **p)
+
+
+@app.post("/api/swap/p2p")
+async def p2p_cambio_biglietto(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """IL BIGLIETTO: il telefono lo chiede PRIMA di chiedere lo swap al
+    fornitore, con lo scambio di Mostro e la cifra. Dentro un lucchetto:
+    il cancello, la forma dello scambio, la cifra nei tetti, al piu'
+    `P2P_CAMBI_PER_SCAMBIO` cambi vivi sullo stesso scambio. {ok, id} o
+    {ok: false, motivo}."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not p2p_altra_rete_per(user["id"]):
+        raise HTTPException(403, "Il cambio non e' disponibile")
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        return {"ok": False, "motivo": "ordine"}
+    chi = swap_fornitore(str(d.get("fornitore") or "satsrouting"))
+    if chi is None:
+        return {"ok": False, "motivo": "fornitore"}
+    cifra = _cambio_sats(d.get("sats"))
+    if not cifra or cifra < int(SWAP_MIN_SATS or 0):
+        return {"ok": False, "motivo": "sotto_minimo"}
+    if int(P2P_ALTRA_RETE_MAX_SATS or 0) and cifra > int(P2P_ALTRA_RETE_MAX_SATS):
+        return {"ok": False, "motivo": "sopra_tetto"}
+    adesso = int(time.time())
+    async with _lucchetto_cambi_p2p:
+        con = _cambi_p2p_db()
+        try:
+            if cambi_p2p_vivi(con, user["id"], ordine, adesso) >= P2P_CAMBI_PER_SCAMBIO:
+                return {"ok": False, "motivo": "troppi"}
+            cur = con.execute(
+                "INSERT INTO cambi_p2p(tg_id,ordine,sats,fornitore,stato,"
+                "creato,aggiornato) VALUES(?,?,?,?,'chiesto',?,?)",
+                (int(user["id"]), ordine, cifra, chi["id"], adesso, adesso))
+            con.commit()
+            cid = int(cur.lastrowid)
+        finally:
+            con.close()
+    return {"ok": True, "id": cid}
+
+
+def _cambio_p2p_mio(con, cid: int, tg_id: int):
+    return con.execute("SELECT * FROM cambi_p2p WHERE id=? AND tg_id=?",
+                       (int(cid), int(tg_id))).fetchone()
+
+
+@app.post("/api/swap/p2p/{cid}/nato")
+async def p2p_cambio_nato(cid: int, req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """LO SWAP C'E': le sole parti pubbliche (id dello swap, impronta del
+    segreto, indirizzo del lockup, quanto), come il cambio libero. Il
+    biglietto passa a «nato» e da qui lo guarda la ronda dell'avviso.
+    Idempotente sullo stesso swap; un biglietto di un altro e' 404. Niente
+    cancello: un cambio nato prima di una leva spenta deve poter finire."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    swap_id = str(d.get("swap_id") or "").strip()
+    impronta = str(d.get("impronta") or "").strip().lower()
+    if not _SWAP_ID_FORMA.match(swap_id) or (
+            impronta and not _SWAP_IMPRONTA_FORMA.match(impronta)):
+        return {"ok": False, "motivo": "forma"}
+    adesso = int(time.time())
+    async with _lucchetto_cambi_p2p:
+        con = _cambi_p2p_db()
+        try:
+            r = _cambio_p2p_mio(con, cid, user["id"])
+            if not r:
+                raise HTTPException(404, "Biglietto non trovato")
+            if r["stato"] == "nato":
+                return {"ok": r["swap_id"] == swap_id, "stato": "nato"}
+            if r["stato"] != "chiesto":
+                return {"ok": False, "motivo": r["stato"]}
+            try:
+                con.execute(
+                    "UPDATE cambi_p2p SET stato='nato', swap_id=?, impronta=?,"
+                    " indirizzo=?, onchain=?, aggiornato=? WHERE id=?",
+                    (swap_id, impronta, str(d.get("indirizzo") or "")[:120],
+                     int(d.get("onchain") or 0), adesso, int(cid)))
+                con.commit()
+            except sqlite3.IntegrityError:
+                return {"ok": False, "motivo": "doppio"}
+        finally:
+            con.close()
+    return {"ok": True, "stato": "nato"}
+
+
+@app.post("/api/swap/p2p/{cid}/annulla")
+async def p2p_cambio_annulla(cid: int, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """LA NASCITA NON E' ANDATA: il biglietto torna libero. Solo un «chiesto»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    async with _lucchetto_cambi_p2p:
+        con = _cambi_p2p_db()
+        try:
+            r = _cambio_p2p_mio(con, cid, user["id"])
+            if not r:
+                raise HTTPException(404, "Biglietto non trovato")
+            if r["stato"] != "chiesto":
+                return {"ok": False, "motivo": r["stato"]}
+            con.execute("UPDATE cambi_p2p SET stato='annullato', aggiornato=? "
+                        "WHERE id=?", (int(time.time()), int(cid)))
+            con.commit()
+        finally:
+            con.close()
+    return {"ok": True, "stato": "annullato"}
+
+
+def _testo_ritiro_p2p(r) -> str:
+    """PURA: l'avviso di chi deve ritirare i bitcoin di un cambio P2P."""
+    onchain = int(r["onchain"] or 0)
+    quanti = f" ({_fmt_sats(onchain)} sats)" if onchain > 0 else ""
+    return ("₿ I bitcoin del tuo scambio P2P sono pronti" + quanti + ".\n"
+            "Apri Barattolo per ritirarli sul tuo indirizzo: il ritiro lo "
+            "fa il tuo telefono. Se non lo apri in tempo il cambio scade, "
+            "i sats tornano fermi al sicuro e ti chiediamo una fattura nuova.")
+
+
+async def ronda_cambi_p2p(adesso: int | None = None) -> int:
+    """LA RONDA DELL'AVVISO: per ogni cambio P2P nato e non ancora finito,
+    lo stato dal fornitore (`swap_stato_di`, dal solo numero dello swap:
+    niente chiavi). Bitcoin bloccati e avviso non ancora mandato → UN
+    avviso a chi deve ritirare, col bottone sullo scambio. Cambio finito
+    → la riga si chiude. Fornitore muto → si riprova al giro dopo. Torna
+    quanti avvisi ha mandato."""
+    adesso = int(adesso if adesso is not None else time.time())
+    con = _cambi_p2p_db()
+    try:
+        righe = [dict(r) for r in con.execute(
+            "SELECT * FROM cambi_p2p WHERE stato='nato' AND creato>? "
+            "ORDER BY id LIMIT 50", (adesso - P2P_CAMBIO_GUARDA_S,))]
+    finally:
+        con.close()
+    mandati = 0
+    for r in righe:
+        f = swap_fornitore(str(r["fornitore"] or "satsrouting"))
+        stato = await swap_stato_di(f, r["swap_id"]) if f else None
+        if not stato:
+            continue
+        avvisa = stato in P2P_CAMBIO_DA_RITIRARE and not r["avvisato"]
+        finito = stato in P2P_CAMBIO_FINITI
+        if avvisa:
+            try:
+                esito = await notifica(
+                    int(r["tg_id"]), _testo_ritiro_p2p(r),
+                    (P2P_BOTTONE_RITIRO, f"{URL_PUBBLICO}/p2p?scambio={r['ordine']}"))
+            except Exception as e:
+                esito = f"SALTATO ({type(e).__name__}: {e})"
+            mandati += 1
+            print(f"₿ Cambio P2P {r['ordine'][:8]} di {r['tg_id']}: bitcoin "
+                  f"bloccati, avviso {esito}", flush=True)
+        if avvisa or finito or stato != r["visto"]:
+            con = _cambi_p2p_db()
+            try:
+                con.execute(
+                    "UPDATE cambi_p2p SET visto=?, avvisato=?, stato=?, "
+                    "aggiornato=? WHERE id=?",
+                    (stato, 1 if (avvisa or r["avvisato"]) else 0,
+                     "finito" if finito else "nato", adesso, int(r["id"])))
+                con.commit()
+            finally:
+                con.close()
+    return mandati
+
+
+_TASK_CAMBI_P2P = None   # stesso patto di _TASK_ONCHAIN: il riferimento tiene vivo il task
+
+
+async def orologio_cambi_p2p():
+    """Ogni due minuti la ronda dell'avviso. Gira anche a leva spenta: un
+    cambio nato prima di spegnerla deve poter finire col suo avviso; senza
+    cambi nati la ronda non chiama nessuno."""
+    while True:
+        await asyncio.sleep(120)
+        try:
+            await ronda_cambi_p2p()
+        except Exception as e:
+            print(f"⚠️ Cambi P2P: ronda saltata: {e}", flush=True)
+
+
+@app.on_event("startup")
+async def avvia_cambi_p2p():
+    global _TASK_CAMBI_P2P
+    _TASK_CAMBI_P2P = asyncio.create_task(orologio_cambi_p2p())
 
 
 @app.post("/api/orders/{ordine_id}/invoice")
