@@ -305,6 +305,12 @@ const SWAP_TESTI_T3 = {
        pagata on-chain: i bitcoin li manda il deposito di garanzia */
     subDaOrdine: n => `I bitcoin partono dal deposito di garanzia appena chi ha comprato mette la seconda firma: poi ${n} paga la tua richiesta Lightning.`,
     subDaScambio: n => `I bitcoin partono dal deposito di garanzia appena chi vende mette la seconda firma: poi ${n} paga la tua richiesta Lightning.`,
+    /* (1 nov 2026, presa-altra-rete, tappa 3) il deposito di uno scambio
+       on-chain pagato in Lightning: i bitcoin vanno al 2-di-3 */
+    depositoPaga: n => `Paga questa richiesta dal tuo wallet Lightning: ${n} prepara i bitcoin e il tuo telefono li mette nel deposito di garanzia.`,
+    depositoInViaggio: id => `Partiti verso il deposito di garanzia: transazione ${id}. Con una conferma lo scambio va avanti.`,
+    depositoFatto: 'Fatto: i bitcoin sono nel deposito di garanzia. Con una conferma lo scambio va avanti.',
+    depositoScaduto: 'La richiesta è scaduta senza pagamento: nessun sats si è mosso.',
     copiaIndirizzo: 'Copia l\'indirizzo',
     subBloccato: 'Bitcoin visti: aspetto la conferma della rete, di solito una decina di minuti.',
     subConfermato: n => `Confermati: ${n} sta pagando la tua richiesta.`,
@@ -415,6 +421,10 @@ const SWAP_TESTI_T3 = {
     mandaTu: (sats, n) => `Send exactly ${sats} sats to this address, from your bitcoin wallet: once the network confirms them, ${n} pays your request.`,
     subDaOrdine: n => `The bitcoin leave the escrow deposit as soon as the buyer adds the second signature: then ${n} pays your Lightning request.`,
     subDaScambio: n => `The bitcoin leave the escrow deposit as soon as the seller adds the second signature: then ${n} pays your Lightning request.`,
+    depositoPaga: n => `Pay this request from your Lightning wallet: ${n} prepares the bitcoin and your phone puts them in the escrow deposit.`,
+    depositoInViaggio: id => `On their way to the escrow deposit: transaction ${id}. With one confirmation the trade moves on.`,
+    depositoFatto: 'Done: the bitcoin are in the escrow deposit. With one confirmation the trade moves on.',
+    depositoScaduto: 'The request expired unpaid: no sats moved.',
     copiaIndirizzo: 'Copy the address',
     subBloccato: 'Bitcoin seen: waiting for the network to confirm, usually about ten minutes.',
     subConfermato: n => `Confirmed: ${n} is paying your request.`,
@@ -672,6 +682,17 @@ function frasestatoSwap(rec){
   if (rec.ritiro && rec.ritiro.concluso)
     return t.concluso(fmt(rec.ritiro.sats || rec.ricevi || 0), swapCorto(rec.ritiro.txid, 8));
   if (rec.spesoDa) return t.spesoAltri(swapNomeFornitore(swapDiChi(rec)));
+  /* (presa-altra-rete, tappa 3) il deposito pagato in Lightning: la
+     fattura la paga lui, i bitcoin vanno al 2-di-3 dello scambio */
+  if (rec.p2pDeposito) {
+    const fase = swapFase(rec), n = swapNomeFornitore(swapDiChi(rec));
+    if (fase === 'fatto') return t.depositoFatto;
+    if (rec.ritiro && rec.ritiro.txid) return t.depositoInViaggio(swapCorto(rec.ritiro.txid, 8));
+    if (fase === 'creato') return t.depositoPaga(n);
+    if (fase === 'scaduto') return t.depositoScaduto;
+    if (fase === 'fallito') return t.cambioFallito;
+    if (fase === 'ripreso') return t.cambioRipreso(n);
+  }
   if (rec.ritiro && rec.ritiro.txid && swapFase(rec) !== 'fatto')
     return t.ritirato(swapCorto(rec.ritiro.txid, 8));
   /* (cambio-libero) nel cambio la fattura la paga lui: le frasi sono sue */
@@ -1239,6 +1260,88 @@ async function swapCreaPerP2PDentro(id, sats, scritto, prima){
   return rec;
 }
 
+/* ─── 6e. IL DEPOSITO DI UNO SCAMBIO ON-CHAIN PAGATO IN LIGHTNING (1 nov
+   2026, cantiere presa-altra-rete, tappa 3; studio del 30 ott, caso B2) ──
+   Chi PRENDE un ordine on-chain vendendo bitcoin deve depositare nel
+   2-di-3: qui nasce il cambio «reverse» che porta i bitcoin DRITTI
+   all'indirizzo del deposito. La cifra della fattura la dice il server
+   (`leggiPreventivoDepositoP2P`, il conto al contrario: al deposito arriva
+   almeno l'importo), la paga lui dal suo wallet Lightning, e la
+   sorveglianza di sempre (qui sotto) ritira all'indirizzo 2-di-3: il
+   ritiro porta ESATTAMENTE `ricevi`, che e' almeno l'importo. Il record
+   entra nella lista con `p2pDeposito` (il numero dello scambio) e SENZA
+   `ordine` ne' `p2p`: non e' un incasso (Barattolo non paga niente), non
+   e' il cambio libero, non e' il cambio di uno scambio di Mostro. Le chiavi
+   dal wallet di Barattolo con un indice nuovo, come ogni cambio dal 29 ott.
+   Alza con `.tipo` come `swapCreaPerP2P`: 'doppio', 'giu', 'indirizzo'
+   (il deposito che il server ha detto non e' quello dello scambio, o non
+   si legge), 'preventivo', 'cambiata', 'seme', 'parole', 'casa',
+   'biglietto' (`.motivo`), 'mente'. */
+function swapDiDepositoP2P(scambio){
+  const n = Number(scambio) || 0;
+  return n ? swapLista().filter(r => Number(r.p2pDeposito) === n).pop() || null : null;
+}
+async function swapCreaPerDepositoP2P({scambio, indirizzo, preventivo}){
+  const id = 'oc:' + (Number(scambio) || 0);
+  if (id === 'oc:0' || swapP2PInCorso.has(id)) throw swapNoP2P('doppio');
+  /* UN CAMBIO VIVO PER DEPOSITO: finche' quello nato non e' scaduto o
+     fallito, un altro tocco non ne fa nascere un secondo (pagarli tutti e
+     due metterebbe nel deposito il doppio) */
+  const vivo = swapDiDepositoP2P(scambio);
+  if (vivo && !['scaduto', 'fallito', 'ripreso'].includes(swapFase(vivo))) throw swapNoP2P('doppio');
+  swapP2PInCorso.add(id);
+  try { return await swapCreaPerDepositoP2PDentro(Number(scambio), String(indirizzo || ''), preventivo || {}); }
+  finally { swapP2PInCorso.delete(id); }
+}
+async function swapCreaPerDepositoP2PDentro(scambio, indirizzo, prima){
+  const f = swapFornitore(prima.fornitore);
+  if (!f || !f.crea) throw swapNoP2P('giu');
+  if (!indirizzo || indirizzo !== String(prima.indirizzo || '')) throw swapNoP2P('indirizzo');
+  let valido;
+  try { valido = await f.indirizzoValido(indirizzo); }
+  catch(e){ throw swapNoP2P('giu'); }
+  if (!valido) throw swapNoP2P('indirizzo');
+  /* LA CONFERMA RICONTROLLA le tariffe mostrate, con la loro impronta: il
+     deposito deve restare quello, la fattura la stessa, e quel che arriva
+     almeno l'importo (sennò lo scambio non andrebbe mai avanti) */
+  const p = await leggiPreventivoDepositoP2P(scambio, f.id, prima.hash);
+  if (!p || !p.ok) throw swapNoP2P(p && p.motivo === 'non_risponde' ? 'giu' : 'preventivo', p);
+  if (p.cambiata || Number(p.fattura) !== Number(prima.fattura) || p.indirizzo !== indirizzo)
+    throw swapNoP2P('cambiata', p);
+  if (!(Number(p.ricevi) >= Number(p.importo))) throw swapNoP2P('preventivo', p);
+  let seme;
+  try { seme = await swapSemePronto(); }
+  catch(e){ throw swapNoP2P('seme'); }
+  if (seme.mostrare) throw swapNoP2P('parole');
+  const indice = swapPrenotaIndice();
+  if (indice < 0) throw swapNoP2P('casa');
+  let biglietto = null;
+  try { biglietto = await chiediBigliettoDepositoP2P({scambio: scambio, sats: Number(p.fattura), fornitore: f.id}); }
+  catch(e){ biglietto = null; }
+  if (!biglietto || !biglietto.ok) {
+    const e = swapNoP2P('biglietto');
+    e.motivo = String((biglietto && biglietto.motivo) || '');
+    throw e;
+  }
+  let nuovo;
+  try { nuovo = await f.crea({parole: seme.parole, indice: indice, preventivo: p, indirizzo: indirizzo}); }
+  catch(e){
+    try { await liberaBigliettoCambioP2P(biglietto.id); } catch(e2){}
+    throw swapNoP2P(e && e.tipo === 'mente' ? 'mente' : 'giu');
+  }
+  /* la cifra del ritiro e' quella del preventivo: mai sotto l'importo */
+  if (!(Number(nuovo.ricevi) >= Number(p.importo))) {
+    try { await liberaBigliettoCambioP2P(biglietto.id); } catch(e2){}
+    throw swapNoP2P('mente');
+  }
+  const rec = Object.assign(nuovo, {fornitore: f.id, p2pDeposito: scambio, indice: indice, seme: 'onchain',
+    indirizzo: indirizzo, creato: Date.now(), pagamento: '', biglietto: Number(biglietto.id) || 0});
+  if (!swapSalvaRecord(rec)) throw swapNoP2P('casa');
+  try { await natoCambioP2PAlServer(rec.biglietto, rec); } catch(e){}
+  swapSorveglia();
+  return rec;
+}
+
 /* ─── 7. LA SORVEGLIANZA E IL RITIRO ──────────────────────────────────
    Ogni 5 secondi, finche' c'e' uno swap non finito, si chiede al suo
    fornitore a che punto e'; quando i bitcoin sono bloccati si ritira.
@@ -1369,6 +1472,9 @@ function swapRidisegnaDove(rec){
   if (swapECambio(rec)) renderSwapCambio();
   /* (presa-altra-rete) il cambio di uno scambio P2P: lo dice la pagina */
   if (rec && rec.p2p && typeof ridisegnaCambioP2P === 'function') ridisegnaCambioP2P(rec);
+  /* (tappa 3) il cambio del deposito di uno scambio on-chain */
+  if (rec && rec.p2pDeposito && typeof ridisegnaDepositoLnOnchainP2P === 'function')
+    ridisegnaDepositoLnOnchainP2P(rec);
   if (currentOrder && Number(currentOrder.id) === Number(rec.ordine)
       && el('payoutIncasso')) ridisegnaIncassoSwap();
   if (el('view-swap') && el('view-swap').classList.contains('active')) renderSwapTelefono();
@@ -1772,7 +1878,7 @@ function renderSwapTelefono(){
       <div class="cambio-voce-riga">
         ${swapMoneta(swapESub(rec) ? 'ln' : 'btc')}
         <span class="cambio-voce-dati">
-          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p || rec.p2pOnchain ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p || rec.p2pOnchain || rec.p2pDeposito ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
           <span>${esc(frasestatoSwap(rec))}</span>
           ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
           ${barretteSwap(rec)}

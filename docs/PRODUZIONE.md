@@ -4953,6 +4953,11 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   (`ONCHAIN_RETE = "mainnet"`): con l'on-chain su signet resta chiusa
   anche a leve accese. Le colonne nuove di `p2p_onchain_ordini` nascono
   da sole al primo avvio.
+  LA TAPPA 3 (1 nov 2026: chi prende un ordine on-chain vendendo paga il
+  deposito in Lightning) sta dietro la STESSA leva, più
+  `P2P_ONCHAIN_ATTIVO` e l'on-chain sulla rete di SATS Routing; non vuole
+  `CAMBIO_BTC_LN_ATTIVO`. Niente colonne nuove: i biglietti stanno in
+  `cambi_p2p` col nome «oc:<numero>».
 
 - LA CHIAVE DI BARATTOLO DELL'ON-CHAIN (27 ott 2026, cantiere
   onchain-disputa; com'è fatta in ARCHITETTURA, «LA DISPUTA ON-CHAIN E
