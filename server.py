@@ -32916,8 +32916,11 @@ def _leve_stato():
                          "On-chain»: la fattura a Mostro e' quella di un "
                          "cambio di SATS Routing, e al rilascio i bitcoin "
                          "vanno all'indirizzo di chi compra; vuole "
-                         "SWAP_ATTIVO",
-                  spento="chi compra riceve solo in Lightning"),
+                         "SWAP_ATTIVO. E il contrario (tappa 2): sugli "
+                         "scambi on-chain chi compra puo' ricevere in "
+                         "Lightning, se c'e' anche CAMBIO_BTC_LN_ATTIVO e "
+                         "l'on-chain sta sulla rete del fornitore",
+                  spento="chi compra riceve solo sulla rete dell'ordine"),
             _leva("P2P on-chain dal cambio: solo moderatori",
                   "P2P_ALTRA_RETE_SOLO_MODERATORI",
                   bool(P2P_ALTRA_RETE_SOLO_MODERATORI),
@@ -93988,7 +93991,16 @@ def _p2p_onchain_prepara(con):
                       ("para_lettura", "INTEGER DEFAULT 0"),
                       ("para_arrivo", "REAL DEFAULT 0"),
                       ("chiuso_perche", "TEXT DEFAULT ''"),
-                      ("cambio_presa", "REAL DEFAULT 0")):
+                      ("cambio_presa", "REAL DEFAULT 0"),
+                      # 1 nov 2026, cantiere presa-altra-rete (tappa 2): chi
+                      # compra bitcoin riceve in Lightning col cambio. La sua
+                      # scelta, la conferma FIRMATA di chi vende («ho
+                      # ricevuto gli euro») e il cambio (le parti pubbliche):
+                      # gli stessi nomi di `onchain_ordini`
+                      ("incasso_ln", "INTEGER DEFAULT 0"),
+                      ("rilascio_chiesto_il", "INTEGER DEFAULT 0"),
+                      ("rilascio_firma", "TEXT DEFAULT ''"),
+                      ("cambio", "TEXT DEFAULT ''")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
@@ -94380,6 +94392,14 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "tariffa": _ONCHAIN_TARIFFA["sat_vb"] or 2.0,
         "esploratore": onchain_mempool_api().rsplit("/api", 1)[0],
         "oreDeposito": P2P_ONCHAIN_ORE_DEPOSITO,
+        # (1 nov 2026, presa-altra-rete) chi compra riceve in Lightning: la
+        # scelta, la conferma firmata di chi vende (il telefono di chi
+        # vende la rilegge prima di co-firmare da solo) e il cambio
+        "incasso_ln": bool(_p2p_onchain_campo(o, "incasso_ln", 0)),
+        "rilascio_chiesto_il": int(_p2p_onchain_campo(o, "rilascio_chiesto_il", 0) or 0),
+        "rilascio_firma": _p2p_onchain_campo(o, "rilascio_firma", "") or "",
+        "cambio": _onchain_cambio_letto({"cambio": _p2p_onchain_campo(o, "cambio", "")}),
+        "ln_possibile": bool(ruolo == "venditore" and p2p_onchain_ln_per(tg_id)),
     }
     if parte_vera and not admin:
         d["recapito"] = o["recapito"] or ""
@@ -94431,7 +94451,8 @@ def _p2p_onchain_riempi_incassi(con, tg_id: int) -> list:
         righe = con.execute(
             "SELECT * FROM p2p_onchain_ordini WHERE ricevente_id=? AND incasso='' "
             "AND stato IN ('preso','depositato','euro_inviati','disputa') "
-            "AND proposta_psbt='' ORDER BY id", (int(tg_id),)).fetchall()
+            "AND proposta_psbt='' AND COALESCE(incasso_ln,0)=0 ORDER BY id",
+            (int(tg_id),)).fetchall()
     except sqlite3.OperationalError:
         return []
     fatti = []
@@ -95072,17 +95093,22 @@ async def p2p_onchain_incasso_qui(oid: int, req: Request, x_tg_init_data: str = 
         if not onchain_firma_valida(r["xpub"], "indirizzo", valore, firma):
             raise HTTPException(400, "L'indirizzo non è firmato dal tuo seme: "
                                      "rifallo da questo telefono")
+        # (1 nov 2026, presa-altra-rete) un indirizzo scritto qui toglie la
+        # scelta del Lightning: e' la via d'uscita di chi l'aveva presa
         cur = con.execute(
             "UPDATE p2p_onchain_ordini SET incasso=?, incasso_tipo='indirizzo',"
-            " incasso_valore=?, incasso_firma=?, incasso_indice=0, aggiornato=?"
-            " WHERE id=? AND incasso='' AND proposta_psbt=''",
+            " incasso_valore=?, incasso_firma=?, incasso_indice=0, incasso_ln=0,"
+            " aggiornato=? WHERE id=? AND incasso='' AND proposta_psbt=''",
             (valore, valore, firma, int(time.time()), oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Dove ricevere non si cambia più")
-        return _p2p_onchain_per(con, _p2p_onchain_carica(con, oid), user["id"])
+        o = _p2p_onchain_carica(con, oid)
+        risposta = _p2p_onchain_per(con, o, user["id"])
     finally:
         con.close()
+    await _p2p_onchain_avvisa_confermato(o)
+    return risposta
 
 
 @app.post("/api/p2p/onchain/{oid}/proposta")
@@ -95125,6 +95151,15 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
                 o["stato"] in ("depositato", "euro_inviati")
                 or (o["stato"] in ("preso", "annullato") and int(o["ricevuti_sats"] or 0) > 0)):
             raise HTTPException(409, "Non c'è niente da rimborsare adesso")
+        if verso == "venditore" and o["incasso_tipo"] == "cambio":
+            # (1 nov 2026, presa-altra-rete) il cambio in Lightning porta gia'
+            # la prima firma, quella di chi compra: non si sostituisce
+            raise HTTPException(409, "Chi compra ha già firmato il cambio in "
+                                     "Lightning: manca solo la tua firma, che il "
+                                     "telefono mette da solo")
+        if verso == "venditore" and not o["incasso"] and o["incasso_ln"]:
+            raise HTTPException(409, "Chi compra riceve in Lightning: conferma che "
+                                     "hai ricevuto gli euro, e lui fa il cambio")
         if verso == "venditore" and not o["incasso"]:
             raise HTTPException(409, "Chi compra non ha ancora scelto dove ricevere "
                                      "(Profilo → Incassi on-chain): i sats restano "
@@ -95180,8 +95215,15 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
         if int(o["proposta_da"] or 0) == int(user["id"]):
             raise HTTPException(409, "La seconda firma è dell'altra parte")
         # la seconda firma e' di chi RICEVE quell'uscita: verso 'venditore'
-        # co-firma chi compra bitcoin (ruolo venditore), e viceversa
-        if o["proposta_verso"] != ruolo:
+        # co-firma chi compra bitcoin (ruolo venditore), e viceversa.
+        # (1 nov 2026, presa-altra-rete) TRANNE IL CAMBIO IN LIGHTNING: la
+        # prima firma l'ha messa chi compra, verso il cambio, e la seconda e'
+        # di chi vende, che ha confermato gli euro col suo seme
+        cambio = (o["incasso_tipo"] == "cambio" and o["proposta_verso"] == "venditore"
+                  and ruolo == "compratore" and not o["decisione_da"]
+                  and int(o["proposta_da"] or 0) == int(o["ricevente_id"] or 0)
+                  and _p2p_onchain_confermato(con, o))
+        if o["proposta_verso"] != ruolo and not cambio:
             raise HTTPException(409, "Questa uscita non va a te: la co-firma "
                                      "l'altra parte")
         try:
@@ -95194,6 +95236,21 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
         verso = o["proposta_verso"]
     finally:
         con.close()
+    if verso == "venditore" and o["incasso_tipo"] == "cambio":
+        # (1 nov 2026, presa-altra-rete) IL CAMBIO E' ANCORA VIVO? Come nel
+        # mercatino (`onchain_cambio_perche_morto`): prima di mandare i
+        # bitcoin al fornitore, lo swap li aspetta ancora e la fattura di
+        # chi compra ha davanti il tempo di una conferma. Il fornitore muto
+        # non e' un si'.
+        perche = await onchain_cambio_perche_morto(o)
+        if perche is None:
+            raise HTTPException(503, "SATS Routing ora non risponde: riprova "
+                                     "fra poco, non è partito niente")
+        if perche:
+            await _p2p_onchain_cambio_togli(o, perche)
+            raise HTTPException(409, "Il cambio di chi compra è scaduto prima "
+                                     "che partissero i sats: gli abbiamo "
+                                     "chiesto di rifarlo. Non è partito niente")
     try:
         txid = await onchain_mempool_invia(tx_hex)
     except ValueError as e:
@@ -95216,7 +95273,10 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     if verso == "venditore":
         testi = {o["depositante_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai venduto {quanto}.",
                  o["ricevente_id"]: f"✅ <b>Scambio on-chain concluso!</b> Hai comprato {quanto}: "
-                                    "i sats arrivano al tuo wallet."}
+                                    + ("i bitcoin vanno al cambio, e SATS Routing paga la "
+                                       "tua richiesta Lightning dopo una conferma."
+                                       if o["incasso_tipo"] == "cambio" else
+                                       "i sats arrivano al tuo wallet.")}
     else:
         testi = {o["depositante_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats tornano a te. Era {quanto}.",
                  o["ricevente_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats sono tornati a chi "
@@ -95253,6 +95313,17 @@ async def p2p_onchain_disputa(oid: int, req: Request, x_tg_init_data: str = Head
                     " proposta_psbt='', proposta_da=0, proposta_il=0, aggiornato=?"
                     " WHERE id=? AND stato IN ('depositato','euro_inviati')",
                     (user["id"], adesso, motivo, adesso, oid))
+        # (1 nov 2026, presa-altra-rete) IN DISPUTA NIENTE CAMBIO: il cambio
+        # scade in poche ore e una decisione puo' metterci di piu'. Se ne va
+        # col Lightning, e chi compra riceve on-chain: il wallet del Profilo,
+        # se c'e', sennò l'indirizzo che scrive nello scambio
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso='', incasso_tipo='',"
+            " incasso_valore='', incasso_firma='', incasso_indice=0, cambio='',"
+            " incasso_ln=0 WHERE id=? AND (incasso_tipo='cambio' OR incasso_ln=1)",
+            (oid,))
+        if cur.rowcount:
+            _p2p_onchain_riempi_incassi(con, int(o["ricevente_id"]))
         con.commit()
         altro = o["ricevente_id"] if ruolo == "compratore" else o["depositante_id"]
         euro = _fmt_eur(int(o["euro_cent"]) / 100)
@@ -95358,6 +95429,388 @@ async def p2p_onchain_decidi(oid: int, req: Request, x_tg_init_data: str = Heade
         + ("di chi compra bitcoin" if verso == "venditore" else "di chi vende bitcoin")
         + f", deciso dal moderatore {int(user['id'])}.")
     return {"ok": True, "attesa_firma": verso}
+
+
+# ============ CHI COMPRA BITCOIN SU UNO SCAMBIO P2P ON-CHAIN RICEVE IN
+# LIGHTNING (1 nov 2026, cantiere presa-altra-rete, tappa 2; studio del 30
+# ott, caso B1; Andrea il 1 nov: «Subito la tappa 2») ============
+# Il calco di «chi vende on-chain riceve in Lightning» del mercatino (28
+# ott, `onchain_cambio_nasce`): il 2-di-3 non cambia, chi vende deposita
+# come sempre, e allo sblocco il prezzo esce verso UN'ALTRA uscita,
+# l'indirizzo del cambio bitcoin → Lightning («submarine») di SATS Routing,
+# che paga la fattura di chi compra quando vede i bitcoin. Il cambio lo
+# crea il TELEFONO DI CHI COMPRA, con la SUA fattura e la SUA chiave di
+# rimborso (lo stesso seme del 2-di-3): se il fornitore non paga, i
+# bitcoin tornano a lui dal suo telefono. Il server non vede chiavi.
+# L'ORDINE DEI GESTI, perche' la fattura scade:
+#   1. chi compra sceglie «⚡ Lightning» (`ricevi-lightning`): l'incasso
+#      resta VUOTO, anche se nel Profilo ha un wallet;
+#   2. chi vende, visti gli euro, non libera verso un incasso che non c'e':
+#      CONFERMA col suo seme (`euro-ricevuti`, il testo
+#      `onchain_messaggio_ricevuto` del mercatino: porta l'indirizzo del
+#      2-di-3, che e' unico, quindi vale solo per questo scambio);
+#   3. chi compra fa il cambio e mette la PRIMA firma verso di lui
+#      (`cambio`): il server giudica tutto con le regole di sempre;
+#   4. il telefono di chi vende mette la SECONDA da solo, dopo aver riletto
+#      la SUA conferma (`onchainCofirma`), e il server, prima di
+#      trasmettere, chiede al fornitore se il cambio e' ancora vivo.
+# Chi compra puo' sempre tornare all'on-chain (`ricevi-lightning` con
+# si: false, o l'indirizzo al volo): se chi vende aveva gia' confermato, il
+# suo telefono firma il rilascio da solo, come nel mercatino. In disputa il
+# cambio se ne va (vedi `p2p_onchain_disputa`).
+P2P_CAMBIO_STATI_SI = ("preso", "depositato", "euro_inviati")
+
+
+def p2p_onchain_ln_per(tg_id) -> bool:
+    """IL CAMBIO IN LIGHTNING C'E' PER CHI COMPRA BITCOIN? La leva della
+    presa sull'altra rete (`p2p_altra_rete_per`, sopra lo swap), lo scambio
+    on-chain, la strada bitcoin → Lightning accesa (`CAMBIO_BTC_LN_ATTIVO`)
+    e le reti giuste (`onchain_ln_rete_ok`: oggi signet contro bitcoin, e la
+    strada resta chiusa anche a leve accese)."""
+    return bool(p2p_altra_rete_per(tg_id) and p2p_onchain_ammesso(tg_id)
+                and "btc-ln" in cambio_strade() and onchain_ln_rete_ok())
+
+
+def _p2p_onchain_confermato(con, o, ind=None) -> bool:
+    """Chi vende ha confermato gli euro col SUO seme? (la riga sola non
+    basta: si rilegge la firma con la sua xpub dedicata)"""
+    if not (o["rilascio_chiesto_il"] and o["rilascio_firma"]):
+        return False
+    if ind is None:
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+    return bool(ind and onchain_firma_valida_testo(
+        ind["xpub_compratore"],
+        onchain_messaggio_ricevuto(o["id"], ind["indirizzo"]),
+        o["rilascio_firma"]))
+
+
+async def _p2p_onchain_avvisa_confermato(o) -> None:
+    """Chi compra ha appena scelto un incasso on-chain su uno scambio in cui
+    chi vende aveva gia' confermato gli euro: il telefono di chi vende ora
+    puo' firmare il rilascio, e glielo si dice."""
+    if o["incasso"] and o["rilascio_chiesto_il"] and not o["proposta_psbt"]:
+        await notifica(o["depositante_id"],
+            "🔓 <b>Chi compra ha scelto dove ricevere</b> (on-chain) sullo scambio "
+            f"di {_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma "
+            "il rilascio che avevi confermato, e i sats partono.",
+            _p2p_onchain_bottone(o))
+
+
+def _p2p_onchain_mio_ln(con, oid: int, tg_id: int, confermato: bool = False):
+    """Lo scambio su cui chi compra bitcoin fa il cambio: suo, vivo, in
+    Lightning, senza uscita ne' proposta ne' decisione; con `confermato`
+    anche la conferma firmata di chi vende. Torna (riga, indirizzo)."""
+    o = _p2p_onchain_carica(con, oid)
+    if _p2p_onchain_ruolo(o, tg_id) != "venditore":
+        raise HTTPException(403, "Il cambio lo fa chi compra bitcoin")
+    if (o["stato"] not in P2P_CAMBIO_STATI_SI or not o["incasso_ln"]
+            or o["incasso"] or o["proposta_psbt"] or o["decisione_da"]):
+        raise HTTPException(409, "Su questo scambio non c'è un cambio da fare adesso")
+    ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                      (o["indirizzo_id"],)).fetchone()
+    if confermato and (o["stato"] == "preso" or not _p2p_onchain_confermato(con, o, ind)):
+        raise HTTPException(409, "Chi vende non ha ancora confermato gli euro: "
+                                 "il cambio si fa dopo, perché la richiesta scade")
+    return o, ind
+
+
+async def _p2p_onchain_cambio_togli(o, perche: str, avvisa: bool = True) -> bool:
+    """Il cambio se ne va prima che partano i sats: l'uscita e la proposta
+    tornano vuote, la scelta del Lightning resta, e chi compra lo rifa'
+    (o sceglie l'on-chain). Torna True se c'era da togliere."""
+    con = _p2p_onchain_db()
+    try:
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso='', incasso_tipo='',"
+            " incasso_valore='', incasso_firma='', incasso_indice=0, cambio='',"
+            " proposta_verso='', proposta_psbt='', proposta_da=0, proposta_il=0,"
+            " aggiornato=? WHERE id=? AND incasso_tipo='cambio' AND decisione_da=0"
+            " AND stato IN ('depositato','euro_inviati')", (int(time.time()), o["id"]))
+        con.commit()
+        tolto = bool(cur.rowcount)
+    finally:
+        con.close()
+    if tolto and avvisa:
+        await notifica(o["ricevente_id"],
+            "⚡ <b>Il cambio in Lightning non è partito</b> sullo scambio di "
+            f"{_p2p_onchain_quanto(o)} ({html.escape(perche)}). Non si è mosso "
+            "niente: apri lo scambio e rifallo, o ricevi on-chain.",
+            _p2p_onchain_bottone(o))
+    return tolto
+
+
+@app.post("/api/p2p/onchain/{oid}/ricevi-lightning")
+async def p2p_onchain_ricevi_lightning(oid: int, req: Request,
+                                       x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    """«⚡ RICEVI IN LIGHTNING» (o no): {si: true|false}. Chi compra
+    bitcoin, fino a che non c'e' una proposta. Col si' l'incasso si svuota
+    (si decide allo sblocco, col cambio); col no torna il wallet del
+    Profilo, se c'e', e chi vende che aveva gia' confermato viene avvisato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_incasso", user["id"])
+    d = await leggi_json(req)
+    si = bool(d.get("si"))
+    if si and not p2p_onchain_ln_per(user["id"]):
+        raise HTTPException(403, "Il cambio in Lightning non è disponibile")
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
+            raise HTTPException(403, "Come ricevere lo sceglie chi compra bitcoin")
+        if (o["stato"] not in P2P_CAMBIO_STATI_SI or o["proposta_psbt"]
+                or o["incasso_tipo"] == "cambio" or o["decisione_da"]):
+            raise HTTPException(409, "Come ricevere non si cambia più")
+        if si:
+            con.execute("UPDATE p2p_onchain_ordini SET incasso='', incasso_tipo='',"
+                        " incasso_valore='', incasso_firma='', incasso_indice=0,"
+                        " incasso_ln=1, aggiornato=? WHERE id=? AND proposta_psbt=''",
+                        (int(time.time()), oid))
+        else:
+            con.execute("UPDATE p2p_onchain_ordini SET incasso_ln=0, aggiornato=?"
+                        " WHERE id=?", (int(time.time()), oid))
+            _p2p_onchain_riempi_incassi(con, user["id"])
+        con.commit()
+        o = _p2p_onchain_carica(con, oid)
+        risposta = _p2p_onchain_per(con, o, user["id"])
+    finally:
+        con.close()
+    if not si:
+        await _p2p_onchain_avvisa_confermato(o)
+    return risposta
+
+
+@app.post("/api/p2p/onchain/{oid}/euro-ricevuti")
+async def p2p_onchain_euro_ricevuti(oid: int, req: Request,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """CHI VENDE HA VISTO GLI EURO, e chi compra riceve in Lightning: al
+    posto di «Libera i sats» (che non ha ancora un'uscita) la sua conferma
+    FIRMATA dal seme (`onchain_messaggio_ricevuto`, chiave `/2/0`). E' il
+    permesso al cambio di chi compra e, dopo, alla seconda firma che il
+    telefono di chi vende mette da solo: il suo telefono la rilegge."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_firma", user["id"])
+    d = await leggi_json(req)
+    firma = str(d.get("firma") or "").strip().lower()
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Gli euro li conferma chi vende bitcoin")
+        if (o["stato"] not in ("depositato", "euro_inviati") or not o["incasso_ln"]
+                or o["incasso"] or o["proposta_psbt"] or o["decisione_da"]):
+            raise HTTPException(409, "Su questo scambio non c'è niente da confermare così")
+        ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
+                          (o["indirizzo_id"],)).fetchone()
+        if not onchain_firma_valida_testo(
+                ind["xpub_compratore"],
+                onchain_messaggio_ricevuto(o["id"], ind["indirizzo"]), firma):
+            raise HTTPException(400, "La conferma non è firmata dal tuo seme: "
+                                     "rifalla da questo telefono")
+        gia = bool(o["rilascio_chiesto_il"])
+        adesso = int(time.time())
+        con.execute("UPDATE p2p_onchain_ordini SET rilascio_chiesto_il=CASE WHEN"
+                    " rilascio_chiesto_il=0 THEN ? ELSE rilascio_chiesto_il END,"
+                    " rilascio_firma=?, aggiornato=? WHERE id=?",
+                    (adesso, firma, adesso, oid))
+        con.commit()
+    finally:
+        con.close()
+    if not gia:
+        await notifica(o["ricevente_id"],
+            "⚡ <b>Chi vende ha ricevuto gli euro</b> per lo scambio di "
+            f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: fai il cambio in "
+            "Lightning (vedi quanto costa prima di confermare) e i sats partono.",
+            _p2p_onchain_bottone(o))
+    return {"ok": True}
+
+
+@app.get("/api/p2p/onchain/{oid}/cambio/preventivo")
+async def p2p_onchain_cambio_preventivo(oid: int, x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
+    """Quanto arriva in Lightning a chi compra: il prezzo esce tutto verso
+    il fornitore (`preventivo_sub_da_mandare`). Si vede gia' dalla scelta,
+    per decidere; il cambio vero nasce dopo la conferma di chi vende."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    if not p2p_onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    con = _p2p_onchain_db()
+    try:
+        o, ind = _p2p_onchain_mio_ln(con, oid, user["id"])
+        confermato = o["stato"] != "preso" and _p2p_onchain_confermato(con, o, ind)
+        u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    finally:
+        con.close()
+    p = await _onchain_preventivo_cambio(o["prezzo_sats"])
+    tetto = int(P2P_ALTRA_RETE_MAX_SATS or 0)
+    if tetto and p.get("ok") and int(p.get("mandi") or 0) > tetto:
+        p = dict(p, ok=False, motivo="sopra_tetto", massimo=tetto)
+    return dict(p, confermato=confermato,
+                ln_address=bool(u and (u["ln_address"] or "").strip()),
+                vita_incollata_s=ONCHAIN_CAMBIO_VITA_INCOLLATA_S,
+                vita_address_s=ONCHAIN_CAMBIO_VITA_ADDRESS_S)
+
+
+@app.post("/api/p2p/onchain/{oid}/cambio/fattura")
+async def p2p_onchain_cambio_fattura(oid: int, req: Request,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """La fattura dal Lightning address di chi compra, come nel mercatino
+    (`onchain_cambio_fattura`, col suo limite dichiarato: con la fattura
+    incollata un server manomesso non c'entra). Solo a conferma arrivata:
+    la fattura scade."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    if not p2p_onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    _frena("ln_address", user["id"])
+    d = await leggi_json(req)
+    try:
+        sats = int(d.get("sats") or 0)
+    except (TypeError, ValueError):
+        sats = 0
+    con = _p2p_onchain_db()
+    try:
+        o, _ = _p2p_onchain_mio_ln(con, oid, user["id"], confermato=True)
+        u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+    finally:
+        con.close()
+    if not 0 < sats < int(o["prezzo_sats"]):
+        raise HTTPException(400, "Cifra della fattura fuori misura")
+    ln = (u["ln_address"] if u else "") or ""
+    if not ln.strip():
+        raise HTTPException(409, "Nel tuo profilo non c'è un Lightning "
+                                 "address: incolla una fattura")
+    try:
+        pr = await invoice_da_ln_address(ln, sats)
+    except LnbitsMuto:
+        raise HTTPException(503, "Adesso non riusciamo a leggere la fattura: "
+                                 "riprova fra poco, o incollane una")
+    if not pr:
+        raise HTTPException(409, f"Il tuo Lightning address non ha dato una "
+                                 f"fattura da {_fmt_sats(sats)} sats: incollane una")
+    return {"ok": True, "fattura": pr}
+
+
+@app.post("/api/p2p/onchain/{oid}/cambio")
+async def p2p_onchain_cambio_nasce(oid: int, req: Request,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """IL CAMBIO NASCE SULLO SCAMBIO: il calco di `onchain_cambio_nasce`,
+    con chi compra bitcoin al posto di chi vende l'oggetto. Le parti
+    pubbliche del cambio, la firma del SUO seme sull'indirizzo (tipo
+    «cambio», valore «p2p:<scambio>:<indirizzo>»: il prefisso tiene
+    separati i numeri dei due libri) e la PRIMA firma del rilascio verso
+    quell'indirizzo, col prezzo esatto. Chi vende co-firma da solo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    if not p2p_onchain_ln_per(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("onchain_cambio", user["id"])
+    _frena("onchain_firma", user["id"])
+    d = await leggi_json(req)
+    c = d.get("cambio") if isinstance(d.get("cambio"), dict) else {}
+    firma = str(d.get("firma") or "").strip().lower()
+    psbt_b64 = str(d.get("psbt") or "").strip()
+    if not psbt_b64 or len(psbt_b64) > 20000:
+        raise HTTPException(400, "Manca la prima firma")
+    lockup = str(c.get("lockup") or "").strip()
+    swap_id = str(c.get("id") or "").strip()
+    try:
+        ricevi, mandi = int(c.get("ricevi") or 0), int(c.get("mandi") or 0)
+        scade = int(c.get("scade_fattura") or 0)
+        timeout = int(c.get("timeout") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Il cambio non si legge")
+    fornitore = swap_fornitore(str(c.get("fornitore") or "satsrouting"))
+    if fornitore is None or not onchain_ln_rete_ok(fornitore):
+        raise HTTPException(400, "Fornitore sconosciuto")
+    if not _SWAP_ID_FORMA.match(swap_id) or timeout <= 0:
+        raise HTTPException(400, "Il cambio non si legge")
+    from embit.script import address_to_scriptpubkey
+    rete = _onchain_rete()
+    try:
+        sc = address_to_scriptpubkey(lockup)
+        buono = sc.script_type() == "p2tr" and sc.address(rete) == lockup
+    except Exception:
+        buono = False
+    if not buono:
+        raise HTTPException(400, "L'indirizzo del cambio non è della rete giusta")
+    if scade - time.time() < ONCHAIN_CAMBIO_VITA_MIN_S:
+        raise HTTPException(400, "La fattura scade troppo presto: creane "
+                                 "una che duri di più")
+    con = _p2p_onchain_db()
+    try:
+        o, ind = _p2p_onchain_mio_ln(con, oid, user["id"], confermato=True)
+        if not 0 < ricevi < mandi <= int(o["prezzo_sats"]):
+            raise HTTPException(400, "Le cifre del cambio non tornano col "
+                                     "prezzo dello scambio")
+        if int(P2P_ALTRA_RETE_MAX_SATS or 0) and mandi > int(P2P_ALTRA_RETE_MAX_SATS):
+            raise HTTPException(400, "Il cambio supera il massimo di "
+                                     f"{_fmt_sats(int(P2P_ALTRA_RETE_MAX_SATS))} sats")
+        valore = f"p2p:{o['id']}:{lockup}"
+        if not onchain_firma_valida(ind["xpub_venditore"], "cambio", valore, firma):
+            raise HTTPException(400, "Il cambio non è firmato dal tuo seme: "
+                                     "rifallo da questo telefono")
+        giudicato = dict(o)
+        giudicato["incasso"] = lockup
+        try:
+            _onchain_psbt_giudica(giudicato, "venditore", psbt_b64,
+                                  ind["chiave_venditore"])
+        except ValueError as e:
+            raise HTTPException(400, f"Proposta rifiutata: {e}")
+        adesso = int(time.time())
+        cambio = json.dumps({"fornitore": fornitore["id"], "id": swap_id,
+                             "lockup": lockup, "ricevi": ricevi,
+                             "mandi": mandi, "scade_fattura": scade,
+                             "timeout": timeout, "il": adesso})
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET incasso=?, incasso_tipo='cambio',"
+            " incasso_valore=?, incasso_firma=?, incasso_indice=0, cambio=?,"
+            " proposta_verso='venditore', proposta_psbt=?, proposta_da=?,"
+            " proposta_il=?, aggiornato=? WHERE id=? AND incasso='' AND"
+            " proposta_psbt='' AND incasso_ln=1 AND decisione_da=0 AND"
+            " stato IN ('depositato','euro_inviati')",
+            (lockup, valore, firma, cambio, psbt_b64, user["id"], adesso,
+             adesso, o["id"]))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Lo scambio è cambiato nel frattempo: riaprilo")
+    finally:
+        con.close()
+    await notifica(o["depositante_id"],
+        "⚡ <b>Chi compra ha fatto il cambio in Lightning</b> sullo scambio di "
+        f"{_p2p_onchain_quanto(o)}.\n\nApri Barattolo: il tuo telefono firma il "
+        "rilascio che avevi confermato, e i sats partono.", _p2p_onchain_bottone(o))
+    return {"ok": True}
+
+
+@app.post("/api/p2p/onchain/{oid}/cambio/togli")
+async def p2p_onchain_cambio_togli_rotta(oid: int, x_tg_init_data: str = Header(""),
+                                         barattolo_sessione: str = Cookie("")):
+    """Chi compra toglie il suo cambio prima che partano i sats (per
+    rifarlo, o per ricevere on-chain)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "venditore":
+            raise HTTPException(403, "Il cambio lo toglie chi compra bitcoin")
+    finally:
+        con.close()
+    if not await _p2p_onchain_cambio_togli(o, "tolto da chi compra", avvisa=False):
+        raise HTTPException(409, "Su questo scambio non c'è un cambio da togliere")
+    return {"ok": True}
 
 
 def _p2p_onchain_passata_paracadute(con, prezzo, letto, adesso: int) -> list:

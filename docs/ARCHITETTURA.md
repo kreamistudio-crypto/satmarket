@@ -34579,6 +34579,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `p2p` e senza `ordine`, poi `swapSorveglia`); `miniapp.html`
   (`sceltaReteIncassoP2P`, `corpoCambioIncassoP2P`, `inviaCambioP2P` →
   `add-invoice` di sempre). Mostro non sa niente del cambio.
+- SU UNO SCAMBIO P2P ON-CHAIN CHI COMPRA RICEVE IN LIGHTNING (1 nov 2026,
+  cantiere presa-altra-rete, tappa 2; perché in CANTIERI, «Su uno scambio
+  P2P on-chain chi compra riceve in Lightning»). Cancello
+  `p2p_onchain_ln_per` (`p2p_altra_rete_per`, `p2p_onchain_ammesso`,
+  «btc-ln» in `cambio_strade`, `onchain_ln_rete_ok`); `/p2p/onchain/{id}`
+  porta `incasso_ln`, `rilascio_chiesto_il`, `rilascio_firma`, `cambio`,
+  `ln_possibile`. Colonne nuove di `p2p_onchain_ordini` (nel giro di
+  `_p2p_onchain_prepara`): `incasso_ln`, `rilascio_chiesto_il`,
+  `rilascio_firma`, `cambio`. Rotte: `POST …/ricevi-lightning` {si} (chi
+  compra, stati preso/depositato/euro_inviati, niente proposta; col si'
+  svuota l'incasso, col no `_p2p_onchain_riempi_incassi` e
+  `_p2p_onchain_avvisa_confermato`), `POST …/euro-ricevuti` {firma} (chi
+  vende, la chiave `/2/0` su `onchain_messaggio_ricevuto`, letta da
+  `_p2p_onchain_confermato`), `GET …/cambio/preventivo`
+  (`_onchain_preventivo_cambio` più `confermato`, il tetto
+  `P2P_ALTRA_RETE_MAX_SATS`), `POST …/cambio/fattura`, `POST …/cambio`
+  {cambio, firma, psbt} (valore firmato «p2p:<id>:<lockup>», PSBT
+  giudicata con `incasso = lockup`; scrive `incasso_tipo='cambio'` e la
+  proposta di chi compra), `POST …/cambio/togli`
+  (`_p2p_onchain_cambio_togli`). `p2p_onchain_firma`: chi vende co-firma
+  il cambio (eccezione `cambio`), e prima di `onchain_mempool_invia`
+  `onchain_cambio_perche_morto`. `p2p_onchain_proposta`: 409 sul cambio e
+  senza incasso in Lightning. `p2p_onchain_disputa` toglie cambio e
+  `incasso_ln` e riempie dal Profilo. Telefono: `incassoLnOnchainP2P`
+  (il riquadro, dentro `schedaOnchainP2P`), `confermaCambioOnchainP2P`
+  (`swapCreaPerOnchain` con `scambio` → record `p2pOnchain`),
+  `euroRicevutiOnchainP2P` (da `liberaOnchainP2P`),
+  `cambioDaFirmareOnchainP2P` dentro `daFirmareOnchainP2P`,
+  `rilascioDaFirmareOnchainP2P` in `p2pOnchainCofirmeInAttesa`,
+  `onchainPrimaDiChiVende` che accetta gli stati P2P con la `rotta`.
 - CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
   onchain-verso-lightning; perché in CANTIERI, «Chi vende on-chain riceve
   in Lightning»). La leva `ONCHAIN_INCASSO_LN_ATTIVO` (False) e il giudice

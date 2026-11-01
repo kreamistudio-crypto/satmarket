@@ -4947,6 +4947,12 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   "^P2P_ALTRA_RETE" /srv/barattolo/config.py` (atteso oggi: niente).
   PER SPEGNERE: via la riga e riavvio; i cambi già nati finiscono dal
   telefono, e la ronda dell'avviso continua a guardarli.
+  LA TAPPA 2 (1 nov 2026: sugli scambi P2P on-chain chi compra riceve in
+  Lightning) sta dietro la STESSA leva, più `P2P_ONCHAIN_ATTIVO`,
+  `CAMBIO_BTC_LN_ATTIVO` e l'on-chain sulla rete di SATS Routing
+  (`ONCHAIN_RETE = "mainnet"`): con l'on-chain su signet resta chiusa
+  anche a leve accese. Le colonne nuove di `p2p_onchain_ordini` nascono
+  da sole al primo avvio.
 
 - LA CHIAVE DI BARATTOLO DELL'ON-CHAIN (27 ott 2026, cantiere
   onchain-disputa; com'è fatta in ARCHITETTURA, «LA DISPUTA ON-CHAIN E
