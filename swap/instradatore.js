@@ -1342,6 +1342,70 @@ async function swapCreaPerDepositoP2PDentro(scambio, indirizzo, prima){
   return rec;
 }
 
+/* ─── 6f. IL CAMBIO PRIMA DELLA PRESA (1 nov 2026, cantiere
+   presa-altra-rete, caso 4; studio del 30 ott §9-12, Massimo il 1 nov) ──
+   Chi vuole VENDERE su un ordine Lightning e ha solo bitcoin: prima un
+   cambio bitcoin → Lightning («submarine») verso una richiesta NORMALE del
+   SUO wallet Lightning, poi la presa e la garanzia di sempre dal suo
+   wallet. Mai la hold invoice di Mostro pagata da un cambio (Massimo:
+   «fare casini con invoice on hold può farti solo perdere i fondi»).
+   Il record entra con `p2pPresa` (l'id dell'ordine del libro) e senza
+   `ordine` ne' `p2p`; il rimborso, se il cambio fallisce coi bitcoin
+   mandati, e' quello del Cambio libero: l'indirizzo lo scrive lui nella
+   pagina «Cambio» (`indirizzo` vuoto). Alza con `.tipo` come gli altri,
+   piu' 'fattura' (il perche' in `.perche`). */
+function swapDiPresaP2P(ordine){
+  const id = String(ordine || '');
+  return id ? swapLista().filter(r => r.p2pPresa === id).pop() || null : null;
+}
+async function swapCreaPerPresaP2P({ordine, fattura, preventivo}){
+  const id = 'presa:' + String(ordine || '');
+  if (id === 'presa:' || swapP2PInCorso.has(id)) throw swapNoP2P('doppio');
+  /* UN CAMBIO VIVO PER ORDINE: due cambi pagherebbero due volte */
+  const vivo = swapDiPresaP2P(ordine);
+  if (vivo && !['scaduto', 'fallito', 'ripreso', 'fatto', 'pagata'].includes(swapFase(vivo))) throw swapNoP2P('doppio');
+  swapP2PInCorso.add(id);
+  try { return await swapCreaPerPresaP2PDentro(String(ordine), String(fattura || '').trim(), preventivo || {}); }
+  finally { swapP2PInCorso.delete(id); }
+}
+async function swapCreaPerPresaP2PDentro(ordine, fattura, prima){
+  const f = swapFornitore(prima.fornitore);
+  if (!f || !f.creaSub) throw swapNoP2P('giu');
+  const sats = Number(prima.ricevi) || 0;
+  const perche = f.fatturaValida(fattura, sats);
+  if (perche) { const e = swapNoP2P('fattura'); e.perche = perche; throw e; }
+  /* LA CONFERMA RICONTROLLA le tariffe mostrate, con la loro impronta */
+  const p = await leggiPreventivoPresaP2P(sats, f.id, prima.hash);
+  if (!p || !p.ok) throw swapNoP2P(p && p.motivo === 'non_risponde' ? 'giu' : 'preventivo', p);
+  if (p.cambiata || Number(p.ricevi) !== sats) throw swapNoP2P('cambiata', p);
+  let seme;
+  try { seme = await swapSemePronto(); }
+  catch(e){ throw swapNoP2P('seme'); }
+  if (seme.mostrare) throw swapNoP2P('parole');
+  const indice = swapPrenotaIndice();
+  if (indice < 0) throw swapNoP2P('casa');
+  let biglietto = null;
+  try { biglietto = await chiediBigliettoPresaP2P({ordine: ordine, sats: sats, fornitore: f.id}); }
+  catch(e){ biglietto = null; }
+  if (!biglietto || !biglietto.ok) {
+    const e = swapNoP2P('biglietto');
+    e.motivo = String((biglietto && biglietto.motivo) || '');
+    throw e;
+  }
+  let nuovo;
+  try { nuovo = await f.creaSub({parole: seme.parole, indice: indice, preventivo: p, fattura: fattura}); }
+  catch(e){
+    try { await liberaBigliettoCambioP2P(biglietto.id); } catch(e2){}
+    throw swapNoP2P(e && e.tipo === 'mente' ? 'mente' : 'giu');
+  }
+  const rec = Object.assign(nuovo, {fornitore: f.id, p2pPresa: ordine, indice: indice, seme: 'onchain',
+    indirizzo: '', creato: Date.now(), pagamento: '', biglietto: Number(biglietto.id) || 0});
+  if (!swapSalvaRecord(rec)) throw swapNoP2P('casa');
+  try { await natoCambioP2PAlServer(rec.biglietto, rec); } catch(e){}
+  swapSorveglia();
+  return rec;
+}
+
 /* ─── 7. LA SORVEGLIANZA E IL RITIRO ──────────────────────────────────
    Ogni 5 secondi, finche' c'e' uno swap non finito, si chiede al suo
    fornitore a che punto e'; quando i bitcoin sono bloccati si ritira.
@@ -1475,6 +1539,8 @@ function swapRidisegnaDove(rec){
   /* (tappa 3) il cambio del deposito di uno scambio on-chain */
   if (rec && rec.p2pDeposito && typeof ridisegnaDepositoLnOnchainP2P === 'function')
     ridisegnaDepositoLnOnchainP2P(rec);
+  /* (caso 4) il cambio prima della presa: la pagina dell'ordine del libro */
+  if (rec && rec.p2pPresa && typeof ridisegnaPresaOcP2P === 'function') ridisegnaPresaOcP2P(rec);
   if (currentOrder && Number(currentOrder.id) === Number(rec.ordine)
       && el('payoutIncasso')) ridisegnaIncassoSwap();
   if (el('view-swap') && el('view-swap').classList.contains('active')) renderSwapTelefono();
@@ -1878,7 +1944,7 @@ function renderSwapTelefono(){
       <div class="cambio-voce-riga">
         ${swapMoneta(swapESub(rec) ? 'ln' : 'btc')}
         <span class="cambio-voce-dati">
-          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p || rec.p2pOnchain || rec.p2pDeposito ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
+          <b>${esc(swapECambio(rec) ? t.cambio : rec.p2p || rec.p2pOnchain || rec.p2pDeposito || rec.p2pPresa ? t.scambioP2P : rec.ordine ? t.ordine(rec.ordine) : t.recuperato)}</b>
           <span>${esc(frasestatoSwap(rec))}</span>
           ${piu ? `<span class="swap-da">${esc(t.eseguitoDa(swapNomeFornitore(swapDiChi(rec))))}</span>` : ''}
           ${barretteSwap(rec)}

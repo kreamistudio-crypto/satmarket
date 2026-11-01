@@ -18911,7 +18911,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = 'fb3b192508';
+const SWAP_TELEFONO_VER = 'f0290cc73c';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -19266,6 +19266,31 @@ async function chiediBigliettoDepositoP2P(d){
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
       body: JSON.stringify({sats: Number(d.sats) || 0, fornitore: d.fornitore || ''})});
+    const j = await r.json().catch(() => null);
+    if (r.status === 403) return {ok: false, motivo: 'spento'};
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+/* (caso 4) il preventivo e il biglietto del cambio prima della presa */
+async function leggiPreventivoPresaP2P(sats, fornitore, hash){
+  let d;
+  try {
+    const q = new URLSearchParams({sats: String(Number(sats) || 0)});
+    if (fornitore) q.set('fornitore', fornitore);
+    if (hash) q.set('hash', hash);
+    const r = await fetch(`${API_BASE}/swap/p2p/presa/preventivo?${q.toString()}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => null);
+    if (!r.ok || !d) d = r.status === 403 ? {ok: false, motivo: 'spento'} : {ok: false, motivo: 'non_risponde'};
+  } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
+  return d;
+}
+async function chiediBigliettoPresaP2P(d){
+  try {
+    const r = await fetch(`${API_BASE}/swap/p2p/presa`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: String(d.ordine || ''), sats: Number(d.sats) || 0, fornitore: d.fornitore || ''})});
     const j = await r.json().catch(() => null);
     if (r.status === 403) return {ok: false, motivo: 'spento'};
     return r.ok && j ? j : null;
@@ -59205,6 +59230,178 @@ function ridisegnaDepositoLnOnchainP2P(rec){
     renderDepositoOnchainP2P();
 }
 
+/* ---- VENDERE AVENDO SOLO BITCOIN: IL CAMBIO PRIMA DELLA PRESA (1 nov
+   2026, cantiere presa-altra-rete, caso 4; studio del 30 ott §9-12, la
+   risposta di Massimo del 1 nov) ----
+   Nella pagina di un ordine Lightning dove chi guarda VENDEREBBE, un
+   riquadro sopra i passi: «₿ Hai solo bitcoin? Caricali in Lightning».
+   Aperto: quanti sats servono per la garanzia (`garanziaVendoP2P`), quanti
+   bitcoin mandare e il costo; la richiesta del SUO wallet Lightning la
+   chiede il telefono al wallet collegato (`make_invoice`) o la incolla
+   lui. «₿ Crea il cambio» → `swapCreaPerPresaP2P` (swap/instradatore.js):
+   il QR del link bitcoin: col lockup del cambio. Arrivati i sats nel suo
+   wallet il bot lo avvisa («tocca per prendere l'ordine») e qui il
+   riquadro dice di toccare «Vendi»: la presa e la garanzia restano
+   quelle di sempre, pagate dal suo wallet. Il cancello lo dice il server
+   (`swap_leve.p2p.presa`). */
+const p2pPresaOc = {};   // ordine -> {aperto, stato, dati, quando, errore}
+function presaOcPossibileP2P(){
+  return typeof swapCreaPerPresaP2P === 'function' && typeof swapAcceso === 'function' && swapAcceso()
+    && !!(swapLeve && swapLeve.p2p && swapLeve.p2p.presa);
+}
+/* PURA: i sats che bloccherà chi vende (la cifra + la sua metà della
+   commissione), come nel conto della pagina. A prezzo di mercato la cifra
+   si fissa alla presa: si chiede il 2% in più, che resta nel suo wallet. */
+function garanziaVendoP2P(o){
+  /* su un intervallo senza cifra scelta non c'e' ancora niente da dire */
+  if (!o || o.euroMax) return {sats: 0, stima: true};
+  const fee = Number(feeMiaP2P(o)) || 0;
+  const fisso = Number(o.sats) > 0;
+  const detto = Math.floor(Number(o.satsDetti) || 0);
+  const merc = detto > 0 ? detto : fisso ? Number(o.sats)
+    : (Number(o.euro) > 0 ? satsMercatoP2P(o) : 0);
+  if (!(merc > 0)) return {sats: 0, stima: !fisso};
+  const netto = merc + (fee > 0 ? Math.round(merc * fee / 2) : 0);
+  const stima = !fisso && !(detto > 0);
+  return {sats: stima ? Math.ceil(netto * 1.02) : netto, stima: stima};
+}
+function perchePresaOcP2P(d){
+  const m = (d && d.motivo) || '';
+  if (m === 'sotto_minimo') return 'Il cambio parte da ' + fmt(d.minimo || 0) + ' sats: per questo ordine usa i sats che hai già.';
+  if (m === 'sopra_tetto') return 'Il cambio arriva al massimo a ' + fmt(d.massimo || 0) + ' sats.';
+  if (m === 'spento') return 'Il cambio non è disponibile.';
+  return 'Il cambio adesso non risponde: riprova fra poco.';
+}
+function frasePresaOcP2P(e){
+  const t = (e && e.tipo) || '';
+  if (t === 'fattura') return typeof swapFatturaPerche === 'function' ? swapFatturaPerche(e.perche) : 'Questa richiesta non va bene.';
+  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».';
+  if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
+  if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
+  if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Crea il cambio».';
+  if (t === 'preventivo') return perchePresaOcP2P(e.dati);
+  if (t === 'mente') return 'Il cambio ha risposto con dati che non tornano: non è partito niente.';
+  if (t === 'wallet') return 'Il wallet collegato non ha dato la richiesta: incollane una tu.';
+  if (t === 'biglietto')
+    return e.motivo === 'troppi' ? 'Per quest\'ordine ci sono già troppi cambi aperti.'
+         : e.motivo === 'spento' ? 'Il cambio non è disponibile.'
+         : 'Barattolo non risponde: riprova fra poco.';
+  return 'Il cambio adesso non risponde: riprova fra poco.';
+}
+/* il riquadro nella pagina dell'ordine (solo a chi venderebbe) */
+function rigaPresaOcP2P(o){
+  const rec = typeof swapDiPresaP2P === 'function' ? swapDiPresaP2P(o.id) : null;
+  const fase = rec ? swapFase(rec) : '';
+  const st = p2pPresaOc[o.id] || {};
+  if (!presaOcPossibileP2P() && !rec) return '';
+  const testa = '<div class="p2p-box p2p-presa-oc" id="p2pPresaOc">';
+  if (rec && (fase === 'pagata' || fase === 'fatto'))
+    return testa + '⚡ <b>I sats sono nel tuo wallet Lightning.</b> Ora tocca «Vendi» qui sotto e paga la garanzia dal tuo wallet.</div>';
+  if (rec && typeof swapDaRimborsare === 'function' && swapDaRimborsare(rec))
+    return testa + esc(frasestatoSwap(rec)) + ' <button type="button" class="btn ghost" onclick="vaiSwap()">Vai al Cambio</button></div>';
+  if (rec && !['scaduto', 'fallito', 'ripreso'].includes(fase)) {
+    const link = rec.bip21 || `bitcoin:${rec.lockupAddress}?amount=${(Number(rec.mandi || rec.onchainAmount) / 1e8).toFixed(8)}`;
+    return testa + '<div class="hint" role="status">' + esc(frasestatoSwap(rec)) + '</div>'
+      + (fase === 'creato' && rec.lockupAddress
+        ? '<div class="qr" id="p2pPresaOcQr"></div>'
+          + '<div class="mono" style="word-break:break-all">' + esc(rec.lockupAddress) + '</div>'
+          + '<div class="row"><a class="btn orange" href="' + esc(link) + '">₿ Apri nel wallet</a>'
+          + '<button type="button" class="btn ghost" onclick="copiaOnchainP2P(' + esc(JSON.stringify(rec.lockupAddress)) + ')">📋 Copia l\'indirizzo</button></div>'
+        : '')
+      + '<div class="hint">Puoi chiudere l\'app: quando i sats arrivano nel tuo wallet Lightning ti avvisiamo col bot. '
+      + 'Se intanto l\'ordine lo prende un altro, i sats restano tuoi, nel wallet.</div></div>';
+  }
+  if (!st.aperto)
+    return testa + '₿ Hai solo bitcoin on-chain? <button type="button" class="btn ghost" onclick="apriPresaOcP2P(' + esc(JSON.stringify(o.id)) + ')">Caricali in Lightning</button></div>';
+  const g = garanziaVendoP2P(o);
+  if (!(g.sats > 0)) return testa + 'Per sapere quanti sats servono scegli prima la cifra.</div>';
+  if (st.stato !== 'pronto' || !st.dati) return testa + 'Chiedo il prezzo del cambio…</div>';
+  const d = st.dati;
+  if (!d.ok) return testa + esc(perchePresaOcP2P(d)) + '</div>';
+  const nome = esc(d.fornitore_nome || 'SATS Routing');
+  const wallet = typeof walletNwcFattura === 'function' && walletNwcFattura();
+  return testa
+    + '<div class="hint">Per la garanzia ti servono ' + (g.stima ? 'circa ' : '') + '<b>' + fmt(g.sats) + ' sats</b> in Lightning'
+      + (g.stima ? ' (a prezzo di mercato la cifra si fissa quando prendi: il poco in più resta nel tuo wallet)' : '') + '.</div>'
+    + '<div class="hint">Mandi <b>' + fmt(d.mandi) + ' sats</b> on-chain: ' + nome + ' li cambia e paga una richiesta del <b>tuo</b> wallet Lightning. '
+      + 'È un cambio: costa ' + fmt(d.costo) + ' sats, li paghi tu. Barattolo non aggiunge niente e non tiene i tuoi sats.</div>'
+    + (wallet ? '<div class="hint">La richiesta la chiedo al tuo wallet collegato.</div>'
+      : '<div class="field"><label>Una richiesta del tuo wallet Lightning di ' + fmt(g.sats) + ' sats</label>'
+        + '<input type="text" id="p2pPresaOcFattura" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="lnbc…"></div>')
+    + (st.errore ? '<div class="hint" role="alert">' + esc(st.errore) + '</div>' : '')
+    + '<button type="button" class="btn orange" id="p2pPresaOcBtn" onclick="creaPresaOcP2P(this, ' + esc(JSON.stringify(o.id)) + ')">₿ Crea il cambio</button>'
+    + '<div class="hint">Poi, coi sats nel wallet, tocchi «Vendi» come sempre.</div></div>';
+}
+function presaOcOrdineP2P(id){
+  const riga = typeof rigaLibroP2P === 'function' ? rigaLibroP2P(id) : null;
+  if (!riga) return null;
+  const scelto = riga.euroMax ? (Number(p2pDettImporto) || 0) : 0;
+  return scelto ? Object.assign({}, riga, {euro: scelto, euroMax: 0}) : riga;
+}
+async function apriPresaOcP2P(id){
+  haptic();
+  p2pPresaOc[id] = Object.assign({}, p2pPresaOc[id] || {}, {aperto: true});
+  await caricaPresaOcP2P(id);
+}
+async function caricaPresaOcP2P(id){
+  const o = presaOcOrdineP2P(id);
+  const st = p2pPresaOc[id] || (p2pPresaOc[id] = {aperto: true});
+  const g = o ? garanziaVendoP2P(o) : {sats: 0};
+  if (g.sats > 0) {
+    st.stato = 'leggo';
+    if (typeof renderDettaglioP2P === 'function') renderDettaglioP2P();
+    let d;
+    try { d = await leggiPreventivoPresaP2P(g.sats, '', ''); } catch(e){ d = {ok: false, motivo: 'non_risponde'}; }
+    Object.assign(st, {stato: 'pronto', dati: d, quando: Date.now()});
+  }
+  if (typeof renderDettaglioP2P === 'function') renderDettaglioP2P();
+}
+async function creaPresaOcP2P(btn, id){
+  const st = p2pPresaOc[id];
+  if (!st || !st.dati || !st.dati.ok) return;
+  if (typeof swapDiPresaP2P === 'function') {
+    const vivo = swapDiPresaP2P(id);
+    if (vivo && !['scaduto', 'fallito', 'ripreso'].includes(swapFase(vivo))) { renderDettaglioP2P(); return; }
+  }
+  haptic();
+  const rip = btn && typeof bottoneInAttesa === 'function' ? bottoneInAttesa(btn, 'Preparo il cambio…') : () => {};
+  try {
+    let fattura = '';
+    const w = typeof walletNwcFattura === 'function' && walletNwcFattura();
+    if (w) {
+      let c = null;
+      try {
+        c = await clientNwc(w);
+        fattura = String(((await c.fattura(Number(st.dati.ricevi), 'Barattolo: sats per vendere nel P2P',
+                                            86400, P2P_NWC_ATTESA_MS)) || {}).invoice || '').trim();
+      } catch(e){ fattura = ''; }
+      finally { if (c) c.chiudi(); }
+      if (!fattura) { const e = new Error('wallet'); e.tipo = 'wallet'; throw e; }
+    } else {
+      fattura = String((el('p2pPresaOcFattura') || {}).value || '').trim();
+    }
+    await swapCreaPerPresaP2P({ordine: id, fattura: fattura, preventivo: st.dati});
+    st.errore = '';
+  } catch(e){
+    if (e && e.tipo === 'doppio') return;
+    if (e && (e.tipo === 'cambiata' || e.tipo === 'preventivo') && e.dati) Object.assign(st, {dati: e.dati, quando: Date.now()});
+    st.errore = frasePresaOcP2P(e);
+  } finally { rip(); }
+  renderDettaglioP2P();
+}
+/* il QR del lockup, dopo ogni ridisegno della pagina */
+function qrPresaOcP2P(id){
+  const q = el('p2pPresaOcQr');
+  const rec = typeof swapDiPresaP2P === 'function' ? swapDiPresaP2P(id) : null;
+  if (q && rec && typeof disegnaQr === 'function')
+    disegnaQr(q, rec.bip21 || `bitcoin:${rec.lockupAddress}`, 'Byte');
+}
+/* (swap/instradatore.js) lo stato del cambio e' cambiato: con la pagina
+   di quell'ordine aperta, si ridisegna */
+function ridisegnaPresaOcP2P(rec){
+  if (rec && p2pDettOrdine === rec.p2pPresa && typeof renderDettaglioP2P === 'function') renderDettaglioP2P();
+}
+
 /* I GESTI SEMPLICI: una POST, un toast, la scheda rifatta. Quelli che
    non si disfano passano dalla domanda unica di casa (`chiediConferma`,
    mai un confirm() o un prompt() di sistema): l'annullo, e la disputa
@@ -71652,6 +71849,10 @@ function renderDettaglioP2P(){
                               : 'Scegli quanto vuoi ' + verboEuro + ' per vedere il dettaglio')
       : (scelto ? rigaImportoSceltoP2P(o, scelto) : '')
         + contoDettP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +
+    /* (1 nov 2026, presa-altra-rete, caso 4) chi VENDEREBBE e ha solo
+       bitcoin: il cambio prima della presa, sotto il conto */
+    (tuo || compro || VETRINA || !myTgId || typeof rigaPresaOcP2P !== 'function'
+      ? '' : rigaPresaOcP2P(scelto ? Object.assign({}, o, {euro: scelto, euroMax: 0}) : o)) +
     /* LA SPIEGAZIONE CHE STAVA NEL FOGLIO DI CONFERMA: non si perde
        col foglio, si sposta sopra i due bottoni — dove la legge chi
        sta per premerli.
@@ -71747,6 +71948,7 @@ function renderDettaglioP2P(){
            on-chain (`apriOnchainP2P`) */
         (daScegliere ? 'Scegli' : '<span class="p2p-invia-ico">⚡</span>' + (compro ? 'Compra' : 'Vendi')) + '</button>' +
     '</div>');
+  if (!tuo && !compro && typeof qrPresaOcP2P === 'function') qrPresaOcP2P(o.id);
 }
 /* «COME FUNZIONA», I QUATTRO PASSI DELLO SCAMBIO (6 ott 2026, idea e
    testi di Andrea). Era una frase sola, «Chi vende blocca i sats in

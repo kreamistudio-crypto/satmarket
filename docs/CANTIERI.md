@@ -76991,3 +76991,57 @@ dell'annullo. Se chi deposita paga la richiesta DOPO aver annullato lo
 scambio (l'aveva copiata), i bitcoin arrivano su un indirizzo chiuso: è la
 coda dei ritardatari, il moderatore li rimanda indietro. Non provato dal
 vivo: serve l'on-chain in mainnet. MiCA prima di aprire.
+
+## Vendere su un ordine P2P Lightning avendo solo bitcoin (1 nov 2026, cantiere presa-altra-rete, caso 4)
+
+DA DOVE VIENE. Lo studio del 30 ott (§9-12) lasciava aperto il caso di chi
+vuole VENDERE su un ordine Lightning del libro di Mostro e ha solo bitcoin
+on-chain. Chi vende blocca i sats con la garanzia di Mostro, che è una hold
+invoice. La domanda a Massimo (SATS Routing) era se un cambio potesse
+pagarla; la sua risposta del 1 nov: «fare casini con invoice on hold può
+farti solo perdere i fondi». Andrea: finire tutte le tappe, poi la
+promozione in una volta.
+
+COSA SI È DECISO. In DUE TEMPI, nella stessa pagina dell'ordine. Prima un
+cambio bitcoin → Lightning («submarine») di SATS Routing verso una
+richiesta NORMALE del SUO wallet Lightning: la chiede il telefono al wallet
+collegato (`make_invoice`) o la incolla lui. Poi, coi sats arrivati, la
+presa e la garanzia di sempre, pagate dal suo wallet. Barattolo non tiene
+mai i sats fra i due tempi (sarebbe custodia). Se nel frattempo l'ordine lo
+prende un altro, i sats restano nel suo wallet: non si perde niente.
+La cifra è quella che bloccherà (`garanziaVendoP2P`: la cifra più la sua
+metà della commissione). A prezzo di mercato si chiede il 2% in più,
+perché la cifra si fissa alla presa; il poco in più resta suo. Su un
+intervallo prima si sceglie la cifra. Il server fa il preventivo
+(`preventivo_sub`, niente fee nostra), il biglietto nella tabella della
+tappa 1 (scambio scritto «presa:<ordine>») e la ronda dell'avviso. A
+richiesta pagata il bot dice «tocca per prendere l'ordine», perché la presa
+la firma la chiave dello scambio, che vive solo nel telefono. Col cambio
+fallito e i bitcoin già mandati il bot dice di riprenderli dalla pagina
+«Cambio». Il rimborso è quello del Cambio libero: l'indirizzo lo scrive lui
+lì. Uno scaduto conta come «bitcoin mandati» solo se la ronda aveva visto
+il lockup; un pagamento non riuscito o un lockup sbagliato li hanno per
+forza. Il cancello: la leva della presa sull'altra rete
+(`P2P_ALTRA_RETE_ATTIVO`, solo moderatori) e la strada bitcoin → Lightning
+del Cambio (`CAMBIO_BTC_LN_ATTIVO`). L'on-chain di Barattolo non c'entra: i
+bitcoin escono dal suo wallet.
+
+STRADE SCARTATE. Il cambio che paga direttamente la hold invoice di Mostro
+(Massimo, sopra). Barattolo che riceve i sats e paga la garanzia per lui
+(custodia). La presa automatica a sats arrivati (la firma è del telefono,
+e a cambio lento l'ordine può essere già sparito: meglio un avviso e un
+tocco).
+
+COSA È PROVATO. `collaudo_presa_ln_p2p` (39 controlli: server vero,
+cartone su 127.0.0.1, telefono vero in node). Copre il cancello e il
+preventivo, il biglietto coi suoi no, e il riquadro con conto, richiesta
+sbagliata respinta, nascita del submarine, QR del link bitcoin:, niente
+doppioni, riuscito che dice «Vendi», lista «Scambio P2P» e wallet
+collegato (anche muto). Poi la ronda con i suoi tre avvisi e il silenzio
+dello scaduto senza bitcoin, e la leva rispenta. Controprova: con l'avviso
+legato al solo `transaction.claimed` tre controlli diventano rossi.
+`prove_presa_ln_p2p` tiene le sentinelle.
+
+COSA RESTA. Alan rivede il flusso. Non provato dal vivo: serve SATS
+Routing vero e una presa vera in mainnet (la prova a due di Andrea e Alan).
+MiCA prima di aprire a tutti.

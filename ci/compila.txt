@@ -164,6 +164,7 @@ collaudo_cambio_libero.py
 collaudo_cambio_p2p.py
 collaudo_cambio_onchain_p2p.py
 collaudo_deposito_ln_p2p.py
+collaudo_presa_ln_p2p.py
 collaudo_margine_cassaforte.py
 collaudo_onchain_indirizzo.py
 collaudo_onchain_ordine.py

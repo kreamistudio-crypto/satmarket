@@ -4958,6 +4958,10 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `P2P_ONCHAIN_ATTIVO` e l'on-chain sulla rete di SATS Routing; non vuole
   `CAMBIO_BTC_LN_ATTIVO`. Niente colonne nuove: i biglietti stanno in
   `cambi_p2p` col nome «oc:<numero>».
+  IL CASO 4 (1 nov 2026: vendere su un ordine Lightning avendo solo
+  bitcoin) sta dietro la stessa leva più `CAMBIO_BTC_LN_ATTIVO`; non vuole
+  l'on-chain di Barattolo. I biglietti in `cambi_p2p` si chiamano
+  «presa:<ordine>».
 
 - LA CHIAVE DI BARATTOLO DELL'ON-CHAIN (27 ott 2026, cantiere
   onchain-disputa; com'è fatta in ARCHITETTURA, «LA DISPUTA ON-CHAIN E

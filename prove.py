@@ -182719,8 +182719,9 @@ def prove_cambio_p2p():
           and "box.innerHTML = intro + sceltaRete +\n    vie +" in rend)
     # EMENDATA (1 nov 2026, presa-altra-rete tappa 3): anche il cambio del
     # deposito di uno scambio on-chain (`p2pDeposito`) si chiama cosi'
+    # EMENDATA (1 nov 2026, caso 4): ...e il cambio prima della presa (`p2pPresa`)
     prova("la lista della pagina «Cambio» lo chiama «Scambio P2P»", (1, 1, 1),
-          (js.count("rec.p2p || rec.p2pOnchain || rec.p2pDeposito ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
+          (js.count("rec.p2p || rec.p2pOnchain || rec.p2pDeposito || rec.p2pPresa ? t.scambioP2P"), js.count("scambioP2P: 'Scambio P2P'"),
            js.count("scambioP2P: 'P2P trade'")))
 
 
@@ -182888,8 +182889,10 @@ def prove_deposito_ln_p2p():
           "muto e' un 503", (True, True),
           ("in_volo = await p2p_onchain_deposito_ln_in_volo(oid)" in ann,
            "if in_volo is None:\n            raise HTTPException(503" in ann))
+    # EMENDATA (1 nov 2026, caso 4): la ronda sceglie fra l'avviso del
+    # cambio prima della presa e `_avviso_ritiro_p2p`
     prova("la ronda ha le parole e il bottone del deposito", (True, True),
-          ("testo, bottone = _avviso_ritiro_p2p(r)" in pezzo("ronda_cambi_p2p"),
+          ("testo, bottone = avviso if presa else _avviso_ritiro_p2p(r)" in pezzo("ronda_cambi_p2p"),
            "return _testo_deposito_ln_p2p(r), (P2P_BOTTONE_DEPOSITO_LN, dove)"
            in pezzo("_avviso_ritiro_p2p")))
     # --- il telefono
@@ -182916,6 +182919,74 @@ def prove_deposito_ln_p2p():
     prova("il giro vero sta nella gabbia e nella CI", (True, True),
           ("\ncollaudo_deposito_ln_p2p\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
            "\ncollaudo_deposito_ln_p2p.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
+
+
+def prove_presa_ln_p2p():
+    """VENDERE SU UN ORDINE P2P LIGHTNING AVENDO SOLO BITCOIN, CASO 4 (1 nov
+    2026, cantiere presa-altra-rete; Massimo: «fare casini con invoice on
+    hold può farti solo perdere i fondi»). Mai la hold invoice di Mostro
+    pagata da un cambio: prima un cambio bitcoin → Lightning verso una
+    richiesta NORMALE del suo wallet, poi la presa di sempre. Il giro vero,
+    server e telefono contro il cartone, e' `collaudo_presa_ln_p2p`; qui le
+    sentinelle."""
+    print("\n[P2P: vendere su un ordine Lightning avendo solo bitcoin]")
+    src = _SORGENTE.replace("\r\n", "\n")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    js = open(os.path.join("swap", "instradatore.js"), encoding="utf-8").read().replace("\r\n", "\n")
+    porta = pezzo("p2p_presa_cambio_per")
+    prova("il cancello: la leva della presa sull'altra rete E la strada bitcoin → "
+          "Lightning del Cambio", (True, True),
+          ("p2p_altra_rete_per(tg_id)" in porta, '"btc-ln" in cambio_strade()' in porta))
+    prova("la pagina lo legge in `swap_leve.p2p.presa`", True,
+          '"presa": p2p_presa_cambio_per(tg_id)' in pezzo("p2p_altra_rete_leve"))
+    for rotta in ('@app.get("/api/swap/p2p/presa/preventivo")',
+                  '@app.post("/api/swap/p2p/presa")'):
+        prova(f"la rotta {rotta[10:-1]} c'e', una volta", 1, src.count(rotta))
+    prev = pezzo("p2p_presa_preventivo")
+    prova("il preventivo e' il conto del submarine, coi tetti della presa sull'altra rete",
+          True, "preventivo_sub(cifra, tariffa, SWAP_MIN_SATS, P2P_ALTRA_RETE_MAX_SATS)" in prev)
+    big = pezzo("p2p_presa_biglietto")
+    prova("il biglietto: la forma dell'ordine del libro, i tetti, la tabella della tappa 1 "
+          "col nome «presa:<ordine>»", (True, True, True),
+          ("FORMA_ORDINE_P2P.fullmatch(ordine)" in big, "nome = p2p_presa_ordine(ordine)" in big,
+           "cambi_p2p_vivi(con, user[\"id\"], nome, adesso) >= P2P_CAMBI_PER_SCAMBIO" in big))
+    ronda = pezzo("ronda_cambi_p2p")
+    prova("la ronda: un cambio prima della presa ha i suoi stati e le sue parole",
+          (True, True),
+          ("avviso = _avviso_presa_p2p(r, stato) if presa else None" in ronda,
+           "finito = stato in P2P_PRESA_FINITI" in ronda))
+    av = pezzo("_avviso_presa_p2p")
+    prova("...l'avviso buono a richiesta pagata, quello del rimborso solo coi bitcoin "
+          "mandati (uno scaduto senza lockup non ha niente da rimandare)", (True, True),
+          ("if stato in P2P_PRESA_PAGATA:" in av,
+           'stato == "swap.expired" and str(r["visto"] or "") in P2P_PRESA_MANDATI' in av))
+    # --- il telefono
+    crea = pezzo_js(js, "async function swapCreaPerPresaP2PDentro(ordine, fattura, prima){", "\n}\n")
+    prova("il telefono: la richiesta del SUO wallet controllata, le tariffe rilette, il "
+          "biglietto PRIMA del cambio, un submarine verso quella richiesta", (True,) * 4,
+          ("f.fatturaValida(fattura, sats)" in crea,
+           "await leggiPreventivoPresaP2P(sats, f.id, prima.hash)" in crea,
+           crea.index("chiediBigliettoPresaP2P(") < crea.index("await f.creaSub("),
+           "f.creaSub({parole: seme.parole, indice: indice, preventivo: p, fattura: fattura})" in crea))
+    prova("...il rimborso si scrive nel Cambio (indirizzo vuoto), e il record non e' ne' "
+          "un ordine ne' uno scambio di Mostro", (True, False),
+          ("p2pPresa: ordine, indice: indice, seme: 'onchain',\n    indirizzo: ''" in crea,
+           (lambda r: " ordine:" in r or " p2p:" in r)(
+               crea[crea.index("Object.assign(nuovo, {"):crea.index("});", crea.index("Object.assign(nuovo, {"))])))
+    prova("MAI la hold invoice di Mostro dentro un cambio: il blocco non parla di "
+          "bolt11 dell'ordine ne' di add-invoice", (0, 0),
+          (crea.count("hold"), crea.count("bolt11")))
+    riga = pezzo_js(mini, "function rigaPresaOcP2P(o){", "\n}\n")
+    prova("il riquadro dice che Barattolo non tiene i sats e che, presa sfumata, restano "
+          "nel suo wallet", (True, True),
+          ("Barattolo non aggiunge niente e non tiene i tuoi sats" in riga,
+           "i sats restano tuoi, nel wallet" in riga))
+    det = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("...e c'e' solo per chi VENDEREBBE un ordine altrui, entrato", True,
+          "(tuo || compro || VETRINA || !myTgId || typeof rigaPresaOcP2P !== 'function'" in det)
+    prova("il giro vero sta nella gabbia e nella CI", (True, True),
+          ("\ncollaudo_presa_ln_p2p\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_presa_ln_p2p.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
 def prove_grafica_swap():
@@ -184623,7 +184694,7 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi, prove_swap_cella, prove_swap_preventivo, prove_leve_mai_doppie,
               prove_swap_telefono, prove_swap_fornitori, prove_swap_pagamento,
-              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p,
+              prove_grafica_swap, prove_cartone_submarine, prove_cambio_libero, prove_cambio_p2p, prove_cambio_onchain_p2p, prove_deposito_ln_p2p, prove_presa_ln_p2p,
               prove_margine_cassaforte,
               prove_quantita_servizi,
               prove_sintassi_client,
