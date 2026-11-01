@@ -18864,7 +18864,7 @@ const swapAcceso = () => !!(swapLeve && swapLeve.attivo);
    sempre. La versione e' l'inizio dello sha256 dei due file (righe LF):
    la controlla `prove_swap_telefono`, cosi' un file cambiato non resta
    nella cache vecchia di un giorno. */
-const SWAP_TELEFONO_VER = '9c2f660724';
+const SWAP_TELEFONO_VER = '4990292aec';
 const swapTelefonoPronto = () => typeof pannelloSwapTelefono === 'function';
 const SWAP_TIPI_FILE = ['boltz'];   // la lista chiusa, come sul server
 let swapTelefonoPromessa = null;
@@ -19146,6 +19146,57 @@ async function natoCambioAlServer(id, rec){
 async function liberaBigliettoCambio(id){
   try {
     const r = await fetch(`${API_BASE}/swap/cambio/${Number(id)}/annulla`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const j = await r.json().catch(() => null);
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+/* IL CAMBIO DI UNO SCAMBIO P2P (1 nov 2026, cantiere presa-altra-rete,
+   tappa 1): chi compra su un ordine Lightning riceve on-chain. Le stesse
+   tre chiamate del cambio libero, sulle rotte sue: il preventivo della
+   cifra che Mostro paghera' (senza la nostra fee: la fattura deve portare
+   quella cifra al sat), il BIGLIETTO prima di chiedere lo swap (con l'id
+   dello scambio), la nascita con le sole parti pubbliche (la ronda del
+   server ci manda l'avviso del ritiro). null = non si e' potuto chiedere. */
+async function leggiPreventivoCambioP2P(sats, fornitore, hash){
+  let d;
+  try {
+    const q = new URLSearchParams({sats: String(Number(sats) || 0)});
+    if (fornitore) q.set('fornitore', fornitore);
+    if (hash) q.set('hash', hash);
+    const r = await fetch(`${API_BASE}/swap/p2p/preventivo?${q.toString()}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => null);
+    if (!r.ok || !d) d = {ok: false, motivo: r.status === 403 ? 'spento' : 'non_risponde'};
+  } catch(e) { d = {ok: false, motivo: 'non_risponde'}; }
+  return d;
+}
+async function chiediBigliettoCambioP2P(d){
+  try {
+    const r = await fetch(`${API_BASE}/swap/p2p`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: String(d.ordine || ''), sats: Number(d.sats) || 0,
+        fornitore: d.fornitore || ''})});
+    const j = await r.json().catch(() => null);
+    if (r.status === 403) return {ok: false, motivo: 'spento'};
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+async function natoCambioP2PAlServer(id, rec){
+  try {
+    const r = await fetch(`${API_BASE}/swap/p2p/${Number(id)}/nato`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({swap_id: rec.id, impronta: rec.impronta,
+        indirizzo: rec.lockupAddress, onchain: rec.onchainAmount})});
+    const j = await r.json().catch(() => null);
+    return r.ok && j ? j : null;
+  } catch(e) { return null; }
+}
+async function liberaBigliettoCambioP2P(id){
+  try {
+    const r = await fetch(`${API_BASE}/swap/p2p/${Number(id)}/annulla`,
       {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
     const j = await r.json().catch(() => null);
     return r.ok && j ? j : null;
@@ -73013,6 +73064,9 @@ function apriIncassoP2P(){
   /* col wallet collegato la fattura la fa lui (16 set 2026): si chiede
      subito, e se non arriva il foglio a mano e' gia' sotto, con la
      ragione scritta */
+  /* (presa-altra-rete) chi ha gia' scelto on-chain non chiede al wallet:
+     si rilegge il conto del cambio */
+  if (p2pIncassoRete[id] === 'oc') { caricaCambioP2P(id); return; }
   if (walletNwcFattura()) fatturaDalWalletP2P(id);
 }
 /* quanto deve VIVERE la fattura chiesta al wallet: la vita dell'ordine
@@ -73398,7 +73452,14 @@ function renderIncassoP2P(){
     : '<div class="hint" style="margin-top:12px"><b>🧾 Oppure una fattura dal tuo wallet</b><br>' +
       'Senza importo' + (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') + '. ' +
       'Meglio se dura almeno un giorno: se scade prima te ne chiediamo un\'altra.</div>';
-  box.innerHTML =
+  /* (1 nov 2026, presa-altra-rete) CHI COMPRA PUO' RICEVERE ON-CHAIN:
+     sopra le due vie la scelta della rete, e con «₿ On-chain» il foglio
+     del cambio al posto di indirizzo e fattura (`corpoCambioIncassoP2P`).
+     Il perche' del pagamento fallito resta in cima: anche li' si puo'
+     ripartire col cambio. */
+  const conCambio = cambioP2PDisponibile(o);
+  const sceltaRete = conCambio ? sceltaReteIncassoP2P(p2pIncassoRete[o.id] === 'oc') : '';
+  const intro =
     (fallito
       ? '<div class="hint" style="color:var(--rosso-p2p-testo);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
         + '<div class="hint">Chi vende li ha liberati, ma il pagamento verso la richiesta che avevi dato non è andato a buon fine: '
@@ -73408,7 +73469,12 @@ function renderIncassoP2P(){
       : riserva
       ? '<div class="hint">Se i sats non ti sono arrivati, qui puoi dare una richiesta di pagamento nuova. '
         + 'Se il pagamento è ancora in corso ti viene risposto di no, e non cambia niente.</div>'
-      : '') +
+      : '');
+  if (conCambio && p2pIncassoRete[o.id] === 'oc') {
+    box.innerHTML = intro + sceltaRete + corpoCambioIncassoP2P(o, netto);
+    return;
+  }
+  box.innerHTML = intro + sceltaRete +
     vie +
     /* la scorciatoia sta SOTTO l'avviso, che cosi' vale anche per lei;
        l'indirizzo e' testo dell'utente: a schermo passa da esc(), e
@@ -73447,6 +73513,215 @@ function renderIncassoP2P(){
       '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tuonome@wallet.com oppure lnbc…"></div>' +
     '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
     '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>';
+}
+/* ---- RICEVERE ON-CHAIN COL CAMBIO (1 nov 2026, cantiere presa-altra-rete,
+   tappa 1; idea di Andrea del 30 ott: «la rete dell'annuncio dice come
+   paga chi pubblica, ma quando lo acquisti puoi sempre ricevere
+   dall'altra parte grazie allo swap») ----
+   Chi COMPRA su un ordine Lightning e ha solo un wallet bitcoin sceglie
+   «₿ On-chain» in cima al foglio: scrive il suo indirizzo, vede quanto
+   arriva e quanto costa il cambio, tocca «Invia». Il telefono fa nascere
+   il cambio di SATS Routing per la cifra ESATTA di Mostro
+   (`swapCreaPerP2P`, swap/instradatore.js) e manda la SUA fattura con
+   l'`add-invoice` di sempre, dopo le stesse guardie di una fattura
+   incollata: cifra, rete, scadenza, il controllo del server. Al rilascio
+   Mostro paga, il fornitore blocca i bitcoin, la sorveglianza dei cambi
+   li ritira; ad app chiusa il bot avvisa (la ronda del server). Mostro e
+   la cassaforte non cambiano. Il cancello lo dice il server
+   (`swap_leve.p2p`), e solo a chi compra, prima del rilascio o dopo un
+   pagamento fallito. */
+const p2pIncassoRete = {};    // scambio -> 'oc' quando chi compra ha scelto on-chain
+const p2pCambioPrev = {};     // scambio -> {dati, quando} (null mentre si legge)
+function cambioP2PDisponibile(o){
+  return !!o && o.lato === 'compro' && typeof swapP2PAcceso === 'function' && swapP2PAcceso()
+    && o.stato !== 'rilasciato' && o.stato !== 'pagamento_ritentato';
+}
+function sceltaReteIncassoP2P(oc){
+  return '<div style="display:flex;gap:8px;margin-bottom:12px" role="group" aria-label="Dove vuoi ricevere">' +
+    '<button class="btn ' + (oc ? 'ghost' : 'orange') + '" type="button" style="flex:1;margin:0" aria-pressed="' + !oc + '" ' +
+      'onclick="scegliReteIncassoP2P(\'ln\')">⚡ Lightning</button>' +
+    '<button class="btn ' + (oc ? 'orange' : 'ghost') + '" type="button" style="flex:1;margin:0" aria-pressed="' + oc + '" ' +
+      'onclick="scegliReteIncassoP2P(\'oc\')">₿ On-chain</button></div>';
+}
+function scegliReteIncassoP2P(rete){
+  const id = p2pIncassoOrdine;
+  if (!id) return;
+  haptic();
+  if (rete === 'oc') p2pIncassoRete[id] = 'oc';
+  else delete p2pIncassoRete[id];
+  renderIncassoP2P();
+  if (rete === 'oc') caricaCambioP2P(id);
+}
+/* il conto in una riga: quanto arriva, quanto costa il cambio; oppure il
+   perche' del no, nelle parole di chi compra */
+function contoCambioP2P(id, netto){
+  const p = p2pCambioPrev[id];
+  if (!p || !p.dati) return 'Calcolo quanto ricevi…';
+  const d = p.dati;
+  if (d.ok) {
+    const costo = Math.max(0, netto - Number(d.ricevi || 0));
+    return 'Ricevi circa <b>' + esc(fmt(d.ricevi)) + ' sats</b> sul tuo indirizzo bitcoin · costo del cambio ' + esc(fmt(costo)) + ' sats.';
+  }
+  return esc(percheCambioP2P(d));
+}
+function percheCambioP2P(d){
+  const m = (d && d.motivo) || '';
+  if (m === 'sotto_minimo') return 'Il cambio parte da ' + fmt(d.minimo || 0) + ' sats: questo scambio è troppo piccolo. Ricevi in Lightning.';
+  if (m === 'sopra_tetto') return 'Il cambio arriva al massimo a ' + fmt(d.massimo || 0) + ' sats: ricevi in Lightning.';
+  if (m === 'spento') return 'Il cambio non è disponibile.';
+  return 'Il cambio adesso non risponde: riprova fra poco, o ricevi in Lightning.';
+}
+function corpoCambioIncassoP2P(o, netto){
+  if (!(netto > 0))
+    return '<div class="hint">La cifra esatta qui non la sappiamo, e per il cambio serve: ricevi in Lightning.</div>';
+  return '<div class="hint">I tuoi <b>' + esc(fmt(netto)) + ' sats</b> partono in Lightning: il cambio di SATS Routing ' +
+      'li porta al tuo indirizzo bitcoin. Il costo del cambio lo paghi tu, Barattolo non aggiunge niente.</div>' +
+    '<div class="hint" id="p2pCambioConto">' + contoCambioP2P(o.id, netto) + '</div>' +
+    '<div class="hint">Al rilascio i bitcoin li ritira il tuo telefono: se l\'app è chiusa ti avvisiamo col bot, e basta aprirla.</div>' +
+    '<div class="field"><label>Il tuo indirizzo bitcoin</label>' +
+      '<input type="text" id="p2pIncassoOcInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="bc1…"></div>' +
+    '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
+    '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaCambioP2P()">Invia</button>';
+}
+/* il preventivo della cifra di Mostro, riletto se ha piu' del suo minuto */
+async function caricaCambioP2P(id){
+  const o = ordiniP2P()[id];
+  const netto = o ? satsDaRicevereP2P(o) : 0;
+  if (!o || !(netto > 0) || typeof swapPreventivoP2P !== 'function') return;
+  const p = p2pCambioPrev[id];
+  if (p && p.dati && p.dati.ok && Number(p.dati.dovuto) === netto
+      && Date.now() - p.quando < (Number(p.dati.valido_s) || 60) * 1000) return;
+  p2pCambioPrev[id] = null;
+  let d;
+  try { d = await swapPreventivoP2P(netto); } catch(e){ d = {ok: false, motivo: 'non_risponde'}; }
+  p2pCambioPrev[id] = {dati: d, quando: Date.now()};
+  const box = el('p2pCambioConto');
+  if (box && p2pIncassoOrdine === id) box.innerHTML = contoCambioP2P(id, netto);
+}
+/* (swap/instradatore.js) lo stato di un cambio e' cambiato: col foglio
+   aperto su quello scambio, il conto si rilegge */
+function ridisegnaCambioP2P(rec){
+  if (rec && p2pIncassoOrdine === rec.p2p && el('p2pCambioConto')) caricaCambioP2P(rec.p2p);
+}
+function fraseCambioP2P(e){
+  const t = (e && e.tipo) || '';
+  if (t === 'indirizzo') return 'Questo non è un indirizzo bitcoin valido.';
+  if (t === 'parole') return 'Prima di usare il cambio guarda le tue 12 parole: Profilo › «Il wallet di Barattolo».';
+  if (t === 'seme') return 'Non riesco a preparare la chiave del cambio: riprova.';
+  if (t === 'casa') return 'Questo telefono non riesce a salvare il cambio: libera un po\' di spazio e riprova.';
+  if (t === 'cambiata') return 'Il costo del cambio è appena cambiato: guarda le cifre nuove e tocca di nuovo «Invia».';
+  if (t === 'preventivo') return percheCambioP2P(e.dati);
+  if (t === 'mente') return 'Il cambio ha risposto con dati che non tornano: non è partito niente. Ricevi in Lightning.';
+  if (t === 'biglietto')
+    return e.motivo === 'troppi' ? 'Su questo scambio ci sono già troppi cambi aperti: ricevi in Lightning.'
+         : e.motivo === 'spento' ? 'Il cambio non è disponibile.'
+         : 'Barattolo non risponde: riprova fra poco.';
+  return 'Il cambio adesso non risponde: riprova fra poco, o ricevi in Lightning.';
+}
+/* UN CAMBIO GIA' NATO SI RIUSA: se la fattura non e' partita (la rete e'
+   caduta dopo la nascita) il tocco dopo manda la stessa, se porta ancora
+   la cifra giusta, va allo stesso indirizzo e vive abbastanza. Cosi' un
+   secondo tocco non fa nascere un secondo cambio. */
+/* il verdetto del server che si puo' forzare: «Usa comunque» rimanda la
+   STESSA fattura del cambio (riusata da `cambioP2PRiusabile`) */
+let p2pCambioFermo = '';
+const FERMO_CAMBIO_P2P = {avviso: 'p2pIncassoAvviso', comunque: 'usaComunqueCambioP2P()'};
+function usaComunqueCambioP2P(){
+  if (!p2pCambioFermo) return;
+  p2pFatturaComunque = p2pCambioFermo;
+  haptic();
+  inviaCambioP2P();
+}
+function cambioP2PRiusabile(id, deve, indirizzo){
+  const rec = typeof swapDiP2P === 'function' ? swapDiP2P(id) : null;
+  if (!rec || typeof swapFase !== 'function' || swapFase(rec) !== 'creato') return null;
+  const b = leggiBolt11(String(rec.invoice || ''));
+  if (!b || b.sats !== deve || rec.indirizzo !== indirizzo) return null;
+  return b.scade >= Math.floor(Date.now() / 1000) + finestraFatturaP2P() ? rec : null;
+}
+async function inviaCambioP2P(){
+  const o = ordiniP2P()[p2pIncassoOrdine];
+  const inp = el('p2pIncassoOcInp');
+  if (!o || !inp) return;
+  const av = el('p2pIncassoAvviso');
+  const dillo = m => { if (av) { av.textContent = m; av.style.display = ''; } };
+  const deve = satsDaRicevereP2P(o);
+  if (!(deve > 0)) { dillo('La cifra esatta qui non la sappiamo: ricevi in Lightning.'); return; }
+  const p = p2pCambioPrev[o.id];
+  if (!p || !p.dati) { dillo('Aspetta un attimo: sto calcolando quanto ricevi.'); return; }
+  if (!p.dati.ok) { dillo(percheCambioP2P(p.dati)); return; }
+  const scritto = String(inp.value || '').trim();
+  if (!scritto) { dillo('Prima scrivi il tuo indirizzo bitcoin.'); return; }
+  const indirizzo = typeof swapEstraiIndirizzo === 'function' ? swapEstraiIndirizzo(scritto) : '';
+  if (!indirizzo) { dillo('Questo non è un indirizzo bitcoin valido.'); return; }
+  haptic();
+  let rec = cambioP2PRiusabile(o.id, deve, indirizzo);
+  if (!rec) {
+    const ripS = attesaP2P('Preparo il cambio…', el('p2pIncassoBtn'));
+    try {
+      rec = await swapCreaPerP2P({ordine: o.id, sats: deve, indirizzo: indirizzo, preventivo: p.dati});
+    } catch(e){
+      if (e && e.tipo === 'doppio') return;
+      /* le cifre nuove si mostrano: un prezzo cambiato non parte di nascosto */
+      if (e && (e.tipo === 'cambiata' || e.tipo === 'preventivo') && e.dati) {
+        p2pCambioPrev[o.id] = {dati: e.dati, quando: Date.now()};
+        const box = el('p2pCambioConto');
+        if (box) box.innerHTML = contoCambioP2P(o.id, deve);
+      }
+      dillo(fraseCambioP2P(e));
+      return;
+    } finally { ripS(); }
+  }
+  /* LE GUARDIE DI UNA FATTURA INCOLLATA, sulla fattura del cambio: la
+     cifra, la rete, la finestra del coordinatore; una piu' corta del
+     consiglio parte, e lo si dice */
+  const bolt = String(rec.invoice || '').trim();
+  const b = leggiBolt11(bolt);
+  if (!b || b.sats !== deve) { dillo('Il cambio ha fatto una fattura che non torna: non è partito niente. Ricevi in Lightning.'); return; }
+  const altraRete = avvisoReteBolt11(bolt);
+  if (altraRete) { dillo(altraRete); return; }
+  const adesso = Math.floor(Date.now() / 1000);
+  if (b.scade < adesso + finestraFatturaP2P()) { dillo('La fattura del cambio scade troppo presto per questo scambio: ricevi in Lightning.'); return; }
+  const corta = b.scade < adesso + vitaMinimaFatturaP2P(o);
+  const ripC = attesaP2P('Controllo che sia pagabile…', el('p2pIncassoBtn'));
+  let fermo = null;
+  try {
+    fermo = typeof controlloFatturaP2P === 'function' ? await controlloFatturaP2P(o, bolt) : null;
+  } finally { ripC(); }
+  if (fermo) { p2pCambioFermo = bolt; mostraFermoFatturaP2P(fermo, FERMO_CAMBIO_P2P); return; }
+  const rip = attesaP2P('Mando dove ricevere i sats…', el('p2pIncassoBtn'));
+  try {
+    if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(o.id, 'fattura_inviata');
+    await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]});
+    ricordaFatturaP2P(o.id, b.scade);
+    chiudiFoglioP2P('p2pIncassoSheet');
+    p2pIncassoOrdine = '';
+    const torna = typeof dopoGestoP2P === 'function' && await dopoGestoP2P(o.id);
+    if (corta) toast(avvisoFatturaCortaP2P(b.scade, Math.floor(Date.now() / 1000)), 8000);
+    else if (!torna) toast('₿ Fatto: al rilascio i bitcoin arrivano al tuo indirizzo');
+  } catch(e) {
+    if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, o.id)) {
+      chiudiFoglioP2P('p2pIncassoSheet');
+      p2pIncassoOrdine = '';
+      if (typeof dopoGestoRilettoP2P === 'function')
+        dopoGestoRilettoP2P(o.id, fatturaPassataP2P).catch(() => {});
+      return;
+    }
+    if (e && e.cantDo && typeof segnaTentativoP2P === 'function')
+      segnaTentativoP2P(o.id, 'fattura_rifiutata', e.motivo);
+    dillo((typeof fraseRifiutoIncassoP2P === 'function' && fraseRifiutoIncassoP2P(e, bolt, o)) || ragioneGestoP2P(e));
+    /* la risposta in ritardo: la fattura puo' essere gia' arrivata, come
+       per quella incollata */
+    if (e && e.silenzio && typeof riallineaScambioP2P === 'function')
+      riallineaScambioP2P(o.id, 'attesa').then(mosso => {
+        const agg = ordiniP2P()[o.id];
+        if (mosso && agg && agg.stato !== 'attesa_mia_fattura' && p2pIncassoOrdine === o.id) {
+          chiudiFoglioP2P('p2pIncassoSheet');
+          p2pIncassoOrdine = '';
+          toast('La fattura era già arrivata: scambio aggiornato ✅');
+        }
+      }).catch(() => {});
+  } finally { rip(); }
 }
 /* la scorciatoia SCRIVE nel campo e basta: a mandare resta «Invia»,
    cosi' l'indirizzo si puo' ancora correggere per questo solo scambio */

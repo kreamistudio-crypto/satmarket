@@ -34517,6 +34517,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   manca; `onchainRilascioDaFirmare(o)` e `onchainCofirmeInAttesa` firmano
   la proposta da soli dopo la scelta; `pannelloOnchainOrdine` dice a chi
   vende «non hai ancora scelto» col bottone al cassetto `accOnchainIncasso`.
+- CHI COMPRA SU UN ORDINE P2P LIGHTNING RICEVE ON-CHAIN (1 nov 2026,
+  cantiere presa-altra-rete, tappa 1; perché in CANTIERI, «Ricevere
+  on-chain da un ordine P2P Lightning col cambio»). Leve
+  `P2P_ALTRA_RETE_ATTIVO` (False), `P2P_ALTRA_RETE_SOLO_MODERATORI`
+  (True), `P2P_ALTRA_RETE_MAX_SATS` (500.000); giudice per persona
+  `p2p_altra_rete_per` (sopra `swap_per`), busta `/api/me.swap_leve.p2p`
+  (`p2p_altra_rete_leve`: attivo, minimo, massimo), tre righe nel
+  pannello. Tabella `cambi_p2p` (nasce da sola, `_cambi_p2p_prepara`):
+  tg_id, ordine (lo scambio di Mostro), sats, fornitore, swap_id unico,
+  impronta, indirizzo, stato `chiesto|nato|annullato|finito`, visto,
+  avvisato. Rotte: `GET /api/swap/p2p/preventivo` (`preventivo_swap` con
+  fee 0: la fattura porta la cifra di Mostro al sat), `POST /api/swap/p2p`
+  (biglietto, `FORMA_ORDINE_P2P`, al più `P2P_CAMBI_PER_SCAMBIO` = 3 vivi),
+  `POST …/{cid}/nato` e `…/{cid}/annulla`. `ronda_cambi_p2p`
+  (`orologio_cambi_p2p`, avviata da `avvia_cambi_p2p`): `swap_stato_di`
+  sui cambi nati degli ultimi 8 giorni; su `transaction.mempool|confirmed`
+  UN avviso del bot col bottone «₿ Ritira i tuoi bitcoin»
+  (`_testo_ritiro_p2p`), sugli stati finali il biglietto è `finito`.
+  Telefono: `swap/instradatore.js` §6d (`swapP2PAcceso`,
+  `swapPreventivoP2P`, `swapCreaPerP2P`: indirizzo, preventivo rifatto con
+  l'impronta, fattura = sats al sat, 12 parole già mostrate, record con
+  `p2p` e senza `ordine`, poi `swapSorveglia`); `miniapp.html`
+  (`sceltaReteIncassoP2P`, `corpoCambioIncassoP2P`, `inviaCambioP2P` →
+  `add-invoice` di sempre). Mostro non sa niente del cambio.
 - CHI VENDE ON-CHAIN RICEVE IN LIGHTNING (28 ott 2026, cantiere
   onchain-verso-lightning; perché in CANTIERI, «Chi vende on-chain riceve
   in Lightning»). La leva `ONCHAIN_INCASSO_LN_ATTIVO` (False) e il giudice

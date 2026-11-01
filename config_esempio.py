@@ -820,6 +820,18 @@ CAMBIO_LIBERO_MAX_AL_GIORNO = 5
 # commissione finale; nessun limite di chiamate, solo il minimo e il
 # massimo dell'importo). Si accende quando decide Andrea.
 CAMBIO_BTC_LN_ATTIVO = False
+# Prendere un ordine P2P Lightning e ricevere on-chain (1 nov 2026,
+# cantiere presa-altra-rete, tappa 1): chi COMPRA sats su un ordine di
+# Mostro sceglie «₿ On-chain» nel foglio «Dove ricevere i sats»; a Mostro
+# parte la fattura di un cambio di SATS Routing nato dal suo telefono, e
+# al rilascio i bitcoin arrivano al suo indirizzo (il costo del cambio lo
+# paga solo lui, Barattolo non aggiunge niente). Mostro non cambia, la
+# cassaforte non c'entra. Vuole SWAP_ATTIVO. Nasce SPENTA; a leva accesa,
+# di serie la vedono solo i moderatori. Il massimo e' per cambio (il
+# minimo e' SWAP_MIN_SATS).
+P2P_ALTRA_RETE_ATTIVO = False
+P2P_ALTRA_RETE_SOLO_MODERATORI = True
+P2P_ALTRA_RETE_MAX_SATS = 500_000
 # Chi vende on-chain riceve in Lightning (28 ott 2026, cantiere
 # onchain-verso-lightning): allo sblocco i bitcoin del 2-di-3 vanno a un
 # cambio bitcoin → Lightning di SATS Routing, con la fattura di chi

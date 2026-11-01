@@ -4929,6 +4929,25 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   annullo del biglietto non hanno cancello, il ritiro e il rimborso
   sono del telefono con le 12 parole).
 
+- IL P2P SULL'ALTRA RETE: LE LEVE (1 nov 2026, cantiere
+  presa-altra-rete, tappa 1: ordine Lightning, chi compra riceve
+  on-chain; perché in CANTIERI, «Ricevere on-chain da un ordine P2P
+  Lightning col cambio»; com'è fatta in ARCHITETTURA, «CHI COMPRA SU UN
+  ORDINE P2P LIGHTNING RICEVE ON-CHAIN»). SUL VPS NON CAMBIA NIENTE: le
+  tre leve sono spente di serie e non compaiono da sole nel config
+  (`P2P_ALTRA_RETE_ATTIVO` False, `P2P_ALTRA_RETE_SOLO_MODERATORI` True,
+  `P2P_ALTRA_RETE_MAX_SATS` 500.000). Il cancello sta SOPRA quello dello
+  swap: senza `SWAP_ATTIVO` (oggi spenta) la scelta «₿ On-chain» non
+  compare comunque. La tabella `cambi_p2p` nasce da sola. PER ACCENDERE
+  (decisione di Andrea, in quest'ordine): `SWAP_ATTIVO = True` con le sue
+  regole, poi `P2P_ALTRA_RETE_ATTIVO = True` e riavvio, lasciando
+  `P2P_ALTRA_RETE_SOLO_MODERATORI` a True (Andrea e Alan, cifre piccole);
+  a tutti solo dopo il parere MiCA. Prima, una prova sul collaudo col
+  SATS Routing di cartone. Il controllo, sola lettura: `grep -n
+  "^P2P_ALTRA_RETE" /srv/barattolo/config.py` (atteso oggi: niente).
+  PER SPEGNERE: via la riga e riavvio; i cambi già nati finiscono dal
+  telefono, e la ronda dell'avviso continua a guardarli.
+
 - LA CHIAVE DI BARATTOLO DELL'ON-CHAIN (27 ott 2026, cantiere
   onchain-disputa; com'è fatta in ARCHITETTURA, «LA DISPUTA ON-CHAIN E
   LA CHIAVE DI BARATTOLO SUL VPS»). NASCE DAL PANNELLO, MAI DA UN
