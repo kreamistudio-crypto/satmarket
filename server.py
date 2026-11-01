@@ -44891,10 +44891,76 @@ async def leggi_busta_ritiro(ordine_id: int,
             "correzioni": o["busta_correzioni"]}
 
 
+# IL DOCUMENTO SCARICATO DA TELEGRAM (1 nov 2026, dal campo: un
+# compratore su GrapheneOS tocca «Apri il documento», legge «Documento
+# scaricato» e il PDF non c'e' da nessuna parte). La pagina scaricava i
+# byte con la sua fetch e poi cliccava un `<a download>` su un URL
+# `blob:` — e la WebView Android di Telegram quei link non li salva:
+# nessun errore, nessun file. La strada che su Android regge c'e' gia'
+# ed e' quella dell'export: `tg.downloadFile`, cioe' il download lo fa
+# la APP di Telegram. Ma la app bussa SENZA il nostro header, quindi
+# serve un BIGLIETTO: lo chiede la pagina (POST, autenticata), vale 5
+# minuti, e il GET dei byte lo accetta al posto di initData.
+# LE REGOLE NON SI COPIANO, SI RIUSANO: il POST chiama la rotta dei
+# byte vera prima di staccare il biglietto (chi non potrebbe leggerli
+# non riceve un link, e l'errore — «rivela prima», 404, 503 — torna
+# alla pagina, che lo dice, invece di finire in un download muto), e il
+# GET col biglietto rifa' TUTTI i controlli col tg_id del biglietto.
+# Il biglietto e' legato a UN ordine e a UN allegato: quello della
+# busta non apre il contenuto, e viceversa. NON e' monouso, per la
+# stessa lezione dell'export (HEAD di sonda, poi GET, a volte a range).
+
+BIGLIETTI_ALLEGATI: dict[str, tuple[int, int, str, float]] = {}
+# biglietto -> (tg_id, ordine_id, allegato, scadenza);
+# allegato e' "busta" o "contenuto"
+
+
+def _stacca_biglietto_allegato(tg_id: int, ordine_id: int,
+                               allegato: str) -> str:
+    adesso = time.time()
+    for b in [b for b, v in BIGLIETTI_ALLEGATI.items() if v[3] < adesso]:
+        BIGLIETTI_ALLEGATI.pop(b, None)
+    while len(BIGLIETTI_ALLEGATI) >= 1000:
+        BIGLIETTI_ALLEGATI.pop(next(iter(BIGLIETTI_ALLEGATI)))
+    biglietto = secrets.token_urlsafe(32)
+    BIGLIETTI_ALLEGATI[biglietto] = (tg_id, ordine_id, allegato,
+                                     adesso + 300)
+    return biglietto
+
+
+def _utente_dal_biglietto(biglietto: str, ordine_id: int,
+                          allegato: str) -> dict:
+    """Chi bussa col biglietto e' chi l'ha chiesto, e solo per QUELL'
+    ordine e QUELL'allegato. Scaduto, sconosciuto o d'un altro
+    allegato: lo stesso 410, che non insegna niente a chi tira a
+    indovinare."""
+    dati = BIGLIETTI_ALLEGATI.get(biglietto)
+    if (not dati or dati[3] < time.time() or dati[1] != ordine_id
+            or dati[2] != allegato):
+        if dati and dati[3] < time.time():
+            BIGLIETTI_ALLEGATI.pop(biglietto, None)
+        raise HTTPException(410, "Link scaduto: riapri il documento "
+                                 "dall'ordine")
+    return {"id": dati[0]}
+
+
+@app.post("/api/orders/{ordine_id}/busta-ritiro/biglietto")
+async def biglietto_documento_busta(ordine_id: int,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    await leggi_documento_busta(ordine_id, x_tg_init_data=x_tg_init_data,
+                                barattolo_sessione=barattolo_sessione)
+    return {"biglietto": _stacca_biglietto_allegato(user["id"], ordine_id,
+                                                    "busta")}
+
+
 @app.get("/api/orders/{ordine_id}/busta-ritiro/file")
+@app.head("/api/orders/{ordine_id}/busta-ritiro/file")   # la sonda di Telegram
 async def leggi_documento_busta(ordine_id: int,
                                 x_tg_init_data: str = Header(""),
-                                barattolo_sessione: str = Cookie("")):
+                                barattolo_sessione: str = Cookie(""),
+                                biglietto: str = ""):
     """I byte del documento di ritiro, decifrati al volo. NON e' un
     file statico e non lo diventera' mai: chi ha questo documento
     RITIRA IL PACCO, quindi non esiste un URL che funzioni senza dire
@@ -44904,8 +44970,12 @@ async def leggi_documento_busta(ordine_id: int,
     Le regole sono quelle della busta, riga per riga: SOLO le due
     parti, il moderatore MAI, e l'autorizzazione PRIMA dell'esistenza
     perche' l'estraneo non impari niente. GET PURO come il gemello:
-    aprire il documento non e' una ricevuta."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    aprire il documento non e' una ricevuta.
+    Col `biglietto` (il download chiesto alla app di Telegram) chi
+    bussa e' chi l'ha staccato: le guardie qui sotto sono le stesse."""
+    user = (_utente_dal_biglietto(biglietto, ordine_id, "busta")
+            if biglietto else verifica_utente(x_tg_init_data,
+                                              barattolo_sessione))
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND "
                     "(compratore_id=? OR venditore_id=?)",
@@ -44927,11 +44997,13 @@ async def leggi_documento_busta(ordine_id: int,
         raise HTTPException(503, "Il documento non si riesce ad aprire: "
                                  "chiedi al venditore di ricaricarlo")
     etichetta = _etichetta_documento(o["busta_file_nome"], "pdf")
+    # col biglietto e' un download chiesto apposta: «attachment»
+    modo = "attachment" if biglietto else "inline"
     return Response(
         content=raw,
         media_type=o["busta_file_tipo"] or "application/octet-stream",
         headers={"Content-Disposition":
-                 f'inline; filename="{etichetta}"',
+                 f'{modo}; filename="{etichetta}"',
                  "Cache-Control": "no-store, private",
                  # il documento non e' MAI una pagina: se un domani
                  # ci finisse dentro un SVG o un HTML travestito, il
@@ -45515,10 +45587,26 @@ async def leggi_contenuto_digitale(ordine_id: int,
             "correzioni": o["contenuto_correzioni"]}
 
 
+@app.post("/api/orders/{ordine_id}/contenuto/biglietto")
+async def biglietto_foto_contenuto(ordine_id: int,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """Il gemello del biglietto della busta (vedi «IL DOCUMENTO
+    SCARICATO DA TELEGRAM»): le regole le applica la rotta dei byte
+    vera, chiamata prima di staccarlo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    await leggi_foto_contenuto(ordine_id, x_tg_init_data=x_tg_init_data,
+                               barattolo_sessione=barattolo_sessione)
+    return {"biglietto": _stacca_biglietto_allegato(user["id"], ordine_id,
+                                                    "contenuto")}
+
+
 @app.get("/api/orders/{ordine_id}/contenuto/file")
+@app.head("/api/orders/{ordine_id}/contenuto/file")   # la sonda di Telegram
 async def leggi_foto_contenuto(ordine_id: int,
                                x_tg_init_data: str = Header(""),
-                               barattolo_sessione: str = Cookie("")):
+                               barattolo_sessione: str = Cookie(""),
+                               biglietto: str = ""):
     """I byte della foto del contenuto, decifrati al volo. Le regole
     sono quelle del documento di ritiro riga per riga — niente
     cartella montata (regola ferrea 3), niente nome indovinabile,
@@ -45535,8 +45623,12 @@ async def leggi_foto_contenuto(ordine_id: int,
     compratore ce l'ha gia' in /api/orders, e negarlo sarebbe una
     bugia inutile.
     GET PURO come i gemelli: guardare la foto non e' una seconda
-    ricevuta — quella l'ha gia' fatta la rivelazione."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    ricevuta — quella l'ha gia' fatta la rivelazione.
+    Col `biglietto` (il download chiesto alla app di Telegram) chi
+    bussa e' chi l'ha staccato: le guardie qui sotto sono le stesse."""
+    user = (_utente_dal_biglietto(biglietto, ordine_id, "contenuto")
+            if biglietto else verifica_utente(x_tg_init_data,
+                                              barattolo_sessione))
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=?",
                     (ordine_id,)).fetchone()
@@ -45562,10 +45654,12 @@ async def leggi_foto_contenuto(ordine_id: int,
         raise HTTPException(503, "L'immagine non si riesce ad aprire: "
                                  "chiedi al venditore di ricaricarla")
     etichetta = _etichetta_documento(o["contenuto_file_nome"], "jpg")
+    # col biglietto e' un download chiesto apposta: «attachment»
+    modo = "attachment" if biglietto else "inline"
     return Response(
         content=raw,
         media_type=o["contenuto_file_tipo"] or "application/octet-stream",
-        headers={"Content-Disposition": f'inline; filename="{etichetta}"',
+        headers={"Content-Disposition": f'{modo}; filename="{etichetta}"',
                  "Cache-Control": "no-store, private",
                  # non e' MAI una pagina: se un domani ci finisse dentro
                  # un SVG o un HTML travestito, il browser non deve

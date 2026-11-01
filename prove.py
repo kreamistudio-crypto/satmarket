@@ -9661,14 +9661,19 @@ def prove_busta_ritiro():
     # aprirla e rileggerla per correggerla sono GET puri, come il
     # collegamento del servizio. La sola lettura che NON sta qui e' la
     # rivelazione del codice digitale, dove leggere E' la ricevuta.
+    # UNDICI dal 1 nov 2026: `allegatoDaTelegram` chiede il biglietto
+    # per far scaricare il documento dell'ordine alla app di Telegram;
+    # e' la stessa LETTURA di apriDocBusta/apriFotoContenuto (il
+    # biglietto vive in memoria e scade da solo, nessuna riga scritta).
     # DIECI dal 14 set 2026: `passaAlContoDalFoglioP2P` chiede al
     # coordinatore com'e' andata davvero PRIMA di giudicare se il
     # passaggio di profilo si puo' fare. E' una lettura, e la cosa che
     # non torna indietro sta dietro la conferma — e' li' che il secondo
     # tocco trova la sua guardia, non qui.
-    prova("l'attesa ritardata la chiamano solo le dieci LETTURE",
+    prova("l'attesa ritardata la chiamano solo le undici LETTURE",
           {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
            "apriDocBusta", "mostraAccesso", "passaAlContoDalFoglioP2P",
+           "allegatoDaTelegram",
            "apriFotoContenuto", "apriCorrezioneContenuto",
            # l'email per il corriere (ago 2026): due LETTURE, e la sua
            # SCRITTURA (mandaEmailCorriere) sta apposta fuori — le due
@@ -10291,6 +10296,83 @@ def prove_busta_ritiro():
     prova("aprire il documento non scrive NIENTE (non e' una ricevuta)",
           dump, [tuple(x) for x in vero.execute(
               "SELECT * FROM ordini ORDER BY id")])
+    # --- IL BIGLIETTO DELLA APP DI TELEGRAM (1 nov 2026) ------------
+    # dal campo: GrapheneOS, «Documento scaricato» e nessun file — il
+    # `<a download>` su un `blob:` la WebView Android non lo salva.
+    # Dentro Telegram il PDF lo scarica la app, che bussa SENZA il
+    # nostro header: il biglietto e' l'unica porta nuova sulla
+    # credenziale di ritiro, quindi la si gira per davvero.
+    biglietti = {}
+
+    def _amb_big(chi, header_vero=True):
+        amb = _amb(chi)
+        amb["Response"] = _Resp
+        amb["BIGLIETTI_ALLEGATI"] = biglietti
+        if not header_vero:
+            # chi bussa col biglietto NON passa dall'header: se la rotta
+            # lo chiedesse lo stesso, qui esploderebbe
+            def _niente(h, s):
+                raise _H(401, "header chiesto")
+            amb["verifica_utente"] = _niente
+        for n in ("_stacca_biglietto_allegato", "_utente_dal_biglietto"):
+            exec(pezzo(n), amb)
+        exec("async " + pezzo("leggi_documento_busta"), amb)
+        exec("async " + pezzo("biglietto_documento_busta"), amb)
+        return amb
+
+    def stacca(chi, oid):
+        return corri(_amb_big(chi), "biglietto_documento_busta", oid)
+
+    def _sincrono(f, *a):
+        try:
+            return f(*a)
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def col_biglietto(oid, b):
+        return corri(_amb_big(0, header_vero=False),
+                     "leggi_documento_busta", oid, "", "", b)
+
+    st = stacca(111, 1)
+    prova("il compratore stacca un biglietto", True,
+          isinstance(st, dict) and len(st.get("biglietto", "")) > 30)
+    b1 = st["biglietto"] if isinstance(st, dict) else ""
+    r = col_biglietto(1, b1)
+    prova("...e col biglietto, SENZA header, arrivano i byte veri", True,
+          isinstance(r, _Resp) and r.content == veri)
+    prova("...come download («attachment»), sempre senza cache", True,
+          isinstance(r, _Resp)
+          and r.headers["Content-Disposition"].startswith("attachment;")
+          and "no-store" in r.headers["Cache-Control"])
+    prova("senza biglietto resta «inline» (il PC e il sito di oggi)", True,
+          byte(111, 1).headers["Content-Disposition"].startswith("inline;"))
+    prova("il biglietto NON e' monouso: la sonda e poi il GET", True,
+          isinstance(col_biglietto(1, b1), _Resp))
+    prova("l'estraneo non stacca niente, e non resta un biglietto", True,
+          stacca(999, 1) == "400 Operazione non permessa"
+          and len(biglietti) == 1)
+    prova("...l'ordine senza documento nemmeno: il 404 torna alla pagina",
+          True, str(stacca(111, 2)).startswith("404")
+          and len(biglietti) == 1)
+    prova("il biglietto apre UN ordine: su un altro e' scaduto", True,
+          str(col_biglietto(2, b1)).startswith("410"))
+    prova("...e UN allegato: quello della busta non apre il contenuto",
+          True, str(_sincrono(_amb_big(0)["_utente_dal_biglietto"],
+                              b1, 1, "contenuto")).startswith("410"))
+    prova("un biglietto inventato e' lo stesso 410", True,
+          str(col_biglietto(1, "inventato")).startswith("410"))
+    biglietti[b1] = biglietti[b1][:3] + (_t.time() - 1,)
+    prova("dopo 5 minuti scade, e se ne va", (True, False),
+          (str(col_biglietto(1, b1)).startswith("410"), b1 in biglietti))
+    b2 = stacca(111, 1)["biglietto"]
+    vero.execute("UPDATE ordini SET compratore_id=333 WHERE id=1")
+    vero.commit()
+    prova("i controlli si RIFANNO al download: chi non e' piu' parte "
+          "non legge", "400 Operazione non permessa", col_biglietto(1, b2))
+    vero.execute("UPDATE ordini SET compratore_id=111 WHERE id=1")
+    vero.commit()
+    biglietti.clear()
+
     # il file sparito da sotto: si dice, non si consegnano byte rotti
     _os.remove(_os.path.join(buste_dir, vero.execute(
         "SELECT busta_file FROM ordini WHERE id=1").fetchone()[0]))
@@ -38513,7 +38595,11 @@ def prove_onion():
                     "\n}\n")
     prova("...e il secondo e' proprio nel collegamento firmato", True,
           "['relay', location.origin]" in _ecf)
-    prova("...e i due URL di export/modello anche", 2,
+    # (1 nov 2026) IL TERZO e' il documento allegato all'ordine
+    # scaricato dalla app di Telegram (`allegatoDaTelegram`): come
+    # l'export, e' un URL per il downloader di QUESTA app, non un link
+    # da dare a qualcun altro — e dentro Telegram onion non c'e'.
+    prova("...e i tre URL di export/modello/allegato anche", 3,
           mini.count("${location.origin}${API_BASE}"))
     # E IL CENSIMENTO: nel CODICE del client `location.origin` resta
     # in SEI posti — il ripiego del giudice, i due tag relay del
@@ -38557,7 +38643,9 @@ def prove_onion():
             _vive.append(_r.strip())
     prova("...il sesto e' il portinaio, che confronta e non condivide",
           True, "origine: location.origin, avviso: avvisoRiprovo}));" in mini)
-    prova("...e nel codice non ne restano altri in giro", 6, len(_vive))
+    # SETTE dal 1 nov 2026: il settimo e' l'URL del documento allegato
+    # che scarica la app di Telegram (vedi il terzo qui sopra)
+    prova("...e nel codice non ne restano altri in giro", 7, len(_vive))
 
     # --- 4) il login Telegram non si offre su onion ----------------
     # Il Login Widget funziona SOLO sul dominio registrato con
@@ -176327,6 +176415,141 @@ console.log(JSON.stringify(out));
 """
 
 
+def prove_allegati_da_telegram():
+    """IL DOCUMENTO DELL'ORDINE SCARICATO DALLA APP DI TELEGRAM (1 nov
+    2026, dal campo: un compratore su GrapheneOS tocca «Apri il
+    documento», legge «Documento scaricato» e il PDF non c'e' ne' in
+    Download ne' fra i download di Telegram). Il `<a download>` su un
+    URL `blob:` nella WebView Android non salva niente e non da'
+    errore, e il toast partiva comunque. La cura: dentro Telegram
+    recente lo scarica la app (`tg.downloadFile`) con un biglietto di 5
+    minuti; il toast solo se la app dice si'. Il biglietto lato server
+    lo gira per davvero `prove_busta_ritiro`; qui il gemello del
+    contenuto (sentinelle) e il client, eseguito in node."""
+    print("\n[il documento dell'ordine scaricato dalla app di Telegram]")
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- il server: il gemello del contenuto ------------------------
+    _lf = codice(pezzo("leggi_foto_contenuto"))
+    _bc = codice(pezzo("biglietto_foto_contenuto"))
+    _bb = codice(pezzo("biglietto_documento_busta"))
+    prova("il contenuto accetta il biglietto SUO, non quello della busta",
+          True, '_utente_dal_biglietto(biglietto, ordine_id, "contenuto")'
+          in _lf)
+    prova("...e senza biglietto chiede l'header come sempre", True,
+          "if biglietto else verifica_utente(x_tg_init_data," in _lf)
+    for nome, corpo, rotta in (("contenuto", _bc, "leggi_foto_contenuto"),
+                               ("busta", _bb, "leggi_documento_busta")):
+        prova(f"il biglietto del{'' if nome == 'contenuto' else 'la'} "
+              f"{nome} si stacca DOPO la rotta vera dei byte", True,
+              f"await {rotta}(" in corpo
+              and corpo.index(f"await {rotta}(")
+              < corpo.index("_stacca_biglietto_allegato("))
+    for rotta in ("contenuto", "busta-ritiro"):
+        prova(f"la sonda HEAD di Telegram trova /{rotta}/file", True,
+              f'@app.head("/api/orders/{{ordine_id}}/{rotta}/file")'
+              in _SORGENTE)
+    prova("col biglietto il contenuto esce come download", True,
+          'modo = "attachment" if biglietto else "inline"' in _lf)
+    prova("il biglietto vale 5 minuti e la scorta ha un tetto", True,
+          "adesso + 300)" in pezzo("_stacca_biglietto_allegato")
+          and ">= 1000" in pezzo("_stacca_biglietto_allegato"))
+
+    # --- il client: le due porte e la scritta -----------------------
+    _af = pezzo_js(mini, "async function apriFotoContenuto(btn){", "\n}\n")
+    _ab = pezzo_js(mini, "async function apriDocBusta(btn){", "\n}\n")
+    for nome, corpo, rotta in (("contenuto", _af, "/contenuto`"),
+                               ("documento di ritiro", _ab,
+                                "/busta-ritiro`")):
+        prova(f"{nome}: dentro Telegram il PDF lo chiede alla app, PRIMA "
+              "del blob", True,
+              "scaricaConTelegram()" in corpo and rotta in corpo
+              and corpo.index("allegatoDaTelegram(")
+              < corpo.index("URL.createObjectURL"))
+        prova(f"{nome}: l'immagine resta in pagina", True,
+              "if (!(" in corpo and "startsWith('image/') && "
+              "scaricaConTelegram())" in corpo)
+    _bf = pezzo_js(mini, "function bloccoFotoContenuto(o, c){", "\n}\n")
+    prova("un PDF non si chiama piu' «un'immagine»", True,
+          "${immagine?'un\\'immagine':'un documento'}" in _bf)
+
+    _node = _sh.which("node")
+    if not _node:
+        salta("allegatoDaTelegram eseguito", "node non installato")
+        return
+    _i = mini.index("function scaricaConTelegram(){")
+    _j = mini.index("\n}\n", mini.index("async function allegatoDaTelegram(")) + 3
+    _prog = r"""
+const giro = [];
+let toasts, chiamate, risposta, esito;
+const location = {origin: 'https://barattolo.store'};
+const API_BASE = '/api';
+const authHdr = () => 'INIT';
+const toast = t => toasts.push(t);
+const attesaRitardata = () => () => {};
+let tg;
+async function fetch(u, o){
+  chiamate.push([u, o.method, o.headers['X-Tg-Init-Data']]);
+  if (risposta === 'rete') throw new Error('rete');
+  return {ok: risposta.ok, json: async () => risposta.corpo};
+}
+""" + mini[_i:_j] + r"""
+function telegram(versione, initData){
+  return {initData, isVersionAtLeast: v => parseFloat(versione) >= parseFloat(v),
+          downloadFile(p, cb){ chiamate.push(['scarica', p.url, p.file_name]); cb(esito); },
+          openLink(u){ chiamate.push(['apri', u]); }};
+}
+async function caso(r, e){
+  toasts = []; chiamate = []; risposta = r; esito = e;
+  await allegatoDaTelegram(null, '/orders/7/contenuto', 'Istruzioni.pdf');
+  return {toasts, chiamate};
+}
+(async () => {
+  tg = telegram('8.0', 'x'); const dentro = scaricaConTelegram();
+  tg = telegram('7.10', 'x'); const vecchio = scaricaConTelegram();
+  tg = telegram('8.0', ''); const browser = scaricaConTelegram();
+  tg = telegram('8.0', 'x');
+  giro.push([dentro, vecchio, browser]);
+  giro.push(await caso({ok: true, corpo: {biglietto: 'B+1'}}, true));
+  giro.push(await caso({ok: true, corpo: {biglietto: 'B'}}, false));
+  giro.push(await caso({ok: false, corpo: {detail: 'Rivela prima il contenuto'}}, true));
+  giro.push(await caso('rete', true));
+  console.log(JSON.stringify(giro));
+})();
+"""
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("allegatoDaTelegram gira in node", "", _r.stderr[:300])
+        return
+    g = _js.loads(_r.stdout.strip())
+    prova("la app scarica solo dentro Telegram 8.0+, con initData vero",
+          [True, False, False], g[0])
+    prova("il biglietto si chiede con l'header, in POST", 
+          ["/api/orders/7/contenuto/biglietto", "POST", "INIT"],
+          g[1]["chiamate"][0])
+    prova("...e la app riceve l'URL assoluto col biglietto, e il nome",
+          ["scarica", "https://barattolo.store/api/orders/7/contenuto/"
+           "file?biglietto=B%2B1", "Istruzioni.pdf"], g[1]["chiamate"][1])
+    prova("«in download» si dice solo quando la app risponde si'",
+          [["📄 Documento in download: lo trovi tra i file scaricati"], []],
+          [g[1]["toasts"], g[2]["toasts"]])
+    prova("un rifiuto del server si DICE, e la app non parte",
+          (["Rivela prima il contenuto"], 1),
+          (g[3]["toasts"], len(g[3]["chiamate"])))
+    prova("...e la rete caduta pure, mai in silenzio",
+          ["Non riesco ad aprire il documento: riprova"], g[4]["toasts"])
+
+
 def prove_pdf_allegati():
     """I PDF DELLA CHAT FINO A 20 MB, RIPULITI, E IL CASSETTO CHE NON
     SCOPPIA (16 ott 2026, cantiere pdf-allegati, decisioni di Andrea).
@@ -183893,7 +184116,8 @@ def main():
               prove_assistente_bot,
               prove_relay_risolti,
               prove_certificati_relay,
-              prove_config_esempio):
+              prove_config_esempio,
+              prove_allegati_da_telegram):
         try:
             f()
         except Exception as e:

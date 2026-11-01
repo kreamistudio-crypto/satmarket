@@ -45440,8 +45440,10 @@ function bloccoFotoContenuto(o, c){
   if (visto && immagine) return `
     <div class="hint" style="margin-top:10px">🖼 ${esc(c.documentoNome||'Immagine del contenuto')}:</div>
     <img src="${visto}" alt="Immagine del contenuto" style="width:100%;border-radius:var(--radius);margin-top:6px;background:#fff">`;
+  /* un PDF non e' «un'immagine» (1 nov 2026: la scritta lo diceva di
+     qualsiasi file, e chi legge cerca una foto che non c'e') */
   return `
-    <div class="hint" style="margin-top:10px">🖼 Il venditore ha allegato un'immagine${c.documentoNome?': '+esc(c.documentoNome):''}.</div>
+    <div class="hint" style="margin-top:10px">${immagine?'🖼':'📄'} Il venditore ha allegato ${immagine?'un\'immagine':'un documento'}${c.documentoNome?': '+esc(c.documentoNome):''}.</div>
     <button class="btn ghost" style="margin-top:6px" onclick="apriFotoContenuto(this)">${immagine?'🖼 Mostra l\'immagine':'📄 Apri il documento'}</button>`;
 }
 
@@ -45480,9 +45482,52 @@ function ridisegnaDigitale(){
     el('digContenuto').value = scritto;
 }
 
+/* IL DOCUMENTO DENTRO TELEGRAM SI CHIEDE ALLA APP (1 nov 2026, dal
+   campo: GrapheneOS, «Documento scaricato» e nessun file). Il clic su
+   un `<a download>` con un URL `blob:` nella WebView Android di
+   Telegram non salva niente e non da' errore — e il toast, che partiva
+   subito dopo il clic, mentiva. Dentro Telegram recente il download lo
+   fa la app (`tg.downloadFile`, la strada dell'export che su Android
+   regge), con un biglietto di 5 minuti perche' la app bussa senza il
+   nostro header; e «in download» si dice SOLO quando la app risponde
+   di si'. Fuori da Telegram (PC, sito, .onion) resta il `<a download>`,
+   che li' funziona. Torna true se il gesto l'ha preso lei. */
+function scaricaConTelegram(){
+  return !!(tg?.initData && tg.isVersionAtLeast?.('8.0')
+            && typeof tg.downloadFile === 'function');
+}
+async function allegatoDaTelegram(btn, rotta, nome){
+  const ripristina = attesaRitardata(btn, 'Apro il documento…');
+  let r, d = {};
+  try {
+    r = await fetch(`${API_BASE}${rotta}/biglietto`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    d = await r.json().catch(()=>({}));
+  } catch(e) { r = null; }
+  ripristina();
+  if (!r || !r.ok || !d.biglietto) {
+    toast(d.detail || 'Non riesco ad aprire il documento: riprova'); return;
+  }
+  const base = API_BASE.startsWith('http') ? API_BASE : `${location.origin}${API_BASE}`;
+  const url = `${base}${rotta}/file?biglietto=${encodeURIComponent(d.biglietto)}`;
+  try {
+    tg.downloadFile({url, file_name: nome}, ok => {
+      if (ok) toast('📄 Documento in download: lo trovi tra i file scaricati');
+    });
+  } catch(e) {
+    /* downloadFile storto: il browser esterno scarica in modo nativo */
+    tg.openLink(url);
+  }
+}
+
 async function apriFotoContenuto(btn){
   haptic();
   const o = currentOrder, c = digDati[o.id];
+  if (!(c?.documentoTipo||'').startsWith('image/') && scaricaConTelegram()) {
+    await allegatoDaTelegram(btn, `/orders/${o.id}/contenuto`,
+                             c?.documentoNome || 'contenuto.pdf');
+    return;
+  }
   let url = digDocVisto[o.id];
   if (!url){
     const ripristina = attesaRitardata(btn, 'Apro l\'immagine…');
@@ -46942,6 +46987,12 @@ function annullaDocBusta(){ bustaDoc = null; openOrder(currentOrder.id); }
 async function apriDocBusta(btn){
   haptic();
   const o = currentOrder, b = bustaLetta[o.id];
+  /* dentro Telegram il PDF lo scarica la app: vedi `allegatoDaTelegram` */
+  if (!(b?.documentoTipo||'').startsWith('image/') && scaricaConTelegram()) {
+    await allegatoDaTelegram(btn, `/orders/${o.id}/busta-ritiro`,
+                             b?.documentoNome || 'ritiro.pdf');
+    return;
+  }
   let url = bustaDocVisto[o.id];
   if (!url){
     const ripristina = attesaRitardata(btn, 'Apro il documento…');
@@ -46958,7 +47009,9 @@ async function apriDocBusta(btn){
   /* l'immagine la disegna il pannello e finisce li'. Il PDF no, e
      dentro Telegram nemmeno una scheda nuova aiuta: un objectURL vive
      solo in QUESTA pagina, e `tg.openLink` lo passerebbe a un browser
-     che non lo sa leggere. Quindi lo si SCARICA, e lo si dice — un
+     che non lo sa leggere. Quindi lo si SCARICA (dentro Telegram
+     recente non si arriva qui: lo fa la app, vedi
+     `allegatoDaTelegram`), e lo si dice — un
      file che compare fra i download senza che nessuno lo annunci si
      legge come «non è successo niente». */
   if ((b?.documentoTipo||'').startsWith('image/')) { openOrder(o.id); return; }

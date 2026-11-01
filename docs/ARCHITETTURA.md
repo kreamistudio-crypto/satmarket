@@ -21900,6 +21900,31 @@
   si apre in una scheda nuova, ed è una limitazione vera: un objectURL
   vive solo in quella pagina e `tg.openLink` lo passerebbe a un browser
   che non lo sa leggere. Per questo il testo del form consiglia il QR.
+  IL PDF DENTRO TELEGRAM LO SCARICA LA APP (1 nov 2026, cantiere
+  allegati-android, dal campo: GrapheneOS, «Documento scaricato» e
+  nessun file da nessuna parte). Il `<a download>` su un URL `blob:`
+  nella WebView Android di Telegram non salva niente e non dà errore,
+  e il toast partiva subito dopo il clic: mentiva. Vale per il
+  documento di ritiro e per il file del contenuto digitale
+  (`apriDocBusta`, `apriFotoContenuto`). Dentro Telegram 8.0+ con
+  initData vero (`scaricaConTelegram()`) un PDF passa da
+  `allegatoDaTelegram`: `POST /api/orders/{id}/busta-ritiro/biglietto`
+  (o `/contenuto/biglietto`) stacca un BIGLIETTO di 5 minuti, poi
+  `tg.downloadFile` con `…/file?biglietto=…` — la strada dell'export,
+  che su Android regge. Il biglietto è legato a UN ordine e a UN
+  allegato (`BIGLIETTI_ALLEGATI`, in memoria, tetto 1000), NON è
+  monouso (la sonda HEAD di Telegram, poi il GET: anche le due rotte
+  `/file` rispondono a HEAD), e lo scaduto, l'inventato e quello d'un
+  altro allegato rispondono lo stesso 410. LE REGOLE NON SI COPIANO: il
+  POST chiama la rotta dei byte vera prima di staccarlo (chi non può
+  leggerli non riceve un link, e il 400/404/503 torna alla pagina, che
+  lo dice), e il GET col biglietto rifà tutte le guardie col tg_id del
+  biglietto. Col biglietto il file esce `attachment`, senza `inline`.
+  «In download» si dice SOLO quando la app risponde sì. Le immagini
+  restano disegnate in pagina, e fuori da Telegram (PC, sito, .onion)
+  resta il `<a download>`, che lì funziona. È l'unica porta sui byte
+  della credenziale che non chiede initData: 32 byte casuali, 5
+  minuti, staccati solo da chi l'header l'ha mostrato.
   IL CODICE COMPARE DENTRO IL BOTTONE (ago 2026, tre cose dal campo in
   un cantiere solo). 1) IL SALTO: toccare «Mostra» riportava la pagina
   in cima, e chi aveva appena chiesto il codice si ritrovava
