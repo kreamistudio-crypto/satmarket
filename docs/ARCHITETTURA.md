@@ -23872,6 +23872,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ma un gesto che cancella tutto in una volta no. Una pagina sulla
   privacy che tace su cosa non c'è ancora è la prima a non meritare
   fiducia.
+  Dal 1 nov 2026 (cantiere cancella-account) quella frase ha una
+  GEMELLA nascosta, `#privCancellaSi`, che dice che il gesto c'è e cosa
+  teniamo (l'impronta e le penalità P2P): le scambia la lettura di
+  `/api/me` con `account_cancellabile`, la stessa che accende la voce
+  nel Profilo. Leva spenta, la frase vecchia resta ed è vera.
   IL CONTATTO PER I DIRITTI È SUO (ago 2026, decisione di Andrea, e
   questa riga ROVESCIA quella di ieri — «il contatto è quello che
   ESISTE GIÀ, il canale del rodaggio: nessun secondo indirizzo da
@@ -34899,3 +34904,44 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `p2pOnchainCofirmeInAttesa`, chiamata da `onchainCofirmeInSottofondo`.
   Il collaudo del giro: `collaudo_p2p_onchain`; le sentinelle:
   `prove_p2p_onchain`.
+- LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026, cantiere cancella-account;
+  perché in CANTIERI, «La cancellazione dell'account»). Leva
+  `ACCOUNT_CANCELLABILE`, spenta di serie, nel pannello sotto «👥 Più
+  account». Il blocco sta IN FONDO a server.py («LA CANCELLAZIONE
+  DELL'ACCOUNT»). Due rotte: `GET /api/me/cancella-account` (gli impegni
+  che bloccano, cosa si perde, la parola da scrivere) e `POST` con
+  `{"conferma": "CANCELLA"}`; leva spenta = 404. IL GIUDICE UNICO DEGLI
+  IMPEGNI è `_impegni_cancellazione(con, tg_id)`: lo leggono il foglio e
+  di nuovo `esegui_cancellazione` DENTRO la transazione (`BEGIN
+  IMMEDIATE`), così fra la lettura e il gesto non s'infila un ordine.
+  Blocca: admin; ordini del mercatino non chiusi (anche da venditore,
+  con `SQL_NON_ANNULLATA_PAGATA`) o col pagamento in uscita verso di lui
+  non ancora `uscito`; ordini, rilanci e pagamenti `creato` di meno di
+  mezz'ora; puntate saldate vive e aste sue con puntate; rimborsi
+  d'asta da riscuotere; ordini P2P vivi negli ultimi 40 giorni, dispute
+  P2P aperte; on-chain e P2P on-chain vivi; swap, Cambio libero e
+  cambi P2P in volo. IL FANTASMA: l'utente diventa un id nuovo in
+  [2^52, 2^53) — sopra ogni id Telegram, lontano dai nativi Nostr
+  (negativi), sotto il 2^53 di JavaScript — con una riga in `utenti`
+  «Utente cancellato» (serve: `/api/orders` fa JOIN su utenti). Le
+  colonne che restano (ordini, recensioni scritte, pagamenti, esiti
+  P2P…) passano al fantasma con `CANCELLA_ANONIMIZZA`; quelle sue e
+  basta si cancellano con `CANCELLA_TOGLI`; i dati di spedizione da
+  compratore si svuotano con `CANCELLA_ORDINE_COMPRATORE`. Gli annunci
+  NON si cancellano mai (FTS e orfani): vanno a `rimosso` coi testi
+  svuotati, le foto restano solo se le usa un ordine o una puntata.
+  `notifica()` tace verso un fantasma. L'IMPRONTA: `impronta_account`
+  è scrypt dell'id con un sale fisso (`IMPRONTA_SALE`, ~77 ms), salvata
+  in `account_cancellati` col fantasma e la data; al rientro (in
+  `_upsert_da_telegram` per un id nuovo e in `crea_utente_nostr`)
+  `_riprendi_penalita` riporta all'id le sole righe di `p2p_esiti` in
+  `PENALITA_CHE_RESTANO` (`mancato`, `disputa_persa`). Il DB delle chat
+  perde buste, allegati, chiamate, letture, chiavi e scorte suoi. Dopo
+  il commit, `_dopo_cancellazione` toglie i file (foto, avatar, banner,
+  buste), ritira da Nostr gli annunci firmati dal server, toglie i post
+  dai canali e manda la lapide della reputazione. Nella Mini App: la
+  voce `#vocCancella` in «Privacy», il foglio `cancellaSheet`
+  (`apriCancellaAccount`, `renderCancella`, `cancellaAccount`) e il
+  saluto `salutoCancellato`, che spegne `fetch` per non far rinascere
+  l'account. Il collaudo: `collaudo_cancella_account` (con la
+  sentinella larga che cerca l'id vecchio in OGNI colonna dei due DB).

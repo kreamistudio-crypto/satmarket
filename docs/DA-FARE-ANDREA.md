@@ -233,3 +233,36 @@ va nel verbale (CANTIERI, «NON PROVATO»). In produzione la leva resta
 spenta finché Alan non ha rivisto le parti 2-di-3 e non c'è il parere
 MiCA. ATTENZIONE alle copie vecchie del config del collaudo: quelle di
 prima di oggi non hanno questa riga.
+
+## 6. La cancellazione dell'account sul collaudo (1 nov 2026, cantiere cancella-account, richiesta di Andrea)
+
+**Perché.** Il gesto «🗑 Cancella il mio account» è su `develop` dietro
+la leva `ACCOUNT_CANCELLABILE`, spenta di serie. Va guardato dal telefono
+sul collaudo prima di pensare alla produzione. Il perché di tutto:
+CANTIERI, «La cancellazione dell'account».
+
+**Sola lettura** (la riga non c'è già: deve dire `0`):
+```
+sudo grep -c "^ACCOUNT_CANCELLABILE" /srv/collaudo/barattolo/config.py
+```
+
+**Scrive**, dopo che il collaudo ha tirato `develop` con il cantiere. La
+copia di riserva, poi la riga, poi il riavvio:
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-cancella-account
+```
+```
+printf '\nACCOUNT_CANCELLABILE = True\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+Atteso 200. Poi, dal telefono, con un account di PROVA (mai il proprio
+admin: gli admin non si cancellano, e il foglio lo dice): Profilo →
+Privacy → «🗑 Cancella il mio account». Con un ordine in corso il foglio
+deve elencarlo senza bottone; senza niente in corso, scrivere CANCELLA e
+confermare. Il gesto NON si annulla. In produzione la leva resta spenta
+finché Andrea non dice sì, dopo la promozione.
